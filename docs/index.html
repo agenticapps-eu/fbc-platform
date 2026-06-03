@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FBC Plattform — Requirements & Design · Phase 1</title>
+<style>
+  :root{
+    --green:#0F5132; --green-d:#0A3D26; --gold:#C8A24B; --gold-d:#9C7D33;
+    --cream:#F6F4EE; --card:#FFFFFF; --ink:#1E1E1E; --mut:#6B7B73; --line:#E4E0D6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--cream);line-height:1.55}
+  a{color:var(--green-d)}
+  header.top{background:var(--green);color:#fff;padding:30px 20px 26px;text-align:center}
+  header.top .crown{font-size:13px;letter-spacing:4px;color:var(--gold);font-weight:700;text-transform:uppercase}
+  header.top h1{margin:8px 0 4px;font-size:30px;font-weight:800}
+  header.top p{margin:0;color:#D7E3DD;font-size:15px;max-width:760px;margin:6px auto 0}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 18px 120px}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 22px 8px;margin:18px 0;
+       box-shadow:0 2px 10px rgba(15,81,50,.05)}
+  .sec h2{font-size:20px;margin:0 0 2px;color:var(--green);display:flex;align-items:center;gap:10px}
+  .sec h2 .n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--gold);color:var(--green-d);
+       font-size:15px;font-weight:800;align-items:center;justify-content:center;flex:0 0 auto}
+  .sec .lead{color:var(--mut);font-size:14px;margin:2px 0 14px}
+  .q{margin:0 0 18px}
+  .q label.qt{display:block;font-weight:700;margin-bottom:6px;font-size:14.5px}
+  .q .hint{color:var(--mut);font-size:12.5px;margin:-4px 0 8px}
+  input[type=text],input[type=email],textarea,select{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;
+    background:#fff;color:var(--ink)}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,162,75,.18)}
+  .opts{display:flex;flex-wrap:wrap;gap:8px}
+  .opts label{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;
+    padding:8px 12px;font-size:13.5px;cursor:pointer;background:#fff}
+  .opts label:hover{border-color:var(--gold)}
+  .opts input{accent-color:var(--green)}
+  .scale label{min-width:96px;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .assume{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px;background:#FCFBF7}
+  .assume .at{font-weight:600;font-size:14px;margin-bottom:8px}
+  /* design themes */
+  .themes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:620px){.themes{grid-template-columns:1fr}}
+  .theme{border:2px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;transition:.15s;position:relative}
+  .theme:hover{border-color:var(--gold)}
+  .theme.sel{border-color:var(--green);box-shadow:0 0 0 3px rgba(15,81,50,.15)}
+  .theme .pv{height:128px;position:relative}
+  .theme .bar{height:30px;display:flex;align-items:center;padding:0 12px;font-size:12px;font-weight:700;color:#fff}
+  .theme .body{padding:12px}
+  .theme .mock-card{border-radius:8px;padding:9px 10px;margin-top:8px;font-size:11px}
+  .theme .btn{display:inline-block;margin-top:8px;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700}
+  .theme .meta{padding:10px 14px 14px;display:flex;align-items:flex-start;gap:10px}
+  .theme .meta input{margin-top:3px;accent-color:var(--green)}
+  .theme .meta .tn{font-weight:800;font-size:15px}
+  .theme .meta .td{font-size:12.5px;color:var(--mut)}
+  .swatches{display:flex;gap:5px;margin-top:6px}
+  .sw{width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.08)}
+  .bar-actions{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+    padding:12px 18px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;z-index:20}
+  .btnp{background:var(--green);color:#fff;border:none;padding:12px 22px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+  .btnp:hover{background:var(--green-d)}
+  .btns{background:#fff;color:var(--green);border:1.5px solid var(--green);padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+  .btns:hover{background:#f0f4f2}
+  .note{font-size:12px;color:var(--mut)}
+  .msg{max-width:860px;margin:0 auto;padding:0 18px}
+  .ok{background:#0F5132;color:#fff;border-radius:12px;padding:18px 20px;margin:18px 0;display:none}
+  .ok.show{display:block}
+  .req{color:var(--gold-d);font-weight:700}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="crown">FAIR BUSINESS CLUB</div>
+  <h1>Requirements &amp; Design — Phase 1</h1>
+  <p>Dieser kurze Fragebogen schärft den Prototyp-Umfang, prüft ein paar Annahmen und lässt dich eine Designrichtung wählen. ~10–15 Minuten. Am Ende auf „Absenden“ — die Antworten kommen direkt bei Donald an.</p>
+</header>
+
+<div class="msg"><div class="ok" id="ok">✅ Danke, Detlev! Deine Antworten sind angekommen. Donald meldet sich mit dem nächsten Schritt.</div></div>
+
+<form id="f" class="wrap">
+  <!-- A -->
+  <div class="sec">
+    <h2><span class="n">A</span> Kontext &amp; Ziele</h2>
+    <p class="lead">Damit der Prototyp das Richtige beweist.</p>
+    <div class="q"><label class="qt">Der wichtigste Zweck der Plattform — in einem Satz</label>
+      <input type="text" name="A_zweck" placeholder="z. B. Unternehmer im Vertrauensraum so verbinden, dass echte Deals entstehen."></div>
+    <div class="q"><label class="qt">Wer ist das ideale erste Mitglied?</label>
+      <input type="text" name="A_zielmitglied" placeholder="z. B. etablierte Unternehmer & Investoren aus der Region Stuttgart"></div>
+    <div class="q"><label class="qt">Woran würdest du den Prototyp als „Erfolg“ messen?</label>
+      <textarea name="A_erfolg" placeholder="z. B. „Ich sehe für mein Profil 3 sinnvolle Matches und kann Kontakt aufnehmen.“"></textarea></div>
+  </div>
+
+  <!-- B -->
+  <div class="sec">
+    <h2><span class="n">B</span> Mitgliedsstufen</h2>
+    <p class="lead">Im Konzept (7-stufig) und im Handbuch (kürzer) stehen unterschiedliche Modelle — wir brauchen ein verbindliches.</p>
+    <div class="q"><label class="qt">Welche Staffelung gilt verbindlich?</label>
+      <div class="opts" >
+        <label><input type="radio" name="B_modell" value="7-stufig (Discover→Explore→Impuls→Active→Prime→Circle→Legacy)"> 7-stufig (Konzept)</label>
+        <label><input type="radio" name="B_modell" value="kürzer (Free/Active/Impuls/Prime/Circle/Legacy)"> kürzer (Handbuch)</label>
+        <label><input type="radio" name="B_modell" value="anders – siehe Kommentar"> anders</label>
+      </div></div>
+    <div class="q"><label class="qt">Finale Stufen + Jahrespreise (frei eintragen)</label>
+      <textarea name="B_stufen" placeholder="z. B. Discover 0 € · Explore 150 € · Impuls 300 € · Active 600 € · Prime 1.200 € · Circle 2.400 € · Legacy 4.800 €"></textarea></div>
+    <div class="q"><label class="qt">Welche 2–3 Stufen sollen im Prototyp gezeigt werden (Zugriffs-Unterschiede)?</label>
+      <input type="text" name="B_proto_stufen" placeholder="z. B. Free vs. Prime vs. Legacy"></div>
+  </div>
+
+  <!-- C -->
+  <div class="sec">
+    <h2><span class="n">C</span> Mitgliederprofil</h2>
+    <p class="lead">Das Profil ist die Bühne jedes Mitglieds.</p>
+    <div class="q"><label class="qt">Welche Felder muss ein Profil haben?</label>
+      <textarea name="C_felder" placeholder="z. B. Name, Foto, Unternehmen, Branche, Region, Kompetenzen, „Ich suche“, „Ich biete“, Projekte, Videos, Links"></textarea></div>
+    <div class="q"><label class="qt">Was ist öffentlich sichtbar, was nur für eingeloggte Mitglieder?</label>
+      <textarea name="C_sichtbarkeit" placeholder="z. B. Name/Branche öffentlich; Kontaktdaten & „Suche/Biete“ nur für Mitglieder"></textarea></div>
+    <div class="q"><label class="qt">Der „Score“ im Profil — was soll er aussagen / woraus berechnet er sich?</label>
+      <div class="hint">In den Mockups gibt es einen Score-Radar und Impact-Werte. Damit wir wissen, ob es echt berechnet oder erstmal dekorativ ist.</div>
+      <textarea name="C_score" placeholder="z. B. Vollständigkeit des Profils + Aktivität + Empfehlungen; oder: erstmal nur visuell im Prototyp"></textarea></div>
+  </div>
+
+  <!-- D -->
+  <div class="sec">
+    <h2><span class="n">D</span> Matching — das Herzstück</h2>
+    <p class="lead">Hier steckt der eigentliche Wert. Je klarer, desto besser der Prototyp.</p>
+    <div class="q"><label class="qt">Welche Match-Typen soll es geben?</label>
+      <div class="opts">
+        <label><input type="checkbox" name="D_typen" value="Mensch ↔ Mensch"> Mensch ↔ Mensch</label>
+        <label><input type="checkbox" name="D_typen" value="Unternehmer ↔ Investor/Kapital"> Unternehmer ↔ Kapital</label>
+        <label><input type="checkbox" name="D_typen" value="Projekt ↔ Investor"> Projekt ↔ Investor</label>
+        <label><input type="checkbox" name="D_typen" value="Immobilie ↔ Käufer"> Immobilie ↔ Käufer</label>
+        <label><input type="checkbox" name="D_typen" value="Suche ↔ Experte/Dienstleister"> Suche ↔ Experte</label>
+      </div></div>
+    <div class="q"><label class="qt">Welche Angaben sollen ein Match bestimmen?</label>
+      <textarea name="D_attribute" placeholder="z. B. Branche, Region, „Ich suche / Ich biete“-Tags, Volumen/Ticketgröße, Mitgliedsstufe"></textarea></div>
+    <div class="q"><label class="qt">Wie „intelligent“ soll das Matching im Prototyp sein?</label>
+      <div class="opts">
+        <label><input type="radio" name="D_intelligenz" value="Regelbasiert (Score aus Tags/Attributen)"> Regelbasiert (empfohlen für Prototyp)</label>
+        <label><input type="radio" name="D_intelligenz" value="KI-/Text-basiert (semantisch)"> KI-/semantisch</label>
+        <label><input type="radio" name="D_intelligenz" value="Egal – Hauptsache es wirkt im Demo"> egal, Hauptsache überzeugend</label>
+      </div></div>
+    <div class="q"><label class="qt">Was passiert, wenn zwei zusammenpassen?</label>
+      <textarea name="D_aktion" placeholder="z. B. Match wird mit % angezeigt → Kontaktanfrage senden → optional FBC Transaction Manager einschalten"></textarea></div>
+  </div>
+
+  <!-- E -->
+  <div class="sec">
+    <h2><span class="n">E</span> Community, Feed &amp; Events</h2>
+    <div class="q"><label class="qt">Wie viel davon braucht der <em>Prototyp</em> schon?</label>
+      <div class="opts">
+        <label><input type="radio" name="E_umfang" value="Nur angedeutet (Liste/Platzhalter)"> nur angedeutet</label>
+        <label><input type="radio" name="E_umfang" value="Feed: Beiträge posten + Events-Liste funktionsfähig"> Feed + Events funktionsfähig</label>
+        <label><input type="radio" name="E_umfang" value="Voll inkl. Gruppen/Kommentare"> voll (inkl. Gruppen)</label>
+      </div></div>
+    <div class="q"><label class="qt">Sonstige Wünsche zu Community/Events?</label>
+      <textarea name="E_kommentar" placeholder="optional"></textarea></div>
+  </div>
+
+  <!-- F -->
+  <div class="sec">
+    <h2><span class="n">F</span> Marke, Inhalte &amp; Bestand</h2>
+    <div class="grid2">
+      <div class="q"><label class="qt">Logo &amp; Brand-Assets vorhanden?</label>
+        <div class="opts">
+          <label><input type="radio" name="F_brand" value="Ja, liegt vor"> Ja</label>
+          <label><input type="radio" name="F_brand" value="Teilweise"> teilweise</label>
+          <label><input type="radio" name="F_brand" value="Nein, brauche Unterstützung"> Nein</label>
+        </div></div>
+      <div class="q"><label class="qt">Domain für den Prototyp</label>
+        <input type="text" name="F_domain" placeholder="z. B. app.fairbusinessclub.de oder Subdomain"></div>
+    </div>
+    <div class="q"><label class="qt">Sollen bestehende Odoo-Daten (Kontakte/Abos) später migriert werden?</label>
+      <div class="opts">
+        <label><input type="radio" name="F_migration" value="Ja, migrieren"> Ja</label>
+        <label><input type="radio" name="F_migration" value="Nein, frischer Start"> Nein, frisch</label>
+        <label><input type="radio" name="F_migration" value="Unklar"> unklar</label>
+      </div></div>
+  </div>
+
+  <!-- G -->
+  <div class="sec">
+    <h2><span class="n">G</span> Annahmen-Check</h2>
+    <p class="lead">Stimmen diese Annahmen aus meinem Vorschlag? (Stimmt / Eher / Nein + optional Kommentar)</p>
+    <div id="assumptions"></div>
+  </div>
+
+  <!-- H -->
+  <div class="sec">
+    <h2><span class="n">H</span> Designrichtung</h2>
+    <p class="lead">Vier Richtungen — bewusst <strong>kein Blau</strong> (steht für Finanzen). Wähle, was sich am meisten nach FBC anfühlt. Farben werden später feinjustiert.</p>
+    <div class="themes" id="themes"></div>
+    <div class="q" style="margin-top:14px"><label class="qt">Kommentar zur Designrichtung (Stil, Vorbilder, No-Gos)</label>
+      <textarea name="H_kommentar" placeholder="z. B. „edel & ruhig wie ein Members-Club“, Logo-Gold soll vorkommen, lieber hell als dunkel …"></textarea></div>
+  </div>
+
+  <!-- Abschluss -->
+  <div class="sec">
+    <h2><span class="n">✓</span> Abschluss</h2>
+    <div class="grid2">
+      <div class="q"><label class="qt">Dein Name</label><input type="text" name="Z_name" value="Detlev Krause"></div>
+      <div class="q"><label class="qt">E-Mail (für Rückfragen)</label><input type="email" name="Z_email" placeholder="detlev.krause@fairbusinessclub.de"></div>
+    </div>
+    <div class="q"><label class="qt">Sonst noch etwas Wichtiges?</label>
+      <textarea name="Z_sonstiges" placeholder="optional"></textarea></div>
+  </div>
+</form>
+
+<div class="bar-actions">
+  <button class="btnp" id="submit">Absenden</button>
+  <button class="btns" id="dl" type="button">Als Markdown speichern</button>
+  <button class="btns" id="cp" type="button">Antworten kopieren</button>
+  <span class="note">Antworten gehen an Donald (Formspree). Markdown-Export als Sicherung.</span>
+</div>
+
+<script>
+  // ===== CONFIG: Formspree-Endpoint hier eintragen (https://formspree.io/f/XXXXXXXX) =====
+  const FORMSPREE_ENDPOINT = "https://formspree.io/f/REPLACE_WITH_FORM_ID";
+
+  const ASSUMPTIONS = [
+    "Das Matching ist das Herzstück und hat in Phase 1 Vorrang vor Academy/Library/Forum.",
+    "Videos werden nur eingebettet (YouTube/Vimeo) — kein eigenes Hosting.",
+    "Zugänge/Funktionen werden je Mitgliedsstufe gestaffelt (Rollen & Rechte).",
+    "Im Prototyp wird noch nicht bezahlt (Stripe erst Phase 2); Stufen werden manuell gesetzt.",
+    "Start mit Stuttgart, danach Ausrollen in weitere Städte.",
+    "Odoo bleibt höchstens als Back-Office im Hintergrund; das Schaufenster wird die neue Plattform.",
+    "Mitglieder sind primär Unternehmer, Experten und Investoren im DACH-Raum."
+  ];
+  const THEMES = [
+    {id:"smaragd", name:"Smaragd & Gold", desc:"Edel, vertraut, Members-Club. Knüpft an euer Logo-Gold an.",
+     primary:"#0F5132", accent:"#C8A24B", bg:"#F6F4EE", text:"#143A2E", btnText:"#143A2E"},
+    {id:"anthrazit", name:"Anthrazit & Bernstein", desc:"Modern-premium, ruhig, dunkel. Tech-seriös ohne Blau.",
+     primary:"#22262B", accent:"#E0A458", bg:"#F3F1EC", text:"#22262B", btnText:"#22262B"},
+    {id:"terrakotta", name:"Terrakotta & Salbei", desc:"Warm, menschlich, einladend. Beziehung vor Technik.",
+     primary:"#B85042", accent:"#7E9886", bg:"#F4EFE7", text:"#5A2B23", btnText:"#FFFFFF"},
+    {id:"aubergine", name:"Aubergine & Champagner", desc:"Exklusiv, distinktiv, hochwertig. Hebt sich klar ab.",
+     primary:"#4A2545", accent:"#C9A66B", bg:"#F5F0EA", text:"#3A1C36", btnText:"#3A1C36"}
+  ];
+
+  // build assumptions
+  const aWrap=document.getElementById('assumptions');
+  ASSUMPTIONS.forEach((t,i)=>{
+    const d=document.createElement('div'); d.className='assume';
+    d.innerHTML=`<div class="at">${i+1}. ${t}</div>
+      <div class="opts scale">
+        <label><input type="radio" name="G_a${i+1}" value="Stimmt"> Stimmt</label>
+        <label><input type="radio" name="G_a${i+1}" value="Eher ja"> Eher ja</label>
+        <label><input type="radio" name="G_a${i+1}" value="Eher nein"> Eher nein</label>
+        <label><input type="radio" name="G_a${i+1}" value="Stimmt nicht"> Stimmt nicht</label>
+      </div>
+      <input type="text" name="G_a${i+1}_kommentar" placeholder="Kommentar (optional)" style="margin-top:8px">`;
+    aWrap.appendChild(d);
+  });
+
+  // build themes
+  const tWrap=document.getElementById('themes');
+  THEMES.forEach((th,i)=>{
+    const el=document.createElement('label'); el.className='theme'; el.dataset.id=th.id;
+    el.innerHTML=`
+      <div class="pv" style="background:${th.bg}">
+        <div class="bar" style="background:${th.primary}">Fair Business Club</div>
+        <div class="body">
+          <div class="mock-card" style="background:#fff;border:1px solid rgba(0,0,0,.08);color:${th.text}">
+            <strong>Maximilian Bauer</strong> · Prime<br>Top-Match <b style="color:${th.accent}">92%</b>
+            <span class="btn" style="background:${th.accent};color:${th.btnText}">Kontakt</span>
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <input type="radio" name="H_design" value="${th.name}">
+        <div><div class="tn" style="color:${th.primary}">${th.name}</div>
+          <div class="td">${th.desc}</div>
+          <div class="swatches">
+            <span class="sw" style="background:${th.primary}"></span>
+            <span class="sw" style="background:${th.accent}"></span>
+            <span class="sw" style="background:${th.bg}"></span>
+          </div>
+        </div>
+      </div>`;
+    el.addEventListener('click',()=>{
+      document.querySelectorAll('.theme').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel'); el.querySelector('input').checked=true;
+    });
+    tWrap.appendChild(el);
+  });
+
+  // ===== collect answers =====
+  function labelFor(name){
+    const map={A_zweck:"Zweck (1 Satz)",A_zielmitglied:"Ideales Erstmitglied",A_erfolg:"Erfolgskriterium",
+      B_modell:"Stufen-Modell",B_stufen:"Finale Stufen + Preise",B_proto_stufen:"Stufen im Prototyp",
+      C_felder:"Profilfelder",C_sichtbarkeit:"Öffentlich vs. Mitglieder",C_score:"Score-Bedeutung",
+      D_typen:"Match-Typen",D_attribute:"Match-Attribute",D_intelligenz:"Matching-Intelligenz",D_aktion:"Aktion bei Match",
+      E_umfang:"Community/Events-Umfang",E_kommentar:"Community-Kommentar",
+      F_brand:"Brand-Assets",F_domain:"Domain",F_migration:"Odoo-Migration",
+      H_design:"Gewählte Designrichtung",H_kommentar:"Design-Kommentar",
+      Z_name:"Name",Z_email:"E-Mail",Z_sonstiges:"Sonstiges"};
+    return map[name]||name;
+  }
+  function gather(){
+    const f=document.getElementById('f');
+    const data={};
+    // text/textarea/select/email
+    f.querySelectorAll('input[type=text],input[type=email],textarea,select').forEach(el=>{
+      if(el.value.trim()) data[el.name]=el.value.trim();
+    });
+    // radios
+    f.querySelectorAll('input[type=radio]:checked').forEach(el=>{ data[el.name]=el.value; });
+    // checkboxes (group)
+    const cb={};
+    f.querySelectorAll('input[type=checkbox]:checked').forEach(el=>{ (cb[el.name]=cb[el.name]||[]).push(el.value); });
+    Object.keys(cb).forEach(k=>data[k]=cb[k].join(", "));
+    return data;
+  }
+  function toMarkdown(d){
+    let m="# FBC Plattform — Requirements & Design (Phase 1)\n\n_Ausgefüllt: "+new Date().toLocaleString('de-DE')+"_\n\n";
+    const order=["A_zweck","A_zielmitglied","A_erfolg","B_modell","B_stufen","B_proto_stufen",
+      "C_felder","C_sichtbarkeit","C_score","D_typen","D_attribute","D_intelligenz","D_aktion",
+      "E_umfang","E_kommentar","F_brand","F_domain","F_migration"];
+    order.forEach(k=>{ if(d[k]) m+="**"+labelFor(k)+":** "+d[k]+"\n\n"; });
+    m+="## Annahmen-Check\n\n";
+    for(let i=1;i<=7;i++){ const v=d["G_a"+i]||"—"; const c=d["G_a"+i+"_kommentar"]?(" — "+d["G_a"+i+"_kommentar"]):"";
+      m+= i+". "+v+c+"\n"; }
+    m+="\n## Design\n\n";
+    if(d.H_design) m+="**Gewählt:** "+d.H_design+"\n\n";
+    if(d.H_kommentar) m+="**Kommentar:** "+d.H_kommentar+"\n\n";
+    m+="## Kontakt\n\n";
+    ["Z_name","Z_email","Z_sonstiges"].forEach(k=>{ if(d[k]) m+="**"+labelFor(k)+":** "+d[k]+"\n\n"; });
+    return m;
+  }
+  function download(){
+    const md=toMarkdown(gather());
+    const b=new Blob([md],{type:"text/markdown"}); const u=URL.createObjectURL(b);
+    const a=document.createElement('a'); a.href=u; a.download="FBC_Requirements_Detlev.md"; a.click(); URL.revokeObjectURL(u);
+  }
+  document.getElementById('dl').onclick=download;
+  document.getElementById('cp').onclick=async()=>{
+    try{ await navigator.clipboard.writeText(toMarkdown(gather())); document.getElementById('cp').textContent="✓ Kopiert"; }
+    catch(e){ alert("Kopieren nicht möglich – bitte „Als Markdown speichern“ nutzen."); }
+  };
+  document.getElementById('submit').onclick=async(e)=>{
+    e.preventDefault();
+    const d=gather(); d["zusammenfassung_markdown"]=toMarkdown(d); d["_subject"]="FBC Requirements – Detlev Krause";
+    const btn=document.getElementById('submit'); btn.textContent="Sende…"; btn.disabled=true;
+    if(FORMSPREE_ENDPOINT.includes("REPLACE_WITH_FORM_ID")){
+      btn.disabled=false; btn.textContent="Absenden";
+      alert("Hinweis für Donald: Formspree-Endpoint ist noch nicht gesetzt.\nAntworten wurden als Markdown heruntergeladen – bitte stattdessen den Endpoint eintragen.");
+      download(); return;
+    }
+    try{
+      const r=await fetch(FORMSPREE_ENDPOINT,{method:"POST",headers:{"Accept":"application/json"},body:JSON.stringify(d)});
+      if(r.ok){ document.getElementById('ok').classList.add('show'); window.scrollTo({top:0,behavior:'smooth'}); }
+      else{ throw new Error("HTTP "+r.status); }
+    }catch(err){
+      alert("Senden fehlgeschlagen. Bitte „Als Markdown speichern“ und an Donald schicken."); download();
+    }finally{ btn.textContent="Absenden"; btn.disabled=false; }
+  };
+</script>
+</body>
+</html>
