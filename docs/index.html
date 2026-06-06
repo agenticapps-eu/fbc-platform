@@ -218,7 +218,7 @@
 
 <script>
   // ===== CONFIG: Formspree-Endpoint hier eintragen (https://formspree.io/f/XXXXXXXX) =====
-  const FORMSPREE_ENDPOINT = "https://formspree.io/f/DEINE_ID";
+  const FORMSPREE_ENDPOINT = "https://formspree.io/f/mdavabyr";
 
   const ASSUMPTIONS = [
     "Das Matching ist das Herzstück und hat in Phase 1 Vorrang vor Academy/Library/Forum.",
@@ -344,7 +344,7 @@
     e.preventDefault();
     const d=gather(); d["zusammenfassung_markdown"]=toMarkdown(d); d["_subject"]="FBC Requirements – Detlev Krause";
     const btn=document.getElementById('submit'); btn.textContent="Sende…"; btn.disabled=true;
-    if(FORMSPREE_ENDPOINT.includes("REPLACE_WITH_FORM_ID")){
+    if(!/^https:\/\/formspree\.io\/f\/[a-z0-9]{8}$/i.test(FORMSPREE_ENDPOINT)){
       btn.disabled=false; btn.textContent="Absenden";
       alert("Hinweis für Donald: Formspree-Endpoint ist noch nicht gesetzt.\nAntworten wurden als Markdown heruntergeladen – bitte stattdessen den Endpoint eintragen.");
       download(); return;
