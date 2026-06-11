@@ -1,8 +1,17 @@
+import { Route, Routes } from "react-router-dom";
+import AppShell from "./components/AppShell";
+import { navItems } from "./config/nav";
+import LoginPage from "./pages/LoginPage";
+
 export default function App() {
   return (
-    <main>
-      <h1>Fair Business Club</h1>
-      <p>Prototyp – Phase 1. Community-Ebene (Discover / Prime / Legacy).</p>
-    </main>
+    <Routes>
+      <Route element={<AppShell />}>
+        {navItems.map(({ path, Component }) => (
+          <Route key={path} path={path} element={<Component />} />
+        ))}
+      </Route>
+      <Route path="/login" element={<LoginPage />} />
+    </Routes>
   );
 }
