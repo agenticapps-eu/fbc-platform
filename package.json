@@ -5,9 +5,11 @@
   "type": "module",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "infisical run --env=dev -- vite",
     "build": "tsc --noEmit && vite build",
+    "build:prod": "tsc --noEmit && infisical run --env=prod -- vite build",
     "preview": "vite preview",
+    "db:push": "infisical run --env=dev -- supabase db push",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
