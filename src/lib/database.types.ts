@@ -8,6 +8,54 @@ export type Database = {
   };
   public: {
     Tables: {
+      compass_responses: {
+        Row: {
+          answers: Json | null;
+          created_at: string;
+          id: string;
+          potential_level: string | null;
+          profile_id: string;
+          routing: string | null;
+          theme: string | null;
+          tx_volume_band: string | null;
+        };
+        Insert: {
+          answers?: Json | null;
+          created_at?: string;
+          id?: string;
+          potential_level?: string | null;
+          profile_id: string;
+          routing?: string | null;
+          theme?: string | null;
+          tx_volume_band?: string | null;
+        };
+        Update: {
+          answers?: Json | null;
+          created_at?: string;
+          id?: string;
+          potential_level?: string | null;
+          profile_id?: string;
+          routing?: string | null;
+          theme?: string | null;
+          tx_volume_band?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compass_responses_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "compass_responses_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       membership_tiers: {
         Row: {
           key: string;
@@ -26,6 +74,21 @@ export type Database = {
           label?: string;
           level_rank?: number;
           price_year?: number;
+        };
+        Relationships: [];
+      };
+      partner_categories: {
+        Row: {
+          key: string;
+          label: string;
+        };
+        Insert: {
+          key: string;
+          label: string;
+        };
+        Update: {
+          key?: string;
+          label?: string;
         };
         Relationships: [];
       };
