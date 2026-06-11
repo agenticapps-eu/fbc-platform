@@ -85,3 +85,51 @@ session-level discipline the model brings to every diff.
 This project uses the AgenticApps Superpowers + GSD + gstack workflow.
 Full hooks, rituals, and red-flag tables: [`.claude/claude-md/workflow.md`](.claude/claude-md/workflow.md).
 Vendored — re-sync via `/update-agenticapps-workflow`.
+
+## Projektkonventionen
+
+- Arbeite in kleinen, überprüfbaren Schritten.
+- Verwende TypeScript strict, pnpm, Conventional Commits.
+- Schreibe keine Secrets ins Repo (nur `.env.example` mit Platzhaltern).
+- Referenziere in jeder Commit-Message das zugehörige Linear-Issue (z. B. `AGE-234`).
+- Aktualisiere den Status des Issues in Linear (In Progress → Done) über das Linear-MCP.
+- Stoppe nach jedem Prompt und fasse zusammen, was getan wurde und wie ich es verifiziere.
+
+### Branches & Commits
+
+- **Conventional Commits** für jede Commit-Message, mit Linear-Issue-Referenz
+  (z. B. `feat: matching ui (AGE-241)`).
+- **Branch-Namen im Linear-Format**: `<owner>/<issue>-<kurzbeschreibung>`,
+  z. B. `donald/age-234-matching-ui`. Keine direkten Commits auf `main` —
+  immer Feature-Branch + PR.
+
+## Projektüberblick
+
+Die **Fair-Business-Club-Plattform (FBC)** ist auf drei Ebenen angelegt. Im
+**Prototyp (Phase 1)** wird nur **Ebene 1** gebaut; die Ebenen 2 und 3 werden
+architektonisch vorbereitet (Datenmodell, RLS-Policies und Rollen so geschnitten,
+dass sie später ohne Bruch erweiterbar sind), aber noch nicht implementiert.
+
+1. **FBC Community** *(Prototyp)* — das soziale Business-Netzwerk: Mitglieder,
+   Profile, Mitgliedsstufen, Suche ⇄ Biete / Matching.
+2. **Potential Ecosystem** *(vorbereitet)* — erweitertes Partner-/Angebots-Ökosystem.
+3. **DKRI** *(vorbereitet)* — oberste Ebene; spätere Integration.
+
+## Kernprinzipien
+
+- **Rechte nach Mitgliedsstufe**: Was ein Nutzer sehen und tun darf, richtet sich
+  nach seiner Mitgliedsstufe.
+- **Sichtbarkeit wird in der DB per RLS erzwungen**, nicht nur im Frontend. Das
+  Frontend ist Komfort, nicht Sicherheitsgrenze — jede Zugriffsregel muss als
+  Supabase-RLS-Policy existieren und unabhängig vom Client greifen.
+- **Keine automatische Freigabe von Kontaktdaten**. Kontaktdaten werden nie
+  implizit sichtbar; ihre Offenlegung erfordert eine explizite Aktion/Zustimmung.
+
+## Datenmodell & Mitgliedsstufen
+
+- Das **Datenmodell** (Tabellen) folgt der Spezifikation aus **P4** der
+  Anforderungs-/Designphase. Die Tabellen werden bei der Supabase-Einführung
+  als Migrationen unter `supabase/` angelegt; RLS-Policies begleiten jede Tabelle.
+- **Mitgliedsstufen im Prototyp**: **Discover** → **Prime** → **Legacy**
+  (aufsteigende Rechte/Sichtbarkeit). Die Stufen-Logik ist die Grundlage der
+  RLS-Policies und der UI-Gating-Regeln.

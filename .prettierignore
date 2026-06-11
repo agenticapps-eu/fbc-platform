@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+pnpm-lock.yaml
+docs
+.planning
+.claude
+# CLAUDE.md contains the verbatim spec §11 block — must not be reformatted.
+CLAUDE.md

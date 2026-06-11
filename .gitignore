@@ -1,8 +1,12 @@
 node_modules/
 dist/
+coverage/
 .env
 .env.*
+!.env.example
+*.local
 .DS_Store
 *.log
 .vscode/
 .idea/
+.wrangler/
