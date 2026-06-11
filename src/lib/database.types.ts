@@ -8,27 +8,45 @@ export type Database = {
   };
   public: {
     Tables: {
+      membership_tiers: {
+        Row: {
+          key: string;
+          label: string;
+          level_rank: number;
+          price_year: number;
+        };
+        Insert: {
+          key: string;
+          label: string;
+          level_rank: number;
+          price_year: number;
+        };
+        Update: {
+          key?: string;
+          label?: string;
+          level_rank?: number;
+          price_year?: number;
+        };
+        Relationships: [];
+      };
       profile_contacts: {
         Row: {
           email: string | null;
           phone: string | null;
           profile_id: string;
           updated_at: string;
-          website: string | null;
         };
         Insert: {
           email?: string | null;
           phone?: string | null;
           profile_id: string;
           updated_at?: string;
-          website?: string | null;
         };
         Update: {
           email?: string | null;
           phone?: string | null;
           profile_id?: string;
           updated_at?: string;
-          website?: string | null;
         };
         Relationships: [
           {
@@ -38,63 +56,121 @@ export type Database = {
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "profile_contacts_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
         ];
       };
       profiles: {
         Row: {
           avatar_url: string | null;
-          bio: string | null;
+          branche: string | null;
           company: string | null;
+          competencies: string[] | null;
           created_at: string;
-          display_name: string | null;
-          headline: string | null;
+          goals: string | null;
           id: string;
-          membership_level: Database["public"]["Enums"]["membership_level"];
-          potential_level: number | null;
-          routing_target: Database["public"]["Enums"]["routing_target"] | null;
-          tx_volume_band: string | null;
+          interests: string[] | null;
+          is_public: boolean;
+          name: string | null;
+          potential_score: number;
+          profile_completion: number;
+          region: string | null;
+          short_bio: string | null;
+          socials: Json | null;
+          tier: string;
           updated_at: string;
+          website: string | null;
         };
         Insert: {
           avatar_url?: string | null;
-          bio?: string | null;
+          branche?: string | null;
           company?: string | null;
+          competencies?: string[] | null;
           created_at?: string;
-          display_name?: string | null;
-          headline?: string | null;
+          goals?: string | null;
           id: string;
-          membership_level?: Database["public"]["Enums"]["membership_level"];
-          potential_level?: number | null;
-          routing_target?: Database["public"]["Enums"]["routing_target"] | null;
-          tx_volume_band?: string | null;
+          interests?: string[] | null;
+          is_public?: boolean;
+          name?: string | null;
+          potential_score?: number;
+          profile_completion?: number;
+          region?: string | null;
+          short_bio?: string | null;
+          socials?: Json | null;
+          tier?: string;
           updated_at?: string;
+          website?: string | null;
         };
         Update: {
           avatar_url?: string | null;
-          bio?: string | null;
+          branche?: string | null;
           company?: string | null;
+          competencies?: string[] | null;
           created_at?: string;
-          display_name?: string | null;
-          headline?: string | null;
+          goals?: string | null;
           id?: string;
-          membership_level?: Database["public"]["Enums"]["membership_level"];
-          potential_level?: number | null;
-          routing_target?: Database["public"]["Enums"]["routing_target"] | null;
-          tx_volume_band?: string | null;
+          interests?: string[] | null;
+          is_public?: boolean;
+          name?: string | null;
+          potential_score?: number;
+          profile_completion?: number;
+          region?: string | null;
+          short_bio?: string | null;
+          socials?: Json | null;
+          tier?: string;
           updated_at?: string;
+          website?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tier_fkey";
+            columns: ["tier"];
+            isOneToOne: false;
+            referencedRelation: "membership_tiers";
+            referencedColumns: ["key"];
+          },
+        ];
+      };
+    };
+    Views: {
+      profiles_public: {
+        Row: {
+          avatar_url: string | null;
+          company: string | null;
+          id: string | null;
+          name: string | null;
+          region: string | null;
+          short_bio: string | null;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          company?: string | null;
+          id?: string | null;
+          name?: string | null;
+          region?: string | null;
+          short_bio?: string | null;
+        };
+        Update: {
+          avatar_url?: string | null;
+          company?: string | null;
+          id?: string | null;
+          name?: string | null;
+          region?: string | null;
+          short_bio?: string | null;
         };
         Relationships: [];
       };
     };
-    Views: {
-      [_ in never]: never;
-    };
     Functions: {
-      [_ in never]: never;
+      current_tier_rank: { Args: never; Returns: number };
     };
     Enums: {
-      membership_level: "discover" | "prime" | "legacy";
-      routing_target: "fbc" | "dkri";
+      [_ in never]: never;
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -219,9 +295,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      membership_level: ["discover", "prime", "legacy"],
-      routing_target: ["fbc", "dkri"],
-    },
+    Enums: {},
   },
 } as const;
