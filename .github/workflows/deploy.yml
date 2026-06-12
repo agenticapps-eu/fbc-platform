@@ -41,7 +41,7 @@ jobs:
       - name: Load secrets from Infisical
         uses: Infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
         with:
-          method: universal-auth
+          method: universal
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
           project-slug: fbc-platform
