@@ -10,8 +10,10 @@ export interface AuthContextValue {
   tier: string | null;
   /** level_rank der Mitgliedsstufe (discover=1 … legacy=7). null wenn ausgeloggt. */
   levelRank: number | null;
-  /** true bis Session und Profil beim Start (oder nach einem Wechsel) geladen sind. */
+  /** true bis die Session beim Start aufgelöst ist (nur Session, nicht das Profil). */
   isLoading: boolean;
+  /** true während für den eingeloggten Nutzer tier/level_rank nachgeladen werden. */
+  tierLoading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;

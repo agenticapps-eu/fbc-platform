@@ -2,7 +2,18 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App from "../App";
+import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
+
+/** Eingeloggt, aber tier/level_rank werden noch geladen (Profil-Fetch offen). */
+function authLoadingTier(): AuthContextValue {
+  return fakeAuthValue({
+    user: { id: "test-user" } as AuthContextValue["user"],
+    tier: null,
+    levelRank: null,
+    tierLoading: true,
+  });
+}
 
 function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"]) {
   return render(
@@ -54,5 +65,22 @@ describe("Auth-Gating für /mein-bereich", () => {
     renderAt("/mein-bereich", authAsTier("discover"));
 
     expect(screen.getByRole("heading", { name: "Mein Bereich" })).toBeInTheDocument();
+  });
+
+  it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
+    renderAt("/mein-bereich", authLoadingTier());
+
+    expect(screen.getByRole("heading", { name: "Mein Bereich" })).toBeInTheDocument();
+  });
+});
+
+describe("Stufen-Gating wartet auf das Laden der Stufe", () => {
+  it("leitet einen eingeloggten Nutzer NICHT vorzeitig weg, solange die Stufe lädt", () => {
+    renderAt("/verzeichnis", authLoadingTier());
+
+    // Kein vorzeitiger Redirect auf / (Feed) und noch kein Verzeichnis-Inhalt:
+    // RequireTier rendert nichts, bis level_rank bekannt ist.
+    expect(screen.queryByRole("heading", { name: "Feed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 });

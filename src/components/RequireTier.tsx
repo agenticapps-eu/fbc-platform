@@ -18,9 +18,10 @@ export default function RequireTier({
   min: MembershipTier;
   children: ReactNode;
 }) {
-  const { user, levelRank, isLoading } = useAuth();
+  const { user, levelRank, isLoading, tierLoading } = useAuth();
 
-  if (isLoading) return null;
+  // Erst entscheiden, wenn Session UND Stufe geladen sind (sonst Fehl-Redirect).
+  if (isLoading || (user && tierLoading)) return null;
   if (!user) return <Navigate to="/login" replace />;
   if ((levelRank ?? 0) < TIER_RANK[min]) return <Navigate to="/" replace />;
   return <>{children}</>;

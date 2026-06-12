@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { navItems } from "../config/nav";
-import { TIER_LABEL, type MembershipTier } from "../lib/tiers";
+import { tierLabel } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
 
 export default function AppShell() {
@@ -12,7 +12,7 @@ export default function AppShell() {
     navigate("/login", { replace: true });
   }
 
-  const tierLabel = tier ? (TIER_LABEL[tier as MembershipTier] ?? tier) : null;
+  const tierLabelText = tier ? tierLabel(tier) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -25,7 +25,7 @@ export default function AppShell() {
             <>
               <span className="text-gray-700">
                 {user.email}
-                {tierLabel && <span className="ml-1 text-gray-400">· {tierLabel}</span>}
+                {tierLabelText && <span className="ml-1 text-gray-400">· {tierLabelText}</span>}
               </span>
               <button
                 type="button"

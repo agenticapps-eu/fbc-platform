@@ -18,16 +18,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Session beim Start laden und auf Änderungen (Login/Logout/Refresh) hören.
   // Der Callback setzt nur State — kein supabase.from() darin (Deadlock-Caveat);
-  // die Profil-/Stufen-Abfrage erfolgt im zweiten Effect.
+  // die Profil-/Stufen-Abfrage erfolgt im zweiten Effect. Bei Logout das Profil
+  // leeren, damit ein erneuter Login (auch mit derselben id) keine veraltete
+  // Stufe wiederverwendet.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthReady(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setAuthReady(true);
+      })
+      .catch(() => setAuthReady(true));
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setAuthReady(true);
+      if (!nextSession) setProfile(null);
     });
 
     return () => sub.subscription.unsubscribe();
@@ -39,22 +45,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id ?? null;
   useEffect(() => {
     if (!userId) return;
+    // userId hier nach dem Guard als string fixieren — die Narrowing-Info geht in
+    // der verschachtelten (später via setTimeout aufgerufenen) load()-Closure verloren.
+    const uid = userId;
 
     let active = true;
-    supabase
-      .from("profiles")
-      .select("tier, membership_tiers(level_rank)")
-      .eq("id", userId)
-      .single()
-      .then(({ data, error }) => {
-        if (!active) return;
-        setProfile({
-          userId,
-          tier: error || !data ? null : data.tier,
-          levelRank: error || !data ? null : (data.membership_tiers?.level_rank ?? null),
-        });
-      });
+    let attempt = 0;
 
+    async function load() {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("tier, membership_tiers(level_rank)")
+          .eq("id", uid)
+          .single();
+        if (!active) return;
+        if (!error && data) {
+          setProfile({
+            userId: uid,
+            tier: data.tier,
+            levelRank: data.membership_tiers?.level_rank ?? null,
+          });
+          return;
+        }
+      } catch {
+        if (!active) return;
+      }
+
+      // Fehler / keine Zeile / Exception: bei transientem Fehler oder Trigger-Lag
+      // direkt nach Signup begrenzt erneut versuchen, statt den Nutzer fälschlich
+      // auf level_rank 0 herabzustufen (würde Prime/Legacy von ihren eigenen
+      // Seiten aussperren).
+      if (attempt < 3) {
+        attempt += 1;
+        setTimeout(() => {
+          if (active) load();
+        }, 500 * attempt);
+        return;
+      }
+      setProfile({ userId: uid, tier: null, levelRank: null });
+    }
+
+    load();
     return () => {
       active = false;
     };
@@ -64,7 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileLoaded = profile?.userId === userId;
   const tier = userId && profileLoaded ? profile.tier : null;
   const levelRank = userId && profileLoaded ? profile.levelRank : null;
-  const isLoading = !authReady || (!!userId && !profileLoaded);
+  // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
+  // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
+  const isLoading = !authReady;
+  const tierLoading = !!userId && !profileLoaded;
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -73,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tier,
       levelRank,
       isLoading,
+      tierLoading,
       signUp: async (email, password) => {
         const { error } = await supabase.auth.signUp({ email, password });
         return { error };
@@ -85,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
       },
     }),
-    [session, tier, levelRank, isLoading],
+    [session, tier, levelRank, isLoading, tierLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

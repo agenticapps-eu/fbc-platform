@@ -15,3 +15,12 @@ export const TIER_LABEL: Record<MembershipTier, string> = {
   prime: "Prime",
   legacy: "Legacy",
 };
+
+/**
+ * Anzeigename einer Stufe. Fällt auf den rohen Key zurück, falls die DB einen
+ * im Prototyp nicht modellierten Tier liefert (z. B. 'circle') — Gating läuft
+ * ohnehin über level_rank aus der DB, nicht über diese Tabelle.
+ */
+export function tierLabel(tier: string): string {
+  return TIER_LABEL[tier as MembershipTier] ?? tier;
+}
