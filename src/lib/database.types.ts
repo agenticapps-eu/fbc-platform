@@ -8,6 +8,52 @@ export type Database = {
   };
   public: {
     Tables: {
+      comments: {
+        Row: {
+          author_id: string;
+          body: string;
+          created_at: string;
+          id: string;
+          post_id: string;
+        };
+        Insert: {
+          author_id: string;
+          body: string;
+          created_at?: string;
+          id?: string;
+          post_id: string;
+        };
+        Update: {
+          author_id?: string;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          post_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "comments_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comments_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comments_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       compass_responses: {
         Row: {
           answers: Json | null;
@@ -116,6 +162,164 @@ export type Database = {
           {
             foreignKeyName: "contact_requests_to_id_fkey";
             columns: ["to_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      event_registrations: {
+        Row: {
+          checked_in: boolean;
+          created_at: string;
+          event_id: string;
+          id: string;
+          profile_id: string;
+          rating: number | null;
+          status: string;
+        };
+        Insert: {
+          checked_in?: boolean;
+          created_at?: string;
+          event_id: string;
+          id?: string;
+          profile_id: string;
+          rating?: number | null;
+          status?: string;
+        };
+        Update: {
+          checked_in?: boolean;
+          created_at?: string;
+          event_id?: string;
+          id?: string;
+          profile_id?: string;
+          rating?: number | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_registrations_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_registrations_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      events: {
+        Row: {
+          capacity: number | null;
+          created_at: string;
+          host_id: string | null;
+          host_partner_id: string | null;
+          id: string;
+          location: string | null;
+          starts_at: string | null;
+          title: string;
+          type: string | null;
+          visibility: string;
+        };
+        Insert: {
+          capacity?: number | null;
+          created_at?: string;
+          host_id?: string | null;
+          host_partner_id?: string | null;
+          id?: string;
+          location?: string | null;
+          starts_at?: string | null;
+          title: string;
+          type?: string | null;
+          visibility?: string;
+        };
+        Update: {
+          capacity?: number | null;
+          created_at?: string;
+          host_id?: string | null;
+          host_partner_id?: string | null;
+          id?: string;
+          location?: string | null;
+          starts_at?: string | null;
+          title?: string;
+          type?: string | null;
+          visibility?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "events_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_host_partner_id_fkey";
+            columns: ["host_partner_id"];
+            isOneToOne: false;
+            referencedRelation: "partners";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      feedback: {
+        Row: {
+          created_at: string;
+          id: string;
+          note: string | null;
+          profile_id: string;
+          rating: number | null;
+          ref_id: string | null;
+          ref_type: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          profile_id: string;
+          rating?: number | null;
+          ref_id?: string | null;
+          ref_type?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          profile_id?: string;
+          rating?: number | null;
+          ref_id?: string | null;
+          ref_type?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_profile_id_fkey";
+            columns: ["profile_id"];
             isOneToOne: false;
             referencedRelation: "profiles_public";
             referencedColumns: ["id"];
@@ -352,6 +556,48 @@ export type Database = {
           },
         ];
       };
+      notifications: {
+        Row: {
+          created_at: string;
+          id: string;
+          payload: Json | null;
+          profile_id: string;
+          read_at: string | null;
+          type: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          payload?: Json | null;
+          profile_id: string;
+          read_at?: string | null;
+          type?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          payload?: Json | null;
+          profile_id?: string;
+          read_at?: string | null;
+          type?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       offers: {
         Row: {
           category: string | null;
@@ -414,6 +660,132 @@ export type Database = {
           label?: string;
         };
         Relationships: [];
+      };
+      partners: {
+        Row: {
+          category: string | null;
+          contact: string | null;
+          created_at: string;
+          description: string | null;
+          id: string;
+          logo_url: string | null;
+          name: string;
+          region: string | null;
+          website: string | null;
+        };
+        Insert: {
+          category?: string | null;
+          contact?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          logo_url?: string | null;
+          name: string;
+          region?: string | null;
+          website?: string | null;
+        };
+        Update: {
+          category?: string | null;
+          contact?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          logo_url?: string | null;
+          name?: string;
+          region?: string | null;
+          website?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "partners_category_fkey";
+            columns: ["category"];
+            isOneToOne: false;
+            referencedRelation: "partner_categories";
+            referencedColumns: ["key"];
+          },
+        ];
+      };
+      post_likes: {
+        Row: {
+          created_at: string;
+          post_id: string;
+          profile_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          post_id: string;
+          profile_id: string;
+        };
+        Update: {
+          created_at?: string;
+          post_id?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_likes_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_likes_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      posts: {
+        Row: {
+          author_id: string;
+          body: string;
+          created_at: string;
+          hashtags: string[] | null;
+          id: string;
+          visibility: string;
+        };
+        Insert: {
+          author_id: string;
+          body: string;
+          created_at?: string;
+          hashtags?: string[] | null;
+          id?: string;
+          visibility?: string;
+        };
+        Update: {
+          author_id?: string;
+          body?: string;
+          created_at?: string;
+          hashtags?: string[] | null;
+          id?: string;
+          visibility?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "posts_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "posts_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       profile_contacts: {
         Row: {
