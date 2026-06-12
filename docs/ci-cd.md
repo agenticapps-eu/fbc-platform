@@ -94,26 +94,36 @@ left tag-pinned.
 
 ## Branch protection (`main`)
 
-Configured on the GitHub repo (not in a workflow file):
+Configured on the GitHub repo (not in a workflow file) — **applied**:
 
-- Pull request required; no direct pushes to `main`.
+- Pull request required before merge (no direct pushes); 0 required approvals
+  (solo-friendly — raise later when there are reviewers).
 - Required status checks (must be green): **`verify`**, **`migrations`**,
-  **`pr-title`**. Branches must be up to date before merge.
+  **`pr-title`**. Branches must be up to date (`strict`) before merge. `deploy` is
+  deliberately **not** required — it can't pass without the Infisical secrets and
+  would otherwise make `main` unmergeable.
 - Conventional-Commit PR title enforced by the `pr-title` check; squash-merge so
   the PR title becomes the commit subject.
 
-Apply / inspect with the GitHub CLI:
+Re-apply / inspect with the GitHub CLI:
 
 ```bash
 gh api -X PUT repos/agenticapps-eu/fbc-platform/branches/main/protection \
-  -H "Accept: application/vnd.github+json" \
-  -f 'required_status_checks[strict]=true' \
-  -f 'required_status_checks[checks][][context]=verify' \
-  -f 'required_status_checks[checks][][context]=migrations' \
-  -f 'required_status_checks[checks][][context]=pr-title' \
-  -F 'enforce_admins=false' \
-  -F 'required_pull_request_reviews=null' \
-  -F 'restrictions=null'
+  -H "Accept: application/vnd.github+json" --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      { "context": "verify" },
+      { "context": "migrations" },
+      { "context": "pr-title" }
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
+  "restrictions": null
+}
+JSON
 ```
 
 ---
