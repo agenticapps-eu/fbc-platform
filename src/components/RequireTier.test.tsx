@@ -74,6 +74,21 @@ describe("Auth-Gating für /mein-bereich", () => {
   });
 });
 
+describe("Auth-Gating für /profil", () => {
+  it("leitet nicht eingeloggte Nutzer auf /login", () => {
+    renderAt("/profil", fakeAuthValue());
+
+    expect(screen.queryByRole("heading", { name: "Profil" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
+  });
+
+  it("lässt eingeloggte Mitglieder das öffentliche Profil sehen (jede Stufe, auch Discover)", () => {
+    renderAt("/profil", authAsTier("discover"));
+
+    expect(screen.getByRole("heading", { name: "Profil" })).toBeInTheDocument();
+  });
+});
+
 describe("Stufen-Gating wartet auf das Laden der Stufe", () => {
   it("leitet einen eingeloggten Nutzer NICHT vorzeitig weg, solange die Stufe lädt", () => {
     renderAt("/verzeichnis", authLoadingTier());

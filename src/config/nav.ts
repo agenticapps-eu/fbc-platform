@@ -29,6 +29,6 @@ export const navItems: NavItem[] = [
   { path: "/academy", label: "Academy", Component: AcademyPage },
   { path: "/projekte", label: "Projekte", Component: ProjektePage },
   { path: "/compass", label: "Compass", Component: CompassPage },
-  { path: "/profil", label: "Profil", Component: ProfilPage },
+  { path: "/profil", label: "Profil", Component: ProfilPage, requiresAuth: true },
   { path: "/mein-bereich", label: "Mein Bereich", Component: MeinBereichPage, requiresAuth: true },
 ];
