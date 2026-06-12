@@ -55,19 +55,22 @@ The required keys (already defined in Infisical — see [secrets.md](./secrets.m
 - `SENTRY_ORG` / `SENTRY_PROJECT` are **not** required in Infisical — the workflow
   and `vite.config.ts` default them to `factiv` / `fbc-platform`.
 
-### A. Infisical service token (recommended — what `deploy.yml` uses)
+### A. Infisical Machine Identity (recommended — what `deploy.yml` uses)
 
-One GitHub secret, **`INFISICAL_TOKEN`** (an Infisical **service token** scoped to
-the `fbc-platform` project). `Infisical/secrets-action` pulls the whole
-environment into the job env at runtime — `prod` on `main`, `dev` for previews.
-Adding or rotating a secret happens once, in Infisical; GitHub never has to be
-touched again.
+An Infisical **Machine Identity** (Universal Auth) — service tokens are
+deprecated and `Infisical/secrets-action` no longer accepts them. Two GitHub
+secrets, **`INFISICAL_CLIENT_ID`** and **`INFISICAL_CLIENT_SECRET`**; the action
+pulls the whole environment into the job env at runtime — `prod` on `main`, `dev`
+for previews. Adding or rotating an app secret happens once, in Infisical; GitHub
+is only touched if the machine identity itself rotates.
 
-1. Infisical → project `fbc-platform` → **Access Control → Service Tokens** → create
-   a token with read access to both the `dev` and `prod` environments.
-2. GitHub → repo **Settings → Secrets and variables → Actions** → add
-   `INFISICAL_TOKEN`.
-3. If your org is on Infisical EU, uncomment the `domain:` line in `deploy.yml`.
+1. Infisical → org **Access Control → Identities** → create a Machine Identity
+   with **Universal Auth**; copy its Client ID + Client Secret.
+2. Give that identity read access to the `fbc-platform` project's `dev` and `prod`
+   environments.
+3. GitHub → repo **Settings → Secrets and variables → Actions** → add
+   `INFISICAL_CLIENT_ID` and `INFISICAL_CLIENT_SECRET`.
+4. If your org is on Infisical EU, uncomment the `domain:` line in `deploy.yml`.
 
 ### B. Individual GitHub secrets (fallback — no Infisical in CI)
 
@@ -76,6 +79,16 @@ the "Load secrets from Infisical" step and replace each `${{ env.X }}` with
 `${{ secrets.X }}`, and add the `VITE_*` keys to the `Build` step's `env:`.
 Heavier to maintain (every rotation = a GitHub edit), which is why **A is
 preferred**.
+
+---
+
+## Supply chain
+
+Third-party actions are **pinned to full commit SHAs** (the `# vN` comment marks
+the human-readable tag) so a moved tag can't silently swap the code that handles
+our deploy secrets. `.github/dependabot.yml` watches the `github-actions`
+ecosystem and opens reviewed PRs to bump those SHAs. First-party `actions/*` are
+left tag-pinned.
 
 ---
 
