@@ -1,0 +1,118 @@
+name: Deploy
+
+# Pull requests -> Cloudflare Pages preview deploy.
+# Push to main   -> production deploy + Sentry release (commits + source-maps).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One in-flight deploy per ref; a newer push supersedes an older one.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so Sentry can associate commits
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Recommended secret path: a single GitHub secret (INFISICAL_TOKEN, a
+      # service token) injects the whole environment from Infisical into the job
+      # env. prod on main, dev for previews (no `staging` env yet). To use plain
+      # GitHub secrets instead, see docs/ci-cd.md and replace `env.X` with
+      # `secrets.X` below.
+      - name: Load secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.7
+        with:
+          method: token
+          token: ${{ secrets.INFISICAL_TOKEN }}
+          project-slug: fbc-platform
+          env-slug: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+          # domain: https://eu.infisical.com  # uncomment if your org is on Infisical EU
+
+      # On main: VITE_SENTRY_RELEASE + SENTRY_AUTH_TOKEN make the Sentry vite
+      # plugin upload (hidden) source-maps to a release named after the commit.
+      # On previews: a blank token disables the plugin, keeping PRs Sentry-free.
+      - name: Build
+        run: pnpm build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ github.ref == 'refs/heads/main' && env.SENTRY_AUTH_TOKEN || '' }}
+          VITE_SENTRY_RELEASE: ${{ github.ref == 'refs/heads/main' && github.sha || '' }}
+
+      # The vite plugin already uploaded source-maps during the build; this step
+      # creates/finalizes the matching release and associates commits.
+      - name: Create Sentry release
+        if: github.ref == 'refs/heads/main'
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ env.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ env.SENTRY_ORG || 'factiv' }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT || 'fbc-platform' }}
+          SENTRY_URL: https://de.sentry.io
+        with:
+          version: ${{ github.sha }}
+          environment: production
+          set_commits: auto
+          finalize: true
+
+      # Preview (PR) -> deploy to the PR's branch; production (main) -> the
+      # `main` production branch on the Cloudflare Pages project.
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        env:
+          # Pass the (attacker-controllable) branch name via env and quote it in
+          # the command, never interpolate it straight into the shell.
+          CF_BRANCH: ${{ github.head_ref || 'main' }}
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ./dist --project-name=fbc-platform --branch="$CF_BRANCH"
+
+      - name: Comment preview URL on the PR
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+        with:
+          script: |
+            const url = process.env.PREVIEW_URL;
+            const marker = '<!-- cf-pages-preview -->';
+            const body = `${marker}\n🚀 **Cloudflare Pages preview:** ${url}\n\n_Deployed from ${context.sha.slice(0, 7)}._`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

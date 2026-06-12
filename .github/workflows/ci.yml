@@ -5,7 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  # Lint, type-check, unit tests and a production build. No secrets needed:
+  # `pnpm build` stays a plain `tsc && vite build` (see docs/secrets.md).
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -20,3 +25,29 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # Migration validation: boot a throwaway local Supabase stack and apply every
+  # migration from scratch. `supabase db reset` exits non-zero if any migration
+  # fails to apply cleanly — that is the dry-run/validate gate. No secrets needed.
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Supabase stack
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+      - name: Apply all migrations from a clean database
+        run: supabase db reset
+
+  # Enforce a Conventional-Commit-style PR title (the squash-merge commit subject).
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
