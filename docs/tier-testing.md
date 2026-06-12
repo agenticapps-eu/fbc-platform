@@ -9,39 +9,52 @@ Zum Testen des Stufen-Gatings (Discover → Prime → Legacy) wird die Stufe dah
 **außerhalb des Clients** gesetzt: im Supabase **SQL Editor** (Studio) oder via CLI
 gegen die DB. Beides läuft mit erhöhten Rechten und umgeht den Client.
 
-## Test-Accounts anlegen
-
-Drei Accounts per Login-/Registrierungsseite der App anlegen, z. B.:
-
 | E-Mail | Stufe (Ziel) |
 | --- | --- |
-| `discover@fbc.test` | `discover` (Default nach Signup) |
-| `prime@fbc.test` | `prime` |
-| `legacy@fbc.test` | `legacy` |
+| `discover@fbcdemo.com` | `discover` (Default nach Signup) |
+| `prime@fbcdemo.com` | `prime` |
+| `legacy@fbcdemo.com` | `legacy` |
 
-> Tipp: Ist in Supabase **„Confirm email"** aktiv, lässt sich das für lokales Testen
-> unter _Authentication → Providers → Email_ deaktivieren, damit der Login direkt
-> ohne Bestätigungsmail funktioniert.
+## Test-Accounts anlegen
 
-## Stufe setzen (Supabase Studio → SQL Editor)
+> ⚠️ **GoTrue erzwingt E-Mail-Validierung.** Der `/signup`-Endpoint lehnt unzustellbare
+> Domains ab (`email_address_invalid`, u. a. reservierte TLDs wie `.test` und Domains
+> ohne MX-Record). Für Test-Accounts mit Fantasie-Domains funktioniert die Registrierung
+> über das App-Formular daher **nicht** — die drei Accounts werden im **SQL Editor**
+> (Studio, service_role) direkt angelegt. Das passt zum Prinzip „keine Self-Service-
+> Anlage im Client". Mit einer echten, zustellbaren Domain funktioniert das App-Formular
+> regulär (ggf. „Confirm email" unter _Authentication → Sign In / Providers → Email_
+> deaktivieren, damit ohne Bestätigungsmail eine Session entsteht).
+
+### Anlegen + Stufen setzen (Supabase Studio → SQL Editor)
 
 ```sql
--- Eine Stufe per E-Mail setzen. Gültige Werte: 'discover' | 'prime' | 'legacy'
--- (allgemein: jeder membership_tiers.key).
-update public.profiles p
-set tier = 'prime'
-from auth.users u
-where u.id = p.id
-  and u.email = 'prime@fbc.test';
+-- Drei bestätigte Test-Accounts direkt anlegen. Passwort für alle: Test1234!
+-- Der Trigger handle_new_user legt automatisch ein profiles-Row mit tier='discover' an.
+insert into auth.users
+  (instance_id, id, aud, role, email, encrypted_password,
+   email_confirmed_at, created_at, updated_at,
+   raw_app_meta_data, raw_user_meta_data, confirmation_token,
+   recovery_token, email_change_token_new, email_change)
+select
+  '00000000-0000-0000-0000-000000000000', gen_random_uuid(),
+  'authenticated', 'authenticated', e.email,
+  extensions.crypt('Test1234!', extensions.gen_salt('bf')),
+  now(), now(), now(),
+  '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, '', '', '', ''
+from (values ('discover@fbcdemo.com'), ('prime@fbcdemo.com'), ('legacy@fbcdemo.com')) as e(email)
+on conflict do nothing;
 
-update public.profiles p
-set tier = 'legacy'
-from auth.users u
-where u.id = p.id
-  and u.email = 'legacy@fbc.test';
+-- Stufen setzen. Gültige Werte: 'discover' | 'prime' | 'legacy'
+-- (allgemein: jeder membership_tiers.key).
+update public.profiles p set tier = 'prime'
+  from auth.users u where u.id = p.id and u.email = 'prime@fbcdemo.com';
+update public.profiles p set tier = 'legacy'
+  from auth.users u where u.id = p.id and u.email = 'legacy@fbcdemo.com';
 ```
 
-Nach dem Update in der App **neu laden** (oder aus-/einloggen) — der `AuthProvider`
+Eine Stufe später ändern: nur den `update`-Teil oben mit der gewünschten E-Mail/Stufe
+ausführen. Danach in der App **neu laden** (oder aus-/einloggen) — der `AuthProvider`
 lädt `tier` + `level_rank` beim Session-Start.
 
 ## Verifizieren
@@ -52,7 +65,7 @@ select u.email, p.tier, t.level_rank
 from public.profiles p
 join auth.users u on u.id = p.id
 join public.membership_tiers t on t.key = p.tier
-where u.email in ('discover@fbc.test', 'prime@fbc.test', 'legacy@fbc.test')
+where u.email in ('discover@fbcdemo.com', 'prime@fbcdemo.com', 'legacy@fbcdemo.com')
 order by t.level_rank;
 ```
 
