@@ -1,7 +1,16 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import { navItems } from "../config/nav";
-import { tierLabel } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
+import { Avatar } from "./ui/Avatar";
+import { Button } from "./ui/Button";
+import { Logo } from "./ui/Logo";
+import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
+import { TierBadge } from "./ui/TierBadge";
+
+const SECTIONS: SidebarNavSection[] = [
+  { title: "Formate", items: navItems.filter((i) => i.section === "formate") },
+  { title: "Konto", items: navItems.filter((i) => i.section === "konto") },
+];
 
 export default function AppShell() {
   const { user, tier, signOut } = useAuth();
@@ -12,61 +21,47 @@ export default function AppShell() {
     navigate("/login", { replace: true });
   }
 
-  const tierLabelText = tier ? tierLabel(tier) : null;
-
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
-        <Link to="/" className="text-lg font-semibold">
-          Fair Business Club
-        </Link>
-        <div className="flex items-center gap-3 text-sm text-gray-500">
-          {user ? (
-            <>
-              <span className="text-gray-700">
-                {user.email}
-                {tierLabelText && <span className="ml-1 text-gray-400">· {tierLabelText}</span>}
-              </span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-blue-600 hover:underline"
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="text-blue-600 hover:underline">
-              Login
-            </Link>
-          )}
+    <div className="min-h-screen bg-warm text-ink">
+      <header className="sticky top-0 z-40 border-b border-ink/8 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link
+            to="/"
+            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-warm"
+          >
+            <Logo />
+          </Link>
+          <div className="flex items-center gap-4">
+            {user ? (
+              <>
+                <div className="hidden items-center gap-3 sm:flex">
+                  <Avatar name={user.email ?? "?"} size="sm" />
+                  <span className="text-sm font-medium text-ink">{user.email}</span>
+                  {tier && <TierBadge tier={tier} />}
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => navigate("/login")}>
+                Login
+              </Button>
+            )}
+          </div>
         </div>
+        {/* Feine Goldlinie als Premium-Akzent unter dem Header. */}
+        <div className="h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
       </header>
 
-      <div className="flex">
-        <aside className="w-56 shrink-0 border-r border-gray-200 bg-white p-4">
-          <nav className="flex flex-col gap-1">
-            {navItems.map(({ path, label }) => (
-              <NavLink
-                key={path}
-                to={path}
-                end={path === "/"}
-                className={({ isActive }) =>
-                  `rounded px-3 py-2 text-sm ${
-                    isActive
-                      ? "bg-gray-100 font-medium text-gray-900"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-          </nav>
+      <div className="mx-auto flex max-w-7xl">
+        <aside className="hidden w-60 shrink-0 border-r border-ink/8 px-4 py-8 lg:block">
+          <SidebarNav sections={SECTIONS} />
         </aside>
-
-        <main className="flex-1 p-6">
-          <Outlet />
+        <main className="min-w-0 flex-1 px-6 py-10 lg:px-10">
+          <div className="mx-auto max-w-4xl">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
