@@ -26,6 +26,8 @@ jobs:
     env:
       INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
       INFISICAL_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+      # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
+      INFISICAL_API_URL: https://eu.infisical.com/api
     steps:
       - uses: actions/checkout@v4
         with:
