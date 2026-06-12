@@ -56,6 +56,134 @@ export type Database = {
           },
         ];
       };
+      contact_requests: {
+        Row: {
+          created_at: string;
+          from_id: string;
+          id: string;
+          match_id: string | null;
+          message: string | null;
+          status: string;
+          to_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          from_id: string;
+          id?: string;
+          match_id?: string | null;
+          message?: string | null;
+          status?: string;
+          to_id: string;
+        };
+        Update: {
+          created_at?: string;
+          from_id?: string;
+          id?: string;
+          match_id?: string | null;
+          message?: string | null;
+          status?: string;
+          to_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_requests_from_id_fkey";
+            columns: ["from_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_requests_from_id_fkey";
+            columns: ["from_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_requests_match_id_fkey";
+            columns: ["match_id"];
+            isOneToOne: false;
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_requests_to_id_fkey";
+            columns: ["to_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_requests_to_id_fkey";
+            columns: ["to_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      matches: {
+        Row: {
+          a_profile_id: string;
+          b_profile_id: string;
+          basis: Json | null;
+          created_at: string;
+          id: string;
+          routing: string;
+          score: number;
+          status: string;
+        };
+        Insert: {
+          a_profile_id: string;
+          b_profile_id: string;
+          basis?: Json | null;
+          created_at?: string;
+          id?: string;
+          routing?: string;
+          score: number;
+          status?: string;
+        };
+        Update: {
+          a_profile_id?: string;
+          b_profile_id?: string;
+          basis?: Json | null;
+          created_at?: string;
+          id?: string;
+          routing?: string;
+          score?: number;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "matches_a_profile_id_fkey";
+            columns: ["a_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "matches_a_profile_id_fkey";
+            columns: ["a_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "matches_b_profile_id_fkey";
+            columns: ["b_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "matches_b_profile_id_fkey";
+            columns: ["b_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       membership_tiers: {
         Row: {
           key: string;
@@ -76,6 +204,201 @@ export type Database = {
           price_year?: number;
         };
         Relationships: [];
+      };
+      message_threads: {
+        Row: {
+          a_profile_id: string;
+          b_profile_id: string;
+          created_at: string;
+          id: string;
+        };
+        Insert: {
+          a_profile_id: string;
+          b_profile_id: string;
+          created_at?: string;
+          id?: string;
+        };
+        Update: {
+          a_profile_id?: string;
+          b_profile_id?: string;
+          created_at?: string;
+          id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "message_threads_a_profile_id_fkey";
+            columns: ["a_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_threads_a_profile_id_fkey";
+            columns: ["a_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_threads_b_profile_id_fkey";
+            columns: ["b_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "message_threads_b_profile_id_fkey";
+            columns: ["b_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      messages: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          sender_id: string;
+          thread_id: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          sender_id: string;
+          thread_id: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          sender_id?: string;
+          thread_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "messages_sender_id_fkey";
+            columns: ["sender_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey";
+            columns: ["sender_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_thread_id_fkey";
+            columns: ["thread_id"];
+            isOneToOne: false;
+            referencedRelation: "message_threads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      needs: {
+        Row: {
+          category: string | null;
+          created_at: string;
+          description: string | null;
+          id: string;
+          profile_id: string;
+          tags: string[] | null;
+          theme: string | null;
+          title: string;
+          tx_volume_band: string | null;
+        };
+        Insert: {
+          category?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          profile_id: string;
+          tags?: string[] | null;
+          theme?: string | null;
+          title: string;
+          tx_volume_band?: string | null;
+        };
+        Update: {
+          category?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          profile_id?: string;
+          tags?: string[] | null;
+          theme?: string | null;
+          title?: string;
+          tx_volume_band?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "needs_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "needs_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      offers: {
+        Row: {
+          category: string | null;
+          created_at: string;
+          description: string | null;
+          id: string;
+          profile_id: string;
+          tags: string[] | null;
+          theme: string | null;
+          title: string;
+        };
+        Insert: {
+          category?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          profile_id: string;
+          tags?: string[] | null;
+          theme?: string | null;
+          title: string;
+        };
+        Update: {
+          category?: string | null;
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          profile_id?: string;
+          tags?: string[] | null;
+          theme?: string | null;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "offers_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "offers_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       partner_categories: {
         Row: {
