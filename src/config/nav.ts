@@ -10,10 +10,15 @@ import ProfilPage from "../pages/ProfilPage";
 import ProjektePage from "../pages/ProjektePage";
 import VerzeichnisPage from "../pages/VerzeichnisPage";
 
+/** Sidebar-Gruppe: die 7 Community-Formate vs. persönliche Konto-Routen. */
+export type NavSection = "formate" | "konto";
+
 export interface NavItem {
   path: string;
   label: string;
   Component: ComponentType;
+  /** Gruppierung in der Sidebar. */
+  section: NavSection;
   /** Mindest-Mitgliedsstufe fürs Route-Gating (impliziert eingeloggt). */
   minTier?: MembershipTier;
   /** Route nur für eingeloggte Nutzer (ohne Stufen-Anforderung). */
@@ -22,13 +27,31 @@ export interface NavItem {
 
 /** Routen innerhalb der AppShell. Einzige Quelle für Sidebar-Navigation und Routing. */
 export const navItems: NavItem[] = [
-  { path: "/", label: "Feed", Component: FeedPage },
-  { path: "/verzeichnis", label: "Verzeichnis", Component: VerzeichnisPage, minTier: "prime" },
-  { path: "/matching", label: "Matching", Component: MatchingPage, minTier: "prime" },
-  { path: "/events", label: "Events", Component: EventsPage },
-  { path: "/academy", label: "Academy", Component: AcademyPage },
-  { path: "/projekte", label: "Projekte", Component: ProjektePage },
-  { path: "/compass", label: "Compass", Component: CompassPage },
-  { path: "/profil", label: "Profil", Component: ProfilPage, requiresAuth: true },
-  { path: "/mein-bereich", label: "Mein Bereich", Component: MeinBereichPage, requiresAuth: true },
+  { path: "/", label: "Feed", Component: FeedPage, section: "formate" },
+  {
+    path: "/verzeichnis",
+    label: "Verzeichnis",
+    Component: VerzeichnisPage,
+    section: "formate",
+    minTier: "prime",
+  },
+  {
+    path: "/matching",
+    label: "Matching",
+    Component: MatchingPage,
+    section: "formate",
+    minTier: "prime",
+  },
+  { path: "/events", label: "Events", Component: EventsPage, section: "formate" },
+  { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },
+  { path: "/projekte", label: "Projekte", Component: ProjektePage, section: "formate" },
+  { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
+  { path: "/profil", label: "Profil", Component: ProfilPage, section: "konto", requiresAuth: true },
+  {
+    path: "/mein-bereich",
+    label: "Mein Bereich",
+    Component: MeinBereichPage,
+    section: "konto",
+    requiresAuth: true,
+  },
 ];
