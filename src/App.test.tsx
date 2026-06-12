@@ -2,16 +2,16 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App from "./App";
-import { AuthProvider } from "./providers/AuthProvider";
+import { AuthFixture, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
   it("zeigt die Shell-Navigation und die Feed-Seite", () => {
     render(
-      <AuthProvider>
+      <AuthFixture value={fakeAuthValue()}>
         <MemoryRouter initialEntries={["/"]}>
           <App />
         </MemoryRouter>
-      </AuthProvider>,
+      </AuthFixture>,
     );
 
     expect(screen.getByRole("link", { name: "Fair Business Club" })).toBeInTheDocument();
