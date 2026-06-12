@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { captureMessage } from "@sentry/react";
+import { useState, type ReactNode } from "react";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -69,6 +70,31 @@ function ToastDemo() {
       >
         Default-Toast
       </Button>
+    </div>
+  );
+}
+
+function SentryTestSection() {
+  const [boom, setBoom] = useState(false);
+  // Render-Fehler → von der App-ErrorBoundary gefangen + an Sentry gemeldet.
+  if (boom) throw new Error("FBC Sentry-Test — absichtlicher Render-Fehler");
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-3">
+        <Button variant="secondary" size="sm" onClick={() => setBoom(true)}>
+          Render-Fehler werfen (ErrorBoundary + Sentry)
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => captureMessage("FBC Sentry-Test-Message", "info")}
+        >
+          Test-Message senden
+        </Button>
+      </div>
+      <p className="text-xs text-grey">
+        Events erscheinen nur in Sentry, wenn <code>VITE_SENTRY_DSN</code> gesetzt ist.
+      </p>
     </div>
   );
 }
@@ -216,6 +242,11 @@ export default function StyleguidePage() {
           {/* Toast */}
           <Section title="Toast">
             <ToastDemo />
+          </Section>
+
+          {/* Sentry (Dev) */}
+          <Section title="Sentry (Dev)">
+            <SentryTestSection />
           </Section>
         </div>
       </div>
