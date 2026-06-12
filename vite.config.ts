@@ -23,7 +23,13 @@ export default defineConfig({
             project: process.env.SENTRY_PROJECT ?? "fbc-platform",
             authToken: sentryAuthToken,
             url: process.env.SENTRY_URL ?? "https://de.sentry.io",
-            release: { name: process.env.VITE_SENTRY_RELEASE },
+            release: {
+              name: process.env.VITE_SENTRY_RELEASE,
+              // Associate the release with its commits (HEAD + previous release).
+              // ignoreMissing keeps the first-ever release from failing when there
+              // is no prior release to diff against.
+              setCommits: { auto: true, ignoreMissing: true },
+            },
           }),
         ]
       : []),
