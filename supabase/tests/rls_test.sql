@@ -7,7 +7,7 @@
 -- The whole thing runs inside the implicit pgTAP transaction and never commits.
 
 begin;
-select plan(15);
+select plan(17);
 
 -- ── fixtures (seeded as the superuser test role → bypasses RLS) ───────────────
 -- Three members; auth.users insert fires handle_new_user(), which provisions the
@@ -32,9 +32,12 @@ insert into public.profile_contacts (profile_id, email) values
   ('22222222-2222-2222-2222-222222222222', 'prime-contact@test.fbc');
 -- Legacy-visibility post authored by LEGACY: the policy lets an author always see
 -- their own post, so it must be authored by someone other than Prime to actually
--- exercise the rank>=7 gate against Prime.
-insert into public.posts (author_id, body, visibility) values
-  ('33333333-3333-3333-3333-333333333333', 'A legacy-only post', 'legacy');
+-- exercise the rank>=7 gate against Prime. A comment on it checks that interaction
+-- rows inherit the parent post's visibility.
+insert into public.posts (id, author_id, body, visibility) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'A legacy-only post', 'legacy');
+insert into public.comments (post_id, author_id, body) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'secret legacy comment');
 
 -- A thread Discover<->Prime with NO accepted contact_request, to prove message
 -- gating independently of thread gating (a service-role engine could create one).
@@ -151,6 +154,17 @@ select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.posts where visibility = ''legacy'''),
   1, 'A legacy-visibility post is visible to Legacy');
+
+-- ── 6. interaction rows inherit parent-post visibility (security follow-up) ───
+select is(
+  pg_temp.count_as('22222222-2222-2222-2222-222222222222',
+    'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
+  0, 'Comment on a legacy-visibility post is hidden from Prime');
+
+select is(
+  pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+    'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
+  1, 'Comment on a legacy-visibility post is visible to Legacy');
 
 select * from finish();
 rollback;
