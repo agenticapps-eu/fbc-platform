@@ -1,9 +1,18 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { navItems } from "../config/nav";
+import { TIER_LABEL, type MembershipTier } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
 
 export default function AppShell() {
-  const { user } = useAuth();
+  const { user, tier, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
+
+  const tierLabel = tier ? (TIER_LABEL[tier as MembershipTier] ?? tier) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -11,9 +20,21 @@ export default function AppShell() {
         <Link to="/" className="text-lg font-semibold">
           Fair Business Club
         </Link>
-        <div className="text-sm text-gray-500">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
           {user ? (
-            <span>Angemeldet</span>
+            <>
+              <span className="text-gray-700">
+                {user.email}
+                {tierLabel && <span className="ml-1 text-gray-400">· {tierLabel}</span>}
+              </span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-blue-600 hover:underline"
+              >
+                Logout
+              </button>
+            </>
           ) : (
             <Link to="/login" className="text-blue-600 hover:underline">
               Login

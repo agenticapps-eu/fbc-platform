@@ -1,9 +1,20 @@
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { createContext, useContext } from "react";
 
 export interface AuthContextValue {
-  /** Angemeldeter Nutzer. Platzhalter bis die Supabase-Auth angebunden ist. */
-  user: null;
+  /** Aktuelle Supabase-Session, oder null wenn ausgeloggt. */
+  session: Session | null;
+  /** Angemeldeter Nutzer, oder null. */
+  user: User | null;
+  /** Mitgliedsstufe (membership_tiers.key), z. B. "discover". null wenn ausgeloggt. */
+  tier: string | null;
+  /** level_rank der Mitgliedsstufe (discover=1 … legacy=7). null wenn ausgeloggt. */
+  levelRank: number | null;
+  /** true bis Session und Profil beim Start (oder nach einem Wechsel) geladen sind. */
   isLoading: boolean;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
