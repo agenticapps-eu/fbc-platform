@@ -2,6 +2,9 @@ name: Deploy
 
 # Pull requests -> Cloudflare Pages preview deploy.
 # Push to main   -> production deploy + Sentry release (commits + source-maps).
+#
+# Secrets are injected by the Infisical CLI (`infisical run`) using a single
+# service token (INFISICAL_TOKEN). prod env on main, dev env for previews.
 on:
   push:
     branches: [main]
@@ -20,6 +23,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+      INFISICAL_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,66 +38,40 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # Recommended secret path: an Infisical Machine Identity (Universal Auth)
-      # injects the whole environment into the job env (export-type defaults to
-      # GITHUB_ENV). Two GitHub secrets — INFISICAL_CLIENT_ID / _CLIENT_SECRET.
-      # prod on main, dev for previews (no `staging` env yet). To use plain
-      # GitHub secrets instead, see docs/ci-cd.md and replace `env.X` with
-      # `secrets.X` below.
-      - name: Load secrets from Infisical
-        uses: Infisical/secrets-action@03d3fa38607956c493f53c6633f94006a13c47ae # v1.0.7
-        with:
-          method: universal
-          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
-          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: fbc-platform
-          env-slug: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
-          # domain: https://eu.infisical.com  # uncomment if your org is on Infisical EU
+      - name: Install Infisical CLI
+        run: |
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y infisical
 
-      # On main: VITE_SENTRY_RELEASE + SENTRY_AUTH_TOKEN make the Sentry vite
-      # plugin upload (hidden) source-maps to a release named after the commit.
-      # On previews: a blank token disables the plugin, keeping PRs Sentry-free.
+      # `infisical run` injects the target env's secrets. On main, SENTRY_AUTH_TOKEN
+      # (present in prod) + VITE_SENTRY_RELEASE make the Sentry vite plugin upload
+      # hidden source-maps and create/finalize the release with commit association
+      # (see vite.config.ts -> release.setCommits.auto). On previews the dev env has
+      # no SENTRY_AUTH_TOKEN, so the plugin stays off — no Sentry noise per PR.
       - name: Build
-        run: pnpm build
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.ref == 'refs/heads/main' && env.SENTRY_AUTH_TOKEN || '' }}
           VITE_SENTRY_RELEASE: ${{ github.ref == 'refs/heads/main' && github.sha || '' }}
+        run: infisical run --env="$INFISICAL_ENV" -- pnpm build
 
-      # The vite plugin already uploaded source-maps during the build; this step
-      # creates/finalizes the matching release and associates commits.
-      - name: Create Sentry release
-        if: github.ref == 'refs/heads/main'
-        uses: getsentry/action-release@a74facf8a080ecbdf1cb355f16743530d712abb7 # v1
-        env:
-          SENTRY_AUTH_TOKEN: ${{ env.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ env.SENTRY_ORG || 'factiv' }}
-          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT || 'fbc-platform' }}
-          SENTRY_URL: https://de.sentry.io
-        with:
-          version: ${{ github.sha }}
-          environment: production
-          set_commits: auto
-          finalize: true
-
-      # Preview (PR) -> deploy to the PR's branch; production (main) -> the
-      # `main` production branch on the Cloudflare Pages project.
+      # wrangler reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID from the env
+      # that infisical injects. The branch name is attacker-controllable, so it is
+      # passed via env and quoted, never interpolated into the shell.
       - name: Deploy to Cloudflare Pages
         id: deploy
-        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         env:
-          # Pass the (attacker-controllable) branch name via env and quote it in
-          # the command, never interpolate it straight into the shell.
           CF_BRANCH: ${{ github.head_ref || 'main' }}
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy ./dist --project-name=fbc-platform --branch="$CF_BRANCH"
+        run: |
+          infisical run --env="$INFISICAL_ENV" -- \
+            pnpm dlx wrangler@4 pages deploy ./dist \
+              --project-name=fbc-platform --branch="$CF_BRANCH" | tee deploy.log
+          url="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL on the PR
-        if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
         uses: actions/github-script@v7
         env:
-          PREVIEW_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         with:
           script: |
             const url = process.env.PREVIEW_URL;

@@ -31,16 +31,17 @@ CI compiles and bundles without any secret. See [secrets.md](./secrets.md).
 | Pull request   | Cloudflare Pages **preview** deploy; preview URL posted as a PR comment  |
 | Push to `main` | Cloudflare Pages **production** deploy **+ Sentry release**              |
 
-Flow: checkout (full history) → install → load secrets (Infisical) → `pnpm build`
-→ (main only) create Sentry release → `wrangler pages deploy ./dist`.
+Flow: checkout (full history) → install deps → install Infisical CLI →
+`infisical run -- pnpm build` → `infisical run -- wrangler pages deploy ./dist`.
+Both secret-needing commands are wrapped in `infisical run`, so secrets are
+injected into the child process and never written to a file or `GITHUB_ENV`.
 
-**Sentry split:** the `@sentry/vite-plugin` (configured in `vite.config.ts`, P8)
-uploads hidden source-maps **during the build** when `SENTRY_AUTH_TOKEN` is set
-and `VITE_SENTRY_RELEASE` names the release. The `getsentry/action-release` step
-then **creates/finalizes** that same release (`version = github.sha`) and
-**associates commits** (`set_commits: auto`, needs `fetch-depth: 0`). On previews
-the build runs with a blank `SENTRY_AUTH_TOKEN`, so the plugin is disabled and no
-Sentry noise is produced per PR.
+**Sentry:** the `@sentry/vite-plugin` (configured in `vite.config.ts`, P8) does
+the whole release **during the build**: when `SENTRY_AUTH_TOKEN` is set (prod env)
+and `VITE_SENTRY_RELEASE` names the release (`= github.sha`, main only), it uploads
+hidden source-maps, creates/finalizes the release, and associates commits
+(`release.setCommits.auto`, needs `fetch-depth: 0`). On previews the dev env has no
+`SENTRY_AUTH_TOKEN`, so the plugin stays off and no Sentry noise is produced per PR.
 
 ---
 
@@ -55,30 +56,46 @@ The required keys (already defined in Infisical — see [secrets.md](./secrets.m
 - `SENTRY_ORG` / `SENTRY_PROJECT` are **not** required in Infisical — the workflow
   and `vite.config.ts` default them to `factiv` / `fbc-platform`.
 
-### A. Infisical Machine Identity (recommended — what `deploy.yml` uses)
+### A. Infisical CLI + service token (recommended — what `deploy.yml` uses)
 
-An Infisical **Machine Identity** (Universal Auth) — service tokens are
-deprecated and `Infisical/secrets-action` no longer accepts them. Two GitHub
-secrets, **`INFISICAL_CLIENT_ID`** and **`INFISICAL_CLIENT_SECRET`**; the action
-pulls the whole environment into the job env at runtime — `prod` on `main`, `dev`
-for previews. Adding or rotating an app secret happens once, in Infisical; GitHub
-is only touched if the machine identity itself rotates.
+CI installs the Infisical CLI and runs `infisical run --env=<env> -- <cmd>`,
+authenticated by **one GitHub secret, `INFISICAL_TOKEN`** (an Infisical service
+token scoped read-only to the `dev` and `prod` environments). Adding or rotating an
+app secret happens once, in Infisical; GitHub is only touched if the service token
+itself is rotated.
 
-1. Infisical → org **Access Control → Identities** → create a Machine Identity
-   with **Universal Auth**; copy its Client ID + Client Secret.
-2. Give that identity read access to the `fbc-platform` project's `dev` and `prod`
-   environments.
-3. GitHub → repo **Settings → Secrets and variables → Actions** → add
-   `INFISICAL_CLIENT_ID` and `INFISICAL_CLIENT_SECRET`.
-4. If your org is on Infisical EU, uncomment the `domain:` line in `deploy.yml`.
+Mint the token with the CLI (read-only, both envs) and store it in GitHub:
 
-### B. Individual GitHub secrets (fallback — no Infisical in CI)
+```bash
+infisical service-token create \
+  --name "github-actions-ci" --access-level read --expiry-seconds 0 \
+  --scope "dev:/" --scope "prod:/" --token-only \
+  | gh secret set INFISICAL_TOKEN --repo agenticapps-eu/fbc-platform
+```
 
-Mirror every key above into GitHub Actions secrets, then in `deploy.yml` remove
-the "Load secrets from Infisical" step and replace each `${{ env.X }}` with
-`${{ secrets.X }}`, and add the `VITE_*` keys to the `Build` step's `env:`.
-Heavier to maintain (every rotation = a GitHub edit), which is why **A is
-preferred**.
+> `--expiry-seconds 0` = never expires (avoids a surprise deploy outage). Rotate by
+> re-running the command; revoke the old token in the Infisical dashboard. If your
+> org is on Infisical EU, `export INFISICAL_API_URL=https://eu.infisical.com` first.
+
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` must exist in **both** envs
+(previews deploy from `dev`):
+
+```bash
+infisical secrets set CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=<id> --env=dev
+infisical secrets set CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=<id> --env=prod
+```
+
+### B. Infisical Machine Identity (alternative — GitHub Action instead of the CLI)
+
+Replace the CLI steps with `Infisical/secrets-action` (Universal Auth: two GitHub
+secrets `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET`, `method: universal`),
+which exports the env into the job and lets later steps read `${{ env.X }}`.
+
+### C. Individual GitHub secrets (fallback — no Infisical in CI)
+
+Mirror every key above into GitHub Actions secrets and reference `${{ secrets.X }}`
+directly instead of going through Infisical. Heaviest to maintain (every rotation =
+a GitHub edit), which is why **A is preferred**.
 
 ---
 
