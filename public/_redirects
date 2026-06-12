@@ -1,0 +1,5 @@
+# SPA-Fallback: jede nicht von einer Pages Function (z. B. /api/log) oder einem
+# statischen Asset bediente Route liefert index.html mit 200 zurück, damit das
+# Client-Routing (React Router) Deep-Links auflöst. Functions und echte Assets
+# haben Vorrang vor dieser Catch-all-Regel.
+/*    /index.html    200

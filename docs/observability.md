@@ -105,42 +105,61 @@ infisical secrets set AXIOM_TOKEN=xaat-xxxx      AXIOM_DATASET=fbc-platform --en
 # override the ingest base.
 ```
 
-### 3. Mirror to the deploy/CI platforms (when they exist — P11)
+### 3. Mirror to the deploy/CI platforms
 
 The Pages Function reads these from the **Cloudflare Pages** project env, not
-from Infisical at runtime. When the Pages project is created (P11):
+from Infisical at runtime.
 
-- Add `AXIOM_TOKEN`, `AXIOM_DATASET` to the Pages project's environment
-  variables, for both Production and Preview. (`AXIOM_URL` only if overriding.)
-- Add the same to GitHub Actions secrets only if a deploy job needs them.
+- **Production: done (AGE-253)** — `AXIOM_TOKEN` + `AXIOM_DATASET` are set as
+  encrypted secrets on the `fbc-platform` Pages project (Production). They are
+  bound to a deployment at deploy time, so a redeploy is required after changing
+  them. (`AXIOM_URL` only if overriding the EU edge default.)
+- **Preview: not set yet** — preview deploys' `/api/log` is a no-op (returns
+  `204`, drops the event) until the same secrets are added to the Preview env.
+- GitHub Actions injects the build-time `VITE_*` vars via Infisical; the
+  server-only `AXIOM_*` secrets live only on the Pages project, not in CI.
 
 ---
 
-## Cloudflare Logpush → Axiom (request/Function logs)
+## Cloudflare Logpush → Axiom (Function logs)
 
-This covers the **infrastructure** logs (HTTP requests, Function invocations,
-`console.*` output) — separate from the application events above.
+This covers the **infrastructure** logs (Pages Function invocations, `console.*`
+output, exceptions) — separate from the application events above.
 
-**Status: prepared, activated in P11** once the Pages project exists.
+**Status: activated via the Axiom app (AGE-253).**
 
-When ready:
+### Finding (AGE-253): no manual Logpush endpoint
 
-1. Create a second Axiom dataset, e.g. **`fbc-platform-cf`**, and an ingest
-   token for it.
-2. In Cloudflare → the zone/account → **Logs → Logpush**, create a job with
-   **Axiom** as the destination:
-   - Dataset (Cloudflare): **Workers Trace Events** (covers Pages Functions)
-     and/or **HTTP requests**.
-   - Destination: Axiom — for our **EU** org the ingest endpoint is the edge host
-     `https://eu-central-1.aws.edge.axiom.co/v1/ingest/fbc-platform-cf`,
-     `Authorization: Bearer <token>` (confirm the exact Logpush endpoint in
-     Axiom's docs at P11).
-3. Logpush requires an Enterprise/eligible plan for some datasets; for the
-   prototype, the `console.*` logs from `functions/api/log.ts` are also visible
-   via `wrangler pages deployment tail`.
+The original plan was a Cloudflare-side Logpush job pointing at a dedicated
+Axiom dataset (`fbc-platform-cf`). **That path no longer exists**: Axiom has
+retired its manual Logpush ingest endpoint — `…/v1/datasets/<ds>/ingest_logpush`
+returns `404` on both `api.eu.axiom.co` and the edge host, and the plain
+`/v1/datasets/<ds>/ingest` returns `403`. With no endpoint that answers
+Cloudflare's **ownership challenge**, a hand-rolled Logpush job cannot validate.
 
-Keep app events (`/api/log` → `fbc-platform`) and infra logs
-(`Logpush` → `fbc-platform-cf`) in **separate datasets** so funnels stay clean.
+### Supported path: the Axiom Cloudflare Logpush app
+
+Axiom now supports **only** its app-side install (Axiom → Settings → Apps →
+Cloudflare Logpush):
+
+1. Create a Cloudflare API token — **Account → Logs: Edit** + **Account
+   Settings: Read**, scoped to the account.
+2. Install the app with that token; select the account-level **Workers Trace
+   Events** dataset. (Skip "HTTP requests" — there is no zone for `*.pages.dev`.)
+3. Axiom creates the Logpush job **and manages its own destination dataset**.
+
+Caveats:
+
+- The job is **account-wide** — it captures *all* Workers' trace events (cparx,
+  callbot, fx-signal, …), not just this project. Isolate the Pages Functions at
+  query time: `where ScriptName contains "9fb4b087"` (the `fbc-platform` Pages
+  project id).
+- The app does **not** use a hand-made dataset, so the originally-planned
+  `fbc-platform-cf` dataset + ingest token are unused and can be deleted.
+- App events (`/api/log` → **`fbc-platform`**) stay in their own dataset, so the
+  funnels remain clean despite the shared infra-log dataset.
+- The `console.*` logs from `functions/api/log.ts` are also visible ad-hoc via
+  `wrangler pages deployment tail`.
 
 ---
 
