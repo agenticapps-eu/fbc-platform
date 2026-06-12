@@ -67,8 +67,9 @@ must **never** reach the client.
 | Key                         | Purpose                                       |
 | --------------------------- | --------------------------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Full-access Supabase key (bypasses RLS)       |
-| `AXIOM_TOKEN`               | Axiom ingest token (logs/analytics)           |
-| `AXIOM_DATASET`             | Axiom dataset name                            |
+| `AXIOM_TOKEN`               | Axiom ingest token (events via `/api/log`)    |
+| `AXIOM_DATASET`             | Axiom dataset name (`fbc-platform`)           |
+| `AXIOM_URL` _(optional)_    | Override of the ingest edge base (defaults to EU edge) |
 | `SENTRY_AUTH_TOKEN`         | Sentry CI token (source-map upload)           |
 | `CLOUDFLARE_API_TOKEN`      | Cloudflare API token (Pages deploy)           |
 | `RESEND_API_KEY`            | Transactional email — added in a later phase  |

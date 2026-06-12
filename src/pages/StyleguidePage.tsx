@@ -1,5 +1,6 @@
 import { captureMessage } from "@sentry/react";
 import { useState, type ReactNode } from "react";
+import { logEvent } from "../lib/log";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -94,6 +95,22 @@ function SentryTestSection() {
       </div>
       <p className="text-xs text-grey">
         Events erscheinen nur in Sentry, wenn <code>VITE_SENTRY_DSN</code> gesetzt ist.
+      </p>
+    </div>
+  );
+}
+
+function AxiomTestSection() {
+  return (
+    <div className="space-y-3">
+      <Button variant="secondary" size="sm" onClick={() => logEvent("login", { test: true })}>
+        Test-Event an <code>/api/log</code> senden
+      </Button>
+      <p className="text-xs text-grey">
+        Geht über den Server-Proxy <code>/api/log</code> an Axiom. Erscheint nur, wenn die Function
+        läuft (<code>wrangler pages dev</code> oder Deploy) und <code>AXIOM_TOKEN</code>/
+        <code>AXIOM_DATASET</code> gesetzt sind. Bei reinem <code>vite dev</code> laufen Pages
+        Functions nicht.
       </p>
     </div>
   );
@@ -247,6 +264,11 @@ export default function StyleguidePage() {
           {/* Sentry (Dev) */}
           <Section title="Sentry (Dev)">
             <SentryTestSection />
+          </Section>
+
+          {/* Axiom (Dev) */}
+          <Section title="Axiom (Dev)">
+            <AxiomTestSection />
           </Section>
         </div>
       </div>
