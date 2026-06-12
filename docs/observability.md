@@ -105,14 +105,19 @@ infisical secrets set AXIOM_TOKEN=xaat-xxxx      AXIOM_DATASET=fbc-platform --en
 # override the ingest base.
 ```
 
-### 3. Mirror to the deploy/CI platforms (when they exist — P11)
+### 3. Mirror to the deploy/CI platforms
 
 The Pages Function reads these from the **Cloudflare Pages** project env, not
-from Infisical at runtime. When the Pages project is created (P11):
+from Infisical at runtime.
 
-- Add `AXIOM_TOKEN`, `AXIOM_DATASET` to the Pages project's environment
-  variables, for both Production and Preview. (`AXIOM_URL` only if overriding.)
-- Add the same to GitHub Actions secrets only if a deploy job needs them.
+- **Production: done (AGE-253)** — `AXIOM_TOKEN` + `AXIOM_DATASET` are set as
+  encrypted secrets on the `fbc-platform` Pages project (Production). They are
+  bound to a deployment at deploy time, so a redeploy is required after changing
+  them. (`AXIOM_URL` only if overriding the EU edge default.)
+- **Preview: not set yet** — preview deploys' `/api/log` is a no-op (returns
+  `204`, drops the event) until the same secrets are added to the Preview env.
+- GitHub Actions injects the build-time `VITE_*` vars via Infisical; the
+  server-only `AXIOM_*` secrets live only on the Pages project, not in CI.
 
 ---
 
