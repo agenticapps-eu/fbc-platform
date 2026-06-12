@@ -63,10 +63,12 @@ jobs:
         env:
           CF_BRANCH: ${{ github.head_ref || 'main' }}
         run: |
+          # pipefail so a wrangler failure isn't masked by the `tee` exit code.
+          set -euo pipefail
           infisical run --env="$INFISICAL_ENV" -- \
             pnpm dlx wrangler@4 pages deploy ./dist \
               --project-name=fbc-platform --branch="$CF_BRANCH" | tee deploy.log
-          url="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1)"
+          url="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1 || true)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL on the PR
