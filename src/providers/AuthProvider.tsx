@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { logEvent } from "../lib/log";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
@@ -111,10 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tierLoading,
       signUp: async (email, password) => {
         const { error } = await supabase.auth.signUp({ email, password });
+        if (!error) logEvent("signup");
         return { error };
       },
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!error) logEvent("login");
         return { error };
       },
       signOut: async () => {
