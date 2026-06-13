@@ -1,10 +1,12 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
+import HomeRedirect from "./components/HomeRedirect";
 import RequireAuth from "./components/RequireAuth";
 import RequireTier from "./components/RequireTier";
 import { navItems, type NavItem } from "./config/nav";
 import LoginPage from "./pages/LoginPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 
 // Dev-only: aus dem Prod-Build heraustree-shaken (DEV ist statisch false).
@@ -21,8 +23,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        {/* Startseite: Community ist die neue „Heimat" (vormals Feed). */}
-        <Route index element={<Navigate to="/community" replace />} />
+        {/* Startseite: leitet neue Nutzer ins Onboarding, sonst in die Community. */}
+        <Route index element={<HomeRedirect />} />
         {navItems.map((item) => (
           <Route key={item.path} path={item.path} element={gatedElement(item)} />
         ))}
@@ -39,6 +41,16 @@ export default function App() {
         />
       </Route>
       <Route path="/login" element={<LoginPage />} />
+      {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
+          außerhalb der AppShell (wie /login). */}
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <OnboardingPage />
+          </RequireAuth>
+        }
+      />
       {StyleguidePage && (
         <Route
           path="/styleguide"
