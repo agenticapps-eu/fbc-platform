@@ -5,7 +5,7 @@ import App from "./App";
 import { AuthFixture, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
-  it("zeigt die Shell-Navigation und die Feed-Seite", () => {
+  it("zeigt die Shell-Navigation und leitet / auf die Community-Startseite", () => {
     render(
       <AuthFixture value={fakeAuthValue()}>
         <MemoryRouter initialEntries={["/"]}>
@@ -14,8 +14,10 @@ describe("App", () => {
       </AuthFixture>,
     );
 
-    expect(screen.getByRole("link", { name: "Fair Business Club" })).toBeInTheDocument();
+    // Logo erscheint in Sidebar (Desktop) und Header (Mobil) — beide im DOM.
+    expect(screen.getAllByRole("link", { name: "Fair Business Club" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Matching" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Feed" })).toBeInTheDocument();
+    // Index-Redirect / → /community.
+    expect(screen.getByRole("heading", { name: "Community" })).toBeInTheDocument();
   });
 });

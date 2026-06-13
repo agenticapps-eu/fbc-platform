@@ -10,7 +10,7 @@ interface ErrorFallbackProps {
 /** Freundlicher Fallback im FBC-Look, wenn die App-ErrorBoundary greift. */
 export function ErrorFallback({ resetError, eventId }: ErrorFallbackProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-warm px-6">
+    <div className="flex min-h-screen items-center justify-center bg-soft px-6">
       <Card className="w-full max-w-md text-center">
         <div className="mb-6 flex justify-center">
           <Logo />
@@ -28,7 +28,7 @@ export function ErrorFallback({ resetError, eventId }: ErrorFallbackProps) {
             Seite neu laden
           </Button>
         </div>
-        {eventId && <p className="mt-6 text-xs text-grey/70">Referenz: {eventId}</p>}
+        {eventId && <p className="mt-6 text-xs text-muted/70">Referenz: {eventId}</p>}
       </Card>
     </div>
   );

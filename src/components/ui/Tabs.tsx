@@ -19,7 +19,7 @@ export function Tabs({ tabs, defaultValue, className }: TabsProps) {
 
   return (
     <div className={className}>
-      <div role="tablist" className="flex gap-6 border-b border-ink/10">
+      <div role="tablist" className="flex gap-6 border-b border-line">
         {tabs.map((tab) => {
           const isActive = tab.value === active;
           return (
@@ -32,8 +32,8 @@ export function Tabs({ tabs, defaultValue, className }: TabsProps) {
               className={cn(
                 "-mb-px border-b-2 px-1 pb-3 text-sm font-medium transition-colors",
                 isActive
-                  ? "border-emerald text-emerald"
-                  : "border-transparent text-grey hover:text-ink",
+                  ? "border-gold text-gold-strong"
+                  : "border-transparent text-muted hover:text-ink",
               )}
             >
               {tab.label}

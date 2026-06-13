@@ -7,10 +7,11 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
 }
 
+// Stufenfarbe nur über Gold/Anthrazit — kein Bunt (AGE-237).
 const variants: Record<BadgeVariant, string> = {
-  discover: "bg-grey/10 text-grey",
-  prime: "bg-emerald/10 text-emerald",
-  legacy: "bg-gold-light text-gold-dark",
+  discover: "bg-ink/[0.06] text-muted",
+  prime: "bg-gold-soft text-gold-strong",
+  legacy: "bg-night text-gold",
   neutral: "bg-ink/5 text-ink",
 };
 

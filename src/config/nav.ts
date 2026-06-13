@@ -1,17 +1,24 @@
 import type { ComponentType } from "react";
 import type { MembershipTier } from "../lib/tiers";
 import AcademyPage from "../pages/AcademyPage";
+import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
 import EventsPage from "../pages/EventsPage";
-import FeedPage from "../pages/FeedPage";
+import LibraryPage from "../pages/LibraryPage";
 import MatchingPage from "../pages/MatchingPage";
 import MeinBereichPage from "../pages/MeinBereichPage";
 import ProfilPage from "../pages/ProfilPage";
 import ProjektePage from "../pages/ProjektePage";
 import VerzeichnisPage from "../pages/VerzeichnisPage";
 
-/** Sidebar-Gruppe: die 7 Community-Formate vs. persönliche Konto-Routen. */
-export type NavSection = "formate" | "konto";
+/**
+ * Sidebar-Gruppe:
+ * - `formate`  — die 7 Community-Formate (Top-Level-Sidebar, feste Reihenfolge).
+ * - `konto`    — persönliche Routen (Mein Bereich, Profil).
+ * - `community`— Unterbereiche von Community (z. B. Verzeichnis); geroutet, aber
+ *                NICHT als eigener Top-Level-Eintrag in der Sidebar.
+ */
+export type NavSection = "formate" | "konto" | "community";
 
 export interface NavItem {
   path: string;
@@ -25,16 +32,19 @@ export interface NavItem {
   requiresAuth?: boolean;
 }
 
-/** Routen innerhalb der AppShell. Einzige Quelle für Sidebar-Navigation und Routing. */
+/**
+ * Routen innerhalb der AppShell. Einzige Quelle für Sidebar-Navigation und Routing.
+ *
+ * Reihenfolge der `formate` ist verbindlich (Detlev, AGE-237): die 7 Formate
+ * bauen aufeinander auf — Compass → Library → Academy → Community → Events →
+ * Matching → Projekte.
+ */
 export const navItems: NavItem[] = [
-  { path: "/", label: "Feed", Component: FeedPage, section: "formate" },
-  {
-    path: "/verzeichnis",
-    label: "Verzeichnis",
-    Component: VerzeichnisPage,
-    section: "formate",
-    minTier: "prime",
-  },
+  { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
+  { path: "/library", label: "Library", Component: LibraryPage, section: "formate" },
+  { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },
+  { path: "/community", label: "Community", Component: CommunityPage, section: "formate" },
+  { path: "/events", label: "Events", Component: EventsPage, section: "formate" },
   {
     path: "/matching",
     label: "Matching",
@@ -42,11 +52,15 @@ export const navItems: NavItem[] = [
     section: "formate",
     minTier: "prime",
   },
-  { path: "/events", label: "Events", Component: EventsPage, section: "formate" },
-  { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },
   { path: "/projekte", label: "Projekte", Component: ProjektePage, section: "formate" },
-  { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
-  { path: "/profil", label: "Profil", Component: ProfilPage, section: "konto", requiresAuth: true },
+  // Verzeichnis: Unterbereich von Community (ab Prime), kein Top-Level-Eintrag.
+  {
+    path: "/verzeichnis",
+    label: "Verzeichnis",
+    Component: VerzeichnisPage,
+    section: "community",
+    minTier: "prime",
+  },
   {
     path: "/mein-bereich",
     label: "Mein Bereich",
@@ -54,4 +68,5 @@ export const navItems: NavItem[] = [
     section: "konto",
     requiresAuth: true,
   },
+  { path: "/profil", label: "Profil", Component: ProfilPage, section: "konto", requiresAuth: true },
 ];

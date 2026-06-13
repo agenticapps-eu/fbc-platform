@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
@@ -58,10 +59,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto max-w-md p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">
+      <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
         {mode === "login" ? "Login" : "Registrieren"}
       </h1>
-      <p className="mt-1 text-sm text-gray-500">
+      <p className="mt-1 text-sm text-muted">
         {mode === "login"
           ? "Mit E-Mail und Passwort anmelden."
           : "Neues Konto erstellen — Stufe „Discover“ wird automatisch vergeben."}
@@ -69,7 +70,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
-          <label htmlFor="email" className="text-sm font-medium text-gray-700">
+          <label htmlFor="email" className="text-sm font-medium text-ink">
             E-Mail
           </label>
           <input
@@ -77,13 +78,13 @@ export default function LoginPage() {
             type="email"
             autoComplete="email"
             {...register("email")}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           />
-          {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
+          {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="password" className="text-sm font-medium text-gray-700">
+          <label htmlFor="password" className="text-sm font-medium text-ink">
             Passwort
           </label>
           <input
@@ -91,21 +92,17 @@ export default function LoginPage() {
             type="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             {...register("password")}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           />
-          {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
+          {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
         </div>
 
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-        {info && <p className="text-sm text-green-700">{info}</p>}
+        {formError && <p className="text-sm text-danger">{formError}</p>}
+        {info && <p className="text-sm text-success">{info}</p>}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-        >
+        <Button type="submit" variant="primary" disabled={isSubmitting}>
           {mode === "login" ? "Anmelden" : "Konto erstellen"}
-        </button>
+        </Button>
       </form>
 
       <button
@@ -115,13 +112,13 @@ export default function LoginPage() {
           setFormError(null);
           setInfo(null);
         }}
-        className="mt-4 text-sm text-blue-600 hover:underline"
+        className="mt-4 text-sm font-medium text-gold-strong hover:underline"
       >
         {mode === "login" ? "Noch kein Konto? Registrieren" : "Schon ein Konto? Zum Login"}
       </button>
 
-      <Link to="/" className="mt-4 block text-sm text-gray-500 hover:underline">
-        ← Zurück zum Feed
+      <Link to="/" className="mt-4 block text-sm text-muted hover:underline">
+        ← Zurück zur Community
       </Link>
     </main>
   );
