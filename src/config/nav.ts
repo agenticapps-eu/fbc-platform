@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { MembershipTier } from "../lib/tiers";
 import AcademyPage from "../pages/AcademyPage";
+import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
 import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
 import EventsPage from "../pages/EventsPage";
@@ -60,6 +61,15 @@ export const navItems: NavItem[] = [
     Component: VerzeichnisPage,
     section: "community",
     minTier: "prime",
+  },
+  // Such-/Bieteprofil-Editor (AGE-244): erreichbar aus „Mein Bereich" und dem
+  // Compass-Kontext, kein eigener Top-Level-Eintrag. Alle Stufen (eigene Zeilen).
+  {
+    path: "/angebote-gesuche",
+    label: "Angebote & Gesuche",
+    Component: AngeboteGesuchePage,
+    section: "community",
+    requiresAuth: true,
   },
   {
     path: "/mein-bereich",

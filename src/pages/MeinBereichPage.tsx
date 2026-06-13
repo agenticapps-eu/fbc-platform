@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { MeinBereichSidebar } from "../components/dashboard/MeinBereichSidebar";
+import { CategoryIcon } from "../components/matching/CategoryIcon";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -18,6 +19,7 @@ import {
   type DashboardProfile,
   type ScoreBreakdown,
 } from "../lib/dashboard";
+import { categoryLabel, findCategory, type MatchingSide } from "../config/matching";
 import { GOAL_CATEGORIES } from "../lib/profile";
 import { tierLabel } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
@@ -528,11 +530,26 @@ function MatchingWidget({ data }: { data: DashboardData }) {
       id="matching"
       title="Mein Matching"
       className="md:col-span-2"
-      action={<CardLink to="/matching">Zum Matching</CardLink>}
+      action={
+        <div className="flex items-center gap-3">
+          <CardLink to="/angebote-gesuche">Bearbeiten</CardLink>
+          <CardLink to="/matching">Zum Matching</CardLink>
+        </div>
+      }
     >
       <div className="grid gap-5 sm:grid-cols-2">
-        <MatchingColumn title="Ich suche" items={data.needs} empty="Keine Gesuche hinterlegt." />
-        <MatchingColumn title="Ich biete" items={data.offers} empty="Keine Angebote hinterlegt." />
+        <MatchingColumn
+          title="Ich suche"
+          side="need"
+          items={data.needs}
+          empty="Keine Gesuche hinterlegt."
+        />
+        <MatchingColumn
+          title="Ich biete"
+          side="offer"
+          items={data.offers}
+          empty="Keine Angebote hinterlegt."
+        />
       </div>
       <div className="grid grid-cols-3 gap-3 border-t border-line pt-4">
         <MatchStat label="Aktive Matches" value={data.matchStats.active} />
@@ -545,10 +562,12 @@ function MatchingWidget({ data }: { data: DashboardData }) {
 
 function MatchingColumn({
   title,
+  side,
   items,
   empty,
 }: {
   title: string;
+  side: MatchingSide;
   items: { id: string; title: string; category: string | null }[];
   empty: string;
 }) {
@@ -559,22 +578,33 @@ function MatchingColumn({
         <p className="mt-2 text-sm text-muted">{empty}</p>
       ) : (
         <ul className="mt-2 grid grid-cols-1 gap-2">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center gap-2.5 rounded-lg border border-line bg-soft p-2.5"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gold-soft text-sm font-semibold text-gold-strong">
-                {(item.category ?? item.title).charAt(0).toUpperCase()}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{item.title}</p>
-                {item.category && (
-                  <p className="truncate text-xs text-muted capitalize">{item.category}</p>
-                )}
-              </div>
-            </li>
-          ))}
+          {items.map((item) => {
+            const cat = findCategory(side, item.category);
+            return (
+              <li
+                key={item.id}
+                className="flex items-center gap-2.5 rounded-lg border border-line bg-soft p-2.5"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold-strong">
+                  {cat ? (
+                    <CategoryIcon icon={cat.icon} className="h-4 w-4" />
+                  ) : (
+                    <span className="text-sm font-semibold">
+                      {item.title.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{item.title}</p>
+                  {item.category && (
+                    <p className="truncate text-xs text-muted">
+                      {categoryLabel(side, item.category)}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
