@@ -13,20 +13,46 @@
 --   3. search_directory(...) RPC: full-text query + facet filters, RLS-respecting.
 
 -- ── 1. Full-text document (generated, stored) ────────────────────────────────
--- The 2-arg to_tsvector(regconfig, text) with a constant config is IMMUTABLE, as are
--- coalesce / array_to_string / concatenation — the requirement for a generated column.
+-- array_to_string() is only STABLE (its volatility is generic across element types),
+-- so an inline generated expression using it is rejected as non-immutable (42P17).
+-- For text[] inputs the conversion is in fact deterministic, so we wrap the document
+-- build in an IMMUTABLE helper — the supported pattern for tsvector generated columns.
+create or replace function public.fbc_profile_search_doc(
+  p_name         text,
+  p_company      text,
+  p_branche      text,
+  p_short_bio    text,
+  p_headline     text,
+  p_roles        text[],
+  p_competencies text[],
+  p_interests    text[]
+)
+returns tsvector
+language sql
+immutable
+set search_path = ''
+as $$
+  select to_tsvector(
+    'german',
+    coalesce(p_name, '') || ' ' ||
+    coalesce(p_company, '') || ' ' ||
+    coalesce(p_branche, '') || ' ' ||
+    coalesce(p_short_bio, '') || ' ' ||
+    coalesce(p_headline, '') || ' ' ||
+    coalesce(array_to_string(p_roles, ' '), '') || ' ' ||
+    coalesce(array_to_string(p_competencies, ' '), '') || ' ' ||
+    coalesce(array_to_string(p_interests, ' '), '')
+  );
+$$;
+
+comment on function public.fbc_profile_search_doc is
+  'IMMUTABLE builder for profiles.search_doc (german tsvector). Wraps array_to_string '
+  '(STABLE in general, deterministic for text[]) so it can drive a generated column.';
+
 alter table public.profiles
   add column search_doc tsvector generated always as (
-    to_tsvector(
-      'german',
-      coalesce(name, '') || ' ' ||
-      coalesce(company, '') || ' ' ||
-      coalesce(branche, '') || ' ' ||
-      coalesce(short_bio, '') || ' ' ||
-      coalesce(headline, '') || ' ' ||
-      coalesce(array_to_string(roles, ' '), '') || ' ' ||
-      coalesce(array_to_string(competencies, ' '), '') || ' ' ||
-      coalesce(array_to_string(interests, ' '), '')
+    public.fbc_profile_search_doc(
+      name, company, branche, short_bio, headline, roles, competencies, interests
     )
   ) stored;
 
