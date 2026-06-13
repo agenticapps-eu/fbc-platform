@@ -1153,6 +1153,32 @@ export type Database = {
     Functions: {
       current_tier_rank: { Args: never; Returns: number };
       is_prime_plus: { Args: never; Returns: boolean };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-241). Mirrors the
+      // search_directory(...) RPC from 20260613170000_directory_search.sql exactly.
+      search_directory: {
+        Args: {
+          p_query?: string | null;
+          p_theme?: string | null;
+          p_branche?: string | null;
+          p_region?: string | null;
+          p_competency?: string | null;
+          p_offering?: string | null;
+        };
+        Returns: {
+          id: string;
+          name: string | null;
+          avatar_url: string | null;
+          region: string | null;
+          company: string | null;
+          short_bio: string | null;
+          branche: string | null;
+          tier: string;
+          roles: string[] | null;
+          competencies: string[] | null;
+          has_offers: boolean;
+          has_needs: boolean;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;
