@@ -1115,7 +1115,9 @@ export type Database = {
           id: string | null;
           name: string | null;
           region: string | null;
+          roles: string[] | null;
           short_bio: string | null;
+          tier: string | null;
         };
         Insert: {
           avatar_url?: string | null;
@@ -1123,7 +1125,9 @@ export type Database = {
           id?: string | null;
           name?: string | null;
           region?: string | null;
+          roles?: string[] | null;
           short_bio?: string | null;
+          tier?: string | null;
         };
         Update: {
           avatar_url?: string | null;
@@ -1131,9 +1135,19 @@ export type Database = {
           id?: string | null;
           name?: string | null;
           region?: string | null;
+          roles?: string[] | null;
           short_bio?: string | null;
+          tier?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tier_fkey";
+            columns: ["tier"];
+            isOneToOne: false;
+            referencedRelation: "membership_tiers";
+            referencedColumns: ["key"];
+          },
+        ];
       };
     };
     Functions: {

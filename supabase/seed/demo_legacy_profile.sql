@@ -93,3 +93,15 @@ insert into public.profile_badges (profile_id, badge_key, awarded_at) values
   ('00000000-0000-0000-0000-000000000238', 'mentor',              date '2022-09-15'),
   ('00000000-0000-0000-0000-000000000238', 'host',                date '2023-02-20')
 on conflict (profile_id, badge_key) do nothing;
+
+-- 7. Such-/Bieteprofil (offers + needs) — rendered by the public profile page
+--    (AGE-239) for Prime+ viewers. Re-seed cleanly; uuid PK can't dedupe on content.
+delete from public.offers where profile_id = '00000000-0000-0000-0000-000000000238';
+insert into public.offers (profile_id, category, theme, title, description) values
+  ('00000000-0000-0000-0000-000000000238', 'Kapital',  'haben', 'Beteiligungskapital', 'Eigenkapital für skalierbare Impact-Ventures im DACH-Raum.'),
+  ('00000000-0000-0000-0000-000000000238', 'Know-how', 'tun',   'M&A-Begleitung',      'Strukturierung und Begleitung von Transaktionen & Nachfolgen.');
+
+delete from public.needs where profile_id = '00000000-0000-0000-0000-000000000238';
+insert into public.needs (profile_id, category, theme, title, description) values
+  ('00000000-0000-0000-0000-000000000238', 'Projekte', 'wirken', 'Impact-Projekte',  'Suche wirkungsorientierte Projekte mit Skalierungspotenzial.'),
+  ('00000000-0000-0000-0000-000000000238', 'Partner',  'tun',    'Preferred Partner', 'Erweitere mein Partnernetzwerk in Immobilien & Beteiligungen.');
