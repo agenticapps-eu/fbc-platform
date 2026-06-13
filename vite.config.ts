@@ -39,5 +39,11 @@ export default defineConfig({
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // Dummy-Supabase-Config, damit src/lib/supabase.ts beim Import nicht wirft
+    // (Unit-Tests sprechen kein Netzwerk an).
+    env: {
+      VITE_SUPABASE_URL: "http://localhost:54321",
+      VITE_SUPABASE_ANON_KEY: "test-anon-key",
+    },
   },
 });
