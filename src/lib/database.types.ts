@@ -6,8 +6,51 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5";
   };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
+      badges: {
+        Row: {
+          icon: string | null;
+          key: string;
+          label: string;
+        };
+        Insert: {
+          icon?: string | null;
+          key: string;
+          label: string;
+        };
+        Update: {
+          icon?: string | null;
+          key?: string;
+          label?: string;
+        };
+        Relationships: [];
+      };
       comments: {
         Row: {
           author_id: string;
@@ -319,6 +362,45 @@ export type Database = {
           },
           {
             foreignKeyName: "feedback_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      goals: {
+        Row: {
+          category: string;
+          id: string;
+          profile_id: string;
+          progress: number | null;
+          title: string;
+        };
+        Insert: {
+          category: string;
+          id?: string;
+          profile_id: string;
+          progress?: number | null;
+          title: string;
+        };
+        Update: {
+          category?: string;
+          id?: string;
+          profile_id?: string;
+          progress?: number | null;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "goals_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "goals_profile_id_fkey";
             columns: ["profile_id"];
             isOneToOne: false;
             referencedRelation: "profiles_public";
@@ -787,6 +869,46 @@ export type Database = {
           },
         ];
       };
+      profile_badges: {
+        Row: {
+          awarded_at: string;
+          badge_key: string;
+          profile_id: string;
+        };
+        Insert: {
+          awarded_at?: string;
+          badge_key: string;
+          profile_id: string;
+        };
+        Update: {
+          awarded_at?: string;
+          badge_key?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_badges_badge_key_fkey";
+            columns: ["badge_key"];
+            isOneToOne: false;
+            referencedRelation: "badges";
+            referencedColumns: ["key"];
+          },
+          {
+            foreignKeyName: "profile_badges_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_badges_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profile_contacts: {
         Row: {
           email: string | null;
@@ -823,6 +945,75 @@ export type Database = {
           },
         ];
       };
+      profile_interests: {
+        Row: {
+          id: string;
+          label: string;
+          profile_id: string;
+          theme: string | null;
+        };
+        Insert: {
+          id?: string;
+          label: string;
+          profile_id: string;
+          theme?: string | null;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          profile_id?: string;
+          theme?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_interests_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_interests_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      profile_theme_scores: {
+        Row: {
+          profile_id: string;
+          score: number;
+          theme: string;
+        };
+        Insert: {
+          profile_id: string;
+          score: number;
+          theme: string;
+        };
+        Update: {
+          profile_id?: string;
+          score?: number;
+          theme?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_theme_scores_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_theme_scores_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_url: string | null;
@@ -830,14 +1021,21 @@ export type Database = {
           company: string | null;
           competencies: string[] | null;
           created_at: string;
+          dev_focus: string | null;
+          dev_progress: number | null;
           goals: string | null;
+          headline: string | null;
           id: string;
           interests: string[] | null;
           is_public: boolean;
+          member_number: string | null;
+          member_since: string | null;
           name: string | null;
+          next_steps: string[] | null;
           potential_score: number;
           profile_completion: number;
           region: string | null;
+          roles: string[] | null;
           short_bio: string | null;
           socials: Json | null;
           tier: string;
@@ -850,14 +1048,21 @@ export type Database = {
           company?: string | null;
           competencies?: string[] | null;
           created_at?: string;
+          dev_focus?: string | null;
+          dev_progress?: number | null;
           goals?: string | null;
+          headline?: string | null;
           id: string;
           interests?: string[] | null;
           is_public?: boolean;
+          member_number?: string | null;
+          member_since?: string | null;
           name?: string | null;
+          next_steps?: string[] | null;
           potential_score?: number;
           profile_completion?: number;
           region?: string | null;
+          roles?: string[] | null;
           short_bio?: string | null;
           socials?: Json | null;
           tier?: string;
@@ -870,14 +1075,21 @@ export type Database = {
           company?: string | null;
           competencies?: string[] | null;
           created_at?: string;
+          dev_focus?: string | null;
+          dev_progress?: number | null;
           goals?: string | null;
+          headline?: string | null;
           id?: string;
           interests?: string[] | null;
           is_public?: boolean;
+          member_number?: string | null;
+          member_since?: string | null;
           name?: string | null;
+          next_steps?: string[] | null;
           potential_score?: number;
           profile_completion?: number;
           region?: string | null;
+          roles?: string[] | null;
           short_bio?: string | null;
           socials?: Json | null;
           tier?: string;
@@ -926,6 +1138,7 @@ export type Database = {
     };
     Functions: {
       current_tier_rank: { Args: never; Returns: number };
+      is_prime_plus: { Args: never; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;
@@ -1052,6 +1265,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
