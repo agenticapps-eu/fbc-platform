@@ -15,22 +15,46 @@ import { ToastProvider } from "../components/ui/Toast";
 import { useToast } from "../components/ui/toast-context";
 
 const COLORS: { name: string; token: string; className: string; dark?: boolean }[] = [
-  { name: "Emerald / Primary", token: "#0E5C4A", className: "bg-emerald", dark: true },
-  { name: "Emerald Dark", token: "#0A3D33", className: "bg-emerald-dark", dark: true },
-  { name: "Gold / Accent", token: "#B8893B", className: "bg-gold", dark: true },
-  { name: "Gold Dark", token: "#7A5A26", className: "bg-gold-dark", dark: true },
-  { name: "Gold Light", token: "#EFE3C8", className: "bg-gold-light" },
-  { name: "Warmweiß", token: "#F2F1EC", className: "bg-warm" },
-  { name: "Ink", token: "#262626", className: "bg-ink", dark: true },
-  { name: "Grey", token: "#5B6770", className: "bg-grey", dark: true },
+  { name: "Night / Chrome", token: "#0E0F12", className: "bg-night", dark: true },
+  { name: "Night Elevated", token: "#16181D", className: "bg-night-elevated", dark: true },
+  { name: "Gold / Accent", token: "#C2A24E", className: "bg-gold", dark: true },
+  { name: "Gold Strong", token: "#B8893B", className: "bg-gold-strong", dark: true },
+  { name: "Gold Soft", token: "#EFE3C8", className: "bg-gold-soft" },
+  { name: "Canvas", token: "#FFFFFF", className: "bg-canvas" },
+  { name: "Soft / Seite", token: "#F6F5F1", className: "bg-soft" },
+  { name: "Ink / Text", token: "#14151A", className: "bg-ink", dark: true },
+  { name: "Muted", token: "#6B7280", className: "bg-muted", dark: true },
+  { name: "Line", token: "#E7E5DF", className: "bg-line" },
+  { name: "Positive", token: "#1F9D6B", className: "bg-positive", dark: true },
+  { name: "Danger", token: "#B23A2E", className: "bg-danger", dark: true },
 ];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-grey/70">{title}</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted/70">{title}</h2>
       {children}
     </section>
+  );
+}
+
+/** Inline-Demo: Stat-Tile (große Zahl + gemutetes Label + Trend in Positive). */
+function StatTile({ label, value, trend }: { label: string; value: string; trend?: string }) {
+  return (
+    <Card>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted">{label}</p>
+      <p className="mt-2 font-display text-4xl font-semibold tracking-tight text-ink">{value}</p>
+      {trend && <p className="mt-1 text-sm font-medium text-positive">{trend}</p>}
+    </Card>
+  );
+}
+
+/** Inline-Demo: dünner Fortschrittsbalken, Gold-Füllung auf Line. */
+function Progress({ value }: { value: number }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
+      <div className="h-full rounded-full bg-gold" style={{ width: `${value}%` }} />
+    </div>
   );
 }
 
@@ -39,7 +63,7 @@ function ToastDemo() {
   return (
     <div className="flex flex-wrap gap-3">
       <Button
-        variant="secondary"
+        variant="ghost"
         size="sm"
         onClick={() =>
           toast({
@@ -52,7 +76,7 @@ function ToastDemo() {
         Success-Toast
       </Button>
       <Button
-        variant="secondary"
+        variant="ghost"
         size="sm"
         onClick={() =>
           toast({
@@ -65,7 +89,7 @@ function ToastDemo() {
         Error-Toast
       </Button>
       <Button
-        variant="secondary"
+        variant="ghost"
         size="sm"
         onClick={() => toast({ title: "Hinweis", description: "Eine ruhige Benachrichtigung." })}
       >
@@ -82,18 +106,18 @@ function SentryTestSection() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" size="sm" onClick={() => setBoom(true)}>
+        <Button variant="ghost" size="sm" onClick={() => setBoom(true)}>
           Render-Fehler werfen (ErrorBoundary + Sentry)
         </Button>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={() => captureMessage("FBC Sentry-Test-Message", "info")}
         >
           Test-Message senden
         </Button>
       </div>
-      <p className="text-xs text-grey">
+      <p className="text-xs text-muted">
         Events erscheinen nur in Sentry, wenn <code>VITE_SENTRY_DSN</code> gesetzt ist.
       </p>
     </div>
@@ -103,10 +127,10 @@ function SentryTestSection() {
 function AxiomTestSection() {
   return (
     <div className="space-y-3">
-      <Button variant="secondary" size="sm" onClick={() => logEvent("login", { test: true })}>
+      <Button variant="ghost" size="sm" onClick={() => logEvent("login", { test: true })}>
         Test-Event an <code>/api/log</code> senden
       </Button>
-      <p className="text-xs text-grey">
+      <p className="text-xs text-muted">
         Geht über den Server-Proxy <code>/api/log</code> an Axiom. Erscheint nur, wenn die Function
         läuft (<code>wrangler pages dev</code> oder Deploy) und <code>AXIOM_TOKEN</code>/
         <code>AXIOM_DATASET</code> gesetzt sind. Bei reinem <code>vite dev</code> laufen Pages
@@ -119,17 +143,36 @@ function AxiomTestSection() {
 export default function StyleguidePage() {
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-warm px-6 py-12 text-ink lg:px-12">
+      <div className="min-h-screen bg-soft px-6 py-12 text-ink lg:px-12">
         <div className="mx-auto max-w-5xl space-y-14">
           {/* Kopf */}
-          <header className="space-y-3 border-b border-ink/8 pb-8">
+          <header className="space-y-3 border-b border-line pb-8">
             <Logo />
-            <h1 className="text-3xl font-semibold tracking-tight">FBC Design-System</h1>
-            <p className="max-w-2xl text-grey">
-              Smaragd &amp; Gold — exklusiver Premium-Club, ruhig, viel Weißraum. Diese Seite ist
-              nur im Dev-Modus erreichbar und zeigt Tokens und Basis-Komponenten.
+            <h1 className="font-display text-4xl font-semibold tracking-tight">
+              FBC Design-System
+            </h1>
+            <p className="max-w-2xl text-muted">
+              Schwarz &amp; Gold — elegant, modern, exklusiv. Schwarz/Anthrazit als Chrome, Gold als
+              einziger Akzent, helle ruhige Content-Flächen. Diese Seite ist nur im Dev-Modus
+              erreichbar und zeigt Tokens und Basis-Komponenten.
             </p>
           </header>
+
+          {/* Chrome-Vorschau (dunkel) */}
+          <Section title="Chrome — Schwarz &amp; Gold">
+            <div className="overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night p-6 shadow-soft">
+              <Logo tone="dark" />
+              <div className="mt-5 flex flex-col gap-1">
+                <span className="relative rounded-md bg-night-elevated px-3 py-2 text-sm font-medium text-gold">
+                  <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold" />
+                  Aktive Route (Gold-Label + Gold-Linksbalken)
+                </span>
+                <span className="rounded-md px-3 py-2 text-sm text-on-night-muted">
+                  Inaktive Route
+                </span>
+              </div>
+            </div>
+          </Section>
 
           {/* Farben */}
           <Section title="Farb-Tokens">
@@ -137,41 +180,45 @@ export default function StyleguidePage() {
               {COLORS.map((c) => (
                 <div
                   key={c.token}
-                  className="overflow-hidden rounded-xl border border-ink/5 bg-white shadow-soft"
+                  className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft"
                 >
                   <div className={`flex h-20 items-end p-3 ${c.className}`}>
-                    <span className={`text-xs font-medium ${c.dark ? "text-warm" : "text-ink"}`}>
+                    <span
+                      className={`text-xs font-medium ${c.dark ? "text-on-night" : "text-ink"}`}
+                    >
                       {c.token}
                     </span>
                   </div>
-                  <div className="px-3 py-2 text-xs font-medium text-grey">{c.name}</div>
+                  <div className="px-3 py-2 text-xs font-medium text-muted">{c.name}</div>
                 </div>
               ))}
             </div>
           </Section>
 
           {/* Typografie */}
-          <Section title="Typografie — Inter">
+          <Section title="Typografie — Cormorant Garamond (Display) &amp; Inter (UI)">
             <Card className="space-y-3">
-              <h1 className="text-4xl font-semibold tracking-tight">
-                Headline H1 — ruhig &amp; klar
+              <h1 className="font-display text-5xl font-semibold tracking-tight">
+                Eine Gemeinschaft, die trägt
               </h1>
-              <h2 className="text-2xl font-semibold tracking-tight">Headline H2</h2>
-              <h3 className="text-lg font-semibold">Headline H3</h3>
-              <p className="max-w-2xl text-grey">
-                Fließtext in Grey mit großzügiger Zeilenhöhe. Das FBC-System setzt auf viel Weißraum
-                und zurückhaltende Akzente statt FinTech-Dichte.
+              <h2 className="font-display text-3xl font-semibold tracking-tight">
+                Display-Headline H2 — Serif
+              </h2>
+              <h3 className="text-lg font-semibold">UI-Headline H3 — Inter</h3>
+              <p className="max-w-2xl text-muted">
+                Fließtext in Inter mit großzügiger Zeilenhöhe. Das FBC-System setzt auf viel
+                Weißraum, feine Linien und einen einzigen Gold-Akzent statt FinTech-Dichte.
               </p>
-              <p className="text-sm text-grey">Kleiner Text / Caption.</p>
+              <p className="text-sm text-muted">Kleiner Text / Caption.</p>
             </Card>
           </Section>
 
           {/* Buttons */}
           <Section title="Buttons">
             <div className="flex flex-wrap items-center gap-4">
-              <Button variant="primary">Primary</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="ghost">Ghost</Button>
+              <Button variant="primary">Primary (Gold)</Button>
+              <Button variant="secondary">Secondary (Dunkel)</Button>
+              <Button variant="ghost">Ghost (Gold-Outline)</Button>
               <Button variant="primary" size="sm">
                 Primary klein
               </Button>
@@ -189,6 +236,35 @@ export default function StyleguidePage() {
               <TierBadge tier="legacy" />
               <Badge variant="neutral">Neutral</Badge>
             </div>
+          </Section>
+
+          {/* Stat-Tiles */}
+          <Section title="Stat-Tiles">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatTile label="Mitglieder" value="248" trend="+12 % MoM" />
+              <StatTile label="Matches" value="37" trend="+5 diese Woche" />
+              <StatTile label="Events" value="6" />
+            </div>
+          </Section>
+
+          {/* Fortschritt */}
+          <Section title="Fortschrittsbalken">
+            <Card className="max-w-md space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-ink">Profil-Vollständigkeit</span>
+                  <span className="text-muted">72 %</span>
+                </div>
+                <Progress value={72} />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-ink">Onboarding</span>
+                  <span className="text-muted">30 %</span>
+                </div>
+                <Progress value={30} />
+              </div>
+            </Card>
           </Section>
 
           {/* Avatare */}

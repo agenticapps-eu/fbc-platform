@@ -26,12 +26,12 @@ function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"
 }
 
 describe("Stufen-Gating für /verzeichnis (min Prime)", () => {
-  it("leitet Discover vom Verzeichnis weg auf den Feed", () => {
+  it("leitet Discover vom Verzeichnis weg auf die Community-Startseite", () => {
     renderAt("/verzeichnis", authAsTier("discover"));
 
-    // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen der Feed (Redirect /).
+    // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen Community (Redirect / → /community).
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Feed" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Community" })).toBeInTheDocument();
   });
 
   it("lässt Prime das Verzeichnis sehen", () => {
@@ -93,9 +93,9 @@ describe("Stufen-Gating wartet auf das Laden der Stufe", () => {
   it("leitet einen eingeloggten Nutzer NICHT vorzeitig weg, solange die Stufe lädt", () => {
     renderAt("/verzeichnis", authLoadingTier());
 
-    // Kein vorzeitiger Redirect auf / (Feed) und noch kein Verzeichnis-Inhalt:
+    // Kein vorzeitiger Redirect auf / (Community) und noch kein Verzeichnis-Inhalt:
     // RequireTier rendert nichts, bis level_rank bekannt ist.
-    expect(screen.queryByRole("heading", { name: "Feed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Community" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 });

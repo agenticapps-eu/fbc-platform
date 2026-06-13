@@ -21,7 +21,7 @@ export function SidebarNav({ sections }: SidebarNavProps) {
       {sections.map((section, i) => (
         <div key={section.title ?? i} className="flex flex-col gap-1">
           {section.title && (
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-grey/70">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-night-muted/70">
               {section.title}
             </p>
           )}
@@ -29,19 +29,18 @@ export function SidebarNav({ sections }: SidebarNavProps) {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === "/"}
               className={({ isActive }) =>
                 cn(
                   "relative rounded-md px-3 py-2 text-sm transition-colors",
                   isActive
-                    ? "bg-emerald/8 font-medium text-emerald"
-                    : "text-grey hover:bg-ink/[0.03] hover:text-ink",
+                    ? "bg-night-elevated font-medium text-gold"
+                    : "text-on-night-muted hover:bg-night-elevated/60 hover:text-on-night",
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  {/* Goldakzent als feine Linie am aktiven Eintrag. */}
+                  {/* Gold-Linksbalken am aktiven Eintrag. */}
                   {isActive && (
                     <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold" />
                   )}

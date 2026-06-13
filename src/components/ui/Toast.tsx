@@ -7,9 +7,9 @@ interface ToastItem extends ToastOptions {
 }
 
 const variantStyles: Record<NonNullable<ToastOptions["variant"]>, string> = {
-  default: "border-l-ink/20",
-  success: "border-l-emerald",
-  error: "border-l-red-400",
+  default: "border-l-gold",
+  success: "border-l-success",
+  error: "border-l-danger",
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -39,18 +39,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex items-start gap-3 rounded-lg border border-ink/5 border-l-4 bg-white px-4 py-3 shadow-soft",
+              "pointer-events-auto flex items-start gap-3 rounded-lg border border-line border-l-4 bg-canvas px-4 py-3 shadow-soft",
               variantStyles[t.variant ?? "default"],
             )}
           >
             <div className="flex-1">
               <p className="text-sm font-medium text-ink">{t.title}</p>
-              {t.description && <p className="mt-0.5 text-sm text-grey">{t.description}</p>}
+              {t.description && <p className="mt-0.5 text-sm text-muted">{t.description}</p>}
             </div>
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="text-grey transition-colors hover:text-ink"
+              className="text-muted transition-colors hover:text-ink"
               aria-label="Schließen"
             >
               &times;

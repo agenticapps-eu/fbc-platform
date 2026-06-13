@@ -1,27 +1,51 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* FBC Design-System — Smaragd & Gold.
-   Anmutung: exklusiver Premium-Club, ruhig, viel Weißraum. */
+/* FBC Design-System — Schwarz & Gold.
+   Anmutung: exklusiver Mitgliederclub — Schwarz/Anthrazit als Chrome,
+   Gold als einziger Akzent, helle, ruhige Content-Flächen. */
 @theme {
-  /* Primary — Smaragd */
-  --color-emerald: #0e5c4a;
-  --color-emerald-dark: #0a3d33;
+  /* Chrome — Schwarz/Anthrazit (Sidebar, Header, Hero) */
+  --color-night: #0e0f12;
+  --color-night-elevated: #16181d;
+  --color-night-border: rgba(255, 255, 255, 0.08);
 
-  /* Akzent — Gold */
-  --color-gold: #b8893b;
-  --color-gold-dark: #7a5a26; /* dunkler für lesbaren Text auf Hell */
-  --color-gold-light: #efe3c8;
+  /* Akzent — Gold (einziger Marken-Akzent) */
+  --color-gold: #c2a24e;
+  --color-gold-strong: #b8893b;
+  --color-gold-soft: #efe3c8;
 
-  /* Neutrals — warmweiß / ink / grey */
-  --color-warm: #f2f1ec;
-  --color-ink: #262626;
-  --color-grey: #5b6770;
+  /* Content — hell, warm */
+  --color-canvas: #ffffff;
+  --color-soft: #f6f5f1;
+  --color-ink: #14151a;
+  --color-muted: #6b7280;
+  --color-line: #e7e5df;
 
+  /* Text auf dunklem Chrome */
+  --color-on-night: #f4f2ec;
+  --color-on-night-muted: #a1a1aa;
+
+  /* Status */
+  --color-success: #2e7d5b;
+  --color-positive: #1f9d6b;
+  --color-danger: #b23a2e;
+
+  /* Format-Akzentfarben (NUR für die kleinen Format-Icons, sparsam) */
+  --color-fmt-compass: #1c6b57;
+  --color-fmt-library: #2c7a7b;
+  --color-fmt-academy: #2b5c9a;
+  --color-fmt-community: #c8791e;
+  --color-fmt-events: #b23a2e;
+  --color-fmt-matching: #1e3a5f;
+  --color-fmt-projekte: #6b3fa0;
+
+  /* Typografie */
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Ruhiger, weicher Premium-Schatten statt harter Kanten. */
-  --shadow-soft: 0 1px 2px rgba(38, 38, 38, 0.04), 0 12px 32px -16px rgba(10, 61, 51, 0.18);
+  --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 16px 40px -24px rgba(20, 21, 26, 0.25);
+  --radius-card: 14px;
 }
 
 @layer base {
@@ -31,7 +55,7 @@
   }
 
   body {
-    background-color: var(--color-warm);
+    background-color: var(--color-soft);
     color: var(--color-ink);
     line-height: 1.65;
   }
