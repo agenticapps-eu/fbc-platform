@@ -21,7 +21,9 @@ export default function CompassPage() {
     enabled: !!uid,
   });
 
-  const hasDraft = uid ? Object.keys(loadDraft(uid).scales).length > 0 : false;
+  const draft = uid ? loadDraft(uid) : null;
+  const hasDraft =
+    !!draft && (Object.keys(draft.scales).length > 0 || Object.keys(draft.chips).length > 0);
   const hasResponses = data?.hasResponses ?? false;
 
   return (

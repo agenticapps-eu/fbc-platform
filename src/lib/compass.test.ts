@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { CompassStep } from "../config/compass";
 import {
   type CompassDraft,
@@ -8,6 +8,7 @@ import {
   deriveOffers,
   dominantTheme,
   emptyDraft,
+  loadDraft,
 } from "./compass";
 
 // Eigener Test-Katalog (unabhängig vom mit Detlev abzustimmenden Default-Katalog).
@@ -132,5 +133,25 @@ describe("deriveInterests / deriveOffers / deriveNeeds", () => {
     expect(deriveInterests(STEPS, emptyDraft())).toEqual([]);
     expect(deriveOffers(STEPS, emptyDraft())).toEqual([]);
     expect(deriveNeeds(STEPS, emptyDraft())).toEqual([]);
+  });
+});
+
+describe("loadDraft (defensives Parsen)", () => {
+  afterEach(() => localStorage.clear());
+
+  it("liefert einen leeren Entwurf bei kaputtem JSON", () => {
+    localStorage.setItem("fbc:compass-draft:u1", "{nicht json");
+    expect(loadDraft("u1")).toEqual(emptyDraft());
+  });
+
+  it("ignoriert nicht-objektförmige scales/chips", () => {
+    localStorage.setItem("fbc:compass-draft:u1", JSON.stringify({ scales: "x", chips: 5 }));
+    expect(loadDraft("u1")).toEqual({ scales: {}, chips: {} });
+  });
+
+  it("liest einen gültigen Entwurf zurück", () => {
+    const draft = { scales: { "scale-sein": 7 }, chips: { interests: ["a"] } };
+    localStorage.setItem("fbc:compass-draft:u1", JSON.stringify(draft));
+    expect(loadDraft("u1")).toEqual(draft);
   });
 });

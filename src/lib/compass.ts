@@ -170,10 +170,16 @@ export interface CompassResult {
 }
 
 /**
- * Schreibt den Compass ab. „Replace-Collection"-Muster (wie saveProfile): die
- * compass-eigenen Sammlungen des Nutzers werden ersetzt, damit ein erneuter
- * Durchlauf idempotent ist und keine Duplikate erzeugt. In Phase 1 gibt es keinen
- * separaten offers/needs-Editor, daher ist das Ersetzen unkritisch.
+ * Schreibt den Compass ab. compass_responses/offers/needs folgen dem „Replace-
+ * Collection"-Muster (eigene Zeilen ersetzen → idempotenter Neulauf; in Phase 1
+ * ist der Compass deren einziger Schreiber). profile_interests werden hingegen
+ * GEMERGT, weil der Profil-Editor dieselbe Tabelle verwaltet — Ersetzen würde dort
+ * gepflegte Interessen bei einem Compass-Neulauf verlieren.
+ *
+ * Hinweis: die Lösch-/Einfüge-Schritte sind nicht in EINER Transaktion (separate
+ * Calls). Schlägt ein Insert nach einem Delete fehl, bleibt die Sammlung leer, bis
+ * der Nutzer erneut abschließt (der localStorage-Entwurf überlebt → wiederholbar).
+ * Bei höherer Kritikalität: in eine SECURITY-DEFINER-RPC (eine tx) verlagern.
  */
 export async function saveCompass(
   uid: string,
@@ -186,8 +192,11 @@ export async function saveCompass(
   const needs = deriveNeeds(steps, draft);
   const focus = dominantTheme(steps, draft);
 
-  // 1. Eigene compass-Sammlungen leeren (idempotenter Neulauf).
-  for (const table of ["compass_responses", "profile_interests", "offers", "needs"] as const) {
+  // 1. Compass-eigene Sammlungen leeren (idempotenter Neulauf). profile_interests
+  //    bewusst NICHT — die werden gemergt (s. u.), weil der Profil-Editor dieselbe
+  //    Tabelle per replace-collection verwaltet; ein Ersetzen würde dort gepflegte
+  //    Interessen bei einem Compass-Neulauf vernichten.
+  for (const table of ["compass_responses", "offers", "needs"] as const) {
     const { error } = await supabase.from(table).delete().eq("profile_id", uid);
     if (error) throw error;
   }
@@ -199,36 +208,43 @@ export async function saveCompass(
       .insert(rows.map((r) => ({ profile_id: uid, theme: r.theme, answers: r.answers })));
     if (error) throw error;
   }
+  // profile_interests additiv mergen: nur neue (theme,label)-Kombinationen ergänzen,
+  // bestehende (Compass- oder Editor-Herkunft) unangetastet lassen.
   if (interests.length > 0) {
-    const { error } = await supabase
+    const { data: existing, error: exErr } = await supabase
       .from("profile_interests")
-      .insert(interests.map((i) => ({ profile_id: uid, theme: i.theme, label: i.label })));
-    if (error) throw error;
+      .select("theme, label")
+      .eq("profile_id", uid);
+    if (exErr) throw exErr;
+    const seen = new Set((existing ?? []).map((e) => `${e.theme ?? ""}::${e.label}`));
+    const fresh = interests.filter((i) => !seen.has(`${i.theme}::${i.label}`));
+    if (fresh.length > 0) {
+      const { error } = await supabase
+        .from("profile_interests")
+        .insert(fresh.map((i) => ({ profile_id: uid, theme: i.theme, label: i.label })));
+      if (error) throw error;
+    }
   }
   if (offers.length > 0) {
-    const { error } = await supabase
-      .from("offers")
-      .insert(
-        offers.map((o) => ({
-          profile_id: uid,
-          theme: o.theme,
-          category: o.category,
-          title: o.title,
-        })),
-      );
+    const { error } = await supabase.from("offers").insert(
+      offers.map((o) => ({
+        profile_id: uid,
+        theme: o.theme,
+        category: o.category,
+        title: o.title,
+      })),
+    );
     if (error) throw error;
   }
   if (needs.length > 0) {
-    const { error } = await supabase
-      .from("needs")
-      .insert(
-        needs.map((n) => ({
-          profile_id: uid,
-          theme: n.theme,
-          category: n.category,
-          title: n.title,
-        })),
-      );
+    const { error } = await supabase.from("needs").insert(
+      needs.map((n) => ({
+        profile_id: uid,
+        theme: n.theme,
+        category: n.category,
+        title: n.title,
+      })),
+    );
     if (error) throw error;
   }
 
