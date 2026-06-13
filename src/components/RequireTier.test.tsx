@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { ToastProvider } from "../components/ui/Toast";
+import { markSkipped } from "../lib/compass";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
+
+afterEach(() => localStorage.clear());
 
 /** Eingeloggt, aber tier/level_rank werden noch geladen (Profil-Fetch offen). */
 function authLoadingTier(): AuthContextValue {
@@ -37,6 +40,10 @@ function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"
 
 describe("Stufen-Gating für /verzeichnis (min Prime)", () => {
   it("leitet Discover vom Verzeichnis weg auf die Community-Startseite", () => {
+    // „/" ist seit AGE-243 onboarding-bewusst (HomeRedirect). Der „übersprungen"-
+    // Merker lässt die Weiche synchron+deterministisch auf /community auflösen,
+    // sodass dieser Test das Stufen-Gating prüft, nicht das Onboarding.
+    markSkipped("test-user");
     renderAt("/verzeichnis", authAsTier("discover"));
 
     // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen Community (Redirect / → /community).

@@ -27,8 +27,8 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  // Bereits eingeloggt → kein Grund für die Login-Seite.
-  // (Mini-Onboarding-Redirect für neue Nutzer folgt in AGE-243.)
+  // Bereits eingeloggt → kein Grund für die Login-Seite. „/" entscheidet via
+  // HomeRedirect, ob neue Nutzer ins Mini-Compass-Onboarding geleitet werden (AGE-243).
   if (!isLoading && user) return <Navigate to="/" replace />;
 
   async function onSubmit(values: FormValues) {
