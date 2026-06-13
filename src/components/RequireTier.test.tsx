@@ -74,13 +74,16 @@ describe("Auth-Gating für /mein-bereich", () => {
   it("lässt eingeloggte Discover-Nutzer Mein Bereich sehen", () => {
     renderAt("/mein-bereich", authAsTier("discover"));
 
-    expect(screen.getByRole("heading", { name: "Mein Bereich" })).toBeInTheDocument();
+    // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; das Dashboard
+    // mountet und lädt seine Daten (Beleg, dass die Seite gerendert wird).
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    expect(screen.getByText("Dashboard wird geladen…")).toBeInTheDocument();
   });
 
   it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
     renderAt("/mein-bereich", authLoadingTier());
 
-    expect(screen.getByRole("heading", { name: "Mein Bereich" })).toBeInTheDocument();
+    expect(screen.getByText("Dashboard wird geladen…")).toBeInTheDocument();
   });
 });
 

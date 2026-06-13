@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "../config/nav";
 import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
@@ -38,6 +38,10 @@ function SearchIcon() {
 export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
+  // Das „Mein Bereich"-Dashboard (Subnav + 3-Spalten-Grid) braucht mehr Breite
+  // als die übrigen, textlastigen Seiten — sonst nur dort den Container weiten.
+  const { pathname } = useLocation();
+  const isWide = pathname.startsWith("/mein-bereich");
 
   async function handleSignOut() {
     await signOut();
@@ -117,7 +121,7 @@ export default function AppShell() {
         </header>
 
         <main className="min-w-0 flex-1 px-6 py-10 lg:px-10">
-          <div className="mx-auto max-w-4xl">
+          <div className={isWide ? "mx-auto max-w-7xl" : "mx-auto max-w-4xl"}>
             <Outlet />
           </div>
         </main>
