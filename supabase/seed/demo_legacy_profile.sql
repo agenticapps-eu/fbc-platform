@@ -105,3 +105,24 @@ delete from public.needs where profile_id = '00000000-0000-0000-0000-00000000023
 insert into public.needs (profile_id, category, theme, title, description) values
   ('00000000-0000-0000-0000-000000000238', 'Projekte', 'wirken', 'Impact-Projekte',  'Suche wirkungsorientierte Projekte mit Skalierungspotenzial.'),
   ('00000000-0000-0000-0000-000000000238', 'Partner',  'tun',    'Preferred Partner', 'Erweitere mein Partnernetzwerk in Immobilien & Beteiligungen.');
+
+-- 8. Score-Inputs (AGE-242): Mini-Compass-Antworten (speisen den Erfolgsradar)
+--    + Feedback, damit recompute_potential_score alle fünf Komponenten aus echten
+--    Daten füllt. Antworten sind so gewählt, dass die Themen-Ø den oben gesetzten
+--    Radar-Werten entsprechen (sein 8.5 / tun 9 / haben 7.5 / wirken 8).
+delete from public.compass_responses where profile_id = '00000000-0000-0000-0000-000000000238';
+insert into public.compass_responses (profile_id, theme, answers) values
+  ('00000000-0000-0000-0000-000000000238', 'sein',   '{"klarheit":8,"sinn":9}'::jsonb),
+  ('00000000-0000-0000-0000-000000000238', 'tun',    '{"umsetzung":9}'::jsonb),
+  ('00000000-0000-0000-0000-000000000238', 'haben',  '{"kapital":7,"netzwerk":8}'::jsonb),
+  ('00000000-0000-0000-0000-000000000238', 'wirken', '{"reichweite":8}'::jsonb);
+
+delete from public.feedback where profile_id = '00000000-0000-0000-0000-000000000238';
+insert into public.feedback (profile_id, ref_type, rating, note) values
+  ('00000000-0000-0000-0000-000000000238', 'event', 5, 'Starker Beitrag beim Summit.'),
+  ('00000000-0000-0000-0000-000000000238', 'match', 4, 'Gutes Match, schnelle Reaktion.');
+
+-- 9. Score & Radar aus den obigen echten Daten berechnen (überschreibt die in
+--    Schritt 2/3 gesetzten Demo-Werte mit dem regelbasierten Ergebnis). Im
+--    Service/Seed-Kontext (auth.uid() = null) ist der Aufruf erlaubt.
+select public.recompute_potential_score('00000000-0000-0000-0000-000000000238');

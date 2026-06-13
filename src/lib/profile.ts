@@ -241,5 +241,16 @@ export async function saveProfile(
     if (error) throw error;
   }
 
+  // Impact Score & Erfolgsradar nach dem Speichern neu berechnen (AGE-242).
+  // Best-effort: das Profil ist bereits persistiert; schlägt die Neuberechnung
+  // fehl, holt sie das Dashboard beim nächsten Laden nach — daher kein throw,
+  // aber auch nicht still: der Fehler wird sichtbar geloggt.
+  const { error: recomputeError } = await supabase.rpc("recompute_potential_score", {
+    p_profile_id: uid,
+  });
+  if (recomputeError) {
+    console.error("recompute_potential_score after save failed:", recomputeError.message);
+  }
+
   return { avatarUrl: updated.avatar_url, completion: updated.profile_completion };
 }

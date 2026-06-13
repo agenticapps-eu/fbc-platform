@@ -94,9 +94,62 @@ export interface DashboardBadge {
   awarded_at: string;
 }
 
+/** Eine der fünf gewichteten Komponenten des Impact Scores (AGE-242). */
+export interface ScoreComponent {
+  key: string;
+  label: string;
+  /** Maximalpunkte (= Gewicht in %). */
+  weight: number;
+  /** Erreichte Punkte (Gewicht × Erfüllungsgrad), 1 Nachkommastelle. */
+  points: number;
+  /** Menschenlesbare Herleitung, z. B. „3/4 Themen beantwortet“. */
+  detail: string;
+}
+
+/** Transparente Aufschlüsselung des Impact Scores (Rückgabe der RPC). */
+export interface ScoreBreakdown {
+  score: number;
+  components: ScoreComponent[];
+}
+
+/**
+ * Validiert die jsonb-Rückgabe von `recompute_potential_score`. Defensiv: bei
+ * unerwarteter Form `null`, damit das Dashboard den Score trotzdem zeigt (ohne
+ * Aufschlüsselung), statt zu brechen.
+ */
+export function parseScoreBreakdown(raw: unknown): ScoreBreakdown | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.score !== "number" || !Array.isArray(obj.components)) return null;
+  const components: ScoreComponent[] = [];
+  for (const c of obj.components) {
+    if (!c || typeof c !== "object") return null;
+    const o = c as Record<string, unknown>;
+    if (
+      typeof o.key !== "string" ||
+      typeof o.label !== "string" ||
+      typeof o.weight !== "number" ||
+      typeof o.points !== "number" ||
+      typeof o.detail !== "string"
+    ) {
+      return null;
+    }
+    components.push({
+      key: o.key,
+      label: o.label,
+      weight: o.weight,
+      points: o.points,
+      detail: o.detail,
+    });
+  }
+  return { score: obj.score, components };
+}
+
 export interface DashboardData {
   profile: DashboardProfile;
   themeScores: ThemeScoreRow[];
+  /** Aufschlüsselung des Impact Scores; null, wenn die RPC nicht lief/parste. */
+  scoreBreakdown: ScoreBreakdown | null;
   interests: InterestRow[];
   goals: GoalRow[];
   offers: MatchingRow[];
@@ -128,6 +181,14 @@ function computeMatchStats(rows: { score: number; status: string }[]): MatchStat
 export async function fetchDashboard(uid: string): Promise<DashboardData> {
   const involvesMe = `a_profile_id.eq.${uid},b_profile_id.eq.${uid}`;
   const contactSides = `from_id.eq.${uid},to_id.eq.${uid}`;
+
+  // On-demand-Neuberechnung beim Laden (AGE-242): aktualisiert potential_score
+  // und profile_theme_scores aus echten Daten, BEVOR wir sie lesen. Schlägt die
+  // RPC fehl, zeigen wir den gespeicherten Score ohne Aufschlüsselung — kein Bruch.
+  const breakdownRes = await supabase.rpc("recompute_potential_score", {
+    p_profile_id: uid,
+  });
+  const scoreBreakdown = breakdownRes.error ? null : parseScoreBreakdown(breakdownRes.data);
 
   const [
     profileRes,
@@ -238,6 +299,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
   return {
     profile,
     themeScores: themeRes.data ?? [],
+    scoreBreakdown,
     interests: interestsRes.data ?? [],
     goals: goalsRes.data ?? [],
     offers: offersRes.data ?? [],

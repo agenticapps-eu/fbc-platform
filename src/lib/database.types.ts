@@ -1153,6 +1153,12 @@ export type Database = {
     Functions: {
       current_tier_rank: { Args: never; Returns: number };
       is_prime_plus: { Args: never; Returns: boolean };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-242). Mirrors the
+      // recompute_potential_score(uuid) RPC from 20260613230000_potential_score.sql.
+      recompute_potential_score: {
+        Args: { p_profile_id: string };
+        Returns: Json;
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-241). Mirrors the
       // search_directory(...) RPC from 20260613170000_directory_search.sql exactly.
       search_directory: {

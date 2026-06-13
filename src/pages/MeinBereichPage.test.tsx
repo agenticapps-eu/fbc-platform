@@ -45,6 +45,34 @@ const baseData: DashboardData = {
     { theme: "sein", score: 8.5 },
     { theme: "wirken", score: 6.4 },
   ],
+  scoreBreakdown: {
+    score: 873,
+    components: [
+      {
+        key: "completion",
+        label: "Profilvollständigkeit",
+        weight: 30,
+        points: 30,
+        detail: "100 % ausgefüllt",
+      },
+      {
+        key: "compass",
+        label: "Compass",
+        weight: 25,
+        points: 18.8,
+        detail: "3/4 Themen beantwortet",
+      },
+      { key: "activity", label: "Aktivität", weight: 20, points: 12, detail: "6 Aktivitäten" },
+      {
+        key: "recommendations",
+        label: "Empfehlungen",
+        weight: 15,
+        points: 9,
+        detail: "3 Empfehlungen",
+      },
+      { key: "feedback", label: "Feedback", weight: 10, points: 8, detail: "4.2 ★ Ø (5)" },
+    ],
+  },
   interests: [{ theme: "tun", label: "Unternehmensaufbau" }],
   goals: [{ category: "unternehmerisch", title: "Skalierung auf 3 Standorte", progress: 45 }],
   offers: [{ id: "o1", category: "kapital", theme: "haben", title: "Beteiligungskapital" }],
@@ -121,6 +149,12 @@ describe("Mein-Bereich-Dashboard (AGE-240)", () => {
     expect(screen.getByText("Certified Mentor")).toBeInTheDocument();
     // potential_score erscheint als Impact-Stat-Tile UND in der Impact-Card.
     expect(screen.getAllByText("873").length).toBeGreaterThanOrEqual(1);
+    // Transparente Score-Aufschlüsselung (AGE-242): Komponenten der Impact-Card.
+    expect(
+      screen.getByRole("list", { name: "Aufschlüsselung des Impact Scores" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Profilvollständigkeit")).toBeInTheDocument();
+    expect(screen.getByText("Empfehlungen")).toBeInTheDocument();
     // Netzwerk-Count (CORE) ist echt.
     // contactsCount erscheint als Netzwerk-Stat-Tile UND im Netzwerk-Widget.
     expect(screen.getByText("Bestätigte Kontakte")).toBeInTheDocument();
