@@ -54,8 +54,8 @@ const GROUPS: SubNavGroup[] = [
     items: [
       { label: "Meine Projekte", anchor: "projekte" },
       { label: "Meine Investments", anchor: "investments" },
-      { label: "Meine Angebote", anchor: "matching" },
-      { label: "Meine Gesuche", anchor: "matching" },
+      { label: "Meine Angebote", to: "/angebote-gesuche" },
+      { label: "Meine Gesuche", to: "/angebote-gesuche" },
     ],
   },
   {

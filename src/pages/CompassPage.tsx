@@ -68,6 +68,21 @@ export default function CompassPage() {
             </Button>
           </div>
         )}
+
+        {user && (
+          <div className="border-t border-line pt-4">
+            <p className="text-sm text-muted">
+              Du kannst dein Such- &amp; Bieteprofil jederzeit direkt pflegen — unabhängig vom
+              Compass.
+            </p>
+            <Link
+              to="/angebote-gesuche"
+              className="mt-2 inline-block text-sm font-medium text-gold-strong hover:underline"
+            >
+              Such- &amp; Bieteprofil bearbeiten →
+            </Link>
+          </div>
+        )}
       </Card>
     </div>
   );

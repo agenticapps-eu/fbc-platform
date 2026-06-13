@@ -131,12 +131,19 @@ export const COMPASS_STEPS: CompassStep[] = [
     prompt: "Was bringst du in die Community ein?",
     hint: "Wähle, was du anderen Mitgliedern anbieten kannst.",
     options: [
+      // category-Schlüssel stammen aus config/matching.ts (Offer-Seite) — eine
+      // gemeinsame Vokabular-Quelle für Onboarding und Such-/Bieteprofil-Editor.
       { value: "kapital", label: "Kapital & Beteiligungen", theme: "haben", category: "kapital" },
       { value: "kontakte", label: "Kontakte & Netzwerk", theme: "wirken", category: "kontakte" },
-      { value: "expertise", label: "Expertise & Know-how", theme: "tun", category: "expertise" },
-      { value: "mentoring", label: "Mentoring & Sparring", theme: "sein", category: "leistung" },
-      { value: "projekte", label: "Projekte & Kooperationen", theme: "tun", category: "projekt" },
-      { value: "immobilien", label: "Immobilien", theme: "haben", category: "kapital" },
+      { value: "expertise", label: "Expertise & Know-how", theme: "tun", category: "know_how" },
+      { value: "mentoring", label: "Mentoring & Sparring", theme: "sein", category: "mentoring" },
+      {
+        value: "projekte",
+        label: "Projekte & Kooperationen",
+        theme: "tun",
+        category: "leistungen",
+      },
+      { value: "immobilien", label: "Immobilien", theme: "haben", category: "immobilien" },
     ],
   },
   {
@@ -147,12 +154,18 @@ export const COMPASS_STEPS: CompassStep[] = [
     prompt: "Wonach suchst du gerade?",
     hint: "Wähle, wobei dich die Community unterstützen soll.",
     options: [
-      { value: "investoren", label: "Investoren & Kapital", theme: "haben", category: "kapital" },
-      { value: "partner", label: "Partner & Co-Founder", theme: "wirken", category: "kontakte" },
-      { value: "experten", label: "Experten & Berater", theme: "tun", category: "expertise" },
-      { value: "mentoren", label: "Mentoren", theme: "sein", category: "leistung" },
-      { value: "projekte", label: "Projekte & Deals", theme: "tun", category: "projekt" },
-      { value: "immobilien", label: "Immobilien", theme: "haben", category: "kapital" },
+      // category-Schlüssel stammen aus config/matching.ts (Need-Seite).
+      {
+        value: "investoren",
+        label: "Investoren & Kapital",
+        theme: "haben",
+        category: "investoren",
+      },
+      { value: "partner", label: "Partner & Co-Founder", theme: "wirken", category: "partner" },
+      { value: "experten", label: "Experten & Berater", theme: "tun", category: "experten" },
+      { value: "mentoren", label: "Mentoren", theme: "sein", category: "mentoren" },
+      { value: "projekte", label: "Projekte & Deals", theme: "tun", category: "projekte" },
+      { value: "immobilien", label: "Immobilien", theme: "haben", category: "immobilien" },
     ],
   },
 ];
