@@ -194,8 +194,8 @@ Der Probe-Datensatz wurde nach dem Test wieder entfernt (Prod-DB sauber).
   eine Shadow-DB, appliziert sie aber nicht auf prod. Diese Abnahme musste die Lücke
   manuell schließen (`supabase db push`). **Vor W3** einen automatischen Push-Schritt
   (oder ein verbindliches Deploy-Runbook) etablieren — sonst gehen W3-Migrationen
-  (Match-Engine, contact_requests/messages, Realtime) erneut nicht live. Eigenes
-  Follow-up-Issue empfohlen.
+  (Match-Engine, contact_requests/messages, Realtime) erneut nicht live. Follow-up:
+  **AGE-257** (W3, High).
 - **R2 — Migrations-History-Drift.** `20260613081749_avatars_drop_public_listing_policy`
   existierte remote ohne Repo-Datei (vermutlich früher direkt per MCP `apply_migration`
   appliziert). Für diese Abnahme als `reverted` repariert (kein Schema-Effekt; Repo
@@ -221,4 +221,4 @@ Der Probe-Datensatz wurde nach dem Test wieder entfernt (Prod-DB sauber).
 - [x] W2-Migrationen auf prod appliziert (AGE-241/242/243); Features live verifiziert
 - [x] W2-Issues in Linear: AGE-238/239/240/241/242/243 = Done; AGE-237 (Design-System, W1) = Done
 - [x] Meilenstein „W2 · Profil & Verzeichnis" = 100 %
-- [ ] Follow-up-Issue „Migrations-Deploy auf prod automatisieren" (R1) — empfohlen, noch anzulegen
+- [x] Follow-up-Issue „Migrations-Deploy auf prod automatisieren" (R1) angelegt — **AGE-257** (W3, High)
