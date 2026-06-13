@@ -16,6 +16,7 @@ import {
   type DashboardData,
   type DashboardEvent,
   type DashboardProfile,
+  type ScoreBreakdown,
 } from "../lib/dashboard";
 import { GOAL_CATEGORIES } from "../lib/profile";
 import { tierLabel } from "../lib/tiers";
@@ -149,7 +150,7 @@ function Dashboard({ uid }: { uid: string }) {
           <NetzwerkWidget contactsCount={data.contactsCount} />
           <MatchingWidget data={data} />
           <StatistikWidget />
-          <ImpactWidget score={data.profile.potential_score} />
+          <ImpactWidget score={data.profile.potential_score} breakdown={data.scoreBreakdown} />
           <ProjekteWidget />
           <InvestmentsWidget />
           <BeitraegeWidget data={data} />
@@ -298,7 +299,7 @@ function DashboardHeader({ data }: { data: DashboardData }) {
 
       {/* Stat-Tiles (§3) — Impact CORE, Netzwerk/Matches/Events CORE-Counts, Projekte DEMO. */}
       <div className="grid grid-cols-2 gap-px border-t border-night-border bg-night-border sm:grid-cols-3 lg:grid-cols-5">
-        <StatTile label="Impact Score" value={p.potential_score} trend="+12" />
+        <StatTile label="Impact Score" value={p.potential_score} />
         <StatTile label="Netzwerk" value={data.contactsCount} />
         <StatTile label="Matches" value={data.matchStats.successful} />
         <StatTile label="Projekte" value={DEMO_PROJECTS.length} demo />
@@ -609,7 +610,9 @@ function StatistikWidget() {
 }
 
 // 9 ── Mein Impact (CORE-Zahl, dunkle Gold-Card) ───────────────────────────────
-function ImpactWidget({ score }: { score: number }) {
+// Regelbasierter Impact Score (AGE-242) mit transparenter Aufschlüsselung der
+// fünf gewichteten Komponenten — der Wert ist nachvollziehbar, kein Demo-Delta.
+function ImpactWidget({ score, breakdown }: { score: number; breakdown: ScoreBreakdown | null }) {
   return (
     <Card
       id="impact"
@@ -617,31 +620,69 @@ function ImpactWidget({ score }: { score: number }) {
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-on-night">Mein Impact</h3>
+        <span className="text-xs text-on-night-muted">regelbasiert</span>
       </div>
       <div>
         <div className="font-display text-5xl font-semibold text-gold">{score}</div>
-        <div className="mt-1 flex items-center gap-2 text-sm">
-          <span className="font-medium text-positive">+12 Punkte diesen Monat</span>
-          <DemoBadge />
-        </div>
+        <div className="mt-1 text-sm text-on-night-muted">von 100 · Impact Score</div>
       </div>
-      {/* Sparkline (DEMO). */}
-      <svg
-        viewBox="0 0 200 48"
-        className="h-12 w-full"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <polyline
-          points="0,40 25,36 50,38 75,28 100,30 125,20 150,22 175,12 200,8"
-          fill="none"
-          stroke="var(--color-gold)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+
+      {breakdown ? (
+        <ScoreBreakdownList breakdown={breakdown} />
+      ) : (
+        <p className="text-xs text-on-night-muted">
+          Die Aufschlüsselung wird beim nächsten Laden berechnet.
+        </p>
+      )}
+
+      {/* Verlauf — DEMO (Tracking liefert Phase 2). */}
+      <div>
+        <div className="mb-1 flex items-center gap-2 text-xs text-on-night-muted">
+          Verlauf <DemoBadge />
+        </div>
+        <svg
+          viewBox="0 0 200 48"
+          className="h-12 w-full"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <polyline
+            points="0,40 25,36 50,38 75,28 100,30 125,20 150,22 175,12 200,8"
+            fill="none"
+            stroke="var(--color-gold)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
     </Card>
+  );
+}
+
+// Transparente Score-Aufschlüsselung: pro Komponente erreichte Punkte / Gewicht,
+// als Mini-Balken; der Detailtext (z. B. „3/4 Themen“) hängt als Tooltip am Eintrag.
+function ScoreBreakdownList({ breakdown }: { breakdown: ScoreBreakdown }) {
+  return (
+    <ul className="flex flex-col gap-2.5" aria-label="Aufschlüsselung des Impact Scores">
+      {breakdown.components.map((c) => {
+        const pct = c.weight > 0 ? Math.min(100, Math.round((c.points / c.weight) * 100)) : 0;
+        return (
+          <li key={c.key} title={c.detail}>
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-on-night-muted">{c.label}</span>
+              <span className="font-medium text-on-night tabular-nums">
+                {c.points}
+                <span className="text-on-night-muted">/{c.weight}</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-night-border">
+              <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
