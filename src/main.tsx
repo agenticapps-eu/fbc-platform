@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { ErrorFallback } from "./components/ErrorFallback";
+import { ToastProvider } from "./components/ui/Toast";
 import { AuthProvider } from "./providers/AuthProvider";
 import "./index.css";
 
@@ -26,9 +27,11 @@ createRoot(document.getElementById("root")!, {
     >
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <ToastProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ToastProvider>
         </AuthProvider>
       </QueryClientProvider>
     </Sentry.ErrorBoundary>

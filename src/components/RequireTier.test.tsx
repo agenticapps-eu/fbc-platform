@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App from "../App";
+import { ToastProvider } from "../components/ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
 
@@ -16,11 +18,19 @@ function authLoadingTier(): AuthContextValue {
 }
 
 function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"]) {
+  // App-weite Provider (sonst in main.tsx) mitliefern: /profil mountet den
+  // Profil-Editor, der QueryClient + Toasts braucht. retry:false hält die
+  // (im Test ins Leere laufende) Profil-Abfrage im Lade-Zustand stabil.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <AuthFixture value={value}>
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <App />
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
     </AuthFixture>,
   );
 }
@@ -82,10 +92,13 @@ describe("Auth-Gating für /profil", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Mitglieder das öffentliche Profil sehen (jede Stufe, auch Discover)", () => {
+  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Discover)", () => {
     renderAt("/profil", authAsTier("discover"));
 
-    expect(screen.getByRole("heading", { name: "Profil" })).toBeInTheDocument();
+    // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; der Editor
+    // mountet und lädt seine Daten.
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    expect(screen.getByText("Profil wird geladen…")).toBeInTheDocument();
   });
 });
 
