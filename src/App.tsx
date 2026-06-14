@@ -6,6 +6,7 @@ import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import RequireTier from "./components/RequireTier";
 import { navItems, type NavItem } from "./config/nav";
+import ChatPage from "./pages/ChatPage";
 import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -30,6 +31,16 @@ export default function App() {
         {navItems.map((item) => (
           <Route key={item.path} path={item.path} element={gatedElement(item)} />
         ))}
+        {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
+            die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
+        <Route
+          path="/chat/:threadId"
+          element={
+            <RequireTier min="prime">
+              <ChatPage />
+            </RequireTier>
+          }
+        />
         {/* Öffentliche Profilseite (AGE-239) — param-basiert, daher kein Sidebar-Eintrag.
             /profil ist der eigene Editor; fremde Profile liegen unter /p/:id. Sichtbarkeit
             erzwingt die RLS (profiles_public ist nur für authenticated lesbar). */}

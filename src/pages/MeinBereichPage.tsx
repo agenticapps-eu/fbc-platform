@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MeinBereichSidebar } from "../components/dashboard/MeinBereichSidebar";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
 import { Avatar } from "../components/ui/Avatar";
@@ -386,6 +386,7 @@ function MeineAnfragenWidget({ uid }: { uid: string }) {
 function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
   // Welche Aktion gerade läuft — sperrt beide Buttons, ohne sie zu vermischen.
   const [pending, setPending] = useState<null | "accept" | "decline">(null);
 
@@ -398,7 +399,7 @@ function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest })
           ? {
               variant: "success",
               title: "Anfrage angenommen",
-              description: `Kontaktdaten von ${request.from.name} sind jetzt für euch beide sichtbar.`,
+              description: `Kontaktdaten von ${request.from.name} sind sichtbar — der Chat ist offen.`,
             }
           : {
               variant: "success",
@@ -409,6 +410,8 @@ function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest })
       queryClient.invalidateQueries({ queryKey: incomingRequestsQueryKey(uid) });
       queryClient.invalidateQueries({ queryKey: dashboardQueryKey(uid) });
       queryClient.invalidateQueries({ queryKey: matchingHubQueryKey(uid) });
+      // §9: Einstieg aus der angenommenen Anfrage — Annehmen öffnet direkt den Chat.
+      if (accept) navigate("/chat");
     },
     onError: (error) => {
       const message =
@@ -607,7 +610,11 @@ function CommunitiesWidget() {
 // 6 ── Mein Netzwerk (CORE-Count, DEMO-Listen) ─────────────────────────────────
 function NetzwerkWidget({ contactsCount }: { contactsCount: number }) {
   return (
-    <DashboardCard id="netzwerk" title="Mein Netzwerk">
+    <DashboardCard
+      id="netzwerk"
+      title="Mein Netzwerk"
+      action={<CardLink to="/chat">Zum Chat</CardLink>}
+    >
       <div>
         <div className="font-display text-3xl font-semibold text-ink">{contactsCount}</div>
         <div className="text-xs tracking-wide text-muted uppercase">Bestätigte Kontakte</div>
