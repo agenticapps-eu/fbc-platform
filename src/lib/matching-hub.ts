@@ -159,6 +159,10 @@ export function computeHubStats(rows: { score: number; status: string }[]): HubS
 
 export const matchingHubQueryKey = (uid: string) => ["matching-hub", uid] as const;
 
+/** Obergrenze der geladenen Top-Matches — hält die `.in()`-Anreicherung (URL-Länge)
+ *  und das UI beschränkt. Der Hub zeigt bewusst die besten Treffer, nicht alle. */
+export const TOP_MATCHES_LIMIT = 50;
+
 /** Lädt die Matches des eigenen Profils samt angereichertem Gegenüber. */
 export async function fetchMatchingHub(uid: string): Promise<MatchingHubData> {
   const involvesMe = `a_profile_id.eq.${uid},b_profile_id.eq.${uid}`;
@@ -168,7 +172,8 @@ export async function fetchMatchingHub(uid: string): Promise<MatchingHubData> {
     .from("matches")
     .select("id, a_profile_id, b_profile_id, score, basis, status, routing")
     .or(involvesMe)
-    .order("score", { ascending: false });
+    .order("score", { ascending: false })
+    .limit(TOP_MATCHES_LIMIT);
   if (matchesRes.error) throw matchesRes.error;
 
   const rows = (matchesRes.data ?? []) as MatchRow[];
@@ -196,17 +201,31 @@ export async function fetchMatchingHub(uid: string): Promise<MatchingHubData> {
       .order("created_at"),
     supabase.from("contact_requests").select("from_id, to_id, status").or(contactSides),
   ]);
-  if (profilesRes.error) throw profilesRes.error;
+  // Auf allen Anreicherungs-Queries hart fehlschlagen statt still zu degradieren:
+  // ein verschluckter offers-/needs-Fehler zeigt fälschlich „keine Angebote", ein
+  // verschluckter contact_requests-Fehler blendet den Senden-Button für ein bereits
+  // angefragtes Paar wieder ein (→ Duplikat-Insert).
+  for (const res of [profilesRes, offersRes, needsRes, crRes]) {
+    if (res.error) throw res.error;
+  }
 
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
   const offersByProfile = groupByProfile(offersRes.data ?? []);
   const needsByProfile = groupByProfile(needsRes.data ?? []);
 
-  // Kontaktanfragen je Gegenüber (Richtung mitgeführt fürs UI).
+  // Kontaktanfragen je Gegenüber. Ein Paar kann (selten) in beide Richtungen eine
+  // Zeile haben (unique ist gerichtet auf from_id,to_id); deterministisch die
+  // „stärkste" wählen, damit der angezeigte Status nicht von der Zeilenreihenfolge
+  // abhängt: accepted > pending > declined.
+  const crRank: Record<string, number> = { accepted: 3, pending: 2, declined: 1 };
   const crByPartner = new Map<string, HubContactRequest>();
   for (const cr of crRes.data ?? []) {
     const other = cr.from_id === uid ? cr.to_id : cr.from_id;
-    crByPartner.set(other, { status: cr.status, outgoing: cr.from_id === uid });
+    const next: HubContactRequest = { status: cr.status, outgoing: cr.from_id === uid };
+    const current = crByPartner.get(other);
+    if (!current || (crRank[next.status] ?? 0) > (crRank[current.status] ?? 0)) {
+      crByPartner.set(other, next);
+    }
   }
 
   const regions = new Set<string>();

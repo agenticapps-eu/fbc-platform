@@ -52,6 +52,17 @@ function errorMessage(error: unknown): string {
   return "Unbekannter Fehler.";
 }
 
+/** Postgres-Unique-Verletzung (23505) — hier: es besteht bereits eine Anfrage für
+ *  das Paar (z. B. zweiter Tab oder noch nicht refetchte Liste). */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code: unknown }).code === "23505"
+  );
+}
+
 export default function MatchingPage() {
   const { user } = useAuth();
   // /matching ist Prime+-gegated — user ist hier vorhanden; defensiver Fallback.
@@ -477,6 +488,19 @@ function ContactAction({ uid, match }: { uid: string; match: HubMatch }) {
       queryClient.invalidateQueries({ queryKey: dashboardQueryKey(uid) });
     },
     onError: (error) => {
+      // Anfrage besteht bereits → kein „Fehler", sondern Liste war veraltet:
+      // freundlich melden, Composer schließen und neu laden (Karte zeigt Status).
+      if (isUniqueViolation(error)) {
+        setOpen(false);
+        setMessage("");
+        toast({
+          variant: "success",
+          title: "Anfrage besteht bereits",
+          description: `Es gibt schon eine Kontaktanfrage mit ${match.partner.name}.`,
+        });
+        queryClient.invalidateQueries({ queryKey: matchingHubQueryKey(uid) });
+        return;
+      }
       toast({
         variant: "error",
         title: "Anfrage fehlgeschlagen",
@@ -484,6 +508,13 @@ function ContactAction({ uid, match }: { uid: string; match: HubMatch }) {
       });
     },
   });
+
+  // Doppelklick-Schutz: mutate() ist fire-and-forget, das disabled-Prop greift erst
+  // nach dem Re-Render. Inline gegen isPending wachen, damit kein zweiter INSERT geht.
+  const submit = () => {
+    if (mutation.isPending) return;
+    mutation.mutate();
+  };
 
   // Bestehende Anfrage → Status statt Senden-Button.
   const cr = match.contactRequest;
@@ -517,12 +548,7 @@ function ContactAction({ uid, match }: { uid: string; match: HubMatch }) {
         placeholder={`Kurze Nachricht an ${match.partner.name} (optional)…`}
       />
       <div className="flex items-center gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-        >
+        <Button variant="primary" size="sm" onClick={submit} disabled={mutation.isPending}>
           {mutation.isPending ? "Senden…" : "Anfrage senden"}
         </Button>
         <Button
