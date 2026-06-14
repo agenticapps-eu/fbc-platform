@@ -14,10 +14,21 @@ vi.mock("../lib/public-profile", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/public-profile")>();
   return { ...actual, fetchPublicProfile: vi.fn() };
 });
+// Auch die Kontaktbeziehung wird gemockt: getestet wird der Render-Vertrag der Seite
+// gegenüber dem, was die RLS zurückgibt (contact nur bei accepted). Die RLS selbst ist
+// auf DB-Ebene verifiziert.
+vi.mock("../lib/contact-requests", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/contact-requests")>();
+  return { ...actual, fetchContactRelation: vi.fn() };
+});
 import { fetchPublicProfile } from "../lib/public-profile";
+import { fetchContactRelation, type ContactRelation } from "../lib/contact-requests";
 import PublicProfilePage from "./PublicProfilePage";
 
 const mockedFetch = vi.mocked(fetchPublicProfile);
+const mockedRelation = vi.mocked(fetchContactRelation);
+
+const NO_RELATION: ContactRelation = { request: null, contact: null, matchId: null };
 
 const PROFILE_ID = "5e195a30-0000-0000-0000-000000000001";
 
@@ -83,7 +94,11 @@ function renderPage(value: AuthContextValue) {
   );
 }
 
-beforeEach(() => mockedFetch.mockReset());
+beforeEach(() => {
+  mockedFetch.mockReset();
+  mockedRelation.mockReset();
+  mockedRelation.mockResolvedValue(NO_RELATION);
+});
 
 describe("Öffentliche Profilseite (AGE-239)", () => {
   it("zeigt Discover nur öffentliche Felder (Name, Rollen, Tier) — keine erweiterten Blöcke", async () => {
@@ -130,12 +145,35 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
   });
 
-  it("zeigt Kontaktdaten (E-Mail/Telefon) niemals an — Hinweis ist immer präsent", async () => {
+  it("zeigt vor Annahme keine Kontaktdaten — Hinweis ist präsent, keine E-Mail/Telefon", async () => {
     mockedFetch.mockResolvedValue(fullView);
     renderPage(authAsTier("prime"));
 
     expect(
       await screen.findByText("E-Mail und Telefon werden nie automatisch angezeigt."),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Kontakt freigegeben/)).not.toBeInTheDocument();
+  });
+
+  it("zeigt Kontaktdaten ERST nach Annahme (RLS gibt `contact` nur bei accepted zurück)", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    mockedRelation.mockResolvedValue({
+      request: { id: "cr1", status: "accepted", outgoing: true },
+      contact: { email: "legacy@example.com", phone: "+49 30 1234567" },
+      matchId: null,
+    });
+    renderPage(authAsTier("prime"));
+
+    expect(await screen.findByText("Kontakt freigegeben")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "legacy@example.com" })).toHaveAttribute(
+      "href",
+      "mailto:legacy@example.com",
+    );
+    expect(screen.getByRole("link", { name: "+49 30 1234567" })).toHaveAttribute(
+      "href",
+      "tel:+49 30 1234567",
+    );
+    // Im freigegebenen Zustand verschwindet der Senden-Button.
+    expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
   });
 });

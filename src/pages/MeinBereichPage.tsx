@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { MeinBereichSidebar } from "../components/dashboard/MeinBereichSidebar";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
@@ -7,7 +7,15 @@ import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
+import { useToast } from "../components/ui/toast-context";
 import { cn } from "../lib/cn";
+import {
+  fetchIncomingRequests,
+  incomingRequestsQueryKey,
+  respondToContactRequest,
+  type IncomingRequest,
+} from "../lib/contact-requests";
+import { matchingHubQueryKey } from "../lib/matching-hub";
 import {
   dashboardQueryKey,
   fetchDashboard,
@@ -142,6 +150,8 @@ function Dashboard({ uid }: { uid: string }) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <DashboardHeader data={data} />
+
+        <MeineAnfragenWidget uid={uid} />
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <ErfolgsradarWidget data={data} />
@@ -331,6 +341,108 @@ function StatTile({
       <div className="mt-1 flex items-baseline gap-2">
         <span className="font-display text-2xl font-semibold text-on-night">{value}</span>
         {trend && <span className="text-xs font-medium text-positive">↑ {trend}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Meine Anfragen (CORE, §6.2) — eingehende Kontaktanfragen mit Annehmen/Ablehnen ──
+// Erscheint nur, wenn offene Anfragen vorliegen (ein Posteingang zeigt sich, wenn Post
+// da ist). Annehmen/Ablehnen setzt nur `status` (RLS `cr_update_recipient`); alle
+// Folgewirkungen (Match-Status, Thread, Benachrichtigung, Kontaktdaten-Freigabe)
+// laufen serverseitig. Kontaktdaten werden hier NIEMALS angezeigt — erst nach Annahme
+// auf der Profilseite des Gegenübers (RLS-gegated).
+function MeineAnfragenWidget({ uid }: { uid: string }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: incomingRequestsQueryKey(uid),
+    queryFn: () => fetchIncomingRequests(uid),
+  });
+
+  // Leise sein, solange nichts anliegt — kein Leerzustand, der das Dashboard zumüllt.
+  if (isLoading || isError || !data || data.length === 0) return null;
+
+  return (
+    <Card id="meine-anfragen" className="flex scroll-mt-24 flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <CardTitle className="text-base">Meine Anfragen</CardTitle>
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-xs font-semibold text-night">
+          {data.length}
+        </span>
+      </div>
+      <p className="text-sm text-muted">
+        Erst nach deiner Annahme werden Kontaktdaten geteilt und der Chat freigeschaltet.
+      </p>
+      <ul className="flex flex-col gap-3">
+        {data.map((request) => (
+          <li key={request.id}>
+            <AnfrageRow uid={uid} request={request} />
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  // Welche Aktion gerade läuft — sperrt beide Buttons, ohne sie zu vermischen.
+  const [pending, setPending] = useState<null | "accept" | "decline">(null);
+
+  const respond = useMutation({
+    mutationFn: (accept: boolean) => respondToContactRequest({ requestId: request.id, accept }),
+    onMutate: (accept) => setPending(accept ? "accept" : "decline"),
+    onSuccess: (_data, accept) => {
+      toast(
+        accept
+          ? {
+              variant: "success",
+              title: "Anfrage angenommen",
+              description: `Kontaktdaten von ${request.from.name} sind jetzt für euch beide sichtbar.`,
+            }
+          : {
+              variant: "success",
+              title: "Anfrage abgelehnt",
+              description: `${request.from.name} erhält keine Kontaktdaten.`,
+            },
+      );
+      queryClient.invalidateQueries({ queryKey: incomingRequestsQueryKey(uid) });
+      queryClient.invalidateQueries({ queryKey: dashboardQueryKey(uid) });
+      queryClient.invalidateQueries({ queryKey: matchingHubQueryKey(uid) });
+    },
+    onError: (error) => {
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Unbekannter Fehler.";
+      toast({ variant: "error", title: "Aktion fehlgeschlagen", description: message });
+    },
+    onSettled: () => setPending(null),
+  });
+
+  const busy = respond.isPending;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-line bg-soft p-3 sm:flex-row sm:items-center">
+      <Link to={`/p/${request.from.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+        <Avatar name={request.from.name} src={request.from.avatar_url} size="md" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-ink">{request.from.name}</p>
+          <p className="truncate text-xs text-muted">
+            {[request.from.company, request.from.region].filter(Boolean).join(" · ") || "—"}
+          </p>
+          {request.message && (
+            <p className="mt-1 line-clamp-2 text-sm text-muted italic">„{request.message}"</p>
+          )}
+        </div>
+      </Link>
+      <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-stretch">
+        <Button variant="primary" size="sm" onClick={() => respond.mutate(true)} disabled={busy}>
+          {pending === "accept" ? "Annehmen…" : "Annehmen"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => respond.mutate(false)} disabled={busy}>
+          {pending === "decline" ? "Ablehnen…" : "Ablehnen"}
+        </Button>
       </div>
     </div>
   );
