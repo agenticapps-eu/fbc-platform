@@ -15,6 +15,7 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     user: null,
     tier: null,
     levelRank: null,
+    staffRole: null,
     isLoading: false,
     tierLoading: false,
     signUp: async () => ({ error: null }),

@@ -10,9 +10,14 @@ export interface AuthContextValue {
   tier: string | null;
   /** level_rank der Mitgliedsstufe (discover=1 … legacy=7). null wenn ausgeloggt. */
   levelRank: number | null;
+  /**
+   * Staff-Rolle aus `staff_roles` (matching_manager/admin) oder null. Server-
+   * kontrolliert, NICHT aus dem frei editierbaren profiles.roles (AGE-249, §8).
+   */
+  staffRole: string | null;
   /** true bis die Session beim Start aufgelöst ist (nur Session, nicht das Profil). */
   isLoading: boolean;
-  /** true während für den eingeloggten Nutzer tier/level_rank nachgeladen werden. */
+  /** true während für den eingeloggten Nutzer tier/level_rank/staffRole nachgeladen werden. */
   tierLoading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
