@@ -1,3 +1,4 @@
+import { recomputeMyMatches } from "./matches";
 import { supabase } from "./supabase";
 import {
   COMPASS_SCALE_DEFAULT,
@@ -262,6 +263,14 @@ export async function saveCompass(
   });
   if (recomputeError) {
     console.error("recompute_potential_score after compass failed:", recomputeError.message);
+  }
+
+  // 4b. Matches neu berechnen (AGE-245) — das Onboarding hat offers/needs/Interessen
+  //     geschrieben. Best-effort wie oben: kein throw, aber sichtbares Log.
+  try {
+    await recomputeMyMatches();
+  } catch (e) {
+    console.error("recompute_my_matches after compass failed:", e instanceof Error ? e.message : e);
   }
 
   // 5. Persistierte Ergebniswerte für die Abschluss-Seite lesen (echte Daten).

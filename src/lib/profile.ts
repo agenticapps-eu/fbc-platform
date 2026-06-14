@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recomputeMyMatches } from "./matches";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
 
@@ -250,6 +251,14 @@ export async function saveProfile(
   });
   if (recomputeError) {
     console.error("recompute_potential_score after save failed:", recomputeError.message);
+  }
+
+  // Matches nach dem Profil-Speichern neu berechnen (AGE-245) — Region/Branche/
+  // Interessen/Kompetenzen/Tier speisen den Score. Best-effort wie oben.
+  try {
+    await recomputeMyMatches();
+  } catch (e) {
+    console.error("recompute_my_matches after save failed:", e instanceof Error ? e.message : e);
   }
 
   return { avatarUrl: updated.avatar_url, completion: updated.profile_completion };
