@@ -375,6 +375,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# notify-contact-request (AGE-247, spec §7): transactional email for the
+# contact-request flow, invoked by a Database Webhook on public.contact_requests.
+# A DB webhook carries no user JWT, so JWT verification is off; the function
+# instead checks a shared secret (Authorization: Bearer $CONTACT_WEBHOOK_SECRET).
+[functions.notify-contact-request]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

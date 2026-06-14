@@ -72,7 +72,10 @@ must **never** reach the client.
 | `AXIOM_URL` _(optional)_    | Override of the ingest edge base (defaults to EU edge) |
 | `SENTRY_AUTH_TOKEN`         | Sentry CI token (source-map upload)           |
 | `CLOUDFLARE_API_TOKEN`      | Cloudflare API token (Pages deploy)           |
-| `RESEND_API_KEY`            | Transactional email — added in a later phase  |
+| `RESEND_API_KEY`            | Resend API key for transactional email (`notify-contact-request`) |
+| `FROM_EMAIL`                | Sender address for transactional email (e.g. `FBC <onboarding@resend.dev>`) |
+| `CONTACT_WEBHOOK_SECRET`    | Shared secret the contact-request DB webhook sends as `Authorization: Bearer …` |
+| `APP_URL` _(optional)_      | Base URL for the "Zum Chat"/"Anfrage ansehen" link in emails |
 
 ## Setting and reading secrets
 
@@ -99,3 +102,43 @@ infisical run --env=dev -- <command>
   here and in `.env.example`, then mirror it to Cloudflare Pages / CI only if it
   is needed there.
 - **Respect the `VITE_` boundary** — see the rule above.
+
+## Supabase Edge Function secrets (`notify-contact-request`, AGE-247)
+
+The transactional-email function (spec `docs/matching-spec.md` §7) reads its
+secrets from the **Supabase Functions secret store**, not from the Vite/Pages
+runtime. Push them from Infisical so the values never live in the repo:
+
+```bash
+# Push the function secrets from Infisical's dev env into Supabase.
+# (--silent keeps the values off your terminal; --plain emits KEY=value pairs.)
+infisical export --env=dev --format=dotenv --plain \
+  | grep -E '^(RESEND_API_KEY|FROM_EMAIL|CONTACT_WEBHOOK_SECRET|APP_URL)=' \
+  > /tmp/fbc-fn.env
+supabase secrets set --env-file /tmp/fbc-fn.env
+rm -f /tmp/fbc-fn.env
+
+# …or set them one-off, reading each value from Infisical at call time:
+infisical run --env=dev -- sh -c \
+  'supabase secrets set RESEND_API_KEY="$RESEND_API_KEY" FROM_EMAIL="$FROM_EMAIL" \
+     CONTACT_WEBHOOK_SECRET="$CONTACT_WEBHOOK_SECRET" APP_URL="$APP_URL"'
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into every Edge
+Function by the platform — do **not** set them here.
+
+### Deploy + wire the Database Webhook
+
+```bash
+supabase functions deploy notify-contact-request   # verify_jwt=false (see config.toml)
+```
+
+Then create a **Database Webhook** (Dashboard → Database → Webhooks) on
+`public.contact_requests` for **Insert** and **Update**, pointing at the
+function URL, with an HTTP header `Authorization: Bearer <CONTACT_WEBHOOK_SECRET>`
+(same value as the secret above). The function rejects any request without it.
+
+> **Sender domain (open point with Detlev):** until a verified FBC domain with
+> DKIM/SPF exists, use a verified **Resend test domain** as `FROM_EMAIL`
+> (e.g. `onboarding@resend.dev`). This is a transition — swap in the real domain
+> once it's set up.
