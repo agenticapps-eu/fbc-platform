@@ -14,7 +14,7 @@ begin;
 insert into auth.users (id, aud, role, email) values
   ('00000000-0000-0000-0000-0000000249aa', 'authenticated', 'authenticated', 't249a@probe.fbc.invalid'),
   ('00000000-0000-0000-0000-0000000249bb', 'authenticated', 'authenticated', 't249b@probe.fbc.invalid'),
-  ('00000000-0000-0000-0000-0000000249mm', 'authenticated', 'authenticated', 't249m@probe.fbc.invalid');
+  ('00000000-0000-0000-0000-0000000249cc', 'authenticated', 'authenticated', 't249c@probe.fbc.invalid');
 
 -- Shared scoring attributes so the engine yields a match ≥ 40 (mirrors probe_match_engine).
 update public.profiles set
@@ -62,7 +62,7 @@ do $$
 declare
   v_a       uuid := '00000000-0000-0000-0000-0000000249aa';
   v_b       uuid := '00000000-0000-0000-0000-0000000249bb';
-  v_m       uuid := '00000000-0000-0000-0000-0000000249mm';
+  v_m       uuid := '00000000-0000-0000-0000-0000000249cc';
   v_match   uuid;
   v_need    uuid;
   v_routing text;
