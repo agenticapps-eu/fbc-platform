@@ -5,6 +5,7 @@ import {
   VOLUME_BANDS,
   type VolumeBand,
 } from "../config/matching";
+import { recomputeMyMatches } from "./matches";
 import { supabase } from "./supabase";
 
 /**
@@ -152,5 +153,17 @@ export async function saveMatchingProfile(
       })),
     );
     if (error) throw error;
+  }
+
+  // Matches nach dem Speichern neu berechnen (AGE-245). Best-effort: offers/needs
+  // sind bereits persistiert; ein Fehler holt die Neuberechnung beim nächsten
+  // Trigger (Button im Matching-Hub) nach — daher kein throw, aber sichtbares Log.
+  try {
+    await recomputeMyMatches();
+  } catch (e) {
+    console.error(
+      "recompute_my_matches after saving offers/needs failed:",
+      e instanceof Error ? e.message : e,
+    );
   }
 }
