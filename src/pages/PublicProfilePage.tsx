@@ -1,10 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
+import { Textarea } from "../components/ui/Textarea";
 import { useToast } from "../components/ui/toast-context";
+import {
+  contactRelationQueryKey,
+  fetchContactRelation,
+  sendContactRequest,
+  type ContactRelation,
+} from "../lib/contact-requests";
+import { dashboardQueryKey } from "../lib/dashboard";
+import { matchingHubQueryKey } from "../lib/matching-hub";
 import {
   fetchPublicProfile,
   publicProfileQueryKey,
@@ -34,7 +44,6 @@ function CrownIcon({ className }: { className?: string }) {
 export default function PublicProfilePage() {
   const { id } = useParams<{ id: string }>();
   const { user, levelRank } = useAuth();
-  const { toast } = useToast();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: publicProfileQueryKey(id ?? ""),
@@ -83,16 +92,11 @@ export default function PublicProfilePage() {
       )}
 
       <ContactArea
+        viewerId={user?.id ?? null}
+        profileId={profile.id}
         isOwn={isOwn}
         isPrimePlus={isPrimePlus}
         name={profile.name}
-        onRequest={() =>
-          toast({
-            variant: "success",
-            title: "Kontaktanfragen folgen",
-            description: "Der Kontakt-Flow wird in Woche 3 (W3) freigeschaltet.",
-          })
-        }
       />
     </div>
   );
@@ -285,17 +289,30 @@ function MatchingColumn({
   );
 }
 
+// ── Kontakt (AGE-247, §6) ─────────────────────────────────────────────────────
+// Der Kontakt-Flow auf der Profilseite: senden, Statusanzeige (pending/accepted/
+// declined) und — NUR nach Annahme — die von der RLS freigegebenen Kontaktdaten.
+// Kontaktdaten werden niemals vor `accepted` angezeigt; das garantiert die RLS
+// (`contacts_select_self_or_released`), nicht dieses Frontend.
 function ContactArea({
+  viewerId,
+  profileId,
   isOwn,
   isPrimePlus,
   name,
-  onRequest,
 }: {
+  viewerId: string | null;
+  profileId: string;
   isOwn: boolean;
   isPrimePlus: boolean;
   name: string;
-  onRequest: () => void;
 }) {
+  const { data: relation } = useQuery({
+    queryKey: contactRelationQueryKey(viewerId ?? "", profileId),
+    queryFn: () => fetchContactRelation(viewerId!, profileId),
+    enabled: !!viewerId && !isOwn,
+  });
+
   if (isOwn) {
     return (
       <Card className="flex flex-wrap items-center justify-between gap-3">
@@ -309,27 +326,247 @@ function ContactArea({
     );
   }
 
+  // Freigegeben: Kontaktdaten anzeigen (RLS gibt `contact` nur bei accepted zurück).
+  if (relation?.request?.status === "accepted") {
+    return <ReleasedContact name={name} contact={relation.contact} />;
+  }
+
   return (
-    <Card className="flex flex-col gap-2">
+    <Card className="flex flex-col gap-3">
       <CardTitle className="text-base">Kontakt</CardTitle>
-      {isPrimePlus ? (
-        <>
-          <p className="text-sm text-muted">
-            Sende {name} eine Kontaktanfrage. Erst nach Annahme werden Kontaktdaten geteilt.
-          </p>
-          <div>
-            <Button variant="primary" size="sm" onClick={onRequest}>
-              Kontaktanfrage senden
-            </Button>
-          </div>
-        </>
+      <ContactBody
+        viewerId={viewerId}
+        profileId={profileId}
+        isPrimePlus={isPrimePlus}
+        name={name}
+        relation={relation ?? null}
+      />
+      <p className="text-xs text-muted">E-Mail und Telefon werden nie automatisch angezeigt.</p>
+    </Card>
+  );
+}
+
+function ContactBody({
+  viewerId,
+  profileId,
+  isPrimePlus,
+  name,
+  relation,
+}: {
+  viewerId: string | null;
+  profileId: string;
+  isPrimePlus: boolean;
+  name: string;
+  relation: ContactRelation | null;
+}) {
+  const request = relation?.request ?? null;
+
+  if (request) {
+    if (request.status === "pending") {
+      return request.outgoing ? (
+        <div className="flex items-center gap-2">
+          <Badge variant="prime">Anfrage gesendet</Badge>
+          <span className="text-sm text-muted">Wartet auf Antwort von {name}.</span>
+        </div>
       ) : (
         <p className="text-sm text-muted">
-          Kontaktanfragen sind ab der Mitgliedsstufe{" "}
-          <span className="font-medium text-ink">Prime</span> möglich.
+          {name} hat dir eine Kontaktanfrage gesendet. Beantworte sie unter{" "}
+          <Link
+            to="/mein-bereich#meine-anfragen"
+            className="font-medium text-gold-strong hover:text-gold"
+          >
+            Meine Anfragen
+          </Link>
+          .
+        </p>
+      );
+    }
+    // declined
+    return (
+      <p className="text-sm text-muted">
+        {request.outgoing
+          ? `${name} hat deine Anfrage abgelehnt.`
+          : "Du hast diese Anfrage abgelehnt."}
+      </p>
+    );
+  }
+
+  if (!isPrimePlus) {
+    return (
+      <p className="text-sm text-muted">
+        Kontaktanfragen sind ab der Mitgliedsstufe{" "}
+        <span className="font-medium text-ink">Prime</span> möglich.
+      </p>
+    );
+  }
+
+  return (
+    <ContactRequestComposer
+      viewerId={viewerId}
+      profileId={profileId}
+      matchId={relation?.matchId ?? null}
+      name={name}
+    />
+  );
+}
+
+function ContactRequestComposer({
+  viewerId,
+  profileId,
+  matchId,
+  name,
+}: {
+  viewerId: string | null;
+  profileId: string;
+  matchId: string | null;
+  name: string;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () => sendContactRequest({ fromId: viewerId!, toId: profileId, matchId, message }),
+    onSuccess: () => {
+      setOpen(false);
+      setMessage("");
+      toast({
+        variant: "success",
+        title: "Kontaktanfrage gesendet",
+        description: `${name} entscheidet über deine Anfrage. Kontaktdaten werden erst nach Annahme sichtbar.`,
+      });
+      if (viewerId) {
+        queryClient.invalidateQueries({ queryKey: contactRelationQueryKey(viewerId, profileId) });
+        queryClient.invalidateQueries({ queryKey: matchingHubQueryKey(viewerId) });
+        queryClient.invalidateQueries({ queryKey: dashboardQueryKey(viewerId) });
+      }
+    },
+    onError: (error) => {
+      // Anfrage besteht bereits (23505) → freundlich melden und Relation neu laden.
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? (error as { code: unknown }).code
+          : undefined;
+      if (code === "23505") {
+        setOpen(false);
+        setMessage("");
+        toast({
+          variant: "success",
+          title: "Anfrage besteht bereits",
+          description: `Es gibt schon eine Kontaktanfrage mit ${name}.`,
+        });
+        if (viewerId) {
+          queryClient.invalidateQueries({ queryKey: contactRelationQueryKey(viewerId, profileId) });
+        }
+        return;
+      }
+      const description =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Unbekannter Fehler.";
+      toast({ variant: "error", title: "Anfrage fehlgeschlagen", description });
+    },
+  });
+
+  // Doppelklick-Schutz: das disabled-Prop greift erst nach dem Re-Render.
+  const submit = () => {
+    if (mutation.isPending) return;
+    mutation.mutate();
+  };
+
+  if (!open) {
+    return (
+      <>
+        <p className="text-sm text-muted">
+          Sende {name} eine Kontaktanfrage. Erst nach Annahme werden Kontaktdaten geteilt.
+        </p>
+        <div>
+          <Button variant="primary" size="sm" onClick={() => setOpen(true)}>
+            Kontaktanfrage senden
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <Textarea
+        rows={3}
+        autoFocus
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder={`Kurze Nachricht an ${name} (optional)…`}
+      />
+      <div className="flex items-center gap-2">
+        <Button variant="primary" size="sm" onClick={submit} disabled={mutation.isPending}>
+          {mutation.isPending ? "Senden…" : "Anfrage senden"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setOpen(false)}
+          disabled={mutation.isPending}
+        >
+          Abbrechen
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ReleasedContact({
+  name,
+  contact,
+}: {
+  name: string;
+  contact: { email: string | null; phone: string | null } | null;
+}) {
+  const hasData = !!(contact && (contact.email || contact.phone));
+  return (
+    <Card className="flex flex-col gap-3 border-night-border bg-night text-on-night">
+      <div className="flex items-center gap-2">
+        <CardTitle className="text-base text-on-night">Kontakt freigegeben</CardTitle>
+        <Badge variant="legacy">Angenommen</Badge>
+      </div>
+      <p className="text-sm text-on-night-muted">
+        {name} hat deine Kontaktanfrage angenommen. Ihr könnt euch jetzt direkt austauschen.
+      </p>
+      {hasData ? (
+        <dl className="flex flex-col gap-2 text-sm">
+          {contact?.email && (
+            <div className="flex items-center gap-2">
+              <dt className="w-16 shrink-0 text-on-night-muted">E-Mail</dt>
+              <dd>
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="font-medium text-gold hover:text-gold-strong"
+                >
+                  {contact.email}
+                </a>
+              </dd>
+            </div>
+          )}
+          {contact?.phone && (
+            <div className="flex items-center gap-2">
+              <dt className="w-16 shrink-0 text-on-night-muted">Telefon</dt>
+              <dd>
+                <a
+                  href={`tel:${contact.phone}`}
+                  className="font-medium text-gold hover:text-gold-strong"
+                >
+                  {contact.phone}
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+      ) : (
+        <p className="text-sm text-on-night-muted">
+          {name} hat noch keine Kontaktdaten hinterlegt.
         </p>
       )}
-      <p className="text-xs text-muted">E-Mail und Telefon werden nie automatisch angezeigt.</p>
     </Card>
   );
 }
