@@ -22,6 +22,7 @@
 //   SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are injected by the platform.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
+import { timingSafeEqual } from "jsr:@std/crypto@1/timing-safe-equal";
 import {
   renderAccepted,
   renderDeclined,
@@ -54,7 +55,10 @@ Deno.serve(async (req) => {
     log("error", "missing_webhook_secret");
     return new Response("Server misconfigured", { status: 500 });
   }
-  if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+  const enc = new TextEncoder();
+  const provided = enc.encode(req.headers.get("authorization") ?? "");
+  const wanted = enc.encode(`Bearer ${expected}`);
+  if (provided.byteLength !== wanted.byteLength || !timingSafeEqual(provided, wanted)) {
     log("warn", "unauthorized");
     return new Response("Unauthorized", { status: 401 });
   }
@@ -91,7 +95,7 @@ Deno.serve(async (req) => {
   // Recipient email + the counterparty's name. Email comes from the RLS-gated
   // profile_contacts (reachable only with the service role); the name shown in
   // the copy is always the OTHER party's.
-  const [{ data: recipientContact }, { data: otherProfile }] = await Promise.all([
+  const [contactRes, otherRes] = await Promise.all([
     supabase
       .from("profile_contacts")
       .select("email")
@@ -100,7 +104,14 @@ Deno.serve(async (req) => {
     supabase.from("profiles").select("name").eq("id", decision.otherId).maybeSingle(),
   ]);
 
-  const toEmail = recipientContact?.email?.trim();
+  // A query ERROR is transient (don't confuse it with "no row") — surface it so
+  // the failure is visible, rather than silently dropping the mail as no_email.
+  if (contactRes.error) {
+    log("error", "recipient_lookup_failed", { kind: decision.kind, error: contactRes.error.code });
+    return new Response("Lookup failed", { status: 502 });
+  }
+
+  const toEmail = contactRes.data?.email?.trim();
   if (!toEmail) {
     // No address on file is not a retryable error — ack so the webhook stops.
     log("warn", "recipient_has_no_email", {
@@ -113,7 +124,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  const otherName = otherProfile?.name ?? "";
+  // Name lookup failure degrades gracefully (templates fall back to generic copy).
+  const otherName = otherRes.data?.name ?? "";
   let email: RenderedEmail;
   switch (decision.kind) {
     case "new_request":
@@ -127,25 +139,38 @@ Deno.serve(async (req) => {
       break;
   }
 
-  const res = await fetch(RESEND_ENDPOINT, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${resendKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [toEmail],
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${resendKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [toEmail],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      }),
+    });
+  } catch (e) {
+    log("error", "resend_threw", {
+      kind: decision.kind,
+      error: e instanceof Error ? e.name : "unknown",
+    });
+    return new Response("Email send failed", { status: 502 });
+  }
 
   if (!res.ok) {
-    const detail = await res.text();
-    log("error", "resend_failed", { status: res.status, detail, kind: decision.kind });
-    // 5xx so the webhook retries the send.
+    // Log only Resend's error name + status — its message/body can echo the
+    // recipient address, which is exactly the contact data we keep gated.
+    const errName = await res
+      .json()
+      .then((j) => (j as { name?: string })?.name)
+      .catch(() => undefined);
+    log("error", "resend_failed", { status: res.status, error: errName, kind: decision.kind });
     return new Response("Email send failed", { status: 502 });
   }
 

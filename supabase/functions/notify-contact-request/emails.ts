@@ -47,13 +47,16 @@ export function selectNotification(payload: WebhookPayload): {
   if (!row) return null;
 
   if (payload.type === "INSERT") {
-    // New request → tell the recipient about the sender.
+    // New request → tell the recipient about the sender. Only a fresh pending
+    // request warrants this mail (a backfilled accepted/declined row must not).
+    if (row.status !== "pending") return null;
     return { kind: "new_request", recipientId: row.to_id, otherId: row.from_id, request: row };
   }
 
   if (payload.type === "UPDATE") {
-    // React only to an actual status change (mirrors the lifecycle trigger).
-    if (payload.old_record && payload.old_record.status === row.status) return null;
+    // React only to a confirmed status change (mirrors the lifecycle trigger).
+    // Fail closed if old_record is absent — we can't prove a change occurred.
+    if (!payload.old_record || payload.old_record.status === row.status) return null;
     if (row.status === "accepted") {
       return { kind: "accepted", recipientId: row.from_id, otherId: row.to_id, request: row };
     }

@@ -83,6 +83,22 @@ Deno.test("DELETE and null record → no email", () => {
   assertEquals(selectNotification(payload({ type: "INSERT", record: null })), null);
 });
 
+Deno.test("INSERT of a non-pending row → no email", () => {
+  assertEquals(
+    selectNotification(payload({ type: "INSERT", record: row({ status: "accepted" }) })),
+    null,
+  );
+});
+
+Deno.test("UPDATE without old_record → no email (fail closed)", () => {
+  assertEquals(
+    selectNotification(
+      payload({ type: "UPDATE", record: row({ status: "accepted" }), old_record: null }),
+    ),
+    null,
+  );
+});
+
 Deno.test("escapeHtml neutralizes injection", () => {
   assertEquals(escapeHtml('<script>"x"</script>'), "&lt;script&gt;&quot;x&quot;&lt;/script&gt;");
 });
