@@ -3,8 +3,10 @@ import { Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import HomeRedirect from "./components/HomeRedirect";
 import RequireAuth from "./components/RequireAuth";
+import RequireStaff from "./components/RequireStaff";
 import RequireTier from "./components/RequireTier";
 import { navItems, type NavItem } from "./config/nav";
+import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
@@ -37,6 +39,17 @@ export default function App() {
             <RequireAuth>
               <PublicProfilePage />
             </RequireAuth>
+          }
+        />
+        {/* Interne Manager-Ansicht: FBC/DKRI-Routing-Queue (AGE-249 §8). Nur Staff
+            (matching_manager/admin), daher kein Sidebar-Eintrag; per URL erreichbar.
+            DB-seitig erzwingt list_routing_queue/RLS is_matching_manager(). */}
+        <Route
+          path="/intern/routing"
+          element={
+            <RequireStaff>
+              <InternRoutingPage />
+            </RequireStaff>
           }
         />
       </Route>

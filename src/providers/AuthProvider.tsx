@@ -10,6 +10,7 @@ interface LoadedProfile {
   userId: string;
   tier: string | null;
   levelRank: number | null;
+  staffRole: string | null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -55,17 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function load() {
       try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("tier, membership_tiers(level_rank)")
-          .eq("id", uid)
-          .single();
+        // Stufe (Pflichtfeld) und Staff-Rolle (optional) parallel laden. Nur die
+        // Stufen-Abfrage steuert Retry/Fallback; eine fehlende staff_roles-Zeile
+        // ist der Normalfall (maybeSingle → data null) und kein Fehler.
+        const [profileRes, staffRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("tier, membership_tiers(level_rank)")
+            .eq("id", uid)
+            .single(),
+          supabase.from("staff_roles").select("role").eq("profile_id", uid).maybeSingle(),
+        ]);
         if (!active) return;
+        const { data, error } = profileRes;
         if (!error && data) {
           setProfile({
             userId: uid,
             tier: data.tier,
             levelRank: data.membership_tiers?.level_rank ?? null,
+            staffRole: staffRes.data?.role ?? null,
           });
           return;
         }
@@ -84,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 500 * attempt);
         return;
       }
-      setProfile({ userId: uid, tier: null, levelRank: null });
+      setProfile({ userId: uid, tier: null, levelRank: null, staffRole: null });
     }
 
     load();
@@ -97,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileLoaded = profile?.userId === userId;
   const tier = userId && profileLoaded ? profile.tier : null;
   const levelRank = userId && profileLoaded ? profile.levelRank : null;
+  const staffRole = userId && profileLoaded ? profile.staffRole : null;
   // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
   // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
   const isLoading = !authReady;
@@ -108,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       tier,
       levelRank,
+      staffRole,
       isLoading,
       tierLoading,
       signUp: async (email, password) => {
@@ -124,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
       },
     }),
-    [session, tier, levelRank, isLoading, tierLoading],
+    [session, tier, levelRank, staffRole, isLoading, tierLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

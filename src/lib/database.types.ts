@@ -152,6 +152,7 @@ export type Database = {
           id: string;
           match_id: string | null;
           message: string | null;
+          routing: string;
           status: string;
           to_id: string;
         };
@@ -161,6 +162,7 @@ export type Database = {
           id?: string;
           match_id?: string | null;
           message?: string | null;
+          routing?: string;
           status?: string;
           to_id: string;
         };
@@ -170,6 +172,7 @@ export type Database = {
           id?: string;
           match_id?: string | null;
           message?: string | null;
+          routing?: string;
           status?: string;
           to_id?: string;
         };
@@ -1149,10 +1152,118 @@ export type Database = {
           },
         ];
       };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
+      // routing_queue table from 20260614120000_volume_routing_queue.sql (§8 manager
+      // queue; rows inserted only by the lifecycle trigger, manager-only RLS).
+      routing_queue: {
+        Row: {
+          assigned_to: string | null;
+          created_at: string;
+          id: string;
+          match_id: string;
+          need_id: string | null;
+          routing: string;
+          status: string;
+          volume_band: string | null;
+        };
+        Insert: {
+          assigned_to?: string | null;
+          created_at?: string;
+          id?: string;
+          match_id: string;
+          need_id?: string | null;
+          routing?: string;
+          status?: string;
+          volume_band?: string | null;
+        };
+        Update: {
+          assigned_to?: string | null;
+          created_at?: string;
+          id?: string;
+          match_id?: string;
+          need_id?: string | null;
+          routing?: string;
+          status?: string;
+          volume_band?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "routing_queue_match_id_fkey";
+            columns: ["match_id"];
+            isOneToOne: true;
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "routing_queue_need_id_fkey";
+            columns: ["need_id"];
+            isOneToOne: false;
+            referencedRelation: "needs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "routing_queue_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
+      // staff_roles table from 20260614120000_volume_routing_queue.sql (server-controlled
+      // matching_manager/admin; self-read only, no client write).
+      staff_roles: {
+        Row: {
+          created_at: string;
+          profile_id: string;
+          role: string;
+        };
+        Insert: {
+          created_at?: string;
+          profile_id: string;
+          role: string;
+        };
+        Update: {
+          created_at?: string;
+          profile_id?: string;
+          role?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_roles_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Functions: {
       current_tier_rank: { Args: never; Returns: number };
+      is_matching_manager: { Args: never; Returns: boolean };
       is_prime_plus: { Args: never; Returns: boolean };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
+      // list_routing_queue() RPC from 20260614120000_volume_routing_queue.sql (manager-
+      // only enriched read of the §8 routing queue).
+      list_routing_queue: {
+        Args: never;
+        Returns: {
+          id: string;
+          match_id: string;
+          status: string;
+          routing: string;
+          volume_band: string | null;
+          score: number;
+          member_a_name: string | null;
+          member_b_name: string | null;
+          need_category: string | null;
+          need_title: string | null;
+          assigned_to: string | null;
+          created_at: string;
+        }[];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-245). Mirrors the
       // recompute_my_matches() RPC from 20260614090000_match_engine.sql (returns the
       // number of matches upserted for the logged-in member).
