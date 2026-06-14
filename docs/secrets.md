@@ -127,16 +127,47 @@ infisical run --env=dev -- sh -c \
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into every Edge
 Function by the platform — do **not** set them here.
 
-### Deploy + wire the Database Webhook
+### Deploy + wire the webhook
 
 ```bash
 supabase functions deploy notify-contact-request   # verify_jwt=false (see config.toml)
 ```
 
-Then create a **Database Webhook** (Dashboard → Database → Webhooks) on
-`public.contact_requests` for **Insert** and **Update**, pointing at the
-function URL, with an HTTP header `Authorization: Bearer <CONTACT_WEBHOOK_SECRET>`
-(same value as the secret above). The function rejects any request without it.
+The webhook is a **`pg_net` trigger** on `public.contact_requests` (Insert +
+Update) that POSTs the Supabase-webhook-shaped payload to the function with the
+bearer token. It is applied **directly to the live DB, not as a committed
+migration**, because the token can't be in git and Supabase Vault writes are
+permission-locked on this project (`_crypto_aead_det_noncegen` — owned by
+`supabase_admin`). The token therefore lives inline in the trigger function in
+the DB, exactly as Supabase's own Dashboard webhooks store their auth header;
+it is readable only with DB-admin access. Reapply with the real token swapped in:
+
+```sql
+create extension if not exists pg_net;
+
+create or replace function public.notify_contact_request_webhook()
+  returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  perform net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/notify-contact-request',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'Authorization', 'Bearer <CONTACT_WEBHOOK_SECRET>'),  -- not in git
+    body    := jsonb_build_object(
+                 'type', tg_op, 'table', tg_table_name, 'schema', tg_table_schema,
+                 'record', to_jsonb(new),
+                 'old_record', case when tg_op='UPDATE' then to_jsonb(old) else null end));
+  return null;
+end; $$;
+revoke execute on function public.notify_contact_request_webhook() from public, anon, authenticated;
+
+create trigger contact_requests_email_webhook
+  after insert or update on public.contact_requests
+  for each row execute function public.notify_contact_request_webhook();
+```
+
+The function rejects any request whose bearer doesn't match its
+`CONTACT_WEBHOOK_SECRET` (401).
 
 > **Sender domain (open point with Detlev):** until a verified FBC domain with
 > DKIM/SPF exists, use a verified **Resend test domain** as `FROM_EMAIL`
