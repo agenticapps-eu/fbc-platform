@@ -94,6 +94,7 @@ const baseData: DashboardData = {
       },
     },
   ],
+  hostedEvents: [],
   posts: [
     {
       id: "p1",
