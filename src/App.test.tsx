@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -6,11 +7,15 @@ import { AuthFixture, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
   it("zeigt die Shell-Navigation und leitet / auf die Community-Startseite", () => {
+    // Die Community-Startseite mountet jetzt den Feed (TanStack Query) → Provider nötig.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <AuthFixture value={fakeAuthValue()}>
-        <MemoryRouter initialEntries={["/"]}>
-          <App />
-        </MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/"]}>
+            <App />
+          </MemoryRouter>
+        </QueryClientProvider>
       </AuthFixture>,
     );
 

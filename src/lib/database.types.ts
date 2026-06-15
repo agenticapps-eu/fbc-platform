@@ -1264,6 +1264,17 @@ export type Database = {
           created_at: string;
         }[];
       };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-250). Mirrors the
+      // post_engagement_counts(uuid[]) RPC from 20260615120000_post_engagement_counts.sql
+      // (read-only aggregate like/comment counts per visible post).
+      post_engagement_counts: {
+        Args: { p_post_ids: string[] };
+        Returns: {
+          post_id: string;
+          like_count: number;
+          comment_count: number;
+        }[];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-245). Mirrors the
       // recompute_my_matches() RPC from 20260614090000_match_engine.sql (returns the
       // number of matches upserted for the logged-in member).

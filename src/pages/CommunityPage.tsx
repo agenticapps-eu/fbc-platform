@@ -1,5 +1,5 @@
+import CommunityFeed from "../components/community/CommunityFeed";
 import MemberDirectory from "../components/community/MemberDirectory";
-import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
 import { useTier } from "../hooks/useTier";
 import { TIER_RANK } from "../lib/tiers";
@@ -26,28 +26,17 @@ export default function CommunityPage() {
       {canSeeDirectory ? (
         <Tabs
           tabs={[
-            { value: "feed", label: "Feed", content: <FeedSection /> },
+            { value: "feed", label: "Feed", content: <CommunityFeed /> },
             { value: "verzeichnis", label: "Verzeichnis", content: <MemberDirectory /> },
           ]}
         />
       ) : (
         <div className="space-y-6">
-          <FeedSection />
+          <CommunityFeed />
           <DirectoryUpsell />
         </div>
       )}
     </section>
-  );
-}
-
-function FeedSection() {
-  return (
-    <Card>
-      <CardTitle>Noch keine Beiträge</CardTitle>
-      <CardDescription>
-        Sobald Mitglieder etwas teilen, erscheinen ihre Beiträge hier.
-      </CardDescription>
-    </Card>
   );
 }
 
