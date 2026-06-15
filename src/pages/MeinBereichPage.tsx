@@ -28,6 +28,7 @@ import {
   type ScoreBreakdown,
 } from "../lib/dashboard";
 import { categoryLabel, findCategory, type MatchingSide } from "../config/matching";
+import { isPastEvent } from "../lib/events";
 import { GOAL_CATEGORIES } from "../lib/profile";
 import { tierLabel } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
@@ -566,9 +567,10 @@ function ChipList({ items }: { items: string[] }) {
 // Echte Buchungen (gebucht/vergangen) und selbst gehostete Events. DEMO nur, wenn
 // das Mitglied noch gar keine Events hat (profile-spec §5: Leerzustand zeigt Demo).
 function EventsWidget({ data }: { data: DashboardData }) {
+  const now = new Date();
   const booked = data.events.filter((e) => e.event && e.status !== "cancelled");
-  const upcoming = booked.filter((e) => !isDashboardPast(e.event!.starts_at));
-  const past = booked.filter((e) => isDashboardPast(e.event!.starts_at));
+  const upcoming = booked.filter((e) => !isPastEvent(e.event!.starts_at, now));
+  const past = booked.filter((e) => isPastEvent(e.event!.starts_at, now));
   const hosted = data.hostedEvents;
   const isDemo = booked.length === 0 && hosted.length === 0;
 
@@ -664,13 +666,6 @@ function EventGroup({
       )}
     </div>
   );
-}
-
-/** Lokaler Vergangenheits-Check fürs Dashboard. */
-function isDashboardPast(starts_at: string | null): boolean {
-  if (!starts_at) return false;
-  const t = new Date(starts_at).getTime();
-  return !Number.isNaN(t) && t < Date.now();
 }
 
 // 5 ── Meine Communities (DEMO) ────────────────────────────────────────────────
