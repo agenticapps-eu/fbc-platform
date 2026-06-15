@@ -43,6 +43,7 @@ export interface ExtendedProfile {
   headline: string | null;
   potential_score: number;
   competencies: string[];
+  videos: string[];
   themeScores: ThemeScore[];
   interests: Interest[];
   offers: Offer[];
@@ -73,7 +74,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("headline, potential_score, competencies")
+      .select("headline, potential_score, competencies, videos")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("profile_theme_scores").select("theme, score").eq("profile_id", id),
@@ -115,6 +116,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
         headline: base.headline,
         potential_score: base.potential_score,
         competencies: base.competencies ?? [],
+        videos: base.videos,
         themeScores: themeRes.data ?? [],
         interests: interestsRes.data ?? [],
         offers: offersRes.data ?? [],

@@ -51,6 +51,7 @@ const fullView: PublicProfileData = {
     headline: null,
     potential_score: 842,
     competencies: ["M&A", "Mentoring"],
+    videos: [],
     themeScores: [
       { theme: "sein", score: 8.5 },
       { theme: "wirken", score: 6.4 },

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { AvatarCropper } from "../components/profile/AvatarCropper";
 import { TagInput } from "../components/profile/TagInput";
+import { VideoLinksInput } from "../components/profile/VideoLinksInput";
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
@@ -41,6 +42,7 @@ const EMPTY_VALUES: ProfileFormValues = {
   socials: { linkedin: "", instagram: "", xing: "" },
   interests: [],
   goals: [],
+  videos: [],
 };
 
 function errorMessage(error: unknown): string {
@@ -423,6 +425,21 @@ function ProfileEditor({ uid }: { uid: string }) {
           </Field>
           <Field label="Xing">{({ id }) => <Input id={id} {...register("socials.xing")} />}</Field>
         </div>
+      </Card>
+
+      {/* Videos (AGE-252) */}
+      <Card className="flex flex-col gap-4">
+        <div>
+          <CardTitle className="text-base">Videos</CardTitle>
+          <CardDescription>
+            YouTube- oder Vimeo-Links. Sie erscheinen auf deinem öffentlichen Profil.
+          </CardDescription>
+        </div>
+        <Controller
+          control={control}
+          name="videos"
+          render={({ field }) => <VideoLinksInput value={field.value} onChange={field.onChange} />}
+        />
       </Card>
 
       <div className="flex justify-end">
