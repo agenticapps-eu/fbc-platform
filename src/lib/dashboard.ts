@@ -161,6 +161,14 @@ export interface DashboardData {
   /** Eigene Event-Registrierungen (Anzahl für die Stat-Tile). */
   eventsCount: number;
   events: DashboardEvent[];
+  /** Events, die ich selbst hoste (host_id = uid). */
+  hostedEvents: {
+    id: string;
+    title: string;
+    type: string | null;
+    starts_at: string | null;
+    location: string | null;
+  }[];
   posts: PostRow[];
 }
 
@@ -203,6 +211,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     eventsRes,
     eventsCountRes,
     postsRes,
+    hostedRes,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -250,6 +259,11 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
       .eq("author_id", uid)
       .order("created_at", { ascending: false })
       .limit(4),
+    supabase
+      .from("events")
+      .select("id, title, type, starts_at, location")
+      .eq("host_id", uid)
+      .order("starts_at", { ascending: true, nullsFirst: true }),
   ]);
 
   if (profileRes.error) throw profileRes.error;
@@ -309,6 +323,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     contactsCount: contactsRes.count ?? 0,
     eventsCount: eventsCountRes.count ?? 0,
     events,
+    hostedEvents: hostedRes.data ?? [],
     posts: postsRes.data ?? [],
   };
 }

@@ -1264,6 +1264,24 @@ export type Database = {
           created_at: string;
         }[];
       };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-251). Mirrors
+      // 20260615140000_event_rpcs.sql (event registration counts, register, check-in).
+      event_registration_counts: {
+        Args: { p_event_ids: string[] };
+        Returns: {
+          event_id: string;
+          registered_count: number;
+          waitlist_count: number;
+        }[];
+      };
+      register_for_event: {
+        Args: { p_event_id: string };
+        Returns: string;
+      };
+      set_event_check_in: {
+        Args: { p_registration_id: string; p_checked_in: boolean };
+        Returns: undefined;
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-250). Mirrors the
       // post_engagement_counts(uuid[]) RPC from 20260615120000_post_engagement_counts.sql
       // (read-only aggregate like/comment counts per visible post).

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthContextValue } from "../providers/auth-context";
@@ -94,6 +94,7 @@ const baseData: DashboardData = {
       },
     },
   ],
+  hostedEvents: [],
   posts: [
     {
       id: "p1",
@@ -172,6 +173,57 @@ describe("Mein-Bereich-Dashboard (AGE-240)", () => {
 
     // Mehrere Demo-Marker (Communities, Statistik, Projekte, Investments, KI, …).
     expect(screen.getAllByText("Demo").length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("gruppiert echte Events in Gebucht / Vergangen / Eigene Events (kein DEMO-Fallback)", async () => {
+    renderPage({
+      ...baseData,
+      events: [
+        {
+          status: "registered",
+          checked_in: false,
+          event: {
+            id: "ev-future",
+            title: "Zukunfts-Dinner",
+            type: "dinner",
+            starts_at: "2026-12-01T18:00:00Z",
+            location: "Stuttgart",
+          },
+        },
+        {
+          status: "registered",
+          checked_in: false,
+          event: {
+            id: "ev-past",
+            title: "Rückblick-Workshop",
+            type: "workshop",
+            starts_at: "2020-01-01T10:00:00Z",
+            location: "Online",
+          },
+        },
+      ],
+      hostedEvents: [
+        {
+          id: "ev-hosted",
+          title: "Mein Eigenes Event",
+          type: "mastermind",
+          starts_at: "2026-11-01T16:00:00Z",
+          location: "München",
+        },
+      ],
+    });
+
+    // Echte Buchungen + gehostete Events → echte Gruppen, kein DEMO-Fallback.
+    const eventsCard = (await screen.findByText("Zukunfts-Dinner")).closest(
+      "[id='events']",
+    ) as HTMLElement;
+    expect(within(eventsCard).getByText("Gebucht")).toBeInTheDocument();
+    expect(within(eventsCard).getByText("Zukunfts-Dinner")).toBeInTheDocument();
+    expect(within(eventsCard).getByText("Vergangen")).toBeInTheDocument();
+    expect(within(eventsCard).getByText("Rückblick-Workshop")).toBeInTheDocument();
+    expect(within(eventsCard).getByText("Eigene Events")).toBeInTheDocument();
+    expect(within(eventsCard).getByText("Mein Eigenes Event")).toBeInTheDocument();
+    expect(within(eventsCard).queryByText("Demo")).not.toBeInTheDocument();
   });
 
   it("fällt für Events/Beiträge auf gekennzeichnete DEMO-Daten zurück, wenn keine echten existieren", async () => {

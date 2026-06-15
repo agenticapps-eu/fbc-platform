@@ -1,5 +1,5 @@
-import PagePlaceholder from "../components/PagePlaceholder";
+import EventsList from "../components/events/EventsList";
 
 export default function EventsPage() {
-  return <PagePlaceholder title="Events" description="Veranstaltungen und Termine." />;
+  return <EventsList />;
 }
