@@ -20,7 +20,15 @@ import { supabase } from "./supabase";
 
 type MessageRow = Database["public"]["Tables"]["messages"]["Row"];
 type ThreadRow = Database["public"]["Tables"]["message_threads"]["Row"];
-type PublicProfile = Database["public"]["Views"]["profiles_public"]["Row"];
+
+/** Partner-Identität für die Thread-Liste (Teilmenge von profiles). */
+type ChatPartner = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  company: string | null;
+  tier: string | null;
+};
 
 export interface ChatMessage {
   id: string;
@@ -61,7 +69,7 @@ export function mapMessageRow(row: MessageRow): ChatMessage {
 export function mapThreadRow(
   thread: Pick<ThreadRow, "id" | "a_profile_id" | "b_profile_id" | "created_at">,
   uid: string,
-  partner: Pick<PublicProfile, "id" | "name" | "avatar_url" | "company" | "tier"> | undefined,
+  partner: ChatPartner | undefined,
   lastMessage: { body: string; created_at: string; sender_id: string } | null,
 ): ChatThread {
   const partnerId = thread.a_profile_id === uid ? thread.b_profile_id : thread.a_profile_id;
@@ -138,10 +146,11 @@ export async function fetchThreads(uid: string): Promise<ChatThread[]> {
   const threadIds = rows.map((t) => t.id);
 
   const [profilesRes, lastMsgRes] = await Promise.all([
-    supabase
-      .from("profiles_public")
-      .select("id, name, avatar_url, company, tier")
-      .in("id", partnerIds),
+    // Partner aus der Basistabelle `profiles` (NICHT `profiles_public`): die Chat-Route
+    // ist Prime+, und `profiles_select_self_or_prime` gibt Prime+ jede Profilzeile frei.
+    // So sieht man den Namen eines freigegebenen Kontakts auch dann, wenn dieser sein
+    // Profil NICHT öffentlich gestellt hat (profiles_public filtert `where is_public`).
+    supabase.from("profiles").select("id, name, avatar_url, company, tier").in("id", partnerIds),
     // Neueste zuerst; pro Thread nimmt der Reduce die erste (= jüngste) Zeile.
     supabase
       .from("messages")

@@ -57,6 +57,8 @@ export default function ChatPage() {
   });
 
   // Realtime: neue Nachrichten des OFFENEN Threads live einspielen (§9).
+  // Bekannte Phase-1-Lücke: zwischen initialem fetchMessages und aktivem Channel
+  // eintreffende Nachrichten erscheinen erst beim nächsten Thread-Wechsel/Refetch.
   useEffect(() => {
     if (!activeId) return;
     const unsubscribe = subscribeToThread(activeId, (incoming) => {
