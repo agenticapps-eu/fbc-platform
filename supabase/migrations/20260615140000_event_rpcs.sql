@@ -69,7 +69,9 @@ begin
     raise exception 'not authenticated' using errcode = '42501';
   end if;
 
-  select * into v_event from public.events e where e.id = p_event_id;
+  -- Event-Zeile sperren: serialisiert gleichzeitige Anmeldungen aufs selbe Event,
+  -- damit count(registered)+insert nicht überbuchen (TOCTOU). Andere Events bleiben frei.
+  select * into v_event from public.events e where e.id = p_event_id for update;
   if not found then
     raise exception 'event not found' using errcode = 'P0002';
   end if;
@@ -107,7 +109,8 @@ $$;
 
 comment on function public.register_for_event(uuid) is
   'Meldet den Aufrufer zum Event an und gibt den Status zurück (registered, oder '
-  'waitlist bei erreichter capacity). Atomar; SECURITY DEFINER, um den Teilnehmerzähler '
+  'waitlist bei erreichter capacity). Sperrt die Event-Zeile (for update), damit '
+  'gleichzeitige Anmeldungen nicht über die capacity hinaus zählen; SECURITY DEFINER, um den Teilnehmerzähler '
   'serverseitig zu lesen. Re-Anmeldung nach Abmeldung bewertet die Kapazität neu.';
 
 grant execute on function public.register_for_event(uuid) to authenticated;
