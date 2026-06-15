@@ -148,7 +148,6 @@ export default function ChatPage() {
                 messages={messagesQuery.data ?? []}
                 myId={myId}
                 onSend={handleSend}
-                sending={false}
               />
             ) : (
               <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">

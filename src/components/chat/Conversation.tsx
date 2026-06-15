@@ -11,15 +11,14 @@ export function Conversation({
   messages,
   myId,
   onSend,
-  sending,
 }: {
   thread: ChatThread;
   messages: ChatMessage[];
   myId: string;
-  onSend: (body: string) => void;
-  sending: boolean;
+  onSend: (body: string) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Immer ans Ende scrollen, wenn neue Nachrichten kommen oder der Thread wechselt.
@@ -30,9 +29,12 @@ export function Conversation({
   function submit(event: FormEvent) {
     event.preventDefault();
     const body = draft.trim();
-    if (!body) return;
-    onSend(body);
+    if (!body || sending) return;
+    // Eingabe sofort leeren (optimistisch); Button bleibt bis zum Insert gesperrt,
+    // damit ein zweiter Klick keine doppelte Blase erzeugt. onSend fängt Fehler selbst.
     setDraft("");
+    setSending(true);
+    void Promise.resolve(onSend(body)).finally(() => setSending(false));
   }
 
   return (

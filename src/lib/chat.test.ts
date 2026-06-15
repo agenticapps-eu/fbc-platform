@@ -131,4 +131,44 @@ describe("mergeMessage (§9 optimistisches Senden + Realtime)", () => {
     const merged = mergeMessage([b], a);
     expect(merged.map((m) => m.id)).toEqual(["a", "b"]);
   });
+
+  it("reconciles two identical-body pending bubbles to two distinct real rows", () => {
+    // Selber Text zweimal schnell gesendet: beide echten Zeilen (distinct id)
+    // müssen je eine pending-Blase ersetzen — keine darf verloren gehen oder kollabieren.
+    const opt1: ChatMessage = { ...optimistic, id: "opt-1" };
+    const opt2: ChatMessage = { ...optimistic, id: "opt-2", createdAt: "2026-06-14T10:00:01Z" };
+    const real1: ChatMessage = {
+      id: "real-1",
+      threadId: "t1",
+      senderId: uid,
+      body: "Hallo von mir",
+      createdAt: "2026-06-14T10:00:02Z",
+    };
+    const real2: ChatMessage = { ...real1, id: "real-2", createdAt: "2026-06-14T10:00:03Z" };
+
+    const afterFirst = mergeMessage([opt1, opt2], real1);
+    const afterSecond = mergeMessage(afterFirst, real2);
+    expect(afterSecond).toHaveLength(2);
+    expect(afterSecond.map((m) => m.id)).toEqual(["real-1", "real-2"]);
+    expect(afterSecond.every((m) => !m.pending)).toBe(true);
+  });
+
+  it("breaks createdAt ties deterministically by id", () => {
+    const sameTime = "2026-06-14T10:00:00Z";
+    const b: ChatMessage = {
+      id: "b",
+      threadId: "t1",
+      senderId: uid,
+      body: "b",
+      createdAt: sameTime,
+    };
+    const a: ChatMessage = {
+      id: "a",
+      threadId: "t1",
+      senderId: uid,
+      body: "a",
+      createdAt: sameTime,
+    };
+    expect(mergeMessage([b], a).map((m) => m.id)).toEqual(["a", "b"]);
+  });
 });

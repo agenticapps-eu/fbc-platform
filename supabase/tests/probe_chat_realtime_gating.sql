@@ -8,8 +8,10 @@
 --   * ON acceptance: the lifecycle trigger opens the thread; both participants can
 --     post and read each other's messages.
 --   * A non-participant (C) can neither read nor post in the thread.
---   * `messages` is in the supabase_realtime publication, so INSERTs actually fan
---     out over Realtime (without this, the UI's live updates never fire).
+--   * `messages` is in the supabase_realtime publication (membership check only —
+--     without it no change events fire at all). The per-row Realtime GATING is not
+--     re-proven here: it rests on Supabase applying the same `messages_select` RLS
+--     to the change stream, which sections 3–4 already prove for direct reads.
 --
 -- Mirrors the role-impersonation helpers of probe_routing_queue.sql.
 
@@ -130,8 +132,9 @@ begin
     || v_thread || ''', ''' || v_c || ''', ''eindringling'')');
   if v_res <> 'DENIED' then raise exception 'non-participant C must not post, got %', v_res; end if;
 
-  -- 5. Realtime: messages must be in the supabase_realtime publication, else the
-  --    live INSERT events never reach the client. (RED until 20260614140000.)
+  -- 5. Realtime: messages must be in the supabase_realtime publication, else NO
+  --    change events fire at all. Membership check only; per-row gating on the
+  --    stream is the same messages_select RLS proven in 3–4. (RED until 20260614140000.)
   if not exists (
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
