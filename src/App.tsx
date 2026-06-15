@@ -7,6 +7,7 @@ import RequireStaff from "./components/RequireStaff";
 import RequireTier from "./components/RequireTier";
 import { navItems, type NavItem } from "./config/nav";
 import ChatPage from "./pages/ChatPage";
+import EventDetailPage from "./pages/EventDetailPage";
 import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -52,6 +53,9 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* Event-Detail (AGE-251) — param-basiert, daher kein Sidebar-Eintrag. Ohne
+            RequireAuth: anon darf öffentliche Events sehen; die RLS gated den Rest. */}
+        <Route path="/events/:id" element={<EventDetailPage />} />
         {/* Interne Manager-Ansicht: FBC/DKRI-Routing-Queue (AGE-249 §8). Nur Staff
             (matching_manager/admin), daher kein Sidebar-Eintrag; per URL erreichbar.
             DB-seitig erzwingt list_routing_queue/RLS is_matching_manager(). */}

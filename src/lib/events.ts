@@ -128,6 +128,7 @@ export interface Attendee {
   tier: string | null;
   status: string;
   checkedIn: boolean;
+  rating: number | null;
 }
 
 export interface EventInput {
@@ -322,7 +323,7 @@ export async function fetchEvent(uid: string | null, id: string): Promise<EventL
 export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
   const { data, error } = await supabase
     .from("event_registrations")
-    .select("id, profile_id, status, checked_in")
+    .select("id, profile_id, status, checked_in, rating")
     .eq("event_id", eventId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -352,6 +353,7 @@ export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
       tier: p?.tier ?? null,
       status: r.status,
       checkedIn: r.checked_in,
+      rating: r.rating,
     };
   });
 }
