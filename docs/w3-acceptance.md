@@ -107,12 +107,21 @@ nicht-komplementäre Profile) liegt als `supabase/tests/probe_match_engine.sql` 
 | Mitgliedsstufe | 5 | 5.0 |
 
 ⚠️ **Befund (Demo-Datenqualität, nicht Code):** Der einzige Live-Match (Maximilian ↔ Legacy Demo)
-trägt gespeichert **`score=84`**, obwohl (a) seine eigenen `basis`-Komponenten auf **≈74** summieren
-und (b) eine Neuberechnung gegen die **heutigen** Profildaten **38** ergäbe (Branche/Region stimmen
-nach späteren Profil-Edits nicht mehr überein, und 38 läge **unter** der 40er-Schwelle). Der Match
+trug gespeichert **`score=84`**, obwohl (a) seine eigenen `basis`-Komponenten auf **≈74** summierten
+und (b) eine Neuberechnung gegen die **heutigen** Profildaten **38** ergibt (Branche/Region stimmen
+nach späteren Profil-Edits nicht mehr überein, und 38 liegt **unter** der 40er-Schwelle). Der Match
 wurde nach Profil-Änderungen **nie neu berechnet** — die Engine schreibt Score und `basis` atomar,
-also ist dies klassische **stale demo data**, kein Engine-Defekt. → Risiko **R4** (vor der Demo
-`recompute_my_matches` laufen lassen bzw. den Hub-Button drücken).
+also ist dies klassische **stale demo data**, kein Engine-Defekt. → war Risiko **R4**.
+
+> **Update 2026-06-15 (behoben):** `generate_matches_for` für alle Demo-Profile neu ausgeführt;
+> da die Engine bestehende **Sub-40-Matches** bewusst nicht überschreibt (`where score >= 40`,
+> „stale matches that drop below 40 are not deleted"), wurde die bereits aktive (`requested`)
+> Zeile zusätzlich auf die **aktuelle** Engine-Ausgabe abgeglichen: **`score=38`, `basis.score=38`,
+> `routing=dkri`** — Score und Begründung sind jetzt self-consistent, der Kontakt-Flow/DKRI-Queue/
+> Thread bleibt intakt (nicht-destruktiv). **Resthinweis:** Das Paar ist mit 38 % nur ein schwacher
+> Match (verschiedene Stadt/Branche, viele Demo-Kategorien sind ggü. `src/config/matching.ts`
+> fehl-kapitalisiert → nur `investoren↔kapital` trifft). Für einen **starken** Demo-Match die
+> Demo-Daten kuratieren (Kategorien/Region/Branche angleichen) → **AGE-254** (Demo-Personas).
 
 ---
 
@@ -246,11 +255,12 @@ gegengetestet — beim W4-QA mit zwei Accounts nachholen.
 
 ## 8. Offene Punkte / Risiken für W4 (Community & Demo)
 
-- **R4 — Veraltete Demo-Matches (Demo-Blocker, mittel).** Der einzige Live-Match zeigt einen
-  Score, der weder zu seiner eigenen Begründung noch zu den heutigen Profildaten passt (84 vs.
-  ≈74 vs. recompute 38). Vor der Demo (**AGE-254/255**) für die Demo-Personas
-  `recompute_my_matches()` laufen lassen, damit Score **und** Begründung self-consistent sind und
-  Paare unter 40 ehrlich herausfallen.
+- **R4 — Veraltete Demo-Matches.** ✅ **behoben 2026-06-15** (Recompute aller Demo-Profile +
+  Abgleich der aktiven Zeile → `score=38`, `basis.score=38`, self-consistent; siehe §1-Update).
+  **Resthinweis (→ AGE-254):** Der Match ist mit 38 % schwach; die Demo-Kategorien sind ggü.
+  `src/config/matching.ts` teils fehl-kapitalisiert (z. B. „Projekte"/„Partner"/„Kapital" ≠
+  lowercase-Keys) und Region/Branche divergieren — für einen überzeugenden Demo-Match die
+  Demo-Daten kuratieren.
 - **R5 — Absender-Domain/DKIM für E-Mail offen (hoch für Demo).** Resend braucht eine verifizierte
   Versand-Domain (SPF/DKIM); der jüngste Edge-Function-Aufruf war **502**. Bis dahin eine
   verifizierte Resend-Testdomain nutzen und klar als Übergang markieren. Zusätzlich
@@ -280,6 +290,7 @@ gegengetestet — beim W4-QA mit zwei Accounts nachholen.
 - [x] Match-Engine-Logik verifiziert (Live-Re-Derivation + `probe_match_engine.sql`); erklärbares `basis`
 - [x] E-Mail-Pipeline verdrahtet & ein 200-Versand belegt — 🟡 jüngster Aufruf 502 (R5)
 - [x] W3-Issues in Linear: AGE-244/245/246/247/248/249 = **Done** (waren bereits Done)
-- [ ] ⚠️ Demo-Matches vor der Demo neu berechnen (R4); Resend-Domain/DKIM klären (R5); DKRI-Schwelle final (R6)
+- [x] Demo-Matches neu berechnet & abgeglichen (R4 behoben 2026-06-15); Rest: starke Demo-Daten kuratieren (AGE-254)
+- [ ] ⚠️ Offen für W4: Resend-Domain/DKIM klären (R5); finale DKRI-Schwelle (R6)
 - [ ] Meilenstein „W3 · Matching & Kontakt": AGE-244…249 done; **AGE-257** (Deploy-Automatisierung)
       noch offen — Handhabung siehe Begleit-Notiz
