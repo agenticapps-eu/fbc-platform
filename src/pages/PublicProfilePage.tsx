@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { Textarea } from "../components/ui/Textarea";
+import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { useToast } from "../components/ui/toast-context";
 import {
   contactRelationQueryKey,
@@ -219,6 +220,17 @@ function ExtendedSections({ extended }: { extended: ExtendedProfile }) {
         <Card className="flex flex-col gap-3">
           <CardTitle className="text-base">Kompetenzen</CardTitle>
           <ChipList items={extended.competencies} />
+        </Card>
+      )}
+
+      {extended.videos.length > 0 && (
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Videos</CardTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {extended.videos.map((url, i) => (
+              <VideoEmbed key={url} url={url} title={`Video ${i + 1}`} />
+            ))}
+          </div>
         </Card>
       )}
 

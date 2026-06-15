@@ -1043,6 +1043,7 @@ export type Database = {
           socials: Json | null;
           tier: string;
           updated_at: string;
+          videos: string[];
           website: string | null;
         };
         Insert: {
@@ -1070,6 +1071,7 @@ export type Database = {
           socials?: Json | null;
           tier?: string;
           updated_at?: string;
+          videos?: string[];
           website?: string | null;
         };
         Update: {
@@ -1097,6 +1099,7 @@ export type Database = {
           socials?: Json | null;
           tier?: string;
           updated_at?: string;
+          videos?: string[];
           website?: string | null;
         };
         Relationships: [

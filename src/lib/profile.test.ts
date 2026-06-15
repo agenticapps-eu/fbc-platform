@@ -3,6 +3,7 @@ import {
   PROFILE_COMPLETE_THRESHOLD,
   computeProfileCompletion,
   isProfileComplete,
+  sanitizeVideos,
   type ProfileFormValues,
 } from "./profile";
 
@@ -21,6 +22,7 @@ const EMPTY: ProfileFormValues = {
   socials: { linkedin: "", instagram: "", xing: "" },
   interests: [],
   goals: [],
+  videos: [],
 };
 
 /** Die 12 gewichteten Felder, jeweils mit einem „gefüllten“ Wert. */
@@ -39,6 +41,7 @@ const FILLED: ProfileFormValues = {
   socials: { linkedin: "max", instagram: "", xing: "" },
   interests: [],
   goals: [],
+  videos: [],
 };
 
 describe("computeProfileCompletion", () => {
@@ -71,5 +74,19 @@ describe("computeProfileCompletion", () => {
     expect(computeProfileCompletion(ten)).toBe(83);
     expect(computeProfileCompletion(ten)).toBeGreaterThanOrEqual(PROFILE_COMPLETE_THRESHOLD);
     expect(isProfileComplete(computeProfileCompletion(ten))).toBe(true);
+  });
+});
+
+describe("sanitizeVideos (AGE-252)", () => {
+  it("behält gültige YouTube-/Vimeo-Links (getrimmt) und bewahrt die Reihenfolge", () => {
+    expect(
+      sanitizeVideos(["  https://youtu.be/dQw4w9WgXcQ  ", "https://vimeo.com/123456789"]),
+    ).toEqual(["https://youtu.be/dQw4w9WgXcQ", "https://vimeo.com/123456789"]);
+  });
+
+  it("verwirft leere und nicht einbettbare Einträge", () => {
+    expect(
+      sanitizeVideos(["", "   ", "nur text", "https://evil.example.com/x", "javascript:alert(1)"]),
+    ).toEqual([]);
   });
 });

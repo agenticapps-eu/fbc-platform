@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseVideoUrl } from "./feed";
 import { recomputeMyMatches } from "./matches";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
@@ -65,6 +66,10 @@ export const profileFormSchema = z.object({
       progress: z.number().int().min(0).max(100),
     }),
   ),
+  // Profil-Videos (AGE-252): rohe YouTube-/Vimeo-URLs. Pro-Zeilen-Validierung
+  // passiert im Editor; beim Speichern werden leere/ungültige Einträge verworfen,
+  // damit nie eine nicht-einbettbare URL persistiert wird.
+  videos: z.array(z.string()),
 });
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -155,7 +160,13 @@ export async function fetchProfileEditorData(uid: string): Promise<ProfileFormVa
       title: g.title,
       progress: g.progress ?? 0,
     })),
+    videos: p.videos,
   };
+}
+
+/** Behält nur nicht-leere, einbettbare YouTube-/Vimeo-URLs (AGE-252). */
+export function sanitizeVideos(videos: string[]): string[] {
+  return videos.map((v) => v.trim()).filter((v) => v !== "" && parseVideoUrl(v) !== null);
 }
 
 // ── Speichern ────────────────────────────────────────────────────────────────
@@ -204,6 +215,7 @@ export async function saveProfile(
       website: emptyToNull(values.website),
       dev_focus: values.dev_focus === "" ? null : values.dev_focus,
       socials: buildSocials(values.socials),
+      videos: sanitizeVideos(values.videos),
       avatar_url: avatarUrl,
     })
     .eq("id", uid)
