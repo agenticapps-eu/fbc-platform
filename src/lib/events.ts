@@ -64,6 +64,21 @@ export function registrationStatusLabel(status: string): string {
   return status;
 }
 
+const eventDateTimeFmt = new Intl.DateTimeFormat("de-DE", {
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Datum + Uhrzeit eines Events; ohne Termin „Termin offen". */
+export function formatEventDate(startsAt: string | null): string {
+  if (!startsAt) return "Termin offen";
+  const d = new Date(startsAt);
+  return Number.isNaN(d.getTime()) ? "Termin offen" : `${eventDateTimeFmt.format(d)} Uhr`;
+}
+
 /** ms-Zeit von starts_at; null/ungültig → null. */
 function startMs(startsAt: string | null): number | null {
   if (!startsAt) return null;

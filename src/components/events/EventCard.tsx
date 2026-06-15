@@ -4,32 +4,21 @@ import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import {
   eventTypeLabel,
+  formatEventDate,
   isFull,
   registrationStatusLabel,
   remainingSpots,
   type EventListItem,
 } from "../../lib/events";
 
-const dateTimeFmt = new Intl.DateTimeFormat("de-DE", {
-  weekday: "short",
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-/** Datum+Uhrzeit eines Events; ohne Termin „Termin offen". Exportiert für die Detailseite. */
-export function formatEventDate(startsAt: string | null): string {
-  if (!startsAt) return "Termin offen";
-  const d = new Date(startsAt);
-  return Number.isNaN(d.getTime()) ? "Termin offen" : `${dateTimeFmt.format(d)} Uhr`;
-}
-
 export function EventCard({ event }: { event: EventListItem }) {
   const remaining = remainingSpots(event.capacity, event.registeredCount);
   const full = isFull(event.capacity, event.registeredCount);
   return (
-    <Link to={`/events/${event.id}`} className="block focus-visible:outline-none">
+    <Link
+      to={`/events/${event.id}`}
+      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
+    >
       <Card className="space-y-3 transition-colors hover:border-gold/50">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
