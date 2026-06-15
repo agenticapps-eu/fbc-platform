@@ -115,13 +115,17 @@ also ist dies klassische **stale demo data**, kein Engine-Defekt. → war Risiko
 
 > **Update 2026-06-15 (behoben):** `generate_matches_for` für alle Demo-Profile neu ausgeführt;
 > da die Engine bestehende **Sub-40-Matches** bewusst nicht überschreibt (`where score >= 40`,
-> „stale matches that drop below 40 are not deleted"), wurde die bereits aktive (`requested`)
-> Zeile zusätzlich auf die **aktuelle** Engine-Ausgabe abgeglichen: **`score=38`, `basis.score=38`,
-> `routing=dkri`** — Score und Begründung sind jetzt self-consistent, der Kontakt-Flow/DKRI-Queue/
-> Thread bleibt intakt (nicht-destruktiv). **Resthinweis:** Das Paar ist mit 38 % nur ein schwacher
-> Match (verschiedene Stadt/Branche, viele Demo-Kategorien sind ggü. `src/config/matching.ts`
-> fehl-kapitalisiert → nur `investoren↔kapital` trifft). Für einen **starken** Demo-Match die
-> Demo-Daten kuratieren (Kategorien/Region/Branche angleichen) → **AGE-254** (Demo-Personas).
+> „stale matches that drop below 40 are not deleted"), wurde die aktive (`requested`) Zeile zunächst
+> auf die Engine-Ausgabe abgeglichen (38, self-consistent), der Kontakt-Flow/DKRI-Queue/Thread blieb
+> intakt (nicht-destruktiv).
+>
+> **Update 2026-06-15 (Demo-Daten kuratiert, AGE-254):** Anschließend die Demo-Profile des Hero-Matches
+> kuratiert — Legacy Demo als Kapitalgeber (Stuttgart, „Beteiligungen & Immobilien", bietet
+> `kapital`/`beteiligungen`/`kontakte`, sucht `immobilien`), Maximilian als Großkapital-Suchender
+> (behält `investoren`@`gt_10m`, bietet `immobilien`/`know_how`), Kategorien auf die
+> `src/config/matching.ts`-Keys normiert. Recompute → **Hero-Match jetzt `score=97`, `basis.score=97`,
+> `routing=dkri`** (Komplementarität voll: `investoren↔kapital`, `investoren↔beteiligungen`,
+> `immobilien↔immobilien`). Match-ID, `pending`-Anfrage, DKRI-Queue und Thread unverändert.
 
 ---
 
@@ -255,12 +259,11 @@ gegengetestet — beim W4-QA mit zwei Accounts nachholen.
 
 ## 8. Offene Punkte / Risiken für W4 (Community & Demo)
 
-- **R4 — Veraltete Demo-Matches.** ✅ **behoben 2026-06-15** (Recompute aller Demo-Profile +
-  Abgleich der aktiven Zeile → `score=38`, `basis.score=38`, self-consistent; siehe §1-Update).
-  **Resthinweis (→ AGE-254):** Der Match ist mit 38 % schwach; die Demo-Kategorien sind ggü.
-  `src/config/matching.ts` teils fehl-kapitalisiert (z. B. „Projekte"/„Partner"/„Kapital" ≠
-  lowercase-Keys) und Region/Branche divergieren — für einen überzeugenden Demo-Match die
-  Demo-Daten kuratieren.
+- **R4 — Veraltete Demo-Matches.** ✅ **behoben 2026-06-15.** Recompute aller Demo-Profile +
+  Abgleich der aktiven Zeile, danach **Demo-Daten kuratiert (AGE-254)** → Hero-Match
+  Maximilian↔Legacy ist jetzt ein starker, self-consistenter **97 %-Match** (`routing=dkri`,
+  Kontakt-Flow + DKRI-Queue + Thread intakt; siehe §1-Updates). Demo-Kategorien sind jetzt auf die
+  `src/config/matching.ts`-Keys normiert.
 - **R5 — Absender-Domain/DKIM für E-Mail offen (hoch für Demo).** Resend braucht eine verifizierte
   Versand-Domain (SPF/DKIM); der jüngste Edge-Function-Aufruf war **502**. Bis dahin eine
   verifizierte Resend-Testdomain nutzen und klar als Übergang markieren. Zusätzlich
