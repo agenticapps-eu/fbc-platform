@@ -14,9 +14,11 @@ import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import {
   addComment,
+  buildMentionResolver,
   commentsQueryKey,
   createPost,
   extractFirstVideo,
+  feedListKey,
   feedQueryKey,
   fetchComments,
   fetchFeed,
@@ -24,8 +26,8 @@ import {
   toggleLike,
   tokenizePostBody,
   VISIBILITY_OPTIONS,
-  type FeedAuthor,
   type FeedPost,
+  type MentionResolver,
   type PostSegment,
   type PostVisibility,
 } from "../../lib/feed";
@@ -38,20 +40,24 @@ import {
  */
 export default function CommunityFeed() {
   const { user } = useAuth();
+  const uid = user?.id ?? null;
   const [hashtag, setHashtag] = useState<string | null>(null);
 
   const feed = useQuery({
-    queryKey: feedQueryKey(hashtag),
-    queryFn: () => fetchFeed({ uid: user?.id ?? null, hashtag }),
+    queryKey: feedQueryKey(uid, hashtag),
+    queryFn: () => fetchFeed({ uid, hashtag }),
   });
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
   // Treffer wird zum Profil-Link, sonst bleibt es dezenter Gold-Text (kein Fake-Link).
-  const mentionResolver = useMemo(() => buildMentionResolver(feed.data ?? []), [feed.data]);
+  const mentionResolver = useMemo(
+    () => buildMentionResolver((feed.data ?? []).map((p) => p.author)),
+    [feed.data],
+  );
 
   return (
     <section className="space-y-6">
-      {user && <PostComposer authorId={user.id} hashtag={hashtag} />}
+      {user && <PostComposer authorId={user.id} />}
 
       {hashtag && (
         <div className="flex items-center gap-2 text-sm">
@@ -82,7 +88,7 @@ export default function CommunityFeed() {
 
 // ── Composer ────────────────────────────────────────────────────────────────
 
-function PostComposer({ authorId, hashtag }: { authorId: string; hashtag: string | null }) {
+function PostComposer({ authorId }: { authorId: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [body, setBody] = useState("");
@@ -104,8 +110,9 @@ function PostComposer({ authorId, hashtag }: { authorId: string; hashtag: string
       setVideoUrl("");
       setVisibility("members");
       toast({ variant: "success", title: "Beitrag veröffentlicht" });
-      queryClient.invalidateQueries({ queryKey: feedQueryKey(hashtag) });
-      queryClient.invalidateQueries({ queryKey: feedQueryKey(null) });
+      // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
+      // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
+      queryClient.invalidateQueries({ queryKey: feedListKey(authorId) });
     },
     onError: (error) => {
       toast({
@@ -260,7 +267,7 @@ function PostCard({
     mutationFn: () =>
       toggleLike({ postId: post.id, profileId: currentUserId as string, liked: post.likedByMe }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: feedQueryKey(activeHashtag) });
+      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) });
     },
     onError: (error) => {
       toast({ variant: "error", title: "Aktion fehlgeschlagen", description: errorMessage(error) });
@@ -337,9 +344,10 @@ function PostCard({
         </button>
         <button
           type="button"
+          disabled={!currentUserId}
           onClick={() => setShowComments((v) => !v)}
           aria-expanded={showComments}
-          className="inline-flex items-center gap-1.5 rounded-md px-1 text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          className="inline-flex items-center gap-1.5 rounded-md px-1 text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-60"
         >
           <CommentIcon />
           <span>{post.commentCount}</span>
@@ -347,13 +355,7 @@ function PostCard({
         </button>
       </footer>
 
-      {showComments && (
-        <CommentThread
-          postId={post.id}
-          currentUserId={currentUserId}
-          activeHashtag={activeHashtag}
-        />
-      )}
+      {showComments && <CommentThread postId={post.id} currentUserId={currentUserId} />}
     </Card>
   );
 }
@@ -425,18 +427,16 @@ function PostBody({
 function CommentThread({
   postId,
   currentUserId,
-  activeHashtag,
 }: {
   postId: string;
   currentUserId: string | null;
-  activeHashtag: string | null;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [body, setBody] = useState("");
 
   const comments = useQuery({
-    queryKey: commentsQueryKey(postId),
+    queryKey: commentsQueryKey(currentUserId, postId),
     queryFn: () => fetchComments(postId),
   });
 
@@ -444,8 +444,8 @@ function CommentThread({
     mutationFn: () => addComment({ postId, authorId: currentUserId as string, body: body.trim() }),
     onSuccess: () => {
       setBody("");
-      queryClient.invalidateQueries({ queryKey: commentsQueryKey(postId) });
-      queryClient.invalidateQueries({ queryKey: feedQueryKey(activeHashtag) });
+      queryClient.invalidateQueries({ queryKey: commentsQueryKey(currentUserId, postId) });
+      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) });
     },
     onError: (error) => {
       toast({
@@ -510,30 +510,6 @@ function CommentThread({
 }
 
 // ── Helfer ──────────────────────────────────────────────────────────────────
-
-type MentionResolver = (handle: string) => string | null;
-
-/** Normalisiert einen Namen/Handle auf reine Kleinbuchstaben+Ziffern (für @-Matching). */
-function slug(value: string): string {
-  return value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-/**
- * Baut einen Resolver, der eine Erwähnung (@handle) auf eine Profil-ID der im Feed
- * bekannten Autoren abbildet — über den slug des vollen Namens UND des Vornamens.
- * Best-effort: kein Treffer → null (Erwähnung bleibt dann unverlinkt).
- */
-function buildMentionResolver(posts: FeedPost[]): MentionResolver {
-  const byHandle = new Map<string, string>();
-  const add = (author: FeedAuthor) => {
-    if (!author.name) return;
-    byHandle.set(slug(author.name), author.id);
-    const first = author.name.trim().split(/\s+/)[0];
-    if (first) byHandle.set(slug(first), author.id);
-  };
-  for (const p of posts) add(p.author);
-  return (handle: string) => byHandle.get(slug(handle)) ?? null;
-}
 
 function errorMessage(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {

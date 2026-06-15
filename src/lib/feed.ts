@@ -1,3 +1,5 @@
+import { captureException } from "@sentry/react";
+
 import { supabase } from "./supabase";
 
 /**
@@ -59,8 +61,10 @@ export interface PostSegment {
 // Hashtag/Erwähnung nur am Wortanfang (Start oder nach Whitespace), damit
 // "C#programming" oder eine E-Mail keine Fehltreffer erzeugen. URLs überall.
 const TOKEN_RE = /(?<=^|\s)[#@][\p{L}\p{N}_]+|https?:\/\/[^\s]+/gu;
-// Satzzeichen am URL-Ende gehören zum Satz, nicht zum Link.
-const TRAILING_PUNCT = /[.,;:!?»"')\]]+$/;
+// Satzzeichen am URL-Ende gehören zum Satz, nicht zum Link. Klammern/eckige
+// Klammern bewusst NICHT abtrennen — sie kommen in echten URLs vor (z. B.
+// Wikipedia `/wiki/Foo_(bar)`); sie hier zu strippen würde solche Links zerreißen.
+const TRAILING_PUNCT = /[.,;:!?»"']+$/;
 
 function normalizeTag(tag: string): string {
   return tag.toLowerCase();
@@ -185,10 +189,49 @@ export function extractFirstVideo(
   return null;
 }
 
+// ── Erwähnungen auflösen ──────────────────────────────────────────────────
+
+export type MentionResolver = (handle: string) => string | null;
+
+/** Name/Handle → reine Kleinbuchstaben+Ziffern (für @-Matching, umlautfest). */
+function mentionSlug(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/**
+ * Baut einen Resolver, der eine Erwähnung (@handle) auf eine Profil-ID der
+ * übergebenen Autoren abbildet — über den Slug des vollen Namens UND des
+ * Vornamens. Best-effort (Spec: „optional auflösen"): leerer Slug wird ignoriert,
+ * bei Vornamens-Kollisionen gewinnt der erste Autor; kein Treffer → null.
+ */
+export function buildMentionResolver(authors: FeedAuthor[]): MentionResolver {
+  const byHandle = new Map<string, string>();
+  for (const author of authors) {
+    if (!author.name) continue;
+    const full = mentionSlug(author.name);
+    if (full && !byHandle.has(full)) byHandle.set(full, author.id);
+    const first = mentionSlug(author.name.trim().split(/\s+/)[0] ?? "");
+    if (first && !byHandle.has(first)) byHandle.set(first, author.id);
+  }
+  return (handle) => {
+    const key = mentionSlug(handle);
+    return key ? (byHandle.get(key) ?? null) : null;
+  };
+}
+
 // ── Query-Keys & Optionen ───────────────────────────────────────────────────
 
-export const feedQueryKey = (hashtag: string | null) => ["feed", "list", hashtag] as const;
-export const commentsQueryKey = (postId: string) => ["feed", "comments", postId] as const;
+/**
+ * Query-Keys sind nach `uid` getrennt: Sichtbarkeit hängt am Principal (tier-
+ * gegated über RLS), also darf der Cache eines Mitglieds NICHT an ein anderes
+ * (z. B. nach Logout/Account-Wechsel) ausgespielt werden. Der `uid`-Präfix
+ * trennt die Cache-Einträge je Betrachter sauber.
+ */
+export const feedListKey = (uid: string | null) => ["feed", "list", uid] as const;
+export const feedQueryKey = (uid: string | null, hashtag: string | null) =>
+  ["feed", "list", uid, hashtag] as const;
+export const commentsQueryKey = (uid: string | null, postId: string) =>
+  ["feed", "comments", uid, postId] as const;
 
 /** Sichtbarkeitsstufen für den Composer (Default `members`). */
 export const VISIBILITY_OPTIONS: { value: PostVisibility; label: string }[] = [
@@ -258,6 +301,10 @@ export async function fetchFeed({ uid, hashtag }: FetchFeedArgs): Promise<FeedPo
     supabase.rpc("post_engagement_counts", { p_post_ids: postIds }),
   ]);
 
+  // Zähler-RPC ist nicht kritisch: schlägt sie fehl, zeigt der Feed 0/0 (statt zu
+  // brechen) — aber NICHT still: an Sentry melden, damit ein kaputter Grant /
+  // fehlende Migration sichtbar wird.
+  if (countsRes.error) captureException(countsRes.error, { tags: { area: "feed.counts" } });
   const counts = new Map((countsRes.data ?? []).map((c) => [c.post_id, c]));
 
   let myLikes = new Set<string>();
@@ -334,9 +381,14 @@ export async function toggleLike(input: {
       .eq("profile_id", input.profileId);
     if (error) throw error;
   } else {
+    // Idempotent: ein Doppelklick (oder Klick vor dem Refetch) darf nicht am
+    // (post_id, profile_id)-PK in einen 23505-Fehler laufen → ON CONFLICT DO NOTHING.
     const { error } = await supabase
       .from("post_likes")
-      .insert({ post_id: input.postId, profile_id: input.profileId });
+      .upsert(
+        { post_id: input.postId, profile_id: input.profileId },
+        { onConflict: "post_id,profile_id", ignoreDuplicates: true },
+      );
     if (error) throw error;
   }
 }

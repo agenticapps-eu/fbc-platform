@@ -24,7 +24,12 @@ as $$
     (select count(*) from public.post_likes pl where pl.post_id = p.id),
     (select count(*) from public.comments  c  where c.post_id  = p.id)
   from public.posts p
-  where p.id = any (p_post_ids)
+  -- Obergrenze: die Funktion ist an anon vergeben und nimmt einen beliebigen
+  -- ID-Array entgegen. Ohne Cap könnte ein anonymer Aufruf zwei korrelierte
+  -- count(*)-Subqueries über zehntausende IDs auslösen (CPU-Amplifikation). Der
+  -- Feed fragt nie mehr als 50 Posts ab; 200 ist großzügig gepuffert.
+  where cardinality(p_post_ids) <= 200
+    and p.id = any (p_post_ids)
     and (
       p.visibility = 'public'
       or ( p.visibility = 'members' and (select auth.uid()) is not null )
