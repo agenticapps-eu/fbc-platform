@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import type { MembershipTier } from "../lib/tiers";
 import AcademyPage from "../pages/AcademyPage";
 import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
+import ChatPage from "../pages/ChatPage";
 import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
 import EventsPage from "../pages/EventsPage";
@@ -59,6 +60,15 @@ export const navItems: NavItem[] = [
     path: "/verzeichnis",
     label: "Verzeichnis",
     Component: VerzeichnisPage,
+    section: "community",
+    minTier: "prime",
+  },
+  // Chat (AGE-248, §9): Direktnachrichten ab Freigabe. Erreichbar aus „Mein
+  // Bereich" und der angenommenen Anfrage, kein eigener Top-Level-Eintrag. Prime+.
+  {
+    path: "/chat",
+    label: "Chat",
+    Component: ChatPage,
     section: "community",
     minTier: "prime",
   },
