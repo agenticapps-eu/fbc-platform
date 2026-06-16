@@ -179,6 +179,29 @@ const EVENT_IDS = Object.values(EVT);
 
 // ── Orchestration ─────────────────────────────────────────────────────────────
 
+/**
+ * TLS for the connection. The Supabase pooler presents a cert chained to a
+ * private Supabase CA (not the public trust store), so plain verification fails.
+ * Secure by default, with two conscious opt-outs (never silently disabled):
+ *   - DEMO_SEED_CA_CERT=<pem path>  → verify against Supabase's CA (recommended;
+ *     download from the project's dashboard → Database → SSL configuration).
+ *   - DEMO_SEED_TLS_INSECURE=1      → encrypt but do not authenticate the server
+ *     (MITM-exposed — only on a trusted network). Prints a warning.
+ */
+function resolveSsl(url: string): pg.ClientConfig["ssl"] {
+  if (url.includes("localhost")) return false; // local `supabase start` is plaintext
+  const caPath = process.env.DEMO_SEED_CA_CERT;
+  if (caPath) return { ca: readFileSync(caPath, "utf8"), rejectUnauthorized: true };
+  if (process.env.DEMO_SEED_TLS_INSECURE === "1") {
+    console.warn(
+      "⚠️  TLS verification disabled (DEMO_SEED_TLS_INSECURE=1): the connection is " +
+        "encrypted but the server is NOT authenticated — only use on a trusted network.",
+    );
+    return { rejectUnauthorized: false };
+  }
+  return { rejectUnauthorized: true };
+}
+
 function runSqlFile(client: pg.Client, file: string): Promise<unknown> {
   const sql = readFileSync(join(HERE, file), "utf8");
   return client.query(sql);
@@ -218,9 +241,7 @@ async function main(): Promise<void> {
 
   const client = new pg.Client({
     connectionString: url,
-    // Verify TLS against the system trust store (the Supabase pooler serves a
-    // publicly-trusted cert). Local connections (supabase start) speak plaintext.
-    ssl: url.includes("localhost") ? false : { rejectUnauthorized: true },
+    ssl: resolveSsl(url),
   });
   await client.connect();
   try {

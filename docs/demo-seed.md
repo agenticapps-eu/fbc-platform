@@ -34,6 +34,23 @@ The connection is derived from `SUPABASE_DB_PASSWORD` (injected by Infisical) vi
 the session pooler; override with `DEMO_SEED_DATABASE_URL` if needed (e.g. a local
 `supabase start` stack).
 
+### TLS
+
+The Supabase pooler presents a certificate chained to a **private Supabase CA**
+(not the public trust store), so strict verification fails out of the box with
+`self-signed certificate in certificate chain`. Choose one:
+
+```bash
+# Recommended — verify against Supabase's CA (download from the dashboard:
+# Project → Database → SSL configuration → Download certificate):
+DEMO_SEED_CONFIRM=fbc-demo DEMO_SEED_CA_CERT=~/prod-ca-2021.crt pnpm demo:seed
+
+# Quick path on a trusted network — encrypted but server NOT authenticated:
+DEMO_SEED_CONFIRM=fbc-demo DEMO_SEED_TLS_INSECURE=1 pnpm demo:seed
+```
+
+A local `supabase start` stack (`localhost`) connects in plaintext, no flag needed.
+
 ## What it does
 
 1. Runs the curated SQL verbatim (idempotent):
