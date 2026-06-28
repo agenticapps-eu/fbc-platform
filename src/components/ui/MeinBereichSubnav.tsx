@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
+import { cn } from "../../lib/cn";
 
 /**
- * „Mein Bereich"-Subnavigation (profile-spec §4) — eigene Sidebar im Dashboard,
- * NICHT die globale Formate-Sidebar. Gruppen & Einträge exakt nach Mockup.
+ * „Mein Bereich"-Subnavigation (profile-spec §4) — wird IN PLACE in der globalen
+ * (dunklen) Sidebar gezeigt, sobald man auf `/mein-bereich` ist. Es gibt nur EINE
+ * Sidebar (AGE-237): sie schaltet zwischen den 7 Formaten und dieser Subnav um.
  *
- * Im Prototyp:
- *  - `anchor` → scrollt zum Widget der „Übersicht" (funktionale Einträge),
- *  - `to`     → verlinkt auf ein vorhandenes Format/Seite,
+ *  - `anchor` → scrollt zum Widget der Dashboard-Seite,
+ *  - `to`     → verlinkt auf ein vorhandenes Format/Seite (Sidebar klappt zurück auf Formate),
  *  - sonst    → „Tiefen-Seite folgt": dezent gemutet, (noch) nicht klickbar.
  */
 interface SubNavItem {
@@ -87,26 +88,26 @@ const GROUPS: SubNavGroup[] = [
 ];
 
 const itemBase = "block rounded-md px-3 py-1.5 text-sm transition-colors";
-const itemActive = "text-muted hover:bg-ink/[0.04] hover:text-gold-strong";
+const itemLink = "text-ink/70 hover:bg-night/[0.05] hover:text-gold-strong";
 
-function NavItem({ item }: { item: SubNavItem }) {
+function SubNavLink({ item, onNavigate }: { item: SubNavItem; onNavigate?: () => void }) {
   if (item.to) {
     return (
-      <Link to={item.to} className={`${itemBase} ${itemActive}`}>
+      <Link to={item.to} onClick={onNavigate} className={cn(itemBase, itemLink)}>
         {item.label}
       </Link>
     );
   }
   if (item.anchor) {
     return (
-      <a href={`#${item.anchor}`} className={`${itemBase} ${itemActive}`}>
+      <a href={`#${item.anchor}`} onClick={onNavigate} className={cn(itemBase, itemLink)}>
         {item.label}
       </a>
     );
   }
   return (
     <span
-      className={`${itemBase} cursor-default text-muted/45`}
+      className={cn(itemBase, "cursor-default text-ink/35")}
       title="Tiefen-Seite folgt in einer späteren Phase."
     >
       {item.label}
@@ -114,33 +115,28 @@ function NavItem({ item }: { item: SubNavItem }) {
   );
 }
 
-export function MeinBereichSidebar() {
+export function MeinBereichSubnav({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <aside className="lg:sticky lg:top-24 lg:h-fit lg:w-60 lg:shrink-0">
-      <nav className="flex flex-col gap-6">
-        {GROUPS.map((group) => (
-          <div key={group.title} className="flex flex-col gap-0.5">
-            <p className="px-3 pb-1 text-xs font-semibold tracking-wider text-muted/70 uppercase">
-              {group.title}
-            </p>
-            {group.items.map((item, i) => (
-              <NavItem key={`${item.label}-${i}`} item={item} />
-            ))}
-          </div>
-        ))}
-      </nav>
+    <nav className="flex flex-col gap-5">
+      {/* Zurück zum Hauptmenü (zeigt wieder die 7 Formate). */}
+      <Link
+        to="/community"
+        onClick={onNavigate}
+        className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors hover:text-gold-strong"
+      >
+        <span aria-hidden="true">←</span> Hauptmenü
+      </Link>
 
-      {/* Compass-Fußkarte (§4) — dunkle Gold-Card. */}
-      <div className="mt-6 rounded-[var(--radius-card)] bg-night p-5 text-on-night shadow-soft">
-        <p className="font-display text-lg font-semibold text-gold">Dein Compass</p>
-        <p className="mt-1 text-sm text-on-night-muted">Dein Weg. Deine Richtung.</p>
-        <Link
-          to="/compass"
-          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-gold px-3 text-sm font-medium text-night transition-colors hover:bg-gold-strong hover:text-on-night focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-night"
-        >
-          Jetzt öffnen
-        </Link>
-      </div>
-    </aside>
+      {GROUPS.map((group) => (
+        <div key={group.title} className="flex flex-col gap-0.5">
+          <p className="px-3 pb-1 text-xs font-semibold tracking-wider text-ink/45 uppercase">
+            {group.title}
+          </p>
+          {group.items.map((item, i) => (
+            <SubNavLink key={`${item.label}-${i}`} item={item} onNavigate={onNavigate} />
+          ))}
+        </div>
+      ))}
+    </nav>
   );
 }

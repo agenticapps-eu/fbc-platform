@@ -9,9 +9,11 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 
 // Stufenfarbe nur über Gold/Anthrazit — kein Bunt (AGE-237).
 const variants: Record<BadgeVariant, string> = {
+  // Stufen-Hierarchie als Gold-„Medaille": Discover neutral → Prime helles Gold →
+  // Legacy volles Gold mit dunklem Text (oberste Stufe, klar distinkt; AGE-237).
   discover: "bg-ink/[0.06] text-muted",
   prime: "bg-gold-soft text-gold-strong",
-  legacy: "bg-night text-gold",
+  legacy: "bg-gold text-night",
   neutral: "bg-ink/5 text-ink",
 };
 

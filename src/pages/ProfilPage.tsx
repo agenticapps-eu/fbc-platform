@@ -11,6 +11,7 @@ import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
+import { PageSkeleton } from "../components/ui/Skeleton";
 import { Textarea } from "../components/ui/Textarea";
 import { useToast } from "../components/ui/toast-context";
 import { cn } from "../lib/cn";
@@ -148,7 +149,7 @@ function ProfileEditor({ uid }: { uid: string }) {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted">Profil wird geladen…</p>;
+    return <PageSkeleton label="Profil wird geladen…" />;
   }
   if (isError) {
     return (

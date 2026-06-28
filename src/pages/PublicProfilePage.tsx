@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Avatar } from "../components/ui/Avatar";
+import { ProfileHero, HeroImpactBadge } from "../components/profile/ProfileHero";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
+import { PageSkeleton } from "../components/ui/Skeleton";
 import { Textarea } from "../components/ui/Textarea";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { useToast } from "../components/ui/toast-context";
@@ -22,7 +23,7 @@ import {
   type ExtendedProfile,
   type PublicProfile,
 } from "../lib/public-profile";
-import { TIER_RANK, tierLabel } from "../lib/tiers";
+import { TIER_RANK } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
 
 // Themen-Reihenfolge & Labels für Erfolgsradar/Interessen (Sein·Tun·Haben·Wirken).
@@ -33,14 +34,6 @@ const THEME_LABEL: Record<string, string> = {
   haben: "Haben",
   wirken: "Wirken",
 };
-
-function CrownIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M3 7l4 4 5-7 5 7 4-4-1.5 11h-15L3 7zm1.8 13h14.4v1.5H4.8V20z" />
-    </svg>
-  );
-}
 
 export default function PublicProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -53,7 +46,7 @@ export default function PublicProfilePage() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted">Profil wird geladen…</p>;
+    return <PageSkeleton label="Profil wird geladen…" />;
   }
   if (isError) {
     return (
@@ -111,54 +104,19 @@ function ProfileHeader({
   impactScore: number | null;
 }) {
   return (
-    <header className="overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night text-on-night shadow-soft">
-      <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:gap-6 sm:p-8">
-        <Avatar
-          name={profile.name}
-          src={profile.avatar_url}
-          size="lg"
-          className="h-20 w-20 text-xl ring-2 ring-gold/60"
-        />
-        <div className="min-w-0 flex-1">
-          {profile.tier && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/60 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-gold uppercase">
-              <CrownIcon className="h-3.5 w-3.5" />
-              {tierLabel(profile.tier)} Member
-            </span>
-          )}
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-on-night">
-            {profile.name}
-          </h1>
-          {profile.roles.length > 0 && (
-            <ul className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-sm text-gold">
-              {profile.roles.map((role, i) => (
-                <li key={role} className="flex items-center gap-2">
-                  {i > 0 && <span className="text-on-night-muted">·</span>}
-                  {role}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-2 text-sm text-on-night-muted">
-            {[profile.region, profile.company].filter(Boolean).join(" · ") || "—"}
-          </p>
-          {profile.short_bio && (
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-night/90">
-              {profile.short_bio}
-            </p>
-          )}
-        </div>
-
-        {impactScore !== null && (
-          <div className="shrink-0 rounded-[var(--radius-card)] bg-night-elevated px-5 py-4 text-center">
-            <div className="text-xs font-medium tracking-wide text-on-night-muted uppercase">
-              Impact Score
-            </div>
-            <div className="mt-1 font-display text-3xl font-semibold text-gold">{impactScore}</div>
-          </div>
-        )}
-      </div>
-    </header>
+    <ProfileHero
+      name={profile.name}
+      avatarUrl={profile.avatar_url}
+      tier={profile.tier}
+      roles={profile.roles}
+      region={profile.region}
+      company={profile.company}
+      action={impactScore !== null && <HeroImpactBadge score={impactScore} />}
+    >
+      {profile.short_bio && (
+        <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>
+      )}
+    </ProfileHero>
   );
 }
 
@@ -537,23 +495,23 @@ function ReleasedContact({
 }) {
   const hasData = !!(contact && (contact.email || contact.phone));
   return (
-    <Card className="flex flex-col gap-3 border-night-border bg-night text-on-night">
+    <Card className="flex flex-col gap-3 border-gold/30 bg-gold-soft/30">
       <div className="flex items-center gap-2">
-        <CardTitle className="text-base text-on-night">Kontakt freigegeben</CardTitle>
+        <CardTitle className="text-base">Kontakt freigegeben</CardTitle>
         <Badge variant="legacy">Angenommen</Badge>
       </div>
-      <p className="text-sm text-on-night-muted">
+      <p className="text-sm text-muted">
         {name} hat deine Kontaktanfrage angenommen. Ihr könnt euch jetzt direkt austauschen.
       </p>
       {hasData ? (
         <dl className="flex flex-col gap-2 text-sm">
           {contact?.email && (
             <div className="flex items-center gap-2">
-              <dt className="w-16 shrink-0 text-on-night-muted">E-Mail</dt>
+              <dt className="w-16 shrink-0 text-muted">E-Mail</dt>
               <dd>
                 <a
                   href={`mailto:${contact.email}`}
-                  className="font-medium text-gold hover:text-gold-strong"
+                  className="font-medium text-gold-strong hover:text-gold"
                 >
                   {contact.email}
                 </a>
@@ -562,11 +520,11 @@ function ReleasedContact({
           )}
           {contact?.phone && (
             <div className="flex items-center gap-2">
-              <dt className="w-16 shrink-0 text-on-night-muted">Telefon</dt>
+              <dt className="w-16 shrink-0 text-muted">Telefon</dt>
               <dd>
                 <a
                   href={`tel:${contact.phone}`}
-                  className="font-medium text-gold hover:text-gold-strong"
+                  className="font-medium text-gold-strong hover:text-gold"
                 >
                   {contact.phone}
                 </a>
@@ -575,9 +533,7 @@ function ReleasedContact({
           )}
         </dl>
       ) : (
-        <p className="text-sm text-on-night-muted">
-          {name} hat noch keine Kontaktdaten hinterlegt.
-        </p>
+        <p className="text-sm text-muted">{name} hat noch keine Kontaktdaten hinterlegt.</p>
       )}
     </Card>
   );

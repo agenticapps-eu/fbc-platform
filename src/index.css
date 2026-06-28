@@ -5,9 +5,10 @@
    Anmutung: exklusiver Mitgliederclub — Schwarz/Anthrazit als Chrome,
    Gold als einziger Akzent, helle, ruhige Content-Flächen. */
 @theme {
-  /* Chrome — Schwarz/Anthrazit (Sidebar, Header, Hero) */
-  --color-night: #0e0f12;
-  --color-night-elevated: #16181d;
+  /* Chrome — weiches Near-Black/Anthrazit (Sidebar, Hero). Bewusst KEIN reines
+     Schwarz: freundlicher, ruhiger Premium-Look (Detlev, AGE-237). */
+  --color-night: #1b1c20;
+  --color-night-elevated: #26282e;
   --color-night-border: rgba(255, 255, 255, 0.08);
 
   /* Akzent — Gold (einziger Marken-Akzent) */
@@ -15,9 +16,9 @@
   --color-gold-strong: #b8893b;
   --color-gold-soft: #efe3c8;
 
-  /* Content — hell, warm */
+  /* Content — hell, warm (App-Hintergrund warmes Hellgrau, Karten reinweiß) */
   --color-canvas: #ffffff;
-  --color-soft: #f6f5f1;
+  --color-soft: #f4f3ee;
   --color-ink: #14151a;
   --color-muted: #6b7280;
   --color-line: #e7e5df;
@@ -52,6 +53,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Scrollbalken-Platz immer reservieren → kein horizontaler Versatz zwischen
+       Seiten mit/ohne Scrollbar (AGE-237: „springt herum"). */
+    scrollbar-gutter: stable;
   }
 
   body {
