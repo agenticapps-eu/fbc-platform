@@ -38,15 +38,15 @@ export interface NavItem {
  * Routen innerhalb der AppShell. Einzige Quelle für Sidebar-Navigation und Routing.
  *
  * Reihenfolge der `formate` ist verbindlich (Detlev, AGE-237): die 7 Formate
- * bauen aufeinander auf — Compass → Library → Academy → Community → Events →
+ * bauen aufeinander auf — Compass → Library → Academy → Events → Community →
  * Matching → Projekte.
  */
 export const navItems: NavItem[] = [
   { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
   { path: "/library", label: "Library", Component: LibraryPage, section: "formate" },
   { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },
-  { path: "/community", label: "Community", Component: CommunityPage, section: "formate" },
   { path: "/events", label: "Events", Component: EventsPage, section: "formate" },
+  { path: "/community", label: "Community", Component: CommunityPage, section: "formate" },
   {
     path: "/matching",
     label: "Matching",

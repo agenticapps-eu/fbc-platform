@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MeinBereichSidebar } from "../components/dashboard/MeinBereichSidebar";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
+import { ProfileHero } from "../components/profile/ProfileHero";
 import { Avatar } from "../components/ui/Avatar";
+import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
@@ -30,7 +31,6 @@ import {
 import { categoryLabel, findCategory, type MatchingSide } from "../config/matching";
 import { isPastEvent } from "../lib/events";
 import { GOAL_CATEGORIES } from "../lib/profile";
-import { tierLabel } from "../lib/tiers";
 import { useAuth } from "../providers/auth-context";
 
 // Recharts nur für diese Route laden — hält die schwere Lib aus dem Haupt-Bundle.
@@ -137,7 +137,7 @@ function Dashboard({ uid }: { uid: string }) {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted">Dashboard wird geladen…</p>;
+    return <DashboardSkeleton />;
   }
   if (isError || !data) {
     return (
@@ -146,31 +146,27 @@ function Dashboard({ uid }: { uid: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row">
-      <MeinBereichSidebar />
+    <div className="flex flex-col gap-6">
+      <DashboardHeader data={data} />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-6">
-        <DashboardHeader data={data} />
+      <MeineAnfragenWidget uid={uid} />
 
-        <MeineAnfragenWidget uid={uid} />
-
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <ErfolgsradarWidget data={data} />
-          <EntwicklungWidget profile={data.profile} />
-          <InteressenWidget data={data} />
-          <EventsWidget data={data} />
-          <CommunitiesWidget />
-          <NetzwerkWidget contactsCount={data.contactsCount} />
-          <MatchingWidget data={data} />
-          <StatistikWidget />
-          <ImpactWidget score={data.profile.potential_score} breakdown={data.scoreBreakdown} />
-          <ProjekteWidget />
-          <InvestmentsWidget />
-          <BeitraegeWidget data={data} />
-          <AuszeichnungenWidget badges={data.badges} />
-          <ZieleWidget data={data} />
-          <KIAssistentWidget />
-        </div>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <ErfolgsradarWidget data={data} />
+        <EntwicklungWidget profile={data.profile} />
+        <InteressenWidget data={data} />
+        <EventsWidget data={data} />
+        <CommunitiesWidget />
+        <NetzwerkWidget contactsCount={data.contactsCount} />
+        <MatchingWidget data={data} />
+        <StatistikWidget />
+        <ImpactWidget score={data.profile.potential_score} breakdown={data.scoreBreakdown} />
+        <ProjekteWidget />
+        <InvestmentsWidget />
+        <BeitraegeWidget data={data} />
+        <AuszeichnungenWidget badges={data.badges} />
+        <ZieleWidget data={data} />
+        <KIAssistentWidget />
       </div>
     </div>
   );
@@ -264,61 +260,38 @@ function CheckIcon({ className }: { className?: string }) {
 function DashboardHeader({ data }: { data: DashboardData }) {
   const p = data.profile;
   return (
-    <header
-      id="uebersicht"
-      className="scroll-mt-24 overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night text-on-night shadow-soft"
-    >
-      <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:gap-6 sm:p-8">
-        <Avatar
-          name={p.name}
-          src={p.avatar_url}
-          size="lg"
-          className="h-20 w-20 text-xl ring-2 ring-gold/60"
-        />
-        <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/60 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-gold uppercase">
-            <CrownIcon className="h-3.5 w-3.5" />
-            {tierLabel(p.tier)} Member
-          </span>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-on-night">
-            {p.name}
-          </h1>
-          {p.roles.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-sm text-gold">
-              {p.roles.map((role, i) => (
-                <li key={role} className="flex items-center gap-2">
-                  {i > 0 && <span className="text-on-night-muted">·</span>}
-                  {role}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            p.headline && <p className="mt-2 text-sm text-gold">{p.headline}</p>
-          )}
-          <p className="mt-2 text-sm text-on-night-muted">
-            {[p.region, p.company].filter(Boolean).join(" · ") || "—"}
-          </p>
-          <p className="mt-3 text-xs text-on-night-muted">
-            Mitglied seit: {formatDate(p.member_since, monthFmt)}
-            {p.member_number && <> · Mitgliedsnummer: {p.member_number}</>}
-          </p>
-        </div>
-        <Link to="/profil" className="shrink-0">
-          <Button variant="ghost" size="sm">
-            Profil bearbeiten
-          </Button>
-        </Link>
-      </div>
+    <div id="uebersicht" className="scroll-mt-24">
+      <ProfileHero
+        name={p.name}
+        avatarUrl={p.avatar_url}
+        tier={p.tier}
+        roles={p.roles}
+        headline={p.headline}
+        region={p.region}
+        company={p.company}
+        action={
+          <Link to="/profil">
+            <Button variant="ghost" size="sm">
+              Profil bearbeiten
+            </Button>
+          </Link>
+        }
+      >
+        <p className="text-xs text-muted">
+          Mitglied seit: {formatDate(p.member_since, monthFmt)}
+          {p.member_number && <> · Mitgliedsnummer: {p.member_number}</>}
+        </p>
 
-      {/* Stat-Tiles (§3) — Impact CORE, Netzwerk/Matches/Events CORE-Counts, Projekte DEMO. */}
-      <div className="grid grid-cols-2 gap-px border-t border-night-border bg-night-border sm:grid-cols-3 lg:grid-cols-5">
-        <StatTile label="Impact Score" value={p.potential_score} />
-        <StatTile label="Netzwerk" value={data.contactsCount} />
-        <StatTile label="Matches" value={data.matchStats.successful} />
-        <StatTile label="Projekte" value={DEMO_PROJECTS.length} demo />
-        <StatTile label="Events" value={data.eventsCount} />
-      </div>
-    </header>
+        {/* Stat-Tiles (§3) — Impact CORE, Netzwerk/Matches/Events CORE-Counts, Projekte DEMO. */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label="Impact Score" value={p.potential_score} />
+          <StatTile label="Netzwerk" value={data.contactsCount} />
+          <StatTile label="Matches" value={data.matchStats.successful} />
+          <StatTile label="Projekte" value={DEMO_PROJECTS.length} demo />
+          <StatTile label="Events" value={data.eventsCount} />
+        </div>
+      </ProfileHero>
+    </div>
   );
 }
 
@@ -334,13 +307,13 @@ function StatTile({
   demo?: boolean;
 }) {
   return (
-    <div className="bg-night px-4 py-4">
-      <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-on-night-muted uppercase">
+    <div className="rounded-[var(--radius-card)] border border-line bg-soft px-4 py-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted uppercase">
         {label}
         {demo && <DemoBadge />}
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-display text-2xl font-semibold text-on-night">{value}</span>
+        <span className="font-display text-2xl font-semibold text-ink">{value}</span>
         {trend && <span className="text-xs font-medium text-positive">↑ {trend}</span>}
       </div>
     </div>

@@ -20,9 +20,10 @@ Ersetze die bisherigen `--color-emerald*`-Tokens. Smaragd ist **nicht** mehr Pri
 
 ```css
 @theme {
-  /* Chrome — Schwarz/Anthrazit (Sidebar, Header, Hero) */
-  --color-night: #0e0f12;          /* Sidebar/Hero-Hintergrund */
-  --color-night-elevated: #16181d; /* Karten/aktive Items auf dunkel */
+  /* Chrome — weiches Near-Black/Anthrazit (Sidebar, Hero-Verlauf). KEIN reines
+     Schwarz: freundlicher Premium-Look (Detlev, AGE-237). Header ist hell. */
+  --color-night: #1b1c20;          /* Sidebar/Hero-Anthrazit */
+  --color-night-elevated: #26282e; /* Karten/aktive Items auf dunkel */
   --color-night-border: rgba(255, 255, 255, 0.08);
 
   /* Akzent — Gold (einziger Marken-Akzent) */
@@ -32,7 +33,7 @@ Ersetze die bisherigen `--color-emerald*`-Tokens. Smaragd ist **nicht** mehr Pri
 
   /* Content — hell, warm */
   --color-canvas: #ffffff;         /* Cards */
-  --color-soft: #f6f5f1;           /* Seitenhintergrund warmweiß */
+  --color-soft: #f4f3ee;           /* Seitenhintergrund warmes Hellgrau */
   --color-ink: #14151a;            /* Haupttext auf Hell */
   --color-muted: #6b7280;          /* Sekundärtext */
   --color-line: #e7e5df;           /* Rahmen/Trenner auf Hell */
@@ -100,8 +101,8 @@ Detlevs Vorgabe: Die **7 Formate bauen aufeinander auf** (linke Spalte der Mitgl
 | 1 | **Compass** | `/compass` | Orientierung, Analyse, Empfehlungen |
 | 2 | **Library** | `/library` | Wissen, Ressourcen, Vorlagen |
 | 3 | **Academy** | `/academy` | Kurse, Videos, Workshops |
-| 4 | **Community** | `/community` | Feed + **Mitgliederverzeichnis** (Verzeichnis nur ab Prime) |
-| 5 | **Events** | `/events` | Online-/Präsenz-Veranstaltungen |
+| 4 | **Events** | `/events` | Online-/Präsenz-Veranstaltungen |
+| 5 | **Community** | `/community` | Feed + **Mitgliederverzeichnis** (Verzeichnis nur ab Prime) |
 | 6 | **Matching** | `/matching` | Such-/Bieteprofile, Matches (ab Prime) |
 | 7 | **Projekte** | `/projekte` | Kooperationen, Initiativen |
 
@@ -140,6 +141,26 @@ Prototyp testet weiterhin **Discover / Prime / Legacy**. UI-Regel: gesperrte Ber
 - Buttons/Cards/Badges/Tiles im neuen Look; `/styleguide` aktualisiert.
 - App wirkt durchgängig „schwarz & gold, elegant, modern".
 - Commit: `feat: redesign to black & gold + canonical nav order (AGE-237)`.
+
+### 7.1 UI/UX-Refresh nach Detlev-Review (AGE-237, Folge-Iteration)
+
+- **Schmaler, zentrierter Shell** (LinkedIn/Facebook-Anmutung): Container max. ~1000 px
+  (Einspalter) bzw. ~1180 px (mehrspaltig: Dashboard/Verzeichnis/Matching), Sidebar als
+  angedockte dunkle Karte an der linken Container-Kante — kein Vollbild-Balken. `<1024 px`
+  klappt die Sidebar als Off-Canvas-Drawer (Hamburger im Header).
+- **Heller & freundlicher:** App-Hintergrund warmes Hellgrau (`--color-soft #f4f3ee`),
+  Sidebar weiches Anthrazit (`--color-night #1b1c20`), kein Vollschwarz im Content
+  (Hero/Impact als Verlauf bzw. helle Karte). Gold-Akzent unverändert, kein Pink.
+- **Nav-Reihenfolge (aktualisiert):** Compass, Library, Academy, **Events, Community**,
+  Matching, Projekte (Events vor Community — neue Detlev-Vorgabe, §5).
+- **Eine Sidebar:** „Mein Bereich" ersetzt den Sidebar-Inhalt IN PLACE durch die Subnav
+  (profile-spec §4) mit `← Hauptmenü`; keine zweite Sidebar/Spalte mehr.
+- **Profil-Hero:** Cover-Banner (Default Gold/Anthrazit-Verlauf) + überlappendes großes
+  rundes Bild, Name/Rollen/Region/Tier — auf öffentlichem Profil und im Dashboard-Kopf.
+- **Wahrnehmbare Performance:** Skeleton-Loader (mit `role="status"`/sr-only) statt
+  Lade-Text; `fetchDashboard` lädt bereits parallel (`Promise.all`); Bilder `loading="lazy"`.
+  _Offen (bewusst nachgelagert):_ vollständiges Route-Code-Splitting — erfordert Umstellung
+  der synchronen Gating-Tests auf `findBy`; die schwerste Lib (Recharts) ist bereits gesplittet.
 
 ---
 

@@ -13,9 +13,11 @@ export interface SidebarNavSection {
 
 export interface SidebarNavProps {
   sections: SidebarNavSection[];
+  /** Wird bei Klick auf einen Eintrag aufgerufen (z. B. Off-Canvas-Drawer schließen). */
+  onNavigate?: () => void;
 }
 
-export function SidebarNav({ sections }: SidebarNavProps) {
+export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
   return (
     <nav className="flex flex-col gap-7">
       {sections.map((section, i) => (
@@ -29,6 +31,7 @@ export function SidebarNav({ sections }: SidebarNavProps) {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
                   "relative rounded-md px-3 py-2 text-sm transition-colors",
