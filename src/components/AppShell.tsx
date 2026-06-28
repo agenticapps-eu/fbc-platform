@@ -19,6 +19,11 @@ const SECTIONS: SidebarNavSection[] = [
 // Container; textlastige Einspalter bleiben schmal & zentriert (social-feed-Anmutung).
 const WIDE_ROUTES = ["/mein-bereich", "/verzeichnis", "/matching"];
 
+// Sidebar-Oberfläche: heller Champagner→Gold-Verlauf (Detlev: „so hell wie
+// möglich", Gold-Anmutung, dunkler Text bleibt lesbar). EINE Stelle zum Tunen
+// der Helligkeit — von aside und Off-Canvas-Drawer geteilt.
+const SIDEBAR_SURFACE = "bg-[linear-gradient(168deg,#fbf6ea_0%,#f1e4c4_50%,#e9d6a8_100%)]";
+
 function BellIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
@@ -69,9 +74,9 @@ function SidebarContent({
       <Link
         to="/community"
         onClick={onNavigate}
-        className="mb-8 inline-flex rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-night"
+        className="mb-8 inline-flex rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5ead0]"
       >
-        <Logo tone="dark" />
+        <Logo />
       </Link>
       {inMeinBereich ? (
         <MeinBereichSubnav onNavigate={onNavigate} />
@@ -183,7 +188,12 @@ export default function AppShell() {
           isWide ? "max-w-[1180px]" : "max-w-[1000px]",
         )}
       >
-        <aside className="sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-night-border bg-night px-4 py-6 lg:block">
+        <aside
+          className={cn(
+            "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-gold/25 px-4 py-6 shadow-soft lg:block",
+            SIDEBAR_SURFACE,
+          )}
+        >
           <SidebarContent inMeinBereich={inMeinBereich} />
         </aside>
 
@@ -204,7 +214,12 @@ export default function AppShell() {
             className="absolute inset-0 bg-night/60 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[80vw] overflow-y-auto bg-night px-4 py-6 shadow-soft">
+          <div
+            className={cn(
+              "absolute inset-y-0 left-0 w-72 max-w-[80vw] overflow-y-auto px-4 py-6 shadow-soft",
+              SIDEBAR_SURFACE,
+            )}
+          >
             <SidebarContent
               inMeinBereich={inMeinBereich}
               onNavigate={() => setMobileNavOpen(false)}

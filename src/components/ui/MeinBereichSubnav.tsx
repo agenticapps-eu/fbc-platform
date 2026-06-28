@@ -88,7 +88,7 @@ const GROUPS: SubNavGroup[] = [
 ];
 
 const itemBase = "block rounded-md px-3 py-1.5 text-sm transition-colors";
-const itemLink = "text-on-night-muted hover:bg-night-elevated/60 hover:text-gold";
+const itemLink = "text-ink/70 hover:bg-night/[0.05] hover:text-gold-strong";
 
 function SubNavLink({ item, onNavigate }: { item: SubNavItem; onNavigate?: () => void }) {
   if (item.to) {
@@ -107,7 +107,7 @@ function SubNavLink({ item, onNavigate }: { item: SubNavItem; onNavigate?: () =>
   }
   return (
     <span
-      className={cn(itemBase, "cursor-default text-on-night-muted/40")}
+      className={cn(itemBase, "cursor-default text-ink/35")}
       title="Tiefen-Seite folgt in einer späteren Phase."
     >
       {item.label}
@@ -122,14 +122,14 @@ export function MeinBereichSubnav({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         to="/community"
         onClick={onNavigate}
-        className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-on-night transition-colors hover:text-gold"
+        className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors hover:text-gold-strong"
       >
         <span aria-hidden="true">←</span> Hauptmenü
       </Link>
 
       {GROUPS.map((group) => (
         <div key={group.title} className="flex flex-col gap-0.5">
-          <p className="px-3 pb-1 text-xs font-semibold tracking-wider text-on-night-muted/60 uppercase">
+          <p className="px-3 pb-1 text-xs font-semibold tracking-wider text-ink/45 uppercase">
             {group.title}
           </p>
           {group.items.map((item, i) => (
