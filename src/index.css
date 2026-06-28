@@ -53,6 +53,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Scrollbalken-Platz immer reservieren → kein horizontaler Versatz zwischen
+       Seiten mit/ohne Scrollbar (AGE-237: „springt herum"). */
+    scrollbar-gutter: stable;
   }
 
   body {

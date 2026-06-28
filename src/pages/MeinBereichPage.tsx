@@ -815,28 +815,28 @@ function ImpactWidget({ score, breakdown }: { score: number; breakdown: ScoreBre
   return (
     <Card
       id="impact"
-      className="flex scroll-mt-24 flex-col gap-4 border-night-border bg-night text-on-night"
+      className="flex scroll-mt-24 flex-col gap-4 border-gold/30 bg-[linear-gradient(120deg,#faf4e6_0%,#f2e6c9_100%)]"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-on-night">Mein Impact</h3>
-        <span className="text-xs text-on-night-muted">regelbasiert</span>
+        <h3 className="text-base font-semibold text-ink">Mein Impact</h3>
+        <span className="text-xs text-muted">regelbasiert</span>
       </div>
       <div>
-        <div className="font-display text-5xl font-semibold text-gold">{score}</div>
-        <div className="mt-1 text-sm text-on-night-muted">von 100 · Impact Score</div>
+        <div className="font-display text-5xl font-semibold text-gold-strong">{score}</div>
+        <div className="mt-1 text-sm text-muted">von 100 · Impact Score</div>
       </div>
 
       {breakdown ? (
         <ScoreBreakdownList breakdown={breakdown} />
       ) : (
-        <p className="text-xs text-on-night-muted">
+        <p className="text-xs text-muted">
           Die Aufschlüsselung wird beim nächsten Laden berechnet.
         </p>
       )}
 
       {/* Verlauf — DEMO (Tracking liefert Phase 2). */}
       <div>
-        <div className="mb-1 flex items-center gap-2 text-xs text-on-night-muted">
+        <div className="mb-1 flex items-center gap-2 text-xs text-muted">
           Verlauf <DemoBadge />
         </div>
         <svg
@@ -848,7 +848,7 @@ function ImpactWidget({ score, breakdown }: { score: number; breakdown: ScoreBre
           <polyline
             points="0,40 25,36 50,38 75,28 100,30 125,20 150,22 175,12 200,8"
             fill="none"
-            stroke="var(--color-gold)"
+            stroke="var(--color-gold-strong)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -869,14 +869,14 @@ function ScoreBreakdownList({ breakdown }: { breakdown: ScoreBreakdown }) {
         return (
           <li key={c.key} title={c.detail}>
             <div className="flex items-baseline justify-between gap-2 text-sm">
-              <span className="text-on-night-muted">{c.label}</span>
-              <span className="font-medium text-on-night tabular-nums">
+              <span className="text-muted">{c.label}</span>
+              <span className="font-medium text-ink tabular-nums">
                 {c.points}
-                <span className="text-on-night-muted">/{c.weight}</span>
+                <span className="text-muted">/{c.weight}</span>
               </span>
             </div>
-            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-night-border">
-              <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
+            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-ink/10">
+              <div className="h-full rounded-full bg-gold-strong" style={{ width: `${pct}%` }} />
             </div>
           </li>
         );

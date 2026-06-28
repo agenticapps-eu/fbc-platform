@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/cn";
 import { navItems } from "../config/nav";
@@ -15,8 +15,9 @@ const SECTIONS: SidebarNavSection[] = [
   { title: "Konto", items: navItems.filter((i) => i.section === "konto") },
 ];
 
-// Mehrspaltige Seiten (Dashboard, Verzeichnis, Matching) brauchen einen breiteren
-// Container; textlastige Einspalter bleiben schmal & zentriert (social-feed-Anmutung).
+// Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
+// Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
+// innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
 const WIDE_ROUTES = ["/mein-bereich", "/verzeichnis", "/matching"];
 
 // Sidebar-Oberfläche: heller Champagner→Gold-Verlauf (Detlev: „so hell wie
@@ -57,6 +58,113 @@ function MenuIcon() {
         strokeLinecap="round"
       />
     </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="hidden h-4 w-4 text-muted sm:block"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="m6 9 6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Profil-Menü hinter dem Avatar (E-Mail, Stufe, Links, Logout) — klappt per Klick
+ *  auf das Profilbild auf; schließt über Außenklick und Escape. */
+function UserMenu({
+  email,
+  tier,
+  onSignOut,
+}: {
+  email: string;
+  tier: string | null;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Profilmenü"
+        className="flex items-center gap-1.5 rounded-full p-1 transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+      >
+        <Avatar name={email} size="sm" />
+        <ChevronDownIcon />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas py-1 shadow-soft"
+        >
+          <div className="border-b border-line px-4 py-3">
+            <p className="truncate text-sm font-medium text-ink">{email}</p>
+            {tier && (
+              <span className="mt-1.5 inline-block">
+                <TierBadge tier={tier} />
+              </span>
+            )}
+          </div>
+          <Link
+            to="/mein-bereich"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
+          >
+            Mein Bereich
+          </Link>
+          <Link
+            to="/profil"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
+          >
+            Profil
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onSignOut();
+            }}
+            className="block w-full px-4 py-2 text-left text-sm font-medium text-danger transition-colors hover:bg-danger/[0.06]"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -146,7 +254,7 @@ export default function AppShell() {
             </label>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {user ? (
               <>
                 <button
@@ -156,20 +264,7 @@ export default function AppShell() {
                 >
                   <BellIcon />
                 </button>
-                <div className="flex items-center gap-2.5">
-                  <Avatar name={user.email ?? "?"} size="sm" />
-                  <div className="hidden flex-col leading-tight sm:flex">
-                    <span className="text-sm font-medium text-ink">{user.email}</span>
-                    {tier && (
-                      <span className="mt-0.5">
-                        <TierBadge tier={tier} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                  Logout
-                </Button>
+                <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
               </>
             ) : (
               <Button variant="secondary" size="sm" onClick={() => navigate("/login")}>
@@ -182,12 +277,7 @@ export default function AppShell() {
 
       {/* Zentrierter Shell: Sidebar an die linke Kante des Containers angedockt,
           Content schmal & zentriert (LinkedIn/Facebook-Anmutung). */}
-      <div
-        className={cn(
-          "mx-auto flex gap-8 px-4 py-8 sm:px-6",
-          isWide ? "max-w-[1180px]" : "max-w-[1000px]",
-        )}
-      >
+      <div className="mx-auto flex max-w-[1180px] gap-8 px-4 py-8 sm:px-6">
         <aside
           className={cn(
             "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-gold/25 px-4 py-6 shadow-soft lg:block",
@@ -198,7 +288,10 @@ export default function AppShell() {
         </aside>
 
         <main className="min-w-0 flex-1">
-          <Outlet />
+          {/* Einspalter cappen ihre innere Spalte zentriert; Sidebar bleibt fix. */}
+          <div className={cn(!isWide && "mx-auto max-w-[720px]")}>
+            <Outlet />
+          </div>
         </main>
       </div>
 

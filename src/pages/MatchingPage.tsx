@@ -168,13 +168,11 @@ function HubHeader({
   recomputing: boolean;
 }) {
   return (
-    <header className="overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night text-on-night shadow-soft">
+    <header className="overflow-hidden rounded-[var(--radius-card)] border border-gold/30 bg-[linear-gradient(120deg,#faf4e6_0%,#f2e6c9_100%)] shadow-soft">
       <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-8">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-on-night">
-            Matching
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-on-night-muted">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Matching</h1>
+          <p className="mt-2 max-w-2xl text-sm text-ink/70">
             Deine Chancen-Datenbank: komplementäre Partner mit Score und Begründung. Such- &amp;
             Bieteprofile stehen im Vordergrund — nicht der Name.
           </p>
@@ -184,7 +182,7 @@ function HubHeader({
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-px border-t border-night-border bg-night-border">
+      <div className="grid grid-cols-3 gap-px border-t border-gold/25 bg-gold/25">
         <StatTile label="Aktive Matches" value={stats?.active ?? 0} />
         <StatTile label="Erfolgreiche" value={stats?.successful ?? 0} />
         <StatTile label="Ø-Score" value={stats ? `${stats.avgScore} %` : "—"} />
@@ -195,9 +193,9 @@ function HubHeader({
 
 function StatTile({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="bg-night px-4 py-4">
-      <div className="text-xs font-medium tracking-wide text-on-night-muted uppercase">{label}</div>
-      <div className="mt-1 font-display text-2xl font-semibold text-on-night">{value}</div>
+    <div className="bg-[#fbf7ec] px-4 py-4">
+      <div className="text-xs font-medium tracking-wide text-muted uppercase">{label}</div>
+      <div className="mt-1 font-display text-2xl font-semibold text-ink">{value}</div>
     </div>
   );
 }

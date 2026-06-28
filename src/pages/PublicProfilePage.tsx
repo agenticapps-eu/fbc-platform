@@ -495,23 +495,23 @@ function ReleasedContact({
 }) {
   const hasData = !!(contact && (contact.email || contact.phone));
   return (
-    <Card className="flex flex-col gap-3 border-night-border bg-night text-on-night">
+    <Card className="flex flex-col gap-3 border-gold/30 bg-gold-soft/30">
       <div className="flex items-center gap-2">
-        <CardTitle className="text-base text-on-night">Kontakt freigegeben</CardTitle>
+        <CardTitle className="text-base">Kontakt freigegeben</CardTitle>
         <Badge variant="legacy">Angenommen</Badge>
       </div>
-      <p className="text-sm text-on-night-muted">
+      <p className="text-sm text-muted">
         {name} hat deine Kontaktanfrage angenommen. Ihr könnt euch jetzt direkt austauschen.
       </p>
       {hasData ? (
         <dl className="flex flex-col gap-2 text-sm">
           {contact?.email && (
             <div className="flex items-center gap-2">
-              <dt className="w-16 shrink-0 text-on-night-muted">E-Mail</dt>
+              <dt className="w-16 shrink-0 text-muted">E-Mail</dt>
               <dd>
                 <a
                   href={`mailto:${contact.email}`}
-                  className="font-medium text-gold hover:text-gold-strong"
+                  className="font-medium text-gold-strong hover:text-gold"
                 >
                   {contact.email}
                 </a>
@@ -520,11 +520,11 @@ function ReleasedContact({
           )}
           {contact?.phone && (
             <div className="flex items-center gap-2">
-              <dt className="w-16 shrink-0 text-on-night-muted">Telefon</dt>
+              <dt className="w-16 shrink-0 text-muted">Telefon</dt>
               <dd>
                 <a
                   href={`tel:${contact.phone}`}
-                  className="font-medium text-gold hover:text-gold-strong"
+                  className="font-medium text-gold-strong hover:text-gold"
                 >
                   {contact.phone}
                 </a>
@@ -533,9 +533,7 @@ function ReleasedContact({
           )}
         </dl>
       ) : (
-        <p className="text-sm text-on-night-muted">
-          {name} hat noch keine Kontaktdaten hinterlegt.
-        </p>
+        <p className="text-sm text-muted">{name} hat noch keine Kontaktdaten hinterlegt.</p>
       )}
     </Card>
   );

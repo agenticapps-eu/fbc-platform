@@ -46,8 +46,9 @@ export function ProfileHero({
   const meta = [region, company].filter(Boolean).join(" · ");
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Cover */}
-      <div className="relative h-28 bg-[linear-gradient(120deg,#1b1c20_0%,#26282e_52%,#5a4a23_100%)] sm:h-40">
+      {/* Cover — warmer Gold-Verlauf (kein Schwarz; der Identitätsblock darunter
+          ist hell, daher bleibt der Text lesbar). */}
+      <div className="relative h-28 bg-[linear-gradient(120deg,#efe1bd_0%,#cdab5e_55%,#b8893b_100%)] sm:h-40">
         {coverUrl && (
           <img src={coverUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
         )}

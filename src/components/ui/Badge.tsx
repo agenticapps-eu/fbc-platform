@@ -11,7 +11,8 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 const variants: Record<BadgeVariant, string> = {
   discover: "bg-ink/[0.06] text-muted",
   prime: "bg-gold-soft text-gold-strong",
-  legacy: "bg-night text-gold",
+  // Legacy: helle Gold-Pille mit Gold-Ring — premium & distinkt zu Prime, kein Vollschwarz (AGE-237).
+  legacy: "bg-gold-soft text-gold-strong ring-1 ring-gold-strong/45",
   neutral: "bg-ink/5 text-ink",
 };
 
