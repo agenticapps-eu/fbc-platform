@@ -80,7 +80,7 @@ Ersetze die bisherigen `--color-emerald*`-Tokens. Smaragd ist **nicht** mehr Pri
 
 ## 4. Kern-Komponenten (Anpassungen)
 
-- **Sidebar (`AppShell`/`SidebarNav`):** Hintergrund `--color-night`, Text `--color-on-night`, aktive Route = **Gold-Label + Gold-Linksbalken** (oder Gold-Pill `--color-night-elevated` mit goldenem Text). Hover dezent heller.
+- **Sidebar (`AppShell`/`SidebarNav`):** seit dem Refresh ein **heller Champagner→Gold-Verlauf** (`SIDEBAR_SURFACE` in `AppShell` — eine Tuning-Stelle), dunkler Text (`--color-ink`) für Lesbarkeit, aktive Route = **`--color-gold-strong` + Gold-Linksbalken** auf dezenter dunkler Pille. Logo-Wortmarke `tone="light"`. (Der frühere near-black `--color-night`-Hintergrund war Detlev zu dunkel, AGE-237.)
 - **Header/Topbar:** dunkel oder weiß mit feiner `--color-line`-Unterkante; globale Suche mittig (wie Mockup), rechts Nachrichten/Benachrichtigungen + Avatar mit Tier-Label in Gold.
 - **Cards:** `--color-canvas`, 1px `--color-line`, `--radius-card`, `--shadow-soft`. Überschrift klein/gemutet in Versalien, „Alle anzeigen" rechts in Gold.
 - **Buttons:** primär = **Gold-Fläche + near-black Text** (`bg-gold text-night`); sekundär = **near-black Fläche + heller Text**; ghost = Gold-Outline. (Wie Website: „Jetzt Mitglied werden" gold, „Mehr über uns" dunkel.)
@@ -149,7 +149,8 @@ Prototyp testet weiterhin **Discover / Prime / Legacy**. UI-Regel: gesperrte Ber
   angedockte dunkle Karte an der linken Container-Kante — kein Vollbild-Balken. `<1024 px`
   klappt die Sidebar als Off-Canvas-Drawer (Hamburger im Header).
 - **Heller & freundlicher:** App-Hintergrund warmes Hellgrau (`--color-soft #f4f3ee`),
-  Sidebar weiches Anthrazit (`--color-night #1b1c20`), kein Vollschwarz im Content
+  **Sidebar als heller Champagner→Gold-Verlauf** (`SIDEBAR_SURFACE`) mit dunklem Text —
+  Detlev war das near-black Anthrazit noch zu dunkel. Kein Vollschwarz im Content
   (Hero/Impact als Verlauf bzw. helle Karte). Gold-Akzent unverändert, kein Pink.
 - **Nav-Reihenfolge (aktualisiert):** Compass, Library, Academy, **Events, Community**,
   Matching, Projekte (Events vor Community — neue Detlev-Vorgabe, §5).
