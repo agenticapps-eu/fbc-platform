@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useId } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { useDesignVariantValue } from "../../providers/design-variant-context";
@@ -21,6 +22,10 @@ export interface SidebarNavProps {
 
 export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
   const { preset } = useDesignVariantValue();
+  // Pro Instanz eindeutig: Desktop-Aside + Off-Canvas-Drawer rendern beide eine
+  // SidebarNav; ein geteilter layoutId würde den Indicator zwischen der sichtbaren
+  // und der (display:none) versteckten Instanz springen lassen.
+  const indicatorId = useId();
   return (
     <nav className="flex flex-col gap-7">
       {sections.map((section, i) => (
@@ -49,7 +54,7 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
                   {/* Gold-Linksbalken — gleitet per layoutId zwischen Einträgen. */}
                   {isActive && (
                     <motion.span
-                      layoutId="sidebar-active-indicator"
+                      layoutId={`sidebar-active-indicator-${indicatorId}`}
                       className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold-strong"
                       transition={{ duration: preset.duration, ease: preset.ease }}
                     />

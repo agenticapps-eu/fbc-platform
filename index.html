@@ -1,6 +1,6 @@
 <!doctype html>
-<!-- data-variant: Default 'd' (Empfehlung) für flackerfreien First Paint;
-     der DesignVariantProvider korrigiert beim Mount auf URL/localStorage. -->
+<!-- data-variant: Default 'd' (Empfehlung); das Inline-Skript unten korrigiert
+     VOR dem First Paint auf URL/localStorage (kein Theme-Flash bei a/b/c). -->
 <html lang="de" data-variant="d">
   <head>
     <meta charset="UTF-8" />
@@ -9,6 +9,19 @@
     <link rel="apple-touch-icon" href="/brand/crown-favicon.svg" />
     <meta name="theme-color" content="#14151a" />
     <title>Fair Business Club</title>
+    <!-- Anti-Flash: setzt data-variant vor dem Rendern, gleiche Precedence wie der
+         DesignVariantProvider (URL ?variant= > localStorage > Default 'd'). -->
+    <script>
+      (function () {
+        try {
+          var ok = ["a", "b", "c", "d"];
+          var p = new URLSearchParams(location.search).get("variant");
+          var s = localStorage.getItem("fbc.designVariant");
+          var v = ok.indexOf(p) > -1 ? p : ok.indexOf(s) > -1 ? s : "d";
+          document.documentElement.dataset.variant = v;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

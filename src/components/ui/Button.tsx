@@ -16,8 +16,10 @@ const variants: Record<Variant, string> = {
   // Primary — Gold-Fläche, near-black Text. fbc-sheen: Gold-Glanz-Hover + Press-Scale.
   primary:
     "fbc-sheen bg-gold text-night hover:bg-gold-strong hover:text-on-night focus-visible:ring-gold",
-  // Secondary — near-black Fläche, heller Text.
-  secondary: "bg-night text-on-night hover:bg-night-elevated focus-visible:ring-night",
+  // Secondary — near-black Fläche, heller Text. Dezenter Rand, damit der Button sich
+  // in Variante B (dunkle Canvas ≈ bg-night) noch von der Fläche abhebt.
+  secondary:
+    "border border-night-border bg-night text-on-night hover:bg-night-elevated focus-visible:ring-night",
   // Ghost — Gold-Outline.
   ghost: "border border-gold text-gold-strong hover:bg-gold-soft/40 focus-visible:ring-gold",
 };

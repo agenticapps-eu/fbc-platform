@@ -462,8 +462,7 @@ function WhyDetails({ basis }: { basis: MatchBasis }) {
                 <motion.div
                   className="h-full rounded-full bg-gold"
                   initial={{ width: 0 }}
-                  whileInView={{ width: `${pct}%` }}
-                  viewport={{ once: true }}
+                  animate={{ width: `${pct}%` }}
                   transition={{ duration: preset.duration, ease: preset.ease }}
                 />
               </div>
