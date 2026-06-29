@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
+import { CountUp, Stagger, StaggerItem } from "../components/ui/Motion";
+import { useDesignVariantValue } from "../providers/design-variant-context";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -143,13 +146,13 @@ function MatchingHub({ uid }: { uid: string }) {
               }
             />
           ) : (
-            <ul className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <Stagger className="grid grid-cols-1 gap-5 xl:grid-cols-2">
               {visible.map((match) => (
-                <li key={match.id}>
+                <StaggerItem key={match.id} className="h-full">
                   <MatchCard uid={uid} match={match} />
-                </li>
+                </StaggerItem>
               ))}
-            </ul>
+            </Stagger>
           )}
         </>
       )}
@@ -168,7 +171,7 @@ function HubHeader({
   recomputing: boolean;
 }) {
   return (
-    <header className="overflow-hidden rounded-[var(--radius-card)] border border-gold/30 bg-[linear-gradient(120deg,#faf4e6_0%,#f2e6c9_100%)] shadow-soft">
+    <header className="fbc-hero-shimmer overflow-hidden rounded-[var(--radius-card)] border border-gold/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-gold-soft))] shadow-soft">
       <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-8">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Matching</h1>
@@ -193,9 +196,11 @@ function HubHeader({
 
 function StatTile({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="bg-[#fbf7ec] px-4 py-4">
+    <div className="bg-canvas px-4 py-4">
       <div className="text-xs font-medium tracking-wide text-muted uppercase">{label}</div>
-      <div className="mt-1 font-display text-2xl font-semibold text-ink">{value}</div>
+      <div className="mt-1 font-display text-2xl font-semibold text-ink">
+        {typeof value === "number" ? <CountUp value={value} /> : value}
+      </div>
     </div>
   );
 }
@@ -370,7 +375,11 @@ function MatchCard({ uid, match }: { uid: string; match: HubMatch }) {
 function ScoreBadge({ score }: { score: number }) {
   return (
     <div className="shrink-0 text-right">
-      <div className="font-display text-3xl font-semibold text-gold-strong">{score}%</div>
+      <CountUp
+        value={score}
+        format={(n) => `${Math.round(n)}%`}
+        className="font-display text-3xl font-semibold text-gold-strong"
+      />
       <div className="text-[10px] font-medium tracking-wide text-muted uppercase">Match-Score</div>
     </div>
   );
@@ -430,6 +439,7 @@ function OfferingList({
 
 /** „Warum dieses Match?" — transparente Aufschlüsselung der gewichteten Faktoren. */
 function WhyDetails({ basis }: { basis: MatchBasis }) {
+  const { preset } = useDesignVariantValue();
   return (
     <details className="group rounded-lg border border-line bg-soft px-3 py-2">
       <summary className="cursor-pointer list-none text-xs font-medium text-gold-strong marker:content-none">
@@ -449,7 +459,12 @@ function WhyDetails({ basis }: { basis: MatchBasis }) {
                 </span>
               </div>
               <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line">
-                <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
+                <motion.div
+                  className="h-full rounded-full bg-gold"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: preset.duration, ease: preset.ease }}
+                />
               </div>
             </li>
           );
