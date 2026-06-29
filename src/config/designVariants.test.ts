@@ -7,8 +7,8 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models exactly the four variants a/b/c/d", () => {
-    expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual(["a", "b", "c", "d"]);
+  it("models the seven variants a–g (a–d stable, e–g experimental)", () => {
+    expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
   });
 
   it("marks D as the recommended default", () => {
@@ -19,11 +19,26 @@ describe("designVariants config", () => {
     expect(recommended).toHaveLength(1);
   });
 
+  it("flags exactly e/f/g as experimental", () => {
+    const experimental = Object.values(DESIGN_VARIANTS)
+      .filter((v) => v.experimental)
+      .map((v) => v.id)
+      .sort();
+    expect(experimental).toEqual(["e", "f", "g"]);
+    // the stable variants must not carry the experimental tag
+    for (const id of ["a", "b", "c", "d"] as const) {
+      expect(DESIGN_VARIANTS[id].experimental).toBeFalsy();
+    }
+  });
+
   it("carries the spec's motion / hero / headline flags", () => {
     expect(DESIGN_VARIANTS.a.motion).toBe("subtle");
     expect(DESIGN_VARIANTS.b.motion).toBe("dramatic");
     expect(DESIGN_VARIANTS.c.motion).toBe("medium");
     expect(DESIGN_VARIANTS.d.motion).toBe("dramatic");
+    expect(DESIGN_VARIANTS.e.motion).toBe("subtle");
+    expect(DESIGN_VARIANTS.f.motion).toBe("dramatic");
+    expect(DESIGN_VARIANTS.g.motion).toBe("medium");
 
     expect(DESIGN_VARIANTS.a.heroStyle).toBe("light");
     expect(DESIGN_VARIANTS.b.heroStyle).toBe("dark-glow");
@@ -32,6 +47,16 @@ describe("designVariants config", () => {
 
     expect(DESIGN_VARIANTS.c.headlineFont).toBe("sans");
     expect(DESIGN_VARIANTS.d.headlineFont).toBe("serif");
+    expect(DESIGN_VARIANTS.f.headlineFont).toBe("sans");
+  });
+
+  it("wires the structural backdrop / cardStyle flags for e/f/g", () => {
+    expect(DESIGN_VARIANTS.e.cardStyle).toBe("editorial");
+    expect(DESIGN_VARIANTS.e.backdrop).toBe("none");
+    expect(DESIGN_VARIANTS.f.cardStyle).toBe("glass");
+    expect(DESIGN_VARIANTS.f.backdrop).toBe("aurora");
+    expect(DESIGN_VARIANTS.g.cardStyle).toBe("solid");
+    expect(DESIGN_VARIANTS.g.backdrop).toBe("paper");
   });
 });
 
@@ -39,7 +64,9 @@ describe("isDesignVariantId", () => {
   it("accepts known ids and rejects everything else", () => {
     expect(isDesignVariantId("a")).toBe(true);
     expect(isDesignVariantId("d")).toBe(true);
-    expect(isDesignVariantId("e")).toBe(false);
+    expect(isDesignVariantId("e")).toBe(true);
+    expect(isDesignVariantId("g")).toBe(true);
+    expect(isDesignVariantId("h")).toBe(false);
     expect(isDesignVariantId("")).toBe(false);
     expect(isDesignVariantId(null)).toBe(false);
     expect(isDesignVariantId(undefined)).toBe(false);

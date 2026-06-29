@@ -44,8 +44,15 @@ export function DesignVariantProvider({ children }: { children: ReactNode }) {
   const reducedMotion = usePrefersReducedMotion();
 
   // Single source of truth → DOM: <html data-variant> treibt alle CSS-Overrides.
+  // Zusätzlich spiegeln die strukturellen Flags der aktiven Variante in
+  // data-card-style / data-backdrop — daran hängen die wiederverwendbaren
+  // Card-/Backdrop-Stile (statt Komponenten-Forks).
   useEffect(() => {
-    document.documentElement.dataset.variant = variant;
+    const root = document.documentElement;
+    const meta = DESIGN_VARIANTS[variant];
+    root.dataset.variant = variant;
+    root.dataset.cardStyle = meta.cardStyle ?? "solid";
+    root.dataset.backdrop = meta.backdrop ?? "none";
     persist(variant);
     syncUrl(variant);
   }, [variant]);

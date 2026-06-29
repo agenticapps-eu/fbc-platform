@@ -10,6 +10,13 @@ export type MotionIntensity = "subtle" | "medium" | "dramatic";
 export type HeroStyle = "light" | "dark-glow";
 export type HeadlineFont = "serif" | "sans";
 
+/** Strukturelle Flags (AGE-237, experimentelle Varianten E/F/G). Steuern
+ *  wiederverwendbare Bausteine statt Komponenten-Forks:
+ *  - `backdrop` → <VariantBackdrop> (aurora-Mesh / Papier-Textur / nichts)
+ *  - `cardStyle` → Card-Look via [data-card-style] (glass / editorial / solid) */
+export type BackdropStyle = "none" | "aurora" | "paper";
+export type CardStyle = "solid" | "glass" | "editorial";
+
 export interface DesignVariant {
   id: DesignVariantId;
   label: string;
@@ -17,12 +24,20 @@ export interface DesignVariant {
   motion: MotionIntensity;
   heroStyle: HeroStyle;
   headlineFont: HeadlineFont;
+  /** Animierter Hintergrund hinter dem App-Content (Default: 'none'). */
+  backdrop?: BackdropStyle;
+  /** Kartenstil; setzt [data-card-style] auf <html> (Default: 'solid'). */
+  cardStyle?: CardStyle;
+  /** Optionaler Zweitakzent (Hex), nur für die Styleguide-Vorschau. */
+  accent2?: string;
+  /** Bewusst distinktes Experiment — im Switcher als „Experimentell" markiert. */
+  experimental?: boolean;
   recommended?: boolean;
 }
 
-export type DesignVariantId = "a" | "b" | "c" | "d";
+export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g";
 
-export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = ["a", "b", "c", "d"];
+export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = ["a", "b", "c", "d", "e", "f", "g"];
 
 export const DEFAULT_VARIANT: DesignVariantId = "d";
 
@@ -65,6 +80,41 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     heroStyle: "dark-glow",
     headlineFont: "serif",
     recommended: true,
+  },
+  e: {
+    id: "e",
+    label: "Noir Editorial",
+    description: "Hochkontrast-Magazin, riesige Serif, Hairlines.",
+    motion: "subtle",
+    heroStyle: "dark-glow",
+    headlineFont: "serif",
+    cardStyle: "editorial",
+    backdrop: "none",
+    experimental: true,
+  },
+  f: {
+    id: "f",
+    label: "Aurora Glass",
+    description: "Futuristisch, Glas, leuchtende Aurora-Gradients.",
+    motion: "dramatic",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
+    cardStyle: "glass",
+    backdrop: "aurora",
+    accent2: "#6ee0c2",
+    experimental: true,
+  },
+  g: {
+    id: "g",
+    label: "Warm Boutique",
+    description: "Warm, taktil, Leinen/Terracotta/Salbei, organisch.",
+    motion: "medium",
+    heroStyle: "light",
+    headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "paper",
+    accent2: "#6e7e5c",
+    experimental: true,
   },
 };
 

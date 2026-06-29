@@ -10,6 +10,8 @@ import { MeinBereichSubnav } from "./ui/MeinBereichSubnav";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
+import { VariantBackdrop } from "./ui/VariantBackdrop";
+import { useDesignVariantValue } from "../providers/design-variant-context";
 
 const SECTIONS: SidebarNavSection[] = [
   { title: "Formate", items: navItems.filter((i) => i.section === "formate") },
@@ -200,6 +202,8 @@ export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { meta } = useDesignVariantValue();
+  const hasBackdrop = (meta.backdrop ?? "none") !== "none";
   const isWide = WIDE_ROUTES.some((r) => pathname.startsWith(r));
   const inMeinBereich = pathname.startsWith("/mein-bereich");
 
@@ -221,7 +225,15 @@ export default function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-soft text-ink">
+    <div
+      className={cn(
+        "relative isolate min-h-screen text-ink",
+        // Bei aktivem Backdrop (F/G) ist der Shell-Hintergrund transparent, damit
+        // die fixe -z-10-Ebene (<VariantBackdrop>) durchscheint; sonst wie gehabt.
+        hasBackdrop ? "bg-transparent" : "bg-soft",
+      )}
+    >
+      <VariantBackdrop />
       {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
           rechts Benachrichtigungen + Avatar/Tier. */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">
