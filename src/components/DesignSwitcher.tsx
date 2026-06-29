@@ -92,6 +92,11 @@ export function DesignSwitcher() {
                             ★
                           </span>
                         )}
+                        {v.experimental && (
+                          <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
+                            Experimentell
+                          </span>
+                        )}
                       </span>
                       <span className="block text-xs leading-snug text-muted">{v.description}</span>
                     </span>

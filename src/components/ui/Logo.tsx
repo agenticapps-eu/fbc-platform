@@ -6,14 +6,20 @@ import { CrownMark } from "./CrownMark";
 type Lockup = "full" | "mark";
 type Tone = "auto" | "light" | "dark";
 
+/** Varianten mit dunkler Masthead-/Sidebar-Fläche (schwarzes bzw. Glas-Chrome):
+ *  hier muss das Logo die SVG-Krone + helle Gold-Wortmarke nutzen, weil das
+ *  Creme-PNG auf Dunkel nicht funktioniert. */
+const DARK_CHROME_VARIANTS = new Set(["b", "e", "f"]);
+
 /** FBC-Logo mit Krone.
  *  - `lockup="full"` → Krone + Wortmarke (Login, Hero, breite Sidebar)
  *  - `lockup="mark"` → nur die Krone (kompakt: Header, Favicon-artig)
  *
- *  `tone="auto"` wählt anhand der aktiven Variante: auf der dunklen Variante B
- *  (und explizit `tone="dark"`) die SVG-Krone + helle Gold-Wortmarke; sonst das
- *  echte Lockup-PNG. Das PNG hat einen Creme-Verlauf-Hintergrund und grüne
- *  Wortmarke und ist deshalb nur auf hellen Flächen einsetzbar. */
+ *  `tone="auto"` wählt anhand der aktiven Variante: auf dunklen Masthead-
+ *  Varianten (B/E/F bzw. explizit `tone="dark"`) die SVG-Krone + helle
+ *  Gold-Wortmarke; sonst das echte Lockup-PNG. Das PNG hat einen Creme-Verlauf-
+ *  Hintergrund und grüne Wortmarke und ist deshalb nur auf hellen Flächen
+ *  einsetzbar. */
 export function Logo({
   lockup = "full",
   tone = "auto",
@@ -28,7 +34,7 @@ export function Logo({
   const ctx = useContext(DesignVariantContext);
   const variant = ctx?.variant ?? "d";
   const resolvedTone: "light" | "dark" =
-    tone === "auto" ? (variant === "b" ? "dark" : "light") : tone;
+    tone === "auto" ? (DARK_CHROME_VARIANTS.has(variant) ? "dark" : "light") : tone;
 
   if (lockup === "mark") {
     return <CrownMark className={className} title="Fair Business Club" />;

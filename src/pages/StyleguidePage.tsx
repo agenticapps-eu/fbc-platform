@@ -150,8 +150,9 @@ function VariantsSection() {
   return (
     <Section title="Design-Varianten (Live-Switcher)">
       <p className="-mt-2 text-sm text-muted">
-        Vier umschaltbare Looks als Theming-/Animations-Schicht (<code>data-variant</code>). Die
-        Auswahl wird in localStorage + URL (<code>?variant=</code>) gespiegelt. Aktiv:{" "}
+        Sieben umschaltbare Looks als Theming-/Animations-Schicht (<code>data-variant</code>) — A–D
+        plus die experimentellen E/F/G (Noir Editorial · Aurora Glass · Warm Boutique). Die Auswahl
+        wird in localStorage + URL (<code>?variant=</code>) gespiegelt. Aktiv:{" "}
         <strong className="text-ink">{meta.label}</strong>.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -171,7 +172,7 @@ function VariantsSection() {
                   : "border-line bg-canvas hover:border-gold/50",
               )}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold uppercase",
@@ -186,10 +187,24 @@ function VariantsSection() {
                     ★
                   </span>
                 )}
+                {v.experimental && (
+                  <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
+                    Experimentell
+                  </span>
+                )}
+                {v.accent2 && (
+                  <span
+                    className="ml-auto h-3.5 w-3.5 rounded-full border border-line"
+                    style={{ backgroundColor: v.accent2 }}
+                    title={`Zweitakzent ${v.accent2}`}
+                  />
+                )}
               </div>
               <p className="mt-2 text-xs text-muted">{v.description}</p>
               <p className="mt-2 text-[11px] uppercase tracking-wide text-muted/80">
                 {v.motion} · {v.heroStyle} · {v.headlineFont}
+                {v.cardStyle && v.cardStyle !== "solid" && ` · ${v.cardStyle}`}
+                {v.backdrop && v.backdrop !== "none" && ` · ${v.backdrop}`}
               </p>
             </button>
           );

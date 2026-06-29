@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /* FBC Design-System — Schwarz & Gold.
@@ -15,6 +15,10 @@
   --color-gold: #c2a24e;
   --color-gold-strong: #b8893b;
   --color-gold-soft: #efe3c8;
+
+  /* Optionaler Zweitakzent — Default = Gold (Variante F/G überschreiben mit
+     Mint bzw. Salbei). So liefert var(--accent2) immer einen gültigen Wert. */
+  --accent2: var(--color-gold);
 
   /* Content — hell, warm (App-Hintergrund warmes Hellgrau, Karten reinweiß) */
   --color-canvas: #ffffff;
@@ -142,6 +146,87 @@ html[data-variant="d"] {
     radial-gradient(120% 90% at 50% 0%, rgba(200, 168, 87, 0.18), transparent 60%), #14151a;
   --hero-ink: #f4f2ec;
   --hero-muted: #cbb88c;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Experimentelle Varianten E/F/G (AGE-237). Jede ist ein eigener Charakter —
+   nicht nur ein anderer Goldton. Strukturelle Effekte (Backdrop, Card-Stil)
+   laufen flag-getrieben über [data-backdrop] / [data-card-style] (s. u.).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* E — Noir Editorial: Hochkontrast-Magazin, schwarze Masthead, riesige Serif,
+   Hairlines statt Schatten, scharfe Kanten. Gold nur als hauchdünner Akzent. */
+html[data-variant="e"] {
+  --color-soft: #f6f4ef;
+  --color-canvas: #ffffff;
+  --color-ink: #0c0c0d;
+  --color-muted: #565654;
+  --color-line: #dad8d2;
+  --color-gold: #a8842f;
+  --color-gold-strong: #8a6d24;
+  --color-gold-soft: #efe9da;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --radius-card: 2px;
+  /* flach: Hairline statt Schatten */
+  --shadow-soft: 0 0 0 1px var(--color-line);
+  --sidebar-surface: #0c0c0d;
+  --hero-bg: #0c0c0d;
+  --hero-ink: #f6f4ef;
+  --hero-muted: #b9b4a6;
+}
+
+/* E: schwarze Masthead-Spalte. Der App-Content bleibt hell (ink ≈ schwarz),
+   daher den Text NUR innerhalb der Sidebar auf Elfenbein umstellen — über die
+   gleiche Token-Mechanik (lokales --color-ink/--color-muted/--color-gold-strong),
+   sodass alle text-ink-Utilities der Sidebar mitziehen (kein Komponenten-Fork). */
+html[data-variant="e"] .fbc-sidebar-surface {
+  --color-ink: #f6f4ef;
+  --color-muted: #b9b4a6;
+  --color-gold-strong: #d9b65f;
+}
+
+/* F — Aurora Glass: tiefdunkle Mitternacht, driftende Aurora-Mesh (Gold + Mint),
+   Frosted-Glass-Cards, Neon-Gold-Akzente, helle Sans-Headlines. */
+html[data-variant="f"] {
+  --color-soft: #0b1020;
+  --color-canvas: rgba(255, 255, 255, 0.06);
+  --color-ink: #eaf0ff;
+  --color-muted: #9aa6c4;
+  --color-line: rgba(255, 255, 255, 0.12);
+  --color-gold: #e6c878;
+  --color-gold-strong: #f2d99a;
+  --color-gold-soft: rgba(230, 200, 120, 0.14);
+  --accent2: #6ee0c2;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 20px;
+  --shadow-soft: 0 8px 40px -12px rgba(110, 224, 194, 0.18), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --sidebar-surface: rgba(255, 255, 255, 0.05);
+  --hero-bg:
+    radial-gradient(120% 90% at 30% 0%, rgba(230, 200, 120, 0.22), transparent 55%),
+    radial-gradient(100% 80% at 90% 10%, rgba(110, 224, 194, 0.18), transparent 55%), #0b1020;
+  --hero-ink: #eaf0ff;
+  --hero-muted: #9aa6c4;
+}
+
+/* G — Warm Boutique: Leinen/Papier-Töne, erdige Akzente (Terracotta + Salbei),
+   sehr weiche runde Formen, warme humanistische Serif (Fraunces → Cormorant). */
+html[data-variant="g"] {
+  --color-soft: #f3ead9;
+  --color-canvas: #fbf6ec;
+  --color-ink: #2a2320;
+  --color-muted: #7a6e63;
+  --color-line: #e3d6bf;
+  --color-gold: #b8893b;
+  --color-gold-strong: #9c6f2c;
+  --color-gold-soft: #efe1c6;
+  --accent2: #6e7e5c;
+  --font-display: "Fraunces", "Cormorant Garamond", Georgia, serif;
+  --radius-card: 22px;
+  --shadow-soft: 0 1px 2px rgba(80, 60, 40, 0.05), 0 18px 44px -24px rgba(80, 60, 40, 0.28);
+  --sidebar-surface: linear-gradient(168deg, #f6efe0, #ecdcc0 60%, #e3cda3);
+  --hero-bg: transparent;
+  --hero-ink: #2a2320;
+  --hero-muted: #7a6e63;
 }
 
 @layer base {
@@ -283,12 +368,96 @@ html[data-variant="d"] .fbc-tier-pulse {
   }
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   Card-Stile (AGE-237, flag-gesteuert über [data-card-style]). Wiederverwendbar
+   für JEDE Variante, die das Flag setzt — kein Komponenten-Fork. 'solid' ist der
+   bestehende Look (kein Override).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* glass (F) — Frosted-Glass: Blur hinter der halbtransparenten Card + Glow-Rand. */
+html[data-card-style="glass"] .fbc-card {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: var(--color-line);
+}
+html[data-card-style="glass"] .fbc-card:hover {
+  /* leuchtender Mint/Gold-Rand + Glow-Anstieg beim Hover (statt Gold-Glow b/d) */
+  box-shadow:
+    0 10px 50px -16px color-mix(in srgb, var(--accent2) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent2) 40%, transparent);
+  border-color: color-mix(in srgb, var(--accent2) 45%, transparent);
+}
+
+/* editorial (E) — scharfe Kanten, flach: Hairline statt Schatten, auch im Hover. */
+html[data-card-style="editorial"] .fbc-card {
+  box-shadow: var(--shadow-soft);
+}
+html[data-card-style="editorial"] .fbc-card:hover {
+  transform: none;
+  /* Hairline zieht beim Hover Gold — ruhig, typografisch, kein „Lift". */
+  box-shadow: 0 0 0 1px var(--color-gold);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Struktureller Backdrop (AGE-237) — fixe -z-10-Ebene hinter dem App-Content,
+   gerendert von <VariantBackdrop>. Flag der aktiven Variante (meta.backdrop).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Basis: die oversized, geblurrte Aurora-Ebene darf nicht über den Viewport
+   hinaus „bluten" → clippen. (Klasse trägt fixed inset-0 -z-10 via Tailwind.) */
+.fbc-backdrop {
+  overflow: hidden;
+}
+
+/* F — Aurora: tiefdunkle Basis + langsam driftende, leuchtende Gradient-Mesh
+   (Gold / Mint / Periwinkle). GPU-freundlich (nur background-position + opacity). */
+.fbc-backdrop--aurora {
+  background-color: #0b1020;
+}
+.fbc-backdrop--aurora::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(38% 42% at 22% 28%, rgba(230, 200, 120, 0.5), transparent 60%),
+    radial-gradient(40% 44% at 78% 22%, rgba(110, 224, 194, 0.42), transparent 60%),
+    radial-gradient(46% 50% at 62% 82%, rgba(132, 142, 230, 0.38), transparent 62%),
+    radial-gradient(40% 46% at 30% 78%, rgba(230, 200, 120, 0.28), transparent 62%);
+  filter: blur(38px);
+  animation: fbc-aurora-drift 26s ease-in-out infinite alternate;
+}
+@keyframes fbc-aurora-drift {
+  0% {
+    transform: translate3d(-4%, -2%, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(3%, 2%, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(-2%, 4%, 0) scale(1.06);
+  }
+}
+
+/* G — Papier/Leinen: warme Basis + sehr dezente SVG-Faser-Textur (niedrige
+   Deckkraft), statisch. */
+.fbc-backdrop--paper {
+  background-color: #f3ead9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* Variante G insgesamt organischer: etwas federnderer Card-Lift. */
+html[data-variant="g"] .fbc-card:hover {
+  transform: translateY(-3px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fbc-card,
   .fbc-sheen,
   .fbc-sheen::after,
   .fbc-hero-shimmer::before,
-  .fbc-tier-pulse {
+  .fbc-tier-pulse,
+  .fbc-backdrop--aurora::before {
     animation: none !important;
     transition: none !important;
   }

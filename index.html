@@ -14,11 +14,18 @@
     <script>
       (function () {
         try {
-          var ok = ["a", "b", "c", "d"];
+          var ok = ["a", "b", "c", "d", "e", "f", "g"];
+          // Strukturelle Flags der experimentellen Varianten (cardStyle, backdrop).
+          // a–d sind solid/none (Default); nur e/f/g weichen ab.
+          var flags = { e: ["editorial", "none"], f: ["glass", "aurora"], g: ["solid", "paper"] };
           var p = new URLSearchParams(location.search).get("variant");
           var s = localStorage.getItem("fbc.designVariant");
           var v = ok.indexOf(p) > -1 ? p : ok.indexOf(s) > -1 ? s : "d";
-          document.documentElement.dataset.variant = v;
+          var d = document.documentElement;
+          var fl = flags[v];
+          d.dataset.variant = v;
+          d.dataset.cardStyle = fl ? fl[0] : "solid";
+          d.dataset.backdrop = fl ? fl[1] : "none";
         } catch (e) {}
       })();
     </script>
