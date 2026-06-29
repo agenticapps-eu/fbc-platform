@@ -7,6 +7,7 @@ import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { Logo } from "./ui/Logo";
 import { MeinBereichSubnav } from "./ui/MeinBereichSubnav";
+import { RouteTransition } from "./ui/Motion";
 import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 
@@ -20,10 +21,10 @@ const SECTIONS: SidebarNavSection[] = [
 // innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
 const WIDE_ROUTES = ["/mein-bereich", "/verzeichnis", "/matching"];
 
-// Sidebar-Oberfläche: heller Champagner→Gold-Verlauf (Detlev: „so hell wie
-// möglich", Gold-Anmutung, dunkler Text bleibt lesbar). EINE Stelle zum Tunen
-// der Helligkeit — von aside und Off-Canvas-Drawer geteilt.
-const SIDEBAR_SURFACE = "bg-[linear-gradient(168deg,#fbf6ea_0%,#f1e4c4_50%,#e9d6a8_100%)]";
+// Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
+// .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —
+// heller Champagner→Gold-Verlauf (a/c/d) bzw. dunkel (b). Von aside + Drawer geteilt.
+const SIDEBAR_SURFACE = "fbc-sidebar-surface";
 
 function BellIcon() {
   return (
@@ -182,7 +183,7 @@ function SidebarContent({
       <Link
         to="/community"
         onClick={onNavigate}
-        className="mb-8 inline-flex rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5ead0]"
+        className="mb-8 inline-flex rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
       >
         <Logo />
       </Link>
@@ -237,7 +238,7 @@ export default function AppShell() {
             to="/community"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
           >
-            <Logo />
+            <Logo lockup="mark" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
@@ -288,9 +289,13 @@ export default function AppShell() {
         </aside>
 
         <main className="min-w-0 flex-1">
-          {/* Einspalter cappen ihre innere Spalte zentriert; Sidebar bleibt fix. */}
+          {/* Einspalter cappen ihre innere Spalte zentriert; Sidebar bleibt fix.
+              RouteTransition: weicher Fade/Slide-Up beim Seitenwechsel (Intensität
+              je Variante, reduced-motion-sicher). */}
           <div className={cn(!isWide && "mx-auto max-w-[720px]")}>
-            <Outlet />
+            <RouteTransition routeKey={pathname}>
+              <Outlet />
+            </RouteTransition>
           </div>
         </main>
       </div>

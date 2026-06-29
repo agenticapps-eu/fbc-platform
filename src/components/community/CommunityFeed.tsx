@@ -6,6 +6,7 @@ import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { Textarea } from "../ui/Textarea";
 import { TierBadge } from "../ui/TierBadge";
@@ -225,9 +226,9 @@ function FeedList({
   }
 
   return (
-    <ul className="space-y-5">
+    <Stagger className="space-y-5">
       {posts.map((post) => (
-        <li key={post.id}>
+        <StaggerItem key={post.id}>
           <PostCard
             post={post}
             currentUserId={currentUserId}
@@ -235,9 +236,9 @@ function FeedList({
             onHashtag={onHashtag}
             mentionResolver={mentionResolver}
           />
-        </li>
+        </StaggerItem>
       ))}
-    </ul>
+    </Stagger>
   );
 }
 

@@ -13,8 +13,9 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-soft disabled:cursor-not-allowed disabled:opacity-50";
 
 const variants: Record<Variant, string> = {
-  // Primary — Gold-Fläche, near-black Text.
-  primary: "bg-gold text-night hover:bg-gold-strong hover:text-on-night focus-visible:ring-gold",
+  // Primary — Gold-Fläche, near-black Text. fbc-sheen: Gold-Glanz-Hover + Press-Scale.
+  primary:
+    "fbc-sheen bg-gold text-night hover:bg-gold-strong hover:text-on-night focus-visible:ring-gold",
   // Secondary — near-black Fläche, heller Text.
   secondary: "bg-night text-on-night hover:bg-night-elevated focus-visible:ring-night",
   // Ghost — Gold-Outline.

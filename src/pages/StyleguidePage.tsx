@@ -9,10 +9,14 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { Logo } from "../components/ui/Logo";
+import { CountUp } from "../components/ui/Motion";
 import { Tabs } from "../components/ui/Tabs";
 import { TierBadge } from "../components/ui/TierBadge";
 import { ToastProvider } from "../components/ui/Toast";
 import { useToast } from "../components/ui/toast-context";
+import { DESIGN_VARIANT_IDS, DESIGN_VARIANTS } from "../config/designVariants";
+import { cn } from "../lib/cn";
+import { useDesignVariant } from "../providers/design-variant-context";
 
 const COLORS: { name: string; token: string; className: string; dark?: boolean }[] = [
   { name: "Night / Chrome", token: "#0E0F12", className: "bg-night", dark: true },
@@ -140,6 +144,78 @@ function AxiomTestSection() {
   );
 }
 
+/** Live-Umschaltbare Design-Varianten + Animations-Demo (AGE-237). */
+function VariantsSection() {
+  const { variant, setVariant, meta } = useDesignVariant();
+  return (
+    <Section title="Design-Varianten (Live-Switcher)">
+      <p className="-mt-2 text-sm text-muted">
+        Vier umschaltbare Looks als Theming-/Animations-Schicht (<code>data-variant</code>). Die
+        Auswahl wird in localStorage + URL (<code>?variant=</code>) gespiegelt. Aktiv:{" "}
+        <strong className="text-ink">{meta.label}</strong>.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {DESIGN_VARIANT_IDS.map((id) => {
+          const v = DESIGN_VARIANTS[id];
+          const active = id === variant;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setVariant(id)}
+              aria-pressed={active}
+              className={cn(
+                "fbc-card rounded-[var(--radius-card)] border p-4 text-left",
+                active
+                  ? "border-gold bg-gold-soft/40"
+                  : "border-line bg-canvas hover:border-gold/50",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold uppercase",
+                    active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
+                  )}
+                >
+                  {id}
+                </span>
+                <span className="font-display text-base font-semibold text-ink">{v.label}</span>
+                {v.recommended && (
+                  <span className="text-gold-strong" title="Empfehlung">
+                    ★
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-muted">{v.description}</p>
+              <p className="mt-2 text-[11px] uppercase tracking-wide text-muted/80">
+                {v.motion} · {v.heroStyle} · {v.headlineFont}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <Card className="text-center">
+          <p className="text-xs uppercase tracking-wide text-muted">Count-up</p>
+          <CountUp
+            value={842}
+            className="mt-1 block font-display text-3xl font-semibold text-gold-strong"
+          />
+        </Card>
+        <Card className="flex flex-col items-center justify-center gap-2 text-center">
+          <p className="text-xs uppercase tracking-wide text-muted">Tier-Puls (b/d)</p>
+          <TierBadge tier="legacy" />
+        </Card>
+        <Card className="flex flex-col items-center justify-center gap-2 text-center">
+          <p className="text-xs uppercase tracking-wide text-muted">Button-Sheen</p>
+          <Button size="sm">Hover mich</Button>
+        </Card>
+      </div>
+    </Section>
+  );
+}
+
 export default function StyleguidePage() {
   return (
     <ToastProvider>
@@ -157,6 +233,9 @@ export default function StyleguidePage() {
               erreichbar und zeigt Tokens und Basis-Komponenten.
             </p>
           </header>
+
+          {/* Design-Varianten (Live-Switcher + Animations-Demo) */}
+          <VariantsSection />
 
           {/* Chrome-Vorschau (dunkel) */}
           <Section title="Chrome — Schwarz &amp; Gold">

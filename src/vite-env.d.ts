@@ -9,6 +9,9 @@ interface ImportMetaEnv {
   readonly VITE_ENVIRONMENT?: string;
   /** Sentry-`release` — Git-SHA, beim Build injiziert. */
   readonly VITE_SENTRY_RELEASE?: string;
+  /** Temporäres Review-Tool: Live-Design-Switcher (A/B/C/D). "off" blendet ihn
+   *  aus; ungesetzt/"on" zeigt ihn (AGE-237). */
+  readonly VITE_DESIGN_SWITCHER?: string;
 }
 
 interface ImportMeta {

@@ -1,5 +1,7 @@
+import { motion } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
+import { useDesignVariantValue } from "../../providers/design-variant-context";
 
 export interface SidebarNavItem {
   path: string;
@@ -18,6 +20,7 @@ export interface SidebarNavProps {
 }
 
 export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
+  const { preset } = useDesignVariantValue();
   return (
     <nav className="flex flex-col gap-7">
       {sections.map((section, i) => (
@@ -43,9 +46,13 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
             >
               {({ isActive }) => (
                 <>
-                  {/* Gold-Linksbalken am aktiven Eintrag. */}
+                  {/* Gold-Linksbalken — gleitet per layoutId zwischen Einträgen. */}
                   {isActive && (
-                    <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold-strong" />
+                    <motion.span
+                      layoutId="sidebar-active-indicator"
+                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold-strong"
+                      transition={{ duration: preset.duration, ease: preset.ease }}
+                    />
                   )}
                   {item.label}
                 </>

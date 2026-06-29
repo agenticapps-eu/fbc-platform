@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
 import { Input } from "../ui/Input";
+import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { tierLabel } from "../../lib/tiers";
 import {
@@ -219,13 +220,13 @@ function DirectoryResults({
       <p className="text-sm text-muted">
         {members.length} {members.length === 1 ? "Mitglied" : "Mitglieder"}
       </p>
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {members.map((m) => (
-          <li key={m.id}>
+          <StaggerItem key={m.id} className="h-full">
             <MemberCard member={m} />
-          </li>
+          </StaggerItem>
         ))}
-      </ul>
+      </Stagger>
     </>
   );
 }

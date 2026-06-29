@@ -10,5 +10,12 @@ export function TierBadge({ tier }: { tier: string }) {
   const variant: BadgeVariant = KNOWN.includes(tier as MembershipTier)
     ? (tier as BadgeVariant)
     : "neutral";
-  return <Badge variant={variant}>{tierLabel(tier)}</Badge>;
+  // Gold-Glow-Puls nur für die Gold-Stufen (Prime/Legacy) und nur in b/d
+  // (CSS .fbc-tier-pulse ist je Variante gestaffelt). Discover bleibt ruhig.
+  const pulse = variant === "prime" || variant === "legacy";
+  return (
+    <Badge variant={variant} className={pulse ? "fbc-tier-pulse" : undefined}>
+      {tierLabel(tier)}
+    </Badge>
+  );
 }

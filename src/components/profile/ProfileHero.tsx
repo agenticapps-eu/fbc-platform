@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Avatar } from "../ui/Avatar";
+import { CountUp } from "../ui/Motion";
 import { tierLabel } from "../../lib/tiers";
 
 function CrownIcon({ className }: { className?: string }) {
@@ -46,9 +47,9 @@ export function ProfileHero({
   const meta = [region, company].filter(Boolean).join(" · ");
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Cover — warmer Gold-Verlauf (kein Schwarz; der Identitätsblock darunter
-          ist hell, daher bleibt der Text lesbar). */}
-      <div className="relative h-28 bg-[linear-gradient(120deg,#efe1bd_0%,#cdab5e_55%,#b8893b_100%)] sm:h-40">
+      {/* Cover — Gold-Verlauf aus Tokens (folgt der Variante; in B cinematisch
+          dunkler) mit Gold-Shimmer-Sweep (fbc-hero-shimmer; b/d deutlich, a/c subtil). */}
+      <div className="fbc-hero-shimmer relative h-28 bg-[linear-gradient(120deg,var(--color-gold-soft),var(--color-gold)_55%,var(--color-gold-strong))] sm:h-40">
         {coverUrl && (
           <img src={coverUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
         )}
@@ -102,7 +103,10 @@ export function HeroImpactBadge({ score }: { score: number }) {
   return (
     <div className="rounded-[var(--radius-card)] border border-line bg-soft px-5 py-3 text-center">
       <div className="text-xs font-medium tracking-wide text-muted uppercase">Impact Score</div>
-      <div className="mt-0.5 font-display text-3xl font-semibold text-gold-strong">{score}</div>
+      <CountUp
+        value={score}
+        className="mt-0.5 block font-display text-3xl font-semibold text-gold-strong"
+      />
     </div>
   );
 }
