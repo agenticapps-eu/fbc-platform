@@ -56,7 +56,8 @@ update public.profiles set
                          'Impact-Report Q3 finalisieren'
                        ],
   competencies       = array['M&A', 'Beteiligungskapital', 'Immobilienentwicklung', 'Unternehmensnachfolge'],
-  interests          = array['Impact Investing', 'Kreislaufwirtschaft', 'Mentoring', 'Family Office']
+  interests          = array['Impact Investing', 'Kreislaufwirtschaft', 'Mentoring', 'Family Office'],
+  avatar_url         = 'https://i.pravatar.cc/300?u=00000000-0000-0000-0000-000000000238'
 where id = '00000000-0000-0000-0000-000000000238';
 
 -- 3. Erfolgsradar (Sein/Tun/Haben/Wirken), 0–10.
