@@ -1,5 +1,7 @@
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
+import { FormatHero } from "../components/ui/FormatHero";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
+import { FORMAT_HERO } from "../config/formatHero";
 
 /**
  * Academy (AGE-252): kuratierte Lerninhalte als Video. Nutzt die wiederverwendbare
@@ -34,12 +36,7 @@ const ACADEMY_LESSONS: Lesson[] = [
 export default function AcademyPage() {
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Academy</h1>
-        <p className="mt-1 text-sm text-muted">
-          Kuratierte Lerninhalte für Mitglieder des Fair Business Club.
-        </p>
-      </header>
+      <FormatHero meta={FORMAT_HERO["/academy"]} />
 
       <div className="grid gap-6 sm:grid-cols-2">
         {ACADEMY_LESSONS.map((lesson) => (

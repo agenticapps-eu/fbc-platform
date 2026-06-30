@@ -32,19 +32,13 @@ export default function EventsList() {
 
   return (
     <section className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-ink">Events</h1>
-          <p className="mt-2 text-sm text-muted">
-            Kommende und vergangene Veranstaltungen des Clubs.
-          </p>
-        </div>
-        {user && !creating && (
+      {user && !creating && (
+        <header className="flex justify-end">
           <Button size="sm" onClick={() => setCreating(true)}>
             Event anlegen
           </Button>
-        )}
-      </header>
+        </header>
+      )}
 
       {creating && user && (
         <Card>
