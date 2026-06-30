@@ -14,7 +14,13 @@ function CrownIcon({ className }: { className?: string }) {
 export interface ProfileHeroProps {
   name: string;
   avatarUrl?: string | null;
-  /** Cover-Bild; ohne Wert ein dezenter Gold/Anthrazit-Verlauf (kein Vollschwarz). */
+  /**
+   * Banner-Bild (pro Mitglied anpassbar — Upload vorbereitet, noch kein Storage-Backend).
+   * Ohne Wert ein heller Gold-Verlauf; mit Wert als Cover-Hintergrund. `coverUrl` bleibt
+   * als Alias bestehen.
+   */
+  bannerUrl?: string | null;
+  /** Alias für `bannerUrl` (Altbestand). */
   coverUrl?: string | null;
   tier?: string | null;
   roles?: string[];
@@ -28,13 +34,16 @@ export interface ProfileHeroProps {
 }
 
 /**
- * Profil-Hero (AGE-237) — LinkedIn-Stil: Cover-Banner über die Breite, darauf
- * überlappend ein großes rundes Profilbild, darunter Name/Rollen/Region/Tier.
- * Helle Karte (kein Vollschwarz im Content); Marke über den Gold-Verlauf & Akzente.
+ * Profil-Hero (AGE-237) — ruhiges Layout: heller Banner über die Breite, darunter
+ * (im normalen Fluss, KEINE Überlappung) das Profilbild neben Name/Rollen/Region/Tier.
+ * Das Avatar ragt nie in den Banner — das vermeidet Größen-/Mobile-Probleme. Der
+ * Banner ist pro Mitglied anpassbar (Upload vorbereitet); ohne Bild ein heller
+ * Gold-Verlauf (kein Vollschwarz). Helle Karte; Marke über Gold-Akzente.
  */
 export function ProfileHero({
   name,
   avatarUrl,
+  bannerUrl,
   coverUrl,
   tier,
   roles = [],
@@ -45,24 +54,30 @@ export function ProfileHero({
   children,
 }: ProfileHeroProps) {
   const meta = [region, company].filter(Boolean).join(" · ");
+  const banner = bannerUrl ?? coverUrl;
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Cover — Gold-Verlauf aus Tokens (folgt der Variante; in B cinematisch
-          dunkler) mit Gold-Shimmer-Sweep (fbc-hero-shimmer; b/d deutlich, a/c subtil). */}
-      <div className="fbc-hero-shimmer relative h-28 bg-[linear-gradient(120deg,var(--color-gold-soft),var(--color-gold)_55%,var(--color-gold-strong))] sm:h-40">
-        {coverUrl && (
-          <img src={coverUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+      {/* Banner — heller Gold-Verlauf aus Tokens (folgt der Variante) mit dezentem
+          Gold-Shimmer-Sweep. Das Avatar überlappt diesen Block NICHT. */}
+      <div className="fbc-hero-shimmer relative h-24 bg-[linear-gradient(120deg,var(--color-gold-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-gold)_20%,var(--color-canvas)))] sm:h-32">
+        {banner && (
+          <img
+            src={banner}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         )}
       </div>
 
-      {/* Body */}
-      <div className="px-6 pb-6 sm:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
+      {/* Body — Avatar + Identität im normalen Fluss UNTER dem Banner (kein -mt). */}
+      <div className="px-6 pb-6 pt-5 sm:px-8 sm:pt-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
             <Avatar
               name={name}
               src={avatarUrl}
-              className="-mt-12 h-24 w-24 text-2xl ring-4 ring-canvas sm:-mt-14 sm:h-28 sm:w-28"
+              className="h-24 w-24 text-2xl ring-4 ring-canvas sm:h-28 sm:w-28"
             />
             <div className="min-w-0">
               {tier && (
