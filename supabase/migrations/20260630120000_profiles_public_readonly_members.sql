@@ -25,3 +25,12 @@ revoke insert, update, delete, truncate, references, trigger
   on public.profiles_public from anon, authenticated;
 
 revoke select on public.profiles_public from anon;
+
+-- LOW (preventive) — `partners` carries a `contact` column and was anon-readable via
+-- `partners_read_all USING(true)`. It is "Potential Ecosystem" (Level 2) data, 0 rows
+-- today; restrict reads to authenticated before it is ever populated. RLS already
+-- blocks anon writes (no permissive write policy). `partner_categories` stays public
+-- (non-sensitive labels). (database-sentinel audit 2026-06-30.)
+drop policy if exists partners_read_all on public.partners;
+create policy partners_read_authenticated on public.partners
+  for select to authenticated using (true);
