@@ -56,6 +56,11 @@ describe("EinstellungenPage", () => {
     expect(screen.getByText("legacy@fbcdemo.de")).toBeInTheDocument();
     const toggle = await screen.findByRole("switch", { name: /Im Verzeichnis sichtbar/ });
     fireEvent.click(toggle);
-    await waitFor(() => expect(mockedSave).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockedSave).toHaveBeenCalledWith("u1", {
+        ...DEFAULT_MEMBER_SETTINGS,
+        visible_in_directory: false,
+      }),
+    );
   });
 });

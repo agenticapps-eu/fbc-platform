@@ -21,11 +21,13 @@ function ToggleRow({
   hint,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   hint?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2">
@@ -39,8 +41,10 @@ function ToggleRow({
         aria-checked={checked}
         aria-label={label}
         onClick={() => onChange(!checked)}
+        disabled={disabled}
         className={cn(
           "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+          "disabled:cursor-not-allowed disabled:opacity-60",
           checked ? "bg-gold-strong" : "bg-line",
         )}
       >
@@ -71,11 +75,20 @@ export default function EinstellungenPage() {
 
   const save = useMutation({
     mutationFn: (next: MemberSettings) => saveMemberSettings(uid, next),
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: memberSettingsQueryKey(uid) });
+      const previous = queryClient.getQueryData<MemberSettings>(memberSettingsQueryKey(uid));
+      queryClient.setQueryData(memberSettingsQueryKey(uid), next);
+      return { previous };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memberSettingsQueryKey(uid) });
       toast({ variant: "success", title: "Einstellungen gespeichert" });
     },
-    onError: (error) => {
+    onError: (error, _next, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(memberSettingsQueryKey(uid), context.previous);
+      }
       const message =
         error && typeof error === "object" && "message" in error
           ? String((error as { message: unknown }).message)
@@ -125,16 +138,19 @@ export default function EinstellungenPage() {
           label="E-Mail bei neuer Kontaktanfrage"
           checked={settings.notify_email_requests}
           onChange={(v) => toggle("notify_email_requests", v)}
+          disabled={save.isPending}
         />
         <ToggleRow
           label="E-Mail zu Event-Erinnerungen"
           checked={settings.notify_email_events}
           onChange={(v) => toggle("notify_email_events", v)}
+          disabled={save.isPending}
         />
         <ToggleRow
           label="Wöchentlicher Digest"
           checked={settings.notify_email_digest}
           onChange={(v) => toggle("notify_email_digest", v)}
+          disabled={save.isPending}
         />
       </Card>
 
@@ -144,11 +160,13 @@ export default function EinstellungenPage() {
           label="Im Verzeichnis sichtbar"
           checked={settings.visible_in_directory}
           onChange={(v) => toggle("visible_in_directory", v)}
+          disabled={save.isPending}
         />
         <ToggleRow
           label="Prime-Mitglieder dürfen mich kontaktieren"
           checked={settings.contactable_by_prime}
           onChange={(v) => toggle("contactable_by_prime", v)}
+          disabled={save.isPending}
         />
       </Card>
     </div>
