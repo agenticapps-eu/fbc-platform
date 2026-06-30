@@ -11,7 +11,6 @@ import LibraryPage from "../pages/LibraryPage";
 import MatchingPage from "../pages/MatchingPage";
 import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
-import MeinBereichPage from "../pages/MeinBereichPage";
 import MeineEventsPage from "../pages/MeineEventsPage";
 import ProfilAnsichtPage from "../pages/ProfilAnsichtPage";
 import ProfilPage from "../pages/ProfilPage";
@@ -126,13 +125,6 @@ export const navItems: NavItem[] = [
     label: "Angebote & Gesuche",
     Component: AngeboteGesuchePage,
     section: "community",
-    requiresAuth: true,
-  },
-  {
-    path: "/mein-bereich",
-    label: "Mein Bereich",
-    Component: MeinBereichPage,
-    section: "konto",
     requiresAuth: true,
   },
   {
