@@ -39,6 +39,8 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
             <NavLink
               key={item.path}
               to={item.path}
+              // `/` (Start) nur bei exaktem Match aktiv, sonst leuchtet es auf jeder Route.
+              end={item.path === "/"}
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(

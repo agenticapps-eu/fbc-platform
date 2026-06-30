@@ -5,6 +5,7 @@ import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
 import ChatPage from "../pages/ChatPage";
 import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
+import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
 import LibraryPage from "../pages/LibraryPage";
 import MatchingPage from "../pages/MatchingPage";
@@ -42,6 +43,10 @@ export interface NavItem {
  * Matching → Projekte.
  */
 export const navItems: NavItem[] = [
+  // Start: öffentliche Landingpage ÜBER den Formaten, für alle sichtbar (auch anon).
+  // HomeRedirect rendert die HomePage und fängt nur den Onboarding-Gate-Fall ab
+  // (frisch eingeloggt, Mini-Compass offen → /onboarding).
+  { path: "/", label: "Start", Component: HomeRedirect, section: "formate" },
   { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
   { path: "/library", label: "Library", Component: LibraryPage, section: "formate" },
   { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },

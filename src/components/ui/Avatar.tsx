@@ -20,9 +20,11 @@ export interface AvatarProps {
   src?: string | null;
   size?: AvatarSize;
   className?: string;
+  /** Verbirgt Identität (Bild und Initialen) hinter einem generischen Personen-Icon. */
+  masked?: boolean;
 }
 
-export function Avatar({ name, src, size = "md", className }: AvatarProps) {
+export function Avatar({ name, src, size = "md", className, masked }: AvatarProps) {
   return (
     <span
       className={cn(
@@ -31,7 +33,12 @@ export function Avatar({ name, src, size = "md", className }: AvatarProps) {
         className,
       )}
     >
-      {src ? (
+      {masked ? (
+        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 text-gold-strong/60" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.2" fill="currentColor" />
+          <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" fill="currentColor" />
+        </svg>
+      ) : src ? (
         <img src={src} alt={name} loading="lazy" className="h-full w-full object-cover" />
       ) : (
         initials(name)

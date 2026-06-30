@@ -1,0 +1,220 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
+import { Avatar } from "../components/ui/Avatar";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { TierBadge } from "../components/ui/TierBadge";
+import { displayAuthor } from "../lib/displayAuthor";
+import {
+  eventsListKey,
+  fetchEvents,
+  formatEventDate,
+  partitionEvents,
+  type EventListItem,
+} from "../lib/events";
+import { fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
+import { useAuth } from "../providers/auth-context";
+
+/**
+ * Öffentliche Startseite (`/`) — eine kuratierte Übersicht ÜBER den Community-
+ * Formaten, für alle (auch ausgeloggte) Besucher sichtbar. Sie ist NICHT die
+ * Community selbst: kommende Events, neue öffentliche Beiträge (anonymisiert für
+ * Gäste), Testimonials, KPIs und CTAs. Tiefe Feeds bleiben in /community.
+ *
+ * Datenschicht: beides RLS-gegated und für anon nutzbar — `fetchEvents` liefert nur
+ * sichtbare Events, `fetchFeed` für anon NUR `visibility = 'public'` (posts_select_by_
+ * visibility). Daher kein eigenes „Public-Only"-Fetching nötig; Identität der Autoren
+ * wird rein für die Anzeige über `displayAuthor` maskiert (Gäste sehen „Ein Mitglied").
+ */
+export default function HomePage() {
+  const { user } = useAuth();
+  const uid = user?.id ?? null;
+  const navigate = useNavigate();
+
+  const eventsQuery = useQuery({
+    queryKey: eventsListKey(uid),
+    queryFn: () => fetchEvents(uid),
+  });
+  const feedQuery = useQuery({
+    queryKey: feedQueryKey(uid, null),
+    queryFn: () => fetchFeed({ uid }),
+  });
+
+  const upcoming = eventsQuery.data
+    ? partitionEvents(eventsQuery.data, new Date()).upcoming.slice(0, 4)
+    : [];
+  const posts = (feedQuery.data ?? []).slice(0, 3);
+
+  return (
+    <div className="space-y-12">
+      <section className="rounded-[var(--radius-card)] border border-gold/40 bg-gold-soft/20 px-6 py-10 sm:px-10 sm:py-14">
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+          Willkommen im Fair Business Club
+        </h1>
+        <p className="mt-4 max-w-2xl text-base text-muted">
+          Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: lerne andere Mitglieder
+          kennen, entdecke Events und finde die richtigen Verbindungen.
+        </p>
+        {!user && (
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button variant="primary" onClick={() => navigate("/compass")}>
+              Kompass kostenlos starten
+            </Button>
+            <Button variant="ghost" onClick={() => navigate("/login")}>
+              Mitglied werden
+            </Button>
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Kpi value="120+" label="Mitglieder" />
+        <Kpi value="24" label="Events 2026" />
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader title="Neue Events" to="/events" linkLabel="Alle Events" />
+        {eventsQuery.isLoading ? (
+          <p className="text-sm text-muted">Events werden geladen…</p>
+        ) : upcoming.length === 0 ? (
+          <p className="text-sm text-muted">Aktuell sind keine Events geplant.</p>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {upcoming.map((event) => (
+              <li key={event.id}>
+                <EventPreview event={event} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          title="Neue öffentliche Beiträge"
+          to="/community"
+          linkLabel="Zur Community"
+        />
+        {feedQuery.isLoading ? (
+          <p className="text-sm text-muted">Beiträge werden geladen…</p>
+        ) : posts.length === 0 ? (
+          <p className="text-sm text-muted">Noch keine öffentlichen Beiträge.</p>
+        ) : (
+          <ul className="space-y-4">
+            {posts.map((post) => (
+              <li key={post.id}>
+                <PostPreview post={post} isLoggedIn={!!user} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
+          Stimmen aus dem Club
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Testimonial
+            quote="Im Club habe ich Partner gefunden, die meine Werte teilen — nicht nur Kontakte, sondern echte Zusammenarbeit."
+            author="Ein Legacy-Mitglied"
+          />
+          <Testimonial
+            quote="Die Events sind kein Networking-Theater. Man kommt mit konkreten nächsten Schritten nach Hause."
+            author="Ein Prime-Mitglied"
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Kpi({ value, label }: { value: string; label: string }) {
+  return (
+    <Card className="text-center">
+      <p className="font-display text-4xl font-semibold text-gold-strong">{value}</p>
+      <p className="mt-1 text-sm text-muted">{label}</p>
+    </Card>
+  );
+}
+
+function SectionHeader({ title, to, linkLabel }: { title: string; to: string; linkLabel: string }) {
+  return (
+    <div className="flex items-end justify-between gap-3">
+      <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
+      <Link to={to} className="text-sm font-medium text-gold-strong hover:underline">
+        {linkLabel} →
+      </Link>
+    </div>
+  );
+}
+
+function EventPreview({ event }: { event: EventListItem }) {
+  return (
+    <Link
+      to={`/events/${event.id}`}
+      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
+    >
+      <Card className="space-y-2 transition-colors hover:border-gold/50">
+        <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
+        <p className="text-sm text-muted">
+          {formatEventDate(event.startsAt)}
+          {event.location && <> · {event.location}</>}
+        </p>
+      </Card>
+    </Link>
+  );
+}
+
+function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: boolean }) {
+  const author = displayAuthor(post.author, isLoggedIn);
+  return (
+    <Card className="space-y-3">
+      <header className="flex items-center gap-3">
+        {author.masked ? (
+          <Avatar
+            name={author.name}
+            src={author.avatarUrl}
+            masked
+            size="sm"
+            className="ring-1 ring-gold/40"
+          />
+        ) : (
+          <Link to={`/p/${post.author.id}`} className="shrink-0">
+            <Avatar
+              name={author.name}
+              src={author.avatarUrl}
+              size="sm"
+              className="ring-1 ring-gold/40"
+            />
+          </Link>
+        )}
+        <div className="flex flex-wrap items-center gap-x-2">
+          {author.masked ? (
+            <span className="font-display text-sm font-semibold text-ink">{author.name}</span>
+          ) : (
+            <>
+              <Link
+                to={`/p/${post.author.id}`}
+                className="font-display text-sm font-semibold text-ink hover:text-gold-strong"
+              >
+                {author.name}
+              </Link>
+              {post.author.tier && <TierBadge tier={post.author.tier} />}
+            </>
+          )}
+        </div>
+      </header>
+      <p className="line-clamp-3 text-sm text-ink/90">{post.body}</p>
+    </Card>
+  );
+}
+
+function Testimonial({ quote, author }: { quote: string; author: string }) {
+  return (
+    <Card className="space-y-3">
+      <p className="text-sm italic text-ink/90">„{quote}"</p>
+      <p className="text-xs font-medium text-muted">— {author}</p>
+    </Card>
+  );
+}

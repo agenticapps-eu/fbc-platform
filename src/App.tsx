@@ -3,7 +3,6 @@ import { Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignSwitcher } from "./components/DesignSwitcher";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
-import HomeRedirect from "./components/HomeRedirect";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import RequireTier from "./components/RequireTier";
@@ -30,8 +29,8 @@ export default function App() {
     <DesignVariantProvider>
       <Routes>
         <Route element={<AppShell />}>
-          {/* Startseite: leitet neue Nutzer ins Onboarding, sonst in die Community. */}
-          <Route index element={<HomeRedirect />} />
+          {/* Startseite (`/`) kommt aus navItems (Eintrag „Start" → HomeRedirect, das die
+            öffentliche HomePage rendert und nur den Onboarding-Gate-Fall abfängt). */}
           {navItems.map((item) => (
             <Route key={item.path} path={item.path} element={gatedElement(item)} />
           ))}

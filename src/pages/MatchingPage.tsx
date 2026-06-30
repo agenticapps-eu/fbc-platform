@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
+import { FormatHero } from "../components/ui/FormatHero";
+import { FORMAT_HERO } from "../config/formatHero";
 import { CountUp, Stagger, StaggerItem } from "../components/ui/Motion";
 import { useDesignVariantValue } from "../providers/design-variant-context";
 import { Avatar } from "../components/ui/Avatar";
@@ -112,6 +114,8 @@ function MatchingHub({ uid }: { uid: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <FormatHero meta={FORMAT_HERO["/matching"]} />
+
       <HubHeader
         stats={data?.stats}
         onRecompute={() => recompute.mutate()}
@@ -174,10 +178,12 @@ function HubHeader({
     <header className="fbc-hero-shimmer overflow-hidden rounded-[var(--radius-card)] border border-gold/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-gold-soft))] shadow-soft">
       <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-8">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Matching</h1>
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
+            Deine Chancen-Datenbank
+          </h2>
           <p className="mt-2 max-w-2xl text-sm text-ink/70">
-            Deine Chancen-Datenbank: komplementäre Partner mit Score und Begründung. Such- &amp;
-            Bieteprofile stehen im Vordergrund — nicht der Name.
+            Komplementäre Partner mit Score und Begründung. Such- &amp; Bieteprofile stehen im
+            Vordergrund — nicht der Name.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={onRecompute} disabled={recomputing}>

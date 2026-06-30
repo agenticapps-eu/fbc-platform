@@ -80,8 +80,8 @@ Ersetze die bisherigen `--color-emerald*`-Tokens. Smaragd ist **nicht** mehr Pri
 
 ## 4. Kern-Komponenten (Anpassungen)
 
-- **Sidebar (`AppShell`/`SidebarNav`):** seit dem Refresh ein **heller Champagner→Gold-Verlauf** (`SIDEBAR_SURFACE` in `AppShell` — eine Tuning-Stelle), dunkler Text (`--color-ink`) für Lesbarkeit, aktive Route = **`--color-gold-strong` + Gold-Linksbalken** auf dezenter dunkler Pille. Logo-Wortmarke `tone="light"`. (Der frühere near-black `--color-night`-Hintergrund war Detlev zu dunkel, AGE-237.)
-- **Header/Topbar:** dunkel oder weiß mit feiner `--color-line`-Unterkante; globale Suche mittig (wie Mockup), rechts Nachrichten/Benachrichtigungen + Avatar mit Tier-Label in Gold.
+- **Sidebar (`AppShell`/`SidebarNav`):** seit dem Refresh ein **heller Champagner→Gold-Verlauf** (`SIDEBAR_SURFACE` in `AppShell` — eine Tuning-Stelle), dunkler Text (`--color-ink`) für Lesbarkeit, aktive Route = **`--color-gold-strong` + Gold-Linksbalken** auf dezenter dunkler Pille. Aufbau von oben nach unten (`SidebarContent`): **Identitäts-/Mitglieder-Block** (Avatar + Name + Tier-Badge, eingeloggt; ausgeloggt ein ruhiger „Anmelden"-Hinweis) → **flaches Hauptmenü** (`SidebarNav`, keine Sektions-Labels mehr) → **„Mein Bereich"-Akkordeon** unten (nur eingeloggt). Die Wortmarke sitzt nicht mehr in der Sidebar, sondern im Header. (Der frühere near-black `--color-night`-Hintergrund war Detlev zu dunkel, AGE-237.)
+- **Header/Topbar:** dunkel oder weiß mit feiner `--color-line`-Unterkante; **links die Kronen-Wortmarke (`Logo lockup="full"`, immer sichtbar, Link auf `/`)**, globale Suche mittig (wie Mockup), rechts Nachrichten/Benachrichtigungen + Avatar mit Tier-Label in Gold.
 - **Cards:** `--color-canvas`, 1px `--color-line`, `--radius-card`, `--shadow-soft`. Überschrift klein/gemutet in Versalien, „Alle anzeigen" rechts in Gold.
 - **Buttons:** primär = **Gold-Fläche + near-black Text** (`bg-gold text-night`); sekundär = **near-black Fläche + heller Text**; ghost = Gold-Outline. (Wie Website: „Jetzt Mitglied werden" gold, „Mehr über uns" dunkel.)
 - **Tier-Badge:** Gold-Outline-Pill mit Krone + Label (z. B. „LEGACY MEMBER"). Stufenfarbe nur über Gold/Anthrazit, kein Bunt.
@@ -94,10 +94,11 @@ Aktualisiere `/styleguide` entsprechend (alle Tokens + Komponenten in Schwarz & 
 
 ## 5. Navigation — verbindliche Reihenfolge ⚠️
 
-Detlevs Vorgabe: Die **7 Formate bauen aufeinander auf** (linke Spalte der Mitglieder-Matrix) und **diese Reihenfolge ist die Sidebar-Reihenfolge**:
+Detlevs Vorgabe: Die **7 Formate bauen aufeinander auf** (linke Spalte der Mitglieder-Matrix) und **diese Reihenfolge ist die Sidebar-Reihenfolge**. Über den Formaten steht als **erster Eintrag „Start"** (`/`, öffentliche HomePage, auch anonym sichtbar):
 
-| # | Format | Route | Hinweis |
+| # | Eintrag | Route | Hinweis |
 |---|---|---|---|
+| 0 | **Start** | `/` | Öffentliche Landingpage, ÜBER den Formaten, für alle sichtbar |
 | 1 | **Compass** | `/compass` | Orientierung, Analyse, Empfehlungen |
 | 2 | **Library** | `/library` | Wissen, Ressourcen, Vorlagen |
 | 3 | **Academy** | `/academy` | Kurse, Videos, Workshops |
@@ -106,13 +107,13 @@ Detlevs Vorgabe: Die **7 Formate bauen aufeinander auf** (linke Spalte der Mitgl
 | 6 | **Matching** | `/matching` | Such-/Bieteprofile, Matches (ab Prime) |
 | 7 | **Projekte** | `/projekte` | Kooperationen, Initiativen |
 
-`src/config/nav.ts` entsprechend umbauen:
-- Reihenfolge exakt wie oben (Compass zuerst, Projekte zuletzt).
+`src/config/nav.ts` entsprechend:
+- **Start** (`/`) als erster Eintrag über den Formaten; danach die Reihenfolge exakt wie oben (Compass zuerst, Projekte zuletzt).
 - `Feed` → wird Teil von **Community** (`/community`); das **Verzeichnis** wird ein Tab/Unterbereich von Community mit `minTier: "prime"` (kein eigener Top-Level-Eintrag mehr).
 - **Library** als neue Route/Seite (Platzhalter, Inhalt folgt Phase 2) ergänzen.
-- `konto`-Sektion: **Mein Bereich** (`/mein-bereich`, persönliches Dashboard) und **Profil** (`/profil`).
+- `konto`-Routen (**Mein Bereich** `/mein-bereich`, **Profil** `/profil`) erscheinen nicht mehr als eigene Sektion in der Sidebar, sondern werden über das Mein-Bereich-Akkordeon bzw. den Identitäts-Block (Profil) erreicht.
 
-Die persönliche **„Mein Bereich"-Subnavigation** (eigene Sidebar im Dashboard) ist in `docs/profile-spec.md` definiert — sie ist NICHT die globale Formate-Sidebar.
+**Sidebar als flache Liste:** Die Sektions-Labels „Formate" und „Konto" sind entfernt — die Sidebar zeigt nur die `formate`-Items als einzelne, flache Liste (`MENU` in `AppShell`). Die persönliche **„Mein Bereich"-Subnavigation** (siehe `docs/profile-spec.md`) ist ein **stabiles Inline-Akkordeon** (`MeinBereichAccordion`) am unteren Ende derselben Sidebar (nur eingeloggt) — kein Menü-Tausch, keine zweite Sidebar. Sie klappt die persönlichen Unterpunkte auf (Mein Profil, Meine Events → Gebuchte/Eingestellte, Meine Kontakte, Meine Investitionen, Einstellungen).
 
 ---
 
@@ -152,10 +153,14 @@ Prototyp testet weiterhin **Discover / Prime / Legacy**. UI-Regel: gesperrte Ber
   **Sidebar als heller Champagner→Gold-Verlauf** (`SIDEBAR_SURFACE`) mit dunklem Text —
   Detlev war das near-black Anthrazit noch zu dunkel. Kein Vollschwarz im Content
   (Hero/Impact als Verlauf bzw. helle Karte). Gold-Akzent unverändert, kein Pink.
-- **Nav-Reihenfolge (aktualisiert):** Compass, Library, Academy, **Events, Community**,
-  Matching, Projekte (Events vor Community — neue Detlev-Vorgabe, §5).
-- **Eine Sidebar:** „Mein Bereich" ersetzt den Sidebar-Inhalt IN PLACE durch die Subnav
-  (profile-spec §4) mit `← Hauptmenü`; keine zweite Sidebar/Spalte mehr.
+- **Nav-Reihenfolge (aktualisiert):** **Start**, dann Compass, Library, Academy,
+  **Events, Community**, Matching, Projekte (Start zuerst über den Formaten; Events vor
+  Community — Detlev-Vorgabe, §5).
+- **Eine Sidebar (Folge-Iteration AGE-237):** Identitäts-/Mitglieder-Block oben, flaches
+  Hauptmenü ohne Sektions-Labels, „Mein Bereich" als **stabiles Inline-Akkordeon** unten
+  (nur eingeloggt). Der frühere Menü-Tausch („Mein Bereich" ersetzte den Sidebar-Inhalt
+  IN PLACE inkl. `← Hauptmenü`) wurde zurückgerollt — er war verwirrend. Keine zweite
+  Sidebar/Spalte.
 - **Profil-Hero:** Cover-Banner (Default Gold/Anthrazit-Verlauf) + überlappendes großes
   rundes Bild, Name/Rollen/Region/Tier — auf öffentlichem Profil und im Dashboard-Kopf.
 - **Wahrnehmbare Performance:** Skeleton-Loader (mit `role="status"`/sr-only) statt

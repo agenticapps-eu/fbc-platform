@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
+import { FormatHero } from "../components/ui/FormatHero";
+import { FORMAT_HERO } from "../config/formatHero";
 import { compassStatusQueryKey, fetchCompassStatus, loadDraft } from "../lib/compass";
 import { useAuth } from "../providers/auth-context";
 
@@ -28,10 +30,7 @@ export default function CompassPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Compass</h1>
-        <p className="mt-1 text-sm text-muted">Dein Weg. Deine Richtung.</p>
-      </header>
+      <FormatHero meta={FORMAT_HERO["/compass"]} />
 
       <Card className="flex flex-col gap-4">
         <div>

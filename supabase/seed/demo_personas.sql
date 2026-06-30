@@ -56,7 +56,8 @@ update public.profiles p set
   region = v.region, company = v.company, branche = v.branche, short_bio = v.short_bio,
   competencies = v.competencies, interests = v.interests, member_number = v.member_number,
   member_since = v.member_since, dev_focus = v.dev_focus, dev_progress = v.dev_progress,
-  profile_completion = v.profile_completion, is_public = true
+  profile_completion = v.profile_completion, is_public = true,
+  avatar_url = 'https://i.pravatar.cc/300?u=' || v.id::text
 from (values
   -- existing accounts, renamed/enriched (ids + emails preserved)
   ('5e195a30-99af-4fbb-ae5f-1f4eff3209c7'::uuid,'Eleonora Voss','legacy','Beteiligungskapital · Family Office · Deal Keeperin','{Investorin,"Deal Keeperin",Mentorin}'::text[],'Stuttgart','Voss Capital Partners','Beteiligungen & Immobilien','DEMO-Profil — fiktive Daten. Beteiligungsgesellschaft mit Fokus auf Wachstums- und Nachfolgesituationen im DACH-Raum.','{"M&A","Beteiligungskapital","Immobilienentwicklung","Private Equity"}'::text[],'{"Impact Investing","Family Office","Unternehmensnachfolge"}'::text[],'FBC-10001','2017-05-01'::date,'wirken',80,100),

@@ -54,12 +54,15 @@ describe("Staff-Gating für /intern/routing", () => {
 
   it("leitet eingeloggte Mitglieder OHNE Staff-Rolle weg (auch Prime)", () => {
     // „/" ist onboarding-bewusst (HomeRedirect); der „übersprungen"-Merker löst die
-    // Weiche deterministisch auf /community auf, sodass der Test das Gating prüft.
+    // Weiche deterministisch auf die öffentliche Startseite auf, sodass der Test das
+    // Gating prüft.
     markSkipped("test-user");
     renderAt("/intern/routing", authAsTier("prime"));
 
     expect(screen.queryByRole("heading", { name: "Routing-Queue" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Community" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
+    ).toBeInTheDocument();
   });
 
   it("lässt Staff (matching_manager) die Routing-Queue sehen", () => {

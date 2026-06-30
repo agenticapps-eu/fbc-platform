@@ -6,17 +6,14 @@ import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { Logo } from "./ui/Logo";
-import { MeinBereichSubnav } from "./ui/MeinBereichSubnav";
+import { MeinBereichAccordion } from "./ui/MeinBereichAccordion";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { VariantBackdrop } from "./ui/VariantBackdrop";
 import { useDesignVariantValue } from "../providers/design-variant-context";
 
-const SECTIONS: SidebarNavSection[] = [
-  { title: "Formate", items: navItems.filter((i) => i.section === "formate") },
-  { title: "Konto", items: navItems.filter((i) => i.section === "konto") },
-];
+const MENU: SidebarNavSection[] = [{ items: navItems.filter((i) => i.section === "formate") }];
 
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
@@ -172,28 +169,39 @@ function UserMenu({
 }
 
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
- *  Schaltet zwischen den 7 Formaten und der „Mein Bereich"-Subnav um (eine Sidebar). */
-function SidebarContent({
-  inMeinBereich,
-  onNavigate,
-}: {
-  inMeinBereich: boolean;
-  onNavigate?: () => void;
-}) {
+ *  Mitglieder-Block oben, flaches Hauptmenü, „Mein Bereich"-Akkordeon unten. */
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { user, tier } = useAuth();
   return (
-    <div className="flex flex-col">
-      <Link
-        to="/community"
-        onClick={onNavigate}
-        className="mb-8 inline-flex rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-      >
-        <Logo />
-      </Link>
-      {inMeinBereich ? (
-        <MeinBereichSubnav onNavigate={onNavigate} />
+    <div className="flex flex-col gap-7">
+      {user ? (
+        <Link
+          to="/profil"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-[var(--radius-card)] border border-gold/20 bg-canvas/50 px-3 py-2.5 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+        >
+          <Avatar name={user.email ?? "?"} size="md" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{user.email}</span>
+            {tier && (
+              <span className="mt-0.5 inline-block">
+                <TierBadge tier={tier} />
+              </span>
+            )}
+          </span>
+        </Link>
       ) : (
-        <SidebarNav sections={SECTIONS} onNavigate={onNavigate} />
+        <Link
+          to="/login"
+          onClick={onNavigate}
+          className="rounded-[var(--radius-card)] border border-gold/20 bg-canvas/50 px-3 py-2.5 text-sm text-ink/70 transition-colors hover:bg-canvas"
+        >
+          <span className="font-semibold text-ink">Anmelden</span>
+          <span className="mt-0.5 block text-xs text-muted">Mitglied werden &amp; alles sehen</span>
+        </Link>
       )}
+      <SidebarNav sections={MENU} onNavigate={onNavigate} />
+      {user && <MeinBereichAccordion onNavigate={onNavigate} />}
     </div>
   );
 }
@@ -205,7 +213,6 @@ export default function AppShell() {
   const { meta } = useDesignVariantValue();
   const hasBackdrop = (meta.backdrop ?? "none") !== "none";
   const isWide = WIDE_ROUTES.some((r) => pathname.startsWith(r));
-  const inMeinBereich = pathname.startsWith("/mein-bereich");
 
   // Off-Canvas-Sidebar (< lg). Schließt über Backdrop, `onNavigate` an jedem Link
   // und Escape. (setState im Event-Callback, nicht im Effect-Body.)
@@ -247,10 +254,10 @@ export default function AppShell() {
             <MenuIcon />
           </button>
           <Link
-            to="/community"
-            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
+            to="/"
+            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            <Logo lockup="mark" />
+            <Logo lockup="full" className="h-7 w-auto" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
@@ -290,14 +297,14 @@ export default function AppShell() {
 
       {/* Zentrierter Shell: Sidebar an die linke Kante des Containers angedockt,
           Content schmal & zentriert (LinkedIn/Facebook-Anmutung). */}
-      <div className="mx-auto flex max-w-[1180px] gap-8 px-4 py-8 sm:px-6">
+      <div className="mx-auto flex max-w-[1180px] gap-4 px-4 py-8 sm:px-6">
         <aside
           className={cn(
             "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-gold/25 px-4 py-6 shadow-soft lg:block",
             SIDEBAR_SURFACE,
           )}
         >
-          <SidebarContent inMeinBereich={inMeinBereich} />
+          <SidebarContent />
         </aside>
 
         <main className="min-w-0 flex-1">
@@ -330,10 +337,7 @@ export default function AppShell() {
               SIDEBAR_SURFACE,
             )}
           >
-            <SidebarContent
-              inMeinBereich={inMeinBereich}
-              onNavigate={() => setMobileNavOpen(false)}
-            />
+            <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
           </div>
         </div>
       )}

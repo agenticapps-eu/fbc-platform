@@ -1,6 +1,8 @@
 import CommunityFeed from "../components/community/CommunityFeed";
 import MemberDirectory from "../components/community/MemberDirectory";
+import { FormatHero } from "../components/ui/FormatHero";
 import { Tabs } from "../components/ui/Tabs";
+import { FORMAT_HERO } from "../config/formatHero";
 import { useTier } from "../hooks/useTier";
 import { TIER_RANK } from "../lib/tiers";
 
@@ -16,12 +18,7 @@ export default function CommunityPage() {
 
   return (
     <section className="space-y-8">
-      <header>
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink">Community</h1>
-        <p className="mt-2 text-sm text-muted">
-          Aktivitäten, Beiträge und das Mitgliederverzeichnis.
-        </p>
-      </header>
+      <FormatHero meta={FORMAT_HERO["/community"]} />
 
       {canSeeDirectory ? (
         <Tabs
