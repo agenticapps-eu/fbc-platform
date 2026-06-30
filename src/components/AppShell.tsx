@@ -8,12 +8,10 @@ import { Button } from "./ui/Button";
 import { Logo } from "./ui/Logo";
 import { MeinBereichAccordion } from "./ui/MeinBereichAccordion";
 import { RouteTransition } from "./ui/Motion";
-import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
+import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { VariantBackdrop } from "./ui/VariantBackdrop";
 import { useDesignVariantValue } from "../providers/design-variant-context";
-
-const MENU: SidebarNavSection[] = [{ items: navItems.filter((i) => i.section === "formate") }];
 
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
@@ -172,6 +170,10 @@ function UserMenu({
  *  Mitglieder-Block oben, flaches Hauptmenü, „Mein Bereich"-Akkordeon unten. */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { user, tier } = useAuth();
+  // Anon sieht nur die öffentlichen Formate (Start/Events/Community), in
+  // Formate-Reihenfolge; eingeloggte Mitglieder sehen alle.
+  const formats = navItems.filter((i) => i.section === "formate");
+  const visible = user ? formats : formats.filter((i) => i.publicAccess);
   return (
     <div className="flex flex-col gap-7">
       {user ? (
@@ -200,7 +202,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <span className="mt-0.5 block text-xs text-muted">Mitglied werden &amp; alles sehen</span>
         </Link>
       )}
-      <SidebarNav sections={MENU} onNavigate={onNavigate} />
+      <SidebarNav sections={[{ items: visible }]} onNavigate={onNavigate} />
       {user && <MeinBereichAccordion onNavigate={onNavigate} />}
     </div>
   );

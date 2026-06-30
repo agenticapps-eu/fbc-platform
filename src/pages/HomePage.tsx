@@ -57,7 +57,7 @@ export default function HomePage() {
         </p>
         {!user && (
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button variant="primary" onClick={() => navigate("/compass")}>
+            <Button variant="primary" onClick={() => navigate("/login")}>
               Kompass kostenlos starten
             </Button>
             <Button variant="ghost" onClick={() => navigate("/login")}>

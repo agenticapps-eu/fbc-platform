@@ -33,6 +33,8 @@ export interface NavItem {
   minTier?: MembershipTier;
   /** Route nur für eingeloggte Nutzer (ohne Stufen-Anforderung). */
   requiresAuth?: boolean;
+  /** Für anonyme Besucher sichtbar/erreichbar (öffentliches Schaufenster). */
+  publicAccess?: boolean;
 }
 
 /**
@@ -46,12 +48,42 @@ export const navItems: NavItem[] = [
   // Start: öffentliche Landingpage ÜBER den Formaten, für alle sichtbar (auch anon).
   // HomeRedirect rendert die HomePage und fängt nur den Onboarding-Gate-Fall ab
   // (frisch eingeloggt, Mini-Compass offen → /onboarding).
-  { path: "/", label: "Start", Component: HomeRedirect, section: "formate" },
-  { path: "/compass", label: "Compass", Component: CompassPage, section: "formate" },
-  { path: "/library", label: "Library", Component: LibraryPage, section: "formate" },
-  { path: "/academy", label: "Academy", Component: AcademyPage, section: "formate" },
-  { path: "/events", label: "Events", Component: EventsPage, section: "formate" },
-  { path: "/community", label: "Community", Component: CommunityPage, section: "formate" },
+  { path: "/", label: "Start", Component: HomeRedirect, section: "formate", publicAccess: true },
+  {
+    path: "/compass",
+    label: "Compass",
+    Component: CompassPage,
+    section: "formate",
+    requiresAuth: true,
+  },
+  {
+    path: "/library",
+    label: "Library",
+    Component: LibraryPage,
+    section: "formate",
+    requiresAuth: true,
+  },
+  {
+    path: "/academy",
+    label: "Academy",
+    Component: AcademyPage,
+    section: "formate",
+    requiresAuth: true,
+  },
+  {
+    path: "/events",
+    label: "Events",
+    Component: EventsPage,
+    section: "formate",
+    publicAccess: true,
+  },
+  {
+    path: "/community",
+    label: "Community",
+    Component: CommunityPage,
+    section: "formate",
+    publicAccess: true,
+  },
   {
     path: "/matching",
     label: "Matching",
@@ -59,7 +91,13 @@ export const navItems: NavItem[] = [
     section: "formate",
     minTier: "prime",
   },
-  { path: "/projekte", label: "Projekte", Component: ProjektePage, section: "formate" },
+  {
+    path: "/projekte",
+    label: "Projekte",
+    Component: ProjektePage,
+    section: "formate",
+    requiresAuth: true,
+  },
   // Verzeichnis: Unterbereich von Community (ab Prime), kein Top-Level-Eintrag.
   {
     path: "/verzeichnis",

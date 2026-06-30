@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignSwitcher } from "./components/DesignSwitcher";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
+import MembershipGate from "./components/MembershipGate";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import RequireTier from "./components/RequireTier";
@@ -17,10 +18,17 @@ import PublicProfilePage from "./pages/PublicProfilePage";
 // Dev-only: aus dem Prod-Build heraustree-shaken (DEV ist statisch false).
 const StyleguidePage = import.meta.env.DEV ? lazy(() => import("./pages/StyleguidePage")) : null;
 
-function gatedElement({ Component, minTier, requiresAuth }: NavItem) {
-  const element = <Component />;
-  if (minTier) return <RequireTier min={minTier}>{element}</RequireTier>;
-  if (requiresAuth) return <RequireAuth>{element}</RequireAuth>;
+function gatedElement(item: NavItem) {
+  const element = <item.Component />;
+  // Formate werden NICHT weggeleitet, sondern zeigen für anon/zu niedrige Stufe
+  // eine „Mitglied werden"-Wand (öffentliches Schaufenster bleibt sichtbar).
+  if (item.section === "formate") {
+    if (item.minTier) return <MembershipGate min={item.minTier}>{element}</MembershipGate>;
+    if (item.requiresAuth) return <MembershipGate>{element}</MembershipGate>;
+    return element; // öffentliche Formate (Start/Community/Events)
+  }
+  if (item.minTier) return <RequireTier min={item.minTier}>{element}</RequireTier>;
+  if (item.requiresAuth) return <RequireAuth>{element}</RequireAuth>;
   return element;
 }
 
