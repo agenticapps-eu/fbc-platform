@@ -6,8 +6,8 @@ import App from "./App";
 import { AuthFixture, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
-  it("zeigt die Shell-Navigation und leitet / auf die Community-Startseite", () => {
-    // Die Community-Startseite mountet jetzt den Feed (TanStack Query) → Provider nötig.
+  it("zeigt die Shell-Navigation und rendert auf / die öffentliche Startseite", () => {
+    // Die Startseite lädt Events/Feed (TanStack Query) → Provider nötig.
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <AuthFixture value={fakeAuthValue()}>
@@ -22,7 +22,10 @@ describe("App", () => {
     // Logo erscheint in Sidebar (Desktop) und Header (Mobil) — beide im DOM.
     expect(screen.getAllByRole("link", { name: "Fair Business Club" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Matching" })).toBeInTheDocument();
-    // Index-Redirect / → /community.
-    expect(screen.getByRole("heading", { name: "Community" })).toBeInTheDocument();
+    // „Start" ist der erste Sidebar-Eintrag; / rendert die öffentliche Startseite.
+    expect(screen.getByRole("link", { name: "Start" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
+    ).toBeInTheDocument();
   });
 });

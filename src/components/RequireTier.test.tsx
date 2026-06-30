@@ -39,16 +39,18 @@ function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"
 }
 
 describe("Stufen-Gating für /verzeichnis (min Prime)", () => {
-  it("leitet Discover vom Verzeichnis weg auf die Community-Startseite", () => {
+  it("leitet Discover vom Verzeichnis weg auf die Startseite", () => {
     // „/" ist seit AGE-243 onboarding-bewusst (HomeRedirect). Der „übersprungen"-
-    // Merker lässt die Weiche synchron+deterministisch auf /community auflösen,
-    // sodass dieser Test das Stufen-Gating prüft, nicht das Onboarding.
+    // Merker lässt die Weiche synchron+deterministisch auf die öffentliche Startseite
+    // auflösen, sodass dieser Test das Stufen-Gating prüft, nicht das Onboarding.
     markSkipped("test-user");
     renderAt("/verzeichnis", authAsTier("discover"));
 
-    // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen Community (Redirect / → /community).
+    // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen die Startseite (Redirect / ).
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Community" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
+    ).toBeInTheDocument();
   });
 
   it("lässt Prime das Verzeichnis sehen", () => {
