@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
 import { ProfileHero } from "../components/profile/ProfileHero";
@@ -32,6 +32,19 @@ import { categoryLabel, findCategory, type MatchingSide } from "../config/matchi
 import { isPastEvent } from "../lib/events";
 import { GOAL_CATEGORIES } from "../lib/profile";
 import { useAuth } from "../providers/auth-context";
+import {
+  CardLink,
+  CheckIcon,
+  CrownIcon,
+  DashboardCard,
+  dateFmt,
+  DemoBadge,
+  EmptyHint,
+  formatDate,
+  monthFmt,
+  ProgressBar,
+  StatTile,
+} from "../components/mein-bereich/building-blocks";
 
 // Recharts nur für diese Route laden — hält die schwere Lib aus dem Haupt-Bundle.
 const ErfolgsradarChart = lazy(() =>
@@ -110,19 +123,6 @@ const DEMO_POSTS = [
   },
 ];
 
-const dateFmt = new Intl.DateTimeFormat("de-DE", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-const monthFmt = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" });
-
-function formatDate(value: string | null, fmt: Intl.DateTimeFormat): string {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : fmt.format(d);
-}
-
 export default function MeinBereichPage() {
   const { user } = useAuth();
   // /mein-bereich ist requiresAuth — user ist hier vorhanden; defensiver Fallback.
@@ -172,90 +172,6 @@ function Dashboard({ uid }: { uid: string }) {
   );
 }
 
-// ── Bausteine ─────────────────────────────────────────────────────────────────
-function DemoBadge() {
-  return (
-    <span
-      className="inline-flex items-center rounded-full bg-gold-soft/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-gold-strong uppercase"
-      title="Demo-Daten — wird in Phase 2 mit echten Daten gefüllt."
-    >
-      Demo
-    </span>
-  );
-}
-
-function DashboardCard({
-  id,
-  title,
-  demo,
-  action,
-  className,
-  children,
-}: {
-  id?: string;
-  title: string;
-  demo?: boolean;
-  action?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card id={id} className={cn("flex scroll-mt-24 flex-col gap-4", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">{title}</CardTitle>
-          {demo && <DemoBadge />}
-        </div>
-        {action}
-      </div>
-      {children}
-    </Card>
-  );
-}
-
-function CardLink({ to, children }: { to: string; children: ReactNode }) {
-  return (
-    <Link to={to} className="text-xs font-medium text-gold-strong hover:text-gold">
-      {children}
-    </Link>
-  );
-}
-
-function ProgressBar({ value }: { value: number }) {
-  const pct = Math.max(0, Math.min(100, value));
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-      <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
-
-function EmptyHint({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted">{children}</p>;
-}
-
-function CrownIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M3 7l4 4 5-7 5 7 4-4-1.5 11h-15L3 7zm1.8 13h14.4v1.5H4.8V20z" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path
-        d="M20 6 9 17l-5-5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 // ── Header (CORE, §3) ─────────────────────────────────────────────────────────
 function DashboardHeader({ data }: { data: DashboardData }) {
   const p = data.profile;
@@ -291,31 +207,6 @@ function DashboardHeader({ data }: { data: DashboardData }) {
           <StatTile label="Events" value={data.eventsCount} />
         </div>
       </ProfileHero>
-    </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  trend,
-  demo,
-}: {
-  label: string;
-  value: number;
-  trend?: string;
-  demo?: boolean;
-}) {
-  return (
-    <div className="rounded-[var(--radius-card)] border border-line bg-soft px-4 py-3">
-      <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted uppercase">
-        {label}
-        {demo && <DemoBadge />}
-      </div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-display text-2xl font-semibold text-ink">{value}</span>
-        {trend && <span className="text-xs font-medium text-positive">↑ {trend}</span>}
-      </div>
     </div>
   );
 }
