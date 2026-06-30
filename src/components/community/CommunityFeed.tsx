@@ -13,6 +13,7 @@ import { TierBadge } from "../ui/TierBadge";
 import { VideoEmbed } from "../ui/VideoEmbed";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
+import { displayAuthor } from "../../lib/displayAuthor";
 import {
   addComment,
   buildMentionResolver,
@@ -263,6 +264,7 @@ function PostCard({
 
   const segments = useMemo(() => tokenizePostBody(post.body), [post.body]);
   const video = useMemo(() => extractFirstVideo(post.body), [post.body]);
+  const author = displayAuthor(post.author, currentUserId !== null);
 
   const like = useMutation({
     mutationFn: () =>
@@ -278,23 +280,39 @@ function PostCard({
   return (
     <Card className="space-y-4">
       <header className="flex items-start gap-3">
-        <Link to={`/p/${post.author.id}`} className="shrink-0">
+        {author.masked ? (
           <Avatar
-            name={post.author.name}
-            src={post.author.avatarUrl}
+            name={author.name}
+            src={author.avatarUrl}
+            masked={author.masked}
             size="md"
             className="ring-1 ring-gold/40"
           />
-        </Link>
+        ) : (
+          <Link to={`/p/${post.author.id}`} className="shrink-0">
+            <Avatar
+              name={author.name}
+              src={author.avatarUrl}
+              size="md"
+              className="ring-1 ring-gold/40"
+            />
+          </Link>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Link
-              to={`/p/${post.author.id}`}
-              className="font-display text-base font-semibold text-ink hover:text-gold-strong"
-            >
-              {post.author.name}
-            </Link>
-            {post.author.tier && <TierBadge tier={post.author.tier} />}
+            {author.masked ? (
+              <span className="font-display text-base font-semibold text-ink">{author.name}</span>
+            ) : (
+              <>
+                <Link
+                  to={`/p/${post.author.id}`}
+                  className="font-display text-base font-semibold text-ink hover:text-gold-strong"
+                >
+                  {author.name}
+                </Link>
+                {post.author.tier && <TierBadge tier={post.author.tier} />}
+              </>
+            )}
           </div>
           <p className="text-xs text-muted">{timeAgo(post.createdAt)}</p>
         </div>
@@ -463,25 +481,36 @@ function CommentThread({
       {comments.isError && (
         <p className="text-sm text-danger">Kommentare konnten nicht geladen werden.</p>
       )}
-      {comments.data?.map((c) => (
-        <div key={c.id} className="flex items-start gap-2.5">
-          <Link to={`/p/${c.author.id}`} className="shrink-0">
-            <Avatar name={c.author.name} src={c.author.avatarUrl} size="sm" />
-          </Link>
-          <div className="min-w-0 flex-1 rounded-[var(--radius-card)] bg-soft px-3 py-2">
-            <div className="flex items-baseline gap-2">
-              <Link
-                to={`/p/${c.author.id}`}
-                className="text-sm font-semibold text-ink hover:text-gold-strong"
-              >
-                {c.author.name}
+      {comments.data?.map((c) => {
+        const author = displayAuthor(c.author, currentUserId !== null);
+        return (
+          <div key={c.id} className="flex items-start gap-2.5">
+            {author.masked ? (
+              <Avatar name={author.name} src={author.avatarUrl} masked={author.masked} size="sm" />
+            ) : (
+              <Link to={`/p/${c.author.id}`} className="shrink-0">
+                <Avatar name={author.name} src={author.avatarUrl} size="sm" />
               </Link>
-              <span className="text-xs text-muted">{timeAgo(c.createdAt)}</span>
+            )}
+            <div className="min-w-0 flex-1 rounded-[var(--radius-card)] bg-soft px-3 py-2">
+              <div className="flex items-baseline gap-2">
+                {author.masked ? (
+                  <span className="text-sm font-semibold text-ink">{author.name}</span>
+                ) : (
+                  <Link
+                    to={`/p/${c.author.id}`}
+                    className="text-sm font-semibold text-ink hover:text-gold-strong"
+                  >
+                    {author.name}
+                  </Link>
+                )}
+                <span className="text-xs text-muted">{timeAgo(c.createdAt)}</span>
+              </div>
+              <p className="text-sm whitespace-pre-wrap text-ink">{c.body}</p>
             </div>
-            <p className="text-sm whitespace-pre-wrap text-ink">{c.body}</p>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {comments.data?.length === 0 && (
         <p className="text-sm text-muted">Noch keine Kommentare. Sei der/die Erste.</p>
