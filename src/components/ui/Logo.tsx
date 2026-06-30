@@ -17,9 +17,11 @@ const DARK_CHROME_VARIANTS = new Set(["b", "e", "f"]);
  *
  *  `tone="auto"` wählt anhand der aktiven Variante: auf dunklen Masthead-
  *  Varianten (B/E/F bzw. explizit `tone="dark"`) die SVG-Krone + helle
- *  Gold-Wortmarke; sonst das echte Lockup-PNG. Das PNG hat einen Creme-Verlauf-
- *  Hintergrund und grüne Wortmarke und ist deshalb nur auf hellen Flächen
- *  einsetzbar. */
+ *  Gold-Wortmarke; sonst das echte Lockup-PNG (offizielles FBC-Logo: Gold-Krone
+ *  + schwarze Wortmarke „FAIR BUSINESS CLUB" + Claim, auf weißem Grund). Das PNG
+ *  ist nur auf hellen Flächen einsetzbar — der weiße Grund wird via
+ *  mix-blend-multiply weggeblendet, die schwarze Wortmarke bliebe auf Dunkel
+ *  unsichtbar. (Ein transparentes/SVG-Asset für dunkle Flächen steht noch aus.) */
 export function Logo({
   lockup = "full",
   tone = "auto",
@@ -42,13 +44,14 @@ export function Logo({
 
   if (resolvedTone === "light") {
     return (
-      // mix-blend-multiply lässt den hellen (Creme-)PNG-Hintergrund in die helle
-      // Fläche eintauchen — Krone/Wortmarke bleiben. Übergangslösung bis Detlevs
-      // transparentes SVG vorliegt (TODO). Wirkt nur auf hellen Flächen, daher light.
+      // mix-blend-multiply lässt den weißen PNG-Hintergrund in die helle Fläche
+      // eintauchen — Gold-Krone + schwarze Wortmarke bleiben. Wirkt nur auf hellen
+      // Flächen, daher light. Default h-20: das Lockup ist gestapelt (Krone über
+      // Wortmarke + Claim), bei h-14 wäre die Wortmarke zu klein.
       <img
         src="/brand/fbc-logo-crown.png"
         alt="Fair Business Club"
-        className={cn("block object-contain mix-blend-multiply", className ?? "h-14 w-auto")}
+        className={cn("block object-contain mix-blend-multiply", className ?? "h-20 w-auto")}
       />
     );
   }
