@@ -257,7 +257,7 @@ export default function AppShell() {
             to="/"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            <Logo lockup="full" className="h-7 w-auto" />
+            <Logo lockup="mark" className="h-8 w-auto" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
