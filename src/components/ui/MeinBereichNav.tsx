@@ -6,7 +6,7 @@ const linkBase = "relative rounded-md px-3 py-2 text-sm transition-colors";
 const linkRest = "text-ink/70 hover:bg-night/[0.05] hover:text-ink";
 const linkActive = "bg-night/[0.06] font-semibold text-gold-strong";
 
-export function MeinBereichAccordion({ onNavigate }: { onNavigate?: () => void }) {
+export function MeinBereichNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav aria-label="Mein Bereich" className="flex flex-col gap-1">
       <p className="px-3 pb-1 text-sm font-semibold text-ink">Mein Bereich</p>

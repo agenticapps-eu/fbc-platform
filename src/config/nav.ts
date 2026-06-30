@@ -9,7 +9,11 @@ import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
 import LibraryPage from "../pages/LibraryPage";
 import MatchingPage from "../pages/MatchingPage";
+import EinstellungenPage from "../pages/EinstellungenPage";
+import KontaktePage from "../pages/KontaktePage";
 import MeinBereichPage from "../pages/MeinBereichPage";
+import MeineEventsPage from "../pages/MeineEventsPage";
+import ProfilAnsichtPage from "../pages/ProfilAnsichtPage";
 import ProfilPage from "../pages/ProfilPage";
 import ProjektePage from "../pages/ProjektePage";
 import VerzeichnisPage from "../pages/VerzeichnisPage";
@@ -131,5 +135,39 @@ export const navItems: NavItem[] = [
     section: "konto",
     requiresAuth: true,
   },
-  { path: "/profil", label: "Profil", Component: ProfilPage, section: "konto", requiresAuth: true },
+  {
+    path: "/profil",
+    label: "Profil",
+    Component: ProfilAnsichtPage,
+    section: "konto",
+    requiresAuth: true,
+  },
+  {
+    path: "/profil/bearbeiten",
+    label: "Profil bearbeiten",
+    Component: ProfilPage,
+    section: "konto",
+    requiresAuth: true,
+  },
+  {
+    path: "/meine-events",
+    label: "Meine Events",
+    Component: MeineEventsPage,
+    section: "konto",
+    requiresAuth: true,
+  },
+  {
+    path: "/kontakte",
+    label: "Meine Kontakte",
+    Component: KontaktePage,
+    section: "konto",
+    requiresAuth: true,
+  },
+  {
+    path: "/einstellungen",
+    label: "Einstellungen",
+    Component: EinstellungenPage,
+    section: "konto",
+    requiresAuth: true,
+  },
 ];
