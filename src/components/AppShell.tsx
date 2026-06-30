@@ -214,7 +214,9 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const { meta } = useDesignVariantValue();
   const hasBackdrop = (meta.backdrop ?? "none") !== "none";
-  const isWide = WIDE_ROUTES.some((r) => pathname.startsWith(r));
+  // Exakter Pfad-Vergleich: /profil (Bento) ist breit, /profil/bearbeiten (Editor) bleibt
+  // zentriert. Alle WIDE_ROUTES sind Blattseiten ohne breite Unterrouten.
+  const isWide = WIDE_ROUTES.includes(pathname);
 
   // Off-Canvas-Sidebar (< lg). Schließt über Backdrop, `onNavigate` an jedem Link
   // und Escape. (setState im Event-Callback, nicht im Effect-Body.)
