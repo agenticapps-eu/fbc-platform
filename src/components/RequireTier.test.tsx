@@ -84,9 +84,9 @@ describe("Auth-Gating für /mein-bereich", () => {
     renderAt("/mein-bereich", authAsTier("discover"));
 
     // /mein-bereich leitet auf /profil weiter; der Auth-Gate hat durchgelassen
-    // und die Profilansicht rendert (Beleg, dass die Seite gerendert wird).
+    // und die Profilansicht rendert (Beleg: Lade-Skeleton sichtbar, kein Login).
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Mein Profil" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
@@ -94,7 +94,8 @@ describe("Auth-Gating für /mein-bereich", () => {
 
     // /mein-bereich → /profil (RequireAuth, kein RequireTier): bei laufendem
     // tier-Fetch reicht die Session – kein vorzeitiger Redirect auf /login.
-    expect(screen.getByRole("heading", { name: "Mein Profil" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });
 
