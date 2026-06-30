@@ -326,7 +326,7 @@ function PostCard({
         mentionResolver={mentionResolver}
       />
 
-      {video && <VideoEmbed url={video.url} title={`Video von ${post.author.name}`} />}
+      {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
 
       {post.hashtags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
