@@ -473,6 +473,44 @@ export type Database = {
           },
         ];
       };
+      member_settings: {
+        Row: {
+          contactable_by_prime: boolean;
+          notify_email_digest: boolean;
+          notify_email_events: boolean;
+          notify_email_requests: boolean;
+          profile_id: string;
+          updated_at: string;
+          visible_in_directory: boolean;
+        };
+        Insert: {
+          contactable_by_prime?: boolean;
+          notify_email_digest?: boolean;
+          notify_email_events?: boolean;
+          notify_email_requests?: boolean;
+          profile_id: string;
+          updated_at?: string;
+          visible_in_directory?: boolean;
+        };
+        Update: {
+          contactable_by_prime?: boolean;
+          notify_email_digest?: boolean;
+          notify_email_events?: boolean;
+          notify_email_requests?: boolean;
+          profile_id?: string;
+          updated_at?: string;
+          visible_in_directory?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_settings_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       membership_tiers: {
         Row: {
           key: string;
