@@ -1,5 +1,5 @@
 -- Behavioural probe for member_settings RLS (AGE-237). Self-contained: creates
--- two members, then verifies the own-profile policy added in
+-- three members, then verifies the own-profile policy added in
 -- 20260630130000_member_settings.sql:
 --   * a member may INSERT their OWN member_settings row;
 --   * a member may SELECT their OWN member_settings row (cross-tenant row hidden);
@@ -15,7 +15,8 @@ begin;
 
 insert into auth.users (id, aud, role, email) values
   ('00000000-0000-0000-0000-0000000237aa', 'authenticated', 'authenticated', 't237a@probe.fbc.invalid'),
-  ('00000000-0000-0000-0000-0000000237bb', 'authenticated', 'authenticated', 't237b@probe.fbc.invalid');
+  ('00000000-0000-0000-0000-0000000237bb', 'authenticated', 'authenticated', 't237b@probe.fbc.invalid'),
+  ('00000000-0000-0000-0000-0000000237cc', 'authenticated', 'authenticated', 't237c@probe.fbc.invalid');
 
 -- Seed one row for B (as the superuser test role → bypasses RLS) so A's
 -- cross-tenant SELECT has something it must NOT see.
@@ -54,6 +55,7 @@ do $$
 declare
   v_a uuid := '00000000-0000-0000-0000-0000000237aa';
   v_b uuid := '00000000-0000-0000-0000-0000000237bb';
+  v_c uuid := '00000000-0000-0000-0000-0000000237cc';
   v text;
   n int;
 begin
@@ -81,12 +83,14 @@ begin
     ' where profile_id = ''00000000-0000-0000-0000-0000000237aa''');
   if n <> 0 then raise exception 'expected B to see 0 rows for A, saw %', n; end if;
 
-  -- B may NOT insert a row for A's profile_id → WITH CHECK denies it.
-  v := pg_temp.try_as(v_b, $q$
+  -- B may NOT insert a row for C's profile_id → WITH CHECK denies it.
+  -- C has no existing member_settings row, so the only blocker is the RLS
+  -- with check (profile_id = (select auth.uid())) — not a PK collision.
+  v := pg_temp.try_as(v_b, format($q$
     insert into public.member_settings (profile_id)
-    values ('00000000-0000-0000-0000-0000000237aa')
-  $q$);
-  if v <> 'DENIED' then raise exception 'expected B to be DENIED inserting for A, got %', v; end if;
+    values (%L)
+  $q$, v_c));
+  if v <> 'DENIED' then raise exception 'expected B to be DENIED inserting for C, got %', v; end if;
 
   raise notice 'probe_member_settings_rls: all assertions passed';
 end $$;
