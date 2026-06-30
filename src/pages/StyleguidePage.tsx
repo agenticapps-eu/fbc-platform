@@ -266,6 +266,13 @@ export default function StyleguidePage() {
                 </span>
               </div>
             </div>
+            <p className="text-sm text-muted">
+              Sidebar-Aufbau (eine Sidebar, flache Liste, keine Sektions-Labels): Identitäts-/
+              Mitglieder-Block oben → Hauptmenü <strong className="text-ink">Start</strong> ·
+              Compass · Library · Academy · Events · Community · Matching · Projekte → „Mein
+              Bereich" als stabiles Inline-Akkordeon unten (nur eingeloggt). Die Kronen-Wortmarke
+              sitzt im Header.
+            </p>
           </Section>
 
           {/* Farben */}
