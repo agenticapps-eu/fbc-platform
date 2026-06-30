@@ -40,3 +40,10 @@ export async function saveMemberSettings(uid: string, values: MemberSettings): P
     .upsert({ profile_id: uid, ...values }, { onConflict: "profile_id" });
   if (error) throw error;
 }
+
+/** Spiegelt die Verzeichnis-Sichtbarkeit auf profiles.is_public (die durchgesetzte
+ *  Quelle der Wahrheit für Verzeichnis/RLS). RLS erzwingt own-profile. */
+export async function setProfileVisibility(uid: string, visible: boolean): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ is_public: visible }).eq("id", uid);
+  if (error) throw error;
+}
