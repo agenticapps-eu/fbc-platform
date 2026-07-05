@@ -7,8 +7,18 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models the seven variants a–g (a–d stable, e–g experimental)", () => {
-    expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
+  it("models the nine variants a–i (a–d stable, e–g experimental, h/i brand)", () => {
+    expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+    ]);
   });
 
   it("marks D as the recommended default", () => {
@@ -25,10 +35,17 @@ describe("designVariants config", () => {
       .map((v) => v.id)
       .sort();
     expect(experimental).toEqual(["e", "f", "g"]);
-    // the stable variants must not carry the experimental tag
-    for (const id of ["a", "b", "c", "d"] as const) {
+    // the stable + brand variants must not carry the experimental tag
+    for (const id of ["a", "b", "c", "d", "h", "i"] as const) {
       expect(DESIGN_VARIANTS[id].experimental).toBeFalsy();
     }
+  });
+
+  it("carries the Navy & Gold brand variants h (dark sidebar) / i (light)", () => {
+    expect(DESIGN_VARIANTS.h.heroStyle).toBe("dark-glow");
+    expect(DESIGN_VARIANTS.i.heroStyle).toBe("light");
+    expect(DESIGN_VARIANTS.h.headlineFont).toBe("serif");
+    expect(DESIGN_VARIANTS.i.headlineFont).toBe("serif");
   });
 
   it("carries the spec's motion / hero / headline flags", () => {
@@ -66,7 +83,9 @@ describe("isDesignVariantId", () => {
     expect(isDesignVariantId("d")).toBe(true);
     expect(isDesignVariantId("e")).toBe(true);
     expect(isDesignVariantId("g")).toBe(true);
-    expect(isDesignVariantId("h")).toBe(false);
+    expect(isDesignVariantId("h")).toBe(true);
+    expect(isDesignVariantId("i")).toBe(true);
+    expect(isDesignVariantId("z")).toBe(false);
     expect(isDesignVariantId("")).toBe(false);
     expect(isDesignVariantId(null)).toBe(false);
     expect(isDesignVariantId(undefined)).toBe(false);

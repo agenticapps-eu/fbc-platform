@@ -35,9 +35,19 @@ export interface DesignVariant {
   recommended?: boolean;
 }
 
-export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g";
+export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i";
 
-export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = ["a", "b", "c", "d", "e", "f", "g"];
+export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+];
 
 export const DEFAULT_VARIANT: DesignVariantId = "d";
 
@@ -115,6 +125,26 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     backdrop: "paper",
     accent2: "#6e7e5c",
     experimental: true,
+  },
+  h: {
+    id: "h",
+    label: "Navy & Gold (dunkel)",
+    description: "Marineblau als Chrome, Gold-Akzent, helle Cards (Wimpel/Marke).",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  i: {
+    id: "i",
+    label: "Navy & Gold (hell)",
+    description: "Navy als Text/Akzent, helle Sidebar & Content, Gold-Akzent.",
+    motion: "medium",
+    heroStyle: "light",
+    headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
   },
 };
 

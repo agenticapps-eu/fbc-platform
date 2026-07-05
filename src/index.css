@@ -229,6 +229,63 @@ html[data-variant="g"] {
   --hero-muted: #7a6e63;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Marken-Varianten H/I (AGE-237) — FBC-Wimpel-Palette: Marineblau + Gold auf
+   Creme. Gemeinsame Marken-Tokens (Ink/Gold/Serif); nur Sidebar-, Hero- und
+   Line-Werte trennen H (dunkles Navy-Chrome) von I (helle Sidebar, Navy nur
+   als Text/Akzent). Wenn Detlev exakte Marken-Hex liefert: nur diese Tokens
+   tauschen — kein Fork.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* H — Navy & Gold (dunkel): Navy-Sidebar + Navy-Hero, heller Creme-Content. */
+html[data-variant="h"] {
+  --color-soft: #f6f1e6;
+  --color-canvas: #ffffff;
+  --color-ink: #12233f;
+  --color-muted: #5b6577;
+  --color-line: #e6dfce;
+  --color-gold: #c2a24e;
+  --color-gold-strong: #a97f2c;
+  --color-gold-soft: #efe3c8;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --radius-card: 14px;
+  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
+  --sidebar-surface: #14294a;
+  --hero-bg: linear-gradient(160deg, #1b3560, #12233f);
+  --hero-ink: #f6f1e6;
+  --hero-muted: #aab6cf;
+}
+
+/* H: dunkle Navy-Sidebar → Text/Logo INNERHALB der Sidebar auf Creme umstellen
+   (gleiche Token-Mechanik wie Variante E; der Content bleibt navy-auf-hell).
+   Aktive Route nutzt ein helleres Gold, damit sie auf Navy trägt (AA). */
+html[data-variant="h"] .fbc-sidebar-surface {
+  --color-ink: #f2ecdd;
+  --color-muted: #9fb0cc;
+  --color-gold-strong: #d9b65f;
+}
+
+/* I — Navy & Gold (hell): helle, leicht navy-getönte Sidebar, Navy nur als
+   Text/Akzent, heller Content. Kein dunkles Chrome → normales Text-Handling
+   (Navy-Ink auf Hell), aktive Route in Gold auf dezenter Pille + Gold-Balken. */
+html[data-variant="i"] {
+  --color-soft: #f6f1e6;
+  --color-canvas: #ffffff;
+  --color-ink: #12233f;
+  --color-muted: #5b6577;
+  --color-line: #dde3ee;
+  --color-gold: #c2a24e;
+  --color-gold-strong: #a97f2c;
+  --color-gold-soft: #efe3c8;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --radius-card: 14px;
+  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
+  --sidebar-surface: #eef1f7;
+  --hero-bg: transparent;
+  --hero-ink: #12233f;
+  --hero-muted: #5b6577;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
