@@ -341,10 +341,7 @@ function ContactBody({
       ) : (
         <p className="text-sm text-muted">
           {name} hat dir eine Kontaktanfrage gesendet. Beantworte sie unter{" "}
-          <Link
-            to="/mein-bereich#meine-anfragen"
-            className="font-medium text-gold-strong hover:text-gold"
-          >
+          <Link to="/kontakte" className="font-medium text-gold-strong hover:text-gold">
             Meine Anfragen
           </Link>
           .

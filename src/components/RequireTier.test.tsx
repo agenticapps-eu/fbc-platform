@@ -83,16 +83,19 @@ describe("Auth-Gating für /mein-bereich", () => {
   it("lässt eingeloggte Discover-Nutzer Mein Bereich sehen", () => {
     renderAt("/mein-bereich", authAsTier("discover"));
 
-    // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; das Dashboard
-    // mountet und lädt seine Daten (Beleg, dass die Seite gerendert wird).
+    // /mein-bereich leitet auf /profil weiter; der Auth-Gate hat durchgelassen
+    // und die Profilansicht rendert (Beleg: Lade-Skeleton sichtbar, kein Login).
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
-    expect(screen.getByText("Dashboard wird geladen…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
     renderAt("/mein-bereich", authLoadingTier());
 
-    expect(screen.getByText("Dashboard wird geladen…")).toBeInTheDocument();
+    // /mein-bereich → /profil (RequireAuth, kein RequireTier): bei laufendem
+    // tier-Fetch reicht die Session – kein vorzeitiger Redirect auf /login.
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });
 
@@ -105,7 +108,7 @@ describe("Auth-Gating für /profil", () => {
   });
 
   it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Discover)", () => {
-    renderAt("/profil", authAsTier("discover"));
+    renderAt("/profil/bearbeiten", authAsTier("discover"));
 
     // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; der Editor
     // mountet und lädt seine Daten.

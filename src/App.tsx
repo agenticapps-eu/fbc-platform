@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignSwitcher } from "./components/DesignSwitcher";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
@@ -42,6 +42,7 @@ export default function App() {
           {navItems.map((item) => (
             <Route key={item.path} path={item.path} element={gatedElement(item)} />
           ))}
+          <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
           {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
             die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
           <Route

@@ -6,7 +6,7 @@ import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { Logo } from "./ui/Logo";
-import { MeinBereichAccordion } from "./ui/MeinBereichAccordion";
+import { MeinBereichNav } from "./ui/MeinBereichNav";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
@@ -16,7 +16,7 @@ import { useDesignVariantValue } from "../providers/design-variant-context";
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
 // innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
-const WIDE_ROUTES = ["/mein-bereich", "/verzeichnis", "/matching"];
+const WIDE_ROUTES = ["/profil", "/kontakte", "/verzeichnis", "/matching"];
 
 // Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
 // .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —
@@ -134,7 +134,7 @@ function UserMenu({
             )}
           </div>
           <Link
-            to="/mein-bereich"
+            to="/profil"
             role="menuitem"
             onClick={() => setOpen(false)}
             className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
@@ -203,7 +203,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       )}
       <SidebarNav sections={[{ items: visible }]} onNavigate={onNavigate} />
-      {user && <MeinBereichAccordion onNavigate={onNavigate} />}
+      {user && <MeinBereichNav onNavigate={onNavigate} />}
     </div>
   );
 }
@@ -214,7 +214,9 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const { meta } = useDesignVariantValue();
   const hasBackdrop = (meta.backdrop ?? "none") !== "none";
-  const isWide = WIDE_ROUTES.some((r) => pathname.startsWith(r));
+  // Exakter Pfad-Vergleich: /profil (Bento) ist breit, /profil/bearbeiten (Editor) bleibt
+  // zentriert. Alle WIDE_ROUTES sind Blattseiten ohne breite Unterrouten.
+  const isWide = WIDE_ROUTES.includes(pathname);
 
   // Off-Canvas-Sidebar (< lg). Schließt über Backdrop, `onNavigate` an jedem Link
   // und Escape. (setState im Event-Callback, nicht im Effect-Body.)

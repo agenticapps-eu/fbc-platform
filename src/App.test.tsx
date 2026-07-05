@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App from "./App";
-import { AuthFixture, fakeAuthValue } from "./test/auth-fixtures";
+import { AuthFixture, authAsTier, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
   it("zeigt die Shell-Navigation und rendert auf / die öffentliche Startseite", () => {
@@ -31,5 +31,23 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
     ).toBeInTheDocument();
+  });
+
+  it("markiert auf /kontakte genau einen Sidebar-Eintrag als aktiv", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <AuthFixture value={authAsTier("legacy")}>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/kontakte"]}>
+            <App />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </AuthFixture>,
+    );
+    const active = screen
+      .getAllByRole("link")
+      .filter((el) => el.getAttribute("aria-current") === "page");
+    expect(active).toHaveLength(1);
+    expect(active[0]).toHaveTextContent("Meine Kontakte");
   });
 });

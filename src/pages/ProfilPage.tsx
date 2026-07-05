@@ -26,6 +26,7 @@ import {
   saveProfile,
   type ProfileFormValues,
 } from "../lib/profile";
+import { Link } from "react-router-dom";
 import { useAuth } from "../providers/auth-context";
 
 const EMPTY_VALUES: ProfileFormValues = {
@@ -165,6 +166,9 @@ function ProfileEditor({ uid }: { uid: string }) {
     >
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
+          <Link to="/profil" className="text-sm font-medium text-gold-strong hover:text-gold">
+            ← Zurück zum Profil
+          </Link>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
             Profil bearbeiten
           </h1>
