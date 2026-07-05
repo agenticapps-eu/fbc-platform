@@ -170,4 +170,30 @@ Prototyp testet weiterhin **Discover / Prime / Legacy**. UI-Regel: gesperrte Ber
 
 ---
 
+## 8. Design-Varianten (Live-Switcher A–I, AGE-237)
+
+Temporäres Review-Tool: ein `data-variant`-Attribut auf `<html>` schaltet
+CSS-Variablen-Overrides (`src/index.css`) + wenige Verhaltens-Flags
+(`src/config/designVariants.ts`) um — **keine** neun Oberflächen, sondern eine
+Theming-Schicht über denselben Komponenten. Deep-Link `?variant=<id>`, Shift+D
+schaltet durch, `/styleguide` zeigt alle Varianten live. Quelle: `designVariants.ts`.
+
+| ID | Label | Charakter |
+|---|---|---|
+| A | Quiet Luxury | Hell, editorial, große Serif, dezentes Gold. |
+| B | Members' Club | Dunkle App, cinematischer Gold-Glow, „VIP". |
+| C | Warm Social | Warmes Creme, freundlich, Sans-Headlines. |
+| **D** | Blend *(Default/Empfehlung)* | Helle Basis + Serif + Gold-Glow-Hero. |
+| E | Noir Editorial *(exp.)* | Hochkontrast-Magazin, schwarze Masthead. |
+| F | Aurora Glass *(exp.)* | Glas, leuchtende Aurora-Gradients. |
+| G | Warm Boutique *(exp.)* | Leinen/Terracotta/Salbei, organisch. |
+| **H** | Navy & Gold (dunkel) | Marineblaue Sidebar (Chrome) + Navy-Hero, helle Cards. |
+| **I** | Navy & Gold (hell) | Helle navy-getönte Sidebar, Navy nur als Text/Akzent. |
+
+H/I sind aus dem FBC-Wimpel abgeleitet (Marineblau + Gold auf Creme). Die
+Marken-Hex liegen als gemeinsame Tokens in den `[data-variant="h"|"i"]`-Blöcken;
+falls die exakten Marken-Werte vorliegen, nur diese Tokens tauschen (kein Fork).
+
+---
+
 _Gehört zu Issue **AGE-237** (Design) im Linear-Projekt „FBC Plattform – Prototyp (Phase 1)"._
