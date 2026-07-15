@@ -21,6 +21,8 @@
 - **TypeScript strict** — kein `any`, keine `@ts-ignore`.
 - **Deutsche UI-Copy und deutsche Kommentare**, passend zum bestehenden Code.
 - **Der Feed wird nicht neu gebaut** (Spec §5) — `CommunityFeed` und `MemberDirectory` werden gemountet, nicht verändert.
+- **Keine `vi.mock` auf projekteigene Komponenten.** Sie laufen in der Testumgebung ungemockt — Beleg: `RequireTier.test.tsx` rendert `MemberDirectory` und `CommunityFeed` über die App, ohne einen einzigen Mock, 10/10 grün. Eine Attrappe, die den String rendert, den der Test danach behauptet, prüft nur sich selbst. Provider (`AuthFixture`, `QueryClientProvider`, `MemoryRouter`) sind **keine** Mocks — sie stellen die Umgebung bereit, statt die Komponente zu ersetzen, und sind erwünscht.
+- **Ein roter Test ist eine Information, kein Hindernis.** Wenn ein Test aus dem Plan fehlschlägt, ist die Meldung des echten Fehlers die richtige Antwort — nicht Wegmocken, nicht die Assertion aufweichen, nicht Produktionscode für die Bequemlichkeit des Tests umbauen. (Genau so wurde in Task 1 eine Lücke im Plan gefunden.)
 - **Verifikation vor jeder „fertig"-Behauptung:** `pnpm test` und `pnpm typecheck` müssen laufen und ihre Ausgabe gezeigt werden.
 
 ## File Structure
@@ -86,22 +88,31 @@ In `src/config/formatHero.ts`, innerhalb von `FORMAT_HERO`, hinter der `/events`
 
 Create `src/pages/AktivitaetPage.test.tsx`:
 
+**Keine Mocks.** `CommunityFeed` und `MemberDirectory` laufen in der Testumgebung ungemockt — Beleg: `RequireTier.test.tsx` rendert beide über die App und ist grün. Wer sie durch Attrappen ersetzt, baut einen Test, der nur noch sich selbst prüft.
+
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import AktivitaetPage from "./AktivitaetPage";
+import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
 
-/** Der Feed lädt über TanStack Query und verlinkt Profile → beide Provider nötig. */
+/**
+ * Der Feed lädt über TanStack Query und verlinkt Profile → beide Provider nötig.
+ * CommunityFeed ruft zudem useAuth(), das ohne Provider wirft — daher AuthFixture.
+ * Bewusst anonym (fakeAuthValue): /aktivitaet ist für alle sichtbar, auch ausgeloggt.
+ */
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <AktivitaetPage />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthFixture value={fakeAuthValue()}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AktivitaetPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthFixture>,
   );
 }
 
