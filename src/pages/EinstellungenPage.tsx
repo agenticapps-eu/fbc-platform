@@ -11,7 +11,6 @@ import {
   fetchMemberSettings,
   memberSettingsQueryKey,
   saveMemberSettings,
-  setProfileVisibility,
   type MemberSettings,
 } from "../lib/member-settings";
 import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
@@ -75,10 +74,7 @@ export default function EinstellungenPage() {
   });
 
   const save = useMutation({
-    mutationFn: async (next: MemberSettings) => {
-      await saveMemberSettings(uid, next);
-      await setProfileVisibility(uid, next.visible_in_directory);
-    },
+    mutationFn: (next: MemberSettings) => saveMemberSettings(uid, next),
     onMutate: async (next) => {
       await queryClient.cancelQueries({ queryKey: memberSettingsQueryKey(uid) });
       const previous = queryClient.getQueryData<MemberSettings>(memberSettingsQueryKey(uid));

@@ -481,7 +481,6 @@ export type Database = {
           notify_email_requests: boolean;
           profile_id: string;
           updated_at: string;
-          visible_in_directory: boolean;
         };
         Insert: {
           contactable_by_prime?: boolean;
@@ -490,7 +489,6 @@ export type Database = {
           notify_email_requests?: boolean;
           profile_id: string;
           updated_at?: string;
-          visible_in_directory?: boolean;
         };
         Update: {
           contactable_by_prime?: boolean;
@@ -499,7 +497,6 @@ export type Database = {
           notify_email_requests?: boolean;
           profile_id?: string;
           updated_at?: string;
-          visible_in_directory?: boolean;
         };
         Relationships: [
           {

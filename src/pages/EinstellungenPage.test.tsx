@@ -12,28 +12,23 @@ vi.mock("../lib/member-settings", async (importOriginal) => {
     ...actual,
     fetchMemberSettings: vi.fn(),
     saveMemberSettings: vi.fn(),
-    setProfileVisibility: vi.fn(),
   };
 });
 import {
   fetchMemberSettings,
   saveMemberSettings,
-  setProfileVisibility,
   DEFAULT_MEMBER_SETTINGS,
 } from "../lib/member-settings";
 import EinstellungenPage from "./EinstellungenPage";
 
 const mockedFetch = vi.mocked(fetchMemberSettings);
 const mockedSave = vi.mocked(saveMemberSettings);
-const mockedSetVisibility = vi.mocked(setProfileVisibility);
 
 beforeEach(() => {
   mockedFetch.mockReset();
   mockedFetch.mockResolvedValue(DEFAULT_MEMBER_SETTINGS);
   mockedSave.mockReset();
   mockedSave.mockResolvedValue();
-  mockedSetVisibility.mockReset();
-  mockedSetVisibility.mockResolvedValue();
 });
 
 function renderPage() {
@@ -71,6 +66,5 @@ describe("EinstellungenPage", () => {
         visible_in_directory: false,
       }),
     );
-    await waitFor(() => expect(mockedSetVisibility).toHaveBeenCalledWith("u1", false));
   });
 });
