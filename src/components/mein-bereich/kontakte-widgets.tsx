@@ -195,8 +195,8 @@ export function MatchingWidget({ data }: { data: DashboardData }) {
       className="md:col-span-2"
       action={
         <div className="flex items-center gap-3">
-          <CardLink to="/angebote-gesuche">Bearbeiten</CardLink>
-          <CardLink to="/matching">Zum Matching</CardLink>
+          <CardLink to="/compass">Bearbeiten</CardLink>
+          <CardLink to="/meine-chancen">Zu meinen Chancen</CardLink>
         </div>
       }
     >

@@ -137,7 +137,7 @@ export default function LoginPage() {
       </button>
 
       <Link to="/" className="mt-4 block text-sm text-muted hover:underline">
-        ← Zurück zur Community
+        ← Zurück zur Startseite
       </Link>
     </main>
   );

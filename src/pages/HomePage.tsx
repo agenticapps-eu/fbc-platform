@@ -92,8 +92,8 @@ export default function HomePage() {
       <section className="space-y-4">
         <SectionHeader
           title="Neue öffentliche Beiträge"
-          to="/community"
-          linkLabel="Zur Community"
+          to="/aktivitaet"
+          linkLabel="Zur Aktivität"
         />
         {feedQuery.isLoading ? (
           <p className="text-sm text-muted">Beiträge werden geladen…</p>

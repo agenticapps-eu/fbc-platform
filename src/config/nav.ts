@@ -1,30 +1,28 @@
 import type { ComponentType } from "react";
 import type { MembershipLevel } from "./levels";
 import AcademyPage from "../pages/AcademyPage";
-import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
+import AktivitaetPage from "../pages/AktivitaetPage";
 import ChatPage from "../pages/ChatPage";
-import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
-import LibraryPage from "../pages/LibraryPage";
-import MatchingPage from "../pages/MatchingPage";
+import MeineChancenPage from "../pages/MeineChancenPage";
+import MeineKursePage from "../pages/MeineKursePage";
 import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
 import MeineEventsPage from "../pages/MeineEventsPage";
+import MitgliederPage from "../pages/MitgliederPage";
 import ProfilAnsichtPage from "../pages/ProfilAnsichtPage";
 import ProfilPage from "../pages/ProfilPage";
-import ProjektePage from "../pages/ProjektePage";
-import VerzeichnisPage from "../pages/VerzeichnisPage";
 
 /**
- * Sidebar-Gruppe:
- * - `formate`  — die 7 Community-Formate (Top-Level-Sidebar, feste Reihenfolge).
- * - `konto`    — persönliche Routen (Mein Bereich, Profil).
- * - `community`— Unterbereiche von Community (z. B. Verzeichnis); geroutet, aber
- *                NICHT als eigener Top-Level-Eintrag in der Sidebar.
+ * Sidebar-Abschnitt (AGE-314, Spec §2):
+ * - `entdecken`    — das öffentliche Schaufenster; auch anon sichtbar.
+ * - `mein-bereich` — persönliche Bereiche; setzen ein Konto voraus.
+ * - `service`      — Konto-nahes.
+ * - `sub`          — geroutet, aber KEIN Menüeintrag (z. B. Chat).
  */
-export type NavSection = "formate" | "konto" | "community";
+export type NavSection = "entdecken" | "mein-bereich" | "service" | "sub";
 
 export interface NavItem {
   path: string;
@@ -32,144 +30,105 @@ export interface NavItem {
   Component: ComponentType;
   /** Gruppierung in der Sidebar. */
   section: NavSection;
-  /** Mindest-Mitgliedsstufe fürs Route-Gating (impliziert eingeloggt). */
+  /** Mindest-Mitgliedsstufe. Löst in App.tsx die „Mitglied werden"-Wand aus. */
   minTier?: MembershipLevel;
   /** Route nur für eingeloggte Nutzer (ohne Stufen-Anforderung). */
   requiresAuth?: boolean;
-  /** Für anonyme Besucher sichtbar/erreichbar (öffentliches Schaufenster). */
-  publicAccess?: boolean;
 }
 
 /**
  * Routen innerhalb der AppShell. Einzige Quelle für Sidebar-Navigation und Routing.
  *
- * Reihenfolge der `formate` ist verbindlich (Detlev, AGE-237): die 7 Formate
- * bauen aufeinander auf — Compass → Library → Academy → Events → Community →
- * Matching → Projekte.
+ * Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte,
+ * nicht das Menü. Anon sieht nur `entdecken` (Donald, 15.07.2026).
+ *
+ * Die Reihenfolge unter `entdecken` ist verbindlich und erzählt die Reise:
+ * Compass (entdecke mich) → Academy (entwickle mich) → Events (treffe Menschen) →
+ * Mitglieder (finde Passende) → Aktivität (hier lebt der Club).
  */
 export const navItems: NavItem[] = [
-  // Start: öffentliche Landingpage ÜBER den Formaten, für alle sichtbar (auch anon).
-  // HomeRedirect rendert die HomePage und fängt nur den Onboarding-Gate-Fall ab
-  // (frisch eingeloggt, Mini-Compass offen → /onboarding).
-  { path: "/", label: "Start", Component: HomeRedirect, section: "formate", publicAccess: true },
+  { path: "/", label: "Start", Component: HomeRedirect, section: "entdecken" },
   {
     path: "/compass",
     label: "Compass",
     Component: CompassPage,
-    section: "formate",
-    requiresAuth: true,
-  },
-  {
-    path: "/library",
-    label: "Library",
-    Component: LibraryPage,
-    section: "formate",
+    section: "entdecken",
     requiresAuth: true,
   },
   {
     path: "/academy",
     label: "Academy",
     Component: AcademyPage,
-    section: "formate",
+    section: "entdecken",
     requiresAuth: true,
   },
+  { path: "/events", label: "Events", Component: EventsPage, section: "entdecken" },
   {
-    path: "/events",
-    label: "Events",
-    Component: EventsPage,
-    section: "formate",
-    publicAccess: true,
-  },
-  {
-    path: "/community",
-    label: "Community",
-    Component: CommunityPage,
-    section: "formate",
-    publicAccess: true,
-  },
-  {
-    path: "/matching",
-    label: "Matching",
-    Component: MatchingPage,
-    section: "formate",
-    // §2: „erweiterte Matchings" ab `discover`. Die „ersten Matchings" von
-    // `connect` kommen aus der matches-Tabelle und brauchen diese Seite nicht.
+    path: "/mitglieder",
+    label: "Mitglieder",
+    Component: MitgliederPage,
+    section: "entdecken",
+    // §2: „vollständiges Mitgliederverzeichnis" ab `discover`. Darunter greift die
+    // Wand; die RLS liefert ohnehin höchstens die eigene Zeile.
     minTier: "discover",
   },
-  {
-    path: "/projekte",
-    label: "Projekte",
-    Component: ProjektePage,
-    section: "formate",
-    requiresAuth: true,
-  },
-  // Verzeichnis: Unterbereich von Community (ab Discover), kein Top-Level-Eintrag.
-  {
-    path: "/verzeichnis",
-    label: "Verzeichnis",
-    Component: VerzeichnisPage,
-    section: "community",
-    // §2: „vollständiges Mitgliederverzeichnis" ab `discover` (150 €). Darunter
-    // bleibt profiles_public — Basisfelder sehen alle Mitglieder.
-    minTier: "discover",
-  },
-  // Chat (AGE-248, §9): Direktnachrichten ab Freigabe. Erreichbar aus „Mein
-  // Bereich" und der angenommenen Anfrage, kein eigener Top-Level-Eintrag.
-  //
-  // Bewusst OHNE minTier (AGE-311): §2 stellt „Nachrichten an bereits akzeptierte
-  // Kontakte" ausdrücklich allen ab `basic` frei. Die Schranke ist die Freigabe,
-  // nicht die Stufe — und sie sitzt ohnehin in der RLS (messages_insert verlangt
-  // eine akzeptierte contact_request). Kontaktanfragen zu STELLEN kostet ab
-  // `exchange`; ein bestehendes Gespräch fortzuführen nie.
-  {
-    path: "/chat",
-    label: "Chat",
-    Component: ChatPage,
-    section: "community",
-    requiresAuth: true,
-  },
-  // Such-/Bieteprofil-Editor (AGE-244): erreichbar aus „Mein Bereich" und dem
-  // Compass-Kontext, kein eigener Top-Level-Eintrag. Alle Stufen (eigene Zeilen).
-  {
-    path: "/angebote-gesuche",
-    label: "Angebote & Gesuche",
-    Component: AngeboteGesuchePage,
-    section: "community",
-    requiresAuth: true,
-  },
+  { path: "/aktivitaet", label: "Aktivität", Component: AktivitaetPage, section: "entdecken" },
+
   {
     path: "/profil",
-    label: "Profil",
+    label: "Mein Profil",
     Component: ProfilAnsichtPage,
-    section: "konto",
+    section: "mein-bereich",
     requiresAuth: true,
   },
   {
-    path: "/profil/bearbeiten",
-    label: "Profil bearbeiten",
-    Component: ProfilPage,
-    section: "konto",
+    path: "/meine-chancen",
+    label: "Meine Chancen",
+    Component: MeineChancenPage,
+    section: "mein-bereich",
+    // §2: „erweiterte Matchings" ab `discover`.
+    minTier: "discover",
+  },
+  {
+    path: "/meine-kurse",
+    label: "Meine Kurse",
+    Component: MeineKursePage,
+    section: "mein-bereich",
     requiresAuth: true,
   },
   {
     path: "/meine-events",
     label: "Meine Events",
     Component: MeineEventsPage,
-    section: "konto",
+    section: "mein-bereich",
     requiresAuth: true,
   },
   {
     path: "/kontakte",
     label: "Meine Kontakte",
     Component: KontaktePage,
-    section: "konto",
+    section: "mein-bereich",
     requiresAuth: true,
   },
+
   {
     path: "/einstellungen",
     label: "Einstellungen",
     Component: EinstellungenPage,
-    section: "konto",
+    section: "service",
     requiresAuth: true,
   },
+
+  // Unterbereiche: geroutet, kein Menüeintrag.
+  {
+    path: "/profil/bearbeiten",
+    label: "Profil bearbeiten",
+    Component: ProfilPage,
+    section: "sub",
+    requiresAuth: true,
+  },
+  // Chat bewusst OHNE minTier (AGE-311): §2 stellt Nachrichten an akzeptierte Kontakte
+  // allen ab `basic` frei. Die Schranke ist die Freigabe, nicht die Stufe — und sie
+  // sitzt in der RLS (messages_insert verlangt eine akzeptierte contact_request).
+  { path: "/chat", label: "Chat", Component: ChatPage, section: "sub", requiresAuth: true },
 ];

@@ -7,7 +7,7 @@ import { useAuth } from "../providers/auth-context";
  * children nur, wenn der Nutzer eine Staff-Rolle aus `staff_roles` trägt. Nicht
  * eingeloggte Nutzer landen auf /login, eingeloggte ohne Staff-Rolle auf /.
  *
- * Wie RequireTier ist das reines UI-Gating (Komfort). Die echte Zugriffskontrolle
+ * Wie RequireAuth ist das reines UI-Gating (Komfort). Die echte Zugriffskontrolle
  * erzwingt die RLS (routing_queue + list_routing_queue prüfen is_matching_manager()),
  * unabhängig vom Client.
  */
