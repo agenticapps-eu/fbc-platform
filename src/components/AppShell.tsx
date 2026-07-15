@@ -15,7 +15,7 @@ import { useDesignVariantValue } from "../providers/design-variant-context";
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
 // innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
-const WIDE_ROUTES = ["/profil", "/kontakte", "/verzeichnis", "/meine-chancen"];
+const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
 
 // Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
 // .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —
@@ -173,7 +173,7 @@ const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
 ];
 
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
- *  Mitglieder-Block oben, flaches Hauptmenü, „Mein Bereich"-Akkordeon unten. */
+ *  Mitglieder-Block oben, darunter die drei Abschnitte aus `navItems`. */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { user, tier } = useAuth();
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte

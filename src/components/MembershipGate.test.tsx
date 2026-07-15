@@ -34,7 +34,7 @@ function renderAt(path: string, value: AuthContextValue) {
   );
 }
 
-describe("MembershipGate für Formate", () => {
+describe("MembershipGate für Entdecken-Routen", () => {
   it("zeigt anon auf einem auth-gegateten Format (/compass) die Wand statt eines Redirects", () => {
     renderAt("/compass", fakeAuthValue());
 

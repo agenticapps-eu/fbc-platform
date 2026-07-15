@@ -7,10 +7,11 @@ import { FormatHero } from "./ui/FormatHero";
 import { Button } from "./ui/Button";
 
 /**
- * Gate für die `formate`-Routen. Anders als <RequireAuth>/<RequireTier> leitet
- * dieses Gate anonyme oder zu niedrig gestufte Besucher NICHT weg, sondern zeigt
- * eine „Mitglied werden"-Wand — das Format bleibt im Schaufenster sichtbar, der
- * Inhalt aber gesperrt. Die echte Zugriffskontrolle bleibt die Supabase-RLS.
+ * Gate für Routen mit `minTier` sowie für auth-pflichtige `entdecken`-Routen
+ * (siehe `gatedElement` in App.tsx). Anders als <RequireAuth> leitet dieses Gate
+ * anonyme oder zu niedrig gestufte Besucher NICHT weg, sondern zeigt eine
+ * „Mitglied werden"-Wand — der Bereich bleibt im Schaufenster sichtbar, der Inhalt
+ * aber gesperrt (Spec §1). Die echte Zugriffskontrolle bleibt die Supabase-RLS.
  */
 export default function MembershipGate({
   min,

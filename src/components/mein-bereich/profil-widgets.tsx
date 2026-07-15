@@ -245,7 +245,7 @@ export function BeitraegeWidget({ data }: { data: DashboardData }) {
       id="beitraege"
       title="Meine Beiträge"
       demo={isDemo}
-      action={<CardLink to="/community">Alle anzeigen</CardLink>}
+      action={<CardLink to="/aktivitaet">Alle anzeigen</CardLink>}
     >
       {isDemo ? (
         <ul className="flex flex-col gap-3">
