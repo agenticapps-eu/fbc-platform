@@ -183,6 +183,26 @@ comment on policy profiles_select_self_or_discover on public.profiles is
   '§2: volles Mitgliederverzeichnis ab `discover` (rank 3). Darunter sieht ein '
   'Mitglied nur die eigene Zeile — plus die Basisfelder aller über profiles_public.';
 
+-- 3.1b Erweiterte Profildaten in den Neben-Tabellen — dieselbe Schwelle wie 3.1.
+-- Erfolgsradar, Interessen und Badges sind genau das, was PublicProfilePage als
+-- „erweiterte Profilangaben" zeigt; sie hingen an derselben Prime-Schwelle wie
+-- profiles und gehören daher mit auf `discover` (rank 3). `goals` bleibt bewusst
+-- außen vor: strikt own-profile, nie stufenabhängig (20260613073842).
+drop policy if exists theme_scores_select on public.profile_theme_scores;
+create policy theme_scores_select on public.profile_theme_scores
+  for select to authenticated
+  using ( profile_id = (select auth.uid()) or public.has_level(3) );
+
+drop policy if exists interests_select on public.profile_interests;
+create policy interests_select on public.profile_interests
+  for select to authenticated
+  using ( profile_id = (select auth.uid()) or public.has_level(3) );
+
+drop policy if exists profile_badges_select on public.profile_badges;
+create policy profile_badges_select on public.profile_badges
+  for select to authenticated
+  using ( profile_id = (select auth.uid()) or public.has_level(3) );
+
 -- 3.2 offers / needs — Grundlage der „erweiterten Matchings" (§2, ab `discover`).
 -- Die eigenen Zeilen bleiben immer sichtbar: „Ich suche / Ich biete" ist Teil des
 -- Compass und damit ab `basic` pflegbar (Nav-Spec §3). Erst das Stöbern in FREMDEN

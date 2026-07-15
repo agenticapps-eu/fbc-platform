@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(24);
+select plan(26);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -52,6 +52,11 @@ insert into public.matches (id, a_profile_id, b_profile_id, score) values
 
 insert into public.offers (profile_id, title) values
   ('66666666-6666-6666-6666-666666666666', 'Impact offer');
+-- Erweiterte Profildaten in einer NEBEN-Tabelle: sie hing an derselben Schwelle
+-- wie profiles und muss ihr folgen, sonst ist die Vollzeile gesperrt und die
+-- Chips daneben trotzdem lesbar.
+insert into public.profile_interests (profile_id, theme, label) values
+  ('66666666-6666-6666-6666-666666666666', 'tun', 'Unternehmensaufbau');
 insert into public.profile_contacts (profile_id, email) values
   ('66666666-6666-6666-6666-666666666666', 'impact-contact@test.fbc');
 
@@ -136,6 +141,17 @@ select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
   1, 'Discover liest die fremde Vollzeile — „vollständiges Verzeichnis" ab 150 €');
+
+-- Die Neben-Tabellen der erweiterten Profildaten müssen dieselbe Schwelle tragen.
+select is(
+  pg_temp.count_as('22222222-2222-2222-2222-222222222222',
+    'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  0, 'Connect sieht fremde Interessen nicht (Neben-Tabelle folgt profiles)');
+
+select is(
+  pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+    'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Discover sieht fremde Interessen');
 
 -- ── 3. offers — ab `discover` (rank 3) ───────────────────────────────────────
 select is(
