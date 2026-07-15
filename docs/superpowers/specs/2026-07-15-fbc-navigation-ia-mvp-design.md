@@ -29,9 +29,17 @@ steht bereits im Repo und wird nicht angefasst — nur ihr Inhalt.
 | `service` | Sichtbarer Abschnitt SERVICE |
 | `sub` | Geroutet, aber kein Menüeintrag (ersetzt das heutige `community`) |
 
-`AppShell.SidebarContent` rendert statt flachem Menü + `MeinBereichNav`-Akkordeon **drei
-betitelte Abschnitte**. `SidebarNav` kann das bereits: der `sections`-Prop mit optionalem
-`title` existiert und ist heute ungenutzt. Kein Umbau an `SidebarNav` nötig.
+`AppShell.SidebarContent` rendert statt flachem Menü + `MeinBereichNav` **drei betitelte
+Abschnitte**. `SidebarNav` kann das bereits: der `sections`-Prop mit optionalem `title`
+existiert und ist heute ungenutzt. Kein Umbau an `SidebarNav` nötig.
+
+**Die zweite Nav-Quelle verschwindet dabei.** `config/meinBereich.ts` (`MEIN_BEREICH_NODES`)
+pflegt heute eine eigene Liste aus `/profil`, `/meine-events`, `/kontakte`,
+`/einstellungen` — dieselben Pfade, die auch in `navItems` stehen, nur ein zweites Mal.
+Da MEIN BEREICH künftig aus `navItems` kommt, werden `config/meinBereich.ts`,
+`components/ui/MeinBereichNav.tsx` und `config/meinBereich.test.ts` gelöscht. Das ist kein
+Zusatz-Refactoring, sondern die Bedingung dafür, dass „`nav.ts` ist die einzige Quelle"
+nach diesem Umbau wieder wahr ist.
 
 ## 3. Ziel-Navigation
 
@@ -59,19 +67,50 @@ wird zum Schaufenster und passt zum bestehenden Anon-CTA „Mitglied werden & al
 
 `AppShell` filtert dafür auf `section === "entdecken"` statt wie heute auf `publicAccess`.
 
-**`/mitglieder` verliert das Route-Gate, nicht die Schranke.** `/verzeichnis` hat heute
-`minTier: "discover"`. Der Eintrag muss nach §1 für alle sichtbar sein, also wandert das
-Gate von der Route in die Seite: `MemberDirectory` zeigt unter `discover` den vorhandenen
-Upsell statt der Liste. Das Frontend-Gate war ohnehin nie die Sicherheitsgrenze — die RLS
-erzwingt das Verzeichnis in der DB unabhängig vom Client (CLAUDE.md; `rls_test.sql` prüft
-es in CI). Verschoben wird Anzeige, nicht Schutz. Siehe §7 zur Testabdeckung.
+### Die Gate-Regel — eine Zeile statt neuer Bausteine
+
+Die Architektur erfüllt §1 bereits; `App.tsx:21-33` kennt zwei Gate-Arten:
+
+- **`MembershipGate`** (heute für `section === "formate"`) leitet **nicht weg**, sondern
+  zeigt eine „Mitglied werden"-Wand. `MembershipGate.tsx:10-13` sagt es wörtlich: „das
+  Format bleibt im Schaufenster sichtbar, der Inhalt aber gesperrt". Das ist §1.
+- **`RequireAuth`/`RequireTier`** leiten weg (Login bzw. Startseite).
+
+`/verzeichnis` leitet heute nur deshalb weg, weil es `section: "community"` ist — ein
+Unterbereich, kein Format. **Als Top-Level-ENTDECKEN-Eintrag bekommt `Mitglieder` die Wand
+von selbst.** Kein Seiten-Gate, kein umgezogener Upsell, keine neue Komponente.
+
+Nötig ist dafür eine Regeländerung in `gatedElement`: die `minTier`-Prüfung wandert **über**
+die Section-Prüfung. Danach gilt:
+
+| Bedingung | Gate |
+|---|---|
+| `minTier` gesetzt | `MembershipGate min={…}` → Wand |
+| `requiresAuth`, Section `entdecken` | `MembershipGate` → Wand |
+| `requiresAuth`, sonst | `RequireAuth` → Login-Redirect |
+
+**Warum die Hoisting-Zeile nötig ist:** `Meine Chancen` wandert von `formate` nach
+`mein-bereich`. Ohne die Änderung fiele `/meine-chancen` aus der Wand-Regel und würde
+`basic`-Mitglieder stillschweigend wegleiten, statt ihnen wie heute die Wand zu zeigen —
+eine Regression, die nur `MembershipGate.test.tsx:51` gefangen hätte.
+
+Alle sechs heutigen Kombinationen durchgespielt: Verhalten bleibt identisch, **außer**
+`/verzeichnis` → `/mitglieder` (Redirect → Wand) — exakt die von §1 gewollte Änderung.
+
+**`RequireTier` wird dadurch zum Waisen** und gelöscht (Donald): `App.tsx:30` war der
+einzige Aufrufer. Die Auth-Fälle in `RequireTier.test.tsx` (`/profil`, `/mein-bereich`)
+prüfen `RequireAuth` und bleiben — unter passendem Dateinamen.
+
+Das Frontend-Gate war ohnehin nie die Sicherheitsgrenze: die RLS erzwingt das Verzeichnis
+in der DB unabhängig vom Client (CLAUDE.md; `rls_test.sql` prüft es in CI). Geändert wird
+Anzeige, nicht Schutz. Siehe §7 zur Testabdeckung.
 
 ## 5. Seiten-Bewegungen
 
 | Neu | Woher | Änderung |
 |---|---|---|
 | `AktivitaetPage` `/aktivitaet` | `CommunityFeed` | Neue dünne Hülle, mountet die vorhandene Feed-Komponente. Feed-Code unangetastet. |
-| `MitgliederPage` `/mitglieder` | `VerzeichnisPage` | Umbenannt, mountet weiter `MemberDirectory`. Keine Beiträge (Spec §3). Nimmt den Upsell auf. |
+| `MitgliederPage` `/mitglieder` | `VerzeichnisPage` | Umbenannt, mountet weiter `MemberDirectory` (unangetastet). Keine Beiträge (Spec §3). Gate kommt aus der Section, siehe §4. |
 | `/compass` | + `AngeboteGesuchePage` | Tabs „Mini-Compass" \| „Suche & Biete"; Editor zieht als Komponente rein, Innenleben bleibt. |
 | `MeineChancenPage` `/meine-chancen` | `MatchingPage` | Datei- und Label-Umbenennung. |
 | `MeineKursePage` `/meine-kurse` | neu | Stub: „noch keine Kurse belegt". |
@@ -123,10 +162,11 @@ sind Pfade) · Links in `profil-widgets.tsx:248`, `kontakte-widgets.tsx:198-199`
 
 ### Zwei Altlasten, die dabei anfallen
 
-- **Der Upsell-Text sagt „ab der Stufe Prime".** Er lebt als `DirectoryUpsell` in
-  `CommunityPage` (verschwindet) und zieht in `MitgliederPage`. Dabei fällt auf: `prime`
-  gibt es seit AGE-311 nicht mehr — ein sichtbarer Fehler. Text wird auf `Discover`
-  korrigiert, weil die Zeilen ohnehin angefasst werden.
+- **Der „ab der Stufe Prime"-Fehler löst sich auf.** `DirectoryUpsell` lebt in
+  `CommunityPage` und behauptet eine Stufe, die es seit AGE-311 nicht mehr gibt — ein
+  sichtbarer Fehler. Er wird **gelöscht, nicht umgezogen**: die `MembershipGate`-Wand aus
+  §4 ersetzt ihn und baut ihren Text aus `levelLabel(min)`, also aus derselben Quelle wie
+  das Level-Modell. Der Fehler kann so nicht wiederkehren. Keine Textkorrektur nötig.
 - **`/mein-bereich`-Altlast aus #54.** `CompassPage:57` und `AngeboteGesuchePage:210`
   werden ohnehin umgebaut; deren Links ziehen auf `/profil`. **`OnboardingPage:88,96`
   bleibt unangetastet** — Nachbarcode ohne Auftrag. Der Redirect bleibt bestehen, also
@@ -146,17 +186,21 @@ maschinell nachprüfbar statt behauptet.
 - `MembershipGate.test.tsx:51` — `/matching` → `/meine-chancen`.
 
 **Kein stiller Deckungsverlust am Verzeichnis-Gate.** Die vier `/verzeichnis`-Tests in
-`RequireTier.test.tsx` prüfen heute das Route-Gate. Da es nach §4 in die Seite wandert,
-werden sie **nicht gelöscht, sondern übersetzt** in `MitgliederPage.test.tsx` — dieselben
-Fälle eine Ebene tiefer:
+`RequireTier.test.tsx` prüfen heute Redirect-Verhalten, das es nach §4 nicht mehr gibt.
+Sie werden **nicht gelöscht, sondern übersetzt** — nach `MembershipGate.test.tsx`, wo die
+Wand-Fälle ohnehin leben. Die Zusage bleibt gleich stark, sie wird nur anders eingelöst:
 
-| Fall | Erwartung |
-|---|---|
-| `basic` | Upsell sichtbar, **keine** Mitgliederdaten |
-| `discover` | Liste sichtbar |
-| `impact` | Liste sichtbar |
-| ausgeloggt | führt zum Login |
-| `tier === loading` | kein Upsell (Ladefall aus `authLoadingTier()`) |
+| Fall | heute (`/verzeichnis`, Redirect) | künftig (`/mitglieder`, Wand) |
+|---|---|---|
+| `basic` | Redirect auf `/`, kein Verzeichnis | Wand „ab Discover verfügbar", **keine** Mitgliederdaten |
+| `discover` | Verzeichnis sichtbar | Verzeichnis sichtbar |
+| `impact` | Verzeichnis sichtbar | Verzeichnis sichtbar |
+| ausgeloggt | Redirect auf `/login` | Wand mit „Mitglied werden" (Schaufenster, §4) |
+| `tier === loading` | rendert nichts | rendert nichts (`MembershipGate.tsx:23`) |
+
+Zwei Fälle ändern bewusst ihre Erwartung (`basic`, ausgeloggt) — das ist die von §1
+gewollte Änderung, nicht ein aufgeweichter Test. Entscheidend bleibt in beiden Fassungen
+die Zeile, die zählt: **keine Mitgliederdaten unterhalb von `discover`.**
 
 **`/browse`-Screenshot je umgebauter Seite** — es sind ausschließlich TSX-Änderungen.
 
