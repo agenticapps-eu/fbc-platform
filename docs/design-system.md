@@ -92,28 +92,11 @@ Aktualisiere `/styleguide` entsprechend (alle Tokens + Komponenten in Schwarz & 
 
 ---
 
-## 5. Navigation — verbindliche Reihenfolge ⚠️
+## 5. Navigation
 
-Detlevs Vorgabe: Die **7 Formate bauen aufeinander auf** (linke Spalte der Mitglieder-Matrix) und **diese Reihenfolge ist die Sidebar-Reihenfolge**. Über den Formaten steht als **erster Eintrag „Start"** (`/`, öffentliche HomePage, auch anonym sichtbar):
-
-| # | Eintrag | Route | Hinweis |
-|---|---|---|---|
-| 0 | **Start** | `/` | Öffentliche Landingpage, ÜBER den Formaten, für alle sichtbar |
-| 1 | **Compass** | `/compass` | Orientierung, Analyse, Empfehlungen |
-| 2 | **Library** | `/library` | Wissen, Ressourcen, Vorlagen |
-| 3 | **Academy** | `/academy` | Kurse, Videos, Workshops |
-| 4 | **Events** | `/events` | Online-/Präsenz-Veranstaltungen |
-| 5 | **Community** | `/community` | Feed + **Mitgliederverzeichnis** (Verzeichnis nur ab Prime) |
-| 6 | **Matching** | `/matching` | Such-/Bieteprofile, Matches (ab Prime) |
-| 7 | **Projekte** | `/projekte` | Kooperationen, Initiativen |
-
-`src/config/nav.ts` entsprechend:
-- **Start** (`/`) als erster Eintrag über den Formaten; danach die Reihenfolge exakt wie oben (Compass zuerst, Projekte zuletzt).
-- `Feed` → wird Teil von **Community** (`/community`); das **Verzeichnis** wird ein Tab/Unterbereich von Community mit `minTier: "prime"` (kein eigener Top-Level-Eintrag mehr).
-- **Library** als neue Route/Seite (Platzhalter, Inhalt folgt Phase 2) ergänzen.
-- `konto`-Routen (**Mein Bereich** `/mein-bereich`, **Profil** `/profil`) erscheinen nicht mehr als eigene Sektion in der Sidebar, sondern werden über das Mein-Bereich-Akkordeon bzw. den Identitäts-Block (Profil) erreicht.
-
-**Sidebar als flache Liste:** Die Sektions-Labels „Formate" und „Konto" sind entfernt — die Sidebar zeigt nur die `formate`-Items als einzelne, flache Liste (`MENU` in `AppShell`). Die persönliche **„Mein Bereich"-Subnavigation** (siehe `docs/profile-spec.md`) ist ein **stabiles Inline-Akkordeon** (`MeinBereichAccordion`) am unteren Ende derselben Sidebar (nur eingeloggt) — kein Menü-Tausch, keine zweite Sidebar. Sie klappt die persönlichen Unterpunkte auf (Mein Profil, Meine Events → Gebuchte/Eingestellte, Meine Kontakte, Meine Investitionen, Einstellungen).
+Sidebar-Struktur, Routing, Reihenfolge und Gating sind seit AGE-314 nicht mehr hier
+spezifiziert, sondern in `docs/superpowers/specs/2026-07-15-fbc-navigation-ia-mvp.md`
+§2 — das ist die maßgebliche Quelle für `src/config/nav.ts`.
 
 ---
 

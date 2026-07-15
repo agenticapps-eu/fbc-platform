@@ -27,5 +27,8 @@ describe("MitgliederPage", () => {
     // Spec §3: „Mitglieder" ist nur noch Suche · Filter · Profile · Kontaktaufnahme —
     // keine Beiträge. Die Verzeichnis-Überschrift stammt aus MemberDirectory.
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
+    // "Feed wird geladen…" ist der garantierte Anfangszustand von CommunityFeed
+    // (FeedList.isLoading) — seine Abwesenheit belegt, dass kein Feed mitmountet.
+    expect(screen.queryByText("Feed wird geladen…")).not.toBeInTheDocument();
   });
 });

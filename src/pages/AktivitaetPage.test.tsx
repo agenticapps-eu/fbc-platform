@@ -33,4 +33,12 @@ describe("AktivitaetPage", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "Aktivität" })).toBeInTheDocument();
   });
+
+  it("mountet den CommunityFeed", () => {
+    renderPage();
+    // "Feed wird geladen…" ist FeedList.isLoading (CommunityFeed.tsx) — der garantierte
+    // Anfangszustand direkt nach dem Mount, unabhängig davon, ob die Query je erfolgreich
+    // lädt. Würde <CommunityFeed /> aus AktivitaetPage entfernt, gäbe es diesen Text nicht.
+    expect(screen.getByText("Feed wird geladen…")).toBeInTheDocument();
+  });
 });
