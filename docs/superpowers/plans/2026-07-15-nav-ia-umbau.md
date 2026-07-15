@@ -906,39 +906,27 @@ In `src/App.test.tsx` den ersten Test ersetzen (ab Zeile ~24):
     ).toBeInTheDocument();
 ```
 
-- [ ] **Step 10: Tests + Typecheck laufen lassen**
+- [ ] **Step 10: Die vier Verzeichnis-Gate-Tests übersetzen**
 
-Run: `pnpm typecheck && pnpm test`
-Expected: `nav.test.ts`, `App.test.tsx`, `MembershipGate.test.tsx` PASS.
-**Erwartete Fehlschläge:** `RequireTier.test.tsx` (die vier `/verzeichnis`-Fälle behaupten Redirects, die es nicht mehr gibt) und `meinBereich.test.ts`. Beide löst Task 6 auf — hier nicht „reparieren".
+`RequireTier.test.tsx` prüft heute, dass `/verzeichnis` zu niedrige Stufen **wegleitet**. Nach Step 4 gibt es dieses Verhalten nicht mehr — die Fälle sind ab jetzt rot. Sie werden **nicht gelöscht, sondern übersetzt**: die Zusage dahinter bleibt wortwörtlich dieselbe — **keine Mitgliederdaten unterhalb von `discover`** — nur mauert sie jetzt, statt wegzuleiten (Design §7).
 
-- [ ] **Step 11: Committen**
+Das passiert hier und nicht später, damit die Gate-Änderung im selben Commit liegt wie ihr Beweis.
 
-```bash
-git add -A
-git commit -m "feat(nav): Nav-Gerüst auf 6+5+1, minTier mauert statt wegzuleiten (AGE-314)"
+In `src/components/MembershipGate.test.tsx` die Helferfunktion aus `RequireTier.test.tsx:14-21` übernehmen (falls noch nicht vorhanden) und sicherstellen, dass `fakeAuthValue` und `AuthContextValue` importiert sind:
+
+```tsx
+/** Eingeloggt, aber tier/level_rank werden noch geladen (Profil-Fetch offen). */
+function authLoadingTier(): AuthContextValue {
+  return fakeAuthValue({
+    user: { id: "test-user" } as AuthContextValue["user"],
+    tier: null,
+    levelRank: null,
+    tierLoading: true,
+  });
+}
 ```
 
----
-
-### Task 6: Waisen abräumen, Tests übersetzen, Links nachziehen
-
-Räumt auf, was Tasks 1–5 zu Waisen gemacht haben, und **übersetzt die vier `/verzeichnis`-Gate-Tests, statt sie zu löschen** (Design §7 — das ist der wichtigste Schritt dieses Tasks).
-
-**Files:**
-- Delete: `src/pages/CommunityPage.tsx`, `src/pages/LibraryPage.tsx`, `src/pages/ProjektePage.tsx`, `src/pages/VerzeichnisPage.tsx`, `src/config/meinBereich.ts`, `src/config/meinBereich.test.ts`, `src/components/ui/MeinBereichNav.tsx`, `src/components/RequireTier.tsx`
-- Rename: `src/components/RequireTier.test.tsx` → `src/components/RequireAuth.test.tsx`
-- Modify: `src/components/MembershipGate.test.tsx`, `src/components/AppShell.tsx`, `src/components/mein-bereich/profil-widgets.tsx`, `src/pages/HomePage.tsx`, `src/components/ui/index.ts`
-
-**Interfaces:**
-- Consumes: alles aus Tasks 1–5.
-- Produces: keine neuen Schnittstellen.
-
-- [ ] **Step 1: Die vier Verzeichnis-Gate-Tests übersetzen**
-
-Sie prüfen heute Redirects, die es nicht mehr gibt — aber die Zusage dahinter bleibt: **keine Mitgliederdaten unterhalb von `discover`.** Sie ziehen zu den anderen Wand-Fällen.
-
-In `src/components/MembershipGate.test.tsx` ergänzen:
+Dann den übersetzten Block ergänzen:
 
 ```tsx
 /**
@@ -986,36 +974,60 @@ describe("Stufen-Gating für /mitglieder (min Discover)", () => {
 });
 ```
 
-Dafür in `MembershipGate.test.tsx` sicherstellen, dass `fakeAuthValue` importiert ist und `authLoadingTier` verfügbar — die Helferfunktion aus `RequireTier.test.tsx:14-21` mitnehmen:
+- [ ] **Step 11: Die übersetzten Fälle aus RequireTier.test.tsx entfernen**
 
-```tsx
-/** Eingeloggt, aber tier/level_rank werden noch geladen (Profil-Fetch offen). */
-function authLoadingTier(): AuthContextValue {
-  return fakeAuthValue({
-    user: { id: "test-user" } as AuthContextValue["user"],
-    tier: null,
-    levelRank: null,
-    tierLoading: true,
-  });
-}
+In `src/components/RequireTier.test.tsx` die beiden `describe`-Blöcke `Stufen-Gating für /verzeichnis (min Discover)` (Zeilen ~41–74) und `Stufen-Gating wartet auf das Laden der Stufe` (Zeilen ~120–129) **löschen** — sie leben ab jetzt in `MembershipGate.test.tsx`.
+
+Die Blöcke `Auth-Gating für /mein-bereich` und `Auth-Gating für /profil` bleiben unverändert: sie prüfen `RequireAuth`, nicht `RequireTier`. Den `markSkipped`-Import entfernen, falls er durch die Löschung ungenutzt wird. Die Datei wird in Task 6 passend umbenannt.
+
+- [ ] **Step 12: Tests + Typecheck laufen lassen — alles muss grün sein**
+
+Run: `pnpm typecheck && pnpm test`
+Expected: **PASS, ohne Ausnahme.** Insbesondere `nav.test.ts` (5), `App.test.tsx`, `MembershipGate.test.tsx` (inkl. der fünf übersetzten `/mitglieder`-Fälle) und `RequireTier.test.tsx` (nur noch Auth-Fälle).
+
+`meinBereich.test.ts` bleibt grün: sie prüft `MEIN_BEREICH_NODES` isoliert, und die Config existiert bis Task 6 weiter.
+
+- [ ] **Step 13: Committen**
+
+```bash
+git add -A
+git commit -m "feat(nav): Nav-Gerüst auf 6+5+1, minTier mauert statt wegzuleiten (AGE-314)"
 ```
 
-- [ ] **Step 2: Test laufen lassen — die Übersetzung muss durchlaufen**
+---
 
-Run: `pnpm vitest run src/components/MembershipGate.test.tsx`
-Expected: PASS — inklusive der fünf neuen `/mitglieder`-Fälle.
+### Task 6: Waisen abräumen, Tests übersetzen, Links nachziehen
 
-- [ ] **Step 3: RequireTier.test.tsx auf die Auth-Fälle eindampfen und umbenennen**
+Räumt ab, was die Tasks 1–5 zu Waisen gemacht haben. Die Test-Übersetzung ist bereits in Task 5 passiert (dort liegt die Gate-Änderung, die sie beweist) — hier bleibt Löschen und Links nachziehen.
 
-Die `/verzeichnis`-Fälle sind jetzt in `MembershipGate.test.tsx`. Was bleibt, prüft `RequireAuth` (`/profil`, `/mein-bereich`) — die Datei heißt danach passend:
+**Files:**
+- Delete: `src/pages/CommunityPage.tsx`, `src/pages/LibraryPage.tsx`, `src/pages/ProjektePage.tsx`, `src/pages/VerzeichnisPage.tsx`, `src/config/meinBereich.ts`, `src/config/meinBereich.test.ts`, `src/components/ui/MeinBereichNav.tsx`, `src/components/RequireTier.tsx`
+- Rename: `src/components/RequireTier.test.tsx` → `src/components/RequireAuth.test.tsx`
+- Modify: `src/components/AppShell.tsx`, `src/components/mein-bereich/profil-widgets.tsx`, `src/pages/HomePage.tsx`, `docs/demo-script.md`
+
+**Interfaces:**
+- Consumes: alles aus Tasks 1–5.
+- Produces: keine neuen Schnittstellen.
+
+**Warum diese acht Dateien Waisen sind** (jede einzeln geprüft, nicht geraten):
+
+| Datei | Letzter Aufrufer entfiel in |
+|---|---|
+| `CommunityPage.tsx` | Task 5 (aus `navItems` entfernt; Feed lebt in `AktivitaetPage`) |
+| `LibraryPage.tsx`, `ProjektePage.tsx` | Task 5 (leere Stubs, ersatzlos gestrichen — Design §5) |
+| `VerzeichnisPage.tsx` | Task 5 (`MitgliederPage` mountet `MemberDirectory` direkt) |
+| `RequireTier.tsx` | Task 5 Step 4 — `App.tsx:30` war der einzige Aufrufer |
+| `meinBereich.ts`, `meinBereich.test.ts`, `MeinBereichNav.tsx` | Task 5 Step 6 — zweite Nav-Quelle, MEIN BEREICH kommt jetzt aus `navItems` |
+
+- [ ] **Step 1: RequireTier.test.tsx umbenennen**
+
+Die Datei enthält nach Task 5 nur noch `RequireAuth`-Fälle (`/profil`, `/mein-bereich`) — die `/verzeichnis`-Fälle sind dort bereits nach `MembershipGate.test.tsx` übersetzt worden. Der Name passt nicht mehr zum Inhalt, und die Komponente, nach der sie heißt, wird in Step 2 gelöscht:
 
 ```bash
 git mv src/components/RequireTier.test.tsx src/components/RequireAuth.test.tsx
 ```
 
-In `src/components/RequireAuth.test.tsx`: die beiden `describe`-Blöcke `Stufen-Gating für /verzeichnis (min Discover)` und `Stufen-Gating wartet auf das Laden der Stufe` **löschen** (nach `MembershipGate.test.tsx` übersetzt, siehe Step 1). Die Blöcke `Auth-Gating für /mein-bereich` und `Auth-Gating für /profil` bleiben unverändert. `markSkipped`-Import entfernen, falls durch die Löschung ungenutzt.
-
-- [ ] **Step 4: Die Waisen löschen**
+- [ ] **Step 2: Die Waisen löschen**
 
 ```bash
 git rm src/pages/CommunityPage.tsx src/pages/LibraryPage.tsx \
@@ -1027,7 +1039,7 @@ git rm src/pages/CommunityPage.tsx src/pages/LibraryPage.tsx \
 `src/components/ui/index.ts` re-exportiert `MeinBereichNav` **nicht** (geprüft: nur
 `SidebarNav` in Zeile 10) — dort ist nichts zu tun.
 
-- [ ] **Step 5: Die letzten Links nachziehen**
+- [ ] **Step 3: Die letzten Links nachziehen**
 
 `src/components/AppShell.tsx:19`:
 
@@ -1058,7 +1070,7 @@ const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
 
 `docs/demo-script.md`: `/verzeichnis` → `/mitglieder`, „Verzeichnis" → „Mitglieder" wo es die Seite meint.
 
-- [ ] **Step 6: Beweisen, dass keine alten Pfade mehr im Code stehen**
+- [ ] **Step 4: Beweisen, dass keine alten Pfade mehr im Code stehen**
 
 ```bash
 grep -rn '"/community"\|"/verzeichnis"\|"/matching"\|"/angebote-gesuche"\|"/library"\|"/projekte"' src/
@@ -1066,12 +1078,12 @@ grep -rn '"/community"\|"/verzeichnis"\|"/matching"\|"/angebote-gesuche"\|"/libr
 
 Expected: **nur** die vier `<Route path=…>`-Redirect-Zeilen in `src/App.tsx`. Jeder andere Treffer ist ein vergessener Link.
 
-- [ ] **Step 7: Vollen Testlauf + Typecheck + Lint**
+- [ ] **Step 5: Vollen Testlauf + Typecheck + Lint**
 
 Run: `pnpm typecheck && pnpm lint && pnpm test`
 Expected: alles PASS, keine ungenutzten Imports.
 
-- [ ] **Step 8: Committen**
+- [ ] **Step 6: Committen**
 
 ```bash
 git add -A
