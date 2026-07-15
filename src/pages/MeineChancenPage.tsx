@@ -70,7 +70,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 export default function MeineChancenPage() {
   const { user } = useAuth();
-  // /matching ist Prime+-gegated — user ist hier vorhanden; defensiver Fallback.
+  // /meine-chancen ist ab Discover gegatet — user ist hier vorhanden; defensiver Fallback.
   if (!user) return null;
   return <MatchingHub uid={user.id} />;
 }

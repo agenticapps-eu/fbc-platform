@@ -22,11 +22,11 @@ describe("App", () => {
     // Logo erscheint in Sidebar (Desktop) und Header (Mobil) — beide im DOM.
     expect(screen.getAllByRole("link", { name: "Fair Business Club" }).length).toBeGreaterThan(0);
     // Anon sieht nur die öffentlichen Formate (Start/Events/Community) — die
-    // gegateten Einträge wie „Matching" tauchen im Anon-Menü nicht auf.
+    // gegateten Einträge wie „Meine Chancen" tauchen im Anon-Menü nicht auf.
     expect(screen.getByRole("link", { name: "Start" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Community" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Matching" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Meine Chancen" })).not.toBeInTheDocument();
     // / rendert die öffentliche Startseite.
     expect(
       screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
