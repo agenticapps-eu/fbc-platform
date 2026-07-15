@@ -1,19 +1,21 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export type BadgeVariant = "discover" | "prime" | "legacy" | "neutral";
+/** Visuelles Gewicht, KEIN Stufenname. Die Varianten hießen bis AGE-311 nach den
+ *  Stufen (discover/prime/legacy) und wurden zugleich dekorativ für Event-Typen und
+ *  „Bietet"/„Sucht" benutzt — jede Modelländerung fasste damit auch Schmuck an.
+ *  TierBadge bildet die sechs Stufen auf diese Gewichte ab. */
+export type BadgeVariant = "muted" | "soft" | "strong" | "neutral";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
 }
 
-// Stufenfarbe nur über Gold/Anthrazit — kein Bunt (AGE-237).
+// Gewichtung nur über Gold/Anthrazit — kein Bunt (AGE-237).
 const variants: Record<BadgeVariant, string> = {
-  // Stufen-Hierarchie als Gold-„Medaille": Discover neutral → Prime helles Gold →
-  // Legacy volles Gold mit dunklem Text (oberste Stufe, klar distinkt; AGE-237).
-  discover: "bg-ink/[0.06] text-muted",
-  prime: "bg-gold-soft text-gold-strong",
-  legacy: "bg-gold text-night",
+  muted: "bg-ink/[0.06] text-muted",
+  soft: "bg-gold-soft text-gold-strong",
+  strong: "bg-gold text-night",
   neutral: "bg-ink/5 text-ink",
 };
 

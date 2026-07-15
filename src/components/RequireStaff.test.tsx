@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { ToastProvider } from "../components/ui/Toast";
 import { markSkipped } from "../lib/compass";
-import { TIER_RANK } from "../lib/tiers";
+import { LEVEL_RANK } from "../config/levels";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
 
@@ -16,7 +16,7 @@ function authAsStaff(): AuthContextValue {
   return fakeAuthValue({
     user: { id: "staff-user" } as AuthContextValue["user"],
     tier: "prime",
-    levelRank: TIER_RANK.prime,
+    levelRank: LEVEL_RANK.impact,
     staffRole: "matching_manager",
   });
 }
@@ -52,12 +52,12 @@ describe("Staff-Gating für /intern/routing", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("leitet eingeloggte Mitglieder OHNE Staff-Rolle weg (auch Prime)", () => {
+  it("leitet eingeloggte Mitglieder OHNE Staff-Rolle weg (auch Impact)", () => {
     // „/" ist onboarding-bewusst (HomeRedirect); der „übersprungen"-Merker löst die
     // Weiche deterministisch auf die öffentliche Startseite auf, sodass der Test das
     // Gating prüft.
     markSkipped("test-user");
-    renderAt("/intern/routing", authAsTier("prime"));
+    renderAt("/intern/routing", authAsTier("impact"));
 
     expect(screen.queryByRole("heading", { name: "Routing-Queue" })).not.toBeInTheDocument();
     expect(

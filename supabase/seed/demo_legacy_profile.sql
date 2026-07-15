@@ -12,7 +12,7 @@
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 
 -- 1. Demo auth user. The handle_new_user trigger auto-creates the profiles row
---    (name from metadata, tier 'discover'); we enrich it below. pgcrypto lives in
+--    (name from metadata, tier 'basic'); we enrich it below. pgcrypto lives in
 --    the `extensions` schema on Supabase — qualify so search_path is irrelevant.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
@@ -36,7 +36,7 @@ on conflict (id) do nothing;
 -- 2. Enrich the demo profile (the trigger already inserted the base row).
 update public.profiles set
   name               = 'Maximilian Bauer',
-  tier               = 'legacy',
+  tier               = 'impact',
   headline           = 'Unternehmer · Investor · Deal Keeper · Ökosystem Architekt',
   roles              = array['Unternehmer', 'Investor', 'Deal Keeper', 'Ökosystem Architekt'],
   member_number      = 'FBC-10023',

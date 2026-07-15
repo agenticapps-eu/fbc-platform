@@ -36,7 +36,7 @@ describe("App", () => {
   it("markiert auf /kontakte genau einen Sidebar-Eintrag als aktiv", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <AuthFixture value={authAsTier("legacy")}>
+      <AuthFixture value={authAsTier("impact")}>
         <QueryClientProvider client={queryClient}>
           <MemoryRouter initialEntries={["/kontakte"]}>
             <App />

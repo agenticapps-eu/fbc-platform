@@ -39,7 +39,7 @@ describe("MembershipGate für Formate", () => {
   });
 
   it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", () => {
-    renderAt("/compass", authAsTier("discover"));
+    renderAt("/compass", authAsTier("basic"));
 
     expect(screen.getByText("Mini-Compass")).toBeInTheDocument();
     expect(
@@ -47,11 +47,11 @@ describe("MembershipGate für Formate", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("zeigt einer zu niedrigen Stufe auf einem prime-Format (/matching) die Stufen-Wand", () => {
-    renderAt("/matching", authAsTier("discover"));
+  it("zeigt einer zu niedrigen Stufe auf einem discover-Format (/matching) die Stufen-Wand", () => {
+    renderAt("/matching", authAsTier("basic"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Prime verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
     ).toBeInTheDocument();
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
     expect(screen.queryByRole("button", { name: "Mitglied werden" })).not.toBeInTheDocument();

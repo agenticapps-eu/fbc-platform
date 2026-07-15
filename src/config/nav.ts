@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { MembershipTier } from "../lib/tiers";
+import type { MembershipLevel } from "./levels";
 import AcademyPage from "../pages/AcademyPage";
 import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
 import ChatPage from "../pages/ChatPage";
@@ -33,7 +33,7 @@ export interface NavItem {
   /** Gruppierung in der Sidebar. */
   section: NavSection;
   /** Mindest-Mitgliedsstufe fürs Route-Gating (impliziert eingeloggt). */
-  minTier?: MembershipTier;
+  minTier?: MembershipLevel;
   /** Route nur für eingeloggte Nutzer (ohne Stufen-Anforderung). */
   requiresAuth?: boolean;
   /** Für anonyme Besucher sichtbar/erreichbar (öffentliches Schaufenster). */
@@ -92,7 +92,9 @@ export const navItems: NavItem[] = [
     label: "Matching",
     Component: MatchingPage,
     section: "formate",
-    minTier: "prime",
+    // §2: „erweiterte Matchings" ab `discover`. Die „ersten Matchings" von
+    // `connect` kommen aus der matches-Tabelle und brauchen diese Seite nicht.
+    minTier: "discover",
   },
   {
     path: "/projekte",
@@ -101,22 +103,30 @@ export const navItems: NavItem[] = [
     section: "formate",
     requiresAuth: true,
   },
-  // Verzeichnis: Unterbereich von Community (ab Prime), kein Top-Level-Eintrag.
+  // Verzeichnis: Unterbereich von Community (ab Discover), kein Top-Level-Eintrag.
   {
     path: "/verzeichnis",
     label: "Verzeichnis",
     Component: VerzeichnisPage,
     section: "community",
-    minTier: "prime",
+    // §2: „vollständiges Mitgliederverzeichnis" ab `discover` (150 €). Darunter
+    // bleibt profiles_public — Basisfelder sehen alle Mitglieder.
+    minTier: "discover",
   },
   // Chat (AGE-248, §9): Direktnachrichten ab Freigabe. Erreichbar aus „Mein
-  // Bereich" und der angenommenen Anfrage, kein eigener Top-Level-Eintrag. Prime+.
+  // Bereich" und der angenommenen Anfrage, kein eigener Top-Level-Eintrag.
+  //
+  // Bewusst OHNE minTier (AGE-311): §2 stellt „Nachrichten an bereits akzeptierte
+  // Kontakte" ausdrücklich allen ab `basic` frei. Die Schranke ist die Freigabe,
+  // nicht die Stufe — und sie sitzt ohnehin in der RLS (messages_insert verlangt
+  // eine akzeptierte contact_request). Kontaktanfragen zu STELLEN kostet ab
+  // `exchange`; ein bestehendes Gespräch fortzuführen nie.
   {
     path: "/chat",
     label: "Chat",
     Component: ChatPage,
     section: "community",
-    minTier: "prime",
+    requiresAuth: true,
   },
   // Such-/Bieteprofil-Editor (AGE-244): erreichbar aus „Mein Bereich" und dem
   // Compass-Kontext, kein eigener Top-Level-Eintrag. Alle Stufen (eigene Zeilen).

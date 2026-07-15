@@ -332,7 +332,7 @@ function MatchCard({ uid, match }: { uid: string; match: HubMatch }) {
             <h3 className="truncate text-base font-semibold text-ink">{partner.name}</h3>
             {partner.tier && <TierBadge tier={partner.tier} />}
             {match.routing === "dkri" && (
-              <Badge variant="legacy" title="Großvolumen → DKRI Deal-Keeping">
+              <Badge variant="strong" title="Großvolumen → DKRI Deal-Keeping">
                 DKRI
               </Badge>
             )}
@@ -347,7 +347,7 @@ function MatchCard({ uid, match }: { uid: string; match: HubMatch }) {
       {(comp.length > 0 || secondary.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {comp.map((text) => (
-            <Badge key={text} variant="prime">
+            <Badge key={text} variant="soft">
               {text}
             </Badge>
           ))}
@@ -538,14 +538,14 @@ function ContactAction({ uid, match }: { uid: string; match: HubMatch }) {
   // Bestehende Anfrage → Status statt Senden-Button.
   const cr = match.contactRequest;
   if (cr) {
-    if (cr.status === "accepted") return <Badge variant="legacy">Kontakt freigegeben</Badge>;
+    if (cr.status === "accepted") return <Badge variant="strong">Kontakt freigegeben</Badge>;
     if (cr.status === "declined")
       return <span className="text-sm text-muted">Anfrage abgelehnt</span>;
     // pending
     return cr.outgoing ? (
-      <Badge variant="prime">Anfrage gesendet</Badge>
+      <Badge variant="soft">Anfrage gesendet</Badge>
     ) : (
-      <Badge variant="prime">Hat dich angefragt</Badge>
+      <Badge variant="soft">Hat dich angefragt</Badge>
     );
   }
 

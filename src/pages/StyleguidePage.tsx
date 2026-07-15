@@ -1,4 +1,5 @@
 import { captureMessage } from "@sentry/react";
+import { LEVEL_ORDER } from "../config/levels";
 import { useState, type ReactNode } from "react";
 import { logEvent } from "../lib/log";
 import { Avatar } from "../components/ui/Avatar";
@@ -220,7 +221,7 @@ function VariantsSection() {
         </Card>
         <Card className="flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-xs uppercase tracking-wide text-muted">Tier-Puls (b/d)</p>
-          <TierBadge tier="legacy" />
+          <TierBadge tier="impact" />
         </Card>
         <Card className="flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-xs uppercase tracking-wide text-muted">Button-Sheen</p>
@@ -332,9 +333,9 @@ export default function StyleguidePage() {
           {/* Badges / Mitgliedsstufen */}
           <Section title="Badges — Mitgliedsstufen">
             <div className="flex flex-wrap items-center gap-3">
-              <TierBadge tier="discover" />
-              <TierBadge tier="prime" />
-              <TierBadge tier="legacy" />
+              {LEVEL_ORDER.map((level) => (
+                <TierBadge key={level} tier={level} />
+              ))}
               <Badge variant="neutral">Neutral</Badge>
             </div>
           </Section>

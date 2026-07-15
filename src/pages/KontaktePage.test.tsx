@@ -63,7 +63,7 @@ beforeEach(() => {
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <AuthFixture value={authAsTier("legacy")}>
+    <AuthFixture value={authAsTier("impact")}>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <KontaktePage />

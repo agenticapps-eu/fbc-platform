@@ -39,7 +39,7 @@ const publicProfile = {
   region: "Berlin",
   company: "Legacy GmbH",
   short_bio: "Begleitet Unternehmer beim Aufbau von Ökosystemen.",
-  tier: "legacy",
+  tier: "impact",
   roles: ["Unternehmer", "Investor"],
 };
 
@@ -102,26 +102,30 @@ beforeEach(() => {
 });
 
 describe("Öffentliche Profilseite (AGE-239)", () => {
-  it("zeigt Discover nur öffentliche Felder (Name, Rollen, Tier) — keine erweiterten Blöcke", async () => {
+  it("zeigt Basic nur öffentliche Felder (Name, Rollen, Tier) — keine erweiterten Blöcke", async () => {
     mockedFetch.mockResolvedValue(discoverView);
-    renderPage(authAsTier("discover"));
+    renderPage(authAsTier("basic"));
 
     expect(await screen.findByRole("heading", { name: "Legacy Demo" })).toBeInTheDocument();
     expect(screen.getByText("Investor")).toBeInTheDocument();
-    expect(screen.getByText(/Legacy Member/i)).toBeInTheDocument();
+    expect(screen.getByText(/Impact Member/i)).toBeInTheDocument();
 
     // Erweiterte Blöcke fehlen — die RLS gab sie nicht frei (extended === null).
     expect(screen.queryByRole("heading", { name: "Erfolgsradar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kompetenzen" })).not.toBeInTheDocument();
     expect(screen.queryByText("842")).not.toBeInTheDocument();
-    // Kein Kontakt-Senden-Button für Discover; stattdessen der Prime-Hinweis-Block.
+    // Kein Kontakt-Senden-Button für Basic; stattdessen der Upgrade-Hinweis-Block.
     expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Erweiterte Profilangaben" })).toBeInTheDocument();
   });
 
-  it("zeigt Prime die erweiterten Felder und den Kontaktanfrage-Button", async () => {
+  // §2 trennt zwei Schwellen, die bis AGE-311 beide auf Prime lagen: das
+  // „vollständige Verzeichnis" (erweiterte Felder, ab `discover`) und das
+  // Kontaktrecht (ab `exchange`). Genau diese Lücke ist der verteidigbare Kern —
+  // Sichtbarkeit ist kein Kontaktrecht —, deshalb je ein eigener Test.
+  it("zeigt Discover die erweiterten Felder, aber KEINEN Kontaktanfrage-Button", async () => {
     mockedFetch.mockResolvedValue(fullView);
-    renderPage(authAsTier("prime"));
+    renderPage(authAsTier("discover"));
 
     expect(await screen.findByRole("heading", { name: "Erfolgsradar" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Kompetenzen" })).toBeInTheDocument();
@@ -129,6 +133,18 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.getByText("842")).toBeInTheDocument();
     expect(screen.getByText("Beteiligungskapital")).toBeInTheDocument();
     expect(screen.getByText("Impact-Projekte")).toBeInTheDocument();
+
+    // Sehen ja, anschreiben nein.
+    expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Kontaktanfragen sind ab der Mitgliedsstufe/)).toBeInTheDocument();
+    expect(screen.getByText("Exchange")).toBeInTheDocument();
+  });
+
+  it("zeigt Exchange zusätzlich den Kontaktanfrage-Button", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    renderPage(authAsTier("exchange"));
+
+    expect(await screen.findByRole("heading", { name: "Erfolgsradar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontaktanfrage senden" })).toBeInTheDocument();
   });
 
@@ -137,8 +153,8 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     renderPage(
       fakeAuthValue({
         user: { id: PROFILE_ID } as AuthContextValue["user"],
-        tier: "legacy",
-        levelRank: 7,
+        tier: "impact",
+        levelRank: 6,
       }),
     );
 
@@ -148,7 +164,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
 
   it("zeigt vor Annahme keine Kontaktdaten — Hinweis ist präsent, keine E-Mail/Telefon", async () => {
     mockedFetch.mockResolvedValue(fullView);
-    renderPage(authAsTier("prime"));
+    renderPage(authAsTier("exchange"));
 
     expect(
       await screen.findByText("E-Mail und Telefon werden nie automatisch angezeigt."),
@@ -163,7 +179,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
       contact: { email: "legacy@example.com", phone: "+49 30 1234567" },
       matchId: null,
     });
-    renderPage(authAsTier("prime"));
+    renderPage(authAsTier("exchange"));
 
     expect(await screen.findByText("Kontakt freigegeben")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "legacy@example.com" })).toHaveAttribute(
