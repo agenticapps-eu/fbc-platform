@@ -5,8 +5,19 @@ import {
   parseHashtags,
   parseVideoUrl,
   tokenizePostBody,
+  VISIBILITY_OPTIONS,
   type FeedAuthor,
 } from "./feed";
+
+describe("VISIBILITY_OPTIONS", () => {
+  it("bietet nur Werte an, die posts_visibility_check akzeptiert (AGE-355)", () => {
+    // Die Wahrheit steht in 20260715150000_six_level_model.sql:265:
+    //   check (visibility in ('public', 'members'))
+    // Eine Option, die die Constraint nicht kennt, ist ein Speichern-Fehler in Prod.
+    // Neue Option ⇒ zuerst Migration, dann diese Liste.
+    expect(VISIBILITY_OPTIONS.map((o) => o.value).sort()).toEqual(["members", "public"]);
+  });
+});
 
 describe("parseHashtags", () => {
   it("extrahiert Hashtags ohne #, normalisiert klein, dedupliziert, Reihenfolge bleibt", () => {
