@@ -8,7 +8,7 @@ import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
 import LibraryPage from "../pages/LibraryPage";
-import MatchingPage from "../pages/MatchingPage";
+import MeineChancenPage from "../pages/MeineChancenPage";
 import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
 import MeineEventsPage from "../pages/MeineEventsPage";
@@ -88,9 +88,9 @@ export const navItems: NavItem[] = [
     publicAccess: true,
   },
   {
-    path: "/matching",
-    label: "Matching",
-    Component: MatchingPage,
+    path: "/meine-chancen",
+    label: "Meine Chancen",
+    Component: MeineChancenPage,
     section: "formate",
     // §2: „erweiterte Matchings" ab `discover`. Die „ersten Matchings" von
     // `connect` kommen aus der matches-Tabelle und brauchen diese Seite nicht.

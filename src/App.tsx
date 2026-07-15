@@ -43,6 +43,7 @@ export default function App() {
             <Route key={item.path} path={item.path} element={gatedElement(item)} />
           ))}
           <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
+          <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
           {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
             die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
           <Route

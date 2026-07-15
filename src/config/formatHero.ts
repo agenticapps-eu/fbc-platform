@@ -11,6 +11,6 @@ export const FORMAT_HERO: Record<string, FormatHeroMeta> = {
   "/mitglieder": { title: "Mitglieder", claim: "Finde die Passenden." },
   "/aktivitaet": { title: "Aktivität", claim: "Hier lebt der Club." },
   "/community": { title: "Community", claim: "Das Netzwerk, das fair handelt." },
-  "/matching": { title: "Matching", claim: "Suche trifft Biete." },
+  "/meine-chancen": { title: "Meine Chancen", claim: "Suche trifft Biete." },
   "/projekte": { title: "Projekte", claim: "Gemeinsam etwas bauen." },
 };

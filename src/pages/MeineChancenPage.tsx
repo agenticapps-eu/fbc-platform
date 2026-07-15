@@ -68,7 +68,7 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-export default function MatchingPage() {
+export default function MeineChancenPage() {
   const { user } = useAuth();
   // /matching ist Prime+-gegated — user ist hier vorhanden; defensiver Fallback.
   if (!user) return null;
@@ -114,7 +114,7 @@ function MatchingHub({ uid }: { uid: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <FormatHero meta={FORMAT_HERO["/matching"]} />
+      <FormatHero meta={FORMAT_HERO["/meine-chancen"]} />
 
       <HubHeader
         stats={data?.stats}
@@ -604,7 +604,7 @@ function EmptyMatches({
       }
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link to="/angebote-gesuche">
+          <Link to="/compass">
             <Button variant="primary" size="sm">
               Angebote &amp; Gesuche pflegen
             </Button>

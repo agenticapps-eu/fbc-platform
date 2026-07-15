@@ -47,8 +47,8 @@ describe("MembershipGate für Formate", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("zeigt einer zu niedrigen Stufe auf einem discover-Format (/matching) die Stufen-Wand", () => {
-    renderAt("/matching", authAsTier("basic"));
+  it("zeigt einer zu niedrigen Stufe auf /meine-chancen die Stufen-Wand", () => {
+    renderAt("/meine-chancen", authAsTier("basic"));
 
     expect(
       screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),

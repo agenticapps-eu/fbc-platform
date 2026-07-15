@@ -16,7 +16,7 @@ import { useDesignVariantValue } from "../providers/design-variant-context";
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
 // innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
-const WIDE_ROUTES = ["/profil", "/kontakte", "/verzeichnis", "/matching"];
+const WIDE_ROUTES = ["/profil", "/kontakte", "/verzeichnis", "/meine-chancen"];
 
 // Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
 // .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —

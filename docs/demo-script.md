@@ -25,7 +25,7 @@
    Hashtags, ein eingebettetes **Video** (YouTube). Jonas kann lesen und selbst posten.
 2. Auf den Tab **Verzeichnis** wechseln → statt der Mitgliederliste erscheint der Hinweis:
    **„Das durchsuchbare Verzeichnis aller Mitglieder ist ab der Stufe Prime verfügbar."**
-3. In der URL `/matching` aufrufen → Discover wird **weggeleitet** (kein Zugriff).
+3. In der URL `/meine-chancen` aufrufen → Discover wird **weggeleitet** (kein Zugriff).
    *Aussage:* „Discover sieht die Bühne, aber nicht das Adressbuch — und das ist keine
    Frontend-Höflichkeit, sondern in der Datenbank gesperrt."
 
@@ -39,7 +39,7 @@
 
 1. **Verzeichnis** (`/verzeichnis`): 18 Mitglieder, **Filter** nach Thema, Branche, Region,
    Kompetenz und Sucht/Bietet. Kurz einen Filter setzen (z. B. Branche „Immobilien").
-2. **Matching-Hub** (`/matching`): Top-Matches mit **Prozent-Score** (z. B. 93 %), Spalten
+2. **Meine Chancen** (`/meine-chancen`): Top-Matches mit **Prozent-Score** (z. B. 93 %), Spalten
    **BIETET ⇄ SUCHT**, und „Warum dieses Match?" mit nachvollziehbarer Begründung. Betonen:
    **die Bedürfnisse stehen im Vordergrund, nicht der Name.**
 3. **Der Kontakt-Moment** (Herzstück):
