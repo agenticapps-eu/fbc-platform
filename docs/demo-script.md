@@ -23,9 +23,10 @@
 
 1. **Community-Feed** zeigen: öffentliche und Mitglieder-Beiträge, ruhiger LinkedIn-artiger Look,
    Hashtags, ein eingebettetes **Video** (YouTube). Jonas kann lesen und selbst posten.
-2. Auf den Tab **Mitglieder** wechseln → statt der Mitgliederliste erscheint der Hinweis:
-   **„Das durchsuchbare Verzeichnis aller Mitglieder ist ab der Stufe Prime verfügbar."**
-3. In der URL `/meine-chancen` aufrufen → Discover wird **weggeleitet** (kein Zugriff).
+2. In der Seitennavigation auf **Mitglieder** wechseln → statt der Mitgliederliste erscheint die
+   Wand: **„Dieser Bereich ist ab Discover verfügbar"**.
+3. In der URL `/meine-chancen` aufrufen → dieselbe Wand statt der Matches (kein Wegleiten,
+   die Seite bleibt sichtbar).
    *Aussage:* „Discover sieht die Bühne, aber nicht das Adressbuch — und das ist keine
    Frontend-Höflichkeit, sondern in der Datenbank gesperrt."
 
