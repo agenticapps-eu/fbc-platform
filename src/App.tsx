@@ -6,7 +6,6 @@ import { DesignVariantProvider } from "./providers/DesignVariantProvider";
 import MembershipGate from "./components/MembershipGate";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
-import RequireTier from "./components/RequireTier";
 import { navItems, type NavItem } from "./config/nav";
 import ChatPage from "./pages/ChatPage";
 import EventDetailPage from "./pages/EventDetailPage";
@@ -20,15 +19,19 @@ const StyleguidePage = import.meta.env.DEV ? lazy(() => import("./pages/Stylegui
 
 function gatedElement(item: NavItem) {
   const element = <item.Component />;
-  // Formate werden NICHT weggeleitet, sondern zeigen für anon/zu niedrige Stufe
-  // eine „Mitglied werden"-Wand (öffentliches Schaufenster bleibt sichtbar).
-  if (item.section === "formate") {
-    if (item.minTier) return <MembershipGate min={item.minTier}>{element}</MembershipGate>;
-    if (item.requiresAuth) return <MembershipGate>{element}</MembershipGate>;
-    return element; // öffentliche Formate (Start/Community/Events)
+  // minTier ⇒ Wand statt Wegleiten: das Format bleibt im Schaufenster sichtbar, der
+  // Inhalt gesperrt (Spec §1). Bewusst VOR der Section-Prüfung: /meine-chancen liegt
+  // seit AGE-314 unter „mein-bereich", soll aber weiter mauern statt wegzuleiten.
+  if (item.minTier) return <MembershipGate min={item.minTier}>{element}</MembershipGate>;
+  // requiresAuth: ENTDECKEN mauert (Schaufenster bleibt sichtbar), persönliche
+  // Bereiche leiten zum Login — dort gibt es ohne Konto nichts zu zeigen.
+  if (item.requiresAuth) {
+    return item.section === "entdecken" ? (
+      <MembershipGate>{element}</MembershipGate>
+    ) : (
+      <RequireAuth>{element}</RequireAuth>
+    );
   }
-  if (item.minTier) return <RequireTier min={item.minTier}>{element}</RequireTier>;
-  if (item.requiresAuth) return <RequireAuth>{element}</RequireAuth>;
   return element;
 }
 
@@ -44,6 +47,8 @@ export default function App() {
           ))}
           <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
           <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
+          <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
+          <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />
           {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).
             Der Redirect landet auf dem Mini-Compass-Tab, nicht auf „Suche & Biete" —
             Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus. */}

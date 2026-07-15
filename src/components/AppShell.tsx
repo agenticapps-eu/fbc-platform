@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/cn";
-import { navItems } from "../config/nav";
+import { navItems, type NavSection } from "../config/nav";
 import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { Logo } from "./ui/Logo";
-import { MeinBereichNav } from "./ui/MeinBereichNav";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
@@ -166,14 +165,26 @@ function UserMenu({
   );
 }
 
+/** Reihenfolge und Titel der Sidebar-Abschnitte (Spec §2). `sub` erscheint nie. */
+const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
+  { section: "entdecken", title: "Entdecken" },
+  { section: "mein-bereich", title: "Mein Bereich" },
+  { section: "service", title: "Service" },
+];
+
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
  *  Mitglieder-Block oben, flaches Hauptmenü, „Mein Bereich"-Akkordeon unten. */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { user, tier } = useAuth();
-  // Anon sieht nur die öffentlichen Formate (Start/Events/Community), in
-  // Formate-Reihenfolge; eingeloggte Mitglieder sehen alle.
-  const formats = navItems.filter((i) => i.section === "formate");
-  const visible = user ? formats : formats.filter((i) => i.publicAccess);
+  // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
+  // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
+  // ohne Konto wäre ein Versprechen ins Leere.
+  const sections = SIDEBAR_SECTIONS.filter(({ section }) => user || section === "entdecken").map(
+    ({ section, title }) => ({
+      title,
+      items: navItems.filter((i) => i.section === section),
+    }),
+  );
   return (
     <div className="flex flex-col gap-7">
       {user ? (
@@ -202,8 +213,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <span className="mt-0.5 block text-xs text-muted">Mitglied werden &amp; alles sehen</span>
         </Link>
       )}
-      <SidebarNav sections={[{ items: visible }]} onNavigate={onNavigate} />
-      {user && <MeinBereichNav onNavigate={onNavigate} />}
+      <SidebarNav sections={sections} onNavigate={onNavigate} />
     </div>
   );
 }
