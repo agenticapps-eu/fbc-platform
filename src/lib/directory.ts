@@ -8,8 +8,9 @@ import type { Database } from "./database.types";
  * `search_directory` ist SECURITY INVOKER, die Policy `profiles_select_self_or_prime`
  * (AGE-235) gibt vollständige Profilzeilen nur am eigenen Profil ODER für Prime+
  * zurück. Eine Discover-/anon-Abfrage liefert höchstens die eigene Zeile — niemals
- * fremde Mitglieder. Der „Verzeichnis"-Tab wird zusätzlich unter Prime UI-seitig
- * versteckt (Komfort, nicht die Grenze).
+ * fremde Mitglieder. `/mitglieder` ist seit AGE-314 eine eigene Route mit
+ * `minTier: "discover"` (Spec §2), die unterhalb davon per MembershipGate die Wand
+ * zeigt (Komfort, nicht die Grenze).
  */
 
 export type DirectoryMember =

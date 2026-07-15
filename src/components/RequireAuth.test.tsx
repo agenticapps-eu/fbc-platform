@@ -56,7 +56,7 @@ describe("Auth-Gating für /mein-bereich", () => {
   it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
     renderAt("/mein-bereich", authLoadingTier());
 
-    // /mein-bereich → /profil (RequireAuth, kein RequireTier): bei laufendem
+    // /mein-bereich → /profil (RequireAuth, kein MembershipGate): bei laufendem
     // tier-Fetch reicht die Session – kein vorzeitiger Redirect auf /login.
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
