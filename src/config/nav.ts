@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import type { MembershipLevel } from "./levels";
 import AcademyPage from "../pages/AcademyPage";
-import AngeboteGesuchePage from "../pages/AngeboteGesuchePage";
 import ChatPage from "../pages/ChatPage";
 import CommunityPage from "../pages/CommunityPage";
 import CompassPage from "../pages/CompassPage";
@@ -125,15 +124,6 @@ export const navItems: NavItem[] = [
     path: "/chat",
     label: "Chat",
     Component: ChatPage,
-    section: "community",
-    requiresAuth: true,
-  },
-  // Such-/Bieteprofil-Editor (AGE-244): erreichbar aus „Mein Bereich" und dem
-  // Compass-Kontext, kein eigener Top-Level-Eintrag. Alle Stufen (eigene Zeilen).
-  {
-    path: "/angebote-gesuche",
-    label: "Angebote & Gesuche",
-    Component: AngeboteGesuchePage,
     section: "community",
     requiresAuth: true,
   },

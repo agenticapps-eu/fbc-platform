@@ -41,7 +41,9 @@ describe("MembershipGate für Formate", () => {
   it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", () => {
     renderAt("/compass", authAsTier("basic"));
 
-    expect(screen.getByText("Mini-Compass")).toBeInTheDocument();
+    // Seit AGE-314 trägt auch der Tab die Beschriftung „Mini-Compass" — daher
+    // gezielt die Karten-Überschrift prüfen statt des mehrdeutigen Texts.
+    expect(screen.getByRole("heading", { name: "Mini-Compass" })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
     ).not.toBeInTheDocument();

@@ -44,6 +44,10 @@ export default function App() {
           ))}
           <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
           <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
+          {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).
+            Der Redirect landet auf dem Mini-Compass-Tab, nicht auf „Suche & Biete" —
+            Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus. */}
+          <Route path="/angebote-gesuche" element={<Navigate to="/compass" replace />} />
           {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
             die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
           <Route

@@ -11,7 +11,6 @@ import {
   type UseFormRegister,
   type UseFormSetValue,
 } from "react-hook-form";
-import { Link } from "react-router-dom";
 import { CategoryIcon } from "../components/matching/CategoryIcon";
 import { TagInput } from "../components/profile/TagInput";
 import { Button } from "../components/ui/Button";
@@ -49,9 +48,14 @@ function errorMessage(error: unknown): string {
   return "Unbekannter Fehler.";
 }
 
-export default function AngeboteGesuchePage() {
+/**
+ * Such-/Bieteprofil-Editor (AGE-244). Seit AGE-314 lebt er als Tab in /compass
+ * (Spec §3: „Biete & Suche wird Teil von Compass") und nicht mehr als eigene
+ * Seite — Hero und Tab-Leiste stellt CompassPage.
+ */
+export function AngeboteGesucheEditor() {
   const { user } = useAuth();
-  // /angebote-gesuche ist requiresAuth — user ist hier vorhanden; defensiver Fallback.
+  // Der Compass-Tab ist requiresAuth — user ist hier vorhanden; defensiver Fallback.
   if (!user) return null;
   return <MatchingProfileEditor uid={user.id} />;
 }
@@ -133,9 +137,6 @@ function MatchingProfileEditor({ uid }: { uid: string }) {
     >
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-            Such- &amp; Bieteprofil
-          </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Pflege, was du anbietest und wonach du suchst. Daraus entstehen deine Matches — es ist
             eine Chancen-Datenbank, kein Kontaktverzeichnis.
@@ -206,10 +207,7 @@ function MatchingProfileEditor({ uid }: { uid: string }) {
         )}
       </Card>
 
-      <div className="flex items-center justify-between gap-4">
-        <Link to="/mein-bereich" className="text-sm font-medium text-gold-strong hover:text-gold">
-          ← Zurück zu Mein Bereich
-        </Link>
+      <div className="flex items-center justify-end gap-4">
         <Button type="submit" variant="primary" disabled={mutation.isPending}>
           {mutation.isPending ? "Speichern…" : "Speichern"}
         </Button>
