@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(26);
+select plan(31);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -73,6 +73,11 @@ insert into public.comments (post_id, author_id, body) values
 insert into public.events (id, title, host_id, visibility, starts_at) values
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Sommerfest', '66666666-6666-6666-6666-666666666666',
    'members', now() + interval '7 days');
+
+-- Thread Basic<->Connect OHNE Kontaktanfrage: der Gegenbeleg für §8 — ein
+-- bestehender Thread allein berechtigt nicht zum Schreiben.
+insert into public.message_threads (a_profile_id, b_profile_id) values
+  ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
 
 -- ── Rollen-Impersonation (Muster aus den probe_*.sql) ────────────────────────
 create function pg_temp.count_as(uid uuid, q text) returns int language plpgsql as $$
@@ -192,7 +197,47 @@ select alike(
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''88888888-8888-8888-8888-888888888888'')'),
   'DENIED:%', 'Wer Kontaktanfragen abgeschaltet hat, bekommt keine (Opt-out wird erzwungen)');
 
--- ── 7. posts — „Aktivität" ab `exchange` (rank 4) ────────────────────────────
+-- ── 7. Nachrichten — nur an bereits akzeptierte Kontakte (§2) ────────────────
+-- Diese Policies hängen an KEINER Stufe: sie verlangen eine angenommene
+-- Kontaktanfrage, sonst nichts. Genau das meint §2 mit „Nachrichten auf basic nur
+-- an bereits akzeptierte Kontakte" — nicht der Rang öffnet den Chat, sondern das
+-- Einverständnis des Gegenübers. Deshalb steht der Abschnitt hier und nicht bei
+-- den Rang-Gates: er prüft die Zustimmung, und die ist die Grenze.
+--
+-- Ausgangspunkt ist die Anfrage Exchange→Impact aus Abschnitt 4, die noch auf
+-- 'pending' liegt.
+
+select alike(
+  pg_temp.try_as('44444444-4444-4444-4444-444444444444',
+    'insert into public.message_threads (a_profile_id, b_profile_id) values (''44444444-4444-4444-4444-444444444444'', ''66666666-6666-6666-6666-666666666666'')'),
+  'DENIED:%', 'Kein Thread, solange die Kontaktanfrage nur pending ist');
+
+select is(
+  pg_temp.try_as('66666666-6666-6666-6666-666666666666',
+    'update public.contact_requests set status = ''accepted'' where from_id = ''44444444-4444-4444-4444-444444444444'' and to_id = ''66666666-6666-6666-6666-666666666666'''),
+  'OK', 'Der Empfänger (Impact) nimmt die Kontaktanfrage an');
+
+-- Den Thread legt der Client nicht an: handle_contact_request_change() öffnet ihn
+-- beim Annehmen (normalisiert über least/greatest, on conflict do nothing). Ein
+-- manuelles Insert könnte hier nur den Unique-Constraint treffen — geprüft wird
+-- deshalb, was gelten muss: der Thread existiert und Exchange sieht ihn.
+select is(
+  pg_temp.count_as('44444444-4444-4444-4444-444444444444',
+    'select count(*)::int from public.message_threads where a_profile_id = ''44444444-4444-4444-4444-444444444444'' and b_profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Das Annehmen öffnet einen Thread, den Exchange sieht');
+
+-- Gegenbeleg am Fixture-Thread Basic<->Connect: er existiert, aber ohne Anfrage.
+select alike(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'insert into public.messages (thread_id, sender_id, body) select id, ''11111111-1111-1111-1111-111111111111'', ''hallo'' from public.message_threads where a_profile_id = ''11111111-1111-1111-1111-111111111111'' and b_profile_id = ''22222222-2222-2222-2222-222222222222'''),
+  'DENIED:%', 'Ein bestehender Thread allein reicht nicht — ohne angenommene Anfrage keine Nachricht');
+
+select is(
+  pg_temp.try_as('44444444-4444-4444-4444-444444444444',
+    'insert into public.messages (thread_id, sender_id, body) select id, ''44444444-4444-4444-4444-444444444444'', ''hallo'' from public.message_threads where a_profile_id = ''44444444-4444-4444-4444-444444444444'' and b_profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  'OK', 'Nach dem Annehmen geht die Nachricht durch');
+
+-- ── 8. posts — „Aktivität" ab `exchange` (rank 4) ────────────────────────────
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
@@ -213,7 +258,7 @@ select is(
     'select count(*)::int from public.posts where id = ''dddddddd-dddd-dddd-dddd-dddddddddddd'''),
   1, 'Basic sieht den EIGENEN members-Beitrag (author-Klausel, rang-unabhängig)');
 
--- ── 8. Kommentare erben die Sichtbarkeit des Eltern-Posts ────────────────────
+-- ── 9. Kommentare erben die Sichtbarkeit des Eltern-Posts ────────────────────
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
@@ -224,7 +269,7 @@ select is(
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
   1, 'Exchange sieht den Kommentar');
 
--- ── 9. Events — sichtbar für alle, Teilnahme ab `exchange` (Nav-Spec §4) ─────
+-- ── 10. Events — sichtbar für alle, Teilnahme ab `exchange` (Nav-Spec §4) ─────
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.events where id = ''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'''),
