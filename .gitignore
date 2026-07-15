@@ -13,3 +13,7 @@ coverage/
 .idea/
 .wrangler/
 .superpowers/
+
+# gstack-Artefakte: Security-Reports, Browse-Logs (können Session-Tokens
+# enthalten). Bleiben lokal — dieses Repo ist öffentlich.
+.gstack/
