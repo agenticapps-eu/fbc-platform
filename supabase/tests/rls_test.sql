@@ -91,7 +91,7 @@ select is(
     'select count(*)::int from public.offers where profile_id = ''33333333-3333-3333-3333-333333333333'''),
   0, 'Discover sees no foreign offers');
 
-select like(
+select alike(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'insert into public.contact_requests (from_id, to_id) values (''11111111-1111-1111-1111-111111111111'', ''22222222-2222-2222-2222-222222222222'')'),
   'DENIED:%', 'Discover cannot send a contact request (rank < Prime)');
@@ -108,7 +108,7 @@ select is(
   'OK', 'Prime can send a contact request');
 
 -- ── 3. Messaging gated on an accepted contact request ────────────────────────
-select like(
+select alike(
   pg_temp.try_as('22222222-2222-2222-2222-222222222222',
     'insert into public.message_threads (a_profile_id, b_profile_id) values (''22222222-2222-2222-2222-222222222222'', ''33333333-3333-3333-3333-333333333333'')'),
   'DENIED:%', 'Thread blocked while the contact request is only pending');
@@ -118,12 +118,16 @@ select is(
     'update public.contact_requests set status = ''accepted'' where from_id = ''22222222-2222-2222-2222-222222222222'' and to_id = ''33333333-3333-3333-3333-333333333333'''),
   'OK', 'Recipient (Legacy) accepts the contact request');
 
+-- The client never opens the thread: handle_contact_request_change() does it on
+-- accept (normalized via least/greatest, on conflict do nothing). A manual insert
+-- here could only ever hit message_threads_unique_pair, so assert what actually
+-- has to hold — the thread exists and Prime can see it.
 select is(
-  pg_temp.try_as('22222222-2222-2222-2222-222222222222',
-    'insert into public.message_threads (a_profile_id, b_profile_id) values (''22222222-2222-2222-2222-222222222222'', ''33333333-3333-3333-3333-333333333333'')'),
-  'OK', 'Thread allowed once the contact request is accepted');
+  pg_temp.count_as('22222222-2222-2222-2222-222222222222',
+    'select count(*)::int from public.message_threads where a_profile_id = ''22222222-2222-2222-2222-222222222222'' and b_profile_id = ''33333333-3333-3333-3333-333333333333'''),
+  1, 'Accepting the contact request opens a thread visible to Prime');
 
-select like(
+select alike(
   pg_temp.try_as('22222222-2222-2222-2222-222222222222',
     'insert into public.messages (thread_id, sender_id, body) select id, ''22222222-2222-2222-2222-222222222222'', ''hi'' from public.message_threads where a_profile_id = ''11111111-1111-1111-1111-111111111111'' and b_profile_id = ''22222222-2222-2222-2222-222222222222'''),
   'DENIED:%', 'Message INSERT fails without an accepted contact request');
