@@ -48,6 +48,16 @@ jobs:
       # Bewusst nur rls_test.sql und nicht das ganze Verzeichnis: die
       # probe_*.sql sind manuelle begin/rollback-Skripte ohne plan()/finish()
       # und damit kein pgTAP — pg_prove würde an ihnen scheitern.
+      - name: DIAGNOSE grants (temporär, AGE-311)
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "
+            select table_name, grantee, string_agg(privilege_type, ',' order by privilege_type) as privs
+            from information_schema.role_table_grants
+            where table_schema = 'public'
+              and table_name in ('profiles','profile_interests','profile_theme_scores','offers','posts','events')
+              and grantee in ('anon','authenticated')
+            group by table_name, grantee
+            order by table_name, grantee;"
       - name: Verify the RLS rights matrix (pgTAP)
         run: supabase test db supabase/tests/rls_test.sql
 
