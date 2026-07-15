@@ -491,23 +491,48 @@ Spec §3: Biete & Suche „wird Teil von Compass". Der Editor zieht als Komponen
 
 - [ ] **Step 1: Den Editor als eigene Komponente herauslösen**
 
-`AngeboteGesuchePage.tsx` rendert heute Seiten-Rahmen (inkl. `/mein-bereich`-Rücklink, Zeile ~210) und Editor in einem. Für den Tab wird der Editor ohne Rahmen gebraucht.
+Die heutige Struktur von `src/pages/AngeboteGesuchePage.tsx`:
 
-In `src/pages/AngeboteGesuchePage.tsx`: den bisherigen Default-Export in eine benannte Komponente umbenennen und den Rahmen-Teil (Überschrift + Rücklink) entfernen, sodass nur der Editor-Inhalt übrig bleibt:
+- **Zeile 52-57** — `export default function AngeboteGesuchePage()`: reine Auth-Hülle, holt `user` und rendert `<MatchingProfileEditor uid={user.id} />`.
+- **Zeile 59 ff.** — `function MatchingProfileEditor({ uid })`: das eigentliche Formular. Enthält zwei Stellen, die zum Seiten-Rahmen gehören und im Tab nicht mehr passen.
+
+Drei Änderungen, sonst nichts:
+
+**(a) Default-Export in benannten Export umbenennen** (Zeile 52). Die Auth-Hülle bleibt — der Editor braucht `uid`:
 
 ```tsx
 /**
  * Such-/Bieteprofil-Editor (AGE-244). Seit AGE-314 lebt er als Tab in /compass
- * (Spec §3: „Biete & Suche wird Teil von Compass"), deshalb ohne eigenen
- * Seiten-Rahmen — Hero und Tab-Leiste stellt CompassPage.
+ * (Spec §3: „Biete & Suche wird Teil von Compass") und nicht mehr als eigene
+ * Seite — Hero und Tab-Leiste stellt CompassPage.
  */
 export function AngeboteGesucheEditor() {
-  // … bisheriger Rumpf, aber OHNE das <Link to="/mein-bereich">-Element und
-  // ohne die Seitenüberschrift.
+  const { user } = useAuth();
+  // Der Compass-Tab ist requiresAuth — user ist hier vorhanden; defensiver Fallback.
+  if (!user) return null;
+  return <MatchingProfileEditor uid={user.id} />;
 }
 ```
 
-Den bisherigen `export default function AngeboteGesuchePage()` **entfernen** — die Route entfällt in Step 3.
+**(b) Die Seitenüberschrift entfernen** (Zeile ~136-139). Der `<h1>Such- &amp; Bieteprofil</h1>` muss weg: `CompassPage` stellt bereits das `h1` über `FormatHero`, und der Tab heißt schon „Suche & Biete" — ein zweites `h1` wäre doppelt und semantisch falsch. **Nur das `<h1>`-Element löschen.** Der beschreibende Absatz darunter („Pflege, was du anbietest …") **bleibt**, ebenso das umgebende `<header>` mit dem Speichern-Button rechts.
+
+**(c) Den Rücklink entfernen** (Zeile ~209-216). Aus einem Tab „zurück zu Mein Bereich" zu verlinken ergibt keinen Sinn. Lösche das `<Link to="/mein-bereich">← Zurück zu Mein Bereich</Link>` samt Inhalt. Das umgebende `<div>` behält nur noch den Speichern-Button — stell es dabei von `justify-between` auf `justify-end`, sonst rutscht der Button nach links:
+
+```tsx
+// vorher
+      <div className="flex items-center justify-between gap-4">
+        <Link to="/mein-bereich" className="text-sm font-medium text-gold-strong hover:text-gold">
+          ← Zurück zu Mein Bereich
+        </Link>
+        <Button type="submit" variant="primary" disabled={mutation.isPending}>
+// nachher
+      <div className="flex items-center justify-end gap-4">
+        <Button type="submit" variant="primary" disabled={mutation.isPending}>
+```
+
+Den `Link`-Import entfernen, falls er dadurch ungenutzt wird.
+
+**Die Formularlogik, die Mutation, die Cards und die Validierung bleiben unangetastet.**
 
 - [ ] **Step 2: Den fehlschlagenden Test für die Compass-Tabs schreiben**
 
