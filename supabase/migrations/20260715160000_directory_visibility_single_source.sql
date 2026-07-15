@@ -15,16 +15,16 @@
 
 -- 1. Verlorene Absicht nachholen -------------------------------------------
 --
--- Wo beide auseinanderlaufen, gehoert die Absicht des Mitglieds in die Kopie:
--- der Toggle schreibt `visible_in_directory` ZUERST, `is_public` danach -- eine
+-- Wo beide auseinanderlaufen, traegt die Kopie die Absicht des Mitglieds: der
+-- Toggle schreibt `visible_in_directory` ZUERST, `is_public` danach -- eine
 -- Divergenz heisst also, dass der zweite Write gescheitert ist und is_public der
 -- veraltete Wert ist. setProfileVisibility() ist der einzige Schreiber von
--- is_public (kein Trigger, keine Funktion, keine andere UI), deshalb ist diese
+-- is_public (kein Trigger, keine Funktion, keine andere UI), deshalb ist die
 -- Richtung eindeutig.
 --
--- Praktisch trifft das die Mitglieder, die sich ausblenden WOLLTEN und weiter
--- gelistet waren. Die Kopie einfach zu droppen wuerde genau deren Wunsch still
--- verwerfen -- das waere der Datenschutz-Fehler, den dieses Issue behebt.
+-- Die Kopie ersatzlos zu droppen wuerde die gespeicherte Einstellung dort still
+-- verwerfen, wo sie noch nicht angekommen ist. Deshalb erst anwenden, dann
+-- entfernen.
 
 do $$
 declare n int;
