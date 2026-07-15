@@ -1095,6 +1095,15 @@ const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
       action={<CardLink to="/aktivitaet">Alle anzeigen</CardLink>}
 ```
 
+`src/components/mein-bereich/kontakte-widgets.tsx:198` — der Editor ist seit Task 4 ein Compass-Tab, der Link lebt sonst nur vom Redirect:
+
+```tsx
+// vorher
+          <CardLink to="/angebote-gesuche">Bearbeiten</CardLink>
+// nachher
+          <CardLink to="/compass">Bearbeiten</CardLink>
+```
+
 `src/pages/HomePage.tsx:93-97`:
 
 ```tsx
