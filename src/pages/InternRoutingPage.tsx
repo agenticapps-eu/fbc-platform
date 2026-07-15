@@ -69,7 +69,7 @@ export default function InternRoutingPage() {
       <header>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-ink">Routing-Queue</h1>
-          <Badge variant="legacy">DKRI</Badge>
+          <Badge variant="strong">DKRI</Badge>
         </div>
         <p className="mt-1 text-sm text-muted">
           Große Volumina (DKRI Deal-Keeping) zur Sichtung. {openCount} offen · {items.length}{" "}
@@ -129,7 +129,7 @@ function QueueRow({
             <span className="font-medium text-ink">
               {item.memberAName ?? "—"} ↔ {item.memberBName ?? "—"}
             </span>
-            <Badge variant="prime">{item.score} %</Badge>
+            <Badge variant="soft">{item.score} %</Badge>
             {item.volumeBandLabel && <Badge variant="neutral">{item.volumeBandLabel}</Badge>}
           </div>
           <p className="mt-1 truncate text-sm text-muted">

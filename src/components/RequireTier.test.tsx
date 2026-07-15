@@ -38,13 +38,13 @@ function renderAt(path: string, value: Parameters<typeof AuthFixture>[0]["value"
   );
 }
 
-describe("Stufen-Gating für /verzeichnis (min Prime)", () => {
-  it("leitet Discover vom Verzeichnis weg auf die Startseite", () => {
+describe("Stufen-Gating für /verzeichnis (min Discover)", () => {
+  it("leitet Basic vom Verzeichnis weg auf die Startseite", () => {
     // „/" ist seit AGE-243 onboarding-bewusst (HomeRedirect). Der „übersprungen"-
     // Merker lässt die Weiche synchron+deterministisch auf die öffentliche Startseite
     // auflösen, sodass dieser Test das Stufen-Gating prüft, nicht das Onboarding.
     markSkipped("test-user");
-    renderAt("/verzeichnis", authAsTier("discover"));
+    renderAt("/verzeichnis", authAsTier("basic"));
 
     // Verzeichnis-Inhalt darf nicht erscheinen; stattdessen die Startseite (Redirect / ).
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
@@ -53,14 +53,14 @@ describe("Stufen-Gating für /verzeichnis (min Prime)", () => {
     ).toBeInTheDocument();
   });
 
-  it("lässt Prime das Verzeichnis sehen", () => {
-    renderAt("/verzeichnis", authAsTier("prime"));
+  it("lässt Discover das Verzeichnis sehen", () => {
+    renderAt("/verzeichnis", authAsTier("discover"));
 
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
-  it("lässt Legacy (höhere Stufe) das Verzeichnis sehen", () => {
-    renderAt("/verzeichnis", authAsTier("legacy"));
+  it("lässt Impact (höhere Stufe) das Verzeichnis sehen", () => {
+    renderAt("/verzeichnis", authAsTier("impact"));
 
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
@@ -80,8 +80,8 @@ describe("Auth-Gating für /mein-bereich", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Discover-Nutzer Mein Bereich sehen", () => {
-    renderAt("/mein-bereich", authAsTier("discover"));
+  it("lässt eingeloggte Basic-Nutzer Mein Bereich sehen", () => {
+    renderAt("/mein-bereich", authAsTier("basic"));
 
     // /mein-bereich leitet auf /profil weiter; der Auth-Gate hat durchgelassen
     // und die Profilansicht rendert (Beleg: Lade-Skeleton sichtbar, kein Login).
@@ -107,8 +107,8 @@ describe("Auth-Gating für /profil", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Discover)", () => {
-    renderAt("/profil/bearbeiten", authAsTier("discover"));
+  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Basic)", () => {
+    renderAt("/profil/bearbeiten", authAsTier("basic"));
 
     // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; der Editor
     // mountet und lädt seine Daten.

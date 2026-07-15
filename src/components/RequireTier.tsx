@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { TIER_RANK, type MembershipTier } from "../lib/tiers";
+import { LEVEL_RANK, type MembershipLevel } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 
 /**
@@ -15,7 +15,7 @@ export default function RequireTier({
   min,
   children,
 }: {
-  min: MembershipTier;
+  min: MembershipLevel;
   children: ReactNode;
 }) {
   const { user, levelRank, isLoading, tierLoading } = useAuth();
@@ -23,6 +23,6 @@ export default function RequireTier({
   // Erst entscheiden, wenn Session UND Stufe geladen sind (sonst Fehl-Redirect).
   if (isLoading || (user && tierLoading)) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if ((levelRank ?? 0) < TIER_RANK[min]) return <Navigate to="/" replace />;
+  if ((levelRank ?? 0) < LEVEL_RANK[min]) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

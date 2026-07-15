@@ -9,7 +9,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
-import { tierLabel } from "../../lib/tiers";
+import { levelLabel } from "../../config/levels";
 import {
   deriveFacets,
   directoryFacetsQueryKey,
@@ -251,7 +251,7 @@ function MemberCard({ member }: { member: DirectoryMember }) {
           </div>
           {member.tier && (
             <span className="inline-flex shrink-0 items-center rounded-full border border-gold/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gold-strong uppercase">
-              {tierLabel(member.tier)}
+              {levelLabel(member.tier)}
             </span>
           )}
         </div>
@@ -263,8 +263,8 @@ function MemberCard({ member }: { member: DirectoryMember }) {
         {(member.branche || member.has_offers || member.has_needs) && (
           <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
             {member.branche && <Badge variant="neutral">{member.branche}</Badge>}
-            {member.has_offers && <Badge variant="prime">Bietet</Badge>}
-            {member.has_needs && <Badge variant="prime">Sucht</Badge>}
+            {member.has_offers && <Badge variant="soft">Bietet</Badge>}
+            {member.has_needs && <Badge variant="soft">Sucht</Badge>}
           </div>
         )}
       </Card>

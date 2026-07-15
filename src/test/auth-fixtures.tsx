@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthContext } from "../providers/auth-context";
-import { TIER_RANK, type MembershipTier } from "../lib/tiers";
+import { LEVEL_RANK, type MembershipLevel } from "../config/levels";
 
 /**
  * Test-Helfer: stellt einen Auth-Context mit fester Stufe bereit, ohne Supabase
@@ -26,12 +26,12 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
 }
 
 /** Eingeloggter Nutzer mit der angegebenen Mitgliedsstufe. */
-export function authAsTier(tier: MembershipTier): AuthContextValue {
+export function authAsTier(tier: MembershipLevel): AuthContextValue {
   return fakeAuthValue({
     // Minimaler User-Stub — Gating prüft nur Vorhandensein + levelRank.
     user: { id: "test-user" } as AuthContextValue["user"],
     tier,
-    levelRank: TIER_RANK[tier],
+    levelRank: LEVEL_RANK[tier],
   });
 }
 

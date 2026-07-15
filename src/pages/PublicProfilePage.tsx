@@ -23,7 +23,7 @@ import {
   type ExtendedProfile,
   type PublicProfile,
 } from "../lib/public-profile";
-import { TIER_RANK } from "../lib/tiers";
+import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 
 // Themen-Reihenfolge & Labels für Erfolgsradar/Interessen (Sein·Tun·Haben·Wirken).
@@ -67,7 +67,11 @@ export default function PublicProfilePage() {
   const profile = data.publicProfile;
   const extended = data.extended;
   const isOwn = !!user && user.id === profile.id;
-  const isPrimePlus = (levelRank ?? 0) >= TIER_RANK.prime;
+  // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie: die
+  // erweiterten Felder gehören zum „vollständigen Verzeichnis" (ab `discover`),
+  // eine Kontaktanfrage ist eine Stufe teurer (ab `exchange`) — das ist der
+  // Welpenschutz-Kern: Sichtbarkeit ≠ Kontaktrecht.
+  const canRequestContact = (levelRank ?? 0) >= LEVEL_RANK.exchange;
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +84,8 @@ export default function PublicProfilePage() {
           <CardTitle className="text-base">Erweiterte Profilangaben</CardTitle>
           <p className="mt-1 text-sm text-muted">
             Erfolgsradar, Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der
-            Mitgliedsstufe <span className="font-medium text-ink">Prime</span> sichtbar.
+            Mitgliedsstufe <span className="font-medium text-ink">{LEVELS.discover.label}</span>{" "}
+            sichtbar.
           </p>
         </Card>
       )}
@@ -89,7 +94,7 @@ export default function PublicProfilePage() {
         viewerId={user?.id ?? null}
         profileId={profile.id}
         isOwn={isOwn}
-        isPrimePlus={isPrimePlus}
+        canRequestContact={canRequestContact}
         name={profile.name}
       />
     </div>
@@ -248,7 +253,7 @@ function MatchingColumn({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-ink">{item.title}</span>
-                {item.category && <Badge variant="prime">{item.category}</Badge>}
+                {item.category && <Badge variant="soft">{item.category}</Badge>}
               </div>
               {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
             </li>
@@ -268,13 +273,13 @@ function ContactArea({
   viewerId,
   profileId,
   isOwn,
-  isPrimePlus,
+  canRequestContact,
   name,
 }: {
   viewerId: string | null;
   profileId: string;
   isOwn: boolean;
-  isPrimePlus: boolean;
+  canRequestContact: boolean;
   name: string;
 }) {
   const { data: relation } = useQuery({
@@ -307,7 +312,7 @@ function ContactArea({
       <ContactBody
         viewerId={viewerId}
         profileId={profileId}
-        isPrimePlus={isPrimePlus}
+        canRequestContact={canRequestContact}
         name={name}
         relation={relation ?? null}
       />
@@ -319,13 +324,13 @@ function ContactArea({
 function ContactBody({
   viewerId,
   profileId,
-  isPrimePlus,
+  canRequestContact,
   name,
   relation,
 }: {
   viewerId: string | null;
   profileId: string;
-  isPrimePlus: boolean;
+  canRequestContact: boolean;
   name: string;
   relation: ContactRelation | null;
 }) {
@@ -335,7 +340,7 @@ function ContactBody({
     if (request.status === "pending") {
       return request.outgoing ? (
         <div className="flex items-center gap-2">
-          <Badge variant="prime">Anfrage gesendet</Badge>
+          <Badge variant="soft">Anfrage gesendet</Badge>
           <span className="text-sm text-muted">Wartet auf Antwort von {name}.</span>
         </div>
       ) : (
@@ -358,11 +363,11 @@ function ContactBody({
     );
   }
 
-  if (!isPrimePlus) {
+  if (!canRequestContact) {
     return (
       <p className="text-sm text-muted">
         Kontaktanfragen sind ab der Mitgliedsstufe{" "}
-        <span className="font-medium text-ink">Prime</span> möglich.
+        <span className="font-medium text-ink">{LEVELS.exchange.label}</span> möglich.
       </p>
     );
   }
@@ -495,7 +500,7 @@ function ReleasedContact({
     <Card className="flex flex-col gap-3 border-gold/30 bg-gold-soft/30">
       <div className="flex items-center gap-2">
         <CardTitle className="text-base">Kontakt freigegeben</CardTitle>
-        <Badge variant="legacy">Angenommen</Badge>
+        <Badge variant="strong">Angenommen</Badge>
       </div>
       <p className="text-sm text-muted">
         {name} hat deine Kontaktanfrage angenommen. Ihr könnt euch jetzt direkt austauschen.

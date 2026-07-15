@@ -6,7 +6,7 @@ export interface AuthContextValue {
   session: Session | null;
   /** Angemeldeter Nutzer, oder null. */
   user: User | null;
-  /** Mitgliedsstufe (membership_tiers.key), z. B. "discover". null wenn ausgeloggt. */
+  /** Mitgliedsstufe (membership_tiers.key), z. B. "basic". null wenn ausgeloggt. */
   tier: string | null;
   /** level_rank der Mitgliedsstufe (discover=1 … legacy=7). null wenn ausgeloggt. */
   levelRank: number | null;

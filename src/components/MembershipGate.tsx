@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../providers/auth-context";
-import { TIER_RANK, tierLabel, type MembershipTier } from "../lib/tiers";
+import { LEVEL_RANK, levelLabel, type MembershipLevel } from "../config/levels";
 import { FORMAT_HERO } from "../config/formatHero";
 import { FormatHero } from "./ui/FormatHero";
 import { Button } from "./ui/Button";
@@ -16,18 +16,18 @@ export default function MembershipGate({
   min,
   children,
 }: {
-  min?: MembershipTier;
+  min?: MembershipLevel;
   children: ReactNode;
 }) {
   const { user, levelRank, isLoading, tierLoading } = useAuth();
   if (isLoading || (user && tierLoading)) return null; // kein Flackern
-  const tierOk = !min || (levelRank ?? 0) >= TIER_RANK[min];
+  const tierOk = !min || (levelRank ?? 0) >= LEVEL_RANK[min];
   if (user && tierOk) return <>{children}</>;
   // anon ODER eingeloggt-aber-Stufe-zu-niedrig → Wand
   return <MembershipWall min={min} loggedIn={!!user} />;
 }
 
-function MembershipWall({ min, loggedIn }: { min?: MembershipTier; loggedIn: boolean }) {
+function MembershipWall({ min, loggedIn }: { min?: MembershipLevel; loggedIn: boolean }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hero = FORMAT_HERO[pathname];
@@ -37,7 +37,7 @@ function MembershipWall({ min, loggedIn }: { min?: MembershipTier; loggedIn: boo
       <div className="rounded-[var(--radius-card)] border border-gold/25 bg-canvas/60 p-8 text-center shadow-soft">
         <h2 className="font-display text-2xl font-semibold text-ink">
           {min
-            ? `Dieser Bereich ist ab ${tierLabel(min)} verfügbar`
+            ? `Dieser Bereich ist ab ${levelLabel(min)} verfügbar`
             : "Dieser Bereich ist Mitgliedern vorbehalten"}
         </h2>
         <p className="mx-auto mt-3 max-w-md text-muted">

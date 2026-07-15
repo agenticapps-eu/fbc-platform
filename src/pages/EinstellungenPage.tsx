@@ -14,7 +14,7 @@ import {
   setProfileVisibility,
   type MemberSettings,
 } from "../lib/member-settings";
-import { tierLabel } from "../lib/tiers";
+import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 
 function ToggleRow({
@@ -131,8 +131,8 @@ export default function EinstellungenPage() {
       <Card className="flex flex-col gap-4">
         <CardTitle>Mitgliedschaft</CardTitle>
         <div className="flex items-center gap-2">
-          <TierBadge tier={tier ?? "discover"} />
-          <span className="text-sm text-muted">{tierLabel(tier ?? "discover")}-Mitglied</span>
+          <TierBadge tier={tier ?? DEFAULT_LEVEL} />
+          <span className="text-sm text-muted">{levelLabel(tier ?? DEFAULT_LEVEL)}-Mitglied</span>
         </div>
       </Card>
 

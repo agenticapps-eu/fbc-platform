@@ -4,17 +4,17 @@ import { FormatHero } from "../components/ui/FormatHero";
 import { Tabs } from "../components/ui/Tabs";
 import { FORMAT_HERO } from "../config/formatHero";
 import { useTier } from "../hooks/useTier";
-import { TIER_RANK } from "../lib/tiers";
+import { LEVEL_RANK } from "../config/levels";
 
 /**
  * Community = Feed + Mitgliederverzeichnis. Der Feed ist für alle Stufen sichtbar;
- * das Verzeichnis ist ein Tab ab Prime (die RLS erzwingt es zusätzlich in der DB).
- * Discover/anon sehen keinen Verzeichnis-Tab, sondern einen dezenten „ab Prime"-Hinweis
+ * das Verzeichnis ist ein Tab ab Discover (die RLS erzwingt es zusätzlich in der DB).
+ * Basic/Connect/anon sehen keinen Verzeichnis-Tab, sondern einen dezenten „ab Discover"-Hinweis
  * (Gold-Outline) — keine Fake-Daten.
  */
 export default function CommunityPage() {
   const { levelRank } = useTier();
-  const canSeeDirectory = (levelRank ?? 0) >= TIER_RANK.prime;
+  const canSeeDirectory = (levelRank ?? 0) >= LEVEL_RANK.discover;
 
   return (
     <section className="space-y-8">

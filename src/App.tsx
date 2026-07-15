@@ -48,9 +48,9 @@ export default function App() {
           <Route
             path="/chat/:threadId"
             element={
-              <RequireTier min="prime">
+              <RequireAuth>
                 <ChatPage />
-              </RequireTier>
+              </RequireAuth>
             }
           />
           {/* Öffentliche Profilseite (AGE-239) — param-basiert, daher kein Sidebar-Eintrag.

@@ -60,7 +60,7 @@ export function EventsWidget({ data }: { data: DashboardData }) {
                   {row.event?.location && <> · {row.event.location}</>}
                 </p>
               </div>
-              {row.event?.type && <Badge variant="prime">{row.event.type}</Badge>}
+              {row.event?.type && <Badge variant="soft">{row.event.type}</Badge>}
             </li>
           ))}
         </ul>
@@ -124,7 +124,7 @@ function EventGroup({
                     {r.location && <> · {r.location}</>}
                   </p>
                 </div>
-                {r.type && <Badge variant="prime">{r.type}</Badge>}
+                {r.type && <Badge variant="soft">{r.type}</Badge>}
               </Link>
             </li>
           ))}

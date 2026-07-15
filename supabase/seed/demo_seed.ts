@@ -88,7 +88,7 @@ insert into public.posts (id, author_id, body, hashtags, visibility, created_at)
    array['robotik','seriesa'], 'members', now() - interval '2 days'),
   ('${POST.p4}', '${P.markus}',
    'Digital Health verändert die Prävention. Spannende Gespräche mit potenziellen Partnern aus dem Club. #HealthTech #Prävention',
-   array['healthtech','prävention'], 'prime', now() - interval '1 day'),
+   array['healthtech','prävention'], 'members', now() - interval '1 day'),
   ('${POST.p5}', '${P.beatrice}',
    'Klarheit über das eigene WARUM ist der Hebel für nachhaltiges Wachstum. Dankbar für die Tiefe der Gespräche hier. #Leadership #Coaching',
    array['leadership','coaching'], 'public', now() - interval '8 hours')
@@ -117,9 +117,9 @@ insert into public.events (id, title, type, starts_at, location, host_id, visibi
   ('${EVT.workshop}', 'Leadership-Workshop: Klarheit & Wirkung', 'workshop', now() + interval '14 days',
    'Stuttgart, FBC Lounge', '${P.beatrice}', 'members', 12),
   ('${EVT.dinner}', 'Legacy Dinner Stuttgart', 'dinner', now() + interval '21 days',
-   'Stuttgart, Restaurant Délice', '${P.maximilian}', 'legacy', 4),
+   'Stuttgart, Restaurant Délice', '${P.maximilian}', 'members', 4),
   ('${EVT.mastermind}', 'Investoren-Mastermind Q3', 'mastermind', now() + interval '28 days',
-   'München, Private Club', '${P.friederike}', 'prime', 6)
+   'München, Private Club', '${P.friederike}', 'members', 6)
 on conflict (id) do nothing;
 
 -- Webinar: a healthy registered list (well under capacity).

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Avatar } from "../ui/Avatar";
 import { CountUp } from "../ui/Motion";
-import { tierLabel } from "../../lib/tiers";
+import { levelLabel } from "../../config/levels";
 
 function CrownIcon({ className }: { className?: string }) {
   return (
@@ -83,7 +83,7 @@ export function ProfileHero({
               {tier && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/60 bg-gold-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-gold-strong uppercase">
                   <CrownIcon className="h-3.5 w-3.5" />
-                  {tierLabel(tier)} Member
+                  {levelLabel(tier)} Member
                 </span>
               )}
               <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink">
