@@ -17,6 +17,7 @@
 - **Conventional Commits mit Linear-Referenz** in jeder Message, z. B. `feat(nav): … (AGE-314)`.
 - **Nie direkt auf `main`** — dieser Branch, PR am Ende.
 - **Keine Prod-Details ins Repo** — `agenticapps-eu/fbc-platform` ist öffentlich. Prod-Zahlen/IDs/URLs gehören in Linear.
+- **Niemals `git add -A` oder `git add .`.** Der Arbeitsbaum enthält untracked Dateien, die nicht ins Repo gehören: `docs/data-model.md` und `docs/rls-policies.md` (Rechte `0600`), `.planning/`, `deno.lock`, ein modifiziertes `session-handoff.md`. Bei einem **öffentlichen** Repo ist ein pauschales Stagen eine Veröffentlichung. Stage die Dateien deines Tasks namentlich, oder nutze `git add -u` (nur Versioniertes), und **prüfe `git status --short` vor jedem Commit**.
 - **Gültige Stufen sind ausschließlich** `basic, connect, discover, exchange, focus, impact` (AGE-311). `prime`, `legacy`, `circle` existieren nicht — nie einbauen, nie in Copy erwähnen.
 - **TypeScript strict** — kein `any`, keine `@ts-ignore`.
 - **Deutsche UI-Copy und deutsche Kommentare**, passend zum bestehenden Code.
@@ -992,7 +993,9 @@ describe("Stufen-Gating für /mitglieder (min Discover)", () => {
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
-  it("zeigt anonymen Besuchern die Wand mit „Mitglied werden" — kein Verzeichnis", () => {
+  // Achtung: Titel bewusst ohne typografische Anführungszeichen um „Mitglied werden".
+  // Ein öffnendes „ mit schließendem ASCII-" beendet das String-Literal vorzeitig (TS1002).
+  it("zeigt anonymen Besuchern die Wand mit Mitglied-werden-Button — kein Verzeichnis", () => {
     renderAt("/mitglieder", fakeAuthValue());
 
     expect(screen.getByRole("button", { name: "Mitglied werden" })).toBeInTheDocument();
@@ -1130,10 +1133,15 @@ Expected: alles PASS, keine ungenutzten Imports.
 
 - [ ] **Step 6: Committen**
 
+**Kein `git add -A`.** Der Arbeitsbaum enthält untracked Dateien, die nicht ins Repo gehören — darunter `docs/data-model.md` und `docs/rls-policies.md` (Dateirechte `0600`), `.planning/` und ein modifiziertes `session-handoff.md`. **`agenticapps-eu/fbc-platform` ist öffentlich**; ein `-A` würde sie dort veröffentlichen. Stage ausschließlich die Dateien dieses Tasks:
+
 ```bash
-git add -A
+git add -u src/pages src/config src/components docs/demo-script.md
+git status --short   # prüfen: NICHTS aus .planning/, kein data-model.md, kein session-handoff.md
 git commit -m "refactor(nav): Waisen entfernen, Verzeichnis-Gate-Tests übersetzen (AGE-314)"
 ```
+
+`git add -u` nimmt nur bereits versionierte Dateien (inkl. Löschungen und Umbenennungen aus Step 1-2) und fasst Untracked nicht an. Prüfe die `git status`-Ausgabe, bevor du committest.
 
 ---
 
