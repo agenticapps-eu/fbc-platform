@@ -3,7 +3,8 @@ import { captureException } from "@sentry/react";
 import { supabase } from "./supabase";
 
 export type EventType = "online" | "presence" | "dinner" | "workshop" | "mastermind";
-export type EventVisibility = "public" | "members" | "prime" | "legacy";
+/** Spiegelt `events_visibility_check` (20260715150000_six_level_model.sql:287). */
+export type EventVisibility = "public" | "members";
 export type RegistrationStatus = "registered" | "waitlist" | "cancelled";
 
 export interface EventHost {
@@ -45,11 +46,15 @@ export const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "mastermind", label: "Mastermind" },
 ];
 
+/**
+ * Events sind bewusst asymmetrisch zu posts: sichtbar für ALLE (das Schaufenster),
+ * die Anmeldung ist ab `exchange` die Leistung — die Stufung sitzt dort, nicht im
+ * Sichtbarkeitswert. Wer hier eine Option ergänzt, ändert zuerst
+ * `events_visibility_check`, sonst scheitert das Speichern.
+ */
 export const VISIBILITY_OPTIONS: { value: EventVisibility; label: string }[] = [
   { value: "members", label: "Mitglieder" },
   { value: "public", label: "Öffentlich" },
-  { value: "prime", label: "Prime & Legacy" },
-  { value: "legacy", label: "Nur Legacy" },
 ];
 
 export function eventTypeLabel(type: string | null): string {

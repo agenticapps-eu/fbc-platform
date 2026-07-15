@@ -7,8 +7,8 @@ import { supabase } from "./supabase";
  *
  * Der Client macht NUR, was die RLS (§7 der RLS-Policies) erlaubt:
  *  - `fetchFeed` liest `posts` (Sichtbarkeit erzwingt `posts_select_by_visibility`:
- *    anon nur 'public', eingeloggte zusätzlich 'members' und je nach Rang 'prime'/
- *    'legacy'). Autoren werden über die View `profiles_public` angereichert.
+ *    anon nur 'public', 'members' ab Rang 4 `exchange`). Autoren werden über die
+ *    View `profiles_public` angereichert.
  *  - Like-/Kommentarzähler kommen aus der read-only RPC `post_engagement_counts`,
  *    weil `post_likes` bewusst owner-only lesbar ist (20260612090845) — ein echter
  *    Zähler ist sonst clientseitig nicht berechenbar. Die RPC liefert nur Zahlen.
@@ -19,7 +19,8 @@ import { supabase } from "./supabase";
  * Reine Helfer (Hashtag-/Body-Parsing, Video-Erkennung) sind in feed.test.ts getestet.
  */
 
-export type PostVisibility = "public" | "members" | "prime" | "legacy";
+/** Spiegelt `posts_visibility_check` (20260715150000_six_level_model.sql:265). */
+export type PostVisibility = "public" | "members";
 
 export interface FeedAuthor {
   id: string;
@@ -233,12 +234,16 @@ export const feedQueryKey = (uid: string | null, hashtag: string | null) =>
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 
-/** Sichtbarkeitsstufen für den Composer (Default `members`). */
+/**
+ * Sichtbarkeitsstufen für den Composer (Default `members`).
+ *
+ * Gestufte Beitrags-Sichtbarkeit gibt es im MVP nicht (AGE-311): die Stufung sitzt in
+ * der RLS — `members` ist ab Rang 4 (`exchange`) lesbar —, nicht im Wert. Wer hier eine
+ * Option ergänzt, ändert zuerst `posts_visibility_check`, sonst scheitert das Speichern.
+ */
 export const VISIBILITY_OPTIONS: { value: PostVisibility; label: string }[] = [
   { value: "members", label: "Mitglieder" },
   { value: "public", label: "Öffentlich" },
-  { value: "prime", label: "Prime & Legacy" },
-  { value: "legacy", label: "Nur Legacy" },
 ];
 
 // ── Lesen ────────────────────────────────────────────────────────────────────

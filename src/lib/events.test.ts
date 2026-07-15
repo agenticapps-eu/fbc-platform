@@ -6,8 +6,19 @@ import {
   partitionEvents,
   registrationStatusLabel,
   remainingSpots,
+  VISIBILITY_OPTIONS,
   type EventListItem,
 } from "./events";
+
+describe("VISIBILITY_OPTIONS", () => {
+  it("bietet nur Werte an, die events_visibility_check akzeptiert (AGE-355)", () => {
+    // Die Wahrheit steht in 20260715150000_six_level_model.sql:287:
+    //   check (visibility in ('public', 'members'))
+    // Eine Option, die die Constraint nicht kennt, ist ein Speichern-Fehler in Prod.
+    // Neue Option ⇒ zuerst Migration, dann diese Liste.
+    expect(VISIBILITY_OPTIONS.map((o) => o.value).sort()).toEqual(["members", "public"]);
+  });
+});
 
 const now = new Date("2026-06-15T12:00:00Z");
 
