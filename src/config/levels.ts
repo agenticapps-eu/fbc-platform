@@ -10,7 +10,7 @@
  *
  *  Die alten Prototyp-Stufen (explore/impuls/active/prime/circle/legacy) sind
  *  ersatzlos weg. ACHTUNG: `discover` existierte vorher mit ANDERER Bedeutung
- *  (0 € statt 150 €) — siehe die Key-Migration in 20260715120000_six_level_model.sql. */
+ *  (0 € statt 150 €) — siehe die Key-Migration in 20260715150000_six_level_model.sql. */
 
 export type MembershipLevel = "basic" | "connect" | "discover" | "exchange" | "focus" | "impact";
 

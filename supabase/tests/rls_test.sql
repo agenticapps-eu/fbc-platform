@@ -4,7 +4,7 @@
 --
 -- Ersetzt den P5-Test (AGE-235), der die alte Discover/Prime/Legacy-Matrix
 -- kodierte: er baute u. a. einen `visibility='legacy'`-Post und prüfte rank >= 7 —
--- beides existiert nach 20260715120000_six_level_model.sql nicht mehr.
+-- beides existiert nach 20260715150000_six_level_model.sql nicht mehr.
 --
 -- RLS greift nur für eine Nicht-Owner-Rolle, daher läuft jede sensible Operation
 -- als `authenticated` mit dem JWT-sub des Mitglieds (Helfer unten), während die
