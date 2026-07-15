@@ -165,7 +165,7 @@ select is(
   1, 'Discover sieht fremde Angebote');
 
 -- ── 4. Kontaktanfragen — ab `exchange` (rank 4) ──────────────────────────────
-select like(
+select alike(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'insert into public.contact_requests (from_id, to_id) values (''33333333-3333-3333-3333-333333333333'', ''66666666-6666-6666-6666-666666666666'')'),
   'DENIED:%', 'Discover kann keine Kontaktanfrage senden (rank < exchange)');
@@ -176,7 +176,7 @@ select is(
   'OK', 'Exchange kann eine Kontaktanfrage senden');
 
 -- ── 5. Welpenschutz (§2) — an neue Mitglieder nur über ein Match ─────────────
-select like(
+select alike(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''77777777-7777-7777-7777-777777777777'')'),
   'DENIED:%', 'Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar');
@@ -187,7 +187,7 @@ select is(
   'OK', 'Über ein Match ist dasselbe neue Mitglied erreichbar');
 
 -- ── 6. Opt-out des Empfängers (member_settings) ──────────────────────────────
-select like(
+select alike(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''88888888-8888-8888-8888-888888888888'')'),
   'DENIED:%', 'Wer Kontaktanfragen abgeschaltet hat, bekommt keine (Opt-out wird erzwungen)');
@@ -230,7 +230,7 @@ select is(
     'select count(*)::int from public.events where id = ''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'''),
   1, 'Basic SIEHT das Event (bewusst anders als die Aktivität)');
 
-select like(
+select alike(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
   'DENIED:%', 'Discover kann sich nicht anmelden — auch nicht über den RPC-Seitenweg');
