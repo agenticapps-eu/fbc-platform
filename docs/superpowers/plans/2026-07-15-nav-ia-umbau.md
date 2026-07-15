@@ -1118,6 +1118,31 @@ const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
 
 `docs/demo-script.md`: `/verzeichnis` → `/mitglieder`, „Verzeichnis" → „Mitglieder" wo es die Seite meint.
 
+- [ ] **Step 3b: Drei Kommentare nachziehen, die Task 5 überholt hat**
+
+Alle drei beschreiben einen Vertrag, den der Umbau aufgehoben hat. Der erste ist der wichtigste: er steht auf der sicherheitsrelevanten Komponente und ist genau die Fehlannahme, aus der jemand später die Section-Prüfung zurückbaut.
+
+**`src/components/MembershipGate.tsx:9-14`** — sagt „Gate für die `formate`-Routen", aber die Section `formate` gibt es nicht mehr, `RequireTier` ist aus der Render-Kette raus, und das Gate bedient jetzt auch `mein-bereich` (`/meine-chancen`):
+
+```tsx
+/**
+ * Gate für Routen mit `minTier` sowie für auth-pflichtige `entdecken`-Routen
+ * (siehe `gatedElement` in App.tsx). Anders als <RequireAuth> leitet dieses Gate
+ * anonyme oder zu niedrig gestufte Besucher NICHT weg, sondern zeigt eine
+ * „Mitglied werden"-Wand — der Bereich bleibt im Schaufenster sichtbar, der Inhalt
+ * aber gesperrt (Spec §1). Die echte Zugriffskontrolle bleibt die Supabase-RLS.
+ */
+```
+
+**`src/components/AppShell.tsx:175-176`** — nennt ein Akkordeon, das Task 5 entfernt hat:
+
+```tsx
+/** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
+ *  Mitglieder-Block oben, darunter die drei Abschnitte aus `navItems`. */
+```
+
+**`src/components/MembershipGate.test.tsx:53`** — `describe("MembershipGate für Formate")` benutzt die alte Taxonomie. Auf `describe("MembershipGate für Entdecken-Routen")` ziehen.
+
 - [ ] **Step 4: Beweisen, dass keine alten Pfade mehr im Code stehen**
 
 ```bash
