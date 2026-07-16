@@ -5,6 +5,7 @@ import { navItems, type NavSection } from "../config/nav";
 import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
+import { FeedbackButton } from "./feedback/FeedbackButton";
 import { Logo } from "./ui/Logo";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav } from "./ui/SidebarNav";
@@ -355,6 +356,11 @@ export default function AppShell() {
           </div>
         </div>
       )}
+
+      {/* QM-Feedback (AGE-300, Spec §3.5) — bewusst außerhalb von <main>, damit der
+          Button beim Seitenwechsel stehen bleibt und die Route mitwandert. Rendert
+          sich selbst weg, wenn niemand eingeloggt ist. */}
+      <FeedbackButton />
     </div>
   );
 }

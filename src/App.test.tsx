@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App from "./App";
+import { ToastProvider } from "./components/ui/Toast";
 import { AuthFixture, authAsTier, fakeAuthValue } from "./test/auth-fixtures";
 
 describe("App", () => {
@@ -12,9 +13,13 @@ describe("App", () => {
     render(
       <AuthFixture value={fakeAuthValue()}>
         <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={["/"]}>
-            <App />
-          </MemoryRouter>
+          {/* AppShell rendert jetzt <FeedbackButton /> (AGE-300), das useToast()
+              braucht — wie main.tsx muss auch der Test-Wrapper ToastProvider stellen. */}
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/"]}>
+              <App />
+            </MemoryRouter>
+          </ToastProvider>
         </QueryClientProvider>
       </AuthFixture>,
     );
@@ -41,9 +46,11 @@ describe("App", () => {
     render(
       <AuthFixture value={authAsTier("impact")}>
         <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={["/kontakte"]}>
-            <App />
-          </MemoryRouter>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/kontakte"]}>
+              <App />
+            </MemoryRouter>
+          </ToastProvider>
         </QueryClientProvider>
       </AuthFixture>,
     );
