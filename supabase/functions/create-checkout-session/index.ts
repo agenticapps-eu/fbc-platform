@@ -12,14 +12,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { parseUpgradeRequest, priceEnvKey } from "./checkout.ts";
 
-const CORS = { "content-type": "application/json" };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+const CORS = { ...corsHeaders, "content-type": "application/json" };
 const log = (level: "info" | "warn" | "error", event: string, f: Record<string, unknown> = {}) =>
   console[level === "info" ? "log" : level](
     JSON.stringify({ fn: "create-checkout-session", event, ...f }),
   );
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (req.method !== "POST")
+    return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
 
   const authHeader = req.headers.get("authorization");
   if (!authHeader)
@@ -33,20 +40,27 @@ Deno.serve(async (req) => {
   if (!user)
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: CORS });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("tier, membership_tiers(level_rank)")
-    .eq("id", user.id)
-    .single();
-  const currentRank =
-    (profile?.membership_tiers as { level_rank?: number } | null)?.level_rank ?? 0;
-
   let body: unknown;
   try {
     body = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: CORS });
   }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("tier, membership_tiers(level_rank)")
+    .eq("id", user.id)
+    .single();
+  if (profileError) {
+    log("error", "profile_lookup_failed", { code: profileError.code });
+    return new Response(JSON.stringify({ error: "profile_lookup_failed" }), {
+      status: 500,
+      headers: CORS,
+    });
+  }
+  const currentRank =
+    (profile?.membership_tiers as { level_rank?: number } | null)?.level_rank ?? 0;
 
   const parsed = parseUpgradeRequest(body, currentRank);
   if (!parsed.ok) {
