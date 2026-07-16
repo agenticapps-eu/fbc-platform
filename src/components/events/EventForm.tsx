@@ -8,6 +8,8 @@ import {
   VISIBILITY_OPTIONS,
   type EventInput,
   type EventListItem,
+  type EventType,
+  type EventVisibility,
 } from "../../lib/events";
 
 /** ISO → Wert für <input type="datetime-local"> (lokale Zeit, ohne Sekunden). */
@@ -38,13 +40,18 @@ export function EventForm({
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [type, setType] = useState(initial?.type ?? "online");
+  const [type, setType] = useState<EventType>((initial?.type as EventType) ?? "online");
   const [startsAt, setStartsAt] = useState(toLocalInput(initial?.startsAt ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");
   const [capacity, setCapacity] = useState(
     initial?.capacity != null ? String(initial.capacity) : "",
   );
-  const [visibility, setVisibility] = useState(initial?.visibility ?? "members");
+  // `initial` ist das Lese-Modell (EventListItem: `string`, wie die DB es liefert), der
+  // State das Schreib-Modell. Die Verengung passiert hier sichtbar an EINER Stelle,
+  // statt am Ende von submit() unbemerkt behauptet zu werden (AGE-356).
+  const [visibility, setVisibility] = useState<EventVisibility>(
+    (initial?.visibility as EventVisibility) ?? "members",
+  );
 
   const canSubmit = title.trim() !== "" && !pending;
 
@@ -52,12 +59,12 @@ export function EventForm({
     const capNum = capacity.trim() === "" ? null : Number(capacity);
     onSubmit({
       title: title.trim(),
-      type: type as EventInput["type"],
+      type,
       // datetime-local ist lokale Zeit ohne Zone → in ISO (UTC) wandeln.
       startsAt: startsAt ? new Date(startsAt).toISOString() : null,
       location: location.trim() || null,
       capacity: capNum != null && Number.isFinite(capNum) && capNum > 0 ? Math.floor(capNum) : null,
-      visibility: visibility as EventInput["visibility"],
+      visibility,
     });
   }
 
@@ -77,7 +84,7 @@ export function EventForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Typ">
           {({ id }) => (
-            <Select id={id} value={type} onChange={(e) => setType(e.target.value)}>
+            <Select id={id} value={type} onChange={(e) => setType(e.target.value as EventType)}>
               {EVENT_TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -121,7 +128,11 @@ export function EventForm({
       </div>
       <Field label="Sichtbarkeit">
         {({ id }) => (
-          <Select id={id} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+          <Select
+            id={id}
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as EventVisibility)}
+          >
             {VISIBILITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
