@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(44);
+select plan(53);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -378,6 +378,30 @@ select is(
 select is(
   has_function_privilege('authenticated', 'public.admin_list_feedback()', 'execute'),
   true, 'authenticated darf admin_list_feedback() ausführen (der RPC-Aufruf der Sicht)');
+
+-- ── apply_upgrade: nur-Upgrade, idempotent, service-role-only (§3.3/§3.4) ─────
+-- Läuft am Ende, weil es Fixture-Tiers mutiert; frühere Assertions sind durch.
+select is(public.apply_upgrade('11111111-1111-1111-1111-111111111111', 'discover'),
+  'discover', 'apply_upgrade Basic→Discover gibt den neuen Tier zurück');
+select is((select tier from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
+  'discover', 'profiles.tier steht danach auf discover');
+select is(public.apply_upgrade('11111111-1111-1111-1111-111111111111', 'discover'),
+  'discover', 'Wiederholung ist idempotent — kein Fehler, gleicher Tier');
+select is(public.apply_upgrade('66666666-6666-6666-6666-666666666666', 'discover'),
+  'impact', 'Ein tieferes Ziel downgradet NICHT — Impact bleibt Impact');
+select throws_ok(
+  $$ select public.apply_upgrade('11111111-1111-1111-1111-111111111111'::uuid, 'bogus') $$,
+  '22023', 'unknown level: bogus', 'Unbekanntes Level wirft 22023');
+select is(has_function_privilege('anon', 'public.apply_upgrade(uuid, text)', 'execute'),
+  false, 'anon darf apply_upgrade nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.apply_upgrade(uuid, text)', 'execute'),
+  false, 'authenticated darf apply_upgrade nicht ausführen');
+select is(has_function_privilege('service_role', 'public.apply_upgrade(uuid, text)', 'execute'),
+  true, 'service_role darf apply_upgrade ausführen (der Webhook-Weg)');
+select alike(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'update public.profiles set tier = ''impact'' where id = ''11111111-1111-1111-1111-111111111111'''),
+  'DENIED:%', 'authenticated kann profiles.tier NICHT selbst schreiben (Spalten-Grant)');
 
 select * from finish();
 rollback;
