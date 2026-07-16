@@ -36,3 +36,17 @@ export function parseUpgradeRequest(body: unknown, currentRank: number): ParseRe
 export function priceEnvKey(level: PaidLevel, interval: Interval): string {
   return `STRIPE_PRICE_${level.toUpperCase()}_${interval === "year" ? "YEAR" : "MONTH"}`;
 }
+
+/**
+ * Rücksprung-Basis-URL für success/cancel: die Request-`Origin`, wenn sie in der
+ * Allowlist steht, sonst der erste Allowlist-Eintrag (Fallback). So funktionieren
+ * lokal (localhost:5173) UND die gehostete Demo, ohne Open-Redirect — eine fremde
+ * Origin kann den Rücksprung nie auf ihre Domain lenken. Trailing Slashes werden
+ * normalisiert, damit `${base}/mitgliedschaft…` keinen Doppel-Slash erzeugt.
+ */
+export function resolveReturnBase(origin: string | null, allowed: string[]): string {
+  const list = allowed.map((s) => s.trim().replace(/\/+$/, "")).filter(Boolean);
+  const o = (origin ?? "").trim().replace(/\/+$/, "");
+  if (o && list.includes(o)) return o;
+  return list[0] ?? "http://localhost:5173";
+}

@@ -7,10 +7,13 @@
 // Session per Stripe-REST (kein SDK, wie Resend in notify-contact-request).
 //
 // Secrets (Infisical → supabase secrets): STRIPE_SECRET_KEY,
-//   STRIPE_PRICE_{DISCOVER,EXCHANGE,FOCUS,IMPACT}_{YEAR,MONTH}, APP_URL.
+//   STRIPE_PRICE_{DISCOVER,EXCHANGE,FOCUS,IMPACT}_{YEAR,MONTH}, APP_URLS.
+//   APP_URLS ist eine Komma-Liste erlaubter Rücksprung-Origins (z. B.
+//   "http://localhost:5173,https://fbc-platform.pages.dev"); der Checkout kehrt zu
+//   der Origin zurück, von der der Aufruf kam. APP_URL (Einzelwert) bleibt Fallback.
 //   SUPABASE_URL + SUPABASE_ANON_KEY sind plattform-injiziert.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { parseUpgradeRequest, priceEnvKey } from "./checkout.ts";
+import { parseUpgradeRequest, priceEnvKey, resolveReturnBase } from "./checkout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,7 +74,12 @@ Deno.serve(async (req) => {
 
   const secretKey = Deno.env.get("STRIPE_SECRET_KEY");
   const priceId = Deno.env.get(priceEnvKey(level, interval));
-  const appUrl = Deno.env.get("APP_URL")?.trim() || "http://localhost:5173";
+  const allowedOrigins = (
+    Deno.env.get("APP_URLS") ??
+    Deno.env.get("APP_URL") ??
+    "http://localhost:5173"
+  ).split(",");
+  const base = resolveReturnBase(req.headers.get("origin"), allowedOrigins);
   if (!secretKey || !priceId) {
     log("error", "misconfigured", {
       hasKey: !!secretKey,
@@ -88,8 +96,8 @@ Deno.serve(async (req) => {
   params.set("mode", "subscription");
   params.set("line_items[0][price]", priceId);
   params.set("line_items[0][quantity]", "1");
-  params.set("success_url", `${appUrl}/mitgliedschaft?status=success`);
-  params.set("cancel_url", `${appUrl}/mitgliedschaft?status=cancel`);
+  params.set("success_url", `${base}/mitgliedschaft?status=success`);
+  params.set("cancel_url", `${base}/mitgliedschaft?status=cancel`);
   params.set("client_reference_id", user.id);
   params.set("metadata[user_id]", user.id);
   params.set("metadata[level]", level); // Interval fließt NICHT in den Tier ein.
