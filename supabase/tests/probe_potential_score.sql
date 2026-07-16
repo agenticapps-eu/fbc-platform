@@ -9,7 +9,9 @@
 --   compass    = 1 of 4 themes answered      → 0.25 × 25 =  6.25
 --   activity   = 1 offer + 1 need (=2/10)    → 0.20 × 20 =  4.0
 --   recommend  = 1 badge + 1 accepted in (=2/5) → 0.40 × 15 = 6.0
---   feedback   = avg rating 4 → (4-1)/4=0.75 → 0.75 × 10 =  7.5
+--   feedback   = avg rating 4 über AKTIONSGEBUNDENES Feedback (ref_type gesetzt);
+--                Plattform-Feedback (ref_type null) zählt nicht mit
+--                → (4-1)/4=0.75 → 0.75 × 10 =  7.5
 --   total = 53.75 → round → 54
 --   radar: sein = compass avg 8.5; tun (no compass) = fallback 1 signal ×2 = 2.0
 --          haben = 1 interest ×2 = 2.0; wirken = no signal = 0.0
@@ -58,9 +60,18 @@ insert into public.contact_requests (from_id, to_id, status)
   values ('00000000-0000-0000-0000-0000000242bb',
           '00000000-0000-0000-0000-0000000242aa', 'accepted');
 
--- Feedback: avg rating 4.
-insert into public.feedback (profile_id, rating)
-  values ('00000000-0000-0000-0000-0000000242aa', 4);
+-- Feedback: avg rating 4. ref_type MUSS gesetzt sein — nur aktionsgebundenes
+-- Feedback zählt auf den Score (AGE-300). ref_id darf NULL bleiben.
+insert into public.feedback (profile_id, ref_type, rating)
+  values ('00000000-0000-0000-0000-0000000242aa', 'event', 4);
+
+-- Plattform-Feedback (§3.5): ref_type NULL, absichtlich mit dem schlechtestmöglichen
+-- rating. Es darf den Score NICHT bewegen — es ist eine Meinung ÜBER die Plattform,
+-- kein Signal über das Mitglied. Ohne den ref_type-Filter in
+-- recompute_potential_score() zöge dieses eine Sternchen den Schnitt von 4 auf 2.5
+-- und den Score von 54 auf 50.
+insert into public.feedback (profile_id, rating, likes, route)
+  values ('00000000-0000-0000-0000-0000000242aa', 1, 'Nichts', '/compass');
 
 -- Compass: theme 'sein' answered with numeric answers averaging 8.5.
 insert into public.compass_responses (profile_id, theme, answers)

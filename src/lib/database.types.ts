@@ -331,29 +331,41 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          idea: string | null;
+          likes: string | null;
+          misses: string | null;
           note: string | null;
           profile_id: string;
           rating: number | null;
           ref_id: string | null;
           ref_type: string | null;
+          route: string | null;
         };
         Insert: {
           created_at?: string;
           id?: string;
+          idea?: string | null;
+          likes?: string | null;
+          misses?: string | null;
           note?: string | null;
           profile_id: string;
           rating?: number | null;
           ref_id?: string | null;
           ref_type?: string | null;
+          route?: string | null;
         };
         Update: {
           created_at?: string;
           id?: string;
+          idea?: string | null;
+          likes?: string | null;
+          misses?: string | null;
           note?: string | null;
           profile_id?: string;
           rating?: number | null;
           ref_id?: string | null;
           ref_type?: string | null;
+          route?: string | null;
         };
         Relationships: [
           {
