@@ -22,7 +22,9 @@
 -- Forward-only. Grants sind bereits tabellenweit ausgesprochen
 -- (20260715140000_explicit_grants.sql: `grant select, insert, update, delete on
 -- public.feedback to authenticated`) und decken neue Spalten mit ab — hier ist
--- also NICHTS nachzuziehen. Das gilt nicht für die Funktion unten (AGE-312).
+-- also NICHTS nachzuziehen. Das gilt nicht für die beiden Funktionen unten
+-- (AGE-312): is_admin() wird explizit gegrantet UND gegen public/anon gesperrt;
+-- recompute_potential_score() erbt seine ACL unverändert per `create or replace`.
 
 alter table public.feedback
   add column likes  text,
@@ -64,6 +66,11 @@ comment on function public.is_admin() is
 
 -- Die Policy läuft als die abfragende Rolle, also braucht sie EXECUTE. Die Funktion
 -- verrät nur die eigene Admin-Eigenschaft des Aufrufers — REST-Exposure ist harmlos.
+--
+-- Lockdown wie bei is_matching_manager (20260614130000): Postgres' Default-EXECUTE
+-- für PUBLIC differiert je nach Anlagedatum der Instanz (AGE-312). Explizit entziehen,
+-- damit die Funktion nicht ungewollt auf der anon-Fläche (PostgREST /rpc) liegt.
+revoke execute on function public.is_admin() from public, anon;
 grant execute on function public.is_admin() to authenticated;
 
 -- ── Policy: Admin liest alles ────────────────────────────────────────────────

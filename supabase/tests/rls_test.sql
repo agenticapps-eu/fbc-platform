@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(36);
+select plan(38);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -332,6 +332,18 @@ select is(
   (select count(*)::int from public.feedback
     where profile_id = '11111111-1111-1111-1111-111111111111'),
   1, '… aber die fremde Zeile steht noch — Admin darf lesen, nicht löschen');
+
+-- is_admin() muss wie jede Schwesterfunktion (is_matching_manager,
+-- recompute_potential_score) gegen anon/public gesperrt sein (AGE-312). anon
+-- ist kein try_as-Fall (der setzt eine authentifizierte Identität) — die
+-- EXECUTE-Grant-ACL prüft man direkt über has_function_privilege.
+select is(
+  has_function_privilege('anon', 'public.is_admin()', 'execute'),
+  false, 'anon darf is_admin() nicht ausführen — gesperrt wie die Geschwister');
+
+select is(
+  has_function_privilege('authenticated', 'public.is_admin()', 'execute'),
+  true, 'authenticated behält sein explizites EXECUTE auf is_admin()');
 
 select * from finish();
 rollback;
