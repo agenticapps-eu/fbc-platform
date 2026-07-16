@@ -389,6 +389,13 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 
+# stripe-webhook (AGE-259): Stripe's webhook target (server-to-server). Stripe carries
+# no user JWT, so JWT verification is off; the function instead verifies the Stripe
+# signature (STRIPE_WEBHOOK_SECRET) and applies the tier upgrade via apply_upgrade.
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
