@@ -30,10 +30,15 @@
   die Edge-Function-Env (`STRIPE_PRICE_DISCOVER/EXCHANGE/FOCUS/IMPACT` via Infisical). `levels.ts`
   bleibt Display-only. Weicht bewusst von §3.1s Wortlaut ab (Preis-IDs „in levels.ts") — Grund:
   ein Stripe-Config-Ort server-seitig, nichts Stripe-bezogenes im Client-Bundle.
-- **D2 — `mode: 'payment'` (Einmal-Preise), nicht `subscription`.** Die Demo braucht nur den
-  einmaligen Tier-Flip (Freischaltung). §4 des 6-Level-Specs schließt Renewal/Proration/Downgrade
-  ausdrücklich aus. **Konsequenz für die Produkt-Anlage:** die 4 Test-Produkte sind
-  **Einmal-Preise** (150/300/600/1.200 €), NICHT wiederkehrend.
+- **D2 — `mode: 'subscription'` mit Jahres- UND Monatsoption.** Jede zahlende Stufe hat zwei
+  wiederkehrende Preise: **jährlich** und **monatlich**. Der Checkout läuft im Subscription-Mode;
+  der Pricing-Screen trägt einen **Jahr/Monat-Toggle**. **Konsequenz für die Produkt-Anlage:**
+  4 Test-Produkte, jedes mit einem **jährlichen** UND einem **monatlichen** wiederkehrenden Preis
+  → **8 Preis-IDs**. Jahrespreise: 150/300/600/1.200 €. Monatspreise legt Donald bei der
+  Produkt-Anlage fest und spiegelt sie zur Anzeige in `levels.ts` (`priceMonth`).
+  §4 schließt weiterhin **Renewal-/Cancellation-Handling, Proration und Downgrade** aus: der Tier
+  wird nur beim `checkout.session.completed` gesetzt; Verlängerungs-/Kündigungs-Events verarbeitet
+  diese Woche kein Webhook.
 - **Onboarding minimal (§3.4).** Kein neuer Signup-Schritt. Neue Profile starten schon auf `basic`;
   es genügt, dass Signup aufs Dashboard führt und der Pricing-Screen erreichbar ist.
 - **Nur Upgrade diese Woche.** Kein Downgrade in der UI; die `apply_upgrade`-RPC setzt `tier` nur,
@@ -45,18 +50,20 @@
 ## 3. Komponenten
 
 ### 3.1 Config (§3.1)
-- `src/config/levels.ts` bleibt Display-only — **keine Änderung** für Preis-IDs.
-- Level→Preis-ID-Map lebt in der Edge-Function `create-checkout-session`, gelesen aus Env.
+- `src/config/levels.ts` bleibt Display-only für **Beträge** — **keine** Stripe-Preis-IDs. Ergänzt
+  wird ein `priceMonth`-Feld (Anzeige der Monatsoption neben `priceYear`).
+- Die (Level, Interval)→Preis-ID-Map lebt in der Edge-Function `create-checkout-session`, gelesen
+  aus Env (8 Einträge).
 - **Akzeptanz:** kein Stripe-Key/keine Preis-ID im Client-Bundle; Test-Keys via Infisical.
 
 ### 3.2 Edge Function `create-checkout-session`
 - `verify_jwt = true` (trägt das User-JWT). Liest den Aufrufer aus dem JWT.
-- Input: `{ level: MembershipLevel }`.
+- Input: `{ level: MembershipLevel, interval: 'month' | 'year' }`.
 - Validiert: `level` ist eine **zahlende** Stufe (`discover|exchange|focus|impact`) **und** ein
-  **Upgrade** über die aktuelle Stufe des Aufrufers. Ablehnung bei `basic`/`connect`, unbekanntem
-  Level oder Downgrade/Gleichstand.
-- Mappt `level` → Preis-ID (Env). Erstellt Checkout-Session:
-  `mode: 'payment'`, `line_items: [{ price, quantity: 1 }]`,
+  **Upgrade** über die aktuelle Stufe des Aufrufers; `interval` ist `month|year`. Ablehnung bei
+  `basic`/`connect`, unbekanntem Level, ungültigem Interval oder Downgrade/Gleichstand.
+- Mappt (`level`, `interval`) → Preis-ID (Env). Erstellt Checkout-Session:
+  `mode: 'subscription'`, `line_items: [{ price, quantity: 1 }]`,
   `metadata: { user_id, level }`, `client_reference_id: user_id`,
   `success_url`/`cancel_url` → zurück zum Pricing-Screen mit Status-Param.
 - Rückgabe: `{ url }`.
@@ -86,10 +93,13 @@ create function public.apply_upgrade(p_user_id uuid, p_level text) returns text
 ### 3.5 Pricing-Screen (§3.2)
 - Neue Route (Konvention aus `nav.ts`/`App.tsx` übernehmen).
 - 6 Karten aus `LEVEL_ORDER`. Aktuelles Level (aus `AuthProvider`) hervorgehoben.
+- **Jahr/Monat-Toggle** oben; die Karten zeigen den Betrag des gewählten Intervals
+  (`priceYear`/`priceMonth`).
 - „Upgrade"-Button **nur** auf höheren **zahlenden** Stufen; aktuelles + niedrigere ohne
   Upgrade-Button (keine Downgrade-Optik). `basic`/`connect` tragen keinen Upgrade-Button.
 - Sichtbarer **„Testzahlung · Demo"**-Hinweis auf jeder Bezahlaktion.
-- Klick → `supabase.functions.invoke('create-checkout-session', { level })` → Redirect auf `url`.
+- Klick → `supabase.functions.invoke('create-checkout-session', { level, interval })` → Redirect
+  auf `url`.
 - Rückkehr auf `success_url`: Toast + Tier-Refetch.
 
 ### 3.6 Onboarding (§3.4)
@@ -99,9 +109,10 @@ create function public.apply_upgrade(p_user_id uuid, p_level text) returns text
 ---
 
 ## 4. Datenfluss (Happy Path)
-1. User auf Pricing-Screen klickt „Upgrade auf Exchange".
-2. Client → `create-checkout-session` (JWT) `{ level: 'exchange' }`.
-3. Edge-Fn validiert (zahlend + Upgrade), erstellt Session (`metadata` uid+level), gibt `url` zurück.
+1. User auf Pricing-Screen (Toggle z. B. auf „Jahr") klickt „Upgrade auf Exchange".
+2. Client → `create-checkout-session` (JWT) `{ level: 'exchange', interval: 'year' }`.
+3. Edge-Fn validiert (zahlend + Upgrade + Interval), erstellt Subscription-Session
+   (`metadata` uid+level — Interval fließt NICHT in den Tier ein), gibt `url` zurück.
 4. Client-Redirect → Stripe Checkout; Testkarte `4242…`; Stripe-Redirect → `success_url`.
 5. Stripe → `stripe-webhook` mit `checkout.session.completed`.
 6. Webhook verifiziert Signatur, ruft `apply_upgrade(uid, 'exchange')` per Service-Role →
@@ -121,8 +132,8 @@ create function public.apply_upgrade(p_user_id uuid, p_level text) returns text
 ---
 
 ## 6. Secrets (Infisical → `supabase secrets`, in `docs/secrets.md` dokumentieren)
-- `STRIPE_SECRET_KEY` (Test), `STRIPE_WEBHOOK_SECRET`,
-  `STRIPE_PRICE_DISCOVER`, `STRIPE_PRICE_EXCHANGE`, `STRIPE_PRICE_FOCUS`, `STRIPE_PRICE_IMPACT`.
+- `STRIPE_SECRET_KEY` (Test), `STRIPE_WEBHOOK_SECRET`, und **8 Preis-IDs** —
+  `STRIPE_PRICE_{DISCOVER,EXCHANGE,FOCUS,IMPACT}_{YEAR,MONTH}`.
 - Plattform-injiziert: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - **Kein neues Client-Env** — der Client ruft die Function via `supabase.functions.invoke` mit der
   bestehenden Session.
@@ -133,11 +144,12 @@ create function public.apply_upgrade(p_user_id uuid, p_level text) returns text
 - **pgTAP** (`rls_test.sql`): `apply_upgrade` upgradet / no-op bei Gleichstand-oder-tiefer / lehnt
   unbekanntes Level ab / ist service-role-only; `authenticated` kann `profiles.tier` **nicht** per
   UPDATE setzen (Spalten-Grant-Beweis).
-- **Edge-Fn (Deno, Stil `emails.test.ts`):** Level- + Downgrade-Validierung in
-  `create-checkout-session`; Signatur-Verifikation (gültig/ungültig) + `metadata`→`apply_upgrade`-
-  Dispatch im Webhook (Stripe + supabase gemockt).
-- **Frontend (vitest):** 6 Karten, korrekte Hervorhebung, Upgrade nur auf höheren zahlenden Stufen,
-  „Testzahlung · Demo" vorhanden, Klick ruft die Function.
+- **Edge-Fn (Deno, Stil `emails.test.ts`):** Level-, Interval- + Downgrade-Validierung in
+  `create-checkout-session` (inkl. (level,interval)→Preis-ID-Mapping); Signatur-Verifikation
+  (gültig/ungültig) + `metadata`→`apply_upgrade`-Dispatch im Webhook (Stripe + supabase gemockt).
+- **Frontend (vitest):** 6 Karten, korrekte Hervorhebung, Jahr/Monat-Toggle schaltet die Beträge,
+  Upgrade nur auf höheren zahlenden Stufen, „Testzahlung · Demo" vorhanden, Klick ruft die Function
+  mit `{ level, interval }`.
 - **Browser (blockiert auf Keys):** `4242…` → Tier-Flip → gesperrter Inhalt wird sichtbar. Das ist
   die Execution-Boundary-Verifikation.
 
@@ -145,10 +157,12 @@ create function public.apply_upgrade(p_user_id uuid, p_level text) returns text
 
 ## 8. Scope-Grenze (diese Session)
 Design-Spec + Implementierungs-Plan. **Execution stoppt**, bis die 4 Stripe-Test-Produkte
-(Einmal-Preise 150/300/600/1.200 €) + Test-Keys in Infisical existieren. Die meisten Unit-Tests
+(je ein **jährlicher** + ein **monatlicher** wiederkehrender Preis, Jahr = 150/300/600/1.200 €,
+Monat von Donald festgelegt → 8 Preis-IDs) + Test-Keys in Infisical existieren. Die meisten Unit-Tests
 sind **ohne** Live-Keys schreib-/lauffähig (Signatur-Fixtures, pgTAP, Frontend); nur der echte
 End-to-End-Checkout und die realen Preis-IDs brauchen Donalds Setup.
 
 ## 9. Diese Woche bewusst NICHT (aus §4)
 Echte Zahlung / Live-Keys · SEPA · Rechnungen · AGB/Widerruf/Datenschutz-Texte · `premium`/
-`enterprise` · Downgrade-/Proration-Logik · Subscription-Lifecycle · autonomes QM.
+`enterprise` · Downgrade-/Proration-Logik · Renewal-/Cancellation-Webhooks (Tier nur bei
+`checkout.session.completed`) · autonomes QM.
