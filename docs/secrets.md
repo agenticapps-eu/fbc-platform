@@ -173,3 +173,41 @@ The function rejects any request whose bearer doesn't match its
 > DKIM/SPF exists, use a verified **Resend test domain** as `FROM_EMAIL`
 > (e.g. `onboarding@resend.dev`). This is a transition — swap in the real domain
 > once it's set up.
+
+## Supabase Edge Function secrets (`create-checkout-session` + `stripe-webhook`, AGE-259)
+
+Der Stripe-Test-Mode-Upgrade-Flow (Spec §3.1–3.4) braucht diese Edge-Function-Secrets
+(Infisical → `supabase secrets set`):
+
+- `STRIPE_SECRET_KEY` — Test-Mode Secret Key (`sk_test_…`)
+- `STRIPE_WEBHOOK_SECRET` — aus dem Stripe-Webhook-Endpoint (`whsec_…`)
+- `STRIPE_PRICE_DISCOVER_YEAR` / `STRIPE_PRICE_DISCOVER_MONTH`
+- `STRIPE_PRICE_EXCHANGE_YEAR` / `STRIPE_PRICE_EXCHANGE_MONTH`
+- `STRIPE_PRICE_FOCUS_YEAR` / `STRIPE_PRICE_FOCUS_MONTH`
+- `STRIPE_PRICE_IMPACT_YEAR` / `STRIPE_PRICE_IMPACT_MONTH`
+- `APP_URL` — Basis-URL für success/cancel (z. B. `http://localhost:5173`)
+
+Plattform-injiziert (nicht setzen): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`.
+
+> **Keine Preis-ID/kein Key im Client** (Spec §3.1, D1): der Client erstellt die
+> Checkout-Session nie selbst — das macht `create-checkout-session`. Preis-IDs leben
+> daher neben dem Secret Key hier, nie im Client-Bundle. `src/config/levels.ts` trägt
+> nur die Anzeige-Beträge (`priceYear`/`priceMonth`), keine Stripe-IDs.
+
+### Einmal-Setup (Mensch, Test-Mode)
+
+1. 4 Produkte in Stripe (Test-Mode): Discover / Exchange / Focus / Impact.
+   Je Produkt **zwei wiederkehrende Preise** (D2, `mode: 'subscription'`):
+   jährlich (150 / 300 / 600 / 1.200 €) **und** monatlich (Beträge frei wählbar;
+   spiegle sie zur Anzeige in `src/config/levels.ts` → `priceMonth`).
+2. Die **8** Price-IDs (`price_…`) + `sk_test_…` als Secrets setzen (s. o.).
+3. Functions deployen: `supabase functions deploy create-checkout-session stripe-webhook`.
+4. Stripe-Webhook-Endpoint auf `…/functions/v1/stripe-webhook` anlegen, Event
+   `checkout.session.completed` abonnieren, das `whsec_…` als
+   `STRIPE_WEBHOOK_SECRET` setzen.
+5. Migration anwenden: `pnpm db:push` (setzt `apply_upgrade`).
+
+Danach: als Basic-Nutzer auf ein gesperrtes Format → Wand → „Upgrade" →
+`/mitgliedschaft` → Testkarte `4242 4242 4242 4242` → der Webhook hebt `profiles.tier`,
+und der zuvor gesperrte Inhalt wird sichtbar.
