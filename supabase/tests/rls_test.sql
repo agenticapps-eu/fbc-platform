@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(31);
+select plan(36);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -25,6 +25,12 @@ insert into auth.users (id, aud, role, email) values
   ('77777777-7777-7777-7777-777777777777', 'authenticated', 'authenticated', 'neu@test.fbc'),
   ('88888888-8888-8888-8888-888888888888', 'authenticated', 'authenticated', 'optout@test.fbc'),
   ('99999999-9999-9999-9999-999999999999', 'authenticated', 'authenticated', 'frisch@test.fbc');
+
+insert into auth.users (id, aud, role, email) values
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'admin@test.fbc'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'manager@test.fbc');
+update public.profiles set tier = 'impact', name = 'Admin'   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+update public.profiles set tier = 'impact', name = 'Manager' where id = 'bbbbbbbb-0000-0000-0000-000000000002';
 
 update public.profiles set tier = 'basic',    name = 'Basic'    where id = '11111111-1111-1111-1111-111111111111';
 update public.profiles set tier = 'connect',  name = 'Connect'  where id = '22222222-2222-2222-2222-222222222222';
@@ -78,6 +84,16 @@ insert into public.events (id, title, host_id, visibility, starts_at) values
 -- bestehender Thread allein berechtigt nicht zum Schreiben.
 insert into public.message_threads (a_profile_id, b_profile_id) values
   ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+
+-- Staff (server-kontrolliert, ADR-0002). Provisioniert wie in Prod: direkt, nie vom Client.
+insert into public.staff_roles (profile_id, role) values
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'admin'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'matching_manager');
+
+-- Feedback von zwei verschiedenen Autoren — der Admin darf beide sehen, sonst niemand.
+insert into public.feedback (profile_id, rating, likes, misses, idea, route) values
+  ('11111111-1111-1111-1111-111111111111', 5, 'Der Compass', 'Nichts', 'Mehr Events', '/compass'),
+  ('66666666-6666-6666-6666-666666666666', 2, 'Das Design', 'Tempo',  'Schneller',    '/meine-chancen');
 
 -- ── Rollen-Impersonation (Muster aus den probe_*.sql) ────────────────────────
 create function pg_temp.count_as(uid uuid, q text) returns int language plpgsql as $$
@@ -284,6 +300,38 @@ select is(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
   'OK', 'Exchange kann sich anmelden');
+
+-- ── 11. feedback — plattformweites QM (§3.5, AGE-300) ────────────────────────
+-- `admin` liest alles (feedback_admin_read), alle anderen nur ihr eigenes
+-- (feedback_own). Die Quelle ist staff_roles, NICHT profiles.roles — letzteres
+-- ist member-writable, ein Mitglied könnte sich sonst selbst freischalten.
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'select count(*)::int from public.feedback'),
+  2, 'Admin liest fremdes Feedback (beide Zeilen)');
+
+select is(
+  pg_temp.count_as('11111111-1111-1111-1111-111111111111',
+    'select count(*)::int from public.feedback'),
+  1, 'Ein gewöhnliches Mitglied sieht nur sein eigenes Feedback');
+
+select is(
+  pg_temp.count_as('bbbbbbbb-0000-0000-0000-000000000002',
+    'select count(*)::int from public.feedback'),
+  0, 'Ein matching_manager sieht KEIN fremdes Feedback — QM ist nicht die Deal-Queue');
+
+-- Der Admin liest, er verwaltet nicht: feedback_admin_read ist `for select`,
+-- feedback_own greift bei fremden Zeilen nicht. Ohne diese Assertion wäre ein
+-- versehentliches `for all` in der Policy unbemerkt.
+select is(
+  pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'delete from public.feedback where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'OK', 'DELETE läuft ohne Fehler durch (RLS filtert stumm, statt zu werfen)');
+
+select is(
+  (select count(*)::int from public.feedback
+    where profile_id = '11111111-1111-1111-1111-111111111111'),
+  1, '… aber die fremde Zeile steht noch — Admin darf lesen, nicht löschen');
 
 select * from finish();
 rollback;
