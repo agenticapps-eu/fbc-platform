@@ -1,7 +1,8 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import MitgliedschaftPage from "./MitgliedschaftPage";
+import { ToastProvider } from "../components/ui";
 
 const invoke = vi.fn();
 vi.mock("../lib/supabase", () => ({
@@ -14,7 +15,9 @@ vi.mock("../providers/auth-context", () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <MitgliedschaftPage />
+      <ToastProvider>
+        <MitgliedschaftPage />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -66,6 +69,30 @@ describe("MitgliedschaftPage", () => {
     );
     expect(invoke).toHaveBeenCalledWith("create-checkout-session", {
       body: { level: "focus", interval: "year" },
+    });
+  });
+
+  it("zeigt einen Fehler-Toast und navigiert nicht, wenn der Checkout-Start fehlschlägt", async () => {
+    invoke.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const assign = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, assign },
+      writable: true,
+      configurable: true,
+    });
+    renderPage();
+    fireEvent.click(
+      within(screen.getByTestId("level-focus")).getByRole("button", { name: /upgrade/i }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/Upgrade konnte nicht gestartet werden/i)).toBeInTheDocument(),
+    );
+    expect(assign).not.toHaveBeenCalled();
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
     });
   });
 });

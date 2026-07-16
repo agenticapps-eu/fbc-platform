@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { useToast } from "../components/ui/toast-context";
 import { cn } from "../lib/cn";
 
 type Interval = "month" | "year";
@@ -12,6 +13,7 @@ const PAID: MembershipLevel[] = ["discover", "exchange", "focus", "impact"];
 
 export default function MitgliedschaftPage() {
   const { tier, levelRank } = useAuth();
+  const { toast } = useToast();
   const [interval, setInterval] = useState<Interval>("year");
   const [busy, setBusy] = useState<MembershipLevel | null>(null);
   const currentRank = levelRank ?? 0;
@@ -22,7 +24,14 @@ export default function MitgliedschaftPage() {
       body: { level, interval },
     });
     setBusy(null);
-    if (error || !data?.url) return; // Fehler-Toast optional; MVP: kein Redirect
+    if (error || !data?.url) {
+      toast({
+        variant: "error",
+        title: "Upgrade konnte nicht gestartet werden",
+        description: "Bitte versuche es erneut oder wende dich an den Support.",
+      });
+      return;
+    }
     window.location.assign(data.url as string);
   }
 
