@@ -25,7 +25,9 @@ begin
   select mt.level_rank into v_current_rank
     from public.profiles p
     join public.membership_tiers mt on mt.key = p.tier
-   where p.id = p_user_id;
+   where p.id = p_user_id
+   for update of p;  -- serialisiert nebenläufige Upgrades desselben Nutzers:
+                     -- ein verspätetes/tieferes Event wartet und no-opt dann korrekt.
   if v_current_rank is null then
     raise exception 'unknown user or tier: %', p_user_id using errcode = 'P0002';
   end if;
