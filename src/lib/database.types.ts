@@ -1294,6 +1294,23 @@ export type Database = {
       current_tier_rank: { Args: never; Returns: number };
       is_matching_manager: { Args: never; Returns: boolean };
       is_prime_plus: { Args: never; Returns: boolean };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
+      // admin_list_feedback() RPC from 20260716103000_admin_feedback_rpc.sql (admin-only
+      // enriched read of QM feedback with the author name; empty for non-admins).
+      admin_list_feedback: {
+        Args: never;
+        Returns: {
+          id: string;
+          rating: number | null;
+          likes: string | null;
+          misses: string | null;
+          idea: string | null;
+          route: string | null;
+          ref_type: string | null;
+          created_at: string;
+          author_name: string;
+        }[];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
       // list_routing_queue() RPC from 20260614120000_volume_routing_queue.sql (manager-
       // only enriched read of the §8 routing queue).
