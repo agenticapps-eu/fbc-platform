@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(38);
+select plan(44);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -344,6 +344,40 @@ select is(
 select is(
   has_function_privilege('authenticated', 'public.is_admin()', 'execute'),
   true, 'authenticated behält sein explizites EXECUTE auf is_admin()');
+
+-- ── 12. admin_list_feedback() — Admin-Sicht mit Autor (AGE-358) ──────────────
+-- SECURITY DEFINER: joint feedback+profiles an der profiles-RLS vorbei, damit der
+-- Admin den Autor-Namen auch bei nicht-öffentlichen Profilen sieht. Gibt aber nur
+-- Zeilen zurück, wenn public.is_admin() — ein Nicht-Admin (auch matching_manager)
+-- bekommt leer. Die feedback-Fixtures oben stammen von '1111…' (Basic) und
+-- '6666…' (Impact); genau deren Namen müssen im author_name auftauchen.
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'select count(*)::int from public.admin_list_feedback()'),
+  2, 'Admin bekommt aus admin_list_feedback() beide Feedback-Zeilen');
+
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'select count(*)::int from public.admin_list_feedback() where author_name in (''Basic'', ''Impact'')'),
+  2, 'Der Autor-Name ist aufgelöst — der Join greift hinter der profiles-RLS');
+
+select is(
+  pg_temp.count_as('bbbbbbbb-0000-0000-0000-000000000002',
+    'select count(*)::int from public.admin_list_feedback()'),
+  0, 'Ein matching_manager bekommt aus admin_list_feedback() nichts — QM ist nicht die Deal-Queue');
+
+select is(
+  pg_temp.count_as('11111111-1111-1111-1111-111111111111',
+    'select count(*)::int from public.admin_list_feedback()'),
+  0, 'Ein gewöhnliches Mitglied bekommt aus admin_list_feedback() nichts');
+
+select is(
+  has_function_privilege('anon', 'public.admin_list_feedback()', 'execute'),
+  false, 'anon darf admin_list_feedback() nicht ausführen — gesperrt wie die Geschwister');
+
+select is(
+  has_function_privilege('authenticated', 'public.admin_list_feedback()', 'execute'),
+  true, 'authenticated darf admin_list_feedback() ausführen (der RPC-Aufruf der Sicht)');
 
 select * from finish();
 rollback;
