@@ -69,10 +69,13 @@ export function FeedbackButton() {
 
   return (
     <>
+      {/* bottom-20 (nicht bottom-5): weicht dem Design-Variant-Switcher aus, der bei
+          bottom-4 rechts unten sitzt (DesignSwitcher.tsx, AGE-237). Sobald der Switcher
+          nach der Design-Entscheidung entfernt ist, kann das wieder bottom-5 werden. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 rounded-full border border-gold/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+        className="fixed bottom-20 right-5 z-40 rounded-full border border-gold/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
       >
         Feedback
       </button>
