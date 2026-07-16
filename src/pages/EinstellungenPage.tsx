@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { AdminFeedbackCard } from "../components/feedback/AdminFeedbackCard";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
@@ -60,7 +61,7 @@ function ToggleRow({
 }
 
 export default function EinstellungenPage() {
-  const { user, tier, signOut } = useAuth();
+  const { user, tier, staffRole, signOut } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -169,6 +170,11 @@ export default function EinstellungenPage() {
           disabled={save.isPending}
         />
       </Card>
+
+      {/* Admin-Sicht auf das QM-Feedback (AGE-358). Nur für `admin`, nicht
+          matching_manager — die RPC gäbe ihm ohnehin leer zurück, das Gating spart
+          den Aufruf und blendet die Card aus. */}
+      {staffRole === "admin" && <AdminFeedbackCard />}
     </div>
   );
 }

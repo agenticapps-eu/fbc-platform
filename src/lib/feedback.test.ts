@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const insert = vi.fn();
+const rpc = vi.fn();
 vi.mock("./supabase", () => ({
-  supabase: { from: (table: string) => ({ insert: (row: unknown) => insert(table, row) }) },
+  supabase: {
+    from: (table: string) => ({ insert: (row: unknown) => insert(table, row) }),
+    rpc: (name: string) => rpc(name),
+  },
 }));
 
-import { submitPlatformFeedback } from "./feedback";
+import { fetchAdminFeedback, submitPlatformFeedback } from "./feedback";
 
 beforeEach(() => {
   insert.mockReset();
   insert.mockResolvedValue({ error: null });
+  rpc.mockReset();
+  rpc.mockResolvedValue({ data: [], error: null });
 });
 
 describe("submitPlatformFeedback", () => {
@@ -61,5 +67,28 @@ describe("submitPlatformFeedback", () => {
         route: "/",
       }),
     ).rejects.toMatchObject({ message: expect.stringContaining("row-level security") });
+  });
+});
+
+describe("fetchAdminFeedback", () => {
+  it("ruft die RPC admin_list_feedback und gibt ihre Zeilen zurück", async () => {
+    rpc.mockResolvedValue({ data: [{ id: "f1", author_name: "Anna" }], error: null });
+
+    const rows = await fetchAdminFeedback();
+
+    expect(rpc).toHaveBeenCalledWith("admin_list_feedback");
+    expect(rows).toEqual([{ id: "f1", author_name: "Anna" }]);
+  });
+
+  it("gibt eine leere Liste zurück, wenn die RPC null liefert (Nicht-Admin sieht nichts)", async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+
+    expect(await fetchAdminFeedback()).toEqual([]);
+  });
+
+  it("reicht einen Fehler der RPC durch, statt ihn zu schlucken", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+
+    await expect(fetchAdminFeedback()).rejects.toMatchObject({ message: "boom" });
   });
 });

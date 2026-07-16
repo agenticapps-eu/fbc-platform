@@ -19,19 +19,24 @@ import {
   saveMemberSettings,
   DEFAULT_MEMBER_SETTINGS,
 } from "../lib/member-settings";
+vi.mock("../lib/feedback", () => ({ fetchAdminFeedback: vi.fn() }));
+import { fetchAdminFeedback } from "../lib/feedback";
 import EinstellungenPage from "./EinstellungenPage";
 
 const mockedFetch = vi.mocked(fetchMemberSettings);
 const mockedSave = vi.mocked(saveMemberSettings);
+const mockedAdminFeedback = vi.mocked(fetchAdminFeedback);
 
 beforeEach(() => {
   mockedFetch.mockReset();
   mockedFetch.mockResolvedValue(DEFAULT_MEMBER_SETTINGS);
   mockedSave.mockReset();
   mockedSave.mockResolvedValue();
+  mockedAdminFeedback.mockReset();
+  mockedAdminFeedback.mockResolvedValue([]);
 });
 
-function renderPage() {
+function renderPage(staffRole: string | null = null) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -39,6 +44,7 @@ function renderPage() {
     user: { id: "u1", email: "legacy@fbcdemo.de" } as AuthContextValue["user"],
     tier: "legacy",
     levelRank: 7,
+    staffRole,
   });
   return render(
     <AuthFixture value={value}>
@@ -66,5 +72,39 @@ describe("EinstellungenPage", () => {
         visible_in_directory: false,
       }),
     );
+  });
+
+  it("zeigt die QM-Feedback-Card mit Inhalt und Autor für einen Admin (AGE-358)", async () => {
+    mockedAdminFeedback.mockResolvedValue([
+      {
+        id: "f1",
+        rating: 4,
+        likes: "Der Compass ist klar",
+        misses: null,
+        idea: null,
+        route: "/compass",
+        ref_type: null,
+        created_at: "2026-07-16T10:00:00Z",
+        author_name: "Anna Müller",
+      },
+    ]);
+    renderPage("admin");
+    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
+    expect(await screen.findByText("Der Compass ist klar")).toBeInTheDocument();
+    expect(screen.getByText("Anna Müller", { exact: false })).toBeInTheDocument();
+  });
+
+  it("zeigt die QM-Feedback-Card NICHT für ein gewöhnliches Mitglied", async () => {
+    renderPage(null);
+    await screen.findByRole("heading", { name: "Einstellungen" });
+    expect(screen.queryByText("QM-Feedback")).toBeNull();
+    expect(mockedAdminFeedback).not.toHaveBeenCalled();
+  });
+
+  it("zeigt die QM-Feedback-Card NICHT für einen matching_manager — QM ist nicht die Deal-Queue", async () => {
+    renderPage("matching_manager");
+    await screen.findByRole("heading", { name: "Einstellungen" });
+    expect(screen.queryByText("QM-Feedback")).toBeNull();
+    expect(mockedAdminFeedback).not.toHaveBeenCalled();
   });
 });
