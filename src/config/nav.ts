@@ -12,6 +12,7 @@ import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
 import MeineEventsPage from "../pages/MeineEventsPage";
 import MitgliederPage from "../pages/MitgliederPage";
+import MitgliedschaftPage from "../pages/MitgliedschaftPage";
 import ProfilAnsichtPage from "../pages/ProfilAnsichtPage";
 import ProfilPage from "../pages/ProfilPage";
 
@@ -124,6 +125,13 @@ export const navItems: NavItem[] = [
     path: "/profil/bearbeiten",
     label: "Profil bearbeiten",
     Component: ProfilPage,
+    section: "sub",
+    requiresAuth: true,
+  },
+  {
+    path: "/mitgliedschaft",
+    label: "Mitgliedschaft",
+    Component: MitgliedschaftPage,
     section: "sub",
     requiresAuth: true,
   },
