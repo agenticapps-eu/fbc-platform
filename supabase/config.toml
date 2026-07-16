@@ -383,6 +383,12 @@ deno_version = 2
 enabled = true
 verify_jwt = false
 
+# create-checkout-session (AGE-259): creates a Stripe Checkout Session (subscription,
+# test-mode) for a level upgrade. Called by the authenticated client with its user JWT.
+[functions.create-checkout-session]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
