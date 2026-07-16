@@ -17,8 +17,11 @@
 
 begin;
 
--- ── 1. New demo auth users (14). The handle_new_user trigger creates each base
---    profiles row (tier 'basic'); section 3 enriches it. Idempotent. ────────
+-- ── 1. New demo auth users (23). The handle_new_user trigger creates each base
+--    profiles row (tier 'basic'); section 3 enriches it. Idempotent.
+--    …25415–…25423 (AGE-357) füllen exchange/discover/basic — vorher hatte das
+--    Verzeichnis nur connect und impact besetzt. Alle tragen dasselbe Dummy-
+--    Passwort wie die übrigen: Verzeichnis-Inhalt, KEINE Logins. ────────────
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
@@ -45,7 +48,19 @@ from (values
   ('00000000-0000-0000-0000-000000025411'::uuid, 'marek.novak@demo.fbc.invalid',         'Marek Novak'),
   ('00000000-0000-0000-0000-000000025412'::uuid, 'aylin.demir@demo.fbc.invalid',         'Aylin Demir'),
   ('00000000-0000-0000-0000-000000025413'::uuid, 'robert.vogt@demo.fbc.invalid',         'Robert Vogt'),
-  ('00000000-0000-0000-0000-000000025414'::uuid, 'mira.saenger@demo.fbc.invalid',        'Mira Sänger')
+  ('00000000-0000-0000-0000-000000025414'::uuid, 'mira.saenger@demo.fbc.invalid',        'Mira Sänger'),
+  -- AGE-357: exchange (rank 4)
+  ('00000000-0000-0000-0000-000000025415'::uuid, 'anna.mueller@demo.fbc.invalid',        'Anna Müller'),
+  ('00000000-0000-0000-0000-000000025416'::uuid, 'christoph.seidel@demo.fbc.invalid',    'Christoph Seidel'),
+  ('00000000-0000-0000-0000-000000025417'::uuid, 'ruth-maria.wagner@demo.fbc.invalid',   'Ruth-Maria Wagner'),
+  -- AGE-357: discover (rank 3)
+  ('00000000-0000-0000-0000-000000025418'::uuid, 'katharina.bruns@demo.fbc.invalid',     'Katharina Bruns'),
+  ('00000000-0000-0000-0000-000000025419'::uuid, 'julian.maier@demo.fbc.invalid',        'Julian Maier'),
+  ('00000000-0000-0000-0000-000000025420'::uuid, 'fatima.cheddadi@demo.fbc.invalid',     'Fatima Cheddadi'),
+  -- AGE-357: basic (rank 1)
+  ('00000000-0000-0000-0000-000000025421'::uuid, 'timo.reuter@demo.fbc.invalid',         'Timo Reuter'),
+  ('00000000-0000-0000-0000-000000025422'::uuid, 'sofia.kranz@demo.fbc.invalid',         'Sofia Kranz'),
+  ('00000000-0000-0000-0000-000000025423'::uuid, 'david.oeztuerk@demo.fbc.invalid',      'David Öztürk')
 ) as v(id, email, name)
 on conflict (id) do nothing;
 
@@ -79,7 +94,22 @@ from (values
   -- new discover
   ('00000000-0000-0000-0000-000000025412'::uuid,'Aylin Demir','connect','Gründerin · DeepTech','{"Gründerin"}'::text[],'Stuttgart','Demir Labs','Technologie','DEMO-Profil — fiktive Daten. DeepTech-Ausgründung, sucht erste Finanzierung und Mentoring.','{"Machine Learning","Forschung"}'::text[],'{"DeepTech","KI","Forschung"}'::text[],'FBC-10461','2024-11-01'::date,'tun',38,55),
   ('00000000-0000-0000-0000-000000025413'::uuid,'Robert Vogt','connect','Dienstleister · Mittelstand','{"Unternehmer"}'::text[],'Köln','Vogt Services','Dienstleistung','DEMO-Profil — fiktive Daten. Wachsendes Dienstleistungsunternehmen, sucht Partner und Kunden.','{"Service","Logistik","Operations"}'::text[],'{"Mittelstand","Digitalisierung"}'::text[],'FBC-10468','2025-01-01'::date,'tun',42,50),
-  ('00000000-0000-0000-0000-000000025414'::uuid,'Mira Sänger','connect','Kreativunternehmerin','{"Gründerin","Designerin"}'::text[],'Berlin','Saenger Studio','Kreativwirtschaft','DEMO-Profil — fiktive Daten. Design- und Markenstudio, sucht Mentoring und Fachexpertise.','{"Design","Branding","Content"}'::text[],'{"Design","Creator Economy","Marke"}'::text[],'FBC-10475','2024-12-01'::date,'sein',44,58)
+  ('00000000-0000-0000-0000-000000025414'::uuid,'Mira Sänger','connect','Kreativunternehmerin','{"Gründerin","Designerin"}'::text[],'Berlin','Saenger Studio','Kreativwirtschaft','DEMO-Profil — fiktive Daten. Design- und Markenstudio, sucht Mentoring und Fachexpertise.','{"Design","Branding","Content"}'::text[],'{"Design","Creator Economy","Marke"}'::text[],'FBC-10475','2024-12-01'::date,'sein',44,58),
+  -- new exchange (rank 4) — AGE-357. Mitgliedsnummern 103xx: invers zum Rang,
+  -- zwischen focus (102xx) und discover (1038x).
+  ('00000000-0000-0000-0000-000000025415'::uuid,'Anna Müller','exchange','Geschäftsführerin · Familienunternehmen','{Unternehmerin,"Geschäftsführerin"}'::text[],'Stuttgart','Müller Präzisionsteile GmbH','Industrie','DEMO-Profil — fiktive Daten. Führt ein Familienunternehmen in dritter Generation und bereitet die Nachfolge vor.','{"Produktion","Nachfolge","Vertrieb"}'::text[],'{"Unternehmensnachfolge","Mittelstand","Automatisierung"}'::text[],'FBC-10310','2023-03-01'::date,'tun',58,78),
+  ('00000000-0000-0000-0000-000000025416'::uuid,'Christoph Seidel','exchange','Steuerberater · Mittelstand','{Berater,"Steuerberater"}'::text[],'München','Seidel & Kollegen','Beratung','DEMO-Profil — fiktive Daten. Steuerliche Gestaltung für inhabergeführte Unternehmen und Nachfolgen.','{"Steuerrecht","Nachfolgeplanung","Bilanzierung"}'::text[],'{"Unternehmensnachfolge","Mittelstand","Vermögensstruktur"}'::text[],'FBC-10317','2023-06-15'::date,'tun',60,80),
+  ('00000000-0000-0000-0000-000000025417'::uuid,'Ruth-Maria Wagner','exchange','Handelsunternehmerin','{Unternehmerin}'::text[],'Köln','Wagner Handel KG','Handel','DEMO-Profil — fiktive Daten. Großhandel im Umbau auf E-Commerce, sucht Partner und Expertise.','{"Einkauf","Logistik","E-Commerce"}'::text[],'{"Digitalisierung","Handel","Nachhaltigkeit"}'::text[],'FBC-10324','2023-09-01'::date,'haben',56,76),
+  -- new discover (rank 3) — AGE-357. Die ALTE Stufe `discover` wurde von AGE-311
+  -- auf `connect` gemappt; die neue gleichnamige Stufe hatte bis hier niemanden.
+  ('00000000-0000-0000-0000-000000025418'::uuid,'Katharina Bruns','discover','Gründerin · Nachhaltige Verpackung','{"Gründerin"}'::text[],'Hamburg','Bruns Packaging','Industrie','DEMO-Profil — fiktive Daten. Entwickelt kompostierbare Verpackungen und sucht erste Kunden im Mittelstand.','{"Materialentwicklung","Produktion"}'::text[],'{"Nachhaltigkeit","Kreislaufwirtschaft","Industrie"}'::text[],'FBC-10380','2024-03-01'::date,'tun',50,66),
+  ('00000000-0000-0000-0000-000000025419'::uuid,'Julian Maier','discover','Selbstständiger IT-Berater','{Berater}'::text[],'Stuttgart','Maier IT','Technologie','DEMO-Profil — fiktive Daten. IT-Beratung für Mittelständler, will vom Einzelkämpfer zum Team wachsen.','{"IT-Infrastruktur","Cloud","Security"}'::text[],'{"Digitalisierung","Mittelstand","Cloud"}'::text[],'FBC-10387','2024-05-15'::date,'tun',48,64),
+  ('00000000-0000-0000-0000-000000025420'::uuid,'Fatima Cheddadi','discover','Architektin · Bestandssanierung','{Architektin,"Unternehmerin"}'::text[],'Frankfurt','Cheddadi Architektur','Immobilien','DEMO-Profil — fiktive Daten. Sanierung von Bestandsgebäuden, sucht Projektpartner und Bauherren.','{"Architektur","Sanierung","Bauleitung"}'::text[],'{"Nachhaltiges Bauen","Immobilien","Denkmalschutz"}'::text[],'FBC-10394','2024-08-01'::date,'tun',52,68),
+  -- new basic (rank 1) — AGE-357. Neu dabei, Profil noch dünn: niedrigster
+  -- dev_progress/profile_completion im ganzen Seed, jüngstes member_since.
+  ('00000000-0000-0000-0000-000000025421'::uuid,'Timo Reuter','basic','Gründer · Handwerk-Plattform','{"Gründer"}'::text[],'Stuttgart','Reuter Digital','Technologie','DEMO-Profil — fiktive Daten. Frisch im Club, baut eine Vermittlungsplattform für Handwerksbetriebe.','{"Product","Marktplatz"}'::text[],'{"Startups","Handwerk","Plattformen"}'::text[],'FBC-10520','2026-04-01'::date,'tun',26,34),
+  ('00000000-0000-0000-0000-000000025422'::uuid,'Sofia Kranz','basic','Freiberufliche Texterin','{Freiberuflerin}'::text[],'Berlin','—','Kreativwirtschaft','DEMO-Profil — fiktive Daten. Neu im Club, orientiert sich noch und sucht erste Kontakte.','{"Text","Content"}'::text[],'{"Kommunikation","Marke"}'::text[],'FBC-10527','2026-05-15'::date,'sein',22,30),
+  ('00000000-0000-0000-0000-000000025423'::uuid,'David Öztürk','basic','Handwerksunternehmer · Elektrotechnik','{Unternehmer}'::text[],'Köln','Öztürk Elektro GmbH','Handwerk','DEMO-Profil — fiktive Daten. Elektrobetrieb mit 12 Mitarbeitenden, gerade beigetreten.','{"Elektrotechnik","Projektabwicklung"}'::text[],'{"Handwerk","Fachkräfte","Energie"}'::text[],'FBC-10534','2026-06-01'::date,'haben',30,40)
 ) as v(id,name,tier,headline,roles,region,company,branche,short_bio,competencies,interests,member_number,member_since,dev_focus,dev_progress,profile_completion)
 where p.id = v.id;
 
@@ -102,7 +132,16 @@ select id, email, phone from (values
   ('00000000-0000-0000-0000-000000025411'::uuid,'marek.novak@demo.fbc.invalid','+49 30 1000246'),
   ('00000000-0000-0000-0000-000000025412'::uuid,'aylin.demir@demo.fbc.invalid','+49 711 1000461'),
   ('00000000-0000-0000-0000-000000025413'::uuid,'robert.vogt@demo.fbc.invalid','+49 221 1000468'),
-  ('00000000-0000-0000-0000-000000025414'::uuid,'mira.saenger@demo.fbc.invalid','+49 30 1000475')
+  ('00000000-0000-0000-0000-000000025414'::uuid,'mira.saenger@demo.fbc.invalid','+49 30 1000475'),
+  ('00000000-0000-0000-0000-000000025415'::uuid,'anna.mueller@demo.fbc.invalid','+49 711 1000310'),
+  ('00000000-0000-0000-0000-000000025416'::uuid,'christoph.seidel@demo.fbc.invalid','+49 89 1000317'),
+  ('00000000-0000-0000-0000-000000025417'::uuid,'ruth-maria.wagner@demo.fbc.invalid','+49 221 1000324'),
+  ('00000000-0000-0000-0000-000000025418'::uuid,'katharina.bruns@demo.fbc.invalid','+49 40 1000380'),
+  ('00000000-0000-0000-0000-000000025419'::uuid,'julian.maier@demo.fbc.invalid','+49 711 1000387'),
+  ('00000000-0000-0000-0000-000000025420'::uuid,'fatima.cheddadi@demo.fbc.invalid','+49 69 1000394'),
+  ('00000000-0000-0000-0000-000000025421'::uuid,'timo.reuter@demo.fbc.invalid','+49 711 1000520'),
+  ('00000000-0000-0000-0000-000000025422'::uuid,'sofia.kranz@demo.fbc.invalid','+49 30 1000527'),
+  ('00000000-0000-0000-0000-000000025423'::uuid,'david.oeztuerk@demo.fbc.invalid','+49 221 1000534')
 ) as v(id, email, phone)
 on conflict (profile_id) do update set email = excluded.email, phone = excluded.phone;
 
@@ -115,7 +154,10 @@ delete from public.offers where profile_id in (
   '00000000-0000-0000-0000-000000025404','00000000-0000-0000-0000-000000025405','00000000-0000-0000-0000-000000025406',
   '00000000-0000-0000-0000-000000025407','00000000-0000-0000-0000-000000025408','00000000-0000-0000-0000-000000025409',
   '00000000-0000-0000-0000-000000025410','00000000-0000-0000-0000-000000025411','00000000-0000-0000-0000-000000025412',
-  '00000000-0000-0000-0000-000000025413','00000000-0000-0000-0000-000000025414');
+  '00000000-0000-0000-0000-000000025413','00000000-0000-0000-0000-000000025414',
+  '00000000-0000-0000-0000-000000025415','00000000-0000-0000-0000-000000025416','00000000-0000-0000-0000-000000025417',
+  '00000000-0000-0000-0000-000000025418','00000000-0000-0000-0000-000000025419','00000000-0000-0000-0000-000000025420',
+  '00000000-0000-0000-0000-000000025421','00000000-0000-0000-0000-000000025422','00000000-0000-0000-0000-000000025423');
 insert into public.offers (profile_id, category, theme, title, description) values
   ('5e195a30-99af-4fbb-ae5f-1f4eff3209c7','kapital','haben','Wachstums- & Beteiligungskapital','Eigenkapital ab 10 Mio. € für etablierte Mittelständler.'),
   ('5e195a30-99af-4fbb-ae5f-1f4eff3209c7','beteiligungen','haben','Minderheits- & Mehrheitsbeteiligungen','Flexible Beteiligungsstrukturen für Wachstum und Nachfolge.'),
@@ -146,7 +188,22 @@ insert into public.offers (profile_id, category, theme, title, description) valu
   ('00000000-0000-0000-0000-000000025411','know_how','tun','Vertriebsaufbau B2B','Aufbau skalierbarer Vertriebsorganisationen.'),
   ('00000000-0000-0000-0000-000000025412','know_how','tun','Machine-Learning-Expertise','Angewandte ML-Forschung und Prototyping.'),
   ('00000000-0000-0000-0000-000000025413','leistungen','tun','Service & Operations','Operative Dienstleistungen für den Mittelstand.'),
-  ('00000000-0000-0000-0000-000000025414','know_how','tun','Design & Branding','Marken- und Designkompetenz.');
+  ('00000000-0000-0000-0000-000000025414','know_how','tun','Design & Branding','Marken- und Designkompetenz.'),
+  -- exchange (AGE-357)
+  ('00000000-0000-0000-0000-000000025415','know_how','tun','Fertigungs-Know-how','Präzisionsfertigung und Produktionsplanung im Mittelstand.'),
+  ('00000000-0000-0000-0000-000000025415','leistungen','tun','Lohnfertigung','Fertigungskapazität für Serien- und Sonderteile.'),
+  ('00000000-0000-0000-0000-000000025416','know_how','tun','Steuerliche Nachfolgegestaltung','Strukturierung von Übergaben und Beteiligungen.'),
+  ('00000000-0000-0000-0000-000000025416','leistungen','tun','Steuerberatung Mittelstand','Laufende Beratung für inhabergeführte Unternehmen.'),
+  ('00000000-0000-0000-0000-000000025417','leistungen','tun','Handel & Distribution','Zugang zu Handels- und Logistikstrukturen.'),
+  ('00000000-0000-0000-0000-000000025417','kontakte','tun','Lieferanten-Netzwerk','Kontakte zu Herstellern und Großhändlern.'),
+  -- discover (AGE-357)
+  ('00000000-0000-0000-0000-000000025418','know_how','tun','Nachhaltige Verpackung','Materialwissen zu kompostierbaren Verpackungen.'),
+  ('00000000-0000-0000-0000-000000025419','know_how','tun','IT-Infrastruktur & Cloud','Migration und Absicherung mittelständischer IT.'),
+  ('00000000-0000-0000-0000-000000025419','leistungen','tun','IT-Beratung','Projektbezogene Beratung und Umsetzung.'),
+  ('00000000-0000-0000-0000-000000025420','know_how','tun','Bestandssanierung','Planung und Bauleitung bei Sanierungen.'),
+  -- basic (AGE-357) — dünn, wie es zur Stufe passt
+  ('00000000-0000-0000-0000-000000025421','know_how','tun','Plattform-Produkt','Produktaufbau für zweiseitige Marktplätze.'),
+  ('00000000-0000-0000-0000-000000025423','leistungen','tun','Elektrotechnik','Installation und Projektabwicklung im Gewerbebau.');
 
 delete from public.needs where profile_id in (
   '5e195a30-99af-4fbb-ae5f-1f4eff3209c7','d73efa12-5f11-4220-94b4-dd5880b10782','2752a480-a737-4f90-af0c-a76722c781a7',
@@ -154,7 +211,10 @@ delete from public.needs where profile_id in (
   '00000000-0000-0000-0000-000000025404','00000000-0000-0000-0000-000000025405','00000000-0000-0000-0000-000000025406',
   '00000000-0000-0000-0000-000000025407','00000000-0000-0000-0000-000000025408','00000000-0000-0000-0000-000000025409',
   '00000000-0000-0000-0000-000000025410','00000000-0000-0000-0000-000000025411','00000000-0000-0000-0000-000000025412',
-  '00000000-0000-0000-0000-000000025413','00000000-0000-0000-0000-000000025414');
+  '00000000-0000-0000-0000-000000025413','00000000-0000-0000-0000-000000025414',
+  '00000000-0000-0000-0000-000000025415','00000000-0000-0000-0000-000000025416','00000000-0000-0000-0000-000000025417',
+  '00000000-0000-0000-0000-000000025418','00000000-0000-0000-0000-000000025419','00000000-0000-0000-0000-000000025420',
+  '00000000-0000-0000-0000-000000025421','00000000-0000-0000-0000-000000025422','00000000-0000-0000-0000-000000025423');
 insert into public.needs (profile_id, category, theme, title, description, tx_volume_band) values
   ('5e195a30-99af-4fbb-ae5f-1f4eff3209c7','immobilien','haben','Immobilien-Beteiligungen','Suche Objekte und Projekte zur Beteiligung.',null),
   ('d73efa12-5f11-4220-94b4-dd5880b10782','experten','tun','Fachexpert:innen','Suche Expert:innen für Beratungsmandate.',null),
@@ -184,7 +244,26 @@ insert into public.needs (profile_id, category, theme, title, description, tx_vo
   ('00000000-0000-0000-0000-000000025413','partner','tun','Vertriebspartner','Suche Partner für Markterschließung.',null),
   ('00000000-0000-0000-0000-000000025413','kunden','tun','Auftraggeber','Suche Kunden für Dienstleistungen.',null),
   ('00000000-0000-0000-0000-000000025414','mentoren','sein','Gründungs-Mentoring','Suche Mentor:innen für den Aufbau.',null),
-  ('00000000-0000-0000-0000-000000025414','experten','tun','Fachexpertise','Suche Expert:innen für Skalierung.',null);
+  ('00000000-0000-0000-0000-000000025414','experten','tun','Fachexpertise','Suche Expert:innen für Skalierung.',null),
+  -- exchange (AGE-357)
+  ('00000000-0000-0000-0000-000000025415','experten','tun','Nachfolgeberatung','Suche Expertise für die Übergabe an die nächste Generation.',null),
+  ('00000000-0000-0000-0000-000000025415','investoren','haben','Nachfolgekapital','Suche Kapitalpartner für die Nachfolgelösung.','1m_10m'),
+  ('00000000-0000-0000-0000-000000025416','kunden','tun','Mandanten','Suche inhabergeführte Unternehmen als Mandanten.',null),
+  ('00000000-0000-0000-0000-000000025417','experten','tun','E-Commerce-Expertise','Suche Expert:innen für den Umbau auf Online-Handel.',null),
+  ('00000000-0000-0000-0000-000000025417','partner','tun','Logistikpartner','Suche Partner für Lager und Versand.',null),
+  -- discover (AGE-357)
+  ('00000000-0000-0000-0000-000000025418','investoren','haben','Erstfinanzierung','Suche Kapital für die erste Serienproduktion.','100k_1m'),
+  ('00000000-0000-0000-0000-000000025418','kunden','tun','Pilotkunden','Suche Mittelständler für erste Verpackungsprojekte.',null),
+  ('00000000-0000-0000-0000-000000025419','mitarbeiter','tun','Erste Mitarbeitende','Suche IT-Fachkräfte für den Aufbau eines Teams.',null),
+  ('00000000-0000-0000-0000-000000025419','kunden','tun','Mittelstandskunden','Suche Unternehmen mit IT-Modernisierungsbedarf.',null),
+  ('00000000-0000-0000-0000-000000025420','projekte','wirken','Sanierungsprojekte','Suche Bestandsobjekte mit Sanierungsbedarf.',null),
+  ('00000000-0000-0000-0000-000000025420','partner','tun','Bauherren & Projektpartner','Suche Partner für gemeinsame Sanierungen.',null),
+  -- basic (AGE-357)
+  ('00000000-0000-0000-0000-000000025421','mentoren','sein','Gründungs-Mentoring','Suche Mentor:innen für die ersten Schritte.',null),
+  ('00000000-0000-0000-0000-000000025421','investoren','haben','Pre-Seed','Suche erstes Kapital für die Plattform.','100k_1m'),
+  ('00000000-0000-0000-0000-000000025422','mentoren','sein','Orientierung im Club','Suche Mentor:innen für den Einstieg ins Netzwerk.',null),
+  ('00000000-0000-0000-0000-000000025423','mitarbeiter','tun','Elektro-Fachkräfte','Suche Gesell:innen und Meister:innen für den Betrieb.',null),
+  ('00000000-0000-0000-0000-000000025423','kunden','tun','Gewerbekunden','Suche Auftraggeber im Gewerbebau.',null);
 
 -- ── 5. Erfolgsradar (Sein/Tun/Haben/Wirken, 0–10) for every persona. ──────────
 insert into public.profile_theme_scores (profile_id, theme, score)
@@ -205,7 +284,19 @@ select id, t.theme, t.score from (values
   ('00000000-0000-0000-0000-000000025411'::uuid, 6.5, 7.5, 6.0, 6.0),
   ('00000000-0000-0000-0000-000000025412'::uuid, 6.0, 7.0, 4.0, 6.5),
   ('00000000-0000-0000-0000-000000025413'::uuid, 6.0, 6.5, 5.0, 5.0),
-  ('00000000-0000-0000-0000-000000025414'::uuid, 7.0, 6.5, 4.5, 6.0)
+  ('00000000-0000-0000-0000-000000025414'::uuid, 7.0, 6.5, 4.5, 6.0),
+  -- exchange (AGE-357)
+  ('00000000-0000-0000-0000-000000025415'::uuid, 6.0, 7.0, 6.5, 5.5),
+  ('00000000-0000-0000-0000-000000025416'::uuid, 6.0, 7.0, 6.0, 5.5),
+  ('00000000-0000-0000-0000-000000025417'::uuid, 5.5, 6.5, 6.5, 5.0),
+  -- discover (AGE-357)
+  ('00000000-0000-0000-0000-000000025418'::uuid, 5.5, 6.0, 4.0, 6.0),
+  ('00000000-0000-0000-0000-000000025419'::uuid, 5.0, 6.0, 4.5, 4.5),
+  ('00000000-0000-0000-0000-000000025420'::uuid, 5.5, 6.0, 5.0, 5.5),
+  -- basic (AGE-357) — neu dabei, entsprechend niedrig
+  ('00000000-0000-0000-0000-000000025421'::uuid, 4.0, 4.5, 2.5, 3.5),
+  ('00000000-0000-0000-0000-000000025422'::uuid, 4.0, 3.5, 2.0, 3.0),
+  ('00000000-0000-0000-0000-000000025423'::uuid, 4.5, 5.0, 3.5, 3.0)
 ) as v(id, sein, tun, haben, wirken)
 cross join lateral (values ('sein', v.sein), ('tun', v.tun), ('haben', v.haben), ('wirken', v.wirken)) as t(theme, score)
 on conflict (profile_id, theme) do update set score = excluded.score;
@@ -248,7 +339,12 @@ select public.recompute_potential_score(id) from (values
   ('00000000-0000-0000-0000-000000025407'::uuid),('00000000-0000-0000-0000-000000025408'::uuid),
   ('00000000-0000-0000-0000-000000025409'::uuid),('00000000-0000-0000-0000-000000025410'::uuid),
   ('00000000-0000-0000-0000-000000025411'::uuid),('00000000-0000-0000-0000-000000025412'::uuid),
-  ('00000000-0000-0000-0000-000000025413'::uuid),('00000000-0000-0000-0000-000000025414'::uuid)
+  ('00000000-0000-0000-0000-000000025413'::uuid),('00000000-0000-0000-0000-000000025414'::uuid),
+  ('00000000-0000-0000-0000-000000025415'::uuid),('00000000-0000-0000-0000-000000025416'::uuid),
+  ('00000000-0000-0000-0000-000000025417'::uuid),('00000000-0000-0000-0000-000000025418'::uuid),
+  ('00000000-0000-0000-0000-000000025419'::uuid),('00000000-0000-0000-0000-000000025420'::uuid),
+  ('00000000-0000-0000-0000-000000025421'::uuid),('00000000-0000-0000-0000-000000025422'::uuid),
+  ('00000000-0000-0000-0000-000000025423'::uuid)
 ) as v(id);
 
 -- ── 9. Build the match graph: recompute matches for every persona (incl. the
@@ -264,7 +360,12 @@ select public.generate_matches_for(id) from (values
   ('00000000-0000-0000-0000-000000025407'::uuid),('00000000-0000-0000-0000-000000025408'::uuid),
   ('00000000-0000-0000-0000-000000025409'::uuid),('00000000-0000-0000-0000-000000025410'::uuid),
   ('00000000-0000-0000-0000-000000025411'::uuid),('00000000-0000-0000-0000-000000025412'::uuid),
-  ('00000000-0000-0000-0000-000000025413'::uuid),('00000000-0000-0000-0000-000000025414'::uuid)
+  ('00000000-0000-0000-0000-000000025413'::uuid),('00000000-0000-0000-0000-000000025414'::uuid),
+  ('00000000-0000-0000-0000-000000025415'::uuid),('00000000-0000-0000-0000-000000025416'::uuid),
+  ('00000000-0000-0000-0000-000000025417'::uuid),('00000000-0000-0000-0000-000000025418'::uuid),
+  ('00000000-0000-0000-0000-000000025419'::uuid),('00000000-0000-0000-0000-000000025420'::uuid),
+  ('00000000-0000-0000-0000-000000025421'::uuid),('00000000-0000-0000-0000-000000025422'::uuid),
+  ('00000000-0000-0000-0000-000000025423'::uuid)
 ) as v(id);
 
 -- ── 10. Two extra contact-request examples (only Prime+ may initiate). ─────────
