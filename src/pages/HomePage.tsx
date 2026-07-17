@@ -128,11 +128,11 @@ function PublicHome() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Testimonial
             quote="Im Club habe ich Partner gefunden, die meine Werte teilen — nicht nur Kontakte, sondern echte Zusammenarbeit."
-            author="Ein Legacy-Mitglied"
+            author="Ein Impact-Mitglied"
           />
           <Testimonial
             quote="Die Events sind kein Networking-Theater. Man kommt mit konkreten nächsten Schritten nach Hause."
-            author="Ein Prime-Mitglied"
+            author="Ein Focus-Mitglied"
           />
         </div>
       </section>
