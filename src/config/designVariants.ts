@@ -35,7 +35,18 @@ export interface DesignVariant {
   recommended?: boolean;
 }
 
-export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "sommerfest";
+export type DesignVariantId =
+  | "a"
+  | "b"
+  | "c"
+  | "d"
+  | "e"
+  | "f"
+  | "g"
+  | "h"
+  | "i"
+  | "sommerfest"
+  | "linkedin";
 
 export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "a",
@@ -48,6 +59,7 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "h",
   "i",
   "sommerfest",
+  "linkedin",
 ];
 
 export const DEFAULT_VARIANT: DesignVariantId = "d";
@@ -154,6 +166,17 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     motion: "medium",
     heroStyle: "light",
     headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  linkedin: {
+    id: "linkedin",
+    label: "eff.bee.zee (Vision)",
+    description:
+      "Vision-Vorschau als Klick-Dummy: eigene Marke, dunkle Navy-Sidebar, ActivePoints.",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
     cardStyle: "solid",
     backdrop: "none",
   },

@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignSwitcher } from "./components/DesignSwitcher";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
+import { useDesignVariant } from "./providers/design-variant-context";
+import { EffBeeZeeApp } from "./vision/EffBeeZeeApp";
 import MembershipGate from "./components/MembershipGate";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
@@ -38,81 +40,91 @@ function gatedElement(item: NavItem) {
 export default function App() {
   return (
     <DesignVariantProvider>
-      <Routes>
-        <Route element={<AppShell />}>
-          {/* Startseite (`/`) kommt aus navItems (Eintrag „Start" → HomeRedirect, das die
-            öffentliche HomePage rendert und nur den Onboarding-Gate-Fall abfängt). */}
-          {navItems.map((item) => (
-            <Route key={item.path} path={item.path} element={gatedElement(item)} />
-          ))}
-          <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
-          <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
-          <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
-          <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />
-          {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).
-            Der Redirect landet auf dem Mini-Compass-Tab, nicht auf „Suche & Biete" —
-            Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus. */}
-          <Route path="/angebote-gesuche" element={<Navigate to="/compass" replace />} />
-          {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
-            die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
-          <Route
-            path="/chat/:threadId"
-            element={
-              <RequireAuth>
-                <ChatPage />
-              </RequireAuth>
-            }
-          />
-          {/* Öffentliche Profilseite (AGE-239) — param-basiert, daher kein Sidebar-Eintrag.
-            /profil ist der eigene Editor; fremde Profile liegen unter /p/:id. Sichtbarkeit
-            erzwingt die RLS (profiles_public ist nur für authenticated lesbar). */}
-          <Route
-            path="/p/:id"
-            element={
-              <RequireAuth>
-                <PublicProfilePage />
-              </RequireAuth>
-            }
-          />
-          {/* Event-Detail (AGE-251) — param-basiert, daher kein Sidebar-Eintrag. Ohne
-            RequireAuth: anon darf öffentliche Events sehen; die RLS gated den Rest. */}
-          <Route path="/events/:id" element={<EventDetailPage />} />
-          {/* Interne Manager-Ansicht: FBC/DKRI-Routing-Queue (AGE-249 §8). Nur Staff
-            (matching_manager/admin), daher kein Sidebar-Eintrag; per URL erreichbar.
-            DB-seitig erzwingt list_routing_queue/RLS is_matching_manager(). */}
-          <Route
-            path="/intern/routing"
-            element={
-              <RequireStaff>
-                <InternRoutingPage />
-              </RequireStaff>
-            }
-          />
-        </Route>
-        <Route path="/login" element={<LoginPage />} />
-        {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
-          außerhalb der AppShell (wie /login). */}
-        <Route
-          path="/onboarding"
-          element={
-            <RequireAuth>
-              <OnboardingPage />
-            </RequireAuth>
-          }
-        />
-        {StyleguidePage && (
-          <Route
-            path="/styleguide"
-            element={
-              <Suspense fallback={null}>
-                <StyleguidePage />
-              </Suspense>
-            }
-          />
-        )}
-      </Routes>
+      <AppInner />
       {/* App-weiter Live-Design-Switcher (temporäres Review-Tool, AGE-237). */}
       <DesignSwitcher />
     </DesignVariantProvider>
+  );
+}
+
+/** Wählt zwischen der echten FBC-App und dem eff.bee.zee-Vision-Dummy (Variante
+ *  `linkedin`, AGE-361). Der Dummy ist rein clientseitig und ersetzt die Routes. */
+function AppInner() {
+  const { variant } = useDesignVariant();
+  if (variant === "linkedin") return <EffBeeZeeApp />;
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        {/* Startseite (`/`) kommt aus navItems (Eintrag „Start" → HomeRedirect, das die
+            öffentliche HomePage rendert und nur den Onboarding-Gate-Fall abfängt). */}
+        {navItems.map((item) => (
+          <Route key={item.path} path={item.path} element={gatedElement(item)} />
+        ))}
+        <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
+        <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
+        <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
+        <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />
+        {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).
+            Der Redirect landet auf dem Mini-Compass-Tab, nicht auf „Suche & Biete" —
+            Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus. */}
+        <Route path="/angebote-gesuche" element={<Navigate to="/compass" replace />} />
+        {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
+            die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
+        <Route
+          path="/chat/:threadId"
+          element={
+            <RequireAuth>
+              <ChatPage />
+            </RequireAuth>
+          }
+        />
+        {/* Öffentliche Profilseite (AGE-239) — param-basiert, daher kein Sidebar-Eintrag.
+            /profil ist der eigene Editor; fremde Profile liegen unter /p/:id. Sichtbarkeit
+            erzwingt die RLS (profiles_public ist nur für authenticated lesbar). */}
+        <Route
+          path="/p/:id"
+          element={
+            <RequireAuth>
+              <PublicProfilePage />
+            </RequireAuth>
+          }
+        />
+        {/* Event-Detail (AGE-251) — param-basiert, daher kein Sidebar-Eintrag. Ohne
+            RequireAuth: anon darf öffentliche Events sehen; die RLS gated den Rest. */}
+        <Route path="/events/:id" element={<EventDetailPage />} />
+        {/* Interne Manager-Ansicht: FBC/DKRI-Routing-Queue (AGE-249 §8). Nur Staff
+            (matching_manager/admin), daher kein Sidebar-Eintrag; per URL erreichbar.
+            DB-seitig erzwingt list_routing_queue/RLS is_matching_manager(). */}
+        <Route
+          path="/intern/routing"
+          element={
+            <RequireStaff>
+              <InternRoutingPage />
+            </RequireStaff>
+          }
+        />
+      </Route>
+      <Route path="/login" element={<LoginPage />} />
+      {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
+          außerhalb der AppShell (wie /login). */}
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <OnboardingPage />
+          </RequireAuth>
+        }
+      />
+      {StyleguidePage && (
+        <Route
+          path="/styleguide"
+          element={
+            <Suspense fallback={null}>
+              <StyleguidePage />
+            </Suspense>
+          }
+        />
+      )}
+    </Routes>
   );
 }

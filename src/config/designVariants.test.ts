@@ -18,6 +18,7 @@ describe("designVariants config", () => {
       "g",
       "h",
       "i",
+      "linkedin",
       "sommerfest",
     ]);
   });
