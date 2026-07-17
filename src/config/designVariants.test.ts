@@ -7,7 +7,7 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models the nine variants a–i (a–d stable, e–g experimental, h/i brand)", () => {
+  it("models the variants a–i plus sommerfest (a–d stable, e–g experimental, h/i brand)", () => {
     expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual([
       "a",
       "b",
@@ -18,6 +18,7 @@ describe("designVariants config", () => {
       "g",
       "h",
       "i",
+      "sommerfest",
     ]);
   });
 

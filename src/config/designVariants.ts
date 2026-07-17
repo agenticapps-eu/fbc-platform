@@ -35,7 +35,7 @@ export interface DesignVariant {
   recommended?: boolean;
 }
 
-export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i";
+export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "sommerfest";
 
 export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "a",
@@ -47,6 +47,7 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "g",
   "h",
   "i",
+  "sommerfest",
 ];
 
 export const DEFAULT_VARIANT: DesignVariantId = "d";
@@ -140,6 +141,16 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     id: "i",
     label: "Navy & Gold (hell)",
     description: "Navy als Text/Akzent, helle Sidebar & Content, Gold-Akzent.",
+    motion: "medium",
+    heroStyle: "light",
+    headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  sommerfest: {
+    id: "sommerfest",
+    label: "Sommerfest (FBC)",
+    description: "FBC-Marke: warmes Creme, Navy-Text, Gold-Akzent, ruhiges Dashboard.",
     motion: "medium",
     heroStyle: "light",
     headlineFont: "serif",

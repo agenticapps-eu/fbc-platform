@@ -286,6 +286,30 @@ html[data-variant="i"] {
   --hero-muted: #5b6577;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Sommerfest (FBC) — Marken-Variante fürs Sommerfest (AGE-361). Warmes Creme
+   statt kühlem Grau, Navy-Text, Gold-Akzent, helle Sidebar. Baut auf Navy&Gold
+   (H/I) auf; nur die Flächen-Tokens sind wärmer. Content bleibt navy-auf-hell →
+   kein Sidebar-Text-Override nötig (anders als H). Default-Kandidat (Prompt).
+   ════════════════════════════════════════════════════════════════════════ */
+html[data-variant="sommerfest"] {
+  --color-soft: #f6f1e6;
+  --color-canvas: #ffffff;
+  --color-ink: #12233f;
+  --color-muted: #5b6577;
+  --color-line: #e7ddc9;
+  --color-gold: #c2a24e;
+  --color-gold-strong: #a97f2c;
+  --color-gold-soft: #efe3c8;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --radius-card: 14px;
+  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.05), 0 18px 44px -24px rgba(18, 35, 63, 0.22);
+  --sidebar-surface: linear-gradient(180deg, #fcfaf4, #f6efe0);
+  --hero-bg: transparent;
+  --hero-ink: #12233f;
+  --hero-muted: #5b6577;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;

@@ -14,6 +14,12 @@ import { useDesignVariant } from "../providers/design-variant-context";
 
 const SWITCHER_ENABLED = (import.meta.env.VITE_DESIGN_SWITCHER ?? "on") !== "off";
 
+/** Kurzcode fürs runde Badge: einbuchstabige IDs (a–i) unverändert, längere
+ *  (z. B. „sommerfest") auf zwei Zeichen gekürzt, damit der Kreis nicht überläuft. */
+function variantBadge(id: string): string {
+  return id.length <= 2 ? id : id.slice(0, 2);
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -82,7 +88,7 @@ export function DesignSwitcher() {
                         active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
                       )}
                     >
-                      {id}
+                      {variantBadge(id)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
@@ -117,7 +123,7 @@ export function DesignSwitcher() {
           className="fbc-sheen inline-flex items-center gap-2 rounded-full border border-gold/40 bg-canvas/90 px-4 py-2 text-sm font-semibold text-ink shadow-soft backdrop-blur transition-colors hover:border-gold"
         >
           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[11px] font-bold uppercase text-night">
-            {variant}
+            {variantBadge(variant)}
           </span>
           Design: {variant.toUpperCase()}
           <span aria-hidden>▸</span>
