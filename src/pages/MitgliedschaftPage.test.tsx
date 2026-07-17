@@ -28,10 +28,22 @@ describe("MitgliedschaftPage", () => {
     invoke.mockResolvedValue({ data: { url: "https://stripe.test/x" }, error: null });
   });
 
-  it("zeigt alle 6 Stufen", () => {
+  it("zeigt alle 6 Stufen als Karten", () => {
     renderPage();
-    for (const l of ["Basic", "Connect", "Discover", "Exchange", "Focus", "Impact"])
-      expect(screen.getByText(l)).toBeInTheDocument();
+    for (const key of ["basic", "connect", "discover", "exchange", "focus", "impact"])
+      expect(screen.getByTestId(`level-${key}`)).toBeInTheDocument();
+  });
+
+  it("zeigt das 'Deine Mitgliedschaft'-Panel mit der aktuellen Stufe", () => {
+    renderPage();
+    expect(screen.getByText("Deine Mitgliedschaft")).toBeInTheDocument();
+    // 'Discover' erscheint jetzt im Panel UND auf der Karte → mehrfach.
+    expect(screen.getAllByText("Discover").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("markiert Discover als Empfohlen", () => {
+    renderPage();
+    expect(within(screen.getByTestId("level-discover")).getByText("Empfohlen")).toBeInTheDocument();
   });
 
   it("markiert die aktuelle Stufe und bietet nur höhere zahlende Stufen zum Upgrade", () => {

@@ -2,14 +2,14 @@ import { useState } from "react";
 import { LEVELS, LEVEL_ORDER, LEVEL_RANK, type MembershipLevel } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 import { supabase } from "../lib/supabase";
-import { Button } from "../components/ui/Button";
-import { Card, CardTitle } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
 import { useToast } from "../components/ui/toast-context";
 import { cn } from "../lib/cn";
+import PricingCard from "../components/membership/PricingCard";
+import { MembershipSummary } from "../components/membership/MembershipSummary";
 
 type Interval = "month" | "year";
 const PAID: MembershipLevel[] = ["discover", "exchange", "focus", "impact"];
+const RECOMMENDED: MembershipLevel = "discover";
 
 export default function MitgliedschaftPage() {
   const { tier, levelRank } = useAuth();
@@ -63,43 +63,21 @@ export default function MitgliedschaftPage() {
         </div>
       </div>
 
+      <MembershipSummary current={tier} />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {LEVEL_ORDER.map((key) => {
-          const lvl = LEVELS[key];
-          const isCurrent = tier === key;
-          const canUpgrade = PAID.includes(key) && LEVEL_RANK[key] > currentRank;
-          const price = interval === "year" ? lvl.priceYear : lvl.priceMonth;
-          return (
-            <Card
-              key={key}
-              data-testid={`level-${key}`}
-              data-current={isCurrent}
-              className={cn("flex flex-col gap-3", isCurrent && "border-gold-strong")}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle>{lvl.label}</CardTitle>
-                {isCurrent && <Badge variant="strong">Aktuell</Badge>}
-              </div>
-              <p className="text-sm text-muted">{lvl.summary}</p>
-              <p className="text-lg font-semibold text-ink">
-                {price === 0 ? "Gratis" : `${price} € / ${interval === "year" ? "Jahr" : "Monat"}`}
-              </p>
-              {canUpgrade && (
-                <div className="mt-auto flex flex-col gap-1">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={busy === key}
-                    onClick={() => startUpgrade(key)}
-                  >
-                    Upgrade
-                  </Button>
-                  <span className="text-center text-xs text-muted">Testzahlung · Demo</span>
-                </div>
-              )}
-            </Card>
-          );
-        })}
+        {LEVEL_ORDER.map((key) => (
+          <PricingCard
+            key={key}
+            level={LEVELS[key]}
+            interval={interval}
+            isCurrent={tier === key}
+            canUpgrade={PAID.includes(key) && LEVEL_RANK[key] > currentRank}
+            recommended={key === RECOMMENDED}
+            busy={busy === key}
+            onUpgrade={startUpgrade}
+          />
+        ))}
       </div>
     </div>
   );
