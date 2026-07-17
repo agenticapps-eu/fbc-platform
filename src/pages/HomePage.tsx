@@ -13,6 +13,7 @@ import {
   type EventListItem,
 } from "../lib/events";
 import { fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
+import { MemberDashboard } from "../components/home/MemberDashboard";
 import { useAuth } from "../providers/auth-context";
 
 /**
@@ -27,6 +28,16 @@ import { useAuth } from "../providers/auth-context";
  * wird rein für die Anzeige über `displayAuthor` maskiert (Gäste sehen „Ein Mitglied").
  */
 export default function HomePage() {
+  const { user } = useAuth();
+  if (user) return <MemberDashboard uid={user.id} />;
+  return <PublicHome />;
+}
+
+/**
+ * Öffentliche Startseite für Gäste (nicht eingeloggt). Eingeloggte Mitglieder
+ * sehen stattdessen ihr persönliches Dashboard (<MemberDashboard>, Nav-IA §3).
+ */
+function PublicHome() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
   const navigate = useNavigate();

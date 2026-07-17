@@ -54,15 +54,14 @@ describe("Staff-Gating für /intern/routing", () => {
 
   it("leitet eingeloggte Mitglieder OHNE Staff-Rolle weg (auch Impact)", () => {
     // „/" ist onboarding-bewusst (HomeRedirect); der „übersprungen"-Merker löst die
-    // Weiche deterministisch auf die öffentliche Startseite auf, sodass der Test das
-    // Gating prüft.
+    // Weiche deterministisch auf die Startseite auf, sodass der Test das Gating prüft.
+    // Eingeloggt landet man dort im Mitglieder-Dashboard innerhalb der AppShell —
+    // geprüft über einen stabilen Nav-Landmark statt über den (datengetriebenen) Inhalt.
     markSkipped("test-user");
     renderAt("/intern/routing", authAsTier("impact"));
 
     expect(screen.queryByRole("heading", { name: "Routing-Queue" })).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mein Profil" })).toBeInTheDocument();
   });
 
   it("lässt Staff (matching_manager) die Routing-Queue sehen", () => {

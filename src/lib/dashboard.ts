@@ -61,6 +61,8 @@ export interface DashboardProfile {
   member_number: string | null;
   member_since: string | null;
   potential_score: number;
+  /** Profilvollständigkeit 0–100 (DB-Trigger set_profile_completion). */
+  profile_completion: number;
   dev_focus: string | null;
   dev_progress: number;
   next_steps: string[];
@@ -216,7 +218,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     supabase
       .from("profiles")
       .select(
-        "id, name, avatar_url, region, company, short_bio, tier, roles, headline, member_number, member_since, potential_score, dev_focus, dev_progress, next_steps",
+        "id, name, avatar_url, region, company, short_bio, tier, roles, headline, member_number, member_since, potential_score, profile_completion, dev_focus, dev_progress, next_steps",
       )
       .eq("id", uid)
       .single(),
@@ -282,6 +284,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     member_number: p.member_number,
     member_since: p.member_since,
     potential_score: p.potential_score,
+    profile_completion: p.profile_completion ?? 0,
     dev_focus: p.dev_focus,
     dev_progress: p.dev_progress ?? 0,
     next_steps: p.next_steps ?? [],
