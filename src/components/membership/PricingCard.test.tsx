@@ -22,7 +22,7 @@ describe("PricingCard", () => {
     renderCard();
     const card = screen.getByTestId("level-discover");
     expect(within(card).getByText("Discover")).toBeInTheDocument();
-    expect(within(card).getByText("3")).toBeInTheDocument(); // rank monogram
+    expect(within(card).getByText("III")).toBeInTheDocument(); // rank monogram (Roman numeral)
     expect(within(card).getByText(/150 € \/ Jahr/)).toBeInTheDocument();
   });
 

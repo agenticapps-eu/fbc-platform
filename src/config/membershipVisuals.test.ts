@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { accentBandStyle, monogram } from "./membershipVisuals";
 
 describe("membershipVisuals", () => {
-  it("monogram is the rank numeral", () => {
-    expect(monogram(1)).toBe("1");
-    expect(monogram(6)).toBe("6");
+  it("monogram is the rank as a Roman numeral", () => {
+    expect(monogram(1)).toBe("I");
+    expect(monogram(3)).toBe("III");
+    expect(monogram(6)).toBe("VI");
   });
 
   it("accentBandStyle mixes gold over canvas, deepening with rank", () => {
@@ -12,8 +13,15 @@ describe("membershipVisuals", () => {
     const r6 = accentBandStyle(6).background as string;
     expect(r1).toContain("var(--color-gold)");
     expect(r1).toContain("var(--color-canvas)");
-    expect(r1).toContain("14%"); // 6 + 1*8
-    expect(r6).toContain("54%"); // 6 + 6*8
+    expect(r1).toContain("14%"); // bottom stop: 6 + 1*8
+    expect(r6).toContain("54%"); // bottom stop: 6 + 6*8
+  });
+
+  it("accentBandStyle adds vertical depth and an engraved gold seam", () => {
+    const style = accentBandStyle(3);
+    expect(style.background as string).toContain("linear-gradient");
+    expect(style.background as string).toContain("radial-gradient"); // spekular highlight
+    expect(style.borderBottom).toContain("var(--color-gold)");
   });
 
   it("clamps the mix percentage to [8,60]", () => {
