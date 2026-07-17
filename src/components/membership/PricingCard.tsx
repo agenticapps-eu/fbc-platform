@@ -29,8 +29,9 @@ export default function PricingCard({
     <Card
       data-testid={`level-${level.key}`}
       data-current={isCurrent}
+      padded={false}
       className={cn(
-        "flex flex-col gap-0 overflow-hidden p-0",
+        "flex flex-col gap-0 overflow-hidden",
         recommended && "ring-2 ring-gold-strong",
       )}
     >
