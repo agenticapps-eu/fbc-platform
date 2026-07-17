@@ -38,6 +38,26 @@ export function priceEnvKey(level: PaidLevel, interval: Interval): string {
 }
 
 /**
+ * Liest den `sub`-Claim (User-ID) aus einem JWT, OHNE die Signatur zu prüfen.
+ * Sicher nur, weil das Edge-Gateway (verify_jwt=true) das Token vorher
+ * vollständig verifiziert — ungültige/abgelaufene Tokens erreichen die Funktion
+ * nie. Gibt undefined zurück, wenn das Token unlesbar ist oder keinen
+ * String-`sub` trägt. Payload ist base64url-kodiert.
+ */
+export function jwtSub(jwt: string): string | undefined {
+  const seg = jwt.split(".")[1];
+  if (!seg) return undefined;
+  const b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+  try {
+    const payload = JSON.parse(atob(b64 + pad));
+    return typeof payload?.sub === "string" ? payload.sub : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Rücksprung-Basis-URL für success/cancel: die Request-`Origin`, wenn sie in der
  * Allowlist steht, sonst der erste Allowlist-Eintrag (Fallback). So funktionieren
  * lokal (localhost:5173) UND die gehostete Demo, ohne Open-Redirect — eine fremde

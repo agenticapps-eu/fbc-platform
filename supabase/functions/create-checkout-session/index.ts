@@ -13,7 +13,7 @@
 //   der Origin zurück, von der der Aufruf kam. APP_URL (Einzelwert) bleibt Fallback.
 //   SUPABASE_URL + SUPABASE_ANON_KEY sind plattform-injiziert.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { parseUpgradeRequest, priceEnvKey, resolveReturnBase } from "./checkout.ts";
+import { jwtSub, parseUpgradeRequest, priceEnvKey, resolveReturnBase } from "./checkout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,9 +38,14 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { authorization: authHeader } },
   });
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user)
+  // verify_jwt=true: das Gateway verifiziert das (ES256-)Token vollständig, bevor
+  // dieser Handler läuft — bogus/abgelaufene Tokens erreichen uns nie (401 vom
+  // Gateway). Wir lesen die User-ID daher aus dem sub-Claim des bereits
+  // verifizierten Tokens. getUser()/getClaims() sind hier unbrauchbar: getUser()
+  // liefert unter ES256 null, getClaims() scheitert am JWKS-Fetch. Der obige
+  // Client bleibt für die RLS-Abfrage (PostgREST verifiziert das Token selbst).
+  const userId = jwtSub(authHeader.replace(/^Bearer\s+/i, ""));
+  if (!userId)
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: CORS });
 
   let body: unknown;
@@ -53,7 +58,7 @@ Deno.serve(async (req) => {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("tier, membership_tiers(level_rank)")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
   if (profileError) {
     log("error", "profile_lookup_failed", { code: profileError.code });
@@ -98,8 +103,8 @@ Deno.serve(async (req) => {
   params.set("line_items[0][quantity]", "1");
   params.set("success_url", `${base}/mitgliedschaft?status=success`);
   params.set("cancel_url", `${base}/mitgliedschaft?status=cancel`);
-  params.set("client_reference_id", user.id);
-  params.set("metadata[user_id]", user.id);
+  params.set("client_reference_id", userId);
+  params.set("metadata[user_id]", userId);
   params.set("metadata[level]", level); // Interval fließt NICHT in den Tier ein.
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
