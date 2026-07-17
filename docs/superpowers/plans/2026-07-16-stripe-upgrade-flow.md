@@ -637,7 +637,7 @@ export default function MitgliedschaftPage() {
               className={cn("flex flex-col gap-3", isCurrent && "border-gold-strong")}>
               <div className="flex items-center justify-between">
                 <CardTitle>{lvl.label}</CardTitle>
-                {isCurrent && <Badge variant="gold">Aktuell</Badge>}
+                {isCurrent && <Badge variant="strong">Aktuell</Badge>}
               </div>
               <p className="text-sm text-muted">{lvl.summary}</p>
               <p className="text-lg font-semibold text-ink">
