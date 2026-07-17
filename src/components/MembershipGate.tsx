@@ -47,7 +47,11 @@ function MembershipWall({ min, loggedIn }: { min?: MembershipLevel; loggedIn: bo
             : "Werde Mitglied im Fair Business Club, um Zugang zu erhalten."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          {!loggedIn && (
+          {loggedIn ? (
+            <Button variant="primary" onClick={() => navigate("/mitgliedschaft")}>
+              Upgrade
+            </Button>
+          ) : (
             <Button variant="primary" onClick={() => navigate("/login")}>
               Mitglied werden
             </Button>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
@@ -68,6 +68,15 @@ describe("MembershipGate für Entdecken-Routen", () => {
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
     expect(screen.queryByRole("button", { name: "Mitglied werden" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zur Startseite" })).toBeInTheDocument();
+  });
+
+  it("bietet eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu /mitgliedschaft", () => {
+    renderAt("/meine-chancen", authAsTier("basic"));
+
+    const upgradeBtn = screen.getByRole("button", { name: "Upgrade" });
+    fireEvent.click(upgradeBtn);
+
+    expect(screen.getByRole("heading", { name: "Mitgliedschaft" })).toBeInTheDocument();
   });
 });
 

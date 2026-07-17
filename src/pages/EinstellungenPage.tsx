@@ -131,6 +131,14 @@ export default function EinstellungenPage() {
           <TierBadge tier={tier ?? DEFAULT_LEVEL} />
           <span className="text-sm text-muted">{levelLabel(tier ?? DEFAULT_LEVEL)}-Mitglied</span>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="self-start"
+          onClick={() => navigate("/mitgliedschaft")}
+        >
+          Stufe ansehen &amp; upgraden
+        </Button>
       </Card>
 
       <Card className="flex flex-col gap-2">

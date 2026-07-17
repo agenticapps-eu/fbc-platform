@@ -19,6 +19,8 @@ export interface LevelConfig {
   label: string;
   /** Jahrespreis in Euro. 0 = gratis, läuft ohne Stripe. */
   priceYear: number;
+  /** Monatspreis in Euro (Anzeige; Stripe-Preis-ID lebt server-seitig). 0 = gratis. */
+  priceMonth: number;
   /** Spiegelt membership_tiers.level_rank (aufsteigend 1…6). */
   rank: number;
   /** Was diese Stufe freischaltet — Detlevs Wortlaut aus §2. */
@@ -30,6 +32,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "basic",
     label: "Basic",
     priceYear: 0,
+    priceMonth: 0,
     rank: 1,
     summary: "Profil anlegen. Compass starten. Entdecken.",
   },
@@ -37,6 +40,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "connect",
     label: "Connect",
     priceYear: 0,
+    priceMonth: 0,
     rank: 2,
     summary: "Compass vervollständigen. Erste Matchings. Favoriten.",
   },
@@ -44,6 +48,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "discover",
     label: "Discover",
     priceYear: 150,
+    priceMonth: 15,
     rank: 3,
     summary: "Academy. Vollständiges Mitgliederverzeichnis. Erweiterte Matchings.",
   },
@@ -51,6 +56,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "exchange",
     label: "Exchange",
     priceYear: 300,
+    priceMonth: 30,
     rank: 4,
     summary: "Events. Kontaktanfragen. Aktivität.",
   },
@@ -58,6 +64,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "focus",
     label: "Focus",
     priceYear: 600,
+    priceMonth: 60,
     rank: 5,
     summary: "Anbieter werden. Leistungen veröffentlichen. Sichtbarkeit. Leads.",
   },
@@ -65,6 +72,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     key: "impact",
     label: "Impact",
     priceYear: 1200,
+    priceMonth: 120,
     rank: 6,
     summary: "Volle Plattform. Priorität. Teams. Partnerprogramme.",
   },

@@ -64,17 +64,28 @@ v4.0 listet **„Nachrichten" bereits auf `basic` (0 €)**. Das steht im Konfli
 Die Upgrade-Mechanik ist unabhängig von Labels/Preisen — Labels + Preise leben in Config.
 
 ### 3.1 Stripe Test-Mode + Preise als Config
-- 4 Produkte/Preise im Stripe **Test-Mode**: 150 / 300 / 600 / 1.200 € (jährlich). `basic`/`connect` ohne Stripe.
-- Preis-IDs + Anzeigenamen in einer Config-Datei (z. B. `src/config/levels.ts`), damit Label-Änderungen ein Einzeiler bleiben.
-- **Akzeptanz:** kein Live-Key im Repo/Client; Test-Keys via Infisical.
+- **Wiederkehrendes Abo (subscription), KEINE Einmalzahlung.** Jedes bezahlte Level = 1 Stripe-Produkt mit **zwei** wiederkehrenden Preisen: **jährlich** (Default/Headline) **und monatlich** (Option). `basic`/`connect` ohne Stripe.
+- Preise (Test-Mode), Vorschlag — Jahr = Headline, Monat = kleiner Aufschlag (Jahr ≈ 10 Monate, „2 Monate geschenkt"; exakte Monatswerte sind Detlev-Entscheidung):
+
+| Level | jährlich | monatlich (Vorschlag) |
+|---|---|---|
+| `discover` | 150 € / Jahr | 15 € / Monat |
+| `exchange` | 300 € / Jahr | 30 € / Monat |
+| `focus` | 600 € / Jahr | 60 € / Monat |
+| `impact` | 1.200 € / Jahr | 120 € / Monat |
+
+- Alle Preis-IDs (je Level `priceIdYear` + `priceIdMonth`) + Anzeigenamen in einer Config (z. B. `src/config/levels.ts`) — Label-/Preis-Änderung bleibt ein Einzeiler.
+- **Offene Detlev-Entscheidung (blockiert nicht den Bau):** nur jährlich · nur monatlich · oder jährlich + optional monatlich. Detlevs Notiz 09.07 lehnt für Verbraucher Richtung **monatlich** (kündbar wie Handyvertrag). Bau beide Intervalle; Default = jährlich.
+- **Akzeptanz:** Produkte sind `recurring` (nicht `one_time`); je Level Jahres- und Monatspreis vorhanden; kein Live-Key im Repo/Client; Test-Keys via Infisical.
 
 ### 3.2 Pricing-/Level-Screen
 - 6 Level als Karten, aktuelles Level markiert, „Upgrade"-Button je höherem Level.
+- **Intervall-Umschalter „Jährlich / Monatlich"** (Toggle) oben; Default = jährlich. Karten zeigen den Preis des gewählten Intervalls (bei jährlich optional „entspricht … €/Monat" bzw. Ersparnis-Hinweis).
 - Sichtbarer Hinweis **„Testzahlung · Demo"** auf jeder Bezahlaktion, damit kein Mitglied echt zu zahlen glaubt.
-- **Akzeptanz:** aktuelles Level korrekt hervorgehoben; Downgrade-Optik nicht anbietbar (nur Upgrade dieser Woche).
+- **Akzeptanz:** aktuelles Level korrekt hervorgehoben; Toggle wechselt Jahres-/Monatspreis; Downgrade-Optik nicht anbietbar (nur Upgrade dieser Woche).
 
 ### 3.3 Upgrade-Flow (Stripe Checkout, Test-Mode)
-- Klick „Upgrade" → Stripe Checkout (Testkarte `4242…`) → Erfolg.
+- Klick „Upgrade" → Stripe Checkout mit der **gewählten Preis-ID (Jahr oder Monat)** (Testkarte `4242…`) → Erfolg.
 - **`tier`/`level` wird per Stripe-Webhook gesetzt, NICHT per Success-Redirect** (Webhook = Wahrheit).
 - Nach Freischaltung: die zum neuen Level gehörenden Rechte greifen (RLS) → vorher gesperrter Inhalt wird sichtbar (das ist der „Wow"-Moment der Präsentation).
 - **Akzeptanz:** ein zuvor gesperrtes Element ist nach dem Test-Upgrade real sichtbar; Webhook idempotent; `level` clientseitig nicht schreibbar.

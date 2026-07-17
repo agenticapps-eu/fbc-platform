@@ -1,0 +1,106 @@
+import { useState } from "react";
+import { LEVELS, LEVEL_ORDER, LEVEL_RANK, type MembershipLevel } from "../config/levels";
+import { useAuth } from "../providers/auth-context";
+import { supabase } from "../lib/supabase";
+import { Button } from "../components/ui/Button";
+import { Card, CardTitle } from "../components/ui/Card";
+import { Badge } from "../components/ui/Badge";
+import { useToast } from "../components/ui/toast-context";
+import { cn } from "../lib/cn";
+
+type Interval = "month" | "year";
+const PAID: MembershipLevel[] = ["discover", "exchange", "focus", "impact"];
+
+export default function MitgliedschaftPage() {
+  const { tier, levelRank } = useAuth();
+  const { toast } = useToast();
+  const [interval, setInterval] = useState<Interval>("year");
+  const [busy, setBusy] = useState<MembershipLevel | null>(null);
+  const currentRank = levelRank ?? 0;
+
+  async function startUpgrade(level: MembershipLevel) {
+    setBusy(level);
+    const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+      body: { level, interval },
+    });
+    setBusy(null);
+    if (error || !data?.url) {
+      toast({
+        variant: "error",
+        title: "Upgrade konnte nicht gestartet werden",
+        description: "Bitte versuche es erneut oder wende dich an den Support.",
+      });
+      return;
+    }
+    window.location.assign(data.url as string);
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl font-semibold text-ink">Mitgliedschaft</h1>
+        <div className="flex gap-1 rounded-full border border-line p-1">
+          <button
+            type="button"
+            onClick={() => setInterval("year")}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm",
+              interval === "year" && "bg-gold-strong text-canvas",
+            )}
+          >
+            Jährlich
+          </button>
+          <button
+            type="button"
+            onClick={() => setInterval("month")}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm",
+              interval === "month" && "bg-gold-strong text-canvas",
+            )}
+          >
+            Monatlich
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {LEVEL_ORDER.map((key) => {
+          const lvl = LEVELS[key];
+          const isCurrent = tier === key;
+          const canUpgrade = PAID.includes(key) && LEVEL_RANK[key] > currentRank;
+          const price = interval === "year" ? lvl.priceYear : lvl.priceMonth;
+          return (
+            <Card
+              key={key}
+              data-testid={`level-${key}`}
+              data-current={isCurrent}
+              className={cn("flex flex-col gap-3", isCurrent && "border-gold-strong")}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle>{lvl.label}</CardTitle>
+                {isCurrent && <Badge variant="strong">Aktuell</Badge>}
+              </div>
+              <p className="text-sm text-muted">{lvl.summary}</p>
+              <p className="text-lg font-semibold text-ink">
+                {price === 0 ? "Gratis" : `${price} € / ${interval === "year" ? "Jahr" : "Monat"}`}
+              </p>
+              {canUpgrade && (
+                <div className="mt-auto flex flex-col gap-1">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={busy === key}
+                    onClick={() => startUpgrade(key)}
+                  >
+                    Upgrade
+                  </Button>
+                  <span className="text-center text-xs text-muted">Testzahlung · Demo</span>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
