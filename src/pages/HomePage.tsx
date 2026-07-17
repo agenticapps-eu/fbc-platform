@@ -13,6 +13,7 @@ import {
   type EventListItem,
 } from "../lib/events";
 import { fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
+import { MemberDashboard } from "../components/home/MemberDashboard";
 import { useAuth } from "../providers/auth-context";
 
 /**
@@ -27,6 +28,16 @@ import { useAuth } from "../providers/auth-context";
  * wird rein für die Anzeige über `displayAuthor` maskiert (Gäste sehen „Ein Mitglied").
  */
 export default function HomePage() {
+  const { user } = useAuth();
+  if (user) return <MemberDashboard uid={user.id} />;
+  return <PublicHome />;
+}
+
+/**
+ * Öffentliche Startseite für Gäste (nicht eingeloggt). Eingeloggte Mitglieder
+ * sehen stattdessen ihr persönliches Dashboard (<MemberDashboard>, Nav-IA §3).
+ */
+function PublicHome() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
   const navigate = useNavigate();
@@ -117,11 +128,11 @@ export default function HomePage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Testimonial
             quote="Im Club habe ich Partner gefunden, die meine Werte teilen — nicht nur Kontakte, sondern echte Zusammenarbeit."
-            author="Ein Legacy-Mitglied"
+            author="Ein Impact-Mitglied"
           />
           <Testimonial
             quote="Die Events sind kein Networking-Theater. Man kommt mit konkreten nächsten Schritten nach Hause."
-            author="Ein Prime-Mitglied"
+            author="Ein Focus-Mitglied"
           />
         </div>
       </section>

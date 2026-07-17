@@ -28,6 +28,7 @@ const DATA: DashboardData = {
     member_number: null,
     member_since: null,
     potential_score: 82,
+    profile_completion: 60,
     dev_focus: null,
     dev_progress: 0,
     next_steps: [],

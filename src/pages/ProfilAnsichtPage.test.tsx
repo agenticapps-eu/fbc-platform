@@ -31,6 +31,7 @@ const DATA: DashboardData = {
     member_number: null,
     member_since: null,
     potential_score: 82,
+    profile_completion: 60,
     dev_focus: null,
     dev_progress: 0,
     next_steps: [],
@@ -78,6 +79,8 @@ describe("ProfilAnsichtPage (Bento)", () => {
     );
     expect(screen.getByRole("heading", { name: "Mein Erfolgsradar" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Meine Interessen" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Mein Impact" })).toBeInTheDocument();
+    // Impact Score / potential_score sind für den MVP ausgeblendet (Nav-IA §3).
+    expect(screen.queryByText("Impact Score")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Mein Impact" })).toBeNull();
   });
 });

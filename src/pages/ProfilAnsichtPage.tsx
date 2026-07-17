@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ProfileHero } from "../components/profile/ProfileHero";
 import { Button } from "../components/ui/Button";
+import { MembershipSummary } from "../components/membership/MembershipSummary";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { StatTile, formatDate, monthFmt } from "../components/mein-bereich/building-blocks";
 import { AktivitaetPortfolio } from "../components/mein-bereich/aktivitaet-portfolio";
@@ -10,7 +11,6 @@ import {
   BeitraegeWidget,
   EntwicklungWidget,
   ErfolgsradarWidget,
-  ImpactWidget,
   InteressenWidget,
   ZieleWidget,
 } from "../components/mein-bereich/profil-widgets";
@@ -57,18 +57,19 @@ function ProfilView({ uid }: { uid: string }) {
           Mitglied seit: {formatDate(p.member_since, monthFmt)}
           {p.member_number && <> · Mitgliedsnummer: {p.member_number}</>}
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Impact Score" value={p.potential_score} />
+        {/* Impact Score bewusst ausgeblendet (Nav-IA §3, MVP „Mein Profil vereinfachen"). */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatTile label="Netzwerk" value={data.contactsCount} />
           <StatTile label="Matches" value={data.matchStats.successful} />
           <StatTile label="Events" value={data.eventsCount} />
         </div>
       </ProfileHero>
 
+      <MembershipSummary current={p.tier} showManageCta />
+
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <ErfolgsradarWidget data={data} />
         <AuszeichnungenWidget badges={data.badges} />
-        <ImpactWidget score={p.potential_score} breakdown={data.scoreBreakdown} />
         <InteressenWidget data={data} />
         <ZieleWidget data={data} />
         <EntwicklungWidget profile={p} />

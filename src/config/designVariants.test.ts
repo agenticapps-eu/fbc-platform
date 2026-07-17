@@ -7,7 +7,7 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models the nine variants a–i (a–d stable, e–g experimental, h/i brand)", () => {
+  it("models the variants a–i plus sommerfest (a–d stable, e–g experimental, h/i brand)", () => {
     expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual([
       "a",
       "b",
@@ -18,15 +18,18 @@ describe("designVariants config", () => {
       "g",
       "h",
       "i",
+      "linkedin",
+      "sommerfest",
     ]);
   });
 
-  it("marks D as the recommended default", () => {
-    expect(DEFAULT_VARIANT).toBe("d");
-    expect(DESIGN_VARIANTS.d.recommended).toBe(true);
+  it("marks sommerfest as the recommended default", () => {
+    expect(DEFAULT_VARIANT).toBe("sommerfest");
+    expect(DESIGN_VARIANTS.sommerfest.recommended).toBe(true);
     // exactly one recommended variant
     const recommended = Object.values(DESIGN_VARIANTS).filter((v) => v.recommended);
     expect(recommended).toHaveLength(1);
+    expect(DESIGN_VARIANTS.d.recommended).toBeFalsy();
   });
 
   it("flags exactly e/f/g as experimental", () => {

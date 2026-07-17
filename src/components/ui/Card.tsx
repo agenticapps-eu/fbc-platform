@@ -1,11 +1,16 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+export function Card({
+  className,
+  padded = true,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { padded?: boolean }) {
   return (
     <div
       className={cn(
-        "fbc-card rounded-[var(--radius-card)] border border-line bg-canvas p-6 shadow-soft",
+        "fbc-card rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft",
+        padded && "p-6",
         className,
       )}
       {...props}

@@ -35,7 +35,18 @@ export interface DesignVariant {
   recommended?: boolean;
 }
 
-export type DesignVariantId = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i";
+export type DesignVariantId =
+  | "a"
+  | "b"
+  | "c"
+  | "d"
+  | "e"
+  | "f"
+  | "g"
+  | "h"
+  | "i"
+  | "sommerfest"
+  | "linkedin";
 
 export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "a",
@@ -47,9 +58,11 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "g",
   "h",
   "i",
+  "sommerfest",
+  "linkedin",
 ];
 
-export const DEFAULT_VARIANT: DesignVariantId = "d";
+export const DEFAULT_VARIANT: DesignVariantId = "sommerfest";
 
 /** localStorage-Schlüssel der persistierten Auswahl. */
 export const VARIANT_STORAGE_KEY = "fbc.designVariant";
@@ -89,7 +102,6 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     motion: "dramatic",
     heroStyle: "dark-glow",
     headlineFont: "serif",
-    recommended: true,
   },
   e: {
     id: "e",
@@ -143,6 +155,28 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     motion: "medium",
     heroStyle: "light",
     headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  sommerfest: {
+    id: "sommerfest",
+    label: "Sommerfest (FBC)",
+    description: "FBC-Marke: warmes Creme, Navy-Text, Gold-Akzent, ruhiges Dashboard.",
+    motion: "medium",
+    heroStyle: "light",
+    headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+    recommended: true,
+  },
+  linkedin: {
+    id: "linkedin",
+    label: "eff.bee.zee (Vision)",
+    description:
+      "Vision-Vorschau als Klick-Dummy: eigene Marke, dunkle Navy-Sidebar, ActivePoints.",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
     cardStyle: "solid",
     backdrop: "none",
   },
