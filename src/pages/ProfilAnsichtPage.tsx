@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ProfileHero } from "../components/profile/ProfileHero";
 import { Button } from "../components/ui/Button";
+import { MembershipSummary } from "../components/membership/MembershipSummary";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { StatTile, formatDate, monthFmt } from "../components/mein-bereich/building-blocks";
 import { AktivitaetPortfolio } from "../components/mein-bereich/aktivitaet-portfolio";
@@ -64,6 +65,8 @@ function ProfilView({ uid }: { uid: string }) {
           <StatTile label="Events" value={data.eventsCount} />
         </div>
       </ProfileHero>
+
+      <MembershipSummary current={p.tier} showManageCta />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <ErfolgsradarWidget data={data} />
