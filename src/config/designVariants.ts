@@ -62,7 +62,7 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "linkedin",
 ];
 
-export const DEFAULT_VARIANT: DesignVariantId = "d";
+export const DEFAULT_VARIANT: DesignVariantId = "sommerfest";
 
 /** localStorage-Schlüssel der persistierten Auswahl. */
 export const VARIANT_STORAGE_KEY = "fbc.designVariant";
@@ -102,7 +102,6 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     motion: "dramatic",
     heroStyle: "dark-glow",
     headlineFont: "serif",
-    recommended: true,
   },
   e: {
     id: "e",
@@ -168,6 +167,7 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     headlineFont: "serif",
     cardStyle: "solid",
     backdrop: "none",
+    recommended: true,
   },
   linkedin: {
     id: "linkedin",
