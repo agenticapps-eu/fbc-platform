@@ -19,7 +19,16 @@ export interface AuthContextValue {
   isLoading: boolean;
   /** true während für den eingeloggten Nutzer tier/level_rank/staffRole nachgeladen werden. */
   tierLoading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  /**
+   * Legt ein Konto an. `fullName` geht als `full_name` in die User-Metadaten und
+   * wird vom Signup-Trigger nach `profiles.name` übernommen (AGE-437) — ohne ihn
+   * bliebe das Mitglied im Verzeichnis namenlos.
+   */
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }

@@ -11,6 +11,10 @@ import { useDesignVariant } from "../providers/design-variant-context";
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
   password: z.string().min(8, "Das Passwort muss mindestens 8 Zeichen haben."),
+  // Im Schema optional, weil der Login-Modus gar kein Namensfeld rendert; beim
+  // Registrieren wird die Pflicht in onSubmit durchgesetzt (AGE-437). `.trim()`
+  // sonst zählt ein Leerzeichen als Name und steht so im Verzeichnis.
+  name: z.string().trim().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -31,6 +35,7 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setError,
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   // Bereits eingeloggt → kein Grund für die Login-Seite. „/" entscheidet via
@@ -51,7 +56,14 @@ export default function LoginPage() {
       return;
     }
 
-    const { error } = await signUp(values.email, values.password);
+    // Ohne Namen bliebe profiles.name NULL und das Mitglied im Verzeichnis
+    // dauerhaft „Mitglied" (AGE-437) — deshalb hier Pflicht, nicht Kür.
+    if (!values.name) {
+      setError("name", { message: "Bitte deinen Namen eingeben." });
+      return;
+    }
+
+    const { error } = await signUp(values.email, values.password, values.name);
     if (error) {
       setFormError(error.message);
       return;
@@ -88,6 +100,22 @@ export default function LoginPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+        {mode === "register" && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="name" className="text-sm font-medium text-ink">
+              Name
+            </label>
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              {...register("name")}
+              className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            />
+            {errors.name && <p className="text-sm text-danger">{errors.name.message}</p>}
+          </div>
+        )}
+
         <div className="flex flex-col gap-1">
           <label htmlFor="email" className="text-sm font-medium text-ink">
             E-Mail
