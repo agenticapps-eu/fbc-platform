@@ -121,8 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       staffRole,
       isLoading,
       tierLoading,
-      signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({ email, password });
+      signUp: async (email, password, fullName) => {
+        // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
+        // (20260611171003) liest genau diesen Schlüssel nach profiles.name.
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName } },
+        });
         if (!error) logEvent("signup");
         return { error };
       },
