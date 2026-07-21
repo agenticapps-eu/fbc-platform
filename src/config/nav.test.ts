@@ -16,12 +16,15 @@ const ERWARTET = {
   ],
   "mein-bereich": [
     ["/profil", "Mein Profil"],
-    ["/meine-chancen", "Meine Chancen"],
     ["/meine-kurse", "Meine Kurse"],
     ["/meine-events", "Meine Events"],
     ["/kontakte", "Meine Kontakte"],
   ],
-  service: [["/einstellungen", "Einstellungen"]],
+  // Detlevs MVP-Reihenfolge: … Kontakte, Mitgliedschaften, Einstellungen.
+  service: [
+    ["/mitgliedschaft", "Mitgliedschaft"],
+    ["/einstellungen", "Einstellungen"],
+  ],
 } as const;
 
 describe("Ziel-Navigation (Spec §2)", () => {
@@ -54,5 +57,20 @@ describe("Ziel-Navigation (Spec §2)", () => {
   it("hält Meine Chancen ab Discover, auch nach dem Umzug in Mein Bereich", () => {
     const chancen = navItems.find((i) => i.path === "/meine-chancen");
     expect(chancen?.minTier).toBe("discover");
+  });
+
+  /* AGE-443 — MVP-Umfang fürs Sommerfest. „Chancen-Modul im Detail" steht auf
+     Detlevs Nicht-Zeigen-Liste. Ausblenden heißt hier: kein Menüeintrag, aber
+     die Route bleibt erreichbar (`section: "sub"`) — reversibel, wie in
+     AGE-439 beim Design-Switcher. */
+  it("blendet Meine Chancen aus dem Menü aus, hält die Route aber erreichbar", () => {
+    const chancen = navItems.find((i) => i.path === "/meine-chancen");
+    expect(chancen).toBeDefined();
+    expect(chancen?.section).toBe("sub");
+  });
+
+  it("führt Mitgliedschaft als Menüeintrag — Detlev listet sie im MVP", () => {
+    const mitgliedschaft = navItems.find((i) => i.path === "/mitgliedschaft");
+    expect(mitgliedschaft?.section).toBe("service");
   });
 });
