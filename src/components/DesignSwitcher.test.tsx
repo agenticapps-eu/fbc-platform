@@ -17,16 +17,17 @@ function openPanel() {
 }
 
 describe("DesignSwitcher", () => {
-  it("bietet genau A, Sommerfest und eff.bee.zee an", () => {
+  it("bietet genau A, Sommerfest, Blau und eff.bee.zee an", () => {
     const panel = openPanel();
     const labels = [...panel.querySelectorAll("li button")].map((b) =>
       b.textContent?.replace(/\s+/g, " ").trim(),
     );
 
-    expect(labels).toHaveLength(3);
+    expect(labels).toHaveLength(4);
     expect(labels[0]).toContain(DESIGN_VARIANTS.a.label);
     expect(labels[1]).toContain(DESIGN_VARIANTS.sommerfest.label);
-    expect(labels[2]).toContain(DESIGN_VARIANTS.linkedin.label);
+    expect(labels[2]).toContain(DESIGN_VARIANTS.blau.label);
+    expect(labels[3]).toContain(DESIGN_VARIANTS.linkedin.label);
   });
 
   it("zeigt keine der zurückgezogenen Varianten B–I", () => {

@@ -14,13 +14,18 @@
     <script>
       (function () {
         try {
-          var ok = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "sommerfest", "linkedin"];
+          var ok = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "sommerfest", "blau", "linkedin"];
+          // Nur diese bietet der Switcher an (SWITCHER_VARIANT_IDS, AGE-439/441).
+          // Muss zur Regel in resolveInitialVariant passen, sonst setzt dieses
+          // Skript eine zurückgezogene Variante und der Provider korrigiert sie
+          // danach sichtbar zurück — genau der Flash, den es verhindern soll.
+          var offered = ["a", "sommerfest", "blau", "linkedin"];
           // Strukturelle Flags der experimentellen Varianten (cardStyle, backdrop).
           // a–d sind solid/none (Default); nur e/f/g weichen ab.
           var flags = { e: ["editorial", "none"], f: ["glass", "aurora"], g: ["solid", "paper"] };
           var p = new URLSearchParams(location.search).get("variant");
           var s = localStorage.getItem("fbc.designVariant");
-          var v = ok.indexOf(p) > -1 ? p : ok.indexOf(s) > -1 ? s : "sommerfest";
+          var v = ok.indexOf(p) > -1 ? p : offered.indexOf(s) > -1 ? s : "sommerfest";
           var d = document.documentElement;
           var fl = flags[v];
           d.dataset.variant = v;
