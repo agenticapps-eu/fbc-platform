@@ -1,0 +1,33 @@
+-- `videos` ins Spalten-Grant von profiles (AGE-436). Donald, 2026-07-21.
+--
+-- ── Befund ──────────────────────────────────────────────────────────────────
+-- Seit dem 15.07. kann KEIN Mitglied sein Profil speichern. Live reproduziert
+-- am 21.07. auf prod: „permission denied for table profiles".
+--
+-- Die Lücke entstand aus zwei für sich richtigen Schritten:
+--   * 20260615150000_profile_videos.sql (AGE-252) legte `videos` an. Grants
+--     wurden damals nicht ausgesprochen, weil sie noch geerbt wurden.
+--   * 20260715140000_explicit_grants.sql (AGE-312) beendete genau dieses Erben
+--     und zählte auf, was `authenticated` auf profiles schreiben darf — aus der
+--     Feldliste des Editors, in der `videos` nicht auftauchte.
+-- src/lib/profile.ts:218 schickt `videos` aber bei JEDEM Speichern mit, auch
+-- ohne gepflegte Videos. Ein UPDATE ohne Recht auf EINE Spalte scheitert ganz.
+--
+-- ── Warum nur diese eine Spalte ─────────────────────────────────────────────
+-- Abgleich aller vom Client geschriebenen profiles-Spalten gegen die Grant-Liste
+-- (profile.ts:205-223, compass.ts:254 `dev_focus`, member-settings.ts:74
+-- `is_public`): alles andere ist gedeckt. `videos` ist die einzige Lücke.
+--
+-- VERWORFEN: `grant update on public.profiles` ohne Spaltenliste. Das machte den
+-- Fehler unmöglich, öffnete aber tier, member_number, potential_score,
+-- profile_completion und search_doc für den Client — abgeleitete Felder, die
+-- Triggern und RPCs gehören (AGE-312). Der Fehler ist die Spaltenliste wert.
+--
+-- VERWORFEN: `videos` aus profile.ts nicht mitsenden, wenn leer. Das versteckte
+-- das fehlende Recht, bis jemand ein Video pflegt — und verlöre die Fähigkeit,
+-- Videos wieder zu entfernen.
+--
+-- Forward-only. Die Sonde supabase/tests/probe_profile_save.sql führt den
+-- Client-Write als Mitglied aus und war vor dieser Migration rot.
+
+grant update (videos) on public.profiles to authenticated;

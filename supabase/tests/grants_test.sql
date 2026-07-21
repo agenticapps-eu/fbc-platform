@@ -87,7 +87,7 @@ select is(
            and table_name in ('profiles', 'contact_requests', 'routing_queue')
          group by 1) t),
 $$contact_requests.UPDATE=status
-profiles.UPDATE=avatar_url,branche,company,competencies,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,website
+profiles.UPDATE=avatar_url,branche,company,competencies,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
 
