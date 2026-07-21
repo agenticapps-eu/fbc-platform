@@ -193,10 +193,13 @@ export async function saveProfile(
   let avatarUrl = values.avatar_url;
 
   if (avatarBlob) {
+    // Kein `upsert`: der Pfad trägt einen Zeitstempel, kollidiert also nie — und
+    // der Upsert-Pfad der Storage-API (INSERT … ON CONFLICT DO UPDATE) scheitert
+    // an der bewusst fehlenden SELECT-Policy auf storage.objects (AGE-438).
     const path = `${uid}/${Date.now()}.webp`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(path, avatarBlob, { upsert: true, contentType: "image/webp" });
+      .upload(path, avatarBlob, { contentType: "image/webp" });
     if (uploadError) throw uploadError;
     avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
   }
