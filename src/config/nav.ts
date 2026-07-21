@@ -82,11 +82,15 @@ export const navItems: NavItem[] = [
     section: "mein-bereich",
     requiresAuth: true,
   },
+  // AGE-443: „Chancen-Modul im Detail" steht auf Detlevs Nicht-Zeigen-Liste für
+  // den Sommerfest-MVP. Ausgeblendet, nicht entfernt — `sub` heißt geroutet ohne
+  // Menüeintrag, das Zurückholen ist eine Zeile. `minTier` bleibt unangetastet,
+  // damit die Schranke beim Wiedereinblenden nicht versehentlich fehlt.
   {
     path: "/meine-chancen",
     label: "Meine Chancen",
     Component: MeineChancenPage,
-    section: "mein-bereich",
+    section: "sub",
     // §2: „erweiterte Matchings" ab `discover`.
     minTier: "discover",
   },
@@ -112,6 +116,16 @@ export const navItems: NavItem[] = [
     requiresAuth: true,
   },
 
+  // AGE-443: Detlev listet „Mitgliedschaften" im MVP-Umfang. Die Seite gab es
+  // schon, sie war nur als `sub` geroutet — jetzt mit Menüeintrag, in seiner
+  // Reihenfolge (… Kontakte, Mitgliedschaft, Einstellungen).
+  {
+    path: "/mitgliedschaft",
+    label: "Mitgliedschaft",
+    Component: MitgliedschaftPage,
+    section: "service",
+    requiresAuth: true,
+  },
   {
     path: "/einstellungen",
     label: "Einstellungen",
@@ -125,13 +139,6 @@ export const navItems: NavItem[] = [
     path: "/profil/bearbeiten",
     label: "Profil bearbeiten",
     Component: ProfilPage,
-    section: "sub",
-    requiresAuth: true,
-  },
-  {
-    path: "/mitgliedschaft",
-    label: "Mitgliedschaft",
-    Component: MitgliedschaftPage,
     section: "sub",
     requiresAuth: true,
   },
