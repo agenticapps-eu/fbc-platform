@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import {
-  DESIGN_VARIANT_IDS,
   DESIGN_VARIANTS,
+  SWITCHER_VARIANT_IDS,
   type DesignVariantId,
 } from "../config/designVariants";
 import { cn } from "../lib/cn";
 import { useDesignVariant } from "../providers/design-variant-context";
 
 /* ⚠️ TEMPORÄRES REVIEW-TOOL (AGE-237).
- * Schwebender Live-Umschalter, damit Detlev die vier Varianten auf dem Deploy
- * direkt vergleichen kann. Sobald die Variante feststeht: VITE_DESIGN_SWITCHER=off
- * setzen und diese Komponente + nicht gewählte Variant-Blöcke entfernen. */
+ * Schwebender Live-Umschalter, damit Detlev die Varianten auf dem Deploy direkt
+ * vergleichen kann. Angeboten wird nur noch, was in SWITCHER_VARIANT_IDS steht
+ * (AGE-439: A, Sommerfest, eff.bee.zee). Sobald der Look endgültig feststeht:
+ * VITE_DESIGN_SWITCHER=off setzen und diese Komponente + die nicht gewählten
+ * Variant-Blöcke in src/index.css entfernen. */
 
 const SWITCHER_ENABLED = (import.meta.env.VITE_DESIGN_SWITCHER ?? "on") !== "off";
 
@@ -68,7 +70,7 @@ export function DesignSwitcher() {
             </button>
           </div>
           <ul className="flex flex-col gap-1">
-            {DESIGN_VARIANT_IDS.map((id: DesignVariantId) => {
+            {SWITCHER_VARIANT_IDS.map((id: DesignVariantId) => {
               const v = DESIGN_VARIANTS[id];
               const active = id === variant;
               return (

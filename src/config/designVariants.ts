@@ -62,6 +62,15 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "linkedin",
 ];
 
+/** Was der Switcher tatsächlich zur Auswahl stellt (AGE-439).
+ *
+ *  Detlev hat die übrigen Varianten abbestellt („die werden wir eh nicht
+ *  verwenden"), B–I sind deshalb hier raus. Sie bleiben aber vollständig in
+ *  `DESIGN_VARIANTS` und in `src/index.css` stehen — das Zurückholen ist eine
+ *  Zeile, und `?variant=b` funktioniert weiterhin fürs interne Zeigen.
+ *  Absichtlich getrennt von DESIGN_VARIANT_IDS: „bekannt" ≠ „angeboten". */
+export const SWITCHER_VARIANT_IDS: readonly DesignVariantId[] = ["a", "sommerfest", "linkedin"];
+
 export const DEFAULT_VARIANT: DesignVariantId = "sommerfest";
 
 /** localStorage-Schlüssel der persistierten Auswahl. */
@@ -192,8 +201,13 @@ function readVariantFromSearch(search: string): string | null {
   return params.get(VARIANT_QUERY_PARAM);
 }
 
-/** Ermittelt die initiale Variante: URL ?variant= > localStorage > Default 'd'.
- *  Ungültige Werte werden in jeder Stufe übersprungen. */
+/** Ermittelt die initiale Variante: URL ?variant= > localStorage > Default.
+ *  Ungültige Werte werden in jeder Stufe übersprungen.
+ *
+ *  Der gespeicherte Wert muss zusätzlich noch angeboten werden (AGE-439): wer
+ *  zuletzt auf einer zurückgezogenen Variante stand, säße sonst darauf fest,
+ *  weil der Switcher keinen Weg zurück anbietet. Die URL bleibt bewusst
+ *  großzügig — Deep-Links auf B–I sollen weiter funktionieren. */
 export function resolveInitialVariant({
   search,
   stored,
@@ -203,6 +217,6 @@ export function resolveInitialVariant({
 }): DesignVariantId {
   const fromUrl = readVariantFromSearch(search);
   if (isDesignVariantId(fromUrl)) return fromUrl;
-  if (isDesignVariantId(stored)) return stored;
+  if (isDesignVariantId(stored) && SWITCHER_VARIANT_IDS.includes(stored)) return stored;
   return DEFAULT_VARIANT;
 }
