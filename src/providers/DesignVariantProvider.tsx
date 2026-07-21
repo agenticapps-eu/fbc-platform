@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   DEFAULT_VARIANT,
-  DESIGN_VARIANT_IDS,
   DESIGN_VARIANTS,
   resolveInitialVariant,
+  SWITCHER_VARIANT_IDS,
   VARIANT_QUERY_PARAM,
   VARIANT_STORAGE_KEY,
   type DesignVariantId,
@@ -59,10 +59,13 @@ export function DesignVariantProvider({ children }: { children: ReactNode }) {
 
   const setVariant = useCallback((id: DesignVariantId) => setVariantState(id), []);
 
+  // Shift+D läuft nur durch die angebotenen Varianten (AGE-439). Steht man per
+  // ?variant= auf einer zurückgezogenen, ist indexOf -1 und der Durchlauf
+  // startet vorne — statt in die ausgeblendeten Varianten zu laufen.
   const cycleVariant = useCallback(() => {
     setVariantState((current) => {
-      const i = DESIGN_VARIANT_IDS.indexOf(current);
-      return DESIGN_VARIANT_IDS[(i + 1) % DESIGN_VARIANT_IDS.length] ?? DEFAULT_VARIANT;
+      const i = SWITCHER_VARIANT_IDS.indexOf(current);
+      return SWITCHER_VARIANT_IDS[(i + 1) % SWITCHER_VARIANT_IDS.length] ?? DEFAULT_VARIANT;
     });
   }, []);
 

@@ -4,6 +4,7 @@ import {
   DESIGN_VARIANTS,
   isDesignVariantId,
   resolveInitialVariant,
+  SWITCHER_VARIANT_IDS,
 } from "./designVariants";
 
 describe("designVariants config", () => {
@@ -80,6 +81,23 @@ describe("designVariants config", () => {
   });
 });
 
+describe("SWITCHER_VARIANT_IDS — was der Switcher anbietet (AGE-439)", () => {
+  it("bietet nur A, Sommerfest und eff.bee.zee an", () => {
+    expect([...SWITCHER_VARIANT_IDS]).toEqual(["a", "sommerfest", "linkedin"]);
+  });
+
+  it("bietet B–I nicht mehr an, behält sie aber in der Config", () => {
+    for (const id of ["b", "c", "d", "e", "f", "g", "h", "i"] as const) {
+      expect(SWITCHER_VARIANT_IDS).not.toContain(id);
+      expect(DESIGN_VARIANTS[id]).toBeDefined();
+    }
+  });
+
+  it("enthält den Default, sonst wäre die aktive Variante nicht anwählbar", () => {
+    expect(SWITCHER_VARIANT_IDS).toContain(DEFAULT_VARIANT);
+  });
+});
+
 describe("isDesignVariantId", () => {
   it("accepts known ids and rejects everything else", () => {
     expect(isDesignVariantId("a")).toBe(true);
@@ -102,8 +120,20 @@ describe("resolveInitialVariant — precedence URL > localStorage > default", ()
   });
 
   it("falls back to a valid stored value when the URL has none", () => {
-    expect(resolveInitialVariant({ search: "", stored: "c" })).toBe("c");
+    expect(resolveInitialVariant({ search: "", stored: "sommerfest" })).toBe("sommerfest");
     expect(resolveInitialVariant({ search: "?foo=1", stored: "a" })).toBe("a");
+  });
+
+  // AGE-439: wer noch eine zurückgezogene Variante im localStorage hat, säße
+  // sonst darauf fest — der Switcher böte keinen Weg zurück.
+  it("ignoriert einen gespeicherten Wert, den der Switcher nicht mehr anbietet", () => {
+    expect(resolveInitialVariant({ search: "", stored: "c" })).toBe(DEFAULT_VARIANT);
+    expect(resolveInitialVariant({ search: "", stored: "h" })).toBe(DEFAULT_VARIANT);
+  });
+
+  // Deep-Links bleiben absichtlich intakt: intern sollen B–I zeigbar bleiben.
+  it("akzeptiert eine zurückgezogene Variante weiterhin per ?variant=", () => {
+    expect(resolveInitialVariant({ search: "?variant=h", stored: null })).toBe("h");
   });
 
   it("falls back to the default when neither is valid", () => {
@@ -112,7 +142,7 @@ describe("resolveInitialVariant — precedence URL > localStorage > default", ()
   });
 
   it("ignores an invalid URL value but still honours valid storage", () => {
-    expect(resolveInitialVariant({ search: "?variant=x", stored: "b" })).toBe("b");
+    expect(resolveInitialVariant({ search: "?variant=x", stored: "a" })).toBe("a");
   });
 
   it("accepts a bare search string without the leading question mark", () => {
