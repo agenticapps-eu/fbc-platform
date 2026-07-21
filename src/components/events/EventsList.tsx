@@ -12,6 +12,7 @@ import {
   eventsListKey,
   fetchEvents,
   partitionEvents,
+  selectMyEvents,
   type EventInput,
   type EventListItem,
 } from "../../lib/events";
@@ -19,9 +20,9 @@ import { EventCard } from "./EventCard";
 import { EventForm } from "./EventForm";
 
 /**
- * Events-Übersicht (AGE-251). Kommende/vergangene Events als Karten, plus eine
- * „Meine Events"-Sektion für selbst gehostete. Sichtbarkeit erzwingt die RLS — der
- * Client zeigt nur, was `fetchEvents` zurückgibt.
+ * Events-Übersicht (AGE-251). Drei Reiter: Kommende, Vergangene, Meine Events
+ * (AGE-442 — gebuchte und selbst gehostete zusammen, keine eigene Unterseite mehr).
+ * Sichtbarkeit erzwingt die RLS — der Client zeigt nur, was `fetchEvents` zurückgibt.
  */
 export default function EventsList() {
   const { user } = useAuth();
@@ -97,35 +98,32 @@ function EventsBody({
       />
     );
   }
-  const { upcoming, past } = partitionEvents(all, new Date());
-  const hosted = hostId
-    ? all.filter((e) => e.host?.kind === "profile" && e.host.id === hostId)
-    : [];
+  const now = new Date();
+  const { upcoming, past } = partitionEvents(all, now);
+  const mine = selectMyEvents(all, hostId, now);
 
-  return (
-    <div className="space-y-8">
-      <Tabs
-        tabs={[
-          {
-            value: "upcoming",
-            label: `Kommende (${upcoming.length})`,
-            content: <CardGrid events={upcoming} empty="Keine kommenden Events." />,
-          },
-          {
-            value: "past",
-            label: `Vergangene (${past.length})`,
-            content: <CardGrid events={past} empty="Keine vergangenen Events." />,
-          },
-        ]}
-      />
-      {hosted.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-display text-xl font-semibold text-ink">Meine Events</h2>
-          <CardGrid events={hosted} empty="" />
-        </div>
-      )}
-    </div>
-  );
+  const tabs = [
+    {
+      value: "upcoming",
+      label: `Kommende (${upcoming.length})`,
+      content: <CardGrid events={upcoming} empty="Keine kommenden Events." />,
+    },
+    {
+      value: "past",
+      label: `Vergangene (${past.length})`,
+      content: <CardGrid events={past} empty="Keine vergangenen Events." />,
+    },
+  ];
+  // Ohne Login gibt es nichts Eigenes — dann bleibt der Reiter weg statt leer.
+  if (hostId) {
+    tabs.push({
+      value: "mine",
+      label: `Meine Events (${mine.length})`,
+      content: <CardGrid events={mine} empty="Du hast noch keine Events gebucht oder angelegt." />,
+    });
+  }
+
+  return <Tabs tabs={tabs} />;
 }
 
 function CardGrid({ events, empty }: { events: EventListItem[]; empty: string }) {

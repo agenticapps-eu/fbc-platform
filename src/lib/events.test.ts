@@ -6,6 +6,7 @@ import {
   partitionEvents,
   registrationStatusLabel,
   remainingSpots,
+  selectMyEvents,
   VISIBILITY_OPTIONS,
   type EventListItem,
 } from "./events";
@@ -47,6 +48,45 @@ describe("partitionEvents", () => {
     const { upcoming, past: pastList } = partitionEvents([a, past, undated, b], now);
     expect(upcoming.map((e) => e.id)).toEqual(["u", "b", "a"]);
     expect(pastList.map((e) => e.id)).toEqual(["p"]);
+  });
+});
+
+describe("selectMyEvents", () => {
+  const hosted = {
+    ...evt("hosted", "2026-07-01T10:00:00Z"),
+    host: { kind: "profile" as const, id: "me", name: "Ich", avatarUrl: null, tier: null },
+  };
+  const booked = { ...evt("booked", "2026-06-20T10:00:00Z"), myStatus: "registered" as const };
+  const waitlisted = {
+    ...evt("waitlisted", "2026-06-25T10:00:00Z"),
+    myStatus: "waitlist" as const,
+  };
+  const foreign = evt("foreign", "2026-06-18T10:00:00Z");
+
+  it("nimmt selbst gehostete und gebuchte Events, sonst nichts", () => {
+    const ids = selectMyEvents([foreign, hosted, booked, waitlisted], "me", now).map((e) => e.id);
+    expect(ids.sort()).toEqual(["booked", "hosted", "waitlisted"]);
+  });
+
+  it("zeigt ein selbst gehostetes UND gebuchtes Event nur einmal", () => {
+    const both = { ...hosted, myStatus: "registered" as const };
+    expect(selectMyEvents([both], "me", now).map((e) => e.id)).toEqual(["hosted"]);
+  });
+
+  it("sortiert kommende (asc) vor vergangene (desc)", () => {
+    const pastMine = { ...evt("past", "2026-06-01T10:00:00Z"), myStatus: "registered" as const };
+    const olderMine = { ...evt("older", "2026-05-01T10:00:00Z"), myStatus: "registered" as const };
+    const ids = selectMyEvents([pastMine, hosted, olderMine, booked], "me", now).map((e) => e.id);
+    expect(ids).toEqual(["booked", "hosted", "past", "older"]);
+  });
+
+  it("ist ohne Login leer — ein Partner-Host ist nie „meins“", () => {
+    const partnerHosted = {
+      ...evt("partner", "2026-07-01T10:00:00Z"),
+      host: { kind: "partner" as const, id: "me", name: "P", avatarUrl: null, tier: null },
+    };
+    expect(selectMyEvents([hosted, booked], null, now)).toEqual([]);
+    expect(selectMyEvents([partnerHosted], "me", now)).toEqual([]);
   });
 });
 
