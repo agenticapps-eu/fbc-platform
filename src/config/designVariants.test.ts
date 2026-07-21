@@ -8,10 +8,11 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models the variants a–i plus sommerfest (a–d stable, e–g experimental, h/i brand)", () => {
+  it("models the variants a–i plus sommerfest, blau (a–d stable, e–g experimental, h/i brand)", () => {
     expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual([
       "a",
       "b",
+      "blau",
       "c",
       "d",
       "e",
@@ -82,8 +83,15 @@ describe("designVariants config", () => {
 });
 
 describe("SWITCHER_VARIANT_IDS — was der Switcher anbietet (AGE-439)", () => {
-  it("bietet nur A, Sommerfest und eff.bee.zee an", () => {
-    expect([...SWITCHER_VARIANT_IDS]).toEqual(["a", "sommerfest", "linkedin"]);
+  it("bietet A, Sommerfest, Blau und eff.bee.zee an", () => {
+    expect([...SWITCHER_VARIANT_IDS]).toEqual(["a", "sommerfest", "blau", "linkedin"]);
+  });
+
+  // AGE-441: Vergleichsreihe für den Termin — heutiger Default, Vorschlag, Referenz.
+  it("stellt Sommerfest, Blau und eff.bee.zee nebeneinander", () => {
+    for (const id of ["sommerfest", "blau", "linkedin"] as const) {
+      expect(SWITCHER_VARIANT_IDS).toContain(id);
+    }
   });
 
   it("bietet B–I nicht mehr an, behält sie aber in der Config", () => {

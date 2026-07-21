@@ -9,7 +9,7 @@ type Tone = "auto" | "light" | "dark";
 /** Varianten mit dunkler Masthead-/Sidebar-Fläche (schwarzes bzw. Glas-Chrome):
  *  hier muss das Logo die SVG-Krone + helle Gold-Wortmarke nutzen, weil das
  *  Creme-PNG auf Dunkel nicht funktioniert. */
-const DARK_CHROME_VARIANTS = new Set(["b", "e", "f"]);
+const DARK_CHROME_VARIANTS = new Set(["b", "e", "f", "blau"]);
 
 /** FBC-Logo mit Krone.
  *  - `lockup="full"` → Krone + Wortmarke (Login, Hero, breite Sidebar)

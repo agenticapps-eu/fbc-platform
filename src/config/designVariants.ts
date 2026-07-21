@@ -46,6 +46,7 @@ export type DesignVariantId =
   | "h"
   | "i"
   | "sommerfest"
+  | "blau"
   | "linkedin";
 
 export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
@@ -59,6 +60,7 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "h",
   "i",
   "sommerfest",
+  "blau",
   "linkedin",
 ];
 
@@ -68,8 +70,18 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
  *  verwenden"), B–I sind deshalb hier raus. Sie bleiben aber vollständig in
  *  `DESIGN_VARIANTS` und in `src/index.css` stehen — das Zurückholen ist eine
  *  Zeile, und `?variant=b` funktioniert weiterhin fürs interne Zeigen.
- *  Absichtlich getrennt von DESIGN_VARIANT_IDS: „bekannt" ≠ „angeboten". */
-export const SWITCHER_VARIANT_IDS: readonly DesignVariantId[] = ["a", "sommerfest", "linkedin"];
+ *  Absichtlich getrennt von DESIGN_VARIANT_IDS: „bekannt" ≠ „angeboten".
+ *
+ *  AGE-441 stellt `blau` dazu — die Vergleichsreihe für den Termin am 22.07.
+ *  ist damit: Sommerfest (heutiger Default) · Blau (Vorschlag) · eff.bee.zee
+ *  (Referenz-Look). H/I bleiben bewusst ausgeblendet — Detlev hat sie
+ *  abbestellt, und der Vorschlag beantwortet „blau" bereits. */
+export const SWITCHER_VARIANT_IDS: readonly DesignVariantId[] = [
+  "a",
+  "sommerfest",
+  "blau",
+  "linkedin",
+];
 
 export const DEFAULT_VARIANT: DesignVariantId = "sommerfest";
 
@@ -164,6 +176,21 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     motion: "medium",
     heroStyle: "light",
     headlineFont: "serif",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  /** AGE-441 — „neues blaues Design" (Detlev, 21.07.). Nimmt die Palette des
+   *  eff.bee.zee-Dummys (`src/vision/theme.ts`), legt sie aber auf die FBC-
+   *  Tokens: der Look ist eff.bee.zee, die Marke bleibt Fair Business Club.
+   *  Der Akzent-Token heißt weiterhin `--color-gold`, trägt hier aber Blau —
+   *  das ist die dokumentierte Mechanik (gleiche Namen, andere Werte). */
+  blau: {
+    id: "blau",
+    label: "FBC Blau",
+    description: "eff.bee.zee-Blau auf FBC-Marke: dunkle Navy-Sidebar, Blau als Akzent.",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
     cardStyle: "solid",
     backdrop: "none",
   },
