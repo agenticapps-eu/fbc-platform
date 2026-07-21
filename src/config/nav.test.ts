@@ -17,7 +17,6 @@ const ERWARTET = {
   "mein-bereich": [
     ["/profil", "Mein Profil"],
     ["/meine-kurse", "Meine Kurse"],
-    ["/meine-events", "Meine Events"],
     ["/kontakte", "Meine Kontakte"],
   ],
   // Detlevs MVP-Reihenfolge: … Kontakte, Mitgliedschaften, Einstellungen.
@@ -67,6 +66,15 @@ describe("Ziel-Navigation (Spec §2)", () => {
     const chancen = navItems.find((i) => i.path === "/meine-chancen");
     expect(chancen).toBeDefined();
     expect(chancen?.section).toBe("sub");
+  });
+
+  /* AGE-442 — „Keine weitere Unterseite": gebuchte und eigene Events stehen jetzt
+     als dritter Reiter unter /events. Der Menüeintrag entfällt, die Route bleibt
+     erreichbar (alte Links, Lesezeichen) — ausblenden statt löschen, wie AGE-443. */
+  it("blendet Meine Events aus dem Menü aus, hält die Route aber erreichbar", () => {
+    const events = navItems.find((i) => i.path === "/meine-events");
+    expect(events).toBeDefined();
+    expect(events?.section).toBe("sub");
   });
 
   it("führt Mitgliedschaft als Menüeintrag — Detlev listet sie im MVP", () => {

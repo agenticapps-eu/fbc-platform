@@ -115,6 +115,25 @@ export function partitionEvents<T extends { startsAt: string | null }>(
   return { upcoming, past };
 }
 
+/**
+ * „Meine Events" (AGE-442): selbst gehostete UND gebuchte in einer Liste, kommende
+ * zuerst. Beides kommt aus demselben `fetchEvents`-Ergebnis (`myStatus` steht dort
+ * schon drin), darum ist das ein Filter und kein zweiter Datenweg — ein Event, das
+ * man selbst hostet und gebucht hat, kann so gar nicht doppelt erscheinen.
+ */
+export function selectMyEvents(
+  events: EventListItem[],
+  uid: string | null,
+  now: Date,
+): EventListItem[] {
+  if (!uid) return [];
+  const mine = events.filter(
+    (e) => e.myStatus !== null || (e.host?.kind === "profile" && e.host.id === uid),
+  );
+  const { upcoming, past } = partitionEvents(mine, now);
+  return [...upcoming, ...past];
+}
+
 export function remainingSpots(capacity: number | null, registeredCount: number): number | null {
   if (capacity === null) return null;
   return Math.max(0, capacity - registeredCount);

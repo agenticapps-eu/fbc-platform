@@ -101,11 +101,15 @@ export const navItems: NavItem[] = [
     section: "mein-bereich",
     requiresAuth: true,
   },
+  // AGE-442: Gebuchte und eigene Events stehen jetzt als dritter Reiter unter
+  // /events („keine weitere Unterseite"). Der Menüeintrag entfällt, die Route
+  // bleibt als `sub` erreichbar — alte Links und Lesezeichen laufen nicht ins
+  // Leere, und das Zurückholen ist wie bei AGE-443 eine Zeile.
   {
     path: "/meine-events",
     label: "Meine Events",
     Component: MeineEventsPage,
-    section: "mein-bereich",
+    section: "sub",
     requiresAuth: true,
   },
   {
