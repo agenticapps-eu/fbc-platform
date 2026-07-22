@@ -1,8 +1,11 @@
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AdminFeedbackCard } from "../components/feedback/AdminFeedbackCard";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
+import { Field } from "../components/ui/Field";
+import { Input } from "../components/ui/Input";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
 import { useToast } from "../components/ui/toast-context";
@@ -57,6 +60,87 @@ function ToggleRow({
         />
       </button>
     </div>
+  );
+}
+
+/**
+ * Passwort ändern (AGE-450). Setzt eine aktive Session voraus (auth.updateUser) —
+ * kein Re-Auth mit dem alten Passwort. Mindestlänge 8, Bestätigung muss passen;
+ * beides wird clientseitig geprüft, bevor der Aufruf rausgeht.
+ */
+function PasswordCard() {
+  const { updatePassword } = useAuth();
+  const { toast } = useToast();
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (pw.length < 8) {
+      setError("Das Passwort muss mindestens 8 Zeichen haben.");
+      return;
+    }
+    if (pw !== confirm) {
+      setError("Die Passwörter stimmen nicht überein.");
+      return;
+    }
+    setError(null);
+    setPending(true);
+    const { error: err } = await updatePassword(pw);
+    setPending(false);
+    if (err) {
+      toast({
+        variant: "error",
+        title: "Passwort ändern fehlgeschlagen",
+        description: err.message,
+      });
+      return;
+    }
+    toast({ variant: "success", title: "Passwort geändert" });
+    setPw("");
+    setConfirm("");
+  }
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <CardTitle>Passwort</CardTitle>
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
+        <Field label="Neues Passwort">
+          {({ id }) => (
+            <Input
+              id={id}
+              type="password"
+              autoComplete="new-password"
+              value={pw}
+              onChange={(ev) => setPw(ev.target.value)}
+            />
+          )}
+        </Field>
+        <Field label="Neues Passwort bestätigen" error={error ?? undefined}>
+          {({ id, invalid }) => (
+            <Input
+              id={id}
+              type="password"
+              autoComplete="new-password"
+              invalid={invalid}
+              value={confirm}
+              onChange={(ev) => setConfirm(ev.target.value)}
+            />
+          )}
+        </Field>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="sm"
+          className="self-start"
+          disabled={pending}
+        >
+          Passwort ändern
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -125,6 +209,8 @@ export default function EinstellungenPage() {
         </Button>
       </Card>
 
+      <PasswordCard />
+
       <Card className="flex flex-col gap-4">
         <CardTitle>Mitgliedschaft</CardTitle>
         <div className="flex items-center gap-2">
@@ -172,7 +258,9 @@ export default function EinstellungenPage() {
           disabled={save.isPending}
         />
         <ToggleRow
-          label="Prime-Mitglieder dürfen mich kontaktieren"
+          // AGE-450: „Prime" ist altes Wording (das 6-Level-Modell kennt kein
+          // Prime mehr). Die DB-Spalte contactable_by_prime bleibt unberührt.
+          label="Andere Mitglieder dürfen mich kontaktieren"
           checked={settings.contactable_by_prime}
           onChange={(v) => toggle("contactable_by_prime", v)}
           disabled={save.isPending}

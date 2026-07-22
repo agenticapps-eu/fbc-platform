@@ -13,6 +13,7 @@
 export type DomainEvent =
   | "signup"
   | "login"
+  | "password_change"
   | "match_suggested"
   | "contact_request_sent"
   | "contact_request_accepted"
