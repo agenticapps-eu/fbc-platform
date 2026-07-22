@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(53);
+select plan(55);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -78,7 +78,10 @@ insert into public.comments (post_id, author_id, body) values
 
 insert into public.events (id, title, host_id, visibility, starts_at) values
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Sommerfest', '66666666-6666-6666-6666-666666666666',
-   'members', now() + interval '7 days');
+   'members', now() + interval '7 days'),
+  -- AGE-448: öffentliches Event — jeder Eingeloggte (auch basic) darf sich anmelden.
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Tag der offenen Tür', '66666666-6666-6666-6666-666666666666',
+   'public', now() + interval '7 days');
 
 -- Thread Basic<->Connect OHNE Kontaktanfrage: der Gegenbeleg für §8 — ein
 -- bestehender Thread allein berechtigt nicht zum Schreiben.
@@ -285,21 +288,34 @@ select is(
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
   1, 'Exchange sieht den Kommentar');
 
--- ── 10. Events — sichtbar für alle, Teilnahme ab `exchange` (Nav-Spec §4) ─────
+-- ── 10. Events — sichtbar für alle; Teilnahme sichtbarkeitsabhängig (AGE-448) ─
+-- public: jeder Eingeloggte (auch basic). members: ab `discover` (rank 3) oder Host.
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.events where id = ''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'''),
   1, 'Basic SIEHT das Event (bewusst anders als die Aktivität)');
 
+-- members-Event: connect (rank 2) bleibt draußen, discover (rank 3) kommt rein.
 select alike(
+  pg_temp.try_as('22222222-2222-2222-2222-222222222222',
+    'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
+  'DENIED:%', 'Connect kann sich NICHT zum Mitglieder-Event anmelden (unter discover)');
+
+select is(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
-  'DENIED:%', 'Discover kann sich nicht anmelden — auch nicht über den RPC-Seitenweg');
+  'OK', 'Discover kann sich zum Mitglieder-Event anmelden (ab rank 3)');
 
 select is(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
   'OK', 'Exchange kann sich anmelden');
+
+-- public-Event: basic (rank 1) darf sich anmelden — das ist der Sommerfest-Fall.
+select is(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'select public.register_for_event(''ffffffff-ffff-ffff-ffff-ffffffffffff'')'),
+  'OK', 'Basic kann sich zum öffentlichen Event anmelden (Gäste-Fall)');
 
 -- ── 11. feedback — plattformweites QM (§3.5, AGE-300) ────────────────────────
 -- `admin` liest alles (feedback_admin_read), alle anderen nur ihr eigenes
