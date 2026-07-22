@@ -59,8 +59,11 @@ describe("MembershipGate für Entdecken-Routen", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("zeigt einer zu niedrigen Stufe auf /meine-chancen die Stufen-Wand", () => {
-    renderAt("/meine-chancen", authAsTier("basic"));
+  // AGE-450: /meine-chancen ist keine gegatete Route mehr (leitet auf /). Diese
+  // beiden Fälle — „Zur Startseite" statt „Mitglied werden", und der Upgrade-Weg —
+  // prüfen wir jetzt an /mitglieder, der verbleibenden discover-gegateten Route.
+  it("zeigt einer zu niedrigen Stufe die Stufen-Wand mit „Zur Startseite“ statt CTA", () => {
+    renderAt("/mitglieder", authAsTier("basic"));
 
     expect(
       screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
@@ -71,7 +74,7 @@ describe("MembershipGate für Entdecken-Routen", () => {
   });
 
   it("bietet eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu /mitgliedschaft", () => {
-    renderAt("/meine-chancen", authAsTier("basic"));
+    renderAt("/mitglieder", authAsTier("basic"));
 
     const upgradeBtn = screen.getByRole("button", { name: "Upgrade" });
     fireEvent.click(upgradeBtn);

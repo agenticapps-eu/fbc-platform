@@ -6,7 +6,6 @@ import ChatPage from "../pages/ChatPage";
 import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
-import MeineChancenPage from "../pages/MeineChancenPage";
 import MeineKursePage from "../pages/MeineKursePage";
 import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
@@ -82,18 +81,11 @@ export const navItems: NavItem[] = [
     section: "mein-bereich",
     requiresAuth: true,
   },
-  // AGE-443: „Chancen-Modul im Detail" steht auf Detlevs Nicht-Zeigen-Liste für
-  // den Sommerfest-MVP. Ausgeblendet, nicht entfernt — `sub` heißt geroutet ohne
-  // Menüeintrag, das Zurückholen ist eine Zeile. `minTier` bleibt unangetastet,
-  // damit die Schranke beim Wiedereinblenden nicht versehentlich fehlt.
-  {
-    path: "/meine-chancen",
-    label: "Meine Chancen",
-    Component: MeineChancenPage,
-    section: "sub",
-    // §2: „erweiterte Matchings" ab `discover`.
-    minTier: "discover",
-  },
+  // AGE-450: Chancen fürs Sommerfest komplett raus (Detlev, 22.07.). Anders als
+  // AGE-443 (nur Menüeintrag weg, Route blieb `sub`): der navItem entfällt ganz,
+  // und App.tsx leitet /meine-chancen auf / um — die Route ist unerreichbar. Die
+  // Seite (MeineChancenPage) bleibt im Code, das Zurückholen ist ein navItem plus
+  // Entfernen des Redirects.
   {
     path: "/meine-kurse",
     label: "Meine Kurse",

@@ -61,7 +61,12 @@ function AppInner() {
           <Route key={item.path} path={item.path} element={gatedElement(item)} />
         ))}
         <Route path="/mein-bereich" element={<Navigate to="/profil" replace />} />
-        <Route path="/matching" element={<Navigate to="/meine-chancen" replace />} />
+        {/* AGE-450: Chancen + Matching sind fürs Sommerfest raus (Detlev, 22.07.).
+            /meine-chancen ist keine navItem-Route mehr; beide Pfade leiten auf /
+            um, damit direkte Links/Lesezeichen nicht ins Leere laufen. Reversibel:
+            navItem zurück + diese Redirects entfernen. */}
+        <Route path="/meine-chancen" element={<Navigate to="/" replace />} />
+        <Route path="/matching" element={<Navigate to="/" replace />} />
         <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
         <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />
         {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).

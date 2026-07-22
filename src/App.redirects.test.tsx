@@ -32,13 +32,16 @@ function renderAt(path: string, value: AuthContextValue) {
  * dass kein Fehler auftritt.
  */
 describe("Redirects alter URLs", () => {
-  it("/matching → /meine-chancen (min Discover)", () => {
+  // AGE-450: Chancen sind fürs Sommerfest raus. /matching und /meine-chancen leiten
+  // auf / — die Chancen-Datenbank ist über keinen der beiden Pfade mehr erreichbar.
+  it("/matching und /meine-chancen sind unerreichbar (keine Chancen-Datenbank)", () => {
     renderAt("/matching", authAsTier("discover"));
+    expect(screen.queryByRole("heading", { name: "Deine Chancen-Datenbank" })).toBeNull();
+  });
 
-    // "Deine Chancen-Datenbank" kommt aus HubHeader, das nur bei echtem Seiteninhalt
-    // rendert — die MembershipGate-Wand zeigt nur denselben Hero-Titel ("Meine
-    // Chancen"), also nicht diese Überschrift.
-    expect(screen.getByRole("heading", { name: "Deine Chancen-Datenbank" })).toBeInTheDocument();
+  it("/meine-chancen zeigt keine Chancen-Seite mehr", () => {
+    renderAt("/meine-chancen", authAsTier("discover"));
+    expect(screen.queryByRole("heading", { name: "Deine Chancen-Datenbank" })).toBeNull();
   });
 
   it("/community → /aktivitaet (jede eingeloggte Stufe)", () => {

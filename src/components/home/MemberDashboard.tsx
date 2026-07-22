@@ -52,7 +52,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
     );
   }
 
-  const { profile, matchStats } = dashQuery.data;
+  const { profile } = dashQuery.data;
   const firstName = profile.name.split(" ")[0];
   const nextEvent = eventsQuery.data
     ? (partitionEvents(eventsQuery.data, new Date()).upcoming[0] ?? null)
@@ -80,13 +80,8 @@ export function MemberDashboard({ uid }: { uid: string }) {
           to="/profil/bearbeiten"
           cta="Weiter bearbeiten"
         />
-        <DashTile
-          label="Neue Empfehlungen"
-          value={matchStats.active}
-          sub="passende Mitglieder"
-          to="/meine-chancen"
-          cta="Ansehen"
-        />
+        {/* AGE-450: „Neue Empfehlungen" (→ /meine-chancen) entfernt — Chancen sind
+            fürs Sommerfest raus. */}
         <DashTile
           label="Nächstes Event"
           value={nextEvent ? nextEvent.title : "—"}
