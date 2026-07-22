@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import {
   CommunitiesWidget,
-  MatchingWidget,
   MeineAnfragenWidget,
   NetzwerkWidget,
 } from "../components/mein-bereich/kontakte-widgets";
@@ -32,7 +31,7 @@ function Inner({ uid }: { uid: string }) {
         <NetzwerkWidget contactsCount={data.contactsCount} />
         <CommunitiesWidget />
       </div>
-      <MatchingWidget data={data} />
+      {/* AGE-450: „Mein Matching"-Widget entfernt — Matching ist fürs Sommerfest raus. */}
     </div>
   );
 }

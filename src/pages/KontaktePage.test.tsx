@@ -75,10 +75,17 @@ function renderPage() {
 }
 
 describe("KontaktePage", () => {
-  it("zeigt Netzwerk, Matching und Communities", async () => {
+  it("zeigt Netzwerk und Communities", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: "Mein Netzwerk" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Mein Matching" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Meine Communities" })).toBeInTheDocument();
+  });
+
+  // AGE-450: Matching ist fürs Sommerfest raus — das „Mein Matching"-Widget
+  // erscheint nicht mehr auf der Kontakte-Seite.
+  it("zeigt kein Matching-Widget mehr", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    expect(screen.queryByRole("heading", { name: "Mein Matching" })).toBeNull();
   });
 });

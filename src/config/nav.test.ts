@@ -43,6 +43,9 @@ describe("Ziel-Navigation (Spec §2)", () => {
       "/verzeichnis",
       "/matching",
       "/angebote-gesuche",
+      // AGE-450: Chancen fürs Sommerfest komplett raus — auch als geroutete
+      // (sub-)Route. /meine-chancen leitet jetzt in App.tsx auf / um.
+      "/meine-chancen",
     ]) {
       expect(pfade).not.toContain(weg);
     }
@@ -53,19 +56,11 @@ describe("Ziel-Navigation (Spec §2)", () => {
     expect(mitglieder?.minTier).toBe("discover");
   });
 
-  it("hält Meine Chancen ab Discover, auch nach dem Umzug in Mein Bereich", () => {
-    const chancen = navItems.find((i) => i.path === "/meine-chancen");
-    expect(chancen?.minTier).toBe("discover");
-  });
-
-  /* AGE-443 — MVP-Umfang fürs Sommerfest. „Chancen-Modul im Detail" steht auf
-     Detlevs Nicht-Zeigen-Liste. Ausblenden heißt hier: kein Menüeintrag, aber
-     die Route bleibt erreichbar (`section: "sub"`) — reversibel, wie in
-     AGE-439 beim Design-Switcher. */
-  it("blendet Meine Chancen aus dem Menü aus, hält die Route aber erreichbar", () => {
-    const chancen = navItems.find((i) => i.path === "/meine-chancen");
-    expect(chancen).toBeDefined();
-    expect(chancen?.section).toBe("sub");
+  /* AGE-450 — Chancen fürs Sommerfest komplett raus (Detlev, 22.07.). Anders als
+     AGE-443 (nur Menüeintrag weg, Route blieb `sub`): jetzt kein navItem mehr,
+     und App.tsx leitet /meine-chancen auf / um. Die Route ist unerreichbar. */
+  it("kennt Meine Chancen gar nicht mehr — die Route ist unerreichbar", () => {
+    expect(navItems.find((i) => i.path === "/meine-chancen")).toBeUndefined();
   });
 
   /* AGE-442 — „Keine weitere Unterseite": gebuchte und eigene Events stehen jetzt
