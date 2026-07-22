@@ -2,23 +2,32 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DESIGN_VARIANTS } from "../config/designVariants";
 import { DesignVariantProvider } from "../providers/DesignVariantProvider";
+import type { AuthContextValue } from "../providers/auth-context";
+import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
 import { DesignSwitcher } from "./DesignSwitcher";
 
-/** AGE-439: Detlev will B–I nicht mehr sehen. Geprüft wird deshalb, was im
- *  geöffneten Panel tatsächlich steht — nicht nur die Konfigurationsliste. */
-function openPanel() {
+/** AGE-439/450: Detlev will B–I nicht sehen, und eff.bee.zee (seine Vision) nur
+ *  für Admins. Geprüft wird deshalb, was im geöffneten Panel tatsächlich steht. */
+function openPanel(auth: AuthContextValue = fakeAuthValue()) {
   render(
-    <DesignVariantProvider>
-      <DesignSwitcher />
-    </DesignVariantProvider>,
+    <AuthFixture value={auth}>
+      <DesignVariantProvider>
+        <DesignSwitcher />
+      </DesignVariantProvider>
+    </AuthFixture>,
   );
   fireEvent.click(screen.getByRole("button", { name: /Switcher öffnen/ }));
   return screen.getByRole("dialog", { name: "Design-Variante wählen" });
 }
 
+const adminAuth = fakeAuthValue({
+  user: { id: "admin" } as AuthContextValue["user"],
+  staffRole: "admin",
+});
+
 describe("DesignSwitcher", () => {
-  it("bietet genau A, Sommerfest, Blau und eff.bee.zee an", () => {
-    const panel = openPanel();
+  it("bietet Admins A, Sommerfest, Blau und eff.bee.zee an", () => {
+    const panel = openPanel(adminAuth);
     const labels = [...panel.querySelectorAll("li button")].map((b) =>
       b.textContent?.replace(/\s+/g, " ").trim(),
     );
@@ -30,8 +39,22 @@ describe("DesignSwitcher", () => {
     expect(labels[3]).toContain(DESIGN_VARIANTS.linkedin.label);
   });
 
-  it("zeigt keine der zurückgezogenen Varianten B–I", () => {
+  // AGE-450: eff.bee.zee ist Detlevs Vision — Nicht-Admins dürfen sie nicht sehen.
+  it("verbirgt eff.bee.zee vor Nicht-Admins — nur A, Sommerfest, Blau", () => {
     const panel = openPanel();
+    const labels = [...panel.querySelectorAll("li button")].map((b) =>
+      b.textContent?.replace(/\s+/g, " ").trim(),
+    );
+
+    expect(labels).toHaveLength(3);
+    expect(panel).not.toHaveTextContent(DESIGN_VARIANTS.linkedin.label);
+    expect(panel).toHaveTextContent(DESIGN_VARIANTS.a.label);
+    expect(panel).toHaveTextContent(DESIGN_VARIANTS.sommerfest.label);
+    expect(panel).toHaveTextContent(DESIGN_VARIANTS.blau.label);
+  });
+
+  it("zeigt keine der zurückgezogenen Varianten B–I", () => {
+    const panel = openPanel(adminAuth);
     for (const id of ["b", "c", "d", "e", "f", "g", "h", "i"] as const) {
       expect(panel).not.toHaveTextContent(DESIGN_VARIANTS[id].label);
     }
