@@ -23,7 +23,13 @@ export function ErfolgsradarChart({ scores }: { scores: { theme: string; score: 
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={data} outerRadius="72%">
+        {/* AGE-450: horizontaler Rand, damit die seitlichen Achsenlabels („Wirken"
+            links, „Tun" rechts) nicht am SVG-Rand abgeschnitten werden. */}
+        <RadarChart
+          data={data}
+          outerRadius="72%"
+          margin={{ top: 8, right: 28, bottom: 8, left: 28 }}
+        >
           <PolarGrid stroke="var(--color-line)" />
           <PolarAngleAxis
             dataKey="theme"

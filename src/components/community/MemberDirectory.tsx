@@ -242,18 +242,21 @@ function MemberCard({ member }: { member: DirectoryMember }) {
       className="block h-full rounded-[var(--radius-card)] focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
     >
       <Card className="flex h-full flex-col gap-4 p-5 transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
+        {/* AGE-450: Das Tier-Label stand rechts in der Namenszeile und schnitt lange
+            Namen ab (Screenshot Detlev). Jetzt unter dem Namen — der bekommt die
+            volle Breite und truncatet erst am Kartenrand. */}
         <div className="flex items-start gap-3">
           <Avatar name={name} src={member.avatar_url} size="lg" className="ring-1 ring-gold/40" />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-display text-lg font-semibold text-ink">{name}</h3>
             {subtitle && <p className="truncate text-sm text-gold-strong">{subtitle}</p>}
             {meta && <p className="mt-0.5 truncate text-xs text-muted">{meta}</p>}
+            {member.tier && (
+              <span className="mt-1.5 inline-flex items-center rounded-full border border-gold/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gold-strong uppercase">
+                {levelLabel(member.tier)}
+              </span>
+            )}
           </div>
-          {member.tier && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-gold/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gold-strong uppercase">
-              {levelLabel(member.tier)}
-            </span>
-          )}
         </div>
 
         {member.short_bio && (
