@@ -5,6 +5,7 @@ import {
   type DesignVariantId,
 } from "../config/designVariants";
 import { cn } from "../lib/cn";
+import { useAuth } from "../providers/auth-context";
 import { useDesignVariant } from "../providers/design-variant-context";
 
 /* ⚠️ TEMPORÄRES REVIEW-TOOL (AGE-237).
@@ -31,7 +32,16 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 export function DesignSwitcher() {
   const { variant, setVariant, cycleVariant } = useDesignVariant();
+  const { staffRole } = useAuth();
   const [open, setOpen] = useState(false);
+
+  // AGE-450: eff.bee.zee (`linkedin`) ist Detlevs Vision — nur Admins/Staff dürfen
+  // sie sehen, damit sie nicht vorab verraten wird. Für alle anderen fällt die
+  // Option aus dem Switcher. Die harte Grenze (Vision-App gar nicht rendern) sitzt
+  // zusätzlich in App.tsx; hier geht es nur um die Auswahl.
+  const offeredIds = staffRole
+    ? SWITCHER_VARIANT_IDS
+    : SWITCHER_VARIANT_IDS.filter((id) => id !== "linkedin");
 
   // Shift+D schaltet durch (Tastatur-Shortcut fürs Review).
   useEffect(() => {
@@ -70,7 +80,7 @@ export function DesignSwitcher() {
             </button>
           </div>
           <ul className="flex flex-col gap-1">
-            {SWITCHER_VARIANT_IDS.map((id: DesignVariantId) => {
+            {offeredIds.map((id: DesignVariantId) => {
               const v = DESIGN_VARIANTS[id];
               const active = id === variant;
               return (

@@ -1,8 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignSwitcher } from "./components/DesignSwitcher";
+import { DEFAULT_VARIANT } from "./config/designVariants";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
+import { useAuth } from "./providers/auth-context";
 import { useDesignVariant } from "./providers/design-variant-context";
 import { EffBeeZeeApp } from "./vision/EffBeeZeeApp";
 import MembershipGate from "./components/MembershipGate";
@@ -48,10 +50,32 @@ export default function App() {
 }
 
 /** Wählt zwischen der echten FBC-App und dem eff.bee.zee-Vision-Dummy (Variante
- *  `linkedin`, AGE-361). Der Dummy ist rein clientseitig und ersetzt die Routes. */
+ *  `linkedin`, AGE-361). Der Dummy ist rein clientseitig und ersetzt die Routes.
+ *
+ *  AGE-450: eff.bee.zee ist Detlevs Vision und darf für Nicht-Admins nicht
+ *  sichtbar sein — auch nicht über ?variant=linkedin oder altes localStorage.
+ *  Der DesignSwitcher blendet die Option aus; DIESE Stelle ist die harte Grenze:
+ *  die Vision-App wird nur für Staff gerendert, Nicht-Staff werden auf den
+ *  Default zurückgesetzt. */
 function AppInner() {
-  const { variant } = useDesignVariant();
-  if (variant === "linkedin") return <EffBeeZeeApp />;
+  const { variant, setVariant } = useDesignVariant();
+  const { staffRole, isLoading, tierLoading } = useAuth();
+  const staffLoading = isLoading || tierLoading;
+
+  useEffect(() => {
+    if (variant === "linkedin" && !staffLoading && !staffRole) {
+      setVariant(DEFAULT_VARIANT);
+    }
+  }, [variant, staffLoading, staffRole, setVariant]);
+
+  if (variant === "linkedin") {
+    // Rolle lädt noch → nichts rendern (kein Aufblitzen der Vision). Staff sieht
+    // die Vision-App; Nicht-Staff wird per Effect zurückgesetzt und rendert dann
+    // die normale App.
+    if (staffLoading) return null;
+    if (staffRole) return <EffBeeZeeApp />;
+    return null;
+  }
   return (
     <Routes>
       <Route element={<AppShell />}>
