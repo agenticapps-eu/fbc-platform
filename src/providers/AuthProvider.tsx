@@ -140,6 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         await supabase.auth.signOut();
       },
+      updatePassword: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (!error) logEvent("password_change");
+        return { error };
+      },
     }),
     [session, tier, levelRank, staffRole, isLoading, tierLoading],
   );

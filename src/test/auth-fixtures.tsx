@@ -21,6 +21,7 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     signUp: async () => ({ error: null }),
     signIn: async () => ({ error: null }),
     signOut: async () => {},
+    updatePassword: async () => ({ error: null }),
     ...overrides,
   };
 }

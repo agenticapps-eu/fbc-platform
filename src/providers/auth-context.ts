@@ -31,6 +31,11 @@ export interface AuthContextValue {
   ) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  /**
+   * Ändert das Passwort des eingeloggten Nutzers (AGE-450). Setzt eine aktive
+   * Session voraus (Supabase updateUser) — kein Re-Auth mit dem alten Passwort.
+   */
+  updatePassword: (password: string) => Promise<{ error: AuthError | null }>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

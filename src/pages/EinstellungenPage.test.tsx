@@ -36,7 +36,10 @@ beforeEach(() => {
   mockedAdminFeedback.mockResolvedValue([]);
 });
 
-function renderPage(staffRole: string | null = null) {
+function renderPage(
+  staffRole: string | null = null,
+  authOverrides: Partial<AuthContextValue> = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -45,6 +48,7 @@ function renderPage(staffRole: string | null = null) {
     tier: "legacy",
     levelRank: 7,
     staffRole,
+    ...authOverrides,
   });
   return render(
     <AuthFixture value={value}>
@@ -72,6 +76,41 @@ describe("EinstellungenPage", () => {
         visible_in_directory: false,
       }),
     );
+  });
+
+  // AGE-450: „Prime" ist altes Wording (6-Level-Modell kennt kein Prime mehr).
+  it("nennt die Kontakt-Einstellung neutral „Andere Mitglieder“", async () => {
+    renderPage();
+    expect(
+      await screen.findByRole("switch", { name: "Andere Mitglieder dürfen mich kontaktieren" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /Prime-Mitglieder/ })).toBeNull();
+  });
+
+  // AGE-450: Passwort ändern in den Einstellungen.
+  it("ändert das Passwort über updatePassword", async () => {
+    const updatePassword = vi.fn().mockResolvedValue({ error: null });
+    renderPage(null, { updatePassword });
+    const pw = await screen.findByLabelText("Neues Passwort");
+    fireEvent.change(pw, { target: { value: "neuesPasswort1" } });
+    fireEvent.change(screen.getByLabelText("Neues Passwort bestätigen"), {
+      target: { value: "neuesPasswort1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    await waitFor(() => expect(updatePassword).toHaveBeenCalledWith("neuesPasswort1"));
+  });
+
+  it("ruft updatePassword nicht auf, wenn die Passwörter nicht übereinstimmen", async () => {
+    const updatePassword = vi.fn().mockResolvedValue({ error: null });
+    renderPage(null, { updatePassword });
+    const pw = await screen.findByLabelText("Neues Passwort");
+    fireEvent.change(pw, { target: { value: "neuesPasswort1" } });
+    fireEvent.change(screen.getByLabelText("Neues Passwort bestätigen"), {
+      target: { value: "tippfehler2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    expect(updatePassword).not.toHaveBeenCalled();
+    expect(screen.getByText(/stimmen nicht überein/i)).toBeInTheDocument();
   });
 
   it("zeigt die QM-Feedback-Card mit Inhalt und Autor für einen Admin (AGE-358)", async () => {
