@@ -29,9 +29,19 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
   return (
     <nav className="flex flex-col gap-7">
       {sections.map((section, i) => (
-        <div key={section.title ?? i} className="flex flex-col gap-1">
+        <div
+          key={section.title ?? i}
+          className={cn(
+            "flex flex-col gap-1",
+            // AGE-450 #9: Bereichstitel sollen sich klar von den klickbaren Menüitems
+            // abheben. Eine Haarlinie + mehr Luft über jedem Abschnitt (außer dem
+            // ersten) trennt die Gruppen sichtbar als Struktur; kräftigerer,
+            // dunklerer Titel (text-ink/60 statt /45) liest sich als Label, nicht Link.
+            i > 0 && "mt-1 border-t border-line pt-5",
+          )}
+        >
           {section.title && (
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-ink/45">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-ink/60">
               {section.title}
             </p>
           )}
