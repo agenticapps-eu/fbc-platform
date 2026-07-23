@@ -55,7 +55,7 @@ export function EventsWidget({ data }: { data: DashboardData }) {
                 <p className="truncate text-sm font-medium text-ink">
                   {row.event?.title ?? "Event"}
                 </p>
-                <p className="text-xs text-muted">
+                <p className="truncate text-xs text-muted">
                   {formatDate(row.event?.starts_at ?? null, dateFmt)}
                   {row.event?.location && <> · {row.event.location}</>}
                 </p>
@@ -119,7 +119,7 @@ function EventGroup({
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{r.title}</p>
-                  <p className="text-xs text-muted">
+                  <p className="truncate text-xs text-muted">
                     {formatDate(r.starts_at, dateFmt)}
                     {r.location && <> · {r.location}</>}
                   </p>

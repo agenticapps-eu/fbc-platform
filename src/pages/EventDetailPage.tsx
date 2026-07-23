@@ -93,7 +93,10 @@ function EventHeader({ event }: { event: EventListItem }) {
         </div>
         <div>
           <dt className="text-xs tracking-wide text-muted uppercase">Wo</dt>
-          <dd className="text-ink">{event.location ?? "—"}</dd>
+          {/* break-words: eine location kann eine sehr lange, unbrechbare URL sein
+              (Zoom-Join-Link als „Ort"). Auf der Detailseite soll sie ganz sichtbar
+              bleiben — also umbrechen statt kürzen, damit sie die Spalte nicht sprengt. */}
+          <dd className="break-words text-ink">{event.location ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-xs tracking-wide text-muted uppercase">Teilnehmer</dt>
