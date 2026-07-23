@@ -284,7 +284,7 @@ export default function AppShell() {
                 erzwungen, weil die Header-Fläche (bg-canvas/85) in allen
                 angebotenen Varianten hell ist — auch bei „FBC Blau — Navy", das
                 nur die Sidebar dunkel färbt. So steht überall dasselbe Logo. */}
-            <Logo lockup="full" tone="light" className="h-12 w-auto" />
+            <Logo lockup="full" tone="light" className="h-16 w-auto" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
@@ -314,7 +314,7 @@ export default function AppShell() {
                 <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
               </>
             ) : (
-              <Button variant="secondary" size="sm" onClick={() => navigate("/login")}>
+              <Button variant="primary" size="sm" onClick={() => navigate("/login")}>
                 Login
               </Button>
             )}
