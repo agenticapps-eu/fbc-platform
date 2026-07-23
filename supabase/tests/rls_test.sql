@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(55);
+select plan(61);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -188,6 +188,11 @@ select is(
     'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
   1, 'Discover sieht fremde Angebote');
 
+-- open_contact steuert, ob Level-Gate + Welpenschutz gelten (AGE-455). Die Gate-Tests
+-- in Abschnitt 4–6 prüfen den GESCHLOSSENEN Modus (§2-Default); der Migrations-Seed
+-- steht auf true (Sommerfest), daher hier explizit aus.
+update public.platform_settings set open_contact = false;
+
 -- ── 4. Kontaktanfragen — ab `exchange` (rank 4) ──────────────────────────────
 select alike(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
@@ -215,6 +220,46 @@ select alike(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''88888888-8888-8888-8888-888888888888'')'),
   'DENIED:%', 'Wer Kontaktanfragen abgeschaltet hat, bekommt keine (Opt-out wird erzwungen)');
+
+-- ── 6b. open_contact öffnet BEIDE Gates (AGE-455) ───────────────────────────
+-- Mit dem Flag darf jedes eingeloggte Mitglied jeden anschreiben — Level-Gate und
+-- Welpenschutz offen. Das Empfänger-Opt-out bleibt in JEDEM Modus erzwungen.
+update public.platform_settings set open_contact = true;
+
+-- Basic (rank 1) an ein FRISCHES Mitglied (7777) OHNE Match: geschlossen doppelt
+-- verboten (Level + Welpenschutz), offen erlaubt → belegt, dass beide Gates fallen.
+select is(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'insert into public.contact_requests (from_id, to_id) values (''11111111-1111-1111-1111-111111111111'', ''77777777-7777-7777-7777-777777777777'')'),
+  'OK', 'open_contact: Basic darf ein neues Mitglied kalt anschreiben (Level + Welpenschutz offen)');
+
+-- Das Opt-out (8888) bleibt auch im offenen Modus geschützt.
+select alike(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'insert into public.contact_requests (from_id, to_id) values (''11111111-1111-1111-1111-111111111111'', ''88888888-8888-8888-8888-888888888888'')'),
+  'DENIED:%', 'open_contact: das Empfänger-Opt-out bleibt erzwungen');
+
+-- ── 6c. platform_settings ist admin-schaltbar (AGE-455) ─────────────────────
+update public.platform_settings set open_contact = false;  -- Ausgangswert (Superuser)
+
+-- Nicht-Admin: das UPDATE läuft (Spalten-Grant) und wirft nicht, trifft unter RLS
+-- aber 0 Zeilen (using = is_admin() = false) und ändert deshalb nichts.
+select is(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'update public.platform_settings set open_contact = true where id'),
+  'OK', 'Nicht-Admin-UPDATE wirft nicht (RLS filtert die Zeile weg)');
+select is(
+  (select open_contact from public.platform_settings where id),
+  false, '… ändert den Flag aber nicht');
+
+-- Admin darf schreiben.
+select is(
+  pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'update public.platform_settings set open_contact = true where id'),
+  'OK', 'Admin darf platform_settings schreiben');
+select is(
+  (select open_contact from public.platform_settings where id),
+  true, 'Admin schaltet open_contact frei');
 
 -- ── 7. Nachrichten — nur an bereits akzeptierte Kontakte (§2) ────────────────
 -- Diese Policies hängen an KEINER Stufe: sie verlangen eine angenommene
