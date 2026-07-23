@@ -4,6 +4,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
+import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { displayAuthor } from "../lib/displayAuthor";
 import {
   eventsListKey,
@@ -12,7 +13,7 @@ import {
   partitionEvents,
   type EventListItem,
 } from "../lib/events";
-import { fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
+import { extractFirstVideo, fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
 import { MemberDashboard } from "../components/home/MemberDashboard";
 import { useAuth } from "../providers/auth-context";
 
@@ -177,8 +178,13 @@ function EventPreview({ event }: { event: EventListItem }) {
   );
 }
 
-function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: boolean }) {
+export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: boolean }) {
   const author = displayAuthor(post.author, isLoggedIn);
+  // Wie im Community-Feed (CommunityFeed/PostBody skipRaw): ein enthaltenes
+  // Video wird eingebettet, und seine nackte URL fällt aus dem Vorschautext —
+  // sonst stünde auf der Startseite der rohe YouTube-Link statt des Players.
+  const video = extractFirstVideo(post.body);
+  const text = video ? post.body.replace(video.url, "").trim() : post.body;
   return (
     <Card className="space-y-3">
       <header className="flex items-center gap-3">
@@ -216,7 +222,8 @@ function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: boolean
           )}
         </div>
       </header>
-      <p className="line-clamp-3 text-sm text-ink/90">{post.body}</p>
+      {text && <p className="line-clamp-3 text-sm text-ink/90">{text}</p>}
+      {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
     </Card>
   );
 }
