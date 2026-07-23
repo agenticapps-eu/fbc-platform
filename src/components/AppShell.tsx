@@ -280,11 +280,12 @@ export default function AppShell() {
             to="/"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            {/* Echtes FBC-Lockup (transparentes PNG) im Header. tone="light" ist
-                erzwungen, weil die Header-Fläche (bg-canvas/85) in allen
-                angebotenen Varianten hell ist — auch bei „FBC Blau — Navy", das
-                nur die Sidebar dunkel färbt. So steht überall dasselbe Logo. */}
-            <Logo lockup="full" tone="light" className="h-16 w-auto" />
+            {/* Horizontales FBC-Lockup: Krone + Wortmarke nebeneinander, aus dem
+                echten transparenten PNG geschnitten. So bleibt die Navbar flach
+                und die Wortmarke trotzdem lesbar (gestapelt ginge nur eins von
+                beidem). Die Header-Fläche ist in allen angebotenen Varianten hell,
+                daher trägt die schwarze Wortmarke überall. */}
+            <Logo lockup="horizontal" className="h-9" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">

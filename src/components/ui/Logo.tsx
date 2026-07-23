@@ -3,7 +3,7 @@ import { cn } from "../../lib/cn";
 import { DesignVariantContext } from "../../providers/design-variant-context";
 import { CrownMark } from "./CrownMark";
 
-type Lockup = "full" | "mark";
+type Lockup = "full" | "mark" | "horizontal";
 type Tone = "auto" | "light" | "dark";
 
 /** Varianten mit dunkler Masthead-/Sidebar-Fläche (schwarzes bzw. Glas-Chrome):
@@ -12,8 +12,9 @@ type Tone = "auto" | "light" | "dark";
 const DARK_CHROME_VARIANTS = new Set(["b", "e", "f", "blau-navy"]);
 
 /** FBC-Logo mit Krone.
- *  - `lockup="full"` → Krone + Wortmarke (Login, Hero, breite Sidebar)
- *  - `lockup="mark"` → nur die Krone (kompakt: Header, Favicon-artig)
+ *  - `lockup="full"` → gestapelt: Krone über Wortmarke + Claim (Login, Hero)
+ *  - `lockup="horizontal"` → Krone NEBEN der Wortmarke (flache Leisten: Header)
+ *  - `lockup="mark"` → nur die Krone (kompakt, Favicon-artig)
  *
  *  `tone="auto"` wählt anhand der aktiven Variante: auf dunklen Masthead-
  *  Varianten (B/E/F bzw. explizit `tone="dark"`) die SVG-Krone + helle
@@ -41,6 +42,40 @@ export function Logo({
 
   if (lockup === "mark") {
     return <CrownMark className={className} title="Fair Business Club" />;
+  }
+
+  if (lockup === "horizontal") {
+    // Horizontales Lockup: Krone + Wortmarke NEBENEINANDER, aus dem echten
+    // gestapelten PNG geschnitten (background-crop). Nötig für kompakte Leisten
+    // (Header): das gestapelte Lockup hätte dort eine unlesbar kleine Wortmarke,
+    // weil die Krone die Höhe frisst. Die Crop-Werte sind an das feste Layout von
+    // fbc-logo-crown.png gebunden — ändert sich das Asset, hier nachziehen.
+    // (Braucht Hell wegen der schwarzen Wortmarke → nur im hellen Header genutzt.)
+    const src = "/brand/fbc-logo-crown.png";
+    return (
+      <span className={cn("inline-flex items-center gap-2", className ?? "h-9")}>
+        <span
+          aria-hidden
+          className="block h-full aspect-[1.44] bg-no-repeat"
+          style={{
+            backgroundImage: `url(${src})`,
+            backgroundSize: "215% 230%",
+            backgroundPosition: "50.5% 27%",
+          }}
+        />
+        <span
+          aria-hidden
+          className="block aspect-[10.75] bg-no-repeat"
+          style={{
+            height: "44%",
+            backgroundImage: `url(${src})`,
+            backgroundSize: "114% 800%",
+            backgroundPosition: "50% 72%",
+          }}
+        />
+        <span className="sr-only">Fair Business Club</span>
+      </span>
+    );
   }
 
   if (resolvedTone === "light") {
