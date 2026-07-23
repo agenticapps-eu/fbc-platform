@@ -267,7 +267,7 @@ export default function AppShell() {
       {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
           rechts Benachrichtigungen + Avatar/Tier. */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-3.5 sm:px-6">
+        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-2 sm:px-6">
           <button
             type="button"
             aria-label="Menü öffnen"
@@ -280,12 +280,11 @@ export default function AppShell() {
             to="/"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            {/* Horizontales FBC-Lockup: Krone + Wortmarke nebeneinander, aus dem
-                echten transparenten PNG geschnitten. So bleibt die Navbar flach
-                und die Wortmarke trotzdem lesbar (gestapelt ginge nur eins von
-                beidem). Die Header-Fläche ist in allen angebotenen Varianten hell,
-                daher trägt die schwarze Wortmarke überall. */}
-            <Logo lockup="horizontal" className="h-9" />
+            {/* Echtes, INTAKTES FBC-Lockup (gestapelt) im Header, so groß wie die
+                Navbar es zulässt (schmaler Rand py-2). tone="light", weil die
+                Header-Fläche in allen angebotenen Varianten hell ist (auch Navy
+                färbt nur die Sidebar). */}
+            <Logo lockup="full" tone="light" className="h-16 w-auto" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
