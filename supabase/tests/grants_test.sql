@@ -58,6 +58,7 @@ offers/authenticated=DELETE,INSERT,SELECT,UPDATE
 partner_categories/anon=SELECT
 partner_categories/authenticated=SELECT
 partners/authenticated=SELECT
+platform_settings/authenticated=SELECT
 post_likes/authenticated=DELETE,INSERT,SELECT,UPDATE
 posts/anon=SELECT
 posts/authenticated=DELETE,INSERT,SELECT,UPDATE
@@ -84,9 +85,10 @@ select is(
          from information_schema.role_column_grants
          where table_schema = 'public' and grantee = 'authenticated'
            and privilege_type = 'UPDATE'
-           and table_name in ('profiles', 'contact_requests', 'routing_queue')
+           and table_name in ('profiles', 'contact_requests', 'routing_queue', 'platform_settings')
          group by 1) t),
 $$contact_requests.UPDATE=status
+platform_settings.UPDATE=open_contact
 profiles.UPDATE=avatar_url,branche,company,competencies,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
