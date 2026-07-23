@@ -23,6 +23,7 @@ import {
   type ExtendedProfile,
   type PublicProfile,
 } from "../lib/public-profile";
+import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
 import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 
@@ -43,6 +44,11 @@ export default function PublicProfilePage() {
     queryKey: publicProfileQueryKey(id ?? ""),
     queryFn: () => fetchPublicProfile(id ?? ""),
     enabled: !!id,
+  });
+
+  const { data: platform } = useQuery({
+    queryKey: platformSettingsQueryKey,
+    queryFn: fetchPlatformSettings,
   });
 
   if (isLoading) {
@@ -71,7 +77,10 @@ export default function PublicProfilePage() {
   // erweiterten Felder gehören zum „vollständigen Verzeichnis" (ab `discover`),
   // eine Kontaktanfrage ist eine Stufe teurer (ab `exchange`) — das ist der
   // Welpenschutz-Kern: Sichtbarkeit ≠ Kontaktrecht.
-  const canRequestContact = (levelRank ?? 0) >= LEVEL_RANK.exchange;
+  // §2: Kontaktrecht ab `exchange`. Der Admin-Flag open_contact (AGE-455) öffnet es
+  // fürs Event für alle — die RLS (cr_insert_self) erzwingt dieselbe Regel.
+  const canRequestContact =
+    (platform?.openContact ?? false) || (levelRank ?? 0) >= LEVEL_RANK.exchange;
 
   return (
     <div className="flex flex-col gap-6">
@@ -431,6 +440,16 @@ function ContactRequestComposer({
         if (viewerId) {
           queryClient.invalidateQueries({ queryKey: contactRelationQueryKey(viewerId, profileId) });
         }
+        return;
+      }
+      // RLS-Ablehnung (42501): der Insert scheitert an is_contactable/Welpenschutz/
+      // Level-Gate. Nie den rohen Postgres-String zeigen (AGE-455).
+      if (code === "42501") {
+        toast({
+          variant: "error",
+          title: "Anfrage nicht möglich",
+          description: `Eine Kontaktanfrage an ${name} ist gerade nicht möglich. An neue Mitglieder ist eine Anfrage nur über ein gemeinsames Match möglich.`,
+        });
         return;
       }
       const description =

@@ -8,8 +8,8 @@ import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
+import { ToggleRow } from "../components/ui/ToggleRow";
 import { useToast } from "../components/ui/toast-context";
-import { cn } from "../lib/cn";
 import {
   DEFAULT_MEMBER_SETTINGS,
   fetchMemberSettings,
@@ -19,49 +19,6 @@ import {
 } from "../lib/member-settings";
 import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
-
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-ink">{label}</p>
-        {hint && <p className="text-xs text-muted">{hint}</p>}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        disabled={disabled}
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          "disabled:cursor-not-allowed disabled:opacity-60",
-          checked ? "bg-gold-strong" : "bg-line",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 h-5 w-5 rounded-full bg-canvas transition-all",
-            checked ? "left-[22px]" : "left-0.5",
-          )}
-        />
-      </button>
-    </div>
-  );
-}
 
 /**
  * Passwort ändern (AGE-450). Setzt eine aktive Session voraus (auth.updateUser) —

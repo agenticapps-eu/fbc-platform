@@ -183,16 +183,28 @@ const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
  *  Mitglieder-Block oben, darunter die drei Abschnitte aus `navItems`. */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { user, tier } = useAuth();
+  const { user, tier, staffRole } = useAuth();
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
   // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
   // ohne Konto wäre ein Versprechen ins Leere.
-  const sections = SIDEBAR_SECTIONS.filter(({ section }) => user || section === "entdecken").map(
-    ({ section, title }) => ({
-      title,
-      items: navItems.filter((i) => i.section === section),
-    }),
-  );
+  const sections: { title: string; items: { path: string; label: string }[] }[] =
+    SIDEBAR_SECTIONS.filter(({ section }) => user || section === "entdecken").map(
+      ({ section, title }) => ({
+        title,
+        items: navItems
+          .filter((i) => i.section === section)
+          .map((i) => ({ path: i.path, label: i.label })),
+      }),
+    );
+  // Admin-Bereich: eigener, nur für `admin` sichtbarer Abschnitt (AGE-455). Bewusst
+  // KEIN navItem — /admin wird in App.tsx über RequireAdmin geroutet, nicht über die
+  // navItems-Schleife.
+  if (staffRole === "admin") {
+    sections.push({
+      title: "Administration",
+      items: [{ path: "/admin", label: "Administration" }],
+    });
+  }
   return (
     <div className="flex flex-col gap-7">
       {user ? (

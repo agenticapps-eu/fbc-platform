@@ -8,9 +8,11 @@ import { useAuth } from "./providers/auth-context";
 import { useDesignVariant } from "./providers/design-variant-context";
 import { EffBeeZeeApp } from "./vision/EffBeeZeeApp";
 import MembershipGate from "./components/MembershipGate";
+import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ChatPage from "./pages/ChatPage";
 import EventDetailPage from "./pages/EventDetailPage";
 import InternRoutingPage from "./pages/InternRoutingPage";
@@ -130,6 +132,17 @@ function AppInner() {
             <RequireStaff>
               <InternRoutingPage />
             </RequireStaff>
+          }
+        />
+        {/* Admin-Einstellungen (AGE-455). Nur `admin` (RequireAdmin), daher kein
+            navItem — der Sidebar-Eintrag wird in AppShell separat für Admins gesetzt.
+            DB-seitig erzwingt platform_settings_update_admin is_admin(). */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminSettingsPage />
+            </RequireAdmin>
           }
         />
       </Route>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
@@ -19,14 +19,25 @@ vi.mock("../lib/public-profile", async (importOriginal) => {
 // auf DB-Ebene verifiziert.
 vi.mock("../lib/contact-requests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/contact-requests")>();
-  return { ...actual, fetchContactRelation: vi.fn() };
+  return { ...actual, fetchContactRelation: vi.fn(), sendContactRequest: vi.fn() };
+});
+vi.mock("../lib/platform-settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/platform-settings")>();
+  return { ...actual, fetchPlatformSettings: vi.fn() };
 });
 import { fetchPublicProfile } from "../lib/public-profile";
-import { fetchContactRelation, type ContactRelation } from "../lib/contact-requests";
+import {
+  fetchContactRelation,
+  sendContactRequest,
+  type ContactRelation,
+} from "../lib/contact-requests";
+import { fetchPlatformSettings } from "../lib/platform-settings";
 import PublicProfilePage from "./PublicProfilePage";
 
 const mockedFetch = vi.mocked(fetchPublicProfile);
 const mockedRelation = vi.mocked(fetchContactRelation);
+const mockedSend = vi.mocked(sendContactRequest);
+const mockedPlatform = vi.mocked(fetchPlatformSettings);
 
 const NO_RELATION: ContactRelation = { request: null, contact: null, matchId: null };
 
@@ -99,6 +110,9 @@ beforeEach(() => {
   mockedFetch.mockReset();
   mockedRelation.mockReset();
   mockedRelation.mockResolvedValue(NO_RELATION);
+  mockedSend.mockReset();
+  mockedPlatform.mockReset();
+  mockedPlatform.mockResolvedValue({ openContact: false });
 });
 
 describe("Öffentliche Profilseite (AGE-239)", () => {
@@ -192,5 +206,30 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     );
     // Im freigegebenen Zustand verschwindet der Senden-Button.
     expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
+  });
+
+  it("zeigt bei open_contact auch Basic den Kontaktanfrage-Button (AGE-455)", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    mockedPlatform.mockResolvedValue({ openContact: true });
+    renderPage(authAsTier("basic"));
+
+    expect(
+      await screen.findByRole("button", { name: "Kontaktanfrage senden" }),
+    ).toBeInTheDocument();
+  });
+
+  it("zeigt bei RLS-Ablehnung (42501) eine freundliche Meldung, nicht den rohen Fehler (AGE-455)", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    mockedSend.mockRejectedValue({
+      code: "42501",
+      message: 'new row violates row-level security policy for table "contact_requests"',
+    });
+    renderPage(authAsTier("exchange"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Kontaktanfrage senden" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));
+
+    expect(await screen.findByText(/nur über ein gemeinsames Match möglich/)).toBeInTheDocument();
+    expect(screen.queryByText(/row-level security/)).not.toBeInTheDocument();
   });
 });
