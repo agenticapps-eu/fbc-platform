@@ -275,7 +275,7 @@ function DashTile({
     <Card className="flex flex-col gap-1">
       <span className="text-sm text-muted">{label}</span>
       <p className={`font-display font-semibold text-ink ${valueClassName}`}>{value}</p>
-      <p className="text-sm text-muted">{sub}</p>
+      <p className="truncate text-sm text-muted">{sub}</p>
       {to && (
         <Link to={to} className="mt-auto pt-3 text-sm font-medium text-gold-strong hover:underline">
           {cta} →

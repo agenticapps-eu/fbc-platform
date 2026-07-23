@@ -24,7 +24,11 @@ export function EventCard({ event }: { event: EventListItem }) {
           <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
           <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
         </div>
-        <p className="text-sm text-muted">
+        {/* truncate: eine location kann eine sehr lange, unbrechbare URL sein
+            (z. B. ein Zoom-Join-Link als „Ort" eines Online-Events). Ohne Klemme
+            sprengt der String die Karte und – im Grid – die ganze Spalte. Die
+            volle Adresse steht auf der Event-Detailseite. */}
+        <p className="truncate text-sm text-muted">
           {formatEventDate(event.startsAt)}
           {event.location && <> · {event.location}</>}
         </p>

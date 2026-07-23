@@ -169,7 +169,7 @@ function EventPreview({ event }: { event: EventListItem }) {
     >
       <Card className="space-y-2 transition-colors hover:border-gold/50">
         <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
-        <p className="text-sm text-muted">
+        <p className="truncate text-sm text-muted">
           {formatEventDate(event.startsAt)}
           {event.location && <> · {event.location}</>}
         </p>
