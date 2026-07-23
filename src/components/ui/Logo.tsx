@@ -9,19 +9,20 @@ type Tone = "auto" | "light" | "dark";
 /** Varianten mit dunkler Masthead-/Sidebar-Fläche (schwarzes bzw. Glas-Chrome):
  *  hier muss das Logo die SVG-Krone + helle Gold-Wortmarke nutzen, weil das
  *  Creme-PNG auf Dunkel nicht funktioniert. */
-const DARK_CHROME_VARIANTS = new Set(["b", "e", "f", "blau"]);
+const DARK_CHROME_VARIANTS = new Set(["b", "e", "f", "blau-navy"]);
 
 /** FBC-Logo mit Krone.
- *  - `lockup="full"` → Krone + Wortmarke (Login, Hero, breite Sidebar)
- *  - `lockup="mark"` → nur die Krone (kompakt: Header, Favicon-artig)
+ *  - `lockup="full"` → gestapelt: Krone über Wortmarke + Claim (Header, Login, Hero)
+ *  - `lockup="mark"` → nur die Krone (kompakt, Favicon-artig)
  *
  *  `tone="auto"` wählt anhand der aktiven Variante: auf dunklen Masthead-
  *  Varianten (B/E/F bzw. explizit `tone="dark"`) die SVG-Krone + helle
  *  Gold-Wortmarke; sonst das echte Lockup-PNG (offizielles FBC-Logo: Gold-Krone
- *  + schwarze Wortmarke „FAIR BUSINESS CLUB" + Claim, auf weißem Grund). Das PNG
- *  ist nur auf hellen Flächen einsetzbar — der weiße Grund wird via
- *  mix-blend-multiply weggeblendet, die schwarze Wortmarke bliebe auf Dunkel
- *  unsichtbar. (Ein transparentes/SVG-Asset für dunkle Flächen steht noch aus.) */
+ *  + schwarze Wortmarke „FAIR BUSINESS CLUB" + Claim, transparenter Grund). Das
+ *  PNG hat echte Transparenz, ist aber nur auf HELLEN Flächen einsetzbar, weil
+ *  die Wortmarke schwarz ist und auf Dunkel verschwände — dort greift tone=dark
+ *  (SVG-Krone + helle Gold-Wortmarke). Ein helles Lockup-Asset für dunkle
+ *  Flächen steht noch aus. */
 export function Logo({
   lockup = "full",
   tone = "auto",
@@ -44,14 +45,15 @@ export function Logo({
 
   if (resolvedTone === "light") {
     return (
-      // mix-blend-multiply lässt den weißen PNG-Hintergrund in die helle Fläche
-      // eintauchen — Gold-Krone + schwarze Wortmarke bleiben. Wirkt nur auf hellen
-      // Flächen, daher light. Default h-20: das Lockup ist gestapelt (Krone über
-      // Wortmarke + Claim), bei h-14 wäre die Wortmarke zu klein.
+      // Das offizielle Lockup-PNG hat einen ECHTEN transparenten Hintergrund
+      // (Palette + tRNS, per Checkerboard-Test bestätigt) — daher kein
+      // mix-blend-multiply mehr: es wird plan gerendert und sitzt sauber auf
+      // jeder hellen Fläche. Die schwarze Wortmarke braucht Hell, daher light.
+      // Default h-20: das Lockup ist gestapelt (Krone über Wortmarke + Claim).
       <img
         src="/brand/fbc-logo-crown.png"
         alt="Fair Business Club"
-        className={cn("block object-contain mix-blend-multiply", className ?? "h-20 w-auto")}
+        className={cn("block object-contain", className ?? "h-20 w-auto")}
       />
     );
   }

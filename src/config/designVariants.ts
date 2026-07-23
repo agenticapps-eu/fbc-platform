@@ -47,6 +47,8 @@ export type DesignVariantId =
   | "i"
   | "sommerfest"
   | "blau"
+  | "blau-slate"
+  | "blau-navy"
   | "linkedin";
 
 export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
@@ -61,6 +63,8 @@ export const DESIGN_VARIANT_IDS: readonly DesignVariantId[] = [
   "i",
   "sommerfest",
   "blau",
+  "blau-slate",
+  "blau-navy",
   "linkedin",
 ];
 
@@ -80,6 +84,8 @@ export const SWITCHER_VARIANT_IDS: readonly DesignVariantId[] = [
   "a",
   "sommerfest",
   "blau",
+  "blau-slate",
+  "blau-navy",
   "linkedin",
 ];
 
@@ -179,15 +185,36 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     cardStyle: "solid",
     backdrop: "none",
   },
-  /** AGE-441 — „neues blaues Design" (Detlev, 21.07.). Nimmt die Palette des
-   *  eff.bee.zee-Dummys (`src/vision/theme.ts`), legt sie aber auf die FBC-
-   *  Tokens: der Look ist eff.bee.zee, die Marke bleibt Fair Business Club.
-   *  Der Akzent-Token heißt weiterhin `--color-gold`, trägt hier aber Blau —
-   *  das ist die dokumentierte Mechanik (gleiche Namen, andere Werte). */
+  /** AGE-441/450 — FBC Blau, drei Ausprägungen zur Auswahl für Detlev. Gemeinsame
+   *  Palette (Blau als Akzent-Token `--color-gold`, dokumentierte Mechanik: gleiche
+   *  Namen, andere Werte); sie unterscheiden sich nur in Sidebar- und Button-Fläche.
+   *  Leitlinie: dezent, geringer Kontrast zum Hintergrund, klar lesbar (kein Glas/
+   *  Blur). `blau` = helle Sidebar · `blau-slate` = gedämpftes Blaugrau ·
+   *  `blau-navy` = dunkle Navy-Sidebar. */
   blau: {
     id: "blau",
-    label: "FBC Blau",
-    description: "eff.bee.zee-Blau auf FBC-Marke: dunkle Navy-Sidebar, Blau als Akzent.",
+    label: "FBC Blau — Hell",
+    description: "Helle Sidebar, dunkle Schrift, Blau als Akzent. Sehr dezent, klar lesbar.",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  "blau-slate": {
+    id: "blau-slate",
+    label: "FBC Blau — Slate",
+    description: "Gedämpftes Blaugrau, dunkle Schrift, ruhiger Navy-Button. Etwas mehr Präsenz.",
+    motion: "medium",
+    heroStyle: "dark-glow",
+    headlineFont: "sans",
+    cardStyle: "solid",
+    backdrop: "none",
+  },
+  "blau-navy": {
+    id: "blau-navy",
+    label: "FBC Blau — Navy",
+    description: "Dunkle Navy-Sidebar, helle Schrift. Premium, kräftiger — aber sauber, kein Blur.",
     motion: "medium",
     heroStyle: "dark-glow",
     headlineFont: "sans",
