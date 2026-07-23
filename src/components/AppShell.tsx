@@ -6,7 +6,6 @@ import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
-import { Logo } from "./ui/Logo";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
@@ -267,7 +266,7 @@ export default function AppShell() {
       {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
           rechts Benachrichtigungen + Avatar/Tier. */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-2 sm:px-6">
+        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-1.5 sm:px-6">
           <button
             type="button"
             aria-label="Menü öffnen"
@@ -280,11 +279,23 @@ export default function AppShell() {
             to="/"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            {/* Echtes, INTAKTES FBC-Lockup (gestapelt) im Header, so groß wie die
-                Navbar es zulässt (schmaler Rand py-2). tone="light", weil die
-                Header-Fläche in allen angebotenen Varianten hell ist (auch Navy
-                färbt nur die Sidebar). */}
-            <Logo lockup="full" tone="light" className="h-16 w-auto" />
+            {/* Header-Logo: das echte, INTAKTE gestapelte FBC-Lockup — aber der
+                umlaufende Weißraum des PNGs (oben/unten ~⅓) ist per background-crop
+                auf die Content-Bounding-Box weggeschnitten. Dadurch wirkt das Logo
+                groß, obwohl die Navbar flach bleibt (py-1.5). Crop-Werte an das
+                Layout von fbc-logo-crown.png gebunden — ändert sich das Asset,
+                hier nachziehen. Header ist in allen angebotenen Varianten hell,
+                daher trägt die schwarze Wortmarke. sr-only trägt den Link-Namen. */}
+            <span
+              aria-hidden
+              className="block h-12 aspect-[1.75] bg-no-repeat"
+              style={{
+                backgroundImage: "url(/brand/fbc-logo-crown.png)",
+                backgroundSize: "113% 148%",
+                backgroundPosition: "48% 51%",
+              }}
+            />
+            <span className="sr-only">Fair Business Club</span>
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
