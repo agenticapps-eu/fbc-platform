@@ -95,7 +95,7 @@ export default function LoginPage() {
         <p className="mt-1 text-sm text-muted">
           {mode === "login"
             ? "Mit E-Mail und Passwort anmelden."
-            : "Neues Konto erstellen — Stufe „Discover“ wird automatisch vergeben."}
+            : "Neues Konto erstellen — du startest mit Stufe „Basic“ und kannst jederzeit upgraden."}
         </p>
       </div>
 

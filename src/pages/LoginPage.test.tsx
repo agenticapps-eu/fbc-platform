@@ -31,6 +31,16 @@ function toRegisterMode() {
 }
 
 describe("LoginPage", () => {
+  // AGE-451: neue Konten starten auf `basic` (handle_new_user), nicht discover.
+  // Der Registrierungshinweis muss das korrekt sagen — sonst verspricht er eine
+  // bezahlte Stufe, die es erst per Stripe-Upgrade gibt.
+  it("nennt im Registrierungshinweis die Stufe Basic, nicht Discover", () => {
+    renderLogin();
+    toRegisterMode();
+    expect(screen.getByText(/Stufe „Basic“/)).toBeInTheDocument();
+    expect(screen.queryByText(/Discover/)).toBeNull();
+  });
+
   it("übergibt den eingegebenen Namen an signUp", async () => {
     const signUp = renderLogin();
     toRegisterMode();
