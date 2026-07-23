@@ -8,11 +8,13 @@ import {
 } from "./designVariants";
 
 describe("designVariants config", () => {
-  it("models the variants a–i plus sommerfest, blau (a–d stable, e–g experimental, h/i brand)", () => {
+  it("models the variants a–i plus sommerfest, blau/-slate/-navy (a–d stable, e–g experimental, h/i brand)", () => {
     expect(Object.keys(DESIGN_VARIANTS).sort()).toEqual([
       "a",
       "b",
       "blau",
+      "blau-navy",
+      "blau-slate",
       "c",
       "d",
       "e",
@@ -83,13 +85,20 @@ describe("designVariants config", () => {
 });
 
 describe("SWITCHER_VARIANT_IDS — was der Switcher anbietet (AGE-439)", () => {
-  it("bietet A, Sommerfest, Blau und eff.bee.zee an", () => {
-    expect([...SWITCHER_VARIANT_IDS]).toEqual(["a", "sommerfest", "blau", "linkedin"]);
+  it("bietet A, Sommerfest, die drei FBC-Blau und eff.bee.zee an", () => {
+    expect([...SWITCHER_VARIANT_IDS]).toEqual([
+      "a",
+      "sommerfest",
+      "blau",
+      "blau-slate",
+      "blau-navy",
+      "linkedin",
+    ]);
   });
 
-  // AGE-441: Vergleichsreihe für den Termin — heutiger Default, Vorschlag, Referenz.
-  it("stellt Sommerfest, Blau und eff.bee.zee nebeneinander", () => {
-    for (const id of ["sommerfest", "blau", "linkedin"] as const) {
+  // AGE-441/450: die drei FBC-Blau-Ausprägungen stehen zur Auswahl für Detlev.
+  it("stellt Sommerfest, alle drei FBC-Blau und eff.bee.zee nebeneinander", () => {
+    for (const id of ["sommerfest", "blau", "blau-slate", "blau-navy", "linkedin"] as const) {
       expect(SWITCHER_VARIANT_IDS).toContain(id);
     }
   });
