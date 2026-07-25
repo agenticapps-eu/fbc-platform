@@ -1,0 +1,10 @@
+Migration scope approved for AGE-235 (P5 — RLS Policies & tier-based visibility).
+Basis: docs/rls-policies.md (binding P5 spec, provided verbatim by the user this session).
+Scope: RLS is already enabled on all tables (AGE-234); this phase adds policies on
+       all 17 tables + is_prime_plus() helper + re-grant EXECUTE on current_tier_rank()
+       (deliberately revoked in 20260611171542_lock_down_current_tier_rank, which
+       states "P5 will grant exactly what its policies require"), plus anon SELECT on
+       profiles_public. No schema/DDL changes to tables.
+Migration: supabase/migrations/20260612082726_rls_policies.sql
+Tests:     supabase/tests/rls_test.sql (pgTAP, `supabase test db`)
+Date: 2026-06-12

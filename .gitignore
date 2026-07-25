@@ -17,3 +17,10 @@ coverage/
 # gstack-Artefakte: Security-Reports, Browse-Logs (können Session-Tokens
 # enthalten). Bleiben lokal — dieses Repo ist öffentlich.
 .gstack/
+
+# Legacy-Planning-Binärartefakte: QA-Screenshots (11 MB, eingeloggte Tier-Zustände),
+# Skill-Session-Telemetrie und Design-Mockups. Auf Platte als Backup erhalten,
+# aber NICHT ins öffentliche Repo — dieses Repo ist öffentlich.
+docs/legacy-planning/qa-screens/
+docs/legacy-planning/skill-observations/
+docs/legacy-planning/design-mocks/
