@@ -82,9 +82,11 @@ session-level discipline the model brings to every diff.
 
 ## Workflow
 
-This project uses the AgenticApps Superpowers + GSD + gstack workflow.
-Full hooks, rituals, and red-flag tables: [`.claude/claude-md/workflow.md`](.claude/claude-md/workflow.md).
-Vendored — re-sync via `/update-agenticapps-workflow`.
+This project uses the AgenticApps **OpenSpec + Superpowers + gstack** workflow.
+Planning is an OpenSpec *change* (`openspec/changes/`); durable current truth is
+`openspec/specs/`. The lifecycle, hooks, and red-flag rituals are enforced by the
+`agentic-apps-workflow` skill and the §18 change-gate — re-sync via
+`/update-agenticapps-workflow`.
 
 ## Projektkonventionen
 
@@ -105,31 +107,26 @@ Vendored — re-sync via `/update-agenticapps-workflow`.
 
 ## Projektüberblick
 
-Die **Fair-Business-Club-Plattform (FBC)** ist auf drei Ebenen angelegt. Im
-**Prototyp (Phase 1)** wird nur **Ebene 1** gebaut; die Ebenen 2 und 3 werden
-architektonisch vorbereitet (Datenmodell, RLS-Policies und Rollen so geschnitten,
-dass sie später ohne Bruch erweiterbar sind), aber noch nicht implementiert.
-
-1. **FBC Community** *(Prototyp)* — das soziale Business-Netzwerk: Mitglieder,
-   Profile, Mitgliedsstufen, Suche ⇄ Biete / Matching.
-2. **Potential Ecosystem** *(vorbereitet)* — erweitertes Partner-/Angebots-Ökosystem.
-3. **DKRI** *(vorbereitet)* — oberste Ebene; spätere Integration.
+Die **Fair-Business-Club-Plattform (FBC)** ist auf drei Ebenen angelegt: Ebene 1
+**FBC Community** (gebaut), Ebene 2 **Potential Ecosystem** und Ebene 3 **DKRI**
+(beide architektonisch vorbereitet, noch nicht implementiert). Produkt-Capabilities
+und ihre aktuelle Wahrheit stehen als Requirements in `openspec/specs/` (u. a.
+`membership-tiers`, `member-profiles`, `directory-search`, `matching`,
+`contact-requests`, `messaging`, `community-feed`, `events`, `partners`,
+`potential-compass`, `access-control`, `admin`). Historische Anforderungs-/
+Designphasen (P1–P5) liegen unter `docs/legacy-planning/`.
 
 ## Kernprinzipien
 
-- **Rechte nach Mitgliedsstufe**: Was ein Nutzer sehen und tun darf, richtet sich
-  nach seiner Mitgliedsstufe.
-- **Sichtbarkeit wird in der DB per RLS erzwungen**, nicht nur im Frontend. Das
-  Frontend ist Komfort, nicht Sicherheitsgrenze — jede Zugriffsregel muss als
-  Supabase-RLS-Policy existieren und unabhängig vom Client greifen.
-- **Keine automatische Freigabe von Kontaktdaten**. Kontaktdaten werden nie
-  implizit sichtbar; ihre Offenlegung erfordert eine explizite Aktion/Zustimmung.
+Die Sicherheits- und Sichtbarkeits-Invarianten — Rechte nach Mitgliedsstufe,
+RLS-erzwungene Sichtbarkeit (Frontend ist Komfort, nicht Sicherheitsgrenze) und
+keine automatische Freigabe von Kontaktdaten — sind als Requirements spezifiziert.
+See `openspec/specs/access-control/spec.md` und `openspec/specs/membership-tiers/spec.md`.
 
 ## Datenmodell & Mitgliedsstufen
 
-- Das **Datenmodell** (Tabellen) folgt der Spezifikation aus **P4** der
-  Anforderungs-/Designphase. Die Tabellen werden bei der Supabase-Einführung
-  als Migrationen unter `supabase/` angelegt; RLS-Policies begleiten jede Tabelle.
-- **Mitgliedsstufen im Prototyp**: **Discover** → **Prime** → **Legacy**
-  (aufsteigende Rechte/Sichtbarkeit). Die Stufen-Logik ist die Grundlage der
-  RLS-Policies und der UI-Gating-Regeln.
+Das **Datenmodell** ist die Menge der Supabase-Migrationen unter
+`supabase/migrations/` (Quelle der Wahrheit fürs Schema). Mitgliedsstufen folgen
+dem **6-Level-Modell** (`basic` → `connect` → `discover` → `exchange` → `focus` →
+`impact`, aufsteigende Rechte; AGE-311) — nicht mehr dem alten 3-/7-Stufen-Modell
+der Legacy-Docs. See `openspec/specs/membership-tiers/spec.md`.
