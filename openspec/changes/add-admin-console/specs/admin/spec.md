@@ -1,74 +1,126 @@
+## REMOVED Requirements
+
+### Requirement: Admin member management is not implemented
+
+**Reason:** This change implements the admin member list, bulk mail, CRM, and topic
+newsletters, superseding the prior "not implemented" declaration.
+
 ## ADDED Requirements
 
-### Requirement: Admin member list with filters
+### Requirement: Admin member list with filters (no contact PII)
 
 The system SHALL provide an admin-only member-list view served by a
-`SECURITY DEFINER` RPC that returns member rows with filterable fields (such as
-tier, status and join date), gated so it returns rows only when `is_admin()`.
-The `/admin` route is UI convenience only; the enforcing boundary is the
-database.
+`SECURITY DEFINER` RPC (fixed `search_path`, identity from `auth.uid()`, `EXECUTE`
+restricted to the API roles) that returns member rows with filterable non-contact
+fields (such as tier, status, and join date), gated so it returns rows only when
+`is_admin()`. The RPC SHALL NOT return contact PII (email, phone) — those remain
+owner-only per `member-profiles`; the bulk-send path resolves recipient addresses
+server-side without exposing them to the client. The `/admin` route is UI
+convenience only; the enforcing boundary is the database.
 
 #### Scenario: Admin lists and filters members
 
 - **WHEN** an admin opens the member list and applies a filter
-- **THEN** the RPC returns the matching member rows because `is_admin()` is true
+- **THEN** the RPC returns the matching member rows (non-contact fields) because
+  `is_admin()` is true
 
 #### Scenario: Non-admin gets no members
 
 - **WHEN** a member without the `admin` staff role calls the member-list RPC
 - **THEN** the `is_admin()` gate returns zero rows
 
-### Requirement: Bulk email to a member segment
+#### Scenario: Contact PII is never returned by the list
 
-The system SHALL let an admin send a bulk/mass email to a selected segment of
-members, with the send gated on `is_admin()` and delivered only to the members in
-the chosen segment. A non-admin MUST NOT be able to trigger a bulk send.
+- **WHEN** the member-list RPC returns rows to an admin
+- **THEN** no email or phone is included in the result
 
-#### Scenario: Admin sends to a segment
+### Requirement: Bulk email resolves recipients server-side and honours suppression
 
-- **WHEN** an admin selects a member segment and triggers a bulk email
-- **THEN** the email is sent to exactly the members in that segment and to no one
-  outside it
+The system SHALL let an admin send a bulk email to a member **segment definition**
+(not a client-supplied list of ids/addresses); the recipient set SHALL be resolved
+server-side from that validated definition, gated on `is_admin()`. Every bulk send
+SHALL consult the shared suppression / do-not-email list (see
+`add-lifecycle-notifications`) and exclude suppressed or invalid-email members, SHALL
+be delivered individualised (no shared BCC leaking recipients), and SHALL be
+idempotent per campaign key so a retry does not re-send. Mass-send SHALL require a
+step-up confirmation and be rate-limited so a single leaked admin session cannot
+blast the platform. Each send SHALL write an audit entry (actor, segment definition,
+exclusions, delivery result) to the privacy audit log (see `add-dsgvo-compliance`).
+
+#### Scenario: Admin sends to a server-resolved segment
+
+- **WHEN** an admin selects a segment definition and confirms a bulk send
+- **THEN** the recipient set is resolved server-side, suppressed/invalid members are
+  excluded, and each remaining member receives an individualised email
 
 #### Scenario: Non-admin cannot bulk send
 
 - **WHEN** a member without the `admin` staff role attempts to trigger a bulk send
 - **THEN** the action is denied by the `is_admin()` gate
 
+#### Scenario: A retried campaign does not re-send
+
+- **WHEN** a bulk campaign is re-run with the same campaign key
+- **THEN** members already sent for that campaign are not emailed again
+
+#### Scenario: A suppressed member is excluded
+
+- **WHEN** a member in the segment is on the suppression list or has no valid email
+- **THEN** they are excluded from the send
+
 ### Requirement: In-platform CRM surface for admins
 
-The system SHALL provide an admin-only CRM surface (a contact list with filters
-and recorded outreach) that replaces the external Odoo workflow, gated on
-`is_admin()` in the database. Outreach recorded against a contact SHALL be
-readable only to admins.
+The system SHALL provide an admin-only CRM surface (a contact list with filters and
+recorded outreach) gated on `is_admin()` in the database. All CRM reads AND
+mutations (INSERT/UPDATE/DELETE of contacts and outreach) SHALL be enforced in the
+database, not only on read. Outreach recorded against a contact SHALL be written to
+the shared privacy audit log (see `add-dsgvo-compliance`) rather than a separate
+parallel outreach log, and SHALL be readable only to admins.
 
 #### Scenario: Admin reviews contacts and logs outreach
 
 - **WHEN** an admin filters the CRM contact list and records an outreach entry
-  against a contact
-- **THEN** the filtered contacts are returned and the outreach entry is persisted
-  against that contact
+- **THEN** the filtered contacts are returned and the outreach is persisted and
+  written to the privacy audit log
 
-#### Scenario: Non-admin cannot read the CRM
+#### Scenario: Non-admin cannot read or mutate the CRM
 
-- **WHEN** a member without the `admin` staff role queries the CRM contacts or
-  outreach
-- **THEN** RLS / the `is_admin()` gate returns nothing
+- **WHEN** a member without the `admin` staff role queries or attempts to
+  insert/update/delete CRM contacts or outreach
+- **THEN** the database gate denies it
 
-### Requirement: Topic newsletters honor per-member opt-in/opt-out
+### Requirement: Topic newsletters default to opt-out and honour per-member choice
 
-The system SHALL record each member's opt-in/opt-out per newsletter topic, with
-the member controlling their own subscription, and SHALL include a member in a
-topic newsletter send only when that member is opted in to that topic. An opted-out
-member MUST be excluded from that topic's send.
+The system SHALL record each member's subscription per newsletter topic as one row
+per `(member, topic)`, controllable only by the member (own-row RLS), defaulting to
+**opted-out** (no pre-ticked subscription); a member with no record for a topic is
+treated as opted-out. A topic newsletter send SHALL be gated on `is_admin()`, SHALL
+apply the per-topic opt-in filter **server-side** (not trusted from a UI selection),
+SHALL exclude suppressed members, and SHALL include an unsubscribe link. A send with
+no eligible recipients SHALL complete as a no-op without error.
 
-#### Scenario: Member controls their topic subscription
+#### Scenario: Member controls their own topic subscription
 
-- **WHEN** a member opts out of a newsletter topic
-- **THEN** their opt-out is persisted against that topic for their own profile only
+- **WHEN** a member opts in or out of a newsletter topic
+- **THEN** the choice is persisted against that topic for their own profile only
 
-#### Scenario: Opted-out member is excluded from the send
+#### Scenario: Opted-out members are excluded server-side
 
-- **WHEN** a topic newsletter is sent
-- **THEN** only members opted in to that topic receive it, and members opted out
-  of it are excluded
+- **WHEN** an admin sends a topic newsletter to "all members"
+- **THEN** the send resolves recipients server-side and only members opted in to that
+  topic (and not suppressed) receive it
+
+#### Scenario: Non-admin cannot send a newsletter
+
+- **WHEN** a member without the `admin` staff role attempts a topic newsletter send
+- **THEN** the `is_admin()` gate denies it
+
+#### Scenario: A topic with no subscribers is a no-op
+
+- **WHEN** a topic newsletter is sent but no member is opted in (or all are suppressed)
+- **THEN** the send completes as a no-op without error
+
+#### Scenario: Unsubscribe link opts the member out
+
+- **WHEN** a member follows the unsubscribe link in a topic newsletter
+- **THEN** their subscription for that topic is set to opted-out

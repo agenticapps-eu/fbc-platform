@@ -1,66 +1,118 @@
+## REMOVED Requirements
+
+### Requirement: Academy lists curated video lessons
+
+**Reason:** Superseded by "Academy content is a real course model" — the hard-coded
+lesson list is replaced by database-backed courses/lessons.
+
+### Requirement: My Courses is a placeholder with no enrollment
+
+**Reason:** Superseded by "Members enroll and their lesson progress is tracked" —
+My Courses now reflects real enrollments and progress.
+
 ## ADDED Requirements
 
 ### Requirement: Academy content is a real course model
 
 The system SHALL store Academy content as data in `courses`, `lessons` and
-`lesson_resources` tables — a course carrying a title and description, each lesson
-belonging to a course with an ordering and an external embed reference, and each
-resource an optional downloadable attached to a lesson — and SHALL render the
-Academy from these tables rather than a hard-coded, code-defined list. The
-platform SHALL NOT host video content itself; only the embed reference is stored.
+`lesson_resources` tables — a course carrying a title, description, an integer
+`min_tier` rank, and a published state; each lesson belonging to a course with a
+unique ordering, a published state, and an external embed reference; each resource
+an optional downloadable attached to a lesson — and SHALL render the Academy from
+these tables rather than a hard-coded list. Only **published** courses/lessons are
+visible to members. The platform SHALL NOT host video content itself; only the
+embed reference (an allowlisted YouTube/Vimeo URL) is stored.
 
-#### Scenario: Academy renders courses from the database
+#### Scenario: Academy renders published courses from the database
 
 - **WHEN** a member opens the Academy page
-- **THEN** the courses and their ordered lessons shown are read from the
-  `courses`/`lessons` tables, not from a code-defined array
+- **THEN** the published courses and their ordered published lessons are read from
+  the `courses`/`lessons` tables, not from a code-defined array
+
+#### Scenario: Draft content is not visible to members
+
+- **WHEN** a course or lesson is not published
+- **THEN** it is not returned to members
 
 #### Scenario: A lesson references an externally hosted video
 
 - **WHEN** a lesson is displayed
 - **THEN** its video is played from the stored external embed reference
-  (YouTube/Vimeo) and no media file is hosted by the platform
+  (allowlisted YouTube/Vimeo) and no media file is hosted by the platform
 
-### Requirement: Members enroll and their lesson progress is tracked
+### Requirement: Course cards are visible for upsell; lessons are gated by enrollment
 
-The system SHALL let a member enroll in a course and record per-lesson completion,
-storing enrollment in `course_enrollments` and completion in `lesson_progress`,
-each row tied to the member's own profile and writable only by that member
-(enforced by `*_write_own` RLS). "My Courses" SHALL reflect the member's real
-enrollments and progress instead of a static empty state.
+The system SHALL let any authenticated member read published course **metadata**
+(title, description, required tier) as a catalog card — including for courses above
+their tier, so a locked/upsell card can be shown — while a course's **lessons and
+resources** are readable only to members enrolled in that course. Unauthenticated
+(`anon`) callers SHALL see nothing (deny by default).
 
-#### Scenario: Member enrolls and completes a lesson
+#### Scenario: Below-tier member sees the card but not the lessons
 
-- **WHEN** an enrolled member marks a lesson complete
-- **THEN** a `lesson_progress` row is written for that member and lesson, and
-  "My Courses" shows the course with its updated completion
+- **WHEN** a member whose tier is below a course's `min_tier` views the Academy
+- **THEN** the course card (metadata) is readable, but its lessons and resources
+  return no rows
 
-#### Scenario: A member cannot write another member's progress
+#### Scenario: Lesson resources inherit the lesson's gating
 
-- **WHEN** a member attempts to insert or update a `course_enrollments` or
-  `lesson_progress` row whose `profile_id` is not their own
-- **THEN** the `*_write_own` RLS policy denies the write
+- **WHEN** a member who is not enrolled in a course queries a `lesson_resources` row
+  belonging to it
+- **THEN** RLS returns no row (resources inherit the enrolled-only gate)
 
-### Requirement: Course access is gated by membership tier
+#### Scenario: Anonymous caller sees nothing
 
-The system SHALL reserve each course for members whose tier clears the course's
-required tier (`courses.min_tier`), enforced by RLS in the database using the
-existing tier/`has_level` helper so the gate holds independently of the client. A
-member whose tier does not clear a course SHALL NOT be able to read its lessons or
-enroll in it.
+- **WHEN** an unauthenticated caller queries any Academy table
+- **THEN** RLS returns no rows
 
-#### Scenario: Below-tier member is denied a gated course
+### Requirement: Enrollment is tier-gated; access persists once enrolled
 
-- **WHEN** a member whose tier is below a course's `min_tier` selects that course
-  or its lessons
-- **THEN** RLS returns no rows for that course
+The system SHALL let a member enroll in a published course only when their tier
+clears the course's `min_tier`, enforced by an INSERT policy on
+`course_enrollments` whose `WITH CHECK` joins `courses` and requires
+`has_level(courses.min_tier)`. Enrollment is unique per `(member, course)`. Once
+enrolled, the member SHALL retain read access to that course's lessons and
+resources even if their tier is later downgraded (the gate is at enrollment, not on
+every read). A member SHALL read only their own enrollment and progress rows.
 
-#### Scenario: Enrollment requires clearing the course tier
+#### Scenario: Below-tier member cannot enroll
 
 - **WHEN** a member below a course's `min_tier` attempts to enroll
-- **THEN** the enrollment is rejected because the tier gate is not cleared
+- **THEN** the INSERT policy's `WITH CHECK` rejects it
 
-#### Scenario: Cleared-tier member reads and enrolls
+#### Scenario: Enrolled member keeps access after a downgrade
 
-- **WHEN** a member whose tier clears a course's `min_tier` opens it
-- **THEN** the course and its lessons are readable and the member may enroll
+- **WHEN** an enrolled member's tier is later downgraded below the course's `min_tier`
+- **THEN** they can still read that course's lessons and resume, because access is
+  keyed to their existing enrollment
+
+#### Scenario: A member cannot read or write another member's enrollment/progress
+
+- **WHEN** a member attempts to read, insert, or update a `course_enrollments` or
+  `lesson_progress` row whose `profile_id` is not their own
+- **THEN** the own-row RLS policy denies it
+
+### Requirement: Lesson progress and course completion are tracked
+
+The system SHALL record per-lesson completion in `lesson_progress`, unique per
+`(member, lesson)` and idempotent (a repeated mark-complete does not create a
+duplicate), writable only by the enrolled member and only for lessons in a course
+they are enrolled in. "My Courses" SHALL reflect the member's enrollments, surface
+the next incomplete lesson so they can resume, and mark a course complete when every
+published lesson in it is complete.
+
+#### Scenario: Member completes a lesson and resumes
+
+- **WHEN** an enrolled member marks a lesson complete
+- **THEN** a `lesson_progress` row is written (idempotently) and "My Courses" shows
+  the course's updated progress and the next incomplete lesson
+
+#### Scenario: A course is complete when all its lessons are
+
+- **WHEN** an enrolled member has completed every published lesson in a course
+- **THEN** "My Courses" marks that course complete
+
+#### Scenario: Progress cannot be recorded without enrollment
+
+- **WHEN** a member marks a lesson complete for a course they are not enrolled in
+- **THEN** the write is denied

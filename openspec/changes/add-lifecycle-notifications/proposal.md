@@ -11,17 +11,23 @@ system + bell wiring) and **AGE-261** (onboarding full build).
 
 ## What Changes
 
-- Wire the in-app bell to the member's unread notifications, including marking them
-  read.
-- Add a lifecycle/nudge mail system that sends scheduled lifecycle emails via Resend
-  beyond the single existing transactional mail.
-- Send onboarding-completion nudges to members who have not finished onboarding.
+- Wire the in-app bell to the member's unread notifications; marking read sets only
+  `read_at` via the existing owner-only policy.
+- Add a **scheduled lifecycle-mail sender** (distinct from the transactional
+  contact-request mail) with a **durable send ledger** keyed `(member, mail_type,
+occurrence)` for idempotency and attempted-vs-confirmed retry semantics.
+- Treat lifecycle/nudge mails as **non-transactional** (legitimate interest):
+  mandatory unsubscribe + suppression list honoured on every send.
+- Record onboarding completion via a new **`onboarded_at`** timestamp; send
+  completion nudges on a bounded cadence **24h → +3d → +7d, max 3**, stopping on completion.
 
 ## Impact
 
 - Affected capability: `notifications`.
-- Bell UI reads/marks the existing owner-only `notifications` rows (no RLS change);
-  a new scheduled sender for lifecycle/nudge mails via Resend; onboarding state drives
-  nudge eligibility.
+- New tables: a send ledger (unique `(member, mail_type, occurrence)`) and a
+  suppression list; a new `onboarded_at` column. Explicit grants on new tables.
+- New **privileged path**: the scheduled sender reads member emails server-side
+  (least-privilege, not member-reachable) — this is a real addition beyond the
+  owner-only `notifications_own` RLS, and recipient PII stays out of client logs.
 - The existing owner-only visibility, server-side trigger inserts, and the
   transactional contact-request email are unchanged.
