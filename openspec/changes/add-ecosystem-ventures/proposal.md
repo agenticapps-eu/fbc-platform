@@ -1,32 +1,36 @@
-# Add Capital-Parks acquisition profiles and platform joint ventures to matching
+# Add ecosystem acquisition profiles as a matching source
 
 ## Why
 
-Phase 4 (Ökosystem) extends matching beyond member-to-member complementarity into
-the wider ecosystem. Two ecosystem inputs need to participate in matching: a
-Capital-Parks acquisition profile (what Capital-Parks is looking to acquire) should
-be ingested as a matching source so members' offers can be matched against it, and
-the platform needs a defined way to spin a joint venture out of an accepted match /
-platform project. Today `matching` only pairs members and routes large-volume needs
-to the DKRI queue; there is no ecosystem participant and no venture-formation step.
-Linear: **AGE-307** (Capital-Parks acquisition profile feeds matching),
-**AGE-308** (joint ventures from platform projects).
+Phase 4 (Ökosystem) extends matching beyond member-to-member complementarity: an
+ecosystem partner's acquisition profile (starting with Capital-Parks — what it is
+looking to acquire) should be ingested as a matching source so members' offers can
+be scored against its criteria. Today `matching` only pairs members. Linear:
+**AGE-307**. Joint ventures from platform projects (**AGE-308**) are split out (see
+Out of scope) — that construct needs its own capability and a defined "platform project".
 
 ## What Changes
 
-- Ingest a Capital-Parks acquisition profile as a first-class matching
-  participant/source, so the rule-based engine can score member offers against its
-  acquisition criteria alongside member-to-member matches.
-- Define a joint-venture formation process that turns an accepted match / platform
-  project into a tracked joint venture with its participating members.
+- Store ecosystem acquisition profiles under a **generic partner** model (Capital-Parks
+  first), staff-ingested and `active`-flagged; ordinary members never read/write them.
+- Score member offers against active acquisition profiles with the existing
+  server-side engine, recording results in a **separate `acquisition_matches` table**
+  keyed `(member, acquisition_profile)` — `matches` stays strictly member-to-member.
+- Keep it **staff-mediated**: acquisition matches surface to matching managers; the
+  member's identity/contact is not disclosed to the acquirer until the member consents.
 
 ## Impact
 
 - Affected capability: `matching`.
-- New tables for the acquisition-profile source and for joint ventures + their
-  participants, each with RLS; the matching engine gains the acquisition profile as
-  a candidate source.
-- Consistent with the existing invariants: matches remain server-computed (members
-  never write `matches`), volume-based FBC/DKRI routing is unchanged, and the
-  acquisition source carries no access to member contact data beyond what matching
-  already exposes.
+- New tables: `acquisition_profiles` (staff-only) and `acquisition_matches`
+  (server-written). No change to `matches` (member-to-member invariant preserved),
+  contact-request rules, or member-side scoring.
+- Member-side weights (tier/completeness) are not applied to the non-member source.
+- Consistent with "contact data is never implicitly disclosed": no member PII reaches
+  the acquiring partner without consent.
+
+## Out of scope (named follow-up)
+
+- **Joint ventures from platform projects (AGE-308)** — its own change under a new
+  `ventures` capability: define "platform project", venture lifecycle, atomic
+  idempotent formation, and participant-table RLS that blocks member self-insert.

@@ -1,31 +1,34 @@
-# Finish UI polish and tiered name resolution
+# Tiered name resolution, logout isolation, and UI polish
 
 ## Why
 
-Several review-driven UI follow-ups are still open, and one of them is a real
-visibility behaviour rather than cosmetics: the directory still has no graduated,
-tier-based name reveal. Only anonymous masking to the literal "Mitglied" exists
-today; whether a viewer sees another member's full name should depend on the
-viewer's tier (AGE-291), and that gate must live in the data layer, not the
-client. The remaining items are client-side polish.
-Linear: **AGE-291** (tiered name resolution), **AGE-292** (mein-bereich inline
-accordion), **AGE-293** (menu label cleanup), **AGE-258** (clear React Query cache
-on logout).
+The headline item is a PII/security behaviour, not cosmetics: whether a viewer sees
+another member's full name should depend on the viewer's tier (AGE-291), enforced in
+the data layer. Today only anonymous masking to "Mitglied" exists, and `profiles_public`
+hands the full `name` to every authenticated tier. A second security item —
+clearing the client cache on logout (AGE-258) — is a data-bleed invariant, not
+polish. Two genuinely cosmetic items round out the change.
+Linear: **AGE-291** (tiered name resolution), **AGE-258** (logout cache isolation),
+**AGE-292** (mein-bereich inline accordion), **AGE-293** (menu label cleanup).
 
 ## What Changes
 
-- Resolve a member's displayed name by the viewer's tier: higher tiers see the
-  full name, lower/opted-out viewers see a masked label, enforced by the database
-  rather than only the UI (AGE-291).
-- (Client-only, no spec delta) Convert the "Mein Bereich" sections to an inline
-  accordion (AGE-292), tidy the navigation menu labels (AGE-293), and clear the
-  React Query cache on logout so a previous session's data cannot bleed through
-  (AGE-258).
+- Resolve display names through a **single shared resolver** keyed off the caller's
+  tier: full name for self and `has_level(4)` (`exchange`) and above; the masked
+  "Mitglied" label otherwise. Applied in the DB read path across **every**
+  name-bearing surface (directory, feed, events, matching, profiles), so masking
+  can't be bypassed via another surface.
+- **Clear** (not just invalidate) the client query cache on logout / principal
+  change (AGE-258) — specified as a data-isolation invariant.
+- (Client-only, no spec delta) Inline "Mein Bereich" accordion (AGE-292) and menu
+  label cleanup (AGE-293).
 
 ## Impact
 
-- Affected capability: `directory-search` (tiered name resolution only).
-- The remaining tasks touch only client components and the auth/logout flow; they
-  carry no spec change and are listed in tasks.md for tracking.
-- No change to directory visibility's single source of truth (`profiles.is_public`)
-  or to the membership-rank full-row gate; tiered name resolution layers on top.
+- Affected capabilities: `directory-search`, `member-profiles` (the `profiles_public`
+  `name` column becomes tier-resolved), and `access-control` (logout cache invariant).
+- Removes the "Author name masking is only partially resolved" requirement; modifies
+  the `profiles_public` public-view requirement so `name` is masked below the reveal tier.
+- Reveal threshold is `has_level(4)`; it layers above the existing row-visibility gate
+  (`level_rank >= 3` for directory rows) — rows visible from discover, full names from exchange.
+- Contact fields (email/phone) stay governed by contact-request rules; out of scope here.

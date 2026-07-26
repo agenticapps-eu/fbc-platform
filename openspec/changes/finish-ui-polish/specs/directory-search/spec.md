@@ -1,45 +1,46 @@
+## REMOVED Requirements
+
+### Requirement: Author name masking is only partially resolved
+
+**Reason:** Superseded — graduated, tier-based name reveal is now implemented via
+the shared display-name resolver (see `member-profiles`), replacing the "partially
+resolved / not yet implemented" status. The anonymous "Mitglied" fallback is
+retained by the new requirements.
+
 ## ADDED Requirements
 
-### Requirement: Displayed name is resolved by the viewer's tier
+### Requirement: Directory names are resolved by the viewer's tier
 
-The system SHALL resolve the name shown for a member according to the viewing
-caller's membership tier: a viewer whose tier clears the reveal threshold SHALL
-see the member's full name, while a viewer below the threshold (and any anonymous
-caller) SHALL see a masked label rather than the full name. This graduated reveal
-extends the existing anonymous "Mitglied" fallback, which remains the masked label
-for callers who cannot read a profile at all.
+The directory SHALL display each member's name via the shared display-name resolver
+(see `member-profiles`): a caller who is the member themselves, or whose tier clears
+`has_level(4)` (`exchange`), SHALL see the full name; every other authenticated
+caller (`level_rank < 4`) and any anonymous caller SHALL see the masked "Mitglied"
+label. Resolution SHALL occur in the database read path (`profiles_public` /
+`search_directory`), so the full name is never sent to a below-threshold caller.
 
-#### Scenario: Cleared-tier viewer sees the full name
+#### Scenario: Exchange-and-above viewer sees the full name
 
-- **WHEN** a viewer whose tier clears the reveal threshold reads another member in
-  the directory
-- **THEN** that member's full name is shown
+- **WHEN** a caller with `level_rank >= 4` reads another member in the directory
+- **THEN** that member's full name is returned
 
 #### Scenario: Below-threshold viewer sees the masked label
 
-- **WHEN** a viewer whose tier is below the reveal threshold reads another member
-- **THEN** a masked label is shown instead of the full name
+- **WHEN** a caller with `level_rank < 4` (but able to see the row) reads another member
+- **THEN** the "Mitglied" masked label is returned and the full name is absent from
+  the payload
 
-#### Scenario: Anonymous viewer keeps the masked fallback
+#### Scenario: A member always sees their own full name
+
+- **WHEN** a caller reads their own directory row
+- **THEN** their full name is returned regardless of tier
+
+#### Scenario: Anonymous caller keeps the masked fallback
 
 - **WHEN** an anonymous caller cannot read an author's profile row
-- **THEN** the name still renders as the masked "Mitglied" fallback
+- **THEN** the name renders as the "Mitglied" fallback
 
-### Requirement: Tiered name masking is enforced server-side
+#### Scenario: The masked name does not leak through search or ordering
 
-The system SHALL enforce the tiered name resolution in the database read path so a
-below-threshold or anonymous caller never receives another member's full name over
-the API, independently of the client. The client SHALL render whichever name value
-the server returns and MUST NOT be the boundary that hides the full name.
-
-#### Scenario: The API withholds the full name from a below-threshold caller
-
-- **WHEN** a below-threshold caller requests directory rows
-- **THEN** the full name is not present in the returned data; only the masked label
-  is returned
-
-#### Scenario: Client renders the server-resolved value
-
-- **WHEN** the directory renders a member's name
-- **THEN** it displays the name value returned by the server without deriving the
-  full name from any other client-held source
+- **WHEN** a below-threshold caller searches or orders the directory by name
+- **THEN** the full name is not disclosed through match highlighting, ordering, or
+  any returned free-text field

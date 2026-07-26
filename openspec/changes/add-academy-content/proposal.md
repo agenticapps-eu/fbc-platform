@@ -11,20 +11,29 @@ Linear: **AGE-262**.
 
 ## What Changes
 
-- Replace the hard-coded lesson stub with a real content model of courses,
-  lessons and downloadable resources stored in the database.
-- Let a member enroll in a course and track per-lesson completion so "My Courses"
-  reflects real progress.
-- Gate access to a course by the viewer's membership tier, enforced in the
-  database (RLS), not only in the UI.
+- Replace the hard-coded lesson stub with a real content model of courses, lessons
+  and downloadable resources (each with a `published` state), seeded via migration.
+- Let a member enroll and track per-lesson completion; "My Courses" surfaces the
+  next incomplete lesson (resume) and marks a course complete when all lessons are.
+- **Enrollment is the tier gate**: enrolling requires clearing `courses.min_tier`
+  (int rank, `has_level`); course cards stay visible to all for upsell, lessons and
+  resources are readable only once enrolled, and access persists after a later
+  downgrade.
 
 ## Impact
 
 - Affected capability: `academy-library`.
-- New tables for courses, lessons, resources, enrollments and lesson progress,
-  each with RLS; the Academy and My Courses pages read from them instead of the
-  code-defined array.
-- Videos remain externally hosted (YouTube/Vimeo); the platform stores lesson
-  metadata and the embed reference, not the media.
-- No change to the tier authority model: `profiles.tier` remains the sole source
-  of a member's rank; the new access gate reads it, never writes it.
+- Removes the two prototype requirements (hard-coded list, placeholder My Courses)
+  via `## REMOVED` blocks.
+- New tables: courses, lessons, resources, enrollments, lesson progress — with RLS,
+  explicit grants, and integrity constraints (unique enrollment/progress, unique
+  lesson ordering). `anon` denied by default.
+- Videos remain externally hosted (allowlisted YouTube/Vimeo embed reference only).
+- No change to the tier authority model: `profiles.tier` remains the sole rank
+  source; the enrollment gate reads it, never writes it.
+
+## Out of scope (named follow-up)
+
+- Admin content authoring UI (incl. resource upload) — fits `add-admin-console`;
+  content is seeded via migration for now.
+- Un-enrollment mechanics.
