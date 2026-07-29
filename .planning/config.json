@@ -1,8 +1,4 @@
 {
-  "knowledge_capture": {
-    "enabled": true,
-    "note": "~/Obsidian/Memex/40-49 Resources/44 Agentic Coding Learnings/fbc-platform.md"
-  },
   "implements_spec": "1.0.0",
   "host": "claude",
   "front_end": "openspec",
