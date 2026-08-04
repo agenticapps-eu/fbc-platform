@@ -20,11 +20,11 @@ import { cn } from "../lib/cn";
 import { useDesignVariant } from "../providers/design-variant-context";
 
 const COLORS: { name: string; token: string; className: string; dark?: boolean }[] = [
-  { name: "Night / Chrome", token: "#0E0F12", className: "bg-night", dark: true },
-  { name: "Night Elevated", token: "#16181D", className: "bg-night-elevated", dark: true },
-  { name: "Gold / Accent", token: "#C2A24E", className: "bg-gold", dark: true },
-  { name: "Gold Strong", token: "#B8893B", className: "bg-gold-strong", dark: true },
-  { name: "Gold Soft", token: "#EFE3C8", className: "bg-gold-soft" },
+  { name: "Night / Chrome", token: "#0E0F12", className: "bg-chrome", dark: true },
+  { name: "Night Elevated", token: "#16181D", className: "bg-chrome-elevated", dark: true },
+  { name: "Gold / Accent", token: "#C2A24E", className: "bg-accent", dark: true },
+  { name: "Gold Strong", token: "#B8893B", className: "bg-accent-strong", dark: true },
+  { name: "Gold Soft", token: "#EFE3C8", className: "bg-accent-soft" },
   { name: "Canvas", token: "#FFFFFF", className: "bg-canvas" },
   { name: "Soft / Seite", token: "#F6F5F1", className: "bg-soft" },
   { name: "Ink / Text", token: "#14151A", className: "bg-ink", dark: true },
@@ -58,7 +58,7 @@ function StatTile({ label, value, trend }: { label: string; value: string; trend
 function Progress({ value }: { value: number }) {
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-      <div className="h-full rounded-full bg-gold" style={{ width: `${value}%` }} />
+      <div className="h-full rounded-full bg-accent" style={{ width: `${value}%` }} />
     </div>
   );
 }
@@ -169,36 +169,29 @@ function VariantsSection() {
               className={cn(
                 "fbc-card rounded-[var(--radius-card)] border p-4 text-left",
                 active
-                  ? "border-gold bg-gold-soft/40"
-                  : "border-line bg-canvas hover:border-gold/50",
+                  ? "border-accent bg-accent-soft/40"
+                  : "border-line bg-canvas hover:border-accent/50",
               )}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold uppercase",
-                    active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
+                    active ? "bg-accent text-chrome" : "bg-ink/[0.07] text-ink",
                   )}
                 >
                   {id}
                 </span>
                 <span className="font-display text-base font-semibold text-ink">{v.label}</span>
                 {v.recommended && (
-                  <span className="text-gold-strong" title="Empfehlung">
+                  <span className="text-accent-strong" title="Empfehlung">
                     ★
                   </span>
                 )}
                 {v.experimental && (
-                  <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
+                  <span className="rounded-full border border-accent/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent-strong">
                     Experimentell
                   </span>
-                )}
-                {v.accent2 && (
-                  <span
-                    className="ml-auto h-3.5 w-3.5 rounded-full border border-line"
-                    style={{ backgroundColor: v.accent2 }}
-                    title={`Zweitakzent ${v.accent2}`}
-                  />
                 )}
               </div>
               <p className="mt-2 text-xs text-muted">{v.description}</p>
@@ -216,7 +209,7 @@ function VariantsSection() {
           <p className="text-xs uppercase tracking-wide text-muted">Count-up</p>
           <CountUp
             value={842}
-            className="mt-1 block font-display text-3xl font-semibold text-gold-strong"
+            className="mt-1 block font-display text-3xl font-semibold text-accent-strong"
           />
         </Card>
         <Card className="flex flex-col items-center justify-center gap-2 text-center">
@@ -255,14 +248,14 @@ export default function StyleguidePage() {
 
           {/* Chrome-Vorschau (dunkel) */}
           <Section title="Chrome — Schwarz &amp; Gold">
-            <div className="overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night p-6 shadow-soft">
+            <div className="overflow-hidden rounded-[var(--radius-card)] border border-chrome-border bg-chrome p-6 shadow-soft">
               <Logo tone="dark" />
               <div className="mt-5 flex flex-col gap-1">
-                <span className="relative rounded-md bg-night-elevated px-3 py-2 text-sm font-medium text-gold">
-                  <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold" />
+                <span className="relative rounded-md bg-chrome-elevated px-3 py-2 text-sm font-medium text-accent">
+                  <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-accent" />
                   Aktive Route (Gold-Label + Gold-Linksbalken)
                 </span>
-                <span className="rounded-md px-3 py-2 text-sm text-on-night-muted">
+                <span className="rounded-md px-3 py-2 text-sm text-on-chrome-muted">
                   Inaktive Route
                 </span>
               </div>
@@ -286,7 +279,7 @@ export default function StyleguidePage() {
                 >
                   <div className={`flex h-20 items-end p-3 ${c.className}`}>
                     <span
-                      className={`text-xs font-medium ${c.dark ? "text-on-night" : "text-ink"}`}
+                      className={`text-xs font-medium ${c.dark ? "text-on-chrome" : "text-ink"}`}
                     >
                       {c.token}
                     </span>
@@ -418,7 +411,7 @@ export default function StyleguidePage() {
                   Eine ruhige Karte mit weichem Schatten und feiner Kontur.
                 </CardDescription>
               </Card>
-              <Card className="border-t-2 border-t-gold">
+              <Card className="border-t-2 border-t-accent">
                 <CardTitle>Mit Goldakzent</CardTitle>
                 <CardDescription>Feine Goldlinie als Premium-Akzent.</CardDescription>
               </Card>

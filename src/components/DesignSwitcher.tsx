@@ -64,7 +64,7 @@ export function DesignSwitcher() {
         <div
           role="dialog"
           aria-label="Design-Variante wählen"
-          className="w-72 rounded-2xl border border-gold/30 bg-canvas/95 p-2 text-ink shadow-soft backdrop-blur"
+          className="w-72 rounded-2xl border border-accent/30 bg-canvas/95 p-2 text-ink shadow-soft backdrop-blur"
         >
           <div className="flex items-center justify-between px-2 py-1.5">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -91,13 +91,13 @@ export function DesignSwitcher() {
                     aria-pressed={active}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-xl px-2.5 py-2 text-left transition-colors",
-                      active ? "bg-gold-soft/60" : "hover:bg-ink/[0.05]",
+                      active ? "bg-accent-soft/60" : "hover:bg-ink/[0.05]",
                     )}
                   >
                     <span
                       className={cn(
                         "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase",
-                        active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
+                        active ? "bg-accent text-chrome" : "bg-ink/[0.07] text-ink",
                       )}
                     >
                       {variantBadge(id)}
@@ -106,12 +106,12 @@ export function DesignSwitcher() {
                       <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                         {v.label}
                         {v.recommended && (
-                          <span className="text-gold-strong" title="Empfehlung">
+                          <span className="text-accent-strong" title="Empfehlung">
                             ★
                           </span>
                         )}
                         {v.experimental && (
-                          <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
+                          <span className="rounded-full border border-accent/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent-strong">
                             Experimentell
                           </span>
                         )}
@@ -132,9 +132,9 @@ export function DesignSwitcher() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label={`Design-Variante: ${DESIGN_VARIANTS[variant].label}. Switcher öffnen`}
-          className="fbc-sheen inline-flex items-center gap-2 rounded-full border border-gold/40 bg-canvas/90 px-4 py-2 text-sm font-semibold text-ink shadow-soft backdrop-blur transition-colors hover:border-gold"
+          className="fbc-sheen inline-flex items-center gap-2 rounded-full border border-accent/40 bg-canvas/90 px-4 py-2 text-sm font-semibold text-ink shadow-soft backdrop-blur transition-colors hover:border-accent"
         >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[11px] font-bold uppercase text-night">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold uppercase text-chrome">
             {variantBadge(variant)}
           </span>
           Design: {variant.toUpperCase()}

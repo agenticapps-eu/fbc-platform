@@ -7,18 +7,14 @@
 @theme {
   /* Chrome — weiches Near-Black/Anthrazit (Sidebar, Hero). Bewusst KEIN reines
      Schwarz: freundlicher, ruhiger Premium-Look (Detlev, AGE-237). */
-  --color-night: #1b1c20;
-  --color-night-elevated: #26282e;
-  --color-night-border: rgba(255, 255, 255, 0.08);
+  --color-chrome: #1b1c20;
+  --color-chrome-elevated: #26282e;
+  --color-chrome-border: rgba(255, 255, 255, 0.08);
 
   /* Akzent — Gold (einziger Marken-Akzent) */
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #efe3c8;
-
-  /* Optionaler Zweitakzent — Default = Gold (Variante F/G überschreiben mit
-     Mint bzw. Salbei). So liefert var(--accent2) immer einen gültigen Wert. */
-  --accent2: var(--color-gold);
+  --color-accent: #c2a24e;
+  --color-accent-strong: #b8893b;
+  --color-accent-soft: #efe3c8;
 
   /* Content — hell, warm (App-Hintergrund warmes Hellgrau, Karten reinweiß) */
   --color-canvas: #ffffff;
@@ -28,8 +24,8 @@
   --color-line: #e7e5df;
 
   /* Text auf dunklem Chrome */
-  --color-on-night: #f4f2ec;
-  --color-on-night-muted: #a1a1aa;
+  --color-on-chrome: #f4f2ec;
+  --color-on-chrome-muted: #a1a1aa;
 
   /* Status */
   --color-success: #2e7d5b;
@@ -75,9 +71,9 @@ html[data-variant="a"] {
   --color-ink: #14151a;
   --color-muted: #6b7280;
   --color-line: #e7e5df;
-  --color-gold: #b8893b;
-  --color-gold-strong: #9c6f2c;
-  --color-gold-soft: #efe3c8;
+  --color-accent: #b8893b;
+  --color-accent-strong: #9c6f2c;
+  --color-accent-soft: #efe3c8;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 10px;
   --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.04), 0 10px 28px -20px rgba(20, 21, 26, 0.18);
@@ -94,9 +90,9 @@ html[data-variant="b"] {
   --color-ink: #f4f2ec;
   --color-muted: #a1a1aa;
   --color-line: rgba(255, 255, 255, 0.08);
-  --color-gold: #c8a857;
-  --color-gold-strong: #e3c071;
-  --color-gold-soft: #3a3322;
+  --color-accent: #c8a857;
+  --color-accent-strong: #e3c071;
+  --color-accent-soft: #3a3322;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 16px;
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 24px 60px -28px rgba(200, 168, 87, 0.35);
@@ -114,9 +110,9 @@ html[data-variant="c"] {
   --color-ink: #14151a;
   --color-muted: #6b7280;
   --color-line: #ece5d6;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #f3e8cf;
+  --color-accent: #c2a24e;
+  --color-accent-strong: #b8893b;
+  --color-accent-soft: #f3e8cf;
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --radius-card: 18px;
   --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 18px 44px -26px rgba(20, 21, 26, 0.2);
@@ -135,9 +131,9 @@ html[data-variant="d"] {
   --color-ink: #14151a;
   --color-muted: #6b7280;
   --color-line: #e7ddc9;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #efe3c8;
+  --color-accent: #c2a24e;
+  --color-accent-strong: #b8893b;
+  --color-accent-soft: #efe3c8;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 14px;
   --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 18px 44px -24px rgba(20, 21, 26, 0.22);
@@ -162,9 +158,9 @@ html[data-variant="e"] {
   --color-ink: #0c0c0d;
   --color-muted: #565654;
   --color-line: #dad8d2;
-  --color-gold: #a8842f;
-  --color-gold-strong: #8a6d24;
-  --color-gold-soft: #efe9da;
+  --color-accent: #a8842f;
+  --color-accent-strong: #8a6d24;
+  --color-accent-soft: #efe9da;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 2px;
   /* flach: Hairline statt Schatten */
@@ -177,12 +173,12 @@ html[data-variant="e"] {
 
 /* E: schwarze Masthead-Spalte. Der App-Content bleibt hell (ink ≈ schwarz),
    daher den Text NUR innerhalb der Sidebar auf Elfenbein umstellen — über die
-   gleiche Token-Mechanik (lokales --color-ink/--color-muted/--color-gold-strong),
+   gleiche Token-Mechanik (lokales --color-ink/--color-muted/--color-accent-strong),
    sodass alle text-ink-Utilities der Sidebar mitziehen (kein Komponenten-Fork). */
 html[data-variant="e"] .fbc-sidebar-surface {
   --color-ink: #f6f4ef;
   --color-muted: #b9b4a6;
-  --color-gold-strong: #d9b65f;
+  --color-accent-strong: #d9b65f;
 }
 
 /* F — Aurora Glass: tiefdunkle Mitternacht, driftende Aurora-Mesh (Gold + Mint),
@@ -193,10 +189,9 @@ html[data-variant="f"] {
   --color-ink: #eaf0ff;
   --color-muted: #9aa6c4;
   --color-line: rgba(255, 255, 255, 0.12);
-  --color-gold: #e6c878;
-  --color-gold-strong: #f2d99a;
-  --color-gold-soft: rgba(230, 200, 120, 0.14);
-  --accent2: #6ee0c2;
+  --color-accent: #e6c878;
+  --color-accent-strong: #f2d99a;
+  --color-accent-soft: rgba(230, 200, 120, 0.14);
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --radius-card: 20px;
   --shadow-soft: 0 8px 40px -12px rgba(110, 224, 194, 0.18), 0 2px 10px rgba(0, 0, 0, 0.4);
@@ -216,10 +211,9 @@ html[data-variant="g"] {
   --color-ink: #2a2320;
   --color-muted: #7a6e63;
   --color-line: #e3d6bf;
-  --color-gold: #b8893b;
-  --color-gold-strong: #9c6f2c;
-  --color-gold-soft: #efe1c6;
-  --accent2: #6e7e5c;
+  --color-accent: #b8893b;
+  --color-accent-strong: #9c6f2c;
+  --color-accent-soft: #efe1c6;
   --font-display: "Fraunces", "Cormorant Garamond", Georgia, serif;
   --radius-card: 22px;
   --shadow-soft: 0 1px 2px rgba(80, 60, 40, 0.05), 0 18px 44px -24px rgba(80, 60, 40, 0.28);
@@ -244,9 +238,9 @@ html[data-variant="h"] {
   --color-ink: #12233f;
   --color-muted: #5b6577;
   --color-line: #e6dfce;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
+  --color-accent: #c2a24e;
+  --color-accent-strong: #a97f2c;
+  --color-accent-soft: #efe3c8;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 14px;
   --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
@@ -262,7 +256,7 @@ html[data-variant="h"] {
 html[data-variant="h"] .fbc-sidebar-surface {
   --color-ink: #f2ecdd;
   --color-muted: #9fb0cc;
-  --color-gold-strong: #d9b65f;
+  --color-accent-strong: #d9b65f;
 }
 
 /* I — Navy & Gold (hell): helle, leicht navy-getönte Sidebar, Navy nur als
@@ -274,9 +268,9 @@ html[data-variant="i"] {
   --color-ink: #12233f;
   --color-muted: #5b6577;
   --color-line: #dde3ee;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
+  --color-accent: #c2a24e;
+  --color-accent-strong: #a97f2c;
+  --color-accent-soft: #efe3c8;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 14px;
   --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
@@ -298,9 +292,9 @@ html[data-variant="sommerfest"] {
   --color-ink: #12233f;
   --color-muted: #5b6577;
   --color-line: #e7ddc9;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
+  --color-accent: #c2a24e;
+  --color-accent-strong: #a97f2c;
+  --color-accent-soft: #efe3c8;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --radius-card: 14px;
   --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.05), 0 18px 44px -24px rgba(18, 35, 63, 0.22);
@@ -312,7 +306,7 @@ html[data-variant="sommerfest"] {
 
 /* ════════════════════════════════════════════════════════════════════════
    FBC Blau (AGE-441/450) — Detlevs „neues blaues Design", drei Ausprägungen zur
-   Auswahl. Blau ist der Akzent-Token --color-gold (dokumentierte Mechanik:
+   Auswahl. Blau ist der Akzent-Token --color-accent (dokumentierte Mechanik:
    gleiche Namen, andere Werte); Gold bleibt der Krone und den Mitgliedsstufen
    vorbehalten. Leitlinie (Design-Skills impeccable/emil): dezent, geringer
    Kontrast zum Hintergrund, klar lesbar — bewusst KEIN Glas/Blur.
@@ -331,9 +325,9 @@ html[data-variant="blau-navy"] {
   --color-ink: #0f1b33;
   --color-muted: #5b6b8c;
   --color-line: #e4e9f2;
-  --color-gold: #2f6bff;
-  --color-gold-strong: #1d4ed8;
-  --color-gold-soft: #eaf1ff;
+  --color-accent: #2f6bff;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: #eaf1ff;
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --radius-card: 14px;
   --shadow-soft: 0 1px 2px rgba(15, 27, 51, 0.06), 0 18px 44px -26px rgba(15, 27, 51, 0.24);
@@ -354,14 +348,14 @@ html[data-variant="blau"] .fbc-sidebar-surface {
     0 1px 2px rgba(15, 27, 51, 0.04),
     0 10px 30px -20px rgba(15, 27, 51, 0.18);
 }
-html[data-variant="blau"] .fbc-sheen.bg-gold {
+html[data-variant="blau"] .fbc-sheen.bg-accent {
   background: #2f6bff;
   color: #ffffff;
   box-shadow:
     0 1px 2px rgba(15, 27, 51, 0.08),
     0 8px 20px -12px rgba(47, 107, 255, 0.45);
 }
-html[data-variant="blau"] .fbc-sheen.bg-gold:hover {
+html[data-variant="blau"] .fbc-sheen.bg-accent:hover {
   background: #1d4ed8;
   color: #ffffff;
 }
@@ -377,7 +371,7 @@ html[data-variant="blau-slate"] .fbc-sidebar-surface {
     0 1px 2px rgba(15, 27, 51, 0.03),
     0 10px 30px -22px rgba(15, 27, 51, 0.16);
 }
-html[data-variant="blau-slate"] .fbc-sheen.bg-gold {
+html[data-variant="blau-slate"] .fbc-sheen.bg-accent {
   background: #1f3a6b;
   color: #eef3fb;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -385,7 +379,7 @@ html[data-variant="blau-slate"] .fbc-sheen.bg-gold {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 8px 20px -14px rgba(18, 35, 63, 0.5);
 }
-html[data-variant="blau-slate"] .fbc-sheen.bg-gold:hover {
+html[data-variant="blau-slate"] .fbc-sheen.bg-accent:hover {
   background: #264785;
   color: #ffffff;
 }
@@ -405,10 +399,10 @@ html[data-variant="blau-navy"] .fbc-sidebar-surface {
     0 12px 34px -22px rgba(15, 27, 51, 0.55);
   --color-ink: #e8eefb;
   --color-muted: #9db0d2;
-  --color-gold-strong: #8fb2ff;
+  --color-accent-strong: #8fb2ff;
   --color-canvas: #213a68;
 }
-html[data-variant="blau-navy"] .fbc-sheen.bg-gold {
+html[data-variant="blau-navy"] .fbc-sheen.bg-accent {
   background: linear-gradient(180deg, #20376a, #182a52);
   color: #eef3fb;
   border: 1px solid rgba(143, 178, 255, 0.28);
@@ -416,7 +410,7 @@ html[data-variant="blau-navy"] .fbc-sheen.bg-gold {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 8px 20px -14px rgba(15, 27, 51, 0.5);
 }
-html[data-variant="blau-navy"] .fbc-sheen.bg-gold:hover {
+html[data-variant="blau-navy"] .fbc-sheen.bg-accent:hover {
   background: linear-gradient(180deg, #284584, #1e3768);
   color: #ffffff;
 }
@@ -573,11 +567,11 @@ html[data-card-style="glass"] .fbc-card {
   border-color: var(--color-line);
 }
 html[data-card-style="glass"] .fbc-card:hover {
-  /* leuchtender Mint/Gold-Rand + Glow-Anstieg beim Hover (statt Gold-Glow b/d) */
+  /* leuchtender Rand + Glow-Anstieg beim Hover (statt Gold-Glow b/d) */
   box-shadow:
-    0 10px 50px -16px color-mix(in srgb, var(--accent2) 45%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--accent2) 40%, transparent);
-  border-color: color-mix(in srgb, var(--accent2) 45%, transparent);
+    0 10px 50px -16px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 
 /* editorial (E) — scharfe Kanten, flach: Hairline statt Schatten, auch im Hover. */
@@ -587,7 +581,7 @@ html[data-card-style="editorial"] .fbc-card {
 html[data-card-style="editorial"] .fbc-card:hover {
   transform: none;
   /* Hairline zieht beim Hover Gold — ruhig, typografisch, kein „Lift". */
-  box-shadow: 0 0 0 1px var(--color-gold);
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* ────────────────────────────────────────────────────────────────────────

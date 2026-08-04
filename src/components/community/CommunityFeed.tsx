@@ -35,7 +35,7 @@ import {
 } from "../../lib/feed";
 
 /**
- * Community-Feed (AGE-250). Composer + chronologische Beitragsliste im Schwarz-&-Gold-
+ * Community-Feed (AGE-250). Composer + chronologische Beitragsliste im
  * Look. Sichtbarkeit entscheidet AUSSCHLIESSLICH die RLS (siehe lib/feed.ts) — anon
  * sieht nur `public`, eingeloggte zusätzlich `members`/rang-gegated. Der Composer ist
  * nur für eingeloggte Mitglieder sichtbar.
@@ -51,7 +51,7 @@ export default function CommunityFeed() {
   });
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
-  // Treffer wird zum Profil-Link, sonst bleibt es dezenter Gold-Text (kein Fake-Link).
+  // Treffer wird zum Profil-Link, sonst bleibt es dezenter Akzent-Text (kein Fake-Link).
   const mentionResolver = useMemo(
     () => buildMentionResolver((feed.data ?? []).map((p) => p.author)),
     [feed.data],
@@ -64,13 +64,13 @@ export default function CommunityFeed() {
       {hashtag && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted">Gefiltert nach</span>
-          <span className="inline-flex items-center rounded-full bg-gold-soft px-2.5 py-0.5 font-medium text-gold-strong">
+          <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
             #{hashtag}
           </span>
           <button
             type="button"
             onClick={() => setHashtag(null)}
-            className="text-gold-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Filter entfernen
           </button>
@@ -147,7 +147,7 @@ function PostComposer({ authorId }: { authorId: string }) {
           aria-invalid={!videoValid || undefined}
           className={`h-10 w-full rounded-md border bg-canvas px-3 text-sm text-ink transition-colors placeholder:text-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-soft ${
             videoValid
-              ? "border-line focus-visible:border-gold focus-visible:ring-gold"
+              ? "border-line focus-visible:border-accent focus-visible:ring-accent"
               : "border-danger focus-visible:ring-danger"
           }`}
         />
@@ -286,7 +286,7 @@ function PostCard({
             src={author.avatarUrl}
             masked={author.masked}
             size="md"
-            className="ring-1 ring-gold/40"
+            className="ring-1 ring-accent/40"
           />
         ) : (
           <Link to={`/p/${post.author.id}`} className="shrink-0">
@@ -294,7 +294,7 @@ function PostCard({
               name={author.name}
               src={author.avatarUrl}
               size="md"
-              className="ring-1 ring-gold/40"
+              className="ring-1 ring-accent/40"
             />
           </Link>
         )}
@@ -306,7 +306,7 @@ function PostCard({
               <>
                 <Link
                   to={`/p/${post.author.id}`}
-                  className="font-display text-base font-semibold text-ink hover:text-gold-strong"
+                  className="font-display text-base font-semibold text-ink hover:text-accent-strong"
                 >
                   {author.name}
                 </Link>
@@ -335,10 +335,10 @@ function PostCard({
               key={tag}
               type="button"
               onClick={() => onHashtag(tag)}
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 activeHashtag === tag
-                  ? "bg-gold text-night"
-                  : "bg-gold-soft/60 text-gold-strong hover:bg-gold-soft"
+                  ? "bg-accent text-chrome"
+                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
               }`}
             >
               #{tag}
@@ -353,8 +353,8 @@ function PostCard({
           disabled={!currentUserId || like.isPending}
           onClick={() => like.mutate()}
           aria-pressed={post.likedByMe}
-          className={`inline-flex items-center gap-1.5 rounded-md px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-60 ${
-            post.likedByMe ? "text-gold-strong" : "text-muted hover:text-ink"
+          className={`inline-flex items-center gap-1.5 rounded-md px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+            post.likedByMe ? "text-accent-strong" : "text-muted hover:text-ink"
           }`}
         >
           <HeartIcon filled={post.likedByMe} />
@@ -366,7 +366,7 @@ function PostCard({
           disabled={!currentUserId}
           onClick={() => setShowComments((v) => !v)}
           aria-expanded={showComments}
-          className="inline-flex items-center gap-1.5 rounded-md px-1 text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-md px-1 text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           <CommentIcon />
           <span>{post.commentCount}</span>
@@ -404,7 +404,7 @@ function PostBody({
               key={i}
               type="button"
               onClick={() => onHashtag(activeHashtag === seg.value ? null : seg.value)}
-              className="font-medium text-gold-strong hover:underline"
+              className="font-medium text-accent-strong hover:underline"
             >
               {seg.raw}
             </button>
@@ -413,11 +413,15 @@ function PostBody({
         if (seg.type === "mention") {
           const id = mentionResolver(seg.value);
           return id ? (
-            <Link key={i} to={`/p/${id}`} className="font-medium text-gold-strong hover:underline">
+            <Link
+              key={i}
+              to={`/p/${id}`}
+              className="font-medium text-accent-strong hover:underline"
+            >
               {seg.raw}
             </Link>
           ) : (
-            <span key={i} className="font-medium text-gold-strong">
+            <span key={i} className="font-medium text-accent-strong">
               {seg.raw}
             </span>
           );
@@ -429,7 +433,7 @@ function PostBody({
               href={seg.value}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gold-strong underline underline-offset-2"
+              className="text-accent-strong underline underline-offset-2"
             >
               {seg.raw}
             </a>
@@ -499,7 +503,7 @@ function CommentThread({
                 ) : (
                   <Link
                     to={`/p/${c.author.id}`}
-                    className="text-sm font-semibold text-ink hover:text-gold-strong"
+                    className="text-sm font-semibold text-ink hover:text-accent-strong"
                   >
                     {author.name}
                   </Link>

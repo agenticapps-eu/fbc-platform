@@ -49,7 +49,7 @@ export function MeineAnfragenWidget({ uid }: { uid: string }) {
     <Card id="meine-anfragen" className="flex scroll-mt-24 flex-col gap-4">
       <div className="flex items-center gap-2">
         <CardTitle className="text-base">Meine Anfragen</CardTitle>
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-xs font-semibold text-night">
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome">
           {data.length}
         </span>
       </div>
@@ -236,7 +236,9 @@ function MatchingColumn({
 }) {
   return (
     <div>
-      <div className="text-xs font-semibold tracking-wide text-gold-strong uppercase">{title}</div>
+      <div className="text-xs font-semibold tracking-wide text-accent-strong uppercase">
+        {title}
+      </div>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-muted">{empty}</p>
       ) : (
@@ -248,7 +250,7 @@ function MatchingColumn({
                 key={item.id}
                 className="flex items-center gap-2.5 rounded-lg border border-line bg-soft p-2.5"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold-strong">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent-strong">
                   {cat ? (
                     <CategoryIcon icon={cat.icon} className="h-4 w-4" />
                   ) : (

@@ -157,7 +157,7 @@ function ExtendedSections({ extended }: { extended: ExtendedProfile }) {
                   <span className="w-16 shrink-0 text-sm text-muted">{THEME_LABEL[theme]}</span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-soft">
                     <div
-                      className="h-full rounded-full bg-gold"
+                      className="h-full rounded-full bg-accent"
                       style={{ width: `${(score / 10) * 100}%` }}
                     />
                   </div>
@@ -250,7 +250,9 @@ function MatchingColumn({
 }) {
   return (
     <div>
-      <div className="text-xs font-semibold tracking-wide text-gold-strong uppercase">{title}</div>
+      <div className="text-xs font-semibold tracking-wide text-accent-strong uppercase">
+        {title}
+      </div>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-muted">{empty}</p>
       ) : (
@@ -355,7 +357,7 @@ function ContactBody({
       ) : (
         <p className="text-sm text-muted">
           {name} hat dir eine Kontaktanfrage gesendet. Beantworte sie unter{" "}
-          <Link to="/kontakte" className="font-medium text-gold-strong hover:text-gold">
+          <Link to="/kontakte" className="font-medium text-accent-strong hover:text-accent">
             Meine Anfragen
           </Link>
           .
@@ -516,7 +518,7 @@ function ReleasedContact({
 }) {
   const hasData = !!(contact && (contact.email || contact.phone));
   return (
-    <Card className="flex flex-col gap-3 border-gold/30 bg-gold-soft/30">
+    <Card className="flex flex-col gap-3 border-accent/30 bg-accent-soft/30">
       <div className="flex items-center gap-2">
         <CardTitle className="text-base">Kontakt freigegeben</CardTitle>
         <Badge variant="strong">Angenommen</Badge>
@@ -532,7 +534,7 @@ function ReleasedContact({
               <dd>
                 <a
                   href={`mailto:${contact.email}`}
-                  className="font-medium text-gold-strong hover:text-gold"
+                  className="font-medium text-accent-strong hover:text-accent"
                 >
                   {contact.email}
                 </a>
@@ -545,7 +547,7 @@ function ReleasedContact({
               <dd>
                 <a
                   href={`tel:${contact.phone}`}
-                  className="font-medium text-gold-strong hover:text-gold"
+                  className="font-medium text-accent-strong hover:text-accent"
                 >
                   {contact.phone}
                 </a>

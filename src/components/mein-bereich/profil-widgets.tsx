@@ -87,7 +87,7 @@ export function EntwicklungWidget({ profile }: { profile: DashboardProfile }) {
               <ul className="mt-2 flex flex-col gap-2">
                 {profile.next_steps.map((step) => (
                   <li key={step} className="flex items-start gap-2 text-sm text-ink">
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-gold text-gold">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-accent text-accent">
                       <CheckIcon className="h-2.5 w-2.5" />
                     </span>
                     {step}
@@ -154,7 +154,7 @@ function ChipList({ items }: { items: string[] }) {
   );
 }
 
-// 9 ── Mein Impact (CORE-Zahl, dunkle Gold-Card) ───────────────────────────────
+// 9 ── Mein Impact (CORE-Zahl, Akzent-Card) ───────────────────────────────────
 // Regelbasierter Impact Score (AGE-242) mit transparenter Aufschlüsselung der
 // fünf gewichteten Komponenten — der Wert ist nachvollziehbar, kein Demo-Delta.
 export function ImpactWidget({
@@ -167,14 +167,14 @@ export function ImpactWidget({
   return (
     <Card
       id="impact"
-      className="flex scroll-mt-24 flex-col gap-4 border-gold/30 bg-[linear-gradient(120deg,#faf4e6_0%,#f2e6c9_100%)]"
+      className="flex scroll-mt-24 flex-col gap-4 border-accent/30 bg-[linear-gradient(120deg,#faf4e6_0%,#f2e6c9_100%)]"
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-ink">Mein Impact</h3>
         <span className="text-xs text-muted">regelbasiert</span>
       </div>
       <div>
-        <div className="font-display text-5xl font-semibold text-gold-strong">{score}</div>
+        <div className="font-display text-5xl font-semibold text-accent-strong">{score}</div>
         <div className="mt-1 text-sm text-muted">von 100 · Impact Score</div>
       </div>
 
@@ -200,7 +200,7 @@ export function ImpactWidget({
           <polyline
             points="0,40 25,36 50,38 75,28 100,30 125,20 150,22 175,12 200,8"
             fill="none"
-            stroke="var(--color-gold-strong)"
+            stroke="var(--color-accent-strong)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -228,7 +228,7 @@ function ScoreBreakdownList({ breakdown }: { breakdown: ScoreBreakdown }) {
               </span>
             </div>
             <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-ink/10">
-              <div className="h-full rounded-full bg-gold-strong" style={{ width: `${pct}%` }} />
+              <div className="h-full rounded-full bg-accent-strong" style={{ width: `${pct}%` }} />
             </div>
           </li>
         );
@@ -280,7 +280,7 @@ export function AuszeichnungenWidget({ badges }: { badges: DashboardBadge[] }) {
         <ul className="flex flex-col gap-3">
           {badges.map((badge) => (
             <li key={badge.key} className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-soft text-gold-strong">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong">
                 <CrownIcon className="h-4 w-4" />
               </span>
               <div className="min-w-0">

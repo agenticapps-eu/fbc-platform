@@ -17,9 +17,9 @@ export function EventCard({ event }: { event: EventListItem }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
+      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
     >
-      <Card className="space-y-3 transition-colors hover:border-gold/50">
+      <Card className="space-y-3 transition-colors hover:border-accent/50">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
           <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
@@ -43,7 +43,7 @@ export function EventCard({ event }: { event: EventListItem }) {
           )}
           <span className="shrink-0 text-xs font-medium">
             {event.myStatus ? (
-              <span className="text-gold-strong">{registrationStatusLabel(event.myStatus)}</span>
+              <span className="text-accent-strong">{registrationStatusLabel(event.myStatus)}</span>
             ) : remaining === null ? (
               <span className="text-muted">Offen</span>
             ) : full ? (

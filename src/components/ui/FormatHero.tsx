@@ -6,10 +6,10 @@ export function FormatHero({ meta, className }: { meta: FormatHeroMeta; classNam
     <header
       className={cn(
         // Heller Format-Hero (AGE-450 #7): leichtgewichtig „wie die Startseite" statt
-        // des früheren dunklen from-night-Verlaufs, der zu schwer wirkte. Rein
-        // token-getrieben (bg-gold-soft/text-ink) → trägt jede Design-Variante hell.
+        // des früheren dunklen from-chrome-Verlaufs, der zu schwer wirkte. Rein
+        // token-getrieben (bg-accent-soft/text-ink) → trägt jede Design-Variante hell.
         // Bewusst flach (kein Schatten), damit der Hero nicht wieder Gewicht bekommt.
-        "mb-8 rounded-[var(--radius-card)] border border-gold/40 bg-gold-soft/20 px-6 py-10",
+        "mb-8 rounded-[var(--radius-card)] border border-accent/40 bg-accent-soft/20 px-6 py-10",
         className,
       )}
     >

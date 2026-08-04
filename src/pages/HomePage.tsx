@@ -59,7 +59,7 @@ function PublicHome() {
 
   return (
     <div className="space-y-12">
-      <section className="rounded-[var(--radius-card)] border border-gold/40 bg-gold-soft/20 px-6 py-10 sm:px-10 sm:py-14">
+      <section className="rounded-[var(--radius-card)] border border-accent/40 bg-accent-soft/20 px-6 py-10 sm:px-10 sm:py-14">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
           Willkommen im Fair Business Club
         </h1>
@@ -144,7 +144,7 @@ function PublicHome() {
 function Kpi({ value, label }: { value: string; label: string }) {
   return (
     <Card className="text-center">
-      <p className="font-display text-4xl font-semibold text-gold-strong">{value}</p>
+      <p className="font-display text-4xl font-semibold text-accent-strong">{value}</p>
       <p className="mt-1 text-sm text-muted">{label}</p>
     </Card>
   );
@@ -154,7 +154,7 @@ function SectionHeader({ title, to, linkLabel }: { title: string; to: string; li
   return (
     <div className="flex items-end justify-between gap-3">
       <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
-      <Link to={to} className="text-sm font-medium text-gold-strong hover:underline">
+      <Link to={to} className="text-sm font-medium text-accent-strong hover:underline">
         {linkLabel} →
       </Link>
     </div>
@@ -165,9 +165,9 @@ function EventPreview({ event }: { event: EventListItem }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
+      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
     >
-      <Card className="space-y-2 transition-colors hover:border-gold/50">
+      <Card className="space-y-2 transition-colors hover:border-accent/50">
         <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
         <p className="truncate text-sm text-muted">
           {formatEventDate(event.startsAt)}
@@ -194,7 +194,7 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
             src={author.avatarUrl}
             masked
             size="sm"
-            className="ring-1 ring-gold/40"
+            className="ring-1 ring-accent/40"
           />
         ) : (
           <Link to={`/p/${post.author.id}`} className="shrink-0">
@@ -202,7 +202,7 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
               name={author.name}
               src={author.avatarUrl}
               size="sm"
-              className="ring-1 ring-gold/40"
+              className="ring-1 ring-accent/40"
             />
           </Link>
         )}
@@ -213,7 +213,7 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
             <>
               <Link
                 to={`/p/${post.author.id}`}
-                className="font-display text-sm font-semibold text-ink hover:text-gold-strong"
+                className="font-display text-sm font-semibold text-ink hover:text-accent-strong"
               >
                 {author.name}
               </Link>

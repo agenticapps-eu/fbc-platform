@@ -56,18 +56,18 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
                 cn(
                   "relative rounded-md px-3 py-2 text-sm transition-colors",
                   isActive
-                    ? "bg-night/[0.06] font-semibold text-gold-strong"
-                    : "text-ink/70 hover:bg-night/[0.05] hover:text-ink",
+                    ? "bg-chrome/[0.06] font-semibold text-accent-strong"
+                    : "text-ink/70 hover:bg-chrome/[0.05] hover:text-ink",
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  {/* Gold-Linksbalken — gleitet per layoutId zwischen Einträgen. */}
+                  {/* Akzent-Linksbalken — gleitet per layoutId zwischen Einträgen. */}
                   {isActive && (
                     <motion.span
                       layoutId={`sidebar-active-indicator-${indicatorId}`}
-                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold-strong"
+                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-accent-strong"
                       transition={{ duration: preset.duration, ease: preset.ease }}
                     />
                   )}

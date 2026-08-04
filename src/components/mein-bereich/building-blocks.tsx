@@ -19,7 +19,7 @@ export function formatDate(value: string | null, fmt: Intl.DateTimeFormat): stri
 export function DemoBadge() {
   return (
     <span
-      className="inline-flex items-center rounded-full bg-gold-soft/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-gold-strong uppercase"
+      className="inline-flex items-center rounded-full bg-accent-soft/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent-strong uppercase"
       title="Demo-Daten — wird in Phase 2 mit echten Daten gefüllt."
     >
       Demo
@@ -58,7 +58,7 @@ export function DashboardCard({
 
 export function CardLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className="text-xs font-medium text-gold-strong hover:text-gold">
+    <Link to={to} className="text-xs font-medium text-accent-strong hover:text-accent">
       {children}
     </Link>
   );
@@ -68,7 +68,7 @@ export function ProgressBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-      <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
+      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
     </div>
   );
 }

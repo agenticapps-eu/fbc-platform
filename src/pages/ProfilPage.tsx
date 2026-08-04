@@ -166,7 +166,7 @@ function ProfileEditor({ uid }: { uid: string }) {
     >
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link to="/profil" className="text-sm font-medium text-gold-strong hover:text-gold">
+          <Link to="/profil" className="text-sm font-medium text-accent-strong hover:text-accent">
             ← Zurück zum Profil
           </Link>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
@@ -188,7 +188,7 @@ function ProfileEditor({ uid }: { uid: string }) {
           <span
             className={cn(
               "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-              complete ? "bg-gold-soft text-gold-strong" : "bg-soft text-muted",
+              complete ? "bg-accent-soft text-accent-strong" : "bg-soft text-muted",
             )}
           >
             {completion}% {complete ? "· vollständig" : ""}
@@ -198,7 +198,7 @@ function ProfileEditor({ uid }: { uid: string }) {
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              complete ? "bg-gold" : "bg-gold/60",
+              complete ? "bg-accent" : "bg-accent/60",
             )}
             style={{ width: `${completion}%` }}
           />

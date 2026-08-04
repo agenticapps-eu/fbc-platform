@@ -56,7 +56,7 @@ export default function EventDetailPage() {
         <p className="text-sm text-muted">
           Dieses Event existiert nicht oder ist für dich nicht sichtbar.
         </p>
-        <Link to="/events" className="text-sm text-gold-strong hover:text-gold">
+        <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
           ← Zu allen Events
         </Link>
       </div>
@@ -66,7 +66,7 @@ export default function EventDetailPage() {
   const isHost = !!uid && event.host?.kind === "profile" && event.host.id === uid;
   return (
     <div className="space-y-6">
-      <Link to="/events" className="text-sm text-gold-strong hover:text-gold">
+      <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
         ← Zu allen Events
       </Link>
       <EventHeader event={event} />
@@ -119,7 +119,7 @@ function EventHeader({ event }: { event: EventListItem }) {
           {event.host.kind === "profile" ? (
             <Link
               to={`/p/${event.host.id}`}
-              className="flex items-center gap-2 hover:text-gold-strong"
+              className="flex items-center gap-2 hover:text-accent-strong"
             >
               <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
               <span className="text-sm font-medium text-ink">{event.host.name}</span>
@@ -196,7 +196,7 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
     <Card className="flex flex-wrap items-center justify-between gap-3">
       <div className="text-sm">
         {event.myStatus ? (
-          <span className="font-medium text-gold-strong">
+          <span className="font-medium text-accent-strong">
             {registrationStatusLabel(event.myStatus)}
           </span>
         ) : full ? (
@@ -249,7 +249,7 @@ function RatePanel({ event, uid }: { event: EventListItem; uid: string }) {
             disabled={rate.isPending}
             onClick={() => rate.mutate(n)}
             aria-label={`${n} Sterne`}
-            className={`text-2xl disabled:opacity-50 ${myReg.rating && myReg.rating >= n ? "text-gold" : "text-line hover:text-gold/60"}`}
+            className={`text-2xl disabled:opacity-50 ${myReg.rating && myReg.rating >= n ? "text-accent" : "text-line hover:text-accent/60"}`}
           >
             ★
           </button>

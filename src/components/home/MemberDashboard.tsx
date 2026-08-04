@@ -63,7 +63,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-[var(--radius-card)] border border-gold/30 bg-gold-soft/25 px-6 py-9 sm:px-10 sm:py-11">
+      <section className="rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft/25 px-6 py-9 sm:px-10 sm:py-11">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           Willkommen zurück, {firstName}! <span aria-hidden="true">👋</span>
         </h1>
@@ -126,7 +126,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
                           src={author.avatarUrl}
                           masked={author.masked}
                           size="sm"
-                          className="ring-1 ring-gold/40"
+                          className="ring-1 ring-accent/40"
                         />
                         <div className="flex flex-wrap items-center gap-x-2">
                           <span className="font-display text-sm font-semibold text-ink">
@@ -158,13 +158,13 @@ export function MemberDashboard({ uid }: { uid: string }) {
                 <li key={m.id}>
                   <Link
                     to={`/p/${m.id}`}
-                    className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition-colors hover:border-gold/50"
+                    className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition-colors hover:border-accent/50"
                   >
                     <Avatar
                       name={m.name ?? "Mitglied"}
                       src={m.avatar_url}
                       size="sm"
-                      className="ring-1 ring-gold/40"
+                      className="ring-1 ring-accent/40"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-sm font-semibold text-ink">
@@ -174,7 +174,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
                         {[m.region, m.company].filter(Boolean).join(" · ") || levelLabel(m.tier)}
                       </span>
                     </span>
-                    <span aria-hidden="true" className="text-gold-strong">
+                    <span aria-hidden="true" className="text-accent-strong">
                       →
                     </span>
                   </Link>
@@ -194,11 +194,11 @@ export function MemberDashboard({ uid }: { uid: string }) {
             <li key={step.label}>
               <Link
                 to={step.to}
-                className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition-colors hover:border-gold/50"
+                className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition-colors hover:border-accent/50"
               >
                 <span className="font-display text-base font-semibold text-ink">{step.label}</span>
                 <span className="text-sm text-muted">{step.detail}</span>
-                <span className="mt-auto pt-2 text-sm font-medium text-gold-strong">
+                <span className="mt-auto pt-2 text-sm font-medium text-accent-strong">
                   Los geht's →
                 </span>
               </Link>
@@ -207,7 +207,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
         </ul>
       </section>
 
-      <section className="rounded-[var(--radius-card)] border border-gold/30 bg-gold-soft/25 px-6 py-6 sm:px-8">
+      <section className="rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft/25 px-6 py-6 sm:px-8">
         <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-display text-xl font-semibold text-ink">Gemeinsam mehr bewegen.</p>
@@ -277,7 +277,10 @@ function DashTile({
       <p className={`font-display font-semibold text-ink ${valueClassName}`}>{value}</p>
       <p className="truncate text-sm text-muted">{sub}</p>
       {to && (
-        <Link to={to} className="mt-auto pt-3 text-sm font-medium text-gold-strong hover:underline">
+        <Link
+          to={to}
+          className="mt-auto pt-3 text-sm font-medium text-accent-strong hover:underline"
+        >
           {cta} →
         </Link>
       )}
@@ -289,7 +292,7 @@ function SectionHeader({ title, to, cta }: { title: string; to: string; cta: str
   return (
     <div className="flex items-end justify-between gap-3">
       <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
-      <Link to={to} className="shrink-0 text-sm font-medium text-gold-strong hover:underline">
+      <Link to={to} className="shrink-0 text-sm font-medium text-accent-strong hover:underline">
         {cta} →
       </Link>
     </div>

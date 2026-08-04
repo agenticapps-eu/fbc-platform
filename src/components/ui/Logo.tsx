@@ -62,9 +62,9 @@ export function Logo({
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <CrownMark className="h-9 w-auto" />
-      {/* text-gold (nicht gold-soft): gold-soft wird in Variante B dunkel → unlesbar.
-          --color-gold ist in allen Varianten ein helles Gold auf dunklem Grund. */}
-      <span className="font-display text-lg font-semibold leading-tight tracking-tight text-gold">
+      {/* text-accent (nicht accent-soft): accent-soft wird in Variante B dunkel → unlesbar.
+          --color-accent ist in allen Varianten ein helles Gold auf dunklem Grund. */}
+      <span className="font-display text-lg font-semibold leading-tight tracking-tight text-accent">
         Fair Business Club
       </span>
     </span>

@@ -75,7 +75,7 @@ export function FeedbackButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-5 z-40 rounded-full border border-gold/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+        className="fixed bottom-20 right-5 z-40 rounded-full border border-accent/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
       >
         Feedback
       </button>
@@ -87,7 +87,7 @@ export function FeedbackButton() {
           aria-modal="true"
           aria-label="Feedback geben"
         >
-          <div className="absolute inset-0 bg-night/60 backdrop-blur-sm" onClick={close} />
+          <div className="absolute inset-0 bg-chrome/60 backdrop-blur-sm" onClick={close} />
           <div className="absolute bottom-0 right-0 max-h-[90vh] w-full overflow-y-auto rounded-t-[var(--radius-card)] bg-canvas p-6 shadow-soft sm:bottom-5 sm:right-5 sm:w-[26rem] sm:rounded-[var(--radius-card)]">
             <h2 className="text-lg font-semibold text-ink">Wie gefällt dir die Plattform?</h2>
 
@@ -100,7 +100,7 @@ export function FeedbackButton() {
                   aria-checked={rating === n}
                   aria-label={`${n} von 5 Sternen`}
                   onClick={() => setRating(n)}
-                  className="px-1 text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+                  className="px-1 text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
                 >
                   <span aria-hidden="true">{n <= rating ? "★" : "☆"}</span>
                 </button>

@@ -98,13 +98,13 @@ function Onboarding({ uid }: { uid: string }) {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-night text-on-night">
+    <main className="flex min-h-screen flex-col bg-chrome text-on-chrome">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
         <Logo tone="dark" />
         <button
           type="button"
           onClick={handleSkip}
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-on-night-muted transition-colors hover:text-on-night focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-on-chrome-muted transition-colors hover:text-on-chrome focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Überspringen
         </button>
@@ -113,14 +113,14 @@ function Onboarding({ uid }: { uid: string }) {
       {/* Fortschritt */}
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-2xl">
-          <div className="flex items-center justify-between text-xs text-on-night-muted">
+          <div className="flex items-center justify-between text-xs text-on-chrome-muted">
             <span>
               Schritt {stepIndex + 1} von {steps.length}
             </span>
           </div>
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-night-elevated">
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-chrome-elevated">
             <div
-              className="h-full rounded-full bg-gold transition-all"
+              className="h-full rounded-full bg-accent transition-all"
               style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
             />
           </div>
@@ -130,8 +130,10 @@ function Onboarding({ uid }: { uid: string }) {
       {/* Frage (ein Schritt) */}
       <div className="flex flex-1 items-center px-6 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gold">{step.title}</p>
-          <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-on-night sm:text-4xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+            {step.title}
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-on-chrome sm:text-4xl">
             {step.prompt}
           </h1>
 
@@ -163,7 +165,7 @@ function Onboarding({ uid }: { uid: string }) {
               type="button"
               onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
               disabled={stepIndex === 0}
-              className="rounded-md px-3 py-2 text-sm font-medium text-on-night-muted transition-colors hover:text-on-night disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="rounded-md px-3 py-2 text-sm font-medium text-on-chrome-muted transition-colors hover:text-on-chrome disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               ← Zurück
             </button>
@@ -199,8 +201,8 @@ function ScaleField({
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
-        <span className="font-display text-6xl font-semibold text-gold">{value}</span>
-        <span className="text-2xl text-on-night-muted"> / {COMPASS_SCALE_MAX}</span>
+        <span className="font-display text-6xl font-semibold text-accent">{value}</span>
+        <span className="text-2xl text-on-chrome-muted"> / {COMPASS_SCALE_MAX}</span>
       </div>
       <input
         type="range"
@@ -210,9 +212,9 @@ function ScaleField({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={step.prompt}
-        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-night-elevated accent-gold"
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-chrome-elevated accent-accent"
       />
-      <div className="flex justify-between text-sm text-on-night-muted">
+      <div className="flex justify-between text-sm text-on-chrome-muted">
         <span>{step.minLabel}</span>
         <span>{step.maxLabel}</span>
       </div>
@@ -231,7 +233,7 @@ function ChipsField({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      {step.hint && <p className="text-sm text-on-night-muted">{step.hint}</p>}
+      {step.hint && <p className="text-sm text-on-chrome-muted">{step.hint}</p>}
       <div className="flex flex-wrap gap-3">
         {step.options.map((opt) => {
           const isOn = selected.includes(opt.value);
@@ -242,10 +244,10 @@ function ChipsField({
               aria-pressed={isOn}
               onClick={() => onToggle(opt.value)}
               className={cn(
-                "rounded-full border px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
+                "rounded-full border px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 isOn
-                  ? "border-gold bg-gold text-night"
-                  : "border-night-border text-on-night hover:border-gold hover:text-on-night",
+                  ? "border-accent bg-accent text-chrome"
+                  : "border-chrome-border text-on-chrome hover:border-accent hover:text-on-chrome",
               )}
             >
               {opt.label}
@@ -272,25 +274,25 @@ function CompassResultView({
   const themes = ["sein", "tun", "haben", "wirken"] as const;
 
   return (
-    <main className="flex min-h-screen flex-col bg-night text-on-night">
+    <main className="flex min-h-screen flex-col bg-chrome text-on-chrome">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
         <Logo tone="dark" />
       </header>
 
       <div className="flex flex-1 items-center px-6 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gold">Geschafft</p>
-          <h1 className="mt-3 font-display text-4xl font-semibold leading-tight text-on-night">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">Geschafft</p>
+          <h1 className="mt-3 font-display text-4xl font-semibold leading-tight text-on-chrome">
             Dein Compass steht.
           </h1>
-          <p className="mt-3 text-on-night-muted">
+          <p className="mt-3 text-on-chrome-muted">
             Aus deinen Antworten haben wir deinen Erfolgsradar, dein Such- &amp; Bieteprofil und
             deine Interessen erstellt — dein Profil ist jetzt zu {result.completion} % vollständig.
           </p>
 
           {/* Erfolgsradar (Themen-Scores) */}
-          <section className="mt-8 rounded-[var(--radius-card)] border border-night-border bg-night-elevated p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-on-night-muted">
+          <section className="mt-8 rounded-[var(--radius-card)] border border-chrome-border bg-chrome-elevated p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-on-chrome-muted">
               Dein Erfolgsradar
             </h2>
             <ul className="mt-4 flex flex-col gap-3">
@@ -298,16 +300,16 @@ function CompassResultView({
                 const score = Number(scoreByTheme[theme] ?? 0);
                 return (
                   <li key={theme} className="flex items-center gap-3">
-                    <span className="w-16 shrink-0 text-sm text-on-night">
+                    <span className="w-16 shrink-0 text-sm text-on-chrome">
                       {COMPASS_THEME_LABEL[theme]}
                     </span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-night">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-chrome">
                       <div
-                        className="h-full rounded-full bg-gold"
+                        className="h-full rounded-full bg-accent"
                         style={{ width: `${(score / 10) * 100}%` }}
                       />
                     </div>
-                    <span className="w-8 shrink-0 text-right text-sm tabular-nums text-on-night-muted">
+                    <span className="w-8 shrink-0 text-right text-sm tabular-nums text-on-chrome-muted">
                       {score.toFixed(1)}
                     </span>
                   </li>
@@ -338,10 +340,10 @@ function CompassResultView({
 
           {/* Erste Empfehlungen / nächste Schritte (ehrlich, keine Fake-Matches) */}
           <section className="mt-8">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-on-night-muted">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-on-chrome-muted">
               Empfohlene nächste Schritte
             </h2>
-            <ul className="mt-3 flex flex-col gap-2 text-sm text-on-night-muted">
+            <ul className="mt-3 flex flex-col gap-2 text-sm text-on-chrome-muted">
               {result.completion < 80 && (
                 <li>• Vervollständige dein Profil, um Sichtbarkeit und Matching zu verbessern.</li>
               )}
@@ -366,10 +368,10 @@ function CompassResultView({
 
 function SummaryCard({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <div className="rounded-[var(--radius-card)] border border-night-border bg-night-elevated p-5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-on-night-muted">{title}</p>
-      <p className="mt-1 font-display text-3xl font-semibold text-gold">{value}</p>
-      <p className="mt-1 text-xs text-on-night-muted">{hint}</p>
+    <div className="rounded-[var(--radius-card)] border border-chrome-border bg-chrome-elevated p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">{title}</p>
+      <p className="mt-1 font-display text-3xl font-semibold text-accent">{value}</p>
+      <p className="mt-1 text-xs text-on-chrome-muted">{hint}</p>
     </div>
   );
 }
@@ -377,14 +379,14 @@ function SummaryCard({ title, value, hint }: { title: string; value: string; hin
 function ResultChips({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="mt-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-on-night-muted">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-on-chrome-muted">
         {title}
       </h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {items.map((item, i) => (
           <span
             key={`${item}-${i}`}
-            className="rounded-full border border-night-border px-3 py-1 text-sm text-on-night"
+            className="rounded-full border border-chrome-border px-3 py-1 text-sm text-on-chrome"
           >
             {item}
           </span>

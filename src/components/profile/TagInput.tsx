@@ -42,19 +42,19 @@ export function TagInput({ value, onChange, id, placeholder, invalid }: TagInput
         "flex min-h-11 flex-wrap items-center gap-1.5 rounded-md border bg-canvas px-2 py-1.5 transition-colors focus-within:ring-2 focus-within:ring-offset-1 focus-within:ring-offset-soft",
         invalid
           ? "border-danger focus-within:ring-danger"
-          : "border-line focus-within:border-gold focus-within:ring-gold",
+          : "border-line focus-within:border-accent focus-within:ring-accent",
       )}
     >
       {value.map((tag, index) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-full bg-gold-soft px-2.5 py-0.5 text-xs font-medium text-gold-strong"
+          className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong"
         >
           {tag}
           <button
             type="button"
             onClick={() => remove(index)}
-            className="text-gold-strong/70 transition-colors hover:text-gold-strong"
+            className="text-accent-strong/70 transition-colors hover:text-accent-strong"
             aria-label={`${tag} entfernen`}
           >
             &times;

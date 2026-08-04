@@ -35,7 +35,7 @@ function MembershipWall({ min, loggedIn }: { min?: MembershipLevel; loggedIn: bo
   return (
     <div className="flex flex-col gap-6">
       {hero && <FormatHero meta={hero} />}
-      <div className="rounded-[var(--radius-card)] border border-gold/25 bg-canvas/60 p-8 text-center shadow-soft">
+      <div className="rounded-[var(--radius-card)] border border-accent/25 bg-canvas/60 p-8 text-center shadow-soft">
         <h2 className="font-display text-2xl font-semibold text-ink">
           {min
             ? `Dieser Bereich ist ab ${levelLabel(min)} verfügbar`

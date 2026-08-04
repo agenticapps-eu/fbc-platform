@@ -65,7 +65,7 @@ export function Conversation({
                   className={cn(
                     "max-w-[75%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap",
                     mine
-                      ? "bg-gold text-night rounded-br-sm"
+                      ? "bg-accent text-chrome rounded-br-sm"
                       : "border border-line bg-canvas text-ink rounded-bl-sm",
                     message.pending && "opacity-60",
                   )}
@@ -92,7 +92,7 @@ export function Conversation({
           rows={1}
           placeholder="Nachricht schreiben…"
           aria-label="Nachricht schreiben"
-          className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-md border border-line bg-canvas px-3 py-2.5 text-sm text-ink focus-visible:border-gold focus-visible:outline-none"
+          className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-md border border-line bg-canvas px-3 py-2.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none"
         />
         <Button type="submit" disabled={sending || !draft.trim()}>
           Senden

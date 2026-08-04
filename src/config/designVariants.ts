@@ -28,8 +28,6 @@ export interface DesignVariant {
   backdrop?: BackdropStyle;
   /** Kartenstil; setzt [data-card-style] auf <html> (Default: 'solid'). */
   cardStyle?: CardStyle;
-  /** Optionaler Zweitakzent (Hex), nur für die Styleguide-Vorschau. */
-  accent2?: string;
   /** Bewusst distinktes Experiment — im Switcher als „Experimentell" markiert. */
   experimental?: boolean;
   recommended?: boolean;
@@ -150,7 +148,6 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     headlineFont: "sans",
     cardStyle: "glass",
     backdrop: "aurora",
-    accent2: "#6ee0c2",
     experimental: true,
   },
   g: {
@@ -162,7 +159,6 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     headlineFont: "serif",
     cardStyle: "solid",
     backdrop: "paper",
-    accent2: "#6e7e5c",
     experimental: true,
   },
   h: {
@@ -186,7 +182,7 @@ export const DESIGN_VARIANTS: Record<DesignVariantId, DesignVariant> = {
     backdrop: "none",
   },
   /** AGE-441/450 — FBC Blau, drei Ausprägungen zur Auswahl für Detlev. Gemeinsame
-   *  Palette (Blau als Akzent-Token `--color-gold`, dokumentierte Mechanik: gleiche
+   *  Palette (Blau als Akzent-Token `--color-accent`, dokumentierte Mechanik: gleiche
    *  Namen, andere Werte); sie unterscheiden sich nur in Sidebar- und Button-Fläche.
    *  Leitlinie: dezent, geringer Kontrast zum Hintergrund, klar lesbar (kein Glas/
    *  Blur). `blau` = helle Sidebar · `blau-slate` = gedämpftes Blaugrau ·

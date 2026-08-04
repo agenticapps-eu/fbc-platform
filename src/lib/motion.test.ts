@@ -16,7 +16,7 @@ describe("getMotionPreset", () => {
     expect(subtle.slide).toBeLessThan(dramatic.slide);
   });
 
-  it("enables the gold glow only for the dramatic tier", () => {
+  it("enables the accent glow only for the dramatic tier", () => {
     expect(getMotionPreset("subtle", false).glow).toBe(false);
     expect(getMotionPreset("medium", false).glow).toBe(false);
     expect(getMotionPreset("dramatic", false).glow).toBe(true);
