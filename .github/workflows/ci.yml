@@ -26,6 +26,31 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+      # Zwei Zusagen aus AGE-492, die KEIN Typecheck halten kann, weil beide
+      # Strings sind: Tailwind-Klassennamen prüft TypeScript nicht, und eine
+      # Font-URL ist nur Text. Ohne diesen Schritt schleichen sie sich in C2–C6
+      # lautlos zurück — genau deshalb steht die Abnahme hier und nicht nur in
+      # einer Checkliste.
+      - name: No retired design tokens, no third-party fonts
+        run: |
+          fail=0
+
+          # `gold` als Token/Utility. src/vision/ ist ausgenommen: der eingefrorene
+          # eff.bee.zee-Vision-Dummy (AGE-492 §3) hat einen eigenen --ebz-gold-
+          # Namensraum, wird von nirgends importiert und landet in keinem Bundle.
+          if grep -rniI "gold" src/ --exclude-dir=vision; then
+            echo "::error::'gold' ist seit AGE-492 kein Token mehr — bitte 'accent' verwenden."
+            fail=1
+          fi
+
+          # Schriften kommen vom eigenen Origin (DSGVO, AGE-492 §6).
+          if grep -rnI -e "fonts\.googleapis" -e "fonts\.gstatic" src/ index.html; then
+            echo "::error::Schriften müssen selbst gehostet werden (public/fonts/)."
+            fail=1
+          fi
+
+          exit $fail
+
   # Migration validation: boot a throwaway local Supabase stack and apply every
   # migration from scratch. `supabase db reset` exits non-zero if any migration
   # fails to apply cleanly — that is the dry-run/validate gate. No secrets needed.

@@ -7,6 +7,7 @@ import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
 import { RouteTransition } from "./ui/Motion";
+import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 
@@ -279,23 +280,15 @@ export default function AppShell() {
             to="/"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            {/* Header-Logo: das echte, INTAKTE gestapelte FBC-Lockup — aber der
-                umlaufende Weißraum des PNGs (oben/unten ~⅓) ist per background-crop
-                auf die Content-Bounding-Box weggeschnitten. Dadurch wirkt das Logo
-                groß, obwohl die Navbar flach bleibt (py-1.5). Crop-Werte an das
-                Layout von fbc-logo-crown.png gebunden — ändert sich das Asset,
-                hier nachziehen. Header ist in allen angebotenen Varianten hell,
-                daher trägt die schwarze Wortmarke. sr-only trägt den Link-Namen. */}
-            <span
-              aria-hidden
-              className="block h-12 aspect-[1.75] bg-no-repeat"
-              style={{
-                backgroundImage: "url(/brand/fbc-logo-crown.png)",
-                backgroundSize: "113% 148%",
-                backgroundPosition: "48% 51%",
-              }}
-            />
-            <span className="sr-only">Fair Business Club</span>
+            {/* Header-Logo. Bis AGE-492 lag hier das gestapelte Kronen-PNG, dessen
+                umlaufender Weißraum per background-crop weggeschnitten war — mit
+                Crop-Werten, die an das Asset-Layout gebunden waren. Das SVG-Lockup
+                braucht das nicht: es ist randlos, skaliert sauber und erbt über
+                currentColor die Farbe beider Themes. */}
+            {/* Kein sr-only daneben: das Lockup enthält die Wortmarke als echten
+                Text, der Link trägt seinen Namen also selbst. Das PNG vorher war
+                aria-hidden und brauchte ihn. */}
+            <Logo className="h-8" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">

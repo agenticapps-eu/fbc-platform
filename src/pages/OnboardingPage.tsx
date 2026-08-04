@@ -100,7 +100,7 @@ function Onboarding({ uid }: { uid: string }) {
   return (
     <main className="flex min-h-screen flex-col bg-chrome text-on-chrome">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
-        <Logo tone="dark" />
+        <Logo />
         <button
           type="button"
           onClick={handleSkip}
@@ -276,7 +276,7 @@ function CompassResultView({
   return (
     <main className="flex min-h-screen flex-col bg-chrome text-on-chrome">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
-        <Logo tone="dark" />
+        <Logo />
       </header>
 
       <div className="flex flex-1 items-center px-6 py-10 sm:px-10">

@@ -26,7 +26,7 @@ describe("App", () => {
     );
 
     // Logo erscheint in Sidebar (Desktop) und Header (Mobil) — beide im DOM.
-    expect(screen.getAllByRole("link", { name: "Fair Business Club" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "eff.bee.zee" }).length).toBeGreaterThan(0);
     // Anon sieht das ganze Schaufenster: alle sechs „Entdecken"-Einträge, unabhängig
     // davon, ob der Inhalt gegatet ist (Spec §1 — Rechte gaten Inhalte, nicht das Menü).
     for (const label of ["Start", "Compass", "Academy", "Events", "Mitglieder", "Aktivität"]) {
