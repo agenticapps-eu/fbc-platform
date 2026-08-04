@@ -1,99 +1,66 @@
-# Session Handoff — 2026-08-04
+# Session Handoff — 2026-08-04 (2. Session)
 
 ## Accomplished
 
-Change C1 des eff.bee.zee-Go-Live (**AGE-492**) vollständig implementiert, auf
-Branch `donald/age-492-c1-design-system-blau-statt-gold`, 10 Commits (6 mit
-Code, 4 mit Dokumentation und Korrekturen).
+Der aus der Vorsession offene Plan-Review für **AGE-492 / C1** ist gelaufen, seine
+Befunde sind eingearbeitet, die pgTAP-Suite ist geprüft, **PR #106 ist offen**.
 
-- OpenSpec-Change `redesign-blue-theme-system` angelegt: proposal.md, tasks.md,
-  neue Capability `design-system` (6 Requirements), `member-profiles` erweitert.
-  `openspec validate --all` grün (25/25).
-- **Umbenennung** gold→accent (237 Treffer/57 Dateien) und night→chrome
-  (55/15) als eigener, verhaltensneutraler erster Commit.
-- **Blau-Token-System**, zwei Themes (hell/navy), `index.css` 661→165 Zeilen
-  (+ Font-Block). Zwölf Varianten, Backdrops, Glow-Effekte, `--accent2`,
-  `--color-fmt-*` entfernt.
-- **`member_settings.theme`** (Migration + 6 pgTAP-Assertions), Theme-Auflösung
-  über localStorage + Server, Umschalter in den Einstellungen.
-- **Marke:** `CompassMark` ersetzt `CrownMark`, Logo ohne `tone`/PNG, neues
-  Favicon. Kronen-Assets gelöscht.
-- **Fonts selbst gehostet** (4 woff2, 260 kB) — kein Fremd-CDN mehr.
-- **CI-Gate** für beide grep-Kriterien, per Sonde als wirksam belegt.
-- **WCAG AA gemessen** in beiden Themes; zwei echte Kontrastfehler gefunden
-  und behoben.
-
-283 Tests grün, lint/typecheck/build grün.
+- **Plan-Review** (`run-plan-review.sh redesign-blue-theme-system`): gemini und
+  codex, **beide REQUEST-CHANGES**; opencode lief in den 180-s-Timeout und fehlt
+  als dritte Stimme. Neun Punkte übernommen, drei begründet abgelehnt — die
+  vollständige Triage steht in `REVIEWS.md` und ist als „von Donald noch nicht
+  gegengelesen" gekennzeichnet.
+- **Ein echter Code-Defekt** aus dem Review: der Server-Write des Themes hing an
+  einem leeren `.catch(() => {})`. Test zuerst rot, dann behoben.
+- **CI-Gate erweitert** auf `--color-night`, `--accent2`, `--color-fmt-`,
+  `data-card-style`; per Sonde belegt.
+- **pgTAP gelaufen** (cparx-Stack kurz gestoppt, danach wieder gestartet):
+  `grants_test.sql` + `rls_test.sql`, **70 Tests, PASS**. Golden-Snapshot unbewegt.
+- 284 Vitest-Tests, lint, typecheck, build grün. `openspec validate --all` 25/25.
+- Linear AGE-492 auf **In Review**; der PR hängt als Attachment daran.
 
 ## Decisions
 
-- **night→chrome mitumbenannt** — auf Donalds Entscheidung, bewusst gegen
-  AGE-492s „ein Massen-Rename reicht". Grund: `--color-night` bedeutet im hellen
-  Theme Weiß.
-- **`linkedin` ganz entfernt** statt „unerreichbar behalten" (AGE-492 §3) — ohne
-  CSS-Block, Route und Vision-App wäre es ein toter Enum-Wert.
-- **Theme hat einen eigenen schmalen Schreibpfad**, nicht ein Feld in
-  `MemberSettings`: `saveMemberSettings` upsertet alle Präferenzen und würde das
-  Theme mit einem veralteten Cache-Wert überschreiben (Lehre aus AGE-313).
-- **Server-Write hängt an der Handlung** (`EinstellungenPage`), nicht an einem
-  Effect über `variant`. Aus einem Effect abgeleitet überschrieb die lokale Wahl
-  beim Login den Serverwert — der Test hat das gefunden, nicht ein Review.
-- **`ThemeServerSync` sitzt neben dem Provider**, nicht darin: Auth+Query im
-  Provider zwangen jeden Seitentest, beide mitzubringen.
-- **TierBadge behält 3 Gewichte** statt der 6 `--tier-*` der Vorlage — die
-  bestehende Entscheidung ist im Code begründet, und niemand hat sie infrage
-  gestellt.
+- **Delta korrigiert statt Code gebaut**, wo der Review etwas verlangte, das der
+  Baum nicht hergibt: die „deliberate transition" gab es nie — statt sie zu bauen,
+  sagt der Delta jetzt „ein einmaliges Umschalten, keine Animation".
+- **localStorage wird beim Logout NICHT gelöscht** (gemini hatte es verlangt).
+  Widerspricht der bestehenden Entscheidung; beim Login gewinnt ohnehin der
+  Serverwert. Die Shared-Device-Folge steht jetzt ausdrücklich im Delta.
+- **Der `CHECK`-Constraint wird im Delta nicht beim Namen genannt** — eine Spec
+  sagt Verhalten, nicht Mechanismus. Der Mechanismus steht im Migrationskopf.
+- **Font-Preload abgelehnt** für diesen Change — Implementierungsdetail,
+  `font-display: swap` steht bereits. Kandidat für C2.
+- Der erste pgTAP-Lauf sah nach echtem Fehlschlag aus (`platform_settings does not
+exist`): **altes lokales Volume**, dem alle Migrationen ab 20260723 fehlten.
+  `supabase db reset` war die Lösung — nicht der Delta.
 
 ## Files modified
 
-- `src/index.css` — komplett neu (Tokens, navy-Override, @font-face)
-- `src/config/designVariants.ts`, `src/providers/{DesignVariantProvider,design-variant-context}` — auf zwei Themes reduziert
-- `src/providers/ThemeServerSync.tsx` (+ Test) — neu
-- `src/components/ui/`: `CompassMark.tsx` neu, `Logo.tsx` neu geschrieben, `CrownMark.tsx` gelöscht
-- `src/pages/{EinstellungenPage,StyleguidePage}.tsx`
-- `supabase/migrations/20260804120000_member_settings_theme.sql`, `supabase/tests/rls_test.sql`
-- `index.html`, `.github/workflows/ci.yml`, `docs/design-system.md`
-- `public/fonts/*` (4 neu), `public/brand/*` (Krone raus, Kompass rein)
+- `openspec/changes/redesign-blue-theme-system/specs/design-system/spec.md` — sechs
+  Stellen korrigiert (First Paint, Query-Ignorierung, ausgeloggter Fall,
+  Write-Fehlerfall, CI-Geltungsbereich, Font-Host)
+- `.../specs/member-profiles/spec.md` — Privatheit auf die DB-Zeile präzisiert
+- `.../REVIEWS.md` — Reviewer-Voten + Triage · `.../tasks.md` — 5.2/5.3 auf erledigt
+- `src/pages/EinstellungenPage.tsx` (+ `.test.tsx`) — Fehlschlag wird gemeldet
+- `.github/workflows/ci.yml` — weitere zurückgezogene Namen
 
 ## Next session: start here
 
-**Erster Schritt: `run-plan-review.sh redesign-blue-theme-system`.** Donald hat
-den Plan-Review bewusst auf nach diesem Handoff + `/clear` verschoben, damit die
-Reviewer den Change ohne den Kontext der Implementierungssession lesen. Der Code
-steht also schon, der Delta ist aber ungeprüft — der Review liest
-`proposal.md`, `tasks.md` und die beiden Spec-Deltas, nicht den Diff. Ergebnis
-nach `openspec/changes/redesign-blue-theme-system/REVIEWS.md`. Kommt dort etwas
-Substanzielles, ist es billiger, den Delta zu korrigieren als den Code.
-
-**Zweiter Schritt: die pgTAP-Suite laufen lassen** — der einzige technisch
-ungeprüfte Teil. Port 54322 war von cparx belegt, deshalb konnte `supabase
-start` hier nicht booten. Also cparx-Stack stoppen
-(`supabase stop --project-id cparx`) oder in `supabase/config.toml` einen
-anderen Port setzen, dann
-`supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql`.
-Besonders `grants_test.sql` — dessen Golden-Snapshot ist bei Schema-Ergänzungen
-schon einmal gebrochen (AGE-455).
-
-Danach PR öffnen.
+**PR #106 prüfen**: `gh pr view 106 --json state,statusCheckRollup`. Beim Verlassen
+dieser Session waren `deploy` und `pr-title` grün, `verify` und `migrations` liefen
+noch — Ergebnis also zuerst ansehen, nicht annehmen. Danach fehlt für die Abnahme
+aus AGE-492 nur noch **die Preview-Abnahme durch Detlev** und das Durchklicken
+beider Themes; alles andere ist abgehakt. Merge nach `gh pr view --json state`
+verifizieren (`gh pr merge` kann still fehlschlagen). **Migrationen erreichen Prod
+nicht durch den Merge** — `supabase db push` bleibt manuell.
 
 ## Open questions
 
-- **Zwei Hook-Overrides** waren nötig: `design-shotgun-gate` und
-  `database-sentinel`. Beide verlangen ein Sentinel unter `.planning/`, das die
-  globale CLAUDE.md als schreibverboten führt; der zweite verweist zusätzlich
-  auf `/gsd-discuss-phase`, das es nicht mehr gibt. Als **AGE-493** gemeldet.
-
-  **Die Sentinels sind gelöscht** (Donald, 2026-08-04) — `.planning/current-phase/`
-  existiert nicht mehr. Beide Gates blockieren also wieder. Für den ersten
-  Schritt der nächsten Session (Plan-Review) ist das egal, der fasst keinen Code
-  an. Muss danach doch etwas an einer `.tsx`/`.css`/Migration korrigiert werden,
-  blockiert es erneut — dann bewusst neu entscheiden, statt den Override
-  reflexhaft zu wiederholen. Die Begründungen von damals stehen vollständig in
-  den Commit-Messages von `cf435f8` und `6457bfc`.
-
-- **`DesignSwitcher` bleibt vorerst** (Donalds Entscheidung, 2026-08-04): nicht
-  gemountet, für zwei Themes umgebaut, Funktion von den Einstellungen
-  übernommen. Löschkandidat, aber nicht in diesem Change.
-- Der alte `CrownIcon` (Rang-Symbol in `profil-widgets`/`ProfileHero`) ist
-  geblieben — gehört nicht zum Logo, aber eine Krone passt nach dem Rebrand
-  nicht mehr. Kandidat für C2/C6.
+- **Die beiden Hook-Gates** (`design-shotgun-gate`, `database-sentinel`) blockierten
+  in dieser Session **nicht** — die Edits an `.tsx`, `.yml` und den Spec-Dateien
+  liefen ohne Override durch. Der in der Vorsession beschriebene Zustand („beide
+  blockieren wieder") hat sich also nicht bestätigt; AGE-493 bleibt trotzdem offen.
+- Die Triage der Review-Befunde ist **von Donald nicht gegengelesen**. Besonders
+  die drei Ablehnungen sind Produktentscheidungen, keine technischen.
+- `DesignSwitcher` und der alte `CrownIcon` bleiben unverändert liegen → C2/C6.
