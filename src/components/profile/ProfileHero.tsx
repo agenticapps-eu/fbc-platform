@@ -57,9 +57,9 @@ export function ProfileHero({
   const banner = bannerUrl ?? coverUrl;
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Banner — heller Akzent-Verlauf aus Tokens (folgt dem Theme) mit dezentem
-          Shimmer-Sweep. Das Avatar überlappt diesen Block NICHT. */}
-      <div className="fbc-hero-shimmer relative h-24 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-32">
+      {/* Banner — heller Akzent-Verlauf aus Tokens (folgt dem Theme).
+          Das Avatar überlappt diesen Block NICHT. */}
+      <div className="relative h-24 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-32">
         {banner && (
           <img
             src={banner}

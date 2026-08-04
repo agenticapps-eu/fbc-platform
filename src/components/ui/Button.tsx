@@ -13,9 +13,8 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-soft disabled:cursor-not-allowed disabled:opacity-50";
 
 const variants: Record<Variant, string> = {
-  // Primary — Akzent-Fläche, Chrome-Text. fbc-sheen: Glanz-Hover + Press-Scale.
-  primary:
-    "fbc-sheen bg-accent text-chrome hover:bg-accent-strong hover:text-on-chrome focus-visible:ring-accent",
+  // Primary — Akzent-Fläche, Text in accent-ink (kein Glanz-Effekt mehr, AGE-492).
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong focus-visible:ring-accent",
   // Secondary — near-black Fläche, heller Text. Dezenter Rand, damit der Button sich
   // in Variante B (dunkle Canvas ≈ bg-chrome) noch von der Fläche abhebt.
   secondary:

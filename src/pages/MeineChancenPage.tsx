@@ -175,7 +175,7 @@ function HubHeader({
   recomputing: boolean;
 }) {
   return (
-    <header className="fbc-hero-shimmer overflow-hidden rounded-[var(--radius-card)] border border-accent/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-accent-soft))] shadow-soft">
+    <header className="overflow-hidden rounded-[var(--radius-card)] border border-accent/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-accent-soft))] shadow-soft">
       <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-8">
         <div className="min-w-0">
           <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">

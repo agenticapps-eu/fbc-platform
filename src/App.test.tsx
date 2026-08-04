@@ -64,22 +64,20 @@ describe("App", () => {
 });
 
 /**
- * AGE-450 — eff.bee.zee (Variante `linkedin`) ist Detlevs Vision und darf für
- * Nicht-Admins nicht sichtbar sein, auch nicht über persistiertes localStorage.
- * Der Vision-Dummy zeigt sein „Vorschau · in Entwicklung"-Banner — daran hängt die Prüfung.
+ * AGE-492 — der eff.bee.zee-Vision-Dummy ist aus dem Renderpfad entfernt. Bis
+ * AGE-450 rendete App.tsx ihn für Staff statt der echten App; dieser Escape-Hatch
+ * ist weg, und `src/vision/` wird von nirgends mehr importiert.
+ *
+ * Der Test steht bewusst als Regressionsschutz weiter hier: er hätte vor diesem
+ * Change bestanden (mit umgekehrter Erwartung), und er fällt, sobald jemand den
+ * Renderpfad zurückholt. Der Dummy zeigt ein „Vorschau · in Entwicklung"-Banner —
+ * daran hängt die Prüfung.
  */
-describe("eff.bee.zee ist admin-only", () => {
+describe("der Vision-Dummy ist aus dem Renderpfad entfernt", () => {
   afterEach(() => {
     localStorage.clear();
-    // Der Provider spiegelt die Variante per replaceState in window.location;
-    // ohne Rücksetzen gewänne dieses ?variant= im nächsten Test über localStorage.
     window.history.replaceState({}, "", "/");
   });
-
-  // Höchste Priorität hat ?variant= (vor localStorage) — deterministisch gesetzt.
-  function selectLinkedin() {
-    window.history.replaceState({}, "", "/?variant=linkedin");
-  }
 
   function renderApp(value: AuthContextValue) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -96,22 +94,25 @@ describe("eff.bee.zee ist admin-only", () => {
     );
   }
 
-  it("rendert die Vision-App für Staff", () => {
-    selectLinkedin();
+  it("rendert die echte App auch für Staff — nicht die Vision", async () => {
     renderApp(
       fakeAuthValue({ user: { id: "admin" } as AuthContextValue["user"], staffRole: "admin" }),
     );
-    expect(screen.getByText(/Vorschau · in Entwicklung/)).toBeInTheDocument();
+    // Die AppShell der echten App (Sidebar-Navigation) ist da; der Vision-Dummy
+    // ersetzt die Routes vollständig und hätte sie nicht.
+    await waitFor(() => expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument());
+    expect(screen.queryByText(/Vorschau · in Entwicklung/)).not.toBeInTheDocument();
   });
 
-  it("verbirgt die Vision-App vor Nicht-Staff und fällt auf die echte App zurück", async () => {
-    selectLinkedin();
-    renderApp(fakeAuthValue());
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: "Willkommen im Fair Business Club" }),
-      ).toBeInTheDocument(),
+  // Bestandsnutzer tragen "linkedin" noch im localStorage. Das darf weder die
+  // Vision holen noch die App auf ein Theme ohne CSS-Block stellen.
+  it('ignoriert ein gespeichertes „linkedin" und fällt auf hell zurück', async () => {
+    localStorage.setItem("fbc.designVariant", "linkedin");
+    renderApp(
+      fakeAuthValue({ user: { id: "admin" } as AuthContextValue["user"], staffRole: "admin" }),
     );
+    await waitFor(() => expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument());
     expect(screen.queryByText(/Vorschau · in Entwicklung/)).not.toBeInTheDocument();
+    expect(document.documentElement.dataset.variant).toBe("hell");
   });
 });

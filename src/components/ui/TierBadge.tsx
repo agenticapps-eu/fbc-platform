@@ -19,12 +19,5 @@ const LEVEL_WEIGHT: Record<MembershipLevel, BadgeVariant> = {
  *  hier nicht modellierten Wert liefert. */
 export function TierBadge({ tier }: { tier: string }) {
   const variant: BadgeVariant = isMembershipLevel(tier) ? LEVEL_WEIGHT[tier] : "neutral";
-  // Glow-Puls nur für das obere Ende und nur in b/d (CSS .fbc-tier-pulse ist
-  // je Variante gestaffelt). Die Gratis-Stufen bleiben ruhig.
-  const pulse = variant === "strong";
-  return (
-    <Badge variant={variant} className={pulse ? "fbc-tier-pulse" : undefined}>
-      {levelLabel(tier)}
-    </Badge>
-  );
+  return <Badge variant={variant}>{levelLabel(tier)}</Badge>;
 }

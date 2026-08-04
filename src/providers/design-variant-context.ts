@@ -4,17 +4,15 @@ import type { DesignVariant, DesignVariantId } from "../config/designVariants";
 import { getMotionPreset, type MotionPreset } from "../lib/motion";
 
 export interface DesignVariantContextValue {
-  /** Aktive Variante (a|b|c|d). */
+  /** Aktives Theme (hell | navy). */
   variant: DesignVariantId;
-  /** Metadaten der aktiven Variante (Label, Flags …). */
+  /** Metadaten des aktiven Themes (Label, Beschreibung). */
   meta: DesignVariant;
-  /** Schaltet live auf eine Variante um (persistiert + setzt ?variant=). */
+  /** Schaltet live um und persistiert (localStorage, eingeloggt zusätzlich Server). */
   setVariant: (id: DesignVariantId) => void;
-  /** Schaltet zur nächsten Variante (für den Tastatur-Shortcut). */
-  cycleVariant: () => void;
   /** prefers-reduced-motion aktiv. */
   reducedMotion: boolean;
-  /** Motion-Preset der aktiven Variante, bereits reduced-motion-bereinigt. */
+  /** Motion-Preset, bereits reduced-motion-bereinigt. */
   preset: MotionPreset;
 }
 
@@ -30,9 +28,9 @@ export function useDesignVariant(): DesignVariantContextValue {
   return ctx;
 }
 
-/** Defaultwert für Leaf-Komponenten ohne Provider (Variante 'd'). reducedMotion
- *  wird einmalig aus der Media-Query abgeleitet, damit auch provider-lose
- *  Komponenten (isolierte Tests, Styleguide-Snippets) reduced-motion respektieren. */
+/** Defaultwert für Leaf-Komponenten ohne Provider. reducedMotion wird einmalig
+ *  aus der Media-Query abgeleitet, damit auch provider-lose Komponenten
+ *  (isolierte Tests, Styleguide-Snippets) reduced-motion respektieren. */
 const defaultReduced =
   typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -42,14 +40,13 @@ const DEFAULT_VALUE: DesignVariantContextValue = {
   variant: DEFAULT_VARIANT,
   meta: DESIGN_VARIANTS[DEFAULT_VARIANT],
   setVariant: () => {},
-  cycleVariant: () => {},
   reducedMotion: defaultReduced,
-  preset: getMotionPreset(DESIGN_VARIANTS[DEFAULT_VARIANT].motion, defaultReduced),
+  preset: getMotionPreset(defaultReduced),
 };
 
 /** Nicht-werfende Lesevariante: liefert ohne Provider sinnvolle Defaults.
  *  Für Theming-/Motion-Leafkomponenten, die auch isoliert rendern (Tests,
- *  Styleguide-Snippets). Der Live-Switcher nutzt dagegen `useDesignVariant`. */
+ *  Styleguide-Snippets). */
 export function useDesignVariantValue(): DesignVariantContextValue {
   return useContext(DesignVariantContext) ?? DEFAULT_VALUE;
 }

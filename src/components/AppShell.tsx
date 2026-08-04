@@ -9,8 +9,6 @@ import { FeedbackButton } from "./feedback/FeedbackButton";
 import { RouteTransition } from "./ui/Motion";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
-import { VariantBackdrop } from "./ui/VariantBackdrop";
-import { useDesignVariantValue } from "../providers/design-variant-context";
 
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
@@ -242,8 +240,6 @@ export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { meta } = useDesignVariantValue();
-  const hasBackdrop = (meta.backdrop ?? "none") !== "none";
   // Exakter Pfad-Vergleich: /profil (Bento) ist breit, /profil/bearbeiten (Editor) bleibt
   // zentriert. Alle WIDE_ROUTES sind Blattseiten ohne breite Unterrouten.
   const isWide = WIDE_ROUTES.includes(pathname);
@@ -266,15 +262,7 @@ export default function AppShell() {
   }
 
   return (
-    <div
-      className={cn(
-        "relative isolate min-h-screen text-ink",
-        // Bei aktivem Backdrop (F/G) ist der Shell-Hintergrund transparent, damit
-        // die fixe -z-10-Ebene (<VariantBackdrop>) durchscheint; sonst wie gehabt.
-        hasBackdrop ? "bg-transparent" : "bg-soft",
-      )}
-    >
-      <VariantBackdrop />
+    <div className="relative isolate min-h-screen bg-soft text-ink">
       {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
           rechts Benachrichtigungen + Avatar/Tier. */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">

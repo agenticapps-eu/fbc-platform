@@ -145,18 +145,18 @@ function AxiomTestSection() {
   );
 }
 
-/** Live-Umschaltbare Design-Varianten + Animations-Demo (AGE-237). */
+/** Theme-Umschalter + Animations-Demo. */
 function VariantsSection() {
   const { variant, setVariant, meta } = useDesignVariant();
   return (
-    <Section title="Design-Varianten (Live-Switcher)">
+    <Section title="Themes">
       <p className="-mt-2 text-sm text-muted">
-        Sieben umschaltbare Looks als Theming-/Animations-Schicht (<code>data-variant</code>) — A–D
-        plus die experimentellen E/F/G (Noir Editorial · Aurora Glass · Warm Boutique). Die Auswahl
-        wird in localStorage + URL (<code>?variant=</code>) gespiegelt. Aktiv:{" "}
+        Zwei Themes als reine Token-Schicht (<code>data-variant</code>) — dieselben Token-Namen,
+        andere Werte. Die Wahl liegt in localStorage, eingeloggt zusätzlich in{" "}
+        <code>member_settings.theme</code>. Aktiv:{" "}
         <strong className="text-ink">{meta.label}</strong>.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         {DESIGN_VARIANT_IDS.map((id) => {
           const v = DESIGN_VARIANTS[id];
           const active = id === variant;
@@ -183,23 +183,8 @@ function VariantsSection() {
                   {id}
                 </span>
                 <span className="font-display text-base font-semibold text-ink">{v.label}</span>
-                {v.recommended && (
-                  <span className="text-accent-strong" title="Empfehlung">
-                    ★
-                  </span>
-                )}
-                {v.experimental && (
-                  <span className="rounded-full border border-accent/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent-strong">
-                    Experimentell
-                  </span>
-                )}
               </div>
               <p className="mt-2 text-xs text-muted">{v.description}</p>
-              <p className="mt-2 text-[11px] uppercase tracking-wide text-muted/80">
-                {v.motion} · {v.heroStyle} · {v.headlineFont}
-                {v.cardStyle && v.cardStyle !== "solid" && ` · ${v.cardStyle}`}
-                {v.backdrop && v.backdrop !== "none" && ` · ${v.backdrop}`}
-              </p>
             </button>
           );
         })}
