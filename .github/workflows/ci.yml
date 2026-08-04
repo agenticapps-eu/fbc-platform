@@ -43,6 +43,16 @@ jobs:
             fail=1
           fi
 
+          # Die übrigen zurückgezogenen Namen. Bewusst die exakten Token-/Attribut-
+          # Formen statt der bloßen Wörter: `night` steht noch in genau einem
+          # Kommentar, der die Umbenennung dokumentiert, und den soll die Prüfung
+          # nicht abschießen.
+          if grep -rnI -e "--color-night" -e "--accent2" -e "--color-fmt-" \
+              -e "data-card-style" src/ --exclude-dir=vision; then
+            echo "::error::Zurückgezogener Token/Mechanismus aus AGE-492 — siehe openspec/specs/design-system."
+            fail=1
+          fi
+
           # Schriften kommen vom eigenen Origin (DSGVO, AGE-492 §6).
           if grep -rnI -e "fonts\.googleapis" -e "fonts\.gstatic" src/ index.html; then
             echo "::error::Schriften müssen selbst gehostet werden (public/fonts/)."
