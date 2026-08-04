@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Conversation } from "../components/chat/Conversation";
 import { ThreadList } from "../components/chat/ThreadList";
+import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useToast } from "../components/ui/toast-context";
@@ -122,9 +123,18 @@ export default function ChatPage() {
           <CardDescription>{errorMessage(threadsQuery.error)}</CardDescription>
         </Card>
       ) : !threadsQuery.isLoading && threads.length === 0 ? (
+        // AGE-494: Hier liegt die Handlung beim Mitglied — also den Weg zeigen,
+        // statt auf ein Ereignis zu warten, das es selbst auslösen kann.
         <EmptyState
-          title="Noch keine Konversationen"
-          description="Sobald eine Kontaktanfrage angenommen wurde, erscheint hier euer Chat."
+          title="Noch kein Gespräch begonnen"
+          description="Chats entstehen, sobald eine Kontaktanfrage angenommen wurde. Schau im Verzeichnis, wer zu dir passt, und schreib die erste Anfrage."
+          action={
+            <Link to="/mitglieder">
+              <Button variant="primary" size="sm">
+                Mitglieder entdecken
+              </Button>
+            </Link>
+          }
         />
       ) : (
         <Card className="grid h-[32rem] grid-cols-1 overflow-hidden p-0 md:grid-cols-[18rem_1fr]">

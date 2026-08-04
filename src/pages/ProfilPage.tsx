@@ -2,6 +2,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { categoryLabel, type MatchingSide } from "../config/matching";
+import {
+  categoryOptionsForSide,
+  ConfirmationRequiredError,
+  fetchCategorySelection,
+  profileCategoriesQueryKey,
+  saveCategorySelection,
+  type CategorySelection,
+} from "../lib/profile-categories";
 import { AvatarCropper } from "../components/profile/AvatarCropper";
 import { TagInput } from "../components/profile/TagInput";
 import { VideoLinksInput } from "../components/profile/VideoLinksInput";
@@ -159,312 +168,506 @@ function ProfileEditor({ uid }: { uid: string }) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit(() => mutation.mutate())}
-      className="flex flex-col gap-6"
-      noValidate
-    >
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Link to="/profil" className="text-sm font-medium text-accent-strong hover:text-accent">
-            ← Zurück zum Profil
-          </Link>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-            Profil bearbeiten
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Pflege deine Angaben — sie speisen dein öffentliches Profil und das Matching.
-          </p>
-        </div>
-        <Button type="submit" variant="primary" disabled={mutation.isPending}>
-          {mutation.isPending ? "Speichern…" : "Speichern"}
-        </Button>
-      </header>
-
-      {/* Vollständigkeit (live) */}
-      <Card className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Profil-Vollständigkeit</CardTitle>
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-              complete ? "bg-accent-soft text-accent-strong" : "bg-soft text-muted",
-            )}
-          >
-            {completion}% {complete ? "· vollständig" : ""}
-          </span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-soft">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              complete ? "bg-accent" : "bg-accent/60",
-            )}
-            style={{ width: `${completion}%` }}
-          />
-        </div>
-        {!complete && (
-          <p className="text-xs text-muted">
-            Ab 80 % gilt dein Profil als vollständig. Avatar, Headline, Rollen, Kompetenzen, Website
-            und Social-Links zählen mit.
-          </p>
-        )}
-      </Card>
-
-      {/* Profilbild */}
-      <Card className="flex flex-col gap-4">
-        <CardTitle className="text-base">Profilbild</CardTitle>
-        <div className="flex items-center gap-5">
-          <Avatar name={values.name || "?"} src={preview ?? values.avatar_url} size="lg" />
-          <div className="flex flex-col gap-2">
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
-              {values.avatar_url || preview ? "Bild ändern" : "Bild hochladen"}
-            </Button>
-            <p className="text-xs text-muted">JPG, PNG oder WebP. Quadratischer Zuschnitt.</p>
+    <div className="flex flex-col gap-6">
+      <form
+        onSubmit={handleSubmit(() => mutation.mutate())}
+        className="flex flex-col gap-6"
+        noValidate
+      >
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <Link to="/profil" className="text-sm font-medium text-accent-strong hover:text-accent">
+              ← Zurück zum Profil
+            </Link>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+              Profil bearbeiten
+            </h1>
+            <p className="mt-1 text-sm text-muted">
+              Pflege deine Angaben — sie speisen dein öffentliches Profil und das Matching.
+            </p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={onFileChange}
-            className="hidden"
-          />
-        </div>
-      </Card>
+          <Button type="submit" variant="primary" disabled={mutation.isPending}>
+            {mutation.isPending ? "Speichern…" : "Speichern"}
+          </Button>
+        </header>
 
-      {/* Basisangaben */}
-      <Card className="flex flex-col gap-4">
-        <CardTitle className="text-base">Basisangaben</CardTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" required error={errors.name?.message}>
-            {({ id, invalid }) => (
-              <Input id={id} invalid={invalid} {...register("name")} autoComplete="name" />
+        {/* Vollständigkeit (live) */}
+        <Card className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Profil-Vollständigkeit</CardTitle>
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                complete ? "bg-accent-soft text-accent-strong" : "bg-soft text-muted",
+              )}
+            >
+              {completion}% {complete ? "· vollständig" : ""}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-soft">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                complete ? "bg-accent" : "bg-accent/60",
+              )}
+              style={{ width: `${completion}%` }}
+            />
+          </div>
+          {!complete && (
+            <p className="text-xs text-muted">
+              Ab 80 % gilt dein Profil als vollständig. Avatar, Headline, Rollen, Kompetenzen,
+              Website und Social-Links zählen mit.
+            </p>
+          )}
+        </Card>
+
+        {/* Profilbild */}
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Profilbild</CardTitle>
+          <div className="flex items-center gap-5">
+            <Avatar name={values.name || "?"} src={preview ?? values.avatar_url} size="lg" />
+            <div className="flex flex-col gap-2">
+              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+                {values.avatar_url || preview ? "Bild ändern" : "Bild hochladen"}
+              </Button>
+              <p className="text-xs text-muted">JPG, PNG oder WebP. Quadratischer Zuschnitt.</p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onFileChange}
+              className="hidden"
+            />
+          </div>
+        </Card>
+
+        {/* Basisangaben */}
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Basisangaben</CardTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Name" required error={errors.name?.message}>
+              {({ id, invalid }) => (
+                <Input id={id} invalid={invalid} {...register("name")} autoComplete="name" />
+              )}
+            </Field>
+            <Field label="Region" required error={errors.region?.message}>
+              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("region")} />}
+            </Field>
+            <Field label="Unternehmen" required error={errors.company?.message}>
+              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("company")} />}
+            </Field>
+            <Field label="Branche" error={errors.branche?.message}>
+              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("branche")} />}
+            </Field>
+          </div>
+          <Field
+            label="Headline"
+            hint="z. B. „Unternehmer · Investor · Deal Keeper“"
+            error={errors.headline?.message}
+          >
+            {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("headline")} />}
+          </Field>
+          <Field label="Kurzbeschreibung" required error={errors.short_bio?.message}>
+            {({ id, invalid }) => <Textarea id={id} invalid={invalid} {...register("short_bio")} />}
+          </Field>
+        </Card>
+
+        {/* Rollen & Kompetenzen */}
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Rollen & Kompetenzen</CardTitle>
+          <Field label="Rollen" hint="Enter oder Komma fügt hinzu.">
+            {({ id }) => (
+              <Controller
+                control={control}
+                name="roles"
+                render={({ field }) => (
+                  <TagInput
+                    id={id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Rolle hinzufügen…"
+                  />
+                )}
+              />
             )}
           </Field>
-          <Field label="Region" required error={errors.region?.message}>
-            {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("region")} />}
+          <Field label="Kompetenzen" hint="Enter oder Komma fügt hinzu.">
+            {({ id }) => (
+              <Controller
+                control={control}
+                name="competencies"
+                render={({ field }) => (
+                  <TagInput
+                    id={id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Kompetenz hinzufügen…"
+                  />
+                )}
+              />
+            )}
           </Field>
-          <Field label="Unternehmen" required error={errors.company?.message}>
-            {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("company")} />}
-          </Field>
-          <Field label="Branche" error={errors.branche?.message}>
-            {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("branche")} />}
-          </Field>
-        </div>
-        <Field
-          label="Headline"
-          hint="z. B. „Unternehmer · Investor · Deal Keeper“"
-          error={errors.headline?.message}
-        >
-          {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("headline")} />}
-        </Field>
-        <Field label="Kurzbeschreibung" required error={errors.short_bio?.message}>
-          {({ id, invalid }) => <Textarea id={id} invalid={invalid} {...register("short_bio")} />}
-        </Field>
-      </Card>
+        </Card>
 
-      {/* Rollen & Kompetenzen */}
-      <Card className="flex flex-col gap-4">
-        <CardTitle className="text-base">Rollen & Kompetenzen</CardTitle>
-        <Field label="Rollen" hint="Enter oder Komma fügt hinzu.">
-          {({ id }) => (
-            <Controller
-              control={control}
-              name="roles"
-              render={({ field }) => (
-                <TagInput
-                  id={id}
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Rolle hinzufügen…"
-                />
-              )}
-            />
-          )}
-        </Field>
-        <Field label="Kompetenzen" hint="Enter oder Komma fügt hinzu.">
-          {({ id }) => (
-            <Controller
-              control={control}
-              name="competencies"
-              render={({ field }) => (
-                <TagInput
-                  id={id}
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Kompetenz hinzufügen…"
-                />
-              )}
-            />
-          )}
-        </Field>
-      </Card>
-
-      {/* Interessen */}
-      <Card className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Interessen</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => interests.append({ theme: "", label: "" })}
-          >
-            + Interesse
-          </Button>
-        </div>
-        {interests.fields.length === 0 ? (
-          <CardDescription>Noch keine Interessen hinterlegt.</CardDescription>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {interests.fields.map((row, index) => (
-              <li key={row.id} className="grid grid-cols-[10rem_1fr_auto] gap-2">
-                <Select {...register(`interests.${index}.theme`)} aria-label="Thema">
-                  <option value="">Ohne Thema</option>
-                  {THEMES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </Select>
-                <Input
-                  placeholder="Bezeichnung"
-                  invalid={!!errors.interests?.[index]?.label}
-                  {...register(`interests.${index}.label`)}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => interests.remove(index)}
-                  aria-label="Interesse entfernen"
-                >
-                  Entfernen
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* Ziele */}
-      <Card className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Ziele</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => goals.append({ category: "persoenlich", title: "", progress: 0 })}
-          >
-            + Ziel
-          </Button>
-        </div>
-        {goals.fields.length === 0 ? (
-          <CardDescription>Noch keine Ziele hinterlegt.</CardDescription>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {goals.fields.map((row, index) => (
-              <li key={row.id} className="grid grid-cols-[10rem_1fr_5rem_auto] gap-2">
-                <Select {...register(`goals.${index}.category`)} aria-label="Kategorie">
-                  {GOAL_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </Select>
-                <Input
-                  placeholder="Titel"
-                  invalid={!!errors.goals?.[index]?.title}
-                  {...register(`goals.${index}.title`)}
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  aria-label="Fortschritt in Prozent"
-                  {...register(`goals.${index}.progress`, { valueAsNumber: true })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => goals.remove(index)}
-                  aria-label="Ziel entfernen"
-                >
-                  Entfernen
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* Entwicklung */}
-      <Card className="flex flex-col gap-4">
-        <CardTitle className="text-base">Entwicklung</CardTitle>
-        <Field label="Aktueller Fokus" hint="Sein · Tun · Haben · Wirken">
-          {({ id }) => (
-            <Select id={id} {...register("dev_focus")}>
-              <option value="">Kein Fokus</option>
-              {THEMES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
+        {/* Interessen */}
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Interessen</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => interests.append({ theme: "", label: "" })}
+            >
+              + Interesse
+            </Button>
+          </div>
+          {interests.fields.length === 0 ? (
+            <CardDescription>Noch keine Interessen hinterlegt.</CardDescription>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {interests.fields.map((row, index) => (
+                <li key={row.id} className="grid grid-cols-[10rem_1fr_auto] gap-2">
+                  <Select {...register(`interests.${index}.theme`)} aria-label="Thema">
+                    <option value="">Ohne Thema</option>
+                    {THEMES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    placeholder="Bezeichnung"
+                    invalid={!!errors.interests?.[index]?.label}
+                    {...register(`interests.${index}.label`)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => interests.remove(index)}
+                    aria-label="Interesse entfernen"
+                  >
+                    Entfernen
+                  </Button>
+                </li>
               ))}
-            </Select>
+            </ul>
           )}
-        </Field>
-      </Card>
+        </Card>
 
-      {/* Web & Social */}
-      <Card className="flex flex-col gap-4">
-        <CardTitle className="text-base">Web & Social</CardTitle>
-        <Field label="Website" error={errors.website?.message}>
-          {({ id, invalid }) => (
-            <Input id={id} invalid={invalid} placeholder="https://…" {...register("website")} />
+        {/* Ziele */}
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Ziele</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => goals.append({ category: "persoenlich", title: "", progress: 0 })}
+            >
+              + Ziel
+            </Button>
+          </div>
+          {goals.fields.length === 0 ? (
+            <CardDescription>Noch keine Ziele hinterlegt.</CardDescription>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {goals.fields.map((row, index) => (
+                <li key={row.id} className="grid grid-cols-[10rem_1fr_5rem_auto] gap-2">
+                  <Select {...register(`goals.${index}.category`)} aria-label="Kategorie">
+                    {GOAL_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    placeholder="Titel"
+                    invalid={!!errors.goals?.[index]?.title}
+                    {...register(`goals.${index}.title`)}
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    aria-label="Fortschritt in Prozent"
+                    {...register(`goals.${index}.progress`, { valueAsNumber: true })}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => goals.remove(index)}
+                    aria-label="Ziel entfernen"
+                  >
+                    Entfernen
+                  </Button>
+                </li>
+              ))}
+            </ul>
           )}
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="LinkedIn">
-            {({ id }) => <Input id={id} {...register("socials.linkedin")} />}
-          </Field>
-          <Field label="Instagram">
-            {({ id }) => <Input id={id} {...register("socials.instagram")} />}
-          </Field>
-          <Field label="Xing">{({ id }) => <Input id={id} {...register("socials.xing")} />}</Field>
-        </div>
-      </Card>
+        </Card>
 
-      {/* Videos (AGE-252) */}
-      <Card className="flex flex-col gap-4">
-        <div>
-          <CardTitle className="text-base">Videos</CardTitle>
-          <CardDescription>
-            YouTube- oder Vimeo-Links. Sie erscheinen auf deinem öffentlichen Profil.
-          </CardDescription>
-        </div>
-        <Controller
-          control={control}
-          name="videos"
-          render={({ field }) => <VideoLinksInput value={field.value} onChange={field.onChange} />}
-        />
-      </Card>
+        {/* Entwicklung */}
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Entwicklung</CardTitle>
+          <Field label="Aktueller Fokus" hint="Sein · Tun · Haben · Wirken">
+            {({ id }) => (
+              <Select id={id} {...register("dev_focus")}>
+                <option value="">Kein Fokus</option>
+                {THEMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </Card>
 
-      <div className="flex justify-end">
-        <Button type="submit" variant="primary" disabled={mutation.isPending}>
-          {mutation.isPending ? "Speichern…" : "Speichern"}
-        </Button>
+        {/* Web & Social */}
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Web & Social</CardTitle>
+          <Field label="Website" error={errors.website?.message}>
+            {({ id, invalid }) => (
+              <Input id={id} invalid={invalid} placeholder="https://…" {...register("website")} />
+            )}
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="LinkedIn">
+              {({ id }) => <Input id={id} {...register("socials.linkedin")} />}
+            </Field>
+            <Field label="Instagram">
+              {({ id }) => <Input id={id} {...register("socials.instagram")} />}
+            </Field>
+            <Field label="Xing">
+              {({ id }) => <Input id={id} {...register("socials.xing")} />}
+            </Field>
+          </div>
+        </Card>
+
+        {/* Videos (AGE-252) */}
+        <Card className="flex flex-col gap-4">
+          <div>
+            <CardTitle className="text-base">Videos</CardTitle>
+            <CardDescription>
+              YouTube- oder Vimeo-Links. Sie erscheinen auf deinem öffentlichen Profil.
+            </CardDescription>
+          </div>
+          <Controller
+            control={control}
+            name="videos"
+            render={({ field }) => (
+              <VideoLinksInput value={field.value} onChange={field.onChange} />
+            )}
+          />
+        </Card>
+
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" disabled={mutation.isPending}>
+            {mutation.isPending ? "Speichern…" : "Speichern"}
+          </Button>
+        </div>
+
+        {pendingFile && (
+          <AvatarCropper
+            file={pendingFile}
+            onCancel={() => setPendingFile(null)}
+            onConfirm={(blob, url) => {
+              setAvatarBlob(blob);
+              if (preview) URL.revokeObjectURL(preview);
+              setPreview(url);
+              setPendingFile(null);
+            }}
+          />
+        )}
+      </form>
+      {/* AGE-494: Der Kompass hat keine eigene Seite mehr — seine Kategorien
+          leben hier und über der Mitgliederliste. */}
+      <KompassKategorien uid={uid} />
+    </div>
+  );
+}
+
+/**
+ * Kompass-Kategorien im Profil (AGE-494).
+ *
+ * Bewusst NEBEN dem Profil-Formular und mit eigenem Speichern: die Chips schreiben
+ * `offers`/`needs`, das Formular schreibt `profiles`. Ein gemeinsames Absenden
+ * müsste zwei Fehlerfälle in einem Button zusammenfassen und beim Rückfrage-Dialog
+ * das ganze Profil blockieren.
+ */
+function KompassKategorien({ uid }: { uid: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  // Der Serverstand ist die Quelle; `edited` ist nur die noch ungespeicherte
+  // Abweichung davon. Kein Effect, der den Serverstand in einen zweiten Zustand
+  // spiegelt — das wären zwei Wahrheiten und eine Kaskade beim ersten Rendern.
+  const [edited, setEdited] = useState<CategorySelection | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { side: MatchingSide; category: string }[] | null
+  >(null);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: profileCategoriesQueryKey(uid),
+    queryFn: () => fetchCategorySelection(uid),
+  });
+
+  const selection = edited ?? data ?? null;
+
+  const mutation = useMutation({
+    mutationFn: (opts: { confirmed?: boolean }) =>
+      saveCategorySelection(uid, selection ?? { offers: [], needs: [] }, opts),
+    onSuccess: () => {
+      setPendingConfirm(null);
+      // Zurück auf den Serverstand: die Abweichung ist geschrieben.
+      setEdited(null);
+      queryClient.invalidateQueries({ queryKey: profileCategoriesQueryKey(uid) });
+      toast({ variant: "success", title: "Kategorien gespeichert" });
+    },
+    onError: (error) => {
+      if (error instanceof ConfirmationRequiredError) {
+        setPendingConfirm(error.categories);
+        return;
+      }
+      toast({
+        variant: "error",
+        title: "Speichern fehlgeschlagen",
+        description: errorMessage(error),
+      });
+    },
+  });
+
+  // isError ZUERST: im Fehlerfall ist `data` undefined und damit `selection` null —
+  // stünde die `!selection`-Prüfung davor, verschwände der ganze Block wortlos.
+  if (isError) {
+    return <p className="text-sm text-danger">Kategorien konnten nicht geladen werden.</p>;
+  }
+  if (isLoading || !selection) return null;
+
+  function toggle(side: "offers" | "needs", value: string) {
+    setPendingConfirm(null);
+    setEdited((prev) => {
+      const base = prev ?? data;
+      if (!base) return prev;
+      const current = base[side];
+      return {
+        ...base,
+        [side]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+      };
+    });
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-canvas p-5 shadow-soft">
+      <div>
+        <h2 className="font-display text-xl font-semibold text-ink">Ich biete &amp; ich suche</h2>
+        <p className="mt-1 text-sm text-muted">
+          Wähle die Kategorien, die auf dich passen. Sie erscheinen auf deiner Karte im
+          Mitgliederverzeichnis und lassen dich über die Filter finden.
+        </p>
       </div>
 
-      {pendingFile && (
-        <AvatarCropper
-          file={pendingFile}
-          onCancel={() => setPendingFile(null)}
-          onConfirm={(blob, url) => {
-            setAvatarBlob(blob);
-            if (preview) URL.revokeObjectURL(preview);
-            setPreview(url);
-            setPendingFile(null);
-          }}
-        />
+      <ChipGroup
+        label="Ich biete"
+        options={categoryOptionsForSide("offer")}
+        selected={selection.offers}
+        onToggle={(v) => toggle("offers", v)}
+      />
+      <ChipGroup
+        label="Ich suche"
+        options={categoryOptionsForSide("need")}
+        selected={selection.needs}
+        onToggle={(v) => toggle("needs", v)}
+      />
+
+      {pendingConfirm && (
+        <div
+          role="alertdialog"
+          aria-label="Ausführliche Einträge verwerfen?"
+          className="rounded-[var(--radius-card)] border border-danger/40 bg-danger/5 p-4"
+        >
+          <p className="text-sm font-semibold text-ink">
+            Diese Kategorien enthalten ausführliche Einträge
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            In {pendingConfirm.map((c) => categoryLabel(c.side, c.category)).join(", ")} hast du
+            unter „Suche &amp; Biete“ etwas ausformuliert — mit Beschreibung, Schlagworten oder
+            Volumen. Beim Entfernen der Kategorie geht das mit verloren.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => mutation.mutate({ confirmed: true })}
+              disabled={mutation.isPending}
+            >
+              Trotzdem entfernen
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPendingConfirm(null);
+                setEdited(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+          </div>
+        </div>
       )}
-    </form>
+
+      <div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => mutation.mutate({})}
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending ? "Wird gespeichert…" : "Kategorien speichern"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function ChipGroup({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-xs font-semibold tracking-wide text-muted uppercase">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const on = selected.includes(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(o.value)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas focus-visible:outline-none",
+                on
+                  ? "border-accent bg-accent text-accent-ink"
+                  : "border-line text-muted hover:border-accent/60 hover:text-ink",
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }

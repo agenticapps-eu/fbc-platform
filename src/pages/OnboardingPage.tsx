@@ -85,7 +85,9 @@ function Onboarding({ uid }: { uid: string }) {
 
   function handleSkip() {
     markSkipped(uid);
-    navigate("/mein-bereich", { replace: true });
+    // AGE-494: /mein-bereich ist reiner Redirect auf /profil (App.tsx) — direkt
+    // dorthin, statt über eine Zwischenstation zu springen.
+    navigate("/profil", { replace: true });
   }
 
   const isLast = stepIndex === steps.length - 1;
@@ -93,7 +95,9 @@ function Onboarding({ uid }: { uid: string }) {
 
   if (mutation.isSuccess) {
     return (
-      <CompassResultView result={mutation.data} onGoDashboard={() => navigate("/mein-bereich")} />
+      // AGE-494: /mein-bereich ist reiner Redirect auf /profil (App.tsx) — direkt
+      // dorthin, statt den Nutzer über eine Zwischenstation zu schicken.
+      <CompassResultView result={mutation.data} onGoDashboard={() => navigate("/profil")} />
     );
   }
 
@@ -155,7 +159,7 @@ function Onboarding({ uid }: { uid: string }) {
 
           {mutation.isError && (
             <p className="mt-8 text-sm text-danger">
-              Compass konnte nicht gespeichert werden: {errorMessage(mutation.error)}
+              Kompass konnte nicht gespeichert werden: {errorMessage(mutation.error)}
             </p>
           )}
 
@@ -175,7 +179,7 @@ function Onboarding({ uid }: { uid: string }) {
                 onClick={() => mutation.mutate()}
                 disabled={mutation.isPending}
               >
-                {mutation.isPending ? "Wird gespeichert…" : "Compass abschließen"}
+                {mutation.isPending ? "Wird gespeichert…" : "Kompass abschließen"}
               </Button>
             ) : (
               <Button variant="primary" onClick={() => setStepIndex((i) => i + 1)}>
@@ -283,7 +287,7 @@ function CompassResultView({
         <div className="mx-auto w-full max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">Geschafft</p>
           <h1 className="mt-3 font-display text-4xl font-semibold leading-tight text-on-chrome">
-            Dein Compass steht.
+            Dein Kompass steht.
           </h1>
           <p className="mt-3 text-on-chrome-muted">
             Aus deinen Antworten haben wir deinen Erfolgsradar, dein Such- &amp; Bieteprofil und

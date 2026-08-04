@@ -68,10 +68,15 @@ function AppInner() {
         <Route path="/matching" element={<Navigate to="/" replace />} />
         <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
         <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />
-        {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /compass (Spec §3).
-            Der Redirect landet auf dem Mini-Compass-Tab, nicht auf „Suche & Biete" —
-            Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus. */}
-        <Route path="/angebote-gesuche" element={<Navigate to="/compass" replace />} />
+        {/* AGE-494: Die Route heißt sichtbar „Kompass". Der Redirect hält alte
+            Links und Lesezeichen am Leben — die DB heißt weiter `compass`, das ist
+            Absicht (siehe Kopf von src/config/compass.ts). */}
+        <Route path="/compass" element={<Navigate to="/kompass" replace />} />
+        {/* Der Such-/Biete-Editor ist seit AGE-314 ein Tab in /kompass (Spec §3).
+            Der Redirect landet auf dem Mini-Kompass-Tab, nicht auf „Suche & Biete" —
+            Tab-Deeplinks hat heute keine Seite, das wäre ein eigener Mechanismus.
+            Direkt auf /kompass, nicht über /compass: zwei Sprünge für nichts. */}
+        <Route path="/angebote-gesuche" element={<Navigate to="/kompass" replace />} />
         {/* Chat-Deeplink auf einen Thread (AGE-248 §9). /chat selbst kommt aus navItems;
             die param-Variante öffnet direkt eine Konversation (z. B. aus einer Anfrage). */}
         <Route

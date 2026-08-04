@@ -1,69 +1,45 @@
 import { Link } from "react-router-dom";
 import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
+import { EmptyState } from "../ui/EmptyState";
 import { CardLink, DashboardCard, dateFmt, formatDate } from "./building-blocks";
 import { isPastEvent } from "../../lib/events";
-import { type DashboardData, type DashboardEvent } from "../../lib/dashboard";
+import { type DashboardData } from "../../lib/dashboard";
 
-const DEMO_EVENTS: DashboardEvent[] = [
-  {
-    status: "registered",
-    checked_in: false,
-    event: {
-      id: "demo-1",
-      title: "Legacy Dinner Stuttgart",
-      type: "dinner",
-      starts_at: "2026-07-02T18:00:00Z",
-      location: "Stuttgart",
-    },
-  },
-  {
-    status: "registered",
-    checked_in: false,
-    event: {
-      id: "demo-2",
-      title: "Mastermind: Nachfolge & Beteiligung",
-      type: "mastermind",
-      starts_at: "2026-07-14T16:00:00Z",
-      location: "Online",
-    },
-  },
-];
-
-// 4 ── Meine Events (CORE soweit Daten, sonst DEMO) ────────────────────────────
-// Echte Buchungen (gebucht/vergangen) und selbst gehostete Events. DEMO nur, wenn
-// das Mitglied noch gar keine Events hat (profile-spec §5: Leerzustand zeigt Demo).
+// 4 ── Meine Events ──────────────────────────────────────────────────────────
+// Echte Buchungen (gebucht/vergangen) und selbst gehostete Events.
+//
+// AGE-494: Der Leerzustand zeigte bis hierher ZWEI ERFUNDENE EVENTS mit
+// „Demo"-Marke (profile-spec §5). Am 17.08. melden sich ~70 Menschen zum ersten
+// Mal an und hätten alle diese beiden Termine gesehen — erfundene Daten sind ein
+// schlechterer erster Eindruck als eine ehrliche Leere, und sie machen aus einer
+// Plattform ein Technik-Projekt. Jetzt steht dort, was als Nächstes zu tun ist.
 export function EventsWidget({ data }: { data: DashboardData }) {
   const now = new Date();
   const booked = data.events.filter((e) => e.event && e.status !== "cancelled");
   const upcoming = booked.filter((e) => !isPastEvent(e.event!.starts_at, now));
   const past = booked.filter((e) => isPastEvent(e.event!.starts_at, now));
   const hosted = data.hostedEvents;
-  const isDemo = booked.length === 0 && hosted.length === 0;
+  const isEmpty = booked.length === 0 && hosted.length === 0;
 
-  if (isDemo) {
+  if (isEmpty) {
     return (
       <DashboardCard
         id="events"
         title="Meine Events"
-        demo
         action={<CardLink to="/events">Alle anzeigen</CardLink>}
       >
-        <ul className="flex flex-col gap-3">
-          {DEMO_EVENTS.map((row, i) => (
-            <li key={row.event?.id ?? i} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">
-                  {row.event?.title ?? "Event"}
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {formatDate(row.event?.starts_at ?? null, dateFmt)}
-                  {row.event?.location && <> · {row.event.location}</>}
-                </p>
-              </div>
-              {row.event?.type && <Badge variant="soft">{row.event.type}</Badge>}
-            </li>
-          ))}
-        </ul>
+        <EmptyState
+          title="Noch nichts gebucht"
+          description="Hier sammeln sich die Termine, zu denen du dich angemeldet hast — und die, die du selbst ausrichtest."
+          action={
+            <Link to="/events">
+              <Button variant="primary" size="sm">
+                Events ansehen
+              </Button>
+            </Link>
+          }
+        />
       </DashboardCard>
     );
   }

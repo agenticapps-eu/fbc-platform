@@ -4,6 +4,8 @@ import {
   emptyDirectoryFilters,
   filtersToArgs,
   hasActiveFilters,
+  NEED_CATEGORY_OPTIONS,
+  OFFER_CATEGORY_OPTIONS,
   type DirectoryMember,
 } from "./directory";
 
@@ -21,6 +23,10 @@ function member(overrides: Partial<DirectoryMember>): DirectoryMember {
     competencies: null,
     has_offers: false,
     has_needs: false,
+    // AGE-494: Die RPC liefert hier immer ein Array, nie null — das `coalesce`
+    // in der Migration garantiert es, und die Fixture bildet das nach.
+    offer_categories: [],
+    need_categories: [],
     ...overrides,
   };
 }
@@ -34,6 +40,8 @@ describe("filtersToArgs", () => {
       p_region: undefined,
       p_competency: undefined,
       p_offering: undefined,
+      p_offers: undefined,
+      p_needs: undefined,
     });
     expect(filtersToArgs({ ...emptyDirectoryFilters, query: "   " }).p_query).toBeUndefined();
   });
@@ -46,6 +54,8 @@ describe("filtersToArgs", () => {
       region: "Stuttgart",
       competency: "Vertrieb",
       offering: "offers",
+      offers: ["kapital", "mentoring"],
+      needs: ["experten"],
     });
     expect(args).toEqual({
       p_query: "Coaching",
@@ -54,7 +64,19 @@ describe("filtersToArgs", () => {
       p_region: "Stuttgart",
       p_competency: "Vertrieb",
       p_offering: "offers",
+      p_offers: ["kapital", "mentoring"],
+      p_needs: ["experten"],
     });
+  });
+
+  /* AGE-494: Ein LEERES Array darf nicht als Argument rausgehen. Serverseitig
+     filtert `cardinality(...) = 0` zwar ohnehin nicht — aber der Filterzustand
+     wandert als Objekt in den React-Query-Key, und `[]` und `undefined` wären dort
+     zwei verschiedene Schlüssel für dieselbe Abfrage. */
+  it("lässt leere Kategorie-Auswahlen weg statt ein leeres Array zu schicken", () => {
+    const args = filtersToArgs({ ...emptyDirectoryFilters, offers: [], needs: [] });
+    expect(args.p_offers).toBeUndefined();
+    expect(args.p_needs).toBeUndefined();
   });
 });
 
@@ -63,6 +85,45 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(emptyDirectoryFilters)).toBe(false);
     expect(hasActiveFilters({ ...emptyDirectoryFilters, query: " x " })).toBe(true);
     expect(hasActiveFilters({ ...emptyDirectoryFilters, offering: "needs" })).toBe(true);
+  });
+
+  it("zählt auch eine Kategorie-Auswahl als aktiven Filter", () => {
+    expect(hasActiveFilters({ ...emptyDirectoryFilters, offers: ["kapital"] })).toBe(true);
+    expect(hasActiveFilters({ ...emptyDirectoryFilters, needs: ["experten"] })).toBe(true);
+    // Eine leere Auswahl ist KEIN Filter — sonst stünde „Filter zurücksetzen"
+    // dauerhaft da, sobald jemand einen Chip an- und wieder abwählt.
+    expect(hasActiveFilters({ ...emptyDirectoryFilters, offers: [], needs: [] })).toBe(false);
+  });
+});
+
+/* AGE-494: Die elf Kategorien sind KEINE flache Elferliste. `compass.ts` führt
+   sechs „Ich biete"- und sechs „Ich suche"-Chips; ihre Vereinigung ergibt elf,
+   weil `immobilien` auf beiden Seiten steht. Die Optionen werden aus derselben
+   Konfiguration abgeleitet, nicht neu aufgeschrieben — sonst driften Filter,
+   Profil-Editor und Assistent auseinander. */
+describe("Kompass-Kategorien als Filteroptionen", () => {
+  it("führt je Seite sechs Optionen, nicht elf", () => {
+    expect(OFFER_CATEGORY_OPTIONS).toHaveLength(6);
+    expect(NEED_CATEGORY_OPTIONS).toHaveLength(6);
+  });
+
+  it("nutzt den Kategorie-Schlüssel als Wert, nicht den Chip-Schlüssel", () => {
+    // `compass.ts` unterscheidet `value` (Entwurfs-Schlüssel) und `category`
+    // (was in offers/needs.category landet). Der Filter muss auf `category`
+    // gehen, sonst sucht er nach Werten, die in der Tabelle nie stehen:
+    // der Chip „expertise" schreibt die Kategorie „know_how".
+    expect(OFFER_CATEGORY_OPTIONS.map((o) => o.value)).toContain("know_how");
+    expect(OFFER_CATEGORY_OPTIONS.map((o) => o.value)).not.toContain("expertise");
+  });
+
+  it("hat auf beiden Seiten Immobilien — die Vereinigung ergibt die elf", () => {
+    const alle = new Set([
+      ...OFFER_CATEGORY_OPTIONS.map((o) => o.value),
+      ...NEED_CATEGORY_OPTIONS.map((o) => o.value),
+    ]);
+    expect(alle.size).toBe(11);
+    expect(OFFER_CATEGORY_OPTIONS.map((o) => o.value)).toContain("immobilien");
+    expect(NEED_CATEGORY_OPTIONS.map((o) => o.value)).toContain("immobilien");
   });
 });
 

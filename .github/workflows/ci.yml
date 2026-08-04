@@ -85,11 +85,20 @@ jobs:
       # sie davon sehen. Beides muss stimmen — ein Grant ohne Policy ist totes
       # Gewicht, eine Policy ohne Grant ist tot (AGE-311, AGE-312).
       #
-      # Bewusst diese zwei Dateien und nicht das ganze Verzeichnis: die
-      # probe_*.sql sind manuelle begin/rollback-Skripte ohne plan()/finish()
-      # und damit kein pgTAP — pg_prove würde an ihnen scheitern.
+      # Bewusst diese Dateien und nicht das ganze Verzeichnis: die probe_*.sql
+      # sind manuelle begin/rollback-Skripte ohne plan()/finish() und damit kein
+      # pgTAP — pg_prove würde an ihnen scheitern. Wer hier einen Test ergänzt,
+      # muss ihn auch in diese Zeile eintragen, sonst läuft er nie.
+      #
+      # directory_search_test.sql (AGE-494) prüft die dritte Frage: WELCHE FELDER
+      # die Verzeichnis-RPC preisgibt. Die Kompass-Kategorien sagen jetzt, was
+      # jemand sucht — nicht mehr nur, dass er sucht.
       - name: Verify the grant + RLS rights matrix (pgTAP)
-        run: supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql
+        run: >
+          supabase test db
+          supabase/tests/grants_test.sql
+          supabase/tests/rls_test.sql
+          supabase/tests/directory_search_test.sql
 
   # Enforce a Conventional-Commit-style PR title (the squash-merge commit subject).
   pr-title:

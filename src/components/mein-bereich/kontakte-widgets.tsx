@@ -159,10 +159,28 @@ export function NetzwerkWidget({ contactsCount }: { contactsCount: number }) {
       title="Mein Netzwerk"
       action={<CardLink to="/chat">Zum Chat</CardLink>}
     >
-      <div>
-        <div className="font-display text-3xl font-semibold text-ink">{contactsCount}</div>
-        <div className="text-xs tracking-wide text-muted uppercase">Bestätigte Kontakte</div>
-      </div>
+      {/* AGE-494: Eine große „0" ohne Weg ist am ersten Tag die entmutigendste
+          Zahl der Plattform. Mit Kontakten bleibt sie die Kennzahl, ohne wird sie
+          zur Einladung. */}
+      {contactsCount === 0 ? (
+        <div>
+          <p className="text-sm text-ink">Dein Netzwerk fängt bei einer Anfrage an.</p>
+          <p className="mt-1 text-sm text-muted">
+            Wen du im Verzeichnis findest, kannst du direkt anschreiben — angenommene Anfragen
+            erscheinen hier und öffnen den Chat.
+          </p>
+          <Link to="/mitglieder" className="mt-3 inline-block">
+            <Button variant="primary" size="sm">
+              Mitglieder entdecken
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div>
+          <div className="font-display text-3xl font-semibold text-ink">{contactsCount}</div>
+          <div className="text-xs tracking-wide text-muted uppercase">Bestätigte Kontakte</div>
+        </div>
+      )}
       <div>
         <div className="flex items-center gap-2">
           <p className="text-xs font-semibold tracking-wide text-muted uppercase">
@@ -194,10 +212,9 @@ export function MatchingWidget({ data }: { data: DashboardData }) {
       title="Mein Matching"
       className="md:col-span-2"
       action={
-        <div className="flex items-center gap-3">
-          <CardLink to="/compass">Bearbeiten</CardLink>
-          <CardLink to="/meine-chancen">Zu meinen Chancen</CardLink>
-        </div>
+        // AGE-494: „Zu meinen Chancen" ist entfallen — /meine-chancen leitet seit
+        // AGE-450 auf / um, der Link führte also seit Wochen ins Nichts.
+        <CardLink to="/kompass">Bearbeiten</CardLink>
       }
     >
       <div className="grid gap-5 sm:grid-cols-2">

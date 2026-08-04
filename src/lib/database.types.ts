@@ -676,6 +676,7 @@ export type Database = {
           description: string | null;
           id: string;
           profile_id: string;
+          source: string;
           tags: string[] | null;
           theme: string | null;
           title: string;
@@ -687,6 +688,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           profile_id: string;
+          source?: string;
           tags?: string[] | null;
           theme?: string | null;
           title: string;
@@ -698,6 +700,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           profile_id?: string;
+          source?: string;
           tags?: string[] | null;
           theme?: string | null;
           title?: string;
@@ -769,6 +772,7 @@ export type Database = {
           description: string | null;
           id: string;
           profile_id: string;
+          source: string;
           tags: string[] | null;
           theme: string | null;
           title: string;
@@ -779,6 +783,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           profile_id: string;
+          source?: string;
           tags?: string[] | null;
           theme?: string | null;
           title: string;
@@ -789,6 +794,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           profile_id?: string;
+          source?: string;
           tags?: string[] | null;
           theme?: string | null;
           title?: string;
@@ -1406,7 +1412,9 @@ export type Database = {
         Returns: Json;
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-241). Mirrors the
-      // search_directory(...) RPC from 20260613170000_directory_search.sql exactly.
+      // search_directory(...) RPC from 20260804200000_directory_search_categories.sql
+      // exactly — die Signatur hat dort acht Parameter, weil sie ERSETZT wurde
+      // (drop + create); die alte sechsstellige Fassung existiert nicht mehr.
       search_directory: {
         Args: {
           p_query?: string | null;
@@ -1415,6 +1423,10 @@ export type Database = {
           p_region?: string | null;
           p_competency?: string | null;
           p_offering?: string | null;
+          /** Kompass-Kategorien „bietet": ODER innerhalb, UND gegen p_needs. */
+          p_offers?: string[] | null;
+          /** Kompass-Kategorien „sucht". Leeres Array filtert NICHT. */
+          p_needs?: string[] | null;
         };
         Returns: {
           id: string;
@@ -1429,6 +1441,9 @@ export type Database = {
           competencies: string[] | null;
           has_offers: boolean;
           has_needs: boolean;
+          /** Distinct, ohne NULL, leeres Array statt NULL — nie `null`. */
+          offer_categories: string[];
+          need_categories: string[];
         }[];
       };
     };

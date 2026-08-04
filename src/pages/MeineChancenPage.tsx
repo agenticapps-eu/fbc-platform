@@ -606,7 +606,7 @@ function EmptyMatches({
       }
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link to="/compass">
+          <Link to="/kompass">
             <Button variant="primary" size="sm">
               Angebote &amp; Gesuche pflegen
             </Button>

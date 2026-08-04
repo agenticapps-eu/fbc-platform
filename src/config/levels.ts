@@ -34,7 +34,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     priceYear: 0,
     priceMonth: 0,
     rank: 1,
-    summary: "Profil anlegen. Compass starten. Entdecken.",
+    summary: "Profil anlegen. Kompass starten. Entdecken.",
   },
   connect: {
     key: "connect",
@@ -42,7 +42,7 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
     priceYear: 0,
     priceMonth: 0,
     rank: 2,
-    summary: "Compass vervollständigen. Erste Matchings. Favoriten.",
+    summary: "Kompass vervollständigen. Erste Matchings. Favoriten.",
   },
   discover: {
     key: "discover",

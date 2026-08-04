@@ -19,15 +19,15 @@ function renderPage() {
 }
 
 describe("CompassPage", () => {
-  it("führt Mini-Compass und Suche & Biete in einer Seite zusammen (Spec §3)", () => {
+  it("führt Mini-Kompass und Suche & Biete in einer Seite zusammen (Spec §3)", () => {
     renderPage();
-    expect(screen.getByRole("tab", { name: "Mini-Compass" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Mini-Kompass" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Suche & Biete" })).toBeInTheDocument();
   });
 
-  it("startet auf dem Mini-Compass", () => {
+  it("startet auf dem Mini-Kompass", () => {
     renderPage();
-    expect(screen.getByRole("tab", { name: "Mini-Compass" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Mini-Kompass" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

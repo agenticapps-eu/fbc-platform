@@ -87,7 +87,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashTile
-          label="Mein Compass"
+          label="Mein Kompass"
           value={`${profile.profile_completion}%`}
           sub="Profilvollständigkeit"
           to="/profil/bearbeiten"
@@ -249,7 +249,7 @@ function buildNextSteps(
   const steps: NextStep[] = [];
   if (completion < 80) {
     steps.push({
-      label: "Compass vervollständigen",
+      label: "Kompass vervollständigen",
       detail: `Noch ${80 - completion}% bis zu besseren Empfehlungen`,
       to: "/profil/bearbeiten",
     });

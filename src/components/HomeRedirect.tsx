@@ -1,55 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { fetchCompassStatus, isSkipped } from "../lib/compass";
-import { useAuth } from "../providers/auth-context";
 import HomePage from "../pages/HomePage";
 
 /**
- * Startseiten-Weiche (`/`). Die Route `/` zeigt die öffentliche Landingpage
- * (`HomePage`) — für alle, auch ausgeloggte Besucher. Diese Weiche bleibt davor
- * gesetzt, um EINEN Fall abzufangen: ein frisch eingeloggter Nutzer ohne
- * abgeschlossenen Mini-Compass (AGE-243) wird einmalig ins Onboarding geleitet,
- * sonst sieht er die Startseite.
+ * Startseiten-Weiche (`/`). Sie zeigt die öffentliche Landingpage (`HomePage`) —
+ * für alle, eingeloggt wie nicht.
  *
- * Onboarding wird gezeigt, wenn der Nutzer noch keine compass_responses hat UND
- * den Compass nicht (clientseitig) übersprungen hat. Gäste und übersprungene
- * Nutzer sehen ohne Netzabfrage sofort die Startseite; nur der „eingeloggt,
- * Status unbekannt"-Fall braucht die DB-Abfrage. Fehler blockieren nie — im
- * Zweifel die Startseite.
+ * AGE-494: Bis hierher fing sie EINEN Fall ab — eingeloggt, keine
+ * `compass_responses`, nicht übersprungen → einmalig nach `/onboarding`. Der
+ * Erstlogin führte damit in einen Fragebogen. Am 17.08. melden sich ~70 Menschen
+ * zum ersten Mal an; ein Fragebogen als erster Eindruck ist der falsche Empfang.
+ * Der Assistent bleibt vollständig im Code und unter `/onboarding` erreichbar,
+ * er wird nur nicht mehr aufgedrängt.
+ *
+ * Die Komponente bleibt als Naht bestehen, obwohl sie im Moment nichts entscheidet:
+ * **C3 setzt genau hier das Aktivierungs-Gate.** Sie jetzt aufzulösen und in C3
+ * wieder einzuziehen, wäre zweimal dieselbe Arbeit und ein Diff mehr an einer
+ * Stelle, die ohnehin gleich wieder aufgeht.
  */
 export default function HomeRedirect() {
-  const { user, isLoading } = useAuth();
-
-  // Synchroner Sofort-Fall: kein Onboarding-Gate nötig → Startseite zeigen.
-  const immediate = useMemo<boolean | null>(() => {
-    if (isLoading) return null;
-    if (!user) return true; // Gast → Startseite
-    if (isSkipped(user.id)) return true; // übersprungen → Startseite
-    return null; // eingeloggt, Status unbekannt → DB-Abfrage nötig
-  }, [user, isLoading]);
-
-  const [showHome, setShowHome] = useState<boolean | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-
-  useEffect(() => {
-    if (immediate !== null || !user) return;
-    let active = true;
-    fetchCompassStatus(user.id)
-      .then(({ hasResponses }) => {
-        if (!active) return;
-        if (hasResponses) setShowHome(true);
-        else setNeedsOnboarding(true);
-      })
-      .catch(() => {
-        if (active) setShowHome(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [immediate, user]);
-
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
-  // Solange die Entscheidung aussteht, nichts rendern (kein Flackern).
-  if (!(immediate ?? showHome)) return null;
   return <HomePage />;
 }

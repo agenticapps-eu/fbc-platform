@@ -43,7 +43,7 @@ describe("OnboardingPage — geführter Flow (ein Schritt pro Frage)", () => {
     expect(
       screen.getByText(`Schritt ${COMPASS_STEPS.length} von ${COMPASS_STEPS.length}`),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Compass abschließen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kompass abschließen" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Weiter" })).not.toBeInTheDocument();
   });
 
