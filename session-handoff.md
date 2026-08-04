@@ -81,6 +81,15 @@ Danach PR öffnen.
   `database-sentinel`. Beide verlangen ein Sentinel unter `.planning/`, das die
   globale CLAUDE.md als schreibverboten führt; der zweite verweist zusätzlich
   auf `/gsd-discuss-phase`, das es nicht mehr gibt. Als **AGE-493** gemeldet.
+
+  **Die Sentinels sind gelöscht** (Donald, 2026-08-04) — `.planning/current-phase/`
+  existiert nicht mehr. Beide Gates blockieren also wieder. Für den ersten
+  Schritt der nächsten Session (Plan-Review) ist das egal, der fasst keinen Code
+  an. Muss danach doch etwas an einer `.tsx`/`.css`/Migration korrigiert werden,
+  blockiert es erneut — dann bewusst neu entscheiden, statt den Override
+  reflexhaft zu wiederholen. Die Begründungen von damals stehen vollständig in
+  den Commit-Messages von `cf435f8` und `6457bfc`.
+
 - **`DesignSwitcher` bleibt vorerst** (Donalds Entscheidung, 2026-08-04): nicht
   gemountet, für zwei Themes umgebaut, Funktion von den Einstellungen
   übernommen. Löschkandidat, aber nicht in diesem Change.
