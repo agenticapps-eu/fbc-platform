@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { FormatHero } from "../components/ui/FormatHero";
+import { FORMAT_HERO } from "../config/formatHero";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import {
   CommunitiesWidget,
@@ -25,7 +27,7 @@ function Inner({ uid }: { uid: string }) {
   }
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-display text-2xl font-semibold text-ink">Meine Kontakte</h1>
+      <FormatHero meta={FORMAT_HERO["/kontakte"]} className="" />
       <MeineAnfragenWidget uid={uid} />
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <NetzwerkWidget contactsCount={data.contactsCount} />

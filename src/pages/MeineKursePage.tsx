@@ -1,3 +1,5 @@
+import { FormatHero } from "../components/ui/FormatHero";
+import { FORMAT_HERO } from "../config/formatHero";
 /**
  * Meine Kurse (AGE-314, Spec §2): persönliches Gegenstück zur Academy, so wie
  * „Meine Events" zu „Events".
@@ -9,7 +11,7 @@
 export default function MeineKursePage() {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-display text-2xl font-semibold text-ink">Meine Kurse</h1>
+      <FormatHero meta={FORMAT_HERO["/meine-kurse"]} className="" />
       <p className="text-sm text-muted">
         Du hast noch keine Kurse belegt. Sobald du in der Academy einen Kurs startest, erscheint er
         hier.

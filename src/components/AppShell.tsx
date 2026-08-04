@@ -11,15 +11,53 @@ import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 
-// Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
-// Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
-// innere Spalte (zentriert) — die Sidebar-Position bleibt konstant.
-const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
+// Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
+// Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
+// `lg:grid-cols-3` und `xl:grid-cols-4`, und beide Breakpoints konnten in einer
+// 720-px-Spalte nie greifen. Jetzt nutzt jede Seite die Breite, und nur die
+// echten Lesespalten (Formulare, Fließtext) behalten einen Deckel.
+const NARROW_ROUTES = ["/login", "/onboarding", "/einstellungen", "/profil/bearbeiten"];
 
 // Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
 // .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —
 // Fläche kommt aus --sidebar-surface, je Theme. Von aside + Drawer geteilt.
 const SIDEBAR_SURFACE = "fbc-sidebar-surface";
+
+/** Breite der angedockten Sidebar, offen und eingeklappt. Wird als CSS-Variable
+ *  gesetzt, weil aside-Breite und Inhalts-Versatz denselben Wert brauchen —
+ *  zwei Tailwind-Klassen, die man synchron halten muss, laufen auseinander. */
+const SIDEBAR_W_OPEN = "16rem";
+const SIDEBAR_W_RAIL = "4.5rem";
+
+/** Merkt sich die eingeklappte Sidebar über Reloads hinweg — sie ist eine
+ *  Arbeitsplatz-Einstellung, keine Kontoeinstellung, und bleibt daher (anders als
+ *  das Theme, AGE-492) bewusst gerätelokal. */
+const SIDEBAR_COLLAPSED_KEY = "fbc.sidebarCollapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function ChevronLeftIcon({ flipped }: { flipped: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("h-4 w-4 transition-transform", flipped && "rotate-180")}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m14 6-6 6 6 6" />
+    </svg>
+  );
+}
 
 function BellIcon() {
   return (
@@ -181,7 +219,13 @@ const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
 
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
  *  Mitglieder-Block oben, darunter die drei Abschnitte aus `navItems`. */
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+}) {
   const { user, tier, staffRole } = useAuth();
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
   // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
@@ -205,34 +249,37 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     });
   }
   return (
-    <div className="flex flex-col gap-7">
+    <div className={cn("flex flex-col", collapsed ? "gap-4" : "gap-7")}>
       {user ? (
         <Link
           to="/profil"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-[var(--radius-card)] border border-accent/20 bg-canvas/50 px-3 py-2.5 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+          title={collapsed ? (user.email ?? "Mein Profil") : undefined}
+          className={cn(
+            "flex items-center rounded-[var(--radius-card)] border border-chrome-border transition-colors hover:bg-chrome-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            collapsed ? "justify-center p-1.5" : "gap-3 px-3 py-2.5",
+          )}
         >
-          <Avatar name={user.email ?? "?"} size="md" />
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-ink">{user.email}</span>
-            {tier && (
-              <span className="mt-0.5 inline-block">
-                <TierBadge tier={tier} />
+          <Avatar name={user.email ?? "?"} size={collapsed ? "sm" : "md"} />
+          {!collapsed && (
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-on-chrome-active">
+                {user.email}
               </span>
-            )}
-          </span>
+              {tier && (
+                <span className="mt-0.5 inline-block">
+                  <TierBadge tier={tier} />
+                </span>
+              )}
+            </span>
+          )}
         </Link>
-      ) : (
-        <Link
-          to="/login"
-          onClick={onNavigate}
-          className="rounded-[var(--radius-card)] border border-accent/20 bg-canvas/50 px-3 py-2.5 text-sm text-ink/70 transition-colors hover:bg-canvas"
-        >
-          <span className="font-semibold text-ink">Anmelden</span>
-          <span className="mt-0.5 block text-xs text-muted">Mitglied werden &amp; alles sehen</span>
-        </Link>
-      )}
-      <SidebarNav sections={sections} onNavigate={onNavigate} />
+      ) : null}
+      {/* Ausgeloggt steht hier nichts: der Anmelde-Weg ist der Login-Button in der
+          Topbar, und ein zweiter „Anmelden"-Block direkt darunter war dieselbe
+          Aufforderung zweimal — an der Stelle, an der eingeloggt das eigene Profil
+          steht (AGE-499). */}
+      <SidebarNav sections={sections} onNavigate={onNavigate} collapsed={collapsed} />
     </div>
   );
 }
@@ -241,13 +288,21 @@ export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  // Exakter Pfad-Vergleich: /profil (Bento) ist breit, /profil/bearbeiten (Editor) bleibt
-  // zentriert. Alle WIDE_ROUTES sind Blattseiten ohne breite Unterrouten.
-  const isWide = WIDE_ROUTES.includes(pathname);
+  // Exakter Pfad-Vergleich: /profil (Bento) nutzt die Breite, /profil/bearbeiten
+  // (Editor) bleibt eine Lesespalte.
+  const isNarrow = NARROW_ROUTES.includes(pathname);
 
   // Off-Canvas-Sidebar (< lg). Schließt über Backdrop, `onNavigate` an jedem Link
   // und Escape. (setState im Event-Callback, nicht im Effect-Body.)
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      // Privater Modus o. Ä. — die Leiste funktioniert, sie merkt sich nur nichts.
+    }
+  }, [collapsed]);
   useEffect(() => {
     if (!mobileNavOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -263,11 +318,70 @@ export default function AppShell() {
   }
 
   return (
-    <div className="relative isolate min-h-screen bg-soft text-ink">
-      {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
-          rechts Benachrichtigungen + Avatar/Tier. */}
-      <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-1.5 sm:px-6">
+    <div
+      className="relative isolate min-h-screen bg-soft text-ink"
+      style={
+        {
+          "--fbc-sidebar-w": collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN,
+        } as React.CSSProperties
+      }
+    >
+      {/* Angedockte Sidebar (≥ lg): sitzt bündig an der linken Viewport-Kante über
+          die volle Höhe, mit border-right statt Rundung und Schatten — so schreibt
+          es die verbindliche Vorlage vor (docs/design-system.html: „Sidebar — sitzt
+          am Rand, nicht schwebend"). Bis AGE-499 hing sie als gerundete Karte in
+          einem zentrierten Container und schwebte sichtbar. */}
+      <aside
+        className={cn(
+          "fbc-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-chrome-border lg:flex",
+          SIDEBAR_SURFACE,
+        )}
+      >
+        {/* Logo-Zeile — gleiche Höhe wie die Topbar rechts daneben, damit die
+            Trennlinien der beiden auf einer Linie liegen. Eingeklappt bleibt nur
+            der Kompass stehen; die Wortmarke passt in 4,5 rem nicht. */}
+        <div
+          className={cn(
+            "flex h-16 shrink-0 items-center border-b border-chrome-border",
+            collapsed ? "justify-center px-2" : "px-5",
+          )}
+        >
+          <Link
+            to="/"
+            className="rounded-md text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <Logo className="h-8" lockup={collapsed ? "mark" : "full"} onChrome />
+          </Link>
+        </div>
+
+        <div className={cn("min-h-0 flex-1 overflow-y-auto py-6", collapsed ? "px-2" : "px-4")}>
+          <SidebarContent collapsed={collapsed} />
+        </div>
+
+        {/* Einklappen — unten, damit der Schalter nicht mit der Navigation
+            konkurriert. Der Zustand überlebt den Reload. */}
+        <div className="shrink-0 border-t border-chrome-border p-2">
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
+            title={collapsed ? "Ausklappen" : "Einklappen"}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              collapsed && "justify-center px-2",
+            )}
+          >
+            <ChevronLeftIcon flipped={collapsed} />
+            {!collapsed && <span>Einklappen</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Header — beginnt rechts neben der Sidebar, nicht darüber. Links
+          Hamburger/Logo (nur mobil), Suche mittig, rechts Avatar/Benachrichtigungen. */}
+      <header className="fbc-shell-offset sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
             type="button"
             aria-label="Menü öffnen"
@@ -276,18 +390,15 @@ export default function AppShell() {
           >
             <MenuIcon />
           </button>
+          {/* Nur unterhalb von lg — ab lg trägt die Sidebar das Logo (AGE-499).
+              Zwei sichtbare Lockups nebeneinander wären doppelt. */}
           <Link
             to="/"
-            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
           >
-            {/* Header-Logo. Bis AGE-492 lag hier das gestapelte Kronen-PNG, dessen
-                umlaufender Weißraum per background-crop weggeschnitten war — mit
-                Crop-Werten, die an das Asset-Layout gebunden waren. Das SVG-Lockup
-                braucht das nicht: es ist randlos, skaliert sauber und erbt über
-                currentColor die Farbe beider Themes. */}
-            {/* Kein sr-only daneben: das Lockup enthält die Wortmarke als echten
-                Text, der Link trägt seinen Namen also selbst. Das PNG vorher war
-                aria-hidden und brauchte ihn. */}
+            {/* Das SVG-Lockup ist randlos, skaliert sauber und erbt über
+                currentColor die Farbe. Kein sr-only daneben: es enthält die
+                Wortmarke als echten Text, der Link trägt seinen Namen selbst. */}
             <Logo className="h-8" />
           </Link>
 
@@ -318,37 +429,34 @@ export default function AppShell() {
                 <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
               </>
             ) : (
+              // Genau EIN Anmelde-Weg im Rahmen (AGE-499). Der Block über der
+              // Sidebar-Navigation ist entfallen — er war dieselbe Aufforderung
+              // ein zweites Mal. Ein zusätzliches „Mitglied werden" hier oben
+              // wäre die dritte: die Mitglied-werden-Wand (MembershipGate) und
+              // der Hero tragen diesen Ruf schon, dort mit Kontext.
               <Button variant="primary" size="sm" onClick={() => navigate("/login")}>
-                Login
+                Anmelden
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Zentrierter Shell: Sidebar an die linke Kante des Containers angedockt,
-          Content schmal & zentriert (LinkedIn/Facebook-Anmutung). */}
-      <div className="mx-auto flex max-w-[1180px] gap-4 px-4 py-8 sm:px-6">
-        <aside
+      {/* Inhalt — links um die Sidebar versetzt, sonst volle Breite bis 1440 px.
+          RouteTransition: weicher Fade/Slide-Up beim Seitenwechsel (reduced-motion-
+          sicher). */}
+      <main className="fbc-shell-offset">
+        <div
           className={cn(
-            "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-accent/25 px-4 py-6 shadow-soft lg:block",
-            SIDEBAR_SURFACE,
+            "mx-auto w-full px-4 py-8 sm:px-6 lg:px-8",
+            isNarrow ? "max-w-[760px]" : "max-w-[1440px]",
           )}
         >
-          <SidebarContent />
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          {/* Einspalter cappen ihre innere Spalte zentriert; Sidebar bleibt fix.
-              RouteTransition: weicher Fade/Slide-Up beim Seitenwechsel (Intensität
-              je Variante, reduced-motion-sicher). */}
-          <div className={cn(!isWide && "mx-auto max-w-[720px]")}>
-            <RouteTransition routeKey={pathname}>
-              <Outlet />
-            </RouteTransition>
-          </div>
-        </main>
-      </div>
+          <RouteTransition routeKey={pathname}>
+            <Outlet />
+          </RouteTransition>
+        </div>
+      </main>
 
       {/* Off-Canvas-Sidebar (< lg). */}
       {mobileNavOpen && (
@@ -359,7 +467,7 @@ export default function AppShell() {
           aria-label="Navigation"
         >
           <div
-            className="absolute inset-0 bg-chrome/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-scrim backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
           <div

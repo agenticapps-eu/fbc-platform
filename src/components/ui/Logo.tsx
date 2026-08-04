@@ -18,16 +18,37 @@ type Lockup = "full" | "mark";
  *
  *  Die Punkte in „eff.bee.zee" tragen die Akzentfarbe; laut Vorlage ist das das
  *  einzige Farbdetail der Wortmarke. Klein geschrieben, nie in Versalien. */
-export function Logo({ lockup = "full", className }: { lockup?: Lockup; className?: string }) {
+export function Logo({
+  lockup = "full",
+  className,
+  onChrome = false,
+}: {
+  lockup?: Lockup;
+  className?: string;
+  /** Steht auf der Sidebar-/Topbar-Fläche, nicht auf Inhalt (AGE-499). */
+  onChrome?: boolean;
+}) {
   if (lockup === "mark") {
     return <CompassMark className={className} title="eff.bee.zee" />;
   }
 
+  // `onChrome`: das Lockup steht auf der Sidebar-/Topbar-Fläche statt auf Inhalt.
+  // Seit AGE-499 kann die dunkel sein, während der Inhalt hell bleibt — dann
+  // trägt weder `text-ink` (dunkel auf dunkel) noch der Inhalts-Akzent (#2F6BD1
+  // auf #081527 sind 2.6:1). Deshalb hier die Chrome-Tokens, statt das Logo raten
+  // zu lassen: es kennt sein Theme nicht, aber sein Aufrufer kennt seine Fläche.
   return (
-    <span className={cn("inline-flex items-center gap-2.5 text-ink", className)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-2.5",
+        onChrome ? "text-on-chrome-active" : "text-ink",
+        className,
+      )}
+    >
       <CompassMark className="h-8 w-auto" />
       <span className="text-lg font-semibold leading-none tracking-tight">
-        eff<span className="text-accent">.</span>bee<span className="text-accent">.</span>zee
+        eff<span className={onChrome ? "text-accent-on-chrome" : "text-accent"}>.</span>bee
+        <span className={onChrome ? "text-accent-on-chrome" : "text-accent"}>.</span>zee
       </span>
     </span>
   );

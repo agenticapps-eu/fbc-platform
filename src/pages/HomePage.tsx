@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
+import { PageHero } from "../components/ui/PageHero";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
@@ -59,16 +60,13 @@ function PublicHome() {
 
   return (
     <div className="space-y-12">
-      <section className="rounded-[var(--radius-card)] border border-accent/40 bg-accent-soft/20 px-6 py-10 sm:px-10 sm:py-14">
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
-          Willkommen im Fair Business Club
-        </h1>
-        <p className="mt-4 max-w-2xl text-base text-muted">
-          Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: lerne andere Mitglieder
-          kennen, entdecke Events und finde die richtigen Verbindungen.
-        </p>
+      <PageHero
+        image="/images/hero-start.webp"
+        title="Willkommen im Fair Business Club"
+        subtitle="Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: lerne andere Mitglieder kennen, entdecke Events und finde die richtigen Verbindungen."
+      >
         {!user && (
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button variant="primary" onClick={() => navigate("/login")}>
               Kompass kostenlos starten
             </Button>
@@ -77,7 +75,7 @@ function PublicHome() {
             </Button>
           </div>
         )}
-      </section>
+      </PageHero>
 
       <section className="grid gap-4 sm:grid-cols-2">
         <Kpi value="120+" label="Mitglieder" />

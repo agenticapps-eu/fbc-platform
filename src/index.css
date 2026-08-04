@@ -99,6 +99,20 @@
   --color-chrome-border: #e2e8f0;
   --color-on-chrome: #475569;
   --color-on-chrome-muted: #64748b;
+  /* Aktiver Navigationseintrag. Eigene Tokens statt `accent`/`accent-soft`,
+     weil das Chrome seit AGE-499 auch dann dunkel sein kann, wenn der Inhalt
+     hell bleibt — der Akzent des Inhalts trägt auf dunklem Grund nicht. */
+  --color-chrome-active: #eff5fd;
+  --color-on-chrome-active: #1f53b0;
+  /* Der Marken-Akzent AUF dem Chrome (Logo-Punkte). Auf hellem Chrome ist das
+     der Inhalts-Akzent; auf dunklem braucht es den helleren Ton, sonst stehen
+     2.6:1 auf der Fläche. */
+  --color-accent-on-chrome: #2f6bd1;
+
+  /* Scrim für Overlays. Muss dunkel sein, egal welches Theme läuft: bis AGE-499
+     lag hier `bg-chrome/60`, und im hellen Theme ist Chrome Weiß — ein weißer
+     Schleier über weißem Inhalt verdunkelt nichts. */
+  --color-scrim: rgb(8 21 39 / 0.6);
 
   /* Content */
   --color-canvas: #ffffff;
@@ -137,43 +151,31 @@
   --hero-muted: #64748b;
 }
 
-/* Navy — überschreibt NUR Werte, nie Namen. `html[…]` (Spezifität > :root)
-   garantiert, dass die Overrides greifen. */
+/* Navy — überschreibt NUR das Chrome, nie den Inhalt (AGE-499).
+ *
+ * Bis AGE-492 kippte `navy` die ganze Oberfläche: Karten, Fließtext, Linien,
+ * Signalfarben. Entscheidung Donald 2026-08-04: der Schalter färbt nur noch
+ * Sidebar und Topbar dunkelblau, der Inhalt bleibt in beiden Themes hell —
+ * so wie die Referenz es zeigt. Damit gibt es bewusst KEINEN Dark-Reading-Mode
+ * mehr; `navy` ist eine Marken-Variante des Rahmens, kein Nachtmodus.
+ *
+ * Praktische Folge: alle Inhalts-Tokens (canvas, soft, ink, line, accent, die
+ * Signalfarben) stehen hier nicht mehr. Wer sie hier wieder einträgt, baut den
+ * Dark-Mode zurück. `html[…]` (Spezifität > :root) garantiert den Override. */
 html[data-variant="navy"] {
-  --color-accent: #5b90e0;
-  --color-accent-strong: #8eb5ec;
-  --color-accent-soft: rgb(91 144 224 / 0.14);
-  --color-accent-ink: #081527;
-
   --color-chrome: #081527;
   --color-chrome-elevated: #0e1f38;
   --color-chrome-border: rgb(255 255 255 / 0.08);
   --color-on-chrome: #9fb4d2;
   --color-on-chrome-muted: #8fa5c4;
-
-  --color-canvas: #0e1f38;
-  --color-soft: #0a1830;
-  --color-ink: #e4ecf7;
-  --color-ink-strong: #ffffff;
-  --color-muted: #8fa5c4;
-  --color-line: #1d3455;
-
-  /* Die semantischen Farben brauchen im Navy-Theme eigene Werte — die Vorlage
-     definiert sie nur einmal, und das ist eine echte Lücke: gemessen auf
-     --color-canvas (#0E1F38) trifft das helle Grün nur 3.12:1 und das helle Rot
-     2.82:1. Dunkle Signalfarben auf dunklem Grund sind nicht lesbar. Diese Werte
-     halten AA auf allen drei dunklen Flächen (canvas, soft, chrome). */
-  --color-success: #3fb58c;
-  --color-positive: #3fb58c;
-  --color-warning: #e5b45f;
-  --color-danger: #e58585;
-
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+  /* Aktiv-Zustand auf dunklem Chrome: gefüllte Blaufläche mit weißer Schrift.
+     Der helle Aktiv-Hintergrund des hellen Themes (#EFF5FD) wäre hier ein
+     grelles Rechteck. */
+  --color-chrome-active: #1f53b0;
+  --color-on-chrome-active: #ffffff;
+  --color-accent-on-chrome: #5b90e0;
 
   --sidebar-surface: #081527;
-  --hero-bg: linear-gradient(160deg, #123061, #081527);
-  --hero-ink: #e4ecf7;
-  --hero-muted: #8fa5c4;
 }
 
 @layer base {
@@ -205,6 +207,28 @@ html[data-variant="navy"] {
    Verlauf sein kann und Tailwind-Arbitrary das als background-color fehldeutet. */
 .fbc-sidebar-surface {
   background: var(--sidebar-surface);
+}
+
+/* Shell-Geometrie (AGE-499). Die Breite steht in einer Variable, weil die
+   eingeklappte Leiste sie zur Laufzeit ändert und Tailwind-Klassen dafür
+   dynamisch zusammengesetzt werden müssten. Der Versatz des Inhalts gilt erst
+   ab lg — darunter liegt die Sidebar als Off-Canvas-Drawer über der Seite und
+   darf keinen Platz belegen. */
+.fbc-sidebar {
+  width: var(--fbc-sidebar-w, 16rem);
+  transition: width 180ms ease;
+}
+@media (min-width: 1024px) {
+  .fbc-shell-offset {
+    padding-left: var(--fbc-sidebar-w, 16rem);
+    transition: padding-left 180ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fbc-sidebar,
+  .fbc-shell-offset {
+    transition: none;
+  }
 }
 .fbc-hero {
   background: var(--hero-bg);

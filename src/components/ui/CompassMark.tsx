@@ -19,8 +19,15 @@ export function CompassMark({ className, title }: { className?: string; title?: 
       aria-label={title}
       aria-hidden={title ? undefined : true}
     >
-      <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2.5" />
-      <path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor" />
+      {/* Der Ring sitzt enger als die Zacken: der Stern bricht an allen vier
+          Spitzen aus dem Kreis aus (AGE-499, Donalds Referenz). Vorher lag er
+          vollständig innen, wodurch die Marke wie ein gefüllter Kreis mit Muster
+          las statt wie ein Kompass. */}
+      <circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" strokeWidth="2.5" />
+      <path
+        d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

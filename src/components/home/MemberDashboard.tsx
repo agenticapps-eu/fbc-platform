@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { TierBadge } from "../ui/TierBadge";
 import { DashboardSkeleton } from "../ui/Skeleton";
+import { PageHero } from "../ui/PageHero";
 import { levelLabel } from "../../config/levels";
 import { dashboardQueryKey, fetchDashboard } from "../../lib/dashboard";
 import { displayAuthor } from "../../lib/displayAuthor";
@@ -16,6 +17,15 @@ import {
   emptyDirectoryFilters,
   fetchDirectoryBaseline,
 } from "../../lib/directory";
+
+/** Tageszeit-Gruß. Die Referenz schreibt „Guten Morgen" in die Eyebrow-Zeile —
+ *  fest verdrahtet wäre das ab mittags falsch. */
+function greeting(now = new Date()): string {
+  const h = now.getHours();
+  if (h < 11) return "Guten Morgen";
+  if (h < 18) return "Schön, dass du da bist";
+  return "Guten Abend";
+}
 
 /**
  * Persönliches Mitglieder-Dashboard (`/`, eingeloggt) — Nav-IA-Spec §3
@@ -63,14 +73,17 @@ export function MemberDashboard({ uid }: { uid: string }) {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft/25 px-6 py-9 sm:px-10 sm:py-11">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          Willkommen zurück, {firstName}! <span aria-hidden="true">👋</span>
-        </h1>
-        <p className="mt-3 max-w-2xl text-base text-muted">
-          Schön, dass du da bist. Entdecke neue Chancen, spannende Menschen und wertvolle Impulse.
-        </p>
-      </section>
+      <PageHero
+        image="/images/hero-see.webp"
+        eyebrow={`${greeting()}, ${firstName}`}
+        title={
+          <>
+            Deine nächste Chance
+            <br className="hidden sm:block" /> beginnt hier.
+          </>
+        }
+        subtitle="Entdecke neue Chancen, spannende Menschen und wertvolle Impulse."
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashTile
