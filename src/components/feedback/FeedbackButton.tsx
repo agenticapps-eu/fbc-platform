@@ -87,7 +87,7 @@ export function FeedbackButton() {
           aria-modal="true"
           aria-label="Feedback geben"
         >
-          <div className="absolute inset-0 bg-chrome/60 backdrop-blur-sm" onClick={close} />
+          <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={close} />
           <div className="absolute bottom-0 right-0 max-h-[90vh] w-full overflow-y-auto rounded-t-[var(--radius-card)] bg-canvas p-6 shadow-soft sm:bottom-5 sm:right-5 sm:w-[26rem] sm:rounded-[var(--radius-card)]">
             <h2 className="text-lg font-semibold text-ink">Wie gefällt dir die Plattform?</h2>
 
