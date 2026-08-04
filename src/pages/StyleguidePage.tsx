@@ -22,21 +22,21 @@ import { useDesignVariant } from "../providers/design-variant-context";
 /* Die Hex-Werte sind die des HELLEN Themes — im Navy-Theme tragen dieselben
    Token-Namen andere Werte. Die Fläche daneben liest immer das Token, nie den
    Hex-Wert: so zeigt der Umschalter oben auch hier den echten Unterschied. */
-const COLORS: { name: string; token: string; className: string; dark?: boolean }[] = [
-  { name: "Akzent", token: "#2F6BD1", className: "bg-accent", dark: true },
-  { name: "Akzent kräftig", token: "#1F53B0", className: "bg-accent-strong", dark: true },
+const COLORS: { name: string; token: string; className: string }[] = [
+  { name: "Akzent", token: "#2F6BD1", className: "bg-accent" },
+  { name: "Akzent kräftig", token: "#1F53B0", className: "bg-accent-strong" },
   { name: "Akzent weich", token: "#EFF5FD", className: "bg-accent-soft" },
   { name: "Chrome (Sidebar)", token: "#FFFFFF", className: "bg-chrome" },
   { name: "Chrome erhöht", token: "#F6F8FB", className: "bg-chrome-elevated" },
   { name: "Canvas (Karten)", token: "#FFFFFF", className: "bg-canvas" },
   { name: "Soft (Seite)", token: "#F6F8FB", className: "bg-soft" },
-  { name: "Ink (Fließtext)", token: "#1E2A3A", className: "bg-ink", dark: true },
-  { name: "Ink kräftig", token: "#0C2043", className: "bg-ink-strong", dark: true },
-  { name: "Muted", token: "#64748B", className: "bg-muted", dark: true },
+  { name: "Ink (Fließtext)", token: "#1E2A3A", className: "bg-ink" },
+  { name: "Ink kräftig", token: "#0C2043", className: "bg-ink-strong" },
+  { name: "Muted", token: "#64748B", className: "bg-muted" },
   { name: "Line", token: "#E2E8F0", className: "bg-line" },
-  { name: "Success / Positive", token: "#167A5B", className: "bg-success", dark: true },
-  { name: "Warning", token: "#B4761A", className: "bg-warning", dark: true },
-  { name: "Danger", token: "#B23B3B", className: "bg-danger", dark: true },
+  { name: "Success / Positive", token: "#167A5B", className: "bg-success" },
+  { name: "Warning", token: "#B4761A", className: "bg-warning" },
+  { name: "Danger", token: "#B23B3B", className: "bg-danger" },
 ];
 
 /** Die Blau-Rampe — die einzige Akzentfamilie des Systems.
@@ -62,7 +62,9 @@ const BLUE_RAMP: { step: string; className: string }[] = [
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted/70">{title}</h2>
+      {/* text-muted, nicht text-muted/70: mit der Abschwächung liegt die
+          Überschrift bei 2.24:1 und verfehlt AA deutlich. */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">{title}</h2>
       {children}
     </section>
   );
@@ -306,14 +308,17 @@ export default function StyleguidePage() {
                   key={c.token}
                   className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft"
                 >
-                  <div className={`flex h-20 items-end p-3 ${c.className}`}>
-                    <span
-                      className={`text-xs font-medium ${c.dark ? "text-on-chrome" : "text-ink"}`}
-                    >
-                      {c.token}
-                    </span>
+                  {/* Der Hex-Wert steht UNTER der Fläche, nicht darauf. Auf der
+                      Fläche bräuchte er je Token und je Theme eine eigene
+                      Textfarbe — der alte `dark ? text-on-chrome : text-ink`
+                      lag im hellen Theme durchweg falsch, weil on-chrome dort
+                      dunkel ist. Darunter ist der Kontrast in beiden Themes
+                      derselbe wie überall sonst. */}
+                  <div className={cn("h-20", c.className)} />
+                  <div className="space-y-0.5 px-3 py-2">
+                    <div className="text-xs font-medium text-ink">{c.name}</div>
+                    <div className="font-mono text-[11px] text-muted">{c.token}</div>
                   </div>
-                  <div className="px-3 py-2 text-xs font-medium text-muted">{c.name}</div>
                 </div>
               ))}
             </div>

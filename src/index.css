@@ -105,7 +105,13 @@
   --color-soft: #f6f8fb;
   --color-ink: #1e2a3a;
   --color-ink-strong: #0c2043;
-  --color-muted: #64748b;
+  /* Abweichung von der Vorlage, gemessen: deren #64748B trifft auf --color-soft
+     (#F6F8FB) nur 4.47:1 und verfehlt WCAG AA für Fließtext um 0.03. Auf weißen
+     Karten reicht es (4.76), auf der Seitenfläche nicht — und genau dort steht
+     der meiste gemutete Text. #626F85 ist der kleinste Schritt, der beides
+     schafft (4.78 auf soft, 5.08 auf canvas); optisch ist der Unterschied nicht
+     wahrnehmbar. Navy braucht die Korrektur nicht (#8FA5C4 liegt bei 6.56/7.04). */
+  --color-muted: #626f85;
   --color-line: #e2e8f0;
 
   /* Status. `positive` (Trendpfeile) trägt denselben Ton wie `success` — die
@@ -151,6 +157,16 @@ html[data-variant="navy"] {
   --color-ink-strong: #ffffff;
   --color-muted: #8fa5c4;
   --color-line: #1d3455;
+
+  /* Die semantischen Farben brauchen im Navy-Theme eigene Werte — die Vorlage
+     definiert sie nur einmal, und das ist eine echte Lücke: gemessen auf
+     --color-canvas (#0E1F38) trifft das helle Grün nur 3.12:1 und das helle Rot
+     2.82:1. Dunkle Signalfarben auf dunklem Grund sind nicht lesbar. Diese Werte
+     halten AA auf allen drei dunklen Flächen (canvas, soft, chrome). */
+  --color-success: #3fb58c;
+  --color-positive: #3fb58c;
+  --color-warning: #e5b45f;
+  --color-danger: #e58585;
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
 
