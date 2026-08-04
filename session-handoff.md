@@ -56,27 +56,34 @@ Branch `donald/age-492-c1-design-system-blau-statt-gold`, 6 Commits.
 
 ## Next session: start here
 
-**Zuerst die pgTAP-Suite laufen lassen** — sie ist der einzige ungeprüfte Teil.
-Port 54322 war von cparx belegt, deshalb konnte `supabase start` hier nicht
-booten. Also: cparx-Stack stoppen (`supabase stop --project-id cparx`) oder in
-`supabase/config.toml` einen anderen Port setzen, dann
+**Erster Schritt: `run-plan-review.sh redesign-blue-theme-system`.** Donald hat
+den Plan-Review bewusst auf nach diesem Handoff + `/clear` verschoben, damit die
+Reviewer den Change ohne den Kontext der Implementierungssession lesen. Der Code
+steht also schon, der Delta ist aber ungeprüft — der Review liest
+`proposal.md`, `tasks.md` und die beiden Spec-Deltas, nicht den Diff. Ergebnis
+nach `openspec/changes/redesign-blue-theme-system/REVIEWS.md`. Kommt dort etwas
+Substanzielles, ist es billiger, den Delta zu korrigieren als den Code.
+
+**Zweiter Schritt: die pgTAP-Suite laufen lassen** — der einzige technisch
+ungeprüfte Teil. Port 54322 war von cparx belegt, deshalb konnte `supabase
+start` hier nicht booten. Also cparx-Stack stoppen
+(`supabase stop --project-id cparx`) oder in `supabase/config.toml` einen
+anderen Port setzen, dann
 `supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql`.
 Besonders `grants_test.sql` — dessen Golden-Snapshot ist bei Schema-Ergänzungen
-schon einmal gebrochen (AGE-455). Danach PR öffnen.
+schon einmal gebrochen (AGE-455).
+
+Danach PR öffnen.
 
 ## Open questions
 
-- **`docs/design-system.html` ist untracked** (Rechte 0600) und wird von
-  proposal.md, tasks.md und `docs/design-system.md` als verbindliche Vorlage
-  referenziert. Soll sie ins (öffentliche) Repo? Bewusst nicht eingecheckt.
 - **Zwei Hook-Overrides** waren nötig: `design-shotgun-gate` und
   `database-sentinel`. Beide verlangen ein Sentinel unter `.planning/`, das die
   globale CLAUDE.md als schreibverboten führt; der zweite verweist zusätzlich
   auf `/gsd-discuss-phase`, das es nicht mehr gibt. Als **AGE-493** gemeldet.
-- **`run-plan-review.sh` lief nicht** — der Spec-Delta ging ungeprüft in die
-  Umsetzung (Stage 2 ist seit Gate 2.0.0 nicht erzwungen).
-- **`DesignSwitcher` ist jetzt totes Gewicht**: nicht gemountet, für zwei Themes
-  umgebaut, Funktion von den Einstellungen übernommen. Löschkandidat für C2.
+- **`DesignSwitcher` bleibt vorerst** (Donalds Entscheidung, 2026-08-04): nicht
+  gemountet, für zwei Themes umgebaut, Funktion von den Einstellungen
+  übernommen. Löschkandidat, aber nicht in diesem Change.
 - Der alte `CrownIcon` (Rang-Symbol in `profil-widgets`/`ProfileHero`) ist
   geblieben — gehört nicht zum Logo, aber eine Krone passt nach dem Rebrand
   nicht mehr. Kandidat für C2/C6.
