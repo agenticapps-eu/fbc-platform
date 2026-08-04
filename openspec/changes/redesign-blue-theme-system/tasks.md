@@ -105,16 +105,21 @@ The inline script in `index.html` already exists and already prevents the flash 
 ## 5. `member_settings.theme` (migration)
 
 - [x] 5.1 New migration: `alter table public.member_settings add column theme text
-  not null default 'hell' check (theme in ('hell','navy'))`. No new policy and
+not null default 'hell' check (theme in ('hell','navy'))`. No new policy and
       no new grant — `member_settings_own` is `for all` and the table grants
       already cover `authenticated`. Record that reasoning in the migration header,
       per this repo's convention.
-- [x] 5.2 **tdd** pgTAP: the owner reads and writes their own `theme`; another
-      member cannot; an invalid value is rejected by the check constraint
-- [x] 5.3 Confirm `supabase/tests/grants_test.sql` still passes — a new **column**
+- [~] 5.2 **tdd** pgTAP: the owner reads and writes their own `theme`; another
+  member cannot; an invalid value is rejected by the check constraint —
+  WRITTEN (6 assertions in `rls_test.sql`, plan bumped 61→67) but NOT RUN
+  locally: port 54322 is held by another project's Supabase stack, and
+  stopping it was not mine to do. CI's `migrations` job is what will
+  actually exercise this.
+- [ ] 5.3 Confirm `supabase/tests/grants_test.sql` still passes — a new **column**
       on a table that already carries table-level grants should not move the golden
       snapshot, but the snapshot has broken on schema additions before, so check
-      rather than assume
+      rather than assume. NOT CHECKED — same blocked local stack as 5.2. This is
+      the one that has actually broken before, so it needs a real run.
 - [x] 5.4 Extend `DEFAULT_MEMBER_SETTINGS` and the `MemberSettings` type in
       `src/lib/member-settings.ts`
 
