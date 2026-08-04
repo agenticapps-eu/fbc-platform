@@ -1,65 +1,71 @@
-# Session Handoff — 2026-08-04 (2. Session)
+# Session Handoff — 2026-08-04 (3. Session)
 
 ## Accomplished
 
-Der aus der Vorsession offene Plan-Review für **AGE-492 / C1** ist gelaufen, seine
-Befunde sind eingearbeitet, die pgTAP-Suite ist geprüft, **PR #106 ist offen**.
+**AGE-492 (C1) ist durch:** Plan-Review eingearbeitet, PR #106 gemerged, main
+deployed, Theme-Migration manuell nach Prod gepusht (`supabase db push`) und
+gegen Prod verifiziert (Spalte da, CHECK greift). Change archiviert →
+`openspec/specs/design-system/` existiert jetzt.
 
-- **Plan-Review** (`run-plan-review.sh redesign-blue-theme-system`): gemini und
-  codex, **beide REQUEST-CHANGES**; opencode lief in den 180-s-Timeout und fehlt
-  als dritte Stimme. Neun Punkte übernommen, drei begründet abgelehnt — die
-  vollständige Triage steht in `REVIEWS.md` und ist als „von Donald noch nicht
-  gegengelesen" gekennzeichnet.
-- **Ein echter Code-Defekt** aus dem Review: der Server-Write des Themes hing an
-  einem leeren `.catch(() => {})`. Test zuerst rot, dann behoben.
-- **CI-Gate erweitert** auf `--color-night`, `--accent2`, `--color-fmt-`,
-  `data-card-style`; per Sonde belegt.
-- **pgTAP gelaufen** (cparx-Stack kurz gestoppt, danach wieder gestartet):
-  `grants_test.sql` + `rls_test.sql`, **70 Tests, PASS**. Golden-Snapshot unbewegt.
-- 284 Vitest-Tests, lint, typecheck, build grün. `openspec validate --all` 25/25.
-- Linear AGE-492 auf **In Review**; der PR hängt als Attachment daran.
+**AGE-499 (C1a) auf Branch `donald/age-499-c1a-shell-layout`, 5 Commits,
+noch kein PR.** Vier Befunde aus Donalds visueller Abnahme:
+
+- **Sidebar sitzt am Rand** statt zu schweben (die Vorlage sagte das von Anfang
+  an: „sitzt am Rand, nicht schwebend"). Logo im Sidebar-Kopf, Topbar rechts.
+- **Volle Breite bis 1440 px.** `WIDE_ROUTES` → `NARROW_ROUTES`; der alte
+  720-px-Default hatte `lg:grid-cols-3`/`xl:grid-cols-4` im Dashboard stillgelegt.
+- **`navy` färbt nur noch das Chrome** — Richtungswechsel gegen Vorlage und
+  gemergte Spec. Kein Dark-Reading-Mode mehr; steht so im Delta.
+- **Seitenköpfe mit Bild** (`PageHero` + `FormatHero`), neun selbst gehostete
+  Unsplash-Motive je Route.
+- Dazu: Icons je Eintrag (aktiv gefüllt), einklappbare Sidebar, Kompass-Zacken
+  brechen aus dem Ring aus (Favicon mitgezogen), `--color-scrim`.
+
+284 Tests, lint, typecheck, build, `openspec validate --all` (26/26) grün.
 
 ## Decisions
 
-- **Delta korrigiert statt Code gebaut**, wo der Review etwas verlangte, das der
-  Baum nicht hergibt: die „deliberate transition" gab es nie — statt sie zu bauen,
-  sagt der Delta jetzt „ein einmaliges Umschalten, keine Animation".
-- **localStorage wird beim Logout NICHT gelöscht** (gemini hatte es verlangt).
-  Widerspricht der bestehenden Entscheidung; beim Login gewinnt ohnehin der
-  Serverwert. Die Shared-Device-Folge steht jetzt ausdrücklich im Delta.
-- **Der `CHECK`-Constraint wird im Delta nicht beim Namen genannt** — eine Spec
-  sagt Verhalten, nicht Mechanismus. Der Mechanismus steht im Migrationskopf.
-- **Font-Preload abgelehnt** für diesen Change — Implementierungsdetail,
-  `font-display: swap` steht bereits. Kandidat für C2.
-- Der erste pgTAP-Lauf sah nach echtem Fehlschlag aus (`platform_settings does not
-exist`): **altes lokales Volume**, dem alle Migrationen ab 20260723 fehlten.
-  `supabase db reset` war die Lösung — nicht der Delta.
+- **Kein Dark-Reading-Mode mehr** (Donald). Der Preis steht ausdrücklich im
+  Delta, damit ihn niemand später als Versehen liest.
+- **Bilder heruntergeladen statt per CDN** — ein `images.unsplash.com`-Request
+  wäre derselbe Fremdabruf, den AGE-492 für die Fonts entfernt hat.
+- **Nur EIN Anmelde-Weg im Rahmen** (Topbar). Der Sidebar-Block war eine
+  Wiederholung; ein zusätzliches „Mitglied werden" oben wäre die dritte Kopie
+  gewesen — zwei Tests haben genau das gemeldet.
+- **Formularseiten ohne Bildkopf** (Login, Onboarding, Einstellungen,
+  Profil-Editor).
+- **Icons selbst gezeichnet**, keine Bibliothek, keine Namensnennungspflicht.
 
 ## Files modified
 
-- `openspec/changes/redesign-blue-theme-system/specs/design-system/spec.md` — sechs
-  Stellen korrigiert (First Paint, Query-Ignorierung, ausgeloggter Fall,
-  Write-Fehlerfall, CI-Geltungsbereich, Font-Host)
-- `.../specs/member-profiles/spec.md` — Privatheit auf die DB-Zeile präzisiert
-- `.../REVIEWS.md` — Reviewer-Voten + Triage · `.../tasks.md` — 5.2/5.3 auf erledigt
-- `src/pages/EinstellungenPage.tsx` (+ `.test.tsx`) — Fehlschlag wird gemeldet
-- `.github/workflows/ci.yml` — weitere zurückgezogene Namen
+- `src/index.css` — Chrome-Aktiv-Tokens, `--color-scrim`, navy auf Chrome
+  reduziert, Shell-Geometrie-Klassen
+- `src/components/AppShell.tsx` — komplette Shell-Struktur · `ui/NavIcon.tsx`,
+  `ui/PageHero.tsx` neu · `ui/SidebarNav.tsx`, `ui/FormatHero.tsx`,
+  `ui/Logo.tsx`, `ui/CompassMark.tsx`
+- `src/config/formatHero.ts` — Motiv je Route · vier Seiten mit Kopf nachgerüstet
+- `public/images/*` (9 webp + CREDITS.md), `public/brand/compass-favicon.svg`
+- `openspec/changes/refine-shell-and-page-heads/` neu; C1 nach
+  `openspec/changes/archive/2026-08-04-redesign-blue-theme-system/`
 
 ## Next session: start here
 
-**PR #106**: alle vier Checks grün (`verify`, `deploy`, `migrations`, `pr-title`),
-`mergeable`, Stand 2026-08-04. Für die Abnahme
-aus AGE-492 nur noch **die Preview-Abnahme durch Detlev** und das Durchklicken
-beider Themes; alles andere ist abgehakt. Merge nach `gh pr view --json state`
-verifizieren (`gh pr merge` kann still fehlschlagen). **Migrationen erreichen Prod
-nicht durch den Merge** — `supabase db push` bleibt manuell.
+**Branch pushen und PR öffnen** (`donald/age-499-c1a-shell-layout` → main), falls
+in dieser Session nicht mehr geschehen. Danach gilt wie bei C1: der Merge
+deployt nur das Frontend — **hier ist das unkritisch, AGE-499 hat keine
+Migration**.
+
+Vorher offen aus `tasks.md`: **7.4** den Dashboard-Hero eingeloggt ansehen (bisher
+nur über `/styleguide` geprüft, weil die lokale Abnahme ohne Login lief) und
+**7.5** `docs/design-system.html` nachziehen — Navy-Umfang und Bildköpfe sind
+dort überholt.
 
 ## Open questions
 
-- **Die beiden Hook-Gates** (`design-shotgun-gate`, `database-sentinel`) blockierten
-  in dieser Session **nicht** — die Edits an `.tsx`, `.yml` und den Spec-Dateien
-  liefen ohne Override durch. Der in der Vorsession beschriebene Zustand („beide
-  blockieren wieder") hat sich also nicht bestätigt; AGE-493 bleibt trotzdem offen.
-- Die Triage der Review-Befunde ist **von Donald nicht gegengelesen**. Besonders
-  die drei Ablehnungen sind Produktentscheidungen, keine technischen.
-- `DesignSwitcher` und der alte `CrownIcon` bleiben unverändert liegen → C2/C6.
+- **Fotografennamen fehlen** in `public/images/CREDITS.md`; über die CDN-Kennung
+  nicht auflösbar. Lizenzkonform, aber unhöflich.
+- **AGE-492s Abnahmeliste ist nicht leer** — die Preview-Abnahme durch Detlev und
+  das Durchklicken beider Themes stehen aus; der Archivlauf hat die zwei offenen
+  Aufgaben gemeldet und trotzdem archiviert (`--yes`).
+- Neue Regel, dauerhaft gemerkt: **bei Design-Änderungen erst eine laufende
+  lokale Version zeigen, dann committen.**
