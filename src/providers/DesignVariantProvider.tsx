@@ -25,6 +25,13 @@ function persist(variant: DesignVariantId) {
   }
 }
 
+/** Hält das aktive Theme und spiegelt es nach localStorage und auf
+ *  <html data-variant>. Bewusst OHNE Auth- und Query-Abhängigkeit: der Provider
+ *  umschließt die ganze App, und jede Abhängigkeit hier zwingt jeden Test, der
+ *  irgendeine Seite rendert, dieselben Provider mitzubringen.
+ *
+ *  Den serverseitigen Abgleich (member_settings.theme) macht deshalb
+ *  <ThemeServerSync /> darunter — siehe App.tsx. */
 export function DesignVariantProvider({ children }: { children: ReactNode }) {
   const [variant, setVariantState] = useState<DesignVariantId>(() =>
     resolveInitialVariant({ stored: readStored() }),
@@ -34,8 +41,8 @@ export function DesignVariantProvider({ children }: { children: ReactNode }) {
   // Single source of truth → DOM: <html data-variant> treibt alle CSS-Overrides.
   // Das Inline-Skript in index.html hat denselben Wert bereits VOR dem ersten
   // Paint gesetzt (gleiche Regel, gleicher Storage-Key); dieser Effect hält ihn
-  // nur synchron. Weichen beide Regeln voneinander ab, korrigiert dieser Effect
-  // sichtbar — genau das Flackern, das das Skript verhindern soll.
+  // synchron. Weichen beide Regeln voneinander ab, korrigiert er sichtbar —
+  // genau das Flackern, das das Skript verhindern soll.
   useEffect(() => {
     document.documentElement.dataset.variant = variant;
     persist(variant);

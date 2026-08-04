@@ -492,6 +492,7 @@ export type Database = {
           notify_email_events: boolean;
           notify_email_requests: boolean;
           profile_id: string;
+          theme: string;
           updated_at: string;
         };
         Insert: {
@@ -500,6 +501,7 @@ export type Database = {
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
           profile_id: string;
+          theme?: string;
           updated_at?: string;
         };
         Update: {
@@ -508,6 +510,7 @@ export type Database = {
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
           profile_id?: string;
+          theme?: string;
           updated_at?: string;
         };
         Relationships: [

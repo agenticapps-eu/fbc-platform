@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
 import type { AuthContextValue } from "../providers/auth-context";
 import { ToastProvider } from "../components/ui/Toast";
+import { DesignVariantProvider } from "../providers/DesignVariantProvider";
 
 vi.mock("../lib/member-settings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/member-settings")>();
@@ -12,11 +13,13 @@ vi.mock("../lib/member-settings", async (importOriginal) => {
     ...actual,
     fetchMemberSettings: vi.fn(),
     saveMemberSettings: vi.fn(),
+    saveMemberTheme: vi.fn(),
   };
 });
 import {
   fetchMemberSettings,
   saveMemberSettings,
+  saveMemberTheme,
   DEFAULT_MEMBER_SETTINGS,
 } from "../lib/member-settings";
 vi.mock("../lib/feedback", () => ({ fetchAdminFeedback: vi.fn() }));
@@ -25,6 +28,7 @@ import EinstellungenPage from "./EinstellungenPage";
 
 const mockedFetch = vi.mocked(fetchMemberSettings);
 const mockedSave = vi.mocked(saveMemberSettings);
+const mockedSaveTheme = vi.mocked(saveMemberTheme);
 const mockedAdminFeedback = vi.mocked(fetchAdminFeedback);
 
 beforeEach(() => {
@@ -32,8 +36,11 @@ beforeEach(() => {
   mockedFetch.mockResolvedValue(DEFAULT_MEMBER_SETTINGS);
   mockedSave.mockReset();
   mockedSave.mockResolvedValue();
+  mockedSaveTheme.mockReset();
+  mockedSaveTheme.mockResolvedValue();
   mockedAdminFeedback.mockReset();
   mockedAdminFeedback.mockResolvedValue([]);
+  localStorage.clear();
 });
 
 function renderPage(
@@ -54,9 +61,11 @@ function renderPage(
     <AuthFixture value={value}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <MemoryRouter>
-            <EinstellungenPage />
-          </MemoryRouter>
+          <DesignVariantProvider>
+            <MemoryRouter>
+              <EinstellungenPage />
+            </MemoryRouter>
+          </DesignVariantProvider>
         </ToastProvider>
       </QueryClientProvider>
     </AuthFixture>,
@@ -75,6 +84,38 @@ describe("EinstellungenPage", () => {
         ...DEFAULT_MEMBER_SETTINGS,
         visible_in_directory: false,
       }),
+    );
+  });
+
+  // AGE-492 — der Theme-Schalter. Er läuft bewusst NICHT über saveMemberSettings:
+  // die schreibt alle Präferenzen in einem Upsert und überschriebe das Theme mit
+  // einem veralteten Cache-Wert.
+  it("schaltet das Theme sofort um und schreibt es zum Server", async () => {
+    renderPage();
+    const toggle = await screen.findByRole("switch", { name: /Dunkles Design/ });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle);
+
+    // Sofort sichtbar, nicht erst nach der Speicher-Bestätigung.
+    await waitFor(() => expect(document.documentElement.dataset.variant).toBe("navy"));
+    expect(localStorage.getItem("fbc.designVariant")).toBe("navy");
+    await waitFor(() => expect(mockedSaveTheme).toHaveBeenCalledWith("u1", "navy"));
+  });
+
+  it("schreibt das Theme nicht über die Präferenz-Mutation", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("switch", { name: /Dunkles Design/ }));
+    await waitFor(() => expect(mockedSaveTheme).toHaveBeenCalled());
+    expect(mockedSave).not.toHaveBeenCalled();
+  });
+
+  it("zeigt den Schalter aktiv, wenn navy läuft", async () => {
+    localStorage.setItem("fbc.designVariant", "navy");
+    renderPage();
+    expect(await screen.findByRole("switch", { name: /Dunkles Design/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
     );
   });
 

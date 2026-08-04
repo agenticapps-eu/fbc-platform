@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
+import { ThemeServerSync } from "./providers/ThemeServerSync";
 import MembershipGate from "./components/MembershipGate";
 import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
@@ -42,6 +43,8 @@ function gatedElement(item: NavItem) {
 export default function App() {
   return (
     <DesignVariantProvider>
+      {/* Rendert nichts — gleicht das Theme mit member_settings.theme ab. */}
+      <ThemeServerSync />
       <AppInner />
     </DesignVariantProvider>
   );

@@ -14,11 +14,14 @@ import {
   DEFAULT_MEMBER_SETTINGS,
   fetchMemberSettings,
   memberSettingsQueryKey,
+  memberThemeQueryKey,
   saveMemberSettings,
+  saveMemberTheme,
   type MemberSettings,
 } from "../lib/member-settings";
 import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
+import { useDesignVariant } from "../providers/design-variant-context";
 
 /**
  * Passwort ändern (AGE-450). Setzt eine aktive Session voraus (auth.updateUser) —
@@ -103,6 +106,7 @@ function PasswordCard() {
 
 export default function EinstellungenPage() {
   const { user, tier, staffRole, signOut } = useAuth();
+  const { variant, setVariant } = useDesignVariant();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -182,6 +186,32 @@ export default function EinstellungenPage() {
         >
           Stufe ansehen &amp; upgraden
         </Button>
+      </Card>
+
+      {/* Darstellung (AGE-492). Läuft bewusst NICHT über die `save`-Mutation
+          daneben: die schreibt alle Präferenzen in einem Upsert, und ein
+          veralteter Theme-Wert im Cache überschriebe dabei still die Wahl.
+          Getrennte Schlüssel, getrennte Writes — dieselbe Lehre wie bei
+          `visible_in_directory` (AGE-313).
+
+          Der Schalter wirkt sofort (lokal) und schreibt danach zum Server.
+          Fire-and-forget: ein fehlgeschlagener Write darf die Darstellung nicht
+          zurückspringen lassen — er kostet die Geräteübergreifbarkeit, nicht die
+          Einstellung selbst. */}
+      <Card className="flex flex-col gap-2">
+        <CardTitle>Darstellung</CardTitle>
+        <ToggleRow
+          label="Dunkles Design (Navy)"
+          hint="Gilt auf allen deinen Geräten, sobald du angemeldet bist."
+          checked={variant === "navy"}
+          onChange={(v) => {
+            const next = v ? "navy" : "hell";
+            setVariant(next);
+            void saveMemberTheme(uid, next)
+              .then(() => queryClient.setQueryData(memberThemeQueryKey(uid), next))
+              .catch(() => {});
+          }}
+        />
       </Card>
 
       <Card className="flex flex-col gap-2">
