@@ -3,11 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>eff.bee.zee — Design-System (Entwurf 04.08.2026)</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Cormorant+Garamond:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>eff.bee.zee — Design-System (Stand 04.08.2026)</title>
 <style>
+/* Schriften aus dem Repo, nicht von einem fremden CDN. Bis AGE-499 lud dieses
+   Dokument Fraunces und Inter von Googles Servern — genau der Fremdabruf, den
+   AGE-492 aus der App entfernt hat. Eine Vorlage, die ihre eigene Regel bricht,
+   ist keine. Es sind dieselben Dateien, die die App ausliefert; der Pfad ist nur
+   relativ, weil dieses Dokument direkt von der Platte geöffnet wird. */
+@font-face{font-family:"Inter";font-style:normal;font-weight:400 700;font-display:swap;
+  src:url("../public/fonts/inter-latin.woff2") format("woff2")}
+@font-face{font-family:"Fraunces";font-style:normal;font-weight:400 500;font-display:swap;
+  src:url("../public/fonts/fraunces-latin.woff2") format("woff2")}
+
 /* ============================================================
    TOKENS
    ============================================================ */
@@ -28,7 +35,7 @@
   --danger:#B23B3B;  --danger-soft:#FBECEC;
 
   /* Stufen-Farben (dezent, nur als Badge) */
-  --tier-boost:#64748B; --tier-connect:#5B90E0; --tier-discover:#2F6BD1;
+  --tier-basic:#64748B; --tier-connect:#5B90E0; --tier-discover:#2F6BD1;
   --tier-exchange:#1F53B0; --tier-focus:#17408B; --tier-impact:#0C2043;
 
   /* Form */
@@ -44,52 +51,51 @@
   --lh-tight:1.2; --lh-normal:1.55;
 }
 
-/* ---- Variante A: HELL (Default) ---- */
-html[data-theme="hell"]{
+/* ---- Inhalt: in BEIDEN Themes derselbe ----
+   Karten, Fließtext, Linien, Akzent und die Signalfarben stehen hier und nicht
+   im Theme-Block. Das Theme greift nur auf den Rahmen zu (AGE-499). Wer eines
+   dieser Tokens unten wieder einträgt, baut den Dark-Reading-Mode zurück, den
+   diese Fassung bewusst abgeschafft hat. */
+html{
   --canvas:var(--n-0);       /* Seitenhintergrund */
   --surface:var(--n-0);      /* Karten */
-  --surface-2:var(--n-50);   /* eingelassene Flächen */
+  --surface-2:var(--n-50);   /* eingelassene Flächen, Inhaltsbereich */
   --line:var(--n-200);
   --ink:var(--n-800);        /* Fließtext — Anthrazit, nicht schwarz */
   --ink-strong:var(--blue-900);
-  --muted:var(--n-500);
+  --muted:#626F85;           /* gemessen nachgeschärft, siehe §07 */
   --accent:var(--blue-500);
   --accent-hover:var(--blue-600);
   --accent-soft:var(--blue-50);
   --accent-ink:#FFFFFF;
-  --sidebar-bg:var(--n-0);
-  --sidebar-line:var(--n-200);
-  --sidebar-ink:var(--n-600);
-  --sidebar-ink-active:var(--blue-600);
-  --sidebar-active-bg:var(--blue-50);
-  --topbar-bg:var(--n-0);
-  --logo-ink:var(--blue-600);
+  --scrim:rgba(8,21,39,.6);  /* Overlays — dunkel in beiden Themes */
   --shadow-soft:0 1px 2px rgba(15,29,51,.05), 0 4px 16px rgba(15,29,51,.05);
   --shadow-lift:0 2px 4px rgba(15,29,51,.06), 0 12px 32px rgba(15,29,51,.10);
 }
 
-/* ---- Variante B: NAVY (blaue Sidebar) ---- */
+/* ---- Variante A: HELL — Rahmen weiß (Default) ---- */
+html[data-theme="hell"]{
+  --chrome:var(--n-0);           /* Sidebar- und Topbar-Fläche */
+  --chrome-elevated:var(--n-50);
+  --chrome-line:var(--n-200);
+  --on-chrome:var(--n-600);      /* Navigationstext */
+  --on-chrome-muted:var(--n-500);
+  --chrome-active:var(--blue-50);      /* aktiver Eintrag: Fläche */
+  --on-chrome-active:var(--blue-600);  /* aktiver Eintrag: Schrift, Logo */
+  --accent-on-chrome:var(--blue-500);  /* die Punkte der Wortmarke */
+}
+
+/* ---- Variante B: NAVY — Rahmen dunkelblau, Inhalt unverändert ---- */
 html[data-theme="navy"]{
-  --canvas:var(--blue-950);
-  --surface:#0E1F38;
-  --surface-2:#0A1830;
-  --line:#1D3455;
-  --ink:#E4ECF7;
-  --ink-strong:#FFFFFF;
-  --muted:#8FA5C4;
-  --accent:var(--blue-400);
-  --accent-hover:var(--blue-300);
-  --accent-soft:rgba(91,144,224,.14);
-  --accent-ink:var(--blue-950);
-  --sidebar-bg:#081527;
-  --sidebar-line:#16294494;
-  --sidebar-ink:#9FB4D2;
-  --sidebar-ink-active:#FFFFFF;
-  --sidebar-active-bg:var(--blue-600);
-  --topbar-bg:#0A1830;
-  --logo-ink:#FFFFFF;
-  --shadow-soft:0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
-  --shadow-lift:0 2px 4px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
+  --chrome:#081527;
+  --chrome-elevated:#0E1F38;
+  --chrome-line:rgba(255,255,255,.08);
+  --on-chrome:#9FB4D2;
+  --on-chrome-muted:#8FA5C4;
+  --chrome-active:var(--blue-600);   /* gefüllt statt hell — #EFF5FD wäre hier
+                                        ein grelles Rechteck */
+  --on-chrome-active:#FFFFFF;
+  --accent-on-chrome:var(--blue-400); /* #2F6BD1 auf #081527 sind 2.6:1 */
 }
 
 /* ============================================================
@@ -116,18 +122,18 @@ section:first-of-type{border-top:0}
 @media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr}}
 .stack{display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:center}
 
-/* Header */
+/* Header — ist selbst Chrome und wechselt deshalb als Einziges mit dem Theme. */
 header.top{
-  position:sticky; top:0; z-index:50; background:var(--topbar-bg);
-  border-bottom:1px solid var(--line); backdrop-filter:blur(8px);
+  position:sticky; top:0; z-index:50; background:var(--chrome);
+  border-bottom:1px solid var(--chrome-line);
 }
 header.top .wrap{display:flex; align-items:center; justify-content:space-between; height:64px; gap:var(--space-4)}
-.switch{display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-pill); padding:3px}
+.switch{display:flex; background:transparent; border:1px solid var(--chrome-line); border-radius:var(--radius-pill); padding:3px}
 .switch button{
-  border:0; background:transparent; color:var(--muted); font:inherit; font-size:var(--fs-sm); font-weight:600;
+  border:0; background:transparent; color:var(--on-chrome); font:inherit; font-size:var(--fs-sm); font-weight:600;
   padding:6px 16px; border-radius:var(--radius-pill); cursor:pointer;
 }
-.switch button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink)}
+.switch button[aria-pressed="true"]{background:var(--chrome-active); color:var(--on-chrome-active)}
 
 /* ============================================================
    KOMPONENTEN
@@ -196,17 +202,27 @@ table.tok td:first-child{font-family:ui-monospace,monospace; color:var(--accent)
 
 pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:var(--space-4); overflow:auto; font-size:.78rem; line-height:1.6; color:var(--ink)}
 
-/* Sidebar-Demo */
+/* Shell-Demo — Sidebar bündig an der Kante, Topbar rechts daneben, beide
+   Kopfzeilen gleich hoch, damit die Trennlinien fluchten. */
 .shell{display:grid; grid-template-columns:212px 1fr; border:1px solid var(--line); border-radius:var(--radius-card); overflow:hidden; box-shadow:var(--shadow-soft)}
-.shell aside{background:var(--sidebar-bg); border-right:1px solid var(--sidebar-line); padding:var(--space-4) var(--space-3)}
-.shell main{background:var(--surface-2); padding:var(--space-5); min-height:340px}
-.navitem{display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:var(--radius); color:var(--sidebar-ink); font-size:var(--fs-sm); font-weight:500; margin-bottom:2px}
-.navitem[aria-current]{background:var(--sidebar-active-bg); color:var(--sidebar-ink-active); font-weight:600}
-.navgroup{font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:700; margin:var(--space-4) 11px var(--space-2)}
+.shell aside{background:var(--chrome); border-right:1px solid var(--chrome-line); padding-bottom:var(--space-4)}
+.shell .sidehead{height:56px; display:flex; align-items:center; padding:0 var(--space-3); border-bottom:1px solid var(--chrome-line); margin-bottom:var(--space-3)}
+.shell .col{display:flex; flex-direction:column; min-width:0}
+.shell .topbar{height:56px; display:flex; align-items:center; justify-content:flex-end; gap:var(--space-3); padding:0 var(--space-4); background:var(--chrome); border-bottom:1px solid var(--chrome-line)}
+.shell main{background:var(--surface-2); padding:var(--space-5); min-height:300px}
+.navitem{display:flex; align-items:center; gap:10px; margin:0 var(--space-3) 2px; padding:8px 11px; border-radius:var(--radius); color:var(--on-chrome); font-size:var(--fs-sm); font-weight:500}
+.navitem[aria-current]{background:var(--chrome-active); color:var(--on-chrome-active); font-weight:600}
+.navgroup{font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--on-chrome-muted); font-weight:700; margin:var(--space-4) 23px var(--space-2)}
 .navitem svg{width:16px; height:16px; flex:none; opacity:.85}
 
-/* Logo */
-.logo{display:inline-flex; align-items:center; gap:10px; color:var(--logo-ink)}
+/* Logo — steht standardmäßig auf Inhalt. `.on-chrome` ist die Fassung für die
+   Sidebar-/Topbar-Fläche: die kann dunkel sein, während der Inhalt hell bleibt,
+   und dann trägt weder --ink noch der Inhalts-Akzent. Das Logo kennt sein Theme
+   nicht, aber sein Aufrufer kennt seine Fläche. */
+.logo{display:inline-flex; align-items:center; gap:10px; color:var(--ink)}
+.logo.on-chrome{color:var(--on-chrome-active)}
+.logo.on-chrome .word i{color:var(--accent-on-chrome)}
+.logo.on-chrome .claim{color:var(--on-chrome)}
 .logo svg{width:30px; height:30px; flex:none}
 .logo .word{font-family:var(--font-sans); font-weight:600; font-size:1.0625rem; letter-spacing:-.01em; line-height:1}
 .logo .word i{font-style:normal; color:var(--accent)}
@@ -242,15 +258,26 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
 .fontrow:last-child{border-bottom:0}
 .fontrow .sample{font-size:1.75rem; line-height:1.25; color:var(--ink-strong)}
 .fontrow .name{font-size:var(--fs-xs); color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px}
+
+/* Seitenkopf mit Bild (PageHero) */
+.pagehero{position:relative; isolation:isolate; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-card); background:var(--surface)}
+.pagehero img{position:absolute; top:0; right:0; bottom:0; height:100%; width:70%; object-fit:cover}
+.pagehero .veil{position:absolute; inset:0;
+  background:linear-gradient(90deg, var(--surface) 0%, var(--surface) 38%,
+    color-mix(in srgb, var(--surface) 55%, transparent) 62%, transparent 88%)}
+.pagehero .body{position:relative; padding:var(--space-10) var(--space-6); max-width:32rem}
+.pagehero .body h1{font-size:var(--fs-h1); margin:6px 0 0}
+.pagehero .body p{color:var(--muted); margin:10px 0 0}
+@media(max-width:640px){.pagehero img{width:100%} .pagehero .body{padding:var(--space-6) var(--space-5)}}
 </style>
 </head>
 <body>
 
 <header class="top">
   <div class="wrap">
-    <div class="logo">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
-      <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span><span class="claim">Design-System · Entwurf</span></span>
+    <div class="logo on-chrome">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
+      <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span><span class="claim">Design-System · Stand 04.08.2026</span></span>
     </div>
     <div class="switch" role="group" aria-label="Theme">
       <button data-set="hell" aria-pressed="true">Hell</button>
@@ -263,9 +290,12 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
 
 <!-- ============================ INTRO ============================ -->
 <section>
-  <p class="eyebrow">Entwurf 04.08.2026</p>
-  <h1 style="font-size:var(--fs-display)">Ein System, zwei Themes, eine Akzentfarbe.</h1>
-  <p class="lead">Blau ersetzt Gold vollständig. Grün als Akzent entfällt. Es gibt genau zwei Themes — <b>Hell</b> und <b>Navy</b> — und beide teilen sich dieselben Token-Namen, sodass keine Komponente ein Theme kennen muss. Umschalten oben rechts, alles auf dieser Seite wechselt mit.</p>
+  <p class="eyebrow">Stand 04.08.2026 · umgesetzt in AGE-492 und AGE-499</p>
+  <h1 style="font-size:var(--fs-display)">Ein System, zwei Rahmen, eine Akzentfarbe.</h1>
+  <p class="lead">Blau ersetzt Gold vollständig. Grün als Akzent entfällt. Es gibt genau zwei Themes — <b>Hell</b> und <b>Navy</b> — und beide teilen sich dieselben Token-Namen, sodass keine Komponente ein Theme kennen muss. Umschalten oben rechts: <b>es wechselt nur der Rahmen</b> — dieser Kopf, die Sidebar in §04. Der Inhalt bleibt in beiden Fassungen hell.</p>
+  <div class="card flat" style="margin-top:var(--space-4);border-left:3px solid var(--accent);border-radius:0;padding:var(--space-3) var(--space-4)">
+    <p style="margin:0;font-size:var(--fs-sm)"><b>Navy ist kein Dark Mode.</b> Bis zum 04.08.2026 kippte der Schalter die ganze Oberfläche — Karten, Fließtext, Linien, Signalfarben. Er färbt jetzt nur noch Sidebar und Topbar, so wie die Referenz es zeigt. Der Preis steht hier ausdrücklich, damit ihn niemand später für ein Versehen hält: <b>es gibt keinen dunklen Lesemodus mehr.</b></p>
+  </div>
   <div class="do-dont" style="margin-top:var(--space-5)">
     <div>
       <h4>Wirkt wie</h4>
@@ -282,13 +312,13 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
 <section>
   <p class="eyebrow">01 — Marke</p>
   <h2>Logo</h2>
-  <p class="lead">Der Kompass ersetzt die Krone. Vierstrahliger Kompassstern im dünnen Ring — spartanisch, prägnant, keine Verspielung. Wortmarke durchgehend klein geschrieben. Die Punkte in <code>eff.bee.zee</code> tragen die Akzentfarbe, das ist das einzige Farbdetail.</p>
+  <p class="lead">Der Kompass ersetzt die Krone. Vierstrahliger Kompassstern im dünnen Ring — spartanisch, prägnant, keine Verspielung. <b>Die Zacken brechen an allen vier Spitzen aus dem Ring aus</b> (AGE-499): lag der Stern vollständig innen, las die Marke wie ein gefüllter Kreis mit Muster statt wie ein Kompass. Wortmarke durchgehend klein geschrieben. Die Punkte in <code>eff.bee.zee</code> tragen die Akzentfarbe, das ist das einzige Farbdetail.</p>
 
   <div class="grid g3" style="margin-top:var(--space-5)">
     <div>
       <div class="logobox on-light">
         <div class="logo" style="color:inherit">
-          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
           <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span></span>
         </div>
       </div>
@@ -297,7 +327,7 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
     <div>
       <div class="logobox on-dark">
         <div class="logo" style="color:inherit">
-          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
           <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span></span>
         </div>
       </div>
@@ -305,11 +335,10 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
     </div>
     <div>
       <div class="logobox on-light" style="gap:var(--space-5); display:flex">
-        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
-        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 8 L28 24 L24 40 L20 24 Z" fill="currentColor"/><path d="M8 24 L24 20 L40 24 L24 28 Z" fill="currentColor" opacity=".4"/></svg>
-        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M31 17 L26.5 26.5 L17 31 L21.5 21.5 Z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 48 48" style="width:44px;height:44px;color:var(--blue-600)"><circle cx="24" cy="24" r="15.5" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 48 48" style="width:16px;height:16px;color:var(--blue-600)"><circle cx="24" cy="24" r="15.5" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
       </div>
-      <p class="hint">Drei Markenvarianten zur Wahl: Stern · Nadel · Kompassnadel schräg. Ich empfehle den Stern.</p>
+      <p class="hint">Favicon · Ring auf 3,5 statt 2,5 verstärkt, sonst verschwindet die Linie bei 16 px. Rechts in Originalgröße. Zwei Dateien, eine Form: <code>CompassMark.tsx</code> und <code>public/brand/compass-favicon.svg</code> müssen zusammen geändert werden, sonst trägt der Tab eine andere Marke als die App.</p>
     </div>
   </div>
 
@@ -320,7 +349,8 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
       <li>Mindestabstand ringsum = Höhe des Kompasses ÷ 2.</li>
       <li>Nie kleiner als 24 px Markenhöhe. Darunter nur die Marke ohne Wortmarke.</li>
       <li>Wortmarke nie in Versalien. „FBC" groß wirkt zu hart — das gilt auch hier.</li>
-      <li>Für Favicon und App-Icon nur die Marke, Ring bei 16 px auf 2 px Stärke verstärken.</li>
+      <li>Für Favicon und App-Icon nur die Marke, Ring auf 3,5 verstärkt (<code>r=15.5</code> statt <code>16.5</code>, damit die dickere Linie innerhalb der Zacken bleibt).</li>
+      <li><b>Entschieden 04.08.2026:</b> Stern, nicht Nadel. Die beiden Alternativen sind aus dieser Vorlage entfernt — ein Design-System zeigt keine verworfenen Entwürfe.</li>
     </ul>
   </div>
 </section>
@@ -359,10 +389,10 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
   <p class="lead">Zwei Schriften: eine Serif für Überschriften, die auflockert, und eine neutrale Serifenlose für alles andere. Fließtext in Anthrazit, nicht Schwarz.</p>
 
   <div class="card" style="margin-top:var(--space-5)">
-    <p class="eyebrow" style="margin-bottom:var(--space-4)">Überschrift-Kandidaten — bitte einen auswählen</p>
-    <div class="fontrow"><div class="name">Fraunces — Empfehlung. Modern, leicht geschwungen, seriös.</div><div class="sample" style="font-family:'Fraunces',serif">Gemeinsam besser wirtschaften</div></div>
-    <div class="fontrow"><div class="name">Cormorant Garamond — eleganter, dünner, klassischer.</div><div class="sample" style="font-family:'Cormorant Garamond',serif;font-weight:600">Gemeinsam besser wirtschaften</div></div>
-    <div class="fontrow"><div class="name">Source Serif 4 — sachlicher, ruhiger, am wenigsten Charakter.</div><div class="sample" style="font-family:'Source Serif 4',serif">Gemeinsam besser wirtschaften</div></div>
+    <p class="eyebrow" style="margin-bottom:var(--space-4)">Entschieden 04.08.2026 — Fraunces</p>
+    <div class="fontrow"><div class="name">Fraunces 500 · Überschriften h1–h3 und Display</div><div class="sample" style="font-family:'Fraunces',serif">Gemeinsam besser wirtschaften</div></div>
+    <div class="fontrow"><div class="name">Inter 400 · Fließtext und alles andere</div><div class="sample" style="font-family:'Inter',sans-serif;font-size:1.25rem">Gemeinsam besser wirtschaften</div></div>
+    <p class="hint" style="margin-top:var(--space-3)">Cormorant Garamond und Source Serif 4 standen zur Wahl und sind raus. Beide Schriften liegen <b>selbst gehostet</b> in <code>public/fonts/</code> — vier Dateien, 260 kB, je ein Variable Font pro Subset. Kein Abruf bei einem fremden CDN: in Deutschland ein Abmahnthema, und ein CI-Schritt hält die Zusage offen.</p>
   </div>
 
   <div class="card" style="margin-top:var(--space-4)">
@@ -382,13 +412,35 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
 <section>
   <p class="eyebrow">04 — Layout</p>
   <h2>App-Rahmen und Navigation</h2>
-  <p class="lead">Sidebar sitzt am Rand, nicht schwebend — das war die Entscheidung aus dem Meeting und gilt besonders im Navy-Theme. Sechs Hauptpunkte, darunter der persönliche Bereich. Kompass ist die Lightweight-Variante ohne Fragebogen.</p>
+  <p class="lead">Sidebar sitzt am Rand, nicht schwebend — das war die Entscheidung aus dem Meeting und gilt besonders im Navy-Theme. Sechs Hauptpunkte, darunter der persönliche Bereich. Kompass ist die Lightweight-Variante ohne Fragebogen. <b>Schalte oben auf Navy um:</b> nur dieser Rahmen wechselt, der Inhaltsbereich bleibt hell.</p>
+
+  <div class="grid g2" style="margin-top:var(--space-4)">
+    <div>
+      <h4 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:0 0 6px">Geometrie</h4>
+      <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+        <li>Bündig an der Viewport-Kante, volle Höhe, <code>border-right</code> — keine Rundung, kein Schatten.</li>
+        <li>Logo im Sidebar-Kopf, Topbar rechts daneben. Beide Kopfzeilen 4 rem, damit die Trennlinien fluchten.</li>
+        <li>Breite als <b>eine</b> CSS-Variable (<code>--fbc-sidebar-w</code>): 16 rem offen, 4,5 rem eingeklappt. Zwei Tailwind-Klassen für Sidebar-Breite und Inhalts-Versatz laufen auseinander.</li>
+        <li>Einklappen wird gerätelokal in <code>localStorage</code> gemerkt.</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:0 0 6px">Breite des Inhalts</h4>
+      <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+        <li><b>1440 px</b> ist der Normalfall — Übersicht, Mitglieder, Events, Academy, Aktivität.</li>
+        <li><b>760 px</b> nur für die vier Formularseiten: Login, Onboarding, Einstellungen, Profil-Editor. Eine Lesespalte ist dort richtig, überall sonst legt sie mehrspaltige Raster still.</li>
+        <li>Genau ein Anmelde-Weg im Rahmen, und der steht in der Topbar. Ein zweiter Block in der Sidebar war eine Wiederholung.</li>
+      </ul>
+    </div>
+  </div>
 
   <div class="shell" style="margin-top:var(--space-5)">
     <aside>
-      <div class="logo" style="padding:4px 11px var(--space-4)">
-        <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
-        <span class="word" style="font-size:.9375rem">eff<i>.</i>bee<i>.</i>zee</span>
+      <div class="sidehead">
+        <div class="logo on-chrome">
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
+          <span class="word" style="font-size:.9375rem">eff<i>.</i>bee<i>.</i>zee</span>
+        </div>
       </div>
       <div class="navgroup">Entdecken</div>
       <div class="navitem" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1z"/></svg>Übersicht</div>
@@ -401,7 +453,12 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
       <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Mein Profil</div>
       <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 005 19.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 13.6H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 5l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 002.7-1.1V1a2 2 0 114 0v.1A1.6 1.6 0 0019 4.6l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 001.1 2.7H23a2 2 0 110 4h-.1"/></svg>Einstellungen</div>
     </aside>
-    <main>
+    <div class="col">
+      <div class="topbar">
+        <span style="font-size:var(--fs-sm);font-weight:600;color:var(--on-chrome)">Detlev Krause</span>
+        <div class="avatar" style="width:30px;height:30px;font-size:11px;border-color:var(--chrome-line)">DK</div>
+      </div>
+      <main>
       <div class="stack" style="justify-content:space-between;margin-bottom:var(--space-4)">
         <h2>Aktivität</h2>
         <button class="btn btn-primary">Beitrag schreiben</button>
@@ -423,14 +480,64 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
         </div>
         <div class="post-actions"><span>♡ 24 Reaktionen</span><span>💬 6 Kommentare</span><span>↗ Teilen</span></div>
       </div>
-    </main>
+      </main>
+    </div>
   </div>
   <p class="hint" style="margin-top:var(--space-3)"><b>Tags:</b> Blau gefüllt = vorgegebene Tags aus der Tag-Tabelle, filterbar. Outline = freie Tags des Autors. Beide klickbar, aber optisch unterscheidbar — und jeder Tag erscheint <b>genau einmal</b>, nicht zusätzlich im Fließtext.</p>
 </section>
 
+<!-- ============================ SEITENKOPF ============================ -->
+<section>
+  <p class="eyebrow">05 — Seitenkopf</p>
+  <h2>Jede Seite beginnt mit einem Bild</h2>
+  <p class="lead">Das Foto liegt rechts und blutet nach oben und rechts aus, der Titel steht links auf ruhiger Fläche. Ein Motiv je Route — kein geteiltes Standardbild: der Kopf soll die Seite erkennbar machen, und ein wiederkehrendes Bild träte an die Stelle genau der Orientierung, die es geben soll.</p>
+
+  <div class="pagehero" style="margin-top:var(--space-5)">
+    <img src="../public/images/hero-events.webp" alt="">
+    <div class="veil"></div>
+    <div class="body">
+      <p class="eyebrow" style="margin:0">Format</p>
+      <h1>Events</h1>
+      <p>Triff den Club in echt.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:var(--space-5)">
+    <div class="card flat">
+      <p class="eyebrow">Aufbau</p>
+      <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+        <li>Bild rechts, 70 % der Breite, <code>object-fit:cover</code>. Unter 640 px volle Breite.</li>
+        <li>Darüber ein Verlauf von der Kartenfläche nach transparent — <b>mit zwei Stopps in der Kartenfarbe, nicht einem</b>. Mit nur einem Stopp scheint das Bild bereits unter dem Fließtext durch, und Text auf Foto ist auch mit Schleier schlechter lesbar als Text auf Fläche.</li>
+        <li>Titel in Fraunces, darüber optional eine Rubrikzeile, darunter der Claim. Suchfeld oder Filter sitzen unter dem Text, noch im Kopf.</li>
+        <li>Das Bild lädt mit <code>fetchPriority="high"</code> — es ist das größte Element above the fold und lädt sonst hinter den Karten-Requests.</li>
+      </ul>
+    </div>
+    <div class="card flat">
+      <p class="eyebrow">Bilder</p>
+      <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+        <li>Neun Motive, <b>selbst gehostet</b> unter <code>public/images/</code> als webp, je 70–230 kB. Quelle und Lizenz in <code>public/images/CREDITS.md</code>.</li>
+        <li>Kein CDN-Abruf — derselbe Grund wie bei den Schriften: der Aufruf einer Seite darf keine Besucher-IP an einen fremden Server geben.</li>
+        <li>Die Zuordnung Route → Motiv steht in <code>src/config/formatHero.ts</code>, nicht in den Seiten.</li>
+        <li><i>Meine Kurse</i> trägt bewusst dasselbe Motiv wie <i>Academy</i>: es ist die persönliche Sicht auf denselben Inhalt, ein fremdes Motiv würde eine zweite Welt suggerieren.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="do-dont" style="margin-top:var(--space-5)">
+    <div>
+      <h4>Mit Bildkopf</h4>
+      <ul><li>Übersicht, Kompass, Academy, Events, Mitglieder, Aktivität</li><li>Meine Kontakte, Meine Kurse, Mitgliedschaft</li></ul>
+    </div>
+    <div class="dont">
+      <h4>Ohne Bildkopf</h4>
+      <ul><li>Login, Onboarding, Einstellungen, Profil-Editor</li><li>Sie laufen in der 760-px-Lesespalte, und ein Bild über einem Formular ist Dekoration vor der Aufgabe.</li></ul>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ KOMPONENTEN ============================ -->
 <section>
-  <p class="eyebrow">05 — Bausteine</p>
+  <p class="eyebrow">06 — Bausteine</p>
   <h2>Komponenten</h2>
 
   <div class="grid g2" style="margin-top:var(--space-5)">
@@ -529,7 +636,7 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
     <div class="card">
       <p class="eyebrow">Leerer Zustand</p>
       <div style="text-align:center;padding:var(--space-5) 0">
-        <svg viewBox="0 0 48 48" style="width:40px;height:40px;color:var(--muted);opacity:.5;margin-bottom:12px"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 48 48" style="width:40px;height:40px;color:var(--muted);opacity:.5;margin-bottom:12px"><circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="currentColor"/></svg>
         <h3 style="font-size:var(--fs-h3);margin-bottom:6px">Noch keine Beiträge</h3>
         <p style="margin:0 0 var(--space-4);font-size:var(--fs-sm);color:var(--muted)">Sei die erste Person, die etwas teilt.</p>
         <button class="btn btn-primary btn-sm">Beitrag schreiben</button>
@@ -540,26 +647,41 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
 
 <!-- ============================ TOKENS ============================ -->
 <section>
-  <p class="eyebrow">06 — Übergabe</p>
+  <p class="eyebrow">07 — Übergabe</p>
   <h2>Tokens</h2>
-  <p class="lead">Das Repo hat keine <code>tailwind.config.js</code> — alle Tokens leben in <code>src/index.css</code> als Tailwind-v4-<code>@theme</code> plus <code>html[data-variant="…"]</code>-Overrides. Der folgende Block ist so aufgebaut, dass er die bestehende Struktur ersetzt.</p>
+  <p class="lead">Das Repo hat keine <code>tailwind.config.js</code> — alle Tokens leben in <code>src/index.css</code> als Tailwind-v4-<code>@theme</code> plus <b>einem</b> Override-Block <code>html[data-variant="navy"]</code>, der ausschließlich Werte überschreibt, nie Namen. Darum muss keine Komponente ihr Theme kennen, und keine darf darauf verzweigen.</p>
 
-  <table class="tok" style="margin-top:var(--space-5)">
-    <tr><th>Token</th><th>Hell</th><th>Navy</th><th>Verwendung</th></tr>
-    <tr><td>--canvas</td><td>#FFFFFF</td><td>#081527</td><td>Seitenhintergrund</td></tr>
-    <tr><td>--surface</td><td>#FFFFFF</td><td>#0E1F38</td><td>Karten, Modale</td></tr>
-    <tr><td>--surface-2</td><td>#F6F8FB</td><td>#0A1830</td><td>Eingelassene Flächen, Inhaltsbereich</td></tr>
-    <tr><td>--line</td><td>#E2E8F0</td><td>#1D3455</td><td>Trennlinien, Rahmen</td></tr>
-    <tr><td>--ink</td><td>#1E2A3A</td><td>#E4ECF7</td><td>Fließtext — nie reines Schwarz</td></tr>
-    <tr><td>--ink-strong</td><td>#0C2043</td><td>#FFFFFF</td><td>Überschriften</td></tr>
-    <tr><td>--muted</td><td>#64748B</td><td>#8FA5C4</td><td>Meta, Labels, Platzhalter</td></tr>
-    <tr><td>--accent</td><td>#2F6BD1</td><td>#5B90E0</td><td>Primäraktion, Links, aktiver Zustand</td></tr>
-    <tr><td>--accent-soft</td><td>#EFF5FD</td><td>rgba(91,144,224,.14)</td><td>Fokusring, Tag-Hintergrund</td></tr>
-    <tr><td>--sidebar-bg</td><td>#FFFFFF</td><td>#081527</td><td>Sidebar — sitzt am Rand, nicht schwebend</td></tr>
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-5) 0 var(--space-3)">Inhalt — in beiden Themes identisch</h3>
+  <table class="tok">
+    <tr><th>Token</th><th>Wert</th><th>Navy</th><th>Verwendung</th></tr>
+    <tr><td>--color-canvas</td><td>#FFFFFF</td><td>unverändert</td><td><b>Karten</b> (siehe Namenswarnung unten)</td></tr>
+    <tr><td>--color-soft</td><td>#F6F8FB</td><td>unverändert</td><td><b>App-Hintergrund</b></td></tr>
+    <tr><td>--color-line</td><td>#E2E8F0</td><td>unverändert</td><td>Trennlinien, Rahmen</td></tr>
+    <tr><td>--color-ink</td><td>#1E2A3A</td><td>unverändert</td><td>Fließtext — nie reines Schwarz</td></tr>
+    <tr><td>--color-ink-strong</td><td>#0C2043</td><td>unverändert</td><td>Überschriften</td></tr>
+    <tr><td>--color-muted</td><td>#626F85</td><td>unverändert</td><td>Meta, Labels, Platzhalter</td></tr>
+    <tr><td>--color-accent</td><td>#2F6BD1</td><td>unverändert</td><td>Primäraktion, Links</td></tr>
+    <tr><td>--color-accent-strong</td><td>#1F53B0</td><td>unverändert</td><td>Hover</td></tr>
+    <tr><td>--color-accent-soft</td><td>#EFF5FD</td><td>unverändert</td><td>Fokusring, Tag-Hintergrund</td></tr>
+    <tr><td>--color-accent-ink</td><td>#FFFFFF</td><td>unverändert</td><td>Text <b>auf</b> einer Akzentfläche</td></tr>
+    <tr><td>--color-scrim</td><td>rgb(8 21 39/.6)</td><td>unverändert</td><td>Overlays — dunkel in beiden Themes</td></tr>
     <tr><td>--radius-card</td><td colspan="2">14px</td><td>Karten</td></tr>
-    <tr><td>--radius</td><td colspan="2">10px</td><td>Buttons, Inputs</td></tr>
     <tr><td>--font-display</td><td colspan="2">Fraunces</td><td>Nur h1–h3 und Display</td></tr>
     <tr><td>--font-sans</td><td colspan="2">Inter</td><td>Alles andere</td></tr>
+  </table>
+
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-6) 0 var(--space-3)">Chrome — das Einzige, was das Theme umfärbt</h3>
+  <table class="tok">
+    <tr><th>Token</th><th>Hell</th><th>Navy</th><th>Verwendung</th></tr>
+    <tr><td>--color-chrome</td><td>#FFFFFF</td><td>#081527</td><td>Sidebar- und Topbar-Fläche</td></tr>
+    <tr><td>--color-chrome-elevated</td><td>#F6F8FB</td><td>#0E1F38</td><td>Abgesetzte Fläche im Rahmen</td></tr>
+    <tr><td>--color-chrome-border</td><td>#E2E8F0</td><td>rgb(255 255 255/.08)</td><td>Trennlinien im Rahmen</td></tr>
+    <tr><td>--color-on-chrome</td><td>#475569</td><td>#9FB4D2</td><td>Navigationstext</td></tr>
+    <tr><td>--color-on-chrome-muted</td><td>#64748B</td><td>#8FA5C4</td><td>Gruppentitel im Menü</td></tr>
+    <tr><td>--color-chrome-active</td><td>#EFF5FD</td><td>#1F53B0</td><td>Fläche des aktiven Eintrags</td></tr>
+    <tr><td>--color-on-chrome-active</td><td>#1F53B0</td><td>#FFFFFF</td><td>Schrift des aktiven Eintrags, Logo</td></tr>
+    <tr><td>--color-accent-on-chrome</td><td>#2F6BD1</td><td>#5B90E0</td><td>Die Punkte der Wortmarke</td></tr>
+    <tr><td>--sidebar-surface</td><td>#FFFFFF</td><td>#081527</td><td>Sidebar — sitzt am Rand, nicht schwebend</td></tr>
   </table>
 
   <pre class="css" style="margin-top:var(--space-5)">@theme {
@@ -568,14 +690,21 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
   --color-blue-600:#1F53B0; --color-blue-700:#17408B; --color-blue-800:#123061;
   --color-blue-900:#0C2043; --color-blue-950:#081527;
 
-  --color-canvas:#FFFFFF; --color-surface:#FFFFFF; --color-surface-2:#F6F8FB;
-  --color-line:#E2E8F0;   --color-ink:#1E2A3A;     --color-ink-strong:#0C2043;
-  --color-muted:#64748B;  --color-accent:#2F6BD1;  --color-accent-soft:#EFF5FD;
-  --color-accent-ink:#FFFFFF;
+  /* Inhalt */
+  --color-canvas:#FFFFFF; --color-soft:#F6F8FB;    --color-line:#E2E8F0;
+  --color-ink:#1E2A3A;    --color-ink-strong:#0C2043; --color-muted:#626F85;
+  --color-accent:#2F6BD1; --color-accent-strong:#1F53B0;
+  --color-accent-soft:#EFF5FD; --color-accent-ink:#FFFFFF;
   --color-success:#167A5B; --color-warning:#B4761A; --color-danger:#B23B3B;
+  --color-scrim:rgb(8 21 39/.6);
 
-  --color-sidebar-bg:#FFFFFF; --color-sidebar-ink:#475569;
-  --color-sidebar-ink-active:#1F53B0; --color-sidebar-active-bg:#EFF5FD;
+  /* Rahmen */
+  --color-chrome:#FFFFFF; --color-chrome-elevated:#F6F8FB;
+  --color-chrome-border:#E2E8F0;
+  --color-on-chrome:#475569; --color-on-chrome-muted:#64748B;
+  --color-chrome-active:#EFF5FD; --color-on-chrome-active:#1F53B0;
+  --color-accent-on-chrome:#2F6BD1;
+  --sidebar-surface:#FFFFFF;
 
   --font-display:"Fraunces",Georgia,serif;
   --font-sans:"Inter",system-ui,sans-serif;
@@ -583,31 +712,37 @@ pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius
   --shadow-soft:0 1px 2px rgb(15 29 51/.05), 0 4px 16px rgb(15 29 51/.05);
 }
 
-/* Variante 2 — nur die Layer-Tokens werden überschrieben. */
+/* Navy überschreibt NUR das Chrome, nie den Inhalt. Wer hier canvas, soft, ink,
+   line, accent oder die Signalfarben wieder einträgt, baut den Dark-Mode zurück. */
 html[data-variant="navy"]{
-  --color-canvas:#081527; --color-surface:#0E1F38; --color-surface-2:#0A1830;
-  --color-line:#1D3455;   --color-ink:#E4ECF7;     --color-ink-strong:#FFFFFF;
-  --color-muted:#8FA5C4;  --color-accent:#5B90E0;  --color-accent-soft:rgb(91 144 224/.14);
-  --color-accent-ink:#081527;
-  --color-sidebar-bg:#081527; --color-sidebar-ink:#9FB4D2;
-  --color-sidebar-ink-active:#FFFFFF; --color-sidebar-active-bg:#1F53B0;
+  --color-chrome:#081527; --color-chrome-elevated:#0E1F38;
+  --color-chrome-border:rgb(255 255 255/.08);
+  --color-on-chrome:#9FB4D2; --color-on-chrome-muted:#8FA5C4;
+  --color-chrome-active:#1F53B0; --color-on-chrome-active:#FFFFFF;
+  --color-accent-on-chrome:#5B90E0;
+  --sidebar-surface:#081527;
 }</pre>
 
   <div class="card flat" style="margin-top:var(--space-5)">
-    <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--space-3)">Was beim Umbau passieren muss</h3>
+    <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--space-3)">Drei Fallen beim Übertragen</h3>
     <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
-      <li>Die zwölf übrigen Varianten aus <code>designVariants.ts</code> entfernen, <code>DEFAULT_VARIANT</code> auf <code>hell</code>.</li>
-      <li><code>--color-gold*</code> ersatzlos streichen. Jede Fundstelle wird <code>--color-accent</code>.</li>
-      <li>Die sieben <code>--color-fmt-*</code> Format-Akzente auf die Blau-Rampe umstellen oder auf Neutral reduzieren.</li>
-      <li><code>VITE_DESIGN_SWITCHER</code> in Produktion auf <code>off</code> — er wird heute mit ausgeliefert.</li>
-      <li><code>Logo.tsx</code>: Kronen-PNG durch das SVG ersetzen, damit die Hell/Dunkel-Umschaltung über <code>currentColor</code> läuft und kein separates Asset mehr fehlt.</li>
-      <li>Fonts über <code>@import</code> in <code>index.css</code> laufen heute gegen Google Fonts. Für DSGVO selbst hosten.</li>
+      <li><b>Die Namen sind vertauscht.</b> In dieser Vorlage heißen die Karten <code>--surface</code> und der Seitenhintergrund <code>--canvas</code>; im Code heißen die <b>Karten</b> <code>--color-canvas</code> und der <b>App-Hintergrund</b> <code>--color-soft</code>. Beim Übertragen mappen: Vorlage <code>--surface</code> → <code>--color-canvas</code>, Vorlage <code>--canvas</code>/<code>--surface-2</code> → <code>--color-soft</code>. Das bleibt bewusst so — AGE-492 wollte nicht zwei Massen-Renames in einem Change.</li>
+      <li><b><code>--color-muted</code> weicht gemessen ab.</b> Die #64748B dieser Vorlage treffen auf <code>--color-soft</code> nur 4.47:1 und verfehlen AA für Fließtext um 0.03 — und genau dort steht der meiste gemutete Text. <code>#626F85</code> ist der kleinste Schritt, der beides schafft (4.78 auf soft, 5.08 auf canvas).</li>
+      <li><b><code>--color-chrome*</code> hieß bis AGE-492 <code>--color-night*</code>.</b> Umbenannt, weil „night" im hellen Theme Weiß bedeutet — ein Name, der das Gegenteil seines Werts behauptet, führt die nächste Änderung in die Irre. Aus demselben Rename stammte ein Fehler, den AGE-499 aufgeräumt hat: die Overlays lagen auf <code>bg-chrome/60</code>, und ein weißer Schleier über weißem Inhalt verdunkelt nichts. Dafür gibt es jetzt <code>--color-scrim</code>.</li>
+    </ul>
+  </div>
+
+  <div class="card flat" style="margin-top:var(--space-4)">
+    <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--space-3)">Was CI festhält</h3>
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+      <li>Keine zurückgezogenen Akzent-Tokens unter <code>src/</code>. TypeScript prüft Tailwind-Klassennamen nicht — eine Utility-Klasse ist ein String, also hängt die Zusage an einem grep-Schritt in <code>.github/workflows/ci.yml</code>, nicht an einer Checkliste.</li>
+      <li>Keine Schrift von einem fremden CDN in <code>src/</code> oder <code>index.html</code>.</li>
     </ul>
   </div>
 </section>
 
 <section style="padding-bottom:var(--space-10)">
-  <p class="hint">Entwurf zur Abstimmung — Donald &amp; Detlev, 04.08.2026. Offen: Überschrift-Schrift (Fraunces / Cormorant / Source Serif), Markenvariante (Stern / Nadel / schräg), Standard-Theme (Hell oder Navy).</p>
+  <p class="hint">Stand 04.08.2026 — Donald &amp; Detlev. Diese Vorlage beschreibt den <b>umgesetzten</b> Zustand: Farben und Schriften aus AGE-492, Rahmen, Theme-Umfang und Seitenköpfe aus AGE-499. Die drei damals offenen Fragen sind entschieden: Fraunces, Kompassstern, Standard-Theme <b>Hell</b>. Die lebende Fassung im Code ist <code>/styleguide</code> (nur im Dev-Modus) — bei Zweifeln gilt der Code, nicht dieses Dokument.</p>
 </section>
 
 </div>
@@ -615,8 +750,8 @@ html[data-variant="navy"]{
 <script>
 const BLUE=[["50","#EFF5FD"],["100","#DCE9FA"],["200","#BCD3F4"],["300","#8EB5EC"],["400","#5B90E0"],["500","#2F6BD1"],["600","#1F53B0"],["700","#17408B"],["800","#123061"],["900","#0C2043"],["950","#081527"]];
 const NEUT=[["0","#FFFFFF"],["50","#F6F8FB"],["100","#EDF1F6"],["200","#E2E8F0"],["300","#CBD5E1"],["400","#94A3B8"],["500","#64748B"],["700","#334155"],["800","#1E2A3A"],["900","#131C29"]];
-const SEM=[["success","#167A5B"],["warning","#B4761A"],["danger","#B23B3B"],["boost","#64748B"],["connect","#5B90E0"],["discover","#2F6BD1"],["exchange","#1F53B0"],["focus","#17408B"],["impact","#0C2043"]];
-const TIERS=[["BOOST","--tier-boost"],["CONNECT","--tier-connect"],["DISCOVER","--tier-discover"],["EXCHANGE","--tier-exchange"],["FOCUS","--tier-focus"],["IMPACT","--tier-impact"]];
+const SEM=[["success","#167A5B"],["warning","#B4761A"],["danger","#B23B3B"],["basic","#64748B"],["connect","#5B90E0"],["discover","#2F6BD1"],["exchange","#1F53B0"],["focus","#17408B"],["impact","#0C2043"]];
+const TIERS=[["BASIC","--tier-basic"],["CONNECT","--tier-connect"],["DISCOVER","--tier-discover"],["EXCHANGE","--tier-exchange"],["FOCUS","--tier-focus"],["IMPACT","--tier-impact"]];
 
 const sw=(name,hex)=>`<div class="swatch"><div class="chip" style="background:${hex}"></div><div class="meta"><b>${name}</b><span>${hex}</span></div></div>`;
 document.getElementById('blueRamp').innerHTML=BLUE.map(([k,v])=>sw('blue-'+k,v)).join('');
