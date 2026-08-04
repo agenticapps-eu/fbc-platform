@@ -1,71 +1,85 @@
-# Session Handoff — 2026-08-04 (3. Session)
+# Session Handoff — 2026-08-04 (6. Session)
 
 ## Accomplished
 
-**AGE-492 (C1) ist durch:** Plan-Review eingearbeitet, PR #106 gemerged, main
-deployed, Theme-Migration manuell nach Prod gepusht (`supabase db push`) und
-gegen Prod verifiziert (Spalte da, CHECK greift). Change archiviert →
-`openspec/specs/design-system/` existiert jetzt.
+**AGE-494 (C2) ist committet, gepusht und als PR #110 offen — alle vier CI-Checks
+grün** (`verify`, `migrations`, `deploy`, `pr-title`), `mergeStateStatus: CLEAN`.
+Branch `donald/age-494-c2-scope-navigation`, Commits `d884b86` + `d498859`.
 
-**AGE-499 (C1a) auf Branch `donald/age-499-c1a-shell-layout`, 5 Commits,
-noch kein PR.** Vier Befunde aus Donalds visueller Abnahme:
-
-- **Sidebar sitzt am Rand** statt zu schweben (die Vorlage sagte das von Anfang
-  an: „sitzt am Rand, nicht schwebend"). Logo im Sidebar-Kopf, Topbar rechts.
-- **Volle Breite bis 1440 px.** `WIDE_ROUTES` → `NARROW_ROUTES`; der alte
-  720-px-Default hatte `lg:grid-cols-3`/`xl:grid-cols-4` im Dashboard stillgelegt.
-- **`navy` färbt nur noch das Chrome** — Richtungswechsel gegen Vorlage und
-  gemergte Spec. Kein Dark-Reading-Mode mehr; steht so im Delta.
-- **Seitenköpfe mit Bild** (`PageHero` + `FormatHero`), neun selbst gehostete
-  Unsplash-Motive je Route.
-- Dazu: Icons je Eintrag (aktiv gefüllt), einklappbare Sidebar, Kompass-Zacken
-  brechen aus dem Ring aus (Favicon mitgezogen), `--color-scrim`.
-
-284 Tests, lint, typecheck, build, `openspec validate --all` (26/26) grün.
+- **Task 9.1 belegt** — lint 0 Fehler (3 vorbestehende Warnungen), typecheck
+  sauber, **357 Vitest in 60 Dateien**, Build ✓, **85 pgTAP**, openspec 26/26.
+- **Task 9.2 gelaufen** (unabhängiger Reviewer-Subagent, Arbeitsbaum gegen
+  `main`, weil es keine Commits gab): **keine kritischen Befunde**, 5 wichtige,
+  9 kleine. Alle fünf wichtigen übernommen und einzeln nachgeprüft:
+  - `compass.ts`-Docstring behauptete das Gegenteil des Codes („Replace-
+    Collection", „einziger Schreiber") — korrigiert.
+  - `ProfilPage`: `if (isLoading || !selection)` stand VOR `if (isError)`; bei
+    einem Ladefehler verschwand der ganze Kategorie-Block wortlos. Reihenfolge
+    gedreht, **neuer Test `ProfilPage.categories.test.tsx` war vorher rot**.
+  - **Task 4.9 war abgehakt, der Test fehlte.** Neu:
+    `matching-profile.test.ts` (7 Fälle). Am Altstand nachweislich rot —
+    `git show main:src/lib/matching-profile.ts` enthält `source` **nullmal**,
+    und das Volumenband war Pflicht.
+  - Zwei „currently"-Sätze im matching-Delta hätten beim Archivieren als
+    aktuelle Wahrheit in `openspec/specs/` gestanden — umformuliert.
+  - Drei grün-per-Konstruktion-Tests geschärft (Identität prüfte `test-user`,
+    das die Fixture gar nicht rendert; TOCTOU-Test war byte-gleich zum Fall
+    darüber; Leerzustands-Verbotsliste traf keinen einzigen echten Wortlaut).
+- **Eine CI-Flake gefunden und behoben** (`d498859`) — der Erstlogin-Test wartete
+  auf einen Text, der nur erschien, weil die ECHTE Supabase-Abfrage in der
+  Testumgebung von selbst scheitert. Lokal Millisekunden, in CI langsamer als
+  `findByText`s 1000-ms-Fenster. `fetchDashboard` schlägt jetzt gezielt fehl:
+  1139 ms → 138 ms. **Lokal grün hätte das nie gezeigt.**
+- **„Aktivität & Portfolio" auf `/profil` ersatzlos entfernt** (Donalds
+  Entscheidung nach dem Review). Vier Karten mit erfundenen Zahlen über das
+  Mitglied selbst. Komponente + Test gelöscht, Task 7.6 und ein neues
+  Requirement im member-profiles-Delta halten die Begründung fest.
 
 ## Decisions
 
-- **Kein Dark-Reading-Mode mehr** (Donald). Der Preis steht ausdrücklich im
-  Delta, damit ihn niemand später als Versehen liest.
-- **Bilder heruntergeladen statt per CDN** — ein `images.unsplash.com`-Request
-  wäre derselbe Fremdabruf, den AGE-492 für die Fonts entfernt hat.
-- **Nur EIN Anmelde-Weg im Rahmen** (Topbar). Der Sidebar-Block war eine
-  Wiederholung; ein zusätzliches „Mitglied werden" oben wäre die dritte Kopie
-  gewesen — zwei Tests haben genau das gemeldet.
-- **Formularseiten ohne Bildkopf** (Login, Onboarding, Einstellungen,
-  Profil-Editor).
-- **Icons selbst gezeichnet**, keine Bibliothek, keine Namensnennungspflicht.
+- **Kein Leerzustand als Ersatz für die Demo-Karten** — Statistik, Projekte,
+  Investments und KI-Assistent existieren in Phase 1 gar nicht. Ein „Noch keine
+  Investments" verspräche eine Funktion, die niemand gebaut hat; bei „Meine
+  Events" ging der Leerzustand nur, weil es Events gibt.
+- **„Meine Communities" (`kontakte-widgets.tsx`) bewusst nicht angefasst** —
+  dieselbe Demo-Marke, sitzt aber auf `/kontakte`. Eigener Nachlauf.
+- **`supabase db push` und Merge macht Donald** (04.08.). Die Migration ist
+  irreversibel und trifft die Live-Instanz.
+- **Archivieren (9.4) erst NACH dem Merge**, als eigener PR — so lief es bei
+  AGE-499 (#107/#108 Arbeit, #109 Archiv).
 
 ## Files modified
 
-- `src/index.css` — Chrome-Aktiv-Tokens, `--color-scrim`, navy auf Chrome
-  reduziert, Shell-Geometrie-Klassen
-- `src/components/AppShell.tsx` — komplette Shell-Struktur · `ui/NavIcon.tsx`,
-  `ui/PageHero.tsx` neu · `ui/SidebarNav.tsx`, `ui/FormatHero.tsx`,
-  `ui/Logo.tsx`, `ui/CompassMark.tsx`
-- `src/config/formatHero.ts` — Motiv je Route · vier Seiten mit Kopf nachgerüstet
-- `public/images/*` (9 webp + CREDITS.md), `public/brand/compass-favicon.svg`
-- `openspec/changes/refine-shell-and-page-heads/` neu; C1 nach
-  `openspec/changes/archive/2026-08-04-redesign-blue-theme-system/`
+- Commit `d884b86` — 60 Dateien, 4061+/463−. Details in der Commit-Message.
+- Neu in dieser Session: `src/lib/matching-profile.test.ts`,
+  `src/pages/ProfilPage.categories.test.tsx`.
+- Gelöscht: `src/components/mein-bereich/aktivitaet-portfolio.tsx` + Test.
+- Nicht eingecheckt (Hausregel, nie `git add -A`): `.claude/*.pre-0034`,
+  `.planning/skill-observations/`, `deno.lock`.
 
 ## Next session: start here
 
-**Branch pushen und PR öffnen** (`donald/age-499-c1a-shell-layout` → main), falls
-in dieser Session nicht mehr geschehen. Danach gilt wie bei C1: der Merge
-deployt nur das Frontend — **hier ist das unkritisch, AGE-499 hat keine
-Migration**.
+**Der erste Griff ist `supabase db push` gegen Prod — vor dem Merge.**
+`deploy.yml` schickt beim Merge nur das Frontend los. Im Fenster dazwischen
+antwortet die alte 6-stellige RPC-Signatur: die Mitgliederkarte ist mit `?? []`
+abgesichert (Regressionstest vorhanden), der Kategorie-**Filter** ist es
+bewusst nicht — ein gesetzter Chip schickt `p_offers`, das die alte Signatur
+nicht kennt, und das Verzeichnis meldet „konnte nicht geladen werden".
 
-Vorher offen aus `tasks.md`: **7.4** den Dashboard-Hero eingeloggt ansehen (bisher
-nur über `/styleguide` geprüft, weil die lokale Abnahme ohne Login lief) und
-**7.5** `docs/design-system.html` nachziehen — Navy-Umfang und Bildköpfe sind
-dort überholt.
+Danach: PR #110 mergen, dann 9.4 archivieren (`/opsx:archive`, eigener PR),
+und die Abnahme-Haken in AGE-494 setzen (9.3, macht Donald).
 
 ## Open questions
 
-- **Fotografennamen fehlen** in `public/images/CREDITS.md`; über die CDN-Kennung
-  nicht auflösbar. Lizenzkonform, aber unhöflich.
-- **AGE-492s Abnahmeliste ist nicht leer** — die Preview-Abnahme durch Detlev und
-  das Durchklicken beider Themes stehen aus; der Archivlauf hat die zwei offenen
-  Aufgaben gemeldet und trotzdem archiviert (`--yes`).
-- Neue Regel, dauerhaft gemerkt: **bei Design-Änderungen erst eine laufende
-  lokale Version zeigen, dann committen.**
+- **Nachläufe aus dem Review, bewusst nicht gefixt:** `NUR_REDIRECT` in
+  `redirect-targets.test.ts` ist handgepflegt (der nächste neue Redirect fällt
+  durchs Raster — genau die Lage, aus der AGE-450 entstand); `ChipGroup` und
+  `ChipFilterGroup` sind bis auf Padding identisch und haben jetzt zwei
+  Aufrufer; ein Kategoriewechsel einer Chip-Zeile im reichen Editor kann einen
+  rohen `23505` zeigen.
+- **Falle beim Prüfen:** `supabase test db` OHNE Dateiliste meldet FAIL. Die
+  elf `probe_*.sql` sind manuelle begin/rollback-Skripte ohne `plan()` und
+  scheitern an Alt-Daten (`tier=prime` aus dem 3-Stufen-Modell). CI ruft
+  bewusst nur `grants_test`, `rls_test`, `directory_search_test` auf
+  (`ci.yml:97-101`). Nicht als Regression fehldeuten.
+- Offen aus dem Vorlauf: die Preview-Abnahme durch Detlev aus AGE-492.
