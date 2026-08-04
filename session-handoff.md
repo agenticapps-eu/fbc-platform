@@ -47,9 +47,8 @@ exist`): **altes lokales Volume**, dem alle Migrationen ab 20260723 fehlten.
 
 ## Next session: start here
 
-**PR #106 prüfen**: `gh pr view 106 --json state,statusCheckRollup`. Beim Verlassen
-dieser Session waren `deploy` und `pr-title` grün, `verify` und `migrations` liefen
-noch — Ergebnis also zuerst ansehen, nicht annehmen. Danach fehlt für die Abnahme
+**PR #106**: alle vier Checks grün (`verify`, `deploy`, `migrations`, `pr-title`),
+`mergeable`, Stand 2026-08-04. Für die Abnahme
 aus AGE-492 nur noch **die Preview-Abnahme durch Detlev** und das Durchklicken
 beider Themes; alles andere ist abgehakt. Merge nach `gh pr view --json state`
 verifizieren (`gh pr merge` kann still fehlschlagen). **Migrationen erreichen Prod
