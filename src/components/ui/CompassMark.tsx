@@ -7,9 +7,9 @@ import { cn } from "../../lib/cn";
  *  Krone brauchte dafür ein zweites Asset — und das für dunkle Flächen fehlte
  *  dauerhaft, was Logo.tsx als offenen Punkt mitschleppte.
  *
- *  Pfad aus der verbindlichen Vorlage (docs/design-system.html). Ab 16 px wird
- *  der Ring dort auf 2 px verstärkt; das betrifft das Favicon
- *  (public/brand/compass-favicon.svg), nicht diese Komponente. */
+ *  Pfad aus der verbindlichen Vorlage (docs/design-system.html). Für 16 px wird
+ *  der Ring dort auf 3.5 verstärkt und dafür auf r=15.5 eingerückt; das betrifft
+ *  das Favicon (public/brand/compass-favicon.svg), nicht diese Komponente. */
 export function CompassMark({ className, title }: { className?: string; title?: string }) {
   return (
     <svg

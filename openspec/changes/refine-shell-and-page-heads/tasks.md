@@ -76,7 +76,17 @@ jeder Punkt wurde lokal in beiden Themes aufgenommen und vor dem Commit gezeigt.
       halten AA für Fließtext.
 - [x] 7.3 Lokale Abnahme durch Donald vor dem Commit (Start hell/navy,
       eingeklappt, Events, Kompass, Academy, Mitgliedschaft, Marke groß).
-- [ ] 7.4 Dashboard-Hero im eingeloggten Zustand ansehen — bisher nur über den
-      Styleguide geprüft, weil die lokale Abnahme ohne Login lief.
-- [ ] 7.5 `docs/design-system.html` nachziehen: Navy-Umfang und Bildköpfe sind
+- [x] 7.4 Dashboard-Hero im eingeloggten Zustand ansehen — bisher nur über den
+      Styleguide geprüft, weil die lokale Abnahme ohne Login lief. Von Donald
+      abgenommen (2026-08-04).
+- [x] 7.5 `docs/design-system.html` nachziehen: Navy-Umfang und Bildköpfe sind
       dort überholt. Die Sidebar-Aussage war von Anfang an richtig.
+      Mitgezogen, weil dieselben zwei Changes es überholt haben und ein
+      Dokument, das sich selbst widerspricht, als Vorlage nichts wert ist: die
+      Markengeometrie (§01 zeigte den alten, innenliegenden Stern), die
+      Übergabe-Tokens (§07 nannte `--color-sidebar-*`, die es im Code nie gab),
+      die erledigte Umbau-Checkliste, die drei entschiedenen Fragen im Fuß —
+      und der eigene Google-Fonts-Aufruf des Dokuments, also genau der
+      Fremdabruf, den §03 der App verbietet. Dazu die Stufe `boost`, die im
+      6-Level-Modell `basic` heißt. `docs/design-system.md` trug dieselbe
+      überholte Navy-Tabelle und ist mit nachgezogen.
