@@ -32,6 +32,41 @@ export const DEFAULT_MEMBER_SETTINGS: MemberSettings = {
 
 export const memberSettingsQueryKey = (uid: string) => ["member-settings", uid] as const;
 
+/* ── Theme (AGE-492) ─────────────────────────────────────────────────────────
+ *
+ *  Bewusst ein EIGENER, schmaler Pfad statt eines weiteren Feldes in
+ *  MemberSettings: `saveMemberSettings` schreibt alle Präferenzen in einem
+ *  Upsert: Legte ein Notification-Toggle los, während der Theme-Wert im Cache
+ *  veraltet ist, überschriebe es das Theme stillschweigend mit dem alten Wert.
+ *  Getrennte Schlüssel, getrennte Writes — dieselbe Lehre wie bei
+ *  `visible_in_directory` oben (AGE-313). */
+
+export type MemberTheme = "hell" | "navy";
+
+export const memberThemeQueryKey = (uid: string) => ["member-theme", uid] as const;
+
+/** Liest das serverseitig gespeicherte Theme. `null` heißt „noch keine Zeile" —
+ *  dann bleibt der lokale Wert gültig, statt ihn auf den Default zu zwingen. */
+export async function fetchMemberTheme(uid: string): Promise<MemberTheme | null> {
+  const { data, error } = await supabase
+    .from("member_settings")
+    .select("theme")
+    .eq("profile_id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  const theme = (data as { theme?: string } | null)?.theme;
+  return theme === "hell" || theme === "navy" ? theme : null;
+}
+
+/** Schreibt das Theme. Upsert, weil ein Mitglied ohne je geänderte Einstellung
+ *  noch gar keine member_settings-Zeile hat. RLS erzwingt own-profile. */
+export async function saveMemberTheme(uid: string, theme: MemberTheme): Promise<void> {
+  const { error } = await supabase
+    .from("member_settings")
+    .upsert({ profile_id: uid, theme }, { onConflict: "profile_id" });
+  if (error) throw error;
+}
+
 /** Lädt die Einstellungen; ohne vorhandene member_settings-Zeile gelten deren Defaults.
  *  Die Sichtbarkeit kommt aus profiles.is_public, nicht aus einer Kopie. */
 export async function fetchMemberSettings(uid: string): Promise<MemberSettings> {

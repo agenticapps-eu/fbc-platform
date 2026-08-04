@@ -7,7 +7,7 @@ interface ToastItem extends ToastOptions {
 }
 
 const variantStyles: Record<NonNullable<ToastOptions["variant"]>, string> = {
-  default: "border-l-gold",
+  default: "border-l-accent",
   success: "border-l-success",
   error: "border-l-danger",
 };

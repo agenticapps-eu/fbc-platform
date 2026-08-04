@@ -16,7 +16,7 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
     );
   }
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[var(--radius-card)] border border-line bg-night">
+    <div className="relative aspect-video overflow-hidden rounded-[var(--radius-card)] border border-line bg-chrome">
       <iframe
         src={video.embedUrl}
         title={title}

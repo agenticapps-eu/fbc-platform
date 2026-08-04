@@ -6,7 +6,6 @@ import { z } from "zod";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
 import { useAuth } from "../providers/auth-context";
-import { useDesignVariant } from "../providers/design-variant-context";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
@@ -22,10 +21,6 @@ type Mode = "login" | "register";
 
 export default function LoginPage() {
   const { user, isLoading, signIn, signUp } = useAuth();
-  const { meta } = useDesignVariant();
-  // Hero-Logo folgt dem Hero-Stil (dark-glow → dunkle Krone), nicht der Basis-Variante:
-  // so bekommt auch D (heller Body, dunkler Hero) die dunkle Logo-Darstellung.
-  const heroTone = meta.heroStyle === "dark-glow" ? "dark" : "light";
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
   const [formError, setFormError] = useState<string | null>(null);
@@ -78,10 +73,10 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
       {/* Variant-bewusster Hero: dark-glow-Panel (b/d) bzw. heller Hero (a/c),
-          Gold-Shimmer-Sweep, Krone-Logo. */}
-      <div className="fbc-hero fbc-hero-shimmer overflow-hidden rounded-[var(--radius-card)] border border-gold/25 px-6 py-8 text-center shadow-soft">
+          Shimmer-Sweep, Marken-Logo. */}
+      <div className="fbc-hero overflow-hidden rounded-[var(--radius-card)] border border-accent/25 px-6 py-8 text-center shadow-soft">
         <div className="flex justify-center">
-          <Logo lockup="full" tone={heroTone} />
+          <Logo lockup="full" />
         </div>
         <p className="mt-4 text-sm font-medium tracking-wide text-[var(--hero-muted)]">
           Gemeinsam erfolgreich · verbinden, wachsen, vertrauen
@@ -110,7 +105,7 @@ export default function LoginPage() {
               type="text"
               autoComplete="name"
               {...register("name")}
-              className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             {errors.name && <p className="text-sm text-danger">{errors.name.message}</p>}
           </div>
@@ -125,7 +120,7 @@ export default function LoginPage() {
             type="email"
             autoComplete="email"
             {...register("email")}
-            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
           {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
         </div>
@@ -139,7 +134,7 @@ export default function LoginPage() {
             type="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             {...register("password")}
-            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
           {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
         </div>
@@ -159,7 +154,7 @@ export default function LoginPage() {
           setFormError(null);
           setInfo(null);
         }}
-        className="mt-4 text-sm font-medium text-gold-strong hover:underline"
+        className="mt-4 text-sm font-medium text-accent-strong hover:underline"
       >
         {mode === "login" ? "Noch kein Konto? Registrieren" : "Schon ein Konto? Zum Login"}
       </button>

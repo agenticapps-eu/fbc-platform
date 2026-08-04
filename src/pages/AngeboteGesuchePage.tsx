@@ -242,7 +242,7 @@ function ItemPanel({ children, onRemove }: { children: React.ReactNode; onRemove
 function CategoryGlyph({ side, categoryKey }: { side: "offer" | "need"; categoryKey: string }) {
   const cat = findCategory(side, categoryKey);
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold-strong">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent-strong">
       {cat ? (
         <CategoryIcon icon={cat.icon} className="h-5 w-5" />
       ) : (

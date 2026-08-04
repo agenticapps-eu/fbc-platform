@@ -11,11 +11,11 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
 }
 
-// Gewichtung nur über Gold/Anthrazit — kein Bunt (AGE-237).
+// Gewichtung nur über Akzent/Anthrazit — kein Bunt (AGE-237).
 const variants: Record<BadgeVariant, string> = {
   muted: "bg-ink/[0.06] text-muted",
-  soft: "bg-gold-soft text-gold-strong",
-  strong: "bg-gold text-night",
+  soft: "bg-accent-soft text-accent-strong",
+  strong: "bg-accent text-chrome",
   neutral: "bg-ink/5 text-ink",
 };
 

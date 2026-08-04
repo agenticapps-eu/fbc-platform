@@ -32,7 +32,7 @@ export function Tabs({ tabs, defaultValue, className }: TabsProps) {
               className={cn(
                 "-mb-px border-b-2 px-1 pb-3 text-sm font-medium transition-colors",
                 isActive
-                  ? "border-gold text-gold-strong"
+                  ? "border-accent text-accent-strong"
                   : "border-transparent text-muted hover:text-ink",
               )}
             >

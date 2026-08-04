@@ -16,7 +16,7 @@ export interface ProfileHeroProps {
   avatarUrl?: string | null;
   /**
    * Banner-Bild (pro Mitglied anpassbar — Upload vorbereitet, noch kein Storage-Backend).
-   * Ohne Wert ein heller Gold-Verlauf; mit Wert als Cover-Hintergrund. `coverUrl` bleibt
+   * Ohne Wert ein heller Akzent-Verlauf; mit Wert als Cover-Hintergrund. `coverUrl` bleibt
    * als Alias bestehen.
    */
   bannerUrl?: string | null;
@@ -38,7 +38,7 @@ export interface ProfileHeroProps {
  * (im normalen Fluss, KEINE Überlappung) das Profilbild neben Name/Rollen/Region/Tier.
  * Das Avatar ragt nie in den Banner — das vermeidet Größen-/Mobile-Probleme. Der
  * Banner ist pro Mitglied anpassbar (Upload vorbereitet); ohne Bild ein heller
- * Gold-Verlauf (kein Vollschwarz). Helle Karte; Marke über Gold-Akzente.
+ * Akzent-Verlauf (kein Vollschwarz). Helle Karte; Marke über Akzente.
  */
 export function ProfileHero({
   name,
@@ -57,9 +57,9 @@ export function ProfileHero({
   const banner = bannerUrl ?? coverUrl;
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Banner — heller Gold-Verlauf aus Tokens (folgt der Variante) mit dezentem
-          Gold-Shimmer-Sweep. Das Avatar überlappt diesen Block NICHT. */}
-      <div className="fbc-hero-shimmer relative h-24 bg-[linear-gradient(120deg,var(--color-gold-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-gold)_20%,var(--color-canvas)))] sm:h-32">
+      {/* Banner — heller Akzent-Verlauf aus Tokens (folgt dem Theme).
+          Das Avatar überlappt diesen Block NICHT. */}
+      <div className="relative h-24 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-32">
         {banner && (
           <img
             src={banner}
@@ -81,7 +81,7 @@ export function ProfileHero({
             />
             <div className="min-w-0">
               {tier && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/60 bg-gold-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-gold-strong uppercase">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-strong uppercase">
                   <CrownIcon className="h-3.5 w-3.5" />
                   {levelLabel(tier)} Member
                 </span>
@@ -90,7 +90,7 @@ export function ProfileHero({
                 {name}
               </h1>
               {roles.length > 0 ? (
-                <ul className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-sm text-gold-strong">
+                <ul className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-sm text-accent-strong">
                   {roles.map((role, i) => (
                     <li key={role} className="flex items-center gap-2">
                       {i > 0 && <span className="text-muted">·</span>}
@@ -99,7 +99,7 @@ export function ProfileHero({
                   ))}
                 </ul>
               ) : (
-                headline && <p className="mt-1.5 text-sm text-gold-strong">{headline}</p>
+                headline && <p className="mt-1.5 text-sm text-accent-strong">{headline}</p>
               )}
               {meta && <p className="mt-1.5 text-sm text-muted">{meta}</p>}
             </div>
@@ -120,7 +120,7 @@ export function HeroImpactBadge({ score }: { score: number }) {
       <div className="text-xs font-medium tracking-wide text-muted uppercase">Impact Score</div>
       <CountUp
         value={score}
-        className="mt-0.5 block font-display text-3xl font-semibold text-gold-strong"
+        className="mt-0.5 block font-display text-3xl font-semibold text-accent-strong"
       />
     </div>
   );

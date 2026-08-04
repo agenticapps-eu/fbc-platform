@@ -28,13 +28,13 @@ export function Avatar({ name, src, size = "md", className, masked }: AvatarProp
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-soft font-semibold text-gold-strong select-none",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-soft font-semibold text-accent-strong select-none",
         sizes[size],
         className,
       )}
     >
       {masked ? (
-        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 text-gold-strong/60" aria-hidden="true">
+        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 text-accent-strong/60" aria-hidden="true">
           <circle cx="12" cy="8" r="3.2" fill="currentColor" />
           <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" fill="currentColor" />
         </svg>

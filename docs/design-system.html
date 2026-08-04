@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="hell">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eff.bee.zee — Design-System (Entwurf 04.08.2026)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Cormorant+Garamond:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  /* Blau-Rampe — die einzige Akzentfamilie. Gold und Grün sind raus. */
+  --blue-50:#EFF5FD;  --blue-100:#DCE9FA; --blue-200:#BCD3F4; --blue-300:#8EB5EC;
+  --blue-400:#5B90E0; --blue-500:#2F6BD1; --blue-600:#1F53B0; --blue-700:#17408B;
+  --blue-800:#123061; --blue-900:#0C2043; --blue-950:#081527;
+
+  /* Neutral — kühl, leichter Blaustich. Kein reines Schwarz. */
+  --n-0:#FFFFFF; --n-50:#F6F8FB; --n-100:#EDF1F6; --n-200:#E933; --n-200:#E2E8F0;
+  --n-300:#CBD5E1; --n-400:#94A3B8; --n-500:#64748B; --n-600:#475569;
+  --n-700:#334155; --n-800:#1E2A3A; --n-900:#131C29;
+
+  /* Semantisch */
+  --success:#167A5B; --success-soft:#E7F4EF;
+  --warning:#B4761A; --warning-soft:#FBF2E3;
+  --danger:#B23B3B;  --danger-soft:#FBECEC;
+
+  /* Stufen-Farben (dezent, nur als Badge) */
+  --tier-boost:#64748B; --tier-connect:#5B90E0; --tier-discover:#2F6BD1;
+  --tier-exchange:#1F53B0; --tier-focus:#17408B; --tier-impact:#0C2043;
+
+  /* Form */
+  --radius-sm:6px; --radius:10px; --radius-card:14px; --radius-pill:999px;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:24px; --space-6:32px; --space-8:48px; --space-10:64px;
+
+  /* Typo */
+  --font-display:"Fraunces",Georgia,serif;
+  --font-sans:"Inter",system-ui,-apple-system,sans-serif;
+  --fs-display:2.25rem; --fs-h1:1.75rem; --fs-h2:1.375rem; --fs-h3:1.0625rem;
+  --fs-body:0.9375rem; --fs-sm:0.8125rem; --fs-xs:0.75rem;
+  --lh-tight:1.2; --lh-normal:1.55;
+}
+
+/* ---- Variante A: HELL (Default) ---- */
+html[data-theme="hell"]{
+  --canvas:var(--n-0);       /* Seitenhintergrund */
+  --surface:var(--n-0);      /* Karten */
+  --surface-2:var(--n-50);   /* eingelassene Flächen */
+  --line:var(--n-200);
+  --ink:var(--n-800);        /* Fließtext — Anthrazit, nicht schwarz */
+  --ink-strong:var(--blue-900);
+  --muted:var(--n-500);
+  --accent:var(--blue-500);
+  --accent-hover:var(--blue-600);
+  --accent-soft:var(--blue-50);
+  --accent-ink:#FFFFFF;
+  --sidebar-bg:var(--n-0);
+  --sidebar-line:var(--n-200);
+  --sidebar-ink:var(--n-600);
+  --sidebar-ink-active:var(--blue-600);
+  --sidebar-active-bg:var(--blue-50);
+  --topbar-bg:var(--n-0);
+  --logo-ink:var(--blue-600);
+  --shadow-soft:0 1px 2px rgba(15,29,51,.05), 0 4px 16px rgba(15,29,51,.05);
+  --shadow-lift:0 2px 4px rgba(15,29,51,.06), 0 12px 32px rgba(15,29,51,.10);
+}
+
+/* ---- Variante B: NAVY (blaue Sidebar) ---- */
+html[data-theme="navy"]{
+  --canvas:var(--blue-950);
+  --surface:#0E1F38;
+  --surface-2:#0A1830;
+  --line:#1D3455;
+  --ink:#E4ECF7;
+  --ink-strong:#FFFFFF;
+  --muted:#8FA5C4;
+  --accent:var(--blue-400);
+  --accent-hover:var(--blue-300);
+  --accent-soft:rgba(91,144,224,.14);
+  --accent-ink:var(--blue-950);
+  --sidebar-bg:#081527;
+  --sidebar-line:#16294494;
+  --sidebar-ink:#9FB4D2;
+  --sidebar-ink-active:#FFFFFF;
+  --sidebar-active-bg:var(--blue-600);
+  --topbar-bg:#0A1830;
+  --logo-ink:#FFFFFF;
+  --shadow-soft:0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
+}
+
+/* ============================================================
+   BASIS
+   ============================================================ */
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--canvas); color:var(--ink);
+  font-family:var(--font-sans); font-size:var(--fs-body); line-height:var(--lh-normal);
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s ease,color .25s ease;
+}
+h1,h2,h3,.display{font-family:var(--font-display); font-weight:500; line-height:var(--lh-tight); color:var(--ink-strong); margin:0}
+a{color:var(--accent); text-decoration:none}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8125rem; background:var(--surface-2); border:1px solid var(--line); padding:1px 5px; border-radius:4px}
+
+.wrap{max-width:1080px; margin:0 auto; padding:0 var(--space-5)}
+section{padding:var(--space-8) 0; border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.eyebrow{font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.09em; font-weight:600; color:var(--muted); margin:0 0 var(--space-2)}
+.lead{color:var(--muted); max-width:62ch; margin:var(--space-2) 0 0}
+.grid{display:grid; gap:var(--space-4)}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.stack{display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:center}
+
+/* Header */
+header.top{
+  position:sticky; top:0; z-index:50; background:var(--topbar-bg);
+  border-bottom:1px solid var(--line); backdrop-filter:blur(8px);
+}
+header.top .wrap{display:flex; align-items:center; justify-content:space-between; height:64px; gap:var(--space-4)}
+.switch{display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-pill); padding:3px}
+.switch button{
+  border:0; background:transparent; color:var(--muted); font:inherit; font-size:var(--fs-sm); font-weight:600;
+  padding:6px 16px; border-radius:var(--radius-pill); cursor:pointer;
+}
+.switch button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink)}
+
+/* ============================================================
+   KOMPONENTEN
+   ============================================================ */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-card); box-shadow:var(--shadow-soft); padding:var(--space-5)}
+.card.flat{box-shadow:none}
+
+.btn{
+  display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:var(--fs-sm); font-weight:600;
+  padding:9px 18px; border-radius:var(--radius); border:1px solid transparent; cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+.btn-primary{background:var(--accent); color:var(--accent-ink)}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:transparent; color:var(--accent); border-color:var(--accent)}
+.btn-secondary:hover{background:var(--accent-soft)}
+.btn-ghost{background:transparent; color:var(--muted); border-color:var(--line)}
+.btn-ghost:hover{color:var(--ink); background:var(--surface-2)}
+.btn-danger{background:transparent; color:var(--danger); border-color:var(--danger)}
+.btn[disabled]{opacity:.45; cursor:not-allowed}
+.btn-sm{padding:5px 12px; font-size:var(--fs-xs)}
+
+.field{display:block}
+.field label{display:block; font-size:var(--fs-sm); font-weight:600; margin-bottom:6px; color:var(--ink)}
+.input,.select,.textarea{
+  width:100%; font:inherit; font-size:var(--fs-body); color:var(--ink);
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:9px 12px; outline:none; transition:border-color .15s, box-shadow .15s;
+}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+.input::placeholder{color:var(--muted)}
+.hint{font-size:var(--fs-xs); color:var(--muted); margin-top:5px}
+
+.badge{display:inline-flex; align-items:center; gap:5px; font-size:var(--fs-xs); font-weight:600; padding:3px 10px; border-radius:var(--radius-pill); background:var(--surface-2); color:var(--muted); border:1px solid var(--line)}
+.badge-accent{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+.badge-success{background:var(--success-soft); color:var(--success); border-color:transparent}
+.badge-warning{background:var(--warning-soft); color:var(--warning); border-color:transparent}
+.tier{color:#fff; border:0; font-size:var(--fs-xs); font-weight:700; letter-spacing:.04em; padding:3px 10px; border-radius:var(--radius-pill)}
+
+.tag{
+  display:inline-flex; align-items:center; font-size:var(--fs-xs); font-weight:500;
+  padding:3px 10px; border-radius:var(--radius-pill);
+  background:var(--accent-soft); color:var(--accent); border:1px solid transparent; cursor:pointer;
+}
+.tag.free{background:transparent; color:var(--muted); border-color:var(--line)}
+.tag:hover{background:var(--accent); color:var(--accent-ink)}
+
+.tabs{display:flex; gap:var(--space-5); border-bottom:1px solid var(--line)}
+.tabs button{border:0; background:none; font:inherit; font-size:var(--fs-sm); font-weight:600; color:var(--muted); padding:0 0 10px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
+
+.avatar{border-radius:var(--radius-pill); object-fit:cover; background:var(--surface-2); border:2px solid var(--surface); display:grid; place-items:center; font-weight:600; color:var(--muted); font-size:var(--fs-sm)}
+.stack-avatars{display:flex}
+.stack-avatars .avatar{margin-left:-10px} .stack-avatars .avatar:first-child{margin-left:0}
+
+.swatch{border-radius:var(--radius); border:1px solid var(--line); overflow:hidden}
+.swatch .chip{height:56px}
+.swatch .meta{padding:8px 10px; font-size:var(--fs-xs); background:var(--surface)}
+.swatch .meta b{display:block; color:var(--ink)}
+.swatch .meta span{color:var(--muted); font-family:ui-monospace,monospace}
+
+table.tok{width:100%; border-collapse:collapse; font-size:var(--fs-sm)}
+table.tok th,table.tok td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+table.tok th{font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+table.tok td:first-child{font-family:ui-monospace,monospace; color:var(--accent); white-space:nowrap}
+
+pre.css{background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:var(--space-4); overflow:auto; font-size:.78rem; line-height:1.6; color:var(--ink)}
+
+/* Sidebar-Demo */
+.shell{display:grid; grid-template-columns:212px 1fr; border:1px solid var(--line); border-radius:var(--radius-card); overflow:hidden; box-shadow:var(--shadow-soft)}
+.shell aside{background:var(--sidebar-bg); border-right:1px solid var(--sidebar-line); padding:var(--space-4) var(--space-3)}
+.shell main{background:var(--surface-2); padding:var(--space-5); min-height:340px}
+.navitem{display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:var(--radius); color:var(--sidebar-ink); font-size:var(--fs-sm); font-weight:500; margin-bottom:2px}
+.navitem[aria-current]{background:var(--sidebar-active-bg); color:var(--sidebar-ink-active); font-weight:600}
+.navgroup{font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:700; margin:var(--space-4) 11px var(--space-2)}
+.navitem svg{width:16px; height:16px; flex:none; opacity:.85}
+
+/* Logo */
+.logo{display:inline-flex; align-items:center; gap:10px; color:var(--logo-ink)}
+.logo svg{width:30px; height:30px; flex:none}
+.logo .word{font-family:var(--font-sans); font-weight:600; font-size:1.0625rem; letter-spacing:-.01em; line-height:1}
+.logo .word i{font-style:normal; color:var(--accent)}
+.logo .claim{display:block; font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-top:3px}
+.logobox{display:grid; place-items:center; height:130px; border-radius:var(--radius); border:1px solid var(--line)}
+.logobox.on-light{background:#fff; color:var(--blue-600)}
+.logobox.on-dark{background:var(--blue-950); color:#fff}
+.logobox.on-dark .claim{color:#8FA5C4}
+.logobox.on-light .logo .word i{color:var(--blue-500)}
+.logobox.on-dark .logo .word i{color:var(--blue-300)}
+
+/* Beispiel-Karten */
+.post-head{display:flex; gap:10px; align-items:center; margin-bottom:10px}
+.post-head b{color:var(--ink-strong); font-size:var(--fs-sm)}
+.post-head span{color:var(--muted); font-size:var(--fs-xs)}
+.post-media{height:150px; border-radius:var(--radius); background:linear-gradient(120deg,var(--blue-700),var(--blue-400)); margin:12px 0}
+.post-actions{display:flex; gap:var(--space-5); padding-top:12px; margin-top:12px; border-top:1px solid var(--line); color:var(--muted); font-size:var(--fs-sm)}
+.event-cover{height:104px; border-radius:var(--radius) var(--radius) 0 0; background:linear-gradient(120deg,var(--blue-800),var(--blue-500)); position:relative}
+.event-date{position:absolute; top:10px; left:10px; background:var(--surface); border-radius:var(--radius-sm); padding:5px 9px; text-align:center; line-height:1.1; box-shadow:var(--shadow-soft)}
+.event-date b{display:block; font-size:1.0625rem; color:var(--ink-strong)}
+.event-date span{font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:700}
+.member-cover{height:64px; background:linear-gradient(120deg,var(--blue-800),var(--blue-400)); border-radius:var(--radius) var(--radius) 0 0}
+
+.do-dont{display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4)}
+@media(max-width:860px){.do-dont{grid-template-columns:1fr}}
+.do-dont > div{border-left:3px solid var(--success); padding-left:var(--space-4)}
+.do-dont > div.dont{border-left-color:var(--danger)}
+.do-dont h4{margin:0 0 6px; font-family:var(--font-sans); font-size:var(--fs-sm); font-weight:700}
+.do-dont ul{margin:0; padding-left:18px; color:var(--muted); font-size:var(--fs-sm)}
+.do-dont li{margin-bottom:4px}
+
+.fontrow{padding:var(--space-4) 0; border-bottom:1px solid var(--line)}
+.fontrow:last-child{border-bottom:0}
+.fontrow .sample{font-size:1.75rem; line-height:1.25; color:var(--ink-strong)}
+.fontrow .name{font-size:var(--fs-xs); color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="logo">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+      <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span><span class="claim">Design-System · Entwurf</span></span>
+    </div>
+    <div class="switch" role="group" aria-label="Theme">
+      <button data-set="hell" aria-pressed="true">Hell</button>
+      <button data-set="navy" aria-pressed="false">Navy</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ============================ INTRO ============================ -->
+<section>
+  <p class="eyebrow">Entwurf 04.08.2026</p>
+  <h1 style="font-size:var(--fs-display)">Ein System, zwei Themes, eine Akzentfarbe.</h1>
+  <p class="lead">Blau ersetzt Gold vollständig. Grün als Akzent entfällt. Es gibt genau zwei Themes — <b>Hell</b> und <b>Navy</b> — und beide teilen sich dieselben Token-Namen, sodass keine Komponente ein Theme kennen muss. Umschalten oben rechts, alles auf dieser Seite wechselt mit.</p>
+  <div class="do-dont" style="margin-top:var(--space-5)">
+    <div>
+      <h4>Wirkt wie</h4>
+      <ul><li>LinkedIn — Vertrauen, Ruhe, Business</li><li>Airbnb — warme Bilder, große Flächen</li><li>Instagram — Erlebnisse stehen vorn</li></ul>
+    </div>
+    <div class="dont">
+      <h4>Wirkt nicht wie</h4>
+      <ul><li>Vereinsportal</li><li>Facebook</li><li>CRM oder Verwaltungssoftware</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ LOGO ============================ -->
+<section>
+  <p class="eyebrow">01 — Marke</p>
+  <h2>Logo</h2>
+  <p class="lead">Der Kompass ersetzt die Krone. Vierstrahliger Kompassstern im dünnen Ring — spartanisch, prägnant, keine Verspielung. Wortmarke durchgehend klein geschrieben. Die Punkte in <code>eff.bee.zee</code> tragen die Akzentfarbe, das ist das einzige Farbdetail.</p>
+
+  <div class="grid g3" style="margin-top:var(--space-5)">
+    <div>
+      <div class="logobox on-light">
+        <div class="logo" style="color:inherit">
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+          <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span></span>
+        </div>
+      </div>
+      <p class="hint">Primär · Blau <code>#1F53B0</code> auf Weiß</p>
+    </div>
+    <div>
+      <div class="logobox on-dark">
+        <div class="logo" style="color:inherit">
+          <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+          <span><span class="word">eff<i>.</i>bee<i>.</i>zee</span></span>
+        </div>
+      </div>
+      <p class="hint">Invers · Weiß auf Navy <code>#081527</code></p>
+    </div>
+    <div>
+      <div class="logobox on-light" style="gap:var(--space-5); display:flex">
+        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 8 L28 24 L24 40 L20 24 Z" fill="currentColor"/><path d="M8 24 L24 20 L40 24 L24 28 Z" fill="currentColor" opacity=".4"/></svg>
+        <svg viewBox="0 0 48 48" style="width:38px;height:38px;color:var(--blue-600)"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M31 17 L26.5 26.5 L17 31 L21.5 21.5 Z" fill="currentColor"/></svg>
+      </div>
+      <p class="hint">Drei Markenvarianten zur Wahl: Stern · Nadel · Kompassnadel schräg. Ich empfehle den Stern.</p>
+    </div>
+  </div>
+
+  <div class="card flat" style="margin-top:var(--space-5)">
+    <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--space-3)">Regeln</h3>
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+      <li>Immer transparenter Hintergrund. Nie auf farbige Kacheln legen.</li>
+      <li>Mindestabstand ringsum = Höhe des Kompasses ÷ 2.</li>
+      <li>Nie kleiner als 24 px Markenhöhe. Darunter nur die Marke ohne Wortmarke.</li>
+      <li>Wortmarke nie in Versalien. „FBC" groß wirkt zu hart — das gilt auch hier.</li>
+      <li>Für Favicon und App-Icon nur die Marke, Ring bei 16 px auf 2 px Stärke verstärken.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ FARBEN ============================ -->
+<section>
+  <p class="eyebrow">02 — Farbe</p>
+  <h2>Palette</h2>
+  <p class="lead">Eine Akzentfamilie, ein kühles Neutral, drei semantische Farben. Mehr nicht. Wenn eine Fläche Aufmerksamkeit braucht, bekommt sie Blau — aber nur eine pro Bildschirm.</p>
+
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-5) 0 var(--space-3)">Blau</h3>
+  <div class="grid g4" id="blueRamp"></div>
+
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-5) 0 var(--space-3)">Neutral</h3>
+  <div class="grid g4" id="neutralRamp"></div>
+
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-5) 0 var(--space-3)">Semantisch &amp; Stufen</h3>
+  <div class="grid g4" id="semRamp"></div>
+
+  <div class="do-dont" style="margin-top:var(--space-5)">
+    <div>
+      <h4>So</h4>
+      <ul><li>Fließtext in <code>--ink</code> (Anthrazit), nie reines Schwarz</li><li>Genau ein Primär-Button pro Ansicht</li><li>Flächen trennen über <code>--line</code>, nicht über Schatten</li></ul>
+    </div>
+    <div class="dont">
+      <h4>Nicht so</h4>
+      <ul><li>Gold, Grün oder eine zweite Akzentfarbe einführen</li><li>Farbverläufe außer auf Bild-Platzhaltern</li><li>Stufen-Farben außerhalb von Badges verwenden</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TYPOGRAFIE ============================ -->
+<section>
+  <p class="eyebrow">03 — Schrift</p>
+  <h2>Typografie</h2>
+  <p class="lead">Zwei Schriften: eine Serif für Überschriften, die auflockert, und eine neutrale Serifenlose für alles andere. Fließtext in Anthrazit, nicht Schwarz.</p>
+
+  <div class="card" style="margin-top:var(--space-5)">
+    <p class="eyebrow" style="margin-bottom:var(--space-4)">Überschrift-Kandidaten — bitte einen auswählen</p>
+    <div class="fontrow"><div class="name">Fraunces — Empfehlung. Modern, leicht geschwungen, seriös.</div><div class="sample" style="font-family:'Fraunces',serif">Gemeinsam besser wirtschaften</div></div>
+    <div class="fontrow"><div class="name">Cormorant Garamond — eleganter, dünner, klassischer.</div><div class="sample" style="font-family:'Cormorant Garamond',serif;font-weight:600">Gemeinsam besser wirtschaften</div></div>
+    <div class="fontrow"><div class="name">Source Serif 4 — sachlicher, ruhiger, am wenigsten Charakter.</div><div class="sample" style="font-family:'Source Serif 4',serif">Gemeinsam besser wirtschaften</div></div>
+  </div>
+
+  <div class="card" style="margin-top:var(--space-4)">
+    <p class="eyebrow" style="margin-bottom:var(--space-4)">Skala</p>
+    <div style="display:grid;gap:var(--space-4)">
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">Display · Fraunces 500 · 36/1.2 — Landingpage-Headline</div><div class="display" style="font-size:var(--fs-display)">Die offene Plattform für Menschen, Chancen und Entwicklung</div></div>
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">H1 · 28/1.2 — Seitentitel</div><h1>Aktivität</h1></div>
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">H2 · 22/1.2 — Abschnitt</div><h2>Kommende Events</h2></div>
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">H3 · 17/1.2 — Kartentitel</div><h3>Business Dinner Stuttgart</h3></div>
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">Body · Inter 400 · 15/1.55 — Fließtext</div><p style="margin:0;max-width:62ch">Entdecke Inspiration, Neuigkeiten und Beiträge aus deiner Community. Teile, was dich bewegt, und finde Menschen, die zu deinem Vorhaben passen.</p></div>
+      <div><div class="name" style="font-size:var(--fs-xs);color:var(--muted)">Small · 13 — Meta, Labels</div><p style="margin:0;font-size:var(--fs-sm);color:var(--muted)">vor 2 Stunden · Business Dinner · Stuttgart</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ SHELL ============================ -->
+<section>
+  <p class="eyebrow">04 — Layout</p>
+  <h2>App-Rahmen und Navigation</h2>
+  <p class="lead">Sidebar sitzt am Rand, nicht schwebend — das war die Entscheidung aus dem Meeting und gilt besonders im Navy-Theme. Sechs Hauptpunkte, darunter der persönliche Bereich. Kompass ist die Lightweight-Variante ohne Fragebogen.</p>
+
+  <div class="shell" style="margin-top:var(--space-5)">
+    <aside>
+      <div class="logo" style="padding:4px 11px var(--space-4)">
+        <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+        <span class="word" style="font-size:.9375rem">eff<i>.</i>bee<i>.</i>zee</span>
+      </div>
+      <div class="navgroup">Entdecken</div>
+      <div class="navitem" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1z"/></svg>Übersicht</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Kompass</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4z"/><path d="M7 11v5c0 1 2.2 2.5 5 2.5s5-1.5 5-2.5v-5"/></svg>Academy</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Events</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M17 8.5a3 3 0 010 5M19 20c0-2.6-1-4.4-2.5-5.3"/></svg>Mitglieder</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 11-3.2-6.4"/><path d="M21 4v5h-5"/></svg>Aktivität</div>
+      <div class="navgroup">Mein Bereich</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Mein Profil</div>
+      <div class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 005 19.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 13.6H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 5l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 002.7-1.1V1a2 2 0 114 0v.1A1.6 1.6 0 0019 4.6l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 001.1 2.7H23a2 2 0 110 4h-.1"/></svg>Einstellungen</div>
+    </aside>
+    <main>
+      <div class="stack" style="justify-content:space-between;margin-bottom:var(--space-4)">
+        <h2>Aktivität</h2>
+        <button class="btn btn-primary">Beitrag schreiben</button>
+      </div>
+      <div class="tabs" style="margin-bottom:var(--space-4)">
+        <button aria-selected="true">Alle Beiträge</button>
+        <button aria-selected="false">Von Mitgliedern</button>
+        <button aria-selected="false">Gespeichert</button>
+      </div>
+      <div class="card">
+        <div class="post-head">
+          <div class="avatar" style="width:36px;height:36px">BS</div>
+          <div><b>Beatrice Sommer</b> <span class="tier" style="background:var(--tier-impact)">IMPACT</span><br><span>vor 2 Stunden · nur für Mitglieder</span></div>
+        </div>
+        <p style="margin:0">Großartiger Erlebnistag im Allgäu — Inspiration, Netzwerk und Natur, die perfekte Mischung.</p>
+        <div class="post-media"></div>
+        <div class="stack" style="gap:6px">
+          <span class="tag">Erlebnistag</span><span class="tag">Netzwerken</span><span class="tag">Persönlichkeitsentwicklung</span><span class="tag free">#allgäu</span>
+        </div>
+        <div class="post-actions"><span>♡ 24 Reaktionen</span><span>💬 6 Kommentare</span><span>↗ Teilen</span></div>
+      </div>
+    </main>
+  </div>
+  <p class="hint" style="margin-top:var(--space-3)"><b>Tags:</b> Blau gefüllt = vorgegebene Tags aus der Tag-Tabelle, filterbar. Outline = freie Tags des Autors. Beide klickbar, aber optisch unterscheidbar — und jeder Tag erscheint <b>genau einmal</b>, nicht zusätzlich im Fließtext.</p>
+</section>
+
+<!-- ============================ KOMPONENTEN ============================ -->
+<section>
+  <p class="eyebrow">05 — Bausteine</p>
+  <h2>Komponenten</h2>
+
+  <div class="grid g2" style="margin-top:var(--space-5)">
+    <div class="card">
+      <p class="eyebrow">Buttons</p>
+      <div class="stack" style="margin-bottom:var(--space-3)">
+        <button class="btn btn-primary">Kontakt anfragen</button>
+        <button class="btn btn-secondary">Profil ansehen</button>
+        <button class="btn btn-ghost">Abbrechen</button>
+      </div>
+      <div class="stack">
+        <button class="btn btn-primary btn-sm">Zusagen</button>
+        <button class="btn btn-danger btn-sm">Absagen</button>
+        <button class="btn btn-primary" disabled>Ausgebucht</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Formular</p>
+      <div class="field" style="margin-bottom:var(--space-3)">
+        <label for="d1">E-Mail-Adresse</label>
+        <input id="d1" class="input" placeholder="name@firma.de">
+        <p class="hint">Die Adresse, mit der du auch in der alten Plattform registriert warst.</p>
+      </div>
+      <div class="field">
+        <label for="d2">Sichtbarkeit</label>
+        <select id="d2" class="select"><option>Nur für Mitglieder</option><option>Öffentlich</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Badges &amp; Stufen</p>
+      <div class="stack" style="margin-bottom:var(--space-3)">
+        <span class="badge">Neu</span>
+        <span class="badge badge-accent">Empfohlen</span>
+        <span class="badge badge-success">Bestätigt</span>
+        <span class="badge badge-warning">E-Mail offen</span>
+      </div>
+      <div class="stack" id="tierBadges"></div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Avatare</p>
+      <div class="stack" style="margin-bottom:var(--space-4)">
+        <div class="avatar" style="width:56px;height:56px">DK</div>
+        <div class="avatar" style="width:40px;height:40px">PS</div>
+        <div class="avatar" style="width:28px;height:28px;font-size:11px">WT</div>
+      </div>
+      <p class="eyebrow">Teilnehmer eines Events</p>
+      <div class="stack">
+        <div class="stack-avatars">
+          <div class="avatar" style="width:30px;height:30px;font-size:11px">DK</div>
+          <div class="avatar" style="width:30px;height:30px;font-size:11px">BS</div>
+          <div class="avatar" style="width:30px;height:30px;font-size:11px">PS</div>
+          <div class="avatar" style="width:30px;height:30px;font-size:11px">WT</div>
+          <div class="avatar" style="width:30px;height:30px;font-size:11px;background:var(--accent);color:var(--accent-ink)">+14</div>
+        </div>
+        <span style="font-size:var(--fs-sm);color:var(--muted)">18 angemeldet</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin:var(--space-6) 0 var(--space-3)">Karten</h3>
+  <div class="grid g3">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="event-cover"><div class="event-date"><b>14</b><span>Aug</span></div></div>
+      <div style="padding:var(--space-4)">
+        <span class="badge badge-accent" style="margin-bottom:8px">Business Dinner</span>
+        <h3 style="font-size:var(--fs-h3);margin-bottom:6px">Business Dinner Stuttgart</h3>
+        <p style="margin:0 0 12px;font-size:var(--fs-sm);color:var(--muted)">Do, 14. Aug 2026 · 19:00–22:30<br>Restaurant Délice, Stuttgart</p>
+        <div class="stack" style="justify-content:space-between">
+          <div class="stack-avatars">
+            <div class="avatar" style="width:26px;height:26px;font-size:10px">DK</div>
+            <div class="avatar" style="width:26px;height:26px;font-size:10px">BS</div>
+            <div class="avatar" style="width:26px;height:26px;font-size:10px;background:var(--accent);color:var(--accent-ink)">+16</div>
+          </div>
+          <button class="btn btn-secondary btn-sm">Details</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="member-cover"></div>
+      <div style="padding:0 var(--space-4) var(--space-4)">
+        <div class="avatar" style="width:56px;height:56px;margin-top:-28px;font-size:1rem">DK</div>
+        <h3 style="font-size:var(--fs-h3);margin:10px 0 2px">Detlev Krause</h3>
+        <p style="margin:0 0 10px;font-size:var(--fs-sm);color:var(--muted)">Investor · Berater · Stuttgart</p>
+        <p style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:0 0 6px">Ich biete</p>
+        <div class="stack" style="gap:5px;margin-bottom:10px"><span class="tag">Kapital</span><span class="tag">Netzwerk</span></div>
+        <p style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:0 0 6px">Ich suche</p>
+        <div class="stack" style="gap:5px;margin-bottom:14px"><span class="tag">Projektentwickler</span><span class="tag">Family Office</span></div>
+        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center">Profil ansehen</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Leerer Zustand</p>
+      <div style="text-align:center;padding:var(--space-5) 0">
+        <svg viewBox="0 0 48 48" style="width:40px;height:40px;color:var(--muted);opacity:.5;margin-bottom:12px"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="currentColor"/></svg>
+        <h3 style="font-size:var(--fs-h3);margin-bottom:6px">Noch keine Beiträge</h3>
+        <p style="margin:0 0 var(--space-4);font-size:var(--fs-sm);color:var(--muted)">Sei die erste Person, die etwas teilt.</p>
+        <button class="btn btn-primary btn-sm">Beitrag schreiben</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TOKENS ============================ -->
+<section>
+  <p class="eyebrow">06 — Übergabe</p>
+  <h2>Tokens</h2>
+  <p class="lead">Das Repo hat keine <code>tailwind.config.js</code> — alle Tokens leben in <code>src/index.css</code> als Tailwind-v4-<code>@theme</code> plus <code>html[data-variant="…"]</code>-Overrides. Der folgende Block ist so aufgebaut, dass er die bestehende Struktur ersetzt.</p>
+
+  <table class="tok" style="margin-top:var(--space-5)">
+    <tr><th>Token</th><th>Hell</th><th>Navy</th><th>Verwendung</th></tr>
+    <tr><td>--canvas</td><td>#FFFFFF</td><td>#081527</td><td>Seitenhintergrund</td></tr>
+    <tr><td>--surface</td><td>#FFFFFF</td><td>#0E1F38</td><td>Karten, Modale</td></tr>
+    <tr><td>--surface-2</td><td>#F6F8FB</td><td>#0A1830</td><td>Eingelassene Flächen, Inhaltsbereich</td></tr>
+    <tr><td>--line</td><td>#E2E8F0</td><td>#1D3455</td><td>Trennlinien, Rahmen</td></tr>
+    <tr><td>--ink</td><td>#1E2A3A</td><td>#E4ECF7</td><td>Fließtext — nie reines Schwarz</td></tr>
+    <tr><td>--ink-strong</td><td>#0C2043</td><td>#FFFFFF</td><td>Überschriften</td></tr>
+    <tr><td>--muted</td><td>#64748B</td><td>#8FA5C4</td><td>Meta, Labels, Platzhalter</td></tr>
+    <tr><td>--accent</td><td>#2F6BD1</td><td>#5B90E0</td><td>Primäraktion, Links, aktiver Zustand</td></tr>
+    <tr><td>--accent-soft</td><td>#EFF5FD</td><td>rgba(91,144,224,.14)</td><td>Fokusring, Tag-Hintergrund</td></tr>
+    <tr><td>--sidebar-bg</td><td>#FFFFFF</td><td>#081527</td><td>Sidebar — sitzt am Rand, nicht schwebend</td></tr>
+    <tr><td>--radius-card</td><td colspan="2">14px</td><td>Karten</td></tr>
+    <tr><td>--radius</td><td colspan="2">10px</td><td>Buttons, Inputs</td></tr>
+    <tr><td>--font-display</td><td colspan="2">Fraunces</td><td>Nur h1–h3 und Display</td></tr>
+    <tr><td>--font-sans</td><td colspan="2">Inter</td><td>Alles andere</td></tr>
+  </table>
+
+  <pre class="css" style="margin-top:var(--space-5)">@theme {
+  --color-blue-50:#EFF5FD;  --color-blue-100:#DCE9FA; --color-blue-200:#BCD3F4;
+  --color-blue-300:#8EB5EC; --color-blue-400:#5B90E0; --color-blue-500:#2F6BD1;
+  --color-blue-600:#1F53B0; --color-blue-700:#17408B; --color-blue-800:#123061;
+  --color-blue-900:#0C2043; --color-blue-950:#081527;
+
+  --color-canvas:#FFFFFF; --color-surface:#FFFFFF; --color-surface-2:#F6F8FB;
+  --color-line:#E2E8F0;   --color-ink:#1E2A3A;     --color-ink-strong:#0C2043;
+  --color-muted:#64748B;  --color-accent:#2F6BD1;  --color-accent-soft:#EFF5FD;
+  --color-accent-ink:#FFFFFF;
+  --color-success:#167A5B; --color-warning:#B4761A; --color-danger:#B23B3B;
+
+  --color-sidebar-bg:#FFFFFF; --color-sidebar-ink:#475569;
+  --color-sidebar-ink-active:#1F53B0; --color-sidebar-active-bg:#EFF5FD;
+
+  --font-display:"Fraunces",Georgia,serif;
+  --font-sans:"Inter",system-ui,sans-serif;
+  --radius-card:14px;
+  --shadow-soft:0 1px 2px rgb(15 29 51/.05), 0 4px 16px rgb(15 29 51/.05);
+}
+
+/* Variante 2 — nur die Layer-Tokens werden überschrieben. */
+html[data-variant="navy"]{
+  --color-canvas:#081527; --color-surface:#0E1F38; --color-surface-2:#0A1830;
+  --color-line:#1D3455;   --color-ink:#E4ECF7;     --color-ink-strong:#FFFFFF;
+  --color-muted:#8FA5C4;  --color-accent:#5B90E0;  --color-accent-soft:rgb(91 144 224/.14);
+  --color-accent-ink:#081527;
+  --color-sidebar-bg:#081527; --color-sidebar-ink:#9FB4D2;
+  --color-sidebar-ink-active:#FFFFFF; --color-sidebar-active-bg:#1F53B0;
+}</pre>
+
+  <div class="card flat" style="margin-top:var(--space-5)">
+    <h3 style="font-family:var(--font-sans);font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--space-3)">Was beim Umbau passieren muss</h3>
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:var(--fs-sm)">
+      <li>Die zwölf übrigen Varianten aus <code>designVariants.ts</code> entfernen, <code>DEFAULT_VARIANT</code> auf <code>hell</code>.</li>
+      <li><code>--color-gold*</code> ersatzlos streichen. Jede Fundstelle wird <code>--color-accent</code>.</li>
+      <li>Die sieben <code>--color-fmt-*</code> Format-Akzente auf die Blau-Rampe umstellen oder auf Neutral reduzieren.</li>
+      <li><code>VITE_DESIGN_SWITCHER</code> in Produktion auf <code>off</code> — er wird heute mit ausgeliefert.</li>
+      <li><code>Logo.tsx</code>: Kronen-PNG durch das SVG ersetzen, damit die Hell/Dunkel-Umschaltung über <code>currentColor</code> läuft und kein separates Asset mehr fehlt.</li>
+      <li>Fonts über <code>@import</code> in <code>index.css</code> laufen heute gegen Google Fonts. Für DSGVO selbst hosten.</li>
+    </ul>
+  </div>
+</section>
+
+<section style="padding-bottom:var(--space-10)">
+  <p class="hint">Entwurf zur Abstimmung — Donald &amp; Detlev, 04.08.2026. Offen: Überschrift-Schrift (Fraunces / Cormorant / Source Serif), Markenvariante (Stern / Nadel / schräg), Standard-Theme (Hell oder Navy).</p>
+</section>
+
+</div>
+
+<script>
+const BLUE=[["50","#EFF5FD"],["100","#DCE9FA"],["200","#BCD3F4"],["300","#8EB5EC"],["400","#5B90E0"],["500","#2F6BD1"],["600","#1F53B0"],["700","#17408B"],["800","#123061"],["900","#0C2043"],["950","#081527"]];
+const NEUT=[["0","#FFFFFF"],["50","#F6F8FB"],["100","#EDF1F6"],["200","#E2E8F0"],["300","#CBD5E1"],["400","#94A3B8"],["500","#64748B"],["700","#334155"],["800","#1E2A3A"],["900","#131C29"]];
+const SEM=[["success","#167A5B"],["warning","#B4761A"],["danger","#B23B3B"],["boost","#64748B"],["connect","#5B90E0"],["discover","#2F6BD1"],["exchange","#1F53B0"],["focus","#17408B"],["impact","#0C2043"]];
+const TIERS=[["BOOST","--tier-boost"],["CONNECT","--tier-connect"],["DISCOVER","--tier-discover"],["EXCHANGE","--tier-exchange"],["FOCUS","--tier-focus"],["IMPACT","--tier-impact"]];
+
+const sw=(name,hex)=>`<div class="swatch"><div class="chip" style="background:${hex}"></div><div class="meta"><b>${name}</b><span>${hex}</span></div></div>`;
+document.getElementById('blueRamp').innerHTML=BLUE.map(([k,v])=>sw('blue-'+k,v)).join('');
+document.getElementById('neutralRamp').innerHTML=NEUT.map(([k,v])=>sw('neutral-'+k,v)).join('');
+document.getElementById('semRamp').innerHTML=SEM.map(([k,v])=>sw(k,v)).join('');
+document.getElementById('tierBadges').innerHTML=TIERS.map(([l,v])=>`<span class="tier" style="background:var(${v})">${l}</span>`).join('');
+
+document.querySelectorAll('.switch button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.documentElement.dataset.theme=b.dataset.set;
+    document.querySelectorAll('.switch button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  });
+});
+</script>
+</body>
+</html>

@@ -19,25 +19,52 @@ import { DESIGN_VARIANT_IDS, DESIGN_VARIANTS } from "../config/designVariants";
 import { cn } from "../lib/cn";
 import { useDesignVariant } from "../providers/design-variant-context";
 
-const COLORS: { name: string; token: string; className: string; dark?: boolean }[] = [
-  { name: "Night / Chrome", token: "#0E0F12", className: "bg-night", dark: true },
-  { name: "Night Elevated", token: "#16181D", className: "bg-night-elevated", dark: true },
-  { name: "Gold / Accent", token: "#C2A24E", className: "bg-gold", dark: true },
-  { name: "Gold Strong", token: "#B8893B", className: "bg-gold-strong", dark: true },
-  { name: "Gold Soft", token: "#EFE3C8", className: "bg-gold-soft" },
-  { name: "Canvas", token: "#FFFFFF", className: "bg-canvas" },
-  { name: "Soft / Seite", token: "#F6F5F1", className: "bg-soft" },
-  { name: "Ink / Text", token: "#14151A", className: "bg-ink", dark: true },
-  { name: "Muted", token: "#6B7280", className: "bg-muted", dark: true },
-  { name: "Line", token: "#E7E5DF", className: "bg-line" },
-  { name: "Positive", token: "#1F9D6B", className: "bg-positive", dark: true },
-  { name: "Danger", token: "#B23A2E", className: "bg-danger", dark: true },
+/* Die Hex-Werte sind die des HELLEN Themes — im Navy-Theme tragen dieselben
+   Token-Namen andere Werte. Die Fläche daneben liest immer das Token, nie den
+   Hex-Wert: so zeigt der Umschalter oben auch hier den echten Unterschied. */
+const COLORS: { name: string; token: string; className: string }[] = [
+  { name: "Akzent", token: "#2F6BD1", className: "bg-accent" },
+  { name: "Akzent kräftig", token: "#1F53B0", className: "bg-accent-strong" },
+  { name: "Akzent weich", token: "#EFF5FD", className: "bg-accent-soft" },
+  { name: "Chrome (Sidebar)", token: "#FFFFFF", className: "bg-chrome" },
+  { name: "Chrome erhöht", token: "#F6F8FB", className: "bg-chrome-elevated" },
+  { name: "Canvas (Karten)", token: "#FFFFFF", className: "bg-canvas" },
+  { name: "Soft (Seite)", token: "#F6F8FB", className: "bg-soft" },
+  { name: "Ink (Fließtext)", token: "#1E2A3A", className: "bg-ink" },
+  { name: "Ink kräftig", token: "#0C2043", className: "bg-ink-strong" },
+  { name: "Muted", token: "#64748B", className: "bg-muted" },
+  { name: "Line", token: "#E2E8F0", className: "bg-line" },
+  { name: "Success / Positive", token: "#167A5B", className: "bg-success" },
+  { name: "Warning", token: "#B4761A", className: "bg-warning" },
+  { name: "Danger", token: "#B23B3B", className: "bg-danger" },
+];
+
+/** Die Blau-Rampe — die einzige Akzentfamilie des Systems.
+ *
+ *  Klassennamen stehen hier VOLLSTÄNDIG und nicht als `bg-blue-${step}`:
+ *  Tailwind scannt den Quelltext nach ganzen Klassennamen und generiert für ein
+ *  zusammengesetztes Literal keine einzige Regel. Der Balken bliebe unsichtbar,
+ *  und weder Typecheck noch Lint sagten ein Wort. */
+const BLUE_RAMP: { step: string; className: string }[] = [
+  { step: "50", className: "bg-blue-50" },
+  { step: "100", className: "bg-blue-100" },
+  { step: "200", className: "bg-blue-200" },
+  { step: "300", className: "bg-blue-300" },
+  { step: "400", className: "bg-blue-400" },
+  { step: "500", className: "bg-blue-500" },
+  { step: "600", className: "bg-blue-600" },
+  { step: "700", className: "bg-blue-700" },
+  { step: "800", className: "bg-blue-800" },
+  { step: "900", className: "bg-blue-900" },
+  { step: "950", className: "bg-blue-950" },
 ];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted/70">{title}</h2>
+      {/* text-muted, nicht text-muted/70: mit der Abschwächung liegt die
+          Überschrift bei 2.24:1 und verfehlt AA deutlich. */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">{title}</h2>
       {children}
     </section>
   );
@@ -54,11 +81,11 @@ function StatTile({ label, value, trend }: { label: string; value: string; trend
   );
 }
 
-/** Inline-Demo: dünner Fortschrittsbalken, Gold-Füllung auf Line. */
+/** Inline-Demo: dünner Fortschrittsbalken, Akzent-Füllung auf Line. */
 function Progress({ value }: { value: number }) {
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-      <div className="h-full rounded-full bg-gold" style={{ width: `${value}%` }} />
+      <div className="h-full rounded-full bg-accent" style={{ width: `${value}%` }} />
     </div>
   );
 }
@@ -145,18 +172,18 @@ function AxiomTestSection() {
   );
 }
 
-/** Live-Umschaltbare Design-Varianten + Animations-Demo (AGE-237). */
+/** Theme-Umschalter + Animations-Demo. */
 function VariantsSection() {
   const { variant, setVariant, meta } = useDesignVariant();
   return (
-    <Section title="Design-Varianten (Live-Switcher)">
+    <Section title="Themes">
       <p className="-mt-2 text-sm text-muted">
-        Sieben umschaltbare Looks als Theming-/Animations-Schicht (<code>data-variant</code>) — A–D
-        plus die experimentellen E/F/G (Noir Editorial · Aurora Glass · Warm Boutique). Die Auswahl
-        wird in localStorage + URL (<code>?variant=</code>) gespiegelt. Aktiv:{" "}
+        Zwei Themes als reine Token-Schicht (<code>data-variant</code>) — dieselben Token-Namen,
+        andere Werte. Die Wahl liegt in localStorage, eingeloggt zusätzlich in{" "}
+        <code>member_settings.theme</code>. Aktiv:{" "}
         <strong className="text-ink">{meta.label}</strong>.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         {DESIGN_VARIANT_IDS.map((id) => {
           const v = DESIGN_VARIANTS[id];
           const active = id === variant;
@@ -169,44 +196,22 @@ function VariantsSection() {
               className={cn(
                 "fbc-card rounded-[var(--radius-card)] border p-4 text-left",
                 active
-                  ? "border-gold bg-gold-soft/40"
-                  : "border-line bg-canvas hover:border-gold/50",
+                  ? "border-accent bg-accent-soft/40"
+                  : "border-line bg-canvas hover:border-accent/50",
               )}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold uppercase",
-                    active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
+                    active ? "bg-accent text-chrome" : "bg-ink/[0.07] text-ink",
                   )}
                 >
                   {id}
                 </span>
                 <span className="font-display text-base font-semibold text-ink">{v.label}</span>
-                {v.recommended && (
-                  <span className="text-gold-strong" title="Empfehlung">
-                    ★
-                  </span>
-                )}
-                {v.experimental && (
-                  <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
-                    Experimentell
-                  </span>
-                )}
-                {v.accent2 && (
-                  <span
-                    className="ml-auto h-3.5 w-3.5 rounded-full border border-line"
-                    style={{ backgroundColor: v.accent2 }}
-                    title={`Zweitakzent ${v.accent2}`}
-                  />
-                )}
               </div>
               <p className="mt-2 text-xs text-muted">{v.description}</p>
-              <p className="mt-2 text-[11px] uppercase tracking-wide text-muted/80">
-                {v.motion} · {v.heroStyle} · {v.headlineFont}
-                {v.cardStyle && v.cardStyle !== "solid" && ` · ${v.cardStyle}`}
-                {v.backdrop && v.backdrop !== "none" && ` · ${v.backdrop}`}
-              </p>
             </button>
           );
         })}
@@ -216,7 +221,7 @@ function VariantsSection() {
           <p className="text-xs uppercase tracking-wide text-muted">Count-up</p>
           <CountUp
             value={842}
-            className="mt-1 block font-display text-3xl font-semibold text-gold-strong"
+            className="mt-1 block font-display text-3xl font-semibold text-accent-strong"
           />
         </Card>
         <Card className="flex flex-col items-center justify-center gap-2 text-center">
@@ -241,38 +246,57 @@ export default function StyleguidePage() {
           <header className="space-y-3 border-b border-line pb-8">
             <Logo />
             <h1 className="font-display text-4xl font-semibold tracking-tight">
-              FBC Design-System
+              eff.bee.zee Design-System
             </h1>
             <p className="max-w-2xl text-muted">
-              Schwarz &amp; Gold — elegant, modern, exklusiv. Schwarz/Anthrazit als Chrome, Gold als
-              einziger Akzent, helle ruhige Content-Flächen. Diese Seite ist nur im Dev-Modus
-              erreichbar und zeigt Tokens und Basis-Komponenten.
+              Ein System, zwei Themes, eine Akzentfamilie. Blau ist der einzige Akzent; beide Themes
+              teilen sich dieselben Token-Namen, sodass keine Komponente ihr Theme kennen muss.
+              Diese Seite ist nur im Dev-Modus erreichbar und ist die lebende Fassung von{" "}
+              <code className="text-accent">docs/design-system.html</code> — schalte oben um, alles
+              hier wechselt mit.
             </p>
           </header>
 
           {/* Design-Varianten (Live-Switcher + Animations-Demo) */}
           <VariantsSection />
 
-          {/* Chrome-Vorschau (dunkel) */}
-          <Section title="Chrome — Schwarz &amp; Gold">
-            <div className="overflow-hidden rounded-[var(--radius-card)] border border-night-border bg-night p-6 shadow-soft">
-              <Logo tone="dark" />
+          {/* Chrome-Vorschau (Sidebar-Fläche) */}
+          <Section title="Chrome — Sidebar-Fläche">
+            <div className="overflow-hidden rounded-[var(--radius-card)] border border-chrome-border bg-chrome p-6 shadow-soft">
+              <Logo />
               <div className="mt-5 flex flex-col gap-1">
-                <span className="relative rounded-md bg-night-elevated px-3 py-2 text-sm font-medium text-gold">
-                  <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-gold" />
-                  Aktive Route (Gold-Label + Gold-Linksbalken)
+                <span className="relative rounded-md bg-chrome-elevated px-3 py-2 text-sm font-medium text-accent">
+                  <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-accent" />
+                  Aktive Route (Akzent-Label + Akzent-Linksbalken)
                 </span>
-                <span className="rounded-md px-3 py-2 text-sm text-on-night-muted">
+                <span className="rounded-md px-3 py-2 text-sm text-on-chrome-muted">
                   Inaktive Route
                 </span>
               </div>
             </div>
             <p className="text-sm text-muted">
-              Sidebar-Aufbau (eine Sidebar, flache Liste, keine Sektions-Labels): Identitäts-/
-              Mitglieder-Block oben → Hauptmenü <strong className="text-ink">Start</strong> ·
-              Compass · Library · Academy · Events · Community · Matching · Projekte → „Mein
-              Bereich" als stabiles Inline-Akkordeon unten (nur eingeloggt). Die Kronen-Wortmarke
-              sitzt im Header.
+              Die Sidebar sitzt am Rand, nicht schwebend — Entscheidung aus dem Meeting, sie gilt
+              besonders im Navy-Theme. Im hellen Theme ist die Chrome-Fläche weiß, im Navy-Theme
+              tiefes Navy; die Token-Namen bleiben in beiden dieselben.
+            </p>
+          </Section>
+
+          {/* Blau-Rampe */}
+          <Section title="Blau — die einzige Akzentfamilie">
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-11">
+              {BLUE_RAMP.map(({ step, className }) => (
+                <div
+                  key={step}
+                  className="overflow-hidden rounded-md border border-line bg-canvas text-center"
+                >
+                  <div className={cn("h-14", className)} />
+                  <div className="px-1 py-1.5 text-[11px] font-medium text-muted">{step}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-muted">
+              Die frühere Akzentfamilie, Grün und ein Zweitakzent sind ersatzlos entfallen. Braucht
+              eine Fläche Aufmerksamkeit, bekommt sie Blau — aber nur eine pro Bildschirm.
             </p>
           </Section>
 
@@ -284,21 +308,24 @@ export default function StyleguidePage() {
                   key={c.token}
                   className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft"
                 >
-                  <div className={`flex h-20 items-end p-3 ${c.className}`}>
-                    <span
-                      className={`text-xs font-medium ${c.dark ? "text-on-night" : "text-ink"}`}
-                    >
-                      {c.token}
-                    </span>
+                  {/* Der Hex-Wert steht UNTER der Fläche, nicht darauf. Auf der
+                      Fläche bräuchte er je Token und je Theme eine eigene
+                      Textfarbe — der alte `dark ? text-on-chrome : text-ink`
+                      lag im hellen Theme durchweg falsch, weil on-chrome dort
+                      dunkel ist. Darunter ist der Kontrast in beiden Themes
+                      derselbe wie überall sonst. */}
+                  <div className={cn("h-20", c.className)} />
+                  <div className="space-y-0.5 px-3 py-2">
+                    <div className="text-xs font-medium text-ink">{c.name}</div>
+                    <div className="font-mono text-[11px] text-muted">{c.token}</div>
                   </div>
-                  <div className="px-3 py-2 text-xs font-medium text-muted">{c.name}</div>
                 </div>
               ))}
             </div>
           </Section>
 
           {/* Typografie */}
-          <Section title="Typografie — Cormorant Garamond (Display) &amp; Inter (UI)">
+          <Section title="Typografie — Fraunces (Display) &amp; Inter (UI)">
             <Card className="space-y-3">
               <h1 className="font-display text-5xl font-semibold tracking-tight">
                 Eine Gemeinschaft, die trägt
@@ -309,7 +336,7 @@ export default function StyleguidePage() {
               <h3 className="text-lg font-semibold">UI-Headline H3 — Inter</h3>
               <p className="max-w-2xl text-muted">
                 Fließtext in Inter mit großzügiger Zeilenhöhe. Das FBC-System setzt auf viel
-                Weißraum, feine Linien und einen einzigen Gold-Akzent statt FinTech-Dichte.
+                Weißraum, feine Linien und einen einzigen Akzent statt FinTech-Dichte.
               </p>
               <p className="text-sm text-muted">Kleiner Text / Caption.</p>
             </Card>
@@ -318,9 +345,9 @@ export default function StyleguidePage() {
           {/* Buttons */}
           <Section title="Buttons">
             <div className="flex flex-wrap items-center gap-4">
-              <Button variant="primary">Primary (Gold)</Button>
+              <Button variant="primary">Primary (Akzent)</Button>
               <Button variant="secondary">Secondary (Dunkel)</Button>
-              <Button variant="ghost">Ghost (Gold-Outline)</Button>
+              <Button variant="ghost">Ghost (Akzent-Outline)</Button>
               <Button variant="primary" size="sm">
                 Primary klein
               </Button>
@@ -418,9 +445,9 @@ export default function StyleguidePage() {
                   Eine ruhige Karte mit weichem Schatten und feiner Kontur.
                 </CardDescription>
               </Card>
-              <Card className="border-t-2 border-t-gold">
-                <CardTitle>Mit Goldakzent</CardTitle>
-                <CardDescription>Feine Goldlinie als Premium-Akzent.</CardDescription>
+              <Card className="border-t-2 border-t-accent">
+                <CardTitle>Mit Akzentlinie</CardTitle>
+                <CardDescription>Feine Akzentlinie als Premium-Detail.</CardDescription>
               </Card>
             </div>
           </Section>

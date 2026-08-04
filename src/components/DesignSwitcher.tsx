@@ -1,27 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   DESIGN_VARIANTS,
-  SWITCHER_VARIANT_IDS,
+  DESIGN_VARIANT_IDS,
   type DesignVariantId,
 } from "../config/designVariants";
 import { cn } from "../lib/cn";
-import { useAuth } from "../providers/auth-context";
 import { useDesignVariant } from "../providers/design-variant-context";
 
-/* ⚠️ TEMPORÄRES REVIEW-TOOL (AGE-237).
- * Schwebender Live-Umschalter, damit Detlev die Varianten auf dem Deploy direkt
- * vergleichen kann. Angeboten wird nur noch, was in SWITCHER_VARIANT_IDS steht
- * (AGE-439: A, Sommerfest, eff.bee.zee). Sobald der Look endgültig feststeht:
- * VITE_DESIGN_SWITCHER=off setzen und diese Komponente + die nicht gewählten
- * Variant-Blöcke in src/index.css entfernen. */
+/* ⚠️ NICHT GEMOUNTET (AGE-492).
+ * War das Review-Tool aus AGE-237, mit dem Detlev zwölf Varianten auf dem Deploy
+ * vergleichen konnte. Seit AGE-492 gibt es nur noch zwei Themes, und ihre Wahl
+ * ist eine Nutzer-Einstellung (EinstellungenPage) statt eines Review-Werkzeugs —
+ * darum ist der Montagepunkt in App.tsx entfallen. Die Komponente bleibt auf
+ * Wunsch im Baum; sie rendert nirgends und ist ein Löschkandidat für C2. */
 
 const SWITCHER_ENABLED = (import.meta.env.VITE_DESIGN_SWITCHER ?? "on") !== "off";
-
-/** Kurzcode fürs runde Badge: einbuchstabige IDs (a–i) unverändert, längere
- *  (z. B. „sommerfest") auf zwei Zeichen gekürzt, damit der Kreis nicht überläuft. */
-function variantBadge(id: string): string {
-  return id.length <= 2 ? id : id.slice(0, 2);
-}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -31,19 +24,15 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function DesignSwitcher() {
-  const { variant, setVariant, cycleVariant } = useDesignVariant();
-  const { staffRole } = useAuth();
+  const { variant, setVariant } = useDesignVariant();
   const [open, setOpen] = useState(false);
 
-  // AGE-450: eff.bee.zee (`linkedin`) ist Detlevs Vision — nur Admins/Staff dürfen
-  // sie sehen, damit sie nicht vorab verraten wird. Für alle anderen fällt die
-  // Option aus dem Switcher. Die harte Grenze (Vision-App gar nicht rendern) sitzt
-  // zusätzlich in App.tsx; hier geht es nur um die Auswahl.
-  const offeredIds = staffRole
-    ? SWITCHER_VARIANT_IDS
-    : SWITCHER_VARIANT_IDS.filter((id) => id !== "linkedin");
+  const cycleVariant = useCallback(() => {
+    const i = DESIGN_VARIANT_IDS.indexOf(variant);
+    setVariant(DESIGN_VARIANT_IDS[(i + 1) % DESIGN_VARIANT_IDS.length] ?? "hell");
+  }, [variant, setVariant]);
 
-  // Shift+D schaltet durch (Tastatur-Shortcut fürs Review).
+  // Shift+D schaltet zwischen hell und navy um.
   useEffect(() => {
     if (!SWITCHER_ENABLED) return;
     const onKey = (e: KeyboardEvent) => {
@@ -63,13 +52,11 @@ export function DesignSwitcher() {
       {open ? (
         <div
           role="dialog"
-          aria-label="Design-Variante wählen"
-          className="w-72 rounded-2xl border border-gold/30 bg-canvas/95 p-2 text-ink shadow-soft backdrop-blur"
+          aria-label="Theme wählen"
+          className="w-72 rounded-2xl border border-accent/30 bg-canvas/95 p-2 text-ink shadow-soft backdrop-blur"
         >
           <div className="flex items-center justify-between px-2 py-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Design · Review
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">Theme</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -80,7 +67,7 @@ export function DesignSwitcher() {
             </button>
           </div>
           <ul className="flex flex-col gap-1">
-            {offeredIds.map((id: DesignVariantId) => {
+            {DESIGN_VARIANT_IDS.map((id: DesignVariantId) => {
               const v = DESIGN_VARIANTS[id];
               const active = id === variant;
               return (
@@ -91,31 +78,11 @@ export function DesignSwitcher() {
                     aria-pressed={active}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-xl px-2.5 py-2 text-left transition-colors",
-                      active ? "bg-gold-soft/60" : "hover:bg-ink/[0.05]",
+                      active ? "bg-accent-soft/60" : "hover:bg-ink/[0.05]",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase",
-                        active ? "bg-gold text-night" : "bg-ink/[0.07] text-ink",
-                      )}
-                    >
-                      {variantBadge(id)}
-                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                        {v.label}
-                        {v.recommended && (
-                          <span className="text-gold-strong" title="Empfehlung">
-                            ★
-                          </span>
-                        )}
-                        {v.experimental && (
-                          <span className="rounded-full border border-gold/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gold-strong">
-                            Experimentell
-                          </span>
-                        )}
-                      </span>
+                      <span className="block text-sm font-semibold text-ink">{v.label}</span>
                       <span className="block text-xs leading-snug text-muted">{v.description}</span>
                     </span>
                   </button>
@@ -123,21 +90,16 @@ export function DesignSwitcher() {
               );
             })}
           </ul>
-          <p className="px-2.5 py-1.5 text-[11px] text-muted/80">
-            Shift+D schaltet durch · <code>?variant=</code> ist teilbar
-          </p>
+          <p className="px-2.5 py-1.5 text-[11px] text-muted/80">Shift+D schaltet um</p>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`Design-Variante: ${DESIGN_VARIANTS[variant].label}. Switcher öffnen`}
-          className="fbc-sheen inline-flex items-center gap-2 rounded-full border border-gold/40 bg-canvas/90 px-4 py-2 text-sm font-semibold text-ink shadow-soft backdrop-blur transition-colors hover:border-gold"
+          aria-label={`Theme: ${DESIGN_VARIANTS[variant].label}. Switcher öffnen`}
+          className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-canvas/90 px-4 py-2 text-sm font-semibold text-ink shadow-soft backdrop-blur transition-colors hover:border-accent"
         >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[11px] font-bold uppercase text-night">
-            {variantBadge(variant)}
-          </span>
-          Design: {variant.toUpperCase()}
+          Theme: {DESIGN_VARIANTS[variant].label}
           <span aria-hidden>▸</span>
         </button>
       )}

@@ -4,7 +4,7 @@ import type { CategoryIconKey } from "../../config/matching";
 /**
  * Schlanke Inline-SVG-Icons für die Such-/Biete-Kategorien (AGE-244). Bewusst
  * im Stil der übrigen lokalen Icons (24er-Viewbox, currentColor-Stroke), damit
- * sie den Schwarz-&-Gold-Look ohne zusätzliche Icon-Abhängigkeit treffen.
+ * sie den Look des Design-Systems ohne zusätzliche Icon-Abhängigkeit treffen.
  */
 const PATHS: Record<CategoryIconKey, ReactNode> = {
   coins: (

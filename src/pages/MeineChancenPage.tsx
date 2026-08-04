@@ -175,7 +175,7 @@ function HubHeader({
   recomputing: boolean;
 }) {
   return (
-    <header className="fbc-hero-shimmer overflow-hidden rounded-[var(--radius-card)] border border-gold/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-gold-soft))] shadow-soft">
+    <header className="overflow-hidden rounded-[var(--radius-card)] border border-accent/30 bg-[linear-gradient(120deg,var(--color-soft),var(--color-accent-soft))] shadow-soft">
       <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-8">
         <div className="min-w-0">
           <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
@@ -191,7 +191,7 @@ function HubHeader({
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-px border-t border-gold/25 bg-gold/25">
+      <div className="grid grid-cols-3 gap-px border-t border-accent/25 bg-accent/25">
         <StatTile label="Aktive Matches" value={stats?.active ?? 0} />
         <StatTile label="Erfolgreiche" value={stats?.successful ?? 0} />
         <StatTile label="Ø-Score" value={stats ? `${stats.avgScore} %` : "—"} />
@@ -298,7 +298,7 @@ function FilterBar({
           <button
             type="button"
             onClick={() => onChange(emptyHubFilters)}
-            className="font-medium text-gold-strong hover:text-gold"
+            className="font-medium text-accent-strong hover:text-accent"
           >
             Filter zurücksetzen
           </button>
@@ -384,7 +384,7 @@ function ScoreBadge({ score }: { score: number }) {
       <CountUp
         value={score}
         format={(n) => `${Math.round(n)}%`}
-        className="font-display text-3xl font-semibold text-gold-strong"
+        className="font-display text-3xl font-semibold text-accent-strong"
       />
       <div className="text-[10px] font-medium tracking-wide text-muted uppercase">Match-Score</div>
     </div>
@@ -404,7 +404,9 @@ function OfferingList({
 }) {
   return (
     <div>
-      <div className="text-xs font-semibold tracking-wide text-gold-strong uppercase">{title}</div>
+      <div className="text-xs font-semibold tracking-wide text-accent-strong uppercase">
+        {title}
+      </div>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-muted">{empty}</p>
       ) : (
@@ -417,7 +419,7 @@ function OfferingList({
                 className="flex items-center gap-2.5 rounded-lg border border-line bg-soft p-2.5"
                 title={`${categoryLabel(side, item.category)} · ${item.title}`}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold-strong">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent-strong">
                   {cat ? (
                     <CategoryIcon icon={cat.icon} className="h-4 w-4" />
                   ) : (
@@ -448,7 +450,7 @@ function WhyDetails({ basis }: { basis: MatchBasis }) {
   const { preset } = useDesignVariantValue();
   return (
     <details className="group rounded-lg border border-line bg-soft px-3 py-2">
-      <summary className="cursor-pointer list-none text-xs font-medium text-gold-strong marker:content-none">
+      <summary className="cursor-pointer list-none text-xs font-medium text-accent-strong marker:content-none">
         Warum dieses Match? <span className="text-muted group-open:hidden">▾</span>
         <span className="hidden text-muted group-open:inline">▴</span>
       </summary>
@@ -466,7 +468,7 @@ function WhyDetails({ basis }: { basis: MatchBasis }) {
               </div>
               <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line">
                 <motion.div
-                  className="h-full rounded-full bg-gold"
+                  className="h-full rounded-full bg-accent"
                   initial={{ width: 0 }}
                   animate={{ width: `${pct}%` }}
                   transition={{ duration: preset.duration, ease: preset.ease }}

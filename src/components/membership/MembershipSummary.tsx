@@ -21,7 +21,9 @@ export function MembershipSummary({
         <p className="mt-1 font-display text-xl font-semibold text-ink">{cur.label}</p>
         <p className="mt-0.5 text-sm text-muted">{cur.summary}</p>
         {nextKey && (
-          <p className="mt-1 text-sm text-gold-strong">Nächster Schritt: {LEVELS[nextKey].label}</p>
+          <p className="mt-1 text-sm text-accent-strong">
+            Nächster Schritt: {LEVELS[nextKey].label}
+          </p>
         )}
       </div>
       {showManageCta && (

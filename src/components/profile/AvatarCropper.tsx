@@ -115,7 +115,7 @@ export function AvatarCropper({ file, onCancel, onConfirm }: AvatarCropperProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-night/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-chrome/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Avatar zuschneiden"
@@ -146,7 +146,7 @@ export function AvatarCropper({ file, onCancel, onConfirm }: AvatarCropperProps)
             step={0.01}
             value={zoom}
             onChange={(e) => changeZoom(Number(e.target.value))}
-            className="flex-1 accent-gold-strong"
+            className="flex-1 accent-accent-strong"
             aria-label="Zoom"
           />
         </label>

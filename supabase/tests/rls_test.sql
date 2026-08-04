@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(61);
+select plan(67);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -463,6 +463,46 @@ select alike(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'update public.profiles set tier = ''impact'' where id = ''11111111-1111-1111-1111-111111111111'''),
   'DENIED:%', 'authenticated kann profiles.tier NICHT selbst schreiben (Spalten-Grant)');
+
+-- ── member_settings.theme: eigen, privat, wertgeprüft (AGE-492) ──────────────
+-- Das Theme trägt keine Zugriffsbedeutung, aber es liegt in member_settings —
+-- einer Tabelle, die strikt own-profile ist. Geprüft wird deshalb dreierlei:
+-- der Eigner schreibt, ein Fremder erreicht die Zeile nicht, und die DB (nicht
+-- der Client) lehnt einen unbekannten Wert ab.
+--
+-- Die Zeile für '1111…' wird hier angelegt: die Fixture oben legt nur für
+-- '8888…' eine an. Ohne sie liefe jedes UPDATE unten auf null Zeilen und wäre
+-- grün, ohne irgendetwas zu prüfen.
+insert into public.member_settings (profile_id) values ('11111111-1111-1111-1111-111111111111');
+
+select is(
+  (select theme from public.member_settings where profile_id = '11111111-1111-1111-1111-111111111111'),
+  'hell', 'theme: der Default ist hell');
+
+select is(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'update public.member_settings set theme = ''navy'' where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'OK', 'theme: das eigene Theme darf man setzen');
+
+select is(
+  (select theme from public.member_settings where profile_id = '11111111-1111-1111-1111-111111111111'),
+  'navy', 'theme: der gesetzte Wert steht auch wirklich in der Zeile');
+
+-- Fremdzugriff wirft NICHT — die Policy filtert die fremde Zeile aus dem UPDATE
+-- heraus. Der Beweis ist deshalb der unveränderte Wert, nicht ein Fehler.
+select is(
+  pg_temp.try_as('88888888-8888-8888-8888-888888888888',
+    'update public.member_settings set theme = ''hell'' where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'OK', 'theme: das fremde UPDATE läuft fehlerfrei durch …');
+
+select is(
+  (select theme from public.member_settings where profile_id = '11111111-1111-1111-1111-111111111111'),
+  'navy', '… ändert die fremde Zeile aber nicht (RLS filtert sie heraus)');
+
+select alike(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'update public.member_settings set theme = ''sommerfest'' where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'DENIED:%', 'theme: ein unbekannter Wert wird von der DB abgelehnt, nicht nur vom Client');
 
 select * from finish();
 rollback;

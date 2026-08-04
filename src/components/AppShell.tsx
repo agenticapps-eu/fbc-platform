@@ -7,10 +7,9 @@ import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
 import { RouteTransition } from "./ui/Motion";
+import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
-import { VariantBackdrop } from "./ui/VariantBackdrop";
-import { useDesignVariantValue } from "../providers/design-variant-context";
 
 // Der Container hat IMMER dieselbe Breite (Sidebar springt nicht). Mehrspaltige
 // Seiten füllen den Content-Bereich; textlastige Einspalter cappen nur ihre
@@ -19,7 +18,7 @@ const WIDE_ROUTES = ["/profil", "/kontakte", "/mitglieder", "/meine-chancen"];
 
 // Sidebar-Oberfläche: jetzt token-getrieben über var(--sidebar-surface) (Klasse
 // .fbc-sidebar-surface). Wert wird je Design-Variante in index.css gesetzt —
-// heller Champagner→Gold-Verlauf (a/c/d) bzw. dunkel (b). Von aside + Drawer geteilt.
+// Fläche kommt aus --sidebar-surface, je Theme. Von aside + Drawer geteilt.
 const SIDEBAR_SURFACE = "fbc-sidebar-surface";
 
 function BellIcon() {
@@ -114,7 +113,7 @@ function UserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Profilmenü"
-        className="flex items-center gap-1.5 rounded-full p-1 transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+        className="flex items-center gap-1.5 rounded-full p-1 transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
       >
         <Avatar name={email} size="sm" />
         <ChevronDownIcon />
@@ -211,7 +210,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Link
           to="/profil"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-[var(--radius-card)] border border-gold/20 bg-canvas/50 px-3 py-2.5 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-strong"
+          className="flex items-center gap-3 rounded-[var(--radius-card)] border border-accent/20 bg-canvas/50 px-3 py-2.5 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
         >
           <Avatar name={user.email ?? "?"} size="md" />
           <span className="min-w-0">
@@ -227,7 +226,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Link
           to="/login"
           onClick={onNavigate}
-          className="rounded-[var(--radius-card)] border border-gold/20 bg-canvas/50 px-3 py-2.5 text-sm text-ink/70 transition-colors hover:bg-canvas"
+          className="rounded-[var(--radius-card)] border border-accent/20 bg-canvas/50 px-3 py-2.5 text-sm text-ink/70 transition-colors hover:bg-canvas"
         >
           <span className="font-semibold text-ink">Anmelden</span>
           <span className="mt-0.5 block text-xs text-muted">Mitglied werden &amp; alles sehen</span>
@@ -242,8 +241,6 @@ export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { meta } = useDesignVariantValue();
-  const hasBackdrop = (meta.backdrop ?? "none") !== "none";
   // Exakter Pfad-Vergleich: /profil (Bento) ist breit, /profil/bearbeiten (Editor) bleibt
   // zentriert. Alle WIDE_ROUTES sind Blattseiten ohne breite Unterrouten.
   const isWide = WIDE_ROUTES.includes(pathname);
@@ -266,15 +263,7 @@ export default function AppShell() {
   }
 
   return (
-    <div
-      className={cn(
-        "relative isolate min-h-screen text-ink",
-        // Bei aktivem Backdrop (F/G) ist der Shell-Hintergrund transparent, damit
-        // die fixe -z-10-Ebene (<VariantBackdrop>) durchscheint; sonst wie gehabt.
-        hasBackdrop ? "bg-transparent" : "bg-soft",
-      )}
-    >
-      <VariantBackdrop />
+    <div className="relative isolate min-h-screen bg-soft text-ink">
       {/* Header — volle Breite, sticky. Links Hamburger/Logo (mobil), Suche mittig,
           rechts Benachrichtigungen + Avatar/Tier. */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur">
@@ -283,31 +272,23 @@ export default function AppShell() {
             type="button"
             aria-label="Menü öffnen"
             onClick={() => setMobileNavOpen(true)}
-            className="rounded-md p-2 text-ink transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold lg:hidden"
+            className="rounded-md p-2 text-ink transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden"
           >
             <MenuIcon />
           </button>
           <Link
             to="/"
-            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
-            {/* Header-Logo: das echte, INTAKTE gestapelte FBC-Lockup — aber der
-                umlaufende Weißraum des PNGs (oben/unten ~⅓) ist per background-crop
-                auf die Content-Bounding-Box weggeschnitten. Dadurch wirkt das Logo
-                groß, obwohl die Navbar flach bleibt (py-1.5). Crop-Werte an das
-                Layout von fbc-logo-crown.png gebunden — ändert sich das Asset,
-                hier nachziehen. Header ist in allen angebotenen Varianten hell,
-                daher trägt die schwarze Wortmarke. sr-only trägt den Link-Namen. */}
-            <span
-              aria-hidden
-              className="block h-12 aspect-[1.75] bg-no-repeat"
-              style={{
-                backgroundImage: "url(/brand/fbc-logo-crown.png)",
-                backgroundSize: "113% 148%",
-                backgroundPosition: "48% 51%",
-              }}
-            />
-            <span className="sr-only">Fair Business Club</span>
+            {/* Header-Logo. Bis AGE-492 lag hier das gestapelte Kronen-PNG, dessen
+                umlaufender Weißraum per background-crop weggeschnitten war — mit
+                Crop-Werten, die an das Asset-Layout gebunden waren. Das SVG-Lockup
+                braucht das nicht: es ist randlos, skaliert sauber und erbt über
+                currentColor die Farbe beider Themes. */}
+            {/* Kein sr-only daneben: das Lockup enthält die Wortmarke als echten
+                Text, der Link trägt seinen Namen also selbst. Das PNG vorher war
+                aria-hidden und brauchte ihn. */}
+            <Logo className="h-8" />
           </Link>
 
           <div className="mx-auto hidden w-full max-w-md sm:block">
@@ -319,7 +300,7 @@ export default function AppShell() {
               <input
                 type="search"
                 placeholder="Suchen in der Community…"
-                className="h-10 w-full rounded-full border border-line bg-soft pl-9 pr-4 text-sm text-ink transition-colors placeholder:text-muted/70 focus-visible:border-gold focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+                className="h-10 w-full rounded-full border border-line bg-soft pl-9 pr-4 text-sm text-ink transition-colors placeholder:text-muted/70 focus-visible:border-accent focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               />
             </label>
           </div>
@@ -330,7 +311,7 @@ export default function AppShell() {
                 <button
                   type="button"
                   aria-label="Benachrichtigungen"
-                  className="rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  className="rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   <BellIcon />
                 </button>
@@ -350,7 +331,7 @@ export default function AppShell() {
       <div className="mx-auto flex max-w-[1180px] gap-4 px-4 py-8 sm:px-6">
         <aside
           className={cn(
-            "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-gold/25 px-4 py-6 shadow-soft lg:block",
+            "sticky top-24 hidden h-fit max-h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto rounded-[var(--radius-card)] border border-accent/25 px-4 py-6 shadow-soft lg:block",
             SIDEBAR_SURFACE,
           )}
         >
@@ -378,7 +359,7 @@ export default function AppShell() {
           aria-label="Navigation"
         >
           <div
-            className="absolute inset-0 bg-night/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-chrome/60 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
           <div

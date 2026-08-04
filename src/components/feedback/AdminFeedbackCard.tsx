@@ -13,7 +13,7 @@ const ADMIN_FEEDBACK_QUERY_KEY = ["admin-feedback"] as const;
 function Stars({ rating }: { rating: number | null }) {
   if (!rating) return <span className="text-xs text-muted">ohne Bewertung</span>;
   return (
-    <span className="text-gold-strong">
+    <span className="text-accent-strong">
       <span aria-hidden="true">
         {"★".repeat(rating)}
         {"☆".repeat(5 - rating)}

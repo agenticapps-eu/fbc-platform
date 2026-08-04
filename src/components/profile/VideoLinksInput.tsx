@@ -41,7 +41,7 @@ export function VideoLinksInput({ value, onChange }: VideoLinksInputProps) {
                 className={cn(
                   "h-10 w-full rounded-md border bg-canvas px-3 text-sm text-ink transition-colors placeholder:text-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-soft",
                   valid
-                    ? "border-line focus-visible:border-gold focus-visible:ring-gold"
+                    ? "border-line focus-visible:border-accent focus-visible:ring-accent"
                     : "border-danger focus-visible:ring-danger",
                 )}
               />

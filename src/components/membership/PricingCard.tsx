@@ -32,7 +32,7 @@ export default function PricingCard({
       padded={false}
       className={cn(
         "flex flex-col gap-0 overflow-hidden",
-        recommended && "ring-2 ring-gold-strong",
+        recommended && "ring-2 ring-accent-strong",
       )}
     >
       {/* Akzent-Band mit Rang-Siegel — Verlauf + gravierte Naht nach rank (token-getrieben). */}
@@ -41,14 +41,14 @@ export default function PricingCard({
         style={accentBandStyle(level.rank)}
       >
         {recommended ? <Badge variant="strong">Empfohlen</Badge> : <span />}
-        {/* Siegel: Gold-Ring (inset) + Emboss-Kante, Serifen-Römerzahl. */}
+        {/* Siegel: Akzent-Ring (inset) + Emboss-Kante, Serifen-Römerzahl. */}
         <span
           aria-hidden="true"
-          className="flex h-10 w-10 items-center justify-center rounded-full font-display text-base font-semibold tracking-tight leading-none text-gold-strong"
+          className="flex h-10 w-10 items-center justify-center rounded-full font-display text-base font-semibold tracking-tight leading-none text-accent-strong"
           style={{
             background: "color-mix(in oklab, var(--color-canvas) 72%, transparent)",
             boxShadow:
-              "inset 0 0 0 1px color-mix(in oklab, var(--color-gold) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35)",
+              "inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35)",
           }}
         >
           {monogram(level.rank)}

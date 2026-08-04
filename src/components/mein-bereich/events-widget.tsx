@@ -115,7 +115,7 @@ function EventGroup({
             <li key={r.id}>
               <Link
                 to={`/events/${r.id}`}
-                className="flex items-start justify-between gap-3 hover:text-gold-strong"
+                className="flex items-start justify-between gap-3 hover:text-accent-strong"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{r.title}</p>

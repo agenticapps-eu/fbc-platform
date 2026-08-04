@@ -1,36 +1,30 @@
 <!doctype html>
-<!-- data-variant: Default 'sommerfest' (FBC-Marke, AGE-361); das Inline-Skript unten
-     korrigiert VOR dem First Paint auf URL/localStorage (kein Theme-Flash). -->
-<html lang="de" data-variant="sommerfest">
+<!-- data-variant: Default 'hell' (AGE-492); das Inline-Skript unten korrigiert
+     VOR dem First Paint auf den gespeicherten Wert (kein Theme-Flash). -->
+<html lang="de" data-variant="hell">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/brand/crown-favicon.svg" />
-    <link rel="apple-touch-icon" href="/brand/crown-favicon.svg" />
-    <meta name="theme-color" content="#14151a" />
+    <link rel="icon" type="image/svg+xml" href="/brand/compass-favicon.svg" />
+    <link rel="apple-touch-icon" href="/brand/compass-favicon.svg" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Fair Business Club</title>
-    <!-- Anti-Flash: setzt data-variant vor dem Rendern, gleiche Precedence wie der
-         DesignVariantProvider (URL ?variant= > localStorage > Default 'sommerfest'). -->
+    <!-- Anti-Flash: setzt data-variant VOR dem ersten Paint. Ohne das lädt die
+         App sichtbar hell und springt danach auf navy.
+
+         Die Regel hier muss mit resolveInitialVariant (src/config/designVariants.ts)
+         übereinstimmen, sonst korrigiert der Provider diesen Wert danach sichtbar
+         zurück — genau der Flash, den das Skript verhindern soll.
+
+         Der Serverwert (member_settings.theme) steht hier prinzipbedingt noch
+         nicht zur Verfügung; er kommt erst nach dem Login-Roundtrip und
+         überschreibt dann localStorage. -->
     <script>
       (function () {
         try {
-          var ok = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "sommerfest", "blau", "linkedin"];
-          // Nur diese bietet der Switcher an (SWITCHER_VARIANT_IDS, AGE-439/441).
-          // Muss zur Regel in resolveInitialVariant passen, sonst setzt dieses
-          // Skript eine zurückgezogene Variante und der Provider korrigiert sie
-          // danach sichtbar zurück — genau der Flash, den es verhindern soll.
-          var offered = ["a", "sommerfest", "blau", "linkedin"];
-          // Strukturelle Flags der experimentellen Varianten (cardStyle, backdrop).
-          // a–d sind solid/none (Default); nur e/f/g weichen ab.
-          var flags = { e: ["editorial", "none"], f: ["glass", "aurora"], g: ["solid", "paper"] };
-          var p = new URLSearchParams(location.search).get("variant");
+          var ok = ["hell", "navy"];
           var s = localStorage.getItem("fbc.designVariant");
-          var v = ok.indexOf(p) > -1 ? p : offered.indexOf(s) > -1 ? s : "sommerfest";
-          var d = document.documentElement;
-          var fl = flags[v];
-          d.dataset.variant = v;
-          d.dataset.cardStyle = fl ? fl[0] : "solid";
-          d.dataset.backdrop = fl ? fl[1] : "none";
+          document.documentElement.dataset.variant = ok.indexOf(s) > -1 ? s : "hell";
         } catch (e) {}
       })();
     </script>

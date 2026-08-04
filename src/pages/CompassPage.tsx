@@ -47,7 +47,7 @@ function MiniCompassTab() {
           <Button variant="ghost" onClick={() => navigate("/onboarding")}>
             Erneut durchlaufen
           </Button>
-          <Link to="/profil" className="text-sm font-medium text-gold-strong hover:underline">
+          <Link to="/profil" className="text-sm font-medium text-accent-strong hover:underline">
             Zum Erfolgsradar →
           </Link>
         </div>

@@ -38,8 +38,8 @@ export function ErfolgsradarChart({ scores }: { scores: { theme: string; score: 
           <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
           <Radar
             dataKey="score"
-            stroke="var(--color-gold-strong)"
-            fill="var(--color-gold)"
+            stroke="var(--color-accent-strong)"
+            fill="var(--color-accent)"
             fillOpacity={0.35}
             strokeWidth={2}
             dot

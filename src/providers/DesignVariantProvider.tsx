@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  DEFAULT_VARIANT,
   DESIGN_VARIANTS,
   resolveInitialVariant,
-  SWITCHER_VARIANT_IDS,
-  VARIANT_QUERY_PARAM,
   VARIANT_STORAGE_KEY,
   type DesignVariantId,
 } from "../config/designVariants";
@@ -28,56 +25,37 @@ function persist(variant: DesignVariantId) {
   }
 }
 
-/** Spiegelt die Auswahl in die URL (?variant=) per replaceState, ohne den
- *  History-Stack zu verändern — Deep-Links bleiben teilbar, Back/Forward heil. */
-function syncUrl(variant: DesignVariantId) {
-  const url = new URL(window.location.href);
-  if (url.searchParams.get(VARIANT_QUERY_PARAM) === variant) return;
-  url.searchParams.set(VARIANT_QUERY_PARAM, variant);
-  window.history.replaceState(window.history.state, "", url);
-}
-
+/** Hält das aktive Theme und spiegelt es nach localStorage und auf
+ *  <html data-variant>. Bewusst OHNE Auth- und Query-Abhängigkeit: der Provider
+ *  umschließt die ganze App, und jede Abhängigkeit hier zwingt jeden Test, der
+ *  irgendeine Seite rendert, dieselben Provider mitzubringen.
+ *
+ *  Den serverseitigen Abgleich (member_settings.theme) macht deshalb
+ *  <ThemeServerSync /> darunter — siehe App.tsx. */
 export function DesignVariantProvider({ children }: { children: ReactNode }) {
   const [variant, setVariantState] = useState<DesignVariantId>(() =>
-    resolveInitialVariant({ search: window.location.search, stored: readStored() }),
+    resolveInitialVariant({ stored: readStored() }),
   );
   const reducedMotion = usePrefersReducedMotion();
 
   // Single source of truth → DOM: <html data-variant> treibt alle CSS-Overrides.
-  // Zusätzlich spiegeln die strukturellen Flags der aktiven Variante in
-  // data-card-style / data-backdrop — daran hängen die wiederverwendbaren
-  // Card-/Backdrop-Stile (statt Komponenten-Forks).
+  // Das Inline-Skript in index.html hat denselben Wert bereits VOR dem ersten
+  // Paint gesetzt (gleiche Regel, gleicher Storage-Key); dieser Effect hält ihn
+  // synchron. Weichen beide Regeln voneinander ab, korrigiert er sichtbar —
+  // genau das Flackern, das das Skript verhindern soll.
   useEffect(() => {
-    const root = document.documentElement;
-    const meta = DESIGN_VARIANTS[variant];
-    root.dataset.variant = variant;
-    root.dataset.cardStyle = meta.cardStyle ?? "solid";
-    root.dataset.backdrop = meta.backdrop ?? "none";
+    document.documentElement.dataset.variant = variant;
     persist(variant);
-    syncUrl(variant);
   }, [variant]);
 
   const setVariant = useCallback((id: DesignVariantId) => setVariantState(id), []);
 
-  // Shift+D läuft nur durch die angebotenen Varianten (AGE-439). Steht man per
-  // ?variant= auf einer zurückgezogenen, ist indexOf -1 und der Durchlauf
-  // startet vorne — statt in die ausgeblendeten Varianten zu laufen.
-  const cycleVariant = useCallback(() => {
-    setVariantState((current) => {
-      const i = SWITCHER_VARIANT_IDS.indexOf(current);
-      return SWITCHER_VARIANT_IDS[(i + 1) % SWITCHER_VARIANT_IDS.length] ?? DEFAULT_VARIANT;
-    });
-  }, []);
-
   const meta = DESIGN_VARIANTS[variant];
-  const preset = useMemo(
-    () => getMotionPreset(meta.motion, reducedMotion),
-    [meta.motion, reducedMotion],
-  );
+  const preset = useMemo(() => getMotionPreset(reducedMotion), [reducedMotion]);
 
   const value = useMemo(
-    () => ({ variant, meta, setVariant, cycleVariant, reducedMotion, preset }),
-    [variant, meta, setVariant, cycleVariant, reducedMotion, preset],
+    () => ({ variant, meta, setVariant, reducedMotion, preset }),
+    [variant, meta, setVariant, reducedMotion, preset],
   );
 
   return <DesignVariantContext.Provider value={value}>{children}</DesignVariantContext.Provider>;

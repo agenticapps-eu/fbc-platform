@@ -24,7 +24,7 @@ export function ThreadList({
               aria-current={active ? "true" : undefined}
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
-                active ? "bg-gold-soft/40" : "hover:bg-soft",
+                active ? "bg-accent-soft/40" : "hover:bg-soft",
               )}
             >
               <Avatar name={thread.partner.name} src={thread.partner.avatarUrl} size="md" />

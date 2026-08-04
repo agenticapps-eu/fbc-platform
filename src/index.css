@@ -1,424 +1,179 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* FBC Design-System — Schwarz & Gold.
-   Anmutung: exklusiver Mitgliederclub — Schwarz/Anthrazit als Chrome,
-   Gold als einziger Akzent, helle, ruhige Content-Flächen. */
+/* Selbst gehostete Schriften (AGE-492 §6). Bis hierhin lud Zeile 1 dieser Datei
+   die Schriften von Googles CDN — in Deutschland ein Abmahnthema, weil dabei die
+   IP des Besuchers dorthin geht, ohne dass er zustimmen konnte. Die Host-Namen
+   stehen hier bewusst nicht ausgeschrieben: das CI-Gate greppt nach ihnen und
+   soll ohne Ausnahmeliste auskommen.
+
+   Beides sind VARIABLE Fonts: eine Datei je Subset deckt alle Gewichte ab, und
+   `font-weight` nennt deshalb einen Bereich statt eines Werts. Google liefert
+   für 400/500/600/700 vier identische Dateien aus (per Hash geprüft) — hier
+   liegen darum 4 statt 12 Dateien, zusammen 260 kB.
+
+   `font-display: swap` zeigt sofort die Fallback-Schrift und tauscht nach; ohne
+   das bliebe der Text bis zum Laden unsichtbar. Die unicode-ranges sind
+   unverändert die von Google, damit latin-ext nur geladen wird, wenn ein Zeichen
+   daraus wirklich vorkommt. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("/fonts/fraunces-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("/fonts/fraunces-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* eff.bee.zee Design-System (AGE-492). Verbindliche Vorlage: docs/design-system.html.
+   Eine Akzentfamilie (Blau), zwei Themes (hell · navy), gleiche Token-NAMEN in
+   beiden — daher kennt keine Komponente ihr Theme und keine verzweigt darauf.
+
+   Zur Namensgebung: `--color-canvas` sind die KARTEN, `--color-soft` ist der
+   App-Hintergrund. Das ist verwirrend und bleibt trotzdem so — die Vorlage nennt
+   sie surface/canvas, aber ein zweiter Massen-Rename gehört nicht in diesen
+   Change (AGE-492). Beim Übertragen aus der Vorlage entsprechend mappen:
+   Vorlage --surface → hier --color-canvas, Vorlage --canvas/--surface-2 → hier
+   --color-soft. */
 @theme {
-  /* Chrome — weiches Near-Black/Anthrazit (Sidebar, Hero). Bewusst KEIN reines
-     Schwarz: freundlicher, ruhiger Premium-Look (Detlev, AGE-237). */
-  --color-night: #1b1c20;
-  --color-night-elevated: #26282e;
-  --color-night-border: rgba(255, 255, 255, 0.08);
+  /* Blau-Rampe — die einzige Akzentfamilie. Die frühere Akzentfarbe und Grün
+     sind ersatzlos raus. */
+  --color-blue-50: #eff5fd;
+  --color-blue-100: #dce9fa;
+  --color-blue-200: #bcd3f4;
+  --color-blue-300: #8eb5ec;
+  --color-blue-400: #5b90e0;
+  --color-blue-500: #2f6bd1;
+  --color-blue-600: #1f53b0;
+  --color-blue-700: #17408b;
+  --color-blue-800: #123061;
+  --color-blue-900: #0c2043;
+  --color-blue-950: #081527;
 
-  /* Akzent — Gold (einziger Marken-Akzent) */
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #efe3c8;
+  /* Akzent — einziger Marken-Akzent. `accent-ink` ist der Text AUF einer
+     Akzentfläche (Primary-Button), nicht der Akzent selbst. */
+  --color-accent: #2f6bd1;
+  --color-accent-strong: #1f53b0;
+  --color-accent-soft: #eff5fd;
+  --color-accent-ink: #ffffff;
 
-  /* Optionaler Zweitakzent — Default = Gold (Variante F/G überschreiben mit
-     Mint bzw. Salbei). So liefert var(--accent2) immer einen gültigen Wert. */
-  --accent2: var(--color-gold);
+  /* Chrome — Sidebar-/Topbar-Fläche. Hieß bis AGE-492 `night`; im hellen Theme
+     ist das Weiß, und ein Name, der das Gegenteil seines Wertes behauptet, ist
+     eine Falle für die Folge-Changes. */
+  --color-chrome: #ffffff;
+  --color-chrome-elevated: #f6f8fb;
+  --color-chrome-border: #e2e8f0;
+  --color-on-chrome: #475569;
+  --color-on-chrome-muted: #64748b;
 
-  /* Content — hell, warm (App-Hintergrund warmes Hellgrau, Karten reinweiß) */
+  /* Content */
   --color-canvas: #ffffff;
-  --color-soft: #f4f3ee;
-  --color-ink: #14151a;
-  --color-muted: #6b7280;
-  --color-line: #e7e5df;
+  --color-soft: #f6f8fb;
+  --color-ink: #1e2a3a;
+  --color-ink-strong: #0c2043;
+  /* Abweichung von der Vorlage, gemessen: deren #64748B trifft auf --color-soft
+     (#F6F8FB) nur 4.47:1 und verfehlt WCAG AA für Fließtext um 0.03. Auf weißen
+     Karten reicht es (4.76), auf der Seitenfläche nicht — und genau dort steht
+     der meiste gemutete Text. #626F85 ist der kleinste Schritt, der beides
+     schafft (4.78 auf soft, 5.08 auf canvas); optisch ist der Unterschied nicht
+     wahrnehmbar. Navy braucht die Korrektur nicht (#8FA5C4 liegt bei 6.56/7.04). */
+  --color-muted: #626f85;
+  --color-line: #e2e8f0;
 
-  /* Text auf dunklem Chrome */
-  --color-on-night: #f4f2ec;
-  --color-on-night-muted: #a1a1aa;
+  /* Status. `positive` (Trendpfeile) trägt denselben Ton wie `success` — die
+     neue Palette kennt nur ein Grün. Bewusst nicht zusammengelegt: das wäre ein
+     weiterer Rename ohne Auftrag. */
+  --color-success: #167a5b;
+  --color-positive: #167a5b;
+  --color-warning: #b4761a;
+  --color-danger: #b23b3b;
 
-  /* Status */
-  --color-success: #2e7d5b;
-  --color-positive: #1f9d6b;
-  --color-danger: #b23a2e;
-
-  /* Format-Akzentfarben (NUR für die kleinen Format-Icons, sparsam) */
-  --color-fmt-compass: #1c6b57;
-  --color-fmt-library: #2c7a7b;
-  --color-fmt-academy: #2b5c9a;
-  --color-fmt-community: #c8791e;
-  --color-fmt-events: #b23a2e;
-  --color-fmt-matching: #1e3a5f;
-  --color-fmt-projekte: #6b3fa0;
-
-  /* Typografie */
-  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  /* Typografie — Fraunces trägt nur h1–h3 und Display, Inter alles andere. */
+  --font-display: "Fraunces", Georgia, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 16px 40px -24px rgba(20, 21, 26, 0.25);
+  --shadow-soft: 0 1px 2px rgb(15 29 51 / 0.05), 0 4px 16px rgb(15 29 51 / 0.05);
   --radius-card: 14px;
 
-  /* Variant-Layer-Tokens (Default = Variante D). Sidebar-Oberfläche und Hero-
-     Hintergrund/-Text werden je Variante über [data-variant] überschrieben. */
-  --sidebar-surface: linear-gradient(168deg, #fbf6ea, #f1e4c4 55%, #e9d6a8);
-  --hero-bg:
-    radial-gradient(120% 90% at 50% 0%, rgba(200, 168, 87, 0.18), transparent 60%), #14151a;
-  --hero-ink: #f4f2ec;
-  --hero-muted: #cbb88c;
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   Design-Varianten (AGE-237 Live-Switcher) — eine Theming-Schicht, KEINE vier
-   Oberflächen. `html[data-variant]` überschreibt nur Token-WERTE (gleiche Namen);
-   Tailwind-Utilities lesen diese Variablen, daher re-themed die ganze App live.
-   `html[...]` (Spezifität > :root) garantiert, dass die Overrides greifen.
-   ──────────────────────────────────────────────────────────────────────── */
-
-/* A — Quiet Luxury: hell, editorial, zurückhaltend. */
-html[data-variant="a"] {
-  --color-soft: #f4f3ee;
-  --color-canvas: #ffffff;
-  --color-ink: #14151a;
-  --color-muted: #6b7280;
-  --color-line: #e7e5df;
-  --color-gold: #b8893b;
-  --color-gold-strong: #9c6f2c;
-  --color-gold-soft: #efe3c8;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 10px;
-  --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.04), 0 10px 28px -20px rgba(20, 21, 26, 0.18);
-  --sidebar-surface: #fbfaf6;
-  --hero-bg: transparent;
-  --hero-ink: #14151a;
-  --hero-muted: #6b7280;
-}
-
-/* B — Members' Club: dunkel, cinematisch, Gold-Glow. Flippt die ganze App dunkel. */
-html[data-variant="b"] {
-  --color-soft: #0e0f12;
-  --color-canvas: #16181d;
-  --color-ink: #f4f2ec;
-  --color-muted: #a1a1aa;
-  --color-line: rgba(255, 255, 255, 0.08);
-  --color-gold: #c8a857;
-  --color-gold-strong: #e3c071;
-  --color-gold-soft: #3a3322;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 16px;
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 24px 60px -28px rgba(200, 168, 87, 0.35);
-  --sidebar-surface: #121317;
-  --hero-bg:
-    radial-gradient(120% 80% at 50% 0%, rgba(200, 168, 87, 0.22), transparent 60%), #0e0f12;
-  --hero-ink: #f4f2ec;
-  --hero-muted: #a1a1aa;
-}
-
-/* C — Warm Social: warmes Creme, freundlich, verspielt, Sans-Headlines. */
-html[data-variant="c"] {
-  --color-soft: #f7f2e6;
-  --color-canvas: #ffffff;
-  --color-ink: #14151a;
-  --color-muted: #6b7280;
-  --color-line: #ece5d6;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #f3e8cf;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --radius-card: 18px;
-  --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 18px 44px -26px rgba(20, 21, 26, 0.2);
-  --sidebar-surface: linear-gradient(168deg, #fbf6ea, #f1e4c4 55%, #e9d6a8);
-  --hero-bg: transparent;
-  --hero-ink: #14151a;
-  --hero-muted: #6b7280;
-}
-
-/* D — Blend (Empfehlung, Default): warme helle Basis + Serif-Headlines +
-   Gold-Glow-Hero. Werte stehen bereits als Default in @theme; hier explizit,
-   damit ?variant=d sich nie auf einen Rest verlässt. */
-html[data-variant="d"] {
-  --color-soft: #f5f1e8;
-  --color-canvas: #ffffff;
-  --color-ink: #14151a;
-  --color-muted: #6b7280;
-  --color-line: #e7ddc9;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #b8893b;
-  --color-gold-soft: #efe3c8;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 14px;
-  --shadow-soft: 0 1px 2px rgba(20, 21, 26, 0.05), 0 18px 44px -24px rgba(20, 21, 26, 0.22);
-  --sidebar-surface: linear-gradient(168deg, #fbf6ea, #f1e4c4 55%, #e9d6a8);
-  --hero-bg:
-    radial-gradient(120% 90% at 50% 0%, rgba(200, 168, 87, 0.18), transparent 60%), #14151a;
-  --hero-ink: #f4f2ec;
-  --hero-muted: #cbb88c;
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   Experimentelle Varianten E/F/G (AGE-237). Jede ist ein eigener Charakter —
-   nicht nur ein anderer Goldton. Strukturelle Effekte (Backdrop, Card-Stil)
-   laufen flag-getrieben über [data-backdrop] / [data-card-style] (s. u.).
-   ════════════════════════════════════════════════════════════════════════ */
-
-/* E — Noir Editorial: Hochkontrast-Magazin, schwarze Masthead, riesige Serif,
-   Hairlines statt Schatten, scharfe Kanten. Gold nur als hauchdünner Akzent. */
-html[data-variant="e"] {
-  --color-soft: #f6f4ef;
-  --color-canvas: #ffffff;
-  --color-ink: #0c0c0d;
-  --color-muted: #565654;
-  --color-line: #dad8d2;
-  --color-gold: #a8842f;
-  --color-gold-strong: #8a6d24;
-  --color-gold-soft: #efe9da;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 2px;
-  /* flach: Hairline statt Schatten */
-  --shadow-soft: 0 0 0 1px var(--color-line);
-  --sidebar-surface: #0c0c0d;
-  --hero-bg: #0c0c0d;
-  --hero-ink: #f6f4ef;
-  --hero-muted: #b9b4a6;
-}
-
-/* E: schwarze Masthead-Spalte. Der App-Content bleibt hell (ink ≈ schwarz),
-   daher den Text NUR innerhalb der Sidebar auf Elfenbein umstellen — über die
-   gleiche Token-Mechanik (lokales --color-ink/--color-muted/--color-gold-strong),
-   sodass alle text-ink-Utilities der Sidebar mitziehen (kein Komponenten-Fork). */
-html[data-variant="e"] .fbc-sidebar-surface {
-  --color-ink: #f6f4ef;
-  --color-muted: #b9b4a6;
-  --color-gold-strong: #d9b65f;
-}
-
-/* F — Aurora Glass: tiefdunkle Mitternacht, driftende Aurora-Mesh (Gold + Mint),
-   Frosted-Glass-Cards, Neon-Gold-Akzente, helle Sans-Headlines. */
-html[data-variant="f"] {
-  --color-soft: #0b1020;
-  --color-canvas: rgba(255, 255, 255, 0.06);
-  --color-ink: #eaf0ff;
-  --color-muted: #9aa6c4;
-  --color-line: rgba(255, 255, 255, 0.12);
-  --color-gold: #e6c878;
-  --color-gold-strong: #f2d99a;
-  --color-gold-soft: rgba(230, 200, 120, 0.14);
-  --accent2: #6ee0c2;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --radius-card: 20px;
-  --shadow-soft: 0 8px 40px -12px rgba(110, 224, 194, 0.18), 0 2px 10px rgba(0, 0, 0, 0.4);
-  --sidebar-surface: rgba(255, 255, 255, 0.05);
-  --hero-bg:
-    radial-gradient(120% 90% at 30% 0%, rgba(230, 200, 120, 0.22), transparent 55%),
-    radial-gradient(100% 80% at 90% 10%, rgba(110, 224, 194, 0.18), transparent 55%), #0b1020;
-  --hero-ink: #eaf0ff;
-  --hero-muted: #9aa6c4;
-}
-
-/* G — Warm Boutique: Leinen/Papier-Töne, erdige Akzente (Terracotta + Salbei),
-   sehr weiche runde Formen, warme humanistische Serif (Fraunces → Cormorant). */
-html[data-variant="g"] {
-  --color-soft: #f3ead9;
-  --color-canvas: #fbf6ec;
-  --color-ink: #2a2320;
-  --color-muted: #7a6e63;
-  --color-line: #e3d6bf;
-  --color-gold: #b8893b;
-  --color-gold-strong: #9c6f2c;
-  --color-gold-soft: #efe1c6;
-  --accent2: #6e7e5c;
-  --font-display: "Fraunces", "Cormorant Garamond", Georgia, serif;
-  --radius-card: 22px;
-  --shadow-soft: 0 1px 2px rgba(80, 60, 40, 0.05), 0 18px 44px -24px rgba(80, 60, 40, 0.28);
-  --sidebar-surface: linear-gradient(168deg, #f6efe0, #ecdcc0 60%, #e3cda3);
-  --hero-bg: transparent;
-  --hero-ink: #2a2320;
-  --hero-muted: #7a6e63;
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   Marken-Varianten H/I (AGE-237) — FBC-Wimpel-Palette: Marineblau + Gold auf
-   Creme. Gemeinsame Marken-Tokens (Ink/Gold/Serif); nur Sidebar-, Hero- und
-   Line-Werte trennen H (dunkles Navy-Chrome) von I (helle Sidebar, Navy nur
-   als Text/Akzent). Wenn Detlev exakte Marken-Hex liefert: nur diese Tokens
-   tauschen — kein Fork.
-   ════════════════════════════════════════════════════════════════════════ */
-
-/* H — Navy & Gold (dunkel): Navy-Sidebar + Navy-Hero, heller Creme-Content. */
-html[data-variant="h"] {
-  --color-soft: #f6f1e6;
-  --color-canvas: #ffffff;
-  --color-ink: #12233f;
-  --color-muted: #5b6577;
-  --color-line: #e6dfce;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 14px;
-  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
-  --sidebar-surface: #14294a;
-  --hero-bg: linear-gradient(160deg, #1b3560, #12233f);
-  --hero-ink: #f6f1e6;
-  --hero-muted: #aab6cf;
-}
-
-/* H: dunkle Navy-Sidebar → Text/Logo INNERHALB der Sidebar auf Creme umstellen
-   (gleiche Token-Mechanik wie Variante E; der Content bleibt navy-auf-hell).
-   Aktive Route nutzt ein helleres Gold, damit sie auf Navy trägt (AA). */
-html[data-variant="h"] .fbc-sidebar-surface {
-  --color-ink: #f2ecdd;
-  --color-muted: #9fb0cc;
-  --color-gold-strong: #d9b65f;
-}
-
-/* I — Navy & Gold (hell): helle, leicht navy-getönte Sidebar, Navy nur als
-   Text/Akzent, heller Content. Kein dunkles Chrome → normales Text-Handling
-   (Navy-Ink auf Hell), aktive Route in Gold auf dezenter Pille + Gold-Balken. */
-html[data-variant="i"] {
-  --color-soft: #f6f1e6;
-  --color-canvas: #ffffff;
-  --color-ink: #12233f;
-  --color-muted: #5b6577;
-  --color-line: #dde3ee;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 14px;
-  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.06), 0 18px 44px -24px rgba(18, 35, 63, 0.28);
-  --sidebar-surface: #eef1f7;
-  --hero-bg: transparent;
-  --hero-ink: #12233f;
-  --hero-muted: #5b6577;
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   Sommerfest (FBC) — Marken-Variante fürs Sommerfest (AGE-361). Warmes Creme
-   statt kühlem Grau, Navy-Text, Gold-Akzent, helle Sidebar. Baut auf Navy&Gold
-   (H/I) auf; nur die Flächen-Tokens sind wärmer. Content bleibt navy-auf-hell →
-   kein Sidebar-Text-Override nötig (anders als H). Default-Kandidat (Prompt).
-   ════════════════════════════════════════════════════════════════════════ */
-html[data-variant="sommerfest"] {
-  --color-soft: #f6f1e6;
-  --color-canvas: #ffffff;
-  --color-ink: #12233f;
-  --color-muted: #5b6577;
-  --color-line: #e7ddc9;
-  --color-gold: #c2a24e;
-  --color-gold-strong: #a97f2c;
-  --color-gold-soft: #efe3c8;
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --radius-card: 14px;
-  --shadow-soft: 0 1px 2px rgba(18, 35, 63, 0.05), 0 18px 44px -24px rgba(18, 35, 63, 0.22);
-  --sidebar-surface: linear-gradient(180deg, #fcfaf4, #f6efe0);
-  --hero-bg: transparent;
-  --hero-ink: #12233f;
-  --hero-muted: #5b6577;
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   FBC Blau (AGE-441/450) — Detlevs „neues blaues Design", drei Ausprägungen zur
-   Auswahl. Blau ist der Akzent-Token --color-gold (dokumentierte Mechanik:
-   gleiche Namen, andere Werte); Gold bleibt der Krone und den Mitgliedsstufen
-   vorbehalten. Leitlinie (Design-Skills impeccable/emil): dezent, geringer
-   Kontrast zum Hintergrund, klar lesbar — bewusst KEIN Glas/Blur.
-
-   Gemeinsame Palette unten; die drei unterscheiden sich nur in Sidebar- und
-   Button-Fläche:
-     · blau        — helle Sidebar, dunkle Tinte, solider Blau-CTA (am dezentesten)
-     · blau-slate  — gedämpftes Blaugrau, dunkle Tinte, ruhiger Navy-CTA
-     · blau-navy   — dunkle Navy-Sidebar, helle Tinte (Token-Mechanik wie E/H)
-   ════════════════════════════════════════════════════════════════════════ */
-html[data-variant="blau"],
-html[data-variant="blau-slate"],
-html[data-variant="blau-navy"] {
-  --color-soft: #f5f7fb;
-  --color-canvas: #ffffff;
-  --color-ink: #0f1b33;
-  --color-muted: #5b6b8c;
-  --color-line: #e4e9f2;
-  --color-gold: #2f6bff;
-  --color-gold-strong: #1d4ed8;
-  --color-gold-soft: #eaf1ff;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --radius-card: 14px;
-  --shadow-soft: 0 1px 2px rgba(15, 27, 51, 0.06), 0 18px 44px -26px rgba(15, 27, 51, 0.24);
-  --hero-bg: linear-gradient(160deg, #17306a, #0e1a3a);
-  --hero-ink: #f5f7fb;
-  --hero-muted: #a8b8d8;
-}
-
-/* — blau (Hell): weiße Sidebar knapp über dem Seitenton, Haarlinie + weicher
-     Schatten; dunkle Tinte (geerbt) = maximale Lesbarkeit. Blau nur als Akzent
-     + solider CTA mit weißer Schrift. Press-Feedback via .fbc-sheen:active. */
-html[data-variant="blau"] {
+  /* Theme-Layer-Tokens: Werte, die kein Tailwind-Utility tragen kann (Verläufe).
+     Die Sidebar sitzt am Rand, nicht schwebend — Entscheidung aus dem Meeting. */
   --sidebar-surface: #ffffff;
-}
-html[data-variant="blau"] .fbc-sidebar-surface {
-  border: 1px solid #e4e9f2;
-  box-shadow:
-    0 1px 2px rgba(15, 27, 51, 0.04),
-    0 10px 30px -20px rgba(15, 27, 51, 0.18);
-}
-html[data-variant="blau"] .fbc-sheen.bg-gold {
-  background: #2f6bff;
-  color: #ffffff;
-  box-shadow:
-    0 1px 2px rgba(15, 27, 51, 0.08),
-    0 8px 20px -12px rgba(47, 107, 255, 0.45);
-}
-html[data-variant="blau"] .fbc-sheen.bg-gold:hover {
-  background: #1d4ed8;
-  color: #ffffff;
+  --hero-bg: transparent;
+  --hero-ink: #1e2a3a;
+  --hero-muted: #64748b;
 }
 
-/* — blau-slate (Slate): gedämpftes Blaugrau, dunkle Tinte (geerbt), ruhiger
-     Navy-CTA. Etwas mehr Präsenz, weiterhin geringer Kontrast zum Hintergrund. */
-html[data-variant="blau-slate"] {
-  --sidebar-surface: #e9edf6;
-}
-html[data-variant="blau-slate"] .fbc-sidebar-surface {
-  border: 1px solid #dde3ef;
-  box-shadow:
-    0 1px 2px rgba(15, 27, 51, 0.03),
-    0 10px 30px -22px rgba(15, 27, 51, 0.16);
-}
-html[data-variant="blau-slate"] .fbc-sheen.bg-gold {
-  background: #1f3a6b;
-  color: #eef3fb;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 20px -14px rgba(18, 35, 63, 0.5);
-}
-html[data-variant="blau-slate"] .fbc-sheen.bg-gold:hover {
-  background: #264785;
-  color: #ffffff;
-}
+/* Navy — überschreibt NUR Werte, nie Namen. `html[…]` (Spezifität > :root)
+   garantiert, dass die Overrides greifen. */
+html[data-variant="navy"] {
+  --color-accent: #5b90e0;
+  --color-accent-strong: #8eb5ec;
+  --color-accent-soft: rgb(91 144 224 / 0.14);
+  --color-accent-ink: #081527;
 
-/* — blau-navy (Navy): dunkle Navy-Sidebar → Tinte/Logo INNERHALB der Sidebar
-     aufhellen (gleiche Token-Mechanik wie E/H). Weicheres Navy als der frühere
-     harte Block + Haarlinien-Highlight, bewusst KEIN Blur. Aktive Route in
-     hellerem Blau (#8fb2ff trägt auf Navy über AA); Anmelden-Karte auf hellem
-     Navy statt ausgewaschenem Weiß. */
-html[data-variant="blau-navy"] {
-  --sidebar-surface: linear-gradient(180deg, #1c2f54, #172645);
-}
-html[data-variant="blau-navy"] .fbc-sidebar-surface {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 12px 34px -22px rgba(15, 27, 51, 0.55);
-  --color-ink: #e8eefb;
-  --color-muted: #9db0d2;
-  --color-gold-strong: #8fb2ff;
-  --color-canvas: #213a68;
-}
-html[data-variant="blau-navy"] .fbc-sheen.bg-gold {
-  background: linear-gradient(180deg, #20376a, #182a52);
-  color: #eef3fb;
-  border: 1px solid rgba(143, 178, 255, 0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 20px -14px rgba(15, 27, 51, 0.5);
-}
-html[data-variant="blau-navy"] .fbc-sheen.bg-gold:hover {
-  background: linear-gradient(180deg, #284584, #1e3768);
-  color: #ffffff;
+  --color-chrome: #081527;
+  --color-chrome-elevated: #0e1f38;
+  --color-chrome-border: rgb(255 255 255 / 0.08);
+  --color-on-chrome: #9fb4d2;
+  --color-on-chrome-muted: #8fa5c4;
+
+  --color-canvas: #0e1f38;
+  --color-soft: #0a1830;
+  --color-ink: #e4ecf7;
+  --color-ink-strong: #ffffff;
+  --color-muted: #8fa5c4;
+  --color-line: #1d3455;
+
+  /* Die semantischen Farben brauchen im Navy-Theme eigene Werte — die Vorlage
+     definiert sie nur einmal, und das ist eine echte Lücke: gemessen auf
+     --color-canvas (#0E1F38) trifft das helle Grün nur 3.12:1 und das helle Rot
+     2.82:1. Dunkle Signalfarben auf dunklem Grund sind nicht lesbar. Diese Werte
+     halten AA auf allen drei dunklen Flächen (canvas, soft, chrome). */
+  --color-success: #3fb58c;
+  --color-positive: #3fb58c;
+  --color-warning: #e5b45f;
+  --color-danger: #e58585;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+
+  --sidebar-surface: #081527;
+  --hero-bg: linear-gradient(160deg, #123061, #081527);
+  --hero-ink: #e4ecf7;
+  --hero-muted: #8fa5c4;
 }
 
 @layer base {
@@ -442,16 +197,12 @@ html[data-variant="blau-navy"] .fbc-sheen.bg-gold:hover {
   h4 {
     line-height: 1.2;
     letter-spacing: -0.012em;
+    color: var(--color-ink-strong);
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   Variant-Flächen + Animationen (AGE-237). Token-getrieben; Intensität per
-   [data-variant] gestaffelt. Alles unter prefers-reduced-motion abgeschaltet.
-   ──────────────────────────────────────────────────────────────────────── */
-
-/* Sidebar-Oberfläche + Hero — als Klassen (nicht bg-[var(...)]), weil der Wert
-   ein Verlauf sein kann und Tailwind-Arbitrary das als background-color fehldeutet. */
+/* Sidebar-Fläche + Hero — als Klassen (nicht bg-[var(...)]), weil der Wert ein
+   Verlauf sein kann und Tailwind-Arbitrary das als background-color fehldeutet. */
 .fbc-sidebar-surface {
   background: var(--sidebar-surface);
 }
@@ -460,7 +211,7 @@ html[data-variant="blau-navy"] .fbc-sheen.bg-gold:hover {
   color: var(--hero-ink);
 }
 
-/* Card-Hover — sanftes Anheben + Schatten; bei b/d zusätzlich Gold-Glow. */
+/* Card-Hover — sanftes Anheben. Kein Glow: „ruhig und seriös" (AGE-492). */
 .fbc-card {
   transition:
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -469,192 +220,14 @@ html[data-variant="blau-navy"] .fbc-sheen.bg-gold:hover {
 }
 .fbc-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 44px -22px rgba(20, 21, 26, 0.32);
-}
-html[data-variant="b"] .fbc-card:hover,
-html[data-variant="d"] .fbc-card:hover {
-  box-shadow:
-    0 18px 50px -22px rgba(200, 168, 87, 0.45),
-    0 0 0 1px rgba(200, 168, 87, 0.22);
-  border-color: rgba(200, 168, 87, 0.35);
-}
-
-/* Button-Sheen — Gold-Glanz läuft einmal durch + leichter Press-Scale. */
-.fbc-sheen {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.12s ease;
-}
-.fbc-sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.45) 50%,
-    transparent 80%
-  );
-  transform: translateX(-130%) skewX(-18deg);
-  pointer-events: none;
-}
-.fbc-sheen:hover::after {
-  animation: fbc-sheen 0.9s ease;
-}
-.fbc-sheen:active {
-  transform: scale(0.97);
-}
-@keyframes fbc-sheen {
-  to {
-    transform: translateX(230%) skewX(-18deg);
-  }
-}
-
-/* Hero-Shimmer — Gold-Sweep über das Hero-Panel (b/d deutlich, a/c sehr subtil). */
-.fbc-hero-shimmer {
-  position: relative;
-  isolation: isolate;
-}
-.fbc-hero-shimmer::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(227, 192, 113, 0.14) 50%,
-    transparent 70%
-  );
-  background-size: 250% 100%;
-  animation: fbc-shimmer 7s ease-in-out infinite;
-  opacity: 0.5;
-}
-html[data-variant="b"] .fbc-hero-shimmer::before,
-html[data-variant="d"] .fbc-hero-shimmer::before {
-  opacity: 1;
-}
-@keyframes fbc-shimmer {
-  0% {
-    background-position: -120% 0;
-  }
-  60%,
-  100% {
-    background-position: 220% 0;
-  }
-}
-
-/* Tier-Badge Gold-Glow-Puls — nur b/d (a/c bleiben minimal/statisch). */
-html[data-variant="b"] .fbc-tier-pulse,
-html[data-variant="d"] .fbc-tier-pulse {
-  animation: fbc-tier-pulse 2.8s ease-in-out infinite;
-  border-radius: 9999px;
-}
-@keyframes fbc-tier-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(200, 168, 87, 0);
-  }
-  50% {
-    box-shadow: 0 0 12px 1px rgba(200, 168, 87, 0.5);
-  }
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   Card-Stile (AGE-237, flag-gesteuert über [data-card-style]). Wiederverwendbar
-   für JEDE Variante, die das Flag setzt — kein Komponenten-Fork. 'solid' ist der
-   bestehende Look (kein Override).
-   ──────────────────────────────────────────────────────────────────────── */
-
-/* glass (F) — Frosted-Glass: Blur hinter der halbtransparenten Card + Glow-Rand. */
-html[data-card-style="glass"] .fbc-card {
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-color: var(--color-line);
-}
-html[data-card-style="glass"] .fbc-card:hover {
-  /* leuchtender Mint/Gold-Rand + Glow-Anstieg beim Hover (statt Gold-Glow b/d) */
-  box-shadow:
-    0 10px 50px -16px color-mix(in srgb, var(--accent2) 45%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--accent2) 40%, transparent);
-  border-color: color-mix(in srgb, var(--accent2) 45%, transparent);
-}
-
-/* editorial (E) — scharfe Kanten, flach: Hairline statt Schatten, auch im Hover. */
-html[data-card-style="editorial"] .fbc-card {
-  box-shadow: var(--shadow-soft);
-}
-html[data-card-style="editorial"] .fbc-card:hover {
-  transform: none;
-  /* Hairline zieht beim Hover Gold — ruhig, typografisch, kein „Lift". */
-  box-shadow: 0 0 0 1px var(--color-gold);
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   Struktureller Backdrop (AGE-237) — fixe -z-10-Ebene hinter dem App-Content,
-   gerendert von <VariantBackdrop>. Flag der aktiven Variante (meta.backdrop).
-   ──────────────────────────────────────────────────────────────────────── */
-
-/* Basis: die oversized, geblurrte Aurora-Ebene darf nicht über den Viewport
-   hinaus „bluten" → clippen. (Klasse trägt fixed inset-0 -z-10 via Tailwind.) */
-.fbc-backdrop {
-  overflow: hidden;
-}
-
-/* F — Aurora: tiefdunkle Basis + langsam driftende, leuchtende Gradient-Mesh
-   (Gold / Mint / Periwinkle). GPU-freundlich (nur background-position + opacity). */
-.fbc-backdrop--aurora {
-  background-color: #0b1020;
-}
-.fbc-backdrop--aurora::before {
-  content: "";
-  position: absolute;
-  inset: -25%;
-  background:
-    radial-gradient(38% 42% at 22% 28%, rgba(230, 200, 120, 0.5), transparent 60%),
-    radial-gradient(40% 44% at 78% 22%, rgba(110, 224, 194, 0.42), transparent 60%),
-    radial-gradient(46% 50% at 62% 82%, rgba(132, 142, 230, 0.38), transparent 62%),
-    radial-gradient(40% 46% at 30% 78%, rgba(230, 200, 120, 0.28), transparent 62%);
-  filter: blur(38px);
-  animation: fbc-aurora-drift 26s ease-in-out infinite alternate;
-}
-@keyframes fbc-aurora-drift {
-  0% {
-    transform: translate3d(-4%, -2%, 0) scale(1.05);
-  }
-  50% {
-    transform: translate3d(3%, 2%, 0) scale(1.12);
-  }
-  100% {
-    transform: translate3d(-2%, 4%, 0) scale(1.06);
-  }
-}
-
-/* G — Papier/Leinen: warme Basis + sehr dezente SVG-Faser-Textur (niedrige
-   Deckkraft), statisch. */
-.fbc-backdrop--paper {
-  background-color: #f3ead9;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-}
-
-/* Variante G insgesamt organischer: etwas federnderer Card-Lift. */
-html[data-variant="g"] .fbc-card:hover {
-  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -18px rgb(15 29 51 / 0.28);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbc-card,
-  .fbc-sheen,
-  .fbc-sheen::after,
-  .fbc-hero-shimmer::before,
-  .fbc-tier-pulse,
-  .fbc-backdrop--aurora::before {
-    animation: none !important;
+  .fbc-card {
     transition: none !important;
   }
-  .fbc-card:hover,
-  .fbc-sheen:active {
+  .fbc-card:hover {
     transform: none;
   }
 }

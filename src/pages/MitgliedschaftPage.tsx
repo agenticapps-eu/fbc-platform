@@ -45,7 +45,7 @@ export default function MitgliedschaftPage() {
             onClick={() => setInterval("year")}
             className={cn(
               "rounded-full px-3 py-1 text-sm",
-              interval === "year" && "bg-gold-strong text-canvas",
+              interval === "year" && "bg-accent-strong text-canvas",
             )}
           >
             Jährlich
@@ -55,7 +55,7 @@ export default function MitgliedschaftPage() {
             onClick={() => setInterval("month")}
             className={cn(
               "rounded-full px-3 py-1 text-sm",
-              interval === "month" && "bg-gold-strong text-canvas",
+              interval === "month" && "bg-accent-strong text-canvas",
             )}
           >
             Monatlich
