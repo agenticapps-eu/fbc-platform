@@ -109,17 +109,18 @@ not null default 'hell' check (theme in ('hell','navy'))`. No new policy and
       no new grant — `member_settings_own` is `for all` and the table grants
       already cover `authenticated`. Record that reasoning in the migration header,
       per this repo's convention.
-- [~] 5.2 **tdd** pgTAP: the owner reads and writes their own `theme`; another
-  member cannot; an invalid value is rejected by the check constraint —
-  WRITTEN (6 assertions in `rls_test.sql`, plan bumped 61→67) but NOT RUN
-  locally: port 54322 is held by another project's Supabase stack, and
-  stopping it was not mine to do. CI's `migrations` job is what will
-  actually exercise this.
-- [ ] 5.3 Confirm `supabase/tests/grants_test.sql` still passes — a new **column**
+- [x] 5.2 **tdd** pgTAP: the owner reads and writes their own `theme`; another
+      member cannot; an invalid value is rejected by the check constraint —
+      6 assertions in `rls_test.sql`, plan 61→67. RUN 2026-08-04 nach dem
+      Freigeben von Port 54322 (cparx-Stack kurz gestoppt, danach wieder
+      gestartet): 70 Tests, `Result: PASS`.
+- [x] 5.3 Confirm `supabase/tests/grants_test.sql` still passes — a new **column**
       on a table that already carries table-level grants should not move the golden
       snapshot, but the snapshot has broken on schema additions before, so check
-      rather than assume. NOT CHECKED — same blocked local stack as 5.2. This is
-      the one that has actually broken before, so it needs a real run.
+      rather than assume. GEPRÜFT, grün — der Golden-Snapshot bewegt sich nicht.
+      Der erste Lauf schlug scheinbar fehl, aber an einem alten lokalen Volume
+      (Migrationen ab 20260723 fehlten, `platform_settings` existierte nicht);
+      nach `supabase db reset` liefen beide Dateien durch.
 - [x] 5.4 Extend `DEFAULT_MEMBER_SETTINGS` and the `MemberSettings` type in
       `src/lib/member-settings.ts`
 
