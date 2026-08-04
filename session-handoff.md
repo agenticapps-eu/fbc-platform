@@ -3,7 +3,8 @@
 ## Accomplished
 
 Change C1 des eff.bee.zee-Go-Live (**AGE-492**) vollständig implementiert, auf
-Branch `donald/age-492-c1-design-system-blau-statt-gold`, 6 Commits.
+Branch `donald/age-492-c1-design-system-blau-statt-gold`, 10 Commits (6 mit
+Code, 4 mit Dokumentation und Korrekturen).
 
 - OpenSpec-Change `redesign-blue-theme-system` angelegt: proposal.md, tasks.md,
   neue Capability `design-system` (6 Requirements), `member-profiles` erweitert.
