@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
   <!-- eff.bee.zee Kompassmarke (AGE-492). Ring auf 3.5 statt 2.5 verstärkt:
        bei 16 px Favicon-Größe verschwindet die dünnere Linie sonst. -->
-  <circle cx="24" cy="24" r="20.5" fill="none" stroke="#1F53B0" stroke-width="3.5" />
-  <path d="M24 7 L27 21 L41 24 L27 27 L24 41 L21 27 L7 24 L21 21 Z" fill="#1F53B0" />
+  <!-- AGE-499: Die Zacken brechen aus dem Ring aus, wie in der Marke selbst
+       (CompassMark.tsx). Ring dafür von 20.5 auf 15.5 eingerückt — beide Dateien
+       müssen dieselbe Form zeigen, sonst trägt der Tab ein anderes Logo als die App. -->
+  <circle cx="24" cy="24" r="15.5" fill="none" stroke="#1F53B0" stroke-width="3.5" />
+  <path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="#1F53B0" />
 </svg>
