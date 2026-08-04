@@ -10,6 +10,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { Logo } from "../components/ui/Logo";
+import { PageHero } from "../components/ui/PageHero";
 import { CountUp } from "../components/ui/Motion";
 import { Tabs } from "../components/ui/Tabs";
 import { TierBadge } from "../components/ui/TierBadge";
@@ -259,6 +260,26 @@ export default function StyleguidePage() {
 
           {/* Design-Varianten (Live-Switcher + Animations-Demo) */}
           <VariantsSection />
+
+          {/* Seitenkopf mit Bild (AGE-499) */}
+          <Section title="Seitenkopf — Bild, Verlauf, Titel">
+            <PageHero
+              image="/images/hero-see.webp"
+              eyebrow="Guten Morgen, Detlev"
+              title={
+                <>
+                  Deine nächste Chance
+                  <br className="hidden sm:block" /> beginnt hier.
+                </>
+              }
+              subtitle="Entdecke neue Chancen, spannende Menschen und wertvolle Impulse."
+            />
+            <p className="mt-3 text-sm text-muted">
+              Das Foto blutet rechts aus, der Verlauf hält die linke Hälfte als ruhige Fläche —
+              Fließtext steht nie auf dem Bild. Bilder liegen selbst gehostet unter /images (Quelle
+              und Lizenz: public/images/CREDITS.md).
+            </p>
+          </Section>
 
           {/* Chrome-Vorschau (Sidebar-Fläche) */}
           <Section title="Chrome — Sidebar-Fläche">

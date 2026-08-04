@@ -96,9 +96,13 @@ function renderDash() {
 describe("MemberDashboard", () => {
   it("begrüßt mit dem Vornamen und zeigt echte Kennzahlen", async () => {
     renderDash();
+    // AGE-499: Der Gruß steht in der Eyebrow-Zeile des Heros, die Überschrift
+    // trägt die Kampagnenzeile. Der Vorname muss trotzdem auftauchen — er ist der
+    // Grund, warum das Dashboard überhaupt eine Begrüßung hat.
     expect(
-      await screen.findByRole("heading", { name: /Willkommen zurück, Anna/ }),
+      await screen.findByRole("heading", { name: /Deine nächste Chance/ }),
     ).toBeInTheDocument();
+    expect(screen.getByText(/Anna$/)).toBeInTheDocument();
     // Compass % kommt direkt aus profile_completion.
     expect(screen.getByText("60%")).toBeInTheDocument();
     // Mein Plan zeigt das Stufen-Label (levelLabel), nicht den rohen Key.

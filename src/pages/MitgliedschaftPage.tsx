@@ -1,3 +1,5 @@
+import { FormatHero } from "../components/ui/FormatHero";
+import { FORMAT_HERO } from "../config/formatHero";
 import { useState } from "react";
 import { LEVELS, LEVEL_ORDER, LEVEL_RANK, type MembershipLevel } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
@@ -38,7 +40,7 @@ export default function MitgliedschaftPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-semibold text-ink">Mitgliedschaft</h1>
+        <FormatHero meta={FORMAT_HERO["/mitgliedschaft"]} className="" />
         <div className="flex gap-1 rounded-full border border-line p-1">
           <button
             type="button"

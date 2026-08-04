@@ -1,20 +1,22 @@
-import { cn } from "../../lib/cn";
 import type { FormatHeroMeta } from "../../config/formatHero";
+import { PageHero } from "./PageHero";
 
+/** Seitenkopf einer Format-Route (Kompass, Academy, Events …).
+ *
+ *  Seit AGE-499 rendert er über `PageHero` und trägt damit dasselbe Muster wie
+ *  das Dashboard: Bild rechts auslaufend, Verlauf, Titel auf ruhiger Fläche.
+ *  Vorher war es eine flache Akzentfläche ohne Bild (AGE-450 #7) — die Referenz
+ *  zeigt jeden Kopf mit Motiv.
+ *
+ *  Das Motiv steht in der Route-Tabelle (config/formatHero.ts), nicht hier: die
+ *  Seiten unterscheiden sich im Motiv, nicht im Aufbau. */
 export function FormatHero({ meta, className }: { meta: FormatHeroMeta; className?: string }) {
   return (
-    <header
-      className={cn(
-        // Heller Format-Hero (AGE-450 #7): leichtgewichtig „wie die Startseite" statt
-        // des früheren dunklen from-chrome-Verlaufs, der zu schwer wirkte. Rein
-        // token-getrieben (bg-accent-soft/text-ink) → trägt jede Design-Variante hell.
-        // Bewusst flach (kein Schatten), damit der Hero nicht wieder Gewicht bekommt.
-        "mb-8 rounded-[var(--radius-card)] border border-accent/40 bg-accent-soft/20 px-6 py-10",
-        className,
-      )}
-    >
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">{meta.title}</h1>
-      <p className="mt-2 max-w-xl text-muted">{meta.claim}</p>
-    </header>
+    <PageHero
+      image={meta.image}
+      title={meta.title}
+      subtitle={meta.claim}
+      className={className ?? "mb-8"}
+    />
   );
 }
