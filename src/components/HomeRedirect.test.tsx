@@ -50,13 +50,20 @@ describe("Erstlogin (AGE-494)", () => {
       hasResponses: false,
     } as Awaited<ReturnType<typeof compass.fetchCompassStatus>>);
 
+    // Das Fehlschlagen der Dashboard-Abfrage wird ERZWUNGEN, nicht abgewartet.
+    // Vorher hing der Test daran, dass der echte Supabase-Aufruf in der
+    // Testumgebung von selbst scheitert — lokal in Millisekunden, in CI langsamer
+    // als das 1000-ms-Fenster von `findByText`. Genau so ist er in CI umgefallen,
+    // ohne dass sich am Verhalten etwas geändert hätte.
+    const dashboard = await import("../lib/dashboard");
+    vi.spyOn(dashboard, "fetchDashboard").mockRejectedValue(new Error("kein Netz im Test"));
+
     renderAt("/", authAsTier("basic"));
 
     // Auf ein Signal warten, das NUR der Nicht-Assistenten-Pfad erzeugt. Die
     // Shell-Navigation taugt dafür nicht: sie steht auch, während die alte Weiche
-    // noch entscheidet, und der Test wäre wieder blind. Das Dashboard versucht zu
-    // laden und meldet in der Testumgebung seinen Fehler — genau dieser Text
-    // erscheint nur, wenn `/` das Dashboard gerendert hat statt umzuleiten.
+    // noch entscheidet, und der Test wäre wieder blind. Dieser Text erscheint nur,
+    // wenn `/` das Dashboard gerendert hat statt umzuleiten.
     expect(
       await screen.findByText("Dashboard konnte nicht geladen werden. Bitte neu laden."),
     ).toBeInTheDocument();
