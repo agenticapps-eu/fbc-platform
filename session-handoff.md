@@ -1,94 +1,82 @@
-# Session Handoff — 2026-07-16 (AGE-300 + AGE-358, zwei PRs offen)
+# Session Handoff — 2026-08-04
 
 ## Accomplished
 
-Zwei zusammenhängende Features gebaut, beide mit offenem PR, beide grün und browser-verifiziert.
+Change C1 des eff.bee.zee-Go-Live (**AGE-492**) vollständig implementiert, auf
+Branch `donald/age-492-c1-design-system-blau-statt-gold`, 6 Commits.
 
-**AGE-358 (Admin liest QM-Feedback)** — **PR #72**, gestapelt auf #71 (Branch
-`donald/age-358-admin-liest-qm-feedback-seed-sicht`, von AGE-300 abgezweigt). Gibt der
-`feedback_admin_read`-Policy einen Nutzer + Oberfläche. Teil A: `supabase/seed/admin_roles.sql`
-(weist admin per E-Mail-Lookup zu, KEINE Accounts/Passwörter, E-Mail-Platzhalter, manuell,
-ADR-0002). Teil B: RPC `admin_list_feedback()` (SECURITY DEFINER, Feedback + Autor-Name nur wenn
-is_admin — RPC statt Join, weil die profiles-RLS sonst Autor-Namen verbärge) + `<Card>` „QM-Feedback"
-in /einstellungen, nur für `staffRole === 'admin'`. pgTAP 47/47, Frontend 193/193. **Browser
-end-to-end belegt:** Admin sieht die Card mit Eintrag (★★★★☆, Texte, „QA Tester · /compass",
-Datum); nach Entzug der admin-Rolle verschwindet die Card beim selben Nutzer (Gating greift live).
-**Wichtig:** GitHub richtet #72 nach dem Merge von #71 automatisch auf `main` um — **#71 zuerst mergen**.
+- OpenSpec-Change `redesign-blue-theme-system` angelegt: proposal.md, tasks.md,
+  neue Capability `design-system` (6 Requirements), `member-profiles` erweitert.
+  `openspec validate --all` grün (25/25).
+- **Umbenennung** gold→accent (237 Treffer/57 Dateien) und night→chrome
+  (55/15) als eigener, verhaltensneutraler erster Commit.
+- **Blau-Token-System**, zwei Themes (hell/navy), `index.css` 661→165 Zeilen
+  (+ Font-Block). Zwölf Varianten, Backdrops, Glow-Effekte, `--accent2`,
+  `--color-fmt-*` entfernt.
+- **`member_settings.theme`** (Migration + 6 pgTAP-Assertions), Theme-Auflösung
+  über localStorage + Server, Umschalter in den Einstellungen.
+- **Marke:** `CompassMark` ersetzt `CrownMark`, Logo ohne `tone`/PNG, neues
+  Favicon. Kronen-Assets gelöscht.
+- **Fonts selbst gehostet** (4 woff2, 260 kB) — kein Fremd-CDN mehr.
+- **CI-Gate** für beide grep-Kriterien, per Sonde als wirksam belegt.
+- **WCAG AA gemessen** in beiden Themes; zwei echte Kontrastfehler gefunden
+  und behoben.
 
-**AGE-300 (QM-Feedback-MVP)** — **PR #71**, Branch
-`donald/age-300-qm-feedback-mvp-sterne-3-fragen-route-kontext`, 9 Commits (inkl. Button-Fix:
-Feedback-Button höher, weicht dem Design-Switcher aus — aus der Browser-Abnahme). Erster Schritt
-aus Spec §3.5 des 6-Level-Upgrade-Specs — Stripe (§3.1-3.4) bleibt offen.
-
-Ablauf: Brainstorming → Design-Spec → Plan → 5 Tasks subagent-getrieben, jeder mit eigenem
-Task-Review (opus), dann Gesamt-Review über den Branch. Ledger: `.superpowers/sdd/progress.md`.
-
-**Was das Feature tut:** Schwebender „Feedback"-Button (nur für eingeloggte Nutzer, überall
-im AppShell), öffnet einen Dialog mit ⭐-Bewertung + drei Fragen (gefällt/fehlt/Idee). Route
-wird automatisch mitgeschrieben. Ein `admin` liest alles, jeder andere nur sein eigenes.
-
-**Stand:** pgTAP 41/41 · Score-Probe alle Spalten grün · Frontend 187/187 · typecheck sauber
-· lint 0 Fehler. Lokales Supabase läuft.
+283 Tests grün, lint/typecheck/build grün.
 
 ## Decisions
 
-- **Plattformweit statt aktionsgebunden** — die `feedback`-Tabelle (AGE-234) ist auf
-  event/match/course gebaut, §3.5 fragt aber die Plattform ab. `ref_type`/`ref_id` bleiben
-  bei diesen Zeilen NULL. Vier Spalten additiv (`likes/misses/idea/route`), keine zweite Tabelle.
-- **`is_admin()` eng auf `role='admin'`**, nicht `is_matching_manager()` mitbenutzt: QM ist
-  nicht die Deal-Queue (ADR-0002). Quelle bleibt `staff_roles`, nie das member-writable
-  `profiles.roles`.
-- **Score-Bug mitgefixt** (kein eigener Task ursprünglich): `recompute_potential_score()`
-  mittelte `avg(rating)` über `feedback.profile_id` OHNE `ref_type`-Filter — ein Gast hätte
-  mit seiner Plattform-Bewertung seinen EIGENEN Potenzial-Score verstellt. `and ref_type is
-not null` ergänzt. Die bestehende `probe_potential_score.sql` hat den Bug die ganze Zeit
-  dokumentiert (Fixture ohne ref_type, erwartet 54); Probe scharf gestellt: ohne Fix 50, mit 54.
-- **is_admin()-Lockdown** (Gesamt-Review-Fund): `revoke execute from public, anon` fehlte —
-  jede Schwesterfunktion hat es (AGE-312-Klasse). Nachgezogen + pgTAP-Assertion.
-- **Kein Nav-Eintrag** — `nav.test.ts` nagelt 6+5+1 an Spec §2; schwebender Button statt Menü.
+- **night→chrome mitumbenannt** — auf Donalds Entscheidung, bewusst gegen
+  AGE-492s „ein Massen-Rename reicht". Grund: `--color-night` bedeutet im hellen
+  Theme Weiß.
+- **`linkedin` ganz entfernt** statt „unerreichbar behalten" (AGE-492 §3) — ohne
+  CSS-Block, Route und Vision-App wäre es ein toter Enum-Wert.
+- **Theme hat einen eigenen schmalen Schreibpfad**, nicht ein Feld in
+  `MemberSettings`: `saveMemberSettings` upsertet alle Präferenzen und würde das
+  Theme mit einem veralteten Cache-Wert überschreiben (Lehre aus AGE-313).
+- **Server-Write hängt an der Handlung** (`EinstellungenPage`), nicht an einem
+  Effect über `variant`. Aus einem Effect abgeleitet überschrieb die lokale Wahl
+  beim Login den Serverwert — der Test hat das gefunden, nicht ein Review.
+- **`ThemeServerSync` sitzt neben dem Provider**, nicht darin: Auth+Query im
+  Provider zwangen jeden Seitentest, beide mitzubringen.
+- **TierBadge behält 3 Gewichte** statt der 6 `--tier-*` der Vorlage — die
+  bestehende Entscheidung ist im Code begründet, und niemand hat sie infrage
+  gestellt.
 
 ## Files modified
 
-- `supabase/migrations/20260716070000_platform_feedback.sql` — 4 Spalten, `is_admin()`,
-  `feedback_admin_read`, Score-Filter, Lockdown.
-- `supabase/tests/rls_test.sql` — Admin-Lesetests + anon-Lockdown-Test (plan 31→38).
-- `supabase/tests/probe_potential_score.sql` — Fixture auf `ref_type='event'` + Plattform-Zeile.
-- `src/lib/feedback.ts` (+test), `src/lib/database.types.ts` (4 Spalten von Hand ergänzt).
-- `src/components/feedback/FeedbackButton.tsx` (+test), `src/components/AppShell.tsx`,
-  `src/App.test.tsx` (ToastProvider-Harness-Fix).
-- Doku: `docs/superpowers/specs/2026-07-16-qm-feedback-design.md`,
-  `docs/superpowers/plans/2026-07-16-qm-feedback.md`.
+- `src/index.css` — komplett neu (Tokens, navy-Override, @font-face)
+- `src/config/designVariants.ts`, `src/providers/{DesignVariantProvider,design-variant-context}` — auf zwei Themes reduziert
+- `src/providers/ThemeServerSync.tsx` (+ Test) — neu
+- `src/components/ui/`: `CompassMark.tsx` neu, `Logo.tsx` neu geschrieben, `CrownMark.tsx` gelöscht
+- `src/pages/{EinstellungenPage,StyleguidePage}.tsx`
+- `supabase/migrations/20260804120000_member_settings_theme.sql`, `supabase/tests/rls_test.sql`
+- `index.html`, `.github/workflows/ci.yml`, `docs/design-system.md`
+- `public/fonts/*` (4 neu), `public/brand/*` (Krone raus, Kompass rein)
 
 ## Next session: start here
 
-**Zwei gestapelte PRs mergen — Reihenfolge zählt.** Erst **#71 (AGE-300)**, dann **#72
-(AGE-358)** (GitHub richtet #72 nach dem #71-Merge automatisch auf `main` um). Merge braucht
-hier je eine Freigabe, die den PR beim Namen nennt (öffentliches Repo, Sicherheits-Klassifikator).
-Nach jedem Merge die **Prod-Migration von Hand anwenden** (CI zieht nicht nach): erst
-`20260716070000_platform_feedback.sql`, dann `20260716103000_admin_feedback_rpc.sql`.
-Danach AGE-300 und AGE-358 auf Done.
-
-**Admins scharf schalten** (fürs Sommerfest): `supabase/seed/admin_roles.sql` mit den ECHTEN
-E-Mails von Detlev und Donald gegen die Prod-DB fahren (SQL-Editor oder psql -v). Wirkt erst,
-wenn die beiden sich registriert haben.
+**Zuerst die pgTAP-Suite laufen lassen** — sie ist der einzige ungeprüfte Teil.
+Port 54322 war von cparx belegt, deshalb konnte `supabase start` hier nicht
+booten. Also: cparx-Stack stoppen (`supabase stop --project-id cparx`) oder in
+`supabase/config.toml` einen anderen Port setzen, dann
+`supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql`.
+Besonders `grants_test.sql` — dessen Golden-Snapshot ist bei Schema-Ergänzungen
+schon einmal gebrochen (AGE-455). Danach PR öffnen.
 
 ## Open questions
 
-- **Beide Browser-Abnahmen ERLEDIGT** (2026-07-16, localhost gegen die LOKALE DB — Infisical
-  umgangen, indem vite direkt mit den lokalen VITE*SUPABASE*\*-Werten gestartet wurde).
-  AGE-300: Button rendert, Dialog mit Sternen + drei Fragen, Absenden ohne Sterne gesperrt →
-  nach 4 Sternen aktiv, DB-Zeile trägt rating=4, die drei Texte, route, ref_type NULL. AGE-358:
-  Admin sieht die QM-Feedback-Card mit Eintrag inkl. Autor; nach Rollen-Entzug verschwindet sie.
-- **Button-Overlap GELÖST** (AGE-300, Button-Fix-Commit): Feedback-Button auf `bottom-20`
-  gesetzt, sitzt jetzt klar über dem AGE-237-Design-Switcher. Browser-bestätigt.
-- **`admin` in `staff_roles` GELÖST** (AGE-358): `admin_roles.sql` schaltet Admins frei. Muss
-  nur noch mit echten E-Mails gegen Prod gefahren werden (s. „Next session").
-- **Prod-Migration** muss ein Mensch anwenden (CI zieht nicht nach) — jetzt ZWEI Migrationen.
-- **Follow-ups** (nicht in diesem Branch): UPDATE-Pfad auf `feedback` ungetestet; Score-Probe
-  läuft nicht in CI (kein Regressionsschutz für den Filter); `database.types.ts` divergiert
-  generell von der CLI (Team-Backlog).
-- **AGE-311-Doku-Altlast** unverändert offen: `demo-script.md`, `tier-testing.md`,
-  `demo-zugang.md` beschreiben noch „Discover → Prime → Legacy". Immer noch ohne Issue.
-- **Branch `donald/age-314-nav-ia-umbau`** liegt weiter lokal + auf origin, obwohl #67 gemergt.
-- Ältere Ränder aus dem AGE-314-Handoff unverändert (`.planning/` nicht gitignored im public
-  Repo, `is_public` Default true, TLS beim Seed, Design-Variant-Switcher).
+- **`docs/design-system.html` ist untracked** (Rechte 0600) und wird von
+  proposal.md, tasks.md und `docs/design-system.md` als verbindliche Vorlage
+  referenziert. Soll sie ins (öffentliche) Repo? Bewusst nicht eingecheckt.
+- **Zwei Hook-Overrides** waren nötig: `design-shotgun-gate` und
+  `database-sentinel`. Beide verlangen ein Sentinel unter `.planning/`, das die
+  globale CLAUDE.md als schreibverboten führt; der zweite verweist zusätzlich
+  auf `/gsd-discuss-phase`, das es nicht mehr gibt. Als **AGE-493** gemeldet.
+- **`run-plan-review.sh` lief nicht** — der Spec-Delta ging ungeprüft in die
+  Umsetzung (Stage 2 ist seit Gate 2.0.0 nicht erzwungen).
+- **`DesignSwitcher` ist jetzt totes Gewicht**: nicht gemountet, für zwei Themes
+  umgebaut, Funktion von den Einstellungen übernommen. Löschkandidat für C2.
+- Der alte `CrownIcon` (Rang-Symbol in `profil-widgets`/`ProfileHero`) ist
+  geblieben — gehört nicht zum Logo, aber eine Krone passt nach dem Rebrand
+  nicht mehr. Kandidat für C2/C6.
