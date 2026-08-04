@@ -14,6 +14,13 @@ It carries no access-control meaning: it selects a presentation and SHALL NOT ga
 what any member may read or write. It is governed by the existing owner-only policy
 and the table's existing grants — the column adds no new policy and no new grant.
 
+Owner-only describes the stored row. The same choice is additionally mirrored into
+device-local `localStorage`, because the server value cannot arrive before the first
+paint; that copy is readable by anything running on the device and is deliberately
+not account-scoped. This is stated rather than fixed: the theme reveals nothing
+about the member, and the alternative — no local copy — costs every member a visible
+theme flash on every load.
+
 #### Scenario: Goals are invisible to everyone but the owner
 
 - **WHEN** any member other than the owner selects the owner's `goals` rows
