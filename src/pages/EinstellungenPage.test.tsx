@@ -110,6 +110,20 @@ describe("EinstellungenPage", () => {
     expect(mockedSave).not.toHaveBeenCalled();
   });
 
+  // AGE-492, aus dem Plan-Review (codex): der Server-Write war mit einem leeren
+  // catch abgefangen. Das Theme steht dann lokal auf navy, der Server auf hell —
+  // und der nächste Login holt still den alten Wert zurück. Der Fehlschlag muss
+  // also sichtbar sein; die lokale Wahl bleibt trotzdem stehen.
+  it("meldet einen fehlgeschlagenen Server-Write und behält das Theme lokal", async () => {
+    mockedSaveTheme.mockRejectedValue(new Error("offline"));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("switch", { name: /Dunkles Design/ }));
+
+    expect(await screen.findByText("Design nicht gespeichert")).toBeInTheDocument();
+    expect(document.documentElement.dataset.variant).toBe("navy");
+  });
+
   it("zeigt den Schalter aktiv, wenn navy läuft", async () => {
     localStorage.setItem("fbc.designVariant", "navy");
     renderPage();

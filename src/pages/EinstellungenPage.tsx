@@ -207,9 +207,18 @@ export default function EinstellungenPage() {
           onChange={(v) => {
             const next = v ? "navy" : "hell";
             setVariant(next);
+            // Der lokale Wechsel steht schon; scheitert der Server-Write, bleibt er
+            // stehen — aber stumm darf das nicht bleiben: Server und Gerät stünden
+            // dann auseinander, und der nächste Login holte den alten Wert zurück.
             void saveMemberTheme(uid, next)
               .then(() => queryClient.setQueryData(memberThemeQueryKey(uid), next))
-              .catch(() => {});
+              .catch(() =>
+                toast({
+                  variant: "error",
+                  title: "Design nicht gespeichert",
+                  description: "Die Wahl gilt auf diesem Gerät, aber nicht auf deinen anderen.",
+                }),
+              );
           }}
         />
       </Card>
