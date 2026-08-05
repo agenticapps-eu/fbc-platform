@@ -3,15 +3,15 @@
 > Gilt ab **AGE-496 / C4**. Löst den Zustand aus ADR-0003 ab (ein geteiltes
 > Projekt für dev und prod). Entscheidungsgrundlage: `docs/decisions/0004-split-prod-dev-supabase.md`.
 >
-> **Stand dieses Dokuments:** geschrieben während der Planung, bevor das
-> PROD-Projekt existierte. Jede Zeile mit `<prod-ref>` wird beim Anlegen
-> ausgefüllt. Wenn hier noch Platzhalter stehen, ist Task 6 nicht gelaufen.
+> **Stand dieses Dokuments:** 2026-08-05. Das PROD-Projekt existiert
+> (`viwntbodrtqxgmqyxluh`), Auth- und Storage-Konfiguration sind angewendet
+> und nachgemessen. Was noch aussteht, steht unter „Offene Nachläufe".
 
 ## Die zwei Projekte
 
 | | DEV/DEMO | PROD |
 |---|---|---|
-| Projekt-Ref | `foelowldexkcqzewvrcf` | `<prod-ref>` |
+| Projekt-Ref | `foelowldexkcqzewvrcf` | `viwntbodrtqxgmqyxluh` |
 | Region | `eu-central-1` | `eu-central-1` |
 | Organisation | `factiv` | `factiv` |
 | Inhalt | Demo-Personas (`@demo.fbc.invalid`) | **echte Mitglieder** |
@@ -27,9 +27,9 @@
 > Umzug in der Go-Live-Woche.
 
 **Die Rollen sind fest.** Es gibt keinen Schalter, der sie tauscht. Ein Wechsel
-ist immer: drei Werte in Infisical ändern (`VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON_KEY`, `SUPABASE_DB_PASSWORD`) plus Re-Deploy. Der Rückweg
-ist derselbe Handgriff rückwärts. Kein Anwendungscode kennt den Unterschied.
+ist immer: zwei Werte in Infisical ändern (`VITE_SUPABASE_URL`,
+`VITE_SUPABASE_ANON_KEY`) plus Re-Deploy. Der Rückweg ist derselbe Handgriff
+rückwärts. Kein Anwendungscode kennt den Unterschied.
 
 **Cloudflare-Pages-Umgebungsvariablen sind irrelevant.** Der Build läuft in
 GitHub Actions unter `infisical run`; Vite backt die `VITE_*`-Werte zur
@@ -53,7 +53,7 @@ Merge auf main
    └─ deploy          needs: [migrate-dev, drift-gate]
 
 Von Hand, wenn DEV es getragen hat:
-   └─ migrate-prod    workflow_dispatch + Freigabe (environment: production)
+   └─ migrate-prod    workflow_dispatch (Freigabe-Regel zurückgestellt, s. u.)
                       zeigt Host + Dry-Run VOR dem Anwenden
                       bricht ab, wenn migrate-dev für denselben Commit fehlt
                       führt den Drift-Scan mit aus
@@ -394,13 +394,20 @@ am Ende der Datei zeigt **genau zwei** Zeilen.
 Nicht Teil von C4. Der Handgriff:
 
 ```bash
-infisical secrets set VITE_SUPABASE_URL=https://<prod-ref>.supabase.co --env=prod
-infisical secrets set VITE_SUPABASE_ANON_KEY=<anon-key>                --env=prod
-infisical secrets set SUPABASE_DB_PASSWORD=<pwd>                       --env=prod
+infisical secrets set VITE_SUPABASE_URL=https://viwntbodrtqxgmqyxluh.supabase.co --env=prod
+infisical secrets set VITE_SUPABASE_ANON_KEY=<anon-key>                          --env=prod
 # dann Re-Deploy von main
 ```
 
-Rückweg: dieselben drei Werte zurück auf `foelowldexkcqzewvrcf`, Re-Deploy.
+Rückweg: dieselben zwei Werte zurück auf `foelowldexkcqzewvrcf`, Re-Deploy.
+
+> **Es sind zwei Werte, nicht drei.** Ein früherer Entwurf nannte hier auch
+> `SUPABASE_DB_PASSWORD`. Seit C4 bestimmt `SUPABASE_DB_URL_PROD` die
+> Datenbankverbindung, und die zeigt bereits auf das neue Projekt — der Umzug
+> betrifft nur noch das Frontend. `SUPABASE_DB_PASSWORD` in `prod` trägt
+> weiterhin das Passwort des **alten** Projekts und hat dort keinen
+> Verbraucher; der Demo-Seed liest es aus `dev`. Wer es aufräumt, prüfe
+> vorher `grep -rn SUPABASE_DB_PASSWORD`.
 
 **Verifiziert wird am Bundle, nicht an der Absicht** — die im Bundle gebackene
 `VITE_SUPABASE_URL` ist der Beleg. Ein Cache-Buster allein reicht nicht, ein 404
@@ -413,7 +420,7 @@ Deploy-URL hinterher.
 |---|---|---|
 | **Eigener SMTP (Resend) als Auth-Mailer** | **C3** | **Vorbedingung für den 17.08., nicht optional — siehe unten** |
 | `send-activation` deployen | C3 | existiert noch nicht — C4 deployt **drei** Functions, nicht vier |
-| Stripe-Webhook-URL auf `<prod-ref>` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
+| Stripe-Webhook-URL auf `viwntbodrtqxgmqyxluh` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
 | Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
 | Umzug der drei prod-Werte | Go-Live-Woche | siehe oben |
 | DEV regelmäßig aus PROD auffrischen | offen | bräuchte Anonymisierung — eigener Change |
