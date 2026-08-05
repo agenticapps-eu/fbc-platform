@@ -83,6 +83,31 @@ fahren (`20260613081749_avatars_drop_public_listing_policy`).
 nicht erreichbar, schlägt `drift-gate` fehl. Ein Gate, das bei Nichtwissen grün
 wird, baut die Juni-Havarie eine Ebene höher nach.
 
+### Das Gate ist abgenommen, nicht angenommen
+
+Am 2026-08-05 an `main` durchgespielt (AGE-496 Task 16.2, PR #113 → Revert #114).
+Ein grünes Gate beweist nichts; diese drei Läufe beweisen etwas:
+
+| Fall | `migrate-dev` | `drift-gate` | `deploy` |
+|---|---|---|---|
+| Migration lokal, auf PROD fehlend | success | **failure** | **skipped** |
+| Migration remote auf DEV, lokal fehlend | — | **failure** (gegen DEV geprüft) | — |
+| `migrate-dev` scheitert, PROD sauber | **failure** | success | **skipped** |
+
+Die dritte Zeile entstand ungeplant: der Revert ließ `migrate-dev` scheitern,
+weil DEVs Historie noch den Wegwerf-Eintrag trug. Der Ausweg steht in der
+Fehlermeldung der CLI selbst:
+
+```bash
+supabase migration repair --status reverted <version> --db-url "$SUPABASE_DB_URL_DEV"
+```
+
+**Merke für den Alltag:** Wird eine Migration zurückgenommen, nachdem
+`migrate-dev` sie schon angewendet hat, ist DEVs Historie voraus. `migrate-dev`
+scheitert dann bei jedem weiteren Merge, bis jemand repariert. Das ist kein
+Fehler des Gates, sondern seine Aufgabe — aber man muss wissen, wo der Schalter
+sitzt.
+
 ### Kein Break-Glass — bewusst
 
 Sobald ein Merge eine Migration enthält, blockiert `drift-gate` **jeden**

@@ -535,24 +535,48 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       `migrate-dev` und `drift-gate` **übersprungen** und `deploy` lief
       trotzdem — die `!cancelled() && !contains(needs.*.result, 'failure')`
       -Logik stimmt. Sie war bis dahin ungetestet.
-- [ ] 16.2 **Das Gate wird echt geprüft, nicht angenommen.** Eine Wegwerf-
+- [x] 16.2 **Das Gate wird echt geprüft, nicht angenommen.** Eine Wegwerf-
       Migration lokal anlegen, ohne sie auf PROD anzuwenden → `drift-gate` muss
       rot werden und `deploy` verhindern. Danach zurücknehmen.
       Das ist die einzige Abnahme, die belegt, dass AGE-257 wirklich geschlossen
       ist — ein grünes Gate beweist nichts, ein rotes beweist alles.
-- [ ] 16.2a Die **andere** Drift-Richtung ebenso: eine Migration remote
+      **Erledigt 2026-08-05, PR #113 → Revert #114.** Wegwerf-Migration
+      `29991231235959` auf `main` gemergt, nicht auf PROD angewendet:
+      ``     drift-gate   failure   DRIFT — lokal vorhanden, auf dem Ziel fehlend: 29991231235959
+                           Migrationshistorie weicht ab. Erst `migrate-prod` freigeben.
+    deploy       skipped   ← verhindert
+    migrate-dev  success   ← auf DEV angewendet, die vorgesehene Generalprobe
+    ``
+      Nebenbei sichtbar im Log: `SUPABASE_DB_URL_PROD: ***` — GitHub maskiert
+      das Secret. Danach zurückgenommen, `main` wieder grün.
+- [x] 16.2a Die **andere** Drift-Richtung ebenso: eine Migration remote
       verzeichnen, die lokal fehlt → Gate muss ebenfalls rot werden. Gegen DEV
       proben, nicht gegen PROD.
-- [ ] 16.2b Fehlschlag von `migrate-dev` hält `deploy` an: einen Lauf gezielt
+      **Erledigt — und zwar mit einem echten Fall statt einem gestellten.** Nach
+      dem Revert von #113 trug DEV die Migration remote, lokal fehlte sie:
+      `DRIFT — auf dem Ziel vorhanden, lokal fehlend: 29991231235959`.
+      Danach `supabase migration repair --status reverted`, beide Projekte
+      wieder 40/40 abweichungsfrei.
+- [x] 16.2b Fehlschlag von `migrate-dev` hält `deploy` an: einen Lauf gezielt
       scheitern lassen und zeigen, dass `deploy` nicht startet, obwohl PROD
       abweichungsfrei ist.
+      **Erledigt, ungeplant — und dadurch aussagekräftiger.** Der Revert-Merge
+      ließ `migrate-dev` scheitern, weil DEVs Historie noch den Wegwerf-Eintrag
+      trug (`Remote migration versions not found in local migrations
+    directory`). Ergebnis genau wie verlangt:
+      `     migrate-dev  failure
+    drift-gate   success   ← PROD war abweichungsfrei
+    deploy       skipped   ← trotzdem angehalten
+    `
+      Nach der Reparatur und einem Neustart: alle drei grün.
 - [x] 16.3 Keine Demo-Personas auf PROD: Zählung über `profiles` und
       `auth.users` gegen die `@demo.fbc.invalid`-Adressen. Erwartung: null.
       **Erledigt 2026-08-05:** `@demo.fbc.invalid` in `auth.users` = **0**.
       Gesamtbestand PROD: 2 Konten (Donald, Detlev), 2 `profiles`, 0 `posts`,
       0 `events`. Es gibt keine `supabase/seed.sql`, und `--include-seed` weist
       `pnpm db:push:prod` ausdrücklich ab — der Weg existiert also gar nicht.
-- [ ] 16.4 `openspec validate --all` grün.
+- [x] 16.4 `openspec validate --all` grün.
+      **Erledigt:** 26/26. Dazu 387 Tests grün.
 - [ ] 16.5 `superpowers:requesting-code-review` in unabhängigem Kontext.
 - [ ] 16.6 Linear AGE-496 und AGE-257 auf den Stand bringen.
       _Die GitHub-Automation schaltet In Progress/Done bei PR-Öffnung und
