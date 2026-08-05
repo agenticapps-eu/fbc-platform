@@ -134,14 +134,19 @@ jobs:
       # Webhook-Trigger wandert nicht mit `db push`; verschwindet er, stirbt
       # der Mailversand still.
       #
-      # ⚠️ DB_SCAN_TLS_INSECURE: der Supabase-Pooler zeigt eine selbstsignierte
-      #    Kette, und die projekt-eigene CA gibt es nur ueber das Dashboard
-      #    (die frueher dokumentierte Sammel-URL antwortet 404). Die Verbindung
-      #    ist verschluesselt, der Server aber nicht authentifiziert. Das steht
-      #    hier sichtbar statt in einer Vorgabe versteckt — offener Nachlauf:
-      #    CA hinterlegen und DB_SCAN_CA_CERT setzen.
+      # Der Server wird authentifiziert, nicht nur die Verbindung verschluesselt.
+      # Die Kette des Poolers ist NICHT projekt-eigen: sie endet bei der
+      # "Supabase Root 2021 CA" (gueltig bis 26.04.2031), die oeffentlich unter
+      # supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt
+      # liegt. Ein oeffentliches Wurzelzertifikat ist kein Geheimnis — es liegt
+      # deshalb als Datei im Repo statt als Secret. Das ist auch der Grund,
+      # warum hier ein PFAD steht: `db-drift-scan.ts` liest ihn mit
+      # `readFileSync`, ein Secret waere eine Zeichenkette und wuerde scheitern.
+      # Belegt am 05.08.2026 gegen den Live-Pooler: ohne CA scheitert die
+      # Verbindung mit SELF_SIGNED_CERT_IN_CHAIN, mit CA erst an der
+      # Postgres-Anmeldung — also nach bestandener Zertifikatspruefung.
       - name: Objekt-Drift-Scan
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-          DB_SCAN_TLS_INSECURE: "1"
+          DB_SCAN_CA_CERT: scripts/supabase-root-2021-ca.crt
         run: pnpm tsx scripts/db-drift-scan.ts
