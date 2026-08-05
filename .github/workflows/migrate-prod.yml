@@ -1,0 +1,116 @@
+name: Migrate PROD
+
+# Migrationen auf das PROD-Supabase-Projekt anwenden — nur von Hand, nur mit
+# Freigabe (AGE-496 Task 4.3, schliesst AGE-257).
+#
+# Warum PROD nicht automatisch laeuft: ein DDL-Rollback ist kein `git revert`.
+# DEV traegt ausserdem Demo-Personas — alles, was an der BESCHAFFENHEIT echter
+# Daten haengt (Dubletten unter einem neuen Unique-Index, gewachsene Altwerte,
+# die ein neuer Check ablehnt), sieht der DEV-Lauf nie. Der Dry-Run unten wird
+# deshalb GELESEN, nicht durchgeklickt.
+#
+# Eigener Workflow statt eines Jobs in deploy.yml: ein `workflow_dispatch` dort
+# loeste auch einen Deploy aus, und deploy.yml's `cancel-in-progress: true`
+# duerfte nie eine laufende PROD-Migration abbrechen.
+on:
+  workflow_dispatch:
+
+# Nie zwei Migrationslaeufe gleichzeitig — und ein laufender wird NICHT
+# abgebrochen.
+concurrency:
+  group: migrate-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read # um den migrate-dev-Lauf desselben Commits nachzuschlagen
+
+jobs:
+  # Alles Lesbare entsteht hier, VOR der Freigabe: der aufgeloeste Zielhost,
+  # der Drift-Vergleich und der Dry-Run. Die Freigabe unten wird auf dieses Log
+  # erteilt, nicht auf eine Absichtserklaerung.
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+
+      # Was DEV nicht getragen hat, geht nicht auf PROD. Ohne diese Pruefung
+      # waere die Reihenfolge DEV->PROD eine Bitte statt einer Zusage.
+      - name: Belegen, dass migrate-dev fuer DIESEN Commit gruen war
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          runs="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+            --jq '.workflow_runs[] | select(.path == ".github/workflows/deploy.yml") | .id')"
+          if [ -z "$runs" ]; then
+            echo "::error::Kein deploy.yml-Lauf fuer $SHA gefunden. Ist der Commit auf main?"
+            exit 1
+          fi
+          ok=0
+          for id in $runs; do
+            conclusion="$(gh api "repos/$REPO/actions/runs/$id/jobs" \
+              --jq '.jobs[] | select(.name == "migrate-dev") | .conclusion')"
+            echo "Lauf $id -> migrate-dev: ${conclusion:-<nicht vorhanden>}"
+            case "$conclusion" in *success*) ok=1 ;; esac
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Fuer $SHA liegt kein erfolgreicher migrate-dev-Lauf vor. PROD kommt nach DEV, nicht davor."
+            exit 1
+          fi
+
+      - name: Zielhost aufloesen
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL_PROD:-}" ]; then
+            echo "::error::SUPABASE_DB_URL_PROD fehlt."
+            exit 1
+          fi
+          # Nur der Projekt-Ref wird gezeigt, nie die URL — sie traegt das Passwort.
+          expected="$(tr -d '[:space:]' < scripts/prod-project-ref.txt)"
+          actual="$(printf '%s' "$SUPABASE_DB_URL_PROD" | grep -oE 'db\.[a-z]{20}\.supabase\.co' | head -1)"
+          echo "Sollwert (scripts/prod-project-ref.txt): $expected"
+          echo "Ziel aus SUPABASE_DB_URL_PROD:           ${actual:-<nicht ableitbar>}"
+          if [ "db.$expected.supabase.co" != "$actual" ]; then
+            echo "::error::Ziel und Sollwert stimmen nicht ueberein. Abbruch vor jeder weiteren Ausgabe."
+            exit 1
+          fi
+
+      - name: Migrationshistorie vergleichen
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: ./scripts/migration-drift-gate.sh || true # hier informativ: die Abweichung IST der Anlass
+
+      - name: Was angewendet wuerde (--dry-run)
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL_PROD" --dry-run
+
+  # Startet erst, wenn ein erforderlicher Freigebender das Log von `plan`
+  # gesehen und zugestimmt hat (Environment `production`, kein Skip-Flag).
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+
+      - name: Migrationen anwenden
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL_PROD"
+
+      - name: Historie nachher — muss abweichungsfrei sein
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: ./scripts/migration-drift-gate.sh

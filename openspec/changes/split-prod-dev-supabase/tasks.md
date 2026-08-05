@@ -129,11 +129,11 @@ für beides — das war zirkulär.
 
 ## 4. AGE-257 — die drei Jobs
 
-- [ ] 4.1 `migrate-dev` in `deploy.yml`: `if: github.ref ==
+- [x] 4.1 `migrate-dev` in `deploy.yml`: `if: github.ref ==
 'refs/heads/main'`, `supabase db push --db-url $SUPABASE_DB_URL_DEV`.
       **Nicht auf Pull Requests** — sonst mutiert jeder offene PR das
       DEV-Projekt mit ungereviewten Migrationen.
-- [ ] 4.2 `drift-gate`: vollständiger Vergleich der Migrationshistorie gegen
+- [x] 4.2 `drift-gate`: vollständiger Vergleich der Migrationshistorie gegen
       PROD, **in beide Richtungen** — lokal-fehlend, remote-fehlend und
       abweichende Reihenfolge sind alle Drift (Entscheidung 15). Nur „lokal
       vorhanden, remote fehlend" zu prüfen ginge an dem Fall vorbei, den
@@ -141,20 +141,34 @@ für beides — das war zirkulär.
       **Muss fehlschlagen, wenn es nicht messen kann** (Secret fehlt, DB nicht
       erreichbar). Ein Gate, das bei Nichtwissen grün wird, baut die
       Juni-Havarie eine Ebene höher nach.
-- [ ] 4.3 `migrate-prod`: `workflow_dispatch`, `environment: production` mit
+- [x] 4.3 `migrate-prod`: `workflow_dispatch`, `environment: production` mit
       Freigabepflicht (Entscheidung 13). Gibt **vor** dem Anwenden den
       aufgelösten Host und den `--dry-run` ins Log — die Freigabe wird auf
       etwas Lesbares erteilt. Bricht ab, wenn für denselben Commit kein
       erfolgreicher `migrate-dev`-Lauf vorliegt. Führt den Drift-Scan aus
       Task 12 mit aus.
-- [ ] 4.4 `deploy` bekommt `needs: [migrate-dev, drift-gate]` — **beide**,
+      **Teilweise:** Der Drift-Scan aus Task 12 existiert noch nicht; der Job
+      faehrt bereits das Migrations-Drift-Gate mit. Der Objekt-Drift-Scan
+      (`scripts/db-drift-scan.sh`) wird in Task 12.2 nachgezogen.
+      **Abweichung, bewusst:** eigener Workflow `migrate-prod.yml` statt eines
+      Jobs in `deploy.yml`, und zwei Jobs (`plan` -> Freigabe -> `apply`).
+      Grund: ein `workflow_dispatch` in `deploy.yml` loeste auch einen Deploy
+      aus, dessen `cancel-in-progress: true` eine laufende PROD-Migration
+      abbrechen duerfte. Und die Freigabe greift VOR dem Job — nur mit
+      getrenntem `plan` steht der Dry-Run im Log, wenn freigegeben wird.
+- [x] 4.4 `deploy` bekommt `needs: [migrate-dev, drift-gate]` — **beide**,
       damit ein Fehlschlag der Frühwarnung nicht lautlos bleibt.
-- [ ] 4.5 Alle neuen Jobs in die bestehende `concurrency`-Gruppe; `drift-gate`
+- [x] 4.5 Alle neuen Jobs in die bestehende `concurrency`-Gruppe; `drift-gate`
       misst gegen denselben `github.sha`, den `deploy` ausliefert.
 - [ ] 4.6 `production`-Environment auf GitHub anlegen, mit Donald als
       erforderlichem Freigebenden. **Kein Skip-Flag, keine Ausnahme**
       (Entscheidung 16).
-- [ ] 4.7 **Verifikation:** `actionlint` bzw. `gh workflow view` parst die
+      **OFFEN — von Claude aus nicht ausfuehrbar.** Der Schreibzugriff auf die
+      Repo-Settings ist geblockt. Donald legt das Environment an, Befehl steht
+      im Runbook. Ohne diesen Schritt laeuft `migrate-prod` durch, OHNE dass
+      jemand freigibt — der Job wartet nur, wenn das Environment eine
+      Reviewer-Regel traegt. Muss vor Task 7 erledigt sein.
+- [x] 4.7 **Verifikation:** `actionlint` bzw. `gh workflow view` parst die
       Datei. Der Beleg, dass das Gate greift, entsteht erst in Task 16 — hier
       wird nur die Syntax abgenommen, und das wird auch so gesagt.
 
