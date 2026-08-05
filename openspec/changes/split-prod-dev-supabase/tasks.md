@@ -543,10 +543,10 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       **Erledigt 2026-08-05, PR #113 → Revert #114.** Wegwerf-Migration
       `29991231235959` auf `main` gemergt, nicht auf PROD angewendet:
       ``     drift-gate   failure   DRIFT — lokal vorhanden, auf dem Ziel fehlend: 29991231235959
-                           Migrationshistorie weicht ab. Erst `migrate-prod` freigeben.
-    deploy       skipped   ← verhindert
-    migrate-dev  success   ← auf DEV angewendet, die vorgesehene Generalprobe
-    ``
+                         Migrationshistorie weicht ab. Erst `migrate-prod` freigeben.
+  deploy       skipped   ← verhindert
+  migrate-dev  success   ← auf DEV angewendet, die vorgesehene Generalprobe
+  ``
       Nebenbei sichtbar im Log: `SUPABASE_DB_URL_PROD: ***` — GitHub maskiert
       das Secret. Danach zurückgenommen, `main` wieder grün.
 - [x] 16.2a Die **andere** Drift-Richtung ebenso: eine Migration remote
@@ -563,11 +563,11 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       **Erledigt, ungeplant — und dadurch aussagekräftiger.** Der Revert-Merge
       ließ `migrate-dev` scheitern, weil DEVs Historie noch den Wegwerf-Eintrag
       trug (`Remote migration versions not found in local migrations
-    directory`). Ergebnis genau wie verlangt:
+  directory`). Ergebnis genau wie verlangt:
       `     migrate-dev  failure
-    drift-gate   success   ← PROD war abweichungsfrei
-    deploy       skipped   ← trotzdem angehalten
-    `
+  drift-gate   success   ← PROD war abweichungsfrei
+  deploy       skipped   ← trotzdem angehalten
+  `
       Nach der Reparatur und einem Neustart: alle drei grün.
 - [x] 16.3 Keine Demo-Personas auf PROD: Zählung über `profiles` und
       `auth.users` gegen die `@demo.fbc.invalid`-Adressen. Erwartung: null.
@@ -578,7 +578,18 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 - [x] 16.4 `openspec validate --all` grün.
       **Erledigt:** 26/26. Dazu 387 Tests grün.
 - [ ] 16.5 `superpowers:requesting-code-review` in unabhängigem Kontext.
-- [ ] 16.6 Linear AGE-496 und AGE-257 auf den Stand bringen.
+- [x] 16.6 Linear AGE-496 und AGE-257 auf den Stand bringen.
       _Die GitHub-Automation schaltet In Progress/Done bei PR-Öffnung und
       -Merge selbst — erst `get_issue` lesen, dann entscheiden, ob überhaupt
       geschrieben werden muss._
+      **Erledigt 2026-08-05, und das Lesen hat sich gelohnt:**
+      **AGE-496** braucht keinen Statusschreib — die Automation hat ihn im Takt
+      der vier PRs viermal zwischen `In Progress` und `Done` geschaltet. Nur ein
+      Kommentar mit der Abnahme, inklusive **drei Stellen, an denen die
+      Abnahme-Liste des Issues nicht mehr stimmt** (vier Edge Functions → drei ·
+      Echt-Link-Probe erst zur Go-Live-Woche · Umzug betrifft zwei Werte, nicht
+      drei).
+      **AGE-257 dagegen stand noch auf `Backlog`** und hatte keine Anhänge — die
+      Automation hat es nie angefasst, weil kein PR-Titel es nennt. Von Hand auf
+      `Done` gesetzt, mit Kommentar (Variante C, die drei Abnahme-Läufe, der
+      CLI-Formatwechsel) und beiden PRs verlinkt.
