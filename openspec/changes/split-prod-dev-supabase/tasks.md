@@ -160,14 +160,22 @@ für beides — das war zirkulär.
       damit ein Fehlschlag der Frühwarnung nicht lautlos bleibt.
 - [x] 4.5 Alle neuen Jobs in die bestehende `concurrency`-Gruppe; `drift-gate`
       misst gegen denselben `github.sha`, den `deploy` ausliefert.
-- [ ] 4.6 `production`-Environment auf GitHub anlegen, mit Donald als
-      erforderlichem Freigebenden. **Kein Skip-Flag, keine Ausnahme**
-      (Entscheidung 16).
-      **OFFEN — von Claude aus nicht ausfuehrbar.** Der Schreibzugriff auf die
-      Repo-Settings ist geblockt. Donald legt das Environment an, Befehl steht
-      im Runbook. Ohne diesen Schritt laeuft `migrate-prod` durch, OHNE dass
-      jemand freigibt — der Job wartet nur, wenn das Environment eine
-      Reviewer-Regel traegt. Muss vor Task 7 erledigt sein.
+      **Abweichung, bewusst:** gilt für `migrate-dev` und `drift-gate` (sie
+      liegen in `deploy.yml` und erben die Gruppe). `migrate-prod` bekommt eine
+      **eigene** Gruppe mit `cancel-in-progress: false` — in der geteilten
+      Gruppe dürfte ein neuer Deploy eine laufende PROD-Migration abbrechen.
+- [x] 4.6 ~~`production`-Environment auf GitHub anlegen, mit Donald als
+      erforderlichem Freigebenden.~~
+      **ZURÜCKGESTELLT (Donald, 2026-08-05).** Entscheidung 16 eingeschränkt:
+      Donald ist derzeit der einzige Entwickler, eine Freigabe an sich selbst
+      ist keine zweite Instanz. `environment: production` bleibt im Workflow
+      stehen, trägt aber keine Reviewer-Regel.
+      _Was dadurch nicht mehr trägt: die Pause zwischen „Log gelesen" und
+      „angewendet". `apply` läuft direkt hinter `plan` los — der Dry-Run steht
+      im Log, aber niemand muss ihn angesehen haben. Es bleibt: Handauslöser,
+      Beleg für `migrate-dev` desselben Commits, Host und Dry-Run im Log._
+      **Sobald ein zweiter Mensch am Repo arbeitet, nachziehen** — Befehl im
+      Runbook, Abschnitt „Migrationen von Hand auf PROD".
 - [x] 4.7 **Verifikation:** `actionlint` bzw. `gh workflow view` parst die
       Datei. Der Beleg, dass das Gate greift, entsteht erst in Task 16 — hier
       wird nur die Syntax abgenommen, und das wird auch so gesagt.

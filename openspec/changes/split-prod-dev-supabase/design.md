@@ -106,9 +106,13 @@ C unten).
 deploy.yml
   migrate-dev   (push main)           db push --db-url $SUPABASE_DB_URL_DEV
   drift-gate    (push main)           migration list gegen PROD → Diff = exit 1
-  migrate-prod  (workflow_dispatch)   db push --db-url $SUPABASE_DB_URL_PROD
-                                      environment: production (Freigabe nötig)
   deploy        needs: [migrate-dev, drift-gate]
+
+migrate-prod.yml  (eigener Workflow, workflow_dispatch)
+  plan                                belegt migrate-dev für denselben Commit,
+                                      löst den Host auf, zeigt den Dry-Run
+  apply         needs: plan           db push --db-url $SUPABASE_DB_URL_PROD
+                                      environment: production
 ```
 
 Fünf Punkte, die beim Bauen leicht falsch laufen und deshalb hier stehen:
@@ -127,16 +131,37 @@ Fünf Punkte, die beim Bauen leicht falsch laufen und deshalb hier stehen:
   History-Reparatur von Hand fahren
   (`20260613081749_avatars_drop_public_listing_policy`). Das Gate vergleicht
   deshalb die vollständige Liste beidseitig.
-- **`migrate-prod` läuft in einer geschützten GitHub-Umgebung mit
-  Freigabepflicht.** Das ist das CI-Gegenstück zur getippten Bestätigung aus
-  Abschnitt B: ein `workflow_dispatch` allein zeigt keinen Host, keinen Dry-Run
-  und verlangt nichts. Zusätzlich gibt der Job den aufgelösten Host und den
-  Dry-Run ins Log aus, bevor er anwendet — die Freigabe wird auf etwas
-  Lesbares erteilt, nicht ins Blaue.
-- **Concurrency und Commit-Bindung.** Alle vier Jobs teilen sich die
-  bestehende `concurrency`-Gruppe, und `drift-gate` misst gegen denselben
-  `github.sha`, den `deploy` ausliefert. Sonst kann ein überholender Lauf einen
-  Stand freigeben, der nie deployt wird — oder umgekehrt.
+- **`migrate-prod` zeigt Host und Dry-Run, bevor es anwendet.** Das ist das
+  CI-Gegenstück zur getippten Bestätigung aus Abschnitt B: ein
+  `workflow_dispatch` allein zeigt keinen Host, keinen Dry-Run und verlangt
+  nichts.
+
+  > **Nachtrag 2026-08-05 (Donald), Entscheidung 16 eingeschränkt.** Die
+  > _geschützte GitHub-Umgebung mit Freigabepflicht_ wird **vorerst nicht**
+  > eingerichtet: Donald ist der einzige Entwickler, eine Freigabe an sich
+  > selbst ist keine zweite Instanz. `environment: production` bleibt im
+  > Workflow stehen, trägt aber keine Reviewer-Regel — GitHub legt die
+  > Umgebung beim ersten Lauf ungeschützt an.
+  >
+  > **Was dadurch trägt und was nicht.** Es trägt: `migrate-prod` bleibt ein
+  > Handauslöser, der Job belegt weiter, dass `migrate-dev` für denselben
+  > Commit grün war, und `plan` schreibt Host und Dry-Run ins Log, bevor
+  > `apply` startet. Es trägt **nicht** mehr: die Pause zwischen „Log
+  > gelesen" und „angewendet". Ohne Reviewer-Regel läuft `apply` direkt
+  > hinter `plan` los — der Dry-Run steht dann im Log, aber niemand muss ihn
+  > angesehen haben. Sobald ein zweiter Mensch am Repo arbeitet, gehört die
+  > Regel nachgezogen; der Befehl steht im Runbook.
+
+- **Concurrency und Commit-Bindung.** `migrate-dev` und `drift-gate` liegen in
+  `deploy.yml` und teilen dadurch dessen `concurrency`-Gruppe; `drift-gate`
+  misst gegen denselben `github.sha`, den `deploy` ausliefert. Sonst kann ein
+  überholender Lauf einen Stand freigeben, der nie deployt wird — oder
+  umgekehrt.
+
+  `migrate-prod` liegt in einem **eigenen** Workflow mit eigener Gruppe und
+  `cancel-in-progress: false`. Ein `workflow_dispatch` in `deploy.yml` löste
+  auch einen Deploy aus, und dessen `cancel-in-progress: true` dürfte nie eine
+  laufende PROD-Migration abbrechen.
 
 ### Die Folge, die niemand mag
 

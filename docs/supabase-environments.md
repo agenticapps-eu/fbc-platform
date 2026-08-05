@@ -123,6 +123,26 @@ und danach arbeitet *jeder* folgende Befehl gegen das neue — auch die, die man
 gedankenlos eintippt. `pnpm db:push` (ohne Suffix) hängt am verlinkten Projekt
 und ist deshalb ausschließlich für DEV.
 
+### Die Freigabe-Regel, die (noch) nicht gesetzt ist
+
+`migrate-prod.yml` trägt `environment: production`, aber die Umgebung hat
+**keine Reviewer-Regel** — zurückgestellt am 2026-08-05, weil Donald der
+einzige Entwickler ist und eine Freigabe an sich selbst keine zweite Instanz
+wäre.
+
+Konkret heißt das: `apply` startet direkt hinter `plan`. Der Zielhost und der
+Dry-Run stehen im Log, aber **niemand muss sie angesehen haben**, bevor
+angewendet wird. Was weiter trägt: der Handauslöser, der Nachweis, dass
+`migrate-dev` für denselben Commit grün war, und die Ausgabe selbst.
+
+Sobald ein zweiter Mensch am Repo arbeitet, gehört die Regel nachgezogen:
+
+```bash
+gh api -X PUT repos/agenticapps-eu/fbc-platform/environments/production \
+  -f "wait_timer=0" -F "prevent_self_review=false" \
+  -f "reviewers[][type]=User" -F "reviewers[][id]=<GitHub-User-ID>"
+```
+
 ## Rollback
 
 ### Eine Migration auf PROD zurücknehmen
