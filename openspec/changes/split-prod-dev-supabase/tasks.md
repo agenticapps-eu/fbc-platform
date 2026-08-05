@@ -285,17 +285,25 @@ at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
 
 - [x] 8.1 Prüfen, dass der `avatars`-Bucket auf PROD existiert (kommt aus
       `20260613081627_profile_editor_storage.sql` mit `db push`).
-- [~] 8.2 Einen Upload gegen PROD testen und danach **wieder löschen**.
-- [~] 8.3 **Verifikation:** Bucket vorhanden, Upload in den eigenen Ordner
-  erlaubt, Upload in einen fremden Ordner abgelehnt (die RLS-Policy ist der
-  eigentliche Prüfgegenstand, nicht die Existenz des Buckets). Keine
-  Demo-Avatare auf PROD — das ist gewollt.
-  **Teilweise erledigt 2026-08-05.** Bucket `avatars` steht (`public = true`),
-  und die drei Policies auf `storage.objects` sind da: `avatars_insert_own`
-  (WITH CHECK), `avatars_update_own`, `avatars_delete_own` — jeweils nur für
-  `authenticated` und nur im Ordner `(storage.foldername(name))[1] =
-  auth.uid()`. **Der Upload-Versuch selbst wandert hinter Task 11**: er
-  braucht eine echte Sitzung, und auf PROD gibt es noch keine Konten.
+- [x] 8.2 Einen Upload gegen PROD testen und danach **wieder löschen**.
+- [x] 8.3 **Verifikation:** Bucket vorhanden, Upload in den eigenen Ordner
+      erlaubt, Upload in einen fremden Ordner abgelehnt (die RLS-Policy ist der
+      eigentliche Prüfgegenstand, nicht die Existenz des Buckets). Keine
+      Demo-Avatare auf PROD — das ist gewollt.
+      **Teilweise erledigt 2026-08-05.** Bucket `avatars` steht (`public = true`),
+      und die drei Policies auf `storage.objects` sind da: `avatars_insert_own`
+      (WITH CHECK), `avatars_update_own`, `avatars_delete_own` — jeweils nur für
+      `authenticated` und nur im Ordner `(storage.foldername(name))[1] =
+auth.uid()`. **Der Upload-Versuch selbst wandert hinter Task 11**: er
+      braucht eine echte Sitzung, und auf PROD gibt es noch keine Konten.
+      **Nachgeholt 2026-08-05, nach Task 11.** In einer Sitzung als
+      `donald@factiv.eu`: Ablage im **eigenen** Ordner (`<uid>/avatar.png`) erlaubt,
+      Ablage im **fremden** Ordner (Detlevs uid) abgelehnt mit
+      `new row violates row-level security policy for table "objects"`. Beide
+      Versuche zurückgerollt, Bucket danach leer.
+      _Geprüft ist damit die RLS-Policy — der eigentliche Prüfgegenstand laut 8.3 —
+      nicht der HTTP-Weg der Storage-API. Der bräuchte ein echtes JWT und damit ein
+      Passwort; das setzt und benutzt Claude nicht._
 
 ## 9. Auth-Konfiguration auf PROD
 
@@ -315,8 +323,14 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
   60 — alle wie geplant; `uri_allow_list` trägt **keine** Loopback-Adresse.
   `rate_limit_email_sent` steht bei 2 und ist ohne eigenen SMTP nicht
   erhöhbar (6a.4).
-  **Offen: die Echt-Link-Probe.** Sie braucht ein Konto und wandert deshalb
-  hinter Task 11.
+  **Die Echt-Link-Probe ist bis zur Go-Live-Woche nicht durchführbar** —
+  begründet, nicht übersprungen: ein Zurücksetzungs-Link des NEUEN Projekts
+  zeigt auf `site_url` = `fbc-platform.pages.dev`, und diese Auslieferung
+  spricht noch mit dem ALTEN Projekt; der Token validiert dort nicht. Ihn auf
+  `localhost` umzulenken ginge nur mit einer Loopback-Adresse in der
+  Allow-List — genau das, was dieser Change verbietet.
+  **Gehört in die Go-Live-Checkliste**, direkt nach dem Umstellen der beiden
+  `VITE_*`-Werte.
   Dazu ein **echter Link**: eine Passwort-Zurücksetzung anfordern und
   prüfen, dass die Zieladresse in der `site_url`-Domain liegt und der Link
   einlösbar ist. Ein Konfigurationswert, der richtig aussieht, ist kein
@@ -362,17 +376,32 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 11. Admin-Konten und Rollen
 
-- [ ] 11.1 Donald und Detlev registrieren sich auf PROD über die App. Passwörter
+- [x] 11.1 Donald und Detlev registrieren sich auf PROD über die App. Passwörter
       setzen sie selbst; sie liegen nie im Repo.
       _Detlev hat zwei Accounts (mit und ohne Bindestrich in der Adresse) — vor
       dem Rollenlauf klären, welcher gilt, sonst sitzt der Admin wieder auf dem
       falschen._
-- [ ] 11.2 `admin_roles.sql` gegen PROD ausführen, über `pg` statt `psql`
+      **Erledigt 2026-08-05.** Beide Konten angelegt und bestätigt:
+      `donald@factiv.eu` und `detlev.krause@dkrealinvest.com` — Donald hat die
+      gültige Adresse benannt. Weg: lokal laufende App gegen das neue Projekt,
+      belegt am ausgelieferten Modul. Kosten: **null Mails**, weil
+      `enable_confirmations = false`. Einladungs- oder Zurücksetzungs-Links
+      wären ins Leere gelaufen — sie zeigen auf `site_url`, und die Auslieferung
+      dort spricht noch mit dem alten Projekt.
+- [x] 11.2 `admin_roles.sql` gegen PROD ausführen, über `pg` statt `psql`
       (Entscheidung 8). Die echten Adressen werden übergeben, nicht in die Datei
       geschrieben.
-- [ ] 11.3 **Verifikation:** `is_admin()` liefert für **beide** Konten `true`,
+      **Erledigt.** Die Datei benutzt `psql`-Variablen (`\set`), und `psql` gibt
+      es hier nicht — die identische `insert … on conflict`-Anweisung lief über
+      `pg` mit `$1`/`$2`. Die Datei selbst blieb unverändert.
+- [x] 11.3 **Verifikation:** `is_admin()` liefert für **beide** Konten `true`,
       und die Kontrollabfrage am Ende von `admin_roles.sql` zeigt genau zwei
       Zeilen — nicht mehr. Ausgabe zeigen.
+      **Erledigt:** Kontrollabfrage zeigt **genau zwei** Zeilen (beide `admin`),
+      `is_admin()` liefert in der jeweiligen Sitzung für beide `true`, und in
+      einer `anon`-Sitzung ist die Funktion **nicht ausführbar**
+      (`permission denied for function is_admin`) — die Absicherung aus AGE-312
+      hält auch auf dem neuen Projekt.
 
 ## 12. Der Webhook, der nicht mitwandert
 
