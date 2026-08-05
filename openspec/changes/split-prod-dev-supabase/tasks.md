@@ -506,8 +506,12 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 - [ ] 16.2b Fehlschlag von `migrate-dev` hält `deploy` an: einen Lauf gezielt
       scheitern lassen und zeigen, dass `deploy` nicht startet, obwohl PROD
       abweichungsfrei ist.
-- [ ] 16.3 Keine Demo-Personas auf PROD: Zählung über `profiles` und
+- [x] 16.3 Keine Demo-Personas auf PROD: Zählung über `profiles` und
       `auth.users` gegen die `@demo.fbc.invalid`-Adressen. Erwartung: null.
+      **Erledigt 2026-08-05:** `@demo.fbc.invalid` in `auth.users` = **0**.
+      Gesamtbestand PROD: 2 Konten (Donald, Detlev), 2 `profiles`, 0 `posts`,
+      0 `events`. Es gibt keine `supabase/seed.sql`, und `--include-seed` weist
+      `pnpm db:push:prod` ausdrücklich ab — der Weg existiert also gar nicht.
 - [ ] 16.4 `openspec validate --all` grün.
 - [ ] 16.5 `superpowers:requesting-code-review` in unabhängigem Kontext.
 - [ ] 16.6 Linear AGE-496 und AGE-257 auf den Stand bringen.
