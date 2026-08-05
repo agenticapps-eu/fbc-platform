@@ -476,7 +476,16 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       **Der Schreibzugriff auf `prod` wird vorher vorgelegt.** Er ist additiv:
       kein bestehender Wert ändert sich, `VITE_SUPABASE_URL` in `prod` bleibt
       auf dem alten Projekt (Entscheidung 7).
-- [ ] 14.3 Beide DB-URLs als GitHub-Secrets für die Jobs aus Task 4.
+- [x] 14.3 Beide DB-URLs als GitHub-Secrets für die Jobs aus Task 4.
+      **Erledigt 2026-08-05 von Donald.** `gh secret list` zeigt vier Einträge;
+      `SUPABASE_DB_URL_DEV` und `SUPABASE_DB_URL_PROD` sind neu.
+      _Weg: `infisical run --env=… -- sh -c 'printf "%s" "$KEY" | gh secret set KEY'`
+      — über stdin, nicht über `--body`. Mit `--body "$WERT"` stünde die
+      Verbindungs-URL samt DB-Passwort in der Prozessliste und in der
+      Shell-History. `printf` statt `echo`, damit kein Zeilenumbruch ins Secret
+      rutscht._
+      **Ob die Werte stimmen, ist damit noch nicht belegt** — das zeigt erst der
+      erste Lauf auf `main` (Task 16).
 - [x] 14.4 **Verifikation:** `VITE_SUPABASE_URL` in `prod` zeigt **weiterhin**
       auf `foelowldexkcqzewvrcf`. Das ist die Zusage dieses Changes: der Umzug
       passiert nicht hier.
