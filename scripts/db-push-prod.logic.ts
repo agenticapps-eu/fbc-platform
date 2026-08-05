@@ -1,13 +1,13 @@
 /**
- * Zielprüfung für schreibende Befehle gegen das PROD-Supabase-Projekt.
+ * Zielprüfung für schreibende Befehle gegen ein Supabase-Projekt (AGE-496).
  *
- * Die Prüfung ist zweistufig, und die Reihenfolge ist der Punkt (AGE-496,
- * Entscheidung 11):
+ * Die Prüfung ist zweistufig, und die Reihenfolge ist der Punkt
+ * (Entscheidung 11):
  *
  *   Stufe 1 — maschinell. Der aus der Verbindungs-URL abgeleitete Projekt-Ref
- *             wird gegen `scripts/prod-project-ref.txt` gehalten, eine vom Ziel
- *             unabhängige Quelle. Passt er nicht, bricht der Lauf ab, **bevor**
- *             irgendetwas angezeigt oder abgefragt wird.
+ *             wird gegen `scripts/<umgebung>-project-ref.txt` gehalten, eine vom
+ *             Ziel unabhängige Quelle. Passt er nicht, bricht der Lauf ab,
+ *             **bevor** irgendetwas angezeigt oder abgefragt wird.
  *   Stufe 2 — durch den Menschen. Erst danach werden Host und Dry-Run gezeigt
  *             und der Ref muss abgetippt werden.
  *
@@ -16,8 +16,12 @@
  * waren bis zu diesem Change byte-gleich — der Fehlgriff hätte keine
  * Fehlermeldung erzeugt, sondern einfach das andere Projekt geschrieben.
  *
- * Reine Funktionen, kein I/O: `scripts/db-push-prod.sh` liefert die Werte an
- * und führt die Entscheidung aus.
+ * **Stufe 1 gilt auch dort, wo es keine Stufe 2 gibt.** In CI schreibt
+ * `migrate-dev` unbeaufsichtigt; `scripts/assert-target.ts` fährt dieselbe
+ * Funktion, damit auch dieser Weg nicht auf das falsche Projekt zeigen kann.
+ *
+ * Reine Funktionen, kein I/O. Die Aufrufer sind `scripts/push-prod.ts`
+ * (interaktiv) und `scripts/assert-target.ts` (CI).
  */
 
 export type Stage1Result =
@@ -52,17 +56,29 @@ export function evaluateStage1(input: {
 }): Stage1Result {
   const { dbUrl, expectedRef, args } = input;
 
-  if (args.includes("--include-seed")) {
+  // Nichts durchreichen. Die erste Fassung führte eine Sperrliste
+  // (`args.includes("--include-seed")`) — die ist ein Vorschlag, keine Sperre:
+  // die CLI akzeptiert auch `--include-seed=true`, und `--yes`, `--include-all`
+  // oder ein zweites `--db-url` standen ohnehin nie darauf. Ein unabhängiges
+  // Review hat das am 2026-08-05 aufgedeckt.
+  //
+  // Das Skript baut sein Kommando selbst; zusätzliche Argumente hat es nie
+  // gebraucht. Wer wirklich ein Sonderflag braucht, ruft `supabase` direkt auf —
+  // dann aber sichtbar außerhalb dieser Prüfung, nicht unbemerkt hindurch.
+  if (args.length > 0) {
+    const seed = args.some((a) => a.startsWith("--include-seed"));
     return {
       kind: "abort",
-      reason: "--include-seed ist gegen PROD nicht zulässig: es würde Demo-Daten einspielen.",
+      reason: seed
+        ? "--include-seed ist gegen PROD nicht zulässig: es würde Demo-Daten einspielen."
+        : `Zusätzliche Argumente werden nicht durchgereicht: ${args.join(" ")}`,
     };
   }
 
   if (!dbUrl) {
     return {
       kind: "abort",
-      reason: "SUPABASE_DB_URL_PROD ist nicht gesetzt. Fehlt der Infisical-Kontext (--env=prod)?",
+      reason: "Die Verbindungs-URL ist nicht gesetzt. Fehlt der Infisical-Kontext?",
     };
   }
 
@@ -71,7 +87,7 @@ export function evaluateStage1(input: {
   if (!REF_PATTERN.test(expectedRef)) {
     return {
       kind: "abort",
-      reason: `Sollwert in scripts/prod-project-ref.txt ist kein Projekt-Ref: "${expectedRef}". Noch nicht gesetzt?`,
+      reason: `Sollwert ist kein Projekt-Ref: "${expectedRef}". Noch nicht gesetzt?`,
     };
   }
 
@@ -79,14 +95,14 @@ export function evaluateStage1(input: {
   if (!actualRef) {
     return {
       kind: "abort",
-      reason: "Aus SUPABASE_DB_URL_PROD lässt sich kein Projekt-Ref ableiten.",
+      reason: "Aus der Verbindungs-URL lässt sich kein Projekt-Ref ableiten.",
     };
   }
 
   if (actualRef !== expectedRef) {
     return {
       kind: "abort",
-      reason: `SUPABASE_DB_URL_PROD zeigt auf "${actualRef}", erwartet war "${expectedRef}". Abbruch vor jeder Ausgabe.`,
+      reason: `zeigt auf "${actualRef}", erwartet war "${expectedRef}". Abbruch vor jeder Ausgabe.`,
     };
   }
 

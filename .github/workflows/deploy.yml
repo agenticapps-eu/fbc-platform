@@ -40,16 +40,28 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Stufe 1 auch hier — dieselbe gepruefte Funktion wie `pnpm db:push:prod`.
+      # Ohne sie schriebe dieser Job unbeaufsichtigt auf das Projekt, das
+      # zufaellig im Secret steht: stuende dort die PROD-URL, liefen Migrationen
+      # bei jedem Merge ohne Bestaetigung auf die Produktivdatenbank — und
+      # `drift-gate` waere danach gruen, weil PROD dann zum Repo passt.
+      # Ein unabhaengiges Review hat diese Luecke am 2026-08-05 gefunden.
+      - name: Ziel pruefen — muss das DEV-Projekt sein
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: pnpm tsx scripts/assert-target.ts dev
+
       - name: Migrationen auf DEV anwenden
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SUPABASE_DB_URL_DEV:-}" ]; then
-            echo "::error::SUPABASE_DB_URL_DEV fehlt."
-            exit 1
-          fi
-          supabase db push --db-url "$SUPABASE_DB_URL_DEV"
+        run: supabase db push --db-url "$SUPABASE_DB_URL_DEV"
 
   # Fruehwarnung vor dem Deploy: weicht die Migrationshistorie von PROD ab,
   # faehrt kein Frontend aus (AGE-257).

@@ -70,7 +70,7 @@ console.log(`Aktion: ${target === "db" ? "supabase db push" : "supabase config p
 
 if (target === "db") {
   console.log("Was angewendet würde (--dry-run):\n");
-  const dry = spawnSync("supabase", ["db", "push", "--db-url", url, "--dry-run", ...args], {
+  const dry = spawnSync("supabase", ["db", "push", "--db-url", url, "--dry-run"], {
     stdio: "inherit",
   });
   if (dry.status !== 0) die("Der Dry-Run ist fehlgeschlagen. Es wurde nichts angewendet.");
@@ -92,11 +92,9 @@ if (stage2.kind === "abort") die(stage2.reason);
 // ── Anwenden ───────────────────────────────────────────────────────────────
 
 const cmd =
-  target === "db"
-    ? ["db", "push", "--db-url", url, ...args]
-    : ["config", "push", "--project-ref", ref, ...args];
+  target === "db" ? ["db", "push", "--db-url", url] : ["config", "push", "--project-ref", ref];
 
 // Die Verbindungs-URL traegt das DB-Passwort — sie wird nie ausgegeben.
-console.log(`\n→ supabase ${cmd.join(" ").replace(url, "***")}`);
+console.log(`\n→ supabase ${cmd.join(" ").replaceAll(url, "***")}`);
 const run = spawnSync("supabase", cmd, { stdio: "inherit" });
 process.exit(run.status ?? 1);

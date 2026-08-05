@@ -542,11 +542,10 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       ist — ein grünes Gate beweist nichts, ein rotes beweist alles.
       **Erledigt 2026-08-05, PR #113 → Revert #114.** Wegwerf-Migration
       `29991231235959` auf `main` gemergt, nicht auf PROD angewendet:
-      ``     drift-gate   failure   DRIFT — lokal vorhanden, auf dem Ziel fehlend: 29991231235959
-                         Migrationshistorie weicht ab. Erst `migrate-prod` freigeben.
-  deploy       skipped   ← verhindert
-  migrate-dev  success   ← auf DEV angewendet, die vorgesehene Generalprobe
-  ``
+      ``    drift-gate   failure   DRIFT — lokal vorhanden, auf dem Ziel fehlend: 29991231235959
+                       Migrationshistorie weicht ab. Erst `migrate-prod` freigeben.
+deploy       skipped   ← verhindert
+migrate-dev  success   ← auf DEV angewendet, die vorgesehene Generalprobe``
       Nebenbei sichtbar im Log: `SUPABASE_DB_URL_PROD: ***` — GitHub maskiert
       das Secret. Danach zurückgenommen, `main` wieder grün.
 - [x] 16.2a Die **andere** Drift-Richtung ebenso: eine Migration remote
@@ -563,11 +562,10 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       **Erledigt, ungeplant — und dadurch aussagekräftiger.** Der Revert-Merge
       ließ `migrate-dev` scheitern, weil DEVs Historie noch den Wegwerf-Eintrag
       trug (`Remote migration versions not found in local migrations
-  directory`). Ergebnis genau wie verlangt:
-      `     migrate-dev  failure
-  drift-gate   success   ← PROD war abweichungsfrei
-  deploy       skipped   ← trotzdem angehalten
-  `
+directory`). Ergebnis genau wie verlangt:
+      `    migrate-dev  failure
+drift-gate   success   ← PROD war abweichungsfrei
+deploy       skipped   ← trotzdem angehalten`
       Nach der Reparatur und einem Neustart: alle drei grün.
 - [x] 16.3 Keine Demo-Personas auf PROD: Zählung über `profiles` und
       `auth.users` gegen die `@demo.fbc.invalid`-Adressen. Erwartung: null.
@@ -577,7 +575,27 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       `pnpm db:push:prod` ausdrücklich ab — der Weg existiert also gar nicht.
 - [x] 16.4 `openspec validate --all` grün.
       **Erledigt:** 26/26. Dazu 387 Tests grün.
-- [ ] 16.5 `superpowers:requesting-code-review` in unabhängigem Kontext.
+- [x] 16.5 `superpowers:requesting-code-review` in unabhängigem Kontext.
+      **Erledigt 2026-08-05 — und es hat sich gelohnt.** Ein Reviewer mit
+      frischem Kontext auf den Diff von PR #112, ohne meine Begründungen.
+      **Sieben Befunde, davon einer kritisch.** Alle nachgemessen statt
+      übernommen; alle bestätigt. Behoben: 1. **`migrate-dev` schrieb ohne jede Zielprüfung.** Stünde in
+      `SUPABASE_DB_URL_DEV` versehentlich die PROD-URL, liefen Migrationen
+      bei jedem Merge unbeaufsichtigt auf die Produktivdatenbank — und
+      `drift-gate` wäre danach **grün**, weil PROD dann zum Repo passt.
+      Genau die Fehlerklasse dieses Changes, auf dem automatischen Weg.
+      → `scripts/assert-target.ts dev|prod`, in beiden Workflows vor jedem
+      schreibenden Schritt. Gegenprobe gefahren. 2. **Die Sperrliste war ein Vorschlag.** `--include-seed=true` wird von der
+      CLI akzeptiert (nachgemessen) und rutschte an
+      `args.includes("--include-seed")` vorbei; `--yes`, `--include-all` und
+      ein zweites `--db-url` standen ohnehin nie darauf.
+      → Es werden **gar keine** Argumente mehr durchgereicht. 6 neue Tests. 3. **Die Maskierung der URL griff nur einmal** (`replace` statt
+      `replaceAll`) — bei zweitem Vorkommen stand das DB-Passwort im Klartext. 4. **`migrate-prod.yml` behauptete im Kommentar eine Freigabe, die es nicht
+      gibt.** Falsche Zusicherung an genau der Stelle, an der jemand die
+      Sicherheitslage nachliest. Ersetzt durch das, was gilt. 5. **`apply` prüfte sein Ziel nicht** — nur `plan` tat es, in einem anderen
+      Runner. Prüfung dazu. 6. **`pnpm db:push` hing weiter am unsichtbaren Link.** → `--db-url`. 7. **Der Objekt-Drift-Scan sah Views und Policies nicht.** → beide dazu
+      (49 Policies, 1 View), und die fünf blinden Flecken der Namens-Heuristik
+      stehen jetzt im Kopf von `db-drift-scan.logic.ts` statt nirgends.
 - [x] 16.6 Linear AGE-496 und AGE-257 auf den Stand bringen.
       _Die GitHub-Automation schaltet In Progress/Done bei PR-Öffnung und
       -Merge selbst — erst `get_issue` lesen, dann entscheiden, ob überhaupt
