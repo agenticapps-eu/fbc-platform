@@ -90,11 +90,11 @@ Dashboard-Konfiguration.
 Stufe 2 fragt den Menschen. Der erste Entwurf hatte nur Stufe 2 und hielt sie
 für beides — das war zirkulär.
 
-- [ ] 3.1 `scripts/prod-project-ref.txt` mit dem PROD-Ref, committed. **Die vom
+- [x] 3.1 `scripts/prod-project-ref.txt` mit dem PROD-Ref, committed. **Die vom
       Ziel unabhängige Quelle.** Kein Geheimnis: der Ref steht in jedem
       ausgelieferten Client-Bundle. Wird in Task 6 gefüllt; bis dahin trägt die
       Datei einen Platzhalter, den Stufe 1 als „noch nicht gesetzt" ablehnt.
-- [ ] 3.2 **RED zuerst.** `scripts/db-push-prod.test.ts` über die reine Logik.
+- [x] 3.2 **RED zuerst.** `scripts/db-push-prod.test.ts` über die reine Logik.
       Prüffälle:
       fehlendes `SUPABASE_DB_URL_PROD` → Abbruch ·
       **URL zeigt auf den DEV-Ref, Sollwert ist der PROD-Ref → Abbruch in Stufe 1,
@@ -107,17 +107,22 @@ für beides — das war zirkulär.
       _Reine Funktionen in einer eigenen Datei, damit der Test kein `vi.mock`
       auf eigene Bausteine braucht — Mock-Zirkelschlüsse sind hier ein
       wiederkehrender Fehler._
-- [ ] 3.3 `scripts/db-push-prod.sh` + die getestete Logik. Ablauf:
+- [x] 3.3 `scripts/db-push-prod.sh` + die getestete Logik. Ablauf:
       **Stufe 1** — Ref aus `SUPABASE_DB_URL_PROD` extrahieren, gegen
       `prod-project-ref.txt` halten, bei Abweichung abbrechen.
       **Stufe 2** — aufgelösten Host anzeigen → `--dry-run` → Migrationsliste →
       Ref tippen lassen → anwenden.
       `--include-seed` wird abgewiesen. Kein `supabase link`, nie.
-- [ ] 3.4 Dasselbe für `scripts/config-push-prod.sh` + `config:push:prod` —
+      **Abweichung vom Plan, bewusst:** umgesetzt als `scripts/push-prod.ts`
+      (via `tsx`), nicht als `.sh`. Grund: die geprüfte Logik ist TypeScript;
+      ein Bash-Skript bräuchte für Stufe 1 ohnehin einen Brückenprozess.
+      `tsx`-Skripte sind hier bereits Konvention (`demo:seed`). Task 3.4
+      teilt sich dieselbe Datei — Ziel als erstes Argument (`db` | `config`).
+- [x] 3.4 Dasselbe für `scripts/config-push-prod.sh` + `config:push:prod` —
       auch `config push` bestimmt sein Ziel sonst über den Link.
-- [ ] 3.5 `"db:push:prod"` und `"config:push:prod"` in `package.json`, mit
+- [x] 3.5 `"db:push:prod"` und `"config:push:prod"` in `package.json`, mit
       `infisical run --env=prod`. Bestehendes `db:push` unverändert.
-- [ ] 3.6 **Verifikation:** Test rot → grün belegt, mit besonderem Augenmerk auf
+- [x] 3.6 **Verifikation:** Test rot → grün belegt, mit besonderem Augenmerk auf
       den Zirkelschluss-Fall. Dazu ein Trockenlauf, bei dem
       `SUPABASE_DB_URL_PROD` absichtlich auf das **alte** Projekt zeigt: er muss
       in Stufe 1 abbrechen und **nie nach einer Eingabe fragen**. Ausgabe zeigen.
@@ -125,7 +130,7 @@ für beides — das war zirkulär.
 ## 4. AGE-257 — die drei Jobs
 
 - [ ] 4.1 `migrate-dev` in `deploy.yml`: `if: github.ref ==
-  'refs/heads/main'`, `supabase db push --db-url $SUPABASE_DB_URL_DEV`.
+'refs/heads/main'`, `supabase db push --db-url $SUPABASE_DB_URL_DEV`.
       **Nicht auf Pull Requests** — sonst mutiert jeder offene PR das
       DEV-Projekt mit ungereviewten Migrationen.
 - [ ] 4.2 `drift-gate`: vollständiger Vergleich der Migrationshistorie gegen
