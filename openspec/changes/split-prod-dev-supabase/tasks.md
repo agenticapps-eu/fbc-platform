@@ -508,11 +508,20 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 16. Gesamtabnahme
 
-- [ ] 16.1 Preview-Deploy eines PR zeigt nachweislich auf DEV; `main` zeigt
+- [x] 16.1 Preview-Deploy eines PR zeigt nachweislich auf DEV; `main` zeigt
       weiterhin auf das alte Projekt. Beleg: die im Bundle gebackene
       `VITE_SUPABASE_URL`, nicht die Absicht.
       _Cache-Buster allein reicht nicht; ein 404 tarnt sich als Bundle (2 kB
       statt 1,2 MB), und die Apex-URL hinkt der Deploy-URL hinterher._
+      **Erledigt 2026-08-05 an PR #112, am Bundle gemessen:**
+      Preview `donald-age-496-c4-supabase-t.fbc-platform.pages.dev` →
+      1.197.413 Bytes, darin **nur** `foelowldexkcqzewvrcf`, kein Vorkommen des
+      neuen Refs. Produktiv `fbc-platform.pages.dev` → 1.197.538 Bytes, ebenso
+      **nur** das alte Projekt. Beide Bundles über 1,1 MB, also kein getarnter 404.
+      **Nebenbei belegt (der eigentliche Zugewinn):** im PR-Lauf wurden
+      `migrate-dev` und `drift-gate` **übersprungen** und `deploy` lief
+      trotzdem — die `!cancelled() && !contains(needs.*.result, 'failure')`
+      -Logik stimmt. Sie war bis dahin ungetestet.
 - [ ] 16.2 **Das Gate wird echt geprüft, nicht angenommen.** Eine Wegwerf-
       Migration lokal anlegen, ohne sie auf PROD anzuwenden → `drift-gate` muss
       rot werden und `deploy` verhindern. Danach zurücknehmen.
