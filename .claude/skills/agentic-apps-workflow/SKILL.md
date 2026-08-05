@@ -254,8 +254,14 @@ grep -ciE '^##[[:space:]]*reviewer' "$CH/REVIEWS.md"
 # TDD tasks produced RED + GREEN commits
 git log --oneline "$BASE"..HEAD | grep -cE "^[a-f0-9]+ (test|feat)\("
 
-# Independent Stage-2 code review happened (validate does not discharge it)
-grep -rl "Stage 2" "$CH"
+# Das Stage-3-Code-Review wird hier NICHT geprueft. Frueher stand hier
+# `grep -rl "Stage 2" "$CH"`; die Zeile ist am 05.08.2026 ersatzlos entfallen,
+# weil sie nichts messen konnte: kein Werkzeug der Kette schreibt diesen Marker
+# (`grep -rl "Stage 2" ~/.agenticapps/bin/` → kein Treffer), und `-rl` ueber das
+# ganze Verzeichnis nahm jede Prosa an — `mvp-scope-navigation` bestand sie
+# allein durch den Aufgabentext in `tasks.md:342`, `split-prod-dev-supabase`
+# fiel durch, obwohl das Review gelaufen war. Nicht wieder aufnehmen, solange
+# das Code-Review keinen strukturierten Beleg im Change-Verzeichnis hinterlaesst.
 
 # Every task in the change is checked off
 grep -c '^- \[ \]' "$CH/tasks.md"     # expect 0
