@@ -50,6 +50,32 @@ Change selbst entstanden.
 **MITTEL** · Vertrauen 9/10 · VERIFIED · Kategorie: Secrets-Verteilung
 **Durch diesen Change entstanden.**
 
+> ### ✅ Der konkrete Angriffsweg ist geschlossen (2026-08-05, noch am selben Tag)
+>
+> Donald hat ein **eigenes** `CONTACT_WEBHOOK_SECRET` für PROD angelegt
+> (64 Zeichen, nachweislich verschieden vom DEV-Wert). Eingetragen an beiden
+> Stellen — Function-Secrets **und** Trigger-Rumpf —, ohne dass der Wert je
+> ausgegeben wurde.
+>
+> Abgenommen, nicht angenommen:
+>
+> | Probe                                      | Ergebnis                                          |
+> | ------------------------------------------ | ------------------------------------------------- |
+> | ALTER (DEV-)Bearer gegen PROD              | `HTTP 401 Unauthorized`                           |
+> | NEUER (PROD-)Bearer, Payload ohne `record` | `HTTP 200 {"skipped":true}` — durch, ohne Versand |
+> | `db-drift-scan.ts` gegen PROD danach       | `OK — keine Objekt-Abweichung`                    |
+>
+> **Was offen bleibt:** von 15 selbst gesetzten Secrets sind jetzt **3 getrennt**
+> (`APP_URL`, `APP_URLS`, `CONTACT_WEBHOOK_SECRET`) und **12 weiter identisch** —
+> `RESEND_API_KEY`, `FROM_EMAIL` und die zehn Stripe-Werte. Das ist heute
+> vertretbar (Stripe ist Test-Mode, Resend verschickt an Adressen aus der
+> jeweiligen DB), **und es hört auf, vertretbar zu sein, sobald in der
+> Go-Live-Woche ein Live-Stripe-Key gesetzt wird.** Der gehört nur auf PROD,
+> nicht aus `dev` kopiert.
+>
+> Der Rest dieses Befunds beschreibt den Zustand **vor** der Rotation und bleibt
+> als Begründung stehen.
+
 Gemessen (Digest-Vergleich, keine Werte ausgegeben): von 15 selbst gesetzten
 Edge-Function-Secrets sind **13 auf beiden Projekten byte-identisch**. Nur
 `APP_URL` und `APP_URLS` unterscheiden sich — die habe ich bewusst auf die
