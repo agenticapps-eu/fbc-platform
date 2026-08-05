@@ -57,9 +57,26 @@ Mitgliedern ein Abflussweg für Anmelde- und Zurücksetzungslinks.
 Das System SHALL Passwörter unterhalb von **zehn** Zeichen als zu schwach
 zurückweisen.
 
-Das System SHALL auf dem PROD-Projekt **mindestens 30** Auth-Mails pro Stunde
-zulassen. Der heutige Wert von 2 blockiert bei ~70 Mitgliedern den Versand für
-alle übrigen, sobald zwei Menschen zugleich ihr Passwort zurücksetzen.
+**Korrigiert nach Messung am 2026-08-05.** Der ursprüngliche Entwurf verlangte
+hier „mindestens 30 Auth-Mails pro Stunde". Das ist nicht erfüllbar: Supabase
+weist eine Erhöhung ab, solange kein eigener SMTP-Server konfiguriert ist —
+
+```
+PATCH /v1/projects/<ref>/config/auth  {"rate_limit_email_sent": 30}
+→ HTTP 401  Custom SMTP required to configure ... RATE_LIMIT_EMAIL_SENT
+```
+
+Eine Anforderung, die das System nicht erfüllen kann, gehört nicht in die
+durable Wahrheit — sie wäre in jeder Prüfung grün und im Betrieb falsch.
+
+Das System SHALL einen eigenen SMTP-Dienst als Auth-Mailer verwenden, **bevor**
+echte Mitglieder auf „Passwort vergessen" angewiesen sind. Erst damit ist die
+projektweite Grenze überhaupt einstellbar; danach SHALL sie **mindestens 30**
+Mails pro Stunde zulassen.
+
+Solange das nicht gilt, SHALL der Betrieb wissen, dass die Grenze bei **zwei**
+Mails pro Stunde liegt — projektweit, nicht pro Mitglied — und dass das
+Zurücksetzen eines Passworts über das Dashboard erfolgt statt über die Mail.
 
 Weil eine höhere projektweite Grenze zugleich mehr unaufgeforderte Mail
 ermöglicht, SHALL die Zusage nicht allein auf ihr ruhen: die vorhandenen Grenzen
@@ -71,6 +88,16 @@ gebaut.
 
 #### Scenario: Mehrere Mitglieder setzen gleichzeitig ihr Passwort zurück
 
+- **GIVEN** ein eigener SMTP-Dienst ist als Auth-Mailer konfiguriert
 - **WHEN** mehrere Mitglieder innerhalb einer Stunde eine Zurücksetzung anfordern
 - **THEN** erhalten alle ihre Mail, weil die Ratengrenze nicht bei einer
   einstelligen Zahl liegt
+
+#### Scenario: Solange kein eigener SMTP-Dienst konfiguriert ist
+
+- **GIVEN** der Auth-Mailer ist der eingebaute Dienst der Plattform
+- **WHEN** die dritte Zurücksetzung innerhalb einer Stunde angefordert wird
+- **THEN** wird keine Mail zugestellt, ohne dass die Oberfläche einen Fehler
+  zeigt
+- **AND** der Betriebsweg ist das Zurücksetzen im Dashboard, nicht das Warten
+  auf die Mail

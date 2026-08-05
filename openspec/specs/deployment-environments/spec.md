@@ -1,4 +1,19 @@
-## ADDED Requirements
+# Deployment-Umgebungen
+
+## Purpose
+
+Hält fest, wie sich die Produktivumgebung von der Entwicklungs-/Demo-Umgebung
+unterscheidet und wie Änderungen an der Datenbank von der einen in die andere
+gelangen. Entstanden mit AGE-496 (C4), das den Zustand aus ADR-0003 ablöst — bis
+dahin teilten sich `dev` und `prod` **ein** Supabase-Projekt. Entscheidung:
+`docs/decisions/0004-split-prod-dev-supabase.md`, Betriebsanleitung:
+`docs/supabase-environments.md`.
+
+Die tragende Idee ist nicht „zwei Projekte", sondern: **kein schreibender Befehl
+bestimmt sein Ziel über einen unsichtbaren Zustand**, und **keine Prüfung wird
+grün, weil sie nicht messen konnte**.
+
+## Requirements
 
 ### Requirement: Zwei getrennte Supabase-Projekte mit festen Rollen
 
@@ -92,10 +107,19 @@ Der Frontend-Deploy SHALL auch dann unterbleiben, wenn der automatische Lauf
 gegen DEV fehlgeschlagen ist. Ein Fehlschlag der Frühwarnung SHALL NOT folgenlos
 bleiben.
 
-Der Lauf gegen PROD SHALL eine ausdrückliche Freigabe erfordern und SHALL vor
-dem Anwenden den aufgelösten Zielhost sowie die Liste der anzuwendenden
-Migrationen ausgeben. Er SHALL abbrechen, wenn für denselben Commit kein
-erfolgreicher Lauf gegen DEV vorliegt.
+Der Lauf gegen PROD SHALL ausschließlich von Hand ausgelöst werden können und
+SHALL vor dem Anwenden den aufgelösten Zielhost sowie die Liste der
+anzuwendenden Migrationen ausgeben. Er SHALL abbrechen, wenn für denselben
+Commit kein erfolgreicher Lauf gegen DEV vorliegt. Der schreibende Schritt
+SHALL sein eigenes Ziel prüfen, nicht nur ein vorgelagerter Schritt in einem
+anderen Lauf.
+
+**Stand 2026-08-05:** eine _zusätzliche_ Freigabe durch einen zweiten Menschen
+(geschützte Umgebung mit Reviewer-Regel) ist bewusst **zurückgestellt**, weil
+derzeit nur eine Person am Repository schreibt. Der Auslöser von Hand bleibt
+damit die einzige Kontrolle vor dem Anwenden — der ausgegebene Dry-Run steht im
+Log, aber niemand muss ihn gelesen haben. Sobald ein zweiter Mensch
+Schreibrechte erhält, SHALL die Reviewer-Regel gesetzt werden.
 
 Es SHALL keinen Weg geben, die Prüfung zu übergehen. Dass eine ausstehende
 Migration auch einen von ihr unabhängigen Frontend-Deploy blockiert, ist die
@@ -194,10 +218,24 @@ darauf zu verlassen, dass die konfigurierte Seed-Datei nicht existiert.
 Das System SHALL für PROD und DEV/DEMO getrennte Datenbank-Zugangsdaten führen.
 Ein Passwort SHALL NOT für beide Projekte gelten.
 
-#### Scenario: Ein erbeuteter DEV-Zugang öffnet PROD nicht
+**Diese Zusage gilt für die Datenbank — für die Function-Secrets gilt sie nur
+teilweise.** Am 2026-08-05 gemessen: von fünfzehn selbst gesetzten
+Edge-Function-Secrets sind drei getrennt und zwölf auf beiden Projekten
+byte-identisch (Transaktionsmail-Schlüssel und die Zahlungsanbieter-Werte).
+Das ist heute tragbar, weil der Zahlungsanbieter im Testmodus läuft. Sobald ein
+produktiver Zahlungsschlüssel gesetzt wird, SHALL er ausschließlich auf PROD
+gesetzt werden und NOT aus der DEV-Umgebung übernommen werden.
+
+#### Scenario: Ein erbeuteter DEV-Datenbankzugang öffnet die PROD-Datenbank nicht
 
 - **WHEN** die Zugangsdaten der DEV/DEMO-Datenbank bekannt werden
 - **THEN** gewähren sie keinen Zugriff auf das PROD-Projekt
+
+#### Scenario: Ein geteiltes Function-Secret ist kein getrenntes Zugangsdatum
+
+- **WHEN** ein Function-Secret auf beiden Projekten denselben Wert trägt
+- **THEN** öffnet die Kenntnis des DEV-Werts auch den entsprechenden Weg auf PROD
+- **AND** dieser Fall SHALL benannt sein statt als getrennt zu gelten
 
 ### Requirement: Edge Functions und ihre Secrets gehören zum Aufsetzen eines Projekts
 
