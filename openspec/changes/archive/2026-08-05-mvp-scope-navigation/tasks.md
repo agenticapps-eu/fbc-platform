@@ -76,7 +76,7 @@ ein visuell falsches Ergebnis durchgewunken).
       sucht, nicht mehr nur dass er sucht) und dürfen die Grenze nicht
       verschieben — ein Aufrufer unterhalb von `discover` darf über die Arrays
       **und** über die Filtertreffer nichts über Fremde lernen.
-- [ ] 1.10 **Die Migration erreicht Prod nur per manuellem `supabase db push` —
+- [x] 1.10 **Die Migration erreicht Prod nur per manuellem `supabase db push` —
       und muss VOR dem Frontend-Deploy laufen.** Merge ≠ live: `deploy.yml`
       schickt beim Merge nur das Frontend los, die Datenbank bleibt stehen. In
       diesem Fenster antwortet die alte 6-stellige Signatur.
@@ -91,6 +91,16 @@ ein visuell falsches Ergebnis durchgewunken).
       abgefangen: eine Fähigkeits-Erkennung im Client wäre Mechanik für ein
       Fenster, das gar nicht entstehen muss. Die Reihenfolge ist die Lösung —
       erst `db push`, dann mergen.
+      **Erledigt am 05.08. in genau dieser Reihenfolge.** `db push` wendete exakt
+      die zwei erwarteten Migrationen an (Trockenlauf davor, keine Divergenz im
+      Ledger). Auf Prod nachgeprüft statt geglaubt: **genau eine** Signatur von
+      `search_directory` mit 8 Argumenten und `security invoker`, EXECUTE für
+      `anon`/`authenticated`/`postgres`/`service_role`, `source text NOT NULL
+    DEFAULT 'editor'` auf beiden Tabellen, beide partiellen Unique-Indizes,
+      Label `Kompass`. Bestand: 49 offers / 48 needs, **alle `editor`** — kein
+      Index-Konflikt, und ihr Löschen verlangt künftig die Rückfrage.
+      Danach Merge (#110) und Frontend-Deploy; live verifiziert (1.197.538 Bytes,
+      HTTP 200, `p_offers` im Bundle, Apex und Deploy-URL auf demselben Hash).
 
 ## 2. Navigation trimmen + Routen/Redirects
 
@@ -100,7 +110,7 @@ ein visuell falsches Ergebnis durchgewunken).
       Reihenfolge-Erklärung im Kopfkommentar stimmt danach nicht mehr —
       mitziehen.
 - [x] 2.2 `src/components/AppShell.tsx`: die Zeile `{ section: "service", title:
-    "Service" }` aus `SIDEBAR_SECTIONS` entfernen — sie wäre sonst eine leere
+  "Service" }` aus `SIDEBAR_SECTIONS` entfernen — sie wäre sonst eine leere
       Überschrift. _Entdecken_ und _Mein Bereich_ bleiben sichtbar (Entscheidung 3).
 - [x] 2.3 `src/App.tsx`: Redirect `/compass` → `/kompass`. Redirect
       `/angebote-gesuche` von `/compass` auf `/kompass` umhängen.
@@ -231,7 +241,7 @@ ein visuell falsches Ergebnis durchgewunken).
       baut das Score-Breakdown mit `'label', 'Compass'`
       (`20260716070000_platform_feedback.sql:236`); `dashboard.ts:198` holt es,
       `profil-widgets.tsx:219` rendert `c.label`. Per `create or replace
-    function` auf „Kompass" ziehen — **der Schlüssel `'key', 'compass'` bleibt**.
+  function` auf „Kompass" ziehen — **der Schlüssel `'key', 'compass'` bleibt**.
       Das ist kein Bruch von Entscheidung 4: umbenannt wird angezeigter Text, kein
       Schema-Objekt, und es kostet keine Kaskade. Ohne diesen Schritt steht nach
       der Umbenennung weiter „Compass" im Profil.
@@ -341,6 +351,10 @@ Handlung — nicht „Keine Daten vorhanden".
       Zurückgewiesen bzw. als Nachlauf notiert: `NUR_REDIRECT` handgepflegt,
       `ChipGroup`/`ChipFilterGroup`-Dopplung, Einrückung in `ProfilPage`,
       roher `23505` beim Kategoriewechsel einer Chip-Zeile im reichen Editor.
-- [ ] 9.3 Abnahme-Checkliste aus AGE-494 durchgehen. **Die Haken in Linear setzt
-      Donald**, nicht dieser Change.
-- [ ] 9.4 Change archivieren, dann shippen — zwei getrennte Akte.
+- [x] 9.3 Abnahme-Checkliste aus AGE-494 durchgehen. **Die Haken in Linear setzt
+      Donald**, nicht dieser Change. _(05.08.: Donald hat das Abhaken freigegeben;
+      alle neun Punkte gesetzt, dazu ein Kommentar mit dem Prod-Beleg und den zwei
+      bewussten Abweichungen von der Issue-Beschreibung — drop+create statt
+      `create or replace`, und „59 Labels" waren real 11.)_
+- [x] 9.4 Change archivieren, dann shippen — zwei getrennte Akte.
+      _(05.08.: geshippt als PR #110, gemergt; danach dieser Archiv-Akt.)_
