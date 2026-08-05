@@ -36,6 +36,12 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
       # Was DEV nicht getragen hat, geht nicht auf PROD. Ohne diese Pruefung
       # waere die Reihenfolge DEV->PROD eine Bitte statt einer Zusage.
@@ -64,29 +70,17 @@ jobs:
             exit 1
           fi
 
+      # Dieselbe Stufe-1-Pruefung wie `pnpm db:push:prod`, dieselbe Funktion —
+      # keine zweite Regex im YAML. Zeigt Ref und Host, nie die URL.
       - name: Zielhost aufloesen
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SUPABASE_DB_URL_PROD:-}" ]; then
-            echo "::error::SUPABASE_DB_URL_PROD fehlt."
-            exit 1
-          fi
-          # Nur der Projekt-Ref wird gezeigt, nie die URL — sie traegt das Passwort.
-          expected="$(tr -d '[:space:]' < scripts/prod-project-ref.txt)"
-          actual="$(printf '%s' "$SUPABASE_DB_URL_PROD" | grep -oE 'db\.[a-z]{20}\.supabase\.co' | head -1)"
-          echo "Sollwert (scripts/prod-project-ref.txt): $expected"
-          echo "Ziel aus SUPABASE_DB_URL_PROD:           ${actual:-<nicht ableitbar>}"
-          if [ "db.$expected.supabase.co" != "$actual" ]; then
-            echo "::error::Ziel und Sollwert stimmen nicht ueberein. Abbruch vor jeder weiteren Ausgabe."
-            exit 1
-          fi
+        run: pnpm tsx scripts/assert-prod-target.ts
 
       - name: Migrationshistorie vergleichen
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-        run: ./scripts/migration-drift-gate.sh || true # hier informativ: die Abweichung IST der Anlass
+        run: pnpm tsx scripts/migration-drift-gate.ts || true # hier informativ: die Abweichung IST der Anlass
 
       - name: Was angewendet wuerde (--dry-run)
         env:
@@ -104,6 +98,12 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
       - name: Migrationen anwenden
         env:
@@ -113,4 +113,4 @@ jobs:
       - name: Historie nachher — muss abweichungsfrei sein
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-        run: ./scripts/migration-drift-gate.sh
+        run: pnpm tsx scripts/migration-drift-gate.ts
