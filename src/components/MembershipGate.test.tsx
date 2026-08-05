@@ -35,8 +35,11 @@ function renderAt(path: string, value: AuthContextValue) {
 }
 
 describe("MembershipGate für Entdecken-Routen", () => {
-  it("zeigt anon auf einem auth-gegateten Format (/compass) die Wand statt eines Redirects", () => {
-    renderAt("/compass", fakeAuthValue());
+  // AGE-494: /kompass ist keine „entdecken"-Route mehr (kein Menüeintrag), also
+  // greift dort RequireAuth statt der Wand. Die Regel, die dieser Test schützt —
+  // ein Schaufenster-Format mauert, statt wegzuleiten — gilt weiter für /academy.
+  it("zeigt anon auf einem auth-gegateten Format (/academy) die Wand statt eines Redirects", () => {
+    renderAt("/academy", fakeAuthValue());
 
     // Kein Redirect auf /login; stattdessen die „Mitglied werden"-Wand.
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
@@ -44,16 +47,14 @@ describe("MembershipGate für Entdecken-Routen", () => {
       screen.getByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mitglied werden" })).toBeInTheDocument();
-    // Compass-Inhalt bleibt gesperrt.
-    expect(screen.queryByText("Mini-Compass")).not.toBeInTheDocument();
+    // Academy-Inhalt bleibt gesperrt.
+    expect(screen.queryByText("Mit dem „Warum“ beginnen")).not.toBeInTheDocument();
   });
 
   it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", () => {
-    renderAt("/compass", authAsTier("basic"));
+    renderAt("/academy", authAsTier("basic"));
 
-    // Seit AGE-314 trägt auch der Tab die Beschriftung „Mini-Compass" — daher
-    // gezielt die Karten-Überschrift prüfen statt des mehrdeutigen Texts.
-    expect(screen.getByRole("heading", { name: "Mini-Compass" })).toBeInTheDocument();
+    expect(screen.getByText("Mit dem „Warum“ beginnen")).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
     ).not.toBeInTheDocument();

@@ -43,18 +43,18 @@ export interface NavItem {
  * nicht das Menü. Anon sieht nur `entdecken` (Donald, 15.07.2026).
  *
  * Die Reihenfolge unter `entdecken` ist verbindlich und erzählt die Reise:
- * Compass (entdecke mich) → Academy (entwickle mich) → Events (treffe Menschen) →
- * Mitglieder (finde Passende) → Aktivität (hier lebt der Club).
+ * Academy (entwickle mich) → Events (treffe Menschen) → Mitglieder (finde
+ * Passende) → Aktivität (hier lebt der Club).
+ *
+ * AGE-494: Das Menü zeigt nur noch, was es zum Go-Live wirklich gibt — sieben
+ * Einträge in zwei Gruppen. Der Kompass hat keinen eigenen Punkt mehr: als eigene
+ * Seite ist er im MVP dünn, als Filter über der Mitgliederliste und als Block im
+ * Profil ist derselbe Inhalt sofort nützlich. `/kompass`, `/mitgliedschaft`,
+ * `/meine-kurse` und `/kontakte` bleiben als `sub` geroutet — nichts wird
+ * gelöscht, es wird nur unerreichbar, und das Zurückholen ist diese eine Zeile.
  */
 export const navItems: NavItem[] = [
   { path: "/", label: "Start", Component: HomeRedirect, section: "entdecken" },
-  {
-    path: "/compass",
-    label: "Compass",
-    Component: CompassPage,
-    section: "entdecken",
-    requiresAuth: true,
-  },
   {
     path: "/academy",
     label: "Academy",
@@ -87,10 +87,31 @@ export const navItems: NavItem[] = [
   // Seite (MeineChancenPage) bleibt im Code, das Zurückholen ist ein navItem plus
   // Entfernen des Redirects.
   {
+    path: "/einstellungen",
+    label: "Einstellungen",
+    Component: EinstellungenPage,
+    section: "mein-bereich",
+    requiresAuth: true,
+  },
+
+  // AGE-494: Der Kompass verliert seinen Menüpunkt (Entscheidung 04.08.), die
+  // Route bleibt. Wizard, Erfolgsradar und der Such-/Biete-Editor liegen
+  // vollständig im Code — sichtbar wird der Kompass jetzt als Filter über der
+  // Mitgliederliste und als Chip-Block im Profil.
+  {
+    path: "/kompass",
+    label: "Kompass",
+    Component: CompassPage,
+    section: "sub",
+    requiresAuth: true,
+  },
+  // AGE-494: Ein leerer Stub ohne Datenbasis — die Academy ist im MVP kuratiert
+  // und kennt keine Einschreibung. In C9 tritt „Meine Academy" an diese Stelle.
+  {
     path: "/meine-kurse",
     label: "Meine Kurse",
     Component: MeineKursePage,
-    section: "mein-bereich",
+    section: "sub",
     requiresAuth: true,
   },
   // AGE-442: Gebuchte und eigene Events stehen jetzt als dritter Reiter unter
@@ -104,29 +125,23 @@ export const navItems: NavItem[] = [
     section: "sub",
     requiresAuth: true,
   },
+  // AGE-494: Kontakte erreicht man über das Profil und den Chat; ein eigener
+  // Menüpunkt daneben ist ein dritter Weg zum selben Ort.
   {
     path: "/kontakte",
     label: "Meine Kontakte",
     Component: KontaktePage,
-    section: "mein-bereich",
+    section: "sub",
     requiresAuth: true,
   },
-
-  // AGE-443: Detlev listet „Mitgliedschaften" im MVP-Umfang. Die Seite gab es
-  // schon, sie war nur als `sub` geroutet — jetzt mit Menüeintrag, in seiner
-  // Reihenfolge (… Kontakte, Mitgliedschaft, Einstellungen).
+  // AGE-443 gab ihr einen Menüeintrag. AGE-494 nimmt ihn wieder: zum Go-Live sind
+  // alle `impact`, es gibt nichts zu kaufen. Kein Redirect — wer den Link kennt,
+  // soll die Seite sehen dürfen.
   {
     path: "/mitgliedschaft",
     label: "Mitgliedschaft",
     Component: MitgliedschaftPage,
-    section: "service",
-    requiresAuth: true,
-  },
-  {
-    path: "/einstellungen",
-    label: "Einstellungen",
-    Component: EinstellungenPage,
-    section: "service",
+    section: "sub",
     requiresAuth: true,
   },
 

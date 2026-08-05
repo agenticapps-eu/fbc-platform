@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import { navItems } from "./nav";
 
 /**
- * Die Ziel-Navigation aus Spec §2 — 6 + 5 + 1. Reihenfolge ist verbindlich: sie
- * erzählt die Reise (Compass → Academy → Events → Mitglieder → Aktivität).
+ * Die Go-Live-Navigation (AGE-494): sieben Einträge in zwei Gruppen. Reihenfolge
+ * ist verbindlich — Academy → Events → Mitglieder → Aktivität erzählt die Reise,
+ * seit der Kompass keinen eigenen Menüpunkt mehr hat (er lebt als Filter über der
+ * Mitgliederliste und als Block im Profil).
+ *
+ * Die Gruppe `service` gibt es nicht mehr: Mitgliedschaft fällt aus dem Menü,
+ * Einstellungen wandert nach „mein-bereich". Eine dritte Überschrift für einen
+ * einzelnen Eintrag wäre mehr Rahmen als Inhalt.
  */
 const ERWARTET = {
   entdecken: [
     ["/", "Start"],
-    ["/compass", "Compass"],
     ["/academy", "Academy"],
     ["/events", "Events"],
     ["/mitglieder", "Mitglieder"],
@@ -16,23 +21,26 @@ const ERWARTET = {
   ],
   "mein-bereich": [
     ["/profil", "Mein Profil"],
-    ["/meine-kurse", "Meine Kurse"],
-    ["/kontakte", "Meine Kontakte"],
-  ],
-  // Detlevs MVP-Reihenfolge: … Kontakte, Mitgliedschaften, Einstellungen.
-  service: [
-    ["/mitgliedschaft", "Mitgliedschaft"],
     ["/einstellungen", "Einstellungen"],
   ],
 } as const;
 
-describe("Ziel-Navigation (Spec §2)", () => {
+describe("Go-Live-Navigation (AGE-494)", () => {
   for (const [section, erwartet] of Object.entries(ERWARTET)) {
     it(`hat unter „${section}" genau die vorgesehenen Einträge, in Reihenfolge`, () => {
       const ist = navItems.filter((i) => i.section === section).map((i) => [i.path, i.label]);
       expect(ist).toEqual(erwartet.map((e) => [...e]));
     });
   }
+
+  it("zeigt genau sieben Menüeinträge — alles andere ist geroutet, aber unsichtbar", () => {
+    const sichtbar = navItems.filter((i) => i.section !== "sub");
+    expect(sichtbar).toHaveLength(7);
+  });
+
+  it("kennt die Gruppe „service“ nicht mehr", () => {
+    expect(navItems.filter((i) => i.section === "service")).toEqual([]);
+  });
 
   it("führt die gestrichenen Pfade nicht mehr", () => {
     const pfade = navItems.map((i) => i.path);
@@ -46,6 +54,8 @@ describe("Ziel-Navigation (Spec §2)", () => {
       // AGE-450: Chancen fürs Sommerfest komplett raus — auch als geroutete
       // (sub-)Route. /meine-chancen leitet jetzt in App.tsx auf / um.
       "/meine-chancen",
+      // AGE-494: die alte Compass-Route heißt jetzt /kompass.
+      "/compass",
     ]) {
       expect(pfade).not.toContain(weg);
     }
@@ -56,11 +66,18 @@ describe("Ziel-Navigation (Spec §2)", () => {
     expect(mitglieder?.minTier).toBe("discover");
   });
 
-  /* AGE-450 — Chancen fürs Sommerfest komplett raus (Detlev, 22.07.). Anders als
-     AGE-443 (nur Menüeintrag weg, Route blieb `sub`): jetzt kein navItem mehr,
-     und App.tsx leitet /meine-chancen auf / um. Die Route ist unerreichbar. */
-  it("kennt Meine Chancen gar nicht mehr — die Route ist unerreichbar", () => {
-    expect(navItems.find((i) => i.path === "/meine-chancen")).toBeUndefined();
+  /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese vier Routen
+     verlieren ihren Menüeintrag und bleiben als `sub` geroutet: wer den Link
+     kennt, darf die Seite sehen, und das Zurückholen ist eine Zeile. */
+  it.each([
+    ["/kompass", "Kompass"],
+    ["/mitgliedschaft", "Mitgliedschaft"],
+    ["/meine-kurse", "Meine Kurse"],
+    ["/kontakte", "Meine Kontakte"],
+  ])("blendet %s aus dem Menü aus, hält die Route aber erreichbar", (pfad) => {
+    const item = navItems.find((i) => i.path === pfad);
+    expect(item).toBeDefined();
+    expect(item?.section).toBe("sub");
   });
 
   /* AGE-442 — „Keine weitere Unterseite": gebuchte und eigene Events stehen jetzt
@@ -70,10 +87,5 @@ describe("Ziel-Navigation (Spec §2)", () => {
     const events = navItems.find((i) => i.path === "/meine-events");
     expect(events).toBeDefined();
     expect(events?.section).toBe("sub");
-  });
-
-  it("führt Mitgliedschaft als Menüeintrag — Detlev listet sie im MVP", () => {
-    const mitgliedschaft = navItems.find((i) => i.path === "/mitgliedschaft");
-    expect(mitgliedschaft?.section).toBe("service");
   });
 });

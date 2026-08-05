@@ -58,12 +58,19 @@ describe("Redirects alter URLs", () => {
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
-  it("/angebote-gesuche → /compass (jede eingeloggte Stufe)", () => {
+  it("/angebote-gesuche → /kompass (jede eingeloggte Stufe)", () => {
     renderAt("/angebote-gesuche", authAsTier("basic"));
 
-    // "Mini-Compass" ist die Karten-Überschrift des Mini-Compass-Tabs — eindeutig
+    // "Mini-Kompass" ist die Karten-Überschrift des Mini-Kompass-Tabs — eindeutig
     // gegenüber der Wand, die stattdessen "Dieser Bereich ist Mitgliedern
     // vorbehalten" zeigt (siehe MembershipGate.test.tsx).
-    expect(screen.getByRole("heading", { name: "Mini-Compass" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Mini-Kompass" })).toBeInTheDocument();
+  });
+
+  // AGE-494: Die Route heißt sichtbar „Kompass"; der alte Pfad bleibt als Brücke.
+  it("/compass → /kompass (alte Links und Lesezeichen)", () => {
+    renderAt("/compass", authAsTier("basic"));
+
+    expect(screen.getByRole("heading", { name: "Mini-Kompass" })).toBeInTheDocument();
   });
 });

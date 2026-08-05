@@ -33,8 +33,9 @@ export default function LoginPage() {
     setError,
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  // Bereits eingeloggt → kein Grund für die Login-Seite. „/" entscheidet via
-  // HomeRedirect, ob neue Nutzer ins Mini-Compass-Onboarding geleitet werden (AGE-243).
+  // Bereits eingeloggt → kein Grund für die Login-Seite. „/" zeigt seit AGE-494
+  // ausnahmslos die Startseite; der Erstlogin wird nicht mehr in den
+  // Kompass-Assistenten umgeleitet (HomeRedirect).
   if (!isLoading && user) return <Navigate to="/" replace />;
 
   async function onSubmit(values: FormValues) {

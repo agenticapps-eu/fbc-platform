@@ -22,7 +22,7 @@ const ICONS: Record<string, ReactElement> = {
       <path d="M5.5 9.5V19a1 1 0 0 0 1 1h3.5v-5h4v5H17a1 1 0 0 0 1-1V9.5" />
     </>
   ),
-  "/compass": (
+  "/kompass": (
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="m15 9-1.8 4.2L9 15l1.8-4.2z" />
@@ -101,7 +101,7 @@ const ICONS: Record<string, ReactElement> = {
  *  richtig und auf dunklem falsch aussieht. */
 const FILLED: Record<string, ReactElement> = {
   "/": <path d="M12 3.2 21.5 10.5v9.3a1 1 0 0 1-1 1h-5v-5.6h-7V20.8h-5a1 1 0 0 1-1-1v-9.3z" />,
-  "/compass": (
+  "/kompass": (
     <path
       fillRule="evenodd"
       d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm3.9 5.1-2.4 5.6-5.6 2.4 2.4-5.6z"

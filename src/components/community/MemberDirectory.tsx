@@ -9,6 +9,8 @@ import { EmptyState } from "../ui/EmptyState";
 import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
+import { cn } from "../../lib/cn";
+import { categoryLabel } from "../../config/matching";
 import { levelLabel } from "../../config/levels";
 import {
   deriveFacets,
@@ -17,6 +19,8 @@ import {
   emptyDirectoryFilters,
   fetchDirectoryBaseline,
   hasActiveFilters,
+  NEED_CATEGORY_OPTIONS,
+  OFFER_CATEGORY_OPTIONS,
   OFFERING_OPTIONS,
   searchDirectory,
   THEME_OPTIONS,
@@ -61,6 +65,16 @@ export default function MemberDirectory() {
 
   function setFilter<K extends keyof DirectoryFilters>(key: K, value: DirectoryFilters[K]) {
     setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleCategory(key: "offers" | "needs", value: string) {
+    setFilters((prev) => {
+      const current = prev[key];
+      return {
+        ...prev,
+        [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+      };
+    });
   }
 
   function reset() {
@@ -124,6 +138,25 @@ export default function MemberDirectory() {
           options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
         />
 
+        {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
+            Gruppen, Mehrfachauswahl: ODER innerhalb einer Gruppe, UND zwischen
+            beiden. Sechs Optionen je Seite, nicht elf: die Elf aus dem Issue ist
+            die Vereinigung, `immobilien` steht in beiden. */}
+        <div className="sm:col-span-2 lg:col-span-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
+          <ChipFilterGroup
+            label="Bietet"
+            options={OFFER_CATEGORY_OPTIONS}
+            selected={filters.offers}
+            onToggle={(v) => toggleCategory("offers", v)}
+          />
+          <ChipFilterGroup
+            label="Sucht"
+            options={NEED_CATEGORY_OPTIONS}
+            selected={filters.needs}
+            onToggle={(v) => toggleCategory("needs", v)}
+          />
+        </div>
+
         {active && (
           <div className="flex items-end">
             <Button variant="ghost" size="sm" onClick={reset}>
@@ -172,6 +205,48 @@ function FilterSelect({
   );
 }
 
+/** Eine Filtergruppe als Chips. Mehrfachauswahl, kein „alle"-Zustand nötig:
+ *  keine Auswahl heißt kein Filter. */
+function ChipFilterGroup({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: readonly { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="text-xs font-semibold tracking-wide text-muted uppercase">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const on = selected.includes(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(o.value)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas focus-visible:outline-none",
+                on
+                  ? "border-accent bg-accent text-accent-ink"
+                  : "border-line text-muted hover:border-accent/60 hover:text-ink",
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 function DirectoryResults({
   isLoading,
   isError,
@@ -197,19 +272,29 @@ function DirectoryResults({
   }
   if (members.length === 0) {
     return (
+      /* AGE-494: Zwei verschiedene Zustände, die nie zusammenfallen dürfen — „die
+         Filter passen auf niemanden" ist etwas anderes als „hier ist noch
+         niemand". Der erste ist eine Sackgasse mit Ausweg, der zweite eine
+         Einladung, selbst den Anfang zu machen. */
       <EmptyState
-        title={active ? "Keine Treffer" : "Noch keine Mitglieder"}
+        title={active ? "Dazu passt gerade niemand" : "Die ersten Profile entstehen"}
         description={
           active
-            ? "Für diese Kombination aus Suche und Filtern gibt es keine Mitglieder."
-            : "Sobald Mitglieder sich vorstellen, erscheinen sie hier."
+            ? "Diese Kombination aus Suche und Filtern trifft auf kein Mitglied. Nimm einen Filter weg — oft reicht schon eine Kategorie weniger."
+            : "Der Club füllt sich gerade. Bis dahin lohnt sich dein eigenes Profil: wer seine Kategorien pflegt, wird von den anderen zuerst gefunden."
         }
         action={
           active ? (
             <Button variant="secondary" size="sm" onClick={onReset}>
               Filter zurücksetzen
             </Button>
-          ) : undefined
+          ) : (
+            <Link to="/profil/bearbeiten">
+              <Button variant="primary" size="sm">
+                Mein Profil ergänzen
+              </Button>
+            </Link>
+          )
         }
       />
     );
@@ -263,13 +348,46 @@ function MemberCard({ member }: { member: DirectoryMember }) {
           <p className="line-clamp-3 text-sm leading-relaxed text-muted">{member.short_bio}</p>
         )}
 
-        {(member.branche || member.has_offers || member.has_needs) && (
-          <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-            {member.branche && <Badge variant="neutral">{member.branche}</Badge>}
-            {member.has_offers && <Badge variant="soft">Bietet</Badge>}
-            {member.has_needs && <Badge variant="soft">Sucht</Badge>}
-          </div>
-        )}
+        {/* AGE-494: Statt der pauschalen „Bietet"/„Sucht"-Marken die Kategorien
+            selbst — das war der Punkt der RPC-Erweiterung.
+            Zwei Rückfälle, aus zwei verschiedenen Gründen:
+            1. Der Typ verspricht hier ein Array, die alte RPC liefert das Feld gar
+               nicht. Beim Merge geht das Frontend automatisch live, die Migration
+               erreicht Prod nur per manuellem `supabase db push` — dazwischen
+               antwortet die alte Signatur, und ein `.length` auf `undefined`
+               macht die Mitgliederseite weiß. Deshalb `?? []`.
+            2. Eine Zeile ohne `category` setzt `has_offers`, taucht aber in keinem
+               Array auf — dafür bleiben die pauschalen Marken. */}
+        {(() => {
+          const offerCats = member.offer_categories ?? [];
+          const needCats = member.need_categories ?? [];
+          if (
+            !member.branche &&
+            offerCats.length === 0 &&
+            needCats.length === 0 &&
+            !member.has_offers &&
+            !member.has_needs
+          ) {
+            return null;
+          }
+          return (
+            <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
+              {member.branche && <Badge variant="neutral">{member.branche}</Badge>}
+              {offerCats.map((c) => (
+                <Badge key={`o-${c}`} variant="soft">
+                  Bietet: {categoryLabel("offer", c)}
+                </Badge>
+              ))}
+              {needCats.map((c) => (
+                <Badge key={`n-${c}`} variant="soft">
+                  Sucht: {categoryLabel("need", c)}
+                </Badge>
+              ))}
+              {member.has_offers && offerCats.length === 0 && <Badge variant="soft">Bietet</Badge>}
+              {member.has_needs && needCats.length === 0 && <Badge variant="soft">Sucht</Badge>}
+            </div>
+          );
+        })()}
       </Card>
     </Link>
   );

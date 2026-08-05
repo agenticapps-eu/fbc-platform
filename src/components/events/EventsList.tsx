@@ -92,9 +92,12 @@ function EventsBody({
   const all = query.data ?? [];
   if (all.length === 0) {
     return (
+      // AGE-494: Am 17.08. sehen ~70 Menschen diesen Zustand beim ersten Login.
+      // „Sobald Veranstaltungen geplant sind, erscheinen sie hier" ist eine
+      // Zustandsmeldung — sie sagt, was fehlt, statt was als Nächstes passiert.
       <EmptyState
-        title="Noch keine Events"
-        description="Sobald Veranstaltungen geplant sind, erscheinen sie hier."
+        title="Die ersten Termine entstehen gerade"
+        description="Der Club trifft sich regelmäßig — Sommerfest, Stammtische, Formate der Mitglieder. Sobald ein Termin steht, findest du ihn hier und kannst dich direkt anmelden."
       />
     );
   }

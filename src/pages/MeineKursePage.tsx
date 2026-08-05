@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
 import { FormatHero } from "../components/ui/FormatHero";
 import { FORMAT_HERO } from "../config/formatHero";
 /**
@@ -12,10 +15,19 @@ export default function MeineKursePage() {
   return (
     <div className="flex flex-col gap-6">
       <FormatHero meta={FORMAT_HERO["/meine-kurse"]} className="" />
-      <p className="text-sm text-muted">
-        Du hast noch keine Kurse belegt. Sobald du in der Academy einen Kurs startest, erscheint er
-        hier.
-      </p>
+      {/* AGE-494: Bis hierher ein nackter Satz ohne Weg. Die Handlung liegt beim
+          Mitglied — also den Weg zeigen, statt den Mangel zu benennen. */}
+      <EmptyState
+        title="Dein Lernpfad beginnt in der Academy"
+        description="Hier sammeln sich die Kurse, die du begonnen hast. In der Academy findest du die kuratierten Inhalte des Clubs."
+        action={
+          <Link to="/academy">
+            <Button variant="primary" size="sm">
+              Zur Academy
+            </Button>
+          </Link>
+        }
+      />
     </div>
   );
 }

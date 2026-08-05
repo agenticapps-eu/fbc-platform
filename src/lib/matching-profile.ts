@@ -29,6 +29,14 @@ const baseItem = {
   title: z.string().trim().min(1, "Titel ist erforderlich."),
   description: z.string().trim(),
   tags: z.array(z.string().trim().min(1)),
+  // AGE-494: Die Herkunft muss den Replace-Durchlauf ÜBERLEBEN. Ohne sie fiele
+  // jede chip-erzeugte Zeile beim Speichern hier auf den Default 'editor' zurück,
+  // und das spätere Abwählen des Chips verlangte plötzlich eine Rückfrage für
+  // etwas, das nie von Hand geschrieben wurde.
+  // Kein `.default()`: das machte zod-Ein- und Ausgabetyp verschieden und bräche
+  // die Typisierung des react-hook-form-Resolvers. Der Wert wird ohnehin an jeder
+  // Stelle gesetzt (Laden aus der DB, EMPTY_OFFER/EMPTY_NEED).
+  source: z.union([z.literal("editor"), z.literal("chip")]),
 };
 
 const offerSchema = z.object({
@@ -39,7 +47,14 @@ const offerSchema = z.object({
 const needSchema = z.object({
   category: z.string().refine((v) => needKeySet.has(v), "Bitte eine Kategorie wählen."),
   ...baseItem,
-  tx_volume_band: z.string().refine((v) => bandSet.has(v), "Bitte ein Volumen wählen."),
+  // AGE-494: Ein FEHLENDES Volumenband heißt „noch nicht angegeben", nicht
+  // „ungültig". Chips und der geführte Kompass legen Zeilen ohne Band an — ein
+  // Pflichtfeld hier machte jede solche Zeile im reichen Editor unspeicherbar und
+  // ließe eine Oberfläche die Ausgabe der anderen blockieren. Ein gesetzter Wert
+  // muss weiterhin aus der bekannten Liste kommen.
+  tx_volume_band: z
+    .string()
+    .refine((v) => v === "" || bandSet.has(v), "Bitte ein gültiges Volumen wählen."),
 });
 
 export const matchingProfileSchema = z.object({
@@ -58,6 +73,7 @@ export const EMPTY_OFFER: OfferValues = {
   title: "",
   description: "",
   tags: [],
+  source: "editor",
 };
 
 export const EMPTY_NEED: NeedValues = {
@@ -67,6 +83,7 @@ export const EMPTY_NEED: NeedValues = {
   description: "",
   tags: [],
   tx_volume_band: "10k_100k",
+  source: "editor",
 };
 
 // ── Laden ────────────────────────────────────────────────────────────────────
@@ -76,12 +93,12 @@ export async function fetchMatchingProfile(uid: string): Promise<MatchingProfile
   const [offersRes, needsRes] = await Promise.all([
     supabase
       .from("offers")
-      .select("category, theme, title, description, tags")
+      .select("category, theme, title, description, tags, source")
       .eq("profile_id", uid)
       .order("created_at"),
     supabase
       .from("needs")
-      .select("category, theme, title, description, tags, tx_volume_band")
+      .select("category, theme, title, description, tags, tx_volume_band, source")
       .eq("profile_id", uid)
       .order("created_at"),
   ]);
@@ -95,6 +112,7 @@ export async function fetchMatchingProfile(uid: string): Promise<MatchingProfile
       title: o.title,
       description: o.description ?? "",
       tags: o.tags ?? [],
+      source: (o.source as OfferValues["source"]) ?? "editor",
     })),
     needs: (needsRes.data ?? []).map((n) => ({
       category: n.category ?? "",
@@ -103,6 +121,7 @@ export async function fetchMatchingProfile(uid: string): Promise<MatchingProfile
       description: n.description ?? "",
       tags: n.tags ?? [],
       tx_volume_band: (n.tx_volume_band as VolumeBand) ?? "",
+      source: (n.source as NeedValues["source"]) ?? "editor",
     })),
   };
 }
@@ -135,6 +154,7 @@ export async function saveMatchingProfile(
         title: o.title.trim(),
         description: emptyToNull(o.description),
         tags: tagsOrNull(o.tags),
+        source: o.source,
       })),
     );
     if (error) throw error;
@@ -150,6 +170,7 @@ export async function saveMatchingProfile(
         description: emptyToNull(n.description),
         tags: tagsOrNull(n.tags),
         tx_volume_band: n.tx_volume_band === "" ? null : n.tx_volume_band,
+        source: n.source,
       })),
     );
     if (error) throw error;

@@ -1,4 +1,5 @@
 import { recomputeMyMatches } from "./matches";
+import { chipRowFor } from "./profile-categories";
 import { supabase } from "./supabase";
 import {
   COMPASS_SCALE_DEFAULT,
@@ -171,11 +172,13 @@ export interface CompassResult {
 }
 
 /**
- * Schreibt den Compass ab. compass_responses/offers/needs folgen dem „Replace-
- * Collection"-Muster (eigene Zeilen ersetzen → idempotenter Neulauf; in Phase 1
- * ist der Compass deren einziger Schreiber). profile_interests werden hingegen
- * GEMERGT, weil der Profil-Editor dieselbe Tabelle verwaltet — Ersetzen würde dort
- * gepflegte Interessen bei einem Compass-Neulauf verlieren.
+ * Schreibt den Compass ab. Nur compass_responses folgt dem „Replace-Collection"-
+ * Muster (eigene Zeilen ersetzen → idempotenter Neulauf) — diese Tabelle gehört
+ * allein dem Assistenten. offers/needs und profile_interests werden hingegen
+ * GEMERGT, weil sie drei Schreiber haben (dieser Assistent, der Chip-Block im
+ * Profil-Editor, der Suche-&-Biete-Editor): Ersetzen würde dort Gepflegtes bei
+ * einem Compass-Neulauf verlieren. Der Assistent ist rein additiv, Wegnehmen
+ * bleibt Sache des Profil-Editors (AGE-494, ausführlich in Schritt 1 begründet).
  *
  * Hinweis: die Lösch-/Einfüge-Schritte sind nicht in EINER Transaktion (separate
  * Calls). Schlägt ein Insert nach einem Delete fehl, bleibt die Sammlung leer, bis
@@ -193,12 +196,23 @@ export async function saveCompass(
   const needs = deriveNeeds(steps, draft);
   const focus = dominantTheme(steps, draft);
 
-  // 1. Compass-eigene Sammlungen leeren (idempotenter Neulauf). profile_interests
-  //    bewusst NICHT — die werden gemergt (s. u.), weil der Profil-Editor dieselbe
-  //    Tabelle per replace-collection verwaltet; ein Ersetzen würde dort gepflegte
-  //    Interessen bei einem Compass-Neulauf vernichten.
-  for (const table of ["compass_responses", "offers", "needs"] as const) {
-    const { error } = await supabase.from(table).delete().eq("profile_id", uid);
+  // 1. NUR compass_responses leeren (idempotenter Neulauf) — die Tabelle gehört
+  //    allein dem Assistenten.
+  //
+  //    AGE-494: `offers` und `needs` standen bis hierher in dieser Schleife. Damit
+  //    vernichtete jeder Kompass-Neulauf sämtliche Beschreibungen, Tags und
+  //    Volumenbänder aus dem Suche-&-Biete-Editor UND alle Chip-Zeilen aus dem
+  //    Profil-Editor — genau das Argument, das direkt darunter seit jeher für
+  //    profile_interests steht, nur nie auf offers/needs angewandt wurde.
+  //
+  //    Der Assistent ist jetzt REIN ADDITIV: er ergänzt fehlende Kategorien und
+  //    nimmt nie etwas weg. Bewusst nicht der kategorie-weise Abgleich des
+  //    Profil-Editors — dessen Auswahl kommt aus den aktuellen Zeilen, die des
+  //    Assistenten aus einem lokalen Entwurf. Ein Neulauf mit frischem Entwurf läse
+  //    sich als „nichts ausgewählt" und löschte alles. Wegnehmen bleibt Sache des
+  //    Profil-Editors.
+  {
+    const { error } = await supabase.from("compass_responses").delete().eq("profile_id", uid);
     if (error) throw error;
   }
 
@@ -226,27 +240,29 @@ export async function saveCompass(
       if (error) throw error;
     }
   }
-  if (offers.length > 0) {
-    const { error } = await supabase.from("offers").insert(
-      offers.map((o) => ({
-        profile_id: uid,
-        theme: o.theme,
-        category: o.category,
-        title: o.title,
-      })),
+  // offers/needs additiv ergänzen: nur Kategorien, die es noch nicht gibt. Der
+  // Titel kommt aus config/matching.ts (dem Vokabular, dem `category` gehört) und
+  // nicht aus der Kompass-Beschriftung — die nennt `kapital` „Kapital &
+  // Beteiligungen", während `beteiligungen` dort eine eigene Kategorie ist.
+  // Dieselbe Zeile, die auch der Chip-Picker anlegt (source = 'chip').
+  for (const [table, items] of [["offers", offers] as const, ["needs", needs] as const]) {
+    if (items.length === 0) continue;
+    const side = table === "offers" ? "offer" : "need";
+    const { data: existing, error: exErr } = await supabase
+      .from(table)
+      .select("category")
+      .eq("profile_id", uid);
+    if (exErr) throw exErr;
+    const belegt = new Set((existing ?? []).map((e) => e.category).filter(Boolean));
+    const fresh = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].filter(
+      (c) => !belegt.has(c),
     );
-    if (error) throw error;
-  }
-  if (needs.length > 0) {
-    const { error } = await supabase.from("needs").insert(
-      needs.map((n) => ({
-        profile_id: uid,
-        theme: n.theme,
-        category: n.category,
-        title: n.title,
-      })),
-    );
-    if (error) throw error;
+    if (fresh.length > 0) {
+      const { error } = await supabase
+        .from(table)
+        .insert(fresh.map((c) => ({ profile_id: uid, ...chipRowFor(side, c) })));
+      if (error) throw error;
+    }
   }
 
   // 3. dev_focus setzen → set_profile_completion-Trigger hebt profile_completion.

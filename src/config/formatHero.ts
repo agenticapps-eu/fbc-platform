@@ -15,7 +15,7 @@ export interface FormatHeroMeta {
  *  Profil-Editor): sie laufen in der schmalen Lesespalte, und ein Bildkopf über
  *  einem Formular ist Dekoration vor der Aufgabe. */
 export const FORMAT_HERO: Record<string, FormatHeroMeta> = {
-  "/compass": {
+  "/kompass": {
     title: "Kompass",
     claim: "Finde deine Richtung im Club.",
     image: "/images/hero-compass.webp",

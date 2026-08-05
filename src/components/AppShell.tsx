@@ -214,11 +214,13 @@ function UserMenu({
 const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
   { section: "entdecken", title: "Entdecken" },
   { section: "mein-bereich", title: "Mein Bereich" },
-  { section: "service", title: "Service" },
+  // AGE-494: „Service" ist entfallen. Mitgliedschaft fällt aus dem Menü,
+  // Einstellungen steht jetzt unter „Mein Bereich" — bliebe die Zeile hier,
+  // rendert die Sidebar eine Überschrift ohne einen einzigen Eintrag darunter.
 ];
 
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
- *  Mitglieder-Block oben, darunter die drei Abschnitte aus `navItems`. */
+ *  Reine Navigation: die Abschnitte aus `navItems`, für Admins ein eigener dazu. */
 function SidebarContent({
   onNavigate,
   collapsed = false,
@@ -226,7 +228,7 @@ function SidebarContent({
   onNavigate?: () => void;
   collapsed?: boolean;
 }) {
-  const { user, tier, staffRole } = useAuth();
+  const { user, staffRole } = useAuth();
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
   // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
   // ohne Konto wäre ein Versprechen ins Leere.
@@ -250,35 +252,15 @@ function SidebarContent({
   }
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-4" : "gap-7")}>
-      {user ? (
-        <Link
-          to="/profil"
-          onClick={onNavigate}
-          title={collapsed ? (user.email ?? "Mein Profil") : undefined}
-          className={cn(
-            "flex items-center rounded-[var(--radius-card)] border border-chrome-border transition-colors hover:bg-chrome-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "justify-center p-1.5" : "gap-3 px-3 py-2.5",
-          )}
-        >
-          <Avatar name={user.email ?? "?"} size={collapsed ? "sm" : "md"} />
-          {!collapsed && (
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-on-chrome-active">
-                {user.email}
-              </span>
-              {tier && (
-                <span className="mt-0.5 inline-block">
-                  <TierBadge tier={tier} />
-                </span>
-              )}
-            </span>
-          )}
-        </Link>
-      ) : null}
-      {/* Ausgeloggt steht hier nichts: der Anmelde-Weg ist der Login-Button in der
-          Topbar, und ein zweiter „Anmelden"-Block direkt darunter war dieselbe
-          Aufforderung zweimal — an der Stelle, an der eingeloggt das eigene Profil
-          steht (AGE-499). */}
+      {/* Über der Navigation steht nichts — weder ein- noch ausgeloggt.
+          AGE-499 hat den „Anmelden"-Block für Gäste entfernt, weil er dieselbe
+          Aufforderung ein zweites Mal war (der Weg steht in der Topbar).
+          AGE-494 zieht dieselbe Regel für den eingeloggten Fall nach: das
+          Mitglied stand hier ein drittes Mal auf demselben Bildschirm — neben
+          dem Avatar in der Topbar und der E-Mail samt Stufe im aufgeklappten
+          Profilmenü —, und zwar mit der ROHEN E-MAIL statt seines Namens,
+          obwohl der im Profil steht. Identität lebt in der Topbar, die Sidebar
+          navigiert. „Mein Profil" ist als Menüeintrag ohnehin da. */}
       <SidebarNav sections={sections} onNavigate={onNavigate} collapsed={collapsed} />
     </div>
   );

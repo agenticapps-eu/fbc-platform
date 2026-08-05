@@ -52,7 +52,7 @@ export function ErfolgsradarWidget({ data }: { data: DashboardData }) {
           <ErfolgsradarChart scores={data.themeScores} />
         </Suspense>
       ) : (
-        <EmptyHint>Noch keine Themen-Scores. Sie entstehen aus deinem Compass.</EmptyHint>
+        <EmptyHint>Noch keine Themen-Scores. Sie entstehen aus deinem Kompass.</EmptyHint>
       )}
     </DashboardCard>
   );
@@ -100,7 +100,7 @@ export function EntwicklungWidget({ profile }: { profile: DashboardProfile }) {
       ) : (
         <EmptyHint>Lege deinen Entwicklungs-Fokus im Profil-Editor fest.</EmptyHint>
       )}
-      <Link to="/compass" className="mt-auto">
+      <Link to="/kompass" className="mt-auto">
         <Button variant="ghost" size="sm" className="w-full">
           Zur persönlichen Roadmap
         </Button>

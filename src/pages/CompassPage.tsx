@@ -28,7 +28,7 @@ function MiniCompassTab() {
   return (
     <Card className="flex flex-col gap-4">
       <div>
-        <CardTitle>Mini-Compass</CardTitle>
+        <CardTitle>Mini-Kompass</CardTitle>
         <CardDescription>
           In wenigen Fragen entlang Sein · Tun · Haben · Wirken sowie „Ich suche" / „Ich biete"
           erstellen wir deinen Erfolgsradar, dein Such- &amp; Bieteprofil und erste Empfehlungen.
@@ -43,7 +43,7 @@ function MiniCompassTab() {
         </div>
       ) : hasResponses ? (
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm text-muted">Du hast deinen Compass bereits ausgefüllt.</p>
+          <p className="text-sm text-muted">Du hast deinen Kompass bereits ausgefüllt.</p>
           <Button variant="ghost" onClick={() => navigate("/onboarding")}>
             Erneut durchlaufen
           </Button>
@@ -54,7 +54,7 @@ function MiniCompassTab() {
       ) : (
         <div>
           <Button variant="primary" onClick={() => navigate("/onboarding")}>
-            {hasDraft ? "Mini-Compass fortsetzen" : "Mini-Compass starten"}
+            {hasDraft ? "Mini-Kompass fortsetzen" : "Mini-Kompass starten"}
           </Button>
         </div>
       )}
@@ -73,10 +73,10 @@ function MiniCompassTab() {
 export default function CompassPage() {
   return (
     <div className="flex flex-col gap-6">
-      <FormatHero meta={FORMAT_HERO["/compass"]} />
+      <FormatHero meta={FORMAT_HERO["/kompass"]} />
       <Tabs
         tabs={[
-          { value: "compass", label: "Mini-Compass", content: <MiniCompassTab /> },
+          { value: "compass", label: "Mini-Kompass", content: <MiniCompassTab /> },
           { value: "suche-biete", label: "Suche & Biete", content: <AngeboteGesucheEditor /> },
         ]}
       />

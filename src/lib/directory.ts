@@ -1,3 +1,4 @@
+import { COMPASS_STEPS } from "../config/compass";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
 
@@ -5,12 +6,17 @@ import type { Database } from "./database.types";
  * Mitgliederverzeichnis (AGE-241) — Datenschicht.
  *
  * Sichtbarkeit entscheidet AUSSCHLIESSLICH die RLS, nicht das Frontend: die RPC
- * `search_directory` ist SECURITY INVOKER, die Policy `profiles_select_self_or_prime`
- * (AGE-235) gibt vollständige Profilzeilen nur am eigenen Profil ODER für Prime+
- * zurück. Eine Discover-/anon-Abfrage liefert höchstens die eigene Zeile — niemals
- * fremde Mitglieder. `/mitglieder` ist seit AGE-314 eine eigene Route mit
- * `minTier: "discover"` (Spec §2), die unterhalb davon per MembershipGate die Wand
- * zeigt (Komfort, nicht die Grenze).
+ * `search_directory` ist SECURITY INVOKER, die Policy
+ * `profiles_select_self_or_discover` (`has_level(3)`) gibt vollständige Profilzeilen
+ * nur am eigenen Profil ODER ab `discover` zurück. Eine Abfrage darunter liefert
+ * höchstens die eigene Zeile — niemals fremde Mitglieder. `/mitglieder` ist seit
+ * AGE-314 eine eigene Route mit `minTier: "discover"` (Spec §2), die unterhalb davon
+ * per MembershipGate die Wand zeigt (Komfort, nicht die Grenze).
+ *
+ * (Der Kopf nannte bis AGE-494 `profiles_select_self_or_prime` und „Prime+" — das
+ * 6-Level-Modell hat die Policy in 20260715150000_six_level_model.sql ersetzt, der
+ * Kommentar war seitdem falsch. Mitgezogen, weil dieser Change genau das
+ * vergrößert, was hinter dieser Grenze preisgegeben wird.)
  */
 
 export type DirectoryMember =
@@ -28,6 +34,10 @@ export interface DirectoryFilters {
   competency: string;
   /** "" = egal, "offers" = bietet, "needs" = sucht. */
   offering: DirectoryOffering;
+  /** Kompass-Kategorien „bietet" (AGE-494). ODER innerhalb, UND gegen `needs`. */
+  offers: string[];
+  /** Kompass-Kategorien „sucht". Leere Auswahl = kein Filter. */
+  needs: string[];
 }
 
 export const emptyDirectoryFilters: DirectoryFilters = {
@@ -37,7 +47,35 @@ export const emptyDirectoryFilters: DirectoryFilters = {
   region: "",
   competency: "",
   offering: "",
+  offers: [],
+  needs: [],
 };
+
+/**
+ * Kompass-Kategorien als Filteroptionen (AGE-494) — abgeleitet aus
+ * `config/compass.ts`, nicht neu aufgeschrieben: Filter, Profil-Editor und
+ * Assistent müssen dieselbe Liste sehen, sonst filtert man nach Kategorien, die
+ * niemand schreiben kann.
+ *
+ * Zwei Fallen stecken darin:
+ *
+ * 1. Es sind **sechs je Seite, nicht elf**. Die Elf aus dem Issue ist die
+ *    VEREINIGUNG beider Seiten — `immobilien` steht in beiden Listen.
+ * 2. Gefiltert wird auf `category`, nicht auf `value`. `compass.ts` trennt beides:
+ *    `value` ist der Entwurfs-Schlüssel im Assistenten, `category` landet in
+ *    `offers`/`needs.category`. Der Chip „expertise" schreibt „know_how" — auf
+ *    `value` zu filtern suchte nach Werten, die in der Tabelle nie stehen.
+ */
+function categoryOptions(target: "offers" | "needs") {
+  const step = COMPASS_STEPS.find((s) => s.kind === "chips" && s.target === target);
+  if (!step || step.kind !== "chips") return [];
+  return step.options
+    .filter((o) => o.category)
+    .map((o) => ({ value: o.category as string, label: o.label }));
+}
+
+export const OFFER_CATEGORY_OPTIONS = categoryOptions("offers");
+export const NEED_CATEGORY_OPTIONS = categoryOptions("needs");
 
 /** Sein·Tun·Haben·Wirken — Reihenfolge wie im Erfolgsradar/öffentlichen Profil. */
 export const THEME_OPTIONS = [
@@ -60,7 +98,9 @@ export function hasActiveFilters(f: DirectoryFilters): boolean {
     f.branche !== "" ||
     f.region !== "" ||
     f.competency !== "" ||
-    f.offering !== ""
+    f.offering !== "" ||
+    f.offers.length > 0 ||
+    f.needs.length > 0
   );
 }
 
@@ -70,6 +110,11 @@ export function filtersToArgs(f: DirectoryFilters) {
     const trimmed = s.trim();
     return trimmed === "" ? undefined : trimmed;
   };
+  // Leere Auswahl → undefined statt []. Serverseitig filtert `cardinality(...) = 0`
+  // ohnehin nicht; entscheidend ist der React-Query-Key, in den der Filterzustand
+  // als Objekt wandert — `[]` und `undefined` wären dort zwei Schlüssel für
+  // dieselbe Abfrage und damit ein zweiter, überflüssiger Netzaufruf.
+  const list = (xs: string[]) => (xs.length > 0 ? xs : undefined);
   return {
     p_query: blank(f.query),
     p_theme: blank(f.theme),
@@ -77,6 +122,8 @@ export function filtersToArgs(f: DirectoryFilters) {
     p_region: blank(f.region),
     p_competency: blank(f.competency),
     p_offering: blank(f.offering),
+    p_offers: list(f.offers),
+    p_needs: list(f.needs),
   };
 }
 
