@@ -15,16 +15,23 @@ import { describe, expect, it } from "vitest";
  * jemand erst die passende Seite mit der passenden Stufe rendern muss.
  */
 
-/** Routen, die in App.tsx ausschließlich per <Navigate> beantwortet werden. */
-const NUR_REDIRECT = [
-  "/compass",
-  "/mein-bereich",
-  "/meine-chancen",
-  "/matching",
-  "/community",
-  "/verzeichnis",
-  "/angebote-gesuche",
-];
+/**
+ * Routen, die in App.tsx ausschließlich per <Navigate> beantwortet werden —
+ * ABGELEITET, nicht gepflegt. Eine Handliste deckt nur die Redirects ab, die
+ * jemand nachgetragen hat: gemessen am 05.08. blieb der Test bei einer achten
+ * Redirect-Route samt totem Link auf sie grün, weil die Route in der Liste
+ * fehlte. Der Test hätte also genau den Fehler durchgelassen, gegen den er
+ * geschrieben wurde.
+ */
+function nurRedirectRouten(): string[] {
+  const app = readFileSync(join("src", "App.tsx"), "utf8");
+  const muster = /<Route\s+path="([^"]+)"\s+element=\{\s*<Navigate\b/g;
+  const routen = [...app.matchAll(muster)].map((m) => m[1]);
+  if (routen.length === 0) throw new Error("Keine <Navigate>-Route in App.tsx gefunden");
+  return routen;
+}
+
+const NUR_REDIRECT = nurRedirectRouten();
 
 /** Dateien, die absichtlich auf diese Pfade verweisen: die Redirects selbst. */
 const ERLAUBT = new Set(["src/App.tsx"]);

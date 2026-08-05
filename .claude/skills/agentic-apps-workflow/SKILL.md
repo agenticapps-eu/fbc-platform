@@ -226,8 +226,24 @@ If any answer gives you pause, follow the protocol.
 Run this to prove the workflow actually fired. `$SLUG` is the change slug; a
 just-archived change lives at `openspec/changes/archive/<date>-$SLUG/`.
 
+**Run this ON THE FEATURE BRANCH, before shipping.** Archive precedes ship, so
+at this point the branch still carries its individual commits. After the PR is
+merged the RED/GREEN check below can no longer pass: `pr-title` enforces
+Conventional-Commit PR titles, i.e. squash merges, so `main` holds one commit
+per change and the `test(`/`feat(` pair never lands there.
+
 ```bash
-CH=$(ls -d openspec/changes/archive/*"$SLUG" 2>/dev/null | tail -1)
+# Glob, NOT `ls -d`: on a machine where `ls` is aliased (eza, exa, `ls -l`)
+# the command substitution captures the whole long-format line instead of the
+# path. Every $CH check below then greps a non-existent file and reports a
+# WARNING, not an error — so the recipe looks like it ran and found nothing.
+# Measured on fbc-platform 2026-08-05: `ls` was `eza -lao`, and the reviewer
+# count came back empty for a change whose REVIEWS.md was present all along.
+CH=$(printf '%s\n' openspec/changes/archive/*"$SLUG" | tail -1)
+[ -d "$CH" ] || { echo "FEHLER: '$CH' ist kein Verzeichnis"; return 1 2>/dev/null || exit 1; }
+
+BASE=$(git merge-base HEAD origin/main)   # was undefined before; without it the
+                                          # RED/GREEN check silently counts 0
 
 # The spec slot states the new truth (the delta was folded, not just moved)
 openspec validate --all

@@ -2,11 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FormatHero } from "../components/ui/FormatHero";
 import { FORMAT_HERO } from "../config/formatHero";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
-import {
-  CommunitiesWidget,
-  MeineAnfragenWidget,
-  NetzwerkWidget,
-} from "../components/mein-bereich/kontakte-widgets";
+import { MeineAnfragenWidget, NetzwerkWidget } from "../components/mein-bereich/kontakte-widgets";
 import { dashboardQueryKey, fetchDashboard } from "../lib/dashboard";
 import { useAuth } from "../providers/auth-context";
 
@@ -29,10 +25,10 @@ function Inner({ uid }: { uid: string }) {
     <div className="flex flex-col gap-6">
       <FormatHero meta={FORMAT_HERO["/kontakte"]} className="" />
       <MeineAnfragenWidget uid={uid} />
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <NetzwerkWidget contactsCount={data.contactsCount} />
-        <CommunitiesWidget />
-      </div>
+      {/* Kein Grid mehr: „Meine Communities" ist ersatzlos entfernt (erfundene
+          Zahlen über das Mitglied, AGE-494 Task 7.6), und ein zweispaltiges
+          Raster mit einem Kind ließe rechts ein Loch stehen. */}
+      <NetzwerkWidget contactsCount={data.contactsCount} />
       {/* AGE-450: „Mein Matching"-Widget entfernt — Matching ist fürs Sommerfest raus. */}
     </div>
   );
