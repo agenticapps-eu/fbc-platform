@@ -255,9 +255,9 @@ Push ein Projekt mit Daten trifft (`design.md` Abschnitt C).
       `[auth.rate_limit] email_sent` 30→2, weil ein `30`, das still nicht
       greift, genau der Fehlerfall ist, den dieser Change abschaffen soll.
 
-- [ ] 6a.5 **Neu, aus der Messung:** `supabase config push` bricht nach dem
+- [x] 6a.5 **Neu, aus der Messung:** `supabase config push` bricht nach dem
       Auth-Teil ab mit `failed to read Storage config: SchemaError(Missing key
-    at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
+  at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
       Diff oben), der Storage-Teil nicht. Verdacht: CLI 2.107.0 gegen eine
       neuere API — 2.111.0 ist verfügbar. Erst CLI aktualisieren, dann erneut
       pushen und **erneut diffen**, nicht annehmen.
@@ -285,20 +285,27 @@ Push ein Projekt mit Daten trifft (`design.md` Abschnitt C).
 
 Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
-- [ ] 9.1 `config:push:prod` (Task 3.4) statt `config push` direkt — dieselbe
+- [x] 9.1 `config:push:prod` (Task 3.4) statt `config push` direkt — dieselbe
       Ref-Prüfung wie beim Migrations-Push. **Ohne `--yes`**, damit der Diff vor
       der Bestätigung sichtbar ist. Der Diff wird gezeigt.
-- [ ] 9.2 **Nicht gegen DEV pushen.** `config.toml` beschreibt PROD
+- [x] 9.2 **Nicht gegen DEV pushen.** `config.toml` beschreibt PROD
       (Entscheidung 12). DEVs Auth-Konfiguration bleibt im Dashboard.
-- [ ] 9.3 **Verifikation:** `GET /v1/projects/<prod-ref>/config/auth` erneut
-      abrufen und die fünf Zielfelder gegen die Tabelle aus Task 2.1 halten.
-      Ausdrücklich prüfen, dass `uri_allow_list` **keine** Loopback-Adresse
-      enthält.
-      Dazu ein **echter Link**: eine Passwort-Zurücksetzung anfordern und
-      prüfen, dass die Zieladresse in der `site_url`-Domain liegt und der Link
-      einlösbar ist. Ein Konfigurationswert, der richtig aussieht, ist kein
-      Beleg — der Link ist einer.
-- [ ] 9.4 Alle Baseline-Dateien liegen außerhalb des Repos mit Rechten 0600.
+- [~] 9.3 **Verifikation:** `GET /v1/projects/<prod-ref>/config/auth` erneut
+  abrufen und die fünf Zielfelder gegen die Tabelle aus Task 2.1 halten.
+  Ausdrücklich prüfen, dass `uri_allow_list` **keine** Loopback-Adresse
+  enthält.
+  **Konfigurationsteil erledigt 2026-08-05:** `site_url`,
+  `password_min_length` 10, `mailer_autoconfirm` true, `smtp_max_frequency`
+  60 — alle wie geplant; `uri_allow_list` trägt **keine** Loopback-Adresse.
+  `rate_limit_email_sent` steht bei 2 und ist ohne eigenen SMTP nicht
+  erhöhbar (6a.4).
+  **Offen: die Echt-Link-Probe.** Sie braucht ein Konto und wandert deshalb
+  hinter Task 11.
+  Dazu ein **echter Link**: eine Passwort-Zurücksetzung anfordern und
+  prüfen, dass die Zieladresse in der `site_url`-Domain liegt und der Link
+  einlösbar ist. Ein Konfigurationswert, der richtig aussieht, ist kein
+  Beleg — der Link ist einer.
+- [x] 9.4 Alle Baseline-Dateien liegen außerhalb des Repos mit Rechten 0600.
       _Nachgemessen für das alte Projekt: die Datei enthält keine Zugangsdaten
       (57 Felder mit sensiblem Namen, sechs nicht leer, alle Einstellungen oder
       Mail-Vorlagen). Auf einem Projekt mit eigenem SMTP wäre das anders —
