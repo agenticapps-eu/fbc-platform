@@ -274,22 +274,28 @@ at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
 
 ## 7. Migrationen auf PROD
 
-- [ ] 7.1 Alle 40 Migrationen anwenden — über den in Task 3 gebauten Weg, nicht
+- [x] 7.1 Alle 40 Migrationen anwenden — über den in Task 3 gebauten Weg, nicht
       von Hand. Das ist zugleich dessen erster echter Lauf.
-- [ ] 7.2 **Verifikation:** `supabase migration list` gegen **beide** Projekte,
+- [x] 7.2 **Verifikation:** `supabase migration list` gegen **beide** Projekte,
       Ausgabe je vollständig zeigen. Diff-frei.
       _Ausgangslage zum Vergleich: das bestehende Projekt ist heute diff-frei,
       40 lokale Dateien zu 40 Remote-Zeilen._
 
 ## 8. Storage
 
-- [ ] 8.1 Prüfen, dass der `avatars`-Bucket auf PROD existiert (kommt aus
+- [x] 8.1 Prüfen, dass der `avatars`-Bucket auf PROD existiert (kommt aus
       `20260613081627_profile_editor_storage.sql` mit `db push`).
-- [ ] 8.2 Einen Upload gegen PROD testen und danach **wieder löschen**.
-- [ ] 8.3 **Verifikation:** Bucket vorhanden, Upload in den eigenen Ordner
-      erlaubt, Upload in einen fremden Ordner abgelehnt (die RLS-Policy ist der
-      eigentliche Prüfgegenstand, nicht die Existenz des Buckets). Keine
-      Demo-Avatare auf PROD — das ist gewollt.
+- [~] 8.2 Einen Upload gegen PROD testen und danach **wieder löschen**.
+- [~] 8.3 **Verifikation:** Bucket vorhanden, Upload in den eigenen Ordner
+  erlaubt, Upload in einen fremden Ordner abgelehnt (die RLS-Policy ist der
+  eigentliche Prüfgegenstand, nicht die Existenz des Buckets). Keine
+  Demo-Avatare auf PROD — das ist gewollt.
+  **Teilweise erledigt 2026-08-05.** Bucket `avatars` steht (`public = true`),
+  und die drei Policies auf `storage.objects` sind da: `avatars_insert_own`
+  (WITH CHECK), `avatars_update_own`, `avatars_delete_own` — jeweils nur für
+  `authenticated` und nur im Ordner `(storage.foldername(name))[1] =
+    auth.uid()`. **Der Upload-Versuch selbst wandert hinter Task 11**: er
+  braucht eine echte Sitzung, und auf PROD gibt es noch keine Konten.
 
 ## 9. Auth-Konfiguration auf PROD
 
@@ -323,16 +329,16 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 10. Edge Functions auf PROD
 
-- [ ] 10.1 **Drei** Functions deployen: `create-checkout-session`,
+- [x] 10.1 **Drei** Functions deployen: `create-checkout-session`,
       `stripe-webhook`, `notify-contact-request`.
       **Nicht vier** — `send-activation` existiert nicht und entsteht in C3
       (Entscheidung 1). Als offener Nachlauf ins Runbook.
-- [ ] 10.2 Die 15 von Hand gesetzten Secrets aus Infisical übertragen. Die 7
+- [x] 10.2 Die 15 von Hand gesetzten Secrets aus Infisical übertragen. Die 7
       plattform-injizierten (`SUPABASE_URL`, `SUPABASE_ANON_KEY`,
       `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `SUPABASE_JWKS`,
       `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS`) **nicht** setzen.
       `APP_URL`/`APP_URLS` bekommen die PROD-Adresse, nicht die von DEV.
-- [ ] 10.3 **Verifikation:** je ein Smoke-Test.
+- [x] 10.3 **Verifikation:** je ein Smoke-Test.
       `create-checkout-session` ohne JWT → 401 (`verify_jwt = true`).
       `stripe-webhook` mit falscher Signatur → Ablehnung.
       `notify-contact-request` mit falschem Bearer → 401.
@@ -342,6 +348,17 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       _`getUser()`/`getClaims()` scheitern hier projektweit an den asymmetrischen
       Signing Keys; die Functions lesen `sub` aus dem Gateway-verifizierten JWT.
       Ein 401 aus dieser Ecke wäre eine andere Ursache als ein fehlendes Secret._
+
+      **Erledigt 2026-08-05, alle drei lehnen korrekt ab:**
+      `create-checkout-session` ohne JWT → `401 UNAUTHORIZED_NO_AUTH_HEADER`
+      (Gateway, `verify_jwt = true` greift) ·
+      `stripe-webhook` mit falscher Signatur → `400 Bad signature` (die Prüfung
+      ist gelaufen, das Secret liegt also an) ·
+      `notify-contact-request` mit falschem Bearer → `401 Unauthorized`.
+      Secrets: 22 auf beiden Projekten, je 15 selbst gesetzt + 7
+      plattform-injiziert. `APP_URL`/`APP_URLS` tragen auf PROD
+      `https://fbc-platform.pages.dev` — kein localhost, gleiche Begründung
+      wie bei der Auth-Allow-List.
 
 ## 11. Admin-Konten und Rollen
 
