@@ -141,6 +141,16 @@ für beides — das war zirkulär.
       **Muss fehlschlagen, wenn es nicht messen kann** (Secret fehlt, DB nicht
       erreichbar). Ein Gate, das bei Nichtwissen grün wird, baut die
       Juni-Havarie eine Ebene höher nach.
+      **Nachgezogen 2026-08-05, aus Schaden:** die erste Fassung war ein
+      `sed`-Parser in Bash. Die Supabase-CLI stellte zwischen 2.107.0 und
+      2.111.0 von einer ASCII-Tabelle auf JSON um — der Parser fand danach
+      **keine einzige Zeile**. Rot wurde das Gate nur wegen der Kreuzprobe
+      gegen die Dateien im Repo; ohne sie hätte es „keine Abweichung"
+      gemeldet, während auf PROD null von 40 Migrationen standen.
+      Die Auswertung liegt jetzt geprüft in `scripts/migration-drift.logic.ts`
+      (10 Fälle), das Format wird explizit angefordert, und die vier
+      „wirft"-Tests sind gegen eine absichtlich nachlässige Variante
+      gegengeprüft.
 - [x] 4.3 `migrate-prod`: `workflow_dispatch`, `environment: production` mit
       Freigabepflicht (Entscheidung 13). Gibt **vor** dem Anwenden den
       aufgelösten Host und den `--dry-run` ins Log — die Freigabe wird auf
@@ -257,7 +267,7 @@ Push ein Projekt mit Daten trifft (`design.md` Abschnitt C).
 
 - [x] 6a.5 **Neu, aus der Messung:** `supabase config push` bricht nach dem
       Auth-Teil ab mit `failed to read Storage config: SchemaError(Missing key
-  at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
+at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
       Diff oben), der Storage-Teil nicht. Verdacht: CLI 2.107.0 gegen eine
       neuere API — 2.111.0 ist verfügbar. Erst CLI aktualisieren, dann erneut
       pushen und **erneut diffen**, nicht annehmen.
