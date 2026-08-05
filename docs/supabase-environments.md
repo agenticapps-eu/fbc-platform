@@ -284,6 +284,69 @@ pnpm config:push:prod     # prüft den Ref maschinell, zeigt dann den Diff
 > Allow-List um `https://*.fbc-platform.pages.dev` **verkürzt** — auf dem
 > laufenden Projekt.
 
+### Was `config push` wirklich anfasst — gemessen, nicht vermutet
+
+Am 2026-08-05 am **leeren** PROD-Projekt `viwntbodrtqxgmqyxluh` gemessen:
+Auth-Baseline über die Management-API ziehen → `config push` → Baseline erneut
+→ über alle 242 Felder diffen.
+
+**Geplant waren fünf Felder. Bewegt haben sich zehn — und einer der fünf war
+nicht dabei.**
+
+| Feld | vorher | nachher | geplant? |
+|---|---|---|---|
+| `site_url` | `http://localhost:3000` | `https://fbc-platform.pages.dev` | ja |
+| `uri_allow_list` | `''` | die drei Einträge | ja |
+| `password_min_length` | 6 | 10 | ja |
+| `mailer_autoconfirm` | false | true | ja (`enable_confirmations = false`) |
+| **`rate_limit_email_sent`** | **2** | **2** | **ja — aber NICHT angekommen** |
+| `smtp_max_frequency` | 60 | 1 | **nein** |
+| `mfa_totp_enroll_enabled` | true | false | **nein** |
+| `mfa_totp_verify_enabled` | true | false | **nein** |
+| `mailer_otp_length` | 8 | 6 | **nein** |
+| `password_required_characters` | `None` | `''` | **nein** (kosmetisch) |
+| `custom_oauth_max_providers` | 3 | 32767 | **nein** (unerklärt, s. u.) |
+
+**Die Antwort auf die offene Frage lautet also: ja.** `config push` überträgt
+die *ganze* Datei, nicht die Absicht. Jeder Wert, den man nie angefasst hat —
+also jede CLI-Vorgabe für die lokale Entwicklung — wird zur Aussage über PROD.
+`smtp_max_frequency` von 60 auf 1 herunterzusetzen war niemandes Absicht und
+wäre auf einem Projekt mit echten Mitgliedern ein Verstärker.
+
+**Konsequenz für Task 9.2 (Push gegen ein Projekt mit Daten):** vor jedem
+`config push` auf ein bewohntes Projekt gilt derselbe Ablauf wie hier —
+Baseline, Push, Baseline, Diff über alle Felder. Der Diff, den die CLI selbst
+anzeigt, reicht nicht: er zeigt die Felder, aber nicht, welche davon niemand
+bewusst gesetzt hat.
+
+`custom_oauth_max_providers` sprang auf denselben Wert, den das alte Projekt
+trägt (32767). Ob das der Push war oder die Provisionierung des frischen
+Projekts, ist **nicht geklärt** — der Wert steht in keiner `config.toml`.
+Harmlos (mehr erlaubte Provider), aber hier als offen vermerkt statt
+weggeschrieben.
+
+### Die E-Mail-Rate lässt sich ohne eigenen SMTP nicht erhöhen
+
+Der Versuch, `rate_limit_email_sent` direkt über die Management-API zu setzen,
+beantwortet, warum der Push ihn ausgelassen hat:
+
+```
+PATCH /v1/projects/<ref>/config/auth   {"rate_limit_email_sent": 30}
+→ HTTP 401
+  Custom SMTP required to configure SMTP_SENDER_NAME or RATE_LIMIT_EMAIL_SENT.
+  Missing SMTP_ADMIN_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+```
+
+**Ohne eigenen SMTP deckelt die Plattform bei 2 Auth-Mails pro Stunde —
+projektweit, nicht pro Nutzer.** Das betrifft „Passwort vergessen" und
+E-Mail-Änderungen; der Transaktionsversand über Resend/Edge Functions ist
+davon unberührt. Mit ~70 Mitgliedern ab dem 17.08. heißt das: zwei
+Zurücksetzungen in einer Stunde, danach bekommt niemand mehr eine.
+
+Das ist **kein Konfigurationsfehler, sondern eine fehlende Zutat**. Der Weg
+ist ein eigener SMTP (Resend, kommt mit C3), und danach wird der Wert
+gemessen, nicht angenommen.
+
 > ⚠️ **`config.toml` beschreibt PROD, nicht beide Projekte.** Sie wird
 > ausschließlich gegen PROD gepusht. **DEVs Auth-Konfiguration lebt im
 > Dashboard und ist bewusst nicht versioniert** — wer DEV ändert, ändert es

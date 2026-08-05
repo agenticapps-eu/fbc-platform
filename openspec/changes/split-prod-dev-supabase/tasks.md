@@ -227,13 +227,40 @@ Diese Frage ist offen und wird am leeren Projekt beantwortet, **bevor** je ein
 Push ein Projekt mit Daten trifft (`design.md` Abschnitt C).
 
 - [x] 6a.1 Auth-Baseline des neuen, noch unberührten Projekts ziehen.
-- [ ] 6a.2 `config push` gegen dieses Projekt.
-- [ ] 6a.3 Baseline erneut ziehen und beide Stände über **alle 242 Felder**
+- [x] 6a.2 `config push` gegen dieses Projekt.
+- [x] 6a.3 Baseline erneut ziehen und beide Stände über **alle 242 Felder**
       diffen.
-- [ ] 6a.4 **Verifikation:** die Liste der Felder, die sich geändert haben,
+- [x] 6a.4 **Verifikation:** die Liste der Felder, die sich geändert haben,
       ohne in `config.toml` zu stehen. Ist sie leer, ist die Sorge ausgeräumt.
       Ist sie es nicht, gehört jedes Feld darin ins Runbook — und Task 9.2
       gegen ein Projekt mit Daten wird neu bewertet.
+
+      **Gemessen 2026-08-05. Die Liste ist NICHT leer — die Sorge war
+      berechtigt.** Geplant waren fünf Felder, bewegt haben sich **zehn**, und
+      einer der fünf ist **nicht angekommen**:
+      ungewollt verändert: `smtp_max_frequency` 60→1 · `mfa_totp_enroll_enabled`
+      true→false · `mfa_totp_verify_enabled` true→false · `mailer_otp_length`
+      8→6 · `password_required_characters` None→'' · `custom_oauth_max_providers`
+      3→32767 (unerklärt, steht in keiner `config.toml`).
+      **`rate_limit_email_sent` blieb auf 2.** Ein direkter PATCH über die
+      Management-API antwortet `HTTP 401 Custom SMTP required to configure ...
+      RATE_LIMIT_EMAIL_SENT` — der Wert ist ohne eigenen SMTP nicht erhöhbar.
+      Volle Tabelle im Runbook, Abschnitt „Was `config push` wirklich anfasst".
+      **Folge für Task 9.2:** vor jedem Push auf ein bewohntes Projekt derselbe
+      Ablauf — Baseline, Push, Baseline, Diff über alle Felder. Der Diff, den
+      die CLI selbst zeigt, reicht nicht: er nennt die Felder, aber nicht,
+      welche davon niemand bewusst gesetzt hat.
+      **Zwei Werte in `config.toml` daraufhin korrigiert:**
+      `[auth.email] max_frequency` 1s→60s (der Push hatte 60→1 gesetzt) und
+      `[auth.rate_limit] email_sent` 30→2, weil ein `30`, das still nicht
+      greift, genau der Fehlerfall ist, den dieser Change abschaffen soll.
+
+- [ ] 6a.5 **Neu, aus der Messung:** `supabase config push` bricht nach dem
+      Auth-Teil ab mit `failed to read Storage config: SchemaError(Missing key
+    at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
+      Diff oben), der Storage-Teil nicht. Verdacht: CLI 2.107.0 gegen eine
+      neuere API — 2.111.0 ist verfügbar. Erst CLI aktualisieren, dann erneut
+      pushen und **erneut diffen**, nicht annehmen.
 
 ## 7. Migrationen auf PROD
 
