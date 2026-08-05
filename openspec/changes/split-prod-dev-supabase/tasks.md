@@ -492,8 +492,21 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 15. Sicherheitsabnahmen
 
-- [ ] 15.1 `/cso` → `SECURITY.md`. Der Change fasst Auth-Konfiguration, Secrets
+- [x] 15.1 `/cso` → `SECURITY.md`. Der Change fasst Auth-Konfiguration, Secrets
       und Storage-Policies an.
+      **Erledigt 2026-08-05, `SECURITY.md`: keine Critical, zwei MITTEL.**
+      Kein Geheimnis im Diff, kein `pull_request_target`, keine
+      Script-Injection, Branch-Name über `env:` gequotet, `permissions:`
+      minimal, Drittanbieter-Actions SHA-gepinnt.
+      **Befund 1 stammt aus diesem Change:** 13 von 15 Function-Secrets sind auf
+      beiden Projekten byte-identisch. Über den geteilten
+      `CONTACT_WEBHOOK_SECRET` lassen sich FBC-gebrandete Mails mit frei
+      gewähltem Text an echte Mitglieder auslösen (die Empfängeradresse kommt
+      **nicht** aus dem Payload — das begrenzt den Schaden). Fix: eigenes
+      Secret für PROD, zwei Handgriffe, vor dem 17.08.
+      **Befund 2:** auf produktives DDL wirkt nur noch der Handauslöser —
+      Environment-Freigabe zurückgestellt, keine CODEOWNERS. Vertretbar bei
+      einem Entwickler, nicht mehr ab dem zweiten.
 - [x] 15.2 `database-sentinel:audit` gegen **beide** Projekte → `DB-AUDIT.md`.
       Critical + High blockieren.
       **Erledigt 2026-08-05: keine Critical, keine High** → nichts blockiert.
