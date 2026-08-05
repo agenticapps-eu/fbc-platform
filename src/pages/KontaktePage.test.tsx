@@ -75,10 +75,21 @@ function renderPage() {
 }
 
 describe("KontaktePage", () => {
-  it("zeigt Netzwerk und Communities", async () => {
+  it("zeigt das Netzwerk", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: "Mein Netzwerk" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Meine Communities" })).toBeInTheDocument();
+  });
+
+  // Derselbe Fall wie „Aktivität & Portfolio" in AGE-494 (Task 7.6), nur auf
+  // dieser Seite: drei erfundene Communities mit erfundenen Mitgliederzahlen,
+  // präsentiert als die des Mitglieds. Ab dem 17.08. sehen das echte Menschen.
+  // Bewusst KEIN Leerzustand als Ersatz — Communities existieren in Phase 1
+  // nicht, ein „Noch keine Communities" verspräche eine Funktion, die es nicht
+  // gibt.
+  it("zeigt kein Communities-Widget mehr", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    expect(screen.queryByRole("heading", { name: "Meine Communities" })).toBeNull();
   });
 
   // AGE-450: Matching ist fürs Sommerfest raus — das „Mein Matching"-Widget

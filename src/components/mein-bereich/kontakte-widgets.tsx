@@ -18,11 +18,6 @@ import { categoryLabel, findCategory, type MatchingSide } from "../../config/mat
 import { CardLink, DashboardCard, DemoBadge } from "./building-blocks";
 
 // ── Demo-Daten (profile-spec §5: DEMO-Widgets, in Phase 2 durch echte Daten ersetzt) ──
-const DEMO_COMMUNITIES = [
-  { name: "Unternehmer-Kreis Süd", members: 142 },
-  { name: "Immobilien & Beteiligungen", members: 87 },
-  { name: "Legacy Mastermind", members: 24 },
-];
 const DEMO_NETWORK = [
   { label: "Freunde", count: 24 },
   { label: "Preferred Partner", count: 8 },
@@ -135,21 +130,11 @@ function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest })
   );
 }
 
-// 5 ── Meine Communities (DEMO) ────────────────────────────────────────────────
-export function CommunitiesWidget() {
-  return (
-    <DashboardCard id="communities" title="Meine Communities" demo>
-      <ul className="flex flex-col gap-3">
-        {DEMO_COMMUNITIES.map((c) => (
-          <li key={c.name} className="flex items-center justify-between gap-3">
-            <span className="truncate text-sm font-medium text-ink">{c.name}</span>
-            <span className="shrink-0 text-xs text-muted">{c.members} Mitglieder</span>
-          </li>
-        ))}
-      </ul>
-    </DashboardCard>
-  );
-}
+// 5 ── „Meine Communities" ersatzlos entfernt ─────────────────────────────────
+// Derselbe Fall wie „Aktivität & Portfolio" in AGE-494 (Task 7.6): erfundene
+// Zahlen ÜBER DAS MITGLIED SELBST — drei Communities mit Mitgliederzahlen, die
+// niemand hat. Die Demo-Marke machte sie nicht wahr, nur seltener gelesen.
+// Bewusst kein Leerzustand als Ersatz: Communities existieren in Phase 1 nicht.
 
 // 6 ── Mein Netzwerk (CORE-Count, DEMO-Listen) ─────────────────────────────────
 export function NetzwerkWidget({ contactsCount }: { contactsCount: number }) {

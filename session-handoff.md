@@ -1,134 +1,111 @@
-# Session Handoff — 2026-08-05 (8. Session)
+# Session Handoff — 2026-08-05 (9. Session)
 
 ## Stand in einem Satz
 
-**C4 / AGE-496 ist gebaut, ausgerollt und als PR #112 offen.** 24 Commits auf
-`donald/age-496-c4-supabase-trennen-neues-prod-projekt-altes-wird-devdemo`,
-CI grün. **7 Task-Punkte offen**, davon 5 erst nach dem Merge machbar.
+**C3 ist bewusst NICHT gestartet.** Diese Session hat die Nachläufe aus dem
+8.-Session-Handoff abgearbeitet (AGE-501) und dabei zwei Dinge gefunden, die
+dort nicht standen — beide betreffen Kontrollen, die aussahen, als liefen sie.
 
-## Accomplished
+## Die zwei Funde, die diese Session ausmachen
 
-**PROD (`viwntbodrtqxgmqyxluh`, `eu-central-1`, Org `factiv`) steht vollständig:**
-40 Migrationen (diff-frei gegen beide Projekte) · Auth- und
-Storage-Konfiguration nachgemessen · `avatars`-Bucket mit belegter RLS ·
-3 Edge Functions, 22 Secrets, alle drei lehnen nachweislich korrekt ab ·
-Webhook-Funktion und -Trigger · 2 Admin-Konten (`donald@factiv.eu`,
-`detlev.krause@dkrealinvest.com`), `is_admin()` beidseitig `true`,
-`anon` darf die Funktion nicht einmal ausführen · **0 Demo-Personas**.
+**1. 33 Deno-Tests liefen nie in CI.** `.github/workflows/` enthielt keinen
+einzigen Deno-Schritt, und `pnpm test` sieht die Edge Functions nicht — sie sind
+Deno, nicht Node. Ungeprüft lagen damit genau die Grenzen, an denen Fremdverkehr
+ankommt: **Stripe-Signaturprüfung** (manipulierter Body, falsches Secret,
+veralteter Zeitstempel), **Open-Redirect-Schutz** in `resolveReturnBase`,
+**HTML-Escaping** der Mail-Templates, **Fail-Closed** ohne `old_record`.
+Job `edge-functions` ergänzt, `deno.lock` per `--frozen` verankert. Alle 33 grün
+— sie waren nie kaputt, nur nie gefragt.
 
-**Repo:** `config.toml` beschreibt PROD · `db:push:prod`/`config:push:prod` mit
-zweistufiger Zielprüfung · Migrations-Drift-Gate **und** Objekt-Drift-Scan,
-beide unter Test · drei CI-Jobs + eigener `migrate-prod`-Workflow ·
-DEV-Kennzeichnung in der App · ADR-0004, Runbook, `secrets.md`, `ci-cd.md`,
-`.env.example` · `DB-AUDIT.md`.
+**2. Das Verifikations-Rezept des Workflow-Skills lieferte stillschweigend
+Müll** (AGE-502). Der 8.-Session-Handoff notierte hier eine Prozesslücke; die
+echte ist schlimmer und eine andere. `CH=$(ls -d …)` bricht an jedem `ls`-Alias
+— hier `eza -lao` — und fängt die ganze Langformat-Zeile statt des Pfads. Jede
+`$CH`-Prüfung greppt daraufhin ins Leere und meldet das als **Warnung**:
 
-387 Tests · `openspec validate --all` 26/26 · GitHub-Secrets gesetzt.
+| an C4 gemessen | vorher   | nachher |
+| -------------- | -------- | ------- |
+| Reviewer-Zahl  | _(leer)_ | **3**   |
+| offene Tasks   | _(leer)_ | 0       |
 
-**Die Kernzusage hält, am Bundle gemessen:** Preview und Produktiv-Auslieferung
-enthalten beide **nur** `foelowldexkcqzewvrcf`. PROD ist aufgesetzt, aber
-unbenutzt, bis die Go-Live-Woche zwei `VITE_*`-Werte umstellt.
+Das Rezept sah aus, als hätte es geprüft und nichts gefunden — bei einem Change,
+dessen `REVIEWS.md` mit drei Reviewern die ganze Zeit dalag. Dazu: `$BASE` war
+nie definiert, und der Branch-Kontext fehlte. Projektkopie korrigiert und einmal
+durchlaufen; **der dauerhafte Fix liegt upstream im `claude-workflow`-Snapshot**
+und betrifft alle sieben Projekte.
+
+## Erledigt (AGE-501)
+
+- **Flaky Test** `ThemeServerSync.test.tsx:121` — mit einem `MutationObserver`
+  gemessen: wenn das DOM `navy` zeigt, steht im `localStorage` noch `hell`.
+  Render-Wert vs. Effect-Wert. Beide Zusicherungen jetzt im selben `waitFor`,
+  10/10 grün.
+- **`NUR_REDIRECT` abgeleitet** statt handgepflegt. Belegt: eine achte
+  Redirect-Route samt totem Link ließ der alte Test grün durch.
+- **Roher `23505`** in `ProfilPage` übersetzt, mit `invalidateQueries` statt
+  „nochmal versuchen". Rot → grün belegt.
+- **„Meine Communities" ersatzlos entfernt** (Entscheidung Donald, 05.08.) —
+  derselbe Fall wie „Aktivität & Portfolio" in AGE-494 7.6. Grid auf eine Spalte.
+- **Arbeitsbaum**: `.planning/skill-observations/` und `*.pre-NNNN` ignoriert,
+  zwei redundante Sicherungskopien gelöscht.
+
+**Bewusst nicht gemacht:** `ChipGroup`/`ChipFilterGroup` bleiben doppelt. Sie
+unterscheiden sich nur in zwei Utility-Klassen; eine gemeinsame Komponente
+bräuchte eine `size`-Prop — die Abstraktion, die CLAUDE.md §2 untersagt und die
+das AGE-494-Review schon zurückgewiesen hatte. Bei einer dritten Chip-Gruppe neu
+bewerten.
+
+Lauf: **lint 0 Fehler** (3 vorbestehende `react-refresh`-Warnungen) · typecheck
+sauber · **397 Vitest in 64 Dateien** · **33 Deno-Tests** · Build ✓ ·
+`openspec validate --all` 26/26.
 
 ## Next session: start here
 
-**1. `/cso` → `SECURITY.md` (Task 15.1).** Der letzte Task, der ohne Merge
-geht. Der Change fasst Auth-Konfiguration, Secrets und Storage-Policies an.
-`DB-AUDIT.md` (Task 15.2) liegt schon vor und sollte als Eingabe dienen, nicht
-noch einmal erhoben werden.
+**Zwei Dinge stehen offen, bevor irgendetwas Neues anfängt:**
 
-**2. Mergen.** Danach laufen `migrate-dev` und `drift-gate` zum ersten Mal
-echt. Erwartung: beide grün, weil beide Projekte 40/40 abweichungsfrei sind.
-Erwartung, kein Beleg — wären die GitHub-Secrets vertauscht, fiele es genau
-dort auf.
+1. **Stage-2-Code-Review für AGE-501 ist NICHT gelaufen.** Ein unabhängiges
+   Review braucht einen Subagenten, und diese Session durfte keinen starten.
+   `/code-review` oder `/pr-review-toolkit:review-pr` auf den PR ansetzen, bevor
+   gemerged wird. `openspec validate` ersetzt das nicht.
+2. **Der Dev-Server lief auf `localhost:5173`** für die Sichtprüfung von
+   `/kontakte` nach dem Entfernen von „Meine Communities". Ein eingeloggter
+   Screenshot war ohne Zugangsdaten nicht möglich — **die Sichtprüfung steht
+   noch aus.**
 
-**3. Die Abnahmen, die den ganzen Change tragen (16.2 / 16.2a / 16.2b).**
-Ein grünes Gate beweist nichts, ein rotes beweist alles:
+Danach ist **C3 (AGE-495)** der nächste Change. Vorarbeit dieser Session: drei
+seiner Abnahmepunkte sind durch C4 bereits erfüllt (`minimum_password_length`
+= 10, `site_url` gesetzt, Redirect-Allow-List gezogen) — die Issue-Beschreibung
+ist an diesen Stellen veraltet. Im Code ist C3 **grüne Wiese**: weder
+`profiles.activated_at` noch `activation_tokens` noch `send-activation`
+existieren. Linear führt AGE-495 als blockiert durch **AGE-256** (DNS-Zugang für
+SPF/DKIM auf `fairbusinessclub.de`) — das blockiert aber nur die
+Zustell-Abnahme, nicht den Sicherheitskern (RLS-Gate, Token, Aktivierungsschirm).
 
-- **16.2** Wegwerf-Migration lokal anlegen, **nicht** auf PROD anwenden →
-  `drift-gate` muss rot werden und `deploy` verhindern. Danach zurücknehmen.
-- **16.2a** andere Richtung: eine Migration remote verzeichnen, die lokal
-  fehlt → ebenfalls rot. **Gegen DEV proben, nicht gegen PROD.**
-- **16.2b** `migrate-dev` gezielt scheitern lassen → `deploy` darf nicht
-  starten, obwohl PROD abweichungsfrei ist.
+## Offene Nachläufe
 
-**4.** Dann 16.4 (`openspec validate`), 16.5 (Code-Review in unabhängigem
-Kontext), 16.6 (Linear — erst `get_issue` lesen, die GitHub-Automation schaltet
-selbst), `openspec archive`, Merge.
-
-## Was beim Bauen schiefging — die fünf Sachen, die den Change erklären
-
-1. **`config push` überträgt die ganze Datei, nicht die Absicht.** Am _leeren_
-   PROD-Projekt gemessen: geplant fünf Felder, bewegt **zehn**. Ungewollt u. a.
-   `smtp_max_frequency` 60→1 und MFA/TOTP aus. Genau dafür lief die Messung am
-   leeren Projekt.
-2. **Die Auth-Mail-Rate lässt sich nicht erhöhen.** `HTTP 401 Custom SMTP
-required`. Ohne eigenen SMTP: **2 Mails/Stunde projektweit**. „Passwort
-   vergessen" ist bis C3 kein verlässlicher Weg. `email_sent` steht deshalb auf
-   `2` statt auf einem `30`, das still nicht greift.
-3. **Das Drift-Gate wäre blind geworden.** Die Supabase-CLI stellte zwischen
-   2.107.0 und 2.111.0 von ASCII-Tabelle auf JSON um; der `sed`-Parser fand
-   keine Zeile. Rot wurde es nur wegen der Kreuzprobe gegen die Repo-Dateien —
-   sonst hätte es „keine Abweichung" gemeldet, während **0 von 40** Migrationen
-   auf PROD standen. Auswertung liegt jetzt unter Test.
-4. **`migrate-prod.yml` hätte bei jedem Lauf abgebrochen** — eigene Regex auf
-   `db.<ref>.supabase.co`, unsere URLs sind Pooler-URLs.
-5. **Der Pooler-Host ist pro PROJEKT verschieden**, nicht pro Region (alt
-   `aws-1`, neu `aws-0`), und `db.<ref>.supabase.co` löst nur auf IPv6 auf —
-   aus CI nicht erreichbar.
-
-Dazu zwei eigene Messfehler, beide korrigiert und im jeweiligen Dokument
-benannt: das Drift-Gate wurde anfangs aus dem falschen Grund rot
-(Spaltentrennzeichen ging verloren), und die erste Sichtbarkeitsmessung im
-DB-Audit zählte alle Tabellen in _einer_ Transaktion — nach der ersten
-Verweigerung meldete jede weitere Zeile „verweigert", was sich wie „anon sieht
-nichts" las.
-
-## Decisions (alle von Donald, 2026-08-05)
-
-- **Task 4.6 zurückgestellt:** kein `production`-Environment mit
-  Freigabepflicht, er ist der einzige Entwickler. Folge: `apply` läuft direkt
-  hinter `plan`, der Dry-Run steht im Log, aber niemand muss ihn gelesen haben.
-  Befehl zum Nachziehen im Runbook.
-- **Resend/SMTP kommt in C3, nicht in C4.** Folge siehe oben, Punkt 2.
-- **MFA/TOTP bleibt aus** — die App hat keine MFA-Oberfläche.
-- **DB-AUDIT Befund 1 auf C3 vertagt** (siehe Offene Fragen).
-- **`email_sent` von 30 auf 2 zurück**, weil ein Wert, der still nicht greift,
-  genau der Fehlerfall ist, den dieser Change abschafft.
-
-## Open questions
-
-- **DB-AUDIT Befund 1 — in C3 prüfen, nicht abnicken.** Ein frisch
-  registriertes Konto ohne Profil und Stufe sieht 36 von 37 Profilen über
-  `profiles_public` und alle `members`-Events. E-Mail-Bestätigung hebt die
-  Hürde nur von „nichts" auf „eine Wegwerf-Adresse" und ändert **nichts**
-  daran, dass die View für jedes `authenticated`-Konto lesbar ist. Drei
-  Prüffragen stehen in `DB-AUDIT.md`, inkl. der Falle, dass
-  `mailer_autoconfirm` **invertiert** zu `enable_confirmations` steht.
-- **Supabase-CA fehlt.** Der Objekt-Drift-Scan läuft mit
-  `DB_SCAN_TLS_INSECURE=1` (verschlüsselt, Server nicht authentifiziert). CA
-  liegt im Dashboard unter Settings → Database → SSL configuration; danach
-  `DB_SCAN_CA_CERT` setzen und das Flag entfernen. Sichtbar im Workflow
-  vermerkt, nicht versteckt.
-- **Echt-Link-Probe (Task 9.3) erst in der Go-Live-Woche.** Ein
-  Zurücksetzungs-Link des neuen Projekts zeigt auf `site_url` =
-  `fbc-platform.pages.dev`, und diese Auslieferung spricht noch mit dem alten
-  Projekt. Steht in der Go-Live-Checkliste.
-- **`custom_oauth_max_providers` sprang 3 → 32767** beim ersten `config push`.
-  Steht in keiner `config.toml`. Ungeklärt, harmlos.
-- **`avatars`-Bucket ist public** (DB-AUDIT Befund 2, NIEDRIG). Umstellung auf
-  signierte URLs ist ein Frontend-Eingriff, gehört nicht in C4.
-- **Nachläufe aus AGE-494**, unverändert offen: „Meine Communities" auf
-  `/kontakte` · `NUR_REDIRECT` handgepflegt · `ChipGroup`/`ChipFilterGroup`
-  dupliziert · roher `23505` beim Kategoriewechsel · Preview-Abnahme durch
-  Detlev.
+- **Supabase-CA** → `DB_SCAN_CA_CERT` setzen, `DB_SCAN_TLS_INSECURE` entfernen.
+  Braucht Dashboard-Zugang. **Falle:** `db-drift-scan.ts:56` erwartet einen
+  **Dateipfad** (`readFileSync`), GitHub-Secrets sind Strings.
+- **Beleglücke:** `grep -rl "Stage 2"` liefert im archivierten C4-Verzeichnis 0,
+  obwohl das Review lief. Marker oder Vorlage — eines von beidem fehlt (AGE-502).
+- **AGE-502 upstream fixen**, sonst überschreibt der nächste
+  `/update-agenticapps-workflow` die Korrektur der Projektkopie.
+- Go-Live-Woche: zwei `VITE_*`-Werte umstellen · Echt-Link-Probe ·
+  **Stripe-Live-Keys nur auf PROD** (12 von 15 Function-Secrets sind identisch).
+- Reviewer-Regel auf `production`, sobald ein Zweiter Schreibrechte hat.
+- Preview-Abnahme durch Detlev.
 
 ## Fallen, die weiter gelten
 
-- **`git add -A` ist in diesem Repo verboten** — der Arbeitsbaum trägt dauerhaft
-  untracked Dateien mit Rechten 0600, und das Repo ist öffentlich.
-- **`psql` gibt es auf dieser Maschine nicht.** DB-Zugriff über `pg` +
-  `SUPABASE_DB_URL_*` aus Infisical.
-- **`supabase test db` ohne Dateiliste meldet FAIL, obwohl grün** — die elf
-  `probe_*.sql` sind kein pgTAP. CI ruft bewusst nur drei Dateien auf.
-- **Der lokale Vite läuft ggf. auf IPv6** (`http://[::1]:PORT`), wenn ein
-  fremder Prozess die IPv4-Adresse desselben Ports hält. Sonst wirkt ein
-  fremder 404 wie ein Fehler der App.
+- **`git add -A` ist verboten** — dauerhaft untracked Dateien mit 0600, Repo ist
+  öffentlich.
+- **`ls` ist ein Alias auf `eza -lao`.** `$(ls …)` in einem Skript liefert
+  Langformat-Zeilen, nicht Pfade. Globs oder `command ls` benutzen. Das ist die
+  Ursache von AGE-502 und wird die nächste Kontrolle genauso still zerlegen.
+- **`psql` gibt es nicht.** DB-Zugriff über `pg` + `SUPABASE_DB_URL_*`.
+- **`supabase test db` ohne Dateiliste meldet FAIL, obwohl grün.**
+- **`@testing-library/user-event` ist nicht installiert** — hier wird
+  `fireEvent` benutzt.
+- **Der Pooler-Host ist pro Projekt verschieden** (alt `aws-1`, neu `aws-0`), und
+  `db.<ref>.supabase.co` löst nur auf IPv6 auf — aus CI nicht erreichbar.
+- **Merge immer gegenprüfen** (`state=closed merged=true`).

@@ -63,6 +63,20 @@ function errorMessage(error: unknown): string {
   return "Unbekannter Fehler.";
 }
 
+/** Postgres-Unique-Verletzung (23505) — hier: der partielle Index auf
+ *  (profile_id, category) where source = 'chip'. `saveCategorySelection` gleicht
+ *  bewusst nicht atomar ab, dieser Index ist die Absicherung; er schlägt also im
+ *  Normalbetrieb zu (zweiter Tab, veralteter Lesestand) und darf dem Mitglied
+ *  nicht als Datenbank-Wortlaut begegnen. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code: unknown }).code === "23505"
+  );
+}
+
 export default function ProfilPage() {
   const { user } = useAuth();
   // /profil ist requiresAuth — user ist hier vorhanden; defensiver Fallback.
@@ -526,6 +540,20 @@ function KompassKategorien({ uid }: { uid: string }) {
     onError: (error) => {
       if (error instanceof ConfirmationRequiredError) {
         setPendingConfirm(error.categories);
+        return;
+      }
+      if (isUniqueViolation(error)) {
+        // Der Serverstand ist nachweislich neuer als der gelesene. Neu laden
+        // statt „nochmal versuchen“ — ein zweiter Versuch mit demselben
+        // veralteten Plan liefe in denselben Index.
+        queryClient.invalidateQueries({ queryKey: profileCategoriesQueryKey(uid) });
+        setEdited(null);
+        toast({
+          variant: "error",
+          title: "Speichern fehlgeschlagen",
+          description:
+            "Eine dieser Kategorien war bereits gespeichert — vermutlich in einem zweiten Tab. Wir haben deine Auswahl neu geladen; bitte prüfe sie und speichere erneut.",
+        });
         return;
       }
       toast({

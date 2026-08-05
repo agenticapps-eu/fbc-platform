@@ -117,8 +117,16 @@ describe("eingeloggt", () => {
 
     renderApp(loggedIn);
 
-    await waitFor(() => expect(screen.getByTestId("variant")).toHaveTextContent("navy"));
-    expect(localStorage.getItem("fbc.designVariant")).toBe("navy");
+    // Beide Zusicherungen gehören IN den waitFor: das <span> trägt den Wert
+    // schon im Commit, localStorage schreibt erst der Passive Effect des
+    // DesignVariantProvider. Gemessen: in dem Moment, in dem das DOM "navy"
+    // zeigt, steht im Storage noch "hell". Stand die Storage-Prüfung draußen,
+    // hing der Test daran, dass das Polling zufällig später fiel — einmal in
+    // CI tat es das nicht.
+    await waitFor(() => {
+      expect(screen.getByTestId("variant")).toHaveTextContent("navy");
+      expect(localStorage.getItem("fbc.designVariant")).toBe("navy");
+    });
   });
 
   // Ohne member_settings-Zeile darf der lokale Wert NICHT auf den Default

@@ -24,3 +24,11 @@ coverage/
 docs/legacy-planning/qa-screens/
 docs/legacy-planning/skill-observations/
 docs/legacy-planning/design-mocks/
+
+# Dieselbe Sorte Telemetrie am neuen Ort: Skill-Session-Mitschriften (jsonl/md)
+# mit Prompt- und Tool-Verläufen. Gleiche Begründung wie oben.
+.planning/skill-observations/
+
+# Sicherungskopien, die /update-agenticapps-workflow vor einer Migration anlegt.
+# Der Vorzustand steht ohnehin in der Git-Historie.
+*.pre-[0-9][0-9][0-9][0-9]

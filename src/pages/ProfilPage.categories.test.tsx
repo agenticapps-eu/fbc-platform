@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthFixture, authAsTier } from "../test/auth-fixtures";
@@ -15,12 +15,13 @@ vi.mock("../lib/profile-categories", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/profile-categories")>();
   return { ...actual, fetchCategorySelection: vi.fn(), saveCategorySelection: vi.fn() };
 });
-import { fetchCategorySelection } from "../lib/profile-categories";
+import { fetchCategorySelection, saveCategorySelection } from "../lib/profile-categories";
 
 import ProfilPage from "./ProfilPage";
 
 const mockedProfile = vi.mocked(fetchProfileEditorData);
 const mockedCategories = vi.mocked(fetchCategorySelection);
+const mockedSave = vi.mocked(saveCategorySelection);
 
 const PROFILE: ProfileFormValues = {
   name: "Bea Lorenz",
@@ -44,6 +45,7 @@ beforeEach(() => {
   mockedProfile.mockReset();
   mockedProfile.mockResolvedValue(PROFILE);
   mockedCategories.mockReset();
+  mockedSave.mockReset();
 });
 
 /** Das Profil lädt; nur die Kategorien-Abfrage variiert je Fall. */
@@ -85,5 +87,27 @@ describe("ProfilPage — Kompass-Kategorien (AGE-494)", () => {
         screen.queryByText("Kategorien konnten nicht geladen werden."),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  /* Der partielle Unique-Index auf (profile_id, category) where source='chip'
+   * ist die einzige Absicherung gegen doppelte Chip-Zeilen — saveCategorySelection
+   * gleicht bewusst nicht atomar ab. Er schlägt also im Normalbetrieb zu
+   * (zweiter Tab, veralteter Lesestand), und dann darf der Postgres-Wortlaut
+   * nicht ins Mitgliederinterface durchschlagen. */
+  it("übersetzt eine Unique-Verletzung, statt den Postgres-Wortlaut zu zeigen", async () => {
+    mockedCategories.mockResolvedValue({ offers: [], needs: [] });
+    mockedSave.mockRejectedValue(
+      Object.assign(
+        new Error('duplicate key value violates unique constraint "offers_chip_unique"'),
+        { code: "23505" },
+      ),
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Kategorien speichern" }));
+
+    expect(await screen.findByText(/bereits gespeichert/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("duplicate key value");
+    expect(document.body.textContent).not.toContain("unique constraint");
   });
 });
