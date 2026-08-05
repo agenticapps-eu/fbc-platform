@@ -51,7 +51,21 @@ const url = dbUrl as string;
 
 // ── Stufe 2 — durch den Menschen ───────────────────────────────────────────
 
-console.log(`\nZiel: Supabase-Projekt ${ref}  (db.${ref}.supabase.co)`);
+// Den TATSAECHLICH aufgeloesten Host zeigen, nicht den aus dem Ref
+// zusammengesetzten. Ein fester `db.<ref>.supabase.co` waere eine Behauptung:
+// die Verbindung laeuft ueber den Session-Pooler, dessen Host pro Projekt
+// verschieden ist (das neue liegt auf aws-0, das alte auf aws-1). Wer eine
+// falsche Zeile bestaetigt, hat nichts bestaetigt.
+let ziel = "<Host nicht ableitbar>";
+try {
+  const p = new URL(url);
+  ziel = `${p.hostname}:${p.port || "5432"}`;
+} catch {
+  /* Stufe 1 hat den Ref bereits belegt; die Anzeige bleibt unscharf. */
+}
+
+console.log(`\nZiel: Supabase-Projekt ${ref}`);
+console.log(`Host: ${ziel}`);
 console.log(`Aktion: ${target === "db" ? "supabase db push" : "supabase config push"}\n`);
 
 if (target === "db") {

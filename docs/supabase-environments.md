@@ -109,6 +109,20 @@ Zwei Stufen, und die erste ist die wichtige:
 2. **Durch den Menschen.** Aufgelöster Zielhost, `--dry-run`, dann den
    Projekt-Ref tippen. Kein Flag, kein `y`.
 
+> **Der Pooler-Host ist pro Projekt verschieden, nicht pro Region.** Am
+> 2026-08-05 gemessen: das alte Projekt liegt auf
+> `aws-1-eu-central-1.pooler.supabase.com`, das neue auf `aws-0-…`. Wer die URL
+> eines Projekts als Vorlage für das andere nimmt, bekommt
+> `FATAL (ENOTFOUND) tenant/user postgres.<ref> not found` — die Verbindungs-URL
+> gehört aus dem Dashboard des jeweiligen Projekts kopiert, nicht abgeleitet.
+> Die Anzeige von `pnpm db:push:prod` zeigt deshalb den **tatsächlichen** Host
+> aus der URL, nicht einen aus dem Ref zusammengesetzten.
+>
+> **Und nicht die direkte Verbindung nehmen.** `db.<ref>.supabase.co` löst nur
+> auf IPv6 auf; GitHub-Actions-Runner sind IPv4. `migrate-dev` und `drift-gate`
+> könnten damit nicht messen — und ein Gate, das nicht messen kann, wird hier
+> rot.
+
 > Stufe 1 ist nicht optional und nicht kosmetisch. Ohne sie wäre die Prüfung
 > zirkulär: eine falsch hinterlegte URL zeigte einen falschen Host, der Mensch
 > tippte den falschen Ref ab, und alles wäre grün. Der erwartete Ref muss aus
