@@ -75,7 +75,7 @@ jobs:
       - name: Zielhost aufloesen
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-        run: pnpm tsx scripts/assert-prod-target.ts
+        run: pnpm tsx scripts/assert-target.ts prod
 
       - name: Migrationshistorie vergleichen
         env:
@@ -87,8 +87,13 @@ jobs:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
         run: supabase db push --db-url "$SUPABASE_DB_URL_PROD" --dry-run
 
-  # Startet erst, wenn ein erforderlicher Freigebender das Log von `plan`
-  # gesehen und zugestimmt hat (Environment `production`, kein Skip-Flag).
+  # ⚠️ ACHTUNG — `environment: production` traegt DERZEIT KEINE Reviewer-Regel.
+  #    Zurueckgestellt am 2026-08-05 (Donald ist der einzige Entwickler). Dieser
+  #    Job startet damit DIREKT hinter `plan`: Zielhost und Dry-Run stehen im
+  #    Log, aber niemand muss sie gesehen haben. Ein frueherer Kommentar hier
+  #    behauptete das Gegenteil — aufgedeckt vom Review am 2026-08-05.
+  #    Nachziehen, sobald ein Zweiter Schreibrechte auf `main` hat; Befehl in
+  #    docs/supabase-environments.md.
   apply:
     needs: plan
     runs-on: ubuntu-latest
@@ -104,6 +109,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Auch hier, nicht nur in `plan`: der SCHREIBENDE Befehl prueft sein
+      # eigenes Ziel. `plan` laeuft in einem anderen Runner und liest das Secret
+      # ein zweites Mal — und sobald die Reviewer-Regel nachgezogen wird, liegt
+      # zwischen beiden ein beliebig langes Fenster.
+      - name: Ziel pruefen — muss das PROD-Projekt sein
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: pnpm tsx scripts/assert-target.ts prod
 
       - name: Migrationen anwenden
         env:

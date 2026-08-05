@@ -83,7 +83,21 @@ const trigger = await client.query<{ name: string }>(
 const tabellen = await client.query<{ name: string }>(
   `select c.relname as name from pg_class c
      join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind = 'r' order by 1`,
+    where n.nspname = 'public' and c.relkind in ('r', 'p') order by 1`,
+);
+// Views und Materialized Views: eine von Hand angelegte View auf `profiles`
+// umgeht deren Zeilensichtbarkeit. Die erste Fassung fragte nur relkind='r' ab.
+const views = await client.query<{ name: string }>(
+  `select c.relname as name from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind in ('v', 'm') order by 1`,
+);
+// RLS ist laut CLAUDE.md die Sicherheitsgrenze des Projekts. Eine von Hand
+// hinzugefuegte Policy war fuer den Scan bisher unsichtbar.
+// (Eine ENTFERNTE Policy findet er weiterhin nicht — siehe Grenze 4 im Kopf
+// von db-drift-scan.logic.ts.)
+const policies = await client.query<{ name: string }>(
+  `select policyname as name from pg_policies where schemaname = 'public' order by 1`,
 );
 await client.end();
 
@@ -91,11 +105,19 @@ const bestand: Bestand = {
   funktionen: funktionen.rows.map((r) => r.name),
   trigger: trigger.rows.map((r) => r.name),
   tabellen: tabellen.rows.map((r) => r.name),
+  views: views.rows.map((r) => r.name),
+  policies: policies.rows.map((r) => r.name),
 };
 
 // Ein Name gilt als "in einer Migration", wenn er dort woertlich vorkommt.
 // Bewusst grob: der Scan soll Vergessenes finden, nicht SQL parsen.
-const alleNamen = [...bestand.funktionen, ...bestand.trigger, ...bestand.tabellen];
+const alleNamen = [
+  ...bestand.funktionen,
+  ...bestand.trigger,
+  ...bestand.tabellen,
+  ...bestand.views,
+  ...bestand.policies,
+];
 const inMigrationen = alleNamen.filter((n) =>
   new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(migrationsText),
 );
@@ -109,7 +131,8 @@ try {
 
 console.log(
   `Bestand: ${bestand.funktionen.length} Funktionen, ${bestand.trigger.length} Trigger, ` +
-    `${bestand.tabellen.length} Tabellen.`,
+    `${bestand.tabellen.length} Tabellen, ${bestand.views.length} Views, ` +
+    `${bestand.policies.length} Policies.`,
 );
 
 if (drift.length > 0) {

@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "build:prod": "tsc --noEmit && infisical run --env=prod -- sh -c 'VITE_SENTRY_RELEASE=$(git rev-parse HEAD) vite build'",
     "preview": "vite preview",
-    "db:push": "infisical run --env=dev -- supabase db push",
+    "db:push": "infisical run --env=dev -- sh -c 'supabase db push --db-url \"$SUPABASE_DB_URL_DEV\"'",
     "db:push:prod": "infisical run --env=prod -- tsx scripts/push-prod.ts db",
     "config:push:prod": "infisical run --env=prod -- tsx scripts/push-prod.ts config",
     "lint": "eslint .",

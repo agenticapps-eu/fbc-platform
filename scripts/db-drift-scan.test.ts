@@ -18,11 +18,11 @@ import { findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
  *     dagegen ist dieser Scan gebaut.
  */
 
-const leer: Bestand = { funktionen: [], trigger: [], tabellen: [] };
+const leer: Bestand = { funktionen: [], trigger: [], tabellen: [], views: [], policies: [] };
 
 describe("findeObjektDrift", () => {
   it("meldet nichts, wenn jedes Objekt in einer Migration steht", () => {
-    const bestand: Bestand = { funktionen: ["is_admin"], trigger: [], tabellen: ["profiles"] };
+    const bestand: Bestand = { ...leer, funktionen: ["is_admin"], tabellen: ["profiles"] };
 
     expect(findeObjektDrift(bestand, ["is_admin", "profiles"], [])).toEqual([]);
   });
@@ -37,9 +37,9 @@ describe("findeObjektDrift", () => {
 
   it("meldet ein Objekt aus der Ausnahmeliste NICHT als unbekannt", () => {
     const bestand: Bestand = {
+      ...leer,
       funktionen: ["notify_contact_request_webhook"],
       trigger: ["contact_requests_email_webhook"],
-      tabellen: [],
     };
 
     const drift = findeObjektDrift(
@@ -53,11 +53,7 @@ describe("findeObjektDrift", () => {
 
   it("meldet ein Objekt aus der Ausnahmeliste, das in der Datenbank FEHLT", () => {
     // Der Havariefall: der Trigger ist weg, der Mailversand still tot.
-    const bestand: Bestand = {
-      funktionen: ["notify_contact_request_webhook"],
-      trigger: [],
-      tabellen: [],
-    };
+    const bestand: Bestand = { ...leer, funktionen: ["notify_contact_request_webhook"] };
 
     const drift = findeObjektDrift(
       bestand,
@@ -71,11 +67,36 @@ describe("findeObjektDrift", () => {
   });
 
   it("unterscheidet Objekttypen in der Meldung", () => {
-    const bestand: Bestand = { funktionen: ["f"], trigger: ["t"], tabellen: ["x"] };
+    const bestand: Bestand = { ...leer, funktionen: ["f"], trigger: ["t"], tabellen: ["x"] };
 
     const drift = findeObjektDrift(bestand, [], []);
 
     expect(drift.map((d) => d.typ)).toEqual(["funktion", "trigger", "tabelle"]);
+  });
+
+  it("meldet eine View, die in keiner Migration steht", () => {
+    // Eine im Dashboard angelegte View auf `profiles` umgeht die
+    // Zeilensichtbarkeit der Tabelle. Die erste Fassung des Scans fragte
+    // ausschliesslich `relkind = 'r'` ab und sah Views gar nicht.
+    const drift = findeObjektDrift(
+      { ...leer, tabellen: ["profiles"], views: ["profile_leak"] },
+      ["profiles"],
+      [],
+    );
+
+    expect(drift).toEqual([{ art: "unbekannt", typ: "view", name: "profile_leak" }]);
+  });
+
+  it("meldet eine Policy, die in keiner Migration steht", () => {
+    // RLS ist laut CLAUDE.md die Sicherheitsgrenze des Projekts. Eine im
+    // Dashboard hinzugefuegte Policy war fuer den Scan bisher unsichtbar.
+    const drift = findeObjektDrift(
+      { ...leer, tabellen: ["profiles"], policies: ["profiles_read_all_oops"] },
+      ["profiles"],
+      [],
+    );
+
+    expect(drift).toEqual([{ art: "unbekannt", typ: "policy", name: "profiles_read_all_oops" }]);
   });
 
   it("wirft, wenn der Bestand leer ist — dann hat die Abfrage nichts gemessen", () => {

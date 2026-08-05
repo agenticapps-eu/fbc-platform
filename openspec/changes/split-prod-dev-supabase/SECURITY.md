@@ -183,6 +183,48 @@ vertagt, mit Prüfauftrag. Details dort.
 
 ---
 
+## Nachtrag — unabhängiges Code-Review, 2026-08-05
+
+Nach diesem Vermerk lief noch Task 16.5: ein Reviewer mit frischem Kontext auf
+den Diff, ohne die Begründungen des Autors. **Sieben Befunde, einer kritisch.**
+Alle nachgemessen statt übernommen, alle bestätigt, alle behoben.
+
+Der kritische gehört hierher, weil er die erste Zusage dieses Vermerks aushebelte
+(„Die Push-Skripte lassen sich nicht überreden"):
+
+> **`migrate-dev` schrieb ohne jede Zielprüfung.** Der Job prüfte nur, ob
+> `SUPABASE_DB_URL_DEV` _gesetzt_ ist — nicht, _wohin_ sie zeigt. Stünde dort
+> versehentlich die PROD-URL (beide sind Pooler-URLs derselben Form und wurden
+> am selben Tag angelegt), liefen Migrationen **bei jedem Merge unbeaufsichtigt
+> auf die Produktivdatenbank**. Und es fiele nicht auf: `drift-gate` misst
+> danach PROD gegen das Repo, findet nichts und wird **grün**.
+>
+> Die zweistufige Prüfung existierte — dieser Pfad berührte sie nur nie. Behoben
+> mit `scripts/assert-target.ts dev|prod`, das dieselbe geprüfte Funktion fährt
+> und jetzt **vor jedem schreibenden Schritt** in beiden Workflows steht.
+> Gegenprobe gefahren: DEV-Variable mit PROD-URL → Abbruch.
+
+Zwei weitere betrafen Aussagen dieses Vermerks direkt:
+
+- **„Die Verbindungs-URL wird nie geloggt"** stimmte nur für das erste
+  Vorkommen — `String.replace` statt `replaceAll`. Behoben.
+- **`migrate-prod.yml` behauptete im Kommentar eine Freigabepflicht, die es seit
+  der Entscheidung vom selben Tag nicht mehr gibt.** Eine falsche Zusicherung an
+  genau der Stelle, an der jemand die Sicherheitslage nachliest. Ersetzt durch
+  das, was gilt — siehe Befund 2 oben.
+
+Dazu: die Flag-Sperrliste war mit `--include-seed=true` umgehbar (nachgemessen —
+die CLI akzeptiert es), `apply` prüfte sein Ziel nicht, `pnpm db:push` hing
+weiter am unsichtbaren Link, und der Objekt-Drift-Scan sah **Views und Policies
+gar nicht**. Alles behoben; die fünf blinden Flecken, die bleiben, stehen jetzt
+im Kopf von `db-drift-scan.logic.ts`.
+
+**Was das über den Rest dieses Vermerks sagt:** er wurde vom selben Modell
+geschrieben, das den Code geschrieben hat. Die Befunde oben sind echt — aber die
+Stellen, an denen ich meine eigene Arbeit als „hält" abgehakt habe, hat erst der
+unabhängige Blick geprüft. Für die Sicherheitsabnahme heißt das: der Reviewer ist
+die Kontrolle, nicht der Vermerk.
+
 ## Status
 
 **DONE_WITH_CONCERNS.** Befund 1 stammt aus diesem Change und sollte vor dem

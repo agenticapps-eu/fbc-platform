@@ -50,6 +50,23 @@ describe("Stufe 1 — maschinell, ohne Menschen", () => {
     expect(result.kind).toBe("abort");
   });
 
+  // Die erste Fassung prüfte mit `args.includes("--include-seed")` auf exakte
+  // Gleichheit. Die Supabase-CLI akzeptiert aber auch `--include-seed=true` —
+  // nachgemessen am 2026-08-05, sie meldet kein "unknown flag". Eine Sperrliste
+  // ist damit ein Vorschlag, keine Sperre. Deshalb: nichts durchreichen.
+  test.each([
+    ["--include-seed=true", "die Umgehung der Sperrliste mit einem Gleichheitszeichen"],
+    ["--include-all", "würde Migrationen anwenden, die nicht in der Remote-Historie stehen"],
+    ["--yes", "würde die Rückfrage der CLI samt Diff abschalten"],
+    ["--db-url", "ein zweites Ziel im selben Befehl"],
+    ["--linked", "würde das Ziel über den unsichtbaren Link bestimmen"],
+    ["--irgendwas", "unbekannt — und damit erst recht nicht durchzureichen"],
+  ])("weist %s ab (%s)", (arg) => {
+    const result = evaluateStage1({ dbUrl: prodUrl, expectedRef: PROD_REF, args: [arg] });
+
+    expect(result.kind).toBe("abort");
+  });
+
   test("bricht ab, wenn die URL auf das DEV-Projekt zeigt — und fragt dabei NIE nach einer Eingabe", () => {
     const result = evaluateStage1({ dbUrl: devUrl, expectedRef: PROD_REF, args: [] });
 
