@@ -36,6 +36,59 @@ Flow: checkout (full history) → install deps → install Infisical CLI →
 Both secret-needing commands are wrapped in `infisical run`, so secrets are
 injected into the child process and never written to a file or `GITHUB_ENV`.
 
+**Seit AGE-496 hängt `deploy` an zwei Vorbedingungen** (`needs: [migrate-dev,
+drift-gate]`), die beide nur auf `main` laufen. Auf Pull Requests werden sie
+übersprungen; `if: !cancelled() && !contains(needs.*.result, 'failure')` lässt
+`deploy` dort trotzdem los.
+
+| Job           | Läuft auf        | Tut                                                              |
+| ------------- | ---------------- | ---------------------------------------------------------------- |
+| `migrate-dev` | Push auf `main`  | `supabase db push --db-url $SUPABASE_DB_URL_DEV`                  |
+| `drift-gate`  | Push auf `main`  | Migrationshistorie gegen PROD, **beidseitig** → Abweichung = rot  |
+| `deploy`      | PR + `main`      | Build + Cloudflare Pages, `needs` beide                           |
+
+**`migrate-dev` läuft bewusst nicht auf Pull Requests.** Sonst mutierte jeder
+offene PR das DEV-Projekt mit ungereviewten Migrationen, und zwei parallele PRs
+schrieben sich gegenseitig in die Historie.
+
+**`drift-gate` wird auch rot, wenn es nicht messen KANN** — fehlendes Secret, DB
+nicht erreichbar, geändertes CLI-Ausgabeformat. Ein Gate, das bei Nichtwissen
+grün wird, baut die Juni-Havarie eine Ebene höher nach. Das ist kein
+theoretischer Fall: am 2026-08-05 stellte die Supabase-CLI zwischen 2.107.0 und
+2.111.0 ihr Ausgabeformat von einer ASCII-Tabelle auf JSON um. Der damalige
+Parser fand keine einzige Zeile — rot wurde das Gate nur wegen der Kreuzprobe
+gegen die Dateien im Repo.
+
+### `.github/workflows/migrate-prod.yml` — von Hand
+
+Eigener Workflow, `workflow_dispatch`, eigene `concurrency`-Gruppe mit
+`cancel-in-progress: false`. Ein `workflow_dispatch` in `deploy.yml` löste auch
+einen Deploy aus, und dessen `cancel-in-progress: true` dürfte nie eine laufende
+PROD-Migration abbrechen.
+
+Zwei Jobs, damit die Freigabe auf etwas Lesbares fällt:
+
+| Job     | Tut                                                                        |
+| ------- | -------------------------------------------------------------------------- |
+| `plan`  | belegt, dass `migrate-dev` für **denselben Commit** grün war · löst den Zielhost auf (`scripts/assert-prod-target.ts`) · Drift-Vergleich · `--dry-run` |
+| `apply` | `supabase db push` · Historie nachher · Objekt-Drift-Scan                    |
+
+> ⚠️ **Die Freigabe-Regel ist zurückgestellt** (2026-08-05, Donald): das
+> GitHub-Environment `production` trägt **keine** Reviewer-Regel, weil er der
+> einzige Entwickler ist. `apply` startet damit direkt hinter `plan` — der
+> Dry-Run steht im Log, aber niemand muss ihn gelesen haben. Nachziehen, sobald
+> ein Zweiter am Repo arbeitet; Befehl in `docs/supabase-environments.md`.
+
+**Kein Break-Glass.** Sobald ein Merge eine Migration enthält, blockiert
+`drift-gate` jeden Frontend-Deploy, bis `migrate-prod` gelaufen ist — auch einen
+eiligen Fix ohne Bezug zur Migration. Der Ausweg ist immer derselbe:
+`migrate-prod` freigeben, dann deployen.
+
+**Nötige GitHub-Secrets:** `SUPABASE_DB_URL_DEV` und `SUPABASE_DB_URL_PROD`
+(beides Session-Pooler-URLs, siehe [secrets.md](./secrets.md)). Fehlen sie,
+werden `migrate-dev` und `drift-gate` auf `main` rot — gewollt, aber es heißt:
+erst die Secrets, dann der Merge.
+
 **Sentry:** the `@sentry/vite-plugin` (configured in `vite.config.ts`, P8) does
 the whole release **during the build**: when `SENTRY_AUTH_TOKEN` is set (prod env)
 and `VITE_SENTRY_RELEASE` names the release (`= github.sha`, main only), it uploads

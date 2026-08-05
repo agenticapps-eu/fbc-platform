@@ -438,27 +438,27 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 13. Doku
 
-- [ ] 13.1 `docs/decisions/0004-split-prod-dev-supabase.md` — löst ADR-0003 ab.
+- [x] 13.1 `docs/decisions/0004-split-prod-dev-supabase.md` — löst ADR-0003 ab.
       Kontext, Entscheidung, verworfene Alternativen (die drei aus `design.md`),
       Konsequenzen.
-- [ ] 13.2 ADR-0003 bekommt oben einen Superseded-Hinweis mit Datum und Verweis.
+- [x] 13.2 ADR-0003 bekommt oben einen Superseded-Hinweis mit Datum und Verweis.
       **Nicht löschen**, nichts anderes darin ändern.
-- [ ] 13.3 `docs/supabase-environments.md` als Runbook: welches Projekt welche
+- [x] 13.3 `docs/supabase-environments.md` als Runbook: welches Projekt welche
       Rolle trägt · wie eine Migration auf beide kommt · wie der Rollback geht ·
       die `auth`/`storage`-Falle beim Dump · der Drift-Scan · die Objekte, die
       bewusst keine Migration sind · die offenen Nachläufe (`send-activation` →
       C3, Stripe-Webhook-URL → Phase 2, Custom Domain → AGE-256, der Umzug der
       drei prod-Werte → Go-Live-Woche).
-- [ ] 13.4 `docs/secrets.md`: zwei Projekte statt einem, `SUPABASE_DB_URL_DEV`
+- [x] 13.4 `docs/secrets.md`: zwei Projekte statt einem, `SUPABASE_DB_URL_DEV`
       und `SUPABASE_DB_URL_PROD` dokumentieren — **und den falschen Satz
       streichen**, die produktiven `VITE_*`-Werte kämen aus der
       Cloudflare-Pages-Build-Umgebung (Entscheidung 10).
-- [ ] 13.5 `docs/ci-cd.md`: die drei neuen Jobs, das Gate, der Handauslöser.
-- [ ] 13.6 `.env.example` um die beiden neuen Schlüssel ergänzen.
+- [x] 13.5 `docs/ci-cd.md`: die drei neuen Jobs, das Gate, der Handauslöser.
+- [x] 13.6 `.env.example` um die beiden neuen Schlüssel ergänzen.
 
 ## 14. ⛔ HALTEPUNKT — Infisical
 
-- [ ] 14.1 `dev` auf das **alte** Projekt festnageln. Heute ist es dieselbe
+- [x] 14.1 `dev` auf das **alte** Projekt festnageln. Heute ist es dieselbe
       Adresse — danach ist es eine Zusage statt eines Zufalls.
 - [x] 14.2 `SUPABASE_DB_URL_DEV` in `dev`, `SUPABASE_DB_URL_PROD` in `prod`.
       **Vorgezogen und erledigt am 2026-08-05**, weil Task 6a ohne die
@@ -477,7 +477,7 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
       kein bestehender Wert ändert sich, `VITE_SUPABASE_URL` in `prod` bleibt
       auf dem alten Projekt (Entscheidung 7).
 - [ ] 14.3 Beide DB-URLs als GitHub-Secrets für die Jobs aus Task 4.
-- [ ] 14.4 **Verifikation:** `VITE_SUPABASE_URL` in `prod` zeigt **weiterhin**
+- [x] 14.4 **Verifikation:** `VITE_SUPABASE_URL` in `prod` zeigt **weiterhin**
       auf `foelowldexkcqzewvrcf`. Das ist die Zusage dieses Changes: der Umzug
       passiert nicht hier.
 
