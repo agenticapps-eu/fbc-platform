@@ -485,8 +485,17 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 - [ ] 15.1 `/cso` → `SECURITY.md`. Der Change fasst Auth-Konfiguration, Secrets
       und Storage-Policies an.
-- [ ] 15.2 `database-sentinel:audit` gegen **beide** Projekte → `DB-AUDIT.md`.
+- [x] 15.2 `database-sentinel:audit` gegen **beide** Projekte → `DB-AUDIT.md`.
       Critical + High blockieren.
+      **Erledigt 2026-08-05: keine Critical, keine High** → nichts blockiert.
+      0 von 28 Tabellen ohne RLS · 0 `true`-Schreib-Policies · 0 `UPDATE` ohne
+      `WITH CHECK` · 0 von 22 `SECURITY DEFINER` ohne fixen `search_path` · kein
+      Service-Role-Key im Client. Zwei Punkte zur **Entscheidung** vor dem
+      17.08. (kein Fehler, sondern eine Annahme, die nicht mehr trägt):
+      `profiles_public` ist für jedes eingeloggte Konto lesbar, und
+      Selbstregistrierung ist offen — „Mitglieder-Sichtbarkeit" heißt damit
+      faktisch „jeder, der sich anmeldet". Dazu der öffentliche `avatars`-Bucket
+      (NIEDRIG). Volles Ergebnis in `DB-AUDIT.md`.
 
 ## 16. Gesamtabnahme
 
