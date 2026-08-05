@@ -174,12 +174,18 @@ für beides — das war zirkulär.
 
 ## 5. DEV-Hinweis in der App
 
-- [ ] 5.1 **RED zuerst.** Test: bei `VITE_ENVIRONMENT !== 'prod'` ist der
+- [x] 5.1 **RED zuerst.** Test: bei `VITE_ENVIRONMENT !== 'prod'` ist der
       Hinweis im Dokument, bei `'prod'` nicht.
       _Assertion auf sichtbaren Text, nicht auf einen Klassennamen._
-- [ ] 5.2 Komponente + Einhängen in die Shell. Dauerhaft sichtbar, nicht
+- [x] 5.2 Komponente + Einhängen in die Shell. Dauerhaft sichtbar, nicht
       wegklickbar, aber nicht im Weg.
-- [ ] 5.3 **Verifikation:** Test grün **und** ein Screenshot aus der laufenden
+      **Abweichung, bewusst:** gemountet in `App.tsx` statt in `AppShell` —
+      sonst fehlte die Kennzeichnung ausgerechnet auf `/login` und
+      `/onboarding`, wo sich entscheidet, gegen welches Projekt jemand
+      arbeitet. Position: unten mittig. Unten links sitzt der Einklapp-Knopf
+      der Sidebar, unten rechts die Toasts; der erste Entwurf verdeckte den
+      Knopf — im Screenshot gesehen, nicht im Test.
+- [x] 5.3 **Verifikation:** Test grün **und** ein Screenshot aus der laufenden
       lokalen App, einer mit und einer ohne Hinweis.
       _Regel aus AGE-492: grüne Tests haben dort ein visuell falsches Ergebnis
       durchgewunken. Erst zeigen, dann committen._

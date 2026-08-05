@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
+import EnvironmentBanner from "./components/EnvironmentBanner";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
 import { ThemeServerSync } from "./providers/ThemeServerSync";
 import MembershipGate from "./components/MembershipGate";
@@ -45,6 +46,10 @@ export default function App() {
     <DesignVariantProvider>
       {/* Rendert nichts — gleicht das Theme mit member_settings.theme ab. */}
       <ThemeServerSync />
+      {/* Hier statt in AppShell: die Kennzeichnung muss auch auf den Seiten
+          stehen, die ohne Rahmen laufen (Anmeldung, Passwort zurücksetzen) —
+          gerade dort entscheidet sich, gegen welches Projekt jemand arbeitet. */}
+      <EnvironmentBanner />
       <AppInner />
     </DesignVariantProvider>
   );
