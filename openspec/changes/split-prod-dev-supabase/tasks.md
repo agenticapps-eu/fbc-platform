@@ -200,21 +200,25 @@ für beides — das war zirkulär.
 
 ## 6. ⛔ HALTEPUNKT — neues Projekt anlegen
 
-- [ ] 6.1 `supabase projects list` ausgeben und zeigen, gegen welches Projekt
+- [x] 6.1 `supabase projects list` ausgeben und zeigen, gegen welches Projekt
       gerade gearbeitet wird.
-- [ ] 6.2 Den geplanten Befehl **vorlegen und warten**: Organisation, Region,
+- [x] 6.2 Den geplanten Befehl **vorlegen und warten**: Organisation, Region,
       Plan, Projektname. Region `eu-central-1` wie das bestehende Projekt
       (DSGVO, gleiche Latenz). Organisation `factiv`.
       **Der Plan ist unbestätigt** — der Management-Token lag beim Erheben nicht
       als Datei vor. Indiz: `factiv` führt drei aktive Projekte, der Free-Tier
       deckelt bei zwei. Wird vor dem Anlegen bestätigt, nicht angenommen.
       **Hier wird nicht weitergearbeitet, bis das OK vorliegt.**
-- [ ] 6.3 Nach dem Anlegen: Ref notieren, `supabase projects list` erneut
+- [x] 6.3 Nach dem Anlegen: Ref notieren, `supabase projects list` erneut
       ausgeben.
-- [ ] 6.4 `scripts/prod-project-ref.txt` mit dem echten Ref füllen (Task 3.1)
+- [x] 6.4 `scripts/prod-project-ref.txt` mit dem echten Ref füllen (Task 3.1)
       und den Test aus 3.2 erneut fahren — der Platzhalter-Fall ist danach
       grün, weil kein Platzhalter mehr dasteht.
-- [ ] 6.5 Eigenes DB-Passwort für PROD setzen. **Nicht das geteilte aus `dev`
+- [x] 6.5 Eigenes DB-Passwort für PROD setzen.
+      **Erledigt von Donald am 2026-08-05.** Projekt `fbc-platform-prod` =
+      `viwntbodrtqxgmqyxluh`, Org `factiv`, `eu-central-1`, ACTIVE_HEALTHY.
+      Der Plan der Org ist damit belegt statt vermutet: vier aktive Projekte
+      in einer Org, der Free-Tier deckelt bei zwei. **Nicht das geteilte aus `dev`
       übernehmen** — getrennte Zugangsdaten sind eine Zusage dieses Changes.
 
 ## 6a. Messung: setzt `config push` unerwähnte Felder zurück?
@@ -222,7 +226,7 @@ für beides — das war zirkulär.
 Diese Frage ist offen und wird am leeren Projekt beantwortet, **bevor** je ein
 Push ein Projekt mit Daten trifft (`design.md` Abschnitt C).
 
-- [ ] 6a.1 Auth-Baseline des neuen, noch unberührten Projekts ziehen.
+- [x] 6a.1 Auth-Baseline des neuen, noch unberührten Projekts ziehen.
 - [ ] 6a.2 `config push` gegen dieses Projekt.
 - [ ] 6a.3 Baseline erneut ziehen und beide Stände über **alle 242 Felder**
       diffen.
@@ -350,7 +354,19 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 - [ ] 14.1 `dev` auf das **alte** Projekt festnageln. Heute ist es dieselbe
       Adresse — danach ist es eine Zusage statt eines Zufalls.
-- [ ] 14.2 `SUPABASE_DB_URL_DEV` in `dev`, `SUPABASE_DB_URL_PROD` in `prod`.
+- [x] 14.2 `SUPABASE_DB_URL_DEV` in `dev`, `SUPABASE_DB_URL_PROD` in `prod`.
+      **Vorgezogen und erledigt am 2026-08-05**, weil Task 6a ohne die
+      PROD-URL nicht messbar ist. `prod` hat Donald selbst gesetzt (der
+      Haltepunkt blieb gewahrt); `SUPABASE_DB_URL_DEV` in `dev` hat Claude
+      angelegt, ohne den Wert je auszugeben — über eine 0600-Datei, damit er
+      nicht in der Prozessliste steht.
+      _Befund dabei: der erste Versuch trug **nur das Passwort** im Schlüssel
+      `SUPABASE_DB_URL_PROD`. Stufe 1 hat das beim ersten echten Kontakt
+      abgewiesen („kein Ref ableitbar") — der Guard hat sich selbst belegt._
+      _Zweiter Befund: `db.<ref>.supabase.co` löst **nur auf IPv6** auf.
+      GitHub-Actions-Runner sind IPv4 — beide URLs müssen der Session-Pooler
+      sein (`aws-1-eu-central-1.pooler.supabase.com:5432`), sonst wären
+      `migrate-dev` und `drift-gate` von CI aus nicht messfähig._
       **Der Schreibzugriff auf `prod` wird vorher vorgelegt.** Er ist additiv:
       kein bestehender Wert ändert sich, `VITE_SUPABASE_URL` in `prod` bleibt
       auf dem alten Projekt (Entscheidung 7).
