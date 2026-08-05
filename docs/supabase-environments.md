@@ -411,8 +411,48 @@ Deploy-URL hinterher.
 
 | Was | Wohin | Status |
 |---|---|---|
+| **Eigener SMTP (Resend) als Auth-Mailer** | **C3** | **Vorbedingung für den 17.08., nicht optional — siehe unten** |
 | `send-activation` deployen | C3 | existiert noch nicht — C4 deployt **drei** Functions, nicht vier |
 | Stripe-Webhook-URL auf `<prod-ref>` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
 | Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
 | Umzug der drei prod-Werte | Go-Live-Woche | siehe oben |
 | DEV regelmäßig aus PROD auffrischen | offen | bräuchte Anonymisierung — eigener Change |
+
+### Warum der eigene SMTP kein Nice-to-have ist
+
+Entschieden am 2026-08-05 (Donald): **Resend kommt in C3, nicht in C4.** Diese
+Reihenfolge ist in Ordnung — die Konsequenz muss aber jemand kennen, solange
+sie gilt.
+
+Ohne eigenen SMTP deckelt Supabase den Auth-Mailversand bei **2 Mails pro
+Stunde, projektweit**. Nicht pro Nutzer. Gemessen, nicht vermutet: der Versuch,
+den Wert über die Management-API zu heben, antwortet
+`HTTP 401 Custom SMTP required to configure ... RATE_LIMIT_EMAIL_SENT`.
+
+Betroffen ist alles, was Supabase selbst verschickt — „Passwort vergessen" und
+E-Mail-Änderung. **Nicht** betroffen ist der Transaktionsversand über Resend in
+den Edge Functions; der läuft an Supabase vorbei.
+
+Mit ~70 Mitgliedern ab dem 17.08. heißt das konkret: zwei Zurücksetzungen in
+einer Stunde, danach bekommt die dritte Person keine Mail mehr — ohne
+Fehlermeldung im Frontend. Zwei Dinge dämpfen das, keines löst es:
+
+- `enable_confirmations = false` — Registrierungen lösen keine Mail aus, das
+  Kontingent geht also nicht schon beim Anmelden drauf.
+- `max_frequency = 60s` — ein einzelner Nutzer kann das Stundenkontingent nicht
+  mehr in zwei Sekunden aufbrauchen (vor der Korrektur stand der Wert auf 1s).
+
+**Bis C3 gilt: „Passwort vergessen" ist am Launch-Tag kein verlässlicher Weg.**
+Wer am 17.08. jemanden aussperrt, setzt das Passwort im Dashboard zurück statt
+auf die Mail zu warten.
+
+### MFA bleibt aus — Entscheidung, nicht Nebenwirkung
+
+`mfa_totp_enroll_enabled` und `mfa_totp_verify_enabled` stehen auf `false`.
+Supabase liefert neue Projekte mit `true` aus; der erste `config push` hat sie
+abgeschaltet, weil `config.toml` die lokalen CLI-Vorgaben trug.
+
+Bestätigt am 2026-08-05 (Donald): **so gewollt.** Die App hat keine
+MFA-Oberfläche — ein per API angelegter Faktor wäre ein Weg, sich selbst
+auszusperren, ohne dass die Anwendung ihn je abfragt. Wenn MFA kommt, kommt es
+mit Oberfläche und dann als eigene Entscheidung.
