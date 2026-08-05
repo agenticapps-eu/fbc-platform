@@ -11,20 +11,56 @@ injects them as environment variables into the wrapped command. That is why the
 `infisical run --env=<env> -- …`.
 
 `build` itself is **not** wrapped — it stays a plain `tsc && vite build` so CI
-(and any environment without the Infisical CLI) can compile and bundle. Real
-production `VITE_*` values are injected at the deploy platform (Cloudflare Pages
-build env). Use `build:prod` for a local build with prod secrets pulled from
-Infisical.
+(and any environment without the Infisical CLI) can compile and bundle. Use
+`build:prod` for a local build with prod secrets pulled from Infisical.
+
+> **Korrigiert 2026-08-05 (AGE-496).** Hier stand, die produktiven `VITE_*`-Werte
+> kämen aus der **Cloudflare-Pages-Build-Umgebung**. Das ist falsch und war es
+> immer: `deploy.yml` baut in GitHub Actions unter `infisical run`, Vite backt
+> die Werte dort ins Bundle, und `wrangler` lädt nur fertige Dateien hoch. Wer
+> an den Cloudflare-Variablen dreht, ändert nichts. Der Satz hätte in der
+> Go-Live-Woche Stunden gekostet.
 
 ## Environments
 
 One Infisical project (`fbc-platform`) with two environments mirroring our
 deployment stages:
 
-| Environment | Slug   | Used by                                |
-| ----------- | ------ | -------------------------------------- |
-| Development | `dev`  | `pnpm dev`, `pnpm db:push`, local work |
-| Production  | `prod` | `pnpm build:prod`, production deploys  |
+| Environment | Slug   | Supabase-Projekt              | Used by                                             |
+| ----------- | ------ | ----------------------------- | --------------------------------------------------- |
+| Development | `dev`  | `foelowldexkcqzewvrcf` (DEMO) | `pnpm dev`, `pnpm db:push`, PR-Previews, local work  |
+| Production  | `prod` | `viwntbodrtqxgmqyxluh`        | `pnpm build:prod`, `pnpm db:push:prod`, prod deploys |
+
+> **Seit AGE-496 (2026-08-05) sind das zwei verschiedene Supabase-Projekte.**
+> Vorher zeigten beide Umgebungen auf dasselbe (ADR-0003). Details:
+> `docs/supabase-environments.md`, Entscheidung: ADR-0004.
+>
+> ⚠️ **Bis zur Go-Live-Woche zeigt `VITE_SUPABASE_URL` in `prod` weiterhin auf
+> das ALTE Projekt.** Das ist Absicht: das neue Projekt ist vollständig
+> aufgesetzt, aber unbenutzt. Die Spalte oben beschreibt die Rollen **nach** dem
+> Umzug — für die Datenbank-Zugriffe (`SUPABASE_DB_URL_*`) gilt sie schon jetzt.
+
+### Die beiden Verbindungs-URLs
+
+| Key                    | Env    | Zeigt auf              |
+| ---------------------- | ------ | ---------------------- |
+| `SUPABASE_DB_URL_DEV`  | `dev`  | `foelowldexkcqzewvrcf` |
+| `SUPABASE_DB_URL_PROD` | `prod` | `viwntbodrtqxgmqyxluh` |
+
+Beide sind **Session-Pooler**-URLs
+(`postgres.<ref>@aws-N-eu-central-1.pooler.supabase.com:5432`), nicht die
+direkte Verbindung. Zwei Gründe, beide gemessen:
+
+- `db.<ref>.supabase.co` löst **nur auf IPv6** auf. GitHub-Actions-Runner sind
+  IPv4 — `migrate-dev` und `drift-gate` könnten damit nicht messen.
+- **Das `aws-N` ist pro Projekt verschieden, nicht pro Region.** Das alte
+  Projekt liegt auf `aws-1`, das neue auf `aws-0`. Wer die eine URL als Vorlage
+  für die andere nimmt, bekommt
+  `FATAL (ENOTFOUND) tenant/user postgres.<ref> not found`.
+
+Dieselben zwei Werte gehören als **GitHub-Secrets** hinterlegt — ohne sie
+werden `migrate-dev` und `drift-gate` auf `main` rot. Das ist gewollt (das Gate
+schweigt nicht bei Nichtwissen), heißt aber: erst die Secrets, dann der Merge.
 
 > On the free tier, per-environment access control isn't available. Splitting
 > `dev`/`prod` into separate projects (for restricted prod visibility) is a
@@ -49,8 +85,9 @@ secret), so a new contributor only needs to authenticate:
 
 ### Client-exposed (`VITE_*`)
 
-Stored in Infisical **and** later mirrored into the Cloudflare Pages build
-environment, because Vite inlines them at build time.
+Stored in Infisical. **Nicht** in der Cloudflare-Pages-Build-Umgebung — siehe
+die Korrektur oben: der Build läuft in GitHub Actions unter `infisical run`,
+Vite backt die Werte dort ins Bundle.
 
 | Key                     | Purpose                                  |
 | ----------------------- | ---------------------------------------- |

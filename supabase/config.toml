@@ -147,13 +147,68 @@ max_indexes = 5
 # Vector Buckets is available to Supabase Pro plan.
 # [storage.vector.buckets.documents-openai]
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DIESER AUTH-BLOCK BESCHREIBT DAS PRODUKTIONSPROJEKT — NICHT DEV.
+#
+# Seit AGE-496 (2026-08-05) ist `config.toml` die Auth-Konfiguration von PROD
+# und wird ausschliesslich dorthin gepusht (`pnpm config:push:prod`). DEVs
+# Auth-Konfiguration lebt im Dashboard und ist bewusst nicht versioniert.
+#
+# Eine gemeinsame Datei fuer beide Projekte ginge nicht: PROD darf keine
+# Loopback-Adresse in der Redirect-Allow-List tragen — auf einem Projekt mit
+# echten Mitgliedern ist das ein Abflussweg fuer Magic-Links. DEV braucht sie
+# fuer `pnpm dev`.
+#
+# ⚠️ `supabase config push` trifft immer das verlinkte Projekt, nicht "PROD".
+#    Nie direkt aufrufen. `pnpm config:push:prod` prueft den Ziel-Ref
+#    maschinell gegen `scripts/prod-project-ref.txt`, bevor es etwas anzeigt.
+#
+# ⚠️ Folge fuer den LOKALEN Stack (`supabase start`): er liest dieselbe Datei
+#    und kennt seit AGE-496 keine Loopback-Adresse mehr in der Allow-List. Fuer
+#    Migrationen, `db reset` und die pgTAP-Laeufe (auch in CI) ist das folgenlos
+#    — die fassen Auth-Redirects nicht an. Wer lokal einen echten Auth-Flow
+#    gegen den lokalen Stack prueft, setzt die Adresse fuer diesen Lauf von Hand
+#    und committet sie nicht. `pnpm dev` ist davon nicht betroffen: es laeuft
+#    gegen das DEV-Projekt, dessen Konfiguration im Dashboard steht.
+#
+# Die Werte und ihre Begruendung:
+#   site_url                  Custom Domain app.fairbusinessclub.de steht in der
+#                             Allow-List, ist aber nicht site_url: AGE-256 ist
+#                             blockiert. Der Umstieg ist ein zweiter Push in der
+#                             Go-Live-Woche.
+#   additional_redirect_urls  Strikt, ohne localhost und ohne
+#                             *.fbc-platform.pages.dev-Wildcard. Der
+#                             Preview-Wildcard gehoert zu DEV, nicht zu PROD.
+#   minimum_password_length   10 statt 6 — hier liegen echte Mitgliederkonten.
+#   [auth.rate_limit].email_sent  bleibt 2 — NICHT erhoehbar ohne eigenen SMTP.
+#                             Begruendung und Messung stehen am Feld selbst.
+#   [auth.email].max_frequency  60s statt 1s. Der Push setzte den Wert
+#                             ungefragt herunter; s. Kommentar am Feld.
+#   [auth.email].enable_confirmations  bleibt `false` — das ist eine
+#                             Entscheidung, kein Versehen. Der Aktivierungsweg
+#                             laeuft ueber Resend und entsteht in C3.
+#                             Nicht "korrigieren".
+#
+# ⚠️ `config push` schreibt die GANZE Datei, nicht nur die Felder, die man
+#    bewusst geaendert hat. Gemessen am 2026-08-05 gegen das leere
+#    PROD-Projekt: zehn Felder bewegten sich, geplant waren fuenf. Was hier
+#    steht — auch ein unveraendert uebernommener CLI-Vorgabewert — ist damit
+#    eine Aussage ueber PROD. Wer eine Zeile anfasst, aendert die
+#    Produktivumgebung; wer eine Zeile stehen laesst, bestaetigt sie.
+#    Vollstaendige Messung: docs/supabase-environments.md, Abschnitt
+#    „Was `config push` wirklich anfasst".
+# ─────────────────────────────────────────────────────────────────────────────
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "https://fbc-platform.pages.dev"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = [
+  "https://fbc-platform.pages.dev/**",
+  "https://app.fairbusinessclub.de",
+  "https://app.fairbusinessclub.de/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -172,7 +227,7 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+minimum_password_length = 10
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 password_requirements = ""
@@ -186,6 +241,21 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
+#
+# ⚠️ AGE-496: DIESER WERT LAESST SICH DERZEIT NICHT ERHOEHEN. Gemessen am
+#    2026-08-05 gegen das leere PROD-Projekt — ein PATCH auf 30 antwortet:
+#
+#      HTTP 401  Custom SMTP required to configure ... RATE_LIMIT_EMAIL_SENT.
+#      Missing SMTP_ADMIN_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+#
+#    Solange kein eigener SMTP-Server konfiguriert ist, deckelt die Plattform
+#    bei 2 Mails pro Stunde — projektweit, nicht pro Nutzer. Der Wert steht
+#    hier deshalb auf dem, was TATSAECHLICH gilt: ein `30`, das still nicht
+#    greift, waere genau der Fehlerfall, den dieser Change abschaffen soll
+#    (gruen in jeder Pruefung, kaputt im Betrieb).
+#
+#    Ziel bleibt 30. Bedingung: eigener SMTP (Resend, kommt mit C3). Erst dann
+#    diesen Wert aendern — und nachmessen, nicht annehmen.
 email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
@@ -217,7 +287,13 @@ enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# AGE-496: 60s statt der lokalen Vorgabe 1s. Gemessen am leeren PROD-Projekt am
+# 2026-08-05: ein `config push` setzte diesen Wert von 60 auf 1 herunter, ohne
+# dass ihn jemand angefasst hatte. Auf PROD ist 1s ein Verstaerker — zusammen
+# mit dem projektweiten Limit von 2 Mails/Stunde (s. [auth.rate_limit]) kann ein
+# einzelner Nutzer das Stundenkontingent in zwei Sekunden aufbrauchen und den
+# Mailversand fuer alle anderen blockieren.
+max_frequency = "60s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).

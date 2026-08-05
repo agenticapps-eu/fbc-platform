@@ -21,7 +21,76 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Migrationen automatisch auf DEV, sobald sie auf main liegen (AGE-257).
+  #
+  # NICHT auf Pull Requests: sonst mutierte jeder offene PR das DEV-Projekt mit
+  # ungereviewten Migrationen, und zwei parallele PRs schrieben sich gegenseitig
+  # in die Historie.
+  #
+  # Warum DEV automatisch und PROD nicht: `ci.yml` belegt mit `supabase db
+  # reset` nur, dass eine Migration auf eine LEERE Datenbank passt. Ein `not
+  # null` ohne Default auf einer gefuellten Tabelle ist in CI gruen und
+  # scheitert erst an Daten. Genau das faengt dieser Lauf ab, wo es folgenlos
+  # ist.
+  migrate-dev:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+      - name: Migrationen auf DEV anwenden
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL_DEV:-}" ]; then
+            echo "::error::SUPABASE_DB_URL_DEV fehlt."
+            exit 1
+          fi
+          supabase db push --db-url "$SUPABASE_DB_URL_DEV"
+
+  # Fruehwarnung vor dem Deploy: weicht die Migrationshistorie von PROD ab,
+  # faehrt kein Frontend aus (AGE-257).
+  #
+  # Misst gegen denselben `github.sha`, den `deploy` ausliefert — beide Jobs
+  # liegen im selben Lauf und checken denselben Commit aus.
+  #
+  # Kein Break-Glass, bewusst: sobald ein Merge eine Migration enthaelt,
+  # blockiert dieses Gate JEDEN Deploy, bis jemand `migrate-prod` freigibt —
+  # auch einen eiligen Fix, der mit der Migration nichts zu tun hat. Eine
+  # Zusage, die man im Eilfall umgehen darf, ist im Eilfall keine.
+  drift-gate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Das Gate wird rot, wenn es nicht messen KANN (fehlendes Secret, DB
+      # nicht erreichbar, geaendertes CLI-Ausgabeformat) — nicht nur, wenn es
+      # Drift findet. Die Auswertung ist in scripts/migration-drift.logic.ts
+      # geprueft; `version: latest` oben heisst, dass die CLI sich unter uns
+      # aendern darf, und genau das ist am 2026-08-05 passiert.
+      - name: Migrationshistorie gegen PROD vergleichen
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: pnpm tsx scripts/migration-drift-gate.ts
+
   deploy:
+    needs: [migrate-dev, drift-gate]
+    # Auf Pull Requests werden beide Vorbedingungen uebersprungen; `!cancelled()`
+    # laesst `deploy` dann trotzdem laufen. Auf main muss beides gruen sein —
+    # ein Fehlschlag der Fruehwarnung bleibt so nicht lautlos.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     env:
       INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}

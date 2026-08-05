@@ -2,6 +2,18 @@
 
 **Status**: Accepted  **Date**: 2026-06-16  **Linear**: AGE-254
 
+> **Teilweise überholt seit 2026-08-05 durch
+> [ADR-0004](0004-split-prod-dev-supabase.md).** Die Prämisse „dev == prod"
+> (Context, Punkt 1) gilt nicht mehr: seit AGE-496 gibt es ein eigenes
+> PROD-Projekt (`viwntbodrtqxgmqyxluh`). Die hier getroffene **Entscheidung**
+> bleibt gültig — der Demo-Seed erkennt prod weiterhin an der Persona-Heuristik,
+> nicht am Projekt-Ref. Ihn auf die Umgebung umzustellen ist ein eigener
+> Change, kein Nebeneffekt von AGE-496.
+>
+> Achtung beim Lesen: bis zur Go-Live-Woche zeigt Infisical `prod` **weiterhin**
+> auf das alte Projekt. Der Satz „dev und prod teilen dasselbe Projekt" ist
+> also noch für den Moment wahr, nur nicht mehr auf Dauer.
+
 ## Context
 
 Spec §4 (`docs/community-events-spec.md`) asks for a demo world produced by a

@@ -38,8 +38,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
-    // Seed-Tooling (supabase/seed) wird mitgetestet — reine Helfer, kein Netzwerk.
-    include: ["src/**/*.test.{ts,tsx}", "supabase/seed/**/*.test.ts"],
+    // Seed-Tooling (supabase/seed) und die Push-Guards (scripts) werden
+    // mitgetestet — reine Helfer, kein Netzwerk.
+    include: ["src/**/*.test.{ts,tsx}", "supabase/seed/**/*.test.ts", "scripts/**/*.test.ts"],
     // Dummy-Supabase-Config, damit src/lib/supabase.ts beim Import nicht wirft
     // (Unit-Tests sprechen kein Netzwerk an).
     env: {
