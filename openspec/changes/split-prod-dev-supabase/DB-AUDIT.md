@@ -98,10 +98,30 @@ Kein Exploit, kein Bug — der vorgesehene Weg.
 3. **Verzeichnis stufen** — `profiles_public` erst ab `connect` oder `discover`.
    Ein Zeilen-Eingriff in der Policy-Ebene, aber eine Produktentscheidung.
 
-Empfehlung: **(1) bewusst annehmen und dokumentieren** — für das Sommerfest ist
-Selbstregistrierung notwendig, und ohne sie fällt der Gäste-Fall aus, den
-AGE-448 gerade erst repariert hat. Aber annehmen heißt aufschreiben, nicht
-übersehen.
+Empfehlung war **(1) bewusst annehmen und dokumentieren** — für das Sommerfest
+ist Selbstregistrierung notwendig, und ohne sie fällt der Gäste-Fall aus, den
+AGE-448 gerade erst repariert hat.
+
+> **Entscheidung Donald, 2026-08-05: wird in C3 erledigt**, dort kommt die
+> E-Mail-Bestätigung. Bis dahin bewusst angenommen.
+>
+> **Beim C3-Check nicht abnicken.** E-Mail-Bestätigung hebt die Hürde von
+> „nichts" auf „eine Wegwerf-Adresse". Sie ändert **nichts** daran, dass
+> `profiles_public` für _jedes_ `authenticated`-Konto lesbar ist, unabhängig
+> von der Stufe. Drei Fragen für C3:
+>
+> 1. Steht `enable_confirmations` auf PROD wirklich auf `true`? Gemessen über
+>    `GET /v1/projects/<ref>/config/auth` — Feld `mailer_autoconfirm` muss
+>    `false` sein (**invertiert**) —, nicht aus `config.toml` gelesen.
+> 2. Sieht ein frisch **bestätigtes** Konto ohne Stufe weiterhin das ganze
+>    Verzeichnis? Wenn ja, ist dieser Befund **offen**, nicht gelöst.
+> 3. Falls offen: entweder in die Datenschutzhinweise und `is_public` sichtbar
+>    in die Profil-Einstellungen (der einzige Schutz, und er liegt beim
+>    Mitglied) — oder `profiles_public` nach Stufe gaten.
+>
+> Reproduzierbar ohne Konto: SQL-Sitzung mit `set local role authenticated` und
+> gesetzten `request.jwt.claims`, dann
+> `select count(*) from public.profiles_public`.
 
 ---
 

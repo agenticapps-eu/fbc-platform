@@ -433,6 +433,7 @@ Deploy-URL hinterher.
 | Was | Wohin | Status |
 |---|---|---|
 | **Eigener SMTP (Resend) als Auth-Mailer** | **C3** | **Vorbedingung für den 17.08., nicht optional — siehe unten** |
+| **Verzeichnis-Sichtbarkeit für frisch registrierte Konten** | **C3** | DB-AUDIT Befund 1 — bewusst angenommen, in C3 erneut prüfen (E-Mail-Bestätigung allein löst es **nicht**) |
 | `send-activation` deployen | C3 | existiert noch nicht — C4 deployt **drei** Functions, nicht vier |
 | Stripe-Webhook-URL auf `viwntbodrtqxgmqyxluh` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
 | Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
