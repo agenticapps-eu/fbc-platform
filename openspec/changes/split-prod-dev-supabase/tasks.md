@@ -29,18 +29,24 @@ Task 6 (kostenpflichtige Ressource) und Task 14 (Schreibzugriff auf Infisical
 - [x] 0.2 Live-Auth-Konfiguration als Rückrollpunkt sichern.
       **Erledigt.** `2026-08-05_auth-baseline-foelowldexkcqzewvrcf.json`,
       242 Felder, über `GET /v1/projects/{ref}/config/auth`.
-- [ ] 0.3 Drift-Scan wiederholen und als Ausgangsbefund im Runbook festhalten:
+- [x] 0.3 Drift-Scan wiederholen und als Ausgangsbefund im Runbook festhalten:
       welche Objekte stehen in der DB, aber in keiner Migration?
       **Erwartung: genau das Webhook-Paar, sonst nichts.** Weicht das ab, ist
       Task 12 größer als geplant — dann erst hier klären.
+      **Erledigt 2026-08-05.** Über 27 Funktionen, 8 Trigger und 28 Tabellen
+      genau zwei Meldungen: `notify_contact_request_webhook` und
+      `contact_requests_email_webhook`. Keine dritte Abweichung → Task 12 bleibt
+      im geplanten Umfang. Befund steht im Runbook, Abschnitt „Der Drift-Scan".
 
 ## 1. Feature-Branch
 
-- [ ] 1.1 `donald/age-496-c4-supabase-trennen-neues-prod-projekt-altes-wird-devdemo`
+- [x] 1.1 `donald/age-496-c4-supabase-trennen-neues-prod-projekt-altes-wird-devdemo`
       von aktuellem `main`. Kein Commit auf `main`.
       _`git add -A` ist in diesem Repo verboten: der Arbeitsbaum trägt dauerhaft
       untracked Dateien mit Rechten 0600, und das Repo ist öffentlich. Dateien
       einzeln stagen._
+      **Erledigt.** Commit `18203e9`, acht Dateien einzeln gestaged; die vier
+      untracked 0600-Pfade sind nachweislich draußen geblieben.
 
 ## 2. `config.toml` produktionstauglich machen — vor jedem Push
 
@@ -48,7 +54,7 @@ Task 6 (kostenpflichtige Ressource) und Task 14 (Schreibzugriff auf Infisical
 (Entscheidung 12). Sie wird nie gegen DEV gepusht; DEV behält seine
 Dashboard-Konfiguration.
 
-- [ ] 2.1 Auth-Block auf die Zielwerte bringen. **Die Schlüssel heißen in der
+- [x] 2.1 Auth-Block auf die Zielwerte bringen. **Die Schlüssel heißen in der
       Datei anders als in der Management-API** — hier gelten die
       `config.toml`-Namen:
 
@@ -70,11 +76,11 @@ Dashboard-Konfiguration.
       Allow-List ein Abflussweg für Magic-Links, und der Preview-Wildcard
       gehört zu DEV, nicht zu PROD._
 
-- [ ] 2.2 Kopfkommentar über den Auth-Block: warum diese Werte, seit wann, dass
+- [x] 2.2 Kopfkommentar über den Auth-Block: warum diese Werte, seit wann, dass
       `enable_confirmations = false` eine Entscheidung ist und kein Versehen
       (C3 baut den Aktivierungsweg über Resend), **und dass diese Datei PROD
       beschreibt** — damit niemand sie versehentlich gegen DEV pusht.
-- [ ] 2.3 **Verifikation:** `git diff supabase/config.toml` zeigt genau diese
+- [x] 2.3 **Verifikation:** `git diff supabase/config.toml` zeigt genau diese
       Felder und keine weiteren. Insbesondere kein `project_id`, keine Ports,
       kein `[functions.*]`-Block verändert.
 
@@ -119,7 +125,7 @@ für beides — das war zirkulär.
 ## 4. AGE-257 — die drei Jobs
 
 - [ ] 4.1 `migrate-dev` in `deploy.yml`: `if: github.ref ==
-    'refs/heads/main'`, `supabase db push --db-url $SUPABASE_DB_URL_DEV`.
+  'refs/heads/main'`, `supabase db push --db-url $SUPABASE_DB_URL_DEV`.
       **Nicht auf Pull Requests** — sonst mutiert jeder offene PR das
       DEV-Projekt mit ungereviewten Migrationen.
 - [ ] 4.2 `drift-gate`: vollständiger Vergleich der Migrationshistorie gegen

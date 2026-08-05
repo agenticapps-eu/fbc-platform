@@ -230,6 +230,23 @@ Dasselbe für `CREATE TRIGGER` und `CREATE TABLE`. Auf einem korrekt
 aufgesetzten Projekt meldet er **das Webhook-Paar und sonst nichts**. Meldet er
 mehr, ist jemand am Dashboard gewesen.
 
+**Ausgangsbefund, 2026-08-05** — gemessen gegen `2026-08-05_prod_schema.sql`
+(Dump des bestehenden Projekts `foelowldexkcqzewvrcf`), 27 Funktionen,
+8 Trigger, 28 Tabellen:
+
+```
+=== FUNCTIONS ===
+DRIFT: function notify_contact_request_webhook
+=== TRIGGERS ===
+DRIFT: trigger contact_requests_email_webhook
+=== TABLES ===
+```
+
+Genau das erwartete Paar, keine dritte Abweichung. Das ist die Zahl, gegen die
+jeder spätere Scan gehalten wird: **zwei Meldungen sind der Normalzustand,
+solange Task 12 nicht gefahren ist — danach null.** Wächst die Liste, ohne dass
+eine Migration dazukam, ist jemand am Dashboard gewesen.
+
 ## Auth-Konfiguration
 
 `supabase/config.toml` ist die Quelle der Wahrheit. Werte, die nur im Dashboard
