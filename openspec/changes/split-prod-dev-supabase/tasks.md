@@ -294,7 +294,7 @@ at ["databasePoolMode"])`. Der Auth-Teil ist nachweislich angekommen (s.
   und die drei Policies auf `storage.objects` sind da: `avatars_insert_own`
   (WITH CHECK), `avatars_update_own`, `avatars_delete_own` — jeweils nur für
   `authenticated` und nur im Ordner `(storage.foldername(name))[1] =
-    auth.uid()`. **Der Upload-Versuch selbst wandert hinter Task 11**: er
+  auth.uid()`. **Der Upload-Versuch selbst wandert hinter Task 11**: er
   braucht eine echte Sitzung, und auf PROD gibt es noch keine Konten.
 
 ## 9. Auth-Konfiguration auf PROD
@@ -376,20 +376,36 @@ Erledigt Task 6a bereits den Push; hier wird abgenommen, nicht wiederholt.
 
 ## 12. Der Webhook, der nicht mitwandert
 
-- [ ] 12.1 `notify_contact_request_webhook()` + Trigger
+- [x] 12.1 `notify_contact_request_webhook()` + Trigger
       `contact_requests_email_webhook` auf PROD anlegen, mit dem **PROD**-Ref in
       der Ziel-URL und dem `CONTACT_WEBHOOK_SECRET` als Bearer. Vorlage:
       `docs/secrets.md`.
-- [ ] 12.2 Den Drift-Scan als Skript ablegen (`scripts/db-drift-scan.sh`), nicht
+- [x] 12.2 Den Drift-Scan als Skript ablegen (`scripts/db-drift-scan.sh`), nicht
       nur als Runbook-Prosa — er läuft ab jetzt bei jedem `migrate-prod` mit
       (Task 4.3). Wird der Trigger später gelöscht, stirbt der Mailversand
       sonst wieder still (Entscheidung 15).
-- [ ] 12.3 **Verifikation:** Drift-Scan gegen PROD wiederholen — er muss jetzt
+      **Umgesetzt als `scripts/db-drift-scan.ts` + geprüfte Logik** (nicht
+      `.sh`), aus derselben Lehre wie beim Migrations-Gate: ein ungeprüfter
+      Parser meldet im Zweifel „nichts gefunden" statt „konnte nicht messen".
+      **Beim Bauen kam heraus, dass der Scan anders herum funktionieren muss
+      als geplant.** Das Webhook-Paar steht in keiner Migration und wird das
+      nie tun — es als „unbekannt" zu melden wäre Dauerlärm. Der Scan trägt
+      es deshalb als Ausnahme und meldet, wenn es **fehlt**. Genau das ist der
+      Havariefall: Trigger weg, Mailversand still tot.
+- [x] 12.3 **Verifikation:** Drift-Scan gegen PROD wiederholen — er muss jetzt
       **leer** sein, während er vor diesem Schritt genau dieses Paar meldet.
       Rot vor grün, mit beiden Ausgaben.
-- [ ] 12.4 Gegenprobe, dass der Scan im laufenden Betrieb greift: den Trigger
+      **Erledigt.** Gegen PROD: 27 Funktionen, 8 Trigger, 28 Tabellen, keine
+      Abweichung. Die „rot vor grün"-Probe steckt in 12.4 — dort ist sie
+      aussagekräftiger, weil sie den Havariefall nachstellt statt den
+      Aufsetz-Zustand.
+- [x] 12.4 Gegenprobe, dass der Scan im laufenden Betrieb greift: den Trigger
       auf **DEV** kurz entfernen, Scan zeigt ihn an, wiederherstellen, Scan ist
       leer. Auf DEV, nicht auf PROD.
+      **Erledigt auf DEV, mit beiden Ausgaben:**
+      Ausgangslage 8 Trigger → „keine Objekt-Abweichung" ·
+      Trigger entfernt → 7 Trigger → „`contact_requests_email_webhook` FEHLT" ·
+      wiederhergestellt → 8 Trigger → wieder leer.
 
 ## 13. Doku
 

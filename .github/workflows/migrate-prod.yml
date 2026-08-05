@@ -114,3 +114,20 @@ jobs:
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
         run: pnpm tsx scripts/migration-drift-gate.ts
+
+      # Objekt-Drift: findet, was in der DB steht und in keiner Migration —
+      # und vor allem, was FEHLT, obwohl es dort sein muss. Der
+      # Webhook-Trigger wandert nicht mit `db push`; verschwindet er, stirbt
+      # der Mailversand still.
+      #
+      # ⚠️ DB_SCAN_TLS_INSECURE: der Supabase-Pooler zeigt eine selbstsignierte
+      #    Kette, und die projekt-eigene CA gibt es nur ueber das Dashboard
+      #    (die frueher dokumentierte Sammel-URL antwortet 404). Die Verbindung
+      #    ist verschluesselt, der Server aber nicht authentifiziert. Das steht
+      #    hier sichtbar statt in einer Vorgabe versteckt — offener Nachlauf:
+      #    CA hinterlegen und DB_SCAN_CA_CERT setzen.
+      - name: Objekt-Drift-Scan
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          DB_SCAN_TLS_INSECURE: "1"
+        run: pnpm tsx scripts/db-drift-scan.ts
