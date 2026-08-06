@@ -380,28 +380,28 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Live-Function, nicht des Quelltexts:
 
       | Fall | Aufruf | Antwort |
-                          | --- | --- | --- |
-                          | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
-                          | Link unbekannt | erfundenes Token | `410 not_found` |
-                          | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
-                          | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
-                          | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+                              | --- | --- | --- |
+                              | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
+                              | Link unbekannt | erfundenes Token | `410 not_found` |
+                              | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
+                              | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
+                              | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
 
-                          Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
-                          `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
-                          Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
-                          Fehlversuche und wirft nicht vorzeitig.
-                          **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
-                          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                          meldet `activated:true`, und dasselbe Konto sieht jetzt
-                          `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
-                          **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
-                          Aktivierungszustand und nicht an einer kaputten Fixture.
-                          _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
-                          (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
-                          also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
-                          nicht an der Live-Datenbank._
+                              Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
+                              `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
+                              Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
+                              Fehlversuche und wirft nicht vorzeitig.
+                              **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
+                              `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+                              Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+                              meldet `activated:true`, und dasselbe Konto sieht jetzt
+                              `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
+                              **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
+                              Aktivierungszustand und nicht an einer kaputten Fixture.
+                              _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
+                              (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
+                              also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
+                              nicht an der Live-Datenbank._
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -497,11 +497,17 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       `https://fbc-platform.pages.dev/aktivierung#token=…`, Absender und
       `Reply-To` stimmen, die Mail landete im Posteingang. `--env=prod` und das
       PROD-Projekt sind ebenfalls geprüft (siehe 10.3).
-      _Nebenbei damit abgenommen, ohne Header lesen zu müssen: auf
-      `effbeezee.com` steht DMARC auf `p=reject`. Wäre die Authentifizierung
-      durchgefallen, hätte die Gegenseite die Mail **abgewiesen** statt
-      zugestellt. Zustellung ist unter dieser Politik also der Beleg, dass DKIM
-      und DMARC greifen._
+      _**Am Rohtext der zugestellten Mail belegt** (`.eml`, von Donald
+      beigebracht), nicht mehr nur erschlossen. Googles Hop:
+      `dkim=pass header.i=@effbeezee.com header.s=resend` ·
+      `spf=pass (domain of …@send.effbeezee.com designates 54.240.6.53 as
+    permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
+    header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
+      einem zweiten Hop. Der `send.`-Subdomain-SPF greift also genau wie
+      eingerichtet, und `Reply-To: info@fairbusinessclub.de` steht im Header —
+      die Zusage auf dem Aktivierungsbildschirm ist damit gemessen, nicht
+      behauptet. Der Link im Text lautet
+      `https://fbc-platform.pages.dev/aktivierung#token=…`._
       **Weiter offen:** `APP_URLS` führt localhost an erster Stelle
       (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht ungefragt an der
       Bezahlstrecke gedreht).
@@ -532,13 +538,18 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
       _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
       Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
-      _Stand 06.08.: **keiner der vier ist abgenommen.** Zwei Zustellungen sind
-      belegt (`donald@vlahovic.de` und `donald.vlahovic@gmail.com`, beide
-      Posteingang) — die zweite Adresse liegt aber trotz `@gmail.com` auf
-      **Fastmail**, ist also gerade keine Gmail-Messung. Das bleibt komplett
-      offen; die Zustellung belegt nur, dass DKIM/DMARC grundsätzlich greifen
-      (10.8), nicht wie die vier großen Freemailer die neue, ungewärmte
-      Absenderdomain einsortieren._
+      _Stand 06.08.: **Gmail zur Hälfte, die anderen drei gar nicht.** Zwei
+      Zustellungen sind belegt (`donald@vlahovic.de`, `donald.vlahovic@gmail.com`).
+      Die zweite ist mehr wert als zunächst gedacht: der `Return-Path`
+      (`donald.vlahovic+caf_=donald=vlahovic.net@gmail.com`) zeigt, dass **Gmail
+      die Mail angenommen, authentifiziert (`dmarc=pass`, s. 10.8) und
+      weitergeleitet** hat — sie landete danach bei Fastmail. Damit ist Gmails
+      **Annahme** gemessen, seine **Platzierung** nicht: ob sie in einem echten
+      Gmail-Postfach im Eingang oder im Spam läge, sagt eine Weiterleitung
+      nicht. GMX, Web.de und Outlook sind unberührt. Und das eigentliche Risiko
+      liegt ohnehin nicht bei der Authentifizierung — die steht —, sondern bei
+      der **Reputation einer neuen, ungewärmten Absenderdomain**, die beim
+      Import auf einen Schlag an alle Mitglieder sendet._
 
 - [x] 10.5 **GESCHLOSSEN 06.08. — war ein BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
       der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
@@ -585,14 +596,21 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       beide Functions setzen `Reply-To: info@fairbusinessclub.de`, weil der
       Bildschirm dem Mitglied eine ankommende Antwort zusagt; `docs/secrets.md`
       korrigiert — der Sandkasten-Hinweis stand dort als Empfehlung.
-      _Bewusst in Kauf genommen: der Absender liegt auf einer anderen Domain als
-      der Auftritt des Clubs. Bei importierten Konten ist diese Mail der einzige
-      Weg hinein, und ein unangekündigter fremder Absender ist von Phishing nicht
-      zu unterscheiden — deshalb steht die Adresse jetzt wörtlich auf dem
-      Bildschirm, und deshalb ist der Test darauf kein Textdetail. Empfohlen und
-      offen: eine Weiterleitung `effbeezee.com` → `fairbusinessclub.de`, damit
-      wer den Absender prüft, beim Club landet und nicht auf einer
-      Strato-Platzhalterseite._
+      _**Korrigiert 06.08. abends:** hier stand, der Absender liege „auf einer
+      anderen Domain als der Auftritt des Clubs", und daraus folgte eine
+      Phishing-Warnung. Das war falsch. Die Plattform heißt **eff.bee.zee** —
+      `send-activation/emails.ts:63,82` führen den Namen im Betreff und im Text
+      selbst ein, seit langem. `effbeezee.com` ist die ausgeschriebene Marke,
+      nicht eine fremde Domain. Der Bildschirmtext, der sich dafür
+      entschuldigte („die Adresse sieht ungewohnt aus"), ist entfernt: er
+      untergrub genau die Marke, die die Mail einführt.
+      Was bleibt, gilt unabhängig davon: der Absender gehört auf den Bildschirm.
+      Bei importierten Konten ist diese Mail der einzige Weg hinein, und einen
+      Absender, den niemand angekündigt hat, erkennt das Mitglied nicht wieder —
+      deshalb steht die Adresse wörtlich dort, und deshalb ist der Test darauf
+      kein Textdetail. Empfohlen und offen bleibt eine Weiterleitung
+      `effbeezee.com` → `fairbusinessclub.de`: wer den Absender prüft, landet
+      heute auf einer Strato-Platzhalterseite statt beim Club._
 
 - [x] 10.7 Nach dem Setzen der DNS-Einträge: `FROM_EMAIL` in Infisical **und**
       per `supabase secrets set` auf `FBC <noreply@effbeezee.com>` ziehen, beide
