@@ -1331,7 +1331,20 @@ export type Database = {
     Functions: {
       current_tier_rank: { Args: never; Returns: number };
       is_matching_manager: { Args: never; Returns: boolean };
-      is_prime_plus: { Args: never; Returns: boolean };
+      // `is_prime_plus` stand hier bis 2026-08-06 und existierte in der Datenbank
+      // seit AGE-311 nicht mehr (gedroppt in 20260715150000:319, nachdem alle
+      // sieben abhaengigen Policies auf has_level() umgehaengt worden waren).
+      // Eine tote Zeile in einer generierten Datei — entfernt mit AGE-495.
+      //
+      // Aktivierungs-Gate (AGE-495). Wie der Rest dieses Blocks von Hand
+      // gepflegt: ein vollstaendiges `supabase gen types` bringt derzeit
+      // Nullability-Drift in unbeteiligten Typen mit und gehoert in einen
+      // eigenen Change.
+      is_activated: { Args: never; Returns: boolean };
+      my_activation_state: {
+        Args: never;
+        Returns: { activated: boolean; display_name: string | null }[];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
       // admin_list_feedback() RPC from 20260716103000_admin_feedback_rpc.sql (admin-only
       // enriched read of QM feedback with the author name; empty for non-admins).

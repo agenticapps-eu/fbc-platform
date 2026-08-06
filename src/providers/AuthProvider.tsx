@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { fetchActivationState } from "../lib/activation";
 import { logEvent } from "../lib/log";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
@@ -11,6 +12,9 @@ interface LoadedProfile {
   tier: string | null;
   levelRank: number | null;
   staffRole: string | null;
+  /** null = noch unbekannt (Fehler/ausstehend). Siehe auth-context. */
+  isActivated: boolean | null;
+  activationName: string | null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,9 +45,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Mitgliedsstufe (tier + level_rank) des eingeloggten Nutzers laden.
-  // Die eigene Zeile ist per RLS (profiles_select_self_or_prime) lesbar,
-  // membership_tiers per tiers_read_all — beides in einer Abfrage.
+  // Aktivierungszustand und Mitgliedsstufe des eingeloggten Nutzers laden.
+  //
+  // Der Aktivierungszustand kommt aus `my_activation_state()` und NICHT aus der
+  // Profilzeile: seit AGE-495 ist die auch für den Eigentümer gesperrt, solange
+  // er nicht bestätigt hat. Ein Angreifer mit dem verteilten Passwort ist für
+  // die Datenbank das Mitglied — „eigene Daten" sind dessen Daten.
+  //
+  // tier/level_rank/staffRole bleiben wie bisher: sie kommen erst nach der
+  // Bestätigung durch und sind dann korrekt. Vorher sind sie null, und das ist
+  // richtig so — ein nicht aktiviertes Konto hat keine Stufenrechte.
   const userId = session?.user.id ?? null;
   useEffect(() => {
     if (!userId) return;
@@ -59,33 +70,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Stufe (Pflichtfeld) und Staff-Rolle (optional) parallel laden. Nur die
         // Stufen-Abfrage steuert Retry/Fallback; eine fehlende staff_roles-Zeile
         // ist der Normalfall (maybeSingle → data null) und kein Fehler.
-        const [profileRes, staffRes] = await Promise.all([
+        const [aktivierung, profileRes, staffRes] = await Promise.all([
+          fetchActivationState(),
           supabase
             .from("profiles")
             .select("tier, membership_tiers(level_rank)")
             .eq("id", uid)
-            .single(),
+            .maybeSingle(),
           supabase.from("staff_roles").select("role").eq("profile_id", uid).maybeSingle(),
         ]);
         if (!active) return;
-        const { data, error } = profileRes;
-        if (!error && data) {
-          setProfile({
-            userId: uid,
-            tier: data.tier,
-            levelRank: data.membership_tiers?.level_rank ?? null,
-            staffRole: staffRes.data?.role ?? null,
-          });
-          return;
-        }
+        // Der Aktivierungszustand ist das Entscheidende und steht als erstes:
+        // Solange er da ist, ist der Zustand vollständig — eine fehlende
+        // Profilzeile ist bei einem nicht aktivierten Konto der NORMALFALL
+        // (das Gate sperrt sie) und darf nicht in den Retry laufen.
+        setProfile({
+          userId: uid,
+          tier: profileRes.data?.tier ?? null,
+          levelRank: profileRes.data?.membership_tiers?.level_rank ?? null,
+          staffRole: staffRes.data?.role ?? null,
+          isActivated: aktivierung.activated,
+          activationName: aktivierung.displayName,
+        });
+        return;
       } catch {
         if (!active) return;
       }
 
-      // Fehler / keine Zeile / Exception: bei transientem Fehler oder Trigger-Lag
-      // direkt nach Signup begrenzt erneut versuchen, statt den Nutzer fälschlich
-      // auf level_rank 0 herabzustufen (würde Prime/Legacy von ihren eigenen
-      // Seiten aussperren).
+      // Fehler / Exception: bei transientem Fehler oder Trigger-Lag direkt nach
+      // Signup begrenzt erneut versuchen, statt den Nutzer fälschlich auf
+      // level_rank 0 herabzustufen — und, seit AGE-495, statt ihm fälschlich
+      // die Aktivierungswand zu zeigen.
       if (attempt < 3) {
         attempt += 1;
         setTimeout(() => {
@@ -93,7 +108,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 500 * attempt);
         return;
       }
-      setProfile({ userId: uid, tier: null, levelRank: null, staffRole: null });
+      // Nach drei Fehlversuchen bleibt `isActivated` bewusst `null`, nicht
+      // `false`: „wir wissen es nicht" ist etwas anderes als „nicht aktiviert".
+      // Das Gate hält ohnehin in der Datenbank; die Oberfläche soll hier einen
+      // Fehler zeigen und nicht behaupten, das Konto sei unbestätigt.
+      setProfile({
+        userId: uid,
+        tier: null,
+        levelRank: null,
+        staffRole: null,
+        isActivated: null,
+        activationName: null,
+      });
     }
 
     load();
@@ -107,6 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tier = userId && profileLoaded ? profile.tier : null;
   const levelRank = userId && profileLoaded ? profile.levelRank : null;
   const staffRole = userId && profileLoaded ? profile.staffRole : null;
+  // Ausgeloggt gibt es nichts zu aktivieren; eingeloggt und noch nicht geladen
+  // ist `null` = unbekannt, und der Gate-Guard wartet darauf.
+  const isActivated = !userId ? true : profileLoaded ? profile.isActivated : null;
+  const activationName = userId && profileLoaded ? profile.activationName : null;
   // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
   // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
   const isLoading = !authReady;
@@ -121,6 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       staffRole,
       isLoading,
       tierLoading,
+      isActivated,
+      activationName,
       signUp: async (email, password, fullName) => {
         // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
         // (20260611171003) liest genau diesen Schlüssel nach profiles.name.
@@ -146,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
     }),
-    [session, tier, levelRank, staffRole, isLoading, tierLoading],
+    [session, tier, levelRank, staffRole, isLoading, tierLoading, isActivated, activationName],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

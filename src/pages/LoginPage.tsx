@@ -9,7 +9,10 @@ import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
-  password: z.string().min(8, "Das Passwort muss mindestens 8 Zeichen haben."),
+  // Zehn, nicht acht: `minimum_password_length` in config.toml steht seit C4
+  // auf 10. Mit acht nahm das Formular eine Eingabe an, die der Server ablehnt —
+  // das Mitglied bekam einen Serverfehler statt einer Feldmeldung (AGE-495).
+  password: z.string().min(10, "Das Passwort muss mindestens 10 Zeichen haben."),
   // Im Schema optional, weil der Login-Modus gar kein Namensfeld rendert; beim
   // Registrieren wird die Pflicht in onSubmit durchgesetzt (AGE-437). `.trim()`
   // sonst zählt ein Leerzeichen als Name und steht so im Verzeichnis.

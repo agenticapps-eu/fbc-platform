@@ -143,6 +143,93 @@ Test hat nachgezogen.
 
 ---
 
-## Nachher
+## Nachher — 2026-08-06, nach den Migrationen A, B und C auf DEV
 
-_Wird nach Migration B eingetragen (Task 8.1)._
+Dasselbe Skript, dieselbe Datenbank, derselbe Kontotyp (`impact`, mit eigenen
+Zeilen), nur mit `activated_at = null`:
+
+```
+profiles.activated_at ist vorhanden → NACHHER-Lauf (Gate erwartet)
+Sondenkonto: tier=impact, activated_at=null, Session steht.
+
+── Fremddaten ──────────────────────────────────────────────────
+  profiles                 0 von 38
+  profiles_public          0 von 0   ⚠ (siehe Anmerkung unten)
+  posts                    0 von 12
+  events                   0 von 9
+  offers                   0 von 49
+  needs                    0 von 48
+  matches                  0 von 164
+  profile_interests        0 von 29
+  profile_theme_scores     0 von 148
+  profile_badges           0 von 6
+  comments                 0 von 6
+  partners                 0 von 0   ⚠ global leer — belegt nichts
+
+── Eigene Daten des Kontos ─────────────────────────────────────
+  profile_contacts         0 von 27
+  goals                    0 von 12
+  notifications            0 von 5
+  compass_responses        0 von 48
+  member_settings          0 von 4
+  feedback                 0 von 21
+  message_threads          0 von 2
+  messages                 0 von 4
+  contact_requests         0 von 4
+  staff_roles              0 von 3
+
+── SECURITY-DEFINER-RPCs ───────────────────────────────────────
+  post_engagement_counts     0
+  event_registration_counts  0
+  recompute_my_matches       Fehler 42501 not activated
+  admin_list_feedback        0
+  list_routing_queue         0
+  register_for_event         Fehler 42501 not activated
+  set_event_check_in         Fehler 42501 not activated
+
+── Gegenprobe: das Schaufenster bleibt offen (ausgeloggt) ───────
+  anon posts (public)      5
+  anon events (public)     1
+```
+
+### Der Vergleich
+
+| Fläche                      |                  Vorher |                   Nachher |
+| --------------------------- | ----------------------: | ------------------------: |
+| `profiles`                  |                      38 |                     **0** |
+| `profiles_public`           |                      37 |                     **0** |
+| `posts`                     |                      12 |                     **0** |
+| `events`                    |                       9 |                     **0** |
+| `offers`                    |                      49 |                     **0** |
+| `needs`                     |                      48 |                     **0** |
+| `profile_theme_scores`      |                     148 |                     **0** |
+| `profile_interests`         |                      29 |                     **0** |
+| `profile_badges`            |                       6 |                     **0** |
+| `comments`                  |                       6 |                     **0** |
+| `profile_contacts` (eigene) |                       1 |                     **0** |
+| `goals` (eigene)            |                       1 |                     **0** |
+| `notifications` (eigene)    |                       1 |                     **0** |
+| `member_settings` (eigene)  |                       1 |                     **0** |
+| `register_for_event`        | `P0002 event not found` | **`42501 not activated`** |
+| `set_event_check_in`        |    `42501 not the host` | **`42501 not activated`** |
+| anon: öffentliche Beiträge  |                       5 |                     **5** |
+| anon: öffentliche Events    |                       1 |                     **1** |
+
+Die beiden RPC-Zeilen sind der Grund, warum die Meldung im Test geprüft wird und
+nicht nur „irgendein Fehler": `set_event_check_in` lehnte schon vorher ab, aber
+aus einem anderen Grund. Eine Assertion auf `DENIED:%` wäre grün gewesen, ohne
+das Gate zu berühren.
+
+### Anmerkung zu `profiles_public` „0 von 0"
+
+Der Gesamtbestand in der rechten Spalte wird über eine **eigene**
+Datenbankverbindung gezählt, ohne Session. Seit Migration B trägt die View
+`is_activated()` im Rumpf, und ohne Session ist das `false` — die Zählung
+liefert deshalb selbst 0. Der Vorher-Wert von **37** steht oben.
+
+**Das ist eine echte Verhaltensänderung und keine Messartefakt-Kuriosität:**
+`profiles_public` ist ab jetzt auch aus `service_role`- und Admin-Kontexten
+leer. Serverseitiger Code liest ohnehin `profiles` direkt (die Service-Rolle
+umgeht die RLS), und keine der drei bestehenden Edge Functions verwendet die
+View. Aber wer sie künftig serverseitig einsetzen will, findet nichts — und
+sollte das hier lesen, statt zu suchen.

@@ -18,6 +18,11 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     staffRole: null,
     isLoading: false,
     tierLoading: false,
+    // Vorgabe „aktiviert": die allermeisten Tests prüfen etwas anderes als das
+    // Aktivierungs-Gate und sollen nicht daran hängenbleiben. Wer das Gate
+    // prüft, setzt isActivated ausdrücklich (AGE-495).
+    isActivated: true,
+    activationName: null,
     signUp: async () => ({ error: null }),
     signIn: async () => ({ error: null }),
     signOut: async () => {},

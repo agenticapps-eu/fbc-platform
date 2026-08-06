@@ -11,10 +11,16 @@ import HomePage from "../pages/HomePage";
  * Der Assistent bleibt vollständig im Code und unter `/onboarding` erreichbar,
  * er wird nur nicht mehr aufgedrängt.
  *
- * Die Komponente bleibt als Naht bestehen, obwohl sie im Moment nichts entscheidet:
- * **C3 setzt genau hier das Aktivierungs-Gate.** Sie jetzt aufzulösen und in C3
- * wieder einzuziehen, wäre zweimal dieselbe Arbeit und ein Diff mehr an einer
- * Stelle, die ohnehin gleich wieder aufgeht.
+ * AGE-495 (C3) hat die Naht eingelöst — allerdings eine Ebene höher: Das
+ * Aktivierungs-Gate sitzt als `ActivationGate` um die gesamte `AppShell`
+ * (`App.tsx`) und nicht nur um die Startseite. Der Grund ist der Auftrag selbst:
+ * „Egal welche Route aufgerufen wird, es erscheint nur der
+ * Aktivierungsbildschirm." Hier allein hätte es `/mitglieder` oder `/profil`
+ * nicht erreicht.
+ *
+ * Damit entscheidet diese Komponente endgültig nichts mehr. Sie bleibt, weil
+ * `navItems` sie als Component für „/" führt und ein Umbau dort ein eigener,
+ * unbeteiligter Diff wäre.
  */
 export default function HomeRedirect() {
   return <HomePage />;
