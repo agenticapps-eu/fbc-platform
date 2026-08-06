@@ -380,28 +380,28 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Live-Function, nicht des Quelltexts:
 
       | Fall | Aufruf | Antwort |
-                  | --- | --- | --- |
-                  | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
-                  | Link unbekannt | erfundenes Token | `410 not_found` |
-                  | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
-                  | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
-                  | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+                      | --- | --- | --- |
+                      | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
+                      | Link unbekannt | erfundenes Token | `410 not_found` |
+                      | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
+                      | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
+                      | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
 
-                  Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
-                  `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
-                  Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
-                  Fehlversuche und wirft nicht vorzeitig.
-                  **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
-                  `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                  Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                  meldet `activated:true`, und dasselbe Konto sieht jetzt
-                  `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
-                  **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
-                  Aktivierungszustand und nicht an einer kaputten Fixture.
-                  _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
-                  (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
-                  also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
-                  nicht an der Live-Datenbank._
+                      Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
+                      `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
+                      Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
+                      Fehlversuche und wirft nicht vorzeitig.
+                      **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
+                      `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+                      Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+                      meldet `activated:true`, und dasselbe Konto sieht jetzt
+                      `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
+                      **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
+                      Aktivierungszustand und nicht an einer kaputten Fixture.
+                      _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
+                      (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
+                      also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
+                      nicht an der Live-Datenbank._
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -509,13 +509,17 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Stripe vollständig und `RESEND_API_KEY`. Das ist der offene CRITICAL und
       braucht Donald im Stripe-Dashboard. `APP_URL` ist seit dem 06.08.
       absichtlich gleich (dieselbe App-URL), kein Befund._
-      **Und ein konkreter Fund: `FROM_EMAIL` auf PROD steht noch auf
-      `FBC <onboarding@resend.dev>`** — dem Sandkasten aus 10.5. Heute folgenlos,
-      weil dort keine Aktivierungs-Functions deployt sind; ungeprüft übernommen
-      würde 10.3 den Blocker aber exakt wiederholen. Infisical allein reicht
-      nicht, der Wert muss zusätzlich ins Projekt:
-      `supabase secrets set "FROM_EMAIL=FBC <noreply@effbeezee.com>"
---project-ref viwntbodrtqxgmqyxluh`.
+      **Ein konkreter Fund, noch am selben Abend behoben:** `FROM_EMAIL` auf
+      PROD stand noch auf `FBC <onboarding@resend.dev>` — dem Sandkasten aus
+      10.5. Folgenlos, weil dort keine Aktivierungs-Functions deployt sind;
+      ungeprüft übernommen hätte 10.3 den Blocker aber exakt wiederholt.
+      Gesetzt und per Hash gegengeprüft: `FROM_EMAIL` und `APP_URL` stimmen auf
+      **beiden** Projekten mit den Sollwerten überein.
+      _Die Lehre daraus ist die wichtigere: **Infisical zu setzen schiebt nichts
+      ins Supabase-Projekt.** Das sind zwei getrennte Flächen, und genau deshalb
+      sah am Morgen alles gesetzt aus, während die Live-Functions den Sandkasten
+      benutzten. Wer einen Function-Wert ändert, muss beide anfassen — und die
+      Prüfung ist der Digest-Vergleich, nicht der Blick in Infisical._
 - [ ] 10.4 Zustell-Abnahme bei GMX, Web.de, Gmail, Outlook. **Hängt an AGE-256**
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
       _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
