@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(67);
+select plan(131);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -41,6 +41,39 @@ update public.profiles set tier = 'connect',  name = 'Neuling'  where id = '7777
 update public.profiles set tier = 'impact',   name = 'OptOut'   where id = '88888888-8888-8888-8888-888888888888';
 -- '9999…' behält bewusst den Default → Beleg für den Signup-Startlevel (§3.4).
 
+-- ── Aktivierungs-Gate (AGE-495) ──────────────────────────────────────────────
+-- Die Fixtures oben entstehen NACH dem Backfill aus 20260806080000 und tragen
+-- deshalb alle `activated_at = null`. Ohne diese Zeile fielen nach Migration B
+-- sämtliche 67 Bestands-Assertions durch — nicht weil eine Stufe falsch wäre,
+-- sondern weil kein Fixture bestätigt ist. Das ist keine Testkosmetik: es ist
+-- der Beleg, dass das Gate wirklich vor allem anderen steht.
+update public.profiles set activated_at = now();
+
+-- Das Sondenkonto für das Gate. Bewusst `impact` (höchste Stufe): bei
+-- importierten Mitgliedern liegt hinter dem Gate KEIN Stufen-Gate mehr, das
+-- einen Fehler noch auffinge. Ein `basic`-Konto sähe vieles schon wegen der
+-- Stufe nicht und täuschte ein Gate vor, das gar nicht greift.
+insert into auth.users (id, aud, role, email) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'authenticated', 'authenticated', 'nichtaktiv@test.fbc');
+update public.profiles
+   set tier = 'impact', name = 'Nichtaktiv', created_at = now() - interval '90 days',
+       activated_at = null
+ where id = 'dddddddd-0000-0000-0000-00000000000d';
+
+-- EIGENE Zeilen für das Sondenkonto. Ohne sie wäre jede 0 im Abschnitt „eigene
+-- Daten" nur der Beleg für ein leeres Konto, nicht für das Gate — genau die
+-- Sorte grüner Test, die nichts prüft.
+insert into public.profile_contacts (profile_id, email, phone) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'nichtaktiv-kontakt@test.fbc', '+49 000 1');
+insert into public.goals (profile_id, category, title) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'persoenlich', 'Eigenes Ziel');
+insert into public.notifications (profile_id, type, payload) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'system', '{"t":"x"}'::jsonb);
+insert into public.member_settings (profile_id) values
+  ('dddddddd-0000-0000-0000-00000000000d');
+insert into public.compass_responses (profile_id, theme, answers) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'tun', '{"a":1}'::jsonb);
+
 -- Welpenschutz (§2) gilt 30 Tage ab Registrierung. Ohne Rückdatierung stünden ALLE
 -- Fixtures darunter und jede Kontaktanfrage im Test wäre aus dem falschen Grund
 -- verboten. '7777…' bleibt bewusst frisch — das ist der Welpenschutz-Fall.
@@ -63,6 +96,12 @@ insert into public.offers (profile_id, title) values
 -- Chips daneben trotzdem lesbar.
 insert into public.profile_interests (profile_id, theme, label) values
   ('66666666-6666-6666-6666-666666666666', 'tun', 'Unternehmensaufbau');
+-- Ohne diese beiden Zeilen sind `needs` und `profile_theme_scores` global leer,
+-- und die Gate-Assertions darauf sind grün, ohne irgendetwas zu prüfen.
+insert into public.needs (profile_id, title) values
+  ('66666666-6666-6666-6666-666666666666', 'Impact need');
+insert into public.profile_theme_scores (profile_id, theme, score) values
+  ('66666666-6666-6666-6666-666666666666', 'tun', 8.0);
 insert into public.profile_contacts (profile_id, email) values
   ('66666666-6666-6666-6666-666666666666', 'impact-contact@test.fbc');
 
@@ -87,6 +126,11 @@ insert into public.events (id, title, host_id, visibility, starts_at) values
 -- bestehender Thread allein berechtigt nicht zum Schreiben.
 insert into public.message_threads (a_profile_id, b_profile_id) values
   ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+
+-- Ohne diese Zeile ist `routing_queue` leer und die list_routing_queue-Assertion
+-- unten grün, ohne etwas zu prüfen.
+insert into public.routing_queue (match_id, routing, status) values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'dkri', 'open');
 
 -- Staff (server-kontrolliert, ADR-0002). Provisioniert wie in Prod: direkt, nie vom Client.
 insert into public.staff_roles (profile_id, role) values
@@ -503,6 +547,273 @@ select alike(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'update public.member_settings set theme = ''sommerfest'' where profile_id = ''11111111-1111-1111-1111-111111111111'''),
   'DENIED:%', 'theme: ein unbekannter Wert wird von der DB abgelehnt, nicht nur vom Client');
+
+-- ── 13. Aktivierungs-Gate (AGE-495) ──────────────────────────────────────────
+-- Läuft am Ende, weil der Block Fixtures mutiert (er nimmt zwei Konten die
+-- Aktivierung weg). Das Sondenkonto 'dddd…' ist `impact` und NICHT aktiviert —
+-- es steht für ein importiertes Mitglied, in dessen Konto sich jemand mit dem
+-- verteilten Passwort angemeldet hat.
+
+-- Hilfsfunktion für die anon-Gegenprobe: count_as setzt eine authentifizierte
+-- Identität und taugt deshalb nicht, um „der ausgeloggte Besucher sieht weiter"
+-- zu belegen.
+create function pg_temp.count_as_anon(q text) returns int language plpgsql as $$
+declare n int;
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role anon';
+  execute q into n;
+  reset role;
+  return n;
+end $$;
+
+-- 13.1 Fremddaten — der Kern der Zusage aus AGE-495.
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profiles where id <> ''dddddddd-0000-0000-0000-00000000000d'''),
+  0, 'Gate: nicht aktiviert sieht KEINE fremde Profilzeile');
+
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profiles_public'),
+  0, 'Gate: nicht aktiviert sieht das Verzeichnis nicht (View umgeht die Policies!)');
+
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.posts'), 0, 'Gate: keine Beiträge');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.events'), 0, 'Gate: keine Veranstaltungen');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.offers'), 0, 'Gate: keine Angebote');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.needs'), 0, 'Gate: keine Gesuche');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profile_interests'), 0, 'Gate: keine fremden Interessen');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profile_theme_scores'), 0, 'Gate: kein fremder Erfolgsradar');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.comments'), 0, 'Gate: keine Kommentare');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.membership_tiers'),
+  6, 'Gate: Referenzdaten (Stufen) bleiben lesbar — sie tragen keinen Personenbezug');
+
+-- 13.2 EIGENE Daten. Der Angreifer meldet sich ALS das Mitglied an; auth.uid()
+-- ist die ID des Bestohlenen. Diese fünf Assertions sind codex' blockierender
+-- Befund aus Review-Runde 1 — sie fehlten in der ersten Planung vollständig.
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profile_contacts'),
+  0, 'Gate: auch die EIGENEN Kontaktdaten bleiben zu (E-Mail + Telefon!)');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.goals'), 0, 'Gate: auch die eigenen Ziele');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.notifications'), 0, 'Gate: auch die eigenen Benachrichtigungen');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.member_settings'), 0, 'Gate: auch die eigenen Einstellungen');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.compass_responses'), 0, 'Gate: auch die eigenen Kompass-Antworten');
+
+-- 13.3 Schreiben. Ein nicht aktiviertes Konto darf nichts veröffentlichen —
+-- sonst erscheint Inhalt unter dem echten Namen eines Mitglieds.
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'update public.profiles set short_bio = ''gekapert'' where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  'OK', 'Gate: das UPDATE aufs eigene Profil wirft nicht (RLS filtert still) …');
+select is(
+  (select short_bio from public.profiles where id = 'dddddddd-0000-0000-0000-00000000000d'),
+  null, '… ändert das Profil aber nicht');
+
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into public.offers (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kaperangebot'')'),
+  'DENIED:%', 'Gate: kein Angebot unter fremdem Namen');
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into public.posts (author_id, body, visibility) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kaperbeitrag'', ''public'')'),
+  'DENIED:%', 'Gate: kein Beitrag unter fremdem Namen');
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into public.needs (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kapergesuch'')'),
+  'DENIED:%', 'Gate: kein Gesuch unter fremdem Namen');
+
+-- 13.4 Zielprofil-Gate (Entscheidung 16, Donald 2026-08-06). Ein BESTÄTIGTES
+-- Mitglied darf das unbestätigte Profil nicht sehen — sonst ist die Zusage im
+-- Mailtext („für kein anderes Mitglied sichtbar") unwahr.
+select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
+  'select count(*)::int from public.profiles_public where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  0, 'Zielprofil-Gate: ein bestätigtes Mitglied sieht das unbestätigte NICHT im Verzeichnis');
+select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
+  'select count(*)::int from public.profiles where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  0, 'Zielprofil-Gate: … auch nicht die Vollzeile');
+
+-- 13.5 my_activation_state — die einzige Fläche, die offen bleibt.
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.my_activation_state() where activated = false'),
+  1, 'my_activation_state meldet „nicht aktiviert"');
+select is(
+  pg_get_function_result('public.my_activation_state()'::regprocedure),
+  'TABLE(activated boolean, display_name text)',
+  'my_activation_state gibt genau ZWEI Felder zurück — jedes weitere wäre eines, '
+  'das ein Angreifer mit dem verteilten Passwort abholt');
+select is(has_function_privilege('anon', 'public.my_activation_state()', 'execute'),
+  false, 'anon darf my_activation_state nicht ausführen');
+
+-- 13.6 Die sieben SECURITY-DEFINER-RPCs (INVENTORY.md B1). Sie umgehen die RLS;
+-- bleiben sie stehen, ist die Migration ein Loch statt eines Gates.
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'select public.register_for_event(''ffffffff-ffff-ffff-ffff-ffffffffffff'')'),
+  'DENIED:%not activated%',
+  'RPC-Gate: register_for_event lehnt wegen fehlender Aktivierung ab — beim '
+  'ÖFFENTLICHEN Event, das sonst jedem Eingeloggten offensteht (AGE-448)');
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'select public.set_event_check_in(''00000000-0000-0000-0000-000000000000''::uuid, true)'),
+  'DENIED:%not activated%',
+  'RPC-Gate: set_event_check_in lehnt wegen fehlender Aktivierung ab '
+  '(nicht wegen „not the host" — das täte es auch ohne Gate)');
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'select public.recompute_my_matches()'),
+  'DENIED:%not activated%', 'RPC-Gate: recompute_my_matches lehnt ab');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.post_engagement_counts(array[''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa''::uuid, ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb''::uuid])'),
+  0, 'RPC-Gate: post_engagement_counts liefert leer (vorher gemessen: 2)');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.event_registration_counts(array[''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee''::uuid, ''ffffffff-ffff-ffff-ffff-ffffffffffff''::uuid])'),
+  0, 'RPC-Gate: event_registration_counts liefert leer (vorher gemessen: 2)');
+
+-- admin_list_feedback / list_routing_queue brauchen ein STAFF-Konto, um etwas
+-- zu liefern — mit einem gewöhnlichen Konto wären sie in beiden Zuständen leer
+-- und bewiesen nichts. Deshalb wird hier den beiden Staff-Fixtures die
+-- Aktivierung genommen. Ihre eigenen Assertions (Abschnitt 11/12) sind durch.
+update public.profiles set activated_at = null
+ where id in ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002');
+
+select is(pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+  'select count(*)::int from public.admin_list_feedback()'),
+  0, 'RPC-Gate: ein nicht aktivierter Admin bekommt kein fremdes Feedback');
+select is(pg_temp.count_as('bbbbbbbb-0000-0000-0000-000000000002',
+  'select count(*)::int from public.list_routing_queue()'),
+  0, 'RPC-Gate: ein nicht aktivierter Manager bekommt keine Routing-Queue');
+select is(pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+  'select count(*)::int from public.feedback'),
+  0, 'Gate: der nicht aktivierte Admin sieht auch über die Policy nichts');
+
+-- 13.7 Das Schaufenster bleibt offen. Ausdrücklich NICHT über count_as — das
+-- setzt eine authentifizierte Identität und könnte die anon-Policies nie prüfen.
+select is(pg_temp.count_as_anon(
+  'select count(*)::int from public.posts where id = ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'''),
+  1, 'anon sieht weiterhin öffentliche Beiträge (Detlevs Schaufenster)');
+select is(pg_temp.count_as_anon(
+  'select count(*)::int from public.events where id = ''ffffffff-ffff-ffff-ffff-ffffffffffff'''),
+  1, 'anon sieht weiterhin öffentliche Veranstaltungen');
+
+-- 13.8 activation_tokens ist für Client-Rollen unerreichbar — kein Grant, keine
+-- Policy. Geprüft wird der GRANT, weil eine fehlende Policy allein nicht
+-- verhindert, dass jemand später eine hinzufügt.
+select is(has_table_privilege('anon', 'public.activation_tokens', 'select'),
+  false, 'activation_tokens: anon hat kein SELECT');
+select is(has_table_privilege('authenticated', 'public.activation_tokens', 'select'),
+  false, 'activation_tokens: authenticated hat kein SELECT');
+select is(has_table_privilege('authenticated', 'public.activation_tokens', 'insert'),
+  false, 'activation_tokens: authenticated hat kein INSERT');
+select is(
+  (select count(*)::int from pg_policies where tablename = 'activation_tokens'),
+  0, 'activation_tokens: es gibt bewusst KEINE Policy');
+
+-- 13.9 activated_at ist nicht vom Client schreibbar — der Mechanismus, nicht nur
+-- die Zusage. Ohne das könnte sich jedes Konto selbst aktivieren.
+select is(has_column_privilege('authenticated', 'public.profiles', 'activated_at', 'update'),
+  false, 'profiles.activated_at: authenticated darf sie NICHT schreiben');
+
+-- 13.10 Gegenprobe. Ohne diese Hälfte prüfen 13.1–13.6 nur, dass die Fixture
+-- kaputt ist.
+update public.profiles set activated_at = now()
+ where id = 'dddddddd-0000-0000-0000-00000000000d';
+
+select cmp_ok(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profiles_public'),
+  '>', 0, 'Nach der Bestätigung sieht dasselbe Konto das Verzeichnis');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.profile_contacts'),
+  1, 'Nach der Bestätigung sind die eigenen Kontaktdaten wieder lesbar');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.goals'),
+  1, 'Nach der Bestätigung sind die eigenen Ziele wieder lesbar');
+select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
+  'select count(*)::int from public.profiles_public where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  1, 'Nach der Bestätigung erscheint das Profil für die anderen im Verzeichnis');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.my_activation_state() where activated = true'),
+  1, 'my_activation_state meldet danach „aktiviert"');
+
+-- ── 14. Die Service-Rollen-Funktionen (Teil C) ───────────────────────────────
+-- Sie bauen das Gate auf und umgehen es deshalb per Definition. Genau darum
+-- muss belegt sein, dass KEINE Client-Rolle sie aufrufen kann.
+select is(has_function_privilege('anon',
+  'public.issue_activation_token(text, text, interval)', 'execute'),
+  false, 'issue_activation_token: anon darf nicht');
+select is(has_function_privilege('authenticated',
+  'public.issue_activation_token(text, text, interval)', 'execute'),
+  false, 'issue_activation_token: authenticated darf nicht — sonst gäbe sich '
+         'jedes Konto selbst einen Link');
+select is(has_function_privilege('service_role',
+  'public.issue_activation_token(text, text, interval)', 'execute'),
+  true, 'issue_activation_token: service_role darf (der Weg der Edge Function)');
+select is(has_function_privilege('authenticated',
+  'public.claim_activation_token(text)', 'execute'),
+  false, 'claim_activation_token: authenticated darf nicht');
+select is(has_function_privilege('authenticated',
+  'public.mark_activated(uuid)', 'execute'),
+  false, 'mark_activated: authenticated darf nicht — sonst aktiviert sich jedes '
+         'Konto selbst und der ganze Change ist wirkungslos');
+select is(has_function_privilege('service_role', 'public.mark_activated(uuid)', 'execute'),
+  true, 'mark_activated: service_role darf');
+
+-- Ausgabe. '9999…' ist unaktiviert (Abschnitt 13 hat nur 'dddd…' wieder aktiviert).
+update public.profiles set activated_at = null
+ where id = '99999999-9999-9999-9999-999999999999';
+
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-eins')),
+  'issued', 'issue: der erste Link wird ausgegeben');
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = '99999999-9999-9999-9999-999999999999'
+              and used_at is null and invalidated_at is null),
+  1, 'issue: genau ein ausstehendes Token');
+
+select is((select status from public.issue_activation_token('nicht-da@test.fbc', 'hash-x')),
+  'unknown', 'issue: eine unbekannte Adresse bekommt „unknown" — und die '
+             'Function wirft nicht, damit die Antwort keine Adressen verrät');
+select is((select status from public.issue_activation_token('impact@test.fbc', 'hash-y')),
+  'already_activated', 'issue: ein bereits aktiviertes Konto bekommt keinen Link');
+
+-- Ratengrenze. Das eben ausgegebene Token ist Sekunden alt.
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zwei')),
+  'rate_limited', 'issue: der zweite Versand binnen 60 s wird abgelehnt');
+
+-- Entwertung: nach einem neuen Link gilt der alte nicht mehr — aber als
+-- `superseded`, nicht als `used`. Sonst läse das Mitglied „bereits aktiviert".
+update public.activation_tokens set created_at = now() - interval '5 minutes'
+ where token_hash = 'hash-eins';
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-drei')),
+  'issued', 'issue: nach der Sperrfrist geht ein neuer Link raus');
+select is((select status from public.claim_activation_token('hash-eins')),
+  'superseded', 'claim: der ÜBERHOLTE Link meldet „superseded" — nicht „used", '
+                'denn das Konto ist gerade NICHT aktiviert');
+
+-- Einlösung.
+select is((select status from public.claim_activation_token('hash-drei')),
+  'claimed', 'claim: der gültige Link wird beansprucht');
+select is((select status from public.claim_activation_token('hash-drei')),
+  'used', 'claim: derselbe Link ein zweites Mal → „used" (einmalig verwendbar). '
+          'Das ist zugleich der Nebenläufigkeits-Beleg: das Beanspruchen ist '
+          'EINE Anweisung, ein zweiter Aufruf findet used_at gesetzt vor');
+select is((select status from public.claim_activation_token('gibt-es-nicht')),
+  'not_found', 'claim: ein unbekannter Hash meldet „not_found"');
+
+-- Ablauf.
+insert into public.activation_tokens (token_hash, profile_id, expires_at) values
+  ('hash-alt', '99999999-9999-9999-9999-999999999999', now() - interval '1 hour');
+select is((select status from public.claim_activation_token('hash-alt')),
+  'expired', 'claim: ein abgelaufener Link meldet „expired"');
+
+-- mark_activated ist idempotent und der letzte Schritt.
+select is((select public.mark_activated('99999999-9999-9999-9999-999999999999') is not null),
+  true, 'mark_activated setzt den Zeitpunkt');
+select is(
+  (select public.mark_activated('99999999-9999-9999-9999-999999999999')),
+  (select activated_at from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
+  'mark_activated ist idempotent — ein zweiter Aufruf überschreibt nicht');
 
 select * from finish();
 rollback;
