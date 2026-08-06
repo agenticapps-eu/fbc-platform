@@ -85,6 +85,24 @@ Begründung, nicht die Prüfung.
 fehlschlagen). Danach ist AGE-495 inhaltlich fertig bis auf 8.7 (unabhängiges
 Code-Review) und die Entscheidungen unten.
 
+**Achtung: CI ist auf dem letzten Stand ungelaufen, und das ist nicht das
+Repo.** Der jüngste Lauf steht auf `fc560e8`; die vier Commits danach
+(`4cef2cd`, `87482a4`, `7762624`, `4d638ab`) haben **null** Check-Runs —
+`gh api repos/…/commits/4d638ab/check-runs` meldet `total_count: 0`.
+Ursache gemessen: **GitHub Actions hatte am 06.08. abends einen
+`major_outage`** (`githubstatus.com/api/v2/components.json`). Kein Pfad-Filter,
+kein `concurrency`-Block in `ci.yml`, Actions ist aktiviert. Also: erst
+nachsehen, ob Läufe inzwischen nachgekommen sind — notfalls mit einem leeren
+Commit oder `gh workflow run` anstoßen —, **nicht** blind mergen und **nicht**
+nach einem Fehler im Repo suchen.
+
+_Und eine zweite Fehlspur, die ich schon ausgeschlossen habe: der Lauf auf
+`1d577ca` steht als `failure` in der Liste. Das waren **vier abgebrochene
+Jobs**, keine roten Tests — GitHub bricht laufende Läufe ab, wenn ein neuerer
+Push nachkommt, und ich hatte mehrere schnell hintereinander gemacht. Die
+nachfolgenden Commits liefen grün. Lokal sind Lint, Typecheck, 426 Vitest, 12
+Deno und pgTAP (173) grün gemessen._
+
 ## Open questions
 
 - **CRITICAL, unverändert:** Stripe- und Resend-Secrets zwischen den Projekten
