@@ -1,0 +1,35 @@
+# Sicherheits-Header für Cloudflare Pages (AGE-495, Befund 13.4).
+#
+# Vite kopiert alles aus public/ nach dist/; Pages liest die Datei im Wurzel-
+# verzeichnis der Ausgabe. Regeln greifen von oben nach unten, die spezifischere
+# Route gewinnt.
+#
+# WAS HIER BEWUSST NICHT STEHT: eine vollständige Content-Security-Policy.
+# Sie bräuchte script-src, connect-src (Supabase, Axiom, Sentry), frame-src
+# (YouTube, Vimeo), img-src (Avatare aus dem Supabase-Bucket) und style-src —
+# und eine falsche Direktive bricht die Anwendung in Produktion still, während
+# lokal alles läuft. Was hier steht, ist die Teilmenge, die NICHT brechen kann:
+# `frame-ancestors` regelt ausschließlich, wer die Seite einbetten darf.
+# Die volle CSP ist ein eigener Schritt mit einer Messung im Browser davor.
+
+/*
+  # Clickjacking. Beides, weil ältere Browser `frame-ancestors` nicht kennen und
+  # neuere `X-Frame-Options` ignorieren, sobald eine CSP da ist.
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Frame-Options: DENY
+  # MIME-Sniffing: ein hochgeladenes Bild soll nie als Skript ausgeführt werden.
+  X-Content-Type-Options: nosniff
+  # Kein vollständiger Pfad an fremde Ziele — Profil- und Mitglieds-IDs stehen
+  # in unseren URLs.
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Zwei Jahre, Subdomains eingeschlossen. Kein `preload`: das ist eine
+  # Einbahnstraße und gehört bewusst entschieden, nicht mitgeliefert.
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  # Die Anwendung fragt nichts davon; das Abschalten macht es zur Zusage.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+/aktivierung
+  # Task 6.4: auf dieser Route steht der Aktivierungs-Token im Fragment. Browser
+  # senden das Fragment ohnehin nicht im `Referer` — dies ist die zweite Sperre,
+  # falls das Token je in den Pfad rutscht, und sie kostet nichts.
+  Referrer-Policy: no-referrer

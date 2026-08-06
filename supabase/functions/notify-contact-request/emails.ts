@@ -68,6 +68,33 @@ export function selectNotification(payload: WebhookPayload): {
   return null;
 }
 
+/**
+ * Does the row the caller handed us match the row that is actually in
+ * `contact_requests`?
+ *
+ * The shared secret proves "this call came from the webhook", not "this row
+ * exists". Without this check, whoever holds the secret can post an invented
+ * row — any recipient, any counterparty name, any message text — and the mail
+ * goes out under the club's own From address. The message body is the teeth of
+ * it: `renderNewRequest` quotes it verbatim.
+ *
+ * Compared are the fields that decide WHO gets mail and WHY. `message` is
+ * deliberately not compared — it is taken from the database row instead, which
+ * is stronger than comparing it.
+ */
+export function passtZurDatenbank(
+  record: ContactRequestRow,
+  dbRow: Pick<ContactRequestRow, "id" | "from_id" | "to_id" | "status"> | null,
+): boolean {
+  if (!dbRow) return false;
+  return (
+    record.id === dbRow.id &&
+    record.from_id === dbRow.from_id &&
+    record.to_id === dbRow.to_id &&
+    record.status === dbRow.status
+  );
+}
+
 /** Minimal HTML-entity escape — names and messages are member-controlled. */
 export function escapeHtml(input: string): string {
   return input

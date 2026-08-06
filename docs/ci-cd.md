@@ -169,9 +169,13 @@ Configured on the GitHub repo (not in a workflow file) — **applied**:
 - Pull request required before merge (no direct pushes); 0 required approvals
   (solo-friendly — raise later when there are reviewers).
 - Required status checks (must be green): **`verify`**, **`migrations`**,
-  **`pr-title`**. Branches must be up to date (`strict`) before merge. `deploy` is
-  deliberately **not** required — it can't pass without the Infisical secrets and
-  would otherwise make `main` unmergeable.
+  **`pr-title`**, **`edge-functions`**. Branches must be up to date (`strict`)
+  before merge. `deploy` is deliberately **not** required — it can't pass without
+  the Infisical secrets and would otherwise make `main` unmergeable.
+  `edge-functions` came in on 2026-08-06 (AGE-495): it runs `deno test --frozen`
+  and needs no secrets, so the reason that keeps `deploy` out does not apply.
+  It earned its place the same day — the added `wrangler` devDependency left
+  `deno.lock` stale, and `--frozen` caught it before the PR existed.
 - Conventional-Commit PR title enforced by the `pr-title` check; squash-merge so
   the PR title becomes the commit subject.
 
@@ -186,7 +190,8 @@ gh api -X PUT repos/agenticapps-eu/fbc-platform/branches/main/protection \
     "checks": [
       { "context": "verify" },
       { "context": "migrations" },
-      { "context": "pr-title" }
+      { "context": "pr-title" },
+      { "context": "edge-functions" }
     ]
   },
   "enforce_admins": false,

@@ -1,111 +1,148 @@
-# Session Handoff — 2026-08-05 (9. Session)
+# Session Handoff — 2026-08-06 (13. Session)
 
 ## Stand in einem Satz
 
-**C3 ist bewusst NICHT gestartet.** Diese Session hat die Nachläufe aus dem
-8.-Session-Handoff abgearbeitet (AGE-501) und dabei zwei Dinge gefunden, die
-dort nicht standen — beide betreffen Kontrollen, die aussahen, als liefen sie.
+**Fünf offene C3-Tasks geschlossen, die Review-Runde 4 gefahren und
+ausgewertet, vier CI/CD-Punkte gehärtet** — fünf Commits auf dem **neuen**
+Branch `donald/age-495-c3-aktivierung`. Die C3-Arbeit lag auf dem falschen
+Branch und ist umgehängt.
 
-## Die zwei Funde, die diese Session ausmachen
+## Accomplished
 
-**1. 33 Deno-Tests liefen nie in CI.** `.github/workflows/` enthielt keinen
-einzigen Deno-Schritt, und `pnpm test` sieht die Edge Functions nicht — sie sind
-Deno, nicht Node. Ungeprüft lagen damit genau die Grenzen, an denen Fremdverkehr
-ankommt: **Stripe-Signaturprüfung** (manipulierter Body, falsches Secret,
-veralteter Zeitstempel), **Open-Redirect-Schutz** in `resolveReturnBase`,
-**HTML-Escaping** der Mail-Templates, **Fail-Closed** ohne `old_record`.
-Job `edge-functions` ergänzt, `deno.lock` per `--frozen` verankert. Alle 33 grün
-— sie waren nie kaputt, nur nie gefragt.
+**5.6 / 12.6 — Drossel auf `redeem-activation`.** Entscheidung Donald: Subjekt
+ist die IP, gezählt werden aber **ausschließlich Fehlversuche**, und die Zählung
+steht **hinter** dem Beanspruchen des Tokens. Daraus folgt: ein gültiges Token
+läuft nie in die Drossel (NAT-Einwand weg), und ein gefälschter
+`x-forwarded-for` bleibt folgenlos. Neu: Migration `20260806110000`
+(`activation_attempts`, RLS an, keine Policy, kein Grant · RPC
+`note_failed_activation`, nur `service_role`), Aufruf fail-open, Status
+`throttled` bis auf die Einlöseseite. pgTAP 14c, +8 Assertions, Plan 140 → 148.
 
-**2. Das Verifikations-Rezept des Workflow-Skills lieferte stillschweigend
-Müll** (AGE-502). Der 8.-Session-Handoff notierte hier eine Prozesslücke; die
-echte ist schlimmer und eine andere. `CH=$(ls -d …)` bricht an jedem `ls`-Alias
-— hier `eza -lao` — und fängt die ganze Langformat-Zeile statt des Pfads. Jede
-`$CH`-Prüfung greppt daraufhin ins Leere und meldet das als **Warnung**:
+**12.7** — vier `member-profiles`-Requirements als MODIFIED nachgezogen, jede
+Zusage gegen `20260806080100` geprüft. **12.8** — „genau eine privilegierte
+Funktion" auf die **Datenklasse** eingegrenzt statt auf eine Anzahl.
 
-| an C4 gemessen | vorher   | nachher |
-| -------------- | -------- | ------- |
-| Reviewer-Zahl  | _(leer)_ | **3**   |
-| offene Tasks   | _(leer)_ | 0       |
+**8.8 — Review-Runde 4** mit codex, opencode, gemini (`AGENT_SELF=claude`).
+2× REQUEST-CHANGES, 1× APPROVE. Vier Befunde behoben, einer widerlegt, fünf als
+Entscheidung offen — vollständig in `tasks.md` Block 14.
 
-Das Rezept sah aus, als hätte es geprüft und nichts gefunden — bei einem Change,
-dessen `REVIEWS.md` mit drei Reviewern die ganze Zeit dalag. Dazu: `$BASE` war
-nie definiert, und der Branch-Kontext fehlte. Projektkopie korrigiert und einmal
-durchlaufen; **der dauerhafte Fix liegt upstream im `claude-workflow`-Snapshot**
-und betrifft alle sieben Projekte.
+**13.4 — vier Audit-Befunde.** `stripe-webhook` prüfte `payment_status` nicht
+(bei SEPA/Überweisung feuert Stripe `completed` mit `unpaid`; die Stufe kam beim
+**Anstoßen** des Kaufs) · `notify-contact-request` prüfte `record` nicht gegen
+die Tabelle (wer das Shared Secret hat, wählte Empfänger, Absendername und
+Nachrichtentext frei) · `public/_headers` neu · `.gitignore` um
+Schlüsselmuster. Sieben neue Deno-Tests, sechs vorher rot.
 
-## Erledigt (AGE-501)
+**CI/CD:** alle 15 `uses:` auf Commit-SHA gepinnt · `dependabot.yml` um `npm` ·
+`wrangler` von `pnpm dlx wrangler@4` auf devDependency `4.119.0` im Lockfile ·
+`-E` aus dem `curl | sudo bash` entfernt.
 
-- **Flaky Test** `ThemeServerSync.test.tsx:121` — mit einem `MutationObserver`
-  gemessen: wenn das DOM `navy` zeigt, steht im `localStorage` noch `hell`.
-  Render-Wert vs. Effect-Wert. Beide Zusicherungen jetzt im selben `waitFor`,
-  10/10 grün.
-- **`NUR_REDIRECT` abgeleitet** statt handgepflegt. Belegt: eine achte
-  Redirect-Route samt totem Link ließ der alte Test grün durch.
-- **Roher `23505`** in `ProfilPage` übersetzt, mit `invalidateQueries` statt
-  „nochmal versuchen". Rot → grün belegt.
-- **„Meine Communities" ersatzlos entfernt** (Entscheidung Donald, 05.08.) —
-  derselbe Fall wie „Aktivität & Portfolio" in AGE-494 7.6. Grid auf eine Spalte.
-- **Arbeitsbaum**: `.planning/skill-observations/` und `*.pre-NNNN` ignoriert,
-  zwei redundante Sicherungskopien gelöscht.
+## Decisions
 
-**Bewusst nicht gemacht:** `ChipGroup`/`ChipFilterGroup` bleiben doppelt. Sie
-unterscheiden sich nur in zwei Utility-Klassen; eine gemeinsame Komponente
-bräuchte eine `size`-Prop — die Abstraktion, die CLAUDE.md §2 untersagt und die
-das AGE-494-Review schon zurückgewiesen hatte. Bei einer dritten Chip-Gruppe neu
-bewerten.
+- **Drossel-Subjekt (12.6):** IP, aber nur Fehlversuche, Zählung hinter dem
+  Claim. Preis: es ist ein Zähler, keine Lastbremse — siehe 14.6.
+- **Branch umgehängt:** die acht C3-Commits lagen ungepusht auf
+  `chore/instruction-file-cleanup` (PR #119, `.planning`-Entfernung). Ein Push
+  hätte C3 in diesen PR geworfen. Neuer Branch von `origin/main`, Cherry-Pick,
+  Cleanup-Branch auf `origin` zurückgesetzt. Differenz zwischen beiden: exakt
+  die zwei PR-#119-Dateien.
+- **Volle CSP NICHT ausgeliefert.** `_headers` trägt nur `frame-ancestors` — die
+  Direktive, die nichts brechen kann. Als 13.5 festgehalten.
+- **`curl | sudo bash` bleibt.** Infisical verteilt die CLI über den eigenen
+  Artefaktserver, ihre GitHub-Releases tragen keine Assets (nachgemessen). Ein
+  Checksum-Pin ist nicht zu haben.
 
-Lauf: **lint 0 Fehler** (3 vorbestehende `react-refresh`-Warnungen) · typecheck
-sauber · **397 Vitest in 64 Dateien** · **33 Deno-Tests** · Build ✓ ·
-`openspec validate --all` 26/26.
+## Files modified
+
+- `supabase/migrations/20260806110000_activation_redeem_throttle.sql` — neu.
+- `supabase/tests/rls_test.sql` — Abschnitt 14c, Plan 148.
+- `supabase/functions/redeem-activation/index.ts` · `stripe-webhook/webhook.ts`
+  - `.test.ts` · `notify-contact-request/{emails,index}.ts` + `emails.test.ts`.
+- `src/lib/activation.ts` · `src/pages/ActivationRedeemPage.{tsx,test.tsx}`.
+- `public/_headers` — neu · `.gitignore` · `.github/{dependabot.yml,workflows/*}`
+  · `package.json` + `pnpm-lock.yaml`.
+- `openspec/changes/member-activation-flow/` — `tasks.md` (Blöcke 13/14),
+  `design.md`, `proposal.md`, beide Spec-Deltas, `REVIEWS.md`.
+
+## Der Befund, der die Reihenfolge umgeworfen hat
+
+**Das Gate war auf der Live-Datenbank scharf, ohne dass die deployte Oberfläche
+es kannte.** Gemessen mit `supabase migration list --linked`: auf
+`foelowldexkcqzewvrcf` — dem Projekt, mit dem die Live-Seite **bis zum Import**
+spricht (`docs/supabase-environments.md:24`) — lagen `20260806080000/080100/080200`
+bereits an, `090000` und `110000` nicht. Und `origin/main` trug **keine einzige**
+Aktivierungsdatei; sein `AuthProvider` liest weiter `.from("profiles")`.
+
+Folge: Bestandsmitglieder unberührt (der Backfill hat sie gestempelt), aber
+Signup ist offen — wer sich seit dem 06.08. 08:00 UTC neu registrierte, bekam
+`activated_at = null`, sah null Zeilen und hatte **keinen
+Aktivierungsbildschirm**, um herauszukommen. Die Zahl ist ungemessen: ohne
+Infisical-Login gibt es kein Verbindungsmaterial zur DB.
+
+**Geschlossen wird das in dieser Reihenfolge** (Donald, 06.08.) — sie ist
+zwingend, weil die Oberfläche `request_own_activation_token` aus `090000` ruft:
+
+1. ✅ `supabase db push --linked` → `090000` + `110000` auf
+   `foelowldexkcqzewvrcf`. Dry-Run vorher, Zielprojekt ausgegeben, danach
+   gegengeprüft: kein lokaler Stand ohne Remote.
+2. ✅ PR **#120** offen, `MERGEABLE`.
+3. ⏳ CI grün → mergen → `deploy.yml` bringt das Frontend. **Erst damit ist die
+   Lücke zu.**
+4. Dann `supabase functions deploy` + echter Versand (10.2/8.3).
 
 ## Next session: start here
 
-**Zwei Dinge stehen offen, bevor irgendetwas Neues anfängt:**
+**Wenn #120 noch offen ist: `gh pr checks 120`, dann mergen** — und mit
+`gh pr view 120 --json state` gegenprüfen, dass wirklich `MERGED` steht.
+Danach Schritt 4 oben. Für PROD (`viwntbodrtqxgmqyxluh`) braucht es einen
+**manuellen** `pnpm db:push:prod`; dort liegt bisher **keine** der vier
+Migrationen.
 
-1. **Stage-2-Code-Review für AGE-501 ist NICHT gelaufen.** Ein unabhängiges
-   Review braucht einen Subagenten, und diese Session durfte keinen starten.
-   `/code-review` oder `/pr-review-toolkit:review-pr` auf den PR ansetzen, bevor
-   gemerged wird. `openspec validate` ersetzt das nicht.
-2. **Der Dev-Server lief auf `localhost:5173`** für die Sichtprüfung von
-   `/kontakte` nach dem Entfernen von „Meine Communities". Ein eingeloggter
-   Screenshot war ohne Zugangsdaten nicht möglich — **die Sichtprüfung steht
-   noch aus.**
+Unverändert daneben: die Stripe- und Resend-Secrets zwischen DEV und PROD
+trennen (der einzige CRITICAL, braucht dich im Stripe-Dashboard). Details in der
+Git-Historie dieser Datei, Commit `2e4ecce`.
 
-Danach ist **C3 (AGE-495)** der nächste Change. Vorarbeit dieser Session: drei
-seiner Abnahmepunkte sind durch C4 bereits erfüllt (`minimum_password_length`
-= 10, `site_url` gesetzt, Redirect-Allow-List gezogen) — die Issue-Beschreibung
-ist an diesen Stellen veraltet. Im Code ist C3 **grüne Wiese**: weder
-`profiles.activated_at` noch `activation_tokens` noch `send-activation`
-existieren. Linear führt AGE-495 als blockiert durch **AGE-256** (DNS-Zugang für
-SPF/DKIM auf `fairbusinessclub.de`) — das blockiert aber nur die
-Zustell-Abnahme, nicht den Sicherheitskern (RLS-Gate, Token, Aktivierungsschirm).
+## Open questions
 
-## Offene Nachläufe
+- **14.6 — die Drossel ist ein Zähler, keine Bremse** (opencode, und er hat
+  recht). Weil erst beansprucht und dann gezählt wird, kostet jeder Fehlversuch
+  weiter eine Datenbankrunde. Das ist der **Preis** der gewählten Eigenschaft.
+  Wer Last sparen will, muss vor dem Claim sperren — und nimmt in Kauf, dass ein
+  Mitglied hinter einer verbrannten IP mit gültigem Link abgewiesen wird. Deine
+  Entscheidung; die Begründung in der Spec muss ihr folgen.
+- **14.7** — Mail-Missbrauch über die offene Selbstregistrierung: die Grenze
+  sitzt je Profil, beliebig viele Profile ⇒ beliebig viele Mails. Trifft die
+  Zustellreputation (AGE-256), nicht das Gate.
+- **14.8** — `directory-search` und `events` sagen in der durable Spec noch
+  Zugriff ohne Aktivierung zu. Dasselbe Muster wie 12.7, hängt an 12.10/AGE-448.
+- **14.9 / 14.10** — Zeitkanal nur im Code-Kommentar · Grenzwerte ohne Zahl.
+- **Nur noch ein GitHub-Punkt offen:** Required Checks auf `main` sind `verify`,
+  `migrations`, `pr-title` (`docs/ci-cd.md:170-176`) — **`edge-functions` fehlt**.
+  Anders als `deploy` braucht der Job keine Secrets und könnte required sein.
+  Nicht angefasst, weil ein neuer Pflicht-Check sofort PRs blockieren kann.
 
-- **Supabase-CA** → `DB_SCAN_CA_CERT` setzen, `DB_SCAN_TLS_INSECURE` entfernen.
-  Braucht Dashboard-Zugang. **Falle:** `db-drift-scan.ts:56` erwartet einen
-  **Dateipfad** (`readFileSync`), GitHub-Secrets sind Strings.
-- **Beleglücke:** `grep -rl "Stage 2"` liefert im archivierten C4-Verzeichnis 0,
-  obwohl das Review lief. Marker oder Vorlage — eines von beidem fehlt (AGE-502).
-- **AGE-502 upstream fixen**, sonst überschreibt der nächste
-  `/update-agenticapps-workflow` die Korrektur der Projektkopie.
-- Go-Live-Woche: zwei `VITE_*`-Werte umstellen · Echt-Link-Probe ·
-  **Stripe-Live-Keys nur auf PROD** (12 von 15 Function-Secrets sind identisch).
-- Reviewer-Regel auf `production`, sobald ein Zweiter Schreibrechte hat.
-- Preview-Abnahme durch Detlev.
+  _Zwei Punkte, die ich hier zuerst gemeldet hatte, sind **zurückgezogen**
+  (Donald, 06.08.). Das `production`-Environment ohne Reviewer-Regel ist
+  **entschieden**, nicht vergessen: zurückgestellt am 2026-08-05, weil Donald
+  der einzige Entwickler ist — die Begründung steht seit jeher im Kopf des Jobs
+  (`migrate-prod.yml:90-96`), und der Kommentar sagt sogar dazu, dass ein
+  früherer Kommentar das Gegenteil behauptete. Ich habe den Audit-Befund
+  ungeprüft weitergetragen. Und die Secrets liegen in **Infisical**:
+  `deploy.yml` ruft 4× `infisical run`. Gemessene Ausnahme ist allein
+  `SUPABASE_DB_URL_PROD` — `migrate-prod.yml` nennt Infisical kein einziges Mal
+  und liest den Wert an neun Stellen über `${{ secrets.… }}`. Das ist der Weg
+  dieses einen Workflows, kein Grund für ein Environment._
+
+- **6.4 war falsch abgehakt.** `Referrer-Policy: no-referrer` auf `/aktivierung`
+  stand nirgends — es gab keine Header-Datei. Steht jetzt in `public/_headers`.
+  Lohnt einen Blick, ob weitere Häkchen so entstanden sind.
 
 ## Fallen, die weiter gelten
 
-- **`git add -A` ist verboten** — dauerhaft untracked Dateien mit 0600, Repo ist
-  öffentlich.
-- **`ls` ist ein Alias auf `eza -lao`.** `$(ls …)` in einem Skript liefert
-  Langformat-Zeilen, nicht Pfade. Globs oder `command ls` benutzen. Das ist die
-  Ursache von AGE-502 und wird die nächste Kontrolle genauso still zerlegen.
-- **`psql` gibt es nicht.** DB-Zugriff über `pg` + `SUPABASE_DB_URL_*`.
-- **`supabase test db` ohne Dateiliste meldet FAIL, obwohl grün.**
-- **`@testing-library/user-event` ist nicht installiert** — hier wird
-  `fireEvent` benutzt.
-- **Der Pooler-Host ist pro Projekt verschieden** (alt `aws-1`, neu `aws-0`), und
-  `db.<ref>.supabase.co` löst nur auf IPv6 auf — aus CI nicht erreichbar.
-- **Merge immer gegenprüfen** (`state=closed merged=true`).
+Unverändert: `git add -A` verboten · `ls` ist `eza`-Alias · `supabase test db`
+ohne Dateiliste lügt · Policies zählen, nicht greppen · Merge mit `state=MERGED`
+gegenprüfen · Infisical-Login braucht ein echtes Terminal.
+
+**Neu:** In einer Pipeline (`cmd | tail`) ist der Exit-Code der von `tail`. Ein
+`git checkout … | tail -2 && git cherry-pick …` lief deshalb auf dem alten
+Branch weiter, obwohl das Checkout abgebrochen war. Bei git-Ketten nie pipen.

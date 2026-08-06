@@ -32,3 +32,24 @@ docs/legacy-planning/design-mocks/
 # Sicherungskopien, die /update-agenticapps-workflow vor einer Migration anlegt.
 # Der Vorzustand steht ohnehin in der Git-Historie.
 *.pre-[0-9][0-9][0-9][0-9]
+
+# Schlüsselmaterial. Kein Muster oben deckt es ab: ein `service-account.json`
+# oder eine `id_rsa` läuft heute glatt durch, und dieses Repo ist ÖFFENTLICH —
+# ein einmal gepushtes Geheimnis ist verbrannt, auch nach dem Löschen.
+# Das ist ein Netz, kein Ersatz für die Regel: Geheimnisse gehören nie ins Repo.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_ecdsa
+id_ed25519
+*_rsa
+*.ppk
+# Dienstkonto-Schlüssel und exportierte Zugangsdaten
+service-account*.json
+*-credentials.json
+gha-creds-*.json
