@@ -131,7 +131,19 @@ describe("ActivationRedeemPage", () => {
   it("leitet ein bereits aktiviertes Konto ohne Token still auf die Startseite", async () => {
     // Fall 3 aus §6: alter Link im Postfach, Konto längst aktiv. Keine
     // Fehlermeldung — das Mitglied hat nichts falsch gemacht.
-    renderMit("", { isActivated: true });
+    renderMit("", { user: { id: "u1", email: "m@test.fbc" } as never, isActivated: true });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+  });
+
+  it("leitet einen AUSGELOGGTEN Besucher NICHT weg — das ist der Weg zurück", async () => {
+    // Für Ausgeloggte ist isActivated true (es gibt nichts zu aktivieren). Ohne
+    // die user-Bedingung landete genau das Mitglied auf der Startseite, dessen
+    // Passwort ein Dritter übernommen hat — und käme nie an einen neuen Link.
+    // Beim Betrachten der laufenden Oberfläche gefunden.
+    renderMit("", { user: null, isActivated: true });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("heading", { name: /Bestätigungslink anfordern/i }),
+    ).toBeInTheDocument();
   });
 });

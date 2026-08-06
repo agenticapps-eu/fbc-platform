@@ -82,7 +82,7 @@ Test, der beim ersten Lauf grün ist, hat nichts gemessen und wird gelöscht.
       dann hilft überhaupt kein Datum. Es gibt EINE Sicherung — die
       Deploy-Reihenfolge — und diesen Stolperdraht._
 - [x] 1.8 Backfill danach unbedingt: `update public.profiles set
-  activated_at = now()`.
+activated_at = now()`.
 - [x] 1.9 **Harte Vorbedingung im Migrationskopf und in C10 vermerken:**
       Migration A läuft **vor** dem Import.
 
@@ -206,10 +206,10 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 - [x] 3.9 `activation_tokens`: `has_table_privilege` ist `false` für `anon` und
       `authenticated`, für alle vier Operationen. Dazu:
       `has_column_privilege('authenticated', 'public.profiles', 'activated_at',
-  'update')` ist `false` (Mechanismus zu 1.2).
+'update')` ist `false` (Mechanismus zu 1.2).
 - [x] 3.10 `plan(n)` auf die neue Zahl heben. Lauf **mit** Dateiliste:
       `supabase test db supabase/tests/rls_test.sql supabase/tests/grants_test.sql
-  supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
+supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
       FAIL, obwohl grün.
 - [x] 3.11 `grants_test.sql`: Golden-Snapshot pflegen. `activation_tokens` taucht
       **nicht** auf (kein Grant) — deshalb eine eigene, explizite Assertion, dass
@@ -262,9 +262,9 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 - [x] 5.2 Ablauf, vier Schritte, Reihenfolge ist die Sicherung (Entscheidung 9):
       **1.** Token atomar beanspruchen —
       `update activation_tokens set used_at = now() where token_hash = $1 and
-  used_at is null and expires_at > now() returning profile_id`. Kein
+used_at is null and expires_at > now() returning profile_id`. Kein
       Treffer → abgelehnt. **2.** Passwort setzen. **3.** `signOut(uid,
-  'global')`. **4.** _Erst danach_ `activated_at` stempeln.
+'global')`. **4.** _Erst danach_ `activated_at` stempeln.
       _Schritt 1 muss EINE Anweisung sein (codex, opencode): ein Prüfen mit
       anschließendem Vermerken lässt zwei gleichzeitige Einlösungen beide durch,
       und es setzten zwei verschiedene Passwörter. Und der Stempel gehört ans
@@ -329,7 +329,7 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 - [x] 6.8 `ThemeServerSync` fällt sauber zurück, wenn `member_settings` gesperrt
       ist (Folge von 2.3). Kein roter Fehler in der Konsole beim
       Aktivierungsbildschirm.
-- [ ] 6.9 Laufende lokale Version zeigen, bevor committet wird. Grüne Tests haben
+- [x] 6.9 Laufende lokale Version zeigen, bevor committet wird. Grüne Tests haben
       in AGE-492 ein visuell falsches Ergebnis durchgewunken.
 
 ## 7. Bereits erledigt — nur verifizieren, nichts ändern
@@ -358,6 +358,10 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       Bestandskonten (Detlev und Donald). Erwarteter Zustand, kein Fehler —
       protokollieren, damit ihn niemand später „repariert".
 - [ ] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
+      _Teilweise erledigt beim Betrachten der laufenden Oberfläche (6.9): Wand
+      auf `/`, `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung ·
+      Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler. Die
+      vier Token-Fälle brauchen einen echten Versand (10.2)._
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
 - [ ] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.

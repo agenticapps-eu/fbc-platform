@@ -26,7 +26,7 @@ const MIN_PASSWORT = 10;
  */
 export default function ActivationRedeemPage() {
   const navigate = useNavigate();
-  const { isActivated, signOut } = useAuth();
+  const { user, isActivated, signOut } = useAuth();
   // Nur einmal lesen: `leseTokenAusFragment` räumt die Adresszeile auf, ein
   // zweiter Aufruf fände nichts mehr.
   const [token] = useState<string | null>(() => leseTokenAusFragment());
@@ -40,9 +40,17 @@ export default function ActivationRedeemPage() {
   // Fall 3 aus §6: Konto schon aktiviert, alter Link im Postfach. Weiterleitung
   // auf die Startseite, ausdrücklich OHNE Fehlermeldung — das Mitglied hat
   // nichts falsch gemacht.
+  //
+  // Das `user &&` ist nicht dekorativ: für einen AUSGELOGGTEN Besucher ist
+  // `isActivated` true (es gibt nichts zu aktivieren). Ohne die Bedingung
+  // landete er auf der Startseite — und damit wäre ausgerechnet der Weg tot,
+  // auf dem die ganze Konstruktion ruht: das Formular „Link anfordern" ist der
+  // einzige Zugang für ein Mitglied, dessen verteiltes Passwort ein Dritter
+  // geändert hat. Beim Betrachten der laufenden Oberfläche aufgefallen, nicht
+  // im Test — die Fixtures hatten immer einen Nutzer.
   useEffect(() => {
-    if (!token && isActivated === true) navigate("/", { replace: true });
-  }, [token, isActivated, navigate]);
+    if (!token && user && isActivated === true) navigate("/", { replace: true });
+  }, [token, user, isActivated, navigate]);
 
   async function einlösen(e: React.FormEvent) {
     e.preventDefault();
