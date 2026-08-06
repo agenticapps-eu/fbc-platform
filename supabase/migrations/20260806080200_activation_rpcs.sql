@@ -32,46 +32,53 @@ create or replace function public.issue_activation_token(
   p_email      text,
   p_token_hash text,
   p_ttl        interval default interval '72 hours'
-) returns table (status text, profile_id uuid, display_name text)
+) returns table (status text, profile_id uuid, display_name text, login_email text)
 language plpgsql
 volatile
 security definer
 set search_path = ''
 as $$
 declare
-  v_profile   public.profiles;
+  -- Skalare statt eines Record-Typs: plpgsql erlaubt keinen Record in einer
+  -- mehrteiligen INTO-Liste (42601), und wir brauchen die Login-Adresse aus
+  -- auth.users neben den Profilfeldern.
+  v_id        uuid;
+  v_name      text;
+  v_activated timestamptz;
+  v_email     text;
   v_letzte    timestamptz;
   v_tag_zahl  int;
 begin
   -- Die LOGIN-Adresse, nicht profile_contacts.email: nur das Postfach, mit dem
   -- man sich anmeldet, taugt als Identitaetsnachweis.
-  select p.* into v_profile
+  select p.id, p.name, p.activated_at, u.email
+    into v_id, v_name, v_activated, v_email
     from public.profiles p
     join auth.users u on u.id = p.id
    where lower(u.email) = lower(trim(p_email));
 
   if not found then
-    return query select 'unknown'::text, null::uuid, null::text;
+    return query select 'unknown'::text, null::uuid, null::text, null::text;
     return;
   end if;
 
-  if v_profile.activated_at is not null then
-    return query select 'already_activated'::text, v_profile.id, v_profile.name;
+  if v_activated is not null then
+    return query select 'already_activated'::text, v_id, v_name, v_email;
     return;
   end if;
 
   select max(created_at), count(*) filter (where created_at > now() - interval '24 hours')
     into v_letzte, v_tag_zahl
     from public.activation_tokens t
-   where t.profile_id = v_profile.id;
+   where t.profile_id = v_id;
 
   if v_letzte is not null and v_letzte > now() - interval '60 seconds' then
-    return query select 'rate_limited'::text, v_profile.id, v_profile.name;
+    return query select 'rate_limited'::text, v_id, v_name, v_email;
     return;
   end if;
 
   if v_tag_zahl >= 5 then
-    return query select 'rate_limited_day'::text, v_profile.id, v_profile.name;
+    return query select 'rate_limited_day'::text, v_id, v_name, v_email;
     return;
   end if;
 
@@ -80,13 +87,13 @@ begin
   -- „nicht mehr gueltig" lesen und nicht „bereits aktiviert".
   update public.activation_tokens
      set invalidated_at = now()
-   where activation_tokens.profile_id = v_profile.id
+   where activation_tokens.profile_id = v_id
      and used_at is null and invalidated_at is null;
 
   insert into public.activation_tokens (token_hash, profile_id, expires_at)
-  values (p_token_hash, v_profile.id, now() + p_ttl);
+  values (p_token_hash, v_id, now() + p_ttl);
 
-  return query select 'issued'::text, v_profile.id, v_profile.name;
+  return query select 'issued'::text, v_id, v_name, v_email;
 end;
 $$;
 
@@ -95,7 +102,10 @@ comment on function public.issue_activation_token(text, text, interval) is
   'den ausstehenden Link und legt den neuen an — alles in einer Transaktion. '
   'Antwortet mit Status (unknown | already_activated | rate_limited | '
   'rate_limited_day | issued) statt zu werfen, damit der Aufrufer nicht '
-  'unterscheiden kann, welche Adressen existieren. Nur service_role.';
+  'unterscheiden kann, welche Adressen existieren. Gibt die HINTERLEGTE '
+  'Login-Adresse zurueck — der Versand geht nie an eine im Aufruf mitgegebene, '
+  'sonst waere die Function ein Weg, sich fremde Links schicken zu lassen. '
+  'Nur service_role.';
 
 revoke execute on function public.issue_activation_token(text, text, interval)
   from public, anon, authenticated;
@@ -187,3 +197,44 @@ comment on function public.mark_activated(uuid) is
 
 revoke execute on function public.mark_activated(uuid) from public, anon, authenticated;
 grant execute on function public.mark_activated(uuid) to service_role;
+
+-- ── 4. Sitzungen widerrufen ─────────────────────────────────────────────────
+-- WARUM NICHT ueber die Admin-API: `auth.admin.signOut` erwartet ein
+-- Access-JWT, keine Nutzer-ID (Signatur geprueft am 2026-08-06:
+-- `signOut(jwt: string, scope?)`). Beim Einloesen liegt uns aber keine Sitzung
+-- des Mitglieds vor — wir haben nur seine ID. Ein Aufruf mit der ID haette zur
+-- Laufzeit 401 geliefert und damit JEDE Aktivierung fehlschlagen lassen, ohne
+-- dass ein Typecheck etwas gemerkt haette. Ein Fremd-Review hat darauf
+-- hingewiesen; die Signatur ist danach am Code nachgemessen worden.
+--
+-- WAS DIESE FUNKTION NICHT KANN: Ein bereits ausgegebener Access-Token ist
+-- zustandslos und bleibt bis zu seinem Ablauf gueltig (`jwt_expiry`, derzeit
+-- 3600 s). Das Loeschen der Sitzung nimmt dem Angreifer die Erneuerung, nicht
+-- das laufende Token. Die verbleibende Luecke ist damit beschraenkt und
+-- benannt; sie zu schliessen hiesse, `jwt_expiry` zu senken oder in jeder
+-- Policy gegen auth.sessions zu joinen (auf jeder Abfrage).
+create or replace function public.revoke_sessions(p_profile_id uuid)
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_zahl int;
+begin
+  delete from auth.refresh_tokens where user_id = p_profile_id::text;
+  delete from auth.sessions where user_id = p_profile_id;
+  get diagnostics v_zahl = row_count;
+  return v_zahl;
+end;
+$$;
+
+comment on function public.revoke_sessions(uuid) is
+  'Beendet alle Sitzungen eines Kontos (AGE-495). Ersetzt auth.admin.signOut, '
+  'das ein Access-JWT erwartet und beim Einloesen deshalb nicht anwendbar ist. '
+  'Nimmt dem Angreifer die Erneuerung; ein laufender Access-Token bleibt bis '
+  'jwt_expiry gueltig — benannte Restflaeche. Nur service_role.';
+
+revoke execute on function public.revoke_sessions(uuid) from public, anon, authenticated;
+grant execute on function public.revoke_sessions(uuid) to service_role;

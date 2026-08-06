@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(131);
+select plan(133);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -814,6 +814,11 @@ select is(
   (select public.mark_activated('99999999-9999-9999-9999-999999999999')),
   (select activated_at from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
   'mark_activated ist idempotent — ein zweiter Aufruf überschreibt nicht');
+
+select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
+  false, 'revoke_sessions: authenticated darf nicht');
+select is(has_function_privilege('service_role', 'public.revoke_sessions(uuid)', 'execute'),
+  true, 'revoke_sessions: service_role darf (der Weg von redeem-activation)');
 
 select * from finish();
 rollback;

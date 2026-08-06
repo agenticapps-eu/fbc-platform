@@ -472,6 +472,34 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# send-activation (AGE-495 / C3): verschickt den Aktivierungslink ueber Resend.
+#
+# verify_jwt = false ist ABSICHT und keine Nachlaessigkeit. Die Function muss
+# OHNE Sitzung erreichbar sein: Wer das verteilte Passwort hat, kann es ueber den
+# Anmeldedienst aendern (gemessen 2026-08-05). Das oeffnet nichts — das Gate
+# haelt —, aber es sperrt das echte Mitglied aus, das sonst nie an den
+# Aktivierungsbildschirm und damit nie an einen neuen Link kaeme.
+#
+# Sie liest deshalb AUCH KEIN JWT: bei verify_jwt = false prueft das Gateway
+# nichts, und eine daraus gelesene Kennung waere frei waehlbar — ein Weg, sich
+# den Link eines fremden Kontos schicken zu lassen. Sie nimmt nur eine Adresse
+# entgegen und antwortet immer gleich (202), damit sie nicht verraet, welche
+# Adressen existieren.
+[functions.send-activation]
+enabled = true
+verify_jwt = false
+
+# redeem-activation (AGE-495 / C3): loest das Token gegen ein neues Passwort ein.
+#
+# verify_jwt = false ebenfalls ABSICHT: das Token traegt die Identitaet, nicht
+# die Sitzung. Nur so funktioniert der Link in einem anderen Browser oder auf
+# einem anderen Geraet (AGE-495 §6) — und genau das ist gefordert. Ein Passwort
+# laesst sich in diesem Weg ohne gueltiges Token nicht setzen; die Function
+# prueft den Hash gegen activation_tokens, bevor sie irgendetwas tut.
+[functions.redeem-activation]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
