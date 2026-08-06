@@ -82,7 +82,7 @@ Test, der beim ersten Lauf grün ist, hat nichts gemessen und wird gelöscht.
       dann hilft überhaupt kein Datum. Es gibt EINE Sicherung — die
       Deploy-Reihenfolge — und diesen Stolperdraht._
 - [x] 1.8 Backfill danach unbedingt: `update public.profiles set
-    activated_at = now()`.
+  activated_at = now()`.
 - [x] 1.9 **Harte Vorbedingung im Migrationskopf und in C10 vermerken:**
       Migration A läuft **vor** dem Import.
 
@@ -206,10 +206,10 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 - [x] 3.9 `activation_tokens`: `has_table_privilege` ist `false` für `anon` und
       `authenticated`, für alle vier Operationen. Dazu:
       `has_column_privilege('authenticated', 'public.profiles', 'activated_at',
-    'update')` ist `false` (Mechanismus zu 1.2).
+  'update')` ist `false` (Mechanismus zu 1.2).
 - [x] 3.10 `plan(n)` auf die neue Zahl heben. Lauf **mit** Dateiliste:
       `supabase test db supabase/tests/rls_test.sql supabase/tests/grants_test.sql
-    supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
+  supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
       FAIL, obwohl grün.
 - [x] 3.11 `grants_test.sql`: Golden-Snapshot pflegen. `activation_tokens` taucht
       **nicht** auf (kein Grant) — deshalb eine eigene, explizite Assertion, dass
@@ -217,10 +217,10 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 
 ## 4. Edge Function `send-activation`
 
-- [ ] 4.1 `supabase/functions/send-activation/` nach dem Muster von
+- [x] 4.1 `supabase/functions/send-activation/` nach dem Muster von
       `notify-contact-request`: `index.ts` (I/O), `emails.ts` (reine Logik),
       `emails.test.ts`, `README.md`.
-- [ ] 4.2 **Auth-Modell.** `verify_jwt = false`, weil die Function **auch ohne
+- [x] 4.2 **Auth-Modell.** `verify_jwt = false`, weil die Function **auch ohne
       Session** erreichbar sein muss: hat ein Angreifer das Passwort geändert,
       käme das Mitglied sonst nie an einen Link (design.md, Entscheidung 7).
       **Die Function liest kein JWT** — nur die E-Mail-Adresse aus dem Body.
@@ -231,14 +231,14 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       Empfänger ist immer die **hinterlegte** Adresse des Profils, nie eine
       mitgegebene. Antwort `202` unabhängig davon, ob die Adresse existiert —
       sonst ist der Endpunkt ein Adressverzeichnis.
-- [ ] 4.3 Token: 32 Byte aus `crypto.getRandomValues`, base64url. Gespeichert
+- [x] 4.3 Token: 32 Byte aus `crypto.getRandomValues`, base64url. Gespeichert
       wird **nur** `sha256(token)` als Hex. `expires_at = now() + 72h`.
       **≥ 256 Bit Entropie, CSPRNG** — das ist die Eigenschaft, auf der der
       öffentliche Einlöse-Endpunkt ruht (opencode), und steht deshalb auch in
       der Spec, nicht nur hier.
       **Ein neuer Versand entwertet das ausstehende Token** — in derselben
       Anweisung, und der `unique`-Index aus 1.3 erzwingt es zusätzlich.
-- [ ] 4.4 Rate-Limit **pro Profil**, konkurrenzsicher: höchstens ein Versand pro
+- [x] 4.4 Rate-Limit **pro Profil**, konkurrenzsicher: höchstens ein Versand pro
       60 s, höchstens fünf pro 24 h. Die Eindeutigkeit trägt der `unique`-Index
       (1.3), die Frequenz eine Bedingung in derselben Anweisung — nicht „erst
       zählen, dann einfügen": zwei parallele Requests passierten sonst beide die
@@ -246,25 +246,25 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       _Das Limit ist zugleich die einzige Begrenzung der Belästigungsfläche aus
       Entscheidung 8: wer eine Adresse kennt, entwertet damit wiederholt den
       ausstehenden Link. Im Code-Kommentar benennen._
-- [ ] 4.5 `emails.test.ts` nach dem Muster von `notify-contact-request`: reine
+- [x] 4.5 `emails.test.ts` nach dem Muster von `notify-contact-request`: reine
       Render-Funktionen, `escapeHtml`-Fall, Betreff, Fallback ohne Namen, und
       **eine Assertion, dass der Klartext-Token im Link steht und der Hash
       nirgends**. `deno test` + `deno check index.ts`.
-- [ ] 4.6 Bereits aktiviertes Konto → `202` wie jeder andere Fall, keine Mail.
-- [ ] 4.7 Der Link zeigt auf `/aktivierung#token=…` — **Fragment, nicht
+- [x] 4.6 Bereits aktiviertes Konto → `202` wie jeder andere Fall, keine Mail.
+- [x] 4.7 Der Link zeigt auf `/aktivierung#token=…` — **Fragment, nicht
       Query-String** (Entscheidung 10). Assertion in 4.5.
 
 ## 5. Edge Function `redeem-activation`
 
-- [ ] 5.1 `verify_jwt = false` — **Absicht.** Das Token trägt die Identität,
+- [x] 5.1 `verify_jwt = false` — **Absicht.** Das Token trägt die Identität,
       nicht die Session; nur so funktioniert der Link in einem anderen Browser
       (AGE-495 §6). Im Kopf der Datei **und** in `config.toml` begründen.
-- [ ] 5.2 Ablauf, vier Schritte, Reihenfolge ist die Sicherung (Entscheidung 9):
+- [x] 5.2 Ablauf, vier Schritte, Reihenfolge ist die Sicherung (Entscheidung 9):
       **1.** Token atomar beanspruchen —
       `update activation_tokens set used_at = now() where token_hash = $1 and
-    used_at is null and expires_at > now() returning profile_id`. Kein
+  used_at is null and expires_at > now() returning profile_id`. Kein
       Treffer → abgelehnt. **2.** Passwort setzen. **3.** `signOut(uid,
-    'global')`. **4.** _Erst danach_ `activated_at` stempeln.
+  'global')`. **4.** _Erst danach_ `activated_at` stempeln.
       _Schritt 1 muss EINE Anweisung sein (codex, opencode): ein Prüfen mit
       anschließendem Vermerken lässt zwei gleichzeitige Einlösungen beide durch,
       und es setzten zwei verschiedene Passwörter. Und der Stempel gehört ans
@@ -277,11 +277,11 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       herein und fordert einen neuen Link an. Die umgekehrte Reihenfolge erzeugt
       den gefährlichen Zustand — aktiviert, aber noch auf dem Default-Passwort.
       Das gehört als Kommentar an die Stelle._
-- [ ] 5.3 Ausstehende Tokens des Profils mit entwerten (der `unique`-Index
+- [x] 5.3 Ausstehende Tokens des Profils mit entwerten (der `unique`-Index
       lässt ohnehin nur eines zu — die Anweisung ist die Absicherung gegen ein
       späteres Lockern des Index).
-- [ ] 5.4 Passwortprüfung serverseitig: mindestens zehn Zeichen.
-- [ ] 5.5 Antworten, die das Frontend unterscheiden kann — je ein eigener Code
+- [x] 5.4 Passwortprüfung serverseitig: mindestens zehn Zeichen.
+- [x] 5.5 Antworten, die das Frontend unterscheiden kann — je ein eigener Code
       für `expired`, `used`, `not_found`, `weak_password`. Kein generisches
       „ungültig": AGE-495 §6 verlangt für „abgelaufen" und „schon benutzt"
       unterschiedliche Bildschirme.
@@ -289,44 +289,44 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       256-Bit-Token ist nicht erratbar, aber ein ungedrosselter öffentlicher
       Endpunkt ist auch ohne Erfolg eine Lastfläche. Steht als Anforderung in
       der Spec, nicht nur hier.
-- [ ] 5.7 `signOut` als Vorsicht kennzeichnen, nicht als Befund: gemessen wurde,
+- [x] 5.7 `signOut` als Vorsicht kennzeichnen, nicht als Befund: gemessen wurde,
       dass ein Passwortwechsel Access- und Refresh-Token bereits tötet. Für den
       Admin-Pfad ist das **ungemessen**, deshalb der explizite Aufruf.
 
 ## 6. Frontend
 
-- [ ] 6.1 `AuthProvider` ruft `my_activation_state()` statt die Profilzeile zu
+- [x] 6.1 `AuthProvider` ruft `my_activation_state()` statt die Profilzeile zu
       lesen — nach Migration B ist Letztere für ein nicht aktiviertes Konto
       gesperrt. Neue Felder `isActivated` / `activationLoading`.
       _Solange unbekannt: **nicht** durchlassen. Fail closed._
-- [ ] 6.2 `ActivationGate` in `HomeRedirect`s Naht und um die
+- [x] 6.2 `ActivationGate` in `HomeRedirect`s Naht und um die
       `AppShell`-Routen. Eingeloggt + nicht aktiviert → ausschließlich der
       Aktivierungsbildschirm, egal welche Route.
-- [ ] 6.3 Aktivierungsbildschirm: erklärt in zwei Sätzen, was passiert, Button
+- [x] 6.3 Aktivierungsbildschirm: erklärt in zwei Sätzen, was passiert, Button
       „Bestätigungslink senden", danach 60 s Sperre mit Countdown und Hinweis
       auf den Spam-Ordner.
-- [ ] 6.4 **Haltepunkt.** Route `/aktivierung` außerhalb der `AppShell`. Token
+- [x] 6.4 **Haltepunkt.** Route `/aktivierung` außerhalb der `AppShell`. Token
       aus dem **Fragment** lesen, danach `history.replaceState` ohne Fragment;
       `Referrer-Policy: no-referrer` auf der Route. Ohne Fragment: Formular
       „Link erneut anfordern" über die E-Mail-Adresse — das ist der Weg für ein
       Mitglied, dessen Passwort übernommen wurde.
-- [ ] 6.5 Die sieben Fehlerfälle aus AGE-495 §6, je ein eigener Zustand:
+- [x] 6.5 Die sieben Fehlerfälle aus AGE-495 §6, je ein eigener Zustand:
       abgelaufen (+ „Neuen Link senden") · schon benutzt („Konto ist schon
       aktiviert" + Login) · Konto schon aktiviert, alter Link (Weiterleitung auf
       `/`, **keine** Fehlermeldung) · Adresse stimmt nicht mehr (Hinweis auf
       `info@fairbusinessclub.de`) · anderer Browser (muss gehen) · Mail kommt
       nicht an (erneut senden nach 60 s) · Passwort zu schwach.
-- [ ] 6.5b Der Aktivierungsbildschirm nennt die Asymmetrie aus Entscheidung 15:
+- [x] 6.5b Der Aktivierungsbildschirm nennt die Asymmetrie aus Entscheidung 15:
       ausgeloggt sieht man das öffentliche Schaufenster, eingeloggt-nicht-
       aktiviert nicht. Ohne diesen Hinweis liest sich der leere Bildschirm als
       Fehler. Button „Abmelden und weiterstöbern".
-- [ ] 6.6 `LoginPage`: Mindestlänge von 8 auf **10**. Heute widerspricht der
+- [x] 6.6 `LoginPage`: Mindestlänge von 8 auf **10**. Heute widerspricht der
       Client dem Server und produziert einen Serverfehler statt einer
       Feldmeldung.
-- [ ] 6.7 Vitest für `ActivationGate` und die Einlöseseite. **Keine `vi.mock` auf
+- [x] 6.7 Vitest für `ActivationGate` und die Einlöseseite. **Keine `vi.mock` auf
       eigene Komponenten** — das prüft den Mock, nicht den Code. `fireEvent`,
       nicht `user-event` (nicht installiert).
-- [ ] 6.8 `ThemeServerSync` fällt sauber zurück, wenn `member_settings` gesperrt
+- [x] 6.8 `ThemeServerSync` fällt sauber zurück, wenn `member_settings` gesperrt
       ist (Folge von 2.3). Kein roter Fehler in der Konsole beim
       Aktivierungsbildschirm.
 - [ ] 6.9 Laufende lokale Version zeigen, bevor committet wird. Grüne Tests haben
@@ -334,31 +334,31 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 
 ## 7. Bereits erledigt — nur verifizieren, nichts ändern
 
-- [ ] 7.1 `minimum_password_length = 10`. **Steht schon** (C4). Nur belegen —
+- [x] 7.1 `minimum_password_length = 10`. **Steht schon** (C4). Nur belegen —
       jede Zeile in dieser Datei ist eine Aussage über PROD.
-- [ ] 7.2 Onboarding-Wizard nicht im Erstlogin. **Ist schon draußen**
+- [x] 7.2 Onboarding-Wizard nicht im Erstlogin. **Ist schon draußen**
       (AGE-494/C2).
-- [ ] 7.3 `site_url` / `additional_redirect_urls`. **Stehen** (C4). Prüfen, dass
+- [x] 7.3 `site_url` / `additional_redirect_urls`. **Stehen** (C4). Prüfen, dass
       `https://fbc-platform.pages.dev/**` die Aktivierungsroute deckt.
-- [ ] 7.4 `enable_confirmations = false` bleibt. Nicht „korrigieren".
-- [ ] 7.5 `is_prime_plus` aus `src/lib/database.types.ts` räumen — fällt bei der
+- [x] 7.4 `enable_confirmations = false` bleibt. Nicht „korrigieren".
+- [x] 7.5 `is_prime_plus` aus `src/lib/database.types.ts` räumen — fällt bei der
       Regenerierung von selbst weg. Danach `pnpm typecheck`.
 
 ## 8. Abnahme — der Beweis, den Donald sehen will
 
-- [ ] 8.1 `scripts/probe-activation-gate.ts` erneut laufen lassen, gegen LOKAL
+- [x] 8.1 `scripts/probe-activation-gate.ts` erneut laufen lassen, gegen LOKAL
       **und** gegen DEV. Erwartung: **null Zeilen** überall, einschließlich
       `profile_contacts`, `goals` und `notifications` des eigenen Kontos.
       Skript und vollständige Ausgabe in `EVIDENCE.md`, Abschnitt „Nachher" —
       neben dem roten Vorher aus 0.2. Kein Screenshot als Beleg.
-- [ ] 8.2 Gegenprobe im selben Lauf: ausgeloggter Client sieht weiterhin
+- [x] 8.2 Gegenprobe im selben Lauf: ausgeloggter Client sieht weiterhin
       öffentliche Posts und Events.
-- [ ] 8.2b **Der Erste sieht nur zwei.** Auf DEV mit einem frisch bestätigten
+- [x] 8.2b **Der Erste sieht nur zwei.** Auf DEV mit einem frisch bestätigten
       Konto das Verzeichnis abfragen: es enthält ausschließlich die
       Bestandskonten (Detlev und Donald). Erwarteter Zustand, kein Fehler —
       protokollieren, damit ihn niemand später „repariert".
 - [ ] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
-- [ ] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
+- [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
 - [ ] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
 - [ ] 8.6 `/cso` → `SECURITY.md`.
@@ -374,7 +374,7 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
 
 ## 10. Deploy — Haltepunkt, Donalds Freigabe
 
-- [ ] 10.1 Migrationen auf DEV: `pnpm db:push`. Zielprojekt vorher ausgeben.
+- [x] 10.1 Migrationen auf DEV: `pnpm db:push`. Zielprojekt vorher ausgeben.
 - [ ] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
       prüfen.
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
@@ -422,7 +422,7 @@ währenddessen.
       das nie ein Postfach nachgewiesen hat; 1.8 winkt sie durch. Entweder als
       benannte Restfläche aufnehmen oder filtern — hängt daran, wie die
       DEV-Profile entstanden sind. Prüfen, bevor 1.8 geschrieben wird.
-- [ ] 12.3 **Der Sitzungswiderruf trägt weniger als zugesagt** (codex).
+- [x] 12.3 **Der Sitzungswiderruf trägt weniger als zugesagt** (codex).
       `auth.admin.signOut` erwartet ein Access-JWT, keine Nutzer-ID — 5.2 ist so
       nicht implementierbar. Und ein bereits ausgegebener Access-Token bleibt
       zustandslos gültig bis zum Ablauf (`jwt_expiry = 3600`), kann also nach dem
@@ -436,7 +436,7 @@ währenddessen.
       Eigener Zustand (`superseded` / `invalidated_at`) oder eine neutrale
       Meldung „dieser Link ist nicht mehr gültig, fordere einen neuen an", plus
       Szenario. Betrifft 5.5 und 6.5.
-- [ ] 12.5 **Zeitkanal beim Versand** (codex). Gleicher HTTP-Status genügt nicht:
+- [x] 12.5 **Zeitkanal beim Versand** (codex). Gleicher HTTP-Status genügt nicht:
       eine bestehende Adresse löst einen echten Mailversand aus und antwortet
       messbar langsamer als eine nicht bestehende — ein Orakel für
       Mitgliedsadressen. **Vorschlag:** sofort `202` antworten und erst danach
@@ -455,7 +455,7 @@ währenddessen.
       Formulierung im access-control-Delta widerspricht `INVENTORY.md` B2, wo 15
       bestehende Funktionen ungegatet bleiben. Auf die gemeinte Datenklasse
       eingrenzen, nicht auf eine Anzahl.
-- [ ] 12.9 **`my_activation_state()` hat keine Grant-Regel in der Spec**
+- [x] 12.9 **`my_activation_state()` hat keine Grant-Regel in der Spec**
       (opencode). In 1.6 steht sie, im Delta nicht — und das
       Prädikat-Requirement verlangt EXECUTE-Entzug für `public`/`anon`.
       Nachziehen.
