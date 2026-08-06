@@ -32,4 +32,12 @@
   # Task 6.4: auf dieser Route steht der Aktivierungs-Token im Fragment. Browser
   # senden das Fragment ohnehin nicht im `Referer` — dies ist die zweite Sperre,
   # falls das Token je in den Pfad rutscht, und sie kostet nichts.
+  #
+  # NICHT „aufräumen": Cloudflare ERSETZT die globale Regel hier nicht, es hängt
+  # an. Die Route liefert deshalb ZWEI `referrer-policy`-Header
+  # (`strict-origin-when-cross-origin` und `no-referrer`) — am 2026-08-06 gegen
+  # die Live-Seite gemessen. Das ist richtig so: mehrere Werte gelten als
+  # kommagetrennte Liste, und der Browser nimmt den letzten gültigen, also
+  # `no-referrer`. Wer einen der beiden „doppelt" findet und löscht, kann damit
+  # die schärfere Regel entfernen.
   Referrer-Policy: no-referrer
