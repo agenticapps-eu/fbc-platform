@@ -11,7 +11,14 @@ Das Feld SHALL ausschließlich serverseitig gesetzt werden. Client-Rollen SHALL
 kein Schreibrecht darauf halten — auch nicht mittelbar über ein
 Spalten-Schreibrecht auf `profiles`.
 
-Profile, die vor Einführung dieses Feldes bestanden, SHALL als aktiviert gelten.
+Profile, die vor Einführung dieses Feldes bestanden, SHALL als aktiviert gelten
+— **aber nur, wenn ihr Inhaber ein Postfach nachgewiesen hat**. Weil die
+E-Mail-Bestätigung beim Anmeldedienst abgeschaltet ist, kann unter den
+Bestandsprofilen jedes sein, das nie einen Nachweis erbracht hat; die
+Nachtragung SHALL diese **nicht** erfassen, sonst kennzeichnet sie genau die
+Konten als bestätigt, für die der Bestätigungsweg gebaut wurde. Maßgeblich ist
+der beim Anmeldedienst hinterlegte Bestätigungszeitpunkt der Adresse.
+
 Profile, die durch den Import bestehender Mitgliedschaften entstehen, SHALL als
 **nicht** aktiviert angelegt werden: für sie ist der Bestätigungsweg der Zweck
 des Feldes.
@@ -28,9 +35,14 @@ Entstehungsdatum auf den historischen Beitritt zurückdatieren. Eine Bedingung,
 die im Schadensfall wahr ist, ist keine Sicherung, sondern eine, die beruhigt.
 
 Stattdessen SHALL die Einführung **laut scheitern**, wenn sie einen Datenbestand
-vorfindet, der auf einen bereits erfolgten Import hindeutet — geprüft an der
-Anzahl vorhandener Profile gegen den bei Abfassung gemessenen Stand. Lieber eine
-abgebrochene Migration als eine stille Fehlkennzeichnung.
+vorfindet, der auf einen bereits erfolgten Import hindeutet. Geprüft SHALL dabei
+**nicht nur die Gesamtzahl** der Profile werden, sondern auch die Zahl der
+Profile auf der **höchsten Mitgliedsstufe**: importierte Konten tragen sie,
+Selbstregistrierer nicht. Eine Prüfung allein auf die Gesamtzahl bräche bei
+jeder organischen Selbstregistrierung zwischen Messung und Ausführung ab und
+könnte „der Import lief zu früh" nicht von „jemand hat sich angemeldet"
+unterscheiden. Lieber eine abgebrochene Migration als eine stille
+Fehlkennzeichnung.
 
 #### Scenario: Ein importiertes Profil startet unbestätigt
 
@@ -41,8 +53,16 @@ abgebrochene Migration als eine stille Fehlkennzeichnung.
 #### Scenario: Ein Bestandsprofil bleibt nutzbar
 
 - **WHEN** die Einführung des Feldes auf einen vorhandenen Datenbestand trifft
-- **THEN** tragen alle bestehenden Profile einen gesetzten Aktivierungszeitpunkt
-  und werden nicht ausgesperrt
+- **THEN** tragen alle bestehenden Profile **mit nachgewiesenem Postfach** einen
+  gesetzten Aktivierungszeitpunkt und werden nicht ausgesperrt
+
+#### Scenario: Ein Bestandsprofil ohne Nachweis wird nicht mitgestempelt
+
+- **GIVEN** ein vor der Einführung entstandenes Profil, dessen Adresse beim
+  Anmeldedienst nie bestätigt wurde
+- **WHEN** die Nachtragung läuft
+- **THEN** bleibt sein Aktivierungszeitpunkt leer, und es durchläuft denselben
+  Bestätigungsweg wie ein importiertes Konto
 
 #### Scenario: Eine vertauschte Reihenfolge bricht laut ab
 

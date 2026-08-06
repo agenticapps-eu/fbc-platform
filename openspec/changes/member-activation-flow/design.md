@@ -117,9 +117,13 @@ Konkret hätte Revision 1 einem nicht aktivierten Angreifer offengelassen:
 | `notifications_own`                   | wer das Mitglied kontaktiert hat        |
 | `offers_write_own`, `needs_write_own` | unter echtem Namen veröffentlichen      |
 
-**Gewählt: das Gate umfasst alle 47 Policies für `authenticated`** — Fremddaten
+**Gewählt: das Gate umfasst alle 46 Policies für `authenticated`** — Fremddaten
 wie eigene. Ausgenommen bleiben nur die fünf anon-Policies und
 `platform_settings_select` (ein globaler Flag, kein Mitgliedsdatum).
+Rechnung: 52 gemessene Policies − 5 anon − 1 `platform_settings_select` = **46**.
+_Hier stand „47". Die Zahl war eine dritte, die niemand nachgerechnet hat —
+`INVENTORY.md` Abschnitt A und die Rechnung in `tasks.md` 2.7 sagen beide 46
+(opencode, Runde 4). Korrigiert 2026-08-06._
 
 **Das Bootstrap-Problem, das dadurch entsteht, und seine Lösung.** Wenn auch die
 eigene Profilzeile gesperrt ist, kann `AuthProvider` sie nicht mehr lesen und
@@ -273,10 +277,29 @@ lesen. Das widerspricht sich: Bei `verify_jwt = false` prüft das Gateway
 den Bestätigungslink eines fremden Kontos auszulösen.
 
 **Gewählt: die Function liest nie ein JWT.** Sie nimmt ausschließlich eine
-E-Mail-Adresse entgegen und bestimmt daraus das Profil. Der Weg ist für
-angemeldete und nicht angemeldete Aufrufer identisch — was ihn zugleich
-einfacher macht als der Entwurf mit zwei Zweigen. Der Empfänger ist immer die
-**hinterlegte** Adresse des Profils, nie eine mitgegebene.
+E-Mail-Adresse entgegen und bestimmt daraus das Profil. Der Empfänger ist immer
+die **hinterlegte** Adresse des Profils, nie eine mitgegebene.
+
+**Revidiert am 2026-08-06 (Audit 8.6, Task 13.3).** Der Satz „der Weg ist für
+angemeldete und nicht angemeldete Aufrufer identisch" gilt **nicht mehr**, und
+seine Begründung („einfacher als zwei Zweige") hat sich als falsch erwiesen:
+Genau dieser eine Weg war die Aussperrung. Weil er unauthentifiziert ist und
+jede Ausgabe den ausstehenden Link entwertete, konnte ein Fremder mit der bloßen
+Adresse eines Mitglieds dessen Link wiederholt ungültig machen.
+
+Es sind jetzt **zwei Wege mit je einem Zweig** — nicht eine Function mit zwei
+Zweigen, vor der dieser Absatz warnte:
+
+- **Hauptweg**, aus dem Aktivierungsbildschirm heraus: `resend-activation` mit
+  `verify_jwt = true`. Subjekt ist die Sitzung, es gibt **keinen**
+  Adressparameter; fremd anfordern ist per Signatur ausgeschlossen.
+- **Wiederherstellungsweg**, ohne Sitzung, auf `/aktivierung`: `send-activation`
+  bleibt wie hier beschrieben — und entwertet einen noch gültigen Link **nicht**
+  mehr (24-Stunden-Schutzfenster, Status `pending`).
+
+Die Spec-Deltas und `tasks.md` tragen diesen Stand; dieser Abschnitt hinkte bis
+hierher hinterher (codex, opencode und gemini haben das in Runde 4 unabhängig
+voneinander gemeldet).
 
 ## Entscheidung 13 — Die Entropie des Tokens ist eine Anforderung, kein Detail
 
@@ -302,9 +325,22 @@ ist. opencode ergänzte den zweiten Defekt: ein Import darf `created_at` auf das
 historische Beitrittsdatum zurückdatieren, dann hilft überhaupt kein Datum.
 
 **Gewählt: eine Tripwire statt einer Sicherung.** Die Migration zählt die
-vorhandenen Profile und **bricht mit einem Fehler ab**, wenn sie mehr vorfindet
-als bei ihrer Abfassung gemessen (37, aus dem C4-Audit). Der Backfill selbst
-läuft dann unbedingt über alle vorhandenen Zeilen.
+vorhandenen Profile und **bricht mit einem Fehler ab**, wenn der Bestand auf
+einen bereits gelaufenen Import hindeutet.
+
+_Revidiert 2026-08-06 (Task 12.1, opencode/codex). Hier stand „37, aus dem
+C4-Audit". Diese Zahl trug nicht: sie stammt aus einer DEV-Messung, während
+PROD seit C4 ein frisches Projekt ist, und sie brach bei **jeder** organischen
+Selbstregistrierung zwischen Messung und Deploy ab, ohne „Import lief zu früh"
+von „ein Fremder hat sich angemeldet" unterscheiden zu können. Die Migration
+prüft deshalb **zwei** Schwellen — `> 50` Profile gesamt **oder** `> 20` auf
+`impact` (`20260806080000:139-158`). Die zweite ist die tragende: importierte
+Konten sind `impact`, Selbstregistrierer `basic`._
+
+_Und der Backfill läuft **nicht** unbedingt über alle Zeilen. Er ist auf Konten
+mit gesetztem `auth.users.email_confirmed_at` eingeschränkt
+(`20260806080000:167`) — Task 12.2: mit `enable_confirmations = false` kann
+unter den Bestandsprofilen jedes sein, das nie ein Postfach nachgewiesen hat._
 
 Das ist ehrlicher als der Entwurf: Es gibt **eine** Sicherung — die
 Deploy-Reihenfolge — und einen Stolperdraht, der ihre Verletzung laut macht.

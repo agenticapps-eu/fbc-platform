@@ -285,6 +285,22 @@ nicht beendet werden konnten — sonst liefe genau die vorab angelegte Sitzung
 eines Dritten hinter dem geöffneten Gate weiter, die dieser Change verhindern
 soll.
 
+**Was „Sitzungen beenden" nicht leistet — benannte Restfläche, keine Zusage.**
+Das Beenden entfernt die Sitzung und ihre Erneuerungsmöglichkeit. Ein bereits
+ausgegebener Zugriffs-Token ist jedoch **zustandslos**: er wird bei jeder
+Abfrage anhand seiner Signatur geprüft, nicht gegen eine Sitzungstabelle, und
+bleibt deshalb bis zu seiner Ablaufzeit gültig. Ein Dritter, der sich unmittelbar
+vor der Aktivierung angemeldet hat, kann folglich **bis zum Ablauf dieses
+Tokens** hinter dem geöffneten Gate weiterarbeiten.
+
+Die Obergrenze dieser Restfläche SHALL die konfigurierte Token-Lebensdauer sein
+und SHALL in der versionierten Auth-Konfiguration nachlesbar sein. Sie zu
+schließen verlangt eine von zwei Entscheidungen — die Lebensdauer senken oder
+die Sitzungskennung bei **jeder** Abfrage gegen die Sitzungstabelle prüfen
+(teuer) — und beide sind ausdrücklich **nicht** Teil dieses Changes. Bis dahin
+gilt: die Zusage ist „kein neuer Zugang mit dem verteilten Passwort", nicht
+„jeder bestehende Zugriff endet sofort".
+
 Ein Abbruch nach Schritt 2 SHALL ein Konto mit **neuem** Passwort und ohne
 Aktivierung hinterlassen: das Mitglied kommt herein, sieht den
 Aktivierungsbildschirm und fordert einen neuen Link an. Ein aktiviertes Konto,
@@ -376,6 +392,15 @@ Mitglied im Unklaren darüber, was von ihm verlangt wird.
   angemeldet und hält eine Sitzung
 - **WHEN** das Mitglied seinen Bestätigungslink einlöst
 - **THEN** ist jene Sitzung beendet und lässt sich nicht erneuern
+
+#### Scenario: Der bereits ausgegebene Zugriffs-Token läuft aus, statt zu enden
+
+- **GIVEN** dieselbe vorab angelegte Sitzung, deren Zugriffs-Token noch nicht
+  abgelaufen ist
+- **WHEN** die Aktivierung abgeschlossen ist und das Gate sich öffnet
+- **THEN** trägt dieser Token bis zu seiner Ablaufzeit weiter — das ist die
+  benannte Obergrenze der Restfläche, keine Zusage, und sie endet ohne weiteres
+  Zutun, weil eine Erneuerung nicht mehr möglich ist
 
 #### Scenario: Ein misslungener Sitzungswiderruf öffnet das Gate nicht
 

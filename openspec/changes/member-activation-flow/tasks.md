@@ -392,7 +392,11 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       wie 8.5; Rohbericht `2026-08-06-084500.json`._
 - [ ] 8.7 Unabhängiges Code-Review in eigenem Kontext. `openspec validate` ist
       ein Schema-Check und ersetzt es nicht.
-- [ ] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
+- [x] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
+      _Gefahren 06.08. mit codex, opencode und gemini (AGENT_SELF=claude, also
+      drei Fremdanbieter). Ergebnis 2× REQUEST-CHANGES, 1× APPROVE. Triage
+      vollständig in **Block 14**: vier Punkte behoben, einer widerlegt, fünf
+      als Entscheidung offen. `REVIEWS.md` trägt den Volltext._
 
 ## 9. Mailtext
 
@@ -589,3 +593,80 @@ Beleg, dass der beschriebene Angriff nicht mehr geht.
       nur-höher; eine widerrufene Lastschrift oder ein Chargeback stuft heute
       nicht zurück. Braucht einen eigenen Weg für `charge.dispute.created` /
       `invoice.payment_failed` — eigenes Issue, nicht Teil von C3.
+
+## 14. Review-Runde 4 (Task 8.8, 2026-08-06)
+
+`run-plan-review.sh` gegen die überarbeiteten Artefakte: **codex
+REQUEST-CHANGES · opencode REQUEST-CHANGES · gemini APPROVE**. Volltext in
+`REVIEWS.md`. Jeder Punkt unten ist **nachgemessen**, nicht übernommen.
+
+### Behoben in derselben Sitzung
+
+- [x] 14.1 **`design.md` Entscheidung 12 war stale** (alle drei Reviewer
+      unabhängig). Sie beschrieb noch EINEN sitzungsfreien Weg für angemeldete
+      wie ausgeloggte Aufrufer und begründete das mit „einfacher als zwei
+      Zweige" — genau dieser eine Weg war die Aussperrung aus 13.3. Ersetzt
+      durch die zwei Wege mit je einem Zweig, mit der widerlegten Begründung im
+      Text statt gelöscht.
+- [x] 14.2 **Drei unbelegte Zahlen** (opencode) — alle drei am 06.08.
+      nachgemessen und alle drei falsch:
+      `proposal.md:210` „`LoginPage` verlangt heute acht" → `LoginPage.tsx:15`
+      verlangt seit 6.6 `min(10)`. ·
+      `design.md` Entscheidung 6 „alle 47 Policies" → die eigene Rechnung
+      (52 − 5 − 1) und `INVENTORY.md` A sagen beide **46**. ·
+      `design.md` Entscheidung 14 „Tripwire über 37" → die Migration prüft
+      `> 50` gesamt **oder** `> 20` auf `impact` (`20260806080000:139-158`).
+- [x] 14.3 **Der Backfill-Widerspruch** (opencode). Das Requirement sagte
+      unbedingt „Profile, die vor Einführung bestanden, SHALL als aktiviert
+      gelten" — die Migration schränkt auf `email_confirmed_at` ein
+      (`20260806080000:167`). Die Bedingung steht jetzt **im Requirement**, mit
+      eigenem Szenario für das Bestandsprofil ohne Nachweis. Ebenso ist die
+      Tripwire-Anforderung auf beide Schwellen ausgeschrieben.
+- [x] 14.4 **Die Zusage zum Sitzungswiderruf war zu stark** (codex, deckt sich
+      mit 12.3). Die Spec versprach, mit dem verteilten Passwort sei nichts mehr
+      anzufangen; ein bereits ausgegebener, zustandsloser Zugriffs-Token trägt
+      aber bis zu seinem Ablauf. Jetzt als benannte Restfläche mit Obergrenze im
+      Requirement plus eigenem Szenario — die Zusage lautet „kein NEUER Zugang",
+      nicht „jeder bestehende Zugriff endet sofort".
+
+### Geprüft, trifft nicht zu
+
+- [x] 14.5 **„Zwei Namen in der durable Spec"** (opencode). Trifft nicht: das
+      access-control-Delta sagt „nur die Bestandskonten"; die Namen stehen in
+      `tasks.md` 8.2b, also im Rollout-Protokoll — genau dort, wo der Reviewer
+      sie haben will.
+
+### Offen, Donalds Entscheidung
+
+- [ ] 14.6 **„Die Drossel drosselt nichts"** (opencode) — der schärfste Punkt,
+      und er trifft die Entscheidung aus 12.6. Weil erst beansprucht und dann
+      gezählt wird, kostet jeder Fehlversuch weiter eine Datenbankrunde; die
+      Drossel **fügt** vor dem Limit sogar Arbeit hinzu (löschen, einfügen,
+      zählen) und schaltet danach einen 429 davor, ohne die Arbeit zu sparen.
+      Sie ist ein Zähler mit Bremslicht, keine Bremse. Das ist der **Preis** der
+      gewählten Eigenschaft: „ein gültiges Token wird nie abgewiesen" verlangt,
+      dass zuerst nachgesehen wird, ob es gültig ist. Wer wirklich Last sparen
+      will, muss vor dem Beanspruchen sperren — und nimmt damit in Kauf, dass
+      ein Mitglied hinter einer verbrannten Adresse mit gültigem Link abgewiesen
+      wird. **Nicht einseitig geändert.** Zu entscheiden, welche der beiden
+      Eigenschaften gilt; die Begründung in der Spec muss der Entscheidung
+      folgen (heute sagt sie „Lastfläche", und das trägt nicht).
+- [ ] 14.7 **Mail-Missbrauch über die offene Selbstregistrierung** (codex, neu).
+      Die Ratengrenze sitzt **je Profil**. Wer beliebig viele Profile mit
+      beliebigen Fremdadressen anlegt, löst je Profil einen Versand aus — die
+      Plattform wird zum Weiterleiter. Keine profilübergreifende, IP- oder
+      globale Grenze deckt das ab. Betrifft nicht das Gate, sondern die
+      Zustellreputation (und damit AGE-256).
+- [ ] 14.8 **Durable Specs widersprechen dem Gate** (codex). `directory-search`
+      sagt jedem angemeldeten Mitglied Verzeichniszugriff zu, `events` jedem
+      `basic`-Konto die Anmeldung zu öffentlichen Veranstaltungen. Beides steht
+      nach dem Archivieren neben dem Gate. Dasselbe Muster wie 12.7, nur in zwei
+      weiteren Capabilities — und es hängt an der AGE-448-Entscheidung (12.10).
+- [ ] 14.9 **Der Zeitkanal steht nur im Code-Kommentar** (codex, opencode,
+      deckt sich mit 12.5). Dass sofort `202` geantwortet und erst danach
+      versendet wird, ist die Abwehr des Adress-Orakels — sie gehört als
+      Anforderung in die Spec, nicht in einen Kommentar.
+- [ ] 14.10 **Grenzwerte ohne Zahl** (opencode). Die Spec nennt 72 h und 256 Bit,
+      aber weder die Sperrfrist je Profil noch das Versuchslimit auf dem
+      Einlöseweg; ein Szenario nennt ein „Tageskontingent", das kein Requirement
+      definiert. So sind die Szenarien nicht prüfbar.

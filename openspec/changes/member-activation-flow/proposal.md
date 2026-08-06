@@ -207,8 +207,11 @@ Absender wie Text müssen uns gehören. `enable_confirmations` bleibt `false`.
 
 **Frontend:** Aktivierungsbildschirm als Wand über allen Routen (die in
 `HomeRedirect` stehengelassene Naht), Einlösung unter `/aktivierung`,
-Passwortfeld mit **zehn** Zeichen Mindestlänge — `LoginPage` verlangt heute acht
-und widerspricht damit dem Server.
+Passwortfeld mit **zehn** Zeichen Mindestlänge — dieselbe Zahl wie
+`minimum_password_length` auf dem Server. _Hier stand, `LoginPage` verlange
+„heute acht" und widerspreche damit dem Server. Das war bei Abfassung wahr und
+ist es seit Task 6.6 nicht mehr: `LoginPage.tsx:15` verlangt `min(10)`
+(opencode, Runde 4; am 2026-08-06 nachgemessen). Korrigiert._
 
 **Alle sieben Fehlerfälle** aus AGE-495 §6, nicht nur der Happy Path.
 
