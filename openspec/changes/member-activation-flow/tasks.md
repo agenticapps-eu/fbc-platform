@@ -559,8 +559,33 @@ Beleg, dass der beschriebene Angriff nicht mehr geht.
       enumeriert; „Der Versandweg SHALL für angemeldete und nicht angemeldete
       Aufrufer derselbe sein" ersetzt durch die Trennung plus das
       Nicht-Entwerten; zwei neue Szenarien. `openspec validate --all` grün.
-- [ ] 13.4 **Offen aus 8.6, bewusst nicht in dieser Runde:** CSP/`frame-ancestors`
-      /HSTS (`public/_headers` fehlt) · `notify-contact-request` verifiziert
-      `record` nicht gegen `contact_requests` · `stripe-webhook` prüft
-      `payment_status` nicht und stuft nie zurück · `.gitignore` ohne
-      Schlüsselmuster. Details in `.gstack/security-reports/SECURITY.md`.
+- [x] 13.4 **Aus 8.6 nachgezogen** (06.08., zweite Runde). Details in
+      `.gstack/security-reports/SECURITY.md`. - **`stripe-webhook` prüfte `payment_status` nicht.**
+      `checkout.session.completed` heißt nicht „bezahlt": bei SEPA-Lastschrift
+      und Überweisung feuert Stripe es sofort mit `payment_status: "unpaid"`.
+      Ein Mitglied bekam die Stufe in dem Moment, in dem es den Kauf
+      **anstößt**. `parseCheckoutCompleted` verlangt jetzt `paid` oder
+      `no_payment_required`; ein fehlendes Feld gilt **nicht**. Drei neue
+      Deno-Tests, zwei davon vorher rot. Der alte Test hatte gar kein
+      `payment_status` im Fixture — er hätte den Fall nie gefunden. - **`notify-contact-request` prüfte `record` nicht gegen die Tabelle.**
+      Das Shared Secret belegt „der Aufruf kommt vom Webhook", nicht „diese
+      Zeile existiert". Wer es hat, wählte Empfänger, Absendername und
+      **Nachrichtentext** frei — die Mail ging unter der Absenderadresse des
+      Clubs raus. Neu: `passtZurDatenbank()` (id/from_id/to_id/status), 409
+      statt 200 bei Abweichung, und der Nachrichtentext kommt jetzt aus der
+      Datenbank statt aus dem Payload. Vier neue Deno-Tests, vorher rot. - **`public/_headers` gab es nicht.** Neu, mit `frame-ancestors 'none'`,
+      `X-Frame-Options`, `nosniff`, `Referrer-Policy`, HSTS (2 Jahre, ohne
+      `preload`) und `Permissions-Policy`. Dabei aufgefallen: **Task 6.4s
+      `Referrer-Policy: no-referrer` auf `/aktivierung` war abgehakt, aber
+      nirgends umgesetzt** — es gab keine Header-Datei. Steht jetzt drin. - **`.gitignore` ohne Schlüsselmuster.** `*.pem`, `*.key`, `id_rsa`,
+      `service-account*.json` u. a. ergänzt; geprüft, dass keine getrackte
+      Datei dadurch verschwindet.
+- [ ] 13.5 **Weiter offen, bewusst:** die **vollständige** CSP. `_headers` trägt
+      nur `frame-ancestors` — die Direktive, die nichts brechen kann. `script-`,
+      `connect-` (Supabase, Axiom, Sentry), `frame-` (YouTube, Vimeo), `img-`
+      und `style-src` brauchen eine Messung im Browser davor, sonst bricht die
+      Anwendung in Produktion still, während lokal alles läuft.
+- [ ] 13.6 **Rückstufung bei geplatzter Zahlung.** `apply_upgrade` ist bewusst
+      nur-höher; eine widerrufene Lastschrift oder ein Chargeback stuft heute
+      nicht zurück. Braucht einen eigenen Weg für `charge.dispute.created` /
+      `invoice.payment_failed` — eigenes Issue, nicht Teil von C3.

@@ -6,6 +6,7 @@ import {
   renderDeclined,
   renderNewRequest,
   selectNotification,
+  passtZurDatenbank,
   type ContactRequestRow,
   type WebhookPayload,
 } from "./emails.ts";
@@ -135,4 +136,26 @@ Deno.test("empty names fall back to neutral wording", () => {
     "Neue Kontaktanfrage von Ein Mitglied",
   );
   assertStringIncludes(renderAccepted({ toName: "" }).html, "Das Mitglied");
+});
+
+// ── Der Befund aus 8.6: `record` wurde nie gegen die Tabelle geprüft ─────────
+// Der Endpunkt steht hinter einem Shared Secret, aber das Secret sagt nur „der
+// Aufruf kommt vom Webhook", nicht „diese Zeile existiert". Wer es hat, schickt
+// eine erfundene Zeile — beliebiger Empfänger, beliebiger Absendername,
+// beliebiger Text — und die Mail geht unter der Absenderadresse des Clubs raus.
+
+Deno.test("passtZurDatenbank: die echte Zeile passt", () => {
+  assertEquals(passtZurDatenbank(row(), row()), true);
+});
+
+Deno.test("passtZurDatenbank: keine Zeile in der Tabelle → nein", () => {
+  assertEquals(passtZurDatenbank(row(), null), false);
+});
+
+Deno.test("passtZurDatenbank: umgelenkter Empfänger → nein", () => {
+  assertEquals(passtZurDatenbank(row({ to_id: "Opfer" }), row()), false);
+});
+
+Deno.test("passtZurDatenbank: erfundener Status → nein", () => {
+  assertEquals(passtZurDatenbank(row({ status: "accepted" }), row()), false);
 });

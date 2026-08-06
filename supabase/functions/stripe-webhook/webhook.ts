@@ -51,9 +51,33 @@ export async function verifyStripeSignature(
   return timingSafeEqualHex(expected, v1);
 }
 
+/**
+ * `checkout.session.completed` heisst „der Kauf ist abgeschlossen", NICHT
+ * „bezahlt". Bei verzoegerten Zahlungsarten — SEPA-Lastschrift, Ueberweisung,
+ * Sofort — feuert Stripe dieses Event sofort mit `payment_status: "unpaid"`
+ * und schickt den Erfolg spaeter als `checkout.session.async_payment_succeeded`.
+ * Ohne die Pruefung bekaeme jemand die Stufe in dem Moment, in dem er den Kauf
+ * ANSTOESST, und behielte sie auch, wenn die Lastschrift platzt.
+ *
+ * `no_payment_required` gilt: das ist der Nulltarif-Fall, bei dem Stripe gar
+ * keine Zahlung erwartet.
+ *
+ * Ein FEHLENDES Feld gilt nicht. Stripe schickt es bei jeder Session; fehlt es,
+ * ist die Nachricht nicht das, wofuer wir sie halten.
+ *
+ * OFFEN, nicht hier geloest: eine platzende Lastschrift stuft nicht zurueck —
+ * `apply_upgrade` ist bewusst nur-hoeher. Das braucht einen eigenen Weg fuer
+ * `charge.dispute.created` / `invoice.payment_failed` (eigenes Issue).
+ */
+const BEZAHLT = new Set(["paid", "no_payment_required"]);
+
 export function parseCheckoutCompleted(event: unknown): { userId: string; level: string } | null {
-  const e = event as { type?: string; data?: { object?: { metadata?: Record<string, string> } } };
+  const e = event as {
+    type?: string;
+    data?: { object?: { payment_status?: string; metadata?: Record<string, string> } };
+  };
   if (e?.type !== "checkout.session.completed") return null;
+  if (!BEZAHLT.has(e.data?.object?.payment_status ?? "")) return null;
   const md = e.data?.object?.metadata;
   if (!md?.user_id || !md?.level) return null;
   return { userId: md.user_id, level: md.level };

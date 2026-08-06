@@ -24,6 +24,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { timingSafeEqual } from "jsr:@std/crypto@1/timing-safe-equal";
 import {
+  passtZurDatenbank,
   renderAccepted,
   renderDeclined,
   renderNewRequest,
@@ -92,17 +93,38 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Recipient email + the counterparty's name. Email comes from the RLS-gated
-  // profile_contacts (reachable only with the service role); the name shown in
-  // the copy is always the OTHER party's.
-  const [contactRes, otherRes] = await Promise.all([
+  // The shared secret proves the CALL came from the webhook — it does not prove
+  // the ROW exists. Without this check, whoever holds the secret posts an
+  // invented row and picks recipient, sender name and message text freely; the
+  // mail then leaves under the club's own From address. So the row is looked up
+  // and compared before anything is sent.
+  const [contactRes, otherRes, echtRes] = await Promise.all([
     supabase
       .from("profile_contacts")
       .select("email")
       .eq("profile_id", decision.recipientId)
       .maybeSingle(),
     supabase.from("profiles").select("name").eq("id", decision.otherId).maybeSingle(),
+    supabase
+      .from("contact_requests")
+      .select("id, from_id, to_id, status, message")
+      .eq("id", decision.request.id)
+      .maybeSingle(),
   ]);
+
+  if (echtRes.error) {
+    log("error", "request_lookup_failed", { kind: decision.kind, error: echtRes.error.code });
+    return new Response("Lookup failed", { status: 502 });
+  }
+  if (!passtZurDatenbank(decision.request, echtRes.data)) {
+    // Kein 200 mit `skipped`: das hier ist kein uninteressantes Ereignis,
+    // sondern ein Aufruf, der etwas behauptet, was nicht in der Tabelle steht.
+    log("warn", "record_mismatch", { kind: decision.kind, requestId: decision.request.id });
+    return new Response("Record does not match", { status: 409 });
+  }
+  // Der Text kommt ab hier aus der Datenbank, nicht aus dem Payload — das ist
+  // stärker, als ihn zu vergleichen.
+  const echteNachricht = echtRes.data?.message ?? null;
 
   // A query ERROR is transient (don't confuse it with "no row") — surface it so
   // the failure is visible, rather than silently dropping the mail as no_email.
@@ -129,7 +151,7 @@ Deno.serve(async (req) => {
   let email: RenderedEmail;
   switch (decision.kind) {
     case "new_request":
-      email = renderNewRequest({ fromName: otherName, message: decision.request.message, appUrl });
+      email = renderNewRequest({ fromName: otherName, message: echteNachricht, appUrl });
       break;
     case "accepted":
       email = renderAccepted({ toName: otherName, appUrl });
