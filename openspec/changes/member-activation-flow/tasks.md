@@ -372,36 +372,48 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Konto das Verzeichnis abfragen: es enthält ausschließlich die
       Bestandskonten (Detlev und Donald). Erwarteter Zustand, kein Fehler —
       protokollieren, damit ihn niemand später „repariert".
-- [ ] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
-      _Teilweise erledigt beim Betrachten der laufenden Oberfläche (6.9): Wand
-      auf `/`, `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung ·
-      Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler.
-      Dazu 06.08. **gegen die deployten Functions gemessen** — Antworten der
-      Live-Function, nicht des Quelltexts:
+- [x] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
+      _Erledigt 06.08. in drei Etappen, weil nicht jeder Fall auf derselben
+      Fläche messbar ist._
 
-      | Fall | Aufruf | Antwort |
-                              | --- | --- | --- |
-                              | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
-                              | Link unbekannt | erfundenes Token | `410 not_found` |
-                              | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
-                              | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
-                              | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+      **Beim Betrachten der laufenden Oberfläche (6.9):** Wand auf `/`,
+          `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
+          und Adresse aus `my_activation_state()` · keine Konsolenfehler.
 
-                              Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
-                              `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
-                              Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
-                              Fehlversuche und wirft nicht vorzeitig.
-                              **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
-                              `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                              Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                              meldet `activated:true`, und dasselbe Konto sieht jetzt
-                              `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
-                              **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
-                              Aktivierungszustand und nicht an einer kaputten Fixture.
-                              _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
-                              (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
-                              also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
-                              nicht an der Live-Datenbank._
+          **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
+          Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
+          · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
+          `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
+          dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
+
+          **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
+          die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
+          Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
+          `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
+          Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
+          gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
+
+          Drei Dinge, die dabei mehr belegen als das Abhaken:
+
+          1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
+             12.4. Andernfalls läse das Mitglied eine falsche Meldung.
+          2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
+             also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
+             Eigenschaft, an der die Entscheidung in 12.6 hing.
+          3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
+             **und** abgelaufen ist, meldet `used`
+             (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
+             Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
+             `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
+             nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
+
+          **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
+          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+          meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
+          **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
+          Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
+          nicht an einer kaputten Fixture.
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -501,8 +513,8 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       beigebracht), nicht mehr nur erschlossen. Googles Hop:
       `dkim=pass header.i=@effbeezee.com header.s=resend` ·
       `spf=pass (domain of …@send.effbeezee.com designates 54.240.6.53 as
-    permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
-    header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
+  permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
+  header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       einem zweiten Hop. Der `send.`-Subdomain-SPF greift also genau wie
       eingerichtet, und `Reply-To: info@fairbusinessclub.de` steht im Header —
       die Zusage auf dem Aktivierungsbildschirm ist damit gemessen, nicht
