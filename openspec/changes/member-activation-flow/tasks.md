@@ -376,11 +376,33 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       _Teilweise erledigt beim Betrachten der laufenden Oberfläche (6.9): Wand
       auf `/`, `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung ·
       Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler.
-      Dazu 06.08. **gegen die deployten Functions gemessen**: „Passwort zu
-      schwach" (`weak_password`, minLength 10) und der unbekannte Link
-      (`not_found`) — beides Antworten der Live-Function, nicht des Quelltexts.
-      Die vier verbleibenden Token-Fälle (abgelaufen, schon benutzt,
-      `superseded`, `throttled`) brauchen einen echten Versand (10.2)._
+      Dazu 06.08. **gegen die deployten Functions gemessen** — Antworten der
+      Live-Function, nicht des Quelltexts:
+
+      | Fall | Aufruf | Antwort |
+          | --- | --- | --- |
+          | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
+          | Link unbekannt | erfundenes Token | `410 not_found` |
+          | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
+          | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
+          | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+
+          Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
+          `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
+          Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
+          Fehlversuche und wirft nicht vorzeitig.
+          **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
+          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+          meldet `activated:true`, und dasselbe Konto sieht jetzt
+          `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
+          **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
+          Aktivierungszustand und nicht an einer kaputten Fixture.
+          _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
+          (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
+          also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
+          nicht an der Live-Datenbank._
+
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
 - [x] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
@@ -419,7 +441,7 @@ used_at is null and expires_at > now() returning profile_id`. Kein
 ## 10. Deploy — Haltepunkt, Donalds Freigabe
 
 - [x] 10.1 Migrationen auf DEV: `pnpm db:push`. Zielprojekt vorher ausgeben.
-- [ ] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
+- [x] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
       prüfen.
       _Deploy-Hälfte erledigt 06.08.: `send-activation`, `resend-activation` und
       `redeem-activation` sind auf `foelowldexkcqzewvrcf` **ACTIVE** (je v1), und
@@ -429,13 +451,42 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       `202 {"accepted":true}`, erfundenes Token → `410 {"status":"not_found"}`,
       vierstelliges Passwort → `400 {"status":"weak_password","minLength":10}`,
       `resend-activation` ohne Sitzung → `401` vom Gateway.
-      **Der echte Versand wurde versucht und ist fehlgeschlagen** — siehe 10.5.
       Testkonto `donald@vlahovic.de` (Selbstregistrierung, `basic`,
       `activated_at = null`) am 06.08. angelegt; dabei nebenbei belegt:
       `my_activation_state()` liefert mit echter Sitzung genau zwei Felder
       (`activated:false`, Anzeigename), `resend-activation` antwortet innerhalb
       der Minute `rate_limited` (die 60-s-Sperre aus 4.4, zur Laufzeit
-      gemessen) und danach `issued`._
+      gemessen) und danach `issued`.
+      **Der erste Versandversuch scheiterte** (10.5, Resend-Sandkasten). Nach der
+      Domainverifikation am selben Tag wiederholt: `resend-activation` →
+      `200 {"status":"issued"}`, und die Mail ist bei `donald@vlahovic.de`
+      **angekommen** (von Donald bestätigt). Damit ist der Versandweg zum ersten
+      Mal Ende zu Ende gegangen._
+- [ ] 10.8 **ZWEITER BLOCKER, gefunden am 06.08. beim ersten echten Versand:
+      `APP_URL` steht auf `http://localhost:5173`.** Gemessen, nicht vermutet —
+      der Wert ist der Hash aus `supabase secrets list` gegen Kandidaten geprüft,
+      und der Link in der zugestellten Mail lautete
+      `http://localhost:5173/aktivierung#token=…`. Jede Aktivierungsmail an ein
+      importiertes Mitglied verlinkt damit auf dessen **eigenen Rechner**.
+      Dieselbe Klasse wie 10.5: der Versand meldet Erfolg, der Weg endet im
+      Nichts.
+      **Reicht über diesen Change hinaus:** `APP_URL` speist auch
+      `notify-contact-request` (`index.ts:89`) — die „Zum Chat"-Links in den
+      Kontaktanfrage-Mails zeigen seit jeher auf localhost. Eigener Nachlauf.
+      Ebenfalls auffällig: `APP_URLS` (Stripe-Rücksprung-Allowlist) lautet
+      `http://localhost:5173,https://fbc-platform.pages.dev` — localhost an
+      erster Stelle, auf dem Projekt der Live-Seite.
+      **Richtiger Wert steht schon in `config.toml`:**
+      `site_url = "https://fbc-platform.pages.dev"`. Behebung:
+      `supabase secrets set APP_URL="https://fbc-platform.pages.dev"
+--project-ref foelowldexkcqzewvrcf` — und Infisical nachziehen, sonst
+      kehrt der Wert beim nächsten Sync zurück. **Vorbedingung von C10**, wie
+      10.5.
+      _Ursache vermutlich die dev==prod-Falle: `env=dev` teilt sich die
+      Supabase-Instanz mit prod, also setzt ein für lokales Testen gesetzter
+      Wert zugleich die Live-Seite. Wer künftig lokal testen will, überschreibt
+      `APP_URL` lokal statt im Projekt-Secret._
+
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen (12 von 15 sind heute mit DEV identisch).
       _Merge ≠ live: `deploy.yml` deployt nur das Frontend._
@@ -444,7 +495,7 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
       Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
 
-- [ ] 10.5 **BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
+- [x] 10.5 **GESCHLOSSEN 06.08. — war ein BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
       der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
       `FROM_EMAIL` steht auf Resends Sandkasten-Absender `onboarding@resend.dev`
       — `docs/secrets.md:209-212` führt das ausdrücklich als Übergang, „swap in
@@ -498,7 +549,7 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       wer den Absender prüft, beim Club landet und nicht auf einer
       Strato-Platzhalterseite._
 
-- [ ] 10.7 Nach dem Setzen der DNS-Einträge: `FROM_EMAIL` in Infisical **und**
+- [x] 10.7 Nach dem Setzen der DNS-Einträge: `FROM_EMAIL` in Infisical **und**
       per `supabase secrets set` auf `FBC <noreply@effbeezee.com>` ziehen, beide
       Functions neu deployen (der Absender steckt nicht im Bundle, das Reply-To
       schon), dann den Versand an `donald@vlahovic.de` wiederholen. Erst wenn
