@@ -64,17 +64,43 @@ Schlüsselmuster. Sieben neue Deno-Tests, sechs vorher rot.
 - `openspec/changes/member-activation-flow/` — `tasks.md` (Blöcke 13/14),
   `design.md`, `proposal.md`, beide Spec-Deltas, `REVIEWS.md`.
 
+## Der Befund, der die Reihenfolge umgeworfen hat
+
+**Das Gate war auf der Live-Datenbank scharf, ohne dass die deployte Oberfläche
+es kannte.** Gemessen mit `supabase migration list --linked`: auf
+`foelowldexkcqzewvrcf` — dem Projekt, mit dem die Live-Seite **bis zum Import**
+spricht (`docs/supabase-environments.md:24`) — lagen `20260806080000/080100/080200`
+bereits an, `090000` und `110000` nicht. Und `origin/main` trug **keine einzige**
+Aktivierungsdatei; sein `AuthProvider` liest weiter `.from("profiles")`.
+
+Folge: Bestandsmitglieder unberührt (der Backfill hat sie gestempelt), aber
+Signup ist offen — wer sich seit dem 06.08. 08:00 UTC neu registrierte, bekam
+`activated_at = null`, sah null Zeilen und hatte **keinen
+Aktivierungsbildschirm**, um herauszukommen. Die Zahl ist ungemessen: ohne
+Infisical-Login gibt es kein Verbindungsmaterial zur DB.
+
+**Geschlossen wird das in dieser Reihenfolge** (Donald, 06.08.) — sie ist
+zwingend, weil die Oberfläche `request_own_activation_token` aus `090000` ruft:
+
+1. ✅ `supabase db push --linked` → `090000` + `110000` auf
+   `foelowldexkcqzewvrcf`. Dry-Run vorher, Zielprojekt ausgegeben, danach
+   gegengeprüft: kein lokaler Stand ohne Remote.
+2. ✅ PR **#120** offen, `MERGEABLE`.
+3. ⏳ CI grün → mergen → `deploy.yml` bringt das Frontend. **Erst damit ist die
+   Lücke zu.**
+4. Dann `supabase functions deploy` + echter Versand (10.2/8.3).
+
 ## Next session: start here
 
-**Erste Handlung: `git push -u origin donald/age-495-c3-aktivierung` und PR
-aufmachen.** Der Branch hat 12 Commits auf `origin/main`, alles grün (lint 0
-Fehler, typecheck, 425 Vitests, pgTAP 168, build, `openspec validate` 27/27).
-Danach **manueller** `pnpm db:push:prod` — Merge deployt nur das Frontend, und
-es sind jetzt vier Migrationen.
+**Wenn #120 noch offen ist: `gh pr checks 120`, dann mergen** — und mit
+`gh pr view 120 --json state` gegenprüfen, dass wirklich `MERGED` steht.
+Danach Schritt 4 oben. Für PROD (`viwntbodrtqxgmqyxluh`) braucht es einen
+**manuellen** `pnpm db:push:prod`; dort liegt bisher **keine** der vier
+Migrationen.
 
-Davor steht unverändert **Schritt 1 aus der letzten Sitzung**: die Stripe- und
-Resend-Secrets zwischen DEV und PROD trennen (der einzige CRITICAL, braucht dich
-im Stripe-Dashboard). Details in der Git-Historie dieser Datei, Commit `2e4ecce`.
+Unverändert daneben: die Stripe- und Resend-Secrets zwischen DEV und PROD
+trennen (der einzige CRITICAL, braucht dich im Stripe-Dashboard). Details in der
+Git-Historie dieser Datei, Commit `2e4ecce`.
 
 ## Open questions
 
