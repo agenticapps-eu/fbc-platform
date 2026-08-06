@@ -1,154 +1,111 @@
-# Session Handoff — 2026-08-06 (11. Session)
+# Session Handoff — 2026-08-06 (13. Session)
 
 ## Stand in einem Satz
 
-**C3 (AGE-495) ist gebaut und belegt.** Freigabe erteilt, vier Commits auf
-`donald/age-495-c3-mitglieder-aktivierung-e-mail-bestatigung-als`, Migrationen
-auf DEV, Beweis-Sonde grün. Offen sind Abnahme-Schritte (Audit, CSO, Review),
-der Mailtext an Detlev und der PROD-Deploy.
-
-## Der Beweis (Task 8.1)
-
-`scripts/probe-activation-gate.ts`, roher Supabase-Client, Konto auf `impact`
-mit `activated_at = null`, gegen DEV mit echten Demo-Daten:
-
-| Fläche                            |                  Vorher |                   Nachher |
-| --------------------------------- | ----------------------: | ------------------------: |
-| `profiles`                        |                      38 |                     **0** |
-| `profiles_public`                 |                      37 |                     **0** |
-| `posts` / `events`                |                  12 / 9 |                 **0 / 0** |
-| `offers` / `needs`                |                 49 / 48 |                 **0 / 0** |
-| `profile_theme_scores`            |                     148 |                     **0** |
-| `profile_contacts` (eigene!)      |                       1 |                     **0** |
-| `register_for_event`              | `P0002 event not found` | **`42501 not activated`** |
-| anon: öffentliche Beiträge/Events |                   5 / 1 |                 **5 / 1** |
-
-Vollständig in `openspec/changes/member-activation-flow/EVIDENCE.md`.
+**Fünf offene C3-Tasks geschlossen, die Review-Runde 4 gefahren und
+ausgewertet, vier CI/CD-Punkte gehärtet** — fünf Commits auf dem **neuen**
+Branch `donald/age-495-c3-aktivierung`. Die C3-Arbeit lag auf dem falschen
+Branch und ist umgehängt.
 
 ## Accomplished
 
-**Bestandsaufnahme gemessen statt gegrept.** Gegen DEV über `pg_policies` /
-`pg_proc` / `pg_class`. Vier Annahmen aus AGE-495 fielen: es sind **52** Policies,
-nicht 72 · `is_prime_plus()` **existiert nicht mehr** (gedroppt in
-`20260715150000:319`) · `minimum_password_length = 10` steht schon (C4) · der
-Onboarding-Wizard ist schon aus dem Erstlogin (AGE-494).
+**5.6 / 12.6 — Drossel auf `redeem-activation`.** Entscheidung Donald: Subjekt
+ist die IP, gezählt werden aber **ausschließlich Fehlversuche**, und die Zählung
+steht **hinter** dem Beanspruchen des Tokens. Daraus folgt: ein gültiges Token
+läuft nie in die Drossel (NAT-Einwand weg), und ein gefälschter
+`x-forwarded-for` bleibt folgenlos. Neu: Migration `20260806110000`
+(`activation_attempts`, RLS an, keine Policy, kein Grant · RPC
+`note_failed_activation`, nur `service_role`), Aufruf fail-open, Status
+`throttled` bis auf die Einlöseseite. pgTAP 14c, +8 Assertions, Plan 140 → 148.
 
-**Drei Review-Runden** (gemini/codex/opencode, `claude` als implementierender
-Host ausgeschlossen). gemini je APPROVE, die beiden anderen je REQUEST-CHANGES —
-27 Befunde, die meisten trugen. Wortlaut in `REVIEWS.md`.
+**12.7** — vier `member-profiles`-Requirements als MODIFIED nachgezogen, jede
+Zusage gegen `20260806080100` geprüft. **12.8** — „genau eine privilegierte
+Funktion" auf die **Datenklasse** eingegrenzt statt auf eine Anzahl.
 
-**Drei Reviewer-Befunde durch Messung widerlegt** statt eingearbeitet:
-Angreifer-Sessions überleben den Passwortwechsel **nicht** (Access- und
-Refresh-Token sterben) · ein `public`-Bucket ist **nicht** aufzählbar (`anon
-list('avatars')` → 0 Einträge, `storage.objects` hat RLS ohne SELECT-Policy) ·
-opencodes Zeilenverweis auf `posts_insert_own` traf die falsche Policy.
+**8.8 — Review-Runde 4** mit codex, opencode, gemini (`AGENT_SELF=claude`).
+2× REQUEST-CHANGES, 1× APPROVE. Vier Befunde behoben, einer widerlegt, fünf als
+Entscheidung offen — vollständig in `tasks.md` Block 14.
 
-**Eine Messung, die den Change umbaute:** Ein Konto mit Session kann sein
-Passwort **ohne Token und ohne Reauth** ändern (`updateUser({password})`, gegen
-DEV nachgestellt). Kein Weg in die App — das Gate hält — aber eine **Aussperrung**
-des echten Mitglieds. Deshalb: Versand beim Import anstoßen, „neuen Link
-anfordern" ohne Session.
+**13.4 — vier Audit-Befunde.** `stripe-webhook` prüfte `payment_status` nicht
+(bei SEPA/Überweisung feuert Stripe `completed` mit `unpaid`; die Stufe kam beim
+**Anstoßen** des Kaufs) · `notify-contact-request` prüfte `record` nicht gegen
+die Tabelle (wer das Shared Secret hat, wählte Empfänger, Absendername und
+Nachrichtentext frei) · `public/_headers` neu · `.gitignore` um
+Schlüsselmuster. Sieben neue Deno-Tests, sechs vorher rot.
+
+**CI/CD:** alle 15 `uses:` auf Commit-SHA gepinnt · `dependabot.yml` um `npm` ·
+`wrangler` von `pnpm dlx wrangler@4` auf devDependency `4.119.0` im Lockfile ·
+`-E` aus dem `curl | sudo bash` entfernt.
 
 ## Decisions
 
-- **Selbstregistrierung bleibt offen** (Donald). Selbstregistrierer sind `basic`,
-  **importierte `impact`**. Folge: hinter dem Aktivierungs-Gate liegt bei
-  importierten Konten **kein Stufen-Gate mehr** — es muss lückenlos sein.
-- **Sichtbarkeit erst nach Bestätigung** (Donald, 06.08.). Das Gate prüft **beide
-  Seiten**. Akzeptierte Folge: Verzeichnis am Go-Live-Abend zunächst leer, der
-  Erste sieht Detlev und Donald. **Kein Fehler — nicht „reparieren".**
-- **Gate an drei Stellen**: 46 Policies + Rumpf von `profiles_public`
-  (`security_invoker = off`!) + **sieben** DEFINER-RPCs (nicht vier).
-- **Own-Data ist mitgegatet** — der Angreifer meldet sich _als das Mitglied_ an;
-  `profile_contacts` trägt dessen E-Mail und Telefon.
-- **Reihenfolge statt Atomarität** bei der Einlösung: Token atomar beanspruchen →
-  Passwort → Sessions → **zuletzt** `activated_at`. Der Stempel öffnet das Gate.
+- **Drossel-Subjekt (12.6):** IP, aber nur Fehlversuche, Zählung hinter dem
+  Claim. Preis: es ist ein Zähler, keine Lastbremse — siehe 14.6.
+- **Branch umgehängt:** die acht C3-Commits lagen ungepusht auf
+  `chore/instruction-file-cleanup` (PR #119, `.planning`-Entfernung). Ein Push
+  hätte C3 in diesen PR geworfen. Neuer Branch von `origin/main`, Cherry-Pick,
+  Cleanup-Branch auf `origin` zurückgesetzt. Differenz zwischen beiden: exakt
+  die zwei PR-#119-Dateien.
+- **Volle CSP NICHT ausgeliefert.** `_headers` trägt nur `frame-ancestors` — die
+  Direktive, die nichts brechen kann. Als 13.5 festgehalten.
+- **`curl | sudo bash` bleibt.** Infisical verteilt die CLI über den eigenen
+  Artefaktserver, ihre GitHub-Releases tragen keine Assets (nachgemessen). Ein
+  Checksum-Pin ist nicht zu haben.
 
 ## Files modified
 
-- `openspec/changes/member-activation-flow/` — neu: `proposal.md` (245 Z.),
-  `design.md` (16 Entscheidungen), `tasks.md` (12 Blöcke), `INVENTORY.md`
-  (alle 52 Policies + 22 DEFINER-Funktionen, mit Erzeugungsabfrage),
-  `REVIEWS.md`, zwei Spec-Deltas (`access-control`, `member-profiles`).
-- `session-handoff.md` — diese Datei.
-- Kein Produktivcode angefasst.
-
-## Was gebaut wurde
-
-**Drei Migrationen.** A: `profiles.activated_at`, `activation_tokens`,
-`is_activated()`, `my_activation_state()`, Stolperdraht + Backfill. B: das Gate
-in 46 Policies, in den Rumpf von `profiles_public` und in **sieben**
-DEFINER-RPCs. C: `issue_activation_token`, `claim_activation_token`,
-`mark_activated`, `revoke_sessions` — nur `service_role`.
-
-**Zwei Edge Functions.** `send-activation` (liest kein JWT, antwortet immer 202,
-sendet nach der Antwort) und `redeem-activation` (vier Schritte, Stempel
-zuletzt).
-
-**Frontend.** `ActivationGate` um die ganze AppShell, Aktivierungsbildschirm,
-`/aktivierung` mit Token im Fragment, alle sieben Fehlerfälle.
-
-**Tests.** pgTAP 153 (rls 133, grants 5, directory 15) · vitest 413/413 ·
-deno 12/12 · lint 0 Fehler · build grün.
+- `supabase/migrations/20260806110000_activation_redeem_throttle.sql` — neu.
+- `supabase/tests/rls_test.sql` — Abschnitt 14c, Plan 148.
+- `supabase/functions/redeem-activation/index.ts` · `stripe-webhook/webhook.ts`
+  - `.test.ts` · `notify-contact-request/{emails,index}.ts` + `emails.test.ts`.
+- `src/lib/activation.ts` · `src/pages/ActivationRedeemPage.{tsx,test.tsx}`.
+- `public/_headers` — neu · `.gitignore` · `.github/{dependabot.yml,workflows/*}`
+  · `package.json` + `pnpm-lock.yaml`.
+- `openspec/changes/member-activation-flow/` — `tasks.md` (Blöcke 13/14),
+  `design.md`, `proposal.md`, beide Spec-Deltas, `REVIEWS.md`.
 
 ## Next session: start here
 
-**Task 6.9 — die laufende Oberfläche zeigen.** Ich konnte `pnpm dev` nicht
-starten: Infisical braucht ein echtes Terminal. Donald startet es (`! pnpm dev`),
-dann Aktivierungsbildschirm und `/aktivierung` ansehen, bevor der PR aufgeht.
+**Erste Handlung: `git push -u origin donald/age-495-c3-aktivierung` und PR
+aufmachen.** Der Branch hat 12 Commits auf `origin/main`, alles grün (lint 0
+Fehler, typecheck, 425 Vitests, pgTAP 168, build, `openspec validate` 27/27).
+Danach **manueller** `pnpm db:push:prod` — Merge deployt nur das Frontend, und
+es sind jetzt vier Migrationen.
 
-Danach die Abnahme: `database-sentinel:audit` (8.5), `/cso` (8.6), unabhängiges
-Code-Review (8.7), `run-plan-review.sh` gegen den fertigen Stand (8.8).
-
-## Beim Bauen gemessen (nicht angenommen)
-
-- **PROD hat 2 Profile, 0 auf `impact`; DEV 37 / 9.** Die „37" aus dem C4-Audit
-  wäre als Stolperdraht-Grenzwert für PROD sinnlos gewesen. Grenzen jetzt:
-  `> 50` gesamt **oder** `> 20 impact` → laute Migration. (12.1 erledigt)
-- **PRODs zwei Konten sind beide bestätigt** (`email_confirmed_at` gesetzt) —
-  der Backfill winkt dort keine unbestätigten Altkonten durch. (12.2 erledigt)
-- **`auth.admin.signOut(jwt, scope)` erwartet ein JWT, keine User-ID.** Signatur
-  am Code nachgemessen. Mein erster Aufruf hätte 401 geliefert und **jede**
-  Aktivierung scheitern lassen — kein Typecheck hätte das gefunden. Ersetzt
-  durch `revoke_sessions(uuid)`. (12.3 erledigt)
-- **`anon` kann den `avatars`-Bucket NICHT auflisten** (0 Einträge) —
-  `storage.objects` trägt RLS ohne SELECT-Policy. Der Reviewer-Einwand trifft
-  nicht zu; die Restfläche bleibt der Abruf einer bekannten URL.
+Davor steht unverändert **Schritt 1 aus der letzten Sitzung**: die Stripe- und
+Resend-Secrets zwischen DEV und PROD trennen (der einzige CRITICAL, braucht dich
+im Stripe-Dashboard). Details in der Git-Historie dieser Datei, Commit `2e4ecce`.
 
 ## Open questions
 
-- **`profiles_public` ist jetzt auch aus `service_role` leer** — die View trägt
-  `is_activated()` im Rumpf, und ohne Session ist das false. Keine bestehende
-  Function nutzt sie serverseitig; wer es künftig tut, liest `profiles`.
-  In EVIDENCE.md festgehalten.
-- **11.1** `security_update_password_require_reauthentication` auf PROD:
-  **ungemessen**. Der Messversuch gegen DEV wurde vom Berechtigungs-Classifier
-  abgelehnt — nicht umgangen. Braucht Donalds Freigabe oder einen Handgriff im
-  Dashboard.
-- **12.6** „Versuchsgedrosselt" auf `redeem-activation` hat noch kein Subjekt
-  (IP? Fingerprint?) und keinen instanzübergreifenden Speicher. Der Endpunkt ist
-  öffentlich; das Token hat 256 Bit, die Drosselung ist Lastschutz.
-- **12.7** Bestehende Requirements in `member-profiles` sichern Eigentümern
-  Zugriff **ohne** Aktivierungsvorbedingung zu — als MODIFIED nachziehen, sonst
-  ist die durable Spec nach dem Archivieren widersprüchlich.
-- **12.8** „Genau eine privilegierte Funktion ohne Gate" im access-control-Delta
-  widerspricht `INVENTORY.md` B2 (15 bestehende ungegatet). Auf die Datenklasse
-  eingrenzen.
-- **12.10** AGE-448: Gäste brauchen künftig erst ihr Postfach, auch für die
-  Anmeldung zu öffentlichen Events. Vor dem Sommerfest mit Detlev klären.
-- Mailtext (`design.md`, Ende) geht als **Entwurf** an Detlev.
-- Zustell-Abnahme hängt an **AGE-256** (SPF/DKIM) — blockiert nur den Versand,
-  nicht den Sicherheitskern.
+- **14.6 — die Drossel ist ein Zähler, keine Bremse** (opencode, und er hat
+  recht). Weil erst beansprucht und dann gezählt wird, kostet jeder Fehlversuch
+  weiter eine Datenbankrunde. Das ist der **Preis** der gewählten Eigenschaft.
+  Wer Last sparen will, muss vor dem Claim sperren — und nimmt in Kauf, dass ein
+  Mitglied hinter einer verbrannten IP mit gültigem Link abgewiesen wird. Deine
+  Entscheidung; die Begründung in der Spec muss ihr folgen.
+- **14.7** — Mail-Missbrauch über die offene Selbstregistrierung: die Grenze
+  sitzt je Profil, beliebig viele Profile ⇒ beliebig viele Mails. Trifft die
+  Zustellreputation (AGE-256), nicht das Gate.
+- **14.8** — `directory-search` und `events` sagen in der durable Spec noch
+  Zugriff ohne Aktivierung zu. Dasselbe Muster wie 12.7, hängt an 12.10/AGE-448.
+- **14.9 / 14.10** — Zeitkanal nur im Code-Kommentar · Grenzwerte ohne Zahl.
+- **GitHub-Einstellungen, nicht angefasst** (ändern live, wer was mergen und
+  deployen darf): `production`-Environment fehlt, obwohl `migrate-prod.yml:100`
+  es referenziert — es entsteht beim Lauf implizit **ohne** Schutzregel ·
+  `SUPABASE_DB_URL_PROD` liegt als Repo-Secret (jeder Workflow, jeder Branch) ·
+  Required Checks sind `verify`, `migrations`, `pr-title` — **`edge-functions`
+  fehlt**. Den Secret-Umzug kann ich ohnehin nicht: der Wert ist nicht lesbar.
+- **6.4 war falsch abgehakt.** `Referrer-Policy: no-referrer` auf `/aktivierung`
+  stand nirgends — es gab keine Header-Datei. Steht jetzt in `public/_headers`.
+  Lohnt einen Blick, ob weitere Häkchen so entstanden sind.
 
 ## Fallen, die weiter gelten
 
-- **`git add -A` ist verboten** — dauerhaft untracked Dateien mit 0600, Repo ist
-  öffentlich.
-- **`ls` ist ein Alias auf `eza -lao`**, **`cd` ist zoxide** — in Skripten
-  absolute Pfade statt `cd`.
-- **`supabase test db` ohne Dateiliste meldet FAIL, obwohl grün.**
-- **Policies zählt man in `pg_policies`, nicht per grep** — über acht Migrationen
-  hinweg wird gedroppt und neu angelegt; der grep zählt die Historie.
-- **Kein Service-Role-Key in Infisical `dev`** — der liegt nur im
-  Functions-Secret-Store. Für DB-Schreibzugriff `SUPABASE_DB_URL_DEV` + `pg`.
-- **Merge immer gegenprüfen** (`state=MERGED`).
+Unverändert: `git add -A` verboten · `ls` ist `eza`-Alias · `supabase test db`
+ohne Dateiliste lügt · Policies zählen, nicht greppen · Merge mit `state=MERGED`
+gegenprüfen · Infisical-Login braucht ein echtes Terminal.
+
+**Neu:** In einer Pipeline (`cmd | tail`) ist der Exit-Code der von `tail`. Ein
+`git checkout … | tail -2 && git cherry-pick …` lief deshalb auf dem alten
+Branch weiter, obwohl das Checkout abgebrochen war. Bei git-Ketten nie pipen.
