@@ -380,28 +380,28 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Live-Function, nicht des Quelltexts:
 
       | Fall | Aufruf | Antwort |
-          | --- | --- | --- |
-          | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
-          | Link unbekannt | erfundenes Token | `410 not_found` |
-          | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
-          | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
-          | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+              | --- | --- | --- |
+              | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
+              | Link unbekannt | erfundenes Token | `410 not_found` |
+              | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
+              | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
+              | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
 
-          Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
-          `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
-          Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
-          Fehlversuche und wirft nicht vorzeitig.
-          **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
-          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-          meldet `activated:true`, und dasselbe Konto sieht jetzt
-          `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
-          **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
-          Aktivierungszustand und nicht an einer kaputten Fixture.
-          _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
-          (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
-          also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
-          nicht an der Live-Datenbank._
+              Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
+              `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
+              Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
+              Fehlversuche und wirft nicht vorzeitig.
+              **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
+              `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+              Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+              meldet `activated:true`, und dasselbe Konto sieht jetzt
+              `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
+              **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
+              Aktivierungszustand und nicht an einer kaputten Fixture.
+              _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
+              (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
+              also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
+              nicht an der Live-Datenbank._
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -486,6 +486,17 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Supabase-Instanz mit prod, also setzt ein für lokales Testen gesetzter
       Wert zugleich die Live-Seite. Wer künftig lokal testen will, überschreibt
       `APP_URL` lokal statt im Projekt-Secret._
+      **Behoben 06.08.** auf beiden Flächen: `supabase secrets set` gegen
+      `foelowldexkcqzewvrcf` und `infisical secrets set … --env=dev`. Über den
+      SHA-256 aus `supabase secrets list` gegengeprüft — `APP_URL` und
+      `FROM_EMAIL` stimmen jetzt mit den Sollwerten überein. `APP_URL` wird zur
+      Laufzeit gelesen, ein Deploy war nicht nötig.
+      **Noch offen an diesem Punkt:** (a) der korrigierte Link ist **nicht an
+      einer echten Mail nachgemessen** — das erste Testkonto ist inzwischen
+      aktiviert und bekommt nach 4.6 keine Mail mehr, es braucht ein zweites;
+      (b) `--env=prod` ist ungeprüft; (c) `APP_URLS` führt weiterhin localhost
+      an erster Stelle (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht
+      ungefragt an der Bezahlstrecke gedreht).
 
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen (12 von 15 sind heute mit DEV identisch).
@@ -563,15 +574,24 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       wenn der Login nicht „kürzlich" war, und der Angreifer hat sich gerade
       angemeldet. Der Messversuch auf DEV wurde vom Berechtigungs-Classifier
       abgelehnt. Eigenes Issue, mit der Messung als erstem Schritt.
-- [ ] 11.2 C10 trägt drei Vorbedingungen — im Import-Issue vermerken, nicht nur
-      hier: (a) Migration A läuft vorher (1.9), (b) der Import stößt den
+- [ ] 11.2 C10 trägt **fünf** Vorbedingungen — im Import-Issue vermerken, nicht
+      nur hier: (a) Migration A läuft vorher (1.9), (b) der Import stößt den
       Aktivierungsversand direkt an, damit der Weg des Mitglieds das
       Default-Passwort nicht berührt, (c) deterministisches Verhalten, wenn eine
       Adresse durch Selbstregistrierung bereits belegt ist — ein vorab besetztes
       Konto darf nicht durch bloße Adressgleichheit zum Mitgliedskonto werden
       (codex), und (d) **in Resend ist eine eigene Absenderdomain verifiziert**
       (10.5) — sonst schlägt jeder Aktivierungsversand fehl und der Import
-      erzeugt lauter gesperrte Konten ohne Weg hinein.
+      erzeugt lauter gesperrte Konten ohne Weg hinein —, und (e) **`APP_URL`
+      zeigt nicht auf localhost** (10.8), sonst verlinkt jede Mail auf den
+      Rechner des Empfängers.
+      _Und eine Buchhaltungssache, die sonst beim Import Verwirrung stiftet: auf
+      `foelowldexkcqzewvrcf` steht seit dem 06.08. ein **Wegwerf-Testkonto**
+      `donald@vlahovic.de` („Donald (Testkonto AGE-495)", `basic`, inzwischen
+      aktiviert und damit im Verzeichnis sichtbar). Entscheidung Donald: bleibt
+      stehen. Es ist **kein Mitglied** — und es zählt in die 50er-Gesamtschwelle
+      der Tripwire aus 1.7 (nicht in die 20er auf `impact`). Wer die Schwelle
+      vor dem Import festschreibt (12.1), muss es abziehen._
 - [ ] 11.3 `avatars`-Bucket privat stellen? Eigener Change mit Folgen für jede
       Bild-URL im Frontend (`INVENTORY.md`, Abschnitt C). Heute kein Weg für ein
       nicht aktiviertes Konto, die URLs überhaupt zu erfahren.
