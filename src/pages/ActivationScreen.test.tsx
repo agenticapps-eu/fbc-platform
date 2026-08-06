@@ -64,6 +64,31 @@ describe("ActivationScreen", () => {
     expect(screen.getByRole("button", { name: /Erneut senden in/i })).toBeDisabled();
   });
 
+  /**
+   * Der Absender ist seit dem 06.08.2026 `noreply@effbeezee.com` und damit eine
+   * ANDERE Domain als die, unter der der Club auftritt. Das ist eine
+   * Entscheidung (Donald/Detlev), und sie macht diesen Satz zur Sicherheits-
+   * eigenschaft statt zur Textkosmetik: die Aktivierungsmail ist bei
+   * importierten Konten der einzige Weg hinein, und ein Absender, den der
+   * Bildschirm nicht ankündigt, ist von Phishing nicht zu unterscheiden.
+   *
+   * Der Test hält beide Hälften fest — angekündigter Absender UND Rückkanal —,
+   * weil genau ihr Auseinanderfallen der Fehler wäre.
+   */
+  it("kündigt den Absender an und nennt getrennt davon den Rückkanal", async () => {
+    renderMit();
+
+    fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
+
+    const hinweis = await screen.findByText(/Der Link ist unterwegs/i);
+    expect(hinweis).toHaveTextContent("noreply@effbeezee.com");
+    // Der Rückkanal bleibt die Club-Domain — er steht woanders auf der Seite.
+    expect(screen.getByRole("link", { name: /info@fairbusinessclub\.de/i })).toHaveAttribute(
+      "href",
+      "mailto:info@fairbusinessclub.de",
+    );
+  });
+
   it("meldet einen Transportfehler, ohne etwas über die Adresse zu verraten", async () => {
     vi.mocked(resendActivationLink).mockRejectedValueOnce(new Error("network"));
     renderMit();

@@ -469,6 +469,42 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       AGE-256 keine Nebenbedingung von 10.4 mehr, sondern Vorbedingung von C10.
       Gehört als vierte Vorbedingung in 11.2.
 
+- [x] 10.6 **Absenderdomain entschieden (Donald/Detlev, 06.08.): `effbeezee.com`,
+      `FROM_EMAIL = "FBC <noreply@effbeezee.com>"`.** Gewählt, weil sie auf
+      Strato-NS liegt und Donald sie selbst pflegen kann; `fairbusinessclub.de`
+      liegt auf Cloudflare-NS, an das nur der Betreuer der WordPress-Seite kommt.
+      Nachgemessen vor der Umstellung: Apex ohne SPF, `resend._domainkey` und
+      `send` frei — keine Kollision.
+      **Zwei Eigenschaften, die die Einrichtung beachten muss:**
+      (a) `_dmarc.effbeezee.com` trägt bereits `v=DMARC1;p=reject;` — Resends
+      optionalen DMARC-Eintrag **nicht** anlegen (zwei Einträge auf einem Namen
+      machen DMARC ungültig), und `reject` heißt: ein vertippter DKIM-Key ist
+      kein Spam-Ordner, sondern ein Bounce. (b) Die Domain hat einen
+      **Wildcard** (`*.effbeezee.com` antwortet mit Stratos MX) — unter `send.`
+      **beide** Einträge setzen, denn sobald dort irgendein Eintrag existiert,
+      greift der Wildcard für diesen Namen nicht mehr.
+      **Im Code nachgezogen:** `ActivationScreen` kündigt den Absender an und
+      nennt getrennt davon den Rückkanal (vorher rot gemessen, Test
+      „kündigt den Absender an und nennt getrennt davon den Rückkanal");
+      beide Functions setzen `Reply-To: info@fairbusinessclub.de`, weil der
+      Bildschirm dem Mitglied eine ankommende Antwort zusagt; `docs/secrets.md`
+      korrigiert — der Sandkasten-Hinweis stand dort als Empfehlung.
+      _Bewusst in Kauf genommen: der Absender liegt auf einer anderen Domain als
+      der Auftritt des Clubs. Bei importierten Konten ist diese Mail der einzige
+      Weg hinein, und ein unangekündigter fremder Absender ist von Phishing nicht
+      zu unterscheiden — deshalb steht die Adresse jetzt wörtlich auf dem
+      Bildschirm, und deshalb ist der Test darauf kein Textdetail. Empfohlen und
+      offen: eine Weiterleitung `effbeezee.com` → `fairbusinessclub.de`, damit
+      wer den Absender prüft, beim Club landet und nicht auf einer
+      Strato-Platzhalterseite._
+
+- [ ] 10.7 Nach dem Setzen der DNS-Einträge: `FROM_EMAIL` in Infisical **und**
+      per `supabase secrets set` auf `FBC <noreply@effbeezee.com>` ziehen, beide
+      Functions neu deployen (der Absender steckt nicht im Bundle, das Reply-To
+      schon), dann den Versand an `donald@vlahovic.de` wiederholen. Erst wenn
+      dort eine Mail ankommt, ist 10.2 zu — `202` von `send-activation` belegt
+      bauartbedingt nichts, der ehrliche Status kommt von `resend-activation`.
+
 ## 11. Nachläufe, die dieser Change nicht schließt
 
 - [ ] 11.1 `security_update_password_require_reauthentication` auf PROD: soll er
