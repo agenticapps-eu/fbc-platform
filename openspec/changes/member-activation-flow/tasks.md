@@ -207,6 +207,14 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       `authenticated`, für alle vier Operationen. Dazu:
       `has_column_privilege('authenticated', 'public.profiles', 'activated_at',
 'update')` ist `false` (Mechanismus zu 1.2).
+      _Nachgezogen 06.08.: das Häkchen stand über **drei** der acht Assertions
+      (anon/SELECT, authenticated/SELECT, authenticated/INSERT). UPDATE und
+      DELETE waren auf beiden Rollen ungeprüft — ein späteres `grant update`
+      wäre also durch genau den Block gerutscht, der ihn fangen soll. Fünf
+      Assertions ergänzt, Plan 148 → 153. Vorher rot gemessen mit einer
+      Wegwerf-Sonde, die die Rechte erteilt und wieder zurücknimmt:
+      `has_table_privilege` schlägt auf `true` um, die Assertions sind also
+      keine Leerprüfung. Gefunden beim 6.4-Nachlauf (siehe 13.4)._
 - [x] 3.10 `plan(n)` auf die neue Zahl heben. Lauf **mit** Dateiliste:
       `supabase test db supabase/tests/rls_test.sql supabase/tests/grants_test.sql
 supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
@@ -367,8 +375,12 @@ used_at is null and expires_at > now() returning profile_id`. Kein
 - [ ] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
       _Teilweise erledigt beim Betrachten der laufenden Oberfläche (6.9): Wand
       auf `/`, `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung ·
-      Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler. Die
-      vier Token-Fälle brauchen einen echten Versand (10.2)._
+      Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler.
+      Dazu 06.08. **gegen die deployten Functions gemessen**: „Passwort zu
+      schwach" (`weak_password`, minLength 10) und der unbekannte Link
+      (`not_found`) — beides Antworten der Live-Function, nicht des Quelltexts.
+      Die vier verbleibenden Token-Fälle (abgelaufen, schon benutzt,
+      `superseded`, `throttled`) brauchen einen echten Versand (10.2)._
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
 - [x] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
@@ -409,6 +421,18 @@ used_at is null and expires_at > now() returning profile_id`. Kein
 - [x] 10.1 Migrationen auf DEV: `pnpm db:push`. Zielprojekt vorher ausgeben.
 - [ ] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
       prüfen.
+      _Deploy-Hälfte erledigt 06.08.: `send-activation`, `resend-activation` und
+      `redeem-activation` sind auf `foelowldexkcqzewvrcf` **ACTIVE** (je v1), und
+      `verify_jwt` deckt sich mit `config.toml` — false / true / false.
+      `APP_URL`, `FROM_EMAIL`, `RESEND_API_KEY` liegen. Gegen die live
+      deployten Endpunkte gemessen (nicht im Code gelesen): unbekannte Adresse →
+      `202 {"accepted":true}`, erfundenes Token → `410 {"status":"not_found"}`,
+      vierstelliges Passwort → `400 {"status":"weak_password","minLength":10}`,
+      `resend-activation` ohne Sitzung → `401` vom Gateway.
+      **Offen bleibt der echte Versand** — er braucht ein nicht aktiviertes Konto
+      auf einer Adresse, die Donald lesen kann. Ein Bestandskonto taugt nicht:
+      es ist durch den Backfill aktiviert, und 4.6 antwortet dann `202` ohne
+      Mail._
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen (12 von 15 sind heute mit DEV identisch).
       _Merge ≠ live: `deploy.yml` deployt nur das Frontend._
