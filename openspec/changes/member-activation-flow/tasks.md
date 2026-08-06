@@ -285,10 +285,17 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       für `expired`, `used`, `not_found`, `weak_password`. Kein generisches
       „ungültig": AGE-495 §6 verlangt für „abgelaufen" und „schon benutzt"
       unterschiedliche Bildschirme.
-- [ ] 5.6 Versuchs-Drosselung pro Aufrufer auf diesem Endpunkt (opencode). Ein
+- [x] 5.6 Versuchs-Drosselung pro Aufrufer auf diesem Endpunkt (opencode). Ein
       256-Bit-Token ist nicht erratbar, aber ein ungedrosselter öffentlicher
       Endpunkt ist auch ohne Erfolg eine Lastfläche. Steht als Anforderung in
       der Spec, nicht nur hier.
+      _Umgesetzt 06.08. nach der Entscheidung in 12.6: Migration
+      `20260806110000_activation_redeem_throttle.sql` (Tabelle
+      `activation_attempts`, RPC `note_failed_activation`, nur `service_role`),
+      Aufruf in `redeem-activation/index.ts` **hinter** dem Beanspruchen, neuer
+      Status `throttled` in `RedeemStatus` und auf der Einlöseseite. Belege:
+      `rls_test.sql` Abschnitt 14c (+8 Assertions, Plan 140 → 148) und ein
+      Vitest auf der Einlöseseite — beide vorher rot gemessen._
 - [x] 5.7 `signOut` als Vorsicht kennzeichnen, nicht als Befund: gemessen wurde,
       dass ein Passwortwechsel Access- und Refresh-Token bereits tötet. Für den
       Admin-Pfad ist das **ungemessen**, deshalb der explizite Aufruf.
@@ -462,20 +469,43 @@ währenddessen.
       messbar langsamer als eine nicht bestehende — ein Orakel für
       Mitgliedsadressen. **Vorschlag:** sofort `202` antworten und erst danach
       versenden. Betrifft 4.2.
-- [ ] 12.6 **„Versuchsgedrosselt" hat kein Subjekt** (opencode). Auf einem
+- [x] 12.6 **„Versuchsgedrosselt" hat kein Subjekt** (opencode). Auf einem
       sitzungsfreien Endpunkt ist unklar, wer der Aufrufer ist — IP (sperrt bei
       NAT das echte Mitglied mit aus), Fingerprint, Token-Präfix? Und anders als
       bei 4.4 ist kein instanzübergreifender Speicher genannt. Betrifft 5.6.
-- [ ] 12.7 **Bestehende Requirements widersprechen dem Delta** (codex). In
+      _Entschieden 06.08. (Donald): **Subjekt ist die IP, gezählt werden aber
+      ausschließlich Fehlversuche**, und die Zählung steht hinter dem
+      Beanspruchen des Tokens. Damit fällt der NAT-Einwand weg — ein gültiges
+      Token läuft nie in die Drossel — und ein gefälschter `x-forwarded-for`
+      bleibt folgenlos, weil er einen Eimer füllt, der niemanden aussperrt. Der
+      instanzübergreifende Speicher ist die Tabelle `activation_attempts`,
+      dasselbe Muster wie bei 4.4 (die Datenbank, nicht der Function-Prozess).
+      Verworfen: globaler Zähler ohne IP-Bezug (ein Fremder legte den Einlöseweg
+      für alle still) und „gar nichts" (stimmt fürs Erraten, nicht für die
+      Last)._
+- [x] 12.7 **Bestehende Requirements widersprechen dem Delta** (codex). In
       `member-profiles` und benachbarten Capabilities sichern Requirements
       Eigentümern weiterhin Profil-, Kontakt-, Einstellungs- und Avatarzugriff
       **ohne** Aktivierungsvorbedingung zu. Sie müssen als MODIFIED auf
       „aktiviertes Mitglied" eingeschränkt werden, sonst ist die durable Spec
       nach dem Archivieren in sich widersprüchlich.
-- [ ] 12.8 **„Genau eine privilegierte Funktion ohne Gate"** (codex) — die
+      _Nachgezogen 06.08.: vier Requirements als MODIFIED im
+      `member-profiles`-Delta — „Full profile and extended data are gated by
+      membership rank", „Contact data is disclosed only after an accepted
+      contact request", „Private profile data is strictly owner-only",
+      „Profile media is stored and gated per member". Jede Zusage gegen
+      `20260806080100_activation_gate.sql` geprüft, nicht gegen die Taskliste._
+- [x] 12.8 **„Genau eine privilegierte Funktion ohne Gate"** (codex) — die
       Formulierung im access-control-Delta widerspricht `INVENTORY.md` B2, wo 15
       bestehende Funktionen ungegatet bleiben. Auf die gemeinte Datenklasse
       eingrenzen, nicht auf eine Anzahl.
+      _Umformuliert 06.08.: Das Gate trägt jede privilegierte Funktion, die
+      **Mitgliederdaten liefert oder verändert**; nicht darunter fallen
+      Funktionen über den eigenen Stand gegenüber der Plattform, plattformweite
+      Merker und Funktionen ohne API-Rollen-EXECUTE. Die „genau zwei" gelten
+      jetzt ausdrücklich **innerhalb dieser Datenklasse**. Die Booleans über
+      einen bereits bekannten Fremdschlüssel stehen als benannte Restfläche
+      drin, wie in `INVENTORY.md` B2._
 - [x] 12.9 **`my_activation_state()` hat keine Grant-Regel in der Spec**
       (opencode). In 1.6 steht sie, im Delta nicht — und das
       Prädikat-Requirement verlangt EXECUTE-Entzug für `public`/`anon`.

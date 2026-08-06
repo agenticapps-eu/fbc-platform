@@ -18,6 +18,11 @@ export type RedeemStatus =
   | "not_found"
   | "weak_password"
   | "retry_needed"
+  /**
+   * Zu viele FEHLVERSUCHE von derselben Adresse (Task 5.6). Ein gültiges Token
+   * erreicht diesen Status nie — die Drossel sitzt hinter dem Beanspruchen.
+   */
+  | "throttled"
   | "error";
 
 export interface ActivationState {

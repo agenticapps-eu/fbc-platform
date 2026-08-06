@@ -93,6 +93,30 @@ Deno.serve(async (req) => {
   // entwertetes Token bedeutet nicht, dass das Konto aktiviert ist. Die
   // Oberfläche muss dafür etwas anderes sagen können.
   if (status !== "claimed") {
+    // ── Drossel (Task 5.6 / 12.6) ───────────────────────────────────────────
+    // Sie steht HIER und nicht oben: gezählt wird nur, was ohnehin abgelehnt
+    // wird. Ein gültiges Token hat die Verzweigung längst verlassen und wird
+    // nie gedrosselt — das ist die Eigenschaft, an der 12.6 hing (NAT). Die
+    // Begründung in voller Länge im Kopf von 20260806110000.
+    //
+    // Die IP wird nicht protokolliert. Sie ist ein personenbezogenes Datum,
+    // und die Drossel braucht sie nur im gleitenden Fenster der Tabelle.
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+    const { data: eimer, error: drosselFehler } = await supabase.rpc("note_failed_activation", {
+      p_ip: ip,
+    });
+    if (drosselFehler) {
+      // Absichtlich fail-open: die Drossel ist eine Lastbremse, keine
+      // Sicherheitsgrenze. Sie darf den Einlöseweg nicht mit sich reißen.
+      log("error", "throttle_failed", { code: drosselFehler.code });
+    } else {
+      const eimerZeile = Array.isArray(eimer) ? eimer[0] : eimer;
+      if (eimerZeile?.throttled) {
+        log("warn", "throttled", { attempts: eimerZeile.attempts });
+        return antwort({ status: "throttled" }, 429);
+      }
+    }
+
     log("info", "not_claimed", { status });
     return antwort({ status }, 410);
   }

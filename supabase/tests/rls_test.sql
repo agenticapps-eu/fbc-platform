@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(140);
+select plan(148);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -864,6 +864,51 @@ select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)'
   false, 'revoke_sessions: authenticated darf nicht');
 select is(has_function_privilege('service_role', 'public.revoke_sessions(uuid)', 'execute'),
   true, 'revoke_sessions: service_role darf (der Weg von redeem-activation)');
+
+-- ── 14c. Drossel auf dem Einlöseweg (Task 5.6 / 12.6) ───────────────────────
+-- Entscheidung Donald 2026-08-06: gezählt werden AUSSCHLIESSLICH Fehlversuche,
+-- und zwar je IP. Der Aufruf steht in redeem-activation NACH dem Beanspruchen —
+-- ein gültiges Token wird also nie gedrosselt. Damit fällt der NAT-Einwand aus
+-- 12.6 weg: das echte Mitglied trägt immer ein gültiges Token, egal wie viele
+-- Fremde hinter derselben Adresse sitzen.
+--
+-- Dieselbe Eigenschaft trägt gegen einen gefälschten `x-forwarded-for`: wer
+-- fremde Adressen einträgt, füllt einen Eimer, der niemanden aussperrt.
+
+select is(has_table_privilege('anon', 'public.activation_attempts', 'select'),
+  false, 'activation_attempts: anon hat kein SELECT');
+select is(has_table_privilege('authenticated', 'public.activation_attempts', 'insert'),
+  false, 'activation_attempts: authenticated hat kein INSERT — die IP-Liste ist '
+         'kein Clientdatum');
+select is(has_function_privilege('authenticated',
+  'public.note_failed_activation(text, interval, integer)', 'execute'),
+  false, 'note_failed_activation: authenticated darf nicht');
+select is(has_function_privilege('service_role',
+  'public.note_failed_activation(text, interval, integer)', 'execute'),
+  true, 'note_failed_activation: service_role darf (der Weg von redeem-activation)');
+
+-- Der erste Fehlversuch zählt und sperrt nicht.
+select is((select throttled from public.note_failed_activation('203.0.113.7', '1 hour', 3)),
+  false, 'note_failed_activation: der erste Fehlversuch sperrt nicht');
+
+-- Über das Limit hinaus sperrt sie. Limit 3: zwei stille Aufrufe (Versuch 2 und
+-- 3), die Assertion ist dann Versuch 4.
+do $$ begin
+  perform public.note_failed_activation('203.0.113.7', '1 hour', 3);
+  perform public.note_failed_activation('203.0.113.7', '1 hour', 3);
+end $$;
+select is((select throttled from public.note_failed_activation('203.0.113.7', '1 hour', 3)),
+  true, 'note_failed_activation: über dem Limit sperrt sie');
+
+-- Der Kern von „pro IP": der Nachbar ist unberührt.
+select is((select throttled from public.note_failed_activation('198.51.100.4', '1 hour', 3)),
+  false, 'note_failed_activation: eine andere IP ist von der Sperre unberührt');
+
+-- Und das Fenster wandert: was älter ist als das Fenster, zählt nicht mehr.
+update public.activation_attempts set attempted_at = now() - interval '2 hours'
+ where ip = '203.0.113.7';
+select is((select attempts from public.note_failed_activation('203.0.113.7', '1 hour', 3)),
+  1, 'note_failed_activation: außerhalb des Fensters zählt nichts mehr');
 
 select * from finish();
 rollback;

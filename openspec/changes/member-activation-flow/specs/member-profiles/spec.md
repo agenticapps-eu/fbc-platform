@@ -143,3 +143,183 @@ Tokens öffnet beides nicht, sondern nur Letzteres.
 - **WHEN** an authenticated client attempts to INSERT into `profiles`
 - **THEN** the write is denied (no client INSERT grant/policy; the trigger owns
   provisioning)
+
+### Requirement: Full profile and extended data are gated by membership rank
+
+The system SHALL restrict SELECT of a full `profiles` base-table row (including
+`interests`, `competencies`, free-text `goals`, `headline`, `dev_focus`, and
+other extended columns) to the profile's owner OR a caller with `level_rank >= 3`
+(`discover`), via the policy `profiles_select_self_or_discover` using
+`has_level(3)`. The extended sub-tables `profile_theme_scores`,
+`profile_interests`, and `profile_badges` SHALL follow the same threshold for
+SELECT (own profile OR `has_level(3)`), while `profile_theme_scores` and
+`profile_interests` remain client-writable only for the owner and
+`profile_badges` has no client write policy (awarded server-side).
+
+Der Rang SHALL **zusätzlich** zur Aktivierung wirken, nicht an ihrer Stelle. Ein
+nicht aktiviertes Konto SHALL keine dieser Zeilen erhalten — **auch nicht die
+eigene**. Die Zusage „nur die eigene Zeile" gilt erst ab der Bestätigung; davor
+ist auch die eigene Zeile verschlossen, weil ein übernommenes Konto gegenüber
+der Datenbank das Mitglied ist.
+
+Ebenso SHALL das Zielprofil bestätigt sein: eine Zeile SHALL für Dritte erst
+erscheinen, wenn **ihr Inhaber** aktiviert hat. Das gilt für `profiles` und für
+die drei genannten Untertabellen.
+
+#### Scenario: Below Discover an activated member sees only their own full row
+
+- **WHEN** a **bestätigtes** `basic`/`connect` member (rank < 3) selects another
+  member's full `profiles` row or their extended sub-tables
+- **THEN** RLS returns no row for the other member (only the caller's own row is visible)
+
+#### Scenario: Discover-and-above sees full rows and extended data
+
+- **WHEN** a **bestätigtes** member with `level_rank >= 3` selects other members'
+  `profiles` rows, `profile_theme_scores`, `profile_interests`, or
+  `profile_badges`
+- **THEN** those rows are returned, sofern deren Inhaber ebenfalls bestätigt haben
+
+#### Scenario: Ohne Bestätigung ist auch die eigene Zeile verschlossen
+
+- **GIVEN** ein angemeldetes Konto mit `tier = 'impact'` und leerem
+  Aktivierungszeitpunkt
+- **WHEN** es seine **eigene** `profiles`-Zeile oder seine eigenen
+  `profile_interests` / `profile_theme_scores` abfragt
+- **THEN** liefert RLS null Zeilen — der Rang trägt hier nichts, weil das Gate
+  davor sitzt
+
+#### Scenario: A member cannot self-award a badge
+
+- **WHEN** an authenticated member attempts to INSERT into `profile_badges`
+- **THEN** the write is denied (no client write policy; badges are awarded by service_role/admin)
+
+### Requirement: Contact data is disclosed only after an accepted contact request
+
+The system SHALL keep contact details in a separate `profile_contacts` table
+(`email`, `phone`, `website`) whose SELECT policy
+`contacts_select_self_or_released` returns a row only to its owner OR to a
+counterparty that shares an `accepted` row in `contact_requests`. Contact data
+SHALL never be exposed through `profiles_public` or the rank-gated profile row.
+
+Beide Zweige — Eigentümer wie freigegebene Gegenseite — SHALL zusätzlich die
+Aktivierung des Aufrufers voraussetzen. Gerade die **eigene** Kontaktzeile ist
+hier der Punkt: sie trägt E-Mail und Telefonnummer des Mitglieds, und wer sich
+mit einem weitergegebenen Passwort anmeldet, holte sie sonst als Erstes ab.
+Zusätzlich SHALL die Zeile des **Zielprofils** dessen Bestätigung voraussetzen.
+
+#### Scenario: Owner reads their own contact data
+
+- **WHEN** a **bestätigtes** member selects their own `profile_contacts` row
+- **THEN** the row is returned
+
+#### Scenario: Die eigene Kontaktzeile bleibt vor der Bestätigung verschlossen
+
+- **GIVEN** ein angemeldetes, nicht bestätigtes Konto
+- **WHEN** es seine eigene `profile_contacts`-Zeile abfragt
+- **THEN** liefert RLS null Zeilen — E-Mail und Telefonnummer sind nicht
+  abholbar, obwohl es formal die eigenen Daten sind
+
+#### Scenario: Contact data stays hidden without acceptance
+
+- **WHEN** a member selects another member's `profile_contacts` row and no
+  `accepted` `contact_requests` row links the two
+- **THEN** RLS returns no row
+
+#### Scenario: Acceptance reveals contact data
+
+- **WHEN** a `contact_requests` row between the two members reaches
+  `status = 'accepted'`
+- **THEN** each may thereafter SELECT the other's `profile_contacts` row, sofern
+  beide bestätigt sind
+
+### Requirement: Private profile data is strictly owner-only
+
+The system SHALL restrict the `goals` table and the `member_settings` table to
+the owning member for both read and write (policies `goals_own` and
+`member_settings_own`, keyed on `profile_id = auth.uid()`), never exposing them
+to higher tiers or to the public. `member_settings` SHALL hold the member's
+notification, contactability and **presentation** preferences (e.g.
+`notify_email_requests`, `contactable_by_prime`, `theme`).
+
+„Owner-only" SHALL **Eigentümer und bestätigt** heißen. Ein nicht aktiviertes
+Konto SHALL weder lesen noch schreiben können; die Oberfläche SHALL das als
+regulären Zustand behandeln und nicht als Fehler melden.
+
+The `theme` column SHALL accept only `hell` or `navy` and SHALL default to `hell`.
+It carries no access-control meaning: it selects a presentation and SHALL NOT gate
+what any member may read or write. It is governed by the existing owner-only policy
+and the table's existing grants — the column adds no new policy and no new grant.
+
+Owner-only describes the stored row. The same choice is additionally mirrored into
+device-local `localStorage`, because the server value cannot arrive before the first
+paint; that copy is readable by anything running on the device and is deliberately
+not account-scoped. This is stated rather than fixed: the theme reveals nothing
+about the member, and the alternative — no local copy — costs every member a visible
+theme flash on every load.
+
+Weil die gespeicherte Zeile hinter dem Gate liegt, die lokale Kopie aber nicht,
+SHALL der Aktivierungsbildschirm mit der lokalen Kopie auskommen und den
+Serverabgleich stillschweigend auslassen.
+
+#### Scenario: Goals are invisible to everyone but the owner
+
+- **WHEN** any member other than the owner selects the owner's `goals` rows
+- **THEN** RLS returns no row, regardless of the caller's tier
+
+#### Scenario: A member manages only their own settings
+
+- **WHEN** a **bestätigtes** member reads or writes `member_settings`
+- **THEN** only the row where `profile_id = auth.uid()` is accessible; writes to
+  another member's row are denied
+
+#### Scenario: Ziele und Einstellungen bleiben vor der Bestätigung verschlossen
+
+- **GIVEN** ein angemeldetes, nicht bestätigtes Konto
+- **WHEN** es seine eigenen `goals` oder `member_settings` liest oder schreibt
+- **THEN** liefert das Lesen null Zeilen und das Schreiben wird abgelehnt, ohne
+  dass die Oberfläche einen Fehler anzeigt
+
+#### Scenario: A member's theme choice is private to them
+
+- **WHEN** a member writes `theme` on their own `member_settings` row
+- **THEN** the write succeeds, and no other member can read or change that value
+
+#### Scenario: An unsupported theme value is rejected
+
+- **WHEN** a write sets `theme` to any value other than `hell` or `navy`
+- **THEN** the write is rejected by the database, not merely by the client
+
+### Requirement: Profile media is stored and gated per member
+
+The system SHALL store avatars in a public `avatars` storage bucket where writes
+are restricted to the caller's own `{uid}/…` folder (policies
+`avatars_insert_own` / `avatars_update_own` / `avatars_delete_own`), and SHALL
+store an ordered `profiles.videos text[]` of provider URLs whose visibility
+follows the existing `profiles` RLS (no separate access path).
+
+Die drei Schreib-Policies SHALL zusätzlich die Aktivierung voraussetzen: ein
+übernommenes Konto SHALL das Profilbild des Mitglieds nicht austauschen können.
+
+Für **Lesezugriffe** SHALL ausgeschrieben sein, was das Gate konstruktionsbedingt
+nicht erreicht: der Bucket ist `public` und trägt bewusst keine SELECT-Policy,
+Objekte rendern über ihre URL. Wovor das Gate schützt, ist das **Erfahren** der
+URL — `profiles.avatar_url` liegt dahinter. Ein nicht aktiviertes Konto SHALL
+keine Bild-URL erhalten; ein Abruf mit bereits bekannter URL SHALL als benannte,
+vorbestehende Restfläche gelten und nicht als Zusage dieses Requirements.
+
+#### Scenario: A member uploads only into their own avatar folder
+
+- **WHEN** an **activated** authenticated member uploads an object to the
+  `avatars` bucket under a first path segment equal to their `auth.uid()`
+- **THEN** the write is permitted; a write under any other member's folder is denied
+
+#### Scenario: Ein nicht bestätigtes Konto tauscht kein Profilbild aus
+
+- **GIVEN** ein angemeldetes, nicht bestätigtes Konto
+- **WHEN** es ein Objekt in seinen eigenen `{uid}/…`-Ordner schreibt
+- **THEN** wird der Schreibzugriff abgelehnt
+
+#### Scenario: Profile videos inherit profile visibility
+
+- **WHEN** a caller can read a given `profiles` row under RLS
+- **THEN** that row's `videos` array is visible to them, and to no one who cannot read the row

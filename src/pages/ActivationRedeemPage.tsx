@@ -135,7 +135,8 @@ export default function ActivationRedeemPage() {
           {(status === "expired" ||
             status === "superseded" ||
             status === "not_found" ||
-            status === "retry_needed") && (
+            status === "retry_needed" ||
+            status === "throttled") && (
             <LinkAnfordern
               adresse={adresse}
               setAdresse={setAdresse}
@@ -195,6 +196,9 @@ function StatusMeldung({ status }: { status: RedeemStatus | null }) {
     retry_needed:
       "Da ist etwas dazwischengekommen. Dein Passwort wurde möglicherweise schon gesetzt — " +
       "fordere bitte einen neuen Link an und versuch es noch einmal.",
+    throttled:
+      "Von deinem Anschluss kamen zu viele ungültige Versuche. Fordere unten einen neuen " +
+      "Link an — ein gültiger Link greift sofort, auch jetzt.",
     error: "Das hat gerade nicht geklappt. Bitte versuche es noch einmal.",
   };
 

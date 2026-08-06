@@ -108,6 +108,18 @@ describe("ActivationRedeemPage", () => {
     expect(screen.getByRole("button", { name: /Neuen Link senden/i })).toBeInTheDocument();
   });
 
+  it("Status throttled bietet trotzdem einen Weg nach vorn (Task 5.6)", async () => {
+    // Die Drossel zählt nur Fehlversuche — ein GÜLTIGER Link läuft nie in sie
+    // hinein. Wer diese Meldung sieht, hat also einen ungültigen Link, und der
+    // Ausweg ist ein neuer. Deshalb muss das Formular hier stehen: eine
+    // Sackgasse wäre an dieser Stelle sachlich falsch.
+    vi.mocked(redeemActivation).mockResolvedValue("throttled");
+    renderMit("#token=zuoft");
+    passwortSetzen("EinLangesPasswort");
+    expect(await screen.findByText(/zu viele/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Neuen Link senden/i })).toBeInTheDocument();
+  });
+
   it("zeigt ohne Token das Anforderungsformular — der Weg bei übernommenem Passwort", () => {
     renderMit("");
     expect(

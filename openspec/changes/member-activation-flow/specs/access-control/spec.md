@@ -39,9 +39,20 @@ Datenbank nicht ein Fremder, sondern **das Mitglied**; „eigene Daten" sind in
 diesem Fall die Daten des Bestohlenen. Eine Ausnahme für den eigenen Datensatz
 wäre deshalb keine Ausnahme, sondern die Lücke.
 
+Maßgeblich ist die **Datenklasse, nicht eine Anzahl**. Unter das Gate SHALL
+jede privilegierte Funktion fallen, die Mitgliederdaten **liefert oder
+verändert** — Profil-, Kontakt-, Inhalts-, Teilnahme- oder Stufendaten, eigene
+wie fremde. Nicht darunter SHALL fallen: Funktionen, die ausschließlich den
+**Stand des Aufrufers gegenüber der Plattform** zurückgeben (seine Stufe, seine
+Rolle, sein Aktivierungszustand), Funktionen über plattformweite Merker, sowie
+Funktionen, die keiner API-Rolle zum Aufruf offenstehen. Sie tragen kein
+Mitgliederdatum und brauchen das Gate nicht; eine Anzahl ungegateter Funktionen
+zu nennen wäre irreführend, weil sie mit jeder Trigger- oder Prädikatfunktion
+wächst, ohne dass sich die Fläche ändert.
+
 Damit die Oberfläche, die zur Aktivierung führt, sich anzeigen **und ihren Link
-anfordern** kann, SHALL das Gate für **genau zwei** privilegierte Funktionen
-ausgenommen sein und für keine weitere:
+anfordern** kann, SHALL das Gate **innerhalb dieser Datenklasse** für genau
+zwei Funktionen ausgenommen sein und für keine weitere:
 
 - eine, die ausschließlich zurückgibt, ob das aufrufende Konto aktiviert ist,
   sowie einen Anzeigenamen für die Anrede;
@@ -51,6 +62,11 @@ Beide SHALL ihr Subjekt aus der Sitzung nehmen und SHALL NOT darüber hinaus
 Profil-, Kontakt- oder Stufendaten preisgeben. Die zweite SHALL NOT eine im
 Aufruf mitgegebene Adresse annehmen — sonst wäre sie ein Weg, den ausstehenden
 Link eines fremden Kontos zu entwerten.
+
+Eine Funktion, die ein einzelnes Boolean über einen dem Aufrufer **bereits
+bekannten** Fremdschlüssel zurückgibt, SHALL als benannte Restfläche geführt
+werden statt als Ausnahme: sie gibt nichts preis, was ein Aufzählen erlaubte,
+verrät aber die Existenz eines Profils.
 
 Zugriffe der Rolle `anon` SHALL von diesem Gate unberührt bleiben: öffentliche
 Beiträge und Veranstaltungen SHALL für ausgeloggte Besucher sichtbar bleiben.
@@ -218,9 +234,27 @@ Das Token SHALL aus einem kryptografisch sicheren Zufallsgenerator stammen und
 mindestens **256 Bit** Entropie tragen. Es ist der einzige Nachweis, den ein
 öffentlich erreichbarer Einlöse-Endpunkt verlangt; seine Unerratbarkeit ist die
 Eigenschaft, auf der das ganze Verfahren ruht. Der Einlöse-Endpunkt SHALL
-zusätzlich die Versuchsrate je Aufrufer begrenzen — nicht weil ein solches Token
-erraten werden könnte, sondern damit ein ungedrosselter öffentlicher Endpunkt
-nicht als Lastfläche dient.
+zusätzlich die Versuchsrate begrenzen — nicht weil ein solches Token erraten
+werden könnte, sondern damit ein ungedrosselter öffentlicher Endpunkt nicht als
+Lastfläche dient.
+
+Gezählt SHALL dabei **ausschließlich der fehlgeschlagene Versuch** werden, und
+die Zählung SHALL **nach** dem Beanspruchen des Tokens stattfinden. Ein gültiges
+Token SHALL deshalb **niemals** abgewiesen werden, auch nicht von einer bereits
+gesperrten Herkunft. Das ist die Eigenschaft, die das Subjekt der Drossel
+überhaupt erst wählbar macht: die Netzwerkadresse taugt als Subjekt genau dann,
+wenn ein legitimer Aufruf nicht in sie hineinlaufen kann — sonst sperrte eine
+geteilte Adresse (NAT) das echte Mitglied mit aus. Aus demselben Grund SHALL
+eine gefälschte Herkunftsangabe folgenlos bleiben: sie füllt einen Zähler, der
+niemanden aussperrt.
+
+Die gespeicherte Herkunftsangabe ist ein personenbezogenes Datum und SHALL
+deshalb nur im Fenster der Drossel gehalten und danach gelöscht werden; ein
+Verlauf SHALL NOT entstehen. Für Client-Rollen SHALL sie unerreichbar sein —
+kein Recht, keine Policy.
+
+Die Drossel ist eine Lastbremse, keine Sicherheitsgrenze. Fällt sie aus, SHALL
+der Einlöseweg trotzdem tragen.
 
 Das Klartext-Token SHALL NOT in einem Teil der Adresse stehen, den Browser,
 Zwischenspeicher oder Server protokollieren. Es SHALL nach dem Auslesen aus der
@@ -355,6 +389,22 @@ Mitglied im Unklaren darüber, was von ihm verlangt wird.
 - **WHEN** derselbe Bestätigungslink zweimal gleichzeitig eingelöst wird
 - **THEN** setzt genau einer der beiden Vorgänge ein Passwort; der andere wird
   abgelehnt, weil das Token bereits beansprucht war
+
+#### Scenario: Wiederholte ungültige Einlösungen werden gedrosselt
+
+- **GIVEN** von derselben Herkunft kamen bereits mehr fehlgeschlagene Versuche
+  als die Grenze zulässt
+- **WHEN** von dort ein weiterer **ungültiger** Link eingelöst wird
+- **THEN** wird der Versuch abgewiesen, und die Oberfläche nennt den Weg nach
+  vorn — einen neuen Link anfordern
+
+#### Scenario: Die Drossel sperrt kein Mitglied mit gültigem Link aus
+
+- **GIVEN** dieselbe, bereits gesperrte Herkunft — etwa der geteilte Anschluss
+  eines Unternehmens
+- **WHEN** von dort ein **gültiger** Bestätigungslink eingelöst wird
+- **THEN** gelingt die Aktivierung, weil die Zählung erst hinter dem
+  Beanspruchen des Tokens steht und einen gelungenen Versuch nie erfasst
 
 #### Scenario: Zwei gleichzeitige Anforderungen erzeugen nicht zwei gültige Links
 
