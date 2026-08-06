@@ -90,12 +90,23 @@ im Stripe-Dashboard). Details in der Git-Historie dieser Datei, Commit `2e4ecce`
 - **14.8** — `directory-search` und `events` sagen in der durable Spec noch
   Zugriff ohne Aktivierung zu. Dasselbe Muster wie 12.7, hängt an 12.10/AGE-448.
 - **14.9 / 14.10** — Zeitkanal nur im Code-Kommentar · Grenzwerte ohne Zahl.
-- **GitHub-Einstellungen, nicht angefasst** (ändern live, wer was mergen und
-  deployen darf): `production`-Environment fehlt, obwohl `migrate-prod.yml:100`
-  es referenziert — es entsteht beim Lauf implizit **ohne** Schutzregel ·
-  `SUPABASE_DB_URL_PROD` liegt als Repo-Secret (jeder Workflow, jeder Branch) ·
-  Required Checks sind `verify`, `migrations`, `pr-title` — **`edge-functions`
-  fehlt**. Den Secret-Umzug kann ich ohnehin nicht: der Wert ist nicht lesbar.
+- **Nur noch ein GitHub-Punkt offen:** Required Checks auf `main` sind `verify`,
+  `migrations`, `pr-title` (`docs/ci-cd.md:170-176`) — **`edge-functions` fehlt**.
+  Anders als `deploy` braucht der Job keine Secrets und könnte required sein.
+  Nicht angefasst, weil ein neuer Pflicht-Check sofort PRs blockieren kann.
+
+  _Zwei Punkte, die ich hier zuerst gemeldet hatte, sind **zurückgezogen**
+  (Donald, 06.08.). Das `production`-Environment ohne Reviewer-Regel ist
+  **entschieden**, nicht vergessen: zurückgestellt am 2026-08-05, weil Donald
+  der einzige Entwickler ist — die Begründung steht seit jeher im Kopf des Jobs
+  (`migrate-prod.yml:90-96`), und der Kommentar sagt sogar dazu, dass ein
+  früherer Kommentar das Gegenteil behauptete. Ich habe den Audit-Befund
+  ungeprüft weitergetragen. Und die Secrets liegen in **Infisical**:
+  `deploy.yml` ruft 4× `infisical run`. Gemessene Ausnahme ist allein
+  `SUPABASE_DB_URL_PROD` — `migrate-prod.yml` nennt Infisical kein einziges Mal
+  und liest den Wert an neun Stellen über `${{ secrets.… }}`. Das ist der Weg
+  dieses einen Workflows, kein Grund für ein Environment._
+
 - **6.4 war falsch abgehakt.** `Referrer-Policy: no-referrer` auf `/aktivierung`
   stand nirgends — es gab keine Header-Datei. Steht jetzt in `public/_headers`.
   Lohnt einen Blick, ob weitere Häkchen so entstanden sind.
