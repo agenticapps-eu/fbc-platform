@@ -380,28 +380,28 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Live-Function, nicht des Quelltexts:
 
       | Fall | Aufruf | Antwort |
-                      | --- | --- | --- |
-                      | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
-                      | Link unbekannt | erfundenes Token | `410 not_found` |
-                      | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
-                      | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
-                      | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
+                          | --- | --- | --- |
+                          | Passwort zu schwach | vier Zeichen | `400 weak_password`, `minLength: 10` |
+                          | Link unbekannt | erfundenes Token | `410 not_found` |
+                          | **schon benutzt** | echtes Token zweimal einlösen | `200 activated`, dann `410 used` |
+                          | **gedrosselt** | Fehlversuche einer IP | 19× `not_found`, dann `throttled` |
+                          | ohne Sitzung | `resend-activation` ohne JWT | `401` vom Gateway |
 
-                      Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
-                      `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
-                      Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
-                      Fehlversuche und wirft nicht vorzeitig.
-                      **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
-                      `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                      Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                      meldet `activated:true`, und dasselbe Konto sieht jetzt
-                      `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
-                      **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
-                      Aktivierungszustand und nicht an einer kaputten Fixture.
-                      _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
-                      (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
-                      also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
-                      nicht an der Live-Datenbank._
+                          Der Fall „schon benutzt" ist der aus 12.4: die Antwort ist `used`, **nicht**
+                          `not_found` — sonst wäre die Meldung an das Mitglied falsch. Und die
+                          Drossel greift erst nach 19 sauberen `not_found`, zählt also wirklich nur
+                          Fehlversuche und wirft nicht vorzeitig.
+                          **Der ganze Weg wurde einmal Ende zu Ende gegangen**: Mail an
+                          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+                          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+                          meldet `activated:true`, und dasselbe Konto sieht jetzt
+                          `profiles_public` **37**, `posts` 5, `events` 9 — vorher waren es
+                          **14 Tabellen mit null Zeilen**. Damit hing die Sperre nachweislich am
+                          Aktivierungszustand und nicht an einer kaputten Fixture.
+                          _Offen bleiben zwei der sieben: **abgelaufen** und **überholt**
+                          (`superseded`). Beide brauchen ein zurückdatiertes bzw. entwertetes Token,
+                          also einen Datenbankeingriff — die gehen gegen LOKAL (`supabase start`),
+                          nicht an der Live-Datenbank._
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -491,12 +491,20 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       SHA-256 aus `supabase secrets list` gegengeprüft — `APP_URL` und
       `FROM_EMAIL` stimmen jetzt mit den Sollwerten überein. `APP_URL` wird zur
       Laufzeit gelesen, ein Deploy war nicht nötig.
-      **Noch offen an diesem Punkt:** (a) der korrigierte Link ist **nicht an
-      einer echten Mail nachgemessen** — das erste Testkonto ist inzwischen
-      aktiviert und bekommt nach 4.6 keine Mail mehr, es braucht ein zweites;
-      (b) `--env=prod` ist ungeprüft; (c) `APP_URLS` führt weiterhin localhost
-      an erster Stelle (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht
-      ungefragt an der Bezahlstrecke gedreht).
+      **Nachgemessen an einer echten Mail** (06.08., zweites Wegwerfkonto
+      `donald.vlahovic@gmail.com`, weil das erste inzwischen aktiviert ist und
+      nach 4.6 keine Mail mehr bekommt): der Link lautet jetzt
+      `https://fbc-platform.pages.dev/aktivierung#token=…`, Absender und
+      `Reply-To` stimmen, die Mail landete im Posteingang. `--env=prod` und das
+      PROD-Projekt sind ebenfalls geprüft (siehe 10.3).
+      _Nebenbei damit abgenommen, ohne Header lesen zu müssen: auf
+      `effbeezee.com` steht DMARC auf `p=reject`. Wäre die Authentifizierung
+      durchgefallen, hätte die Gegenseite die Mail **abgewiesen** statt
+      zugestellt. Zustellung ist unter dieser Politik also der Beleg, dass DKIM
+      und DMARC greifen._
+      **Weiter offen:** `APP_URLS` führt localhost an erster Stelle
+      (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht ungefragt an der
+      Bezahlstrecke gedreht).
 
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen.
@@ -524,6 +532,13 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
       _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
       Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
+      _Stand 06.08.: **keiner der vier ist abgenommen.** Zwei Zustellungen sind
+      belegt (`donald@vlahovic.de` und `donald.vlahovic@gmail.com`, beide
+      Posteingang) — die zweite Adresse liegt aber trotz `@gmail.com` auf
+      **Fastmail**, ist also gerade keine Gmail-Messung. Das bleibt komplett
+      offen; die Zustellung belegt nur, dass DKIM/DMARC grundsätzlich greifen
+      (10.8), nicht wie die vier großen Freemailer die neue, ungewärmte
+      Absenderdomain einsortieren._
 
 - [x] 10.5 **GESCHLOSSEN 06.08. — war ein BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
       der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
