@@ -429,15 +429,45 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       `202 {"accepted":true}`, erfundenes Token → `410 {"status":"not_found"}`,
       vierstelliges Passwort → `400 {"status":"weak_password","minLength":10}`,
       `resend-activation` ohne Sitzung → `401` vom Gateway.
-      **Offen bleibt der echte Versand** — er braucht ein nicht aktiviertes Konto
-      auf einer Adresse, die Donald lesen kann. Ein Bestandskonto taugt nicht:
-      es ist durch den Backfill aktiviert, und 4.6 antwortet dann `202` ohne
-      Mail._
+      **Der echte Versand wurde versucht und ist fehlgeschlagen** — siehe 10.5.
+      Testkonto `donald@vlahovic.de` (Selbstregistrierung, `basic`,
+      `activated_at = null`) am 06.08. angelegt; dabei nebenbei belegt:
+      `my_activation_state()` liefert mit echter Sitzung genau zwei Felder
+      (`activated:false`, Anzeigename), `resend-activation` antwortet innerhalb
+      der Minute `rate_limited` (die 60-s-Sperre aus 4.4, zur Laufzeit
+      gemessen) und danach `issued`._
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen (12 von 15 sind heute mit DEV identisch).
       _Merge ≠ live: `deploy.yml` deployt nur das Frontend._
 - [ ] 10.4 Zustell-Abnahme bei GMX, Web.de, Gmail, Outlook. **Hängt an AGE-256**
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
+      _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
+      Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
+
+- [ ] 10.5 **BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
+      der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
+      `FROM_EMAIL` steht auf Resends Sandkasten-Absender `onboarding@resend.dev`
+      — `docs/secrets.md:209-212` führt das ausdrücklich als Übergang, „swap in
+      the real domain once it's set up". Von diesem Absender lässt Resend
+      **ausschließlich** Mail an die Adresse des Resend-Kontoinhabers zu, jede
+      andere Empfängeradresse wird mit `403` abgewiesen
+      (<https://resend.com/docs/knowledge-base/403-error-resend-dev-domain>).
+      Gemessen: `resend-activation` an `donald@vlahovic.de` antwortet
+      `502 {"status":"send_failed"}`, und `send-activation` an dieselbe Adresse
+      hat `202` geliefert (Anti-Aufzählung, unabhängig vom Versandergebnis)
+      ohne dass eine Mail ankam.
+      Bestätigend im DNS: `fairbusinessclub.de` trägt
+      `v=spf1 include:spf.protection.outlook.com -all` — nur Microsoft 365 darf
+      senden, `-all` ist ein harter Fehlschlag für alles andere — und
+      `resend._domainkey.fairbusinessclub.de` existiert nicht. Die Domain ist in
+      Resend also nicht verifiziert.
+      **Tragweite: das ist ein Startblocker, kein Nachlauf.** Bei importierten
+      Konten ist das Aktivierungs-Gate die einzige Hürde, und der einzige Weg
+      hindurch ist diese Mail. Liefe C10 heute, bekämen alle importierten
+      Mitglieder ein gesperrtes Konto und keinen Link. **Der Import darf erst
+      nach einer in Resend verifizierten Absenderdomain laufen** — damit ist
+      AGE-256 keine Nebenbedingung von 10.4 mehr, sondern Vorbedingung von C10.
+      Gehört als vierte Vorbedingung in 11.2.
 
 ## 11. Nachläufe, die dieser Change nicht schließt
 
@@ -452,7 +482,9 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Default-Passwort nicht berührt, (c) deterministisches Verhalten, wenn eine
       Adresse durch Selbstregistrierung bereits belegt ist — ein vorab besetztes
       Konto darf nicht durch bloße Adressgleichheit zum Mitgliedskonto werden
-      (codex).
+      (codex), und (d) **in Resend ist eine eigene Absenderdomain verifiziert**
+      (10.5) — sonst schlägt jeder Aktivierungsversand fehl und der Import
+      erzeugt lauter gesperrte Konten ohne Weg hinein.
 - [ ] 11.3 `avatars`-Bucket privat stellen? Eigener Change mit Folgen für jede
       Bild-URL im Frontend (`INVENTORY.md`, Abschnitt C). Heute kein Weg für ein
       nicht aktiviertes Konto, die URLs überhaupt zu erfahren.
