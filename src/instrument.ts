@@ -9,6 +9,14 @@ import {
   useNavigationType,
 } from "react-router-dom";
 
+import { entnimmAktivierungsFragment } from "./lib/activation-fragment";
+
+// VOR init(): Sentry erfasst `location.href` samt Fragment, und der
+// Replay-Puffer läuft bei jedem Fehler mit. Stünde das Aktivierungs-Token hier
+// noch in der Adresszeile, landete es im Replay. Siehe activation-fragment.ts.
+// Unabhängig vom DSN, damit die Adresszeile in jeder Umgebung gleich aussieht.
+entnimmAktivierungsFragment();
+
 const dsn = import.meta.env.VITE_SENTRY_DSN;
 
 // Nur aktiv, wenn ein DSN gesetzt ist (lokal optional). Ohne DSN passiert nichts.

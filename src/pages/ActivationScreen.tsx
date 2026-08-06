@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
-import { requestActivationLink } from "../lib/activation";
+import { resendActivationLink } from "../lib/activation";
 import { useAuth } from "../providers/auth-context";
 
 /** Sperrfrist in Sekunden — spiegelt die Ratengrenze in `issue_activation_token`. */
@@ -31,7 +31,10 @@ export default function ActivationScreen() {
     setLäuft(true);
     setFehler(null);
     try {
-      await requestActivationLink(user.email);
+      // Ohne Adresse: das Subjekt ist die Sitzung. Über den adressbasierten Weg
+      // konnte ein Fremder, der die Login-Adresse kannte, den ausstehenden Link
+      // entwerten und das Mitglied aussperren (Audit vom 2026-08-06).
+      await resendActivationLink();
       setGesendet(true);
       setRestSek(SPERRE);
     } catch {

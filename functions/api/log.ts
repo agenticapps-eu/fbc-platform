@@ -89,11 +89,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // Serverseitige Anreicherung. cf-Felder sind nur am Edge verfügbar
   // (lokal via `wrangler pages dev` ggf. leer).
   const cf = request.cf;
+  // Reihenfolge ist hier eine Sicherheitseigenschaft, keine Formsache: `props`
+  // kommt vom öffentlichen, unauthentifizierten Endpunkt und muss VOR den
+  // geprüften Feldern stehen. Stand es dahinter, überschrieb es `event` nach
+  // der Allowlist-Prüfung und dazu `source` und `_time` — also einen
+  // frei erfundenen, als serverseitig ausgegebenen, zurückdatierten
+  // Audit-Eintrag.
   const record = {
+    ...(props as Record<string, unknown> | undefined),
     _time: new Date().toISOString(),
     event,
     source: "web-client",
-    ...(props as Record<string, unknown> | undefined),
     request: {
       country: cf?.country,
       colo: cf?.colo,

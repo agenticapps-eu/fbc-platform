@@ -489,6 +489,19 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# resend-activation (AGE-495 / C3, Teil D): derselbe Link, aber fuer ein
+# EINGELOGGTES Konto — der Hauptweg vom Aktivierungsbildschirm aus.
+#
+# verify_jwt = true ist hier der ganze Punkt. Der Audit vom 2026-08-06 fand an
+# send-activation eine Aussperrung: unauthentifiziert, und jede Ausgabe
+# entwertete den ausstehenden Link, also konnte ein Fremder mit Kenntnis der
+# Login-Adresse ein Mitglied draussen halten. Wer den Bildschirm sieht, ist
+# angemeldet — dieser Weg braucht die Offenheit nicht. Die dahinterliegende RPC
+# nimmt keine Adresse entgegen, ihr Subjekt ist auth.uid().
+[functions.resend-activation]
+enabled = true
+verify_jwt = true
+
 # redeem-activation (AGE-495 / C3): loest das Token gegen ein neues Passwort ein.
 #
 # verify_jwt = false ebenfalls ABSICHT: das Token traegt die Identitaet, nicht

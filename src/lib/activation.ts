@@ -6,6 +6,7 @@
  * verteilte Passwort hat, kann sich mit einem eigenen Supabase-Client anmelden
  * und an dieser Datei vorbei fragen — und bekommt nichts.
  */
+import { holeAktivierungsToken } from "./activation-fragment";
 import { supabase } from "./supabase";
 
 /** Antwortstatus von `redeem-activation`. Je ein eigener Bildschirm (AGE-495 §6). */
@@ -47,12 +48,31 @@ export async function fetchActivationState(): Promise<ActivationState> {
 }
 
 /**
- * Fordert einen Bestätigungslink an.
+ * Fordert den eigenen Bestätigungslink an — der Weg des Aktivierungsbildschirms.
+ *
+ * Nimmt bewusst **keine Adresse** entgegen: das Subjekt ist die Sitzung. Die
+ * dahinterliegende RPC `request_own_activation_token` liest `auth.uid()`, ein
+ * Aufrufer kann also nur sich selbst einen Link auslösen.
+ *
+ * Das ist der Unterschied zu {@link requestActivationLink}, und er ist der
+ * Grund, warum es beide gibt: über den adressbasierten Weg konnte ein Fremder,
+ * der bloß die Login-Adresse kannte, den ausstehenden Link eines Mitglieds
+ * entwerten und es damit aussperren (Audit vom 2026-08-06).
+ */
+export async function resendActivationLink(): Promise<void> {
+  const { error } = await supabase.functions.invoke("resend-activation", { body: {} });
+  if (error) throw error;
+}
+
+/**
+ * Fordert einen Bestätigungslink über die **Adresse** an.
  *
  * Braucht KEINE Session — das ist der Weg für ein Mitglied, dessen verteiltes
- * Passwort ein Dritter geändert hat. Die Function antwortet immer gleich,
- * unabhängig davon, ob es die Adresse gibt; dieses Modul kann daraus also
- * nichts ableiten und tut es auch nicht.
+ * Passwort ein Dritter geändert hat, und nur noch für den. Wer angemeldet ist,
+ * nimmt {@link resendActivationLink}.
+ *
+ * Die Function antwortet immer gleich, unabhängig davon, ob es die Adresse
+ * gibt; dieses Modul kann daraus also nichts ableiten und tut es auch nicht.
  */
 export async function requestActivationLink(email: string): Promise<void> {
   const { error } = await supabase.functions.invoke("send-activation", {
@@ -95,13 +115,11 @@ async function leseFehlerRumpf(error: unknown): Promise<RedeemStatus | null> {
  * in der Browser-Historie, in Server- und CDN-Logs und potenziell im `Referer`
  * landet. Nach dem Auslesen wird es auch aus der Adresszeile entfernt — ein
  * Screenshot oder ein über die Schulter geworfener Blick soll es nicht tragen.
+ *
+ * Die Entnahme selbst passiert nicht mehr hier, sondern in `instrument.ts`,
+ * noch vor `Sentry.init()`: bis dorthin ist es für den Replay-Puffer zu spät.
+ * Diese Funktion holt nur noch ab, was dort entnommen wurde.
  */
 export function leseTokenAusFragment(): string | null {
-  if (typeof window === "undefined") return null;
-  const fragment = window.location.hash.replace(/^#/, "");
-  if (!fragment) return null;
-  const token = new URLSearchParams(fragment).get("token");
-  if (!token) return null;
-  window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  return token;
+  return holeAktivierungsToken();
 }

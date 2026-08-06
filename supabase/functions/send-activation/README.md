@@ -16,7 +16,13 @@ Aktivierungsbildschirm nie, von dem aus es seinen Link anfordert.
 Genau deshalb liest sie **auch kein JWT**. Bei `verify_jwt = false` prüft das
 Gateway nichts; eine daraus gelesene Kennung wäre vom Aufrufer frei wählbar und
 damit ein Weg, sich den Bestätigungslink eines fremden Kontos schicken zu
-lassen. Ein Zweig statt zwei — und der sicherere.
+lassen.
+
+Seit Teil D ist das **nur noch der Wiederherstellungsweg** (`/aktivierung` ohne
+Sitzung). Der Hauptweg vom Aktivierungsbildschirm aus geht über
+[`resend-activation`](../resend-activation/) mit `verify_jwt = true`; dort ist
+das Subjekt die Sitzung. Zwei Functions mit je einem Zweig — nicht eine
+Function, die beides trägt.
 
 Der Empfänger ist immer die **hinterlegte** Login-Adresse, die die Datenbank
 zurückgibt, nie die im Aufruf mitgegebene.
@@ -44,10 +50,21 @@ Datenbankoperation (`issue_activation_token`). Zwei Round-Trips ließen zwei
 gleichzeitige Anforderungen beide passieren; zusätzlich erzwingt ein
 `unique`-Index höchstens ein ausstehendes Token je Profil.
 
-Ratengrenze pro Profil: ein Versand pro 60 s, fünf pro 24 h. Sie begrenzt
-zugleich die einzige benannte Belästigungsfläche — wer eine Adresse kennt, kann
-den ausstehenden Link eines Mitglieds wiederholt entwerten. Ein Zugang geht
-dabei nicht verloren; das Mitglied fordert einen neuen an.
+Ratengrenze pro Profil: ein Versand pro 60 s, fünf pro 24 h.
+
+Die frühere Einschätzung an dieser Stelle — „ein Zugang geht dabei nicht
+verloren; das Mitglied fordert einen neuen an" — **war falsch**, und der Audit
+vom 2026-08-06 hat gezeigt, woran. Fünf Anforderungen mit fremder Adresse
+verbrauchen das Tageskontingent des Opfers, und danach fordert es eben _keinen_
+neuen an. Zwei Änderungen halten das jetzt:
+
+1. Der Hauptweg läuft nicht mehr hierüber (s. oben) und ist damit gar nicht
+   fremd auslösbar.
+2. **Schutzfenster:** liegt ein noch gültiger, unbenutzter Link im Postfach und
+   ist er unter 24 h alt, passiert hier nichts — kein Entwerten, kein neues
+   Token, kein Versand. Status `pending`. Ein Fremder kann damit höchstens
+   einmal am Tag stören, und ein gültiger Link liegt danach sofort wieder im
+   Postfach.
 
 ## Secrets
 

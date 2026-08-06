@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(133);
+select plan(140);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -781,12 +781,27 @@ select is((select status from public.issue_activation_token('impact@test.fbc', '
 select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zwei')),
   'rate_limited', 'issue: der zweite Versand binnen 60 s wird abgelehnt');
 
--- Entwertung: nach einem neuen Link gilt der alte nicht mehr — aber als
--- `superseded`, nicht als `used`. Sonst läse das Mitglied „bereits aktiviert".
+-- Schutzfenster (Teil D). Auch NACH der 60-s-Sperre passiert nichts, solange
+-- ein gültiger Link im Postfach liegt. Ohne das entwertet ein Fremder, der bloß
+-- die Login-Adresse kennt, den Link des Mitglieds — bis zu fünfmal am Tag, und
+-- danach ist die Tagesquote leer. Das war der Aussperrungs-Befund aus dem
+-- Audit vom 2026-08-06.
 update public.activation_tokens set created_at = now() - interval '5 minutes'
  where token_hash = 'hash-eins';
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zwei-b')),
+  'pending', 'issue: ein noch gültiger Link wird nicht entwertet');
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = '99999999-9999-9999-9999-999999999999'
+              and used_at is null and invalidated_at is null),
+  1, 'issue: das Schutzfenster legt auch kein zweites Token an');
+
+-- Entwertung: nach Ablauf des Schutzfensters gilt der alte nicht mehr — aber
+-- als `superseded`, nicht als `used`. Sonst läse das Mitglied „bereits
+-- aktiviert".
+update public.activation_tokens set created_at = now() - interval '25 hours'
+ where token_hash = 'hash-eins';
 select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-drei')),
-  'issued', 'issue: nach der Sperrfrist geht ein neuer Link raus');
+  'issued', 'issue: nach dem Schutzfenster geht ein neuer Link raus');
 select is((select status from public.claim_activation_token('hash-eins')),
   'superseded', 'claim: der ÜBERHOLTE Link meldet „superseded" — nicht „used", '
                 'denn das Konto ist gerade NICHT aktiviert');
@@ -814,6 +829,36 @@ select is(
   (select public.mark_activated('99999999-9999-9999-9999-999999999999')),
   (select activated_at from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
   'mark_activated ist idempotent — ein zweiter Aufruf überschreibt nicht');
+
+-- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
+-- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der
+-- Grund steht in ihrer Signatur: sie nimmt keine Adresse entgegen, das Subjekt
+-- ist `auth.uid()`. Ein Konto kann damit nur sich selbst einen Link auslösen,
+-- und genau deshalb ist der Aussperrungs-Angriff auf diesem Weg unmöglich.
+select is(has_function_privilege('anon',
+  'public.request_own_activation_token(text, interval)', 'execute'),
+  false, 'request_own_activation_token: anon darf nicht');
+select is(has_function_privilege('authenticated',
+  'public.request_own_activation_token(text, interval)', 'execute'),
+  true, 'request_own_activation_token: authenticated darf — das Subjekt ist '
+        'auth.uid(), fremd anfordern ist per Signatur ausgeschlossen');
+select is((select status from public.request_own_activation_token('hash-ohne-sitzung')),
+  'unknown', 'request_own: ohne Sitzung kein Link — auth.uid() ist NULL');
+
+-- Wirkung unter einer echten Identität. '9999…' wurde oben aktiviert und
+-- geleert, damit dieser Block unabhängig von der Reihenfolge steht.
+update public.profiles set activated_at = null
+ where id = '99999999-9999-9999-9999-999999999999';
+delete from public.activation_tokens
+ where profile_id = '99999999-9999-9999-9999-999999999999';
+select is(pg_temp.count_as('99999999-9999-9999-9999-999999999999',
+  'select count(*)::int from public.request_own_activation_token(''hash-selbst'') '
+  'where status = ''issued'''),
+  1, 'request_own: das eingeloggte Konto bekommt seinen Link');
+select is((select count(*)::int from public.activation_tokens
+            where token_hash = 'hash-selbst'
+              and profile_id = '99999999-9999-9999-9999-999999999999'),
+  1, 'request_own: das Token hängt am Aufrufer, nicht an einer mitgegebenen Adresse');
 
 select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
   false, 'revoke_sessions: authenticated darf nicht');

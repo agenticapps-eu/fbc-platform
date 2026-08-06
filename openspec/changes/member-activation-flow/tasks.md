@@ -364,8 +364,25 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       vier Token-Fälle brauchen einen echten Versand (10.2)._
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
-- [ ] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
-- [ ] 8.6 `/cso` → `SECURITY.md`.
+- [x] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
+      _Gefahren 06.08. Ergebnis: **kein Critical, kein High auf DB-Ebene** —
+      blockt nicht. 29/29 Tabellen mit RLS, 49 Policies, keine mit nacktem
+      `auth.uid()` oder `user_metadata`, keine DEFINER-Funktion ohne
+      `search_path`, kein INSERT/UPDATE-Grant auf `tier`, `potential_score`,
+      `member_number`. `activation_tokens`: RLS an, 0 Policies, keine Grants —
+      absichtlich. Der `profiles_public`-CRITICAL des Sentinels ist
+      **zurückgezogen**: er stammt aus einer PROD-Messung ohne die
+      C3-Migrationen. **Ablage `.gstack/security-reports/DB-AUDIT.md`**, nicht
+      im Change-Verzeichnis: das Repo ist öffentlich und die Change-Dateien
+      sind getrackt._
+- [x] 8.6 `/cso` → `SECURITY.md`.
+      _Gefahren 06.08., 41 Kandidaten → 17 gemeldet (1 CRITICAL, 3 HIGH, 12
+      MEDIUM, 1 LOW). **Für C3 blockt nichts**; C3-eigen sind nur die MEDIUMs
+      Nr. 6 (Sentry erfasst das Token-Fragment) und Nr. 7 (`send-activation`
+      entwertet den gültigen Link). Der CRITICAL (Stripe-Secret-Parität) liegt
+      außerhalb und ist für das Migrationsfenster auf MEDIUM neubewertet.
+      **Ablage `.gstack/security-reports/SECURITY.md`**, gleiche Begründung
+      wie 8.5; Rohbericht `2026-08-06-084500.json`._
 - [ ] 8.7 Unabhängiges Code-Review in eigenem Kontext. `openspec validate` ist
       ein Schema-Check und ersetzt es nicht.
 - [ ] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
@@ -469,3 +486,51 @@ währenddessen.
       Event, weil `register_for_event` gegatet ist. Vermutlich richtig so, aber
       es ist eine Verhaltensänderung und braucht ein eigenes Szenario statt der
       Behauptung. Vor dem Sommerfest mit Detlev klären.
+
+## 13. Aus dem Sicherheits-Audit nachgezogen (8.5/8.6)
+
+Drei Befunde aus dem Audit vom 2026-08-06, in derselben Sitzung behoben. Jeder
+mit einem Test, der vorher rot war — der Punkt ist nicht der Diff, sondern der
+Beleg, dass der beschriebene Angriff nicht mehr geht.
+
+- [x] 13.1 **`/api/log`: `...props` überschrieb die geprüften Felder.** Die
+      Allowlist prüft `event`, danach wurde `props` DARÜBER gespreizt — ein
+      unauthentifizierter Aufruf konnte sich einen beliebigen Event-Namen,
+      `source: "server"` und einen zurückdatierten Zeitstempel ins
+      Axiom-Audit-Dataset schreiben. Spread vorgezogen
+      (`functions/api/log.ts:92`). Neu: `functions/api/log.test.ts` (4 Tests)
+      und `functions/**/*.test.ts` in der Vitest-`include` — die Pages
+      Functions hatten bis hierher **kein** Testzuhause (der Deno-Job deckt nur
+      `supabase/functions/`).
+- [x] 13.2 **Sentry erfasste das Aktivierungs-Token im Fragment.**
+      `getLocationHref()` strippt den Hash nicht, `replaysOnErrorSampleRate`
+      steht auf 1.0, und aufgeräumt wurde erst beim Rendern der Einlöseseite —
+      Hunderte Millisekunden zu spät. Die Entnahme sitzt jetzt in
+      `src/lib/activation-fragment.ts` und läuft in `instrument.ts` **vor**
+      `Sentry.init()`; `leseTokenAusFragment()` holt nur noch ab.
+      `src/instrument.test.ts` misst nicht, DASS aufgeräumt wird, sondern WANN:
+      die Adresszeile zum Zeitpunkt des `init`-Aufrufs. Ein Supabase-Auth-
+      Fragment (`#access_token=…`) bleibt unangetastet — eigener Test.
+- [x] 13.3 **`send-activation` konnte Mitglieder aussperren.** Unauthentifiziert,
+      und jede Ausgabe entwertete den ausstehenden Link; fünf Aufrufe mit fremder
+      Adresse leerten das Tageskontingent. Entscheidung Donald (06.08.):
+      **die zwei Wege trennen**, statt IP-Drossel (sperrt hinter NAT das echte
+      Mitglied mit aus) oder Turnstile (Reibung im Hauptweg). Verworfen ist auch
+      „den gültigen Link nicht entwerten" als Alleinlösung: der Unique-Index
+      `activation_tokens_offen_je_profil` erzwingt höchstens **ein** ausstehendes
+      Token je Profil, und den alten erneut zu versenden geht nicht — gespeichert
+      ist nur der Hash. - Migration `20260806090000_activation_self_request.sql`: neue RPC
+      `request_own_activation_token` (Subjekt `auth.uid()`, kein
+      Adressparameter, EXECUTE nur für `authenticated`), und
+      `issue_activation_token` bekommt ein **24-Stunden-Schutzfenster** mit
+      neuem Status `pending`. - Neue Function `resend-activation` mit `verify_jwt = true`; Mailtext aus
+      `send-activation/emails.ts` geteilt, nicht kopiert. - `ActivationScreen` ruft `resendActivationLink()` ohne Adresse. - Belege: `rls_test.sql` Abschnitt 14b (+7 Assertions, Plan 133 → 140),
+      `src/pages/ActivationScreen.test.tsx` (3 Tests). - Spec-Delta nachgezogen: „genau **eine** privilegierte Funktion" → zwei,
+      enumeriert; „Der Versandweg SHALL für angemeldete und nicht angemeldete
+      Aufrufer derselbe sein" ersetzt durch die Trennung plus das
+      Nicht-Entwerten; zwei neue Szenarien. `openspec validate --all` grün.
+- [ ] 13.4 **Offen aus 8.6, bewusst nicht in dieser Runde:** CSP/`frame-ancestors`
+      /HSTS (`public/_headers` fehlt) · `notify-contact-request` verifiziert
+      `record` nicht gegen `contact_requests` · `stripe-webhook` prüft
+      `payment_status` nicht und stuft nie zurück · `.gitignore` ohne
+      Schlüsselmuster. Details in `.gstack/security-reports/SECURITY.md`.

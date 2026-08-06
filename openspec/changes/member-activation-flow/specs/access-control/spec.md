@@ -39,11 +39,18 @@ Datenbank nicht ein Fremder, sondern **das Mitglied**; „eigene Daten" sind in
 diesem Fall die Daten des Bestohlenen. Eine Ausnahme für den eigenen Datensatz
 wäre deshalb keine Ausnahme, sondern die Lücke.
 
-Damit die Oberfläche, die zur Aktivierung führt, sich dennoch anzeigen kann,
-SHALL genau **eine** privilegierte Funktion vom Gate ausgenommen sein. Sie SHALL
-ausschließlich zurückgeben, ob das aufrufende Konto aktiviert ist, sowie einen
-Anzeigenamen für die Anrede — und SHALL NOT darüber hinaus Profil-, Kontakt-
-oder Stufendaten preisgeben.
+Damit die Oberfläche, die zur Aktivierung führt, sich anzeigen **und ihren Link
+anfordern** kann, SHALL das Gate für **genau zwei** privilegierte Funktionen
+ausgenommen sein und für keine weitere:
+
+- eine, die ausschließlich zurückgibt, ob das aufrufende Konto aktiviert ist,
+  sowie einen Anzeigenamen für die Anrede;
+- eine, die dem **aufrufenden** Konto einen Aktivierungslink ausstellt.
+
+Beide SHALL ihr Subjekt aus der Sitzung nehmen und SHALL NOT darüber hinaus
+Profil-, Kontakt- oder Stufendaten preisgeben. Die zweite SHALL NOT eine im
+Aufruf mitgegebene Adresse annehmen — sonst wäre sie ein Weg, den ausstehenden
+Link eines fremden Kontos zu entwerten.
 
 Zugriffe der Rolle `anon` SHALL von diesem Gate unberührt bleiben: öffentliche
 Beiträge und Veranstaltungen SHALL für ausgeloggte Besucher sichtbar bleiben.
@@ -367,8 +374,19 @@ Die Anforderung SHALL das Empfängerprofil **ausschließlich** aus der genannten
 E-Mail-Adresse bestimmen. Sie SHALL NOT eine Angabe aus einem mitgesendeten
 Anmeldenachweis verwenden: Auf einem Endpunkt, der ohne Sitzung erreichbar ist,
 prüft niemand einen solchen Nachweis, und eine daraus gelesene Kennung wäre vom
-Aufrufer frei wählbar. Der Versandweg SHALL für angemeldete und nicht
-angemeldete Aufrufer derselbe sein.
+Aufrufer frei wählbar.
+
+Dieser sitzungsfreie Weg SHALL dem Wiederherstellungsfall vorbehalten sein. Für
+ein angemeldetes Konto SHALL ein **getrennter, authentifizierter** Weg bestehen,
+dessen Subjekt die Sitzung ist. Ein gemeinsamer Weg für beide wäre für den
+Hauptfall unnötig offen: wer die Login-Adresse eines Mitglieds kennt, könnte in
+dessen Namen anfordern.
+
+Weil eine Ausgabe den zuvor ausgegebenen Link entwertet, SHALL der sitzungsfreie
+Weg einen noch gültigen, unbenutzten Link **nicht** entwerten. Er SHALL die
+Anforderung stattdessen folgenlos lassen und den bestehenden Link stehen lassen.
+Andernfalls ist er kein Weg zurück ins Konto, sondern ein Weg, ein Mitglied
+auszusperren.
 
 Der Empfänger SHALL in jedem Fall die hinterlegte Adresse des Profils sein,
 niemals eine im Aufruf mitgegebene. Andernfalls wäre der Endpunkt ein Weg, sich
@@ -399,6 +417,22 @@ Verzeichnis der Mitgliedsadressen.
   Konto besteht
 - **THEN** ist die Antwort nicht von der für eine bestehende Adresse zu
   unterscheiden
+
+#### Scenario: Ein Fremder kann ein Mitglied nicht aussperren
+
+- **GIVEN** ein Mitglied hat einen gültigen, unbenutzten Bestätigungslink im
+  Postfach
+- **WHEN** ein Dritter über die bekannte Login-Adresse **ohne Sitzung** einen
+  neuen Link anfordert
+- **THEN** bleibt der Link im Postfach gültig, es wird kein neuer ausgegeben,
+  und das Tageskontingent des Mitglieds bleibt unberührt
+
+#### Scenario: Der Hauptweg nimmt keine Adresse entgegen
+
+- **WHEN** ein angemeldetes, nicht aktiviertes Konto den Bestätigungslink vom
+  Aktivierungsbildschirm anfordert
+- **THEN** bestimmt sich der Empfänger aus der Sitzung; eine im Aufruf
+  mitgegebene Adresse gibt es nicht und kann folglich nicht gefälscht werden
 
 ### Requirement: Der Aktivierungsversand ist gegen Selbstüberflutung begrenzt
 
