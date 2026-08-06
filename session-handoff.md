@@ -86,9 +86,22 @@ zwingend, weil die Oberfläche `request_own_activation_token` aus `090000` ruft:
    `foelowldexkcqzewvrcf`. Dry-Run vorher, Zielprojekt ausgegeben, danach
    gegengeprüft: kein lokaler Stand ohne Remote.
 2. ✅ PR **#120** offen, `MERGEABLE`.
-3. ⏳ CI grün → mergen → `deploy.yml` bringt das Frontend. **Erst damit ist die
-   Lücke zu.**
-4. Dann `supabase functions deploy` + echter Versand (10.2/8.3).
+3. ✅ CI grün (alle fünf Pflicht-Checks), **PR #120 gemergt** (`state=MERGED`
+   gegengeprüft, nicht am Exit-Code).
+4. ✅ Der erste Deploy **scheiterte — richtigerweise**: das `drift-gate` fand
+   fünf Migrationen, die auf PROD fehlten, und verweigerte ein Frontend, das
+   Tabellen erwartet, die dort nicht sind. Diese Kontrolle kannte ich nicht;
+   sie hat genau den Fehler verhindert, den ich sonst gemacht hätte.
+5. ✅ `migrate-prod.yml` (Run 31091900799): `assert-target.ts` bestätigte
+   Sollwert = Ziel = `viwntbodrtqxgmqyxluh`, Drift genau die fünf, `apply`
+   grün, Nachkontrolle abweichungsfrei. Der Stolperdraht (`> 50` / `> 20`) löste
+   nicht aus — PROD ist der leere Neubau.
+6. ✅ Deploy nachgefahren, grün. **Live gegengeprüft am echten Bundle**, nicht
+   am Workflow-Status: Deploy-URL und Apex liefern beide
+   `index-DGHj5bBj.js` mit `my_activation_state`, `aktivierung` und
+   `throttled` darin; alle fünf Sicherheits-Header sind live; `/aktivierung`
+   trägt `no-referrer`. **Die Lücke ist zu.**
+7. Offen: `supabase functions deploy` + echter Versand (10.2/8.3).
 
 ## Next session: start here
 
