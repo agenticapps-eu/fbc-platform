@@ -1,132 +1,130 @@
-# Session Handoff — 2026-08-06 (13. Session)
+# Session Handoff — 2026-08-06 (14. Session)
 
 ## Stand in einem Satz
 
-**C3 (AGE-495) ist gemergt, migriert und deployt — aber noch nicht benutzbar:
-die drei Aktivierungs-Functions sind nirgends deployt.** Der
-Aktivierungsbildschirm ist live und erklärt sich, sein Knopf läuft ins Leere.
+**Der Aktivierungsweg funktioniert — zum ersten Mal Ende zu Ende, an einer
+echten Mail belegt.** Zwei Startblocker steckten darin, beide unsichtbar im
+Code, beide heute gefunden und geschlossen.
 
-## Der eine Satz, der zählt
+## Die zwei Blocker
 
-Ich habe in dieser Sitzung zwischendurch „die Lücke ist zu" gesagt. **Das war zu
-früh.** Gemessen mit `supabase functions list --project-ref foelowldexkcqzewvrcf`:
-dort liegen nur `notify-contact-request`, `create-checkout-session` und
-`stripe-webhook`. `send-activation`, `resend-activation` und `redeem-activation`
-sind **nicht deployt**.
+|                   | war                                                                                        | ist                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **10.5** Absender | `FROM_EMAIL` = Resends Sandkasten `onboarding@resend.dev` → **403 an jede fremde Adresse** | `effbeezee.com` in Resend verifiziert, `FBC <noreply@effbeezee.com>` |
+| **10.8** Link     | `APP_URL` = `http://localhost:5173` → jede Mail verlinkte auf den Rechner des Empfängers   | `https://fbc-platform.pages.dev`                                     |
 
-| Zustand für ein nicht aktiviertes Konto | vorher | jetzt  | nach Schritt 4 |
-| --------------------------------------- | ------ | ------ | -------------- |
-| Sieht eine Erklärung                    | nein   | **ja** | ja             |
-| Kann sich abmelden und stöbern          | nein   | **ja** | ja             |
-| Kann einen Link anfordern               | nein   | nein   | **ja**         |
-| Kann aktivieren                         | nein   | nein   | **ja**         |
+Beide hätten den Import (C10) in ein Feld lauter gesperrter Konten laufen
+lassen: bei importierten Konten ist das Gate die einzige Hürde, und die Mail
+der einzige Weg hindurch. **Beide sahen im Code richtig aus** — die Werte waren
+gesetzt, die Prüfungen bestanden. `send-activation` antwortet bauartbedingt
+immer `202` (Anti-Aufzählung), der Fehlschlag war also von außen unsichtbar.
+Der ehrliche Status kommt von `resend-activation`.
 
-Besser als heute Morgen, fertig ist es nicht.
-
-## Next session: start here
-
-**1. PR #127 mergen, wenn grün.** Nur Kommentar + Handoff, kein Verhalten.
-`gh pr checks 127`, dann `gh pr merge 127 --squash --delete-branch`, danach
-**`gh pr view 127 --json state`** gegenprüfen — `gh pr merge` kann still
-fehlschlagen.
-
-**2. Schritt 4 — Functions deployen und den Weg zum ersten Mal wirklich gehen**
-(Tasks 10.2 und 8.3, die letzten offenen Abnahmeschritte).
-
-```bash
-# Ziel ist foelowldexkcqzewvrcf — bis zum Import DAS Projekt der Live-Seite.
-supabase functions deploy send-activation   --project-ref foelowldexkcqzewvrcf
-supabase functions deploy resend-activation --project-ref foelowldexkcqzewvrcf
-supabase functions deploy redeem-activation --project-ref foelowldexkcqzewvrcf
-supabase functions list --project-ref foelowldexkcqzewvrcf   # gegenprüfen
-```
-
-`verify_jwt` steht je Function in `supabase/config.toml` und ist Absicht:
-`resend-activation` **true** (Subjekt ist die Sitzung), die beiden anderen
-**false** (das Token trägt die Identität). Nach dem Deploy prüfen, dass die
-Liste das auch so zeigt.
-
-Secrets sind da (am 06.08. gemessen): `APP_URL`, `FROM_EMAIL`, `RESEND_API_KEY`.
-
-Danach **8.3**: die sieben Fehlerfälle von Hand, protokolliert. Vier brauchen
-einen echten Versand — abgelaufen, schon benutzt, überholt (`superseded`),
-gedrosselt (`throttled`, ab dem 21. Fehlversuch je IP und Stunde). Drei sind
-beim Betrachten der Oberfläche schon abgehakt.
-
-**Für PROD (`viwntbodrtqxgmqyxluh`) sind die Functions ebenfalls nicht deployt.**
-Das ist Task 10.3 und braucht Donalds Freigabe — zusammen mit der Secret-Frage
-unten.
+C10 trägt deshalb jetzt **fünf** Vorbedingungen statt drei (11.2).
 
 ## Accomplished
 
-- **5.6/12.6** Drossel auf `redeem-activation`: Migration `20260806110000`
-  (`activation_attempts`, RLS an, keine Policy, kein Grant; RPC
-  `note_failed_activation` nur für `service_role`). Gezählt werden nur
-  **Fehlversuche**, und erst **hinter** dem Beanspruchen — ein gültiges Token
-  wird nie abgewiesen. pgTAP-Plan 140 → 148.
-- **12.7/12.8** vier `member-profiles`-Requirements als MODIFIED; „genau eine
-  privilegierte Funktion" auf die **Datenklasse** eingegrenzt statt auf eine Zahl.
-- **8.8** Review-Runde 4 (codex, opencode, gemini): 2× REQUEST-CHANGES, 1×
-  APPROVE. Vier Befunde behoben, einer widerlegt, fünf offen — `tasks.md` Block 14.
-- **13.4** `stripe-webhook` prüfte `payment_status` nicht (bei SEPA/Überweisung
-  kam die Stufe beim **Anstoßen** des Kaufs) · `notify-contact-request` prüfte
-  `record` nicht gegen die Tabelle · `public/_headers` neu · `.gitignore` um
-  Schlüsselmuster. Sieben Deno-Tests, sechs vorher rot.
-- **CI/CD** 15 `uses:` auf SHA · `dependabot.yml` um npm · `wrangler` ins
-  Lockfile · `-E` aus `curl | sudo bash` · **`edge-functions` als Pflicht-Check**.
-- **PR #120 gemergt**, `migrate-prod` brachte die fünf Migrationen auf PROD,
-  Deploy nachgefahren und **am echten Bundle** verifiziert (`index-DGHj5bBj.js`
-  auf Deploy-URL _und_ Apex, mit `my_activation_state` / `aktivierung` /
-  `throttled`; fünf Sicherheits-Header live; `/aktivierung` mit `no-referrer`).
+- **PR #127 gemergt** (`state=MERGED` gegengeprüft).
+- **Die drei Aktivierungs-Functions deployt**, `verify_jwt` gegen `config.toml`
+  geprüft (false/true/false).
+- **Das Gate hält in Produktion**: frisch registriertes, nicht aktiviertes
+  Konto → **14 Tabellen, null Zeilen**, einschließlich der eigenen Daten
+  (`profile_contacts`, `goals`, `notifications`, `compass_responses`,
+  `member_settings`). Gegenprobe: ausgeloggt weiter 5 Beiträge + 1 Event.
+  Nach dem Einlösen: `profiles_public` **37**, `posts` 5, `events` 9.
+- **8.3 vollständig** — alle sieben Fehlerfälle gemessen. Fünf gegen die live
+  deployten Functions, zwei (`expired`, `superseded`) gegen eine lokal
+  servierte, weil sie einen DB-Eingriff brauchen.
+- **Ein falsches Häkchen gefunden** (Nachlauf zu 6.4): Task 3.9 verlangt acht
+  Assertions, im Test standen drei — UPDATE/DELETE waren auf beiden Rollen
+  ungeprüft. Ergänzt, `plan(148) → plan(153)`, vorher rot gemessen. Der übrige
+  Nachlauf ist sauber (5.4/6.6, 7.1, 7.3, 7.5, 4.7, 13.1, 2.5, 1.4, 3.10).
+- **DNS für `effbeezee.com`** eingerichtet und am Rohtext der Mail abgenommen:
+  Googles Hop meldet `dkim=pass header.i=@effbeezee.com`, `spf=pass` über
+  `send.effbeezee.com`, `dmarc=pass (p=REJECT)`.
+- **Der `APP_URL`-Fix repariert nebenbei `notify-contact-request`** — die „Zum
+  Chat"-Links zeigten seit jeher auf localhost. War nie Teil von AGE-495.
+- **CRITICAL ausgezählt statt geschätzt:** 12 von 22 Secrets byte-identisch.
+  Die 10 „getrennten" täuschen — fast alle sind projektgebundene `SUPABASE_*`.
+  Bewusst getrennt sind **drei**. Alles von Hand Gepflegte (Stripe komplett,
+  `RESEND_API_KEY`) ist geteilt.
 
 ## Decisions
 
-- **Drossel-Subjekt:** IP, aber nur Fehlversuche, Zählung hinter dem Claim.
-  Preis: ein Zähler, keine Lastbremse — siehe 14.6.
-- **Volle CSP nicht ausgeliefert.** `_headers` trägt nur `frame-ancestors` — die
-  Direktive, die nichts brechen kann. Als 13.5 festgehalten.
-- **`curl | sudo bash` bleibt.** Infisical verteilt die CLI über den eigenen
-  Artefaktserver, ihre GitHub-Releases tragen keine Assets (nachgemessen).
-- **Zurückgezogen (Donald, 06.08.):** das fehlende `production`-Environment ist
-  **entschieden**, nicht vergessen (`migrate-prod.yml`, Kommentar über `apply:`),
-  und die Secrets liegen in Infisical. Ich hatte Audit-Befunde ungeprüft
-  weitergetragen.
+- **Absenderdomain `effbeezee.com`** (Donald/Detlev). Auf Strato-NS, also selbst
+  pflegbar; `fairbusinessclub.de` liegt auf Cloudflare-NS beim Betreuer der
+  WordPress-Seite.
+- **`FROM_EMAIL = FBC <noreply@effbeezee.com>`**, `Reply-To` fest verdrahtet auf
+  `info@fairbusinessclub.de` — der Bildschirm sagt eine ankommende Antwort zu.
+- **Testkonten bleiben stehen** (Donald). `donald@vlahovic.de` (aktiviert, im
+  Verzeichnis) und `donald.vlahovic@gmail.com`. **Kein Mitglied** — beide zählen
+  in die 50er-Schwelle der Tripwire aus 1.7 und müssen bei 12.1 abgezogen werden.
+
+## Ich lag falsch — zweimal am selben Punkt
+
+Ich habe zweimal gewarnt, `effbeezee.com` sei eine fremde Domain neben dem
+Auftritt des Clubs, und daraus eine Phishing-Sorge abgeleitet. **Falsch.** Der
+Betreff heißt „Dein Zugang zu eff.bee.zee", und `emails.ts:63,82` führen den
+Namen seit langem selbst ein: die Plattform _heißt_ so. Der Bildschirmtext, den
+ich daraufhin schrieb („die Adresse sieht ungewohnt aus"), entschuldigte sich
+für die eigene Marke und ist wieder raus. Die Assertion bleibt — falsch war die
+Begründung, nicht die Prüfung.
+
+## Files modified
+
+- `supabase/tests/rls_test.sql` — fünf Assertions ergänzt, `plan(153)`
+- `src/pages/ActivationScreen.tsx` / `.test.tsx` — Absender genannt, Test dazu
+- `supabase/functions/{send,resend}-activation/index.ts` — `Reply-To`
+- `docs/secrets.md` — Sandkasten-Hinweis als **widerlegt** gekennzeichnet
+- `openspec/changes/member-activation-flow/tasks.md` — 10.5–10.8 neu, 8.3, 11.2
+
+## Next session: start here
+
+**PR #128 prüfen und mergen** (`gh pr checks 128`, dann merge, danach
+`gh pr view 128 --json state` gegenprüfen — `gh pr merge` kann still
+fehlschlagen). Danach ist AGE-495 inhaltlich fertig bis auf 8.7 (unabhängiges
+Code-Review) und die Entscheidungen unten.
 
 ## Open questions
 
-- **CRITICAL, unverändert:** `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY` und
-  `STRIPE_SECRET_KEY` sind zwischen DEV und PROD byte-identisch. Wer den
-  DEV-Wert hat, fälscht ein `checkout.session.completed` an die PROD-Function
-  und setzt jede `user_id` auf `impact`. Braucht Donald im Stripe-Dashboard;
-  Details im Commit `2e4ecce` dieser Datei.
-- **14.6** Die Drossel ist ein Zähler, keine Bremse (opencode, und er hat recht).
-  Wer Last sparen will, muss vor dem Claim sperren — und nimmt in Kauf, dass ein
-  Mitglied hinter einer verbrannten IP mit gültigem Link abgewiesen wird. Die
-  Begründung in der Spec sagt heute „Lastfläche" und trägt so nicht.
-- **14.7** Mail-Missbrauch: die Grenze sitzt je Profil, Signup ist offen ⇒
-  beliebig viele Profile, beliebig viele Mails. Trifft AGE-256.
-- **14.8 / 12.10** `directory-search` und `events` sagen in der durable Spec noch
-  Zugriff ohne Aktivierung zu; hängt an der AGE-448-Entscheidung mit Detlev.
-- **9.1** Mailtext an Detlev — blockiert die Rundmail und damit den Import.
-- **6.4 war falsch abgehakt.** `Referrer-Policy: no-referrer` stand nirgends.
-  Lohnt einen Blick, ob weitere Häkchen so entstanden sind.
+- **CRITICAL, unverändert:** Stripe- und Resend-Secrets zwischen den Projekten
+  byte-identisch. Braucht Donald im Stripe-Dashboard. Billigster vollständiger
+  Fix bleibt, `stripe-webhook` und `create-checkout-session` von PROD abzuziehen,
+  bis Stripe wirklich läuft.
+- **10.4** Zustell-Abnahme: Gmails _Annahme_ ist gemessen (Return-Path zeigt
+  Annahme + Weiterleitung), seine _Platzierung_ nicht. GMX, Web.de, Outlook
+  unberührt. Das Risiko ist nicht die Authentifizierung — die steht —, sondern
+  die **Reputation einer ungewärmten Domain**, die beim Import auf einen Schlag
+  an alle sendet.
+- **`APP_URLS`** führt weiterhin localhost an erster Stelle (Stripe-Rücksprung).
+  Bewusst nicht ungefragt an der Bezahlstrecke gedreht.
+- **Weiterleitung `effbeezee.com` → `fairbusinessclub.de`** empfohlen: wer den
+  Absender prüft, landet heute auf einer Strato-Platzhalterseite.
+- **14.6** Drossel ist ein Zähler, keine Bremse · **14.7** Mail-Missbrauch über
+  offene Selbstregistrierung · **14.8/12.10** `directory-search` und `events`
+  widersprechen dem Gate (hängt an AGE-448 mit Detlev) · **9.1** Mailtext an
+  Detlev · **10.3** PROD-Deploy braucht Freigabe.
 
 ## Fallen
 
 Unverändert: `git add -A` verboten · `ls` ist `eza`-Alias · `supabase test db`
-ohne Dateiliste lügt · Policies zählen, nicht greppen · Merge mit `state=MERGED`
-gegenprüfen · Infisical-Login braucht ein echtes Terminal (kein TTY hier).
+ohne Dateiliste lügt · Merge mit `state=MERGED` gegenprüfen · zustandsändernde
+git-Befehle nie pipen · Infisical-Login braucht ein echtes Terminal.
 
 **Neu aus dieser Sitzung:**
 
-- In `cmd | tail` ist der Exit-Code der von `tail`. Ein
-  `git checkout … | tail && git cherry-pick …` lief deshalb auf dem alten Branch
-  weiter, obwohl das Checkout abgebrochen war. Git-Ketten nie pipen.
-- **Deploy-Erfolg ≠ Code live.** Der Workflow war grün, die Apex lieferte noch
-  das alte Bundle. Immer am Bundle prüfen: Hash aus `index.html` holen, Datei
-  laden, nach einem Bezeichner greppen, den nur der neue Stand hat.
-- **GitHub liefert Job-Logs erst nach Ende des ganzen Runs.** „Ich lese den
-  `plan`, bevor `apply` läuft" ist über die CLI nicht einlösbar.
-- Cloudflare **ersetzt** eine globale Header-Regel auf einer Route nicht, es
-  **hängt an** — `/aktivierung` liefert zwei `referrer-policy`-Header. Korrekt
-  (letzter gültiger gewinnt), sieht aber nach Fehler aus.
+- **`202` von `send-activation` belegt keinen Versand.** Die Function antwortet
+  bauartbedingt immer so. Wer den Versand prüfen will, nimmt `resend-activation`
+  (mit Sitzung) — die gibt einen ehrlichen Status.
+- **Infisical zu setzen schiebt nichts ins Supabase-Projekt.** Zwei getrennte
+  Flächen. Genau deshalb sah am Morgen alles gesetzt aus, während die
+  Live-Functions den Sandkasten benutzten.
+- **`supabase secrets list` zeigt SHA-256 statt Klartext** — man kann einen
+  vermuteten Wert also verifizieren, ohne ihn lesen zu dürfen. So war der
+  localhost-Wert in zwei Minuten belegt statt vermutet.
+- **Fehlende Konfiguration fällt auf, falsche nicht.** Die Functions prüfen auf
+  Vorhandensein und melden `500 Server misconfigured`. Beide Blocker heute waren
+  _gesetzt_ und _falsch_ — und damit still.
+- Der Classifier blockt `supabase functions deploy` und `secrets set`
+  unzuverlässig (mal ja, mal nein). Wenn er blockt: dem User den Befehl mit
+  `!`-Präfix geben, nicht umgehen.
