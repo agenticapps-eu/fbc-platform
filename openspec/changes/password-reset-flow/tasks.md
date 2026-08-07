@@ -44,18 +44,18 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 3. Versand — zweiter Text, zweite Zieladresse
 
-- [ ] 3.1 **RED:** In `supabase/functions/send-activation/emails.test.ts` prüfen,
+- [x] 3.1 **RED:** In `supabase/functions/send-activation/emails.test.ts` prüfen,
       dass der Reset-Text die Gültigkeitsdauer, die **Abmeldung aller Geräte**
       und den Ignorieren-Hinweis trägt — und dass er nicht zur Aktivierung
       auffordert.
-- [ ] 3.2 **RED:** Prüfen, dass die Reset-URL auf `/passwort-neu` zeigt und die
+- [x] 3.2 **RED:** Prüfen, dass die Reset-URL auf `/passwort-neu` zeigt und die
       Aktivierungs-URL unverändert auf `/aktivierung`.
-- [ ] 3.3 **GREEN:** `renderPasswordReset` und die zweite URL-Form in
+- [x] 3.3 **GREEN:** `renderPasswordReset` und die zweite URL-Form in
       `emails.ts`.
-- [ ] 3.4 **GREEN:** `send-activation/index.ts` akzeptiert `issued_reset` und
+- [x] 3.4 **GREEN:** `send-activation/index.ts` akzeptiert `issued_reset` und
       wählt daran Text und URL. Der `status !== "issued"`-Zweig muss beide
       Erfolgsfälle durchlassen — sonst schluckt er den Reset still.
-- [ ] 3.5 Absender und `reply_to` unverändert (`effbeezee.com` / Club-Domain).
+- [x] 3.5 Absender und `reply_to` unverändert (`effbeezee.com` / Club-Domain).
       Der Reset-Text sagt dieselbe Zusage zu wie der Aktivierungstext, also muss
       sie auch hier wahr sein.
 

@@ -1,6 +1,12 @@
 // deno test  (aus supabase/functions/send-activation/)
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
-import { activationUrl, escapeHtml, renderActivation } from "./emails.ts";
+import {
+  activationUrl,
+  escapeHtml,
+  passwordResetUrl,
+  renderActivation,
+  renderPasswordReset,
+} from "./emails.ts";
 
 Deno.test("activationUrl legt das Token ins FRAGMENT, nicht in den Query-String", () => {
   const url = activationUrl("https://app.test", "abc123");
@@ -68,6 +74,76 @@ Deno.test("renderActivation: leerer Name fällt auf eine neutrale Anrede zurück
   const e = renderActivation({ name: "  ", url: "https://app.test/#token=t" });
   assertStringIncludes(e.html, "Hallo");
   assert(!e.html.includes("Liebe/r  ,"));
+});
+
+// ── Passwort vergessen (AGE-505) ───────────────────────────────────────────
+// Das Token ist bewusst undurchsichtig und trägt seinen Zweck nicht. Die
+// ZIELADRESSE ist deshalb der einzige Träger, an dem die Oberfläche die richtige
+// Sprache wählen kann — diese zwei Tests halten die Trennung fest.
+
+Deno.test("passwordResetUrl führt auf /passwort-neu, nicht auf /aktivierung", () => {
+  const url = passwordResetUrl("https://app.test", "abc123");
+  assertEquals(url, "https://app.test/passwort-neu#token=abc123");
+  assert(!url.includes("/aktivierung"), "der Reset-Link darf nicht auf den Aktivierungsweg zeigen");
+});
+
+Deno.test("passwordResetUrl legt das Token ebenfalls ins FRAGMENT", () => {
+  const url = passwordResetUrl("https://app.test/", "a+b/c=");
+  assert(!url.includes("?token="), "Token darf nicht im Query-String stehen");
+  assertStringIncludes(url, "%2B");
+});
+
+Deno.test("die beiden Linkformen sind unterscheidbar", () => {
+  assert(activationUrl("https://app.test", "t") !== passwordResetUrl("https://app.test", "t"));
+});
+
+Deno.test("renderPasswordReset: eigener Betreff, nicht der Aktivierungsbetreff", () => {
+  const r = renderPasswordReset({ name: "Erika", url: "https://app.test/passwort-neu#token=t" });
+  const a = renderActivation({ name: "Erika", url: "https://app.test/aktivierung#token=t" });
+  assert(r.subject !== a.subject, "Reset und Aktivierung dürfen nicht denselben Betreff tragen");
+  assertStringIncludes(r.html, "Erika");
+  assertStringIncludes(r.text, "Erika");
+});
+
+Deno.test("renderPasswordReset: 72 Stunden, Abmeldung aller Geräte, Ignorieren-Hinweis", () => {
+  // Die Abmeldung ist eine technische Zusage (revoke_sessions läuft beim
+  // Einlösen mit) und zugleich eine Überraschung, wenn sie nicht dasteht.
+  // Der Ignorieren-Hinweis ist keine Höflichkeit: weil ein Fremder den Versand
+  // auslösen kann, ist die Mail der einzige Ort, an dem das Mitglied davon
+  // erfährt.
+  const r = renderPasswordReset({ name: "X", url: "https://app.test/passwort-neu#token=t" });
+  for (const teil of [r.html, r.text]) {
+    assertStringIncludes(teil, "72");
+    assertStringIncludes(teil.toLowerCase(), "abgemeldet");
+    assertStringIncludes(teil.toLowerCase(), "ignorier");
+  }
+});
+
+Deno.test("renderPasswordReset: fordert NICHT zur Aktivierung auf", () => {
+  const r = renderPasswordReset({ name: "X", url: "https://app.test/passwort-neu#token=t" });
+  assert(!r.html.includes("Zugang freischalten"), "das ist der Aktivierungs-Knopf");
+  assert(!r.html.includes("Bestätige diese Adresse"));
+  assert(!r.text.includes("Bestätige diese Adresse"));
+});
+
+Deno.test("renderPasswordReset: der Link steht im HTML UND im Text", () => {
+  const url = "https://app.test/passwort-neu#token=geheim";
+  const r = renderPasswordReset({ name: "X", url });
+  assertStringIncludes(r.html, url);
+  assertStringIncludes(r.text, url);
+});
+
+Deno.test("renderPasswordReset: kein Hash in der Mail, und Markup wird escaped", () => {
+  const r = renderPasswordReset({ name: "Max <b>", url: "https://app.test/passwort-neu#token=K" });
+  assert(!/[0-9a-f]{64}/.test(r.html), "kein SHA-256-Hex in der Mail");
+  assertStringIncludes(r.html, "Max &lt;b&gt;");
+  assert(!r.html.includes("Max <b>"));
+});
+
+Deno.test("renderPasswordReset: leerer Name fällt auf eine neutrale Anrede zurück", () => {
+  const r = renderPasswordReset({ name: "  ", url: "https://app.test/passwort-neu#token=t" });
+  assertStringIncludes(r.html, "Hallo");
+  assert(!r.html.includes("Liebe/r  ,"));
 });
 
 Deno.test("escapeHtml neutralisiert Injektion", () => {
