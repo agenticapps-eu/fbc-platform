@@ -57,11 +57,23 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Der Aufruf kommt aus dem Browser über `supabase.functions.invoke`, das
+// `content-type: application/json` setzt — damit ist der Preflight Pflicht.
+// Ohne diese Header scheitert er, und der Aufruf erreicht die Function nie
+// (gemessen 07.08., Review 8.7: OPTIONS → 405 ohne Access-Control-*). Muster
+// aus create-checkout-session.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST")
+    return new Response("Method Not Allowed", { status: 405, headers: CORS });
 
   const authHeader = req.headers.get("authorization");
-  if (!authHeader) return new Response("Unauthorized", { status: 401 });
+  if (!authHeader) return new Response("Unauthorized", { status: 401, headers: CORS });
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const fromEmail = Deno.env.get("FROM_EMAIL");
@@ -72,7 +84,7 @@ Deno.serve(async (req) => {
       hasFrom: !!fromEmail,
       hasAppUrl: !!appUrl,
     });
-    return new Response("Server misconfigured", { status: 500 });
+    return new Response("Server misconfigured", { status: 500, headers: CORS });
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -88,7 +100,7 @@ Deno.serve(async (req) => {
 
   if (error) {
     log("error", "issue_failed", { code: error.code });
-    return new Response("Issue failed", { status: 502 });
+    return new Response("Issue failed", { status: 502, headers: CORS });
   }
 
   const row = Array.isArray(data) ? data[0] : data;
@@ -101,7 +113,7 @@ Deno.serve(async (req) => {
     log("info", "no_mail", { status });
     return new Response(JSON.stringify({ status }), {
       status: 200,
-      headers: { "content-type": "application/json" },
+      headers: { ...CORS, "content-type": "application/json" },
     });
   }
 
@@ -133,7 +145,7 @@ Deno.serve(async (req) => {
       log("error", "resend_failed", { status: res.status, error: errName });
       return new Response(JSON.stringify({ status: "send_failed" }), {
         status: 502,
-        headers: { "content-type": "application/json" },
+        headers: { ...CORS, "content-type": "application/json" },
       });
     }
     const { id } = (await res.json().catch(() => ({}))) as { id?: string };
@@ -142,7 +154,7 @@ Deno.serve(async (req) => {
     log("error", "resend_threw", { error: e instanceof Error ? e.name : "unknown" });
     return new Response(JSON.stringify({ status: "send_failed" }), {
       status: 502,
-      headers: { "content-type": "application/json" },
+      headers: { ...CORS, "content-type": "application/json" },
     });
   }
 
@@ -150,6 +162,6 @@ Deno.serve(async (req) => {
   // Zeitkanal-Problem, wenn der Aufrufer ohnehin weiß, dass es sein Konto gibt.
   return new Response(JSON.stringify({ status: "issued" }), {
     status: 200,
-    headers: { "content-type": "application/json" },
+    headers: { ...CORS, "content-type": "application/json" },
   });
 });

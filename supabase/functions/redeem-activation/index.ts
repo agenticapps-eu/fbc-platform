@@ -42,10 +42,20 @@ function log(
   );
 }
 
+// Der Aufruf kommt aus dem Browser über `supabase.functions.invoke`, das
+// `content-type: application/json` setzt — damit ist der Preflight Pflicht.
+// Ohne diese Header scheitert er, und der Aufruf erreicht die Function nie
+// (gemessen 07.08., Review 8.7: OPTIONS → 405 ohne Access-Control-*). Muster
+// aus create-checkout-session.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 function antwort(body: Record<string, unknown>, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { ...CORS, "content-type": "application/json" },
   });
 }
 
@@ -55,7 +65,9 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST")
+    return new Response("Method Not Allowed", { status: 405, headers: CORS });
 
   let token: string;
   let password: string;
@@ -64,7 +76,7 @@ Deno.serve(async (req) => {
     token = String(body?.token ?? "");
     password = String(body?.password ?? "");
   } catch {
-    return new Response("Bad Request", { status: 400 });
+    return new Response("Bad Request", { status: 400, headers: CORS });
   }
 
   // Serverseitig prüfen, nicht nur im Formular: die Function ist die Grenze.

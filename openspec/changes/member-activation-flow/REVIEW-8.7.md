@@ -50,6 +50,28 @@ und `supabase/migrations/` ist leer).
 **Fix:** die vier Zeilen aus `create-checkout-session/index.ts:18-32` in jede
 der drei Functions. Danach **am Browser** gegenmessen, nicht per curl.
 
+### Behoben 07.08. — rot vorher, grün nachher
+
+`CORS`-Konstante, `OPTIONS`-Zweig und die Header auf **jeder** Antwort (auch
+den Fehlerantworten — sonst kann der Browser die Fehlermeldung nicht lesen).
+`deno check` grün, deployt gegen `foelowldexkcqzewvrcf`. Gemessen:
+
+|                        | vorher             | nachher                                    |
+| ---------------------- | ------------------ | ------------------------------------------ |
+| `OPTIONS` (alle drei)  | `405`, kein `ACAO` | `200`, `ACAO: *`, `ACAH` gesetzt           |
+| `POST send-activation` | —                  | `202`, `ACAO: *`, Body `{"accepted":true}` |
+
+Der zweite Wert ist der wichtigere: ein bestandener Preflight allein reicht
+nicht, die eigentliche Antwort muss den Header auch tragen.
+
+**Ehrliche Grenze dieser Messung.** Sie ist mit `curl` gemacht, und `curl`
+erzwingt CORS nicht. Was sie belegt, ist die **Serverseite** vollständig —
+also genau das, was der Browser prüft, und genau das, was vorher fehlte.
+Was sie **nicht** belegt, ist der Client-Pfad durch `functions.invoke`.
+Ein echter Klick auf „Bestätigungslink senden" bleibt die letzte Abnahme;
+er gehört zu 10.4. **Nicht dieselbe Prüfung wiederholen, die den Befund erst
+möglich gemacht hat** — der Serverweg war auch am 06.08. grün.
+
 ---
 
 ## B2 — HOCH (operativ) · Auf PROD existiert keine der drei Functions
