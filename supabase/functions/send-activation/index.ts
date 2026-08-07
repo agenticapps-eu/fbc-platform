@@ -27,6 +27,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { activationUrl, renderActivation } from "./emails.ts";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+// Rückkanal, bewusst fest verdrahtet und nicht aus der Umgebung: er steht
+// wörtlich auf dem Aktivierungsbildschirm und im Mailtext. Ein Secret, das
+// stillschweigend abweicht, macht beide Texte unwahr, ohne dass es auffällt.
+const REPLY_TO = "info@fairbusinessclub.de";
 
 function log(
   level: "info" | "warn" | "error",
@@ -130,6 +134,12 @@ Deno.serve(async (req) => {
         headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
         body: JSON.stringify({
           from: fromEmail,
+          // Der Absender liegt auf effbeezee.com, der Rückkanal auf der
+          // Club-Domain. Das ist kein Schönheitsfehler, sondern die Folge der
+          // Absenderentscheidung vom 06.08.2026 — und der Aktivierungsbildschirm
+          // sagt dem Mitglied zu, dass eine Antwort ankommt. Ohne dieses Feld
+          // ist diese Zusage unwahr.
+          reply_to: REPLY_TO,
           to: [empfaenger],
           subject: mail.subject,
           html: mail.html,

@@ -207,6 +207,14 @@ TDD: dieser Block wird **vor** Migration B geschrieben und muss rot sein.
       `authenticated`, für alle vier Operationen. Dazu:
       `has_column_privilege('authenticated', 'public.profiles', 'activated_at',
 'update')` ist `false` (Mechanismus zu 1.2).
+      _Nachgezogen 06.08.: das Häkchen stand über **drei** der acht Assertions
+      (anon/SELECT, authenticated/SELECT, authenticated/INSERT). UPDATE und
+      DELETE waren auf beiden Rollen ungeprüft — ein späteres `grant update`
+      wäre also durch genau den Block gerutscht, der ihn fangen soll. Fünf
+      Assertions ergänzt, Plan 148 → 153. Vorher rot gemessen mit einer
+      Wegwerf-Sonde, die die Rechte erteilt und wieder zurücknimmt:
+      `has_table_privilege` schlägt auf `true` um, die Assertions sind also
+      keine Leerprüfung. Gefunden beim 6.4-Nachlauf (siehe 13.4)._
 - [x] 3.10 `plan(n)` auf die neue Zahl heben. Lauf **mit** Dateiliste:
       `supabase test db supabase/tests/rls_test.sql supabase/tests/grants_test.sql
 supabase/tests/directory_search_test.sql` — ohne Liste meldet der Befehl
@@ -364,11 +372,49 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Konto das Verzeichnis abfragen: es enthält ausschließlich die
       Bestandskonten (Detlev und Donald). Erwarteter Zustand, kein Fehler —
       protokollieren, damit ihn niemand später „repariert".
-- [ ] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
-      _Teilweise erledigt beim Betrachten der laufenden Oberfläche (6.9): Wand
-      auf `/`, `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung ·
-      Anrede und Adresse aus `my_activation_state()` · keine Konsolenfehler. Die
-      vier Token-Fälle brauchen einen echten Versand (10.2)._
+- [x] 8.3 Alle sieben Fehlerfälle einmal von Hand durchspielen, protokolliert.
+      _Erledigt 06.08. in drei Etappen, weil nicht jeder Fall auf derselben
+      Fläche messbar ist._
+
+      **Beim Betrachten der laufenden Oberfläche (6.9):** Wand auf `/`,
+          `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
+          und Adresse aus `my_activation_state()` · keine Konsolenfehler.
+
+          **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
+          Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
+          · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
+          `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
+          dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
+
+          **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
+          die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
+          Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
+          `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
+          Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
+          gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
+
+          Drei Dinge, die dabei mehr belegen als das Abhaken:
+
+          1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
+             12.4. Andernfalls läse das Mitglied eine falsche Meldung.
+          2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
+             also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
+             Eigenschaft, an der die Entscheidung in 12.6 hing.
+          3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
+             **und** abgelaufen ist, meldet `used`
+             (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
+             Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
+             `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
+             nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
+
+          **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
+          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+          meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
+          **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
+          Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
+          nicht an einer kaputten Fixture.
+
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
 - [x] 8.5 `database-sentinel:audit` → `DB-AUDIT.md`. Critical und High blocken.
@@ -407,13 +453,183 @@ used_at is null and expires_at > now() returning profile_id`. Kein
 ## 10. Deploy — Haltepunkt, Donalds Freigabe
 
 - [x] 10.1 Migrationen auf DEV: `pnpm db:push`. Zielprojekt vorher ausgeben.
-- [ ] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
+- [x] 10.2 Functions auf DEV deployen, echten Versand an eine eigene Adresse
       prüfen.
+      _Deploy-Hälfte erledigt 06.08.: `send-activation`, `resend-activation` und
+      `redeem-activation` sind auf `foelowldexkcqzewvrcf` **ACTIVE** (je v1), und
+      `verify_jwt` deckt sich mit `config.toml` — false / true / false.
+      `APP_URL`, `FROM_EMAIL`, `RESEND_API_KEY` liegen. Gegen die live
+      deployten Endpunkte gemessen (nicht im Code gelesen): unbekannte Adresse →
+      `202 {"accepted":true}`, erfundenes Token → `410 {"status":"not_found"}`,
+      vierstelliges Passwort → `400 {"status":"weak_password","minLength":10}`,
+      `resend-activation` ohne Sitzung → `401` vom Gateway.
+      Testkonto `donald@vlahovic.de` (Selbstregistrierung, `basic`,
+      `activated_at = null`) am 06.08. angelegt; dabei nebenbei belegt:
+      `my_activation_state()` liefert mit echter Sitzung genau zwei Felder
+      (`activated:false`, Anzeigename), `resend-activation` antwortet innerhalb
+      der Minute `rate_limited` (die 60-s-Sperre aus 4.4, zur Laufzeit
+      gemessen) und danach `issued`.
+      **Der erste Versandversuch scheiterte** (10.5, Resend-Sandkasten). Nach der
+      Domainverifikation am selben Tag wiederholt: `resend-activation` →
+      `200 {"status":"issued"}`, und die Mail ist bei `donald@vlahovic.de`
+      **angekommen** (von Donald bestätigt). Damit ist der Versandweg zum ersten
+      Mal Ende zu Ende gegangen._
+- [ ] 10.8 **ZWEITER BLOCKER, gefunden am 06.08. beim ersten echten Versand:
+      `APP_URL` steht auf `http://localhost:5173`.** Gemessen, nicht vermutet —
+      der Wert ist der Hash aus `supabase secrets list` gegen Kandidaten geprüft,
+      und der Link in der zugestellten Mail lautete
+      `http://localhost:5173/aktivierung#token=…`. Jede Aktivierungsmail an ein
+      importiertes Mitglied verlinkt damit auf dessen **eigenen Rechner**.
+      Dieselbe Klasse wie 10.5: der Versand meldet Erfolg, der Weg endet im
+      Nichts.
+      **Reicht über diesen Change hinaus:** `APP_URL` speist auch
+      `notify-contact-request` (`index.ts:89`) — die „Zum Chat"-Links in den
+      Kontaktanfrage-Mails zeigen seit jeher auf localhost. Eigener Nachlauf.
+      Ebenfalls auffällig: `APP_URLS` (Stripe-Rücksprung-Allowlist) lautet
+      `http://localhost:5173,https://fbc-platform.pages.dev` — localhost an
+      erster Stelle, auf dem Projekt der Live-Seite.
+      **Richtiger Wert steht schon in `config.toml`:**
+      `site_url = "https://fbc-platform.pages.dev"`. Behebung:
+      `supabase secrets set APP_URL="https://fbc-platform.pages.dev"
+--project-ref foelowldexkcqzewvrcf` — und Infisical nachziehen, sonst
+      kehrt der Wert beim nächsten Sync zurück. **Vorbedingung von C10**, wie
+      10.5.
+      _Ursache vermutlich die dev==prod-Falle: `env=dev` teilt sich die
+      Supabase-Instanz mit prod, also setzt ein für lokales Testen gesetzter
+      Wert zugleich die Live-Seite. Wer künftig lokal testen will, überschreibt
+      `APP_URL` lokal statt im Projekt-Secret._
+      **Behoben 06.08.** auf beiden Flächen: `supabase secrets set` gegen
+      `foelowldexkcqzewvrcf` und `infisical secrets set … --env=dev`. Über den
+      SHA-256 aus `supabase secrets list` gegengeprüft — `APP_URL` und
+      `FROM_EMAIL` stimmen jetzt mit den Sollwerten überein. `APP_URL` wird zur
+      Laufzeit gelesen, ein Deploy war nicht nötig.
+      **Nachgemessen an einer echten Mail** (06.08., zweites Wegwerfkonto
+      `donald.vlahovic@gmail.com`, weil das erste inzwischen aktiviert ist und
+      nach 4.6 keine Mail mehr bekommt): der Link lautet jetzt
+      `https://fbc-platform.pages.dev/aktivierung#token=…`, Absender und
+      `Reply-To` stimmen, die Mail landete im Posteingang. `--env=prod` und das
+      PROD-Projekt sind ebenfalls geprüft (siehe 10.3).
+      _**Am Rohtext der zugestellten Mail belegt** (`.eml`, von Donald
+      beigebracht), nicht mehr nur erschlossen. Googles Hop:
+      `dkim=pass header.i=@effbeezee.com header.s=resend` ·
+      `spf=pass (domain of …@send.effbeezee.com designates 54.240.6.53 as
+  permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
+  header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
+      einem zweiten Hop. Der `send.`-Subdomain-SPF greift also genau wie
+      eingerichtet, und `Reply-To: info@fairbusinessclub.de` steht im Header —
+      die Zusage auf dem Aktivierungsbildschirm ist damit gemessen, nicht
+      behauptet. Der Link im Text lautet
+      `https://fbc-platform.pages.dev/aktivierung#token=…`._
+      **Weiter offen:** `APP_URLS` führt localhost an erster Stelle
+      (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht ungefragt an der
+      Bezahlstrecke gedreht).
+
 - [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
-      Secrets auf PROD prüfen (12 von 15 sind heute mit DEV identisch).
+      Secrets auf PROD prüfen.
       _Merge ≠ live: `deploy.yml` deployt nur das Frontend._
+      _Am 06.08. abends ausgezählt statt geschätzt: **12 von 22** gemeinsamen
+      Secrets sind byte-identisch, 10 getrennt — aber die 10 sind fast alle die
+      projektgebundenen `SUPABASE_*`-Werte, die gar nicht gleich sein können.
+      Bewusst getrennt sind genau drei: `APP_URLS`, `CONTACT_WEBHOOK_SECRET`,
+      `FROM_EMAIL`. Jedes von Hand gepflegte geteilte Secret ist also geteilt —
+      Stripe vollständig und `RESEND_API_KEY`. Das ist der offene CRITICAL und
+      braucht Donald im Stripe-Dashboard. `APP_URL` ist seit dem 06.08.
+      absichtlich gleich (dieselbe App-URL), kein Befund._
+      **Ein konkreter Fund, noch am selben Abend behoben:** `FROM_EMAIL` auf
+      PROD stand noch auf `FBC <onboarding@resend.dev>` — dem Sandkasten aus
+      10.5. Folgenlos, weil dort keine Aktivierungs-Functions deployt sind;
+      ungeprüft übernommen hätte 10.3 den Blocker aber exakt wiederholt.
+      Gesetzt und per Hash gegengeprüft: `FROM_EMAIL` und `APP_URL` stimmen auf
+      **beiden** Projekten mit den Sollwerten überein.
+      _Die Lehre daraus ist die wichtigere: **Infisical zu setzen schiebt nichts
+      ins Supabase-Projekt.** Das sind zwei getrennte Flächen, und genau deshalb
+      sah am Morgen alles gesetzt aus, während die Live-Functions den Sandkasten
+      benutzten. Wer einen Function-Wert ändert, muss beide anfassen — und die
+      Prüfung ist der Digest-Vergleich, nicht der Blick in Infisical._
 - [ ] 10.4 Zustell-Abnahme bei GMX, Web.de, Gmail, Outlook. **Hängt an AGE-256**
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
+      _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
+      Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
+      _Stand 06.08.: **Gmail zur Hälfte, die anderen drei gar nicht.** Zwei
+      Zustellungen sind belegt (`donald@vlahovic.de`, `donald.vlahovic@gmail.com`).
+      Die zweite ist mehr wert als zunächst gedacht: der `Return-Path`
+      (`donald.vlahovic+caf_=donald=vlahovic.net@gmail.com`) zeigt, dass **Gmail
+      die Mail angenommen, authentifiziert (`dmarc=pass`, s. 10.8) und
+      weitergeleitet** hat — sie landete danach bei Fastmail. Damit ist Gmails
+      **Annahme** gemessen, seine **Platzierung** nicht: ob sie in einem echten
+      Gmail-Postfach im Eingang oder im Spam läge, sagt eine Weiterleitung
+      nicht. GMX, Web.de und Outlook sind unberührt. Und das eigentliche Risiko
+      liegt ohnehin nicht bei der Authentifizierung — die steht —, sondern bei
+      der **Reputation einer neuen, ungewärmten Absenderdomain**, die beim
+      Import auf einen Schlag an alle Mitglieder sendet._
+
+- [x] 10.5 **GESCHLOSSEN 06.08. — war ein BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
+      der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
+      `FROM_EMAIL` steht auf Resends Sandkasten-Absender `onboarding@resend.dev`
+      — `docs/secrets.md:209-212` führt das ausdrücklich als Übergang, „swap in
+      the real domain once it's set up". Von diesem Absender lässt Resend
+      **ausschließlich** Mail an die Adresse des Resend-Kontoinhabers zu, jede
+      andere Empfängeradresse wird mit `403` abgewiesen
+      (<https://resend.com/docs/knowledge-base/403-error-resend-dev-domain>).
+      Gemessen: `resend-activation` an `donald@vlahovic.de` antwortet
+      `502 {"status":"send_failed"}`, und `send-activation` an dieselbe Adresse
+      hat `202` geliefert (Anti-Aufzählung, unabhängig vom Versandergebnis)
+      ohne dass eine Mail ankam.
+      Bestätigend im DNS: `fairbusinessclub.de` trägt
+      `v=spf1 include:spf.protection.outlook.com -all` — nur Microsoft 365 darf
+      senden, `-all` ist ein harter Fehlschlag für alles andere — und
+      `resend._domainkey.fairbusinessclub.de` existiert nicht. Die Domain ist in
+      Resend also nicht verifiziert.
+      **Tragweite: das ist ein Startblocker, kein Nachlauf.** Bei importierten
+      Konten ist das Aktivierungs-Gate die einzige Hürde, und der einzige Weg
+      hindurch ist diese Mail. Liefe C10 heute, bekämen alle importierten
+      Mitglieder ein gesperrtes Konto und keinen Link. **Der Import darf erst
+      nach einer in Resend verifizierten Absenderdomain laufen** — damit ist
+      AGE-256 keine Nebenbedingung von 10.4 mehr, sondern Vorbedingung von C10.
+      Gehört als vierte Vorbedingung in 11.2.
+
+- [x] 10.6 **Absenderdomain entschieden (Donald/Detlev, 06.08.): `effbeezee.com`,
+      `FROM_EMAIL = "FBC <noreply@effbeezee.com>"`.** Gewählt, weil sie auf
+      Strato-NS liegt und Donald sie selbst pflegen kann; `fairbusinessclub.de`
+      liegt auf Cloudflare-NS, an das nur der Betreuer der WordPress-Seite kommt.
+      Nachgemessen vor der Umstellung: Apex ohne SPF, `resend._domainkey` und
+      `send` frei — keine Kollision.
+      **Zwei Eigenschaften, die die Einrichtung beachten muss:**
+      (a) `_dmarc.effbeezee.com` trägt bereits `v=DMARC1;p=reject;` — Resends
+      optionalen DMARC-Eintrag **nicht** anlegen (zwei Einträge auf einem Namen
+      machen DMARC ungültig), und `reject` heißt: ein vertippter DKIM-Key ist
+      kein Spam-Ordner, sondern ein Bounce. (b) Die Domain hat einen
+      **Wildcard** (`*.effbeezee.com` antwortet mit Stratos MX) — unter `send.`
+      **beide** Einträge setzen, denn sobald dort irgendein Eintrag existiert,
+      greift der Wildcard für diesen Namen nicht mehr.
+      **Im Code nachgezogen:** `ActivationScreen` kündigt den Absender an und
+      nennt getrennt davon den Rückkanal (vorher rot gemessen, Test
+      „kündigt den Absender an und nennt getrennt davon den Rückkanal");
+      beide Functions setzen `Reply-To: info@fairbusinessclub.de`, weil der
+      Bildschirm dem Mitglied eine ankommende Antwort zusagt; `docs/secrets.md`
+      korrigiert — der Sandkasten-Hinweis stand dort als Empfehlung.
+      _**Korrigiert 06.08. abends:** hier stand, der Absender liege „auf einer
+      anderen Domain als der Auftritt des Clubs", und daraus folgte eine
+      Phishing-Warnung. Das war falsch. Die Plattform heißt **eff.bee.zee** —
+      `send-activation/emails.ts:63,82` führen den Namen im Betreff und im Text
+      selbst ein, seit langem. `effbeezee.com` ist die ausgeschriebene Marke,
+      nicht eine fremde Domain. Der Bildschirmtext, der sich dafür
+      entschuldigte („die Adresse sieht ungewohnt aus"), ist entfernt: er
+      untergrub genau die Marke, die die Mail einführt.
+      Was bleibt, gilt unabhängig davon: der Absender gehört auf den Bildschirm.
+      Bei importierten Konten ist diese Mail der einzige Weg hinein, und einen
+      Absender, den niemand angekündigt hat, erkennt das Mitglied nicht wieder —
+      deshalb steht die Adresse wörtlich dort, und deshalb ist der Test darauf
+      kein Textdetail. Empfohlen und offen bleibt eine Weiterleitung
+      `effbeezee.com` → `fairbusinessclub.de`: wer den Absender prüft, landet
+      heute auf einer Strato-Platzhalterseite statt beim Club._
+
+- [x] 10.7 Nach dem Setzen der DNS-Einträge: `FROM_EMAIL` in Infisical **und**
+      per `supabase secrets set` auf `FBC <noreply@effbeezee.com>` ziehen, beide
+      Functions neu deployen (der Absender steckt nicht im Bundle, das Reply-To
+      schon), dann den Versand an `donald@vlahovic.de` wiederholen. Erst wenn
+      dort eine Mail ankommt, ist 10.2 zu — `202` von `send-activation` belegt
+      bauartbedingt nichts, der ehrliche Status kommt von `resend-activation`.
 
 ## 11. Nachläufe, die dieser Change nicht schließt
 
@@ -422,13 +638,24 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       wenn der Login nicht „kürzlich" war, und der Angreifer hat sich gerade
       angemeldet. Der Messversuch auf DEV wurde vom Berechtigungs-Classifier
       abgelehnt. Eigenes Issue, mit der Messung als erstem Schritt.
-- [ ] 11.2 C10 trägt drei Vorbedingungen — im Import-Issue vermerken, nicht nur
-      hier: (a) Migration A läuft vorher (1.9), (b) der Import stößt den
+- [ ] 11.2 C10 trägt **fünf** Vorbedingungen — im Import-Issue vermerken, nicht
+      nur hier: (a) Migration A läuft vorher (1.9), (b) der Import stößt den
       Aktivierungsversand direkt an, damit der Weg des Mitglieds das
       Default-Passwort nicht berührt, (c) deterministisches Verhalten, wenn eine
       Adresse durch Selbstregistrierung bereits belegt ist — ein vorab besetztes
       Konto darf nicht durch bloße Adressgleichheit zum Mitgliedskonto werden
-      (codex).
+      (codex), und (d) **in Resend ist eine eigene Absenderdomain verifiziert**
+      (10.5) — sonst schlägt jeder Aktivierungsversand fehl und der Import
+      erzeugt lauter gesperrte Konten ohne Weg hinein —, und (e) **`APP_URL`
+      zeigt nicht auf localhost** (10.8), sonst verlinkt jede Mail auf den
+      Rechner des Empfängers.
+      _Und eine Buchhaltungssache, die sonst beim Import Verwirrung stiftet: auf
+      `foelowldexkcqzewvrcf` steht seit dem 06.08. ein **Wegwerf-Testkonto**
+      `donald@vlahovic.de` („Donald (Testkonto AGE-495)", `basic`, inzwischen
+      aktiviert und damit im Verzeichnis sichtbar). Entscheidung Donald: bleibt
+      stehen. Es ist **kein Mitglied** — und es zählt in die 50er-Gesamtschwelle
+      der Tripwire aus 1.7 (nicht in die 20er auf `impact`). Wer die Schwelle
+      vor dem Import festschreibt (12.1), muss es abziehen._
 - [ ] 11.3 `avatars`-Bucket privat stellen? Eigener Change mit Folgen für jede
       Bild-URL im Frontend (`INVENTORY.md`, Abschnitt C). Heute kein Weg für ein
       nicht aktiviertes Konto, die URLs überhaupt zu erfahren.

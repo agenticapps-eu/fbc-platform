@@ -64,6 +64,39 @@ describe("ActivationScreen", () => {
     expect(screen.getByRole("button", { name: /Erneut senden in/i })).toBeDisabled();
   });
 
+  /**
+   * Der Absender ist seit dem 06.08.2026 `noreply@effbeezee.com`, der Rückkanal
+   * bleibt `info@fairbusinessclub.de`. Der Bildschirm muss den Absender nennen,
+   * weil die Aktivierungsmail bei importierten Konten der einzige Weg ins Konto
+   * ist — ein Absender, den niemand angekündigt hat, ist von Phishing nicht zu
+   * unterscheiden, und wer ihn nicht wiedererkennt, klickt nicht.
+   *
+   * _Korrektur 06.08.: hier stand, `effbeezee.com` sei „eine andere Domain als
+   * die, unter der der Club auftritt". Das ist falsch — die Plattform heißt
+   * **eff.bee.zee** (siehe `send-activation/emails.ts:82`, der Mailtext führt
+   * den Namen selbst ein). Die Domain ist die ausgeschriebene Marke, nicht eine
+   * fremde. Die Assertion bleibt trotzdem richtig, nur ihre Begründung war es
+   * nicht._
+   *
+   * Der Test hält beide Hälften fest — angekündigter Absender UND Rückkanal —,
+   * weil genau ihr Auseinanderfallen der Fehler wäre. Dass der Rückkanal
+   * wirklich trägt, ist inzwischen am `Reply-To`-Header der zugestellten Mail
+   * belegt, nicht nur hier behauptet.
+   */
+  it("kündigt den Absender an und nennt getrennt davon den Rückkanal", async () => {
+    renderMit();
+
+    fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
+
+    const hinweis = await screen.findByText(/Der Link ist unterwegs/i);
+    expect(hinweis).toHaveTextContent("noreply@effbeezee.com");
+    // Der Rückkanal bleibt die Club-Domain — er steht woanders auf der Seite.
+    expect(screen.getByRole("link", { name: /info@fairbusinessclub\.de/i })).toHaveAttribute(
+      "href",
+      "mailto:info@fairbusinessclub.de",
+    );
+  });
+
   it("meldet einen Transportfehler, ohne etwas über die Adresse zu verraten", async () => {
     vi.mocked(resendActivationLink).mockRejectedValueOnce(new Error("network"));
     renderMit();

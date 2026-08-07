@@ -29,6 +29,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { activationUrl, renderActivation } from "../send-activation/emails.ts";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+// Siehe send-activation: derselbe Rückkanal, aus demselben Grund fest verdrahtet.
+const REPLY_TO = "info@fairbusinessclub.de";
 
 function log(
   level: "info" | "warn" | "error",
@@ -115,6 +117,7 @@ Deno.serve(async (req) => {
       headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
       body: JSON.stringify({
         from: fromEmail,
+        reply_to: REPLY_TO,
         to: [empfaenger],
         subject: mail.subject,
         html: mail.html,

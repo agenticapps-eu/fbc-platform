@@ -78,7 +78,8 @@ export default function ActivationScreen() {
       {gesendet && (
         <p className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
           Der Link ist unterwegs. Er gilt 72 Stunden. Schau bitte auch im Spam-Ordner nach —
-          Absender ist <strong>info@fairbusinessclub.de</strong>.
+          Absender ist <strong>noreply@effbeezee.com</strong> — antworten kannst du auf die Mail,
+          sie landet bei uns.
         </p>
       )}
       {fehler && <p className="text-sm text-danger">{fehler}</p>}

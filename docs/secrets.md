@@ -110,7 +110,7 @@ must **never** reach the client.
 | `SENTRY_AUTH_TOKEN`         | Sentry CI token (source-map upload)           |
 | `CLOUDFLARE_API_TOKEN`      | Cloudflare API token (Pages deploy)           |
 | `RESEND_API_KEY`            | Resend API key for transactional email (`notify-contact-request`) |
-| `FROM_EMAIL`                | Sender address for transactional email (e.g. `FBC <onboarding@resend.dev>`) |
+| `FROM_EMAIL`                | Sender address for transactional email — `FBC <noreply@effbeezee.com>` (see the sender-domain note below; **must not** be `onboarding@resend.dev`) |
 | `CONTACT_WEBHOOK_SECRET`    | Shared secret the contact-request DB webhook sends as `Authorization: Bearer …` |
 | `APP_URL` _(optional)_      | Base URL for the "Zum Chat"/"Anfrage ansehen" link in emails |
 
@@ -206,10 +206,32 @@ create trigger contact_requests_email_webhook
 The function rejects any request whose bearer doesn't match its
 `CONTACT_WEBHOOK_SECRET` (401).
 
-> **Sender domain (open point with Detlev):** until a verified FBC domain with
-> DKIM/SPF exists, use a verified **Resend test domain** as `FROM_EMAIL`
-> (e.g. `onboarding@resend.dev`). This is a transition — swap in the real domain
-> once it's set up.
+> **Sender domain — decided 2026-08-06 (Donald/Detlev): `effbeezee.com`.**
+> `FROM_EMAIL` is `FBC <noreply@effbeezee.com>`; both activation functions set
+> `Reply-To: info@fairbusinessclub.de` in code, because the activation screen
+> promises the member that a reply arrives.
+>
+> The earlier advice in this box — "use `onboarding@resend.dev` as a
+> transition" — was **wrong, not merely dated**, and it is kept here rather than
+> deleted because it cost a launch-blocking day. From Resend's shared sandbox
+> sender, mail is delivered **only to the Resend account owner's own address**;
+> every other recipient is refused with `403`
+> (<https://resend.com/docs/knowledge-base/403-error-resend-dev-domain>). It is
+> therefore not a transition one can ship on: with it, the activation path can
+> reach no member at all, and `send-activation` still answers `202`, so the
+> failure is invisible from the API. Measured 2026-08-06, see
+> `openspec/changes/member-activation-flow/tasks.md` 10.5.
+>
+> Two properties of `effbeezee.com` that the setup must respect:
+>
+> - `_dmarc.effbeezee.com` already carries **`v=DMARC1;p=reject;`**. Do **not**
+>   add Resend's optional DMARC record — a second record on the same name makes
+>   DMARC invalid. And `reject` means a mistyped DKIM key is not a spam-folder
+>   problem but a bounce.
+> - The domain has a **wildcard** (`*.effbeezee.com` answers with Strato's MX).
+>   Under `send.` create **both** the TXT and the MX: as soon as any record
+>   exists at that name the wildcard stops applying to it, so a lone TXT would
+>   leave the bounce address pointing nowhere.
 
 ## Supabase Edge Function secrets (`create-checkout-session` + `stripe-webhook`, AGE-259)
 

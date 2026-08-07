@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(148);
+select plan(153);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -701,12 +701,25 @@ select is(pg_temp.count_as_anon(
 -- 13.8 activation_tokens ist für Client-Rollen unerreichbar — kein Grant, keine
 -- Policy. Geprüft wird der GRANT, weil eine fehlende Policy allein nicht
 -- verhindert, dass jemand später eine hinzufügt.
+-- Beide Rollen, alle vier Operationen: bis 2026-08-06 standen hier nur drei der
+-- acht Assertions, ein späteres `grant update` oder `grant delete` wäre also
+-- unbemerkt durchgegangen — und genau dagegen steht dieser Block.
 select is(has_table_privilege('anon', 'public.activation_tokens', 'select'),
   false, 'activation_tokens: anon hat kein SELECT');
+select is(has_table_privilege('anon', 'public.activation_tokens', 'insert'),
+  false, 'activation_tokens: anon hat kein INSERT');
+select is(has_table_privilege('anon', 'public.activation_tokens', 'update'),
+  false, 'activation_tokens: anon hat kein UPDATE');
+select is(has_table_privilege('anon', 'public.activation_tokens', 'delete'),
+  false, 'activation_tokens: anon hat kein DELETE');
 select is(has_table_privilege('authenticated', 'public.activation_tokens', 'select'),
   false, 'activation_tokens: authenticated hat kein SELECT');
 select is(has_table_privilege('authenticated', 'public.activation_tokens', 'insert'),
   false, 'activation_tokens: authenticated hat kein INSERT');
+select is(has_table_privilege('authenticated', 'public.activation_tokens', 'update'),
+  false, 'activation_tokens: authenticated hat kein UPDATE');
+select is(has_table_privilege('authenticated', 'public.activation_tokens', 'delete'),
+  false, 'activation_tokens: authenticated hat kein DELETE');
 select is(
   (select count(*)::int from pg_policies where tablename = 'activation_tokens'),
   0, 'activation_tokens: es gibt bewusst KEINE Policy');
