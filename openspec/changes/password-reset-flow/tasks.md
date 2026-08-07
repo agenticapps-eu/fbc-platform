@@ -77,12 +77,12 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 5. Gates
 
-- [ ] 5.1 `database-sentinel` auf den Diff — die Migration ist eine
+- [x] 5.1 `database-sentinel` auf den Diff — die Migration ist eine
       Neudeklaration einer SECURITY-DEFINER-Function.
-- [ ] 5.2 Vollständige Verifikation: pgTAP (Dateiliste!), `pnpm test`,
+- [x] 5.2 Vollständige Verifikation: pgTAP (Dateiliste!), `pnpm test`,
       `pnpm typecheck`, `pnpm typecheck:functions`,
       `deno test --frozen --allow-env --allow-net supabase/functions/`.
-- [ ] 5.3 `openspec validate --all` grün.
+- [x] 5.3 `openspec validate --all` grün.
 - [ ] 5.4 Unabhängiger Code-Review auf den **Diff** (Schritt 4 des Workflows).
       Löst Donald aus.
 
