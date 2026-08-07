@@ -115,6 +115,16 @@ Doktrin nicht.
 Die `v_caller is not null`-Bedingung ist nötig, weil Seeds und `service_role`
 mit `auth.uid() = null` laufen.
 
+### Behoben 07.08. — rot vorher, grün nachher **gemessen**
+
+Migration `20260807090000_activation_gate_nachlauf.sql`. Die Rot-Messung war
+schärfer als die Code-Lektüre: `try_as()` lieferte für das nicht aktivierte
+Konto **`'OK'`** — die Funktion lief glatt durch —, und `profile_theme_scores`
+trug danach **4 Zeilen**. Der Write-Bypass war damit nicht hergeleitet, sondern
+beobachtet. Nach dem Fix: `DENIED:…not activated`, 0 Zeilen. Gegenprobe in
+13.10: nach der Bestätigung läuft die Funktion wieder durch (`'OK'`) — die
+Sperre ist ein Gate, keine kaputte Funktion.
+
 ### R2 — NIEDRIG · `is_activated_profile(uuid)` ist ein ungegatetes Orakel
 
 `20260806080100_activation_gate.sql:53-71`, `grant execute … to
@@ -240,6 +250,17 @@ Folge: Das Schaufenster zeigt ausgeloggten Besuchern **0 Likes, 0 Kommentare,
 0 Teilnehmer**. Und zwar still — `src/lib/feed.ts:313` und
 `src/lib/events.ts:256` melden nur einen _Fehler_ an Sentry; es kommt aber kein
 Fehler, nur ein leeres Ergebnis. Kein Test würde davon rot.
+
+**Behoben 07.08.**, rot vorher / grün nachher gemessen. Der Konjunkt lautet
+jetzt `((select auth.uid()) is null or public.is_activated())`: anon passiert,
+angemeldet gilt das Gate. Rot war er eindeutig — anon bekam `0`, erwartet `1`.
+Vier neue Assertions in 13.7a decken beide Richtungen ab, plus eine Gegenprobe
+in 13.10, dass die Zahlen nach der Bestätigung wiederkommen.
+
+_Verworfene Alternative: den Grant `to anon` entziehen und die Zahlen im
+Schaufenster ausblenden. Kleinere Codeänderung, kehrt aber Detlevs erklärten
+Wunsch um — und der Grant war ja gerade der Hinweis, dass die Sperre nicht
+gewollt war._
 
 ### Tests, die etwas anderes messen als ihren Namen
 
