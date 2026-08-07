@@ -137,6 +137,21 @@ Deno.serve(async (req) => {
   });
   const empfaenger = String(row.login_email);
 
+  // Kam keine Mail heraus, darf auch kein gültiges Token liegen bleiben: sonst
+  // antwortet issue_activation_token bis zu 24 h lang „pending" — kein Versand,
+  // kein neues Token —, und /aktivierung meldet dabei dasselbe Grün wie im
+  // Erfolgsfall (Befund E1 / Aufgabe 11.6). Der Aufrufer hat längst 202; das
+  // Entwerten ist die einzige Stelle, an der dieser Fehlschlag überhaupt noch
+  // behandelt werden kann.
+  const entwerten = async () => {
+    const { data, error } = await supabase.rpc("invalidate_activation_token", {
+      p_token_hash: hash,
+    });
+    // Ohne diese Zeile wäre die Behebung eines stillen Fehlschlags selbst einer.
+    if (error) log("error", "invalidate_failed", { code: error.code });
+    else log("info", "token_invalidated", { profileId: row.profile_id, getroffen: data });
+  };
+
   // Erst antworten, dann senden: sonst dauert eine bestehende Adresse messbar
   // länger als eine unbekannte, und die Antwortzeit verrät den Bestand.
   const versand = (async () => {
@@ -165,12 +180,14 @@ Deno.serve(async (req) => {
           .then((j) => (j as { name?: string })?.name)
           .catch(() => undefined);
         log("error", "resend_failed", { status: res.status, error: errName });
+        await entwerten();
         return;
       }
       const { id } = (await res.json().catch(() => ({}))) as { id?: string };
       log("info", "mail_sent", { profileId: row.profile_id, resendId: id });
     } catch (e) {
       log("error", "resend_threw", { error: e instanceof Error ? e.name : "unknown" });
+      await entwerten();
     }
   })();
 

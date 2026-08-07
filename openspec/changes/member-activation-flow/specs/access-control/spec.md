@@ -463,6 +463,20 @@ Anforderung stattdessen folgenlos lassen und den bestehenden Link stehen lassen.
 Andernfalls ist er kein Weg zurück ins Konto, sondern ein Weg, ein Mitglied
 auszusperren.
 
+Weil die Antwort dem Aufrufer zugestellt wird, **bevor** der Versand feststeht,
+SHALL ein danach fehlgeschlagener Versand das dabei ausgegebene Token entwerten.
+Andernfalls liegt ein gültiges Token im System, zu dem es keinen zugestellten
+Link gibt — und der schützende Nichtversand von oben hält genau diesen Zustand
+bis zu einen Tag lang fest. Ein stiller Fehlschlag würde so zu der Aussperrung,
+die dieselbe Regel verhindern soll.
+
+Weil die Antwort in allen diesen Fällen ununterscheidbar bleiben muss, SHALL die
+Meldung an das Mitglied **alle** Ausgänge abdecken, statt einen Versand
+zuzusagen, den es nicht gegeben haben muss. Sie SHALL benennen, dass ein in den
+letzten 24 Stunden bereits angeforderter Link weiter gilt, und einen Rückkanal
+nennen. Andernfalls wartet, wer die Mail nie bekommen hat, auf etwas, das nicht
+mehr kommt — und liest dabei eine Erfolgsmeldung.
+
 Der Empfänger SHALL in jedem Fall die hinterlegte Adresse des Profils sein,
 niemals eine im Aufruf mitgegebene. Andernfalls wäre der Endpunkt ein Weg, sich
 den Bestätigungslink eines fremden Kontos zusenden zu lassen.
@@ -501,6 +515,20 @@ Verzeichnis der Mitgliedsadressen.
   neuen Link anfordert
 - **THEN** bleibt der Link im Postfach gültig, es wird kein neuer ausgegeben,
   und das Tageskontingent des Mitglieds bleibt unberührt
+
+#### Scenario: Ein fehlgeschlagener Versand sperrt nicht bis zum nächsten Tag
+
+- **GIVEN** eine Anforderung wurde angenommen und der Versand der Mail schlägt
+  danach fehl
+- **WHEN** für dieselbe Adresse erneut ein Bestätigungslink angefordert wird
+- **THEN** gilt das Token des Fehlversands nicht mehr als ausstehend, und die
+  erneute Anforderung gibt einen Link aus, statt folgenlos zu bleiben
+
+#### Scenario: Die Meldung sagt nichts zu, was nicht geschehen sein muss
+
+- **WHEN** eine Anforderung ohne Anmeldung angenommen wurde
+- **THEN** nennt die Meldung sowohl den soeben verschickten Link als auch den
+  bereits vorhandenen und einen Rückkanal — und sie unterscheidet die Fälle nicht
 
 #### Scenario: Der Hauptweg nimmt keine Adresse entgegen
 

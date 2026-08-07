@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(161);
+select plan(170);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -921,6 +921,50 @@ select is((select count(*)::int from public.activation_tokens
             where token_hash = 'hash-selbst'
               and profile_id = '99999999-9999-9999-9999-999999999999'),
   1, 'request_own: das Token hängt am Aufrufer, nicht an einer mitgegebenen Adresse');
+
+-- ── 14b-bis. Der Fehlversand entwertet sein eigenes Token (E1 / 11.6) ───────
+-- Schlägt Resend fehl, hat send-activation längst 202 geantwortet und das Token
+-- liegt GÜLTIG in der Tabelle. Jeder weitere anonyme Anlauf läuft danach 24 h
+-- lang ins Schutzfenster: kein Versand, kein neues Token — und /aktivierung
+-- meldet dabei dasselbe Grün wie im Erfolgsfall. Wer die Mail nie bekam, wartet
+-- einen Tag auf nichts. Entwertet die Function ihr eigenes Token, ist der
+-- nächste Anlauf sofort wieder frei.
+select is(has_function_privilege('anon',
+  'public.invalidate_activation_token(text)', 'execute'),
+  false, 'invalidate_activation_token: anon darf nicht');
+select is(has_function_privilege('authenticated',
+  'public.invalidate_activation_token(text)', 'execute'),
+  false, 'invalidate_activation_token: authenticated darf nicht — sonst ist das '
+         'Entwerten selbst der Aussperrungs-Weg, den das Schutzfenster zumacht');
+select is(has_function_privilege('service_role',
+  'public.invalidate_activation_token(text)', 'execute'),
+  true, 'invalidate_activation_token: service_role darf (der Weg von send-activation)');
+
+-- 'hash-selbst' liegt offen und ist Sekunden alt. Ohne das Altern greift die
+-- 60-s-Sperre VOR dem Schutzfenster, und der Test misst die falsche Grenze.
+update public.activation_tokens set created_at = now() - interval '5 minutes'
+ where token_hash = 'hash-selbst';
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-vor')),
+  'pending', 'E1-Ausgangslage: mit offenem Token geht NICHTS raus');
+
+select is((select public.invalidate_activation_token('hash-selbst')),
+  true, 'invalidate: das offene Token wird entwertet');
+select is((select count(*)::int from public.activation_tokens
+            where token_hash = 'hash-selbst'
+              and invalidated_at is not null and used_at is null),
+  1, 'invalidate: entwertet, aber NICHT als eingelöst markiert — sonst läse das '
+     'Mitglied beim nächsten Anlauf „bereits aktiviert"');
+
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-nach')),
+  'issued', 'E1 geschlossen: nach dem Entwerten ist der nächste Anlauf frei, '
+            'statt 24 h zu schweigen');
+
+select is((select public.invalidate_activation_token('hash-selbst')),
+  false, 'invalidate: ein bereits entwertetes Token meldet false — der Aufruf '
+         'ist folgenlos wiederholbar');
+select is((select public.invalidate_activation_token('gibt-es-nicht')),
+  false, 'invalidate: ein unbekannter Hash meldet false und wirft nicht — die '
+         'Function läuft im Fehlerpfad, sie darf ihn nicht verbreitern');
 
 select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
   false, 'revoke_sessions: authenticated darf nicht');

@@ -750,13 +750,36 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       _Was daraus bleibt, ist eine Sprachregelung, keine Aufgabe: „auf PROD
       gemessen" ist doppeldeutig, solange Projektname und benutzte Umgebung
       auseinanderfallen. Jede Messnotiz nennt den **Ref**._
-- [ ] 11.6 **Der anonyme Weg schweigt 24 h und sieht dabei aus wie Erfolg** (P2).
+- [x] 11.6 **Der anonyme Weg schweigt 24 h und sieht dabei aus wie Erfolg** (P2).
       Offenes Token unter 24 h → `issue_activation_token` gibt `pending`, es geht
       **keine Mail** raus, aber `send-activation` antwortet `202` und
       `/aktivierung` zeigt dieselbe grüne Meldung wie im Erfolgsfall. Wer die
       erste Mail nicht bekam, wartet bis zu einen Tag auf nichts. Das
       Schutzfenster selbst ist richtig — zu ändern ist die Oberfläche. Gehört mit
       E1 zusammen entschieden, nicht einzeln.
+      _Entschieden 07.08. (Donald), Variante A+B′ — **beides zusammen**, weil P2
+      und E1 derselbe Mechanismus von zwei Seiten sind. **B′ (die Ursache):**
+      schlägt Resend nach der 202-Antwort fehl, entwertet `send-activation` sein
+      eigenes Token (`20260807190000`, neuer RPC `invalidate_activation_token`,
+      nur `service_role`). Aus 24 Stunden Schweigen wird die 60-s-Sperre.
+      **A (die Meldung):** `ActivationRedeemPage.tsx:233` deckt jetzt alle drei
+      Ausgänge ab — Absender, „ein Link aus den letzten 24 h gilt weiter",
+      Rückkanal — ohne sie zu unterscheiden.
+      **Nicht gewählt:** das Schutzfenster in eine Drossel umbauen. Hätte die
+      zwei gegensätzlichen Knöpfe angeglichen, aber die Aussperrung vom 06.08.
+      wieder geöffnet. Begründung steht im Migrationskopf.
+      **Nicht angefasst:** `ActivationScreen.tsx:80`.
+      `request_own_activation_token` (`20260806090000:108-114`) entwertet und
+      gibt immer neu aus, hat also gar kein Schutzfenster — dort ist „Der Link
+      ist unterwegs" wahr.
+      **Gemessen, nicht behauptet:** pgTAP rot (`function
+    "public.invalidate_activation_token(text)" does not exist`) → grün
+      (`Files=3, Tests=190, Result: PASS`, neun neue Assertions in `rls_test.sql`
+      §14b-bis); Vitest rot (`Expected /letzten 24 Stunden/`) → grün (427/427).
+      **Offen bleibt:** `index.ts` hat keine eigene Testdatei — der Fehlerzweig
+      ist über den RPC belegt, die zwei Zeilen Verdrahtung sind es nicht.
+      **E2 ist NICHT erledigt:** `resend-activation` entwertet weiter vor dem
+      Senden; derselbe Fehlschlag kostet dort den alten Link._
 - [ ] 11.7 **Es gibt keinen „Passwort vergessen"-Weg** (P3). `rg
 'resetPasswordForEmail|forgot|reset-password' src` findet nichts. Für nicht
       aktivierte Konten deckt `/aktivierung` das ab; für **aktivierte** nicht —

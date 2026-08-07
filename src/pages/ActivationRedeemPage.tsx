@@ -231,7 +231,9 @@ function LinkAnfordern({
     return (
       <p className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
         Wenn es zu dieser Adresse ein Konto gibt, ist der Link unterwegs. Er gilt 72 Stunden; schau
-        bitte auch im Spam-Ordner nach.
+        bitte auch im Spam-Ordner nach — Absender ist <strong>noreply@effbeezee.com</strong>. Wurde
+        in den letzten 24 Stunden schon ein Link angefordert, gilt weiter der aus jener Mail. Kommt
+        gar nichts an, schreib uns an <strong>info@fairbusinessclub.de</strong>.
       </p>
     );
   }
