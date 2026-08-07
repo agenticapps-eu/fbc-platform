@@ -97,6 +97,159 @@ jobs:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
         run: pnpm tsx scripts/migration-drift-gate.ts
 
+  # Edge Functions auf BEIDE Projekte ausrollen (AGE-506).
+  #
+  # WARUM ES DIESEN JOB GIBT. Bis hierher rollte CI zwei der drei Flaechen aus —
+  # Frontend und Migrationen — und Functions gar nicht. Das ist zweimal
+  # aufgeschlagen: bei AGE-495/B2 existierten die drei Aktivierungs-Functions auf
+  # PROD ueberhaupt nicht, waehrend der Change als „live" galt; und der
+  # Code-Review zu PR #133 musste melden, dass ein PR `send-activation` aendert,
+  # ohne dass irgendetwas sie ausliefert. Die Gegenmassnahme war eine Merkregel.
+  # Eine Regel, an die gedacht werden muss, ist genau das, was zweimal versagt hat.
+  #
+  # WARUM DIESELBEN VORBEDINGUNGEN WIE `deploy`. Eine Function kann eine
+  # Datenbankfunktion aufrufen, die auf dem Ziel noch nicht angelegt ist — auf
+  # PROD laufen Migrationen nur ueber `migrate-prod`, also von Hand. Liefe dieser
+  # Job voraus, waere die Function dort sofort kaputt. `drift-gate` blockiert
+  # bereits jeden Deploy, sobald PRODs Migrationshistorie vom Repo abweicht; die
+  # Function erbt diesen Schutz, statt einen zweiten danebenzustellen.
+  #
+  # WARUM NUR GEAENDERTE. `supabase functions deploy` ohne Namen deployt alle
+  # sechs. Auf PROD liegt fuer `notify-contact-request` bewusst ein aelterer
+  # Stand (member-activation-flow, Aufgabe 11.4) — ein pauschaler Lauf zoege ihn
+  # stillschweigend mit. Was uebergangen wird, steht deshalb NAMENTLICH im
+  # Protokoll: eine Beschraenkung, die nicht ausgesprochen wird, liest sich
+  # hinterher wie Vollstaendigkeit.
+  functions:
+    needs: [migrate-dev, drift-gate]
+    # Nur auf main, und nur wenn beide Vorbedingungen nicht fehlgeschlagen sind —
+    # dieselbe Bedingung wie `deploy` eine Etage tiefer.
+    if: ${{ github.ref == 'refs/heads/main' && !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    env:
+      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+      # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
+      INFISICAL_API_URL: https://eu.infisical.com/api
+      # WARUM `dev`, obwohl dieser Job auch auf PROD ausliefert. Ein
+      # Supabase-PAT authentifiziert den BETREIBER gegen die Management-API und
+      # gilt kontoweit — er ist kein dev- und kein prod-Wert. Er liegt seit
+      # AGE-496 in `dev`; ihn zusaetzlich nach `prod` zu legen hiesse, dieselbe
+      # Zugangsdatei an zwei Stellen zu fuehren, und bei der naechsten Rotation
+      # wuerde eine davon vergessen. Eine Kopie, eine Wahrheit.
+      INFISICAL_ENV: dev
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 2 # HEAD^ wird fuer die Ableitung gebraucht
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Gleiche Installation wie im `deploy`-Job weiter unten. Ein Checksum-Pin
+      # ist nicht zu haben — Infisical verteilt die CLI ueber sein eigenes
+      # Repository.
+      - name: Install Infisical CLI
+        run: |
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
+          sudo apt-get update && sudo apt-get install -y infisical
+
+      # Die Ableitung steht in scripts/changed-functions.logic.ts und hat dort
+      # einen Test daneben — nicht hier als Shell-Zeile, die niemand prueft.
+      - name: Geaenderte Functions ableiten
+        id: ableitung
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify -q "HEAD^" >/dev/null; then
+            echo "::warning::Kein Vorgaenger-Commit vorhanden (erster Commit oder Force-Push). Es wird nichts ausgeliefert."
+            echo "namen=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          namen="$(git diff --name-only "HEAD^" HEAD | pnpm tsx scripts/changed-functions.ts | tr '\n' ' ')"
+          echo "Abgeleitet: ${namen:-<keine>}"
+          echo "namen=$namen" >> "$GITHUB_OUTPUT"
+
+      # Ohne Token kaeme aus der CLI eine unverstaendliche Meldung. Dieser Schritt
+      # sagt stattdessen, was fehlt — und er schlaegt NUR fehl, wenn tatsaechlich
+      # etwas auszuliefern waere. Genau dieser Fall war bisher der stille.
+      #
+      # Geprueft wird ueber den EXIT-CODE, nicht ueber eine Ausgabe: der Wert
+      # darf nirgends erscheinen, auch nicht maskiert.
+      - name: Voraussetzung pruefen
+        if: ${{ steps.ableitung.outputs.namen != '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INFISICAL_TOKEN:-}" ]; then
+            echo "::error::Secret INFISICAL_TOKEN fehlt — ohne es kommt der Job an keinen Supabase-PAT (AGE-506)."
+            exit 1
+          fi
+          # Die einfachen Anfuehrungszeichen sind Absicht: expandieren soll die
+          # INNERE Shell, die `infisical run` mit dem Secret befuellt — nicht
+          # diese hier, die es nicht kennt.
+          # shellcheck disable=SC2016
+          if ! infisical run --env="$INFISICAL_ENV" --silent -- \
+                 sh -c '[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]'; then
+            echo "::error::SUPABASE_ACCESS_TOKEN liegt nicht in Infisical (env=$INFISICAL_ENV). Ohne Supabase-PAT kann keine Function ausgeliefert werden — und die Aenderung waere still nicht live (AGE-506)."
+            exit 1
+          fi
+
+      - name: Ausliefern und nachlesen
+        if: ${{ steps.ableitung.outputs.namen != '' }}
+        env:
+          NAMEN: ${{ steps.ableitung.outputs.namen }}
+        run: |
+          set -euo pipefail
+
+          # `find` statt `ls`: das Ausgabeformat von `ls` ist nicht zugesichert.
+          alle="$(find supabase/functions -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
+
+          echo "### Ausgeliefert" >> "$GITHUB_STEP_SUMMARY"
+          for fn in $NAMEN; do echo "- \`$fn\`" >> "$GITHUB_STEP_SUMMARY"; done
+
+          # Das Uebergangene beim Namen nennen — sonst liest sich die
+          # Beschraenkung hinterher als Vollstaendigkeit.
+          echo "### Uebergangen (unveraendert in diesem Merge)" >> "$GITHUB_STEP_SUMMARY"
+          uebergangen=0
+          for fn in $alle; do
+            case " $NAMEN " in
+              *" $fn "*) ;;
+              *) echo "- \`$fn\`" >> "$GITHUB_STEP_SUMMARY"; uebergangen=$((uebergangen + 1)) ;;
+            esac
+          done
+          [ "$uebergangen" -eq 0 ] && echo "- (keine)" >> "$GITHUB_STEP_SUMMARY"
+
+          for refdatei in scripts/dev-project-ref.txt scripts/prod-project-ref.txt; do
+            # Das Ziel kommt aus einer versionierten Datei, nicht aus einem
+            # Secret: ein Ziel, das nur im Secret steht, ist im Review unsichtbar
+            # (dieselbe Begruendung wie scripts/assert-target.ts).
+            ref="$(tr -d '[:space:]' < "$refdatei")"
+            # `infisical run` umschliesst NUR den supabase-Aufruf, nicht den
+            # ganzen Block: der PAT lebt damit im Prozess, der ihn braucht, und
+            # in keinem anderen.
+            for fn in $NAMEN; do
+              echo "::group::deploy $fn -> $ref"
+              infisical run --env="$INFISICAL_ENV" --silent -- \
+                supabase functions deploy "$fn" --project-ref "$ref"
+              echo "::endgroup::"
+            done
+
+            # Dass ein Befehl fehlerfrei zurueckkam, ist kein Beleg dafuer, dass
+            # das Ziel den neuen Stand traegt. Also nachlesen.
+            echo "::group::functions list $ref"
+            infisical run --env="$INFISICAL_ENV" --silent -- \
+              supabase functions list --project-ref "$ref"
+            echo "::endgroup::"
+          done
+
+      - name: Nichts auszuliefern
+        if: ${{ steps.ableitung.outputs.namen == '' }}
+        run: echo "Kein Function-Code in diesem Merge — es wurde nichts ausgeliefert."
+
   deploy:
     needs: [migrate-dev, drift-gate]
     # Auf Pull Requests werden beide Vorbedingungen uebersprungen; `!cancelled()`

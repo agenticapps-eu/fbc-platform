@@ -62,6 +62,32 @@ Dieselben zwei Werte gehören als **GitHub-Secrets** hinterlegt — ohne sie
 werden `migrate-dev` und `drift-gate` auf `main` rot. Das ist gewollt (das Gate
 schweigt nicht bei Nichtwissen), heißt aber: erst die Secrets, dann der Merge.
 
+### `SUPABASE_ACCESS_TOKEN` — für den Functions-Deploy (AGE-506)
+
+Ein **Supabase Personal Access Token**. Er liegt **in Infisical, env `dev`**, und
+**nicht** als GitHub-Secret — der Job `functions` in `deploy.yml` zieht ihn zur
+Laufzeit über `infisical run`, genau wie der `deploy`-Job seine Build-Secrets.
+
+- **Wozu:** `supabase functions deploy <name> --project-ref <ref>` gegen beide
+  Projekte. Die Refs kommen aus `scripts/dev-project-ref.txt` und
+  `scripts/prod-project-ref.txt`, nicht aus einem Secret — ein Ziel, das nur im
+  Secret steht, ist im Review unsichtbar.
+- **Warum `dev`, obwohl der Job auch auf PROD ausliefert:** ein PAT
+  authentifiziert den **Betreiber** gegen die Management-API und gilt kontoweit.
+  Er ist kein dev- und kein prod-Wert. Ihn zusätzlich nach `prod` zu legen hieße,
+  dieselbe Zugangsdatei an zwei Stellen zu führen — und bei der nächsten
+  Rotation würde eine davon vergessen. Eine Kopie, eine Wahrheit.
+- **Reichweite, benannt statt beschwiegen:** ein PAT kann mehr als Functions
+  deployen. Deshalb umschließt `infisical run` im Job **nur** den
+  `supabase`-Aufruf und nicht den ganzen Schritt: der Wert lebt im Prozess, der
+  ihn braucht, und in keinem anderen.
+- **Verhalten ohne ihn:** der Job schlägt **nur dann** fehl, wenn ein Merge
+  tatsächlich eine Function verändert hat — und sagt dann, was fehlt. Geprüft
+  wird über den **Exit-Code**, nie über eine Ausgabe. Genau dieser Fall war
+  vorher der stille.
+- **Was CI dafür braucht:** nur `INFISICAL_TOKEN`, das ohnehin schon als
+  GitHub-Secret existiert. Es kommt **kein** neues GitHub-Secret dazu.
+
 > On the free tier, per-environment access control isn't available. Splitting
 > `dev`/`prod` into separate projects (for restricted prod visibility) is a
 > later, paid-plan concern — for the prototype, two environments in one project

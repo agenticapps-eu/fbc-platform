@@ -377,43 +377,43 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Fläche messbar ist._
 
       **Beim Betrachten der laufenden Oberfläche (6.9):** Wand auf `/`,
-                                  `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
-                                  und Adresse aus `my_activation_state()` · keine Konsolenfehler.
+                                      `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
+                                      und Adresse aus `my_activation_state()` · keine Konsolenfehler.
 
-                                  **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
-                                  Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
-                                  · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
-                                  `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
-                                  dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
+                                      **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
+                                      Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
+                                      · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
+                                      `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
+                                      dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
 
-                                  **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
-                                  die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
-                                  Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
-                                  `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
-                                  Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
-                                  gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
+                                      **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
+                                      die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
+                                      Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
+                                      `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
+                                      Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
+                                      gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
 
-                                  Drei Dinge, die dabei mehr belegen als das Abhaken:
+                                      Drei Dinge, die dabei mehr belegen als das Abhaken:
 
-                                  1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
-                                     12.4. Andernfalls läse das Mitglied eine falsche Meldung.
-                                  2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
-                                     also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
-                                     Eigenschaft, an der die Entscheidung in 12.6 hing.
-                                  3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
-                                     **und** abgelaufen ist, meldet `used`
-                                     (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
-                                     Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
-                                     `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
-                                     nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
+                                      1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
+                                         12.4. Andernfalls läse das Mitglied eine falsche Meldung.
+                                      2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
+                                         also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
+                                         Eigenschaft, an der die Entscheidung in 12.6 hing.
+                                      3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
+                                         **und** abgelaufen ist, meldet `used`
+                                         (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
+                                         Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
+                                         `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
+                                         nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
 
-                                  **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
-                                  `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                                  Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                                  meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
-                                  **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
-                                  Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
-                                  nicht an einer kaputten Fixture.
+                                      **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
+                                      `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+                                      Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+                                      meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
+                                      **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
+                                      Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
+                                      nicht an einer kaputten Fixture.
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -444,58 +444,58 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       #120/#127/#128). Volltext in `REVIEW-8.7.md`._
 
       **Ein Blocker, selbst nachgemessen:** die drei Aktivierungs-Functions
-                              beantworten OPTIONS mit `405` **ohne** `Access-Control-*`. Antwort trägt
-                              `x-deno-execution-id` und `x-served-by: supabase-edge-runtime` — die
-                              Function antwortet, nicht das Gateway. Das Frontend ruft alle drei über
-                              `supabase.functions.invoke` (`src/lib/activation.ts:68,83,91`), das
-                              `Content-Type: application/json` setzt und damit einen Preflight erzwingt.
-                              **Aus dem Browser schlägt der ganze Weg fehl.** Gegenprobe:
-                              `create-checkout-session` → `200` + `ACAO: *`.
-                              _Warum das bis heute unsichtbar war: die Ende-zu-Ende-Belege aus 8.3 und
-                              10.5/10.8 sind HTTP-Antworten der Functions. Der Serverweg ist gemessen,
-                              der Browserweg nie. Dieselbe Klasse wie die zwei Blocker vom 06.08. —
-                              die Prüfung bestand, weil sie die falsche Fläche traf._
-                              **Behoben 07.08.**, rot vorher / grün nachher gemessen: `CORS`-Konstante,
-                              `OPTIONS`-Zweig und Header auf **jeder** Antwort (auch den Fehlerfällen —
-                              sonst kann der Browser die Meldung nicht lesen). `deno check` grün,
-                              deployt gegen `foelowldexkcqzewvrcf`. `OPTIONS` → `200` mit `ACAO: *` und
-                              `ACAH`; `POST send-activation` → `202` **mit** `ACAO`. Der zweite Wert
-                              zählt mehr: ein bestandener Preflight allein reicht nicht.
-                              _Grenze der Messung: mit `curl` gemacht, und `curl` erzwingt CORS nicht.
-                              Belegt ist die Serverseite vollständig — der Client-Pfad durch
-                              `functions.invoke` nicht. Ein echter Klick bleibt Teil von 10.4._
-                              **Client-Pfad nachgeholt 07.08., im Browser:** Klick auf „Neuen Link
-                              senden" auf `/aktivierung` → Preflight `OPTIONS …/send-activation`
-                              `200` **und** der Erfolgszweig der Oberfläche. Der zweite Teil ist der
-                              Beweis: bei Fehler wirft `activation.ts:88`, dann stünde dort der
-                              Fehlerzweig. Adresse `…@example.invalid` — keine Mail ausgelöst.
-                              **Die zwei restlichen Wege nachgeholt 07.08.**, mit Testkonto
-                              `donald.vlahovic@gmail.com` (angemeldet, `activated_at` per Hand auf
-                              `null`). `resend-activation`: Preflight `OPTIONS` → `200`,
-                              Erfolgszweig „Der Link ist unterwegs" **und** Knopfsperre „Erneut
-                              senden in 58 s", dazu serverseitig ein neues Token um
-                              `2026-08-07T12:17:17.915Z`, und die Mail kam an. Damit ist der
-                              Gateway-Pfad **mit** JWT-Prüfung gedeckt.
-                              `redeem-activation`: `used_at 12:20:43.278Z` und
-                              `profiles.activated_at` auf dieselbe Sekunde, Bildschirm davor
-                              „Passwort festlegen" / danach `/login` (der vorgesehene Ausgang,
-                              `ActivationRedeemPage.tsx:66-70`).
-                              _Grenze, und sie bleibt: für `redeem-activation` gibt es **keinen
-                              Netzwerkbeleg** — der Mitschnitt stand danach beide Male leer, Ursache
-                              ungeklärt. Der Weg trägt über zwei Zeitstempel und zwei Bildschirme,
-                              nicht über einen Statuscode._
-                              → **B2 (Vorbedingung von C10) ist am 07.08. geschlossen**: die drei
-                              Functions liegen jetzt auch auf `viwntbodrtqxgmqyxluh`, mit
-                              DEV-gleichem `ezbr_sha256` und bestandenem Preflight. Messung in
-                              `REVIEW-8.7.md`, Vorbedingung (f) in 11.2.
+                                  beantworten OPTIONS mit `405` **ohne** `Access-Control-*`. Antwort trägt
+                                  `x-deno-execution-id` und `x-served-by: supabase-edge-runtime` — die
+                                  Function antwortet, nicht das Gateway. Das Frontend ruft alle drei über
+                                  `supabase.functions.invoke` (`src/lib/activation.ts:68,83,91`), das
+                                  `Content-Type: application/json` setzt und damit einen Preflight erzwingt.
+                                  **Aus dem Browser schlägt der ganze Weg fehl.** Gegenprobe:
+                                  `create-checkout-session` → `200` + `ACAO: *`.
+                                  _Warum das bis heute unsichtbar war: die Ende-zu-Ende-Belege aus 8.3 und
+                                  10.5/10.8 sind HTTP-Antworten der Functions. Der Serverweg ist gemessen,
+                                  der Browserweg nie. Dieselbe Klasse wie die zwei Blocker vom 06.08. —
+                                  die Prüfung bestand, weil sie die falsche Fläche traf._
+                                  **Behoben 07.08.**, rot vorher / grün nachher gemessen: `CORS`-Konstante,
+                                  `OPTIONS`-Zweig und Header auf **jeder** Antwort (auch den Fehlerfällen —
+                                  sonst kann der Browser die Meldung nicht lesen). `deno check` grün,
+                                  deployt gegen `foelowldexkcqzewvrcf`. `OPTIONS` → `200` mit `ACAO: *` und
+                                  `ACAH`; `POST send-activation` → `202` **mit** `ACAO`. Der zweite Wert
+                                  zählt mehr: ein bestandener Preflight allein reicht nicht.
+                                  _Grenze der Messung: mit `curl` gemacht, und `curl` erzwingt CORS nicht.
+                                  Belegt ist die Serverseite vollständig — der Client-Pfad durch
+                                  `functions.invoke` nicht. Ein echter Klick bleibt Teil von 10.4._
+                                  **Client-Pfad nachgeholt 07.08., im Browser:** Klick auf „Neuen Link
+                                  senden" auf `/aktivierung` → Preflight `OPTIONS …/send-activation`
+                                  `200` **und** der Erfolgszweig der Oberfläche. Der zweite Teil ist der
+                                  Beweis: bei Fehler wirft `activation.ts:88`, dann stünde dort der
+                                  Fehlerzweig. Adresse `…@example.invalid` — keine Mail ausgelöst.
+                                  **Die zwei restlichen Wege nachgeholt 07.08.**, mit Testkonto
+                                  `donald.vlahovic@gmail.com` (angemeldet, `activated_at` per Hand auf
+                                  `null`). `resend-activation`: Preflight `OPTIONS` → `200`,
+                                  Erfolgszweig „Der Link ist unterwegs" **und** Knopfsperre „Erneut
+                                  senden in 58 s", dazu serverseitig ein neues Token um
+                                  `2026-08-07T12:17:17.915Z`, und die Mail kam an. Damit ist der
+                                  Gateway-Pfad **mit** JWT-Prüfung gedeckt.
+                                  `redeem-activation`: `used_at 12:20:43.278Z` und
+                                  `profiles.activated_at` auf dieselbe Sekunde, Bildschirm davor
+                                  „Passwort festlegen" / danach `/login` (der vorgesehene Ausgang,
+                                  `ActivationRedeemPage.tsx:66-70`).
+                                  _Grenze, und sie bleibt: für `redeem-activation` gibt es **keinen
+                                  Netzwerkbeleg** — der Mitschnitt stand danach beide Male leer, Ursache
+                                  ungeklärt. Der Weg trägt über zwei Zeitstempel und zwei Bildschirme,
+                                  nicht über einen Statuscode._
+                                  → **B2 (Vorbedingung von C10) ist am 07.08. geschlossen**: die drei
+                                  Functions liegen jetzt auch auf `viwntbodrtqxgmqyxluh`, mit
+                                  DEV-gleichem `ezbr_sha256` und bestandenem Preflight. Messung in
+                                  `REVIEW-8.7.md`, Vorbedingung (f) in 11.2.
 
-                              **Die zentrale Zusage hält.** Der RLS-Reviewer hat den Endzustand aller
-                              Migrationen nachgespielt statt nur den Diff: 52 lebende Policies, 46
-                              gegatet, keine permissive Altpolicy überlebt (Policies ODERn — das wäre
-                              die gefährlichste Ausfallform gewesen), alle 31 DEFINER-Funktionen mit
-                              gesetztem `search_path`, `activated_at` client-seitig nicht schreibbar,
-                              `activation_tokens` ohne Policy und ohne Grant. An **fremde**
-                              Mitgliederdaten kommt ein nicht aktiviertes Konto nicht.
+                                  **Die zentrale Zusage hält.** Der RLS-Reviewer hat den Endzustand aller
+                                  Migrationen nachgespielt statt nur den Diff: 52 lebende Policies, 46
+                                  gegatet, keine permissive Altpolicy überlebt (Policies ODERn — das wäre
+                                  die gefährlichste Ausfallform gewesen), alle 31 DEFINER-Funktionen mit
+                                  gesetztem `search_path`, `activated_at` client-seitig nicht schreibbar,
+                                  `activation_tokens` ohne Policy und ohne Grant. An **fremde**
+                                  Mitgliederdaten kommt ein nicht aktiviertes Konto nicht.
 
 - [x] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
       _Gefahren 06.08. mit codex, opencode und gemini (AGENT_SELF=claude, also
@@ -709,13 +709,14 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       zeigt nicht auf localhost** (10.8), sonst verlinkt jede Mail auf den
       Rechner des Empfängers, und (f) **die drei Aktivierungs-Functions liegen
       auf dem Projekt, auf das das Frontend zeigt** (B2).
-      _(f) ist am 07.08. erfüllt worden, bleibt aber als Vorbedingung stehen —
-      sie ist nicht dauerhaft wahr. **Nichts rollt Edge Functions automatisch
-      aus:** `deploy.yml` deployt das Frontend, `migrate-prod` die Migrationen,
-      Functions gehen nur von Hand. Jede spätere Änderung an einer der drei
-      Functions muss deshalb **beide** Projekte anfassen, sonst ist der Zustand
-      vom 07.08. still wieder weg. Die Prüfung ist der `ezbr_sha256`-Vergleich
-      aus `supabase functions list`, nicht der Blick ins Dashboard._
+      _(f) ist am 07.08. erfüllt worden. Die Merkregel, die hier stand — „nichts
+      rollt Edge Functions automatisch aus, jede spätere Änderung muss beide
+      Projekte von Hand anfassen" —, ist **durch AGE-506 ersetzt**: der Job
+      `functions` in `deploy.yml` liefert die geänderten Functions bei jedem
+      Merge auf beide Projekte aus und liest danach `supabase functions list`
+      nach. Sie steht hier nicht mehr als Regel, sondern als Hinweis, woher der
+      Zustand kommt — zwei Wahrheiten nebeneinander wären schlimmer als keine.
+      **Solange AGE-506 nicht gemergt ist, gilt die alte Regel weiter.**_
       _Und eine Buchhaltungssache, die sonst beim Import Verwirrung stiftet: auf
       `foelowldexkcqzewvrcf` steht seit dem 06.08. ein **Wegwerf-Testkonto**
       `donald@vlahovic.de` („Donald (Testkonto AGE-495)", `basic`, inzwischen
@@ -757,7 +758,7 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       Schutzfenster selbst ist richtig — zu ändern ist die Oberfläche. Gehört mit
       E1 zusammen entschieden, nicht einzeln.
 - [ ] 11.7 **Es gibt keinen „Passwort vergessen"-Weg** (P3). `rg
-  'resetPasswordForEmail|forgot|reset-password' src` findet nichts. Für nicht
+'resetPasswordForEmail|forgot|reset-password' src` findet nichts. Für nicht
       aktivierte Konten deckt `/aktivierung` das ab; für **aktivierte** nicht —
       dort antwortet `issue_activation_token` `already_activated`, verschickt
       nichts, und die Oberfläche meldet trotzdem Erfolg
