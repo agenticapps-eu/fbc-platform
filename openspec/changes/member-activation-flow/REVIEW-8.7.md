@@ -99,6 +99,57 @@ voraus. Der gemessene Weg ist der einzige der drei, der ohne Sitzung
 erreichbar ist — er belegt den CORS-Fix als solchen, aber nicht den
 Gateway-Pfad mit JWT-Prüfung.
 
+### Die beiden restlichen Wege sind gemessen (07.08.)
+
+Konto: `donald.vlahovic@gmail.com` („Donald (Testkonto 2, Linkprüfung)",
+`tier=basic`) im Projekt, das die App **tatsächlich** benutzt — siehe P1 weiter
+unten. Für den Aktivierungsbildschirm wurde `profiles.activated_at` zweimal per
+Hand auf `null` gesetzt; den Endwert hat das echte Einlösen gesetzt, nicht die
+Hand.
+
+**`resend-activation` — der Gateway-Pfad mit JWT-Prüfung:**
+
+|                   | gemessen                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| Preflight         | `OPTIONS …/functions/v1/resend-activation` → **200**, vom Browser ausgelöst             |
+| Oberfläche danach | Erfolgszweig „Der Link ist unterwegs" **und** Knopf gesperrt: „Erneut senden in 58 s"   |
+| Server            | `activation_tokens` neu: `created 2026-08-07T12:17:17.915Z`, unbenutzt, `expires` +72 h |
+| Zustellung        | Mail an Gmail angekommen, ihr Link trug bis in den Einlöse-Bildschirm                   |
+
+Die Oberflächenzeile trägt den Beweis: `resendActivationLink` wirft bei jedem
+Fehler von `functions.invoke` (`activation.ts:69`), der Erfolgszweig ist ohne
+aufgelösten Aufruf nicht erreichbar. Die 58-Sekunden-Sperre ist der Client-Timer
+(`ActivationScreen.tsx:8,39`), **nicht** die serverseitige Drossel — sie belegt
+den Zweig, nicht die Ratengrenze.
+
+Der Klick wurde bewusst vom Messenden ausgelöst, nicht vom Kontoinhaber: nur so
+liegt der Moment fest und der Mitschnitt ist vorher leer.
+
+**`redeem-activation` — belegt, aber nicht netzwerkseitig:**
+
+|            | gemessen                                                                       |
+| ---------- | ------------------------------------------------------------------------------ |
+| Server     | dasselbe Token `used_at 2026-08-07T12:20:43.278Z`                              |
+| Server     | `profiles.activated_at` = **12:20:43** — auf dieselbe Sekunde                  |
+| Oberfläche | davor `/aktivierung` „Passwort festlegen", danach `/login` — je ein Screenshot |
+| Netzwerk   | **nichts** — der Puffer war nach dem Einlösen beide Male leer                  |
+
+`/login` ist dabei der **vorgesehene** Ausgang, kein Defekt:
+`ActivationRedeemPage.tsx:66-70` ruft bei `activated` bewusst `signOut()` und
+leitet um, weil das neue Passwort alle Sitzungen widerruft.
+
+_Grenze, und sie ist echt: für `redeem-activation` gibt es **keinen
+Netzwerkbeleg**. Zweimal, mit vorher geleertem Mitschnitt, stand der Puffer
+danach leer. Die Ursache ist **nicht** geklärt — die naheliegende Erklärung
+„vollständiges Seitenladen" scheidet aus, `navigate()` ist clientseitig. Was
+den Weg trägt, sind die zwei Zeitstempel und die zwei Bildschirme, nicht ein
+Statuscode._
+
+_Zwei Werkzeugfallen, die dabei Belege gekostet haben: der Mitschnitt beginnt
+erst beim ersten Aufruf des Werkzeugs, und ein **Screenshot landet als
+`data:`-URI im Netzwerkprotokoll** und verdrängt dort alles andere. Reihenfolge
+deshalb immer: leeren → handeln → **Netzwerk lesen** → Screenshot._
+
 ---
 
 ## B2 — HOCH (operativ) · Auf PROD existiert keine der drei Functions
@@ -131,6 +182,83 @@ nicht aus dieser Zahl._
 _Der Deploy war benannt, nicht pauschal: `notify-contact-request` trägt auf PROD
 einen abweichenden `ezbr_sha256` (`6c0358f462eb` gegen `046dfb9d9619`) und
 wurde bewusst nicht mitgezogen — eigener Nachlauf, festgehalten als 11.4._
+
+---
+
+## P1 — HOCH (operativ) · Das Projekt, das „PROD" heißt, erreicht niemand
+
+Aufgefallen am 07.08. beim Suchen eines Testkontos. **Die ausgelieferte App
+zeigt auf `foelowldexkcqzewvrcf`** — das in `docs/supabase-environments.md:14`
+als **DEV** geführte Projekt. Drei voneinander unabhängige Belege:
+
+| Beleg                                                                     | Ergebnis                                                                   |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Bundle `fbc-platform.pages.dev/assets/index-DFTWa04C.js` nach beiden Refs | genau ein Treffer: `foelowldexkcqzewvrcf`, `viwntbodrtqxgmqyxluh` **null** |
+| `auth.users` in beiden Projekten nach den Testkonten vom 06./07.08.       | `foelowldexkcqzewvrcf` **2**, `viwntbodrtqxgmqyxluh` **0**                 |
+| Netzwerk im Browser beim echten Klick                                     | `…/functions/v1/resend-activation` auf **`foelowldexkcqzewvrcf`**          |
+
+Dazu zeigen `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` in Infisical
+**`--env=prod`** beide auf `foelowldexkcqzewvrcf` (der Anon-Key trägt den Ref im
+JWT). Das ist genau der Zustand, den `docs/supabase-environments.md:441` als
+„Rückweg" beschreibt — der Umschaltschritt aus Zeile 436 ist also nicht (oder
+nicht dauerhaft) vollzogen.
+
+**Was das für B2 heißt:** der Deploy dort hat stattgefunden und ist gemessen,
+aber er liegt auf dem Projekt, das **kein Mitglied benutzt**. B2 bleibt richtig
+als Vorbereitung des Umschaltens und ist als Aussage über den Live-Zustand
+wertlos. Umgekehrt gilt: alles, was hier im Browser gemessen wurde, ist am
+**echten** Weg der Mitglieder gemessen — nur eben nicht auf dem Projekt, das so
+heißt.
+
+**Was daraus folgt, aber hier nicht entschieden wird:** ob `viwntbodrtqxgmqyxluh`
+Ziel bleibt und wann umgeschaltet wird, ist eine offene Freigabe (10.3/11.2),
+keine Frage dieses Reviews. Der Befund ist, dass die **Beschriftung trügt** —
+und dass jede künftige Aussage „auf PROD gemessen" benennen muss, welchen der
+beiden Refs sie meint.
+
+---
+
+## P2 — MITTEL · Der anonyme Weg schweigt 24 Stunden lang, sichtbar wie Erfolg
+
+Am 07.08. beim Vorbereiten der Messung aufgefallen, bevor es Zeit gekostet hat.
+Liegt für ein Profil ein **offenes Token unter 24 h**, antwortet
+`issue_activation_token` mit `pending`: kein neues Token, **kein Versand**
+(`20260806090000_activation_self_request.sql`, Zweig „Schutzfenster"). Nach
+außen ist das von Erfolg nicht unterscheidbar — `send-activation` gibt in beiden
+Fällen `202`, und `/aktivierung` zeigt in beiden Fällen dieselbe grüne Meldung
+„der Link ist unterwegs".
+
+Das Schutzfenster ist richtig und begründet (es verhindert die Aussperrung, die
+den Umbau überhaupt ausgelöst hat). Der Befund ist die **Oberfläche**: wer die
+erste Mail nicht bekommen hat — Spam-Ordner, Tippfehler beim Import, Postfach
+voll — liest „Link ist unterwegs" und wartet bis zu 24 Stunden auf etwas, das
+nie geschickt wurde. Das ist derselbe Mechanismus wie E1, nur von der anderen
+Seite: dort verschluckt ein stiller Versandfehler den Link, hier eine bewusste
+Nicht-Versendung.
+
+Verschärfend: der Hauptweg (`resend-activation`) hat dieses Fenster **nicht** —
+er entwertet und gibt neu aus. Zwei Knöpfe („Bestätigungslink senden" auf dem
+Aktivierungsbildschirm, „Neuen Link senden" auf `/aktivierung`), die dasselbe zu
+tun versprechen, sich aber gegensätzlich verhalten — und deren grüne Meldung
+sich nicht unterscheidet.
+
+---
+
+## P3 — NIEDRIG · Es gibt keinen „Passwort vergessen"-Weg
+
+`rg 'resetPasswordForEmail|forgot|reset-password' src` findet **nichts**. Ein
+Mitglied, das sein Passwort vergisst, hat in der App keinen Selbstbedienungsweg
+zurück.
+
+Für **nicht aktivierte** Konten ist das gedeckt: `/aktivierung` fordert einen
+Link an, und `redeem-activation` setzt dabei ein neues Passwort — der
+Wiederherstellungsweg ist derselbe wie der Aktivierungsweg. Für **aktivierte**
+Konten greift das nicht mehr: `issue_activation_token` antwortet dort
+`already_activated`, verschickt nichts, und die Oberfläche sagt trotzdem dasselbe
+Grüne. Nach C10 ist das der Normalfall, nicht die Ausnahme.
+
+Nicht Teil dieses Changes — gehört als eigene Anforderung erfasst, sonst landet
+es beim ersten vergesslichen Mitglied auf `info@fairbusinessclub.de`.
 
 ---
 
