@@ -62,6 +62,25 @@ Dieselben zwei Werte gehören als **GitHub-Secrets** hinterlegt — ohne sie
 werden `migrate-dev` und `drift-gate` auf `main` rot. Das ist gewollt (das Gate
 schweigt nicht bei Nichtwissen), heißt aber: erst die Secrets, dann der Merge.
 
+### `SUPABASE_ACCESS_TOKEN` — für den Functions-Deploy (AGE-506)
+
+Ein **Supabase Personal Access Token**, hinterlegt als **Repo-Secret**. Ohne ihn
+kann der Job `functions` in `deploy.yml` nichts ausliefern.
+
+- **Wozu:** `supabase functions deploy <name> --project-ref <ref>` gegen beide
+  Projekte. Die Refs kommen aus `scripts/dev-project-ref.txt` und
+  `scripts/prod-project-ref.txt`, nicht aus einem Secret — ein Ziel, das nur im
+  Secret steht, ist im Review unsichtbar.
+- **Wo er herkommt:** Supabase-Dashboard → Account → Access Tokens. Er liegt
+  beim CLI sonst im Keychain, nicht als Datei — auf dem Rechner ist er also
+  nicht einfach abzugreifen und muss dort neu erzeugt werden.
+- **Reichweite, benannt statt beschwiegen:** ein PAT kann mehr als Functions
+  deployen, und als Repo-Secret ist er für jeden Workflow dieses Repos
+  erreichbar. Das ist die Bedingung, unter der der Job überhaupt läuft.
+- **Verhalten ohne ihn:** der Job schlägt **nur dann** fehl, wenn ein Merge
+  tatsächlich eine Function verändert hat — und sagt dann, was fehlt. Genau
+  dieser Fall war vorher der stille.
+
 > On the free tier, per-environment access control isn't available. Splitting
 > `dev`/`prod` into separate projects (for restricted prod visibility) is a
 > later, paid-plan concern — for the prototype, two environments in one project
