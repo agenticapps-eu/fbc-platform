@@ -57,22 +57,34 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Der Aufruf kommt aus dem Browser über `supabase.functions.invoke`, das
+// `content-type: application/json` setzt — damit ist der Preflight Pflicht.
+// Ohne diese Header scheitert er, und der Aufruf erreicht die Function nie
+// (gemessen 07.08., Review 8.7: OPTIONS → 405 ohne Access-Control-*). Muster
+// aus create-checkout-session.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 /** Antwortet immer gleich — der Aufrufer erfährt nie, ob es die Adresse gibt. */
 const ANGENOMMEN = () =>
   new Response(JSON.stringify({ accepted: true }), {
     status: 202,
-    headers: { "content-type": "application/json" },
+    headers: { ...CORS, "content-type": "application/json" },
   });
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST")
+    return new Response("Method Not Allowed", { status: 405, headers: CORS });
 
   let email: string;
   try {
     const body = await req.json();
     email = String(body?.email ?? "").trim();
   } catch {
-    return new Response("Bad Request", { status: 400 });
+    return new Response("Bad Request", { status: 400, headers: CORS });
   }
   if (!email || !email.includes("@")) return ANGENOMMEN();
 
@@ -85,7 +97,7 @@ Deno.serve(async (req) => {
       hasFrom: !!fromEmail,
       hasAppUrl: !!appUrl,
     });
-    return new Response("Server misconfigured", { status: 500 });
+    return new Response("Server misconfigured", { status: 500, headers: CORS });
   }
 
   const supabase = createClient(
@@ -105,7 +117,7 @@ Deno.serve(async (req) => {
 
   if (error) {
     log("error", "issue_failed", { code: error.code });
-    return new Response("Issue failed", { status: 502 });
+    return new Response("Issue failed", { status: 502, headers: CORS });
   }
 
   const row = Array.isArray(data) ? data[0] : data;

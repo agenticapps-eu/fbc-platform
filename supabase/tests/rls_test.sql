@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(153);
+select plan(161);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -698,6 +698,47 @@ select is(pg_temp.count_as_anon(
   'select count(*)::int from public.events where id = ''ffffffff-ffff-ffff-ffff-ffffffffffff'''),
   1, 'anon sieht weiterhin öffentliche Veranstaltungen');
 
+-- 13.7a Die Zahlen unter dem Schaufenster gehören dazu. Beide Zähler sind an
+-- anon vergeben; ohne diese Fälle bleibt unbemerkt, wenn ein Gate im Rumpf sie
+-- für den ausgeloggten Besucher leerlaufen lässt — kein Fehler, nur eine 0.
+-- Genau das war zwischen dem 06. und dem 07.08. der Fall (Review 8.7, T-D).
+select is(pg_temp.count_as_anon(
+  'select count(*)::int from public.post_engagement_counts(
+     array[''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb''::uuid])'),
+  1, 'anon bekommt weiterhin die Zahlen zum öffentlichen Beitrag');
+select is(pg_temp.count_as_anon(
+  'select count(*)::int from public.event_registration_counts(
+     array[''ffffffff-ffff-ffff-ffff-ffffffffffff''::uuid])'),
+  1, 'anon bekommt weiterhin die Zahlen zur öffentlichen Veranstaltung');
+
+-- Und die Gegenrichtung: ein EINGELOGGTES, nicht bestätigtes Konto bekommt sie
+-- nicht. Das ist der eigentliche Zweck des Gates — es darf nicht mehr sehen als
+-- ein ausgeloggter Besucher, aber die Zahlen sind personenbezogene Aggregate
+-- über Likes und Anmeldungen.
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.post_engagement_counts(
+     array[''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb''::uuid])'),
+  0, 'Gate: ein nicht aktiviertes Konto bekommt keine Beitragszahlen');
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.event_registration_counts(
+     array[''ffffffff-ffff-ffff-ffff-ffffffffffff''::uuid])'),
+  0, 'Gate: ein nicht aktiviertes Konto bekommt keine Teilnehmerzahlen');
+
+-- 13.7b recompute_potential_score ist SECURITY DEFINER und an `authenticated`
+-- vergeben. Ihr einziger Schutz war `v_caller <> p_profile_id` — also genau der
+-- `id = auth.uid()`-Zweig, den der Kopf von 20260806080100 als „die Luecke"
+-- benennt. Sie berichtet Zaehlungen ueber die eigenen Beitraege, Angebote,
+-- Anmeldungen und Empfehlungen und SCHREIBT dabei an zwei gegateten
+-- Write-Policies vorbei (Review 8.7, R1).
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'select public.recompute_potential_score(''dddddddd-0000-0000-0000-00000000000d''::uuid)'),
+  'DENIED:%not activated%',
+  'RPC-Gate: recompute_potential_score lehnt ein nicht aktiviertes Konto ab');
+select is(
+  (select count(*)::int from public.profile_theme_scores
+    where profile_id = 'dddddddd-0000-0000-0000-00000000000d'),
+  0, 'und hat dabei nichts nach profile_theme_scores geschrieben');
+
 -- 13.8 activation_tokens ist für Client-Rollen unerreichbar — kein Grant, keine
 -- Policy. Geprüft wird der GRANT, weil eine fehlende Policy allein nicht
 -- verhindert, dass jemand später eine hinzufügt.
@@ -749,6 +790,14 @@ select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.my_activation_state() where activated = true'),
   1, 'my_activation_state meldet danach „aktiviert"');
+-- Gegenprobe zu 13.7a/13.7b: die Sperren sind Gates, keine kaputten Funktionen.
+select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+  'select count(*)::int from public.post_engagement_counts(
+     array[''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb''::uuid])'),
+  1, 'Nach der Bestätigung kommen die Beitragszahlen wieder');
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'select public.recompute_potential_score(''dddddddd-0000-0000-0000-00000000000d''::uuid)'),
+  'OK', 'Nach der Bestätigung läuft recompute_potential_score wieder durch');
 
 -- ── 14. Die Service-Rollen-Funktionen (Teil C) ───────────────────────────────
 -- Sie bauen das Gate auf und umgehen es deshalb per Definition. Genau darum
