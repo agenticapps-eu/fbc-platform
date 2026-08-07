@@ -141,6 +141,17 @@ export default function LoginPage() {
             className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
           {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
+          {/* AGE-505. Der Weg gehört genau hierhin: Wer sein Passwort vergessen
+              hat, scheitert an DIESEM Feld und sucht ihn nirgendwo sonst. Im
+              Registrierungsmodus gibt es nichts zu vergessen. */}
+          {mode === "login" && (
+            <Link
+              to="/passwort-vergessen"
+              className="self-start text-sm text-muted hover:underline"
+            >
+              Passwort vergessen?
+            </Link>
+          )}
         </div>
 
         {formError && <p className="text-sm text-danger">{formError}</p>}

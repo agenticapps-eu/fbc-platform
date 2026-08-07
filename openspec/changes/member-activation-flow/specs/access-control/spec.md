@@ -559,8 +559,13 @@ begrenzen, nicht nur pro Absender-IP. Die Begrenzung SHALL serverseitig aus
 gespeichertem Zustand abgeleitet werden, damit sie auch bei mehreren gleichzeitig
 laufenden Instanzen gilt.
 
-Ein erneuter Versand an ein bereits aktiviertes Konto SHALL keine Mail auslösen
-und SHALL NOT als Fehler des Aufrufers behandelt werden.
+Eine erneute **Aktivierungs**anforderung für ein bereits aktiviertes Konto SHALL
+keine **Aktivierungsmail** auslösen — an einem aktivierten Konto gibt es nichts
+zu aktivieren — und SHALL NOT als Fehler des Aufrufers behandelt werden. Ein
+Versand zu **anderem Zweck** über denselben Endpunkt bleibt davon unberührt: den
+Weg zurück für ein Konto mit vergessenem Passwort regelt AGE-505
+(`password-reset-flow`). Ohne diese Verengung sagte der Satz mehr, als er
+schützen soll, und die beiden Changes widersprächen einander.
 
 Der Aktivierungsversand SHALL NOT über den eingebauten Mailversand der
 Auth-Plattform laufen. Dessen projektweite Grenze ist ohne eigenen SMTP-Dienst
@@ -573,10 +578,12 @@ außerdem SHALL Absender und Text unter der Kontrolle des Betreibers stehen.
   anfordert
 - **THEN** wird nur die erste Mail versendet
 
-#### Scenario: Anfordern für ein bereits aktiviertes Konto
+#### Scenario: Aktivierung anfordern für ein bereits aktiviertes Konto
 
-- **WHEN** ein bereits aktiviertes Konto einen Bestätigungslink anfordert
-- **THEN** wird keine Mail versendet und der Aufruf gilt als erfolgreich
+- **WHEN** ein bereits aktiviertes Konto über den Aktivierungsbildschirm einen
+  Bestätigungslink anfordert
+- **THEN** wird keine Aktivierungsmail versendet und der Aufruf gilt als
+  erfolgreich
 
 ## MODIFIED Requirements
 

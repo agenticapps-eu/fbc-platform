@@ -40,9 +40,30 @@ function renderMit(hash: string, auth = {}) {
   );
 }
 
+/**
+ * Derselbe Bauteil, anderer Zweck (AGE-505). Das Token trägt seinen Zweck nicht
+ * — die ROUTE tut es. Deshalb wird hier auch der Pfad mitgesetzt und nicht nur
+ * die Eigenschaft: sonst prüfte der Test eine Konstruktion, die es so nicht gibt.
+ */
+function renderReset(pfad: string, hash = "", auth = {}) {
+  window.history.replaceState(null, "", `${pfad}${hash}`);
+  return render(
+    <AuthContext.Provider value={fakeAuthValue({ isActivated: false, ...auth })}>
+      <MemoryRouter>
+        <ActivationRedeemPage zweck="reset" />
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  );
+}
+
 function passwortSetzen(wert: string) {
+  passwortSetzenMit(/Zugang freischalten/i, wert);
+}
+
+/** Wie oben, aber mit dem Knopf des jeweiligen Zwecks — der Wortlaut unterscheidet sie. */
+function passwortSetzenMit(knopf: RegExp, wert: string) {
   fireEvent.change(screen.getByLabelText(/Neues Passwort/i), { target: { value: wert } });
-  fireEvent.click(screen.getByRole("button", { name: /Zugang freischalten/i }));
+  fireEvent.click(screen.getByRole("button", { name: knopf }));
 }
 
 describe("ActivationRedeemPage", () => {
@@ -154,6 +175,57 @@ describe("ActivationRedeemPage", () => {
     const hinweis = await screen.findByText(/Wenn es zu dieser Adresse ein Konto gibt/i);
     expect(hinweis).toHaveTextContent(/letzten 24 Stunden/i);
     expect(hinweis).toHaveTextContent(/info@fairbusinessclub\.de/i);
+  });
+
+  // ── Passwort vergessen (AGE-505) ────────────────────────────────────────
+  // Wer hier landet, hat seinen Zugang längst bestätigt. „Zugang freischalten"
+  // wäre schlicht falsch — und „danach ist dein Zugang fertig" auch.
+
+  it("/passwort-neu spricht vom Passwort, nicht vom Bestätigen eines Zugangs", () => {
+    renderReset("/passwort-neu", "#token=geheim");
+    expect(screen.getByRole("heading", { name: /Neues Passwort setzen/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Neues Passwort setzen/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zugang freischalten/i })).not.toBeInTheDocument();
+  });
+
+  it("/passwort-neu kündigt die Abmeldung aller Geräte an, bevor sie passiert", () => {
+    // revoke_sessions läuft beim Einlösen mit. Steht das nicht auf dem Schirm,
+    // hält wer auf dem Telefon angemeldet war den Reset für kaputt.
+    renderReset("/passwort-neu", "#token=geheim");
+    expect(screen.getByText(/abgemeldet/i)).toBeInTheDocument();
+  });
+
+  it("/passwort-neu räumt das Token genauso aus der Adresszeile wie /aktivierung", () => {
+    renderReset("/passwort-neu", "#token=geheim");
+    expect(window.location.hash).toBe("");
+  });
+
+  it("/passwort-vergessen zeigt das Adressformular in der richtigen Sprache", () => {
+    renderReset("/passwort-vergessen");
+    expect(screen.getByRole("heading", { name: /Passwort vergessen/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Neues Passwort/i)).not.toBeInTheDocument();
+  });
+
+  it("/passwort-vergessen verrät nicht, ob es die Adresse gibt — und deckt alle Ausgänge ab", async () => {
+    renderReset("/passwort-vergessen");
+    fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
+      target: { value: "wer@auch.immer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Link senden/i }));
+    await waitFor(() => expect(requestActivationLink).toHaveBeenCalledWith("wer@auch.immer"));
+    const hinweis = await screen.findByText(/Wenn es zu dieser Adresse ein Konto gibt/i);
+    expect(hinweis).toHaveTextContent(/letzten 24 Stunden/i);
+    expect(hinweis).toHaveTextContent(/info@fairbusinessclub\.de/i);
+  });
+
+  it("Status used sagt im Reset-Fall nichts von „bereits aktiviert“", async () => {
+    // Beim Zurücksetzen heißt „schon benutzt" nicht „dein Konto ist aktiviert" —
+    // das ist es längst. Es heißt: das neue Passwort steht bereits.
+    vi.mocked(redeemActivation).mockResolvedValue("used");
+    renderReset("/passwort-neu", "#token=verbraucht");
+    passwortSetzenMit(/Neues Passwort setzen/i, "einlangespasswort");
+    expect(await screen.findByText(/bereits verwendet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/bereits aktiviert/i)).not.toBeInTheDocument();
   });
 
   it("leitet ein bereits aktiviertes Konto ohne Token still auf die Startseite", async () => {

@@ -24,7 +24,12 @@
 //   SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY spritzt die Plattform ein.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { activationUrl, renderActivation } from "./emails.ts";
+import {
+  activationUrl,
+  passwordResetUrl,
+  renderActivation,
+  renderPasswordReset,
+} from "./emails.ts";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 // Rückkanal, bewusst fest verdrahtet und nicht aus der Umgebung: er steht
@@ -123,18 +128,24 @@ Deno.serve(async (req) => {
   const row = Array.isArray(data) ? data[0] : data;
   const status = row?.status as string | undefined;
 
+  // Zwei Erfolgsfälle seit AGE-505: `issued` ist eine Aktivierung, `issued_reset`
+  // ein vergessenes Passwort. Der Unterschied kommt allein aus dem Kontostand
+  // und wird in der Datenbank bestimmt — hier entscheidet er nur noch über Text
+  // und Zieladresse.
+  const istReset = status === "issued_reset";
+
   // Kein Versand — aber dieselbe Antwort wie im Erfolgsfall. Die Adresse selbst
   // wird nie protokolliert; sie ist genau das Datum, das wir schützen.
-  if (status !== "issued") {
+  if (status !== "issued" && !istReset) {
     log("info", "no_mail", { status });
     return ANGENOMMEN();
   }
 
-  const mail = renderActivation({
-    name: String(row.display_name ?? ""),
-    // Immer die HINTERLEGTE Adresse, nie die mitgegebene.
-    url: activationUrl(appUrl, token),
-  });
+  const name = String(row.display_name ?? "");
+  // Immer die HINTERLEGTE Adresse, nie die mitgegebene.
+  const mail = istReset
+    ? renderPasswordReset({ name, url: passwordResetUrl(appUrl, token) })
+    : renderActivation({ name, url: activationUrl(appUrl, token) });
   const empfaenger = String(row.login_email);
 
   // Hat Resend den Versand ABGELEHNT, darf kein gültiges Token liegen bleiben:
@@ -187,7 +198,14 @@ Deno.serve(async (req) => {
         return;
       }
       const { id } = (await res.json().catch(() => ({}))) as { id?: string };
-      log("info", "mail_sent", { profileId: row.profile_id, resendId: id });
+      // `zweck` mitschreiben: im Protokoll sind die zwei Fälle sonst nicht zu
+      // trennen, und genau das ist die Frage, die beim ersten Support-Fall
+      // gestellt wird („kam bei ihr eine Reset-Mail an oder eine Aktivierung?").
+      log("info", "mail_sent", {
+        profileId: row.profile_id,
+        resendId: id,
+        zweck: istReset ? "reset" : "aktivierung",
+      });
     } catch (e) {
       // HIER wird BEWUSST NICHT entwertet — anders als im Zweig darüber.
       //

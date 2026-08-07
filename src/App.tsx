@@ -147,6 +147,12 @@ function AppInner() {
           nicht die Sitzung. Nur so funktioniert der Link in einem anderen
           Browser (AGE-495 §6). */}
       <Route path="/aktivierung" element={<ActivationRedeemPage />} />
+      {/* AGE-505: dasselbe Bauteil, derselbe Einlöse-Endpunkt, andere Sprache.
+          Das Token trägt seinen Zweck bewusst nicht mit sich — die Route ist
+          der einzige Träger, an dem sich entscheiden lässt, ob hier ein Zugang
+          bestätigt oder ein vergessenes Passwort ersetzt wird. */}
+      <Route path="/passwort-vergessen" element={<ActivationRedeemPage zweck="reset" />} />
+      <Route path="/passwort-neu" element={<ActivationRedeemPage zweck="reset" />} />
       {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
           außerhalb der AppShell (wie /login). */}
       <Route
