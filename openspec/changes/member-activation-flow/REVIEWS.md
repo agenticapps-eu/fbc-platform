@@ -63,6 +63,31 @@ VERDICT: APPROVE
 - **PII in Rate-Limiting:** The requirement for rate-limiting the `redeem-activation` function mentions storing the "Herkunftsangabe" (origin information, likely IP address). It correctly states this is PII and should only be stored temporarily. It should be made explicit that this data must be handled with care and must not be logged or persisted beyond the short-term needs of the rate-limiter.
 - **Missing Scenario:** The spec correctly identifies and addresses the risk of a "nuisance attack" where an attacker repeatedly requests activation links to invalidate a legitimate user's link. The mitigation is that sessionless requests will not invalidate an existing, valid link. A formal scenario should be added under "Requirement: Der Weg zur Aktivierung setzt keine Anmeldung voraus" to explicitly test this mitigation, as it's a critical non-obvious behavior.
 
+## Nach der Review geändert — 2026-08-07
+
+Das Delta wurde **nach** diesen drei Reviews angefasst. Wer sie gelesen hat,
+muss das sehen; der `tasks-digest` im Trailer stimmt seitdem nicht mehr.
+
+**Requirement „Der Aktivierungsversand ist gegen Selbstüberflutung begrenzt".**
+Der Satz „Ein erneuter Versand an ein bereits aktiviertes Konto SHALL keine Mail
+auslösen" und sein Szenario sind auf **Aktivierungs**mail verengt. Grund:
+AGE-505 (`password-reset-flow`) gibt für ein aktiviertes Konto sehr wohl ein
+Token aus — als **Passwort-Reset**, nicht als Aktivierung. Der Satz meinte immer
+schon nur den Aktivierungszweck; wörtlich genommen widerspräche er dem zweiten
+Change. Entscheidung Donald, 2026-08-07.
+
+Der authentifizierte Weg (`request_own_activation_token`) ändert sich dadurch
+**nicht** — er lehnt ein aktiviertes Konto weiter ab, und das Szenario benennt
+jetzt ausdrücklich den Aktivierungsbildschirm als Auslöser.
+
+**Requirement „Der Weg zur Aktivierung setzt keine Anmeldung voraus"** hat am
+selben Tag zwei Absätze und zwei Szenarien dazubekommen (PR #133, Befund E1/P2:
+ein fehlgeschlagener Versand entwertet sein eigenes Token, und die Meldung deckt
+alle Ausgänge ab). Das adressiert codex' vierten Punkt oben — „The recovery path
+has no adequate lost-mail scenario" — der bis dahin offen stand.
+
+Beides ist **nicht** erneut von anderen Anbietern gegengelesen.
+
 <!-- openspec-review-trailer v1
 implementing-host: claude
 digest: sha256:807398b1c3f26513e66809a0ecf417aad99f63d55e945a2348551582b57d18a9

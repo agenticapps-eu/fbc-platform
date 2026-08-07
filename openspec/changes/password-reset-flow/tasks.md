@@ -11,14 +11,14 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 1. Den Widerspruch im offenen Delta auflösen
 
-- [ ] 1.1 In `openspec/changes/member-activation-flow/specs/access-control/spec.md`
+- [x] 1.1 In `openspec/changes/member-activation-flow/specs/access-control/spec.md`
       den Satz „Ein erneuter Versand an ein bereits aktiviertes Konto SHALL keine
       Mail auslösen" auf **Aktivierungsmail** verengen, mit Verweis auf AGE-505.
-- [ ] 1.2 Das Szenario „Anfordern für ein bereits aktiviertes Konto" entsprechend
+- [x] 1.2 Das Szenario „Anfordern für ein bereits aktiviertes Konto" entsprechend
       verengen: keine **Aktivierungs**mail.
-- [ ] 1.3 Die Änderung in `member-activation-flow/REVIEWS.md` vermerken — ein
+- [x] 1.3 Die Änderung in `member-activation-flow/REVIEWS.md` vermerken — ein
       bereits reviewtes Delta wurde angefasst; wer es gelesen hat, muss das sehen.
-- [ ] 1.4 `openspec validate --all` grün.
+- [x] 1.4 `openspec validate --all` grün.
 
 ## 2. Datenbank — der Zweig wandert
 
