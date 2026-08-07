@@ -84,6 +84,27 @@ Infisical-Werte + Re-Deploy". Danach zeigt das Frontend auf ein Projekt ohne
 Aktivierungs-Functions, und C10 liefe in ein Feld gesperrter Konten.
 → gehört auf die Vorbedingungsliste 11.2.
 
+**Behoben 07.08.**, rot vorher / grün nachher gemessen. Rot: `OPTIONS` auf alle
+drei → `404`. Deploy mit `supabase functions deploy send-activation
+resend-activation redeem-activation --project-ref viwntbodrtqxgmqyxluh`. Grün:
+
+|                                                | belegt womit                                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Code ist **derselbe**, nicht nur ein ähnlicher | `ezbr_sha256` byte-gleich mit `foelowldexkcqzewvrcf`: `2d58d7e4c077` · `7788f54b506c` · `3f649770921c`                     |
+| B1 gilt auch auf PROD                          | `OPTIONS` → `200` mit `ACAO: *` und `ACAH` auf allen dreien                                                                |
+| `verify_jwt` stimmt                            | `false` / `true` / `false` — aus `config.toml`, nicht von Hand gesetzt                                                     |
+| die drei Function-Secrets **stehen**           | `POST send-activation` → `202`; der `missing_config`-Zweig (`index.ts:94`) liegt **vor** dem RPC und hätte `500` geliefert |
+
+_Grenze der letzten Zeile: das `202` belegt die Secrets, **nicht** den
+Datenbankweg — es ist dieselbe Antwort, die die Function zur Abwehr von
+Adressaufzählung in fast jedem Zweig gibt. Dass `issue_activation_token` auf
+PROD existiert, folgt aus der am 07.08. beidseitig nachgemessenen Migration,
+nicht aus dieser Zahl._
+
+_Der Deploy war benannt, nicht pauschal: `notify-contact-request` trägt auf PROD
+einen abweichenden `ezbr_sha256` (`6c0358f462eb` gegen `046dfb9d9619`) und
+wurde bewusst nicht mitgezogen — eigener Nachlauf, festgehalten als 11.4._
+
 ---
 
 ## RLS-Gate
