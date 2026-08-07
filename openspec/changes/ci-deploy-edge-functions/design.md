@@ -9,9 +9,10 @@ Bestand, den der Entwurf benutzt, ist schon da:
   Vorbedingungen, die auch für Functions gelten müssen.
 - `supabase/setup-cli` ist in beiden Workflows schon eingebunden.
 
-Was fehlt, ist ein GitHub-Secret `SUPABASE_ACCESS_TOKEN` (ein Supabase-PAT).
-Vorhanden sind nur `INFISICAL_TOKEN`, `SENTRY_AUTH_TOKEN`, `SUPABASE_DB_URL_DEV`
-und `SUPABASE_DB_URL_PROD`.
+Der PAT ist ebenfalls schon da: `SUPABASE_ACCESS_TOKEN` liegt seit AGE-496 in
+**Infisical, env `dev`**. Als GitHub-Secret existiert er nicht — und muss es auch
+nicht, weil `INFISICAL_TOKEN` dort bereits liegt und der `deploy`-Job das Muster
+`infisical run` schon vormacht. **Es kommt kein neues GitHub-Secret dazu.**
 
 ## Goals / Non-Goals
 
@@ -81,9 +82,17 @@ Frontend; die Function zieht gleich. Zurücknehmbar durch Deploy des vorigen
 Commits.
 
 **Der PAT ist ein weitreichendes Geheimnis.** Er kann mehr als Functions
-deployen. Er liegt als Repo-Secret und ist damit für jeden Workflow des Repos
-erreichbar — das ist die Bedingung, unter der der Job überhaupt läuft, und
-gehört benannt statt beschwiegen.
+deployen. Deshalb umschließt `infisical run` im Job **nur** den
+`supabase`-Aufruf und nicht den ganzen Schritt: der Wert lebt im Prozess, der ihn
+braucht, und in keinem anderen. Und die Vorbedingung wird über den **Exit-Code**
+geprüft, nie über eine Ausgabe.
+
+**Er liegt in `dev`, obwohl der Job auch auf PROD ausliefert.** Ein PAT
+authentifiziert den Betreiber kontoweit und ist kein umgebungsspezifischer Wert.
+Verworfen wurde, ihn zusätzlich nach `prod` zu legen: dieselbe Zugangsdatei an
+zwei Stellen heißt, dass die nächste Rotation eine davon vergisst. Der Preis ist,
+dass der prod-ausliefernde Job `INFISICAL_ENV: dev` trägt — das sieht auf den
+ersten Blick falsch aus und steht deshalb im Workflow ausführlich begründet.
 
 **`git diff HEAD^ HEAD` setzt einen Vorgänger voraus.** Beim allerersten Commit
 oder nach einem Force-Push gibt es ihn nicht; der Job fängt das ab und liefert

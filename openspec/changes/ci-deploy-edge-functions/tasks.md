@@ -40,8 +40,9 @@ Linear: **AGE-506**. TDD — RED vor GREEN, roter Lauf zitiert statt behauptet.
 - [x] 3.1 Aufgabe 11.2 (f) in `member-activation-flow/tasks.md` auf den neuen
       Zustand bringen — die Regel wird **ersetzt**, nicht ergänzt, sonst stehen
       zwei Wahrheiten nebeneinander.
-- [x] 3.2 `docs/secrets.md` um `SUPABASE_ACCESS_TOKEN` ergänzen: wozu, wo er
-      liegt, und dass er ein Repo-Secret ist.
+- [x] 3.2 `docs/secrets.md` um `SUPABASE_ACCESS_TOKEN` ergänzen: wozu, dass er
+      in Infisical (`dev`) liegt und warum dort, und dass kein neues
+      GitHub-Secret dazukommt.
 - [ ] 3.3 In `openspec/changes/password-reset-flow/tasks.md` Aufgabe 6.2
       nachziehen, sobald der Job steht.
 
@@ -51,8 +52,11 @@ Linear: **AGE-506**. TDD — RED vor GREEN, roter Lauf zitiert statt behauptet.
 - [x] 4.2 YAML-Syntax belegen, nicht annehmen (`actionlint` oder ein
       gleichwertiger Parser-Lauf).
 - [ ] 4.3 Unabhängiger Code-Review auf den Diff. Löst Donald aus.
-- [ ] 4.4 **Blocker, außerhalb des Repos:** `SUPABASE_ACCESS_TOKEN` als
-      Repo-Secret hinterlegen. Donald.
+- [x] 4.4 ~~Blocker: `SUPABASE_ACCESS_TOKEN` als Repo-Secret hinterlegen.~~
+      **Entfällt.** Der PAT liegt seit AGE-496 in Infisical (`dev`); der Job
+      zieht ihn über `infisical run`. Nachgesehen statt angenommen — er ist in
+      `dev` vorhanden und in `prod` nicht, und genau deshalb liest der Job
+      `dev` (Begründung im Workflow und in `design.md`).
 - [ ] 4.5 **Der erste echte Lauf ist die Abnahme.** Nach dem Merge prüfen, dass
       der Job lief, was er deployt hat und was er übersprang — und den
       `functions list`-Vergleich je Projekt lesen. Vorher gilt der Job als

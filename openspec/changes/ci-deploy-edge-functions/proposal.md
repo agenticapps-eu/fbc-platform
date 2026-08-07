@@ -27,8 +27,10 @@ was hier zweimal versagt hat.
 - `docs/secrets.md` und die Aufgabe 11.2 (f) werden auf den neuen Zustand
   gebracht: die Merkregel wird durch den Job ersetzt, nicht ergänzt.
 
-**Blocker, der außerhalb des Repos liegt:** `SUPABASE_ACCESS_TOKEN` existiert
-nicht als GitHub-Secret. Ohne ihn kann der Job nichts tun.
+Der PAT kommt **aus Infisical** (`SUPABASE_ACCESS_TOKEN`, env `dev`), gezogen
+zur Laufzeit über `infisical run` — dasselbe Muster, das der `deploy`-Job schon
+benutzt. **Es kommt kein neues GitHub-Secret dazu**; `INFISICAL_TOKEN` liegt
+bereits dort.
 
 ## Capabilities
 
