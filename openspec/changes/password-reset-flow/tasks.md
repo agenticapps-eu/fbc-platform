@@ -22,24 +22,24 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 2. Datenbank — der Zweig wandert
 
-- [ ] 2.1 **RED:** In `rls_test.sql` einen Block ergänzen, der für ein
+- [x] 2.1 **RED:** In `rls_test.sql` einen Block ergänzen, der für ein
       **aktiviertes** Profil `issued_reset` erwartet, plus genau ein offenes
       Token. Muss fehlschlagen, solange `already_activated` zurückkommt.
       `plan(N)` mitziehen.
-- [ ] 2.2 **RED:** Assertions, dass die drei Grenzen auch auf dem Reset-Weg
+- [x] 2.2 **RED:** Assertions, dass die drei Grenzen auch auf dem Reset-Weg
       greifen — 60-s-Sperre, Schutzfenster (offener Link wird nicht entwertet),
       Tageskontingent. Das ist der Kern von Entscheidung 2 im `design.md`; ohne
       diese Assertions ist die Umstellung der Reihenfolge ungeprüft.
-- [ ] 2.3 **RED:** Assertion, dass `already_activated` von
+- [x] 2.3 **RED:** Assertion, dass `already_activated` von
       `issue_activation_token` **nicht mehr** kommt — sonst merkt niemand, wenn
       der Zweig versehentlich wieder vorne landet.
-- [ ] 2.4 **GREEN:** Migration `<ts>_activation_token_reset_zweck.sql` —
+- [x] 2.4 **GREEN:** Migration `<ts>_activation_token_reset_zweck.sql` —
       Neudeklaration von `issue_activation_token`. Kopf trägt Befund,
       Entscheidung, verworfene Alternative (Spalte `purpose`) und die Begründung
       für die neue Reihenfolge.
-- [ ] 2.5 Belegen, dass `request_own_activation_token` **unverändert** ist und
+- [x] 2.5 Belegen, dass `request_own_activation_token` **unverändert** ist und
       seinen `already_activated`-Zweig behält (Non-Goal aus `design.md`).
-- [ ] 2.6 Grants unverändert: `issue_activation_token` bleibt `service_role`-only.
+- [x] 2.6 Grants unverändert: `issue_activation_token` bleibt `service_role`-only.
       Die vorhandenen Assertions müssen weiter halten.
 
 ## 3. Versand — zweiter Text, zweite Zieladresse

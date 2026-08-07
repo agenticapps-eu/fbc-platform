@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(170);
+select plan(179);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -836,8 +836,14 @@ select is((select count(*)::int from public.activation_tokens
 select is((select status from public.issue_activation_token('nicht-da@test.fbc', 'hash-x')),
   'unknown', 'issue: eine unbekannte Adresse bekommt „unknown" — und die '
              'Function wirft nicht, damit die Antwort keine Adressen verrät');
+-- Bis AGE-505 stand hier `already_activated` — „ein bereits aktiviertes Konto
+-- bekommt keinen Link". Das war die alte Wahrheit und ist ausdrücklich ersetzt
+-- worden: es war zugleich der Grund, warum ein Mitglied mit vergessenem
+-- Passwort keinen Rückweg hatte. Der Aufruf gibt jetzt aus, mit eigenem Status.
+-- Der ANGEMELDETE Weg lehnt weiterhin ab; das prüft der request_own-Block.
 select is((select status from public.issue_activation_token('impact@test.fbc', 'hash-y')),
-  'already_activated', 'issue: ein bereits aktiviertes Konto bekommt keinen Link');
+  'issued_reset', 'issue: ein bereits aktiviertes Konto bekommt einen '
+                  'Passwort-Reset-Link statt einer Absage (AGE-505)');
 
 -- Ratengrenze. Das eben ausgegebene Token ist Sekunden alt.
 select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zwei')),
@@ -965,6 +971,76 @@ select is((select public.invalidate_activation_token('hash-selbst')),
 select is((select public.invalidate_activation_token('gibt-es-nicht')),
   false, 'invalidate: ein unbekannter Hash meldet false und wirft nicht — die '
          'Function läuft im Fehlerpfad, sie darf ihn nicht verbreitern');
+-- ── 14b-ter. Der Rückweg für ein AKTIVIERTES Konto (AGE-505) ────────────────
+-- Bisher endete genau dieser Aufruf mit `already_activated`: kein Token, keine
+-- Mail — und die Oberfläche meldete trotzdem Erfolg. Nach C10 ist „aktiviert"
+-- der Normalfall, also war das der Normalfall ohne Rückweg.
+--
+-- Der Zweig gibt jetzt aus, mit eigenem Status. Entscheidend ist dabei nicht,
+-- DASS er ausgibt, sondern dass er es erst NACH den drei Grenzen tut — sonst
+-- wäre der Rückweg der Weg an ihnen vorbei. Genau das prüfen die Assertions
+-- unten der Reihe nach.
+update public.profiles set activated_at = now() - interval '1 day'
+ where id = '99999999-9999-9999-9999-999999999999';
+delete from public.activation_tokens
+ where profile_id = '99999999-9999-9999-9999-999999999999';
+
+-- Non-Goal aus AGE-505, hier festgenagelt statt nur behauptet: der ANGEMELDETE
+-- Weg lehnt ein aktiviertes Konto weiterhin ab. Wer angemeldet ist, hat kein
+-- vergessenes Passwort — er kommt ja rein. Der Rückweg ist der anonyme.
+select is(pg_temp.count_as('99999999-9999-9999-9999-999999999999',
+  'select count(*)::int from public.request_own_activation_token(''hash-angemeldet'') '
+  'where status = ''already_activated'''),
+  1, 'request_own: ein aktiviertes Konto bekommt weiterhin KEINEN Link — '
+     'already_activated lebt dort weiter, nur nicht mehr im anonymen Weg');
+
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-reset')),
+  'issued_reset', 'reset: ein aktiviertes Konto bekommt ein Token — und der '
+                  'Status sagt, dass es ein Passwort-Reset ist, kein Aktivieren. '
+                  'Derselbe Aufruf lieferte vorher „already_activated"');
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = '99999999-9999-9999-9999-999999999999'
+              and used_at is null and invalidated_at is null),
+  1, 'reset: genau ein ausstehendes Token');
+
+-- Grenze 1: die 60-s-Sperre. Das eben ausgegebene Token ist Sekunden alt.
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-r2')),
+  'rate_limited', 'reset: die 60-s-Sperre gilt auch für den Rückweg');
+
+-- Grenze 2: das Schutzfenster. Auch nach der Sperre passiert nichts, solange ein
+-- gültiger Link im Postfach liegt — sonst entwertet ein Fremder mit blosser
+-- Adresskenntnis den Reset-Link des Mitglieds.
+update public.activation_tokens set created_at = now() - interval '5 minutes'
+ where token_hash = 'hash-reset';
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-r3')),
+  'pending', 'reset: das Schutzfenster gilt auch für den Rückweg');
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = '99999999-9999-9999-9999-999999999999'
+              and used_at is null and invalidated_at is null),
+  1, 'reset: das Schutzfenster legt auch hier kein zweites Token an');
+
+-- Das Reset-Token fährt auf dem VORHANDENEN Einlöseweg. claim_activation_token
+-- bleibt unverändert — es fragt nicht, ob das Profil aktiviert ist.
+select is((select status from public.claim_activation_token('hash-reset')),
+  'claimed', 'reset: das Token wird auf dem vorhandenen Einlöseweg beansprucht');
+
+-- Und das Einlösen nimmt die Aktivierung nicht zurück. Stünde hier `now()`,
+-- schriebe ein Passwort-Reset die Mitgliedschaftsgeschichte um.
+select is((select public.mark_activated('99999999-9999-9999-9999-999999999999')
+             < now() - interval '23 hours'),
+  true, 'reset: der Aktivierungszeitpunkt bleibt der alte und wird nicht '
+        'überschrieben');
+
+-- Grenze 3: das Tageskontingent. Fünf Ausgaben im Fenster, alle älter als die
+-- 60-s-Sperre und keine mehr offen — damit greifen weder Sperre noch
+-- Schutzfenster, und was übrig bleibt, ist die Tagesgrenze.
+insert into public.activation_tokens (token_hash, profile_id, expires_at, invalidated_at, created_at)
+select 'hash-tag-' || g, '99999999-9999-9999-9999-999999999999',
+       now() + interval '72 hours', now(), now() - interval '10 minutes'
+  from generate_series(1, 4) g;
+select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zuviel')),
+  'rate_limited_day', 'reset: das Tageskontingent gilt auch für den Rückweg — '
+                      'Aktivierung und Reset teilen es sich');
 
 select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
   false, 'revoke_sessions: authenticated darf nicht');
