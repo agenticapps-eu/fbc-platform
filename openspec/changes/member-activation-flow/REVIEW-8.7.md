@@ -72,6 +72,33 @@ Ein echter Klick auf „Bestätigungslink senden" bleibt die letzte Abnahme;
 er gehört zu 10.4. **Nicht dieselbe Prüfung wiederholen, die den Befund erst
 möglich gemacht hat** — der Serverweg war auch am 06.08. grün.
 
+### Der Client-Pfad ist nachgeholt — im Browser, nicht per curl (07.08.)
+
+`https://fbc-platform.pages.dev/aktivierung`, echter Klick auf „Neuen Link
+senden" (`ActivationRedeemPage.tsx:153` → `requestActivationLink` →
+`send-activation`):
+
+|                   | gemessen                                                                  |
+| ----------------- | ------------------------------------------------------------------------- |
+| Preflight         | `OPTIONS …/functions/v1/send-activation` → **200**, vom Browser ausgelöst |
+| Oberfläche danach | der **Erfolgszweig** („… ist der Link unterwegs. Er gilt 72 Stunden …")   |
+
+Die zweite Zeile trägt den Beweis, nicht die erste. `requestActivationLink`
+wirft bei Fehler (`activation.ts:88`), und die Seite zeigt dann den
+Fehlerzweig. Dass die grüne Meldung erscheint, heißt: `functions.invoke` hat
+**aufgelöst** — Preflight bestanden _und_ POST durchgekommen. Vor dem Fix war
+genau das tot.
+
+Adresse war `…@example.invalid`, eine TLD, die nicht existieren kann: der Weg
+lief vollständig durch, ohne eine Mail auszulösen.
+
+**Was weiterhin offen ist:** `resend-activation` (`verify_jwt=true`, der Knopf
+„Bestätigungslink senden" in `ActivationScreen.tsx:92`) und
+`redeem-activation`. Beide setzen ein **angemeldetes, nicht aktiviertes** Konto
+voraus. Der gemessene Weg ist der einzige der drei, der ohne Sitzung
+erreichbar ist — er belegt den CORS-Fix als solchen, aber nicht den
+Gateway-Pfad mit JWT-Prüfung.
+
 ---
 
 ## B2 — HOCH (operativ) · Auf PROD existiert keine der drei Functions
