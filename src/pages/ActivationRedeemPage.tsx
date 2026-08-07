@@ -13,6 +13,56 @@ import { useAuth } from "../providers/auth-context";
 /** Muss zu `minimum_password_length` (config.toml) und `MIN_PASSWORT` der Function passen. */
 const MIN_PASSWORT = 10;
 
+export type Zweck = "aktivierung" | "reset";
+
+/**
+ * Der Wortlaut je Zweck (AGE-505).
+ *
+ * Mechanik, Token und Einlöse-Endpunkt sind identisch — was sich unterscheidet,
+ * ist die Lage des Mitglieds. Wer hier über `/passwort-neu` landet, hat seinen
+ * Zugang längst bestätigt: „Zugang freischalten" wäre falsch, und „danach ist
+ * dein Zugang fertig" auch. Umgekehrt hat, wer aktiviert, noch kein Passwort
+ * vergessen. Zwei Texte, eine Mechanik.
+ */
+const TEXTE: Record<
+  Zweck,
+  {
+    titelToken: string;
+    hinweisToken: string;
+    knopf: string;
+    titelAnfordern: string;
+    hinweisAnfordern: string;
+    knopfAnfordern: string;
+    used: string;
+  }
+> = {
+  aktivierung: {
+    titelToken: "Passwort festlegen",
+    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT} Zeichen. Danach ist dein Zugang fertig.`,
+    knopf: "Zugang freischalten",
+    titelAnfordern: "Bestätigungslink anfordern",
+    hinweisAnfordern:
+      "Gib die E-Mail-Adresse ein, unter der du im Club bekannt bist. Wir schicken dir einen neuen Link.",
+    knopfAnfordern: "Neuen Link senden",
+    used: "Dieses Konto ist bereits aktiviert. Du kannst dich direkt anmelden.",
+  },
+  reset: {
+    titelToken: "Neues Passwort setzen",
+    // Die Abmeldung steht hier, BEVOR sie passiert: `revoke_sessions` läuft
+    // beim Einlösen mit, und wer auf dem Telefon angemeldet war, hielte den
+    // Reset sonst für kaputt.
+    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT} Zeichen. Danach wirst du auf allen Geräten abgemeldet und meldest dich einmal neu an.`,
+    knopf: "Neues Passwort setzen",
+    titelAnfordern: "Passwort vergessen",
+    hinweisAnfordern:
+      "Gib die E-Mail-Adresse ein, unter der du im Club bekannt bist. Wir schicken dir einen Link zum Zurücksetzen.",
+    knopfAnfordern: "Link senden",
+    // „bereits aktiviert" wäre hier keine Auskunft, sondern eine Verwechslung:
+    // das Konto IST aktiviert, darum geht es gar nicht.
+    used: "Dieser Link wurde bereits verwendet. Melde dich mit deinem neuen Passwort an.",
+  },
+};
+
 /**
  * `/aktivierung` — Token einlösen und eigenes Passwort setzen (AGE-495 / C3).
  *
@@ -24,7 +74,8 @@ const MIN_PASSWORT = 10;
  * der Weg für ein Mitglied, dessen verteiltes Passwort ein Dritter geändert hat:
  * Es käme sonst an der Anmeldung nicht vorbei und nie an einen neuen Link.
  */
-export default function ActivationRedeemPage() {
+export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?: Zweck } = {}) {
+  const t = TEXTE[zweck];
   const navigate = useNavigate();
   const { user, isActivated, signOut } = useAuth();
   // Nur einmal lesen: `leseTokenAusFragment` räumt die Adresszeile auf, ein
@@ -95,12 +146,9 @@ export default function ActivationRedeemPage() {
         <>
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-              Passwort festlegen
+              {t.titelToken}
             </h1>
-            <p className="mt-2 text-sm text-muted">
-              Wähle ein eigenes Passwort mit mindestens {MIN_PASSWORT} Zeichen. Danach ist dein
-              Zugang fertig.
-            </p>
+            <p className="mt-2 text-sm text-muted">{t.hinweisToken}</p>
           </div>
 
           <form onSubmit={einlösen} className="flex flex-col gap-4" noValidate>
@@ -123,10 +171,10 @@ export default function ActivationRedeemPage() {
               )}
             </div>
 
-            <StatusMeldung status={status} />
+            <StatusMeldung status={status} zweck={zweck} />
 
             <Button type="submit" variant="primary" disabled={läuft}>
-              Zugang freischalten
+              {t.knopf}
             </Button>
           </form>
 
@@ -143,6 +191,7 @@ export default function ActivationRedeemPage() {
               angefordert={angefordert}
               läuft={läuft}
               onSubmit={neuenLinkAnfordern}
+              knopf={t.knopfAnfordern}
             />
           )}
         </>
@@ -150,12 +199,9 @@ export default function ActivationRedeemPage() {
         <>
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-              Bestätigungslink anfordern
+              {t.titelAnfordern}
             </h1>
-            <p className="mt-2 text-sm text-muted">
-              Gib die E-Mail-Adresse ein, unter der du im Club bekannt bist. Wir schicken dir einen
-              neuen Link.
-            </p>
+            <p className="mt-2 text-sm text-muted">{t.hinweisAnfordern}</p>
           </div>
           <LinkAnfordern
             adresse={adresse}
@@ -163,6 +209,7 @@ export default function ActivationRedeemPage() {
             angefordert={angefordert}
             läuft={läuft}
             onSubmit={neuenLinkAnfordern}
+            knopf={t.knopfAnfordern}
           />
         </>
       )}
@@ -183,12 +230,12 @@ export default function ActivationRedeemPage() {
  * einer gemeinsamen Meldung bekäme, wer zweimal anfordert und den ersten Link
  * klickt, eine schlicht falsche Auskunft.
  */
-function StatusMeldung({ status }: { status: RedeemStatus | null }) {
+function StatusMeldung({ status, zweck }: { status: RedeemStatus | null; zweck: Zweck }) {
   if (!status || status === "weak_password" || status === "activated") return null;
 
   const texte: Record<Exclude<RedeemStatus, "weak_password" | "activated">, string> = {
     expired: "Dieser Link ist abgelaufen — er gilt 72 Stunden. Fordere unten einen neuen an.",
-    used: "Dieses Konto ist bereits aktiviert. Du kannst dich direkt anmelden.",
+    used: TEXTE[zweck].used,
     superseded:
       "Dieser Link ist nicht mehr gültig, weil danach ein neuer angefordert wurde. " +
       "Nimm den neuesten Link aus deinem Postfach — oder fordere unten einen an.",
@@ -220,14 +267,20 @@ function LinkAnfordern({
   angefordert,
   läuft,
   onSubmit,
+  knopf,
 }: {
   adresse: string;
   setAdresse: (v: string) => void;
   angefordert: boolean;
   läuft: boolean;
   onSubmit: (e: React.FormEvent) => void;
+  knopf: string;
 }) {
   if (angefordert) {
+    // Diese eine Meldung steht für DREI Ausgänge: Link ausgegeben,
+    // Schutzfenster (offener Link unter 24 h — es geht nichts raus) und
+    // unbekannte Adresse. Unterscheiden darf sie sie nicht, das wäre die
+    // Adressaufzählung. Also muss sie alle drei abdecken.
     return (
       <p className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
         Wenn es zu dieser Adresse ein Konto gibt, ist der Link unterwegs. Er gilt 72 Stunden; schau
@@ -251,7 +304,7 @@ function LinkAnfordern({
         className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       />
       <Button type="submit" variant="secondary" disabled={läuft}>
-        Neuen Link senden
+        {knopf}
       </Button>
     </form>
   );

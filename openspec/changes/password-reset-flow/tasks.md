@@ -61,18 +61,18 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 4. Oberfläche
 
-- [ ] 4.1 **RED:** `LoginPage.test.tsx` — die Anmeldeseite trägt einen sichtbaren
+- [x] 4.1 **RED:** `LoginPage.test.tsx` — die Anmeldeseite trägt einen sichtbaren
       Weg zum Zurücksetzen.
-- [ ] 4.2 **RED:** Test für `/passwort-vergessen`: Adressformular, danach die
+- [x] 4.2 **RED:** Test für `/passwort-vergessen`: Adressformular, danach die
       Alle-Ausgänge-Meldung mit Rückkanal (dieselbe Regel wie 11.6).
-- [ ] 4.3 **RED:** Test für `/passwort-neu`: Token aus dem Fragment, Passwort
+- [x] 4.3 **RED:** Test für `/passwort-neu`: Token aus dem Fragment, Passwort
       setzen, danach `/login` — und die Wortwahl spricht vom **Passwort**, nicht
       vom Bestätigen eines Zugangs.
-- [ ] 4.4 **GREEN:** Zweck-Schalter am Einlöse-Bauteil, zwei Routen in `App.tsx`,
+- [x] 4.4 **GREEN:** Zweck-Schalter am Einlöse-Bauteil, zwei Routen in `App.tsx`,
       Link auf `LoginPage.tsx`.
-- [ ] 4.5 Die Adresszeile wird auch auf `/passwort-neu` aufgeräumt — das Token
+- [x] 4.5 Die Adresszeile wird auch auf `/passwort-neu` aufgeräumt — das Token
       darf dort so wenig stehenbleiben wie auf `/aktivierung`.
-- [ ] 4.6 **Lokal zeigen, bevor committet wird.** Grüne Tests haben in AGE-492
+- [x] 4.6 **Lokal zeigen, bevor committet wird.** Grüne Tests haben in AGE-492
       ein visuell falsches Ergebnis durchgewunken.
 
 ## 5. Gates

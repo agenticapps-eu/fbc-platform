@@ -72,4 +72,12 @@ describe("LoginPage", () => {
     renderLogin();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
   });
+
+  // AGE-505. Der Weg muss genau hier stehen: Wer sein Passwort vergessen hat,
+  // scheitert an DIESER Seite und sucht ihn nirgendwo sonst.
+  it("bietet einen Weg für ein vergessenes Passwort an", () => {
+    renderLogin();
+    const link = screen.getByRole("link", { name: /Passwort vergessen/i });
+    expect(link).toHaveAttribute("href", "/passwort-vergessen");
+  });
 });
