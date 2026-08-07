@@ -137,6 +137,24 @@ Deno.serve(async (req) => {
   });
   const empfaenger = String(row.login_email);
 
+  // Hat Resend den Versand ABGELEHNT, darf kein gültiges Token liegen bleiben:
+  // sonst antwortet issue_activation_token bis zu 24 h lang „pending" — kein
+  // Versand, kein neues Token —, und /aktivierung meldet dabei dasselbe Grün
+  // wie im Erfolgsfall (Befund E1 / Aufgabe 11.6). Der Aufrufer hat längst 202;
+  // das Entwerten ist die einzige Stelle, an der dieser Fehlschlag überhaupt
+  // noch behandelt werden kann.
+  //
+  // Aufgerufen wird das NUR bei einer Ablehnung, nicht bei einem Wurf — die
+  // Begründung steht am `catch` unten.
+  const entwerten = async () => {
+    const { data, error } = await supabase.rpc("invalidate_activation_token", {
+      p_token_hash: hash,
+    });
+    // Ohne diese Zeile wäre die Behebung eines stillen Fehlschlags selbst einer.
+    if (error) log("error", "invalidate_failed", { code: error.code });
+    else log("info", "token_invalidated", { profileId: row.profile_id, getroffen: data });
+  };
+
   // Erst antworten, dann senden: sonst dauert eine bestehende Adresse messbar
   // länger als eine unbekannte, und die Antwortzeit verrät den Bestand.
   const versand = (async () => {
@@ -165,12 +183,31 @@ Deno.serve(async (req) => {
           .then((j) => (j as { name?: string })?.name)
           .catch(() => undefined);
         log("error", "resend_failed", { status: res.status, error: errName });
+        await entwerten();
         return;
       }
       const { id } = (await res.json().catch(() => ({}))) as { id?: string };
       log("info", "mail_sent", { profileId: row.profile_id, resendId: id });
     } catch (e) {
-      log("error", "resend_threw", { error: e instanceof Error ? e.name : "unknown" });
+      // HIER wird BEWUSST NICHT entwertet — anders als im Zweig darüber.
+      //
+      // Ein `!res.ok` ist eine Ablehnung: Resend hat die Mail nicht angenommen,
+      // es ging nichts raus, das Token ist wertlos. Ein Wurf ist etwas anderes.
+      // Er trifft auch den Fall, dass die ANTWORT verlorengeht, nachdem Resend
+      // die Mail bereits angenommen und zugestellt hat. Entwerteten wir hier,
+      // hielte das Mitglied eine echte Mail in der Hand, deren Link „überholt"
+      // meldet — die Auskunft für einen Link, den ein neuerer ersetzt hat, was
+      // nicht passiert ist. Ein zugestellter Link ist mehr wert als ein
+      // geschlossenes Schutzfenster.
+      //
+      // Der Preis ist benannt: für diesen selteneren Fall bleibt E1 bestehen,
+      // das Token liegt gültig da und der anonyme Weg schweigt bis zu 24 h.
+      // Deshalb ist die Logzeile `warn` und nicht `error` — sie ist der einzige
+      // Ort, an dem dieser Zustand sichtbar wird.
+      log("warn", "resend_threw_token_bleibt", {
+        error: e instanceof Error ? e.name : "unknown",
+        profileId: row.profile_id,
+      });
     }
   })();
 

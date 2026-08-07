@@ -140,6 +140,22 @@ describe("ActivationRedeemPage", () => {
     ).toBeInTheDocument();
   });
 
+  // 11.6 / P2. Diese eine Meldung steht für DREI Ausgänge: Link ausgegeben,
+  // Schutzfenster (offener Link unter 24 h — es geht nichts raus) und bereits
+  // aktiviert. Unterscheiden darf sie sie nicht, das wäre die Adressaufzählung.
+  // Also muss sie alle drei abdecken: wer die erste Mail nie bekam, liest sonst
+  // „Link ist unterwegs" und wartet einen Tag auf nichts.
+  it("deckt den 24-Stunden-Fall ab und nennt einen Rückkanal", async () => {
+    renderMit("");
+    fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
+      target: { value: "wer@auch.immer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Neuen Link senden/i }));
+    const hinweis = await screen.findByText(/Wenn es zu dieser Adresse ein Konto gibt/i);
+    expect(hinweis).toHaveTextContent(/letzten 24 Stunden/i);
+    expect(hinweis).toHaveTextContent(/info@fairbusinessclub\.de/i);
+  });
+
   it("leitet ein bereits aktiviertes Konto ohne Token still auf die Startseite", async () => {
     // Fall 3 aus §6: alter Link im Postfach, Konto längst aktiv. Keine
     // Fehlermeldung — das Mitglied hat nichts falsch gemacht.
