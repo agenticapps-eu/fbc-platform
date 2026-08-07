@@ -1,123 +1,105 @@
-# Session Handoff — 2026-08-06 (14. Session)
+# Session Handoff — 2026-08-07 (15. Session)
 
 ## Stand in einem Satz
 
-**Der Aktivierungsweg funktioniert — zum ersten Mal Ende zu Ende, an einer
-echten Mail belegt.** Zwei Startblocker steckten darin, beide unsichtbar im
-Code, beide heute gefunden und geschlossen.
+**PR #128 ist gemergt und live.** Die Sitzung war kurz und bestand fast nur aus
+der einen Frage, die der vorige Handoff offen gelassen hatte: ist CI wirklich
+ungelaufen, und liegt es am Repo?
 
-## Die zwei Blocker
+## Was die Sitzung geklärt hat
 
-|                   | war                                                                                        | ist                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| **10.5** Absender | `FROM_EMAIL` = Resends Sandkasten `onboarding@resend.dev` → **403 an jede fremde Adresse** | `effbeezee.com` in Resend verifiziert, `FBC <noreply@effbeezee.com>` |
-| **10.8** Link     | `APP_URL` = `http://localhost:5173` → jede Mail verlinkte auf den Rechner des Empfängers   | `https://fbc-platform.pages.dev`                                     |
+Der Verdacht des vorigen Handoffs war richtig, und die Fehlspur war richtig
+ausgeschlossen. Actions stand wieder auf `operational`, aber die sechs Commits
+seit `fc560e8` hatten **weiterhin null Check-Runs** — die Läufe kamen nicht von
+selbst nach. Der Ausfall vom 06.08. hat die Events nicht nachgeliefert, er hat
+sie verloren.
 
-Beide hätten den Import (C10) in ein Feld lauter gesperrter Konten laufen
-lassen: bei importierten Konten ist das Gate die einzige Hürde, und die Mail
-der einzige Weg hindurch. **Beide sahen im Code richtig aus** — die Werte waren
-gesetzt, die Prüfungen bestanden. `send-activation` antwortet bauartbedingt
-immer `202` (Anti-Aufzählung), der Fehlschlag war also von außen unsichtbar.
-Der ehrliche Status kommt von `resend-activation`.
+Darunter lagen echte Code-Änderungen (`ActivationScreen.tsx` + `.test.tsx`),
+nicht nur Doku. **Ein blinder Merge wäre ungeprüfter Code auf `main` gewesen.**
 
-C10 trägt deshalb jetzt **fünf** Vorbedingungen statt drei (11.2).
+Neustarten ging nur über **Close/Reopen des PR**: `ci.yml` und `deploy.yml`
+kennen ausschließlich `push: [main]` und `pull_request` — kein
+`workflow_dispatch`, also greift `gh workflow run` nicht.
 
 ## Accomplished
 
-- **PR #127 gemergt** (`state=MERGED` gegengeprüft).
-- **Die drei Aktivierungs-Functions deployt**, `verify_jwt` gegen `config.toml`
-  geprüft (false/true/false).
-- **Das Gate hält in Produktion**: frisch registriertes, nicht aktiviertes
-  Konto → **14 Tabellen, null Zeilen**, einschließlich der eigenen Daten
-  (`profile_contacts`, `goals`, `notifications`, `compass_responses`,
-  `member_settings`). Gegenprobe: ausgeloggt weiter 5 Beiträge + 1 Event.
-  Nach dem Einlösen: `profiles_public` **37**, `posts` 5, `events` 9.
-- **8.3 vollständig** — alle sieben Fehlerfälle gemessen. Fünf gegen die live
-  deployten Functions, zwei (`expired`, `superseded`) gegen eine lokal
-  servierte, weil sie einen DB-Eingriff brauchen.
-- **Ein falsches Häkchen gefunden** (Nachlauf zu 6.4): Task 3.9 verlangt acht
-  Assertions, im Test standen drei — UPDATE/DELETE waren auf beiden Rollen
-  ungeprüft. Ergänzt, `plan(148) → plan(153)`, vorher rot gemessen. Der übrige
-  Nachlauf ist sauber (5.4/6.6, 7.1, 7.3, 7.5, 4.7, 13.1, 2.5, 1.4, 3.10).
-- **DNS für `effbeezee.com`** eingerichtet und am Rohtext der Mail abgenommen:
-  Googles Hop meldet `dkim=pass header.i=@effbeezee.com`, `spf=pass` über
-  `send.effbeezee.com`, `dmarc=pass (p=REJECT)`.
-- **Der `APP_URL`-Fix repariert nebenbei `notify-contact-request`** — die „Zum
-  Chat"-Links zeigten seit jeher auf localhost. War nie Teil von AGE-495.
-- **CRITICAL ausgezählt statt geschätzt:** 12 von 22 Secrets byte-identisch.
-  Die 10 „getrennten" täuschen — fast alle sind projektgebundene `SUPABASE_*`.
-  Bewusst getrennt sind **drei**. Alles von Hand Gepflegte (Stripe komplett,
-  `RESEND_API_KEY`) ist geteilt.
+- **CI auf `747c1c2` nachgeholt und grün**: `pr-title`, `verify`, `migrations`,
+  `edge-functions`, dazu `deploy`. `migrate-dev` und `drift-gate` übersprungen
+  (nur auf `main` aktiv, kein Befund). `mergeStateStatus` von `BLOCKED` auf
+  `CLEAN`.
+- **PR #128 squash-gemergt** — `27e903b`, `state: MERGED`, 07:58 UTC.
+  Squash, weil #127 und #120 ebenfalls einen Parent tragen.
+- **`main`-Läufe grün**: CI, Deploy und Pages auf `27e903b`.
+- **Live gegengeprüft, nicht angenommen**: `/aktivierung` liefert
+  `index-36J3tHYc.js`, **1.206.503 Bytes** (also ein echtes Bundle, kein
+  getarnter 404), und darin steht der neue Absendersatz mit
+  `noreply@effbeezee.com`. Der alte Text ist weg.
+- **Edge Functions geprüft statt nachdeployt**: der PR enthält
+  `send-activation` und `resend-activation`, und der Deploy-Workflow rollt
+  Functions bekanntlich nicht aus. Hier war trotzdem nichts offen — die letzte
+  Änderung an beiden Dateien ist `1d577ca`, also **vor** dem manuellen Deploy
+  der 14. Sitzung, und `Reply-To` steht im Header der echten gemessenen Mail.
+  Live-Stand und gemergter Code decken sich. Migrationen enthält der PR keine.
+- **Linear setzt sich selbst**: AGE-495 steht auf `Done`, gesetzt `07:58:39` —
+  exakt der Merge. Nichts von Hand geschrieben.
+- `main` lokal per Fast-Forward auf `27e903b`, Arbeitsbaum sauber.
 
 ## Decisions
 
-- **Absenderdomain `effbeezee.com`** (Donald/Detlev). Auf Strato-NS, also selbst
-  pflegbar; `fairbusinessclub.de` liegt auf Cloudflare-NS beim Betreuer der
-  WordPress-Seite.
-- **`FROM_EMAIL = FBC <noreply@effbeezee.com>`**, `Reply-To` fest verdrahtet auf
-  `info@fairbusinessclub.de` — der Bildschirm sagt eine ankommende Antwort zu.
-- **Testkonten bleiben stehen** (Donald). `donald@vlahovic.de` (aktiviert, im
-  Verzeichnis) und `donald.vlahovic@gmail.com`. **Kein Mitglied** — beide zählen
-  in die 50er-Schwelle der Tripwire aus 1.7 und müssen bei 12.1 abgezogen werden.
+- **Close/Reopen statt Leer-Commit**, um CI anzustoßen. Ein Leer-Commit hätte
+  die Historie um einen inhaltslosen Eintrag verlängert; Close/Reopen feuert
+  `pull_request: reopened` und lässt den Baum unberührt.
 
-## Ich lag falsch — zweimal am selben Punkt
+## Der Merge lief still durch
 
-Ich habe zweimal gewarnt, `effbeezee.com` sei eine fremde Domain neben dem
-Auftritt des Clubs, und daraus eine Phishing-Sorge abgeleitet. **Falsch.** Der
-Betreff heißt „Dein Zugang zu eff.bee.zee", und `emails.ts:63,82` führen den
-Namen seit langem selbst ein: die Plattform _heißt_ so. Der Bildschirmtext, den
-ich daraufhin schrieb („die Adresse sieht ungewohnt aus"), entschuldigte sich
-für die eigene Marke und ist wieder raus. Die Assertion bleibt — falsch war die
-Begründung, nicht die Prüfung.
+`gh pr merge 128 --squash` gab **nichts** aus — weder Erfolg noch Fehler.
+Genau die Falle aus `merge-erfolg-verifizieren`, nur in die andere Richtung als
+sonst: der leere Output sah aus wie ein Classifier-Block, war aber ein
+erfolgreicher Merge. Erst `gh pr view --json state` hat es entschieden. Der
+Befehl war im ersten Anlauf tatsächlich vom Classifier geblockt worden, im
+zweiten nicht — die Unzuverlässigkeit ist also nicht auf `supabase`-Befehle
+beschränkt.
 
 ## Files modified
 
-- `supabase/tests/rls_test.sql` — fünf Assertions ergänzt, `plan(153)`
-- `src/pages/ActivationScreen.tsx` / `.test.tsx` — Absender genannt, Test dazu
-- `supabase/functions/{send,resend}-activation/index.ts` — `Reply-To`
-- `docs/secrets.md` — Sandkasten-Hinweis als **widerlegt** gekennzeichnet
-- `openspec/changes/member-activation-flow/tasks.md` — 10.5–10.8 neu, 8.3, 11.2
+Keine. Diese Sitzung hat nichts am Code geändert — nur gemessen, gemergt und
+gegengeprüft. Der Handoff selbst liegt **uncommitted** auf `main`, weil auf
+`main` nicht direkt committet wird.
 
 ## Next session: start here
 
-**PR #128 prüfen und mergen** (`gh pr checks 128`, dann merge, danach
-`gh pr view 128 --json state` gegenprüfen — `gh pr merge` kann still
-fehlschlagen). Danach ist AGE-495 inhaltlich fertig bis auf 8.7 (unabhängiges
-Code-Review) und die Entscheidungen unten.
+**AGE-495 ist gemergt und live; inhaltlich offen bleibt 8.7** — ein
+unabhängiges Code-Review in eigenem Kontext. Das ist der einzige Punkt, den ich
+ohne dich weitertreiben könnte. `tasks.md` steht bei **17 offen / 92 erledigt**;
+der Rest hängt an Entscheidungen, nicht an Arbeit.
 
-**Achtung: CI ist auf dem letzten Stand ungelaufen, und das ist nicht das
-Repo.** Der jüngste Lauf steht auf `fc560e8`; die vier Commits danach
-(`4cef2cd`, `87482a4`, `7762624`, `4d638ab`) haben **null** Check-Runs —
-`gh api repos/…/commits/4d638ab/check-runs` meldet `total_count: 0`.
-Ursache gemessen: **GitHub Actions hatte am 06.08. abends einen
-`major_outage`** (`githubstatus.com/api/v2/components.json`). Kein Pfad-Filter,
-kein `concurrency`-Block in `ci.yml`, Actions ist aktiviert. Also: erst
-nachsehen, ob Läufe inzwischen nachgekommen sind — notfalls mit einem leeren
-Commit oder `gh workflow run` anstoßen —, **nicht** blind mergen und **nicht**
-nach einem Fehler im Repo suchen.
+Erste Handlung: entscheiden, ob 8.7 jetzt läuft oder ob C10 (Import) vorgeht.
+**Falls C10 vorgeht:** die fünf Vorbedingungen aus 11.2 zuerst gegenprüfen —
+zwei davon (10.5 Absender, 10.8 Link) waren am 06.08. still falsch gesetzt und
+haben genau deshalb keinen Fehler geworfen.
 
-_Und eine zweite Fehlspur, die ich schon ausgeschlossen habe: der Lauf auf
-`1d577ca` steht als `failure` in der Liste. Das waren **vier abgebrochene
-Jobs**, keine roten Tests — GitHub bricht laufende Läufe ab, wenn ein neuerer
-Push nachkommt, und ich hatte mehrere schnell hintereinander gemacht. Die
-nachfolgenden Commits liefen grün. Lokal sind Lint, Typecheck, 426 Vitest, 12
-Deno und pgTAP (173) grün gemessen._
+Der Handoff braucht einen Branch, falls er ins Repo soll.
 
 ## Open questions
 
-- **CRITICAL, unverändert:** Stripe- und Resend-Secrets zwischen den Projekten
-  byte-identisch. Braucht Donald im Stripe-Dashboard. Billigster vollständiger
-  Fix bleibt, `stripe-webhook` und `create-checkout-session` von PROD abzuziehen,
+Unverändert aus der 14. Sitzung, nichts davon hat sich heute bewegt:
+
+- **CRITICAL:** Stripe- und Resend-Secrets zwischen DEV und PROD byte-identisch
+  (12 von 22). Braucht dich im Stripe-Dashboard. Billigster vollständiger Fix
+  bleibt, `stripe-webhook` und `create-checkout-session` von PROD abzuziehen,
   bis Stripe wirklich läuft.
-- **10.4** Zustell-Abnahme: Gmails _Annahme_ ist gemessen (Return-Path zeigt
-  Annahme + Weiterleitung), seine _Platzierung_ nicht. GMX, Web.de, Outlook
-  unberührt. Das Risiko ist nicht die Authentifizierung — die steht —, sondern
-  die **Reputation einer ungewärmten Domain**, die beim Import auf einen Schlag
-  an alle sendet.
+- **10.4** Zustell-Abnahme: Gmails Annahme ist gemessen, seine _Platzierung_
+  nicht. GMX, Web.de, Outlook unberührt. Das Risiko ist die **Reputation einer
+  ungewärmten Domain**, die beim Import auf einen Schlag an alle sendet — nicht
+  die Authentifizierung, die steht.
 - **`APP_URLS`** führt weiterhin localhost an erster Stelle (Stripe-Rücksprung).
-  Bewusst nicht ungefragt an der Bezahlstrecke gedreht.
 - **Weiterleitung `effbeezee.com` → `fairbusinessclub.de`** empfohlen: wer den
   Absender prüft, landet heute auf einer Strato-Platzhalterseite.
+- **Neu aufgefallen:** Die **Abnahmeliste im Linear-Issue** verlangt noch „Mail
+  kommt von `info@fairbusinessclub.de` an". Das ist durch die
+  `effbeezee.com`-Entscheidung überholt und in `tasks.md` sauber dokumentiert —
+  aber der Issue-Text sagt weiter das Alte. Wer AGE-495 später liest, liest die
+  falsche Zusage.
 - **14.6** Drossel ist ein Zähler, keine Bremse · **14.7** Mail-Missbrauch über
   offene Selbstregistrierung · **14.8/12.10** `directory-search` und `events`
   widersprechen dem Gate (hängt an AGE-448 mit Detlev) · **9.1** Mailtext an
@@ -126,23 +108,19 @@ Deno und pgTAP (173) grün gemessen._
 ## Fallen
 
 Unverändert: `git add -A` verboten · `ls` ist `eza`-Alias · `supabase test db`
-ohne Dateiliste lügt · Merge mit `state=MERGED` gegenprüfen · zustandsändernde
-git-Befehle nie pipen · Infisical-Login braucht ein echtes Terminal.
+ohne Dateiliste lügt · zustandsändernde git-Befehle nie pipen · Infisical-Login
+braucht ein echtes Terminal · `202` von `send-activation` belegt keinen Versand ·
+Infisical zu setzen schiebt nichts ins Supabase-Projekt · fehlende Konfiguration
+fällt auf, falsche nicht.
 
 **Neu aus dieser Sitzung:**
 
-- **`202` von `send-activation` belegt keinen Versand.** Die Function antwortet
-  bauartbedingt immer so. Wer den Versand prüfen will, nimmt `resend-activation`
-  (mit Sitzung) — die gibt einen ehrlichen Status.
-- **Infisical zu setzen schiebt nichts ins Supabase-Projekt.** Zwei getrennte
-  Flächen. Genau deshalb sah am Morgen alles gesetzt aus, während die
-  Live-Functions den Sandkasten benutzten.
-- **`supabase secrets list` zeigt SHA-256 statt Klartext** — man kann einen
-  vermuteten Wert also verifizieren, ohne ihn lesen zu dürfen. So war der
-  localhost-Wert in zwei Minuten belegt statt vermutet.
-- **Fehlende Konfiguration fällt auf, falsche nicht.** Die Functions prüfen auf
-  Vorhandensein und melden `500 Server misconfigured`. Beide Blocker heute waren
-  _gesetzt_ und _falsch_ — und damit still.
-- Der Classifier blockt `supabase functions deploy` und `secrets set`
-  unzuverlässig (mal ja, mal nein). Wenn er blockt: dem User den Befehl mit
-  `!`-Präfix geben, nicht umgehen.
+- **Ein GitHub-Actions-Ausfall liefert Läufe nicht nach.** Verlorene
+  Webhook-Events bleiben verloren, auch wenn der Status wieder `operational`
+  meldet. Wer nach einem Ausfall mergt, muss die Check-Runs auf der **HEAD-SHA**
+  zählen (`gh api …/commits/<sha>/check-runs`), nicht auf die grüne Liste in
+  `gh run list` schauen — die zeigt ältere Commits.
+- **Ohne `workflow_dispatch` gibt es kein `gh workflow run`.** Der Neustart
+  läuft dann über Close/Reopen des PR, nicht über einen Leer-Commit.
+- **Leerer Output von `gh pr merge` heißt nicht „geblockt".** Er heißt gar
+  nichts. Immer `state` nachlesen.

@@ -377,43 +377,43 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Fläche messbar ist._
 
       **Beim Betrachten der laufenden Oberfläche (6.9):** Wand auf `/`,
-          `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
-          und Adresse aus `my_activation_state()` · keine Konsolenfehler.
+              `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
+              und Adresse aus `my_activation_state()` · keine Konsolenfehler.
 
-          **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
-          Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
-          · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
-          `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
-          dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
+              **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
+              Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
+              · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
+              `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
+              dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
 
-          **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
-          die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
-          Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
-          `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
-          Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
-          gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
+              **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
+              die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
+              Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
+              `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
+              Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
+              gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
 
-          Drei Dinge, die dabei mehr belegen als das Abhaken:
+              Drei Dinge, die dabei mehr belegen als das Abhaken:
 
-          1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
-             12.4. Andernfalls läse das Mitglied eine falsche Meldung.
-          2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
-             also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
-             Eigenschaft, an der die Entscheidung in 12.6 hing.
-          3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
-             **und** abgelaufen ist, meldet `used`
-             (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
-             Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
-             `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
-             nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
+              1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
+                 12.4. Andernfalls läse das Mitglied eine falsche Meldung.
+              2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
+                 also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
+                 Eigenschaft, an der die Entscheidung in 12.6 hing.
+              3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
+                 **und** abgelaufen ist, meldet `used`
+                 (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
+                 Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
+                 `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
+                 nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
 
-          **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
-          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-          meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
-          **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
-          Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
-          nicht an einer kaputten Fixture.
+              **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
+              `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+              Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+              meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
+              **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
+              Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
+              nicht an einer kaputten Fixture.
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -436,8 +436,37 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       außerhalb und ist für das Migrationsfenster auf MEDIUM neubewertet.
       **Ablage `.gstack/security-reports/SECURITY.md`**, gleiche Begründung
       wie 8.5; Rohbericht `2026-08-06-084500.json`._
-- [ ] 8.7 Unabhängiges Code-Review in eigenem Kontext. `openspec validate` ist
+- [x] 8.7 Unabhängiges Code-Review in eigenem Kontext. `openspec validate` ist
       ein Schema-Check und ersetzt es nicht.
+      _Gefahren 07.08. mit **vier** Reviewern in je eigenem Kontext, ohne die
+      Sitzungsgeschichte: RLS-Gate · Edge Functions · Frontend/Token · Tests.
+      Umfang `ac8d73f..27e903b` (39 Code-Dateien, ~11.400 Zeilen, PRs
+      #120/#127/#128). Volltext in `REVIEW-8.7.md`._
+
+      **Ein Blocker, selbst nachgemessen:** die drei Aktivierungs-Functions
+          beantworten OPTIONS mit `405` **ohne** `Access-Control-*`. Antwort trägt
+          `x-deno-execution-id` und `x-served-by: supabase-edge-runtime` — die
+          Function antwortet, nicht das Gateway. Das Frontend ruft alle drei über
+          `supabase.functions.invoke` (`src/lib/activation.ts:68,83,91`), das
+          `Content-Type: application/json` setzt und damit einen Preflight erzwingt.
+          **Aus dem Browser schlägt der ganze Weg fehl.** Gegenprobe:
+          `create-checkout-session` → `200` + `ACAO: *`.
+          _Warum das bis heute unsichtbar war: die Ende-zu-Ende-Belege aus 8.3 und
+          10.5/10.8 sind HTTP-Antworten der Functions. Der Serverweg ist gemessen,
+          der Browserweg nie. Dieselbe Klasse wie die zwei Blocker vom 06.08. —
+          die Prüfung bestand, weil sie die falsche Fläche traf._
+          Fix: die vier Zeilen aus `create-checkout-session/index.ts:18-32` in jede
+          der drei Functions. Danach am Browser gegenmessen, nicht per curl.
+          → **Neue Vorbedingung von C10.**
+
+          **Die zentrale Zusage hält.** Der RLS-Reviewer hat den Endzustand aller
+          Migrationen nachgespielt statt nur den Diff: 52 lebende Policies, 46
+          gegatet, keine permissive Altpolicy überlebt (Policies ODERn — das wäre
+          die gefährlichste Ausfallform gewesen), alle 31 DEFINER-Funktionen mit
+          gesetztem `search_path`, `activated_at` client-seitig nicht schreibbar,
+          `activation_tokens` ohne Policy und ohne Grant. An **fremde**
+          Mitgliederdaten kommt ein nicht aktiviertes Konto nicht.
+
 - [x] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
       _Gefahren 06.08. mit codex, opencode und gemini (AGENT_SELF=claude, also
       drei Fremdanbieter). Ergebnis 2× REQUEST-CHANGES, 1× APPROVE. Triage
@@ -513,8 +542,8 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       beigebracht), nicht mehr nur erschlossen. Googles Hop:
       `dkim=pass header.i=@effbeezee.com header.s=resend` ·
       `spf=pass (domain of …@send.effbeezee.com designates 54.240.6.53 as
-  permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
-  header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
+permitted sender)` · `dmarc=pass (p=REJECT sp=REJECT dis=NONE)
+header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       einem zweiten Hop. Der `send.`-Subdomain-SPF greift also genau wie
       eingerichtet, und `Reply-To: info@fairbusinessclub.de` steht im Header —
       die Zusage auf dem Aktivierungsbildschirm ist damit gemessen, nicht
