@@ -464,11 +464,19 @@ Andernfalls ist er kein Weg zurück ins Konto, sondern ein Weg, ein Mitglied
 auszusperren.
 
 Weil die Antwort dem Aufrufer zugestellt wird, **bevor** der Versand feststeht,
-SHALL ein danach fehlgeschlagener Versand das dabei ausgegebene Token entwerten.
+SHALL ein danach **abgelehnter** Versand das dabei ausgegebene Token entwerten.
 Andernfalls liegt ein gültiges Token im System, zu dem es keinen zugestellten
 Link gibt — und der schützende Nichtversand von oben hält genau diesen Zustand
 bis zu einen Tag lang fest. Ein stiller Fehlschlag würde so zu der Aussperrung,
 die dieselbe Regel verhindern soll.
+
+Bleibt dagegen **ungewiss**, ob die Mail hinausging — etwa weil die Antwort des
+Versanddienstes verlorenging, nachdem er sie angenommen hatte —, SHALL das Token
+**gültig bleiben**. Ein zugestellter Link, den das System nachträglich entwertet,
+wäre für das Mitglied schlimmer als ein offenes Schutzfenster: Es hielte eine
+echte Mail in der Hand, deren Link „überholt" meldet, also die Auskunft für einen
+Fall, der nicht eingetreten ist. Dieser Zustand SHALL stattdessen protokolliert
+werden, weil er sonst nirgends sichtbar wird.
 
 Weil die Antwort in allen diesen Fällen ununterscheidbar bleiben muss, SHALL die
 Meldung an das Mitglied **alle** Ausgänge abdecken, statt einen Versand
@@ -523,6 +531,13 @@ Verzeichnis der Mitgliedsadressen.
 - **WHEN** für dieselbe Adresse erneut ein Bestätigungslink angefordert wird
 - **THEN** gilt das Token des Fehlversands nicht mehr als ausstehend, und die
   erneute Anforderung gibt einen Link aus, statt folgenlos zu bleiben
+
+#### Scenario: Ein ungewisser Versand entwertet den Link nicht
+
+- **GIVEN** eine Anforderung wurde angenommen und der Versanddienst hat die Mail
+  angenommen, seine Antwort ging aber verloren
+- **WHEN** das Mitglied den Link aus der zugestellten Mail öffnet
+- **THEN** wirkt er — das System hat ihn nicht nachträglich entwertet
 
 #### Scenario: Die Meldung sagt nichts zu, was nicht geschehen sein muss
 
