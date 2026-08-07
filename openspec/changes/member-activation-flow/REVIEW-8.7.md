@@ -185,11 +185,19 @@ wurde bewusst nicht mitgezogen — eigener Nachlauf, festgehalten als 11.4._
 
 ---
 
-## P1 — HOCH (operativ) · Das Projekt, das „PROD" heißt, erreicht niemand
+## P1 — KEIN BEFUND · Das Cloudflare-Deployment läuft absichtlich gegen DEV
 
-Aufgefallen am 07.08. beim Suchen eines Testkontos. **Die ausgelieferte App
-zeigt auf `foelowldexkcqzewvrcf`** — das in `docs/supabase-environments.md:14`
-als **DEV** geführte Projekt. Drei voneinander unabhängige Belege:
+Am 07.08. beim Suchen eines Testkontos aufgefallen und zunächst als operativer
+Befund notiert. **Es ist keiner** — Entscheidung Donald, 07.08.: das
+Live-Deployment auf Cloudflare läuft bewusst gegen die DEV-Datenbank, die
+PROD-Datenbank ist derzeit nur über einen lokalen Dev-Server erreichbar, und in
+PROD stehen **noch keine Daten**. Die Demo-Konten liegen deshalb dort, wo das
+Deployment hinzeigt. Der Abschnitt bleibt stehen, damit die Beobachtung nicht
+ein zweites Mal als Fehler aufschlägt.
+
+**Die ausgelieferte App zeigt auf `foelowldexkcqzewvrcf`** — das in
+`docs/supabase-environments.md:14` als **DEV** geführte Projekt. Drei
+voneinander unabhängige Belege:
 
 | Beleg                                                                     | Ergebnis                                                                   |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -203,18 +211,18 @@ JWT). Das ist genau der Zustand, den `docs/supabase-environments.md:441` als
 „Rückweg" beschreibt — der Umschaltschritt aus Zeile 436 ist also nicht (oder
 nicht dauerhaft) vollzogen.
 
-**Was das für B2 heißt:** der Deploy dort hat stattgefunden und ist gemessen,
-aber er liegt auf dem Projekt, das **kein Mitglied benutzt**. B2 bleibt richtig
-als Vorbereitung des Umschaltens und ist als Aussage über den Live-Zustand
-wertlos. Umgekehrt gilt: alles, was hier im Browser gemessen wurde, ist am
-**echten** Weg der Mitglieder gemessen — nur eben nicht auf dem Projekt, das so
-heißt.
+**Was das für B2 heißt — und was nicht.** B2 war die Vorbereitung des
+Umschaltens, und genau das ist es geblieben: die drei Functions liegen jetzt
+auf dem Projekt, auf das später gezeigt wird. Dass heute niemand dort
+hinkommt, ist der Plan, nicht das Versäumnis.
 
-**Was daraus folgt, aber hier nicht entschieden wird:** ob `viwntbodrtqxgmqyxluh`
-Ziel bleibt und wann umgeschaltet wird, ist eine offene Freigabe (10.3/11.2),
-keine Frage dieses Reviews. Der Befund ist, dass die **Beschriftung trügt** —
-und dass jede künftige Aussage „auf PROD gemessen" benennen muss, welchen der
-beiden Refs sie meint.
+**Was bleibt, ist eine Sprachregelung.** „Auf PROD gemessen" ist in diesem
+Repo doppeldeutig: es kann das Projekt `viwntbodrtqxgmqyxluh` meinen oder die
+Umgebung, die die Mitglieder benutzen — und das sind bis zum Umschalten zwei
+verschiedene Dinge. Jede Messnotiz muss deshalb den **Ref** nennen. Konkret:
+alles, was in diesem Dokument im Browser gemessen wurde, ist auf
+`foelowldexkcqzewvrcf` gemessen, also am Weg, den die Demo-Konten heute
+tatsächlich gehen.
 
 ---
 
