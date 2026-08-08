@@ -130,6 +130,12 @@ jobs:
   # mehr, und aufs Ziel kam die Aenderung nur, weil der naechste Merge zufaellig
   # dieselbe Function anfasste. Basis ist deshalb der Stand des juengsten Laufs,
   # in dem dieser Job mit `success` endete.
+  #
+  # DER NAME DIESES JOBS IST TEIL DER MECHANIK. Die Basis wird ueber
+  # `select(.name == "functions")` gefunden. Ein `name:` am Job oder eine
+  # `strategy.matrix` (die Namen zu `functions (x)` macht) bricht die Suche
+  # dauerhaft — deshalb unterscheidet `deploy-base.logic.ts` diesen Fall in der
+  # Meldung von einem bloss zu kurzen Fenster.
   functions:
     needs: [migrate-dev, drift-gate]
     # Nur auf main, und nur wenn beide Vorbedingungen nicht fehlgeschlagen sind —
@@ -200,11 +206,31 @@ jobs:
               --jq '.workflow_runs[] | {id, sha: .head_sha}' |
             while read -r lauf; do
               id="$(jq -r '.id' <<<"$lauf")"
-              # Der leere Ersatzwert faengt beides ab: kein `functions`-Job im
+              # `filter=latest` ist zwar die Vorgabe der API, steht hier aber
+              # ausdruecklich: mit `filter=all` liefe `first` auf den AELTESTEN
+              # Versuch, und ein Lauf, dessen erster Versuch gelang und dessen
+              # zweiter scheiterte, laese sich als `success`. Das waere die
+              # Richtung „Basis zu neu" — also ein stiller Ausfall.
+              #
+              # `</dev/null`, weil `gh` sonst stdin der `while`-Schleife
+              # leerlesen koennte; die Liste waere dann nach einem Eintrag zu
+              # Ende, ohne dass irgendetwas fehlschlaegt.
+              #
+              # Der leere Ersatzwert faengt zweierlei ab: kein `functions`-Job im
               # Lauf, und einer, der noch laeuft (etwa dieser hier). Weder das
               # eine noch das andere ist ein Nachweis, dass ausgeliefert wurde.
-              ergebnis="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
-                --jq '[.jobs[] | select(.name == "functions") | .conclusion] | first // ""')"
+              if ! ergebnis="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?filter=latest" \
+                --jq '[.jobs[] | select(.name == "functions") | .conclusion] | first // ""' \
+                </dev/null)"; then
+                # OHNE dieses `if` verschwaende der Fehlschlag spurlos: `set -e`
+                # ist in dieser verschachtelten Ersetzung abgeschaltet, weil sie
+                # in der Bedingung eines `if !` steht. Der Lauf wuerde dann als
+                # „kein functions-Job" gewertet — richtungssicher (die Basis wird
+                # aelter), aber der GRUND im Protokoll behauptete danach einen
+                # Erfolg in einem aelteren Lauf, den es so nie gab.
+                echo "::warning::Job-Ergebnis fuer Lauf $id nicht abrufbar — der Lauf gilt als NICHT ausgeliefert." >&2
+                ergebnis=""
+              fi
               jq -c --arg e "$ergebnis" \
                 '. + {functions: (if $e == "" then null else $e end)}' <<<"$lauf"
             done | jq -sc '.'
@@ -225,22 +251,39 @@ jobs:
             sha=""
           fi
 
-          # Rueckfall statt Abbruch (Entscheidung Donald, 2026-08-08): gegen
+          # Rueckfall auf HEAD^, damit dieser Lauf wenigstens ausliefert, was er
+          # sieht — aber er darf NICHT als Nachweis gelten (Entscheidung Donald,
+          # 2026-08-08, nach dem Review). Die urspruengliche Begruendung „gegen
           # HEAD^ zu vergleichen ist das bisherige Verhalten, also nie
-          # schlechter — aber es wird ausgesprochen, statt still zu geschehen.
+          # schlechter" gilt nur INNERHALB eines Laufs. Ueber Laeufe hinweg ist
+          # sie falsch: die Basis wird aus der Laufhistorie gelesen, also wuerde
+          # ein gruener Rueckfall-Lauf zur Basis des naechsten — und alles davor
+          # Uebersprungene laege ab da DAUERHAFT ausserhalb jedes Diffs. Der alte
+          # Code verlor eine Aenderung einmal und konnte sie durch Zufall
+          # zurueckholen (genau das rettete 36b662a); ein gruener Rueckfall
+          # naegelte diesen Fluchtweg zu.
+          #
+          # Deshalb setzt der Schritt `rueckfall` — der letzte Schritt des Jobs
+          # laesst ihn daran scheitern. Rot heisst hier: dieser Lauf zaehlt nicht
+          # als ausgeliefert, der naechste sieht die Luecke noch. Selbstheilend.
+          rueckfall=""
           if [ -z "$sha" ]; then
+            rueckfall="ja"
             if git rev-parse --verify -q "HEAD^" >/dev/null; then
-              echo "::warning::Vergleichsbasis nicht ermittelbar ($grund) — es wird gegen HEAD^ verglichen. Aenderungen aus uebersprungenen Laeufen koennen dabei herausfallen."
+              echo "::error::Vergleichsbasis nicht ermittelbar ($grund). Es wird gegen HEAD^ ausgeliefert, der Lauf endet aber ROT — sonst gaelte er als Nachweis und die Luecke waere dauerhaft."
               sha="$(git rev-parse HEAD^)"
               grund="RUECKFALL auf HEAD^ — $grund"
             else
-              echo "::warning::Weder Vergleichsbasis noch Vorgaenger-Commit vorhanden. Es wird nichts ausgeliefert."
-              grund="kein Vorgaenger-Commit vorhanden — $grund"
+              echo "::error::Weder Vergleichsbasis noch Vorgaenger-Commit vorhanden. Es wird nichts ausgeliefert."
+              grund="RUECKFALL unmoeglich, kein Vorgaenger-Commit — $grund"
             fi
           fi
 
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "grund=$grund" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=$sha"
+            echo "grund=$grund"
+            echo "rueckfall=$rueckfall"
+          } >> "$GITHUB_OUTPUT"
 
           # In JEDEN Lauf, auch in den unauffaelligen. Eine Basis, die nur im
           # Ausnahmefall genannt wird, ist im Normalfall unbelegt — dieselbe
@@ -295,6 +338,7 @@ jobs:
         if: ${{ steps.ableitung.outputs.namen != '' }}
         env:
           NAMEN: ${{ steps.ableitung.outputs.namen }}
+          BASIS: ${{ steps.basis.outputs.sha }}
         run: |
           set -euo pipefail
 
@@ -306,7 +350,10 @@ jobs:
 
           # Das Uebergangene beim Namen nennen — sonst liest sich die
           # Beschraenkung hinterher als Vollstaendigkeit.
-          echo "### Uebergangen (unveraendert in diesem Merge)" >> "$GITHUB_STEP_SUMMARY"
+          # „in diesem Merge" waere jetzt falsch: die Basis kann viele Merges
+          # zurueckliegen. Eine Ueberschrift, die weniger behauptet, als geprueft
+          # wurde, ist genau der Fehler, den der Abschnitt verhindern soll.
+          echo "### Uebergangen (unveraendert seit \`$BASIS\`)" >> "$GITHUB_STEP_SUMMARY"
           uebergangen=0
           for fn in $alle; do
             case " $NAMEN " in
@@ -348,11 +395,28 @@ jobs:
           BASIS: ${{ steps.basis.outputs.sha }}
           GRUND: ${{ steps.basis.outputs.grund }}
         run: |
+          set -euo pipefail
           if [ -z "$BASIS" ]; then
             echo "Keine Vergleichsbasis ($GRUND) — es wurde nichts ausgeliefert."
           else
             echo "Seit $BASIS ($GRUND) aenderte sich kein Function-Code — es wurde nichts ausgeliefert."
           fi
+
+      # ZULETZT, und mit Absicht nach dem Ausliefern: der Lauf soll noch
+      # herausholen, was er sehen konnte, aber danach ROT enden. Die
+      # `conclusion` dieses Jobs ist das Buch, aus dem der naechste Lauf seine
+      # Basis liest — ein gruener Rueckfall schriebe „alles bis hierher ist
+      # ausgeliefert" ueber eine Luecke, die niemand mehr aufmachen kann.
+      #
+      # Das blockiert weder `deploy` noch `migrate-dev`: beide haengen an
+      # `migrate-dev` und `drift-gate`, nicht an diesem Job.
+      - name: Rueckfall ist kein Nachweis
+        if: ${{ steps.basis.outputs.rueckfall != '' }}
+        env:
+          GRUND: ${{ steps.basis.outputs.grund }}
+        run: |
+          echo "::error::$GRUND — dieser Lauf darf NICHT als ausgeliefert gelten. Ursache beheben; der naechste Lauf holt die Luecke dann nach."
+          exit 1
 
   deploy:
     needs: [migrate-dev, drift-gate]

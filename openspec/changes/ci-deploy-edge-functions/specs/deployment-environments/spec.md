@@ -40,10 +40,21 @@ gemessen** haben — dass eine Auslieferung stattfand, SHALL NOT aus dem Ergebni
 anderer Arbeitsschritte erschlossen werden.
 
 Lässt sich dieser Stand nicht ermitteln, SHALL das System auf den vorigen Commit
-zurückfallen und das **ausdrücklich** melden. Die gewählte Vergleichsbasis und
-der Grund für ihre Wahl SHALL bei **jedem** Lauf protokolliert werden, auch im
-Normalfall — eine Basis, die nur im Ausnahmefall genannt wird, ist im Normalfall
-unbelegt.
+zurückfallen, das **ausdrücklich** melden — und der Lauf SHALL NOT als Nachweis
+einer Auslieferung gelten. Andernfalls würde er selbst zum Ausgangspunkt des
+nächsten Vergleichs und verwandelte damit eine vorübergehende Lücke in eine
+dauerhafte: was vor ihm ausfiel, läge ab dann außerhalb jedes künftigen
+Vergleichs, und nichts könnte es je wieder herleiten.
+
+Die gewählte Vergleichsbasis und der Grund für ihre Wahl SHALL bei **jedem** Lauf
+protokolliert werden, auch im Normalfall — eine Basis, die nur im Ausnahmefall
+genannt wird, ist im Normalfall unbelegt.
+
+Ein Fehlschlag beim Ermitteln des Standes SHALL vom Zustand „es gibt ihn nicht"
+unterscheidbar gemeldet werden. Ein dauerhafter Schaden — etwa eine Suche, die
+ins Leere greift, weil sich benannte Voraussetzungen geändert haben — SHALL NOT
+dieselbe Meldung erzeugen wie ein vorübergehender Zustand, sonst liest er sich
+als Rauschen.
 
 #### Scenario: Eine geänderte Function geht auf beide Projekte
 
@@ -83,8 +94,17 @@ unbelegt.
 
 - **GIVEN** der zuletzt ausgelieferte Stand ist nicht zu ermitteln
 - **WHEN** die Auslieferung läuft
-- **THEN** wird gegen den vorigen Commit verglichen, und das Protokoll meldet
-  den Rückfall als Warnung, statt ihn als Normalfall zu zeigen
+- **THEN** wird gegen den vorigen Commit verglichen und ausgeliefert, der Lauf
+  gilt aber **nicht** als erfolgreich — sonst wäre er der Ausgangspunkt des
+  nächsten Vergleichs
+
+#### Scenario: Nach einem Rückfall holt der nächste Lauf die Lücke nach
+
+- **GIVEN** ein Lauf musste auf den vorigen Commit zurückfallen und gilt deshalb
+  nicht als Nachweis
+- **WHEN** der nächste Merge läuft
+- **THEN** setzt er beim letzten **echten** Nachweis an, und alles seither
+  Übersprungene liegt wieder im Vergleich
 
 #### Scenario: Abweichender Migrationsstand hält auch die Functions an
 
