@@ -35,10 +35,18 @@
 -- deterministisch (derselbe Hash zweimal) und verlangt, dass sie WIRFT.
 --
 -- ── Warum „pending" der richtige Status ist ────────────────────────────────
--- Nicht als Notluege, sondern weil es die Lage beschreibt: der Gewinner hat
--- soeben ein gueltiges Token angelegt und verschickt es an dieselbe hinterlegte
--- Adresse. Der Verlierer findet also genau das vor, was `pending` meint — ein
--- gueltiger Link ist unterwegs. Er versendet nichts und legt nichts an.
+-- Nicht als Notluege, sondern weil es die Lage beschreibt: im Moment des
+-- Constraint-Fehlers liegt ein committetes, offenes Token fuer dasselbe Profil
+-- vor. Genau das meint `pending` — und der Verlierer versendet nichts und legt
+-- nichts an.
+--
+-- Genauer als das darf der Status NICHT gelesen werden: „eine Mail ist
+-- unterwegs" waere zu stark. Der Gewinner kann seinen Versand noch verlieren —
+-- lehnt Resend ab, entwertet send-activation das Token wieder (E1/11.6). Diese
+-- Zusage kann aus dem Insert allein nicht folgen; sie braeuchte einen
+-- dauerhaften Versandzustand, den es hier bewusst nicht gibt. `pending` heisst
+-- also: Anforderung angenommen, Token vorhanden. Aufgefallen im Review dieses
+-- Fixes.
 --
 -- Der Wettlauf selbst ist in pgTAP NICHT nachstellbar: er braucht zwei
 -- Sitzungen, und weder `dblink` noch `pg_background` sind installiert. Was
@@ -139,9 +147,10 @@ begin
       if v_constraint is distinct from 'activation_tokens_offen_je_profil' then
         raise;
       end if;
-      -- Eine gleichzeitige Anfrage war schneller und hat soeben ein gueltiges
-      -- Token fuer dieselbe Adresse angelegt. Das ist genau die Lage, die
-      -- `pending` beschreibt — nichts versenden, nichts anlegen.
+      -- Eine gleichzeitige Anfrage war schneller: es liegt ein committetes,
+      -- offenes Token fuer dieses Profil vor. Das ist die Lage, die `pending`
+      -- beschreibt — nichts versenden, nichts anlegen. NICHT gelesen werden
+      -- darf es als „eine Mail ist unterwegs"; siehe Kopf.
       return query select 'pending'::text, v_id, v_name, v_email;
       return;
   end;

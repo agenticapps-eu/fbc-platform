@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(180);
+select plan(181);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1067,6 +1067,17 @@ select throws_ok(
   null,
   'issue: ein doppelter token_hash WIRFT — er ist kein Wettlauf, sondern eine '
   'kaputte Token-Erzeugung, und darf nicht in der Anti-Aufzählung verschwinden');
+
+-- Die andere Hälfte desselben Vertrags. Der Test oben prüft nur, was NICHT
+-- verschluckt wird; der Wächter-Fall selbst braucht zwei Sitzungen und ist hier
+-- nicht erreichbar. Was erreichbar ist: der NAME. Der Exception-Handler nennt
+-- den Index wörtlich, also ist der Name Teil des Funktionsvertrags — wer ihn
+-- umbenennt, macht aus dem Wächter-Fall wieder einen 502 und damit das
+-- Aufzählungs-Orakel wieder auf. Ein Tippfehler im Handler bliebe vom Test
+-- oben unbemerkt; diese Zeile ist die Klammer dagegen.
+select has_index('public', 'activation_tokens', 'activation_tokens_offen_je_profil',
+  'issue_activation_token: der Wächter-Index heißt weiterhin so, wie der '
+  'Exception-Handler in 20260808150000 ihn nennt');
 
 select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
   false, 'revoke_sessions: authenticated darf nicht');
