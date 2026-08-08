@@ -83,8 +83,11 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       `pnpm typecheck`, `pnpm typecheck:functions`,
       `deno test --frozen --allow-env --allow-net supabase/functions/`.
 - [x] 5.3 `openspec validate --all` grün.
-- [ ] 5.4 Unabhängiger Code-Review auf den **Diff** (Schritt 4 des Workflows).
-      Löst Donald aus.
+- [x] 5.4 Unabhängiger Code-Review auf den **Diff** (Schritt 4 des Workflows).
+      Löst Donald aus. **Gelaufen am 08.08.** auf `c5862fd^..c5862fd`, drei
+      unabhängige Reviewer (Claude-Senior, Silent-Failure-Hunter, **Codex** —
+      anderer Anbieter). Befunde in Gruppe 8; nachgelagert, weil #134 schon
+      gemergt war.
 
 ## 6. Ausrollen — drei Flächen, drei Befehle
 
@@ -112,3 +115,109 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       abhaken, mit Verweis auf AGE-505.
 - [ ] 7.3 `openspec archive` erst, wenn 6.3 gemessen ist — nicht, wenn der Code
       existiert.
+
+## 8. Nach dem Review (08.08., 5.4)
+
+Drei unabhängige Reviewer auf `c5862fd^..c5862fd`. Anders als bei AGE-506 fanden
+sie **nicht** denselben Kern — jeder Blickwinkel fand etwas, das die beiden
+anderen übersahen. Der schwerste Befund kam vom Reviewer des anderen Anbieters.
+
+Was hier steht, ist nachgemessen, nicht übernommen. Drei Behauptungen der
+Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
+
+- [ ] 8.1 **Gleichzeitige Anfragen machen Adressen aufzählbar (Codex, schwerster
+      Befund).** Zwei parallele Anfragen für eine bekannte, gerade
+      ausgabeberechtigte Adresse passieren beide die Zähl- und Pending-Abfragen;
+      der partielle Unique-Index `activation_tokens_offen_je_profil`
+      (`20260806080000:65`) lässt nur einen Insert zu, der zweite RPC endet mit
+      Unique-Violation, und `index.ts:123-126` übersetzt **jeden** RPC-Fehler in
+      **502**. Für eine unbekannte Adresse antworten beide mit 202. Ein einziges
+      Paar paralleler Anfragen unterscheidet damit Mitglied von Nicht-Mitglied —
+      genau das, was die Immer-202-Konstruktion verhindern soll.
+      **PR-spezifische Verschärfung, die Codex nicht nennt:** vor AGE-505 kehrte
+      ein aktiviertes Konto bei `already_activated` um, **bevor** irgendetwas
+      eingefügt wurde — für solche Konten gab es den Wettlauf gar nicht. Da
+      „aktiviert" nach C10 der Normalfall ist, dehnt AGE-505 das Orakel von den
+      unaktivierten auf **alle** Konten aus. Der Index ist nicht der Fehler
+      (er ist die Absicht, siehe sein Kommentar); der Fehler ist, dass sein
+      Verstoß als 502 nach außen dringt. Fix: Unique-Violation in
+      `issue_activation_token` abfangen und als `pending` zurückgeben — der
+      Zustand, den der Verlierer des Wettlaufs faktisch vorfindet.
+- [ ] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
+      (Silent-Failure-Hunter). `ActivationRedeemPage.tsx:129-135` hat ein
+      `finally` ohne `catch`; `setAngefordert(true)` läuft unabhängig vom
+      Ausgang, und `angefordert` ist das Einzige, was Formular von „der Link ist
+      unterwegs" trennt. **Nachgemessen an `index.ts:99-126`:** fehlendes Secret
+      → 500, DB-Fehler → 502, kaputter Rumpf → 400; `requestActivationLink`
+      wirft bei jedem Nicht-2xx. Alle drei enden in derselben grünen Meldung.
+      Vorbestehend — aber `/passwort-vergessen` ist ab AGE-505 der **einzige**
+      Rückweg eines aktivierten Kontos. Fix: `catch`, eigener Fehlerzustand, und
+      er darf nicht klingen wie die drei Anti-Aufzählungs-Ausgänge.
+- [ ] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
+      Codex, unabhängig voneinander). `renderReset` setzt zwar
+      `window.history`, der `MemoryRouter` liest den Pfad aber nie — der Zweck
+      kommt aus der **Prop**. **Zweimal falsifiziert:** (a) alle sechs Pfade in
+      `ActivationRedeemPage.test.tsx` durch `/voelliger-unsinn` ersetzt →
+      **18/18 grün**; (b) `zweck="reset"` in `App.tsx:155` entfernt, sodass
+      `/passwort-neu` wieder „Zugang freischalten" zeigt → **458/458 grün**.
+      Damit ist der eigentliche Zweck von AGE-505 ungeschützt. Verschärfend: der
+      Kommentar über `renderReset` behauptet ausdrücklich das Gegenteil („sonst
+      prüfte der Test eine Konstruktion, die es so nicht gibt") — das ist
+      schlechter als kein Test. Fix: ein Fall in `App.test.tsx` mit
+      `initialEntries={["/passwort-neu#token=x"]}`, plus den falschen Kommentar
+      streichen.
+- [ ] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
+      (Silent-Failure-Hunter; unabhängig auch beim Lesen des Diffs aufgefallen).
+      `ActivationRedeemPage.tsx:103` wirft bei `!token && user && isActivated`
+      wortlos auf `/`. Für „aktivierung" ist das begründet — für „reset" ist
+      aktiviert-sein die **Voraussetzung**, nicht der Grund wegzuschicken. Ein
+      eingeloggtes Mitglied auf `/passwort-vergessen` landet ohne Meldung auf der
+      Startseite. **Entschärfend nachgemessen:** es gibt einen eingeloggten Weg
+      (`EinstellungenPage`, AGE-450, ohne Re-Auth), und `LoginPage.tsx:42` hält
+      Angemeldete von `/login` fern, der neue Link ist für sie also nicht
+      erreichbar. Niemand ist ausgesperrt; es fehlt der Hinweis. Fix:
+      `&& zweck === "aktivierung"`, oder auf `/einstellungen` leiten.
+- [ ] 8.5 **Kein Zweig für einen unbekannten Status** (Silent-Failure-Hunter).
+      `index.ts:139` fasst vier Status plus **alles Unbekannte** in eine
+      `info`-Zeile. Der genannte Ablauf: Function deployt, Migration nicht →
+      DB antwortet weiter `already_activated` → kein Mitglied bekommt je eine
+      Reset-Mail, und das einzige Signal sieht aus wie der Normalfall.
+      **Nachgemessen und entschärft:** `20260807200000` **ist** auf
+      `foelowldexkcqzewvrcf` angewandt (dem Projekt, auf das das Deployment
+      zeigt) — die Function trägt `issued_reset`. Nicht akut, aber die
+      Absicherung fehlt: Erlaubnisliste + `error` für Unerwartetes.
+- [ ] 8.6 **Der abgeleitete Zweck trägt nur, solange `activated_at` genau einen
+      Schreiber hat** (Senior). `mark_activated` mit
+      `coalesce(activated_at, now())` ist heute der einzige, eine Deaktivierung
+      gibt es nicht. Genau das ist die unausgesprochene Bedingung des Entwurfs
+      „Zweck ableiten statt speichern". Wer je eine Sperrfunktion baut, die
+      `activated_at` auf `null` setzt, macht jedes ausstehende Reset-Token zum
+      Re-Aktivierer. Gehört als Warnung an `mark_activated` in
+      `20260806080200`, nicht nur in den Kopf von `20260807200000`.
+- [ ] 8.7 Kleinkram, gesammelt: Adressvalidierung
+      (`ActivationRedeemPage.tsx:127`) kehrt bei Tippfehler **wortlos** um, der
+      Knopf wirkt kaputt (`noValidate` schaltet die Browser-Prüfung ab) ·
+      `entwerten()` protokolliert `token_invalidated` auf `info`, auch wenn
+      **null** Zeilen getroffen wurden (`index.ts:165`) · `EdgeRuntime?.waitUntil?.`
+      überspringt den Versand still, wenn die Laufzeit es nicht hat ·
+      `instrument.test.ts:41` prüft die Fragment-Aufräumung nur auf
+      `/aktivierung`, nicht auf `/passwort-neu` · `LoginPage.test.tsx` belegt den
+      Link, aber nicht die Bedingung `mode === "login"`.
+
+**Geprüft und in Ordnung** — damit es nicht zweimal geprüft wird: Der Kopf der
+Migration behauptet, gegen `20260806090000` seien ausschließlich Zweigreihenfolge
+und Status geändert. **Rumpf-Diff ohne Kommentare: exakt wahr**, ein verschobener
+Zweig, sonst byte-identisch. AGE-495/E2 wurde nicht still zurückgedreht
+(`20260807190000` deklariert die Function nicht neu). `activated_at` überlebt
+einen echten Reset (`coalesce`), und `rls_test.sql` nagelt das mit einer
+Assertion fest, die rot wird, wenn jemand `coalesce` entfernt. `SECURITY DEFINER`
+ist sauber: leerer `search_path`, qualifizierte Tabellen, `revoke` für `public`,
+`anon`, `authenticated`. Empfänger ist immer die hinterlegte Adresse.
+
+**Bewusst NICHT als Befund geführt:** Codex nennt die fehlende serverseitige
+Zweckbindung (ein Aktivierungs-Token lässt sich unter `/passwort-neu` einlösen).
+Das ist so **entworfen** und im Migrationskopf begründet — das Einlösen ist für
+beide Zwecke identisch, die Route ist ein Etikett. Codex' Folgerung, die
+Invariante „Reset ändert `activated_at` nicht" sei dadurch verletzt, trägt nicht:
+`activated_at` ändert sich nur bei einem Konto, das **nie** aktiviert war — das
+ist eine Aktivierung, kein Reset. Was bleibt, ist 8.6.
