@@ -180,6 +180,14 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
   `catch` mit eigenem Zustand, `finally` trägt nur noch `setLäuft(false)`. Das
   Formular bleibt stehen, damit ein zweiter Versuch möglich ist. 19/19.
 
+  **Offen: die Sichtprobe der neuen Meldung (4.6).** Die lokale App mountet in
+  dieser Sitzung nicht — Vite liefert das HTML aus, aber auch die Startseite
+  bleibt leer und die Konsole gibt nichts her. Es liegt also nicht an dieser
+  Änderung, belegt ist die Darstellung aber trotzdem nicht. Beim nächsten
+  lokalen Lauf mit ansehen: `/passwort-vergessen`, Adresse eingeben, senden —
+  ohne laufende Edge Function wirft der Aufruf, die Meldung erscheint also von
+  selbst.
+
 - [x] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
       Codex, unabhängig voneinander). `renderReset` setzt zwar
       `window.history`, der `MemoryRouter` liest den Pfad aber nie — der Zweck
