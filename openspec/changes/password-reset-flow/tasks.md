@@ -359,6 +359,12 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
   ersetzt → **genau** der Registrierungs-Fall fällt (1 von 6). Beide Quellen
   danach unverändert (`git diff` leer). Suite 462 → 466.
 
+  **Sichtprobe zu 1 (4.6):** `/passwort-vergessen`, `probe.example.invalid`
+  eingegeben, gesendet — der rote Kasten „Bitte gib eine vollständige
+  E-Mail-Adresse ein — mit @ und Domain." steht über dem Formular, und der Knopf
+  wirkt nicht mehr kaputt. Damit ist genau der Eindruck weg, der den Befund
+  ausgelöst hat.
+
 ### Aus dem Review des Fixes selbst (08.08.)
 
 Der Fix zu 8.1 wurde vor dem Merge nochmals geprüft — dieselbe Kontrolle, die
