@@ -46,10 +46,12 @@
 -- gilt. Das ist der Teil, an dem der erste Anlauf gescheitert ist.
 --
 -- Vollstaendige Neudeklaration, weil Postgres keine partielle Aenderung kennt.
--- Gegen 20260807200000 ist AUSSCHLIESSLICH das `insert` geaendert (in einen
--- Block mit `exception when unique_violation` gefasst);
--- Grenzwerte, Reihenfolge, Entwertung und die zurueckgegebenen Spalten sind
--- unveraendert uebernommen.
+-- Gegen 20260807200000 sind AUSSCHLIESSLICH zwei Dinge geaendert: das `insert`
+-- ist in einen Block mit `exception when unique_violation` gefasst, und dafuer
+-- kommt die Deklaration `v_constraint text` dazu. Grenzwerte, Reihenfolge der
+-- Zweige, Entwertung, zurueckgegebene Spalten, `search_path` und Grants sind
+-- unveraendert uebernommen — nachgemessen am kommentarfreien Rumpf-Diff, nicht
+-- behauptet.
 
 create or replace function public.issue_activation_token(
   p_email      text,
