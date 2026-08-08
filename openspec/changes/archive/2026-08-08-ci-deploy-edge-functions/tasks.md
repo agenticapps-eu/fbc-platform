@@ -147,7 +147,7 @@ Historie. Das ist 5.8. Was sie darüber hinaus fanden:
       geprüft ließe eine Fassung durch, die den richtigen SHA nennt und die
       falsche Herkunft dazu.
 - [x] 6.8 `### Uebergangen (unveraendert in diesem Merge)` → `(unveraendert seit
-    <basis>)`. Die Basis kann viele Merges zurückliegen; die alte Überschrift
+  <basis>)`. Die Basis kann viele Merges zurückliegen; die alte Überschrift
       behauptete weniger, als geprüft wurde.
 - [x] 6.9 Der veraltete Risiko-Absatz in `design.md` (`git diff HEAD^ HEAD`
       setze einen Vorgänger voraus, nach Force-Push liefere der Job nichts aus)
@@ -173,7 +173,22 @@ Historie. Das ist 5.8. Was sie darüber hinaus fanden:
       auch wenn nichts auszuliefern war. Eine Basis, die nur im Ausnahmefall
       genannt wird, ist im Normalfall unbelegt — dieselbe Begründung wie bei 2.5.
 - [x] 5.10 `pnpm test`, `pnpm typecheck`, `actionlint`, `openspec validate --all`.
-- [ ] 5.11 **Abnahme am echten Lauf:** nach dem Merge im Protokoll lesen, welche
+- [x] 5.11 **Abnahme am echten Lauf:** nach dem Merge im Protokoll lesen, welche
       Basis gewählt wurde und warum. Erwartung beim ersten Lauf: `57032b5` aus
       Lauf `31247900892` — also **gleich** `HEAD^`, weil aktuell keine Lücke
       offen ist. Der Beleg ist die genannte Herkunft, nicht der Wert.
+
+  **Gemessen** an Lauf `31260468370` (Merge `67fd960`, PR #137), Job `functions`
+  grün, `drift-gate` grün — der Job lief also wirklich, statt übersprungen zu
+  werden:
+
+  ```
+  BASIS: 57032b59a9150bf9c9e24f07c5d846a4c3791f42
+  GRUND: zuletzt erfolgreich ausgeliefert in Lauf 31247900892
+  ```
+
+  Wert wie erwartet gleich `HEAD^`; entscheidend ist der **Grund** — die Basis
+  stammt aus der Laufhistorie, nicht aus `HEAD^`. Kein Rückfall gesetzt (sonst
+  wäre der Job rot). Zweite Hälfte mitbelegt: „Seit `57032b5` … änderte sich kein
+  Function-Code — es wurde nichts ausgeliefert", also auch im unauffälligen Lauf
+  benannt statt verschwiegen (5.9).
