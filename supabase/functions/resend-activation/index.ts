@@ -23,7 +23,9 @@
 //
 // Secrets (Infisical → `supabase secrets set`, s. docs/secrets.md):
 //   RESEND_API_KEY, FROM_EMAIL, APP_URL.
-//   SUPABASE_URL + SUPABASE_ANON_KEY spritzt die Plattform ein.
+//   SUPABASE_URL + SUPABASE_ANON_KEY + SUPABASE_SERVICE_ROLE_KEY spritzt die
+//   Plattform ein. Wozu hier BEIDE Schlüssel gebraucht werden, steht am
+//   Service-Rollen-Client weiter unten.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { activationUrl, renderActivation } from "../send-activation/emails.ts";
@@ -123,6 +125,45 @@ Deno.serve(async (req) => {
   });
   const empfaenger = String(row.login_email);
 
+  // Hat Resend den Versand ABGELEHNT, darf das soeben ausgegebene Token nicht
+  // gültig liegen bleiben (Befund E2 aus Review 8.7). Der Schaden trifft nicht
+  // diesen Weg — `request_own_activation_token` hat kein Schutzfenster, hier
+  // wirkt nur die 60-s-Sperre —, sondern den ANDEREN: das offene Token sieht
+  // das Schutzfenster von `issue_activation_token` (20260806090000:190-201),
+  // und der sitzungsfreie Rückfallweg auf `/aktivierung` antwortet darauf bis
+  // zu 24 Stunden lang `pending`. Kein Versand, kein neues Token — und die
+  // Oberfläche meldet dabei dasselbe Grün wie im Erfolgsfall. Ein Fehlversand
+  // auf dem angemeldeten Weg sperrt also den anonymen zu. Gemessen gegen DEV
+  // am 2026-08-08 mit `scripts/probe-e2-resend-fehlversand.ts`.
+  //
+  // WAS DAS NICHT HEILT, ausdrücklich: der überholte Link im Postfach bleibt
+  // tot. `request_own_activation_token` entwertet ihn, bevor überhaupt gesendet
+  // wird, und der Klartext des neuen ist mit diesem Aufruf verschwunden. Ihn
+  // zurückzuholen hieße, `invalidated_at` wieder auf `null` zu setzen — eine
+  // Zustandsumkehr, die es im System sonst nirgends gibt. Entscheidung Donald,
+  // 2026-08-08: der stille Schaden wird geschlossen, der laute bleibt benannt.
+  //
+  // Zwei Clients, nicht einer, und beides mit Absicht: der obere trägt das
+  // User-JWT, weil `auth.uid()` in `request_own_activation_token` auflösen
+  // muss. `invalidate_activation_token` ist dagegen `service_role`-only
+  // (20260807190000:75-77) — für `authenticated` aufrufbar wäre das Entwerten
+  // selbst der Aussperrungsweg, den das Schutzfenster zumacht.
+  //
+  // Aufgerufen wird das NUR bei einer Ablehnung, nicht bei einem Wurf — die
+  // Begründung steht am `catch` unten.
+  const entwerten = async () => {
+    const dienst = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data, error } = await dienst.rpc("invalidate_activation_token", {
+      p_token_hash: hash,
+    });
+    // Ohne diese Zeile wäre die Behebung eines stillen Fehlschlags selbst einer.
+    if (error) log("error", "invalidate_failed", { code: error.code });
+    else log("info", "token_invalidated", { getroffen: data });
+  };
+
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
@@ -143,6 +184,7 @@ Deno.serve(async (req) => {
         .then((j) => (j as { name?: string })?.name)
         .catch(() => undefined);
       log("error", "resend_failed", { status: res.status, error: errName });
+      await entwerten();
       return new Response(JSON.stringify({ status: "send_failed" }), {
         status: 502,
         headers: { ...CORS, "content-type": "application/json" },
@@ -151,6 +193,15 @@ Deno.serve(async (req) => {
     const { id } = (await res.json().catch(() => ({}))) as { id?: string };
     log("info", "mail_sent", { resendId: id });
   } catch (e) {
+    // HIER wird BEWUSST NICHT entwertet — anders als im Zweig darüber, und aus
+    // demselben Grund wie in send-activation (dort ausführlich am `catch`):
+    // ein `!res.ok` ist eine Ablehnung, es ging nichts raus. Ein Wurf trifft
+    // auch den Fall, dass die ANTWORT verlorengeht, nachdem Resend die Mail
+    // angenommen und zugestellt hat — dort hielte das Mitglied eine echte Mail
+    // in der Hand, deren Link „überholt" meldet. Ein zugestellter Link ist mehr
+    // wert als ein geschlossenes Schutzfenster.
+    //
+    // Der Preis ist benannt: für diesen selteneren Fall bleibt E2 bestehen.
     log("error", "resend_threw", { error: e instanceof Error ? e.name : "unknown" });
     return new Response(JSON.stringify({ status: "send_failed" }), {
       status: 502,

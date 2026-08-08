@@ -377,43 +377,43 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       Fläche messbar ist._
 
       **Beim Betrachten der laufenden Oberfläche (6.9):** Wand auf `/`,
-                                          `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
-                                          und Adresse aus `my_activation_state()` · keine Konsolenfehler.
+                                              `/mitglieder` und `/profil` · Anforderungsformular ohne Sitzung · Anrede
+                                              und Adresse aus `my_activation_state()` · keine Konsolenfehler.
 
-                                          **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
-                                          Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
-                                          · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
-                                          `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
-                                          dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
+                                              **Gegen die LIVE deployten Functions** — Antworten der Function, nicht des
+                                              Quelltexts: vierstelliges Passwort → `400 weak_password` (`minLength: 10`)
+                                              · erfundenes Token → `410 not_found` · echtes Token zweimal eingelöst →
+                                              `200 activated`, dann `410 used` · Fehlversuche einer IP → 19× `not_found`,
+                                              dann `throttled` · `resend-activation` ohne JWT → `401` vom Gateway.
 
-                                          **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
-                                          die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
-                                          Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
-                                          `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
-                                          Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
-                                          gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
+                                              **Gegen die LOKAL servierte Function** (`supabase functions serve`), weil
+                                              die letzten zwei Fälle einen Datenbankeingriff brauchen und der an der
+                                              Live-Datenbank nichts zu suchen hat: Token abgelaufen, nicht entwertet →
+                                              `410 expired` · Token entwertet, nicht abgelaufen → `410 superseded`.
+                                              Beide Zustände vorher einzeln in `activation_tokens` hergestellt und
+                                              gegengeprüft, damit nicht ein Zustand zwei Antworten erklärt.
 
-                                          Drei Dinge, die dabei mehr belegen als das Abhaken:
+                                              Drei Dinge, die dabei mehr belegen als das Abhaken:
 
-                                          1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
-                                             12.4. Andernfalls läse das Mitglied eine falsche Meldung.
-                                          2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
-                                             also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
-                                             Eigenschaft, an der die Entscheidung in 12.6 hing.
-                                          3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
-                                             **und** abgelaufen ist, meldet `used`
-                                             (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
-                                             Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
-                                             `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
-                                             nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
+                                              1. **„Schon benutzt" antwortet `used`, nicht `not_found`** — der Punkt aus
+                                                 12.4. Andernfalls läse das Mitglied eine falsche Meldung.
+                                              2. **Die Drossel greift erst nach 19 sauberen `not_found`.** Sie zählt
+                                                 also wirklich nur Fehlversuche und wirft nicht vorzeitig — die
+                                                 Eigenschaft, an der die Entscheidung in 12.6 hing.
+                                              3. **Die Reihenfolge im Fehlerzweig stimmt.** Ein Token, das benutzt
+                                                 **und** abgelaufen ist, meldet `used`
+                                                 (`20260806080200_activation_rpcs.sql:146-154`). Das ist die richtige
+                                                 Wahl: das Konto ist aktiviert, „melde dich an" führt weiter. Gewönne
+                                                 `expired`, schickte man das Mitglied einen neuen Link anfordern, den es
+                                                 nie bekommt (`already_activated`) — eine Sackgasse. Vorher ungeprüft.
 
-                                          **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
-                                          `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
-                                          Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
-                                          meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
-                                          **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
-                                          Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
-                                          nicht an einer kaputten Fixture.
+                                              **Der ganze Weg wurde einmal Ende zu Ende gegangen:** Mail an
+                                              `donald@vlahovic.de` → Link → Token → Passwort gesetzt → `activated`.
+                                              Gegenprobe direkt danach mit dem neuen Passwort: `my_activation_state()`
+                                              meldet `activated:true`, und dasselbe Konto sieht jetzt `profiles_public`
+                                              **37**, `posts` 5, `events` 9 — vorher waren es **14 Tabellen mit null
+                                              Zeilen**. Damit hing die Sperre nachweislich am Aktivierungszustand und
+                                              nicht an einer kaputten Fixture.
 
 - [x] 8.4 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       pgTAP grün, mit Dateiliste aufgerufen.
@@ -444,58 +444,58 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       #120/#127/#128). Volltext in `REVIEW-8.7.md`._
 
       **Ein Blocker, selbst nachgemessen:** die drei Aktivierungs-Functions
-                                      beantworten OPTIONS mit `405` **ohne** `Access-Control-*`. Antwort trägt
-                                      `x-deno-execution-id` und `x-served-by: supabase-edge-runtime` — die
-                                      Function antwortet, nicht das Gateway. Das Frontend ruft alle drei über
-                                      `supabase.functions.invoke` (`src/lib/activation.ts:68,83,91`), das
-                                      `Content-Type: application/json` setzt und damit einen Preflight erzwingt.
-                                      **Aus dem Browser schlägt der ganze Weg fehl.** Gegenprobe:
-                                      `create-checkout-session` → `200` + `ACAO: *`.
-                                      _Warum das bis heute unsichtbar war: die Ende-zu-Ende-Belege aus 8.3 und
-                                      10.5/10.8 sind HTTP-Antworten der Functions. Der Serverweg ist gemessen,
-                                      der Browserweg nie. Dieselbe Klasse wie die zwei Blocker vom 06.08. —
-                                      die Prüfung bestand, weil sie die falsche Fläche traf._
-                                      **Behoben 07.08.**, rot vorher / grün nachher gemessen: `CORS`-Konstante,
-                                      `OPTIONS`-Zweig und Header auf **jeder** Antwort (auch den Fehlerfällen —
-                                      sonst kann der Browser die Meldung nicht lesen). `deno check` grün,
-                                      deployt gegen `foelowldexkcqzewvrcf`. `OPTIONS` → `200` mit `ACAO: *` und
-                                      `ACAH`; `POST send-activation` → `202` **mit** `ACAO`. Der zweite Wert
-                                      zählt mehr: ein bestandener Preflight allein reicht nicht.
-                                      _Grenze der Messung: mit `curl` gemacht, und `curl` erzwingt CORS nicht.
-                                      Belegt ist die Serverseite vollständig — der Client-Pfad durch
-                                      `functions.invoke` nicht. Ein echter Klick bleibt Teil von 10.4._
-                                      **Client-Pfad nachgeholt 07.08., im Browser:** Klick auf „Neuen Link
-                                      senden" auf `/aktivierung` → Preflight `OPTIONS …/send-activation`
-                                      `200` **und** der Erfolgszweig der Oberfläche. Der zweite Teil ist der
-                                      Beweis: bei Fehler wirft `activation.ts:88`, dann stünde dort der
-                                      Fehlerzweig. Adresse `…@example.invalid` — keine Mail ausgelöst.
-                                      **Die zwei restlichen Wege nachgeholt 07.08.**, mit Testkonto
-                                      `donald.vlahovic@gmail.com` (angemeldet, `activated_at` per Hand auf
-                                      `null`). `resend-activation`: Preflight `OPTIONS` → `200`,
-                                      Erfolgszweig „Der Link ist unterwegs" **und** Knopfsperre „Erneut
-                                      senden in 58 s", dazu serverseitig ein neues Token um
-                                      `2026-08-07T12:17:17.915Z`, und die Mail kam an. Damit ist der
-                                      Gateway-Pfad **mit** JWT-Prüfung gedeckt.
-                                      `redeem-activation`: `used_at 12:20:43.278Z` und
-                                      `profiles.activated_at` auf dieselbe Sekunde, Bildschirm davor
-                                      „Passwort festlegen" / danach `/login` (der vorgesehene Ausgang,
-                                      `ActivationRedeemPage.tsx:66-70`).
-                                      _Grenze, und sie bleibt: für `redeem-activation` gibt es **keinen
-                                      Netzwerkbeleg** — der Mitschnitt stand danach beide Male leer, Ursache
-                                      ungeklärt. Der Weg trägt über zwei Zeitstempel und zwei Bildschirme,
-                                      nicht über einen Statuscode._
-                                      → **B2 (Vorbedingung von C10) ist am 07.08. geschlossen**: die drei
-                                      Functions liegen jetzt auch auf `viwntbodrtqxgmqyxluh`, mit
-                                      DEV-gleichem `ezbr_sha256` und bestandenem Preflight. Messung in
-                                      `REVIEW-8.7.md`, Vorbedingung (f) in 11.2.
+                                          beantworten OPTIONS mit `405` **ohne** `Access-Control-*`. Antwort trägt
+                                          `x-deno-execution-id` und `x-served-by: supabase-edge-runtime` — die
+                                          Function antwortet, nicht das Gateway. Das Frontend ruft alle drei über
+                                          `supabase.functions.invoke` (`src/lib/activation.ts:68,83,91`), das
+                                          `Content-Type: application/json` setzt und damit einen Preflight erzwingt.
+                                          **Aus dem Browser schlägt der ganze Weg fehl.** Gegenprobe:
+                                          `create-checkout-session` → `200` + `ACAO: *`.
+                                          _Warum das bis heute unsichtbar war: die Ende-zu-Ende-Belege aus 8.3 und
+                                          10.5/10.8 sind HTTP-Antworten der Functions. Der Serverweg ist gemessen,
+                                          der Browserweg nie. Dieselbe Klasse wie die zwei Blocker vom 06.08. —
+                                          die Prüfung bestand, weil sie die falsche Fläche traf._
+                                          **Behoben 07.08.**, rot vorher / grün nachher gemessen: `CORS`-Konstante,
+                                          `OPTIONS`-Zweig und Header auf **jeder** Antwort (auch den Fehlerfällen —
+                                          sonst kann der Browser die Meldung nicht lesen). `deno check` grün,
+                                          deployt gegen `foelowldexkcqzewvrcf`. `OPTIONS` → `200` mit `ACAO: *` und
+                                          `ACAH`; `POST send-activation` → `202` **mit** `ACAO`. Der zweite Wert
+                                          zählt mehr: ein bestandener Preflight allein reicht nicht.
+                                          _Grenze der Messung: mit `curl` gemacht, und `curl` erzwingt CORS nicht.
+                                          Belegt ist die Serverseite vollständig — der Client-Pfad durch
+                                          `functions.invoke` nicht. Ein echter Klick bleibt Teil von 10.4._
+                                          **Client-Pfad nachgeholt 07.08., im Browser:** Klick auf „Neuen Link
+                                          senden" auf `/aktivierung` → Preflight `OPTIONS …/send-activation`
+                                          `200` **und** der Erfolgszweig der Oberfläche. Der zweite Teil ist der
+                                          Beweis: bei Fehler wirft `activation.ts:88`, dann stünde dort der
+                                          Fehlerzweig. Adresse `…@example.invalid` — keine Mail ausgelöst.
+                                          **Die zwei restlichen Wege nachgeholt 07.08.**, mit Testkonto
+                                          `donald.vlahovic@gmail.com` (angemeldet, `activated_at` per Hand auf
+                                          `null`). `resend-activation`: Preflight `OPTIONS` → `200`,
+                                          Erfolgszweig „Der Link ist unterwegs" **und** Knopfsperre „Erneut
+                                          senden in 58 s", dazu serverseitig ein neues Token um
+                                          `2026-08-07T12:17:17.915Z`, und die Mail kam an. Damit ist der
+                                          Gateway-Pfad **mit** JWT-Prüfung gedeckt.
+                                          `redeem-activation`: `used_at 12:20:43.278Z` und
+                                          `profiles.activated_at` auf dieselbe Sekunde, Bildschirm davor
+                                          „Passwort festlegen" / danach `/login` (der vorgesehene Ausgang,
+                                          `ActivationRedeemPage.tsx:66-70`).
+                                          _Grenze, und sie bleibt: für `redeem-activation` gibt es **keinen
+                                          Netzwerkbeleg** — der Mitschnitt stand danach beide Male leer, Ursache
+                                          ungeklärt. Der Weg trägt über zwei Zeitstempel und zwei Bildschirme,
+                                          nicht über einen Statuscode._
+                                          → **B2 (Vorbedingung von C10) ist am 07.08. geschlossen**: die drei
+                                          Functions liegen jetzt auch auf `viwntbodrtqxgmqyxluh`, mit
+                                          DEV-gleichem `ezbr_sha256` und bestandenem Preflight. Messung in
+                                          `REVIEW-8.7.md`, Vorbedingung (f) in 11.2.
 
-                                      **Die zentrale Zusage hält.** Der RLS-Reviewer hat den Endzustand aller
-                                      Migrationen nachgespielt statt nur den Diff: 52 lebende Policies, 46
-                                      gegatet, keine permissive Altpolicy überlebt (Policies ODERn — das wäre
-                                      die gefährlichste Ausfallform gewesen), alle 31 DEFINER-Funktionen mit
-                                      gesetztem `search_path`, `activated_at` client-seitig nicht schreibbar,
-                                      `activation_tokens` ohne Policy und ohne Grant. An **fremde**
-                                      Mitgliederdaten kommt ein nicht aktiviertes Konto nicht.
+                                          **Die zentrale Zusage hält.** Der RLS-Reviewer hat den Endzustand aller
+                                          Migrationen nachgespielt statt nur den Diff: 52 lebende Policies, 46
+                                          gegatet, keine permissive Altpolicy überlebt (Policies ODERn — das wäre
+                                          die gefährlichste Ausfallform gewesen), alle 31 DEFINER-Funktionen mit
+                                          gesetztem `search_path`, `activated_at` client-seitig nicht schreibbar,
+                                          `activation_tokens` ohne Policy und ohne Grant. An **fremde**
+                                          Mitgliederdaten kommt ein nicht aktiviertes Konto nicht.
 
 - [x] 8.8 `run-plan-review.sh` erneut, gegen die überarbeiteten Artefakte.
       _Gefahren 06.08. mit codex, opencode und gemini (AGENT_SELF=claude, also
@@ -773,13 +773,18 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       gibt immer neu aus, hat also gar kein Schutzfenster — dort ist „Der Link
       ist unterwegs" wahr.
       **Gemessen, nicht behauptet:** pgTAP rot (`function
-  "public.invalidate_activation_token(text)" does not exist`) → grün
+"public.invalidate_activation_token(text)" does not exist`) → grün
       (`Files=3, Tests=190, Result: PASS`, neun neue Assertions in `rls_test.sql`
       §14b-bis); Vitest rot (`Expected /letzten 24 Stunden/`) → grün (427/427).
       **Offen bleibt:** `index.ts` hat keine eigene Testdatei — der Fehlerzweig
       ist über den RPC belegt, die zwei Zeilen Verdrahtung sind es nicht.
       **E2 ist NICHT erledigt:** `resend-activation` entwertet weiter vor dem
       Senden; derselbe Fehlschlag kostet dort den alten Link._
+      _**Nachgetragen 08.08.:** E2 ist inzwischen erledigt — siehe 11.8. Dabei
+      zeigte sich, dass dieser Satz den Befund verfehlte: der teurere Schaden
+      war nicht der verlorene alte Link, sondern das liegengebliebene Token, mit
+      dem der Fehlversand hier den anonymen Weg 24 h lang zusperrte. Genau der
+      Schaden, den 11.6 für den anderen Weg schloss._
       _**Nachgezogen nach dem Code-Review vom 07.08.** (zwei Befunde):_
       _(1) **Der `catch`-Zweig entwertet nicht mehr.** Ein `!res.ok` ist eine
       Ablehnung — nichts ging raus, das Token ist wertlos. Ein Wurf trifft auch
@@ -803,6 +808,48 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       (`ActivationRedeemPage.tsx:80-82` setzt `setAngefordert(true)` im
       `finally`). Nach C10 ist „aktiviert" der Normalfall. Eigene Anforderung,
       nicht Teil dieses Changes.
+- [x] 11.8 **Der Fehlversand auf dem angemeldeten Weg sperrt den anonymen zu**
+      (E2). `resend-activation` entwertet über `request_own_activation_token`
+      und gibt neu aus, **bevor** es sendet. Lehnt Resend ab, antwortet die
+      Function zwar ehrlich mit 502 — aber das neue Token bleibt **offen und
+      gültig** liegen, und damit sieht das Schutzfenster von
+      `issue_activation_token` (`20260806090000:190-201`) ein ausstehendes
+      Token: der sitzungsfreie Rückfallweg auf `/aktivierung` antwortet bis zu
+      24 Stunden lang `pending` — kein Versand, kein neues Token, und die
+      Oberfläche meldet dabei dasselbe Grün wie im Erfolgsfall. **Das ist der
+      Befund, nicht der 502.** Er stand so weder in Review 8.7 noch in der
+      Handoff-Notiz; beide beschrieben nur den lauten Teil.
+      _Entschieden 08.08. (Donald), Variante B — **nur entwerten**, kein
+      Zurückholen: bei `!res.ok` ruft `resend-activation` das vorhandene
+      `invalidate_activation_token`. **Keine Migration, kein neuer RPC, kein
+      neuer Grant** — der RPC ist seit `20260807190000` da. Nötig ist dafür ein
+      **zweiter** Client mit Service-Role-Key: der bestehende trägt das
+      User-JWT, weil `auth.uid()` in `request_own_activation_token` auflösen
+      muss, und `invalidate_activation_token` ist `service_role`-only, weil sie
+      für `authenticated` aufrufbar selbst der Aussperrungsweg wäre._
+      _**Nicht gewählt:** den überholten Link zurückholen (`invalidated_at`
+      wieder auf `null`, die Handoff-Variante A). Sie hätte auch den lauten
+      Schaden geschlossen, verlangt aber eine Zustandsumkehr, die es im System
+      sonst nirgends gibt — `invalidated_at` ist überall Einbahnstraße — und der
+      Nutzen ist gering: Wer einen neuen Link anfordert, tut es, weil ihm der
+      alte nicht vorliegt. **Offen bleibt damit ausdrücklich:** der überholte
+      Link im Postfach bleibt tot. Benannt im Code, im Spec-Delta und hier._
+      _**Der `catch`-Zweig entwertet nicht**, gleiche Begründung wie bei E1
+      (11.6): ein `!res.ok` ist eine Ablehnung, ein Wurf trifft auch den Fall,
+      dass die Antwort verlorenging, nachdem Resend zugestellt hat._
+      _**Gemessen, nicht behauptet** — `scripts/probe-e2-resend-fehlversand.ts`
+      gegen DEV, echter Resend-Fehlversand an eine `@example.com`-Adresse,
+      nichts gemockt. Die Sonde bricht laut ab, wenn Resend die Adresse doch
+      annimmt, statt einen grünen Lauf vorzutäuschen._
+      _Rot (09:31 Uhr, vor dem Diff): `HTTP 502 / send_failed` · offene gültige
+      Token **1** · `issue_activation_token` → **`pending`**._
+      _Grün (09:48 Uhr, nach dem Deploy auf DEV): `HTTP 502 / send_failed` ·
+      offene gültige Token **0** · `issue_activation_token` → **`issued`**._
+      _Die zweite Zeile ist die Abnahme; die erste ist nur ihre Ursache._
+      _**Deploy-Pflicht nach 11.2 (f):** diese Änderung fasst
+      `resend-activation` an und muss auf **beide** Projekte. DEV ist für die
+      Messung schon deployt; PROD übernimmt der `functions`-Job aus AGE-506 beim
+      Merge._
 
 ## 12. Aus Review-Runde 3 offen — als Aufgabe festgehalten, nicht als Revision
 

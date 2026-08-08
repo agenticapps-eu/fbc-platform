@@ -478,6 +478,21 @@ echte Mail in der Hand, deren Link „überholt" meldet, also die Auskunft für 
 Fall, der nicht eingetreten ist. Dieser Zustand SHALL stattdessen protokolliert
 werden, weil er sonst nirgends sichtbar wird.
 
+Dieselbe Pflicht — abgelehnter Versand entwertet sein Token, ungewisser nicht —
+SHALL für den **angemeldeten** Weg gelten. Ihre Begründung ist dort eine andere:
+Er antwortet nicht vorab, und ein Schutzfenster hat er nicht; der Schaden eines
+abgelehnten Versands fällt also nicht auf ihn selbst, sondern auf den anderen.
+Bleibt sein Token gültig liegen, sieht das Schutzfenster von oben ein
+ausstehendes Token, und der sitzungsfreie Rückfallweg bleibt bis zu einen Tag
+lang folgenlos — für einen Link, den es nie gab. Ein Fehlversand auf dem Weg
+**mit** Sitzung SHALL NOT den Weg **ohne** Sitzung zusperren.
+
+Der zuvor ausgegebene, vom neuen Versand überholte Link SHALL dabei entwertet
+bleiben. Ihn zurückzuholen wäre eine Zustandsumkehr, die das System sonst
+nirgends kennt, und sein Nutzen ist gering: Wer einen neuen Link anfordert, tut
+es, weil der alte ihm nicht vorliegt. Der Preis SHALL benannt sein, statt
+stillschweigend hingenommen zu werden.
+
 Weil die Antwort in allen diesen Fällen ununterscheidbar bleiben muss, SHALL die
 Meldung an das Mitglied **alle** Ausgänge abdecken, statt einen Versand
 zuzusagen, den es nicht gegeben haben muss. Sie SHALL benennen, dass ein in den
@@ -551,6 +566,15 @@ Verzeichnis der Mitgliedsadressen.
   Aktivierungsbildschirm anfordert
 - **THEN** bestimmt sich der Empfänger aus der Sitzung; eine im Aufruf
   mitgegebene Adresse gibt es nicht und kann folglich nicht gefälscht werden
+
+#### Scenario: Ein Fehlversand auf dem angemeldeten Weg sperrt den sitzungsfreien nicht
+
+- **GIVEN** ein angemeldetes Konto hat einen Bestätigungslink angefordert und der
+  Versand wurde abgelehnt
+- **WHEN** dasselbe Mitglied den Link danach **ohne** Sitzung über seine Adresse
+  anfordert
+- **THEN** gilt das Token des Fehlversands nicht mehr als ausstehend, und die
+  Anforderung gibt einen Link aus, statt folgenlos zu bleiben
 
 ### Requirement: Der Aktivierungsversand ist gegen Selbstüberflutung begrenzt
 
