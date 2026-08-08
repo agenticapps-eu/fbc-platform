@@ -150,3 +150,71 @@ describe("der Vision-Dummy ist aus dem Renderpfad entfernt", () => {
     expect(document.documentElement.dataset.variant).toBe("hell");
   });
 });
+
+/**
+ * Die Routen zurück ins Konto (AGE-505, Befund 8.3 aus Review 5.4).
+ *
+ * `ActivationRedeemPage` bekommt den Zweck als **Eigenschaft**; erzeugt wird sie
+ * einzig in `App.tsx`. Genau diese Stelle prüfte kein Test: die Fälle in
+ * `ActivationRedeemPage.test.tsx` übergeben `zweck` selbst und rendern die
+ * Komponente direkt. Gemessen am 08.08.: mit entferntem `zweck="reset"` blieben
+ * **458/458** Tests grün, während `/passwort-neu` wieder „Zugang freischalten"
+ * anbot — also genau die Verwechslung, die AGE-505 ausräumen sollte.
+ *
+ * Zwei Fallen, an denen der frühere Versuch vorbeiging:
+ *
+ *  1. Das Token steht im **Fragment**, und `entnimmAktivierungsFragment` liest
+ *     `window.location.hash` — nicht die Router-Location. `MemoryRouter` allein
+ *     zeigt deshalb nie das Passwortformular.
+ *  2. Ein Test auf nur EINER Route ist nicht unterscheidend: wer die beiden
+ *     Routen vertauscht, bestünde ihn. Deshalb steht `/aktivierung` daneben.
+ */
+describe("Zweck der Einlöseseite hängt an der Route (AGE-505)", () => {
+  afterEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
+
+  function renderRoute(pfad: string, hash = "") {
+    // Beides setzen: der Router entscheidet, WELCHE Route greift, das Fragment,
+    // ob ein Token da ist. Siehe Falle 1 oben.
+    window.history.replaceState(null, "", `${pfad}${hash}`);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <AuthFixture value={fakeAuthValue()}>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <MemoryRouter initialEntries={[`${pfad}${hash}`]}>
+              <App />
+            </MemoryRouter>
+          </ToastProvider>
+        </QueryClientProvider>
+      </AuthFixture>,
+    );
+  }
+
+  it("/passwort-neu spricht vom Passwort, nicht vom Freischalten eines Zugangs", () => {
+    renderRoute("/passwort-neu", "#token=geheim");
+
+    expect(screen.getByRole("heading", { name: /Neues Passwort setzen/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zugang freischalten/i })).not.toBeInTheDocument();
+  });
+
+  it("/aktivierung spricht weiter vom Zugang — sonst wäre der Test nicht unterscheidend", () => {
+    renderRoute("/aktivierung", "#token=geheim");
+
+    expect(screen.getByRole("button", { name: /Zugang freischalten/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Neues Passwort setzen/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("/passwort-vergessen zeigt das Adressformular in der Reset-Sprache", () => {
+    renderRoute("/passwort-vergessen");
+
+    expect(screen.getByRole("heading", { name: /Passwort vergessen/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Bestätigungslink anfordern/i }),
+    ).not.toBeInTheDocument();
+  });
+});

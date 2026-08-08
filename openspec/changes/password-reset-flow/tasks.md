@@ -125,7 +125,7 @@ anderen übersahen. Der schwerste Befund kam vom Reviewer des anderen Anbieters.
 Was hier steht, ist nachgemessen, nicht übernommen. Drei Behauptungen der
 Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
 
-- [ ] 8.1 **Gleichzeitige Anfragen machen Adressen aufzählbar (Codex, schwerster
+- [x] 8.1 **Gleichzeitige Anfragen machen Adressen aufzählbar (Codex, schwerster
       Befund).** Zwei parallele Anfragen für eine bekannte, gerade
       ausgabeberechtigte Adresse passieren beide die Zähl- und Pending-Abfragen;
       der partielle Unique-Index `activation_tokens_offen_je_profil`
@@ -143,7 +143,25 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       Verstoß als 502 nach außen dringt. Fix: Unique-Violation in
       `issue_activation_token` abfangen und als `pending` zurückgeben — der
       Zustand, den der Verlierer des Wettlaufs faktisch vorfindet.
-- [ ] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
+
+  **Behoben (08.08.).** Nicht in der Migration, sondern dort, wo das Leck
+  sichtbar wird: der 502. Ein echter Zwei-Sitzungs-Wettlauf ist in pgTAP
+  **nicht** erreichbar (kein `dblink`, kein `pg_background` — nachgesehen), und
+  die Entwertung vor dem Insert lässt in einer Sitzung keine Lücke. Die
+  Entscheidung steht deshalb als reine Funktion in
+  `send-activation/rpc-ausgang.ts` mit Tests daneben — dieselbe Bauform wie
+  `emails.ts` und `deploy-base.logic.ts`, weil `index.ts` wegen `Deno.serve` auf
+  oberster Ebene nicht als Einheit testbar ist.
+  **RED zuerst:** die Funktion bildete absichtlich das heutige Verhalten nach
+  (jeder Fehler → `serverfehler`); genau die zwei `23505`-Fälle fielen mit
+  `serverfehler` statt `still_angenommen`, die drei übrigen bestätigten den
+  Rest. Danach GREEN, 5/5. Jeder ANDERE Fehlercode bleibt 502 — ein echter
+  Ausfall darf nicht in der Anti-Aufzählung verschwinden. Der Verlierer wird
+  innen eigens als `wettlauf_verloren` auf `warn` protokolliert: nach außen
+  ununterscheidbar (Zweck), nach innen unterscheidbar (sonst verschwindet ein
+  Nebenläufigkeitsproblem).
+
+- [x] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
       (Silent-Failure-Hunter). `ActivationRedeemPage.tsx:129-135` hat ein
       `finally` ohne `catch`; `setAngefordert(true)` läuft unabhängig vom
       Ausgang, und `angefordert` ist das Einzige, was Formular von „der Link ist
@@ -153,7 +171,16 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       Vorbestehend — aber `/passwort-vergessen` ist ab AGE-505 der **einzige**
       Rückweg eines aktivierten Kontos. Fix: `catch`, eigener Fehlerzustand, und
       er darf nicht klingen wie die drei Anti-Aufzählungs-Ausgänge.
-- [ ] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
+
+  **Behoben (08.08.), RED zuerst.** Neuer Fall „meldet einen technischen
+  Fehlschlag als solchen, statt Erfolg zu behaupten": `requestActivationLink`
+  wirft, und der Test verlangt die Fehlermeldung **und** die Abwesenheit der
+  grünen. Rot mit `Unable to find an element with the text: /konnte gerade nicht
+gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
+  `catch` mit eigenem Zustand, `finally` trägt nur noch `setLäuft(false)`. Das
+  Formular bleibt stehen, damit ein zweiter Versuch möglich ist. 19/19.
+
+- [x] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
       Codex, unabhängig voneinander). `renderReset` setzt zwar
       `window.history`, der `MemoryRouter` liest den Pfad aber nie — der Zweck
       kommt aus der **Prop**. **Zweimal falsifiziert:** (a) alle sechs Pfade in
@@ -166,6 +193,20 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       schlechter als kein Test. Fix: ein Fall in `App.test.tsx` mit
       `initialEntries={["/passwort-neu#token=x"]}`, plus den falschen Kommentar
       streichen.
+
+  **Behoben (08.08.).** Drei Fälle in `App.test.tsx` unter „Zweck der
+  Einlöseseite hängt an der Route", die das echte `<App />` fahren. Zwei Fallen
+  dabei: das Token kommt aus `window.location.hash`, nicht aus dem Router (also
+  wird **beides** gesetzt) — und ein Test auf nur EINER Route wäre nicht
+  unterscheidend, wer die Routen vertauscht bestünde ihn. Deshalb steht
+  `/aktivierung` daneben.
+  **Als Sonde belegt, nicht behauptet** (ein fehlender Test wird von sich aus
+  nie rot): Mutation 1 `zweck="reset"` entfernt → **genau** der `/passwort-neu`-
+  Fall fällt; Mutation 2 die Routen vertauscht → **genau** der `/aktivierung`-
+  Fall fällt. `App.tsx` danach unverändert (`git diff` leer). Der falsche
+  Kommentar über `renderReset` ist ersetzt und verweist jetzt auf die Stelle,
+  die die Verdrahtung wirklich prüft. Suite 458 → 462.
+
 - [ ] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
       (Silent-Failure-Hunter; unabhängig auch beim Lesen des Diffs aufgefallen).
       `ActivationRedeemPage.tsx:103` wirft bei `!token && user && isActivated`
