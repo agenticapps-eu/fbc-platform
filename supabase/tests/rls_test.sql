@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(182);
+select plan(184);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -908,6 +908,49 @@ select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_pr
   '%Re-Aktivierer%',
   'mark_activated: der Kommentar warnt davor, activated_at zurückzusetzen — '
   'wer das täte, machte jedes ausstehende Reset-Token zum Re-Aktivierer');
+
+-- ── 14a-bis. Die Sperre steht VOR dem ersten Zugriff auf die Token (AGE-507) ─
+-- Beide ausgebenden RPCs sperren die Profilzeile, BEVOR sie irgendetwas prüfen.
+-- Ohne das entscheiden zwei gleichzeitige Anforderungen beide auf einem
+-- veralteten Snapshot, und die zweite entwertet den soeben ausgegebenen
+-- gültigen Link (Befund 8.8).
+--
+-- Diese Zeile vergleicht POSITIONEN, nicht Vorkommen — und das ist der ganze
+-- Grund für ihre Bauart. Gemessen (AGE-507, Task 4.4): eine Sperre, die
+-- vorhanden, aber HINTER die Prüfungen verschoben ist, richtet mehr Schaden an
+-- als eine fehlende — sie gibt in einer Reihenfolge sogar zwei Token aus. Eine
+-- Kontrolle, die nur zählt, ob `for update of p` vorkommt, sähe davon nichts.
+--
+-- Die Kommentarbefreiung ist kein Zierrat: ohne sie täuscht ein `--`-Kommentar,
+-- der eines der beiden Muster enthält, die Reihenfolge vor.
+--
+-- WAS DIESE ZEILE NICHT BELEGT: sie liest Text. Sie bemerkt keine
+-- Verhaltensregression und beweist nicht, dass die Sperre WIRKT. Das belegt die
+-- Sonde `scripts/probe-wettlauf-token-ausgabe.ts` — einmal, gemessen, zum
+-- Zeitpunkt des Baus, mit rotem Vorher und grünem Nachher. Dass sie NICHT in
+-- der Pipeline läuft, ist eine bewusste Entscheidung (Donald, 2026-08-08,
+-- zweimal bestätigt); die Abwägung steht in REVIEWS.md. Diese Zeile hält
+-- deshalb nur fest, dass die Sperre nicht wortlos wieder verschwindet oder
+-- verrutscht.
+select ok(
+  strpos(rumpf, 'for update of p') > 0
+  and strpos(rumpf, 'for update of p') < strpos(rumpf, 'activation_tokens'),
+  'issue_activation_token: `for update of p` steht VOR dem ersten Zugriff auf '
+  'activation_tokens — die Prüfung entscheidet auf gesperrtem, nicht auf '
+  'veraltetem Stand (AGE-507)')
+from (select regexp_replace(
+        pg_get_functiondef('public.issue_activation_token(text,text,interval)'::regprocedure),
+        '--[^\n]*', '', 'g') as rumpf) s;
+
+select ok(
+  strpos(rumpf, 'for update of p') > 0
+  and strpos(rumpf, 'for update of p') < strpos(rumpf, 'activation_tokens'),
+  'request_own_activation_token: `for update of p` steht VOR dem ersten Zugriff '
+  'auf activation_tokens — sonst löst der zweite gleichzeitige Aufruf eine rohe '
+  'unique_violation aus, die diese Function nicht fängt (AGE-507)')
+from (select regexp_replace(
+        pg_get_functiondef('public.request_own_activation_token(text,interval)'::regprocedure),
+        '--[^\n]*', '', 'g') as rumpf) s;
 
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der
