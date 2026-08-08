@@ -144,22 +144,39 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       `issue_activation_token` abfangen und als `pending` zurückgeben — der
       Zustand, den der Verlierer des Wettlaufs faktisch vorfindet.
 
-  **Behoben (08.08.).** Nicht in der Migration, sondern dort, wo das Leck
-  sichtbar wird: der 502. Ein echter Zwei-Sitzungs-Wettlauf ist in pgTAP
-  **nicht** erreichbar (kein `dblink`, kein `pg_background` — nachgesehen), und
-  die Entwertung vor dem Insert lässt in einer Sitzung keine Lücke. Die
-  Entscheidung steht deshalb als reine Funktion in
-  `send-activation/rpc-ausgang.ts` mit Tests daneben — dieselbe Bauform wie
-  `emails.ts` und `deploy-base.logic.ts`, weil `index.ts` wegen `Deno.serve` auf
-  oberster Ebene nicht als Einheit testbar ist.
-  **RED zuerst:** die Funktion bildete absichtlich das heutige Verhalten nach
-  (jeder Fehler → `serverfehler`); genau die zwei `23505`-Fälle fielen mit
-  `serverfehler` statt `still_angenommen`, die drei übrigen bestätigten den
-  Rest. Danach GREEN, 5/5. Jeder ANDERE Fehlercode bleibt 502 — ein echter
-  Ausfall darf nicht in der Anti-Aufzählung verschwinden. Der Verlierer wird
-  innen eigens als `wettlauf_verloren` auf `warn` protokolliert: nach außen
-  ununterscheidbar (Zweck), nach innen unterscheidbar (sonst verschwindet ein
-  Nebenläufigkeitsproblem).
+  **Behoben (08.08.) in `20260808150000_activation_token_wettlauf_ist_pending.sql`** —
+  im zweiten Anlauf, und der erste ist der lehrreichere.
+
+  **Der verworfene erste Anlauf.** Er fing `23505` in der Edge Function ab
+  (reine Funktion `rpc-ausgang.ts` samt Tests, RED/GREEN sauber, 5/5). Ein
+  Review dieses Fixes durch den Reviewer des anderen Anbieters meldete ihn als
+  **Blocker**, und zu Recht: `activation_tokens` trägt **zwei** Unique-
+  Constraints — den partiellen Index (der Wächter) und den **Primärschlüssel**
+  auf `token_hash` (`20260806080000:38`). Beide werfen `23505`. Der Fix hätte
+  eine kaputte Token-Erzeugung als „angenommen" verbucht: kein Fehler, keine
+  Mail, im Protokoll „Wettlauf verloren" — also ausgerechnet die Fehlerklasse,
+  gegen die er im eigenen Kommentar argumentierte. Zurückgenommen,
+  `index.ts` ist wieder byte-identisch zum Stand davor.
+
+  **Der Fix.** Ein `exception when unique_violation` um das `insert`, das den
+  Wächter über `get stacked diagnostics … = constraint_name` beim **Namen**
+  nennt statt über den Fehlercode; alles andere wird durchgereicht (`raise`).
+  Verworfen: `on conflict (profile_id) where …` — kürzer, aber die
+  Inferenz-Klausel darf nicht qualifiziert werden, und `profile_id` ist zugleich
+  OUT-Parameter der Function. Postgres meldet die Spalte als mehrdeutig;
+  gemessen, nicht vermutet.
+
+  **Zwei Messungen statt Annahmen.** (a) Liefert Postgres für einen partiellen
+  **Index** (keinen Table-Constraint) überhaupt einen `constraint_name`? An
+  einer Wegwerf-Tabelle gegen die lokale Instanz geprüft: ja —
+  `probe_offen_je_profil` gegen `probe_tokens_pkey`, beide `23505`. (b) Greift
+  der neue pgTAP-Test wirklich? Gegen die **naive** Fassung (23505 pauschal als
+  Wettlauf) fällt genau er: `Failed test 170`. Danach GREEN, 200/200 über alle
+  drei Testdateien.
+
+  Der Wettlauf selbst bleibt ungetestet — er braucht zwei Sitzungen, und weder
+  `dblink` noch `pg_background` sind installiert (nachgesehen). Geprüft ist die
+  **Unterscheidung**, und genau an ihr ist der erste Anlauf gescheitert.
 
 - [x] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
       (Silent-Failure-Hunter). `ActivationRedeemPage.tsx:129-135` hat ein

@@ -30,7 +30,6 @@ import {
   renderActivation,
   renderPasswordReset,
 } from "./emails.ts";
-import { ausgangNachRpc } from "./rpc-ausgang.ts";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 // Rückkanal, bewusst fest verdrahtet und nicht aus der Umgebung: er steht
@@ -121,38 +120,26 @@ Deno.serve(async (req) => {
     p_token_hash: hash,
   });
 
-  const row = Array.isArray(data) ? data[0] : data;
-  const status = row?.status as string | undefined;
-
-  // Die Entscheidung steht in rpc-ausgang.ts und hat dort Tests daneben — nicht
-  // hier als Bedingung, die niemand prüft. Seit Befund 8.1 hängt an ihr die
-  // Anti-Aufzählung: ein Unique-Violation-Fehler (der Verlierer zweier
-  // GLEICHZEITIGER Anfragen) darf nicht 502 liefern, wo jeder andere Ausgang
-  // 202 liefert — sonst unterscheidet ein Anfragenpaar Mitglied von
-  // Nicht-Mitglied.
-  const ausgang = ausgangNachRpc(error?.code, status);
-
-  if (ausgang === "serverfehler") {
-    log("error", "issue_failed", { code: error?.code });
+  if (error) {
+    log("error", "issue_failed", { code: error.code });
     return new Response("Issue failed", { status: 502, headers: CORS });
   }
 
-  // Kein Versand — aber dieselbe Antwort wie im Erfolgsfall. Die Adresse selbst
-  // wird nie protokolliert; sie ist genau das Datum, das wir schützen.
-  if (ausgang === "still_angenommen") {
-    // Nach außen ist der Wettlauf-Verlierer von `pending` nicht zu
-    // unterscheiden — das ist der Zweck. Nach innen soll er es sein, sonst
-    // verschwindet ein Nebenläufigkeitsproblem in der Anti-Aufzählung.
-    if (error) log("warn", "wettlauf_verloren", { code: error.code });
-    else log("info", "no_mail", { status });
-    return ANGENOMMEN();
-  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const status = row?.status as string | undefined;
 
   // Zwei Erfolgsfälle seit AGE-505: `issued` ist eine Aktivierung, `issued_reset`
   // ein vergessenes Passwort. Der Unterschied kommt allein aus dem Kontostand
   // und wird in der Datenbank bestimmt — hier entscheidet er nur noch über Text
   // und Zieladresse.
   const istReset = status === "issued_reset";
+
+  // Kein Versand — aber dieselbe Antwort wie im Erfolgsfall. Die Adresse selbst
+  // wird nie protokolliert; sie ist genau das Datum, das wir schützen.
+  if (status !== "issued" && !istReset) {
+    log("info", "no_mail", { status });
+    return ANGENOMMEN();
+  }
 
   const name = String(row.display_name ?? "");
   // Immer die HINTERLEGTE Adresse, nie die mitgegebene.
