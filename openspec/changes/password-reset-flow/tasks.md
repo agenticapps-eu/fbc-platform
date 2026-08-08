@@ -91,10 +91,13 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 - [ ] 6.1 Merge trägt nur das Frontend. Nach dem Merge prüfen, dass `migrate-dev`
       auf `main` gelaufen ist (auf dem PR ist es zu Recht übersprungen,
       `deploy.yml:36`).
-- [ ] 6.2 `supabase functions deploy send-activation` auf **beiden** Refs — kein
-      Workflow tut das (`grep 'functions deploy' .github/` ist leer). Genau diese
-      Lücke hat AGE-495 schon einmal als „live" gemeldet, während nichts
-      deployt war.
+- [x] 6.2 ~~`supabase functions deploy send-activation` auf **beiden** Refs — kein
+      Workflow tut das.~~ **Erledigt durch AGE-506.** Der `functions`-Job in
+      `deploy.yml` liefert geänderte Functions nach dem Merge auf beide Refs aus;
+      die Handarbeit entfällt. Was bleibt, ist das **Nachlesen**: der Job
+      protokolliert je Projekt `supabase functions list` und nennt Übergangene
+      sowie die gewählte Vergleichsbasis namentlich. Genau diese Lücke hat
+      AGE-495 schon einmal als „live" gemeldet, während nichts deployt war.
 - [ ] 6.3 Am echten Konto messen, nicht am Testdoppel: aktiviertes Konto →
       `/passwort-vergessen` → Mail → `/passwort-neu` → Anmeldung mit dem neuen
       Passwort. Reihenfolge beim Messen: Mitschnitt leeren → handeln →

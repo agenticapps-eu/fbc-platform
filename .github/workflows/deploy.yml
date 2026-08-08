@@ -120,12 +120,29 @@ jobs:
   # stillschweigend mit. Was uebergangen wird, steht deshalb NAMENTLICH im
   # Protokoll: eine Beschraenkung, die nicht ausgesprochen wird, liest sich
   # hinterher wie Vollstaendigkeit.
+  #
+  # WOMIT VERGLICHEN WIRD. Nicht mit `HEAD^`. `HEAD^..HEAD` beantwortet „was
+  # aenderte dieser Merge"; gebraucht wird „was ist noch nicht ausgeliefert".
+  # Die zwei sind nur solange dasselbe, wie JEDER Lauf ausliefert — und das ist
+  # nicht zugesichert: steht `drift-gate` rot, wird dieser Job uebersprungen.
+  # Genau das ist am 2026-08-07 passiert (Lauf 31211729060, Merge 36b662a): der
+  # Merge aenderte `send-activation/index.ts`, der Folgelauf sah davon nichts
+  # mehr, und aufs Ziel kam die Aenderung nur, weil der naechste Merge zufaellig
+  # dieselbe Function anfasste. Basis ist deshalb der Stand des juengsten Laufs,
+  # in dem dieser Job mit `success` endete.
   functions:
     needs: [migrate-dev, drift-gate]
     # Nur auf main, und nur wenn beide Vorbedingungen nicht fehlgeschlagen sind —
     # dieselbe Bedingung wie `deploy` eine Etage tiefer.
     if: ${{ github.ref == 'refs/heads/main' && !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
+    # Am JOB, nicht am Workflow: dort steht `contents: read`, und was nicht
+    # aufgefuehrt ist, ist damit `none`. Nur dieser eine Job liest Laufhistorie —
+    # und `actions: read` kann strikt weniger als das `contents: write`, das ein
+    # von CI umgesetztes Deploy-Tag gebraucht haette (siehe design.md, 5.).
+    permissions:
+      contents: read
+      actions: read
     env:
       INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
       # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
@@ -140,7 +157,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 2 # HEAD^ wird fuer die Ableitung gebraucht
+          # Volle Historie, NICHT `2`. Die Vergleichsbasis liegt ausserhalb von
+          # `HEAD^`, sobald ein Lauf ausfiel oder uebersprungen wurde — und dann
+          # koennte weder `git diff` noch `git merge-base` sie aufloesen.
+          fetch-depth: 0
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
@@ -159,19 +179,92 @@ jobs:
           curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
           sudo apt-get update && sudo apt-get install -y infisical
 
+      # Die Wahl steht in scripts/deploy-base.logic.ts und hat dort einen Test
+      # daneben — samt Regressionstest auf den Vorfall, der sie ausgeloest hat.
+      - name: Vergleichsbasis ermitteln
+        id: basis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Gemessen wird das Ergebnis dieses JOBS, nicht das des Laufs: ein
+          # uebersprungener Job macht einen Lauf nicht rot. Ueber die Lauf-Ebene
+          # waere die Antwort heute zwar zufaellig richtig, aber nur ueber eine
+          # Schlusskette, die ein kuenftiges `if:` still kippt.
+          #
+          # 30 Laeufe sind der Blick zurueck; reicht er nicht, greift der
+          # Rueckfall weiter unten — laut.
+          if ! laeufe="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&event=push&per_page=30" \
+              --jq '.workflow_runs[] | {id, sha: .head_sha}' |
+            while read -r lauf; do
+              id="$(jq -r '.id' <<<"$lauf")"
+              # Der leere Ersatzwert faengt beides ab: kein `functions`-Job im
+              # Lauf, und einer, der noch laeuft (etwa dieser hier). Weder das
+              # eine noch das andere ist ein Nachweis, dass ausgeliefert wurde.
+              ergebnis="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                --jq '[.jobs[] | select(.name == "functions") | .conclusion] | first // ""')"
+              jq -c --arg e "$ergebnis" \
+                '. + {functions: (if $e == "" then null else $e end)}' <<<"$lauf"
+            done | jq -sc '.'
+          )"; then
+            echo "::warning::Laufhistorie nicht abrufbar — die Vergleichsbasis faellt auf HEAD^ zurueck."
+            laeufe=""
+          fi
+
+          pnpm tsx scripts/deploy-base.ts <<<"$laeufe" > "$RUNNER_TEMP/basis.txt"
+          sha="$(head -n 1 "$RUNNER_TEMP/basis.txt")"
+          grund="$(tail -n 1 "$RUNNER_TEMP/basis.txt")"
+
+          # Ein SHA aus der Laufhistorie muss nicht mehr in dieser Historie
+          # liegen — nach einem Force-Push tut er es nicht, und `git diff` liefe
+          # ins Leere.
+          if [ -n "$sha" ] && ! git merge-base --is-ancestor "$sha" HEAD; then
+            grund="$sha ist kein Vorfahr von HEAD (Force-Push oder History-Umbau)"
+            sha=""
+          fi
+
+          # Rueckfall statt Abbruch (Entscheidung Donald, 2026-08-08): gegen
+          # HEAD^ zu vergleichen ist das bisherige Verhalten, also nie
+          # schlechter — aber es wird ausgesprochen, statt still zu geschehen.
+          if [ -z "$sha" ]; then
+            if git rev-parse --verify -q "HEAD^" >/dev/null; then
+              echo "::warning::Vergleichsbasis nicht ermittelbar ($grund) — es wird gegen HEAD^ verglichen. Aenderungen aus uebersprungenen Laeufen koennen dabei herausfallen."
+              sha="$(git rev-parse HEAD^)"
+              grund="RUECKFALL auf HEAD^ — $grund"
+            else
+              echo "::warning::Weder Vergleichsbasis noch Vorgaenger-Commit vorhanden. Es wird nichts ausgeliefert."
+              grund="kein Vorgaenger-Commit vorhanden — $grund"
+            fi
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "grund=$grund" >> "$GITHUB_OUTPUT"
+
+          # In JEDEN Lauf, auch in den unauffaelligen. Eine Basis, die nur im
+          # Ausnahmefall genannt wird, ist im Normalfall unbelegt — dieselbe
+          # Begruendung wie beim namentlichen Protokoll der Uebergangenen.
+          {
+            echo "### Vergleichsbasis"
+            echo "- gewaehlt: \`${sha:-<keine>}\`"
+            echo "- Grund: $grund"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Die Ableitung steht in scripts/changed-functions.logic.ts und hat dort
       # einen Test daneben — nicht hier als Shell-Zeile, die niemand prueft.
       - name: Geaenderte Functions ableiten
         id: ableitung
+        env:
+          BASIS: ${{ steps.basis.outputs.sha }}
         run: |
           set -euo pipefail
-          if ! git rev-parse --verify -q "HEAD^" >/dev/null; then
-            echo "::warning::Kein Vorgaenger-Commit vorhanden (erster Commit oder Force-Push). Es wird nichts ausgeliefert."
+          if [ -z "$BASIS" ]; then
             echo "namen=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          namen="$(git diff --name-only "HEAD^" HEAD | pnpm tsx scripts/changed-functions.ts | tr '\n' ' ')"
-          echo "Abgeleitet: ${namen:-<keine>}"
+          namen="$(git diff --name-only "$BASIS" HEAD | pnpm tsx scripts/changed-functions.ts | tr '\n' ' ')"
+          echo "Abgeleitet seit $BASIS: ${namen:-<keine>}"
           echo "namen=$namen" >> "$GITHUB_OUTPUT"
 
       # Ohne Token kaeme aus der CLI eine unverstaendliche Meldung. Dieser Schritt
@@ -246,9 +339,20 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Der Grund gehoert dazu. „Kein Function-Code in diesem Merge" waere
+      # schlicht falsch, wenn in Wahrheit die Vergleichsbasis fehlte — und lesen
+      # wuerde es sich wie ein unauffaelliger Lauf.
       - name: Nichts auszuliefern
         if: ${{ steps.ableitung.outputs.namen == '' }}
-        run: echo "Kein Function-Code in diesem Merge — es wurde nichts ausgeliefert."
+        env:
+          BASIS: ${{ steps.basis.outputs.sha }}
+          GRUND: ${{ steps.basis.outputs.grund }}
+        run: |
+          if [ -z "$BASIS" ]; then
+            echo "Keine Vergleichsbasis ($GRUND) — es wurde nichts ausgeliefert."
+          else
+            echo "Seit $BASIS ($GRUND) aenderte sich kein Function-Code — es wurde nichts ausgeliefert."
+          fi
 
   deploy:
     needs: [migrate-dev, drift-gate]

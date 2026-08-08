@@ -75,6 +75,42 @@ das nur im Secret steht, ist im Review unsichtbar — dieselbe Begründung, aus 
 Dass ein Befehl fehlerfrei zurückkam, ist kein Beleg dafür, dass das Ziel den
 neuen Stand trägt — dieselbe Lehre wie „`202` belegt keinen Versand".
 
+### 5. Die Vergleichsbasis ist der zuletzt ausgelieferte Stand, nicht `HEAD^`
+
+Nachgetragen am 2026-08-08, nachdem der erste echte Lauf (4.5) die Lücke zeigte
+— und nachdem sich herausstellte, dass sie **schon zugeschlagen hatte**: Lauf
+`31211729060` sprang `functions` über (`drift-gate` rot), der Merge `36b662a`
+änderte `send-activation/index.ts`, und der Folgelauf sah davon nichts mehr.
+Gerettet hat es der Zufall, dass der nächste Merge dieselbe Function anfasste.
+
+`HEAD^..HEAD` beantwortet „was änderte dieser Merge". Gebraucht wird „was ist
+noch nicht ausgeliefert". Die zwei sind nur solange dasselbe, wie **jeder** Lauf
+ausliefert; genau das ist nicht zugesichert, weil `drift-gate` regelmäßig rot
+steht.
+
+Die Basis ist deshalb der `head_sha` des jüngsten Laufs, in dem der
+`functions`-**Job** mit `success` endete. Gemessen auf **Job**-Ebene, nicht auf
+Lauf-Ebene: ein übersprungener Job macht einen Lauf nicht rot. Lauf-Ebene wäre
+heute zwar zufällig richtig — weil `functions` dieselben `needs` trägt wie
+`deploy`, kippt jeder Fehlschlag den ganzen Lauf — aber das ist eine
+Schlusskette über GitHub-Semantik und über eine `if:`-Bedingung, die morgen
+jemand ändert. Ein Job-Ergebnis ist die Eigenschaft selbst.
+
+Verworfen: **ein Git-Tag, das CI nach jedem Erfolg umsetzt.** Es käme ohne
+API-Abfrage aus und kennt keine Retention-Grenze, verlangt aber `contents:
+write` — für einen Job, der einen kontoweiten Supabase-PAT im Prozess hat. Der
+API-Weg braucht `actions: read`, das strikt weniger kann. Und ein umgesetztes
+Tag wäre eine **zweite** Aussage darüber, was ausgeliefert ist, die von der
+ersten abdriften kann; die Laufhistorie ist die erste.
+
+**Der Rückfall warnt, er bricht nicht ab** (Donald, 08.08.). Ist die Basis nicht
+zu ermitteln oder kein Vorfahr von HEAD, wird gegen `HEAD^` verglichen — das
+heutige Verhalten, also nie schlechter — und der Job sagt es als `::warning::`.
+Verworfen wurde, hart fehlzuschlagen: ein GitHub-API-Schluckauf färbte dann
+`main` rot und machte das Ausliefern wieder zur Handarbeit. Der Schutz gegen
+„sieht vollständig aus, ist es nicht" liegt stattdessen darin, dass Basis **und
+Grund** in **jedem** Lauf im Protokoll stehen, auch im Normalfall.
+
 ## Risks / Trade-offs
 
 **Ein kaputter Merge geht unbeaufsichtigt auf PROD.** Das gilt heute schon fürs
