@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(179);
+select plan(182);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -898,6 +898,17 @@ select is(
   (select activated_at from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
   'mark_activated ist idempotent — ein zweiter Aufruf überschreibt nicht');
 
+-- Befund 8.6 aus Review 5.4. Der abgeleitete Zweck (`activated_at is not null`
+-- ⇒ Reset) trägt nur, solange `activated_at` GENAU EINEN Schreiber hat. Das ist
+-- die unausgesprochene Bedingung des Entwurfs „Zweck ableiten statt speichern" —
+-- und sie stand nur im Kopf von `20260807200000`, also dort, wo niemand
+-- nachsieht, der eine Sperrfunktion baut. Hier wird sie zur Zusicherung: die
+-- Warnung hängt an der Function selbst und ist mit `\df+` zu sehen.
+select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_proc'),
+  '%Re-Aktivierer%',
+  'mark_activated: der Kommentar warnt davor, activated_at zurückzusetzen — '
+  'wer das täte, machte jedes ausstehende Reset-Token zum Re-Aktivierer');
+
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der
 -- Grund steht in ihrer Signatur: sie nimmt keine Adresse entgegen, das Subjekt
@@ -1041,6 +1052,43 @@ select 'hash-tag-' || g, '99999999-9999-9999-9999-999999999999',
 select is((select status from public.issue_activation_token('frisch@test.fbc', 'hash-zuviel')),
   'rate_limited_day', 'reset: das Tageskontingent gilt auch für den Rückweg — '
                       'Aktivierung und Reset teilen es sich');
+
+-- ── Ein doppelter token_hash ist KEIN Wettlauf (AGE-505, Befund 8.1) ───────
+-- `activation_tokens` trägt ZWEI Unique-Constraints: den partiellen Index
+-- (höchstens ein offenes Token je Profil — der Wettlauf-Wächter) und den
+-- PRIMÄRSCHLÜSSEL auf `token_hash`. Beide werfen SQLSTATE 23505.
+--
+-- Der erste Anlauf des Fixes fing 23505 pauschal ab und hätte damit eine
+-- kaputte Token-Erzeugung als „angenommen" verbucht: kein Fehler, keine Mail,
+-- und im Protokoll stünde „Wettlauf verloren". Der Review meldete das als
+-- Blocker. Deshalb benennt die Function den Wächter über sein Prädikat.
+--
+-- Der Wettlauf selbst braucht zwei Sitzungen und ist hier nicht nachstellbar
+-- (kein dblink, kein pg_background). Die UNTERSCHEIDUNG ist es — und genau an
+-- ihr ist der erste Anlauf gescheitert. Die PK-Kollision wird deterministisch
+-- erzwungen: `hash-y` liegt seit dem Reset-Block in der Tabelle; entwertet und
+-- gealtert kommt der Aufruf an allen drei Grenzen vorbei und versucht denselben
+-- Hash ein zweites Mal einzufügen.
+update public.activation_tokens
+   set invalidated_at = now(), created_at = now() - interval '25 hours'
+ where token_hash = 'hash-y';
+select throws_ok(
+  $$ select status from public.issue_activation_token('impact@test.fbc', 'hash-y') $$,
+  '23505',
+  null,
+  'issue: ein doppelter token_hash WIRFT — er ist kein Wettlauf, sondern eine '
+  'kaputte Token-Erzeugung, und darf nicht in der Anti-Aufzählung verschwinden');
+
+-- Die andere Hälfte desselben Vertrags. Der Test oben prüft nur, was NICHT
+-- verschluckt wird; der Wächter-Fall selbst braucht zwei Sitzungen und ist hier
+-- nicht erreichbar. Was erreichbar ist: der NAME. Der Exception-Handler nennt
+-- den Index wörtlich, also ist der Name Teil des Funktionsvertrags — wer ihn
+-- umbenennt, macht aus dem Wächter-Fall wieder einen 502 und damit das
+-- Aufzählungs-Orakel wieder auf. Ein Tippfehler im Handler bliebe vom Test
+-- oben unbemerkt; diese Zeile ist die Klammer dagegen.
+select has_index('public', 'activation_tokens', 'activation_tokens_offen_je_profil',
+  'issue_activation_token: der Wächter-Index heißt weiterhin so, wie der '
+  'Exception-Handler in 20260808150000 ihn nennt');
 
 select is(has_function_privilege('authenticated', 'public.revoke_sessions(uuid)', 'execute'),
   false, 'revoke_sessions: authenticated darf nicht');

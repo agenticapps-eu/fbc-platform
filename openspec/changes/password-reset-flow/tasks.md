@@ -125,7 +125,7 @@ anderen übersahen. Der schwerste Befund kam vom Reviewer des anderen Anbieters.
 Was hier steht, ist nachgemessen, nicht übernommen. Drei Behauptungen der
 Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
 
-- [ ] 8.1 **Gleichzeitige Anfragen machen Adressen aufzählbar (Codex, schwerster
+- [x] 8.1 **Gleichzeitige Anfragen machen Adressen aufzählbar (Codex, schwerster
       Befund).** Zwei parallele Anfragen für eine bekannte, gerade
       ausgabeberechtigte Adresse passieren beide die Zähl- und Pending-Abfragen;
       der partielle Unique-Index `activation_tokens_offen_je_profil`
@@ -143,7 +143,42 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       Verstoß als 502 nach außen dringt. Fix: Unique-Violation in
       `issue_activation_token` abfangen und als `pending` zurückgeben — der
       Zustand, den der Verlierer des Wettlaufs faktisch vorfindet.
-- [ ] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
+
+  **Behoben (08.08.) in `20260808150000_activation_token_wettlauf_ist_pending.sql`** —
+  im zweiten Anlauf, und der erste ist der lehrreichere.
+
+  **Der verworfene erste Anlauf.** Er fing `23505` in der Edge Function ab
+  (reine Funktion `rpc-ausgang.ts` samt Tests, RED/GREEN sauber, 5/5). Ein
+  Review dieses Fixes durch den Reviewer des anderen Anbieters meldete ihn als
+  **Blocker**, und zu Recht: `activation_tokens` trägt **zwei** Unique-
+  Constraints — den partiellen Index (der Wächter) und den **Primärschlüssel**
+  auf `token_hash` (`20260806080000:38`). Beide werfen `23505`. Der Fix hätte
+  eine kaputte Token-Erzeugung als „angenommen" verbucht: kein Fehler, keine
+  Mail, im Protokoll „Wettlauf verloren" — also ausgerechnet die Fehlerklasse,
+  gegen die er im eigenen Kommentar argumentierte. Zurückgenommen,
+  `index.ts` ist wieder byte-identisch zum Stand davor.
+
+  **Der Fix.** Ein `exception when unique_violation` um das `insert`, das den
+  Wächter über `get stacked diagnostics … = constraint_name` beim **Namen**
+  nennt statt über den Fehlercode; alles andere wird durchgereicht (`raise`).
+  Verworfen: `on conflict (profile_id) where …` — kürzer, aber die
+  Inferenz-Klausel darf nicht qualifiziert werden, und `profile_id` ist zugleich
+  OUT-Parameter der Function. Postgres meldet die Spalte als mehrdeutig;
+  gemessen, nicht vermutet.
+
+  **Zwei Messungen statt Annahmen.** (a) Liefert Postgres für einen partiellen
+  **Index** (keinen Table-Constraint) überhaupt einen `constraint_name`? An
+  einer Wegwerf-Tabelle gegen die lokale Instanz geprüft: ja —
+  `probe_offen_je_profil` gegen `probe_tokens_pkey`, beide `23505`. (b) Greift
+  der neue pgTAP-Test wirklich? Gegen die **naive** Fassung (23505 pauschal als
+  Wettlauf) fällt genau er: `Failed test 170`. Danach GREEN, 200/200 über alle
+  drei Testdateien.
+
+  Der Wettlauf selbst bleibt ungetestet — er braucht zwei Sitzungen, und weder
+  `dblink` noch `pg_background` sind installiert (nachgesehen). Geprüft ist die
+  **Unterscheidung**, und genau an ihr ist der erste Anlauf gescheitert.
+
+- [x] 8.2 **Jeder technische Fehlschlag rendert die grüne Erfolgsmeldung**
       (Silent-Failure-Hunter). `ActivationRedeemPage.tsx:129-135` hat ein
       `finally` ohne `catch`; `setAngefordert(true)` läuft unabhängig vom
       Ausgang, und `angefordert` ist das Einzige, was Formular von „der Link ist
@@ -153,7 +188,36 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       Vorbestehend — aber `/passwort-vergessen` ist ab AGE-505 der **einzige**
       Rückweg eines aktivierten Kontos. Fix: `catch`, eigener Fehlerzustand, und
       er darf nicht klingen wie die drei Anti-Aufzählungs-Ausgänge.
-- [ ] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
+
+  **Behoben (08.08.), RED zuerst.** Neuer Fall „meldet einen technischen
+  Fehlschlag als solchen, statt Erfolg zu behaupten": `requestActivationLink`
+  wirft, und der Test verlangt die Fehlermeldung **und** die Abwesenheit der
+  grünen. Rot mit `Unable to find an element with the text: /konnte gerade nicht
+gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
+  `catch` mit eigenem Zustand, `finally` trägt nur noch `setLäuft(false)`. Das
+  Formular bleibt stehen, damit ein zweiter Versuch möglich ist. 19/19.
+
+  **Sichtprobe nachgeholt (08.08., 4.6).** `/passwort-vergessen`, Adresse
+  eingegeben, gesendet: der rote Kasten „Die Anfrage konnte gerade nicht
+  gestellt werden…" steht **über** dem Formular, das Formular bleibt stehen,
+  und die grüne Meldung erscheint nicht. Damit ist auch visuell belegt, was der
+  Test behauptet.
+
+  Erzwungen wurde der Fehlschlag **ohne** Wirkung auf die DEV-Datenbank: der
+  Server lief mit einem unerreichbaren Backend
+  (`VITE_SUPABASE_URL=http://127.0.0.1:59999`), also wirft schon `fetch`. Ein
+  echter Absenden-Versuch gegen `foelowldexkcqzewvrcf` hätte für eine bekannte
+  Adresse ein Token angelegt und eine Mail ausgelöst — deshalb nicht so
+  gemessen.
+
+  **Und der Grund fürs Nichtmounten steht jetzt fest: es lag nicht an der App.**
+  Auf 5173–5176 lauschten noch vier **alte** Vite-Server aus früheren
+  Sitzungen. Der auf 5173 liefert das HTML mit 200 aus, antwortet auf
+  `/src/main.tsx` aber mit **504** — kein Modul, also kein Mount, und die
+  Konsole bleibt genau deshalb stumm. Ein frisch gestarteter Server (`pnpm dev`
+  weicht selbst auf einen freien Port aus) rendert dieselbe Seite sofort.
+
+- [x] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
       Codex, unabhängig voneinander). `renderReset` setzt zwar
       `window.history`, der `MemoryRouter` liest den Pfad aber nie — der Zweck
       kommt aus der **Prop**. **Zweimal falsifiziert:** (a) alle sechs Pfade in
@@ -166,7 +230,21 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       schlechter als kein Test. Fix: ein Fall in `App.test.tsx` mit
       `initialEntries={["/passwort-neu#token=x"]}`, plus den falschen Kommentar
       streichen.
-- [ ] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
+
+  **Behoben (08.08.).** Drei Fälle in `App.test.tsx` unter „Zweck der
+  Einlöseseite hängt an der Route", die das echte `<App />` fahren. Zwei Fallen
+  dabei: das Token kommt aus `window.location.hash`, nicht aus dem Router (also
+  wird **beides** gesetzt) — und ein Test auf nur EINER Route wäre nicht
+  unterscheidend, wer die Routen vertauscht bestünde ihn. Deshalb steht
+  `/aktivierung` daneben.
+  **Als Sonde belegt, nicht behauptet** (ein fehlender Test wird von sich aus
+  nie rot): Mutation 1 `zweck="reset"` entfernt → **genau** der `/passwort-neu`-
+  Fall fällt; Mutation 2 die Routen vertauscht → **genau** der `/aktivierung`-
+  Fall fällt. `App.tsx` danach unverändert (`git diff` leer). Der falsche
+  Kommentar über `renderReset` ist ersetzt und verweist jetzt auf die Stelle,
+  die die Verdrahtung wirklich prüft. Suite 458 → 462.
+
+- [x] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
       (Silent-Failure-Hunter; unabhängig auch beim Lesen des Diffs aufgefallen).
       `ActivationRedeemPage.tsx:103` wirft bei `!token && user && isActivated`
       wortlos auf `/`. Für „aktivierung" ist das begründet — für „reset" ist
@@ -177,7 +255,19 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       Angemeldete von `/login` fern, der neue Link ist für sie also nicht
       erreichbar. Niemand ist ausgesperrt; es fehlt der Hinweis. Fix:
       `&& zweck === "aktivierung"`, oder auf `/einstellungen` leiten.
-- [ ] 8.5 **Kein Zweig für einen unbekannten Status** (Silent-Failure-Hunter).
+
+  **Behoben (08.08.), RED zuerst.** `&& zweck === "aktivierung"` in der
+  Bedingung; das Formular bleibt für Angemeldete stehen, statt sie wortlos
+  wegzuschicken. Der neue Fall „schickt ein angemeldetes Mitglied auf
+  `/passwort-vergessen` NICHT weg" war rot (`navigate` wurde aufgerufen), ist
+  jetzt grün. Die Weiterleitung auf `/aktivierung` deckt der bestehende Fall
+  „leitet ein bereits aktiviertes Konto ohne Token still auf die Startseite" ab
+  — **das Paar** ist der Beleg: einer allein bestünde auch, wer die
+  Weiterleitung ganz entfernt oder sie überall lässt. Verworfen: auf
+  `/einstellungen` leiten — das wäre wieder eine stumme Weiterleitung, nur
+  woandershin.
+
+- [x] 8.5 **Kein Zweig für einen unbekannten Status** (Silent-Failure-Hunter).
       `index.ts:139` fasst vier Status plus **alles Unbekannte** in eine
       `info`-Zeile. Der genannte Ablauf: Function deployt, Migration nicht →
       DB antwortet weiter `already_activated` → kein Mitglied bekommt je eine
@@ -186,7 +276,20 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       `foelowldexkcqzewvrcf` angewandt (dem Projekt, auf das das Deployment
       zeigt) — die Function trägt `issued_reset`. Nicht akut, aber die
       Absicherung fehlt: Erlaubnisliste + `error` für Unerwartetes.
-- [ ] 8.6 **Der abgeleitete Zweck trägt nur, solange `activated_at` genau einen
+
+  **Behoben (08.08.), RED zuerst.** Neues Modul `status.ts` mit `versandArt()`
+  und dem Muster der Nachbarn (`checkout.ts`, `webhook.ts`: reine Logik neben
+  der Schale). Es kennt vier Ausgänge — `aktivierung`, `reset`, `kein_versand`
+  und **`unerwartet`**; die Erlaubnisliste stammt aus dem `comment on function`
+  von `issue_activation_token`. `index.ts` protokolliert `unerwartet` als
+  `error` und antwortet **weiterhin 202**: ein eigener Ausgang wäre genau das
+  Adressorakel, gegen das die ganze Konstruktion gebaut ist.
+
+  RED war der fehlende Import (`TS2307`), dann 3/3 grün, `deno test` insgesamt
+  64/64. Der Fall, der den Befund trägt, steht namentlich drin:
+  `already_activated` → `unerwartet`, nicht `kein_versand`.
+
+- [x] 8.6 **Der abgeleitete Zweck trägt nur, solange `activated_at` genau einen
       Schreiber hat** (Senior). `mark_activated` mit
       `coalesce(activated_at, now())` ist heute der einzige, eine Deaktivierung
       gibt es nicht. Genau das ist die unausgesprochene Bedingung des Entwurfs
@@ -194,7 +297,28 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       `activated_at` auf `null` setzt, macht jedes ausstehende Reset-Token zum
       Re-Aktivierer. Gehört als Warnung an `mark_activated` in
       `20260806080200`, nicht nur in den Kopf von `20260807200000`.
-- [ ] 8.7 Kleinkram, gesammelt: Adressvalidierung
+
+  **Behoben (08.08.), RED zuerst** — in
+  `20260808180000_mark_activated_warnt_vor_ruecksetzen.sql`. Der Kommentar von
+  `mark_activated` trägt die Warnung jetzt selbst: wer `activated_at`
+  zurücksetzt, macht jedes ausstehende Reset-Token zum Re-Aktivierer, und dann
+  muss der Zweck gespeichert statt abgeleitet werden. **Die Function bleibt
+  byte-identisch**, nur ihr Kommentar wächst.
+
+  Verworfen: den Kommentar in `20260806080200` selbst ändern — die Migration ist
+  auf beiden Projekten angewandt, eine nachträgliche Änderung wirkt nirgends und
+  lässt Datei und Datenbank auseinanderlaufen. Ebenfalls verworfen: das
+  Zurücksetzen technisch verbieten (Trigger/Check) — das verböte eine
+  Sperrfunktion, die es geben darf; was fehlte, war die Information, nicht die
+  Erlaubnis.
+
+  Belegt statt behauptet: eine pgTAP-Zeile prüft `obj_description` auf die
+  Warnung. Vor der Migration fiel sie (`Failed test 147`, der alte Kommentar
+  wird im Protokoll wörtlich ausgegeben), nach `supabase db reset` 202/202 über
+  alle drei Dateien. Damit verschwindet die Warnung auch nicht wortlos bei der
+  nächsten Neudeklaration.
+
+- [x] 8.7 Kleinkram, gesammelt: Adressvalidierung
       (`ActivationRedeemPage.tsx:127`) kehrt bei Tippfehler **wortlos** um, der
       Knopf wirkt kaputt (`noValidate` schaltet die Browser-Prüfung ab) ·
       `entwerten()` protokolliert `token_invalidated` auf `info`, auch wenn
@@ -203,6 +327,78 @@ Reviewer habe ich geprüft: zwei bestätigt, eine entschärft.
       `instrument.test.ts:41` prüft die Fragment-Aufräumung nur auf
       `/aktivierung`, nicht auf `/passwort-neu` · `LoginPage.test.tsx` belegt den
       Link, aber nicht die Bedingung `mode === "login"`.
+
+  **Alle fünf behoben (08.08.).**
+
+  1. **Adressvalidierung.** Sie kehrt nicht mehr wortlos um: „Bitte gib eine
+     vollständige E-Mail-Adresse ein — mit @ und Domain." RED zuerst
+     (`Unable to find an element with the text: /vollständige E-Mail-Adresse/i`).
+     Der Zustand ist mit dem technischen Fehlschlag aus 8.2 zu EINEM
+     `AnfrageHinweis` zusammengelegt (`"adresse" | "technisch" | null`), weil die
+     beiden einander ausschließen und zwei Wahrheitswerte einen Zustand
+     erlaubten, den es nicht gibt. Sie **müssen** verschiedene Texte haben: der
+     eine sagt „der Aufruf ging nie raus", der andere „er kam nicht durch".
+  2. **`entwerten()` bei null Treffern.** Eigener Zweig, `error` statt `info`:
+     null Treffer heißt, das gerade ausgegebene Token ist nicht mehr da — also
+     liegt entweder eines gültig herum oder das Entwerten greift am falschen
+     Hash. Beides ist der Zustand, gegen den `entwerten` gebaut wurde.
+  3. **Fehlendes `waitUntil`.** Statt `?.` ein Zweig mit `error`-Zeile.
+     **Abwarten geht hier nicht** — das wäre die Zeitmessung, die den
+     Adressbestand verrät. Nebenbei repariert: der Empfänger bleibt erhalten
+     (`rt.waitUntil(...)` statt der herausgelösten Funktion), sonst hinge der
+     Fix an einer Annahme über die Laufzeit.
+  4. **Fragment-Aufräumung auf `/passwort-neu`.** Neuer Fall in
+     `instrument.test.ts`.
+  5. **Die Bedingung des Login-Links.** Neuer Fall: im Registrierungsmodus steht
+     der Link **nicht**.
+
+  **4 und 5 mit Sonden belegt, nicht behauptet** — ein fehlender Test wird von
+  sich aus nie rot, beide waren also sofort grün. Sonde 1: Aufräumung an
+  `/aktivierung` gebunden → **genau** der `/passwort-neu`-Fall fällt (1 von 4),
+  der `/aktivierung`-Fall bleibt grün. Sonde 2: `mode === "login"` durch `true`
+  ersetzt → **genau** der Registrierungs-Fall fällt (1 von 6). Beide Quellen
+  danach unverändert (`git diff` leer). Suite 462 → 466.
+
+  **Sichtprobe zu 1 (4.6):** `/passwort-vergessen`, `probe.example.invalid`
+  eingegeben, gesendet — der rote Kasten „Bitte gib eine vollständige
+  E-Mail-Adresse ein — mit @ und Domain." steht über dem Formular, und der Knopf
+  wirkt nicht mehr kaputt. Damit ist genau der Eindruck weg, der den Befund
+  ausgelöst hat.
+
+### Aus dem Review des Fixes selbst (08.08.)
+
+Der Fix zu 8.1 wurde vor dem Merge nochmals geprüft — dieselbe Kontrolle, die
+den Change fand, auf die eigene Korrektur. Sie hat einen Blocker gefunden (oben
+in 8.1 beschrieben) und danach noch das hier:
+
+- [ ] 8.8 **Der Wettlauf ist damit NICHT abschließend behoben — der andere
+      Ablauf umgeht den Wächter ganz.** Läuft B's `update … set invalidated_at`
+      **nach** A's Commit, bekommt es unter `read committed` einen frischen
+      Snapshot, **sieht A's soeben angelegtes Token und entwertet es**. B's
+      `insert` kollidiert dann mit nichts mehr und liefert `issued`. Ergebnis:
+      zwei Mails, nur B's Link gilt — und das 24-Stunden-Schutzfenster, das
+      genau das verhindern soll, ist umgangen. Der Exception-Handler wird dabei
+      nie betreten.
+      **Einordnung, die der Review nicht macht:** das ist **vorbestehend** und
+      kein Rückschritt von 8.1. `update`-dann-`insert` ohne Sperre steht seit
+      AGE-495 unverändert; der Diff zu 8.1 berührt diesen Pfad nicht. Deshalb
+      hier erfasst statt in den Fix gestopft — er würde sonst zwei verschiedene
+      Dinge auf einmal ändern.
+      **Vorgeschlagener Fix:** die Profilzeile vor den drei Grenzen sperren
+      (`select … for update`), und zwar in **beiden** ausgebenden RPCs — sonst
+      bleibt der Wettlauf zwischen anonymem und angemeldetem Weg offen
+      (`request_own_activation_token`, `20260806090000`). Das macht den
+      23505-Zweig zum Gürtel neben den Hosenträgern, statt ihn zu ersetzen.
+      Eigener Change: es ändert das Sperrverhalten beider Wege und gehört
+      gemessen, nicht nebenbei mitgenommen.
+- [ ] 8.9 **Der Wächter-Fall selbst bleibt ungetestet.** Der `throws_ok`-Test
+      belegt nur, was NICHT verschluckt wird; ein Tippfehler im Constraint-Namen
+      des Handlers bliebe grün. Teilweise geschlossen: eine `has_index`-Zeile
+      nagelt den Namen als Vertragsbestandteil fest (Sonde: mit falschem Namen
+      fällt sie, `Failed test 171`). Vollständig belegen ließe sich der Zweig nur
+      mit zwei echten Sitzungen außerhalb der pgTAP-Transaktion — dafür fehlen
+      hier `dblink` und `pg_background`. Gehört zu 8.8: wer dort `for update`
+      einzieht, braucht ohnehin einen Zwei-Sitzungs-Aufbau.
 
 **Geprüft und in Ordnung** — damit es nicht zweimal geprüft wird: Der Kopf der
 Migration behauptet, gegen `20260806090000` seien ausschließlich Zweigreihenfolge

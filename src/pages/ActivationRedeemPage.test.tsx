@@ -42,8 +42,18 @@ function renderMit(hash: string, auth = {}) {
 
 /**
  * Derselbe Bauteil, anderer Zweck (AGE-505). Das Token trägt seinen Zweck nicht
- * — die ROUTE tut es. Deshalb wird hier auch der Pfad mitgesetzt und nicht nur
- * die Eigenschaft: sonst prüfte der Test eine Konstruktion, die es so nicht gibt.
+ * — die ROUTE tut es.
+ *
+ * `pfad` setzt hier NUR `window.location`, damit das Fragment gelesen und
+ * aufgeräumt werden kann. Für die Zweckwahl ist er wirkungslos: der
+ * `MemoryRouter` steht ohne `initialEntries`, und die Komponente liest den Zweck
+ * aus der Eigenschaft, die diese Datei selbst übergibt.
+ *
+ * Bis zum Review 5.4 behauptete hier ein Kommentar das Gegenteil („sonst prüfte
+ * der Test eine Konstruktion, die es so nicht gibt"). Gemessen am 08.08.: alle
+ * sechs Pfade durch `/voelliger-unsinn` ersetzt — 18/18 blieben grün. Wer die
+ * Verdrahtung geprüft haben will, findet sie in `App.test.tsx` unter „Zweck der
+ * Einlöseseite hängt an der Route"; die Fälle hier prüfen den Wortlaut.
  */
 function renderReset(pfad: string, hash = "", auth = {}) {
   window.history.replaceState(null, "", `${pfad}${hash}`);
@@ -206,7 +216,11 @@ describe("ActivationRedeemPage", () => {
     expect(screen.queryByLabelText(/Neues Passwort/i)).not.toBeInTheDocument();
   });
 
-  it("/passwort-vergessen verrät nicht, ob es die Adresse gibt — und deckt alle Ausgänge ab", async () => {
+  // Der Name sagt, was der Fall MISST. Bis zum Review 5.4 hieß er „verrät nicht,
+  // ob es die Adresse gibt" — das kann er gar nicht prüfen: `requestActivationLink`
+  // ist gemockt und antwortet für jede Eingabe gleich. Die Nichtpreisgabe lebt in
+  // `send-activation` (immer 202) und in `issue_activation_token`.
+  it("deckt die drei Ausgänge des Anforderns mit EINER Meldung ab", async () => {
     renderReset("/passwort-vergessen");
     fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
       target: { value: "wer@auch.immer" },
@@ -216,6 +230,34 @@ describe("ActivationRedeemPage", () => {
     const hinweis = await screen.findByText(/Wenn es zu dieser Adresse ein Konto gibt/i);
     expect(hinweis).toHaveTextContent(/letzten 24 Stunden/i);
     expect(hinweis).toHaveTextContent(/info@fairbusinessclub\.de/i);
+  });
+
+  /**
+   * Befund 8.2 aus Review 5.4. Der Anforderungspfad hatte ein `finally` ohne
+   * `catch`: `setAngefordert(true)` lief unabhängig vom Ausgang, und
+   * `angefordert` ist das Einzige, was Formular von Erfolgsmeldung trennt.
+   *
+   * `requestActivationLink` wirft bei JEDEM Nicht-2xx (`activation.ts`), und
+   * `send-activation` antwortet 500 bei fehlendem Secret, 502 bei DB-Fehler,
+   * 400 bei kaputtem Rumpf. Alle drei endeten in „der Link ist unterwegs".
+   * Seit AGE-505 ist das der einzige Rückweg eines aktivierten Kontos.
+   *
+   * Die Meldung darf NICHT klingen wie die drei fachlichen Ausgänge — sonst ist
+   * „hat nicht geklappt" wieder von „gibt es nicht" ununterscheidbar.
+   */
+  it("meldet einen technischen Fehlschlag als solchen, statt Erfolg zu behaupten", async () => {
+    vi.mocked(requestActivationLink).mockRejectedValueOnce(new Error("500"));
+    renderReset("/passwort-vergessen");
+    fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
+      target: { value: "wer@auch.immer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Link senden/i }));
+
+    expect(await screen.findByText(/konnte gerade nicht gestellt werden/i)).toBeInTheDocument();
+    // Der entscheidende Teil: die Erfolgsmeldung darf NICHT dastehen.
+    expect(screen.queryByText(/Wenn es zu dieser Adresse ein Konto gibt/i)).not.toBeInTheDocument();
+    // Und das Formular bleibt stehen, damit ein zweiter Versuch möglich ist.
+    expect(screen.getByRole("button", { name: /Link senden/i })).toBeInTheDocument();
   });
 
   it("Status used sagt im Reset-Fall nichts von „bereits aktiviert“", async () => {
@@ -233,6 +275,42 @@ describe("ActivationRedeemPage", () => {
     // Fehlermeldung — das Mitglied hat nichts falsch gemacht.
     renderMit("", { user: { id: "u1", email: "m@test.fbc" } as never, isActivated: true });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+  });
+
+  /**
+   * Befund 8.4 aus Review 5.4. Die Weiterleitung aus Fall 3 galt für BEIDE
+   * Zwecke. Für „aktivierung" ist sie begründet — für „reset" ist aktiviert-sein
+   * die Voraussetzung, nicht der Grund wegzuschicken. Ein angemeldetes Mitglied
+   * landete auf `/passwort-vergessen` wortlos auf der Startseite.
+   *
+   * Der Fall daneben (`/aktivierung`, oben) ist der unterscheidende Teil: ohne
+   * ihn bestünde diesen hier auch, wer die Weiterleitung ganz entfernt.
+   */
+  it("schickt ein angemeldetes Mitglied auf /passwort-vergessen NICHT weg", () => {
+    renderReset("/passwort-vergessen", "", {
+      user: { id: "u1", email: "m@test.fbc" } as never,
+      isActivated: true,
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: /Passwort vergessen/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Befund 8.7 aus Review 5.4. `noValidate` schaltet die Browser-Prüfung ab, und
+   * die eigene Prüfung kehrte bei einem Tippfehler wortlos um: der Knopf wirkte
+   * kaputt. Die Meldung muss vom technischen Fehlschlag (8.2) unterscheidbar
+   * sein — sonst sucht das Mitglied den Fehler an der falschen Stelle.
+   */
+  it("sagt bei einer unvollständigen Adresse, was fehlt, statt stumm zu bleiben", async () => {
+    renderReset("/passwort-vergessen");
+    fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
+      target: { value: "wer.auch.immer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Link senden/i }));
+
+    expect(await screen.findByText(/vollständige E-Mail-Adresse/i)).toBeInTheDocument();
+    expect(requestActivationLink).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Wenn es zu dieser Adresse ein Konto gibt/i)).not.toBeInTheDocument();
   });
 
   it("leitet einen AUSGELOGGTEN Besucher NICHT weg — das ist der Weg zurück", async () => {

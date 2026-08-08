@@ -43,6 +43,23 @@ describe("instrument", () => {
     expect(window.location.pathname).toBe("/aktivierung");
   });
 
+  /**
+   * Befund 8.7 aus Review 5.4. Der Fall oben stand allein da und prüfte nur
+   * `/aktivierung` — dabei trägt der Reset-Link seit AGE-505 dasselbe Token im
+   * Fragment, und dieselbe Sentry-Gefahr hängt daran: wer damit binnen 72 h
+   * ankommt, setzt ein fremdes Passwort. Wer die Aufräumung je an den Pfad
+   * bindet, hätte den Reset-Weg damit lautlos offengelassen.
+   */
+  it("räumt auch auf /passwort-neu auf — der Reset-Link trägt dasselbe Token", async () => {
+    window.history.replaceState(null, "", "/passwort-neu#token=geheim-456");
+
+    await import("./instrument");
+
+    expect(sentry.hrefBeiInit).toHaveLength(1);
+    expect(sentry.hrefBeiInit[0]).not.toContain("geheim-456");
+    expect(window.location.pathname).toBe("/passwort-neu");
+  });
+
   it("lässt ein Supabase-Auth-Fragment unangetastet", async () => {
     window.history.replaceState(null, "", "/#access_token=abc&token_type=bearer");
 

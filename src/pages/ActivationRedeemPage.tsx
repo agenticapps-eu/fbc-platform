@@ -16,6 +16,15 @@ const MIN_PASSWORT = 10;
 export type Zweck = "aktivierung" | "reset";
 
 /**
+ * Was beim Anfordern schiefging — die beiden Fälle schließen einander aus, und
+ * genau deshalb ist es EIN Zustand und nicht zwei Wahrheitswerte: „Adresse
+ * unvollständig" (der Aufruf ging nie raus) und „technisch fehlgeschlagen" (er
+ * ging raus und kam nicht durch, Befund 8.2) verlangen verschiedene nächste
+ * Schritte vom Mitglied.
+ */
+type AnfrageHinweis = "adresse" | "technisch" | null;
+
+/**
  * Der Wortlaut je Zweck (AGE-505).
  *
  * Mechanik, Token und Einlöse-Endpunkt sind identisch — was sich unterscheidet,
@@ -87,10 +96,17 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
   const [läuft, setLäuft] = useState(false);
   const [adresse, setAdresse] = useState("");
   const [angefordert, setAngefordert] = useState(false);
+  const [hinweis, setHinweis] = useState<AnfrageHinweis>(null);
 
   // Fall 3 aus §6: Konto schon aktiviert, alter Link im Postfach. Weiterleitung
   // auf die Startseite, ausdrücklich OHNE Fehlermeldung — das Mitglied hat
   // nichts falsch gemacht.
+  //
+  // Nur für „aktivierung" (Befund 8.4). Beim Zurücksetzen ist aktiviert-sein die
+  // VORAUSSETZUNG und nicht der Grund wegzuschicken: ein angemeldetes Mitglied
+  // landete auf `/passwort-vergessen` sonst wortlos auf der Startseite. Es ist
+  // dort niemand ausgesperrt — `/einstellungen` ändert das Passwort ohne
+  // Re-Auth (AGE-450) —, aber eine stumme Weiterleitung ist keine Auskunft.
   //
   // Das `user &&` ist nicht dekorativ: für einen AUSGELOGGTEN Besucher ist
   // `isActivated` true (es gibt nichts zu aktivieren). Ohne die Bedingung
@@ -100,8 +116,9 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
   // geändert hat. Beim Betrachten der laufenden Oberfläche aufgefallen, nicht
   // im Test — die Fixtures hatten immer einen Nutzer.
   useEffect(() => {
-    if (!token && user && isActivated === true) navigate("/", { replace: true });
-  }, [token, user, isActivated, navigate]);
+    if (!token && user && isActivated === true && zweck === "aktivierung")
+      navigate("/", { replace: true });
+  }, [token, user, isActivated, navigate, zweck]);
 
   async function einlösen(e: React.FormEvent) {
     e.preventDefault();
@@ -124,12 +141,31 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
 
   async function neuenLinkAnfordern(e: React.FormEvent) {
     e.preventDefault();
-    if (!adresse.includes("@") || läuft) return;
+    if (läuft) return;
+    // Bis Review 5.4 kehrte die Prüfung hier WORTLOS um (Befund 8.7). Weil
+    // `noValidate` am Formular die Browser-Prüfung abschaltet, sah ein Tippfehler
+    // aus wie ein kaputter Knopf.
+    if (!adresse.includes("@")) {
+      setHinweis("adresse");
+      return;
+    }
     setLäuft(true);
+    setHinweis(null);
     try {
       await requestActivationLink(adresse);
-    } finally {
+      // Erst NACH dem gelungenen Aufruf. Bis Review 5.4 stand das im `finally`
+      // und lief damit auch dann, wenn die Anfrage geworfen hatte — jeder
+      // technische Fehlschlag (500 bei fehlendem Secret, 502 bei DB-Fehler, 400
+      // bei kaputtem Rumpf) meldete dem Mitglied Erfolg. Seit AGE-505 ist das
+      // hier der einzige Rückweg eines aktivierten Kontos.
       setAngefordert(true);
+    } catch {
+      // Bewusst ein EIGENER Zustand und kein Text, der nach den drei fachlichen
+      // Ausgängen klingt: sonst ist „hat nicht geklappt" wieder von „gibt es
+      // nicht" ununterscheidbar. Der Fehler ist adressunabhängig und verrät
+      // deshalb nichts über den Bestand.
+      setHinweis("technisch");
+    } finally {
       setLäuft(false);
     }
   }
@@ -189,6 +225,7 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
               adresse={adresse}
               setAdresse={setAdresse}
               angefordert={angefordert}
+              hinweis={hinweis}
               läuft={läuft}
               onSubmit={neuenLinkAnfordern}
               knopf={t.knopfAnfordern}
@@ -207,6 +244,7 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
             adresse={adresse}
             setAdresse={setAdresse}
             angefordert={angefordert}
+            hinweis={hinweis}
             läuft={läuft}
             onSubmit={neuenLinkAnfordern}
             knopf={t.knopfAnfordern}
@@ -265,6 +303,7 @@ function LinkAnfordern({
   adresse,
   setAdresse,
   angefordert,
+  hinweis,
   läuft,
   onSubmit,
   knopf,
@@ -272,6 +311,7 @@ function LinkAnfordern({
   adresse: string;
   setAdresse: (v: string) => void;
   angefordert: boolean;
+  hinweis: AnfrageHinweis;
   läuft: boolean;
   onSubmit: (e: React.FormEvent) => void;
   knopf: string;
@@ -292,6 +332,22 @@ function LinkAnfordern({
   }
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
+      {/* Der technische Fehlschlag, ausdrücklich getrennt von den drei
+          fachlichen Ausgängen oben (Befund 8.2). Er sagt nichts über den
+          Adressbestand — er tritt unabhängig davon auf —, und das Formular
+          bleibt stehen, damit ein zweiter Versuch möglich ist. */}
+      {hinweis && (
+        <p className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+          {hinweis === "adresse" ? (
+            <>Bitte gib eine vollständige E-Mail-Adresse ein — mit @ und Domain.</>
+          ) : (
+            <>
+              Die Anfrage konnte gerade nicht gestellt werden. Bitte versuch es in einer Minute noch
+              einmal — oder schreib uns an <strong>info@fairbusinessclub.de</strong>.
+            </>
+          )}
+        </p>
+      )}
       <label htmlFor="adresse" className="text-sm font-medium text-ink">
         E-Mail-Adresse
       </label>
