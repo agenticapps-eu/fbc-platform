@@ -197,13 +197,25 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
   `catch` mit eigenem Zustand, `finally` trägt nur noch `setLäuft(false)`. Das
   Formular bleibt stehen, damit ein zweiter Versuch möglich ist. 19/19.
 
-  **Offen: die Sichtprobe der neuen Meldung (4.6).** Die lokale App mountet in
-  dieser Sitzung nicht — Vite liefert das HTML aus, aber auch die Startseite
-  bleibt leer und die Konsole gibt nichts her. Es liegt also nicht an dieser
-  Änderung, belegt ist die Darstellung aber trotzdem nicht. Beim nächsten
-  lokalen Lauf mit ansehen: `/passwort-vergessen`, Adresse eingeben, senden —
-  ohne laufende Edge Function wirft der Aufruf, die Meldung erscheint also von
-  selbst.
+  **Sichtprobe nachgeholt (08.08., 4.6).** `/passwort-vergessen`, Adresse
+  eingegeben, gesendet: der rote Kasten „Die Anfrage konnte gerade nicht
+  gestellt werden…" steht **über** dem Formular, das Formular bleibt stehen,
+  und die grüne Meldung erscheint nicht. Damit ist auch visuell belegt, was der
+  Test behauptet.
+
+  Erzwungen wurde der Fehlschlag **ohne** Wirkung auf die DEV-Datenbank: der
+  Server lief mit einem unerreichbaren Backend
+  (`VITE_SUPABASE_URL=http://127.0.0.1:59999`), also wirft schon `fetch`. Ein
+  echter Absenden-Versuch gegen `foelowldexkcqzewvrcf` hätte für eine bekannte
+  Adresse ein Token angelegt und eine Mail ausgelöst — deshalb nicht so
+  gemessen.
+
+  **Und der Grund fürs Nichtmounten steht jetzt fest: es lag nicht an der App.**
+  Auf 5173–5176 lauschten noch vier **alte** Vite-Server aus früheren
+  Sitzungen. Der auf 5173 liefert das HTML mit 200 aus, antwortet auf
+  `/src/main.tsx` aber mit **504** — kein Modul, also kein Mount, und die
+  Konsole bleibt genau deshalb stumm. Ein frisch gestarteter Server (`pnpm dev`
+  weicht selbst auf einen freien Port aus) rendert dieselbe Seite sofort.
 
 - [x] 8.3 **Die Route-Verdrahtung ist durch keinen Test geschützt** (Senior +
       Codex, unabhängig voneinander). `renderReset` setzt zwar
