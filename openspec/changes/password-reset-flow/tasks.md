@@ -91,9 +91,39 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
 
 ## 6. Ausrollen — drei Flächen, drei Befehle
 
-- [ ] 6.1 Merge trägt nur das Frontend. Nach dem Merge prüfen, dass `migrate-dev`
+- [x] 6.1 Merge trägt nur das Frontend. Nach dem Merge prüfen, dass `migrate-dev`
       auf `main` gelaufen ist (auf dem PR ist es zu Recht übersprungen,
       `deploy.yml:36`).
+
+  **Gemessen (08.08.) am Merge `70dda9a` (#140), Lauf `31267948141`:**
+  `migrate-dev` = success. Der Satz stimmt aber nur zur Hälfte, und die andere
+  Hälfte hat den Rollout zuerst blockiert:
+
+  | Fläche        | erster Anlauf                   | nach `migrate-prod`          |
+  | ------------- | ------------------------------- | ---------------------------- |
+  | Frontend      | live (`pages-build-deployment`) | live                         |
+  | DEV-DB        | angewandt                       | angewandt                    |
+  | PROD-DB       | **zwei Migrationen fehlten**    | 50, abweichungsfrei          |
+  | Edge Function | `functions` = **skipped**       | auf beiden Refs ausgeliefert |
+
+  **`drift-gate` war rot** — `20260808150000` und `20260808180000` fehlten auf
+  PROD —, und weil `functions` und `deploy` beide an
+  `!contains(needs.*.result, 'failure')` hängen, wurden sie übersprungen. Ein
+  Merge trägt hier also nicht einmal zuverlässig das Frontend über den
+  `deploy.yml`-Weg; live war es nur über den eigenen Pages-Workflow.
+
+  Reihenfolge, die funktioniert hat: `migrate-prod` von Hand (Lauf
+  `31269631686`, `plan` + `apply` grün, „OK — 50 Migrationen, Historie
+  abweichungsfrei", Objekt-Drift-Scan ohne Abweichung) → dann `Deploy` neu
+  auslösen → alle vier Jobs grün.
+
+  Vor dem Auslösen wurde der Dry-Run **gelesen**, nicht durchgeklickt (der
+  `apply`-Job trägt bis heute keine Reviewer-Regel): PROD kannte 48 Versionen,
+  es fehlten genau die zwei, und beide fassen keine Tabelle an — ein
+  `create or replace function` samt Kommentar und Grants, dazu ein
+  `comment on function`. Keine Indexanlage, kein Check, kein Backfill, also
+  keine der Risikoklassen aus dem Kopf von `migrate-prod.yml`.
+
 - [x] 6.2 ~~`supabase functions deploy send-activation` auf **beiden** Refs — kein
       Workflow tut das.~~ **Erledigt durch AGE-506.** Der `functions`-Job in
       `deploy.yml` liefert geänderte Functions nach dem Merge auf beide Refs aus;
@@ -101,6 +131,28 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       protokolliert je Projekt `supabase functions list` und nennt Übergangene
       sowie die gewählte Vergleichsbasis namentlich. Genau diese Lücke hat
       AGE-495 schon einmal als „live" gemeldet, während nichts deployt war.
+
+  **Nachgelesen (08.08.), und genau das war der Punkt.** Im ersten Anlauf hätte
+  das Häkchen getrogen: der Job war `skipped`, und zwei Checks heißen „deploy" —
+  der grüne gehörte `pages-build-deployment`. Nach dem Neustart steht im
+  Protokoll:
+
+  ```
+  BASIS: cf4aa6e2f21ba92e4bb4b829e99b1a7d30c68b45
+  Abgeleitet seit cf4aa6e…: send-activation
+  Deployed Functions on project foelowldexkcqzewvrcf: send-activation
+  Deployed Functions on project viwntbodrtqxgmqyxluh: send-activation
+  ```
+
+  Die `functions list` beider Projekte zeigt `send-activation` als `ACTIVE` mit
+  frischem Zeitstempel (17:35:09 bzw. 17:35:13) — Version 7 auf dem einen,
+  Version 3 auf dem anderen. Übergangen wurde nichts, was sich geändert hätte.
+
+  **Frontend zusätzlich am lebenden Bundle belegt:** `index-mbb0EILy.js`,
+  1.208.439 Bytes (also kein 404-Stub, der sich als Bundle tarnt), enthält beide
+  neuen Meldungen — „vollständige E-Mail-Adresse" (8.7) und „konnte gerade nicht
+  gestellt werden" (8.2).
+
 - [ ] 6.3 Am echten Konto messen, nicht am Testdoppel: aktiviertes Konto →
       `/passwort-vergessen` → Mail → `/passwort-neu` → Anmeldung mit dem neuen
       Passwort. Reihenfolge beim Messen: Mitschnitt leeren → handeln →
