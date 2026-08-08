@@ -31,6 +31,31 @@ Das Ziel SHALL aus einer versionierten Datei des Repositories stammen und
 SHALL NOT allein aus einem Secret. Ein Ziel, das nur im Secret steht, ist im
 Review nicht sichtbar.
 
+Als geändert SHALL gelten, was sich seit dem zuletzt **nachweislich
+ausgelieferten** Stand geändert hat — nicht, was sich seit dem vorigen Commit
+geändert hat. Sonst fällt jede Änderung, deren Auslieferung ausfiel oder
+übersprungen wurde, dauerhaft heraus: der nächste Lauf sieht sie nicht mehr an,
+und nichts holt sie je nach. Wovon ausgegangen wird, SHALL das System **selbst
+gemessen** haben — dass eine Auslieferung stattfand, SHALL NOT aus dem Ergebnis
+anderer Arbeitsschritte erschlossen werden.
+
+Lässt sich dieser Stand nicht ermitteln, SHALL das System auf den vorigen Commit
+zurückfallen, das **ausdrücklich** melden — und der Lauf SHALL NOT als Nachweis
+einer Auslieferung gelten. Andernfalls würde er selbst zum Ausgangspunkt des
+nächsten Vergleichs und verwandelte damit eine vorübergehende Lücke in eine
+dauerhafte: was vor ihm ausfiel, läge ab dann außerhalb jedes künftigen
+Vergleichs, und nichts könnte es je wieder herleiten.
+
+Die gewählte Vergleichsbasis und der Grund für ihre Wahl SHALL bei **jedem** Lauf
+protokolliert werden, auch im Normalfall — eine Basis, die nur im Ausnahmefall
+genannt wird, ist im Normalfall unbelegt.
+
+Ein Fehlschlag beim Ermitteln des Standes SHALL vom Zustand „es gibt ihn nicht"
+unterscheidbar gemeldet werden. Ein dauerhafter Schaden — etwa eine Suche, die
+ins Leere greift, weil sich benannte Voraussetzungen geändert haben — SHALL NOT
+dieselbe Meldung erzeugen wie ein vorübergehender Zustand, sonst liest er sich
+als Rauschen.
+
 #### Scenario: Eine geänderte Function geht auf beide Projekte
 
 - **GIVEN** ein Merge verändert genau eine Edge Function
@@ -50,6 +75,36 @@ Review nicht sichtbar.
 - **WHEN** ein Merge keine Edge Function berührt
 - **THEN** wird nichts ausgeliefert, und das Protokoll sagt das ausdrücklich,
   statt zu schweigen
+
+#### Scenario: Eine ausgefallene Auslieferung wird nachgeholt
+
+- **GIVEN** ein Merge verändert eine Edge Function, und ihre Auslieferung fällt
+  aus oder wird übersprungen — etwa weil der Migrationsstand abwich
+- **WHEN** ein **späterer** Merge läuft, der diese Function nicht anfasst
+- **THEN** wird sie trotzdem ausgeliefert, weil der Vergleich beim zuletzt
+  ausgelieferten Stand ansetzt und nicht beim vorigen Commit
+
+#### Scenario: Die Vergleichsbasis steht in jedem Protokoll
+
+- **WHEN** die Auslieferung läuft
+- **THEN** nennt das Protokoll die gewählte Vergleichsbasis und den Grund ihrer
+  Wahl — auch dann, wenn nichts auszuliefern war
+
+#### Scenario: Unermittelbare Basis fällt zurück und sagt es
+
+- **GIVEN** der zuletzt ausgelieferte Stand ist nicht zu ermitteln
+- **WHEN** die Auslieferung läuft
+- **THEN** wird gegen den vorigen Commit verglichen und ausgeliefert, der Lauf
+  gilt aber **nicht** als erfolgreich — sonst wäre er der Ausgangspunkt des
+  nächsten Vergleichs
+
+#### Scenario: Nach einem Rückfall holt der nächste Lauf die Lücke nach
+
+- **GIVEN** ein Lauf musste auf den vorigen Commit zurückfallen und gilt deshalb
+  nicht als Nachweis
+- **WHEN** der nächste Merge läuft
+- **THEN** setzt er beim letzten **echten** Nachweis an, und alles seither
+  Übersprungene liegt wieder im Vergleich
 
 #### Scenario: Abweichender Migrationsstand hält auch die Functions an
 

@@ -75,6 +75,65 @@ das nur im Secret steht, ist im Review unsichtbar — dieselbe Begründung, aus 
 Dass ein Befehl fehlerfrei zurückkam, ist kein Beleg dafür, dass das Ziel den
 neuen Stand trägt — dieselbe Lehre wie „`202` belegt keinen Versand".
 
+### 5. Die Vergleichsbasis ist der zuletzt ausgelieferte Stand, nicht `HEAD^`
+
+Nachgetragen am 2026-08-08, nachdem der erste echte Lauf (4.5) die Lücke zeigte
+— und nachdem sich herausstellte, dass sie **schon zugeschlagen hatte**: Lauf
+`31211729060` sprang `functions` über (`drift-gate` rot), der Merge `36b662a`
+änderte `send-activation/index.ts`, und der Folgelauf sah davon nichts mehr.
+Gerettet hat es der Zufall, dass der nächste Merge dieselbe Function anfasste.
+
+`HEAD^..HEAD` beantwortet „was änderte dieser Merge". Gebraucht wird „was ist
+noch nicht ausgeliefert". Die zwei sind nur solange dasselbe, wie **jeder** Lauf
+ausliefert; genau das ist nicht zugesichert, weil `drift-gate` regelmäßig rot
+steht.
+
+Die Basis ist deshalb der `head_sha` des jüngsten Laufs, in dem der
+`functions`-**Job** mit `success` endete. Gemessen auf **Job**-Ebene, nicht auf
+Lauf-Ebene: ein übersprungener Job macht einen Lauf nicht rot. Lauf-Ebene wäre
+heute zwar zufällig richtig — weil `functions` dieselben `needs` trägt wie
+`deploy`, kippt jeder Fehlschlag den ganzen Lauf — aber das ist eine
+Schlusskette über GitHub-Semantik und über eine `if:`-Bedingung, die morgen
+jemand ändert. Ein Job-Ergebnis ist die Eigenschaft selbst.
+
+Verworfen: **ein Git-Tag, das CI nach jedem Erfolg umsetzt.** Es käme ohne
+API-Abfrage aus und kennt keine Retention-Grenze, verlangt aber `contents:
+write` — für einen Job, der einen kontoweiten Supabase-PAT im Prozess hat. Der
+API-Weg braucht `actions: read`, das strikt weniger kann. Und ein umgesetztes
+Tag wäre eine **zweite** Aussage darüber, was ausgeliefert ist, die von der
+ersten abdriften kann; die Laufhistorie ist die erste.
+
+**Der Rückfall liefert aus, endet aber rot** (Donald, 08.08., nach dem Review).
+Ist die Basis nicht zu ermitteln oder kein Vorfahr von HEAD, wird gegen `HEAD^`
+verglichen — und der Job scheitert danach absichtlich.
+
+Die erste Fassung dieser Entscheidung lautete „warnen, nicht abbrechen", mit der
+Begründung, ein Rückfall auf `HEAD^` sei „das heutige Verhalten, also nie
+schlechter". **Diese Begründung war falsch, und drei unabhängige Reviewer fanden
+denselben Fehler.** Sie gilt nur _innerhalb_ eines Laufs. Über Läufe hinweg gilt
+sie nicht: die Basis wird aus der Laufhistorie gelesen, also würde ein grüner
+Rückfall-Lauf zur Basis des **nächsten** — und alles davor Übersprungene läge ab
+da **dauerhaft** außerhalb jedes künftigen Diffs. Der alte `HEAD^`-Code verlor
+eine Änderung _einmal_ und konnte sie durch Zufall zurückholen; genau das rettete
+`36b662a`. Ein grüner Rückfall nagelte diesen Fluchtweg zu — der ursprüngliche
+Fehler im neuen Kostüm, mit einer Warnung als einziger Spur.
+
+Ein roter `functions`-Job ist billiger als angenommen: er blockiert **weder**
+`deploy` **noch** `migrate-dev`, weil beide an `migrate-dev` und `drift-gate`
+hängen und nicht an ihm. Und er ist selbstheilend — der nächste Lauf findet den
+letzten echten Erfolg und holt die Lücke nach.
+
+Verworfen: **beim Rückfall verbreitern statt verengen** (Basis = ältester Lauf im
+Fenster). Hielte `main` grün und überdeckte die Lücke sicher, zöge aber
+`notify-contact-request` mit — auf PROD liegt dort laut 11.4 bewusst ein älterer
+Stand. Nachgemessen: zuletzt geändert in `45abb43` (2026-08-06), das 30er-Fenster
+reicht bis `c418e39` (2026-07-28), also **mitten im Fenster**. Es bräuchte dafür
+eine namentliche Dauerausnahme — neue Mechanik für einen seltenen Pfad.
+
+Der Schutz gegen „sieht vollständig aus, ist es nicht" liegt damit an zwei
+Stellen: Basis **und Grund** stehen in **jedem** Lauf im Protokoll, auch im
+Normalfall — und ein Lauf, der raten musste, trägt sich nicht als Nachweis ein.
+
 ## Risks / Trade-offs
 
 **Ein kaputter Merge geht unbeaufsichtigt auf PROD.** Das gilt heute schon fürs
@@ -94,6 +153,26 @@ zwei Stellen heißt, dass die nächste Rotation eine davon vergisst. Der Preis i
 dass der prod-ausliefernde Job `INFISICAL_ENV: dev` trägt — das sieht auf den
 ersten Blick falsch aus und steht deshalb im Workflow ausführlich begründet.
 
-**`git diff HEAD^ HEAD` setzt einen Vorgänger voraus.** Beim allerersten Commit
-oder nach einem Force-Push gibt es ihn nicht; der Job fängt das ab und liefert
-dann nichts aus, statt zu raten.
+**Ohne Vorgänger-Commit liefert der Job nichts aus.** Beim allerersten Commit
+gibt es weder eine Basis noch `HEAD^`; dann wird nichts ausgeliefert und der Job
+endet rot, statt zu raten. Nach einem **Force-Push** greift dagegen der Rückfall:
+die Basis aus der Laufhistorie ist dann kein Vorfahr von HEAD mehr,
+`git merge-base --is-ancestor` schlägt an, und es wird gegen `HEAD^` ausgeliefert
+— mit rotem Job, damit der Lauf nicht als Nachweis zählt (siehe 5.).
+
+> Bis zum Review am 2026-08-08 stand hier, `git diff HEAD^ HEAD` sei der
+> Vergleich und der Job liefere nach einem Force-Push **nichts** aus. Beides ist
+> seit Entscheidung 5 falsch. Der Absatz wurde ersetzt, nicht ergänzt — zwei
+> Wahrheiten nebeneinander wären schlimmer als keine.
+
+**Das 30-Läufe-Fenster ist endlich.** Liegt der letzte erfolgreiche Lauf weiter
+zurück, ist die Basis nicht zu ermitteln. Das ist seit Entscheidung 5 kein
+stiller Zustand mehr, sondern ein roter Lauf. Ein größeres Fenster kostet je Lauf
+einen weiteren `/jobs`-Aufruf; 30 genügt, solange nicht 30 Merges in Folge
+übersprungen werden — und dieser Fall meldet sich jetzt selbst.
+
+**Der Name des `functions`-Jobs ist Teil der Mechanik.** Die Basis wird über
+`select(.name == "functions")` gefunden. Ein `name:` am Job oder eine
+`strategy.matrix` bricht die Suche dauerhaft. `deploy-base.logic.ts`
+unterscheidet diesen Fall in der Meldung von einem bloß zu kurzen Fenster — ein
+Dauerschaden darf nicht wie ein Rauschen aussehen.
