@@ -277,6 +277,42 @@ describe("ActivationRedeemPage", () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
   });
 
+  /**
+   * Befund 8.4 aus Review 5.4. Die Weiterleitung aus Fall 3 galt für BEIDE
+   * Zwecke. Für „aktivierung" ist sie begründet — für „reset" ist aktiviert-sein
+   * die Voraussetzung, nicht der Grund wegzuschicken. Ein angemeldetes Mitglied
+   * landete auf `/passwort-vergessen` wortlos auf der Startseite.
+   *
+   * Der Fall daneben (`/aktivierung`, oben) ist der unterscheidende Teil: ohne
+   * ihn bestünde diesen hier auch, wer die Weiterleitung ganz entfernt.
+   */
+  it("schickt ein angemeldetes Mitglied auf /passwort-vergessen NICHT weg", () => {
+    renderReset("/passwort-vergessen", "", {
+      user: { id: "u1", email: "m@test.fbc" } as never,
+      isActivated: true,
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: /Passwort vergessen/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Befund 8.7 aus Review 5.4. `noValidate` schaltet die Browser-Prüfung ab, und
+   * die eigene Prüfung kehrte bei einem Tippfehler wortlos um: der Knopf wirkte
+   * kaputt. Die Meldung muss vom technischen Fehlschlag (8.2) unterscheidbar
+   * sein — sonst sucht das Mitglied den Fehler an der falschen Stelle.
+   */
+  it("sagt bei einer unvollständigen Adresse, was fehlt, statt stumm zu bleiben", async () => {
+    renderReset("/passwort-vergessen");
+    fireEvent.change(screen.getByLabelText(/E-Mail-Adresse/i), {
+      target: { value: "wer.auch.immer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Link senden/i }));
+
+    expect(await screen.findByText(/vollständige E-Mail-Adresse/i)).toBeInTheDocument();
+    expect(requestActivationLink).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Wenn es zu dieser Adresse ein Konto gibt/i)).not.toBeInTheDocument();
+  });
+
   it("leitet einen AUSGELOGGTEN Besucher NICHT weg — das ist der Weg zurück", async () => {
     // Für Ausgeloggte ist isActivated true (es gibt nichts zu aktivieren). Ohne
     // die user-Bedingung landete genau das Mitglied auf der Startseite, dessen

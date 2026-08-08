@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(181);
+select plan(182);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -897,6 +897,17 @@ select is(
   (select public.mark_activated('99999999-9999-9999-9999-999999999999')),
   (select activated_at from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
   'mark_activated ist idempotent — ein zweiter Aufruf überschreibt nicht');
+
+-- Befund 8.6 aus Review 5.4. Der abgeleitete Zweck (`activated_at is not null`
+-- ⇒ Reset) trägt nur, solange `activated_at` GENAU EINEN Schreiber hat. Das ist
+-- die unausgesprochene Bedingung des Entwurfs „Zweck ableiten statt speichern" —
+-- und sie stand nur im Kopf von `20260807200000`, also dort, wo niemand
+-- nachsieht, der eine Sperrfunktion baut. Hier wird sie zur Zusicherung: die
+-- Warnung hängt an der Function selbst und ist mit `\df+` zu sehen.
+select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_proc'),
+  '%Re-Aktivierer%',
+  'mark_activated: der Kommentar warnt davor, activated_at zurückzusetzen — '
+  'wer das täte, machte jedes ausstehende Reset-Token zum Re-Aktivierer');
 
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der

@@ -30,6 +30,7 @@ import {
   renderActivation,
   renderPasswordReset,
 } from "./emails.ts";
+import { versandArt } from "./status.ts";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 // Rückkanal, bewusst fest verdrahtet und nicht aus der Umgebung: er steht
@@ -132,11 +133,22 @@ Deno.serve(async (req) => {
   // ein vergessenes Passwort. Der Unterschied kommt allein aus dem Kontostand
   // und wird in der Datenbank bestimmt — hier entscheidet er nur noch über Text
   // und Zieladresse.
-  const istReset = status === "issued_reset";
+  const art = versandArt(status);
+  const istReset = art === "reset";
+
+  // Ein Status, den diese Function nicht kennt, ist ein Betriebsfehler und kein
+  // Normalfall (Befund 8.5). Er entsteht genau dann, wenn Function und Migration
+  // auseinanderlaufen — dann bekäme niemand mehr eine Mail, während das
+  // Protokoll wie üblich aussähe. Die Antwort bleibt trotzdem 202: ein eigener
+  // Ausgang wäre das Adressorakel.
+  if (art === "unerwartet") {
+    log("error", "unerwarteter_status", { status });
+    return ANGENOMMEN();
+  }
 
   // Kein Versand — aber dieselbe Antwort wie im Erfolgsfall. Die Adresse selbst
   // wird nie protokolliert; sie ist genau das Datum, das wir schützen.
-  if (status !== "issued" && !istReset) {
+  if (art === "kein_versand") {
     log("info", "no_mail", { status });
     return ANGENOMMEN();
   }
@@ -163,6 +175,11 @@ Deno.serve(async (req) => {
     });
     // Ohne diese Zeile wäre die Behebung eines stillen Fehlschlags selbst einer.
     if (error) log("error", "invalidate_failed", { code: error.code });
+    // NULL Treffer heißt: das Token, das gerade ausgegeben wurde, ist nicht mehr
+    // da — es liegt also entweder eines gültig herum, oder das Entwerten greift
+    // am falschen Hash. Beides ist genau der Zustand, gegen den `entwerten`
+    // gebaut wurde, und darf nicht als Erfolg protokolliert werden (Befund 8.7).
+    else if (!data) log("error", "invalidate_traf_nichts", { profileId: row.profile_id });
     else log("info", "token_invalidated", { profileId: row.profile_id, getroffen: data });
   };
 
@@ -230,9 +247,18 @@ Deno.serve(async (req) => {
   })();
 
   // Hält die Isolate am Leben, bis der Versand durch ist.
-  (
-    globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }
-  ).EdgeRuntime?.waitUntil?.(versand);
+  //
+  // Fehlt `waitUntil` (andere Laufzeit, künftige Version), lief der Versand
+  // vorher still ins Leere: `?.` überspringt den Aufruf, die Antwort geht raus,
+  // und die Isolate darf jederzeit abgeräumt werden — mitten im Versand, ohne
+  // eine einzige Logzeile (Befund 8.7). Abwarten können wir hier NICHT, das
+  // wäre die Zeitmessung, die den Adressbestand verrät; sichtbar machen schon.
+  // `rt.waitUntil(...)` und nicht die herausgelöste Funktion: sonst ginge der
+  // Empfänger verloren, falls die Laufzeit ihn braucht.
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+    .EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(versand);
+  else log("error", "kein_waituntil", { profileId: row.profile_id });
 
   return ANGENOMMEN();
 });

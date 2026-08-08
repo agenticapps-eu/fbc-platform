@@ -244,7 +244,7 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
   Kommentar über `renderReset` ist ersetzt und verweist jetzt auf die Stelle,
   die die Verdrahtung wirklich prüft. Suite 458 → 462.
 
-- [ ] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
+- [x] 8.4 **Die Weiterleitung wurde nicht zweck-abhängig gemacht**
       (Silent-Failure-Hunter; unabhängig auch beim Lesen des Diffs aufgefallen).
       `ActivationRedeemPage.tsx:103` wirft bei `!token && user && isActivated`
       wortlos auf `/`. Für „aktivierung" ist das begründet — für „reset" ist
@@ -255,7 +255,19 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
       Angemeldete von `/login` fern, der neue Link ist für sie also nicht
       erreichbar. Niemand ist ausgesperrt; es fehlt der Hinweis. Fix:
       `&& zweck === "aktivierung"`, oder auf `/einstellungen` leiten.
-- [ ] 8.5 **Kein Zweig für einen unbekannten Status** (Silent-Failure-Hunter).
+
+  **Behoben (08.08.), RED zuerst.** `&& zweck === "aktivierung"` in der
+  Bedingung; das Formular bleibt für Angemeldete stehen, statt sie wortlos
+  wegzuschicken. Der neue Fall „schickt ein angemeldetes Mitglied auf
+  `/passwort-vergessen` NICHT weg" war rot (`navigate` wurde aufgerufen), ist
+  jetzt grün. Die Weiterleitung auf `/aktivierung` deckt der bestehende Fall
+  „leitet ein bereits aktiviertes Konto ohne Token still auf die Startseite" ab
+  — **das Paar** ist der Beleg: einer allein bestünde auch, wer die
+  Weiterleitung ganz entfernt oder sie überall lässt. Verworfen: auf
+  `/einstellungen` leiten — das wäre wieder eine stumme Weiterleitung, nur
+  woandershin.
+
+- [x] 8.5 **Kein Zweig für einen unbekannten Status** (Silent-Failure-Hunter).
       `index.ts:139` fasst vier Status plus **alles Unbekannte** in eine
       `info`-Zeile. Der genannte Ablauf: Function deployt, Migration nicht →
       DB antwortet weiter `already_activated` → kein Mitglied bekommt je eine
@@ -264,7 +276,20 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
       `foelowldexkcqzewvrcf` angewandt (dem Projekt, auf das das Deployment
       zeigt) — die Function trägt `issued_reset`. Nicht akut, aber die
       Absicherung fehlt: Erlaubnisliste + `error` für Unerwartetes.
-- [ ] 8.6 **Der abgeleitete Zweck trägt nur, solange `activated_at` genau einen
+
+  **Behoben (08.08.), RED zuerst.** Neues Modul `status.ts` mit `versandArt()`
+  und dem Muster der Nachbarn (`checkout.ts`, `webhook.ts`: reine Logik neben
+  der Schale). Es kennt vier Ausgänge — `aktivierung`, `reset`, `kein_versand`
+  und **`unerwartet`**; die Erlaubnisliste stammt aus dem `comment on function`
+  von `issue_activation_token`. `index.ts` protokolliert `unerwartet` als
+  `error` und antwortet **weiterhin 202**: ein eigener Ausgang wäre genau das
+  Adressorakel, gegen das die ganze Konstruktion gebaut ist.
+
+  RED war der fehlende Import (`TS2307`), dann 3/3 grün, `deno test` insgesamt
+  64/64. Der Fall, der den Befund trägt, steht namentlich drin:
+  `already_activated` → `unerwartet`, nicht `kein_versand`.
+
+- [x] 8.6 **Der abgeleitete Zweck trägt nur, solange `activated_at` genau einen
       Schreiber hat** (Senior). `mark_activated` mit
       `coalesce(activated_at, now())` ist heute der einzige, eine Deaktivierung
       gibt es nicht. Genau das ist die unausgesprochene Bedingung des Entwurfs
@@ -272,7 +297,28 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
       `activated_at` auf `null` setzt, macht jedes ausstehende Reset-Token zum
       Re-Aktivierer. Gehört als Warnung an `mark_activated` in
       `20260806080200`, nicht nur in den Kopf von `20260807200000`.
-- [ ] 8.7 Kleinkram, gesammelt: Adressvalidierung
+
+  **Behoben (08.08.), RED zuerst** — in
+  `20260808180000_mark_activated_warnt_vor_ruecksetzen.sql`. Der Kommentar von
+  `mark_activated` trägt die Warnung jetzt selbst: wer `activated_at`
+  zurücksetzt, macht jedes ausstehende Reset-Token zum Re-Aktivierer, und dann
+  muss der Zweck gespeichert statt abgeleitet werden. **Die Function bleibt
+  byte-identisch**, nur ihr Kommentar wächst.
+
+  Verworfen: den Kommentar in `20260806080200` selbst ändern — die Migration ist
+  auf beiden Projekten angewandt, eine nachträgliche Änderung wirkt nirgends und
+  lässt Datei und Datenbank auseinanderlaufen. Ebenfalls verworfen: das
+  Zurücksetzen technisch verbieten (Trigger/Check) — das verböte eine
+  Sperrfunktion, die es geben darf; was fehlte, war die Information, nicht die
+  Erlaubnis.
+
+  Belegt statt behauptet: eine pgTAP-Zeile prüft `obj_description` auf die
+  Warnung. Vor der Migration fiel sie (`Failed test 147`, der alte Kommentar
+  wird im Protokoll wörtlich ausgegeben), nach `supabase db reset` 202/202 über
+  alle drei Dateien. Damit verschwindet die Warnung auch nicht wortlos bei der
+  nächsten Neudeklaration.
+
+- [x] 8.7 Kleinkram, gesammelt: Adressvalidierung
       (`ActivationRedeemPage.tsx:127`) kehrt bei Tippfehler **wortlos** um, der
       Knopf wirkt kaputt (`noValidate` schaltet die Browser-Prüfung ab) ·
       `entwerten()` protokolliert `token_invalidated` auf `info`, auch wenn
@@ -281,6 +327,37 @@ gestellt werden/i`. Danach `setAngefordert(true)` in den `try` verschoben,
       `instrument.test.ts:41` prüft die Fragment-Aufräumung nur auf
       `/aktivierung`, nicht auf `/passwort-neu` · `LoginPage.test.tsx` belegt den
       Link, aber nicht die Bedingung `mode === "login"`.
+
+  **Alle fünf behoben (08.08.).**
+
+  1. **Adressvalidierung.** Sie kehrt nicht mehr wortlos um: „Bitte gib eine
+     vollständige E-Mail-Adresse ein — mit @ und Domain." RED zuerst
+     (`Unable to find an element with the text: /vollständige E-Mail-Adresse/i`).
+     Der Zustand ist mit dem technischen Fehlschlag aus 8.2 zu EINEM
+     `AnfrageHinweis` zusammengelegt (`"adresse" | "technisch" | null`), weil die
+     beiden einander ausschließen und zwei Wahrheitswerte einen Zustand
+     erlaubten, den es nicht gibt. Sie **müssen** verschiedene Texte haben: der
+     eine sagt „der Aufruf ging nie raus", der andere „er kam nicht durch".
+  2. **`entwerten()` bei null Treffern.** Eigener Zweig, `error` statt `info`:
+     null Treffer heißt, das gerade ausgegebene Token ist nicht mehr da — also
+     liegt entweder eines gültig herum oder das Entwerten greift am falschen
+     Hash. Beides ist der Zustand, gegen den `entwerten` gebaut wurde.
+  3. **Fehlendes `waitUntil`.** Statt `?.` ein Zweig mit `error`-Zeile.
+     **Abwarten geht hier nicht** — das wäre die Zeitmessung, die den
+     Adressbestand verrät. Nebenbei repariert: der Empfänger bleibt erhalten
+     (`rt.waitUntil(...)` statt der herausgelösten Funktion), sonst hinge der
+     Fix an einer Annahme über die Laufzeit.
+  4. **Fragment-Aufräumung auf `/passwort-neu`.** Neuer Fall in
+     `instrument.test.ts`.
+  5. **Die Bedingung des Login-Links.** Neuer Fall: im Registrierungsmodus steht
+     der Link **nicht**.
+
+  **4 und 5 mit Sonden belegt, nicht behauptet** — ein fehlender Test wird von
+  sich aus nie rot, beide waren also sofort grün. Sonde 1: Aufräumung an
+  `/aktivierung` gebunden → **genau** der `/passwort-neu`-Fall fällt (1 von 4),
+  der `/aktivierung`-Fall bleibt grün. Sonde 2: `mode === "login"` durch `true`
+  ersetzt → **genau** der Registrierungs-Fall fällt (1 von 6). Beide Quellen
+  danach unverändert (`git diff` leer). Suite 462 → 466.
 
 ### Aus dem Review des Fixes selbst (08.08.)
 
