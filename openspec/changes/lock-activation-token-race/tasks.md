@@ -412,7 +412,80 @@ Gebaut als `supabase/migrations/20260808200000_activation_token_profilzeile_sper
       kein Superuser. Ein verlässliches Merkmal in der Datenbank gibt es nicht.
       Behoben wurde es deshalb, indem der Umschalter **entfällt** — die Adresse
       steht fest, es gibt nichts umzustellen. Sonde danach erneut **15/15**.
-- [ ] 6.4 Code-Review auf den **Diff**, nicht auf den Plan.
+- [x] 6.4 Code-Review auf den **Diff**, nicht auf den Plan.
+      Zwei unabhängige Prüfer mit verschiedenen Linsen auf `c913d88`.
+
+      **Prüfer 1 — SQL und Nebenläufigkeit: kein CRITICAL, kein HIGH.** Er hat
+      keinen Ablauf gefunden, in dem zwei Anforderungen beide durchkommen oder
+      ein frisches Token entwertet wird, und die Sperr-Reihenfolge gegen **alle**
+      Schreiber beider Tabellen durchgesehen — inklusive der vier getrennten
+      PostgREST-Aufrufe in `redeem-activation`, der BEFORE-ROW-Trigger auf
+      `profiles` und der `on delete cascade`-Richtung. Drei Befunde übernommen,
+      alle drei von mir nachgeprüft, bevor ich sie geglaubt habe:
+
+      1. **`apply_tier_upgrade` existiert nicht.** `grep` über `supabase/`,
+         `src/`, `openspec/`: der Name kam ausschließlich in meinem eigenen
+         Kopfkommentar vor. Die Function heißt `public.apply_upgrade`
+         (`20260716120000:9`); der falsche Name war aus `proposal.md:118` und
+         `design.md:220` mitgewandert.
+      2. **`mark_activated` fehlte in der Liste der Kollisionspartner** — es
+         schreibt bei *jeder* Einlösung auf dieselbe Profilzeile, ist zum Launch
+         also alles andere als „selten". Nachgeprüft: `20260806080200:184`.
+      3. **Ein Satz zu S2 war mechanisch falsch.** `rate_limited` *ist* eine
+         Prüfung und kann nicht „vor den Prüfungen" zurückkommen; richtig ist,
+         dass der Aufruf vor den Prüfungen **wartet** und danach entscheidet.
+
+      Dazu ein Befund, der eine Entscheidung braucht und deshalb als offener
+      Punkt im Kopf steht statt als Entwarnung: **aus gemeinsamem Warten wird
+      eine Schlange.** Vorher liefen N gleichzeitige Anforderungen für dieselbe
+      Adresse alle auf *eine* Transaktion am Index und wurden gemeinsam
+      freigegeben; jetzt wartet die k-te auf k−1 Vorgänger. Nachgeprüft:
+      `send-activation/index.ts:119` **wartet** auf den RPC, bevor es 202
+      antwortet, und `:124` antwortet bei einem Fehler **502**. An einem
+      Endpunkt, dessen Zweck Adress-Unkenntlichkeit ist, ist das kein reines
+      Latenzthema. Nicht gemessen; der Aufbau, der es entscheiden würde, steht
+      im Migrationskopf.
+
+      **Prüfer 2 — taugen die Belege: zwei HIGH auf meine eigene Sonde.**
+
+      - **HIGH: S1 konnte leer laufen und trotzdem 4/4 grün melden.** Mit
+        `for update of p skip locked` bekommt B keine Zeile, antwortet `unknown`
+        und wartet nie — **es fand gar kein Wettlauf statt**, und alle vier
+        S1-Behauptungen hielten. S1 ist das Szenario, das Befund 8.8 trägt.
+        Gefangen wurde die Fassung nur von S4; ohne S4 wäre ein kaputter Fix mit
+        voller Punktzahl durchgegangen.
+      - **HIGH: „ehrliche Grenze" akzeptierte `unknown`.** Geprüft wurde nur
+        „kein DB-Fehler". `unknown` sagt einem existierenden Mitglied, sein
+        Konto gebe es nicht, und `send-activation` macht daraus „unbekannte
+        Adresse" — das ist keine Grenze, sondern eine Falschauskunft.
+      - **MEDIUM: der pgTAP-Wächter ließ vier Fassungen mit fehlender Sperre
+        durch** — Blockkommentar `/* … */` (die Textbereinigung entfernte nur
+        `--`, obwohl ihr eigener Kommentar genau diesen Angriff begründete),
+        String-Literal, `skip locked`, und `if false then … end if`.
+      - **MEDIUM: S2 und S3 behaupteten die Kontention nicht**, sie druckten
+        sie nur — beide waren damit in jedem Zustand grün.
+
+      **Eingearbeitet, und mit denselben Gegenproben nachgemessen:**
+
+      | Fassung | Sonde | pgTAP |
+      | --- | --- | --- |
+      | unverändert | **18/18** | PASS |
+      | V1 Sperre in beiden entfernt | 12/18 | FAIL 148 149 |
+      | V5 `skip locked` | 12/18 | FAIL 148 |
+      | V6 Blockkommentar-Attrappe | 14/18 | FAIL 148 |
+      | V7 String-Literal-Attrappe | 14/18 | FAIL 148 |
+      | V8 `if false then … end if` | 14/18 | **PASS** |
+
+      V5 war vorher in S1 vollständig grün und ist es nicht mehr. V8 bleibt die
+      **bekannte, benannte Grenze** einer Textkontrolle: eine Sperre, die
+      dasteht, aber nie ausgeführt wird, kann kein `pg_get_functiondef`-Vergleich
+      sehen — die Sonde fängt sie. Das steht jetzt so im Test, statt dass er
+      mehr beansprucht, als er einlöst.
+
+      Drei neue Behauptungen (Wettlauf hat stattgefunden: S1, S2, S3),
+      Positivliste `rate_limited | pending | rate_limited_day` für alle
+      Verlierer-Behauptungen, `pg_temp.rumpf_ohne_kommentare` entfernt **beide**
+      Kommentarformen, und gesucht wird `for update of p;` **mit** Semikolon.
 
 ## 7. Ausrollen — drei Flächen, und die Falle dazwischen
 

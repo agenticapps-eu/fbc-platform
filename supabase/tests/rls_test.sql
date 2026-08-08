@@ -171,6 +171,16 @@ begin
   return 'OK';
 end $$;
 
+-- Rumpf einer Function OHNE Kommentare — beide Formen. `--` bis Zeilenende und
+-- `/* … */` über Zeilen hinweg. Wer nur die erste entfernt, prüft eine Zusage,
+-- die ein Blockkommentar vortäuschen kann; gemessen im Review zu AGE-507.
+create function pg_temp.rumpf_ohne_kommentare(f regprocedure) returns text
+language sql stable as $$
+  select regexp_replace(
+           regexp_replace(pg_get_functiondef(f), '/\*.*?\*/', '', 'g'),
+           '--[^\n]*', '', 'g')
+$$;
+
 -- ── 1. Das Modell selbst (§1a) ───────────────────────────────────────────────
 select is(
   (select count(*)::int from public.membership_tiers),
@@ -921,36 +931,41 @@ select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_pr
 -- als eine fehlende — sie gibt in einer Reihenfolge sogar zwei Token aus. Eine
 -- Kontrolle, die nur zählt, ob `for update of p` vorkommt, sähe davon nichts.
 --
--- Die Kommentarbefreiung ist kein Zierrat: ohne sie täuscht ein `--`-Kommentar,
--- der eines der beiden Muster enthält, die Reihenfolge vor.
+-- Die Textbereinigung entfernt BEIDE Kommentarformen und gesucht wird
+-- `for update of p;` MIT Semikolon. Beides ist nachgemessen und nicht
+-- vorsorglich: eine frühere Fassung entfernte nur `--`-Kommentare und suchte
+-- ohne Semikolon. Sie war grün, während die Sperre nachweislich fehlte, bei
+-- `/* … for update of p … */`, bei `raise debug 'for update of p'` und bei
+-- `for update of p skip locked` — letzteres nimmt die Sperre, WARTET aber
+-- nicht, und ist damit genau so kaputt wie gar keine.
 --
--- WAS DIESE ZEILE NICHT BELEGT: sie liest Text. Sie bemerkt keine
--- Verhaltensregression und beweist nicht, dass die Sperre WIRKT. Das belegt die
--- Sonde `scripts/probe-wettlauf-token-ausgabe.ts` — einmal, gemessen, zum
--- Zeitpunkt des Baus, mit rotem Vorher und grünem Nachher. Dass sie NICHT in
--- der Pipeline läuft, ist eine bewusste Entscheidung (Donald, 2026-08-08,
--- zweimal bestätigt); die Abwägung steht in REVIEWS.md. Diese Zeile hält
--- deshalb nur fest, dass die Sperre nicht wortlos wieder verschwindet oder
--- verrutscht.
+-- WAS DIESE ZEILE NICHT BELEGT, und das ist gemessen, nicht eingeräumt: sie
+-- liest Text. Eine Sperre, die syntaktisch dasteht, aber nie ausgeführt wird —
+-- `if false then … for update of p; … end if;` — kommt hier durch. Die Zeile
+-- beweist NICHT, dass die Sperre wirkt; sie hält nur fest, dass sie nicht
+-- wortlos verschwindet, verrutscht oder in einen Kommentar wandert. Das
+-- Verhalten belegt allein die Sonde `scripts/probe-wettlauf-token-ausgabe.ts`,
+-- einmal, zum Zeitpunkt des Baus, mit rotem Vorher und grünem Nachher — und
+-- die fängt den `if false`-Fall. Dass sie NICHT in der Pipeline läuft, ist eine
+-- bewusste Entscheidung (Donald, 2026-08-08, zweimal bestätigt); die Abwägung
+-- steht in REVIEWS.md.
 select ok(
-  strpos(rumpf, 'for update of p') > 0
-  and strpos(rumpf, 'for update of p') < strpos(rumpf, 'activation_tokens'),
-  'issue_activation_token: `for update of p` steht VOR dem ersten Zugriff auf '
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'issue_activation_token: `for update of p;` steht VOR dem ersten Zugriff auf '
   'activation_tokens — die Prüfung entscheidet auf gesperrtem, nicht auf '
   'veraltetem Stand (AGE-507)')
-from (select regexp_replace(
-        pg_get_functiondef('public.issue_activation_token(text,text,interval)'::regprocedure),
-        '--[^\n]*', '', 'g') as rumpf) s;
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.issue_activation_token(text,text,interval)'::regprocedure) as rumpf) s;
 
 select ok(
-  strpos(rumpf, 'for update of p') > 0
-  and strpos(rumpf, 'for update of p') < strpos(rumpf, 'activation_tokens'),
-  'request_own_activation_token: `for update of p` steht VOR dem ersten Zugriff '
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'request_own_activation_token: `for update of p;` steht VOR dem ersten Zugriff '
   'auf activation_tokens — sonst löst der zweite gleichzeitige Aufruf eine rohe '
   'unique_violation aus, die diese Function nicht fängt (AGE-507)')
-from (select regexp_replace(
-        pg_get_functiondef('public.request_own_activation_token(text,interval)'::regprocedure),
-        '--[^\n]*', '', 'g') as rumpf) s;
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
 
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der

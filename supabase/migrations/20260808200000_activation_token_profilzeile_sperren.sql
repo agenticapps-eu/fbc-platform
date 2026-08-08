@@ -43,9 +43,17 @@
 -- deshalb auch im Spec-Delta, nicht nur hier.
 --
 -- BENANNTE FOLGE: eine Token-Anforderung serialisiert sich kuenftig gegen
--- andere Schreiber derselben Profilzeile, insbesondere gegen
--- `apply_tier_upgrade` (Stripe). Beide sind kurz und selten; die Wartezeit ist
--- die Dauer eines Funktionsaufrufs.
+-- andere Schreiber derselben Profilzeile. Das sind, vollstaendig aufgezaehlt:
+-- `public.mark_activated` (20260806080200:184) — laeuft bei JEDER Einloesung
+-- und ist zum Launch alles andere als selten; `public.apply_upgrade`
+-- (20260716120000:36, Stripe, idempotent und wiederholbar); sowie jede
+-- Profilbearbeitung des Mitglieds selbst ueber `profiles_update_own`.
+-- (Frueher stand hier `apply_tier_upgrade` — diese Function gibt es nicht, der
+-- Name war aus Proposal und Design mitgewandert und liess sich nicht greppen.)
+--
+-- Die Kollision mit `mark_activated` ist funktional sogar NUETZLICH: `v_activated`
+-- kann jetzt nicht mehr zwischen Lesen und Zweigwahl veralten, der aus
+-- `activated_at` abgeleitete Zweck aus AGE-505 wird dadurch belastbar.
 --
 -- SIE REICHT WEITER ALS „SCHREIBER DER PROFILZEILE", und das ist beim Bau
 -- gemessen worden, nicht vorhergesagt: ein `insert` in `activation_tokens`
@@ -54,8 +62,27 @@
 -- jede offene Transaktion, die irgendwo eine Token-Zeile fuer dieses Profil
 -- eingefuegt hat — auch an den RPCs vorbei. Sichtbar an Szenario S2 der Sonde:
 -- ohne die Sperre antwortete der Aufruf `pending` ueber den 23505-Zweig, mit
--- ihr `rate_limited` schon VOR den Pruefungen. Das ist die ehrlichere Antwort,
--- aber es ist eine ANDERE als vorher.
+-- ihr `rate_limited`. Der Aufruf WARTET dabei vor seinen Pruefungen und
+-- entscheidet danach auf dem committeten Stand; den Status erzeugt dann die
+-- 60-Sekunden-Pruefung. Das ist die ehrlichere Antwort, aber eine ANDERE als
+-- vorher. (Nach aussen folgenlos: `send-activation/status.ts` bildet `pending`
+-- und `rate_limited` beide auf `kein_versand` ab.)
+--
+-- AUS GEMEINSAMEM WARTEN WIRD EINE SCHLANGE, und das ist die unangenehme Seite.
+-- Vorher liefen N gleichzeitige Anforderungen fuer dieselbe Adresse alle auf
+-- EINE Transaktion am partiellen Index und wurden gemeinsam freigegeben.
+-- Jetzt serialisieren sie streng: die k-te wartet auf k-1 Vorgaenger.
+-- `send-activation` WARTET auf den RPC, bevor es 202 antwortet (index.ts:119) —
+-- die Wartezeit steht also in der Antwortzeit, und fuer eine unbekannte Adresse
+-- entsteht sie gar nicht, weil ohne Treffer keine Sperre genommen wird. An
+-- einem Endpunkt, dessen Zweck Adress-Unkenntlichkeit ist, ist das kein reines
+-- Latenzthema. Schaerfer noch: reisst die Wartezeit das `statement_timeout` der
+-- Rolle, wirft der RPC 57014, und `send-activation` antwortet 502 statt 202
+-- (index.ts:124) — aus einem zeitlichen wuerde ein binaeres Signal.
+-- NICHT GEMESSEN, und deshalb hier als offener Punkt und nicht als Entwarnung.
+-- Der Aufbau, der es entscheiden wuerde: je 50 parallele Aufrufe fuer eine
+-- bekannte und eine garantiert unbekannte Adresse, p95 und Maximum vergleichen,
+-- danach dasselbe mit `set statement_timeout = '200ms'`.
 --
 -- DESHALB NACHGEPRUEFT, ob heute jemand die Reihenfolge umdreht: nein.
 -- `claim_activation_token` fasst nur `activation_tokens` an, `mark_activated`

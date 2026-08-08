@@ -137,3 +137,50 @@ Was offen bleibt und hier steht, statt später entdeckt zu werden: **eine
 Verhaltensregression fällt in CI weiterhin nicht auf.** Die Sonde belegt den Fix
 einmal, zum Zeitpunkt des Baus. Wer den CI-Schritt später doch will, findet in
 `design.md §6`, was er kostet.
+
+---
+
+## Stufe 4 — Review auf den Diff (`c913d88`), 2026-08-08
+
+Zwei unabhängige Prüfer mit getrennten Linsen. Der Vollständigkeit halber: sie
+liefen gleichzeitig gegen denselben lokalen Stack, was sich verfälscht hätte —
+deshalb bekam einer den Stack zugewiesen und der andere las nur. Das ist im
+Nachhinein eine Lehre über die Beauftragung, nicht über den Change.
+
+### Prüfer 1 — SQL und Nebenläufigkeit: kein CRITICAL, kein HIGH
+
+Kein Ablauf gefunden, in dem zwei Anforderungen beide durchkommen oder ein
+frisches Token entwertet wird. Sperr-Reihenfolge gegen **alle** Schreiber beider
+Tabellen geprüft, inklusive der vier getrennten PostgREST-Aufrufe in
+`redeem-activation`, der BEFORE-ROW-Trigger auf `profiles` und der
+`on delete cascade`-Richtung. Kein Deadlock heute.
+
+Drei Befunde übernommen, jeder vor der Übernahme nachgeprüft: `apply_tier_upgrade`
+existiert nicht (heißt `apply_upgrade`); `mark_activated` fehlte in der Liste der
+Kollisionspartner, obwohl es bei jeder Einlösung dieselbe Zeile schreibt; und ein
+Satz zu S2 war mechanisch falsch (`rate_limited` **ist** eine Prüfung, der Aufruf
+wartet davor und entscheidet danach).
+
+**Offen, im Migrationskopf als offener Punkt und nicht als Entwarnung:** aus dem
+gemeinsamen Warten am Index wird eine Schlange. `send-activation` wartet auf den
+RPC, bevor es 202 antwortet, und antwortet bei einem Fehler 502 — an einem
+Endpunkt gegen Adressaufzählung ist das kein reines Latenzthema. Nicht gemessen;
+der Aufbau, der es entschiede, steht im Kopf.
+
+### Prüfer 2 — taugen die Belege: zwei HIGH auf die eigene Sonde
+
+Der Befund, der zählt: mit `for update of p skip locked` findet **kein Wettlauf
+statt** — B bekommt keine Zeile, antwortet `unknown`, wartet nie — und S1 meldete
+trotzdem alle vier Behauptungen grün. S1 ist das Szenario, das Befund 8.8 trägt.
+Dazu: „ehrliche Grenze" akzeptierte `unknown`; der pgTAP-Wächter ließ vier
+Fassungen mit fehlender Sperre durch, darunter einen Blockkommentar — obwohl sein
+eigener Kommentar die Kommentarbefreiung mit genau diesem Angriff begründete.
+
+Eingearbeitet und mit denselben Gegenproben nachgemessen: unverändert 18/18 und
+PASS; V1 12/18 / FAIL 148 149; V5 12/18 / FAIL 148; V6 und V7 je 14/18 / FAIL 148;
+V8 14/18 / **PASS**.
+
+**Was bewusst offen bleibt:** V8 — `if false then … for update of p; … end if;`.
+Eine Sperre, die syntaktisch dasteht, aber nie ausgeführt wird, kann kein
+Textvergleich sehen. Die Sonde fängt sie. Der Test sagt das jetzt selbst, statt
+mehr zu beanspruchen, als er einlöst.

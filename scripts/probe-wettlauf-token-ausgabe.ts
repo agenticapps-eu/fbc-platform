@@ -82,9 +82,9 @@ const laeufe: { name: string; ok: boolean; text: string }[] = [];
 async function neueVerbindung(): Promise<pg.Client> {
   const c = new pg.Client({ connectionString: DB_URL });
   await c.connect();
-  // Ein haengender Lauf ist kein Messwert. Alle Wartezeiten der Sonde liegen
-  // unter 5 s; was laenger haengt, ist ein Fehler im Aufbau und soll als
-  // Fehler erscheinen, nicht als Stillstand.
+  // Ein haengender Lauf ist kein Messwert. Die Wartefristen der Sonde selbst
+  // liegen unter 5 s; die `await`s auf die RPC-Aufrufe begrenzt allein dieser
+  // Wert. Was laenger haengt, soll als Fehler erscheinen, nicht als Stillstand.
   await c.query("set statement_timeout = '20s'");
   return c;
 }
@@ -203,6 +203,14 @@ function istAusgabe(a: Antwort): boolean {
   return "status" in a && (a.status === "issued" || a.status === "issued_reset");
 }
 
+/**
+ * Die Antworten, die ein unterliegender Aufruf geben DARF. Positivliste, weil
+ * eine Negativliste („kein Fehler") auch `unknown` durchliesse — und das ist
+ * gegenueber einem existierenden Mitglied keine Grenze, sondern eine falsche
+ * Auskunft, aus der `send-activation` „unbekannte Adresse" macht.
+ */
+const GRENZEN = ["rate_limited", "pending", "rate_limited_day"];
+
 async function ruf(c: pg.Client, sql: string, args: unknown[]): Promise<Antwort> {
   try {
     const { rows } = await c.query(sql, args);
@@ -262,10 +270,15 @@ async function s1(admin: pg.Client, beobachter: pg.Client): Promise<void> {
     ]);
     const blockB = await warteBisBlockiert(beobachter, pidB, 2000);
     const bWartetAufA = blockB.includes(pidA);
-    console.log(
-      `       gemessen: pg_blocking_pids(B) = [${blockB}]` +
-        `${bWartetAufA ? "  (B wartet auf A)" : "  (B wartet NICHT auf A)"}` +
-        ` · ${await wartetAuf(beobachter, pidB)}`,
+    // BEHAUPTET, nicht bloss protokolliert. Ohne diese Zeile ist S1 blind gegen
+    // jede Fassung, in der die Sperre zwar dasteht, aber nicht WARTET: mit
+    // `for update of p skip locked` bekommt B keine Zeile, antwortet `unknown`,
+    // und alle uebrigen S1-Behauptungen halten — obwohl ueberhaupt kein
+    // Wettlauf stattgefunden hat. Gemessen im Review zu diesem Change.
+    pruefe(
+      "S1 · der Wettlauf hat stattgefunden: B wartet auf A",
+      bWartetAufA,
+      `pg_blocking_pids(B) = [${blockB}], A = ${pidA} · ${await wartetAuf(beobachter, pidB)}`,
     );
 
     // Die Reihenfolge richtet sich nach dem MESSWERT, nicht nach einer Erwartung.
@@ -323,10 +336,14 @@ async function s1(admin: pg.Client, beobachter: pg.Client): Promise<void> {
       `${ausgaben.length} von 2 (A=${zeige(antwortA)}, B=${zeige(antwortB)})`,
     );
     const verlierer = [antwortA, antwortB].find((r) => !istAusgabe(r));
+    // POSITIVLISTE, nicht „irgendein Status". Vorher bestand `unknown` diese
+    // Behauptung — und `unknown` heisst gegenueber einem existierenden Mitglied
+    // „dein Konto gibt es nicht"; `send-activation` macht daraus „unbekannte
+    // Adresse". Das ist keine ehrliche Grenze, das ist eine Falschauskunft.
     pruefe(
-      "S1 · der Verlierer faellt in eine ehrliche Grenze, nicht in einen DB-Fehler",
-      verlierer !== undefined && "status" in verlierer && verlierer.status !== "(keine Zeile)",
-      verlierer ? zeige(verlierer) : "es gab keinen Verlierer",
+      "S1 · der Verlierer faellt in eine ehrliche GRENZE, nicht in einen DB-Fehler und nicht in `unknown`",
+      verlierer !== undefined && "status" in verlierer && GRENZEN.includes(verlierer.status),
+      verlierer ? `${zeige(verlierer)} (erlaubt: ${GRENZEN.join(" | ")})` : "es gab keinen Verlierer",
     );
     pruefe(
       "S1 · genau EIN offenes Token bleibt uebrig",
@@ -351,6 +368,7 @@ async function s2(admin: pg.Client, beobachter: pg.Client): Promise<void> {
   const c = await neueVerbindung();
   const a = await neueVerbindung();
   try {
+    const pidC = await pidVon(c);
     await c.query("begin");
     await c.query(
       `insert into public.activation_tokens (token_hash, profile_id, expires_at)
@@ -365,8 +383,13 @@ async function s2(admin: pg.Client, beobachter: pg.Client): Promise<void> {
       "zz-probe-s2-TA",
     ]);
     const blockA = await warteBisBlockiert(beobachter, pidA);
-    console.log(
-      `       gemessen: pg_blocking_pids(A) = [${blockA}] · ${await wartetAuf(beobachter, pidA)}`,
+    // Behauptet, nicht gedruckt: ohne nachgewiesene Kontention misst dieses
+    // Szenario zwei Aufrufe, die sich nie begegnet sind — und ist dann in
+    // JEDEM Zustand gruen.
+    pruefe(
+      "S2 · der Wettlauf hat stattgefunden: A wartet auf die fremde Sitzung",
+      blockA.includes(pidC),
+      `pg_blocking_pids(A) = [${blockA}], fremde Sitzung = ${pidC} · ${await wartetAuf(beobachter, pidA)}`,
     );
 
     await c.query("commit");
@@ -389,9 +412,11 @@ async function s2(admin: pg.Client, beobachter: pg.Client): Promise<void> {
       [p.id],
     );
     pruefe(
-      "S2 · A antwortet mit einem Status statt einen DB-Fehler durchzureichen",
-      "status" in antwortA,
-      `${zeige(antwortA)} (ohne Sperre: pending ueber den 23505-Zweig · mit Sperre: rate_limited vor den Pruefungen)`,
+      "S2 · A faellt in eine Grenze statt in einen DB-Fehler oder `unknown`",
+      "status" in antwortA && GRENZEN.includes(antwortA.status),
+      `${zeige(antwortA)} — ohne Sperre "pending" ueber den 23505-Zweig, mit Sperre ` +
+        `"rate_limited", weil A schon vor seinen Pruefungen wartet und danach auf dem ` +
+        `committeten Stand entscheidet`,
     );
     pruefe("S2 · genau EIN offenes Token", Number(rows[0].offen) === 1, `${rows[0].offen} offen`);
   } finally {
@@ -411,6 +436,7 @@ async function s3(admin: pg.Client, beobachter: pg.Client): Promise<void> {
   const b = await neueVerbindung();
   const a = await neueVerbindung();
   try {
+    const pidB = await pidVon(b);
     await b.query("begin");
     await alsMitglied(b, p.id);
     const antwortB = await ruf(
@@ -426,8 +452,10 @@ async function s3(admin: pg.Client, beobachter: pg.Client): Promise<void> {
       "zz-probe-s3-TA",
     ]);
     const blockA = await warteBisBlockiert(beobachter, pidA);
-    console.log(
-      `       gemessen: pg_blocking_pids(A) = [${blockA}] · ${await wartetAuf(beobachter, pidA)}`,
+    pruefe(
+      "S3 · der Wettlauf hat stattgefunden: A wird VON B blockiert",
+      blockA.includes(pidB),
+      `pg_blocking_pids(A) = [${blockA}], B = ${pidB} · ${await wartetAuf(beobachter, pidA)}`,
     );
 
     await b.query("commit");
@@ -436,9 +464,9 @@ async function s3(admin: pg.Client, beobachter: pg.Client): Promise<void> {
 
     console.log(`       B = ${zeige(antwortB)} · A = ${zeige(antwortA)}`);
     pruefe(
-      "S3 · A antwortet mit einem Status statt einen DB-Fehler durchzureichen",
-      "status" in antwortA,
-      zeige(antwortA),
+      "S3 · A faellt in eine Grenze statt in einen DB-Fehler oder `unknown`",
+      "status" in antwortA && GRENZEN.includes(antwortA.status),
+      `${zeige(antwortA)} (erlaubt: ${GRENZEN.join(" | ")})`,
     );
     const { rows } = await admin.query(
       "select count(*) filter (where used_at is null and invalidated_at is null) as offen from public.activation_tokens where profile_id = $1",
@@ -519,9 +547,9 @@ async function s4(admin: pg.Client, beobachter: pg.Client, anonymGewinnt: boolea
 
     console.log(`       B = ${zeige(antwortB)} · A = ${zeige(antwortA)}`);
     pruefe(
-      `S4/${anonymGewinnt ? "a" : "b"} · A antwortet mit einem Status statt einen DB-Fehler durchzureichen`,
-      "status" in antwortA,
-      zeige(antwortA),
+      `S4/${anonymGewinnt ? "a" : "b"} · A faellt in eine Grenze statt in einen DB-Fehler oder \`unknown\``,
+      "status" in antwortA && GRENZEN.includes(antwortA.status),
+      `${zeige(antwortA)} (erlaubt: ${GRENZEN.join(" | ")})`,
     );
     const ausgaben = [antwortA, antwortB].filter(istAusgabe);
     pruefe(
