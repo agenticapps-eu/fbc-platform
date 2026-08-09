@@ -235,8 +235,10 @@ mindestens **256 Bit** Entropie tragen. Es ist der einzige Nachweis, den ein
 öffentlich erreichbarer Einlöse-Endpunkt verlangt; seine Unerratbarkeit ist die
 Eigenschaft, auf der das ganze Verfahren ruht. Der Einlöse-Endpunkt SHALL
 zusätzlich die Versuchsrate begrenzen — nicht weil ein solches Token erraten
-werden könnte, sondern damit ein ungedrosselter öffentlicher Endpunkt nicht als
-Lastfläche dient.
+werden könnte, sondern damit anhaltendes Raten aus einer Herkunft ein Ende
+findet und im Betrieb sichtbar wird. Die Grenze SHALL bei **20 fehlgeschlagenen
+Versuchen je Herkunft in einem gleitenden Fenster von einer Stunde** liegen; der
+21. SHALL abgewiesen werden.
 
 Gezählt SHALL dabei **ausschließlich der fehlgeschlagene Versuch** werden, und
 die Zählung SHALL **nach** dem Beanspruchen des Tokens stattfinden. Ein gültiges
@@ -253,8 +255,18 @@ deshalb nur im Fenster der Drossel gehalten und danach gelöscht werden; ein
 Verlauf SHALL NOT entstehen. Für Client-Rollen SHALL sie unerreichbar sein —
 kein Recht, keine Policy.
 
-Die Drossel ist eine Lastbremse, keine Sicherheitsgrenze. Fällt sie aus, SHALL
-der Einlöseweg trotzdem tragen.
+Die Grenze SHALL NOT als Ersparnis an Datenbankarbeit verstanden werden. Weil
+zuerst beansprucht und erst danach gezählt wird, kostet jeder Fehlversuch bis
+zum Erreichen der Grenze **mehr** Arbeit als ohne die Zählung — beanspruchen,
+löschen, einfügen, zählen —, und jenseits der Grenze spart sie diese Arbeit
+nicht ein, sondern verweigert die Antwort. Das ist der bewusst gewählte Preis
+der Zusage „ein gültiges Token wird niemals abgewiesen": ob ein Token gültig
+ist, lässt sich nur durch Nachsehen feststellen. Eine Sperre **vor** dem
+Beanspruchen wäre die Lastbremse, die diese Zusage bricht; sie SHALL NOT
+eingeführt werden, solange die Zusage gilt.
+
+Die Drossel ist damit ein Zähler mit Missbrauchssignal, weder Lastbremse noch
+Sicherheitsgrenze. Fällt sie aus, SHALL der Einlöseweg trotzdem tragen.
 
 Das Klartext-Token SHALL NOT in einem Teil der Adresse stehen, den Browser,
 Zwischenspeicher oder Server protokollieren. Es SHALL nach dem Auslesen aus der
@@ -515,6 +527,15 @@ Die Antwort auf eine solche Anforderung SHALL unabhängig davon gleich ausfallen
 ob zu der Adresse ein Konto besteht. Andernfalls wäre die Schnittstelle ein
 Verzeichnis der Mitgliedsadressen.
 
+Gleich SHALL dabei nicht nur der **Inhalt** der Antwort sein, sondern auch ihr
+**Zeitpunkt**. Das System SHALL deshalb zuerst antworten und den Versand erst
+**danach** anstoßen. Andernfalls verriete die Antwortdauer, was die
+gleichlautende Antwort verbergen soll: eine bekannte Adresse zöge die Runde zum
+Versanddienst nach sich, eine unbekannte nicht. Diese Reihenfolge ist die Abwehr
+des Adress-Orakels und SHALL als Anforderung gelten — sie SHALL NOT allein als
+Hinweis im Quelltext stehen, weil eine Umstellung des Ablaufs sie dort
+folgenlos aufheben könnte.
+
 #### Scenario: Ein übernommenes Passwort sperrt nicht dauerhaft aus
 
 - **GIVEN** ein Dritter hat das verteilte Passwort eines Kontos geändert
@@ -528,7 +549,8 @@ Verzeichnis der Mitgliedsadressen.
 - **WHEN** ein Bestätigungslink für eine Adresse angefordert wird, zu der kein
   Konto besteht
 - **THEN** ist die Antwort nicht von der für eine bestehende Adresse zu
-  unterscheiden
+  unterscheiden — weder in Statuscode und Inhalt noch darin, dass sie später
+  käme: versendet wird erst, nachdem geantwortet wurde
 
 #### Scenario: Ein Fremder kann ein Mitglied nicht aussperren
 
@@ -583,6 +605,18 @@ begrenzen, nicht nur pro Absender-IP. Die Begrenzung SHALL serverseitig aus
 gespeichertem Zustand abgeleitet werden, damit sie auch bei mehreren gleichzeitig
 laufenden Instanzen gilt.
 
+Die Grenzen SHALL benannte Werte tragen, sonst ist keines der folgenden
+Szenarien prüfbar:
+
+- Zwischen zwei Ausgaben für dasselbe Profil SHALL eine **Sperrfrist von 60
+  Sekunden** liegen.
+- Je Profil SHALL innerhalb von **24 Stunden** höchstens **fünf** Token
+  ausgegeben werden. Das ist das „Tageskontingent", auf das sich die Szenarien
+  berufen.
+
+Eine über diese Grenzen hinausgehende Anforderung SHALL abgewiesen werden, ohne
+dass ein Zugang verlorengeht: der zuletzt ausgegebene Link SHALL gültig bleiben.
+
 Eine erneute **Aktivierungs**anforderung für ein bereits aktiviertes Konto SHALL
 keine **Aktivierungsmail** auslösen — an einem aktivierten Konto gibt es nichts
 zu aktivieren — und SHALL NOT als Fehler des Aufrufers behandelt werden. Ein
@@ -601,6 +635,13 @@ außerdem SHALL Absender und Text unter der Kontrolle des Betreibers stehen.
 - **WHEN** ein Mitglied den Bestätigungslink zweimal innerhalb der Sperrfrist
   anfordert
 - **THEN** wird nur die erste Mail versendet
+
+#### Scenario: Das Tageskontingent ist erschöpft
+
+- **WHEN** für dasselbe Profil innerhalb von 24 Stunden ein sechster
+  Bestätigungslink angefordert wird
+- **THEN** wird weder ein weiteres Token ausgegeben noch eine weitere Mail
+  versendet, und der zuletzt ausgegebene Link bleibt gültig
 
 #### Scenario: Aktivierung anfordern für ein bereits aktiviertes Konto
 

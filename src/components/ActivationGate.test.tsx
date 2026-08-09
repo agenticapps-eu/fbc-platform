@@ -74,4 +74,51 @@ describe("ActivationGate", () => {
     renderMit({ user: einNutzer, isActivated: false });
     expect(screen.getByRole("button", { name: /abmelden und weiterstöbern/i })).toBeInTheDocument();
   });
+
+  /**
+   * Befund F2 aus AGE-495 (C3, Review-Restbefund): `isActivated === null`
+   * deckt zwei verschiedene Lagen ab — „noch am Laden/Wiederholen" und, nach
+   * drei Fehlversuchen, das endgültige „wir wissen es nicht" (siehe
+   * AuthProvider.tsx). Bislang gab das Gate in BEIDEN Fällen `null` zurück:
+   * dauerhaft nichts, ohne Meldung, ohne Ausweg. `activationLookupFailed`
+   * unterscheidet die beiden Lagen.
+   */
+  describe("wenn die Prüfung endgültig aufgegeben hat (activationLookupFailed)", () => {
+    it("zeigt eine Fehlermeldung mit Wiederholen-Option statt dauerhaft nichts", () => {
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: true });
+      expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: /Noch ein Schritt/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /erneut versuchen/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("löst beim Klick auf den Wiederholen-Knopf einen Seiten-Reload aus", () => {
+      const reload = vi.fn();
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...originalLocation, reload },
+      });
+
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: true });
+      screen.getByRole("button", { name: /erneut versuchen/i }).click();
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    it("bleibt bei WEDER-NOCH, solange nur gewartet wird (activationLookupFailed: false)", () => {
+      // Löschprobe für die beiden Tests oben: ohne activationLookupFailed:true
+      // bleibt das alte Warten-Verhalten unverändert — die neue Fehlermeldung
+      // erscheint NICHT von selbst, nur weil isActivated null ist.
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: false });
+      expect(screen.queryByRole("button", { name: /erneut versuchen/i })).not.toBeInTheDocument();
+    });
+  });
 });

@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(184);
+select plan(195);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -638,6 +638,45 @@ select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'insert into public.needs (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kapergesuch'')'),
   'DENIED:%', 'Gate: kein Gesuch unter fremdem Namen');
 
+-- 13.3a Storage: die drei avatars_*-Policies auf storage.objects (20260806080100
+-- §Storage) hatten bislang KEINE Assertion — der größte benannte Restbefund aus
+-- dem AGE-495-Review. storage.objects hat KEINE SELECT-Policy (Kopf von
+-- 20260613081627: das öffentliche Bucket liefert über die Objekt-URL aus, eine
+-- SELECT-Policy würde nur das Auflisten erlauben). Für UPDATE/DELETE zieht
+-- Postgres deren SELECT-Policy heran, sobald das WHERE eine Spalte referenziert
+-- — gemessen: `where bucket_id = 'avatars'` liefert AUCH mit `using (true)` 0
+-- Zeilen (`One-Time Filter: false`). Ein spaltenbezogenes WHERE prüfte hier
+-- also nur diese vorbestehende Lücke, nie das Aktivierungs-Gate. Deshalb genau
+-- EIN Objekt im Bucket zum Testzeitpunkt und blanke Anweisungen ohne WHERE.
+insert into storage.objects (bucket_id, name, owner) values
+  ('avatars', 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp',
+   'dddddddd-0000-0000-0000-00000000000d');
+
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into storage.objects (bucket_id, name) values (''avatars'', ''dddddddd-0000-0000-0000-00000000000d/kaper.webp'')'),
+  'DENIED:%row-level security policy%',
+  'Storage-Gate: avatars_insert_own lehnt den Avatar-Upload eines nicht aktivierten Kontos ab');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'update storage.objects set metadata = ''{"probe":true}''::jsonb'),
+  'OK', 'Storage-Gate: das UPDATE des eigenen Avatar-Objekts wirft nicht (RLS filtert still) …');
+select is(
+  (select metadata from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  null, '… ändert das Objekt aber nicht');
+
+-- storage.protect_delete() (BEFORE-STATEMENT-Trigger, vorbestehend) blockt
+-- JEDES direkte DELETE ohne diesen Guard — unabhängig von RLS. Ohne ihn testete
+-- die folgende Assertion nur den Trigger, nie die avatars_delete_own-Policy.
+select set_config('storage.allow_delete_query', 'true', true);
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'delete from storage.objects'),
+  'OK', 'Storage-Gate: das DELETE des eigenen Avatar-Objekts wirft nicht …');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  1, '… löscht das Objekt aber nicht');
+
 -- 13.4 Zielprofil-Gate (Entscheidung 16, Donald 2026-08-06). Ein BESTÄTIGTES
 -- Mitglied darf das unbestätigte Profil nicht sehen — sonst ist die Zusage im
 -- Mailtext („für kein anderes Mitglied sichtbar") unwahr.
@@ -808,6 +847,31 @@ select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
 select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'select public.recompute_potential_score(''dddddddd-0000-0000-0000-00000000000d''::uuid)'),
   'OK', 'Nach der Bestätigung läuft recompute_potential_score wieder durch');
+
+-- Gegenprobe zu 13.3a: dieselben blanken Anweisungen, jetzt mit Wirkung.
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'update storage.objects set metadata = ''{"probe":true}''::jsonb'),
+  'OK', 'Storage-Gate: nach der Bestätigung wirft das UPDATE weiterhin nicht …');
+select is(
+  (select metadata from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  '{"probe":true}'::jsonb, '… und ändert das Objekt jetzt wirklich');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'delete from storage.objects'),
+  'OK', 'Storage-Gate: nach der Bestätigung wirft das DELETE weiterhin nicht …');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  0, '… und löscht das Objekt jetzt wirklich');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into storage.objects (bucket_id, name) values (''avatars'', ''dddddddd-0000-0000-0000-00000000000d/aktiv.webp'')'),
+  'OK', 'Storage-Gate: nach der Bestätigung geht der Avatar-Upload durch');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/aktiv.webp'),
+  1, '… und die Zeile steht wirklich da');
 
 -- ── 14. Die Service-Rollen-Funktionen (Teil C) ───────────────────────────────
 -- Sie bauen das Gate auf und umgehen es deshalb per Definition. Genau darum

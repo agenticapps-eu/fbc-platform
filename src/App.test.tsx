@@ -1,11 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ToastProvider } from "./components/ui/Toast";
 import type { AuthContextValue } from "./providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "./test/auth-fixtures";
+
+/**
+ * Nur für den ActivationGate-Test unten gebraucht: `ActivationScreen` (was das
+ * Gate bei einem unbestätigten Konto rendert) ruft `resendActivationLink` beim
+ * Klick auf den Button, nicht schon beim Mount — hier reicht ein Stub, damit
+ * das Modul ohne Netzwerk lädt. Kein `vi.mock` auf eigene Komponenten (siehe
+ * ActivationGate.test.tsx): gemockt wird nur der Netzwerkrand. Der Rest des
+ * Moduls (`leseTokenAusFragment` u. a.) bleibt echt — den brauchen die
+ * `ActivationRedeemPage`-Tests weiter unten in dieser Datei.
+ */
+vi.mock("./lib/activation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./lib/activation")>()),
+  resendActivationLink: vi.fn(async () => {}),
+}));
 
 describe("App", () => {
   it("zeigt die Shell-Navigation und rendert auf / die öffentliche Startseite", () => {
@@ -216,5 +230,51 @@ describe("Zweck der Einlöseseite hängt an der Route (AGE-505)", () => {
     expect(
       screen.queryByRole("heading", { name: /Bestätigungslink anfordern/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Befund F1 aus AGE-495 (C3, Review-Restbefund): `/onboarding` trug nur
+ * `<RequireAuth>`, nicht `<ActivationGate>` — der gategeschützte Zweig endet
+ * in App.tsx vor dieser Route. Ein unbestätigtes Konto sah dadurch den vollen
+ * Kompass-Assistenten statt der Wand, obwohl `ActivationGate.tsx` „egal
+ * welche Route" verspricht.
+ *
+ * `/onboarding` bleibt bewusst außerhalb der `AppShell` (eigene Vollbild-
+ * strecke, wie `/login`) — nur das Gate kommt zusätzlich, verschachtelt wie
+ * im geschützten AppShell-Zweig.
+ */
+describe("/onboarding liegt hinter der Aktivierungswand (AGE-495, Befund F1)", () => {
+  function renderOnboarding(value: AuthContextValue) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <AuthFixture value={value}>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/onboarding"]}>
+              <App />
+            </MemoryRouter>
+          </ToastProvider>
+        </QueryClientProvider>
+      </AuthFixture>,
+    );
+  }
+
+  it("zeigt einem unbestätigten Konto die Wand statt des Kompass-Assistenten", () => {
+    renderOnboarding(
+      fakeAuthValue({ user: { id: "u1" } as AuthContextValue["user"], isActivated: false }),
+    );
+
+    expect(screen.getByRole("heading", { name: /Noch ein Schritt/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Schritt 1 von/)).not.toBeInTheDocument();
+  });
+
+  it("lässt ein bestätigtes Konto weiterhin auf den Kompass-Assistenten", () => {
+    renderOnboarding(
+      fakeAuthValue({ user: { id: "u1" } as AuthContextValue["user"], isActivated: true }),
+    );
+
+    expect(screen.getByText(/Schritt 1 von/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Noch ein Schritt/i })).not.toBeInTheDocument();
   });
 });
