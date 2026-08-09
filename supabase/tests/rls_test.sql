@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(182);
+select plan(184);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -170,6 +170,16 @@ begin
   perform set_config('request.jwt.claims', '', true);
   return 'OK';
 end $$;
+
+-- Rumpf einer Function OHNE Kommentare — beide Formen. `--` bis Zeilenende und
+-- `/* … */` über Zeilen hinweg. Wer nur die erste entfernt, prüft eine Zusage,
+-- die ein Blockkommentar vortäuschen kann; gemessen im Review zu AGE-507.
+create function pg_temp.rumpf_ohne_kommentare(f regprocedure) returns text
+language sql stable as $$
+  select regexp_replace(
+           regexp_replace(pg_get_functiondef(f), '/\*.*?\*/', '', 'g'),
+           '--[^\n]*', '', 'g')
+$$;
 
 -- ── 1. Das Modell selbst (§1a) ───────────────────────────────────────────────
 select is(
@@ -908,6 +918,54 @@ select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_pr
   '%Re-Aktivierer%',
   'mark_activated: der Kommentar warnt davor, activated_at zurückzusetzen — '
   'wer das täte, machte jedes ausstehende Reset-Token zum Re-Aktivierer');
+
+-- ── 14a-bis. Die Sperre steht VOR dem ersten Zugriff auf die Token (AGE-507) ─
+-- Beide ausgebenden RPCs sperren die Profilzeile, BEVOR sie irgendetwas prüfen.
+-- Ohne das entscheiden zwei gleichzeitige Anforderungen beide auf einem
+-- veralteten Snapshot, und die zweite entwertet den soeben ausgegebenen
+-- gültigen Link (Befund 8.8).
+--
+-- Diese Zeile vergleicht POSITIONEN, nicht Vorkommen — und das ist der ganze
+-- Grund für ihre Bauart. Gemessen (AGE-507, Task 4.4): eine Sperre, die
+-- vorhanden, aber HINTER die Prüfungen verschoben ist, richtet mehr Schaden an
+-- als eine fehlende — sie gibt in einer Reihenfolge sogar zwei Token aus. Eine
+-- Kontrolle, die nur zählt, ob `for update of p` vorkommt, sähe davon nichts.
+--
+-- Die Textbereinigung entfernt BEIDE Kommentarformen und gesucht wird
+-- `for update of p;` MIT Semikolon. Beides ist nachgemessen und nicht
+-- vorsorglich: eine frühere Fassung entfernte nur `--`-Kommentare und suchte
+-- ohne Semikolon. Sie war grün, während die Sperre nachweislich fehlte, bei
+-- `/* … for update of p … */`, bei `raise debug 'for update of p'` und bei
+-- `for update of p skip locked` — letzteres nimmt die Sperre, WARTET aber
+-- nicht, und ist damit genau so kaputt wie gar keine.
+--
+-- WAS DIESE ZEILE NICHT BELEGT, und das ist gemessen, nicht eingeräumt: sie
+-- liest Text. Eine Sperre, die syntaktisch dasteht, aber nie ausgeführt wird —
+-- `if false then … for update of p; … end if;` — kommt hier durch. Die Zeile
+-- beweist NICHT, dass die Sperre wirkt; sie hält nur fest, dass sie nicht
+-- wortlos verschwindet, verrutscht oder in einen Kommentar wandert. Das
+-- Verhalten belegt allein die Sonde `scripts/probe-wettlauf-token-ausgabe.ts`,
+-- einmal, zum Zeitpunkt des Baus, mit rotem Vorher und grünem Nachher — und
+-- die fängt den `if false`-Fall. Dass sie NICHT in der Pipeline läuft, ist eine
+-- bewusste Entscheidung (Donald, 2026-08-08, zweimal bestätigt); die Abwägung
+-- steht in REVIEWS.md.
+select ok(
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'issue_activation_token: `for update of p;` steht VOR dem ersten Zugriff auf '
+  'activation_tokens — die Prüfung entscheidet auf gesperrtem, nicht auf '
+  'veraltetem Stand (AGE-507)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.issue_activation_token(text,text,interval)'::regprocedure) as rumpf) s;
+
+select ok(
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'request_own_activation_token: `for update of p;` steht VOR dem ersten Zugriff '
+  'auf activation_tokens — sonst löst der zweite gleichzeitige Aufruf eine rohe '
+  'unique_violation aus, die diese Function nicht fängt (AGE-507)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
 
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der
