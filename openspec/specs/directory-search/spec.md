@@ -7,9 +7,7 @@ the server-side full-text and faceted search, the single visibility flag that
 governs whether a member is listed, and the membership-rank gate that controls
 access to richer profile data. Visibility is enforced by Postgres RLS, not by the
 client. Reconstructed from the code as of the OpenSpec migration.
-
 ## Requirements
-
 ### Requirement: Server-side directory search with facet filters
 
 The system SHALL provide a `search_directory(...)` RPC that returns a fixed
@@ -129,13 +127,26 @@ The system SHALL expose the directory's public field subset through the
 `profiles_public` view (`id`, `name`, `avatar_url`, `region`, `company`,
 `short_bio`, `tier`, `roles`) of `is_public` profiles. The view SHALL grant
 SELECT to `authenticated` only, deny SELECT to `anon`, and hold no client write
-privileges, so every logged-in member can browse the base directory fields while
-no client can mutate them.
+privileges, so no client can mutate the directory.
+
+A session alone SHALL NOT suffice. The view SHALL return rows only to a caller
+whose own account is **activated**, and SHALL return only those profiles whose
+**owner** is activated. "Every logged-in member can browse the base directory
+fields" therefore reads: every logged-in **and activated** member. Because the
+view runs with its owner's rights and bypasses the base table's policies, this
+condition SHALL sit in the view body itself, not only in the policies behind it.
 
 #### Scenario: Logged-in member browses base directory fields
 
-- **WHEN** an authenticated member selects from `profiles_public`
-- **THEN** the public field subset of all `is_public` profiles is returned regardless of the member's tier
+- **WHEN** an authenticated, activated member selects from `profiles_public`
+- **THEN** the public field subset of all `is_public` profiles **whose owner is
+  activated** is returned regardless of the member's tier
+
+#### Scenario: Logged-in but unconfirmed member sees no directory
+
+- **WHEN** an authenticated member whose account is not yet activated selects
+  from `profiles_public`
+- **THEN** no rows are returned
 
 #### Scenario: Anonymous visitor is denied the directory
 
@@ -196,3 +207,4 @@ name reveal by the viewer's tier is pending and is not present in the code.
 
 - **WHEN** the current behavior is inspected for graduated, tier-based name reveal
 - **THEN** none exists beyond the RLS full-row gate and anonymous masking (tiered resolution remains a pending follow-up)
+

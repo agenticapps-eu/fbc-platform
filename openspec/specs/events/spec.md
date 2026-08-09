@@ -9,9 +9,7 @@ Visibility and participation are enforced in the database via RLS and
 `SECURITY DEFINER` RPCs keyed on membership tier rank. Reconstructed from the code
 as of the OpenSpec migration; the retired `prime`/`legacy` visibility values were
 folded into `members`.
-
 ## Requirements
-
 ### Requirement: Events describe format, timing, host, and capacity
 
 The system SHALL store each event with a non-null `title`, an optional `type`
@@ -35,18 +33,26 @@ than delete the event.
 
 ### Requirement: Events are visible to all authenticated members
 
-The system SHALL, via RLS, permit any authenticated member to read every event
-whose `visibility` is `public` or `members`, and additionally permit the host to
-read their own event. Tiering SHALL sit on participation, not on visibility.
+The system SHALL, via RLS, permit any authenticated **and activated** member to
+read every event whose `visibility` is `public` or `members`, and additionally
+permit the host to read their own event. Tiering SHALL sit on participation, not
+on visibility — but activation SHALL sit in front of both. An account that holds
+a session without having confirmed its address SHALL read no events at all.
 
 #### Scenario: A basic member sees a members-visibility event
 
-- **WHEN** an authenticated member of any tier reads the events list
+- **WHEN** an authenticated, activated member of any tier reads the events list
 - **THEN** both `public` and `members` events are returned
+
+#### Scenario: An unconfirmed account sees no events
+
+- **WHEN** an authenticated member whose account is not yet activated reads the
+  events list
+- **THEN** no events are returned, including `public` ones
 
 #### Scenario: Host sees their own event
 
-- **WHEN** a member reads an event they host
+- **WHEN** an activated member reads an event they host
 - **THEN** the event is returned regardless of the caller's tier
 
 ### Requirement: Registrations are unique per member with tracked status
@@ -85,21 +91,38 @@ visibility: for `public` events any authenticated member (including `basic`) may
 register, while for `members` events the caller must hold at least `discover`
 (rank 3) or be the host.
 
+The function SHALL additionally require the caller's account to be **activated**,
+and SHALL apply that requirement to `public` events as well. This is a
+deliberate behavioural change (AGE-495): a self-registered guest who was usable
+immediately SHALL now confirm their address before signing up for anything,
+including a public event. The cost is accepted because the alternative — one
+ungated write path into member data — would make the gate a matter of taste
+rather than a boundary. The threshold by tier SHALL remain unchanged behind it.
+
 #### Scenario: Sign-up past capacity goes to the waitlist
 
-- **WHEN** a member registers for a `registered`-full event with a set `capacity`
+- **WHEN** an activated member registers for a `registered`-full event with a set
+  `capacity`
 - **THEN** the function returns `waitlist` and stores the row with
   `status = 'waitlist'`
 
 #### Scenario: Public event admits a basic member
 
-- **WHEN** a `basic` (rank 1) authenticated member registers for a `public` event
+- **WHEN** a `basic` (rank 1) authenticated **and activated** member registers
+  for a `public` event
 - **THEN** registration succeeds
+
+#### Scenario: An unconfirmed account cannot register for a public event
+
+- **WHEN** an authenticated member whose account is not yet activated registers
+  for a `public` event
+- **THEN** the function raises `not activated` and no registration row is
+  written
 
 #### Scenario: Members event requires discover
 
-- **WHEN** an authenticated member below `discover` (rank 3) registers for a
-  `members` event they do not host
+- **WHEN** an authenticated, activated member below `discover` (rank 3) registers
+  for a `members` event they do not host
 - **THEN** the function raises `membership level too low to register`
 
 ### Requirement: Only the host may set attendee check-in
@@ -143,3 +166,4 @@ the `register_for_event` path.
   `event_registrations` row directly instead of calling `register_for_event`
 - **THEN** the write is accepted by `regs_write_own` without the capacity-based
   waitlist assignment, so overbooking is prevented only via the RPC
+
