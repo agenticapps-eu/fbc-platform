@@ -14,6 +14,8 @@ interface LoadedProfile {
   staffRole: string | null;
   /** null = noch unbekannt (Fehler/ausstehend). Siehe auth-context. */
   isActivated: boolean | null;
+  /** true nur in der endgültigen Aufgeben-Lage nach drei Fehlversuchen. Siehe auth-context. */
+  activationLookupFailed: boolean;
   activationName: string | null;
 }
 
@@ -90,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           levelRank: profileRes.data?.membership_tiers?.level_rank ?? null,
           staffRole: staffRes.data?.role ?? null,
           isActivated: aktivierung.activated,
+          activationLookupFailed: false,
           activationName: aktivierung.displayName,
         });
         return;
@@ -112,12 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // `false`: „wir wissen es nicht" ist etwas anderes als „nicht aktiviert".
       // Das Gate hält ohnehin in der Datenbank; die Oberfläche soll hier einen
       // Fehler zeigen und nicht behaupten, das Konto sei unbestätigt.
+      // `activationLookupFailed: true` markiert genau diese Aufgeben-Lage —
+      // im Unterschied zu `isActivated === null` während noch geladen/wiederholt
+      // wird (AGE-495, Befund F2): dort bleibt es `false`, das Gate wartet weiter.
       setProfile({
         userId: uid,
         tier: null,
         levelRank: null,
         staffRole: null,
         isActivated: null,
+        activationLookupFailed: true,
         activationName: null,
       });
     }
@@ -136,6 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Ausgeloggt gibt es nichts zu aktivieren; eingeloggt und noch nicht geladen
   // ist `null` = unbekannt, und der Gate-Guard wartet darauf.
   const isActivated = !userId ? true : profileLoaded ? profile.isActivated : null;
+  const activationLookupFailed =
+    userId && profileLoaded ? profile.activationLookupFailed : false;
   const activationName = userId && profileLoaded ? profile.activationName : null;
   // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
   // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
@@ -152,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       tierLoading,
       isActivated,
+      activationLookupFailed,
       activationName,
       signUp: async (email, password, fullName) => {
         // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
@@ -178,7 +188,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
     }),
-    [session, tier, levelRank, staffRole, isLoading, tierLoading, isActivated, activationName],
+    [
+      session,
+      tier,
+      levelRank,
+      staffRole,
+      isLoading,
+      tierLoading,
+      isActivated,
+      activationLookupFailed,
+      activationName,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

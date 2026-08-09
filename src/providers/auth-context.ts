@@ -27,6 +27,14 @@ export interface AuthContextValue {
    * warten, nicht durchlassen.
    */
   isActivated: boolean | null;
+  /**
+   * true, wenn die Aktivierungsprüfung nach drei Fehlversuchen endgültig
+   * aufgegeben hat (siehe `AuthProvider`) — im Unterschied zu „noch am
+   * Warten" (auch dort `isActivated === null`, aber dieses Feld bleibt
+   * `false`). `ActivationGate` unterscheidet danach, ob es weiter nichts
+   * zeigt oder eine Fehlermeldung mit Wiederholen-Option (AGE-495, Befund F2).
+   */
+  activationLookupFailed: boolean;
   /** Anzeigename aus `my_activation_state()` — für die Anrede auf dem Aktivierungsschirm. */
   activationName: string | null;
   /**
