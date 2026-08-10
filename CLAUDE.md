@@ -130,3 +130,18 @@ Das **Datenmodell** ist die Menge der Supabase-Migrationen unter
 dem **6-Level-Modell** (`basic` → `connect` → `discover` → `exchange` → `focus` →
 `impact`, aufsteigende Rechte; AGE-311) — nicht mehr dem alten 3-/7-Stufen-Modell
 der Legacy-Docs. See `openspec/specs/membership-tiers/spec.md`.
+
+<!-- BEGIN: agentic-apps-workflow sections (do not remove this marker) -->
+<!-- section-version: 1.0.0 -->
+
+## The AgenticApps workflow
+
+Work moves through the OpenSpec lifecycle, and how to do that lives in the
+`agentic-apps-workflow` skill on this machine — not in this file. Read the
+skill for the loop, the gates and the coding discipline.
+
+This repository carries two workflow artifacts: `openspec/`, which is its
+durable truth, and this instruction file. Everything else — skills, hooks,
+enforcement — is machine-level and comes from `install.sh`.
+
+<!-- END: agentic-apps-workflow sections -->
