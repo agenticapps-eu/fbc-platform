@@ -1,0 +1,124 @@
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it, vi } from "vitest";
+import ActivationGate from "./ActivationGate";
+import { AuthContext } from "../providers/auth-context";
+import { fakeAuthValue } from "../test/auth-fixtures";
+
+/**
+ * Die Wand wird ECHT gerendert, samt ActivationScreen — kein `vi.mock` auf
+ * eigene Komponenten. Ein Mock auf `ActivationScreen` würde nur belegen, dass
+ * der Mock aufgerufen wurde, nicht dass das Mitglied die Wand sieht.
+ *
+ * Gemockt wird ausschließlich der Netzwerkrand (`lib/activation`), damit der
+ * Test nicht an Supabase hängt.
+ */
+vi.mock("../lib/activation", () => ({
+  requestActivationLink: vi.fn(async () => {}),
+}));
+
+function renderMit(
+  auth: Partial<Parameters<typeof fakeAuthValue>[0]>,
+  kind = <p>Geschützter Inhalt</p>,
+) {
+  return render(
+    <AuthContext.Provider value={fakeAuthValue(auth)}>
+      <MemoryRouter>
+        <ActivationGate>{kind}</ActivationGate>
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  );
+}
+
+const einNutzer = { id: "u1", email: "mitglied@test.fbc" } as never;
+
+describe("ActivationGate", () => {
+  it("zeigt den Inhalt für ein bestätigtes Mitglied", () => {
+    renderMit({ user: einNutzer, isActivated: true });
+    expect(screen.getByText("Geschützter Inhalt")).toBeInTheDocument();
+  });
+
+  it("ersetzt den Inhalt für ein unbestätigtes Konto durch die Wand", () => {
+    renderMit({ user: einNutzer, isActivated: false });
+    expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Noch ein Schritt/i })).toBeInTheDocument();
+  });
+
+  it("nennt die Adresse, an die der Link geht", () => {
+    renderMit({ user: einNutzer, isActivated: false });
+    expect(screen.getByText("mitglied@test.fbc")).toBeInTheDocument();
+  });
+
+  it("lässt den ausgeloggten Besucher durch — das Schaufenster bleibt offen", () => {
+    renderMit({ user: null, isActivated: true });
+    expect(screen.getByText("Geschützter Inhalt")).toBeInTheDocument();
+  });
+
+  it("zeigt WEDER Inhalt NOCH Wand, solange der Zustand unbekannt ist", () => {
+    // Fail closed heißt hier warten. Ein Netzwerkfehler darf einem bestätigten
+    // Mitglied nicht vorwerfen, es sei unbestätigt — und ein unbestätigtes darf
+    // nicht durchrutschen, solange die Antwort aussteht.
+    renderMit({ user: einNutzer, isActivated: null });
+    expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Noch ein Schritt/i })).not.toBeInTheDocument();
+  });
+
+  it("entscheidet nichts, solange die Session lädt", () => {
+    renderMit({ user: null, isLoading: true, isActivated: null });
+    expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+  });
+
+  it("bietet dem unbestätigten Konto den Weg zurück ins Schaufenster an", () => {
+    // Ohne diesen Hinweis liest sich der leere Bildschirm wie ein Fehler:
+    // ausgeloggt sieht man mehr als eingeloggt-aber-unbestätigt.
+    renderMit({ user: einNutzer, isActivated: false });
+    expect(screen.getByRole("button", { name: /abmelden und weiterstöbern/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Befund F2 aus AGE-495 (C3, Review-Restbefund): `isActivated === null`
+   * deckt zwei verschiedene Lagen ab — „noch am Laden/Wiederholen" und, nach
+   * drei Fehlversuchen, das endgültige „wir wissen es nicht" (siehe
+   * AuthProvider.tsx). Bislang gab das Gate in BEIDEN Fällen `null` zurück:
+   * dauerhaft nichts, ohne Meldung, ohne Ausweg. `activationLookupFailed`
+   * unterscheidet die beiden Lagen.
+   */
+  describe("wenn die Prüfung endgültig aufgegeben hat (activationLookupFailed)", () => {
+    it("zeigt eine Fehlermeldung mit Wiederholen-Option statt dauerhaft nichts", () => {
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: true });
+      expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: /Noch ein Schritt/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /erneut versuchen/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("löst beim Klick auf den Wiederholen-Knopf einen Seiten-Reload aus", () => {
+      const reload = vi.fn();
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...originalLocation, reload },
+      });
+
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: true });
+      screen.getByRole("button", { name: /erneut versuchen/i }).click();
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    it("bleibt bei WEDER-NOCH, solange nur gewartet wird (activationLookupFailed: false)", () => {
+      // Löschprobe für die beiden Tests oben: ohne activationLookupFailed:true
+      // bleibt das alte Warten-Verhalten unverändert — die neue Fehlermeldung
+      // erscheint NICHT von selbst, nur weil isActivated null ist.
+      renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: false });
+      expect(screen.queryByRole("button", { name: /erneut versuchen/i })).not.toBeInTheDocument();
+    });
+  });
+});

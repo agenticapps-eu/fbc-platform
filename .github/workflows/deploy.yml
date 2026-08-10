@@ -36,12 +36,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
@@ -77,12 +77,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: latest
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
@@ -97,6 +97,327 @@ jobs:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
         run: pnpm tsx scripts/migration-drift-gate.ts
 
+  # Edge Functions auf BEIDE Projekte ausrollen (AGE-506).
+  #
+  # WARUM ES DIESEN JOB GIBT. Bis hierher rollte CI zwei der drei Flaechen aus —
+  # Frontend und Migrationen — und Functions gar nicht. Das ist zweimal
+  # aufgeschlagen: bei AGE-495/B2 existierten die drei Aktivierungs-Functions auf
+  # PROD ueberhaupt nicht, waehrend der Change als „live" galt; und der
+  # Code-Review zu PR #133 musste melden, dass ein PR `send-activation` aendert,
+  # ohne dass irgendetwas sie ausliefert. Die Gegenmassnahme war eine Merkregel.
+  # Eine Regel, an die gedacht werden muss, ist genau das, was zweimal versagt hat.
+  #
+  # WARUM DIESELBEN VORBEDINGUNGEN WIE `deploy`. Eine Function kann eine
+  # Datenbankfunktion aufrufen, die auf dem Ziel noch nicht angelegt ist — auf
+  # PROD laufen Migrationen nur ueber `migrate-prod`, also von Hand. Liefe dieser
+  # Job voraus, waere die Function dort sofort kaputt. `drift-gate` blockiert
+  # bereits jeden Deploy, sobald PRODs Migrationshistorie vom Repo abweicht; die
+  # Function erbt diesen Schutz, statt einen zweiten danebenzustellen.
+  #
+  # WARUM NUR GEAENDERTE. `supabase functions deploy` ohne Namen deployt alle
+  # sechs. Auf PROD liegt fuer `notify-contact-request` bewusst ein aelterer
+  # Stand (member-activation-flow, Aufgabe 11.4) — ein pauschaler Lauf zoege ihn
+  # stillschweigend mit. Was uebergangen wird, steht deshalb NAMENTLICH im
+  # Protokoll: eine Beschraenkung, die nicht ausgesprochen wird, liest sich
+  # hinterher wie Vollstaendigkeit.
+  #
+  # WOMIT VERGLICHEN WIRD. Nicht mit `HEAD^`. `HEAD^..HEAD` beantwortet „was
+  # aenderte dieser Merge"; gebraucht wird „was ist noch nicht ausgeliefert".
+  # Die zwei sind nur solange dasselbe, wie JEDER Lauf ausliefert — und das ist
+  # nicht zugesichert: steht `drift-gate` rot, wird dieser Job uebersprungen.
+  # Genau das ist am 2026-08-07 passiert (Lauf 31211729060, Merge 36b662a): der
+  # Merge aenderte `send-activation/index.ts`, der Folgelauf sah davon nichts
+  # mehr, und aufs Ziel kam die Aenderung nur, weil der naechste Merge zufaellig
+  # dieselbe Function anfasste. Basis ist deshalb der Stand des juengsten Laufs,
+  # in dem dieser Job mit `success` endete.
+  #
+  # DER NAME DIESES JOBS IST TEIL DER MECHANIK. Die Basis wird ueber
+  # `select(.name == "functions")` gefunden. Ein `name:` am Job oder eine
+  # `strategy.matrix` (die Namen zu `functions (x)` macht) bricht die Suche
+  # dauerhaft — deshalb unterscheidet `deploy-base.logic.ts` diesen Fall in der
+  # Meldung von einem bloss zu kurzen Fenster.
+  functions:
+    needs: [migrate-dev, drift-gate]
+    # Nur auf main, und nur wenn beide Vorbedingungen nicht fehlgeschlagen sind —
+    # dieselbe Bedingung wie `deploy` eine Etage tiefer.
+    if: ${{ github.ref == 'refs/heads/main' && !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    # Am JOB, nicht am Workflow: dort steht `contents: read`, und was nicht
+    # aufgefuehrt ist, ist damit `none`. Nur dieser eine Job liest Laufhistorie —
+    # und `actions: read` kann strikt weniger als das `contents: write`, das ein
+    # von CI umgesetztes Deploy-Tag gebraucht haette (siehe design.md, 5.).
+    permissions:
+      contents: read
+      actions: read
+    env:
+      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+      # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
+      INFISICAL_API_URL: https://eu.infisical.com/api
+      # WARUM `dev`, obwohl dieser Job auch auf PROD ausliefert. Ein
+      # Supabase-PAT authentifiziert den BETREIBER gegen die Management-API und
+      # gilt kontoweit — er ist kein dev- und kein prod-Wert. Er liegt seit
+      # AGE-496 in `dev`; ihn zusaetzlich nach `prod` zu legen hiesse, dieselbe
+      # Zugangsdatei an zwei Stellen zu fuehren, und bei der naechsten Rotation
+      # wuerde eine davon vergessen. Eine Kopie, eine Wahrheit.
+      INFISICAL_ENV: dev
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Volle Historie, NICHT `2`. Die Vergleichsbasis liegt ausserhalb von
+          # `HEAD^`, sobald ein Lauf ausfiel oder uebersprungen wurde — und dann
+          # koennte weder `git diff` noch `git merge-base` sie aufloesen.
+          fetch-depth: 0
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Gleiche Installation wie im `deploy`-Job weiter unten. Ein Checksum-Pin
+      # ist nicht zu haben — Infisical verteilt die CLI ueber sein eigenes
+      # Repository.
+      - name: Install Infisical CLI
+        run: |
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
+          sudo apt-get update && sudo apt-get install -y infisical
+
+      # Die Wahl steht in scripts/deploy-base.logic.ts und hat dort einen Test
+      # daneben — samt Regressionstest auf den Vorfall, der sie ausgeloest hat.
+      - name: Vergleichsbasis ermitteln
+        id: basis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Gemessen wird das Ergebnis dieses JOBS, nicht das des Laufs: ein
+          # uebersprungener Job macht einen Lauf nicht rot. Ueber die Lauf-Ebene
+          # waere die Antwort heute zwar zufaellig richtig, aber nur ueber eine
+          # Schlusskette, die ein kuenftiges `if:` still kippt.
+          #
+          # 30 Laeufe sind der Blick zurueck; reicht er nicht, greift der
+          # Rueckfall weiter unten — laut.
+          if ! laeufe="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&event=push&per_page=30" \
+              --jq '.workflow_runs[] | {id, sha: .head_sha}' |
+            while read -r lauf; do
+              id="$(jq -r '.id' <<<"$lauf")"
+              # `filter=latest` ist zwar die Vorgabe der API, steht hier aber
+              # ausdruecklich: mit `filter=all` liefe `first` auf den AELTESTEN
+              # Versuch, und ein Lauf, dessen erster Versuch gelang und dessen
+              # zweiter scheiterte, laese sich als `success`. Das waere die
+              # Richtung „Basis zu neu" — also ein stiller Ausfall.
+              #
+              # `</dev/null`, weil `gh` sonst stdin der `while`-Schleife
+              # leerlesen koennte; die Liste waere dann nach einem Eintrag zu
+              # Ende, ohne dass irgendetwas fehlschlaegt.
+              #
+              # Der leere Ersatzwert faengt zweierlei ab: kein `functions`-Job im
+              # Lauf, und einer, der noch laeuft (etwa dieser hier). Weder das
+              # eine noch das andere ist ein Nachweis, dass ausgeliefert wurde.
+              if ! ergebnis="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?filter=latest" \
+                --jq '[.jobs[] | select(.name == "functions") | .conclusion] | first // ""' \
+                </dev/null)"; then
+                # OHNE dieses `if` verschwaende der Fehlschlag spurlos: `set -e`
+                # ist in dieser verschachtelten Ersetzung abgeschaltet, weil sie
+                # in der Bedingung eines `if !` steht. Der Lauf wuerde dann als
+                # „kein functions-Job" gewertet — richtungssicher (die Basis wird
+                # aelter), aber der GRUND im Protokoll behauptete danach einen
+                # Erfolg in einem aelteren Lauf, den es so nie gab.
+                echo "::warning::Job-Ergebnis fuer Lauf $id nicht abrufbar — der Lauf gilt als NICHT ausgeliefert." >&2
+                ergebnis=""
+              fi
+              jq -c --arg e "$ergebnis" \
+                '. + {functions: (if $e == "" then null else $e end)}' <<<"$lauf"
+            done | jq -sc '.'
+          )"; then
+            echo "::warning::Laufhistorie nicht abrufbar — die Vergleichsbasis faellt auf HEAD^ zurueck."
+            laeufe=""
+          fi
+
+          pnpm tsx scripts/deploy-base.ts <<<"$laeufe" > "$RUNNER_TEMP/basis.txt"
+          sha="$(head -n 1 "$RUNNER_TEMP/basis.txt")"
+          grund="$(tail -n 1 "$RUNNER_TEMP/basis.txt")"
+
+          # Ein SHA aus der Laufhistorie muss nicht mehr in dieser Historie
+          # liegen — nach einem Force-Push tut er es nicht, und `git diff` liefe
+          # ins Leere.
+          if [ -n "$sha" ] && ! git merge-base --is-ancestor "$sha" HEAD; then
+            grund="$sha ist kein Vorfahr von HEAD (Force-Push oder History-Umbau)"
+            sha=""
+          fi
+
+          # Rueckfall auf HEAD^, damit dieser Lauf wenigstens ausliefert, was er
+          # sieht — aber er darf NICHT als Nachweis gelten (Entscheidung Donald,
+          # 2026-08-08, nach dem Review). Die urspruengliche Begruendung „gegen
+          # HEAD^ zu vergleichen ist das bisherige Verhalten, also nie
+          # schlechter" gilt nur INNERHALB eines Laufs. Ueber Laeufe hinweg ist
+          # sie falsch: die Basis wird aus der Laufhistorie gelesen, also wuerde
+          # ein gruener Rueckfall-Lauf zur Basis des naechsten — und alles davor
+          # Uebersprungene laege ab da DAUERHAFT ausserhalb jedes Diffs. Der alte
+          # Code verlor eine Aenderung einmal und konnte sie durch Zufall
+          # zurueckholen (genau das rettete 36b662a); ein gruener Rueckfall
+          # naegelte diesen Fluchtweg zu.
+          #
+          # Deshalb setzt der Schritt `rueckfall` — der letzte Schritt des Jobs
+          # laesst ihn daran scheitern. Rot heisst hier: dieser Lauf zaehlt nicht
+          # als ausgeliefert, der naechste sieht die Luecke noch. Selbstheilend.
+          rueckfall=""
+          if [ -z "$sha" ]; then
+            rueckfall="ja"
+            if git rev-parse --verify -q "HEAD^" >/dev/null; then
+              echo "::error::Vergleichsbasis nicht ermittelbar ($grund). Es wird gegen HEAD^ ausgeliefert, der Lauf endet aber ROT — sonst gaelte er als Nachweis und die Luecke waere dauerhaft."
+              sha="$(git rev-parse HEAD^)"
+              grund="RUECKFALL auf HEAD^ — $grund"
+            else
+              echo "::error::Weder Vergleichsbasis noch Vorgaenger-Commit vorhanden. Es wird nichts ausgeliefert."
+              grund="RUECKFALL unmoeglich, kein Vorgaenger-Commit — $grund"
+            fi
+          fi
+
+          {
+            echo "sha=$sha"
+            echo "grund=$grund"
+            echo "rueckfall=$rueckfall"
+          } >> "$GITHUB_OUTPUT"
+
+          # In JEDEN Lauf, auch in den unauffaelligen. Eine Basis, die nur im
+          # Ausnahmefall genannt wird, ist im Normalfall unbelegt — dieselbe
+          # Begruendung wie beim namentlichen Protokoll der Uebergangenen.
+          {
+            echo "### Vergleichsbasis"
+            echo "- gewaehlt: \`${sha:-<keine>}\`"
+            echo "- Grund: $grund"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Die Ableitung steht in scripts/changed-functions.logic.ts und hat dort
+      # einen Test daneben — nicht hier als Shell-Zeile, die niemand prueft.
+      - name: Geaenderte Functions ableiten
+        id: ableitung
+        env:
+          BASIS: ${{ steps.basis.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASIS" ]; then
+            echo "namen=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          namen="$(git diff --name-only "$BASIS" HEAD | pnpm tsx scripts/changed-functions.ts | tr '\n' ' ')"
+          echo "Abgeleitet seit $BASIS: ${namen:-<keine>}"
+          echo "namen=$namen" >> "$GITHUB_OUTPUT"
+
+      # Ohne Token kaeme aus der CLI eine unverstaendliche Meldung. Dieser Schritt
+      # sagt stattdessen, was fehlt — und er schlaegt NUR fehl, wenn tatsaechlich
+      # etwas auszuliefern waere. Genau dieser Fall war bisher der stille.
+      #
+      # Geprueft wird ueber den EXIT-CODE, nicht ueber eine Ausgabe: der Wert
+      # darf nirgends erscheinen, auch nicht maskiert.
+      - name: Voraussetzung pruefen
+        if: ${{ steps.ableitung.outputs.namen != '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INFISICAL_TOKEN:-}" ]; then
+            echo "::error::Secret INFISICAL_TOKEN fehlt — ohne es kommt der Job an keinen Supabase-PAT (AGE-506)."
+            exit 1
+          fi
+          # Die einfachen Anfuehrungszeichen sind Absicht: expandieren soll die
+          # INNERE Shell, die `infisical run` mit dem Secret befuellt — nicht
+          # diese hier, die es nicht kennt.
+          # shellcheck disable=SC2016
+          if ! infisical run --env="$INFISICAL_ENV" --silent -- \
+                 sh -c '[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]'; then
+            echo "::error::SUPABASE_ACCESS_TOKEN liegt nicht in Infisical (env=$INFISICAL_ENV). Ohne Supabase-PAT kann keine Function ausgeliefert werden — und die Aenderung waere still nicht live (AGE-506)."
+            exit 1
+          fi
+
+      - name: Ausliefern und nachlesen
+        if: ${{ steps.ableitung.outputs.namen != '' }}
+        env:
+          NAMEN: ${{ steps.ableitung.outputs.namen }}
+          BASIS: ${{ steps.basis.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          # `find` statt `ls`: das Ausgabeformat von `ls` ist nicht zugesichert.
+          alle="$(find supabase/functions -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
+
+          echo "### Ausgeliefert" >> "$GITHUB_STEP_SUMMARY"
+          for fn in $NAMEN; do echo "- \`$fn\`" >> "$GITHUB_STEP_SUMMARY"; done
+
+          # Das Uebergangene beim Namen nennen — sonst liest sich die
+          # Beschraenkung hinterher als Vollstaendigkeit.
+          # „in diesem Merge" waere jetzt falsch: die Basis kann viele Merges
+          # zurueckliegen. Eine Ueberschrift, die weniger behauptet, als geprueft
+          # wurde, ist genau der Fehler, den der Abschnitt verhindern soll.
+          echo "### Uebergangen (unveraendert seit \`$BASIS\`)" >> "$GITHUB_STEP_SUMMARY"
+          uebergangen=0
+          for fn in $alle; do
+            case " $NAMEN " in
+              *" $fn "*) ;;
+              *) echo "- \`$fn\`" >> "$GITHUB_STEP_SUMMARY"; uebergangen=$((uebergangen + 1)) ;;
+            esac
+          done
+          [ "$uebergangen" -eq 0 ] && echo "- (keine)" >> "$GITHUB_STEP_SUMMARY"
+
+          for refdatei in scripts/dev-project-ref.txt scripts/prod-project-ref.txt; do
+            # Das Ziel kommt aus einer versionierten Datei, nicht aus einem
+            # Secret: ein Ziel, das nur im Secret steht, ist im Review unsichtbar
+            # (dieselbe Begruendung wie scripts/assert-target.ts).
+            ref="$(tr -d '[:space:]' < "$refdatei")"
+            # `infisical run` umschliesst NUR den supabase-Aufruf, nicht den
+            # ganzen Block: der PAT lebt damit im Prozess, der ihn braucht, und
+            # in keinem anderen.
+            for fn in $NAMEN; do
+              echo "::group::deploy $fn -> $ref"
+              infisical run --env="$INFISICAL_ENV" --silent -- \
+                supabase functions deploy "$fn" --project-ref "$ref"
+              echo "::endgroup::"
+            done
+
+            # Dass ein Befehl fehlerfrei zurueckkam, ist kein Beleg dafuer, dass
+            # das Ziel den neuen Stand traegt. Also nachlesen.
+            echo "::group::functions list $ref"
+            infisical run --env="$INFISICAL_ENV" --silent -- \
+              supabase functions list --project-ref "$ref"
+            echo "::endgroup::"
+          done
+
+      # Der Grund gehoert dazu. „Kein Function-Code in diesem Merge" waere
+      # schlicht falsch, wenn in Wahrheit die Vergleichsbasis fehlte — und lesen
+      # wuerde es sich wie ein unauffaelliger Lauf.
+      - name: Nichts auszuliefern
+        if: ${{ steps.ableitung.outputs.namen == '' }}
+        env:
+          BASIS: ${{ steps.basis.outputs.sha }}
+          GRUND: ${{ steps.basis.outputs.grund }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASIS" ]; then
+            echo "Keine Vergleichsbasis ($GRUND) — es wurde nichts ausgeliefert."
+          else
+            echo "Seit $BASIS ($GRUND) aenderte sich kein Function-Code — es wurde nichts ausgeliefert."
+          fi
+
+      # ZULETZT, und mit Absicht nach dem Ausliefern: der Lauf soll noch
+      # herausholen, was er sehen konnte, aber danach ROT enden. Die
+      # `conclusion` dieses Jobs ist das Buch, aus dem der naechste Lauf seine
+      # Basis liest — ein gruener Rueckfall schriebe „alles bis hierher ist
+      # ausgeliefert" ueber eine Luecke, die niemand mehr aufmachen kann.
+      #
+      # Das blockiert weder `deploy` noch `migrate-dev`: beide haengen an
+      # `migrate-dev` und `drift-gate`, nicht an diesem Job.
+      - name: Rueckfall ist kein Nachweis
+        if: ${{ steps.basis.outputs.rueckfall != '' }}
+        env:
+          GRUND: ${{ steps.basis.outputs.grund }}
+        run: |
+          echo "::error::$GRUND — dieser Lauf darf NICHT als ausgeliefert gelten. Ursache beheben; der naechste Lauf holt die Luecke dann nach."
+          exit 1
+
   deploy:
     needs: [migrate-dev, drift-gate]
     # Auf Pull Requests werden beide Vorbedingungen uebersprungen; `!cancelled()`
@@ -110,20 +431,33 @@ jobs:
       # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
       INFISICAL_API_URL: https://eu.infisical.com/api
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # full history so Sentry can associate commits
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # OFFEN (AGE-495, Audit 8.6): Dies ist eine Fremd-Shell, die als root
+      # läuft. Ein Checksum-Pin ist nicht zu haben — Infisical verteilt die CLI
+      # über den eigenen Artefaktserver, die GitHub-Releases tragen KEINE
+      # Assets (am 2026-08-06 nachgemessen). Es bleiben zwei Wege, und beide
+      # sind eine Entscheidung, kein Handgriff: das Setup-Skript per SHA-256
+      # festnageln (bricht bei jeder legitimen Änderung ihrerseits) oder auf
+      # `@infisical/cli` von npm wechseln (steht auf 0.43.120, während die
+      # Go-CLI bei 0.162.16 ist — anderer Verteilweg, ungemessenes Verhalten).
+      #
+      # Was hier heute besser wird: kein `-E` mehr. Es reichte die GESAMTE
+      # Job-Umgebung an die root-Shell durch, einschließlich INFISICAL_TOKEN,
+      # CLOUDFLARE_API_TOKEN und SENTRY_AUTH_TOKEN. Das Setup-Skript braucht
+      # nichts davon.
       - name: Install Infisical CLI
         run: |
-          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
           sudo apt-get update && sudo apt-get install -y infisical
 
       # `infisical run` injects the target env's secrets. On main, SENTRY_AUTH_TOKEN
@@ -139,6 +473,11 @@ jobs:
       # wrangler reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID from the env
       # that infisical injects. The branch name is attacker-controllable, so it is
       # passed via env and quoted, never interpolated into the shell.
+      #
+      # `pnpm exec`, nicht `pnpm dlx wrangler@4`: dlx löste die Version bei
+      # JEDEM Deploy neu auf und lud sie ohne Integritätsprüfung — das Werkzeug,
+      # das unser Produktions-Frontend hochlädt, war das einzige ungepinnte
+      # Stück der Kette. wrangler steht jetzt als devDependency im Lockfile.
       - name: Deploy to Cloudflare Pages
         id: deploy
         env:
@@ -147,14 +486,14 @@ jobs:
           # pipefail so a wrangler failure isn't masked by the `tee` exit code.
           set -euo pipefail
           infisical run --env="$INFISICAL_ENV" -- \
-            pnpm dlx wrangler@4 pages deploy ./dist \
+            pnpm exec wrangler pages deploy ./dist \
               --project-name=fbc-platform --branch="$CF_BRANCH" | tee deploy.log
           url="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1 || true)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL on the PR
         if: github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         with:

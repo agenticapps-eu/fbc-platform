@@ -20,6 +20,24 @@ export interface AuthContextValue {
   /** true während für den eingeloggten Nutzer tier/level_rank/staffRole nachgeladen werden. */
   tierLoading: boolean;
   /**
+   * Hat das Mitglied seinen Zugang bestätigt (AGE-495)? `null` heißt „noch
+   * unbekannt" — bewusst dreiwertig: ein Netzwerkfehler darf einem aktivierten
+   * Mitglied nicht die Wand zeigen, und ein unaktiviertes darf nicht
+   * durchrutschen, solange die Antwort aussteht. Fail closed heißt hier:
+   * warten, nicht durchlassen.
+   */
+  isActivated: boolean | null;
+  /**
+   * true, wenn die Aktivierungsprüfung nach drei Fehlversuchen endgültig
+   * aufgegeben hat (siehe `AuthProvider`) — im Unterschied zu „noch am
+   * Warten" (auch dort `isActivated === null`, aber dieses Feld bleibt
+   * `false`). `ActivationGate` unterscheidet danach, ob es weiter nichts
+   * zeigt oder eine Fehlermeldung mit Wiederholen-Option (AGE-495, Befund F2).
+   */
+  activationLookupFailed: boolean;
+  /** Anzeigename aus `my_activation_state()` — für die Anrede auf dem Aktivierungsschirm. */
+  activationName: string | null;
+  /**
    * Legt ein Konto an. `fullName` geht als `full_name` in die User-Metadaten und
    * wird vom Signup-Trigger nach `profiles.name` übernommen (AGE-437) — ohne ihn
    * bliebe das Mitglied im Verzeichnis namenlos.

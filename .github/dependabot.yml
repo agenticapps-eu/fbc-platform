@@ -1,7 +1,29 @@
 version: 2
 updates:
   # Keep the SHA-pinned GitHub Actions current via reviewed PRs (not silent tag moves).
+  # Die Pins stehen seit 2026-08-06 wirklich als SHA in den Workflows — bis dahin
+  # war dieser Kommentar eine Zusage ohne Deckung (`actions/checkout@v7` u. a.).
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+
+  # Die Anwendungsabhängigkeiten selbst. Sie fehlten hier: der einzige Eintrag
+  # betraf die Workflows, nicht das, was ausgeliefert wird. Gruppiert, damit aus
+  # vielen Paketen nicht ebenso viele PRs werden.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      produktion:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      entwicklung:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch

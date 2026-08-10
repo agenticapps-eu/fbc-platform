@@ -9,7 +9,10 @@ import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
-  password: z.string().min(8, "Das Passwort muss mindestens 8 Zeichen haben."),
+  // Zehn, nicht acht: `minimum_password_length` in config.toml steht seit C4
+  // auf 10. Mit acht nahm das Formular eine Eingabe an, die der Server ablehnt —
+  // das Mitglied bekam einen Serverfehler statt einer Feldmeldung (AGE-495).
+  password: z.string().min(10, "Das Passwort muss mindestens 10 Zeichen haben."),
   // Im Schema optional, weil der Login-Modus gar kein Namensfeld rendert; beim
   // Registrieren wird die Pflicht in onSubmit durchgesetzt (AGE-437). `.trim()`
   // sonst zählt ein Leerzeichen als Name und steht so im Verzeichnis.
@@ -138,6 +141,17 @@ export default function LoginPage() {
             className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
           {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
+          {/* AGE-505. Der Weg gehört genau hierhin: Wer sein Passwort vergessen
+              hat, scheitert an DIESEM Feld und sucht ihn nirgendwo sonst. Im
+              Registrierungsmodus gibt es nichts zu vergessen. */}
+          {mode === "login" && (
+            <Link
+              to="/passwort-vergessen"
+              className="self-start text-sm text-muted hover:underline"
+            >
+              Passwort vergessen?
+            </Link>
+          )}
         </div>
 
         {formError && <p className="text-sm text-danger">{formError}</p>}

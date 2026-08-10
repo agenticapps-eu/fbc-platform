@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import ActivationGate from "./components/ActivationGate";
 import AppShell from "./components/AppShell";
 import EnvironmentBanner from "./components/EnvironmentBanner";
 import { DesignVariantProvider } from "./providers/DesignVariantProvider";
@@ -15,6 +16,7 @@ import EventDetailPage from "./pages/EventDetailPage";
 import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import ActivationRedeemPage from "./pages/ActivationRedeemPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 
 // Dev-only: aus dem Prod-Build heraustree-shaken (DEV ist statisch false).
@@ -58,7 +60,17 @@ export default function App() {
 function AppInner() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
+      {/* Aktivierungs-Wand um ALLES, was in der Shell liegt (AGE-495). Ein
+          eingeloggtes, noch unbestätigtes Konto sieht ausschließlich den
+          Aktivierungsbildschirm — egal welche Route. Bequemlichkeit, nicht die
+          Sicherheitsgrenze: die ist die RLS. */}
+      <Route
+        element={
+          <ActivationGate>
+            <AppShell />
+          </ActivationGate>
+        }
+      >
         {/* Startseite (`/`) kommt aus navItems (Eintrag „Start" → HomeRedirect, das die
             öffentliche HomePage rendert und nur den Onboarding-Gate-Fall abfängt). */}
         {navItems.map((item) => (
@@ -130,13 +142,29 @@ function AppInner() {
         />
       </Route>
       <Route path="/login" element={<LoginPage />} />
+      {/* Einlösung — außerhalb der Shell (wie /login) und bewusst OHNE
+          RequireAuth und ohne ActivationGate: Das Token trägt die Identität,
+          nicht die Sitzung. Nur so funktioniert der Link in einem anderen
+          Browser (AGE-495 §6). */}
+      <Route path="/aktivierung" element={<ActivationRedeemPage />} />
+      {/* AGE-505: dasselbe Bauteil, derselbe Einlöse-Endpunkt, andere Sprache.
+          Das Token trägt seinen Zweck bewusst nicht mit sich — die Route ist
+          der einzige Träger, an dem sich entscheiden lässt, ob hier ein Zugang
+          bestätigt oder ein vergessenes Passwort ersetzt wird. */}
+      <Route path="/passwort-vergessen" element={<ActivationRedeemPage zweck="reset" />} />
+      <Route path="/passwort-neu" element={<ActivationRedeemPage zweck="reset" />} />
       {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
-          außerhalb der AppShell (wie /login). */}
+          außerhalb der AppShell (wie /login). AGE-495 Befund F1: liegt trotzdem
+          hinter der Aktivierungswand — ActivationGate verspricht „egal welche
+          Route", und ohne das Gate sah ein unbestätigtes Konto hier den vollen
+          Kompass-Assistenten statt der Wand. */}
       <Route
         path="/onboarding"
         element={
           <RequireAuth>
-            <OnboardingPage />
+            <ActivationGate>
+              <OnboardingPage />
+            </ActivationGate>
           </RequireAuth>
         }
       />

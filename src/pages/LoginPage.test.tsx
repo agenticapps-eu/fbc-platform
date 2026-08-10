@@ -72,4 +72,22 @@ describe("LoginPage", () => {
     renderLogin();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
   });
+
+  // AGE-505. Der Weg muss genau hier stehen: Wer sein Passwort vergessen hat,
+  // scheitert an DIESER Seite und sucht ihn nirgendwo sonst.
+  it("bietet einen Weg für ein vergessenes Passwort an", () => {
+    renderLogin();
+    const link = screen.getByRole("link", { name: /Passwort vergessen/i });
+    expect(link).toHaveAttribute("href", "/passwort-vergessen");
+  });
+
+  // Befund 8.7 aus Review 5.4: der Fall oben belegte den Link, nicht seine
+  // BEDINGUNG. Wer `mode === "login"` entfernt, bestünde ihn weiterhin — und
+  // böte dann jemandem, der gerade ein Konto anlegt, an, ein Passwort
+  // zurückzusetzen, das es noch nicht gibt.
+  it("zeigt den Weg im Registrierungsmodus NICHT — dort ist nichts zu vergessen", () => {
+    renderLogin();
+    toRegisterMode();
+    expect(screen.queryByRole("link", { name: /Passwort vergessen/i })).not.toBeInTheDocument();
+  });
 });

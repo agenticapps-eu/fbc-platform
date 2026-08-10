@@ -39,8 +39,16 @@ export default defineConfig({
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
     // Seed-Tooling (supabase/seed) und die Push-Guards (scripts) werden
-    // mitgetestet — reine Helfer, kein Netzwerk.
-    include: ["src/**/*.test.{ts,tsx}", "supabase/seed/**/*.test.ts", "scripts/**/*.test.ts"],
+    // mitgetestet — reine Helfer, kein Netzwerk. Die Cloudflare Pages Functions
+    // (functions/) laufen anders als die Supabase Edge Functions in einer
+    // Node-kompatiblen Runtime und passen deshalb hierher statt in den
+    // Deno-Job `edge-functions`.
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "functions/**/*.test.ts",
+      "supabase/seed/**/*.test.ts",
+      "scripts/**/*.test.ts",
+    ],
     // Dummy-Supabase-Config, damit src/lib/supabase.ts beim Import nicht wirft
     // (Unit-Tests sprechen kein Netzwerk an).
     env: {

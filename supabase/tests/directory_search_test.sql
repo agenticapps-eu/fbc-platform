@@ -42,6 +42,13 @@ update public.profiles set tier = 'impact', name = 'Dora', is_public = true
 update public.profiles set tier = 'basic', name = 'Egon', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000005';
 
+-- Aktivierungs-Gate (AGE-495). Die Fixtures entstehen NACH dem Backfill aus
+-- 20260806080000 und sind deshalb unbestätigt; `search_directory` ist SECURITY
+-- INVOKER und folgt der profiles-RLS, liefert also sonst durchgehend leer.
+-- Ohne diese Zeile prüfte die Datei nicht mehr die Suche, sondern nur noch das
+-- Gate — und zwar an einer Stelle, an der es niemand suchen würde.
+update public.profiles set activated_at = now();
+
 insert into public.offers (profile_id, category, title) values
   ('d1000000-0000-0000-0000-000000000001', 'kapital',  'Annas Kapital'),
   ('d1000000-0000-0000-0000-000000000001', 'kontakte', 'Annas Kontakte'),

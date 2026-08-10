@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(3);
+select plan(5);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -112,6 +112,27 @@ select is(
      and (acl like 'anon=%' or acl like 'authenticated=%')),
   '(keine)',
   'Default privileges: neue Tabellen erben nichts an anon/authenticated');
+
+-- ── 4. activation_tokens: die Abwesenheit als eigene Aussage (AGE-495) ───────
+-- Die Tabelle taucht im Golden-Snapshot oben NICHT auf, weil sie keinen Grant
+-- traegt. Genau das ist gewollt — aber eine Abwesenheit ist von einem
+-- vergessenen Eintrag nicht zu unterscheiden. Deshalb hier ausdruecklich, mit
+-- Namen: waere der Snapshot je mit einem Grant auf dieser Tabelle
+-- nachgepflegt worden, faellt diese Assertion und nicht der Vergleich oben.
+select is(
+  (select count(*)::int from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'activation_tokens'
+      and grantee in ('anon', 'authenticated')),
+  0,
+  'activation_tokens traegt fuer anon/authenticated KEIN einziges Recht — '
+  'gelesen und geschrieben wird sie allein mit der Service-Rolle');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and tablename = 'activation_tokens'),
+  0,
+  'activation_tokens hat bewusst KEINE Policy — deny-by-default ist hier das '
+  'Feature, nicht eine Luecke, die jemand schliessen sollte');
 
 select * from finish();
 rollback;
