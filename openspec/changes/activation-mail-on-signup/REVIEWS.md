@@ -114,3 +114,76 @@ Dieser Reviewer hat den echten Quelltext gelesen — RPC, Edge Function,
   Change dazu tut und was er offen lässt, steht im Proposal.
 - gemini nennt synchrone Systemuhren als Voraussetzung. Alle Zeiten kommen aus
   `now()` **einer** Datenbank; es gibt keine zweite Uhr. Kein Handlungsbedarf.
+
+---
+
+# Code-Review über den Diff (Schritt 4)
+
+Gelaufen am 2026-08-10, nach der Umsetzung, über `git diff main...HEAD`. Beide
+Reviewer bekamen zusätzlich eine Sicherheitsbrille (`cso`-Gate): Kann jemand die
+Grenze umgehen, ein Mitglied aussperren, Adressen aufzählen oder die Plattform
+zum Mailverteiler machen?
+
+## Reviewer: gemini (gemini-3-pro-preview)
+
+VERDICT: APPROVE — ohne Befund.
+
+## Reviewer: opencode (hf:moonshotai/Kimi-K3)
+
+VERDICT: REQUEST-CHANGES. Hat den Diff gegen das echte Repo gelesen (Edge
+Function, Migration, Gate, Provider) und den Serverteil ausdrücklich für
+tragfähig erklärt — die drei Treffer liegen alle auf der Client-Seite.
+
+- [HIGH] `activationMailStatus` wird nie geräumt. Auf einem geteilten Gerät sieht
+  der nächste Nutzer „Der Link ist unterwegs. Er gilt 72 Stunden" über eine Mail,
+  die an jemand anderen ging — und weil der Wert sich nicht ändert, startet nicht
+  einmal die Sperrfrist neu.
+- [HIGH] Nach einem `send_failed` liefert der nächste Klick innerhalb von 60 s
+  `rate_limited`, weil `max(created_at)` auch entwertete Zeilen sieht. Die
+  Oberfläche sagte dann „Der Link ist bereits unterwegs … schau ins Postfach"
+  über eine Mail, die es nie gab.
+- [MEDIUM] Der Hinweis auf `LoginPage` ist unerreichbar: `signUp` meldet die
+  Sitzung an den Auth-Zuhörer, bevor es auflöst, der Navigate-Guard räumt die
+  Seite ab. Der Test dazu bestand nur, weil die Attrappe keine Sitzung herstellt.
+- [LOW] `already_activated` wird als Fehler eingefärbt; unbekannte Status fallen
+  in eine Lücke (`MELDUNGEN[lage] === undefined`).
+- [LOW] Das Stundenkontingent zählt auch nie versendete Zeilen — bei einer
+  Resend-Störung brennt es ab, ohne dass ein Link ankommt.
+
+**Ausdrücklich geprüft und für richtig befunden:** `plan(202)` = 195 + 7, die
+`>`-Randwerte bei 10 min und 1 h, „Abweisung schreibt kein Token", die
+Sperr-Reihenfolge (eigene Profilzeile → Riegel) als deadlockfrei, die
+`strpos`-Assertion überlebt das Kommentar-Strippen, und die ehrlichen
+200-Antworten verraten nichts, weil das Subjekt immer die eigene Sitzung ist.
+
+## Resolution
+
+- **HIGH 1** → Behoben, aber anders als vorgeschlagen. Statt den Status zu
+  *räumen*, trägt er jetzt die `userId`, zu der er gehört, und wird abgeleitet —
+  dieselbe Bauart, die `profile` in derselben Datei schon hat. Ein Räumen per
+  Effect hätte einen Moment gelassen, in dem der alte Wert noch sichtbar ist, und
+  `react-hooks/set-state-in-effect` zu Recht angeschlagen. Die Kennung kommt aus
+  der **Antwort** von `signUp`, nicht aus dem Render: Beim Aufruf steht die
+  Sitzung noch nicht. Test in `AuthProvider.test.tsx`, gegengeprüft — ohne den
+  Fix fällt er.
+- **HIGH 2** → Behoben über den Text, nicht über die Drossel. Die Meldung lautet
+  jetzt „Gerade eben wurde schon ein Link angefordert" und verspricht **kein**
+  Postfach. Das Szenario im Delta ist entsprechend geschärft. Die Drossel selbst
+  bleibt unangetastet: Sie hängt am Zeitpunkt der Anforderung, nicht am
+  Versandergebnis, und das ist richtig so — sie schützt das Kontingent, das ein
+  Fehlversand ebenso verbraucht. Entwertete Zeilen aus `max(created_at)`
+  auszunehmen wäre ein Eingriff in eine Grenze aus AGE-495 und gehört nicht in
+  einen Fehlerbehebungs-Change.
+- **MEDIUM** → Hinweis und Test **gelöscht**, samt der `info`-Zustandsvariable,
+  die danach niemand mehr setzte. Der Reviewer hat recht, und der eigentliche
+  Schaden war nicht der Text, sondern ein Test, der einen unerreichbaren Zustand
+  bestätigte. Die Fortsetzung ist der Aktivierungsbildschirm.
+- **LOW (unbekannte Status)** → Fallback auf `error` statt `undefined`.
+- **LOW (Kontingent zählt Ungesendetes)** → Als Entscheidung in den
+  Migrationskopf geschrieben, mit der Begründung, warum die Alternative schlechter
+  ist: Ausgerechnet der Angriffsweg braucht keine Zustellung.
+- **LOW (`already_activated` rot eingefärbt)** → **Nicht geändert.** Der
+  Bildschirm erscheint nur, wenn `isActivated === false` ist; dieser Status ist
+  von dort aus nur über ein Wettrennen mit einem zweiten Tab erreichbar. Eine
+  eigene Einfärbung samt Handlungsangebot für einen Zustand, den der Weg dorthin
+  fast ausschließt, wäre mehr Fläche als Nutzen. Notiert, nicht gebaut.

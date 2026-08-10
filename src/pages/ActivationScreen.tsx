@@ -22,9 +22,14 @@ const SPERRE = 60;
  */
 const MELDUNGEN: Record<ResendStatus, string> = {
   issued: "",
+  // Sagt bewusst NICHT „der Link ist unterwegs" und schickt niemanden ins
+  // Postfach: Schlug der Versand eben fehl, liegt dort nichts, und die
+  // Sperrfrist zählt trotzdem — sie hängt am Zeitpunkt der Anforderung, nicht
+  // am Versandergebnis. Wer hier ein Postfach verspricht, wiederholt den
+  // Fehler, gegen den dieser Change gebaut ist (Befund aus dem Diff-Review).
   rate_limited:
-    "Der Link ist bereits unterwegs. Bitte warte einen Moment, bevor du einen neuen anforderst — " +
-    "schau solange ins Postfach und in den Spam-Ordner.",
+    "Gerade eben wurde schon ein Link angefordert. Bitte warte einen Moment, " +
+    "bevor du es noch einmal versuchst.",
   rate_limited_day:
     "Für heute wurden schon mehrere Links an dein Konto geschickt. Bitte sieh im Postfach und im " +
     "Spam-Ordner nach; morgen kannst du wieder einen neuen anfordern.",
@@ -59,13 +64,16 @@ export default function ActivationScreen() {
   // da, als wäre nie etwas versendet worden (Sichtprobe vom 2026-08-10).
   const lage = eigeneLage ?? activationMailStatus;
 
-  // Aus demselben Grund ein Effect: Die Sperrfrist beginnt, wenn der
-  // automatische Versand griff — auch dann, wenn das erst nach dem Rendern
-  // feststeht. Läuft genau einmal je Statuswechsel, der Zähler unten setzt
-  // ihn nicht erneut in Gang.
-  useEffect(() => {
+  // Die Sperrfrist beginnt, wenn der automatische Versand griff — auch dann,
+  // wenn das erst nach dem Rendern feststeht. Angepasst WÄHREND des Renderns
+  // statt in einem Effect: React verwirft den Zwischenstand und rendert direkt
+  // neu, statt erst zu zeichnen und dann eine zweite Runde anzustoßen. `useEffect`
+  // dafür ist der Fall, vor dem `react-hooks/set-state-in-effect` warnt.
+  const [gesehenerVersand, setGesehenerVersand] = useState<ResendStatus | null>(null);
+  if (gesehenerVersand !== activationMailStatus) {
+    setGesehenerVersand(activationMailStatus);
     if (activationMailStatus === "issued") setRestSek(SPERRE);
-  }, [activationMailStatus]);
+  }
 
   useEffect(() => {
     if (restSek <= 0) return;
@@ -98,7 +106,9 @@ export default function ActivationScreen() {
     }
   }
 
-  const meldung = lage ? MELDUNGEN[lage] : null;
+  // Fallback statt `undefined`: Der Status kommt vom Server, und ein künftiger
+  // neuer Wert liefe sonst in eine Lücke — Klick ohne jede Rückmeldung.
+  const meldung = lage ? (MELDUNGEN[lage] ?? MELDUNGEN.error) : null;
 
   const anrede = activationName?.trim() ? `Hallo ${activationName.trim()},` : "Hallo,";
 

@@ -57,8 +57,11 @@ eine Wartezeit, wo ein erneuter Versuch nötig ist.
 
 - **WHEN** ein Mitglied nach dem automatischen Versand innerhalb der Sperrfrist
   den Bestätigungsknopf drückt
-- **THEN** meldet der Bildschirm keinen Versand, sondern dass der Link bereits
-  unterwegs ist und ein erneuter Versuch erst nach kurzer Wartezeit möglich ist
+- **THEN** meldet der Bildschirm keinen Versand, sondern dass gerade erst ein
+  Link **angefordert** wurde und ein erneuter Versuch kurz warten muss. Er SHALL
+  dabei NICHT behaupten, dass eine Mail unterwegs oder im Postfach ist: Die
+  Sperrfrist hängt am Zeitpunkt der Anforderung, nicht am Versandergebnis, und
+  greift deshalb auch dann, wenn der vorige Versand fehlschlug
 
 #### Scenario: Der Versand wird abgelehnt
 

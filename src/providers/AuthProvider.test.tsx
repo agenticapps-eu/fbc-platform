@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -22,12 +22,19 @@ const signUp = vi.fn();
 const invoke = vi.fn();
 const rpc = vi.fn(async () => ({ data: [{ activated: false, display_name: "Neu" }], error: null }));
 
+/** Der Rückruf, den `AuthProvider` bei Supabase hinterlegt — damit ein Test
+ *  einen Sitzungswechsel auslösen kann, ohne echtes Netzwerk. */
+let authRückruf: ((event: string, session: unknown) => void) | null = null;
+
 vi.mock("../lib/supabase", () => ({
   supabase: {
     auth: {
       signUp,
       getSession: vi.fn(async () => ({ data: { session: null } })),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      onAuthStateChange: vi.fn((cb: (event: string, session: unknown) => void) => {
+        authRückruf = cb;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      }),
       signInWithPassword: vi.fn(),
       signOut: vi.fn(),
       updateUser: vi.fn(),
@@ -73,7 +80,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
   });
 
   it("fordert nach erfolgreicher Registrierung den Bestätigungslink an", async () => {
-    signUp.mockResolvedValueOnce({ error: null });
+    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-neu" } }, error: null });
 
     renderUndRegistrieren();
 
@@ -88,7 +95,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
    * könnte.
    */
   it("versendet nichts, wenn die Registrierung fehlschlägt", async () => {
-    signUp.mockResolvedValueOnce({ error: { message: "User already registered" } });
+    signUp.mockResolvedValueOnce({ data: { user: null }, error: { message: "User already registered" } });
 
     renderUndRegistrieren();
 
@@ -103,7 +110,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
    * vergeben", während sein Konto längst existiert.
    */
   it("meldet die Registrierung als erfolgreich, auch wenn der Versand wirft", async () => {
-    signUp.mockResolvedValueOnce({ error: null });
+    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-x" } }, error: null });
     invoke.mockRejectedValueOnce(new Error("network"));
 
     let ergebnis: { error: unknown } | undefined;
@@ -127,5 +134,50 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
 
     await waitFor(() => expect(ergebnis).toBeDefined());
     expect(ergebnis?.error).toBeNull();
+  });
+
+  /**
+   * Befund aus dem Diff-Review (2026-08-10): Der Status wurde gesetzt und nie
+   * wieder geräumt — weder beim Abmelden noch beim Wechsel des Kontos. Auf
+   * einem geteilten Gerät, etwa dem Anmeldetisch einer Veranstaltung, sieht
+   * dann der NÄCHSTE Nutzer „Der Link ist unterwegs. Er gilt 72 Stunden" über
+   * eine Mail, die an jemand anderen ging. Und weil der Wert sich nicht
+   * ändert, startet nicht einmal die Sperrfrist neu.
+   *
+   * Das ist genau die Falschmeldung, gegen die dieser ganze Change gebaut ist,
+   * nur an einer Stelle, an die niemand gedacht hatte.
+   */
+  it("räumt den Versandstatus, wenn das Konto wechselt", async () => {
+    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-a" } }, error: null });
+
+    const gesehen: (string | null)[] = [];
+    function Zeigen() {
+      const { activationMailStatus, signUp: melden } = useAuth();
+      gesehen.push(activationMailStatus);
+      return (
+        <button type="button" onClick={() => void melden("a@test.fbc", "geheim1234567", "A")}>
+          los
+        </button>
+      );
+    }
+    render(
+      <AuthProvider>
+        <Zeigen />
+      </AuthProvider>,
+    );
+    // Erst den Mount zu Ende laufen lassen: `getSession()` löst mit `null` auf
+    // und setzt die Sitzung ein zweites Mal. Ohne dieses Abwarten überholt es
+    // die Anmeldung unten, und der Test misst die Reihenfolge seines eigenen
+    // Mocks statt das Verhalten.
+    await act(async () => {});
+
+    act(() => authRückruf?.("SIGNED_IN", { user: { id: "nutzer-a" } }));
+    screen.getByRole("button", { name: "los" }).click();
+    await waitFor(() => expect(gesehen.at(-1)).toBe("issued"));
+
+    // Abmelden — und danach meldet sich jemand anderes im selben Tab an.
+    act(() => authRückruf?.("SIGNED_OUT", null));
+
+    await waitFor(() => expect(gesehen.at(-1)).toBeNull());
   });
 });

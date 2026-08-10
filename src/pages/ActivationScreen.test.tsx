@@ -177,8 +177,11 @@ describe("ActivationScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
 
-      expect(await screen.findByText(/bereits unterwegs/i)).toBeInTheDocument();
+      expect(await screen.findByText(/schon ein Link angefordert/i)).toBeInTheDocument();
       expect(screen.queryByText(/Der Link ist unterwegs/i)).not.toBeInTheDocument();
+      // Kein Postfach versprechen: Schlug der Versand eben fehl, liegt dort
+      // nichts — und genau diese Reihenfolge ist der wahrscheinlichste Fall.
+      expect(screen.queryByText(/Postfach/i)).not.toBeInTheDocument();
     });
 
     it("nennt das erschöpfte Kontingent beim Namen, statt Erfolg zu melden", async () => {
@@ -203,7 +206,7 @@ describe("ActivationScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
 
       expect(await screen.findByText(/hat gerade nicht geklappt/i)).toBeInTheDocument();
-      expect(screen.queryByText(/bereits unterwegs/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/schon ein Link angefordert/i)).not.toBeInTheDocument();
     });
   });
 });

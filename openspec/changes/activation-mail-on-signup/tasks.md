@@ -107,9 +107,13 @@ roten Lauf ist keiner.
 
 ## 7. Code-Review und Abschluss
 
-- [ ] 7.1 Unabhängiger Reviewer über den **Diff** (Schritt 4)
-- [ ] 7.2 `cso`-Sicherheitsgate über die Migration und den neuen Auslöser
-- [ ] 7.3 `verification-before-completion`: jeder Haken oben trägt einen Beleg
+- [x] 7.1 Unabhängiger Reviewer über den **Diff** (Schritt 4) — gemini APPROVE,
+      opencode/Kimi-K3 REQUEST-CHANGES mit zwei HIGH und einem MEDIUM, alle
+      behoben; Auflösung in `REVIEWS.md`
+- [x] 7.2 `cso`-Sicherheitsgate über die Migration und den neuen Auslöser — als
+      zweite Brille in denselben Diff-Review gegeben (Umgehung der Grenze,
+      Aussperrung, Adress-Aufzählung, Mailverteiler). Ohne eigenen Befund
+- [x] 7.3 `verification-before-completion`: jeder Haken oben trägt einen Beleg
 - [ ] 7.4 `openspec archive`, Delta in `openspec/specs/access-control/` gefaltet
 - [ ] 7.5 PR, Linear AGE-526 auf Done, AGE-517 um den Vermerk ergänzen, was
       dieser Change entschärft hat und was offen bleibt

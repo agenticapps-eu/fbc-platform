@@ -39,6 +39,17 @@
 -- traegt. Der Zugang ist verzoegert, nicht verschlossen; dauerhaft aussperren
 -- kann damit niemand.
 --
+-- WAS MITGEZAEHLT WIRD, und was das kostet: JEDE Zeile in activation_tokens der
+-- letzten Stunde — auch eine entwertete. Fuer den Missbrauchsfall ist das
+-- richtig, denn schon die ZEILE ist das, was ein Angreifer billig erzeugt. Fuer
+-- den Fehlversand ist es ein Nachteil, den man kennen muss: Lehnt Resend ab,
+-- entwertet `resend-activation` sein eigenes Token (E1 aus AGE-495) — die Zeile
+-- bleibt und verbraucht das Kontingent, obwohl keine Mail rausging. Eine
+-- laengere Resend-Stoerung kann das Stundenkontingent also aufbrauchen, ohne
+-- dass ein einziger Link zugestellt wurde. Bewusst hingenommen: Die Alternative
+-- waere, ungesendete Zeilen auszunehmen, und dann zaehlte ausgerechnet der
+-- Angriffsweg nicht mehr mit, der keine Zustellung braucht.
+--
 -- VERWORFEN: ein Feld `automatisch` im Anfragerumpf. Es haette den
 -- automatischen Weg sauber vom Knopf getrennt — aber der Aufrufer setzt es
 -- selbst. Ein Missbrauchender schickt `false` und die Grenze ist umgangen.
