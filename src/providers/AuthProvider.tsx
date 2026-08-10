@@ -1,7 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { fetchActivationState } from "../lib/activation";
+import { fetchActivationState, resendActivationLink, type ResendStatus } from "../lib/activation";
 import { logEvent } from "../lib/log";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
@@ -23,6 +23,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<LoadedProfile | null>(null);
+  // AGE-526: Ergebnis des Versands, den die Registrierung selbst ausgelöst hat.
+  // Der Aktivierungsbildschirm wird von `ActivationGate` nach dem Routenwechsel
+  // gerendert, nicht von `LoginPage` — ohne diese Naht könnte er vom Versand
+  // gar nichts wissen. Nach einem Neuladen ist der Wert fort und der Bildschirm
+  // zeigt wieder den Knopf; das ist richtig so, denn ein Neuladen weiß nichts
+  // über einen Versand, und die Alternative wäre eine ungeprüfte Behauptung.
+  const [activationMailStatus, setActivationMailStatus] = useState<ResendStatus | null>(null);
 
   // Session beim Start laden und auf Änderungen (Login/Logout/Refresh) hören.
   // Der Callback setzt nur State — kein supabase.from() darin (Deadlock-Caveat);
@@ -163,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isActivated,
       activationLookupFailed,
       activationName,
+      activationMailStatus,
       signUp: async (email, password, fullName) => {
         // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
         // (20260611171003) liest genau diesen Schlüssel nach profiles.name.
@@ -171,7 +179,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           options: { data: { full_name: fullName } },
         });
-        if (!error) logEvent("signup");
+        if (!error) {
+          logEvent("signup");
+          // AGE-526: Der Bestätigungslink geht hier raus, nicht erst auf Knopf-
+          // druck. Ein selbst registriertes Konto trägt keinen
+          // Aktivierungszeitpunkt und steht damit hinter dem Gate — der Link ist
+          // seine einzige Tür. Bis hierher löste ihn niemand aus, und die
+          // Registrierung war eine Sackgasse, die wie ein Erfolg aussah (Demo
+          // vom 2026-08-10).
+          //
+          // Die Sitzung besteht an dieser Stelle bereits, weil die eingebaute
+          // E-Mail-Bestätigung ausgeschaltet ist (AGE-445) — nur deshalb trägt
+          // der sitzungsgebundene Weg schon direkt nach der Registrierung.
+          //
+          // Der Fehlschlag wird gefangen und NICHT weitergereicht: Konto und
+          // Sitzung stehen schon. Wer hier einen Fehler meldete, schickte den
+          // Gast in einen zweiten Registrierungsversuch auf eine Adresse, die
+          // längst vergeben ist. Der Aktivierungsbildschirm bietet den Knopf.
+          setActivationMailStatus(await resendActivationLink().catch(() => "error" as const));
+        }
         return { error };
       },
       signIn: async (email, password) => {
@@ -198,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isActivated,
       activationLookupFailed,
       activationName,
+      activationMailStatus,
     ],
   );
 

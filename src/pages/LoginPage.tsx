@@ -67,10 +67,15 @@ export default function LoginPage() {
       setFormError(error.message);
       return;
     }
-    // Ist E-Mail-Bestätigung deaktiviert, liefert signUp direkt eine Session und
-    // der Navigate-Guard oben leitet nach "/". Sonst diesen Hinweis zeigen.
+    // Die eingebaute Bestätigung ist aus (AGE-445), `signUp` liefert also direkt
+    // eine Session und der Navigate-Guard oben leitet auf den
+    // Aktivierungsbildschirm. Dieser Hinweis ist nur die Brücke dorthin.
+    //
+    // Er verspricht ausdrücklich KEINEN Versand (AGE-526): Ob die Mail rausging,
+    // weiß diese Seite nicht — sie hat den Status nicht. Der
+    // Aktivierungsbildschirm hat ihn und sagt ihn wahrheitsgemäß.
     setInfo(
-      "Registrierung erfolgreich. Falls E-Mail-Bestätigung aktiv ist, bitte Postfach prüfen.",
+      "Registrierung erfolgreich. Wie es weitergeht, steht auf dem nächsten Bildschirm.",
     );
   }
 

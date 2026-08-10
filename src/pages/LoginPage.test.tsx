@@ -90,4 +90,28 @@ describe("LoginPage", () => {
     toRegisterMode();
     expect(screen.queryByRole("link", { name: /Passwort vergessen/i })).not.toBeInTheDocument();
   });
+
+  /**
+   * AGE-526. Der Hinweis nach der Registrierung lautete „Falls E-Mail-
+   * Bestätigung aktiv ist, bitte Postfach prüfen". Beide Hälften stimmen nicht
+   * mehr: Die eingebaute Bestätigung ist aus (AGE-445) und bleibt es, und der
+   * Bestätigungslink geht jetzt in jedem Fall raus. Ein „falls" beschreibt eine
+   * Ungewissheit, die es nicht gibt.
+   *
+   * Der neue Text verspricht trotzdem KEINEN Versand — ob die Mail rausging,
+   * weiß diese Seite nicht, und der Aktivierungsbildschirm sagt es
+   * wahrheitsgemäß. Er verweist nur dorthin.
+   */
+  it("verspricht nach der Registrierung keinen Versand, den diese Seite nicht kennt", async () => {
+    renderLogin();
+    toRegisterMode();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Anna Muster" } });
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "anna@example.org" } });
+    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "geheim1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
+
+    const hinweis = await screen.findByText(/Registrierung erfolgreich/i);
+    expect(hinweis).toHaveTextContent(/nächsten Bildschirm/i);
+    expect(hinweis).not.toHaveTextContent(/Falls E-Mail-Bestätigung aktiv ist/i);
+  });
 });

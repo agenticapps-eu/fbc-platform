@@ -25,6 +25,28 @@ export type RedeemStatus =
   | "throttled"
   | "error";
 
+/**
+ * Ausgang einer Anforderung des eigenen Bestätigungslinks (AGE-526).
+ *
+ * Die ersten sechs kommen aus `request_own_activation_token` und erreichen den
+ * Aufrufer mit **200**; `send_failed` ist der 502 aus `resend-activation`, wenn
+ * Resend den Versand ablehnt, `error` alles Übrige.
+ *
+ * Der Unterschied zwischen einer abgewiesenen Anforderung und einem
+ * Fehlversand ist keine Feinheit: Das eine heißt „warte kurz", das andere
+ * „versuch es nochmal". Wer beides zusammenwirft, schickt ein Mitglied ins
+ * Warten auf eine Mail, die nie kommt.
+ */
+export type ResendStatus =
+  | "issued"
+  | "rate_limited"
+  | "rate_limited_day"
+  | "rate_limited_global"
+  | "already_activated"
+  | "unknown"
+  | "send_failed"
+  | "error";
+
 export interface ActivationState {
   activated: boolean;
   displayName: string | null;
@@ -64,9 +86,18 @@ export async function fetchActivationState(): Promise<ActivationState> {
  * der bloß die Login-Adresse kannte, den ausstehenden Link eines Mitglieds
  * entwerten und es damit aussperren (Audit vom 2026-08-06).
  */
-export async function resendActivationLink(): Promise<void> {
-  const { error } = await supabase.functions.invoke("resend-activation", { body: {} });
-  if (error) throw error;
+export async function resendActivationLink(): Promise<ResendStatus> {
+  const { data, error } = await supabase.functions.invoke("resend-activation", { body: {} });
+  // Bei jedem FACHLICHEN Ausgang antwortet die Function 200 und legt den Status
+  // in den Rumpf; nur ein Fehlschlag kommt als `error`. Beides trägt einen
+  // Status — der Aufrufer muss „warte kurz" von „versuch es nochmal"
+  // unterscheiden können, sonst wartet ein Mitglied auf eine Mail, die niemand
+  // mehr schickt (AGE-526).
+  if (error) {
+    const body = await leseFehlerRumpf(error);
+    return (body as ResendStatus) ?? "error";
+  }
+  return ((data as { status?: ResendStatus })?.status ?? "error") as ResendStatus;
 }
 
 /**
@@ -96,17 +127,19 @@ export async function redeemActivation(token: string, password: string): Promise
   // die Wahrheit, nicht der HTTP-Code.
   if (error) {
     const body = await leseFehlerRumpf(error);
-    return body ?? "error";
+    return (body as RedeemStatus) ?? "error";
   }
   return ((data as { status?: RedeemStatus })?.status ?? "error") as RedeemStatus;
 }
 
-/** Holt den Status aus dem Rumpf einer FunctionsHttpError-Antwort. */
-async function leseFehlerRumpf(error: unknown): Promise<RedeemStatus | null> {
+/** Holt den Status aus dem Rumpf einer FunctionsHttpError-Antwort. Roh, weil
+ *  beide Aufrufer eine eigene Statusmenge haben — die Zuordnung macht der
+ *  Aufrufer, nicht dieser Leser. */
+async function leseFehlerRumpf(error: unknown): Promise<string | null> {
   const context = (error as { context?: { json?: () => Promise<unknown> } })?.context;
   if (!context?.json) return null;
   try {
-    const body = (await context.json()) as { status?: RedeemStatus };
+    const body = (await context.json()) as { status?: string };
     return body?.status ?? null;
   } catch {
     return null;
