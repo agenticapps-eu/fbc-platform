@@ -75,9 +75,12 @@ roten Lauf ist keiner.
       nichts vom Versand wissen
 - [x] 4.6 Der Bildschirm startet nach der Registrierung im Zustand „unterwegs"
       mit laufender Sperre, ohne dass jemand drückt — und **nur** bei `issued`
-- [x] 4.7 `LoginPage`-Hinweistext **ändern** (Befund M2, kein Prüfhaken): „Falls
-      E-Mail-Bestätigung aktiv ist, bitte Postfach prüfen" ist nach diesem
-      Change falsch. Vitest **RED** auf dem neuen Text
+- [x] 4.7 `LoginPage`-Hinweistext — **gelöscht statt geändert.** Zuerst neu
+      formuliert und mit einem roten Test belegt; der Diff-Review zeigte dann,
+      dass der Hinweis überhaupt nie zu sehen ist (`signUp` meldet die Sitzung,
+      bevor es auflöst, und der Navigate-Guard räumt die Seite ab). Der Test
+      bestand nur, weil die Attrappe keine Sitzung herstellt. Hinweis, Test und
+      die verwaiste `info`-Variable sind entfallen
 - [x] 4.8 Alle Zweige **GREEN**
 
 ## 5. Sichtprobe statt Vertrauen
