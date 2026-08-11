@@ -61,6 +61,9 @@ const fullView: PublicProfileData = {
   publicProfile,
   extended: {
     headline: null,
+    branche: null,
+    member_since: null,
+    posts: [],
     potential_score: 842,
     competencies: ["M&A", "Mentoring"],
     videos: [],
@@ -143,8 +146,13 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     renderPage(authAsTier("discover"));
 
     expect(await screen.findByRole("heading", { name: "Erfolgsradar" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Kompetenzen" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Such- & Bieteprofil" })).toBeInTheDocument();
+    // AGE-498: „Kompetenzen" ist als eigene Karte weggefallen — sie steht jetzt
+    // unter „Beruf", und „Such- & Bieteprofil" heißt nach dem Mockup „Ich biete"
+    // und „Ich suche". Die SCHWELLE, die dieser Test prüft, ist unverändert:
+    // Discover sieht die erweiterten Felder, darf aber nicht anschreiben.
+    expect(screen.getByRole("heading", { name: "Beruf" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ich biete" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ich suche" })).toBeInTheDocument();
     expect(screen.getByText("842")).toBeInTheDocument();
     expect(screen.getByText("Beteiligungskapital")).toBeInTheDocument();
     expect(screen.getByText("Impact-Projekte")).toBeInTheDocument();

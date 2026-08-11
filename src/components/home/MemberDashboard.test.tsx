@@ -33,6 +33,7 @@ const DASH: DashboardData = {
     id: "u1",
     name: "Anna Müller",
     avatar_url: null,
+    cover_url: null,
     region: "Stuttgart",
     company: "Müller GmbH",
     short_bio: null,

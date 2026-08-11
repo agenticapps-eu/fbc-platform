@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(243);
+select plan(250);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1672,6 +1672,33 @@ select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
              'c6c6c6c6-0000-0000-0000-0000000000b1')$q$),
   'DENIED:%',
   'Niemand schreibt sich einen Audit-Eintrag selbst — auch ein Admin nicht');
+
+-- 18.8 Der Weg der Edge Function. GEFUNDEN BEI DER SICHTPROBE, nicht hier:
+-- admin-change-email las zuerst `staff_roles` direkt mit service_role und lief
+-- in „permission denied for table staff_roles". Der Grund ist kein Versehen,
+-- sondern der Lockdown aus AGE-312: service_role hält auf KEINER Tabelle in
+-- `public` ein SELECT/INSERT — alles, was es tut, geht durch SECURITY-DEFINER-
+-- Funktionen (issue_activation_token, mark_activated, revoke_sessions …).
+--
+-- Die erste Assertion hält genau diese Voraussetzung fest. Fiele sie eines Tages
+-- weg, wäre die zweite Hälfte des Musters (die beiden Funktionen unten) nur noch
+-- Umweg — und das soll auffallen, statt sich anzuschleichen.
+select is(has_table_privilege('service_role', 'public.staff_roles', 'SELECT'),
+  false, 'service_role liest staff_roles NICHT direkt (AGE-312-Lockdown)');
+
+select is((select public.is_admin_uid('aaaaaaaa-0000-0000-0000-000000000001')),
+  true, 'is_admin_uid erkennt den Admin …');
+select is((select public.is_admin_uid('c6c6c6c6-0000-0000-0000-0000000000a1')),
+  false, '… und ein normales Mitglied nicht');
+select is((select public.is_admin_uid('bbbbbbbb-0000-0000-0000-000000000002')),
+  false, '… auch keinen Matching-Manager (QM ist nicht die Deal-Queue)');
+
+select is(has_function_privilege('authenticated', 'public.is_admin_uid(uuid)', 'execute'),
+  false, 'is_admin_uid: nur service_role — sonst wäre es ein Auskunftsweg über fremde Rollen');
+select is(has_function_privilege('service_role', 'public.is_admin_uid(uuid)', 'execute'),
+  true, 'is_admin_uid: service_role darf');
+select is(has_function_privilege('authenticated', 'public.log_admin_action(uuid,text,uuid,jsonb)', 'execute'),
+  false, 'log_admin_action: authenticated darf nicht — sonst wäre die Spur fälschbar');
 
 select * from finish();
 rollback;

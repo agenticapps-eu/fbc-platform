@@ -89,17 +89,18 @@ Deno.serve(async (req) => {
   // Die Admin-Eigenschaft wird SERVERSEITIG geprüft, gegen staff_roles — nicht
   // aus einer im Aufruf mitgeschickten Kennung und nicht aus profiles.roles
   // (die ist mitglieds-schreibbar, siehe 20260614120000:15).
-  const { data: rolle, error: rollenFehler } = await admin
-    .from("staff_roles")
-    .select("role")
-    .eq("profile_id", actor)
-    .eq("role", "admin")
-    .maybeSingle();
+  //
+  // ÜBER EINE RPC, NICHT ÜBER DIE TABELLE: service_role hält seit AGE-312 auf
+  // keiner Tabelle in `public` ein SELECT. Ein direktes `.from("staff_roles")`
+  // lief in „permission denied" — gefunden bei der Sichtprobe, nicht im Test.
+  const { data: istAdmin, error: rollenFehler } = await admin.rpc("is_admin_uid", {
+    p_profile_id: actor,
+  });
   if (rollenFehler) {
     log("error", "role_lookup_failed", { message: rollenFehler.message });
     return antwort({ error: "server_error" }, 500);
   }
-  if (!rolle) {
+  if (!istAdmin) {
     log("warn", "forbidden", { actor });
     return antwort({ error: "forbidden" }, 403);
   }
@@ -122,11 +123,11 @@ Deno.serve(async (req) => {
 
   // Die Spur entsteht auch dann, wenn das Widerrufen scheitert — die Adresse
   // ist ja geändert, und genau das muss nachvollziehbar bleiben.
-  const { error: auditFehler } = await admin.from("admin_audit").insert({
-    actor,
-    action: "change_login_email",
-    target: eingabe.target,
-    payload: { email: eingabe.email, sessions_revoked: !revokeFehler },
+  const { error: auditFehler } = await admin.rpc("log_admin_action", {
+    p_actor: actor,
+    p_action: "change_login_email",
+    p_target: eingabe.target,
+    p_payload: { email: eingabe.email, sessions_revoked: !revokeFehler },
   });
   if (auditFehler) log("error", "audit_failed", { message: auditFehler.message });
 

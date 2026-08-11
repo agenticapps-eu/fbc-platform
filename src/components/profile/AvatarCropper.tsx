@@ -85,14 +85,24 @@ export function AvatarCropper({
 }: AvatarCropperProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const geoRef = useRef<CropGeometry>(cropGeometry({ aspect, outWidth }));
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
 
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // Die natürliche Bildgröße als STATE, nicht als ref: die Geometrie hängt
+  // daran, und eine Ref, die während des Renderings gelesen wird, ließe die
+  // Canvas-Maße beim Wechsel des Seitenverhältnisses stehen (React-Regel:
+  // „Cannot access refs during render", und sie hat hier recht).
+  const [natural, setNatural] = useState({ width: 0, height: 0 });
 
-  const { viewWidth, viewHeight } = geoRef.current;
+  const geo = cropGeometry({
+    aspect,
+    outWidth,
+    naturalWidth: natural.width,
+    naturalHeight: natural.height,
+  });
+  const { viewWidth, viewHeight } = geo;
 
   // Bild aus der gewählten Datei laden, Basis-Skalierung („cover“) bestimmen.
   useEffect(() => {
@@ -100,22 +110,17 @@ export function AvatarCropper({
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
-      geoRef.current = cropGeometry({
-        aspect,
-        outWidth,
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight,
-      });
+      setNatural({ width: img.naturalWidth, height: img.naturalHeight });
       setZoom(1);
       setOffset({ x: 0, y: 0 });
       setReady(true);
     };
     img.src = url;
     return () => URL.revokeObjectURL(url);
-  }, [file, aspect, outWidth]);
+  }, [file]);
 
   function clampFor(x: number, y: number, z: number) {
-    return geoRef.current.clamp(x, y, z);
+    return geo.clamp(x, y, z);
   }
 
   // Live-Vorschau zeichnen.
@@ -125,11 +130,10 @@ export function AvatarCropper({
     if (!canvas || !img || !ready) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const geo = geoRef.current;
     const scale = geo.baseScale * zoom;
     ctx.clearRect(0, 0, geo.viewWidth, geo.viewHeight);
     ctx.drawImage(img, offset.x, offset.y, img.naturalWidth * scale, img.naturalHeight * scale);
-  }, [offset, zoom, ready]);
+  }, [offset, zoom, ready, geo]);
 
   function changeZoom(z: number) {
     setZoom(z);
@@ -160,7 +164,6 @@ export function AvatarCropper({
   function handleConfirm() {
     const img = imgRef.current;
     if (!img) return;
-    const geo = geoRef.current;
     const out = document.createElement("canvas");
     out.width = geo.outWidth;
     out.height = geo.outHeight;

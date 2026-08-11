@@ -6,7 +6,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", "node_modules", "docs", "public"] },
+  // `supabase/.temp` entsteht bei `supabase start` (gitignored, aber auf der
+  // Platte) und enthält gebündeltes Edge-Runtime-JS. Ohne diesen Eintrag meldet
+  // `pnpm lint` lokal ~190 Fehler aus einer Datei, die niemand geschrieben hat —
+  // und ist damit als Gate wertlos, sobald jemand den lokalen Stack laufen lässt.
+  { ignores: ["dist", "coverage", "node_modules", "docs", "public", "supabase/.temp"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -299,6 +299,76 @@ end $$;
 revoke execute on function public.admin_find_profile(text) from public, anon;
 grant  execute on function public.admin_find_profile(text) to authenticated;
 
+-- ── 5. Was die Edge Function braucht ────────────────────────────────────────
+-- GEFUNDEN BEI DER SICHTPROBE, nicht im Test: `admin-change-email` las
+-- zunaechst `staff_roles` direkt mit service_role und lief in „permission
+-- denied for table staff_roles".
+--
+-- Der Grund ist kein Versehen, sondern der Lockdown aus AGE-312: service_role
+-- haelt auf KEINER Tabelle in `public` ein SELECT oder INSERT. Alles, was es
+-- tut, geht durch SECURITY-DEFINER-Funktionen — issue_activation_token,
+-- claim_activation_token, mark_activated, revoke_sessions. Diese beiden
+-- schliessen die Luecke, die C6 aufgemacht hat, im selben Muster.
+--
+-- VERWORFEN: `grant select on public.staff_roles to service_role`. Eine Zeile
+-- statt zwanzig, und genau deshalb falsch: es oeffnete die Tabelle fuer JEDEN
+-- kuenftigen service_role-Aufruf, waehrend hier genau eine Frage gebraucht wird
+-- („ist dieses Konto Admin?"). Der Lockdown ist die Zusage; ein Loch darin ist
+-- teurer als eine Funktion.
+
+create or replace function public.is_admin_uid(p_profile_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.staff_roles
+    where profile_id = p_profile_id
+      and role = 'admin'
+  );
+$$;
+
+-- NUR service_role. `is_admin()` (ohne Argument) beantwortet dieselbe Frage
+-- fuer den AUFRUFER und liegt bei authenticated — harmlos, es verraet nur die
+-- eigene Eigenschaft. Diese Variante beantwortet sie fuer JEDEN, und das ist
+-- eine Auskunft ueber fremde Rollen.
+revoke execute on function public.is_admin_uid(uuid) from public, anon, authenticated;
+grant  execute on function public.is_admin_uid(uuid) to service_role;
+
+comment on function public.is_admin_uid(uuid) is
+  'Admin-Pruefung fuer eine FREMDE Kennung (AGE-498). Nur service_role: '
+  'service_role haelt seit AGE-312 keine Tabellenrechte und kann staff_roles '
+  'nicht selbst lesen. Nicht mit is_admin() verwechseln — das prueft den '
+  'Aufrufer und darf deshalb bei authenticated liegen.';
+
+create or replace function public.log_admin_action(
+  p_actor   uuid,
+  p_action  text,
+  p_target  uuid,
+  p_payload jsonb default null
+) returns void
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  insert into public.admin_audit (actor, action, target, payload)
+  values (p_actor, p_action, p_target, p_payload);
+$$;
+
+revoke execute on function public.log_admin_action(uuid, text, uuid, jsonb)
+  from public, anon, authenticated;
+grant  execute on function public.log_admin_action(uuid, text, uuid, jsonb)
+  to service_role;
+
+comment on function public.log_admin_action(uuid, text, uuid, jsonb) is
+  'Schreibt eine Zeile nach admin_audit fuer die Edge Functions (AGE-498). '
+  'Nur service_role — laege EXECUTE bei authenticated, waere die Spur '
+  'faelschbar und damit wertlos. Die SQL-seitigen Admin-RPCs schreiben direkt, '
+  'sie laufen ohnehin als Eigentuemer.';
+
 comment on function public.admin_find_profile(text) is
   'Sucht EIN Mitglied ueber Login-Adresse oder Name (AGE-498). Hoechstens 20 '
   'Treffer, mindestens 3 Zeichen — ein Einstieg, keine Mitgliederliste; die '
