@@ -1,7 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { fetchActivationState } from "../lib/activation";
+import { fetchActivationState, resendActivationLink, type ResendStatus } from "../lib/activation";
 import { logEvent } from "../lib/log";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
@@ -14,6 +14,8 @@ interface LoadedProfile {
   staffRole: string | null;
   /** null = noch unbekannt (Fehler/ausstehend). Siehe auth-context. */
   isActivated: boolean | null;
+  /** true nur in der endgültigen Aufgeben-Lage nach drei Fehlversuchen. Siehe auth-context. */
+  activationLookupFailed: boolean;
   activationName: string | null;
 }
 
@@ -21,6 +23,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<LoadedProfile | null>(null);
+  // AGE-526: Ergebnis des Versands, den die Registrierung selbst ausgelöst hat.
+  // Der Aktivierungsbildschirm wird von `ActivationGate` nach dem Routenwechsel
+  // gerendert, nicht von `LoginPage` — ohne diese Naht könnte er vom Versand
+  // gar nichts wissen. Nach einem Neuladen ist der Wert fort und der Bildschirm
+  // zeigt wieder den Knopf; das ist richtig so, denn ein Neuladen weiß nichts
+  // über einen Versand, und die Alternative wäre eine ungeprüfte Behauptung.
+  //
+  // Getaggt mit der userId, zu der er gehört — dieselbe Bauart wie `profile`
+  // darüber, und aus demselben Grund: Wechselt das Konto (Abmelden, oder ein
+  // anderer Mensch meldet sich im selben Tab an), darf der Status nicht
+  // stehenbleiben. Sonst sähe der Nächste „Der Link ist unterwegs" über eine
+  // Mail, die an jemand anderen ging — auf einem geteilten Gerät, etwa dem
+  // Anmeldetisch einer Veranstaltung, keine Theorie (Befund aus dem
+  // Diff-Review). Abgeleitet statt geräumt: Es gibt keinen Moment, in dem der
+  // alte Wert noch sichtbar wäre.
+  const [mailStatus, setMailStatus] = useState<{
+    userId: string | null;
+    status: ResendStatus;
+  } | null>(null);
 
   // Session beim Start laden und auf Änderungen (Login/Logout/Refresh) hören.
   // Der Callback setzt nur State — kein supabase.from() darin (Deadlock-Caveat);
@@ -56,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Bestätigung durch und sind dann korrekt. Vorher sind sie null, und das ist
   // richtig so — ein nicht aktiviertes Konto hat keine Stufenrechte.
   const userId = session?.user.id ?? null;
+
   useEffect(() => {
     if (!userId) return;
     // userId hier nach dem Guard als string fixieren — die Narrowing-Info geht in
@@ -90,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           levelRank: profileRes.data?.membership_tiers?.level_rank ?? null,
           staffRole: staffRes.data?.role ?? null,
           isActivated: aktivierung.activated,
+          activationLookupFailed: false,
           activationName: aktivierung.displayName,
         });
         return;
@@ -112,12 +135,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // `false`: „wir wissen es nicht" ist etwas anderes als „nicht aktiviert".
       // Das Gate hält ohnehin in der Datenbank; die Oberfläche soll hier einen
       // Fehler zeigen und nicht behaupten, das Konto sei unbestätigt.
+      // `activationLookupFailed: true` markiert genau diese Aufgeben-Lage —
+      // im Unterschied zu `isActivated === null` während noch geladen/wiederholt
+      // wird (AGE-495, Befund F2): dort bleibt es `false`, das Gate wartet weiter.
       setProfile({
         userId: uid,
         tier: null,
         levelRank: null,
         staffRole: null,
         isActivated: null,
+        activationLookupFailed: true,
         activationName: null,
       });
     }
@@ -136,6 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Ausgeloggt gibt es nichts zu aktivieren; eingeloggt und noch nicht geladen
   // ist `null` = unbekannt, und der Gate-Guard wartet darauf.
   const isActivated = !userId ? true : profileLoaded ? profile.isActivated : null;
+  // Der Versandstatus zählt nur für das Konto, für das er erhoben wurde.
+  const activationMailStatus = mailStatus && mailStatus.userId === userId ? mailStatus.status : null;
+  const activationLookupFailed =
+    userId && profileLoaded ? profile.activationLookupFailed : false;
   const activationName = userId && profileLoaded ? profile.activationName : null;
   // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
   // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
@@ -152,16 +183,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       tierLoading,
       isActivated,
+      activationLookupFailed,
       activationName,
+      activationMailStatus,
       signUp: async (email, password, fullName) => {
         // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
         // (20260611171003) liest genau diesen Schlüssel nach profiles.name.
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } },
         });
-        if (!error) logEvent("signup");
+        if (!error) {
+          logEvent("signup");
+          // AGE-526: Der Bestätigungslink geht hier raus, nicht erst auf Knopf-
+          // druck. Ein selbst registriertes Konto trägt keinen
+          // Aktivierungszeitpunkt und steht damit hinter dem Gate — der Link ist
+          // seine einzige Tür. Bis hierher löste ihn niemand aus, und die
+          // Registrierung war eine Sackgasse, die wie ein Erfolg aussah (Demo
+          // vom 2026-08-10).
+          //
+          // Die Sitzung besteht an dieser Stelle bereits, weil die eingebaute
+          // E-Mail-Bestätigung ausgeschaltet ist (AGE-445) — nur deshalb trägt
+          // der sitzungsgebundene Weg schon direkt nach der Registrierung.
+          //
+          // Der Fehlschlag wird gefangen und NICHT weitergereicht: Konto und
+          // Sitzung stehen schon. Wer hier einen Fehler meldete, schickte den
+          // Gast in einen zweiten Registrierungsversuch auf eine Adresse, die
+          // längst vergeben ist. Der Aktivierungsbildschirm bietet den Knopf.
+          // Die Kennung kommt aus der ANTWORT, nicht aus dem Render: Beim
+          // Aufruf war die Sitzung noch nicht da, und ein aus dem Render
+          // geschlossener Wert wäre `null` — der Status gehörte dann zu
+          // niemandem und wäre sofort wieder unsichtbar.
+          const status = await resendActivationLink().catch(() => "error" as const);
+          setMailStatus({ userId: data.user?.id ?? null, status });
+        }
         return { error };
       },
       signIn: async (email, password) => {
@@ -178,7 +234,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
     }),
-    [session, tier, levelRank, staffRole, isLoading, tierLoading, isActivated, activationName],
+    [
+      session,
+      tier,
+      levelRank,
+      staffRole,
+      isLoading,
+      tierLoading,
+      isActivated,
+      activationLookupFailed,
+      activationName,
+      activationMailStatus,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

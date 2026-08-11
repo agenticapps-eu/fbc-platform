@@ -1,126 +1,111 @@
-# Session Handoff — 2026-08-07 (15. Session)
+# Session Handoff — 2026-08-10 (27. Session)
 
 ## Stand in einem Satz
 
-**PR #128 ist gemergt und live.** Die Sitzung war kurz und bestand fast nur aus
-der einen Frage, die der vorige Handoff offen gelassen hatte: ist CI wirklich
-ungelaufen, und liegt es am Repo?
-
-## Was die Sitzung geklärt hat
-
-Der Verdacht des vorigen Handoffs war richtig, und die Fehlspur war richtig
-ausgeschlossen. Actions stand wieder auf `operational`, aber die sechs Commits
-seit `fc560e8` hatten **weiterhin null Check-Runs** — die Läufe kamen nicht von
-selbst nach. Der Ausfall vom 06.08. hat die Events nicht nachgeliefert, er hat
-sie verloren.
-
-Darunter lagen echte Code-Änderungen (`ActivationScreen.tsx` + `.test.tsx`),
-nicht nur Doku. **Ein blinder Merge wäre ungeprüfter Code auf `main` gewesen.**
-
-Neustarten ging nur über **Close/Reopen des PR**: `ci.yml` und `deploy.yml`
-kennen ausschließlich `push: [main]` und `pull_request` — kein
-`workflow_dispatch`, also greift `gh workflow run` nicht.
+**AGE-526 ist gebaut, gegengelesen und liegt als PR #150** — die Registrierung
+verschickt die Aktivierungsmail jetzt selbst. Offen ist nur noch die Abnahme mit
+einer echten Adresse, das Anwenden der Migration und der Deploy.
 
 ## Accomplished
 
-- **CI auf `747c1c2` nachgeholt und grün**: `pr-title`, `verify`, `migrations`,
-  `edge-functions`, dazu `deploy`. `migrate-dev` und `drift-gate` übersprungen
-  (nur auf `main` aktiv, kein Befund). `mergeStateStatus` von `BLOCKED` auf
-  `CLEAN`.
-- **PR #128 squash-gemergt** — `27e903b`, `state: MERGED`, 07:58 UTC.
-  Squash, weil #127 und #120 ebenfalls einen Parent tragen.
-- **`main`-Läufe grün**: CI, Deploy und Pages auf `27e903b`.
-- **Live gegengeprüft, nicht angenommen**: `/aktivierung` liefert
-  `index-36J3tHYc.js`, **1.206.503 Bytes** (also ein echtes Bundle, kein
-  getarnter 404), und darin steht der neue Absendersatz mit
-  `noreply@effbeezee.com`. Der alte Text ist weg.
-- **Edge Functions geprüft statt nachdeployt**: der PR enthält
-  `send-activation` und `resend-activation`, und der Deploy-Workflow rollt
-  Functions bekanntlich nicht aus. Hier war trotzdem nichts offen — die letzte
-  Änderung an beiden Dateien ist `1d577ca`, also **vor** dem manuellen Deploy
-  der 14. Sitzung, und `Reply-To` steht im Header der echten gemessenen Mail.
-  Live-Stand und gemergter Code decken sich. Migrationen enthält der PR keine.
-- **Linear setzt sich selbst**: AGE-495 steht auf `Done`, gesetzt `07:58:39` —
-  exakt der Merge. Nichts von Hand geschrieben.
-- `main` lokal per Fast-Forward auf `27e903b`, Arbeitsbaum sauber.
+**Der Befund aus der Demo mit Detlev (2026-08-10, 15:50–15:53).** Es kam keine
+Mail an, weil **nie eine angefordert wurde** — nicht, weil eine fehlschlug.
+
+| Beleg | Wert |
+| --- | --- |
+| `activation_tokens` in 24 h | **0 Zeilen** |
+| Gateway-Anfragen 15:30–16:10 | 952, davon **0 auf `/functions/`** |
+| Detlevs Konto | `dk.email@gmx.de`, `basic`, `activated_at NULL`, Abmeldung nach 84 s |
+| Versandweg | intakt: `FROM_EMAIL = FBC <noreply@effbeezee.com>` (Digest), `effbeezee.com` bei Resend `verified` |
+
+Ursache: Die eingebaute Bestätigung ist aus (AGE-445), und der Aktivierungsweg
+aus AGE-495 war für **importierte** Mitglieder gebaut. Die Selbstregistrierung
+fällt hinter dasselbe Gate, aber niemand löst den Versand aus.
+
+**Der Change `activation-mail-on-signup` (AGE-526), drei Commits auf
+`donald/age-526-aktivierungsmail-bei-registrierung`:**
+
+| Teil | Was |
+| --- | --- |
+| Auslöser | `AuthProvider.signUp` fordert den Link an — dort, weil die Registrierung dort entsteht |
+| Ehrlichkeit | `resendActivationLink` reicht den Status durch; „unterwegs" nur bei `issued` |
+| Bremse | Migration `20260810170000`: 100 Ausgaben/Stunde, **nur** für Profile jünger als 10 Minuten, `pg_advisory_xact_lock` vor der Zählung |
+
+**Belege:** 222 pgTAP (7 neue, RED gesehen) · 486 Vitest · Typen und Lint sauber ·
+Wettlauf-Sonde mit zwei Sitzungen: ohne Riegel 101 Token, mit ihm 100.
+
+**Zwei Reviews, beide mit echten Treffern** (`REVIEWS.md`): über das Delta *vor*
+der ersten Codezeile und über den Diff. gemini APPROVE, opencode/Kimi-K3 beide
+Male REQUEST-CHANGES.
 
 ## Decisions
 
-- **Close/Reopen statt Leer-Commit**, um CI anzustoßen. Ein Leer-Commit hätte
-  die Historie um einen inhaltslosen Eintrag verlängert; Close/Reopen feuert
-  `pull_request: reopened` und lässt den Baum unberührt.
-
-## Der Merge lief still durch
-
-`gh pr merge 128 --squash` gab **nichts** aus — weder Erfolg noch Fehler.
-Genau die Falle aus `merge-erfolg-verifizieren`, nur in die andere Richtung als
-sonst: der leere Output sah aus wie ein Classifier-Block, war aber ein
-erfolgreicher Merge. Erst `gh pr view --json state` hat es entschieden. Der
-Befehl war im ersten Anlauf tatsächlich vom Classifier geblockt worden, im
-zweiten nicht — die Unzuverlässigkeit ist also nicht auf `supabase`-Befehle
-beschränkt.
+- **100 Ausgaben/Stunde**, nicht 60. Die Spec begründet den eigenen Mailversand
+  mit „siebzig Mitglieder an einem Abend"; 60 hätte genau diesen Fall verfehlt.
+- **Die Grenze greift nur für Profile jünger als 10 Minuten.** Eine Grenze für
+  alle machte aus dem Missbrauch eine Aussperrung. Der Preis steht in der
+  Anforderung: Bei vollem Kontingent wartet ein Neuling zehn Minuten — verzögert,
+  nicht verschlossen.
+- **Nicht „plattformweit".** Der Admin-Weg zählt hinein, wird aber nicht
+  gebremst. Die erste Fassung des Deltas versprach mehr, als sie baute.
+- **Ein Flag `automatisch` im Anfragerumpf ist verworfen** — das setzt der
+  Angreifer selbst. Prüfbar ist nur das Alter des Profils.
+- **AGE-517 bleibt offen**, bewusst: Wer wartet, steht wieder beim
+  Zwei-Anfragen-Weg. Eine Grenze je IP ist dort weiter zu bauen.
 
 ## Files modified
 
-Keine. Diese Sitzung hat nichts am Code geändert — nur gemessen, gemergt und
-gegengeprüft. Der Handoff selbst liegt **uncommitted** auf `main`, weil auf
-`main` nicht direkt committet wird.
+- `supabase/migrations/20260810170000_activation_stundenkontingent.sql` — neu
+- `supabase/tests/rls_test.sql` — 7 Assertions, `plan(195)` → `plan(202)`
+- `scripts/probe-kontingent-wettlauf.ts` — neu, Laufzeitbeleg für den Riegel
+- `src/providers/AuthProvider.tsx` · `auth-context.ts` — Auslöser + getaggter Status
+- `src/lib/activation.ts` — `ResendStatus`, Status statt `void`
+- `src/pages/ActivationScreen.tsx` — je Ausgang eine wahrheitsgemäße Meldung
+- `src/pages/LoginPage.tsx` — unerreichbarer Hinweis samt `info`-Variable entfernt
+- `openspec/changes/activation-mail-on-signup/` — proposal, design, Delta, tasks, REVIEWS
 
 ## Next session: start here
 
-**AGE-495 ist gemergt und live; inhaltlich offen bleibt 8.7** — ein
-unabhängiges Code-Review in eigenem Kontext. Das ist der einzige Punkt, den ich
-ohne dich weitertreiben könnte. `tasks.md` steht bei **17 offen / 92 erledigt**;
-der Rest hängt an Entscheidungen, nicht an Arbeit.
-
-Erste Handlung: entscheiden, ob 8.7 jetzt läuft oder ob C10 (Import) vorgeht.
-**Falls C10 vorgeht:** die fünf Vorbedingungen aus 11.2 zuerst gegenprüfen —
-zwei davon (10.5 Absender, 10.8 Link) waren am 06.08. still falsch gesetzt und
-haben genau deshalb keinen Fehler geworfen.
-
-Der Handoff braucht einen Branch, falls er ins Repo soll.
+**Der erste Schritt gehört Donald: Task 6.1.** Auf DEV registrieren mit einer
+**echten Fremdadresse** und nachsehen, ob der Link im Postfach liegt — ein `202`
+und ein grüner Bildschirm belegen das nicht. Dafür muss vorher `migrate-dev`
+laufen. Danach 6.2 (Link einlösen), dann 6.3 (Dry-Run für PROD **lesend** prüfen,
+erst dann `migrate-prod`) und 6.4 (Live-Stand am ausgelieferten Bundle messen).
+Erst nach dem Ausrollen wird der Change archiviert.
 
 ## Open questions
 
-Unverändert aus der 14. Sitzung, nichts davon hat sich heute bewegt:
-
-- **CRITICAL:** Stripe- und Resend-Secrets zwischen DEV und PROD byte-identisch
-  (12 von 22). Braucht dich im Stripe-Dashboard. Billigster vollständiger Fix
-  bleibt, `stripe-webhook` und `create-checkout-session` von PROD abzuziehen,
-  bis Stripe wirklich läuft.
-- **10.4** Zustell-Abnahme: Gmails Annahme ist gemessen, seine _Platzierung_
-  nicht. GMX, Web.de, Outlook unberührt. Das Risiko ist die **Reputation einer
-  ungewärmten Domain**, die beim Import auf einen Schlag an alle sendet — nicht
-  die Authentifizierung, die steht.
-- **`APP_URLS`** führt weiterhin localhost an erster Stelle (Stripe-Rücksprung).
-- **Weiterleitung `effbeezee.com` → `fairbusinessclub.de`** empfohlen: wer den
-  Absender prüft, landet heute auf einer Strato-Platzhalterseite.
-- **Neu aufgefallen:** Die **Abnahmeliste im Linear-Issue** verlangt noch „Mail
-  kommt von `info@fairbusinessclub.de` an". Das ist durch die
-  `effbeezee.com`-Entscheidung überholt und in `tasks.md` sauber dokumentiert —
-  aber der Issue-Text sagt weiter das Alte. Wer AGE-495 später liest, liest die
-  falsche Zusage.
-- **14.6** Drossel ist ein Zähler, keine Bremse · **14.7** Mail-Missbrauch über
-  offene Selbstregistrierung · **14.8/12.10** `directory-search` und `events`
-  widersprechen dem Gate (hängt an AGE-448 mit Detlev) · **9.1** Mailtext an
-  Detlev · **10.3** PROD-Deploy braucht Freigabe.
+- **Ist die Zustellung an eine Fremdadresse belegt?** Bisher nur: Domain
+  verifiziert, Absender richtig. Nicht: Link im Postfach eines Dritten.
+- **Die beiden Demo-Konten** (`donald+test@factiv.eu`, `dk.email@gmx.de`) liegen
+  unbestätigt in der Live-DB. Nachträglich einen Link schicken oder löschen?
+  Gehört zu AGE-522.
+- **Zwei Sichtprobe-Konten** liegen im **lokalen** Stack (`sichtprobe-age526@…`,
+  `sichtprobe2-age526@…`). Wegwerf, ein `supabase db reset` räumt sie.
+- **CRITICAL, unverändert (AGE-512):** Stripe- und Resend-Secrets byte-identisch
+  zwischen DEV und PROD.
 
 ## Fallen
 
 Unverändert: `git add -A` verboten · `ls` ist `eza`-Alias · `supabase test db`
-ohne Dateiliste lügt · zustandsändernde git-Befehle nie pipen · Infisical-Login
-braucht ein echtes Terminal · `202` von `send-activation` belegt keinen Versand ·
-Infisical zu setzen schiebt nichts ins Supabase-Projekt · fehlende Konfiguration
-fällt auf, falsche nicht.
+ohne Dateiliste lügt · zustandsändernde git-Befehle nie pipen · `202` belegt
+keinen Versand · nur `check-runs` auf der HEAD-SHA zählt · `migrate-prod`
+dispatchen heißt anwenden.
 
 **Neu aus dieser Sitzung:**
 
-- **Ein GitHub-Actions-Ausfall liefert Läufe nicht nach.** Verlorene
-  Webhook-Events bleiben verloren, auch wenn der Status wieder `operational`
-  meldet. Wer nach einem Ausfall mergt, muss die Check-Runs auf der **HEAD-SHA**
-  zählen (`gh api …/commits/<sha>/check-runs`), nicht auf die grüne Liste in
-  `gh run list` schauen — die zeigt ältere Commits.
-- **Ohne `workflow_dispatch` gibt es kein `gh workflow run`.** Der Neustart
-  läuft dann über Close/Reopen des PR, nicht über einen Leer-Commit.
-- **Leerer Output von `gh pr merge` heißt nicht „geblockt".** Er heißt gar
-  nichts. Immer `state` nachlesen.
+- **Ein Test mit vorbelegtem Kontext prüft die falsche Zeitachse.** Der Status
+  des automatischen Versands trifft ein, NACHDEM der Bildschirm steht —
+  `useState(wert)` nimmt ihn dann nie an. Grün im Test, kaputt im Browser.
+  Gefunden hat es die Sichtprobe am laufenden System, nicht die Testsuite.
+- **`react-hooks/set-state-in-effect` hatte beide Male recht.** Was aussieht wie
+  „Zustand beim Wechsel räumen", ist fast immer eine Ableitung: den Wert mit der
+  `userId` taggen, zu der er gehört, so wie `profile` es in derselben Datei tut.
+- **Ein Reviewer, der den echten Quelltext liest, findet anderes als einer, der
+  nur den Diff bekommt.** opencode/Kimi-K3 fand beide Male die teuersten
+  Befunde, weil es die Nachbardateien mitgelesen hat.
+- **`supabase functions serve` mit absichtlich ungültigem Resend-Schlüssel** ist
+  der saubere Weg, den Versandpfad lokal zu prüfen, ohne eine Mail zu erzeugen —
+  das Token entsteht trotzdem, und genau das ist die Assertion.
+- **`gh api …/check-runs` braucht eine Warteschleife**, kein `sleep` davor: Der
+  Harness blockt führende Sleeps.

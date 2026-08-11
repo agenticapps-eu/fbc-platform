@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(182);
+select plan(202);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -170,6 +170,16 @@ begin
   perform set_config('request.jwt.claims', '', true);
   return 'OK';
 end $$;
+
+-- Rumpf einer Function OHNE Kommentare — beide Formen. `--` bis Zeilenende und
+-- `/* … */` über Zeilen hinweg. Wer nur die erste entfernt, prüft eine Zusage,
+-- die ein Blockkommentar vortäuschen kann; gemessen im Review zu AGE-507.
+create function pg_temp.rumpf_ohne_kommentare(f regprocedure) returns text
+language sql stable as $$
+  select regexp_replace(
+           regexp_replace(pg_get_functiondef(f), '/\*.*?\*/', '', 'g'),
+           '--[^\n]*', '', 'g')
+$$;
 
 -- ── 1. Das Modell selbst (§1a) ───────────────────────────────────────────────
 select is(
@@ -628,6 +638,45 @@ select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'insert into public.needs (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kapergesuch'')'),
   'DENIED:%', 'Gate: kein Gesuch unter fremdem Namen');
 
+-- 13.3a Storage: die drei avatars_*-Policies auf storage.objects (20260806080100
+-- §Storage) hatten bislang KEINE Assertion — der größte benannte Restbefund aus
+-- dem AGE-495-Review. storage.objects hat KEINE SELECT-Policy (Kopf von
+-- 20260613081627: das öffentliche Bucket liefert über die Objekt-URL aus, eine
+-- SELECT-Policy würde nur das Auflisten erlauben). Für UPDATE/DELETE zieht
+-- Postgres deren SELECT-Policy heran, sobald das WHERE eine Spalte referenziert
+-- — gemessen: `where bucket_id = 'avatars'` liefert AUCH mit `using (true)` 0
+-- Zeilen (`One-Time Filter: false`). Ein spaltenbezogenes WHERE prüfte hier
+-- also nur diese vorbestehende Lücke, nie das Aktivierungs-Gate. Deshalb genau
+-- EIN Objekt im Bucket zum Testzeitpunkt und blanke Anweisungen ohne WHERE.
+insert into storage.objects (bucket_id, name, owner) values
+  ('avatars', 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp',
+   'dddddddd-0000-0000-0000-00000000000d');
+
+select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into storage.objects (bucket_id, name) values (''avatars'', ''dddddddd-0000-0000-0000-00000000000d/kaper.webp'')'),
+  'DENIED:%row-level security policy%',
+  'Storage-Gate: avatars_insert_own lehnt den Avatar-Upload eines nicht aktivierten Kontos ab');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'update storage.objects set metadata = ''{"probe":true}''::jsonb'),
+  'OK', 'Storage-Gate: das UPDATE des eigenen Avatar-Objekts wirft nicht (RLS filtert still) …');
+select is(
+  (select metadata from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  null, '… ändert das Objekt aber nicht');
+
+-- storage.protect_delete() (BEFORE-STATEMENT-Trigger, vorbestehend) blockt
+-- JEDES direkte DELETE ohne diesen Guard — unabhängig von RLS. Ohne ihn testete
+-- die folgende Assertion nur den Trigger, nie die avatars_delete_own-Policy.
+select set_config('storage.allow_delete_query', 'true', true);
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'delete from storage.objects'),
+  'OK', 'Storage-Gate: das DELETE des eigenen Avatar-Objekts wirft nicht …');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  1, '… löscht das Objekt aber nicht');
+
 -- 13.4 Zielprofil-Gate (Entscheidung 16, Donald 2026-08-06). Ein BESTÄTIGTES
 -- Mitglied darf das unbestätigte Profil nicht sehen — sonst ist die Zusage im
 -- Mailtext („für kein anderes Mitglied sichtbar") unwahr.
@@ -799,6 +848,31 @@ select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'select public.recompute_potential_score(''dddddddd-0000-0000-0000-00000000000d''::uuid)'),
   'OK', 'Nach der Bestätigung läuft recompute_potential_score wieder durch');
 
+-- Gegenprobe zu 13.3a: dieselben blanken Anweisungen, jetzt mit Wirkung.
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'update storage.objects set metadata = ''{"probe":true}''::jsonb'),
+  'OK', 'Storage-Gate: nach der Bestätigung wirft das UPDATE weiterhin nicht …');
+select is(
+  (select metadata from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  '{"probe":true}'::jsonb, '… und ändert das Objekt jetzt wirklich');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'delete from storage.objects'),
+  'OK', 'Storage-Gate: nach der Bestätigung wirft das DELETE weiterhin nicht …');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/bestehend.webp'),
+  0, '… und löscht das Objekt jetzt wirklich');
+
+select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
+  'insert into storage.objects (bucket_id, name) values (''avatars'', ''dddddddd-0000-0000-0000-00000000000d/aktiv.webp'')'),
+  'OK', 'Storage-Gate: nach der Bestätigung geht der Avatar-Upload durch');
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'dddddddd-0000-0000-0000-00000000000d/aktiv.webp'),
+  1, '… und die Zeile steht wirklich da');
+
 -- ── 14. Die Service-Rollen-Funktionen (Teil C) ───────────────────────────────
 -- Sie bauen das Gate auf und umgehen es deshalb per Definition. Genau darum
 -- muss belegt sein, dass KEINE Client-Rolle sie aufrufen kann.
@@ -908,6 +982,54 @@ select alike(obj_description('public.mark_activated(uuid)'::regprocedure, 'pg_pr
   '%Re-Aktivierer%',
   'mark_activated: der Kommentar warnt davor, activated_at zurückzusetzen — '
   'wer das täte, machte jedes ausstehende Reset-Token zum Re-Aktivierer');
+
+-- ── 14a-bis. Die Sperre steht VOR dem ersten Zugriff auf die Token (AGE-507) ─
+-- Beide ausgebenden RPCs sperren die Profilzeile, BEVOR sie irgendetwas prüfen.
+-- Ohne das entscheiden zwei gleichzeitige Anforderungen beide auf einem
+-- veralteten Snapshot, und die zweite entwertet den soeben ausgegebenen
+-- gültigen Link (Befund 8.8).
+--
+-- Diese Zeile vergleicht POSITIONEN, nicht Vorkommen — und das ist der ganze
+-- Grund für ihre Bauart. Gemessen (AGE-507, Task 4.4): eine Sperre, die
+-- vorhanden, aber HINTER die Prüfungen verschoben ist, richtet mehr Schaden an
+-- als eine fehlende — sie gibt in einer Reihenfolge sogar zwei Token aus. Eine
+-- Kontrolle, die nur zählt, ob `for update of p` vorkommt, sähe davon nichts.
+--
+-- Die Textbereinigung entfernt BEIDE Kommentarformen und gesucht wird
+-- `for update of p;` MIT Semikolon. Beides ist nachgemessen und nicht
+-- vorsorglich: eine frühere Fassung entfernte nur `--`-Kommentare und suchte
+-- ohne Semikolon. Sie war grün, während die Sperre nachweislich fehlte, bei
+-- `/* … for update of p … */`, bei `raise debug 'for update of p'` und bei
+-- `for update of p skip locked` — letzteres nimmt die Sperre, WARTET aber
+-- nicht, und ist damit genau so kaputt wie gar keine.
+--
+-- WAS DIESE ZEILE NICHT BELEGT, und das ist gemessen, nicht eingeräumt: sie
+-- liest Text. Eine Sperre, die syntaktisch dasteht, aber nie ausgeführt wird —
+-- `if false then … for update of p; … end if;` — kommt hier durch. Die Zeile
+-- beweist NICHT, dass die Sperre wirkt; sie hält nur fest, dass sie nicht
+-- wortlos verschwindet, verrutscht oder in einen Kommentar wandert. Das
+-- Verhalten belegt allein die Sonde `scripts/probe-wettlauf-token-ausgabe.ts`,
+-- einmal, zum Zeitpunkt des Baus, mit rotem Vorher und grünem Nachher — und
+-- die fängt den `if false`-Fall. Dass sie NICHT in der Pipeline läuft, ist eine
+-- bewusste Entscheidung (Donald, 2026-08-08, zweimal bestätigt); die Abwägung
+-- steht in REVIEWS.md.
+select ok(
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'issue_activation_token: `for update of p;` steht VOR dem ersten Zugriff auf '
+  'activation_tokens — die Prüfung entscheidet auf gesperrtem, nicht auf '
+  'veraltetem Stand (AGE-507)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.issue_activation_token(text,text,interval)'::regprocedure) as rumpf) s;
+
+select ok(
+  strpos(rumpf, 'for update of p;') > 0
+  and strpos(rumpf, 'for update of p;') < strpos(rumpf, 'activation_tokens'),
+  'request_own_activation_token: `for update of p;` steht VOR dem ersten Zugriff '
+  'auf activation_tokens — sonst löst der zweite gleichzeitige Aufruf eine rohe '
+  'unique_violation aus, die diese Function nicht fängt (AGE-507)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
 
 -- ── 14b. Der eigene Link über die Sitzung (Teil D) ──────────────────────────
 -- Diese Funktion DARF `authenticated` aufrufen — als einzige aus Teil C/D. Der
@@ -1139,6 +1261,114 @@ update public.activation_attempts set attempted_at = now() - interval '2 hours'
  where ip = '203.0.113.7';
 select is((select attempts from public.note_failed_activation('203.0.113.7', '1 hour', 3)),
   1, 'note_failed_activation: außerhalb des Fensters zählt nichts mehr');
+
+-- ── 14e. Das Stundenkontingent der Token-Ausgabe (AGE-526) ──────────────────
+-- Der automatische Versand nach der Selbstregistrierung macht aus jeder
+-- Registrierung eine Mail. Ohne profilübergreifende Grenze ist die Plattform
+-- damit ein Weiterleiter: ein Angreifer legt Konten mit fremden Adressen an und
+-- jede erzeugt Post. Die Grenze greift NUR für frische Profile — sonst würde ein
+-- verbranntes Kontingent echte Mitglieder aussperren, und der Missbrauch wäre
+-- zur Aussperrung geworden.
+--
+-- Alle Token aus den vorigen Abschnitten fliegen raus: dieser Block misst
+-- Zählstände, und eine geerbte Zeile verschiebt jede Schwelle um eins.
+delete from public.activation_tokens;
+
+insert into auth.users (id, aud, role, email) values
+  ('a5260000-0000-0000-0000-00000000f001', 'authenticated', 'authenticated',
+   'frisch-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f002', 'authenticated', 'authenticated',
+   'alt-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f003', 'authenticated', 'authenticated',
+   'grenze-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f004', 'authenticated', 'authenticated',
+   'kante-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f005', 'authenticated', 'authenticated',
+   'fueller-kontingent@test.fbc');
+
+-- Ausgangslage: keins der fünf ist aktiviert, sonst antwortet die Function
+-- `already_activated`, bevor sie irgendeine Grenze erreicht.
+update public.profiles set activated_at = null
+ where id::text like 'a5260000-%';
+-- '…f002' ist das bestehende Mitglied, '…f003' liegt exakt auf der Kante.
+update public.profiles set created_at = now() - interval '90 days'
+ where id = 'a5260000-0000-0000-0000-00000000f002';
+update public.profiles set created_at = now() - interval '10 minutes'
+ where id = 'a5260000-0000-0000-0000-00000000f003';
+
+-- Einhundert Ausgaben in der laufenden Stunde, alle auf einem fremden Profil:
+-- die Grenze zählt über ALLE Profile, nicht die des Aufrufers. `invalidated_at`
+-- ist gesetzt, weil höchstens ein OFFENES Token je Profil liegen darf — für die
+-- Zählung ist das gleichgültig, jede dieser Zeilen stand für einen Versand.
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+select 'fueller-' || g, 'a5260000-0000-0000-0000-00000000f005',
+       now() + interval '72 hours', now() - interval '5 minutes', now()
+  from generate_series(1, 100) g;
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f001',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-frisch'') '
+  'where status = ''rate_limited_global'''),
+  1, 'Kontingent: ein frisches Profil bekommt bei vollem Stundenkontingent '
+     'keinen Link — sonst ist die offene Selbstregistrierung ein Mailverteiler');
+
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = 'a5260000-0000-0000-0000-00000000f001'),
+  0, 'Kontingent: die Abweisung schreibt KEIN Token — eine Zeile, die niemand '
+     'versendet, verbrauchte sonst das Kontingent ein zweites Mal');
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f002',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-alt'') '
+  'where status = ''issued'''),
+  1, 'Kontingent: ein bestehendes Mitglied kommt auch bei vollem Kontingent '
+     'durch — die Grenze darf aus Missbrauch keine Aussperrung machen');
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f003',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-grenze'') '
+  'where status = ''issued'''),
+  1, 'Kontingent, Randwert: exakt zehn Minuten alt ist NICHT mehr frisch — die '
+     'Grenze ist `> now() - 10 minutes`, nicht `>=`');
+
+-- Dasselbe Konto wie in der ersten Assertion, nur zehn Minuten später. Die
+-- Sperre muss sich von selbst lösen, sonst ist der Zugang nicht verzögert,
+-- sondern verschlossen.
+update public.profiles set created_at = now() - interval '11 minutes'
+ where id = 'a5260000-0000-0000-0000-00000000f001';
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f001',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-spaeter'') '
+  'where status = ''issued'''),
+  1, 'Kontingent: das abgewiesene frische Konto kommt nach zehn Minuten durch, '
+     'auch wenn das Kontingent noch voll ist — die Sperre löst sich selbst');
+
+-- Randwert der Stunde: neunundneunzig innerhalb des Fensters, eines exakt auf
+-- der Kante. `now()` steht in der Transaktion still, die Gleichheit ist also
+-- echt prüfbar. Zählte die Kante mit, wäre die Grenze um eins zu scharf.
+delete from public.activation_tokens;
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+select 'kante-' || g, 'a5260000-0000-0000-0000-00000000f005',
+       now() + interval '72 hours', now() - interval '5 minutes', now()
+  from generate_series(1, 99) g;
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+values ('kante-exakt', 'a5260000-0000-0000-0000-00000000f005',
+        now() + interval '72 hours', now() - interval '1 hour', now());
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f004',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-kante'') '
+  'where status = ''issued'''),
+  1, 'Kontingent, Randwert: was exakt eine Stunde alt ist, zählt nicht mehr '
+     'mit — das Fenster ist `> now() - 1 hour`');
+
+-- Die Grenze ist profilübergreifend, die Sperre auf der eigenen Profilzeile
+-- trägt sie deshalb NICHT: zwei gleichzeitige frische Anforderungen sperren
+-- verschiedene Zeilen und lesen denselben Zählstand. Nur ein Riegel, den beide
+-- nehmen müssen, hält die Zusage. Der Laufzeitbeleg dafür steht in
+-- scripts/probe-kontingent-wettlauf.ts — zwei Sitzungen bekommt pgTAP nicht.
+select ok(
+  strpos(rumpf, 'pg_advisory_xact_lock') > 0
+  and strpos(rumpf, 'pg_advisory_xact_lock') < strpos(rumpf, 'interval ''1 hour'''),
+  'request_own_activation_token: der Riegel steht VOR der Zählung des '
+  'Stundenkontingents — ein count(*) ohne ihn ist genau im Registrierungsschwall '
+  'falsch, für den die Grenze existiert (AGE-526)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
 
 select * from finish();
 rollback;

@@ -505,9 +505,15 @@ used_at is null and expires_at > now() returning profile_id`. Kein
 
 ## 9. Mailtext
 
-- [ ] 9.1 Entwurf aus `design.md` an Detlev, als **Entwurf**.
-- [ ] 9.2 Nach der Abstimmung in `emails.ts` einpflegen; `emails.test.ts` prüft
+- [x] 9.1 Entwurf aus `design.md` an Detlev, als **Entwurf**.
+- [x] 9.2 Nach der Abstimmung in `emails.ts` einpflegen; `emails.test.ts` prüft
       Struktur, nicht Wortlaut, damit eine Textänderung nicht rot wird.
+      _**Aus C3 herausgenommen, 2026-08-09 (Donald).** Der ausgelieferte Text ist
+      in Ordnung und geht so live — er ist an zwei echten Mails belegt (10.8).
+      Die Abstimmung mit Detlev ist damit kein Bestandteil dieses Changes mehr,
+      sondern ein eigener, kleiner Change im Backlog. `emails.test.ts` prüft
+      ohnehin Struktur statt Wortlaut, eine spätere Textänderung wird also nicht
+      rot._
 
 ## 10. Deploy — Haltepunkt, Donalds Freigabe
 
@@ -533,7 +539,7 @@ used_at is null and expires_at > now() returning profile_id`. Kein
       `200 {"status":"issued"}`, und die Mail ist bei `donald@vlahovic.de`
       **angekommen** (von Donald bestätigt). Damit ist der Versandweg zum ersten
       Mal Ende zu Ende gegangen._
-- [ ] 10.8 **ZWEITER BLOCKER, gefunden am 06.08. beim ersten echten Versand:
+- [x] 10.8 **ZWEITER BLOCKER, gefunden am 06.08. beim ersten echten Versand:
       `APP_URL` steht auf `http://localhost:5173`.** Gemessen, nicht vermutet —
       der Wert ist der Hash aus `supabase secrets list` gegen Kandidaten geprüft,
       und der Link in der zugestellten Mail lautete
@@ -582,9 +588,21 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       **Weiter offen:** `APP_URLS` führt localhost an erster Stelle
       (Stripe-Rücksprung, eigener Nachlauf — bewusst nicht ungefragt an der
       Bezahlstrecke gedreht).
+      _Der Blocker selbst ist seit dem 06.08. behoben und an einer echten Mail
+      gemessen; das Häkchen stand nur wegen dieses Restes aus. Er liegt seit
+      2026-08-09 als **AGE-519** im Backlog und bleibt damit sichtbar, ohne C3
+      offen zu halten._
 
-- [ ] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
+- [x] 10.3 **Erst nach Freigabe:** `pnpm db:push:prod`, Functions auf PROD,
       Secrets auf PROD prüfen.
+      _**Aus C3 herausgenommen, 2026-08-09 (Donald), ins Backlog.** Begründung:
+      das Projekt namens PROD ist leer, und die Live-Seite läuft gewollt gegen
+      `foelowldexkcqzewvrcf` — dort sind Migrationen und Functions seit dem
+      06.08. deployt (10.1/10.2). Der PROD-Deploy ist damit kein Haltepunkt
+      dieses Changes, sondern Vorarbeit für eine spätere Umschaltung. **Der
+      offene CRITICAL wandert mit** und bleibt offen: Stripe- und
+      `RESEND_API_KEY`-Werte sind zwischen den Projekten byte-identisch; das
+      braucht Donald im Stripe-Dashboard und ist als eigenes Issue erfasst._
       _Merge ≠ live: `deploy.yml` deployt nur das Frontend._
       _Am 06.08. abends ausgezählt statt geschätzt: **12 von 22** gemeinsamen
       Secrets sind byte-identisch, 10 getrennt — aber die 10 sind fast alle die
@@ -605,7 +623,7 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       sah am Morgen alles gesetzt aus, während die Live-Functions den Sandkasten
       benutzten. Wer einen Function-Wert ändert, muss beide anfassen — und die
       Prüfung ist der Digest-Vergleich, nicht der Blick in Infisical._
-- [ ] 10.4 Zustell-Abnahme bei GMX, Web.de, Gmail, Outlook. **Hängt an AGE-256**
+- [x] 10.4 Zustell-Abnahme bei GMX, Web.de, Gmail, Outlook. **Hängt an AGE-256**
       (SPF/DKIM). Blockiert die Abnahme des Versands, nicht den Sicherheitskern.
       _Der zweite Satz war zu milde formuliert — siehe 10.5. Es geht nicht um
       Zustellqualität, sondern darum, dass gar nicht erst gesendet wird._
@@ -621,6 +639,17 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       liegt ohnehin nicht bei der Authentifizierung — die steht —, sondern bei
       der **Reputation einer neuen, ungewärmten Absenderdomain**, die beim
       Import auf einen Schlag an alle Mitglieder sendet._
+      _**Geschlossen 2026-08-09 (Donald) mit dem, was belegt ist — und nur
+      damit.** Belegt: DKIM, SPF und DMARC bestehen an zwei unabhängigen Hops
+      (10.8), Gmail hat angenommen und weitergeleitet, zwei echte Zustellungen
+      liegen vor. **Nicht belegt und ausdrücklich nicht behauptet:** die
+      Platzierung bei GMX, Web.de und Outlook, und die Platzierung in einem
+      echten Gmail-Postfach. Diese Prüfung wandert dorthin, wo auch ihr eigentliches
+      Risiko liegt — **AGE-256**, Reputation und Aufwärmen der Absenderdomain vor
+      dem Import. Der Grund, es hier zu schließen: drei weitere Postfächer
+      abzunehmen hieße drei weitere Wegwerf-Konten in der Live-Datenbank
+      anzulegen (es liegen schon zwei), und das Ergebnis hinge trotzdem an der
+      Aufwärmphase, die C3 nicht leistet._
 
 - [x] 10.5 **GESCHLOSSEN 06.08. — war ein BLOCKER, gefunden am 06.08. beim ersten echten Versuch (10.2):
       der Aktivierungsweg kann an kein Mitglied eine Mail schicken.**
@@ -692,12 +721,18 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
 
 ## 11. Nachläufe, die dieser Change nicht schließt
 
-- [ ] 11.1 `security_update_password_require_reauthentication` auf PROD: soll er
+_**2026-08-09:** Die Häkchen hier bedeuten „hat einen Besitzer", nicht „ist
+erledigt". 11.1–11.4 liegen als **AGE-520** im Backlog, 11.7 ist als eigener
+Change **`password-reset-flow`** (AGE-505) längst in Arbeit. Der Abschnitt heißt
+seit jeher „Nachläufe, die dieser Change nicht schließt" — offen zu bleiben war
+nie seine Aufgabe, einen Ort zu bekommen schon._
+
+- [x] 11.1 `security_update_password_require_reauthentication` auf PROD: soll er
       `true` werden? **Ungemessen** — die Einstellung wirkt laut Supabase nur,
       wenn der Login nicht „kürzlich" war, und der Angreifer hat sich gerade
       angemeldet. Der Messversuch auf DEV wurde vom Berechtigungs-Classifier
       abgelehnt. Eigenes Issue, mit der Messung als erstem Schritt.
-- [ ] 11.2 C10 trägt **fünf** Vorbedingungen — im Import-Issue vermerken, nicht
+- [x] 11.2 C10 trägt **fünf** Vorbedingungen — im Import-Issue vermerken, nicht
       nur hier: (a) Migration A läuft vorher (1.9), (b) der Import stößt den
       Aktivierungsversand direkt an, damit der Weg des Mitglieds das
       Default-Passwort nicht berührt, (c) deterministisches Verhalten, wenn eine
@@ -729,7 +764,7 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       12:20:43 Z durch die Messung der beiden restlichen Wege). Gilt dasselbe:
       kein Mitglied, zählt in die 50er-Schwelle, beim Festschreiben abziehen —
       also **zwei** Konten, nicht eins._
-- [ ] 11.4 **`notify-contact-request` ist auf PROD ein älterer Stand** — beim
+- [x] 11.4 **`notify-contact-request` ist auf PROD ein älterer Stand** — beim
       B2-Deploy am 07.08. nebenbei gemessen, nicht gesucht: `ezbr_sha256`
       `6c0358f462eb` auf `viwntbodrtqxgmqyxluh` gegen `046dfb9d9619` auf
       `foelowldexkcqzewvrcf`. Bewusst **nicht** mitgezogen — der Auftrag war B2,
@@ -737,7 +772,7 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       angelegt wird (`docs/supabase-environments.md`, „Objekte, die bewusst
       keine Migration sind"). Vor dem Umzug klären, welcher Stand der richtige
       ist; blind angleichen wäre hier die falsche Bewegung.
-- [ ] 11.3 `avatars`-Bucket privat stellen? Eigener Change mit Folgen für jede
+- [x] 11.3 `avatars`-Bucket privat stellen? Eigener Change mit Folgen für jede
       Bild-URL im Frontend (`INVENTORY.md`, Abschnitt C). Heute kein Weg für ein
       nicht aktiviertes Konto, die URLs überhaupt zu erfahren.
 - [x] 11.5 **Kein Befund — das Cloudflare-Deployment läuft absichtlich gegen
@@ -800,7 +835,7 @@ header.from=effbeezee.com`. Fastmail bestätigt dasselbe unabhängig auf
       `foelowldexkcqzewvrcf` UND `viwntbodrtqxgmqyxluh`, geprüft über den
       `ezbr_sha256`-Vergleich aus `supabase functions list`. Ohne das läuft nach
       dem Merge weiter der alte Build, während die Migration schon da ist._
-- [ ] 11.7 **Es gibt keinen „Passwort vergessen"-Weg** (P3). `rg
+- [x] 11.7 **Es gibt keinen „Passwort vergessen"-Weg** (P3). `rg
 'resetPasswordForEmail|forgot|reset-password' src` findet nichts. Für nicht
       aktivierte Konten deckt `/aktivierung` das ab; für **aktivierte** nicht —
       dort antwortet `issue_activation_token` `already_activated`, verschickt
@@ -932,12 +967,23 @@ währenddessen.
       (opencode). In 1.6 steht sie, im Delta nicht — und das
       Prädikat-Requirement verlangt EXECUTE-Entzug für `public`/`anon`.
       Nachziehen.
-- [ ] 12.10 **AGE-448 ist nicht „intakt", sondern verschoben** (opencode). Ein
+- [x] 12.10 **AGE-448 ist nicht „intakt", sondern verschoben** (opencode). Ein
       Gast registriert sich heute und ist sofort nutzbar; nach diesem Change muss
       er erst sein Postfach öffnen — auch für die Anmeldung zu einem öffentlichen
       Event, weil `register_for_event` gegatet ist. Vermutlich richtig so, aber
       es ist eine Verhaltensänderung und braucht ein eigenes Szenario statt der
       Behauptung. Vor dem Sommerfest mit Detlev klären.
+      _**Entschieden 2026-08-09 (Donald): das Gate gewinnt.** Ein unbestätigtes
+      Konto meldet sich zu nichts an, auch nicht zu einem öffentlichen Event.
+      Begründung: die Alternative wäre **ein** ungegateter Schreibweg in
+      Mitgliederdaten, und damit wäre das Gate eine Geschmacksfrage statt einer
+      Grenze. Der Preis ist benannt — ein selbst registrierter Gast war bisher
+      sofort nutzbar und muss jetzt erst sein Postfach öffnen. Die
+      Verhaltensänderung steht damit **als Szenario** in den Deltas zu `events`
+      und `directory-search` (siehe 14.8) und nicht mehr als Behauptung. Die
+      Produktfrage selbst geht getrennt an Detlev (eigenes Issue im Backlog) und
+      blockiert C3 nicht: sie kann die Entscheidung später umdrehen, ohne dass
+      dieser Change offen bleiben muss._
 
 ## 13. Aus dem Sicherheits-Audit nachgezogen (8.5/8.6)
 
@@ -1002,12 +1048,14 @@ Beleg, dass der beschriebene Angriff nicht mehr geht.
       nirgends umgesetzt** — es gab keine Header-Datei. Steht jetzt drin. - **`.gitignore` ohne Schlüsselmuster.** `*.pem`, `*.key`, `id_rsa`,
       `service-account*.json` u. a. ergänzt; geprüft, dass keine getrackte
       Datei dadurch verschwindet.
-- [ ] 13.5 **Weiter offen, bewusst:** die **vollständige** CSP. `_headers` trägt
+- [x] 13.5 **Ins Backlog, 2026-08-09 (Donald)** — eigenes Issue, nicht Teil von
+      C3. Der Befund selbst bleibt gültig: die **vollständige** CSP. `_headers` trägt
       nur `frame-ancestors` — die Direktive, die nichts brechen kann. `script-`,
       `connect-` (Supabase, Axiom, Sentry), `frame-` (YouTube, Vimeo), `img-`
       und `style-src` brauchen eine Messung im Browser davor, sonst bricht die
       Anwendung in Produktion still, während lokal alles läuft.
-- [ ] 13.6 **Rückstufung bei geplatzter Zahlung.** `apply_upgrade` ist bewusst
+- [x] 13.6 **Ins Backlog, 2026-08-09 (Donald)** — eigenes Issue, wie hier schon
+      vermerkt. **Rückstufung bei geplatzter Zahlung.** `apply_upgrade` ist bewusst
       nur-höher; eine widerrufene Lastschrift oder ein Chargeback stuft heute
       nicht zurück. Braucht einen eigenen Weg für `charge.dispute.created` /
       `invoice.payment_failed` — eigenes Issue, nicht Teil von C3.
@@ -1056,7 +1104,7 @@ REQUEST-CHANGES · opencode REQUEST-CHANGES · gemini APPROVE**. Volltext in
 
 ### Offen, Donalds Entscheidung
 
-- [ ] 14.6 **„Die Drossel drosselt nichts"** (opencode) — der schärfste Punkt,
+- [x] 14.6 **„Die Drossel drosselt nichts"** (opencode) — der schärfste Punkt,
       und er trifft die Entscheidung aus 12.6. Weil erst beansprucht und dann
       gezählt wird, kostet jeder Fehlversuch weiter eine Datenbankrunde; die
       Drossel **fügt** vor dem Limit sogar Arbeit hinzu (löschen, einfügen,
@@ -1069,22 +1117,141 @@ REQUEST-CHANGES · opencode REQUEST-CHANGES · gemini APPROVE**. Volltext in
       wird. **Nicht einseitig geändert.** Zu entscheiden, welche der beiden
       Eigenschaften gilt; die Begründung in der Spec muss der Entscheidung
       folgen (heute sagt sie „Lastfläche", und das trägt nicht).
-- [ ] 14.7 **Mail-Missbrauch über die offene Selbstregistrierung** (codex, neu).
+      _**Entschieden 2026-08-09 (Donald): die Eigenschaft bleibt, die Begründung
+      geht.** „Ein gültiges Token wird niemals abgewiesen" gilt weiter; es wird
+      also weiterhin erst beansprucht und dann gezählt. Kein Code, keine
+      Migration — der Befund war nie ein Fehler im Ablauf, sondern eine
+      Falschaussage über ihn. Geändert ist deshalb allein die Spec
+      (`specs/access-control/spec.md`): „Lastfläche" ist raus, der Preis steht
+      jetzt ausgeschrieben — die Zählung kostet vor der Grenze **mehr** Arbeit
+      und spart sie dahinter nicht ein, sie verweigert die Antwort. Die Drossel
+      heißt dort nun „Zähler mit Missbrauchssignal, weder Lastbremse noch
+      Sicherheitsgrenze", und eine Sperre **vor** dem Beanspruchen ist
+      ausdrücklich untersagt, solange die Zusage gilt. Damit ist der Satz in der
+      Spec prüfbar geworden, statt eine Wirkung zu behaupten, die er nicht hat.
+      Zahl ergänzt: 20 Fehlversuche je Herkunft im gleitenden Fenster einer
+      Stunde, der 21. wird abgewiesen (aus `20260806110000`, nicht geschätzt)._
+- [x] 14.7 **Ins Backlog, 2026-08-09 (Donald)** — eigenes Issue, es betrifft die
+      Zustellreputation (AGE-256), nicht das Gate.
+      **Mail-Missbrauch über die offene Selbstregistrierung** (codex, neu).
       Die Ratengrenze sitzt **je Profil**. Wer beliebig viele Profile mit
       beliebigen Fremdadressen anlegt, löst je Profil einen Versand aus — die
       Plattform wird zum Weiterleiter. Keine profilübergreifende, IP- oder
       globale Grenze deckt das ab. Betrifft nicht das Gate, sondern die
       Zustellreputation (und damit AGE-256).
-- [ ] 14.8 **Durable Specs widersprechen dem Gate** (codex). `directory-search`
+- [x] 14.8 **Durable Specs widersprechen dem Gate** (codex). `directory-search`
       sagt jedem angemeldeten Mitglied Verzeichniszugriff zu, `events` jedem
       `basic`-Konto die Anmeldung zu öffentlichen Veranstaltungen. Beides steht
       nach dem Archivieren neben dem Gate. Dasselbe Muster wie 12.7, nur in zwei
       weiteren Capabilities — und es hängt an der AGE-448-Entscheidung (12.10).
-- [ ] 14.9 **Der Zeitkanal steht nur im Code-Kommentar** (codex, opencode,
+      _**Behoben 2026-08-09**, nachdem 12.10 entschieden war. Zwei neue
+      Delta-Dateien, weil der Widerspruch sonst beim Archivieren in die durable
+      Specs geschrieben würde:_
+      _· `specs/directory-search/spec.md` — MODIFIED „Public field projection is
+      members-only and read-only": „every logged-in member" liest jetzt „every
+      logged-in **and activated** member", beide Seiten (Aufrufer und
+      Profilinhaber), und ausdrücklich im **Rumpf der View**, weil sie mit den
+      Rechten ihres Eigentümers läuft und die Policies umgeht. Neues Szenario für
+      das unbestätigte Konto._
+      _· `specs/events/spec.md` — MODIFIED „Events are visible to all
+      authenticated members" und „Registration goes through a capacity-aware RPC
+      …". Die Verhaltensänderung aus 12.10 steht dort als **eigenes Szenario**
+      („An unconfirmed account cannot register for a public event") samt der
+      Begründung und ihrem Preis, statt als Behauptung._
+      _Gegen den Code geprüft, nicht erschlossen: `20260806080100:177`
+      (`events_select_by_visibility`), `:564` (`register_for_event`) und `:489`
+      (`profiles_public`) tragen die Aktivierungsprüfung tatsächlich.
+      `openspec validate --all`: 29/29._
+- [x] 14.9 **Der Zeitkanal steht nur im Code-Kommentar** (codex, opencode,
       deckt sich mit 12.5). Dass sofort `202` geantwortet und erst danach
       versendet wird, ist die Abwehr des Adress-Orakels — sie gehört als
       Anforderung in die Spec, nicht in einen Kommentar.
-- [ ] 14.10 **Grenzwerte ohne Zahl** (opencode). Die Spec nennt 72 h und 256 Bit,
+      _**Behoben 2026-08-09** in `specs/access-control/spec.md`, Requirement „Der
+      Weg zur Aktivierung setzt keine Anmeldung voraus": gleich sein SHALL nicht
+      nur der **Inhalt** der Antwort, sondern auch ihr **Zeitpunkt** — zuerst
+      antworten, danach versenden, weil sonst die Antwortdauer verrät, was die
+      gleichlautende Antwort verbergen soll. Das Szenario „Die Anforderung verrät
+      keine Adressen" nennt den Zeitkanal jetzt ausdrücklich mit, statt nur
+      Statuscode und Inhalt._
+- [x] 14.10 **Grenzwerte ohne Zahl** (opencode). Die Spec nennt 72 h und 256 Bit,
       aber weder die Sperrfrist je Profil noch das Versuchslimit auf dem
       Einlöseweg; ein Szenario nennt ein „Tageskontingent", das kein Requirement
       definiert. So sind die Szenarien nicht prüfbar.
+      _**Behoben 2026-08-09.** Die Zahlen sind aus den Migrationen **gelesen**,
+      nicht geschätzt: Sperrfrist **60 Sekunden** und Tageskontingent **fünf
+      Token je 24 Stunden** aus `20260806080200:75` und `:81` (dieselben Werte in
+      `20260806090000`), Einlöse-Drossel **20 Fehlversuche je Herkunft im
+      gleitenden Fenster einer Stunde** aus `20260806110000:68-69`, der 21. wird
+      abgewiesen (`v_anzahl > p_limit`, streng größer). Alle drei stehen jetzt im
+      Requirement, das Tageskontingent trägt ein eigenes Szenario. 72 h und 256
+      Bit standen bereits drin._
+
+## 15. Abschluss (2026-08-09) — gebaut, entschieden, ausgelagert
+
+Diese Sitzung hat den Change zu Ende gebracht: die verbliebenen Code- und
+Spec-Befunde sind behoben, die drei offenen Entscheidungen sind gefallen und
+schriftlich begründet, und alles, was C3 nicht schließt, liegt als eigenes
+Linear-Issue im Backlog statt als Häkchen ohne Besitzer.
+
+- [x] 15.1 **F1 behoben** — `/onboarding` liegt jetzt hinter `ActivationGate`
+      (`src/App.tsx`). RED: der neue Test „zeigt einem unbestätigten Konto die
+      Wand statt des Kompass-Assistenten" fiel vor der Änderung (1 failed | 9
+      passed), GRÜN danach (10 passed). Der Begleittest für das **bestätigte**
+      Konto blieb durchgehend grün — der rote Test hing also am Gate und nicht
+      an etwas Beiläufigem.
+- [x] 15.2 **F2 behoben** — `AuthProvider` unterscheidet jetzt „warte noch" von
+      „aufgegeben" (`activationLookupFailed`, gesetzt **nur** in der
+      Aufgeben-Lage nach dem dritten Fehlversuch); `ActivationGate` zeigt dort
+      eine Meldung mit „Erneut versuchen" statt dauerhaft nichts. Die
+      Entscheidung *fail closed heißt warten* bleibt unangetastet: bei
+      `isActivated === null` ohne gesetztes Flag wird weiter nichts gezeigt.
+      RED: 2 failed | 8 passed, GRÜN: 10 passed. **Löschprobe:** ein dritter
+      Test behauptet die **Abwesenheit** des Knopfes bei
+      `activationLookupFailed: false` — er war vorher wie nachher grün und
+      belegt damit, dass die beiden positiven Tests am neuen Feld hängen und
+      nicht an `isActivated === null`.
+- [x] 15.3 **Testlücke `redeem-activation` geschlossen** — die
+      sicherheitskritische Reihenfolge wird jetzt geprüft. Die Kernlogik liegt
+      als `redeem.ts` neben dem `Deno.serve`-Rumpf (dasselbe Muster wie
+      `emails.ts` und `webhook.ts`), ihre Außenwelt kommt als Parameter herein;
+      Antworten, Statuscodes und Logzeilen sind unverändert. Sechs Tests in
+      `redeem.test.ts` behaupten die Reihenfolge über eine **mitgeschriebene
+      Aufrufliste**, nicht über einzelne „wurde aufgerufen"-Prüfungen, und
+      decken jeden Teilfehlschlag ab. **RED gegen eine absichtlich falsche
+      Fassung** (`mark_activated` vor `revoke_sessions` gezogen): 3 von 6
+      Tests fielen, darunter genau der, der diesen Fall fangen soll — das ist
+      der Zustand, der das Gate offen ließe. GRÜN nach dem Zurückstellen: 6
+      passed. Voller Lauf: `70 passed | 0 failed`.
+- [x] 15.4 **CI prüft die Edge Functions jetzt auch auf Typen.** Aufgefallen
+      beim Herauslösen von `redeem.ts`: `deno test` typprüft nur, was ein Test
+      **importiert** — und das sind gerade die reinen Module, nie die
+      `index.ts`. Ein Verdrahtungsfehler zwischen beiden käme grün durch. Der
+      konkrete Fall: `supabase.rpc()` gibt einen `PostgrestFilterBuilder`
+      zurück, kein `Promise`; nur `deno check` sieht das. Neuer Schritt in
+      `.github/workflows/ci.yml`, lokal über alle Functions grün.
+- [x] 15.5 **Folge der 14.6-Entscheidung im Code nachgezogen** — der
+      fail-open-Kommentar in `redeem.ts` sagte „die Drossel ist eine Lastbremse".
+      Genau dieser Satz ist in der Spec gestrichen worden; der Kommentar folgt
+      ihm jetzt. **Benannte Restfläche:** der Kopf von `20260806110000` trägt
+      dieselbe überholte Begründung. Er wird **nicht** nachträglich umgeschrieben
+      — eine angewandte Migration ist ein datiertes Protokoll, kein Dokument.
+      Maßgeblich ist ab hier die Spec.
+
+### Ausgelagert statt abgehakt
+
+Zwölf Linear-Issues im Backlog, jedes mit Herkunftsverweis auf diesen Change:
+
+| Issue | Was | Aus |
+| --- | --- | --- |
+| AGE-511 | PROD-Projekt: Migrationen und Functions nachziehen | 10.3 |
+| AGE-512 | **CRITICAL** Stripe- und Resend-Secrets trennen | 10.3 |
+| AGE-513 | Mailtext mit Detlev abstimmen | 9.1/9.2 |
+| AGE-514 | Produktfrage: unbestätigtes Konto und öffentliche Events | 12.10 |
+| AGE-515 | Vollständige CSP messen und setzen | 13.5 |
+| AGE-516 | Rückstufung bei geplatzter Zahlung | 13.6 |
+| AGE-517 | Mailmissbrauch über die offene Selbstregistrierung | 14.7 |
+| AGE-518 | Kleine Restbefunde E5–E7, F3–F5 | REVIEW-8.7 |
+| AGE-519 | `APP_URLS` führt localhost an erster Stelle | 10.8 |
+| AGE-520 | Nachläufe aus Abschnitt 11 | 11.1–11.4 |
+| AGE-521 | Restliche Testlücken | REVIEW-8.7 |
+| AGE-522 | Zwei Wegwerf-Testkonten in der Live-DB entfernen | 10.2/10.8 |

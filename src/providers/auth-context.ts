@@ -1,5 +1,6 @@
 import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { createContext, useContext } from "react";
+import type { ResendStatus } from "../lib/activation";
 
 export interface AuthContextValue {
   /** Aktuelle Supabase-Session, oder null wenn ausgeloggt. */
@@ -27,8 +28,29 @@ export interface AuthContextValue {
    * warten, nicht durchlassen.
    */
   isActivated: boolean | null;
+  /**
+   * true, wenn die Aktivierungsprüfung nach drei Fehlversuchen endgültig
+   * aufgegeben hat (siehe `AuthProvider`) — im Unterschied zu „noch am
+   * Warten" (auch dort `isActivated === null`, aber dieses Feld bleibt
+   * `false`). `ActivationGate` unterscheidet danach, ob es weiter nichts
+   * zeigt oder eine Fehlermeldung mit Wiederholen-Option (AGE-495, Befund F2).
+   */
+  activationLookupFailed: boolean;
   /** Anzeigename aus `my_activation_state()` — für die Anrede auf dem Aktivierungsschirm. */
   activationName: string | null;
+  /**
+   * Ergebnis des Versands, den die Registrierung selbst ausgelöst hat
+   * (AGE-526), oder `null`, wenn in dieser Sitzung keiner lief — auch nach
+   * einem Neuladen.
+   *
+   * Der Aktivierungsbildschirm hängt an `ActivationGate` und wird erst nach dem
+   * Routenwechsel gerendert; ohne diesen Weg erführe er vom automatischen
+   * Versand nichts und böte einen Knopf für eine Mail an, die schon unterwegs
+   * ist. Er zeigt „unterwegs" ausschließlich bei `issued` — jeder andere Wert
+   * heißt, dass nichts versendet wurde, und darf nicht wie ein Versand
+   * aussehen.
+   */
+  activationMailStatus: ResendStatus | null;
   /**
    * Legt ein Konto an. `fullName` geht als `full_name` in die User-Metadaten und
    * wird vom Signup-Trigger nach `profiles.name` übernommen (AGE-437) — ohne ihn

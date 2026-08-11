@@ -186,7 +186,7 @@ Ebenso SHALL das Zielprofil bestätigt sein: eine Zeile SHALL für Dritte erst
 erscheinen, wenn **ihr Inhaber** aktiviert hat. Das gilt für `profiles` und für
 die drei genannten Untertabellen.
 
-#### Scenario: Below Discover an activated member sees only their own full row
+#### Scenario: Below Discover a member sees only their own full row
 
 - **WHEN** a **bestätigtes** `basic`/`connect` member (rank < 3) selects another
   member's full `profiles` row or their extended sub-tables

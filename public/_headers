@@ -5,7 +5,7 @@
 # Route gewinnt.
 #
 # WAS HIER BEWUSST NICHT STEHT: eine vollständige Content-Security-Policy.
-# Sie bräuchte script-src, connect-src (Supabase, Axiom, Sentry), frame-src
+# Sie bräuchte script-src, connect-src (Supabase, Sentry), frame-src
 # (YouTube, Vimeo), img-src (Avatare aus dem Supabase-Bucket) und style-src —
 # und eine falsche Direktive bricht die Anwendung in Produktion still, während
 # lokal alles läuft. Was hier steht, ist die Teilmenge, die NICHT brechen kann:

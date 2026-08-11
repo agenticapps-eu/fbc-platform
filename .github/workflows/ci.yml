@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
@@ -80,6 +80,15 @@ jobs:
           deno-version: v2.x
       - name: Deno-Tests der Edge Functions
         run: deno test --frozen --allow-env --allow-net supabase/functions/
+      # `deno test` typprüft nur, was ein Test importiert — und das sind gerade
+      # die reinen Module, nicht die `index.ts`. Ein Verdrahtungsfehler zwischen
+      # `index.ts` und dem Modul daneben käme also grün durch. Aufgefallen beim
+      # Herauslösen von `redeem.ts` (AGE-495): `supabase.rpc()` gibt einen
+      # PostgrestFilterBuilder zurück, kein Promise — nur `deno check` sieht das.
+      - name: Typprüfung der Edge Functions
+        # `*/*.ts` statt `**/*.ts`: In bash ohne `globstar` steht `**` für eine
+        # einzige Ebene, der Ausdruck sähe also nur zufällig richtig aus.
+        run: deno check supabase/functions/*/*.ts
 
   # Migration validation: boot a throwaway local Supabase stack and apply every
   # migration from scratch. `supabase db reset` exits non-zero if any migration

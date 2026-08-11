@@ -22,7 +22,9 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     // Aktivierungs-Gate und sollen nicht daran hängenbleiben. Wer das Gate
     // prüft, setzt isActivated ausdrücklich (AGE-495).
     isActivated: true,
+    activationLookupFailed: false,
     activationName: null,
+    activationMailStatus: null,
     signUp: async () => ({ error: null }),
     signIn: async () => ({ error: null }),
     signOut: async () => {},

@@ -90,4 +90,5 @@ describe("LoginPage", () => {
     toRegisterMode();
     expect(screen.queryByRole("link", { name: /Passwort vergessen/i })).not.toBeInTheDocument();
   });
+
 });

@@ -154,12 +154,17 @@ function AppInner() {
       <Route path="/passwort-vergessen" element={<ActivationRedeemPage zweck="reset" />} />
       <Route path="/passwort-neu" element={<ActivationRedeemPage zweck="reset" />} />
       {/* Mini-Compass-Onboarding (AGE-243) — eigene, fokussierte Vollbild-Strecke
-          außerhalb der AppShell (wie /login). */}
+          außerhalb der AppShell (wie /login). AGE-495 Befund F1: liegt trotzdem
+          hinter der Aktivierungswand — ActivationGate verspricht „egal welche
+          Route", und ohne das Gate sah ein unbestätigtes Konto hier den vollen
+          Kompass-Assistenten statt der Wand. */}
       <Route
         path="/onboarding"
         element={
           <RequireAuth>
-            <OnboardingPage />
+            <ActivationGate>
+              <OnboardingPage />
+            </ActivationGate>
           </RequireAuth>
         }
       />
