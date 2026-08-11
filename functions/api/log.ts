@@ -1,37 +1,24 @@
 /// <reference types="@cloudflare/workers-types" />
 
-// Serverseitiger Axiom-Proxy für strukturierte Domänen-Events.
+// Serverseitiger Endpunkt für strukturierte Domänen-Events.
 //
-// Warum ein Proxy: Der Axiom-Ingest-Token ist ein Schreib-Secret und darf NIE
-// in den Client-Bundle. Der Browser-Logger (src/lib/log.ts) POSTet Events an
-// diese Cloudflare Pages Function; erst hier — mit dem Token aus der
-// Function-Env — werden sie an Axiom gesendet. Sentry bleibt für Fehler
-// zuständig, Axiom für Events/Funnels (siehe docs/observability.md).
+// Der Browser-Logger (src/lib/log.ts) POSTet Events hierher; diese Cloudflare
+// Pages Function prüft sie gegen eine Allowlist, reichert sie serverseitig an
+// und schreibt sie als strukturierte JSON-Zeile — Cloudflare Workers Logs
+// erfasst stdout automatisch. Sentry bleibt für Fehler zuständig.
 //
-// Raw fetch statt @axiomhq/js: der SDK läuft NICHT in der Cloudflare-Workers-
-// Runtime — seine fetch-retry-Abhängigkeit setzt ein `cache`-Feld auf den
-// Request, das workerd nicht implementiert ("The 'cache' field on
-// 'RequestInitializerDict' is not implemented"); der Ingest schlägt dann still
-// fehl (ingested:0). Das Schwesterprojekt cparx nutzt aus demselben Grund einen
-// rohen fetch an den Edge-Endpoint.
+// Zuvor ging der Endpunkt an Axiom. ADR-0037 (agenticapps-observability) hat
+// die Axiom-Destination entfernt: kein Ingest-Token, kein Secret, keine
+// Netzwerk-Egress mehr. Der Endpunkt bleibt trotzdem sinnvoll — die Allowlist,
+// die Größenbegrenzung und die serverseitige Anreicherung (cf-Felder, _time)
+// gehören auf den Server und nicht in den Client.
+//
+// TRADEOFF: Workers Logs ist kein Analyse-Store. Funnel-Auswertungen, die
+// vorher in Axiom liefen, brauchen jetzt entweder eine Log-Query oder ein
+// eigenes Analytics-Ziel. Siehe docs/observability.md.
 
-interface Env {
-  /** Axiom-Ingest-Token (server-only Secret). Ohne ihn ist Logging ein No-op. */
-  AXIOM_TOKEN?: string;
-  /** Ziel-Dataset, z. B. "fbc-platform". */
-  AXIOM_DATASET?: string;
-  /** Optionaler Override der Ingest-Edge-Basis (siehe DEFAULT_EDGE_URL). */
-  AXIOM_URL?: string;
-}
-
-// Das Dataset "fbc-platform" liegt in Axiom EU (eu-central-1). EU-Datasets MÜSSEN
-// über den Edge-Ingest-Host + Pfad /v1/ingest/:dataset laufen:
-//   api.eu.axiom.co/v1/datasets/:d/ingest       -> 403 forbidden
-//   eu-central-1.aws.edge.axiom.co/v1/ingest/:d -> 200 ✓
-const DEFAULT_EDGE_URL = "https://eu-central-1.aws.edge.axiom.co";
-
-const ingestUrl = (base: string, dataset: string): string =>
-  `${base.replace(/\/+$/, "")}/v1/ingest/${encodeURIComponent(dataset)}`;
+// Keine Env-Bindings mehr nötig: der Endpunkt liest weder Token noch Dataset.
+type Env = Record<string, never>;
 
 /** Erlaubte Event-Namen — synchron zu DomainEvent in src/lib/log.ts.
  *  Eine Allowlist verhindert, dass der öffentliche Endpunkt mit beliebigen
@@ -54,7 +41,10 @@ function noContent(): Response {
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const { request, env } = context;
+  // Kein `env` mehr: Seit der Axiom-Destination auch das letzte Secret entfiel,
+  // liest dieser Endpunkt keine Bindings. Das Feld stehenzulassen kostet nichts
+  // — außer `typecheck:functions`, das es zu Recht als ungenutzt meldet.
+  const { request } = context;
 
   let body: unknown;
   try {
@@ -76,14 +66,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
   if (props !== undefined && JSON.stringify(props).length > MAX_PROPS_BYTES) {
     return new Response("props too large", { status: 413 });
-  }
-
-  // Ohne Konfiguration kein Fehler nach außen: Client-Logging darf die App nie
-  // brechen. In dev (lokal ohne Secret) bleibt es ein No-op; der Warn-Log
-  // erscheint in den Cloudflare-Function-Logs.
-  if (!env.AXIOM_TOKEN || !env.AXIOM_DATASET) {
-    console.warn("axiom: AXIOM_TOKEN/AXIOM_DATASET nicht gesetzt — Event verworfen");
-    return noContent();
   }
 
   // Serverseitige Anreicherung. cf-Felder sind nur am Edge verfügbar
@@ -109,26 +91,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     },
   };
 
-  const url = ingestUrl(env.AXIOM_URL || DEFAULT_EDGE_URL, env.AXIOM_DATASET);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.AXIOM_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify([record]),
-    });
-    // Kein stiller Fehler: ein nicht angenommenes Event als 502 melden, statt
-    // 204 vorzutäuschen.
-    if (!res.ok) {
-      console.error(`axiom ingest HTTP ${res.status}:`, await res.text());
-      return new Response(null, { status: 502 });
-    }
-  } catch (err) {
-    console.error("axiom ingest failed:", err);
-    return new Response(null, { status: 502 });
-  }
+  // Eine JSON-Zeile pro Event auf stdout — Workers Logs erfasst sie. Kein
+  // await, kein Netzwerk, damit hier nichts mehr fehlschlagen kann.
+  console.log(JSON.stringify(record));
 
   return noContent();
 };

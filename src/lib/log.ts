@@ -1,9 +1,10 @@
 // Schlanker Client-Logger für strukturierte Domänen-Events.
 //
-// Events laufen über den serverseitigen Proxy /api/log (functions/api/log.ts) —
-// der Axiom-Token bleibt dort und erreicht nie den Browser. Fehler/Performance
-// gehen weiter an Sentry; Axiom bekommt Events/Funnels. Siehe
-// docs/observability.md für die Trennung.
+// Events laufen über den serverseitigen Endpunkt /api/log
+// (functions/api/log.ts), der sie prüft, anreichert und als strukturierte
+// JSON-Zeile in Workers Logs schreibt. Fehler/Performance gehen weiter an
+// Sentry. Seit ADR-0037 gibt es kein Axiom und damit kein Ingest-Secret mehr —
+// siehe docs/observability.md.
 //
 // Fire-and-forget: Logging darf den Nutzerfluss nie blockieren oder einen
 // Fehler werfen — schlägt der POST fehl, wird er still verworfen.
