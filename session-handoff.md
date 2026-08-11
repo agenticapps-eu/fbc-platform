@@ -1,89 +1,77 @@
-# Session Handoff — 2026-08-10 (27. Session)
+# Session Handoff — 2026-08-11 (28. Session)
 
 ## Stand in einem Satz
 
-**AGE-526 ist gebaut, gegengelesen und liegt als PR #150** — die Registrierung
-verschickt die Aktivierungsmail jetzt selbst. Offen ist nur noch die Abnahme mit
-einer echten Adresse, das Anwenden der Migration und der Deploy.
+**C3 ist abgeräumt, inklusive seiner beiden Nachläufer und AGE-511.** `main`
+steht auf `6ab8206d`, **kein PR offen**, aktiver OpenSpec-Change ist nur noch
+`password-reset-flow` neben den acht schlafenden. **Als Nächstes kommt C6 —
+Donald gibt den Auftrag in einer frischen Session.**
 
 ## Accomplished
 
-**Der Befund aus der Demo mit Detlev (2026-08-10, 15:50–15:53).** Es kam keine
-Mail an, weil **nie eine angefordert wurde** — nicht, weil eine fehlschlug.
+**AGE-526 — die Registrierung verschickt die Aktivierungsmail selbst.** Der
+Befund kam aus der Demo mit Detlev: Es war keine Mail fehlgeschlagen, es hatte
+nie jemand eine angefordert (0 Token in 24 h, 0 von 952 Gateway-Anfragen auf
+`/functions/`). Dazu eine Grenze von 100 Token-Ausgaben je Stunde für Profile
+jünger als 10 Minuten, serialisiert per `pg_advisory_xact_lock`. Auf DEV **und**
+PROD angewandt, am Live-Bundle gemessen, archiviert (#155).
 
-| Beleg | Wert |
-| --- | --- |
-| `activation_tokens` in 24 h | **0 Zeilen** |
-| Gateway-Anfragen 15:30–16:10 | 952, davon **0 auf `/functions/`** |
-| Detlevs Konto | `dk.email@gmx.de`, `basic`, `activated_at NULL`, Abmeldung nach 84 s |
-| Versandweg | intakt: `FROM_EMAIL = FBC <noreply@effbeezee.com>` (Digest), `effbeezee.com` bei Resend `verified` |
+**AGE-527 — das Passwort entsteht nach der Bestätigung.** Zwei UX-Befunde aus
+Donalds erstem vollständigen Durchlauf: Das Passwort wurde zweimal abgefragt, und
+das Setzen endete wortlos auf dem Login. Jetzt kein Passwortfeld bei der
+Registrierung (Zufallswert aus dem CSPRNG) und ein Erfolgsschirm mit Knopf und
+angekündigtem Zähler, im Wortlaut des jeweiligen Zwecks. Ausgerollt, archiviert
+(#156).
 
-Ursache: Die eingebaute Bestätigung ist aus (AGE-445), und der Aktivierungsweg
-aus AGE-495 war für **importierte** Mitglieder gebaut. Die Selbstregistrierung
-fällt hinter dasselbe Gate, aber niemand löst den Versand aus.
+**AGE-511 — PROD nachgezogen, dabei eine Live-Lücke gefunden.** Migrationen
+synchron, alle 22 Secrets vorhanden, 5 von 6 Functions byte-identisch. Die
+sechste, `notify-contact-request`, lief auf **beiden** Projekten in einer
+Fassung, die älter war als die AGE-495-Härtung — auch auf DEV, das die Live-Seite
+bedient. Auf beide ausgerollt, Digests stimmen jetzt überein.
 
-**Der Change `activation-mail-on-signup` (AGE-526), drei Commits auf
-`donald/age-526-aktivierungsmail-bei-registrierung`:**
-
-| Teil | Was |
-| --- | --- |
-| Auslöser | `AuthProvider.signUp` fordert den Link an — dort, weil die Registrierung dort entsteht |
-| Ehrlichkeit | `resendActivationLink` reicht den Status durch; „unterwegs" nur bei `issued` |
-| Bremse | Migration `20260810170000`: 100 Ausgaben/Stunde, **nur** für Profile jünger als 10 Minuten, `pg_advisory_xact_lock` vor der Zählung |
-
-**Belege:** 222 pgTAP (7 neue, RED gesehen) · 486 Vitest · Typen und Lint sauber ·
-Wettlauf-Sonde mit zwei Sitzungen: ohne Riegel 101 Token, mit ihm 100.
-
-**Zwei Reviews, beide mit echten Treffern** (`REVIEWS.md`): über das Delta *vor*
-der ersten Codezeile und über den Diff. gemini APPROVE, opencode/Kimi-K3 beide
-Male REQUEST-CHANGES.
+**Elf PRs gemergt:** #150, #152, #121, #144, #153, #124, #125, #126, #154, #155,
+#156. Dabei die Arbeit auf `chore/remove-axiom` committet und als PR eröffnet —
+sie lag uncommittet im Baum und war nicht grün (`TS6133` auf ungenutztem `env`).
 
 ## Decisions
 
-- **100 Ausgaben/Stunde**, nicht 60. Die Spec begründet den eigenen Mailversand
-  mit „siebzig Mitglieder an einem Abend"; 60 hätte genau diesen Fall verfehlt.
+- **100 Ausgaben/Stunde, nicht 60.** Die Spec begründet den eigenen Mailversand
+  mit „siebzig Mitglieder an einem Abend"; 60 hätte genau das verfehlt.
 - **Die Grenze greift nur für Profile jünger als 10 Minuten.** Eine Grenze für
-  alle machte aus dem Missbrauch eine Aussperrung. Der Preis steht in der
-  Anforderung: Bei vollem Kontingent wartet ein Neuling zehn Minuten — verzögert,
-  nicht verschlossen.
-- **Nicht „plattformweit".** Der Admin-Weg zählt hinein, wird aber nicht
-  gebremst. Die erste Fassung des Deltas versprach mehr, als sie baute.
-- **Ein Flag `automatisch` im Anfragerumpf ist verworfen** — das setzt der
-  Angreifer selbst. Prüfbar ist nur das Alter des Profils.
-- **AGE-517 bleibt offen**, bewusst: Wer wartet, steht wieder beim
-  Zwei-Anfragen-Weg. Eine Grenze je IP ist dort weiter zu bauen.
+  alle machte aus dem Missbrauch eine Aussperrung. Der Preis — Neulinge warten im
+  Missbrauchsfall zehn Minuten — steht in der Anforderung, nicht nur im Code.
+- **Nicht „plattformweit".** Der Admin-Weg zählt ins Kontingent, wird aber nicht
+  gebremst; eine größere Zusage hätte an einer Stelle versprochen, wo nichts
+  gebaut ist.
+- **Kein Passwort bei der Registrierung**, statt es beim Einlösen zu
+  überspringen: ein Weg statt zwei, wie bei importierten Mitgliedern.
+- **AGE-512 und AGE-517 bleiben liegen** (Donald), **AGE-522** wird mit der
+  Migration in der letzten Phase geschlossen.
 
 ## Files modified
 
-- `supabase/migrations/20260810170000_activation_stundenkontingent.sql` — neu
-- `supabase/tests/rls_test.sql` — 7 Assertions, `plan(195)` → `plan(202)`
-- `scripts/probe-kontingent-wettlauf.ts` — neu, Laufzeitbeleg für den Riegel
-- `src/providers/AuthProvider.tsx` · `auth-context.ts` — Auslöser + getaggter Status
-- `src/lib/activation.ts` — `ResendStatus`, Status statt `void`
-- `src/pages/ActivationScreen.tsx` — je Ausgang eine wahrheitsgemäße Meldung
-- `src/pages/LoginPage.tsx` — unerreichbarer Hinweis samt `info`-Variable entfernt
-- `openspec/changes/activation-mail-on-signup/` — proposal, design, Delta, tasks, REVIEWS
+Alles gemergt. Arbeitsbaum sauber, `main` aktuell.
 
 ## Next session: start here
 
-**Der erste Schritt gehört Donald: Task 6.1.** Auf DEV registrieren mit einer
-**echten Fremdadresse** und nachsehen, ob der Link im Postfach liegt — ein `202`
-und ein grüner Bildschirm belegen das nicht. Dafür muss vorher `migrate-dev`
-laufen. Danach 6.2 (Link einlösen), dann 6.3 (Dry-Run für PROD **lesend** prüfen,
-erst dann `migrate-prod`) und 6.4 (Live-Stand am ausgelieferten Bundle messen).
-Erst nach dem Ausrollen wird der Change archiviert.
+**C6.** Donald bringt den Auftrag mit — vorher nichts anfangen. Die offenen
+C3-Nachläufer (AGE-512 bis AGE-522, ohne 511) sind bewusst im Backlog geparkt.
+
+**Der lokale Dev-Server läuft weiter**, abgekoppelt von der Aufgabenverwaltung:
+Vite auf `http://localhost:5173` (PID 17936), Edge Functions (PID 17937) mit
+**absichtlich ungültigem Resend-Schlüssel** — beim Herumklicken geht keine echte
+Post raus. Beenden mit `kill 17936 17937`.
 
 ## Open questions
 
-- **Ist die Zustellung an eine Fremdadresse belegt?** Bisher nur: Domain
-  verifiziert, Absender richtig. Nicht: Link im Postfach eines Dritten.
-- **Die beiden Demo-Konten** (`donald+test@factiv.eu`, `dk.email@gmx.de`) liegen
-  unbestätigt in der Live-DB. Nachträglich einen Link schicken oder löschen?
-  Gehört zu AGE-522.
-- **Zwei Sichtprobe-Konten** liegen im **lokalen** Stack (`sichtprobe-age526@…`,
-  `sichtprobe2-age526@…`). Wegwerf, ein `supabase db reset` räumt sie.
-- **CRITICAL, unverändert (AGE-512):** Stripe- und Resend-Secrets byte-identisch
-  zwischen DEV und PROD.
+- **AGE-512 (CRITICAL, unverändert):** Stripe- und Resend-Secrets byte-identisch
+  zwischen DEV und PROD. Braucht Donald im Stripe-Dashboard.
+- **Die Anmeldung mit Donalds Passwort auf `donald@factiv.eu`** ist nie gemessen
+  worden; `last_sign_in_at` trägt die automatische Anmeldung der Registrierung.
+  Der Schritt selbst ist mit `age527@test.fbc` vollständig durchgespielt.
+- **`app.fairbusinessclub.de` löst nicht auf** — kein DNS-Eintrag. Live ist
+  `fbc-platform.pages.dev`. Gehört zu AGE-256.
+- **Testkonten** liegen in der Live-DB (AGE-522) und im lokalen Stack.
 
 ## Fallen
 
@@ -94,18 +82,24 @@ dispatchen heißt anwenden.
 
 **Neu aus dieser Sitzung:**
 
-- **Ein Test mit vorbelegtem Kontext prüft die falsche Zeitachse.** Der Status
-  des automatischen Versands trifft ein, NACHDEM der Bildschirm steht —
-  `useState(wert)` nimmt ihn dann nie an. Grün im Test, kaputt im Browser.
-  Gefunden hat es die Sichtprobe am laufenden System, nicht die Testsuite.
-- **`react-hooks/set-state-in-effect` hatte beide Male recht.** Was aussieht wie
-  „Zustand beim Wechsel räumen", ist fast immer eine Ableitung: den Wert mit der
-  `userId` taggen, zu der er gehört, so wie `profile` es in derselben Datei tut.
-- **Ein Reviewer, der den echten Quelltext liest, findet anderes als einer, der
-  nur den Diff bekommt.** opencode/Kimi-K3 fand beide Male die teuersten
-  Befunde, weil es die Nachbardateien mitgelesen hat.
-- **`supabase functions serve` mit absichtlich ungültigem Resend-Schlüssel** ist
-  der saubere Weg, den Versandpfad lokal zu prüfen, ohne eine Mail zu erzeugen —
-  das Token entsteht trotzdem, und genau das ist die Assertion.
-- **`gh api …/check-runs` braucht eine Warteschleife**, kein `sleep` davor: Der
-  Harness blockt führende Sleeps.
+- **`deno.lock` spiegelt die `package.json`** (480 npm-Pakete unter
+  `workspace.packageJson.dependencies`). Jeder npm-Bump macht sie unter
+  `--frozen` ungültig, und `edge-functions` ist ein **Pflicht-Check**. Dependabot
+  weiß davon nichts — die Lockdatei gehört in jeden Paket-PR nachgezogen.
+- **`main` verlangt `strict: true`.** Jeder PR muss vor dem Merge auf den Stand
+  gebracht werden; Merges sind damit zwangsläufig seriell.
+- **Ein roter Check kann veraltet sein.** Die Dependabot-PRs zeigten Ergebnisse
+  gegen ein `main`, das es nicht mehr gab. Erst nach dem Aktualisieren misst man
+  die Gegenwart — vorher behebt man womöglich das Falsche.
+- **Der `functions`-CI-Job rollt nur GEÄNDERTE Functions aus.** Fällt der Lauf
+  aus, wird die Änderung nie nachgeholt. Und Versionszähler zählen Deploys, nicht
+  Inhalte — vergleichbar ist nur `ezbr_sha256`. `functions download` scheitert
+  hier in beiden Varianten.
+- **Ein Test mit vorbelegtem Context prüft die falsche Zeitachse.** Trifft der
+  Wert erst nach dem Mount ein, nimmt `useState(wert)` ihn nie an: grün im Test,
+  kaputt im Browser. Gefunden hat es die Sichtprobe, nicht die Testsuite.
+- **`gh pr merge` bei `mergeStateStatus = UNKNOWN`** tut still nichts. Erst auf
+  einen anderen Zustand warten, dann mergen, dann `state` prüfen.
+- **Ein Grep kann bestätigen, was nicht da ist.** Beim Live-Check traf ein alter
+  Satz auf einer anderen Seite dieselbe Wortfolge; erst ein eindeutiger Marker
+  zeigte, dass noch das alte Bundle auslieferte.
