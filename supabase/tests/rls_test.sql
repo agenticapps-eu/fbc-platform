@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(219);
+select plan(242);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1536,6 +1536,136 @@ select is(
       and policyname like 'avatars\_%'
       and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
   3, '… und avatars unverändert ebenso — die Falltabelle gilt für beide');
+
+-- ── 18. Admin-Bearbeitung: die vier Funktionen (AGE-498, C6-D) ─────────────
+-- Der Anlassfall ist ein IMPORTIERTES, NICHT BESTÄTIGTES Profil: genau dieses
+-- ist unter der RLS für niemanden sichtbar (profiles_select_self_or_discover
+-- verlangt activated_at am ZIELPROFIL, Zeile 79 dieser Migration; die Sicht
+-- ebenso). Ein Schreibweg ohne Lesepfad griffe deshalb nur an den Profilen,
+-- die ihn nicht brauchen — Befund aus dem Fremd-Review (REVIEWS.md, codex).
+-- Das Ziel unten ist absichtlich unbestätigt.
+
+create function pg_temp.text_as(uid uuid, q text) returns text language plpgsql as $$
+declare t text;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute q into t;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return t;
+end $$;
+
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated', 'importiert@test.fbc');
+update public.profiles
+   set name = 'Importiert', company = 'Alt GmbH', activated_at = null,
+       created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000b1';
+-- Der Admin aus den Fixtures (staff_roles, Zeile 136) — bestätigt, damit er
+-- sich nicht am eigenen Gate stößt.
+update public.profiles set activated_at = now()
+ where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+-- 18.1 Der Schreibweg am Gate vorbei, mit allen drei Zielzeilen in einem Aufruf.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile(
+      'c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"name":"Korrigiert","roles":["Vorstand","Beirat"],
+        "email":"neu@test.fbc","paid_until":"2027-06-30","legacy_price":1200.00}'::jsonb)$q$),
+  'OK', 'Admin ändert ein UNBESTÄTIGTES fremdes Profil');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… die Profilzeile ist wirklich geschrieben');
+
+select is((select roles::text from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  '{Vorstand,Beirat}', '… ein Array-Feld ist feldweise dekodiert, nicht als Text abgelegt');
+
+select is((select email from public.profile_contacts where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'neu@test.fbc', '… die KONTAKTzeile ist mitgeschrieben (sonst liefen die Mails weiter ins alte Postfach)');
+
+select is((select paid_until from public.profile_legacy where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  date '2027-06-30', '… und die Altdatenzeile ebenso');
+
+select is((select count(*)::int from public.admin_audit
+            where target = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  1, '… und die Änderung hat eine Spur hinterlassen');
+
+-- 18.2 Die Abwehr. Der Button im Frontend ist Komfort — DAS hier ist die Grenze.
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"name":"Gekapert"}'::jsonb)$q$),
+  'DENIED:%',
+  'Ein normales Mitglied prallt an der RPC ab — am Formular vorbei aufgerufen');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… und hat nichts verändert');
+
+-- 18.3 Ein Feld außerhalb der Weißliste. `tier` ist der Nebeneingang, den dieser
+-- Change gerade vermeiden will — Stufenwechsel gehen über Abrechnung und Import.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"company":"Neu GmbH","tier":"impact"}'::jsonb)$q$),
+  'DENIED:%',
+  'Ein unbekanntes Feld bricht ab');
+
+select is((select company from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Alt GmbH', '… und das GÜLTIGE Feld desselben Aufrufs bleibt ebenfalls ungeschrieben');
+
+-- 18.4 Ein ungültiger Wert. Ein nicht lesbares Datum ist ein Fehler, kein NULL.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"paid_until":"morgen"}'::jsonb)$q$),
+  'DENIED:%', 'Ein nicht interpretierbares Datum bricht ab');
+
+select is((select paid_until from public.profile_legacy where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  date '2027-06-30', '… und lässt den vorherigen Wert stehen');
+
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1', '[]'::jsonb)$q$),
+  'DENIED:%', 'Ein patch, der kein JSON-Objekt ist, bricht ab');
+
+-- 18.5 Fehlend und leer sind zweierlei — der Unterschied, den coalesce nicht kann.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"short_bio":null}'::jsonb)$q$),
+  'OK', 'JSON-null wird angenommen …');
+
+select is((select short_bio from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und leert das Feld');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… während ein NICHT geschickter Schlüssel unverändert bleibt');
+
+-- 18.6 Der Lesepfad — ohne ihn wäre der Schreibweg unerreichbar.
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1') -> 'profile' ->> 'name'$q$),
+  'Korrigiert', 'admin_get_profile liest das unbestätigte Profil');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1')$q$),
+  'DENIED:%', 'Ein normales Mitglied liest darüber nichts');
+
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select jsonb_array_length(public.admin_find_profile('importiert@test.fbc'))$q$),
+  1, 'admin_find_profile findet es über die Login-Adresse — es gibt keine Mitgliederliste');
+
+-- 18.7 Rechte und Unversehrtheit der Spur.
+select is(has_function_privilege('anon', 'public.admin_update_profile(uuid,jsonb)', 'execute'),
+  false, 'admin_update_profile: anon darf nicht');
+select is(has_function_privilege('anon', 'public.admin_get_profile(uuid)', 'execute'),
+  false, 'admin_get_profile: anon darf nicht');
+select is(has_function_privilege('anon', 'public.admin_find_profile(text)', 'execute'),
+  false, 'admin_find_profile: anon darf nicht');
+
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$insert into public.admin_audit (actor, action, target)
+     values ('aaaaaaaa-0000-0000-0000-000000000001', 'erfunden',
+             'c6c6c6c6-0000-0000-0000-0000000000b1')$q$),
+  'DENIED:%',
+  'Niemand schreibt sich einen Audit-Eintrag selbst — auch ein Admin nicht');
 
 select * from finish();
 rollback;

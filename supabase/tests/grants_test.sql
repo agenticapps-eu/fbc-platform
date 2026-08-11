@@ -36,7 +36,8 @@ select is(
          from information_schema.role_table_grants
          where table_schema = 'public' and grantee in ('anon', 'authenticated')
          group by 1, 2) t),
-$$badges/anon=SELECT
+$$admin_audit/authenticated=SELECT
+badges/anon=SELECT
 badges/authenticated=SELECT
 comments/authenticated=INSERT,SELECT
 compass_responses/authenticated=DELETE,INSERT,SELECT,UPDATE
