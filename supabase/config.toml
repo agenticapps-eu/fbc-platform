@@ -513,6 +513,19 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# admin-change-email (AGE-498 / C6): ein Admin setzt die LOGIN-Adresse eines
+# Mitglieds neu — der Fallback aus C3, wenn jemand nicht mehr an sein altes
+# Postfach kommt.
+#
+# verify_jwt = true ist hier ABSICHT und traegt die halbe Sicherheit: das
+# Gateway verifiziert das ES256-Token vollstaendig, bevor der Handler laeuft, und
+# der Handler liest die Aufruferkennung aus genau diesem geprueften Token
+# (getUser/getClaims sind unter asymmetrischen Schluesseln unbrauchbar, AGE-259).
+# Die andere Haelfte ist die serverseitige Pruefung gegen staff_roles.
+[functions.admin-change-email]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
