@@ -1,65 +1,61 @@
-# Observability — Sentry & Axiom
+# Observability — Sentry & structured event logs
 
-Two complementary tools, with a hard split of responsibilities:
+Two complementary surfaces, with a hard split of responsibilities:
 
 | Tool       | Responsibility                                       | Surface                                  |
 | ---------- | ---------------------------------------------------- | ---------------------------------------- |
 | **Sentry** | **Errors & performance** — exceptions, crashes, traces, session replay on error | `@sentry/react` in the browser (`src/instrument.ts`) |
-| **Axiom**  | **Structured events & logs** — domain funnels (signup → match → contact → event), and later Cloudflare request logs | Server-side ingest only (`/api/log` + Logpush) |
+| **Workers Logs** | **Structured events** — domain funnels (signup → match → contact → event) | Server-side only, via `/api/log` |
 
-Rule of thumb: **if it threw, it's Sentry. If it happened, it's Axiom.**
-A failed login is a Sentry error; a successful login is an Axiom event.
+Rule of thumb: **if it threw, it's Sentry. If it happened, it's an event log.**
+A failed login is a Sentry error; a successful login is a logged event.
 
 ---
 
-## Why a server-side proxy
+## Axiom was removed (ADR-0037, 2026-08-10)
 
-The Axiom **ingest token is a write secret** and must never reach the browser
-bundle (unlike the Sentry DSN, which is public by design). So client events do
-**not** talk to Axiom directly. They POST to a Cloudflare Pages Function that
-holds the token in its server-side env and forwards to Axiom:
+This page previously described Axiom as the event/funnel store. That
+destination is gone across the whole fleet: it was ingest-priced, and the
+structured JSON line every event already produces is captured natively by each
+runtime's own log product. There is **no `AXIOM_TOKEN`, no `AXIOM_DATASET`, no
+`AXIOM_URL`** any more — nothing to place in Pages, CI, or a secret store.
+
+**Read the tradeoff before relying on this.** Workers Logs is a log store, not
+an analytics store. The funnel queries this doc used to describe
+(`['fbc-platform'] | where event=="login"`) have no direct equivalent: you get
+log search and retention, not aggregation over long windows. If funnel
+analysis becomes load-bearing for a decision, that is the point to pick a real
+analytics destination — and the `/api/log` endpoint is already the right place
+to add one, because every event passes through it.
+
+**Operator action outstanding:** revoke the Axiom ingest token at Axiom itself
+and delete `AXIOM_TOKEN` / `AXIOM_DATASET` / `AXIOM_URL` from the Cloudflare
+Pages project and from CI. Deleting the code does not invalidate the token.
+
+---
+
+## Why the endpoint still exists
+
+It no longer holds a secret, but `/api/log` still earns its place: it validates
+`event` against a server-side allowlist, caps `props` size, and enriches each
+record with `cf` fields and a server `_time` that client input cannot
+overwrite. Those are server responsibilities and must not move into the client.
 
 ```
-Browser                         Cloudflare Pages Function            Axiom
-─────────                       ─────────────────────────            ─────
-logEvent("login")  ──POST──►    /api/log                  ──ingest──►  dataset
-src/lib/log.ts     (no token)   functions/api/log.ts                  "fbc-platform"
-                                (AXIOM_TOKEN from env)
+Browser                         Cloudflare Pages Function       Workers Logs
+─────────                       ─────────────────────────       ────────────
+logEvent("login")  ──POST──►    /api/log               ──JSON──►  stdout
+src/lib/log.ts     (no token)   functions/api/log.ts              (no secret)
 ```
 
 - **`src/lib/log.ts`** — `logEvent(name, props?)`. Fire-and-forget, never throws,
   `keepalive: true` so the request survives a redirect (e.g. right after login).
   No token, no PII by default.
 - **`functions/api/log.ts`** — `onRequestPost`. Validates the event against an
-  allowlist, enriches it server-side (timestamp, Cloudflare country/colo/ray,
-  user-agent), and ingests with a **raw `fetch`** to the Axiom EU edge endpoint.
-  The token comes from `context.env`, never from the client. If Axiom rejects the
-  request it returns **`502`** (not a silent `204`); a missing token/dataset is a
-  no-op `204` so client logging never breaks the app.
-
-### Why raw `fetch` and not `@axiomhq/js`
-
-The task originally specified `@axiomhq/js`, but the SDK **does not run in the
-Cloudflare Workers/Pages runtime (workerd)**: its `fetch-retry` dependency sets a
-`cache` field on the request, which workerd doesn't implement
-(`The 'cache' field on 'RequestInitializerDict' is not implemented`). The SDK
-catches that internally and silently returns `ingested:0` — so it *appears* to
-work but ingests nothing. It works fine under Node, which is the trap. The sister
-project **cparx** hit the same wall and uses a raw `fetch` to the edge endpoint;
-we do the same.
-
-### EU edge endpoint (important)
-
-The `fbc-platform` dataset lives in Axiom **EU (`eu-central-1`)**. EU datasets
-must be ingested via the **edge host and path**, not the API host:
-
-```
-api.eu.axiom.co/v1/datasets/:dataset/ingest      → 403 forbidden
-eu-central-1.aws.edge.axiom.co/v1/ingest/:dataset → 200 ✓   ← use this
-```
-
-The function defaults to `https://eu-central-1.aws.edge.axiom.co`. `AXIOM_URL`
-is an **optional override** of that base — you normally don't need to set it.
+  allowlist, caps `props` size, enriches it server-side (timestamp, Cloudflare
+  country/colo/ray, user-agent), and writes one JSON line to stdout. Always
+  answers `204` on an accepted event and `400` on a rejected one; there is no
+  egress left that could fail, so the `502` path is gone.
 
 ### Domain events (the funnel)
 
@@ -82,84 +78,54 @@ The four `⏳` events are defined now so the type/allowlist is complete; their
 
 ## Setup (one-time, external — not in the repo)
 
-### 1. Axiom dataset + token
+### Secrets: none
 
-1. In Axiom, create a dataset named **`fbc-platform`**
-   (Settings → Datasets → New dataset).
-2. Create an **API token with the *Ingest* action** scoped to that dataset
-   (Settings → API tokens). An ingest token is write-only — it **cannot query**,
-   so verify events in the Axiom UI, not with this token.
-3. The dataset is in **EU (`eu-central-1`)**; the function already targets the EU
-   edge by default, so no region setting is needed. (`AXIOM_URL` only exists as an
-   override — see "EU edge endpoint" above.)
+There is nothing to provision. The endpoint reads no environment variable, so
+there is no Infisical entry, no Cloudflare Pages secret, and no CI variable to
+mirror. `/api/log` behaves identically on production, preview and local
+`wrangler pages dev` — which it previously did not, because preview deploys
+never had the Axiom secrets and silently dropped every event.
 
-### 2. Store the secrets in Infisical
+**Decommission checklist (operator, once):**
 
-Server-only — **never** prefix with `VITE_`. We have two environments (`dev`,
-`prod`); there is no `staging` env (see `docs/secrets.md`).
+1. Revoke the `fbc-platform` ingest token in Axiom.
+2. `infisical secrets delete AXIOM_TOKEN AXIOM_DATASET --env=dev` (and `prod`).
+3. Delete `AXIOM_TOKEN` / `AXIOM_DATASET` / `AXIOM_URL` from the Cloudflare
+   Pages project (Production **and** Preview), then redeploy — Pages binds env
+   at deploy time.
+4. Delete the Axiom dataset if you do not want to retain the historical events.
 
-```bash
-infisical secrets set AXIOM_TOKEN=xaat-xxxx      AXIOM_DATASET=fbc-platform --env=dev
-infisical secrets set AXIOM_TOKEN=xaat-xxxx      AXIOM_DATASET=fbc-platform --env=prod
-# AXIOM_URL is NOT needed (the function defaults to the EU edge). Set it only to
-# override the ingest base.
-```
 
-### 3. Mirror to the deploy/CI platforms
+## Cloudflare Logpush → Axiom — DECOMMISSION (was: infrastructure logs)
 
-The Pages Function reads these from the **Cloudflare Pages** project env, not
-from Infisical at runtime.
+This covered **infrastructure** logs (Pages Function invocations, `console.*`
+output, exceptions) via Axiom's Cloudflare Logpush app, separate from the
+application events above.
 
-- **Production: done (AGE-253)** — `AXIOM_TOKEN` + `AXIOM_DATASET` are set as
-  encrypted secrets on the `fbc-platform` Pages project (Production). They are
-  bound to a deployment at deploy time, so a redeploy is required after changing
-  them. (`AXIOM_URL` only if overriding the EU edge default.)
-- **Preview: not set yet** — preview deploys' `/api/log` is a no-op (returns
-  `204`, drops the event) until the same secrets are added to the Preview env.
-- GitHub Actions injects the build-time `VITE_*` vars via Infisical; the
-  server-only `AXIOM_*` secrets live only on the Pages project, not in CI.
+**Status: to be decommissioned.** ADR-0037 removed Axiom from the fleet, and
+this is the last thing still shipping to it — and the one that keeps the bill
+alive even with every `AXIOM_TOKEN` deleted, because the Logpush job is
+configured **account-side in the Axiom app**, not in this repo. Nothing in a
+code change can turn it off.
 
----
+**Operator steps (Axiom + Cloudflare dashboards):**
 
-## Cloudflare Logpush → Axiom (Function logs)
+1. Axiom → Settings → Apps → **Cloudflare Logpush** → uninstall. This deletes
+   the Logpush job it created and the dataset it manages.
+2. Cloudflare → Account → API Tokens → revoke the token issued for that app
+   (**Logs: Edit** + **Account Settings: Read**).
+3. Delete any leftover datasets (`fbc-platform`, and `fbc-platform-cf` if it
+   was ever created) once you no longer need the history.
 
-This covers the **infrastructure** logs (Pages Function invocations, `console.*`
-output, exceptions) — separate from the application events above.
+**Read this before uninstalling — it is account-wide.** The job captured *all*
+Workers trace events across the account (cparx, callbot, fx-signal-agent, …),
+not just this project. Removing it removes that view for **every** repo in the
+fleet, not only `fbc-platform`. Nothing in this repo depended on it, but
+confirm the same for the others before you pull it.
 
-**Status: activated via the Axiom app (AGE-253).**
-
-### Finding (AGE-253): no manual Logpush endpoint
-
-The original plan was a Cloudflare-side Logpush job pointing at a dedicated
-Axiom dataset (`fbc-platform-cf`). **That path no longer exists**: Axiom has
-retired its manual Logpush ingest endpoint — `…/v1/datasets/<ds>/ingest_logpush`
-returns `404` on both `api.eu.axiom.co` and the edge host, and the plain
-`/v1/datasets/<ds>/ingest` returns `403`. With no endpoint that answers
-Cloudflare's **ownership challenge**, a hand-rolled Logpush job cannot validate.
-
-### Supported path: the Axiom Cloudflare Logpush app
-
-Axiom now supports **only** its app-side install (Axiom → Settings → Apps →
-Cloudflare Logpush):
-
-1. Create a Cloudflare API token — **Account → Logs: Edit** + **Account
-   Settings: Read**, scoped to the account.
-2. Install the app with that token; select the account-level **Workers Trace
-   Events** dataset. (Skip "HTTP requests" — there is no zone for `*.pages.dev`.)
-3. Axiom creates the Logpush job **and manages its own destination dataset**.
-
-Caveats:
-
-- The job is **account-wide** — it captures *all* Workers' trace events (cparx,
-  callbot, fx-signal, …), not just this project. Isolate the Pages Functions at
-  query time: `where ScriptName contains "9fb4b087"` (the `fbc-platform` Pages
-  project id).
-- The app does **not** use a hand-made dataset, so the originally-planned
-  `fbc-platform-cf` dataset + ingest token are unused and can be deleted.
-- App events (`/api/log` → **`fbc-platform`**) stay in their own dataset, so the
-  funnels remain clean despite the shared infra-log dataset.
-- The `console.*` logs from `functions/api/log.ts` are also visible ad-hoc via
-  `wrangler pages deployment tail`.
+**What replaces it:** `wrangler pages deployment tail` for live output, and
+Cloudflare **Workers Logs** (`[observability] enabled = true`) for retained,
+queryable logs per project — native to the runtime, no external ingest.
 
 ---
 
@@ -171,12 +137,12 @@ Pages Functions do **not** run under plain `vite dev`. Use Wrangler or a deploy.
 
 ```bash
 pnpm build
-# inject the dev secrets and serve the built app + functions locally:
-infisical run --env=dev -- npx wrangler pages dev dist
+# no secrets to inject any more — serve the built app + functions locally:
+npx wrangler pages dev dist
 ```
 
-Then open `/styleguide` → section **Axiom (Dev)** → *„Test-Event an /api/log
-senden"*, or:
+Then open `/styleguide` → section **Event-Log (Dev)** → *„Test-Event an
+/api/log senden"*, or:
 
 ```bash
 curl -X POST http://localhost:8788/api/log \
@@ -185,16 +151,17 @@ curl -X POST http://localhost:8788/api/log \
 # → 204 No Content
 ```
 
-Confirm in the **Axiom UI** (Stream, or the Query tab) — the ingest token is
-write-only and can't query from the CLI:
+The record is a JSON line in the Wrangler output (and, when deployed, in
+Workers Logs / `wrangler pages deployment tail`):
 
-```kusto
-['fbc-platform'] | where event == "login" | order by _time desc | take 20
+```json
+{"test":true,"_time":"…","event":"login","source":"web-client","request":{…}}
 ```
 
-A row with `event: "login"`, `source: "web-client"`, `test: true` and a
-`request.*` block confirms the path end-to-end. To prove failures aren't
-silent: a bad token/endpoint makes `/api/log` return **`502`**, not `204`.
+`event: "login"`, `source: "web-client"`, `test: true` and a `request.*` block
+confirm the path end-to-end. Note this now works **identically** in preview and
+local dev — previously both silently dropped events because only production had
+the Axiom secrets.
 
 ---
 

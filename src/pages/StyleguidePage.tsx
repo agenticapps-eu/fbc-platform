@@ -157,17 +157,17 @@ function SentryTestSection() {
   );
 }
 
-function AxiomTestSection() {
+function EventLogTestSection() {
   return (
     <div className="space-y-3">
       <Button variant="ghost" size="sm" onClick={() => logEvent("login", { test: true })}>
         Test-Event an <code>/api/log</code> senden
       </Button>
       <p className="text-xs text-muted">
-        Geht über den Server-Proxy <code>/api/log</code> an Axiom. Erscheint nur, wenn die Function
-        läuft (<code>wrangler pages dev</code> oder Deploy) und <code>AXIOM_TOKEN</code>/
-        <code>AXIOM_DATASET</code> gesetzt sind. Bei reinem <code>vite dev</code> laufen Pages
-        Functions nicht.
+        Geht an den Server-Endpunkt <code>/api/log</code>, der das Event prüft, anreichert und
+        als JSON-Zeile in die Workers Logs schreibt. Erscheint nur, wenn die Function läuft
+        (<code>wrangler pages dev</code> oder Deploy) — bei reinem <code>vite dev</code> laufen
+        Pages Functions nicht. Ein Secret braucht es seit ADR-0037 nicht mehr.
       </p>
     </div>
   );
@@ -492,9 +492,9 @@ export default function StyleguidePage() {
             <SentryTestSection />
           </Section>
 
-          {/* Axiom (Dev) */}
-          <Section title="Axiom (Dev)">
-            <AxiomTestSection />
+          {/* Event-Log (Dev) */}
+          <Section title="Event-Log (Dev)">
+            <EventLogTestSection />
           </Section>
         </div>
       </div>
