@@ -59,8 +59,14 @@ kein spaltenweises Leseverbot bei erteiltem Tabellen-SELECT — die Trennung SHA
 deshalb über die Tabelle laufen.
 
 Die Tabelle SHALL RLS tragen und **keinerlei** Grant für `anon` oder
-`authenticated` halten. Gelesen und geschrieben SHALL sie nur durch
-`service_role` (Import) und durch die Admin-Funktionen werden.
+`authenticated` halten. Geschrieben SHALL sie auf zwei Wegen werden: durch den
+Import über eine **direkte Datenbankverbindung** und durch die
+Admin-Funktionen.
+
+`service_role` SHALL dafür NOT in Betracht kommen. Es hält seit dem
+Grant-Lockdown auf keiner Tabelle in `public` ein Lese- oder Schreibrecht;
+alles, was es tut, geht durch `SECURITY DEFINER`-Funktionen. Ein Importweg über
+die REST-Fläche bräuchte deshalb eine eigene solche Funktion — kein Grant.
 
 `paid_until` SHALL den **letzten eingeschlossenen** Kalendertag der bereits
 bezahlten Mitgliedschaft tragen. `null` SHALL **unbekannt** bedeuten und nicht

@@ -146,13 +146,6 @@ Jede tragende Behauptung ist gegen das Repo geprüft worden:
   gehen über Abrechnung und Import; ein Admin-Patch wäre der stille
   Nebeneingang, den dieser Change gerade vermeiden will.
 
-<!-- openspec-review-trailer v1
-implementing-host: claude
-digest: sha256:009d15da151ddc4b110b6aef7f4fc58f70d8999e08cfe2ab11cc28f19584609c
-producer-version: 1.2.0
-tasks-digest: sha256:c4f4f7895b03605880ab2e419a73effda4bc2f2a31341bb5990344ac7171c90d
--->
-
 ## Review auf dem Diff (Schritt 4)
 
 Ein Reviewer, anderer Anbieter: **codex (gpt-5.6-sol)**, auf `git diff main...HEAD`.
@@ -182,3 +175,11 @@ richtiggestellt, einer abgelehnt.
 `staff_roles` direkt mit `service_role` und lief in „permission denied". Gefunden
 hat das die **Sichtprobe im Browser** — nicht pgTAP, nicht Vitest, nicht der
 Fremd-Review. Behoben mit `is_admin_uid` und `log_admin_action`.
+
+
+<!-- openspec-review-trailer v1
+implementing-host: claude
+digest: sha256:acc4ea7c7ec68ca8661659629fe67f66d84d6bf4f4698d9cc96fd018f14ebee4
+producer-version: 1.2.0
+tasks-digest: sha256:d2add2c2ed87f3b2aff9ad6b8cfe940668eaa4e8d66d56f31ac26e8c0b545251
+-->

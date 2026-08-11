@@ -26,6 +26,12 @@ Die Weißliste SHALL fest in der Funktion stehen und `tier`, `potential_score`,
 ausschließen — für diese gibt es eigene Wege, und ein Admin-Patch wäre ein
 stiller Nebeneingang.
 
+Sie SHALL außerdem die Profilspalten `goals` und `interests` ausschließen. Sie
+sind zwar client-schreibbar, heißen aber wie die gleichnamigen Kind-Tabellen und
+tragen etwas anderes; die Oberfläche schickt sie nie. Ein Feld offenzuhalten,
+das kein Aufrufer benutzt, ist Fläche ohne Nutzen — und der erste Fehlgriff
+schriebe die Formularform der Kind-Tabelle in die Profilspalte.
+
 Ein Schlüssel außerhalb der Weißliste SHALL die Funktion abbrechen lassen und
 SHALL NOT stillschweigend übergangen werden: ein ignoriertes Feld meldet dem
 Admin Erfolg für etwas, das nicht geschehen ist. Ebenso SHALL ein `patch`
@@ -96,10 +102,15 @@ erscheint nie, und das Nachladen der Formulardaten liefert null Zeilen. Ein
 Schreibweg ohne Lesepfad griffe nur an den Profilen, die ihn nicht brauchen.
 
 `admin_find_profile` SHALL über die Login-Adresse und den Namen suchen und die
-Trefferzahl begrenzen. Es SHALL bestehen, weil es keine Mitgliederliste gibt
-und die Profilseite für unbestätigte Profile nicht existiert — ohne Suche müsste
-der Admin die Kennung aus der Datenbank holen, also genau das tun, was diese
+Trefferzahl begrenzen. Es SHALL bestehen, weil es keine Mitgliederliste gibt und
+die Profilseite für unbestätigte Profile nicht existiert — ohne Suche müsste der
+Admin die Kennung aus der Datenbank holen, also genau das tun, was diese
 Fähigkeit abschaffen soll.
+
+Platzhalterzeichen des Mustervergleichs SHALL die Funktion **entschärfen**.
+Sonst kommt ein Suchbegriff aus lauter Jokerzeichen durch die Mindestlänge und
+liefert die Trefferobergrenze quer durch die Mitgliedschaft — also genau die
+Liste, die es nicht geben soll, nur mit einem anderen Namen.
 
 Beide Funktionen SHALL dieselbe Feld-Weißliste bedienen wie der Schreibweg und
 SHALL NOT zu einem allgemeinen Auskunftsweg über Mitglieder werden.
@@ -121,6 +132,12 @@ SHALL NOT zu einem allgemeinen Auskunftsweg über Mitglieder werden.
 - **WHEN** ein Admin `admin_find_profile` mit einer E-Mail-Adresse aufruft
 - **THEN** erhält er die zugehörige Profilkennung, auch wenn das Profil
   unbestätigt und damit sonst unsichtbar ist
+
+#### Scenario: Ein Suchbegriff aus Jokerzeichen öffnet die Suche nicht
+
+- **WHEN** ein Admin `admin_find_profile` mit einem Suchbegriff aufruft, der nur
+  aus Platzhalterzeichen des Mustervergleichs besteht
+- **THEN** erhält er keine Treffer — nicht die halbe Mitgliedschaft
 
 ### Requirement: Ein Admin ändert die Login-Adresse eines Mitglieds
 
@@ -150,6 +167,10 @@ eine im Aufruf mitgeschickte Kennung SHALL NOT genügen.
 Die neue Adresse SHALL sofort gelten, ohne Bestätigungsmail — eine Bestätigung
 ginge an das Postfach, an das das Mitglied gerade nicht herankommt, und
 verfehlte damit den Zweck. Genau deshalb SHALL der Weg Admins vorbehalten sein.
+
+Scheitert der Eintrag in die Spur, SHALL die Antwort das **eigens benennen**.
+Als Erfolg gemeldet bräche sie die Zusage unbemerkt; als Gesamtfehler gemeldet
+lüde sie zum Wiederholen einer Änderung ein, die bereits gilt.
 
 Nach der Änderung SHALL das System die Sitzungen des Kontos beenden. Die Zusage
 SHALL dabei **nicht überschrieben** werden: gelöscht werden Sitzung und
@@ -191,6 +212,13 @@ Benachrichtigungen weiter an das unerreichbare Postfach gehen.
   gültigem eigenem Token aufruft
 - **THEN** antwortet sie mit 403, und in `auth.users` ändert sich nichts — auch
   nicht die eigene Adresse
+
+#### Scenario: Eine Änderung ohne Spur wird als solche gemeldet
+
+- **GIVEN** eine erfolgreich geänderte Login-Adresse
+- **WHEN** der Eintrag in die Spur fehlschlägt
+- **THEN** meldet die Antwort das eigens — weder als schlichten Erfolg noch als
+  Gesamtfehler, der zum Wiederholen einlüde
 
 #### Scenario: Die Kontaktadresse folgt nicht von selbst
 
