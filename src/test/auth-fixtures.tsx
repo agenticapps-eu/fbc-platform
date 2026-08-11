@@ -24,6 +24,7 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     isActivated: true,
     activationLookupFailed: false,
     activationName: null,
+    activationMailStatus: null,
     signUp: async () => ({ error: null }),
     signIn: async () => ({ error: null }),
     signOut: async () => {},

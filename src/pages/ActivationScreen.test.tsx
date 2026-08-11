@@ -20,17 +20,20 @@ vi.mock("../lib/activation", async (orig) => {
   return {
     ...echt,
     requestActivationLink: vi.fn(async () => {}),
-    resendActivationLink: vi.fn(async () => {}),
+    // Seit AGE-526 gibt die Anforderung ihren Status zurück, statt ihn zu
+    // verschlucken. Die Vorgabe hier ist der Erfolgsfall.
+    resendActivationLink: vi.fn(async () => "issued" as const),
   };
 });
 
-function renderMit() {
+function renderMit(auth: Parameters<typeof fakeAuthValue>[0] = {}) {
   return render(
     <AuthFixture
       value={fakeAuthValue({
         isActivated: false,
         activationName: "Detlev",
         user: { id: "u1", email: "detlev@test.fbc" } as never,
+        ...auth,
       })}
     >
       <ActivationScreen />
@@ -104,5 +107,106 @@ describe("ActivationScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
 
     expect(await screen.findByText(/hat gerade nicht geklappt/i)).toBeInTheDocument();
+  });
+
+  /**
+   * AGE-526. Ab hier löst die Registrierung den Versand selbst aus — der
+   * Bildschirm muss also den Zustand zeigen, der wirklich eingetreten ist,
+   * statt einen Knopf für eine Mail anzubieten, die schon unterwegs ist.
+   *
+   * Und die andere Richtung, die vorher der stille Fehler war: Die Function
+   * antwortet bei jeder Abweisung mit **200** und dem Status im Rumpf. Wer
+   * daraus Erfolg liest, meldet grün „Der Link ist unterwegs", obwohl nichts
+   * versendet wurde. Mit dem automatischen Versand ist das der
+   * WAHRSCHEINLICHSTE Fall: Er verbraucht die 60-Sekunden-Sperrfrist sofort.
+   */
+  describe("automatischer Versand aus der Registrierung", () => {
+    it("startet ohne Klick im Zustand „unterwegs“, wenn der Versand griff", async () => {
+      renderMit({ activationMailStatus: "issued" });
+
+      expect(await screen.findByText(/Der Link ist unterwegs/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Erneut senden in/i })).toBeDisabled();
+      // Nichts nachgefordert: die Mail ist schon raus.
+      expect(resendActivationLink).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Der Fehler, den erst die Sichtprobe am laufenden System zeigte
+     * (2026-08-10, lokaler Stack): Der Versand läuft NACH der Registrierung,
+     * die Weiterleitung auf diesen Bildschirm passiert aber schon, sobald die
+     * Sitzung steht — also VORHER. Der Status trifft damit ein, während der
+     * Bildschirm längst gerendert ist.
+     *
+     * Eine erste Fassung las ihn als Anfangswert von `useState`. Das ist genau
+     * der Fall, den `useState` ignoriert: Der Anfangswert wird einmal genommen,
+     * spätere Änderungen erreichen den Zustand nie. Im Test mit vorbelegtem
+     * Kontext war das unsichtbar, im Browser stand der Knopf da, als wäre nie
+     * etwas versendet worden.
+     */
+    it("nimmt den Status auch an, wenn er erst nach dem Rendern eintrifft", async () => {
+      const { rerender } = renderMit({ activationMailStatus: null });
+      expect(screen.queryByText(/Der Link ist unterwegs/i)).not.toBeInTheDocument();
+
+      rerender(
+        <AuthFixture
+          value={fakeAuthValue({
+            isActivated: false,
+            activationName: "Detlev",
+            user: { id: "u1", email: "detlev@test.fbc" } as never,
+            activationMailStatus: "issued",
+          })}
+        >
+          <ActivationScreen />
+        </AuthFixture>,
+      );
+
+      expect(await screen.findByText(/Der Link ist unterwegs/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Erneut senden in/i })).toBeDisabled();
+    });
+
+    it("bietet den Knopf an, wenn der automatische Versand NICHT griff", () => {
+      renderMit({ activationMailStatus: "send_failed" });
+
+      expect(screen.queryByText(/Der Link ist unterwegs/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Bestätigungslink senden/i })).toBeEnabled();
+    });
+
+    it("meldet eine abgewiesene Anforderung als Wartezeit, nicht als Versand", async () => {
+      vi.mocked(resendActivationLink).mockResolvedValueOnce("rate_limited");
+      renderMit();
+
+      fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
+
+      expect(await screen.findByText(/schon ein Link angefordert/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Der Link ist unterwegs/i)).not.toBeInTheDocument();
+      // Kein Postfach versprechen: Schlug der Versand eben fehl, liegt dort
+      // nichts — und genau diese Reihenfolge ist der wahrscheinlichste Fall.
+      expect(screen.queryByText(/Postfach/i)).not.toBeInTheDocument();
+    });
+
+    it("nennt das erschöpfte Kontingent beim Namen, statt Erfolg zu melden", async () => {
+      vi.mocked(resendActivationLink).mockResolvedValueOnce("rate_limited_global");
+      renderMit();
+
+      fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
+
+      expect(await screen.findByText(/gerade sehr viele/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Der Link ist unterwegs/i)).not.toBeInTheDocument();
+    });
+
+    /**
+     * „Warte kurz" und „versuch es nochmal" sind verschiedene Auskünfte. Landet
+     * der Fehlversand im Wartezweig, wartet ein Mitglied auf eine Mail, die
+     * niemand mehr schickt.
+     */
+    it("trennt den Fehlversand von der Abweisung", async () => {
+      vi.mocked(resendActivationLink).mockResolvedValueOnce("send_failed");
+      renderMit();
+
+      fireEvent.click(screen.getByRole("button", { name: /Bestätigungslink senden/i }));
+
+      expect(await screen.findByText(/hat gerade nicht geklappt/i)).toBeInTheDocument();
+      expect(screen.queryByText(/schon ein Link angefordert/i)).not.toBeInTheDocument();
+    });
   });
 });

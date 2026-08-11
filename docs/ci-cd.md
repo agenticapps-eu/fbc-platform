@@ -104,7 +104,7 @@ The required keys (already defined in Infisical — see [secrets.md](./secrets.m
 
 - **Client / build (`VITE_*`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
   `VITE_SENTRY_DSN`, `VITE_ENVIRONMENT`
-- **Server / deploy:** `SENTRY_AUTH_TOKEN`, `AXIOM_TOKEN`, `AXIOM_DATASET`,
+- **Server / deploy:** `SENTRY_AUTH_TOKEN`,
   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
 - `SENTRY_ORG` / `SENTRY_PROJECT` are **not** required in Infisical — the workflow
   and `vite.config.ts` default them to `factiv` / `fbc-platform`.

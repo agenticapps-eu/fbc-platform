@@ -423,7 +423,7 @@ Der Fix zu 8.1 wurde vor dem Merge nochmals geprüft — dieselbe Kontrolle, die
 den Change fand, auf die eigene Korrektur. Sie hat einen Blocker gefunden (oben
 in 8.1 beschrieben) und danach noch das hier:
 
-- [ ] 8.8 **Der Wettlauf ist damit NICHT abschließend behoben — der andere
+- [x] 8.8 **Der Wettlauf ist damit NICHT abschließend behoben — der andere
       Ablauf umgeht den Wächter ganz.** Läuft B's `update … set invalidated_at`
       **nach** A's Commit, bekommt es unter `read committed` einen frischen
       Snapshot, **sieht A's soeben angelegtes Token und entwertet es**. B's
@@ -443,7 +443,18 @@ in 8.1 beschrieben) und danach noch das hier:
       23505-Zweig zum Gürtel neben den Hosenträgern, statt ihn zu ersetzen.
       Eigener Change: es ändert das Sperrverhalten beider Wege und gehört
       gemessen, nicht nebenbei mitgenommen.
-- [ ] 8.9 **Der Wächter-Fall selbst bleibt ungetestet.** Der `throws_ok`-Test
+      _**Geschlossen durch AGE-507** (`lock-activation-token-race`, gemergt als
+      `#146`, auf PROD angewendet 2026-08-09). Der dort gebaute Fix ist genau der
+      hier vorgeschlagene: `for update of p` in **beiden** ausgebenden RPCs, vor
+      den drei Grenzen. Nicht behauptet, sondern gemessen — Szenario S1 der Sonde
+      `scripts/probe-wettlauf-token-ausgabe.ts` trägt diesen Befund (Gruppe 1.5
+      und 4 dort). Die Messung hat dabei zwei Erwartungen dieses Absatzes
+      widerlegt: die Rollen sind vertauscht (A gewinnt, B fällt in die
+      Sperrfrist), und die beiden Wege warten heute schon aufeinander — nur am
+      **Index** statt an der Profilzeile. Die Sperre reicht weiter als hier
+      angenommen: ein `insert` in `activation_tokens` nimmt für den Fremdschlüssel
+      ohnehin ein `for key share` auf die Profilzeile._
+- [x] 8.9 **Der Wächter-Fall selbst bleibt ungetestet.** Der `throws_ok`-Test
       belegt nur, was NICHT verschluckt wird; ein Tippfehler im Constraint-Namen
       des Handlers bliebe grün. Teilweise geschlossen: eine `has_index`-Zeile
       nagelt den Namen als Vertragsbestandteil fest (Sonde: mit falschem Namen
@@ -451,6 +462,14 @@ in 8.1 beschrieben) und danach noch das hier:
       mit zwei echten Sitzungen außerhalb der pgTAP-Transaktion — dafür fehlen
       hier `dblink` und `pg_background`. Gehört zu 8.8: wer dort `for update`
       einzieht, braucht ohnehin einen Zwei-Sitzungs-Aufbau.
+      _**Geschlossen durch AGE-507.** Genau dieser Aufbau ist dort entstanden:
+      Szenario S2 der Sonde fährt den 23505-Wächter unter einem echten
+      Zwei-Sitzungs-Wettlauf, außerhalb jeder pgTAP-Transaktion, und belegt das
+      Warten über `pg_blocking_pids`. Der Zweig ist damit betreten worden, nicht
+      nur umschrieben. Ein Nachtrag, der hierher gehört: S2 behauptet **keinen
+      festen Statuswert** — ohne Sperre `pending`, mit ihr `rate_limited`. Beides
+      ist ehrlich; auf „pending" zu prüfen hätte den **Weg** statt das
+      **Ergebnis** gemessen._
 
 **Geprüft und in Ordnung** — damit es nicht zweimal geprüft wird: Der Kopf der
 Migration behauptet, gegen `20260806090000` seien ausschließlich Zweigreihenfolge

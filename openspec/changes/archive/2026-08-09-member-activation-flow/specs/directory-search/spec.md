@@ -15,7 +15,7 @@ fields" therefore reads: every logged-in **and activated** member. Because the
 view runs with its owner's rights and bypasses the base table's policies, this
 condition SHALL sit in the view body itself, not only in the policies behind it.
 
-#### Scenario: Logged-in activated member browses base directory fields
+#### Scenario: Logged-in member browses base directory fields
 
 - **WHEN** an authenticated, activated member selects from `profiles_public`
 - **THEN** the public field subset of all `is_public` profiles **whose owner is

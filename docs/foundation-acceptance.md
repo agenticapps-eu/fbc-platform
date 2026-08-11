@@ -1,5 +1,14 @@
 # Foundation Acceptance — W1 · Fundament (Smoke Test)
 
+> **Nachtrag 2026-08-10 (ADR-0037):** Die Axiom-Destination wurde entfernt.
+> `/api/log` schreibt jetzt eine strukturierte JSON-Zeile in die Workers Logs
+> statt an Axiom zu senden; es gibt kein `AXIOM_TOKEN` und keinen `502`-Pfad
+> mehr. **Die Ergebnisse unten bleiben unverändert** — sie sind das Protokoll
+> des Abnahmelaufs vom 2026-06-12 und beschreiben, was damals galt, nicht den
+> heutigen Stand. Nur der offene Punkt „Axiom Preview-Env" weiter unten war
+> zukunftsgerichtet und ist korrigiert.
+
+
 > **Issue:** AGE-232 · **Datum:** 2026-06-12 · **Tester:** Claude Code (automatisiert)
 > **Live-URL (Prüfgegenstand):** <https://fbc-platform.pages.dev> (Default-Domain, `pages.dev`)
 > **Supabase:** Projekt `foelowldexkcqzewvrcf` (EU `eu-central-1`/Frankfurt) ·
@@ -150,8 +159,9 @@ eigene Profilzeile).
   (kein `staging`, bewusst — siehe `docs/secrets.md`).
 - **Avatar-Storage:** noch kein `storage`-Bucket vorhanden — Voraussetzung für den
   Avatar-Upload in AGE-238.
-- **Axiom Preview-Env:** `/api/log` ist auf Preview-Deploys ein No-op (`204`),
-  bis `AXIOM_TOKEN`/`AXIOM_DATASET` auch im Preview-Env der Pages-Projekts gesetzt sind.
+- ~~**Axiom Preview-Env:** `/api/log` ist auf Preview-Deploys ein No-op.~~
+  **Erledigt durch ADR-0037:** der Endpunkt liest keine Secrets mehr und
+  verhält sich in Preview, Produktion und lokal identisch.
 - **`/api/log` ohne Rate-Limit:** nur Payload-Cap + Event-Allowlist; Abuse-Schutz
   (Turnstile/IP-Limit) vor öffentlichem Einsatz nötig.
 - **Funnel-Events teils ungenutzt:** `match_suggested`, `contact_request_*`,

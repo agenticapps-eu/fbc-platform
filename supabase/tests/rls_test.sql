@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(195);
+select plan(202);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1261,6 +1261,114 @@ update public.activation_attempts set attempted_at = now() - interval '2 hours'
  where ip = '203.0.113.7';
 select is((select attempts from public.note_failed_activation('203.0.113.7', '1 hour', 3)),
   1, 'note_failed_activation: außerhalb des Fensters zählt nichts mehr');
+
+-- ── 14e. Das Stundenkontingent der Token-Ausgabe (AGE-526) ──────────────────
+-- Der automatische Versand nach der Selbstregistrierung macht aus jeder
+-- Registrierung eine Mail. Ohne profilübergreifende Grenze ist die Plattform
+-- damit ein Weiterleiter: ein Angreifer legt Konten mit fremden Adressen an und
+-- jede erzeugt Post. Die Grenze greift NUR für frische Profile — sonst würde ein
+-- verbranntes Kontingent echte Mitglieder aussperren, und der Missbrauch wäre
+-- zur Aussperrung geworden.
+--
+-- Alle Token aus den vorigen Abschnitten fliegen raus: dieser Block misst
+-- Zählstände, und eine geerbte Zeile verschiebt jede Schwelle um eins.
+delete from public.activation_tokens;
+
+insert into auth.users (id, aud, role, email) values
+  ('a5260000-0000-0000-0000-00000000f001', 'authenticated', 'authenticated',
+   'frisch-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f002', 'authenticated', 'authenticated',
+   'alt-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f003', 'authenticated', 'authenticated',
+   'grenze-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f004', 'authenticated', 'authenticated',
+   'kante-kontingent@test.fbc'),
+  ('a5260000-0000-0000-0000-00000000f005', 'authenticated', 'authenticated',
+   'fueller-kontingent@test.fbc');
+
+-- Ausgangslage: keins der fünf ist aktiviert, sonst antwortet die Function
+-- `already_activated`, bevor sie irgendeine Grenze erreicht.
+update public.profiles set activated_at = null
+ where id::text like 'a5260000-%';
+-- '…f002' ist das bestehende Mitglied, '…f003' liegt exakt auf der Kante.
+update public.profiles set created_at = now() - interval '90 days'
+ where id = 'a5260000-0000-0000-0000-00000000f002';
+update public.profiles set created_at = now() - interval '10 minutes'
+ where id = 'a5260000-0000-0000-0000-00000000f003';
+
+-- Einhundert Ausgaben in der laufenden Stunde, alle auf einem fremden Profil:
+-- die Grenze zählt über ALLE Profile, nicht die des Aufrufers. `invalidated_at`
+-- ist gesetzt, weil höchstens ein OFFENES Token je Profil liegen darf — für die
+-- Zählung ist das gleichgültig, jede dieser Zeilen stand für einen Versand.
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+select 'fueller-' || g, 'a5260000-0000-0000-0000-00000000f005',
+       now() + interval '72 hours', now() - interval '5 minutes', now()
+  from generate_series(1, 100) g;
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f001',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-frisch'') '
+  'where status = ''rate_limited_global'''),
+  1, 'Kontingent: ein frisches Profil bekommt bei vollem Stundenkontingent '
+     'keinen Link — sonst ist die offene Selbstregistrierung ein Mailverteiler');
+
+select is((select count(*)::int from public.activation_tokens
+            where profile_id = 'a5260000-0000-0000-0000-00000000f001'),
+  0, 'Kontingent: die Abweisung schreibt KEIN Token — eine Zeile, die niemand '
+     'versendet, verbrauchte sonst das Kontingent ein zweites Mal');
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f002',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-alt'') '
+  'where status = ''issued'''),
+  1, 'Kontingent: ein bestehendes Mitglied kommt auch bei vollem Kontingent '
+     'durch — die Grenze darf aus Missbrauch keine Aussperrung machen');
+
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f003',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-grenze'') '
+  'where status = ''issued'''),
+  1, 'Kontingent, Randwert: exakt zehn Minuten alt ist NICHT mehr frisch — die '
+     'Grenze ist `> now() - 10 minutes`, nicht `>=`');
+
+-- Dasselbe Konto wie in der ersten Assertion, nur zehn Minuten später. Die
+-- Sperre muss sich von selbst lösen, sonst ist der Zugang nicht verzögert,
+-- sondern verschlossen.
+update public.profiles set created_at = now() - interval '11 minutes'
+ where id = 'a5260000-0000-0000-0000-00000000f001';
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f001',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-spaeter'') '
+  'where status = ''issued'''),
+  1, 'Kontingent: das abgewiesene frische Konto kommt nach zehn Minuten durch, '
+     'auch wenn das Kontingent noch voll ist — die Sperre löst sich selbst');
+
+-- Randwert der Stunde: neunundneunzig innerhalb des Fensters, eines exakt auf
+-- der Kante. `now()` steht in der Transaktion still, die Gleichheit ist also
+-- echt prüfbar. Zählte die Kante mit, wäre die Grenze um eins zu scharf.
+delete from public.activation_tokens;
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+select 'kante-' || g, 'a5260000-0000-0000-0000-00000000f005',
+       now() + interval '72 hours', now() - interval '5 minutes', now()
+  from generate_series(1, 99) g;
+insert into public.activation_tokens (token_hash, profile_id, expires_at, created_at, invalidated_at)
+values ('kante-exakt', 'a5260000-0000-0000-0000-00000000f005',
+        now() + interval '72 hours', now() - interval '1 hour', now());
+select is(pg_temp.count_as('a5260000-0000-0000-0000-00000000f004',
+  'select count(*)::int from public.request_own_activation_token(''hash-kontingent-kante'') '
+  'where status = ''issued'''),
+  1, 'Kontingent, Randwert: was exakt eine Stunde alt ist, zählt nicht mehr '
+     'mit — das Fenster ist `> now() - 1 hour`');
+
+-- Die Grenze ist profilübergreifend, die Sperre auf der eigenen Profilzeile
+-- trägt sie deshalb NICHT: zwei gleichzeitige frische Anforderungen sperren
+-- verschiedene Zeilen und lesen denselben Zählstand. Nur ein Riegel, den beide
+-- nehmen müssen, hält die Zusage. Der Laufzeitbeleg dafür steht in
+-- scripts/probe-kontingent-wettlauf.ts — zwei Sitzungen bekommt pgTAP nicht.
+select ok(
+  strpos(rumpf, 'pg_advisory_xact_lock') > 0
+  and strpos(rumpf, 'pg_advisory_xact_lock') < strpos(rumpf, 'interval ''1 hour'''),
+  'request_own_activation_token: der Riegel steht VOR der Zählung des '
+  'Stundenkontingents — ein count(*) ohne ihn ist genau im Registrierungsschwall '
+  'falsch, für den die Grenze existiert (AGE-526)')
+from (select pg_temp.rumpf_ohne_kommentare(
+        'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
 
 select * from finish();
 rollback;

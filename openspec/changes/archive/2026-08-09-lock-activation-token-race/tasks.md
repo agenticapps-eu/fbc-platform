@@ -489,24 +489,59 @@ Gebaut als `supabase/migrations/20260808200000_activation_token_profilzeile_sper
 
 ## 7. Ausrollen — drei Flächen, und die Falle dazwischen
 
-- [ ] 7.1 Merge; danach prüfen, dass `migrate-dev` auf `main` **gelaufen** ist.
-- [ ] 7.2 `migrate-prod` von Hand freigeben. Solange PROD die Migration nicht
+- [x] 7.1 Merge; danach prüfen, dass `migrate-dev` auf `main` **gelaufen** ist.
+- [x] 7.2 `migrate-prod` von Hand freigeben. Solange PROD die Migration nicht
       kennt, steht `drift-gate` auf `failure` — und `deploy` und `functions`
       werden dann **stillschweigend übersprungen**, obwohl ein Check namens
       „deploy" grün aussieht (der gehört `pages-build-deployment`).
-- [ ] 7.3 Den Dry-Run von `migrate-prod` **lesen**, bevor `apply` ausgelöst
+- [x] 7.3 Den Dry-Run von `migrate-prod` **lesen**, bevor `apply` ausgelöst
       wird: der Job trägt keine Reviewer-Regel, der Dispatch ist der Punkt ohne
       Rückweg. Erwartet werden zwei `create or replace function` samt Kommentar
       und Grants — keine Tabelle, kein Index, kein Backfill.
-- [ ] 7.4 Nach dem Rollout je Projekt belegen, dass die Sperre in der **Live**-
+- [x] 7.4 Nach dem Rollout je Projekt belegen, dass die Sperre in der **Live**-
       Definition steht (`pg_get_functiondef` gegen beide Refs gelesen), nicht nur
       in der Datei.
 
+_**Gruppe 7 belegt, 2026-08-09** — jede Zeile mit Ausgabe statt Häkchen:_
+
+- _**7.1** `migrate-dev` auf `main` für `44316b6`: **success** (Lauf `31306988638`)._
+- _**7.3 vor 7.2**, weil der Dispatch beides in einem Lauf tut: Der `apply`-Job
+  startet **direkt** hinter `plan`, die `production`-Umgebung trägt derzeit keine
+  Reviewer-Regel. Der Dry-Run wurde deshalb **vorab lesend** geholt —
+  `migration-drift-gate.ts` gegen PROD meldete genau eine fehlende Migration
+  (`20260808200000`), und die Datei trägt auf oberster Ebene ausschließlich
+  zweimal `create or replace function`, je mit `comment`, `revoke` und `grant`.
+  Die vier `insert`/`update` darin stehen **innerhalb** der Funktionsrümpfe
+  (Zeilen 202/217 in `$$` 143–243, 336/341 in `$$` 283–346) — kein Backfill,
+  keine Tabelle, kein Index. Der Lauf selbst bestätigte es wörtlich:
+  `Would push these migrations: • 20260808200000_activation_token_profilzeile_sperren.sql`._
+- _**7.2** Lauf `31315854905` auf `44316b6`: `plan` success, `apply` success.
+  Der Job prüft nach dem Anwenden selbst auf Abweichungsfreiheit — auch das grün._
+- _**7.4** `pg_get_functiondef` gegen **beide** Refs gelesen, nicht die Datei:_
+
+  | | vor `apply` | nach `apply` |
+  | --- | --- | --- |
+  | PROD `viwntbodrtqxgmqyxluh` | `for update of p`: **NEIN** | **JA** |
+  | DEV `foelowldexkcqzewvrcf` | **JA** | **JA** |
+
+  _Dieselbe Sonde, dieselbe Abfrage. Dass sie eine Stunde zuvor auf PROD NEIN
+  und auf DEV JA sagte, ist der Beleg, dass sie trennscharf ist und nicht
+  einfach immer JA meldet._
+
 ## 8. Abschließen
 
-- [ ] 8.1 Delta nach `openspec/specs/access-control/` folden und den Change
+- [x] 8.1 Delta nach `openspec/specs/access-control/` folden und den Change
       archivieren.
-- [ ] 8.2 8.8 und 8.9 in `openspec/changes/password-reset-flow/tasks.md`
+- [x] 8.2 8.8 und 8.9 in `openspec/changes/password-reset-flow/tasks.md`
       abhaken, mit Verweis auf AGE-507 und den Messungen aus Gruppe 4.
-- [ ] 8.3 AGE-507 in Linear auf Done — erst prüfen, ob die GitHub-Automation das
+- [x] 8.3 AGE-507 in Linear auf Done — erst prüfen, ob die GitHub-Automation das
       schon getan hat.
+
+_**Gruppe 8 erledigt, 2026-08-09.** 8.1: Delta gefaltet (`access-control`, +1
+Requirement), Change liegt als `archive/2026-08-09-lock-activation-token-race`.
+8.2: 8.8 und 8.9 in `password-reset-flow/tasks.md` abgehakt, je mit Verweis auf
+die Messung, die sie schließt — S1 für 8.8, S2 für 8.9 — und mit den zwei
+Nachträgen, die die Messung gegenüber der dortigen Annahme korrigiert
+(vertauschte Rollen; kein fester Statuswert in S2). 8.3: **nichts zu tun** —
+die GitHub-Automation hat AGE-507 beim Merge von #146 auf Done gesetzt
+(`completedAt` 2026-08-09T07:54Z). Erst gelesen, dann nicht geschrieben._
