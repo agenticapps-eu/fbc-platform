@@ -70,35 +70,32 @@ Vollständig im PR; die tragenden:
 
 ## Next session: start here
 
-**Die Reihenfolge ist von den Workflows erzwungen — und andersherum, als es
-intuitiv wirkt.** `migrate-prod` prüft als Erstes, ob ein `migrate-dev`-Lauf
-**für genau diese SHA auf `main`** grün war („PROD kommt nach DEV, nicht
-davor"). Vor dem Merge gibt es den nicht, ein Dispatch scheitert also sofort.
-Und `migrate-dev` läuft auf `main` ohne `needs`, ist vom `drift-gate` somit
-unabhängig — nur `deploy` und `functions` hängen an beiden.
+**C6 ist fertig und vollständig ausgerollt — nichts steht mehr offen.** Der
+Ablauf, den die Workflows erzwingen, ist einmal komplett durchlaufen:
 
-Daraus folgt:
+1. PR #157 squash-gemergt → `89e5e8a`.
+2. `migrate-dev` grün (DEV war schon auf Stand), `drift-gate` **rot** wie
+   erwartet, `deploy`/`functions` übersprungen.
+3. `migrate-prod` dispatcht → `plan` + `apply` grün. PROD
+   (`viwntbodrtqxgmqyxluh`) danach **nachgemessen**, nicht geglaubt: 56
+   Migrationen, jüngste `20260811090300`; `cover_url` in Spalte, Grant und
+   Sicht; `profile_legacy` mit RLS und ohne jeden Client-Grant; covers-Bucket
+   mit 2 MiB/WebP und drei Policies mit Gate (avatars unverändert drei); alle
+   sechs Funktionen; `admin_audit` für `authenticated` nur SELECT, kein INSERT.
+   Die zwei Bestandsprofile unverändert.
+4. `deploy.yml` neu laufen lassen → alle vier Jobs grün.
+   `admin-change-email` auf PROD **v1 ACTIVE, `verify_jwt=True`**; Frontend
+   live (Bundle 1,2 MB, enthält `/admin/mitglied`).
 
-1. **PR #157 mergen** (squash). `migrate-dev` wird grün — die Migrationen
-   liegen bereits auf DEV, `db push` meldet dort „up to date". `drift-gate`
-   wird **rot**, weil PROD die vier Migrationen fehlen; `deploy` und
-   `functions` werden dadurch übersprungen. Erwartet, keine Panne.
-2. **`migrate-prod` dispatchen.** ACHTUNG: `apply` startet direkt hinter
-   `plan`, ohne Reviewer-Regel — der Dispatch IST die Anwendung.
-3. **`deploy.yml` neu laufen lassen** (`gh run rerun <id>` auf dem
-   Merge-Commit). Erst dann ist das Frontend draußen und `admin-change-email`
-   auch auf PROD. Der `functions`-Job vergleicht gegen den letzten
-   ERFOLGREICHEN Lauf, nicht gegen `HEAD^` — der übersprungene Lauf reißt also
-   keine Lücke.
+**Die Reihenfolge ist erzwungen und war anfangs falsch notiert**, deshalb hier
+festgehalten: `migrate-prod` prüft als Erstes, ob `migrate-dev` **für dieselbe
+SHA auf `main`** grün war („PROD kommt nach DEV, nicht davor"). Vor dem Merge
+gibt es diesen Lauf nicht. Und nach `migrate-prod` läuft `deploy.yml` **nicht
+von selbst** noch einmal — ohne den Re-Run ist nichts ausgeliefert, obwohl alles
+grün aussieht.
 
-Danach ist C6 fertig und **C7** dran.
-
-**Was `migrate-prod` anwenden wird** — PROD gelesen am 11.08.
-(`viwntbodrtqxgmqyxluh`): 52 Migrationen, jüngste `20260810170000`, es fehlen
-also genau die vier neuen. PROD trägt 2 Profile, keins auf `impact` — der
-Import lief dort nicht, der neue Unique-Index findet nichts vor. Alle vier sind
-additiv; das Einzige, was ein bestehendes Objekt anfasst, ist das Anhängen von
-`cover_url` an `profiles_public` plus der Spalten-Grant.
+**Als Nächstes: C7.** Linear-Nummer vom Nutzer holen, dann Schritt 1 des Loops
+(Kontext lesen), Change anlegen, Fremd-Review vor der ersten Zeile Code.
 
 ## Open questions
 
