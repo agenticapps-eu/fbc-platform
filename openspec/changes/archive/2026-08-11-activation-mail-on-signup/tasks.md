@@ -100,13 +100,34 @@ roten Lauf ist keiner.
 
 ## 6. Abnahme durch Donald
 
-- [ ] 6.1 `migrate-dev`, danach echte Registrierung auf DEV mit einer **echten
-      Fremdadresse** — Link im Postfach, nicht nur `202`
-- [ ] 6.2 Link einlösen, Passwort setzen, anmelden: das Konto ist aktiviert
-- [ ] 6.3 Dry-Run für PROD **lesend** prüfen (`migration-drift-gate.ts` plus die
-      Migrationsdatei), dann `migrate-prod`
-- [ ] 6.4 Frontend-Deploy; Live-Stand am ausgelieferten Bundle messen, nicht am
-      grünen Job
+- [x] 6.1 Echte Registrierung mit einer **echten Adresse**, Zustellung belegt —
+      und zwar härter als geplant: Resend meldet für die Mail an
+      `donald@factiv.eu` `last_event = delivered`, und das Token wurde
+      **eingelöst** (`used_at`), was ohne die zugestellte Mail unmöglich ist.
+      **Abweichung, die benannt gehört:** gelaufen gegen den LOKALEN Stack, nicht
+      gegen DEV — mit dem echten Resend-Konto und der verifizierten Domain
+      `effbeezee.com`. AGE-526 ändert an den Edge Functions nichts; die
+      geänderte RPC ist auf DEV und PROD getrennt nachgemessen
+- [x] 6.2 Link eingelöst und Passwort gesetzt: `used_at` und `activated_at`
+      stehen beide auf `07:18:20`. **Was für dieses Konto NICHT gemessen wurde:**
+      die anschließende Anmeldung — `last_sign_in_at` trägt weiter die
+      automatische Anmeldung der Registrierung. Der Schritt selbst ist am
+      2026-08-11 mit einem anderen Konto (`age527@test.fbc`) vollständig
+      durchgespielt worden: Anmeldung nach dem Setzen führt in die Startseite
+- [x] 6.3 Dry-Run **vorab gelesen**: `migration-drift-gate.ts` gegen PROD nannte
+      genau `20260810170000`, und die Datei trägt auf oberster Ebene zwei
+      Anweisungen — beide auf Funktionsebene, keine Tabellen- oder
+      Datenänderung. Danach `migrate-prod`: `plan` und `apply` erfolgreich.
+      Direkt auf PROD nachgemessen: Migration in der Historie, Funktion mit
+      Riegel, `rate_limited_global`, Altersgrenze und Kontingent. Drift danach:
+      „OK — 52 Migrationen, Historie abweichungsfrei"
+- [x] 6.4 Der Deploy war vorher vom `drift-gate` **übersprungen** worden — nach
+      `migrate-prod` nachgezogen, alle vier Jobs grün. Am ausgelieferten Bundle
+      gemessen: `assets/index-BTWXky_j.js`, 1.220.353 Bytes, mit
+      `rate_limited_global` und beiden neuen Meldungen. **Eine erste Messung war
+      ein Fehlalarm** — ein alter Satz auf einer anderen Seite enthält dieselbe
+      Wortfolge; erst der eindeutige Marker deckte auf, dass noch das alte
+      Bundle auslieferte
 
 ## 7. Code-Review und Abschluss
 
@@ -117,6 +138,9 @@ roten Lauf ist keiner.
       zweite Brille in denselben Diff-Review gegeben (Umgehung der Grenze,
       Aussperrung, Adress-Aufzählung, Mailverteiler). Ohne eigenen Befund
 - [x] 7.3 `verification-before-completion`: jeder Haken oben trägt einen Beleg
-- [ ] 7.4 `openspec archive`, Delta in `openspec/specs/access-control/` gefaltet
-- [ ] 7.5 PR, Linear AGE-526 auf Done, AGE-517 um den Vermerk ergänzen, was
-      dieser Change entschärft hat und was offen bleibt
+- [x] 7.4 `openspec archive`, Delta in `openspec/specs/access-control/` gefaltet
+- [x] 7.5 PR #150 gemergt; Linear AGE-526 steht auf Done (die Automation setzt
+      es beim Merge). AGE-517 um den Vermerk ergänzt: was entschärft ist (100/h
+      für frische Profile, mit Riegel) und was offen bleibt (keine IP-Grenze,
+      der Admin-Weg zählt mit statt gebremst zu werden, das Kontingent zählt
+      auch nie versendete Zeilen)
