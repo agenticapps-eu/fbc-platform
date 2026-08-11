@@ -27,7 +27,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
   const [formError, setFormError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const {
     register,
@@ -43,7 +42,6 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
-    setInfo(null);
 
     if (mode === "login") {
       const { error } = await signIn(values.email, values.password);
@@ -67,11 +65,17 @@ export default function LoginPage() {
       setFormError(error.message);
       return;
     }
-    // Ist E-Mail-Bestätigung deaktiviert, liefert signUp direkt eine Session und
-    // der Navigate-Guard oben leitet nach "/". Sonst diesen Hinweis zeigen.
-    setInfo(
-      "Registrierung erfolgreich. Falls E-Mail-Bestätigung aktiv ist, bitte Postfach prüfen.",
-    );
+    // Hier stand ein Hinweis „Registrierung erfolgreich …". Er ist mit AGE-526
+    // entfallen, und zwar nicht wegen seines Textes, sondern weil er nie zu
+    // sehen war: Die eingebaute Bestätigung ist aus (AGE-445), `supabase.auth
+    // .signUp` meldet die Sitzung an den Auth-Zuhörer, BEVOR es auflöst — der
+    // Navigate-Guard oben hat diese Seite dann längst abgeräumt. Der Hinweis
+    // wäre ein setState auf eine ausgehängte Komponente gewesen, und der Test
+    // darauf bestand nur, weil die Attrappe keine Sitzung herstellt.
+    //
+    // Die Fortsetzung ist der Aktivierungsbildschirm. Er kennt den
+    // Versandstatus und sagt ihn wahrheitsgemäß; diese Seite kennt ihn nicht.
+    // Befund aus dem Diff-Review vom 2026-08-10.
   }
 
   return (
@@ -155,7 +159,6 @@ export default function LoginPage() {
         </div>
 
         {formError && <p className="text-sm text-danger">{formError}</p>}
-        {info && <p className="text-sm text-success">{info}</p>}
 
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           {mode === "login" ? "Anmelden" : "Konto erstellen"}
@@ -167,8 +170,7 @@ export default function LoginPage() {
         onClick={() => {
           setMode((m) => (m === "login" ? "register" : "login"));
           setFormError(null);
-          setInfo(null);
-        }}
+              }}
         className="mt-4 text-sm font-medium text-accent-strong hover:underline"
       >
         {mode === "login" ? "Noch kein Konto? Registrieren" : "Schon ein Konto? Zum Login"}
