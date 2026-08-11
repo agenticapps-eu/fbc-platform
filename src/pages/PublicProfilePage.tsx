@@ -38,7 +38,7 @@ const THEME_LABEL: Record<string, string> = {
 
 export default function PublicProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const { user, levelRank } = useAuth();
+  const { user, levelRank, staffRole } = useAuth();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: publicProfileQueryKey(id ?? ""),
@@ -73,6 +73,11 @@ export default function PublicProfilePage() {
   const profile = data.publicProfile;
   const extended = data.extended;
   const isOwn = !!user && user.id === profile.id;
+  // Komfort, nicht die Grenze: die ist `is_admin()` im Rumpf der RPCs (AGE-498).
+  // Der Weg erscheint nur bei Profilen, die HIER sichtbar sind — unbestätigte
+  // erreicht der Admin über die Suche auf /admin, weil profiles_public sie für
+  // niemanden führt.
+  const istAdmin = staffRole === "admin" && !isOwn;
   // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie: die
   // erweiterten Felder gehören zum „vollständigen Verzeichnis" (ab `discover`),
   // eine Kontaktanfrage ist eine Stufe teurer (ab `exchange`) — das ist der
@@ -84,7 +89,11 @@ export default function PublicProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <ProfileHeader profile={profile} impactScore={extended?.potential_score ?? null} />
+      <ProfileHeader
+        profile={profile}
+        impactScore={extended?.potential_score ?? null}
+        adminEditPath={istAdmin ? `/admin/mitglied/${profile.id}` : null}
+      />
 
       {extended ? (
         <ExtendedSections extended={extended} />
@@ -113,19 +122,33 @@ export default function PublicProfilePage() {
 function ProfileHeader({
   profile,
   impactScore,
+  adminEditPath,
 }: {
   profile: PublicProfile;
   impactScore: number | null;
+  adminEditPath: string | null;
 }) {
   return (
     <ProfileHero
       name={profile.name}
       avatarUrl={profile.avatar_url}
+      coverUrl={profile.cover_url}
       tier={profile.tier}
       roles={profile.roles}
       region={profile.region}
       company={profile.company}
-      action={impactScore !== null && <HeroImpactBadge score={impactScore} />}
+      action={
+        <div className="flex flex-col items-end gap-2">
+          {impactScore !== null && <HeroImpactBadge score={impactScore} />}
+          {adminEditPath && (
+            <Link to={adminEditPath}>
+              <Button variant="ghost" size="sm">
+                Als Admin bearbeiten
+              </Button>
+            </Link>
+          )}
+        </div>
+      }
     >
       {profile.short_bio && (
         <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>

@@ -32,6 +32,9 @@ export interface PublicProfile {
   id: string;
   name: string;
   avatar_url: string | null;
+  /** Hintergrundbild (AGE-498). Liegt in der Sicht, nicht nur auf der Basiszeile —
+   *  sonst sähe es außer dem Eigentümer niemand. */
+  cover_url: string | null;
   region: string | null;
   company: string | null;
   short_bio: string | null;
@@ -69,7 +72,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
   const [publicRes, baseRes, themeRes, interestsRes, offersRes, needsRes] = await Promise.all([
     supabase
       .from("profiles_public")
-      .select("id, name, avatar_url, region, company, short_bio, tier, roles")
+      .select("id, name, avatar_url, cover_url, region, company, short_bio, tier, roles")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -101,6 +104,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
           id: pub.id,
           name: pub.name ?? "Mitglied",
           avatar_url: pub.avatar_url,
+          cover_url: pub.cover_url,
           region: pub.region,
           company: pub.company,
           short_bio: pub.short_bio,

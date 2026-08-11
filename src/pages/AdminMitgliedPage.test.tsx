@@ -1,0 +1,146 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthFixture, authAsTier } from "../test/auth-fixtures";
+import { ToastProvider } from "../components/ui/Toast";
+
+vi.mock("../lib/admin-profile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/admin-profile")>();
+  return {
+    ...actual,
+    fetchAdminProfile: vi.fn(),
+    saveAdminProfile: vi.fn(),
+    changeLoginEmail: vi.fn(),
+  };
+});
+import {
+  changeLoginEmail,
+  fetchAdminProfile,
+  saveAdminProfile,
+  type AdminProfileData,
+} from "../lib/admin-profile";
+
+import AdminMitgliedPage from "./AdminMitgliedPage";
+
+const ZIEL = "c6c6c6c6-0000-0000-0000-0000000000b1";
+
+const DATEN: AdminProfileData = {
+  form: {
+    name: "Importiert",
+    region: "Berlin",
+    company: "Alt GmbH",
+    short_bio: "Kurz",
+    avatar_url: null,
+    cover_url: null,
+    branche: "",
+    headline: "",
+    roles: [],
+    competencies: [],
+    website: "",
+    dev_focus: "",
+    socials: { linkedin: "", instagram: "", xing: "" },
+    interests: [],
+    goals: [],
+    videos: [],
+  },
+  contact: { email: "kontakt@alt.de", phone: "" },
+  legacy: { paid_until: "2027-06-30", legacy_tier: "Premium", legacy_price: "1200", legacy_source_id: "wp-4711" },
+  loginEmail: "login@alt.de",
+  activated: false,
+};
+
+beforeEach(() => {
+  vi.mocked(fetchAdminProfile).mockReset().mockResolvedValue(DATEN);
+  vi.mocked(saveAdminProfile).mockReset().mockResolvedValue(undefined);
+  vi.mocked(changeLoginEmail).mockReset().mockResolvedValue({ status: "ok" });
+});
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AuthFixture value={{ ...authAsTier("impact"), staffRole: "admin" }}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[`/admin/mitglied/${ZIEL}`]}>
+            <Routes>
+              <Route path="/admin/mitglied/:id" element={<AdminMitgliedPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </AuthFixture>
+    </QueryClientProvider>,
+  );
+}
+
+describe("AdminMitgliedPage (AGE-498)", () => {
+  it("lädt über admin_get_profile — nicht über die Tabelle", async () => {
+    renderPage();
+    await screen.findByDisplayValue("Importiert");
+    expect(fetchAdminProfile).toHaveBeenCalledWith(ZIEL);
+  });
+
+  // Der Anlassfall des ganzen Changes: ein importiertes, unbestätigtes Konto.
+  // Es ist unter der RLS für niemanden sichtbar — die Seite muss es trotzdem
+  // zeigen, und sichtbar machen, DASS es unbestätigt ist.
+  it("zeigt ein unbestätigtes Profil und sagt das auch", async () => {
+    renderPage();
+    expect(await screen.findByText(/nicht bestätigt/i)).toBeInTheDocument();
+  });
+
+  it("bietet keine Bild-Steuerung an — die Bucket-Policies verlangen die eigene uid", async () => {
+    renderPage();
+    await screen.findByDisplayValue("Importiert");
+    expect(screen.queryByText("Profilbild")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hintergrundbild")).not.toBeInTheDocument();
+  });
+
+  it("bietet keine Interessen und Ziele an — die Kind-Tabellen sind owner-only", async () => {
+    renderPage();
+    await screen.findByDisplayValue("Importiert");
+    expect(screen.queryByText("Interessen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ziele")).not.toBeInTheDocument();
+  });
+
+  it("zeigt Altdaten und beide Adressen nebeneinander", async () => {
+    renderPage();
+    expect(await screen.findByDisplayValue("2027-06-30")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("wp-4711")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("login@alt.de")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("kontakt@alt.de")).toBeInTheDocument();
+  });
+
+  it("speichert über saveAdminProfile", async () => {
+    renderPage();
+    const name = await screen.findByDisplayValue("Importiert");
+    fireEvent.change(name, { target: { value: "Korrigiert" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(saveAdminProfile).toHaveBeenCalled());
+    const [id, form] = vi.mocked(saveAdminProfile).mock.calls[0];
+    expect(id).toBe(ZIEL);
+    expect(form.name).toBe("Korrigiert");
+  });
+
+  it("ändert die Login-Adresse über die Edge Function", async () => {
+    renderPage();
+    const login = await screen.findByDisplayValue("login@alt.de");
+    fireEvent.change(login, { target: { value: "neu@fbc.de" } });
+    fireEvent.click(screen.getByRole("button", { name: "Login-Adresse ändern" }));
+
+    await waitFor(() => expect(changeLoginEmail).toHaveBeenCalledWith(ZIEL, "neu@fbc.de"));
+  });
+
+  // Die Adresse IST dann geändert. Als Fehler gemeldet, wiederholte der Admin
+  // eine Änderung, die längst gilt.
+  it("meldet nicht beendete Sitzungen als Hinweis, nicht als Fehler", async () => {
+    vi.mocked(changeLoginEmail).mockResolvedValue({ status: "sessions_not_revoked" });
+    renderPage();
+    const login = await screen.findByDisplayValue("login@alt.de");
+    fireEvent.change(login, { target: { value: "neu@fbc.de" } });
+    fireEvent.click(screen.getByRole("button", { name: "Login-Adresse ändern" }));
+
+    expect(await screen.findByText(/Sitzungen/i)).toBeInTheDocument();
+    expect(screen.queryByText(/fehlgeschlagen/i)).not.toBeInTheDocument();
+  });
+});

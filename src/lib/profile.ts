@@ -79,6 +79,32 @@ export const profileFormSchema = z.object({
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
+/**
+ * Leerwerte für `useForm({ defaultValues })`. Sie sind kein Komfort: die
+ * Chip-Eingaben lesen `value.map`, und vor dem ersten `reset(data)` gäbe es
+ * ohne sie `undefined` — die Komponente wirft, und zwar erst zur Laufzeit auf
+ * einer Seite, die gerade lädt. Beide Editoren (eigenes Profil und
+ * Admin-Bearbeitung, AGE-498) benutzen dieselben.
+ */
+export const EMPTY_PROFILE_FORM: ProfileFormValues = {
+  name: "",
+  region: "",
+  company: "",
+  short_bio: "",
+  avatar_url: null,
+  cover_url: null,
+  branche: "",
+  headline: "",
+  roles: [],
+  competencies: [],
+  website: "",
+  dev_focus: "",
+  socials: { linkedin: "", instagram: "", xing: "" },
+  interests: [],
+  goals: [],
+  videos: [],
+};
+
 // ── Vollständigkeit ──────────────────────────────────────────────────────────
 // Spiegelt EXAKT den DB-Trigger set_profile_completion (12 Profil-Felder,
 // Ganzzahl-Division). ≥ 80 % = „vollständig“ (10/12 → 83 %).
@@ -227,7 +253,7 @@ export async function saveProfile(
   values: ProfileFormValues,
   avatarBlob: Blob | null,
   coverBlob: Blob | null = null,
-): Promise<{ avatarUrl: string | null; completion: number }> {
+): Promise<{ avatarUrl: string | null; coverUrl: string | null; completion: number }> {
   const avatarUrl = await uploadBild("avatars", uid, avatarBlob, values.avatar_url);
   const coverUrl = await uploadBild("covers", uid, coverBlob, values.cover_url);
 
@@ -250,7 +276,7 @@ export async function saveProfile(
       cover_url: coverUrl,
     })
     .eq("id", uid)
-    .select("profile_completion, avatar_url")
+    .select("profile_completion, avatar_url, cover_url")
     .single();
   if (updateError) throw updateError;
 
@@ -304,5 +330,9 @@ export async function saveProfile(
     console.error("recompute_my_matches after save failed:", e instanceof Error ? e.message : e);
   }
 
-  return { avatarUrl: updated.avatar_url, completion: updated.profile_completion };
+  return {
+    avatarUrl: updated.avatar_url,
+    coverUrl: updated.cover_url,
+    completion: updated.profile_completion,
+  };
 }

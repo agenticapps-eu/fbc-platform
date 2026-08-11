@@ -47,6 +47,7 @@ const publicProfile = {
   id: PROFILE_ID,
   name: "Legacy Demo",
   avatar_url: null,
+  cover_url: null,
   region: "Berlin",
   company: "Legacy GmbH",
   short_bio: "Begleitet Unternehmer beim Aufbau von Ökosystemen.",

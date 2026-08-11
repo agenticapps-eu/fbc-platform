@@ -10,6 +10,7 @@ import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
+import AdminMitgliedPage from "./pages/AdminMitgliedPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ChatPage from "./pages/ChatPage";
 import EventDetailPage from "./pages/EventDetailPage";
@@ -137,6 +138,20 @@ function AppInner() {
           element={
             <RequireAdmin>
               <AdminSettingsPage />
+            </RequireAdmin>
+          }
+        />
+        {/* Admin bearbeitet ein fremdes Profil (AGE-498). BEWUSST hier und nicht
+            unter /p/:id/bearbeiten: /p/:id liest profiles_public, und die Sicht
+            verlangt ein bestätigtes ZIELPROFIL — für ein importiertes,
+            unbestätigtes Mitglied, also den Anlassfall, meldet sie „nicht
+            gefunden". Die Grenze ist ohnehin is_admin() in den RPCs; RequireAdmin
+            ist Komfort. */}
+        <Route
+          path="/admin/mitglied/:id"
+          element={
+            <RequireAdmin>
+              <AdminMitgliedPage />
             </RequireAdmin>
           }
         />
