@@ -55,12 +55,13 @@ export interface AuthContextValue {
    * Legt ein Konto an. `fullName` geht als `full_name` in die User-Metadaten und
    * wird vom Signup-Trigger nach `profiles.name` übernommen (AGE-437) — ohne ihn
    * bliebe das Mitglied im Verzeichnis namenlos.
+   *
+   * **Nimmt kein Passwort entgegen** (AGE-527): Es entsteht erst beim Einlösen
+   * des Bestätigungslinks. Was der Anmeldedienst bis dahin braucht, erzeugt der
+   * Provider selbst — ein optionales Argument hätte einen zweiten Weg offen
+   * gelassen, den niemand geht und auf dem niemand das Passwort ersetzt.
    */
-  signUp: (
-    email: string,
-    password: string,
-    fullName: string,
-  ) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   /**

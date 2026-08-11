@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -55,7 +55,7 @@ function Registrieren() {
   const { signUp: melden } = useAuth();
   return (
     <button
-      onClick={() => void melden("neu@test.fbc", "geheim1234567", "Neu Mitglied")}
+      onClick={() => void melden("neu@test.fbc", "Neu Mitglied")}
       type="button"
     >
       los
@@ -119,7 +119,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
       return (
         <button
           type="button"
-          onClick={() => void melden("x@test.fbc", "geheim1234567", "X").then((r) => (ergebnis = r))}
+          onClick={() => void melden("x@test.fbc", "X").then((r) => (ergebnis = r))}
         >
           los
         </button>
@@ -155,7 +155,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
       const { activationMailStatus, signUp: melden } = useAuth();
       gesehen.push(activationMailStatus);
       return (
-        <button type="button" onClick={() => void melden("a@test.fbc", "geheim1234567", "A")}>
+        <button type="button" onClick={() => void melden("a@test.fbc", "A")}>
           los
         </button>
       );
@@ -179,5 +179,47 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
     act(() => authRückruf?.("SIGNED_OUT", null));
 
     await waitFor(() => expect(gesehen.at(-1)).toBeNull());
+  });
+
+  /**
+   * AGE-527. Der Anmeldedienst kennt kein Konto ohne Passwort — es verschwindet
+   * also nicht, es wird nur niemandem mehr abverlangt. Was hier festgehalten
+   * wird, sind die zwei Eigenschaften, die es tragen muss:
+   *
+   * KEIN KRYPTO-MOCK in dieser Datei. Wäre die Zufallsquelle eine Attrappe,
+   * bewiese der Verschiedenheits-Test nichts — er prüfte dann die Attrappe.
+   * Vitest läuft auf Node ≥ 19, `crypto.getRandomValues` ist dort echt.
+   */
+  it("erzeugt für jedes Konto ein anderes Passwort", async () => {
+    signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    // Zwei Durchläufe im selben Dokument: die Abfrage muss an den jeweiligen
+    // Container gebunden sein, sonst findet sie beide Knöpfe.
+    for (let lauf = 0; lauf < 2; lauf++) {
+      const { container } = render(
+        <AuthProvider>
+          <Registrieren />
+        </AuthProvider>,
+      );
+      within(container).getByRole("button", { name: "los" }).click();
+    }
+    await waitFor(() => expect(signUp).toHaveBeenCalledTimes(2));
+
+    const ersteres = signUp.mock.calls[0][0].password as string;
+    const zweiteres = signUp.mock.calls[1][0].password as string;
+    // Ein fester Platzhalter waere ein Generalschluessel fuer jedes Konto in
+    // genau dem Fenster, in dem das Gate noch zu ist.
+    expect(zweiteres).not.toBe(ersteres);
+  });
+
+  it("erzeugt ein Passwort, das die Mindestlänge des Projekts erfüllt", async () => {
+    signUp.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
+
+    renderUndRegistrieren();
+
+    await waitFor(() => expect(signUp).toHaveBeenCalledTimes(1));
+    // `minimum_password_length = 10` (config.toml). Darunter lehnt der
+    // Anmeldedienst ab — und zwar serverseitig, also still.
+    expect((signUp.mock.calls[0][0].password as string).length).toBeGreaterThanOrEqual(10);
   });
 });
