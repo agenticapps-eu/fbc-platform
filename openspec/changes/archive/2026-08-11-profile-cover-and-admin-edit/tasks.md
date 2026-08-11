@@ -276,8 +276,11 @@ Datei: `supabase/migrations/2026<TS>_admin_profile_functions.sql`
 - [x] 10.5 `openspec archive` gelaufen: +7 Requirements, ~3 modifiziert, 0
       gelöscht. `openspec validate --all` danach grün — die Szenario-Titel in
       den MODIFIED-Blöcken waren wortgleich, sonst hätte es abgebrochen.
-- [ ] 10.6 PR gegen `main`, Linear-Status prüfen (die Automation setzt ihn
-      selbst — erst lesen, dann entscheiden).
+- [x] 10.6 PR #157 offen und `MERGEABLE`, fünf Checks grün (verify, migrations,
+      edge-functions, pr-title, deploy); die drei „skipping" sind die
+      main-only-Jobs. Linear-Status hatte die Automation bereits auf
+      *In Progress* gesetzt — nichts zu schreiben; stattdessen ein Kommentar,
+      der die drei Abweichungen von der Issue-Beschreibung festhält.
 
 ---
 
