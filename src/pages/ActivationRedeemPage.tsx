@@ -158,7 +158,13 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
       // Die WEITERLEITUNG wartet dagegen (AGE-527). Bis hierher sprang die
       // Seite wortlos auf den Login — und weil dabei alle Sitzungen fallen,
       // sah der Erfolg aus wie ein Rauswurf.
-      await signOut();
+      // `.catch` ist hier kein Verschlucken, sondern die Konsequenz aus dem
+      // Grund für den Aufruf: Der Server hat ALLE Sitzungen bereits widerrufen,
+      // und genau dann kann ein globales `signOut` ablehnen. Das lokale
+      // Aufräumen ist eine Freundlichkeit, kein tragender Schritt — es darf den
+      // Erfolgsweg nicht mit einer unbehandelten Ablehnung stören
+      // (Befund aus dem Diff-Review).
+      await signOut().catch(() => {});
     }
   }
 
@@ -171,8 +177,11 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
     return () => clearTimeout(t);
   }, [status, navigate]);
 
-  // Nur die Anzeige. Läuft sie einmal daneben, ist das eine falsche Zahl auf
-  // dem Bildschirm — nicht ein Weg, der nicht stattfindet.
+  // Nur die Anzeige, mit einem EIGENEN Zeitgeber. Dass beide um bis zu eine
+  // Sekunde auseinanderlaufen können, ist hingenommen: Die Weiterleitung hängt
+  // an der Frist oben, nicht an dieser Zahl. Wer beide zusammenlegt, holt sich
+  // das Gegenteil zurück — eine Frist, die so lange dauert, wie das
+  // Herunterzählen braucht.
   useEffect(() => {
     if (status !== "activated" || restSek <= 0) return;
     const t = setTimeout(() => setRestSek((s) => s - 1), 1000);
