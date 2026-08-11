@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(202);
+select plan(219);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1369,6 +1369,173 @@ select ok(
   'falsch, für den die Grenze existiert (AGE-526)')
 from (select pg_temp.rumpf_ohne_kommentare(
         'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
+
+-- ── 15. Hintergrundbild: Spalte, Grant, Projektion (AGE-498, C6-A) ──────────
+-- Vier Zusagen: das Mitglied darf `cover_url` schreiben, der Wert erreicht die
+-- FREMDE Ansicht über `profiles_public` (nicht über die Basistabelle — die ist
+-- für `connect` und darunter zu), die Neudeklaration der Sicht hat ihr
+-- Aktivierungs-Gate behalten, und die Vollständigkeit bleibt unberührt.
+
+select is(
+  pg_temp.try_as('66666666-6666-6666-6666-666666666666',
+    'update public.profiles set cover_url = ''https://x/cover.webp''
+      where id = ''66666666-6666-6666-6666-666666666666'''),
+  'OK', 'Ein Mitglied schreibt sein eigenes cover_url');
+
+select is(
+  pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+    'select count(*)::int from public.profiles_public
+      where id = ''66666666-6666-6666-6666-666666666666''
+        and cover_url = ''https://x/cover.webp'''),
+  1, 'cover_url erreicht die fremde Ansicht über profiles_public');
+
+-- Gegenprobe zur Neudeklaration: das Gate der Sicht muss sie überlebt haben.
+-- Ein Anhängen, das die beiden is_activated-Bedingungen beim Abschreiben
+-- verliert, öffnete das Verzeichnis lautlos — und nur dieser Fall merkt es.
+--
+-- MIT EIGENER SONDE, nicht mit '…000d': dessen Aktivierung wird in 13.10
+-- absichtlich nachgeholt (Zeile 824), 1300 Zeilen weiter oben. Ein Test, der
+-- sich hier darauf verlässt, prüft den Zustand eines fremden Abschnitts.
+-- `created_at` 90 Tage zurück, sonst fiele die Sonde in den Nachlauf aus
+-- 20260807090000 und gälte als bestätigt.
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-00000000c6c6', 'authenticated', 'authenticated', 'coversonde@test.fbc');
+update public.profiles
+   set tier = 'impact', activated_at = null, created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-00000000c6c6';
+
+select is(
+  pg_temp.count_as('c6c6c6c6-0000-0000-0000-00000000c6c6',
+    'select count(*)::int from public.profiles_public'),
+  0, 'Nach dem Anhängen von cover_url gilt das Gate der Sicht unverändert');
+
+select is(
+  (select profile_completion from public.profiles
+    where id = '66666666-6666-6666-6666-666666666666'),
+  (select profile_completion from public.profiles
+    where id = '44444444-4444-4444-4444-444444444444'),
+  'cover_url geht nicht in die Vollständigkeit ein (beide Profile leer gepflegt)');
+
+-- ── 16. Altmitgliedschaft: eigene Tabelle, für den Client unsichtbar ────────
+-- (AGE-498, C6-B. Befund aus dem Fremd-Review, REVIEWS.md/codex.)
+--
+-- WARUM DAS NICHT VIER SPALTEN AUF `profiles` SIND: `authenticated` hält
+-- Tabellen-SELECT auf profiles, und profiles_select_self_or_discover gibt
+-- jedem bestätigten `discover` die VOLLE Zeile jedes anderen (siehe §2 oben,
+-- Assertion „Discover liest die fremde Vollzeile"). Ein Spalten-Grant regelt
+-- nur das Schreiben — `legacy_price` stünde offen. Postgres kennt kein
+-- spaltenweises Leseverbot bei erteiltem Tabellen-SELECT.
+--
+-- Die erste Assertion unten ist deshalb der eigentliche Beleg: dieselbe
+-- Identität, die in §2 die fremde Vollzeile SIEHT, kommt hier nicht durch.
+
+insert into public.profile_legacy (profile_id, paid_until, legacy_tier, legacy_price, legacy_source_id)
+values ('66666666-6666-6666-6666-666666666666', date '2027-03-31', 'Premium', 1200.00, 'wp-4711');
+
+select is(has_table_privilege('authenticated', 'public.profile_legacy', 'SELECT'),
+  false, 'profile_legacy: authenticated hält kein SELECT');
+
+select is(has_table_privilege('authenticated', 'public.profile_legacy', 'INSERT'),
+  false, 'profile_legacy: authenticated hält kein INSERT');
+
+select alike(
+  pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+    'select paid_until from public.profile_legacy
+      where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  'DENIED:%permission denied%',
+  'Discover sieht die fremden Altdaten NICHT — obwohl es die Vollzeile sieht');
+
+select alike(
+  pg_temp.try_as('66666666-6666-6666-6666-666666666666',
+    'select paid_until from public.profile_legacy
+      where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  'DENIED:%permission denied%',
+  'Auch die EIGENEN Altdaten führen nicht über den Client — nur über die Admin-RPCs');
+
+-- Wiederholbarkeit des Imports: dieselbe Quell-Kennung ein zweites Mal.
+select throws_ok(
+  $$insert into public.profile_legacy (profile_id, legacy_source_id)
+    values ('44444444-4444-4444-4444-444444444444', 'wp-4711')$$,
+  23505,
+  null,
+  'Eine zweite Zeile mit derselben legacy_source_id prallt am Unique-Index ab');
+
+-- …und die Kehrseite: „keine Kennung" darf beliebig oft vorkommen. Ohne das
+-- btrim() im Index kollidierten '' und '   ' nicht miteinander, aber jeweils
+-- mit sich selbst — und der Import bliebe an leeren Feldern hängen.
+select lives_ok(
+  $$insert into public.profile_legacy (profile_id, legacy_source_id) values
+      ('11111111-1111-1111-1111-111111111111', null),
+      ('22222222-2222-2222-2222-222222222222', ''),
+      ('33333333-3333-3333-3333-333333333333', '   ')$$,
+  'Leere Kennungen (null, '''', Leerzeichen) koexistieren');
+
+-- ── 17. Bucket `covers`: dieselbe Falltabelle wie `avatars` (AGE-498, C6-C) ─
+-- Die Warnung aus 13.3a gilt hier unverändert: storage.objects hat keine
+-- SELECT-Policy, deshalb blanke INSERTs und die Gegenprobe als Testrolle,
+-- nicht über ein WHERE unter der Mitglieds-Identität.
+--
+-- Eigene Sonden statt geliehener Fixtures — die Aktivierungszustände der
+-- oberen Abschnitte werden dort mehrfach umgeschaltet (Zeilen 728, 824, 900,
+-- 1051, 1291), und ein Test, der sich darauf verlässt, prüft fremden Zustand.
+
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'coverja@test.fbc'),
+  ('c6c6c6c6-0000-0000-0000-0000000000a2', 'authenticated', 'authenticated', 'covernein@test.fbc');
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000a1';
+update public.profiles
+   set tier = 'impact', activated_at = null, created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''c6c6c6c6-0000-0000-0000-0000000000a1/eigen.webp'')'),
+  'OK', 'covers_insert_own: das bestätigte Mitglied schreibt in seinen eigenen Ordner');
+
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'c6c6c6c6-0000-0000-0000-0000000000a1/eigen.webp'),
+  1, '… und das Objekt liegt danach wirklich da');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''66666666-6666-6666-6666-666666666666/fremd.webp'')'),
+  'DENIED:%row-level security policy%',
+  'covers_insert_own: der Ordner eines FREMDEN Mitglieds bleibt zu');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a2',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''c6c6c6c6-0000-0000-0000-0000000000a2/eigen.webp'')'),
+  'DENIED:%row-level security policy%',
+  'covers_insert_own: ein nicht bestätigtes Konto lädt kein Hintergrundbild hoch');
+
+-- Die serverseitige Regel, die der Grund für den eigenen Bucket war. pgTAP
+-- sieht die Durchsetzung nicht (die macht die Storage-API), aber es hält fest,
+-- dass sie überhaupt AUSGESPROCHEN ist — ein `do nothing` beim Anlegen über
+-- einem falsch eingestellten Bestands-Bucket fiele hier auf.
+select is(
+  (select (public, file_size_limit, allowed_mime_types)::text
+     from storage.buckets where id = 'covers'),
+  '(t,2097152,{image/webp})',
+  'covers: öffentlich, 2 MiB, nur WebP — serverseitig, nicht nur im Formular');
+
+-- Die Drift-Sicherung aus dem Spec: dieselbe Regel steht jetzt an SECHS
+-- Stellen. Wer sie an einem Bucket ändert, wird hier rot — auch wenn er den
+-- anderen gar nicht angefasst hat.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'covers\_%'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, 'covers trägt drei Schreib-Policies, alle mit dem Aktivierungs-Gate');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'avatars\_%'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, '… und avatars unverändert ebenso — die Falltabelle gilt für beide');
 
 select * from finish();
 rollback;

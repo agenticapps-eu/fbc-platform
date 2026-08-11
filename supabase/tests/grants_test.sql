@@ -89,7 +89,7 @@ select is(
          group by 1) t),
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
-profiles.UPDATE=avatar_url,branche,company,competencies,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
+profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
 
