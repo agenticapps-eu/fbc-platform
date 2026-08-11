@@ -70,12 +70,35 @@ Vollständig im PR; die tragenden:
 
 ## Next session: start here
 
-**PR #157 mergen ist nicht der nächste Schritt — `migrate-prod` ist es.** Das
-`drift-gate` misst gegen PROD und hält nach dem Merge **jeden** Deploy an
-(Frontend *und* Functions), absichtlich und ohne Break-Glass, bis die vier
-Migrationen auf PROD liegen. Reihenfolge also: PR reviewen → `migrate-prod`
-dispatchen (das wendet direkt an, kein zweiter Bestätigungsschritt) → mergen.
+**Die Reihenfolge ist von den Workflows erzwungen — und andersherum, als es
+intuitiv wirkt.** `migrate-prod` prüft als Erstes, ob ein `migrate-dev`-Lauf
+**für genau diese SHA auf `main`** grün war („PROD kommt nach DEV, nicht
+davor"). Vor dem Merge gibt es den nicht, ein Dispatch scheitert also sofort.
+Und `migrate-dev` läuft auf `main` ohne `needs`, ist vom `drift-gate` somit
+unabhängig — nur `deploy` und `functions` hängen an beiden.
+
+Daraus folgt:
+
+1. **PR #157 mergen** (squash). `migrate-dev` wird grün — die Migrationen
+   liegen bereits auf DEV, `db push` meldet dort „up to date". `drift-gate`
+   wird **rot**, weil PROD die vier Migrationen fehlen; `deploy` und
+   `functions` werden dadurch übersprungen. Erwartet, keine Panne.
+2. **`migrate-prod` dispatchen.** ACHTUNG: `apply` startet direkt hinter
+   `plan`, ohne Reviewer-Regel — der Dispatch IST die Anwendung.
+3. **`deploy.yml` neu laufen lassen** (`gh run rerun <id>` auf dem
+   Merge-Commit). Erst dann ist das Frontend draußen und `admin-change-email`
+   auch auf PROD. Der `functions`-Job vergleicht gegen den letzten
+   ERFOLGREICHEN Lauf, nicht gegen `HEAD^` — der übersprungene Lauf reißt also
+   keine Lücke.
+
 Danach ist C6 fertig und **C7** dran.
+
+**Was `migrate-prod` anwenden wird** — PROD gelesen am 11.08.
+(`viwntbodrtqxgmqyxluh`): 52 Migrationen, jüngste `20260810170000`, es fehlen
+also genau die vier neuen. PROD trägt 2 Profile, keins auf `impact` — der
+Import lief dort nicht, der neue Unique-Index findet nichts vor. Alle vier sind
+additiv; das Einzige, was ein bestehendes Objekt anfasst, ist das Anhängen von
+`cover_url` an `profiles_public` plus der Spalten-Grant.
 
 ## Open questions
 
