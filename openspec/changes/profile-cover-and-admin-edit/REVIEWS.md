@@ -14,7 +14,9 @@ Einschränkung zu Regel 4: Der gemini-Arm des Wrappers pinnt kein Modell und
 gibt das aufgelöste Modell nicht aus, deshalb steht oben der CLI-Standard statt
 einer Modellkennung. Der codex-Arm meldet `gpt-5.6-sol` im Banner.
 
-## Reviewer: gemini (CLI-Standard)
+## Reviewer: gemini
+
+Modell: CLI-Standard (der gemini-Arm pinnt keines und gibt keines aus).
 
 VERDICT: REQUEST-CHANGES
 
@@ -30,7 +32,9 @@ Ungesagte Annahmen laut gemini: dass der Profilzeilen-Umfang für alle
 Nach-Import-Korrekturen reicht · dass `tier` nie von Hand geändert werden muss ·
 dass `profiles.email` gefahrlos ignoriert werden kann.
 
-## Reviewer: codex (gpt-5.6-sol)
+## Reviewer: codex
+
+Modell: gpt-5.6-sol (aus dem Banner der CLI).
 
 VERDICT: REQUEST-CHANGES
 
