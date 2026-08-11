@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ActivationRedeemPage from "./ActivationRedeemPage";
@@ -106,9 +106,84 @@ describe("ActivationRedeemPage", () => {
     await waitFor(() =>
       expect(redeemActivation).toHaveBeenCalledWith("geheim", "EinLangesPasswort"),
     );
-    // Alle Sitzungen sind widerrufen, auch die eigene — eine tote Session
-    // weiterzutragen wäre falsch.
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/login", { replace: true }));
+    // AGE-527: Der Sprung passiert NICHT mehr sofort. Was hier belegt wird, ist
+    // die Bestätigung; die Weiterleitung prüfen die Tests darunter.
+    expect(await screen.findByText(/Passwort ist gesetzt/i)).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AGE-527, Befund aus Donalds Abnahme am 2026-08-11: Nach dem Setzen wurde
+   * kommentarlos auf den Login gesprungen. Weil dabei ALLE Sitzungen widerrufen
+   * werden, auch die eigene, sieht das aus wie ein Rauswurf — und wer nicht
+   * erfährt, dass es geklappt hat, versucht es erneut oder hält den Link für
+   * kaputt.
+   *
+   * Die Negativprobe im ersten Test ist die wichtigere Hälfte und kommt aus dem
+   * Plan-Review: Die Verzweigung im Rumpf war ZWEIWERTIG
+   * (`token && status !== "activated"`). Der Erfolg ist ein dritter Fall — wer
+   * ihn nur anhängt, zeigt dem gerade aktivierten Mitglied ausgerechnet das
+   * „Link anfordern"-Formular.
+   */
+  describe("Erfolgsschirm nach dem Setzen (AGE-527)", () => {
+    it("zeigt weder das Passwortformular noch das Anfordern-Formular", async () => {
+      vi.mocked(redeemActivation).mockResolvedValue("activated");
+      renderMit("#token=geheim");
+      passwortSetzen("EinLangesPasswort");
+
+      expect(await screen.findByText(/Passwort ist gesetzt/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Neues Passwort/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/E-Mail/i)).not.toBeInTheDocument();
+    });
+
+    it("meldet sich sofort ab, nicht erst mit der Weiterleitung", async () => {
+      const signOut = vi.fn(async () => {});
+      vi.mocked(redeemActivation).mockResolvedValue("activated");
+      renderMit("#token=geheim", { signOut });
+      passwortSetzen("EinLangesPasswort");
+
+      // Sonst hielte der Browser zehn Sekunden ein Token, das der Server
+      // längst widerrufen hat.
+      await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("führt auf Knopfdruck sofort zur Anmeldung", async () => {
+      vi.mocked(redeemActivation).mockResolvedValue("activated");
+      renderMit("#token=geheim");
+      passwortSetzen("EinLangesPasswort");
+
+      fireEvent.click(await screen.findByRole("button", { name: /Zur Anmeldung/i }));
+      expect(navigate).toHaveBeenCalledWith("/login", { replace: true });
+    });
+
+    it("leitet nach der angekündigten Frist von selbst weiter", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(redeemActivation).mockResolvedValue("activated");
+        renderMit("#token=geheim");
+        passwortSetzen("EinLangesPasswort");
+        await vi.waitFor(() => expect(screen.getByText(/Passwort ist gesetzt/i)).toBeInTheDocument());
+
+        expect(navigate).not.toHaveBeenCalled();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(navigate).toHaveBeenCalledWith("/login", { replace: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("spricht beim Zurücksetzen nicht von einer Aktivierung", async () => {
+      vi.mocked(redeemActivation).mockResolvedValue("activated");
+      renderReset("/passwort-neu", "#token=geheim");
+      passwortSetzenMit(/Neues Passwort setzen/i, "EinLangesPasswort");
+
+      const meldung = await screen.findByText(/Passwort ist gesetzt/i);
+      expect(meldung).toBeInTheDocument();
+      expect(screen.queryByText(/aktiviert/i)).not.toBeInTheDocument();
+    });
   });
 
   it("Status expired nennt die Frist und bietet einen neuen Link an", async () => {

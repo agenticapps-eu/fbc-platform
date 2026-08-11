@@ -47,13 +47,11 @@ describe("LoginPage", () => {
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  Anna Muster  " } });
     fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "anna@example.org" } });
-    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "geheim1234" } });
     fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
 
     // Getrimmt: führende/folgende Leerzeichen landen sonst im Verzeichnis.
-    await waitFor(() =>
-      expect(signUp).toHaveBeenCalledWith("anna@example.org", "geheim1234", "Anna Muster"),
-    );
+    // Ohne Passwort seit AGE-527 — es entsteht beim Einlösen des Links.
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith("anna@example.org", "Anna Muster"));
   });
 
   it("verlangt einen Namen und registriert ohne ihn nicht", async () => {
@@ -61,7 +59,6 @@ describe("LoginPage", () => {
     toRegisterMode();
 
     fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "anna@example.org" } });
-    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "geheim1234" } });
     fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
 
     expect(await screen.findByText(/Bitte deinen Namen eingeben/)).toBeInTheDocument();
@@ -91,4 +88,43 @@ describe("LoginPage", () => {
     expect(screen.queryByRole("link", { name: /Passwort vergessen/i })).not.toBeInTheDocument();
   });
 
+
+  /**
+   * AGE-527. Das Passwort entsteht erst nach der Bestätigung der Mail — beim
+   * Einlösen des Links. Vorher eines zu erheben hieß: gesetzt, nie gebraucht,
+   * stillschweigend überschrieben.
+   *
+   * Der zweite Test hier ist der wichtigere, und er kommt aus dem Plan-Review:
+   * Das Zod-Schema verlangte `password` in BEIDEN Modi. Wer nur das Feld
+   * entfernt, bekommt einen Knopf, der wortlos nichts tut — die Validierung
+   * scheitert an einem Feld, das gar nicht mehr gerendert wird. Ein Test, der
+   * bloß „wurde ohne Passwort aufgerufen" prüft, sieht das nicht: Er ist auch
+   * dann grün, wenn `signUp` NIE läuft.
+   */
+  it("zeigt im Registrierungsmodus kein Passwortfeld", () => {
+    renderLogin();
+    toRegisterMode();
+
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    expect(screen.getByLabelText("E-Mail")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Passwort")).not.toBeInTheDocument();
+  });
+
+  it("registriert ohne Passworteingabe — der Submit läuft durch", async () => {
+    const signUp = renderLogin();
+    toRegisterMode();
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Anna Muster" } });
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "anna@example.org" } });
+    fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
+
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith("anna@example.org", "Anna Muster"));
+    // Und keine Schema-Meldung zu einem Feld, das es nicht mehr gibt.
+    expect(screen.queryByText(/Passwort muss mindestens/i)).not.toBeInTheDocument();
+  });
+
+  it("verlangt im LOGIN-Modus weiterhin ein Passwort", () => {
+    renderLogin();
+    expect(screen.getByLabelText("Passwort")).toBeInTheDocument();
+  });
 });

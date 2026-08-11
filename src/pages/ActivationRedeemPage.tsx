@@ -11,6 +11,10 @@ import {
 import { useAuth } from "../providers/auth-context";
 
 /** Muss zu `minimum_password_length` (config.toml) und `MIN_PASSWORT` der Function passen. */
+/** Frist bis zur Weiterleitung auf den Login. Lang genug für einen Satz, kurz
+ *  genug, dass niemand auf einem Erfolgsschirm strandet (AGE-527). */
+const WEITERLEITUNG_SEK = 10;
+
 const MIN_PASSWORT = 10;
 
 export type Zweck = "aktivierung" | "reset";
@@ -43,6 +47,10 @@ const TEXTE: Record<
     hinweisAnfordern: string;
     knopfAnfordern: string;
     used: string;
+    /** Überschrift des Erfolgsschirms (AGE-527). */
+    titelErfolg: string;
+    /** Was danach passiert — in der Sprache der jeweiligen Lage. */
+    hinweisErfolg: string;
   }
 > = {
   aktivierung: {
@@ -54,6 +62,9 @@ const TEXTE: Record<
       "Gib die E-Mail-Adresse ein, unter der du im Club bekannt bist. Wir schicken dir einen neuen Link.",
     knopfAnfordern: "Neuen Link senden",
     used: "Dieses Konto ist bereits aktiviert. Du kannst dich direkt anmelden.",
+    titelErfolg: "Dein Passwort ist gesetzt",
+    hinweisErfolg:
+      "Dein Zugang ist damit bestätigt. Melde dich jetzt einmal mit deinem neuen Passwort an — danach sind dein Profil und der Club für dich sichtbar.",
   },
   reset: {
     titelToken: "Neues Passwort setzen",
@@ -69,6 +80,11 @@ const TEXTE: Record<
     // „bereits aktiviert" wäre hier keine Auskunft, sondern eine Verwechslung:
     // das Konto IST aktiviert, darum geht es gar nicht.
     used: "Dieser Link wurde bereits verwendet. Melde dich mit deinem neuen Passwort an.",
+    // Kein Wort von „aktiviert": Wer hier steht, war es längst. Er hat sein
+    // Passwort zurückgesetzt, sonst nichts.
+    titelErfolg: "Dein neues Passwort ist gesetzt",
+    hinweisErfolg:
+      "Du bist auf allen Geräten abgemeldet worden. Melde dich jetzt einmal mit dem neuen Passwort an.",
   },
 };
 
@@ -97,6 +113,8 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
   const [adresse, setAdresse] = useState("");
   const [angefordert, setAngefordert] = useState(false);
   const [hinweis, setHinweis] = useState<AnfrageHinweis>(null);
+  /** Sekunden bis zur Weiterleitung auf den Login (AGE-527). */
+  const [restSek, setRestSek] = useState(WEITERLEITUNG_SEK);
 
   // Fall 3 aus §6: Konto schon aktiviert, alter Link im Postfach. Weiterleitung
   // auf die Startseite, ausdrücklich OHNE Fehlermeldung — das Mitglied hat
@@ -133,11 +151,33 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
     setLäuft(false);
     if (ergebnis === "activated") {
       // Das Passwort ist neu und alle Sitzungen sind widerrufen — auch die
-      // eigene. Also sauber zum Login, statt eine tote Session weiterzutragen.
+      // eigene. Die Abmeldung passiert deshalb SOFORT: Bis zur Weiterleitung
+      // vergehen jetzt bis zu zehn Sekunden, und eine tote Sitzung so lange
+      // mitzuschleppen wäre das Gegenteil von sauber.
+      //
+      // Die WEITERLEITUNG wartet dagegen (AGE-527). Bis hierher sprang die
+      // Seite wortlos auf den Login — und weil dabei alle Sitzungen fallen,
+      // sah der Erfolg aus wie ein Rauswurf.
       await signOut();
-      navigate("/login", { replace: true });
     }
   }
+
+  // Die Weiterleitung hängt an EINER Frist, nicht an zehn Einzelticks: Sonst
+  // dauert sie so lange, wie der Zähler zum Herunterzählen braucht — plus einen
+  // Render. Eine angekündigte Frist muss die angekündigte sein.
+  useEffect(() => {
+    if (status !== "activated") return;
+    const t = setTimeout(() => navigate("/login", { replace: true }), WEITERLEITUNG_SEK * 1000);
+    return () => clearTimeout(t);
+  }, [status, navigate]);
+
+  // Nur die Anzeige. Läuft sie einmal daneben, ist das eine falsche Zahl auf
+  // dem Bildschirm — nicht ein Weg, der nicht stattfindet.
+  useEffect(() => {
+    if (status !== "activated" || restSek <= 0) return;
+    const t = setTimeout(() => setRestSek((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [status, restSek]);
 
   async function neuenLinkAnfordern(e: React.FormEvent) {
     e.preventDefault();
@@ -178,7 +218,31 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
         </div>
       </div>
 
-      {token && status !== "activated" ? (
+      {/* DREI Fälle, nicht zwei (AGE-527). Bis hierher wählte diese Bedingung
+          nur zwischen Passwortformular und „Link anfordern" — der Erfolg fiel
+          deshalb in den Anfordern-Zweig und bot dem gerade aktivierten
+          Mitglied einen neuen Link an. Befund aus dem Plan-Review. */}
+      {status === "activated" ? (
+        <div className="flex flex-col gap-4">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+            {t.titelErfolg}
+          </h1>
+          <p className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
+            {t.hinweisErfolg}
+          </p>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => navigate("/login", { replace: true })}
+          >
+            Zur Anmeldung
+          </Button>
+          {/* Angekündigt, damit die Weiterleitung kein Sprung ist. */}
+          <p className="text-sm text-muted">
+            Wir bringen dich in {restSek} Sekunden von selbst dorthin.
+          </p>
+        </div>
+      ) : token ? (
         <>
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
@@ -252,9 +316,14 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
         </>
       )}
 
-      <Link to="/login" className="mt-2 block text-sm text-muted hover:underline">
-        ← Zur Anmeldung
-      </Link>
+      {/* Auf dem Erfolgsschirm nicht: dort führt schon der Knopf dorthin, und
+          zweimal dieselbe Handlung untereinander liest sich wie zwei
+          verschiedene (gesehen in der Sichtprobe am 2026-08-11). */}
+      {status !== "activated" && (
+        <Link to="/login" className="mt-2 block text-sm text-muted hover:underline">
+          ← Zur Anmeldung
+        </Link>
+      )}
     </main>
   );
 }
