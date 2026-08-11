@@ -261,12 +261,21 @@ Datei: `supabase/migrations/2026<TS>_admin_profile_functions.sql`
 - [x] 10.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün —
       Ausgabe gelesen, nicht behauptet.
 - [x] 10.2 `supabase test db --local <alle pgTAP-Dateien>` grün.
-- [ ] 10.3 Code-Review auf dem **Diff** (Schritt 4), unabhängiger Leser.
-- [ ] 10.4 Migrationen auf **DEV** anwenden, danach `migrate-prod` — sonst
-      blockt das drift-gate jeden Frontend-Deploy. Edge Function separat
-      deployen.
-- [ ] 10.5 `openspec archive` — Szenario-Titel in den MODIFIED-Blöcken sind
-      wortgleich zu den bestehenden (ein umgetaufter Titel löscht den alten).
+- [x] 10.3 Code-Review auf dem **Diff** (Schritt 4): codex, REQUEST-CHANGES,
+      sieben Befunde übernommen, einer begründet abgelehnt (REVIEWS.md).
+- [x] 10.4a Migrationen auf **DEV** (`foelowldexkcqzewvrcf`) angewendet und
+      nachgemessen: Spalte, Grant-Liste, leere profile_legacy-Grants,
+      Bucket-Einstellungen, drei Policies mit Gate, sechs Funktionen, Sicht mit
+      Gate auf beiden Seiten.
+- [x] 10.4b Edge Function `admin-change-email` auf DEV deployt — v1, ACTIVE,
+      `verify_jwt=True`.
+- [ ] 10.4c **PROD steht aus.** `migrate-prod` ist ein bewusst manueller
+      Schritt und lag außerhalb dieser Sitzung. Solange er nicht lief, hält das
+      `drift-gate` nach dem Merge JEDEN Deploy an — Frontend wie Functions, und
+      ohne Break-Glass. Das ist die Zusage, keine Panne.
+- [x] 10.5 `openspec archive` gelaufen: +7 Requirements, ~3 modifiziert, 0
+      gelöscht. `openspec validate --all` danach grün — die Szenario-Titel in
+      den MODIFIED-Blöcken waren wortgleich, sonst hätte es abgebrochen.
 - [ ] 10.6 PR gegen `main`, Linear-Status prüfen (die Automation setzt ihn
       selbst — erst lesen, dann entscheiden).
 
