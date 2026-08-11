@@ -9,10 +9,15 @@ import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben."),
-  // Zehn, nicht acht: `minimum_password_length` in config.toml steht seit C4
-  // auf 10. Mit acht nahm das Formular eine Eingabe an, die der Server ablehnt —
-  // das Mitglied bekam einen Serverfehler statt einer Feldmeldung (AGE-495).
-  password: z.string().min(10, "Das Passwort muss mindestens 10 Zeichen haben."),
+  // Im Schema optional, seit AGE-527 aus DEMSELBEN Grund wie der Name darunter:
+  // Der Registrierungsmodus rendert gar kein Passwortfeld mehr — das Passwort
+  // entsteht erst beim Einlösen des Bestätigungslinks. Die Pflicht für den
+  // Login-Modus steht in `onSubmit`.
+  //
+  // Ein Schema, das `password` weiterhin für BEIDE Modi verlangt, wäre der
+  // Fehler, den der Plan-Review vorhergesagt hat: Der Knopf täte wortlos
+  // nichts, weil die Prüfung an einem Feld scheitert, das niemand sieht.
+  password: z.string().optional(),
   // Im Schema optional, weil der Login-Modus gar kein Namensfeld rendert; beim
   // Registrieren wird die Pflicht in onSubmit durchgesetzt (AGE-437). `.trim()`
   // sonst zählt ein Leerzeichen als Name und steht so im Verzeichnis.
@@ -44,6 +49,14 @@ export default function LoginPage() {
     setFormError(null);
 
     if (mode === "login") {
+      // Zehn, nicht acht: `minimum_password_length` in config.toml steht seit C4
+      // auf 10. Mit acht nähme das Formular eine Eingabe an, die der Server
+      // ablehnt — das Mitglied bekäme einen Serverfehler statt einer
+      // Feldmeldung (AGE-495).
+      if (!values.password || values.password.length < 10) {
+        setError("password", { message: "Das Passwort muss mindestens 10 Zeichen haben." });
+        return;
+      }
       const { error } = await signIn(values.email, values.password);
       if (error) {
         setFormError(error.message);
@@ -60,7 +73,7 @@ export default function LoginPage() {
       return;
     }
 
-    const { error } = await signUp(values.email, values.password, values.name);
+    const { error } = await signUp(values.email, values.name);
     if (error) {
       setFormError(error.message);
       return;
@@ -133,6 +146,10 @@ export default function LoginPage() {
           {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
         </div>
 
+        {/* Nur im Login-Modus. Beim Registrieren wird kein Passwort mehr
+            erhoben (AGE-527) — es entsteht beim Einlösen des
+            Bestätigungslinks, und zwar genau einmal. */}
+        {mode === "login" && (
         <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-sm font-medium text-ink">
             Passwort
@@ -146,17 +163,18 @@ export default function LoginPage() {
           />
           {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
           {/* AGE-505. Der Weg gehört genau hierhin: Wer sein Passwort vergessen
-              hat, scheitert an DIESEM Feld und sucht ihn nirgendwo sonst. Im
-              Registrierungsmodus gibt es nichts zu vergessen. */}
-          {mode === "login" && (
-            <Link
-              to="/passwort-vergessen"
-              className="self-start text-sm text-muted hover:underline"
-            >
-              Passwort vergessen?
-            </Link>
-          )}
+              hat, scheitert an DIESEM Feld und sucht ihn nirgendwo sonst. Die
+              frühere Bedingung `mode === "login"` steht seit AGE-527 eine Ebene
+              höher am ganzen Feld — im Registrierungsmodus gibt es weder das
+              eine noch das andere. */}
+          <Link
+            to="/passwort-vergessen"
+            className="self-start text-sm text-muted hover:underline"
+          >
+            Passwort vergessen?
+          </Link>
         </div>
+        )}
 
         {formError && <p className="text-sm text-danger">{formError}</p>}
 

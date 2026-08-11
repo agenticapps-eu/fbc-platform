@@ -6,6 +6,31 @@ import { logEvent } from "../lib/log";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
+/**
+ * Ein Passwort, das niemand je sieht (AGE-527).
+ *
+ * Die Registrierung erhebt seit AGE-527 keines mehr — es entsteht erst beim
+ * Einlösen des Bestätigungslinks. Der Anmeldedienst kennt aber kein Konto ohne
+ * Passwort, also braucht es hier eines für die Sekunden bis dahin.
+ *
+ * 32 Byte aus dem CSPRNG, base64url — dieselbe Bauart wie das Aktivierungstoken
+ * in `send-activation`. Es wird nirgends angezeigt, protokolliert oder
+ * gespeichert.
+ *
+ * Ein FESTER Platzhalter wäre hier der Fehler: Er wäre für alle Konten gleich
+ * und damit ein Generalschlüssel für jedes von ihnen in genau dem Fenster, in
+ * dem das Aktivierungs-Gate noch geschlossen ist, der Anmeldedienst aber schon
+ * Sitzungen ausgibt.
+ */
+function neuesZufallspasswort(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
 /** Geladene Stufe, getaggt mit der userId, zu der sie gehört (Stale-Schutz beim Wechsel). */
 interface LoadedProfile {
   userId: string;
@@ -186,12 +211,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       activationLookupFailed,
       activationName,
       activationMailStatus,
-      signUp: async (email, password, fullName) => {
+      signUp: async (email, fullName) => {
         // `full_name` landet in raw_user_meta_data; der handle_new_user-Trigger
         // (20260611171003) liest genau diesen Schlüssel nach profiles.name.
         const { data, error } = await supabase.auth.signUp({
           email,
-          password,
+          password: neuesZufallspasswort(),
           options: { data: { full_name: fullName } },
         });
         if (!error) {
