@@ -34,11 +34,20 @@ export interface ProfileHeroProps {
 }
 
 /**
- * Profil-Hero (AGE-237) — ruhiges Layout: heller Banner über die Breite, darunter
- * (im normalen Fluss, KEINE Überlappung) das Profilbild neben Name/Rollen/Region/Tier.
- * Das Avatar ragt nie in den Banner — das vermeidet Größen-/Mobile-Probleme. Der
- * Banner ist pro Mitglied anpassbar (Upload vorbereitet); ohne Bild ein heller
- * Akzent-Verlauf (kein Vollschwarz). Helle Karte; Marke über Akzente.
+ * Profil-Hero (AGE-237, Aufbau nach dem Mockup vom 29.07. — AGE-498).
+ *
+ * Hintergrundbild über die volle Breite, davor ÜBERLAPPEND das Profilbild,
+ * daneben Name, Stufen-Badge, Rollen und Region. Ohne Bild springt ein heller
+ * Akzent-Verlauf ein (kein Vollschwarz) — die Ansicht hängt nie an einem
+ * gesetzten Bild.
+ *
+ * Bis AGE-498 stand hier ausdrücklich das Gegenteil: „KEINE Überlappung … das
+ * Avatar ragt nie in den Banner", mit der Begründung, das vermeide
+ * Größen-/Mobile-Probleme. Das Mockup verlangt die Überlappung, und sie ist
+ * hier auf den negativen Rand am Avatar-Block beschränkt: der Banner behält
+ * seine Höhe, der Textblock bleibt im Fluss, und auf schmalen Schirmen
+ * überlappt weniger (-mt-10 statt -mt-14). Der alte Kommentar ist ersetzt und
+ * nicht stehen gelassen — er beschriebe sonst Code, den es nicht mehr gibt.
  */
 export function ProfileHero({
   name,
@@ -57,9 +66,9 @@ export function ProfileHero({
   const banner = bannerUrl ?? coverUrl;
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
-      {/* Banner — heller Akzent-Verlauf aus Tokens (folgt dem Theme).
-          Das Avatar überlappt diesen Block NICHT. */}
-      <div className="relative h-24 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-32">
+      {/* Hintergrundbild — ohne Bild ein heller Akzent-Verlauf aus Tokens, der
+          dem Theme folgt. Das Profilbild ragt hinein (siehe unten). */}
+      <div className="relative h-28 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-40">
         {banner && (
           <img
             src={banner}
@@ -70,16 +79,19 @@ export function ProfileHero({
         )}
       </div>
 
-      {/* Body — Avatar + Identität im normalen Fluss UNTER dem Banner (kein -mt). */}
-      <div className="px-6 pb-6 pt-5 sm:px-8 sm:pt-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+      {/* Body — der Avatar-Block trägt den negativen Rand, nicht der ganze
+          Body: so überlappt nur das Bild, und Name/Rollen bleiben im Fluss. */}
+      <div className="px-6 pb-6 sm:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
             <Avatar
               name={name}
               src={avatarUrl}
-              className="h-24 w-24 text-2xl ring-4 ring-canvas sm:h-28 sm:w-28"
+              className="-mt-10 h-24 w-24 shrink-0 text-2xl ring-4 ring-canvas sm:-mt-14 sm:h-28 sm:w-28"
             />
-            <div className="min-w-0">
+            {/* pb bringt den Textblock auf die Grundlinie des überlappenden
+                Avatars — ohne ihn steht der Name am oberen Bildrand. */}
+            <div className="min-w-0 pb-1">
               {tier && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-strong uppercase">
                   <CrownIcon className="h-3.5 w-3.5" />

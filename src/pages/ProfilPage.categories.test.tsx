@@ -29,6 +29,7 @@ const PROFILE: ProfileFormValues = {
   company: "",
   short_bio: "",
   avatar_url: null,
+  cover_url: null,
   branche: "",
   headline: "",
   roles: [],

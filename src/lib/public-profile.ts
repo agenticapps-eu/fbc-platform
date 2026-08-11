@@ -32,6 +32,9 @@ export interface PublicProfile {
   id: string;
   name: string;
   avatar_url: string | null;
+  /** Hintergrundbild (AGE-498). Liegt in der Sicht, nicht nur auf der Basiszeile —
+   *  sonst sähe es außer dem Eigentümer niemand. */
+  cover_url: string | null;
   region: string | null;
   company: string | null;
   short_bio: string | null;
@@ -39,8 +42,19 @@ export interface PublicProfile {
   roles: string[];
 }
 
+export interface ProfileActivity {
+  id: string;
+  body: string;
+  created_at: string;
+}
+
 export interface ExtendedProfile {
   headline: string | null;
+  /** Für den Abschnitt „Beruf" (AGE-498). */
+  branche: string | null;
+  /** Für die Eckdaten (AGE-498). Steht NICHT in profiles_public — nur in der
+   *  Vollzeile, also ab `discover`. */
+  member_since: string | null;
   potential_score: number;
   competencies: string[];
   videos: string[];
@@ -48,6 +62,9 @@ export interface ExtendedProfile {
   interests: Interest[];
   offers: Offer[];
   needs: Need[];
+  /** Eigene Beiträge des Mitglieds („Aktivitäten" im Mockup). Die RLS des
+   *  Feeds entscheidet, welche sichtbar sind — wir filtern nichts nach. */
+  posts: ProfileActivity[];
 }
 
 export interface PublicProfileData {
@@ -66,15 +83,16 @@ export const publicProfileQueryKey = (id: string) => ["public-profile", id] as c
  * und `extended` wird zusammengebaut; sonst bleibt es `null`.
  */
 export async function fetchPublicProfile(id: string): Promise<PublicProfileData> {
-  const [publicRes, baseRes, themeRes, interestsRes, offersRes, needsRes] = await Promise.all([
+  const [publicRes, baseRes, themeRes, interestsRes, offersRes, needsRes, postsRes] =
+    await Promise.all([
     supabase
       .from("profiles_public")
-      .select("id, name, avatar_url, region, company, short_bio, tier, roles")
+      .select("id, name, avatar_url, cover_url, region, company, short_bio, tier, roles")
       .eq("id", id)
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("headline, potential_score, competencies, videos")
+      .select("headline, branche, member_since, potential_score, competencies, videos")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("profile_theme_scores").select("theme, score").eq("profile_id", id),
@@ -89,6 +107,12 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
       .select("id, category, theme, title, description")
       .eq("profile_id", id)
       .order("created_at"),
+    supabase
+      .from("posts")
+      .select("id, body, created_at")
+      .eq("author_id", id)
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   if (publicRes.error) throw publicRes.error;
@@ -101,6 +125,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
           id: pub.id,
           name: pub.name ?? "Mitglied",
           avatar_url: pub.avatar_url,
+          cover_url: pub.cover_url,
           region: pub.region,
           company: pub.company,
           short_bio: pub.short_bio,
@@ -114,6 +139,8 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
   const extended: ExtendedProfile | null = base
     ? {
         headline: base.headline,
+        branche: base.branche,
+        member_since: base.member_since,
         potential_score: base.potential_score,
         competencies: base.competencies ?? [],
         videos: base.videos,
@@ -121,6 +148,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
         interests: interestsRes.data ?? [],
         offers: offersRes.data ?? [],
         needs: needsRes.data ?? [],
+        posts: postsRes.data ?? [],
       }
     : null;
 

@@ -38,7 +38,7 @@ const THEME_LABEL: Record<string, string> = {
 
 export default function PublicProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const { user, levelRank } = useAuth();
+  const { user, levelRank, staffRole } = useAuth();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: publicProfileQueryKey(id ?? ""),
@@ -73,6 +73,11 @@ export default function PublicProfilePage() {
   const profile = data.publicProfile;
   const extended = data.extended;
   const isOwn = !!user && user.id === profile.id;
+  // Komfort, nicht die Grenze: die ist `is_admin()` im Rumpf der RPCs (AGE-498).
+  // Der Weg erscheint nur bei Profilen, die HIER sichtbar sind — unbestätigte
+  // erreicht der Admin über die Suche auf /admin, weil profiles_public sie für
+  // niemanden führt.
+  const istAdmin = staffRole === "admin" && !isOwn;
   // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie: die
   // erweiterten Felder gehören zum „vollständigen Verzeichnis" (ab `discover`),
   // eine Kontaktanfrage ist eine Stufe teurer (ab `exchange`) — das ist der
@@ -84,10 +89,14 @@ export default function PublicProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <ProfileHeader profile={profile} impactScore={extended?.potential_score ?? null} />
+      <ProfileHeader
+        profile={profile}
+        impactScore={extended?.potential_score ?? null}
+        adminEditPath={istAdmin ? `/admin/mitglied/${profile.id}` : null}
+      />
 
       {extended ? (
-        <ExtendedSections extended={extended} />
+        <ExtendedSections extended={extended} profile={profile} />
       ) : (
         <Card className="border-dashed">
           <CardTitle className="text-base">Erweiterte Profilangaben</CardTitle>
@@ -113,38 +122,160 @@ export default function PublicProfilePage() {
 function ProfileHeader({
   profile,
   impactScore,
+  adminEditPath,
 }: {
   profile: PublicProfile;
   impactScore: number | null;
+  adminEditPath: string | null;
 }) {
   return (
     <ProfileHero
       name={profile.name}
       avatarUrl={profile.avatar_url}
+      coverUrl={profile.cover_url}
       tier={profile.tier}
       roles={profile.roles}
       region={profile.region}
       company={profile.company}
-      action={impactScore !== null && <HeroImpactBadge score={impactScore} />}
-    >
-      {profile.short_bio && (
-        <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>
-      )}
-    </ProfileHero>
+      action={
+        // Die Kurzbeschreibung steht NICHT mehr hier, sondern im Abschnitt
+        // „Über mich" (AGE-498). Zweimal derselbe Satz auf einer Seite ist kein
+        // Aufbau, sondern ein Versehen.
+        <div className="flex flex-col items-end gap-2">
+          {impactScore !== null && <HeroImpactBadge score={impactScore} />}
+          {adminEditPath && (
+            <Link to={adminEditPath}>
+              <Button variant="ghost" size="sm">
+                Als Admin bearbeiten
+              </Button>
+            </Link>
+          )}
+        </div>
+      }
+    />
   );
 }
 
-function ExtendedSections({ extended }: { extended: ExtendedProfile }) {
+/**
+ * Die Abschnitte nach dem Mockup vom 29.07. (AGE-498), in dieser Reihenfolge:
+ * Über mich · Beruf · Hobbys · Ich biete · Ich suche · Aktivitäten · Eckdaten.
+ * Erfolgsradar, Kompetenzen und Videos bleiben dazwischen erhalten — sie waren
+ * schon da, und das Mockup verbietet sie nicht.
+ *
+ * Jeder Abschnitt hat GENAU EINE Quelle (siehe Spec-Delta), und ein leerer
+ * Abschnitt entfällt, statt einen Platzhalter zu zeigen: dieselbe Regel, die
+ * AGE-494 auf der eigenen Profilseite gesetzt hat.
+ */
+function ExtendedSections({
+  extended,
+  profile,
+}: {
+  extended: ExtendedProfile;
+  profile: PublicProfile;
+}) {
   const interestsByTheme = THEME_ORDER.map((theme) => ({
     theme,
     items: extended.interests.filter((i) => i.theme === theme),
   })).filter((g) => g.items.length > 0);
   const untheured = extended.interests.filter((i) => !i.theme);
   const hasRadar = extended.themeScores.length > 0;
-  const hasMatching = extended.offers.length > 0 || extended.needs.length > 0;
+  const hatHobbys = interestsByTheme.length > 0 || untheured.length > 0;
+  const beruf = [profile.company, extended.branche, extended.headline].filter(Boolean);
 
   return (
     <>
+      {profile.short_bio && (
+        <Card className="flex flex-col gap-3">
+          <CardTitle className="text-base">Über mich</CardTitle>
+          <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>
+        </Card>
+      )}
+
+      {(beruf.length > 0 || extended.competencies.length > 0) && (
+        <Card className="flex flex-col gap-3">
+          <CardTitle className="text-base">Beruf</CardTitle>
+          {beruf.length > 0 && <p className="text-sm text-ink/80">{beruf.join(" · ")}</p>}
+          {extended.competencies.length > 0 && <ChipList items={extended.competencies} />}
+        </Card>
+      )}
+
+      {hatHobbys && (
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Hobbys</CardTitle>
+          <div className="flex flex-col gap-3">
+            {interestsByTheme.map((group) => (
+              <div key={group.theme}>
+                <div className="text-xs font-semibold tracking-wide text-muted uppercase">
+                  {THEME_LABEL[group.theme]}
+                </div>
+                <ChipList items={group.items.map((i) => i.label)} />
+              </div>
+            ))}
+            {untheured.length > 0 && <ChipList items={untheured.map((i) => i.label)} />}
+          </div>
+        </Card>
+      )}
+
+      {/* Kompass-Kategorien aus C2 — KEINE zweite Kategorienliste. */}
+      {extended.offers.length > 0 && (
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Ich biete</CardTitle>
+          <MatchingList items={extended.offers} />
+        </Card>
+      )}
+
+      {extended.needs.length > 0 && (
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Ich suche</CardTitle>
+          <MatchingList items={extended.needs} />
+        </Card>
+      )}
+
+      {extended.posts.length > 0 && (
+        <Card className="flex flex-col gap-4">
+          <CardTitle className="text-base">Aktivitäten</CardTitle>
+          <ul className="flex flex-col divide-y divide-line">
+            {extended.posts.map((post) => (
+              <li key={post.id} className="py-3 first:pt-0 last:pb-0">
+                <p className="text-sm text-ink/80">{post.body}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {new Date(post.created_at).toLocaleDateString("de-DE")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <Card className="flex flex-col gap-2">
+        <CardTitle className="text-base">Eckdaten</CardTitle>
+        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+          {extended.member_since && (
+            <div className="flex gap-2">
+              <dt className="text-muted">Mitglied seit</dt>
+              <dd className="text-ink">
+                {new Date(extended.member_since).toLocaleDateString("de-DE", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </dd>
+            </div>
+          )}
+          {profile.tier && (
+            <div className="flex gap-2">
+              <dt className="text-muted">Stufe</dt>
+              <dd className="text-ink">{profile.tier}</dd>
+            </div>
+          )}
+          {profile.region && (
+            <div className="flex gap-2">
+              <dt className="text-muted">Standort</dt>
+              <dd className="text-ink">{profile.region}</dd>
+            </div>
+          )}
+        </dl>
+      </Card>
+
       {hasRadar && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Erfolgsradar</CardTitle>
@@ -171,30 +302,6 @@ function ExtendedSections({ extended }: { extended: ExtendedProfile }) {
         </Card>
       )}
 
-      {(interestsByTheme.length > 0 || untheured.length > 0) && (
-        <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Interessen</CardTitle>
-          <div className="flex flex-col gap-3">
-            {interestsByTheme.map((group) => (
-              <div key={group.theme}>
-                <div className="text-xs font-semibold tracking-wide text-muted uppercase">
-                  {THEME_LABEL[group.theme]}
-                </div>
-                <ChipList items={group.items.map((i) => i.label)} />
-              </div>
-            ))}
-            {untheured.length > 0 && <ChipList items={untheured.map((i) => i.label)} />}
-          </div>
-        </Card>
-      )}
-
-      {extended.competencies.length > 0 && (
-        <Card className="flex flex-col gap-3">
-          <CardTitle className="text-base">Kompetenzen</CardTitle>
-          <ChipList items={extended.competencies} />
-        </Card>
-      )}
-
       {extended.videos.length > 0 && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Videos</CardTitle>
@@ -206,23 +313,6 @@ function ExtendedSections({ extended }: { extended: ExtendedProfile }) {
         </Card>
       )}
 
-      {hasMatching && (
-        <Card className="flex flex-col gap-5">
-          <CardTitle className="text-base">Such- & Bieteprofil</CardTitle>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <MatchingColumn
-              title="Ich suche"
-              empty="Keine Gesuche hinterlegt."
-              items={extended.needs}
-            />
-            <MatchingColumn
-              title="Ich biete"
-              empty="Keine Angebote hinterlegt."
-              items={extended.offers}
-            />
-          </div>
-        </Card>
-      )}
     </>
   );
 }
@@ -239,47 +329,27 @@ function ChipList({ items }: { items: string[] }) {
   );
 }
 
-function MatchingColumn({
-  title,
-  empty,
+/** Angebote oder Gesuche als Liste — dieselbe Darstellung für beide Seiten. */
+function MatchingList({
   items,
 }: {
-  title: string;
-  empty: string;
   items: { id: string; title: string; description: string | null; category: string | null }[];
 }) {
   return (
-    <div>
-      <div className="text-xs font-semibold tracking-wide text-accent-strong uppercase">
-        {title}
-      </div>
-      {items.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">{empty}</p>
-      ) : (
-        <ul className="mt-2 flex flex-col gap-3">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-[var(--radius-card)] border border-line bg-soft p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-ink">{item.title}</span>
-                {item.category && <Badge variant="soft">{item.category}</Badge>}
-              </div>
-              {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul className="flex flex-col gap-3">
+      {items.map((item) => (
+        <li key={item.id} className="rounded-[var(--radius-card)] border border-line bg-soft p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-ink">{item.title}</span>
+            {item.category && <Badge variant="soft">{item.category}</Badge>}
+          </div>
+          {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
+        </li>
+      ))}
+    </ul>
   );
 }
 
-// ── Kontakt (AGE-247, §6) ─────────────────────────────────────────────────────
-// Der Kontakt-Flow auf der Profilseite: senden, Statusanzeige (pending/accepted/
-// declined) und — NUR nach Annahme — die von der RLS freigegebenen Kontaktdaten.
-// Kontaktdaten werden niemals vor `accepted` angezeigt; das garantiert die RLS
-// (`contacts_select_self_or_released`), nicht dieses Frontend.
 function ContactArea({
   viewerId,
   profileId,

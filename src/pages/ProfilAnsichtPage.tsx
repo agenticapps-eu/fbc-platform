@@ -37,9 +37,14 @@ function ProfilView({ uid }: { uid: string }) {
   const p = data.profile;
   return (
     <div className="flex flex-col gap-6">
+      {/* `coverUrl` muss hier stehen: die EIGENE Ansicht liest den
+          Dashboard-Weg, nicht profiles_public. Fehlt es, lädt ein Mitglied sein
+          Hintergrundbild hoch und sieht es genau dort nicht, wo es danach
+          sucht (AGE-498). */}
       <ProfileHero
         name={p.name}
         avatarUrl={p.avatar_url}
+        coverUrl={p.cover_url}
         tier={p.tier}
         roles={p.roles}
         headline={p.headline}

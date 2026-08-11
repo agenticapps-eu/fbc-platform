@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { categoryLabel, type MatchingSide } from "../config/matching";
 import {
   categoryOptionsForSide,
@@ -12,19 +12,23 @@ import {
   type CategorySelection,
 } from "../lib/profile-categories";
 import { AvatarCropper } from "../components/profile/AvatarCropper";
-import { TagInput } from "../components/profile/TagInput";
-import { VideoLinksInput } from "../components/profile/VideoLinksInput";
+import {
+  ProfileBasicsFieldset,
+  ProfileDevelopmentFieldset,
+  ProfileRolesFieldset,
+  ProfileVideosFieldset,
+  ProfileWebFieldset,
+} from "../components/profile/ProfileFieldsets";
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
-import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
-import { Textarea } from "../components/ui/Textarea";
 import { useToast } from "../components/ui/toast-context";
 import { cn } from "../lib/cn";
 import {
+  EMPTY_PROFILE_FORM,
   GOAL_CATEGORIES,
   THEMES,
   computeProfileCompletion,
@@ -37,24 +41,6 @@ import {
 } from "../lib/profile";
 import { Link } from "react-router-dom";
 import { useAuth } from "../providers/auth-context";
-
-const EMPTY_VALUES: ProfileFormValues = {
-  name: "",
-  region: "",
-  company: "",
-  short_bio: "",
-  avatar_url: null,
-  branche: "",
-  headline: "",
-  roles: [],
-  competencies: [],
-  website: "",
-  dev_focus: "",
-  socials: { linkedin: "", instagram: "", xing: "" },
-  interests: [],
-  goals: [],
-  videos: [],
-};
 
 function errorMessage(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
@@ -89,10 +75,16 @@ function ProfileEditor({ uid }: { uid: string }) {
   const { toast } = useToast();
   const queryKey = profileEditorQueryKey(uid);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  // Ein Zuschnitt-Dialog für beide Bilder — er weiß über `kind`, welches
+  // Seitenverhältnis gilt. Zwei parallele Dialoge wären zwei Zustände, die sich
+  // gegenseitig überschreiben könnten.
+  const [pending, setPending] = useState<{ file: File; kind: "avatar" | "cover" } | null>(null);
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   // Formular nur EINMAL aus den Serverdaten befüllen — ein optimistisches
   // Rollback (Speicher-Fehler) darf die Eingaben des Nutzers nicht überschreiben.
   const initialized = useRef(false);
@@ -112,7 +104,7 @@ function ProfileEditor({ uid }: { uid: string }) {
     formState: { errors },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: EMPTY_VALUES,
+    defaultValues: EMPTY_PROFILE_FORM,
   });
 
   useEffect(() => {
@@ -125,13 +117,17 @@ function ProfileEditor({ uid }: { uid: string }) {
   const interests = useFieldArray({ control, name: "interests" });
   const goals = useFieldArray({ control, name: "goals" });
 
+  // Die Feldgruppen, die auf `profiles` schreiben, teilt sich diese Seite mit
+  // der Admin-Bearbeitung (AGE-498) — eine Felddefinition, zwei Rahmen.
+  const felder = { register, control, errors };
+
   // Live-Werte für die Vollständigkeits-Anzeige (Compiler-freundliche Subscription).
   const values = useWatch({ control }) as ProfileFormValues;
   const completion = computeProfileCompletion(values);
   const complete = isProfileComplete(completion);
 
   const mutation = useMutation({
-    mutationFn: () => saveProfile(uid, getValues(), avatarBlob),
+    mutationFn: () => saveProfile(uid, getValues(), avatarBlob, coverBlob),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<ProfileFormValues>(queryKey);
@@ -146,13 +142,19 @@ function ProfileEditor({ uid }: { uid: string }) {
         description: errorMessage(error),
       });
     },
-    onSuccess: ({ avatarUrl, completion: saved }) => {
+    onSuccess: ({ avatarUrl, coverUrl, completion: saved }) => {
       setAvatarBlob(null);
       if (preview) {
         URL.revokeObjectURL(preview);
         setPreview(null);
       }
       setValue("avatar_url", avatarUrl, { shouldDirty: false });
+      setCoverBlob(null);
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview);
+        setCoverPreview(null);
+      }
+      setValue("cover_url", coverUrl, { shouldDirty: false });
       toast({
         variant: "success",
         title: "Profil gespeichert",
@@ -166,10 +168,27 @@ function ProfileEditor({ uid }: { uid: string }) {
     },
   });
 
-  function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) setPendingFile(file);
-    event.target.value = ""; // gleiche Datei erneut wählbar machen
+  function onFileChange(kind: "avatar" | "cover") {
+    return (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) setPending({ file, kind });
+      event.target.value = ""; // gleiche Datei erneut wählbar machen
+    };
+  }
+
+  /**
+   * Entfernen heißt hier ENTKOPPELN, nicht löschen: `cover_url` wird geleert,
+   * das Objekt bleibt im Bucket und über seine URL abrufbar. Genau so verhält
+   * sich der Avatar seit AGE-238; die Beschriftung sagt es, statt eine Löschung
+   * zu versprechen, die nicht stattfindet.
+   */
+  function removeCover() {
+    setCoverBlob(null);
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+      setCoverPreview(null);
+    }
+    setValue("cover_url", null, { shouldDirty: true });
   }
 
   if (isLoading) {
@@ -250,79 +269,53 @@ function ProfileEditor({ uid }: { uid: string }) {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={onFileChange}
+              onChange={onFileChange("avatar")}
               className="hidden"
             />
           </div>
         </Card>
 
-        {/* Basisangaben */}
+        {/* Hintergrundbild (AGE-498) */}
         <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Basisangaben</CardTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name" required error={errors.name?.message}>
-              {({ id, invalid }) => (
-                <Input id={id} invalid={invalid} {...register("name")} autoComplete="name" />
-              )}
-            </Field>
-            <Field label="Region" required error={errors.region?.message}>
-              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("region")} />}
-            </Field>
-            <Field label="Unternehmen" required error={errors.company?.message}>
-              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("company")} />}
-            </Field>
-            <Field label="Branche" error={errors.branche?.message}>
-              {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("branche")} />}
-            </Field>
-          </div>
-          <Field
-            label="Headline"
-            hint="z. B. „Unternehmer · Investor · Deal Keeper“"
-            error={errors.headline?.message}
+          <CardTitle className="text-base">Hintergrundbild</CardTitle>
+          <div
+            className="relative h-24 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-28"
+            data-testid="cover-vorschau"
           >
-            {({ id, invalid }) => <Input id={id} invalid={invalid} {...register("headline")} />}
-          </Field>
-          <Field label="Kurzbeschreibung" required error={errors.short_bio?.message}>
-            {({ id, invalid }) => <Textarea id={id} invalid={invalid} {...register("short_bio")} />}
-          </Field>
+            {(coverPreview ?? values.cover_url) && (
+              <img
+                src={coverPreview ?? values.cover_url ?? undefined}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => coverInputRef.current?.click()}>
+              {values.cover_url || coverPreview ? "Bild ändern" : "Bild hochladen"}
+            </Button>
+            {(values.cover_url || coverPreview) && (
+              <Button variant="ghost" size="sm" onClick={removeCover}>
+                Bild entfernen
+              </Button>
+            )}
+            <p className="text-xs text-muted">
+              JPG, PNG oder WebP, Zuschnitt 3:1. „Entfernen" löst nur die Verknüpfung — die Datei
+              bleibt erreichbar, wer ihre Adresse kennt.
+            </p>
+          </div>
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            onChange={onFileChange("cover")}
+            className="hidden"
+          />
         </Card>
 
-        {/* Rollen & Kompetenzen */}
-        <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Rollen & Kompetenzen</CardTitle>
-          <Field label="Rollen" hint="Enter oder Komma fügt hinzu.">
-            {({ id }) => (
-              <Controller
-                control={control}
-                name="roles"
-                render={({ field }) => (
-                  <TagInput
-                    id={id}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="Rolle hinzufügen…"
-                  />
-                )}
-              />
-            )}
-          </Field>
-          <Field label="Kompetenzen" hint="Enter oder Komma fügt hinzu.">
-            {({ id }) => (
-              <Controller
-                control={control}
-                name="competencies"
-                render={({ field }) => (
-                  <TagInput
-                    id={id}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="Kompetenz hinzufügen…"
-                  />
-                )}
-              />
-            )}
-          </Field>
-        </Card>
+        <ProfileBasicsFieldset {...felder} />
+
+        <ProfileRolesFieldset {...felder} />
 
         {/* Interessen */}
         <Card className="flex flex-col gap-4">
@@ -420,60 +413,11 @@ function ProfileEditor({ uid }: { uid: string }) {
           )}
         </Card>
 
-        {/* Entwicklung */}
-        <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Entwicklung</CardTitle>
-          <Field label="Aktueller Fokus" hint="Sein · Tun · Haben · Wirken">
-            {({ id }) => (
-              <Select id={id} {...register("dev_focus")}>
-                <option value="">Kein Fokus</option>
-                {THEMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        </Card>
+        <ProfileDevelopmentFieldset {...felder} />
 
-        {/* Web & Social */}
-        <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Web & Social</CardTitle>
-          <Field label="Website" error={errors.website?.message}>
-            {({ id, invalid }) => (
-              <Input id={id} invalid={invalid} placeholder="https://…" {...register("website")} />
-            )}
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="LinkedIn">
-              {({ id }) => <Input id={id} {...register("socials.linkedin")} />}
-            </Field>
-            <Field label="Instagram">
-              {({ id }) => <Input id={id} {...register("socials.instagram")} />}
-            </Field>
-            <Field label="Xing">
-              {({ id }) => <Input id={id} {...register("socials.xing")} />}
-            </Field>
-          </div>
-        </Card>
+        <ProfileWebFieldset {...felder} />
 
-        {/* Videos (AGE-252) */}
-        <Card className="flex flex-col gap-4">
-          <div>
-            <CardTitle className="text-base">Videos</CardTitle>
-            <CardDescription>
-              YouTube- oder Vimeo-Links. Sie erscheinen auf deinem öffentlichen Profil.
-            </CardDescription>
-          </div>
-          <Controller
-            control={control}
-            name="videos"
-            render={({ field }) => (
-              <VideoLinksInput value={field.value} onChange={field.onChange} />
-            )}
-          />
-        </Card>
+        <ProfileVideosFieldset {...felder} />
 
         <div className="flex justify-end">
           <Button type="submit" variant="primary" disabled={mutation.isPending}>
@@ -481,15 +425,24 @@ function ProfileEditor({ uid }: { uid: string }) {
           </Button>
         </div>
 
-        {pendingFile && (
+        {pending && (
           <AvatarCropper
-            file={pendingFile}
-            onCancel={() => setPendingFile(null)}
+            file={pending.file}
+            aspect={pending.kind === "cover" ? 3 : 1}
+            outWidth={pending.kind === "cover" ? 1500 : 512}
+            label={pending.kind === "cover" ? "Hintergrundbild zuschneiden" : "Avatar zuschneiden"}
+            onCancel={() => setPending(null)}
             onConfirm={(blob, url) => {
-              setAvatarBlob(blob);
-              if (preview) URL.revokeObjectURL(preview);
-              setPreview(url);
-              setPendingFile(null);
+              if (pending.kind === "cover") {
+                setCoverBlob(blob);
+                if (coverPreview) URL.revokeObjectURL(coverPreview);
+                setCoverPreview(url);
+              } else {
+                setAvatarBlob(blob);
+                if (preview) URL.revokeObjectURL(preview);
+                setPreview(url);
+              }
+              setPending(null);
             }}
           />
         )}

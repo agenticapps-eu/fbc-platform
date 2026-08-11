@@ -52,6 +52,7 @@ export interface DashboardProfile {
   id: string;
   name: string;
   avatar_url: string | null;
+  cover_url: string | null;
   region: string | null;
   company: string | null;
   short_bio: string | null;
@@ -218,7 +219,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     supabase
       .from("profiles")
       .select(
-        "id, name, avatar_url, region, company, short_bio, tier, roles, headline, member_number, member_since, potential_score, profile_completion, dev_focus, dev_progress, next_steps",
+        "id, name, avatar_url, cover_url, region, company, short_bio, tier, roles, headline, member_number, member_since, potential_score, profile_completion, dev_focus, dev_progress, next_steps",
       )
       .eq("id", uid)
       .single(),
@@ -275,6 +276,7 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     id: p.id,
     name: p.name ?? "Mitglied",
     avatar_url: p.avatar_url,
+    cover_url: p.cover_url,
     region: p.region,
     company: p.company,
     short_bio: p.short_bio,

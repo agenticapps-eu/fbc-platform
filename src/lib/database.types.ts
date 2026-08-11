@@ -33,6 +33,46 @@ export type Database = {
   };
   public: {
     Tables: {
+      // Von Hand gepflegt wie der Functions-Block unten (AGE-498): ein volles
+      // `supabase gen types` mit CLI 2.113 schreibt die Datei stillos um
+      // (Semikolons weg) und markiert RPC-Rueckgabespalten als non-null, was
+      // zwanzig Testfixtures bricht, die legitim `null` pruefen. Werkzeug-Drift,
+      // kein Schema-Unterschied — gehoert in einen eigenen Change.
+      admin_audit: {
+        Row: {
+          action: string;
+          actor: string;
+          at: string;
+          id: number;
+          payload: Json | null;
+          target: string;
+        };
+        Insert: {
+          action: string;
+          actor: string;
+          at?: string;
+          id?: never;
+          payload?: Json | null;
+          target: string;
+        };
+        Update: {
+          action?: string;
+          actor?: string;
+          at?: string;
+          id?: never;
+          payload?: Json | null;
+          target?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_actor_fkey";
+            columns: ["actor"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       badges: {
         Row: {
           icon: string | null;
@@ -1069,6 +1109,54 @@ export type Database = {
           },
         ];
       };
+      // Kein Client-Grant und keine Policy (20260811090100): der Typ steht hier
+      // fuer die Admin-RPCs und den Import, nicht fuer einen Client-Zugriff.
+      // Eine Abfrage von `authenticated` aus laeuft in „permission denied".
+      profile_legacy: {
+        Row: {
+          created_at: string;
+          legacy_price: number | null;
+          legacy_source_id: string | null;
+          legacy_tier: string | null;
+          paid_until: string | null;
+          profile_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          legacy_price?: number | null;
+          legacy_source_id?: string | null;
+          legacy_tier?: string | null;
+          paid_until?: string | null;
+          profile_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          legacy_price?: number | null;
+          legacy_source_id?: string | null;
+          legacy_tier?: string | null;
+          paid_until?: string | null;
+          profile_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_legacy_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_legacy_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profile_theme_scores: {
         Row: {
           profile_id: string;
@@ -1108,6 +1196,7 @@ export type Database = {
           branche: string | null;
           company: string | null;
           competencies: string[] | null;
+          cover_url: string | null;
           created_at: string;
           dev_focus: string | null;
           dev_progress: number | null;
@@ -1136,6 +1225,7 @@ export type Database = {
           branche?: string | null;
           company?: string | null;
           competencies?: string[] | null;
+          cover_url?: string | null;
           created_at?: string;
           dev_focus?: string | null;
           dev_progress?: number | null;
@@ -1164,6 +1254,7 @@ export type Database = {
           branche?: string | null;
           company?: string | null;
           competencies?: string[] | null;
+          cover_url?: string | null;
           created_at?: string;
           dev_focus?: string | null;
           dev_progress?: number | null;
@@ -1203,6 +1294,7 @@ export type Database = {
         Row: {
           avatar_url: string | null;
           company: string | null;
+          cover_url: string | null;
           id: string | null;
           name: string | null;
           region: string | null;
@@ -1213,6 +1305,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null;
           company?: string | null;
+          cover_url?: string | null;
           id?: string | null;
           name?: string | null;
           region?: string | null;
@@ -1223,6 +1316,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null;
           company?: string | null;
+          cover_url?: string | null;
           id?: string | null;
           name?: string | null;
           region?: string | null;
@@ -1345,6 +1439,19 @@ export type Database = {
         Args: never;
         Returns: { activated: boolean; display_name: string | null }[];
       };
+      // Admin-Bearbeitung fremder Profile (AGE-498), aus
+      // 20260811090300_admin_profile_functions.sql. Von Hand gepflegt wie der
+      // Rest dieses Blocks.
+      //
+      // Alle drei sind fuer `authenticated` ausfuehrbar — die Abwehr sitzt IN
+      // der Funktion (is_admin()), damit sie pruefbar ist. Ein Nicht-Admin
+      // bekommt eine Ausnahme, keine leere Antwort.
+      admin_update_profile: {
+        Args: { target: string; patch: Json };
+        Returns: undefined;
+      };
+      admin_get_profile: { Args: { target: string }; Returns: Json };
+      admin_find_profile: { Args: { needle: string }; Returns: Json };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
       // admin_list_feedback() RPC from 20260716103000_admin_feedback_rpc.sql (admin-only
       // enriched read of QM feedback with the author name; empty for non-admins).

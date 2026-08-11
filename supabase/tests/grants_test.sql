@@ -36,7 +36,8 @@ select is(
          from information_schema.role_table_grants
          where table_schema = 'public' and grantee in ('anon', 'authenticated')
          group by 1, 2) t),
-$$badges/anon=SELECT
+$$admin_audit/authenticated=SELECT
+badges/anon=SELECT
 badges/authenticated=SELECT
 comments/authenticated=INSERT,SELECT
 compass_responses/authenticated=DELETE,INSERT,SELECT,UPDATE
@@ -89,7 +90,7 @@ select is(
          group by 1) t),
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
-profiles.UPDATE=avatar_url,branche,company,competencies,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
+profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
 

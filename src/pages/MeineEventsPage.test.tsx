@@ -19,6 +19,7 @@ const DATA: DashboardData = {
     id: "test-user",
     name: "Eleonora Voss",
     avatar_url: null,
+    cover_url: null,
     region: "Berlin",
     company: "Voss Ventures",
     short_bio: null,

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MemberLookup } from "../components/admin/MemberLookup";
 import { Card, CardTitle } from "../components/ui/Card";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { ToggleRow } from "../components/ui/ToggleRow";
@@ -46,6 +47,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-2xl font-semibold text-ink">Administration</h1>
+      <MemberLookup />
       <Card className="flex flex-col gap-2">
         <CardTitle>Kontaktanfragen</CardTitle>
         <ToggleRow

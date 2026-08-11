@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(202);
+select plan(255);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1369,6 +1369,372 @@ select ok(
   'falsch, für den die Grenze existiert (AGE-526)')
 from (select pg_temp.rumpf_ohne_kommentare(
         'public.request_own_activation_token(text,interval)'::regprocedure) as rumpf) s;
+
+-- ── 15. Hintergrundbild: Spalte, Grant, Projektion (AGE-498, C6-A) ──────────
+-- Vier Zusagen: das Mitglied darf `cover_url` schreiben, der Wert erreicht die
+-- FREMDE Ansicht über `profiles_public` (nicht über die Basistabelle — die ist
+-- für `connect` und darunter zu), die Neudeklaration der Sicht hat ihr
+-- Aktivierungs-Gate behalten, und die Vollständigkeit bleibt unberührt.
+
+select is(
+  pg_temp.try_as('66666666-6666-6666-6666-666666666666',
+    'update public.profiles set cover_url = ''https://x/cover.webp''
+      where id = ''66666666-6666-6666-6666-666666666666'''),
+  'OK', 'Ein Mitglied schreibt sein eigenes cover_url');
+
+select is(
+  pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+    'select count(*)::int from public.profiles_public
+      where id = ''66666666-6666-6666-6666-666666666666''
+        and cover_url = ''https://x/cover.webp'''),
+  1, 'cover_url erreicht die fremde Ansicht über profiles_public');
+
+-- Gegenprobe zur Neudeklaration: das Gate der Sicht muss sie überlebt haben.
+-- Ein Anhängen, das die beiden is_activated-Bedingungen beim Abschreiben
+-- verliert, öffnete das Verzeichnis lautlos — und nur dieser Fall merkt es.
+--
+-- MIT EIGENER SONDE, nicht mit '…000d': dessen Aktivierung wird in 13.10
+-- absichtlich nachgeholt (Zeile 824), 1300 Zeilen weiter oben. Ein Test, der
+-- sich hier darauf verlässt, prüft den Zustand eines fremden Abschnitts.
+-- `created_at` 90 Tage zurück, sonst fiele die Sonde in den Nachlauf aus
+-- 20260807090000 und gälte als bestätigt.
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-00000000c6c6', 'authenticated', 'authenticated', 'coversonde@test.fbc');
+update public.profiles
+   set tier = 'impact', activated_at = null, created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-00000000c6c6';
+
+select is(
+  pg_temp.count_as('c6c6c6c6-0000-0000-0000-00000000c6c6',
+    'select count(*)::int from public.profiles_public'),
+  0, 'Nach dem Anhängen von cover_url gilt das Gate der Sicht unverändert');
+
+select is(
+  (select profile_completion from public.profiles
+    where id = '66666666-6666-6666-6666-666666666666'),
+  (select profile_completion from public.profiles
+    where id = '44444444-4444-4444-4444-444444444444'),
+  'cover_url geht nicht in die Vollständigkeit ein (beide Profile leer gepflegt)');
+
+-- ── 16. Altmitgliedschaft: eigene Tabelle, für den Client unsichtbar ────────
+-- (AGE-498, C6-B. Befund aus dem Fremd-Review, REVIEWS.md/codex.)
+--
+-- WARUM DAS NICHT VIER SPALTEN AUF `profiles` SIND: `authenticated` hält
+-- Tabellen-SELECT auf profiles, und profiles_select_self_or_discover gibt
+-- jedem bestätigten `discover` die VOLLE Zeile jedes anderen (siehe §2 oben,
+-- Assertion „Discover liest die fremde Vollzeile"). Ein Spalten-Grant regelt
+-- nur das Schreiben — `legacy_price` stünde offen. Postgres kennt kein
+-- spaltenweises Leseverbot bei erteiltem Tabellen-SELECT.
+--
+-- Die erste Assertion unten ist deshalb der eigentliche Beleg: dieselbe
+-- Identität, die in §2 die fremde Vollzeile SIEHT, kommt hier nicht durch.
+
+insert into public.profile_legacy (profile_id, paid_until, legacy_tier, legacy_price, legacy_source_id)
+values ('66666666-6666-6666-6666-666666666666', date '2027-03-31', 'Premium', 1200.00, 'wp-4711');
+
+select is(has_table_privilege('authenticated', 'public.profile_legacy', 'SELECT'),
+  false, 'profile_legacy: authenticated hält kein SELECT');
+
+select is(has_table_privilege('authenticated', 'public.profile_legacy', 'INSERT'),
+  false, 'profile_legacy: authenticated hält kein INSERT');
+
+select alike(
+  pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+    'select paid_until from public.profile_legacy
+      where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  'DENIED:%permission denied%',
+  'Discover sieht die fremden Altdaten NICHT — obwohl es die Vollzeile sieht');
+
+select alike(
+  pg_temp.try_as('66666666-6666-6666-6666-666666666666',
+    'select paid_until from public.profile_legacy
+      where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  'DENIED:%permission denied%',
+  'Auch die EIGENEN Altdaten führen nicht über den Client — nur über die Admin-RPCs');
+
+-- Wiederholbarkeit des Imports: dieselbe Quell-Kennung ein zweites Mal.
+select throws_ok(
+  $$insert into public.profile_legacy (profile_id, legacy_source_id)
+    values ('44444444-4444-4444-4444-444444444444', 'wp-4711')$$,
+  23505,
+  null,
+  'Eine zweite Zeile mit derselben legacy_source_id prallt am Unique-Index ab');
+
+-- …und die Kehrseite: „keine Kennung" darf beliebig oft vorkommen. Ohne das
+-- btrim() im Index kollidierten '' und '   ' nicht miteinander, aber jeweils
+-- mit sich selbst — und der Import bliebe an leeren Feldern hängen.
+select lives_ok(
+  $$insert into public.profile_legacy (profile_id, legacy_source_id) values
+      ('11111111-1111-1111-1111-111111111111', null),
+      ('22222222-2222-2222-2222-222222222222', ''),
+      ('33333333-3333-3333-3333-333333333333', '   ')$$,
+  'Leere Kennungen (null, '''', Leerzeichen) koexistieren');
+
+-- ── 17. Bucket `covers`: dieselbe Falltabelle wie `avatars` (AGE-498, C6-C) ─
+-- Die Warnung aus 13.3a gilt hier unverändert: storage.objects hat keine
+-- SELECT-Policy, deshalb blanke INSERTs und die Gegenprobe als Testrolle,
+-- nicht über ein WHERE unter der Mitglieds-Identität.
+--
+-- Eigene Sonden statt geliehener Fixtures — die Aktivierungszustände der
+-- oberen Abschnitte werden dort mehrfach umgeschaltet (Zeilen 728, 824, 900,
+-- 1051, 1291), und ein Test, der sich darauf verlässt, prüft fremden Zustand.
+
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'coverja@test.fbc'),
+  ('c6c6c6c6-0000-0000-0000-0000000000a2', 'authenticated', 'authenticated', 'covernein@test.fbc');
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000a1';
+update public.profiles
+   set tier = 'impact', activated_at = null, created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''c6c6c6c6-0000-0000-0000-0000000000a1/eigen.webp'')'),
+  'OK', 'covers_insert_own: das bestätigte Mitglied schreibt in seinen eigenen Ordner');
+
+select is(
+  (select count(*)::int from storage.objects
+    where name = 'c6c6c6c6-0000-0000-0000-0000000000a1/eigen.webp'),
+  1, '… und das Objekt liegt danach wirklich da');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''66666666-6666-6666-6666-666666666666/fremd.webp'')'),
+  'DENIED:%row-level security policy%',
+  'covers_insert_own: der Ordner eines FREMDEN Mitglieds bleibt zu');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a2',
+  'insert into storage.objects (bucket_id, name) values
+     (''covers'', ''c6c6c6c6-0000-0000-0000-0000000000a2/eigen.webp'')'),
+  'DENIED:%row-level security policy%',
+  'covers_insert_own: ein nicht bestätigtes Konto lädt kein Hintergrundbild hoch');
+
+-- Die serverseitige Regel, die der Grund für den eigenen Bucket war. pgTAP
+-- sieht die Durchsetzung nicht (die macht die Storage-API), aber es hält fest,
+-- dass sie überhaupt AUSGESPROCHEN ist — ein `do nothing` beim Anlegen über
+-- einem falsch eingestellten Bestands-Bucket fiele hier auf.
+select is(
+  (select (public, file_size_limit, allowed_mime_types)::text
+     from storage.buckets where id = 'covers'),
+  '(t,2097152,{image/webp})',
+  'covers: öffentlich, 2 MiB, nur WebP — serverseitig, nicht nur im Formular');
+
+-- Die Drift-Sicherung aus dem Spec: dieselbe Regel steht jetzt an SECHS
+-- Stellen. Wer sie an einem Bucket ändert, wird hier rot — auch wenn er den
+-- anderen gar nicht angefasst hat.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'covers\_%'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, 'covers trägt drei Schreib-Policies, alle mit dem Aktivierungs-Gate');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'avatars\_%'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, '… und avatars unverändert ebenso — die Falltabelle gilt für beide');
+
+-- ── 18. Admin-Bearbeitung: die vier Funktionen (AGE-498, C6-D) ─────────────
+-- Der Anlassfall ist ein IMPORTIERTES, NICHT BESTÄTIGTES Profil: genau dieses
+-- ist unter der RLS für niemanden sichtbar (profiles_select_self_or_discover
+-- verlangt activated_at am ZIELPROFIL, Zeile 79 dieser Migration; die Sicht
+-- ebenso). Ein Schreibweg ohne Lesepfad griffe deshalb nur an den Profilen,
+-- die ihn nicht brauchen — Befund aus dem Fremd-Review (REVIEWS.md, codex).
+-- Das Ziel unten ist absichtlich unbestätigt.
+
+create function pg_temp.text_as(uid uuid, q text) returns text language plpgsql as $$
+declare t text;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute q into t;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return t;
+end $$;
+
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated', 'importiert@test.fbc');
+update public.profiles
+   set name = 'Importiert', company = 'Alt GmbH', activated_at = null,
+       created_at = now() - interval '90 days'
+ where id = 'c6c6c6c6-0000-0000-0000-0000000000b1';
+-- Der Admin aus den Fixtures (staff_roles, Zeile 136) — bestätigt, damit er
+-- sich nicht am eigenen Gate stößt.
+update public.profiles set activated_at = now()
+ where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+-- 18.1 Der Schreibweg am Gate vorbei, mit allen drei Zielzeilen in einem Aufruf.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile(
+      'c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"name":"Korrigiert","roles":["Vorstand","Beirat"],
+        "email":"neu@test.fbc","paid_until":"2027-06-30","legacy_price":1200.00}'::jsonb)$q$),
+  'OK', 'Admin ändert ein UNBESTÄTIGTES fremdes Profil');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… die Profilzeile ist wirklich geschrieben');
+
+select is((select roles::text from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  '{Vorstand,Beirat}', '… ein Array-Feld ist feldweise dekodiert, nicht als Text abgelegt');
+
+select is((select email from public.profile_contacts where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'neu@test.fbc', '… die KONTAKTzeile ist mitgeschrieben (sonst liefen die Mails weiter ins alte Postfach)');
+
+select is((select paid_until from public.profile_legacy where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  date '2027-06-30', '… und die Altdatenzeile ebenso');
+
+select is((select count(*)::int from public.admin_audit
+            where target = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  1, '… und die Änderung hat eine Spur hinterlassen');
+
+-- 18.2 Die Abwehr. Der Button im Frontend ist Komfort — DAS hier ist die Grenze.
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"name":"Gekapert"}'::jsonb)$q$),
+  'DENIED:%',
+  'Ein normales Mitglied prallt an der RPC ab — am Formular vorbei aufgerufen');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… und hat nichts verändert');
+
+-- 18.3 Ein Feld außerhalb der Weißliste. `tier` ist der Nebeneingang, den dieser
+-- Change gerade vermeiden will — Stufenwechsel gehen über Abrechnung und Import.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"company":"Neu GmbH","tier":"impact"}'::jsonb)$q$),
+  'DENIED:%',
+  'Ein unbekanntes Feld bricht ab');
+
+select is((select company from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Alt GmbH', '… und das GÜLTIGE Feld desselben Aufrufs bleibt ebenfalls ungeschrieben');
+
+-- 18.4 Ein ungültiger Wert. Ein nicht lesbares Datum ist ein Fehler, kein NULL.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"paid_until":"morgen"}'::jsonb)$q$),
+  'DENIED:%', 'Ein nicht interpretierbares Datum bricht ab');
+
+select is((select paid_until from public.profile_legacy where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  date '2027-06-30', '… und lässt den vorherigen Wert stehen');
+
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1', '[]'::jsonb)$q$),
+  'DENIED:%', 'Ein patch, der kein JSON-Objekt ist, bricht ab');
+
+-- 18.5 Fehlend und leer sind zweierlei — der Unterschied, den coalesce nicht kann.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"short_bio":null}'::jsonb)$q$),
+  'OK', 'JSON-null wird angenommen …');
+
+select is((select short_bio from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und leert das Feld');
+
+select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Korrigiert', '… während ein NICHT geschickter Schlüssel unverändert bleibt');
+
+-- 18.5b Aus dem Review auf dem DIFF (codex): drei Zusagen, die die Funktion
+-- noch nicht hielt.
+--
+-- Erstens gilt „JSON-null leert" auch für die Array-Felder.
+-- `jsonb_array_elements_text('null'::jsonb)` wirft — die Zusage aus 18.5 war
+-- also nur für Textfelder wahr.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"roles":null}'::jsonb)$q$),
+  'OK', 'JSON-null leert auch ein Array-Feld …');
+select is((select roles from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und setzt es wirklich auf NULL');
+
+-- Zweitens: `profiles.goals` und `profiles.interests` heißen wie die
+-- KIND-TABELLEN goals/profile_interests, tragen aber etwas anderes. Der Editor
+-- schickt sie nie; sie trotzdem anzunehmen hieße, ein Feld offenzuhalten, das
+-- beim ersten Fehlgriff die Formularform der Kind-Tabelle in die Profilspalte
+-- schriebe.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"goals":"irgendwas"}'::jsonb)$q$),
+  'DENIED:%', 'profiles.goals ist kein Admin-Feld — der Name kollidiert mit der Kind-Tabelle');
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"interests":["x"]}'::jsonb)$q$),
+  'DENIED:%', 'profiles.interests ebenso');
+
+-- 18.6 Der Lesepfad — ohne ihn wäre der Schreibweg unerreichbar.
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1') -> 'profile' ->> 'name'$q$),
+  'Korrigiert', 'admin_get_profile liest das unbestätigte Profil');
+
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1') ->> 'login_email'$q$),
+  'importiert@test.fbc',
+  '… und liefert die LOGIN-Adresse mit, damit der Editor sie neben der Kontaktadresse zeigen kann');
+
+select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
+  $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1')$q$),
+  'DENIED:%', 'Ein normales Mitglied liest darüber nichts');
+
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select jsonb_array_length(public.admin_find_profile('importiert@test.fbc'))$q$),
+  1, 'admin_find_profile findet es über die Login-Adresse — es gibt keine Mitgliederliste');
+
+-- Und genau das muss auch dann gelten, wenn jemand die Suche als Blankoschein
+-- benutzt: `%` ist in ILIKE ein Platzhalter, `'%%%'` käme durch die
+-- Drei-Zeichen-Schwelle und lieferte JEDES Mitglied — eine Liste durch die
+-- Hintertür. Aus dem Review auf dem Diff (codex).
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select jsonb_array_length(public.admin_find_profile('%%%'))$q$),
+  0, 'Platzhalter im Suchbegriff öffnen die Suche nicht zur Mitgliederliste');
+
+-- 18.7 Rechte und Unversehrtheit der Spur.
+select is(has_function_privilege('anon', 'public.admin_update_profile(uuid,jsonb)', 'execute'),
+  false, 'admin_update_profile: anon darf nicht');
+select is(has_function_privilege('anon', 'public.admin_get_profile(uuid)', 'execute'),
+  false, 'admin_get_profile: anon darf nicht');
+select is(has_function_privilege('anon', 'public.admin_find_profile(text)', 'execute'),
+  false, 'admin_find_profile: anon darf nicht');
+
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$insert into public.admin_audit (actor, action, target)
+     values ('aaaaaaaa-0000-0000-0000-000000000001', 'erfunden',
+             'c6c6c6c6-0000-0000-0000-0000000000b1')$q$),
+  'DENIED:%',
+  'Niemand schreibt sich einen Audit-Eintrag selbst — auch ein Admin nicht');
+
+-- 18.8 Der Weg der Edge Function. GEFUNDEN BEI DER SICHTPROBE, nicht hier:
+-- admin-change-email las zuerst `staff_roles` direkt mit service_role und lief
+-- in „permission denied for table staff_roles". Der Grund ist kein Versehen,
+-- sondern der Lockdown aus AGE-312: service_role hält auf KEINER Tabelle in
+-- `public` ein SELECT/INSERT — alles, was es tut, geht durch SECURITY-DEFINER-
+-- Funktionen (issue_activation_token, mark_activated, revoke_sessions …).
+--
+-- Die erste Assertion hält genau diese Voraussetzung fest. Fiele sie eines Tages
+-- weg, wäre die zweite Hälfte des Musters (die beiden Funktionen unten) nur noch
+-- Umweg — und das soll auffallen, statt sich anzuschleichen.
+select is(has_table_privilege('service_role', 'public.staff_roles', 'SELECT'),
+  false, 'service_role liest staff_roles NICHT direkt (AGE-312-Lockdown)');
+
+select is((select public.is_admin_uid('aaaaaaaa-0000-0000-0000-000000000001')),
+  true, 'is_admin_uid erkennt den Admin …');
+select is((select public.is_admin_uid('c6c6c6c6-0000-0000-0000-0000000000a1')),
+  false, '… und ein normales Mitglied nicht');
+select is((select public.is_admin_uid('bbbbbbbb-0000-0000-0000-000000000002')),
+  false, '… auch keinen Matching-Manager (QM ist nicht die Deal-Queue)');
+
+select is(has_function_privilege('authenticated', 'public.is_admin_uid(uuid)', 'execute'),
+  false, 'is_admin_uid: nur service_role — sonst wäre es ein Auskunftsweg über fremde Rollen');
+select is(has_function_privilege('service_role', 'public.is_admin_uid(uuid)', 'execute'),
+  true, 'is_admin_uid: service_role darf');
+select is(has_function_privilege('authenticated', 'public.log_admin_action(uuid,text,uuid,jsonb)', 'execute'),
+  false, 'log_admin_action: authenticated darf nicht — sonst wäre die Spur fälschbar');
 
 select * from finish();
 rollback;
