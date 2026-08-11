@@ -59,10 +59,17 @@ Test vor Code. Ein Haken ohne gesehenen roten Lauf ist keiner.
       niemanden ein zweites Mal behelligen
 - [x] 4.2 Mit dem gesetzten Passwort angemeldet: die Startseite steht, Stufe
       „Basic", volle Navigation — der Weg trägt bis ins Konto
-- [ ] 4.3 Denselben Schirm über `/passwort-neu` prüfen (Zweck `reset`)
+- [x] 4.3 Denselben Schirm über `/passwort-neu` geprüft (Zweck `reset`):
+      „Dein **neues** Passwort ist gesetzt" plus der Hinweis auf die Abmeldung
+      auf allen Geräten — kein Wort von einer Aktivierung, und der doppelte
+      Fußzeilen-Link fehlt dort ebenfalls
 
 ## 5. Abschluss
 
-- [ ] 5.1 Unabhängiger Reviewer über den **Diff**
-- [ ] 5.2 `verification-before-completion`: jeder Haken trägt einen Beleg
-- [ ] 5.3 PR, Linear AGE-527, nach dem Ausrollen archivieren
+- [x] 5.1 Unabhängiger Reviewer über den **Diff** — nachgeholt am 2026-08-11
+      nach dem Merge (er war durchgerutscht). APPROVE mit vier Befunden: drei
+      behoben, einer entkräftet. Auflösung in `REVIEWS.md`
+- [x] 5.2 `verification-before-completion`: 499 Vitest, Typen sauber, eslint
+      ohne Fehler; der ganze Weg lokal gegangen und am Live-Bundle gemessen
+- [x] 5.3 PR #154 gemergt und ausgerollt (Bundle `index-D9sUq5Ru.js` trägt alle
+      drei Marker); Linear AGE-527 auf Done

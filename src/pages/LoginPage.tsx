@@ -49,12 +49,14 @@ export default function LoginPage() {
     setFormError(null);
 
     if (mode === "login") {
-      // Zehn, nicht acht: `minimum_password_length` in config.toml steht seit C4
-      // auf 10. Mit acht nähme das Formular eine Eingabe an, die der Server
-      // ablehnt — das Mitglied bekäme einen Serverfehler statt einer
-      // Feldmeldung (AGE-495).
-      if (!values.password || values.password.length < 10) {
-        setError("password", { message: "Das Passwort muss mindestens 10 Zeichen haben." });
+      // Beim ANMELDEN nur auf „leer" prüfen, nicht auf Länge (Befund aus dem
+      // Diff-Review zu AGE-527). Die Zehn aus `minimum_password_length` gilt
+      // beim SETZEN eines Passworts — der Anmeldedienst prüft sie beim Anmelden
+      // nicht. Ein Konto aus der Zeit vor C4 mit acht Zeichen käme serverseitig
+      // durch, würde hier aber vom eigenen Formular ausgesperrt. Die
+      // Längenregel steht auf der Einlöseseite, wo ein NEUES Passwort entsteht.
+      if (!values.password) {
+        setError("password", { message: "Bitte dein Passwort eingeben." });
         return;
       }
       const { error } = await signIn(values.email, values.password);

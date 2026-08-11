@@ -91,3 +91,45 @@ unbestätigtes Konto.
   Fehlerbehandlung für einen Fall, den die Invarianten ausschließen
   (`crypto.getRandomValues` ist in jedem Zielbrowser und in Node ≥ 19 vorhanden
   und wirft nur bei zu großem Puffer).
+
+---
+
+# Code-Review über den Diff (Schritt 4)
+
+**Nachgeholt am 2026-08-11, nach dem Merge.** Task 5.1 verlangte ihn vor dem
+Abschluss; er war mir durchgerutscht, und das steht hier, statt still korrigiert
+zu werden.
+
+## Reviewer: opencode (hf:moonshotai/Kimi-K3)
+
+VERDICT: APPROVE — die Umsetzung trägt; vier Befunde für den Nachlauf.
+
+- [MEDIUM] `LoginPage.tsx` — Die Zehn-Zeichen-Regel wanderte aus dem Schema in
+  `onSubmit` und gilt dort auch beim **Anmelden**. Der Anmeldedienst prüft sie
+  beim Anmelden nicht. Ein Konto aus der Zeit vor C4 mit acht Zeichen käme
+  serverseitig durch und wird vom eigenen Formular ausgesperrt.
+- [MEDIUM] `ActivationRedeemPage.tsx` — Wenn Fall 3 („Konto schon aktiviert")
+  jemals `status = "activated"` setzte, bekäme ein alter Link den Erfolgsschirm
+  samt Login-Weiterleitung, ohne dass etwas eingelöst wurde. „Verify, not
+  assert."
+- [LOW] `signOut()` im Erfolgsweg ohne `catch` — ausgerechnet der Grund für den
+  Aufruf ist der Fall, in dem ein globales `signOut` ablehnen kann.
+- [LOW] Anzeige-Zähler und Weiterleitungsfrist können um bis zu eine Sekunde
+  auseinanderlaufen.
+
+Ausdrücklich bestätigt: der Drei-Wege-Umbau samt Negativproben, die
+typsichere Signaturänderung, `replace: true`, die sofortige Abmeldung vor der
+Wartezeit und der zweckabhängige Wortlaut.
+
+## Resolution
+
+- **MEDIUM 1** → Behoben. Beim Anmelden wird nur noch auf „leer" geprüft; die
+  Längenregel bleibt dort, wo ein NEUES Passwort entsteht. Zwei Tests, und
+  gegengeprüft, dass sie gegen die alte Fassung fallen.
+- **MEDIUM 2** → **Entkräftet, nicht behoben.** Nachgelesen: Fall 3 ruft
+  `navigate("/", { replace: true })` und fasst `status` nicht an. Der Reviewer
+  hat es als „verify" markiert, und die Prüfung fällt zu unseren Gunsten aus.
+- **LOW 1** → `signOut().catch(() => {})`, mit der Begründung im Code.
+- **LOW 2** → Als hingenommene Entscheidung im Code benannt, damit der nächste
+  Leser die beiden Zeitgeber nicht „repariert" und die Frist wieder länger macht
+  als sie ankündigt.

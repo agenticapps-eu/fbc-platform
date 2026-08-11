@@ -127,4 +127,49 @@ describe("LoginPage", () => {
     renderLogin();
     expect(screen.getByLabelText("Passwort")).toBeInTheDocument();
   });
+
+  /**
+   * Befund aus dem Diff-Review zu AGE-527: Die Zehn-Zeichen-Regel galt auch beim
+   * ANMELDEN. Der Anmeldedienst prüft sie dort nicht — sie gilt beim SETZEN.
+   * Ein Konto aus der Zeit vor C4 mit acht Zeichen käme serverseitig durch und
+   * wurde vom eigenen Formular ausgesperrt.
+   */
+  it("sperrt beim Anmelden kein kurzes Alt-Passwort aus", async () => {
+    const signIn = vi.fn(async () => ({ error: null }));
+    render(
+      <AuthFixture value={fakeAuthValue({ signIn })}>
+        <DesignVariantProvider>
+          <MemoryRouter>
+            <LoginPage />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "alt@example.org" } });
+    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "achtzehn" } });
+    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+
+    await waitFor(() => expect(signIn).toHaveBeenCalledWith("alt@example.org", "achtzehn"));
+    expect(screen.queryByText(/mindestens 10 Zeichen/i)).not.toBeInTheDocument();
+  });
+
+  it("verlangt beim Anmelden aber ein nicht leeres Passwort", async () => {
+    const signIn = vi.fn(async () => ({ error: null }));
+    render(
+      <AuthFixture value={fakeAuthValue({ signIn })}>
+        <DesignVariantProvider>
+          <MemoryRouter>
+            <LoginPage />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "alt@example.org" } });
+    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+
+    expect(await screen.findByText(/Bitte dein Passwort eingeben/i)).toBeInTheDocument();
+    expect(signIn).not.toHaveBeenCalled();
+  });
 });
