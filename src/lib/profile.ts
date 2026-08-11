@@ -39,6 +39,11 @@ export const profileFormSchema = z.object({
   company: z.string().trim().min(1, "Unternehmen ist erforderlich."),
   short_bio: z.string().trim().min(1, "Kurzbeschreibung ist erforderlich."),
   avatar_url: z.string().nullable(),
+  // Hintergrundbild (AGE-498). Wie der Avatar „empfohlen", nie Pflicht — und
+  // bewusst NICHT in computeProfileCompletion: die zwölf gewichteten Felder
+  // sind Vertrag mit dem DB-Trigger, ein dreizehntes verschöbe rückwirkend den
+  // Vollständigkeitsgrad jedes bestehenden Profils.
+  cover_url: z.string().nullable(),
   branche: z.string().trim(),
   headline: z.string().trim(),
   roles: z.array(z.string().trim().min(1)),
@@ -140,6 +145,7 @@ export async function fetchProfileEditorData(uid: string): Promise<ProfileFormVa
     company: p.company ?? "",
     short_bio: p.short_bio ?? "",
     avatar_url: p.avatar_url,
+    cover_url: p.cover_url,
     branche: p.branche ?? "",
     headline: p.headline ?? "",
     roles: p.roles ?? [],
@@ -181,7 +187,38 @@ function buildSocials(socials: ProfileFormValues["socials"]): Record<string, str
 }
 
 /**
- * Speichert das Profil: optionaler Avatar-Upload, Profilzeile aktualisieren,
+ * Lädt ein zugeschnittenes Bild in seinen Bucket und gibt die öffentliche URL
+ * zurück; ohne Blob bleibt der bisherige Wert stehen.
+ *
+ * Kein `upsert`: der Pfad trägt einen Zeitstempel, kollidiert also nie — und der
+ * Upsert-Weg der Storage-API (INSERT … ON CONFLICT DO UPDATE) scheitert an der
+ * bewusst fehlenden SELECT-Policy auf storage.objects (AGE-438).
+ *
+ * Der erste Pfadabschnitt MUSS die eigene uid sein: daran hängt die
+ * Bucket-Policy, in beiden Buckets. Ein Admin kann darüber deshalb kein fremdes
+ * Bild hochladen — die Bild-Steuerung ist im Fremd-Modus ausgeblendet.
+ *
+ * Ein ersetztes Bild wird nicht gelöscht: das alte Objekt bleibt über seine URL
+ * abrufbar. Das ist beim Avatar seit AGE-238 so und hier bewusst gleich
+ * gehalten — benannt, statt als Löschung versprochen.
+ */
+async function uploadBild(
+  bucket: "avatars" | "covers",
+  uid: string,
+  blob: Blob | null,
+  bisher: string | null,
+): Promise<string | null> {
+  if (!blob) return bisher;
+  const path = `${uid}/${Date.now()}.webp`;
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, { contentType: "image/webp" });
+  if (error) throw error;
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * Speichert das Profil: optionale Bild-Uploads, Profilzeile aktualisieren,
  * Interessen und Ziele ersetzen. profile_completion setzt der DB-Trigger —
  * die zurückgegebene Zeile trägt den maßgeblichen Wert.
  */
@@ -189,20 +226,10 @@ export async function saveProfile(
   uid: string,
   values: ProfileFormValues,
   avatarBlob: Blob | null,
+  coverBlob: Blob | null = null,
 ): Promise<{ avatarUrl: string | null; completion: number }> {
-  let avatarUrl = values.avatar_url;
-
-  if (avatarBlob) {
-    // Kein `upsert`: der Pfad trägt einen Zeitstempel, kollidiert also nie — und
-    // der Upsert-Pfad der Storage-API (INSERT … ON CONFLICT DO UPDATE) scheitert
-    // an der bewusst fehlenden SELECT-Policy auf storage.objects (AGE-438).
-    const path = `${uid}/${Date.now()}.webp`;
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, avatarBlob, { contentType: "image/webp" });
-    if (uploadError) throw uploadError;
-    avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
-  }
+  const avatarUrl = await uploadBild("avatars", uid, avatarBlob, values.avatar_url);
+  const coverUrl = await uploadBild("covers", uid, coverBlob, values.cover_url);
 
   const { data: updated, error: updateError } = await supabase
     .from("profiles")
@@ -220,6 +247,7 @@ export async function saveProfile(
       socials: buildSocials(values.socials),
       videos: sanitizeVideos(values.videos),
       avatar_url: avatarUrl,
+      cover_url: coverUrl,
     })
     .eq("id", uid)
     .select("profile_completion, avatar_url")

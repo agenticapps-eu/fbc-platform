@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(242);
+select plan(243);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1642,6 +1642,12 @@ select is(
   pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
     $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1') -> 'profile' ->> 'name'$q$),
   'Korrigiert', 'admin_get_profile liest das unbestätigte Profil');
+
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1') ->> 'login_email'$q$),
+  'importiert@test.fbc',
+  '… und liefert die LOGIN-Adresse mit, damit der Editor sie neben der Kontaktadresse zeigen kann');
 
 select alike(pg_temp.try_as('c6c6c6c6-0000-0000-0000-0000000000a1',
   $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1')$q$),

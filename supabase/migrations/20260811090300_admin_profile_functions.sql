@@ -229,12 +229,19 @@ begin
     raise exception 'forbidden: admin_get_profile' using errcode = '42501';
   end if;
 
+  -- Die LOGIN-Adresse kommt mit, weil der Editor sie neben der Kontaktadresse
+  -- zeigen muss: wer den Zugang repariert, soll nicht uebersehen, dass die
+  -- Benachrichtigungen weiter ans alte Postfach gehen. Geaendert wird sie
+  -- NICHT hier, sondern ueber die Edge Function admin-change-email — auth.users
+  -- gehoert GoTrue.
   select jsonb_build_object(
-    'profile', to_jsonb(p) - 'search_doc',
-    'contact', to_jsonb(c),
-    'legacy',  to_jsonb(l))
+    'profile',     to_jsonb(p) - 'search_doc',
+    'contact',     to_jsonb(c),
+    'legacy',      to_jsonb(l),
+    'login_email', u.email)
     into ergebnis
     from public.profiles p
+    join auth.users u on u.id = p.id
     left join public.profile_contacts c on c.profile_id = p.id
     left join public.profile_legacy   l on l.profile_id = p.id
    where p.id = target;
