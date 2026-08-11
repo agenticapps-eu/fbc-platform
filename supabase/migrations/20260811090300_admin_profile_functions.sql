@@ -47,7 +47,7 @@
 -- kann.
 --
 -- Und das Dekodieren ist FELDWEISE, nicht einheitlich (Review, MEDIUM):
--- interests/competencies/roles/videos sind text[], socials ist jsonb,
+-- competencies/roles/videos sind text[], socials ist jsonb,
 -- is_public ist boolean, paid_until ist date, legacy_price ist numeric. Ein
 -- durchgängiges `patch ->> 'feld'` legte in den Array-Spalten Text ab oder
 -- scheiterte.
@@ -56,6 +56,15 @@
 -- "morgen"` darf keine Zeile schreiben. Eine eigene Fehlermeldung je Feld wäre
 -- Aufwand ohne Empfänger — der einzige Aufrufer ist ein Formular, das seine
 -- Felder bereits typisiert.
+--
+-- ══ WARUM `goals` UND `interests` NICHT IN DER WEISSLISTE STEHEN ═══════════
+-- Es GIBT die Spalten `profiles.goals` (text) und `profiles.interests` (text[]),
+-- und beide sind client-schreibbar. Sie heißen aber wie die KIND-TABELLEN
+-- `goals` und `profile_interests`, die etwas anderes tragen — und die
+-- Formularform der Kind-Tabelle ist `[{theme,label}]`, nicht `text[]`. Ein
+-- Fehlgriff schriebe also stillschweigend Unsinn in die Profilspalte. Der
+-- Editor schickt sie ohnehin nie; ein Feld offenzuhalten, das kein Aufrufer
+-- benutzt, ist Fläche ohne Nutzen. Aus dem Review auf dem Diff.
 --
 -- ══ WARUM DIE SPUR JETZT ENTSTEHT UND NICHT SPÄTER ═════════════════════════
 -- Beide Reviewer haben es unabhängig als HIGH gemeldet. Ein Admin ändert über
@@ -99,6 +108,23 @@ comment on table public.admin_audit is
   'payload traegt den Patch, nicht die ganze Zeile.';
 
 -- ── 2. Schreiben ────────────────────────────────────────────────────────────
+-- Ein jsonb-Array nach text[], mit JSON-null als SQL NULL. Ohne diesen Umweg
+-- wirft `jsonb_array_elements_text` auf einem Skalar, und die Zusage
+-- „JSON-null leert das Feld" galt nur fuer Textspalten.
+create or replace function public.jsonb_text_array(v jsonb)
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when v is null or jsonb_typeof(v) = 'null' then null
+    else (select array(select jsonb_array_elements_text(v)))
+  end;
+$$;
+
+revoke execute on function public.jsonb_text_array(jsonb) from public, anon, authenticated;
+
 create or replace function public.admin_update_profile(target uuid, patch jsonb)
 returns void
 language plpgsql
@@ -129,7 +155,7 @@ begin
       -- profiles (die client-schreibbare Menge + cover_url)
       'name', 'avatar_url', 'cover_url', 'region', 'company', 'short_bio',
       'branche', 'headline', 'roles', 'socials', 'website', 'competencies',
-      'dev_focus', 'goals', 'interests', 'is_public', 'videos',
+      'dev_focus', 'is_public', 'videos',
       -- profile_contacts
       'email', 'phone',
       -- profile_legacy
@@ -152,19 +178,16 @@ begin
     dev_focus    = case when patch ? 'dev_focus'    then patch ->> 'dev_focus'    else dev_focus end,
     goals        = case when patch ? 'goals'        then patch ->> 'goals'        else goals end,
     is_public    = case when patch ? 'is_public'    then (patch ->> 'is_public')::boolean else is_public end,
-    socials      = case when patch ? 'socials'      then patch -> 'socials'       else socials end,
-    roles        = case when patch ? 'roles'
-                        then (select array(select jsonb_array_elements_text(patch -> 'roles')))
-                        else roles end,
-    competencies = case when patch ? 'competencies'
-                        then (select array(select jsonb_array_elements_text(patch -> 'competencies')))
-                        else competencies end,
-    interests    = case when patch ? 'interests'
-                        then (select array(select jsonb_array_elements_text(patch -> 'interests')))
-                        else interests end,
-    videos       = case when patch ? 'videos'
-                        then (select array(select jsonb_array_elements_text(patch -> 'videos')))
-                        else videos end
+    socials      = case when patch ? 'socials'
+                        then nullif(patch -> 'socials', 'null'::jsonb)
+                        else socials end,
+    -- Die Array-Felder brauchen den null-Zweig ausdruecklich:
+    -- `jsonb_array_elements_text('null'::jsonb)` WIRFT („cannot extract
+    -- elements from a scalar"). Ohne ihn galt die Zusage „JSON-null leert"
+    -- nur fuer Textfelder — gefunden im Review auf dem Diff.
+    roles        = case when patch ? 'roles'        then public.jsonb_text_array(patch -> 'roles')        else roles end,
+    competencies = case when patch ? 'competencies' then public.jsonb_text_array(patch -> 'competencies') else competencies end,
+    videos       = case when patch ? 'videos'       then public.jsonb_text_array(patch -> 'videos')       else videos end
   where id = target;
 
   if not found then
@@ -275,6 +298,7 @@ set search_path = ''
 as $$
 declare
   ergebnis jsonb;
+  muster   text;
 begin
   if not public.is_admin() then
     raise exception 'forbidden: admin_find_profile' using errcode = '42501';
@@ -283,13 +307,23 @@ begin
     raise exception 'Suchbegriff zu kurz' using errcode = '22023';
   end if;
 
+  -- Platzhalter im Suchbegriff entschaerfen. `%` und `_` sind in ILIKE
+  -- Jokerzeichen: `'%%%'` kaeme durch die Drei-Zeichen-Schwelle und lieferte
+  -- JEDES Mitglied — die Mitgliederliste durch die Hintertuer, die dieser
+  -- Change gerade nicht baut. Gefunden im Review auf dem Diff.
+  --
+  -- `!` als ESCAPE statt des ueblichen Backslash: der Backslash muesste hier
+  -- in drei Schichten geschrieben werden (SQL-Literal, plpgsql, Migration) und
+  -- war beim ersten Versuch prompt zwei Zeichen lang — „invalid escape string".
+  muster := '%' || replace(replace(replace(btrim(needle), '!', '!!'), '%', '!%'), '_', '!_') || '%';
+
   select coalesce(jsonb_agg(t), '[]'::jsonb) into ergebnis from (
     select p.id, p.name, p.tier, u.email as login_email,
            (p.activated_at is not null) as bestaetigt
       from public.profiles p
       join auth.users u on u.id = p.id
-     where u.email ilike '%' || btrim(needle) || '%'
-        or p.name  ilike '%' || btrim(needle) || '%'
+     where u.email ilike muster escape '!'
+        or p.name  ilike muster escape '!'
      order by p.name
      limit 20) t;
 

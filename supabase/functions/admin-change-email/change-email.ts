@@ -29,7 +29,8 @@ export function parseChangeEmailRequest(body: unknown): ChangeEmailRequest | nul
 
 export type ChangeEmailOutcome =
   | { status: "ok" }
-  | { status: "sessions_not_revoked"; detail: string };
+  | { status: "sessions_not_revoked"; detail: string }
+  | { status: "not_audited"; detail: string };
 
 /**
  * Fasst zusammen, was nach der Adressänderung mit den Sitzungen geschah.
@@ -41,6 +42,16 @@ export type ChangeEmailOutcome =
  * warum das Mitglied sich mit der „nicht gesetzten" Adresse anmelden kann.
  * Aus dem Fremd-Review zum Change (REVIEWS.md, codex).
  */
-export function summarizeOutcome(revokeError: string | null): ChangeEmailOutcome {
-  return revokeError === null ? { status: "ok" } : { status: "sessions_not_revoked", detail: revokeError };
+export function summarizeOutcome(
+  revokeError: string | null,
+  auditError: string | null = null,
+): ChangeEmailOutcome {
+  // Die Spur zuerst: eine Adressänderung OHNE Eintrag ist der Fall, den beide
+  // Reviewer als HIGH gemeldet haben. Sie stillschweigend als „ok" zu melden
+  // hieße, die Zusage „privilegierte Änderungen hinterlassen eine Spur" zu
+  // brechen, ohne dass es jemand merkt. Ein Fehlschlag der Function wäre aber
+  // schlimmer: die Adresse IST geändert, und der Admin wiederholte sie.
+  if (auditError !== null) return { status: "not_audited", detail: auditError };
+  if (revokeError !== null) return { status: "sessions_not_revoked", detail: revokeError };
+  return { status: "ok" };
 }

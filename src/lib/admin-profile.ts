@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { ProfileFormValues } from "./profile";
+import { sanitizeVideos, type ProfileFormValues } from "./profile";
 import type { Json } from "./database.types";
 
 /**
@@ -127,7 +127,16 @@ export async function saveAdminProfile(
   contact: AdminContact,
   legacy: AdminLegacy,
 ): Promise<void> {
-  const preis = leerZuNull(legacy.legacy_price);
+  // `Number("zwölfhundert")` ist NaN, und `JSON.stringify` macht daraus `null`.
+  // Ein Tippfehler im Betragsfeld hätte den gezahlten Preis also STILL gelöscht,
+  // statt zu scheitern — gefunden im Review auf dem Diff. Hier abfangen und
+  // nicht erst in der Datenbank: die Funktion sähe ein sauberes `null` und
+  // hätte keinen Grund abzubrechen.
+  const preisText = leerZuNull(legacy.legacy_price);
+  const preis = preisText === null ? null : Number(preisText.replace(",", "."));
+  if (preis !== null && !Number.isFinite(preis)) {
+    throw new Error(`„${legacy.legacy_price}" ist kein lesbarer Betrag.`);
+  }
 
   const patch: Record<string, unknown> = {
     name: form.name.trim(),
@@ -142,6 +151,9 @@ export async function saveAdminProfile(
     avatar_url: form.avatar_url,
     roles: form.roles,
     competencies: form.competencies,
+    // Der Editor zeigt die Videos — ohne diese Zeile meldete das Speichern
+    // Erfolg und verwarf die Änderung (Review auf dem Diff).
+    videos: sanitizeVideos(form.videos),
     socials: Object.fromEntries(
       Object.entries(form.socials).filter(([, v]) => v.trim() !== ""),
     ),
@@ -149,7 +161,7 @@ export async function saveAdminProfile(
     phone: leerZuNull(contact.phone),
     paid_until: leerZuNull(legacy.paid_until),
     legacy_tier: leerZuNull(legacy.legacy_tier),
-    legacy_price: preis === null ? null : Number(preis),
+    legacy_price: preis,
     legacy_source_id: leerZuNull(legacy.legacy_source_id),
   };
 
@@ -170,7 +182,11 @@ export async function findProfiles(needle: string): Promise<AdminSearchHit[]> {
   return (Array.isArray(data) ? data : []) as unknown as AdminSearchHit[];
 }
 
-export type ChangeEmailResult = { status: "ok" } | { status: "sessions_not_revoked" };
+export type ChangeEmailResult =
+  | { status: "ok" }
+  | { status: "sessions_not_revoked" }
+  /** Adresse geändert, aber ohne Eintrag in admin_audit — muss sichtbar sein. */
+  | { status: "not_audited" };
 
 /**
  * Ändert die LOGIN-Adresse. Über die Edge Function, nicht über die Datenbank:

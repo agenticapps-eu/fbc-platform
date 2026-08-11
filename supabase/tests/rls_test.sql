@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(250);
+select plan(255);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1637,6 +1637,33 @@ select is((select short_bio from public.profiles where id = 'c6c6c6c6-0000-0000-
 select is((select name from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
   'Korrigiert', '… während ein NICHT geschickter Schlüssel unverändert bleibt');
 
+-- 18.5b Aus dem Review auf dem DIFF (codex): drei Zusagen, die die Funktion
+-- noch nicht hielt.
+--
+-- Erstens gilt „JSON-null leert" auch für die Array-Felder.
+-- `jsonb_array_elements_text('null'::jsonb)` wirft — die Zusage aus 18.5 war
+-- also nur für Textfelder wahr.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"roles":null}'::jsonb)$q$),
+  'OK', 'JSON-null leert auch ein Array-Feld …');
+select is((select roles from public.profiles where id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und setzt es wirklich auf NULL');
+
+-- Zweitens: `profiles.goals` und `profiles.interests` heißen wie die
+-- KIND-TABELLEN goals/profile_interests, tragen aber etwas anderes. Der Editor
+-- schickt sie nie; sie trotzdem anzunehmen hieße, ein Feld offenzuhalten, das
+-- beim ersten Fehlgriff die Formularform der Kind-Tabelle in die Profilspalte
+-- schriebe.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"goals":"irgendwas"}'::jsonb)$q$),
+  'DENIED:%', 'profiles.goals ist kein Admin-Feld — der Name kollidiert mit der Kind-Tabelle');
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"interests":["x"]}'::jsonb)$q$),
+  'DENIED:%', 'profiles.interests ebenso');
+
 -- 18.6 Der Lesepfad — ohne ihn wäre der Schreibweg unerreichbar.
 select is(
   pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
@@ -1657,6 +1684,15 @@ select is(
   pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
     $q$select jsonb_array_length(public.admin_find_profile('importiert@test.fbc'))$q$),
   1, 'admin_find_profile findet es über die Login-Adresse — es gibt keine Mitgliederliste');
+
+-- Und genau das muss auch dann gelten, wenn jemand die Suche als Blankoschein
+-- benutzt: `%` ist in ILIKE ein Platzhalter, `'%%%'` käme durch die
+-- Drei-Zeichen-Schwelle und lieferte JEDES Mitglied — eine Liste durch die
+-- Hintertür. Aus dem Review auf dem Diff (codex).
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select jsonb_array_length(public.admin_find_profile('%%%'))$q$),
+  0, 'Platzhalter im Suchbegriff öffnen die Suche nicht zur Mitgliederliste');
 
 -- 18.7 Rechte und Unversehrtheit der Spur.
 select is(has_function_privilege('anon', 'public.admin_update_profile(uuid,jsonb)', 'execute'),

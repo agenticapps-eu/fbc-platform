@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
   });
   if (auditFehler) log("error", "audit_failed", { message: auditFehler.message });
 
-  const ergebnis = summarizeOutcome(revokeFehler?.message ?? null);
+  const ergebnis = summarizeOutcome(revokeFehler?.message ?? null, auditFehler?.message ?? null);
   log("info", "changed", { actor, target: eingabe.target, outcome: ergebnis.status });
   return antwort(ergebnis, 200);
 });

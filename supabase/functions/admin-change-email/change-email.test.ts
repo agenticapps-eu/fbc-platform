@@ -39,3 +39,18 @@ Deno.test("gescheitertes Sitzungs-Widerrufen ist ein eigener Zustand, kein Fehle
     detail: "timeout",
   });
 });
+
+// Aus dem Review auf dem Diff: eine Adressaenderung ohne Eintrag als „ok" zu
+// melden braeche die Zusage „privilegierte Aenderungen hinterlassen eine Spur",
+// ohne dass es jemand merkt. Ein Gesamtfehler waere schlimmer — die Adresse IST
+// geaendert. Also ein dritter, benannter Ausgang, und er geht vor.
+Deno.test("eine fehlende Spur wird gemeldet und geht dem Sitzungs-Hinweis vor", () => {
+  assertEquals(summarizeOutcome(null, "audit down"), {
+    status: "not_audited",
+    detail: "audit down",
+  });
+  assertEquals(summarizeOutcome("timeout", "audit down"), {
+    status: "not_audited",
+    detail: "audit down",
+  });
+});

@@ -121,6 +121,15 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
       // `sessions_not_revoked` ist KEIN Fehler: die Adresse ist geändert, nur
       // die Sitzungen leben weiter. Als Fehler gemeldet, wiederholte der Admin
       // eine Änderung, die längst gilt.
+      if (ergebnis.status === "not_audited") {
+        toast({
+          variant: "error",
+          title: "Adresse geändert — ohne Protokolleintrag",
+          description:
+            "Die Änderung gilt, ist aber nicht im Admin-Protokoll gelandet. Bitte melden, nicht wiederholen.",
+        });
+        return;
+      }
       if (ergebnis.status === "sessions_not_revoked") {
         toast({
           variant: "success",

@@ -71,9 +71,21 @@ alter table public.profile_legacy enable row level security;
 
 -- KEINE Policy und KEIN Grant für anon/authenticated. Das ist kein Vergessen:
 -- RLS ohne Policy verweigert alles, und das fehlende Grant hält die Tabelle
--- zusätzlich von der PostgREST-Fläche fern. Gelesen und geschrieben wird von
--- `service_role` (Import) und von den SECURITY-DEFINER-Funktionen aus
--- 20260811090300_admin_profile_functions.sql.
+-- zusätzlich von der PostgREST-Fläche fern.
+--
+-- WER SCHREIBT DANN? Zwei Wege, und `service_role` ist KEINER davon — es hält
+-- seit AGE-312 auf keiner Tabelle in `public` ein Recht (nachgemessen; ein
+-- früherer Kommentar an dieser Stelle behauptete das Gegenteil, gefunden im
+-- Review auf dem Diff):
+--
+--   * Der Import (C10) verbindet sich DIREKT mit der Datenbank, als `postgres`
+--     — so wie supabase/seed/demo_seed.ts es tut (`pg` + SUPABASE_DB_URL).
+--     Diese Rolle geht ohnehin an RLS und Grants vorbei.
+--   * Die Oberfläche schreibt über `admin_update_profile` aus
+--     20260811090300_admin_profile_functions.sql (SECURITY DEFINER).
+--
+-- Sollte C10 stattdessen über die REST-Fläche mit service_role importieren
+-- wollen, braucht es dafür eine eigene DEFINER-Funktion — nicht ein Grant.
 --
 -- Nach AGE-312 erbt eine neue Tabelle nichts mehr — es ist also wirklich zu.
 -- grants_test.sql belegt das über den Default-Privileges-Abschnitt.
@@ -91,7 +103,9 @@ comment on table public.profile_legacy is
   'profiles, WEIL ein Spalten-Grant nur das Schreiben regelt: authenticated '
   'haelt Tabellen-SELECT auf profiles, und profiles_select_self_or_discover '
   'gibt ab `discover` die volle Zeile — legacy_price stuende sonst offen. '
-  'Kein Client-Grant, keine Policy; nur service_role und die admin_*-RPCs.';
+  'Kein Client-Grant, keine Policy. Geschrieben wird vom Import ueber eine '
+  'DIREKTE DB-Verbindung (postgres) und von admin_update_profile; '
+  'service_role kann es NICHT, es haelt seit AGE-312 keine Tabellenrechte.';
 
 comment on column public.profile_legacy.paid_until is
   'Letzter EINGESCHLOSSENER Tag der bereits bezahlten Mitgliedschaft. null = '

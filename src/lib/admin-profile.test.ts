@@ -134,6 +134,36 @@ describe("saveAdminProfile", () => {
     expect(patch.email).toBeNull();
   });
 
+  // Aus dem Review auf dem Diff: der Editor zeigt die Videos, der Patch trug
+  // sie nicht — Speichern meldete Erfolg und verwarf die Änderung.
+  it("schickt die Videos mit, die das Formular anbietet", async () => {
+    await saveAdminProfile(
+      ZIEL,
+      { ...form, videos: ["https://youtu.be/abc"] },
+      { email: "", phone: "" },
+      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
+    );
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.videos).toEqual(["https://youtu.be/abc"]);
+  });
+
+  // Number("zwölfhundert") ist NaN, und JSON.stringify macht daraus `null` —
+  // ein Tippfehler im Betragsfeld hätte den gezahlten Preis stillschweigend
+  // gelöscht, statt zu scheitern.
+  it("lehnt einen unlesbaren Betrag ab, statt das Feld zu leeren", async () => {
+    await expect(
+      saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
+        paid_until: "",
+        legacy_tier: "",
+        legacy_price: "zwölfhundert",
+        legacy_source_id: "",
+      }),
+    ).rejects.toThrow(/Betrag/i);
+
+    expect(rpcCalls).toHaveLength(0);
+  });
+
   it("schickt kein tier — der Stufenwechsel gehört nicht hierher", async () => {
     await saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
       paid_until: "",

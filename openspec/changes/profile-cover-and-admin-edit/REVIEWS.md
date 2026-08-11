@@ -152,3 +152,33 @@ digest: sha256:009d15da151ddc4b110b6aef7f4fc58f70d8999e08cfe2ab11cc28f19584609c
 producer-version: 1.2.0
 tasks-digest: sha256:c4f4f7895b03605880ab2e419a73effda4bc2f2a31341bb5990344ac7171c90d
 -->
+
+## Review auf dem Diff (Schritt 4)
+
+Ein Reviewer, anderer Anbieter: **codex (gpt-5.6-sol)**, auf `git diff main...HEAD`.
+VERDICT: **REQUEST-CHANGES**, 6 HIGH und 3 MEDIUM. Sechs sind übernommen, zwei
+richtiggestellt, einer abgelehnt.
+
+| Befund | Nachgemessen | Erledigt |
+|---|---|---|
+| **[HIGH]** `videos` steht im Admin-Formular, fehlt aber im Patch — Speichern meldet Erfolg und verwirft die Änderung | bestätigt | `sanitizeVideos(form.videos)` im Patch + Test |
+| **[HIGH]** `Number("zwölfhundert")` → NaN → JSON `null`: ein Tippfehler löscht `legacy_price` still | bestätigt | Prüfung vor dem Aufruf, Fehler statt Löschung + Test |
+| **[HIGH]** Weißliste nimmt `goals`/`interests` — Namen kollidieren mit den Kind-Tabellen | bestätigt | beide raus; zwei pgTAP-Fälle halten das fest |
+| **[HIGH]** Adressänderung meldet 200, auch wenn der Audit-Eintrag scheitert | bestätigt | dritter Ausgang `not_audited`, geht dem Sitzungs-Hinweis vor; die Oberfläche zeigt ihn als Fehler, ohne zum Wiederholen einzuladen |
+| **[HIGH]** `profile_legacy` verspricht Import über `service_role` — das hat keine Tabellenrechte | **bestätigt, und mein Fehler**: der Import läuft über eine direkte DB-Verbindung (`pg`, wie `demo_seed.ts`). Kommentar und Spec sagten das Falsche | Kopf und `comment on table` richtiggestellt |
+| **[MEDIUM]** `jsonb_array_elements_text('null')` wirft — „JSON-null leert" galt nur für Textfelder | bestätigt (`cannot extract elements from a scalar`) | Helfer `jsonb_text_array`, zwei pgTAP-Fälle |
+| **[MEDIUM]** `%` und `_` bleiben ILIKE-Joker: `'%%%'` kommt durch die Drei-Zeichen-Schwelle | bestätigt — lieferte **20 Treffer**, also die Mitgliederliste durch die Hintertür | Escaping mit `!`, pgTAP-Fall |
+
+**Nicht übernommen:**
+
+- **[HIGH] „Jedes Speichern schickt einen veralteten Formular-Schnappschuss"**
+  (optimistisches Sperren gegen gleichzeitige Änderungen). Der Befund stimmt,
+  aber er beschreibt **jedes** Formular in diesem Repo — der eigene Profil-Editor
+  verhält sich seit AGE-238 genauso. Ihn nur für den Admin-Weg zu lösen hieße,
+  zwei Speicher-Semantiken nebeneinander zu haben; ihn überall zu lösen ist ein
+  eigener Change. Notiert, nicht gebaut.
+
+**Und einer, den kein Reviewer gefunden hat:** `admin-change-email` las
+`staff_roles` direkt mit `service_role` und lief in „permission denied". Gefunden
+hat das die **Sichtprobe im Browser** — nicht pgTAP, nicht Vitest, nicht der
+Fremd-Review. Behoben mit `is_admin_uid` und `log_admin_action`.
