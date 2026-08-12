@@ -9,21 +9,28 @@ import { TierBadge } from "../components/ui/TierBadge";
 import { useToast } from "../components/ui/toast-context";
 import { EventForm } from "../components/events/EventForm";
 import { useAuth } from "../providers/auth-context";
+import { EventCard } from "../components/events/EventCard";
+import { EventCover } from "../components/events/EventCover";
+import { useEventCovers } from "../components/events/useEventCovers";
 import {
   attendeesKey,
   cancelRegistration,
+  eventAttendeesKey,
   eventDetailKey,
   eventsListKey,
   eventTypeLabel,
   fetchAttendees,
   fetchEvent,
-  formatEventDate,
+  fetchEvents,
+  fetchEventAttendees,
+  formatEventSpan,
   isFull,
   isPastEvent,
   rateEvent,
   registerForEvent,
   registrationStatusLabel,
   remainingSpots,
+  selectSimilarEvents,
   setCheckIn,
   updateEvent,
   type EventInput,
@@ -64,76 +71,228 @@ export default function EventDetailPage() {
   }
 
   const isHost = !!uid && event.host?.kind === "profile" && event.host.id === uid;
+  return <EventBody event={event} uid={uid} isHost={isHost} />;
+}
+
+/**
+ * Der Rumpf als eigene Komponente, damit die Haken nicht hinter den frühen
+ * Rückgaben oben stehen (React verbietet bedingte Haken).
+ *
+ * Hier sitzt der EINE Signieraufruf der Detailseite: Header-Cover und die
+ * Cover der ähnlichen Events werden in EINEM Stapel signiert, nicht in zweien.
+ * Das ist die Zusicherung aus dem Spec-Delta („one batched signing call per
+ * view"), und die erste Fassung hat sie verletzt — zwei Komponenten riefen den
+ * Haken je für sich auf. Befund aus dem Diff-Review.
+ */
+function EventBody({
+  event,
+  uid,
+  isHost,
+}: {
+  event: EventListItem;
+  uid: string | null;
+  isHost: boolean;
+}) {
+  const alle = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
+  const aehnlich = selectSimilarEvents(alle.data ?? [], event, new Date());
+  // Erst signieren, wenn die Eventliste steht: sonst ginge ein Stapel mit dem
+  // Header-Cover raus und gleich danach einer mit allen dreien.
+  const covers = useEventCovers([event, ...aehnlich], !alle.isLoading);
+
   return (
     <div className="space-y-6">
       <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
         ← Zu allen Events
       </Link>
-      <EventHeader event={event} />
+      <EventHeader event={event} covers={covers} />
       <RegistrationPanel event={event} uid={uid} />
-      {isHost && <HostTools event={event} uid={uid} />}
+      {/* Ohne Session gibt es keine Teilnehmer: `event_attendees` trägt kein
+          `execute` für `anon`. Der Block entfällt dann ganz, statt einen 42501
+          in die Konsole zu schreiben — dieselbe Regel wie in AGE-530 für
+          `profiles_public` und `partners`. */}
+      {uid && <AttendeeRow event={event} uid={uid} />}
+      {isHost && uid && <HostTools event={event} uid={uid} />}
+      <SimilarEvents events={aehnlich} covers={covers} />
     </div>
   );
 }
 
-function EventHeader({ event }: { event: EventListItem }) {
+/**
+ * Die Avatarreihe des Mockups: bis zu fünf Gesichter, dann „+n".
+ *
+ * Die GESAMTZAHL kommt aus `event_registration_counts` und wird NICHT aus den
+ * Gesichtern gerechnet. `event_attendees` lässt Mitglieder aus, deren Profil
+ * nicht öffentlich ist — die Zahl ist deshalb im Zweifel größer als das, was
+ * hier zu sehen ist, und das ist die ehrlichere Auskunft (siehe
+ * openspec/changes/events-content/proposal.md).
+ */
+const SICHTBARE_GESICHTER = 5;
+
+function AttendeeRow({ event, uid }: { event: EventListItem; uid: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: eventAttendeesKey(uid, event.id),
+    queryFn: () => fetchEventAttendees(event.id),
+  });
+  // NUR Angemeldete. Die RPC gibt dem HOST jeden Status heraus — das braucht
+  // sein Werkzeug —, aber diese Reihe beantwortet „wer kommt", und da hat eine
+  // Abmeldung nichts verloren. Befund aus dem Diff-Review; für einen
+  // Nicht-Host ist der Filter wirkungslos, weil die RPC ihm ohnehin nur
+  // `registered` liefert.
+  const rows = (data ?? []).filter((a) => a.status === "registered");
+  if (isLoading) return null;
+  if (event.registeredCount === 0) return null;
+
+  const sichtbar = rows.slice(0, SICHTBARE_GESICHTER);
+  const weitere = event.registeredCount - sichtbar.length;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-lg font-semibold text-ink">
+        Teilnehmer ({event.registeredCount})
+      </h2>
+      <div className="flex flex-wrap items-center gap-2">
+        {sichtbar.map((a) => (
+          <Link
+            key={a.profileId}
+            to={`/p/${a.profileId}`}
+            title={a.name}
+            className="rounded-full focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            <Avatar name={a.name} src={a.avatarUrl} size="sm" />
+          </Link>
+        ))}
+        {weitere > 0 && (
+          <span className="rounded-full bg-soft px-3 py-1.5 text-xs font-medium text-muted">
+            +{weitere}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * „Ähnliche Events": die drei nächsten kommenden desselben Typs.
+ *
+ * Auswahl und Signaturen kommen von oben (`EventBody`), damit die Seite EINEN
+ * Signierstapel macht und die Liste aus DERSELBEN Abfrage wie die Übersicht
+ * stammt — nicht aus einem Cache, auf dessen Füllung man hofft. Beim
+ * Direktaufruf, beim Neuladen und beim Lesezeichen war sie nie geladen.
+ */
+function SimilarEvents({
+  events: aehnlich,
+  covers,
+}: {
+  events: EventListItem[];
+  covers: Record<string, string>;
+}) {
+  if (aehnlich.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-lg font-semibold text-ink">Ähnliche Events</h2>
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {aehnlich.map((e) => (
+          <li key={e.id}>
+            <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function EventHeader({ event, covers }: { event: EventListItem; covers: Record<string, string> }) {
   const remaining = remainingSpots(event.capacity, event.registeredCount);
   return (
-    <Card className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-          {event.title}
-        </h1>
-        <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
-      </div>
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-xs tracking-wide text-muted uppercase">Wann</dt>
-          <dd className="text-ink">{formatEventDate(event.startsAt)}</dd>
+    <Card className="space-y-4 overflow-hidden !p-0">
+      <EventCover
+        startsAt={event.startsAt}
+        url={event.coverPath ? (covers[event.coverPath] ?? null) : null}
+        gross
+      />
+      <div className="space-y-4 px-5 pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+            {event.title}
+          </h1>
+          <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
         </div>
-        <div>
-          <dt className="text-xs tracking-wide text-muted uppercase">Wo</dt>
-          {/* break-words: eine location kann eine sehr lange, unbrechbare URL sein
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs tracking-wide text-muted uppercase">Wann</dt>
+            <dd className="text-ink">{formatEventSpan(event.startsAt, event.endsAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-muted uppercase">Wo</dt>
+            {/* break-words: eine location kann eine sehr lange, unbrechbare URL sein
               (Zoom-Join-Link als „Ort"). Auf der Detailseite soll sie ganz sichtbar
               bleiben — also umbrechen statt kürzen, damit sie die Spalte nicht sprengt. */}
-          <dd className="break-words text-ink">{event.location ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-xs tracking-wide text-muted uppercase">Teilnehmer</dt>
-          <dd className="text-ink">
-            {event.registeredCount}
-            {event.capacity != null && <> / {event.capacity}</>}
-            {event.waitlistCount > 0 && (
-              <span className="text-muted"> · {event.waitlistCount} auf Warteliste</span>
+            <dd className="break-words text-ink">{event.location ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-muted uppercase">Teilnehmer</dt>
+            <dd className="text-ink">
+              {event.registeredCount}
+              {event.capacity != null && <> / {event.capacity}</>}
+              {event.waitlistCount > 0 && (
+                <span className="text-muted"> · {event.waitlistCount} auf Warteliste</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-muted uppercase">Freie Plätze</dt>
+            <dd className="text-ink">{remaining === null ? "Unbegrenzt" : remaining}</dd>
+          </div>
+        </dl>
+        {event.description && (
+          <div className="space-y-2 border-t border-line pt-4">
+            <h2 className="text-xs tracking-wide text-muted uppercase">Beschreibung</h2>
+            {/* whitespace-pre-line: das Feld ist mehrzeilig, und Absätze des
+              Veranstalters sollen Absätze bleiben. Kein Markdown — der Text
+              kommt von Mitgliedern und wird nirgends als HTML gedeutet. */}
+            <p className="whitespace-pre-line text-sm text-ink">{event.description}</p>
+          </div>
+        )}
+        {event.topics && event.topics.length > 0 && (
+          <div className="space-y-2 border-t border-line pt-4">
+            <h2 className="text-xs tracking-wide text-muted uppercase">Themen</h2>
+            {/* Häkchenliste, nicht Chip-Reihe: das Mockup zeigt hier die
+              Tagesordnung dieses einen Events („Aktuelle Club-News",
+              „Neue Mitglieder begrüßen"), keine Schlagworte. Deshalb auch
+              kein Bezug zu den 15 kuratierten Tags aus C7. */}
+            <ul className="space-y-1.5">
+              {event.topics.map((t) => (
+                <li key={t} className="flex items-start gap-2 text-sm text-ink">
+                  <span aria-hidden className="mt-0.5 text-accent-strong">
+                    ✓
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {event.host && (
+          <div className="flex items-center gap-2 border-t border-line pt-3">
+            <span className="text-xs text-muted">Host:</span>
+            {event.host.kind === "profile" ? (
+              <Link
+                to={`/p/${event.host.id}`}
+                className="flex items-center gap-2 hover:text-accent-strong"
+              >
+                <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
+                <span className="text-sm font-medium text-ink">{event.host.name}</span>
+                {event.host.tier && <TierBadge tier={event.host.tier} />}
+              </Link>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
+                <span className="text-sm font-medium text-ink">{event.host.name}</span>
+                <Badge variant="neutral">Partner</Badge>
+              </span>
             )}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs tracking-wide text-muted uppercase">Freie Plätze</dt>
-          <dd className="text-ink">{remaining === null ? "Unbegrenzt" : remaining}</dd>
-        </div>
-      </dl>
-      {event.host && (
-        <div className="flex items-center gap-2 border-t border-line pt-3">
-          <span className="text-xs text-muted">Host:</span>
-          {event.host.kind === "profile" ? (
-            <Link
-              to={`/p/${event.host.id}`}
-              className="flex items-center gap-2 hover:text-accent-strong"
-            >
-              <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
-              <span className="text-sm font-medium text-ink">{event.host.name}</span>
-              {event.host.tier && <TierBadge tier={event.host.tier} />}
-            </Link>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
-              <span className="text-sm font-medium text-ink">{event.host.name}</span>
-              <Badge variant="neutral">Partner</Badge>
-            </span>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -147,6 +306,12 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: eventDetailKey(uid, event.id) });
     queryClient.invalidateQueries({ queryKey: eventsListKey(uid) });
+    // Die Teilnehmerreihe hängt an einem EIGENEN Schlüssel (nicht `attendeesKey`,
+    // der die vollen Registrierungszeilen für Host-Werkzeug und Bewertung hält).
+    // Ohne diese Zeile zeigte sie nach der eigenen Anmeldung veraltete Gesichter
+    // — der Befund aus dem Plan-Review, der den zweiten Schlüssel überhaupt
+    // nötig gemacht hat.
+    queryClient.invalidateQueries({ queryKey: eventAttendeesKey(uid, event.id) });
   }
 
   const register = useMutation({
