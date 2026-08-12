@@ -376,7 +376,7 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 - [x] 9.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       576/576, 0 Fehler, 4 vorbestehende Warnungen in fremden Dateien.
 - [x] 9.2 pgTAP vollständig grün, mit **Dateiliste** aufgerufen. 312/312.
-- [ ] 9.3 **Der Beweis** (Tabelle in `design.md`), im Inkognito-Fenster gegen
+- [x] 9.3 **Der Beweis** (Tabelle in `design.md`), im Inkognito-Fenster gegen
       DEV, mit Screenshot bzw. Statuscode je Zeile:
       `members` → rohe URL kein Bild, Signatur als anon abgelehnt;
       `public` → Bild im ausgeloggten Feed sichtbar.
@@ -386,6 +386,28 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       und hat ihn abgebaut. Der Beweis verlangt also erst einen Schema-Schreib-
       zugriff auf die Instanz, die die Live-Seite bedient. Entscheidung Donald
       2026-08-12: erst 9.4–9.6 lokal, 9.3 danach. `EVIDENCE.md`.
+      **Stand nach dem Merge: die scharfe Hälfte ist gemessen.** `migrate-dev`
+      ist für die Merge-SHA `df37349` grün, DEV kennt die vier Migrationen.
+      `scripts/probe-9-3-sichtbarkeit.ts --dev=foelowldexkcqzewvrcf` führt die
+      Tabelle aus `design.md` ausgeloggt: **sechs von sechs erfüllt**, Abbau
+      nachgezählt auf null. Vorher am lokalen Stack **mutiert** — beide
+      Beiträge auf `public` gestellt — und genau die zwei `members`-Zeilen
+      fielen; die Sonde kann also rot.
+      **Offen bleibt nur die gerenderte Zeile** („public-Bild im ausgeloggten
+      Feed sichtbar"): dafür muss erst der `deploy`-Re-Run aus 10.4 laufen, denn
+      bis dahin steht auf pages.dev das alte Frontend — `drift-gate` blockt den
+      Deploy, bis `migrate-prod` lief. Entscheidung Donald 2026-08-12: die
+      API-Hälfte vor PROD, die gerenderte danach am echten System.
+      **Nachgeholt und damit vollständig:** nach dem `deploy`-Re-Run auf
+      `https://fbc-platform.pages.dev/aktivitaet`, ausgeloggt (kein
+      Auth-Token im `localStorage`, nachgesehen statt angenommen). Der
+      `public`-Beitrag der Sonde steht da, **sein Bild ist gerendert** —
+      615×615, und die Quelle ist eine **signierte** URL
+      (`/object/sign/post-media/…?token=`), kein öffentlicher Pfad. Der
+      `members`-Beitrag ist nicht dabei. Der Autor heißt dort „Ein Mitglied",
+      also greift auch ausgeloggt `displayAuthor(...)` (der siebte Weg des
+      `cso`-Gates). Danach abgebaut und **von außen** nachgesehen: die Seite
+      zeigt die Sonde nicht mehr, null Beitragsbilder.
 - [x] 9.4 Bild hochladen, mehrere Bilder, Reihenfolge, einzeln löschen — von
       Hand durchgespielt. Sechs Ziffernbilder 1–6, damit die Reihenfolge im Bild
       ablesbar ist: Nachwählen **erweitert** die Auswahl, „Bild 2 entfernen"
@@ -471,15 +493,45 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       erwartet, sie hängen an `main`. Linear schaltete den Status selbst auf
       In Progress und hängte den PR an, es war kein Schreibzugriff nötig.
       Die zwei niedrigen QA-Befunde liegen als **AGE-529** im Backlog.
-- [ ] 10.4 Reihenfolge des Ausrollens, erzwungen und schon einmal falsch notiert:
+- [x] 10.4 Reihenfolge des Ausrollens, erzwungen und schon einmal falsch notiert:
       Merge → `migrate-dev` grün für **dieselbe SHA auf `main`** → `migrate-prod`
       dispatchen (`plan` **lesen**, dann `apply`) → **`deploy.yml` erneut
       laufen lassen**. Ohne diesen Re-Run ist nichts ausgeliefert, obwohl alles
       grün aussieht. `drift-gate` blockt den Deploy bis `migrate-prod` lief.
-- [ ] 10.5 PROD **nachmessen**, nicht glauben: Bucket privat mit 1 MiB/WebP,
+      **Stand 2026-08-12:** Merge `df37349` · `migrate-dev` grün für genau diese
+      SHA · `migrate-prod` (Lauf 31605508737) dispatcht, `plan` **gelesen** statt
+      durchgeklickt: Zielhost `viwntbodrtqxgmqyxluh` auf
+      `aws-0-eu-central-1.pooler.supabase.com`, Drift nannte die vier fehlenden
+      Versionen, der Dry-Run kündigte genau diese vier an — dann `apply`, alle
+      vier angewendet, und die Nachkontrolle im selben Job sagt
+      „**OK — 60 Migrationen, Historie abweichungsfrei**".
+      **Der Re-Run ist gelaufen.** `deploy.yml` hat *kein*
+      `workflow_dispatch` (nur `push: [main]` und `pull_request`) — der Re-Run
+      ging deshalb über `gh run rerun 31603101953 --failed`, nicht über
+      `gh workflow run`; das wäre am fehlenden Trigger gescheitert. `deploy` und
+      `functions` hängen beide an `[migrate-dev, drift-gate]`, und drift-gate war
+      der Job, der fiel. Nach `migrate-prod`: **drift-gate grün, functions grün,
+      deploy grün** — und damit ist erst jetzt etwas ausgeliefert.
+- [x] 10.5 PROD **nachmessen**, nicht glauben: Bucket privat mit 1 MiB/WebP,
       vier Storage-Policies, `post_media` und `tags` mit ihren Grants.
-- [ ] 10.6 `openspec archive` — **Szenario-Titel unverändert lassen**, ein
+      `scripts/mess-10-5-prod.ts --prod=viwntbodrtqxgmqyxluh`, **nur lesend**
+      (die Sitzung steht auf `default_transaction_read_only`, damit ein
+      versehentliches Schreiben von der Datenbank abgelehnt würde und nicht von
+      einem Kommentar). **Zwölf von zwölf.** Einzelheiten in `EVIDENCE.md`;
+      hervorzuheben ist die Grants-Zeile, weil genau sie hier zweimal teuer war:
+      `post_media` trägt `anon=SELECT`, `authenticated=SELECT,INSERT,DELETE`,
+      `tags` trägt `anon=SELECT`, `authenticated=SELECT`. Nichts davon ist
+      geerbt — es steht so in den Migrationen (AGE-312).
+- [x] 10.6 `openspec archive` — **Szenario-Titel unverändert lassen**, ein
       umgetaufter Titel in einem MODIFIED-Block löscht das alte Szenario;
       `validate` bleibt dabei grün, nur `archive` bricht ab.
-- [ ] 10.7 Linear AGE-528 auf Done — erst `get_issue` lesen, die
+      **Die Falle konnte hier nicht greifen** — nachgesehen, nicht gehofft: das
+      Delta trägt genau einen Block, `## ADDED Requirements`, kein MODIFIED,
+      kein RENAMED. Zusätzlich auf Namenskollisionen geprüft (`comm -12` über
+      die Requirement-Zeilen): keine. `openspec archive` meldete entsprechend
+      `+ 11, ~ 0, - 0, → 0`; `openspec/specs/community-feed/spec.md` trägt
+      jetzt 16 statt 5 Requirements, `validate --all` grün (27 Elemente, eines
+      weniger, weil der Change kein offener mehr ist). Archiviert als
+      `2026-08-12-activity-media-and-tags`.
+- [x] 10.7 Linear AGE-528 auf Done — erst `get_issue` lesen, die
       GitHub-Automation schaltet den Status womöglich schon selbst.

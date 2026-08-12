@@ -430,3 +430,180 @@ von einem echten Browser mit echter Datei-Auswahl.
 
 Konto `qa-c7@example.test` (Profil „QA C7") und ein Beitrag „QA-Gate 9.7" mit
 zwei Bildern. Nur im lokalen Stack; `supabase db reset --local` räumt beides ab.
+
+## 9.3 — die scharfe Hälfte, gemessen gegen DEV
+
+Gelaufen am 2026-08-12, nachdem `migrate-dev` für die Merge-SHA `df37349` grün
+war und DEV die vier Migrationen kannte. Sonde:
+`scripts/probe-9-3-sichtbarkeit.ts --dev=foelowldexkcqzewvrcf`.
+
+Die Sonde aus 1.0c hatte den **Mechanismus** an einem Wegwerf-Aufbau gemessen.
+Diese hier misst das **echte Schema**: Bucket `post-media`, `post_media`,
+`post_media_lesbar()` und die vier Storage-Policies, so wie sie nach den
+Migrationen dastehen. Zwei Beiträge mit je einem Bild, einer `members`, einer
+`public`, alle Prüfungen ausgeloggt — nur der anon-Key, keine Sitzung.
+
+| | Prüfung | Erwartet | Gemessen auf DEV |
+|---|---|---|---|
+| `members` | rohe Storage-URL | kein Bild | **HTTP 400**, `application/json` |
+| `public` | rohe Storage-URL | kein Bild (der Bucket ist privat) | **HTTP 400**, `application/json` |
+| `members` | ausgeloggter Feed | Beitrag nicht dabei | 6 Beiträge sichtbar, **members-Beitrag nicht darunter** |
+| `public` | ausgeloggter Feed | Beitrag dabei | **sichtbar** |
+| `members` | `createSignedUrls` als anon | **abgelehnt** | „Either the object does not exist or you do not have access to it" |
+| `public` | ausgeloggt signieren **und holen** | Bild kommt an | **HTTP 200, 34 Bytes, RIFF/WEBP** |
+
+**Sechs von sechs erfüllt.** Der `members`-Teil ist damit schärfer erfüllt als
+die Abnahme verlangt: es scheitert nicht nur die Datei, sondern schon der
+Versuch, sich eine Signatur ausstellen zu lassen.
+
+### Die Sonde kann rot — nachgewiesen, nicht behauptet
+
+Ein grüner Lauf beweist wenig, wenn die Zusicherungen gar nicht fallen können;
+dieses Repo hat mit Vakuum-Tests schon bezahlt. Vor dem DEV-Lauf lief deshalb am
+lokalen Stack eine **Mutation**: `p_visibility` fest auf `public`, sodass der
+„members"-Beitrag keiner mehr ist. Ergebnis — genau die zwei `members`-Zeilen
+fielen (`ausgeloggter Feed`: Beitrag sichtbar; `createSignedUrls`: Signatur
+**wird** ausgestellt), die vier übrigen blieben grün. Die Sonde misst also, was
+sie behauptet.
+
+### Der Abbau ist nachgezählt
+
+DEV bedient die Live-Seite; für die Dauer des Laufs stand ein Testbeitrag im
+Feed der eingeloggten Mitglieder. Die Sonde räumt am Ende ab und **zählt dann
+nach** — Beiträge, Bildzeilen, Storage-Objekte, Profil, Konto:
+
+```
+OK    nachgezaehlt: Beitraege 0, Bildzeilen 0, Storage-Objekte 0, Profil 0, Konto 0
+```
+
+Ein liegengebliebener Rest wäre als eigener Fehler gezählt worden, getrennt von
+den Prüfungen — eine erfüllte Sonde mit Resten ist kein Erfolg.
+
+### Was noch offen ist, und warum es offen sein muss
+
+Die Zeile **„public-Bild im ausgeloggten Feed sichtbar"** führt `design.md`
+bewusst über den *gerenderten* Feed. Das geht in diesem Fenster nicht: auf
+`pages.dev` steht noch das alte Frontend, weil `drift-gate` jeden Deploy
+blockt, bis `migrate-prod` lief (nachgelesen im Lauf zur Merge-SHA: „DRIFT —
+lokal vorhanden, auf dem Ziel fehlend" für alle vier Migrationen). Ein
+ausgeloggter Feed dort zeigt heute gar keine Beitragsbilder.
+
+Gemessen ist stattdessen der Weg, den der Feed danach nimmt: ausgeloggt
+signieren, holen, Bytes vergleichen. Die gerenderte Zeile wird direkt nach dem
+`deploy`-Re-Run aus 10.4 im echten Inkognito-Fenster nachgeholt.
+
+## 10.4 / 10.5 — PROD, gelesen und nachgemessen
+
+### Der Dry-Run wurde gelesen, nicht durchgeklickt
+
+`migrate-prod` Lauf **31605508737** auf der Merge-SHA `df37349`. Der Workflow
+trennt `plan` und `apply` genau deshalb, und der `plan`-Job sagt der Reihe nach:
+
+```
+Umgebung:                                prod
+Sollwert (scripts/prod-project-ref.txt): viwntbodrtqxgmqyxluh
+Ziel aus SUPABASE_DB_URL_PROD:           viwntbodrtqxgmqyxluh
+Host:                                    aws-0-eu-central-1.pooler.supabase.com:5432
+
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090000
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090100
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090200
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090300
+
+DRY RUN: migrations will *not* be pushed to the database.
+Would push these migrations:
+ • 20260812090000_post_media.sql
+ • 20260812090100_post_media_storage.sql
+ • 20260812090200_tags.sql
+ • 20260812090300_posts_indizes.sql
+```
+
+Der aufgelöste Zielhost stand also **vor** der Anwendung im Log, und die Liste
+der vier Versionen deckte sich mit dem, was `drift-gate` als fehlend gemeldet
+hatte. `apply` wendete danach genau diese vier an; die Nachkontrolle im selben
+Job schließt mit:
+
+```
+OK — 60 Migrationen, Historie abweichungsfrei.
+```
+
+Anzumerken: das `production`-Environment trägt `protection_rules: []` —
+nachgesehen über die API, nicht vermutet. `apply` startet also unmittelbar hinter
+`plan`, ohne Reviewer-Regel. Das Dispatchen **ist** der Schreibzugriff, und
+Donald hat es deshalb von Hand ausgelöst.
+
+### PROD nachgemessen (10.5): zwölf von zwölf
+
+`scripts/mess-10-5-prod.ts --prod=viwntbodrtqxgmqyxluh`, ausschließlich SELECTs;
+die Sitzung steht zusätzlich auf `default_transaction_read_only`, damit ein
+versehentliches Schreiben von der Datenbank abgelehnt würde und nicht von einem
+Kommentar.
+
+| Prüfung | Gemessen auf PROD |
+|---|---|
+| Bucket `post-media` privat | `public = false` |
+| Größenlimit | `1048576` (1 MiB) |
+| erlaubte Typen | `["image/webp"]` |
+| Storage-Policies | `post_media_select(SELECT)`, `_insert_own(INSERT)`, `_update_own(UPDATE)`, `_delete_own(DELETE)` |
+| `post_media` RLS | `relrowsecurity = true` |
+| **`post_media` Grants** | `anon=SELECT` · `authenticated=SELECT,INSERT,DELETE` |
+| `tags` RLS | `relrowsecurity = true` |
+| **`tags` Grants** | `anon=SELECT` · `authenticated=SELECT` |
+| Funktionen | `create_post_with_media`, `post_media_hoechstens_sechs`, `post_media_lesbar` |
+| Sechser-Grenze | Trigger `post_media_hoechstens_sechs` auf `post_media` |
+| Indizes | `posts_created_at_id_idx`, `posts_hashtags_gin` |
+| kuratierte Tags | 15 aktiv |
+
+Die zwei Grants-Zeilen sind der Grund, warum dieses Skript überhaupt existiert:
+ein grüner `migrate-prod`-Lauf sagt, dass die CLI die Versionen verbucht hat —
+nicht, dass die Rechte dastehen. Grants werden in dieser Instanz **nicht geerbt**
+(AGE-312), und `service_role` hält auf keiner Tabelle in `public` ein Recht;
+beides ist hier schon einmal erst zur Laufzeit aufgefallen.
+
+### 9.3, letzte Zeile — am echten System, ausgeloggt
+
+Nach dem `deploy`-Re-Run (drift-gate grün, functions grün, deploy grün) auf
+`https://fbc-platform.pages.dev/aktivitaet`. Ausgeloggt heißt hier
+**nachgesehen**, nicht angenommen: kein Auth-Token im `localStorage`.
+
+Damit überhaupt etwas zu sehen war, musste ein Bild-Beitrag dastehen — DEV trug
+nach dem Abbau der ersten Sonde **null** `post_media`-Zeilen. Die Sonde hat
+dafür zwei Schalter bekommen, `--behalten` und `--abbauen=<uid>`, damit zwischen
+Aufbau und Abbau ein Browser auf die Seite schauen kann. Beide Phasen liefen
+vorher lokal durch, inklusive Nachzählen.
+
+| | Gemessen auf der Live-Seite |
+|---|---|
+| `public`-Beitrag der Sonde | **sichtbar** („vor 17 Sekunden · Öffentlich") |
+| **sein Bild** | **gerendert**, 615×615 |
+| Quelle des Bildes | `…/object/sign/post-media/…?token=…` — **signiert**, kein öffentlicher Pfad |
+| `members`-Beitrag der Sonde | **nicht dabei** |
+| Autorname ausgeloggt | „Ein Mitglied" — siehe die Korrektur direkt darunter |
+
+Danach `--abbauen=…`: nachgezählt auf null, und **von außen** gegengeprüft — die
+Live-Seite zeigt die Sonde nicht mehr und null Beitragsbilder.
+
+Damit ist die Abnahme aus AGE-528 vollständig belegt: das Bild eines
+`members`-Beitrags ist ohne Session nicht abrufbar (schärfer noch: es gibt gar
+keine Signatur), und das Bild eines `public`-Beitrags ist ausgeloggt sichtbar.
+
+#### Korrektur zu dieser Zeile: der Autorname fehlt aus einem anderen Grund
+
+Zuerst notiert als „`displayAuthor(...)` greift auch ausgeloggt" — das stimmt im
+Ergebnis, verdeckt aber die Ursache. Nachgemessen: der Feed fragt beim Zeichnen
+`profiles_public` ab, und diese Abfrage antwortet ausgeloggt mit **HTTP 401**:
+
+```
+{"code":"42501","message":"permission denied for view profiles_public"}
+```
+
+`anon` hält auf der View **überhaupt kein Recht** — nachgesehen auf beiden
+Instanzen, `authenticated=SELECT`, `anon` fehlt ganz. Der Name ist also nicht
+bewusst zurückgehalten; die Abfrage wird abgewiesen und die Oberfläche fällt auf
+„Ein Mitglied" zurück.
+
+**Für dieses Change ändert das nichts** — es fällt geschlossen aus, kein Name
+tritt aus, und die Zeile „`public`-Bild ausgeloggt sichtbar" steht unabhängig
+davon. Aber es ist ein eigener Befund: auf der öffentlichen Seite heißt **jeder**
+Autor „Ein Mitglied". Das ist älter als C7 (`profiles_public` und die
+Autor-Abfrage gab es vorher) und liegt als **AGE-530** im Backlog.
