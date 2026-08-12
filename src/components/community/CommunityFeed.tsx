@@ -393,25 +393,6 @@ function PostComposer({ authorId }: { authorId: string }) {
         </ul>
       )}
 
-      <div>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted">
-          <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            aria-label="Bilder auswählen"
-            className="sr-only"
-            onChange={(e) => {
-              const dateien = [...(e.target.files ?? [])];
-              e.target.value = "";
-              void waehleBilder(dateien);
-            }}
-          />
-        </label>
-        {bildFehler && <p className="mt-1 text-xs text-danger">{bildFehler}</p>}
-      </div>
-
       {(tags.data ?? []).length > 0 && (
         <div role="group" aria-label="Tags für diesen Beitrag" className="flex flex-wrap gap-2">
           {(tags.data ?? []).map((tag) => {
@@ -460,6 +441,13 @@ function PostComposer({ authorId }: { authorId: string }) {
         )}
       </div>
 
+      {bildFehler && <p className="text-xs text-danger">{bildFehler}</p>}
+
+      {/* Handelndes gehört zusammen und nach rechts: Dateiauswahl und „Posten"
+          teilen die Aktionszeile mit der Sichtbarkeit links (Donald,
+          2026-08-12) — die Anordnung von LinkedIn, Slack und Gmail. Vorher lag
+          die Auswahl allein auf einer eigenen Zeile über den Kacheln; deren
+          Wegfall macht den Composer auf dem Telefon um eine Zeile kürzer. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm text-muted">
           <span className="whitespace-nowrap">Sichtbar für</span>
@@ -476,9 +464,32 @@ function PostComposer({ authorId }: { authorId: string }) {
             ))}
           </Select>
         </label>
-        <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
-          {create.isPending ? "Wird veröffentlicht…" : "Posten"}
-        </Button>
+        {/* `ml-auto` und nicht nur `justify-between`: bricht die Zeile auf dem
+            Telefon um, landet ein einzelnes Element sonst am ZEILENANFANG —
+            die Gruppe stünde dort links. Gemessen auf 375 px. */}
+        <div className="ml-auto flex items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center text-sm text-muted">
+            {/* Beschriftung bleibt „Bild", bis auch Dateien gehen (AGE-532).
+                Ein Knopf, der „Datei anhängen" verspricht und nur Bilder
+                annimmt, ist schlechter als der genaue Name. */}
+            <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label="Bilder auswählen"
+              className="sr-only"
+              onChange={(e) => {
+                const dateien = [...(e.target.files ?? [])];
+                e.target.value = "";
+                void waehleBilder(dateien);
+              }}
+            />
+          </label>
+          <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
+            {create.isPending ? "Wird veröffentlicht…" : "Posten"}
+          </Button>
+        </div>
       </div>
     </Card>
   );
