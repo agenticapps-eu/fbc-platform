@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -147,6 +147,34 @@ describe("Beitragskarte — Bilder", () => {
 
     expect(await screen.findByText("+1")).toBeInTheDocument();
     expect(screen.getAllByRole("img")).toHaveLength(4);
+  });
+
+  it("öffnet auch die Bilder, die das Raster gar nicht zeichnet", async () => {
+    // Der Befund aus dem Diff-Review: Schema, Trigger und Composer erlauben
+    // sechs Bilder, das Raster zeigt vier — und die vierte liegt unter dem
+    // „+n". Ohne Lightbox veröffentlicht jemand Bilder, die kein Leser
+    // erreicht. Die schärfste Zusicherung ist deshalb das FÜNFTE Bild: es wird
+    // im Raster nie gezeichnet.
+    postZeilen = [post("p1")];
+    mediaZeilen = media("p1", 5);
+
+    renderFeed();
+    fireEvent.click(await screen.findByRole("button", { name: /bild 4 vergrößern/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      `https://sig.test/${AUTOR}/p1/3-1.webp`,
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /nächstes bild/i }));
+    expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      `https://sig.test/${AUTOR}/p1/4-1.webp`,
+    );
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("ein abgelehntes Bild lässt seine Kachel weg — nie den ganzen Beitrag", async () => {

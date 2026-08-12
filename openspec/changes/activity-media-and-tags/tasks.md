@@ -401,12 +401,22 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       fehlenden Indizes gemessen nachgelegt.
       **Offen:** ein zweiter echter Fremd-Anbieter, falls die Deckung gebraucht
       wird — und die Produktentscheidung zu Bildern 4–6 (siehe unten).
-- [ ] 10.1a **Produktentscheidung, Donald:** Schema, Trigger und Composer
-      erlauben sechs Bilder; das Raster zeigt vier, und die vierte liegt unter
-      dem „+n". Ohne Lightbox sieht die Bilder 4–6 niemand. Entweder Lightbox
-      nachziehen (neuer Umfang) oder die Auswahl auf vier begrenzen (dann fällt
-      die Sechser-Grenze in Schema und Trigger auseinander). So wie es jetzt
-      ist, kann jemand Bilder veröffentlichen, die kein Leser erreicht.
+- [x] 10.1a **Produktentscheidung, Donald: Lightbox nachziehen.** Schema,
+      Trigger und Composer erlauben sechs Bilder; das Raster zeigt vier, und die
+      vierte liegt unter dem „+n" — ohne diesen Weg veröffentlicht jemand
+      Bilder, die kein Leser erreicht. Am 2026-08-12 so entschieden; die
+      Alternative (Auswahl auf vier begrenzen) hätte die Sechser-Grenze in
+      Schema und Trigger auseinanderfallen lassen.
+      Bewusst schmal: vor, zurück, zu — kein Zoom, kein Wischen, keine
+      Miniaturenleiste. Tastatur trägt mit (Escape, Pfeile), der Fokus wandert
+      nur beim Öffnen. Die Zusicherung ist das **fünfte** Bild, weil das im
+      Raster nie gezeichnet wird; Gegenprobe: ein fester Startindex lässt sie
+      fallen.
+      **Dabei mitgefunden, vom Review nicht genannt:** `bildLayout` zählte über
+      alle Bildzeilen, während abgelehnte Pfade beim Zeichnen entfielen. Bei
+      einem abgelehnten vierten Bild verschwand das „+n" ersatzlos, und der Rest
+      war weder sichtbar noch angekündigt. Gezählt wird jetzt, was gezeigt
+      werden kann.
 - [x] 10.2 `cso`-Gate: die Storage-Policies noch einmal gegen die Frage lesen,
       ob irgendein Pfad ohne Session zu einem `members`-Bild führt.
       Sieben Wege geprüft, keiner führt hin; Tabelle in `EVIDENCE.md`. Der

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -742,8 +742,16 @@ function PostMedien({
   onFehler: (pfad: string) => void;
   autor: string;
 }) {
-  if (media.length === 0) return null;
-  const layout = bildLayout(media.length);
+  const [offen, setOffen] = useState<number | null>(null);
+
+  // Gezählt wird, was auch gezeigt werden KANN. Vorher rechnete `bildLayout`
+  // über alle Bildzeilen, während abgelehnte Pfade beim Zeichnen entfielen —
+  // bei einem abgelehnten vierten Bild verschwand das „+n" ersatzlos, und der
+  // Rest war weder sichtbar noch angekündigt.
+  const nutzbar = media.filter((bild) => urls[bild.storagePath]);
+  const layout = bildLayout(nutzbar.length);
+  if (nutzbar.length === 0) return null;
+
   const raster =
     layout.art === "einzeln"
       ? "grid-cols-1"
@@ -752,44 +760,177 @@ function PostMedien({
         : "grid-cols-2 sm:grid-cols-3";
 
   return (
-    <ul className={`grid gap-2 ${raster}`}>
-      {media.slice(0, layout.sichtbar).map((bild, i) => {
-        const url = urls[bild.storagePath];
-        if (!url) return null;
-        const letzte = i === layout.sichtbar - 1 && layout.rest > 0;
-        return (
-          <li key={bild.storagePath} className="relative">
-            <img
-              src={url}
-              // Die Maße stehen in `post_media`, damit der Platz schon steht,
-              // bevor das Bild da ist — sonst springt die Karte beim Laden.
-              width={bild.width}
-              height={bild.height}
-              // Ein einzelnes Bild behält sein echtes Seitenverhältnis; erst im
-              // Raster wird beschnitten, weil dort die Kacheln zueinander
-              // passen müssen. Ohne diese Zeile wären `width`/`height` nur
-              // Dekoration: `aspect-4/3` setzt die Box ohnehin.
-              style={
-                layout.art === "einzeln"
-                  ? { aspectRatio: `${bild.width} / ${bild.height}` }
-                  : undefined
-              }
-              loading="lazy"
-              alt={`Bild ${i + 1} zum Beitrag von ${autor}`}
-              onError={() => onFehler(url)}
-              className={`w-full rounded-md object-cover ${
-                layout.art === "einzeln" ? "" : "aspect-4/3"
-              }`}
-            />
-            {letzte && (
-              <span className="absolute inset-0 flex items-center justify-center rounded-md bg-scrim text-lg font-semibold text-white">
-                +{layout.rest}
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className={`grid gap-2 ${raster}`}>
+        {nutzbar.slice(0, layout.sichtbar).map((bild, i) => {
+          const url = urls[bild.storagePath];
+          const letzte = i === layout.sichtbar - 1 && layout.rest > 0;
+          return (
+            <li key={bild.storagePath} className="relative">
+              <button
+                type="button"
+                onClick={() => setOffen(i)}
+                aria-label={`Bild ${i + 1} vergrößern`}
+                className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <img
+                  src={url}
+                  // Die Maße stehen in `post_media`, damit der Platz schon steht,
+                  // bevor das Bild da ist — sonst springt die Karte beim Laden.
+                  width={bild.width}
+                  height={bild.height}
+                  // Ein einzelnes Bild behält sein echtes Seitenverhältnis; erst im
+                  // Raster wird beschnitten, weil dort die Kacheln zueinander
+                  // passen müssen. Ohne diese Zeile wären `width`/`height` nur
+                  // Dekoration: `aspect-4/3` setzt die Box ohnehin.
+                  style={
+                    layout.art === "einzeln"
+                      ? { aspectRatio: `${bild.width} / ${bild.height}` }
+                      : undefined
+                  }
+                  loading="lazy"
+                  alt={`Bild ${i + 1} zum Beitrag von ${autor}`}
+                  onError={() => onFehler(url)}
+                  className={`w-full rounded-md object-cover ${
+                    layout.art === "einzeln" ? "" : "aspect-4/3"
+                  }`}
+                />
+              </button>
+              {letzte && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-scrim text-lg font-semibold text-white"
+                >
+                  +{layout.rest}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {offen !== null && (
+        <Lightbox
+          media={nutzbar}
+          urls={urls}
+          autor={autor}
+          index={offen}
+          onIndex={setOffen}
+          onSchliessen={() => setOffen(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Die Bilder in voller Größe (AGE-528).
+ *
+ * Sie ist kein Schmuck, sondern die Antwort auf einen Befund aus dem
+ * Diff-Review: Schema, Trigger und Composer erlauben sechs Bilder, das Raster
+ * zeigt vier, und die vierte liegt unter dem „+n". Ohne diesen Weg
+ * veröffentlicht jemand Bilder, die kein Leser je erreicht.
+ *
+ * Bewusst KEIN Zoom, kein Wischen, keine Miniaturenleiste: vor, zurück, zu.
+ */
+function Lightbox({
+  media,
+  urls,
+  autor,
+  index,
+  onIndex,
+  onSchliessen,
+}: {
+  media: FeedMedia[];
+  urls: Record<string, string>;
+  autor: string;
+  index: number;
+  onIndex: (i: number) => void;
+  onSchliessen: () => void;
+}) {
+  const schliessen = useRef<HTMLButtonElement>(null);
+
+  const weiter = (schritt: number) =>
+    onIndex((index + schritt + media.length) % media.length);
+
+  // Ohne Abhängigkeitsliste, weil `weiter` den aktuellen `index` schließt — der
+  // Zuhörer wird je Render neu gesetzt und wieder abgeräumt.
+  useEffect(() => {
+    // Die Tastatur ist hier kein Zusatz: wer mit ihr bedient, kommt sonst aus
+    // dem Overlay nicht mehr heraus.
+    function taste(e: KeyboardEvent) {
+      if (e.key === "Escape") onSchliessen();
+      if (e.key === "ArrowRight") weiter(1);
+      if (e.key === "ArrowLeft") weiter(-1);
+    }
+    document.addEventListener("keydown", taste);
+    return () => document.removeEventListener("keydown", taste);
+  });
+
+  // Der Fokus wandert NUR beim Öffnen. Stünde das im Effekt darüber, risse
+  // jeder Bildwechsel den Fokus zurück auf „Schließen" — wer mit der Tastatur
+  // weiterblättert, verlöre nach dem ersten Klick seinen Knopf.
+  useEffect(() => {
+    schliessen.current?.focus();
+  }, []);
+
+  const bild = media[index];
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Bild ${index + 1} von ${media.length}`}
+      onClick={onSchliessen}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 backdrop-blur-sm"
+    >
+      <img
+        src={urls[bild.storagePath]}
+        width={bild.width}
+        height={bild.height}
+        alt={`Bild ${index + 1} zum Beitrag von ${autor}`}
+        // Der Klick aufs Bild soll NICHT schließen — sonst trifft man beim
+        // Weiterblättern ständig daneben.
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-full max-w-full rounded-md object-contain"
+      />
+
+      <button
+        ref={schliessen}
+        type="button"
+        onClick={onSchliessen}
+        aria-label="Schließen"
+        className="absolute top-4 right-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        ×
+      </button>
+
+      {media.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              weiter(-1);
+            }}
+            aria-label="Vorheriges Bild"
+            className="absolute left-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              weiter(1);
+            }}
+            aria-label="Nächstes Bild"
+            className="absolute right-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ›
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

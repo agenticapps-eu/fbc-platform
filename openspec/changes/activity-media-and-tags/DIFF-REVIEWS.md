@@ -104,13 +104,11 @@ nachgesehen: `en_US.UTF-8`, Umlaut **true**, Bindestrich und Leerzeichen
 
 ## Nicht behoben, mit Begründung
 
-- **Bilder 4–6 sind unerreichbar** (claude, MEDIUM). Schema, Trigger und
-  Composer erlauben sechs; das Raster zeigt vier, und die vierte Kachel liegt
-  unter dem „+n". Ohne Lightbox sieht sie niemand. Das ist **so spezifiziert**
-  (7.2), aber der Reviewer hat recht, dass die Kombination unfertig ist. Es ist
-  eine Produktentscheidung — Lightbox nachziehen oder die Auswahl auf vier
-  begrenzen —, und die trifft nicht der Autor beim Aufräumen. **Offen, Donald
-  vorgelegt.**
+- ~~**Bilder 4–6 sind unerreichbar**~~ (claude, MEDIUM) — **behoben, nach
+  Entscheidung von Donald am 2026-08-12: Lightbox nachgezogen.** Die Alternative
+  (Auswahl auf vier begrenzen) hätte die Sechser-Grenze in Schema und Trigger
+  auseinanderfallen lassen. Bewusst schmal: vor, zurück, zu, mit Tastatur.
+  Die Zusicherung ist das fünfte Bild — das im Raster nie gezeichnet wird.
 - **Der Sechser-Trigger ist nicht wettlaufsicher** (codex, MEDIUM). Zwei
   gleichzeitige Direkt-Inserts sehen je fünf Zeilen und schreiben zusammen
   sieben. Steht so im Migrationskopf: der einzige Client-Weg ist die RPC, und
