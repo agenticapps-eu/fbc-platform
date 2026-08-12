@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Avatar } from "../ui/Avatar";
@@ -28,6 +28,7 @@ import {
   toggleLike,
   tokenizePostBody,
   VISIBILITY_OPTIONS,
+  type FeedCursor,
   type FeedPost,
   type MentionResolver,
   type PostSegment,
@@ -45,16 +46,25 @@ export default function CommunityFeed() {
   const uid = user?.id ?? null;
   const [hashtag, setHashtag] = useState<string | null>(null);
 
-  const feed = useQuery({
+  // Seitenweise (AGE-528): eine feste Obergrenze ohne Nachladen wäre mit Bildern
+  // eine stille Kappung — ältere Beiträge blieben unauffindbar. Der Cursor läuft
+  // über (created_at, id), siehe lib/feed.ts.
+  const feed = useInfiniteQuery({
     queryKey: feedQueryKey(uid, hashtag),
-    queryFn: () => fetchFeed({ uid, hashtag }),
+    queryFn: ({ pageParam }) => fetchFeed({ uid, hashtag, cursor: pageParam }),
+    initialPageParam: null as FeedCursor | null,
+    getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
   });
+  const posts = useMemo(
+    () => (feed.data?.pages ?? []).flatMap((seite) => seite.posts),
+    [feed.data],
+  );
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
   // Treffer wird zum Profil-Link, sonst bleibt es dezenter Akzent-Text (kein Fake-Link).
   const mentionResolver = useMemo(
-    () => buildMentionResolver((feed.data ?? []).map((p) => p.author)),
-    [feed.data],
+    () => buildMentionResolver(posts.map((p) => p.author)),
+    [posts],
   );
 
   return (
@@ -78,7 +88,12 @@ export default function CommunityFeed() {
       )}
 
       <FeedList
-        query={feed}
+        posts={posts}
+        isLoading={feed.isLoading}
+        isError={feed.isError}
+        hasNextPage={feed.hasNextPage}
+        isFetchingNextPage={feed.isFetchingNextPage}
+        onNextPage={() => void feed.fetchNextPage()}
         currentUserId={user?.id ?? null}
         activeHashtag={hashtag}
         onHashtag={setHashtag}
@@ -185,27 +200,36 @@ function PostComposer({ authorId }: { authorId: string }) {
 // ── Liste ─────────────────────────────────────────────────────────────────────
 
 function FeedList({
-  query,
+  posts,
+  isLoading,
+  isError,
+  hasNextPage,
+  isFetchingNextPage,
+  onNextPage,
   currentUserId,
   activeHashtag,
   onHashtag,
   mentionResolver,
 }: {
-  query: ReturnType<typeof useQuery<FeedPost[]>>;
+  posts: FeedPost[];
+  isLoading: boolean;
+  isError: boolean;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onNextPage: () => void;
   currentUserId: string | null;
   activeHashtag: string | null;
   onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
 }) {
-  if (query.isLoading) {
+  if (isLoading) {
     return <p className="text-sm text-muted">Feed wird geladen…</p>;
   }
-  if (query.isError) {
+  if (isError) {
     return (
       <p className="text-sm text-danger">Der Feed konnte nicht geladen werden. Bitte neu laden.</p>
     );
   }
-  const posts = query.data ?? [];
   if (posts.length === 0) {
     return (
       <EmptyState
@@ -227,19 +251,29 @@ function FeedList({
   }
 
   return (
-    <Stagger className="space-y-5">
-      {posts.map((post) => (
-        <StaggerItem key={post.id}>
-          <PostCard
-            post={post}
-            currentUserId={currentUserId}
-            activeHashtag={activeHashtag}
-            onHashtag={onHashtag}
-            mentionResolver={mentionResolver}
-          />
-        </StaggerItem>
-      ))}
-    </Stagger>
+    <div className="space-y-5">
+      <Stagger className="space-y-5">
+        {posts.map((post) => (
+          <StaggerItem key={post.id}>
+            <PostCard
+              post={post}
+              currentUserId={currentUserId}
+              activeHashtag={activeHashtag}
+              onHashtag={onHashtag}
+              mentionResolver={mentionResolver}
+            />
+          </StaggerItem>
+        ))}
+      </Stagger>
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button variant="secondary" onClick={onNextPage} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? "Wird geladen…" : "Ältere Beiträge"}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

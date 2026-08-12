@@ -144,6 +144,33 @@ Die Migration wäre gar nicht durchgelaufen. Ersetzt durch die POSIX-Klasse
 misst `rls_test.sql` §20 den Umlaut-Fall ausdrücklich mit — auf jeder
 Datenbank, auf der die Suite läuft, also auch auf DEV und PROD.
 
+## Block 5 — der Cursor, gemessen statt behauptet
+
+Gemessen am 2026-08-12, lokaler Stack.
+
+```
+tsx scripts/probe-feed-cursor.ts
+```
+
+Der Unit-Test (`feed.pagination.test.ts`) sichert die **Zeichenkette** zu, die
+`fetchFeed` an PostgREST schickt. Ob PostgREST sie annimmt und ob dabei kein
+Beitrag verlorengeht, kann er nicht sagen — ein falsch geklammertes `or(…)`
+fällt erst zur Laufzeit auf, als 400 auf einer Seite, die niemand testet.
+
+Drei Beiträge, zwei davon mit **identischem** `created_at`, Seitengröße 1 —
+nur so fällt die Seitengrenze zwischen die beiden:
+
+| Prüfung | Gemessen |
+|---|---|
+| PostgREST nimmt `or(created_at.lt.X,and(created_at.eq.X,id.lt.Y))` an | **3 Zeilen, kein 400** |
+| jeder Beitrag genau einmal | **3 von 3, 3 verschieden** |
+| **Gegenprobe:** Cursor nur über `created_at` | **2 von 3 — einer fehlt** |
+
+Die dritte Zeile ist der Punkt. Ohne sie wäre der grüne Lauf der ersten beiden
+nichtssagend: bei Seitengröße 2 stehen die zeitgleichen Beiträge auf derselben
+Seite, und dann verliert auch die naive Fassung nichts. Der Befund aus dem
+Plan-Review ist damit gemessen, nicht geglaubt.
+
 ## Task 1.0c — noch offen
 
 Die Sonde gegen **DEV** laufen zu lassen (Plan-Review: ein grüner lokaler Lauf

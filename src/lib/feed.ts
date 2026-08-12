@@ -29,6 +29,16 @@ export interface FeedAuthor {
   tier: string | null;
 }
 
+/** Ein Bild des Beitrags. Die Maße stehen hier, damit die Karte ihr Layout
+ *  bestimmen kann, ohne die Datei zu laden (AGE-528). Der Pfad zeigt in den
+ *  PRIVATEN Bucket — sichtbar wird er erst über `signPostMedia`. */
+export interface FeedMedia {
+  storagePath: string;
+  sort: number;
+  width: number;
+  height: number;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -39,6 +49,7 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  media: FeedMedia[];
 }
 
 export interface FeedComment {
@@ -277,34 +288,79 @@ async function fetchAuthors(ids: string[]): Promise<Map<string, FeedAuthor>> {
   return byId;
 }
 
+/** Seitengröße des Feeds. Eine feste Obergrenze ohne Nachladen wäre mit Bildern
+ *  eine stille Kappung — ältere Beiträge wären unauffindbar (AGE-528). */
+export const FEED_SEITE = 20;
+
+/**
+ * Der Cursor läuft über **(created_at, id)**, nicht über `created_at` allein.
+ * Bei gleichen Zeitstempeln — beim Import der ~70 Konten der wahrscheinliche
+ * Fall — überspränge eine reine Zeitgrenze den zweiten Beitrag still: er stünde
+ * weder auf der einen noch auf der nächsten Seite.
+ */
+export interface FeedCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface FeedSeite {
+  posts: FeedPost[];
+  /** `null` heißt: es gibt nichts mehr nachzuladen. */
+  nextCursor: FeedCursor | null;
+}
+
 export interface FetchFeedArgs {
   /** Eigene Profil-ID (für `likedByMe`); null = ausgeloggt. */
   uid: string | null;
   /** Optionaler Hashtag-Filter (normalisiert, ohne #). */
   hashtag?: string | null;
+  /** Weiterlesen ab hier; fehlt er, beginnt die erste Seite. */
+  cursor?: FeedCursor | null;
 }
 
-/** Lädt den chronologischen Feed (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
-export async function fetchFeed({ uid, hashtag }: FetchFeedArgs): Promise<FeedPost[]> {
+/** Lädt eine Feed-Seite (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
+export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promise<FeedSeite> {
   let query = supabase
     .from("posts")
     .select("id, author_id, body, hashtags, visibility, created_at")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    .limit(FEED_SEITE);
   if (hashtag) query = query.contains("hashtags", [hashtag]);
+  if (cursor) {
+    query = query.or(
+      `created_at.lt.${cursor.createdAt},` +
+        `and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+    );
+  }
 
   const { data: posts, error } = await query;
   if (error) throw error;
   const rows = posts ?? [];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { posts: [], nextCursor: null };
 
   const postIds = rows.map((r) => r.id);
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
 
-  const [authors, countsRes] = await Promise.all([
+  const [authors, countsRes, mediaRes] = await Promise.all([
     fetchAuthors(authorIds),
     supabase.rpc("post_engagement_counts", { p_post_ids: postIds }),
+    supabase
+      .from("post_media")
+      .select("post_id, storage_path, sort, width, height")
+      .in("post_id", postIds),
   ]);
+
+  // Wie bei den Zählern: ein Fehler hier nimmt dem Feed die Bilder, nicht die
+  // Beiträge — aber nicht still. Ein fehlender Grant soll sichtbar werden.
+  if (mediaRes.error) captureException(mediaRes.error, { tags: { area: "feed.media" } });
+  const media = new Map<string, FeedMedia[]>();
+  for (const m of mediaRes.data ?? []) {
+    const liste = media.get(m.post_id) ?? [];
+    liste.push({ storagePath: m.storage_path, sort: m.sort, width: m.width, height: m.height });
+    media.set(m.post_id, liste);
+  }
+  for (const liste of media.values()) liste.sort((a, b) => a.sort - b.sort);
 
   // Zähler-RPC ist nicht kritisch: schlägt sie fehl, zeigt der Feed 0/0 (statt zu
   // brechen) — aber NICHT still: an Sentry melden, damit ein kaputter Grant /
@@ -323,17 +379,25 @@ export async function fetchFeed({ uid, hashtag }: FetchFeedArgs): Promise<FeedPo
     myLikes = new Set((data ?? []).map((l) => l.post_id));
   }
 
-  return rows.map((r) => ({
-    id: r.id,
-    author: authorOf(authors, r.author_id),
-    body: r.body,
-    hashtags: r.hashtags ?? [],
-    visibility: r.visibility,
-    createdAt: r.created_at,
-    likeCount: counts.get(r.id)?.like_count ?? 0,
-    commentCount: counts.get(r.id)?.comment_count ?? 0,
-    likedByMe: myLikes.has(r.id),
-  }));
+  const letzte = rows[rows.length - 1];
+  return {
+    posts: rows.map((r) => ({
+      id: r.id,
+      author: authorOf(authors, r.author_id),
+      body: r.body,
+      hashtags: r.hashtags ?? [],
+      visibility: r.visibility,
+      createdAt: r.created_at,
+      likeCount: counts.get(r.id)?.like_count ?? 0,
+      commentCount: counts.get(r.id)?.comment_count ?? 0,
+      likedByMe: myLikes.has(r.id),
+      media: media.get(r.id) ?? [],
+    })),
+    // Eine nicht volle Seite ist die letzte. Ein Cursor darauf brächte nur eine
+    // leere Anfrage — und eine „Mehr laden"-Schaltfläche, die nichts tut.
+    nextCursor:
+      rows.length === FEED_SEITE ? { createdAt: letzte.created_at, id: letzte.id } : null,
+  };
 }
 
 /** Kommentare eines Beitrags, chronologisch (RLS: nur wenn der Post sichtbar ist). */

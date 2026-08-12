@@ -955,6 +955,44 @@ export type Database = {
           },
         ];
       };
+      post_media: {
+        Row: {
+          created_at: string;
+          height: number;
+          id: string;
+          post_id: string;
+          sort: number;
+          storage_path: string;
+          width: number;
+        };
+        Insert: {
+          created_at?: string;
+          height: number;
+          id?: string;
+          post_id: string;
+          sort: number;
+          storage_path: string;
+          width: number;
+        };
+        Update: {
+          created_at?: string;
+          height?: number;
+          id?: string;
+          post_id?: string;
+          sort?: number;
+          storage_path?: string;
+          width?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "post_media_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       posts: {
         Row: {
           author_id: string;
@@ -1421,8 +1459,40 @@ export type Database = {
           },
         ];
       };
+      tags: {
+        Row: {
+          active: boolean;
+          key: string;
+          label: string;
+          sort: number;
+        };
+        Insert: {
+          active?: boolean;
+          key: string;
+          label: string;
+          sort: number;
+        };
+        Update: {
+          active?: boolean;
+          key?: string;
+          label?: string;
+          sort?: number;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      create_post_with_media: {
+        Args: {
+          p_post_id: string;
+          p_body: string;
+          p_visibility: string;
+          p_hashtags: string[];
+          p_tags: string[];
+          p_media: Json;
+        };
+        Returns: string;
+      };
       current_tier_rank: { Args: never; Returns: number };
       is_matching_manager: { Args: never; Returns: boolean };
       // `is_prime_plus` stand hier bis 2026-08-06 und existierte in der Datenbank

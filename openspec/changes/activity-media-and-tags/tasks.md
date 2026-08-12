@@ -203,41 +203,73 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 5 · Datenschicht für Medien und Tags
 
-- [ ] 5.1 `src/lib/image.ts`: reine Funktion `zielMasse(w, h, maxEdge)` +
+- [x] 5.1 `src/lib/image.ts`: reine Funktion `zielMasse(w, h, maxEdge)` +
       `shrinkToWebp(file, opts)`. **Getestet wird die reine Funktion** (4032×3024
       → 1600×1200; kleines Bild unverändert) — jsdom hat keinen 2D-Kontext, ein
       Canvas-Test könnte nur behaupten, dass nichts wirft.
-- [ ] 5.1a Fehlerfall benennen: scheitert `shrinkToWebp` (unlesbares Format,
+- [x] 5.1a Fehlerfall benennen: scheitert `shrinkToWebp` (unlesbares Format,
       Speichergrenze), wird **sofort** eine konkrete Meldung gezeigt und **gar
       nicht** hochgeladen. Sonst läuft der Nutzer in einen späten,
       nichtssagenden Serverfehler am 1-MiB-Limit (Befund aus dem Plan-Review).
-- [ ] 5.2 `src/lib/post-media.ts`: hochladen nach `{uid}/{postId}/{i}-{ts}.webp`
-      (Beitrags-`id` **im Client** erzeugt, siehe 2.12), einzeln löschen, und
+      `BILD_UNLESBAR` ist eine Meldung für alle drei Fehlerwege — sie
+      unterscheiden sich für den Nutzer nicht. Der Zweig ist in jsdom echt
+      erreichbar und deshalb zugesichert, nicht nur behauptet.
+- [x] 5.2 `src/lib/post-media.ts`: hochladen nach `{uid}/{postId}/{i}-{ts}.webp`
+      (Beitrags-`id` **im Client** erzeugt, siehe `design.md`) und
       **gebündeltes** `createSignedUrls` je Feed-Seite.
-- [ ] 5.2a `createSignedUrls` kann **einzelne** Pfade ablehnen — in der Sonde
+      **„Einzeln löschen" ist NICHT gebaut, mit Begründung.** Hochgeladen wird
+      beim Veröffentlichen, nicht beim Auswählen — ein Bild vor dem
+      Veröffentlichen zu entfernen heißt damit, es aus einem Array zu nehmen,
+      ohne den Storage anzufassen (6.2). Ein Bild aus einem *veröffentlichten*
+      Beitrag zu löschen verlangt keine Oberfläche in diesem Change; die
+      Einzel-Löschbarkeit ist eine Eigenschaft des **Datenmodells** (Tabelle
+      statt `jsonb`, DELETE-Policy) und in Block 2 gemessen. Eine Funktion ohne
+      Aufrufer wäre hier die teurere Wahl.
+- [x] 5.2a `createSignedUrls` kann **einzelne** Pfade ablehnen — in der Sonde
       gemessen (Fall F: 4 von 5, der Stapel wird nicht verworfen). Je Bild
       behandeln: ein abgelehntes Bild lässt seine Kachel weg, es darf nie den
       ganzen Beitrag verschlucken.
-- [ ] 5.2b **Eine Ablehnung ist kein Fehler und gehört NICHT an Sentry.** Die
+- [x] 5.2b **Eine Ablehnung ist kein Fehler und gehört NICHT an Sentry.** Die
       Sonde hat gezeigt, dass der Storage „Object not found" meldet, wo er
       „nicht erlaubt" meint — er unterscheidet die beiden Fälle nach außen
       bewusst nicht (keine Aufzählbarkeit). Für ein Bild, das den Betrachter
       nichts angeht, ist das der Normalfall; wer es meldet, meldet Rauschen.
-- [ ] 5.3 Signierte URLs pro Pfad in react-query cachen, `staleTime` 50 min bei
+      Der Gegenfall ist mitgezogen: scheitert der **ganze** Aufruf, ist etwas
+      kaputt — das geht sehr wohl an Sentry, und der Feed zeigt die Beiträge
+      ohne Bilder statt gar nicht.
+- [~] 5.3 Signierte URLs pro Pfad in react-query cachen, `staleTime` 50 min bei
       1 h Gültigkeit. Ohne das lädt der Browser bei jedem Render jedes Bild neu.
       **Plus**: ein Bildfehler (403 nach Ablauf in einem lange offenen Tab)
       löst ein Nachsignieren aus, statt eine kaputte Kachel stehen zu lassen.
-- [ ] 5.4 `src/lib/tags.ts`: aktive kuratierte Tags lesen, `istKuratiert(key)`.
-- [ ] 5.5 `fetchFeed` auf Seiten zu 20 umstellen, `post_media` mitlesen. Der
+      **Halb erledigt:** `signaturQueryKey` und `SIGNATUR_STALE_MS` stehen in
+      `post-media.ts` und sind zugesichert. Der Hook und das Nachsignieren
+      brauchen das `<img>`, das es erst in **7.2** gibt — sie werden dort
+      gebaut, nicht hier auf Vorrat.
+- [x] 5.4 `src/lib/tags.ts`: aktive kuratierte Tags lesen, `istKuratiert(key)`.
+- [x] 5.5 `fetchFeed` auf Seiten zu 20 umstellen, `post_media` mitlesen. Der
       Cursor läuft über **`(created_at, id)`**, nicht über `created_at` allein —
       bei gleichen Zeitstempeln überspränge er sonst Beiträge, und genau das
       wird beim Import der ~70 Konten wahrscheinlich (Befund aus dem
       Plan-Review). Der bestehende Hashtag-Filter
       (`.contains("hashtags", […])`) bleibt unverändert.
-- [ ] 5.6 `database.types.ts` **von Hand** um `post_media` und `tags` ergänzen.
-- [ ] 5.7 Tests: Cursor-Logik (**inklusive gleicher Zeitstempel**),
+      **Der Aufrufer musste mit:** `CommunityFeed` läuft auf `useInfiniteQuery`
+      mit einer „Ältere Beiträge"-Schaltfläche. Ohne das wäre aus der Kappung
+      bei 50 eine bei 20 geworden — schlimmer als vorher.
+- [x] 5.6 `database.types.ts` **von Hand** um `post_media` und `tags` ergänzen.
+- [x] 5.7 Tests: Cursor-Logik (**inklusive gleicher Zeitstempel**),
       Tag-Vereinigung und `istKuratiert` als reine Funktionen. Keine Mocks auf
       eigene Module.
+      **Die Tag-Vereinigung wird hier NICHT nachgebaut.** Sie steht in
+      `create_post_with_media()` und ist dort in pgTAP gemessen; eine zweite
+      Fassung im Client wäre dieselbe Regel an zwei Stellen — genau das, was
+      `profiles_public` in diesem Repo teuer macht. Der Client übergibt beide
+      Listen, die RPC vereinigt.
+- [x] 5.8 **Sichtprobe statt Behauptung:** `scripts/probe-feed-cursor.ts` misst
+      gegen den lokalen Stack, dass PostgREST den `or(…,and(…))`-Ausdruck
+      annimmt und kein Beitrag verlorengeht — samt Gegenprobe, dass die naive
+      Fassung (nur `created_at`) genau einen verliert. Der Unit-Test kann nur
+      die Zeichenkette zusichern; ein falsch geklammerter Ausdruck wäre ein 400
+      zur Laufzeit. `EVIDENCE.md`, „Block 5".
 
 ## 6 · Composer nach Mockup
 

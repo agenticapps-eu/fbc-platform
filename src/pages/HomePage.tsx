@@ -56,7 +56,7 @@ function PublicHome() {
   const upcoming = eventsQuery.data
     ? partitionEvents(eventsQuery.data, new Date()).upcoming.slice(0, 4)
     : [];
-  const posts = (feedQuery.data ?? []).slice(0, 3);
+  const posts = (feedQuery.data?.posts ?? []).slice(0, 3);
 
   return (
     <div className="space-y-12">

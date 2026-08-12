@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CommunityFeed from "./CommunityFeed";
 import { ToastProvider } from "../ui/Toast";
-import { fetchFeed, type FeedPost } from "../../lib/feed";
+import { fetchFeed, type FeedPost, type FeedSeite } from "../../lib/feed";
 import { AuthFixture, fakeAuthValue } from "../../test/auth-fixtures";
 
 /**
@@ -33,13 +33,19 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
+    media: [],
     ...overrides,
   };
 }
 
 /** Ausgeloggt: /aktivitaet ist ohne Session erreichbar, das ist der offenste Fall. */
 async function renderFeed(posts: FeedPost[]) {
-  vi.mocked(fetchFeed).mockResolvedValue(posts);
+  vi.mocked(fetchFeed).mockResolvedValue({ posts, nextCursor: null });
+  renderNackt();
+  await screen.findByText(/viel gelernt/);
+}
+
+function renderNackt() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <AuthFixture value={fakeAuthValue()}>
@@ -52,7 +58,6 @@ async function renderFeed(posts: FeedPost[]) {
       </QueryClientProvider>
     </AuthFixture>,
   );
-  await screen.findByText(/viel gelernt/);
 }
 
 beforeEach(() => {
@@ -96,5 +101,41 @@ describe("CommunityFeed — jeder Tag erscheint genau einmal", () => {
     const link = screen.getByText("https://fair-business-club.de").closest("a");
     expect(link).toHaveAttribute("href", "https://fair-business-club.de");
     expect(link).toHaveAttribute("target", "_blank");
+  });
+});
+
+describe("CommunityFeed — ältere Beiträge sind erreichbar", () => {
+  const CURSOR = { createdAt: "2026-08-01T10:00:00Z", id: "p1" };
+
+  function seite(over: Partial<FeedSeite> & { posts: FeedPost[] }): FeedSeite {
+    return { nextCursor: null, ...over };
+  }
+
+  it("lädt die nächste Seite mit dem Cursor der vorigen und blendet den Knopf danach aus", async () => {
+    // Eine feste Obergrenze ohne Nachladen wäre mit Bildern eine stille
+    // Kappung: ältere Beiträge wären unauffindbar, ohne dass etwas darauf
+    // hinweist (spec.md, „Der Feed lädt seitenweise").
+    vi.mocked(fetchFeed)
+      .mockResolvedValueOnce(seite({ posts: [post()], nextCursor: CURSOR }))
+      .mockResolvedValueOnce(
+        seite({ posts: [post({ id: "p2", body: "Ein älterer Erlebnisbericht." })] }),
+      );
+
+    renderNackt();
+    await screen.findByText(/viel gelernt/);
+
+    fireEvent.click(screen.getByRole("button", { name: /ältere beiträge/i }));
+
+    expect(await screen.findByText(/älterer Erlebnisbericht/)).toBeInTheDocument();
+    expect(vi.mocked(fetchFeed).mock.calls[1][0].cursor).toEqual(CURSOR);
+    // Der erste Beitrag bleibt stehen — nachladen ist kein Blättern.
+    expect(screen.getByText(/viel gelernt/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ältere beiträge/i })).toBeNull();
+  });
+
+  it("zeigt ohne weitere Seite gar keinen Knopf", async () => {
+    await renderFeed([post()]);
+
+    expect(screen.queryByRole("button", { name: /ältere beiträge/i })).toBeNull();
   });
 });

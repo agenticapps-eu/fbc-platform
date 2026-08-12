@@ -67,7 +67,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
   const nextEvent = eventsQuery.data
     ? (partitionEvents(eventsQuery.data, new Date()).upcoming[0] ?? null)
     : null;
-  const posts = (feedQuery.data ?? []).slice(0, 2);
+  const posts = (feedQuery.data?.posts ?? []).slice(0, 2);
   const members = (membersQuery.data ?? []).filter((m) => m.id !== uid).slice(0, 3);
   const steps = buildNextSteps(profile.profile_completion, nextEvent);
 
