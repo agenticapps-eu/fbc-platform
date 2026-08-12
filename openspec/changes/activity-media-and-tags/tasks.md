@@ -488,8 +488,28 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       dispatchen (`plan` **lesen**, dann `apply`) → **`deploy.yml` erneut
       laufen lassen**. Ohne diesen Re-Run ist nichts ausgeliefert, obwohl alles
       grün aussieht. `drift-gate` blockt den Deploy bis `migrate-prod` lief.
-- [ ] 10.5 PROD **nachmessen**, nicht glauben: Bucket privat mit 1 MiB/WebP,
+      **Stand 2026-08-12:** Merge `df37349` · `migrate-dev` grün für genau diese
+      SHA · `migrate-prod` (Lauf 31605508737) dispatcht, `plan` **gelesen** statt
+      durchgeklickt: Zielhost `viwntbodrtqxgmqyxluh` auf
+      `aws-0-eu-central-1.pooler.supabase.com`, Drift nannte die vier fehlenden
+      Versionen, der Dry-Run kündigte genau diese vier an — dann `apply`, alle
+      vier angewendet, und die Nachkontrolle im selben Job sagt
+      „**OK — 60 Migrationen, Historie abweichungsfrei**".
+      **Offen: der `deploy.yml`-Re-Run.** `deploy.yml` hat *kein*
+      `workflow_dispatch` (nur `push: [main]` und `pull_request`) — der Re-Run
+      geht deshalb über `gh run rerun 31603101953 --failed`, nicht über
+      `gh workflow run`. `deploy` und `functions` hängen beide an
+      `[migrate-dev, drift-gate]`, und drift-gate war der Job, der fiel.
+- [x] 10.5 PROD **nachmessen**, nicht glauben: Bucket privat mit 1 MiB/WebP,
       vier Storage-Policies, `post_media` und `tags` mit ihren Grants.
+      `scripts/mess-10-5-prod.ts --prod=viwntbodrtqxgmqyxluh`, **nur lesend**
+      (die Sitzung steht auf `default_transaction_read_only`, damit ein
+      versehentliches Schreiben von der Datenbank abgelehnt würde und nicht von
+      einem Kommentar). **Zwölf von zwölf.** Einzelheiten in `EVIDENCE.md`;
+      hervorzuheben ist die Grants-Zeile, weil genau sie hier zweimal teuer war:
+      `post_media` trägt `anon=SELECT`, `authenticated=SELECT,INSERT,DELETE`,
+      `tags` trägt `anon=SELECT`, `authenticated=SELECT`. Nichts davon ist
+      geerbt — es steht so in den Migrationen (AGE-312).
 - [ ] 10.6 `openspec archive` — **Szenario-Titel unverändert lassen**, ein
       umgetaufter Titel in einem MODIFIED-Block löscht das alte Szenario;
       `validate` bleibt dabei grün, nur `archive` bricht ab.

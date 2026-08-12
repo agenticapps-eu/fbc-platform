@@ -491,3 +491,71 @@ ausgeloggter Feed dort zeigt heute gar keine Beitragsbilder.
 Gemessen ist stattdessen der Weg, den der Feed danach nimmt: ausgeloggt
 signieren, holen, Bytes vergleichen. Die gerenderte Zeile wird direkt nach dem
 `deploy`-Re-Run aus 10.4 im echten Inkognito-Fenster nachgeholt.
+
+## 10.4 / 10.5 — PROD, gelesen und nachgemessen
+
+### Der Dry-Run wurde gelesen, nicht durchgeklickt
+
+`migrate-prod` Lauf **31605508737** auf der Merge-SHA `df37349`. Der Workflow
+trennt `plan` und `apply` genau deshalb, und der `plan`-Job sagt der Reihe nach:
+
+```
+Umgebung:                                prod
+Sollwert (scripts/prod-project-ref.txt): viwntbodrtqxgmqyxluh
+Ziel aus SUPABASE_DB_URL_PROD:           viwntbodrtqxgmqyxluh
+Host:                                    aws-0-eu-central-1.pooler.supabase.com:5432
+
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090000
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090100
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090200
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260812090300
+
+DRY RUN: migrations will *not* be pushed to the database.
+Would push these migrations:
+ • 20260812090000_post_media.sql
+ • 20260812090100_post_media_storage.sql
+ • 20260812090200_tags.sql
+ • 20260812090300_posts_indizes.sql
+```
+
+Der aufgelöste Zielhost stand also **vor** der Anwendung im Log, und die Liste
+der vier Versionen deckte sich mit dem, was `drift-gate` als fehlend gemeldet
+hatte. `apply` wendete danach genau diese vier an; die Nachkontrolle im selben
+Job schließt mit:
+
+```
+OK — 60 Migrationen, Historie abweichungsfrei.
+```
+
+Anzumerken: das `production`-Environment trägt `protection_rules: []` —
+nachgesehen über die API, nicht vermutet. `apply` startet also unmittelbar hinter
+`plan`, ohne Reviewer-Regel. Das Dispatchen **ist** der Schreibzugriff, und
+Donald hat es deshalb von Hand ausgelöst.
+
+### PROD nachgemessen (10.5): zwölf von zwölf
+
+`scripts/mess-10-5-prod.ts --prod=viwntbodrtqxgmqyxluh`, ausschließlich SELECTs;
+die Sitzung steht zusätzlich auf `default_transaction_read_only`, damit ein
+versehentliches Schreiben von der Datenbank abgelehnt würde und nicht von einem
+Kommentar.
+
+| Prüfung | Gemessen auf PROD |
+|---|---|
+| Bucket `post-media` privat | `public = false` |
+| Größenlimit | `1048576` (1 MiB) |
+| erlaubte Typen | `["image/webp"]` |
+| Storage-Policies | `post_media_select(SELECT)`, `_insert_own(INSERT)`, `_update_own(UPDATE)`, `_delete_own(DELETE)` |
+| `post_media` RLS | `relrowsecurity = true` |
+| **`post_media` Grants** | `anon=SELECT` · `authenticated=SELECT,INSERT,DELETE` |
+| `tags` RLS | `relrowsecurity = true` |
+| **`tags` Grants** | `anon=SELECT` · `authenticated=SELECT` |
+| Funktionen | `create_post_with_media`, `post_media_hoechstens_sechs`, `post_media_lesbar` |
+| Sechser-Grenze | Trigger `post_media_hoechstens_sechs` auf `post_media` |
+| Indizes | `posts_created_at_id_idx`, `posts_hashtags_gin` |
+| kuratierte Tags | 15 aktiv |
+
+Die zwei Grants-Zeilen sind der Grund, warum dieses Skript überhaupt existiert:
+ein grüner `migrate-prod`-Lauf sagt, dass die CLI die Versionen verbucht hat —
+nicht, dass die Rechte dastehen. Grants werden in dieser Instanz **nicht geerbt**
+(AGE-312), und `service_role` hält auf keiner Tabelle in `public` ein Recht;
+beides ist hier schon einmal erst zur Laufzeit aufgefallen.
