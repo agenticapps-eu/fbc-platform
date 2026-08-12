@@ -258,3 +258,103 @@ Zwei Änderungen daraus, beide gemessen:
 
 Danach: Lauf grün, Exit 0, und DEV trägt wieder nur `avatars` und `covers`
 (nachgesehen, nicht geglaubt).
+
+## Abnahme 9.4 / 9.5 / 9.6 — die Sichtprobe, von Hand durchgespielt
+
+Am 2026-08-12 gegen den **lokalen Stack** gefahren (Vite mit
+`VITE_SUPABASE_URL=http://127.0.0.1:54321`, drei angelegte Konten, sechs
+erzeugte PNGs mit großen Ziffern 1–6, damit Reihenfolge im Bild ablesbar ist).
+**9.3 bleibt offen** — dazu unten.
+
+### 9.4 — Bild hochladen, mehrere, Reihenfolge, einzeln löschen
+
+| Prüfung | Ergebnis |
+|---|---|
+| Ein Bild wählen | Vorschau erscheint, Composer bleibt bedienbar |
+| Mehrere nachwählen | Auswahl **wächst** (kein Ersetzen), Reihenfolge = Auswahlreihenfolge |
+| Einzeln löschen | „Bild 2 entfernen" nimmt genau 2; 1 und 3 bleiben in Ordnung |
+| Siebtes Bild | abgelehnt mit „Höchstens sechs Bilder pro Beitrag — 1 wurden nicht übernommen.", sechs bleiben stehen |
+| Nach dem Posten | `post_media` trägt `sort` 0–5, Pfade unter `<uid>/<postId>/`, `storage.objects` sechs Objekte, alle `image/webp`, 2,3–2,8 kB |
+| Maße | 900×700 / 900×600 abwechselnd — genau die Auswahlreihenfolge, Ende zu Ende |
+
+Der Composer wandelt clientseitig nach WebP (`shrinkToWebp`), hochgeladen wurden
+PNGs — der Bucket nimmt trotzdem nur `image/webp`, und genau das kam an.
+
+### 9.5 — jeder Tag genau einmal, kuratiert von frei unterscheidbar
+
+Der schärfste Fall, absichtlich gebaut: **derselbe Tag zweimal eingegeben** —
+`#Netzwerken` im Fließtext *und* der kuratierte Chip „Netzwerken" gewählt.
+
+Gemessen an den gerenderten Chips (`data-kuratiert` am Knopf):
+
+| Chip | kuratiert | Anzahl im Beitrag |
+|---|---|---|
+| `#netzwerken` | `true` | **1** — die Deduplizierung greift |
+| `#persönlichkeitsentwicklung` | `true` | 1 — mit **ö** getippt und trotzdem als kuratiert erkannt |
+| `#sommerfest` | `false` | 1 |
+
+Die zweite Zeile ist die Falle aus `design.md` („Die Form des Schlüssels"): ein
+Schlüssel `persoenlichkeitsentwicklung` hätte nie getroffen, der Chip wäre still
+als freier Tag erschienen. Die Startbefüllung trägt `persönlichkeitsentwicklung`
+mit Umlaut, und der Weg Text → `toLowerCase()` → `tags` passt zusammen.
+
+Kuratiert ist **gefüllt**, frei ist **Outline** — wie in `design.md` festgelegt,
+und im Bild in beiden Themes unterscheidbar. Alle drei sind Knöpfe, der Text im
+Beitrag ist normaler Text (Block 4 hält).
+
+Filter: kuratierter Chip aus der Leiste → „Gefiltert nach #erlebnistag ·
+Filter entfernen", Feed auf die zwei passenden Beiträge verengt, Chip in der
+Leiste hervorgehoben. Freier Chip aus einem Beitrag (`#allgäu`) → ein Beitrag,
+kein Leisten-Chip gedrückt. Tag ohne Beiträge (`Immobilien`) → „Keine Beiträge
+mit diesem Hashtag", also der leere Zustand aus 8.3, nicht der aus C2.
+
+### 9.6 — gegen das Mockup, in beiden Themes und auf dem Telefon
+
+Beide Themes: `hell` und `navy`. Erwartungsgemäß **kein** Unterschied im Inhalt —
+`navy` färbt nur die Schale (AGE-499), Karten und Chips bleiben hell. Auf dem
+Telefon (390 px) liegt die Tag-Leiste **über** dem Feed (8.4 bestätigt), das
+Bildraster wird 2×2, das „+n" sitzt auf der vierten Kachel.
+
+**Der Befund, den nur die Sichtprobe finden konnte: die Lightbox war in der
+Karte gefangen.**
+
+`.fbc-card:hover` setzt `transform: translateY(-2px)` (AGE-492). Ein
+transformierter Vorfahr ist der Bezugsrahmen für `position: fixed` — und beim
+Klick auf eine Kachel liegt der Zeiger immer auf der Karte. Gemessen:
+
+| | Dialog | Viewport |
+|---|---|---|
+| vorher (Zeiger auf der Karte) | 847×615 an x=105/y=91 | 1280×900 |
+| vorher (Klick per Skript, ohne Hover) | 485×828 | 500×844 |
+| nachher, Portal an `document.body` | 1265×900 an 0/0 | 1280×900 |
+| nachher, Transform am Vorfahren **erzwungen** | 1265×900 an 0/0 | 1280×900 |
+
+Die letzte Zeile ist die Gegenprobe: der Fehler kann nicht zurückkommen, solange
+der Dialog nicht mehr unter der Karte hängt. Drei Testsuiten hatten das nicht
+gesehen, weil jsdom kein Layout rechnet; die Zusicherung ist deshalb strukturell
+(`dialog.closest(".fbc-card")` ist `null`, Elternteil ist `document.body`) und
+lief vor dem Fix rot.
+
+Konsole bei allem: leer, keine Fehler, keine Warnungen.
+
+**Zwei Beobachtungen ohne Diff, bewusst nicht selbst entschieden:**
+
+- **Vier Kacheln ergeben ab `sm` ein 3+1-Raster** (`grid-cols-2 sm:grid-cols-3`),
+  die vierte steht allein in der zweiten Zeile. Das Mockup zeigt nie vier, nur
+  drei in einer Reihe. Ein `grid-cols-2` genau bei vier sichtbaren Kacheln wäre
+  ein 2×2 und eine Zeile Diff — es ist aber eine Gestaltungsfrage.
+- **Die Chips tragen den Schlüssel (`#persönlichkeitsentwicklung`), das Mockup
+  das Label ohne Raute („Persönlichkeitsentwicklung") und je Tag eine eigene
+  Farbe.** Gefüllt-gegen-Outline ist die in `design.md` festgehaltene
+  Unterscheidung und trägt; die Schreibweise ist offen.
+
+### 9.3 — offen, und warum
+
+DEV kennt die drei Migrationen dieses Change **nicht**: nachgesehen am
+2026-08-12, `storage.buckets` trägt nur `avatars` und `covers`, `post_media` und
+`tags` fehlen, die höchste Migration ist `20260811090300`. Die Sonde aus 1.0c
+hatte mit einem Wegwerf-Bucket gearbeitet und ihn abgebaut.
+
+Der Beweis „gegen DEV" verlangt also erst einen Schema-Schreibzugriff auf die
+Instanz, die die Live-Seite bedient. Mit Donald am 2026-08-12 so entschieden:
+**9.4–9.6 zuerst lokal, 9.3 danach** — nicht nebenbei mit `db push` auf DEV.

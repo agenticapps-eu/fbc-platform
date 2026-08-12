@@ -380,13 +380,33 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       DEV, mit Screenshot bzw. Statuscode je Zeile:
       `members` → rohe URL kein Bild, Signatur als anon abgelehnt;
       `public` → Bild im ausgeloggten Feed sichtbar.
-- [ ] 9.4 Bild hochladen, mehrere Bilder, Reihenfolge, einzeln löschen — von
-      Hand durchgespielt.
-- [ ] 9.5 Jeder Tag genau einmal; kuratierte und freie unterscheidbar, beide
-      klickbar; Filter funktioniert.
-- [ ] 9.6 Feed in beiden Themes und auf dem Telefon gegen das Mockup gehalten.
+      **Blockiert, nicht vergessen:** DEV kennt die drei Migrationen nicht
+      (nachgesehen 2026-08-12 — nur `avatars`/`covers`, höchste Version
+      `20260811090300`); die Sonde aus 1.0c arbeitete mit einem Wegwerf-Bucket
+      und hat ihn abgebaut. Der Beweis verlangt also erst einen Schema-Schreib-
+      zugriff auf die Instanz, die die Live-Seite bedient. Entscheidung Donald
+      2026-08-12: erst 9.4–9.6 lokal, 9.3 danach. `EVIDENCE.md`.
+- [x] 9.4 Bild hochladen, mehrere Bilder, Reihenfolge, einzeln löschen — von
+      Hand durchgespielt. Sechs Ziffernbilder 1–6, damit die Reihenfolge im Bild
+      ablesbar ist: Nachwählen **erweitert** die Auswahl, „Bild 2 entfernen"
+      nimmt genau 2, das siebte wird benannt abgelehnt, und nach dem Posten
+      trägt `post_media` `sort` 0–5 mit den passenden Maßen. `EVIDENCE.md`.
+- [x] 9.5 Jeder Tag genau einmal; kuratierte und freie unterscheidbar, beide
+      klickbar; Filter funktioniert. Gemessen am schärfsten Fall: `#Netzwerken`
+      im Text **und** als kuratierter Chip gewählt ergibt **einen** Chip; ein mit
+      `ö` getipptes `#Persönlichkeitsentwicklung` wird als kuratiert erkannt
+      (die Falle aus `design.md` fällt nicht). `EVIDENCE.md`.
+- [x] 9.6 Feed in beiden Themes und auf dem Telefon gegen das Mockup gehalten.
       **Erst eine laufende lokale Version zeigen, dann committen** — grüne
       Tests haben in AGE-492 ein visuell falsches Ergebnis durchgewunken.
+      Genau das ist hier eingetreten: die **Lightbox war in der Beitragskarte
+      gefangen** (847×615 statt 1280×900), weil `.fbc-card:hover` einen
+      `transform` setzt und ein transformierter Vorfahr den Bezugsrahmen für
+      `position: fixed` bildet. jsdom rechnet kein Layout, deshalb war das in
+      drei Suiten grün. Behoben mit einem Portal an `document.body`, Zusicherung
+      strukturell und vorher rot, Gegenprobe mit erzwungenem Transform.
+      Zwei Beobachtungen ohne Diff (3+1-Raster bei vier Kacheln, Chip-Schreib-
+      weise) stehen in `EVIDENCE.md` und sind Donalds Entscheidung.
 - [ ] 9.7 QA-Gate (`qa`) auf der Oberfläche.
 
 ## 10 · Abschluss

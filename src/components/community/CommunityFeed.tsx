@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   useInfiniteQuery,
   useMutation,
@@ -875,7 +876,13 @@ function Lightbox({
   }, []);
 
   const bild = media[index];
-  return (
+  // Der Portal ist keine Kosmetik: `.fbc-card:hover` setzt `transform`
+  // (AGE-492), und ein transformierter Vorfahr wird zum Bezugsrahmen für
+  // `position: fixed`. In der Karte gezeichnet schrumpfte dieses Overlay bei
+  // jedem echten Mausklick auf die Kartenfläche (gemessen 847×615 statt
+  // 1280×900). jsdom hat kein Layout, deshalb hat das kein Test gesehen,
+  // sondern die Sichtprobe zu 9.6.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -930,7 +937,8 @@ function Lightbox({
           </button>
         </>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

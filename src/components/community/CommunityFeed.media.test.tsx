@@ -177,6 +177,25 @@ describe("Beitragskarte — Bilder", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("zeichnet die Lightbox außerhalb der Beitragskarte", async () => {
+    // Gefunden in der Sichtprobe zu 9.6, nicht von einem Test: `.fbc-card:hover`
+    // setzt `transform: translateY(-2px)` (AGE-492), und ein transformierter
+    // Vorfahr ist der Bezugsrahmen für `position: fixed`. Die Lightbox schrumpfte
+    // damit auf die Karte — gemessen 847×615 statt 1280×900 —, sobald der Zeiger
+    // beim Klick auf der Karte lag, also bei jedem echten Mausklick.
+    // In jsdom gibt es kein Layout, deshalb ist die Zusicherung strukturell:
+    // zwischen Dialog und Viewport darf keine Karte stehen.
+    postZeilen = [post("p1")];
+    mediaZeilen = media("p1", 5);
+
+    renderFeed();
+    fireEvent.click(await screen.findByRole("button", { name: /bild 4 vergrößern/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.closest(".fbc-card")).toBeNull();
+    expect(dialog.parentElement).toBe(document.body);
+  });
+
   it("ein abgelehntes Bild lässt seine Kachel weg — nie den ganzen Beitrag", async () => {
     // Der Fall aus EVIDENCE.md, Fall F: der Storage lehnt EINZELNE Pfade ab.
     // Ein Beitrag, der deshalb ganz verschwände, wäre die schlechtere Antwort.
