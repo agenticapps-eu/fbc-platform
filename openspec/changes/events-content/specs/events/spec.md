@@ -1,0 +1,421 @@
+## MODIFIED Requirements
+
+### Requirement: Events describe format, timing, host, and capacity
+
+The system SHALL store each event with a non-null `title`, an optional `type`
+constrained to `online`, `presence`, `dinner`, `workshop`, or `mastermind`, a
+**non-null** `starts_at`, an optional `ends_at`, an optional `location`, an
+optional `description`, an optional `cover_path`, optional `topics`, an optional
+`host_id` (a profile) and `host_partner_id` (a partner), a `visibility`
+constrained to `public` or `members` (default `public`), an optional integer
+`capacity`, and a `created_at`. Deleting a referenced host profile or partner
+SHALL null the corresponding host column rather than delete the event.
+
+`starts_at` SHALL be `not null`. An event without a date is meaningless as
+content and breaks the chronological ordering the list and both tabs rely on.
+
+`ends_at` SHALL be constrained by `ends_at is null or ends_at > starts_at`, so
+an event cannot end before it begins while the end remains optional.
+
+`cover_path` SHALL hold a **storage path** into the private bucket
+`event-covers`, never a URL: a private bucket yields no durable URL, only a
+path plus a time-limited signature. It SHALL be `unique`, because the bucket's
+visibility function resolves the owning event through exactly this column and
+two rows on one path would make that answer ambiguous.
+
+`cover_path` SHALL be bound to the writing host: a write SHALL be rejected
+unless the path's first segment equals the caller's uid, or the path is null.
+Uniqueness alone SHALL NOT be relied upon for this, because it stops holding
+the moment the original row is unlinked and the object is left orphaned.
+
+#### Scenario: A foreign cover path is refused on write
+
+- **WHEN** a host sets `cover_path` to a path whose first segment is another
+  member's uid
+- **THEN** the write is rejected
+
+`topics` SHALL be a `text[]` of free-text agenda points for this one event. It
+SHALL NOT reference `public.tags`: those fifteen curated values are an
+editorial list for the activity feed and do not describe an agenda.
+
+#### Scenario: An event is created with a valid type
+
+- **WHEN** a host creates an event with `type = 'workshop'`, a `starts_at` and
+  no `capacity`
+- **THEN** the row is stored with `visibility = 'public'`, unlimited capacity
+  (null), and a generated `id`
+
+#### Scenario: An unsupported type is rejected
+
+- **WHEN** a write sets an event `type` outside the allowed set
+- **THEN** the write is rejected by the type check constraint
+
+#### Scenario: An event without a start is rejected
+
+- **WHEN** a write creates an event with `starts_at` null
+- **THEN** the write is rejected by the not-null constraint
+
+#### Scenario: An end before the start is rejected
+
+- **WHEN** a write sets `ends_at` earlier than or equal to `starts_at`
+- **THEN** the write is rejected by the check constraint
+
+#### Scenario: An open end is accepted
+
+- **WHEN** a write sets `starts_at` and leaves `ends_at` null
+- **THEN** the write is accepted
+
+### Requirement: Registrations are unique per member with tracked status
+
+The system SHALL store each registration with an `event_id`, a `profile_id`, a
+`status` constrained to `registered`, `waitlist`, or `cancelled` (default
+`registered`), a boolean `checked_in` (default false), an optional `rating`
+between 1 and 5, and a `unique (event_id, profile_id)` constraint so a member has
+at most one registration per event. A member SHALL read only their own
+registration rows **from the table**, while the host reads all rows for their
+event.
+
+Attendee identities beyond one's own row SHALL be reachable only through
+`event_attendees(uuid)`. The table-level policy `regs_select_self_or_host`
+SHALL remain unchanged, so `checked_in` and `rating` of a foreign registration
+stay unreadable: row-level security is row-level, not column-level, and opening
+the policy would disclose a member's rating alongside their name.
+
+#### Scenario: Duplicate registration collapses to one row
+
+- **WHEN** a member registers for an event they already have a row for
+- **THEN** no second row is created; the existing row is updated (unique
+  constraint on `event_id, profile_id`)
+
+#### Scenario: Attendee visibility is scoped
+
+- **WHEN** a non-host member queries registrations for an event
+- **THEN** only their own registration row is returned; the host querying the same
+  event sees all attendee rows
+
+#### Scenario: A foreign rating stays unreadable
+
+- **WHEN** a member reads the attendees of an event they do not host
+- **THEN** no `rating` and no `checked_in` value of another member is returned
+
+#### Scenario: Rating is bounded
+
+- **WHEN** a write sets `rating` outside 1..5
+- **THEN** the write is rejected by the rating check constraint
+
+## ADDED Requirements
+
+### Requirement: Attendees of a visible event are resolvable by activated members
+
+The system SHALL expose the attendees of an event through the `SECURITY
+DEFINER` function `event_attendees(uuid)`, which returns `profile_id` and
+`status` for the registrations of the given event, ordered by `created_at`.
+
+The function SHALL return rows only when all of the following hold: the caller
+holds a session, the caller's account is **activated**, and the event's
+`visibility` is `public` or `members` or the caller is its host. It SHALL
+return only registrations with `status = 'registered'` to callers other than
+the host — a cancellation and a waitlist position are nobody else's business —
+while the host SHALL see every status.
+
+The function SHALL return only attendees whose own profile is **public and
+activated**, the same condition `profiles_public` applies. A member who has
+withdrawn from the directory SHALL NOT have their `profile_id` disclosed here:
+a stable UUID on the wire is a disclosure that a "Ein Mitglied" label in the
+interface does not undo, and it correlates with everything else visible about
+that account.
+
+Consequently the attendee **total** MAY exceed the number of resolvable
+attendees. The total SHALL keep coming from `event_registration_counts` and
+SHALL stay complete rather than silently counting only the visible ones.
+
+`execute` SHALL be granted to `authenticated` only. A visitor without a session
+SHALL learn no attendees, not even for a `public` event.
+
+The function SHALL NOT return `checked_in` or `rating`. Those belong to the
+host tooling, which reads them through the unchanged table policy.
+
+#### Scenario: An activated member sees who is coming
+
+- **WHEN** an authenticated, activated member calls `event_attendees` for an
+  event they may see but do not host
+- **THEN** the `profile_id` of every `registered` attendee with a public,
+  activated profile is returned
+
+#### Scenario: A member outside the directory is not disclosed
+
+- **WHEN** an attendee's profile is not public and an activated member calls
+  `event_attendees` for that event
+- **THEN** that attendee's `profile_id` is absent from the result entirely
+
+#### Scenario: An unconfirmed account sees no attendees
+
+- **WHEN** an authenticated member whose account is not yet activated calls
+  `event_attendees` for a visible event
+- **THEN** no rows are returned
+
+#### Scenario: Cancellations and waitlist stay private
+
+- **WHEN** an activated non-host member calls `event_attendees` for an event
+  that has `cancelled` and `waitlist` registrations
+- **THEN** neither is returned, while the host calling the same function
+  receives both
+
+#### Scenario: The table policy is unaffected
+
+- **WHEN** an activated member selects directly from `event_registrations` for
+  an event they do not host
+- **THEN** only their own row is returned, exactly as before
+
+### Requirement: An event cover lives in a private bucket
+
+The system SHALL store event cover images in a storage bucket `event-covers`
+with `public = false`, a `file_size_limit` of 2 MiB and `allowed_mime_types` of
+exactly `image/webp`.
+
+The bucket SHALL be private for the same reason `post-media` is: the visibility
+of the image follows the visibility of its event. A public bucket with
+hard-to-guess paths SHALL NOT count as access control.
+
+Size and type SHALL be stated on the bucket, not only in the form, so a
+hand-built upload cannot bypass them.
+
+Writing SHALL be permitted only within the caller's own `{uid}/` path prefix
+and only for an activated account, matching `avatars`, `covers` and
+`post-media` word for word.
+
+#### Scenario: A non-WebP upload is rejected
+
+- **WHEN** an upload to `event-covers` carries a MIME type other than
+  `image/webp`
+- **THEN** the bucket rejects it
+
+#### Scenario: Writing into a foreign prefix is refused
+
+- **WHEN** an activated member uploads to a path whose first segment is not
+  their own uid
+- **THEN** the write is refused
+
+#### Scenario: An unconfirmed account cannot upload
+
+- **WHEN** an authenticated member whose account is not yet activated uploads a
+  cover
+- **THEN** the write is refused
+
+### Requirement: A cover is exactly as visible as its event
+
+The system SHALL decide readability of an `event-covers` object through the
+`SECURITY DEFINER` function `event_cover_lesbar(text)`, which resolves the
+owning event via `events.cover_path` and mirrors the event's own read rules:
+without a session only `public` events, with a session the activated caller's
+`public` and `members` events plus their own hosted events.
+
+The function SHALL additionally require that the object's first path segment
+equals the resolved event's `host_id`. This is the read-side half of binding a
+cover to its host; it holds for rows the write-side check never saw.
+
+`execute` on the function SHALL be revoked from `PUBLIC` and granted explicitly
+to `anon` and `authenticated`, because a Postgres function is executable by
+`PUBLIC` by default and silently inheriting that would widen privileges.
+
+Because the bucket is private, issuing a signed URL **is** a `select` on
+`storage.objects` under the caller's role; the SELECT policy is therefore the
+whole of the access control, not a listing convenience.
+
+An object with no matching `events.cover_path` row SHALL be readable by nobody.
+
+Signatures SHALL be issued with the same validity C7 chose for post media, so
+a visibility change takes effect on the image with the same known lag as it
+does on a post image.
+
+#### Scenario: A members-event cover is unreachable without a session
+
+- **WHEN** a visitor without a session requests a signed URL for the cover of a
+  `members` event
+- **THEN** the request is refused
+
+#### Scenario: A public-event cover is reachable without a session
+
+- **WHEN** a visitor without a session requests a signed URL for the cover of a
+  `public` event
+- **THEN** the signature is issued and the image is retrievable
+
+#### Scenario: An orphaned object is readable by nobody
+
+- **WHEN** an object exists in `event-covers` that no `events.cover_path`
+  references
+- **THEN** no caller, with or without a session, receives a signature for it
+
+#### Scenario: A stolen path stays unreadable
+
+- **WHEN** an orphaned object belonging to another member's `members` event is
+  referenced by a `public` event whose host is not that member
+- **THEN** no caller receives a signature for it, with or without a session
+
+### Requirement: Covers are signed in one batch per view
+
+The system SHALL obtain signed URLs for event covers through **one** batched
+signing call per view — one for the whole overview list, one for the detail
+page — never one call per tile.
+
+The signature validity and the client-side staleness window SHALL be the values
+C7 chose for post media, reused rather than re-decided, because that number is
+also the lag with which a visibility change reaches an already-rendered image.
+
+The signing query's cache key SHALL be scoped to the principal, since which
+covers can be signed depends on who is asking.
+
+An event whose cover cannot be signed SHALL render the placeholder, exactly as
+an event with no cover does. A single unsignable object SHALL NOT fail the
+whole view.
+
+#### Scenario: One signing call serves the whole list
+
+- **WHEN** an overview with several covered events is rendered
+- **THEN** a single batched signing request is issued, not one per tile
+
+#### Scenario: An unsignable cover degrades to the placeholder
+
+- **WHEN** one event's cover object cannot be signed for this caller
+- **THEN** that tile shows the placeholder and the remaining tiles still show
+  their images
+
+### Requirement: The events overview shows three tiles per row
+
+The system SHALL lay out the event list at three tiles per row on wide
+viewports, degrading to two and then one on narrower ones.
+
+Each tile SHALL show the cover image with the start date as a badge on it, the
+type badge, the title, the time span, the location, the number of attendees and
+a link into the detail page. An event without a cover SHALL render a neutral
+placeholder rather than a collapsed tile.
+
+The attendee **number** on the tile SHALL come from `event_registration_counts`,
+not from `event_attendees`: the overview shows a count, and the count is
+already available to every caller who can see the event.
+
+#### Scenario: A wide viewport shows three tiles
+
+- **WHEN** the events list is rendered at a wide viewport with at least three
+  events
+- **THEN** three tiles sit side by side
+
+#### Scenario: An event without a cover keeps its tile
+
+- **WHEN** an event has no `cover_path`
+- **THEN** the tile renders a placeholder in the cover's place and keeps its
+  height
+
+### Requirement: The event detail page shows the content of the event
+
+The system SHALL render the detail page with the cover as a header carrying the
+start date, the title and type, the time span, the location, the description,
+the topics as a checked list, the host with avatar and a link to their profile,
+the attendee row, the registration control with capacity and waitlist, and
+similar events.
+
+The host block and the attendee row SHALL be rendered **only with a session**.
+Without one, neither `profiles_public` nor `partners` nor `event_attendees`
+SHALL be queried, and the event SHALL appear without host and without
+attendees. This preserves the existing requirement that the event pages resolve
+no hosts without a session; the page SHALL remain reachable either way.
+
+The attendee row SHALL show at most five avatars followed by `+n` for the
+remainder, and SHALL name the total from `event_registration_counts`. Because
+`event_attendees` omits members outside the directory, the total MAY exceed the
+number of avatars and their `+n`; the row SHALL NOT recompute the total from
+the rows it received.
+
+Similar events SHALL be the three next upcoming events of the same `type`,
+excluding the event itself, filled up with the next upcoming events overall
+when fewer than three qualify. They SHALL come from the same query as the
+events list and SHALL be fetched when that query has not run, so a direct link,
+a reload or a bookmark shows them as a navigation from the list would.
+
+Time spans SHALL render as a single range when start and end fall on the same
+day and SHALL name both dates otherwise. An event without `ends_at` SHALL show
+only its start.
+
+#### Scenario: An event with an end shows a span
+
+- **WHEN** an event has `starts_at` and `ends_at` on the same day
+- **THEN** the page shows one date with a start and end time
+
+#### Scenario: An event without an end shows only the start
+
+- **WHEN** an event has no `ends_at`
+- **THEN** the page shows the start date and time and no range
+
+#### Scenario: The total may exceed the visible faces
+
+- **WHEN** an event has attendees whose profiles are not public
+- **THEN** the row names the full total while showing only the resolvable
+  attendees as avatars
+
+#### Scenario: Similar events exclude the current one
+
+- **WHEN** the detail page of an event renders similar events
+- **THEN** the event itself is not among them
+
+#### Scenario: A direct link still shows similar events
+
+- **WHEN** the detail page is opened directly, without the events list having
+  been visited in this session
+- **THEN** similar events are fetched and rendered
+
+#### Scenario: Without a session the page shows no host and no attendees
+
+- **WHEN** a visitor without a session opens a public event's detail page
+- **THEN** neither `profiles_public` nor `partners` nor `event_attendees` is
+  queried
+- **AND** the event renders without host and without an attendee row
+- **AND** the console stays free of `42501`
+
+### Requirement: The event form stays short
+
+The system SHALL require exactly two fields to create an event: the title and
+the start. Type, end, location, capacity, visibility, description, cover and
+topics SHALL all remain optional.
+
+The start SHALL be required in the form because the column is `not null`; a
+form that permits an empty start would fail at the insert instead of at the
+field.
+
+The form SHALL NOT grow a subtitle field. The description carries what a
+subtitle would.
+
+Editing an event without choosing a new image SHALL keep the existing cover.
+Removing a cover SHALL be an explicit action that sets `cover_path` to null;
+it SHALL NOT be reachable by accident through saving the form.
+
+#### Scenario: Saving without a new image keeps the cover
+
+- **WHEN** a host edits an event's title and saves without touching the image
+- **THEN** `cover_path` is unchanged
+
+#### Scenario: Removing the cover is explicit
+
+- **WHEN** a host uses the remove action on the cover and saves
+- **THEN** `cover_path` becomes null and the tile falls back to the placeholder
+
+#### Scenario: Title and start suffice
+
+- **WHEN** a member fills in only the title and the start
+- **THEN** the event can be saved
+
+#### Scenario: A missing start blocks submission
+
+- **WHEN** a member leaves the start empty
+- **THEN** the form refuses to submit and marks the field, rather than sending
+  the insert
+
+### Requirement: The cover upload reuses the existing cropper
+
+The system SHALL crop event covers with the existing `AvatarCropper` at a
+landscape aspect, exporting WebP, rather than introducing a second cropping
+implementation.
+
+#### Scenario: A landscape crop is produced
+
+- **WHEN** a host selects an image for the event cover
+- **THEN** the cropper offers a landscape frame and the export is `image/webp`

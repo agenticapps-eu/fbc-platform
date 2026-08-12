@@ -18,6 +18,7 @@ import {
 } from "../../lib/events";
 import { EventCard } from "./EventCard";
 import { EventForm } from "./EventForm";
+import { useEventCovers } from "./useEventCovers";
 
 /**
  * Events-Übersicht (AGE-251). Drei Reiter: Kommende, Vergangene, Meine Events
@@ -129,13 +130,20 @@ function EventsBody({
   return <Tabs tabs={tabs} />;
 }
 
+/**
+ * Drei Kacheln je Reihe (Entscheidung Meeting 03.08., AGE-531). Vorher standen
+ * hier zwei — das Mockup zeigt vier, entschieden wurden drei; der Schritt ist
+ * also 2 → 3 und nicht, wie im Issue formuliert, 4 → 3.
+ */
 function CardGrid({ events, empty }: { events: EventListItem[]; empty: string }) {
+  // Ein Signieraufruf für die ganze Reiterseite, nicht einer je Kachel.
+  const covers = useEventCovers(events);
   if (events.length === 0) return <p className="text-sm text-muted">{empty}</p>;
   return (
-    <ul className="grid gap-4 sm:grid-cols-2">
+    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {events.map((e) => (
         <li key={e.id}>
-          <EventCard event={e} />
+          <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
         </li>
       ))}
     </ul>

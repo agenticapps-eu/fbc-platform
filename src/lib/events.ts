@@ -19,8 +19,20 @@ export interface EventListItem {
   id: string;
   title: string;
   type: string | null;
+  /**
+   * `events.starts_at` ist seit AGE-531 `not null`. Der Typ bleibt hier
+   * trotzdem tolerant: `partitionEvents`, `isPastEvent` und `formatEventDate`
+   * behandeln null seit AGE-251, und diese Zweige zu entfernen wäre ein Umbau,
+   * den C8 nicht verlangt. Das SCHREIB-Modell (`EventInput`) ist verengt — dort
+   * gehört die Zusicherung hin.
+   */
   startsAt: string | null;
+  endsAt: string | null;
   location: string | null;
+  description: string | null;
+  /** Pfad im privaten Bucket `event-covers`, KEINE URL — siehe `event-cover.ts`. */
+  coverPath: string | null;
+  topics: string[] | null;
   visibility: string;
   capacity: number | null;
   host: EventHost | null;
@@ -84,6 +96,46 @@ export function formatEventDate(startsAt: string | null): string {
   return Number.isNaN(d.getTime()) ? "Termin offen" : `${eventDateTimeFmt.format(d)} Uhr`;
 }
 
+const spanDateFmt = new Intl.DateTimeFormat("de-DE", {
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+const spanTimeFmt = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+/**
+ * „Selber Tag" heißt: derselbe Kalendertag in der Zone des BETRACHTERS. Deshalb
+ * der Vergleich über die lokalen Datumsanteile und nicht über die Differenz in
+ * Millisekunden — an der Sommerzeitgrenze hat ein lokaler Tag 23 oder 25
+ * Stunden, und „weniger als 24 h" wäre dort falsch.
+ */
+function gleicherTag(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Von–Bis eines Events (AGE-531). Drei Formen, in dieser Reihenfolge:
+ * ohne Ende nur der Beginn · gleicher Tag ein Datum mit zwei Uhrzeiten ·
+ * über Mitternacht beide Daten.
+ */
+export function formatEventSpan(startsAt: string | null, endsAt: string | null): string {
+  if (!startsAt) return "Termin offen";
+  const s = new Date(startsAt);
+  if (Number.isNaN(s.getTime())) return "Termin offen";
+  const beginn = `${spanDateFmt.format(s)} · ${spanTimeFmt.format(s)}`;
+  if (!endsAt) return `${beginn} Uhr`;
+  const e = new Date(endsAt);
+  if (Number.isNaN(e.getTime())) return `${beginn} Uhr`;
+  return gleicherTag(s, e)
+    ? `${beginn} – ${spanTimeFmt.format(e)} Uhr`
+    : `${beginn} Uhr – ${spanDateFmt.format(e)} · ${spanTimeFmt.format(e)} Uhr`;
+}
+
 /** ms-Zeit von starts_at; null/ungültig → null. */
 function startMs(startsAt: string | null): number | null {
   if (!startsAt) return null;
@@ -134,6 +186,32 @@ export function selectMyEvents(
   return [...upcoming, ...past];
 }
 
+/**
+ * „Ähnliche Events" der Detailseite (AGE-531): die drei nächsten KOMMENDEN
+ * desselben Typs, das eigene ausgenommen; sind es weniger als drei, wird mit
+ * den nächsten kommenden überhaupt aufgefüllt.
+ *
+ * Reine Funktion über die Liste, die die Seite ohnehin lädt — kein zweiter
+ * Datenweg. Wer sie füttert, muss sicherstellen, dass die Liste geladen IST;
+ * beim Direktaufruf einer Detailseite war sie es nie (Befund aus dem
+ * Plan-Review), deshalb hängt sich die Seite mit `useQuery` an denselben
+ * Schlüssel, statt auf einen gefüllten Cache zu hoffen.
+ */
+export function selectSimilarEvents(
+  events: EventListItem[],
+  event: EventListItem,
+  now: Date,
+  limit = 3,
+): EventListItem[] {
+  const { upcoming } = partitionEvents(
+    events.filter((e) => e.id !== event.id),
+    now,
+  );
+  const gleicherTyp = upcoming.filter((e) => e.type === event.type);
+  const rest = upcoming.filter((e) => e.type !== event.type);
+  return [...gleicherTyp, ...rest].slice(0, limit);
+}
+
 export function remainingSpots(capacity: number | null, registeredCount: number): number | null {
   if (capacity === null) return null;
   return Math.max(0, capacity - registeredCount);
@@ -142,6 +220,18 @@ export function remainingSpots(capacity: number | null, registeredCount: number)
 export function isFull(capacity: number | null, registeredCount: number): boolean {
   if (capacity === null) return false;
   return registeredCount >= capacity;
+}
+
+/**
+ * Ein Gesicht in der Teilnehmerreihe. Bewusst schmaler als `Attendee`: kein
+ * `registrationId`, kein `checkedIn`, kein `rating` — die RPC gibt sie nicht
+ * heraus, und das ist der Punkt.
+ */
+export interface AttendeeFace {
+  profileId: string;
+  name: string;
+  avatarUrl: string | null;
+  status: string;
 }
 
 export interface Attendee {
@@ -158,10 +248,21 @@ export interface Attendee {
 export interface EventInput {
   title: string;
   type: EventType;
-  startsAt: string | null;
+  /** Nicht nullbar: `events.starts_at` ist seit AGE-531 `not null`. */
+  startsAt: string;
+  endsAt: string | null;
   location: string | null;
+  description: string | null;
+  topics: string[] | null;
   capacity: number | null;
   visibility: EventVisibility;
+  /**
+   * `undefined` = unangetastet lassen, `null` = entfernen, String = neu setzen.
+   * Die Unterscheidung ist der Grund, warum das Feld optional ist: ein
+   * Speichern ohne neue Bildauswahl darf das bestehende Titelbild nicht
+   * löschen, und ein Entfernen muss ausdrücklich sein.
+   */
+  coverPath?: string | null;
 }
 
 /**
@@ -174,21 +275,39 @@ export const eventDetailKey = (uid: string | null, id: string) =>
   ["events", "detail", uid, id] as const;
 export const attendeesKey = (uid: string | null, eventId: string) =>
   ["events", "attendees", uid, eventId] as const;
+/**
+ * EIGENER Schlüssel für die öffentliche Teilnehmerreihe — bewusst nicht
+ * `attendeesKey`. Die beiden tragen verschiedene Datenformen: `attendeesKey`
+ * hält die vollen Registrierungszeilen (mit `registrationId`, `checkedIn`,
+ * `rating`) und wird von ZWEI privilegierten Stellen gelesen, `HostTools` und
+ * `RatePanel`. Ein geteilter Schlüssel spielte einer davon die falsche Form
+ * aus und bräche Bewertung oder Check-in.
+ */
+export const eventAttendeesKey = (uid: string | null, eventId: string) =>
+  ["events", "attendee-row", uid, eventId] as const;
 
 interface EventRow {
   id: string;
   title: string;
   type: string | null;
   starts_at: string | null;
+  ends_at: string | null;
   location: string | null;
+  description: string | null;
+  cover_path: string | null;
+  topics: string[] | null;
   visibility: string;
   capacity: number | null;
   host_id: string | null;
   host_partner_id: string | null;
 }
 
+// EINE Zeichenkette, nicht zusammengesetzt: supabase-js leitet die Zeilenform
+// aus dem LITERAL ab. Ein `"a, b" + "c"` ist für den Typprüfer nur `string`,
+// und die Abfrage fiele still auf `GenericStringError` zurück.
+// prettier-ignore
 const EVENT_COLUMNS =
-  "id, title, type, starts_at, location, visibility, capacity, host_id, host_partner_id";
+  "id, title, type, starts_at, ends_at, location, description, cover_path, topics, visibility, capacity, host_id, host_partner_id";
 
 /**
  * Hosts je Event auflösen. Profil-Hosts aus der View `profiles_public`,
@@ -302,7 +421,11 @@ function toItem(
     title: r.title,
     type: r.type,
     startsAt: r.starts_at,
+    endsAt: r.ends_at,
     location: r.location,
+    description: r.description,
+    coverPath: r.cover_path,
+    topics: r.topics,
     visibility: r.visibility,
     capacity: r.capacity,
     host: hosts.get(r.id) ?? null,
@@ -349,6 +472,42 @@ export async function fetchEvent(uid: string | null, id: string): Promise<EventL
   return toItem(row, hosts, counts, statuses);
 }
 
+/**
+ * Die Teilnehmerreihe der Detailseite (AGE-531) über die RPC `event_attendees`.
+ *
+ * Getrennt von `fetchAttendees` und nicht deren Ersatz: jene liest die
+ * Registrierungszeilen direkt und liefert `registrationId`, `checkedIn` und
+ * `rating` — beides braucht der Host (Check-in) bzw. der Teilnehmer selbst
+ * (Bewertung), und beides gibt diese RPC bewusst NICHT heraus, weil RLS
+ * zeilenweise wirkt und eine geöffnete Policy fremde Bewertungen mitliefern
+ * würde.
+ *
+ * Die RPC lässt Mitglieder ohne öffentliches Profil ganz aus. Die Auflösung
+ * über `profiles_public` ist deshalb vollständig; der Ersatztext bleibt für den
+ * Fall eines inzwischen gelöschten Profils.
+ */
+export async function fetchEventAttendees(eventId: string): Promise<AttendeeFace[]> {
+  const { data, error } = await supabase.rpc("event_attendees", { p_event_id: eventId });
+  if (error) throw error;
+  const rows = data ?? [];
+  const ids = [...new Set(rows.map((r) => r.profile_id))];
+  if (ids.length === 0) return [];
+  const { data: pdata } = await supabase
+    .from("profiles_public")
+    .select("id, name, avatar_url")
+    .in("id", ids);
+  const profiles = new Map((pdata ?? []).flatMap((p) => (p.id ? [[p.id, p] as const] : [])));
+  return rows.map((r) => {
+    const p = profiles.get(r.profile_id);
+    return {
+      profileId: r.profile_id,
+      name: p?.name ?? "Ein Mitglied",
+      avatarUrl: p?.avatar_url ?? null,
+      status: r.status,
+    };
+  });
+}
+
 /** Teilnehmerliste eines Events. RLS (regs_select_self_or_host): nur der Host sieht alle. */
 export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
   const { data, error } = await supabase
@@ -388,38 +547,46 @@ export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
   });
 }
 
+/** Die Felder, die Anlegen und Bearbeiten gemeinsam haben. */
+function eventPatch(input: EventInput) {
+  return {
+    title: input.title,
+    type: input.type,
+    starts_at: input.startsAt,
+    ends_at: input.endsAt,
+    location: input.location,
+    description: input.description,
+    topics: input.topics,
+    capacity: input.capacity,
+    visibility: input.visibility,
+  };
+}
+
 /** Legt ein Event an (host_id = self). Gibt die neue Event-ID zurück. */
 export async function createEvent(hostId: string, input: EventInput): Promise<string> {
   const { data, error } = await supabase
     .from("events")
-    .insert({
-      host_id: hostId,
-      title: input.title,
-      type: input.type,
-      starts_at: input.startsAt,
-      location: input.location,
-      capacity: input.capacity,
-      visibility: input.visibility,
-    })
+    .insert({ host_id: hostId, ...eventPatch(input), cover_path: input.coverPath ?? null })
     .select("id")
     .single();
   if (error) throw error;
   return data.id;
 }
 
-/** Aktualisiert ein Event. RLS (events_write_host): nur der Host. */
+/**
+ * Aktualisiert ein Event. RLS (events_write_host): nur der Host, und
+ * `cover_path` muss im eigenen `{uid}/`-Präfix liegen (AGE-531).
+ *
+ * `coverPath === undefined` lässt die Spalte in Ruhe. Ohne diese Unterscheidung
+ * setzte jedes Speichern ohne neue Bildauswahl das Titelbild auf null — ein
+ * Datenverlust, den niemand auslösen wollte.
+ */
 export async function updateEvent(id: string, input: EventInput): Promise<void> {
-  const { error } = await supabase
-    .from("events")
-    .update({
-      title: input.title,
-      type: input.type,
-      starts_at: input.startsAt,
-      location: input.location,
-      capacity: input.capacity,
-      visibility: input.visibility,
-    })
-    .eq("id", id);
+  const patch = { ...eventPatch(input) } as ReturnType<typeof eventPatch> & {
+    cover_path?: string | null;
+  };
+  if (input.coverPath !== undefined) patch.cover_path = input.coverPath;
+  const { error } = await supabase.from("events").update(patch).eq("id", id);
   if (error) throw error;
 }
 

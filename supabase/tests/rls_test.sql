@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(310);
+select plan(342);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2203,6 +2203,281 @@ select is(
 select is(
   (select count(*)::int from public.tags where sort >= 200),
   4, 'Startbefüllung: vier Formate');
+
+-- ── 20. Event-Inhalte: Spalten, Teilnehmer-RPC, Titelbild (AGE-531, C8) ─────
+-- Eigene Sonden statt geliehener Fixtures — dieselbe Begründung wie in §17/§19:
+-- die Bestandskonten tragen Registrierungen und Events aus anderen Abschnitten,
+-- und eine Zählung über sie prüfte am Ende die Nachbarn mit.
+--
+-- Drei Dinge, die dieser Abschnitt belegt und die vorher niemand geprüft hat:
+--
+--  1. `starts_at` ist NOT NULL und `ends_at` liegt dahinter.
+--  2. `event_attendees` gibt die Teilnehmer heraus, ABER weder das
+--     unbestätigte Konto noch ein Mitglied, das nicht im Verzeichnis steht —
+--     geprüft an der ROHEN Antwort, nicht an einem Label im Frontend.
+--  3. Ein Titelbild ist genau so sichtbar wie sein Event, UND ein fremder
+--     Pfad bleibt unlesbar, auch wenn er an einem eigenen `public`-Event hängt.
+--     Das dritte ist der Befund aus dem Plan-Review (codex): die Upload-Policy
+--     beweist Eigentum nur beim Anlegen des OBJEKTS; wer danach die SPALTE
+--     schreibt, prüfte bis hierhin niemand. C7 wehrt denselben Angriff in
+--     `create_post_with_media` ab (20260812090000_post_media.sql:214–240).
+
+insert into auth.users (id, aud, role, email) values
+  ('c8c8c8c8-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'c8host@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a2', 'authenticated', 'authenticated', 'c8zweiterhost@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a3', 'authenticated', 'authenticated', 'c8mitglied@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a4', 'authenticated', 'authenticated', 'c8optout@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a5', 'authenticated', 'authenticated', 'c8unbestaetigt@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a6', 'authenticated', 'authenticated', 'c8warteliste@test.fbc'),
+  ('c8c8c8c8-0000-0000-0000-0000000000a7', 'authenticated', 'authenticated', 'c8abgemeldet@test.fbc');
+
+update public.profiles set tier = 'impact', activated_at = now()
+ where id::text like 'c8c8c8c8-%';
+-- Das unbestätigte Konto: bewusst `impact`, damit hinter dem Gate kein
+-- Stufen-Gate mehr steht, das einen Fehler noch auffinge (wie in §13).
+update public.profiles set activated_at = null
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a5';
+-- Das Opt-out-Konto: bestätigt, aber nicht im Verzeichnis. Genau der Fall, den
+-- der Plan-Review getroffen hat — es geht nicht darum, wie es angezeigt wird,
+-- sondern darum, dass seine UUID gar nicht erst herausgegeben wird.
+update public.profiles set is_public = false
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a4';
+
+insert into public.events (id, title, host_id, visibility, starts_at, cover_path) values
+  ('c8000001-0000-4000-8000-000000000001', 'C8 Mitglieder-Event',
+   'c8c8c8c8-0000-0000-0000-0000000000a1', 'members', now() + interval '7 days',
+   'c8c8c8c8-0000-0000-0000-0000000000a1/members.webp'),
+  ('c8000002-0000-4000-8000-000000000002', 'C8 Öffentliches Event',
+   'c8c8c8c8-0000-0000-0000-0000000000a1', 'public', now() + interval '8 days',
+   'c8c8c8c8-0000-0000-0000-0000000000a1/public.webp'),
+  -- Der Diebstahl, absichtlich AN DER POLICY VORBEI eingesetzt (Superuser).
+  -- Die Frage dieses Abschnitts ist nicht, ob das Schreiben scheitert — das
+  -- prüft 20.2 —, sondern ob das LESEN auch dann noch hält, wenn die Zeile
+  -- trotzdem existiert. Nur so deckt der Test auch Bestand ab.
+  ('c8000003-0000-4000-8000-000000000003', 'C8 Geklautes Titelbild',
+   'c8c8c8c8-0000-0000-0000-0000000000a2', 'public', now() + interval '9 days',
+   'c8c8c8c8-0000-0000-0000-0000000000a1/geklaut.webp');
+
+insert into public.event_registrations (event_id, profile_id, status) values
+  ('c8000001-0000-4000-8000-000000000001', 'c8c8c8c8-0000-0000-0000-0000000000a2', 'registered'),
+  ('c8000001-0000-4000-8000-000000000001', 'c8c8c8c8-0000-0000-0000-0000000000a3', 'registered'),
+  ('c8000001-0000-4000-8000-000000000001', 'c8c8c8c8-0000-0000-0000-0000000000a4', 'registered'),
+  ('c8000001-0000-4000-8000-000000000001', 'c8c8c8c8-0000-0000-0000-0000000000a6', 'waitlist'),
+  ('c8000001-0000-4000-8000-000000000001', 'c8c8c8c8-0000-0000-0000-0000000000a7', 'cancelled');
+
+insert into storage.objects (bucket_id, name) values
+  ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/members.webp'),
+  ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/public.webp'),
+  ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/geklaut.webp'),
+  ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/verwaist.webp');
+
+-- 20.1 Die vier Spalten und ihre Bedingungen.
+select throws_ok(
+  $$insert into public.events (title, host_id, visibility)
+    values ('Ohne Termin', 'c8c8c8c8-0000-0000-0000-0000000000a1', 'public')$$,
+  23502, null, 'events.starts_at: ein Event ohne Termin wird abgelehnt');
+
+select throws_ok(
+  $$insert into public.events (title, host_id, visibility, starts_at, ends_at)
+    values ('Endet vorher', 'c8c8c8c8-0000-0000-0000-0000000000a1', 'public',
+            now() + interval '7 days', now() + interval '6 days')$$,
+  23514, null, 'events_ends_after_start: ein Ende vor dem Beginn wird abgelehnt');
+
+select lives_ok(
+  $$insert into public.events (title, host_id, visibility, starts_at, ends_at)
+    values ('Offenes Ende', 'c8c8c8c8-0000-0000-0000-0000000000a1', 'public',
+            now() + interval '7 days', null)$$,
+  'events.ends_at bleibt optional — ein offenes Ende ist erlaubt');
+
+select throws_ok(
+  $$insert into public.events (title, host_id, visibility, starts_at, cover_path)
+    values ('Derselbe Pfad', 'c8c8c8c8-0000-0000-0000-0000000000a1', 'public',
+            now() + interval '7 days',
+            'c8c8c8c8-0000-0000-0000-0000000000a1/members.webp')$$,
+  23505, null, 'events.cover_path ist unique — zwei Events auf einem Pfad wären mehrdeutig');
+
+-- 20.2 Die Pfadbindung beim SCHREIBEN (Befund codex, HIGH — schreibende Hälfte).
+select is(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a1',
+  $$update public.events
+       set cover_path = 'c8c8c8c8-0000-0000-0000-0000000000a1/neu.webp'
+     where id = 'c8000002-0000-4000-8000-000000000002'$$),
+  'OK', 'events_write_host: der Host setzt einen Pfad in seinem EIGENEN Präfix');
+
+select alike(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a2',
+  $$update public.events
+       set cover_path = 'c8c8c8c8-0000-0000-0000-0000000000a1/fremd.webp'
+     where id = 'c8000003-0000-4000-8000-000000000003'$$),
+  'DENIED:%row-level security%',
+  'events_write_host: ein FREMDES Pfadpräfix wird abgelehnt — der Kern des Befunds');
+
+select is(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a2',
+  $$update public.events set cover_path = null
+     where id = 'c8000003-0000-4000-8000-000000000003'$$),
+  'OK', 'events_write_host: das Titelbild entfernen bleibt erlaubt (cover_path = null)');
+
+-- Aufräumen: 20.2 hat die Sonde verändert; die Signatur-Fälle unten brauchen
+-- den geklauten Pfad zurück. Als Superuser, an der Policy vorbei — siehe oben.
+update public.events
+   set cover_path = 'c8c8c8c8-0000-0000-0000-0000000000a1/geklaut.webp'
+ where id = 'c8000003-0000-4000-8000-000000000003';
+update public.events
+   set cover_path = 'c8c8c8c8-0000-0000-0000-0000000000a1/public.webp'
+ where id = 'c8000002-0000-4000-8000-000000000002';
+
+-- 20.3 event_attendees — wer sieht, wer kommt.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  2, 'event_attendees: das aktivierte Mitglied sieht die beiden angemeldeten Verzeichnis-Profile');
+
+-- Die Zeile daneben belegt, dass die Abfrage überhaupt trägt: derselbe Aufruf
+-- als Host liefert VIER — er gewinnt Warteliste und Abmeldung dazu.
+--
+-- Vier und nicht fünf, weil das Opt-out AUCH vor dem Host steht. Das ist
+-- Absicht und keine Lücke: der Host sieht die fünfte Zeile ohnehin, über die
+-- unveränderte `regs_select_self_or_host` und mit Status und Check-in (das ist
+-- sein Werkzeug). Diese Funktion ist die Avatarreihe im Frontend, und dort hat
+-- ein Mitglied ohne Verzeichnis-Eintrag nichts verloren — auch nicht auf der
+-- Seite des Veranstalters.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a1',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  4, '… der Host dagegen vier: er gewinnt Warteliste und Abmeldung, verliert das Opt-out');
+
+-- Und dass dieser Zugewinn wirklich die Status-Dimension ist und nicht zufällig
+-- dieselbe Zahl: der Host sieht die Wartelisten-Zeile namentlich.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a1',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a6' and status = 'waitlist'$$),
+  1, '… und zwar genau die Wartelisten-Zeile, die dem Nicht-Host fehlt');
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a5',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  0, 'event_attendees: das eingeloggte, NICHT bestätigte Konto sieht niemanden');
+
+-- Der Befund aus dem Plan-Review, an der rohen Antwort geprüft: die UUID des
+-- Opt-out-Mitglieds darf gar nicht erst auf der Leitung stehen. Ein Test gegen
+-- ein Label im Frontend hätte das nie gefunden.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a4'$$),
+  0, 'event_attendees: wer nicht im Verzeichnis steht, dessen UUID wird nicht herausgegeben');
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where status <> 'registered'$$),
+  0, 'event_attendees: Warteliste und Abmeldung bleiben vor Nicht-Hosts verborgen');
+
+select alike(pg_temp.try_as_anon(
+  $$select * from public.event_attendees('c8000002-0000-4000-8000-000000000002')$$),
+  'DENIED:%permission denied%',
+  'event_attendees: ohne Session gibt es keine Teilnehmer, auch nicht beim öffentlichen Event');
+
+-- 20.4 Die Regression, die den Kern der Entscheidung sichert: die Tabelle
+-- selbst bleibt zu. Wäre `regs_select_self_or_host` mit umgebaut worden, wären
+-- `rating` und `checked_in` fremder Zeilen mit herausgefallen.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_registrations
+     where event_id = 'c8000001-0000-4000-8000-000000000001'$$),
+  1, 'regs_select_self_or_host UNVERÄNDERT: direkt an der Tabelle sieht man nur die eigene Zeile');
+
+-- 20.5 event_cover_lesbar — das Titelbild ist so sichtbar wie sein Event.
+select is(pg_temp.bool_as_anon(
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/public.webp')$$),
+  true, 'event_cover_lesbar: ohne Session geht das Bild des ÖFFENTLICHEN Events auf …');
+
+select is(pg_temp.bool_as_anon(
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/members.webp')$$),
+  false, '… und das des Mitglieder-Events nicht (die Zeile darüber belegt, dass die Abfrage trägt)');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/members.webp')$$),
+  true, 'event_cover_lesbar: das aktivierte Mitglied kommt an das Mitglieder-Bild');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a5',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/public.webp')$$),
+  false, 'event_cover_lesbar: das Gate steht auch vor dem Bild eines ÖFFENTLICHEN Events');
+
+select is(pg_temp.bool_as_anon(
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/verwaist.webp')$$),
+  false, 'event_cover_lesbar: ein Objekt ohne Event-Zeile ist für niemanden lesbar');
+
+-- 20.6 Der Diebstahl (Befund codex, HIGH — lesende Hälfte). Das Event ist
+-- `public` und gehört a2; der Pfad trägt das Präfix von a1. Ohne die
+-- Präfix-Prüfung im Lesepfad signierte `anon` hier ein Bild, das nie
+-- öffentlich war.
+select is(pg_temp.bool_as_anon(
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/geklaut.webp')$$),
+  false, 'event_cover_lesbar: ein fremder Pfad an einem eigenen public-Event bleibt zu (anon)');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a2',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/geklaut.webp')$$),
+  false, '… auch für den Dieb selbst, der das Event ja hostet');
+
+-- 20.7 Die Wirkung auf storage.objects — jeweils als Paar (siehe §19).
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from storage.objects where bucket_id = 'event-covers'
+      and name = 'c8c8c8c8-0000-0000-0000-0000000000a1/public.webp'$$),
+  1, 'Storage-Policy: anon sieht das Objekt des öffentlichen Events …');
+
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from storage.objects where bucket_id = 'event-covers'
+      and name = 'c8c8c8c8-0000-0000-0000-0000000000a1/members.webp'$$),
+  0, '… und das des Mitglieder-Events nicht');
+
+-- 20.8 Schreiben in den Bucket. Hier GIBT es einen Fehler, und er ist der Beleg.
+select is(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a1',
+  $$insert into storage.objects (bucket_id, name) values
+     ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/neu.webp')$$),
+  'OK', 'event_cover_insert_own: das bestätigte Mitglied schreibt in sein eigenes Präfix');
+
+select alike(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a2',
+  $$insert into storage.objects (bucket_id, name) values
+     ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a1/kaper.webp')$$),
+  'DENIED:%row-level security%',
+  'event_cover_insert_own: das Präfix eines FREMDEN Mitglieds bleibt zu');
+
+select alike(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a5',
+  $$insert into storage.objects (bucket_id, name) values
+     ('event-covers', 'c8c8c8c8-0000-0000-0000-0000000000a5/eigen.webp')$$),
+  'DENIED:%row-level security%',
+  'event_cover_insert_own: ein nicht bestätigtes Konto lädt kein Titelbild hoch');
+
+-- 20.9 Die Bucket-Einstellungen selbst (Befund codex, MEDIUM). Größe und Typ
+-- stehen SERVERSEITIG am Bucket, nicht nur im Formular. Dass ein zu großer
+-- oder nicht-WebP-Upload tatsächlich abgewiesen wird, kann pgTAP nicht
+-- messen — die Grenzen sitzen im Storage-Dienst; das belegt die Sonde.
+select is(
+  (select public::text || '/' || file_size_limit::text || '/' ||
+          array_to_string(allowed_mime_types, ',')
+     from storage.buckets where id = 'event-covers'),
+  'false/2097152/image/webp',
+  'event-covers: PRIVAT, 2 MiB, nur WebP — anders als covers, das öffentlich ist');
+
+-- 20.10 Die Drift-Sicherung: dieselbe Regel steht jetzt an ACHT Stellen. Jede
+-- Bucket-Sektion zählt ihre eigene (vgl. §17 für covers/avatars, §19 für
+-- post_media) — ohne diese Zeile zählte die Sicherung ab jetzt einen Bucket
+-- zu wenig, ohne dabei rot zu werden.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'event\_cover\_%'
+      and cmd <> 'SELECT'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, 'event-covers trägt drei Schreib-Policies, alle mit dem Aktivierungs-Gate');
+
+-- 20.11 Rechte an den beiden neuen Funktionen. Eine Funktion ist per
+-- Voreinstellung für PUBLIC ausführbar; ohne `revoke` wäre das eine stille
+-- Rechteausweitung (Befund codex, LOW).
+select is(
+  has_function_privilege('anon', 'public.event_attendees(uuid)', 'execute'),
+  false, 'event_attendees: anon darf sie NICHT aufrufen — ausgeloggt gibt es keine Teilnehmer');
+
+select is(
+  has_function_privilege('authenticated', 'public.event_attendees(uuid)', 'execute'),
+  true, '… authenticated schon');
+
+select is(
+  has_function_privilege('anon', 'public.event_cover_lesbar(text)', 'execute'),
+  true, 'event_cover_lesbar: anon MUSS sie aufrufen dürfen, sonst trägt die SELECT-Policy nicht');
 
 select * from finish();
 rollback;

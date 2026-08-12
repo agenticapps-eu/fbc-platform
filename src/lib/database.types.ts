@@ -307,39 +307,55 @@ export type Database = {
         ];
       };
       events: {
+        // AGE-531 (C8), von Hand ergänzt: vier Spalten, und `starts_at` wird
+        // an ALLEN DREI Stellen nicht-nullbar. Nur die Row zu verengen reichte
+        // nicht — der Typvertrag nähme sonst weiterhin genau den Schreibzugriff
+        // an, den `alter column starts_at set not null` verbietet.
         Row: {
           capacity: number | null;
+          cover_path: string | null;
           created_at: string;
+          description: string | null;
+          ends_at: string | null;
           host_id: string | null;
           host_partner_id: string | null;
           id: string;
           location: string | null;
-          starts_at: string | null;
+          starts_at: string;
           title: string;
+          topics: string[] | null;
           type: string | null;
           visibility: string;
         };
         Insert: {
           capacity?: number | null;
+          cover_path?: string | null;
           created_at?: string;
+          description?: string | null;
+          ends_at?: string | null;
           host_id?: string | null;
           host_partner_id?: string | null;
           id?: string;
           location?: string | null;
-          starts_at?: string | null;
+          starts_at: string;
           title: string;
+          topics?: string[] | null;
           type?: string | null;
           visibility?: string;
         };
         Update: {
           capacity?: number | null;
+          cover_path?: string | null;
           created_at?: string;
+          description?: string | null;
+          ends_at?: string | null;
           host_id?: string | null;
           host_partner_id?: string | null;
           id?: string;
           location?: string | null;
-          starts_at?: string | null;
+          starts_at?: string;
           title?: string;
+          topics?: string[] | null;
           type?: string | null;
           visibility?: string;
         };
@@ -1561,6 +1577,15 @@ export type Database = {
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-251). Mirrors
       // 20260615140000_event_rpcs.sql (event registration counts, register, check-in).
+      // AGE-531 (C8): die Teilnehmerreihe. Bewusst OHNE `checked_in` und
+      // `rating` — die bleiben dem Host über regs_select_self_or_host.
+      event_attendees: {
+        Args: { p_event_id: string };
+        Returns: {
+          profile_id: string;
+          status: string;
+        }[];
+      };
       event_registration_counts: {
         Args: { p_event_ids: string[] };
         Returns: {
@@ -1654,12 +1679,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1679,13 +1704,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1704,13 +1728,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1729,13 +1752,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1746,13 +1768,12 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }

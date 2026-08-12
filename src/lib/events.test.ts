@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   eventTypeLabel,
+  formatEventSpan,
   isFull,
   isPastEvent,
   partitionEvents,
   registrationStatusLabel,
   remainingSpots,
   selectMyEvents,
+  selectSimilarEvents,
   VISIBILITY_OPTIONS,
   type EventListItem,
 } from "./events";
@@ -29,7 +31,11 @@ function evt(id: string, startsAt: string | null): EventListItem {
     title: id,
     type: "online",
     startsAt,
+    endsAt: null,
     location: null,
+    description: null,
+    coverPath: null,
+    topics: null,
     visibility: "members",
     capacity: null,
     host: null,
@@ -38,6 +44,91 @@ function evt(id: string, startsAt: string | null): EventListItem {
     myStatus: null,
   };
 }
+
+/**
+ * Lokale Zeit → ISO. Die Tests unten konstruieren ihre Zeitpunkte bewusst so
+ * und nicht als feste UTC-Zeichenketten: „selber Tag" ist eine Frage der Zone
+ * des Betrachters, und diese Suite pinnt keine (vite.config.ts setzt kein TZ).
+ * Ein hartkodiertes `2026-07-29T23:30:00Z` fiele je nach Maschine auf den 29.
+ * oder den 30. — der Test wäre in Berlin grün und in einer UTC-CI rot, ohne
+ * dass sich am Code etwas geändert hätte.
+ */
+function lokal(jahr: number, monat: number, tag: number, std: number, min = 0): string {
+  return new Date(jahr, monat - 1, tag, std, min).toISOString();
+}
+
+describe("formatEventSpan", () => {
+  // Geprüft wird die STRUKTUR, nicht die genaue Zeichenkette: „29. Aug." gegen
+  // „29. Aug" ist eine Frage der ICU-Version der Laufzeit und sagt nichts über
+  // die Regel aus, um die es hier geht — steht das Datum einmal oder zweimal da.
+  it("nennt das Datum EINMAL, wenn Beginn und Ende auf denselben lokalen Tag fallen", () => {
+    const s = formatEventSpan(lokal(2026, 7, 29, 20), lokal(2026, 7, 29, 21, 30));
+    expect(s.match(/29\./g)).toHaveLength(1);
+    expect(s).toContain("20:00");
+    expect(s).toContain("21:30");
+    expect(s).toContain("–");
+  });
+
+  it("nennt BEIDE Daten, wenn das Event über lokale Mitternacht läuft", () => {
+    const s = formatEventSpan(lokal(2026, 7, 29, 22), lokal(2026, 7, 30, 1));
+    expect(s).toContain("29.");
+    expect(s).toContain("30.");
+  });
+
+  it("zeigt ohne Ende nur den Beginn und keinen Gedankenstrich", () => {
+    const s = formatEventSpan(lokal(2026, 7, 29, 20), null);
+    expect(s).toContain("20:00");
+    expect(s).not.toContain("–");
+  });
+
+  it("bleibt an der Sommerzeitgrenze bei einem Tag", () => {
+    // In Europa endet die Sommerzeit am letzten Sonntag im Oktober; an dem Tag
+    // hat der lokale Tag 25 Stunden. Ein Vergleich über die reine Differenz in
+    // Millisekunden („weniger als 24 h ⇒ selber Tag") ginge hier schief.
+    const s = formatEventSpan(lokal(2026, 10, 25, 1), lokal(2026, 10, 25, 23));
+    expect(s.match(/25\./g)).toHaveLength(1);
+  });
+});
+
+describe("selectSimilarEvents", () => {
+  const jetzt = new Date("2026-06-15T12:00:00Z");
+  const typ = (id: string, t: string, tage: number): EventListItem => ({
+    ...evt(id, new Date(jetzt.getTime() + tage * 86400000).toISOString()),
+    type: t,
+  });
+
+  const self = typ("self", "workshop", 1);
+
+  it("nimmt die drei nächsten kommenden desselben Typs", () => {
+    const alle = [
+      self,
+      typ("w1", "workshop", 2),
+      typ("w2", "workshop", 3),
+      typ("w3", "workshop", 4),
+    ];
+    expect(selectSimilarEvents(alle, self, jetzt).map((e) => e.id)).toEqual(["w1", "w2", "w3"]);
+  });
+
+  it("lässt das Event selbst aus", () => {
+    const alle = [self, typ("w1", "workshop", 2)];
+    expect(selectSimilarEvents(alle, self, jetzt).map((e) => e.id)).toEqual(["w1"]);
+  });
+
+  it("füllt mit den nächsten kommenden auf, wenn es zu wenige desselben Typs gibt", () => {
+    const alle = [self, typ("w1", "workshop", 5), typ("d1", "dinner", 2), typ("o1", "online", 3)];
+    // w1 zuerst (gleicher Typ), dann die nächsten überhaupt in Datumsfolge.
+    expect(selectSimilarEvents(alle, self, jetzt).map((e) => e.id)).toEqual(["w1", "d1", "o1"]);
+  });
+
+  it("nimmt keine vergangenen Events", () => {
+    const alle = [self, typ("alt", "workshop", -5), typ("w1", "workshop", 2)];
+    expect(selectSimilarEvents(alle, self, jetzt).map((e) => e.id)).toEqual(["w1"]);
+  });
+
+  it("ist leer, wenn es nur das Event selbst gibt", () => {
+    expect(selectSimilarEvents([self], self, jetzt)).toEqual([]);
+  });
+});
 
 describe("partitionEvents", () => {
   it("splits upcoming (asc) and past (desc), undated counts as upcoming first", () => {
