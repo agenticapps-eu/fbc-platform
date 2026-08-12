@@ -177,6 +177,28 @@ describe("Beitragskarte — Bilder", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("sperrt die Seite dahinter und hält den Fokus im Overlay", async () => {
+    // Anschluss 1 von 4 an `useOverlay` (AGE-529). Der Fokusumlauf steht hier
+    // bewusst NEBEN der Body-Sperre: die Sperre allein wäre auch grün, wenn der
+    // Hook zwar gerufen, sein Ref aber nie an den Container gehängt würde.
+    postZeilen = [post("p1")];
+    mediaZeilen = media("p1", 5);
+
+    renderFeed();
+    fireEvent.click(await screen.findByRole("button", { name: /bild 4 vergrößern/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(document.body.style.position).toBe("fixed");
+
+    const knoepfe = within(dialog).getAllByRole("button");
+    knoepfe[knoepfe.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(knoepfe[0]);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.body.style.position).toBe("");
+  });
+
   it("zeichnet die Lightbox außerhalb der Beitragskarte", async () => {
     // Gefunden in der Sichtprobe zu 9.6, nicht von einem Test: `.fbc-card:hover`
     // setzt `transform: translateY(-2px)` (AGE-492), und ein transformierter

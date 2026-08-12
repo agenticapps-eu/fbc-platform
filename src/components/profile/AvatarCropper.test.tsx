@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { cropGeometry } from "./AvatarCropper";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AvatarCropper, cropGeometry } from "./AvatarCropper";
 
 /**
  * Der Zuschnitt wird über seine GEOMETRIE geprüft, nicht über ein gerendertes
@@ -34,5 +35,50 @@ describe("cropGeometry", () => {
     const geklemmt = g.clamp(9999, -9999, 1);
     expect(geklemmt.x).toBeLessThanOrEqual(0);
     expect(geklemmt.y).toBeGreaterThanOrEqual(g.viewHeight - 1000 * g.baseScale);
+  });
+});
+
+/**
+ * Hier wird nun DOCH gerendert — aber nicht, um zu behaupten, dass es nicht
+ * wirft (der Einwand oben gilt weiter und ist der Grund, warum die Geometrie
+ * getrennt gemessen wird). Gemessen wird die Overlay-Hygiene aus AGE-529, und
+ * die hängt an nichts, was jsdom fehlt: Body-Stile und Fokus sind dort echt.
+ *
+ * Anschluss 2 von 4 an `useOverlay`. Der Fokusumlauf steht neben der Sperre,
+ * weil die Sperre allein auch grün wäre, wenn der Ref nie am Container hinge.
+ */
+describe("AvatarCropper — Overlay-Hygiene", () => {
+  beforeAll(() => {
+    // jsdom kennt weder createObjectURL noch einen 2D-Kontext. Beides wird nur
+    // gebraucht, damit die Komponente überhaupt bis zum Markup kommt; das Bild
+    // lädt in jsdom ohnehin nie, `ready` bleibt false und es wird nichts gezeichnet.
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:x", revokeObjectURL: () => {} });
+  });
+  afterAll(() => vi.unstubAllGlobals());
+
+  function renderCropper() {
+    return render(
+      <AvatarCropper
+        file={new File(["x"], "a.png", { type: "image/png" })}
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+  }
+
+  it("sperrt die Seite dahinter und hält den Fokus im Zuschnitt", () => {
+    const { unmount } = renderCropper();
+
+    expect(document.body.style.position).toBe("fixed");
+
+    const dialog = screen.getByRole("dialog");
+    const knoten = Array.from(dialog.querySelectorAll<HTMLElement>("button, input"));
+    expect(knoten.length).toBeGreaterThan(1);
+    knoten[knoten.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(knoten[0]);
+
+    unmount();
+    expect(document.body.style.position).toBe("");
   });
 });

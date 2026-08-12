@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { submitPlatformFeedback } from "../../lib/feedback";
 import { useAuth } from "../../providers/auth-context";
 import { Button, Textarea, useToast } from "../ui";
+import { useOverlay } from "../ui/useOverlay";
 
 /**
  * QM-Feedback (AGE-300) — Spec §3.5. Schwebender Button, überall im AppShell.
@@ -27,6 +28,11 @@ export function FeedbackButton() {
   const [idea, setIdea] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // VOR dem frühen `return null` unten (AGE-529): stünde der Hook dahinter,
+  // verletzte jeder Wechsel des Anmeldezustands die Hook-Regeln. `Boolean(user)`
+  // in der Bedingung sorgt außerdem dafür, dass ein Sitzungsverlust bei offenem
+  // Panel keine Sperre ohne sichtbares Overlay zurücklässt.
+  const overlay = useOverlay(Boolean(user) && open);
 
   // Ohne Konto ist Feedback nicht speicherbar: feedback.profile_id ist `not null`
   // und feedback_own verlangt profile_id = auth.uid(). Einen Button zu zeigen, der
@@ -69,19 +75,26 @@ export function FeedbackButton() {
 
   return (
     <>
-      {/* bottom-20 (nicht bottom-5): weicht dem Design-Variant-Switcher aus, der bei
+      {/* Unter `sm` schwebt er NICHT (AGE-529): gemessen auf 375×812 lag er über der
+          kuratierten Kachel „Frage", `elementFromPoint` in deren Mitte lieferte
+          „Feedback". Er wird ohnehin nach <main> gerendert — ohne `fixed` fällt er
+          von selbst ans Seitenende. Nicht bloß verschoben: die nächste Kollision
+          wäre dieselbe, und dann misst niemand mehr nach.
+
+          bottom-20 (nicht bottom-5): weicht dem Design-Variant-Switcher aus, der bei
           bottom-4 rechts unten sitzt (DesignSwitcher.tsx, AGE-237). Sobald der Switcher
           nach der Design-Entscheidung entfernt ist, kann das wieder bottom-5 werden. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-5 z-40 rounded-full border border-accent/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+        className="mx-auto mb-8 block rounded-full border border-accent/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong sm:fixed sm:bottom-20 sm:right-5 sm:z-40 sm:mx-0 sm:mb-0"
       >
         Feedback
       </button>
 
       {open && (
         <div
+          ref={overlay}
           className="fixed inset-0 z-50"
           role="dialog"
           aria-modal="true"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Button } from "../ui/Button";
+import { useOverlay } from "../ui/useOverlay";
 
 const VIEW_WIDTH = 288; // Anzeigebreite des Ausschnitts (px) — die Höhe folgt dem Seitenverhältnis
 
@@ -83,6 +84,9 @@ export function AvatarCropper({
   outWidth = 512,
   label = "Avatar zuschneiden",
 }: AvatarCropperProps) {
+  // Nur montiert, solange zugeschnitten wird — daher fest `true` (AGE-529).
+  // Hier stört das Hintergrund-Scrollen am meisten: man ZIEHT in diesem Overlay.
+  const overlay = useOverlay(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
@@ -189,6 +193,7 @@ export function AvatarCropper({
 
   return (
     <div
+      ref={overlay}
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"

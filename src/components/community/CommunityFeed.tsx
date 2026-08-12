@@ -18,6 +18,7 @@ import { Select } from "../ui/Select";
 import { Textarea } from "../ui/Textarea";
 import { TierBadge } from "../ui/TierBadge";
 import { VideoEmbed } from "../ui/VideoEmbed";
+import { useOverlay } from "../ui/useOverlay";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import { displayAuthor } from "../../lib/displayAuthor";
@@ -861,6 +862,10 @@ function Lightbox({
   onSchliessen: () => void;
 }) {
   const schliessen = useRef<HTMLButtonElement>(null);
+  // Die Lightbox ist nur montiert, solange sie offen ist — daher fest `true`
+  // (AGE-529). Sperrt die Seite dahinter und hält den Fokus im Overlay; den
+  // ERSTEN Fokus setzt weiterhin der Effekt unten, aus dem Grund, der dort steht.
+  const overlay = useOverlay(true);
 
   const weiter = (schritt: number) =>
     onIndex((index + schritt + media.length) % media.length);
@@ -895,6 +900,7 @@ function Lightbox({
   // sondern die Sichtprobe zu 9.6.
   return createPortal(
     <div
+      ref={overlay}
       role="dialog"
       aria-modal="true"
       aria-label={`Bild ${index + 1} von ${media.length}`}
