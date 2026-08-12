@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +16,7 @@ import { AuthFixture, authAsTier } from "../../test/auth-fixtures";
  */
 
 let signaturAufrufe: string[][] = [];
+let containsAufrufe: [string, unknown][] = [];
 let postZeilen: Record<string, unknown>[] = [];
 let mediaZeilen: Record<string, unknown>[] = [];
 let abgelehnt: string[] = [];
@@ -40,7 +41,10 @@ vi.mock("../../lib/supabase", () => {
           order: () => kette,
           limit: () => kette,
           or: () => kette,
-          contains: () => kette,
+          contains: (spalte: string, wert: unknown) => {
+            containsAufrufe.push([spalte, wert]);
+            return kette;
+          },
           eq: () => kette,
           in: () => kette,
           then: (auf: (r: { data: unknown; error: null }) => unknown) =>
@@ -107,6 +111,7 @@ function renderFeed() {
 
 beforeEach(() => {
   signaturAufrufe = [];
+  containsAufrufe = [];
   postZeilen = [];
   mediaZeilen = [];
   abgelehnt = [];
@@ -179,5 +184,32 @@ describe("Beitragskarte — Chips und Sichtbarkeit", () => {
 
     await screen.findByText(/Erlebnistag/);
     expect(screen.getByText(/nur für mitglieder/i)).toBeInTheDocument();
+  });
+});
+
+describe("Tag-Filterleiste", () => {
+  it("zeigt die aktiven kuratierten Tags und filtert den Feed beim Klick", async () => {
+    postZeilen = [post("p1")];
+
+    renderFeed();
+    await screen.findByText(/Erlebnistag/);
+
+    // Die Leiste trägt das LABEL, die Chips am Beitrag den normalisierten Wert.
+    fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
+
+    // Der bestehende Weg, unverändert: `.contains("hashtags", […])` (8.2).
+    await waitFor(() => expect(containsAufrufe).toContainEqual(["hashtags", ["netzwerken"]]));
+    expect(screen.getByText(/gefiltert nach/i)).toBeInTheDocument();
+  });
+
+  it("unterscheidet im leeren Zustand „nichts da“ von „nichts zu diesem Filter“", async () => {
+    postZeilen = [];
+
+    renderFeed();
+    expect(await screen.findByText(/noch keine beiträge/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
+
+    expect(await screen.findByText(/keine beiträge mit diesem hashtag/i)).toBeInTheDocument();
   });
 });

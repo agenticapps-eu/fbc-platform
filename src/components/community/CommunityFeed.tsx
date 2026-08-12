@@ -121,23 +121,32 @@ export default function CommunityFeed() {
     <section className="space-y-6">
       {user && <PostComposer authorId={user.id} />}
 
-      {hashtag && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted">Gefiltert nach</span>
-          <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
-            #{hashtag}
-          </span>
-          <button
-            type="button"
-            onClick={() => setHashtag(null)}
-            className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Filter entfernen
-          </button>
-        </div>
-      )}
+      {/* Die Leiste steht im Markup VOR dem Feed: auf dem Telefon liegt sie
+          damit über ihm, auf großen Schirmen schiebt sie das Raster in die
+          rechte Spalte (Mockup). */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <aside className="lg:col-start-2 lg:row-start-1">
+          <TagFilter tags={tags.data ?? []} aktiv={hashtag} onWaehlen={setHashtag} />
+        </aside>
 
-      <FeedList
+        <div className="space-y-6 lg:col-start-1 lg:row-start-1">
+          {hashtag && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted">Gefiltert nach</span>
+              <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
+                #{hashtag}
+              </span>
+              <button
+                type="button"
+                onClick={() => setHashtag(null)}
+                className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Filter entfernen
+              </button>
+            </div>
+          )}
+
+          <FeedList
         posts={posts}
         isLoading={feed.isLoading}
         isError={feed.isError}
@@ -148,11 +157,62 @@ export default function CommunityFeed() {
         activeHashtag={hashtag}
         onHashtag={setHashtag}
         mentionResolver={mentionResolver}
-        bildUrls={bildUrls}
-        onBildFehler={onBildFehler}
-        kuratierteTags={tags.data ?? []}
-      />
+            bildUrls={bildUrls}
+            onBildFehler={onBildFehler}
+            kuratierteTags={tags.data ?? []}
+          />
+        </div>
+      </div>
     </section>
+  );
+}
+
+// ── Tag-Filterleiste ────────────────────────────────────────────────────────
+
+/**
+ * Die kuratierten Tags als Filter (AGE-528). Bewusst EINE Auswahl zur Zeit:
+ * der Feed filtert über `.contains("hashtags", [tag])`, und mehrere Tags wären
+ * eine andere Abfrage — nicht eine andere Leiste. Ein zweiter Klick auf
+ * denselben Tag hebt den Filter auf.
+ *
+ * „Beliebte Tags" mit Zählern und „Aktivste Mitglieder" aus dem Mockup gehören
+ * NICHT hierher (Non-goals): die rechte Spalte trägt in dieser Fassung nur den
+ * Filter.
+ */
+function TagFilter({
+  tags,
+  aktiv,
+  onWaehlen,
+}: {
+  tags: Tag[];
+  aktiv: string | null;
+  onWaehlen: (tag: string | null) => void;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-sm font-semibold text-ink">Tags</h2>
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((tag) => {
+          const gewaehlt = aktiv === tag.key;
+          return (
+            <button
+              key={tag.key}
+              type="button"
+              aria-pressed={gewaehlt}
+              onClick={() => onWaehlen(gewaehlt ? null : tag.key)}
+              className={`rounded-full px-2.5 py-0.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                gewaehlt
+                  ? "bg-accent text-chrome"
+                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
+              }`}
+            >
+              {tag.label}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -333,7 +393,7 @@ function PostComposer({ authorId }: { authorId: string }) {
       </div>
 
       {(tags.data ?? []).length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Tags für diesen Beitrag" className="flex flex-wrap gap-2">
           {(tags.data ?? []).map((tag) => {
             const aktiv = gewaehlteTags.includes(tag.key);
             return (

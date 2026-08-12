@@ -340,13 +340,22 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 8 · Tag-Filterleiste
 
-- [ ] 8.1 Sichtbare Leiste mit den aktiven kuratierten Tags, rechte Spalte nach
+- [x] 8.1 Sichtbare Leiste mit den aktiven kuratierten Tags, rechte Spalte nach
       Mockup — **nur der Filter**, nicht „Beliebte Tags" mit Zählern und nicht
       „Aktivste Mitglieder" (siehe Non-goals).
-- [ ] 8.2 Der bestehende Chip-Klick-Filter arbeitet unverändert weiter.
-- [ ] 8.3 Leerer Zustand aus C2 greift weiterhin und unterscheidet „nichts da"
+      **Eine Auswahl zur Zeit**, nicht die Kästchen des Mockups: der Feed
+      filtert über `.contains("hashtags", [tag])`, mehrere Tags wären eine
+      andere Abfrage — nicht eine andere Leiste. Ein zweiter Klick hebt auf.
+- [x] 8.2 Der bestehende Chip-Klick-Filter arbeitet unverändert weiter.
+      Zugesichert am aufgezeichneten `.contains`-Aufruf, nicht am Ergebnis:
+      der Filter läuft in der Datenbank, nicht im Client.
+- [x] 8.3 Leerer Zustand aus C2 greift weiterhin und unterscheidet „nichts da"
       von „nichts zu diesem Filter".
-- [ ] 8.4 Auf dem Telefon: die Leiste liegt über dem Feed, nicht daneben.
+- [x] 8.4 Auf dem Telefon: die Leiste liegt über dem Feed, nicht daneben.
+      Die Leiste steht **im Markup vor** dem Feed und wird erst ab `lg` per
+      `col-start-2 / row-start-1` in die rechte Spalte gehoben. Das ist eine
+      reine Layout-Aussage — in jsdom nicht messbar und deshalb bewusst OHNE
+      Test; sie gehört in die Sichtprobe (9.6).
 
 ## 9 · Abnahme
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -126,7 +126,10 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
     waehleBilder(foto("a.jpg"), foto("b.jpg"));
     await screen.findByRole("button", { name: /bild 1 entfernen/i });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Netzwerken" }));
+    // Ausdrücklich im Composer: dieselben Tags stehen seit Block 8 auch in der
+    // Filterleiste, und ein unqualifiziertes `getByRole` fände beide.
+    const tagAuswahl = await screen.findByRole("group", { name: /tags für diesen beitrag/i });
+    fireEvent.click(within(tagAuswahl).getByRole("button", { name: "Netzwerken" }));
     fireEvent.click(screen.getByRole("button", { name: /posten/i }));
 
     await waitFor(() => expect(rpcAufrufe).toHaveLength(1));
