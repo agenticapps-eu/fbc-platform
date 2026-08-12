@@ -188,10 +188,15 @@ auth.uid())` (spiegelt `events_select_by_visibility`); **und in jedem
 ## 4 · Migrationen anwenden
 
 - [x] 4.1 Lokal: `supabase db reset`, alle drei laufen sauber durch, pgTAP grün.
-- [ ] 4.2 **Gegen DEV** (`foelowldexkcqzewvrcf`, Zielprojekt vorher nennen):
+- [ ] 4.2 **OFFEN — bewusst.** **Gegen DEV** (`foelowldexkcqzewvrcf`, Zielprojekt vorher nennen):
       `pnpm db:push`. Danach nochmals `supabase test db` gegen DEV, nicht nur
       lokal — ein grüner lokaler Lauf sagt nichts über DEV, wenn die
       Supabase-Versionen auseinanderliegen (Befund aus dem C7-Plan-Review).
+      **Warum noch nicht gelaufen:** DEV ist das Projekt hinter
+      `fbc-platform.pages.dev`. `starts_at set not null` bricht „Event anlegen"
+      im Frontend, solange dort der Termin optional ist. Der Code ist jetzt
+      gemerged, also gehören Migration und Deploy zusammen raus — die
+      Reihenfolge ist `db push` → Frontend-Deploy, nicht umgekehrt.
 - [ ] 4.3 **Merken für später:** `migrate-dev` wendet Migrationen auf DEV selbst
       an; danach überspringt `drift-gate` **jeden** Frontend-Deploy, bis
       `migrate-prod` gelaufen ist. Der Deploy danach geht nur per
@@ -356,16 +361,21 @@ supabase/tests/grants_test.sql` grün, **mit** Pfadliste.
 - [x] 9.5 **Mechanik unversehrt**, am laufenden Stack durchgespielt, nicht nur
       im Test: anmelden · Warteliste bei voller Kapazität · abmelden ·
       Check-in als Host · bewerten nach dem Event · alle drei Reiter.
-- [ ] 9.6 Code-Review auf dem **Diff** (Schritt 4), unabhängig vom Verfasser.
+- [x] 9.6 Code-Review auf dem **Diff** (Schritt 4), unabhängig vom Verfasser.
+      codex, `DIFF-REVIEWS.md`: vier Befunde, alle übernommen — darunter ein
+      echter Fehler (der Host sah Abmeldungen als Teilnehmer).
 - [x] 9.7 `openspec validate --all` grün.
 
 ## 10 · Abschluss
 
-- [ ] 10.1 Commit(s) nach Conventional Commits mit `(AGE-531)`.
-- [ ] 10.2 PR gegen `main`. Vier Pflichtchecks auf der **HEAD-SHA** prüfen
-      (`gh pr view --json state` nach dem Merge — `gh pr merge` kann still
-      fehlschlagen, und ein `; echo "merged"` täuscht Erfolg vor).
-- [ ] 10.3 `openspec archive`. **Szenario-Titel in den MODIFIED-Blöcken exakt
+- [x] 10.1 Drei Commits: `f3ec42b`, `dce905f`, `f4c620b`.
+- [x] 10.2 PR #166, gemerged als `5c90f6e`. Alle Checks auf der HEAD-SHA
+      `f4c620b` grün (verify · migrations · edge-functions · pr-title · deploy);
+      `edge-functions` war einmal rot durch `socket hang up` beim Deno-Download
+      und lief nach `gh run rerun --failed` durch. Merge über
+      `gh pr view --json state` geprüft: `MERGED`.
+- [x] 10.3 `openspec archive` — 8 ADDED, 2 MODIFIED in `openspec/specs/events/`.
+      `openspec archive`. **Szenario-Titel in den MODIFIED-Blöcken exakt
       wie im Bestand lassen** — ein umgetaufter Titel löscht das alte Szenario,
       und `validate` bleibt dabei grün; nur `archive` bricht ab.
 - [ ] 10.4 Linear-Status **erst lesen** (`get_issue`), dann entscheiden, ob
