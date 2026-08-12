@@ -19,6 +19,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 let angefragt: string[] = [];
+/**
+ * Welche SPALTEN wurden je Relation angefragt? Der Mock verwarf das Argument
+ * von `select()` bisher — eine Fixture beantwortet dann jede Projektion gleich,
+ * und ein entfernter Spaltenname fiele niemandem auf. Befund aus dem
+ * Diff-Review zum Layout-Nachzug (AGE-531).
+ */
+let spalten: Record<string, string> = {};
 
 const AUTOR = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -59,9 +66,26 @@ const ZEILEN: Record<string, Record<string, unknown>[]> = {
     },
   ],
   profiles_public: [
-    { id: AUTOR, name: "Jonas Keller", avatar_url: "https://x/a.webp", tier: "impact" },
+    {
+      id: AUTOR,
+      name: "Jonas Keller",
+      avatar_url: "https://x/a.webp",
+      tier: "impact",
+      // Seit dem Layout-Nachzug zu AGE-531 wählt `hostsFor` drei Spalten mehr
+      // aus derselben Abfrage; sie füllen die Veranstalter-Karte.
+      company: "Keller GmbH",
+      roles: ["Gründer"],
+      short_bio: "Baut Dinge.",
+    },
   ],
-  partners: [{ id: PARTNER, name: "Musterpartner", logo_url: "https://x/p.png" }],
+  partners: [
+    {
+      id: PARTNER,
+      name: "Musterpartner",
+      logo_url: "https://x/p.png",
+      description: "Ein Partner.",
+    },
+  ],
   post_media: [],
   event_registrations: [],
   comments: [
@@ -81,7 +105,10 @@ vi.mock("./supabase", () => ({
       angefragt.push(table);
       const daten = () => ZEILEN[table] ?? [];
       const kette: Record<string, unknown> = {
-        select: () => kette,
+        select: (spalte?: string) => {
+          if (typeof spalte === "string") spalten[table] = spalte;
+          return kette;
+        },
         order: () => kette,
         limit: () => kette,
         or: () => kette,
@@ -103,6 +130,7 @@ import { fetchEvent, fetchEvents } from "./events";
 
 beforeEach(() => {
   angefragt = [];
+  spalten = {};
 });
 
 /**
@@ -203,6 +231,17 @@ describe("Events — Hosts", () => {
     expect(angefragt).not.toContain("partners");
   });
 
+  it("fragt die Spalten an, die die Veranstalter-Karte braucht", async () => {
+    // Ohne diese Zeile wäre die Fixture-Erweiterung eine Behauptung: der Mock
+    // liefert seine Felder unabhängig davon, was `select()` verlangt hat. Fällt
+    // eine Spalte aus der Projektion, verliert die Karte still ihre Zeile.
+    await fetchEvents("me");
+    expect(spalten.profiles_public).toContain("company");
+    expect(spalten.profiles_public).toContain("roles");
+    expect(spalten.profiles_public).toContain("short_bio");
+    expect(spalten.partners).toContain("description");
+  });
+
   it("löst eingeloggt beide Host-Arten unverändert auf", async () => {
     const events = await fetchEvents("me");
 
@@ -214,6 +253,9 @@ describe("Events — Hosts", () => {
       name: "Jonas Keller",
       avatarUrl: "https://x/a.webp",
       tier: "impact",
+      company: "Keller GmbH",
+      roles: ["Gründer"],
+      shortBio: "Baut Dinge.",
     });
     expect(events[1].host).toEqual({
       kind: "partner",
@@ -221,6 +263,9 @@ describe("Events — Hosts", () => {
       name: "Musterpartner",
       avatarUrl: "https://x/p.png",
       tier: null,
+      company: null,
+      roles: null,
+      shortBio: "Ein Partner.",
     });
   });
 });

@@ -145,7 +145,16 @@ describe("partitionEvents", () => {
 describe("selectMyEvents", () => {
   const hosted = {
     ...evt("hosted", "2026-07-01T10:00:00Z"),
-    host: { kind: "profile" as const, id: "me", name: "Ich", avatarUrl: null, tier: null },
+    host: {
+      kind: "profile" as const,
+      id: "me",
+      name: "Ich",
+      avatarUrl: null,
+      tier: null,
+      company: null,
+      roles: null,
+      shortBio: null,
+    },
   };
   const booked = { ...evt("booked", "2026-06-20T10:00:00Z"), myStatus: "registered" as const };
   const waitlisted = {
@@ -174,7 +183,16 @@ describe("selectMyEvents", () => {
   it("ist ohne Login leer — ein Partner-Host ist nie „meins“", () => {
     const partnerHosted = {
       ...evt("partner", "2026-07-01T10:00:00Z"),
-      host: { kind: "partner" as const, id: "me", name: "P", avatarUrl: null, tier: null },
+      host: {
+        kind: "partner" as const,
+        id: "me",
+        name: "P",
+        avatarUrl: null,
+        tier: null,
+        company: null,
+        roles: null,
+        shortBio: null,
+      },
     };
     expect(selectMyEvents([hosted, booked], null, now)).toEqual([]);
     expect(selectMyEvents([partnerHosted], "me", now)).toEqual([]);

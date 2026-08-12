@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
@@ -144,11 +144,114 @@ describe("EventDetailPage — Teilnehmerreihe", () => {
   });
 });
 
+describe("EventDetailPage — Layout nach Mockup", () => {
+  const host = {
+    kind: "profile" as const,
+    id: "h1",
+    name: "Detlev Krause",
+    avatarUrl: null,
+    tier: "impact",
+    company: "DK Real Invest eG",
+    roles: ["Vorstand"],
+    shortBio: "Deal Keeper und Vorstand der DK Real Invest eG.",
+  };
+
+  it("zeigt die Sichtbarkeit als Satz, nicht als Rohwert", async () => {
+    // Die Frage stellt sich genau dann, wenn jemand ans Anmelden denkt. Das
+    // Mockup führt die Zeile; die erste Fassung sagte dazu gar nichts.
+    mEvent.mockResolvedValue(evt({ visibility: "members" }));
+    renderPage(true);
+    expect(await screen.findByText(/Nur für Mitglieder sichtbar/)).toBeInTheDocument();
+  });
+
+  it("sagt bei einem öffentlichen Event: sichtbar, nicht offen für Mitglieder", async () => {
+    // Der Wortlaut ist zweimal wichtig: ein `public`-Event sieht man AUCH OHNE
+    // Session (nicht nur „alle Mitglieder"), und die Zeile darf nichts über die
+    // Anmeldeberechtigung versprechen — die verlangt bei `members` zusätzlich
+    // mindestens `discover`. Befund aus dem Diff-Review.
+    mEvent.mockResolvedValue(evt({ visibility: "public" }));
+    renderPage(true);
+    expect(await screen.findByText(/Öffentlich sichtbar/)).toBeInTheDocument();
+    expect(screen.queryByText(/Offen für alle Mitglieder/)).not.toBeInTheDocument();
+  });
+
+  it("nennt die Teilnehmerzahl auch ohne Session", async () => {
+    // Vor dem Layout-Nachzug stand sie in der Definitionsliste; danach nur noch
+    // in der Teilnehmer-Karte, die es ohne Session nicht gibt. Ein ausgeloggter
+    // Besucher sah damit gar keine Zahl mehr (Befund aus dem Diff-Review).
+    mEvent.mockResolvedValue(evt({ registeredCount: 12, capacity: null, visibility: "public" }));
+    renderPage(false);
+    expect(await screen.findByText(/12 Teilnehmer · Plätze unbegrenzt/)).toBeInTheDocument();
+  });
+
+  it("lässt bei einem vergangenen Event ohne Teilnahme keine leere Spalte stehen", async () => {
+    // Im Browser gesehen: eine Trennlinie und 288 px Leerraum rechts im Hero,
+    // weil `RegistrationPanel` für diesen Fall `null` liefert, die Rasterspur
+    // aber stehen blieb (Befund aus dem Diff-Review).
+    mEvent.mockResolvedValue(
+      evt({ startsAt: new Date(Date.now() - 10 * 86400000).toISOString(), endsAt: null }),
+    );
+    const { container } = renderPage(true);
+    await screen.findByRole("heading", { level: 1, name: "FBC Online-Treffen" });
+    const hero = container.querySelector(".grid.gap-6") as HTMLElement;
+    expect(hero.className).not.toMatch(/grid-cols-\[1fr_18rem\]/);
+    expect(hero.children).toHaveLength(1);
+  });
+
+  it("gibt dem Veranstalter eine Karte mit Rolle, Firma und Kurzbio", async () => {
+    mEvent.mockResolvedValue(evt({ host }));
+    renderPage(true);
+    // Auf die Karte eingrenzen: „DK Real Invest eG" steht auch in der Kurzbio,
+    // eine Seiten-weite Suche fände zwei Treffer und sagte nichts über den Ort.
+    const karte = (await screen.findByRole("heading", { name: "Veranstalter" }))
+      .parentElement as HTMLElement;
+    expect(within(karte).getByText(/Vorstand · DK Real Invest eG/)).toBeInTheDocument();
+    expect(within(karte).getByText(/Deal Keeper und Vorstand/)).toBeInTheDocument();
+    expect(within(karte).getByRole("link", { name: /Profil ansehen/ })).toHaveAttribute(
+      "href",
+      "/p/h1",
+    );
+  });
+
+  it("lässt bei einem Host ohne Firma und Bio keine leeren Zeilen stehen", async () => {
+    mEvent.mockResolvedValue(
+      evt({ host: { ...host, company: null, roles: null, shortBio: null } }),
+    );
+    renderPage(true);
+    const karte = (await screen.findByRole("heading", { name: "Veranstalter" }))
+      .parentElement as HTMLElement;
+    expect(within(karte).queryByText(/DK Real Invest/)).not.toBeInTheDocument();
+    expect(within(karte).queryByText(/Deal Keeper/)).not.toBeInTheDocument();
+    // Name und „Profil ansehen" bleiben — die Karte ist nicht leer, nur knapp.
+    expect(within(karte).getByText("Detlev Krause")).toBeInTheDocument();
+    expect(within(karte).getByRole("link", { name: /Profil ansehen/ })).toBeInTheDocument();
+  });
+
+  it("verlinkt von den ähnlichen Events auf die volle Liste", async () => {
+    const self = evt();
+    const anderes = evt({
+      id: "e2",
+      title: "Zweites Treffen",
+      startsAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+      endsAt: null,
+    });
+    mEvent.mockResolvedValue(self);
+    mEvents.mockResolvedValue([self, anderes]);
+    renderPage(true);
+    expect(await screen.findByRole("link", { name: /Alle Events anzeigen/ })).toHaveAttribute(
+      "href",
+      "/events",
+    );
+  });
+});
+
 describe("EventDetailPage — ohne Session", () => {
   it("fragt weder Teilnehmer noch Host ab, zeigt das Event aber", async () => {
     mEvent.mockResolvedValue(evt({ registeredCount: 12, visibility: "public" }));
     renderPage(false);
-    expect(await screen.findByText("FBC Online-Treffen")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "FBC Online-Treffen" }),
+    ).toBeInTheDocument();
     expect(mFaces).not.toHaveBeenCalled();
     expect(screen.queryByText(/^Teilnehmer \(/)).not.toBeInTheDocument();
   });
@@ -168,9 +271,11 @@ describe("EventDetailPage — ähnliche Events", () => {
     renderPage(true);
     expect(await screen.findByText("Ähnliche Events")).toBeInTheDocument();
     expect(screen.getByText("Zweites Online-Treffen")).toBeInTheDocument();
-    // Der Titel des eigenen Events steht genau EINMAL auf der Seite — als
-    // Überschrift, nicht zusätzlich als Kachel unter „Ähnliche Events".
-    expect(screen.getAllByText("FBC Online-Treffen")).toHaveLength(1);
+    // Schärfer als eine Textzählung (der Titel steht seit der Brotkrume zweimal
+    // auf der Seite): es gibt KEINEN Link auf das eigene Event. Genau das ist
+    // gemeint — eine Kachel ist ein Link auf `/events/<id>`.
+    expect(screen.queryByRole("link", { name: /FBC Online-Treffen/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Zweites Online-Treffen/ })).toBeInTheDocument();
   });
 
   it("signiert Header und ähnliche Events in EINEM Stapel", async () => {
@@ -201,7 +306,7 @@ describe("EventDetailPage — ähnliche Events", () => {
     // nichts.
     mEvent.mockResolvedValue(evt());
     renderPage(true);
-    await screen.findByText("FBC Online-Treffen");
+    await screen.findByRole("heading", { level: 1, name: "FBC Online-Treffen" });
     expect(mEvents).toHaveBeenCalled();
   });
 });
