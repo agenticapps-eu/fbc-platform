@@ -18,6 +18,7 @@ function makePost(body: string): FeedPost {
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
+    media: [],
   };
 }
 

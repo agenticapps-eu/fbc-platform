@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Avatar } from "../ui/Avatar";
@@ -14,20 +21,31 @@ import { VideoEmbed } from "../ui/VideoEmbed";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import { displayAuthor } from "../../lib/displayAuthor";
+import { shrinkToWebp } from "../../lib/image";
+import {
+  bildLayout,
+  signaturQueryKey,
+  signPostMedia,
+  SIGNATUR_STALE_MS,
+  uploadPostMedia,
+} from "../../lib/post-media";
+import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
 import {
   addComment,
   buildMentionResolver,
   commentsQueryKey,
-  createPost,
+  createPostWithMedia,
   extractFirstVideo,
   feedListKey,
-  feedQueryKey,
+  feedSeitenKey,
   fetchComments,
   fetchFeed,
   parseVideoUrl,
   toggleLike,
   tokenizePostBody,
   VISIBILITY_OPTIONS,
+  type FeedCursor,
+  type FeedMedia,
   type FeedPost,
   type MentionResolver,
   type PostSegment,
@@ -45,72 +63,261 @@ export default function CommunityFeed() {
   const uid = user?.id ?? null;
   const [hashtag, setHashtag] = useState<string | null>(null);
 
-  const feed = useQuery({
-    queryKey: feedQueryKey(uid, hashtag),
-    queryFn: () => fetchFeed({ uid, hashtag }),
+  // Seitenweise (AGE-528): eine feste Obergrenze ohne Nachladen wäre mit Bildern
+  // eine stille Kappung — ältere Beiträge blieben unauffindbar. Der Cursor läuft
+  // über (created_at, id), siehe lib/feed.ts.
+  const feed = useInfiniteQuery({
+    queryKey: feedSeitenKey(uid, hashtag),
+    queryFn: ({ pageParam }) => fetchFeed({ uid, hashtag, cursor: pageParam }),
+    initialPageParam: null as FeedCursor | null,
+    getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
   });
+  const posts = useMemo(
+    () => (feed.data?.pages ?? []).flatMap((seite) => seite.posts),
+    [feed.data],
+  );
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
   // Treffer wird zum Profil-Link, sonst bleibt es dezenter Akzent-Text (kein Fake-Link).
-  const mentionResolver = useMemo(
-    () => buildMentionResolver((feed.data ?? []).map((p) => p.author)),
-    [feed.data],
+  const mentionResolver = useMemo(() => buildMentionResolver(posts.map((p) => p.author)), [posts]);
+
+  // Signaturen JE SEITE, nicht je Bild und nicht für alles zusammen: der Token
+  // steckt in der URL, und ein Schlüssel über alle geladenen Seiten würde beim
+  // Nachladen auch die alten Bilder neu signieren — der Browser lüde sie dann
+  // erneut. Je Seite bleibt die Zeichenkette stabil, solange die Seite es ist.
+  const signaturen = useQueries({
+    queries: (feed.data?.pages ?? []).map((seite) => {
+      const pfade = seite.posts.flatMap((p) => p.media.map((m) => m.storagePath));
+      return {
+        queryKey: signaturQueryKey(pfade),
+        queryFn: () => signPostMedia(pfade),
+        enabled: pfade.length > 0,
+        staleTime: SIGNATUR_STALE_MS,
+      };
+    }),
+  });
+  const bildUrls: Record<string, string> = Object.assign(
+    {},
+    ...signaturen.map((q) => q.data ?? {}),
   );
+
+  // Zwischen `staleTime` (50 min) und Ablauf (60 min) liegt ein Fenster, in dem
+  // ein offen gelassener Tab eine abgelaufene URL hält und das Bild 403 liefert.
+  // Dann wird nachsigniert.
+  //
+  // Der Wächter merkt sich die fehlgeschlagene URL, NICHT den Pfad: ein wirklich
+  // kaputtes Bild liefert dieselbe URL wieder und dreht sich nicht im Kreis —
+  // aber eine zweite abgelaufene Signatur desselben Pfades ist eine andere
+  // Zeichenkette und bekommt ihren Versuch. Genau der Fall, den der Kommentar
+  // hier beschreibt (ein Tab über zwei Ablauffenster), war mit einem Wächter je
+  // Pfad nach dem ersten Mal dauerhaft kaputt.
+  const queryClient = useQueryClient();
+  const nachsigniert = useRef(new Set<string>());
+  function onBildFehler(url: string) {
+    if (nachsigniert.current.has(url)) return;
+    nachsigniert.current.add(url);
+    void queryClient.invalidateQueries({ queryKey: ["post-media", "signiert"] });
+  }
+
+  const tags = useQuery({ queryKey: tagsQueryKey, queryFn: fetchAktiveTags });
 
   return (
     <section className="space-y-6">
       {user && <PostComposer authorId={user.id} />}
 
-      {hashtag && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted">Gefiltert nach</span>
-          <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
-            #{hashtag}
-          </span>
-          <button
-            type="button"
-            onClick={() => setHashtag(null)}
-            className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Filter entfernen
-          </button>
-        </div>
-      )}
+      {/* Die Leiste steht im Markup VOR dem Feed: auf dem Telefon liegt sie
+          damit über ihm, auf großen Schirmen schiebt sie das Raster in die
+          rechte Spalte (Mockup). */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <aside className="lg:col-start-2 lg:row-start-1">
+          <TagFilter tags={tags.data ?? []} aktiv={hashtag} onWaehlen={setHashtag} />
+        </aside>
 
-      <FeedList
-        query={feed}
-        currentUserId={user?.id ?? null}
-        activeHashtag={hashtag}
-        onHashtag={setHashtag}
-        mentionResolver={mentionResolver}
-      />
+        <div className="space-y-6 lg:col-start-1 lg:row-start-1">
+          {hashtag && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted">Gefiltert nach</span>
+              <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
+                #{hashtag}
+              </span>
+              <button
+                type="button"
+                onClick={() => setHashtag(null)}
+                className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Filter entfernen
+              </button>
+            </div>
+          )}
+
+          <FeedList
+            posts={posts}
+            isLoading={feed.isLoading}
+            isError={feed.isError}
+            hasNextPage={feed.hasNextPage}
+            isFetchingNextPage={feed.isFetchingNextPage}
+            onNextPage={() => void feed.fetchNextPage()}
+            currentUserId={user?.id ?? null}
+            activeHashtag={hashtag}
+            onHashtag={setHashtag}
+            mentionResolver={mentionResolver}
+            bildUrls={bildUrls}
+            onBildFehler={onBildFehler}
+            kuratierteTags={tags.data ?? []}
+          />
+        </div>
+      </div>
     </section>
+  );
+}
+
+// ── Tag-Filterleiste ────────────────────────────────────────────────────────
+
+/**
+ * Die kuratierten Tags als Filter (AGE-528). Bewusst EINE Auswahl zur Zeit:
+ * der Feed filtert über `.contains("hashtags", [tag])`, und mehrere Tags wären
+ * eine andere Abfrage — nicht eine andere Leiste. Ein zweiter Klick auf
+ * denselben Tag hebt den Filter auf.
+ *
+ * „Beliebte Tags" mit Zählern und „Aktivste Mitglieder" aus dem Mockup gehören
+ * NICHT hierher (Non-goals): die rechte Spalte trägt in dieser Fassung nur den
+ * Filter.
+ */
+function TagFilter({
+  tags,
+  aktiv,
+  onWaehlen,
+}: {
+  tags: Tag[];
+  aktiv: string | null;
+  onWaehlen: (tag: string | null) => void;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-sm font-semibold text-ink">Tags</h2>
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((tag) => {
+          const gewaehlt = aktiv === tag.key;
+          return (
+            <button
+              key={tag.key}
+              type="button"
+              aria-pressed={gewaehlt}
+              onClick={() => onWaehlen(gewaehlt ? null : tag.key)}
+              className={`rounded-full px-2.5 py-0.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                gewaehlt
+                  ? "bg-accent text-chrome"
+                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
+              }`}
+            >
+              {tag.label}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
 // ── Composer ────────────────────────────────────────────────────────────────
 
+/** Höchstens sechs Bilder pro Beitrag — dieselbe Grenze hält der Trigger auf
+ *  `post_media`. Hier steht sie, damit der Nutzer sie sieht, nicht damit sie
+ *  gilt: durchgesetzt wird sie in der Datenbank. */
+const MAX_BILDER = 6;
+
+/** Ein gewähltes Bild, bereits verkleinert und nach WebP gewandelt. */
+interface GewaehltesBild {
+  blob: Blob;
+  width: number;
+  height: number;
+  vorschau: string;
+}
+
 function PostComposer({ authorId }: { authorId: string }) {
+  const { activationName } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [offen, setOffen] = useState(false);
   const [body, setBody] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [visibility, setVisibility] = useState<PostVisibility>("members");
+  const [bilder, setBilder] = useState<GewaehltesBild[]>([]);
+  const [bildFehler, setBildFehler] = useState<string | null>(null);
+  const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
+  /** Laufende Bildverarbeitungen. Solange > 0, ist „Posten" gesperrt: sonst
+   *  veröffentlicht ein Klick den Beitrag OHNE die Bilder, die gerade noch
+   *  verkleinert werden — und die fertigen Ergebnisse fallen ins Leere. */
+  const [verarbeitet, setVerarbeitet] = useState(0);
+
+  // Die kuratierte Liste hängt an keinem Betrachter; freie Tags entstehen
+  // weiterhin durch `#Wort` im Text — beide Quellen vereinigt die RPC.
+  const tags = useQuery({ queryKey: tagsQueryKey, queryFn: fetchAktiveTags });
 
   const videoValid = videoUrl.trim() === "" || parseVideoUrl(videoUrl) !== null;
 
+  /**
+   * Verkleinern passiert beim AUSWÄHLEN, nicht beim Veröffentlichen: ein
+   * unlesbares Bild soll sofort und benennbar auffallen, statt den Nutzer
+   * später in einen nichtssagenden Serverfehler am 1-MiB-Limit laufen zu lassen.
+   */
+  async function waehleBilder(dateien: File[]) {
+    const frei = MAX_BILDER - bilder.length;
+    setBildFehler(
+      dateien.length > frei
+        ? `Höchstens sechs Bilder pro Beitrag — ${dateien.length - frei} wurden nicht übernommen.`
+        : null,
+    );
+    setVerarbeitet((n) => n + 1);
+    try {
+      for (const datei of dateien.slice(0, Math.max(0, frei))) {
+        try {
+          const { blob, width, height } = await shrinkToWebp(datei);
+          // Die Grenze steht IM Zustandswechsel, nicht davor: `frei` oben ist
+          // ein Schnappschuss, und zwei rasch aufeinanderfolgende Auswahlen
+          // lesen beide denselben. Hier kann nichts vorbeikommen.
+          setBilder((bisher) =>
+            bisher.length >= MAX_BILDER
+              ? bisher
+              : [...bisher, { blob, width, height, vorschau: URL.createObjectURL(blob) }],
+          );
+        } catch (fehler) {
+          setBildFehler(errorMessage(fehler));
+        }
+      }
+    } finally {
+      setVerarbeitet((n) => n - 1);
+    }
+  }
+
   const create = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // Video-URL (falls valide) wird an den Body gehängt — kein neues Schema; die
       // Karte erkennt und bettet sie ein.
       const trimmedVideo = videoUrl.trim();
       const fullBody = trimmedVideo ? `${body.trim()}\n${trimmedVideo}` : body.trim();
-      return createPost({ authorId, body: fullBody, visibility });
+      // Die id entsteht HIER, vor dem Upload: die Bildpfade tragen sie, und der
+      // Beitrag entsteht erst danach — in einem Schritt mit seinen Bildzeilen.
+      const postId = crypto.randomUUID();
+      const media = await uploadPostMedia({ uid: authorId, postId, bilder });
+      await createPostWithMedia({
+        postId,
+        body: fullBody,
+        visibility,
+        tags: gewaehlteTags,
+        media,
+      });
     },
     onSuccess: () => {
       setBody("");
       setVideoUrl("");
       setVisibility("members");
+      for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
+      setBilder([]);
+      setBildFehler(null);
+      setGewaehlteTags([]);
+      setOffen(false);
       toast({ variant: "success", title: "Beitrag veröffentlicht" });
       // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
       // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
@@ -125,7 +332,30 @@ function PostComposer({ authorId }: { authorId: string }) {
     },
   });
 
-  const canSubmit = body.trim() !== "" && videoValid && !create.isPending;
+  const canSubmit =
+    (body.trim() !== "" || bilder.length > 0) &&
+    videoValid &&
+    verarbeitet === 0 &&
+    !create.isPending;
+
+  // Die ruhige Zeile aus dem Mockup: der Composer nimmt geschlossen so wenig
+  // Raum ein wie ein Beitrag Aufmerksamkeit verdient.
+  if (!offen) {
+    return (
+      <Card>
+        <button
+          type="button"
+          onClick={() => setOffen(true)}
+          className="flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Avatar name={activationName ?? ""} masked={!activationName} />
+          <span className="flex-1 rounded-full border border-line px-4 py-2.5 text-sm text-muted">
+            Was möchtest du mit der Community teilen?
+          </span>
+        </button>
+      </Card>
+    );
+  }
 
   return (
     <Card className="space-y-4">
@@ -136,6 +366,78 @@ function PostComposer({ authorId }: { authorId: string }) {
         placeholder="Etwas mit der Community teilen … #Hashtag, @Erwähnung"
         aria-label="Neuer Beitrag"
       />
+
+      {bilder.length > 0 && (
+        <ul className="grid grid-cols-3 gap-2">
+          {bilder.map((bild, i) => (
+            <li key={bild.vorschau} className="relative">
+              <img
+                src={bild.vorschau}
+                alt=""
+                className="aspect-4/3 w-full rounded-md object-cover"
+              />
+              <button
+                type="button"
+                aria-label={`Bild ${i + 1} entfernen`}
+                onClick={() => {
+                  URL.revokeObjectURL(bild.vorschau);
+                  setBilder((bisher) => bisher.filter((_, j) => j !== i));
+                  setBildFehler(null);
+                }}
+                className="absolute top-1 right-1 rounded-full bg-scrim px-2 py-0.5 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            aria-label="Bilder auswählen"
+            className="sr-only"
+            onChange={(e) => {
+              const dateien = [...(e.target.files ?? [])];
+              e.target.value = "";
+              void waehleBilder(dateien);
+            }}
+          />
+        </label>
+        {bildFehler && <p className="mt-1 text-xs text-danger">{bildFehler}</p>}
+      </div>
+
+      {(tags.data ?? []).length > 0 && (
+        <div role="group" aria-label="Tags für diesen Beitrag" className="flex flex-wrap gap-2">
+          {(tags.data ?? []).map((tag) => {
+            const aktiv = gewaehlteTags.includes(tag.key);
+            return (
+              <button
+                key={tag.key}
+                type="button"
+                aria-pressed={aktiv}
+                onClick={() =>
+                  setGewaehlteTags((bisher) =>
+                    aktiv ? bisher.filter((k) => k !== tag.key) : [...bisher, tag.key],
+                  )
+                }
+                className={`rounded-full px-2.5 py-0.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  aktiv
+                    ? "bg-accent-soft font-medium text-accent-strong"
+                    : "border border-line text-muted hover:text-ink"
+                }`}
+              >
+                {tag.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div>
         <input
@@ -175,7 +477,7 @@ function PostComposer({ authorId }: { authorId: string }) {
           </Select>
         </label>
         <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
-          {create.isPending ? "Wird veröffentlicht…" : "Beitrag teilen"}
+          {create.isPending ? "Wird veröffentlicht…" : "Posten"}
         </Button>
       </div>
     </Card>
@@ -185,27 +487,42 @@ function PostComposer({ authorId }: { authorId: string }) {
 // ── Liste ─────────────────────────────────────────────────────────────────────
 
 function FeedList({
-  query,
+  posts,
+  isLoading,
+  isError,
+  hasNextPage,
+  isFetchingNextPage,
+  onNextPage,
   currentUserId,
   activeHashtag,
   onHashtag,
   mentionResolver,
+  bildUrls,
+  onBildFehler,
+  kuratierteTags,
 }: {
-  query: ReturnType<typeof useQuery<FeedPost[]>>;
+  posts: FeedPost[];
+  isLoading: boolean;
+  isError: boolean;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onNextPage: () => void;
   currentUserId: string | null;
   activeHashtag: string | null;
   onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
+  bildUrls: Record<string, string>;
+  onBildFehler: (pfad: string) => void;
+  kuratierteTags: Tag[];
 }) {
-  if (query.isLoading) {
+  if (isLoading) {
     return <p className="text-sm text-muted">Feed wird geladen…</p>;
   }
-  if (query.isError) {
+  if (isError) {
     return (
       <p className="text-sm text-danger">Der Feed konnte nicht geladen werden. Bitte neu laden.</p>
     );
   }
-  const posts = query.data ?? [];
   if (posts.length === 0) {
     return (
       <EmptyState
@@ -227,19 +544,32 @@ function FeedList({
   }
 
   return (
-    <Stagger className="space-y-5">
-      {posts.map((post) => (
-        <StaggerItem key={post.id}>
-          <PostCard
-            post={post}
-            currentUserId={currentUserId}
-            activeHashtag={activeHashtag}
-            onHashtag={onHashtag}
-            mentionResolver={mentionResolver}
-          />
-        </StaggerItem>
-      ))}
-    </Stagger>
+    <div className="space-y-5">
+      <Stagger className="space-y-5">
+        {posts.map((post) => (
+          <StaggerItem key={post.id}>
+            <PostCard
+              post={post}
+              currentUserId={currentUserId}
+              activeHashtag={activeHashtag}
+              onHashtag={onHashtag}
+              mentionResolver={mentionResolver}
+              bildUrls={bildUrls}
+              onBildFehler={onBildFehler}
+              kuratierteTags={kuratierteTags}
+            />
+          </StaggerItem>
+        ))}
+      </Stagger>
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button variant="secondary" onClick={onNextPage} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? "Wird geladen…" : "Ältere Beiträge"}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -251,12 +581,18 @@ function PostCard({
   activeHashtag,
   onHashtag,
   mentionResolver,
+  bildUrls,
+  onBildFehler,
+  kuratierteTags,
 }: {
   post: FeedPost;
   currentUserId: string | null;
   activeHashtag: string | null;
   onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
+  bildUrls: Record<string, string>;
+  onBildFehler: (pfad: string) => void;
+  kuratierteTags: Tag[];
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -314,36 +650,45 @@ function PostCard({
               </>
             )}
           </div>
-          <p className="text-xs text-muted">{timeAgo(post.createdAt)}</p>
+          <p className="text-xs text-muted">
+            {timeAgo(post.createdAt)}
+            {" · "}
+            {post.visibility === "members" ? "Nur für Mitglieder" : "Öffentlich"}
+          </p>
         </div>
       </header>
 
-      <PostBody
-        segments={segments}
-        skipRaw={video?.url}
-        activeHashtag={activeHashtag}
-        onHashtag={onHashtag}
-        mentionResolver={mentionResolver}
-      />
+      <PostBody segments={segments} skipRaw={video?.url} mentionResolver={mentionResolver} />
+
+      <PostMedien media={post.media} urls={bildUrls} onFehler={onBildFehler} autor={author.name} />
 
       {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
 
       {post.hashtags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {post.hashtags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onHashtag(tag)}
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                activeHashtag === tag
-                  ? "bg-accent text-chrome"
-                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
-              }`}
-            >
-              #{tag}
-            </button>
-          ))}
+          {post.hashtags.map((tag) => {
+            // Kuratiert heißt: dieser Wert steht in `tags`. Ein umbenannter oder
+            // deaktivierter Tag wirkt NICHT rückwirkend — der Beitrag behält
+            // seine Zeichenkette und der Chip wandert nach „frei".
+            const kuratiert = istKuratiert(tag, kuratierteTags);
+            return (
+              <button
+                key={tag}
+                type="button"
+                data-kuratiert={kuratiert}
+                onClick={() => onHashtag(tag)}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  activeHashtag === tag
+                    ? "bg-accent text-chrome"
+                    : kuratiert
+                      ? "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
+                      : "border border-line text-muted hover:text-ink"
+                }`}
+              >
+                #{tag}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -379,36 +724,246 @@ function PostCard({
   );
 }
 
+// ── Bilder einer Karte ──────────────────────────────────────────────────────
+
+/**
+ * Die Bilder liegen in einem PRIVATEN Bucket; sichtbar sind sie nur über eine
+ * signierte URL. Fehlt die Signatur für einen Pfad, entfällt seine Kachel —
+ * der Storage lehnt einzelne Pfade ab, und der Beitrag darf deshalb nicht
+ * verschwinden (gemessen in EVIDENCE.md, Fall F).
+ */
+function PostMedien({
+  media,
+  urls,
+  onFehler,
+  autor,
+}: {
+  media: FeedMedia[];
+  urls: Record<string, string>;
+  onFehler: (pfad: string) => void;
+  autor: string;
+}) {
+  const [offen, setOffen] = useState<number | null>(null);
+
+  // Gezählt wird, was auch gezeigt werden KANN. Vorher rechnete `bildLayout`
+  // über alle Bildzeilen, während abgelehnte Pfade beim Zeichnen entfielen —
+  // bei einem abgelehnten vierten Bild verschwand das „+n" ersatzlos, und der
+  // Rest war weder sichtbar noch angekündigt.
+  const nutzbar = media.filter((bild) => urls[bild.storagePath]);
+  const layout = bildLayout(nutzbar.length);
+  if (nutzbar.length === 0) return null;
+
+  const raster =
+    layout.art === "einzeln"
+      ? "grid-cols-1"
+      : layout.art === "paar"
+        ? "grid-cols-2"
+        : "grid-cols-2 sm:grid-cols-3";
+
+  return (
+    <>
+      <ul className={`grid gap-2 ${raster}`}>
+        {nutzbar.slice(0, layout.sichtbar).map((bild, i) => {
+          const url = urls[bild.storagePath];
+          const letzte = i === layout.sichtbar - 1 && layout.rest > 0;
+          return (
+            <li key={bild.storagePath} className="relative">
+              <button
+                type="button"
+                onClick={() => setOffen(i)}
+                aria-label={`Bild ${i + 1} vergrößern`}
+                className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <img
+                  src={url}
+                  // Die Maße stehen in `post_media`, damit der Platz schon steht,
+                  // bevor das Bild da ist — sonst springt die Karte beim Laden.
+                  width={bild.width}
+                  height={bild.height}
+                  // Ein einzelnes Bild behält sein echtes Seitenverhältnis; erst im
+                  // Raster wird beschnitten, weil dort die Kacheln zueinander
+                  // passen müssen. Ohne diese Zeile wären `width`/`height` nur
+                  // Dekoration: `aspect-4/3` setzt die Box ohnehin.
+                  style={
+                    layout.art === "einzeln"
+                      ? { aspectRatio: `${bild.width} / ${bild.height}` }
+                      : undefined
+                  }
+                  loading="lazy"
+                  alt={`Bild ${i + 1} zum Beitrag von ${autor}`}
+                  onError={() => onFehler(url)}
+                  className={`w-full rounded-md object-cover ${
+                    layout.art === "einzeln" ? "" : "aspect-4/3"
+                  }`}
+                />
+              </button>
+              {letzte && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-scrim text-lg font-semibold text-white"
+                >
+                  +{layout.rest}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {offen !== null && (
+        <Lightbox
+          media={nutzbar}
+          urls={urls}
+          autor={autor}
+          index={offen}
+          onIndex={setOffen}
+          onSchliessen={() => setOffen(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Die Bilder in voller Größe (AGE-528).
+ *
+ * Sie ist kein Schmuck, sondern die Antwort auf einen Befund aus dem
+ * Diff-Review: Schema, Trigger und Composer erlauben sechs Bilder, das Raster
+ * zeigt vier, und die vierte liegt unter dem „+n". Ohne diesen Weg
+ * veröffentlicht jemand Bilder, die kein Leser je erreicht.
+ *
+ * Bewusst KEIN Zoom, kein Wischen, keine Miniaturenleiste: vor, zurück, zu.
+ */
+function Lightbox({
+  media,
+  urls,
+  autor,
+  index,
+  onIndex,
+  onSchliessen,
+}: {
+  media: FeedMedia[];
+  urls: Record<string, string>;
+  autor: string;
+  index: number;
+  onIndex: (i: number) => void;
+  onSchliessen: () => void;
+}) {
+  const schliessen = useRef<HTMLButtonElement>(null);
+
+  const weiter = (schritt: number) =>
+    onIndex((index + schritt + media.length) % media.length);
+
+  // Ohne Abhängigkeitsliste, weil `weiter` den aktuellen `index` schließt — der
+  // Zuhörer wird je Render neu gesetzt und wieder abgeräumt.
+  useEffect(() => {
+    // Die Tastatur ist hier kein Zusatz: wer mit ihr bedient, kommt sonst aus
+    // dem Overlay nicht mehr heraus.
+    function taste(e: KeyboardEvent) {
+      if (e.key === "Escape") onSchliessen();
+      if (e.key === "ArrowRight") weiter(1);
+      if (e.key === "ArrowLeft") weiter(-1);
+    }
+    document.addEventListener("keydown", taste);
+    return () => document.removeEventListener("keydown", taste);
+  });
+
+  // Der Fokus wandert NUR beim Öffnen. Stünde das im Effekt darüber, risse
+  // jeder Bildwechsel den Fokus zurück auf „Schließen" — wer mit der Tastatur
+  // weiterblättert, verlöre nach dem ersten Klick seinen Knopf.
+  useEffect(() => {
+    schliessen.current?.focus();
+  }, []);
+
+  const bild = media[index];
+  // Der Portal ist keine Kosmetik: `.fbc-card:hover` setzt `transform`
+  // (AGE-492), und ein transformierter Vorfahr wird zum Bezugsrahmen für
+  // `position: fixed`. In der Karte gezeichnet schrumpfte dieses Overlay bei
+  // jedem echten Mausklick auf die Kartenfläche (gemessen 847×615 statt
+  // 1280×900). jsdom hat kein Layout, deshalb hat das kein Test gesehen,
+  // sondern die Sichtprobe zu 9.6.
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Bild ${index + 1} von ${media.length}`}
+      onClick={onSchliessen}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 backdrop-blur-sm"
+    >
+      <img
+        src={urls[bild.storagePath]}
+        width={bild.width}
+        height={bild.height}
+        alt={`Bild ${index + 1} zum Beitrag von ${autor}`}
+        // Der Klick aufs Bild soll NICHT schließen — sonst trifft man beim
+        // Weiterblättern ständig daneben.
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-full max-w-full rounded-md object-contain"
+      />
+
+      <button
+        ref={schliessen}
+        type="button"
+        onClick={onSchliessen}
+        aria-label="Schließen"
+        className="absolute top-4 right-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        ×
+      </button>
+
+      {media.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              weiter(-1);
+            }}
+            aria-label="Vorheriges Bild"
+            className="absolute left-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              weiter(1);
+            }}
+            aria-label="Nächstes Bild"
+            className="absolute right-4 rounded-full bg-canvas/90 px-3 py-1 text-lg text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            ›
+          </button>
+        </>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
 // ── Body-Rendering (Text/Hashtag/Erwähnung/URL) ───────────────────────────────
 
 function PostBody({
   segments,
   skipRaw,
-  activeHashtag,
-  onHashtag,
   mentionResolver,
 }: {
   segments: PostSegment[];
   skipRaw: string | undefined;
-  activeHashtag: string | null;
-  onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
 }) {
   return (
     <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-ink">
       {segments.map((seg, i) => {
         if (seg.type === "url" && seg.raw === skipRaw) return null; // als Embed gezeigt
+        // Hashtags im Fließtext bleiben Text (AGE-528). Sie waren bis hierher
+        // ein zweiter Button neben dem Chip unter dem Beitrag — derselbe Tag
+        // stand also zweimal klickbar da. Der Chip ist die Bedienstelle; der
+        // Satz liest sich, er wird nicht bedient. `seg.raw` und nicht
+        // `seg.value`, damit die getippte Schreibweise samt `#` stehen bleibt.
         if (seg.type === "hashtag") {
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onHashtag(activeHashtag === seg.value ? null : seg.value)}
-              className="font-medium text-accent-strong hover:underline"
-            >
-              {seg.raw}
-            </button>
-          );
+          return <span key={i}>{seg.raw}</span>;
         }
         if (seg.type === "mention") {
           const id = mentionResolver(seg.value);

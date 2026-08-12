@@ -1,5 +1,7 @@
 import { captureException } from "@sentry/react";
 
+import { type Json } from "./database.types";
+import { type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
 
 /**
@@ -14,7 +16,9 @@ import { supabase } from "./supabase";
  *    Zähler ist sonst clientseitig nicht berechenbar. Die RPC liefert nur Zahlen.
  *  - `likedByMe` aus den eigenen `post_likes`-Zeilen (alles, was die owner-only
  *    SELECT-Policy zurückgibt).
- *  - Schreiben (`createPost`/`toggleLike`/`addComment`) über die `*_own`-Policies.
+ *  - Schreiben: `toggleLike`/`addComment` über die `*_own`-Policies; ein Beitrag
+ *    entsteht über die RPC `create_post_with_media`, damit er nie ohne seine
+ *    Bilder im Feed steht (AGE-528). `posts_write_own` bleibt daneben bestehen.
  *
  * Reine Helfer (Hashtag-/Body-Parsing, Video-Erkennung) sind in feed.test.ts getestet.
  */
@@ -29,6 +33,16 @@ export interface FeedAuthor {
   tier: string | null;
 }
 
+/** Ein Bild des Beitrags. Die Maße stehen hier, damit die Karte ihr Layout
+ *  bestimmen kann, ohne die Datei zu laden (AGE-528). Der Pfad zeigt in den
+ *  PRIVATEN Bucket — sichtbar wird er erst über `signPostMedia`. */
+export interface FeedMedia {
+  storagePath: string;
+  sort: number;
+  width: number;
+  height: number;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -39,6 +53,7 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  media: FeedMedia[];
 }
 
 export interface FeedComment {
@@ -231,6 +246,22 @@ export function buildMentionResolver(authors: FeedAuthor[]): MentionResolver {
 export const feedListKey = (uid: string | null) => ["feed", "list", uid] as const;
 export const feedQueryKey = (uid: string | null, hashtag: string | null) =>
   ["feed", "list", uid, hashtag] as const;
+
+/**
+ * Der seitenweise Feed braucht einen EIGENEN Schlüssel (AGE-528).
+ *
+ * `feedQueryKey` liegt bei Startseite und Mitglieder-Übersicht auf einem
+ * `useQuery` und trägt dort `{posts, nextCursor}`. Der Feed selbst ist eine
+ * `useInfiniteQuery` und trägt `{pages, pageParams}`. Unter demselben Schlüssel
+ * ist ein Eintrag für den anderen unlesbar: `data.pages` wäre `undefined`,
+ * `isLoading` aber false — der Feed malte den leeren Zustand über einen vollen
+ * Feed, und die Startseite verlöre umgekehrt ihre Beiträge.
+ *
+ * Das Anhängsel steht am ENDE, damit `feedListKey` weiter als Präfix greift:
+ * eine Invalidierung nach dem Veröffentlichen erreicht beide Formen.
+ */
+export const feedSeitenKey = (uid: string | null, hashtag: string | null) =>
+  ["feed", "list", uid, hashtag, "seiten"] as const;
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 
@@ -277,34 +308,87 @@ async function fetchAuthors(ids: string[]): Promise<Map<string, FeedAuthor>> {
   return byId;
 }
 
+/** Seitengröße des Feeds. Eine feste Obergrenze ohne Nachladen wäre mit Bildern
+ *  eine stille Kappung — ältere Beiträge wären unauffindbar (AGE-528). */
+export const FEED_SEITE = 20;
+
+/**
+ * Der Cursor läuft über **(created_at, id)**, nicht über `created_at` allein.
+ * Bei gleichen Zeitstempeln — beim Import der ~70 Konten der wahrscheinliche
+ * Fall — überspränge eine reine Zeitgrenze den zweiten Beitrag still: er stünde
+ * weder auf der einen noch auf der nächsten Seite.
+ */
+export interface FeedCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface FeedSeite {
+  posts: FeedPost[];
+  /** `null` heißt: es gibt nichts mehr nachzuladen. */
+  nextCursor: FeedCursor | null;
+}
+
 export interface FetchFeedArgs {
   /** Eigene Profil-ID (für `likedByMe`); null = ausgeloggt. */
   uid: string | null;
   /** Optionaler Hashtag-Filter (normalisiert, ohne #). */
   hashtag?: string | null;
+  /** Weiterlesen ab hier; fehlt er, beginnt die erste Seite. */
+  cursor?: FeedCursor | null;
 }
 
-/** Lädt den chronologischen Feed (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
-export async function fetchFeed({ uid, hashtag }: FetchFeedArgs): Promise<FeedPost[]> {
+/** Lädt eine Feed-Seite (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
+export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promise<FeedSeite> {
   let query = supabase
     .from("posts")
     .select("id, author_id, body, hashtags, visibility, created_at")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
+    // Seite" das einzige Indiz dafür, dass es weitergeht — und bei genau 20
+    // sichtbaren Beiträgen verspricht das eine nächste Seite, die garantiert
+    // leer ist. Der Knopf holte sie, bevor er verschwände.
+    .limit(FEED_SEITE + 1);
   if (hashtag) query = query.contains("hashtags", [hashtag]);
+  if (cursor) {
+    query = query.or(
+      `created_at.lt.${cursor.createdAt},` +
+        `and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+    );
+  }
 
   const { data: posts, error } = await query;
   if (error) throw error;
-  const rows = posts ?? [];
-  if (rows.length === 0) return [];
+  const geholt = posts ?? [];
+  // Die Spähzeile wird abgeschnitten: sie ist die Antwort auf „gibt es mehr?",
+  // kein Teil der Seite.
+  const gibtMehr = geholt.length > FEED_SEITE;
+  const rows = gibtMehr ? geholt.slice(0, FEED_SEITE) : geholt;
+  if (rows.length === 0) return { posts: [], nextCursor: null };
 
   const postIds = rows.map((r) => r.id);
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
 
-  const [authors, countsRes] = await Promise.all([
+  const [authors, countsRes, mediaRes] = await Promise.all([
     fetchAuthors(authorIds),
     supabase.rpc("post_engagement_counts", { p_post_ids: postIds }),
+    supabase
+      .from("post_media")
+      .select("post_id, storage_path, sort, width, height")
+      .in("post_id", postIds),
   ]);
+
+  // Wie bei den Zählern: ein Fehler hier nimmt dem Feed die Bilder, nicht die
+  // Beiträge — aber nicht still. Ein fehlender Grant soll sichtbar werden.
+  if (mediaRes.error) captureException(mediaRes.error, { tags: { area: "feed.media" } });
+  const media = new Map<string, FeedMedia[]>();
+  for (const m of mediaRes.data ?? []) {
+    const liste = media.get(m.post_id) ?? [];
+    liste.push({ storagePath: m.storage_path, sort: m.sort, width: m.width, height: m.height });
+    media.set(m.post_id, liste);
+  }
+  for (const liste of media.values()) liste.sort((a, b) => a.sort - b.sort);
 
   // Zähler-RPC ist nicht kritisch: schlägt sie fehl, zeigt der Feed 0/0 (statt zu
   // brechen) — aber NICHT still: an Sentry melden, damit ein kaputter Grant /
@@ -323,17 +407,24 @@ export async function fetchFeed({ uid, hashtag }: FetchFeedArgs): Promise<FeedPo
     myLikes = new Set((data ?? []).map((l) => l.post_id));
   }
 
-  return rows.map((r) => ({
-    id: r.id,
-    author: authorOf(authors, r.author_id),
-    body: r.body,
-    hashtags: r.hashtags ?? [],
-    visibility: r.visibility,
-    createdAt: r.created_at,
-    likeCount: counts.get(r.id)?.like_count ?? 0,
-    commentCount: counts.get(r.id)?.comment_count ?? 0,
-    likedByMe: myLikes.has(r.id),
-  }));
+  const letzte = rows[rows.length - 1];
+  return {
+    posts: rows.map((r) => ({
+      id: r.id,
+      author: authorOf(authors, r.author_id),
+      body: r.body,
+      hashtags: r.hashtags ?? [],
+      visibility: r.visibility,
+      createdAt: r.created_at,
+      likeCount: counts.get(r.id)?.like_count ?? 0,
+      commentCount: counts.get(r.id)?.comment_count ?? 0,
+      likedByMe: myLikes.has(r.id),
+      media: media.get(r.id) ?? [],
+    })),
+    // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
+    // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.
+    nextCursor: gibtMehr ? { createdAt: letzte.created_at, id: letzte.id } : null,
+  };
 }
 
 /** Kommentare eines Beitrags, chronologisch (RLS: nur wenn der Post sichtbar ist). */
@@ -357,17 +448,38 @@ export async function fetchComments(postId: string): Promise<FeedComment[]> {
 
 // ── Schreiben ─────────────────────────────────────────────────────────────────
 
-/** Legt einen Beitrag an. Hashtags werden aus dem Body geparst und gespeichert. */
-export async function createPost(input: {
-  authorId: string;
+/**
+ * Legt Beitrag UND Bildzeilen in einer Transaktion an (AGE-528).
+ *
+ * Der naheliegende Ablauf — Beitrag anlegen, Bilder hochladen, Zeilen anlegen —
+ * hat einen sichtbaren Fehlerzustand: bricht er nach dem ersten Schritt ab,
+ * steht der Beitrag sofort im Feed, und zwar **ohne seine Bilder**. Ein
+ * Erlebnisbericht ohne Fotos ist kein halber Beitrag, sondern ein falscher.
+ * Deshalb wird die `id` im Client erzeugt, die Bilder wandern zuerst in den
+ * Bucket, und diese eine RPC klammert die beiden Inserts.
+ *
+ * Die Tags gehen GETRENNT hinein: getippte (aus dem Text) und geklickte. Die
+ * Vereinigung steht in der RPC — sie hier zusätzlich zu bauen wäre dieselbe
+ * Regel an zwei Stellen.
+ */
+export async function createPostWithMedia(input: {
+  postId: string;
   body: string;
   visibility: PostVisibility;
+  tags: string[];
+  media: PostMediaEingabe[];
 }): Promise<void> {
-  const { error } = await supabase.from("posts").insert({
-    author_id: input.authorId,
-    body: input.body,
-    visibility: input.visibility,
-    hashtags: parseHashtags(input.body),
+  const { error } = await supabase.rpc("create_post_with_media", {
+    p_post_id: input.postId,
+    p_body: input.body,
+    p_visibility: input.visibility,
+    p_hashtags: parseHashtags(input.body),
+    p_tags: input.tags,
+    // `p_media` ist in Postgres `jsonb`, und der Typgenerator schreibt dafür
+    // `Json` — eine Struktur mit festen Feldern passt da nicht ohne Weiteres
+    // hinein. Die Form prüft die RPC beim Auspacken (`m->>'storage_path'` …),
+    // hier ist nur die Typbrücke.
+    p_media: input.media as unknown as Json,
   });
   if (error) throw error;
 }

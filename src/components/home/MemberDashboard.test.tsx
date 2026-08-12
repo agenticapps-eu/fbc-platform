@@ -79,7 +79,7 @@ const MEMBERS = [
 beforeEach(() => {
   vi.mocked(fetchDashboard).mockReset().mockResolvedValue(DASH);
   vi.mocked(fetchEvents).mockReset().mockResolvedValue([]);
-  vi.mocked(fetchFeed).mockReset().mockResolvedValue([]);
+  vi.mocked(fetchFeed).mockReset().mockResolvedValue({ posts: [], nextCursor: null });
   vi.mocked(fetchDirectoryBaseline).mockReset().mockResolvedValue(MEMBERS);
 });
 
