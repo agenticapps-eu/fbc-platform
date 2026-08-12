@@ -1026,7 +1026,7 @@ function CommentThread({
 
   const comments = useQuery({
     queryKey: commentsQueryKey(currentUserId, postId),
-    queryFn: () => fetchComments(postId),
+    queryFn: () => fetchComments(currentUserId, postId),
   });
 
   const add = useMutation({
