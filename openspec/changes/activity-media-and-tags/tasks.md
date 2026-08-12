@@ -407,7 +407,24 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       strukturell und vorher rot, Gegenprobe mit erzwungenem Transform.
       Zwei Beobachtungen ohne Diff (3+1-Raster bei vier Kacheln, Chip-Schreib-
       weise) stehen in `EVIDENCE.md` und sind Donalds Entscheidung.
-- [ ] 9.7 QA-Gate (`qa`) auf der Oberfläche.
+- [x] 9.7 QA-Gate (`qa`) auf der Oberfläche. Standard-Stufe, 98/100, **kein
+      kritischer, hoher oder mittlerer Befund — und deshalb kein Diff**.
+      Gemessen im Browser gegen den lokalen Stack, nicht in jsdom: Lightbox
+      erreicht Bild 5 und 6 und läuft um, Tastatur trägt, Tag-Filter schaltet
+      4 → 3 Beiträge und wieder zurück, der leere Filterzustand unterscheidet
+      die beiden Fälle, und auf 375 px steht die Leiste vor dem Feed (Task 8.4,
+      die einzige Aussage, die in jsdom nicht messbar war).
+      **Der ganze Schreibweg von Hand:** zwei PNG → client-seitig nach WebP
+      gewandelt → hochgeladen → `create_post_with_media` 200 → im Feed sofort
+      sichtbar, `hashtags` je genau einmal, obwohl `Netzwerken` getippt **und**
+      geklickt war. Damit ist der Composer-Weg nicht nur von der Sonde, sondern
+      auch von einem echten Browser gelaufen.
+      Zwei niedrige Befunde bleiben liegen, beide mit Begründung: die Seite
+      scrollt hinter der offenen Lightbox (dieses Repo kennt **nirgends** eine
+      Scroll-Sperre — eine nur hier wäre die Ausnahme), und auf dem Telefon
+      verdeckt der feste Feedback-Knopf die Kachel „Frage" (fremdes Widget,
+      nach 150 px Scrollen frei). Bericht:
+      `.gstack/qa-reports/qa-report-aktivitaet-2026-08-12.md`.
 
 ## 10 · Abschluss
 

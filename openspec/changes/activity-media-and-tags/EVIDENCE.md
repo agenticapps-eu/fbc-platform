@@ -358,3 +358,75 @@ hatte mit einem Wegwerf-Bucket gearbeitet und ihn abgebaut.
 Der Beweis „gegen DEV" verlangt also erst einen Schema-Schreibzugriff auf die
 Instanz, die die Live-Seite bedient. Mit Donald am 2026-08-12 so entschieden:
 **9.4–9.6 zuerst lokal, 9.3 danach** — nicht nebenbei mit `db push` auf DEV.
+
+## 9.7 — QA-Gate auf der Oberfläche
+
+Gelaufen am 2026-08-12 im Browser gegen den lokalen Stack (`localhost:5173`,
+Supabase auf `127.0.0.1:54321`), mit einem eigens angelegten Konto
+`qa-c7@example.test` (Stufe `impact`, aktiviert). Standard-Stufe, **98/100,
+kein kritischer, hoher oder mittlerer Befund**. Der ausführliche Bericht liegt
+unter `.gstack/qa-reports/qa-report-aktivitaet-2026-08-12.md` — das Verzeichnis
+ist `.gitignore`d, deshalb steht die Substanz hier.
+
+### Was jsdom nicht messen konnte und hier gemessen wurde
+
+| Prüfung | Gemessen |
+|---|---|
+| Lightbox liegt an `document.body` und füllt das Fenster | 1265×720 = volles Fenster, in jedem Schritt |
+| **Bild 5 und 6 erreichbar**, Umlauf 6 → 1 | `Bild 4 von 6` → 5 → 6 → 1 |
+| Tastatur ←, →, Escape | trägt |
+| Tag-Filter | 4 → 3 Beiträge, zweiter Klick zurück auf 4, `aria-pressed` folgt |
+| Leerer Filterzustand (Task 8.3) | „Keine Beiträge mit diesem Hashtag" statt des allgemeinen Leerzustands |
+| **Telefon 375 px: Leiste vor dem Feed** (Task 8.4) | 936 px vs. 1246 px — die eine Aussage, die bewusst ohne Test blieb |
+| Netzwerk | 515 Antworten mit 200, keine N+1 (alles über `in.(…)`), keine Konsolenfehler |
+
+### Der ganze Schreibweg, im Browser statt in pgTAP
+
+Zwei PNG in den Composer, Text mit getipptem `#Netzwerken`, dazu die Kacheln
+`Netzwerken` und `Erlebnistag`, dann „Posten":
+
+- beide Bilder **client-seitig nach WebP gewandelt** (der Bucket nimmt nur WebP)
+  und hochgeladen, je 200;
+- `rpc/create_post_with_media` → 200;
+- in der Datenbank `hashtags = ["netzwerken","erlebnistag"]` — **je genau
+  einmal**, obwohl `Netzwerken` getippt *und* geklickt war;
+- im Feed sofort sichtbar, beide Bilder geladen; im Kartentext steht
+  „Netzwerken" zweimal, **genau eine Stelle ist klickbar** (Regel 4.1).
+
+Damit ist der Composer-Weg nicht mehr nur von der Sonde gelaufen (9.0), sondern
+von einem echten Browser mit echter Datei-Auswahl.
+
+### Zwei niedrige Befunde, beide bewusst ohne Diff
+
+- **Die Seite scrollt hinter der offenen Lightbox** (`scrollY` 0 → 600). Real,
+  aber dieses Repo kennt **nirgends** eine Scroll-Sperre — `AvatarCropper`,
+  `FeedbackButton` und `DesignSwitcher` sperren ebenso wenig. Eine Sperre nur
+  hier wäre die Ausnahme statt der Regel; alle vier zu ändern ist eine eigene
+  Aufgabe. Folgeaufgabe, nicht dieser PR.
+- **Auf 375 px verdeckt der feste Feedback-Knopf die Kachel „Frage"**
+  (240–340 × 690–732 gegen 240–299 × 697–723; `elementFromPoint` in der
+  Kachelmitte liefert „Feedback"). Nach 150 px Scrollen frei, am Schreibtisch
+  gar nicht. Die Kachelreihe ist neu, die Ursache liegt im fremden Widget —
+  Donalds Entscheidung.
+
+### Vier Fehlalarme, damit sie nicht erneut gejagt werden
+
+1. **„Bild 2 fehlt im Raster."** Das Raster zeigt 1, 3, 4, 5. Die Dateien wurden
+   heruntergeladen und angesehen: `sort=1` **enthält** die Ziffer 3 — Rückstand
+   aus dem Handlauf 9.4, wo Bild 2 absichtlich entfernt wurde. Die Anzeige ist
+   der Datenlage treu. Ohne den Blick in die Bytes wäre das ein Fehlbefund
+   gegen eine korrekte Komponente gewesen.
+2. **„Die Tastatur ist tot."** Das QA-Werkzeug liefert überhaupt keine
+   Tastenereignisse an die Seite — ein Lauscher auf `document` in der
+   Capture-Phase sah null. Werkzeug, nicht App.
+3. **„Escape schließt nicht."** Im selben synchronen JS-Block gelesen, in dem
+   das Ereignis abgeschickt wurde; React hatte noch nicht neu gezeichnet. Mit
+   einem Tick Abstand schließt es.
+4. **„Der Autor heißt ‚Mitglied'."** Das Aufsetz-Skript schrieb `name` nur im
+   INSERT-Zweig, die Profilzeile existierte aber schon (Trigger bei der
+   Anmeldung) — also blieb `name` null. Testdaten, nicht die App.
+
+### Was lokal liegen bleibt
+
+Konto `qa-c7@example.test` (Profil „QA C7") und ein Beitrag „QA-Gate 9.7" mit
+zwei Bildern. Nur im lokalen Stack; `supabase db reset --local` räumt beides ab.
