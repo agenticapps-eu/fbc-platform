@@ -171,6 +171,36 @@ nichtssagend: bei Seitengröße 2 stehen die zeitgleichen Beiträge auf derselbe
 Seite, und dann verliert auch die naive Fassung nichts. Der Befund aus dem
 Plan-Review ist damit gemessen, nicht geglaubt.
 
+## Die RPC, zum ersten Mal von einem echten Client gerufen
+
+Gemessen am 2026-08-12, lokaler Stack.
+
+```
+tsx scripts/probe-rpc-create-post.ts
+```
+
+`create_post_with_media()` war bis hierher nur in pgTAP grün — also unter
+`set local role authenticated` in einer psql-Sitzung, **nie über PostgREST**.
+Genau dazwischen liegt die Fehlerklasse, die dieses Repo teuer bezahlt hat
+(`service_role` hält keine Tabellenrechte): Argumentnamen, über die PostgREST
+die Funktion überhaupt erst auswählt, die Wandlung des JSON-Arrays nach `jsonb`,
+das EXECUTE-Recht. Alles drei fällt erst zur Laufzeit auf.
+
+Echtes Konto, echter Login, echter Aufruf:
+
+| | Prüfung | Gemessen |
+|---|---|---|
+| **A** | PostgREST findet die Funktion und nimmt sie an | kein Fehler |
+| **A** | Beitrag **und** beide Bildzeilen stehen da | 1 Beitrag, 2 Bildzeilen |
+| **A** | getippt **und** geklickt ergibt den Tag genau einmal | `["netzwerken","erlebnistag"]` |
+| **B** | das siebte Bild nimmt den Beitrag mit zurück | abgelehnt, **kein Beitrag übrig** |
+| **C** | unbestätigtes Konto | abgelehnt: „Kein bestätigter Zugang" |
+| **D** | ohne Session | „permission denied for function" |
+
+Zeile B ist die, die den Ablauf trägt: die Sechser-Grenze fällt **nach** dem
+Insert in `posts` und nimmt ihn mit zurück. Es gibt keinen halb veröffentlichten
+Zustand — die Zusicherung aus `design.md` ist damit gemessen, nicht geglaubt.
+
 ## Task 1.0c — noch offen
 
 Die Sonde gegen **DEV** laufen zu lassen (Plan-Review: ein grüner lokaler Lauf

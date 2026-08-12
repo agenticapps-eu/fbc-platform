@@ -359,8 +359,15 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 9 · Abnahme
 
-- [ ] 9.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
-- [ ] 9.2 pgTAP vollständig grün, mit **Dateiliste** aufgerufen.
+- [x] 9.0 **Die RPC einmal von einem echten Client rufen** — offene Frage aus
+      der Übergabe nach Block 3. `scripts/probe-rpc-create-post.ts`: echtes
+      Konto, echter Login, echter Aufruf über PostgREST. Sechs Prüfungen erfüllt,
+      darunter die beiden, die den Ablauf tragen: sieben Bilder nehmen den
+      **ganzen** Beitrag zurück, und ohne Session fehlt schon das
+      Ausführungsrecht. `EVIDENCE.md`.
+- [x] 9.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
+      576/576, 0 Fehler, 4 vorbestehende Warnungen in fremden Dateien.
+- [x] 9.2 pgTAP vollständig grün, mit **Dateiliste** aufgerufen. 312/312.
 - [ ] 9.3 **Der Beweis** (Tabelle in `design.md`), im Inkognito-Fenster gegen
       DEV, mit Screenshot bzw. Statuscode je Zeile:
       `members` → rohe URL kein Bild, Signatur als anon abgelehnt;
