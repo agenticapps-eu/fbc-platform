@@ -26,6 +26,9 @@ vi.mock("../lib/event-cover", async (importOriginal) => {
   return { ...actual, signEventCovers: vi.fn(async () => ({})) };
 });
 
+import { signEventCovers } from "../lib/event-cover";
+const mSign = vi.mocked(signEventCovers);
+
 import { fetchEvent, fetchEvents, fetchEventAttendees, fetchAttendees } from "../lib/events";
 import EventDetailPage from "./EventDetailPage";
 
@@ -108,6 +111,26 @@ describe("EventDetailPage — Teilnehmerreihe", () => {
     expect(screen.getByText("+59")).toBeInTheDocument();
   });
 
+  it("zeigt dem Host keine Abmeldungen und keine Warteliste als Gesichter", async () => {
+    // Befund aus dem Diff-Review (codex, MEDIUM). `event_attendees` gibt dem
+    // HOST jeden Status heraus — das braucht er für sein Werkzeug. Die
+    // Avatarreihe ist aber die Antwort auf „wer kommt", und da hat eine
+    // Abmeldung nichts verloren. Der pgTAP-Fall prüft die RPC, dieser hier die
+    // Reihe; die React-Tests fuhren vorher nur mit `registered`-Fixtures und
+    // konnten den Fehler deshalb nicht sehen.
+    mEvent.mockResolvedValue(evt({ registeredCount: 2 }));
+    mFaces.mockResolvedValue([
+      { ...gesicht("a"), name: "Kommt Wirklich" },
+      { ...gesicht("b"), name: "Hat Abgesagt", status: "cancelled" },
+      { ...gesicht("c"), name: "Steht Auf Warteliste", status: "waitlist" },
+    ]);
+    renderPage(true);
+    expect(await screen.findByText("Teilnehmer (2)")).toBeInTheDocument();
+    expect(screen.getByTitle("Kommt Wirklich")).toBeInTheDocument();
+    expect(screen.queryByTitle("Hat Abgesagt")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Steht Auf Warteliste")).not.toBeInTheDocument();
+  });
+
   it("nennt die volle Zahl, auch wenn weniger Gesichter auflösbar sind", async () => {
     // Der Kern der Datenschutz-Entscheidung: `event_attendees` lässt Mitglieder
     // ohne öffentliches Profil aus, die Zahl bleibt vollständig. Würde die Seite
@@ -148,6 +171,28 @@ describe("EventDetailPage — ähnliche Events", () => {
     // Der Titel des eigenen Events steht genau EINMAL auf der Seite — als
     // Überschrift, nicht zusätzlich als Kachel unter „Ähnliche Events".
     expect(screen.getAllByText("FBC Online-Treffen")).toHaveLength(1);
+  });
+
+  it("signiert Header und ähnliche Events in EINEM Stapel", async () => {
+    // Die Zusicherung aus dem Spec-Delta: ein Signieraufruf je Ansicht, nicht
+    // einer je Komponente. Die erste Fassung machte zwei — Header und
+    // „Ähnliche Events" riefen den Haken je für sich auf. Befund aus dem
+    // Diff-Review; ohne diese Zusicherung wächst die Zahl still mit jedem
+    // weiteren Block, der ein Cover zeigt.
+    const self = evt({ coverPath: "uid/self.webp" });
+    const anderes = evt({
+      id: "e2",
+      title: "Zweites Treffen",
+      coverPath: "uid/andere.webp",
+      startsAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+      endsAt: null,
+    });
+    mEvent.mockResolvedValue(self);
+    mEvents.mockResolvedValue([self, anderes]);
+    renderPage(true);
+    await screen.findByText("Zweites Treffen");
+    expect(mSign).toHaveBeenCalledTimes(1);
+    expect(mSign.mock.calls[0][0].sort()).toEqual(["uid/andere.webp", "uid/self.webp"]);
   });
 
   it("holt die Liste selbst, wenn die Übersicht nie geladen wurde", async () => {

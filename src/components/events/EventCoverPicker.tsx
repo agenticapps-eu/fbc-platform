@@ -30,10 +30,19 @@ export function EventCoverPicker({
   initialPath,
   value,
   onChange,
+  onBusy,
 }: {
   initialPath: string | null;
   value: string | null | undefined;
   onChange: (pfad: string | null) => void;
+  /**
+   * Meldet dem Formular, dass gerade hochgeladen wird. Ohne das bliebe
+   * „Speichern" während des Uploads klickbar — und ein Klick genau dann
+   * speicherte das Event OHNE das gewählte Bild, während der Upload weiterläuft
+   * und ein Objekt hinterlässt, auf das nie ein Event zeigt. Befund aus dem
+   * Diff-Review.
+   */
+  onBusy?: (laeuft: boolean) => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -68,6 +77,7 @@ export function EventCoverPicker({
     setPending(null);
     if (!user) return;
     setLaedt(true);
+    onBusy?.(true);
     try {
       const neuerPfad = await uploadEventCover(user.id, blob);
       if (vorschau) URL.revokeObjectURL(vorschau);
@@ -82,6 +92,7 @@ export function EventCoverPicker({
       });
     } finally {
       setLaedt(false);
+      onBusy?.(false);
     }
   }
 

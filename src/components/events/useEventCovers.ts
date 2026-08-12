@@ -19,13 +19,18 @@ import type { EventListItem } from "../../lib/events";
  * kein Fehler. Ein Fehlschlag der ganzen Abfrage nimmt nur die Bilder mit, nie
  * die Liste.
  */
-export function useEventCovers(events: EventListItem[]): Record<string, string> {
+export function useEventCovers(events: EventListItem[], bereit = true): Record<string, string> {
   const { user } = useAuth();
   const pfade = [...new Set(events.map((e) => e.coverPath).filter((p): p is string => !!p))];
   const { data } = useQuery({
     queryKey: coverSignaturKey(user?.id ?? null, pfade),
     queryFn: () => signEventCovers(pfade),
-    enabled: pfade.length > 0,
+    // `bereit` verhindert einen Aufruf auf einer HALBEN Pfadmenge. Auf der
+    // Detailseite steht das Header-Cover sofort fest, die Cover der ähnlichen
+    // Events erst, wenn die Eventliste geladen ist — ohne diese Bremse würde
+    // erst das eine signiert und gleich darauf alle drei, also zweimal statt
+    // einmal. Der Aufrufer sagt, wann seine Menge vollständig ist.
+    enabled: bereit && pfade.length > 0,
     staleTime: SIGNATUR_STALE_MS,
   });
   return data ?? {};

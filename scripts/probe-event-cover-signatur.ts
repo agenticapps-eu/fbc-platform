@@ -23,6 +23,7 @@
  *   4. eingeloggt, NICHT bestätigt                      → verweigert
  *   5. Objekt ohne events-Zeile (verwaist)              → verweigert
  *   6. fremder Pfad an eigenem `public`-Event (Diebstahl) → verweigert
+ *  6b. gemischter STAPEL über `createSignedUrls` — der Endpunkt der App
  *   7. Upload > 2 MiB                                   → abgelehnt
  *   8. Upload, der kein WebP ist                        → abgelehnt
  *
@@ -197,6 +198,44 @@ async function main() {
     !s6a.data?.signedUrl && !s6b.data?.signedUrl,
     `anon=${s6a.data?.signedUrl ? "ERTEILT" : "verweigert"} dieb=${s6b.data?.signedUrl ? "ERTEILT" : "verweigert"}`,
   );
+
+  // ── 6b. Der Endpunkt, den die App WIRKLICH benutzt ───────────────────────
+  // Befund aus dem Diff-Review (codex, MEDIUM): die Fälle oben messen
+  // `createSignedUrl` (Einzahl), `signEventCovers` ruft aber
+  // `createSignedUrls` (Mehrzahl). Das ist nicht dieselbe Frage: der
+  // Stapel-Endpunkt liefert eine LISTE mit Teilerfolgen, und genau darauf baut
+  // die Oberfläche — ein Pfad ohne URL heißt „Platzhalter zeigen", nicht
+  // „Ansicht kaputt". Ungemessen wäre das eine Annahme über fremden Code.
+  console.log(`\n### Stapel-Endpunkt (der, den die App benutzt)\n`);
+
+  const gemischt = [pfad("public"), pfad("members"), pfad("verwaist")];
+  const b1 = await anon.storage.from(BUCKET).createSignedUrls(gemischt, 60);
+  const treffer = new Map((b1.data ?? []).map((e) => [e.path ?? "", e.signedUrl as string | null]));
+  const nurOeffentlich =
+    !b1.error &&
+    !!treffer.get(pfad("public")) &&
+    !treffer.get(pfad("members")) &&
+    !treffer.get(pfad("verwaist"));
+  pruefe(
+    "6b. anon · gemischter Stapel (public + members + verwaist)",
+    nurOeffentlich,
+    `öffentlich=${treffer.get(pfad("public")) ? "URL" : "keine"} ` +
+      `members=${treffer.get(pfad("members")) ? "URL — LECK!" : "keine"} ` +
+      `verwaist=${treffer.get(pfad("verwaist")) ? "URL — LECK!" : "keine"} ` +
+      `${b1.error ? "Fehler: " + b1.error.message : ""}`,
+  );
+
+  // Der Teilerfolg darf den Aufruf NICHT insgesamt scheitern lassen — sonst
+  // verlöre eine Liste alle Bilder, sobald ein einziges nicht signierbar ist.
+  pruefe(
+    "6c. Ein nicht signierbarer Pfad reißt den Stapel nicht mit",
+    !b1.error && (b1.data ?? []).length === gemischt.length,
+    `Fehler=${b1.error ? b1.error.message : "keiner"} Einträge=${(b1.data ?? []).length}/${gemischt.length}`,
+  );
+
+  const url = treffer.get(pfad("public"));
+  const status = url ? (await fetch(url)).status : 0;
+  pruefe("6d. Die URL aus dem Stapel liefert das Bild", status === 200, `Abruf=${status}`);
 
   console.log(`\n### Bucket-Grenzen (Dienst, nicht Datenbank)\n`);
 

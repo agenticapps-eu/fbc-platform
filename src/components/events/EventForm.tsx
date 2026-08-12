@@ -60,6 +60,9 @@ export function EventForm({
   // `undefined` = unangetastet. Genau diese dritte Möglichkeit verhindert, dass
   // ein Speichern ohne Bildauswahl das bestehende Titelbild löscht.
   const [coverPath, setCoverPath] = useState<string | null | undefined>(undefined);
+  // Solange ein Titelbild hochlädt, darf nicht gespeichert werden — sonst
+  // entsteht ein Event ohne das Bild, das man gerade gewählt hat.
+  const [bildLaedt, setBildLaedt] = useState(false);
   // `initial` ist das Lese-Modell (EventListItem: `string`, wie die DB es liefert), der
   // State das Schreib-Modell. Die Verengung passiert hier sichtbar an EINER Stelle,
   // statt am Ende von submit() unbemerkt behauptet zu werden (AGE-356).
@@ -70,7 +73,8 @@ export function EventForm({
   // Das Ende liegt vor dem Beginn: die Constraint fängt das ohnehin, aber als
   // roher Datenbankfehler in einem Toast. Hier steht es am Feld.
   const endeVorBeginn = startsAt !== "" && endsAt !== "" && endsAt <= startsAt;
-  const canSubmit = title.trim() !== "" && startsAt !== "" && !endeVorBeginn && !pending;
+  const canSubmit =
+    title.trim() !== "" && startsAt !== "" && !endeVorBeginn && !pending && !bildLaedt;
 
   function submit() {
     const capNum = capacity.trim() === "" ? null : Number(capacity);
@@ -207,13 +211,14 @@ export function EventForm({
         initialPath={initial?.coverPath ?? null}
         value={coverPath}
         onChange={setCoverPath}
+        onBusy={setBildLaedt}
       />
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
           Abbrechen
         </Button>
         <Button size="sm" disabled={!canSubmit} onClick={submit}>
-          {pending ? "Wird gespeichert…" : submitLabel}
+          {pending ? "Wird gespeichert…" : bildLaedt ? "Bild lädt…" : submitLabel}
         </Button>
       </div>
     </div>

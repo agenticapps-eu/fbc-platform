@@ -71,20 +71,48 @@ export default function EventDetailPage() {
   }
 
   const isHost = !!uid && event.host?.kind === "profile" && event.host.id === uid;
+  return <EventBody event={event} uid={uid} isHost={isHost} />;
+}
+
+/**
+ * Der Rumpf als eigene Komponente, damit die Haken nicht hinter den frühen
+ * Rückgaben oben stehen (React verbietet bedingte Haken).
+ *
+ * Hier sitzt der EINE Signieraufruf der Detailseite: Header-Cover und die
+ * Cover der ähnlichen Events werden in EINEM Stapel signiert, nicht in zweien.
+ * Das ist die Zusicherung aus dem Spec-Delta („one batched signing call per
+ * view"), und die erste Fassung hat sie verletzt — zwei Komponenten riefen den
+ * Haken je für sich auf. Befund aus dem Diff-Review.
+ */
+function EventBody({
+  event,
+  uid,
+  isHost,
+}: {
+  event: EventListItem;
+  uid: string | null;
+  isHost: boolean;
+}) {
+  const alle = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
+  const aehnlich = selectSimilarEvents(alle.data ?? [], event, new Date());
+  // Erst signieren, wenn die Eventliste steht: sonst ginge ein Stapel mit dem
+  // Header-Cover raus und gleich danach einer mit allen dreien.
+  const covers = useEventCovers([event, ...aehnlich], !alle.isLoading);
+
   return (
     <div className="space-y-6">
       <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
         ← Zu allen Events
       </Link>
-      <EventHeader event={event} />
+      <EventHeader event={event} covers={covers} />
       <RegistrationPanel event={event} uid={uid} />
       {/* Ohne Session gibt es keine Teilnehmer: `event_attendees` trägt kein
           `execute` für `anon`. Der Block entfällt dann ganz, statt einen 42501
           in die Konsole zu schreiben — dieselbe Regel wie in AGE-530 für
           `profiles_public` und `partners`. */}
       {uid && <AttendeeRow event={event} uid={uid} />}
-      {isHost && <HostTools event={event} uid={uid} />}
-      <SimilarEvents event={event} uid={uid} />
+      {isHost && uid && <HostTools event={event} uid={uid} />}
+      <SimilarEvents events={aehnlich} covers={covers} />
     </div>
   );
 }
@@ -105,7 +133,12 @@ function AttendeeRow({ event, uid }: { event: EventListItem; uid: string }) {
     queryKey: eventAttendeesKey(uid, event.id),
     queryFn: () => fetchEventAttendees(event.id),
   });
-  const rows = data ?? [];
+  // NUR Angemeldete. Die RPC gibt dem HOST jeden Status heraus — das braucht
+  // sein Werkzeug —, aber diese Reihe beantwortet „wer kommt", und da hat eine
+  // Abmeldung nichts verloren. Befund aus dem Diff-Review; für einen
+  // Nicht-Host ist der Filter wirkungslos, weil die RPC ihm ohnehin nur
+  // `registered` liefert.
+  const rows = (data ?? []).filter((a) => a.status === "registered");
   if (isLoading) return null;
   if (event.registeredCount === 0) return null;
 
@@ -140,15 +173,18 @@ function AttendeeRow({ event, uid }: { event: EventListItem; uid: string }) {
 /**
  * „Ähnliche Events": die drei nächsten kommenden desselben Typs.
  *
- * Gespeist aus DERSELBEN Abfrage wie die Übersicht — nicht aus dem Cache
- * gelesen und gehofft, dass er gefüllt ist. Beim Direktaufruf, beim Neuladen
- * und beim Lesezeichen war die Liste nie geladen; `useQuery` auf denselben
- * Schlüssel holt sie dann nach und teilt sie sonst.
+ * Auswahl und Signaturen kommen von oben (`EventBody`), damit die Seite EINEN
+ * Signierstapel macht und die Liste aus DERSELBEN Abfrage wie die Übersicht
+ * stammt — nicht aus einem Cache, auf dessen Füllung man hofft. Beim
+ * Direktaufruf, beim Neuladen und beim Lesezeichen war sie nie geladen.
  */
-function SimilarEvents({ event, uid }: { event: EventListItem; uid: string | null }) {
-  const { data } = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
-  const aehnlich = selectSimilarEvents(data ?? [], event, new Date());
-  const covers = useEventCovers(aehnlich);
+function SimilarEvents({
+  events: aehnlich,
+  covers,
+}: {
+  events: EventListItem[];
+  covers: Record<string, string>;
+}) {
   if (aehnlich.length === 0) return null;
   return (
     <section className="space-y-3">
@@ -164,12 +200,8 @@ function SimilarEvents({ event, uid }: { event: EventListItem; uid: string | nul
   );
 }
 
-function EventHeader({ event }: { event: EventListItem }) {
+function EventHeader({ event, covers }: { event: EventListItem; covers: Record<string, string> }) {
   const remaining = remainingSpots(event.capacity, event.registeredCount);
-  // Ein einzelnes Cover, aber über denselben gebündelten Weg wie die Liste —
-  // eine zweite Signier-Implementierung wäre eine zweite Stelle, an der
-  // Gültigkeit und Cache-Fenster auseinanderlaufen könnten.
-  const covers = useEventCovers([event]);
   return (
     <Card className="space-y-4 overflow-hidden !p-0">
       <EventCover

@@ -162,12 +162,42 @@ Lokaler Stack, eigene Daten, Chrome.
 | Telefon (390 px)        | einspaltig, `scrollWidth == clientWidth`, 0 Elemente über dem Rand                                                                               |
 | Variante `navy`         | trägt, nichts bricht                                                                                                                             |
 
-## 8 · Abschlussmessung
+## 8 · Diff-Review (Schritt 4) — vier Befunde, alle übernommen
+
+`DIFF-REVIEWS.md`. Der wichtigste war ein echter Fehler: **der Host sah
+Abmeldungen als Teilnehmer.** `event_attendees` gibt ihm jeden Status heraus,
+und die Avatarreihe filterte nicht. pgTAP prüft die RPC, die React-Tests fuhren
+nur mit `registered`-Fixtures — die Lücke saß genau dazwischen.
+
+```
+RED:   expected document not to contain element, found <a …>   1 failed | 7 passed
+GREEN: 9 passed
+```
+
+Beim Beheben des Signier-Befunds kam ein zweiter Aufruf zum Vorschein, den der
+Reviewer nicht genannt hatte: die Pfadmenge **wächst**, sobald die Eventliste
+eintrifft. `useEventCovers` wartet jetzt auf ein `bereit`-Flag.
+
+```
+RED:   expected "vi.fn()" to be called 1 times, but got 2 times
+GREEN: 9 passed
+```
+
+Die Sonde misst jetzt auch den Endpunkt, den die App wirklich benutzt:
+
+```
+OK  6b. anon · gemischter Stapel: öffentlich=URL members=keine verwaist=keine
+OK  6c. Ein nicht signierbarer Pfad reißt den Stapel nicht mit: Einträge=3/3
+OK  6d. Die URL aus dem Stapel liefert das Bild: Abruf=200
+```
+
+## 9 · Abschlussmessung
 
 ```
 pnpm lint       0 Fehler (4 Bestandswarnungen, unverändert)
 pnpm typecheck  sauber
-pnpm test       643 Tests / 93 Dateien   grün   (Ausgang: 615 / 90)
+pnpm test       645 Tests / 93 Dateien   grün   (Ausgang: 615 / 90)
 pnpm build      erfolgreich
 supabase test db --local   347 Tests   grün   (Ausgang: 315)
+Sonde                      11 Faelle, alle erfuellt
 ```
