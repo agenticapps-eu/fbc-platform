@@ -273,27 +273,47 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 6 · Composer nach Mockup
 
-- [ ] 6.1 Ruhige Zeile, die sich beim Klick öffnet (Mockup: Avatar +
+- [x] 6.1 Ruhige Zeile, die sich beim Klick öffnet (Mockup: Avatar +
       „Was möchtest du mit der Community teilen?").
-- [ ] 6.2 Bildauswahl mit Vorschau, Reihenfolge, einzeln entfernen, **hart auf
+      Der Avatar zeigt das generische Personen-Symbol: die Komponente kennt den
+      eigenen Namen nur über `activationName` aus dem Auth-Context und lädt für
+      ein Schmuckbild kein Profil nach.
+- [x] 6.2 Bildauswahl mit Vorschau, Reihenfolge, einzeln entfernen, **hart auf
       sechs begrenzt** — mit sichtbarer Rückmeldung, nicht stillem Verschlucken.
-- [ ] 6.3 Video-Link bleibt ein eigenes Feld; `parseVideoUrl` entscheidet
+      Verkleinert wird beim **Auswählen**, nicht beim Veröffentlichen: nur so
+      ist die Meldung aus 5.1a sofort da. Hochgeladen wird beim Veröffentlichen
+      — deshalb ist „einzeln entfernen" hier nur ein `filter` auf einem Array
+      und fasst den Storage nicht an (siehe 5.2).
+- [x] 6.3 Video-Link bleibt ein eigenes Feld; `parseVideoUrl` entscheidet
       weiterhin. **Kein Upload.** Gespeichert wird er wie heute: an den Body
       angehängt (`CommunityFeed.tsx:104–108`) und beim Rendern über `skipRaw`
       unterdrückt, damit er nicht als Link **und** als Einbettung erscheint.
       **Kein neues Feld am Schema** — das Plan-Review hat zu Recht bemängelt,
       dass dieser Weg nirgends ausgesprochen war.
-- [ ] 6.4 Tag-Auswahl aus den aktiven kuratierten Tags plus Freitext.
-- [ ] 6.4a Beim Veröffentlichen werden getippte und geklickte Tags
+      Das Feld steht im geöffneten Composer sichtbar; der „Video"-Knopf des
+      Mockups (der es erst einblendet) ist ein Zustand mehr ohne Gewinn.
+- [x] 6.4 Tag-Auswahl aus den aktiven kuratierten Tags plus Freitext.
+      **Der Freitext ist der Beitragstext.** Ein freier Tag entsteht wie bisher
+      als `#Wort` im Text und geht über `parseHashtags` in `p_hashtags`; die
+      Chips gehen als `p_tags`. Ein zweites Eingabefeld für freie Tags wäre ein
+      dritter Weg zu demselben Wert — und der Fall „getippt UND geklickt", den
+      6.4a trägt, entsteht genau zwischen diesen beiden.
+- [x] 6.4a Beim Veröffentlichen werden getippte und geklickte Tags
       **vereinigt und dedupliziert** (`design.md`, „Tags werden vereinigt").
       Der Fall, der sonst durchrutscht: jemand tippt `#Netzwerken` **und**
       klickt denselben Tag — ohne Vereinigung steht er zweimal in `hashtags`
       und erscheint als doppelter Chip, also genau der Bug, den Block 4 behebt.
-- [ ] 6.5 Sichtbarkeit wie bisher, `members` als Vorgabe.
-- [ ] 6.6 Test: veröffentlichen mit zwei Bildern und zwei Tags legt zwei
+      Der Client übergibt beide Listen getrennt; vereinigt wird in der RPC.
+- [x] 6.5 Sichtbarkeit wie bisher, `members` als Vorgabe.
+- [x] 6.6 Test: veröffentlichen mit zwei Bildern und zwei Tags legt zwei
       `post_media`-Zeilen in Reihenfolge an. **Vorbelegter Context prüft die
       falsche Zeitachse** — kommt ein Wert erst nach dem Mount, nimmt
       `useState(wert)` ihn nie an. Wo das droht, zusätzlich Sichtprobe.
+      Gefälscht ist im Test der **Browser** (jsdom hat weder `createImageBitmap`
+      noch einen 2D-Kontext), nicht der eigene Code: `shrinkToWebp`,
+      `zielMasse`, `parseHashtags` und `uploadPostMedia` laufen echt. Deshalb
+      trägt die Zusicherung auf 1600×1200 — die Zahl ist gerechnet, nicht
+      eingesetzt. Gegenprobe: `sort` fest auf 0 mutiert lässt zwei Tests fallen.
 
 ## 7 · Beitragskarte und Bildlayout
 

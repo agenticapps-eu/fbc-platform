@@ -1,5 +1,7 @@
 import { captureException } from "@sentry/react";
 
+import { type Json } from "./database.types";
+import { type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
 
 /**
@@ -14,7 +16,9 @@ import { supabase } from "./supabase";
  *    Zähler ist sonst clientseitig nicht berechenbar. Die RPC liefert nur Zahlen.
  *  - `likedByMe` aus den eigenen `post_likes`-Zeilen (alles, was die owner-only
  *    SELECT-Policy zurückgibt).
- *  - Schreiben (`createPost`/`toggleLike`/`addComment`) über die `*_own`-Policies.
+ *  - Schreiben: `toggleLike`/`addComment` über die `*_own`-Policies; ein Beitrag
+ *    entsteht über die RPC `create_post_with_media`, damit er nie ohne seine
+ *    Bilder im Feed steht (AGE-528). `posts_write_own` bleibt daneben bestehen.
  *
  * Reine Helfer (Hashtag-/Body-Parsing, Video-Erkennung) sind in feed.test.ts getestet.
  */
@@ -421,17 +425,38 @@ export async function fetchComments(postId: string): Promise<FeedComment[]> {
 
 // ── Schreiben ─────────────────────────────────────────────────────────────────
 
-/** Legt einen Beitrag an. Hashtags werden aus dem Body geparst und gespeichert. */
-export async function createPost(input: {
-  authorId: string;
+/**
+ * Legt Beitrag UND Bildzeilen in einer Transaktion an (AGE-528).
+ *
+ * Der naheliegende Ablauf — Beitrag anlegen, Bilder hochladen, Zeilen anlegen —
+ * hat einen sichtbaren Fehlerzustand: bricht er nach dem ersten Schritt ab,
+ * steht der Beitrag sofort im Feed, und zwar **ohne seine Bilder**. Ein
+ * Erlebnisbericht ohne Fotos ist kein halber Beitrag, sondern ein falscher.
+ * Deshalb wird die `id` im Client erzeugt, die Bilder wandern zuerst in den
+ * Bucket, und diese eine RPC klammert die beiden Inserts.
+ *
+ * Die Tags gehen GETRENNT hinein: getippte (aus dem Text) und geklickte. Die
+ * Vereinigung steht in der RPC — sie hier zusätzlich zu bauen wäre dieselbe
+ * Regel an zwei Stellen.
+ */
+export async function createPostWithMedia(input: {
+  postId: string;
   body: string;
   visibility: PostVisibility;
+  tags: string[];
+  media: PostMediaEingabe[];
 }): Promise<void> {
-  const { error } = await supabase.from("posts").insert({
-    author_id: input.authorId,
-    body: input.body,
-    visibility: input.visibility,
-    hashtags: parseHashtags(input.body),
+  const { error } = await supabase.rpc("create_post_with_media", {
+    p_post_id: input.postId,
+    p_body: input.body,
+    p_visibility: input.visibility,
+    p_hashtags: parseHashtags(input.body),
+    p_tags: input.tags,
+    // `p_media` ist in Postgres `jsonb`, und der Typgenerator schreibt dafür
+    // `Json` — eine Struktur mit festen Feldern passt da nicht ohne Weiteres
+    // hinein. Die Form prüft die RPC beim Auspacken (`m->>'storage_path'` …),
+    // hier ist nur die Typbrücke.
+    p_media: input.media as unknown as Json,
   });
   if (error) throw error;
 }

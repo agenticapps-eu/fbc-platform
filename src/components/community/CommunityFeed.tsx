@@ -14,11 +14,14 @@ import { VideoEmbed } from "../ui/VideoEmbed";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import { displayAuthor } from "../../lib/displayAuthor";
+import { shrinkToWebp } from "../../lib/image";
+import { uploadPostMedia } from "../../lib/post-media";
+import { fetchAktiveTags, tagsQueryKey } from "../../lib/tags";
 import {
   addComment,
   buildMentionResolver,
   commentsQueryKey,
-  createPost,
+  createPostWithMedia,
   extractFirstVideo,
   feedListKey,
   feedQueryKey,
@@ -105,27 +108,89 @@ export default function CommunityFeed() {
 
 // ── Composer ────────────────────────────────────────────────────────────────
 
+/** Höchstens sechs Bilder pro Beitrag — dieselbe Grenze hält der Trigger auf
+ *  `post_media`. Hier steht sie, damit der Nutzer sie sieht, nicht damit sie
+ *  gilt: durchgesetzt wird sie in der Datenbank. */
+const MAX_BILDER = 6;
+
+/** Ein gewähltes Bild, bereits verkleinert und nach WebP gewandelt. */
+interface GewaehltesBild {
+  blob: Blob;
+  width: number;
+  height: number;
+  vorschau: string;
+}
+
 function PostComposer({ authorId }: { authorId: string }) {
+  const { activationName } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [offen, setOffen] = useState(false);
   const [body, setBody] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [visibility, setVisibility] = useState<PostVisibility>("members");
+  const [bilder, setBilder] = useState<GewaehltesBild[]>([]);
+  const [bildFehler, setBildFehler] = useState<string | null>(null);
+  const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
+
+  // Die kuratierte Liste hängt an keinem Betrachter; freie Tags entstehen
+  // weiterhin durch `#Wort` im Text — beide Quellen vereinigt die RPC.
+  const tags = useQuery({ queryKey: tagsQueryKey, queryFn: fetchAktiveTags });
 
   const videoValid = videoUrl.trim() === "" || parseVideoUrl(videoUrl) !== null;
 
+  /**
+   * Verkleinern passiert beim AUSWÄHLEN, nicht beim Veröffentlichen: ein
+   * unlesbares Bild soll sofort und benennbar auffallen, statt den Nutzer
+   * später in einen nichtssagenden Serverfehler am 1-MiB-Limit laufen zu lassen.
+   */
+  async function waehleBilder(dateien: File[]) {
+    const frei = MAX_BILDER - bilder.length;
+    setBildFehler(
+      dateien.length > frei
+        ? `Höchstens sechs Bilder pro Beitrag — ${dateien.length - frei} wurden nicht übernommen.`
+        : null,
+    );
+    for (const datei of dateien.slice(0, Math.max(0, frei))) {
+      try {
+        const { blob, width, height } = await shrinkToWebp(datei);
+        setBilder((bisher) => [
+          ...bisher,
+          { blob, width, height, vorschau: URL.createObjectURL(blob) },
+        ]);
+      } catch (fehler) {
+        setBildFehler(errorMessage(fehler));
+      }
+    }
+  }
+
   const create = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // Video-URL (falls valide) wird an den Body gehängt — kein neues Schema; die
       // Karte erkennt und bettet sie ein.
       const trimmedVideo = videoUrl.trim();
       const fullBody = trimmedVideo ? `${body.trim()}\n${trimmedVideo}` : body.trim();
-      return createPost({ authorId, body: fullBody, visibility });
+      // Die id entsteht HIER, vor dem Upload: die Bildpfade tragen sie, und der
+      // Beitrag entsteht erst danach — in einem Schritt mit seinen Bildzeilen.
+      const postId = crypto.randomUUID();
+      const media = await uploadPostMedia({ uid: authorId, postId, bilder });
+      await createPostWithMedia({
+        postId,
+        body: fullBody,
+        visibility,
+        tags: gewaehlteTags,
+        media,
+      });
     },
     onSuccess: () => {
       setBody("");
       setVideoUrl("");
       setVisibility("members");
+      for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
+      setBilder([]);
+      setBildFehler(null);
+      setGewaehlteTags([]);
+      setOffen(false);
       toast({ variant: "success", title: "Beitrag veröffentlicht" });
       // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
       // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
@@ -140,7 +205,27 @@ function PostComposer({ authorId }: { authorId: string }) {
     },
   });
 
-  const canSubmit = body.trim() !== "" && videoValid && !create.isPending;
+  const canSubmit =
+    (body.trim() !== "" || bilder.length > 0) && videoValid && !create.isPending;
+
+  // Die ruhige Zeile aus dem Mockup: der Composer nimmt geschlossen so wenig
+  // Raum ein wie ein Beitrag Aufmerksamkeit verdient.
+  if (!offen) {
+    return (
+      <Card>
+        <button
+          type="button"
+          onClick={() => setOffen(true)}
+          className="flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Avatar name={activationName ?? ""} masked={!activationName} />
+          <span className="flex-1 rounded-full border border-line px-4 py-2.5 text-sm text-muted">
+            Was möchtest du mit der Community teilen?
+          </span>
+        </button>
+      </Card>
+    );
+  }
 
   return (
     <Card className="space-y-4">
@@ -151,6 +236,78 @@ function PostComposer({ authorId }: { authorId: string }) {
         placeholder="Etwas mit der Community teilen … #Hashtag, @Erwähnung"
         aria-label="Neuer Beitrag"
       />
+
+      {bilder.length > 0 && (
+        <ul className="grid grid-cols-3 gap-2">
+          {bilder.map((bild, i) => (
+            <li key={bild.vorschau} className="relative">
+              <img
+                src={bild.vorschau}
+                alt=""
+                className="aspect-4/3 w-full rounded-md object-cover"
+              />
+              <button
+                type="button"
+                aria-label={`Bild ${i + 1} entfernen`}
+                onClick={() => {
+                  URL.revokeObjectURL(bild.vorschau);
+                  setBilder((bisher) => bisher.filter((_, j) => j !== i));
+                  setBildFehler(null);
+                }}
+                className="absolute top-1 right-1 rounded-full bg-scrim px-2 py-0.5 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            aria-label="Bilder auswählen"
+            className="sr-only"
+            onChange={(e) => {
+              const dateien = [...(e.target.files ?? [])];
+              e.target.value = "";
+              void waehleBilder(dateien);
+            }}
+          />
+        </label>
+        {bildFehler && <p className="mt-1 text-xs text-danger">{bildFehler}</p>}
+      </div>
+
+      {(tags.data ?? []).length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {(tags.data ?? []).map((tag) => {
+            const aktiv = gewaehlteTags.includes(tag.key);
+            return (
+              <button
+                key={tag.key}
+                type="button"
+                aria-pressed={aktiv}
+                onClick={() =>
+                  setGewaehlteTags((bisher) =>
+                    aktiv ? bisher.filter((k) => k !== tag.key) : [...bisher, tag.key],
+                  )
+                }
+                className={`rounded-full px-2.5 py-0.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  aktiv
+                    ? "bg-accent-soft font-medium text-accent-strong"
+                    : "border border-line text-muted hover:text-ink"
+                }`}
+              >
+                {tag.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div>
         <input
@@ -190,7 +347,7 @@ function PostComposer({ authorId }: { authorId: string }) {
           </Select>
         </label>
         <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
-          {create.isPending ? "Wird veröffentlicht…" : "Beitrag teilen"}
+          {create.isPending ? "Wird veröffentlicht…" : "Posten"}
         </Button>
       </div>
     </Card>
