@@ -180,6 +180,33 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
     expect(screen.getAllByRole("button", { name: /bild \d entfernen/i })).toHaveLength(1);
   });
 
+  /**
+   * Die Ausrichtung selbst ist in jsdom nicht messbar — es rechnet kein Layout.
+   * Messbar ist die STRUKTUR, die sie erzeugt: die Dateiauswahl und „Posten"
+   * teilen sich denselben Aktionsbereich. Vorher lagen sie in getrennten
+   * Zeilen, und genau daran ist diese Zusicherung rot gewesen.
+   */
+  it("legt die Dateiauswahl in dieselbe Aktionszeile wie „Posten\"", () => {
+    renderFeed();
+    oeffneComposer();
+
+    const auswahl = screen.getByLabelText("Bilder auswählen");
+    const posten = screen.getByRole("button", { name: /posten/i });
+
+    // Dateiauswahl und „Posten" liegen in DERSELBEN Gruppe — das ist das
+    // Rechtsbündeln.
+    const gruppe = auswahl.closest("div");
+    expect(gruppe).not.toBeNull();
+    expect(gruppe!.contains(posten)).toBe(true);
+
+    // Und diese Gruppe teilt die Aktionszeile mit der Sichtbarkeit, die links
+    // bleibt. Ohne diese zweite Zusicherung wäre der Test auch grün, wenn die
+    // Gruppe irgendwo sonst im Composer stünde.
+    const zeile = gruppe!.parentElement;
+    expect(zeile).not.toBeNull();
+    expect(zeile!.contains(screen.getByLabelText("Sichtbarkeit"))).toBe(true);
+  });
+
   it("macht einen fremden Videolink nicht absendbar", async () => {
     renderFeed();
     oeffneComposer();
