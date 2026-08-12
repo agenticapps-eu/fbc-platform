@@ -28,6 +28,27 @@ export const POST_MEDIA_BUCKET = "post-media";
 export const SIGNATUR_GUELTIGKEIT_SEK = 3600;
 export const SIGNATUR_STALE_MS = 50 * 60 * 1000;
 
+/**
+ * Wie viele Kacheln zeigt die Karte, und wie viele bleiben übrig?
+ *
+ * Rein, damit die Wahl prüfbar ist, ohne etwas zu rendern: ein Bild steht
+ * allein, zwei stehen nebeneinander, ab drei wird es ein Raster mit höchstens
+ * vier Kacheln — die vierte trägt dann „+n". Die Maße jedes Bildes stehen in
+ * `post_media`, damit beim Laden nichts springt.
+ */
+export type BildLayout = {
+  art: "einzeln" | "paar" | "raster";
+  sichtbar: number;
+  rest: number;
+};
+
+export function bildLayout(anzahl: number): BildLayout {
+  if (anzahl <= 1) return { art: "einzeln", sichtbar: anzahl, rest: 0 };
+  if (anzahl === 2) return { art: "paar", sichtbar: 2, rest: 0 };
+  const sichtbar = Math.min(anzahl, 4);
+  return { art: "raster", sichtbar, rest: anzahl - sichtbar };
+}
+
 /** Genau die Form, die `create_post_with_media(p_media jsonb)` erwartet. */
 export interface PostMediaEingabe {
   storage_path: string;

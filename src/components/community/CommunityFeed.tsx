@@ -1,5 +1,11 @@
-import { useMemo, useState } from "react";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Avatar } from "../ui/Avatar";
@@ -15,8 +21,14 @@ import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import { displayAuthor } from "../../lib/displayAuthor";
 import { shrinkToWebp } from "../../lib/image";
-import { uploadPostMedia } from "../../lib/post-media";
-import { fetchAktiveTags, tagsQueryKey } from "../../lib/tags";
+import {
+  bildLayout,
+  signaturQueryKey,
+  signPostMedia,
+  SIGNATUR_STALE_MS,
+  uploadPostMedia,
+} from "../../lib/post-media";
+import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
 import {
   addComment,
   buildMentionResolver,
@@ -32,6 +44,7 @@ import {
   tokenizePostBody,
   VISIBILITY_OPTIONS,
   type FeedCursor,
+  type FeedMedia,
   type FeedPost,
   type MentionResolver,
   type PostSegment,
@@ -70,6 +83,40 @@ export default function CommunityFeed() {
     [posts],
   );
 
+  // Signaturen JE SEITE, nicht je Bild und nicht für alles zusammen: der Token
+  // steckt in der URL, und ein Schlüssel über alle geladenen Seiten würde beim
+  // Nachladen auch die alten Bilder neu signieren — der Browser lüde sie dann
+  // erneut. Je Seite bleibt die Zeichenkette stabil, solange die Seite es ist.
+  const signaturen = useQueries({
+    queries: (feed.data?.pages ?? []).map((seite) => {
+      const pfade = seite.posts.flatMap((p) => p.media.map((m) => m.storagePath));
+      return {
+        queryKey: signaturQueryKey(pfade),
+        queryFn: () => signPostMedia(pfade),
+        enabled: pfade.length > 0,
+        staleTime: SIGNATUR_STALE_MS,
+      };
+    }),
+  });
+  const bildUrls: Record<string, string> = Object.assign(
+    {},
+    ...signaturen.map((q) => q.data ?? {}),
+  );
+
+  // Zwischen `staleTime` (50 min) und Ablauf (60 min) liegt ein Fenster, in dem
+  // ein offen gelassener Tab eine abgelaufene URL hält und das Bild 403 liefert.
+  // Dann wird nachsigniert — aber je Pfad genau einmal, sonst dreht sich ein
+  // wirklich kaputtes Bild endlos im Kreis.
+  const queryClient = useQueryClient();
+  const nachsigniert = useRef(new Set<string>());
+  function onBildFehler(pfad: string) {
+    if (nachsigniert.current.has(pfad)) return;
+    nachsigniert.current.add(pfad);
+    void queryClient.invalidateQueries({ queryKey: ["post-media", "signiert"] });
+  }
+
+  const tags = useQuery({ queryKey: tagsQueryKey, queryFn: fetchAktiveTags });
+
   return (
     <section className="space-y-6">
       {user && <PostComposer authorId={user.id} />}
@@ -101,6 +148,9 @@ export default function CommunityFeed() {
         activeHashtag={hashtag}
         onHashtag={setHashtag}
         mentionResolver={mentionResolver}
+        bildUrls={bildUrls}
+        onBildFehler={onBildFehler}
+        kuratierteTags={tags.data ?? []}
       />
     </section>
   );
@@ -367,6 +417,9 @@ function FeedList({
   activeHashtag,
   onHashtag,
   mentionResolver,
+  bildUrls,
+  onBildFehler,
+  kuratierteTags,
 }: {
   posts: FeedPost[];
   isLoading: boolean;
@@ -378,6 +431,9 @@ function FeedList({
   activeHashtag: string | null;
   onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
+  bildUrls: Record<string, string>;
+  onBildFehler: (pfad: string) => void;
+  kuratierteTags: Tag[];
 }) {
   if (isLoading) {
     return <p className="text-sm text-muted">Feed wird geladen…</p>;
@@ -418,6 +474,9 @@ function FeedList({
               activeHashtag={activeHashtag}
               onHashtag={onHashtag}
               mentionResolver={mentionResolver}
+              bildUrls={bildUrls}
+              onBildFehler={onBildFehler}
+              kuratierteTags={kuratierteTags}
             />
           </StaggerItem>
         ))}
@@ -442,12 +501,18 @@ function PostCard({
   activeHashtag,
   onHashtag,
   mentionResolver,
+  bildUrls,
+  onBildFehler,
+  kuratierteTags,
 }: {
   post: FeedPost;
   currentUserId: string | null;
   activeHashtag: string | null;
   onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
+  bildUrls: Record<string, string>;
+  onBildFehler: (pfad: string) => void;
+  kuratierteTags: Tag[];
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -505,30 +570,45 @@ function PostCard({
               </>
             )}
           </div>
-          <p className="text-xs text-muted">{timeAgo(post.createdAt)}</p>
+          <p className="text-xs text-muted">
+            {timeAgo(post.createdAt)}
+            {" · "}
+            {post.visibility === "members" ? "Nur für Mitglieder" : "Öffentlich"}
+          </p>
         </div>
       </header>
 
       <PostBody segments={segments} skipRaw={video?.url} mentionResolver={mentionResolver} />
 
+      <PostMedien media={post.media} urls={bildUrls} onFehler={onBildFehler} autor={author.name} />
+
       {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
 
       {post.hashtags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {post.hashtags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onHashtag(tag)}
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                activeHashtag === tag
-                  ? "bg-accent text-chrome"
-                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
-              }`}
-            >
-              #{tag}
-            </button>
-          ))}
+          {post.hashtags.map((tag) => {
+            // Kuratiert heißt: dieser Wert steht in `tags`. Ein umbenannter oder
+            // deaktivierter Tag wirkt NICHT rückwirkend — der Beitrag behält
+            // seine Zeichenkette und der Chip wandert nach „frei".
+            const kuratiert = istKuratiert(tag, kuratierteTags);
+            return (
+              <button
+                key={tag}
+                type="button"
+                data-kuratiert={kuratiert}
+                onClick={() => onHashtag(tag)}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  activeHashtag === tag
+                    ? "bg-accent text-chrome"
+                    : kuratiert
+                      ? "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
+                      : "border border-line text-muted hover:text-ink"
+                }`}
+              >
+                #{tag}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -561,6 +641,65 @@ function PostCard({
 
       {showComments && <CommentThread postId={post.id} currentUserId={currentUserId} />}
     </Card>
+  );
+}
+
+// ── Bilder einer Karte ──────────────────────────────────────────────────────
+
+/**
+ * Die Bilder liegen in einem PRIVATEN Bucket; sichtbar sind sie nur über eine
+ * signierte URL. Fehlt die Signatur für einen Pfad, entfällt seine Kachel —
+ * der Storage lehnt einzelne Pfade ab, und der Beitrag darf deshalb nicht
+ * verschwinden (gemessen in EVIDENCE.md, Fall F).
+ */
+function PostMedien({
+  media,
+  urls,
+  onFehler,
+  autor,
+}: {
+  media: FeedMedia[];
+  urls: Record<string, string>;
+  onFehler: (pfad: string) => void;
+  autor: string;
+}) {
+  if (media.length === 0) return null;
+  const layout = bildLayout(media.length);
+  const raster =
+    layout.art === "einzeln"
+      ? "grid-cols-1"
+      : layout.art === "paar"
+        ? "grid-cols-2"
+        : "grid-cols-2 sm:grid-cols-3";
+
+  return (
+    <ul className={`grid gap-2 ${raster}`}>
+      {media.slice(0, layout.sichtbar).map((bild, i) => {
+        const url = urls[bild.storagePath];
+        if (!url) return null;
+        const letzte = i === layout.sichtbar - 1 && layout.rest > 0;
+        return (
+          <li key={bild.storagePath} className="relative">
+            <img
+              src={url}
+              // Die Maße stehen in `post_media`, damit der Platz schon steht,
+              // bevor das Bild da ist — sonst springt die Karte beim Laden.
+              width={bild.width}
+              height={bild.height}
+              loading="lazy"
+              alt={`Bild ${i + 1} zum Beitrag von ${autor}`}
+              onError={() => onFehler(bild.storagePath)}
+              className="aspect-4/3 w-full rounded-md object-cover"
+            />
+            {letzte && (
+              <span className="absolute inset-0 flex items-center justify-center rounded-md bg-scrim text-lg font-semibold text-white">
+                +{layout.rest}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

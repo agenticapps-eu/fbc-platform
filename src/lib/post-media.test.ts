@@ -37,6 +37,7 @@ const captureException = vi.fn();
 vi.mock("@sentry/react", () => ({ captureException: (...args: unknown[]) => captureException(...args) }));
 
 import {
+  bildLayout,
   POST_MEDIA_BUCKET,
   SIGNATUR_GUELTIGKEIT_SEK,
   SIGNATUR_STALE_MS,
@@ -131,5 +132,27 @@ describe("signPostMedia", () => {
     expect(SIGNATUR_GUELTIGKEIT_SEK).toBe(3600);
     expect(SIGNATUR_STALE_MS).toBe(50 * 60 * 1000);
     expect(SIGNATUR_STALE_MS).toBeLessThan(SIGNATUR_GUELTIGKEIT_SEK * 1000);
+  });
+});
+
+describe("bildLayout", () => {
+  it("ein Bild steht allein und groß", () => {
+    expect(bildLayout(1)).toEqual({ art: "einzeln", sichtbar: 1, rest: 0 });
+  });
+
+  it("zwei Bilder stehen nebeneinander", () => {
+    expect(bildLayout(2)).toEqual({ art: "paar", sichtbar: 2, rest: 0 });
+  });
+
+  it("drei Bilder sind ein Raster ohne Rest", () => {
+    expect(bildLayout(3)).toEqual({ art: "raster", sichtbar: 3, rest: 0 });
+  });
+
+  it("fünf Bilder zeigen vier Kacheln, die vierte trägt „+1“", () => {
+    expect(bildLayout(5)).toEqual({ art: "raster", sichtbar: 4, rest: 1 });
+  });
+
+  it("ohne Bild ist nichts zu zeichnen", () => {
+    expect(bildLayout(0)).toEqual({ art: "einzeln", sichtbar: 0, rest: 0 });
   });
 });

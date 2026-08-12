@@ -237,14 +237,13 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       Der Gegenfall ist mitgezogen: scheitert der **ganze** Aufruf, ist etwas
       kaputt — das geht sehr wohl an Sentry, und der Feed zeigt die Beiträge
       ohne Bilder statt gar nicht.
-- [~] 5.3 Signierte URLs pro Pfad in react-query cachen, `staleTime` 50 min bei
+- [x] 5.3 Signierte URLs pro Pfad in react-query cachen, `staleTime` 50 min bei
       1 h Gültigkeit. Ohne das lädt der Browser bei jedem Render jedes Bild neu.
       **Plus**: ein Bildfehler (403 nach Ablauf in einem lange offenen Tab)
       löst ein Nachsignieren aus, statt eine kaputte Kachel stehen zu lassen.
-      **Halb erledigt:** `signaturQueryKey` und `SIGNATUR_STALE_MS` stehen in
-      `post-media.ts` und sind zugesichert. Der Hook und das Nachsignieren
-      brauchen das `<img>`, das es erst in **7.2** gibt — sie werden dort
-      gebaut, nicht hier auf Vorrat.
+      In Block 5 entstanden `signaturQueryKey` und `SIGNATUR_STALE_MS`; Hook
+      und Nachsignieren kamen mit **7.2**, wo es das `<img>` gibt — nicht hier
+      auf Vorrat.
 - [x] 5.4 `src/lib/tags.ts`: aktive kuratierte Tags lesen, `istKuratiert(key)`.
 - [x] 5.5 `fetchFeed` auf Seiten zu 20 umstellen, `post_media` mitlesen. Der
       Cursor läuft über **`(created_at, id)`**, nicht über `created_at` allein —
@@ -317,14 +316,27 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 7 · Beitragskarte und Bildlayout
 
-- [ ] 7.1 Karte nach Mockup: Autor mit Avatar und Stufen-Badge, Zeit,
+- [x] 7.1 Karte nach Mockup: Autor mit Avatar und Stufen-Badge, Zeit,
       Sichtbarkeits-Hinweis, Text, Medien, Chips, darunter Reaktion und
       Kommentare. **Eine** Reaktionsart (Herz) — wie im Mockup.
-- [ ] 7.2 Bildlayout: eins groß, zwei nebeneinander, drei und mehr als Raster
+      Alles außer dem Sichtbarkeits-Hinweis und den Medien stand schon; neu sind
+      genau diese beiden. Der Hinweis steht neben der Zeit und benennt beide
+      Fälle („Nur für Mitglieder" / „Öffentlich").
+- [x] 7.2 Bildlayout: eins groß, zwei nebeneinander, drei und mehr als Raster
       mit vier Kacheln; die vierte trägt „+n". Maße aus `width`/`height`, damit
       nichts springt.
-- [ ] 7.3 Kuratierte Chips gefüllt, freie als Outline; beide klickbar.
-- [ ] 7.4 Test für die Layout-Wahl als reine Funktion (1/2/3/5 Bilder).
+      **Damit ist auch die zweite Hälfte von 5.3 erledigt:** die Signaturen
+      werden mit `useQueries` **je Seite** geholt — ein Schlüssel über alle
+      geladenen Seiten würde beim Nachladen auch die alten Bilder neu signieren
+      und der Browser lüde sie erneut. Ein Bildfehler löst ein Nachsignieren
+      aus, aber je Pfad genau einmal: ein wirklich kaputtes Bild soll sich nicht
+      im Kreis drehen.
+- [x] 7.3 Kuratierte Chips gefüllt, freie als Outline; beide klickbar.
+      Zugesichert über `data-kuratiert`, nicht über Klassennamen — welche Klasse
+      füllt und welche umrandet, ist Umsetzung und gehört in die Sichtprobe.
+- [x] 7.4 Test für die Layout-Wahl als reine Funktion (1/2/3/5 Bilder).
+      Gegenprobe: ohne den `if (!url) return null`-Zweig fällt der Fall des
+      abgelehnten Bildes — der Test misst also wirklich ihn.
 
 ## 8 · Tag-Filterleiste
 
