@@ -522,8 +522,16 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       `post_media` trägt `anon=SELECT`, `authenticated=SELECT,INSERT,DELETE`,
       `tags` trägt `anon=SELECT`, `authenticated=SELECT`. Nichts davon ist
       geerbt — es steht so in den Migrationen (AGE-312).
-- [ ] 10.6 `openspec archive` — **Szenario-Titel unverändert lassen**, ein
+- [x] 10.6 `openspec archive` — **Szenario-Titel unverändert lassen**, ein
       umgetaufter Titel in einem MODIFIED-Block löscht das alte Szenario;
       `validate` bleibt dabei grün, nur `archive` bricht ab.
-- [ ] 10.7 Linear AGE-528 auf Done — erst `get_issue` lesen, die
+      **Die Falle konnte hier nicht greifen** — nachgesehen, nicht gehofft: das
+      Delta trägt genau einen Block, `## ADDED Requirements`, kein MODIFIED,
+      kein RENAMED. Zusätzlich auf Namenskollisionen geprüft (`comm -12` über
+      die Requirement-Zeilen): keine. `openspec archive` meldete entsprechend
+      `+ 11, ~ 0, - 0, → 0`; `openspec/specs/community-feed/spec.md` trägt
+      jetzt 16 statt 5 Requirements, `validate --all` grün (27 Elemente, eines
+      weniger, weil der Change kein offener mehr ist). Archiviert als
+      `2026-08-12-activity-media-and-tags`.
+- [x] 10.7 Linear AGE-528 auf Done — erst `get_issue` lesen, die
       GitHub-Automation schaltet den Status womöglich schon selbst.
