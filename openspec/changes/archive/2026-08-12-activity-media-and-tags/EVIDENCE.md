@@ -578,7 +578,7 @@ vorher lokal durch, inklusive Nachzählen.
 | **sein Bild** | **gerendert**, 615×615 |
 | Quelle des Bildes | `…/object/sign/post-media/…?token=…` — **signiert**, kein öffentlicher Pfad |
 | `members`-Beitrag der Sonde | **nicht dabei** |
-| Autorname ausgeloggt | „Ein Mitglied" — `displayAuthor(...)` greift auch hier (siebter Weg des `cso`-Gates) |
+| Autorname ausgeloggt | „Ein Mitglied" — siehe die Korrektur direkt darunter |
 
 Danach `--abbauen=…`: nachgezählt auf null, und **von außen** gegengeprüft — die
 Live-Seite zeigt die Sonde nicht mehr und null Beitragsbilder.
@@ -586,3 +586,24 @@ Live-Seite zeigt die Sonde nicht mehr und null Beitragsbilder.
 Damit ist die Abnahme aus AGE-528 vollständig belegt: das Bild eines
 `members`-Beitrags ist ohne Session nicht abrufbar (schärfer noch: es gibt gar
 keine Signatur), und das Bild eines `public`-Beitrags ist ausgeloggt sichtbar.
+
+#### Korrektur zu dieser Zeile: der Autorname fehlt aus einem anderen Grund
+
+Zuerst notiert als „`displayAuthor(...)` greift auch ausgeloggt" — das stimmt im
+Ergebnis, verdeckt aber die Ursache. Nachgemessen: der Feed fragt beim Zeichnen
+`profiles_public` ab, und diese Abfrage antwortet ausgeloggt mit **HTTP 401**:
+
+```
+{"code":"42501","message":"permission denied for view profiles_public"}
+```
+
+`anon` hält auf der View **überhaupt kein Recht** — nachgesehen auf beiden
+Instanzen, `authenticated=SELECT`, `anon` fehlt ganz. Der Name ist also nicht
+bewusst zurückgehalten; die Abfrage wird abgewiesen und die Oberfläche fällt auf
+„Ein Mitglied" zurück.
+
+**Für dieses Change ändert das nichts** — es fällt geschlossen aus, kein Name
+tritt aus, und die Zeile „`public`-Bild ausgeloggt sichtbar" steht unabhängig
+davon. Aber es ist ein eigener Befund: auf der öffentlichen Seite heißt **jeder**
+Autor „Ein Mitglied". Das ist älter als C7 (`profiles_public` und die
+Autor-Abfrage gab es vorher) und liegt als **AGE-530** im Backlog.
