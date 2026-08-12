@@ -9,9 +9,7 @@ event/match/course (the original P4 §7 model), and platform-wide quality-manage
 route the member is on. Members write only their own feedback (RLS); a dedicated
 admin path aggregates all feedback with author names for review. Reconstructed from
 code as of the OpenSpec migration.
-
 ## Requirements
-
 ### Requirement: Feedback rows belong to a member
 
 The system SHALL store every feedback row in `public.feedback` tied to a
@@ -100,3 +98,32 @@ own score.
 - **WHEN** `recompute_potential_score()` computes the feedback component for a member
 - **THEN** it averages only feedback rows with a non-null `ref_type`, ignoring
   platform QM rows (where `ref_type` is NULL)
+
+### Requirement: Der Feedback-Knopf schwebt nur dort, wo er nichts verdeckt
+
+Der schwebende Feedback-Knopf SHALL unterhalb des `sm`-Breakpoints **nicht**
+schweben, sondern am Ende der Seite im Dokumentfluss stehen. Ab `sm` SHALL er
+unverändert unten rechts schweben.
+
+Er SHALL NOT stattdessen um einige Pixel verschoben werden. Ein fester Knopf
+über einer Kachelreihe kollidierte beim nächsten Formular wieder, und dann
+merkte es niemand, weil niemand danach messen würde.
+
+Der Anlass ist gemessen (AGE-528, Task 9.7): auf 375×812 mit geöffnetem
+Composer liegt der Knopf (240–340 × 690–732) auf der kuratierten Kachel
+„Frage" (240–299 × 697–723); `document.elementFromPoint` in deren Mitte
+liefert „Feedback".
+
+#### Scenario: Auf dem Telefon verdeckt er keine Bedienelemente
+
+- **WHEN** die Seite auf 375 px Breite mit geöffnetem Composer am Seitenanfang
+  dargestellt wird
+- **THEN** steht der Feedback-Knopf im Dokumentfluss am Seitenende
+- **AND** `document.elementFromPoint` in der Mitte jeder sichtbaren kuratierten
+  Kachel liefert diese Kachel, nicht den Feedback-Knopf
+
+#### Scenario: Am Schreibtisch bleibt alles wie es war
+
+- **WHEN** die Seite ab dem `sm`-Breakpoint dargestellt wird
+- **THEN** schwebt der Knopf unverändert unten rechts
+
