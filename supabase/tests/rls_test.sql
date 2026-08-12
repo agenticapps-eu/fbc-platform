@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(307);
+select plan(310);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2112,6 +2112,31 @@ select is(has_function_privilege('anon',
   'public.create_post_with_media(uuid,text,text,text[],text[],jsonb)', 'execute'),
   false, 'create_post_with_media: ohne Session gibt es keinen Schreibweg');
 
+-- 19.7a Der Pfad muss dem Aufrufer gehören. Aus dem Diff-Review, und es ist die
+-- einzige Stelle, an der das noch geprüft werden KANN: die RPC ist
+-- SECURITY DEFINER, umgeht also `post_media_insert_own` — und selbst die Policy
+-- prüft nur den BEITRAG, nie den Pfad. Der Pfad-Präfix wird sonst allein beim
+-- Hochladen geprüft, an einem anderen Objekt und zu einer anderen Zeit.
+--
+-- Der Weg, den das offenließe: ein Mitglied liest den `storage_path` eines
+-- fremden `members`-Beitrags (das darf es ab Rang 4), wartet, bis der Autor den
+-- Beitrag löscht — die Bildzeile fällt per Kaskade, das Objekt im Bucket bleibt
+-- liegen (benannt in den Non-goals) — und hängt den nun verwaisten Pfad an
+-- seinen EIGENEN öffentlichen Beitrag. `post_media_lesbar` sagt danach „public",
+-- und `anon` bekommt eine Signatur auf ein fremdes, nie öffentliches Bild.
+-- `unique (storage_path)` hält das nur so lange auf, wie die alte Zeile lebt.
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$select public.create_post_with_media(
+      'c7000008-0000-4000-8000-000000000008',
+      'Fremder Pfad', 'public', array[]::text[], array[]::text[],
+      '[{"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a2/beliebig/0.webp","sort":0,"width":16,"height":16}]'::jsonb)$$),
+  'DENIED:%',
+  'create_post_with_media: ein Pfad unter fremdem Präfix wird abgelehnt');
+
+select is(
+  (select count(*)::int from public.posts where id = 'c7000008-0000-4000-8000-000000000008'),
+  0, '… und auch hier bleibt kein halber Beitrag stehen');
+
 -- ── 20. Kuratierte Tags: eine redaktionelle Liste (AGE-528, C7) ─────────────
 -- `tags` ist kein Mitgliedsinhalt. Beide Rollen lesen, keine schreibt — und die
 -- Form des Schlüssels ist durchgesetzt, nicht verabredet: weil es keine
@@ -2161,6 +2186,15 @@ delete from public.tags where key = 'grüße';
 select is(
   (select count(*)::int from public.tags where key <> lower(label)),
   0, 'tags: jeder Schlüssel ist das kleingeschriebene Label — sonst trifft kein getippter Tag');
+
+-- Und dass das nicht nur für die Startbefüllung gilt, sondern DURCHGESETZT ist.
+-- Befund aus dem Diff-Review: die Zeile darüber prüft 15 vorhandene Zeilen; eine
+-- spätere redaktionelle Ergänzung ist ein Insert und läuft an keiner Suite
+-- vorbei. Ein Label „Know-how" mit Schlüssel `knowhow` spaltete den Filter
+-- still in zwei Töpfe — geklickt träfe er, getippt nie.
+select throws_ok(
+  $$insert into public.tags (key, label, sort) values ('knowhow', 'Know-how', 904)$$,
+  23514, null, 'tags: ein Schlüssel, der nicht das kleingeschriebene Label ist, wird abgelehnt');
 
 select is(
   (select count(*)::int from public.tags where sort < 200),

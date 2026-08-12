@@ -36,7 +36,7 @@ import {
   createPostWithMedia,
   extractFirstVideo,
   feedListKey,
-  feedQueryKey,
+  feedSeitenKey,
   fetchComments,
   fetchFeed,
   parseVideoUrl,
@@ -66,7 +66,7 @@ export default function CommunityFeed() {
   // eine stille Kappung — ältere Beiträge blieben unauffindbar. Der Cursor läuft
   // über (created_at, id), siehe lib/feed.ts.
   const feed = useInfiniteQuery({
-    queryKey: feedQueryKey(uid, hashtag),
+    queryKey: feedSeitenKey(uid, hashtag),
     queryFn: ({ pageParam }) => fetchFeed({ uid, hashtag, cursor: pageParam }),
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
@@ -78,10 +78,7 @@ export default function CommunityFeed() {
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
   // Treffer wird zum Profil-Link, sonst bleibt es dezenter Akzent-Text (kein Fake-Link).
-  const mentionResolver = useMemo(
-    () => buildMentionResolver(posts.map((p) => p.author)),
-    [posts],
-  );
+  const mentionResolver = useMemo(() => buildMentionResolver(posts.map((p) => p.author)), [posts]);
 
   // Signaturen JE SEITE, nicht je Bild und nicht für alles zusammen: der Token
   // steckt in der URL, und ein Schlüssel über alle geladenen Seiten würde beim
@@ -105,13 +102,19 @@ export default function CommunityFeed() {
 
   // Zwischen `staleTime` (50 min) und Ablauf (60 min) liegt ein Fenster, in dem
   // ein offen gelassener Tab eine abgelaufene URL hält und das Bild 403 liefert.
-  // Dann wird nachsigniert — aber je Pfad genau einmal, sonst dreht sich ein
-  // wirklich kaputtes Bild endlos im Kreis.
+  // Dann wird nachsigniert.
+  //
+  // Der Wächter merkt sich die fehlgeschlagene URL, NICHT den Pfad: ein wirklich
+  // kaputtes Bild liefert dieselbe URL wieder und dreht sich nicht im Kreis —
+  // aber eine zweite abgelaufene Signatur desselben Pfades ist eine andere
+  // Zeichenkette und bekommt ihren Versuch. Genau der Fall, den der Kommentar
+  // hier beschreibt (ein Tab über zwei Ablauffenster), war mit einem Wächter je
+  // Pfad nach dem ersten Mal dauerhaft kaputt.
   const queryClient = useQueryClient();
   const nachsigniert = useRef(new Set<string>());
-  function onBildFehler(pfad: string) {
-    if (nachsigniert.current.has(pfad)) return;
-    nachsigniert.current.add(pfad);
+  function onBildFehler(url: string) {
+    if (nachsigniert.current.has(url)) return;
+    nachsigniert.current.add(url);
     void queryClient.invalidateQueries({ queryKey: ["post-media", "signiert"] });
   }
 
@@ -147,16 +150,16 @@ export default function CommunityFeed() {
           )}
 
           <FeedList
-        posts={posts}
-        isLoading={feed.isLoading}
-        isError={feed.isError}
-        hasNextPage={feed.hasNextPage}
-        isFetchingNextPage={feed.isFetchingNextPage}
-        onNextPage={() => void feed.fetchNextPage()}
-        currentUserId={user?.id ?? null}
-        activeHashtag={hashtag}
-        onHashtag={setHashtag}
-        mentionResolver={mentionResolver}
+            posts={posts}
+            isLoading={feed.isLoading}
+            isError={feed.isError}
+            hasNextPage={feed.hasNextPage}
+            isFetchingNextPage={feed.isFetchingNextPage}
+            onNextPage={() => void feed.fetchNextPage()}
+            currentUserId={user?.id ?? null}
+            activeHashtag={hashtag}
+            onHashtag={setHashtag}
+            mentionResolver={mentionResolver}
             bildUrls={bildUrls}
             onBildFehler={onBildFehler}
             kuratierteTags={tags.data ?? []}
@@ -242,6 +245,10 @@ function PostComposer({ authorId }: { authorId: string }) {
   const [bilder, setBilder] = useState<GewaehltesBild[]>([]);
   const [bildFehler, setBildFehler] = useState<string | null>(null);
   const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
+  /** Laufende Bildverarbeitungen. Solange > 0, ist „Posten" gesperrt: sonst
+   *  veröffentlicht ein Klick den Beitrag OHNE die Bilder, die gerade noch
+   *  verkleinert werden — und die fertigen Ergebnisse fallen ins Leere. */
+  const [verarbeitet, setVerarbeitet] = useState(0);
 
   // Die kuratierte Liste hängt an keinem Betrachter; freie Tags entstehen
   // weiterhin durch `#Wort` im Text — beide Quellen vereinigt die RPC.
@@ -261,16 +268,25 @@ function PostComposer({ authorId }: { authorId: string }) {
         ? `Höchstens sechs Bilder pro Beitrag — ${dateien.length - frei} wurden nicht übernommen.`
         : null,
     );
-    for (const datei of dateien.slice(0, Math.max(0, frei))) {
-      try {
-        const { blob, width, height } = await shrinkToWebp(datei);
-        setBilder((bisher) => [
-          ...bisher,
-          { blob, width, height, vorschau: URL.createObjectURL(blob) },
-        ]);
-      } catch (fehler) {
-        setBildFehler(errorMessage(fehler));
+    setVerarbeitet((n) => n + 1);
+    try {
+      for (const datei of dateien.slice(0, Math.max(0, frei))) {
+        try {
+          const { blob, width, height } = await shrinkToWebp(datei);
+          // Die Grenze steht IM Zustandswechsel, nicht davor: `frei` oben ist
+          // ein Schnappschuss, und zwei rasch aufeinanderfolgende Auswahlen
+          // lesen beide denselben. Hier kann nichts vorbeikommen.
+          setBilder((bisher) =>
+            bisher.length >= MAX_BILDER
+              ? bisher
+              : [...bisher, { blob, width, height, vorschau: URL.createObjectURL(blob) }],
+          );
+        } catch (fehler) {
+          setBildFehler(errorMessage(fehler));
+        }
       }
+    } finally {
+      setVerarbeitet((n) => n - 1);
     }
   }
 
@@ -316,7 +332,10 @@ function PostComposer({ authorId }: { authorId: string }) {
   });
 
   const canSubmit =
-    (body.trim() !== "" || bilder.length > 0) && videoValid && !create.isPending;
+    (body.trim() !== "" || bilder.length > 0) &&
+    videoValid &&
+    verarbeitet === 0 &&
+    !create.isPending;
 
   // Die ruhige Zeile aus dem Mockup: der Composer nimmt geschlossen so wenig
   // Raum ein wie ein Beitrag Aufmerksamkeit verdient.
@@ -746,10 +765,21 @@ function PostMedien({
               // bevor das Bild da ist — sonst springt die Karte beim Laden.
               width={bild.width}
               height={bild.height}
+              // Ein einzelnes Bild behält sein echtes Seitenverhältnis; erst im
+              // Raster wird beschnitten, weil dort die Kacheln zueinander
+              // passen müssen. Ohne diese Zeile wären `width`/`height` nur
+              // Dekoration: `aspect-4/3` setzt die Box ohnehin.
+              style={
+                layout.art === "einzeln"
+                  ? { aspectRatio: `${bild.width} / ${bild.height}` }
+                  : undefined
+              }
               loading="lazy"
               alt={`Bild ${i + 1} zum Beitrag von ${autor}`}
-              onError={() => onFehler(bild.storagePath)}
-              className="aspect-4/3 w-full rounded-md object-cover"
+              onError={() => onFehler(url)}
+              className={`w-full rounded-md object-cover ${
+                layout.art === "einzeln" ? "" : "aspect-4/3"
+              }`}
             />
             {letzte && (
               <span className="absolute inset-0 flex items-center justify-center rounded-md bg-scrim text-lg font-semibold text-white">

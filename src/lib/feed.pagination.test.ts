@@ -92,7 +92,7 @@ describe("fetchFeed — Seiten", () => {
     await fetchFeed({ uid: null });
 
     expect(FEED_SEITE).toBe(20);
-    expect(postsAufruf().limit).toBe(FEED_SEITE);
+    expect(postsAufruf().limit).toBe(FEED_SEITE + 1);
     // Beide Spalten in der Sortierung, sonst ist der Cursor unten wirkungslos:
     // ein Stichentscheid im `where` ohne denselben im `order by` ordnet nichts.
     expect(postsAufruf().order).toEqual([
@@ -102,7 +102,33 @@ describe("fetchFeed — Seiten", () => {
     expect(postsAufruf().or).toBeUndefined();
   });
 
-  it("gibt als Cursor den LETZTEN Beitrag der Seite zurück — nur bei voller Seite", async () => {
+  it("fragt eine Zeile mehr an, als die Seite trägt", async () => {
+    // Der Spähzeile wegen: ohne sie wüsste niemand, ob es weitergeht. Eine
+    // volle Seite allein ist kein Beweis — bei genau 20 sichtbaren Beiträgen
+    // verspräche sie eine nächste Seite, die garantiert leer ist.
+    postZeilen = [zeile("p1", "2026-08-01T10:00:00Z")];
+
+    await fetchFeed({ uid: null });
+
+    expect(postsAufruf().limit).toBe(FEED_SEITE + 1);
+  });
+
+  it("gibt genau 20 Beiträge zurück und den Cursor der 20., wenn eine 21. Zeile kam", async () => {
+    postZeilen = Array.from({ length: 21 }, (_, i) =>
+      zeile(`p${i}`, `2026-08-01T10:00:${String(i).padStart(2, "0")}Z`),
+    );
+
+    const seite = await fetchFeed({ uid: null });
+
+    expect(seite.posts).toHaveLength(20);
+    expect(seite.posts.at(-1)?.id).toBe("p19");
+    expect(seite.nextCursor).toEqual({ createdAt: "2026-08-01T10:00:19Z", id: "p19" });
+  });
+
+  it("genau 20 sichtbare Beiträge versprechen KEINE weitere Seite", async () => {
+    // Der Fall aus dem Diff-Review: vorher kam hier ein Cursor heraus, und
+    // „Ältere Beiträge" holte eine garantiert leere Seite, bevor der Knopf
+    // verschwand.
     postZeilen = Array.from({ length: 20 }, (_, i) =>
       zeile(`p${i}`, `2026-08-01T10:00:${String(i).padStart(2, "0")}Z`),
     );
@@ -110,7 +136,7 @@ describe("fetchFeed — Seiten", () => {
     const seite = await fetchFeed({ uid: null });
 
     expect(seite.posts).toHaveLength(20);
-    expect(seite.nextCursor).toEqual({ createdAt: "2026-08-01T10:00:19Z", id: "p19" });
+    expect(seite.nextCursor).toBeNull();
   });
 
   it("keine volle Seite heißt: nichts mehr nachzuladen", async () => {

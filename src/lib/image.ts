@@ -16,12 +16,25 @@ export const MAX_KANTE = 1600;
 export const QUALITAET = 0.82;
 
 /**
+ * Dieselbe Grenze, die der Bucket `post-media` serverseitig hält
+ * (`file_size_limit = 1048576`). Sie steht hier NICHT, damit sie gilt — sie
+ * gilt am Bucket —, sondern damit ihr Bruch am richtigen Ort auffällt: beim
+ * Auswählen des Bildes und nicht als roher Storage-Fehler, nachdem der Beitrag
+ * geschrieben und „Posten" gedrückt ist.
+ */
+export const MAX_BYTES = 1048576;
+
+/**
  * Eine Meldung für alle drei Fehlerwege (unlesbares Format, kein Canvas, keine
  * Kodierung). Sie unterscheiden sich für den Nutzer nicht: er wählt in jedem
  * Fall ein anderes Bild.
  */
 export const BILD_UNLESBAR =
   "Dieses Bild konnte nicht verarbeitet werden. Bitte ein anderes wählen (JPEG, PNG oder WebP).";
+
+/** Eigene Meldung, weil hier etwas anderes zu tun ist: ein anderes Bild wählen. */
+export const BILD_ZU_GROSS =
+  "Dieses Bild bleibt auch verkleinert über 1 MB. Bitte ein anderes wählen.";
 
 export interface Masse {
   width: number;
@@ -74,9 +87,16 @@ export async function shrinkToWebp(
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  const blob = await new Promise<Blob | null>((auf) =>
-    canvas.toBlob(auf, "image/webp", QUALITAET),
-  );
-  if (!blob) throw new Error(BILD_UNLESBAR);
-  return { blob, width, height };
+  // Die Maße allein garantieren die Dateigröße nicht: ein rauschiges Foto kann
+  // auch bei 1600 px über 1 MiB liegen, und der Bucket lehnt es dann ab. Also
+  // messen statt schätzen — und notfalls mit weniger Qualität nachkodieren.
+  // Drei Anläufe, dann ist es an der Datei und nicht an der Einstellung.
+  for (let qualitaet = QUALITAET; qualitaet >= 0.4; qualitaet -= 0.2) {
+    const blob = await new Promise<Blob | null>((auf) =>
+      canvas.toBlob(auf, "image/webp", qualitaet),
+    );
+    if (!blob) throw new Error(BILD_UNLESBAR);
+    if (blob.size <= MAX_BYTES) return { blob, width, height };
+  }
+  throw new Error(BILD_ZU_GROSS);
 }

@@ -111,13 +111,20 @@ describe("signPostMedia", () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  it("ein Fehlschlag des GANZEN Aufrufs geht sehr wohl an Sentry und wirft nicht", async () => {
+  it("ein Fehlschlag des GANZEN Aufrufs geht an Sentry UND wirft", async () => {
     // Anders als die Einzelablehnung: hier ist etwas kaputt (Grant, Bucket,
-    // Netz). Der Feed zeigt die Beiträge dann ohne Bilder statt gar nicht —
-    // dasselbe Muster wie die Zähler-RPC in feed.ts.
+    // Netz). Der Feed zeigt die Beiträge dann ohne Bilder statt gar nicht — die
+    // Signatur-Abfrage hängt an keiner Beitragsliste.
+    //
+    // Aber sie muss WERFEN und darf nicht ein leeres Ergebnis zurückgeben: ein
+    // leeres Ergebnis ist für react-query ein Erfolg, wird 50 min gecacht, und
+    // weil ohne URL kein `<img>` entsteht, löst auch kein Bildfehler ein
+    // Nachsignieren aus. Der Beitrag bliebe bis zum nächsten Refetch bilderlos.
     signaturAntwort = { data: null, error: { message: "Bucket not found" } };
 
-    await expect(signPostMedia(["a.webp"])).resolves.toEqual({});
+    await expect(signPostMedia(["a.webp"])).rejects.toMatchObject({
+      message: "Bucket not found",
+    });
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
@@ -126,9 +133,15 @@ describe("signPostMedia", () => {
     expect(signaturAufrufe).toHaveLength(0);
   });
 
-  it("cacht knapp unter der Gültigkeit, damit der Browser dieselbe URL sieht", () => {
+  it("hält die beiden Zahlen zusammen: Cache-Dauer unter der Gültigkeit", () => {
     // 1 h Gültigkeit / 50 min staleTime (design.md, „Signatur"). Ohne diesen
     // Abstand ändert sich der Cache-Key pro Render und jedes Bild lädt neu.
+    //
+    // Dieser Test prüft ausdrücklich NUR das Verhältnis der beiden Konstanten —
+    // nicht, dass irgendjemand sie benutzt. Wer `staleTime` aus der Abfrage in
+    // `CommunityFeed` entfernte, bliebe hier grün. Dass die Signaturen je Seite
+    // überhaupt gecacht werden, misst CommunityFeed.media.test.tsx („EIN
+    // Aufruf je Feed-Seite").
     expect(SIGNATUR_GUELTIGKEIT_SEK).toBe(3600);
     expect(SIGNATUR_STALE_MS).toBe(50 * 60 * 1000);
     expect(SIGNATUR_STALE_MS).toBeLessThan(SIGNATUR_GUELTIGKEIT_SEK * 1000);

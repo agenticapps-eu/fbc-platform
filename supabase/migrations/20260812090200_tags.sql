@@ -9,8 +9,10 @@
 -- Wert hier als `key` vorkommt.
 --
 -- Der Grund ist nicht Bequemlichkeit: die bestehende Filterung
--- `.contains("hashtags", [tag])` (src/lib/feed.ts:294) und ihr GIN-Index
--- arbeiten unverändert weiter. Eine Verknüpfungstabelle hieße, denselben Filter
+-- `.contains("hashtags", [tag])` (src/lib/feed.ts) arbeitet unverändert weiter.
+-- KORREKTUR vom 2026-08-12: hier stand „und ihr GIN-Index", und den gab es
+-- nicht — die Filterung lief seit AGE-250 als Seq-Scan. Gemessen und angelegt
+-- in 20260812090300_posts_indizes.sql. Eine Verknüpfungstabelle hieße, denselben Filter
 -- neu zu bauen, alle Bestandsbeiträge umzuschreiben und dabei die freien Tags
 -- entweder zu verlieren oder doppelt zu führen. Diese Migration ist so ein
 -- Insert statt einer Umstrukturierung.
@@ -58,7 +60,15 @@ create table public.tags (
   sort   int     not null,
   active boolean not null default true,
   constraint tags_key_klein  check (key = lower(key)),
-  constraint tags_key_tippbar check (key ~ '^[[:alnum:]_]+$')
+  constraint tags_key_tippbar check (key ~ '^[[:alnum:]_]+$'),
+  -- Die dritte Hälfte derselben Regel, ergänzt am 2026-08-12 nach dem
+  -- Diff-Review: `key` = `lower(label)`. Die beiden Constraints darüber prüfen
+  -- nur den Schlüssel für sich; ein Label „Know-how" mit dem Schlüssel
+  -- `knowhow` käme durch — und spaltete den Filter still in zwei Töpfe, weil
+  -- `parseHashtags` aus dem Fließtext nie `knowhow` erzeugt. Der Test dazu
+  -- prüfte bis dahin nur die 15 Zeilen der Startbefüllung; eine spätere
+  -- redaktionelle Ergänzung ist ein Insert und läuft an keiner Suite vorbei.
+  constraint tags_key_ist_label check (key = lower(label))
 );
 alter table public.tags enable row level security;
 

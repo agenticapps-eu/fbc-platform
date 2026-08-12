@@ -221,7 +221,10 @@ als kuratiert, wenn sein Wert in `tags` vorkommt.
 
 Der Grund ist nicht Bequemlichkeit, sondern dass die bestehende Filterlogik
 dadurch **unangetastet** bleibt: `.contains("hashtags", [hashtag])`
-(`src/lib/feed.ts:294`) funktioniert weiter, der GIN-Index dahinter auch. Eine
+(`src/lib/feed.ts`) funktioniert weiter. (Hier stand bis zum 2026-08-12 „der
+GIN-Index dahinter auch" — den gab es nie; der Filter lief als Seq-Scan.
+Angelegt wird er jetzt in `20260812090300_posts_indizes.sql`, zusammen mit dem
+Index für den Keyset-Cursor. Beide vorher und nachher gemessen.) Eine
 Verknüpfungstabelle hieße, denselben Filter neu zu bauen, alle Bestandsbeiträge
 umzuschreiben und dabei die freien Tags entweder zu verlieren oder doppelt zu
 führen. Die Migration ist so ein Insert statt einer Umstrukturierung.

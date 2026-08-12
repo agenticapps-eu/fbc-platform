@@ -246,6 +246,22 @@ export function buildMentionResolver(authors: FeedAuthor[]): MentionResolver {
 export const feedListKey = (uid: string | null) => ["feed", "list", uid] as const;
 export const feedQueryKey = (uid: string | null, hashtag: string | null) =>
   ["feed", "list", uid, hashtag] as const;
+
+/**
+ * Der seitenweise Feed braucht einen EIGENEN Schlüssel (AGE-528).
+ *
+ * `feedQueryKey` liegt bei Startseite und Mitglieder-Übersicht auf einem
+ * `useQuery` und trägt dort `{posts, nextCursor}`. Der Feed selbst ist eine
+ * `useInfiniteQuery` und trägt `{pages, pageParams}`. Unter demselben Schlüssel
+ * ist ein Eintrag für den anderen unlesbar: `data.pages` wäre `undefined`,
+ * `isLoading` aber false — der Feed malte den leeren Zustand über einen vollen
+ * Feed, und die Startseite verlöre umgekehrt ihre Beiträge.
+ *
+ * Das Anhängsel steht am ENDE, damit `feedListKey` weiter als Präfix greift:
+ * eine Invalidierung nach dem Veröffentlichen erreicht beide Formen.
+ */
+export const feedSeitenKey = (uid: string | null, hashtag: string | null) =>
+  ["feed", "list", uid, hashtag, "seiten"] as const;
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 
@@ -329,7 +345,11 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
     .select("id, author_id, body, hashtags, visibility, created_at")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(FEED_SEITE);
+    // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
+    // Seite" das einzige Indiz dafür, dass es weitergeht — und bei genau 20
+    // sichtbaren Beiträgen verspricht das eine nächste Seite, die garantiert
+    // leer ist. Der Knopf holte sie, bevor er verschwände.
+    .limit(FEED_SEITE + 1);
   if (hashtag) query = query.contains("hashtags", [hashtag]);
   if (cursor) {
     query = query.or(
@@ -340,7 +360,11 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
 
   const { data: posts, error } = await query;
   if (error) throw error;
-  const rows = posts ?? [];
+  const geholt = posts ?? [];
+  // Die Spähzeile wird abgeschnitten: sie ist die Antwort auf „gibt es mehr?",
+  // kein Teil der Seite.
+  const gibtMehr = geholt.length > FEED_SEITE;
+  const rows = gibtMehr ? geholt.slice(0, FEED_SEITE) : geholt;
   if (rows.length === 0) return { posts: [], nextCursor: null };
 
   const postIds = rows.map((r) => r.id);
@@ -397,10 +421,9 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
       likedByMe: myLikes.has(r.id),
       media: media.get(r.id) ?? [],
     })),
-    // Eine nicht volle Seite ist die letzte. Ein Cursor darauf brächte nur eine
-    // leere Anfrage — und eine „Mehr laden"-Schaltfläche, die nichts tut.
-    nextCursor:
-      rows.length === FEED_SEITE ? { createdAt: letzte.created_at, id: letzte.id } : null,
+    // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
+    // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.
+    nextCursor: gibtMehr ? { createdAt: letzte.created_at, id: letzte.id } : null,
   };
 }
 

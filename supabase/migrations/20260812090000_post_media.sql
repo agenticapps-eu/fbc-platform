@@ -102,6 +102,11 @@ create trigger post_media_hoechstens_sechs
   after insert on public.post_media
   for each row execute function public.post_media_hoechstens_sechs();
 
+-- Auch eine Trigger-Funktion bekommt ihre Rechte ausgesprochen (AGE-312).
+-- Direkt aufrufbar ist sie ohnehin nicht — sie gibt `trigger` zurück —, aber
+-- die Konvention dieses Repos ist, dass keine neue Funktion ihre Rechte erbt.
+revoke execute on function public.post_media_hoechstens_sechs() from public, anon, authenticated;
+
 -- ── Die Sichtbarkeitsfunktion: sie liest die ZEILE, sie zerlegt NIE den Pfad ─
 -- Aus dem Fremd-Review (REVIEWS.md, gemini). Naheliegend wäre, aus dem
 -- Objektnamen `{uid}/{postId}/{datei}.webp` die Beitragskennung zu schneiden und
@@ -204,6 +209,32 @@ declare
 begin
   if v_autor is null or not public.is_activated() then
     raise exception 'Kein bestätigter Zugang' using errcode = 'insufficient_privilege';
+  end if;
+
+  -- Der Pfad muss dem Aufrufer gehören.
+  --
+  -- Das ist KEIN Widerspruch zu `post_media_lesbar`, die den Pfad ausdrücklich
+  -- nie zerlegt: dort würde aus dem Pfad eine SICHTBARKEIT abgeleitet, und die
+  -- gehört der Zeile, nicht der Zeichenkette. Hier wird dieselbe Prüfung
+  -- gespiegelt, die die INSERT-Policy des Buckets ohnehin macht
+  -- (`(storage.foldername(name))[1] = auth.uid()`) — nur zu dem Zeitpunkt, an
+  -- dem die ZEILE entsteht. Ohne sie prüft niemand den Pfad an dieser Stelle:
+  -- die Funktion ist SECURITY DEFINER, umgeht also `post_media_insert_own`, und
+  -- selbst diese Policy prüft nur den Beitrag.
+  --
+  -- Der Weg, den das offenließe (aus dem Diff-Review): ein Mitglied liest ab
+  -- Rang 4 den `storage_path` eines fremden `members`-Beitrags, wartet auf
+  -- dessen Löschung — die Zeile fällt per Kaskade, das Objekt bleibt liegen —
+  -- und hängt den verwaisten Pfad an seinen eigenen `public`-Beitrag. Danach
+  -- signiert `anon` ein Bild, das nie öffentlich war. `unique (storage_path)`
+  -- hält das nur auf, solange die alte Zeile lebt.
+  if exists (
+    select 1
+      from jsonb_array_elements(coalesce(p_media, '[]'::jsonb)) m
+     where split_part(m->>'storage_path', '/', 1) is distinct from v_autor::text
+  ) then
+    raise exception 'Bildpfad gehört nicht zum Aufrufer'
+      using errcode = 'insufficient_privilege';
   end if;
 
   -- Tags werden VEREINIGT, nicht ersetzt: getippte (aus parseHashtags) und

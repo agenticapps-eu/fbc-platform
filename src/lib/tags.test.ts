@@ -13,6 +13,12 @@ let letzteAbfrage: { table: string; spalten: string; eq: [string, unknown][]; or
   eq: [],
 };
 let zeilen: { key: string; label: string; sort: number }[] = [];
+let fehler: { message: string } | null = null;
+
+const captureException = vi.fn();
+vi.mock("@sentry/react", () => ({
+  captureException: (...args: unknown[]) => captureException(...args),
+}));
 
 vi.mock("./supabase", () => ({
   supabase: {
@@ -29,7 +35,7 @@ vi.mock("./supabase", () => ({
         },
         order: (spalte: string) => {
           letzteAbfrage.order = spalte;
-          return Promise.resolve({ data: zeilen, error: null });
+          return Promise.resolve({ data: fehler ? null : zeilen, error: fehler });
         },
       };
       return kette;
@@ -43,6 +49,8 @@ const tag = (key: string, sort = 10): Tag => ({ key, label: key, sort });
 
 beforeEach(() => {
   zeilen = [];
+  fehler = null;
+  captureException.mockClear();
 });
 
 describe("fetchAktiveTags", () => {
@@ -60,6 +68,19 @@ describe("fetchAktiveTags", () => {
     expect(letzteAbfrage.eq).toEqual([["active", true]]);
     expect(letzteAbfrage.order).toBe("sort");
     expect(ergebnis).toEqual(zeilen);
+  });
+});
+
+describe("fetchAktiveTags — wenn die Liste nicht kommt", () => {
+  it("meldet den Fehler und liefert eine leere Liste, statt still zu verschwinden", async () => {
+    // Ohne Tags zeichnet `TagFilter` gar nichts — die Filterleiste wäre weg,
+    // und niemand erführe warum. Dasselbe Muster wie bei der Zähler-RPC und den
+    // Bildzeilen in feed.ts: die Oberfläche bleibt benutzbar, der Fehler wird
+    // gemeldet. „Nicht still" ist hier die Regel, nicht „nicht kaputt".
+    fehler = { message: "permission denied for table tags" };
+
+    await expect(fetchAktiveTags()).resolves.toEqual([]);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });
 

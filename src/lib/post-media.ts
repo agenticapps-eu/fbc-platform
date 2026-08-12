@@ -96,8 +96,11 @@ export async function uploadPostMedia(input: {
  *    fehlt seine Kachel, der Beitrag bleibt. **Nicht an Sentry** — das wäre
  *    Rauschen.
  *  - **Der ganze Aufruf scheitert.** Dann ist etwas kaputt (Grant, Bucket,
- *    Netz). Der Feed zeigt die Beiträge ohne Bilder statt gar nicht, meldet es
- *    aber — dasselbe Muster wie die Zähler-RPC in `feed.ts`.
+ *    Netz). Das wird gemeldet **und geworfen**. Ein leeres Ergebnis wäre für
+ *    react-query ein Erfolg, würde 50 min gecacht — und weil ohne URL kein
+ *    `<img>` entsteht, löste auch kein Bildfehler ein Nachsignieren aus. Der
+ *    Beitrag bliebe bis zum nächsten Refetch bilderlos. Der Feed selbst hängt
+ *    nicht an dieser Abfrage: die Beiträge stehen dann ohne Bilder da.
  */
 export async function signPostMedia(pfade: string[]): Promise<Record<string, string>> {
   if (pfade.length === 0) return {};
@@ -106,7 +109,7 @@ export async function signPostMedia(pfade: string[]): Promise<Record<string, str
     .createSignedUrls(pfade, SIGNATUR_GUELTIGKEIT_SEK);
   if (error) {
     captureException(error, { tags: { area: "post-media.sign" } });
-    return {};
+    throw error;
   }
   const urls: Record<string, string> = {};
   for (const eintrag of data ?? []) {

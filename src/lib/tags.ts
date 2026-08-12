@@ -1,3 +1,5 @@
+import { captureException } from "@sentry/react";
+
 import { supabase } from "./supabase";
 
 /**
@@ -22,14 +24,25 @@ export interface Tag {
 /** Die Liste hängt an keinem Betrachter — `tags` ist für alle gleich lesbar. */
 export const tagsQueryKey = ["tags", "aktiv"] as const;
 
-/** Aktive kuratierte Tags in ihrer redaktionellen Reihenfolge. */
+/**
+ * Aktive kuratierte Tags in ihrer redaktionellen Reihenfolge.
+ *
+ * Schlägt die Abfrage fehl, gibt es eine leere Liste — und eine Meldung. Ohne
+ * Tags zeichnet die Filterleiste gar nichts; sie verschwände sonst spurlos, und
+ * niemand erführe warum. Dasselbe Muster wie bei der Zähler-RPC und den
+ * Bildzeilen in `feed.ts`: die Oberfläche bleibt benutzbar, der Fehler wird
+ * gemeldet.
+ */
 export async function fetchAktiveTags(): Promise<Tag[]> {
   const { data, error } = await supabase
     .from("tags")
     .select("key, label, sort")
     .eq("active", true)
     .order("sort");
-  if (error) throw error;
+  if (error) {
+    captureException(error, { tags: { area: "tags.liste" } });
+    return [];
+  }
   return data ?? [];
 }
 

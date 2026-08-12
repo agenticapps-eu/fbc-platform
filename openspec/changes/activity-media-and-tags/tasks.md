@@ -391,7 +391,22 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 10 · Abschluss
 
-- [ ] 10.1 Fremd-Review **auf dem Diff** (Schritt 4), nicht auf dem Plan.
+- [~] 10.1 Fremd-Review **auf dem Diff** (Schritt 4), nicht auf dem Plan.
+      `DIFF-REVIEWS.md`. **Nur EIN Anbieter war fremd** (`codex`); der zweite
+      Lauf war als CodeRabbit angesetzt, aber dessen CLI ist auf dieser Maschine
+      nicht installiert, und der Agent hat das Review dann selbst gemacht — also
+      als Claude, derselbe Anbieter, der den Diff geschrieben hat. Steht so im
+      Kopf der Datei. Zwei HIGH-Befunde, beide behoben und mit vorher rotem
+      Test belegt; zwei falsche Sätze in Entscheidungs-Köpfen korrigiert und die
+      fehlenden Indizes gemessen nachgelegt.
+      **Offen:** ein zweiter echter Fremd-Anbieter, falls die Deckung gebraucht
+      wird — und die Produktentscheidung zu Bildern 4–6 (siehe unten).
+- [ ] 10.1a **Produktentscheidung, Donald:** Schema, Trigger und Composer
+      erlauben sechs Bilder; das Raster zeigt vier, und die vierte liegt unter
+      dem „+n". Ohne Lightbox sieht die Bilder 4–6 niemand. Entweder Lightbox
+      nachziehen (neuer Umfang) oder die Auswahl auf vier begrenzen (dann fällt
+      die Sechser-Grenze in Schema und Trigger auseinander). So wie es jetzt
+      ist, kann jemand Bilder veröffentlichen, die kein Leser erreicht.
 - [x] 10.2 `cso`-Gate: die Storage-Policies noch einmal gegen die Frage lesen,
       ob irgendein Pfad ohne Session zu einem `members`-Bild führt.
       Sieben Wege geprüft, keiner führt hin; Tabelle in `EVIDENCE.md`. Der

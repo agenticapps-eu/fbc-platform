@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CommunityFeed from "./CommunityFeed";
 import { ToastProvider } from "../ui/Toast";
+import { feedQueryKey } from "../../lib/feed";
 import { AuthFixture, authAsTier } from "../../test/auth-fixtures";
 
 /**
@@ -94,8 +95,9 @@ function media(postId: string, anzahl: number) {
   }));
 }
 
-function renderFeed() {
+function renderFeed(vorbelegen?: (qc: QueryClient) => void) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vorbelegen?.(queryClient);
   render(
     <AuthFixture value={authAsTier("impact")}>
       <QueryClientProvider client={queryClient}>
@@ -211,5 +213,44 @@ describe("Tag-Filterleiste", () => {
     fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
 
     expect(await screen.findByText(/keine beiträge mit diesem hashtag/i)).toBeInTheDocument();
+  });
+});
+
+describe("Der Feed teilt seinen Cache-Eintrag mit niemandem", () => {
+  it("liest einen Eintrag der Startseite NICHT als eigene Seitenliste", async () => {
+    // Startseite und Mitglieder-Übersicht rufen `fetchFeed` über `useQuery` und
+    // legen `{posts, nextCursor}` ab. Der Feed selbst ist eine
+    // `useInfiniteQuery` und legt `{pages, pageParams}` ab. Unter DEMSELBEN
+    // Schlüssel wäre der eine Eintrag für den anderen unlesbar: `data.pages`
+    // ist dann `undefined`, `isLoading` aber false — der Feed malte den leeren
+    // Zustand über einen vollen Feed.
+    postZeilen = [post("p1")];
+
+    renderFeed((qc) =>
+      qc.setQueryData(feedQueryKey("test-user", null), {
+        posts: [
+          {
+            id: "vonDerStartseite",
+            author: { id: AUTOR, name: "Beatrice Sommer", avatarUrl: null, tier: "impact" },
+            body: "Beitrag aus dem Cache der Startseite",
+            hashtags: [],
+            visibility: "public",
+            createdAt: "2026-08-12T10:00:00Z",
+            likeCount: 0,
+            commentCount: 0,
+            likedByMe: false,
+            media: [],
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    // Sofort nach dem Mount, bevor der eigene Abruf zurück ist: der Feed darf
+    // hier NICHT „Noch keine Beiträge" behaupten.
+    expect(screen.queryByText(/noch keine beiträge/i)).toBeNull();
+
+    // Und danach steht sein eigener Beitrag da.
+    expect(await screen.findByText(/Erlebnistag/)).toBeInTheDocument();
   });
 });
