@@ -53,6 +53,23 @@ const LOKAL = {
 
 const zielRef = process.argv.find((a) => a.startsWith("--dev="))?.slice("--dev=".length);
 
+/**
+ * Zwei Zusatzschalter, und nur fuer die EINE Zeile, die ein Auge braucht:
+ * „public-Bild im ausgeloggten Feed sichtbar" laesst sich nicht im selben Lauf
+ * pruefen, in dem die Sonde ihren Beitrag wieder abraeumt — dazwischen muss ein
+ * Mensch (oder ein Browser) auf die Seite schauen.
+ *
+ *   --behalten        Aufbau und Pruefungen wie sonst, aber NICHT abraeumen.
+ *                     Gibt die Kennung aus, mit der abgeraeumt wird.
+ *   --abbauen=<uid>   Nur abraeumen und nachzaehlen, nichts anlegen.
+ *
+ * Der Abbau bleibt damit derselbe Code wie im Normalfall — inklusive
+ * Nachzaehlen. Ein zweiter, halb gepflegter Abbau-Pfad waere genau die Sorte
+ * Aufraeumcode, der beim ersten Fehler nicht laeuft.
+ */
+const behalten = process.argv.includes("--behalten");
+const abbauenUid = process.argv.find((a) => a.startsWith("--abbauen="))?.slice("--abbauen=".length);
+
 async function ziel() {
   if (!zielRef) return { ...LOKAL, name: "LOKAL, fest verdrahtet", lokal: true };
 
@@ -122,9 +139,28 @@ let uid = "";
 const pfade: Record<string, string> = {};
 const beitraege: Record<string, string> = {};
 
+/** Zeichen, kein Fehler: „springe zum Abbau". Siehe `--abbauen=` oben. */
+const NUR_ABBAUEN = Symbol("nur-abbauen");
+
 try {
   console.log(`\nZiel: ${ZIEL.name}\n`);
   await db.connect();
+
+  if (abbauenUid) {
+    // Nur abraeumen: die Pfade stehen nicht mehr im Speicher, also aus dem
+    // Storage nachschlagen statt sie zu raten.
+    uid = abbauenUid;
+    const objekte = await db.query(
+      `select name from storage.objects where bucket_id = $1 and name like $2`,
+      [BUCKET, `${uid}/%`],
+    );
+    objekte.rows.forEach((r, i) => (pfade[`rest${i}`] = r.name));
+    console.log(`Nur Abbau fuer ${uid} — ${objekte.rowCount} Storage-Objekt(e) gefunden.`);
+    // Absichtlich in den `finally`-Zweig springen: dort steht der EINE
+    // Abbau-Pfad, den auch der Normalfall nimmt. Kein Fehler — der `catch`
+    // unten erkennt das Zeichen und zaehlt es nicht als solchen.
+    throw NUR_ABBAUEN;
+  }
 
   if (WEBP.subarray(0, 4).toString() !== "RIFF" || WEBP.subarray(8, 12).toString() !== "WEBP") {
     throw new Error("Das eingebettete Bild ist kein WebP — Abbruch vor dem ersten Schreiben.");
@@ -154,9 +190,7 @@ try {
   for (const sicht of ["members", "public"] as const) {
     const postId = crypto.randomUUID();
     const pfad = `${uid}/${postId}/0-${Date.now()}.webp`;
-    const hoch = await autor.storage
-      .from(BUCKET)
-      .upload(pfad, WEBP, { contentType: "image/webp" });
+    const hoch = await autor.storage.from(BUCKET).upload(pfad, WEBP, { contentType: "image/webp" });
     if (hoch.error) throw new Error(`Upload (${sicht}): ${hoch.error.message}`);
 
     const rpc = await autor.rpc("create_post_with_media", {
@@ -238,23 +272,32 @@ try {
     );
   }
 } catch (e) {
-  fehler += 1;
-  console.log(`\nABBRUCH: ${(e as Error).message}`);
+  if (e !== NUR_ABBAUEN) {
+    fehler += 1;
+    console.log(`\nABBRUCH: ${(e as Error).message}`);
+  }
 } finally {
   // ── Abbau, und danach nachzaehlen ─────────────────────────────────────────
-  console.log("\nAbbau:");
-  try {
-    if (Object.keys(pfade).length) {
-      await dienst.storage.from(BUCKET).remove(Object.values(pfade));
-    }
-    if (uid) {
-      await db.query("delete from public.posts where author_id = $1", [uid]);
-      await db.query("delete from public.profiles where id = $1", [uid]);
-      await dienst.auth.admin.deleteUser(uid);
-    }
+  if (behalten && fehler === 0) {
+    console.log(
+      `\nStehen gelassen (--behalten). Der public-Beitrag ist jetzt im ausgeloggten\n` +
+        `Feed zu sehen. Danach abraeumen mit:\n\n` +
+        `  --abbauen=${uid}\n`,
+    );
+  } else {
+    console.log("\nAbbau:");
+    try {
+      if (Object.keys(pfade).length) {
+        await dienst.storage.from(BUCKET).remove(Object.values(pfade));
+      }
+      if (uid) {
+        await db.query("delete from public.posts where author_id = $1", [uid]);
+        await db.query("delete from public.profiles where id = $1", [uid]);
+        await dienst.auth.admin.deleteUser(uid);
+      }
 
-    const rest = await db.query(
-      `select
+      const rest = await db.query(
+        `select
          (select count(*) from public.posts where author_id = $1) as beitraege,
          (select count(*) from public.post_media
             where storage_path like $2) as bildzeilen,
@@ -262,18 +305,19 @@ try {
             where bucket_id = $3 and name like $2) as objekte,
          (select count(*) from public.profiles where id = $1) as profile,
          (select count(*) from auth.users where id = $1) as konten`,
-      [uid || "00000000-0000-0000-0000-000000000000", `${uid}/%`, BUCKET],
-    );
-    const r = rest.rows[0];
-    const sauber = Object.values(r).every((v) => Number(v) === 0);
-    if (!sauber) abbauFehler += 1;
-    console.log(
-      `  ${sauber ? "OK   " : "REST "} nachgezaehlt: Beitraege ${r.beitraege}, Bildzeilen ${r.bildzeilen}, ` +
-        `Storage-Objekte ${r.objekte}, Profil ${r.profile}, Konto ${r.konten}`,
-    );
-  } catch (e) {
-    abbauFehler += 1;
-    console.log(`  REST  Abbau fehlgeschlagen: ${(e as Error).message}`);
+        [uid || "00000000-0000-0000-0000-000000000000", `${uid}/%`, BUCKET],
+      );
+      const r = rest.rows[0];
+      const sauber = Object.values(r).every((v) => Number(v) === 0);
+      if (!sauber) abbauFehler += 1;
+      console.log(
+        `  ${sauber ? "OK   " : "REST "} nachgezaehlt: Beitraege ${r.beitraege}, Bildzeilen ${r.bildzeilen}, ` +
+          `Storage-Objekte ${r.objekte}, Profil ${r.profile}, Konto ${r.konten}`,
+      );
+    } catch (e) {
+      abbauFehler += 1;
+      console.log(`  REST  Abbau fehlgeschlagen: ${(e as Error).message}`);
+    }
   }
   await db.end().catch(() => {});
 }

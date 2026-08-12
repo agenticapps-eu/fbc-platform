@@ -376,7 +376,7 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 - [x] 9.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       576/576, 0 Fehler, 4 vorbestehende Warnungen in fremden Dateien.
 - [x] 9.2 pgTAP vollständig grün, mit **Dateiliste** aufgerufen. 312/312.
-- [ ] 9.3 **Der Beweis** (Tabelle in `design.md`), im Inkognito-Fenster gegen
+- [x] 9.3 **Der Beweis** (Tabelle in `design.md`), im Inkognito-Fenster gegen
       DEV, mit Screenshot bzw. Statuscode je Zeile:
       `members` → rohe URL kein Bild, Signatur als anon abgelehnt;
       `public` → Bild im ausgeloggten Feed sichtbar.
@@ -398,6 +398,16 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       bis dahin steht auf pages.dev das alte Frontend — `drift-gate` blockt den
       Deploy, bis `migrate-prod` lief. Entscheidung Donald 2026-08-12: die
       API-Hälfte vor PROD, die gerenderte danach am echten System.
+      **Nachgeholt und damit vollständig:** nach dem `deploy`-Re-Run auf
+      `https://fbc-platform.pages.dev/aktivitaet`, ausgeloggt (kein
+      Auth-Token im `localStorage`, nachgesehen statt angenommen). Der
+      `public`-Beitrag der Sonde steht da, **sein Bild ist gerendert** —
+      615×615, und die Quelle ist eine **signierte** URL
+      (`/object/sign/post-media/…?token=`), kein öffentlicher Pfad. Der
+      `members`-Beitrag ist nicht dabei. Der Autor heißt dort „Ein Mitglied",
+      also greift auch ausgeloggt `displayAuthor(...)` (der siebte Weg des
+      `cso`-Gates). Danach abgebaut und **von außen** nachgesehen: die Seite
+      zeigt die Sonde nicht mehr, null Beitragsbilder.
 - [x] 9.4 Bild hochladen, mehrere Bilder, Reihenfolge, einzeln löschen — von
       Hand durchgespielt. Sechs Ziffernbilder 1–6, damit die Reihenfolge im Bild
       ablesbar ist: Nachwählen **erweitert** die Auswahl, „Bild 2 entfernen"
@@ -483,7 +493,7 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       erwartet, sie hängen an `main`. Linear schaltete den Status selbst auf
       In Progress und hängte den PR an, es war kein Schreibzugriff nötig.
       Die zwei niedrigen QA-Befunde liegen als **AGE-529** im Backlog.
-- [ ] 10.4 Reihenfolge des Ausrollens, erzwungen und schon einmal falsch notiert:
+- [x] 10.4 Reihenfolge des Ausrollens, erzwungen und schon einmal falsch notiert:
       Merge → `migrate-dev` grün für **dieselbe SHA auf `main`** → `migrate-prod`
       dispatchen (`plan` **lesen**, dann `apply`) → **`deploy.yml` erneut
       laufen lassen**. Ohne diesen Re-Run ist nichts ausgeliefert, obwohl alles
@@ -495,11 +505,13 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       Versionen, der Dry-Run kündigte genau diese vier an — dann `apply`, alle
       vier angewendet, und die Nachkontrolle im selben Job sagt
       „**OK — 60 Migrationen, Historie abweichungsfrei**".
-      **Offen: der `deploy.yml`-Re-Run.** `deploy.yml` hat *kein*
+      **Der Re-Run ist gelaufen.** `deploy.yml` hat *kein*
       `workflow_dispatch` (nur `push: [main]` und `pull_request`) — der Re-Run
-      geht deshalb über `gh run rerun 31603101953 --failed`, nicht über
-      `gh workflow run`. `deploy` und `functions` hängen beide an
-      `[migrate-dev, drift-gate]`, und drift-gate war der Job, der fiel.
+      ging deshalb über `gh run rerun 31603101953 --failed`, nicht über
+      `gh workflow run`; das wäre am fehlenden Trigger gescheitert. `deploy` und
+      `functions` hängen beide an `[migrate-dev, drift-gate]`, und drift-gate war
+      der Job, der fiel. Nach `migrate-prod`: **drift-gate grün, functions grün,
+      deploy grün** — und damit ist erst jetzt etwas ausgeliefert.
 - [x] 10.5 PROD **nachmessen**, nicht glauben: Bucket privat mit 1 MiB/WebP,
       vier Storage-Policies, `post_media` und `tags` mit ihren Grants.
       `scripts/mess-10-5-prod.ts --prod=viwntbodrtqxgmqyxluh`, **nur lesend**

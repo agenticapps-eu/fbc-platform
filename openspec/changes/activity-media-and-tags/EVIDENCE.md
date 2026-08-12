@@ -559,3 +559,30 @@ ein grüner `migrate-prod`-Lauf sagt, dass die CLI die Versionen verbucht hat �
 nicht, dass die Rechte dastehen. Grants werden in dieser Instanz **nicht geerbt**
 (AGE-312), und `service_role` hält auf keiner Tabelle in `public` ein Recht;
 beides ist hier schon einmal erst zur Laufzeit aufgefallen.
+
+### 9.3, letzte Zeile — am echten System, ausgeloggt
+
+Nach dem `deploy`-Re-Run (drift-gate grün, functions grün, deploy grün) auf
+`https://fbc-platform.pages.dev/aktivitaet`. Ausgeloggt heißt hier
+**nachgesehen**, nicht angenommen: kein Auth-Token im `localStorage`.
+
+Damit überhaupt etwas zu sehen war, musste ein Bild-Beitrag dastehen — DEV trug
+nach dem Abbau der ersten Sonde **null** `post_media`-Zeilen. Die Sonde hat
+dafür zwei Schalter bekommen, `--behalten` und `--abbauen=<uid>`, damit zwischen
+Aufbau und Abbau ein Browser auf die Seite schauen kann. Beide Phasen liefen
+vorher lokal durch, inklusive Nachzählen.
+
+| | Gemessen auf der Live-Seite |
+|---|---|
+| `public`-Beitrag der Sonde | **sichtbar** („vor 17 Sekunden · Öffentlich") |
+| **sein Bild** | **gerendert**, 615×615 |
+| Quelle des Bildes | `…/object/sign/post-media/…?token=…` — **signiert**, kein öffentlicher Pfad |
+| `members`-Beitrag der Sonde | **nicht dabei** |
+| Autorname ausgeloggt | „Ein Mitglied" — `displayAuthor(...)` greift auch hier (siebter Weg des `cso`-Gates) |
+
+Danach `--abbauen=…`: nachgezählt auf null, und **von außen** gegengeprüft — die
+Live-Seite zeigt die Sonde nicht mehr und null Beitragsbilder.
+
+Damit ist die Abnahme aus AGE-528 vollständig belegt: das Bild eines
+`members`-Beitrags ist ohne Session nicht abrufbar (schärfer noch: es gibt gar
+keine Signatur), und das Bild eines `public`-Beitrags ist ausgeloggt sichtbar.
