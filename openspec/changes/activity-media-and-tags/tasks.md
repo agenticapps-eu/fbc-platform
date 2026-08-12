@@ -386,6 +386,18 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       und hat ihn abgebaut. Der Beweis verlangt also erst einen Schema-Schreib-
       zugriff auf die Instanz, die die Live-Seite bedient. Entscheidung Donald
       2026-08-12: erst 9.4–9.6 lokal, 9.3 danach. `EVIDENCE.md`.
+      **Stand nach dem Merge: die scharfe Hälfte ist gemessen.** `migrate-dev`
+      ist für die Merge-SHA `df37349` grün, DEV kennt die vier Migrationen.
+      `scripts/probe-9-3-sichtbarkeit.ts --dev=foelowldexkcqzewvrcf` führt die
+      Tabelle aus `design.md` ausgeloggt: **sechs von sechs erfüllt**, Abbau
+      nachgezählt auf null. Vorher am lokalen Stack **mutiert** — beide
+      Beiträge auf `public` gestellt — und genau die zwei `members`-Zeilen
+      fielen; die Sonde kann also rot.
+      **Offen bleibt nur die gerenderte Zeile** („public-Bild im ausgeloggten
+      Feed sichtbar"): dafür muss erst der `deploy`-Re-Run aus 10.4 laufen, denn
+      bis dahin steht auf pages.dev das alte Frontend — `drift-gate` blockt den
+      Deploy, bis `migrate-prod` lief. Entscheidung Donald 2026-08-12: die
+      API-Hälfte vor PROD, die gerenderte danach am echten System.
 - [x] 9.4 Bild hochladen, mehrere Bilder, Reihenfolge, einzeln löschen — von
       Hand durchgespielt. Sechs Ziffernbilder 1–6, damit die Reihenfolge im Bild
       ablesbar ist: Nachwählen **erweitert** die Auswahl, „Bild 2 entfernen"

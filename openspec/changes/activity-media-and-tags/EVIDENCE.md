@@ -430,3 +430,64 @@ von einem echten Browser mit echter Datei-Auswahl.
 
 Konto `qa-c7@example.test` (Profil „QA C7") und ein Beitrag „QA-Gate 9.7" mit
 zwei Bildern. Nur im lokalen Stack; `supabase db reset --local` räumt beides ab.
+
+## 9.3 — die scharfe Hälfte, gemessen gegen DEV
+
+Gelaufen am 2026-08-12, nachdem `migrate-dev` für die Merge-SHA `df37349` grün
+war und DEV die vier Migrationen kannte. Sonde:
+`scripts/probe-9-3-sichtbarkeit.ts --dev=foelowldexkcqzewvrcf`.
+
+Die Sonde aus 1.0c hatte den **Mechanismus** an einem Wegwerf-Aufbau gemessen.
+Diese hier misst das **echte Schema**: Bucket `post-media`, `post_media`,
+`post_media_lesbar()` und die vier Storage-Policies, so wie sie nach den
+Migrationen dastehen. Zwei Beiträge mit je einem Bild, einer `members`, einer
+`public`, alle Prüfungen ausgeloggt — nur der anon-Key, keine Sitzung.
+
+| | Prüfung | Erwartet | Gemessen auf DEV |
+|---|---|---|---|
+| `members` | rohe Storage-URL | kein Bild | **HTTP 400**, `application/json` |
+| `public` | rohe Storage-URL | kein Bild (der Bucket ist privat) | **HTTP 400**, `application/json` |
+| `members` | ausgeloggter Feed | Beitrag nicht dabei | 6 Beiträge sichtbar, **members-Beitrag nicht darunter** |
+| `public` | ausgeloggter Feed | Beitrag dabei | **sichtbar** |
+| `members` | `createSignedUrls` als anon | **abgelehnt** | „Either the object does not exist or you do not have access to it" |
+| `public` | ausgeloggt signieren **und holen** | Bild kommt an | **HTTP 200, 34 Bytes, RIFF/WEBP** |
+
+**Sechs von sechs erfüllt.** Der `members`-Teil ist damit schärfer erfüllt als
+die Abnahme verlangt: es scheitert nicht nur die Datei, sondern schon der
+Versuch, sich eine Signatur ausstellen zu lassen.
+
+### Die Sonde kann rot — nachgewiesen, nicht behauptet
+
+Ein grüner Lauf beweist wenig, wenn die Zusicherungen gar nicht fallen können;
+dieses Repo hat mit Vakuum-Tests schon bezahlt. Vor dem DEV-Lauf lief deshalb am
+lokalen Stack eine **Mutation**: `p_visibility` fest auf `public`, sodass der
+„members"-Beitrag keiner mehr ist. Ergebnis — genau die zwei `members`-Zeilen
+fielen (`ausgeloggter Feed`: Beitrag sichtbar; `createSignedUrls`: Signatur
+**wird** ausgestellt), die vier übrigen blieben grün. Die Sonde misst also, was
+sie behauptet.
+
+### Der Abbau ist nachgezählt
+
+DEV bedient die Live-Seite; für die Dauer des Laufs stand ein Testbeitrag im
+Feed der eingeloggten Mitglieder. Die Sonde räumt am Ende ab und **zählt dann
+nach** — Beiträge, Bildzeilen, Storage-Objekte, Profil, Konto:
+
+```
+OK    nachgezaehlt: Beitraege 0, Bildzeilen 0, Storage-Objekte 0, Profil 0, Konto 0
+```
+
+Ein liegengebliebener Rest wäre als eigener Fehler gezählt worden, getrennt von
+den Prüfungen — eine erfüllte Sonde mit Resten ist kein Erfolg.
+
+### Was noch offen ist, und warum es offen sein muss
+
+Die Zeile **„public-Bild im ausgeloggten Feed sichtbar"** führt `design.md`
+bewusst über den *gerenderten* Feed. Das geht in diesem Fenster nicht: auf
+`pages.dev` steht noch das alte Frontend, weil `drift-gate` jeden Deploy
+blockt, bis `migrate-prod` lief (nachgelesen im Lauf zur Merge-SHA: „DRIFT —
+lokal vorhanden, auf dem Ziel fehlend" für alle vier Migrationen). Ein
+ausgeloggter Feed dort zeigt heute gar keine Beitragsbilder.
+
+Gemessen ist stattdessen der Weg, den der Feed danach nimmt: ausgeloggt
+signieren, holen, Bytes vergleichen. Die gerenderte Zeile wird direkt nach dem
+`deploy`-Re-Run aus 10.4 im echten Inkognito-Fenster nachgeholt.
