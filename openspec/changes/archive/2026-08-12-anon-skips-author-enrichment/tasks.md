@@ -55,9 +55,23 @@ das bereits und ist grün; die Anzeige ändert dieser Change nicht.
 
 - [x] 3.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
 - [x] 3.2 Code-Review auf dem Diff (nicht auf dem Plan).
-- [ ] 3.3 **Auf der Live-Seite ausgeloggt nachgesehen** — alle vier
-      öffentlichen Flächen: `/`, `/aktivitaet`, `/events`, `/events/:id`.
-      Konsole fehlerfrei, **null** `profiles_public`- und
-      `partners`-Anfragen im Netzwerkverkehr. Kommt nach dem Ausrollen.
+- [x] 3.3 **Auf der Live-Seite ausgeloggt nachgesehen** (2026-08-12, nach dem
+      Deploy von PR #163 auf `fbc-platform.pages.dev`, Chrome/DevTools):
+
+      | Fläche | Supabase-Aufrufe ausgeloggt |
+      | -- | -- |
+      | `/aktivitaet` | `posts` 200 · `tags` 200 · `post_media` 200 · `post_engagement_counts` 200 |
+      | `/events` | `events` 200 · `event_registration_counts` 200 |
+      | `/` | `posts`, `events`, `post_media` und beide Zähler-RPC — sonst nichts |
+
+      **Kein `profiles_public`, kein `partners`, kein `comments`** — und die
+      Konsole ist fehlerfrei. Vor dem Deploy war der 401 an derselben Stelle
+      klar zu sehen (lokal gegen dasselbe Backend gemessen, siehe die
+      EVIDENCE des Schwesterchanges).
+
+      `/events/:id` wurde **nicht einzeln** aufgerufen: ausgeloggt gibt es dort
+      derzeit nur ein vergangenes Event ohne Kartenlink. Der Pfad ist
+      codegleich — `fetchEvent` ruft dasselbe abgesicherte `hostsFor` wie die
+      Liste.
 - [ ] 3.4 Eingeloggt gegengeprüft: Autorennamen, Avatare, Stufen-Badges und
-      beide Host-Arten unverändert.
+      beide Host-Arten unverändert. **Braucht ein Konto** — offen für Donald.
