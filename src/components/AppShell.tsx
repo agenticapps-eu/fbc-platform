@@ -10,6 +10,7 @@ import { RouteTransition } from "./ui/Motion";
 import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
+import { useOverlay } from "./ui/useOverlay";
 
 // Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
 // Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
@@ -294,6 +295,25 @@ export default function AppShell() {
     return () => document.removeEventListener("keydown", onKey);
   }, [mobileNavOpen]);
 
+  // Ab `lg` verschwindet die Schublade NUR per CSS (`lg:hidden`) — der Zustand
+  // bliebe offen. Solange das bloß eine unsichtbare Schublade war, fiel es
+  // niemandem auf; mit der Scroll-Sperre daran (AGE-529) wäre die Seite danach
+  // DAUERHAFT gesperrt, ohne sichtbaren Grund. Also hier schließen.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const auf = () => {
+      if (mq.matches) setMobileNavOpen(false);
+    };
+    auf();
+    mq.addEventListener("change", auf);
+    return () => mq.removeEventListener("change", auf);
+  }, []);
+
+  // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es
+  // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon
+  // erscheint. Genau dort zählt die iOS-feste Sperre am meisten.
+  const mobileNav = useOverlay(mobileNavOpen);
+
   async function handleSignOut() {
     await signOut();
     navigate("/login", { replace: true });
@@ -443,6 +463,7 @@ export default function AppShell() {
       {/* Off-Canvas-Sidebar (< lg). */}
       {mobileNavOpen && (
         <div
+          ref={mobileNav}
           className="fixed inset-0 z-50 lg:hidden"
           role="dialog"
           aria-modal="true"

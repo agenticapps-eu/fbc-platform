@@ -32,6 +32,15 @@ if (!window.matchMedia) {
   }));
 }
 
+// jsdom implementiert `window.scrollTo` nicht und meldet das bei jedem Aufruf
+// als „Not implemented" auf der Konsole. Die Scroll-Sperre der Overlays
+// (AGE-529) ruft es bei jedem Schließen — ohne diesen Stub verrauscht jeder
+// Lauf. Wo der AUFRUF selbst die Zusicherung ist, überschreibt der Test ihn
+// mit einem eigenen Spion (siehe useOverlay.test.tsx).
+if (!vi.isMockFunction(window.scrollTo)) {
+  Object.defineProperty(window, "scrollTo", { value: vi.fn(), writable: true });
+}
+
 // globals: false in vitest.config → testing-library registriert sein
 // automatisches Cleanup nicht selbst. Ohne dies bleiben gerenderte DOMs über
 // Testfälle hinweg bestehen (mehrfach gefundene Elemente).

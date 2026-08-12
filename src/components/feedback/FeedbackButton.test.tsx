@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthFixture, fakeAuthValue } from "../../test/auth-fixtures";
@@ -75,5 +75,47 @@ describe("FeedbackButton", () => {
     fireEvent.click(screen.getByRole("button", { name: /absenden/i }));
 
     expect(await screen.findByText(/konnte nicht gespeichert werden/i)).toBeInTheDocument();
+  });
+
+  // ── Overlay-Hygiene (AGE-529) ────────────────────────────────────────────
+
+  it("sperrt die Seite dahinter und hält den Fokus im Panel", () => {
+    // Anschluss 3 von 4 an `useOverlay`. Der Fokusumlauf steht neben der
+    // Body-Sperre, weil die Sperre allein auch dann grün wäre, wenn der Ref nie
+    // am Container hinge.
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+
+    expect(document.body.style.position).toBe("fixed");
+
+    const dialog = screen.getByRole("dialog");
+    // Dieselbe Menge, die der Hook sieht — NICHT `getAllByRole("button")`: die
+    // Sterne tragen `role="radio"` und fielen dort heraus, der CSS-Selektor des
+    // Hooks kennt sie aber. Die erste Fassung dieses Tests scheiterte genau
+    // daran, und der Hook hatte recht.
+    const knoten = Array.from(dialog.querySelectorAll<HTMLElement>("button, textarea"));
+    knoten[knoten.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(knoten[0]);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /abbrechen/i }));
+    expect(document.body.style.position).toBe("");
+  });
+
+  it("schwebt unter sm nicht mehr — dort verdeckte er die Composer-Kacheln", () => {
+    // Gemessen auf 375×812 (AGE-528, Task 9.7): der feste Knopf lag über der
+    // kuratierten Kachel „Frage", `elementFromPoint` in deren Mitte lieferte
+    // „Feedback".
+    //
+    // Diese Zusicherung ist bewusst SCHWACH und sagt das auch: jsdom hat kein
+    // Layout und kennt keine Breakpoints, `elementFromPoint` liefert dort
+    // nichts Brauchbares. Geprüft wird nur, dass das Schweben an `sm` hängt —
+    // die echte Messung braucht einen Browser und steht in der Abnahme (4.3).
+    renderAt("/");
+    const knopf = screen.getByRole("button", { name: /feedback/i });
+    const klassen = knopf.className.split(/\s+/);
+
+    expect(klassen).toContain("sm:fixed");
+    expect(klassen).not.toContain("fixed");
   });
 });
