@@ -66,9 +66,17 @@ Reviews überstanden hat und erst die Sichtprobe fand.
 - [x] 1.0b Dieselbe Sonde misst die **Laufzeit eines Stapels mit 120 Pfaden**.
       Die Policy wertet je Objekt eine `SECURITY DEFINER`-Funktion mit Join aus;
       wenn das teuer ist, will man es hier wissen und nicht am Starttag.
-- [ ] 1.0c Sonde **zusätzlich gegen DEV** laufen lassen, bevor Block 2 dort
+- [x] 1.0c Sonde **zusätzlich gegen DEV** laufen lassen, bevor Block 2 dort
       landet. Ein grüner lokaler Lauf sagt nichts über DEV, wenn die
       Supabase-Versionen auseinanderliegen (Befund aus dem Plan-Review).
+      Erledigt am 2026-08-12: alle sechs Fälle erfüllt, 120 Signaturen in
+      70–135 ms statt 15 ms (das Netz, nicht die Konstruktion). Der Zielaufruf
+      verlangt die Projektkennung als Argument; lokal bleibt fest verdrahtet.
+      **DEV hatte einen eigenen Befund:** der Abbau war nicht symmetrisch — der
+      Wegwerf-Bucket blieb im Live-Projekt stehen, während die Sonde „ALLE
+      PRUEFUNGEN ERFUELLT" meldete. `emptyBucket` ist gehostet nicht sofort
+      wirksam. Der Abbau prüft jetzt seine Rückgaben, zählt Reste getrennt und
+      versucht es dreimal; `EVIDENCE.md`.
 - [x] 1.1 **Verzweigung — nicht eingetreten.** Die Sonde ist grün
       (`EVIDENCE.md`): alle sechs Fälle erfüllt, 120 Signaturen in 17 ms. Der
       Rückfallweg (Edge Function mit `service_role`) wird nicht gebraucht,

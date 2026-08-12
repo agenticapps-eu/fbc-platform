@@ -31,21 +31,83 @@
  * jemand die Variable anders setzt. Weicht etwas ab, bricht die Sonde ab,
  * bevor sie irgendetwas anlegt.
  */
+import { readFile } from "node:fs/promises";
+
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 
-// ── Fest verdrahtet. Nicht konfigurierbar, mit Absicht. ─────────────────────
-const DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-const API_URL = "http://127.0.0.1:54321";
-const ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-const SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+// ── Lokal ist fest verdrahtet. DEV muss AUSDRUECKLICH benannt werden. ───────
+//
+// Task 1.0c: ein gruener lokaler Lauf sagt nichts ueber DEV, wenn die
+// Supabase-Versionen auseinanderliegen (Befund aus dem Plan-Review). Die Sonde
+// laeuft deshalb auch gegen DEV — aber nur, wenn der Aufrufer die Kennung des
+// Zielprojekts HINSCHREIBT:
+//
+//   tsx scripts/probe-post-media-signatur.ts --dev=foelowldexkcqzewvrcf
+//
+// Kein `--dev=prod`, kein Umschalten ueber eine Umgebungsvariable: ein
+// Waechter, der nur einen Namen prueft, haelt nichts, wenn jemand die Variable
+// anders setzt. Die Kennung wird gegen scripts/dev-project-ref.txt geprueft;
+// alles andere bricht ab, bevor irgendetwas angelegt wird.
+const LOKAL = {
+  DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+  API_URL: "http://127.0.0.1:54321",
+  ANON_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
+  SERVICE_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU",
+};
+
+const zielRef = process.argv.find((a) => a.startsWith("--dev="))?.slice("--dev=".length);
+
+async function ziel() {
+  if (!zielRef) return { ...LOKAL, name: "LOKAL, fest verdrahtet", lokal: true };
+
+  const erwartet = (await readFile("scripts/dev-project-ref.txt", "utf8")).trim();
+  if (zielRef !== erwartet) {
+    throw new Error(
+      `--dev=${zielRef} ist nicht das DEV-Projekt (erwartet ${erwartet}). Abbruch vor dem ersten Schreiben.`,
+    );
+  }
+  const dbUrl = process.env.SUPABASE_DB_URL_DEV;
+  const pat = process.env.SUPABASE_ACCESS_TOKEN;
+  if (!dbUrl || !pat) {
+    throw new Error(
+      "SUPABASE_DB_URL_DEV und SUPABASE_ACCESS_TOKEN fehlen — mit `infisical run --env=dev --` starten.",
+    );
+  }
+  // Die Schluessel kommen aus der Management-API und nicht aus der Umgebung:
+  // in Infisical steht nur der anon-Key, und der genuegt der Sonde nicht.
+  const antwort = await fetch(
+    `https://api.supabase.com/v1/projects/${zielRef}/api-keys?reveal=true`,
+    { headers: { Authorization: `Bearer ${pat}` } },
+  );
+  if (!antwort.ok) throw new Error(`Management-API: HTTP ${antwort.status}`);
+  const schluessel = (await antwort.json()) as { name: string; api_key: string }[];
+  const hole = (name: string) => {
+    const k = schluessel.find((s) => s.name === name)?.api_key;
+    if (!k) throw new Error(`Kein ${name}-Schluessel fuer ${zielRef}`);
+    return k;
+  };
+  return {
+    DB_URL: dbUrl,
+    API_URL: `https://${zielRef}.supabase.co`,
+    ANON_KEY: hole("anon"),
+    SERVICE_KEY: hole("service_role"),
+    name: `DEV ${zielRef}`,
+    lokal: false,
+  };
+}
+
+const ZIEL = await ziel();
+const { DB_URL, API_URL, ANON_KEY, SERVICE_KEY } = ZIEL;
 
 const BUCKET = "probe-post-media";
 const UID = "00000000-0000-4000-8000-0000000000c7";
 
 let fehler = 0;
+/** Zaehlt getrennt: eine erfuellte Sonde mit liegengebliebenen Resten ist kein Erfolg. */
+let abbauFehler = 0;
 function pruefe(name: string, erwartet: string, tatsaechlich: string, ok: boolean) {
   if (ok) {
     console.log(`  OK    ${name}\n        erwartet: ${erwartet}\n        gemessen: ${tatsaechlich}`);
@@ -99,8 +161,27 @@ async function abbau(db: pg.Client) {
     drop table if exists public.probe_media;
   `);
   // Objekte und Bucket ueber die API — SQL-DELETE blockt storage.protect_delete().
-  await dienst.storage.emptyBucket(BUCKET);
-  await dienst.storage.deleteBucket(BUCKET);
+  //
+  // Die Rueckgabe wird GEPRUEFT, nicht verworfen. Beim ersten DEV-Lauf am
+  // 2026-08-12 ist genau hier etwas liegengeblieben: Tabelle, Funktion, Policy
+  // und Objekte waren weg, der Bucket stand noch. Ein Abbau, der seinen eigenen
+  // Fehlschlag verschweigt, hinterlaesst Reste in einem geteilten Projekt — und
+  // niemand erfaehrt es, weil die Sonde daneben „ALLE PRUEFUNGEN ERFUELLT"
+  // meldet.
+  // Gehostet ist `emptyBucket` nicht sofort wirksam: beim ersten DEV-Lauf hat
+  // `deleteBucket` unmittelbar danach noch Objekte gesehen und abgelehnt.
+  // Deshalb bis zu drei Anlaeufe mit kurzer Pause.
+  let letzterFehler: string | null = null;
+  for (let versuch = 0; versuch < 3; versuch++) {
+    await dienst.storage.emptyBucket(BUCKET);
+    const weg = await dienst.storage.deleteBucket(BUCKET);
+    // „not found" ist der Normalfall vor dem ersten Lauf, kein Rest.
+    if (!weg.error || /not found/i.test(weg.error.message)) return;
+    letzterFehler = weg.error.message;
+    await new Promise((auf) => setTimeout(auf, 500));
+  }
+  console.error(`::error::Abbau unvollstaendig — deleteBucket: ${letzterFehler}`);
+  abbauFehler += 1;
 }
 
 /** Ein winziges gueltiges WebP (RIFF-Kopf reicht — der Bucket prueft den MIME-Typ). */
@@ -112,13 +193,22 @@ function bildBytes(): Blob {
 
 async function main() {
   console.log("== Sonde: darf anon aus einem privaten Bucket signieren? ==");
-  console.log(`   Ziel: ${DB_URL} (LOKAL, fest verdrahtet)\n`);
+  console.log(`   Ziel: ${ZIEL.name}\n`);
 
-  const db = new pg.Client({ connectionString: DB_URL });
+  const db = new pg.Client({
+    connectionString: DB_URL,
+    // Gehostete Projekte sprechen TLS mit Supabases eigener Wurzel, die die
+    // System-Kette nicht kennt. Die liegt im Repo — geprueft wird also, nicht
+    // weggeschaltet. Lokal ist das Feld unwirksam.
+    ...(ZIEL.lokal
+      ? {}
+      : { ssl: { ca: await readFile("scripts/supabase-root-2021-ca.crt", "utf8") } }),
+  });
   await db.connect();
 
   const wirt = (await db.query("select inet_server_addr()::text as adresse")).rows[0].adresse;
-  if (wirt !== null && wirt !== "127.0.0.1" && !wirt.startsWith("172.") && wirt !== "::1") {
+  const istLokal = wirt === null || wirt === "127.0.0.1" || wirt.startsWith("172.") || wirt === "::1";
+  if (ZIEL.lokal && !istLokal) {
     console.error(`::error::Nicht der lokale Stack (inet_server_addr = ${wirt}). Abbruch.`);
     process.exit(1);
   }
@@ -246,7 +336,12 @@ async function main() {
   await db.end();
 
   console.log(`\n== ${fehler === 0 ? "ALLE PRUEFUNGEN ERFUELLT" : `${fehler} PRUEFUNG(EN) OFFEN`} ==`);
-  process.exit(fehler === 0 ? 0 : 1);
+  if (abbauFehler > 0) {
+    console.error(
+      `::error::${abbauFehler} Rest(e) im Zielprojekt liegengeblieben — von Hand nachsehen.`,
+    );
+  }
+  process.exit(fehler === 0 && abbauFehler === 0 ? 0 : 1);
 }
 
 main().catch((e) => {

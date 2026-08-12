@@ -220,13 +220,41 @@ benannt und gewollt: eine bereits ausgestellte Signatur gilt bis zu einer Stunde
 weiter, auch wenn der Beitrag inzwischen auf `members` steht. Das steht im
 Migrationskopf und in `design.md`, samt seiner Folge für Detlev.
 
-## Task 1.0c — noch offen
+## Task 1.0c — dieselbe Sonde gegen DEV
 
-Die Sonde gegen **DEV** laufen zu lassen (Plan-Review: ein grüner lokaler Lauf
-sagt nichts über DEV, wenn die Supabase-Versionen auseinanderliegen) steht noch
-aus. Sie ist **blockiert**: `infisical` hat keine Session, und der Login
-braucht ein echtes Terminal (`! infisical login`).
+Gemessen am 2026-08-12 gegen **DEV `foelowldexkcqzewvrcf`**, ausdrücklich
+benannt:
 
-Blockiert nicht den Fortschritt — 1.0c gehört ohnehin vor den Zeitpunkt, an
-dem Block 2 auf DEV landet, und bis dahin müssen die Migrationen erst
-existieren.
+```
+infisical run --env=dev -- tsx scripts/probe-post-media-signatur.ts --dev=foelowldexkcqzewvrcf
+```
+
+Lokal bleibt fest verdrahtet; DEV verlangt die Projektkennung als Argument, und
+die wird gegen `scripts/dev-project-ref.txt` geprüft. Ein Umschalten über eine
+Umgebungsvariable gibt es nicht — ein Wächter, der nur einen Namen prüft, hält
+nichts, wenn jemand die Variable anders setzt.
+
+**Alle sechs Fälle erfüllt, wie lokal.** Die Sorge aus dem Plan-Review
+(auseinanderlaufende Supabase-Versionen) ist damit ausgeräumt. Ein Unterschied
+ist messbar und erwartbar: **120 Signaturen in 70–135 ms statt 15 ms** — das
+Netz, nicht die Konstruktion.
+
+### Der Befund, den erst DEV hatte: der Abbau war nicht symmetrisch
+
+Nach dem ersten DEV-Lauf meldete die Sonde „ALLE PRUEFUNGEN ERFUELLT" — und
+hatte den Wegwerf-**Bucket im Live-Projekt stehen gelassen**. Tabelle, Funktion,
+Policy und Objekte waren weg, `deleteBucket` war fehlgeschlagen und sein Fehler
+wurde verworfen.
+
+Ursache: `emptyBucket` ist gehostet nicht sofort wirksam, `deleteBucket`
+unmittelbar danach sieht noch Objekte. Lokal fällt das nicht auf.
+
+Zwei Änderungen daraus, beide gemessen:
+
+- Der Abbau **prüft seine eigenen Rückgaben** und zählt Reste getrennt. Eine
+  erfüllte Sonde mit liegengebliebenen Resten ist kein Erfolg mehr — der
+  Exit-Code ist dann 1.
+- Bis zu drei Anläufe mit kurzer Pause.
+
+Danach: Lauf grün, Exit 0, und DEV trägt wieder nur `avatars` und `covers`
+(nachgesehen, nicht geglaubt).
