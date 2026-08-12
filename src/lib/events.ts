@@ -191,13 +191,19 @@ const EVENT_COLUMNS =
   "id, title, type, starts_at, location, visibility, capacity, host_id, host_partner_id";
 
 /**
- * Hosts je Event auflösen. Profil-Hosts aus der View `profiles_public` (für
- * authenticated lesbar), Partner-Hosts aus `partners` (für alle lesbar). Best-effort:
- * fehlt ein Host (z. B. anon ohne profiles_public-Zugriff), bleibt host = null.
+ * Hosts je Event auflösen. Profil-Hosts aus der View `profiles_public`,
+ * Partner-Hosts aus `partners`. Best-effort: fehlt ein Host, bleibt host = null.
  * Ein Partner-Host hat Vorrang vor host_id (ein Event wird i. d. R. nur eines haben).
+ *
+ * OHNE Session wird KEINE der beiden gefragt (AGE-530). Beide sind für `anon`
+ * gesperrt — `profiles_public` seit AGE-239, `partners` per Grant nur an
+ * `authenticated` (20260715140000_explicit_grants.sql:62) —, ausgeloggt kämen also
+ * zwei `42501` zurück und der Host bliebe so oder so leer. Ein Event erscheint
+ * ausgeloggt daher ohne Host-Angabe.
  */
-async function hostsFor(rows: EventRow[]): Promise<Map<string, EventHost>> {
+async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<string, EventHost>> {
   const byEventId = new Map<string, EventHost>();
+  if (!uid) return byEventId;
   const profileIds = [...new Set(rows.map((r) => r.host_id).filter((x): x is string => !!x))];
   const partnerIds = [
     ...new Set(rows.map((r) => r.host_partner_id).filter((x): x is string => !!x)),
@@ -318,7 +324,7 @@ export async function fetchEvents(uid: string | null): Promise<EventListItem[]> 
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const [hosts, counts, statuses] = await Promise.all([
-    hostsFor(rows),
+    hostsFor(uid, rows),
     countsFor(ids),
     myStatuses(uid, ids),
   ]);
@@ -336,7 +342,7 @@ export async function fetchEvent(uid: string | null, id: string): Promise<EventL
   if (!data) return null;
   const row = data as EventRow;
   const [hosts, counts, statuses] = await Promise.all([
-    hostsFor([row]),
+    hostsFor(uid, [row]),
     countsFor([id]),
     myStatuses(uid, [id]),
   ]);

@@ -285,12 +285,18 @@ function authorOf(byId: Map<string, FeedAuthor>, id: string): FeedAuthor {
 
 /**
  * Autoren aus `profiles_public` (nur öffentliche Spalten, für authenticated lesbar).
- * Best-effort: hat der Aufrufer (anon) keinen Lesezugriff oder ist ein Autor nicht
- * öffentlich, bleibt es beim Fallback „Mitglied" — der Feed bricht dadurch nie ab.
+ * Best-effort: ist ein Autor nicht öffentlich, bleibt es beim Fallback „Mitglied" —
+ * der Feed bricht dadurch nie ab.
+ *
+ * OHNE Session wird gar nicht erst gefragt (AGE-530): `profiles_public` trägt für
+ * `anon` bewusst kein Leserecht (AGE-239), die Abfrage käme also als `42501`
+ * zurück. Das ist KEINE Sicherheitsgrenze — die bleibt das fehlende Recht, und die
+ * Maskierung der Anzeige bleibt `displayAuthor`. Hier wird nur nichts gefragt, was
+ * gesichert abgewiesen wird.
  */
-async function fetchAuthors(ids: string[]): Promise<Map<string, FeedAuthor>> {
+async function fetchAuthors(uid: string | null, ids: string[]): Promise<Map<string, FeedAuthor>> {
   const byId = new Map<string, FeedAuthor>();
-  if (ids.length === 0) return byId;
+  if (!uid || ids.length === 0) return byId;
   const { data, error } = await supabase
     .from("profiles_public")
     .select("id, name, avatar_url, tier")
@@ -371,7 +377,7 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
 
   const [authors, countsRes, mediaRes] = await Promise.all([
-    fetchAuthors(authorIds),
+    fetchAuthors(uid, authorIds),
     supabase.rpc("post_engagement_counts", { p_post_ids: postIds }),
     supabase
       .from("post_media")
@@ -427,8 +433,15 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
   };
 }
 
-/** Kommentare eines Beitrags, chronologisch (RLS: nur wenn der Post sichtbar ist). */
-export async function fetchComments(postId: string): Promise<FeedComment[]> {
+/** Kommentare eines Beitrags, chronologisch (RLS: nur wenn der Post sichtbar ist).
+ *
+ *  Ohne Session wird gar nicht gefragt (AGE-530): `comments` trägt sein select nur
+ *  für `authenticated`. Aufklappen kann ein ausgeloggter Besucher den Thread zwar
+ *  nicht — der Knopf ist `disabled` —, aber er kann sich abmelden, WÄHREND er offen
+ *  ist. Dann bleibt der Thread montiert, der Query-Key wechselt auf `uid = null`,
+ *  und ohne diese Zeile liefe genau dort die nächste verbotene Abfrage. */
+export async function fetchComments(uid: string | null, postId: string): Promise<FeedComment[]> {
+  if (!uid) return [];
   const { data, error } = await supabase
     .from("comments")
     .select("id, post_id, author_id, body, created_at")
@@ -436,7 +449,7 @@ export async function fetchComments(postId: string): Promise<FeedComment[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = data ?? [];
-  const authors = await fetchAuthors([...new Set(rows.map((r) => r.author_id))]);
+  const authors = await fetchAuthors(uid, [...new Set(rows.map((r) => r.author_id))]);
   return rows.map((r) => ({
     id: r.id,
     postId: r.post_id,
