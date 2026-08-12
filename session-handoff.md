@@ -20,8 +20,8 @@ Produktcode).
 - **10.4/10.5**: `migrate-prod` Lauf 31605508737, Dry-Run **gelesen**, danach
   „OK — 60 Migrationen, Historie abweichungsfrei". PROD nachgemessen,
   **zwölf von zwölf** (`scripts/mess-10-5-prod.ts`, nur lesend).
-- **Zwei neue Issues**: **AGE-529** (niedrig, Overlay-Hygiene) und **AGE-530**
-  (hoch, siehe unten).
+- **Zwei neue Issues**, beide entschieden und umsetzungsreif: **AGE-529**
+  (Overlay-Hygiene) und **AGE-530** (ausgeloggter 401 im Feed) — siehe unten.
 
 ## Decisions
 
@@ -53,28 +53,52 @@ Produktcode).
 
 ## Next session: start here
 
-**PR #160 mergen**, sobald die Checks grün sind (`gh pr checks 160`; der Merge
-selbst wird vom Klassifikator geblockt, also `! gh pr merge 160 --squash` selbst
-tippen — danach mit `gh pr view 160 --json state` prüfen, `gh pr merge` kann
-still fehlschlagen). Der PR trägt **keinen Produktcode**, nur die zwei Sonden,
-das Archiv und die +11 Requirements; nach dem Merge ist an C7 nichts mehr offen.
+**PR #160 mergen** — Stand 2026-08-12 `mergeState=CLEAN`, alle vier Pflichtchecks
+(`verify`, `migrations`, `pr-title`, `edge-functions`) grün auf `fc214ae`. **Nicht
+vorher auf den Branch pushen**: jeder Push startet CI neu und blockt den Merge
+erneut (genau so ist der erste Versuch gescheitert). Der Merge selbst wird vom
+Klassifikator geblockt, also `! gh pr merge 160 --squash` selbst tippen und
+danach mit `gh pr view 160 --json state` prüfen — `gh pr merge` kann still
+fehlschlagen. Der PR trägt **keinen Produktcode**, nur die zwei Sonden, das
+Archiv und die +11 Requirements; nach dem Merge ist an C7 nichts mehr offen.
 
-Danach inhaltlich: **AGE-530** ist der wertvollste nächste Griff — auf der
-öffentlichen Seite heißt heute *jeder* Autor „Ein Mitglied", weil `anon` kein
-SELECT auf `profiles_public` hat (401, `42501`, auf **beiden** Instanzen). Vor
-dem `grant select` steht eine Produktfrage, keine technische.
+**Diese Übergabe ist absichtlich nicht committet** — ein Push auf den Branch von
+#160 hätte den Merge wieder blockiert. Nach dem Merge mit einem eigenen Commit
+nachziehen.
+
+Danach inhaltlich: **AGE-529** ist der größere Griff (gemeinsamer Hook, vier
+Overlays, Fokus-Falle, Feedback-Knopf), **AGE-530** der kleinere und schnellere
+(ausgeloggt gar nicht anreichern). Beide sind entschieden und brauchen keine
+Rückfrage — der Zuschnitt steht unten und ausführlich in den Issues.
+
+## Nach dem Ausrollen entschieden (2026-08-12, Donald)
+
+Beide Folge-Issues sind **umsetzungsreif** — der Zuschnitt steht in der
+Beschreibung, es ist nichts mehr zu klären:
+
+- **AGE-530** (mittel, war zuerst falsch gerahmt): Namen bleiben für
+  Nicht-Mitglieder **unsichtbar** — das fehlende `anon`-Recht ist Absicht und
+  steht so in `App.tsx:110` und `feed.ts:287`. **Kein Grant.** Es bleibt nur:
+  der Feed fragt ausgeloggt trotzdem ab und kassiert je Seitenaufruf einen 401.
+  Ohne Session gar nicht anreichern, damit „Ein Mitglied" eine ausgesprochene
+  Regel ist und nicht das Nebenprodukt eines Fehlschlags.
+- **AGE-529** (mittel, Zuschnitt gewachsen): **ein** `useScrollLock()` in
+  `src/components/ui/` für **alle vier** Overlays, in der **robusten**
+  iOS-Variante (`position: fixed` + `top: -scrollY`, Scroll-Position exakt
+  wiederherstellen — eine halbe Umsetzung springt beim Schließen nach oben und
+  ist schlechter als heute), mit **Zählung statt Schalter** für gleichzeitig
+  offene Overlays, plus **Fokus-Falle** (alle vier behaupten `aria-modal`, keines
+  hält den Fokus). Der Feedback-Knopf **schwebt unter `sm` nicht mehr**.
+  Eine Abnahmezeile kann ich nicht selbst erfüllen: die Sichtprobe auf einem
+  echten iPhone.
 
 ## Open questions
 
-- **Die 15 kuratierten Tags sind seit heute in PROD, ohne Detlevs Abstimmung.**
-  Stand ausdrücklich so im Issue („Die Startbefüllung stimmt Donald mit Detlev
-  ab") und ist nicht passiert. Korrektur ist ein Insert bzw. `active = false`,
-  keine Migration — aber sie steht jetzt live.
-- **AGE-530** (hoch): Sollen Namen öffentlicher Beiträge für Nicht-Mitglieder
-  sichtbar sein? Achtung: `profiles_public` läuft mit `security_invoker=off`,
-  ein Grant öffnet die View für alle Zeilen, die ihr Prädikat durchlässt.
-- **AGE-529** (niedrig): Scroll-Sperre für alle vier Dialoge; Feedback-Knopf
-  über der Kachel „Frage" auf 375 px.
+**Keine offenen Punkte mehr zu C7.** Die 15 kuratierten Tags in PROD sind von
+Donald am 2026-08-12 ausdrücklich abgenommen — die Abstimmung mit Detlev, die
+das Issue vorsah, ist damit erledigt und **nicht erneut vorzuschlagen**. Wer die
+Liste später ändern will: ein Insert bzw. `active = false`, keine Migration.
+
 - Aus früheren Sitzungen offen: dunkles Theme färbt die Schale, nicht die Karten
   (heute bestätigt) · `file_size_limit` für den `avatars`-Bucket fehlt weiterhin
   · zwei Gestaltungsfragen aus 9.6 (3+1-Raster bei vier Kacheln,
