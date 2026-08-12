@@ -461,9 +461,16 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       trägt den Autornamen — er nimmt `displayAuthor(...)`, also ausgeloggt
       „Ein Mitglied". Der einzige benannte Rest bleibt die 1-h-Nachlaufzeit
       einer schon ausgestellten Signatur.
-- [ ] 10.3 PR gegen `main`, Conventional Commit mit `(AGE-528)`.
+- [x] 10.3 PR gegen `main`, Conventional Commit mit `(AGE-528)`.
       **Merge-Erfolg mit `gh pr view --json state` prüfen** — `gh pr merge` kann
       still fehlschlagen.
+      **PR #159**, 17 Commits, 37 Dateien. Checks auf der HEAD-SHA gelesen
+      (nicht `gh run list`, das zeigt grün für eine alte SHA): `verify`,
+      `migrations`, `deploy`, `edge-functions`, `pr-title` bestanden;
+      `drift-gate`, `migrate-dev` und `functions` übersprungen — auf einem PR
+      erwartet, sie hängen an `main`. Linear schaltete den Status selbst auf
+      In Progress und hängte den PR an, es war kein Schreibzugriff nötig.
+      Die zwei niedrigen QA-Befunde liegen als **AGE-529** im Backlog.
 - [ ] 10.4 Reihenfolge des Ausrollens, erzwungen und schon einmal falsch notiert:
       Merge → `migrate-dev` grün für **dieselbe SHA auf `main`** → `migrate-prod`
       dispatchen (`plan` **lesen**, dann `apply`) → **`deploy.yml` erneut
