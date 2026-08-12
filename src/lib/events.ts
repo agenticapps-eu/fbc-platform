@@ -13,6 +13,10 @@ export interface EventHost {
   name: string;
   avatarUrl: string | null;
   tier: string | null;
+  /** Für die Veranstalter-Karte. Alle drei fehlen oft — dann entfällt die Zeile. */
+  company: string | null;
+  roles: string[] | null;
+  shortBio: string | null;
 }
 
 export interface EventListItem {
@@ -330,10 +334,15 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
 
   const [profilesRes, partnersRes] = await Promise.all([
     profileIds.length
-      ? supabase.from("profiles_public").select("id, name, avatar_url, tier").in("id", profileIds)
+      ? supabase
+          .from("profiles_public")
+          // Drei Spalten mehr als vorher (company, roles, short_bio) — dieselbe
+          // Abfrage, kein zweiter Weg. Sie füllen die Veranstalter-Karte.
+          .select("id, name, avatar_url, tier, company, roles, short_bio")
+          .in("id", profileIds)
       : Promise.resolve({ data: [], error: null }),
     partnerIds.length
-      ? supabase.from("partners").select("id, name, logo_url").in("id", partnerIds)
+      ? supabase.from("partners").select("id, name, logo_url, description").in("id", partnerIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -346,6 +355,11 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
       name: p.name ?? "Mitglied",
       avatarUrl: p.avatar_url,
       tier: p.tier,
+      // `?? null` statt roher Durchreichung: der Typ sagt `string | null` zu,
+      // und eine fehlende Spalte käme sonst als `undefined` durch.
+      company: p.company ?? null,
+      roles: p.roles ?? null,
+      shortBio: p.short_bio ?? null,
     });
   }
   const partners = new Map<string, EventHost>();
@@ -356,6 +370,9 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
       name: p.name,
       avatarUrl: p.logo_url,
       tier: null,
+      company: null,
+      roles: null,
+      shortBio: p.description ?? null,
     });
   }
 

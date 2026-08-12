@@ -100,21 +100,45 @@ function EventBody({
   const covers = useEventCovers([event, ...aehnlich], !alle.isLoading);
 
   return (
-    <div className="space-y-6">
-      <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
-        ← Zu allen Events
-      </Link>
-      <EventHeader event={event} covers={covers} />
-      <RegistrationPanel event={event} uid={uid} />
-      {/* Ohne Session gibt es keine Teilnehmer: `event_attendees` trägt kein
-          `execute` für `anon`. Der Block entfällt dann ganz, statt einen 42501
-          in die Konsole zu schreiben — dieselbe Regel wie in AGE-530 für
-          `profiles_public` und `partners`. */}
-      {uid && <AttendeeRow event={event} uid={uid} />}
+    <div className="space-y-4">
+      {/* Brotkrume statt „← Zu allen Events" (Mockup). Sie sagt zusätzlich, wo
+          man ist, nicht nur wohin man zurückkann. */}
+      <nav aria-label="Brotkrume" className="text-sm text-muted">
+        <Link to="/events" className="text-accent-strong hover:text-accent">
+          Events
+        </Link>
+        <span className="px-1.5">›</span>
+        <span className="text-ink">{event.title}</span>
+      </nav>
+
+      <EventHero event={event} covers={covers} uid={uid} />
+
+      {/* Dreierreihe wie im Mockup. Fehlt ein Block — keine Themen, kein Host
+          ohne Session —, rücken die übrigen auf, statt eine Lücke zu lassen. */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <DetailsCard event={event} />
+        <TopicsCard event={event} />
+        {uid && <HostCard event={event} />}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <DescriptionCard event={event} />
+        {/* Ohne Session gibt es keine Teilnehmer: `event_attendees` trägt kein
+            `execute` für `anon`. Der Block entfällt dann ganz, statt einen 42501
+            in die Konsole zu schreiben — dieselbe Regel wie in AGE-530 für
+            `profiles_public` und `partners`. */}
+        {uid && <AttendeeRow event={event} uid={uid} />}
+      </div>
+
       {isHost && uid && <HostTools event={event} uid={uid} />}
       <SimilarEvents events={aehnlich} covers={covers} />
     </div>
   );
+}
+
+/** „Offen für alle Mitglieder" / „Nur für Mitglieder" statt des Rohwerts. */
+function sichtbarkeitSatz(visibility: string): string {
+  return visibility === "public" ? "Offen für alle Mitglieder" : "Nur für Mitglieder";
 }
 
 /**
@@ -188,7 +212,12 @@ function SimilarEvents({
   if (aehnlich.length === 0) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-display text-lg font-semibold text-ink">Ähnliche Events</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold text-ink">Ähnliche Events</h2>
+        <Link to="/events" className="text-sm text-accent-strong hover:text-accent">
+          Alle Events anzeigen →
+        </Link>
+      </div>
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {aehnlich.map((e) => (
           <li key={e.id}>
@@ -200,99 +229,226 @@ function SimilarEvents({
   );
 }
 
-function EventHeader({ event, covers }: { event: EventListItem; covers: Record<string, string> }) {
-  const remaining = remainingSpots(event.capacity, event.registeredCount);
+/**
+ * Die Hero-Karte des Mockups: Titelbild, Typ-Marke, Titel, „Veranstaltet von"
+ * — und rechts das Anmelde-Feld. Auf schmalen Fenstern rutscht es darunter.
+ *
+ * Der Veranstalter erscheint hier bewusst NUR als Zeile; seine Karte steht in
+ * der Dreierreihe darunter (`HostCard`). Das Mockup führt beides, und die
+ * Zeile beantwortet die Frage „von wem?" schon oben, ohne die Karte zu
+ * verdoppeln.
+ */
+function EventHero({
+  event,
+  covers,
+  uid,
+}: {
+  event: EventListItem;
+  covers: Record<string, string>;
+  uid: string | null;
+}) {
   return (
-    <Card className="space-y-4 overflow-hidden !p-0">
+    <Card className="overflow-hidden !p-0">
       <EventCover
         startsAt={event.startsAt}
         url={event.coverPath ? (covers[event.coverPath] ?? null) : null}
         gross
       />
-      <div className="space-y-4 px-5 pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+      <div className="grid gap-6 p-5 lg:grid-cols-[1fr_18rem]">
+        <div className="space-y-3">
+          <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
+          <h1 className="font-display text-3xl leading-tight font-semibold tracking-tight text-ink">
             {event.title}
           </h1>
-          <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
-        </div>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs tracking-wide text-muted uppercase">Wann</dt>
-            <dd className="text-ink">{formatEventSpan(event.startsAt, event.endsAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-muted uppercase">Wo</dt>
-            {/* break-words: eine location kann eine sehr lange, unbrechbare URL sein
-              (Zoom-Join-Link als „Ort"). Auf der Detailseite soll sie ganz sichtbar
-              bleiben — also umbrechen statt kürzen, damit sie die Spalte nicht sprengt. */}
-            <dd className="break-words text-ink">{event.location ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-muted uppercase">Teilnehmer</dt>
-            <dd className="text-ink">
-              {event.registeredCount}
-              {event.capacity != null && <> / {event.capacity}</>}
-              {event.waitlistCount > 0 && (
-                <span className="text-muted"> · {event.waitlistCount} auf Warteliste</span>
+          {event.host && (
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-muted">Veranstaltet von</span>
+              {event.host.kind === "profile" ? (
+                <Link
+                  to={`/p/${event.host.id}`}
+                  className="flex items-center gap-2 hover:text-accent-strong"
+                >
+                  <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
+                  <span className="text-sm font-medium text-ink">{event.host.name}</span>
+                  {event.host.tier && <TierBadge tier={event.host.tier} />}
+                </Link>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
+                  <span className="text-sm font-medium text-ink">{event.host.name}</span>
+                  <Badge variant="neutral">Partner</Badge>
+                </span>
               )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-muted uppercase">Freie Plätze</dt>
-            <dd className="text-ink">{remaining === null ? "Unbegrenzt" : remaining}</dd>
-          </div>
-        </dl>
-        {event.description && (
-          <div className="space-y-2 border-t border-line pt-4">
-            <h2 className="text-xs tracking-wide text-muted uppercase">Beschreibung</h2>
-            {/* whitespace-pre-line: das Feld ist mehrzeilig, und Absätze des
-              Veranstalters sollen Absätze bleiben. Kein Markdown — der Text
-              kommt von Mitgliedern und wird nirgends als HTML gedeutet. */}
-            <p className="whitespace-pre-line text-sm text-ink">{event.description}</p>
-          </div>
-        )}
-        {event.topics && event.topics.length > 0 && (
-          <div className="space-y-2 border-t border-line pt-4">
-            <h2 className="text-xs tracking-wide text-muted uppercase">Themen</h2>
-            {/* Häkchenliste, nicht Chip-Reihe: das Mockup zeigt hier die
-              Tagesordnung dieses einen Events („Aktuelle Club-News",
-              „Neue Mitglieder begrüßen"), keine Schlagworte. Deshalb auch
-              kein Bezug zu den 15 kuratierten Tags aus C7. */}
-            <ul className="space-y-1.5">
-              {event.topics.map((t) => (
-                <li key={t} className="flex items-start gap-2 text-sm text-ink">
-                  <span aria-hidden className="mt-0.5 text-accent-strong">
-                    ✓
-                  </span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {event.host && (
-          <div className="flex items-center gap-2 border-t border-line pt-3">
-            <span className="text-xs text-muted">Host:</span>
-            {event.host.kind === "profile" ? (
-              <Link
-                to={`/p/${event.host.id}`}
-                className="flex items-center gap-2 hover:text-accent-strong"
-              >
-                <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
-                <span className="text-sm font-medium text-ink">{event.host.name}</span>
-                {event.host.tier && <TierBadge tier={event.host.tier} />}
-              </Link>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Avatar name={event.host.name} src={event.host.avatarUrl} size="sm" />
-                <span className="text-sm font-medium text-ink">{event.host.name}</span>
-                <Badge variant="neutral">Partner</Badge>
-              </span>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+        <div className="lg:border-l lg:border-line lg:pl-6">
+          <RegistrationPanel event={event} uid={uid} />
+        </div>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Vier Symbole für den „Details"-Block, im Hausstil: inline, `currentColor`,
+ * 1,6 px, runde Enden, 24er-Viewbox — dieselben Regeln wie `NavIcon`
+ * (`src/components/ui/NavIcon.tsx`), das aus demselben Grund keine
+ * Icon-Bibliothek zieht.
+ *
+ * Nicht in `NavIcon` aufgenommen: die Datei bildet ROUTEN auf Symbole ab. Vier
+ * Symbole, die keine Route haben, gehörten dort nicht hin.
+ *
+ * Emoji wären billiger gewesen und sahen in der Sichtprobe auch so aus: bunt,
+ * je nach Betriebssystem anders, und neben dem sonst monochromen Chrome fremd.
+ */
+const DETAIL_ICONS = {
+  kalender: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" />
+    </>
+  ),
+  ort: (
+    <>
+      <path d="M12 21s6.5-5.4 6.5-10a6.5 6.5 0 1 0-13 0c0 4.6 6.5 10 6.5 10Z" />
+      <circle cx="12" cy="11" r="2.4" />
+    </>
+  ),
+  personen: (
+    <>
+      <circle cx="9" cy="8.5" r="3" />
+      <path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+      <path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.9.5 3 2.2 3 4.7" />
+    </>
+  ),
+  ticket: (
+    <>
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5a2.5 2.5 0 0 0 0-5Z" />
+      <path d="M13.5 6v2M13.5 11v2M13.5 16v2" />
+    </>
+  ),
+} as const;
+
+/** Eine Zeile im „Details"-Block: Symbol, Text. Fehlt der Text, fehlt die Zeile. */
+function DetailZeile({
+  icon,
+  children,
+}: {
+  icon: keyof typeof DETAIL_ICONS;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="flex items-start gap-2.5 text-sm text-ink">
+      <svg
+        viewBox="0 0 24 24"
+        className="mt-0.5 h-4 w-4 shrink-0 text-muted"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {DETAIL_ICONS[icon]}
+      </svg>
+      {/* break-words: eine location kann eine sehr lange, unbrechbare URL sein
+          (Zoom-Join-Link als „Ort"). Umbrechen statt kürzen — auf der
+          Detailseite soll sie ganz sichtbar bleiben. */}
+      <span className="break-words">{children}</span>
+    </li>
+  );
+}
+
+function DetailsCard({ event }: { event: EventListItem }) {
+  const remaining = remainingSpots(event.capacity, event.registeredCount);
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-base font-semibold text-ink">Details</h2>
+      <ul className="space-y-2">
+        <DetailZeile icon="kalender">{formatEventSpan(event.startsAt, event.endsAt)}</DetailZeile>
+        {event.location && <DetailZeile icon="ort">{event.location}</DetailZeile>}
+        {/* Die Sichtbarkeit als Satz. Sie beantwortet die Frage, die sich
+            genau beim Anmelden stellt, und stand vorher nirgends. */}
+        <DetailZeile icon="personen">{sichtbarkeitSatz(event.visibility)}</DetailZeile>
+        <DetailZeile icon="ticket">
+          {remaining === null
+            ? "Plätze unbegrenzt"
+            : `${remaining} von ${event.capacity} Plätzen frei`}
+          {event.waitlistCount > 0 && (
+            <span className="text-muted"> · {event.waitlistCount} auf Warteliste</span>
+          )}
+        </DetailZeile>
+      </ul>
+    </Card>
+  );
+}
+
+function TopicsCard({ event }: { event: EventListItem }) {
+  if (!event.topics || event.topics.length === 0) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-base font-semibold text-ink">Themen</h2>
+      {/* Häkchenliste, nicht Chip-Reihe: das Mockup zeigt hier die Tagesordnung
+          dieses einen Events („Aktuelle Club-News", „Neue Mitglieder begrüßen"),
+          keine Schlagworte. Deshalb auch kein Bezug zu den 15 kuratierten Tags
+          aus C7. */}
+      <ul className="space-y-1.5">
+        {event.topics.map((t) => (
+          <li key={t} className="flex items-start gap-2 text-sm text-ink">
+            <span aria-hidden className="mt-0.5 text-accent-strong">
+              ✓
+            </span>
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="pt-1 text-xs text-muted">Änderungen vorbehalten.</p>
+    </Card>
+  );
+}
+
+/**
+ * Die Veranstalter-Karte. Rolle, Firma und Kurzbio kommen aus
+ * `profiles_public`; fehlt eines davon, entfällt die Zeile ganz — eine
+ * Beschriftung ohne Wert ist schlechter als keine.
+ */
+function HostCard({ event }: { event: EventListItem }) {
+  const host = event.host;
+  if (!host) return null;
+  const rolle = [host.roles?.join(" · "), host.company].filter(Boolean).join(" · ");
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-base font-semibold text-ink">Veranstalter</h2>
+      <div className="flex items-center gap-3">
+        <Avatar name={host.name} src={host.avatarUrl} size="md" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-ink">{host.name}</p>
+          {rolle && <p className="truncate text-xs text-muted">{rolle}</p>}
+        </div>
+      </div>
+      {host.shortBio && <p className="text-sm text-muted">{host.shortBio}</p>}
+      {host.kind === "profile" && (
+        <Link
+          to={`/p/${host.id}`}
+          className="inline-flex w-full items-center justify-center rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm font-medium text-accent-strong hover:border-accent/50"
+        >
+          Profil ansehen
+        </Link>
+      )}
+    </Card>
+  );
+}
+
+function DescriptionCard({ event }: { event: EventListItem }) {
+  if (!event.description) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-base font-semibold text-ink">Beschreibung</h2>
+      {/* whitespace-pre-line: das Feld ist mehrzeilig, und Absätze des
+          Veranstalters sollen Absätze bleiben. Kein Markdown — der Text kommt
+          von Mitgliedern und wird nirgends als HTML gedeutet. */}
+      <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{event.description}</p>
     </Card>
   );
 }
@@ -341,24 +497,18 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
       toast({ variant: "error", title: "Abmeldung fehlgeschlagen", description: errMsg(e) }),
   });
 
+  // KEIN eigenes Card-Gehäuse mehr: dieser Block sitzt seit dem Layout-Nachzug
+  // in der rechten Spalte der Hero-Karte.
   if (!uid) {
-    return (
-      <Card>
-        <p className="text-sm text-muted">Melde dich an, um an diesem Event teilzunehmen.</p>
-      </Card>
-    );
+    return <p className="text-sm text-muted">Melde dich an, um an diesem Event teilzunehmen.</p>;
   }
   if (past) {
-    return event.myStatus ? (
-      <Card>
-        <RatePanel event={event} uid={uid} />
-      </Card>
-    ) : null;
+    return event.myStatus ? <RatePanel event={event} uid={uid} /> : null;
   }
 
   const busy = register.isPending || cancel.isPending;
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-3">
       <div className="text-sm">
         {event.myStatus ? (
           <span className="font-medium text-accent-strong">
@@ -379,7 +529,7 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
           {full ? "Auf Warteliste" : "Anmelden"}
         </Button>
       )}
-    </Card>
+    </div>
   );
 }
 

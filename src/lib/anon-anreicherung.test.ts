@@ -59,9 +59,26 @@ const ZEILEN: Record<string, Record<string, unknown>[]> = {
     },
   ],
   profiles_public: [
-    { id: AUTOR, name: "Jonas Keller", avatar_url: "https://x/a.webp", tier: "impact" },
+    {
+      id: AUTOR,
+      name: "Jonas Keller",
+      avatar_url: "https://x/a.webp",
+      tier: "impact",
+      // Seit dem Layout-Nachzug zu AGE-531 wählt `hostsFor` drei Spalten mehr
+      // aus derselben Abfrage; sie füllen die Veranstalter-Karte.
+      company: "Keller GmbH",
+      roles: ["Gründer"],
+      short_bio: "Baut Dinge.",
+    },
   ],
-  partners: [{ id: PARTNER, name: "Musterpartner", logo_url: "https://x/p.png" }],
+  partners: [
+    {
+      id: PARTNER,
+      name: "Musterpartner",
+      logo_url: "https://x/p.png",
+      description: "Ein Partner.",
+    },
+  ],
   post_media: [],
   event_registrations: [],
   comments: [
@@ -214,6 +231,9 @@ describe("Events — Hosts", () => {
       name: "Jonas Keller",
       avatarUrl: "https://x/a.webp",
       tier: "impact",
+      company: "Keller GmbH",
+      roles: ["Gründer"],
+      shortBio: "Baut Dinge.",
     });
     expect(events[1].host).toEqual({
       kind: "partner",
@@ -221,6 +241,9 @@ describe("Events — Hosts", () => {
       name: "Musterpartner",
       avatarUrl: "https://x/p.png",
       tier: null,
+      company: null,
+      roles: null,
+      shortBio: "Ein Partner.",
     });
   });
 });
