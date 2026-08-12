@@ -318,13 +318,7 @@ function PostCard({
         </div>
       </header>
 
-      <PostBody
-        segments={segments}
-        skipRaw={video?.url}
-        activeHashtag={activeHashtag}
-        onHashtag={onHashtag}
-        mentionResolver={mentionResolver}
-      />
+      <PostBody segments={segments} skipRaw={video?.url} mentionResolver={mentionResolver} />
 
       {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
 
@@ -384,31 +378,23 @@ function PostCard({
 function PostBody({
   segments,
   skipRaw,
-  activeHashtag,
-  onHashtag,
   mentionResolver,
 }: {
   segments: PostSegment[];
   skipRaw: string | undefined;
-  activeHashtag: string | null;
-  onHashtag: (tag: string | null) => void;
   mentionResolver: MentionResolver;
 }) {
   return (
     <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-ink">
       {segments.map((seg, i) => {
         if (seg.type === "url" && seg.raw === skipRaw) return null; // als Embed gezeigt
+        // Hashtags im Fließtext bleiben Text (AGE-528). Sie waren bis hierher
+        // ein zweiter Button neben dem Chip unter dem Beitrag — derselbe Tag
+        // stand also zweimal klickbar da. Der Chip ist die Bedienstelle; der
+        // Satz liest sich, er wird nicht bedient. `seg.raw` und nicht
+        // `seg.value`, damit die getippte Schreibweise samt `#` stehen bleibt.
         if (seg.type === "hashtag") {
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onHashtag(activeHashtag === seg.value ? null : seg.value)}
-              className="font-medium text-accent-strong hover:underline"
-            >
-              {seg.raw}
-            </button>
-          );
+          return <span key={i}>{seg.raw}</span>;
         }
         if (seg.type === "mention") {
           const id = mentionResolver(seg.value);

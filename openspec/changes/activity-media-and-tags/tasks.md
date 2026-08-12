@@ -182,7 +182,7 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 
 ## 4 · Die Tag-Doppelanzeige beheben
 
-- [ ] 4.1 **RED**: `src/components/community/CommunityFeed.test.tsx` — die
+- [x] 4.1 **RED**: `src/components/community/CommunityFeed.test.tsx` — die
       erste Testdatei zu dieser Komponente. Ein Beitrag mit `#Netzwerken` im
       Body und `netzwerken` in `hashtags` wird gerendert. Die Zusicherung ist
       **genau**: `netzwerken` erscheint zweimal im Dokument (einmal als Chip,
@@ -193,12 +193,12 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
       Der Test ist vor der Änderung rot.
       **Kein `vi.mock` auf die eigene Komponente** und keine Assertion auf
       Bezeichner statt sichtbaren Text — beides ist grün und prüft nichts.
-- [ ] 4.2 In `PostBody` (`CommunityFeed.tsx:401–412`) den Hashtag-Zweig auf
+- [x] 4.2 In `PostBody` (`CommunityFeed.tsx:401–412`) den Hashtag-Zweig auf
       normalen Text umstellen. Erwähnungen (`:413`) und URLs (`:429`) bleiben
       Verweise. Die Chip-Reihe (`:331–348`) bleibt unverändert.
-- [ ] 4.3 **GREEN** + zweiter Fall: Erwähnung und URL im selben Beitrag sind
+- [x] 4.3 **GREEN** + zweiter Fall: Erwähnung und URL im selben Beitrag sind
       weiterhin Verweise.
-- [ ] 4.4 `tokenizePostBody` und `parseHashtags` bleiben unverändert — die
+- [x] 4.4 `tokenizePostBody` und `parseHashtags` bleiben unverändert — die
       Segmente werden weiter gebraucht, nur anders gezeichnet.
 
 ## 5 · Datenschicht für Medien und Tags
