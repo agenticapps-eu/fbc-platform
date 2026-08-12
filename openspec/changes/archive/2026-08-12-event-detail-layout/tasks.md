@@ -69,6 +69,7 @@ Datei: `src/pages/EventDetailPage.tsx`
 
 ## 4 · Abschluss
 
-- [ ] 4.1 Commit mit `(AGE-531)`, PR gegen `main`, Checks auf der HEAD-SHA.
-- [ ] 4.2 `openspec archive` — **Szenario-Titel im MODIFIED-Block exakt wie im
-      Bestand**, sonst löscht das Archivieren die alten Szenarien.
+- [x] 4.1 Zwei Commits, PR #168, gemerged als `cbba9a6`; alle Checks grün auf `4c8384a`.
+- [x] 4.2 `openspec archive` — 1 MODIFIED gefaltet. Die bestehenden
+      Szenario-Titel blieben wortgleich, deshalb hat das Archivieren keines
+      gelöscht; nachgezählt: 9 Szenarien in der Anforderung, davon 3 neue.
