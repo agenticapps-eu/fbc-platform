@@ -29,7 +29,6 @@ import {
   rateEvent,
   registerForEvent,
   registrationStatusLabel,
-  remainingSpots,
   selectSimilarEvents,
   setCheckIn,
   updateEvent,
@@ -99,6 +98,12 @@ function EventBody({
   // Header-Cover raus und gleich danach einer mit allen dreien.
   const covers = useEventCovers([event, ...aehnlich], !alle.isLoading);
 
+  // Welche Blöcke entstehen überhaupt? Davon hängt die Spaltenzahl ab.
+  const hatThemen = !!event.topics && event.topics.length > 0;
+  const hatHost = !!uid && !!event.host;
+  const hatBeschreibung = !!event.description;
+  const hatTeilnehmer = !!uid && event.registeredCount > 0;
+
   return (
     <div className="space-y-4">
       {/* Brotkrume statt „← Zu allen Events" (Mockup). Sie sagt zusätzlich, wo
@@ -107,21 +112,32 @@ function EventBody({
         <Link to="/events" className="text-accent-strong hover:text-accent">
           Events
         </Link>
-        <span className="px-1.5">›</span>
-        <span className="text-ink">{event.title}</span>
+        <span aria-hidden className="px-1.5">
+          ›
+        </span>
+        <span aria-current="page" className="text-ink">
+          {event.title}
+        </span>
       </nav>
 
       <EventHero event={event} covers={covers} uid={uid} />
 
-      {/* Dreierreihe wie im Mockup. Fehlt ein Block — keine Themen, kein Host
-          ohne Session —, rücken die übrigen auf, statt eine Lücke zu lassen. */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Die Spaltenzahl folgt den TATSÄCHLICH vorhandenen Blöcken. Eine feste
+          Dreierteilung ließ die Spuren stehen, wenn Themen oder Host fehlen —
+          im Browser gemessen: eine einzelne Karte blieb 344 px breit, während
+          700 px Spur daneben leer standen. React rendert für `null` zwar kein
+          Element, aber das Raster rechnet trotzdem mit drei Spalten. */}
+      <div
+        className={`grid gap-4 ${SPALTEN[Math.max(1, [true, hatThemen, hatHost].filter(Boolean).length)]}`}
+      >
         <DetailsCard event={event} />
-        <TopicsCard event={event} />
-        {uid && <HostCard event={event} />}
+        {hatThemen && <TopicsCard event={event} />}
+        {hatHost && <HostCard event={event} />}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      <div
+        className={`grid gap-4 ${hatBeschreibung && hatTeilnehmer ? "lg:grid-cols-[2fr_1fr]" : ""}`}
+      >
         <DescriptionCard event={event} />
         {/* Ohne Session gibt es keine Teilnehmer: `event_attendees` trägt kein
             `execute` für `anon`. Der Block entfällt dann ganz, statt einen 42501
@@ -136,9 +152,26 @@ function EventBody({
   );
 }
 
-/** „Offen für alle Mitglieder" / „Nur für Mitglieder" statt des Rohwerts. */
+/** Tailwind sieht nur ganze Klassennamen — deshalb eine Tabelle statt Interpolation. */
+const SPALTEN: Record<number, string> = {
+  1: "",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-2 lg:grid-cols-3",
+};
+
+/**
+ * Die Sichtbarkeit in Worten — und zwar in KORREKTEN. Die erste Fassung sagte
+ * bei `public` „Offen für alle Mitglieder"; das ist gleich zweimal daneben:
+ * ein öffentliches Event ist auch ohne Session sichtbar, und der Satz vermischte
+ * Sichtbarkeit mit Anmeldeberechtigung (die für `members`-Events zusätzlich
+ * mindestens `discover` verlangt, siehe `register_for_event`). Befund aus dem
+ * Diff-Review.
+ *
+ * Deshalb ausdrücklich „sichtbar": die Zeile beantwortet, WER das Event sieht,
+ * und verspricht nichts über das Anmelden.
+ */
 function sichtbarkeitSatz(visibility: string): string {
-  return visibility === "public" ? "Offen für alle Mitglieder" : "Nur für Mitglieder";
+  return visibility === "public" ? "Öffentlich sichtbar" : "Nur für Mitglieder sichtbar";
 }
 
 /**
@@ -238,6 +271,18 @@ function SimilarEvents({
  * Zeile beantwortet die Frage „von wem?" schon oben, ohne die Karte zu
  * verdoppeln.
  */
+/**
+ * Zeigt die rechte Hero-Spalte überhaupt etwas? Bei einem vergangenen Event,
+ * an dem man nicht teilgenommen hat, gibt `RegistrationPanel` `null` zurück.
+ * Ohne diese Prüfung blieben eine Trennlinie und 288 px Leerraum stehen —
+ * im Browser gesehen, nicht hergeleitet (Befund aus dem Diff-Review).
+ */
+function hatTeilnahmeBlock(event: EventListItem, uid: string | null): boolean {
+  if (!uid) return true; // „Melde dich an, um teilzunehmen."
+  if (isPastEvent(event.startsAt, new Date())) return !!event.myStatus; // nur die Bewertung
+  return true;
+}
+
 function EventHero({
   event,
   covers,
@@ -247,6 +292,7 @@ function EventHero({
   covers: Record<string, string>;
   uid: string | null;
 }) {
+  const teilnahme = hatTeilnahmeBlock(event, uid);
   return (
     <Card className="overflow-hidden !p-0">
       <EventCover
@@ -254,7 +300,7 @@ function EventHero({
         url={event.coverPath ? (covers[event.coverPath] ?? null) : null}
         gross
       />
-      <div className="grid gap-6 p-5 lg:grid-cols-[1fr_18rem]">
+      <div className={`grid gap-6 p-5 ${teilnahme ? "lg:grid-cols-[1fr_18rem]" : ""}`}>
         <div className="space-y-3">
           <Badge variant="neutral">{eventTypeLabel(event.type)}</Badge>
           <h1 className="font-display text-3xl leading-tight font-semibold tracking-tight text-ink">
@@ -282,9 +328,11 @@ function EventHero({
             </div>
           )}
         </div>
-        <div className="lg:border-l lg:border-line lg:pl-6">
-          <RegistrationPanel event={event} uid={uid} />
-        </div>
+        {teilnahme && (
+          <div className="lg:border-l lg:border-line lg:pl-6">
+            <RegistrationPanel event={event} uid={uid} />
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -333,13 +381,22 @@ const DETAIL_ICONS = {
 /** Eine Zeile im „Details"-Block: Symbol, Text. Fehlt der Text, fehlt die Zeile. */
 function DetailZeile({
   icon,
+  label,
   children,
 }: {
   icon: keyof typeof DETAIL_ICONS;
+  /**
+   * Für Screenreader. Die Symbole sind `aria-hidden`, also hörte man ohne das
+   * hier nur nackte Werte — „Online (Zoom)" ohne „Wo". Die frühere Fassung war
+   * eine `<dl>` mit sichtbaren Beschriftungen; das Mockup hat sie nicht, die
+   * Ansage darf trotzdem nicht verlorengehen (Befund aus dem Diff-Review).
+   */
+  label: string;
   children: React.ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2.5 text-sm text-ink">
+      <span className="sr-only">{label}: </span>
       <svg
         viewBox="0 0 24 24"
         className="mt-0.5 h-4 w-4 shrink-0 text-muted"
@@ -361,20 +418,31 @@ function DetailZeile({
 }
 
 function DetailsCard({ event }: { event: EventListItem }) {
-  const remaining = remainingSpots(event.capacity, event.registeredCount);
   return (
     <Card className="space-y-3">
       <h2 className="font-display text-base font-semibold text-ink">Details</h2>
       <ul className="space-y-2">
-        <DetailZeile icon="kalender">{formatEventSpan(event.startsAt, event.endsAt)}</DetailZeile>
-        {event.location && <DetailZeile icon="ort">{event.location}</DetailZeile>}
+        <DetailZeile icon="kalender" label="Wann">
+          {formatEventSpan(event.startsAt, event.endsAt)}
+        </DetailZeile>
+        {event.location && (
+          <DetailZeile icon="ort" label="Wo">
+            {event.location}
+          </DetailZeile>
+        )}
         {/* Die Sichtbarkeit als Satz. Sie beantwortet die Frage, die sich
             genau beim Anmelden stellt, und stand vorher nirgends. */}
-        <DetailZeile icon="personen">{sichtbarkeitSatz(event.visibility)}</DetailZeile>
-        <DetailZeile icon="ticket">
-          {remaining === null
-            ? "Plätze unbegrenzt"
-            : `${remaining} von ${event.capacity} Plätzen frei`}
+        <DetailZeile icon="personen" label="Sichtbarkeit">
+          {sichtbarkeitSatz(event.visibility)}
+        </DetailZeile>
+        {/* Die TEILNEHMERZAHL steht hier und nicht nur in der Teilnehmer-Karte:
+            die gibt es ohne Session nicht, und ein ausgeloggter Besucher sah
+            dadurch gar keine Zahl mehr — eine Verschlechterung gegenüber der
+            Fassung vor dem Layout-Nachzug (Befund aus dem Diff-Review). */}
+        <DetailZeile icon="ticket" label="Plätze">
+          {event.capacity === null
+            ? `${event.registeredCount} ${event.registeredCount === 1 ? "Teilnehmer" : "Teilnehmer"} · Plätze unbegrenzt`
+            : `${event.registeredCount} von ${event.capacity} Plätzen belegt`}
           {event.waitlistCount > 0 && (
             <span className="text-muted"> · {event.waitlistCount} auf Warteliste</span>
           )}
@@ -423,8 +491,11 @@ function HostCard({ event }: { event: EventListItem }) {
       <div className="flex items-center gap-3">
         <Avatar name={host.name} src={host.avatarUrl} size="md" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-ink">{host.name}</p>
-          {rolle && <p className="truncate text-xs text-muted">{rolle}</p>}
+          {/* break-words statt truncate: mehrere Rollen oder ein langer
+              Firmenname wären in der schmalen Karte sonst unlesbar
+              abgeschnitten (Befund aus dem Diff-Review). */}
+          <p className="text-sm font-medium break-words text-ink">{host.name}</p>
+          {rolle && <p className="text-xs break-words text-muted">{rolle}</p>}
         </div>
       </div>
       {host.shortBio && <p className="text-sm text-muted">{host.shortBio}</p>}

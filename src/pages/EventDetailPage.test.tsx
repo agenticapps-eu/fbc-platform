@@ -161,13 +161,41 @@ describe("EventDetailPage — Layout nach Mockup", () => {
     // Mockup führt die Zeile; die erste Fassung sagte dazu gar nichts.
     mEvent.mockResolvedValue(evt({ visibility: "members" }));
     renderPage(true);
-    expect(await screen.findByText(/Nur für Mitglieder/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nur für Mitglieder sichtbar/)).toBeInTheDocument();
   });
 
-  it("sagt bei einem öffentlichen Event, dass es offen ist", async () => {
+  it("sagt bei einem öffentlichen Event: sichtbar, nicht offen für Mitglieder", async () => {
+    // Der Wortlaut ist zweimal wichtig: ein `public`-Event sieht man AUCH OHNE
+    // Session (nicht nur „alle Mitglieder"), und die Zeile darf nichts über die
+    // Anmeldeberechtigung versprechen — die verlangt bei `members` zusätzlich
+    // mindestens `discover`. Befund aus dem Diff-Review.
     mEvent.mockResolvedValue(evt({ visibility: "public" }));
     renderPage(true);
-    expect(await screen.findByText(/Offen für alle Mitglieder/)).toBeInTheDocument();
+    expect(await screen.findByText(/Öffentlich sichtbar/)).toBeInTheDocument();
+    expect(screen.queryByText(/Offen für alle Mitglieder/)).not.toBeInTheDocument();
+  });
+
+  it("nennt die Teilnehmerzahl auch ohne Session", async () => {
+    // Vor dem Layout-Nachzug stand sie in der Definitionsliste; danach nur noch
+    // in der Teilnehmer-Karte, die es ohne Session nicht gibt. Ein ausgeloggter
+    // Besucher sah damit gar keine Zahl mehr (Befund aus dem Diff-Review).
+    mEvent.mockResolvedValue(evt({ registeredCount: 12, capacity: null, visibility: "public" }));
+    renderPage(false);
+    expect(await screen.findByText(/12 Teilnehmer · Plätze unbegrenzt/)).toBeInTheDocument();
+  });
+
+  it("lässt bei einem vergangenen Event ohne Teilnahme keine leere Spalte stehen", async () => {
+    // Im Browser gesehen: eine Trennlinie und 288 px Leerraum rechts im Hero,
+    // weil `RegistrationPanel` für diesen Fall `null` liefert, die Rasterspur
+    // aber stehen blieb (Befund aus dem Diff-Review).
+    mEvent.mockResolvedValue(
+      evt({ startsAt: new Date(Date.now() - 10 * 86400000).toISOString(), endsAt: null }),
+    );
+    const { container } = renderPage(true);
+    await screen.findByRole("heading", { level: 1, name: "FBC Online-Treffen" });
+    const hero = container.querySelector(".grid.gap-6") as HTMLElement;
+    expect(hero.className).not.toMatch(/grid-cols-\[1fr_18rem\]/);
+    expect(hero.children).toHaveLength(1);
   });
 
   it("gibt dem Veranstalter eine Karte mit Rolle, Firma und Kurzbio", async () => {

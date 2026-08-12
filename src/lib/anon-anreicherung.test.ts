@@ -19,6 +19,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 let angefragt: string[] = [];
+/**
+ * Welche SPALTEN wurden je Relation angefragt? Der Mock verwarf das Argument
+ * von `select()` bisher — eine Fixture beantwortet dann jede Projektion gleich,
+ * und ein entfernter Spaltenname fiele niemandem auf. Befund aus dem
+ * Diff-Review zum Layout-Nachzug (AGE-531).
+ */
+let spalten: Record<string, string> = {};
 
 const AUTOR = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -98,7 +105,10 @@ vi.mock("./supabase", () => ({
       angefragt.push(table);
       const daten = () => ZEILEN[table] ?? [];
       const kette: Record<string, unknown> = {
-        select: () => kette,
+        select: (spalte?: string) => {
+          if (typeof spalte === "string") spalten[table] = spalte;
+          return kette;
+        },
         order: () => kette,
         limit: () => kette,
         or: () => kette,
@@ -120,6 +130,7 @@ import { fetchEvent, fetchEvents } from "./events";
 
 beforeEach(() => {
   angefragt = [];
+  spalten = {};
 });
 
 /**
@@ -218,6 +229,17 @@ describe("Events — Hosts", () => {
 
     expect(angefragt).not.toContain("profiles_public");
     expect(angefragt).not.toContain("partners");
+  });
+
+  it("fragt die Spalten an, die die Veranstalter-Karte braucht", async () => {
+    // Ohne diese Zeile wäre die Fixture-Erweiterung eine Behauptung: der Mock
+    // liefert seine Felder unabhängig davon, was `select()` verlangt hat. Fällt
+    // eine Spalte aus der Projektion, verliert die Karte still ihre Zeile.
+    await fetchEvents("me");
+    expect(spalten.profiles_public).toContain("company");
+    expect(spalten.profiles_public).toContain("roles");
+    expect(spalten.profiles_public).toContain("short_bio");
+    expect(spalten.partners).toContain("description");
   });
 
   it("löst eingeloggt beide Host-Arten unverändert auf", async () => {
