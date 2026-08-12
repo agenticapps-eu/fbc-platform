@@ -24,8 +24,18 @@ export function EventCover({
 }) {
   const d = startsAt ? new Date(startsAt) : null;
   const gueltig = d && !Number.isNaN(d.getTime());
+  // Auf der DETAILSEITE ohne Bild ein flaches Band statt 3:1. Gemessen in der
+  // Sichtprobe: ein 3:1-Platzhalter ist auf einer 1100 px breiten Seite rund
+  // 370 px leerer Verlauf, der den Titel unter die Falz drückt — und ohne
+  // Titelbilder ist das zum Start der Normalfall, nicht die Ausnahme. Die
+  // Datumsmarke bleibt, sie ist der einzige Inhalt, den das Band trägt.
+  //
+  // In der KACHEL bleibt es bei 16:9, auch ohne Bild: dort stehen bebilderte
+  // und unbebilderte Events nebeneinander, und ungleiche Bildhöhen ließen das
+  // Raster ausfransen.
+  const hoehe = gross ? (url ? "aspect-[3/1]" : "h-28") : "aspect-[16/9]";
   return (
-    <div className={`relative overflow-hidden bg-soft ${gross ? "aspect-[3/1]" : "aspect-[16/9]"}`}>
+    <div className={`relative overflow-hidden bg-soft ${hoehe}`}>
       {url ? (
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (

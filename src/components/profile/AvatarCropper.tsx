@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "../ui/Button";
 import { useOverlay } from "../ui/useOverlay";
 
@@ -191,7 +192,17 @@ export function AvatarCropper({
     );
   }
 
-  return (
+  // PORTAL an document.body, und das ist keine Kosmetik: ein transformierter
+  // Vorfahre wird zum Containing Block für `position: fixed`. `.fbc-card:hover`
+  // setzt `transform: translateY(-2px)` (src/index.css:246) — steht dieser
+  // Dialog also in einer Karte und zeigt die Maus darauf, schrumpft er auf die
+  // Karte statt den Bildschirm zu füllen.
+  //
+  // GEMESSEN am 2026-08-12 im Browser, als der Zuschnitt in den Host-Werkzeugen
+  // eines Events landete (Karte → EventForm → EventCoverPicker → hier):
+  // 1063×1272 bei y = −654 statt 1400×1000 bei 0. jsdom kennt kein Layout und
+  // kann das nie sehen; gefunden hat es die Sichtprobe.
+  return createPortal(
     <div
       ref={overlay}
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 backdrop-blur-sm"
@@ -241,6 +252,7 @@ export function AvatarCropper({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

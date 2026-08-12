@@ -69,6 +69,19 @@ export async function uploadEventCover(uid: string, datei: Blob): Promise<string
   const pfad = `${uid}/${Date.now()}.webp`;
   const { error } = await supabase.storage
     .from(EVENT_COVER_BUCKET)
+    // `upsert: false` ist hier keine Vorsichtsmaßnahme, sondern die einzige
+    // Möglichkeit — gemessen am 2026-08-12 gegen den lokalen Stack:
+    //
+    //   upsert: true  → „new row violates row-level security policy"
+    //   upsert: false → ok
+    //
+    // `upsert` wird zu `insert … on conflict do update`, und ON CONFLICT
+    // verlangt Leserecht auf die betroffene Zeile. Lesen entscheidet in diesem
+    // Bucket `event_cover_lesbar()`, und die verneint für ein Objekt, auf das
+    // noch KEIN Event zeigt — was beim Hochladen immer der Fall ist, weil die
+    // `events.cover_path`-Zeile erst danach entsteht. Ein Henne-Ei-Problem, das
+    // sich nicht auflösen lässt und auch nicht muss: der Pfad trägt einen
+    // Zeitstempel, kollidiert also ohnehin nie.
     .upload(pfad, datei, { contentType: "image/webp", upsert: false });
   if (error) throw error;
   return pfad;
