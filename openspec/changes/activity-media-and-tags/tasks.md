@@ -384,8 +384,13 @@ Datei: `supabase/migrations/20260812090200_tags.sql`
 ## 10 · Abschluss
 
 - [ ] 10.1 Fremd-Review **auf dem Diff** (Schritt 4), nicht auf dem Plan.
-- [ ] 10.2 `cso`-Gate: die Storage-Policies noch einmal gegen die Frage lesen,
+- [x] 10.2 `cso`-Gate: die Storage-Policies noch einmal gegen die Frage lesen,
       ob irgendein Pfad ohne Session zu einem `members`-Bild führt.
+      Sieben Wege geprüft, keiner führt hin; Tabelle in `EVIDENCE.md`. Der
+      siebte war neu und stammt aus diesem Block: der **Alt-Text** der Bilder
+      trägt den Autornamen — er nimmt `displayAuthor(...)`, also ausgeloggt
+      „Ein Mitglied". Der einzige benannte Rest bleibt die 1-h-Nachlaufzeit
+      einer schon ausgestellten Signatur.
 - [ ] 10.3 PR gegen `main`, Conventional Commit mit `(AGE-528)`.
       **Merge-Erfolg mit `gh pr view --json state` prüfen** — `gh pr merge` kann
       still fehlschlagen.

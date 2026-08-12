@@ -201,6 +201,25 @@ Zeile B ist die, die den Ablauf trägt: die Sechser-Grenze fällt **nach** dem
 Insert in `posts` und nimmt ihn mit zurück. Es gibt keinen halb veröffentlichten
 Zustand — die Zusicherung aus `design.md` ist damit gemessen, nicht geglaubt.
 
+## `cso`-Gate (Task 10.2) — führt irgendein Pfad ohne Session zu einem `members`-Bild?
+
+Gelesen am 2026-08-12, gegen den Stand nach Block 8. Sieben Wege geprüft:
+
+| Weg | Ergebnis |
+|---|---|
+| `createSignedUrls` als anon | `post_media_lesbar` fordert ohne Session `visibility = 'public'` — gemessen (Sonde, Fall B) |
+| öffentliche Bucket-URL | Bucket ist `public = false` — gemessen: HTTP 400 |
+| `post_media`-Zeile als anon lesen | Policy delegiert an die RLS von `posts`; anon sieht die Zeile eines `members`-Beitrags nicht. Und der Pfad allein trägt nichts: signieren muss man ihn trotzdem |
+| eingeloggt unter Rang 4 | `has_level(4)` — `rls_test.sql` §19.2 misst beide Seiten |
+| fremdes Objekt unterschieben | INSERT/UPDATE prüfen den ersten Pfadabschnitt gegen die eigene `uid`; ein fremder Beitragspfad beginnt mit der `uid` seines Autors |
+| Zeile auf fremden Beitrag zeigen lassen | `post_media_insert_own` verlangt Autorschaft am Beitrag; die RPC setzt `post_id` selbst |
+| **Alt-Text der Bilder** | trägt `displayAuthor(...).name` — ausgeloggt „Ein Mitglied". Der neue Alt-Text gibt also keinen Namen preis, den die Karte nicht ohnehin zeigte |
+
+**Kein Weg ohne Session führt zu einem `members`-Bild.** Der einzige Rest ist
+benannt und gewollt: eine bereits ausgestellte Signatur gilt bis zu einer Stunde
+weiter, auch wenn der Beitrag inzwischen auf `members` steht. Das steht im
+Migrationskopf und in `design.md`, samt seiner Folge für Detlev.
+
 ## Task 1.0c — noch offen
 
 Die Sonde gegen **DEV** laufen zu lassen (Plan-Review: ein grüner lokaler Lauf
