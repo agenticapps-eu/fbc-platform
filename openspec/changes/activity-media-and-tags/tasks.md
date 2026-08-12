@@ -79,7 +79,7 @@ Reviews überstanden hat und erst die Sichtprobe fand.
 Datei: `supabase/migrations/20260812090000_post_media.sql`
 Datei: `supabase/migrations/20260812090100_post_media_storage.sql`
 
-- [ ] 2.1 **RED**: neuer Abschnitt in `supabase/tests/rls_test.sql` mit den
+- [x] 2.1 **RED**: neuer Abschnitt in `supabase/tests/rls_test.sql` mit den
       Fällen aus dem Spec-Delta, alle rot:
       - anon signiert Objekt eines `public`-Beitrags → erlaubt
       - anon signiert Objekt eines `members`-Beitrags → verweigert
@@ -92,79 +92,91 @@ Datei: `supabase/migrations/20260812090100_post_media_storage.sql`
       0 Zeilen, auch bei `using(true)` — ein Test, der „0 Zeilen" mit „verboten"
       verwechselt, ist grün und prüft nichts. Der verweigerte Fall wird über den
       **Fehler** belegt, nicht über die Zeilenzahl.
-- [ ] 2.2 Tabelle `public.post_media` anlegen: Spalten nach Spec, FK
+- [x] 2.2 Tabelle `public.post_media` anlegen: Spalten nach Spec, FK
       `on delete cascade`, RLS an, **`unique (post_id, sort)`** und
       **`unique (storage_path)`**. Der zweite Index ist nicht Kosmetik: die
       Sichtbarkeitsfunktion sucht über genau diese Spalte (2.7), und zwei Zeilen
       auf denselben Pfad machten die Antwort mehrdeutig.
-- [ ] 2.3 Grants **aussprechen**, nicht erben: seit AGE-312 erbt eine neue
+- [x] 2.3 Grants **aussprechen**, nicht erben: seit AGE-312 erbt eine neue
       Tabelle nichts. `authenticated` bekommt SELECT/INSERT/DELETE, `anon`
       SELECT. Ohne SELECT für `anon` kann die Storage-Policy für den
       ausgeloggten Besucher nicht ausgewertet werden.
-- [ ] 2.4 RLS-Policies auf `post_media`: lesen wie der Beitrag, schreiben nur
+- [x] 2.4 RLS-Policies auf `post_media`: lesen wie der Beitrag, schreiben nur
       als Autor des Beitrags und nur mit `public.is_activated()`.
-- [ ] 2.5 „Höchstens sechs Bilder pro Beitrag" als **Trigger**, nicht als
+- [x] 2.5 „Höchstens sechs Bilder pro Beitrag" als **Trigger**, nicht als
       `check` — es ist eine Zählung über andere Zeilen, und die kann eine
       Check-Constraint nicht ausdrücken (Befund aus dem Plan-Review). Der
       verbleibende Wettlauf zwischen gleichzeitigen Inserts ist hier
       unerheblich: der einzige Schreibweg ist die RPC aus 2.13, und die schreibt
       alle Zeilen eines Beitrags in einer Anweisung.
-- [ ] 2.6 Bucket `post-media` anlegen: `public = false`, `file_size_limit`
+- [x] 2.6 Bucket `post-media` anlegen: `public = false`, `file_size_limit`
       1 MiB, `allowed_mime_types` `{image/webp}`. **`on conflict (id) do update`**,
       nicht `do nothing` — ein bestehender Bucket mit falschen Einstellungen
       würde sonst konserviert und der Test liefe grün gegen eine falsche
       Konfiguration (Befund aus dem C6-Review).
-- [ ] 2.7 `public.post_media_lesbar(text)` als `SECURITY DEFINER`: sucht die
+- [x] 2.7 `public.post_media_lesbar(text)` als `SECURITY DEFINER`: sucht die
       `post_media`-Zeile über `storage_path = <objektname>` und wertet das
       Prädikat von `posts_select_by_visibility` für **deren** Beitrag aus.
       **Den Pfad NICHT zerlegen** — der Objektname ist frei wählbar, und eine
       daraus geschnittene `postId` würde eine fremde Sichtbarkeit behaupten
       (HIGH-nahe Falle aus dem Plan-Review, Begründung in `design.md`).
       Execute-Recht für `anon` und `authenticated`, sonst entzogen.
-- [ ] 2.7a **RED dazu**: ein Objekt unter `{eigene-uid}/{fremde-members-postId}/x.webp`
+- [x] 2.7a **RED dazu**: ein Objekt unter `{eigene-uid}/{fremde-**public**-postId}/x.webp`
       hochladen und als anon signieren wollen → **abgelehnt**. Dieser Fall ist
       der Grund für 2.7 und muss eigenständig rot gewesen sein.
-- [ ] 2.8 Vier Storage-Policies: SELECT für `anon` **und** `authenticated` über
+      **Korrigiert am 2026-08-12 — hier stand `fremde-members-postId`, und das
+      misst nichts.** Eine members-Kennung ist auch einer pfad-zerlegenden
+      Fassung verboten; der Test bliebe an der kaputten Funktion grün. Genau das
+      ist passiert und wurde erst von einer Mutation gefunden (`EVIDENCE.md`,
+      „Die Gegenprobe"). `design.md` beschrieb die scharfe Variante von Anfang
+      an richtig: eine **öffentliche** Kennung, bei der ein Pfad-Parser „public"
+      läse und ein Objekt signierte, das zu keinem Beitrag gehört.
+- [x] 2.8 Vier Storage-Policies: SELECT für `anon` **und** `authenticated` über
       2.7, INSERT/UPDATE/DELETE auf `{uid}/`-Präfix mit `is_activated()`.
-- [ ] 2.9 **GREEN**: `supabase test db --local supabase/tests/rls_test.sql
+- [x] 2.9 **GREEN**: `supabase test db --local supabase/tests/rls_test.sql
       supabase/tests/grants_test.sql` — alle Fälle aus 2.1 grün.
-- [ ] 2.10 `grants_test.sql` nachziehen (Golden-String **und**
+- [x] 2.10 `grants_test.sql` nachziehen (Golden-String **und**
       Spalten-Grants-Assertion), sonst ist der `migrations`-Job rot.
-- [ ] 2.11 Migrationskopf schreiben: signiert, datiert, mit Begründung und
+- [x] 2.11 Migrationskopf schreiben: signiert, datiert, mit Begründung und
       **verworfener Alternative** (zwei Buckets nach Sichtbarkeit) — so wie es
       in diesem Repo üblich ist. Die 1-h-Gültigkeit der Signaturen gehört
       dorthin, samt ihrer Folge für die Nachlaufzeit eines
       Sichtbarkeitswechsels.
-- [ ] 2.13 RPC `public.create_post_with_media(...)` als `SECURITY DEFINER`:
+- [x] 2.13 RPC `public.create_post_with_media(...)` als `SECURITY DEFINER`:
       legt Beitrag **und** `post_media`-Zeilen in **einer Transaktion** an,
       erzwingt Autorschaft, die Sechser-Grenze und die Tag-Vereinigung. Grund
       und Ablauf in `design.md` („Veröffentlichen ist ein Schritt, nicht drei").
       Sie ersetzt keine Policy — `posts_write_own` bleibt.
-- [ ] 2.13a **RED dazu**: schlägt das Anlegen einer `post_media`-Zeile fehl,
+- [x] 2.13a **RED dazu**: schlägt das Anlegen einer `post_media`-Zeile fehl,
       existiert **kein** Beitrag. Kein halb veröffentlichter Zustand.
 
 ## 3 · Migration B — `tags` mit Startbefüllung
 
 Datei: `supabase/migrations/20260812090200_tags.sql`
 
-- [ ] 3.1 **RED**: pgTAP — `tags` ist für `anon` und `authenticated` lesbar,
+- [x] 3.1 **RED**: pgTAP — `tags` ist für `anon` und `authenticated` lesbar,
       für beide **nicht** schreibbar (redaktionelle Liste, kein Mitgliedsinhalt).
       Dazu die Schlüsselform: ein `key` mit Großbuchstabe wird abgelehnt, einer
       mit Leerzeichen oder Bindestrich ebenso; `persönlichkeitsentwicklung`
       (mit Umlaut) wird angenommen.
-- [ ] 3.2 Tabelle `public.tags` (`key` PK, `label`, `sort`, `active`), RLS an,
+- [x] 3.2 Tabelle `public.tags` (`key` PK, `label`, `sort`, `active`), RLS an,
       SELECT-Policy für beide Rollen, kein Schreibrecht.
-- [ ] 3.3 Grants aussprechen (SELECT für `anon`, `authenticated`).
-- [ ] 3.4 Startbefüllung: **15 Tags aus dem Mockup**, elf Themen und vier
+- [x] 3.3 Grants aussprechen (SELECT für `anon`, `authenticated`).
+- [x] 3.4 Startbefüllung: **15 Tags aus dem Mockup**, elf Themen und vier
       Formate (Liste und Begründung in `design.md`). **Nicht** die
       Kompass-Kategorien — die sind Matching-Kategorien und es sind 14, nicht
       elf (siehe `design.md`). Von Donald am 2026-08-11 freigegeben; eine
       spätere Korrektur mit Detlev ist ein Insert, keine Migration.
-- [ ] 3.4a `check (key = lower(key))` **und** `check (key ~ '^[\p{L}\p{N}_]+$')`.
+- [x] 3.4a `check (key = lower(key))` **und** `check (key ~ '^[[:alnum:]_]+$')`.
       Ohne beide zerfällt derselbe Tag in zwei Werte, je nachdem ob er getippt
       oder geklickt wurde — Begründung in `design.md`, Testfall in 3.1.
-- [ ] 3.5 **GREEN** + `grants_test.sql` nachziehen.
-- [ ] 3.6 `posts.hashtags` bleibt **unangetastet**. Keine Verknüpfungstabelle,
+      **Zeichenklasse korrigiert am 2026-08-12:** hier und in `design.md` stand
+      `^[\p{L}\p{N}_]+$`, von `TOKEN_RE` aus dem Frontend abgeschrieben.
+      Postgres kennt keine Unicode-Property-Escapes und bricht mit „invalid
+      escape \ sequence" ab — die Migration wäre nicht durchgelaufen. Gemessen
+      in `EVIDENCE.md`; `[[:alnum:]]` leistet dasselbe und trägt den Umlaut.
+- [x] 3.5 **GREEN** + `grants_test.sql` nachziehen.
+- [x] 3.6 `posts.hashtags` bleibt **unangetastet**. Keine Verknüpfungstabelle,
       keine Datenwanderung. Wer hier eine anlegt, hat die Entscheidung aus
       `design.md` übergangen.
 

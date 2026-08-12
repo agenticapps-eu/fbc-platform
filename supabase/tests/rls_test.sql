@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(255);
+select plan(307);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1735,6 +1735,440 @@ select is(has_function_privilege('service_role', 'public.is_admin_uid(uuid)', 'e
   true, 'is_admin_uid: service_role darf');
 select is(has_function_privilege('authenticated', 'public.log_admin_action(uuid,text,uuid,jsonb)', 'execute'),
   false, 'log_admin_action: authenticated darf nicht — sonst wäre die Spur fälschbar');
+
+-- ── 19. Beitragsbilder: `post_media`, Bucket `post-media` (AGE-528, C7) ─────
+-- Die Zusage aus dem Spec-Delta: „Ein Bild ist genau so sichtbar wie sein
+-- Beitrag." Sie wird an DREI Flächen gemessen, weil sie an dreien brechen kann:
+-- an der Funktion (das Prädikat), an der Storage-Policy (die Wirkung auf
+-- storage.objects) und an der Tabelle (wer die Pfade überhaupt erfährt).
+--
+-- WIE „SIGNIEREN" HIER GEMESSEN WIRD. Das Ausstellen einer signierten URL ist
+-- ein HTTP-Weg und kein SQL — was die Storage-API dabei tut, ist ein SELECT auf
+-- storage.objects unter der Rolle des Aufrufers. Genau das steht unten. Der
+-- Ende-zu-Ende-Beleg (echte Signatur, echter Abruf, HTTP-Status) ist die Sonde
+-- scripts/probe-post-media-signatur.ts; sie hat den Mechanismus vor dieser
+-- Migration gemessen (EVIDENCE.md).
+--
+-- DIE FALLE AUS 13.3a, hier in ihrer schärferen Form: bei einem SELECT gibt es
+-- keinen Fehler, den man vorzeigen könnte — verboten heißt „keine Zeile". Eine
+-- 0 allein belegt deshalb nichts; sie steht genauso für „das Objekt existiert
+-- nicht". Jeder verweigerte Fall unten ist darum GEPAART: dieselbe Abfrage,
+-- dieselbe Identität, ein erlaubtes Objekt daneben, das 1 liefert. Erst das
+-- Paar trennt „die Policy verbietet es" von „die Abfrage trifft ins Leere".
+-- Zusätzlich wird das Prädikat direkt gefragt (post_media_lesbar → false), und
+-- ein `false` ist eindeutig, wo eine 0 es nicht ist.
+
+create function pg_temp.bool_as(uid uuid, q text) returns boolean language plpgsql as $$
+declare b boolean;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute q into b;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return b;
+end $$;
+
+create function pg_temp.bool_as_anon(q text) returns boolean language plpgsql as $$
+declare b boolean;
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role anon';
+  execute q into b;
+  reset role;
+  return b;
+end $$;
+
+create function pg_temp.try_as_anon(q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role anon';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    return 'DENIED:' || SQLERRM;
+  end;
+  reset role;
+  return 'OK';
+end $$;
+
+-- Eigene Sonden statt geliehener Fixtures — dieselbe Begründung wie in §17.
+insert into auth.users (id, aud, role, email) values
+  ('c7c7c7c7-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'c7autor@test.fbc'),
+  ('c7c7c7c7-0000-0000-0000-0000000000a2', 'authenticated', 'authenticated', 'c7basic@test.fbc'),
+  ('c7c7c7c7-0000-0000-0000-0000000000a3', 'authenticated', 'authenticated', 'c7unbestaetigt@test.fbc');
+update public.profiles set tier = 'impact', activated_at = now(),
+       created_at = now() - interval '90 days'
+ where id = 'c7c7c7c7-0000-0000-0000-0000000000a1';
+-- Rang 1: unter der Schwelle 4, an der `members` aufgeht. Der Fall, den die
+-- Autoren-Klausel sonst überdeckt.
+update public.profiles set tier = 'basic', activated_at = now(),
+       created_at = now() - interval '90 days'
+ where id = 'c7c7c7c7-0000-0000-0000-0000000000a2';
+update public.profiles set tier = 'impact', activated_at = null,
+       created_at = now() - interval '90 days'
+ where id = 'c7c7c7c7-0000-0000-0000-0000000000a3';
+
+insert into public.posts (id, author_id, body, visibility) values
+  ('c7000001-0000-4000-8000-000000000001', 'c7c7c7c7-0000-0000-0000-0000000000a1',
+   'C7 öffentlich', 'public'),
+  ('c7000002-0000-4000-8000-000000000002', 'c7c7c7c7-0000-0000-0000-0000000000a1',
+   'C7 nur für Mitglieder', 'members'),
+  -- Eigener members-Beitrag eines Rang-1-Kontos: prüft die Autoren-Klausel
+  -- unabhängig von der Stufe.
+  ('c7000003-0000-4000-8000-000000000003', 'c7c7c7c7-0000-0000-0000-0000000000a2',
+   'C7 eigener Beitrag', 'members'),
+  -- Wegwerf-Beitrag für die Struktur-Fälle (Kaskade, Sechser-Grenze).
+  ('c7000004-0000-4000-8000-000000000004', 'c7c7c7c7-0000-0000-0000-0000000000a1',
+   'C7 Struktur', 'members');
+
+insert into public.post_media (post_id, storage_path, sort, width, height) values
+  ('c7000001-0000-4000-8000-000000000001',
+   'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/0.webp', 0, 1600, 1200),
+  ('c7000002-0000-4000-8000-000000000002',
+   'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp', 0, 1600, 1200),
+  ('c7000003-0000-4000-8000-000000000003',
+   'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp', 0, 1600, 1200);
+
+-- Die Objekte dazu, plus zwei ohne Zeile: ein verwaistes und die Fälschung aus
+-- 2.7a — eigenes Präfix, im weiteren Pfad die Kennung eines FREMDEN
+-- members-Beitrags. Als Testrolle eingefügt, also an der RLS vorbei; geprüft
+-- wird hier das Lesen, nicht das Schreiben (das steht weiter unten).
+insert into storage.objects (bucket_id, name) values
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/0.webp'),
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp'),
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp'),
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/verwaist.webp'),
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a2/c7000002-0000-4000-8000-000000000002/nachgebaut.webp'),
+  ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a2/c7000001-0000-4000-8000-000000000001/erschlichen.webp');
+
+-- 19.1 Struktur: Kaskade, Einzellöschung, Sechser-Grenze, Eindeutigkeit.
+insert into public.post_media (post_id, storage_path, sort, width, height)
+select 'c7000004-0000-4000-8000-000000000004',
+       'c7c7c7c7-0000-0000-0000-0000000000a1/c7000004-0000-4000-8000-000000000004/' || i || '.webp',
+       i, 1600, 1200
+  from generate_series(0, 5) i;
+
+select is(
+  (select count(*)::int from public.post_media
+    where post_id = 'c7000004-0000-4000-8000-000000000004'),
+  6, 'Sechs Bilder an einem Beitrag sind erlaubt');
+
+select throws_ok(
+  $$insert into public.post_media (post_id, storage_path, sort, width, height) values
+      ('c7000004-0000-4000-8000-000000000004',
+       'c7c7c7c7-0000-0000-0000-0000000000a1/c7000004-0000-4000-8000-000000000004/6.webp',
+       6, 1600, 1200)$$,
+  23514, null,
+  'Das siebte Bild prallt am Trigger ab — eine Zählung über andere Zeilen kann '
+  'keine check-Constraint ausdrücken');
+
+select throws_ok(
+  $$insert into public.post_media (post_id, storage_path, sort, width, height) values
+      ('c7000004-0000-4000-8000-000000000004',
+       'c7c7c7c7-0000-0000-0000-0000000000a1/c7000004-0000-4000-8000-000000000004/doppelt.webp',
+       0, 1600, 1200)$$,
+  23505, null,
+  'Zwei Bilder auf derselben Position prallen an unique (post_id, sort) ab');
+
+select throws_ok(
+  $$insert into public.post_media (post_id, storage_path, sort, width, height) values
+      ('c7000001-0000-4000-8000-000000000001',
+       'c7c7c7c7-0000-0000-0000-0000000000a1/c7000004-0000-4000-8000-000000000004/0.webp',
+       9, 1600, 1200)$$,
+  23505, null,
+  'Derselbe storage_path zweimal prallt ab — sonst wäre die Antwort der '
+  'Sichtbarkeitsfunktion mehrdeutig');
+
+delete from public.post_media
+ where post_id = 'c7000004-0000-4000-8000-000000000004' and sort = 2;
+select is(
+  (select string_agg(sort::text, ',' order by sort) from public.post_media
+    where post_id = 'c7000004-0000-4000-8000-000000000004'),
+  '0,1,3,4,5', 'Ein einzelnes Bild lässt sich entfernen, die Reihenfolge der übrigen bleibt');
+
+delete from public.posts where id = 'c7000004-0000-4000-8000-000000000004';
+select is(
+  (select count(*)::int from public.post_media
+    where post_id = 'c7000004-0000-4000-8000-000000000004'),
+  0, 'Ein gelöschter Beitrag nimmt seine Bildzeilen mit (on delete cascade)');
+
+-- 19.2 Das Prädikat selbst. Ein boolean, kein Zeilenzähler — hier ist „false"
+-- eine Aussage und keine Leerstelle.
+select is(pg_temp.bool_as_anon(
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/0.webp')$$),
+  true, 'anon darf das Objekt eines public-Beitrags signieren');
+
+select is(pg_temp.bool_as_anon(
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp')$$),
+  false, 'anon darf das Objekt eines members-Beitrags NICHT signieren');
+
+select is(pg_temp.bool_as_anon(
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/verwaist.webp')$$),
+  false, 'Ein verwaistes Objekt ist für anon nicht signierbar — keine Zeile, keine Erlaubnis');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/verwaist.webp')$$),
+  false, '… und auch nicht für ein bestätigtes impact-Mitglied');
+
+-- Der Fall, für den die Funktion überhaupt die ZEILE nachschlägt statt den Pfad
+-- zu zerlegen (2.7a): eigenes Präfix, im Namen die Kennung eines fremden
+-- members-Beitrags. Wer hier den Pfad parste, ließe eine fremde Sichtbarkeit
+-- behaupten.
+select is(pg_temp.bool_as_anon(
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000002-0000-4000-8000-000000000002/nachgebaut.webp')$$),
+  false, 'Ein nachgebauter Pfad erschleicht keine Signatur — die Zeile entscheidet, nicht der Name');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000002-0000-4000-8000-000000000002/nachgebaut.webp')$$),
+  false, '… auch nicht für das Mitglied, dem das Pfadpräfix gehört');
+
+-- DIE ZWEI ASSERTIONS, DIE DEN UNTERSCHIED WIRKLICH MESSEN. Die beiden oben tun
+-- es nicht: sie tragen die Kennung eines MEMBERS-Beitrags, und die wäre auch
+-- einer pfad-zerlegenden Fassung verboten — sie wären grün an einer kaputten
+-- Funktion. Gemessen am 2026-08-12 mit einer Mutation, die den Pfad zerlegt:
+-- gefallen sind davon nur die verwaisten Fälle, diese beiden nicht.
+-- tasks.md 2.7a nennt genau die untaugliche Variante; design.md beschreibt die
+-- scharfe, und das ist diese: eigenes Präfix, im Namen die Kennung eines
+-- fremden ÖFFENTLICHEN Beitrags. Wer den Pfad zerlegte, läse „public" und
+-- signierte ein Objekt, das zu gar keinem Beitrag gehört.
+select is(pg_temp.bool_as_anon(
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000001-0000-4000-8000-000000000001/erschlichen.webp')$$),
+  false, 'Eine fremde PUBLIC-Kennung im eigenen Pfad erschleicht anon keine Signatur');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000001-0000-4000-8000-000000000001/erschlichen.webp')$$),
+  false, '… und dem Mitglied, das das Objekt dort abgelegt hat, ebenso wenig');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp')$$),
+  false, 'Rang 1 kommt an das Bild eines fremden members-Beitrags nicht heran');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp')$$),
+  true, '… an das Bild seines EIGENEN members-Beitrags aber schon (Autoren-Klausel)');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp')$$),
+  true, 'Ab Rang 4 geht das Bild eines fremden members-Beitrags auf');
+
+select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a3',
+  $$select public.post_media_lesbar(
+      'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/0.webp')$$),
+  false, 'Das Aktivierungs-Gate steht auch vor dem Bild eines ÖFFENTLICHEN Beitrags');
+
+-- 19.3 Die Wirkung auf storage.objects — jeweils als Paar (siehe Kopf).
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from storage.objects where bucket_id = 'post-media'
+      and name = 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000001-0000-4000-8000-000000000001/0.webp'$$),
+  1, 'Storage-Policy: anon sieht das Objekt des public-Beitrags …');
+
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from storage.objects where bucket_id = 'post-media'
+      and name = 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp'$$),
+  0, '… und das des members-Beitrags nicht (die Zeile daneben belegt, dass die Abfrage trägt)');
+
+select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select count(*)::int from storage.objects where bucket_id = 'post-media'
+      and name = 'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp'$$),
+  1, 'Storage-Policy: Rang 1 sieht sein eigenes Objekt …');
+
+select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select count(*)::int from storage.objects where bucket_id = 'post-media'
+      and name = 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp'$$),
+  0, '… und das eines fremden members-Beitrags nicht');
+
+-- 19.4 Schreiben. Hier GIBT es einen Fehler, und er ist der Beleg.
+select is(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$insert into storage.objects (bucket_id, name) values
+     ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a1/neu/1.webp')$$),
+  'OK', 'post_media_insert_own: das bestätigte Mitglied schreibt in sein eigenes Präfix');
+
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$insert into storage.objects (bucket_id, name) values
+     ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a2/fremd.webp')$$),
+  'DENIED:%row-level security policy%',
+  'post_media_insert_own: das Präfix eines FREMDEN Mitglieds bleibt zu');
+
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a3',
+  $$insert into storage.objects (bucket_id, name) values
+     ('post-media', 'c7c7c7c7-0000-0000-0000-0000000000a3/eigen.webp')$$),
+  'DENIED:%row-level security policy%',
+  'post_media_insert_own: ein nicht bestätigtes Konto lädt kein Bild hoch');
+
+select alike(pg_temp.try_as_anon(
+  $$insert into storage.objects (bucket_id, name) values
+     ('post-media', 'ohne-session/1.webp')$$),
+  'DENIED:%row-level security policy%',
+  'Ohne Session wird gar nicht geschrieben — für anon gibt es keine Schreib-Policy');
+
+-- 19.5 Bucket und Policy-Bestand. Was pgTAP nicht sieht (die Durchsetzung von
+-- Größe und Typ macht die Storage-API), hält es wenigstens als AUSGESPROCHEN
+-- fest — ein `do nothing` über einem falsch eingestellten Bestands-Bucket
+-- fiele hier auf.
+select is(
+  (select (public, file_size_limit, allowed_mime_types)::text
+     from storage.buckets where id = 'post-media'),
+  '(f,1048576,{image/webp})',
+  'post-media: PRIVAT, 1 MiB, nur WebP — serverseitig, nicht nur im Formular');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'post\_media\_%'),
+  4, 'post-media trägt vier Policies: eine zum Lesen, drei zum Schreiben');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname like 'post\_media\_%' and cmd <> 'SELECT'
+      and coalesce(qual, '') || coalesce(with_check, '') like '%is_activated%'),
+  3, '… und alle drei Schreib-Policies tragen das Aktivierungs-Gate, wie avatars und covers');
+
+-- 19.6 Die Tabelle selbst: wer den Pfad überhaupt erfährt. Ohne diese Fläche
+-- wäre das Gate Kulisse — der ausgeloggte Besucher braucht die Zeile, um den
+-- Pfad zu kennen, und darf sie deshalb nur für public-Beiträge bekommen.
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from public.post_media
+      where post_id = 'c7000001-0000-4000-8000-000000000001'$$),
+  1, 'post_media: anon liest die Bildzeile eines public-Beitrags …');
+
+select is(pg_temp.count_as_anon(
+  $$select count(*)::int from public.post_media
+      where post_id = 'c7000002-0000-4000-8000-000000000002'$$),
+  0, '… und die eines members-Beitrags nicht');
+
+select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select count(*)::int from public.post_media
+      where post_id = 'c7000002-0000-4000-8000-000000000002'$$),
+  0, 'post_media: Rang 1 liest die Bildzeile eines fremden members-Beitrags nicht …');
+
+select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
+  $$select count(*)::int from public.post_media
+      where post_id = 'c7000003-0000-4000-8000-000000000003'$$),
+  1, '… die seines eigenen aber schon');
+
+-- 19.7 Veröffentlichen ist EIN Schritt. Der Fehlerzustand, den die RPC
+-- ausschließt: ein Beitrag steht im Feed, seine Bilder fehlen.
+select is(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$select public.create_post_with_media(
+      'c7000005-0000-4000-8000-000000000005',
+      'Beitrag mit zwei Bildern', 'members',
+      array['netzwerken', 'allgäu'], array['ki', 'netzwerken'],
+      '[{"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a1/c7000005-0000-4000-8000-000000000005/0.webp","sort":0,"width":1600,"height":1200},
+        {"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a1/c7000005-0000-4000-8000-000000000005/1.webp","sort":1,"width":800,"height":600}]'::jsonb)$$),
+  'OK', 'create_post_with_media: der Autor legt Beitrag und Bilder in einem Zug an');
+
+select is(
+  (select string_agg(sort || ':' || width || 'x' || height, ',' order by sort)
+     from public.post_media where post_id = 'c7000005-0000-4000-8000-000000000005'),
+  '0:1600x1200,1:800x600',
+  '… beide Bildzeilen stehen in Reihenfolge, mit ihren Maßen');
+
+select is(
+  (select hashtags from public.posts where id = 'c7000005-0000-4000-8000-000000000005'),
+  array['netzwerken', 'allgäu', 'ki'],
+  'Getippte und geklickte Tags werden vereinigt und dedupliziert, getippte zuerst');
+
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$select public.create_post_with_media(
+      'c7000006-0000-4000-8000-000000000006',
+      'Beitrag mit sieben Bildern', 'members', array[]::text[], array[]::text[],
+      (select jsonb_agg(jsonb_build_object(
+          'storage_path', 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000006-0000-4000-8000-000000000006/' || i || '.webp',
+          'sort', i, 'width', 1600, 'height', 1200))
+         from generate_series(0, 6) i))$$),
+  'DENIED:%',
+  'create_post_with_media: sieben Bilder werden abgelehnt');
+
+-- Und das ist der eigentliche Beleg für die Transaktion, nicht für die Grenze:
+-- die Beitragszeile war beim Fehlschlag SCHON geschrieben — der Trigger fällt
+-- erst beim siebten Bild, also nach dem Insert in `posts`. Bliebe sie stehen,
+-- stünde genau der Zustand im Feed, gegen den die RPC gebaut ist.
+select is(
+  (select count(*)::int from public.posts where id = 'c7000006-0000-4000-8000-000000000006'),
+  0, '… und danach existiert KEIN Beitrag — kein halb veröffentlichter Zustand');
+
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a3',
+  $$select public.create_post_with_media(
+      'c7000007-0000-4000-8000-000000000007', 'Unbestätigt', 'members',
+      array[]::text[], array[]::text[], '[]'::jsonb)$$),
+  'DENIED:%',
+  'create_post_with_media: ein nicht bestätigtes Konto veröffentlicht nicht');
+
+select is(has_function_privilege('anon',
+  'public.create_post_with_media(uuid,text,text,text[],text[],jsonb)', 'execute'),
+  false, 'create_post_with_media: ohne Session gibt es keinen Schreibweg');
+
+-- ── 20. Kuratierte Tags: eine redaktionelle Liste (AGE-528, C7) ─────────────
+-- `tags` ist kein Mitgliedsinhalt. Beide Rollen lesen, keine schreibt — und die
+-- Form des Schlüssels ist durchgesetzt, nicht verabredet: weil es keine
+-- Verknüpfungstabelle gibt, IST die Zeichenkette die Verbindung zwischen
+-- posts.hashtags und tags.key.
+
+select is(pg_temp.count_as_anon('select count(*)::int from public.tags'),
+  15, 'tags: der ausgeloggte Besucher liest die Liste (Filterleiste ohne Session)');
+
+select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  'select count(*)::int from public.tags'),
+  15, 'tags: das Mitglied ebenso');
+
+select is(has_table_privilege('anon', 'public.tags', 'INSERT'),
+  false, 'tags: anon hält kein INSERT');
+select is(has_table_privilege('authenticated', 'public.tags', 'INSERT'),
+  false, 'tags: authenticated hält kein INSERT — die Liste ist redaktionell');
+
+select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
+  $$insert into public.tags (key, label, sort) values ('selbstgemacht', 'Selbstgemacht', 999)$$),
+  'DENIED:%permission denied%',
+  'tags: ein Mitglied legt keinen kuratierten Tag an');
+
+-- Die Schlüsselform. Jeder dieser drei Schlüssel ließe sich NIE tippen —
+-- parseHashtags erzeugt ihn nicht — und der Filter zerfiele still in zwei Töpfe.
+select throws_ok(
+  $$insert into public.tags (key, label, sort) values ('Gross', 'Gross', 900)$$,
+  23514, null, 'tags: ein Großbuchstabe im Schlüssel wird abgelehnt');
+
+select throws_ok(
+  $$insert into public.tags (key, label, sort) values ('know-how', 'Know-how', 901)$$,
+  23514, null, 'tags: ein Bindestrich wird abgelehnt — er beendet den Hashtag im Fließtext');
+
+select throws_ok(
+  $$insert into public.tags (key, label, sort) values ('zwei wort', 'Zwei Wort', 902)$$,
+  23514, null, 'tags: ein Leerzeichen wird abgelehnt');
+
+-- Die Gegenprobe, und sie ist der eigentliche Grund für die Zeichenklasse:
+-- toLowerCase() ersetzt Umlaute NICHT, also muss der Schlüssel sie tragen
+-- dürfen. Diese Assertion misst zugleich, dass [[:alnum:]] in dieser Datenbank
+-- Unicode-Buchstaben umfasst — sie hängt an der Locale, nicht am SQL-Text.
+select lives_ok(
+  $$insert into public.tags (key, label, sort) values ('grüße', 'Grüße', 903)$$,
+  'tags: ein Umlaut im Schlüssel ist erlaubt');
+delete from public.tags where key = 'grüße';
+
+select is(
+  (select count(*)::int from public.tags where key <> lower(label)),
+  0, 'tags: jeder Schlüssel ist das kleingeschriebene Label — sonst trifft kein getippter Tag');
+
+select is(
+  (select count(*)::int from public.tags where sort < 200),
+  11, 'Startbefüllung: elf Themen aus dem Mockup');
+
+select is(
+  (select count(*)::int from public.tags where sort >= 200),
+  4, 'Startbefüllung: vier Formate');
 
 select * from finish();
 rollback;

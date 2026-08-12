@@ -250,11 +250,19 @@ Daraus folgen zwei Constraints auf `tags`, und sie sind keine Kosmetik:
 
 ```sql
 check (key = lower(key))
-check (key ~ '^[\p{L}\p{N}_]+$')
+check (key ~ '^[[:alnum:]_]+$')
 ```
 
 Die zweite spiegelt die Zeichenklasse aus `TOKEN_RE` (`src/lib/feed.ts:64`):
-`[#@][\p{L}\p{N}_]+`. Ein kuratierter Tag mit Leerzeichen oder Bindestrich —
+`[#@][\p{L}\p{N}_]+`. **Sie spiegelt sie, sie schreibt sie nicht ab** — hier
+stand bis zum 2026-08-12 `^[\p{L}\p{N}_]+$`, und Postgres kennt keine
+Unicode-Property-Escapes: der Ausdruck bricht mit „invalid regular expression:
+invalid escape \ sequence" ab, die Migration wäre nicht durchgelaufen.
+`[[:alnum:]]` leistet in einer UTF8-Datenbank dasselbe
+(`persönlichkeitsentwicklung` geht durch, `know-how` und `zwei wort` nicht),
+hängt dafür an der
+Locale statt am SQL-Text — weshalb der Umlaut-Fall in `rls_test.sql` §20 als
+eigene Zusicherung mitläuft. Messung in `EVIDENCE.md`. Ein kuratierter Tag mit Leerzeichen oder Bindestrich —
 etwa „Know-how" — **ließe sich nie tippen**, nur klicken. Das ist der Grund,
 warum unten kein einziges Label mehrteilig ist.
 

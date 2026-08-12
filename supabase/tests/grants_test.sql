@@ -61,6 +61,8 @@ partner_categories/authenticated=SELECT
 partners/authenticated=SELECT
 platform_settings/authenticated=SELECT
 post_likes/authenticated=DELETE,INSERT,SELECT,UPDATE
+post_media/anon=SELECT
+post_media/authenticated=DELETE,INSERT,SELECT
 posts/anon=SELECT
 posts/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_badges/authenticated=SELECT
@@ -70,8 +72,19 @@ profile_theme_scores/authenticated=DELETE,INSERT,SELECT,UPDATE
 profiles/authenticated=SELECT
 profiles_public/authenticated=SELECT
 routing_queue/authenticated=SELECT
-staff_roles/authenticated=SELECT$$,
+staff_roles/authenticated=SELECT
+tags/anon=SELECT
+tags/authenticated=SELECT$$,
   'Tabellen-Grants: exakt das, was die Policies decken — und sonst nichts');
+
+-- AGE-528 hat zwei Tabellen dazugelegt, und beide Zeilen sind eine Aussage:
+-- `post_media/anon=SELECT` ist nicht Großzügigkeit, sondern Voraussetzung — ohne
+-- sie erfährt der ausgeloggte Besucher den Pfad des Bildes eines öffentlichen
+-- Beitrags nicht und die Storage-Policy käme nie zum Zug. Kein UPDATE auf
+-- post_media: ein Bild wird ersetzt, indem die Zeile fällt und eine neue
+-- entsteht. Und `tags` trägt fuer BEIDE Rollen nur SELECT — die Liste ist
+-- redaktionell, ein INSERT hier waere der Weg, sich einen kuratierten Tag
+-- selbst zu verleihen.
 
 -- ── 2. Spalten-Grants ────────────────────────────────────────────────────────
 -- Nur die drei Tabellen, bei denen das Grant ENGER ist als seine Policy. Die

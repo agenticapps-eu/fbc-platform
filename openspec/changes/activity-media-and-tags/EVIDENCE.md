@@ -63,6 +63,87 @@ not allowed"). Aufräumen läuft deshalb über die Storage-API
 pgTAP-Fälle in Task 2.1 heißt das: ein Testaufbau, der Objekte per SQL wieder
 entfernen will, scheitert am Trigger — nicht an der Policy.
 
+## Block 2 / 3 — RED vor GREEN, und die Gegenprobe darauf
+
+Gemessen am 2026-08-12, lokaler Stack, PostgreSQL 17.6, UTF8, `en_US.UTF-8`.
+
+```
+supabase test db --local supabase/tests/rls_test.sql supabase/tests/grants_test.sql
+```
+
+### RED — die Tests vor den Migrationen
+
+`rls_test.sql` um §19 (`post_media`, Bucket, RPC) und §20 (`tags`) erweitert,
+`plan(255)` → `plan(305)`:
+
+```
+ERROR:  relation "public.post_media" does not exist
+Failed 50/305 subtests
+Parse errors: Bad plan. You planned 305 tests but ran 255.
+```
+
+Die 255 bestehenden Zusicherungen bleiben dabei grün — es fällt genau das Neue.
+
+### GREEN — nach den drei Migrationen
+
+`20260812090000_post_media.sql` · `20260812090100_post_media_storage.sql` ·
+`20260812090200_tags.sql`, danach `grants_test.sql` nachgezogen (zwei neue
+Tabellen im Golden-Snapshot, sonst bricht der `migrations`-Job in CI, ohne dass
+`post_media` irgendwo vorkäme):
+
+```
+rls_test.sql ..... ok
+grants_test.sql .. ok
+Files=2, Tests=312    Result: PASS
+```
+
+### Die Gegenprobe: hält der Test, wenn die Funktion kaputt ist?
+
+Ein grüner Test, der auch an einer kaputten Policy grün bliebe, ist keine
+Zusicherung. `post_media_lesbar()` wurde deshalb zweimal mutiert und die Suite
+jedes Mal erneut gefahren.
+
+| Mutation | Gefallen |
+|---|---|
+| `select true` — das Prädikat sagt immer ja | **9 von 305** |
+| das Prädikat **zerlegt den Pfad** statt die Zeile zu lesen | **4 von 307** |
+
+**Und die zweite Mutation hat einen Fehler in den Tests aufgedeckt, nicht im
+Code.** Im ersten Anlauf fielen nur die beiden *verwaisten* Fälle — die zwei
+Assertions, die den gefälschten Pfad prüfen sollten, blieben **grün**. Der
+Grund: mein Fixture trug die Kennung eines `members`-Beitrags, und die ist auch
+einer pfad-zerlegenden Fassung verboten. `tasks.md` 2.7a nennt genau diese
+untaugliche Variante (`{eigene-uid}/{fremde-members-postId}/…`); `design.md`
+beschreibt die scharfe (`{eigene-uid}/{fremde-public-postId}/…`), bei der ein
+Pfad-Parser „public" läse und ein Objekt signierte, das zu gar keinem Beitrag
+gehört. Zwei Assertions dafür ergänzt (`plan(307)`); danach fallen unter der
+Mutation vier statt zwei — die richtigen vier.
+
+### Nebenbefund: `\p{L}` ist in Postgres ein harter Fehler
+
+`design.md` schreibt den Tag-Constraint als `key ~ '^[\p{L}\p{N}_]+$'`,
+abgeschrieben von `TOKEN_RE` aus dem Frontend. Postgres kennt keine
+Unicode-Property-Escapes:
+
+```
+select 'ki' ~ '^[\p{L}\p{N}_]+$'
+  → FEHLER: invalid regular expression: invalid escape \ sequence
+```
+
+Die Migration wäre gar nicht durchgelaufen. Ersetzt durch die POSIX-Klasse
+`^[[:alnum:]_]+$`, gemessen gegen dieselbe Datenbank:
+
+| Eingabe | `^[[:alnum:]_]+$` |
+|---|---|
+| `persönlichkeitsentwicklung` | **true** — der Umlaut muss durch, `toLowerCase()` ersetzt ihn nicht |
+| `know-how` | false |
+| `zwei wort` | false |
+| `Gross` | true (den fängt der zweite Constraint `key = lower(key)`) |
+
+`[[:alnum:]]` hängt an der Locale der Datenbank, nicht am SQL-Text. Deshalb
+misst `rls_test.sql` §20 den Umlaut-Fall ausdrücklich mit — auf jeder
+Datenbank, auf der die Suite läuft, also auch auf DEV und PROD.
+
 ## Task 1.0c — noch offen
 
 Die Sonde gegen **DEV** laufen zu lassen (Plan-Review: ein grüner lokaler Lauf
