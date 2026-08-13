@@ -37,3 +37,21 @@ Linear: **AGE-262**.
 - Admin content authoring UI (incl. resource upload) — fits `add-admin-console`;
   content is seeded via migration for now.
 - Un-enrollment mechanics.
+
+## Post-C9 note (2026-08-13, not yet acted on)
+
+`academy-lite-and-feed-weave` (AGE-533) shipped and was archived on 2026-08-13.
+It moved `academy-library` underneath this change, which is still unimplemented:
+
+- **"My Courses is a placeholder with no enrollment" no longer exists.** C9
+  removed it — the page is deleted and `/meine-kurse` redirects to `/academy`.
+  The `## REMOVED` block in `specs/academy-library/spec.md` still names that
+  requirement, so `openspec archive` will abort here unless the entry is dropped
+  first.
+- **"Academy lists curated video lessons" survived but was rewritten** by C9's
+  `## MODIFIED` block: the Academy is now a filtered view of `posts` with the
+  tabs "Alle" and "Meine Academy". Re-read it before restating it — the text
+  this change was written against is gone.
+- Consequently the enrollment and progress model below has no "My Courses"
+  surface left to land on. Where course progress lives is an open design
+  question, not a rename.
