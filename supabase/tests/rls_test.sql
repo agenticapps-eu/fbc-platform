@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(384);
+select plan(388);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2846,7 +2846,54 @@ select is(
   (select count(*)::int from public.events where id = 'c9e00004-0000-4000-8000-000000000004'),
   1, '… das Event bleibt (events.host_id ist on delete set null). Hingenommen, nicht übersehen');
 
--- 22.21 Rechte an der Trigger-Funktion. Wie in §21: ohne `revoke` wäre eine
+-- 22.21 Der Host haengt seinem Event-Beitrag KEINE Bilder an.
+--
+-- Befund aus dem Diff-Review (opencode, MEDIUM). Das Engerfassen von
+-- `posts_write_own` reichte dafuer NICHT: `post_media_insert_own` ist eine
+-- eigene Policy und haengt allein an der Autorschaft — und der Host ist der
+-- Autor. Die Zusage „ein Event-Beitrag traegt niemals post_media" stand in der
+-- Migration, bevor sie wahr war.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.post_media (post_id, storage_path, sort, width, height)
+      select id, 'c9c9c9c9-0000-0000-0000-0000000000b1/x.webp', 0, 100, 100
+        from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  'DENIED:%', 'Der Host haengt seinem Event-Beitrag kein Bild an');
+
+-- Gegenprobe: an seinem eigenen MITGLIEDS-Beitrag geht es weiterhin. Ohne sie
+-- waere die Behauptung darueber auch dann gruen, wenn die Policy alles ablehnt.
+insert into public.posts (id, author_id, body, visibility, kind)
+values ('c9000010-0000-4000-8000-000000000010',
+        'c9c9c9c9-0000-0000-0000-0000000000b1', 'Mit Bild', 'public', 'member');
+
+select is(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.post_media (post_id, storage_path, sort, width, height)
+      values ('c9000010-0000-4000-8000-000000000010',
+              'c9c9c9c9-0000-0000-0000-0000000000b1/y.webp', 0, 100, 100)$$),
+  'OK', '… an seinem eigenen Mitglieds-Beitrag aber schon');
+
+-- 22.22 Ausgeloggt: ein OEFFENTLICHES Event ist im Feed sichtbar — Beitrag UND
+-- Event. 22.18 deckt nur den members-Fall ab; ohne diesen hier waere unbemerkt,
+-- ob die Einbettung fuer anon ueberhaupt etwas liefert (Frage aus dem
+-- Diff-Review, opencode).
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00005-0000-4000-8000-000000000005', 'C9 Oeffentlich fuer anon',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '11 days');
+
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00005-0000-4000-8000-000000000005'$$),
+  1, 'Ausgeloggt ist der Beitrag eines public-Events sichtbar …');
+
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.events
+       where id = 'c9e00005-0000-4000-8000-000000000005'$$),
+  1, '… und das Event dazu, sonst haette die Karte nichts zu joinen');
+
+-- 22.23 Rechte an der Trigger-Funktion. Wie in §21: ohne `revoke` wäre eine
 -- neue Funktion für PUBLIC ausführbar.
 select is(
   has_function_privilege('anon', 'public.event_feed_post_sync()', 'execute'),

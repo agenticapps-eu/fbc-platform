@@ -106,13 +106,18 @@ describe("Event-Karte im Feed", () => {
     );
   });
 
-  it("zeigt KEINEN leeren Beitragstext — die Karte lebt vom Event, nicht vom Body", async () => {
-    renderFeed([eventPost()]);
+  it("rendert den Body GAR NICHT — die Karte lebt vom Event, nicht vom Beitrag", async () => {
+    // Der Body wird hier absichtlich GEFÜLLT, obwohl der Trigger ihn leer
+    // anlegt. Nur so misst der Test etwas: bei leerem Body wäre „kein Text
+    // sichtbar" auch dann wahr, wenn die Karte den Body brav rendern würde.
+    //
+    // Die frühere Fassung prüfte auf das Fehlen des Lightbox-Knopfes — den es
+    // an einem Beitrag ohne Bilder ohnehin nie gibt. Sie war grün und bewies
+    // nichts (Befund opencode im Diff-Review, MEDIUM).
+    renderFeed([eventPost({ body: "DIESER TEXT DARF NICHT ERSCHEINEN" })]);
     await screen.findByText("Sommerfest im Hafen");
 
-    // Die Beitragskarte würde hier einen (leeren) Absatz für den Body zeichnen.
-    // Die Event-Karte hat keinen — sie ist ein anderer Aufbau, keine Variante.
-    expect(screen.queryByRole("button", { name: /Bild 1 vergrößern/ })).toBeNull();
+    expect(screen.queryByText(/DIESER TEXT DARF NICHT ERSCHEINEN/)).toBeNull();
   });
 
   it("lässt sich liken wie ein gewöhnlicher Beitrag", async () => {

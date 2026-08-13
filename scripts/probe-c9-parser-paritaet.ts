@@ -97,6 +97,19 @@ const KORPUS: string[] = [
   "http://www.youtube.com/watch?v=abc",
   "Zwei: https://vimeo.com/1 und https://youtu.be/zwei",
   "Klammer https://vimeo.com/123456789) dahinter",
+
+  // ── Gross-/Kleinschreibung: Host ja, Pfad NEIN ─────────────────────────
+  // Der zweite Entwurf prüfte die ganze URL mit `~*` und hätte diese vier
+  // falsch beantwortet (Befund opencode im Diff-Review, HIGH). `parseVideoUrl`
+  // schreibt nur den HOST klein; `pathname === "/watch"` und
+  // `searchParams.get("v")` vergleichen case-sensitiv.
+  "https://youtube.com/WATCH?v=dQw4w9WgXcQ",
+  "https://www.youtube.com/watch?V=dQw4w9WgXcQ",
+  "https://www.youtube.com/EMBED/dQw4w9WgXcQ",
+  "https://player.vimeo.com/VIDEO/123456789",
+  "https://YouTube.com/watch?v=dQw4w9WgXcQ",
+  "https://YOUTU.BE/dQw4w9WgXcQ",
+  "https://WWW.VIMEO.com/123456789",
   "Komma https://youtu.be/abc, weiter",
   "  https://youtu.be/mitLeerzeichen  ",
   "mehrzeilig\nhttps://vimeo.com/999\nende",

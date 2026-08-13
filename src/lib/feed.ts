@@ -27,6 +27,16 @@ import { tokenizePostBody } from "./video-url";
 /** Spiegelt `posts_visibility_check` (20260715150000_six_level_model.sql:265). */
 export type PostVisibility = "public" | "members";
 
+/**
+ * Spiegelt `posts_kind_check` (20260813100000). Bewusst eine geschlossene Menge
+ * und nicht `string`, obwohl der Typgenerator für eine `text`-Spalte `string`
+ * liefert: die Feed-Liste verzweigt auf diesen Wert, und eine dritte Ausprägung
+ * soll beim Übersetzen auffallen statt still als Mitgliedsbeitrag zu erscheinen
+ * (Befund opencode im Diff-Review, LOW). Verengt wird an der Grenze, in
+ * `fetchFeed`.
+ */
+export type PostKind = "member" | "event";
+
 export interface FeedAuthor {
   id: string;
   name: string;
@@ -81,7 +91,7 @@ export interface FeedPost {
    */
   videoUrl: string | null;
   /** `member` (Default) oder `event` — ein vom Trigger erzeugter Event-Beitrag. */
-  kind: string;
+  kind: PostKind;
   /**
    * Das bezogene Event, zur Laufzeit gejoint. `null` heißt eines von zwei
    * Dingen: gewöhnlicher Beitrag, oder das Event ist für den Betrachter nicht
@@ -411,7 +421,11 @@ export async function fetchFeed({
       likedByMe: myLikes.has(r.id),
       media: media.get(r.id) ?? [],
       videoUrl: r.video_url,
-      kind: r.kind,
+      // Verengung an der Grenze: die Datenbank liefert `text`, der Constraint
+      // lässt aber nur zwei Werte zu. Alles Unerwartete gilt als Mitgliedsbeitrag
+      // — die harmlose Richtung, denn ein Event-Beitrag ohne lesbares Event
+      // entfällt ohnehin.
+      kind: r.kind === "event" ? "event" : "member",
       event: eventVon(r.events),
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der

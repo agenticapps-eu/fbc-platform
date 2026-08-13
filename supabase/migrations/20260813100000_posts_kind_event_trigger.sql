@@ -57,10 +57,14 @@
 -- DEFINER-Trigger Event-Zeilen. `is_activated()` bleibt das äußere `and` — wie
 -- in C3 und C8.
 --
--- Daraus folgt eine zweite Zusage, die vorher nur zufällig galt: ein
--- Event-Beitrag trägt NIEMALS `post_media`. Der Trigger legt keine an, und
--- niemand kann welche nachtragen. `post_media_lesbar` ist deshalb von dieser
--- Migration nicht betroffen.
+-- Daraus folgt eine zweite Zusage: ein Event-Beitrag trägt NIEMALS
+-- `post_media`. Der Trigger legt keine an — und niemand kann welche
+-- nachtragen, ABER erst seit dem `kind`-Prädikat in `post_media_insert_own`
+-- weiter unten. Das Engerfassen von `posts_write_own` allein reichte dafür
+-- nicht: die Bild-Policy ist eine eigene und hängt allein an der Autorschaft,
+-- und der Host IST der Autor seines Event-Beitrags. Befund aus dem
+-- Diff-Review (opencode) — die Zusage stand hier, bevor sie wahr war.
+-- `post_media_lesbar` bleibt unberührt.
 --
 -- ── Warum EINE Funktion für beide Trigger ──────────────────────────────────
 -- Der Entwurf sah zwei vor (anlegen / nachziehen). Ein `update … if not found
@@ -121,6 +125,41 @@ create policy posts_write_own on public.posts
     and kind = 'member'
     and ref_id is null
   );
+
+-- Und die Bildzeilen dazu. OHNE DIESE POLICY IST DIE ZUSAGE OBEN FALSCH.
+--
+-- Befund aus dem Diff-Review (opencode, SEVERITY MEDIUM), und er sass. Der
+-- Kopf dieser Migration behauptete, ein Event-Beitrag trage niemals
+-- `post_media`, weil „niemand welche nachtragen kann". Das Engerfassen von
+-- `posts_write_own` stellt das NICHT her: `post_media_insert_own` ist eine
+-- EIGENE Policy, und sie haengt allein an der Autorschaft des Beitrags
+-- (20260812090000:69–77) — der Host aber IST der Autor seines Event-Beitrags.
+-- Er haette also Bilder anhaengen koennen, und `post_media_lesbar` haette sie
+-- brav signiert.
+--
+-- Die Behauptung wird hier wahr gemacht statt gestrichen: ein Event-Beitrag
+-- traegt keinen Body, in den ein Bild gehoerte, und die Event-Karte zeichnet
+-- ausschliesslich das Titelbild aus `events`.
+--
+-- Nur INSERT. Ein DELETE auf Zeilen, die es nicht geben kann, braucht keine
+-- Schranke — und eine Regel ohne moeglichen Fall waere nur Rauschen.
+drop policy if exists post_media_insert_own on public.post_media;
+create policy post_media_insert_own on public.post_media
+  for insert to authenticated
+  with check (
+    public.is_activated()
+    and exists (
+      select 1 from public.posts p
+       where p.id = post_media.post_id
+         and p.author_id = (select auth.uid())
+         and p.kind = 'member'
+    )
+  );
+
+comment on policy post_media_insert_own on public.post_media is
+  'Bilder nur am eigenen MITGLIEDS-Beitrag. Das `kind`-Praedikat seit AGE-533: '
+  'ohne es haette der Host seinem systemverwalteten Event-Beitrag Bilder '
+  'anhaengen koennen, weil er dessen Autor ist.';
 
 comment on policy posts_write_own on public.posts is
   'Ein Mitglied schreibt seine eigenen Beitraege, sofern sein Zugang bestaetigt '

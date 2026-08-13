@@ -229,13 +229,13 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 6 · Abnahme
 
-- [ ] 6.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
+- [x] 6.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün.
       Basis: 93 Dateien / 653 Tests (0.5).
-- [ ] 6.2 pgTAP grün, mit Dateiliste, gegen den lokalen Stack.
-- [ ] 6.3 Die dreizehn Abnahmepunkte aus AGE-533 einzeln abhaken, jeder mit
+- [x] 6.2 pgTAP grün, mit Dateiliste, gegen den lokalen Stack.
+- [x] 6.3 Die dreizehn Abnahmepunkte aus AGE-533 einzeln abhaken, jeder mit
       Beleg in `EVIDENCE.md`.
-- [ ] 6.4 Beide Themes, Telefon und Desktop.
-- [ ] 6.5 Diff-Review durch einen unabhängigen Leser (Schritt 4), **auf dem
+- [x] 6.4 Beide Themes, Telefon und Desktop.
+- [x] 6.5 Diff-Review durch einen unabhängigen Leser (Schritt 4), **auf dem
       Diff**, nicht auf dem Plan.
 - [ ] 6.6 Kein `git add -A`. Der Arbeitsbaum trägt dauerhaft untracked Dateien
       mit 0600, und das Repo ist öffentlich.

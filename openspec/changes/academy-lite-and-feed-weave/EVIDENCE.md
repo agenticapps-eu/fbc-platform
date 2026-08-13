@@ -403,6 +403,85 @@ Komponententest war unvollständig getypt. `pnpm test` läuft ohne Typprüfung u
 war grün, `tsc` im Build nicht. Behoben — und der Grund, warum Punkt 13 alle
 vier Befehle nennt und nicht nur die Tests.
 
+## Nachtrag — die Sortierung des Like-Regals, mit ZWEI Zeilen
+
+Die Sichtprobe hatte nur einen Eintrag im Regal; damit ist eine Sortierung nicht
+prüfbar. Nachgeholt über den **echten PostgREST-Weg** (anon-Key + Nutzer-JWT,
+nicht über den Client), mit absichtlich verdrehten Zeiten:
+
+| | Beitrag angelegt | geliked | Position |
+|---|---|---|---|
+| „Über den echten Composer geteilt …" | **neuer** | 07:29 | **2.** |
+| „Ein gewöhnlicher Beitrag …" | älter | 08:29 | **1.** |
+
+Der neuere Beitrag steht hinten, weil er früher markiert wurde. `order=
+created_at.desc` greift also auf `post_likes.created_at` und nicht auf den
+eingebetteten Beitrag — genau die Zusage „zuletzt markierte zuerst".
+
+## Nachtrag — die Backfills gegen BESTANDSDATEN
+
+Eine Lücke, die beim Selbstlesen des Diffs auffiel und die keiner der Reviewer
+benannt hat: **`supabase db reset` wendet die Migrationen auf eine LEERE
+Datenbank an.** Beide Backfills waren damit nie gegen Bestandszeilen gelaufen —
+genau das aber tun sie in DEV (12 Beiträge, 9 Events) und in PROD.
+
+Nachgeholt in einer zurückgerollten Transaktion: den Zustand vor C9
+hergestellt (Trigger, Funktionen und Spalten zurückgebaut), Bestandsdaten
+eingefügt, dann **die beiden Migrationsdateien unverändert eingespielt**.
+
+| Prüfung | Ergebnis |
+|---|---|
+| 5 Bestandsbeiträge, davon 4 mit Videolink | `video_url` bei **4** gefüllt, der ohne Link bleibt leer |
+| 4 Bestands-Events, eines **ohne Host** | **3** Event-Beiträge — das hostlose übersprungen |
+| Beitrag trägt `created_at` **des Events** | `true` (also nicht `now()`) |
+| Sichtbarkeit gespiegelt | `true` |
+
+Damit ist der Zweig „Event ohne Host" zum ersten Mal wirklich durchlaufen: in
+DEV ist er unbesetzt (0 von 9), hier war er besetzt.
+
+## 6.5 — Diff-Review (Schritt 4)
+
+Vollständig in `DIFF-REVIEWS.md`. Zwei Anbieter haben gelesen (gemini,
+opencode/Kimi-K3), beide REQUEST-CHANGES; **codex zählt nicht** — nach ~26
+Minuten abgebrochen, 0 Bytes.
+
+**Der Review hat einen Fehler gefunden, den ich beim Beheben des vorigen selbst
+eingebaut hatte.** Der Plan-Review hatte `~` als zu streng erkannt; meine
+Antwort `~*` war zu lax, weil sie in Postgres das ganze Muster erfasst — auch
+den Pfad, den `parseVideoUrl` case-sensitiv vergleicht. Belegt am verworfenen
+Entwurf:
+
+```
+https://youtube.com/WATCH?v=dQw4w9WgXcQ      ALT=<akzeptiert>  NEU=NULL
+https://www.youtube.com/watch?V=dQw4w9WgXcQ  ALT=<akzeptiert>  NEU=NULL
+https://www.youtube.com/EMBED/dQw4w9WgXcQ    ALT=<akzeptiert>  NEU=NULL
+https://player.vimeo.com/VIDEO/123456789     ALT=<akzeptiert>  NEU=NULL
+```
+
+`erste_video_url` zerlegt jetzt in Host und Rest, statt zu flaggen. Der
+Paritätskorpus wächst auf **46 Fälle, 0 Abweichungen**.
+
+**Und eine Zusage, die vor ihrer Wahrheit dastand:** der Kopf von Migration B
+behauptete, ein Event-Beitrag könne nie `post_media` tragen. Das Engerfassen von
+`posts_write_own` stellt das nicht her — `post_media_insert_own` ist eine eigene
+Policy und hängt allein an der Autorschaft, und der Host IST der Autor. Die
+Policy bekommt jetzt `and p.kind = 'member'`, mit zwei pgTAP-Fällen (Abweisung
+plus Gegenprobe am eigenen Mitglieds-Beitrag).
+
+**Ein Test, der nichts bewies**, ist repariert und mit einer Negativkontrolle
+belegt: er füllt den Body jetzt absichtlich, und wer den Body in der Event-Karte
+rendert, lässt genau ihn fallen.
+
+**Zwei der vier schwersten Befunde beruhten auf falschen Prämissen** — dass
+`fetchFeed` bereits auf `profile_id` filtere (tut es nicht) und dass der
+Event-Zweig im Dashboard toter Code sei (die Liste dort kommt aus `fetchFeed`,
+nicht aus `fetchDashboard`). Beide sind in `DIFF-REVIEWS.md` richtiggestellt;
+den ersten habe ich trotzdem übernommen, weil er an dieser Stelle einen eigenen
+Grund hat.
+
+**Stand nach der Einarbeitung:** lint 0 Errors · typecheck sauber · **95
+Dateien / 665 Tests** · build grün · pgTAP **408 PASS** · Parität 46/46.
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch

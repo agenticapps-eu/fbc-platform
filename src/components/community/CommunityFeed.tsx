@@ -775,7 +775,15 @@ function EventCard({
           Bucket ist privat, und eine fehlende Signatur ist dort der Normalfall
           (fremdes members-Event), kein Fehler. */}
       {coverUrl && (
-        <Link to={`/events/${event.id}`} className="block">
+        /* Der Link braucht einen eigenen Namen: sein einziger Inhalt ist ein
+           Bild mit leerem `alt`, und ein Screenreader läse sonst die rohe URL
+           vor. Der sichtbare Titel darunter hilft ihm nicht — das ist ein
+           zweiter Link (Befund opencode im Diff-Review, LOW). */
+        <Link
+          to={`/events/${event.id}`}
+          className="block"
+          aria-label={`Titelbild: ${event.title}`}
+        >
           <img
             src={coverUrl}
             alt=""

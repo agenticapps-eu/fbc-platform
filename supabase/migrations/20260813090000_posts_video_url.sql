@@ -77,22 +77,53 @@ create or replace function public.erste_video_url(p_body text)
   immutable
   set search_path = ''
 as $$
-  select kandidat.url
+  select zerlegt.url
     from (
-      select rtrim(treffer[1], '.,;:!?»"''') as url, ord
-        from regexp_matches(coalesce(p_body, ''), 'https?://[^\s]+', 'g')
-             with ordinality as t(treffer, ord)
-    ) as kandidat
-   where kandidat.url ~* (
-     '^https?://(www\.)?(' ||
-       '(m\.)?youtube\.com/watch\?([^\s]*&)?v=[A-Za-z0-9_-]+([&#][^\s]*)?' || '|' ||
-       '(m\.)?youtube\.com/embed/[A-Za-z0-9_-]+([?#][^\s]*)?'             || '|' ||
-       'youtu\.be/[A-Za-z0-9_-]+([?#][^\s]*)?'                            || '|' ||
-       'vimeo\.com/[0-9]+([?#][^\s]*)?'                                   || '|' ||
-       'player\.vimeo\.com/video/[0-9]+([?#][^\s]*)?'                     ||
-     ')$'
-   )
-   order by kandidat.ord
+      select
+        kandidat.url,
+        kandidat.ord,
+        -- Der HOST wird kleingeschrieben und ein fuehrendes `www.` entfernt —
+        -- genau das tut `new URL(...)` plus `hostname.replace(/^www\./)`.
+        regexp_replace(
+          lower(substring(kandidat.url from '^https?://([^/?#]+)')), '^www\.', ''
+        ) as host,
+        -- Alles ab dem Pfad bleibt UNVERAENDERT, also case-SENSITIV.
+        coalesce(substring(kandidat.url from '^https?://[^/?#]*(.*)$'), '') as rest
+      from (
+        select rtrim(treffer[1], '.,;:!?»"''') as url, ord
+          from regexp_matches(coalesce(p_body, ''), 'https?://[^\s]+', 'g')
+               with ordinality as t(treffer, ord)
+      ) as kandidat
+    ) as zerlegt
+   where
+     -- Host und Pfad werden GETRENNT geprueft, und das ist der Kern.
+     --
+     -- Der erste Entwurf pruefte die ganze URL mit `~*`. Das war als Fix fuer
+     -- `WWW.YouTube.com` gedacht, machte aber auch den PFAD unempfindlich —
+     -- `youtube.com/WATCH?v=x` waere durchgegangen, waehrend `parseVideoUrl`
+     -- mit `url.pathname === '/watch'` case-sensitiv vergleicht und `null`
+     -- liefert. Ein Beitrag stuende dann in der Academy, dessen Karte nichts
+     -- einbettet: genau die Drift, gegen die diese Funktion antritt.
+     -- Gefunden im Diff-Review (opencode, SEVERITY HIGH).
+     --
+     -- Postgres kennt keine gruppenlokalen Optionen (`(?i:…)` wirft
+     -- „invalid regular expression"), also wird zerlegt statt geflaggt — was
+     -- ohnehin naeher an dem ist, was `new URL()` tut.
+     --
+     -- Das SCHEMA braucht keine eigene Behandlung: schon die Tokenisierung
+     -- oben akzeptiert nur `http`/`https` in Kleinschreibung, und
+     -- `tokenizePostBody` tut mit demselben Muster dasselbe.
+     case zerlegt.host
+       when 'youtube.com'   then zerlegt.rest ~ '^/watch\?([^\s]*&)?v=[A-Za-z0-9_-]+([&#][^\s]*)?$'
+                              or zerlegt.rest ~ '^/embed/[A-Za-z0-9_-]+([?#][^\s]*)?$'
+       when 'm.youtube.com' then zerlegt.rest ~ '^/watch\?([^\s]*&)?v=[A-Za-z0-9_-]+([&#][^\s]*)?$'
+                              or zerlegt.rest ~ '^/embed/[A-Za-z0-9_-]+([?#][^\s]*)?$'
+       when 'youtu.be'      then zerlegt.rest ~ '^/[A-Za-z0-9_-]+([?#][^\s]*)?$'
+       when 'vimeo.com'     then zerlegt.rest ~ '^/[0-9]+([?#][^\s]*)?$'
+       when 'player.vimeo.com' then zerlegt.rest ~ '^/video/[0-9]+([?#][^\s]*)?$'
+       else false
+     end
+   order by zerlegt.ord
    limit 1;
 $$;
 
