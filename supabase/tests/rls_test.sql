@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(407);
+select plan(411);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2955,6 +2955,49 @@ select is((select count(*)::int from public.profile_contacts
 select is((select city from public.profile_contacts
             where profile_id = '33333333-3333-3333-3333-333333333333'),
   'Ludwigsburg', '… und der geänderte Wert steht drin');
+
+-- 23.2b Die Abwehr auf DEMSELBEN Weg. Der Befund aus dem Review auf dem Diff
+-- (codex, MEDIUM): geprüft war nur der Umweg über `admin_update_profile`, nicht
+-- der neue direkte. Ein Schreibweg, dessen Grenze niemand misst, ist eine
+-- Behauptung — und dieser hier ist der erste, den ein MITGLIED benutzt.
+select alike(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+  $q$insert into public.profile_contacts (profile_id, street)
+     values ('66666666-6666-6666-6666-666666666666', 'Fremdstr. 9')
+     on conflict (profile_id) do update set street = excluded.street$q$),
+  'DENIED:%', 'Ein Mitglied schreibt keine FREMDE Kontaktzeile');
+
+select is((select street from public.profile_contacts
+            where profile_id = '66666666-6666-6666-6666-666666666666'),
+  null, '… und die fremde Zeile ist unverändert');
+
+-- Ein FRISCHES unbestätigtes Konto, eigens für diesen Fall. Das Sondenkonto
+-- 'dddd…' aus den Fixtures taugt hier nicht mehr: die Aktivierungstests in §14
+-- lösen es unterwegs ein, es ist an dieser Stelle der Datei längst bestätigt.
+-- Der erste Anlauf prüfte genau das und war grün, ohne die Grenze zu berühren.
+insert into auth.users (id, aud, role, email) values
+  ('c6a0c6a0-0000-0000-0000-00000000000f', 'authenticated', 'authenticated', 'unbestaetigt-c6a@test.fbc');
+update public.profiles
+   set activated_at = null, created_at = now() - interval '90 days'
+ where id = 'c6a0c6a0-0000-0000-0000-00000000000f';
+insert into public.profile_contacts (profile_id, email) values
+  ('c6a0c6a0-0000-0000-0000-00000000000f', 'unbestaetigt-c6a@test.fbc');
+
+-- GEZÄHLT, nicht auf eine Ausnahme geprüft: ein UPDATE, dessen Zeile die
+-- USING-Klausel wegfiltert, trifft NULL Zeilen und wirft nichts. `try_as`
+-- meldete hier folgerichtig 'OK' — die erste Fassung dieses Tests hätte einen
+-- funktionierenden Schutz als Lücke gemeldet. Dieselbe Falle wie bei
+-- storage.objects in AGE-438.
+select is(pg_temp.count_as('c6a0c6a0-0000-0000-0000-00000000000f',
+  $q$with u as (
+       update public.profile_contacts set street = 'Eigenstr. 1'
+        where profile_id = 'c6a0c6a0-0000-0000-0000-00000000000f'
+        returning 1)
+     select count(*)::int from u$q$),
+  0, 'Ein UNBESTÄTIGTES Konto schreibt nicht einmal die eigene Anschrift — null Zeilen');
+
+select is((select street from public.profile_contacts
+            where profile_id = 'c6a0c6a0-0000-0000-0000-00000000000f'),
+  null, '… auch hier ist nichts geschrieben');
 
 -- 23.3 Die Freigabe. `6666` (impact) trägt eine Anschrift; `4444` hat eine
 -- ANGENOMMENE Anfrage mit ihm (Zeile 335), `3333` nur eine offene, `1111` gar

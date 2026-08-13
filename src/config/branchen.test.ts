@@ -55,12 +55,16 @@ describe("matchBranche", () => {
     expect(matchBranche("Immobilien, Makler und Hausverwaltung")).toBe("Immobilien");
   });
 
-  it("liefert nur Werte, die auch in der Liste stehen", () => {
-    const werte = new Set(BRANCHEN.map((b) => b.value));
+  // Streng, nicht nachsichtig: eine frühere Fassung ließ `null` durch und hätte
+  // ein Stichwort, das seine Zuordnung verliert, unbemerkt passieren lassen —
+  // der Test hätte dann nur noch bewiesen, dass die Funktion nichts Falsches
+  // sagt, nicht dass sie etwas Richtiges sagt. Aus dem Review auf dem Diff
+  // (codex, LOW). Nebenbei belegt er, dass kein Stichwort zwei Branchen trifft:
+  // wäre eines mehrdeutig, käme hier `null` zurück und der Test fiele.
+  it("ordnet JEDES Stichwort genau seiner Branche zu", () => {
     for (const b of BRANCHEN) {
       for (const stichwort of b.keywords) {
-        const treffer = matchBranche(`Tätig im Bereich ${stichwort}.`);
-        if (treffer !== null) expect(werte.has(treffer)).toBe(true);
+        expect(matchBranche(`Tätig im Bereich ${stichwort}.`)).toBe(b.value);
       }
     }
   });

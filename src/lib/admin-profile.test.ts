@@ -174,6 +174,50 @@ describe("saveAdminProfile", () => {
     expect(rpcCalls).toHaveLength(0);
   });
 
+  // Aus dem Review auf dem Diff (codex, MEDIUM): der Seitentest mockt
+  // `saveAdminProfile` — also eigenen Code. Ein Entfernen der Adress-Zuordnung
+  // HIER wäre dort grün geblieben. Diese Aussage liegt deshalb am Rand zur
+  // Datenbank, wo der Patch wirklich entsteht.
+  it("schickt alle fünf Adressfelder im Patch (AGE-537)", async () => {
+    await saveAdminProfile(
+      ZIEL,
+      {
+        ...form,
+        contact: {
+          email: "kontakt@neu.de",
+          phone: "+49 711 1",
+          street: "Altstr. 3",
+          postal_code: "80331",
+          city: "München",
+          state: "Bayern",
+          country: "DE",
+        },
+      },
+      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
+    );
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.street).toBe("Altstr. 3");
+    expect(patch.postal_code).toBe("80331");
+    expect(patch.city).toBe("München");
+    expect(patch.state).toBe("Bayern");
+    expect(patch.country).toBe("DE");
+    expect(patch.email).toBe("kontakt@neu.de");
+  });
+
+  it("macht auch aus leeren Adressfeldern null, nicht leeren Text", async () => {
+    await saveAdminProfile(ZIEL, form, {
+      paid_until: "",
+      legacy_tier: "",
+      legacy_price: "",
+      legacy_source_id: "",
+    });
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.street).toBeNull();
+    expect(patch.country).toBeNull();
+  });
+
   it("schickt kein tier — der Stufenwechsel gehört nicht hierher", async () => {
     await saveAdminProfile(ZIEL, form, {
       paid_until: "",

@@ -503,7 +503,7 @@ function ContactAction({ uid, match }: { uid: string; match: HubMatch }) {
       toast({
         variant: "success",
         title: "Kontaktanfrage gesendet",
-        description: `${match.partner.name} entscheidet über deine Anfrage. Kontaktdaten werden erst nach Annahme sichtbar.`,
+        description: `${match.partner.name} entscheidet über deine Anfrage. E-Mail, Telefon und Anschrift werden beidseitig erst nach der Annahme sichtbar.`,
       });
       queryClient.invalidateQueries({ queryKey: matchingHubQueryKey(uid) });
       queryClient.invalidateQueries({ queryKey: dashboardQueryKey(uid) });

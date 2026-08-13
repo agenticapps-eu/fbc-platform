@@ -119,7 +119,11 @@
 
 - [x] 7.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün, Ausgabe
       gelesen statt behauptet
-- [ ] 7.2 Code-Review auf dem **Diff** (Schritt 4), Ergebnis festgehalten
+- [x] 7.2 Code-Review auf dem **Diff** (Schritt 4): gemini APPROVE, codex
+      REQUEST-CHANGES mit 3 HIGH. Vier Befunde behoben (Sendetexte, pgTAP für
+      den direkten Mitgliederweg, Adress-Patch am Supabase-Rand, strenger
+      Branchen-Schleifentest), drei mit Grund nicht — darunter einer, der
+      Donald vorgelegt wird. Protokoll in `REVIEWS.md`
 - [x] 7.3 Sichtprobe gegen den **lokalen** Stack, mit zwei echten Konten und
       einer angenommenen Anfrage. Sie hat einen Fehler gefunden, den alle drei
       grünen Tests durchgelassen hatten: das Branchenfeld fiel nach `reset()`

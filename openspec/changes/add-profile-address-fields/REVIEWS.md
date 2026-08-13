@@ -112,8 +112,11 @@ Keiner. Beide Reviewer liefen durch (exit 0).
 5. **Der Upsert-Test läuft zweimal** (codex MEDIUM 2). Der Befund ist richtig:
    der `ON CONFLICT`-Pfad war genau der, den Entscheidung 4 behauptet, und der
    Test hätte ihn nie berührt.
-6. **`country` wird nur vorbelegt, wenn es noch gar keine Kontaktzeile gibt**
-   (codex MEDIUM 3). Eine vorhandene Zeile mit `country = NULL` bleibt leer.
+6. **`country` wird gar nicht vorbelegt** (codex MEDIUM 3). Die erste Antwort
+   auf den Befund war eine Bedingung („nur wenn keine Zeile existiert"); beim
+   Bauen zeigte sich die Fassung ohne Vorbelegung als die kürzere, die den
+   Fehler nicht zulässt. „DE" steht als Platzhalter im Feld, gesetzt wird es vom
+   Import — dort, wo es gebraucht wird, weil WordPress das Feld nicht erhebt.
 7. **zod-`email` auf die Kontakt-E-Mail** samt Negativtest (codex MEDIUM 5).
 8. **Entscheidung 2 im Design richtiggestellt** (codex LOW 1). Die Aussage war
    falsch — ein zusätzlicher Spalten-Grant widerruft nichts. Die breite
@@ -152,3 +155,81 @@ Keiner. Beide Reviewer liefen durch (exit 0).
   notiert.
 - **Zweite Adresszeile / c/o** (Annahme). In WordPress ist „Straße & Nr." **ein**
   Textfeld; eine zweite Spalte hätte beim Import nichts, was hineinginge.
+
+---
+
+# Review auf dem Diff (Schritt 4)
+
+Nach der Umsetzung, vor dem Merge. Prompt: der vollständige Diff gegen `main`
+über `supabase/` und `src/`.
+
+## Reviewer: gemini (gemini-cli 0.28.2, Modell nicht ausgewiesen)
+
+VERDICT: APPROVE
+
+- [LOW] Migration — Die Weißliste von `admin_update_profile` mischt Schlüssel
+  aus drei Tabellen; auf Dauer wären drei tabellenbezogene Funktionen näher an
+  ihren Anweisungen. Ausdrücklich kein Fehler an diesem Change.
+
+## Reviewer: codex (gpt-5.6-sol, codex-cli 0.145.0)
+
+VERDICT: REQUEST-CHANGES
+
+- [HIGH] Bestandsbeziehungen — Bereits `accepted`-Beziehungen sehen die
+  Anschrift sofort, ohne dass der neue Dialog sie je erreicht hat.
+- [HIGH] `src/lib/profile.ts` — Der bedingungslose Upsert schreibt alle sieben
+  Felder; eine parallele Admin-Änderung wird von einem fachfremden Speichern
+  still überschrieben.
+- [HIGH] `PublicProfilePage` / `MeineChancenPage` — Die Texte VOR dem Senden
+  sagen weiter nur „Kontaktdaten". Aufgabe 5.3 ist damit nicht erfüllt.
+- [MEDIUM] `admin_audit` — Der rohe Patch kopiert die Anschrift bei jeder
+  Admin-Speicherung erneut, ohne Aufbewahrungs- oder Löschregel.
+- [MEDIUM] `rls_test.sql` — Der negative Schreibtest deckt nur den Umweg über
+  die Admin-RPC ab, nicht den neuen DIREKTEN Mitgliederweg.
+- [MEDIUM] `AdminMitgliedPage.test.tsx` — mockt `saveAdminProfile`, also eigenen
+  Code; der Service-Test prüft die Adressfelder im Patch nicht. Ein Entfernen
+  der Zuordnung bliebe überall grün.
+- [LOW] `branchen.test.ts` — Der Schleifentest akzeptiert `null` und würde ein
+  Stichwort, das seine Zuordnung verliert, nicht bemerken.
+
+## Not counted
+
+- codex, erster Lauf — abgebrochen, null Bytes Ausgabe. Neu gestartet; der
+  zweite Lauf ist der oben verzeichnete.
+
+## Resolution (Diff-Review)
+
+**Behoben:**
+
+1. **Die Texte vor dem Senden** nennen jetzt „E-Mail, Telefon und Anschrift"
+   und sagen ausdrücklich *beidseitig* (HIGH 3). Der Befund ist der
+   unangenehmste der Runde: Aufgabe 5.3 nannte beide Dateien beim Namen, 5.4 war
+   abgehakt, und geändert war nur der Empfänger-Hinweis.
+2. **pgTAP für den direkten Mitgliederweg** (MEDIUM 2): ein fremder Upsert
+   prallt ab, und ein unbestätigtes Konto trifft **null Zeilen**. Zwei Fallen
+   dabei, beide erst im Lauf sichtbar: das Sondenkonto `dddd…` ist an dieser
+   Stelle der Datei längst bestätigt (§14 löst es unterwegs ein), und ein von
+   der USING-Klausel weggefiltertes UPDATE wirft NICHTS — `try_as` meldete
+   folgerichtig `OK`. Deshalb ein frisches Konto und eine gezählte Zeilenzahl
+   statt einer erwarteten Ausnahme.
+3. **Der Admin-Patch wird am Supabase-Rand geprüft** (MEDIUM 3): zwei
+   Aussagen in `admin-profile.test.ts` über alle fünf Felder und über leer→null.
+4. **Der Branchen-Schleifentest ist streng** (LOW): jedes Stichwort MUSS seine
+   Branche treffen. Nebenwirkung, die den Aufwand allein wert ist: der Test
+   belegt jetzt auch, dass kein Stichwort zwei Branchen trifft.
+
+**Nicht behoben, mit Grund:**
+
+- **Bestandsbeziehungen** (HIGH 1). Der Befund ist richtig und die Entscheidung
+  gehört nicht mir: die fortlaufende, beidseitige Freigabe steht so im Delta,
+  weil sie für E-Mail und Telefon seit jeher gilt. Praktisch ist das Fenster
+  heute leer — PROD trägt zwei Konten und keine gewachsene Beziehungshistorie,
+  und C10 importiert in eine Datenbank ohne Altannahmen. **Donald vorgelegt**,
+  nicht stillschweigend entschieden.
+- **Der bedingungslose Upsert** (HIGH 2). Gleiches Verhalten wie bei der
+  Profilzeile seit AGE-238: `saveProfile` schreibt auch dort alle Felder aus dem
+  Formular, das beim Öffnen geladen wurde. Eine optimistische Sperre allein für
+  die Kontaktzeile führte ein Nebenläufigkeitsmodell ein, das der Rest des
+  Editors nicht hat — das ist ein eigener Vorgang, kein Nebenschritt hier.
+- **`admin_audit`** (MEDIUM 1). Wie schon im Plan-Review: älter als dieser
+  Change, gehört zu `add-dsgvo-compliance`.
