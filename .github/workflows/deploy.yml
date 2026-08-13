@@ -63,19 +63,59 @@ jobs:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: supabase db push --db-url "$SUPABASE_DB_URL_DEV"
 
-  # Fruehwarnung vor dem Deploy: weicht die Migrationshistorie von PROD ab,
-  # faehrt kein Frontend aus (AGE-257).
+  # Fruehwarnung vor dem Deploy: weicht die Migrationshistorie des Projekts ab,
+  # das der auszuliefernde Build anspricht, faehrt kein Frontend aus (AGE-257).
   #
   # Misst gegen denselben `github.sha`, den `deploy` ausliefert — beide Jobs
   # liegen im selben Lauf und checken denselben Commit aus.
   #
-  # Kein Break-Glass, bewusst: sobald ein Merge eine Migration enthaelt,
-  # blockiert dieses Gate JEDEN Deploy, bis jemand `migrate-prod` freigibt —
-  # auch einen eiligen Fix, der mit der Migration nichts zu tun hat. Eine
-  # Zusage, die man im Eilfall umgehen darf, ist im Eilfall keine.
+  # WARUM NICHT MEHR FEST GEGEN PROD (AGE-536). Solange „Bis zum Import traegt
+  # allein DEV die Rolle beider Umgebungen" gilt, zeigt `VITE_SUPABASE_URL` der
+  # Infisical-Umgebung `prod` auf das DEV-Projekt — das ausgelieferte Frontend
+  # liest also aus DEV. Ein fest gegen PROD gerichtetes Gate mass damit eine
+  # Datenbank, die kein Nutzer anfasst, und hielt dabei genau das Frontend
+  # zurueck, das zur tatsaechlich gelesenen Datenbank passt. Am 2026-08-13
+  # standen dadurch drei Stunden lang neun leere Karten live: `migrate-dev`
+  # hatte die Event-Beitraege in DEV angelegt, das Frontend, das diesen
+  # Kartentyp kennt, kam wegen Drift gegen PROD nicht heraus. Das Gate hat den
+  # Schaden nicht verhindert, sondern verlaengert.
+  #
+  # Nach dem Umzug auf das PROD-Projekt ergibt dieselbe Regel wieder PROD —
+  # ohne Aenderung an dieser Datei.
+  #
+  # WARUM `needs: migrate-dev`. Sobald das Gate DEV misst, misst es dasselbe
+  # Projekt, das `migrate-dev` im selben Lauf gerade beschreibt. Parallel
+  # gestartet faende es die eben gemergten Migrationen als fehlend und wuerde rot
+  # — nicht wegen einer echten Abweichung, sondern wegen der Reihenfolge der
+  # eigenen Pipeline. Das kostet echte Laufzeit — vorher startete `deploy` bei
+  # `max(migrate-dev, drift-gate)`, jetzt bei `migrate-dev + drift-gate`, plus
+  # der Infisical-Installation unten. Rund zwei Minuten je Push auf main, und
+  # sie sind es wert: ohne die Reihenfolge misst das Gate den Stand VOR der
+  # Migration und wird an der eigenen Pipeline rot.
+  #
+  # Kein Break-Glass, bewusst: sobald ein Merge eine Migration enthaelt, die das
+  # gemessene Projekt nicht hat, blockiert dieses Gate JEDEN Deploy — auch einen
+  # eiligen Fix, der mit der Migration nichts zu tun hat. Eine Zusage, die man im
+  # Eilfall umgehen darf, ist im Eilfall keine.
+  #
+  # EHRLICH ZUR REICHWEITE, solange DEV live ist: das Gate misst dann eine
+  # Datenbank, die unmittelbar zuvor in diesem Lauf automatisch migriert wurde.
+  # Es ist in dieser Zeit eine Nachkontrolle von `migrate-dev` (plus
+  # Remote-only-Drift und Reihenfolge), keine Zusage, dass ein Mensch die
+  # Migration freigegeben haette. Was in dieser Phase traegt, ist der Abbruch des
+  # Deploys bei fehlgeschlagenem DEV-Lauf.
   drift-gate:
+    needs: [migrate-dev]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+      # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
+      INFISICAL_API_URL: https://eu.infisical.com/api
+      # DIESELBE Umgebung, mit der `deploy` auf main baut. Wuerde hier eine
+      # andere stehen, maesse das Gate wieder ein anderes Projekt als das
+      # ausgelieferte Frontend anspricht — der Fehler, den dieser Job behebt.
+      INFISICAL_ENV: prod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
@@ -87,15 +127,171 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Gleiche Installation wie in `functions` und `deploy`. Ein Checksum-Pin
+      # ist nicht zu haben — Infisical verteilt die CLI ueber sein eigenes
+      # Repository (offener Punkt aus AGE-495, Audit 8.6). Kein `-E`: das
+      # Setup-Skript braucht nichts aus dieser Job-Umgebung.
+      - name: Install Infisical CLI
+        run: |
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
+          sudo apt-get update && sudo apt-get install -y infisical
+
+      # Die Zuordnung steht in scripts/live-target.logic.ts und hat dort einen
+      # Test daneben — samt Regressionsfall auf den Vorfall, der sie ausgeloest
+      # hat. Nicht hier als Shell-Zeile, die niemand prueft.
+      #
+      # STDOUT traegt genau zwei Zeilen (Umgebung, Ref), alles Erklaerende geht
+      # nach STDERR — deshalb die Datei statt einer Kommandosubstitution.
+      #
+      # Geprueft werden BEIDE Zeilen und ihre ANZAHL. `live-target.ts` haelt sich
+      # daran, aber dazwischen liegen `infisical`, `pnpm` und `tsx`: schriebe
+      # eines davon eine Zeile auf STDOUT, liefen `head` und `tail` auseinander,
+      # und bei einzeiliger Ausgabe lieferten beide denselben Wert — `ref` hiesse
+      # dann „dev". Diese Angabe soll im Vorfall belastbar sein, also wird sie
+      # geprueft und nicht angenommen.
+      - name: Ziel bestimmen — welches Projekt spricht der Build an?
+        id: ziel
+        run: |
+          set -euo pipefail
+          infisical run --env="$INFISICAL_ENV" --silent -- \
+            pnpm tsx scripts/live-target.ts > "$RUNNER_TEMP/ziel.txt"
+
+          zeilen="$(wc -l < "$RUNNER_TEMP/ziel.txt" | tr -d ' ')"
+          if [ "$zeilen" != "2" ]; then
+            echo "::error::live-target.ts hat $zeilen Zeilen auf STDOUT geschrieben, erwartet waren 2. Schreibt ein Werkzeug in der Kette dazwischen?"
+            exit 1
+          fi
+
+          umgebung="$(head -n 1 "$RUNNER_TEMP/ziel.txt")"
+          ref="$(tail -n 1 "$RUNNER_TEMP/ziel.txt")"
+
+          case "$umgebung" in
+            dev|prod) ;;
+            *) echo "::error::Unerwartete Ausgabe von live-target.ts: \"$umgebung\"." ; exit 1 ;;
+          esac
+
+          case "$ref" in
+            [a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z]) ;;
+            *) echo "::error::\"$ref\" ist kein Supabase-Projekt-Ref (20 Kleinbuchstaben)." ; exit 1 ;;
+          esac
+
+          echo "umgebung=$umgebung" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+          # In JEDEN Lauf, auch in den unauffaelligen: eine Angabe, die nur im
+          # Ausnahmefall erscheint, ist im Normalfall unbelegt — und beim
+          # naechsten Vorfall will niemand rekonstruieren muessen, welche
+          # Datenbank das Gate damals angesehen hat.
+          {
+            echo "### Drift-Gate"
+            echo "- gemessen: **$umgebung** (\`$ref\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Das Gate wird rot, wenn es nicht messen KANN (fehlendes Secret, DB
       # nicht erreichbar, geaendertes CLI-Ausgabeformat) — nicht nur, wenn es
       # Drift findet. Die Auswertung ist in scripts/migration-drift.logic.ts
       # geprueft; `version: latest` oben heisst, dass die CLI sich unter uns
       # aendern darf, und genau das ist am 2026-08-05 passiert.
-      - name: Migrationshistorie gegen PROD vergleichen
+      - name: Migrationshistorie gegen das gemessene Projekt vergleichen
         env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
-        run: pnpm tsx scripts/migration-drift-gate.ts
+          UMGEBUNG: ${{ steps.ziel.outputs.umgebung }}
+        run: |
+          set -euo pipefail
+          # Kein `else` auf PROD: ein unerwarteter Wert — auch der leere — waehlte
+          # sonst stillschweigend das PROD-Secret, und ein Gate, dessen einziger
+          # Fehlermodus „hat die falsche Datenbank gemessen" ist, darf genau das
+          # nicht als Vorgabe haben. Heute unerreichbar (das `case` oben laesst
+          # nur dev|prod durch), aber die Vorgabe soll auch dann richtig sein,
+          # wenn jemand das `case` umbaut.
+          case "$UMGEBUNG" in
+            dev)  ziel="${SUPABASE_DB_URL_DEV:-}" ;;
+            prod) ziel="${SUPABASE_DB_URL_PROD:-}" ;;
+            *)    echo "::error::Unerwartete Umgebung \"$UMGEBUNG\" — das Gate misst nichts auf Verdacht." ; exit 1 ;;
+          esac
+          if [ -z "$ziel" ]; then
+            echo "::error::Kein Verbindungs-Secret fuer \"$UMGEBUNG\". Das Gate kann nicht messen und wird deshalb rot."
+            exit 1
+          fi
+
+          # Belegen, dass das Secret auch wirklich auf das aufgeloeste Projekt
+          # zeigt. Ohne diese Zeile prueft das Gate nur ein ETIKETT: es weiss,
+          # welches Projekt der Build anspricht, nimmt aber ungeprueft an, dass
+          # `SUPABASE_DB_URL_<UMGEBUNG>` dorthin fuehrt. Waere das Secret
+          # vertauscht — beim Umzug die wahrscheinlichste Verwechslung —, maesse
+          # das Gate ein anderes Projekt als der Build anspricht und waere gruen.
+          # Dieselbe gepruefte Funktion wie in `migrate-dev` und `migrate-prod`.
+          pnpm tsx scripts/assert-target.ts "$UMGEBUNG"
+
+          pnpm tsx scripts/migration-drift-gate.ts "$ziel"
+
+      # NUR BERICHT, NIE ROT. Zeigt der Build auf DEV, entfiele sonst jede
+      # Sichtbarkeit von PRODs Rueckstand — und genau der ist zweimal unbemerkt
+      # gewachsen und fiel erst auf, als ein Deploy scheiterte.
+      #
+      # `!cancelled()` statt `always()`: der Bericht soll auch dann entstehen,
+      # wenn das Gate oben rot war — da ist er am meisten wert —, aber nicht
+      # noch anlaufen, waehrend der Lauf abgebrochen wird.
+      #
+      # `set +e` AUSDRUECKLICH — und das ist der Punkt. GitHub startet jeden
+      # `run:`-Block als `bash -e {0}`; errexit ist an, BEVOR die erste Zeile
+      # laeuft, und `set -uo pipefail` loescht es nicht. Ohne `set +e` stuerbe
+      # der Schritt an der ersten fehlgeschlagenen Messung, der ganze
+      # Auswertungsblock waere toter Code, der Job wuerde rot — und der Deploy
+      # waere wegen einer Datenbank blockiert, die niemand liest. Also genau die
+      # Havarie, gegen die dieser Job geschrieben ist. Gefunden im Review am
+      # 2026-08-13; die lokale Probe hatte mit `bash datei` statt `bash -e`
+      # gemessen und deshalb nichts bemerkt.
+      #
+      # NICHT `|| true`: das setzte `$?` auf 0, jeder Rueckstand landete im Zweig
+      # „abweichungsfrei" — die stille Falschauskunft, die dieser Schritt gerade
+      # verhindern soll.
+      #
+      # Ein fehlschlagender Vergleich ist hier das ERWARTETE Ergebnis.
+      # Unterschieden wird zwischen „Rueckstand" und „nicht ermittelbar".
+      - name: Stand des anderen Projekts — nur Bericht
+        if: ${{ !cancelled() && steps.ziel.outputs.umgebung != '' }}
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          UMGEBUNG: ${{ steps.ziel.outputs.umgebung }}
+        run: |
+          set +e
+          set -uo pipefail
+          if [ "$UMGEBUNG" = "dev" ]; then
+            anderes="prod"; url="${SUPABASE_DB_URL_PROD:-}"
+          else
+            anderes="dev"; url="${SUPABASE_DB_URL_DEV:-}"
+          fi
+
+          echo "### Anderes Projekt (\`$anderes\`) — nur Bericht" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$url" ]; then
+            echo "- nicht ermittelbar: kein Verbindungs-Secret" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          pnpm tsx scripts/migration-drift-gate.ts "$url" > "$RUNNER_TEMP/anderes.txt" 2>&1
+          code=$?
+
+          # `::error::` entschaerfen, bevor die Ausgabe im Protokoll landet. Das
+          # Gate schreibt seine Befunde als Workflow-Kommandos; unveraendert
+          # ausgegeben erzeugten sie rote Annotationen an einem gruenen Lauf —
+          # ununterscheidbar von denen des echten Gates, samt der Aufforderung,
+          # `migrate-prod` freizugeben. Die Lauf-Seite koennte dann nicht mehr
+          # beantworten, ob und woran der Deploy haengt.
+          sed 's/^::error::/::notice::/' "$RUNNER_TEMP/anderes.txt"
+
+          if [ "$code" -eq 0 ]; then
+            echo "- abweichungsfrei" >> "$GITHUB_STEP_SUMMARY"
+          elif grep -q 'DRIFT —' "$RUNNER_TEMP/anderes.txt"; then
+            echo "- **Rueckstand** — vor dem naechsten Deploy gegen \`$anderes\` bedenken:" >> "$GITHUB_STEP_SUMMARY"
+            grep -o 'DRIFT — .*' "$RUNNER_TEMP/anderes.txt" | sed 's/^/  - /' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- **nicht ermittelbar** (Exit $code) — das ist NICHT \"kein Rueckstand\"" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # Edge Functions auf BEIDE Projekte ausrollen (AGE-506).
   #
