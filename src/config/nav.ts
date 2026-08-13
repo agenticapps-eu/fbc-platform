@@ -6,7 +6,6 @@ import ChatPage from "../pages/ChatPage";
 import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
-import MeineKursePage from "../pages/MeineKursePage";
 import EinstellungenPage from "../pages/EinstellungenPage";
 import KontaktePage from "../pages/KontaktePage";
 import MeineEventsPage from "../pages/MeineEventsPage";
@@ -49,9 +48,15 @@ export interface NavItem {
  * AGE-494: Das Menü zeigt nur noch, was es zum Go-Live wirklich gibt — sieben
  * Einträge in zwei Gruppen. Der Kompass hat keinen eigenen Punkt mehr: als eigene
  * Seite ist er im MVP dünn, als Filter über der Mitgliederliste und als Block im
- * Profil ist derselbe Inhalt sofort nützlich. `/kompass`, `/mitgliedschaft`,
- * `/meine-kurse` und `/kontakte` bleiben als `sub` geroutet — nichts wird
- * gelöscht, es wird nur unerreichbar, und das Zurückholen ist diese eine Zeile.
+ * Profil ist derselbe Inhalt sofort nützlich. `/kompass`, `/mitgliedschaft`
+ * und `/kontakte` bleiben als `sub` geroutet — nichts wird gelöscht, es wird
+ * nur unerreichbar, und das Zurückholen ist diese eine Zeile.
+ *
+ * AGE-533: `/meine-kurse` ist die Ausnahme von diesem Satz — die Seite ist
+ * GELÖSCHT, nicht ausgeblendet. „Meine Academy" ist als Reiter an ihre Stelle
+ * getreten, und ein Stub, der auf die Academy verweist, neben einem Reiter, der
+ * dasselbe leistet, wäre ein zweiter Weg zum selben Ort. `App.tsx` leitet den
+ * alten Pfad dorthin um, damit Lesezeichen nicht ins Leere laufen.
  */
 export const navItems: NavItem[] = [
   { path: "/", label: "Start", Component: HomeRedirect, section: "entdecken" },
@@ -102,15 +107,6 @@ export const navItems: NavItem[] = [
     path: "/kompass",
     label: "Kompass",
     Component: CompassPage,
-    section: "sub",
-    requiresAuth: true,
-  },
-  // AGE-494: Ein leerer Stub ohne Datenbasis — die Academy ist im MVP kuratiert
-  // und kennt keine Einschreibung. In C9 tritt „Meine Academy" an diese Stelle.
-  {
-    path: "/meine-kurse",
-    label: "Meine Kurse",
-    Component: MeineKursePage,
     section: "sub",
     requiresAuth: true,
   },

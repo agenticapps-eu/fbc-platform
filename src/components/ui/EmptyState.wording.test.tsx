@@ -58,7 +58,6 @@ describe("Wortlaut leerer Zustände (AGE-494)", () => {
     ["src/components/community/CommunityFeed.tsx", "Aktivität"],
     ["src/components/community/MemberDirectory.tsx", "Mitglieder"],
     ["src/pages/ChatPage.tsx", "Chat"],
-    ["src/pages/MeineKursePage.tsx", "Meine Kurse"],
     ["src/components/mein-bereich/events-widget.tsx", "Meine Events"],
     ["src/pages/ProfilAnsichtPage.tsx", "Mein Profil"],
     // Die Academy ist seit AGE-533 hier statt in der Gegenprobe unten: sie

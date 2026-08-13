@@ -118,13 +118,13 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 3 · „Meine Kurse" entfällt
 
-- [ ] 3.1 `src/pages/MeineKursePage.tsx` und `MeineKursePage.test.tsx` löschen.
-- [ ] 3.2 `nav.ts`: navItem entfernen, Import entfernen, den C9-Kommentar
+- [x] 3.1 `src/pages/MeineKursePage.tsx` und `MeineKursePage.test.tsx` löschen.
+- [x] 3.2 `nav.ts`: navItem entfernen, Import entfernen, den C9-Kommentar
       (Zeilen 108–109) auflösen. Der Satz in Zeile 53, der `/meine-kurse` unter
       den `sub`-Routen aufzählt, muss mit.
-- [ ] 3.3 `App.tsx`: `<Route path="/meine-kurse" element={<Navigate to="/academy"
+- [x] 3.3 `App.tsx`: `<Route path="/meine-kurse" element={<Navigate to="/academy"
       replace />} />` — Muster wie `/meine-chancen` (AGE-450).
-- [ ] 3.4 Die vier Mitesser aufräumen: `nav.test.ts:75`,
+- [x] 3.4 Die vier Mitesser aufräumen: `nav.test.ts:75`,
       `EmptyState.wording.test.tsx:61`, `formatHero.ts:48`, `NavIcon.tsx:61`
       und `:139`.
 
