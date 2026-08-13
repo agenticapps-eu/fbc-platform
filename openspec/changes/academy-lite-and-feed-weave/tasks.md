@@ -130,7 +130,7 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 4 · Migration B — `posts.kind`, `posts.ref_id`, zwei Trigger
 
-- [ ] 4.1 **RED:** pgTAP-Fälle, die ohne die Migration scheitern:
+- [x] 4.1 **RED:** pgTAP-Fälle, die ohne die Migration scheitern:
       - Anlegen eines Events erzeugt genau eine `posts`-Zeile mit
         `kind='event'`, `ref_id`, leerem `body`, Host als Autor.
       - `visibility` wird übernommen; ein `update` auf `events.visibility` zieht
@@ -153,7 +153,7 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
       - Rang unter 4: der Beitrag eines fremden `members`-Events kommt nicht
         zurück, das Event selbst schon (die benannte Asymmetrie).
       - Der zweite Trigger-Lauf erzeugt keinen zweiten Beitrag.
-- [ ] 4.2 Migration `2026....._posts_kind_event_trigger.sql`:
+- [x] 4.2 Migration `2026....._posts_kind_event_trigger.sql`:
       `kind text not null default 'member' check (kind in ('member','event'))`;
       `ref_id uuid`, Fremdschlüssel **ausdrücklich benannt**
       `constraint posts_ref_id_fkey references public.events (id) on delete cascade`
@@ -163,25 +163,25 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
       Unique-Index `on public.posts (ref_id) where kind = 'event'`.
       **Kein zweiter Index auf `ref_id`** (Befund opencode, MEDIUM): der
       partielle Unique-Index trägt den Join vollständig.
-- [ ] 4.3 `posts_write_own` ersetzen: `using` bekommt `kind = 'member'`,
+- [x] 4.3 `posts_write_own` ersetzen: `using` bekommt `kind = 'member'`,
       `with check` zusätzlich `ref_id is null`. `is_activated()` bleibt das
       äußere `and` — wie in C3 und C8. Kommentar auf der Policy mit dem Grund.
-- [ ] 4.4 Trigger-Funktionen `security definer set search_path = ''` — sie
+- [x] 4.4 Trigger-Funktionen `security definer set search_path = ''` — sie
       schreiben in `posts`, und bei einem admin-angelegten Event ist der
       Schreibende nicht der Host; als Invoker scheiterten sie an
       `posts_write_own`. Beide vollständig revoken (s. 1.3).
-- [ ] 4.5 `trg_event_feed_post` (`after insert`) und `trg_event_feed_sync`
+- [x] 4.5 `trg_event_feed_post` (`after insert`) und `trg_event_feed_sync`
       (`after update of visibility, host_id`).
-- [ ] 4.6 Backfill für bestehende Events, `created_at` vom Event übernommen,
+- [x] 4.6 Backfill für bestehende Events, `created_at` vom Event übernommen,
       Events ohne Host übersprungen. **Sollwert DEV: 9 Beiträge**, davon 8
       `members` (0.4).
-- [ ] 4.7 `grants_test.sql` erneut laufen lassen; Typen nachziehen.
-- [ ] 4.8 **`rls_test.sql:15` trägt `select plan(342)`** (Befund codex, MEDIUM,
+- [x] 4.7 `grants_test.sql` erneut laufen lassen; Typen nachziehen.
+- [x] 4.8 **`rls_test.sql:15` trägt `select plan(342)`** (Befund codex, MEDIUM,
       nachgemessen). Die Zahl auf die neuen Behauptungen anheben — sonst
       scheitert die Suite am Plan-Mismatch bei völlig korrektem Verhalten.
-- [ ] 4.9 pgTAP mit **expliziter Dateiliste** fahren — ohne sie meldet
+- [x] 4.9 pgTAP mit **expliziter Dateiliste** fahren — ohne sie meldet
       `supabase test db` FAIL wegen der elf `probe_*.sql`, die kein pgTAP sind.
-- [ ] 4.10 **Blast-Radius auf die Bestandstests** (Befund opencode, MEDIUM —
+- [x] 4.10 **Blast-Radius auf die Bestandstests** (Befund opencode, MEDIUM —
       den hat nur er gesehen). Ab hier erzeugt **jedes** `insert into events`
       in jedem pgTAP-Fall, jeder JS-Fixtur und jedem Seed eine zusätzliche
       `posts`-Zeile. Diese Aufgabe ist **nicht** „die Suite ist grün", sondern:

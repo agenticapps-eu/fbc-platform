@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(359);
+select plan(384);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2625,6 +2625,236 @@ select is(
 select is(
   has_function_privilege('authenticated', 'public.erste_video_url(text)', 'execute'),
   false, '… authenticated auch nicht — sie ist Innerei des Triggers, keine API');
+
+-- ── 22. Events weben sich in den Feed: `posts.kind`/`ref_id` (AGE-533, C9) ──
+-- Ein Event kündigt sich selbst im Feed an. Der Beitrag speichert dabei KEINEN
+-- Event-Inhalt — kein Titel, kein Datum, kein Bild —, sondern nur `kind`,
+-- `ref_id` und einen leeren Body; die Darstellung joint zur Laufzeit.
+--
+-- Drei Dinge, die dieser Abschnitt belegt und die der Plan-Review erzwungen hat:
+--
+--  1. **Event-Beiträge sind systemverwaltet** (codex, SEVERITY HIGH). Der Host
+--     IST der Autor seines Event-Beitrags, und `posts_write_own` galt `for all`
+--     auf `author_id = auth.uid()`. Er konnte den Beitrag also löschen, auf
+--     `kind='member'` umschreiben oder die vom Trigger gesetzte Sichtbarkeit
+--     danach wieder ändern — Eindeutigkeit und Spiegelung galten nur zufällig.
+--     22.10–22.13 prüfen jede dieser vier Umgehungen einzeln.
+--  2. **Der Lebenszyklus von `host_id`**, nicht nur `visibility` (codex MEDIUM
+--     und opencode HIGH, unabhängig voneinander). Vier Übergänge, vier Fälle:
+--     22.6–22.9.
+--  3. **Das Aktivierungs-Gate greift auch hier** (C3/AGE-495), und der
+--     gespiegelte Beitrag ist STRENGER als sein Event: `events` sieht jedes
+--     bestätigte Konto, `members`-Posts erst ab Rang 4. 22.16 hält beides fest,
+--     damit eine spätere Änderung eine Entscheidung ist und kein Unfall.
+
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated', 'c9host1@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b2', 'authenticated', 'authenticated', 'c9host2@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b3', 'authenticated', 'authenticated', 'c9rang1@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b4', 'authenticated', 'authenticated', 'c9unbest@test.fbc');
+
+update public.profiles set tier = 'impact', activated_at = now()
+ where id::text like 'c9c9c9c9-0000-0000-0000-0000000000b%';
+-- Rang 1: sieht `members`-EVENTS, aber keine `members`-POSTS. Genau die
+-- Asymmetrie, die 22.16 festhält.
+update public.profiles set tier = 'basic'
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b3';
+-- Bestätigt-Flag weg, Stufe bewusst `impact`: dahinter steht kein Stufen-Gate
+-- mehr, das einen Fehler noch auffinge (wie in §13/§20).
+update public.profiles set activated_at = null
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b4';
+
+-- 22.1/22.2 Die zwei Spalten.
+select has_column('public', 'posts', 'kind', 'posts trägt kind');
+select has_column('public', 'posts', 'ref_id', 'posts trägt ref_id');
+
+-- 22.3 Der Fremdschlüssel trägt den AUSGESCHRIEBENEN Namen: der Client nennt
+-- ihn in der PostgREST-Einbettung, ein generierter Name wäre eine stille
+-- Kopplung (offene Annahme aus dem Plan-Review).
+select is(
+  (select count(*)::int from pg_constraint
+    where conname = 'posts_ref_id_fkey'
+      and conrelid = 'public.posts'::regclass
+      and confdeltype = 'c'),
+  1, 'posts_ref_id_fkey heißt so und kaskadiert beim Löschen');
+
+-- 22.4 Anlegen erzeugt GENAU EINEN Beitrag, ohne Event-Inhalt.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00001-0000-4000-8000-000000000001', 'C9 Öffentliches Event',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '7 days');
+
+select results_eq(
+  $$select kind, body, visibility, author_id::text
+      from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$,
+  $$values ('event', '', 'public', 'c9c9c9c9-0000-0000-0000-0000000000b1')$$,
+  'Ein neues Event erzeugt einen Beitrag: kind=event, LEERER Body, Sichtbarkeit und Host übernommen');
+
+-- 22.5 Sichtbarkeit zieht nach.
+update public.events set visibility = 'members'
+ where id = 'c9e00001-0000-4000-8000-000000000001';
+
+select is(
+  (select visibility from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'),
+  'members', 'Eine spätere Sichtbarkeitsänderung zieht den Beitrag nach');
+
+-- 22.6–22.9 Der Lebenszyklus von host_id, alle vier Übergänge.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00002-0000-4000-8000-000000000002', 'C9 Event ohne Host',
+   null, 'public', now() + interval '8 days');
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  0, 'Ein Event OHNE Host legt an und erzeugt keinen Beitrag (posts.author_id ist not null)');
+
+update public.events set host_id = 'c9c9c9c9-0000-0000-0000-0000000000b1'
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select author_id::text from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  'c9c9c9c9-0000-0000-0000-0000000000b1',
+  'null→Host: der fehlende Beitrag entsteht jetzt');
+
+update public.events set host_id = 'c9c9c9c9-0000-0000-0000-0000000000b2'
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select author_id::text from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  'c9c9c9c9-0000-0000-0000-0000000000b2',
+  'Host→Host: author_id zieht nach');
+
+update public.events set host_id = null
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  0, 'Host→null: der Beitrag wird entfernt — es gäbe niemanden, dem er gehört');
+
+-- 22.10 Die Kaskade beim Löschen des Events.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00003-0000-4000-8000-000000000003', 'C9 Wegwerf-Event',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '9 days');
+delete from public.events where id = 'c9e00003-0000-4000-8000-000000000003';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00003-0000-4000-8000-000000000003'),
+  0, 'Ein gelöschtes Event nimmt seinen Beitrag mit (on delete cascade)');
+
+-- 22.11 Zwei Beiträge zu EINEM Event sind unmöglich — sonst stünde derselbe
+-- Eintrag doppelt im Feed, sobald ein Trigger zweimal liefe.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.posts (author_id, body, visibility, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b1', '', 'public', 'event',
+              'c9e00001-0000-4000-8000-000000000001')$$),
+  'DENIED:%', 'Ein zweiter Beitrag zu demselben Event wird abgelehnt');
+
+-- 22.12 Die zwei Spalten müssen zusammenpassen.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.posts (author_id, body, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b1', 'x', 'member',
+              'c9e00001-0000-4000-8000-000000000001')$$),
+  'DENIED:%', 'kind=member mit ref_id wird abgelehnt');
+
+-- ── Die vier Umgehungen (codex, HIGH) ──────────────────────────────────────
+-- 22.13 Ein Mitglied legt keinen Event-Beitrag an.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$insert into public.posts (author_id, body, visibility, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b3', '', 'public', 'event',
+              'c9e00002-0000-4000-8000-000000000002')$$),
+  'DENIED:%', 'Ein Mitglied kann keinen kind=event-Beitrag anlegen');
+
+-- 22.14 Der HOST kann seinen eigenen Event-Beitrag nicht löschen — obwohl er
+-- dessen Autor ist. Das ist der Kern des Befunds: `posts_write_own` hing allein
+-- an der Autorschaft.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with weg as (
+        delete from public.posts
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from weg$$),
+  0, 'Der Host löscht seinen Event-Beitrag NICHT (die Policy lässt keine Zeile durch)');
+
+-- 22.15 … und schreibt ihn auch nicht auf `member` um.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with u as (
+        update public.posts set kind = 'member', ref_id = null
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from u$$),
+  0, 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
+
+-- 22.16 … und dreht die gespiegelte Sichtbarkeit nicht zurück.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with u as (
+        update public.posts set visibility = 'public'
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from u$$),
+  0, 'Der Host dreht die vom Trigger gesetzte Sichtbarkeit nicht zurück');
+
+select is(
+  (select visibility from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'),
+  'members', '… die Zeile trägt danach unverändert members');
+
+-- ── Sichtbarkeit des Event-Beitrags ────────────────────────────────────────
+-- 22.17 Das Aktivierungs-Gate aus C3 greift auch auf den neuen Beiträgen.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b4',
+    $$select count(*)::int from public.posts where kind = 'event'$$),
+  0, 'Eingeloggt, aber NICHT aktiviert: kein einziger Event-Beitrag');
+
+-- 22.18 Ausgeloggt: der Beitrag eines members-Events kommt nicht zurück.
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  0, 'Ausgeloggt ist der Beitrag eines members-Events unsichtbar');
+
+-- 22.19 Die benannte Asymmetrie, in einem Paar gemessen: Rang 1 sieht das
+-- EVENT, aber nicht seinen Feed-Beitrag. Die Richtung ist die ungefährliche
+-- (strenger, nicht undichter) — unbenannt wäre sie ein Rätsel.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$select count(*)::int from public.events
+       where id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  1, 'Rang 1 sieht das members-EVENT …');
+
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  0, '… aber NICHT seinen Feed-Beitrag (members-Posts erst ab Rang 4)');
+
+-- 22.20 Die asymmetrische Kaskade, gepint statt nur beschrieben (opencode, LOW):
+-- ein gelöschtes Host-Profil nimmt den BEITRAG mit, das EVENT bleibt.
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000b5', 'authenticated', 'authenticated', 'c9weg@test.fbc');
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00004-0000-4000-8000-000000000004', 'C9 Event eines verschwundenen Hosts',
+   'c9c9c9c9-0000-0000-0000-0000000000b5', 'public', now() + interval '10 days');
+delete from auth.users where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00004-0000-4000-8000-000000000004'),
+  0, 'Host-Profil gelöscht: sein Event-Beitrag fällt über posts.author_id …');
+
+select is(
+  (select count(*)::int from public.events where id = 'c9e00004-0000-4000-8000-000000000004'),
+  1, '… das Event bleibt (events.host_id ist on delete set null). Hingenommen, nicht übersehen');
+
+-- 22.21 Rechte an der Trigger-Funktion. Wie in §21: ohne `revoke` wäre eine
+-- neue Funktion für PUBLIC ausführbar.
+select is(
+  has_function_privilege('anon', 'public.event_feed_post_sync()', 'execute'),
+  false, 'event_feed_post_sync: anon darf sie nicht aufrufen');
+
+select is(
+  has_function_privilege('authenticated', 'public.event_feed_post_sync()', 'execute'),
+  false, '… authenticated auch nicht — sie ist Innerei der Trigger');
 
 select * from finish();
 rollback;

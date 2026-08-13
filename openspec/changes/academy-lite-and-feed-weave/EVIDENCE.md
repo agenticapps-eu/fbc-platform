@@ -239,6 +239,76 @@ lockerer.
 `typecheck` sauber · `lint` 0 Errors (unverändert 4 Warnungen) ·
 **94 Testdateien / 659 Tests grün** (653 Basis + 6 neue).
 
+## 4.x — Migration B: `posts.kind`, `ref_id`, ein Trigger
+
+### RED vor GRÜN
+
+`rls_test.sql` §22, **vor** der Migration:
+
+```
+ERROR: column "kind" does not exist
+# Failed test 360: "posts trägt kind"
+# Failed test 361: "posts trägt ref_id"
+# Failed test 362: "posts_ref_id_fkey heißt so und kaskadiert beim Löschen"
+Failed 25/384 subtests
+```
+
+Die 359 Behauptungen aus §21 und davor blieben grün.
+
+**Nach** der Migration: **384/384, `Result: PASS`** — auf Anhieb, ohne
+Nachbesserung. Über alle drei Suiten mit ausdrücklicher Dateiliste:
+**404 Tests, PASS**.
+
+Darunter die vier Umgehungsfälle aus codex' HIGH-Befund, jeder einzeln: ein
+Mitglied kann keinen `kind='event'`-Beitrag anlegen · der Host löscht seinen
+eigenen Event-Beitrag nicht · schreibt ihn nicht auf `member` um · dreht die
+gespiegelte Sichtbarkeit nicht zurück. Dazu die vier `host_id`-Übergänge und
+das Aktivierungs-Gate.
+
+### Eine Funktion statt zwei
+
+Der Plan sah zwei Trigger-Funktionen vor (anlegen / nachziehen). Ein
+`update … if not found then insert` deckt beide Fälle **und** alle vier
+`host_id`-Übergänge in einem Rumpf ab. Damit steht die Regel wirklich an einer
+Stelle — was `design.md` §1 behauptet, gilt jetzt auch wörtlich.
+
+### 4.10 — der Blast-Radius, gemessen statt für grün gehalten
+
+Der Befund, den nur opencode gesehen hat: ab dieser Migration erzeugt **jedes**
+`insert into events` eine zusätzliche `posts`-Zeile.
+
+**Er ist real.** Sonde gegen den lokalen Stack, in einer zurückgerollten
+Transaktion, auf einer frisch zurückgesetzten Datenbank:
+
+```
+insert into public.events (…) → posts gesamt: 1
+                                davon kind=event: 1
+```
+
+`rls_test.sql` trägt **10** `insert into public.events`. Jede Behauptung, die
+`posts` zählt, wurde einzeln angesehen:
+
+| Zeile | Form | Betroffen? |
+|---|---|---|
+| 361, 366, 371, 376, 744, 2101, 2137 | `where id = '<feste uuid>'` | nein — sie zählen genau eine bekannte Zeile |
+| **590** | `count(*) from public.posts`, **unqualifiziert** | **ja** |
+
+Zeile 590 ist §13.1, „Gate: nicht aktiviert sieht keine Beiträge". Der
+Fixtur-Block in Zeile 118 legt zwei Events mit Host an — an dieser Stelle
+existieren also seit dieser Migration auch deren Feed-Beiträge.
+
+**Die Behauptung bleibt grün, und zwar aus einem STÄRKEREN Grund:** sie deckt
+jetzt zusätzlich Event-Beiträge ab. Wäre das Gate auf ihnen offen, stünde dort
+eine Zahl > 0. Genau der Fall, den 4.10 sucht — nur mit dem guten Ausgang.
+
+### Typen
+
+`kind`, `ref_id` und die Beziehung `posts_ref_id_fkey` von Hand in
+`database.types.ts` ergänzt und gegen `supabase gen types typescript --local`
+gegengeprüft — Felder, Typen und der Beziehungsname stimmen überein. Der
+Beziehungsname ist keine Kosmetik: der Client nennt ihn in der
+PostgREST-Einbettung.
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch
