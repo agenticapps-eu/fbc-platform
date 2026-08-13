@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveFacets,
+  directoryQueryKey,
+  directoryUrlForQuery,
   emptyDirectoryFilters,
   filtersToArgs,
   hasActiveFilters,
+  headerSearchKeyPrefix,
+  headerSearchQueryKey,
   NEED_CATEGORY_OPTIONS,
   OFFER_CATEGORY_OPTIONS,
   type DirectoryMember,
@@ -137,5 +141,59 @@ describe("deriveFacets", () => {
     expect(facets.branchen).toEqual(["Bau", "IT"]);
     expect(facets.regionen).toEqual(["Stuttgart"]);
     expect(facets.kompetenzen).toEqual(["Strategie", "Vertrieb"]);
+  });
+});
+
+/**
+ * Kopfzeilen-Suche: die Schlüssel-Eigenschaften direkt (AGE-540).
+ *
+ * Bewusst hier und nicht im Komponententest. Dort ist diese Aussage NICHT
+ * prüfbar: `HeaderSearch` leert beim Identitätswechsel ohnehin den
+ * Zwischenspeicher, und dieser zweite Schutz macht das Fehlen der Kennung im
+ * Schlüssel unsichtbar. Gemessen — nimmt man `uid` aus dem Schlüssel, bleiben
+ * alle Komponententests grün. Also wird die Eigenschaft dort geprüft, wo sie
+ * entsteht.
+ */
+describe("headerSearchQueryKey (AGE-540)", () => {
+  it("trennt zwei Konten bei gleichem Suchwort", () => {
+    expect(headerSearchQueryKey("konto-a", "anna")).not.toEqual(
+      headerSearchQueryKey("konto-b", "anna"),
+    );
+  });
+
+  it("trennt zwei Suchwörter bei gleichem Konto", () => {
+    expect(headerSearchQueryKey("konto-a", "anna")).not.toEqual(
+      headerSearchQueryKey("konto-a", "berta"),
+    );
+  });
+
+  it("kollidiert nicht mit dem Schlüssel des vollen Verzeichnisses", () => {
+    // Ein auf fünf gekürztes Ergebnis unter `directoryQueryKey` vergiftete den
+    // Zwischenspeicher der Verzeichnisseite, die dort die volle Liste erwartet.
+    const kopf = headerSearchQueryKey("konto-a", "anna") as readonly unknown[];
+    const voll = directoryQueryKey({
+      ...emptyDirectoryFilters,
+      query: "anna",
+    }) as readonly unknown[];
+    expect(kopf[1]).not.toBe(voll[1]);
+  });
+
+  it("liegt unter dem Präfix, das beim Abmelden entfernt wird", () => {
+    const kopf = headerSearchQueryKey("konto-a", "anna") as readonly unknown[];
+    expect(kopf.slice(0, headerSearchKeyPrefix.length)).toEqual([...headerSearchKeyPrefix]);
+  });
+});
+
+describe("directoryUrlForQuery (AGE-540)", () => {
+  it("hängt den getrimmten Begriff als Parameter an", () => {
+    expect(directoryUrlForQuery("  anna  ")).toBe("/mitglieder?q=anna");
+  });
+
+  it("kodiert Sonderzeichen", () => {
+    expect(directoryUrlForQuery("müller & co")).toBe("/mitglieder?q=m%C3%BCller%20%26%20co");
+  });
+
+  it("lässt den Parameter bei leerem Begriff weg", () => {
+    expect(directoryUrlForQuery("   ")).toBe("/mitglieder");
   });
 });

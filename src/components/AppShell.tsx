@@ -6,6 +6,7 @@ import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
+import HeaderSearch from "./search/HeaderSearch";
 import { RouteTransition } from "./ui/Motion";
 import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
@@ -70,15 +71,6 @@ function BellIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -404,19 +396,13 @@ export default function AppShell() {
             <Logo className="h-8" />
           </Link>
 
-          <div className="mx-auto hidden w-full max-w-md sm:block">
-            <label className="relative block">
-              <span className="sr-only">Globale Suche</span>
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                <SearchIcon />
-              </span>
-              <input
-                type="search"
-                placeholder="Suchen in der Community…"
-                className="h-10 w-full rounded-full border border-line bg-soft pl-9 pr-4 text-sm text-ink transition-colors placeholder:text-muted/70 focus-visible:border-accent focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              />
-            </label>
-          </div>
+          {/* NUR angemeldet (AGE-540). Das tote Feld, das hier stand, lag
+              AUSSERHALB des Zweigs unten und war damit auch für Gäste sichtbar.
+              Es einfach zu „ersetzen" hätte die neue Suche an dieselbe Stelle
+              gesetzt — und `search_directory` ist für `anon` nicht ausführbar,
+              jede Eingabe liefe in `42501`. Ein anon-Weg dorthin wäre eine
+              eigene Sicherheitsentscheidung, kein Nebeneffekt dieser Zeile. */}
+          {user && <HeaderSearch />}
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {user ? (

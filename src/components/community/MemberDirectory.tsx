@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -14,6 +14,7 @@ import { categoryLabel } from "../../config/matching";
 import { levelLabel } from "../../config/levels";
 import {
   deriveFacets,
+  DIRECTORY_QUERY_PARAM,
   directoryFacetsQueryKey,
   directoryQueryKey,
   emptyDirectoryFilters,
@@ -35,8 +36,20 @@ import {
  * Discover/anon erhalten höchstens die eigene Zeile (siehe lib/directory.ts).
  */
 export default function MemberDirectory() {
-  const [filters, setFilters] = useState<DirectoryFilters>(emptyDirectoryFilters);
-  const [queryInput, setQueryInput] = useState("");
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  /** Der von der Kopfzeilen-Suche übergebene Begriff (AGE-540). */
+  const urlQuery = searchParams.get(DIRECTORY_QUERY_PARAM) ?? "";
+
+  // BEIM AUFBAU synchron aus der Adresszeile — beides, Eingabe UND Filter.
+  // Den Filter erst per Effekt nachzureichen wäre der teure Fehler: dazwischen
+  // liefe eine Trefferabfrage über das GANZE Verzeichnis, die aufblitzt und im
+  // Zwischenspeicher landet. Belegt im Test „läuft beim Aufbau mit Parameter
+  // nie mit leerer Suche los".
+  const [filters, setFilters] = useState<DirectoryFilters>(() =>
+    urlQuery ? { ...emptyDirectoryFilters, query: urlQuery } : emptyDirectoryFilters,
+  );
+  const [queryInput, setQueryInput] = useState(urlQuery);
 
   // Suchtext entkoppelt vom Filterzustand und entprellt (300 ms), damit nicht jeder
   // Tastendruck eine Server-Abfrage auslöst. Selects greifen sofort.
@@ -46,6 +59,25 @@ export default function MemberDirectory() {
     }, 300);
     return () => clearTimeout(id);
   }, [queryInput]);
+
+  // SPÄTERE Navigationen ziehen nur die EINGABE nach; den Weg zum Filterzustand
+  // geht weiterhin allein die Entprellung oben. Zwei Wege dorthin könnten
+  // einander umgehen.
+  //
+  // Die Bedingung hängt am `key` der Location, nicht am Wert des Parameters:
+  // Wird derselbe Begriff erneut abgeschickt, NACHDEM hier lokal weitergetippt
+  // wurde, ändert sich der Wert nicht — das Ereignis aber schon, und die
+  // Suche muss trotzdem auf den abgeschickten Begriff zurückspringen. Ein
+  // Vergleich auf den Wert ließe den Fall stillschweigend liegen.
+  //
+  // Der Startwert des Ref ist der Schlüssel des ersten Aufbaus, damit dieser
+  // Effekt beim Mounten NICHT feuert — dort hat der Zustand den Begriff schon.
+  const letzteNavigation = useRef(location.key);
+  useEffect(() => {
+    if (letzteNavigation.current === location.key) return;
+    letzteNavigation.current = location.key;
+    setQueryInput(urlQuery);
+  }, [location.key, urlQuery]);
 
   // Baseline (ungefiltert) → stabile Facetten-Optionen für die Dropdowns.
   const facetsQuery = useQuery({
