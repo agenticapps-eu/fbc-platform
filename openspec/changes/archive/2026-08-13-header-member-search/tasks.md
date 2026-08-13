@@ -75,11 +75,17 @@
 
 - [x] 11.1 Code-Review auf dem **Diff** durch einen unabhängigen Leser (Schritt 4).
 - [x] 11.2 `openspec validate --all` grün; jede Aufgabe abgehakt mit einem Diff, der sie erfüllt.
-- [ ] 11.3 **Vor** dem PR archivieren (`openspec archive header-member-search`), damit die gefaltete `openspec/specs/directory-search/spec.md` im geprüften Diff liegt.
-- [ ] 11.4 Commit(s) auf dem Feature-Branch, Conventional Commit mit `(AGE-540)`; PR mit den Belegen aus 9.x und 10.x, nicht als Behauptung.
+- [x] 11.3 **Vor** dem PR archivieren (`openspec archive header-member-search`), damit die gefaltete `openspec/specs/directory-search/spec.md` im geprüften Diff liegt. — Erledigt: fünf Anforderungen gefaltet (`+ 5, ~ 0, - 0`), der Delta trug nur `ADDED`.
+- [x] 11.4 Commit(s) auf dem Feature-Branch, Conventional Commit mit `(AGE-540)`; PR mit den Belegen aus 9.x und 10.x, nicht als Behauptung.
 - [ ] 11.5 CI grün auf der HEAD-SHA prüfen (`check-runs`, nicht `run list`), mergen, Merge mit `gh pr view --json state` bestätigen.
 - [ ] 11.6 Live belegen: Bundle-Name und Größe, plus eine Zeichenkette aus diesem Diff im ausgelieferten Bundle — Größe allein unterscheidet die Vorversion nicht.
 - [ ] 11.7 AGE-540 in Linear: erst `get_issue` lesen, dann die widerlegten Annahmen als Kommentar hinterlassen — das Feld drängt auf dem Telefon nicht (es fehlt dort), „nur öffentliche Profile durchsuchen" ist kein vorhandener Weg, ausgeloggt ist nicht der einzige Leerfall, und Enter unterhalb `discover` kann nicht ins Verzeichnis führen.
+
+> **11.5–11.7 stehen nach diesem Commit noch aus** und können in ihm nicht
+> abgehakt werden: CI, Merge, Live-Beleg und der Linear-Kommentar setzen ihn
+> voraus. Ihre Belege stehen in der PR-Beschreibung, im Linear-Kommentar und in
+> der Sitzungsübergabe — nicht hier, weil ein Häkchen, das vor der Tatsache
+> gesetzt wird, genau die Behauptung wäre, die diese Liste vermeiden soll.
 
 
 ## Belege zu Gruppe 11 — das Code-Review und was es gefunden hat
