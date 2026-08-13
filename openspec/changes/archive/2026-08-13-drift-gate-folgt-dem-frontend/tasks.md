@@ -104,12 +104,25 @@ entfiel. Er hat sich gelohnt — Befund 1 hätte die Havarie wiederholt.
 
 ## 4. Nach dem Merge (nicht Teil des PR)
 
-- [ ] 4.1 Ersten `main`-Lauf lesen: nennt `drift-gate` das gemessene Projekt, und
-      ist es DEV? Das ist der eigentliche Beleg — die Unit-Tests sind es nicht.
-- [ ] 4.2 Belegen, dass der Deploy im **selben** Lauf durchläuft, ohne dass
-      jemand `migrate-prod` freigibt. Genau das war vorher unmöglich.
-- [ ] 4.3 Prüfen, dass der Rückstand des anderen Projekts im Protokoll steht.
-- [ ] 4.4 `openspec archive drift-gate-folgt-dem-frontend` — Szenario-Titel in
+- [x] 4.1 Erster `main`-Lauf (31694340684, `66c44b2`): „Der ausgelieferte Build
+      spricht das DEV-Projekt an (foelowldexkcqzewvrcf)." `assert-target` belegte
+      dazu `SUPABASE_DB_URL_DEV` auf denselben Ref, Host
+      `aws-1-eu-central-1.pooler.supabase.com`. Dann 65 Migrationen
+      abweichungsfrei. Das ist der Beleg — die Unit-Tests sind es nicht.
+- [x] 4.2 Deploy lief im selben Lauf durch, ohne Freigabe: `migrate-dev`
+      11:10:36→11:11:07, `drift-gate` **11:11:16**→11:12:01 (also nach
+      `migrate-dev` — das `needs` greift), `deploy` 11:12:04→11:13:12. Gesamt
+      2:36. Vorher hätte hier `drift-gate` rot gestanden und der Deploy wäre
+      ausgefallen, bis jemand `migrate-prod` auslöst.
+- [x] 4.3 Der Bericht über das andere Projekt (PROD) lief und meldete
+      „OK — 65 Migrationen, Historie abweichungsfrei" — heute Vormittag
+      nachgezogen, deshalb kein Rückstand. Der Rückstands-Zweig ist stattdessen
+      lokal unter `bash -e` mit untergeschobener Fernhistorie nachgestellt
+      (3b.9); der erste echte Rückstand wird ihn im Protokoll zeigen.
+- [x] 4.4 `openspec archive drift-gate-folgt-dem-frontend` — Szenario-Titel in
       MODIFIED-Blöcken unverändert lassen, sonst bricht das Archivieren.
-- [ ] 4.5 Beim Umzug auf das PROD-Projekt gegenprüfen, dass dieselbe Regel dann
-      PROD ergibt — ohne Textänderung. Vermerk am Umzugs-Vorhaben, nicht hier.
+- [x] 4.5 Vermerk für den Umzug gesetzt — als Kommentar an AGE-536, weil es
+      (noch) kein eigenes Umzugs-Vorhaben gibt: nach der Umstellung muss der
+      erste `main`-Lauf „spricht das **PROD**-Projekt an" nennen, und
+      `assert-target prod` muss grün sein. Bleibt beides aus, ist die Umstellung
+      nicht durchgeschlagen oder das Secret vertauscht.
