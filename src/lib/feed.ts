@@ -55,6 +55,15 @@ export interface FeedPost {
   commentCount: number;
   likedByMe: boolean;
   media: FeedMedia[];
+  /**
+   * Erste einbettbare Video-URL des Beitrags — aus der Spalte `posts.video_url`,
+   * die ein Trigger aus dem Body ableitet (AGE-533, 20260813090000).
+   *
+   * Die Karte bettet DIESEN Wert ein und parst den Body nicht erneut. Sonst
+   * gäbe es zwei Quellen fürs Rendern, und die Academy (die über die Spalte
+   * filtert) könnte Beiträge zeigen, deren Karte etwas anderes einbettet.
+   */
+  videoUrl: string | null;
 }
 
 export interface FeedComment {
@@ -187,7 +196,10 @@ function authorOf(byId: Map<string, FeedAuthor>, id: string): FeedAuthor {
  * Maskierung der Anzeige bleibt `displayAuthor`. Hier wird nur nichts gefragt, was
  * gesichert abgewiesen wird.
  */
-async function fetchAuthors(uid: string | null, ids: string[]): Promise<Map<string, FeedAuthor>> {
+export async function fetchAuthors(
+  uid: string | null,
+  ids: string[],
+): Promise<Map<string, FeedAuthor>> {
   const byId = new Map<string, FeedAuthor>();
   if (!uid || ids.length === 0) return byId;
   const { data, error } = await supabase
@@ -235,13 +247,30 @@ export interface FetchFeedArgs {
   hashtag?: string | null;
   /** Weiterlesen ab hier; fehlt er, beginnt die erste Seite. */
   cursor?: FeedCursor | null;
+  /**
+   * Nur Beiträge mit Video — die Academy (AGE-533).
+   *
+   * Die Academy bekommt bewusst KEINE eigene Ladefunktion: sie stellt dieselbe
+   * Abfrage wie der Feed, nur mit einem Filter mehr. Eine zweite Funktion
+   * müsste Autoren-Anreicherung, Zähler und den Keyset-Cursor nachbauen — und
+   * damit dreimal dieselbe Regel pflegen.
+   */
+  nurVideos?: boolean;
+  /** Nur Beiträge dieses Autors — das Regal „selbst geteilt". */
+  autorId?: string | null;
 }
 
 /** Lädt eine Feed-Seite (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
-export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promise<FeedSeite> {
+export async function fetchFeed({
+  uid,
+  hashtag,
+  cursor,
+  nurVideos,
+  autorId,
+}: FetchFeedArgs): Promise<FeedSeite> {
   let query = supabase
     .from("posts")
-    .select("id, author_id, body, hashtags, visibility, created_at")
+    .select("id, author_id, body, hashtags, visibility, created_at, video_url")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
@@ -250,6 +279,11 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
     // leer ist. Der Knopf holte sie, bevor er verschwände.
     .limit(FEED_SEITE + 1);
   if (hashtag) query = query.contains("hashtags", [hashtag]);
+  // Der Filter sitzt in der ANFRAGE, nicht hinterher im Client: sonst trüge
+  // eine Seite von 20 gelesenen Zeilen nur die paar mit Video, und „Ältere
+  // Beiträge" liefe durch den ganzen Bestand, um eine Seite zu füllen.
+  if (nurVideos) query = query.not("video_url", "is", null);
+  if (autorId) query = query.eq("author_id", autorId);
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.createdAt},` +
@@ -319,6 +353,7 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
       commentCount: counts.get(r.id)?.comment_count ?? 0,
       likedByMe: myLikes.has(r.id),
       media: media.get(r.id) ?? [],
+      videoUrl: r.video_url,
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
     // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
-import type { FeedPost } from "../lib/feed";
+import { extractFirstVideo, type FeedPost } from "../lib/feed";
 import { PostPreview } from "./HomePage";
 
 /** Regression: YouTube-Links wurden auf der Startseite als nackte URL angezeigt
@@ -19,6 +19,12 @@ function makePost(body: string): FeedPost {
     commentCount: 0,
     likedByMe: false,
     media: [],
+    // Die Fixtur leitet `videoUrl` aus dem Body ab, weil die DATENBANK das tut
+    // (trg_posts_video_url → erste_video_url, 20260813090000). Ein fest
+    // gesetzter Wert liesse den Test an der Fixtur haengen statt am Verhalten.
+    // Dass beide Erkenner deckungsgleich sind, misst
+    // scripts/probe-c9-parser-paritaet.ts — hier darf man sich darauf stuetzen.
+    videoUrl: extractFirstVideo(body)?.url ?? null,
   };
 }
 

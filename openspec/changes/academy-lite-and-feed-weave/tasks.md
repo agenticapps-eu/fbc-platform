@@ -84,37 +84,37 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 2 · Academy-Seite
 
-- [ ] 2.1 **RED:** Tests für die Datenschicht: „Alle" filtert auf
+- [x] 2.1 **RED:** Tests für die Datenschicht: „Alle" filtert auf
       `video_url not null`, „Meine" zusätzlich auf `author_id`. Kein `vi.mock`
       auf eigene Komponenten.
-- [ ] 2.2 Datenschicht bauen. Sie SETZT KEIN Sichtbarkeitsprädikat — das
+- [x] 2.2 Datenschicht bauen. Sie SETZT KEIN Sichtbarkeitsprädikat — das
       entscheidet die RLS, wie im Feed.
-- [ ] 2.3 **Paginierung, nicht stille Kappung** (Befund codex, MEDIUM): „Alle"
+- [x] 2.3 **Paginierung, nicht stille Kappung** (Befund codex, MEDIUM): „Alle"
       übernimmt die Keyset-Paginierung des Feeds (`FEED_SEITE`, Cursor über
       `(created_at, id)`) statt eine zweite Mechanik zu erfinden. PostgREST
       begrenzt Resultsets ohnehin — ohne Cursor schnitte die Academy still ab.
       Für das Like-Regal gilt dasselbe.
-- [ ] 2.4 **RED + Bau: das zweite Regal aus den eigenen Likes** (Entscheidung
+- [x] 2.4 **RED + Bau: das zweite Regal aus den eigenen Likes** (Entscheidung
       Donald, 13.08.). Eigene `post_likes` lesen, `post_id` gegen `posts` mit
       `video_url` auflösen. Keine neue Tabelle. **Sortiert nach dem Zeitpunkt
       des Likes** (`post_likes.created_at`), nicht nach dem des Beitrags.
       Der Test, der zählt: ein geliktes Video, das die RLS **nicht mehr
       liefert**, entfällt lautlos — keine Lücke, kein Fehler, kein Platzhalter.
-- [ ] 2.5 `AcademyPage`: kuratierter Block bleibt oben als Konstante; darunter
+- [x] 2.5 `AcademyPage`: kuratierter Block bleibt oben als Konstante; darunter
       zwei Reiter „Alle" / „Meine Academy". „Meine Academy" trägt zwei Regale.
       Leere Zustände unterscheiden „gar keine" von „keine eigenen" — je Regal
       einer.
-- [ ] 2.6 Beschriftung des zweiten Regals: die eigene **„gefällt mir"-Liste**.
+- [x] 2.6 Beschriftung des zweiten Regals: die eigene **„gefällt mir"-Liste**.
       Die Wörter „gemerkt", „gespeichert", „Merkzettel" kommen NICHT vor: der
       Like-Zähler ist über `post_engagement_counts` für jeden sichtbar, ein Like
       hier also nicht privat.
-- [ ] 2.7 Test: der Reiter-Zustand kommt **nach** dem Mount aus der Query —
+- [x] 2.7 Test: der Reiter-Zustand kommt **nach** dem Mount aus der Query —
       `useState(wert)` nähme ihn nie an. Vorbelegten Kontext vermeiden, sonst
       prüft der Test die falsche Zeitachse.
-- [ ] 2.8 Die Karte bettet **`post.video_url`** ein, nicht den erneut geparsten
+- [x] 2.8 Die Karte bettet **`post.video_url`** ein, nicht den erneut geparsten
       Body. Das ist die Client-Hälfte der Kehrtwende aus `design.md` §2 — ohne
       sie gäbe es weiterhin zwei Quellen fürs Rendern.
-- [ ] 2.9 Sichtprobe im Browser, beide Themes, 375 px und Desktop.
+- [x] 2.9 Sichtprobe im Browser, beide Themes, 375 px und Desktop.
 
 ## 3 · „Meine Kurse" entfällt
 

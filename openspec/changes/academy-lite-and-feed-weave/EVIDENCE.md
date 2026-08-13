@@ -188,6 +188,57 @@ pgTAP über alle drei Suiten mit ausdrücklicher Dateiliste:
 **379 Tests, `Result: PASS`** — `grants_test.sql` inbegriffen, der
 Golden-Snapshot bleibt also unberührt (keine neue Tabelle).
 
+## 2.x — Academy-Seite
+
+### Sichtprobe im Browser, gegen echte Daten
+
+Nicht gegen Fixtures: lokaler Stack, zwei echte Konten über die Auth-Admin-API,
+vier Beiträge — drei mit Video, **einer bewusst ohne**, plus ein Like des einen
+Kontos auf das Video des anderen.
+
+Der Trigger hat dabei sichtbar getan, was er soll:
+
+| Beitrag | `video_url` |
+|---|---|
+| „Mein Vortrag zum Thema Führung … `watch?v=qp0HIF3SfI4`" | gesetzt |
+| „… meine Sicht auf Gründungen … `watch?v=bNpx7gpSqbY`" | gesetzt |
+| „Eine ruhige Einstimmung. `vimeo.com/76979871`" | gesetzt |
+| „Ein ganz normaler Beitrag ohne Video …" | **null** |
+
+**Reiter „Alle"** (1440×900): drei Karten, alle drei Embeds geladen (zwei
+YouTube, ein Vimeo), echte Autorennamen mit Profil-Link. Der Beitrag ohne Video
+fehlt — der Filter greift.
+
+**Reiter „Meine Academy"**: zwei Regale.
+„Von mir geteilt" zeigt genau das eigene Video, nicht die zwei fremden.
+„Gefällt mir" zeigt genau das gelikte fremde Video, mit dem Hinweis
+„Zuletzt markierte zuerst".
+
+**375 px**: eine Spalte, Karten passen, beide Reiter erreichbar.
+
+**Konsole: keine Fehler, keine Warnungen.**
+
+Der abgeschnittene linke Rand in den Vollseiten-Aufnahmen ist ein Artefakt der
+Aufnahme über die feste Seitenleiste, kein Layoutfehler — im Viewport-Screenshot
+bei 1440 px steht alles am Platz.
+
+### Ein Wächter-Test hat die Prämisse gewechselt, nicht die Regel
+
+`EmptyState.wording.test.tsx` führte `AcademyPage.tsx` unter „trägt bewusst
+KEINEN Leerzustand" — mit der Begründung, sie rendere immer Inhalt (drei feste
+Videos). Das stimmt nicht mehr: die beiden Reiter speisen sich aus `posts` und
+sind am 17.08. garantiert leer.
+
+Die Academy ist deshalb in die andere Liste gewandert („bietet im Leerzustand
+eine Handlung an"), nicht aus dem Test entfernt worden. Der Wächter prüft jetzt,
+dass ihre Leerzustände einen Weg anbieten — das ist strenger als vorher, nicht
+lockerer.
+
+### Abschluss Academy
+
+`typecheck` sauber · `lint` 0 Errors (unverändert 4 Warnungen) ·
+**94 Testdateien / 659 Tests grün** (653 Basis + 6 neue).
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch

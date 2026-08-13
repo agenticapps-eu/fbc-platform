@@ -14,7 +14,7 @@ import {
   partitionEvents,
   type EventListItem,
 } from "../lib/events";
-import { extractFirstVideo, fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
+import { fetchFeed, feedQueryKey, type FeedPost } from "../lib/feed";
 import { MemberDashboard } from "../components/home/MemberDashboard";
 import { useAuth } from "../providers/auth-context";
 
@@ -181,8 +181,14 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
   // Wie im Community-Feed (CommunityFeed/PostBody skipRaw): ein enthaltenes
   // Video wird eingebettet, und seine nackte URL fällt aus dem Vorschautext —
   // sonst stünde auf der Startseite der rohe YouTube-Link statt des Players.
-  const video = extractFirstVideo(post.body);
-  const text = video ? post.body.replace(video.url, "").trim() : post.body;
+  //
+  // Die URL kommt seit AGE-533 aus `post.videoUrl`, nicht mehr aus einem
+  // erneuten Parsen des Bodys. Sonst gäbe es zwei Quellen fürs Rendern, und die
+  // Academy — die über die Spalte filtert — könnte Beiträge zeigen, deren Karte
+  // etwas anderes einbettet. Die Spalte trägt denselben rohen Token, den der
+  // Body enthält, deshalb schneidet `replace` ihn weiterhin sauber heraus.
+  const video = post.videoUrl;
+  const text = video ? post.body.replace(video, "").trim() : post.body;
   return (
     <Card className="space-y-3">
       <header className="flex items-center gap-3">
@@ -221,7 +227,7 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
         </div>
       </header>
       {text && <p className="line-clamp-3 text-sm text-ink/90">{text}</p>}
-      {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
+      {video && <VideoEmbed url={video} title={`Video von ${author.name}`} />}
     </Card>
   );
 }

@@ -36,7 +36,6 @@ import {
   buildMentionResolver,
   commentsQueryKey,
   createPostWithMedia,
-  extractFirstVideo,
   feedListKey,
   feedSeitenKey,
   fetchComments,
@@ -611,7 +610,11 @@ function PostCard({
   const [showComments, setShowComments] = useState(false);
 
   const segments = useMemo(() => tokenizePostBody(post.body), [post.body]);
-  const video = useMemo(() => extractFirstVideo(post.body), [post.body]);
+  // Seit AGE-533 aus der Spalte, nicht aus einem erneuten Parsen des Bodys:
+  // die Academy filtert über `posts.video_url`, und zwei Quellen fürs Rendern
+  // könnten auseinanderlaufen. Die Spalte trägt denselben rohen Token, den der
+  // Body enthält — `skipRaw` unterdrückt ihn deshalb weiterhin im Fließtext.
+  const video = post.videoUrl;
   const author = displayAuthor(post.author, currentUserId !== null);
 
   const like = useMutation({
@@ -670,11 +673,11 @@ function PostCard({
         </div>
       </header>
 
-      <PostBody segments={segments} skipRaw={video?.url} mentionResolver={mentionResolver} />
+      <PostBody segments={segments} skipRaw={video ?? undefined} mentionResolver={mentionResolver} />
 
       <PostMedien media={post.media} urls={bildUrls} onFehler={onBildFehler} autor={author.name} />
 
-      {video && <VideoEmbed url={video.url} title={`Video von ${author.name}`} />}
+      {video && <VideoEmbed url={video} title={`Video von ${author.name}`} />}
 
       {post.hashtags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

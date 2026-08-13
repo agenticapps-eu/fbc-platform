@@ -61,6 +61,11 @@ describe("Wortlaut leerer Zustände (AGE-494)", () => {
     ["src/pages/MeineKursePage.tsx", "Meine Kurse"],
     ["src/components/mein-bereich/events-widget.tsx", "Meine Events"],
     ["src/pages/ProfilAnsichtPage.tsx", "Mein Profil"],
+    // Die Academy ist seit AGE-533 hier statt in der Gegenprobe unten: sie
+    // rendert nicht mehr IMMER Inhalt. Der kuratierte Block steht zwar fest,
+    // aber die beiden Reiter speisen sich aus `posts` mit Video — und die sind
+    // am 17.08. garantiert leer.
+    ["src/pages/AcademyPage.tsx", "Academy"],
   ])("%s (%s) bietet im Leerzustand eine Handlung an", (datei) => {
     const inhalt = readFileSync(datei, "utf8");
     expect(inhalt).toMatch(/<EmptyState/);
@@ -72,7 +77,7 @@ describe("Wortlaut leerer Zustände (AGE-494)", () => {
   /* Gegenprobe zur Regel: Seiten, die IMMER Inhalt rendern, bekommen bewusst
      keinen Leerzustand. Ohne diesen Test liest sich ihr Fehlen wie ein Versäumnis
      und jemand baut einen ein, der nie erscheinen kann. */
-  it.each(["src/pages/AcademyPage.tsx", "src/pages/MitgliedschaftPage.tsx"])(
+  it.each(["src/pages/MitgliedschaftPage.tsx"])(
     "%s trägt bewusst KEINEN Leerzustand",
     (datei) => {
       expect(readFileSync(datei, "utf8")).not.toMatch(/<EmptyState/);
