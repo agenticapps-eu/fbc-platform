@@ -127,5 +127,6 @@ sehen.
       beide REQUEST-CHANGES, vier Befunde — **alle vier auf die Tests, keiner
       auf den Code**. Drei übernommen (Widgets-bleiben-im-Code-Fälle,
       Zählerwert statt Beschriftung, Trenner), einer begründet abgelehnt.
-- [ ] 6.3 Commit mit `AGE-539`, PR gegen `main`. Linear-Status erst **lesen** —
-      die Automation schaltet selbst.
+- [x] 6.3 Commit mit `AGE-539`, PR gegen `main`. Linear-Status erst **lesen** —
+      die Automation schaltet selbst. Erledigt: PR #177, gemergt als `4444a17`,
+      alle fünf Pflichtchecks grün.
