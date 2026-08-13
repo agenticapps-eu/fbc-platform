@@ -3,6 +3,7 @@ import { captureException } from "@sentry/react";
 import { type Json } from "./database.types";
 import { type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
+import { tokenizePostBody } from "./video-url";
 
 /**
  * Community-Feed (AGE-250) — Datenschicht. Spec: docs/community-events-spec.md §1.
@@ -64,71 +65,25 @@ export interface FeedComment {
   createdAt: string;
 }
 
-export interface PostSegment {
-  type: "text" | "hashtag" | "mention" | "url";
-  /** Hashtag/Mention ohne Präfix (Hashtag klein normalisiert); sonst der rohe Text. */
-  value: string;
-  /** Das exakt erkannte Stück (inkl. #/@), für die Anzeige. */
-  raw: string;
-}
-
 // ── reine Helfer (getestet) ─────────────────────────────────────────────────
 
-// Hashtag/Erwähnung nur am Wortanfang (Start oder nach Whitespace), damit
-// "C#programming" oder eine E-Mail keine Fehltreffer erzeugen. URLs überall.
-const TOKEN_RE = /(?<=^|\s)[#@][\p{L}\p{N}_]+|https?:\/\/[^\s]+/gu;
-// Satzzeichen am URL-Ende gehören zum Satz, nicht zum Link. Klammern/eckige
-// Klammern bewusst NICHT abtrennen — sie kommen in echten URLs vor (z. B.
-// Wikipedia `/wiki/Foo_(bar)`); sie hier zu strippen würde solche Links zerreißen.
-const TRAILING_PUNCT = /[.,;:!?»"']+$/;
-
-function normalizeTag(tag: string): string {
-  return tag.toLowerCase();
-}
-
-/** Zerlegt den Beitragstext in geordnete Segmente (Text/Hashtag/Erwähnung/URL). */
-export function tokenizePostBody(body: string): PostSegment[] {
-  const segments: PostSegment[] = [];
-  const re = new RegExp(TOKEN_RE);
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body)) !== null) {
-    let matched = m[0];
-    const start = m.index;
-
-    // URL: nachgestellte Satzzeichen abtrennen (wandern zurück in den Text).
-    let trailing = "";
-    if (matched.startsWith("http")) {
-      const t = TRAILING_PUNCT.exec(matched);
-      if (t) {
-        trailing = t[0];
-        matched = matched.slice(0, -trailing.length);
-      }
-    }
-
-    if (start > last) {
-      const text = body.slice(last, start);
-      segments.push({ type: "text", value: text, raw: text });
-    }
-    if (matched.startsWith("#")) {
-      segments.push({ type: "hashtag", value: normalizeTag(matched.slice(1)), raw: matched });
-    } else if (matched.startsWith("@")) {
-      segments.push({ type: "mention", value: matched.slice(1), raw: matched });
-    } else {
-      segments.push({ type: "url", value: matched, raw: matched });
-    }
-    last = start + matched.length;
-    if (trailing) {
-      segments.push({ type: "text", value: trailing, raw: trailing });
-      last += trailing.length;
-    }
-  }
-  if (last < body.length) {
-    const text = body.slice(last);
-    segments.push({ type: "text", value: text, raw: text });
-  }
-  return segments;
-}
+/**
+ * Textzerlegung und Video-Erkennung liegen seit AGE-533 in `./video-url` und
+ * werden hier unverändert weitergereicht — jeder bisherige Import aus
+ * `lib/feed` bleibt gültig.
+ *
+ * Der Grund für den Schnitt steht dort: dieses Modul baut beim Laden den
+ * Supabase-Client und ist außerhalb von Vite nicht importierbar. Seit C9
+ * leitet die Datenbank `posts.video_url` über `public.erste_video_url()` ab,
+ * und die Parität der beiden Erkenner wird von einem Node-Skript gemessen —
+ * das braucht den kanonischen Parser ohne diesen Rattenschwanz.
+ */
+export {
+  extractFirstVideo,
+  parseVideoUrl,
+  tokenizePostBody,
+  type PostSegment,
+} from "./video-url";
 
 /** Hashtags eines Beitrags: klein normalisiert, dedupliziert, Reihenfolge erhalten. */
 export function parseHashtags(body: string): string[] {
@@ -141,68 +96,6 @@ export function parseHashtags(body: string): string[] {
     }
   }
   return out;
-}
-
-function youtube(id: string) {
-  return { provider: "youtube" as const, embedUrl: `https://www.youtube.com/embed/${id}` };
-}
-
-/**
- * Wandelt eine YouTube-/Vimeo-URL in eine sichere Embed-URL. Lässt NUR diese beiden
- * Anbieter und valide Video-IDs zu — alles andere (fremde Hosts, javascript:, kein
- * Link) ergibt `null`, damit nie ein beliebiges iframe eingebettet wird (AGE-252-Regel).
- */
-export function parseVideoUrl(
-  raw: string,
-): { provider: "youtube" | "vimeo"; embedUrl: string } | null {
-  let url: URL;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const host = url.hostname.replace(/^www\./, "").toLowerCase();
-
-  if (host === "youtube.com" || host === "m.youtube.com") {
-    if (url.pathname === "/watch") {
-      const id = url.searchParams.get("v");
-      if (id && /^[\w-]+$/.test(id)) return youtube(id);
-      return null;
-    }
-    const embed = url.pathname.match(/^\/embed\/([\w-]+)$/);
-    return embed ? youtube(embed[1]) : null;
-  }
-  if (host === "youtu.be") {
-    const id = url.pathname.slice(1);
-    return id && /^[\w-]+$/.test(id) ? youtube(id) : null;
-  }
-  if (host === "vimeo.com") {
-    const m = url.pathname.match(/^\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
-  }
-  if (host === "player.vimeo.com") {
-    const m = url.pathname.match(/^\/video\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
-  }
-  return null;
-}
-
-/**
- * Erste einbettbare Video-URL im Beitrag (für die Embed-Vorschau der Karte). Gibt
- * neben der Embed-URL auch die rohe Quell-URL zurück, damit die Karte sie im Text
- * ausblenden kann (kein doppelter Link + Embed).
- */
-export function extractFirstVideo(
-  body: string,
-): { url: string; provider: "youtube" | "vimeo"; embedUrl: string } | null {
-  for (const seg of tokenizePostBody(body)) {
-    if (seg.type === "url") {
-      const video = parseVideoUrl(seg.value);
-      if (video) return { url: seg.raw, ...video };
-    }
-  }
-  return null;
 }
 
 // ── Erwähnungen auflösen ──────────────────────────────────────────────────

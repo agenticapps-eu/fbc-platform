@@ -29,7 +29,7 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 1 · Migration A — `posts.video_url`, serverseitig abgeleitet
 
-- [ ] 1.1 **RED:** pgTAP-Fälle in `rls_test.sql` (neuer Abschnitt „§21 Academy
+- [x] 1.1 **RED:** pgTAP-Fälle in `rls_test.sql` (neuer Abschnitt „§21 Academy
       aus geteilten Videos"), die ohne die Migration scheitern:
       - Spalte `video_url` existiert, partieller Index existiert.
       - `erste_video_url` liefert für jeden akzeptierten Fall die URL.
@@ -40,7 +40,7 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
         `null`.
       - **Groß-/Kleinschreibung:** `https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc`
         wird akzeptiert (`~*`, nicht `~` — der Fehler des Entwurfs).
-- [ ] 1.2 Migration `2026....._posts_video_url.sql`:
+- [x] 1.2 Migration `2026....._posts_video_url.sql`:
       - `alter table public.posts add column video_url text;`
       - `create function public.erste_video_url(text) returns text
         language sql immutable`, die `parseVideoUrl` Fall für Fall nachbildet:
@@ -57,26 +57,26 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
       - **Kein** Check-Constraint auf der Spalte: der Trigger ist die Garantie.
       - Kopf mit Begründung, Datum, Signatur und der verworfenen Alternative
         (Ableitung im Client) samt dem Grund für die Kehrtwende.
-- [ ] 1.3 **Grants und Revokes der neuen Funktionen** (Befund codex, MEDIUM):
+- [x] 1.3 **Grants und Revokes der neuen Funktionen** (Befund codex, MEDIUM):
       `revoke execute on function public.erste_video_url(text) from public, anon,
       authenticated;` dasselbe für die Trigger-Funktion. Eine neue Funktion
       erhält sonst `PUBLIC EXECUTE`. Dazu `has_function_privilege`-Fälle in
       pgTAP — `grants_test.sql` prüft Funktionsrechte nicht.
-- [ ] 1.4 Spalten-Grants: nicht nötig, **gemessen** (0.4 —
+- [x] 1.4 Spalten-Grants: nicht nötig, **gemessen** (0.4 —
       `pg_attribute.attacl` ist auf `posts`/`events` durchweg null, neue Spalten
       erben von den Tabellen-Grants). `grants_test.sql` trotzdem laufen lassen
       und die Ausgabe lesen (AGE-455).
-- [ ] 1.5 **Backfill im selben Skript**, über **dieselbe** Funktion:
+- [x] 1.5 **Backfill im selben Skript**, über **dieselbe** Funktion:
       `update public.posts set video_url = public.erste_video_url(body)
        where video_url is distinct from public.erste_video_url(body);`
       Vorher/nachher-Zählung in die Ausgabe. **Sollwert DEV: 2** (0.4).
-- [ ] 1.6 **Parität SQL ↔ TypeScript**, und zwar scharf: **alle** Fixtures aus
+- [x] 1.6 **Parität SQL ↔ TypeScript**, und zwar scharf: **alle** Fixtures aus
       `feed.test.ts` (19 Fälle) durch `erste_video_url` laufen lassen; was
       `parseVideoUrl` akzeptiert, muss die Funktion akzeptieren und umgekehrt.
       **Schwelle null**, Fall für Fall — nicht über eine Trefferzahl (Befunde
       gemini MEDIUM und codex MEDIUM: gleiche Summen können aus verschiedenen
       Treffern bestehen). Zusätzlich die zwei echten Bestandstreffer aus 0.4.
-- [ ] 1.7 Typen nachziehen. **`pnpm gen:types` existiert nicht** (Befund codex,
+- [x] 1.7 Typen nachziehen. **`pnpm gen:types` existiert nicht** (Befund codex,
       LOW — nachgemessen: weder in `package.json` noch in den Workflows). Der
       Weg ist `supabase gen types typescript` gegen den lokalen Stack; das
       benutzte Kommando wird in `EVIDENCE.md` notiert, damit der nächste es

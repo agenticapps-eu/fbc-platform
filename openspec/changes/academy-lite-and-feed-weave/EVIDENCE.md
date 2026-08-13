@@ -95,6 +95,99 @@ stellt jetzt die richtige Frage.
 `create_post_with_media(uuid,text,text,text[],text[],jsonb)`. Keine Überladung
 vorhanden, die vorher aufzuräumen wäre.
 
+## 0.5 — Grün-Basis vor der ersten Codezeile
+
+`pnpm lint` 0 Errors (4 Warnungen) · `pnpm typecheck` sauber ·
+**93 Testdateien / 653 Tests grün**. Alles, was danach rot wird, gehört diesem
+Change.
+
+*Nebenbei, weil es zuerst falsch aussah:* der erste Lauf meldete `TEST_EXIT=1`.
+Ursache war `pnpm test --run` — `--run` ging an pnpm statt an vitest
+(`"test": "vitest run"` läuft ohnehin einmalig), die Suite lief gar nicht. Kein
+Befund.
+
+## 1.x — Migration A: `posts.video_url`
+
+### RED vor GRÜN, belegt
+
+`supabase test db … rls_test.sql` **vor** der Migration:
+
+```
+# Failed test 343: "posts trägt video_url"
+# Failed test 344: "posts_video_url_idx besteht und ist partiell"
+ERROR: function public.erste_video_url(unknown) does not exist
+Failed 17/359 subtests
+```
+
+Die 342 Bestandsbehauptungen blieben dabei grün — der neue Abschnitt hat nichts
+Bestehendes umgeworfen.
+
+**Nach** der Migration: 359/359. Ein Zwischenschritt zeigte 358/359, und der
+Fehler lag in der Behauptung, nicht im Code: `pg_indexes.indexdef` gibt
+Schlüsselwörter GROSS zurück, `like` ist case-sensitiv, und mein Muster suchte
+`where` klein. Korrigiert und um die Sortierspalten erweitert.
+
+### Parität der zwei Erkenner — gemessen, nicht zugesagt
+
+`scripts/probe-c9-parser-paritaet.ts` hält `public.erste_video_url()` gegen den
+**echten** `extractFirstVideo` aus `src/lib/video-url.ts` — nicht gegen eine
+Abschrift seiner Erwartungen.
+
+```
+39 Fälle: 20 mit Video (beide einig), 19 ohne Video (beide einig), 0 Abweichungen.
+ERGEBNIS: deckungsgleich über den ganzen Korpus.
+```
+
+Der Korpus ist die Vereinigung aus allen Fixtures in `feed.test.ts`, den Fällen
+aus `rls_test.sql` §21, den zwei echten Bestandstreffern aus DEV und den
+Angriffen aus dem Plan-Review.
+
+**Negativkontrolle — der Beweis, dass die Sonde Zähne hat.** Ein grüner
+Vergleich sagt nichts, wenn er eine echte Abweichung nicht fände. Also den
+Fehler, den der Review gefunden hat (`~` statt `~*`), gegen dieselbe Frage
+gestellt:
+
+```
+case-sensitiv (Entwurfsfehler): NULL
+ausgeliefert (~*):              https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc
+```
+
+TypeScript liefert dort die URL. Der Entwurf hätte also `null` gespeichert und
+den Beitrag still aus der Academy gehalten — und die Sonde hätte es als
+Abweichung gemeldet.
+
+### Der Schnitt in `src/lib/video-url.ts`
+
+`parseVideoUrl`, `extractFirstVideo` und `tokenizePostBody` sind aus `feed.ts`
+in ein eigenes Modul gezogen; `feed.ts` exportiert sie unverändert weiter, alle
+sieben bisherigen Importeure bleiben unberührt.
+
+Der Grund ist die Messung oben: `feed.ts` baut beim Laden den Supabase-Client
+(`import.meta.env`) und ist außerhalb von Vite nicht importierbar. Ohne den
+Schnitt bliebe nur, die Erwartungen im Skript abzuschreiben — das prüfte die
+Abschrift, nicht den Parser.
+
+**Beleg, dass der Schnitt nichts verändert hat:** typecheck sauber und
+**653/653 Tests grün — dieselbe Zahl wie in der Basis.**
+
+### Typen
+
+`pnpm gen:types` existiert nicht (Befund codex, LOW — nachgemessen). Der Weg ist
+`supabase gen types typescript --local`.
+
+Das Generat wurde **nicht** eingecheckt: es unterscheidet sich in 3415 Zeilen von
+der eingecheckten Datei, weil diese Prettier-formatiert ist und aus einer anderen
+CLI-Version stammt. Ein wholesale-Ersatz wäre fremder Ballast im Diff. Stattdessen
+`video_url: string | null` von Hand in `Row`/`Insert`/`Update` ergänzt und **gegen
+das Generat gegengeprüft** — Feld, Typ und Position stimmen überein.
+
+### Abschluss Migration A
+
+`pnpm lint` 0 Errors · `typecheck` sauber · **653/653** Tests ·
+pgTAP über alle drei Suiten mit ausdrücklicher Dateiliste:
+**379 Tests, `Result: PASS`** — `grants_test.sql` inbegriffen, der
+Golden-Snapshot bleibt also unberührt (keine neue Tabelle).
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch

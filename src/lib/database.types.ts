@@ -1016,6 +1016,7 @@ export type Database = {
           created_at: string;
           hashtags: string[] | null;
           id: string;
+          video_url: string | null;
           visibility: string;
         };
         Insert: {
@@ -1024,6 +1025,7 @@ export type Database = {
           created_at?: string;
           hashtags?: string[] | null;
           id?: string;
+          video_url?: string | null;
           visibility?: string;
         };
         Update: {
@@ -1032,6 +1034,7 @@ export type Database = {
           created_at?: string;
           hashtags?: string[] | null;
           id?: string;
+          video_url?: string | null;
           visibility?: string;
         };
         Relationships: [

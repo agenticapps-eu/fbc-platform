@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(342);
+select plan(359);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2478,6 +2478,153 @@ select is(
 select is(
   has_function_privilege('anon', 'public.event_cover_lesbar(text)', 'execute'),
   true, 'event_cover_lesbar: anon MUSS sie aufrufen dürfen, sonst trägt die SELECT-Policy nicht');
+
+-- ── 21. Academy aus geteilten Videos: `posts.video_url` (AGE-533, C9) ───────
+-- Die Spalte trägt die Academy: sie ist der Filter („Beiträge mit Video") und
+-- über den partiellen Index zugleich die Sortierung.
+--
+-- Was dieser Abschnitt belegt, und warum jede Zeile davon nötig ist:
+--
+--  1. Der Wert wird in der DATENBANK abgeleitet, nicht im Client. Der erste
+--     Entwurf ließ den Client rechnen und versprach, `video_url` und das
+--     gerenderte Embed könnten deshalb nicht auseinanderlaufen. Die Zusage war
+--     nicht durchsetzbar (Plan-Review codex, HIGH): `posts_write_own` erlaubt
+--     `authenticated` INSERT und UPDATE direkt auf `posts`. 21.9–21.12 prüfen
+--     genau das — ein selbst gesetzter Wert überlebt den Trigger nicht.
+--  2. `erste_video_url` akzeptiert GENAU, was `parseVideoUrl` akzeptiert
+--     (src/lib/feed.ts). Zwei Fehler des Entwurfs hat der Review hier gefunden:
+--     `~` ist case-sensitive, während der TS-Parser den Host kleinschreibt
+--     (21.7) — und die Host-Grenze muss verankert sein, sonst kommt
+--     `youtube.com.boese.example` durch (21.8).
+--  3. `youtube-nocookie` steht bewusst NICHT in der Liste: `parseVideoUrl`
+--     kennt den Host nicht. Ihn nur in SQL zu ergänzen wäre genau die Drift,
+--     gegen die der ganze Abschnitt antritt.
+
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'c9autor@test.fbc');
+
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000a1';
+
+-- 21.1/21.2 Spalte und Index. Der Index ist PARTIELL und über
+-- (created_at desc, id desc) — er trägt Filter und Sortierung in einem; ein
+-- Index auf `video_url` allein trüge die Sortierung nicht.
+select has_column('public', 'posts', 'video_url',
+  'posts trägt video_url');
+
+select is(
+  (select count(*)::int from pg_indexes
+    where schemaname = 'public' and indexname = 'posts_video_url_idx'
+      -- `indexdef` gibt Schlüsselwörter GROSS zurück, und `like` ist
+      -- case-sensitiv. Beides zusammen hat diese Behauptung erst rot gemeldet,
+      -- obwohl der Index richtig stand.
+      and indexdef like '%WHERE (video_url IS NOT NULL)%'
+      and indexdef like '%(created_at DESC, id DESC)%'),
+  1, 'posts_video_url_idx besteht, ist partiell und trägt die Sortierung');
+
+-- 21.3–21.6 Die akzeptierten Formen, je eine Familie.
+select is(
+  public.erste_video_url('Schau mal https://www.youtube.com/watch?v=Ks-_Mh1QhMc an'),
+  'https://www.youtube.com/watch?v=Ks-_Mh1QhMc',
+  'erste_video_url: youtube.com/watch mit www.');
+
+select is(
+  public.erste_video_url('https://m.youtube.com/watch?feature=x&v=AiOz1vDMjr0&list=RD'),
+  'https://m.youtube.com/watch?feature=x&v=AiOz1vDMjr0&list=RD',
+  '… m.youtube.com, v hinter einem anderen Parameter, weitere Parameter dahinter');
+
+select is(
+  public.erste_video_url('http://youtu.be/abc_123-x?t=30'),
+  'http://youtu.be/abc_123-x?t=30',
+  '… youtu.be mit http und Query — new URL() hält den Query aus dem Pfad heraus');
+
+select is(
+  public.erste_video_url('https://player.vimeo.com/video/76979871 und https://vimeo.com/1'),
+  'https://player.vimeo.com/video/76979871',
+  '… player.vimeo.com, und bei zwei Videos gewinnt das erste');
+
+-- 21.7 Der Fehler des Entwurfs: `~` statt `~*`. `parseVideoUrl` schreibt den
+-- Host klein (feed.ts:165), akzeptiert diese URL also — eine case-sensitive
+-- Prüfung hätte sie abgelehnt und den Beitrag aus der Academy gehalten.
+select is(
+  public.erste_video_url('https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc'),
+  'https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc',
+  'erste_video_url: Großschreibung im Host wird akzeptiert (~*, nicht ~)');
+
+-- 21.8 Der Präfix-Angriff. Ein `like 'https://youtube.com%'` ließe ihn durch,
+-- und in `video_url` stünde ein Wert, den VideoEmbed nicht einbettet.
+select is(
+  public.erste_video_url('https://youtube.com.boese.example/watch?v=x'),
+  null,
+  'erste_video_url: erlaubtes Präfix, fremder Host — abgelehnt');
+
+select is(
+  public.erste_video_url('https://vimeo.com/keinezahl'),
+  null,
+  'erste_video_url: vimeo verlangt eine Zahl');
+
+select is(
+  public.erste_video_url('Ein Satz ganz ohne Link.'),
+  null,
+  'erste_video_url: kein Link, kein Wert');
+
+-- Satzzeichen am Linkende gehören zum Satz, nicht zur URL — dieselbe Regel wie
+-- in tokenizePostBody (TRAILING_PUNCT).
+select is(
+  public.erste_video_url('Sehenswert: https://youtu.be/abc123.'),
+  'https://youtu.be/abc123',
+  'erste_video_url: nachgestellter Punkt gehört nicht zur URL');
+
+-- 21.9–21.12 Der Trigger. Das ist der Kern: die Ableitung ist nicht fälschbar.
+insert into public.posts (id, author_id, body, video_url) values
+  ('c9000001-0000-4000-8000-000000000001',
+   'c9c9c9c9-0000-0000-0000-0000000000a1',
+   'Dieser Beitrag hat gar keinen Link.',
+   'https://youtu.be/GEFAELSCHT');
+
+select is(
+  (select video_url from public.posts where id = 'c9000001-0000-4000-8000-000000000001'),
+  null,
+  'Trigger: ein von Hand gesetzter Wert überlebt den INSERT nicht');
+
+insert into public.posts (id, author_id, body) values
+  ('c9000002-0000-4000-8000-000000000002',
+   'c9c9c9c9-0000-0000-0000-0000000000a1',
+   'Mein Vortrag: https://vimeo.com/76979871');
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://vimeo.com/76979871',
+  'Trigger: aus dem Body abgeleitet, ohne dass der Client etwas mitschickt');
+
+update public.posts set body = 'Doch lieber https://youtu.be/neuervideo'
+ where id = 'c9000002-0000-4000-8000-000000000002';
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://youtu.be/neuervideo',
+  'Trigger: ein geänderter Body rechnet neu');
+
+-- Der Grund, warum der Trigger auf JEDEM Update sitzt und nicht auf
+-- `update of body`: sonst käme genau dieser Schreibzugriff an ihm vorbei.
+update public.posts set video_url = 'https://youtu.be/GEFAELSCHT'
+ where id = 'c9000002-0000-4000-8000-000000000002';
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://youtu.be/neuervideo',
+  'Trigger: ein UPDATE nur auf video_url wird überschrieben (kein `update of body`)');
+
+-- 21.13/21.14 Rechte. Eine neue Funktion ist per Voreinstellung für PUBLIC
+-- ausführbar; ohne `revoke` wäre das eine stille Rechteausweitung (Befund
+-- codex, MEDIUM). Der Trigger ruft sie als Definer, niemand sonst braucht sie.
+select is(
+  has_function_privilege('anon', 'public.erste_video_url(text)', 'execute'),
+  false, 'erste_video_url: anon darf sie nicht aufrufen');
+
+select is(
+  has_function_privilege('authenticated', 'public.erste_video_url(text)', 'execute'),
+  false, '… authenticated auch nicht — sie ist Innerei des Triggers, keine API');
 
 select * from finish();
 rollback;
