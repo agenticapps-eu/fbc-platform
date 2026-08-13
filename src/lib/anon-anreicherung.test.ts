@@ -136,6 +136,31 @@ beforeEach(() => {
 /**
  * Die Positivliste aus `20260715140000_explicit_grants.sql` — mehr darf `anon`
  * nicht lesen. Alles andere ist ein 401, egal wie plausibel der Aufruf aussieht.
+ *
+ * ── WIE WEIT DIESER WÄCHTER REICHT (AGE-291, gemessen 2026-08-13) ───────────
+ *
+ * Er wird gern als allgemeines Geländer zitiert („ausgeloggt kann nichts
+ * austreten, das prüft ja der Test"). Das ist er NICHT, und die Grenze ist
+ * gemessen, nicht geschätzt — mit zwei Eingriffen, die ihn GRÜN ließen:
+ *
+ *   1. **Nur die hier aufgerufenen Lesepfade.** Der Test ruft `fetchFeed`,
+ *      `fetchEvents`, `fetchEvent` und `fetchComments` auf — mehr nicht. Eine
+ *      NEUE Datei mit eigenem `supabase.from(...)` läuft nie durch diesen
+ *      Aufruf und bleibt unbemerkt.
+ *   2. **Keine Funktionsaufrufe.** Der Stub unten beantwortet `rpc()`, ohne den
+ *      NAMEN festzuhalten. Eine für `anon` ausführbare `SECURITY DEFINER`-RPC —
+ *      etwa eine öffentliche Suche — liefe vollständig daran vorbei.
+ *
+ * WAS ER LEISTET: er fängt einen bisher unbekannten Verstoß INNERHALB dieses
+ * Aufrufgraphen, ohne dass ihn jemand vorher erraten muss. Das ist der Grund
+ * für die Positivliste statt einer Ausschlussliste, und es ist viel wert — nur
+ * eben nicht alles.
+ *
+ * WER EINEN NEUEN AUSGELOGGT ERREICHBAREN LESEPFAD BAUT, bringt seinen EIGENEN
+ * negativen Nachweis mit und beruft sich nicht auf diese Liste. Steht so als
+ * Anforderung in `openspec/specs/directory-search/spec.md`. Wird der neue Pfad
+ * über eine der vier Funktionen oben erreichbar, gehört er zusätzlich in den
+ * Aufruf in „Die Regel, nicht der Einzelfall" — sonst wächst die Lücke.
  */
 const ANON_DARF_LESEN = [
   "badges",

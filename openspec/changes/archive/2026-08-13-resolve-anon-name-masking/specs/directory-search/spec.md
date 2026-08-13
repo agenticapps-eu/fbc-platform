@@ -49,6 +49,23 @@ bleiben, der sie in der Datenbank vorsieht. Der Verweis ist Teil der
 Anforderung: „ausstehend" ohne Adresse ist der Zustand, aus dem diese Fassung
 herausführt.
 
+#### Scenario: Anonymous reader sees a masked author name
+
+- **WHEN** an anonymous caller reads a post whose author's profile row is not
+  readable to them
+- **THEN** the author renders as a masked label without an avatar
+- **AND** this is produced by the display masking, not by a failed query — the
+  query is not issued at all
+
+#### Scenario: Tiered name resolution is not yet in effect
+
+- **WHEN** the current behaviour is inspected for graduated, tier-based name
+  reveal
+- **THEN** none exists — every activated authenticated caller reads every public
+  member's full name through `profiles_public`, regardless of tier
+- **AND** the pending work is the database-side resolver planned in the
+  `finish-ui-polish` change (AGE-291), not an unassigned follow-up
+
 #### Scenario: Ausgeloggt wird die gesperrte Relation nicht angefragt
 
 - **WHEN** ein ausgeloggter Besucher die Startseite, die Aktivitätenseite, die
