@@ -191,26 +191,26 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 
 ## 5 · Feed — der zweite Kartentyp
 
-- [ ] 5.1 **RED:** Test, der den Join belegt statt der Kopie: Feed-Zeile mit
+- [x] 5.1 **RED:** Test, der den Join belegt statt der Kopie: Feed-Zeile mit
       `kind='event'` liefert Titel/Datum/Ort aus `events`; ändert sich der
       Titel, ändert sich die Darstellung — **ohne** Schreibzugriff auf `posts`.
-- [ ] 5.2 `fetchFeed`: `kind`, `ref_id` mitselektieren und das Event über den
+- [x] 5.2 `fetchFeed`: `kind`, `ref_id` mitselektieren und das Event über den
       Fremdschlüssel einbetten (`events!posts_ref_id_fkey(...)`). Die RLS von
       `events` wertet die Einbettung selbst aus — zweite Verteidigungslinie,
       kein Ersatz für die gespiegelte Sichtbarkeit.
-- [ ] 5.3 `FeedPost` um `kind` und ein optionales `event` erweitern.
-- [ ] 5.4 `EventCard` in `CommunityFeed.tsx`, **innerhalb** der bestehenden
+- [x] 5.3 `FeedPost` um `kind` und ein optionales `event` erweitern.
+- [x] 5.4 `EventCard` in `CommunityFeed.tsx`, **innerhalb** der bestehenden
       `Stagger`-Liste — dieselbe `<Card>`-Hülle wie `PostCard`. Titelbild über
       `signEventCovers`; ohne Signatur erscheint sie ohne Bild, nicht gar nicht.
-- [ ] 5.5 **RED + Bau: Likes und Kommentare an der Event-Karte** (Befund codex,
+- [x] 5.5 **RED + Bau: Likes und Kommentare an der Event-Karte** (Befund codex,
       MEDIUM — die Spec sagt es zu, keine Aufgabe verdrahtete es). Vier Fälle:
       liken, entliken, Kommentarfaden öffnen, Kommentar anlegen. Der
       Interaktions-Footer wird mit `PostCard` geteilt, nicht kopiert.
-- [ ] 5.6 Ein Overlay in dieser Karte gehört per Portal an `document.body` —
+- [x] 5.6 (entfallen — die Event-Karte hat kein Overlay.) Ein Overlay gehörte per Portal an `document.body` —
       `.fbc-card:hover` setzt einen `transform` und fängt jedes `position:
       fixed` (AGE-492). Ohne Overlay entfällt der Punkt.
-- [ ] 5.7 Ist das Event nicht lesbar (`event === null`), entfällt die Karte.
-- [ ] 5.8 **Alle `posts`-Leser, nicht nur der Feed** (Befund codex, HIGH —
+- [x] 5.7 Ist das Event nicht lesbar (`event === null`), entfällt die Karte.
+- [x] 5.8 **Alle `posts`-Leser, nicht nur der Feed** (Befund codex, HIGH —
       nachgemessen: `grep 'from("posts")' src/` liefert drei Dateien):
       - `HomePage.PostPreview` und `MemberDashboard` (über `fetchFeed`):
         Event-Beiträge benennen statt eine leere Vorschau zu zeichnen.
@@ -219,10 +219,10 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
         `kind='member'`.
       Ohne die letzten beiden sähe ein Host leere Karten, die seine echten
       Beiträge aus einem Limit von vier bzw. fünf verdrängen. Je ein Test.
-- [ ] 5.9 Sichtprobe im Browser: Event anlegen → erscheint im Feed → umbenennen
+- [x] 5.9 Sichtprobe im Browser: Event anlegen → erscheint im Feed → umbenennen
       → Feed zeigt den neuen Titel → löschen → Karte weg. Das ist die Abnahme
       von Zusage 1, und sie ist nur im Browser echt.
-- [ ] 5.10 **Für die Sichtprobe ein Event MIT Titelbild anlegen.** Gemessen
+- [x] 5.10 **Für die Sichtprobe ein Event MIT Titelbild anlegen.** Gemessen
       (0.4): in DEV hat kein einziges der 9 Events ein `cover_path` — der
       Bildweg der Event-Karte ist am Bestand nicht prüfbar und bliebe sonst
       ungemessen.

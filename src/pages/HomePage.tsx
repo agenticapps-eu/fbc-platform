@@ -188,7 +188,15 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
   // etwas anderes einbettet. Die Spalte trägt denselben rohen Token, den der
   // Body enthält, deshalb schneidet `replace` ihn weiterhin sauber heraus.
   const video = post.videoUrl;
-  const text = video ? post.body.replace(video, "").trim() : post.body;
+  // Ein Event-Beitrag trägt einen LEEREN Body (AGE-533). Ohne diese Zeile
+  // stünde auf der Startseite eine Vorschaukarte ganz ohne Text. Titel und
+  // Datum kommen zur Laufzeit aus `events`, nicht aus dem Beitrag.
+  const text =
+    post.kind === "event" && post.event
+      ? `Neues Event: ${post.event.title}`
+      : video
+        ? post.body.replace(video, "").trim()
+        : post.body;
   return (
     <Card className="space-y-3">
       <header className="flex items-center gap-3">

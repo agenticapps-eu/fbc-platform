@@ -309,6 +309,77 @@ gegengeprüft — Felder, Typen und der Beziehungsname stimmen überein. Der
 Beziehungsname ist keine Kosmetik: der Client nennt ihn in der
 PostgREST-Einbettung.
 
+## 5.x — Der zweite Kartentyp im Feed
+
+### Die Zusage, im Browser belegt: gejoint, nicht kopiert
+
+Der ganze Change steht und fällt mit diesem einen Punkt, und er ist nur im
+Browser echt. Gegen den lokalen Stack, mit einem Event **mit** Titelbild (in
+DEV hat keines eines — 0.4 —, also eigens hochgeladen):
+
+1. **Anlegen** → die Karte steht im Feed, *innerhalb* derselben Liste,
+   chronologisch über dem gewöhnlichen Beitrag. Kopfzeile „Neues Event · vor 1
+   Minute · Öffentlich", Titelbild, Titel, „Di., 18. Aug., 10:04 Uhr · Hamburg",
+   Knopf „Zum Event", darunter der geteilte Interaktionsbereich.
+2. **Umbenennen** — und hier liegt der Beleg. Der Titel wurde in `events`
+   geändert, und die `posts`-Zeile davor und danach gehasht:
+
+   ```
+   VORHER posts-Zeile: 5491c30fa70fc8f487517af7e0d16c7f
+   NACHHER posts-Zeile: 5491c30fa70fc8f487517af7e0d16c7f
+   events.title jetzt: Sommerfest im Hafen — verlegt an die Elbe
+   ```
+
+   **Byte-identisch.** An der `posts`-Zeile wurde nichts geschrieben — der
+   Umbenennungs-Trigger feuert bewusst nicht, weil er nur auf `visibility` und
+   `host_id` hört. Trotzdem zeigt der Feed nach dem Neuladen
+   „Sommerfest im Hafen — verlegt an die Elbe". Das ist die Zusage, gemessen
+   statt behauptet.
+3. **Löschen** → `delete from events` meldet `posts mit kind=event danach: 0`,
+   und die Karte ist aus dem Feed verschwunden. Der gewöhnliche Beitrag bleibt.
+
+### Beide Themes
+
+Aufgelöst, was zuerst nach einem kaputten Theme aussah: `navy` überschreibt
+**nur neun Chrome-Token** (Seitenleiste, Kopfzeile), keine für die
+Inhaltsfläche. Die dunkle Seitenleiste in den Aufnahmen *ist* also bereits
+navy. Zur Gegenprobe auf `hell` umgestellt — helle Seitenleiste, Karte
+unverändert korrekt. Beide geprüft.
+
+### Likes und Kommentare — mit Negativkontrolle
+
+Der Interaktionsbereich ist **geteilt**, nicht kopiert: `InteraktionsLeiste`
+wird von `PostCard` und `EventCard` benutzt. Fünf Komponententests decken
+Titel/Datum/Ort/Weg, den fehlenden Body, Liken, den Kommentarfaden und den
+Fall „Event nicht lesbar ⇒ Karte entfällt".
+
+Diese Karte war vor ihrem Test da — deshalb die Negativkontrolle, statt „grün"
+zu behaupten. Die geteilte Leiste testweise aus der Event-Karte entfernt:
+
+```
+× lässt sich liken wie ein gewöhnlicher Beitrag
+× öffnet den Kommentarfaden wie ein gewöhnlicher Beitrag
+Tests  2 failed | 3 passed (5)
+```
+
+Genau die zwei, die es treffen soll. Zurückgenommen: 5/5.
+
+### Alle `posts`-Leser, nicht nur der Feed
+
+Der HIGH-Befund von codex, abgearbeitet an allen fünf Oberflächen:
+
+| Ort | Behandlung |
+|---|---|
+| `CommunityFeed` | zweiter Kartentyp |
+| `HomePage.PostPreview` | benennt „Neues Event: <Titel>" statt leerem Text |
+| `MemberDashboard` | dito, plus Datum |
+| **`lib/dashboard.ts`** (`limit(4)`) | filtert `kind = 'member'` |
+| **`lib/public-profile.ts`** (`limit(5)`) | filtert `kind = 'member'` |
+
+Die letzten beiden hatte der Vorschlag übersehen; dort hätte ein Host leere
+Karten gesehen, die seine echten Beiträge aus einem Limit von vier bzw. fünf
+verdrängen.
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch

@@ -111,6 +111,10 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
       .from("posts")
       .select("id, body, created_at")
       .eq("author_id", id)
+      // Nur Mitgliedsbeitraege (AGE-533): ein Event-Beitrag traegt einen leeren
+      // Body und erschiene hier als leere Karte — und wuerde bei `limit(5)`
+      // einen echten Beitrag verdraengen.
+      .eq("kind", "member")
       .order("created_at", { ascending: false })
       .limit(5),
   ]);

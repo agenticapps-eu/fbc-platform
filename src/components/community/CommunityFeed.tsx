@@ -30,6 +30,8 @@ import {
   SIGNATUR_STALE_MS,
   uploadPostMedia,
 } from "../../lib/post-media";
+import { coverSignaturKey, signEventCovers } from "../../lib/event-cover";
+import { formatEventDate } from "../../lib/events";
 import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
 import {
   addComment,
@@ -101,6 +103,29 @@ export default function CommunityFeed() {
     ...signaturen.map((q) => q.data ?? {}),
   );
 
+  // Titelbilder der Event-Karten — JE SEITE signiert, aus demselben Grund wie
+  // die Beitragsbilder darüber: ein Schlüssel über alle geladenen Seiten würde
+  // beim Nachladen auch die alten Cover neu signieren, und der Browser lüde sie
+  // erneut. Ein Pfad ohne Signatur ist der NORMALFALL (fremdes members-Event),
+  // kein Fehler — die Karte erscheint dann ohne Bild.
+  const coverSignaturen = useQueries({
+    queries: (feed.data?.pages ?? []).map((seite) => {
+      const pfade = seite.posts
+        .map((p) => p.event?.coverPath)
+        .filter((pfad): pfad is string => !!pfad);
+      return {
+        queryKey: coverSignaturKey(uid, pfade),
+        queryFn: () => signEventCovers(pfade),
+        enabled: pfade.length > 0,
+        staleTime: SIGNATUR_STALE_MS,
+      };
+    }),
+  });
+  const coverUrls: Record<string, string> = Object.assign(
+    {},
+    ...coverSignaturen.map((q) => q.data ?? {}),
+  );
+
   // Zwischen `staleTime` (50 min) und Ablauf (60 min) liegt ein Fenster, in dem
   // ein offen gelassener Tab eine abgelaufene URL hält und das Bild 403 liefert.
   // Dann wird nachsigniert.
@@ -164,6 +189,7 @@ export default function CommunityFeed() {
             bildUrls={bildUrls}
             onBildFehler={onBildFehler}
             kuratierteTags={tags.data ?? []}
+            coverUrls={coverUrls}
           />
         </div>
       </div>
@@ -511,6 +537,7 @@ function FeedList({
   bildUrls,
   onBildFehler,
   kuratierteTags,
+  coverUrls,
 }: {
   posts: FeedPost[];
   isLoading: boolean;
@@ -525,6 +552,7 @@ function FeedList({
   bildUrls: Record<string, string>;
   onBildFehler: (pfad: string) => void;
   kuratierteTags: Tag[];
+  coverUrls: Record<string, string>;
 }) {
   if (isLoading) {
     return <p className="text-sm text-muted">Feed wird geladen…</p>;
@@ -557,18 +585,24 @@ function FeedList({
   return (
     <div className="space-y-5">
       <Stagger className="space-y-5">
+        {/* Zwei Kartentypen, EINE Liste: die Event-Karte steht chronologisch
+            zwischen den Beiträgen, nicht als getrennte Liste daneben. */}
         {posts.map((post) => (
           <StaggerItem key={post.id}>
-            <PostCard
-              post={post}
-              currentUserId={currentUserId}
-              activeHashtag={activeHashtag}
-              onHashtag={onHashtag}
-              mentionResolver={mentionResolver}
-              bildUrls={bildUrls}
-              onBildFehler={onBildFehler}
-              kuratierteTags={kuratierteTags}
-            />
+            {post.kind === "event" ? (
+              <EventCard post={post} currentUserId={currentUserId} coverUrls={coverUrls} />
+            ) : (
+              <PostCard
+                post={post}
+                currentUserId={currentUserId}
+                activeHashtag={activeHashtag}
+                onHashtag={onHashtag}
+                mentionResolver={mentionResolver}
+                bildUrls={bildUrls}
+                onBildFehler={onBildFehler}
+                kuratierteTags={kuratierteTags}
+              />
+            )}
           </StaggerItem>
         ))}
       </Stagger>
@@ -605,10 +639,6 @@ function PostCard({
   onBildFehler: (pfad: string) => void;
   kuratierteTags: Tag[];
 }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [showComments, setShowComments] = useState(false);
-
   const segments = useMemo(() => tokenizePostBody(post.body), [post.body]);
   // Seit AGE-533 aus der Spalte, nicht aus einem erneuten Parsen des Bodys:
   // die Academy filtert über `posts.video_url`, und zwei Quellen fürs Rendern
@@ -616,17 +646,6 @@ function PostCard({
   // Body enthält — `skipRaw` unterdrückt ihn deshalb weiterhin im Fließtext.
   const video = post.videoUrl;
   const author = displayAuthor(post.author, currentUserId !== null);
-
-  const like = useMutation({
-    mutationFn: () =>
-      toggleLike({ postId: post.id, profileId: currentUserId as string, liked: post.likedByMe }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) });
-    },
-    onError: (error) => {
-      toast({ variant: "error", title: "Aktion fehlgeschlagen", description: errorMessage(error) });
-    },
-  });
 
   return (
     <Card className="space-y-4">
@@ -707,6 +726,125 @@ function PostCard({
         </div>
       )}
 
+      <InteraktionsLeiste post={post} currentUserId={currentUserId} />
+    </Card>
+  );
+}
+
+// ── Event-Karte ─────────────────────────────────────────────────────────────
+
+/**
+ * Ein Event im Feed (AGE-533).
+ *
+ * Sie steht INNERHALB derselben Liste wie die Beitragskarte, chronologisch
+ * zwischen den übrigen Beiträgen — nicht als getrennte Liste daneben.
+ *
+ * Alles, was sie zeigt, kommt aus `post.event` und damit zur Laufzeit aus
+ * `events`. Am Beitrag selbst steht davon nichts: ein umbenanntes Event ändert
+ * die Darstellung beim nächsten Abruf, ohne dass irgendwo etwas nachgezogen
+ * würde. Genau deshalb gibt es hier auch keinen `body` zu rendern.
+ */
+function EventCard({
+  post,
+  currentUserId,
+  coverUrls,
+}: {
+  post: FeedPost;
+  currentUserId: string | null;
+  coverUrls: Record<string, string>;
+}) {
+  const event = post.event;
+  // Ist das Event für den Betrachter nicht lesbar, liefert die Einbettung null.
+  // Dann entfällt die Karte — sie erscheint NICHT leer.
+  if (!event) return null;
+
+  const coverUrl = event.coverPath ? coverUrls[event.coverPath] : undefined;
+
+  return (
+    <Card className="space-y-4">
+      <header className="flex items-center gap-2 text-xs text-muted">
+        <CalendarIcon />
+        <span>Neues Event</span>
+        <span>·</span>
+        <span>{timeAgo(post.createdAt)}</span>
+        <span>·</span>
+        <span>{post.visibility === "members" ? "Nur für Mitglieder" : "Öffentlich"}</span>
+      </header>
+
+      {/* Ohne Signatur erscheint die Karte OHNE Bild, nicht gar nicht — der
+          Bucket ist privat, und eine fehlende Signatur ist dort der Normalfall
+          (fremdes members-Event), kein Fehler. */}
+      {coverUrl && (
+        <Link to={`/events/${event.id}`} className="block">
+          <img
+            src={coverUrl}
+            alt=""
+            loading="lazy"
+            className="aspect-[3/1] w-full rounded-md object-cover"
+          />
+        </Link>
+      )}
+
+      <div className="space-y-1">
+        <Link
+          to={`/events/${event.id}`}
+          className="font-display text-lg font-semibold text-ink hover:text-accent-strong"
+        >
+          {event.title}
+        </Link>
+        <p className="text-sm text-muted">
+          {formatEventDate(event.startsAt)}
+          {event.location && <> · {event.location}</>}
+        </p>
+      </div>
+
+      <div>
+        <Link to={`/events/${event.id}`}>
+          <Button variant="secondary" size="sm">
+            Zum Event
+          </Button>
+        </Link>
+      </div>
+
+      <InteraktionsLeiste post={post} currentUserId={currentUserId} />
+    </Card>
+  );
+}
+
+// ── Likes und Kommentare — von BEIDEN Kartentypen benutzt ───────────────────
+
+/**
+ * Der Interaktionsbereich einer Karte (AGE-533).
+ *
+ * Bewusst GETEILT und nicht kopiert: unter einer Event-Karte liegt dieselbe
+ * `posts`-Zeile wie unter einem Textbeitrag, Likes und Kommentare funktionieren
+ * dort also ohne Sonderweg. Zwei Fassungen desselben Bereichs würden driften —
+ * und die Spec sagt diese Gleichheit ausdrücklich zu.
+ */
+function InteraktionsLeiste({
+  post,
+  currentUserId,
+}: {
+  post: FeedPost;
+  currentUserId: string | null;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showComments, setShowComments] = useState(false);
+
+  const like = useMutation({
+    mutationFn: () =>
+      toggleLike({ postId: post.id, profileId: currentUserId as string, liked: post.likedByMe }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) });
+    },
+    onError: (error) => {
+      toast({ variant: "error", title: "Aktion fehlgeschlagen", description: errorMessage(error) });
+    },
+  });
+
+  return (
+    <>
       <footer className="flex items-center gap-4 border-t border-line pt-3 text-sm">
         <button
           type="button"
@@ -735,7 +873,7 @@ function PostCard({
       </footer>
 
       {showComments && <CommentThread postId={post.id} currentUserId={currentUserId} />}
-    </Card>
+    </>
   );
 }
 
@@ -1157,6 +1295,20 @@ function HeartIcon({ filled }: { filled: boolean }) {
         d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+      <path
+        d="M7 3v3m10-3v3M3.5 9h17M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V7A1.5 1.5 0 0 1 5 5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>

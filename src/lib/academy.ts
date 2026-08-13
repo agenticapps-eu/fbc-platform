@@ -105,10 +105,6 @@ export async function fetchGelikteVideos({
   const rows = gibtMehr ? geholt.slice(0, FEED_SEITE) : geholt;
   if (rows.length === 0) return { posts: [], nextCursor: null };
 
-  // Ein `!inner`-Join sollte keine Zeile ohne Beitrag liefern. Die Prüfung
-  // steht trotzdem hier, weil der Typ ihn als nullable führt und ein
-  // durchgereichtes `null` die Karte zerlegen würde — nicht als Fehlerbehandlung
-  // für einen unmöglichen Fall, sondern als Typ-Grenze.
   // Autoren wie im Feed über `profiles_public` anreichern. Ohne das trüge jede
   // Karte in DIESEM Regal „Mitglied", während das Regal daneben echte Namen
   // zeigt — derselbe Reiter, zwei Auskünfte über dieselben Leute.
@@ -118,6 +114,10 @@ export async function fetchGelikteVideos({
   const posts: FeedPost[] = [];
   for (const zeile of rows) {
     const p = zeile.posts;
+    // Ein `!inner`-Join sollte keine Zeile ohne Beitrag liefern. Die Prüfung
+    // steht trotzdem hier, weil der Typ ihn als nullable führt und ein
+    // durchgereichtes `null` die Karte zerlegen würde — eine Typ-Grenze, keine
+    // Fehlerbehandlung für einen unmöglichen Fall.
     if (!p) continue;
     posts.push({
       id: p.id,
@@ -137,6 +137,11 @@ export async function fetchGelikteVideos({
       likedByMe: true,
       media: [],
       videoUrl: p.video_url,
+      // Ein gelikter Beitrag mit Video ist immer ein Mitgliedsbeitrag: an einem
+      // Event-Beitrag kann kein `video_url` stehen (leerer Body, und niemand
+      // kann ihn beschreiben).
+      kind: "member",
+      event: null,
     });
   }
 

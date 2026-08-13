@@ -25,6 +25,8 @@ function makePost(body: string): FeedPost {
     // Dass beide Erkenner deckungsgleich sind, misst
     // scripts/probe-c9-parser-paritaet.ts — hier darf man sich darauf stuetzen.
     videoUrl: extractFirstVideo(body)?.url ?? null,
+    kind: "member",
+    event: null,
   };
 }
 

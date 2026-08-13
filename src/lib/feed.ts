@@ -44,6 +44,22 @@ export interface FeedMedia {
   height: number;
 }
 
+/**
+ * Das bezogene Event eines Beitrags mit `kind = 'event'` (AGE-533).
+ *
+ * Diese Felder stehen NICHT am Beitrag — sie kommen bei jedem Abruf frisch aus
+ * `events`. Genau darin liegt die Zusage: ein umbenanntes Event ändert die
+ * Feed-Darstellung sofort, ohne dass irgendwo etwas nachgezogen wird.
+ */
+export interface FeedEvent {
+  id: string;
+  title: string;
+  startsAt: string | null;
+  location: string | null;
+  /** Pfad im PRIVATEN Bucket `event-covers`, keine URL — siehe event-cover.ts. */
+  coverPath: string | null;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -64,6 +80,15 @@ export interface FeedPost {
    * filtert) könnte Beiträge zeigen, deren Karte etwas anderes einbettet.
    */
   videoUrl: string | null;
+  /** `member` (Default) oder `event` — ein vom Trigger erzeugter Event-Beitrag. */
+  kind: string;
+  /**
+   * Das bezogene Event, zur Laufzeit gejoint. `null` heißt eines von zwei
+   * Dingen: gewöhnlicher Beitrag, oder das Event ist für den Betrachter nicht
+   * lesbar (die RLS von `events` wertet die Einbettung selbst aus). Im zweiten
+   * Fall entfällt die Karte, statt leer zu erscheinen.
+   */
+  event: FeedEvent | null;
 }
 
 export interface FeedComment {
@@ -260,6 +285,28 @@ export interface FetchFeedArgs {
   autorId?: string | null;
 }
 
+/**
+ * Die eingebettete Event-Zeile in unsere Form bringen.
+ *
+ * PostgREST liefert eine n:1-Einbettung je nach Version als Objekt ODER als
+ * einelementiges Array; beides wird hier auf dieselbe Form gebracht. `null`
+ * bleibt `null` — das ist der Normalfall (gewöhnlicher Beitrag) und zugleich
+ * die Antwort der RLS auf ein Event, das der Betrachter nicht sehen darf.
+ */
+function eventVon(roh: unknown): FeedEvent | null {
+  const e = Array.isArray(roh) ? roh[0] : roh;
+  if (!e || typeof e !== "object") return null;
+  const z = e as Record<string, unknown>;
+  if (typeof z.id !== "string" || typeof z.title !== "string") return null;
+  return {
+    id: z.id,
+    title: z.title,
+    startsAt: typeof z.starts_at === "string" ? z.starts_at : null,
+    location: typeof z.location === "string" ? z.location : null,
+    coverPath: typeof z.cover_path === "string" ? z.cover_path : null,
+  };
+}
+
 /** Lädt eine Feed-Seite (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
 export async function fetchFeed({
   uid,
@@ -270,7 +317,17 @@ export async function fetchFeed({
 }: FetchFeedArgs): Promise<FeedSeite> {
   let query = supabase
     .from("posts")
-    .select("id, author_id, body, hashtags, visibility, created_at, video_url")
+    // Das Event wird ÜBER DEN FREMDSCHLÜSSEL eingebettet, nicht kopiert
+    // (AGE-533). Der Name `posts_ref_id_fkey` ist in der Migration
+    // ausgeschrieben, genau damit diese Zeile ihn nennen kann. Die RLS von
+    // `events` wertet die Einbettung selbst aus — zweite Verteidigungslinie
+    // neben der gespiegelten Sichtbarkeit, kein Ersatz dafür.
+    // EIN Zeichenketten-Literal, nicht zusammengesetzt: supabase-js leitet die
+    // Form der Antwort aus dem Literal ab. Ein `+` daraus macht `string`, und
+    // die eingebettete Zeile faellt auf `GenericStringError` zurueck.
+    .select(
+      "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)",
+    )
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
@@ -354,6 +411,8 @@ export async function fetchFeed({
       likedByMe: myLikes.has(r.id),
       media: media.get(r.id) ?? [],
       videoUrl: r.video_url,
+      kind: r.kind,
+      event: eventVon(r.events),
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
     // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.
