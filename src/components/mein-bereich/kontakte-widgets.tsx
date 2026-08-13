@@ -15,15 +15,14 @@ import {
 import { matchingHubQueryKey } from "../../lib/matching-hub";
 import { dashboardQueryKey, type DashboardData } from "../../lib/dashboard";
 import { categoryLabel, findCategory, type MatchingSide } from "../../config/matching";
-import { CardLink, DashboardCard, DemoBadge } from "./building-blocks";
+import { CardLink, DashboardCard } from "./building-blocks";
 
-// ── Demo-Daten (profile-spec §5: DEMO-Widgets, in Phase 2 durch echte Daten ersetzt) ──
-const DEMO_NETWORK = [
-  { label: "Freunde", count: 24 },
-  { label: "Preferred Partner", count: 8 },
-  { label: "Mentoren", count: 3 },
-  { label: "Mentees", count: 5 },
-];
+// AGE-539: `DEMO_NETWORK` ist hier ersatzlos gelöscht — 24 Freunde, 8 Preferred
+// Partner, 3 Mentoren, 5 Mentees, fest verdrahtet und unabhängig von den echten
+// Kontakten, direkt unter der Zahl, die stimmt. Derselbe Fall wie „Meine
+// Communities" (AGE-494) und `DEMO_POSTS`: erfundene Zahlen ÜBER DAS MITGLIED
+// SELBST. Bewusst kein Leerzustand als Ersatz — Kontaktgruppen gibt es in Phase 1
+// nicht, ein „Noch keine Mentoren" verspräche eine Funktion, die niemand gebaut hat.
 
 // ── Meine Anfragen (CORE, §6.2) — eingehende Kontaktanfragen mit Annehmen/Ablehnen ──
 // Erscheint nur, wenn offene Anfragen vorliegen (ein Posteingang zeigt sich, wenn Post
@@ -141,7 +140,7 @@ function AnfrageRow({ uid, request }: { uid: string; request: IncomingRequest })
 // niemand hat. Die Demo-Marke machte sie nicht wahr, nur seltener gelesen.
 // Bewusst kein Leerzustand als Ersatz: Communities existieren in Phase 1 nicht.
 
-// 6 ── Mein Netzwerk (CORE-Count, DEMO-Listen) ─────────────────────────────────
+// 6 ── Mein Netzwerk (CORE) ──────────────────────────────────────────────────
 export function NetzwerkWidget({ contactsCount }: { contactsCount: number }) {
   return (
     <DashboardCard
@@ -171,25 +170,6 @@ export function NetzwerkWidget({ contactsCount }: { contactsCount: number }) {
           <div className="text-xs tracking-wide text-muted uppercase">Bestätigte Kontakte</div>
         </div>
       )}
-      <div>
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-            Aufschlüsselung
-          </p>
-          <DemoBadge />
-        </div>
-        <ul className="mt-2 grid grid-cols-2 gap-2">
-          {DEMO_NETWORK.map((n) => (
-            <li
-              key={n.label}
-              className="flex items-center justify-between rounded-lg border border-line bg-soft px-3 py-2 text-sm"
-            >
-              <span className="text-muted">{n.label}</span>
-              <span className="font-medium text-ink">{n.count}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </DashboardCard>
   );
 }
