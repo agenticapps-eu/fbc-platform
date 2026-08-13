@@ -391,9 +391,26 @@ export default function AppShell() {
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
           >
             {/* Das SVG-Lockup ist randlos, skaliert sauber und erbt über
-                currentColor die Farbe. Kein sr-only daneben: es enthält die
-                Wortmarke als echten Text, der Link trägt seinen Namen selbst. */}
-            <Logo className="h-8" />
+                currentColor die Farbe. Kein sr-only daneben: beide Fassungen
+                tragen ihren Namen selbst — die Wortmarke als echten Text, die
+                Marke über den `title` von CompassMark.
+
+                Unter `sm` NUR die Marke (AGE-540, Entscheidung Donald): die
+                Reihe brauchte hier bei 320 px 319 px und war damit randvoll;
+                die Lupe der Kopfzeilen-Suche kostet 48 px und ließ die Kopfzeile
+                seitlich überlaufen. Gemessen, nicht geschätzt — engere Abstände
+                (gap-2 + px-3) kamen auf 339 px und hätten es nicht getragen.
+                Ohne Wortmarke bleiben bei 320 px 56 px Reserve. Dieselbe Grenze,
+                an der HeaderSearch ohnehin auf das Lupensymbol umschaltet; das
+                volle Lockup steht weiter in Seitenleiste und Menü. */}
+            <Logo lockup="mark" className="h-8 sm:hidden" />
+            {/* Die Hülle trägt die Umschaltung, nicht das Lockup selbst: dessen
+                Wurzel bringt `inline-flex` schon mit, und ein `hidden` daneben
+                verliert — gemessen, `display` blieb `inline-flex`. Das übliche
+                „hidden sm:block direkt drauf" trägt hier also nicht. */}
+            <span className="hidden sm:block">
+              <Logo className="h-8" />
+            </span>
           </Link>
 
           {/* NUR angemeldet (AGE-540). Das tote Feld, das hier stand, lag

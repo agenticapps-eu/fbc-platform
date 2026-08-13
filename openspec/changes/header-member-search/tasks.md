@@ -58,18 +58,18 @@
 
 ## 9. Nachweis an der Datenbank
 
-- [ ] 9.1 Ein nicht aktiviertes Konto ruft `search_directory` mit einem Begriff auf, der auf mehrere Profile passt, und bekommt keine fremde Zeile. Gegen die Datenbank belegen (pgTAP oder roher Client), **nicht** in jsdom. Eigener Nachweis dieses Changes — `anon-anreicherung.test.ts` trägt ihn nicht (dessen Positivliste erfasst weder neue Dateien noch Funktionsaufrufe).
-- [ ] 9.2 Gegenprobe im selben Lauf: ein aktiviertes Konto ab `discover` bekommt mit demselben Begriff Treffer. Ohne sie belegt 9.1 nur, dass die Abfrage nichts liefert.
-- [ ] 9.3 Ausgeloggt belegen, dass `search_directory` mit `42501` abweist — die Tatsache, auf der „ausgeloggt kein Feld" beruht.
+- [x] 9.1 Ein nicht aktiviertes Konto ruft `search_directory` mit einem Begriff auf, der auf mehrere Profile passt, und bekommt keine fremde Zeile. Gegen die Datenbank belegen (pgTAP oder roher Client), **nicht** in jsdom. Eigener Nachweis dieses Changes — `anon-anreicherung.test.ts` trägt ihn nicht (dessen Positivliste erfasst weder neue Dateien noch Funktionsaufrufe).
+- [x] 9.2 Gegenprobe im selben Lauf: ein aktiviertes Konto ab `discover` bekommt mit demselben Begriff Treffer. Ohne sie belegt 9.1 nur, dass die Abfrage nichts liefert.
+- [x] 9.3 Ausgeloggt belegen, dass `search_directory` mit `42501` abweist — die Tatsache, auf der „ausgeloggt kein Feld" beruht.
 
 ## 10. Sichtprobe im Browser
 
-- [ ] 10.1 Angemeldet suchen: Treffer erscheinen, Auswahl öffnet das Profil, Enter landet auf `/mitglieder` mit gefüllter Suche.
-- [ ] 10.2 Auf `/mitglieder` stehend **zweimal hintereinander verschieden** aus der Kopfzeile suchen, danach **denselben** Begriff nach lokalem Tippen erneut — die Fälle, die jsdom nicht sieht und die hier schon einmal grün und kaputt waren.
-- [ ] 10.3 Breiten 320 px, 375 px, 640 px und Desktop über die Geräte-Emulation prüfen (macOS kann kein Fenster unter 500 px): Lupensymbol erscheint, Kopfzeile bricht nicht um, die Liste ist nicht abgeschnitten.
-- [ ] 10.4 Telefon-Fassung öffnen und das Fenster **verbreitern** — sie schließt, die Seite scrollt wieder.
-- [ ] 10.5 Ausgeloggt gegenprüfen: kein Feld, kein Lupensymbol, in allen geprüften Breiten.
-- [ ] 10.6 Mit einem Konto unterhalb `discover` gegenprüfen: Aufstiegs-Hinweis im Dropdown, Enter führt auf `/mitgliedschaft`.
+- [x] 10.1 Angemeldet suchen: Treffer erscheinen, Auswahl öffnet das Profil, Enter landet auf `/mitglieder` mit gefüllter Suche.
+- [x] 10.2 Auf `/mitglieder` stehend **zweimal hintereinander verschieden** aus der Kopfzeile suchen, danach **denselben** Begriff nach lokalem Tippen erneut — die Fälle, die jsdom nicht sieht und die hier schon einmal grün und kaputt waren.
+- [x] 10.3 Breiten 320 px, 375 px, 640 px und Desktop über die Geräte-Emulation prüfen (macOS kann kein Fenster unter 500 px): Lupensymbol erscheint, Kopfzeile bricht nicht um, die Liste ist nicht abgeschnitten.
+- [x] 10.4 Telefon-Fassung öffnen und das Fenster **verbreitern** — sie schließt, die Seite scrollt wieder.
+- [x] 10.5 Ausgeloggt gegenprüfen: kein Feld, kein Lupensymbol, in allen geprüften Breiten.
+- [x] 10.6 Mit einem Konto unterhalb `discover` gegenprüfen: Aufstiegs-Hinweis im Dropdown, Enter führt auf `/mitgliedschaft`.
 
 ## 11. Abschluss
 
@@ -81,6 +81,93 @@
 - [ ] 11.6 Live belegen: Bundle-Name und Größe, plus eine Zeichenkette aus diesem Diff im ausgelieferten Bundle — Größe allein unterscheidet die Vorversion nicht.
 - [ ] 11.7 AGE-540 in Linear: erst `get_issue` lesen, dann die widerlegten Annahmen als Kommentar hinterlassen — das Feld drängt auf dem Telefon nicht (es fehlt dort), „nur öffentliche Profile durchsuchen" ist kein vorhandener Weg, ausgeloggt ist nicht der einzige Leerfall, und Enter unterhalb `discover` kann nicht ins Verzeichnis führen.
 
+
+## Belege zu Gruppe 10 — und die zwei Befunde, die sie gebracht hat
+
+Lokal gegen DEV, Chrome über die Geräte-Emulation. Konten: Maximilian Bauer
+(`impact`) für 10.1–10.4, ausgeloggt für 10.5, Jonas Keller (**`connect`**, also
+unter `discover`) für 10.6.
+
+| Aufgabe | Gemessen |
+|---|---|
+| 10.1 | Liste erscheint; ↓ setzt `aria-activedescendant`, Enter öffnet `/p/…025415`; Enter **ohne** Hervorhebung → `/mitglieder?q=anna`, Verzeichnisfeld gefüllt, „1 Mitglied" |
+| 10.2 | auf `/mitglieder`: „aylin" → `?q=aylin` (Feld + Treffer ziehen nach), direkt danach „julian" → `?q=julian`; dann lokal „sandra" getippt (Adresszeile bleibt `?q=julian` — kein Rückschreiben), **derselbe** Begriff erneut aus der Kopfzeile → Verzeichnis springt von „sandra" auf „julian" zurück |
+| 10.3 | 320 px: Lupe da, Feld weg, kein Überlauf · 375 px: 111 px Reserve · 640 px: Feld da, Lupe weg, Wortmarke zurück · Desktop unverändert (dort trägt die Seitenleiste das Logo). Kopfzeilenhöhe überall 64 px — kein Umbruch |
+| 10.4 | Fassung offen: `body.style.position = fixed`, Fokus im Feld. Nach dem Verbreitern auf 900 px: Fassung zu, `position` leer, Seite scrollt wieder (0 → 200), Lupe weg, Feld zurück |
+| 10.5 | ausgeloggt bei 1280 / 640 / 375 / 320 px: **kein** Feld, **keine** Lupe, kein Überlauf |
+| 10.6 | `connect`-Konto, Suche „anna": 0 Treffer, Hinweis „Das Mitgliederverzeichnis ist ab Discover verfügbar." + „Mitgliedschaft ansehen"; Enter → `/mitgliedschaft` |
+
+**Die Sichtprobe hat zwei Dinge gefunden, die 787 grüne Tests nicht sehen
+konnten.** Beide sind behoben und danach nachgemessen:
+
+**1. Die Lupe sprengte bei 320 px die Kopfzeile.** Gemessen am Inhaltsbedarf der
+Reihe, nicht an `scrollWidth` — der log: bei einer Zwischenvariante meldete er
+„passt" (320), während der Inhalt real 339 px brauchte. Belastbar:
+
+| Zustand | Bedarf bei 320 px |
+|---|---|
+| ohne die neue Lupe | 319 px (1 px Reserve — die Reihe war randvoll) |
+| mit Lupe | **367 px (47 px zu viel)** |
+| engere Abstände (`gap-2` + `px-3`) | 339 px — hätte **nicht** getragen |
+| Wortmarke erst ab `sm` | 264 px (**56 px Reserve**) |
+
+Entscheidung Donald: unter 640 px trägt die Kopfzeile nur die Kompass-Marke,
+darüber das volle Lockup — dieselbe Grenze, an der die Suche ohnehin umschaltet.
+Der Link behält seinen Namen „eff.bee.zee" (über den `title` von `CompassMark`).
+
+Dabei fiel eine zweite Annahme: das übliche `hidden sm:block` **direkt auf dem
+Lockup** trägt hier nicht — dessen Wurzel bringt `inline-flex` mit, und
+gemessen blieb `display` auf `inline-flex` stehen. Die Umschaltung sitzt deshalb
+auf einer Hülle.
+
+**2. Die Trefferliste der Telefon-Fassung war nur so breit wie das Eingabefeld.**
+Sie hing an dessen `relative`-Hülle, die neben „Abbrechen" nur die halbe
+Blattbreite hat: bei 320 px **165 px** Liste, Namen brachen mitten im Wort ab
+(„Beatrice So…", „Christoph S…"), während rechts 126 px frei blieben. Jetzt am
+Blatt bezogen: **286 px**, volle Namen, „Alle Ergebnisse im Verzeichnis" auf
+einer Zeile. Aufgabe 7.4 bleibt erfüllt — die Liste ist weiterhin `absolute`,
+nicht `fixed`; und sie bleibt DOM-Kind des Rahmens, an dem Zeile 158 den
+Klick-außerhalb prüft (Verschachtelung, nicht Positionierung).
+
+**Kein Test dazu.** Beides ist Layout: das eine hängt an einer Media Query, das
+andere an gerechneten Breiten. jsdom kennt weder das eine noch das andere; ein
+Test, der nur Klassennamen abfragt, wäre grün und prüfte nichts. Der Beleg sind
+die Messungen oben.
+
+Nach beiden Eingriffen: **787/787 Tests**, `tsc` sauber, 0 Lint-Fehler.
+
+## Belege zu Gruppe 9
+
+`scripts/probe-9-kopfzeilensuche-rls.ts`, gelaufen gegen DEV
+(`infisical run --env=dev -- npx tsx …`). Zwei Wegwerf-Konten in **einer
+zurückgerollten Transaktion**; kein Schreiben an einer bestehenden Zeile. Das
+Suchwort ist nicht ausgedacht, sondern aus `ts_stat` über die echten
+`search_doc` gezogen: **„demo", in 28 öffentlichen, aktivierten Profilen.**
+
+| Fall | Erwartet | Gemessen |
+|---|---|---|
+| 9.2 aktiviert, `discover` | ≥ 2 fremde Zeilen | ✅ **28** (Anna Müller · Aylin Demir · Basic Demo …) |
+| 9.1 **nicht** aktiviert, `impact` | 0 fremde Zeilen | ✅ **0** |
+| 9.1b dasselbe Konto, Zeilen gesamt | 0 | ✅ **0** — das Gate hält auch die *eigene* Zeile |
+| 9.3 ausgeloggt (Rolle `anon`) | `42501` | ✅ **42501** |
+| Wegwerf-Zeilen nach dem Rollback | 0 | ✅ **0** |
+
+**Warum das unaktivierte Konto auf `impact` steht:** auf `basic` ließe die Null
+zwei Lesarten zu — Stufe oder Aktivierung. Auf der höchsten Stufe bleibt genau
+eine.
+
+**Und warum ein Nullbefund allein nicht gereicht hat.** Vier grüne Fälle im
+ersten Lauf sind hier kein Beleg: ein vertippter Rollenwechsel, eine nicht
+ankommende `sub` oder ein Suchwort ohne Treffer sähen genauso aus. Deshalb der
+nachgezogene Fall **9.1c** — *dasselbe* Konto, *dasselbe* Wort, es wird **nur**
+`activated_at` gesetzt:
+
+| 9.1c nach `update … set activated_at = now()` | ≥ 2 fremde Zeilen | ✅ **28** |
+|---|---|---|
+
+Damit ist die Null aus 9.1 zurechenbar: 0 → 28 bei genau einer geänderten
+Spalte. Zweite, unabhängige Kontrolle im selben Lauf: 9.2 liefert überhaupt
+Zeilen, was ohne funktionierenden Rollenwechsel unmöglich wäre.
 
 ## Belege zu den Gruppen 2-8
 

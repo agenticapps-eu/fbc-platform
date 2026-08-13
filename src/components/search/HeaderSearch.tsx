@@ -300,10 +300,18 @@ export default function HeaderSearch() {
         >
           <div
             ref={overlay}
-            className="mx-auto w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-3 shadow-soft"
+            className="relative mx-auto w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-3 shadow-soft"
           >
             <div className="flex items-center gap-2">
-              <div ref={rahmen} className="relative min-w-0 flex-1">
+              {/* `relative` sitzt hier BEWUSST nicht: sonst bezieht die
+                  Trefferliste ihr `left-0 right-0` auf das Eingabefeld, das
+                  neben „Abbrechen" nur noch die halbe Blattbreite hat — bei
+                  320 px gemessen 165 px, und die Namen brachen mitten im Wort
+                  ab („Beatrice So…"), während rechts 126 px frei blieben. Am
+                  Blatt bezogen nutzt sie dessen volle Breite. Die Liste bleibt
+                  dabei ein DOM-Kind dieses Rahmens — der Klick-außerhalb-Test
+                  in Zeile 158 prüft Verschachtelung, nicht Positionierung. */}
+              <div ref={rahmen} className="min-w-0 flex-1">
                 {kombifeld}
               </div>
               <button
