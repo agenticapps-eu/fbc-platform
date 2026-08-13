@@ -237,15 +237,15 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
 - [x] 6.4 Beide Themes, Telefon und Desktop.
 - [x] 6.5 Diff-Review durch einen unabhängigen Leser (Schritt 4), **auf dem
       Diff**, nicht auf dem Plan.
-- [ ] 6.6 Kein `git add -A`. Der Arbeitsbaum trägt dauerhaft untracked Dateien
+- [x] 6.6 Kein `git add -A`. Der Arbeitsbaum trägt dauerhaft untracked Dateien
       mit 0600, und das Repo ist öffentlich.
-- [ ] 6.7 PR gegen `main`, Conventional Commit mit `(AGE-533)`.
+- [x] 6.7 PR gegen `main`, Conventional Commit mit `(AGE-533)`.
 
 ## 7 · Nach dem Merge (nicht Teil des PR)
 
-- [ ] 7.1 `migrate-dev` läuft automatisch; danach blockt `drift-gate` **jeden**
+- [x] 7.1 `migrate-dev` läuft automatisch; danach blockt `drift-gate` **jeden**
       Deploy, bis `migrate-prod` gelaufen ist. Eingeplant, nicht entdeckt.
-- [ ] 7.2 **Die 0.4-Messung gegen PROD wiederholen**, vor `migrate-prod`:
+- [x] 7.2 **Die 0.4-Messung gegen PROD wiederholen**, vor `migrate-prod`:
       `infisical run --env=prod -- pnpm exec tsx scripts/probe-c9-bestand.ts`.
       DEV-Deckungsgleichheit sagt über den PROD-Korpus nichts — dort können
       Tokenformen und Events ohne Host stehen, die es in DEV nicht gibt.

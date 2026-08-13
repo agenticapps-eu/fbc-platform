@@ -482,6 +482,53 @@ Grund hat.
 **Stand nach der Einarbeitung:** lint 0 Errors · typecheck sauber · **95
 Dateien / 665 Tests** · build grün · pgTAP **408 PASS** · Parität 46/46.
 
+## 7.x — Nach dem Merge
+
+**Gemergt** als `2c165a6` (PR #170, squash). Alle acht Checks auf der HEAD-SHA
+des PR waren grün, bevor gemergt wurde.
+
+Auf `main` danach, wie erwartet und wie im Handoff der Vorsession beschrieben:
+
+```
+migrate-dev      success     ← die Migrationen sind auf DEV angewandt
+drift-gate       failure     ← DEV ist PROD voraus
+deploy           skipped     ← und damit blockiert
+```
+
+### Die Live-Folge, gemessen statt vermutet
+
+DEV **ist** die Datenbank des Live-Frontends. Der Event-Backfill hat dort
+gerade gelaufen:
+
+```
+DEV posts: {"event_posts":9,"oeffentlich":1,"mit_video":2,"gesamt":21}
+```
+
+Das ausgelieferte Frontend ist Vor-C9 und kennt `kind` nicht — es rendert
+`post.body`, und der ist bei Event-Beiträgen leer. **Im Live-Feed stehen damit
+neun leere Karten, eine davon auch für Ausgeloggte.** Kein Datenverlust, keine
+offene Sichtbarkeit — aber sichtbar falsch, bis der Deploy durch ist.
+
+Genau die strukturelle Lücke, die der Handoff vom 13.08. als offene Frage
+notiert hat: `migrate-dev` läuft automatisch, der Deploy desselben Laufs wird
+von `drift-gate` gestoppt, und geschlossen wird das Fenster erst durch eine
+MANUELLE `migrate-prod`-Freigabe.
+
+### Der Dry-Run für `migrate-prod` (Aufgabe 7.2)
+
+Rein lesend gegen **PROD `viwntbodrtqxgmqyxluh`**:
+
+| | PROD |
+|---|---|
+| `posts` gesamt | **0** |
+| `events` gesamt | **0** |
+| Spalten mit echtem Spalten-ACL | keine |
+| `create_post_with_media` | genau eine Signatur |
+
+**Beide Backfills treffen in PROD null Zeilen.** `migrate-prod` ist dort eine
+reine Schemaänderung: zwei Spalten, ein Index, zwei Funktionen, zwei Trigger,
+zwei Policies. Kein Datenrisiko.
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch
