@@ -249,11 +249,11 @@ Entwickelt und getestet wird lokal (`supabase start`) und gegen DEV
       `infisical run --env=prod -- pnpm exec tsx scripts/probe-c9-bestand.ts`.
       DEV-Deckungsgleichheit sagt über den PROD-Korpus nichts — dort können
       Tokenformen und Events ohne Host stehen, die es in DEV nicht gibt.
-- [ ] 7.3 `migrate-prod` erst nach gelesenem Dry-Run dispatchen (`apply` startet
+- [x] 7.3 `migrate-prod` erst nach gelesenem Dry-Run dispatchen (`apply` startet
       direkt hinter `plan`, ohne Reviewer-Regel).
-- [ ] 7.4 Deploy per `gh run rerun --failed`; Live-Beleg an einer **Zeichenkette
+- [x] 7.4 Deploy per `gh run rerun --failed`; Live-Beleg an einer **Zeichenkette
       aus dem Diff**, nicht an der Bundle-Größe.
-- [ ] 7.5 `openspec archive` — Szenario-Titel in MODIFIED-Blöcken unverändert
+- [x] 7.5 `openspec archive` — Szenario-Titel in MODIFIED-Blöcken unverändert
       lassen, sonst bricht das Archivieren.
-- [ ] 7.6 `add-academy-content` (AGE-262) anmerken: sein `## REMOVED`-Block
+- [x] 7.6 `add-academy-content` (AGE-262) anmerken: sein `## REMOVED`-Block
       zeigt danach auf eine Anforderung, die es so nicht mehr gibt.
