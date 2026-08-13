@@ -48,6 +48,37 @@ ist ein **schneller Weg dorthin**.
    richtige Endausbaustufe, kostet aber eine übergreifende Suche über vier
    Tabellen. Für den Go-Live reicht die Mitgliedersuche.
 
+**Was der Plan-Review hinzugefügt hat.** Beide Reviewer gaben
+REQUEST-CHANGES; fünf HIGH-Befunde wurden an der Platte nachgeprüft und
+bestätigt. Sie machen den Change nicht größer im Umfang, aber vollständiger im
+Vertrag:
+
+5. **Enter unterhalb `discover` führt auf die Aufstiegsseite, nicht ins
+   Verzeichnis.** `/mitglieder` liegt hinter `MembershipGate min="discover"`
+   (`nav.ts:78`, `App.tsx:31`) — die Verzeichnisoberfläche entsteht dort gar
+   nicht, der Begriff verschwände in einer Wand. Das ursprüngliche Versprechen
+   war baulich unhaltbar.
+6. **Der leere Fall zerfällt in drei Zustände**, nicht zwei: Fehler ·
+   Stufe zu niedrig · echter Nulltreffer. Ohne den ersten erschiene ein
+   `42501` oder eine abgelaufene Sitzung als „nichts gefunden".
+7. **Suchergebnisse werden an die Identität gebunden.** Es gibt **einen**
+   globalen `QueryClient` (`main.tsx:14`), der nie geleert wird, und
+   `directoryQueryKey` trägt **keine** Nutzerkennung. Als `discover` geholte
+   Treffer könnten einem später angemeldeten `basic`-Konto gezeigt werden. Das
+   Feld auszublenden genügt nicht.
+8. **Das Zustandsmodell der Adresszeile wird ausgeschrieben** — ein Eigentümer,
+   kein Zurückschreiben beim Tippen, Übernahme am Navigationsereignis statt am
+   bloßen Wert, und beim Aufbau mit Parameter **keine** ungefilterte Erstabfrage.
+9. **Escape, Anfangsfokus und Schließen an der Umbruchbreite** gehören
+   ausdrücklich in den Vertrag: `useOverlay` sperrt den Scroll und fängt `Tab` —
+   **mehr nicht** (`useOverlay.ts:113`).
+
+Zwei stille Annahmen sind dabei zu ausgesprochenen Aussagen geworden: es gibt
+**kein Feld für eine Berufsbezeichnung** im Rückgabetyp der RPC (die
+Trefferzeile bildet ihre Einordnung aus `company`/`roles`/`branche`/`short_bio`),
+und es gibt **kein serverseitiges Limit** — „die ersten fünf" heißt
+alphabetisch die ersten fünf aller geladenen Treffer.
+
 **Kein BREAKING**, keine Migration, keine neue RPC.
 
 ## Capabilities
@@ -68,8 +99,12 @@ Einstieg.
 
 **Betroffener Code:**
 
-- `src/components/AppShell.tsx` — das tote `<input>` weicht der neuen
-  Komponente; unter `sm` kommt das Lupensymbol dazu.
+- `src/components/AppShell.tsx` — das tote `<input>` entfällt; `HeaderSearch`
+  entsteht **innerhalb** des `user ? … :`-Zweigs, nicht an der Stelle des toten
+  Feldes. Ein reines „ersetzen" hätte die Komponente dort gelassen, wo das tote
+  Feld steht — außerhalb dieses Zweigs, also für Ausgeloggte sichtbar und im
+  Widerspruch zur eigenen Anforderung dieses Changes. Unter `sm` kommt das
+  Lupensymbol dazu.
 - **neu** `src/components/search/HeaderSearch.tsx` (+ Test) — Eingabe, Entprellung,
   Dropdown, Tastatur, Zustände.
 - `src/components/community/MemberDirectory.tsx` — nimmt einen Suchbegriff aus
@@ -77,8 +112,11 @@ Einstieg.
   `useState(wert)` übernimmt einen Wert nicht, der erst nach dem Mounten
   eintrifft — genau der Fall, wenn man auf `/mitglieder` steht und aus der
   Kopfzeile erneut sucht.
-- `src/lib/directory.ts` — höchstens eine dünne Funktion für „die ersten N
-  Treffer zu einem Begriff"; die RPC und `filtersToArgs` bleiben unangetastet.
+- `src/lib/directory.ts` — eine dünne Funktion für „die ersten N Treffer zu
+  einem Begriff" **mit eigenem, nach Konto getrenntem Zwischenspeicher-Schlüssel**;
+  die RPC und `filtersToArgs` bleiben unangetastet. Ein gekürztes Ergebnis unter
+  `directoryQueryKey` abzulegen vergiftete den Zwischenspeicher des vollen
+  Verzeichnisses.
 
 **Nicht betroffen:** keine Migration, keine RPC, keine Policy, keine Edge
 Function. Die Sichtbarkeitsgrenze bleibt exakt, wo sie ist.
@@ -92,3 +130,14 @@ den Aufstiegs-Hinweis, `Avatar` und `TierBadge`.
 ihre **Preisgabe** — dieselbe RPC, dieselbe RLS, dieselben Zeilen. Das
 Aktivierungs-Gate (`20260806080100`) trägt bereits über alle drei Flächen; was
 fehlt, ist der Nachweis, nicht die Sperre. Er gehört in die Abnahme.
+
+Mit **einer** Ausnahme, die der Plan-Review gefunden hat: der Zwischenspeicher
+ist heute kontenübergreifend. Das ist eine bestehende Lücke (AGE-258, geführt in
+`finish-ui-polish`), aber dieser Change legt einen neuen Weg hinein und schließt
+sie deshalb **für den hier gebauten Einstieg**. Für das übrige Verzeichnis bleibt
+sie offen — benannt, nicht stillschweigend mitgenommen.
+
+**Eigener Nachweis statt geerbter Zusage:** Ein früherer Stand berief sich für
+„ausgeloggt findet niemand etwas" auf `anon-anreicherung.test.ts`. Dessen
+Positivliste erfasst nur die dort aufgerufenen Lesepfade und **keine
+Funktionsaufrufe** — dieser Change bringt seinen eigenen negativen Test mit.
