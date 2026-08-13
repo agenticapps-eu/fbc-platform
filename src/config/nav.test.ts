@@ -66,13 +66,17 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     expect(mitglieder?.minTier).toBe("discover");
   });
 
-  /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese vier Routen
+  /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese Routen
      verlieren ihren Menüeintrag und bleiben als `sub` geroutet: wer den Link
-     kennt, darf die Seite sehen, und das Zurückholen ist eine Zeile. */
+     kennt, darf die Seite sehen, und das Zurückholen ist eine Zeile.
+
+     `/meine-kurse` stand hier bis AGE-533 und ist jetzt raus — nicht weil die
+     Regel nicht mehr gilt, sondern weil die Seite gelöscht ist: „Meine Academy"
+     ist an ihre Stelle getreten. Der Pfad wird umgeleitet, was der Test
+     darunter prüft. */
   it.each([
     ["/kompass", "Kompass"],
     ["/mitgliedschaft", "Mitgliedschaft"],
-    ["/meine-kurse", "Meine Kurse"],
     ["/kontakte", "Meine Kontakte"],
   ])("blendet %s aus dem Menü aus, hält die Route aber erreichbar", (pfad) => {
     const item = navItems.find((i) => i.path === pfad);

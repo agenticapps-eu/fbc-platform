@@ -148,7 +148,17 @@ export function MemberDashboard({ uid }: { uid: string }) {
                           {post.author.tier && <TierBadge tier={post.author.tier} />}
                         </div>
                       </header>
-                      <p className="line-clamp-2 text-sm text-ink/90">{post.body}</p>
+                      {/* Ein Event-Beitrag traegt einen LEEREN Body (AGE-533) — ohne
+                          diese Unterscheidung stuende hier eine Karte ohne Text.
+                          Titel und Datum kommen zur Laufzeit aus `events`. */}
+                      {post.kind === "event" && post.event ? (
+                        <p className="line-clamp-2 text-sm text-ink/90">
+                          Neues Event: {post.event.title}
+                          {post.event.startsAt && <> · {formatEventDate(post.event.startsAt)}</>}
+                        </p>
+                      ) : (
+                        <p className="line-clamp-2 text-sm text-ink/90">{post.body}</p>
+                      )}
                     </Card>
                   </li>
                 );

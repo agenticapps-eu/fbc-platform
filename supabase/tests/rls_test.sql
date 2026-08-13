@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(342);
+select plan(388);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2478,6 +2478,430 @@ select is(
 select is(
   has_function_privilege('anon', 'public.event_cover_lesbar(text)', 'execute'),
   true, 'event_cover_lesbar: anon MUSS sie aufrufen dürfen, sonst trägt die SELECT-Policy nicht');
+
+-- ── 21. Academy aus geteilten Videos: `posts.video_url` (AGE-533, C9) ───────
+-- Die Spalte trägt die Academy: sie ist der Filter („Beiträge mit Video") und
+-- über den partiellen Index zugleich die Sortierung.
+--
+-- Was dieser Abschnitt belegt, und warum jede Zeile davon nötig ist:
+--
+--  1. Der Wert wird in der DATENBANK abgeleitet, nicht im Client. Der erste
+--     Entwurf ließ den Client rechnen und versprach, `video_url` und das
+--     gerenderte Embed könnten deshalb nicht auseinanderlaufen. Die Zusage war
+--     nicht durchsetzbar (Plan-Review codex, HIGH): `posts_write_own` erlaubt
+--     `authenticated` INSERT und UPDATE direkt auf `posts`. 21.9–21.12 prüfen
+--     genau das — ein selbst gesetzter Wert überlebt den Trigger nicht.
+--  2. `erste_video_url` akzeptiert GENAU, was `parseVideoUrl` akzeptiert
+--     (src/lib/feed.ts). Zwei Fehler des Entwurfs hat der Review hier gefunden:
+--     `~` ist case-sensitive, während der TS-Parser den Host kleinschreibt
+--     (21.7) — und die Host-Grenze muss verankert sein, sonst kommt
+--     `youtube.com.boese.example` durch (21.8).
+--  3. `youtube-nocookie` steht bewusst NICHT in der Liste: `parseVideoUrl`
+--     kennt den Host nicht. Ihn nur in SQL zu ergänzen wäre genau die Drift,
+--     gegen die der ganze Abschnitt antritt.
+
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000a1', 'authenticated', 'authenticated', 'c9autor@test.fbc');
+
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000a1';
+
+-- 21.1/21.2 Spalte und Index. Der Index ist PARTIELL und über
+-- (created_at desc, id desc) — er trägt Filter und Sortierung in einem; ein
+-- Index auf `video_url` allein trüge die Sortierung nicht.
+select has_column('public', 'posts', 'video_url',
+  'posts trägt video_url');
+
+select is(
+  (select count(*)::int from pg_indexes
+    where schemaname = 'public' and indexname = 'posts_video_url_idx'
+      -- `indexdef` gibt Schlüsselwörter GROSS zurück, und `like` ist
+      -- case-sensitiv. Beides zusammen hat diese Behauptung erst rot gemeldet,
+      -- obwohl der Index richtig stand.
+      and indexdef like '%WHERE (video_url IS NOT NULL)%'
+      and indexdef like '%(created_at DESC, id DESC)%'),
+  1, 'posts_video_url_idx besteht, ist partiell und trägt die Sortierung');
+
+-- 21.3–21.6 Die akzeptierten Formen, je eine Familie.
+select is(
+  public.erste_video_url('Schau mal https://www.youtube.com/watch?v=Ks-_Mh1QhMc an'),
+  'https://www.youtube.com/watch?v=Ks-_Mh1QhMc',
+  'erste_video_url: youtube.com/watch mit www.');
+
+select is(
+  public.erste_video_url('https://m.youtube.com/watch?feature=x&v=AiOz1vDMjr0&list=RD'),
+  'https://m.youtube.com/watch?feature=x&v=AiOz1vDMjr0&list=RD',
+  '… m.youtube.com, v hinter einem anderen Parameter, weitere Parameter dahinter');
+
+select is(
+  public.erste_video_url('http://youtu.be/abc_123-x?t=30'),
+  'http://youtu.be/abc_123-x?t=30',
+  '… youtu.be mit http und Query — new URL() hält den Query aus dem Pfad heraus');
+
+select is(
+  public.erste_video_url('https://player.vimeo.com/video/76979871 und https://vimeo.com/1'),
+  'https://player.vimeo.com/video/76979871',
+  '… player.vimeo.com, und bei zwei Videos gewinnt das erste');
+
+-- 21.7 Der Fehler des Entwurfs: `~` statt `~*`. `parseVideoUrl` schreibt den
+-- Host klein (feed.ts:165), akzeptiert diese URL also — eine case-sensitive
+-- Prüfung hätte sie abgelehnt und den Beitrag aus der Academy gehalten.
+select is(
+  public.erste_video_url('https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc'),
+  'https://WWW.YouTube.com/watch?v=Ks-_Mh1QhMc',
+  'erste_video_url: Großschreibung im Host wird akzeptiert (~*, nicht ~)');
+
+-- 21.8 Der Präfix-Angriff. Ein `like 'https://youtube.com%'` ließe ihn durch,
+-- und in `video_url` stünde ein Wert, den VideoEmbed nicht einbettet.
+select is(
+  public.erste_video_url('https://youtube.com.boese.example/watch?v=x'),
+  null,
+  'erste_video_url: erlaubtes Präfix, fremder Host — abgelehnt');
+
+select is(
+  public.erste_video_url('https://vimeo.com/keinezahl'),
+  null,
+  'erste_video_url: vimeo verlangt eine Zahl');
+
+select is(
+  public.erste_video_url('Ein Satz ganz ohne Link.'),
+  null,
+  'erste_video_url: kein Link, kein Wert');
+
+-- Satzzeichen am Linkende gehören zum Satz, nicht zur URL — dieselbe Regel wie
+-- in tokenizePostBody (TRAILING_PUNCT).
+select is(
+  public.erste_video_url('Sehenswert: https://youtu.be/abc123.'),
+  'https://youtu.be/abc123',
+  'erste_video_url: nachgestellter Punkt gehört nicht zur URL');
+
+-- 21.9–21.12 Der Trigger. Das ist der Kern: die Ableitung ist nicht fälschbar.
+insert into public.posts (id, author_id, body, video_url) values
+  ('c9000001-0000-4000-8000-000000000001',
+   'c9c9c9c9-0000-0000-0000-0000000000a1',
+   'Dieser Beitrag hat gar keinen Link.',
+   'https://youtu.be/GEFAELSCHT');
+
+select is(
+  (select video_url from public.posts where id = 'c9000001-0000-4000-8000-000000000001'),
+  null,
+  'Trigger: ein von Hand gesetzter Wert überlebt den INSERT nicht');
+
+insert into public.posts (id, author_id, body) values
+  ('c9000002-0000-4000-8000-000000000002',
+   'c9c9c9c9-0000-0000-0000-0000000000a1',
+   'Mein Vortrag: https://vimeo.com/76979871');
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://vimeo.com/76979871',
+  'Trigger: aus dem Body abgeleitet, ohne dass der Client etwas mitschickt');
+
+update public.posts set body = 'Doch lieber https://youtu.be/neuervideo'
+ where id = 'c9000002-0000-4000-8000-000000000002';
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://youtu.be/neuervideo',
+  'Trigger: ein geänderter Body rechnet neu');
+
+-- Der Grund, warum der Trigger auf JEDEM Update sitzt und nicht auf
+-- `update of body`: sonst käme genau dieser Schreibzugriff an ihm vorbei.
+update public.posts set video_url = 'https://youtu.be/GEFAELSCHT'
+ where id = 'c9000002-0000-4000-8000-000000000002';
+
+select is(
+  (select video_url from public.posts where id = 'c9000002-0000-4000-8000-000000000002'),
+  'https://youtu.be/neuervideo',
+  'Trigger: ein UPDATE nur auf video_url wird überschrieben (kein `update of body`)');
+
+-- 21.13/21.14 Rechte. Eine neue Funktion ist per Voreinstellung für PUBLIC
+-- ausführbar; ohne `revoke` wäre das eine stille Rechteausweitung (Befund
+-- codex, MEDIUM). Der Trigger ruft sie als Definer, niemand sonst braucht sie.
+select is(
+  has_function_privilege('anon', 'public.erste_video_url(text)', 'execute'),
+  false, 'erste_video_url: anon darf sie nicht aufrufen');
+
+select is(
+  has_function_privilege('authenticated', 'public.erste_video_url(text)', 'execute'),
+  false, '… authenticated auch nicht — sie ist Innerei des Triggers, keine API');
+
+-- ── 22. Events weben sich in den Feed: `posts.kind`/`ref_id` (AGE-533, C9) ──
+-- Ein Event kündigt sich selbst im Feed an. Der Beitrag speichert dabei KEINEN
+-- Event-Inhalt — kein Titel, kein Datum, kein Bild —, sondern nur `kind`,
+-- `ref_id` und einen leeren Body; die Darstellung joint zur Laufzeit.
+--
+-- Drei Dinge, die dieser Abschnitt belegt und die der Plan-Review erzwungen hat:
+--
+--  1. **Event-Beiträge sind systemverwaltet** (codex, SEVERITY HIGH). Der Host
+--     IST der Autor seines Event-Beitrags, und `posts_write_own` galt `for all`
+--     auf `author_id = auth.uid()`. Er konnte den Beitrag also löschen, auf
+--     `kind='member'` umschreiben oder die vom Trigger gesetzte Sichtbarkeit
+--     danach wieder ändern — Eindeutigkeit und Spiegelung galten nur zufällig.
+--     22.10–22.13 prüfen jede dieser vier Umgehungen einzeln.
+--  2. **Der Lebenszyklus von `host_id`**, nicht nur `visibility` (codex MEDIUM
+--     und opencode HIGH, unabhängig voneinander). Vier Übergänge, vier Fälle:
+--     22.6–22.9.
+--  3. **Das Aktivierungs-Gate greift auch hier** (C3/AGE-495), und der
+--     gespiegelte Beitrag ist STRENGER als sein Event: `events` sieht jedes
+--     bestätigte Konto, `members`-Posts erst ab Rang 4. 22.16 hält beides fest,
+--     damit eine spätere Änderung eine Entscheidung ist und kein Unfall.
+
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated', 'c9host1@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b2', 'authenticated', 'authenticated', 'c9host2@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b3', 'authenticated', 'authenticated', 'c9rang1@test.fbc'),
+  ('c9c9c9c9-0000-0000-0000-0000000000b4', 'authenticated', 'authenticated', 'c9unbest@test.fbc');
+
+update public.profiles set tier = 'impact', activated_at = now()
+ where id::text like 'c9c9c9c9-0000-0000-0000-0000000000b%';
+-- Rang 1: sieht `members`-EVENTS, aber keine `members`-POSTS. Genau die
+-- Asymmetrie, die 22.16 festhält.
+update public.profiles set tier = 'basic'
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b3';
+-- Bestätigt-Flag weg, Stufe bewusst `impact`: dahinter steht kein Stufen-Gate
+-- mehr, das einen Fehler noch auffinge (wie in §13/§20).
+update public.profiles set activated_at = null
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b4';
+
+-- 22.1/22.2 Die zwei Spalten.
+select has_column('public', 'posts', 'kind', 'posts trägt kind');
+select has_column('public', 'posts', 'ref_id', 'posts trägt ref_id');
+
+-- 22.3 Der Fremdschlüssel trägt den AUSGESCHRIEBENEN Namen: der Client nennt
+-- ihn in der PostgREST-Einbettung, ein generierter Name wäre eine stille
+-- Kopplung (offene Annahme aus dem Plan-Review).
+select is(
+  (select count(*)::int from pg_constraint
+    where conname = 'posts_ref_id_fkey'
+      and conrelid = 'public.posts'::regclass
+      and confdeltype = 'c'),
+  1, 'posts_ref_id_fkey heißt so und kaskadiert beim Löschen');
+
+-- 22.4 Anlegen erzeugt GENAU EINEN Beitrag, ohne Event-Inhalt.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00001-0000-4000-8000-000000000001', 'C9 Öffentliches Event',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '7 days');
+
+select results_eq(
+  $$select kind, body, visibility, author_id::text
+      from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$,
+  $$values ('event', '', 'public', 'c9c9c9c9-0000-0000-0000-0000000000b1')$$,
+  'Ein neues Event erzeugt einen Beitrag: kind=event, LEERER Body, Sichtbarkeit und Host übernommen');
+
+-- 22.5 Sichtbarkeit zieht nach.
+update public.events set visibility = 'members'
+ where id = 'c9e00001-0000-4000-8000-000000000001';
+
+select is(
+  (select visibility from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'),
+  'members', 'Eine spätere Sichtbarkeitsänderung zieht den Beitrag nach');
+
+-- 22.6–22.9 Der Lebenszyklus von host_id, alle vier Übergänge.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00002-0000-4000-8000-000000000002', 'C9 Event ohne Host',
+   null, 'public', now() + interval '8 days');
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  0, 'Ein Event OHNE Host legt an und erzeugt keinen Beitrag (posts.author_id ist not null)');
+
+update public.events set host_id = 'c9c9c9c9-0000-0000-0000-0000000000b1'
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select author_id::text from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  'c9c9c9c9-0000-0000-0000-0000000000b1',
+  'null→Host: der fehlende Beitrag entsteht jetzt');
+
+update public.events set host_id = 'c9c9c9c9-0000-0000-0000-0000000000b2'
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select author_id::text from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  'c9c9c9c9-0000-0000-0000-0000000000b2',
+  'Host→Host: author_id zieht nach');
+
+update public.events set host_id = null
+ where id = 'c9e00002-0000-4000-8000-000000000002';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00002-0000-4000-8000-000000000002'),
+  0, 'Host→null: der Beitrag wird entfernt — es gäbe niemanden, dem er gehört');
+
+-- 22.10 Die Kaskade beim Löschen des Events.
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00003-0000-4000-8000-000000000003', 'C9 Wegwerf-Event',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '9 days');
+delete from public.events where id = 'c9e00003-0000-4000-8000-000000000003';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00003-0000-4000-8000-000000000003'),
+  0, 'Ein gelöschtes Event nimmt seinen Beitrag mit (on delete cascade)');
+
+-- 22.11 Zwei Beiträge zu EINEM Event sind unmöglich — sonst stünde derselbe
+-- Eintrag doppelt im Feed, sobald ein Trigger zweimal liefe.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.posts (author_id, body, visibility, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b1', '', 'public', 'event',
+              'c9e00001-0000-4000-8000-000000000001')$$),
+  'DENIED:%', 'Ein zweiter Beitrag zu demselben Event wird abgelehnt');
+
+-- 22.12 Die zwei Spalten müssen zusammenpassen.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.posts (author_id, body, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b1', 'x', 'member',
+              'c9e00001-0000-4000-8000-000000000001')$$),
+  'DENIED:%', 'kind=member mit ref_id wird abgelehnt');
+
+-- ── Die vier Umgehungen (codex, HIGH) ──────────────────────────────────────
+-- 22.13 Ein Mitglied legt keinen Event-Beitrag an.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$insert into public.posts (author_id, body, visibility, kind, ref_id)
+      values ('c9c9c9c9-0000-0000-0000-0000000000b3', '', 'public', 'event',
+              'c9e00002-0000-4000-8000-000000000002')$$),
+  'DENIED:%', 'Ein Mitglied kann keinen kind=event-Beitrag anlegen');
+
+-- 22.14 Der HOST kann seinen eigenen Event-Beitrag nicht löschen — obwohl er
+-- dessen Autor ist. Das ist der Kern des Befunds: `posts_write_own` hing allein
+-- an der Autorschaft.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with weg as (
+        delete from public.posts
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from weg$$),
+  0, 'Der Host löscht seinen Event-Beitrag NICHT (die Policy lässt keine Zeile durch)');
+
+-- 22.15 … und schreibt ihn auch nicht auf `member` um.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with u as (
+        update public.posts set kind = 'member', ref_id = null
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from u$$),
+  0, 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
+
+-- 22.16 … und dreht die gespiegelte Sichtbarkeit nicht zurück.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$with u as (
+        update public.posts set visibility = 'public'
+         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
+      select count(*)::int from u$$),
+  0, 'Der Host dreht die vom Trigger gesetzte Sichtbarkeit nicht zurück');
+
+select is(
+  (select visibility from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'),
+  'members', '… die Zeile trägt danach unverändert members');
+
+-- ── Sichtbarkeit des Event-Beitrags ────────────────────────────────────────
+-- 22.17 Das Aktivierungs-Gate aus C3 greift auch auf den neuen Beiträgen.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b4',
+    $$select count(*)::int from public.posts where kind = 'event'$$),
+  0, 'Eingeloggt, aber NICHT aktiviert: kein einziger Event-Beitrag');
+
+-- 22.18 Ausgeloggt: der Beitrag eines members-Events kommt nicht zurück.
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  0, 'Ausgeloggt ist der Beitrag eines members-Events unsichtbar');
+
+-- 22.19 Die benannte Asymmetrie, in einem Paar gemessen: Rang 1 sieht das
+-- EVENT, aber nicht seinen Feed-Beitrag. Die Richtung ist die ungefährliche
+-- (strenger, nicht undichter) — unbenannt wäre sie ein Rätsel.
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$select count(*)::int from public.events
+       where id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  1, 'Rang 1 sieht das members-EVENT …');
+
+select is(
+  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  0, '… aber NICHT seinen Feed-Beitrag (members-Posts erst ab Rang 4)');
+
+-- 22.20 Die asymmetrische Kaskade, gepint statt nur beschrieben (opencode, LOW):
+-- ein gelöschtes Host-Profil nimmt den BEITRAG mit, das EVENT bleibt.
+insert into auth.users (id, aud, role, email) values
+  ('c9c9c9c9-0000-0000-0000-0000000000b5', 'authenticated', 'authenticated', 'c9weg@test.fbc');
+update public.profiles set tier = 'impact', activated_at = now()
+ where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00004-0000-4000-8000-000000000004', 'C9 Event eines verschwundenen Hosts',
+   'c9c9c9c9-0000-0000-0000-0000000000b5', 'public', now() + interval '10 days');
+delete from auth.users where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00004-0000-4000-8000-000000000004'),
+  0, 'Host-Profil gelöscht: sein Event-Beitrag fällt über posts.author_id …');
+
+select is(
+  (select count(*)::int from public.events where id = 'c9e00004-0000-4000-8000-000000000004'),
+  1, '… das Event bleibt (events.host_id ist on delete set null). Hingenommen, nicht übersehen');
+
+-- 22.21 Der Host haengt seinem Event-Beitrag KEINE Bilder an.
+--
+-- Befund aus dem Diff-Review (opencode, MEDIUM). Das Engerfassen von
+-- `posts_write_own` reichte dafuer NICHT: `post_media_insert_own` ist eine
+-- eigene Policy und haengt allein an der Autorschaft — und der Host ist der
+-- Autor. Die Zusage „ein Event-Beitrag traegt niemals post_media" stand in der
+-- Migration, bevor sie wahr war.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.post_media (post_id, storage_path, sort, width, height)
+      select id, 'c9c9c9c9-0000-0000-0000-0000000000b1/x.webp', 0, 100, 100
+        from public.posts where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  'DENIED:%', 'Der Host haengt seinem Event-Beitrag kein Bild an');
+
+-- Gegenprobe: an seinem eigenen MITGLIEDS-Beitrag geht es weiterhin. Ohne sie
+-- waere die Behauptung darueber auch dann gruen, wenn die Policy alles ablehnt.
+insert into public.posts (id, author_id, body, visibility, kind)
+values ('c9000010-0000-4000-8000-000000000010',
+        'c9c9c9c9-0000-0000-0000-0000000000b1', 'Mit Bild', 'public', 'member');
+
+select is(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$insert into public.post_media (post_id, storage_path, sort, width, height)
+      values ('c9000010-0000-4000-8000-000000000010',
+              'c9c9c9c9-0000-0000-0000-0000000000b1/y.webp', 0, 100, 100)$$),
+  'OK', '… an seinem eigenen Mitglieds-Beitrag aber schon');
+
+-- 22.22 Ausgeloggt: ein OEFFENTLICHES Event ist im Feed sichtbar — Beitrag UND
+-- Event. 22.18 deckt nur den members-Fall ab; ohne diesen hier waere unbemerkt,
+-- ob die Einbettung fuer anon ueberhaupt etwas liefert (Frage aus dem
+-- Diff-Review, opencode).
+insert into public.events (id, title, host_id, visibility, starts_at) values
+  ('c9e00005-0000-4000-8000-000000000005', 'C9 Oeffentlich fuer anon',
+   'c9c9c9c9-0000-0000-0000-0000000000b1', 'public', now() + interval '11 days');
+
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.posts
+       where ref_id = 'c9e00005-0000-4000-8000-000000000005'$$),
+  1, 'Ausgeloggt ist der Beitrag eines public-Events sichtbar …');
+
+select is(
+  pg_temp.count_as_anon(
+    $$select count(*)::int from public.events
+       where id = 'c9e00005-0000-4000-8000-000000000005'$$),
+  1, '… und das Event dazu, sonst haette die Karte nichts zu joinen');
+
+-- 22.23 Rechte an der Trigger-Funktion. Wie in §21: ohne `revoke` wäre eine
+-- neue Funktion für PUBLIC ausführbar.
+select is(
+  has_function_privilege('anon', 'public.event_feed_post_sync()', 'execute'),
+  false, 'event_feed_post_sync: anon darf sie nicht aufrufen');
+
+select is(
+  has_function_privilege('authenticated', 'public.event_feed_post_sync()', 'execute'),
+  false, '… authenticated auch nicht — sie ist Innerei der Trigger');
 
 select * from finish();
 rollback;

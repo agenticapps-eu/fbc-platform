@@ -1016,6 +1016,9 @@ export type Database = {
           created_at: string;
           hashtags: string[] | null;
           id: string;
+          kind: string;
+          ref_id: string | null;
+          video_url: string | null;
           visibility: string;
         };
         Insert: {
@@ -1024,6 +1027,9 @@ export type Database = {
           created_at?: string;
           hashtags?: string[] | null;
           id?: string;
+          kind?: string;
+          ref_id?: string | null;
+          video_url?: string | null;
           visibility?: string;
         };
         Update: {
@@ -1032,6 +1038,9 @@ export type Database = {
           created_at?: string;
           hashtags?: string[] | null;
           id?: string;
+          kind?: string;
+          ref_id?: string | null;
+          video_url?: string | null;
           visibility?: string;
         };
         Relationships: [
@@ -1047,6 +1056,13 @@ export type Database = {
             columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "posts_ref_id_fkey";
+            columns: ["ref_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
             referencedColumns: ["id"];
           },
         ];

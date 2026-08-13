@@ -83,6 +83,11 @@ function AppInner() {
             um, damit direkte Links/Lesezeichen nicht ins Leere laufen. Reversibel:
             navItem zurück + diese Redirects entfernen. */}
         <Route path="/meine-chancen" element={<Navigate to="/" replace />} />
+        {/* AGE-533: „Meine Kurse" ist gelöscht — „Meine Academy" ist als
+            Reiter an ihre Stelle getreten. Anders als bei /meine-chancen
+            führt der Redirect NICHT auf die Startseite, sondern dorthin,
+            wo der Inhalt jetzt steht. */}
+        <Route path="/meine-kurse" element={<Navigate to="/academy" replace />} />
         <Route path="/matching" element={<Navigate to="/" replace />} />
         <Route path="/community" element={<Navigate to="/aktivitaet" replace />} />
         <Route path="/verzeichnis" element={<Navigate to="/mitglieder" replace />} />

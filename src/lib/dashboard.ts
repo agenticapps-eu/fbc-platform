@@ -260,6 +260,10 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
       .from("posts")
       .select("id, body, hashtags, created_at, visibility")
       .eq("author_id", uid)
+      // Nur Mitgliedsbeitraege (AGE-533): ein Event-Beitrag traegt einen leeren
+      // Body und erschiene hier als leere Karte — und wuerde bei `limit(4)`
+      // einen echten Beitrag verdraengen.
+      .eq("kind", "member")
       .order("created_at", { ascending: false })
       .limit(4),
     supabase

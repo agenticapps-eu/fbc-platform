@@ -45,13 +45,6 @@ export const FORMAT_HERO: Record<string, FormatHeroMeta> = {
     claim: "Deine Verbindungen im Club.",
     image: "/images/hero-kontakte.webp",
   },
-  "/meine-kurse": {
-    title: "Meine Kurse",
-    claim: "Dein Lernpfad in der Academy.",
-    // Bewusst dasselbe Motiv wie /academy: die Seite ist die persönliche Sicht
-    // auf denselben Inhalt, ein fremdes Motiv würde eine zweite Welt suggerieren.
-    image: "/images/hero-academy.webp",
-  },
   "/mitgliedschaft": {
     title: "Mitgliedschaft",
     claim: "Deine Stufe und was sie öffnet.",

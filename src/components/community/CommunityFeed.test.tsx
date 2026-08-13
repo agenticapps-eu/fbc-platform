@@ -33,6 +33,9 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
+    videoUrl: null,
+    kind: "member",
+    event: null,
     media: [],
     ...overrides,
   };

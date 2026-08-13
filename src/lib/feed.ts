@@ -3,6 +3,7 @@ import { captureException } from "@sentry/react";
 import { type Json } from "./database.types";
 import { type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
+import { tokenizePostBody } from "./video-url";
 
 /**
  * Community-Feed (AGE-250) — Datenschicht. Spec: docs/community-events-spec.md §1.
@@ -26,6 +27,16 @@ import { supabase } from "./supabase";
 /** Spiegelt `posts_visibility_check` (20260715150000_six_level_model.sql:265). */
 export type PostVisibility = "public" | "members";
 
+/**
+ * Spiegelt `posts_kind_check` (20260813100000). Bewusst eine geschlossene Menge
+ * und nicht `string`, obwohl der Typgenerator für eine `text`-Spalte `string`
+ * liefert: die Feed-Liste verzweigt auf diesen Wert, und eine dritte Ausprägung
+ * soll beim Übersetzen auffallen statt still als Mitgliedsbeitrag zu erscheinen
+ * (Befund opencode im Diff-Review, LOW). Verengt wird an der Grenze, in
+ * `fetchFeed`.
+ */
+export type PostKind = "member" | "event";
+
 export interface FeedAuthor {
   id: string;
   name: string;
@@ -43,6 +54,22 @@ export interface FeedMedia {
   height: number;
 }
 
+/**
+ * Das bezogene Event eines Beitrags mit `kind = 'event'` (AGE-533).
+ *
+ * Diese Felder stehen NICHT am Beitrag — sie kommen bei jedem Abruf frisch aus
+ * `events`. Genau darin liegt die Zusage: ein umbenanntes Event ändert die
+ * Feed-Darstellung sofort, ohne dass irgendwo etwas nachgezogen wird.
+ */
+export interface FeedEvent {
+  id: string;
+  title: string;
+  startsAt: string | null;
+  location: string | null;
+  /** Pfad im PRIVATEN Bucket `event-covers`, keine URL — siehe event-cover.ts. */
+  coverPath: string | null;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -54,6 +81,24 @@ export interface FeedPost {
   commentCount: number;
   likedByMe: boolean;
   media: FeedMedia[];
+  /**
+   * Erste einbettbare Video-URL des Beitrags — aus der Spalte `posts.video_url`,
+   * die ein Trigger aus dem Body ableitet (AGE-533, 20260813090000).
+   *
+   * Die Karte bettet DIESEN Wert ein und parst den Body nicht erneut. Sonst
+   * gäbe es zwei Quellen fürs Rendern, und die Academy (die über die Spalte
+   * filtert) könnte Beiträge zeigen, deren Karte etwas anderes einbettet.
+   */
+  videoUrl: string | null;
+  /** `member` (Default) oder `event` — ein vom Trigger erzeugter Event-Beitrag. */
+  kind: PostKind;
+  /**
+   * Das bezogene Event, zur Laufzeit gejoint. `null` heißt eines von zwei
+   * Dingen: gewöhnlicher Beitrag, oder das Event ist für den Betrachter nicht
+   * lesbar (die RLS von `events` wertet die Einbettung selbst aus). Im zweiten
+   * Fall entfällt die Karte, statt leer zu erscheinen.
+   */
+  event: FeedEvent | null;
 }
 
 export interface FeedComment {
@@ -64,71 +109,25 @@ export interface FeedComment {
   createdAt: string;
 }
 
-export interface PostSegment {
-  type: "text" | "hashtag" | "mention" | "url";
-  /** Hashtag/Mention ohne Präfix (Hashtag klein normalisiert); sonst der rohe Text. */
-  value: string;
-  /** Das exakt erkannte Stück (inkl. #/@), für die Anzeige. */
-  raw: string;
-}
-
 // ── reine Helfer (getestet) ─────────────────────────────────────────────────
 
-// Hashtag/Erwähnung nur am Wortanfang (Start oder nach Whitespace), damit
-// "C#programming" oder eine E-Mail keine Fehltreffer erzeugen. URLs überall.
-const TOKEN_RE = /(?<=^|\s)[#@][\p{L}\p{N}_]+|https?:\/\/[^\s]+/gu;
-// Satzzeichen am URL-Ende gehören zum Satz, nicht zum Link. Klammern/eckige
-// Klammern bewusst NICHT abtrennen — sie kommen in echten URLs vor (z. B.
-// Wikipedia `/wiki/Foo_(bar)`); sie hier zu strippen würde solche Links zerreißen.
-const TRAILING_PUNCT = /[.,;:!?»"']+$/;
-
-function normalizeTag(tag: string): string {
-  return tag.toLowerCase();
-}
-
-/** Zerlegt den Beitragstext in geordnete Segmente (Text/Hashtag/Erwähnung/URL). */
-export function tokenizePostBody(body: string): PostSegment[] {
-  const segments: PostSegment[] = [];
-  const re = new RegExp(TOKEN_RE);
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body)) !== null) {
-    let matched = m[0];
-    const start = m.index;
-
-    // URL: nachgestellte Satzzeichen abtrennen (wandern zurück in den Text).
-    let trailing = "";
-    if (matched.startsWith("http")) {
-      const t = TRAILING_PUNCT.exec(matched);
-      if (t) {
-        trailing = t[0];
-        matched = matched.slice(0, -trailing.length);
-      }
-    }
-
-    if (start > last) {
-      const text = body.slice(last, start);
-      segments.push({ type: "text", value: text, raw: text });
-    }
-    if (matched.startsWith("#")) {
-      segments.push({ type: "hashtag", value: normalizeTag(matched.slice(1)), raw: matched });
-    } else if (matched.startsWith("@")) {
-      segments.push({ type: "mention", value: matched.slice(1), raw: matched });
-    } else {
-      segments.push({ type: "url", value: matched, raw: matched });
-    }
-    last = start + matched.length;
-    if (trailing) {
-      segments.push({ type: "text", value: trailing, raw: trailing });
-      last += trailing.length;
-    }
-  }
-  if (last < body.length) {
-    const text = body.slice(last);
-    segments.push({ type: "text", value: text, raw: text });
-  }
-  return segments;
-}
+/**
+ * Textzerlegung und Video-Erkennung liegen seit AGE-533 in `./video-url` und
+ * werden hier unverändert weitergereicht — jeder bisherige Import aus
+ * `lib/feed` bleibt gültig.
+ *
+ * Der Grund für den Schnitt steht dort: dieses Modul baut beim Laden den
+ * Supabase-Client und ist außerhalb von Vite nicht importierbar. Seit C9
+ * leitet die Datenbank `posts.video_url` über `public.erste_video_url()` ab,
+ * und die Parität der beiden Erkenner wird von einem Node-Skript gemessen —
+ * das braucht den kanonischen Parser ohne diesen Rattenschwanz.
+ */
+export {
+  extractFirstVideo,
+  parseVideoUrl,
+  tokenizePostBody,
+  type PostSegment,
+} from "./video-url";
 
 /** Hashtags eines Beitrags: klein normalisiert, dedupliziert, Reihenfolge erhalten. */
 export function parseHashtags(body: string): string[] {
@@ -141,68 +140,6 @@ export function parseHashtags(body: string): string[] {
     }
   }
   return out;
-}
-
-function youtube(id: string) {
-  return { provider: "youtube" as const, embedUrl: `https://www.youtube.com/embed/${id}` };
-}
-
-/**
- * Wandelt eine YouTube-/Vimeo-URL in eine sichere Embed-URL. Lässt NUR diese beiden
- * Anbieter und valide Video-IDs zu — alles andere (fremde Hosts, javascript:, kein
- * Link) ergibt `null`, damit nie ein beliebiges iframe eingebettet wird (AGE-252-Regel).
- */
-export function parseVideoUrl(
-  raw: string,
-): { provider: "youtube" | "vimeo"; embedUrl: string } | null {
-  let url: URL;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const host = url.hostname.replace(/^www\./, "").toLowerCase();
-
-  if (host === "youtube.com" || host === "m.youtube.com") {
-    if (url.pathname === "/watch") {
-      const id = url.searchParams.get("v");
-      if (id && /^[\w-]+$/.test(id)) return youtube(id);
-      return null;
-    }
-    const embed = url.pathname.match(/^\/embed\/([\w-]+)$/);
-    return embed ? youtube(embed[1]) : null;
-  }
-  if (host === "youtu.be") {
-    const id = url.pathname.slice(1);
-    return id && /^[\w-]+$/.test(id) ? youtube(id) : null;
-  }
-  if (host === "vimeo.com") {
-    const m = url.pathname.match(/^\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
-  }
-  if (host === "player.vimeo.com") {
-    const m = url.pathname.match(/^\/video\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
-  }
-  return null;
-}
-
-/**
- * Erste einbettbare Video-URL im Beitrag (für die Embed-Vorschau der Karte). Gibt
- * neben der Embed-URL auch die rohe Quell-URL zurück, damit die Karte sie im Text
- * ausblenden kann (kein doppelter Link + Embed).
- */
-export function extractFirstVideo(
-  body: string,
-): { url: string; provider: "youtube" | "vimeo"; embedUrl: string } | null {
-  for (const seg of tokenizePostBody(body)) {
-    if (seg.type === "url") {
-      const video = parseVideoUrl(seg.value);
-      if (video) return { url: seg.raw, ...video };
-    }
-  }
-  return null;
 }
 
 // ── Erwähnungen auflösen ──────────────────────────────────────────────────
@@ -294,7 +231,10 @@ function authorOf(byId: Map<string, FeedAuthor>, id: string): FeedAuthor {
  * Maskierung der Anzeige bleibt `displayAuthor`. Hier wird nur nichts gefragt, was
  * gesichert abgewiesen wird.
  */
-async function fetchAuthors(uid: string | null, ids: string[]): Promise<Map<string, FeedAuthor>> {
+export async function fetchAuthors(
+  uid: string | null,
+  ids: string[],
+): Promise<Map<string, FeedAuthor>> {
   const byId = new Map<string, FeedAuthor>();
   if (!uid || ids.length === 0) return byId;
   const { data, error } = await supabase
@@ -342,13 +282,62 @@ export interface FetchFeedArgs {
   hashtag?: string | null;
   /** Weiterlesen ab hier; fehlt er, beginnt die erste Seite. */
   cursor?: FeedCursor | null;
+  /**
+   * Nur Beiträge mit Video — die Academy (AGE-533).
+   *
+   * Die Academy bekommt bewusst KEINE eigene Ladefunktion: sie stellt dieselbe
+   * Abfrage wie der Feed, nur mit einem Filter mehr. Eine zweite Funktion
+   * müsste Autoren-Anreicherung, Zähler und den Keyset-Cursor nachbauen — und
+   * damit dreimal dieselbe Regel pflegen.
+   */
+  nurVideos?: boolean;
+  /** Nur Beiträge dieses Autors — das Regal „selbst geteilt". */
+  autorId?: string | null;
+}
+
+/**
+ * Die eingebettete Event-Zeile in unsere Form bringen.
+ *
+ * PostgREST liefert eine n:1-Einbettung je nach Version als Objekt ODER als
+ * einelementiges Array; beides wird hier auf dieselbe Form gebracht. `null`
+ * bleibt `null` — das ist der Normalfall (gewöhnlicher Beitrag) und zugleich
+ * die Antwort der RLS auf ein Event, das der Betrachter nicht sehen darf.
+ */
+function eventVon(roh: unknown): FeedEvent | null {
+  const e = Array.isArray(roh) ? roh[0] : roh;
+  if (!e || typeof e !== "object") return null;
+  const z = e as Record<string, unknown>;
+  if (typeof z.id !== "string" || typeof z.title !== "string") return null;
+  return {
+    id: z.id,
+    title: z.title,
+    startsAt: typeof z.starts_at === "string" ? z.starts_at : null,
+    location: typeof z.location === "string" ? z.location : null,
+    coverPath: typeof z.cover_path === "string" ? z.cover_path : null,
+  };
 }
 
 /** Lädt eine Feed-Seite (neueste zuerst). Sichtbarkeit erzwingt die RLS. */
-export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promise<FeedSeite> {
+export async function fetchFeed({
+  uid,
+  hashtag,
+  cursor,
+  nurVideos,
+  autorId,
+}: FetchFeedArgs): Promise<FeedSeite> {
   let query = supabase
     .from("posts")
-    .select("id, author_id, body, hashtags, visibility, created_at")
+    // Das Event wird ÜBER DEN FREMDSCHLÜSSEL eingebettet, nicht kopiert
+    // (AGE-533). Der Name `posts_ref_id_fkey` ist in der Migration
+    // ausgeschrieben, genau damit diese Zeile ihn nennen kann. Die RLS von
+    // `events` wertet die Einbettung selbst aus — zweite Verteidigungslinie
+    // neben der gespiegelten Sichtbarkeit, kein Ersatz dafür.
+    // EIN Zeichenketten-Literal, nicht zusammengesetzt: supabase-js leitet die
+    // Form der Antwort aus dem Literal ab. Ein `+` daraus macht `string`, und
+    // die eingebettete Zeile faellt auf `GenericStringError` zurueck.
+    .select(
+      "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)",
+    )
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
@@ -357,6 +346,11 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
     // leer ist. Der Knopf holte sie, bevor er verschwände.
     .limit(FEED_SEITE + 1);
   if (hashtag) query = query.contains("hashtags", [hashtag]);
+  // Der Filter sitzt in der ANFRAGE, nicht hinterher im Client: sonst trüge
+  // eine Seite von 20 gelesenen Zeilen nur die paar mit Video, und „Ältere
+  // Beiträge" liefe durch den ganzen Bestand, um eine Seite zu füllen.
+  if (nurVideos) query = query.not("video_url", "is", null);
+  if (autorId) query = query.eq("author_id", autorId);
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.createdAt},` +
@@ -426,6 +420,13 @@ export async function fetchFeed({ uid, hashtag, cursor }: FetchFeedArgs): Promis
       commentCount: counts.get(r.id)?.comment_count ?? 0,
       likedByMe: myLikes.has(r.id),
       media: media.get(r.id) ?? [],
+      videoUrl: r.video_url,
+      // Verengung an der Grenze: die Datenbank liefert `text`, der Constraint
+      // lässt aber nur zwei Werte zu. Alles Unerwartete gilt als Mitgliedsbeitrag
+      // — die harmlose Richtung, denn ein Event-Beitrag ohne lesbares Event
+      // entfällt ohnehin.
+      kind: r.kind === "event" ? "event" : "member",
+      event: eventVon(r.events),
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
     // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.
