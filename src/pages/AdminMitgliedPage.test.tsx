@@ -43,8 +43,19 @@ const DATEN: AdminProfileData = {
     interests: [],
     goals: [],
     videos: [],
+    // Die Kontaktzeile liegt seit AGE-537 IM Formular, nicht daneben: das
+    // Mitglied pflegt sie jetzt selbst, und beide Editoren benutzen dieselbe
+    // Feldgruppe.
+    contact: {
+      email: "kontakt@alt.de",
+      phone: "",
+      street: "Altstr. 3",
+      postal_code: "80331",
+      city: "München",
+      state: "Bayern",
+      country: "DE",
+    },
   },
-  contact: { email: "kontakt@alt.de", phone: "" },
   legacy: { paid_until: "2027-06-30", legacy_tier: "Premium", legacy_price: "1200", legacy_source_id: "wp-4711" },
   loginEmail: "login@alt.de",
   activated: false,
@@ -108,6 +119,18 @@ describe("AdminMitgliedPage (AGE-498)", () => {
     expect(screen.getByDisplayValue("wp-4711")).toBeInTheDocument();
     expect(screen.getByDisplayValue("login@alt.de")).toBeInTheDocument();
     expect(screen.getByDisplayValue("kontakt@alt.de")).toBeInTheDocument();
+  });
+
+  it("zeigt die Anschrift und schickt sie im Patch mit (AGE-537)", async () => {
+    renderPage();
+    const ort = await screen.findByDisplayValue("München");
+    fireEvent.change(ort, { target: { value: "Nürnberg" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(saveAdminProfile).toHaveBeenCalled());
+    const [, form] = vi.mocked(saveAdminProfile).mock.calls[0];
+    expect(form.contact.city).toBe("Nürnberg");
+    expect(form.contact.street).toBe("Altstr. 3");
   });
 
   it("speichert über saveAdminProfile", async () => {

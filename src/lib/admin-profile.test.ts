@@ -58,7 +58,7 @@ describe("fetchAdminProfile", () => {
     expect(tableCalls).toEqual([]);
     expect(daten.form.name).toBe("Importiert");
     expect(daten.form.roles).toEqual(["Vorstand"]);
-    expect(daten.contact.email).toBe("kontakt@alt.de");
+    expect(daten.form.contact.email).toBe("kontakt@alt.de");
     expect(daten.legacy.paid_until).toBe("2027-06-30");
     expect(daten.loginEmail).toBe("login@alt.de");
   });
@@ -68,7 +68,7 @@ describe("fetchAdminProfile", () => {
 
     const daten = await fetchAdminProfile(ZIEL);
 
-    expect(daten.contact.email).toBe("");
+    expect(daten.form.contact.email).toBe("");
     expect(daten.legacy.paid_until).toBe("");
   });
 });
@@ -91,10 +91,21 @@ describe("saveAdminProfile", () => {
     interests: [],
     goals: [],
     videos: [],
+    // Die Kontaktzeile liegt seit AGE-537 im Formular (AdminContact ist
+    // dieselbe Struktur wie im eigenen Editor).
+    contact: {
+      email: "",
+      phone: "",
+      street: "",
+      postal_code: "",
+      city: "",
+      state: "",
+      country: "",
+    },
   };
 
   it("ruft admin_update_profile und fasst kein Tabellenobjekt an", async () => {
-    await saveAdminProfile(ZIEL, form, { email: "neu@fbc.de", phone: "" }, {
+    await saveAdminProfile(ZIEL, { ...form, contact: { ...form.contact, email: "neu@fbc.de" } }, {
       paid_until: "2027-06-30",
       legacy_tier: "Premium",
       legacy_price: "1200",
@@ -107,7 +118,7 @@ describe("saveAdminProfile", () => {
   });
 
   it("schickt Arrays als Arrays und Zahlen als Zahlen", async () => {
-    await saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
+    await saveAdminProfile(ZIEL, form, {
       paid_until: "2027-06-30",
       legacy_tier: "",
       legacy_price: "1200.50",
@@ -121,7 +132,7 @@ describe("saveAdminProfile", () => {
   });
 
   it("macht aus leeren Feldern null — sonst bricht der Datums-Cast ab", async () => {
-    await saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
+    await saveAdminProfile(ZIEL, form, {
       paid_until: "",
       legacy_tier: "",
       legacy_price: "",
@@ -140,7 +151,6 @@ describe("saveAdminProfile", () => {
     await saveAdminProfile(
       ZIEL,
       { ...form, videos: ["https://youtu.be/abc"] },
-      { email: "", phone: "" },
       { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
     );
 
@@ -153,7 +163,7 @@ describe("saveAdminProfile", () => {
   // gelöscht, statt zu scheitern.
   it("lehnt einen unlesbaren Betrag ab, statt das Feld zu leeren", async () => {
     await expect(
-      saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
+      saveAdminProfile(ZIEL, form, {
         paid_until: "",
         legacy_tier: "",
         legacy_price: "zwölfhundert",
@@ -164,8 +174,52 @@ describe("saveAdminProfile", () => {
     expect(rpcCalls).toHaveLength(0);
   });
 
+  // Aus dem Review auf dem Diff (codex, MEDIUM): der Seitentest mockt
+  // `saveAdminProfile` — also eigenen Code. Ein Entfernen der Adress-Zuordnung
+  // HIER wäre dort grün geblieben. Diese Aussage liegt deshalb am Rand zur
+  // Datenbank, wo der Patch wirklich entsteht.
+  it("schickt alle fünf Adressfelder im Patch (AGE-537)", async () => {
+    await saveAdminProfile(
+      ZIEL,
+      {
+        ...form,
+        contact: {
+          email: "kontakt@neu.de",
+          phone: "+49 711 1",
+          street: "Altstr. 3",
+          postal_code: "80331",
+          city: "München",
+          state: "Bayern",
+          country: "DE",
+        },
+      },
+      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
+    );
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.street).toBe("Altstr. 3");
+    expect(patch.postal_code).toBe("80331");
+    expect(patch.city).toBe("München");
+    expect(patch.state).toBe("Bayern");
+    expect(patch.country).toBe("DE");
+    expect(patch.email).toBe("kontakt@neu.de");
+  });
+
+  it("macht auch aus leeren Adressfeldern null, nicht leeren Text", async () => {
+    await saveAdminProfile(ZIEL, form, {
+      paid_until: "",
+      legacy_tier: "",
+      legacy_price: "",
+      legacy_source_id: "",
+    });
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.street).toBeNull();
+    expect(patch.country).toBeNull();
+  });
+
   it("schickt kein tier — der Stufenwechsel gehört nicht hierher", async () => {
-    await saveAdminProfile(ZIEL, form, { email: "", phone: "" }, {
+    await saveAdminProfile(ZIEL, form, {
       paid_until: "",
       legacy_tier: "",
       legacy_price: "",

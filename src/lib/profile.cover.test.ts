@@ -40,6 +40,9 @@ vi.mock("./supabase", () => ({
       },
       delete: () => ({ eq: async () => ({ error: null }) }),
       insert: async () => ({ error: null }),
+      // Die Kontaktzeile geht seit AGE-537 im selben Aufruf mit; ohne diesen
+      // Rand liefe der Test in „upsert is not a function".
+      upsert: async () => ({ error: null }),
     }),
     rpc: async () => ({ error: null }),
   },
@@ -69,6 +72,17 @@ function werte(over: Partial<ProfileFormValues> = {}): ProfileFormValues {
     interests: [],
     goals: [],
     videos: [],
+    // Die Kontaktzeile (AGE-537). Sie geht denselben `saveProfile`-Weg; hier
+    // leer, weil dieser Test das Hintergrundbild prüft und nicht sie.
+    contact: {
+      email: "",
+      phone: "",
+      street: "",
+      postal_code: "",
+      city: "",
+      state: "",
+      country: "",
+    },
     ...over,
   };
 }

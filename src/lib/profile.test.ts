@@ -24,6 +24,15 @@ const EMPTY: ProfileFormValues = {
   interests: [],
   goals: [],
   videos: [],
+  contact: {
+    email: "",
+    phone: "",
+    street: "",
+    postal_code: "",
+    city: "",
+    state: "",
+    country: "",
+  },
 };
 
 /** Die 12 gewichteten Felder, jeweils mit einem „gefüllten“ Wert. */
@@ -44,6 +53,15 @@ const FILLED: ProfileFormValues = {
   interests: [],
   goals: [],
   videos: [],
+  contact: {
+    email: "",
+    phone: "",
+    street: "",
+    postal_code: "",
+    city: "",
+    state: "",
+    country: "",
+  },
 };
 
 describe("computeProfileCompletion", () => {

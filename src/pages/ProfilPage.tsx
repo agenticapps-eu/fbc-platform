@@ -14,6 +14,7 @@ import {
 import { AvatarCropper } from "../components/profile/AvatarCropper";
 import {
   ProfileBasicsFieldset,
+  ProfileContactFieldset,
   ProfileDevelopmentFieldset,
   ProfileRolesFieldset,
   ProfileVideosFieldset,
@@ -416,6 +417,8 @@ function ProfileEditor({ uid }: { uid: string }) {
         <ProfileDevelopmentFieldset {...felder} />
 
         <ProfileWebFieldset {...felder} />
+
+        <ProfileContactFieldset {...felder} />
 
         <ProfileVideosFieldset {...felder} />
 

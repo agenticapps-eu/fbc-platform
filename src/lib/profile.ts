@@ -75,6 +75,30 @@ export const profileFormSchema = z.object({
   // passiert im Editor; beim Speichern werden leere/ungültige Einträge verworfen,
   // damit nie eine nicht-einbettbare URL persistiert wird.
   videos: z.array(z.string()),
+  // Die Kontaktzeile (AGE-537). Sie liegt in `profile_contacts`, NICHT in
+  // `profiles`: dort wäre sie für jedes eingeloggte Mitglied lesbar, hier gibt
+  // `contacts_select_self_or_released` sie erst nach einer angenommenen
+  // Kontaktanfrage frei. Kein Feld ist Pflicht.
+  //
+  // `country` bekommt bewusst KEINE Vorbelegung — ein vorbelegtes „DE" machte
+  // aus einer bewussten Leerung beim nächsten Laden wieder Deutschland. Die
+  // Vorgabe setzt der Import (C10), der ein Feld füllt, das WordPress nicht
+  // erhebt; im Formular steht sie als Platzhalter.
+  contact: z.object({
+    // Die KONTAKT-Adresse, nicht die Login-Adresse (auth.users). An sie
+    // schickt notify-contact-request — ein Tippfehler hier ist keine
+    // Anzeigefrage, sondern eine Benachrichtigung, die niemanden erreicht.
+    email: z.union([
+      z.literal(""),
+      z.string().trim().email("Bitte eine gültige E-Mail-Adresse eingeben."),
+    ]),
+    phone: z.string().trim(),
+    street: z.string().trim(),
+    postal_code: z.string().trim(),
+    city: z.string().trim(),
+    state: z.string().trim(),
+    country: z.string().trim(),
+  }),
 });
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -103,6 +127,15 @@ export const EMPTY_PROFILE_FORM: ProfileFormValues = {
   interests: [],
   goals: [],
   videos: [],
+  contact: {
+    email: "",
+    phone: "",
+    street: "",
+    postal_code: "",
+    city: "",
+    state: "",
+    country: "",
+  },
 };
 
 // ── Vollständigkeit ──────────────────────────────────────────────────────────
@@ -150,7 +183,7 @@ function socialString(socials: ProfileRow["socials"], key: string): string {
 
 /** Lädt Profilzeile + Interessen + Ziele und baut die Formular-Defaults. */
 export async function fetchProfileEditorData(uid: string): Promise<ProfileFormValues> {
-  const [profileRes, interestsRes, goalsRes] = await Promise.all([
+  const [profileRes, interestsRes, goalsRes, contactRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).single(),
     supabase.from("profile_interests").select("theme, label").eq("profile_id", uid).order("label"),
     supabase
@@ -158,13 +191,23 @@ export async function fetchProfileEditorData(uid: string): Promise<ProfileFormVa
       .select("category, title, progress")
       .eq("profile_id", uid)
       .order("category"),
+    // `maybeSingle`: die meisten Profile haben (noch) gar keine Kontaktzeile —
+    // sie entsteht bei der Registrierung nicht, sondern erst beim ersten
+    // Speichern hier oder durch admin_update_profile.
+    supabase
+      .from("profile_contacts")
+      .select("email, phone, street, postal_code, city, state, country")
+      .eq("profile_id", uid)
+      .maybeSingle(),
   ]);
 
   if (profileRes.error) throw profileRes.error;
   if (interestsRes.error) throw interestsRes.error;
   if (goalsRes.error) throw goalsRes.error;
+  if (contactRes.error) throw contactRes.error;
 
   const p = profileRes.data;
+  const c = contactRes.data;
   return {
     name: p.name ?? "",
     region: p.region ?? "",
@@ -193,6 +236,15 @@ export async function fetchProfileEditorData(uid: string): Promise<ProfileFormVa
       progress: g.progress ?? 0,
     })),
     videos: p.videos,
+    contact: {
+      email: c?.email ?? "",
+      phone: c?.phone ?? "",
+      street: c?.street ?? "",
+      postal_code: c?.postal_code ?? "",
+      city: c?.city ?? "",
+      state: c?.state ?? "",
+      country: c?.country ?? "",
+    },
   };
 }
 
@@ -279,6 +331,24 @@ export async function saveProfile(
     .select("profile_completion, avatar_url, cover_url")
     .single();
   if (updateError) throw updateError;
+
+  // Die Kontaktzeile (AGE-537). Upsert, weil ein Mitglied meist noch keine hat:
+  // die Zeile entsteht bei der Registrierung nicht. Bedingungslos, damit ein
+  // Leeren auch wirklich leert — „alle Felder leer" wäre sonst von „nichts
+  // eingetragen" nicht zu unterscheiden. Für ein Profil ohne Kontaktdaten
+  // entsteht dabei eine Zeile aus lauter NULL; sie behauptet nichts, und die
+  // Anzeige lässt leere Werte ohnehin weg.
+  const { error: contactError } = await supabase.from("profile_contacts").upsert({
+    profile_id: uid,
+    email: emptyToNull(values.contact.email),
+    phone: emptyToNull(values.contact.phone),
+    street: emptyToNull(values.contact.street),
+    postal_code: emptyToNull(values.contact.postal_code),
+    city: emptyToNull(values.contact.city),
+    state: emptyToNull(values.contact.state),
+    country: emptyToNull(values.contact.country),
+  });
+  if (contactError) throw contactError;
 
   // Kind-Tabellen ersetzen (einfaches „replace collection“-Muster).
   const { error: delInterests } = await supabase

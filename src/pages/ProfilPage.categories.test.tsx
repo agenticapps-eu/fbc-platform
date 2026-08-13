@@ -40,6 +40,15 @@ const PROFILE: ProfileFormValues = {
   interests: [],
   goals: [],
   videos: [],
+  contact: {
+    email: "",
+    phone: "",
+    street: "",
+    postal_code: "",
+    city: "",
+    state: "",
+    country: "",
+  },
 };
 
 beforeEach(() => {

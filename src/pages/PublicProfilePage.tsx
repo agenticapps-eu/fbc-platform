@@ -397,7 +397,11 @@ function ContactArea({
         name={name}
         relation={relation ?? null}
       />
-      <p className="text-xs text-muted">E-Mail und Telefon werden nie automatisch angezeigt.</p>
+      {/* Zählt auf, was verschlossen bleibt — seit AGE-537 gehört die Anschrift
+          dazu, und eine unvollständige Aufzählung liest sich wie eine Zusage. */}
+      <p className="text-xs text-muted">
+        E-Mail, Telefon und Anschrift werden nie automatisch angezeigt.
+      </p>
     </Card>
   );
 }
@@ -487,7 +491,7 @@ function ContactRequestComposer({
       toast({
         variant: "success",
         title: "Kontaktanfrage gesendet",
-        description: `${name} entscheidet über deine Anfrage. Kontaktdaten werden erst nach Annahme sichtbar.`,
+        description: `${name} entscheidet über deine Anfrage. E-Mail, Telefon und Anschrift werden beidseitig erst nach der Annahme sichtbar.`,
       });
       if (viewerId) {
         queryClient.invalidateQueries({ queryKey: contactRelationQueryKey(viewerId, profileId) });
@@ -579,14 +583,24 @@ function ContactRequestComposer({
   );
 }
 
-function ReleasedContact({
+/**
+ * Die freigegebene Kontaktzeile. Exportiert, damit die Anschrift-Fälle (AGE-537)
+ * ohne die halbe Seite drumherum geprüft werden können — die Sperre selbst
+ * liegt in der RLS und ist dort belegt, nicht hier.
+ */
+export function ReleasedContact({
   name,
   contact,
 }: {
   name: string;
-  contact: { email: string | null; phone: string | null } | null;
+  contact: ContactRelation["contact"];
 }) {
-  const hasData = !!(contact && (contact.email || contact.phone));
+  // Die Anschrift zeilenweise, leere Teile fallen weg: „70173 Stuttgart" ohne
+  // Straße ist eine Angabe, „, 70173 " wäre ein Darstellungsfehler.
+  const ortszeile = [contact?.postal_code, contact?.city].filter(Boolean).join(" ");
+  const landzeile = [contact?.state, contact?.country].filter(Boolean).join(" · ");
+  const adresse = [contact?.street, ortszeile, landzeile].filter((t) => t && t !== "");
+  const hasData = !!(contact && (contact.email || contact.phone || adresse.length > 0));
   return (
     <Card className="flex flex-col gap-3 border-accent/30 bg-accent-soft/30">
       <div className="flex items-center gap-2">
@@ -621,6 +635,20 @@ function ReleasedContact({
                 >
                   {contact.phone}
                 </a>
+              </dd>
+            </div>
+          )}
+          {adresse.length > 0 && (
+            <div className="flex gap-2">
+              <dt className="w-16 shrink-0 text-muted">Anschrift</dt>
+              <dd className="font-medium not-italic">
+                <address className="not-italic">
+                  {adresse.map((zeile) => (
+                    <span key={zeile} className="block">
+                      {zeile}
+                    </span>
+                  ))}
+                </address>
               </dd>
             </div>
           )}

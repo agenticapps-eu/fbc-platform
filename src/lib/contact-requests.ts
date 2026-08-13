@@ -125,7 +125,21 @@ export interface ContactRelation {
    * zurückgegeben. `null` = nicht freigegeben; ein Objekt (auch mit leeren Feldern)
    * = freigegeben.
    */
-  contact: { email: string | null; phone: string | null } | null;
+  /**
+   * Die freigegebene Kontaktzeile — seit AGE-537 samt Anschrift. Sie kommt
+   * NICHT von einer eigenen Regel: dieselbe Policy
+   * `contacts_select_self_or_released` gibt die ganze Zeile frei oder gar
+   * nichts, weshalb eine Auswahl nur der Adressspalten ebenso leer bliebe.
+   */
+  contact: {
+    email: string | null;
+    phone: string | null;
+    street: string | null;
+    postal_code: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  } | null;
   /** Match zwischen beiden (liefert die `match_id` der Anfrage), falls vorhanden. */
   matchId: string | null;
 }
@@ -174,7 +188,7 @@ export async function fetchContactRelation(
     supabase.from("contact_requests").select("id, from_id, to_id, status").or(requestPair),
     supabase
       .from("profile_contacts")
-      .select("email, phone")
+      .select("email, phone, street, postal_code, city, state, country")
       .eq("profile_id", profileId)
       .maybeSingle(),
     supabase.from("matches").select("id").or(matchPair).maybeSingle(),
@@ -186,7 +200,15 @@ export async function fetchContactRelation(
   return {
     request: pickRelevantRequest(crRes.data ?? [], viewerId),
     contact: contactRes.data
-      ? { email: contactRes.data.email, phone: contactRes.data.phone }
+      ? {
+          email: contactRes.data.email,
+          phone: contactRes.data.phone,
+          street: contactRes.data.street,
+          postal_code: contactRes.data.postal_code,
+          city: contactRes.data.city,
+          state: contactRes.data.state,
+          country: contactRes.data.country,
+        }
       : null,
     matchId: matchRes.data?.id ?? null,
   };
