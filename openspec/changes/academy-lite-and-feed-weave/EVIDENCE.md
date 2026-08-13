@@ -380,6 +380,29 @@ Die letzten beiden hatte der Vorschlag übersehen; dort hätte ein Host leere
 Karten gesehen, die seine echten Beiträge aus einem Limit von vier bzw. fünf
 verdrängen.
 
+## 6.3 — Die dreizehn Abnahmepunkte aus AGE-533
+
+| # | Punkt | Beleg |
+|---|---|---|
+| 1 | `posts.video_url` wird beim Anlegen gefüllt | **Über den echten Composer geprüft:** der Client schickt `video_url` gar nicht mit, die RPC ist unverändert — und die Zeile trägt danach `video_url=https://www.youtube.com/watch?v=qp0HIF3SfI4`. Der stärkste Beleg für die Serverableitung. Dazu pgTAP §21.9–21.12 |
+| 2 | Academy „Alle" zeigt alle sichtbaren Beiträge mit Video | Sichtprobe: drei Videos, der Beitrag **ohne** Video fehlt |
+| 3 | Academy „Meine" zeigt die eigenen | Sichtprobe: Regal „Von mir geteilt" trägt nur das eigene |
+| 4 | Ein geteiltes Video erscheint **ohne Zutun** in der Academy | Über den Composer veröffentlicht, danach ohne weiteren Schritt in der Academy sichtbar |
+| 5 | Die drei kuratierten Videos stehen weiterhin oben | Sichtprobe: Block „Aus der Redaktion", alle drei Embeds geladen |
+| 6 | Neues Event erzeugt einen Feed-Beitrag mit `kind='event'` | pgTAP §22.4 (`results_eq`) + Sichtprobe |
+| 7 | Event löschen entfernt den Beitrag mit | pgTAP §22.10 + Sichtprobe (`posts mit kind=event danach: 0`) |
+| 8 | Event umbenennen ändert die Feed-Darstellung sofort | **md5 der posts-Zeile vorher = nachher**, Feed zeigt den neuen Titel |
+| 9 | Beitrag zu einem `members`-Event ist ausgeloggt nicht sichtbar | pgTAP §22.18 |
+| 10 | `is_activated()` greift auf den neuen Beiträgen | pgTAP §22.17 („eingeloggt, nicht aktiviert" ⇒ 0) |
+| 11 | Der leere Zustand der Academy aus C2 greift weiterhin | Sichtprobe: „Noch nichts markiert" mit Knopf „Zur Aktivität"; der Wortlaut-Wächter führt die Academy jetzt in der strengeren Liste |
+| 12 | Beide Themes, auch auf dem Telefon | `navy` und `hell` je geprüft; Academy bei 375 px |
+| 13 | `lint && typecheck && test && build` grün, pgTAP grün | 0 Errors · sauber · **95 Dateien / 665 Tests** · `built in 354ms` · pgTAP **404 PASS** |
+
+**Ein Fehler, den erst `pnpm build` gefunden hat:** die Auth-Fixtur im neuen
+Komponententest war unvollständig getypt. `pnpm test` läuft ohne Typprüfung und
+war grün, `tsc` im Build nicht. Behoben — und der Grund, warum Punkt 13 alle
+vier Befehle nennt und nicht nur die Tests.
+
 ## Noch nicht gemessen
 
 - **PROD.** Die Sonde nimmt `SUPABASE_DB_URL_PROD` entgegen und ist dort noch
