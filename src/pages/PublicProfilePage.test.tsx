@@ -190,7 +190,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     renderPage(authAsTier("exchange"));
 
     expect(
-      await screen.findByText("E-Mail und Telefon werden nie automatisch angezeigt."),
+      await screen.findByText("E-Mail, Telefon und Anschrift werden nie automatisch angezeigt."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Kontakt freigegeben/)).not.toBeInTheDocument();
   });
@@ -199,7 +199,15 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     mockedFetch.mockResolvedValue(fullView);
     mockedRelation.mockResolvedValue({
       request: { id: "cr1", status: "accepted", outgoing: true },
-      contact: { email: "legacy@example.com", phone: "+49 30 1234567" },
+      contact: {
+        email: "legacy@example.com",
+        phone: "+49 30 1234567",
+        street: null,
+        postal_code: null,
+        city: null,
+        state: null,
+        country: null,
+      },
       matchId: null,
     });
     renderPage(authAsTier("exchange"));

@@ -1109,21 +1109,36 @@ export type Database = {
       };
       profile_contacts: {
         Row: {
+          city: string | null;
+          country: string | null;
           email: string | null;
           phone: string | null;
+          postal_code: string | null;
           profile_id: string;
+          state: string | null;
+          street: string | null;
           updated_at: string;
         };
         Insert: {
+          city?: string | null;
+          country?: string | null;
           email?: string | null;
           phone?: string | null;
+          postal_code?: string | null;
           profile_id: string;
+          state?: string | null;
+          street?: string | null;
           updated_at?: string;
         };
         Update: {
+          city?: string | null;
+          country?: string | null;
           email?: string | null;
           phone?: string | null;
+          postal_code?: string | null;
           profile_id?: string;
+          state?: string | null;
+          street?: string | null;
           updated_at?: string;
         };
         Relationships: [

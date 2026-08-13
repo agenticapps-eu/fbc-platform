@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import {
   ProfileBasicsFieldset,
+  ProfileContactFieldset,
   ProfileDevelopmentFieldset,
   ProfileRolesFieldset,
   ProfileVideosFieldset,
@@ -21,7 +22,6 @@ import {
   changeLoginEmail,
   fetchAdminProfile,
   saveAdminProfile,
-  type AdminContact,
   type AdminLegacy,
 } from "../lib/admin-profile";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
@@ -62,7 +62,6 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
   const queryKey = adminProfileQueryKey(targetId);
   const initialized = useRef(false);
 
-  const [contact, setContact] = useState<AdminContact>({ email: "", phone: "" });
   const [legacy, setLegacy] = useState<AdminLegacy>({
     paid_until: "",
     legacy_tier: "",
@@ -93,7 +92,6 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
   useEffect(() => {
     if (data && !initialized.current) {
       reset(data.form);
-      setContact(data.contact);
       setLegacy(data.legacy);
       setLoginEmail(data.loginEmail);
       initialized.current = true;
@@ -101,7 +99,7 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
   }, [data, reset]);
 
   const speichern = useMutation({
-    mutationFn: () => saveAdminProfile(targetId, getValues(), contact, legacy),
+    mutationFn: () => saveAdminProfile(targetId, getValues(), legacy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       toast({ variant: "success", title: "Profil gespeichert" });
@@ -192,36 +190,12 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
 
         {/* Kontaktdaten — NICHT die Login-Adresse. Das ist die Adresse, an die
             notify-contact-request schickt; wird nur die Login-Adresse geändert,
-            gehen die Benachrichtigungen weiter ans alte Postfach. */}
-        <Card className="flex flex-col gap-4">
-          <div>
-            <CardTitle className="text-base">Kontaktdaten</CardTitle>
-            <CardDescription>
-              Wird nach einer angenommenen Kontaktanfrage freigegeben und trägt die
-              Benachrichtigungen. Nicht die Adresse, mit der sich das Mitglied anmeldet.
-            </CardDescription>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Kontakt-E-Mail">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={contact.email}
-                  onChange={(e) => setContact({ ...contact, email: e.target.value })}
-                />
-              )}
-            </Field>
-            <Field label="Telefon">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={contact.phone}
-                  onChange={(e) => setContact({ ...contact, phone: e.target.value })}
-                />
-              )}
-            </Field>
-          </div>
-        </Card>
+            gehen die Benachrichtigungen weiter ans alte Postfach.
+
+            Seit AGE-537 dieselbe Feldgruppe wie im eigenen Editor: das Mitglied
+            pflegt diese Zeile jetzt selbst, und zwei Formen für eine Tabelle
+            wären eine zweite Wahrheit. */}
+        <ProfileContactFieldset {...felder} />
 
         {/* Altmitgliedschaft (profile_legacy) */}
         <Card className="flex flex-col gap-4">

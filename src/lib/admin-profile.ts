@@ -21,10 +21,16 @@ import type { Json } from "./database.types";
  * Bucket-Policies prüfen die `auth.uid()` des AUFRUFERS.
  */
 
-export interface AdminContact {
-  email: string;
-  phone: string;
-}
+/**
+ * Die Kontaktzeile hat KEINE eigene Admin-Form mehr (AGE-537). Bis C6a hielt
+ * diese Datei ein eigenes `AdminContact` mit E-Mail und Telefon, weil der
+ * Mitglieder-Editor die Tabelle gar nicht anfasste. Seit es dort einen
+ * Kontaktblock gibt, wäre eine zweite Struktur eine zweite Wahrheit — und da
+ * `profileFormSchema` die Felder ohnehin verlangt, bliebe im Admin-Formular
+ * ein totes Feld stehen. Gemeldet im Fremd-Review zum Change (codex, MEDIUM);
+ * beim Bauen hat sich der Befund bestätigt.
+ */
+export type AdminContact = ProfileFormValues["contact"];
 
 export interface AdminLegacy {
   paid_until: string;
@@ -35,7 +41,6 @@ export interface AdminLegacy {
 
 export interface AdminProfileData {
   form: ProfileFormValues;
-  contact: AdminContact;
   legacy: AdminLegacy;
   loginEmail: string;
   activated: boolean;
@@ -100,8 +105,16 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
       interests: [],
       goals: [],
       videos: strArray(p.videos),
+      contact: {
+        email: text(c.email),
+        phone: text(c.phone),
+        street: text(c.street),
+        postal_code: text(c.postal_code),
+        city: text(c.city),
+        state: text(c.state),
+        country: text(c.country),
+      },
     },
-    contact: { email: text(c.email), phone: text(c.phone) },
     legacy: {
       paid_until: text(l.paid_until),
       legacy_tier: text(l.legacy_tier),
@@ -124,7 +137,6 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
 export async function saveAdminProfile(
   id: string,
   form: ProfileFormValues,
-  contact: AdminContact,
   legacy: AdminLegacy,
 ): Promise<void> {
   // `Number("zwölfhundert")` ist NaN, und `JSON.stringify` macht daraus `null`.
@@ -157,8 +169,15 @@ export async function saveAdminProfile(
     socials: Object.fromEntries(
       Object.entries(form.socials).filter(([, v]) => v.trim() !== ""),
     ),
-    email: leerZuNull(contact.email),
-    phone: leerZuNull(contact.phone),
+    email: leerZuNull(form.contact.email),
+    phone: leerZuNull(form.contact.phone),
+    // Die Anschrift (AGE-537). Sie liegt auf derselben Zeile wie E-Mail und
+    // Telefon und geht denselben Weg — die Weißliste der RPC kennt sie.
+    street: leerZuNull(form.contact.street),
+    postal_code: leerZuNull(form.contact.postal_code),
+    city: leerZuNull(form.contact.city),
+    state: leerZuNull(form.contact.state),
+    country: leerZuNull(form.contact.country),
     paid_until: leerZuNull(legacy.paid_until),
     legacy_tier: leerZuNull(legacy.legacy_tier),
     legacy_price: preis,

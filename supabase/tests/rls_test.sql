@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(388);
+select plan(407);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2902,6 +2902,145 @@ select is(
 select is(
   has_function_privilege('authenticated', 'public.event_feed_post_sync()', 'execute'),
   false, '… authenticated auch nicht — sie ist Innerei der Trigger');
+
+-- ── 23. Anschrift: dieselbe Freigabe wie E-Mail und Telefon (AGE-537, C6a) ──
+-- Die Abnahme verlangt den Beleg ausdrücklich hier und nicht im UI: „Ohne
+-- angenommene Kontaktanfrage liefert die Adresse nichts — per pgTAP belegt".
+--
+-- Kein neuer Sichtbarkeitsbegriff: die fünf Spalten liegen auf
+-- `profile_contacts` und werden von `contacts_select_self_or_released`
+-- gedeckt. Der Test prüft deshalb nicht die Policy neu, sondern DASS die
+-- Anschrift unter ihr liegt — und zwar auch, wenn nur die Adressspalten
+-- ausgewählt werden.
+
+-- 23.1 Der EIGENE Schreibweg. `3333` (discover) hat noch keine Kontaktzeile,
+-- der erste Upsert geht also durch den INSERT-Zweig.
+select is(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+  $q$insert into public.profile_contacts
+       (profile_id, email, phone, street, postal_code, city, state, country)
+     values ('33333333-3333-3333-3333-333333333333', 'discover@test.fbc', '+49 711 1',
+             'Hauptstr. 1', '70173', 'Stuttgart', 'Baden-Württemberg', 'DE')
+     on conflict (profile_id) do update set
+       street = excluded.street, postal_code = excluded.postal_code,
+       city = excluded.city, state = excluded.state, country = excluded.country$q$),
+  'OK', 'Ein Mitglied legt seine eigene Kontaktzeile samt Anschrift an');
+
+select is((select count(*)::int from public.profile_contacts
+            where profile_id = '33333333-3333-3333-3333-333333333333'),
+  1, '… genau eine Zeile');
+
+select is((select street from public.profile_contacts
+            where profile_id = '33333333-3333-3333-3333-333333333333'),
+  'Hauptstr. 1', '… mit der eingetragenen Straße');
+
+-- 23.2 DERSELBE Aufruf ein zweites Mal. Erst hier läuft `on conflict do update`
+-- — und der Zweig braucht LESErecht auf die Konfliktzeile, das der
+-- Eigentümer-Zweig der SELECT-Policy hält. Ein einmaliger Upsert prüft nur
+-- INSERT und belegt gerade nicht, was der Editor tatsächlich tut (Fremd-Review
+-- zum Change, codex, MEDIUM).
+select is(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+  $q$insert into public.profile_contacts
+       (profile_id, email, phone, street, postal_code, city, state, country)
+     values ('33333333-3333-3333-3333-333333333333', 'discover@test.fbc', '+49 711 1',
+             'Hauptstr. 1', '71634', 'Ludwigsburg', 'Baden-Württemberg', 'DE')
+     on conflict (profile_id) do update set
+       street = excluded.street, postal_code = excluded.postal_code,
+       city = excluded.city, state = excluded.state, country = excluded.country$q$),
+  'OK', 'Derselbe Weg ein zweites Mal — jetzt durch ON CONFLICT DO UPDATE');
+
+select is((select count(*)::int from public.profile_contacts
+            where profile_id = '33333333-3333-3333-3333-333333333333'),
+  1, '… weiterhin genau eine Zeile, keine zweite angelegt');
+
+select is((select city from public.profile_contacts
+            where profile_id = '33333333-3333-3333-3333-333333333333'),
+  'Ludwigsburg', '… und der geänderte Wert steht drin');
+
+-- 23.3 Die Freigabe. `6666` (impact) trägt eine Anschrift; `4444` hat eine
+-- ANGENOMMENE Anfrage mit ihm (Zeile 335), `3333` nur eine offene, `1111` gar
+-- keine.
+update public.profile_contacts
+   set street = 'Impactweg 7', postal_code = '10115', city = 'Berlin',
+       state = 'Berlin', country = 'DE'
+ where profile_id = '66666666-6666-6666-6666-666666666666';
+
+select is(pg_temp.count_as('44444444-4444-4444-4444-444444444444',
+  $q$select count(*)::int from public.profile_contacts
+      where profile_id = '66666666-6666-6666-6666-666666666666' and street is not null$q$),
+  1, 'Nach angenommener Anfrage ist die Anschrift lesbar');
+
+select is(pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+  $q$select count(*)::int from public.profile_contacts
+      where profile_id = '66666666-6666-6666-6666-666666666666' and street is not null$q$),
+  0, '… bei offener Anfrage liefert sie NICHTS');
+
+select is(pg_temp.count_as('11111111-1111-1111-1111-111111111111',
+  $q$select count(*)::int from public.profile_contacts
+      where profile_id = '66666666-6666-6666-6666-666666666666' and street is not null$q$),
+  0, '… und ohne jede Anfrage erst recht nicht');
+
+-- Die Spaltenauswahl ist kein Umweg: die Policy wirkt auf die ZEILE. Ein
+-- `select street` statt `select *` bekommt deshalb ebenso null Zeilen — das
+-- ist die Form, die eine Oberfläche tatsächlich schickt.
+select is(pg_temp.count_as('11111111-1111-1111-1111-111111111111',
+  $q$select count(*)::int from (
+       select street, postal_code, city from public.profile_contacts
+        where profile_id = '66666666-6666-6666-6666-666666666666') t$q$),
+  0, '… auch wenn nur die Adressspalten ausgewählt werden');
+
+-- 23.4 Der Admin-Weg. Ohne ihn bräche C10 genau dort ab, wo nachgearbeitet
+-- wird: an importierten Datensätzen. Ziel ist das UNBESTÄTIGTE Profil aus §18.
+create temp table pg_temp_audit_vorher as
+  select count(*)::int as n from public.admin_audit;
+
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile(
+      'c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"street":"Altstr. 3","postal_code":"80331","city":"München",
+        "state":"Bayern","country":"DE"}'::jsonb)$q$),
+  'OK', 'Ein Admin trägt eine Anschrift nach');
+
+select is((select street || ' / ' || postal_code || ' ' || city || ' / ' || state || ' / ' || country
+             from public.profile_contacts where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Altstr. 3 / 80331 München / Bayern / DE',
+  '… alle fünf Felder stehen in der Kontaktzeile');
+
+-- Fehlend und leer bleiben zweierlei — die Zusage aus C6 gilt für die neuen
+-- Felder genauso, sonst löschte jeder Teil-Patch die halbe Anschrift.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"city":null}'::jsonb)$q$),
+  'OK', 'Ein Patch mit JSON-null auf einem Adressfeld geht durch');
+
+select is((select city from public.profile_contacts
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und leert genau dieses Feld');
+
+select is((select street from public.profile_contacts
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Altstr. 3', '… während das nicht geschickte Feld unverändert bleibt');
+
+-- 23.5 Die Abwehr gilt auch für die neuen Felder. Ein Mitglied darf die eigene
+-- Anschrift pflegen — die eines FREMDEN nicht, auch nicht über die RPC.
+select alike(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"street":"Gekapert 1"}'::jsonb)$q$),
+  'DENIED:%', 'Ein normales Mitglied prallt auch mit Adressfeldern ab');
+
+select is((select street from public.profile_contacts
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'Altstr. 3', '… und hat nichts verändert');
+
+-- 23.6 Der Lesepfad zählt keine Spalten auf (`to_jsonb(c)`), aber genau das ist
+-- eine Behauptung, solange es niemand nachsieht.
+select is(pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_get_profile('c6c6c6c6-0000-0000-0000-0000000000b1')
+       -> 'contact' ->> 'postal_code'$q$),
+  '80331', 'admin_get_profile liefert die Adressfelder mit');
+
+select is(
+  (select count(*)::int from public.admin_audit) - (select n from pg_temp_audit_vorher),
+  2, 'Beide erfolgreichen Admin-Aufrufe haben je eine Spur hinterlassen');
 
 select * from finish();
 rollback;

@@ -89,11 +89,13 @@ Keines der Felder SHALL Pflicht sein. Ein Mitglied ohne Kontaktzeile SHALL beim
 ersten Speichern eine bekommen (Upsert auf `profile_id`), ohne dass die
 Oberfläche zwischen „anlegen" und „ändern" unterscheidet.
 
-Die Vorgabe `DE` für `country` SHALL nur greifen, wenn **noch keine
-Kontaktzeile existiert**. Eine vorhandene Zeile mit leerem Land SHALL leer
-bleiben: sonst machte jedes Laden des Editors aus einer bewussten Leerung
-wieder „DE", und eine Speicherung, die mit der Anschrift nichts zu tun hat,
-legte eine Kontaktzeile mit erfundenem Land an.
+Das Formular SHALL **kein** Land erfinden. `country` bleibt leer, bis ein
+Mitglied es einträgt; die Oberfläche SHALL „DE" höchstens als Platzhalter
+zeigen. Eine Vorbelegung im Formular machte aus einer bewussten Leerung beim
+nächsten Laden wieder „DE" und legte bei einer Speicherung, die mit der
+Anschrift nichts zu tun hat, eine Kontaktzeile an, deren einziger Inhalt ein
+erfundenes Land wäre. Die Vorgabe `DE` gehört dorthin, wo sie gebraucht wird:
+in den Import (C10), der ein Feld füllt, das WordPress nicht erhebt.
 
 Die Kontakt-E-Mail SHALL vor dem Speichern auf ihre Form geprüft werden. Sie ist
 die Adresse, an die `notify-contact-request` schickt; ein Tippfehler dort ist
@@ -120,12 +122,13 @@ keine Anzeigefrage, sondern eine Benachrichtigung, die niemanden erreicht. Die
 - **THEN** wird der Vorgang angenommen und die betroffenen Spalten stehen auf
   NULL — kein Feld des Blocks ist Pflicht
 
-#### Scenario: Ein geleertes Land kommt nicht als „DE" zurück
+#### Scenario: Das Formular erfindet kein Land
 
-- **GIVEN** eine vorhandene Kontaktzeile, deren `country` bewusst geleert wurde
-- **WHEN** das Mitglied den Profil-Editor erneut öffnet und speichert
-- **THEN** bleibt `country` leer — die Vorgabe `DE` greift nur bei einem Profil
-  ohne Kontaktzeile
+- **GIVEN** ein Profil ohne Anschrift
+- **WHEN** das Mitglied den Profil-Editor öffnet und etwas speichert, das mit
+  der Anschrift nichts zu tun hat
+- **THEN** bleibt `country` leer — es entsteht keine Kontaktzeile, deren
+  einziger Inhalt ein nicht eingetragenes Land wäre
 
 #### Scenario: Eine unbrauchbare Kontakt-E-Mail wird abgewiesen
 

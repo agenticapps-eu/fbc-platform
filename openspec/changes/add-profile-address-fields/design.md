@@ -95,14 +95,23 @@ Spalten-Default wird von einem ausdrücklichen NULL nicht ausgelöst. Ein Defaul
 der in der Praxis nur bei Zeilen zieht, die niemand so anlegt, ist eine
 Behauptung im Schema statt einer Vorgabe im Formular.
 
-*Nach dem Fremd-Review (codex, MEDIUM) verschärft:* Die Vorbelegung greift nur,
-wenn es **noch keine Kontaktzeile gibt**. `EMPTY_PROFILE_FORM` ist der falsche
-Ort dafür — die Struktur wird auch benutzt, bevor `reset(data)` gelaufen ist, und
-ein dort fest eingetragenes „DE" machte aus einem bewusst geleerten Land beim
-nächsten Speichern wieder Deutschland. Schlimmer: eine Speicherung, die die
-Anschrift gar nicht betrifft, legte für ein Profil ohne Kontaktzeile eine solche
-an, die nichts enthält außer einem erfundenen Land. Die Vorbelegung gehört
-deshalb in `loadProfile`, in den Zweig „keine Zeile gefunden".
+*Nach dem Fremd-Review (codex, MEDIUM) fällt die Vorbelegung ganz weg.* Der
+Befund war, dass ein fest eingetragenes „DE" aus einer bewussten Leerung beim
+nächsten Laden wieder Deutschland macht und bei einer Speicherung ohne Bezug zur
+Anschrift eine Kontaktzeile anlegt, deren einziger Inhalt ein erfundenes Land
+ist. Die erste Antwort darauf war eine Bedingung („nur wenn keine Zeile
+existiert"), also eine Fallunterscheidung im Ladeweg.
+
+Die zweite ist kürzer und lässt den Fehler nicht zu: **das Formular belegt
+nichts vor.** `DE` steht als Platzhalter im Feld und wird vom Import gesetzt —
+dort, wo es hingehört, weil WordPress das Feld nicht erhebt. Ein Zustand, den es
+nicht gibt, braucht keine Bedingung.
+
+Der Upsert läuft dafür **bedingungslos** bei jedem Speichern. Sonst könnte ein
+Mitglied seine Kontaktdaten nicht mehr leeren: „alle Felder leer" wäre von
+„nichts eingetragen" nicht zu unterscheiden. Die Zeile, die dabei für ein Profil
+ohne Kontaktdaten entsteht, trägt ausschließlich NULL-Werte — sie behauptet
+nichts, und die Anzeige lässt leere Werte ohnehin weg.
 
 ### 4 · Der Editor schreibt per Upsert auf `profile_id`
 

@@ -48,8 +48,13 @@ export function MeineAnfragenWidget({ uid }: { uid: string }) {
           {data.length}
         </span>
       </div>
+      {/* Benennt seit AGE-537 ausdrücklich, WAS eine Annahme freigibt. „Kontaktdaten"
+          deckte sich mit der Erwartung, solange die Zeile E-Mail und Telefon trug;
+          mit der Anschrift tut es das nicht mehr. Beide Reviewer des Plans haben
+          das unabhängig gemeldet. */}
       <p className="text-sm text-muted">
-        Erst nach deiner Annahme werden Kontaktdaten geteilt und der Chat freigeschaltet.
+        Mit deiner Annahme gibst du E-Mail, Telefon und Anschrift frei — und der Chat wird
+        freigeschaltet. Vorher sieht die Gegenseite nichts davon.
       </p>
       <ul className="flex flex-col gap-3">
         {data.map((request) => (
