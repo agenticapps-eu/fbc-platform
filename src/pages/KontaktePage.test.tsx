@@ -100,4 +100,54 @@ describe("KontaktePage", () => {
     await screen.findByRole("heading", { name: "Mein Netzwerk" });
     expect(screen.queryByRole("heading", { name: "Mein Matching" })).toBeNull();
   });
+
+  // AGE-539: Unter der echten Kontaktzahl stand eine fest verdrahtete
+  // „Aufschlüsselung" — 24 Freunde, 8 Preferred Partner, 3 Mentoren, 5 Mentees,
+  // unabhängig von den tatsächlichen Kontakten. Derselbe Fall wie DEMO_POSTS auf
+  // dem Profil: erfundene Zahlen ÜBER DAS MITGLIED SELBST. Die Demo-Marke machte
+  // sie nicht wahr.
+  it("zeigt keine erfundene Netzwerk-Aufschlüsselung", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    expect(screen.queryByText("Aufschlüsselung")).toBeNull();
+  });
+
+  it("nennt keine erfundenen Kontaktgruppen", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    expect(screen.queryByText("Freunde")).toBeNull();
+    expect(screen.queryByText("Preferred Partner")).toBeNull();
+    expect(screen.queryByText("Mentoren")).toBeNull();
+    expect(screen.queryByText("Mentees")).toBeNull();
+  });
+
+  it("trägt keine Demo-Marke mehr", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    expect(screen.queryByText("Demo")).toBeNull();
+  });
+
+  // Bewahrend: die echte Zahl ist der Grund, warum das Widget bleibt. Geprüft
+  // wird der WERT, nicht nur die Beschriftung — eine fehlende oder fest
+  // verdrahtete Zahl bestünde sonst den Test.
+  // (Fremd-Review auf dem Diff, codex, MEDIUM.)
+  it("zeigt die Zahl der bestätigten Kontakte", async () => {
+    mockedFetch.mockResolvedValue({ ...DATA, contactsCount: 7 });
+    renderPage();
+    await screen.findByRole("heading", { name: "Mein Netzwerk" });
+    const label = screen.getByText("Bestätigte Kontakte");
+    expect(label.parentElement?.textContent).toContain("7");
+  });
+
+  // Bewahrend (AGE-494): ohne Kontakte steht bewusst KEINE Null, sondern eine
+  // Einladung. Der Ausbau der Aufschlüsselung darf daran nichts ändern.
+  it("lädt ohne Kontakte ein, statt eine Null zu zeigen", async () => {
+    mockedFetch.mockResolvedValue({ ...DATA, contactsCount: 0 });
+    renderPage();
+    const karte = (await screen.findByRole("heading", { name: "Mein Netzwerk" })).closest("div")
+      ?.parentElement;
+    expect(screen.getByRole("link", { name: "Mitglieder entdecken" })).toBeInTheDocument();
+    expect(screen.queryByText("Bestätigte Kontakte")).toBeNull();
+    expect(karte?.textContent).not.toContain("0");
+  });
 });

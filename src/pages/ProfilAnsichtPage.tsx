@@ -7,12 +7,8 @@ import { MembershipSummary } from "../components/membership/MembershipSummary";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { StatTile, formatDate, monthFmt } from "../components/mein-bereich/building-blocks";
 import {
-  AuszeichnungenWidget,
   BeitraegeWidget,
-  EntwicklungWidget,
-  ErfolgsradarWidget,
   InteressenWidget,
-  ZieleWidget,
 } from "../components/mein-bereich/profil-widgets";
 import { dashboardQueryKey, fetchDashboard } from "../lib/dashboard";
 import { useAuth } from "../providers/auth-context";
@@ -58,14 +54,23 @@ function ProfilView({ uid }: { uid: string }) {
           </Link>
         }
       >
-        <p className="text-xs text-muted">
-          Mitglied seit: {formatDate(p.member_since, monthFmt)}
-          {p.member_number && <> · Mitgliedsnummer: {p.member_number}</>}
-        </p>
-        {/* Impact Score bewusst ausgeblendet (Nav-IA §3, MVP „Mein Profil vereinfachen"). */}
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* AGE-539: Beide Angaben stehen EINZELN unter Bedingung. Den ganzen
+            Absatz an `member_since` zu hängen wäre der kürzere Griff und
+            verschluckte die Mitgliedsnummer — nach dem Import bei 18 von 70
+            Konten, und für einen Verein ist die Nummer die härtere Angabe. */}
+        {(p.member_since || p.member_number) && (
+          <p className="text-xs text-muted">
+            {p.member_since && <>Mitglied seit: {formatDate(p.member_since, monthFmt)}</>}
+            {p.member_since && p.member_number && <> · </>}
+            {p.member_number && <>Mitgliedsnummer: {p.member_number}</>}
+          </p>
+        )}
+        {/* Impact Score bewusst ausgeblendet (Nav-IA §3, MVP „Mein Profil vereinfachen").
+            AGE-539: „Matches" ist hier raus — Matching ist unerreichbar (AGE-450),
+            der Zähler verwies also auf eine Oberfläche, die niemand öffnen kann.
+            Nicht der Wert war das Problem, sondern das Ziel. */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <StatTile label="Netzwerk" value={data.contactsCount} />
-          <StatTile label="Matches" value={data.matchStats.successful} />
           <StatTile label="Events" value={data.eventsCount} />
         </div>
       </ProfileHero>
@@ -92,15 +97,15 @@ function ProfilView({ uid }: { uid: string }) {
 
       <MembershipSummary current={p.tier} showManageCta />
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <ErfolgsradarWidget data={data} />
-        <AuszeichnungenWidget badges={data.badges} />
+      {/* AGE-539: Erfolgsradar, Auszeichnungen, Ziele und Entwicklung sind hier
+          ausgebaut — die Kompass-Oberfläche ist für den Go-Live vertagt (AGE-494),
+          ihre Widgets standen aber weiter auf dem Profil. Die Komponenten bleiben
+          in `profil-widgets.tsx`, wie bei Matching (AGE-450): Zurückholen ist eine
+          Zeile. Statt eines Rasters mit zwei Kacheln eine Spalte — ein Raster mit
+          einer Spalte kündigt eine zweite an, die nicht kommt. */}
+      <div className="flex flex-col gap-5">
         <InteressenWidget data={data} />
-        <ZieleWidget data={data} />
-        <EntwicklungWidget profile={p} />
-        <div className="md:col-span-2 xl:col-span-3">
-          <BeitraegeWidget data={data} />
-        </div>
+        <BeitraegeWidget data={data} />
       </div>
 
       {/* AGE-494 (Donald, 04.08.): „Aktivität & Portfolio" ist hier ersatzlos raus.

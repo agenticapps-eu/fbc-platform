@@ -29,19 +29,12 @@ const ErfolgsradarChart = lazy(() =>
   import("../dashboard/ErfolgsradarChart").then((m) => ({ default: m.ErfolgsradarChart })),
 );
 
-// ── Demo-Daten (profile-spec §5: DEMO-Widgets, in Phase 2 durch echte Daten ersetzt) ──
-const DEMO_POSTS = [
-  {
-    title: "Warum Ökosysteme die Zukunft des Mittelstands sind",
-    kind: "Artikel",
-    meta: "1,2k Views · 84 Likes",
-  },
-  {
-    title: "Deal-Keeping im Family Office (Podcast)",
-    kind: "Podcast",
-    meta: "640 Views · 51 Likes",
-  },
-];
+// AGE-539: `DEMO_POSTS` ist hier ersatzlos gelöscht — zwei erfundene Artikel mit
+// erfundenen Reichweiten, gerendert sobald `posts` leer war, also nach dem Import
+// bei praktisch jedem Mitglied. Die Demo-Marke daneben machte sie nicht wahr; sie
+// erklärte die Zahlen dem, der sie gebaut hat, nicht dem, der sein eigenes Profil
+// liest. Nicht „ausgebaut" wie die Widgets unten, sondern gelöscht: eine
+// bereitliegende Demo-Konstante ist eine Einladung zum nächsten Einbau.
 
 // 1 ── Erfolgsradar (CORE) ─────────────────────────────────────────────────────
 export function ErfolgsradarWidget({ data }: { data: DashboardData }) {
@@ -117,27 +110,30 @@ export function InteressenWidget({ data }: { data: DashboardData }) {
   })).filter((g) => g.items.length > 0);
   const untheured = data.interests.filter((i) => !i.theme);
 
+  // AGE-539: Ohne Interessen verschwindet die Karte ganz. Ein einladender
+  // Leerzustand käme hier nicht in Frage — „Bearbeiten" führt in denselben
+  // Profil-Editor wie die Einladung oben auf der Seite, und zwei Einladungen mit
+  // einem Ziel sind Wiederholung. Die öffentliche Ansicht lässt leere Interessen
+  // ohnehin längst verschwinden.
+  if (data.interests.length === 0) return null;
+
   return (
     <DashboardCard
       id="interessen"
       title="Meine Interessen"
       action={<CardLink to="/profil/bearbeiten">Bearbeiten</CardLink>}
     >
-      {data.interests.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          {groups.map((group) => (
-            <div key={group.theme}>
-              <div className="text-xs font-semibold tracking-wide text-muted uppercase">
-                {THEME_LABEL[group.theme]}
-              </div>
-              <ChipList items={group.items.map((i) => i.label)} />
+      <div className="flex flex-col gap-3">
+        {groups.map((group) => (
+          <div key={group.theme}>
+            <div className="text-xs font-semibold tracking-wide text-muted uppercase">
+              {THEME_LABEL[group.theme]}
             </div>
-          ))}
-          {untheured.length > 0 && <ChipList items={untheured.map((i) => i.label)} />}
-        </div>
-      ) : (
-        <EmptyHint>Noch keine Interessen hinterlegt.</EmptyHint>
-      )}
+            <ChipList items={group.items.map((i) => i.label)} />
+          </div>
+        ))}
+        {untheured.length > 0 && <ChipList items={untheured.map((i) => i.label)} />}
+      </div>
     </DashboardCard>
   );
 }
@@ -237,27 +233,32 @@ function ScoreBreakdownList({ breakdown }: { breakdown: ScoreBreakdown }) {
   );
 }
 
-// 12 ── Meine Beiträge (CORE soweit posts, sonst DEMO) ─────────────────────────
+// 12 ── Meine Beiträge (CORE) ──────────────────────────────────────────────────
+// AGE-539: Ohne Beiträge steht hier eine Einladung statt einer Feststellung der
+// Leere. Das ist die eine Ausnahme von „ein leerer Bereich rendert nicht":
+// Beiträge gibt es wirklich (C8), und das Ziel `/aktivitaet` steht sonst nirgends
+// auf dieser Seite — anders als bei „Meine Interessen", das in denselben Editor
+// führt wie die Einladung weiter oben.
 export function BeitraegeWidget({ data }: { data: DashboardData }) {
-  const isDemo = data.posts.length === 0;
   return (
     <DashboardCard
       id="beitraege"
       title="Meine Beiträge"
-      demo={isDemo}
       action={<CardLink to="/aktivitaet">Alle anzeigen</CardLink>}
     >
-      {isDemo ? (
-        <ul className="flex flex-col gap-3">
-          {DEMO_POSTS.map((p) => (
-            <li key={p.title}>
-              <p className="text-sm font-medium text-ink">{p.title}</p>
-              <p className="text-xs text-muted">
-                {p.kind} · {p.meta}
-              </p>
-            </li>
-          ))}
-        </ul>
+      {data.posts.length === 0 ? (
+        <div>
+          <p className="text-sm text-ink">Von dir war hier noch nichts zu lesen.</p>
+          <p className="mt-1 text-sm text-muted">
+            Was dich gerade beschäftigt, ist für die anderen der schnellste Weg, dich
+            einzuordnen — ein paar Sätze genügen.
+          </p>
+          <Link to="/aktivitaet" className="mt-3 inline-block">
+            <Button variant="primary" size="sm">
+              Beitrag schreiben
+            </Button>
+          </Link>
+        </div>
       ) : (
         <ul className="flex flex-col gap-3">
           {data.posts.map((post) => (
