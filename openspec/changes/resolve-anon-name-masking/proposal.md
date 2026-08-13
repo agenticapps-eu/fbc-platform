@@ -1,53 +1,60 @@
 ## Why
 
 `directory-search/spec.md` führt seit AGE-239 die Anforderung **„Author name
-masking is only partially resolved"**. Sie sagt, die anonyme Maskierung stehe,
-das **stufenweise Auflösen von Namen nach Mitgliedsstufe** (AGE-291) sei aber
-„pending and is not present in the code".
+masking is only partially resolved"**. Sie sagt zwei Dinge, und **beide stimmen
+nicht**:
 
-Der Rest davon ist inzwischen gebaut, und die Anforderung ist damit die einzige
-Stelle, die AGE-291 noch offen hält. Vier Tage vor dem Go-Live ist zu
-entscheiden, ob das Fehlende gebaut oder gestrichen wird — nicht, ob es weiter
-als „pending" stehen bleibt. Eine Anforderung, die auf ein Vorhaben zeigt, das
-niemand mehr verfolgt, ist keine laufende Wahrheit, sondern eine Notiz.
+1. Die anonyme Maskierung sei ein Rückfall auf den Namen „Mitglied", wenn eine
+   Profilzeile nicht lesbar ist. Tatsächlich greift sie seit AGE-530 eine Ebene
+   früher: ohne Session wird `profiles_public` **gar nicht erst angefragt**.
+2. Das stufenweise Auflösen von Namen nach Mitgliedsstufe sei „pending". Es ist
+   nicht nur ausstehend, sondern in einem **anderen, aktiven Change** geplant —
+   `finish-ui-polish` trägt AGE-291 mit vier Aufgaben und baut den Resolver in
+   der Datenbank.
 
-Entscheidung Donald, 2026-08-13: **gestrichen.** Die RLS gattert die Daten
-bereits nach Stufe (`profiles_select_self_or_discover`, `has_level(3)`; Beiträge
-`members` ab Rang 4). Eine Anzeige-Maskierung nach Stufe obendrauf wäre eine
-zweite, schwächere Kopie derselben Grenze — Kulisse vor einem Gate, das schon
-hält, und damit genau die Bauweise, vor der `profiles_public` warnt.
+Und die Anforderung verschweigt das, was heute wirklich gilt: **jedes aktivierte
+Konto — auch ein frei registriertes `basic` — kann jeden öffentlichen
+Mitgliedsnamen lesen.** `profiles_public` läuft mit `security_invoker = off`
+(`20260612082726:64`) und trägt `grant select … to authenticated`
+(`20260715140000:118`); die Stufen-Policy der Basistabelle wird dort **nicht**
+ausgewertet. Diese Preisgabe steht in **keiner** Spec.
+
+Das ist der Anlass. Vier Tage vor dem Umzug, mit 70 echten importierten
+Mitgliedern, ist eine undokumentierte PII-Lage schlimmer als eine unbequeme
+dokumentierte.
+
+> **Korrektur an einem früheren Stand dieses Vorschlags.** Er begründete die
+> Streichung des stufenweisen Auflösens damit, „die RLS gattert die Daten
+> bereits nach Stufe". Für **Zeilen** über `search_directory` stimmt das
+> (`has_level(3)`), für **Namen** über `profiles_public` nicht. Ein
+> stufenweises Auflösen wäre also keine zweite Kopie einer bestehenden Grenze,
+> sondern eine echte neue. Der Plan-Review hat das aufgedeckt; die Streichung
+> ist zurückgenommen.
 
 ## What Changes
 
-Reine Spec-Arbeit. **Kein Produktionscode, keine Migration, keine Testdatei** —
-das Verhalten steht bereits vollständig und ist bereits festgenagelt:
+Entscheidung Donald, 2026-08-13, nach dem Plan-Review: **vertagen und ehrlich
+benennen** — nicht streichen und nicht jetzt bauen. Die Produktfrage („sehen frei
+registrierte Konten alle Namen?") gehört Detlev, und ein Resolver quer durch
+`profiles_public`, `search_directory` und jede namenstragende Fläche ist vier
+Tage vor dem Umzug der falsche Eingriff.
 
-- `src/lib/displayAuthor.ts` — Ausgeloggte sehen „Ein Mitglied" ohne Avatarbild.
-  Festgenagelt in `displayAuthor.test.ts` (drei Fälle, Gegenprobe eingeloggt).
-- `src/lib/feed.ts` `fetchAuthors` — ohne Session wird `profiles_public` gar
-  nicht erst angefragt (AGE-530). Festgenagelt in `anon-anreicherung.test.ts`,
-  und zwar **als Regel**: die Positivliste `ANON_DARF_LESEN` lässt ausgeloggt
-  nur Relationen zu, die `anon` laut `20260715140000_explicit_grants.sql`
-  überhaupt lesen darf. Ein vierter Verstoß fiele dort auf, ohne dass ihn jemand
-  vorher erraten muss.
-- `PublicHome` (`HomePage.tsx`) zeigt Gästen Events, öffentliche Beiträge,
-  Testimonials und Kennzahlen — **keine Mitgliederliste**. Es gibt heute keine
-  Fläche, auf der ein Gast einen Namen sähe.
+Dieser Change ersetzt deshalb eine **falsche** Anforderung durch **wahre**:
 
-Geändert wird deshalb nur, was der Spec behauptet:
+- Die anonyme Verdeckung wird als das beschrieben, was sie ist — **zwei Ebenen**,
+  Daten und Anzeige, mit der Datenebene als der tragenden.
+- Die **tatsächliche Preisgabe an eingeloggte Konten** wird ausgesprochen: volle
+  Namen sind heute Verzeichnisdaten für jedes aktivierte Konto, `basic`
+  eingeschlossen. Bisher stand das nirgends.
+- Das stufenweise Auflösen bleibt **benannt offen**, mit Zeiger auf
+  `finish-ui-polish`, statt als „pending" ohne Adresse zu schweben.
+- Das Geländer für neue anon-Flächen wird auf das zurückgenommen, was der
+  vorhandene Test **wirklich** hält.
 
-- Die Anforderung „Author name masking is only partially resolved" **entfällt**.
-- An ihre Stelle tritt eine Anforderung, die den erreichten Zustand als
-  laufende Wahrheit führt und das stufenweise Auflösen **ausdrücklich als
-  verworfen** benennt, mit Begründung — damit es nicht als vergessene Lücke
-  wieder aufschlägt.
-- Zusätzlich wird die Regel für **neue** anon-Flächen ausgesprochen: keine neue
-  ausgeloggt erreichbare Fläche gibt Mitgliedsnamen preis. Das ist das
-  Geländer, gegen das AGE-540 (Kopfzeilen-Suche) baut — dort ist entschieden,
-  das Suchfeld für Ausgeloggte auszublenden, statt eine für `anon` lesbare
-  DEFINER-RPC zu bauen.
-
-**Kein BREAKING.** Nichts am Verhalten ändert sich.
+**`finish-ui-polish` wird nicht angefasst.** Es bleibt aktiv und behält AGE-291.
+Damit entfernen zwei Changes dieselbe Anforderung — deshalb entfernt **dieser**
+sie nicht, sondern **ändert** sie. Wer später zuerst archiviert, macht den
+anderen nicht unarchivierbar.
 
 ## Capabilities
 
@@ -57,26 +64,43 @@ Keine.
 
 ### Modified Capabilities
 
-- `directory-search`: Die Anforderung zur Autor-Maskierung wird von „teilweise
-  gelöst / stufenweises Auflösen ausstehend" auf „gelöst; stufenweises Auflösen
-  verworfen" umgestellt, und die Regel für neue anon-Flächen kommt hinzu.
+- `directory-search`: Die Anforderung zur Autor-Maskierung wird von einer
+  falschen Beschreibung („Rückfall auf einen Namen", „pending") auf den
+  tatsächlichen Zustand umgestellt und um die bisher nirgends festgehaltene
+  Preisgabe voller Namen an alle aktivierten Stufen ergänzt.
 
 ## Impact
 
-**Betroffene Dateien:** ausschließlich `openspec/specs/directory-search/spec.md`
-(beim Archivieren).
+**Betroffene Dateien:**
 
-**Nicht betroffen:** kein Produktionscode, kein Test, keine Migration, keine
-Edge Function. Das ist die zentrale Aussage dieses Changes und zugleich die
-Behauptung, die die Aufgaben belegen müssen — nicht durch „es sieht so aus",
-sondern indem die bestehenden Tests einmal rot gemacht und wieder grün gesehen
-werden.
+- `openspec/specs/directory-search/spec.md` (beim Archivieren).
+- `src/lib/displayAuthor.ts` — der Kopfkommentar sagt „Folgeschritt (nicht
+  hier): stufenweise Auflösung je Mitgliedsstufe" und ist die einzige Stelle im
+  Produktionscode, die diesen Folgeschritt benennt, **ohne** zu sagen wo er
+  liegt. Er bekommt die Adresse (`finish-ui-polish`, AGE-291).
+- `src/lib/anon-anreicherung.test.ts` — ein Kommentar über `ANON_DARF_LESEN`,
+  der seine Rolle **und seine Grenze** benennt.
 
-**Verwandt:** AGE-540 baut die Kopfzeilen-Suche und stützt sich auf das hier
-festgeschriebene Geländer. Getrennter Change, getrennter Branch.
+> Ein früherer Stand behauptete „kein Produktionscode". Der Plan-Review hat den
+> Kommentar in `displayAuthor.ts` gefunden; die Behauptung ist korrigiert statt
+> gerettet.
 
-**Anschlussrisiko, benannt statt behoben:** `HomePage.tsx:81` trägt erfundene
-Kennzahlen (`120+ Mitglieder`, `24 Events 2026`) und zwei erfundene
-Testimonials. Dieselbe Klasse, die AGE-539 aus dem Profil geworfen hat, auf der
-öffentlichen Startseite. Gehört nicht in diesen Change — hier steht es, damit es
-nicht wieder verloren geht.
+**Nicht betroffen:** kein Verhalten, keine Migration, keine Policy, keine RPC,
+keine Edge Function, kein Test-**Ergebnis**.
+
+**Bewusst nicht mitgenommen:**
+
+- `HomePage.tsx:81` trägt erfundene Kennzahlen (`120+ Mitglieder`, `24 Events
+  2026`) und zwei erfundene Testimonials — dieselbe Klasse, die AGE-539 aus dem
+  Profil geworfen hat, auf der öffentlichen Startseite. Gehört in ein eigenes
+  Issue.
+- Die `.rpc`-Lücke im anon-Wächter (siehe unten) wird **benannt**, nicht
+  geschlossen. Sie zu schließen hieße, ein repositoriumsweites Mittel zu bauen
+  (zentrales anon-Lesetor oder Lint-Regel) — ein eigener Change.
+
+**Für AGE-540 wichtig:** Der frühere Stand versprach, `anon-anreicherung.test.ts`
+sei das Geländer, gegen das die Kopfzeilen-Suche baut. **Das Versprechen ist
+hinfällig.** Der Test ruft vier importierte Funktionen auf und zeichnet nur
+`.from(...)` auf; `.rpc(...)` ist gemockt, **ohne den Namen festzuhalten**. Eine
+neue Datei mit eigenem Supabase-Aufruf — und erst recht eine anon-DEFINER-RPC —
+liefe durch. AGE-540 braucht seinen **eigenen** negativen Test.

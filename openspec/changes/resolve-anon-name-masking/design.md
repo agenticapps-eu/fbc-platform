@@ -1,125 +1,144 @@
 ## Context
 
-Dieser Change schreibt eine Entscheidung fest und ändert keinen Produktionscode.
-Das ist die ungewöhnlichste Eigenschaft daran, und sie ist auch das einzige
-echte Risiko: Ein Change ohne Diff kann jede Behauptung aufstellen, ohne dass
-irgendetwas widerspricht.
+Dieser Change korrigiert eine Anforderung, die drei Dinge falsch sagt, und
+schreibt eine PII-Lage auf, die bisher **nirgends** stand. Er ändert kein
+Verhalten. Das ist seine ungewöhnlichste Eigenschaft und zugleich sein einziges
+echtes Risiko: ein Change ohne Verhaltensdiff kann jede Behauptung aufstellen,
+ohne dass etwas widerspricht.
 
-**Ausgangslage, gemessen am 2026-08-13:**
+**Ausgangslage, gemessen am 2026-08-13 und im Plan-Review nachgeprüft:**
 
-| Fläche | Stand |
-|---|---|
-| `src/lib/displayAuthor.ts` | Ausgeloggt „Ein Mitglied", kein Avatarbild |
-| `src/lib/feed.ts` `fetchAuthors` | Ohne Session wird `profiles_public` nicht angefragt |
-| `src/lib/events.ts` `hostsFor` | Ohne Session weder `profiles_public` noch `partners` |
-| `HomePage.tsx` `PublicHome` | Events, öffentliche Beiträge, Testimonials, Kennzahlen — **keine Mitgliederliste** |
-| `displayAuthor.test.ts` | 3 Fälle, mit Gegenprobe eingeloggt |
-| `anon-anreicherung.test.ts` | Positivliste `ANON_DARF_LESEN` + Gegenproben |
+| Fläche | Stand | Beleg |
+|---|---|---|
+| `displayAuthor.ts` | Ausgeloggt „Ein Mitglied", kein Avatarbild | `displayAuthor.test.ts` |
+| `feed.ts` `fetchAuthors` | Ohne Session wird `profiles_public` nicht angefragt | `anon-anreicherung.test.ts` |
+| `events.ts` `hostsFor` | Ohne Session weder `profiles_public` noch `partners` | dito |
+| `HomePage.tsx` `PublicHome` | Events, Beiträge, Testimonials, Kennzahlen — **keine Mitgliederliste** | gelesen |
+| `profiles_public` | `security_invoker = off`, `grant select … to authenticated` | `20260612082726:64`, `20260715140000:118` |
 
-Es gibt also heute **keine Fläche, auf der ein Gast einen Mitgliedsnamen sähe**.
-Die Prämisse in AGE-291 („die öffentliche Startseite zeigt öffentliche Beiträge
-und **Mitglieder**") trifft auf `PublicHome` nicht zu.
+Die letzte Zeile ist der Anlass für die Neufassung. **Jedes aktivierte Konto,
+auch ein frei registriertes `basic`, liest darüber jeden öffentlichen Namen** —
+unabhängig von `profiles_select_self_or_discover`, weil die View die Policies der
+Basistabelle nicht auswertet.
 
-Offen war allein das stufenweise Auflösen nach Mitgliedsstufe, das der Spec als
-„pending" führte. Es ist gestrichen.
+> **Was der Plan-Review gekippt hat.** Der erste Entwurf strich das stufenweise
+> Auflösen mit der Begründung, die RLS gattere Namen schon nach Stufe. Das gilt
+> für **Zeilen** über `search_directory`, nicht für **Namen** über
+> `profiles_public`. Die Streichung ist zurückgenommen; die Entscheidung heißt
+> jetzt **vertagen und ehrlich benennen**.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Die Anforderung in `directory-search` sagt, was gilt, statt was fehlt.
-- Die verworfene Alternative steht benannt und begründet im Spec, damit sie nicht
-  als vergessene Lücke zurückkehrt.
-- Das Geländer für neue anon-Flächen ist ausgesprochen — AGE-540 baut dagegen.
-- Die Behauptung „das Verhalten steht schon und ist festgenagelt" wird **belegt**,
-  nicht behauptet.
+- Die Anforderung sagt, was gilt — einschließlich der unbequemen Hälfte.
+- Die stufenweise Auflösung bleibt offen, aber **mit Adresse** statt als
+  heimatloses „pending".
+- Das Geländer für anon-Flächen sagt, wie weit es reicht, statt eine Zusage zu
+  geben, die es nicht hält.
+- Die Behauptung „das Verhalten steht schon und ist festgenagelt" wird
+  **belegt**, nicht behauptet.
 
 **Non-Goals:**
 
-- Kein neues Verhalten, keine neue Testdatei, keine Migration.
-- Keine Änderung an `HomePage.tsx` — auch nicht an den erfundenen Kennzahlen
-  (`120+ Mitglieder`, `24 Events 2026`) und Testimonials. Sie sind im Proposal
-  als Folgepunkt notiert; sie hier mitzunehmen wäre ein Cleanup im
-  Entscheidungs-Commit.
-- Kein neuer anon-Lesepfad, in keiner Richtung.
+- Kein neues Verhalten, keine Migration, keine Policy.
+- **Keine Änderung an `finish-ui-polish`.** Es bleibt aktiv und behält AGE-291.
+- Kein Bau der stufenweisen Auflösung, in keiner Richtung.
+- Kein Schließen der Funktionsaufruf-Lücke im anon-Wächter — sie wird benannt.
+- Keine Änderung an `HomePage.tsx`, auch nicht an den erfundenen Kennzahlen.
 
 ## Decisions
 
-### 1. Der Beleg ist eine Mutationsprobe, kein neuer Test
+### 1. `MODIFIED` statt `REMOVED` — damit sich zwei Changes nicht gegenseitig sperren
 
-Die Regel des Repos ist RED vor GREEN. Ein Change ohne Produktionsdiff hat
-nichts, was rot werden könnte — und ein **neu geschriebener** Test, der sofort
-grün ist, belegt nichts (es wäre genau der Vakuumtest, den dieses Repo schon
-zweimal gefangen hat).
+`finish-ui-polish` entfernt dieselbe Anforderung, unter **exakt demselben Kopf**,
+aus der Gegenrichtung. Entfernten beide, machte der zuerst archivierte den
+anderen unarchivierbar — genau die Lage, die `add-academy-content` heute
+blockiert.
 
-Der Beleg läuft deshalb andersherum: die **bestehenden** Tests werden einmal rot
-gemacht, indem der Produktionscode vorübergehend kaputtgemacht wird, und danach
-wieder grün, indem der Eingriff zurückgenommen wird. Das misst genau die Frage,
-die dieser Change offen hat — **halten die Tests die Anforderung wirklich, oder
-wären sie auch ohne sie grün?**
+Der Kopf „Author name masking is only partially resolved" ist unter der
+Vertagungs-Entscheidung ohnehin **wahr**: teilweise gelöst ist genau der Stand.
+Falsch war nie der Kopf, sondern welcher Teil gelöst sei und was in der
+Zwischenzeit gilt. Also bleibt er stehen, und der Rumpf wird richtig.
 
-Drei Proben, eine je Aussage der Anforderung:
+Damit ist die Reihenfolge einseitig entschärft: archiviert **dieser** Change
+zuerst, findet `finish-ui-polish` seine Anforderung unverändert vor. Der
+umgekehrte Fall bliebe problematisch — er tritt nicht ein, weil dieser Change
+klein und jener ungebaut ist. Benannt, nicht weggeredet.
+
+Verworfene Alternative: den Kopf umbenennen. Dann fände `finish-ui-polish` beim
+Archivieren nichts mehr — dieselbe Falle, nur später.
+
+### 2. Der Beleg ist eine Mutationsprobe, kein neuer Test
+
+Die Regel des Repos ist RED vor GREEN. Ein Change ohne Verhaltensdiff hat nichts,
+was rot werden könnte — und ein **neu geschriebener** Test, der sofort grün ist,
+belegt nichts. Es wäre der Vakuumtest, den dieses Repo schon zweimal gefangen
+hat.
+
+Der Beleg läuft andersherum: die **bestehenden** Tests werden einmal rot gemacht,
+indem der Produktionscode vorübergehend kaputtgemacht wird, und danach wieder
+grün. Das misst die einzige offene Frage — **halten die Tests die Anforderung
+wirklich, oder wären sie auch ohne sie grün?**
 
 | Probe | Eingriff | Muss rot werden in |
 |---|---|---|
-| A — Anzeige | `displayAuthor` gibt auch ausgeloggt den echten Namen zurück | `displayAuthor.test.ts` |
+| A — Anzeige | `displayAuthor` gibt auch ausgeloggt den echten Namen | `displayAuthor.test.ts` |
 | B — Daten | `fetchAuthors` fragt `profiles_public` auch ohne Session an | `anon-anreicherung.test.ts` |
-| C — Positivliste | eine für `anon` gesperrte Relation zusätzlich ausgeloggt anfragen | `anon-anreicherung.test.ts` („Die Regel, nicht der Einzelfall") |
+| C — Positivliste | eine gesperrte, in keinem Test genannte Relation ausgeloggt anfragen | „Die Regel, nicht der Einzelfall" |
 
-Probe C ist die wichtigste: sie prüft nicht das bekannte Verhalten, sondern ob
-der **Wächter** einen bisher unbekannten Verstoß fängt. Sie ist der Grund, warum
-das Geländer für AGE-540 überhaupt trägt.
+**Probe C hat ihre Aussage im Review verloren und behält nur die kleinere.** Sie
+belegt, dass der Wächter einen unvorhergesehenen Verstoß **innerhalb des
+bestehenden Aufrufgraphen** fängt. Sie belegt **nicht**, dass er eine neue Datei
+oder einen Funktionsaufruf fängt — er tut es nachweislich nicht. Genau deshalb
+steht die Reichweite jetzt in der Anforderung.
 
-Verworfene Alternative: die Aussagen einfach durch Lesen des Codes belegen. Das
-ist genau die Bauweise, die in diesem Repo dreimal danebenlag — zuletzt bei
-`service_role`, wo drei Testsuiten und zwei Reviews eine Lücke übersahen, die
-erst die Sichtprobe fand.
+**Sicherheitsregeln für die Proben**, aus dem Review übernommen:
 
-Die Eingriffe werden **nicht committet**. Sie laufen im Arbeitsbaum, ihre Ausgabe
-wird gelesen und in `tasks.md` festgehalten, dann per gezieltem
-`git checkout -- <datei>` zurückgenommen — nie breit, weil der Arbeitsbaum hier
-dauerhaft ungesicherte Dateien trägt.
+- Sie laufen **nach** Validierung und Plan-Review, nicht davor. 2b liegt vor
+  jeder Code-Änderung, auch vor einer, die zurückgenommen wird.
+- Sie laufen nur, wenn das Ziel **sauber** ist. `git checkout -- <datei>` auf
+  eine Datei mit vorbestehenden Änderungen vernichtet diese. Die Datei nur zu
+  notieren schützt sie nicht — die Probe wird verweigert.
+- Der Blob-Hash der Zieldatei wird vor und nach der Rücknahme verglichen. „Sieht
+  wieder aus wie vorher" ist keine Messung.
 
-### 2. REMOVED + ADDED statt MODIFIED
+### 3. Der Change ist nicht spec-only, und das wird nicht gerettet
 
-Der Kopf der alten Anforderung ist selbst die Falschaussage („is only partially
-resolved"). Ein `MODIFIED`-Block mit umgeschriebenem Kopf fände beim Archivieren
-das Original nicht mehr — dieselbe Falle, die dieses Repo bei Szenario-Titeln
-schon getroffen hat. Also `REMOVED` mit `**Reason**` und `**Migration**`, plus
-zwei `ADDED`-Anforderungen.
+`displayAuthor.ts:6` sagt „Folgeschritt (nicht hier): stufenweise Auflösung je
+Mitgliedsstufe" — die einzige Stelle im Produktionscode, die den Folgeschritt
+benennt, und sie nennt keine Adresse. Sie bekommt eine. Dazu ein Kommentar über
+`ANON_DARF_LESEN`, der Rolle **und Grenze** des Wächters festhält, weil ein
+späterer Leser dort sonst nur die Liste findet und den Rest annimmt.
 
-Verworfene Alternative: Kopf stehen lassen und nur den Rumpf drehen. Dann hieße
-die laufende Wahrheit weiterhin „only partially resolved" und sagte das Gegenteil
-ihres Inhalts.
+Beides sind Kommentare, kein Verhalten. Der frühere Stand behauptete trotzdem
+„kein Produktionscode" — das war falsch und ist korrigiert statt umformuliert.
 
-### 3. Zwei Anforderungen, nicht eine
+### 4. Zwei Anforderungen, nicht eine
 
-Die erste beschreibt den **Ist-Zustand** (zwei Ebenen, Anzeige plus Daten). Die
-zweite ist eine **Regel für künftige Flächen**. Sie in eine zu gießen hieße, dass
-jede spätere Änderung am Ist-Zustand die Regel mitanfasst — und die Regel ist das,
-was AGE-540 trägt.
+Die erste beschreibt den **Ist-Zustand** samt Preisgabe. Die zweite ist eine
+**Regel für künftige Flächen** samt ihrer Reichweite. In eine gegossen fasste
+jede spätere Änderung am Ist-Zustand die Regel mit an.
 
 ## Risks / Trade-offs
 
-**Ein Change ohne Diff kann sich nicht irren, weil er nichts tut — und genau
-deshalb kann seine Beschreibung falsch sein, ohne dass es auffällt.**
-→ Die Mutationsprobe ist die Gegenmaßnahme. Ohne sie ist dieser Change ein
-Meinungsbeitrag.
+**Ein Change ohne Verhaltensdiff kann sich nicht irren, weil er nichts tut — und
+genau deshalb kann seine Beschreibung falsch sein, ohne dass es auffällt.**
+→ Der erste Entwurf war der Beweis: seine tragende Begründung war falsch, und
+`validate` war grün. Die Gegenmaßnahmen sind die Mutationsprobe und der
+Plan-Review; beide haben gegriffen.
 
-**Die Streichung des stufenweisen Auflösens kann als Sicherheitslücke gelesen
-werden.**
-→ Sie ist keine: die Stufen entscheiden über die Daten, nicht über die Anzeige.
-Der Spec-Text sagt das ausdrücklich und nennt die verworfene Alternative. Wer
-später anderer Meinung ist, findet die Begründung statt eines Lochs.
+**Die aufgeschriebene Preisgabe kann als neue Lücke gelesen werden.**
+→ Sie ist keine neue, sondern eine seit AGE-235 bestehende, bisher
+undokumentierte. Sie hinzuschreiben verschlechtert nichts und ist die
+Voraussetzung dafür, dass jemand sie entscheidet.
 
-**Das Geländer für neue anon-Flächen ist eine Anforderung, kein Zwang.**
-→ Es hängt an `anon-anreicherung.test.ts` und dessen Positivliste. Die trägt so
-lange, wie ein neuer Lesepfad über `fetchFeed`/`fetchEvents`/`fetchComments`
-läuft. Eine völlig neue Datei mit eigenem Supabase-Aufruf umginge sie. Das ist
-benannt, nicht behoben — es zu beheben hieße, einen Lint-Wächter zu bauen, und
-das ist ein eigener Change.
+**Zwei aktive Changes zu AGE-291 sind ein Zustand, kein Ziel.**
+→ Solange `finish-ui-polish` ungebaut ist, tragen beide dieselbe offene Frage.
+Entscheidung 1 sorgt dafür, dass sie einander nicht sperren; sie ersetzt nicht,
+dass `finish-ui-polish` irgendwann gebaut oder zurückgezogen wird.
 
 **Der Spec-Slot ist `directory-search`, obwohl die Maskierung im Feed sitzt.**
-→ Bewusst: dort steht die alte Anforderung, und `community-feed` trägt bereits
-die Feed-Seite derselben Sache (Zeile 464-494). Ein dritter Slot machte drei
-Stellen aus zweien. Die neue Anforderung verweist auf beides.
+→ Bewusst: dort steht die alte Anforderung, dort entfernt `finish-ui-polish`
+sie, und `community-feed` trägt bereits die Feed-Seite derselben Sache
+(Zeile 464-494). Ein dritter Slot machte drei Stellen aus zweien.
