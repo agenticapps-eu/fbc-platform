@@ -156,6 +156,10 @@ describe("Academy „Meine Academy“ — Regal „gefällt mir“", () => {
     // Der Filter auf das Video sitzt am eingebetteten Beitrag, damit die
     // Seitengröße stimmt — nachträgliches Wegwerfen ergäbe kürzere Seiten.
     expect(likes?.not).toContainEqual(["posts.video_url", "is", null]);
+    // Und ausdrücklich auf das eigene Profil (Diff-Review gemini, HIGH): die
+    // Grenze bleibt `likes_write_own`, aber diese Zeilen bilden den INHALT
+    // eines Regals — fiele die Policy, stünden hier fremde Markierungen.
+    expect(likes?.eq).toContainEqual(["profile_id", ICH]);
   });
 
   it("gibt ohne Session nichts zurück, statt eine verbotene Abfrage abzusetzen", async () => {

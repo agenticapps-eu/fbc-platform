@@ -78,6 +78,15 @@ export async function fetchGelikteVideos({
     // Seiten als angefordert — und „Mehr laden" liefe irgendwann durch den
     // ganzen Bestand, um eine Seite zu füllen.
     .select(`post_id, created_at, posts!inner(${POST_SPALTEN})`)
+    // Ausdrücklich auf das eigene Profil, obwohl `likes_write_own` ohnehin nur
+    // eigene Zeilen liefert (Befund gemini im Diff-Review, HIGH).
+    //
+    // Die Grenze bleibt die Policy — das hier ersetzt sie nicht. Der Grund für
+    // die Redundanz an DIESER Stelle und nicht in `fetchFeed`: dort speisen die
+    // Like-Zeilen nur ein Boolean (`likedByMe`), hier bilden sie den INHALT
+    // eines Regals. Fiele die Grenze, zeigte `fetchFeed` ein falsches Herz —
+    // diese Funktion zeigte fremde Markierungen.
+    .eq("profile_id", uid)
     .order("created_at", { ascending: false })
     .order("post_id", { ascending: false })
     // Der Filter sitzt am EINGEBETTETEN Beitrag, nicht an der Like-Zeile.
