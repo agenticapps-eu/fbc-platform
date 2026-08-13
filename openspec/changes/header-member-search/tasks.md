@@ -73,14 +73,69 @@
 
 ## 11. Abschluss
 
-- [ ] 11.1 Code-Review auf dem **Diff** durch einen unabhängigen Leser (Schritt 4).
-- [ ] 11.2 `openspec validate --all` grün; jede Aufgabe abgehakt mit einem Diff, der sie erfüllt.
+- [x] 11.1 Code-Review auf dem **Diff** durch einen unabhängigen Leser (Schritt 4).
+- [x] 11.2 `openspec validate --all` grün; jede Aufgabe abgehakt mit einem Diff, der sie erfüllt.
 - [ ] 11.3 **Vor** dem PR archivieren (`openspec archive header-member-search`), damit die gefaltete `openspec/specs/directory-search/spec.md` im geprüften Diff liegt.
 - [ ] 11.4 Commit(s) auf dem Feature-Branch, Conventional Commit mit `(AGE-540)`; PR mit den Belegen aus 9.x und 10.x, nicht als Behauptung.
 - [ ] 11.5 CI grün auf der HEAD-SHA prüfen (`check-runs`, nicht `run list`), mergen, Merge mit `gh pr view --json state` bestätigen.
 - [ ] 11.6 Live belegen: Bundle-Name und Größe, plus eine Zeichenkette aus diesem Diff im ausgelieferten Bundle — Größe allein unterscheidet die Vorversion nicht.
 - [ ] 11.7 AGE-540 in Linear: erst `get_issue` lesen, dann die widerlegten Annahmen als Kommentar hinterlassen — das Feld drängt auf dem Telefon nicht (es fehlt dort), „nur öffentliche Profile durchsuchen" ist kein vorhandener Weg, ausgeloggt ist nicht der einzige Leerfall, und Enter unterhalb `discover` kann nicht ins Verzeichnis führen.
 
+
+## Belege zu Gruppe 11 — das Code-Review und was es gefunden hat
+
+**Ergebnis: „needs work", zwei Critical.** Der Datenpfad, die Zwischenspeicher-
+Identität, das Adresszeilen-Modell und der Datenbank-Nachweis wurden bestätigt.
+Die Telefon-Fassung nicht. **Alle Befunde angenommen, keiner zurückgewiesen.**
+
+| | Befund | Belegt durch | Behoben |
+|---|---|---|---|
+| **C1** | Die Telefon-Fassung war **nicht bildschirmfüllend**: `HeaderSearch` steht in `<header>`, und dessen `backdrop-blur` macht das Element zum Bezugsrahmen für `fixed` Nachkommen. Gemessen bei 375×812: Schleier **375×64**; `elementFromPoint` in der Seitenmitte traf den Inhalt. Die Seite blieb ungedimmt **und anklickbar**, „Schließen über den Hintergrund" galt nur im obersten Streifen | eigene Nachmessung im Browser | Portal an `document.body` |
+| **C2** | **Zurück öffnete die Fassung wieder** — samt Scroll-Sperre. Die Offen-Zustände trugen `location.key`, und React Router stellt den Schlüssel eines Eintrags bei POP wieder her | eigene Nachmessung: `/mitglieder` → `/events` → zurück ⇒ `overlay: true`, `position: fixed` | echte Wahrheitswerte, zurückgesetzt beim Schlüsselvergleich im Render |
+| **I3** | `(levelRank ?? 0)` machte aus **„Stufe unbekannt"** ein „unterhalb discover". Ein `impact`-Mitglied mit gescheitertem Profilabruf (`activationLookupFailed`) bekam den **Aufstiegs-Hinweis** und landete auf `/mitgliedschaft` — der Anmeldefehler als Verkaufsargument, den Punkt 3 der Komponente für die Abfrage-Seite ausschließt, durch die Stufen-Tür zurück | Code (`AuthProvider.tsx:169`) | `tierLoading` wie in `MembershipGate.tsx:24` |
+| **I4** | Falle und Sperre ohne Dialog-Auszeichnung — alle anderen Nutzer von `useOverlay` tragen sie | Code | `role="dialog" aria-modal aria-label` |
+| **I5** | Der Kopfzeilen-Link hieß in jsdom **„eff.bee.zeeeff.bee.zee"** (zwei Lockups, keine Media Queries) und fiel aus `App.test.tsx` still heraus — `> 0` war schon mit der Seitenleiste zufrieden | Nachgemessen: Zusicherung findet **1** statt 2 Links | `aria-label` am Link, Zusicherung auf `toHaveLength(2)` |
+| **M6** | `aria-controls` zeigte in drei von vier Zuständen auf eine Kennung, die es nicht gibt | Code | nur ankündigen, wenn die Listbox steht |
+| **M8** | `Filter zurücksetzen` ließ `?q=` stehen — Neuladen brachte die zurückgesetzte Suche zurück | Test | `setSearchParams({}, { replace: true })` |
+| **M9/M10** | toter Savepoint in der Sonde; `HEADER_SEARCH_LIMIT` mit einem Aufrufer exportiert | Code | beides bereinigt |
+
+**Sieben neue Tests — und jeder ist gegen den Stand VOR der Behebung geprüft.**
+Die Suite war mit den Fehlern **787/787 grün**; sie deckte diese Fälle nicht ab.
+Deshalb wurde die alte Komponente zurückgespielt und die neuen Tests gegen sie
+laufen gelassen:
+
+| Gegen den alten Stand | |
+|---|---|
+| schließt beim ZURÜCK | 🔴 rot — und zwar **nach** dem Zurückgehen (`expected document not to contain … Abbrechen`), nicht schon vorher |
+| Fassung neben dem Mount-Punkt | 🔴 rot |
+| Fassung ist ein Dialog | 🔴 rot |
+| unbekannte Stufe ⇒ kein Aufstiegs-Hinweis | 🔴 rot |
+| kündigt nur eine vorhandene Liste an | 🔴 rot |
+| Logo-Link genau zweimal | 🔴 rot (`length of 2 but got 1`) |
+| Zurücksetzen räumt `?q=` | 🔴 rot (`'/mitglieder?q=anna' to be '/mitglieder'`) |
+| schließt bei fremder Navigation | 🟢 grün — **deckt eine Lücke, korrigiert keinen Fehler**: der alte Weg schloss beim Vorwärtsgehen richtig, nur Aufgabe 6.4 hatte das nie geprüft |
+| ausgeloggt kein Lupensymbol | 🟢 grün — dito zu Aufgabe 4.6 |
+
+**Nachgemessen im Browser (nicht nur grüne Tests):** Schleier jetzt **375×812**,
+Elternteil `BODY`, `elementFromPoint` in der Mitte trifft das Overlay; zurück ⇒
+Fassung zu, Sperre gelöst, Seite scrollt. Die Gruppe-10-Belege wurden nach der
+Portal-Umstellung wiederholt: Listenbreite weiter 286 px, Verbreitern schließt
+weiter.
+
+**Was der Reviewer zu Recht über meine Messungen sagt:** ich hatte bei C1 die
+Breite gemessen und nicht die Höhe, und keinen Treffertest außerhalb des
+Overlays gemacht — beides drei Zeilen. Für jedes `fixed`-Overlay in diesem Repo
+gilt ab jetzt: `rect.height === innerHeight` **und** `elementFromPoint` in der
+Mitte liegt im Overlay, plus **ein Zurück-Weg** über alles, dessen Zustand aus
+`location.key` abgeleitet ist.
+
+> I3 ist als **Test** belegt, nicht im Browser: ein dauerhaft gescheiterter
+> Profilabruf lässt sich dort nicht ohne Weiteres herstellen. Es ist ein reiner
+> Logikzweig, und er spiegelt `MembershipGate`.
+
+Danach: **795/795 Tests** (vorher 787), `tsc` sauber, 0 Lint-Fehler.
+`pnpm format:check` meldet 111 Dateien — **vorbestehend**, mit und ohne diese
+Änderungen identisch, keine davon aus diesem Change.
 
 ## Belege zu Gruppe 10 — und die zwei Befunde, die sie gebracht hat
 
@@ -96,6 +151,19 @@ unter `discover`) für 10.6.
 | 10.4 | Fassung offen: `body.style.position = fixed`, Fokus im Feld. Nach dem Verbreitern auf 900 px: Fassung zu, `position` leer, Seite scrollt wieder (0 → 200), Lupe weg, Feld zurück |
 | 10.5 | ausgeloggt bei 1280 / 640 / 375 / 320 px: **kein** Feld, **keine** Lupe, kein Überlauf |
 | 10.6 | `connect`-Konto, Suche „anna": 0 Treffer, Hinweis „Das Mitgliederverzeichnis ist ab Discover verfügbar." + „Mitgliedschaft ansehen"; Enter → `/mitgliedschaft` |
+
+**Zusätzlich „Beide Themes" aus der Linear-Abnahme** (steht in keiner Aufgabe
+oben, gehört aber zur Abnahme): Es gibt `hell` und `navy`, und seit AGE-492 ist
+`navy` **kein** Nachtmodus, sondern färbt nur den Rahmen. Gemessen mit einem
+`focus`-Konto in beiden Varianten — Kopfzeilen-Fläche
+(`bg-canvas/85`), Feldfläche, Textfarbe und Rand sind **identisch**, weil die
+Topbar auf **Inhalts**-Tokens steht. Die Suche ist damit themeninvariant, nicht
+„in beiden geprüft und zufällig gleich".
+
+> Nebenbefund, **nicht** in diesem Change behoben: der Kopf von `index.css`
+> schreibt, `navy` färbe „Sidebar und Topbar" dunkel — die Topbar steht aber auf
+> `bg-canvas` und bleibt hell. Entweder ist der Kommentar veraltet oder die
+> Topbar wurde vergessen. Gehört zu AGE-492/499, nicht hierher.
 
 **Die Sichtprobe hat zwei Dinge gefunden, die 787 grüne Tests nicht sehen
 konnten.** Beide sind behoben und danach nachgemessen:

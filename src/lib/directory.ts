@@ -184,7 +184,7 @@ export async function fetchDirectoryBaseline(): Promise<DirectoryMember[]> {
 // ── Kopfzeilen-Suche (AGE-540) ──────────────────────────────────────────────
 
 /** Höchstzahl der Treffer im Dropdown der Kopfzeile. */
-export const HEADER_SEARCH_LIMIT = 5;
+const HEADER_SEARCH_LIMIT = 5;
 
 /** Mindestlänge des GETRIMMTEN Suchtexts, ab der überhaupt abgefragt wird. */
 export const HEADER_SEARCH_MIN_CHARS = 2;

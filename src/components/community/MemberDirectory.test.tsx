@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MemberDirectory from "./MemberDirectory";
 import type { DirectoryMember } from "../../lib/directory";
@@ -92,12 +92,22 @@ function NavigationsGriff() {
   return null;
 }
 
+/** Macht die Adresse prüfbar — gebraucht für das Zurücksetzen. */
+function Adresse() {
+  const { pathname, search } = useLocation();
+  return <span data-testid="adresse">{pathname + search}</span>;
+}
+function adresse(): string {
+  return screen.getByTestId("adresse").textContent ?? "";
+}
+
 function renderDirectoryAt(url: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[url]}>
         <NavigationsGriff />
+        <Adresse />
         <MemberDirectory />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -277,6 +287,21 @@ describe("Suchbegriff aus der Adresszeile (AGE-540)", () => {
 
     await waitFor(() => expect(lastArgs().p_query).toBe("beispiel"));
     expect(lastArgs().p_offers).toEqual(["kapital"]);
+  });
+
+  it("nimmt „Filter zurücksetzen“ den Begriff auch aus der Adresszeile", async () => {
+    // Befund des Code-Reviews: bliebe `?q=` stehen, brächte ein Neuladen genau
+    // die Suche zurück, die gerade zurückgesetzt wurde.
+    renderDirectoryAt("/mitglieder?q=anna");
+    await waitFor(() => expect(lastArgs().p_query).toBe("anna"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
+
+    await waitFor(() => expect(adresse()).toBe("/mitglieder"));
+    expect(suchfeld().value).toBe("");
+    // Ein leerer Filter reist als `undefined`, nicht als leerer Text — geprüft
+    // wird deshalb, dass der Begriff WEG ist, nicht seine genaue leere Form.
+    await waitFor(() => expect(lastArgs().p_query).toBeFalsy());
   });
 
   it("führt der Zurück-Weg zur vorigen Suche", async () => {

@@ -388,12 +388,20 @@ export default function AppShell() {
               Zwei sichtbare Lockups nebeneinander wären doppelt. */}
           <Link
             to="/"
+            // Der Name steht am Link, nicht an seinem Inhalt (Befund des
+            // Code-Reviews): darunter liegen ZWEI Lockups, von denen im Browser
+            // je eines per Media Query verborgen ist. jsdom kennt keine Media
+            // Queries — dort tragen beide bei, und der Link hieß gemessen
+            // „eff.bee.zeeeff.bee.zee". `App.test.tsx` blieb nur deshalb grün,
+            // weil es `getAllByRole(...).length > 0` prüft und die Seitenleiste
+            // mitzählt; der Kopfzeilen-Link war aus seiner eigenen Zusicherung
+            // still herausgefallen. Ein `aria-label` hier ist in beiden Welten
+            // derselbe eine Name.
+            aria-label="eff.bee.zee"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
           >
             {/* Das SVG-Lockup ist randlos, skaliert sauber und erbt über
-                currentColor die Farbe. Kein sr-only daneben: beide Fassungen
-                tragen ihren Namen selbst — die Wortmarke als echten Text, die
-                Marke über den `title` von CompassMark.
+                currentColor die Farbe.
 
                 Unter `sm` NUR die Marke (AGE-540, Entscheidung Donald): die
                 Reihe brauchte hier bei 320 px 319 px und war damit randvoll;

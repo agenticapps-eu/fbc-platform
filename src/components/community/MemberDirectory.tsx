@@ -36,7 +36,7 @@ import {
  * Discover/anon erhalten höchstens die eigene Zeile (siehe lib/directory.ts).
  */
 export default function MemberDirectory() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   /** Der von der Kopfzeilen-Suche übergebene Begriff (AGE-540). */
   const urlQuery = searchParams.get(DIRECTORY_QUERY_PARAM) ?? "";
@@ -112,6 +112,15 @@ export default function MemberDirectory() {
   function reset() {
     setQueryInput("");
     setFilters(emptyDirectoryFilters);
+    // Der Begriff steht seit AGE-540 auch in der Adresszeile. Bliebe er dort,
+    // brächte ein Neuladen — oder ein geteilter Link — genau die Suche zurück,
+    // die gerade zurückgesetzt wurde (Befund des Code-Reviews).
+    //
+    // Das widerspricht dem „einen Schreiber" nicht: die Regel gilt dem TIPPEN,
+    // das bewusst nicht in die Adresszeile zurückschreibt. Zurücksetzen ist eine
+    // ausdrückliche Handlung. `replace`, damit der Zurück-Weg nicht auf einer
+    // leeren Suche stehen bleibt, die niemand aufgerufen hat.
+    if (urlQuery) setSearchParams({}, { replace: true });
   }
 
   return (

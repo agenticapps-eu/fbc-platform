@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HeaderSearch from "./HeaderSearch";
 import type { DirectoryMember } from "../../lib/directory";
@@ -18,9 +18,10 @@ vi.mock("../../lib/supabase", () => ({
   supabase: { rpc: (...args: unknown[]) => rpc(...args) },
 }));
 
-let auth: { user: { id: string } | null; levelRank: number | null } = {
+let auth: { user: { id: string } | null; levelRank: number | null; tierLoading: boolean } = {
   user: { id: "u-discover" },
   levelRank: 3,
+  tierLoading: false,
 };
 vi.mock("../../providers/auth-context", () => ({
   useAuth: () => auth,
@@ -52,12 +53,37 @@ function Adresse() {
   return <span data-testid="adresse">{pathname + search}</span>;
 }
 
+/** Navigation von AUSSERHALB der Komponente — der Fall, den ihre eigenen
+ *  Handler nicht abdecken: dort ruft sie `schliessen()` selbst. Nur hierüber
+ *  lässt sich prüfen, ob sie auch bei fremder Navigation und beim ZURÜCK
+ *  schließt. */
+function Steuerung() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => navigate("/events")}>
+        woanders hin
+      </button>
+      <button type="button" onClick={() => navigate(-1)}>
+        zurück
+      </button>
+    </>
+  );
+}
+
 function baum(queryClient: QueryClient) {
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/"]}>
-        <HeaderSearch />
+        {/* Der Mount-Punkt steht hier, damit prüfbar bleibt, dass die
+            Telefon-Fassung ihn per Portal VERLÄSST. Im Rahmen ist er
+            `<header>` mit `backdrop-blur`, und der fing jedes `fixed`
+            darunter ein. */}
+        <div data-testid="mountpunkt">
+          <HeaderSearch />
+        </div>
         <Adresse />
+        <Steuerung />
         <Routes>
           <Route path="*" element={null} />
         </Routes>
@@ -93,7 +119,7 @@ function suchbegriffe(): unknown[] {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  auth = { user: { id: "u-discover" }, levelRank: 3 };
+  auth = { user: { id: "u-discover" }, levelRank: 3, tierLoading: false };
   rpc.mockReset();
   rpc.mockResolvedValue({ data: [member("Anna Beispiel")], error: null });
 });
@@ -254,7 +280,7 @@ describe("Die fünf Zustände", () => {
   });
 
   it("zeigt unterhalb discover bei leerer Antwort den Aufstiegs-Hinweis", async () => {
-    auth = { user: { id: "u-basic" }, levelRank: 1 };
+    auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     rpc.mockResolvedValue({ data: [], error: null });
     renderSuche();
     tippe("anna");
@@ -267,7 +293,7 @@ describe("Die fünf Zustände", () => {
   it("zeigt unterhalb discover die eigene Zeile trotzdem an", async () => {
     // Der Rang formuliert NUR den leeren Fall. Blendete er Treffer aus, wäre er
     // eine zweite Zugriffskontrolle im Frontend — Kulisse vor einem echten Gate.
-    auth = { user: { id: "u-basic" }, levelRank: 1 };
+    auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     rpc.mockResolvedValue({ data: [member("Ich Selbst")], error: null });
     renderSuche();
     tippe("ich");
@@ -278,7 +304,7 @@ describe("Die fünf Zustände", () => {
   });
 
   it("rendert ausgeloggt gar nichts", () => {
-    auth = { user: null, levelRank: null };
+    auth = { user: null, levelRank: null, tierLoading: false };
     const { container } = renderSuche();
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
@@ -343,7 +369,7 @@ describe("Tastatur und Navigation", () => {
   it("führt Enter unterhalb discover auf die Aufstiegsseite", async () => {
     // `/mitglieder` liegt hinter MembershipGate min="discover" — MemberDirectory
     // mountet dort nie, der Begriff verschwände hinter einer Wand.
-    auth = { user: { id: "u-basic" }, levelRank: 1 };
+    auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     renderSuche();
     tippe("anna");
     await entprellen();
@@ -404,7 +430,7 @@ describe("Identität und Zwischenspeicher", () => {
     await entprellen();
     await screen.findByRole("option", { name: /Anna Beispiel/ });
 
-    auth = { user: { id: "u-basic" }, levelRank: 1 };
+    auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     rpc.mockResolvedValue({ data: [], error: null });
     act(() => nochmal());
 
@@ -422,7 +448,7 @@ describe("Identität und Zwischenspeicher", () => {
     await entprellen();
     await screen.findByRole("option", { name: /Anna Beispiel/ });
 
-    auth = { user: null, levelRank: null };
+    auth = { user: null, levelRank: null, tierLoading: false };
     act(() => nochmal());
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
@@ -523,5 +549,135 @@ describe("Telefon-Fassung", () => {
 
     fireEvent.keyDown(feld(), { key: "Escape" });
     expect(screen.queryByRole("button", { name: "Abbrechen" })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Die Befunde des Code-Reviews (Schritt 4). Jeder dieser Fälle war vorher grün,
+ * weil ihn niemand geprüft hat — nicht, weil er funktionierte. Sie stehen
+ * zusammen, damit erkennbar bleibt, wogegen sie schützen.
+ */
+describe("Befunde des Code-Reviews", () => {
+  function lupe() {
+    return screen.getByRole("button", { name: "Suche öffnen" });
+  }
+
+  it("schließt die Telefon-Fassung beim ZURÜCK — und gibt die Scroll-Sperre frei", async () => {
+    // Der Zustand hing am `location.key`. Der schließt beim Vorwärtsgehen
+    // richtig — und öffnet beim Zurückgehen wieder, weil React Router den
+    // Schlüssel eines Eintrags bei POP wiederherstellt. Ein Modal, das sich
+    // selbst wieder öffnet und die Seite erneut festhält.
+    // Geprüft wird über „Abbrechen", nicht über `role="dialog"`: so läuft
+    // dieser Test auch gegen die Fassung VOR der Behebung und zeigt dort den
+    // echten Fehler, statt an einem fehlenden Attribut zu scheitern.
+    const fassungDa = () => screen.queryByRole("button", { name: "Abbrechen" });
+
+    renderSuche();
+    fireEvent.click(lupe());
+    expect(fassungDa()).toBeInTheDocument();
+    expect(document.body.style.position).toBe("fixed");
+
+    fireEvent.click(screen.getByRole("button", { name: "woanders hin" }));
+    await waitFor(() => expect(adresse()).toBe("/events"));
+    expect(fassungDa()).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "zurück" }));
+
+    await waitFor(() => expect(adresse()).toBe("/"));
+    expect(fassungDa()).not.toBeInTheDocument();
+    expect(document.body.style.position).not.toBe("fixed");
+  });
+
+  it("schließt die Trefferliste bei fremder Navigation", async () => {
+    // Bisher deckten das nur die eigenen Handler ab, und die rufen `schliessen()`
+    // selbst — die Eigenschaft „schließt bei JEDEM Routenwechsel" war damit
+    // ungeprüft.
+    renderSuche();
+    tippe("anna");
+    await entprellen();
+    await screen.findByRole("option", { name: /Anna/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "woanders hin" }));
+
+    await waitFor(() => expect(screen.queryByRole("option")).not.toBeInTheDocument());
+  });
+
+  it("hängt die Telefon-Fassung NEBEN ihren Mount-Punkt, nicht hinein", () => {
+    // Im Rahmen steht die Komponente in `<header>`, und der trägt
+    // `backdrop-blur`. Ein nicht-`none` `backdrop-filter` macht das Element zum
+    // Bezugsrahmen für `fixed` Nachkommen — gemessen war der Schleier 375×64
+    // statt 375×812. jsdom rechnet kein Layout und kann das nie sehen; prüfbar
+    // ist der MECHANISMUS der Behebung: die Fassung verlässt den Teilbaum.
+    renderSuche();
+    fireEvent.click(lupe());
+
+    const fassung = screen.getByRole("dialog");
+    expect(fassung).toBeInTheDocument();
+    expect(screen.getByTestId("mountpunkt").contains(fassung)).toBe(false);
+    expect(document.body.contains(fassung)).toBe(true);
+  });
+
+  it("nennt die Telefon-Fassung einen Dialog", () => {
+    // `useOverlay` sperrt Scrollen und fängt Tab. Ohne `role`/`aria-modal`
+    // bekäme Hilfstechnik die Falle ohne die Ansage.
+    renderSuche();
+    fireEvent.click(lupe());
+
+    const fassung = screen.getByRole("dialog", { name: "Mitglieder suchen" });
+    expect(fassung).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("zeigt bei UNBEKANNTER Stufe keinen Aufstiegs-Hinweis und führt ins Verzeichnis", async () => {
+    // `levelRank` ist `null`, solange das Profil lädt — und dauerhaft, wenn es
+    // nicht geladen werden konnte. `(levelRank ?? 0)` machte aus beidem
+    // „unterhalb discover": ein `impact`-Mitglied mit gescheitertem Profilabruf
+    // bekam den Aufstiegs-Hinweis und landete auf `/mitgliedschaft`. Ein
+    // Anmeldefehler, verkleidet als Verkaufsargument.
+    auth = { user: { id: "u-lädt" }, levelRank: null, tierLoading: true };
+    rpc.mockResolvedValue({ data: [], error: null });
+    renderSuche();
+    tippe("anna");
+    await entprellen();
+
+    await waitFor(() => expect(screen.getByText(/kein mitglied gefunden/i)).toBeInTheDocument());
+    expect(screen.queryByText(/ab discover verfügbar/i)).not.toBeInTheDocument();
+
+    fireEvent.keyDown(feld(), { key: "Enter" });
+
+    expect(adresse()).toBe("/mitglieder?q=anna");
+  });
+
+  it("kündigt nur dann eine Liste an, wenn es sie gibt", async () => {
+    // `aria-expanded`/`aria-controls` hingen am Offen-Zustand. In den drei
+    // Zuständen ohne Listbox (Fehler, Laden, leer) zeigte `aria-controls` auf
+    // eine Kennung, die im Dokument nicht existiert.
+    rpc.mockResolvedValue({ data: [], error: null });
+    renderSuche();
+    tippe("anna");
+    await entprellen();
+    await waitFor(() => expect(screen.getByText(/kein mitglied gefunden/i)).toBeInTheDocument());
+
+    expect(feld()).toHaveAttribute("aria-expanded", "false");
+    expect(feld()).not.toHaveAttribute("aria-controls");
+
+    rpc.mockResolvedValue({ data: [member("Anna Beispiel")], error: null });
+    tippe("annab");
+    await entprellen();
+    await screen.findByRole("option", { name: /Anna/ });
+
+    const listenId = screen.getByRole("listbox").id;
+    expect(feld()).toHaveAttribute("aria-expanded", "true");
+    expect(feld()).toHaveAttribute("aria-controls", listenId);
+  });
+
+  it("zeigt ausgeloggt auch KEIN Lupensymbol", () => {
+    // Der bestehende Test prüfte nur Combobox und `input` — das Lupensymbol,
+    // der einzige Einstieg auf dem Telefon, war von der Zusicherung nicht
+    // erfasst.
+    auth = { user: null, levelRank: null, tierLoading: false };
+    renderSuche();
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Suche öffnen" })).not.toBeInTheDocument();
   });
 });

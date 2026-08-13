@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
@@ -46,7 +47,7 @@ const DISCOVER_RANK = LEVEL_RANK.discover;
 const ENTPRELLUNG_MS = 300;
 
 export default function HeaderSearch() {
-  const { user, levelRank } = useAuth();
+  const { user, levelRank, tierLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -54,14 +55,34 @@ export default function HeaderSearch() {
   const [roh, setRoh] = useState("");
   const [entprellt, setEntprellt] = useState("");
   const [aktiv, setAktiv] = useState(-1);
-  // Offen-Zustände tragen den Schlüssel der Location, bei der sie geöffnet
-  // wurden — nicht `true`/`false`. Damit schließen beide beim Navigieren von
-  // selbst, ohne Effekt: der Rahmen wird beim Navigieren nicht abgebaut, und
-  // eine Liste, die über der Zielseite stehen bleibt, ist der Fehler, den das
-  // verhindert. Ein Effekt, der auf `location.key` hört und `setState` ruft,
-  // täte dasselbe — löste aber eine zusätzliche Renderrunde aus.
-  const [offenBei, setOffenBei] = useState<string | null>(null);
-  const [mobilBei, setMobilBei] = useState<string | null>(null);
+  // Beide Fassungen müssen beim Navigieren schließen — der Rahmen wird dabei
+  // nicht abgebaut, und eine Liste, die über der Zielseite stehen bleibt, ist
+  // genau der Fehler, den das verhindert.
+  //
+  // WARUM NICHT MEHR `offenBei === location.key`: Bis zum Code-Review trugen
+  // diese Zustände den Schlüssel der Location, bei der sie geöffnet wurden.
+  // Das schließt beim Vorwärtsgehen richtig — und öffnet beim ZURÜCKGEHEN
+  // wieder, weil React Router den Schlüssel eines Eintrags bei POP
+  // wiederherstellt. Gemessen: Fassung auf `/mitglieder` öffnen, auf `/events`
+  // navigieren (zu), zurück → `overlay: true` UND `body.style.position ===
+  // "fixed"`. Ein Modal, das sich von selbst wieder öffnet und dabei die
+  // Scroll-Sperre neu legt.
+  //
+  // Jetzt echte Wahrheitswerte, zurückgesetzt beim Vergleich WÄHREND des
+  // Renderns (Reacts dokumentiertes Muster für „Zustand an eine Änderung
+  // anpassen"). Der Schlüssel ändert sich bei JEDER Navigation, auch bei POP —
+  // deshalb trägt der Vergleich dort, wo die Gleichheitsprüfung scheiterte.
+  // Kein Effekt: der liefe erst NACH dem Malen, die Liste wäre einen Frame lang
+  // über der Zielseite zu sehen.
+  const [listeOffen, setListeOffen] = useState(false);
+  const [mobilOffen, setMobilOffen] = useState(false);
+  const [letzterKey, setLetzterKey] = useState(location.key);
+  if (letzterKey !== location.key) {
+    setLetzterKey(location.key);
+    setListeOffen(false);
+    setMobilOffen(false);
+    setAktiv(-1);
+  }
 
   const rahmen = useRef<HTMLDivElement>(null);
   const feld = useRef<HTMLInputElement>(null);
@@ -70,12 +91,25 @@ export default function HeaderSearch() {
   // Sperre und Tab-Falle kommen aus dem gemeinsamen Hook (AGE-529). Was er
   // NICHT mitbringt — Anfangsfokus und Escape — steht weiter unten; das war ein
   // Befund des Plan-Reviews und keine Vermutung.
-  const mobilOffen = mobilBei === location.key;
   const overlay = useOverlay<HTMLDivElement>(mobilOffen);
 
   const begriff = roh.trim();
   const langGenug = begriff.length >= HEADER_SEARCH_MIN_CHARS;
-  const reichtStufe = (levelRank ?? 0) >= DISCOVER_RANK;
+  // `levelRank` ist `null` in ZWEI Lagen: solange das Profil lädt, und dauerhaft,
+  // wenn es nach drei Versuchen nicht geladen werden konnte
+  // (`activationLookupFailed`, AuthProvider.tsx:169). `(levelRank ?? 0)` machte
+  // aus beiden „unterhalb discover" — ein `impact`-Mitglied mit gescheitertem
+  // Profilabruf bekam den Aufstiegs-Hinweis und landete mit Enter auf
+  // `/mitgliedschaft`. Genau der Anmeldefehler, verkleidet als Verkaufsargument,
+  // den Punkt 3 oben für die Abfrage-Seite ausschließt — er kam durch die
+  // Stufen-Tür wieder herein (Befund des Code-Reviews).
+  //
+  // Unbekannt ist deshalb ein eigener Fall, kein „zu niedrig": die Formulierung
+  // bleibt neutral, und Enter geht ins Verzeichnis, wo `MembershipGate` die
+  // richtige Wand zeigt, sobald die Stufe wirklich feststeht. Dasselbe tut
+  // MembershipGate.tsx:24.
+  const stufeUnbekannt = tierLoading;
+  const reichtStufe = stufeUnbekannt || (levelRank ?? 0) >= DISCOVER_RANK;
 
   useEffect(() => {
     const id = setTimeout(() => setEntprellt(begriff), ENTPRELLUNG_MS);
@@ -143,33 +177,38 @@ export default function HeaderSearch() {
   useEffect(() => {
     if (!mobilOffen) return;
     function beiGroesse() {
-      if (window.innerWidth >= 640) setMobilBei(null);
+      if (window.innerWidth >= 640) setMobilOffen(false);
     }
     window.addEventListener("resize", beiGroesse);
     return () => window.removeEventListener("resize", beiGroesse);
   }, [mobilOffen]);
 
   useEffect(() => {
-    if (offenBei === null) return;
+    if (!listeOffen) return;
     function aufKlick(e: MouseEvent) {
       // `mousedown` am Dokument, aber die Prüfung geht über den Rahmen: ein
       // Klick AUF eine Option liegt innerhalb und schließt daher nicht, bevor
       // die Auswahl ankommt.
-      if (!rahmen.current?.contains(e.target as Node)) setOffenBei(null);
+      if (!rahmen.current?.contains(e.target as Node)) setListeOffen(false);
     }
     document.addEventListener("mousedown", aufKlick);
     return () => document.removeEventListener("mousedown", aufKlick);
-  }, [offenBei]);
+  }, [listeOffen]);
 
   if (!user) return null;
 
   const offen =
-    offenBei === location.key &&
-    aktuell &&
-    (treffer.isFetching || treffer.isSuccess || treffer.isError);
+    listeOffen && aktuell && (treffer.isFetching || treffer.isSuccess || treffer.isError);
+  const laedt = treffer.isFetching && !treffer.data;
+  // Ob eine Listbox WIRKLICH im Dokument steht — `Ergebnisse` rendert sie nur im
+  // letzten Zweig. `aria-expanded`/`aria-controls` hingen bisher an `offen` und
+  // zeigten in den drei anderen Zuständen (Fehler, Laden, leer) auf eine
+  // Kennung, die es nicht gibt: eine angekündigte Liste ohne Liste. Die
+  // Reihenfolge spiegelt die Zweige dort — wer sie ändert, muss beide ändern.
+  const listboxDa = offen && !treffer.isError && !laedt && liste.length > 0;
 
   function schliessen() {
-    setOffenBei(null);
+    setListeOffen(false);
     setAktiv(-1);
   }
 
@@ -185,7 +224,7 @@ export default function HeaderSearch() {
   }
 
   function schliesseMobil() {
-    setMobilBei(null);
+    setMobilOffen(false);
     schliessen();
     lupe.current?.focus();
   }
@@ -237,15 +276,15 @@ export default function HeaderSearch() {
           ref={feld}
           type="search"
           role="combobox"
-          aria-expanded={offen}
-          aria-controls={listenId}
+          aria-expanded={listboxDa}
+          aria-controls={listboxDa ? listenId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={aktivGueltig >= 0 ? optionId(listenId, aktivGueltig) : undefined}
           value={roh}
           onChange={(e) => {
             setRoh(e.target.value);
             // Tippen öffnet wieder — sonst bliebe die Liste nach einem Escape zu.
-            setOffenBei(location.key);
+            setListeOffen(true);
             setAktiv(-1);
           }}
           onKeyDown={aufTaste}
@@ -261,7 +300,7 @@ export default function HeaderSearch() {
             liste={liste}
             aktiv={aktivGueltig}
             istFehler={treffer.isError}
-            laedt={treffer.isFetching && !treffer.data}
+            laedt={laedt}
             reichtStufe={reichtStufe}
             onWaehlen={oeffneProfil}
             onAlle={alleErgebnisse}
@@ -285,25 +324,48 @@ export default function HeaderSearch() {
         ref={lupe}
         type="button"
         aria-label="Suche öffnen"
-        onClick={() => setMobilBei(location.key)}
+        onClick={() => setMobilOffen(true)}
         className="rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
       >
         <SearchIcon />
       </button>
 
-      {mobilOffen && (
-        <div
-          className="fixed inset-0 z-40 bg-ink/25 p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) schliesseMobil();
-          }}
-        >
+      {/* AN `document.body`, NICHT hier im Baum (Befund des Code-Reviews).
+          `HeaderSearch` steht in `<header>`, und der trägt `backdrop-blur` —
+          also `backdrop-filter: blur(8px)`. Ein nicht-`none` `backdrop-filter`
+          macht das Element zum Bezugsrahmen für `fixed` Nachkommen, genau wie
+          ein `transform`. Gemessen bei 375×812: der Schleier war 375×64 statt
+          375×812, `elementFromPoint` in der Seitenmitte traf den Inhalt statt
+          das Overlay — die Seite blieb ungedimmt UND anklickbar, und
+          „Schließen über den Hintergrund" galt nur im obersten Streifen.
+          Dieselbe Falle, die `design.md` (Entscheidung 4) für die Trefferliste
+          nennt; sie saß eine Ebene höher und über `backdrop-filter` statt
+          `transform`. Die Navigationsschublade des Rahmens entgeht ihr, weil
+          sie außerhalb von `<header>` steht (AppShell.tsx). */}
+      {mobilOffen &&
+        createPortal(
           <div
-            ref={overlay}
-            className="relative mx-auto w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-3 shadow-soft"
+            className="fixed inset-0 z-40 bg-ink/25 p-4"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) schliesseMobil();
+            }}
           >
-            <div className="flex items-center gap-2">
-              {/* `relative` sitzt hier BEWUSST nicht: sonst bezieht die
+            {/* `role="dialog" aria-modal` gehört dazu, nicht nur die Falle:
+                `useOverlay` sperrt Scrollen und fängt Tab, und der Hook selbst
+                begründet das damit, dass `aria-modal` sonst „eine Zusage ohne
+                Deckung" wäre. Ohne die Auszeichnung bekäme Hilfstechnik die
+                Falle ohne die Ansage. Alle anderen Nutzer des Hooks in diesem
+                Repo tragen sie (AppShell, FeedbackButton, AvatarCropper,
+                CommunityFeed) — hier fehlte sie (Befund des Code-Reviews). */}
+            <div
+              ref={overlay}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mitglieder suchen"
+              className="relative mx-auto w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-3 shadow-soft"
+            >
+              <div className="flex items-center gap-2">
+                {/* `relative` sitzt hier BEWUSST nicht: sonst bezieht die
                   Trefferliste ihr `left-0 right-0` auf das Eingabefeld, das
                   neben „Abbrechen" nur noch die halbe Blattbreite hat — bei
                   320 px gemessen 165 px, und die Namen brachen mitten im Wort
@@ -311,20 +373,21 @@ export default function HeaderSearch() {
                   Blatt bezogen nutzt sie dessen volle Breite. Die Liste bleibt
                   dabei ein DOM-Kind dieses Rahmens — der Klick-außerhalb-Test
                   in Zeile 158 prüft Verschachtelung, nicht Positionierung. */}
-              <div ref={rahmen} className="min-w-0 flex-1">
-                {kombifeld}
+                <div ref={rahmen} className="min-w-0 flex-1">
+                  {kombifeld}
+                </div>
+                <button
+                  type="button"
+                  onClick={schliesseMobil}
+                  className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Abbrechen
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={schliesseMobil}
-                className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                Abbrechen
-              </button>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

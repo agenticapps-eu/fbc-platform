@@ -157,7 +157,9 @@ async function main() {
 
     // ── 9.2 zuerst: die Gegenprobe ──────────────────────────────────────────
     // Ohne sie belegt 9.1 nur, dass die Abfrage nichts liefert.
-    await c.query("savepoint s_aktiviert");
+    // (Kein Savepoint: hier wird kein Fehler erwartet. Einen zu setzen, den
+    // niemand freigibt oder zurückrollt, sähe nach einer Absicht aus, die es
+    // nicht gibt — 9.3 braucht einen, weil `42501` die Transaktion abbricht.)
     await alsKonto(uidAktiviert);
     const aktiviert = await c.query<{ id: string; name: string }>(
       "select id, name from public.search_directory(p_query => $1)",
