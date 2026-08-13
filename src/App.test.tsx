@@ -40,7 +40,15 @@ describe("App", () => {
     );
 
     // Logo erscheint in Sidebar (Desktop) und Header (Mobil) — beide im DOM.
-    expect(screen.getAllByRole("link", { name: "eff.bee.zee" }).length).toBeGreaterThan(0);
+    //
+    // `toBe(2)` statt `> 0` (Befund des Code-Reviews): der Kopfzeilen-Link führt
+    // seit AGE-540 zwei Lockups (Marke unter `sm`, volles darüber), von denen im
+    // Browser je eines per Media Query verborgen ist. jsdom kennt keine Media
+    // Queries — dort trugen beide zum Namen bei, der Link hieß
+    // „eff.bee.zeeeff.bee.zee" und fiel aus GENAU DIESER Zusicherung heraus,
+    // ohne sie rot zu machen. `> 0` war schon zufrieden, wenn nur die
+    // Seitenleiste passte. Die Zahl prüft jetzt, was der Kommentar behauptet.
+    expect(screen.getAllByRole("link", { name: "eff.bee.zee" })).toHaveLength(2);
     // Anon sieht das ganze Schaufenster: alle fünf „Entdecken"-Einträge, unabhängig
     // davon, ob der Inhalt gegatet ist (Spec §1 — Rechte gaten Inhalte, nicht das Menü).
     // AGE-494: „Compass" ist nicht mehr darunter — der Kompass hat keinen eigenen

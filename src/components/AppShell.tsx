@@ -6,6 +6,7 @@ import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
+import HeaderSearch from "./search/HeaderSearch";
 import { RouteTransition } from "./ui/Motion";
 import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
@@ -70,15 +71,6 @@ function BellIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -396,27 +388,46 @@ export default function AppShell() {
               Zwei sichtbare Lockups nebeneinander wären doppelt. */}
           <Link
             to="/"
+            // Der Name steht am Link, nicht an seinem Inhalt (Befund des
+            // Code-Reviews): darunter liegen ZWEI Lockups, von denen im Browser
+            // je eines per Media Query verborgen ist. jsdom kennt keine Media
+            // Queries — dort tragen beide bei, und der Link hieß gemessen
+            // „eff.bee.zeeeff.bee.zee". `App.test.tsx` blieb nur deshalb grün,
+            // weil es `getAllByRole(...).length > 0` prüft und die Seitenleiste
+            // mitzählt; der Kopfzeilen-Link war aus seiner eigenen Zusicherung
+            // still herausgefallen. Ein `aria-label` hier ist in beiden Welten
+            // derselbe eine Name.
+            aria-label="eff.bee.zee"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
           >
             {/* Das SVG-Lockup ist randlos, skaliert sauber und erbt über
-                currentColor die Farbe. Kein sr-only daneben: es enthält die
-                Wortmarke als echten Text, der Link trägt seinen Namen selbst. */}
-            <Logo className="h-8" />
+                currentColor die Farbe.
+
+                Unter `sm` NUR die Marke (AGE-540, Entscheidung Donald): die
+                Reihe brauchte hier bei 320 px 319 px und war damit randvoll;
+                die Lupe der Kopfzeilen-Suche kostet 48 px und ließ die Kopfzeile
+                seitlich überlaufen. Gemessen, nicht geschätzt — engere Abstände
+                (gap-2 + px-3) kamen auf 339 px und hätten es nicht getragen.
+                Ohne Wortmarke bleiben bei 320 px 56 px Reserve. Dieselbe Grenze,
+                an der HeaderSearch ohnehin auf das Lupensymbol umschaltet; das
+                volle Lockup steht weiter in Seitenleiste und Menü. */}
+            <Logo lockup="mark" className="h-8 sm:hidden" />
+            {/* Die Hülle trägt die Umschaltung, nicht das Lockup selbst: dessen
+                Wurzel bringt `inline-flex` schon mit, und ein `hidden` daneben
+                verliert — gemessen, `display` blieb `inline-flex`. Das übliche
+                „hidden sm:block direkt drauf" trägt hier also nicht. */}
+            <span className="hidden sm:block">
+              <Logo className="h-8" />
+            </span>
           </Link>
 
-          <div className="mx-auto hidden w-full max-w-md sm:block">
-            <label className="relative block">
-              <span className="sr-only">Globale Suche</span>
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                <SearchIcon />
-              </span>
-              <input
-                type="search"
-                placeholder="Suchen in der Community…"
-                className="h-10 w-full rounded-full border border-line bg-soft pl-9 pr-4 text-sm text-ink transition-colors placeholder:text-muted/70 focus-visible:border-accent focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              />
-            </label>
-          </div>
+          {/* NUR angemeldet (AGE-540). Das tote Feld, das hier stand, lag
+              AUSSERHALB des Zweigs unten und war damit auch für Gäste sichtbar.
+              Es einfach zu „ersetzen" hätte die neue Suche an dieselbe Stelle
+              gesetzt — und `search_directory` ist für `anon` nicht ausführbar,
+              jede Eingabe liefe in `42501`. Ein anon-Weg dorthin wäre eine
+              eigene Sicherheitsentscheidung, kein Nebeneffekt dieser Zeile. */}
+          {user && <HeaderSearch />}
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {user ? (

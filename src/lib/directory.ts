@@ -40,6 +40,16 @@ export interface DirectoryFilters {
   needs: string[];
 }
 
+/**
+ * Name des Suchparameters in der Adresszeile von `/mitglieder` (AGE-540).
+ *
+ * Steht hier und nicht an den beiden Verwendungsstellen, weil er die
+ * Schnittstelle zwischen ihnen IST: die Kopfzeilen-Suche schreibt ihn, das
+ * Verzeichnis liest ihn. Zwei Zeichenketten-Literale wären zwei Wahrheiten, und
+ * ihr Auseinanderlaufen fiele erst im Browser auf.
+ */
+export const DIRECTORY_QUERY_PARAM = "q";
+
 export const emptyDirectoryFilters: DirectoryFilters = {
   query: "",
   theme: "",
@@ -169,4 +179,53 @@ export async function fetchDirectoryBaseline(): Promise<DirectoryMember[]> {
   const { data, error } = await supabase.rpc("search_directory", {});
   if (error) throw error;
   return data ?? [];
+}
+
+// ── Kopfzeilen-Suche (AGE-540) ──────────────────────────────────────────────
+
+/** Höchstzahl der Treffer im Dropdown der Kopfzeile. */
+const HEADER_SEARCH_LIMIT = 5;
+
+/** Mindestlänge des GETRIMMTEN Suchtexts, ab der überhaupt abgefragt wird. */
+export const HEADER_SEARCH_MIN_CHARS = 2;
+
+/** Präfix aller Kopfzeilen-Schlüssel — zum Entfernen beim Identitätswechsel. */
+export const headerSearchKeyPrefix = ["directory", "header-search"] as const;
+
+/**
+ * Eigener Schlüssel, und die Kontenkennung gehört hinein.
+ *
+ * Zwei Gründe, beide im Plan-Review gefunden. Erstens sind die Treffer
+ * RLS-gefiltert und damit stufen- und kontoabhängig: ohne Identität im
+ * Schlüssel bekäme ein später angemeldetes `basic`-Konto die Treffer eines
+ * `discover`-Kontos aus dem Zwischenspeicher. `feedQueryKey` trennt aus genau
+ * diesem Grund seit je nach `uid` — das Verzeichnis tat es nicht.
+ *
+ * Zweitens darf ein auf fünf gekürztes Ergebnis NIE unter `directoryQueryKey`
+ * liegen: dort erwartet die Verzeichnisseite die vollständige Liste.
+ *
+ * Die allgemeine Fassung („Zwischenspeicher beim Abmelden leeren") ist AGE-258
+ * und liegt im Change `finish-ui-polish`. Hier ist nur dieser eine Weg dicht.
+ */
+export const headerSearchQueryKey = (uid: string, term: string) =>
+  [...headerSearchKeyPrefix, uid, term] as const;
+
+/**
+ * Die ersten N Treffer zu einem Begriff.
+ *
+ * `search_directory` kennt **kein** `LIMIT` und sortiert `order by p.name nulls
+ * last`. „Die ersten fünf" heißt hier also: alphabetisch die ersten fünf ALLER
+ * Treffer, geladen und clientseitig gekürzt — keine Rangfolge nach Relevanz.
+ * Bei der Größenordnung dieses Verzeichnisses ist das hingenommen; es steht
+ * hier, damit es niemand für eine serverseitige Kappung hält.
+ */
+export async function searchMembersForHeader(term: string): Promise<DirectoryMember[]> {
+  const alle = await searchDirectory({ ...emptyDirectoryFilters, query: term });
+  return alle.slice(0, HEADER_SEARCH_LIMIT);
+}
+
+/** Adresse der Verzeichnisseite mit übernommenem Suchbegriff. */
+export function directoryUrlForQuery(term: string): string {
+  const t = term.trim();
+  return t ? `/mitglieder?${DIRECTORY_QUERY_PARAM}=${encodeURIComponent(t)}` : "/mitglieder";
 }
