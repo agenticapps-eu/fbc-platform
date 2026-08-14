@@ -109,7 +109,7 @@
 - [x] 11.2 `pnpm test` **829 grün** (Ausgangslinie 795, **+34**), `tsc --noEmit` sauber, `eslint --quiet` sauber. `pnpm format:check` **nicht** gelaufen und `pnpm format` **nicht** aufgerufen — es schriebe rund 60 fremde Dateien um.
 - [x] 11.3 `openspec validate --all` grün (28/28), archiviert als `2026-08-14-add-member-onboarding`; `member-onboarding` ist mit 9 Anforderungen als laufende Wahrheit in `openspec/specs/` angelegt — vor dem PR.
 - [x] 11.7 Linear-Kommentar an AGE-538 gesetzt (14.08.): die drei nicht haltbaren Prämissen der Abnahmeliste, die Entscheidung „zwei Auswege", und wo der Erfolg von Schritt 2 wirklich gemessen wird.
-- [ ] 11.4 Branch `donald/age-538-…`, PR, CI auf der **HEAD-SHA** prüfen (nicht `gh run list`), Merge über `gh pr view --json state` verifizieren.
-- [ ] 11.5 Migration anwenden ist ein **eigener** Schritt: der Merge wendet sie nicht an. Danach greift das `drift-gate` — den Deploy per `gh run rerun --failed` nachziehen.
-- [ ] 11.6 Live-Beleg an einer Zeichenkette aus dem Diff, nicht an der Bundle-Größe.
+- [x] 11.4 PR #181, gemerged am 2026-08-14. CI auf der **HEAD-SHA** geprüft (nicht `gh run list`): `verify`, `migrations`, `edge-functions`, `pr-title` alle `success`. Merge über `gh pr view --json state` verifiziert → `MERGED`.
+- [x] 11.5 **Die Erwartung stimmte nicht — und das ist die gute Richtung.** Geplant war ein eigener Schritt plus `gh run rerun --failed`, weil `drift-gate` sonst jeden Deploy überspringt. Tatsächlich lief auf `main` alles von selbst durch: `migrate-dev: success`, `drift-gate: success`, `deploy: success`. An der Datenbank nachgesehen statt geglaubt: `member_settings.onboarded_at` existiert (`timestamptz`, nullable, kein Default), jüngste angewendete Migration ist `20260814100000`. Von 6 Einstellungszeilen trägt **keine** den Merker — alle bestehenden Konten sehen die Strecke, wie beabsichtigt.
+- [x] 11.6 Live-Beleg an einer Zeichenkette aus dem Diff, nicht an der Bundle-Größe: `https://fbc-platform.pages.dev/assets/index-B8WWtdQ5.js` (200, 1 289 114 B) enthält „Schön, dass du da bist" — die gibt es nur in diesem Diff. Größe allein hätte auch die Vorversion bestätigt.
 
