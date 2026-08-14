@@ -11,6 +11,7 @@ import {
   fuegeZusammen,
   leseAufruf,
   pruefeKopfzeile,
+  pruefeVorab,
   pruefeQuellPfad,
   pruefeZiel,
   schreibeBericht,
@@ -634,6 +635,202 @@ describe("bildeAb — user_pass", () => {
 
     expect(JSON.stringify(satz)).not.toContain("GEHEIM");
     expect(QUELLFELDER).not.toContain("user_pass");
+  });
+});
+
+/** Eine Vorabprüfung mit sauberen Vorgaben; die Tests setzen, worum es ihnen geht. */
+function vorab(eingabe: {
+  zeilen: Record<string, string>[];
+  spalten?: readonly string[];
+  bestandsadressenOhneKennung?: readonly string[];
+  schreibend?: boolean;
+}) {
+  return pruefeVorab({
+    spalten: eingabe.spalten ?? QUELLFELDER,
+    zeilen: eingabe.zeilen,
+    bestandsadressenOhneKennung: eingabe.bestandsadressenOhneKennung ?? [],
+    schreibend: eingabe.schreibend ?? false,
+  });
+}
+
+/** Ein vollständiger, unauffälliger Datensatz. */
+function satz(nummer: number): Record<string, string> {
+  return zeile({ source_user_id: String(nummer), user_email: `m${nummer}@example.org` });
+}
+
+describe("pruefeVorab — Kopfzeile", () => {
+  it("lässt eine saubere Datei durch", () => {
+    const ergebnis = vorab({ zeilen: [satz(1), satz(2)], schreibend: true });
+
+    expect(ergebnis).toEqual({ abbruch: false, befunde: [], ausgeschlossen: [] });
+  });
+
+  it("bricht bei fehlender Spalte ab — in beiden Betriebsarten", () => {
+    const ohneBeruf = QUELLFELDER.filter((f) => f !== "beruf");
+
+    for (const schreibend of [false, true]) {
+      const ergebnis = vorab({ zeilen: [satz(1)], spalten: ohneBeruf, schreibend });
+
+      expect(ergebnis.abbruch).toBe(true);
+      expect(ergebnis.befunde).toHaveLength(1);
+      expect(ergebnis.befunde[0].art).toBe("kopfzeile");
+    }
+  });
+
+  it("liest die Datensätze bei kaputter Kopfzeile gar nicht erst", () => {
+    // Sonst stünden im Bericht Befunde über Felder, die unter den falschen
+    // Namen gelesen wurden — die Ursache wäre danach nicht mehr zu sehen.
+    const ergebnis = vorab({
+      zeilen: [satz(1), satz(1)],
+      spalten: QUELLFELDER.filter((f) => f !== "beruf"),
+      schreibend: true,
+    });
+
+    expect(ergebnis.befunde.map((b) => b.art)).toEqual(["kopfzeile"]);
+  });
+});
+
+describe("pruefeVorab — Dubletten", () => {
+  it("findet eine doppelte Kennung und nennt beide Datensätze", () => {
+    const ergebnis = vorab({ zeilen: [satz(1), satz(2), satz(1)], schreibend: true });
+
+    expect(ergebnis.abbruch).toBe(true);
+    expect(ergebnis.befunde).toContainEqual({
+      art: "dublette_kennung",
+      wert: "1",
+      zeilen: [1, 3],
+    });
+  });
+
+  it("findet eine doppelte Adresse, auch in anderer Schreibweise", () => {
+    const ergebnis = vorab({
+      zeilen: [
+        zeile({ source_user_id: "1", user_email: "Anna@Example.org" }),
+        zeile({ source_user_id: "2", user_email: " anna@example.org " }),
+      ],
+      schreibend: true,
+    });
+
+    expect(ergebnis.befunde).toContainEqual({
+      art: "dublette_adresse",
+      wert: "anna@example.org",
+      zeilen: [1, 2],
+    });
+  });
+
+  it("lässt leere Kennungen einander nicht blockieren", () => {
+    // Der Unique-Index läuft über `nullif(btrim(...), '')` — zwei leere
+    // Kennungen kollidieren dort ebenfalls nicht. Eine Vorabprüfung, die es
+    // anders sieht, hielte einen Lauf auf, den die Datenbank durchliesse.
+    const ergebnis = vorab({
+      zeilen: [
+        zeile({ source_user_id: "", user_email: "a@example.org" }),
+        zeile({ source_user_id: "  ", user_email: "b@example.org" }),
+      ],
+      schreibend: true,
+    });
+
+    expect(ergebnis.befunde).toEqual([]);
+  });
+
+  it("hält den Trockenlauf nicht auf, führt die Dublette aber auf", () => {
+    // Derselbe Datensatz zweimal ist zwei Befunde, nicht einer: Kennung und
+    // Adresse sind getrennte Schlüssel, und nach der Lieferung wird an beiden
+    // getrennt nachgearbeitet.
+    const ergebnis = vorab({ zeilen: [satz(1), satz(1)], schreibend: false });
+
+    expect(ergebnis.abbruch).toBe(false);
+    expect(ergebnis.befunde.map((b) => b.art).sort()).toEqual([
+      "dublette_adresse",
+      "dublette_kennung",
+    ]);
+  });
+});
+
+describe("pruefeVorab — Adressen", () => {
+  it("schliesst einen Datensatz ohne brauchbare Adresse aus, ohne den Lauf zu beenden", () => {
+    // Aufgabe 7.5: ein fehlerhafter Datensatz beendet den Lauf nicht. Ohne
+    // Adresse gibt es kein Anmeldekonto — der eine Datensatz fällt aus, die
+    // anderen 69 laufen.
+    const ergebnis = vorab({
+      zeilen: [satz(1), zeile({ source_user_id: "2", user_email: "kein-at-zeichen" }), satz(3)],
+      schreibend: true,
+    });
+
+    expect(ergebnis.abbruch).toBe(false);
+    expect(ergebnis.ausgeschlossen).toEqual([2]);
+    expect(ergebnis.befunde).toContainEqual({
+      art: "adresse_ungueltig",
+      zeile: 2,
+      kennung: "2",
+      wert: "kein-at-zeichen",
+    });
+  });
+
+  it("behandelt die fehlende Adresse als denselben Fall mit leerem Wert", () => {
+    const ergebnis = vorab({ zeilen: [zeile({ source_user_id: "1", user_email: "  " })] });
+
+    expect(ergebnis.ausgeschlossen).toEqual([1]);
+    expect(ergebnis.befunde[0]).toMatchObject({ art: "adresse_ungueltig", wert: "" });
+  });
+});
+
+describe("pruefeVorab — Kollision mit Bestandskonten", () => {
+  it("blockiert den Schreiblauf und führt den Fall auf", () => {
+    const ergebnis = vorab({
+      zeilen: [satz(1)],
+      bestandsadressenOhneKennung: ["M1@example.org"],
+      schreibend: true,
+    });
+
+    expect(ergebnis.abbruch).toBe(true);
+    expect(ergebnis.befunde).toContainEqual({
+      art: "kollision_bestand",
+      zeile: 1,
+      kennung: "1",
+      wert: "m1@example.org",
+    });
+  });
+
+  it("fasst das Bestandskonto auch dann nicht an, wenn der Abbruch übergangen würde", () => {
+    // Zweite Sperre, absichtlich: ein bestehendes Konto darf NICHT automatisch
+    // auf `impact` gehoben werden — sonst reichte eine Selbstregistrierung
+    // unter einer bekannten Mitgliedsadresse für die höchste Stufe. Die Zeile
+    // steht deshalb in BEIDEN Betriebsarten auf der Ausschlussliste, nicht nur
+    // hinter dem Abbruch.
+    for (const schreibend of [false, true]) {
+      const ergebnis = vorab({
+        zeilen: [satz(1)],
+        bestandsadressenOhneKennung: ["m1@example.org"],
+        schreibend,
+      });
+
+      expect(ergebnis.ausgeschlossen).toEqual([1]);
+    }
+  });
+
+  it("hält den Trockenlauf nicht auf", () => {
+    const ergebnis = vorab({
+      zeilen: [satz(1)],
+      bestandsadressenOhneKennung: ["m1@example.org"],
+      schreibend: false,
+    });
+
+    expect(ergebnis.abbruch).toBe(false);
+    expect(ergebnis.befunde).toHaveLength(1);
+  });
+});
+
+describe("pruefeVorab — schreibt nichts", () => {
+  it("verändert die übergebenen Datensätze nicht", () => {
+    // „Schreibt nichts" ist hier ohne Datenbank prüfbar: die Funktion bekommt
+    // keinen Zugriff, und sie fasst nicht einmal ihre Eingabe an. Eingefroren
+    // wird tief — ein Schreibversuch wirft dann im strict mode.
+    const zeilen = [satz(1), satz(2)].map((z) => Object.freeze(z));
+    const vorher = JSON.stringify(zeilen);
+
+    expect(() => vorab({ zeilen, schreibend: true })).not.toThrow();
+    expect(JSON.stringify(zeilen)).toBe(vorher);
   });
 });
 

@@ -59,13 +59,20 @@
 
 ## 4. Vorabprüfung und Bericht
 
-- [ ] 4.1 Vorabprüfung über die **ganze** Datei: Kopfzeile, Dubletten, ungültige Adressen — schreibt nichts (Test)
-- [ ] 4.2 Kollision mit Bestandskonten ohne Kennung: blockiert den Schreiblauf, hebt keine Stufe an (Test)
-- [ ] 4.3 Beide Betriebsarten laufen ohne Ausgetretenen-Liste und ohne Zahlungsstände durch und vermerken das Fehlen (Test) — **kein** Riegel, Entscheidung Donald 14.08.
-- [ ] 4.4 Bericht führt die nachtragbaren Fälle einzeln auf, sodass sie sich nach der Lieferung gezielt abarbeiten lassen (Test)
-- [ ] 4.5 Berichtsaufbau: Klassensumme = Zahl der Datensätze für Läufe, die den verarbeitenden Abschnitt erreichen; Vorab-Abbruch erzeugt den eigenen Berichtstyp (je ein Test)
-- [ ] 4.6 Bericht führt die aufgefüllten Beitrittsdaten mit **Rohangabe** — sie ist sonst nirgends erhalten
-- [ ] 4.7 Ausgabe-Disziplin: `stdout` führt nur Zeilennummer und Kennung; Test prüft, dass kein Name und keine Adresse der Quelle darin vorkommt
+- [x] 4.1 Vorabprüfung über die **ganze** Datei: Kopfzeile, Dubletten, ungültige Adressen — schreibt nichts (Test)
+      — `pruefeVorab()`, 13 Tests. **Drei verschieden schwere Fälle, nicht ein Riegel**: die Kopfzeile bricht IMMER ab (danach spräche jeder Befund über Felder, die unter dem falschen Namen gelesen wurden); Dublette und Kollision brechen nur den SCHREIBENDEN Lauf ab, weil der Trockenlauf gerade das vollständige Bild liefern soll; eine unbrauchbare Adresse bricht NICHTS ab, sie schliesst ihren eigenen Datensatz aus (Aufgabe 7.5). Leere Kennungen kollidieren nicht miteinander — der Unique-Index läuft über `nullif(btrim(...), '')`, eine strengere Prüfung hielte einen Lauf auf, den die Datenbank durchliesse. „Schreibt nichts" ist ohne Datenbank belegt: die Funktion bekommt keinen Zugriff und fasst nicht einmal ihre tief eingefrorene Eingabe an.
+- [x] 4.2 Kollision mit Bestandskonten ohne Kennung: blockiert den Schreiblauf, hebt keine Stufe an (Test)
+      — **zwei Sperren, absichtlich**: der Abbruch im Schreibmodus UND die Ausschlussliste, die in BEIDEN Betriebsarten greift. Der Abbruch allein wäre eine einzige Sperre vor einem teuren Fall — ein bestehendes Konto automatisch auf `impact` zu heben hiesse, dass eine Selbstregistrierung unter einer bekannten Mitgliedsadresse die höchste Stufe geschenkt bekommt.
+- [x] 4.3 Beide Betriebsarten laufen ohne Ausgetretenen-Liste und ohne Zahlungsstände durch und vermerken das Fehlen (Test) — **kein** Riegel, Entscheidung Donald 14.08.
+      — der Test greift bewusst über den Bericht hinaus: „vermerkt das Fehlen" allein liesse offen, ob der Lauf trotzdem läuft. Die Vorabprüfung bekommt die Listen gar nicht erst als Eingabe, sie kann also nicht an ihnen hängen bleiben.
+- [x] 4.4 Bericht führt die nachtragbaren Fälle einzeln auf, sodass sie sich nach der Lieferung gezielt abarbeiten lassen (Test)
+      — vier Abschnitte in `wp_bericht.ts`: aufgefüllte Beitrittsdaten, nicht geschriebene Felder, fehlerhafte **und übersprungene** Datensätze, offene Zahlungsstände. Der übersprungene Datensatz fehlte — gefunden hat es die **Sichtprobe am ausgegebenen Bericht**, kein Test: er stand nur als Zahl in der Klassentabelle, sein Grund allenfalls indirekt über einen Vorabbefund. Ein senkrechter Strich im Namen wird maskiert, sonst verschöbe er alle folgenden Spalten und der Bericht läse sich falsch statt kaputt.
+- [x] 4.5 Berichtsaufbau: Klassensumme = Zahl der Datensätze für Läufe, die den verarbeitenden Abschnitt erreichen; Vorab-Abbruch erzeugt den eigenen Berichtstyp (je ein Test)
+      — die Summe wird nicht mitgeführt, sondern **gezählt**: sie kann so gar nicht abweichen, eine mitgeführte Zahl könnte es. Jede Klasse steht auch mit null Fällen da — eine fehlende Zeile liest sich wie ein vergessener Fall, eine Null ist eine Aussage. Der Vorab-Abbruch ist ein eigener Zweig ohne jede Klasse: sie mit lauter Nullen zu führen behauptete einen Lauf, den es nicht gab.
+- [x] 4.6 Bericht führt die aufgefüllten Beitrittsdaten mit **Rohangabe** — sie ist sonst nirgends erhalten
+      — mit Auffüllgrad, und nur die aufgefüllten: ein tagesgenaues Datum steht nicht in der Liste, sonst ginge der Hinweis in 70 Zeilen unter.
+- [x] 4.7 Ausgabe-Disziplin: `stdout` führt nur Zeilennummer und Kennung; Test prüft, dass kein Name und keine Adresse der Quelle darin vorkommt
+      — `stdoutZeile()` führt Datensatznummer, Kennung und Klasse. **Der Grund gehört ausdrücklich nicht dazu**: Gründe tragen oft den Namen mit („Anna Berg hat keine PLZ"). Eine fehlende Kennung wird als „ohne Kennung" benannt statt weggelassen, sonst verschöbe sich die Spur.
 
 ## 5. Trockenlauf (`wp_import.ts`)
 

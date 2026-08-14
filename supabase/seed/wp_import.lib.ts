@@ -324,6 +324,132 @@ export function pruefeKopfzeile(spalten: readonly string[]): Kopfpruefung {
 }
 
 /**
+ * Was die Vorabprüfung gefunden hat. Die Werte stehen hier im Klartext — der
+ * Befund speist den BERICHT, und der liegt mit `0600` ausserhalb des
+ * Arbeitsbaums. Für `stdout` gibt es eine eigene, kurze Darstellung
+ * (`stdoutZeile` in `wp_bericht.ts`); hier hineingegriffen wird nicht.
+ *
+ * `zeile` zählt DATENSÄTZE, nicht Dateizeilen: Freitextfelder tragen
+ * Zeilenumbrüche, ein Datensatz erstreckt sich also über mehrere Zeilen der
+ * Datei. Der erste Datensatz ist die 1.
+ */
+export type Vorabbefund =
+  | { art: "kopfzeile"; grund: string }
+  | { art: "dublette_kennung"; wert: string; zeilen: number[] }
+  | { art: "dublette_adresse"; wert: string; zeilen: number[] }
+  | { art: "adresse_ungueltig"; zeile: number; kennung: string | null; wert: string }
+  | { art: "kollision_bestand"; zeile: number; kennung: string | null; wert: string };
+
+export type Vorabergebnis = {
+  /** Blockiert dieser Befundstand den Lauf, der geprüft wurde? */
+  abbruch: boolean;
+  befunde: Vorabbefund[];
+  /** Datensätze, die der schreibende Abschnitt auslassen MUSS. */
+  ausgeschlossen: number[];
+};
+
+/**
+ * Dieselbe Regel, nach der die Anmeldemaske eine Adresse annimmt
+ * (`z.string().email()`, `src/pages/LoginPage.tsx:11`) — grob nachgezogen, weil
+ * der Seed-Lauf ohne Zod auskommt: ein Zeichen vor dem `@`, ein Punkt danach,
+ * kein Leerraum. Strenger zu prüfen als die Anwendung hiesse, Menschen
+ * auszuschliessen, die sich anmelden könnten; lockerer hiesse, Konten
+ * anzulegen, in die niemand hineinkommt.
+ */
+const ADRESSE_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+/**
+ * Prüft die GANZE Datei, bevor der erste Schreibvorgang stattfindet. Rein: kein
+ * Zugriff, keine Wirkung, die Eingabe wird nicht angefasst.
+ *
+ * WARUM VORAB UND NICHT JE DATENSATZ. Der geforderte Abbruch bei einer Dublette
+ * „ohne jeden Schreibvorgang" ist mit Transaktionen je Datensatz nicht zu
+ * halten — eine spät erkannte Dublette fände die früheren Datensätze bereits
+ * geschrieben.
+ *
+ * WAS BLOCKIERT UND WAS NICHT — die drei Fälle sind verschieden schwer:
+ *
+ *   * **Kopfzeile**: bricht IMMER ab, auch den Trockenlauf. Fehlt eine Spalte,
+ *     wurde der Export anders gezogen; jeder Befund danach spräche über Felder,
+ *     die unter dem falschen Namen gelesen wurden.
+ *   * **Dublette und Kollision**: brechen nur den SCHREIBENDEN Lauf ab. Der
+ *     Trockenlauf soll gerade das vollständige Bild liefern — er hört nicht beim
+ *     ersten Problem auf, er berichtet es.
+ *   * **Unbrauchbare Adresse**: bricht NICHTS ab. Ohne Adresse gibt es kein
+ *     Anmeldekonto, aber das ist der Fehler dieses einen Datensatzes; die
+ *     übrigen 69 laufen (Aufgabe 7.5). Er landet auf der Ausschlussliste.
+ *
+ * Die Kollision landet ZUSÄTZLICH auf der Ausschlussliste, in beiden
+ * Betriebsarten. Der Abbruch allein wäre eine einzige Sperre vor einem Fall, der
+ * teuer ist: ein bestehendes Konto automatisch auf `impact` zu heben hiesse,
+ * dass eine Selbstregistrierung unter einer bekannten Mitgliedsadresse die
+ * höchste Stufe geschenkt bekommt.
+ */
+export function pruefeVorab(input: {
+  spalten: readonly string[];
+  zeilen: readonly Record<string, string>[];
+  /** Normalisierte Adressen bestehender Konten OHNE `legacy_source_id`. */
+  bestandsadressenOhneKennung: readonly string[];
+  schreibend: boolean;
+}): Vorabergebnis {
+  const kopf = pruefeKopfzeile(input.spalten);
+  if (kopf.kind === "abbruch") {
+    return { abbruch: true, befunde: [{ art: "kopfzeile", grund: kopf.grund }], ausgeschlossen: [] };
+  }
+
+  const befunde: Vorabbefund[] = [];
+  const ausgeschlossen = new Set<number>();
+
+  const bestand = new Set(
+    input.bestandsadressenOhneKennung.map((a) => normalisiereAdresse(a)).filter(Boolean),
+  );
+
+  // Leere Werte werden NICHT gesammelt: der Unique-Index läuft über
+  // `nullif(btrim(legacy_source_id), '')`, dort kollidieren zwei fehlende
+  // Kennungen ebenfalls nicht. Eine strengere Vorabprüfung hielte einen Lauf
+  // auf, den die Datenbank durchliesse.
+  const nachKennung = new Map<string, number[]>();
+  const nachAdresse = new Map<string, number[]>();
+
+  input.zeilen.forEach((row, i) => {
+    const nummer = i + 1;
+    const kennung = normalisiereKennung(row["source_user_id"] ?? "");
+    const adresse = normalisiereAdresse(row["user_email"] ?? "");
+
+    if (kennung) nachKennung.set(kennung, [...(nachKennung.get(kennung) ?? []), nummer]);
+    if (adresse) nachAdresse.set(adresse, [...(nachAdresse.get(adresse) ?? []), nummer]);
+
+    if (adresse === null || !ADRESSE_PATTERN.test(adresse)) {
+      befunde.push({ art: "adresse_ungueltig", zeile: nummer, kennung, wert: adresse ?? "" });
+      ausgeschlossen.add(nummer);
+      return;
+    }
+
+    if (bestand.has(adresse)) {
+      befunde.push({ art: "kollision_bestand", zeile: nummer, kennung, wert: adresse });
+      ausgeschlossen.add(nummer);
+    }
+  });
+
+  for (const [wert, zeilen] of nachKennung) {
+    if (zeilen.length > 1) befunde.push({ art: "dublette_kennung", wert, zeilen });
+  }
+  for (const [wert, zeilen] of nachAdresse) {
+    if (zeilen.length > 1) befunde.push({ art: "dublette_adresse", wert, zeilen });
+  }
+
+  const blockierend = befunde.some(
+    (b) => b.art === "dublette_kennung" || b.art === "dublette_adresse" || b.art === "kollision_bestand",
+  );
+
+  return {
+    abbruch: input.schreibend && blockierend,
+    befunde,
+    ausgeschlossen: [...ausgeschlossen].sort((a, b) => a - b),
+  };
+}
+
+/**
  * Was aus einer Quellzeile wird — die sechs Ziele plus, was der Bericht braucht.
  *
  * `profil`, `kontakt` und `legacy` sind je eine Zeile; `offers`, `needs` und
