@@ -589,8 +589,14 @@ export function fuegeZusammen(ziel: Zielsatz, bestand: Bestand | null): Zusammen
 
   // Ein Bestand, in dem dieser Import schon geschrieben hat, gibt nichts mehr
   // her: dann ist jede Lücke das Ergebnis einer Entscheidung.
+  //
+  // KEIN eigener Zweig für `bestand === null`. Er stand hier und die
+  // Mutations-Gegenprobe hat ihn als gleichwertig ausgewiesen: ohne Bestand
+  // ruft jede Stelle unten mit dem Ersatzwert für „leer" auf, `zielIstLeer` ist
+  // dann ohnehin wahr. Ein Zweig, den keine Mutation rot bekommt, ist toter
+  // Code — derselbe Befund wie an `pruefeQuellPfad`.
   const darfSchreiben = (zielIstLeer: boolean): boolean =>
-    bestand === null || (!bestand.bereitsImportiert && zielIstLeer);
+    !(bestand?.bereitsImportiert ?? false) && zielIstLeer;
   const darfFuellen = (bestandswert: string | null): boolean => darfSchreiben(leer(bestandswert));
 
   for (const feld of MITGLIEDSFELDER.profil) {
