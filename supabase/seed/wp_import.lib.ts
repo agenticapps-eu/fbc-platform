@@ -203,7 +203,10 @@ export function pruefeQuellPfad(input: {
   const aufgeloest = resolve(input.cwd, input.pfad);
   const dazu = relative(input.repoWurzel, aufgeloest);
 
-  if (dazu === "" || (!dazu.startsWith("..") && !isAbsolute(dazu))) {
+  // Der Arbeitsbaum selbst ergibt `""` und fällt unter dieselbe Bedingung — ein
+  // eigener Zweig dafür wäre toter Code, was die Mutations-Gegenprobe am 14.08.
+  // gezeigt hat.
+  if (!dazu.startsWith("..") && !isAbsolute(dazu)) {
     return {
       kind: "abbruch",
       grund:
@@ -241,6 +244,10 @@ export function ablageorte(input: { quellPfad: string; zeitstempel: string }): A
  * Schreibt den Bericht und setzt die Rechte anschliessend hart. Der `mode` von
  * `writeFileSync` wirkt nur beim Anlegen — über einer vorhandenen 0644-Datei
  * bliebe der Bericht sonst weltlesbar.
+ *
+ * Beides, nicht nur `chmod`: der `mode` schliesst das Fenster zwischen Anlegen
+ * und `chmod`, in dem die Personendaten schon dastehen. Kein Test sieht dieses
+ * Fenster — deshalb steht der Grund hier.
  */
 export function schreibeBericht(pfad: string, inhalt: string): void {
   writeFileSync(pfad, inhalt, { mode: 0o600 });

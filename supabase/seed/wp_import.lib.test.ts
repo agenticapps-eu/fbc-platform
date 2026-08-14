@@ -92,6 +92,14 @@ describe("pruefeZiel", () => {
     expect(pruefeZiel({ dbUrl: fremd, erwartetesZiel: "lokal", ...REFS }).kind).toBe("abbruch");
   });
 
+  it("hält ein fremdes Projekt hinter einem lokalen Tunnel nicht für den lokalen Stack", () => {
+    // Die Adresse zählt nur, wo gar keine Kennung steht. Sonst genügte ein
+    // Tunnel auf 127.0.0.1, um an dem Wächter vorbeizukommen.
+    const fremd = "postgresql://postgres.abcdefghijklmnopqrst:pw@127.0.0.1:5432/postgres";
+
+    expect(pruefeZiel({ dbUrl: fremd, erwartetesZiel: "lokal", ...REFS }).kind).toBe("abbruch");
+  });
+
   it("bricht ohne Verbindungs-URL ab", () => {
     expect(pruefeZiel({ dbUrl: undefined, erwartetesZiel: "lokal", ...REFS }).kind).toBe("abbruch");
     expect(pruefeZiel({ dbUrl: "", erwartetesZiel: "lokal", ...REFS }).kind).toBe("abbruch");
@@ -106,6 +114,12 @@ describe("pruefeZiel", () => {
     });
 
     expect(ergebnis.kind).toBe("abbruch");
+    if (ergebnis.kind !== "abbruch") return;
+    // Der Grund muss die Ref-Datei nennen. Ohne diese Zusicherung prüft der
+    // Test nichts: ein leerer Sollwert bricht auch ohne die Sollwert-Prüfung
+    // ab — dann aber mit „weder DEV noch PROD", was auf die Verbindung zeigt
+    // statt auf die Datei, in der der Fehler steht.
+    expect(ergebnis.grund).toContain("dev-project-ref.txt");
   });
 
   it("bricht ab, wenn beide Sollwerte dasselbe Projekt nennen", () => {
@@ -117,6 +131,8 @@ describe("pruefeZiel", () => {
     });
 
     expect(ergebnis.kind).toBe("abbruch");
+    if (ergebnis.kind !== "abbruch") return;
+    expect(ergebnis.grund).toContain("dasselbe Projekt");
   });
 });
 
@@ -174,8 +190,19 @@ describe("leseAufruf", () => {
   });
 
   it("reicht nichts Unbekanntes durch", () => {
-    expect(leseAufruf(["/aussen/export.csv", "--force"]).kind).toBe("abbruch");
-    expect(leseAufruf(["/aussen/e.csv", "/aussen/zweite.csv"]).kind).toBe("abbruch");
+    // Die Gründe gehören zur Zusicherung: ohne sie bestünde der Test auch dann,
+    // wenn `--force` stillschweigend als zweite Quelldatei durchginge — die
+    // Meldung zeigte dann auf die falsche Sache.
+    const flagge = leseAufruf(["/aussen/export.csv", "--force"]);
+    expect(flagge.kind).toBe("abbruch");
+    if (flagge.kind !== "abbruch") return;
+    expect(flagge.grund).toContain("Unbekanntes Argument");
+    expect(flagge.grund).toContain("--force");
+
+    const zweite = leseAufruf(["/aussen/e.csv", "/aussen/zweite.csv"]);
+    expect(zweite.kind).toBe("abbruch");
+    if (zweite.kind !== "abbruch") return;
+    expect(zweite.grund).toContain("Mehr als eine Quelldatei");
   });
 });
 
@@ -251,6 +278,16 @@ describe("ablageorte", () => {
     expect(orte.bericht).toContain("2026-08-14");
     expect(orte.bericht.split("/").pop()).not.toContain(":");
     expect(orte.bericht.endsWith(".md")).toBe(true);
+  });
+
+  it("hält die Zwischenablage über Läufe hinweg an derselben Stelle", () => {
+    // Ihr Zweck ist, das Abschalten der alten Seite zu überleben. Ein
+    // Zeitstempel im Verzeichnisnamen machte jeden Lauf zu einem leeren Anfang.
+    const erster = ablageorte({ quellPfad: quelle, zeitstempel: "2026-08-14T15:53:00.000Z" });
+    const zweiter = ablageorte({ quellPfad: quelle, zeitstempel: "2026-08-20T09:12:00.000Z" });
+
+    expect(zweiter.zwischenablage).toBe(erster.zwischenablage);
+    expect(zweiter.bericht).not.toBe(erster.bericht);
   });
 
   it("liegt außerhalb des Arbeitsbaums, wenn die Quelle es tut", () => {
