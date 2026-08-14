@@ -237,6 +237,47 @@ describe("Willkommensstrecke — Gerüst und Auswege", () => {
     expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();
   });
 
+  it("kehrt auch auf dem ECHTEN Weg über die Startseite nicht zurück", async () => {
+    // Der Weg, den ein Mitglied wirklich nimmt: `/` → Weiche → Strecke →
+    // Abschluss → `/`. Er unterscheidet sich von `renderAt("/willkommen")` an
+    // genau einer Stelle, und die ist die entscheidende: die Weiche hat den
+    // leeren Merker beim Hinweg SCHON GELESEN und im Cache. Zieht der gelesene
+    // Zustand beim Abschluss nicht nach, steht dort weiter `null`, und die
+    // Startseite schickt das Mitglied in die eben beendete Strecke zurück.
+    renderAt("/");
+    await screen.findByText(/^Schritt 1 von/);
+
+    klick("Weiter");
+    await screen.findByText(/^Schritt 2 von/);
+    klick("Weiter");
+    await screen.findByText(/^Schritt 3 von/);
+    klick("Fertig");
+
+    expect(await screen.findByText(STARTSEITE)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();
+  });
+
+  it("vertagt, wenn die Strecke gar nicht laden kann", async () => {
+    // Sonst ist der einzige sichtbare Ausgang eine Schleife: er führt auf `/`,
+    // die Weiche liest den weiterhin leeren Merker und schickt sofort zurück —
+    // und bei dauerhaft scheiternder Abfrage kommt niemand mehr heraus.
+    profilMock.mockRejectedValue(new Error("kein Netz im Test"));
+    renderAt("/");
+
+    expect(
+      await screen.findByRole("heading", { name: "Das hat gerade nicht geklappt" }),
+    ).toBeInTheDocument();
+
+    klick("Zur Startseite");
+
+    expect(await screen.findByText(STARTSEITE)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Das hat gerade nicht geklappt" }),
+    ).not.toBeInTheDocument();
+    // Und der Merker bleibt ungesetzt: die Strecke ist vertagt, nicht erledigt.
+    expect(setzeMerkerMock).not.toHaveBeenCalled();
+  });
+
   it("zählt einen entfallenen Schritt nicht mit", async () => {
     // Profilbild UND Standort stehen schon → zwei Schritte, nicht drei. Ein Test
     // gegen eine feste Drei wäre vorher wie nachher grün.
