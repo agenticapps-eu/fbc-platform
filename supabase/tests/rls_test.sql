@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(411);
+select plan(420);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -3084,6 +3084,100 @@ select is(pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
 select is(
   (select count(*)::int from public.admin_audit) - (select n from pg_temp_audit_vorher),
   2, 'Beide erfolgreichen Admin-Aufrufe haben je eine Spur hinterlassen');
+
+-- ── 24. member_settings.onboarded_at — der Onboarding-Merker (AGE-538) ───────
+-- Der Merker liegt in member_settings und NICHT in profiles, weil
+-- `profiles_select_self_or_discover` (`id = auth.uid() or has_level(3)`) ab
+-- `discover` fremde VOLLZEILEN freigibt. Was hier geprüft wird, ist deshalb
+-- nicht „ein Flag lässt sich setzen", sondern die Kapselung dahinter.
+--
+-- Die entscheidende Feinheit steht in 24.4/24.5: ein fremdes UPDATE wirft
+-- NICHT. `member_settings_own` filtert die fremde Zeile über `USING` heraus,
+-- PostgreSQL führt das Statement erfolgreich aus und ändert null Zeilen.
+-- `42501` käme aus fehlenden RECHTEN — die hat `authenticated` hier aber.
+-- Der Beleg ist deshalb der nachgelesene, unveränderte Fremdwert; ohne die
+-- Nachlese belegte „läuft durch" gar nichts.
+
+-- SQLSTATE statt SQLERRM: try_as_anon liefert nur den Meldungstext, und die
+-- Zusage in 24.6 lautet ausdrücklich auf den Code 42501.
+create function pg_temp.state_as_anon(q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role anon';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    return SQLSTATE;
+  end;
+  reset role;
+  return 'KEIN FEHLER';
+end $$;
+
+-- 24.1 Ausgangslage. Die Zeile für '1111…' entsteht in §12 (Theme); ohne diese
+-- Zusicherung wäre jedes „ist gesetzt" unten auch dann grün, wenn schon vorher
+-- ein Wert dort stünde.
+select is(
+  (select onboarded_at from public.member_settings
+    where profile_id = '11111111-1111-1111-1111-111111111111'),
+  null, 'Merker: eine bestehende Einstellungszeile trägt ihn zunächst nicht');
+
+-- 24.2/24.3 Der Eigentümer schreibt. Ein fester Wert statt now(), damit 24.5
+-- den Fremdwert exakt vergleichen kann.
+select is(
+  pg_temp.try_as('11111111-1111-1111-1111-111111111111',
+    'update public.member_settings set onboarded_at = ''2026-01-01T00:00:00Z''
+       where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'OK', 'Merker: das eigene Konto darf ihn setzen');
+
+select is(
+  (select onboarded_at from public.member_settings
+    where profile_id = '11111111-1111-1111-1111-111111111111'),
+  '2026-01-01T00:00:00Z'::timestamptz,
+  '… und der Wert steht auch wirklich in der Zeile');
+
+-- 24.4/24.5 Der fremde Schreibversuch. Erwartet wird OK mit null geänderten
+-- Zeilen — nicht 42501.
+select is(
+  pg_temp.try_as('88888888-8888-8888-8888-888888888888',
+    'update public.member_settings set onboarded_at = ''2030-01-01T00:00:00Z''
+       where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  'OK', 'Merker: das fremde UPDATE läuft fehlerfrei durch …');
+
+select is(
+  (select onboarded_at from public.member_settings
+    where profile_id = '11111111-1111-1111-1111-111111111111'),
+  '2026-01-01T00:00:00Z'::timestamptz,
+  '… ändert die fremde Zeile aber nicht (RLS filtert sie heraus)');
+
+-- 24.6 Erst hier ist 42501 richtig: `anon` hält auf member_settings gar kein
+-- Recht, das Statement scheitert also vor jeder Policy.
+select is(
+  pg_temp.state_as_anon(
+    'update public.member_settings set onboarded_at = now()
+       where profile_id = ''11111111-1111-1111-1111-111111111111'''),
+  '42501', 'Merker: ausgeloggt fehlt schon das Tabellenrecht (42501)');
+
+-- 24.7-24.9 Der Schreibweg muss ein UPSERT sein. Die Einstellungszeile entsteht
+-- bei der Registrierung NICHT: '2222…' hat keine. Ein UPDATE änderte dort null
+-- Zeilen und meldete dabei keinen Fehler — der Merker wäre stumm nicht gesetzt.
+select is(
+  (select count(*)::int from public.member_settings
+    where profile_id = '22222222-2222-2222-2222-222222222222'),
+  0, 'Merker: das Sondenkonto hat vorher KEINE Einstellungszeile');
+
+select is(
+  pg_temp.try_as('22222222-2222-2222-2222-222222222222',
+    'insert into public.member_settings (profile_id, onboarded_at)
+       values (''22222222-2222-2222-2222-222222222222'', ''2026-01-02T00:00:00Z'')
+       on conflict (profile_id) do update set onboarded_at = excluded.onboarded_at'),
+  'OK', 'Merker: ein Konto ohne Einstellungszeile darf ihn per Upsert anlegen');
+
+select is(
+  (select onboarded_at from public.member_settings
+    where profile_id = '22222222-2222-2222-2222-222222222222'),
+  '2026-01-02T00:00:00Z'::timestamptz,
+  '… und die Zeile existiert danach samt Merker');
 
 select * from finish();
 rollback;

@@ -67,6 +67,78 @@ export async function saveMemberTheme(uid: string, theme: MemberTheme): Promise<
   if (error) throw error;
 }
 
+/* ── Onboarding-Merker (AGE-538) ─────────────────────────────────────────────
+ *
+ *  Wieder ein EIGENER schmaler Pfad, aus demselben Grund wie beim Theme:
+ *  `saveMemberSettings` schreibt alle Präferenzen in einem Upsert und
+ *  überschriebe den Merker mit einem veralteten Cache-Wert, sobald jemand
+ *  während der Strecke eine Einstellung umlegt. */
+
+export const memberOnboardingQueryKey = (uid: string) => ["member-onboarding", uid] as const;
+
+/** Liest den Merker. `null` heißt „die Strecke ist offen" — und zwar sowohl für
+ *  eine Zeile ohne Wert als auch für ein Konto ohne Einstellungszeile. Beide
+ *  bedeuten dasselbe, deshalb unterscheidet der Rückgabewert sie nicht.
+ *
+ *  Wirft bei einem Lesefehler, statt `null` zurückzugeben: der Aufrufer muss
+ *  „nicht gesetzt" von „nicht gelesen" unterscheiden können, sonst wirft ein
+ *  Netzfehler jedes Mitglied erneut in die Strecke. */
+export async function fetchOnboardedAt(uid: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("member_settings")
+    .select("onboarded_at")
+    .eq("profile_id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.onboarded_at ?? null;
+}
+
+/** Setzt den Merker auf jetzt und gibt den geschriebenen Zeitpunkt zurück.
+ *
+ *  Upsert, weil die Einstellungszeile bei der Registrierung nicht entsteht — ein
+ *  `update` änderte dort null Zeilen und meldete dabei keinen Fehler. RLS
+ *  erzwingt own-profile.
+ *
+ *  Der Rückgabewert ist kein Beiwerk: der Aufrufer setzt damit den gelesenen
+ *  Zustand, BEVOR er zur Startseite navigiert. Sonst liest die Weiche dort noch
+ *  den alten `null` und schickt das Mitglied in die Strecke zurück, die es
+ *  gerade beendet hat. */
+export async function markOnboarded(uid: string): Promise<string> {
+  const onboarded_at = new Date().toISOString();
+  const { error } = await supabase
+    .from("member_settings")
+    .upsert({ profile_id: uid, onboarded_at }, { onConflict: "profile_id" });
+  if (error) throw error;
+  return onboarded_at;
+}
+
+/* ── Vertagen („Später") ─────────────────────────────────────────────────────
+ *
+ *  „Später" setzt den Merker ausdrücklich NICHT — die Strecke soll ja
+ *  wiederkommen. Damit entsteht aber ein Kreis: „Später" führt zur Startseite,
+ *  und die Startseite IST die Weiche, die zurück in die Strecke schickt.
+ *
+ *  Aufgelöst mit dem kleinstmöglichen Zustand: einem Modulwert, der genau diese
+ *  Anwendungssitzung überdauert. Ein Neuladen der Seite und ein Abmelden setzen
+ *  ihn zurück, ein Navigieren innerhalb der App nicht. Damit ist „vertagt"
+ *  wörtlich das, was es heißt — und nichts davon liegt dauerhaft im Browser, wo
+ *  es den Gerätewechsel überstünde und den Merker heimlich ersetzte. */
+let vertagtFuer: string | null = null;
+
+export function vertageOnboarding(uid: string): void {
+  vertagtFuer = uid;
+}
+
+export function istOnboardingVertagt(uid: string): boolean {
+  return vertagtFuer === uid;
+}
+
+/** Beim Abmelden zurücksetzen: sonst bliebe die Strecke nach „Später" auch für
+ *  die nächste Anmeldung im selben Tab unterdrückt. */
+export function vertagungZuruecksetzen(): void {
+  vertagtFuer = null;
+}
+
 /** Lädt die Einstellungen; ohne vorhandene member_settings-Zeile gelten deren Defaults.
  *  Die Sichtbarkeit kommt aus profiles.is_public, nicht aus einer Kopie. */
 export async function fetchMemberSettings(uid: string): Promise<MemberSettings> {
