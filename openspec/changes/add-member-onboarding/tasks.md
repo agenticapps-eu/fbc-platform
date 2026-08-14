@@ -86,9 +86,9 @@
 
 ## 9. Datenbank-Sonde (Nachweis statt Zusage)
 
-- [ ] 9.1 `scripts/probe-…-onboarding-merker.ts` nach dem Muster von `probe-9-kopfzeilensuche-rls.ts`: Wegwerf-Konten in einer **zurückgerollten** Transaktion, gegen den **lokalen** Stack. Belegt: eigene Zeile schreibbar; fremde Zeile → **null geänderte Zeilen und der Fremdwert unverändert**; `anon` → `42501`.
-- [ ] 9.2 Belegt zusätzlich, dass ein Mitglied ab `discover` beim Lesen eines fremden Kontos den Merker **nicht** sieht. Das ist der Grund für `member_settings` statt `profiles` und gehört nachgewiesen, nicht behauptet.
-- [ ] 9.3 Jede Null zurechenbar machen — dasselbe Konto, ein Zustand geändert, anderes Ergebnis.
+- [x] 9.1 `scripts/probe-…-onboarding-merker.ts` nach dem Muster von `probe-9-kopfzeilensuche-rls.ts`: Wegwerf-Konten in einer **zurückgerollten** Transaktion, gegen den **lokalen** Stack. Belegt: eigene Zeile schreibbar; fremde Zeile → **null geänderte Zeilen und der Fremdwert unverändert**; `anon` → `42501`.
+- [x] 9.2 Belegt zusätzlich, dass ein Mitglied ab `discover` beim Lesen eines fremden Kontos den Merker **nicht** sieht. Das ist der Grund für `member_settings` statt `profiles` und gehört nachgewiesen, nicht behauptet.
+- [x] 9.3 Jede Null zurechenbar machen — dasselbe Konto, ein Zustand geändert, anderes Ergebnis.
 
 ## 10. Sichtprobe im Browser (UI-Gate)
 
