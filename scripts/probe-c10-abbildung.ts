@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 
 import { parse } from "csv-parse/sync";
 
+import { parseVideoUrl } from "../src/lib/video-url";
 import { bildeAb } from "../supabase/seed/wp_import.lib";
 import { htmlEntfernen } from "../supabase/seed/wp_felder";
 
@@ -101,6 +102,30 @@ console.log(
 if (beitritt > infos16) fehler.push("member_since: mehr Daten als Quellwerte");
 
 console.log("\nHarte Zusicherungen:");
+// Ohne diese Zeile war die Aufteilung oben blosse ANZEIGE: eine Fassung ohne
+// Video-Filter legte alle zehn praesi-Werte in `videos` ab, und die Probe blieb
+// grün (gefunden in der Gegenprobe am 14.08.).
+const unspielbar = saetze.reduce(
+  (n, s) => n + s.profil.videos.filter((v) => parseVideoUrl(v) === null).length,
+  0,
+);
+console.log(
+  `  ${unspielbar === 0 ? "ok  " : "FEHL"}  videos ohne abspielbare URL: ${unspielbar} (Anzeige und sanitizeVideos filtern sie sonst weg)`,
+);
+if (unspielbar > 0) fehler.push(`${unspielbar} nicht abspielbare Werte in videos`);
+
+// Die Kontaktadresse ist Text und bleibt, wie sie geschrieben wurde; nur die
+// ANMELDEadresse wird case-gefaltet. Ohne diese Prüfung fiel eine Fassung nicht
+// auf, die beide über normalisiereAdresse schickt.
+const verfaelscht = zeilen.filter((z, i) => {
+  const roh = htmlEntfernen(z["E-Mail"] ?? "").trim();
+  return roh !== "" && saetze[i].kontakt.email !== roh;
+}).length;
+console.log(
+  `  ${verfaelscht === 0 ? "ok  " : "FEHL"}  kontakt.email gegenüber der Quelle verändert: ${verfaelscht}`,
+);
+if (verfaelscht > 0) fehler.push(`${verfaelscht} Kontaktadressen verändert`);
+
 const ohneTitel = saetze.filter((s) =>
   [...s.offers, ...s.needs].some((e) => e.title.trim() === ""),
 ).length;
