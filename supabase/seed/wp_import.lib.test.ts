@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  type Bestand,
   QUELLFELDER,
   ablageorte,
   bildeAb,
+  fuegeZusammen,
   leseAufruf,
   pruefeKopfzeile,
   pruefeQuellPfad,
@@ -632,5 +634,251 @@ describe("bildeAb — user_pass", () => {
 
     expect(JSON.stringify(satz)).not.toContain("GEHEIM");
     expect(QUELLFELDER).not.toContain("user_pass");
+  });
+});
+
+/** Ein leeres Bestandsprofil — die Tests setzen nur, worum es ihnen geht. */
+function bestand(werte: Partial<Bestand> = {}): Bestand {
+  return {
+    bereitsImportiert: false,
+    profil: {
+      name: null,
+      headline: null,
+      short_bio: null,
+      region: null,
+      website: null,
+      socials: {},
+      videos: [],
+    },
+    kontakt: {
+      email: null,
+      phone: null,
+      street: null,
+      postal_code: null,
+      city: null,
+      state: null,
+      country: null,
+    },
+    offers: 0,
+    needs: 0,
+    interessen: 0,
+    ...werte,
+  };
+}
+
+describe("fuegeZusammen — ohne Bestand", () => {
+  it("schreibt bei einem neuen Profil alles, was die Quelle hat", () => {
+    const satz = bildeAb(zeile({ beruf: "Steuerberaterin", Strasse: "Hauptstr. 1" }));
+
+    const ergebnis = fuegeZusammen(satz, null);
+
+    expect(ergebnis.profil.headline).toBe("Steuerberaterin");
+    expect(ergebnis.kontakt.street).toBe("Hauptstr. 1");
+    expect(ergebnis.uebersprungen).toEqual([]);
+  });
+
+  it("führt ein Feld ohne Quellwert gar nicht auf", () => {
+    // Nicht `null` schreiben: ein Update mit lauter Nullen räumte auf einem
+    // Bestandskonto Felder leer, die die Quelle nur nicht kennt.
+    const ergebnis = fuegeZusammen(bildeAb(zeile({ beruf: "Steuerberaterin" })), null);
+
+    expect(ergebnis.profil).not.toHaveProperty("region");
+    expect(ergebnis.kontakt).not.toHaveProperty("phone");
+  });
+});
+
+describe("fuegeZusammen — nur leere Ziele füllen", () => {
+  it("füllt ein leeres Feld eines noch nicht importierten Bestandskontos", () => {
+    const ergebnis = fuegeZusammen(bildeAb(zeile({ beruf: "Steuerberaterin" })), bestand());
+
+    expect(ergebnis.profil.headline).toBe("Steuerberaterin");
+  });
+
+  it("lässt ein belegtes Feld stehen und führt es als übersprungen", () => {
+    const ergebnis = fuegeZusammen(
+      bildeAb(zeile({ beruf: "Steuerberaterin" })),
+      bestand({ profil: { ...bestand().profil, headline: "Selbst eingetragen" } }),
+    );
+
+    expect(ergebnis.profil).not.toHaveProperty("headline");
+    expect(ergebnis.uebersprungen).toContain("profiles.headline");
+  });
+
+  it("wertet reine Leerzeichen im Bestand als leer", () => {
+    const ergebnis = fuegeZusammen(
+      bildeAb(zeile({ beruf: "Steuerberaterin" })),
+      bestand({ profil: { ...bestand().profil, headline: "   " } }),
+    );
+
+    expect(ergebnis.profil.headline).toBe("Steuerberaterin");
+  });
+});
+
+describe("fuegeZusammen — das geleerte Feld", () => {
+  it("füllt ein Feld NICHT nach, das ein bereits importiertes Mitglied geleert hat", () => {
+    // Der Kern der Merge-Regel und ihr Widerspruch: ein gelöschtes Feld IST
+    // leer, „leer, also füllen" machte die Löschung also bei jedem Lauf
+    // rückgängig. Unterschieden wird deshalb am Profil, nicht am Feld — wo
+    // dieser Import schon einmal geschrieben hat, ist eine Lücke eine
+    // Entscheidung des Mitglieds.
+    const satz = bildeAb(zeile({ beruf: "Steuerberaterin", Telefonnummer: "'+49 711 123456" }));
+
+    const ergebnis = fuegeZusammen(satz, bestand({ bereitsImportiert: true }));
+
+    expect(ergebnis.profil).not.toHaveProperty("headline");
+    expect(ergebnis.kontakt).not.toHaveProperty("phone");
+    expect(ergebnis.uebersprungen).toEqual(
+      expect.arrayContaining(["profiles.headline", "profile_contacts.phone"]),
+    );
+  });
+});
+
+describe("fuegeZusammen — Verwaltungsfelder", () => {
+  it("aktualisiert member_since auch über einen belegten Bestandswert", () => {
+    const ergebnis = fuegeZusammen(
+      bildeAb(zeile({ infos_16: "April 2021" })),
+      bestand({ bereitsImportiert: true }),
+    );
+
+    expect(ergebnis.profil.member_since).toBe("2021-04-01");
+    expect(ergebnis.uebersprungen).not.toContain("profiles.member_since");
+  });
+
+  it("aktualisiert legacy_tier und schreibt die Kennung immer mit", () => {
+    const ergebnis = fuegeZusammen(
+      bildeAb(zeile({ Mitgliedschaft: "Premium-Mitglied", source_user_id: "318" })),
+      bestand({ bereitsImportiert: true }),
+    );
+
+    expect(ergebnis.legacy).toEqual({ legacy_source_id: "318", legacy_tier: "Premium-Mitglied" });
+  });
+
+  it("löscht ein Verwaltungsfeld nicht, nur weil die Quelle es nicht führt", () => {
+    // „Immer aktualisieren" heisst nicht „immer schreiben": 66 der 70
+    // Datensätze führen keine Mitgliedschaft. Ein Update mit `null` nähme dem
+    // Verzeichnis genau die Angabe, die die Verwaltung von Hand nachgetragen hat.
+    const ergebnis = fuegeZusammen(bildeAb(zeile({ source_user_id: "318" })), bestand());
+
+    expect(ergebnis.legacy).not.toHaveProperty("legacy_tier");
+    expect(ergebnis.profil).not.toHaveProperty("member_since");
+  });
+
+  it("fasst paid_until und legacy_price nicht an — die Quelle führt sie nicht", () => {
+    // Sie kommen aus Detlevs Zahlungsständen (Aufgabe 3.5, offen). Solange der
+    // Import sie nicht kennt, darf kein Lauf sie überschreiben; `null` hiesse
+    // auf `paid_until` „unbekannt" und nähme den Bestandsschutz weg.
+    const ergebnis = fuegeZusammen(bildeAb(zeile({ source_user_id: "318" })), bestand());
+
+    expect(ergebnis.legacy).not.toHaveProperty("paid_until");
+    expect(ergebnis.legacy).not.toHaveProperty("legacy_price");
+  });
+});
+
+describe("fuegeZusammen — was der Import nie anfasst", () => {
+  it("führt weder activated_at noch die Anmeldeadresse im Ergebnis", () => {
+    const satz = bildeAb(
+      zeile({ user_email: "privat@web.de", "E-Mail": "kontakt@firma.de", beruf: "Beraterin" }),
+    );
+
+    const ergebnis = fuegeZusammen(satz, bestand());
+
+    // Die Anmeldeadresse dient dem Wiedererkennen des Kontos, nicht dem
+    // Schreiben. Die Kontaktadresse ist ein anderes Feld und wird geschrieben.
+    expect(JSON.stringify(ergebnis)).not.toContain("privat@web.de");
+    expect(ergebnis.kontakt.email).toBe("kontakt@firma.de");
+    expect(JSON.stringify(ergebnis)).not.toContain("activated_at");
+  });
+});
+
+describe("fuegeZusammen — socials und videos", () => {
+  it("führt socials pro Schlüssel zusammen und lässt fremde Netzwerke stehen", () => {
+    const satz = bildeAb(zeile({ linkedin: "https://linkedin.com/in/neu", facebook: "https://fb.com/b" }));
+
+    const ergebnis = fuegeZusammen(
+      satz,
+      bestand({
+        profil: {
+          ...bestand().profil,
+          socials: { xing: "https://xing.com/x", linkedin: "https://linkedin.com/in/selbst" },
+        },
+      }),
+    );
+
+    // Geschrieben wird das VOLLSTÄNDIGE Objekt: die Spalte ist jsonb und wird
+    // als Ganzes ersetzt — nur die neuen Schlüssel zurückzugeben, räumte xing weg.
+    expect(ergebnis.profil.socials).toEqual({
+      xing: "https://xing.com/x",
+      linkedin: "https://linkedin.com/in/selbst",
+      facebook: "https://fb.com/b",
+    });
+  });
+
+  it("lässt socials aus, wenn kein Schlüssel hinzukommt", () => {
+    const satz = bildeAb(zeile({ linkedin: "https://linkedin.com/in/neu" }));
+
+    const ergebnis = fuegeZusammen(
+      satz,
+      bestand({
+        profil: { ...bestand().profil, socials: { linkedin: "https://linkedin.com/in/selbst" } },
+      }),
+    );
+
+    expect(ergebnis.profil).not.toHaveProperty("socials");
+  });
+
+  it("fasst socials eines bereits importierten Profils nicht an", () => {
+    const satz = bildeAb(zeile({ facebook: "https://fb.com/b" }));
+
+    const ergebnis = fuegeZusammen(satz, bestand({ bereitsImportiert: true }));
+
+    // Aufgeführt wird der SCHLÜSSEL, nicht das Feld: nachzutragen ist genau
+    // dieses eine Netzwerk, nicht die ganze Spalte.
+    expect(ergebnis.profil).not.toHaveProperty("socials");
+    expect(ergebnis.uebersprungen).toEqual(["profiles.socials.facebook"]);
+  });
+
+  it("wertet ein leeres videos-Array als leeres Ziel", () => {
+    const satz = bildeAb(zeile({ praesi_kurz: "https://www.youtube.com/watch?v=abc123" }));
+
+    expect(fuegeZusammen(satz, bestand()).profil.videos).toEqual([
+      "https://www.youtube.com/watch?v=abc123",
+    ]);
+    expect(
+      fuegeZusammen(satz, bestand({ profil: { ...bestand().profil, videos: ["https://vimeo.com/1"] } }))
+        .profil,
+    ).not.toHaveProperty("videos");
+  });
+});
+
+describe("fuegeZusammen — offers, needs, interessen", () => {
+  it("legt die Zeilen an, solange das Ziel keine trägt", () => {
+    const satz = bildeAb(zeile({ biete: "Beratung", suche: "Kontakte", infos_28: "Segeln" }));
+
+    const ergebnis = fuegeZusammen(satz, bestand());
+
+    expect(ergebnis.offers).toHaveLength(1);
+    expect(ergebnis.needs).toHaveLength(1);
+    expect(ergebnis.interessen).toHaveLength(1);
+  });
+
+  it("legt keine zweite Zeile an, wenn das Ziel schon eine trägt", () => {
+    const satz = bildeAb(zeile({ biete: "Beratung", suche: "Kontakte", infos_28: "Segeln" }));
+
+    const ergebnis = fuegeZusammen(satz, bestand({ offers: 1, needs: 2, interessen: 1 }));
+
+    expect(ergebnis.offers).toEqual([]);
+    expect(ergebnis.needs).toEqual([]);
+    expect(ergebnis.interessen).toEqual([]);
+    expect(ergebnis.uebersprungen).toEqual(
+      expect.arrayContaining(["offers", "needs", "profile_interests"]),
+    );
+  });
+
+  it("legt beim zweiten Lauf keine Zeile an, auch wenn das Mitglied seine gelöscht hat", () => {
+    // Ohne diese Regel wüchse die Zeilenzahl mit jedem Lauf, und eine vom
+    // Mitglied entfernte Zeile käme jedes Mal zurück (Aufgabe 7.7).
+    const satz = bildeAb(zeile({ biete: "Beratung" }));
+
+    expect(fuegeZusammen(satz, bestand({ bereitsImportiert: true })).offers).toEqual([]);
   });
 });

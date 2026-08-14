@@ -184,6 +184,43 @@ werden **nie** vom Import angefasst.
 Go-Live zu einem stillen Datenverlust. *Verworfen:* ein Schalter, der die Regel
 am Go-Live-Tag umstellt — eine weitere Sache, die falsch stehen kann.
 
+#### Nachtrag 14.08.: die zwei Sätze widersprechen sich, unterschieden wird am Profil
+
+Beim Bauen von 3.7 fiel auf, dass die beiden Sätze oben nicht zusammen gelten
+können. Ein **gelöschtes Feld ist leer** — nach „nur wenn das Ziel leer ist"
+füllte der nächste Lauf es wieder, und keine Löschung hielte länger als bis zum
+nächsten Import.
+
+Ein einzelnes leeres Feld trägt kein Merkmal, das „nie befüllt" von „geleert"
+trennt. Das Profil trägt eines: ob dieser Import dort schon geschrieben hat
+(`profile_legacy.legacy_source_id`). Danach entschieden:
+
+- **Profil noch nicht importiert** (neu, oder ein Bestandskonto, das über die
+  Adresse zugeordnet wurde) → leere Felder werden gefüllt. Die Lücken stammen
+  nicht von uns, und Ergänzen ist der Zweck des Laufs.
+- **Profil bereits importiert** → die Mitgliedsfelder bleiben unangetastet. Was
+  dort leer ist, war entweder in der Quelle leer — dann ist nichts zu tun — oder
+  es ist geleert worden, dann ist es eine Entscheidung.
+
+Der Preis, mit Ansage: bringt ein neu gezogener Export einen Wert für ein Feld,
+das beim ersten Lauf leer war, wird er nicht mehr geschrieben. Er steht deshalb
+in `uebersprungen` und damit im Bericht — von Hand nachtragbar, statt still
+gegen eine Löschung entschieden.
+
+**Zwei Verschärfungen dazu.** „Immer aktualisiert" gilt für die
+Verwaltungsfelder nur, wo die **Quelle einen Wert führt**: 66 der 70 Datensätze
+haben keine `Mitgliedschaft`, und ein `null` darüber räumte weg, was von Hand
+nachgetragen wurde. Und `socials` wird **pro Schlüssel** zusammengeführt, nicht
+als Feld — die Quelle kennt fünf Netzwerke, das Formular sechs, ein Mitglied mit
+eigenem Xing-Eintrag verlöre sonst entweder das Xing oder die anderen fünf.
+`videos` dagegen als Feld: Anhängen legte bei jedem Lauf dasselbe Video ein
+zweites Mal ab.
+
+*`paid_until` und `legacy_price` kommen in der Zusammenführung überhaupt nicht
+vor.* Die Quelle führt sie nicht, und auf `paid_until` heißt `null`
+ausdrücklich „unbekannt" — ein Lauf, der sie mitschriebe, nähme den
+Bestandsschutz weg.
+
 ### `member_since`: auffüllen und ausweisen (entschieden 14.08., Donald)
 
 Fehlender Tag → 1. des Monats, fehlender Monat → 1. Januar; jeder aufgefüllte

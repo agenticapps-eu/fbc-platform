@@ -472,6 +472,191 @@ export function bildeAb(row: Record<string, string>): Zielsatz {
   };
 }
 
+/**
+ * Was im Ziel schon steht. Bewusst NICHT der ganze Zielsatz: `member_since`,
+ * `legacy_tier`, `paid_until` und `legacy_price` stehen hier nicht, weil die
+ * Merge-Regel ihren Bestandswert gar nicht liest — sonst führe der Aufrufer
+ * Daten heran, auf die es nicht ankommt.
+ *
+ * `offers`, `needs` und `interessen` sind Zählwerte: die Regel fragt nur, ob das
+ * Ziel überhaupt eine Zeile trägt. Gezählt werden dabei die Zeilen des
+ * Freitext-Editors — die Chips des Kategorie-Wählers (`source = 'chip'`,
+ * `20260804200000`) sind anderer Inhalt, und ein Mitglied mit drei Kategorien
+ * hat trotzdem kein „Ich biete" geschrieben.
+ */
+export type Bestand = {
+  /**
+   * Trägt dieses Profil bereits die Kennung dieses Imports? Der Unterschied
+   * zwischen „hier stand noch nie etwas" und „hier hat jemand aufgeräumt".
+   */
+  bereitsImportiert: boolean;
+  profil: {
+    name: string | null;
+    headline: string | null;
+    short_bio: string | null;
+    region: string | null;
+    website: string | null;
+    socials: Record<string, string>;
+    videos: string[];
+  };
+  kontakt: {
+    email: string | null;
+    phone: string | null;
+    street: string | null;
+    postal_code: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  };
+  offers: number;
+  needs: number;
+  interessen: number;
+};
+
+/**
+ * Was geschrieben werden soll — und nur das. Ein Feld, das hier fehlt, wird
+ * nicht angefasst; der Aufrufer baut sein UPDATE aus den vorhandenen Schlüsseln.
+ *
+ * `uebersprungen` trägt die Felder, für die die Quelle einen Wert hatte, der
+ * nicht geschrieben wurde. Ohne diese Liste verschwiegen die Läufe genau das,
+ * was ein Mensch nachtragen müsste (Aufgabe 4.4).
+ */
+export type Zusammenfuehrung = {
+  profil: Partial<Zielsatz["profil"]>;
+  kontakt: Partial<Zielsatz["kontakt"]>;
+  legacy: { legacy_source_id: string | null; legacy_tier?: string };
+  offers: Zielsatz["offers"];
+  needs: Zielsatz["needs"];
+  interessen: Zielsatz["interessen"];
+  uebersprungen: string[];
+};
+
+/** Die Felder, die dem Mitglied gehören — sie werden nur in leere Ziele geschrieben. */
+const MITGLIEDSFELDER = {
+  profil: ["name", "headline", "short_bio", "region", "website"],
+  kontakt: ["email", "phone", "street", "postal_code", "city", "state", "country"],
+} as const;
+
+const leer = (v: string | null): boolean => (v ?? "").trim() === "";
+
+/**
+ * Hält den Zielsatz gegen den Bestand und gibt zurück, was geschrieben werden
+ * darf. Rein — kein Zugriff, keine Wirkung.
+ *
+ * ── DER WIDERSPRUCH IN DER REGEL, UND WIE ER AUFGELÖST IST ──────────────────
+ * Das Design sagt beides: „ein zweiter Lauf schreibt ein Profilfeld nur, wenn
+ * das Ziel leer ist" UND „was ein Mitglied selbst eingetragen oder GELÖSCHT hat,
+ * bleibt". Ein gelöschtes Feld ist leer — nach der ersten Hälfte füllte der
+ * nächste Lauf es wieder, und die Löschung hielte nie länger als bis zum
+ * nächsten Import. Aufgabe 3.7 verlangt genau dafür einen Test.
+ *
+ * Aufgelöst wird es am PROFIL, nicht am Feld: es gibt kein Merkmal, das ein
+ * einzelnes leeres Feld als „nie befüllt" oder „geleert" ausweist, wohl aber
+ * eines am Profil — ob dieser Import dort schon einmal geschrieben hat
+ * (`profile_legacy` trägt die Kennung). Danach:
+ *
+ *   * Profil noch nicht importiert (neu, oder ein Bestandskonto, das über die
+ *     Adresse zugeordnet wurde) → leere Felder werden gefüllt. Die Lücken
+ *     stammen nicht von uns, und „ergänzen" ist der Zweck des Laufs.
+ *   * Profil bereits importiert → die Mitgliedsfelder bleiben unangetastet.
+ *     Was dort leer ist, war entweder in der Quelle leer (dann ist nichts zu
+ *     tun) oder ist geleert worden (dann ist es eine Entscheidung).
+ *
+ * Der Preis: bringt ein neu gezogener Export einen Wert für ein Feld, das beim
+ * ersten Lauf leer war, wird er nicht mehr geschrieben. Deshalb steht dieser
+ * Fall in `uebersprungen` und damit im Bericht — nachtragbar von Hand, statt
+ * still gegen eine Löschung entschieden.
+ *
+ * ── VERWALTUNGSFELDER: IMMER, ABER NICHT MIT LEEREN HÄNDEN ──────────────────
+ * `member_since` und `legacy_tier` gehören der Verwaltung und überschreiben
+ * auch einen belegten Bestandswert. Ein fehlender QUELLwert schreibt trotzdem
+ * nichts: 66 der 70 Datensätze führen keine Mitgliedschaft, und ein `null`
+ * darüber räumte weg, was von Hand nachgetragen wurde.
+ *
+ * `paid_until` und `legacy_price` kommen in dieser Funktion nicht vor. Die
+ * Quelle führt sie nicht (sie stehen in Detlevs Zahlungsständen, Aufgabe 3.5),
+ * und auf `paid_until` heisst `null` ausdrücklich „unbekannt", nicht
+ * „unbefristet" — ein Lauf, der sie mitschriebe, nähme den Bestandsschutz weg.
+ *
+ * `activated_at` und die Anmeldeadresse stehen aus demselben Grund nicht im
+ * Ergebnis: die Adresse dient dem Wiedererkennen des Kontos, nicht dem
+ * Schreiben, und die Freischaltung ist keine Angabe aus WordPress.
+ */
+export function fuegeZusammen(ziel: Zielsatz, bestand: Bestand | null): Zusammenfuehrung {
+  const uebersprungen: string[] = [];
+  const profil: Partial<Zielsatz["profil"]> = {};
+  const kontakt: Partial<Zielsatz["kontakt"]> = {};
+
+  // Ein Bestand, in dem dieser Import schon geschrieben hat, gibt nichts mehr
+  // her: dann ist jede Lücke das Ergebnis einer Entscheidung.
+  const darfSchreiben = (zielIstLeer: boolean): boolean =>
+    bestand === null || (!bestand.bereitsImportiert && zielIstLeer);
+  const darfFuellen = (bestandswert: string | null): boolean => darfSchreiben(leer(bestandswert));
+
+  for (const feld of MITGLIEDSFELDER.profil) {
+    const wert = ziel.profil[feld];
+    if (wert === null) continue;
+    if (darfFuellen(bestand?.profil[feld] ?? null)) profil[feld] = wert;
+    else uebersprungen.push(`profiles.${feld}`);
+  }
+
+  for (const feld of MITGLIEDSFELDER.kontakt) {
+    const wert = ziel.kontakt[feld];
+    if (wert === null) continue;
+    if (darfFuellen(bestand?.kontakt[feld] ?? null)) kontakt[feld] = wert;
+    else uebersprungen.push(`profile_contacts.${feld}`);
+  }
+
+  // `socials` wird pro Schlüssel zusammengeführt, nicht als Feld: die Quelle
+  // kennt fünf Netzwerke, das Formular sechs, und ein Mitglied mit einem
+  // eingetragenen Xing-Profil verlöre sonst entweder das Xing oder die anderen
+  // fünf. Zurückgegeben wird das VOLLSTÄNDIGE Objekt — die Spalte ist jsonb und
+  // wird beim Schreiben als Ganzes ersetzt.
+  const socialsNeu = { ...(bestand?.profil.socials ?? {}) };
+  let socialsGeaendert = false;
+  for (const [netz, adresse] of Object.entries(ziel.profil.socials)) {
+    if (darfFuellen(socialsNeu[netz] ?? null)) {
+      socialsNeu[netz] = adresse;
+      socialsGeaendert = true;
+    } else {
+      uebersprungen.push(`profiles.socials.${netz}`);
+    }
+  }
+  if (socialsGeaendert) profil.socials = socialsNeu;
+
+  // `videos` dagegen als Feld und nicht je Eintrag: die Liste ist die
+  // Präsentation des Mitglieds in seiner Reihenfolge, und Anhängen legte bei
+  // jedem Lauf dasselbe Video ein zweites Mal ab.
+  if (ziel.profil.videos.length > 0) {
+    if (darfSchreiben((bestand?.profil.videos.length ?? 0) === 0)) profil.videos = ziel.profil.videos;
+    else uebersprungen.push("profiles.videos");
+  }
+
+  if (ziel.profil.member_since !== null) profil.member_since = ziel.profil.member_since;
+
+  const legacy: Zusammenfuehrung["legacy"] = {
+    legacy_source_id: ziel.legacy.legacy_source_id,
+  };
+  if (ziel.legacy.legacy_tier !== null) legacy.legacy_tier = ziel.legacy.legacy_tier;
+
+  const liste = <T>(zeilen: T[], vorhanden: number, name: string): T[] => {
+    if (zeilen.length === 0) return [];
+    if (darfSchreiben(vorhanden === 0)) return zeilen;
+    uebersprungen.push(name);
+    return [];
+  };
+
+  return {
+    profil,
+    kontakt,
+    legacy,
+    offers: liste(ziel.offers, bestand?.offers ?? 0, "offers"),
+    needs: liste(ziel.needs, bestand?.needs ?? 0, "needs"),
+    interessen: liste(ziel.interessen, bestand?.interessen ?? 0, "profile_interests"),
+    uebersprungen,
+  };
+}
+
 export type Ablageorte = { verzeichnis: string; bericht: string; zwischenablage: string };
 
 /**
