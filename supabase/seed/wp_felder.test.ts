@@ -37,6 +37,13 @@ describe("phpArray", () => {
   it("kommt mit Zeilenumbrüchen im Wert zurecht", () => {
     expect(phpArray('a:1:{i:0;s:5:"a\nb";}')).toEqual(["a\nb"]);
   });
+
+  it("glaubt der angegebenen Länge, nicht dem Inhalt", () => {
+    // Widersprüchlich: die Kopfzahl sagt „leer", der Rumpf trägt einen Wert.
+    // Ohne den frühen Ausstieg gewönne der Rumpf — dann entschiede bei kaputten
+    // Daten der Zufall, welche der beiden Angaben zählt.
+    expect(phpArray('a:0:{i:0;s:5:"hallo";}')).toEqual([]);
+  });
 });
 
 describe("ortParsen", () => {
@@ -67,6 +74,13 @@ describe("ortParsen", () => {
       land: "AT",
       guete: "ok",
     });
+  });
+
+  it("hält ein einzelnes d im Ortsnamen nicht für eine Landesangabe", () => {
+    // Nur ausgeschriebene Länder werden gesucht. Sonst risse „v. d." aus
+    // „Bad Homburg v. d. Höhe" ein Wort heraus, und der Ortsname im Profil
+    // wäre ein anderer als der eingetragene.
+    expect(ortParsen("61348 Bad Homburg v. d. Höhe").ort).toBe("Bad Homburg v. d. Höhe");
   });
 
   it("meldet die Güteklassen einzeln", () => {
@@ -127,6 +141,17 @@ describe("datumParsen", () => {
 
   it.each(faelle)("liest %s als %s (%s)", (roh, datum, grad) => {
     expect(datumParsen(roh)).toEqual({ datum, grad, roh });
+  });
+
+  it("liest auch den Monat mit Umlaut", () => {
+    // Der einzige. Mit `[A-Za-z]+` statt `\p{L}+` fiele er lautlos durch und
+    // stünde als „nicht lesbar" im Bericht.
+    expect(datumParsen("März 2020")).toEqual({
+      datum: "2020-03-01",
+      grad: "monat",
+      roh: "März 2020",
+    });
+    expect(datumParsen("Maerz 2020")?.datum).toBe("2020-03-01");
   });
 
   it("hält die Rohangabe fest", () => {

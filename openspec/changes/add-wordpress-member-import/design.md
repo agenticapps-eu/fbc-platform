@@ -12,10 +12,22 @@ Aussagen des Issues stimmen jedoch nicht, und dieses Design ersetzt sie:
 
 | Issue | Gemessen |
 |---|---|
-| Parser für Datum, Ort, PHP-Array, Telefon „liegen vor" | `parser.py` enthält nur `php_array` und `ort_parsen`. **Datum und Telefon sind zu schreiben.** |
-| „Datum: 52 von 52 über elf Schreibweisen" | 10 Schreibweisen; **17 der 52 ohne Tag**, 6 ohne Monat |
+| Parser für Datum, Ort, PHP-Array, Telefon „liegen vor" | ~~`parser.py` enthält nur `php_array` und `ort_parsen`~~ — **diese Zeile war falsch**, siehe unten |
+| „Datum: 52 von 52 über elf Schreibweisen" | 11 Rohformen, **9 normalisiert**; **16 der 52 ohne Tag**, 6 ohne Monat |
 | Bildendungen „`.jpg` und `.png`, beide probieren" | **Drei**: `jpg`, `png`, `jpeg` — je 7 Datensätze hingen an der fehlenden dritten |
 | Ex-Mitglieder „über UM-Status erkennbar? — prüfen" | **Nein.** 70× `approved`. Detlevs Liste ist zwingend |
+
+**Nachtrag vom 14.08., beim Übertragen der Parser aufgefallen und hier
+korrigiert:** Der Vorlauf hat `parser.py` gelesen (13.08., 15:17) und daraus
+geschlossen, Datum und Telefon seien noch zu schreiben. Im selben Verzeichnis
+liegt `wp_feld_parser.py` (15:51) — 34 Minuten jünger, mit **allen vier**
+Parsern plus `text_saeubern` und einer `headline`-Ableitung. Die Korrektur der
+Ausgangslage korrigiert nicht die Arbeit: die Übertragung war ohnehin zu leisten,
+und drei Stellen tragen die Python-Semantik nicht (`\b` vor Umlauten, die
+Zeitzone eines `Date`, der Rückfall vom Wohnort auf die Regionalgruppe). Die
+`headline`-Ableitung aus `infos` ist bewusst **nicht** übernommen — die
+Abbildungsmatrix führt `beruf` → `headline`, und eine falsche Headline steht
+unter dem Namen im Verzeichnis.
 
 Drei Fehlerfälle aus Abschnitt 4 des Issues laufen ins Leere: keine doppelte
 E-Mail, keine leere, keine syntaktisch ungültige. Sie werden trotzdem geprüft —

@@ -17,13 +17,21 @@
 
 ## 2. Die vier Parser (`wp_felder.ts`, ohne Datenbank)
 
-- [ ] 2.1 `phpArray` nach TypeScript übertragen — RED/GREEN; Fälle: `a:2:{…}`, `a:0:{}`, Klartext, leer
-- [ ] 2.2 `ortParsen` übertragen — RED/GREEN; Güteklassen `ok`, `nur_plz`, `nur_ort`, `leer`, plus Länderkürzel `D-70173`
-- [ ] 2.3 **neu** `datumParsen` — RED/GREEN über alle 10 Schreibweisen inkl. `.17.03.2019` (führender Punkt), `April 2021`, `2019-09`, `9/2020`; liefert Datum **und** Auffüllgrad (`tag`/`monat`/`jahr`)
-- [ ] 2.4 **neu** `telefonParsen` — RED/GREEN; führendes Apostroph des Exporters entfernen (17 von 52 Datensätzen)
-- [ ] 2.5 `htmlEntfernen` — RED/GREEN; Tags weg, `&nbsp;`/`&amp;`/numerische Entitäten aufgelöst
-- [ ] 2.6 `normalisieren` für Adresse (trimmen, case-folden) und Kennung (trimmen, nichtleer) — RED/GREEN
-- [ ] 2.7 Paritätsprüfung: alle Parser gegen die echte Quelldatei laufen lassen und die Zählwerte gegen die Python-Messung stellen (Ort 33/15/2, Datum 52, Arrays 49). Abweichung = Fehler im Port
+> **Korrektur zur Ausgangslage.** Der Vorlauf hat gegen `parser.py` (13.08., 15:17) gemessen und geschlossen, Datum und Telefon seien noch zu schreiben. Die spätere `wp_feld_parser.py` (15:51) enthält **alle vier** Parser plus `text_saeubern` und eine `headline`-Ableitung. „**neu**" unten stimmt also nicht — es war eine Übertragung wie die anderen auch. Die Ableitung der Headline aus `infos` ist in diesem Change **nicht** übernommen: die Abbildungsmatrix führt `beruf` → `headline`, und eine falsche Headline steht unter dem Namen im Verzeichnis.
+
+- [x] 2.1 `phpArray` nach TypeScript übertragen — RED/GREEN; Fälle: `a:2:{…}`, `a:0:{}`, Klartext, leer
+      — dazu ein Fall, den die Gegenprobe erzwungen hat: bei widersprüchlichem `a:0:{i:0;s:5:"hallo";}` gewinnt die Kopfzahl, nicht der Rumpf.
+- [x] 2.2 `ortParsen` übertragen — RED/GREEN; Güteklassen `ok`, `nur_plz`, `nur_ort`, `leer`, plus Länderkürzel `D-70173`
+      — zwei Fallen: `\b` greift in JavaScript vor „Ö" nicht (Lookaround statt Wortgrenze), und ohne die Längenschranke für Landesnamen frisst „d" ein Wort aus „Bad Homburg v. d. Höhe". Der Rückfall auf die Regionalgruppe ist **nicht** übernommen.
+- [x] 2.3 `datumParsen` — RED/GREEN über alle Schreibweisen inkl. `.17.03.2019` (führender Punkt), `April 2021`, `2019-09`, `9/2020`; liefert Datum **und** Auffüllgrad (`tag`/`monat`/`jahr`)
+      — gemessen sind **11 Rohformen / 9 normalisierte** (nicht 10) und **16 ohne Tag** (nicht 17), 6 ohne Monat. Führt die Zeichenkette statt eines `Date`: ein `new Date("2020-07-22")` steht auf UTC-Mitternacht. Unmögliche Tage (`31.02.`) werden abgewiesen statt umgerechnet.
+- [x] 2.4 `telefonParsen` — RED/GREEN; führendes Apostroph des Exporters entfernen (17 von 52 Datensätzen)
+- [x] 2.5 `htmlEntfernen` — RED/GREEN; Tags weg, `&nbsp;`/`&amp;`/numerische Entitäten aufgelöst
+      — Auflösung in **einem** Durchgang, sonst wird aus `&amp;lt;` wieder echtes Markup.
+- [x] 2.6 `normalisieren` für Adresse (trimmen, case-folden) und Kennung (trimmen, nichtleer) — RED/GREEN
+      — die Kennung wird **nicht** case-gefaltet: sie ist ein Schlüssel, kein Text.
+- [x] 2.7 Paritätsprüfung: alle Parser gegen die echte Quelldatei laufen lassen und die Zählwerte gegen die Python-Messung stellen. Abweichung = Fehler im Port
+      — `scripts/probe-c10-parser-paritaet.ts`, **16 von 16 Zählwerten gleich** gegen die echten 70 Datensätze. Die „Arrays 49" der Aufgabenstellung sind zwei Zahlen: 49 Felder befüllt, davon 43 mit Inhalt (6× `a:0:{}`). Gegenprobe: ein Port, der den führenden Punkt nicht abschneidet, wird von der Probe mit Fehlercode gemeldet (52 → 51).
 
 ## 3. Abbildung (`wp_import.lib.ts`)
 

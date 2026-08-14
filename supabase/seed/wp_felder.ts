@@ -74,6 +74,12 @@ const LAENDER: ReadonlyArray<readonly [string, string]> = [
  * Zerlegt das eine Freitextfeld `ort` in PLZ, Ort und Land. 50 der 70
  * Datensätze sind befüllt, davon 33 mit beidem, 15 nur mit einem Ortsnamen und
  * 2 nur mit einer PLZ.
+ *
+ * `DE` ist die Vorgabe für jede nicht-leere Angabe ohne erkanntes Land — eine
+ * vierstellige PLZ aus AT oder CH landete also bei `DE`, sofern das Land nicht
+ * danebensteht. In diesen Daten kommt kein solcher Fall vor (50× DE, 20× leer);
+ * die Vorlage trug dafür einen Zweig, der wegen dieser Vorgabe nie etwas
+ * anderes bewirken konnte — er ist hier nicht mit übernommen.
  */
 export function ortParsen(roh: string): Ort {
   let s = (roh ?? "").replace(/<[^>]+>/g, " ");
@@ -114,8 +120,6 @@ export function ortParsen(roh: string): Ort {
     ? s.slice(0, plzTreffer.index) + " " + s.slice((plzTreffer.index ?? 0) + plzTreffer[0].length)
     : s;
   const ort = beschneide(rest.replace(/\s+/g, " ").trim(), " ,-–/.;");
-
-  if (plz && !land) land = plz.length === 5 ? "DE" : "";
 
   let guete: OrtGuete;
   if (plz && ort) guete = "ok";
