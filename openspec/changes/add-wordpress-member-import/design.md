@@ -371,6 +371,39 @@ Bearbeitungsformular. Die importierten Netzwerke sind damit vorerst für
 niemanden sichtbar ausser für das Mitglied selbst. Das ist kein Fehler dieses
 Changes, aber es begrenzt, was der Import hier bewirken kann.
 
+#### `offers`/`needs` sind bereits belegt — die importierte Zeile muss sich einfügen
+
+Bei der Sichtprobe am Formular aufgefallen: unter „Ich biete & ich suche" sitzt
+ein **Kategorie-Wähler**, und der schreibt in dieselben zwei Tabellen
+(`profile-categories.ts`). Eine importierte Freitext-Zeile trifft also auf ein
+bestehendes System, statt in eine leere Tabelle zu fallen.
+
+Nachgelesen — es passt, aber nur unter drei Bedingungen, die beim Schreiben
+(Gruppe 7) eingehalten werden müssen:
+
+- **`category` bleibt `null`.** `planReconciliation` sagt es wörtlich: „Zeilen
+  ohne Kategorie gehören keinem Chip — sie bleiben unberührt." Eine importierte
+  Zeile mit gesetzter `category` würde dagegen vom Chip-Wähler als abgewählte
+  Kategorie gelesen.
+- **`source` bleibt auf dem Default `'editor'`.** Die Spalte kennt nur
+  `'editor'` und `'chip'` (Check-Constraint), ein `'import'` gibt es nicht — und
+  `'editor'` trägt genau die gewünschte Bedeutung: solche Zeilen dürfen beim
+  Abwählen einer Kategorie **nicht ohne Rückfrage** gelöscht werden. Ein
+  versehentliches `'chip'` machte die Zeile dagegen kommentarlos löschbar und
+  liefe zusätzlich in den Unique-Index `(profile_id, category) where source =
+  'chip'`.
+- **`theme` bleibt `null`.** Es gehört zum Facettenfilter des Kompass-Vokabulars;
+  ein geratenes Thema stellte die Zeile in eine Facette, die das Mitglied nie
+  gewählt hat.
+
+Damit greift auch das Argument, mit dem die Entscheidung oben gefällt wurde:
+`has_offers`/`has_needs` im Verzeichnis prüfen nur die Existenz einer Zeile, die
+47 bzw. 46 Menschen sind also ab Tag 1 auffindbar. Nebenwirkung, bewusst in Kauf
+genommen: `recompute_potential_score` summiert `count(*)` über beide Tabellen —
+ein importierter Eintrag hebt den Potential-Score um denselben Betrag wie ein
+selbst angelegter. Das ist konsistent, aber es heisst, dass der Score nach dem
+Import anders steht als davor.
+
 **Leerwertregel:** ein leeres oder nur aus Leerzeichen bestehendes Quellfeld
 zählt als „nicht vorhanden" und schreibt `null`, nicht `''`.
 

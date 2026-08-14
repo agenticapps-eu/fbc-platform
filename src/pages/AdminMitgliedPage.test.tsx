@@ -39,7 +39,7 @@ const DATEN: AdminProfileData = {
     competencies: [],
     website: "",
     dev_focus: "",
-    socials: { linkedin: "", instagram: "", xing: "" },
+    socials: { linkedin: "", instagram: "", xing: "", facebook: "", youtube: "", twitter: "" },
     interests: [],
     goals: [],
     videos: [],

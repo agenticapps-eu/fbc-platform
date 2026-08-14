@@ -164,12 +164,28 @@ export function ProfileWebFieldset({ register, errors }: ProfileFieldsetsProps) 
           <Input id={id} invalid={invalid} placeholder="https://…" {...register("website")} />
         )}
       </Field>
+      {/*
+       * Sechs Netzwerke, nicht drei. Facebook, YouTube und X/Twitter stehen
+       * hier, weil der WordPress-Import sie mitbringt (AGE-534) und
+       * `saveProfile` die `socials`-Spalte vollständig ersetzt: ohne ein Feld
+       * im Formular käme der Wert nie im Formularwert an und wäre nach dem
+       * ersten Speichern weg. Betroffen sind 23 der 70 Altmitglieder.
+       */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="LinkedIn">{({ id }) => <Input id={id} {...register("socials.linkedin")} />}</Field>
         <Field label="Instagram">
           {({ id }) => <Input id={id} {...register("socials.instagram")} />}
         </Field>
         <Field label="Xing">{({ id }) => <Input id={id} {...register("socials.xing")} />}</Field>
+        <Field label="Facebook">
+          {({ id }) => <Input id={id} {...register("socials.facebook")} />}
+        </Field>
+        <Field label="YouTube">
+          {({ id }) => <Input id={id} {...register("socials.youtube")} />}
+        </Field>
+        <Field label="X / Twitter">
+          {({ id }) => <Input id={id} {...register("socials.twitter")} />}
+        </Field>
       </div>
     </Card>
   );

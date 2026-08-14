@@ -95,10 +95,18 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
       competencies: strArray(p.competencies),
       website: text(p.website),
       dev_focus: text(p.dev_focus) as ProfileFormValues["dev_focus"],
+      // Alle sechs, nicht die drei des ersten Entwurfs: der Admin-Weg schreibt
+      // unten (`Object.entries(form.socials)`) genau das zurück, was hier
+      // geladen wurde. Ein hier fehlender Schlüssel wäre nach dem ersten
+      // Speichern durch die Verwaltung weg — dieselbe Falle wie im
+      // Mitglieder-Editor (AGE-534).
       socials: {
         linkedin: socialString(p.socials, "linkedin"),
         instagram: socialString(p.socials, "instagram"),
         xing: socialString(p.socials, "xing"),
+        facebook: socialString(p.socials, "facebook"),
+        youtube: socialString(p.socials, "youtube"),
+        twitter: socialString(p.socials, "twitter"),
       },
       // Die Kind-Tabellen sind im Fremd-Modus nicht bearbeitbar; leer statt
       // halb gefüllt, damit ein Speichern sie nicht versehentlich leert.

@@ -53,10 +53,19 @@ export const profileFormSchema = z.object({
     z.string().trim().url("Bitte eine gültige URL eingeben (inkl. https://)."),
   ]),
   dev_focus: z.union([z.literal(""), themeEnum]),
+  // Fünf davon kommen aus dem WordPress-Altbestand (AGE-534), `xing` kennt nur
+  // dieses Formular. `facebook`, `youtube` und `twitter` sind hier nicht
+  // dekorativ: `z.object` entfernt unbekannte Schlüssel still, und `saveProfile`
+  // ersetzt die jsonb-Spalte vollständig — ohne diese drei Zeilen räumt das
+  // erste Speichern eines Mitglieds die importierten Werte wieder weg.
+  // Betroffen wären 23 der 70 Altmitglieder, 5 davon ohne jedes andere Netz.
   socials: z.object({
     linkedin: z.string().trim(),
     instagram: z.string().trim(),
     xing: z.string().trim(),
+    facebook: z.string().trim(),
+    youtube: z.string().trim(),
+    twitter: z.string().trim(),
   }),
   interests: z.array(
     z.object({
@@ -123,7 +132,7 @@ export const EMPTY_PROFILE_FORM: ProfileFormValues = {
   competencies: [],
   website: "",
   dev_focus: "",
-  socials: { linkedin: "", instagram: "", xing: "" },
+  socials: { linkedin: "", instagram: "", xing: "", facebook: "", youtube: "", twitter: "" },
   interests: [],
   goals: [],
   videos: [],
@@ -225,6 +234,9 @@ export async function fetchProfileEditorData(uid: string): Promise<ProfileFormVa
       linkedin: socialString(p.socials, "linkedin"),
       instagram: socialString(p.socials, "instagram"),
       xing: socialString(p.socials, "xing"),
+      facebook: socialString(p.socials, "facebook"),
+      youtube: socialString(p.socials, "youtube"),
+      twitter: socialString(p.socials, "twitter"),
     },
     interests: (interestsRes.data ?? []).map((i) => ({
       theme: (i.theme as ProfileFormValues["interests"][number]["theme"]) ?? "",
