@@ -2,11 +2,18 @@
 
 - [x] 1.1 `sharp` und einen RFC-4180-fähigen CSV-Parser aufnehmen; `supabase/seed/tsconfig.json` um die neuen Dateien erweitern (heute feste `include`-Liste mit drei Einträgen)
       — `sharp@0.35.3` + `csv-parse@7.0.2` als devDependencies; `include` auf `*.ts` umgestellt. Belegt mit Sonde: eine neue Datei mit Typfehler ist unter dem Muster **rot**, unter der alten Dateiliste **unsichtbar**.
-- [ ] 1.2 Ablageort für Quelle, Zwischenablage und Bericht **außerhalb** des Arbeitsbaums festlegen; Bericht mit Rechten `0600` schreiben
-- [ ] 1.3 Pfadprüfung: eine Quelldatei **innerhalb** des Arbeitsbaums wird abgelehnt, nicht gelesen — RED zuerst, dann GREEN
-- [ ] 1.4 Wächter: Projektkennung aus dem **Benutzernamen** (`postgres.<ref>`) gegen eine feste Allowlist; RED-Test mit PROD-Kennung erwartet Abbruch. **Nicht** gegen den Host prüfen — der Pooler-Host ist regionsweit gleich
-- [ ] 1.5 Schreibmodus verlangt zusätzlich die ausdrückliche Nennung des Ziels (Test)
-- [ ] 1.6 Quelldatei ist Pflichtargument; Aufruf ohne Pfad endet mit Benutzungshinweis (Test)
+- [x] 1.2 Ablageort für Quelle, Zwischenablage und Bericht **außerhalb** des Arbeitsbaums festlegen; Bericht mit Rechten `0600` schreiben
+      — `ablageorte()` legt beides neben die Quelle, `schreibeBericht()` schreibt mit `mode` **und** `chmod`: der `mode` allein wirkt nur beim Anlegen, über einer vorhandenen 0644-Datei bliebe der Bericht weltlesbar. Die Zwischenablage ist bewusst **nicht** zeitgestempelt (Test) — sie soll das Abschalten der alten Seite überleben.
+- [x] 1.3 Pfadprüfung: eine Quelldatei **innerhalb** des Arbeitsbaums wird abgelehnt, nicht gelesen — RED zuerst, dann GREEN
+      — verglichen wird über `relative`, nicht `startsWith`: ein Nachbarverzeichnis `fbc-platform-daten` liegt daneben, nicht darin (Test). Relative Pfade werden vorher aufgelöst, `../fbc-platform/export.csv` fällt also mit.
+- [x] 1.4 Wächter: Projektkennung aus dem **Benutzernamen** (`postgres.<ref>`) gegen eine feste Allowlist; RED-Test mit PROD-Kennung erwartet Abbruch. **Nicht** gegen den Host prüfen — der Pooler-Host ist regionsweit gleich
+      — `pruefeZiel()` in `wp_import.lib.ts`, wiederverwendet `extractProjectRef` statt einer zweiten Regex. Ein Test hält die Voraussetzung des Befunds fest (`new URL(DEV_URL).host === new URL(PROD_URL).host`), zwei weitere die Kanten: fremdes Projekt wird keinem Ziel zugeordnet, und die Kennung schlägt die Adresse (Tunnel auf 127.0.0.1).
+- [x] 1.5 Schreibmodus verlangt zusätzlich die ausdrückliche Nennung des Ziels (Test)
+      — `--schreiben` ohne `--ziel=` bricht ab; `prod` bleibt im Wörterbuch, damit der Go-Live-Lauf keine Codeänderung braucht.
+- [x] 1.6 Quelldatei ist Pflichtargument; Aufruf ohne Pfad endet mit Benutzungshinweis (Test)
+      — dazu: nichts Unbekanntes wird durchgereicht (weder ein Flag noch eine zweite Quelldatei), je mit Prüfung des **Grundes** — ohne die prüfte der Test nichts, weil der Ersatzpfad ebenfalls abbricht.
+
+> Gegenprobe zu Gruppe 1: 17 Mutationen an `wp_import.lib.ts`, jede muss die Suite rot machen. Drei Vakuum-Tests dabei gefunden und geschlossen, ein toter Zweig entfernt.
 
 ## 2. Die vier Parser (`wp_felder.ts`, ohne Datenbank)
 
