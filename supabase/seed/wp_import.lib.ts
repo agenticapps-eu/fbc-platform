@@ -283,11 +283,17 @@ export type Kopfpruefung = { kind: "ok" } | { kind: "abbruch"; grund: string };
  * einem neu gezogenen Export eine Kette von Einzelläufen.
  */
 export function pruefeKopfzeile(spalten: readonly string[]): Kopfpruefung {
-  // Das BOM klebt am Namen der ERSTEN Spalte (nachgemessen: die echte Datei
-  // beginnt mit U+FEFF). Heute folgenlos, weil dort `user_login` steht — stünde
-  // nach einem neuen Export ein erwartetes Feld an erster Stelle, meldete der
-  // Wächter es als fehlend, und der Grund zeigte auf die falsche Ursache.
-  const vorhanden = new Set(spalten.map((s) => s.replace(/^\uFEFF/, "")));
+  // `trim` und nicht ein gezielter Schnitt auf U+FEFF: das BOM zählt in
+  // JavaScript als WhiteSpace, `trim` erledigt es also mit — und nimmt
+  // Leerzeichen gleich mit, ohne eine Zeile mehr zu kosten. Die
+  // Mutations-Gegenprobe hat beide Fassungen als gleichwertig ausgewiesen.
+  //
+  // Warum es überhaupt nötig ist: das BOM klebt am Namen der ERSTEN Spalte
+  // (nachgemessen: die echte Datei beginnt damit). Heute folgenlos, weil dort
+  // `user_login` steht — stünde nach einem neu gezogenen Export ein erwartetes
+  // Feld an erster Stelle, meldete der Wächter es als fehlend, und der Grund
+  // zeigte auf die falsche Ursache.
+  const vorhanden = new Set(spalten.map((s) => s.trim()));
   const fehlend = QUELLFELDER.filter((feld) => !vorhanden.has(feld));
 
   if (fehlend.length > 0) {
