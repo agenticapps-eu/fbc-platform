@@ -547,6 +547,7 @@ export type Database = {
           notify_email_digest: boolean;
           notify_email_events: boolean;
           notify_email_requests: boolean;
+          onboarded_at: string | null;
           profile_id: string;
           theme: string;
           updated_at: string;
@@ -556,6 +557,7 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
+          onboarded_at?: string | null;
           profile_id: string;
           theme?: string;
           updated_at?: string;
@@ -565,6 +567,7 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
+          onboarded_at?: string | null;
           profile_id?: string;
           theme?: string;
           updated_at?: string;

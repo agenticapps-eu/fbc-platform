@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchActivationState, resendActivationLink, type ResendStatus } from "../lib/activation";
 import { logEvent } from "../lib/log";
+import { vertagungZuruecksetzen } from "../lib/member-settings";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
@@ -251,6 +252,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
       signOut: async () => {
+        // Ein vertagtes Onboarding gilt für die laufende Anwendungssitzung. Ohne
+        // dieses Zurücksetzen bliebe die Strecke nach „Später" auch für die
+        // nächste Anmeldung im selben Tab unterdrückt (AGE-538).
+        vertagungZuruecksetzen();
         await supabase.auth.signOut();
       },
       updatePassword: async (password) => {

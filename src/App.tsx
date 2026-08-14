@@ -17,6 +17,7 @@ import EventDetailPage from "./pages/EventDetailPage";
 import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import WillkommenPage from "./pages/WillkommenPage";
 import ActivationRedeemPage from "./pages/ActivationRedeemPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 
@@ -184,6 +185,23 @@ function AppInner() {
           <RequireAuth>
             <ActivationGate>
               <OnboardingPage />
+            </ActivationGate>
+          </RequireAuth>
+        }
+      />
+      {/* Willkommensstrecke (AGE-538, C11) — außerhalb der AppShell wie
+          /onboarding, hinter denselben beiden Wachen. KEIN Eintrag in
+          NARROW_ROUTES: die Liste wird in AppShell.tsx:268 INNERHALB der Shell
+          gelesen und wäre für eine Route außerhalb wirkungslos.
+          Die Strecke ist erreichbar, ohne dass jemand hierher geleitet wird —
+          umgeleitet wird nur von `/` und nur ohne gesetzten Merker
+          (HomeRedirect). */}
+      <Route
+        path="/willkommen"
+        element={
+          <RequireAuth>
+            <ActivationGate>
+              <WillkommenPage />
             </ActivationGate>
           </RequireAuth>
         }

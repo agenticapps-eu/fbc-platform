@@ -279,8 +279,12 @@ function buildSocials(socials: ProfileFormValues["socials"]): Record<string, str
  * Ein ersetztes Bild wird nicht gelöscht: das alte Objekt bleibt über seine URL
  * abrufbar. Das ist beim Avatar seit AGE-238 so und hier bewusst gleich
  * gehalten — benannt, statt als Löschung versprochen.
+ *
+ * Exportiert seit AGE-538: die Willkommensstrecke lädt ihr Profilbild über
+ * denselben Weg. Sie ist der EINZIGE Teil von `profile.ts`, den sie
+ * wiederverwendet — geschrieben wird dort feldbezogen.
  */
-async function uploadBild(
+export async function uploadBild(
   bucket: "avatars" | "covers",
   uid: string,
   blob: Blob | null,
