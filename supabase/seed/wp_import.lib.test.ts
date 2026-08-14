@@ -6,11 +6,13 @@ import { describe, expect, it } from "vitest";
 import {
   QUELLFELDER,
   ablageorte,
+  bildeAb,
   leseAufruf,
   pruefeKopfzeile,
   pruefeQuellPfad,
   pruefeZiel,
   schreibeBericht,
+  titelAus,
 } from "./wp_import.lib";
 
 const DEV_REF = "foelowldexkcqzewvrcf";
@@ -420,5 +422,215 @@ describe("pruefeKopfzeile", () => {
 
   it("bricht bei leerer Kopfzeile ab", () => {
     expect(pruefeKopfzeile([]).kind).toBe("abbruch");
+  });
+});
+
+/** Eine Zeile mit allen 26 Feldern leer; die Fälle setzen nur, was sie prüfen. */
+function zeile(werte: Record<string, string> = {}): Record<string, string> {
+  const leer = Object.fromEntries(QUELLFELDER.map((f) => [f, ""]));
+  return { ...leer, ...werte };
+}
+
+describe("titelAus", () => {
+  it("nimmt kurzen einzeiligen Text unverändert", () => {
+    expect(titelAus("Beratung für Familienunternehmen")).toBe("Beratung für Familienunternehmen");
+  });
+
+  it("nimmt die erste nicht-leere Zeile", () => {
+    expect(titelAus("\n\nErste Zeile\nZweite Zeile")).toBe("Erste Zeile");
+  });
+
+  it("kürzt an der Wortgrenze und markiert die Kürzung", () => {
+    const lang =
+      "Wir begleiten mittelständische Unternehmen bei der Nachfolge und der Übergabe an die nächste Generation";
+
+    const titel = titelAus(lang);
+
+    expect(titel.length).toBeLessThanOrEqual(81);
+    expect(titel.endsWith("…")).toBe(true);
+    // An der Wortgrenze, nicht mitten im Wort.
+    expect(lang.startsWith(titel.slice(0, -1))).toBe(true);
+    expect(titel).not.toMatch(/ …$/);
+  });
+
+  it("schneidet hart, wenn vor der Grenze kein Leerzeichen steht", () => {
+    const titel = titelAus("A".repeat(200));
+
+    expect(titel.length).toBeLessThanOrEqual(81);
+    expect(titel.endsWith("…")).toBe(true);
+  });
+});
+
+describe("bildeAb — profiles", () => {
+  it("setzt den Namen aus Vor- und Nachname zusammen", () => {
+    expect(bildeAb(zeile({ first_name: "Anna", last_name: "Berg" })).profil.name).toBe("Anna Berg");
+  });
+
+  it("kommt mit nur einem der beiden Namensteile aus", () => {
+    expect(bildeAb(zeile({ first_name: "Anna" })).profil.name).toBe("Anna");
+    expect(bildeAb(zeile({ last_name: "Berg" })).profil.name).toBe("Berg");
+  });
+
+  it("schreibt null statt einer leeren Zeichenkette", () => {
+    // Die Leerwertregel: ein Feld aus lauter Leerzeichen zählt als nicht
+    // vorhanden. Ein '' im Profil sähe aus wie eine bewusste Eingabe.
+    const satz = bildeAb(zeile({ first_name: "   ", beruf: "  ", Strasse: " " }));
+
+    expect(satz.profil.name).toBeNull();
+    expect(satz.profil.headline).toBeNull();
+    expect(satz.kontakt.street).toBeNull();
+  });
+
+  it("führt beruf als headline", () => {
+    expect(bildeAb(zeile({ beruf: "Steuerberaterin" })).profil.headline).toBe("Steuerberaterin");
+  });
+
+  it("hängt infos_15 an infos an und entfernt dabei das Markup", () => {
+    const satz = bildeAb(
+      zeile({ infos: "<p>Erster Teil</p>", infos_15: "Zweiter&nbsp;Teil" }),
+    );
+
+    expect(satz.profil.short_bio).toBe("Erster Teil\n\nZweiter Teil");
+  });
+
+  it("führt ort_27_28 als region und NICHT als Wohnort", () => {
+    const satz = bildeAb(zeile({ ort_27_28: "Rhein-Main", ort: "70173 Stuttgart" }));
+
+    expect(satz.profil.region).toBe("Rhein-Main");
+    expect(satz.kontakt.city).toBe("Stuttgart");
+  });
+
+  it("führt Homepage als profiles.website — profile_contacts.website gibt es nicht mehr", () => {
+    const satz = bildeAb(zeile({ Homepage: "https://example.org" }));
+
+    expect(satz.profil.website).toBe("https://example.org");
+    expect(satz.kontakt).not.toHaveProperty("website");
+  });
+
+  it("leitet member_since aus infos_16 ab und hält die Rohangabe fest", () => {
+    const satz = bildeAb(zeile({ infos_16: "April 2021" }));
+
+    expect(satz.profil.member_since).toBe("2021-04-01");
+    // Der Auffüllgrad gehört in den Bericht: „2021-04-01" sieht genauer aus,
+    // als die Angabe war.
+    expect(satz.herkunft.beitritt).toMatchObject({ grad: "monat", roh: "April 2021" });
+  });
+});
+
+describe("bildeAb — socials und videos", () => {
+  it("führt alle fünf Netzwerke zusammen und lässt leere weg", () => {
+    const satz = bildeAb(
+      zeile({ linkedin: "https://linkedin.com/in/a", facebook: "https://fb.com/b", youtube: "" }),
+    );
+
+    expect(satz.profil.socials).toEqual({
+      linkedin: "https://linkedin.com/in/a",
+      facebook: "https://fb.com/b",
+    });
+  });
+
+  it("trennt Präsentations-Videos von Präsentations-Text", () => {
+    // Gemessen: praesi_kurz/praesei_lang sind KEINE Video-Felder. 2 Menschen
+    // haben dort YouTube-Links, 3 haben Fließtext.
+    const satz = bildeAb(
+      zeile({
+        infos: "Über mich",
+        praesi_kurz: "https://www.youtube.com/watch?v=abc123",
+        praesei_lang: "Ich begleite Unternehmen bei der Nachfolge.",
+      }),
+    );
+
+    expect(satz.profil.videos).toEqual(["https://www.youtube.com/watch?v=abc123"]);
+    expect(satz.profil.short_bio).toBe("Über mich\n\nIch begleite Unternehmen bei der Nachfolge.");
+  });
+
+  it("legt nicht abspielbare Werte NICHT in videos ab", () => {
+    // Anzeige und sanitizeVideos filtern über parseVideoUrl — dort abgelegt
+    // wäre der Text importiert und trotzdem unsichtbar.
+    const satz = bildeAb(zeile({ praesi_kurz: "Branded Content für Mittelständler" }));
+
+    expect(satz.profil.videos).toEqual([]);
+    expect(satz.profil.short_bio).toBe("Branded Content für Mittelständler");
+  });
+});
+
+describe("bildeAb — profile_contacts", () => {
+  it("trennt die Ortsangabe in Postleitzahl und Ort", () => {
+    const satz = bildeAb(zeile({ ort: "70173 Stuttgart", Strasse: "Hauptstr. 1", ort_27: "BW" }));
+
+    expect(satz.kontakt).toMatchObject({
+      postal_code: "70173",
+      city: "Stuttgart",
+      street: "Hauptstr. 1",
+      state: "BW",
+      country: "DE",
+    });
+  });
+
+  it("hält die Kontaktadresse von der Anmeldeadresse getrennt", () => {
+    const satz = bildeAb(zeile({ "E-Mail": "Kontakt@Firma.de", user_email: "Privat@Web.de" }));
+
+    expect(satz.kontakt.email).toBe("Kontakt@Firma.de");
+    expect(satz.anmeldeadresse).toBe("privat@web.de");
+  });
+
+  it("räumt das führende Apostroph aus der Telefonnummer", () => {
+    expect(bildeAb(zeile({ Telefonnummer: "'+49 711 123456" })).kontakt.phone).toBe(
+      "+49 711 123456",
+    );
+  });
+});
+
+describe("bildeAb — offers, needs, interessen", () => {
+  it("macht aus biete eine offers-Zeile mit Titel und Volltext", () => {
+    const text = "Beratung\nIch berate zu allem, was mit Nachfolge zu tun hat.";
+
+    const satz = bildeAb(zeile({ biete: text }));
+
+    expect(satz.offers).toEqual([{ title: "Beratung", description: text }]);
+    expect(satz.needs).toEqual([]);
+  });
+
+  it("macht aus suche eine needs-Zeile", () => {
+    const satz = bildeAb(zeile({ suche: "Kontakte in die Industrie" }));
+
+    expect(satz.needs).toEqual([
+      { title: "Kontakte in die Industrie", description: "Kontakte in die Industrie" },
+    ]);
+  });
+
+  it("gibt offers/needs einen nicht-leeren Titel — die Spalte ist not null", () => {
+    const satz = bildeAb(zeile({ biete: "   \n\n  Endlich Text  " }));
+
+    expect(satz.offers[0].title.trim()).not.toBe("");
+  });
+
+  it("macht aus infos_28 EINEN Chip ohne Thema", () => {
+    const satz = bildeAb(zeile({ infos_28: "Segeln, Bergsteigen und Jazz" }));
+
+    expect(satz.interessen).toEqual([{ label: "Segeln, Bergsteigen und Jazz", theme: null }]);
+  });
+});
+
+describe("bildeAb — profile_legacy", () => {
+  it("führt die Stufe roh und die Kennung als Schlüssel", () => {
+    const satz = bildeAb(zeile({ Mitgliedschaft: "  Premium-Mitglied  ", source_user_id: " 318 " }));
+
+    // Roh heisst: nicht normalisiert, nur der Rand beschnitten. Normalisiert
+    // wäre die Herkunft weg und der Abgleich mit einer Rechnung unmöglich.
+    expect(satz.legacy.legacy_tier).toBe("Premium-Mitglied");
+    expect(satz.legacy.legacy_source_id).toBe("318");
+  });
+});
+
+describe("bildeAb — user_pass", () => {
+  it("liest den Passwort-Hash nirgendwo", () => {
+    // Aufgabe 3.2: der Wert darf im Ergebnis nicht auftauchen — auch nicht in
+    // einem Feld, das ihn versehentlich mitschleppt.
+    const geheim = "$P$BxxxxxxxxxxxxxxxxxxxGEHEIM";
+    const satz = bildeAb({ ...zeile({ first_name: "Anna" }), user_pass: geheim });
+
+    expect(JSON.stringify(satz)).not.toContain("GEHEIM");
+    expect(QUELLFELDER).not.toContain("user_pass");
   });
 });

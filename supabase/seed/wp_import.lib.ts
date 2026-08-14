@@ -28,6 +28,21 @@ import { chmodSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { extractProjectRef } from "../../scripts/db-push-prod.logic";
+// Der kanonische Video-Erkenner der Anwendung. Nicht nachgebaut: Anzeige und
+// `sanitizeVideos` filtern über genau diese Funktion — ein zweiter Erkenner
+// hiesse, dass der Import etwas ablegt, das die Oberfläche danach verwirft.
+// Das Modul ist bewusst seiteneffektfrei und aus Node ladbar (siehe sein Kopf).
+import { parseVideoUrl } from "../../src/lib/video-url";
+import {
+  type Datum,
+  type Ort,
+  datumParsen,
+  htmlEntfernen,
+  normalisiereAdresse,
+  normalisiereKennung,
+  ortParsen,
+  telefonParsen,
+} from "./wp_felder";
 
 /** Ein Supabase-Projekt-Ref sind genau 20 Kleinbuchstaben. */
 const REF_PATTERN = /^[a-z]{20}$/;
@@ -306,6 +321,155 @@ export function pruefeKopfzeile(spalten: readonly string[]): Kopfpruefung {
   }
 
   return { kind: "ok" };
+}
+
+/**
+ * Was aus einer Quellzeile wird — die sechs Ziele plus, was der Bericht braucht.
+ *
+ * `profil`, `kontakt` und `legacy` sind je eine Zeile; `offers`, `needs` und
+ * `interessen` sind Listen, weil die Zieltabellen mehrere Zeilen je Profil
+ * tragen (aus dieser Quelle wird es je höchstens eine).
+ *
+ * `herkunft` geht NICHT in die Datenbank. Sie trägt, was beim Abbilden verloren
+ * geht: der Auffüllgrad des Beitrittsdatums und die Güte der Ortsangabe. Ohne
+ * sie sähe „2021-04-01" im Profil wie ein tagesgenaues Datum aus, obwohl in der
+ * Quelle „April 2021" stand.
+ */
+export type Zielsatz = {
+  anmeldeadresse: string | null;
+  profil: {
+    name: string | null;
+    headline: string | null;
+    short_bio: string | null;
+    region: string | null;
+    website: string | null;
+    member_since: string | null;
+    socials: Record<string, string>;
+    videos: string[];
+  };
+  kontakt: {
+    email: string | null;
+    phone: string | null;
+    street: string | null;
+    postal_code: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  };
+  legacy: { legacy_source_id: string | null; legacy_tier: string | null };
+  offers: { title: string; description: string }[];
+  needs: { title: string; description: string }[];
+  interessen: { label: string; theme: null }[];
+  herkunft: { beitritt: Datum | null; ort: Ort };
+};
+
+/** Die fünf Netzwerke der Quelle. `xing` kennt nur das Zielformular. */
+const NETZWERKE = ["linkedin", "facebook", "instagram", "youtube", "twitter"] as const;
+
+/**
+ * Die Leerwertregel an einer Stelle: Markup raus, Rand beschneiden, und ein
+ * Feld, von dem nichts übrig bleibt, ist `null` — nicht `''`. Ein `''` im
+ * Profil sähe aus wie eine bewusste Eingabe des Mitglieds.
+ *
+ * `htmlEntfernen` läuft über JEDES Textfeld, nicht nur über die vier, in denen
+ * am 13.08. Markup gemessen wurde. Die Messung gilt für den Export von damals;
+ * die Quelle wird vor dem Go-Live neu gezogen, und dann stünde `&nbsp;` im
+ * Profil, weil ein Feld nicht auf der Liste stand.
+ */
+function wert(roh: string | undefined): string | null {
+  const s = htmlEntfernen(roh ?? "").trim();
+  return s === "" ? null : s;
+}
+
+/** Wie lang ein abgeleiteter Titel höchstens werden darf. */
+const TITEL_GRENZE = 80;
+
+/**
+ * `offers.title` und `needs.title` sind `not null`, die Quelle liefert aber
+ * Fließtext ohne Titel (Median 99 Zeichen, max 1050). Der Titel wird deshalb
+ * abgeleitet: erste nicht-leere Zeile, an der Wortgrenze gekürzt.
+ *
+ * Bei den 26 einzeiligen Werten ist das Ergebnis der Text selbst, bei den
+ * langen ein Anriss. Das ist eine Notlösung mit Ansage — der Volltext steht
+ * vollständig in `description`, es geht nichts verloren.
+ */
+export function titelAus(text: string): string {
+  const zeile = text.split("\n").map((z) => z.trim()).find((z) => z !== "") ?? "";
+  if (zeile.length <= TITEL_GRENZE) return zeile;
+
+  const schnitt = zeile.slice(0, TITEL_GRENZE);
+  const luecke = schnitt.lastIndexOf(" ");
+  return `${(luecke > 0 ? schnitt.slice(0, luecke) : schnitt).trimEnd()}…`;
+}
+
+/**
+ * Bildet eine Quellzeile auf die sechs Ziele ab. Rein — keine Datenbank, kein
+ * Netz; der Aufrufer entscheidet, was damit geschieht.
+ *
+ * Gelesen wird ausschliesslich über die Namen aus `QUELLFELDER`. `user_pass`
+ * steht dort nicht und wird deshalb nie berührt.
+ */
+export function bildeAb(row: Record<string, string>): Zielsatz {
+  const ort = ortParsen(row["ort"] ?? "");
+  const beitritt = datumParsen(htmlEntfernen(row["infos_16"] ?? ""));
+
+  // `praesi_kurz`/`praesei_lang` heissen „Präsentation", nicht „Video": ein
+  // Teil der Mitglieder hat dort einen Link hinterlegt, ein anderer einen Text
+  // (gemessen 14.08.: 2 gegen 3). Entschieden wird deshalb pro Wert.
+  const praesentation = [row["praesi_kurz"], row["praesei_lang"]]
+    .map((v) => (v ?? "").trim())
+    .filter((v) => v !== "");
+  const videos = praesentation.filter((v) => parseVideoUrl(v) !== null);
+  const praesiText = praesentation.filter((v) => parseVideoUrl(v) === null);
+
+  const name = [wert(row["first_name"]), wert(row["last_name"])].filter(Boolean).join(" ");
+  const bioTeile = [wert(row["infos"]), wert(row["infos_15"]), ...praesiText.map(wert)].filter(
+    Boolean,
+  );
+
+  const socials: Record<string, string> = {};
+  for (const netz of NETZWERKE) {
+    const v = wert(row[netz]);
+    if (v) socials[netz] = v;
+  }
+
+  const biete = wert(row["biete"]);
+  const suche = wert(row["suche"]);
+  const interesse = wert(row["infos_28"]);
+
+  return {
+    anmeldeadresse: normalisiereAdresse(row["user_email"] ?? ""),
+    profil: {
+      name: name === "" ? null : name,
+      headline: wert(row["beruf"]),
+      short_bio: bioTeile.length > 0 ? bioTeile.join("\n\n") : null,
+      region: wert(row["ort_27_28"]),
+      website: wert(row["Homepage"]),
+      member_since: beitritt?.datum ?? null,
+      socials,
+      videos,
+    },
+    kontakt: {
+      email: wert(row["E-Mail"]),
+      phone: wert(telefonParsen(row["Telefonnummer"] ?? "")),
+      street: wert(row["Strasse"]),
+      postal_code: ort.plz === "" ? null : ort.plz,
+      city: ort.ort === "" ? null : ort.ort,
+      state: wert(row["ort_27"]),
+      // Die Vorgabe „DE" kommt aus `ortParsen` und gilt nur, wo überhaupt eine
+      // Ortsangabe stand. Sie auf eine leere Anschrift zu setzen, wäre eine
+      // Behauptung über einen Menschen, zu dem nichts vorliegt.
+      country: ort.land === "" ? null : ort.land,
+    },
+    legacy: {
+      legacy_source_id: normalisiereKennung(row["source_user_id"] ?? ""),
+      legacy_tier: wert(row["Mitgliedschaft"]),
+    },
+    offers: biete ? [{ title: titelAus(biete), description: biete }] : [],
+    needs: suche ? [{ title: titelAus(suche), description: suche }] : [],
+    interessen: interesse ? [{ label: interesse, theme: null }] : [],
+    herkunft: { beitritt, ort },
+  };
 }
 
 export type Ablageorte = { verzeichnis: string; bericht: string; zwischenablage: string };
