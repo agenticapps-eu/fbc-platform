@@ -74,6 +74,8 @@
 - [x] 4.7 Ausgabe-Disziplin: `stdout` führt nur Zeilennummer und Kennung; Test prüft, dass kein Name und keine Adresse der Quelle darin vorkommt
       — `stdoutZeile()` führt Datensatznummer, Kennung und Klasse. **Der Grund gehört ausdrücklich nicht dazu**: Gründe tragen oft den Namen mit („Anna Berg hat keine PLZ"). Eine fehlende Kennung wird als „ohne Kennung" benannt statt weggelassen, sonst verschöbe sich die Spur.
 
+> Gegenprobe zu Gruppe 4: 26 Mutationen an `pruefeVorab` und `wp_bericht.ts`, alle 26 rot. Darunter die vier, auf die es ankommt: dass eine Dublette den Trockenlauf **nicht** aufhält, dass eine unbrauchbare Adresse den Lauf **nicht** beendet, dass die Kollision auf der Ausschlussliste bleibt, und dass weder Name noch Adresse nach `stdout` gelangen.
+
 ## 5. Trockenlauf (`wp_import.ts`)
 
 - [ ] 5.1 CSV lesen (UTF-8 mit BOM, Kommas und Zeilenumbrüche in Freitextfeldern), Datensätze durch Vorabprüfung, Abbildung und Klassifikation führen
