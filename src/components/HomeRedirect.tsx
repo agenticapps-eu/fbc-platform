@@ -49,7 +49,12 @@ export default function HomeRedirect() {
     queryKey: memberOnboardingQueryKey(uid),
     queryFn: () => fetchOnboardedAt(uid),
     enabled: zustaendig,
-    staleTime: Infinity,
+    // KEIN `staleTime: Infinity`. Der Merker ist eine Zeile über den
+    // Primärschlüssel, die Abfrage kostet nichts — und ein für immer frischer
+    // `null` überlebte sonst das Beenden der Strecke in einem ANDEREN Tab und
+    // schickte dieses Fenster erneut hinein. Ein Nachladen bei vorhandenen
+    // Daten flackert nicht: `status` bleibt „success", der alte Wert steht.
+    // (Fremd-Review zum Diff, codex, MEDIUM.)
   });
 
   if (!zustaendig) return <HomePage />;

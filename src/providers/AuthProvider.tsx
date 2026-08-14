@@ -86,7 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setAuthReady(true);
-      if (!nextSession) setProfile(null);
+      if (!nextSession) {
+        setProfile(null);
+        // Ein vertagtes Onboarding gilt für die laufende Anmeldung (AGE-538).
+        // Hier und nicht in `signOut`: das trifft AUCH den abgelaufenen Token
+        // und das serverseitige Abmelden. Sonst bliebe die Strecke im selben
+        // Tab für dieselbe Person dauerhaft verschluckt, obwohl sie nur
+        // vertagt war. (Fremd-Review zum Diff, codex, MEDIUM.)
+        vertagungZuruecksetzen();
+      }
     });
 
     return () => sub.subscription.unsubscribe();
@@ -252,10 +260,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
       signOut: async () => {
-        // Ein vertagtes Onboarding gilt für die laufende Anwendungssitzung. Ohne
-        // dieses Zurücksetzen bliebe die Strecke nach „Später" auch für die
-        // nächste Anmeldung im selben Tab unterdrückt (AGE-538).
-        vertagungZuruecksetzen();
         await supabase.auth.signOut();
       },
       updatePassword: async (password) => {

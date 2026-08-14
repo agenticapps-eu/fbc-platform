@@ -87,8 +87,17 @@ beforeEach(() => {
   headlineMock.mockResolvedValue();
   regionMock.mockResolvedValue();
   speichereKategorienMock.mockResolvedValue();
-  setzeMerkerMock.mockResolvedValue("2026-08-14T10:00:00Z");
   merkerMock.mockResolvedValue(null);
+  // Der Merker-Mock bildet eine echte Datenbank nach: was `markOnboarded`
+  // schreibt, liest `fetchOnboardedAt` danach auch. Ein statisches `null` wäre
+  // eine Datenbank, die den Schreibvorgang bestätigt und den Wert trotzdem
+  // verliert — an so einem Mock scheiterte hier jede Zusage über die Rückkehr
+  // von der Startseite, und zwar zu Recht.
+  setzeMerkerMock.mockImplementation(async () => {
+    const wann = "2026-08-14T10:00:00Z";
+    merkerMock.mockResolvedValue(wann);
+    return wann;
+  });
   dashboardMock.mockRejectedValue(new Error("kein Netz im Test"));
 });
 
@@ -369,6 +378,31 @@ describe("Schritt 2 — Kompass-Kategorien", () => {
     const optionen = categoryOptionsForSide("offer");
     kategorienMock.mockResolvedValue({ offers: [optionen[0].value], needs: [] });
     await schrittZwei();
+
+    fireEvent.click(screen.getAllByRole("button", { name: optionen[1].label })[0]);
+    klick("Weiter");
+
+    await waitFor(() =>
+      expect(speichereKategorienMock).toHaveBeenCalledWith("test-user", {
+        offers: [optionen[0].value, optionen[1].value],
+        needs: [],
+      }),
+    );
+  });
+
+  it("gleicht gegen den Stand BEIM SPEICHERN ab, nicht gegen den beim Laden", async () => {
+    // `saveCategorySelection` löscht alles, was in der Datenbank steht und in
+    // der übergebenen Auswahl fehlt. Wird der Ladestand übergeben, verschwindet
+    // eine Kategorie, die inzwischen woanders entstanden ist — still, wenn sie
+    // ein Chip war, und mit einer unbeantwortbaren Rückfrage, wenn sie ein
+    // reicher Editor-Eintrag war.
+    const { categoryOptionsForSide } = await import("../lib/profile-categories");
+    const optionen = categoryOptionsForSide("offer");
+    kategorienMock.mockResolvedValue({ offers: [], needs: [] });
+    await schrittZwei();
+
+    // Zwischen Laden und Speichern entsteht anderswo eine Kategorie.
+    kategorienMock.mockResolvedValue({ offers: [optionen[0].value], needs: [] });
 
     fireEvent.click(screen.getAllByRole("button", { name: optionen[1].label })[0]);
     klick("Weiter");

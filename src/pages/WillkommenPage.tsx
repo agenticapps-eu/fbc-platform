@@ -76,6 +76,7 @@ export default function WillkommenPage() {
  * dauerhaft leer — und ein Test, der die Daten vorbelegt, sähe das nie.
  */
 function Laden({ uid }: { uid: string }) {
+  const navigate = useNavigate();
   const profil = useQuery({
     queryKey: onboardingProfileQueryKey(uid),
     queryFn: () => fetchOnboardingProfile(uid),
@@ -103,7 +104,18 @@ function Laden({ uid }: { uid: string }) {
           Konto — du kannst alles auch jederzeit in deinem Profil ergänzen.
         </p>
         <div className="mt-8">
-          <Button variant="primary" onClick={() => window.location.assign("/")}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              // VERTAGEN, nicht nur navigieren. Ohne das führte der einzige
+              // sichtbare Ausgang im Kreis: `/` liest den weiterhin leeren
+              // Merker und schickt sofort hierher zurück — und wenn die Abfrage
+              // dauerhaft scheitert, kommt das Mitglied nie wieder heraus.
+              // (Fremd-Review zum Diff, codex, HIGH.)
+              vertageOnboarding(uid);
+              navigate("/", { replace: true });
+            }}
+          >
             Zur Startseite
           </Button>
         </div>
@@ -203,12 +215,18 @@ function Strecke({
     }
     if (id === "kategorien") {
       if (neueOffers.length === 0 && neueNeeds.length === 0) return;
-      // Rein additiv: die vorhandenen Kategorien stehen mit in der Auswahl,
-      // deshalb löscht der Abgleich nichts und `ConfirmationRequiredError` kann
-      // hier nicht entstehen.
+      // Rein additiv — und zwar gegen den Stand BEIM SPEICHERN, nicht gegen den
+      // beim Laden. `saveCategorySelection` gleicht die übergebene Auswahl mit
+      // frisch gelesenen Zeilen ab und löscht alles, was dort steht und hier
+      // fehlt. Mit dem Ladestand als Grundlage verschwände eine Kategorie, die
+      // inzwischen woanders entstanden ist, still — oder ein reicher Eintrag
+      // brächte eine Rückfrage, die diese Oberfläche gar nicht beantworten
+      // kann. Beides ist genau der Datenverlust, den dieser Change vermeiden
+      // soll. (Fremd-Review zum Diff, codex, HIGH.)
+      const aktuell = await fetchCategorySelection(uid);
       await saveCategorySelection(uid, {
-        offers: [...vorhanden.offers, ...neueOffers],
-        needs: [...vorhanden.needs, ...neueNeeds],
+        offers: [...new Set([...aktuell.offers, ...neueOffers])],
+        needs: [...new Set([...aktuell.needs, ...neueNeeds])],
       });
       return;
     }
@@ -233,7 +251,13 @@ function Strecke({
   }
 
   function zurueckZurStartseite() {
-    // Was die Strecke geschrieben hat, liegt in den Caches des Profils noch alt.
+    // Was die Strecke geschrieben hat, liegt in den Caches noch alt — auch in
+    // IHREN EIGENEN. Der QueryClient überlebt das Abmelden (AGE-258 ist offen);
+    // ohne die ersten beiden Zeilen zeigte die Strecke bei der nächsten
+    // Anmeldung im selben Tab den alten Profilstand und begänne wieder bei
+    // einem Feld, das längst gefüllt ist. (Fremd-Review zum Diff, codex.)
+    queryClient.invalidateQueries({ queryKey: onboardingProfileQueryKey(uid) });
+    queryClient.invalidateQueries({ queryKey: onboardingFreetextQueryKey(uid) });
     queryClient.invalidateQueries({ queryKey: profileEditorQueryKey(uid) });
     queryClient.invalidateQueries({ queryKey: profileCategoriesQueryKey(uid) });
     navigate("/", { replace: true });
@@ -587,6 +611,12 @@ function ProfilSchritt({
               aria-label="Profilbild auswählen"
               onChange={(e) => {
                 const datei = e.target.files?.[0];
+                // Zuruecksetzen, BEVOR der Zuschnitt aufgeht: sonst feuert
+                // `change` nicht, wenn jemand den Zuschnitt abbricht und
+                // dieselbe Datei erneut waehlt — der Wert des Feldes hat sich
+                // dann ja nicht geaendert. Fuer das Mitglied sieht das aus, als
+                // haette der Klick nichts getan. (Fremd-Review zum Diff, gemini)
+                e.target.value = "";
                 if (datei) onDatei(datei);
               }}
               className="text-sm text-on-chrome-muted"
