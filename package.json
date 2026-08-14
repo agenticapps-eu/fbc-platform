@@ -26,13 +26,13 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
-    "@sentry/react": "^10.69.0",
-    "@supabase/supabase-js": "^2.112.1",
+    "@sentry/react": "^10.70.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@tanstack/react-query": "^5.101.4",
     "framer-motion": "^12.42.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-hook-form": "^7.84.0",
+    "react-hook-form": "^7.85.0",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
     "zod": "^4.4.3"
