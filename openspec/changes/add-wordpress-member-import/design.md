@@ -267,8 +267,8 @@ Befüllung am 14.08. gegen die echte Datei gemessen.
 | `ort_27_28` | 31/70 | `profiles.region` | Regionalgruppe, **nicht** der Wohnort |
 | — | — | `profile_contacts.country` | aus `ortParsen`, Vorgabe `DE` |
 | `infos_16` | 52/70 | `profiles.member_since` | `datumParsen` + Auffüllung |
-| `praesi_kurz`, `praesei_lang` | 5/70 | `profiles.videos` | — |
-| `linkedin`, `facebook`, `instagram`, `youtube`, `twitter` | 24/19/16/6/4 | `profiles.socials` | zusammenführen |
+| `praesi_kurz`, `praesei_lang` | je 5/70 | `profiles.videos` **oder** `.short_bio` | pro Wert: parsebare URL → Video, sonst Text |
+| `linkedin`, `facebook`, `instagram`, `youtube`, `twitter` | 24/19/16/6/4 | `profiles.socials` | zusammenführen; **drei davon brauchen erst ein Formularfeld** |
 | `Homepage` | 38/70 | `profiles.website` | — |
 | `E-Mail` | 52/70 | `profile_contacts.email` | Kontaktadresse, **nicht** die Anmeldeadresse |
 | `Telefonnummer` | 52/70 | `profile_contacts.phone` | `telefonParsen` |
@@ -325,6 +325,51 @@ Für den Import heißt das: er schreibt **sechs** Tabellen, nicht drei —
 `profiles`, `profile_contacts`, `profile_legacy`, `offers`, `needs`,
 `profile_interests`. Das Spec-Delta ist davon unberührt; es nennt keine
 Zielspalten.
+
+#### Nachtrag 14.08., zweiter Teil: zwei Felder waren gar nicht das, was sie heißen
+
+Beim Bauen der Abbildung gegen die echten Werte gemessen — und zwei weitere
+Zeilen der Matrix fielen:
+
+**`praesi_kurz` / `praesei_lang` sind keine Videos, sondern Präsentationstexte.**
+Die Matrix führte beide auf `profiles.videos`. Gemessen: je 5/70 befüllt, davon
+sind **2 parsebare YouTube-Links und 3 Fließtext** — „Wir vermitte…",
+„HR-Consultin…", bis zu 2320 Zeichen. Die Felder heißen „Präsentation kurz" und
+„Präsentation lang"; ein Teil der Mitglieder hat dort ein Video hinterlegt, der
+andere einen Text. Sauber getrennt: die 2 Menschen haben in **beiden** Feldern
+Videos, die 3 in beiden Feldern Text, keine Mischung.
+
+**Entschieden (Donald, 14.08.): pro Wert.** Was `parseVideoUrl` annimmt, wird
+ein Video; alles andere wird an `short_bio` angehängt. Eine Person kommt damit
+auf rund 3.900 Zeichen „Über mich" — lang, aber vom Mitglied selbst kürzbar,
+und die Herkunft steht im Bericht. VERWORFEN: alles auf `videos`, wie die
+Matrix sagte — `sanitizeVideos` und die Anzeige filtern über `parseVideoUrl`,
+die drei Texte wären also importiert und trotzdem unsichtbar gewesen.
+
+**`socials` kennt nur drei Schlüssel — die Quelle liefert fünf.** Das Formular
+(`ProfileFieldsets.tsx:168-172`) erfasst `linkedin`, `instagram`, `xing`; die
+Matrix führt `linkedin`, `facebook`, `instagram`, `youtube`, `twitter`
+zusammen. `facebook`, `youtube` und `twitter` haben im Ziel kein Feld.
+Gemessen: **23 Menschen** tragen mindestens eines dieser drei, **5 davon haben
+sonst gar kein Netzwerk**. Und weil `saveProfile` alle Profilfelder
+bedingungslos schreibt, hätte das erste Speichern durch das Mitglied die drei
+unbekannten Schlüssel wieder aus der `jsonb`-Spalte geräumt — unsichtbar
+importiert, unsichtbar gelöscht.
+
+**Entschieden (Donald, 14.08.): alle fünf schreiben und das Formular jetzt um
+die drei fehlenden Felder erweitern.** Das ist der einzige Weg ohne Verlust und
+ohne Wette auf einen Folge-Change. Er zieht diesen Change über den Import
+hinaus in die Oberfläche — bewusst, weil die Alternative heisst, 29 Werte
+entweder wegzuwerfen oder auf Zeit in einer Spalte zu parken, die das nächste
+Speichern leert. VERWORFEN: nur `linkedin` + `instagram` importieren und den
+Rest in den Bericht legen — verlustfrei, aber es verschiebt Handarbeit für 23
+Menschen auf Detlev.
+
+Nebenbefund, für die Erwartung an das Ergebnis: **`socials` wird auf keiner
+Profilseite angezeigt**, weder öffentlich noch intern — es existiert nur im
+Bearbeitungsformular. Die importierten Netzwerke sind damit vorerst für
+niemanden sichtbar ausser für das Mitglied selbst. Das ist kein Fehler dieses
+Changes, aber es begrenzt, was der Import hier bewirken kann.
 
 **Leerwertregel:** ein leeres oder nur aus Leerzeichen bestehendes Quellfeld
 zählt als „nicht vorhanden" und schreibt `null`, nicht `''`.
