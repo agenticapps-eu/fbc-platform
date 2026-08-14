@@ -53,7 +53,7 @@
 - [x] 6.2 **RED:** Eine bereits gesetzte Kategorie ist **nicht bedienbar**. Der Test klickt sie an und erwartet, dass nichts gelöscht wird. Muss gegen eine normal abwählbare Chip-Reihe rot werden.
 - [x] 6.3 **RED:** Ein Konto mit einem vorhandenen Eintrag `source = 'editor'` samt Beschreibung, Tags und Volumenband durchläuft den Schritt; alle drei stehen danach **unverändert**. Das ist die Falle aus dem Kopf von `profile-categories.ts`.
 - [x] 6.4 **GREEN:** Schreiben ausschließlich über `saveCategorySelection`, rein additiv. Kein eigener Schreibpfad, keine Kopie der Abgleichsregeln. `ConfirmationRequiredError` kann damit nicht entstehen — nicht aus Gewohnheit, sondern weil die Oberfläche das Abwählen nicht anbietet.
-- [ ] 6.5 **Teilweise.** Der Vitest belegt, dass die gewählte Kategorie über `saveCategorySelection` **geschrieben** wird — mehr kann er nicht: der Kategorienfilter des Verzeichnisses ist eine Datenbankabfrage. Die eigentliche Abnahme steht deshalb offen und gehört in die Sichtprobe (10.x) bzw. an die Sonde. `profile_completion` ist die Abnahme ausdrücklich **nicht** (proposal.md, Befund 2).
+- [x] 6.5 **Abgenommen — im Verzeichnis, nicht im Test.** Der Vitest belegt nur den Schreibaufruf; der Kategorienfilter ist eine Datenbankabfrage. Deshalb in der Sichtprobe gemessen: das Konto, dessen Kategorien **ausschließlich** aus der Strecke stammen, steht im Verzeichnis mit „Bietet: Know-how · Sucht: Investoren", und der Filter „Expertise & Know-how" liefert **genau dieses eine** Mitglied. `profile_completion` ist die Abnahme ausdrücklich **nicht** (proposal.md, Befund 2) — sie stand nach der Strecke unverändert bei 25 %, und genau das war vorhergesagt.
 - [x] 6.6 Freitext: eigener Lesepfad für `offers.description` / `needs.description` — `fetchCategorySelection` lädt **keine** Beschreibungen. Festlegen und testen: je Seite, Zeilen **ohne** Kategorie eingeschlossen, mehrere Zeilen als Liste. Ein Test je Fall, plus einer für „kein Freitext → kein Platzhalter".
 
 ## 7. Schritt 3 — Profilbild und Standort
@@ -92,13 +92,16 @@
 
 ## 10. Sichtprobe im Browser (UI-Gate)
 
-- [ ] 10.1 Lokal starten und die Strecke **durchspielen** — nicht Screenshots einzelner Schritte. Grüne Tests haben in AGE-492 ein visuell falsches Ergebnis durchgewunken.
-- [ ] 10.2 Mit einem Konto **ohne** und einem **mit** vorbelegten Feldern. Demo-Logins stehen in der Übergabe.
-- [ ] 10.3 **375 px** und Schreibtisch. Am Inhaltsbedarf messen, nicht an `scrollWidth` — der meldete in AGE-540 „passt" bei 339 px echtem Bedarf.
-- [ ] 10.4 Beide Themes (`hell` und `navy`, Schalter in `/einstellungen`).
-- [ ] 10.5 Vertagen, abmelden, neu anmelden → die Strecke kommt wieder und beginnt beim ersten leeren Feld.
-- [ ] 10.6 Überspringen, abmelden, **in einem anderen Browser** anmelden → die Strecke kommt nicht wieder. Das ist der Test, den `localStorage` nicht bestünde.
-- [ ] 10.7 Den Hinweis vor dem Überspringen lesen und beurteilen, ob er einlädt statt zu drohen. Das entscheidet kein Test.
+**Gelaufen gegen den LOKALEN Stack, nicht gegen `--env=dev`.** Der dev-Server zeigt sonst auf `foelowldexkcqzewvrcf` — die Datenbank, die auch die Live-Seite bedient; die Strecke schriebe dort in echte Konten, und die Migration ist dort noch gar nicht angewendet. Stattdessen: `vite` mit `VITE_SUPABASE_URL=http://127.0.0.1:54321` und zwei Wegwerf-Konten (`leer@`/`voll@example.test`) im lokalen Stack.
+
+- [x] 10.1 Durchgespielt, nicht abfotografiert: Login → `/` → `/willkommen`, drei Schritte, Abschluss → Startseite. Danach in der Datenbank nachgesehen, was wirklich geschrieben wurde — `headline`, `region`, Merker, **eine** `offers`- und **eine** `needs`-Zeile mit `source = 'chip'` und der richtigen Kategorie-Abbildung (`Expertise & Know-how` → `know_how`), Kontaktzeile und Interessen unberührt.
+- [x] 10.2 Beide Konten. Das **vorbelegte** (Berufsbezeichnung, Bild, Standort gesetzt) zeigt „**Schritt 2 von 2**" — der dritte Schritt entfällt und der Einstieg springt über das gefüllte Feld. Beide Regeln greifen zusammen, live.
+- [x] 10.3 375 px per Geräte-Emulation, **nicht** per Fenstergröße: macOS lässt kein Fenster unter 500 px zu, `resize_page(375)` lieferte still 500 zurück. Gemessen am Inhaltsbedarf (rechteste Kante aller Elemente in `main`), nicht an `scrollWidth`: **375 von 375 px, Überlauf 0**. Schreibtisch (1280 px) ebenfalls.
+- [x] 10.4 Beide Themes. `navy` über `localStorage['fbc.designVariant']` gesetzt und neu geladen — die Strecke trägt die Chrome-Tokens und folgt dem Theme; geprüft an Schritt 2 und am Hinweisbildschirm.
+- [x] 10.5 Vertagt, **abgemeldet, neu angemeldet** → die Strecke ist wieder da, bei „Schritt 1 von 2". Das ist die eine Zeile, für die `signOut` angefasst wurde, und ohne sie bliebe die Strecke im selben Tab dauerhaft unterdrückt. Zusätzlich: nach „Später" ein bloßes Neuladen → Strecke ebenfalls wieder da.
+- [x] 10.6 In einem **isolierten Browser-Kontext** (eigener Speicher, eigene Sitzung) angemeldet → die Strecke erscheint **nicht**. Gegenprobe dazu: `Object.keys(localStorage)` enthält nichts Onboarding-Artiges. Das ist der Test, den `localStorage` nicht bestünde.
+- [x] 10.7 Gelesen und beurteilt: der Hinweis benennt den Verlust (Kompass-Filter), erklärt den Gewinn, bietet den Ausweg („jederzeit im Profil nachholen") und macht **„Doch ausfüllen" zum primären Knopf**, „Trotzdem überspringen" zum stillen. Er lädt ein. Eine Ungenauigkeit bleibt bewusst stehen: er spricht immer von Kategorien, auch wenn aus Schritt 1 oder 3 heraus übersprungen wird — Überspringen beendet die ganze Strecke, und die Kategorien sind ihr Zweck.
+- [x] 10.8 **Nachgetragen, weil es die Sichtprobe hergab:** ein Konto mit einem reichen `source = 'editor'`-Eintrag (Beschreibung + Tags) durch die Strecke geschickt, den gesetzten Chip **angeklickt** — `aria-disabled="true"`, „Steht schon in deinem Profil", er bleibt gesetzt — und danach in der Datenbank nachgelesen: Beschreibung und Tags **unverändert**. Der datenzerstörende Fall, an der echten Datenbank.
 
 ## 11. Abschluss
 
