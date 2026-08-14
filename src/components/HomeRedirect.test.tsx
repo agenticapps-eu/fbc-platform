@@ -133,10 +133,18 @@ describe("Willkommensstrecke (AGE-538)", () => {
 
   /** Erzwingt ein Signal, das NUR der Startseiten-Pfad erzeugt. Die
    *  Shell-Navigation taugt dafür nicht: sie steht auch, während die Weiche noch
-   *  entscheidet. */
+   *  entscheidet.
+   *
+   *  Der Rückgabewert ist der Spion selbst: für den LADEzustand ist die
+   *  Fehlermeldung das falsche Signal, weil sie erst einen Tick später erscheint
+   *  und ihre Abwesenheit deshalb auch dann zu sehen ist, wenn die Startseite
+   *  längst rendert. Dass die Abfrage GAR NICHT startet, ist synchron und wahr
+   *  oder falsch — nicht schnell oder langsam. */
   async function dashboardScheitern() {
     const dashboard = await import("../lib/dashboard");
-    vi.spyOn(dashboard, "fetchDashboard").mockRejectedValue(new Error("kein Netz im Test"));
+    return vi
+      .spyOn(dashboard, "fetchDashboard")
+      .mockRejectedValue(new Error("kein Netz im Test"));
   }
 
   beforeEach(async () => {
@@ -210,14 +218,17 @@ describe("Willkommensstrecke (AGE-538)", () => {
     // Der dritte Zustand. Ein Test, der den Merker vorbelegt, wäre vorher wie
     // nachher grün und prüfte ihn nie.
     await mockMerker("laedt");
-    await dashboardScheitern();
+    const dashboard = await dashboardScheitern();
 
     renderAt("/", authAsTier("basic"));
 
     // Die Shell steht — die Weiche entscheidet innerhalb von ihr.
     await screen.findByRole("link", { name: "Aktivität" });
     expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();
-    expect(screen.queryByText(DASHBOARD_KAPUTT)).not.toBeInTheDocument();
+    // Die Startseite ist nicht nur unsichtbar, sie ist gar nicht montiert: ihre
+    // Abfrage läuft nicht. Das ist die Zusicherung, die den Ladezustand wirklich
+    // von „zeigt schon die Startseite" unterscheidet.
+    expect(dashboard).not.toHaveBeenCalled();
   });
 
   it("leitet bei einem Lesefehler NICHT um", async () => {

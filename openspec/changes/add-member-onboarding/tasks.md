@@ -17,57 +17,72 @@
 
 ## 3. Die Weiche in `HomeRedirect` (die riskanteste Stelle)
 
-- [ ] 3.1 **RED:** Über `<App />` an `/`, angemeldet, aktiviert, Merker `null` → die Strecke erscheint. Muss gegen den heutigen Stand rot werden (`HomeRedirect` rendert heute unbedingt `HomePage`).
-- [ ] 3.2 **RED:** derselbe Aufbau mit gesetztem Merker → Startseite, **keine** Umleitung.
-- [ ] 3.3 **RED:** **ausgeloggt** an `/` → öffentliche Startseite. Ohne diesen Test schlägt die Falle aus `ActivationRedeemPage.tsx:129-135` erneut zu: für einen Ausgeloggten meldet das System „aktiviert".
-- [ ] 3.4 **RED:** angemeldet, **nicht** aktiviert → Aktivierungsbildschirm. Belegt, dass die Weiche das Gate nicht unterläuft.
-- [ ] 3.5 **RED:** angemeldet, Merker `null`, Aufruf von `/mitglieder` → das Verzeichnis. Belegt, dass die Weiche **keine** Wand ist.
-- [ ] 3.6 **RED:** Merker **lädt noch** → weder Strecke noch Inhalt der Startseite. Ein Test, der den Merker vorbelegt, wäre vorher wie nachher grün und prüfte diesen Zustand nie.
-- [ ] 3.7 **RED:** Lesen des Merkers **schlägt fehl** → Startseite, **keine** Umleitung. Ein Netzfehler darf niemanden in die Strecke werfen.
-- [ ] 3.8 **RED:** Merker gerade gesetzt, Navigation auf `/` → **keine** Rückkehr in die Strecke. Der gelesene Zustand muss vor der Navigation nachziehen.
-- [ ] 3.9 **GREEN:** `HomeRedirect` entscheidet wieder — drei Zustände (lädt / Fehler / fertig), `isActivated === true` ausdrücklich.
-- [ ] 3.10 Der Kommentarkopf von `HomeRedirect.tsx` sagt heute „entscheidet endgültig nichts mehr". Er wird Teil des Diffs und muss die neue Wahrheit sagen.
+- [x] 3.1 **RED:** Über `<App />` an `/`, angemeldet, aktiviert, Merker `null` → die Strecke erscheint. Muss gegen den heutigen Stand rot werden (`HomeRedirect` rendert heute unbedingt `HomePage`).
+- [x] 3.2 **RED:** derselbe Aufbau mit gesetztem Merker → Startseite, **keine** Umleitung.
+- [x] 3.3 **RED:** **ausgeloggt** an `/` → öffentliche Startseite. Ohne diesen Test schlägt die Falle aus `ActivationRedeemPage.tsx:129-135` erneut zu: für einen Ausgeloggten meldet das System „aktiviert".
+- [x] 3.4 **RED:** angemeldet, **nicht** aktiviert → Aktivierungsbildschirm. Belegt, dass die Weiche das Gate nicht unterläuft.
+- [x] 3.5 **RED:** angemeldet, Merker `null`, Aufruf von `/mitglieder` → das Verzeichnis. Belegt, dass die Weiche **keine** Wand ist.
+- [x] 3.6 **RED:** Merker **lädt noch** → weder Strecke noch Inhalt der Startseite. Ein Test, der den Merker vorbelegt, wäre vorher wie nachher grün und prüfte diesen Zustand nie.
+- [x] 3.7 **RED:** Lesen des Merkers **schlägt fehl** → Startseite, **keine** Umleitung. Ein Netzfehler darf niemanden in die Strecke werfen.
+- [x] 3.8 **RED:** Merker gerade gesetzt, Navigation auf `/` → **keine** Rückkehr in die Strecke. Der gelesene Zustand muss vor der Navigation nachziehen.
+- [x] 3.9 **GREEN:** `HomeRedirect` entscheidet wieder — drei Zustände (lädt / Fehler / fertig), `isActivated === true` ausdrücklich.
+- [x] 3.10 Der Kommentarkopf von `HomeRedirect.tsx` sagt heute „entscheidet endgültig nichts mehr". Er wird Teil des Diffs und muss die neue Wahrheit sagen.
 
 ## 4. Die Strecke — Gerüst, Nutzenerklärung, zwei Auswege
 
-- [ ] 4.1 Route `/willkommen` in `App.tsx`, außerhalb der `AppShell`, hinter `RequireAuth` + `ActivationGate` — wie `/onboarding` (`App.tsx:176-190`). **Kein** Eintrag in `NARROW_ROUTES`: die Liste wird in `AppShell.tsx:268` *innerhalb* der Shell gelesen und wäre hier wirkungslos.
-- [ ] 4.2 **RED → GREEN:** Vor dem ersten Schritt steht die Nutzenerklärung, und sie spricht vom Mitglied, nicht von der Plattform.
-- [ ] 4.3 **RED → GREEN:** **Vertagen** auf **jedem** Schritt → Startseite, Merker **nicht** gesetzt, Strecke erscheint beim nächsten Aufruf von `/` wieder. Je Schritt ein Fall, nicht nur der erste.
-- [ ] 4.4 **RED → GREEN:** **Überspringen** auf **jedem** Schritt → Hinweis erscheint zuerst, danach Startseite und Merker gesetzt.
-- [ ] 4.5 **RED → GREEN:** Der Hinweis benennt den Kompass-Filter als das, was ohne Kategorien fehlt. Kein Drohton — die Zusicherung prüft den Text, nicht nur seine Existenz.
-- [ ] 4.6 **RED → GREEN:** Abschluss des letzten Schritts setzt den Merker.
-- [ ] 4.7 **RED:** Konto mit gesetztem Profilbild **und** Standort — der Fortschritt nennt **zwei** Schritte, nicht drei, und die Strecke endet nach dem zweiten. Ein Test gegen eine feste Drei wäre vorher wie nachher grün.
-- [ ] 4.8 **RED → GREEN:** Wiederkehr beginnt beim **ersten leeren Feld**, nicht wieder beim ersten Schritt.
-- [ ] 4.9 Kein `useOverlay`, kein Portal, kein Scroll-Lock — eine Seite, keine Schicht.
+- [x] 4.1 Route `/willkommen` in `App.tsx`, außerhalb der `AppShell`, hinter `RequireAuth` + `ActivationGate` — wie `/onboarding` (`App.tsx:176-190`). **Kein** Eintrag in `NARROW_ROUTES`: die Liste wird in `AppShell.tsx:268` *innerhalb* der Shell gelesen und wäre hier wirkungslos.
+- [x] 4.2 **RED → GREEN:** Vor dem ersten Schritt steht die Nutzenerklärung, und sie spricht vom Mitglied, nicht von der Plattform.
+- [x] 4.3 **RED → GREEN:** **Vertagen** auf **jedem** Schritt → Startseite, Merker **nicht** gesetzt, Strecke erscheint beim nächsten Aufruf von `/` wieder. Je Schritt ein Fall, nicht nur der erste.
+- [x] 4.4 **RED → GREEN:** **Überspringen** auf **jedem** Schritt → Hinweis erscheint zuerst, danach Startseite und Merker gesetzt.
+- [x] 4.5 **RED → GREEN:** Der Hinweis benennt den Kompass-Filter als das, was ohne Kategorien fehlt. Kein Drohton — die Zusicherung prüft den Text, nicht nur seine Existenz.
+- [x] 4.6 **RED → GREEN:** Abschluss des letzten Schritts setzt den Merker.
+- [x] 4.7 **RED:** Konto mit gesetztem Profilbild **und** Standort — der Fortschritt nennt **zwei** Schritte, nicht drei, und die Strecke endet nach dem zweiten. Ein Test gegen eine feste Drei wäre vorher wie nachher grün.
+- [x] 4.8 **RED → GREEN:** Wiederkehr beginnt beim **ersten leeren Feld**, nicht wieder beim ersten Schritt.
+- [x] 4.9 Kein `useOverlay`, kein Portal, kein Scroll-Lock — eine Seite, keine Schicht.
 
 ## 5. Schritt 1 — Berufsbezeichnung (feldbezogen schreiben)
 
-- [ ] 5.1 **RED → GREEN:** vorhandene `headline` erscheint als vorbelegter Wert; der Text des Schritts ist bestätigend statt fragend. Leere `headline` → fragender Text, leeres Feld.
-- [ ] 5.2 **RED:** Ein Konto mit hinterlegten Interessen **und** gefüllter Kontaktzeile schließt den Schritt ab — Interessen und Kontaktzeile sind danach **unverändert**. Der Test muss gegen einen `saveProfile`-Aufruf **rot** werden: `profile.ts:303` schreibt alle Profilspalten, upsertet `profile_contacts` bedingungslos und ersetzt `profile_interests` und `profile_goals` vollständig.
-- [ ] 5.3 **GREEN:** feldbezogenes `update({ headline })` auf `id = auth.uid()`. Aus `profile.ts` wird **nur** der Bild-Upload wiederverwendet.
-- [ ] 5.4 **RED → GREEN:** Abbruch **nach** dem Weitergehen lässt den Wert stehen.
+- [x] 5.1 **RED → GREEN:** vorhandene `headline` erscheint als vorbelegter Wert; der Text des Schritts ist bestätigend statt fragend. Leere `headline` → fragender Text, leeres Feld.
+- [x] 5.2 **RED:** Ein Konto mit hinterlegten Interessen **und** gefüllter Kontaktzeile schließt den Schritt ab — Interessen und Kontaktzeile sind danach **unverändert**. Der Test muss gegen einen `saveProfile`-Aufruf **rot** werden: `profile.ts:303` schreibt alle Profilspalten, upsertet `profile_contacts` bedingungslos und ersetzt `profile_interests` und `profile_goals` vollständig.
+- [x] 5.3 **GREEN:** feldbezogenes `update({ headline })` auf `id = auth.uid()`. Aus `profile.ts` wird **nur** der Bild-Upload wiederverwendet.
+- [x] 5.4 **RED → GREEN:** Abbruch **nach** dem Weitergehen lässt den Wert stehen.
 
 ## 6. Schritt 2 — Kompass-Kategorien (der eigentliche Zweck)
 
-- [ ] 6.1 **RED → GREEN:** Die Chips kommen aus `categoryOptionsForSide` für beide Seiten. Keine zweite Kategorienliste, kein kopiertes Vokabular — `config/compass.ts` ist die einzige Quelle. **Keine** feste Gesamtzahl zusichern: sechs je Seite, elf verschiedene Werte, `immobilien` auf beiden.
-- [ ] 6.2 **RED:** Eine bereits gesetzte Kategorie ist **nicht bedienbar**. Der Test klickt sie an und erwartet, dass nichts gelöscht wird. Muss gegen eine normal abwählbare Chip-Reihe rot werden.
-- [ ] 6.3 **RED:** Ein Konto mit einem vorhandenen Eintrag `source = 'editor'` samt Beschreibung, Tags und Volumenband durchläuft den Schritt; alle drei stehen danach **unverändert**. Das ist die Falle aus dem Kopf von `profile-categories.ts`.
-- [ ] 6.4 **GREEN:** Schreiben ausschließlich über `saveCategorySelection`, rein additiv. Kein eigener Schreibpfad, keine Kopie der Abgleichsregeln. `ConfirmationRequiredError` kann damit nicht entstehen — nicht aus Gewohnheit, sondern weil die Oberfläche das Abwählen nicht anbietet.
-- [ ] 6.5 **RED → GREEN:** Eine gewählte Kategorie macht das Mitglied im **Kategorienfilter des Verzeichnisses** auffindbar. Das ist die Abnahme für diesen Schritt — `profile_completion` ist es ausdrücklich **nicht** (proposal.md, Befund 2).
-- [ ] 6.6 Freitext: eigener Lesepfad für `offers.description` / `needs.description` — `fetchCategorySelection` lädt **keine** Beschreibungen. Festlegen und testen: je Seite, Zeilen **ohne** Kategorie eingeschlossen, mehrere Zeilen als Liste. Ein Test je Fall, plus einer für „kein Freitext → kein Platzhalter".
+- [x] 6.1 **RED → GREEN:** Die Chips kommen aus `categoryOptionsForSide` für beide Seiten. Keine zweite Kategorienliste, kein kopiertes Vokabular — `config/compass.ts` ist die einzige Quelle. **Keine** feste Gesamtzahl zusichern: sechs je Seite, elf verschiedene Werte, `immobilien` auf beiden.
+- [x] 6.2 **RED:** Eine bereits gesetzte Kategorie ist **nicht bedienbar**. Der Test klickt sie an und erwartet, dass nichts gelöscht wird. Muss gegen eine normal abwählbare Chip-Reihe rot werden.
+- [x] 6.3 **RED:** Ein Konto mit einem vorhandenen Eintrag `source = 'editor'` samt Beschreibung, Tags und Volumenband durchläuft den Schritt; alle drei stehen danach **unverändert**. Das ist die Falle aus dem Kopf von `profile-categories.ts`.
+- [x] 6.4 **GREEN:** Schreiben ausschließlich über `saveCategorySelection`, rein additiv. Kein eigener Schreibpfad, keine Kopie der Abgleichsregeln. `ConfirmationRequiredError` kann damit nicht entstehen — nicht aus Gewohnheit, sondern weil die Oberfläche das Abwählen nicht anbietet.
+- [ ] 6.5 **Teilweise.** Der Vitest belegt, dass die gewählte Kategorie über `saveCategorySelection` **geschrieben** wird — mehr kann er nicht: der Kategorienfilter des Verzeichnisses ist eine Datenbankabfrage. Die eigentliche Abnahme steht deshalb offen und gehört in die Sichtprobe (10.x) bzw. an die Sonde. `profile_completion` ist die Abnahme ausdrücklich **nicht** (proposal.md, Befund 2).
+- [x] 6.6 Freitext: eigener Lesepfad für `offers.description` / `needs.description` — `fetchCategorySelection` lädt **keine** Beschreibungen. Festlegen und testen: je Seite, Zeilen **ohne** Kategorie eingeschlossen, mehrere Zeilen als Liste. Ein Test je Fall, plus einer für „kein Freitext → kein Platzhalter".
 
 ## 7. Schritt 3 — Profilbild und Standort
 
-- [ ] 7.1 **RED → GREEN:** Nur das **leere** Feld erscheint; ist eines gesetzt, fehlt es im Schritt.
-- [ ] 7.2 Bild-Upload über den vorhandenen Weg aus `profile.ts`. In privaten Buckets **`upsert: false`** — `upsert: true` scheitert an der SELECT-Policy, und der Fehler zeigt fälschlich auf die RLS.
-- [ ] 7.3 `region` ist ein **Freitextfeld** (`ProfileFieldsets.tsx:46`, `<Input {...register("region")}>`). **Keine** Auswahlliste erfinden — es gibt keine abgenommene Liste der FBC-Standorte. In der Strecke **ohne** die `min(1)`-Pflicht aus `profile.ts:38`: hier wird ergänzt, nicht validiert.
-- [ ] 7.4 **RED → GREEN:** feldbezogenes Schreiben wie in 5.3, mit derselben Gegenprobe auf unberührte Kindtabellen.
+- [x] 7.1 **RED → GREEN:** Nur das **leere** Feld erscheint; ist eines gesetzt, fehlt es im Schritt.
+- [x] 7.2 Bild-Upload über den vorhandenen Weg aus `profile.ts`. In privaten Buckets **`upsert: false`** — `upsert: true` scheitert an der SELECT-Policy, und der Fehler zeigt fälschlich auf die RLS.
+- [x] 7.3 `region` ist ein **Freitextfeld** (`ProfileFieldsets.tsx:46`, `<Input {...register("region")}>`). **Keine** Auswahlliste erfinden — es gibt keine abgenommene Liste der FBC-Standorte. In der Strecke **ohne** die `min(1)`-Pflicht aus `profile.ts:38`: hier wird ergänzt, nicht validiert.
+- [x] 7.4 **RED → GREEN:** feldbezogenes Schreiben wie in 5.3, mit derselben Gegenprobe auf unberührte Kindtabellen.
 
 ## 8. Tests, die nichts prüfen — Gegenprobe
 
-- [ ] 8.1 Kein `vi.mock` auf eigene Komponenten. Gemockt wird **nur** der Rand zur Datenbank.
-- [ ] 8.2 Für jeden als RED markierten Test belegen, dass er gegen den **alten** Stand rot wird — alte Fassung zurückspielen, Suite laufen lassen, Zahl notieren. Behauptet, nicht gemessen, zählt nicht.
-- [ ] 8.3 Kein Test, der einen Zustand **vorbelegt**, wo die App ihn erst nach dem Mount bekommt. `useState(wert)` nimmt einen später eintreffenden Wert nie an — der Fall, der in AGE-540 grün war und live falsch. Betrifft hier besonders 3.6.
+- [x] 8.1 Kein `vi.mock` auf eigene Komponenten. Gemockt sind ausschließlich `lib/member-onboarding`, `lib/member-settings`, `lib/profile-categories`, `lib/profile` und `lib/dashboard` — allesamt der Rand zur Datenbank. Gerendert wird über `<App />`, nicht die Seite isoliert.
+- [x] 8.2 **Gemessen, nicht behauptet.** Der „alte Stand" trägt hier nicht: gegen ihn ist nur 3.1 rot, weil `HomeRedirect` unbedingt `HomePage` rendert und alle übrigen Zusagen Abwesenheiten prüfen, die vorher trivial gelten. Belegt wurde deshalb das, worauf es ankommt — jede Zusage einzeln verbogen und die Suite gemessen (Basis 24 bzw. 10 grün):
+
+      | Verbiegung | Ergebnis |
+      |---|---|
+      | Chip einer gesetzten Kategorie abwählbar machen | 1 rot |
+      | Schrittzahl fest auf drei | 1 rot |
+      | Merker erst NACH der Navigation nachziehen (`invalidateQueries` statt `setQueryData`) | 5 rot |
+      | Einstieg immer bei Schritt 1 | 1 rot |
+      | Überspringen ohne Hinweis | 4 rot |
+      | Kategorien ersetzend statt additiv | 1 rot |
+      | `saveProfile` statt feldbezogenem `update` | 2 rot |
+      | Ladezustand dem Startseiten-Zweig zuschlagen | 1 rot |
+      | Lesefehler wie fehlenden Merker behandeln | 1 rot |
+      | Ausgeloggte nicht ausnehmen | 1 rot |
+
+      Zwei Verbiegungen blieben zunächst **grün**, und beide waren ein echter Befund: die eine war eine wirkungslose Mutation (`data === null` trifft `undefined` nicht), die andere ein **rennender Test** — 3.6 prüfte die Abwesenheit einer Fehlermeldung, die ohnehin erst einen Tick später erscheint. Er prüft jetzt, dass die Dashboard-Abfrage gar nicht erst startet: synchron, also wahr oder falsch statt schnell oder langsam.
+- [x] 8.3 Kein Test, der einen Zustand **vorbelegt**, wo die App ihn erst nach dem Mount bekommt. Baulich abgesichert statt nur geprüft: `WillkommenPage` montiert die Strecke erst, wenn Profil, Kategorien und Freitext gelesen sind — `useState(wert)` nähme einen später eintreffenden Wert nie an. Für 3.6 siehe 8.2.
 
 ## 9. Datenbank-Sonde (Nachweis statt Zusage)
 
