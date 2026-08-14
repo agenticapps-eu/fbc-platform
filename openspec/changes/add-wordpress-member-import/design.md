@@ -128,6 +128,24 @@ schreibenden Abschnitt erreichen.
 
 *Aufgenommen nach dem Review (codex, HIGH ×2, MEDIUM).*
 
+### Die fehlenden Lieferungen blockieren nichts (entschieden 14.08., Donald)
+
+Ein Zwischenstand dieses Designs verlangte, dass der **schreibende** Lauf ohne
+Detlevs Ausgetretenen-Liste verweigert — auf einen HIGH-Befund von `codex` hin.
+**Zurückgenommen.**
+
+Begründung von Donald: die Liste kommt, und die erste Zielumgebung ist ohnehin
+DEV, nicht die Live-Umgebung. Ein zu viel importiertes Ex-Mitglied lässt sich dort
+folgenlos entfernen. Ein Riegel kostete mehr, als er schützt — er hielte die
+Arbeit an einer Lieferung auf, die unterwegs ist.
+
+Der Bericht bleibt die Gegenmaßnahme: er führt die betroffenen Mitglieder
+einzeln, damit sie sich nach der Lieferung gezielt abarbeiten lassen.
+
+*Der Befund war richtig für einen Lauf gegen PROD. Die Antwort darauf ist der
+Go-Live-Ablauf (AGE-534 §5, Trockenlauf mit Durchsprache vor dem echten Lauf),
+nicht ein Riegel im Script.*
+
 ### Kollision mit Bestandskonten blockiert, statt zu erheben
 
 PROD trägt bereits Konten ohne `legacy_source_id`: zwei Testkonten (AGE-522),
@@ -319,20 +337,11 @@ Schritt 1 des Go-Live-Ablaufs.
 
 ## Open Questions
 
-- **Zahlungsstände, Rückläufer, Ausgetretene** — die drei Lieferungen von
-  Detlev. Der Trockenlauf läuft ohne sie; der **schreibende** Lauf verlangt
-  mindestens die Ausgetretenen-Liste, weil sonst Ex-Mitglieder importiert werden.
-  Format und Schlüssel sind festzulegen, bevor Gruppe 6 beginnt.
 - **Was sollte in „Mitgliedschaft" eingetragen werden?** Die Auswertung zeigt
   eindeutig ein Beitrittsdatum (kein Zukunftswert bei 52 Angaben), aber die
   Beschriftung ist mehrdeutig. Von Detlev bestätigen lassen.
 - **Auf welchem Weg bekommt Detlev den Bericht?** Er trägt Personendaten von 70
   Menschen. Nicht per unverschlüsselter Mail, und nicht ins Repository.
-- **`260813_Datenanforderung_WordPress-Migration.md` ist an zwei Stellen
-  überholt** — es sagt Detlev, Anschriften kämen nicht mit und es gebe „über
-  hundert Videos". Beides wurde am 13.08. anders entschieden (AGE-537 ist
-  `Done`; es sind 5 Videos). Falls das Dokument so verschickt wurde, ist das
-  ein Nachtrag an Detlev, kein Code.
 - **`demo_seed.lib.ts` trägt die überholte Annahme** „dev and prod are the SAME
   Supabase project (ADR-0003)". Seit AGE-496 falsch — und genau diese Annahme
   hat meinen Host-Wächter in die Irre geführt. Nicht in diesem Change angefasst;

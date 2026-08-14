@@ -12,5 +12,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["demo_seed.ts", "demo_seed.lib.ts", "demo_seed.lib.test.ts"]
+  "//": "Muster statt Dateiliste (AGE-534): eine Aufzählung erfasst neue Dateien nicht, und eine ungeprüfte Datei sieht wie eine geprüfte aus. Der Plan-Review fand genau das — die drei Namen hier hätten den Import-Code stillschweigend ausgelassen.",
+  "include": ["*.ts"]
 }

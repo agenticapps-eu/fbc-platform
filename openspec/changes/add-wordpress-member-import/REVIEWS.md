@@ -137,8 +137,18 @@ außer einem, plus alle vier von `gemini`. Im Einzelnen:
   (siehe oben), und der Go-Live-Ablauf mit Backup und Stichproben ist in AGE-534 §5
   beschrieben, nicht hier. Als Anmerkung im Design vermerkt.
 
-**Offen und an Donald gegeben** — die Merge-Regel für einen Lauf **nach** dem
-Go-Live: Soll ein zweiter Lauf vom Mitglied gepflegte Felder überschreiben
-(Quelle bleibt WordPress) oder nur leere füllen? Vor dem Go-Live ist die Frage
-folgenlos, danach entscheidet sie über Datenverlust. Wird beantwortet, bevor
-Aufgabengruppe 6 beginnt.
+**Zurückgenommen nach Donalds Entscheidung (14.08.)**
+
+- [HIGH, codex] *„Schreibmodus ohne vollständige, validierte Lieferungen hart
+  blockieren."* — Zuerst übernommen (Punkt 8 oben in der ersten Fassung), dann
+  von Donald gekippt: die Liste kommt, und die erste Zielumgebung ist DEV. Ein
+  dort zu viel importiertes Ex-Mitglied lässt sich folgenlos entfernen; ein
+  Riegel hielte die Arbeit an einer Lieferung auf, die unterwegs ist.
+  Der Befund bleibt richtig **für einen Lauf gegen PROD** — die Antwort darauf
+  ist der Go-Live-Ablauf mit Trockenlauf und Durchsprache (AGE-534 §5), nicht ein
+  Riegel im Script. Spec, Design und Aufgabe 4.3 entsprechend zurückgebaut.
+
+**Beantwortet** — die Merge-Regel für einen Lauf **nach** dem Go-Live: ein
+zweiter Lauf füllt **nur leere Felder**; Verwaltungsfelder immer,
+Aktivierungszeitpunkt und Anmeldeadresse nie (Donald, 14.08.). Steht als eigene
+Anforderung in der Delta.

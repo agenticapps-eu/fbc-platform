@@ -215,16 +215,17 @@ sie stillschweigend zu behandeln:
 - ein Profil mit wenig Inhalt — SHALL importiert werden; ein dünnes Profil ist
   besser als ein fehlendes Mitglied
 
-Der **Trockenlauf** SHALL ohne die Liste der Ausgetretenen und ohne die
-Zahlungsstände lauffähig sein und ihr Fehlen im Bericht vermerken. Diese Angaben
-stammen von außerhalb des Systems; ein Import, der auf sie wartet, kann den
-Bericht nicht erzeugen, mit dem sie eingefordert werden.
+Der Import SHALL ohne die Liste der Ausgetretenen und ohne die Zahlungsstände
+lauffähig sein — als Trockenlauf **wie als schreibender Lauf** — und ihr Fehlen
+im Bericht vermerken. Diese Angaben stammen von außerhalb des Systems; ein
+Import, der auf sie wartet, kann den Bericht nicht erzeugen, mit dem sie
+eingefordert werden.
 
-Der **schreibende** Lauf SHALL ohne die Liste der Ausgetretenen verweigern. Ohne
-sie ist nicht entscheidbar, wer nicht mitkommen soll, und ein Ex-Mitglied im
-Verzeichnis ist nach dem Anlegen nicht folgenlos rückgängig zu machen. Fehlende
-Zahlungsstände SHALL den schreibenden Lauf dagegen **nicht** verweigern — sie
-sind nachtragbar, und die betroffenen Mitglieder stehen im Bericht.
+Beide Angaben sind nachtragbar: ein zu viel importiertes Mitglied lässt sich
+entfernen, ein fehlender Zahlungsstand ergänzen. Ein Riegel davor kostete mehr,
+als er schützt, weil die erste Zielumgebung ohnehin nicht die Live-Umgebung ist.
+Der Bericht SHALL die betroffenen Mitglieder deshalb so ausweisen, dass sie sich
+nachträglich abarbeiten lassen.
 
 #### Scenario: Doppelte Adresse bricht ab
 
@@ -232,16 +233,18 @@ sind nachtragbar, und die betroffenen Mitglieder stehen im Bericht.
 - **THEN** bricht der Lauf ab, nennt die betroffenen Datensätze und schreibt
   nichts
 
-#### Scenario: Der Trockenlauf kommt ohne die Listen aus
+#### Scenario: Ein Lauf kommt ohne die Listen aus
 
-- **WHEN** ein Trockenlauf ohne Liste der Ausgetretenen ausgeführt wird
+- **WHEN** ein Lauf — trocken oder schreibend — ohne Liste der Ausgetretenen
+  ausgeführt wird
 - **THEN** läuft er vollständig durch und vermerkt im Bericht, dass die Liste
   fehlte und deshalb niemand als ausgetreten behandelt wurde
 
-#### Scenario: Der schreibende Lauf verweigert ohne die Ausgetretenen-Liste
+#### Scenario: Nachtragbare Fälle stehen abarbeitbar im Bericht
 
-- **WHEN** ein schreibender Lauf ohne Liste der Ausgetretenen gestartet wird
-- **THEN** endet er ohne Schreibvorgang und nennt die fehlende Liste als Grund
+- **WHEN** ein Lauf ohne Zahlungsstände durchläuft
+- **THEN** führt der Bericht die betroffenen Mitglieder einzeln auf, sodass sie
+  nach der Lieferung gezielt nachgetragen werden können
 
 ### Requirement: Unvollständige Beitrittsdaten werden aufgefüllt und ausgewiesen
 

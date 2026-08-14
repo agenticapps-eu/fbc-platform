@@ -1,6 +1,7 @@
 ## 1. Rüstzeug, Ablage, Wächter
 
-- [ ] 1.1 `sharp` und einen RFC-4180-fähigen CSV-Parser aufnehmen; `supabase/seed/tsconfig.json` um die neuen Dateien erweitern (heute feste `include`-Liste mit drei Einträgen)
+- [x] 1.1 `sharp` und einen RFC-4180-fähigen CSV-Parser aufnehmen; `supabase/seed/tsconfig.json` um die neuen Dateien erweitern (heute feste `include`-Liste mit drei Einträgen)
+      — `sharp@0.35.3` + `csv-parse@7.0.2` als devDependencies; `include` auf `*.ts` umgestellt. Belegt mit Sonde: eine neue Datei mit Typfehler ist unter dem Muster **rot**, unter der alten Dateiliste **unsichtbar**.
 - [ ] 1.2 Ablageort für Quelle, Zwischenablage und Bericht **außerhalb** des Arbeitsbaums festlegen; Bericht mit Rechten `0600` schreiben
 - [ ] 1.3 Pfadprüfung: eine Quelldatei **innerhalb** des Arbeitsbaums wird abgelehnt, nicht gelesen — RED zuerst, dann GREEN
 - [ ] 1.4 Wächter: Projektkennung aus dem **Benutzernamen** (`postgres.<ref>`) gegen eine feste Allowlist; RED-Test mit PROD-Kennung erwartet Abbruch. **Nicht** gegen den Host prüfen — der Pooler-Host ist regionsweit gleich
@@ -31,8 +32,8 @@
 
 - [ ] 4.1 Vorabprüfung über die **ganze** Datei: Kopfzeile, Dubletten, ungültige Adressen — schreibt nichts (Test)
 - [ ] 4.2 Kollision mit Bestandskonten ohne Kennung: blockiert den Schreiblauf, hebt keine Stufe an (Test)
-- [ ] 4.3 Schreiblauf ohne Ausgetretenen-Liste verweigert; ohne Zahlungsstände läuft er und listet auf (je ein Test)
-- [ ] 4.4 Trockenlauf kommt ohne beide Listen aus und vermerkt ihr Fehlen (Test)
+- [ ] 4.3 Beide Betriebsarten laufen ohne Ausgetretenen-Liste und ohne Zahlungsstände durch und vermerken das Fehlen (Test) — **kein** Riegel, Entscheidung Donald 14.08.
+- [ ] 4.4 Bericht führt die nachtragbaren Fälle einzeln auf, sodass sie sich nach der Lieferung gezielt abarbeiten lassen (Test)
 - [ ] 4.5 Berichtsaufbau: Klassensumme = Zahl der Datensätze für Läufe, die den verarbeitenden Abschnitt erreichen; Vorab-Abbruch erzeugt den eigenen Berichtstyp (je ein Test)
 - [ ] 4.6 Bericht führt die aufgefüllten Beitrittsdaten mit **Rohangabe** — sie ist sonst nirgends erhalten
 - [ ] 4.7 Ausgabe-Disziplin: `stdout` führt nur Zeilennummer und Kennung; Test prüft, dass kein Name und keine Adresse der Quelle darin vorkommt
