@@ -258,18 +258,18 @@ Befüllung am 14.08. gegen die echte Datei gemessen.
 | `beruf` | 17/70 | `profiles.headline` | — |
 | `infos` | 45/70 | `profiles.short_bio` | HTML entfernen |
 | `infos_15` | 24/70 | `profiles.short_bio` | anhängen, HTML entfernen |
-| `infos_28` | 38/70 | `profiles.interests` | HTML entfernen |
-| `biete` | 47/70 | `profiles.offers` | Fließtext |
-| `suche` | 46/70 | `profiles.needs` | Fließtext |
-| `Strasse` | 38/70 | `profiles.street` | — |
-| `ort` | 50/70 | `profiles.postal_code` + `.city` | `ortParsen`, **ein Feld → zwei** |
-| `ort_27` | 34/70 | `profiles.state` | — |
+| `infos_28` | 38/70 | `profile_interests` (`label`, `theme` = `null`) | HTML entfernen, **ein Wert = ein Chip** |
+| `biete` | 47/70 | `offers` (`description`, `title` abgeleitet) | Fließtext |
+| `suche` | 46/70 | `needs` (`description`, `title` abgeleitet) | Fließtext |
+| `Strasse` | 38/70 | `profile_contacts.street` | — |
+| `ort` | 50/70 | `profile_contacts.postal_code` + `.city` | `ortParsen`, **ein Feld → zwei** |
+| `ort_27` | 34/70 | `profile_contacts.state` | — |
 | `ort_27_28` | 31/70 | `profiles.region` | Regionalgruppe, **nicht** der Wohnort |
-| — | — | `profiles.country` | aus `ortParsen`, Vorgabe `DE` |
+| — | — | `profile_contacts.country` | aus `ortParsen`, Vorgabe `DE` |
 | `infos_16` | 52/70 | `profiles.member_since` | `datumParsen` + Auffüllung |
 | `praesi_kurz`, `praesei_lang` | 5/70 | `profiles.videos` | — |
 | `linkedin`, `facebook`, `instagram`, `youtube`, `twitter` | 24/19/16/6/4 | `profiles.socials` | zusammenführen |
-| `Homepage` | 38/70 | `profile_contacts.website` | — |
+| `Homepage` | 38/70 | `profiles.website` | — |
 | `E-Mail` | 52/70 | `profile_contacts.email` | Kontaktadresse, **nicht** die Anmeldeadresse |
 | `Telefonnummer` | 52/70 | `profile_contacts.phone` | `telefonParsen` |
 | `user_email` | 70/70 | Anmeldeadresse | Schlüssel; trimmen + case-folden |
@@ -282,6 +282,49 @@ Befüllung am 14.08. gegen die echte Datei gemessen.
 
 `branche` wird aus `infos` per Stichwortzuordnung abgeleitet (AGE-537); grob
 gefüllt ist besser als leer, jedes Mitglied kann es ändern.
+
+#### Nachtrag 14.08.: sieben Ziele stimmten nicht
+
+Die Matrix oben stand vor dem ersten Blick ins Zielschema. Gegen
+`supabase/migrations/` gelesen, zeigten sieben Zeilen auf Spalten, die es an dem
+Ort nicht gibt. Fünf davon sind reine Faktenkorrekturen mit genau einem
+richtigen Ziel:
+
+- **Die Anschrift liegt auf `profile_contacts`, nicht auf `profiles`.**
+  `20260813140000_profile_address_fields.sql` legt `street`, `postal_code`,
+  `city`, `state`, `country` dort an — und nennt im Kopf ausdrücklich diesen
+  Import als den, der `ort` auftrennt. Der Ort ist dort nicht gewählt, sondern
+  erzwungen: auf `profiles` wäre die Anschrift für **jedes** eingeloggte Konto
+  lesbar (AGE-530), auf `profile_contacts` erst nach angenommener Kontaktanfrage.
+  Die Matrix hätte die Anschrift also nicht bloß woandershin geschrieben — sie
+  hätte sie veröffentlicht.
+- **`profile_contacts.website` existiert seit dem 11.06. nicht mehr**
+  (`foundation_conform:75`, „website moves to profiles"). Ziel ist
+  `profiles.website`.
+
+Zwei weitere hatten überhaupt kein existierendes Ziel; hier ist entschieden
+worden (Donald, 14.08.):
+
+- **`profiles.offers` / `profiles.needs` gibt es nicht.** `public.offers` und
+  `public.needs` sind eigene Tabellen mit `title text not null`. `biete` und
+  `suche` sind Fließtext (Median 99 / 85 Zeichen, max 1050 / 784) und tragen
+  keinen Titel. **Entschieden: je eine Zeile**, `description` = Volltext,
+  `title` abgeleitet. VERWORFEN: an `short_bio` anhängen — dann stünden die 47
+  bzw. 46 bestbefüllten Felder des ganzen Exports im Verzeichnis als „bietet
+  nichts", und das Matching startete am Go-Live-Tag leer.
+- **`profiles.interests` ist nicht das, was das Profil zeigt.** Die Spalte
+  (`text[]`) speist nur `search_doc`; gerendert und bearbeitet wird
+  `public.profile_interests (theme, label)` (`src/lib/profile.ts:188/359`).
+  **Entschieden: `profile_interests` mit `theme = null`** — die öffentliche
+  Profilseite rendert themenlose Einträge bereits (`untheured`), ein Wert wird
+  ein Chip, ohne Auftrennen. VERWORFEN: `profiles.interests` — das Mitglied
+  fände sich damit über eine Suche wieder, ohne den Grund sehen oder löschen zu
+  können.
+
+Für den Import heißt das: er schreibt **sechs** Tabellen, nicht drei —
+`profiles`, `profile_contacts`, `profile_legacy`, `offers`, `needs`,
+`profile_interests`. Das Spec-Delta ist davon unberührt; es nennt keine
+Zielspalten.
 
 **Leerwertregel:** ein leeres oder nur aus Leerzeichen bestehendes Quellfeld
 zählt als „nicht vorhanden" und schreibt `null`, nicht `''`.

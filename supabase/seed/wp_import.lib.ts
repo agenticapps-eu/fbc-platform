@@ -218,6 +218,90 @@ export function pruefeQuellPfad(input: {
   return { kind: "ok", pfad: aufgeloest };
 }
 
+/**
+ * Die 26 lebenden Quellfelder, nach der Abbildungsmatrix im Design gruppiert.
+ *
+ * WARUM EINE FESTE LISTE UND NICHT `Object.entries(row)`. Die Datei trägt 140
+ * Spalten. Der Rest ist WordPress-Innenleben (`wp_*`, `aioseo_*`,
+ * `session_tokens`), Reste gelöschter Formularfelder (`Homepage_16_19` …) und
+ * `user_pass`. Über alle Spalten zu laufen, zöge tote Daten mit — und den
+ * Passwort-Hash gleich hinterher.
+ *
+ * DIE ZIELE HIER SIND DIE KORRIGIERTEN. Die erste Fassung der Matrix legte die
+ * Anschrift auf `profiles`, `biete`/`suche` auf nicht existierende Spalten und
+ * die Interessen in die Spalte, die nur die Suche speist. Nachgelesen am
+ * Zielschema, siehe Design, „Nachtrag 14.08.: sieben Ziele stimmten nicht".
+ */
+export const QUELLFELDER: readonly string[] = [
+  // Schlüssel
+  "user_email", // Anmeldeadresse
+  "source_user_id", // → profile_legacy.legacy_source_id
+
+  // → profiles
+  "first_name",
+  "last_name", // → name, zusammengesetzt
+  "beruf", // → headline
+  "infos", // → short_bio
+  "infos_15", // → short_bio, angehängt
+  "infos_16", // → member_since
+  "ort_27_28", // → region (Regionalgruppe, NICHT der Wohnort)
+  "Homepage", // → website; profile_contacts.website ist seit dem 11.06. gedroppt
+  "praesi_kurz",
+  "praesei_lang", // → videos
+  "linkedin",
+  "facebook",
+  "instagram",
+  "youtube",
+  "twitter", // → socials
+
+  // → profile_contacts (die Anschrift liegt hier, nicht auf profiles: dort wäre
+  // sie für jedes eingeloggte Konto lesbar)
+  "E-Mail", // → email (Kontaktadresse, nicht die Anmeldeadresse)
+  "Telefonnummer", // → phone
+  "Strasse", // → street
+  "ort", // → postal_code + city, ein Feld → zwei
+  "ort_27", // → state
+
+  // → profile_legacy
+  "Mitgliedschaft", // → legacy_tier, roh
+
+  // → offers / needs / profile_interests
+  "biete", // → offers
+  "suche", // → needs
+  "infos_28", // → profile_interests, theme = null
+];
+
+export type Kopfpruefung = { kind: "ok" } | { kind: "abbruch"; grund: string };
+
+/**
+ * Hält die Kopfzeile der Quelle gegen die erwarteten Felder. Unbekannte Spalten
+ * sind kein Grund — die Datei ist voll davon. Ein fehlendes erwartetes Feld
+ * bricht ab: es hiesse, dass der Export anders gezogen wurde als der vom 13.08.,
+ * und ein stillschweigend leeres Ziel fiele erst im Profil auf.
+ *
+ * Gemeldet werden ALLE fehlenden auf einmal. Beim ersten auszusteigen machte aus
+ * einem neu gezogenen Export eine Kette von Einzelläufen.
+ */
+export function pruefeKopfzeile(spalten: readonly string[]): Kopfpruefung {
+  // Das BOM klebt am Namen der ERSTEN Spalte (nachgemessen: die echte Datei
+  // beginnt mit U+FEFF). Heute folgenlos, weil dort `user_login` steht — stünde
+  // nach einem neuen Export ein erwartetes Feld an erster Stelle, meldete der
+  // Wächter es als fehlend, und der Grund zeigte auf die falsche Ursache.
+  const vorhanden = new Set(spalten.map((s) => s.replace(/^\uFEFF/, "")));
+  const fehlend = QUELLFELDER.filter((feld) => !vorhanden.has(feld));
+
+  if (fehlend.length > 0) {
+    return {
+      kind: "abbruch",
+      grund:
+        `Die Kopfzeile der Quelle fuehrt ${fehlend.length} erwartete Feld(er) nicht: ` +
+        `${fehlend.join(", ")}. Wurde der Export anders gezogen?`,
+    };
+  }
+
+  return { kind: "ok" };
+}
+
 export type Ablageorte = { verzeichnis: string; bericht: string; zwischenablage: string };
 
 /**

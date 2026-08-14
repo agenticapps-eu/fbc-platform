@@ -35,11 +35,15 @@
 
 ## 3. Abbildung (`wp_import.lib.ts`)
 
-- [ ] 3.1 Die 26 lebenden Quellfelder als feste Tabelle nach der Matrix im Design; unbekannte Spalte ignorieren, erwartete fehlende bricht ab (Test für beide Richtungen)
+- [x] 3.1 Die 26 lebenden Quellfelder als feste Tabelle nach der Matrix im Design; unbekannte Spalte ignorieren, erwartete fehlende bricht ab (Test für beide Richtungen)
+      — `QUELLFELDER` + `pruefeKopfzeile()`, 8 Tests. Die 26 Namen stehen im Test **wörtlich** statt aus der Liste abgeleitet, sonst prüfte er sie gegen sich selbst. Gegen die echte Kopfzeile gehalten: alle 26 vorhanden (von 140 Spalten). Dazu ein Fall, den erst das Lesen der echten Datei ergab: sie beginnt mit einem **BOM**, das am Namen der ersten Spalte klebt — heute folgenlos, weil dort `user_login` steht, aber nach einem neu gezogenen Export meldete der Wächter sonst ein vorhandenes Feld als fehlend.
 - [ ] 3.2 `user_pass` ist in keiner Abbildung enthalten — Test belegt, dass der Wert weder im Zielobjekt noch im Bericht noch in der Ausgabe auftaucht
-- [ ] 3.3 Abbildung auf `profiles` inkl. `ort` → `postal_code` + `city`, `beruf` → `headline`, `infos_15` an `short_bio` anhängen, `socials` aus fünf Feldern
-- [ ] 3.4 Abbildung auf **`profile_contacts`** (`email`, `phone`, `website`) — eigene Tabelle, im ersten Entwurf übersehen
+> **Korrektur 14.08. am Zielschema gelesen (Design, „Nachtrag: sieben Ziele stimmten nicht").** Die Anschrift liegt auf `profile_contacts`, nicht `profiles`; `profile_contacts.website` ist seit dem 11.06. gedroppt; `profiles.offers`/`.needs` gibt es nicht; `profiles.interests` ist nicht die Spalte, die das Profil zeigt. Der Import schreibt **sechs** Tabellen, nicht drei.
+
+- [ ] 3.3 Abbildung auf `profiles`: `beruf` → `headline`, `infos_15` an `short_bio` anhängen, `Homepage` → `website`, `ort_27_28` → `region`, `infos_16` → `member_since`, `socials` aus fünf Feldern, `videos` aus zweien
+- [ ] 3.4 Abbildung auf **`profile_contacts`** — `email`, `phone` **und die Anschrift**: `Strasse` → `street`, `ort` → `postal_code` + `city` (`ortParsen`, ein Feld → zwei), `ort_27` → `state`, `country` Vorgabe `DE`. **Nicht** auf `profiles`: dort wäre die Anschrift für jedes eingeloggte Konto lesbar
 - [ ] 3.5 Abbildung auf `profile_legacy` (`legacy_source_id`, `legacy_tier` roh, `paid_until` aus der externen Liste)
+- [ ] 3.5a Abbildung auf `offers`/`needs`/`profile_interests` — die drei Ziele, die der erste Entwurf auf nicht existierende `profiles`-Spalten legte: `biete`/`suche` je **eine Zeile** mit `description` = Volltext und abgeleitetem `title` (`not null`), `infos_28` als **ein** `profile_interests`-Chip mit `theme = null`
 - [ ] 3.6 Leerwertregel: leeres oder reines Leerzeichen-Feld schreibt `null`, nicht `''` (Test)
 - [ ] 3.7 Merge-Regel: nur leere Ziele füllen; `paid_until`/`legacy_tier`/`legacy_price`/`member_since` immer; `activated_at` und Anmeldeadresse nie — je ein Test, inkl. „Mitglied hat das Feld geleert"
 

@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  QUELLFELDER,
   ablageorte,
   leseAufruf,
+  pruefeKopfzeile,
   pruefeQuellPfad,
   pruefeZiel,
   schreibeBericht,
@@ -320,5 +322,103 @@ describe("schreibeBericht", () => {
 
     expect(statSync(ziel).mode & 0o777).toBe(0o600);
     expect(readFileSync(ziel, "utf8")).toBe("neu");
+  });
+});
+
+/**
+ * Die 26 Namen stehen hier WÖRTLICH und nicht aus `QUELLFELDER` abgeleitet.
+ * Sonst prüfte der Test die Liste gegen sich selbst: eine gestrichene Zeile
+ * bliebe grün. Die Namen sind am 14.08. gegen die Kopfzeile der echten Quelle
+ * gehalten — alle 26 vorhanden.
+ */
+const ERWARTETE_26 = [
+  "E-Mail",
+  "Homepage",
+  "Mitgliedschaft",
+  "Strasse",
+  "Telefonnummer",
+  "beruf",
+  "biete",
+  "facebook",
+  "first_name",
+  "infos",
+  "infos_15",
+  "infos_16",
+  "infos_28",
+  "instagram",
+  "last_name",
+  "linkedin",
+  "ort",
+  "ort_27",
+  "ort_27_28",
+  "praesei_lang",
+  "praesi_kurz",
+  "source_user_id",
+  "suche",
+  "twitter",
+  "user_email",
+  "youtube",
+];
+
+describe("QUELLFELDER", () => {
+  it("führt genau die 26 lebenden Quellfelder der Abbildungsmatrix", () => {
+    expect([...QUELLFELDER].sort()).toEqual(ERWARTETE_26);
+  });
+
+  it("nennt kein Feld doppelt", () => {
+    expect(new Set(QUELLFELDER).size).toBe(QUELLFELDER.length);
+  });
+});
+
+describe("pruefeKopfzeile", () => {
+  it("nimmt eine Kopfzeile an, die alle erwarteten Felder trägt", () => {
+    expect(pruefeKopfzeile(ERWARTETE_26)).toEqual({ kind: "ok" });
+  });
+
+  it("ignoriert unbekannte Spalten, statt an ihnen abzubrechen", () => {
+    // Die echte Datei trägt 140 Spalten: 26 lebende, der Rest ist WordPress-
+    // Innenleben (`wp_*`, `aioseo_*`, `session_tokens`) und Reste gelöschter
+    // Formularfelder. Ein Wächter, der daran abbricht, wäre nie grün.
+    const mitBallast = [...ERWARTETE_26, "wp_capabilities", "aioseo_twitter_url", "user_pass"];
+
+    expect(pruefeKopfzeile(mitBallast)).toEqual({ kind: "ok" });
+  });
+
+  it("bricht ab, wenn ein erwartetes Feld fehlt, und nennt es", () => {
+    const ohneOrt = ERWARTETE_26.filter((f) => f !== "ort");
+
+    const ergebnis = pruefeKopfzeile(ohneOrt);
+
+    expect(ergebnis.kind).toBe("abbruch");
+    expect(ergebnis.kind === "abbruch" && ergebnis.grund).toContain("ort");
+  });
+
+  it("nennt ALLE fehlenden Felder, nicht nur das erste", () => {
+    // Ein Wächter, der beim ersten Fund aussteigt, macht aus einem neu gezogenen
+    // Export eine Kette von Einzelläufen — jeder deckt genau ein Feld auf.
+    const ergebnis = pruefeKopfzeile(
+      ERWARTETE_26.filter((f) => f !== "biete" && f !== "suche" && f !== "beruf"),
+    );
+
+    expect(ergebnis.kind).toBe("abbruch");
+    const grund = ergebnis.kind === "abbruch" ? ergebnis.grund : "";
+    for (const fehlend of ["beruf", "biete", "suche"]) {
+      expect(grund).toContain(fehlend);
+    }
+  });
+
+  it("lässt sich vom BOM der ersten Spalte nicht täuschen", () => {
+    // Nachgemessen: die echte Datei beginnt mit U+FEFF, die erste Spalte heisst
+    // damit "\uFEFFuser_login". Heute folgenlos, weil `user_login` nicht
+    // abgebildet wird — steht aber ein erwartetes Feld nach einem neuen Export
+    // an erster Stelle, meldete der Wächter es sonst als fehlend, obwohl es da
+    // ist. Der Abbruchgrund zeigte dann auf die falsche Ursache.
+    const mitBom = ERWARTETE_26.map((f, i) => (i === 0 ? `\uFEFF${f}` : f));
+
+    expect(pruefeKopfzeile(mitBom)).toEqual({ kind: "ok" });
+  });
+
+  it("bricht bei leerer Kopfzeile ab", () => {
+    expect(pruefeKopfzeile([]).kind).toBe("abbruch");
   });
 });
