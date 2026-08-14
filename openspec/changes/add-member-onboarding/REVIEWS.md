@@ -178,3 +178,76 @@ nicht auftreten.
 Admin- und Demo-Konten die Strecke bekommen, trifft zu und bleibt so — sie ist
 überspringbar, und eine Ausnahmeregel für Rollen wäre mehr Code als Nutzen. Wenn
 das am Go-Live stört, ist es ein Einzeiler in der Weiche.
+
+---
+
+# Diff-Review (Schritt 4) — 2026-08-14, nach der Implementierung
+
+Zweite Stufe, eigener Lauf, eigener Gegenstand: geprüft wurde `git diff
+main...HEAD` über `src/`, `supabase/` und `scripts/` (2038 Zeilen) — **nicht** der
+Plan. Wieder zwei fremde Anbieter, wieder ohne `claude`.
+
+| Reviewer | Modell | Exit | Befunde |
+|---|---|---|---|
+| gemini | gemini-cli, Standardmodell | 0 | 2 × LOW |
+| codex | gpt-5.6-sol | 0 | 2 × HIGH, 3 × MEDIUM, 2 × LOW |
+
+**Eine Falle beim Werkzeug, festgehalten weil sie wiederkommt:** der erste
+gemini-Lauf mit `-m gemini-3-pro-preview` scheiterte am nicht mehr existierenden
+Modell — und meldete dabei **Exit 0**. Der Exit-Code trägt hier nichts; gezählt
+hat erst der Inhalt der Antwort.
+
+## Behoben (5 von 7)
+
+**HIGH — der Fehlerausgang führte im Kreis** (`WillkommenPage.tsx`, Ladefehler).
+„Zur Startseite" navigierte nur. Die Weiche auf `/` liest den weiterhin leeren
+Merker und schickt sofort zurück; bei dauerhaft scheiternder Abfrage kommt
+niemand mehr heraus. Der Ausgang **vertagt** jetzt. Ein Test deckte das nicht —
+er ist nachgezogen und rot gemessen.
+
+**HIGH — „additiv" galt gegen den falschen Zeitpunkt.**
+`saveCategorySelection` gleicht die übergebene Auswahl mit **frisch gelesenen**
+Zeilen ab und löscht alles, was dort steht und hier fehlt. Übergeben wurde der
+Stand vom *Laden* der Strecke. Eine inzwischen anderswo entstandene Kategorie
+wäre still verschwunden; bei einem reichen Editor-Eintrag hätte es eine
+Rückfrage ausgelöst, die diese Oberfläche gar nicht beantworten kann. Jetzt wird
+unmittelbar vor dem Schreiben neu gelesen. Das ist genau der Datenverlust, den
+der Change verhindern sollte — und die Planung hatte ihn an dieser Stelle nicht
+gesehen.
+
+**MEDIUM — `staleTime: Infinity` auf dem Merker** hielt ein `null` für immer
+frisch: wer die Strecke in einem anderen Tab beendet, wäre hier erneut
+hineingeschickt worden. Entfernt; die Abfrage ist ein Primärschlüsseltreffer.
+
+**MEDIUM — die Vertagung wurde nur in `signOut` zurückgesetzt**, nicht bei
+abgelaufener Sitzung. Verschoben nach `onAuthStateChange`, wo beide Fälle
+zusammenlaufen.
+
+**MEDIUM — die Strecke invalidierte ihre EIGENEN Caches nicht.** Der
+QueryClient überlebt das Abmelden (AGE-258 ist offen), also hätte die nächste
+Anmeldung im selben Tab den alten Profilstand gesehen und wieder bei einem längst
+gefüllten Feld begonnen.
+
+**LOW (gemini) — das Datei-Feld setzte seinen Wert nicht zurück:** dieselbe Datei
+zweimal wählen löste kein `change` aus. Einzeiler.
+
+## Nicht behoben, begründet
+
+**LOW (gemini) — Modulzustand und HMR.** Der Vertagungs-Merker kann in der
+Entwicklung ein Hot-Reload überleben. Zutreffend, aber ausschließlich in der
+Entwicklung; `sessionStorage` überlebte dafür das Neuladen, und *genau das* soll
+er nicht.
+
+**LOW (codex) — der Test für die Wiederkehr ruft `vertagungZuruecksetzen` direkt
+auf** statt einen echten Logout zu fahren. Stimmt: die Auth-Fixture bringt eine
+eigene `signOut`-Attrappe mit, ein echter Abmeldevorgang ist über sie nicht
+erreichbar. Der Fall ist stattdessen **im Browser** durchgespielt — vertagen,
+abmelden, neu anmelden, Strecke wieder da (Aufgabe 10.5).
+
+## Was die Gegenprobe danach noch fand
+
+Nach den Korrekturen wurde jede einzeln verbogen. Zwei blieben grün: das
+Vorziehen des gelesenen Merkers und der vertagende Fehlerausgang. Der Grund war
+derselbe — **alle** Fälle betraten die Strecke direkt über `/willkommen` und nie
+über die Weiche, und erst auf dem echten Weg (`/` → Strecke → `/`) liegt der
+gelesene `null` überhaupt im Cache. Zwei Fälle nachgezogen, beide rot gemessen.

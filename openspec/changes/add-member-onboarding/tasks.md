@@ -105,8 +105,8 @@
 
 ## 11. Abschluss
 
-- [ ] 11.1 Code-Review auf den **Diff** (Schritt 4), unabhängig vom Plan-Review.
-- [ ] 11.2 `pnpm test`, `tsc`, Lint. `pnpm format:check` meldet 111 vorbestehende Dateien — nicht als Befund melden und **nie** `pnpm format`.
+- [x] 11.1 Diff-Review gelaufen (gemini + codex, beide fremde Anbieter, Gegenstand war der Diff und nicht der Plan): **2 HIGH, 3 MEDIUM, 4 LOW**. Fünf behoben, zwei begründet offen gelassen — Auflösung je Befund in `REVIEWS.md`. Die beiden HIGH waren echt: der Fehlerausgang der Strecke führte im Kreis, und „additiv" galt gegen den Ladestand statt gegen den Stand beim Speichern. Der zweite ist genau der Datenverlust, den dieser Change verhindern sollte, und die Planung hatte ihn an dieser Stelle nicht gesehen.
+- [x] 11.2 `pnpm test` **829 grün** (Ausgangslinie 795, **+34**), `tsc --noEmit` sauber, `eslint --quiet` sauber. `pnpm format:check` **nicht** gelaufen und `pnpm format` **nicht** aufgerufen — es schriebe rund 60 fremde Dateien um.
 - [ ] 11.3 `openspec validate --all` grün, dann archivieren — **vor** dem PR.
 - [ ] 11.4 Branch `donald/age-538-…`, PR, CI auf der **HEAD-SHA** prüfen (nicht `gh run list`), Merge über `gh pr view --json state` verifizieren.
 - [ ] 11.5 Migration anwenden ist ein **eigener** Schritt: der Merge wendet sie nicht an. Danach greift das `drift-gate` — den Deploy per `gh run rerun --failed` nachziehen.
