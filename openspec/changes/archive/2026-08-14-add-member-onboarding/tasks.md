@@ -107,8 +107,9 @@
 
 - [x] 11.1 Diff-Review gelaufen (gemini + codex, beide fremde Anbieter, Gegenstand war der Diff und nicht der Plan): **2 HIGH, 3 MEDIUM, 4 LOW**. Fünf behoben, zwei begründet offen gelassen — Auflösung je Befund in `REVIEWS.md`. Die beiden HIGH waren echt: der Fehlerausgang der Strecke führte im Kreis, und „additiv" galt gegen den Ladestand statt gegen den Stand beim Speichern. Der zweite ist genau der Datenverlust, den dieser Change verhindern sollte, und die Planung hatte ihn an dieser Stelle nicht gesehen.
 - [x] 11.2 `pnpm test` **829 grün** (Ausgangslinie 795, **+34**), `tsc --noEmit` sauber, `eslint --quiet` sauber. `pnpm format:check` **nicht** gelaufen und `pnpm format` **nicht** aufgerufen — es schriebe rund 60 fremde Dateien um.
-- [ ] 11.3 `openspec validate --all` grün, dann archivieren — **vor** dem PR.
+- [x] 11.3 `openspec validate --all` grün (28/28), archiviert als `2026-08-14-add-member-onboarding`; `member-onboarding` ist mit 9 Anforderungen als laufende Wahrheit in `openspec/specs/` angelegt — vor dem PR.
+- [x] 11.7 Linear-Kommentar an AGE-538 gesetzt (14.08.): die drei nicht haltbaren Prämissen der Abnahmeliste, die Entscheidung „zwei Auswege", und wo der Erfolg von Schritt 2 wirklich gemessen wird.
 - [ ] 11.4 Branch `donald/age-538-…`, PR, CI auf der **HEAD-SHA** prüfen (nicht `gh run list`), Merge über `gh pr view --json state` verifizieren.
 - [ ] 11.5 Migration anwenden ist ein **eigener** Schritt: der Merge wendet sie nicht an. Danach greift das `drift-gate` — den Deploy per `gh run rerun --failed` nachziehen.
 - [ ] 11.6 Live-Beleg an einer Zeichenkette aus dem Diff, nicht an der Bundle-Größe.
-- [ ] 11.7 Linear: Kommentar mit den Prämissen-Korrekturen (Einstieg beim Aufruf von `/` statt nach dem Passwortsetzen · `profile_completion` steigt durch Schritt 2 nicht · zwei Auswege statt einem), damit die Abnahmeliste des Issues nicht gegen unerfüllbare Punkte gehalten wird.
+
