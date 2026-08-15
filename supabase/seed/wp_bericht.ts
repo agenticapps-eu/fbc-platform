@@ -31,6 +31,24 @@ const KLASSENNAME: Record<Klasse, string> = {
   fehlerhaft: "fehlerhaft",
 };
 
+/**
+ * Wie es einem der beiden Bilder ergangen ist (6.3/6.4).
+ *
+ * `fehlt` ist ausdrücklich KEIN Datensatzfehler: das Mitglied wird angelegt,
+ * das Bild steht als Zeile im Bericht. Es ist der einzige Ort, an dem jemand
+ * nachlesen kann, welches Bild nachzutragen ist.
+ */
+export type Bildbefund = {
+  art: "profil" | "cover";
+  stand: "hochgeladen" | "vorhanden" | "fehlt";
+  grund?: string;
+};
+
+const BILDART: Record<Bildbefund["art"], string> = {
+  profil: "Profilbild",
+  cover: "Headerbild",
+};
+
 export type Datensatzergebnis = {
   /** Zählt DATENSÄTZE, nicht Dateizeilen — Freitextfelder tragen Umbrüche. */
   zeile: number;
@@ -43,6 +61,8 @@ export type Datensatzergebnis = {
   uebersprungeneFelder?: string[];
   /** Übernommenes Beitrittsdatum samt Rohangabe und Auffüllgrad. */
   beitritt?: { datum: string; grad: "tag" | "monat" | "jahr"; roh: string };
+  /** Wie es den beiden Bildern erging — nur im schreibenden Lauf belegt. */
+  bilder?: Bildbefund[];
 };
 
 export type Berichtskopf = {
@@ -196,6 +216,45 @@ export function baueBericht(daten: Berichtsdaten): string {
       tabelle(["Datensatz", "Kennung", "Name", "Feld"], stehengelassen),
       "",
     );
+  }
+
+  // Die Bilder (6.3/6.4). Ein fehlendes Bild ist KEIN Datensatzfehler — das
+  // Mitglied steht, nur sein Bild fehlt. Genau deshalb braucht es eine eigene
+  // Zeile: in der Klassentabelle wäre es unsichtbar, und im Profil sieht ein
+  // fehlender Avatar aus wie einer, den niemand hochgeladen hat.
+  const alleBilder = ergebnisse.flatMap((e) => (e.bilder ?? []).map((b) => ({ e, b })));
+  if (alleBilder.length > 0) {
+    const zaehle = (stand: Bildbefund["stand"]) =>
+      alleBilder.filter(({ b }) => b.stand === stand).length;
+
+    nachzutragen.push(
+      "### Bilder",
+      "",
+      `- hochgeladen: ${zaehle("hochgeladen")}`,
+      `- schon vorhanden (übersprungen, nicht ersetzt): ${zaehle("vorhanden")}`,
+      `- fehlt: ${zaehle("fehlt")}`,
+      "",
+    );
+
+    const fehlend = alleBilder.filter(({ b }) => b.stand === "fehlt");
+    if (fehlend.length > 0) {
+      nachzutragen.push(
+        "Diese Bilder sind nicht im Bucket gelandet. Das Mitglied wurde trotzdem",
+        "angelegt; nachzutragen ist es von Hand über den Profil-Editor.",
+        "",
+        tabelle(
+          ["Datensatz", "Kennung", "Name", "Bild", "Grund"],
+          fehlend.map(({ e, b }) => [
+            String(e.zeile),
+            zelle(e.kennung),
+            zelle(e.name),
+            BILDART[b.art],
+            zelle(b.grund ?? null),
+          ]),
+        ),
+        "",
+      );
+    }
   }
 
   // Übersprungene gehören hierher, nicht nur in die Klassentabelle: hinter

@@ -62,6 +62,9 @@ function bestand(werte: Partial<Bestand> = {}): Bestand {
 /** Der Regelfall: nichts im Ziel, jeder Datensatz ist neu. */
 const KEIN_BESTAND = () => null;
 
+/** Eine Zwischenablage, in der nichts liegt — dann gibt es keine Bilder. */
+const KEINE_BILDER = "/ausserhalb/gibt-es-nicht";
+
 describe("leseDatensaetze", () => {
   it("löst das BOM vom Namen der ersten Spalte", () => {
     // Die echte Datei beginnt mit einem BOM. Bliebe es am Namen kleben, ginge
@@ -134,6 +137,7 @@ describe("verarbeite — Vorabprüfung", () => {
       bestandsadressenOhneKennung: [],
       bestand: leser,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(lauf.art).toBe("vorab-abbruch");
@@ -151,6 +155,7 @@ describe("verarbeite — Vorabprüfung", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(lauf.art).toBe("lauf");
@@ -164,6 +169,7 @@ describe("verarbeite — Vorabprüfung", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -178,6 +184,7 @@ describe("verarbeite — Vorabprüfung", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: true,
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(lauf.art).toBe("vorab-abbruch");
@@ -191,6 +198,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -205,6 +213,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: () => bestand(),
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -220,6 +229,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: () => bestand({ uid: "uid-1" }),
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -234,6 +244,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -248,6 +259,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: leser,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(leser).toHaveBeenCalledWith({ kennung: "318", adresse: "anna@example.org" });
@@ -261,6 +273,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: leser,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -277,6 +290,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: ["ANNA@example.org"],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -295,6 +309,7 @@ describe("verarbeite — Klassifikation", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -310,6 +325,7 @@ describe("verarbeite — was der Bericht braucht", () => {
       bestandsadressenOhneKennung: [],
       bestand: () => bestand({ bereitsImportiert: true }),
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -322,6 +338,7 @@ describe("verarbeite — was der Bericht braucht", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -338,6 +355,7 @@ describe("verarbeite — was der Bericht braucht", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -449,6 +467,7 @@ describe("baueLauf — beide Betriebsarten, ein Weg", () => {
     ziel: "lokal",
     quelle: "/ausserhalb/wp-export.csv",
     zeitpunkt: "2026-08-15T08:00:00.000Z",
+    zwischenablage: KEINE_BILDER,
   };
 
   it("klassifiziert im schreibenden Lauf genau wie im Trockenlauf", () => {
@@ -506,6 +525,7 @@ describe("baueLauf — beide Betriebsarten, ein Weg", () => {
       inhalt: csv([zeile(), zeile()]),
       bestandsdaten: bestandsdaten(),
       schreibend: true,
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(lauf.art).toBe("vorab-abbruch");
@@ -520,6 +540,7 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
     ziel: "lokal",
     quelle: "/ausserhalb/wp-export.csv",
     zeitpunkt: "2026-08-15T08:00:00.000Z",
+    zwischenablage: KEINE_BILDER,
   };
 
   it("reicht die Bestandsadressen bis in die Vorabprüfung durch", () => {
@@ -530,6 +551,7 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
       ...rahmen,
       bestandsdaten: bestandsdaten({ adressenOhneKennung: ["anna@example.org"] }),
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -554,6 +576,7 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
         zeileAusDb({ uid: "uid-rest", tier: "impact", activated_at: null }),
       ]),
       schreibend: true,
+      zwischenablage: KEINE_BILDER,
     });
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
@@ -717,6 +740,7 @@ function saetzeOhneKonto(anzahl: number): Datensatzlauf[] {
     bestandsadressenOhneKennung: [],
     bestand: KEIN_BESTAND,
     schreibend: false,
+    zwischenablage: KEINE_BILDER,
   });
   if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
   return lauf.saetze;
@@ -732,7 +756,7 @@ describe("schreibeDatensaetze", () => {
     const { gestellt, client } = fakeClient();
     const { gerufen, hole } = fakeFetch("uid-neu");
 
-    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
 
     expect(fehler.size).toBe(0);
     expect(gerufen).toEqual(["http://127.0.0.1:54321/auth/v1/admin/users"]);
@@ -754,6 +778,7 @@ describe("schreibeDatensaetze", () => {
       bestandsadressenOhneKennung: [],
       bestand: () => bestand({ uid: "uid-alt" }),
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
 
@@ -787,7 +812,7 @@ describe("schreibeDatensaetze", () => {
     const { hole } = fakeFetch();
     const saetze = saetzeOhneKonto(3);
 
-    const fehler = await schreibeDatensaetze(saetze, { ...MITTEL, client, hole });
+    const { fehler } = await schreibeDatensaetze(saetze, { ...MITTEL, client, hole });
 
     // Alle drei kippen an derselben Stelle — entscheidend ist, dass der Lauf
     // alle drei erreicht hat, statt am ersten zu enden.
@@ -810,7 +835,7 @@ describe("schreibeDatensaetze", () => {
     );
     const { hole } = fakeFetch();
 
-    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
 
     const grund = fehler.get(1) ?? "";
     expect(grund).toContain("23505");
@@ -828,7 +853,7 @@ describe("schreibeDatensaetze", () => {
         status: 422,
       })) as unknown as typeof fetch;
 
-    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
 
     expect(fehler.get(1)).toContain("422");
     expect(gestellt).toEqual([]);
@@ -842,6 +867,7 @@ describe("schreibeDatensaetze", () => {
       bestandsadressenOhneKennung: [],
       bestand: KEIN_BESTAND,
       schreibend: false,
+      zwischenablage: KEINE_BILDER,
     });
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
 
@@ -864,6 +890,7 @@ describe("baueLauf — was beim Schreiben herauskam", () => {
       nachAdresse: new Map(),
     } as Bestandsdaten,
     schreibend: true,
+    zwischenablage: KEINE_BILDER,
   };
 
   it("macht aus einem gescheiterten Datensatz ein fehlerhaftes Ergebnis", async () => {
@@ -903,6 +930,7 @@ describe("Dublette im letzten Datensatz (7.6)", () => {
       ziel: "lokal",
       quelle: "/ausserhalb/wp-export.csv",
       zeitpunkt: "2026-08-15T08:00:00.000Z",
+      zwischenablage: KEINE_BILDER,
     });
 
     expect(lauf.art).toBe("vorab-abbruch");
@@ -910,5 +938,189 @@ describe("Dublette im letzten Datensatz (7.6)", () => {
 
     expect(gestellt).toEqual([]);
     expect(gerufen).toEqual([]);
+  });
+});
+
+// ── 6.3/6.4: die Bilder im schreibenden Abschnitt ───────────────────────────
+
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+/**
+ * Eine Zwischenablage mit echten Dateien darin. Der Inhalt ist beliebig —
+ * `ladeBildHoch` prüft nur, DASS die gewandelte Fassung da ist; gewandelt hat
+ * sie `wandleBild` (eigene Tests, gegen echte Bilder).
+ */
+function zwischenablageMit(dateien: Record<string, string[]>): string {
+  const ordner = mkdtempSync(join(tmpdir(), "wp-import-bilder-"));
+  for (const [kennung, namen] of Object.entries(dateien)) {
+    mkdirSync(join(ordner, kennung), { recursive: true });
+    for (const name of namen) writeFileSync(join(ordner, kennung, name), "WEBP");
+  }
+  return ordner;
+}
+
+/** Ein Datensatz mit beiden Bildern, Kennung 318. */
+function satzMitBildern(zwischenablage: string): Datensatzlauf[] {
+  const lauf = verarbeite({
+    quelle: quelle([zeile({ profile_photo: "profile_photo.jpg", cover_photo: "cover_photo.png" })]),
+    bestandsadressenOhneKennung: [],
+    bestand: KEIN_BESTAND,
+    schreibend: true,
+    zwischenablage,
+  });
+  if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+  return lauf.saetze;
+}
+
+/** Ein `fetch`, das GoTrue und Storage unterschiedlich beantwortet. */
+function fakeDienste(storageStatus: Record<string, [number, unknown]> = {}) {
+  const gerufen: string[] = [];
+  const hole = (async (url: string | URL | Request) => {
+    const s = String(url);
+    gerufen.push(s);
+    if (s.includes("/storage/v1/")) {
+      const treffer = Object.entries(storageStatus).find(([teil]) => s.includes(teil));
+      const [status, rumpf] = treffer?.[1] ?? [200, { Key: "…" }];
+      return new Response(JSON.stringify(rumpf), { status });
+    }
+    return new Response(JSON.stringify({ id: "uid-neu" }), { status: 200 });
+  }) as unknown as typeof fetch;
+  return { gerufen, hole };
+}
+
+/**
+ * Nur die Anweisungen, die eine Bild-URL setzen. NICHT `startsWith("update
+ * public.profiles set")` — darunter fiele auch `stufeFuerNeuesKonto`, und der
+ * Test zählte die Stufe als Bild mit.
+ */
+const urlSaetze = (gestellt: { sql: string }[]) =>
+  gestellt.filter((g) => /"(avatar|cover)_url" is null/.test(g.sql));
+
+describe("schreibeDatensaetze — die Bilder (6.3)", () => {
+  it("lädt beide Bilder hoch und setzt beide URLs in derselben Transaktion", async () => {
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp", "cover_photo.webp"] });
+    const { gestellt, client } = fakeClient();
+    const { gerufen, hole } = fakeDienste();
+
+    await schreibeDatensaetze(satzMitBildern(ablage), { ...MITTEL, client, hole });
+
+    expect(gerufen.filter((u) => u.includes("/storage/v1/object/avatars/"))).toHaveLength(1);
+    expect(gerufen.filter((u) => u.includes("/storage/v1/object/covers/"))).toHaveLength(1);
+
+    const gesetzt = urlSaetze(gestellt);
+    expect(gesetzt).toHaveLength(2);
+    // In der Klammer, nicht daneben: das Bild gehört zum Datensatz.
+    const beginn = gestellt.findIndex((g) => g.sql === "begin");
+    const ende = gestellt.findIndex((g) => g.sql === "commit");
+    for (const satz of gesetzt) {
+      const i = gestellt.indexOf(satz);
+      expect(i).toBeGreaterThan(beginn);
+      expect(i).toBeLessThan(ende);
+    }
+  });
+
+  it("lädt zur gewandelten Fassung hoch, nicht zum Original", async () => {
+    // Der `covers`-Bucket lässt ausschliesslich `image/webp` zu — ein
+    // hochgeladenes .jpg wäre nicht bloss gross, sondern abgewiesen.
+    const ablage = zwischenablageMit({ "318": ["profile_photo.jpg", "profile_photo.webp"] });
+    const { client } = fakeClient();
+    const { hole } = fakeDienste();
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(ergebnis.bilder.get(1)?.find((b) => b.art === "profil")?.stand).toBe("hochgeladen");
+  });
+
+  it("setzt beim zweiten Lauf KEINE URL — das vorhandene Objekt wird übersprungen", async () => {
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp", "cover_photo.webp"] });
+    const { gestellt, client } = fakeClient();
+    const { hole } = fakeDienste({
+      "/storage/v1/": [400, { statusCode: "409", error: "Duplicate" }],
+    });
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(urlSaetze(gestellt)).toHaveLength(0);
+    expect(ergebnis.fehler.size).toBe(0);
+    expect(ergebnis.bilder.get(1)?.map((b) => b.stand)).toEqual(["vorhanden", "vorhanden"]);
+  });
+
+  it("lässt ein fehlendes Headerbild das Profilbild nicht mitnehmen (6.4)", async () => {
+    // Die Mengen sind nicht deckungsgleich: 57 Profil-, 53 Headerbilder.
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp"] });
+    const { gestellt, client } = fakeClient();
+    const { hole } = fakeDienste();
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(urlSaetze(gestellt)).toHaveLength(1);
+    expect(urlSaetze(gestellt)[0].sql).toContain('"avatar_url"');
+    expect(ergebnis.bilder.get(1)?.find((b) => b.art === "cover")?.stand).toBe("fehlt");
+  });
+
+  it("legt das Mitglied auch dann an, wenn BEIDE Bilder fehlen (6.4)", async () => {
+    const ablage = zwischenablageMit({});
+    const { gestellt, client } = fakeClient();
+    const { hole } = fakeDienste();
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(ergebnis.fehler.size).toBe(0);
+    expect(gestellt.some((g) => g.sql.includes("insert into public.profiles"))).toBe(true);
+    expect(urlSaetze(gestellt)).toHaveLength(0);
+  });
+
+  it("meldet einen abgewiesenen Upload als Bildbefund, nicht als Datensatzfehler", async () => {
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp", "cover_photo.webp"] });
+    const { client } = fakeClient();
+    const { hole } = fakeDienste({ "/storage/v1/": [413, { error: "PayloadTooLarge" }] });
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(ergebnis.fehler.size).toBe(0);
+    expect(ergebnis.bilder.get(1)?.every((b) => b.stand === "fehlt")).toBe(true);
+  });
+
+  it("lädt kein Bild hoch, wo das Konto nicht entstand", async () => {
+    // Ohne Kennung gibt es kein Ziel — ein Objekt unter einer fremden uid wäre
+    // schlimmer als keines.
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp"] });
+    const { client } = fakeClient();
+    const gerufen: string[] = [];
+    const hole = (async (url: string | URL | Request) => {
+      gerufen.push(String(url));
+      return new Response(JSON.stringify({ msg: "kaputt" }), { status: 500 });
+    }) as unknown as typeof fetch;
+
+    const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
+      ...MITTEL,
+      client,
+      hole,
+    });
+
+    expect(ergebnis.fehler.size).toBe(1);
+    expect(gerufen.some((u) => u.includes("/storage/v1/"))).toBe(false);
   });
 });

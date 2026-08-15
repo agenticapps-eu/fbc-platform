@@ -15,6 +15,7 @@
  * Darum wirft es hier, statt still auszulassen.
  */
 
+import { type Bildart, URLSPALTE } from "./wp_bilder";
 import type { Zusammenfuehrung } from "./wp_import.lib";
 
 /**
@@ -156,9 +157,31 @@ function einfuegesatz(input: {
  * Der Trigger hat die Zeile zwar schon angelegt, aber die Reihenfolge soll nicht
  * davon abhängen.
  */
+/**
+ * Setzt die öffentliche URL eines hochgeladenen Bildes — mit dem Riegel gegen
+ * das Überschreiben eines fremden Bildes IN SQL (Aufgabe 6.3).
+ *
+ * `and "avatar_url" is null` ist der einzige Schutz an dieser Stelle, und er
+ * gehört genau hierher: ein Vergleich in TypeScript läse einen Stand, der
+ * zwischen Lesen und Schreiben veraltet. Hat ein Mitglied sein Bild selbst
+ * gewählt, trifft dieses UPDATE null Zeilen und der Lauf geht weiter.
+ *
+ * Es ist bewusst KEIN Teil des `profiles`-Upserts: dort stünde die Spalte im
+ * `do update set` und überschriebe bedingungslos.
+ */
+function bildsatz(input: { uid: string; art: Bildart; url: string }): Anweisung {
+  const name = spalte(URLSPALTE[input.art]);
+  return {
+    sql: `update public.profiles set ${name} = $1 where "id" = $2 and ${name} is null`,
+    werte: [input.url, input.uid],
+  };
+}
+
 export function schreibauftrag(input: {
   uid: string;
   zusammenfuehrung: Zusammenfuehrung;
+  /** Was der Bildabschnitt gerade hochgeladen hat — leer, wo nichts entstand. */
+  bilder?: ReadonlyArray<{ art: Bildart; url: string }>;
 }): Anweisung[] {
   const { uid, zusammenfuehrung: auftrag } = input;
   const alsProfil = { spalte: "id", wert: uid };
@@ -211,6 +234,11 @@ export function schreibauftrag(input: {
         felder: interesse,
       }),
     );
+  }
+
+  // Die Bild-URLs zuletzt: sie ergänzen die Profilzeile, die oben steht.
+  for (const bild of input.bilder ?? []) {
+    anweisungen.push(bildsatz({ uid, art: bild.art, url: bild.url }));
   }
 
   // Eine Tabelle ohne zu schreibendes Feld fällt hier heraus — ein Statement,

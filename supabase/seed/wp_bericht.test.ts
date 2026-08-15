@@ -312,3 +312,56 @@ describe("baueBericht — was der Lauf anlegen würde", () => {
     expect(text).not.toContain("Was der Lauf anlegen");
   });
 });
+
+describe("baueBericht — die Bilder (6.3/6.4)", () => {
+  it("führt jedes fehlende Bild einzeln auf, mit Bildart und Grund", () => {
+    // Der Bericht ist der EINZIGE Ort, an dem jemand nachlesen kann, welches
+    // Bild nachzutragen ist — im Profil sieht ein fehlender Avatar aus wie ein
+    // Mitglied, das keinen hochgeladen hat.
+    const text = baueBericht(
+      lauf({
+        ergebnisse: [
+          ergebnis({
+            bilder: [
+              { art: "profil", stand: "hochgeladen" },
+              { art: "cover", stand: "fehlt", grund: "Keine gewandelte Fassung" },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(text).toContain("Headerbild");
+    expect(text).toContain("Keine gewandelte Fassung");
+  });
+
+  it("zählt hochgeladen, vorhanden und fehlt zusammen", () => {
+    const text = baueBericht(
+      lauf({
+        ergebnisse: [
+          ergebnis({ zeile: 1, bilder: [{ art: "profil", stand: "hochgeladen" }] }),
+          ergebnis({ zeile: 2, bilder: [{ art: "profil", stand: "vorhanden" }] }),
+          ergebnis({ zeile: 3, bilder: [{ art: "cover", stand: "fehlt", grund: "Antwort 413" }] }),
+        ],
+      }),
+    );
+
+    expect(text).toMatch(/hochgeladen.*1/);
+    expect(text).toMatch(/schon vorhanden.*1/);
+  });
+
+  it("schweigt über Bilder, wo keine im Spiel waren", () => {
+    // Der Trockenlauf lädt nichts hoch. Ein Abschnitt mit lauter Nullen
+    // behauptete einen Bildlauf, den es nicht gab — dieselbe Regel wie beim
+    // Vorab-Abbruch.
+    expect(baueBericht(lauf())).not.toContain("Bilder");
+  });
+
+  it("führt ein hochgeladenes Bild NICHT als nachzutragen", () => {
+    const text = baueBericht(
+      lauf({ ergebnisse: [ergebnis({ bilder: [{ art: "profil", stand: "hochgeladen" }] })] }),
+    );
+
+    expect(text).not.toContain("Profilbild |");
+  });
+});

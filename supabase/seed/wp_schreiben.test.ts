@@ -337,3 +337,67 @@ describe("die Stufe kommt an keinen Datensatz-Weg heran", () => {
     }
   });
 });
+
+describe("schreibauftrag — die Bild-URLs (6.3)", () => {
+  it("setzt avatar_url und cover_url in eigenen Anweisungen", () => {
+    const anweisungen = schreibauftrag({
+      uid: "uid-1",
+      zusammenfuehrung: zusammenfuehrung(),
+      bilder: [
+        { art: "profil", url: "https://例/avatars/uid-1/import-avatar.webp" },
+        { art: "cover", url: "https://例/covers/uid-1/import-cover.webp" },
+      ],
+    });
+
+    const urlSaetze = anweisungen.filter((a) => a.sql.startsWith("update"));
+    expect(urlSaetze).toHaveLength(2);
+    expect(urlSaetze[0].sql).toContain('"avatar_url"');
+    expect(urlSaetze[1].sql).toContain('"cover_url"');
+  });
+
+  it("überschreibt ein Bild NICHT, das schon dasteht — der Riegel steht in SQL", () => {
+    // Der einzige Schutz gegen das Überschreiben eines selbst gewählten Bildes,
+    // und er ist atomar. Ein Vergleich in TypeScript läse einen Stand, der
+    // zwischen Lesen und Schreiben veraltet.
+    const [satz] = schreibauftrag({
+      uid: "uid-1",
+      zusammenfuehrung: zusammenfuehrung(),
+      bilder: [{ art: "profil", url: "https://例/a.webp" }],
+    }).filter((a) => a.sql.startsWith("update"));
+
+    expect(satz.sql).toContain('"avatar_url" is null');
+  });
+
+  it("schreibt die URL als Wert, nie in den Text", () => {
+    const url = "https://例/avatars/uid-1/import-avatar.webp";
+    const [satz] = schreibauftrag({
+      uid: "uid-1",
+      zusammenfuehrung: zusammenfuehrung(),
+      bilder: [{ art: "profil", url }],
+    }).filter((a) => a.sql.startsWith("update"));
+
+    expect(satz.sql).not.toContain(url);
+    expect(satz.werte).toEqual([url, "uid-1"]);
+  });
+
+  it("baut ohne Bilder keine einzige zusätzliche Anweisung", () => {
+    const ohne = schreibauftrag({ uid: "uid-1", zusammenfuehrung: zusammenfuehrung() });
+    const mit = schreibauftrag({ uid: "uid-1", zusammenfuehrung: zusammenfuehrung(), bilder: [] });
+
+    expect(mit).toHaveLength(ohne.length);
+    expect(ohne.some((a) => a.sql.startsWith("update"))).toBe(false);
+  });
+
+  it("setzt die URL NACH dem Profil — die Zeile muss stehen, bevor sie ergänzt wird", () => {
+    const anweisungen = schreibauftrag({
+      uid: "uid-1",
+      zusammenfuehrung: zusammenfuehrung(),
+      bilder: [{ art: "profil", url: "https://例/a.webp" }],
+    });
+
+    const profil = anweisungen.findIndex((a) => a.sql.includes("insert into public.profiles"));
+    const bild = anweisungen.findIndex((a) => a.sql.startsWith("update"));
+    expect(profil).toBeGreaterThanOrEqual(0);
+    expect(bild).toBeGreaterThan(profil);
+  });
+});

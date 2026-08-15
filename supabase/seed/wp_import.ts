@@ -28,7 +28,14 @@ import { fileURLToPath } from "node:url";
 import { parse } from "csv-parse/sync";
 import pg from "pg";
 
-import { type Berichtskopf, type Datensatzergebnis, baueBericht, stdoutZeile } from "./wp_bericht";
+import {
+  type Berichtskopf,
+  type Bildbefund,
+  type Datensatzergebnis,
+  baueBericht,
+  stdoutZeile,
+} from "./wp_bericht";
+import { BILDQUELLE, type Bildart, bildauftraege, ladeBildHoch, webpAblage } from "./wp_bilder";
 import { normalisiereAdresse, normalisiereKennung } from "./wp_felder";
 import { type Anweisung, legeKontoAn, schreibauftrag, stufeFuerNeuesKonto } from "./wp_schreiben";
 import {
@@ -104,6 +111,13 @@ export type Datensatzlauf = {
     /** `profiles.id`, wo das Konto schon besteht — sonst `null`, es entsteht erst. */
     uid: string | null;
     zusammenfuehrung: Zusammenfuehrung;
+    /**
+     * Die gewandelten Fassungen in der Zwischenablage — Pfade, keine Dateien.
+     * Hier berechnet und nicht im schreibenden Abschnitt, weil nur DIESE Stelle
+     * die Quellzeile hat: der Dateiname kommt aus ihr (6.1), nicht aus einer
+     * Annahme über die Benennung des Altsystems.
+     */
+    bilder: ReadonlyArray<{ art: Bildart; webp: string }>;
   } | null;
 };
 
@@ -136,6 +150,8 @@ export function verarbeite(input: {
   bestandsadressenOhneKennung: readonly string[];
   bestand: Bestandsleser;
   schreibend: boolean;
+  /** Wo die geholten und gewandelten Bilder liegen (6.1/6.3). */
+  zwischenablage: string;
 }): Lauf {
   const vorab = pruefeVorab({
     spalten: input.quelle.spalten,
@@ -196,7 +212,16 @@ export function verarbeite(input: {
           : {}),
         ...(ziel.herkunft.beitritt ? { beitritt: ziel.herkunft.beitritt } : {}),
       },
-      auftrag: { anmeldeadresse, uid: vorhanden?.uid ?? null, zusammenfuehrung },
+      auftrag: {
+        anmeldeadresse,
+        uid: vorhanden?.uid ?? null,
+        zusammenfuehrung,
+        bilder: bildauftraege({
+          row,
+          basis: BILDQUELLE,
+          zwischenablage: input.zwischenablage,
+        }).map((a) => ({ art: a.art, webp: webpAblage(a.ablage) })),
+      },
     };
   });
 
@@ -270,14 +295,19 @@ export function baueLauf(input: {
   ziel: string;
   quelle: string;
   zeitpunkt: string;
+  /** Wo die geholten und gewandelten Bilder liegen (6.1/6.3). */
+  zwischenablage: string;
   /** Datensatznummer → Fehlergrund, aus dem schreibenden Abschnitt. */
   ausgaenge?: ReadonlyMap<number, string>;
+  /** Datensatznummer → wie es den Bildern erging, aus demselben Abschnitt. */
+  bildausgaenge?: ReadonlyMap<number, Bildbefund[]>;
 }): { lauf: Lauf; bericht: string; konsole: string[] } {
   const lauf = verarbeite({
     quelle: leseDatensaetze(input.inhalt),
     bestandsadressenOhneKennung: input.bestandsdaten.adressenOhneKennung,
     bestand: bestandsleser(input.bestandsdaten),
     schreibend: input.schreibend,
+    zwischenablage: input.zwischenablage,
   });
 
   const kopf: Berichtskopf = {
@@ -306,9 +336,11 @@ export function baueLauf(input: {
   // zweideutig zu machen.
   const ergebnisse = lauf.saetze.map((s) => {
     const grund = input.ausgaenge?.get(s.ergebnis.zeile);
+    const bilder = input.bildausgaenge?.get(s.ergebnis.zeile);
+    const mitBildern = bilder ? { ...s.ergebnis, bilder } : s.ergebnis;
     return grund === undefined
-      ? s.ergebnis
-      : { ...s.ergebnis, klasse: "fehlerhaft" as const, grund };
+      ? mitBildern
+      : { ...mitBildern, klasse: "fehlerhaft" as const, grund };
   });
 
   return {
@@ -550,8 +582,9 @@ function grundOhneWerte(fehler: unknown): string {
 export async function schreibeDatensaetze(
   saetze: readonly Datensatzlauf[],
   mittel: { client: Abfrager; basis: string; schluessel: string; hole?: typeof fetch },
-): Promise<Map<number, string>> {
+): Promise<{ fehler: Map<number, string>; bilder: Map<number, Bildbefund[]> }> {
   const fehler = new Map<number, string>();
+  const bilder = new Map<number, Bildbefund[]>();
 
   for (const satz of saetze) {
     if (!satz.auftrag) continue;
@@ -568,6 +601,8 @@ export async function schreibeDatensaetze(
         );
         if (konto.stand === "fehler") {
           fehler.set(nummer, konto.grund);
+          // KEIN Bild ohne Konto: der Objektpfad beginnt mit der uid, und ein
+          // Objekt unter einer fremden Kennung wäre schlimmer als keines.
           continue;
         }
         const stufe = stufeFuerNeuesKonto(konto);
@@ -575,13 +610,47 @@ export async function schreibeDatensaetze(
         uid = konto.uid;
       }
 
-      await fuehreDatensatzAus(mittel.client, schreibauftrag({ uid, zusammenfuehrung }));
+      // Die Bilder VOR der Transaktion: der Upload ist Netzarbeit gegen einen
+      // fremden Dienst, und eine offene Klammer darüber hielte eine Transaktion
+      // so lange auf, wie er braucht. Was dabei entsteht, ist eine URL — sie
+      // geht danach IN die Klammer und gehört damit zum Datensatz.
+      //
+      // Ein fehlgeschlagener Upload ist ein Bildbefund, KEIN Datensatzfehler
+      // (6.4): ein fehlendes Bild darf ein Mitglied nicht kosten.
+      const befunde: Bildbefund[] = [];
+      const hochgeladen: { art: Bildart; url: string }[] = [];
+
+      for (const bild of satz.auftrag.bilder) {
+        const ergebnis = await ladeBildHoch(
+          {
+            datei: bild.webp,
+            art: bild.art,
+            uid,
+            basis: mittel.basis,
+            schluessel: mittel.schluessel,
+          },
+          mittel.hole,
+        );
+        befunde.push(
+          ergebnis.stand === "fehlt"
+            ? { art: bild.art, stand: "fehlt", grund: ergebnis.grund }
+            : { art: bild.art, stand: ergebnis.stand },
+        );
+        if (ergebnis.stand === "hochgeladen")
+          hochgeladen.push({ art: bild.art, url: ergebnis.url });
+      }
+      if (befunde.length > 0) bilder.set(nummer, befunde);
+
+      await fuehreDatensatzAus(
+        mittel.client,
+        schreibauftrag({ uid, zusammenfuehrung, bilder: hochgeladen }),
+      );
     } catch (e) {
       fehler.set(nummer, grundOhneWerte(e));
     }
   }
 
-  return fehler;
+  return { fehler, bilder };
 }
 
 async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
@@ -674,6 +743,10 @@ async function main(): Promise<void> {
       ziel: geprueft.ziel,
       quelle: pfad.pfad,
       zeitpunkt,
+      // OHNE Zeitstempel, wie in `wp_bilder_holen.ts`: die Zwischenablage soll
+      // über Läufe hinweg bestehen bleiben (1.2), sonst schützt sie nicht gegen
+      // das Abschalten der alten Seite.
+      zwischenablage: ablageorte({ quellPfad: pfad.pfad, zeitstempel: "" }).zwischenablage,
     };
 
     // Erst erfahren, was zu tun ist; dann tun; dann berichten, was daraus wurde.
@@ -685,7 +758,9 @@ async function main(): Promise<void> {
         ? await schreibeDatensaetze(vorlauf.lauf.saetze, { client, ...schreibmittel })
         : undefined;
 
-    const { lauf, bericht, konsole } = ausgaenge ? baueLauf({ ...eingaben, ausgaenge }) : vorlauf;
+    const { lauf, bericht, konsole } = ausgaenge
+      ? baueLauf({ ...eingaben, ausgaenge: ausgaenge.fehler, bildausgaenge: ausgaenge.bilder })
+      : vorlauf;
 
     for (const zeile of konsole) console.log(zeile);
 
@@ -697,7 +772,7 @@ async function main(): Promise<void> {
         ? `Vorab-Abbruch — nichts verarbeitet. Bericht: ${orte.bericht}`
         : `${aufruf.schreiben ? "Schreibender Lauf" : "Trockenlauf"} über ` +
             `${lauf.saetze.length} Datensätze${
-              ausgaenge?.size ? `, davon ${ausgaenge.size} fehlerhaft` : ""
+              ausgaenge?.fehler.size ? `, davon ${ausgaenge.fehler.size} fehlerhaft` : ""
             }. Bericht: ${orte.bericht}`,
     );
   } finally {
