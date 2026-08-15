@@ -981,14 +981,20 @@ function satzMitBildern(zwischenablage: string): Datensatzlauf[] {
  * „liegt nicht" — sonst prüfte kein Test darunter je den Upload-Weg. Der Fall
  * „liegt schon" wird über `storageStatus` gestellt, wie ihn der Dienst stellt.
  */
-function fakeDienste(storageStatus: Record<string, [number, unknown]> = {}) {
+function fakeDienste(
+  storageStatus: Record<string, [number, unknown]> | { objektLiegt: true } = {},
+) {
+  const liegt = "objektLiegt" in storageStatus;
+  const stati = liegt ? {} : (storageStatus as Record<string, [number, unknown]>);
   const gerufen: string[] = [];
   const hole = (async (url: string | URL | Request, init?: RequestInit) => {
     const s = String(url);
-    if ((init?.method ?? "GET") === "HEAD") return new Response(null, { status: 400 });
+    if ((init?.method ?? "GET") === "HEAD") {
+      return new Response(null, { status: liegt ? 200 : 400 });
+    }
     gerufen.push(s);
     if (s.includes("/storage/v1/")) {
-      const treffer = Object.entries(storageStatus).find(([teil]) => s.includes(teil));
+      const treffer = Object.entries(stati).find(([teil]) => s.includes(teil));
       const [status, rumpf] = treffer?.[1] ?? [200, { Key: "…" }];
       return new Response(JSON.stringify(rumpf), { status });
     }
@@ -1002,7 +1008,7 @@ function fakeDienste(storageStatus: Record<string, [number, unknown]> = {}) {
  * public.profiles set")` — darunter fiele auch `stufeFuerNeuesKonto`, und der
  * Test zählte die Stufe als Bild mit.
  */
-const urlSaetze = (gestellt: { sql: string }[]) =>
+const urlSaetze = (gestellt: { sql: string; werte?: unknown[] }[]) =>
   gestellt.filter((g) => /"(avatar|cover)_url" is null/.test(g.sql));
 
 describe("schreibeDatensaetze — die Bilder (6.3)", () => {
@@ -1031,9 +1037,26 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
   it("lädt zur gewandelten Fassung hoch, nicht zum Original", async () => {
     // Der `covers`-Bucket lässt ausschliesslich `image/webp` zu — ein
     // hochgeladenes .jpg wäre nicht bloss gross, sondern abgewiesen.
-    const ablage = zwischenablageMit({ "318": ["profile_photo.jpg", "profile_photo.webp"] });
+    //
+    // Geprüft wird der GESENDETE RUMPF, nicht bloss der Stand: die erste
+    // Fassung zählte nur `stand === "hochgeladen"` und blieb deshalb auch dann
+    // grün, wenn der Pfad aufs Original zeigte (Befund LOW-7 aus dem Review).
+    const ablage = zwischenablageMit({
+      "318": ["profile_photo.jpg", "profile_photo.webp"],
+    });
+    writeFileSync(join(ablage, "318", "profile_photo.jpg"), "DAS ORIGINAL");
+    writeFileSync(join(ablage, "318", "profile_photo.webp"), "DIE GEWANDELTE");
+
     const { client } = fakeClient();
-    const { hole } = fakeDienste();
+    const rumpfe: string[] = [];
+    const hole = (async (url: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "HEAD") return new Response(null, { status: 400 });
+      if (String(url).includes("/storage/v1/")) {
+        rumpfe.push(new TextDecoder().decode(init?.body as Uint8Array));
+        return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "uid-neu" }), { status: 200 });
+    }) as unknown as typeof fetch;
 
     const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
       ...MITTEL,
@@ -1042,14 +1065,14 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
     });
 
     expect(ergebnis.bilder.get(1)?.find((b) => b.art === "profil")?.stand).toBe("hochgeladen");
+    expect(rumpfe).toContain("DIE GEWANDELTE");
+    expect(rumpfe).not.toContain("DAS ORIGINAL");
   });
 
-  it("setzt beim zweiten Lauf KEINE URL — das vorhandene Objekt wird übersprungen", async () => {
+  it("lädt ein vorhandenes Objekt NICHT noch einmal hoch", async () => {
     const ablage = zwischenablageMit({ "318": ["profile_photo.webp", "cover_photo.webp"] });
-    const { gestellt, client } = fakeClient();
-    const { hole } = fakeDienste({
-      "/storage/v1/": [400, { statusCode: "409", error: "Duplicate" }],
-    });
+    const { client } = fakeClient();
+    const { gerufen, hole } = fakeDienste({ objektLiegt: true });
 
     const ergebnis = await schreibeDatensaetze(satzMitBildern(ablage), {
       ...MITTEL,
@@ -1057,9 +1080,32 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
       hole,
     });
 
-    expect(urlSaetze(gestellt)).toHaveLength(0);
+    expect(gerufen.filter((u) => u.includes("/storage/v1/"))).toEqual([]);
     expect(ergebnis.fehler.size).toBe(0);
     expect(ergebnis.bilder.get(1)?.map((b) => b.stand)).toEqual(["vorhanden", "vorhanden"]);
+  });
+
+  it("setzt die URL AUCH dann, wenn das Objekt schon liegt", async () => {
+    // DER STILLE ENDZUSTAND, aus dem Code-Review. Kippt die Transaktion NACH
+    // einem gelungenen Upload (Constraint, Verbindungsabbruch, Strg-C), liegt
+    // das Objekt und die Spalte ist leer. Gäbe „vorhanden" keine URL heraus,
+    // schriebe der nächste Lauf den Datensatz sauber — und das Bild wäre
+    // DAUERHAFT weg, gezählt als „schon vorhanden, übersprungen". Es ist der
+    // einzige Pfad dieses Abschnitts, der nichts meldet.
+    //
+    // Das Objekt beweist, dass HOCHGELADEN wurde, nicht dass GESCHRIEBEN wurde.
+    // Doppelt schreiben kann es nicht: der SQL-Riegel `is null` lässt das
+    // UPDATE null Zeilen treffen, wo schon etwas steht.
+    const ablage = zwischenablageMit({ "318": ["profile_photo.webp", "cover_photo.webp"] });
+    const { gestellt, client } = fakeClient();
+    const { hole } = fakeDienste({ objektLiegt: true });
+
+    await schreibeDatensaetze(satzMitBildern(ablage), { ...MITTEL, client, hole });
+
+    const gesetzt = urlSaetze(gestellt);
+    expect(gesetzt).toHaveLength(2);
+    expect(gesetzt[0].werte?.[0]).toContain("/storage/v1/object/public/avatars/");
+    expect(gesetzt[1].werte?.[0]).toContain("/storage/v1/object/public/covers/");
   });
 
   it("lässt ein fehlendes Headerbild das Profilbild nicht mitnehmen (6.4)", async () => {
@@ -1129,5 +1175,80 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
 
     expect(ergebnis.fehler.size).toBe(1);
     expect(gerufen.some((u) => u.includes("/storage/v1/"))).toBe(false);
+  });
+});
+
+describe("verarbeite — ein verworfener Bildwert verschwindet nicht (HIGH-2 aus dem Review)", () => {
+  const mitBild = (werte: Record<string, string>) =>
+    verarbeite({
+      quelle: quelle([zeile(werte)]),
+      bestandsadressenOhneKennung: [],
+      bestand: KEIN_BESTAND,
+      schreibend: false,
+      zwischenablage: KEINE_BILDER,
+    });
+
+  it("meldet einen Dateinamen mit Pfadanteil, statt ihn still fallen zu lassen", () => {
+    // Die Prüfung in `bildauftraege` weist ab, indem sie KEINEN Auftrag
+    // erzeugt — und ohne Auftrag gibt es keinen Befund. Bei einem neu
+    // gezogenen Export, der die Bilder anders benennt, verschwände so der
+    // ganze Abschnitt „Bilder" aus dem Bericht: kein Zähler, keine Null, keine
+    // Tabelle. Der Lauf sähe normal aus, und 70 Profile hätten kein Bild.
+    // Genau der Fall, für den die Prüfung geschrieben wurde.
+    const lauf = mitBild({ profile_photo: "2026/06/profile_photo.jpg" });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.uebersprungeneFelder).toContain("profiles.avatar_url");
+  });
+
+  it("meldet eine unbekannte Endung", () => {
+    const lauf = mitBild({ cover_photo: "cover_photo.gif" });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.uebersprungeneFelder).toContain("profiles.cover_url");
+  });
+
+  it("meldet NICHTS, wo die Quelle gar kein Bild führt", () => {
+    // Ein Befund für jedes Mitglied ohne Bild wäre Lärm: 13 von 70 haben kein
+    // Profilbild, und das ist keine Auffälligkeit, sondern der Normalfall.
+    const lauf = mitBild({ profile_photo: "", cover_photo: "" });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.uebersprungeneFelder ?? []).not.toContain("profiles.avatar_url");
+  });
+
+  it("meldet nichts, wo der Wert in Ordnung ist", () => {
+    const lauf = mitBild({ profile_photo: "profile_photo.jpg" });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.uebersprungeneFelder ?? []).not.toContain("profiles.avatar_url");
+  });
+});
+
+describe("baueLauf — die Bildbefunde erreichen den Bericht (MEDIUM-3 aus dem Review)", () => {
+  it("trägt sie aus dem schreibenden Abschnitt in den Bericht", () => {
+    // Diese Naht war ungeprüft: kein Test reichte je `bildausgaenge` an
+    // `baueLauf`. Die Berichtstests bauten `Datensatzergebnis.bilder` von Hand,
+    // die Schreibtests prüften die zurückgegebene Map — dazwischen nichts.
+    const { bericht, lauf } = baueLauf({
+      inhalt: ZWEI_DATENSAETZE,
+      ziel: "lokal",
+      quelle: "/ausserhalb/wp-export.csv",
+      zeitpunkt: "2026-08-15T08:00:00.000Z",
+      zwischenablage: KEINE_BILDER,
+      bestandsdaten: {
+        adressenOhneKennung: [],
+        nachKennung: new Map(),
+        nachAdresse: new Map(),
+      } as Bestandsdaten,
+      schreibend: true,
+      bildausgaenge: new Map([
+        [1, [{ art: "profil" as const, stand: "fehlt" as const, grund: "Antwort 413" }]],
+      ]),
+    });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(bericht).toContain("Antwort 413");
+    expect(bericht).toContain("Profilbild");
   });
 });

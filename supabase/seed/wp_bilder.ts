@@ -131,6 +131,32 @@ export function bildauftraege(input: {
   return auftraege;
 }
 
+/**
+ * Bildarten, für die die Quelle einen Wert FÜHRT, den `bildauftraege` aber
+ * verworfen hat — Pfadanteil, unbekannte Endung, unbrauchbare Kennung.
+ *
+ * Ohne diese Funktion verschwindet ein solcher Wert spurlos (Befund HIGH-2 aus
+ * dem Code-Review): die Prüfung weist ab, indem sie KEINEN Auftrag erzeugt, und
+ * ohne Auftrag gibt es keinen Befund. Bei einem vor dem Go-Live neu gezogenen
+ * Export, der die Bilder anders benennt, fiele damit der ganze Abschnitt
+ * „Bilder" aus dem Bericht — kein Zähler, keine Null, keine Tabelle. Der Lauf
+ * sähe normal aus, und 70 Profile hätten kein Bild. Genau das Szenario, für das
+ * die Prüfung überhaupt geschrieben wurde.
+ *
+ * Ein LEERER Wert ist kein Befund: 13 der 70 Mitglieder führen kein Profilbild,
+ * das ist der Normalfall und keine Auffälligkeit.
+ */
+export function verworfeneBildwerte(input: {
+  row: Record<string, string>;
+  auftraege: readonly Bildauftrag[];
+}): Bildart[] {
+  const erzeugt = new Set(input.auftraege.map((a) => a.art));
+
+  return SPALTEN.filter(
+    ([art, spalte]) => (input.row[spalte] ?? "").trim() !== "" && !erzeugt.has(art),
+  ).map(([art]) => art);
+}
+
 /** Wie ein Auftrag ausgegangen ist. `fehlt` beendet nie einen Lauf (6.4). */
 export type Holergebnis = {
   auftrag: Bildauftrag;
@@ -298,9 +324,23 @@ export const URLSPALTE: Record<Bildart, "avatar_url" | "cover_url"> = {
   cover: "cover_url",
 };
 
+/**
+ * `vorhanden` trägt die URL MIT, und das ist kein Beiwerk (Befund HIGH-1 aus
+ * dem Code-Review).
+ *
+ * Kippt die Datensatz-Transaktion NACH einem gelungenen Upload — Constraint,
+ * Verbindungsabbruch, Strg-C —, liegt das Objekt und die Spalte ist leer. Gäbe
+ * `vorhanden` keine URL heraus, schriebe der nächste Lauf den Datensatz sauber
+ * und das Bild wäre DAUERHAFT weg, gezählt als „schon vorhanden, übersprungen".
+ * Es war der einzige Pfad dieses Abschnitts, der nichts meldet.
+ *
+ * Der Grund dahinter: das Objekt beweist, dass HOCHGELADEN wurde, nicht dass
+ * GESCHRIEBEN wurde. Zweimal schreiben kann daraus nichts — der SQL-Riegel
+ * `is null` lässt das UPDATE null Zeilen treffen, wo schon etwas steht.
+ */
 export type Hochladeergebnis =
   | { stand: "hochgeladen"; url: string }
-  | { stand: "vorhanden" }
+  | { stand: "vorhanden"; url: string }
   | { stand: "fehlt"; grund: string };
 
 /**
@@ -330,8 +370,22 @@ export async function ladeBildHoch(
   input: { datei: string; art: Bildart; uid: string; basis: string; schluessel: string },
   hole: (url: string, init?: RequestInit) => Promise<Response> = fetch,
 ): Promise<Hochladeergebnis> {
-  if (!existsSync(input.datei)) {
-    return { stand: "fehlt", grund: "Keine gewandelte Fassung in der Zwischenablage" };
+  // Die Datei wird VOR dem ersten Netzaufruf gelesen. Stand sie im `try` um den
+  // POST, käme ein Rechte- oder Lesefehler als „Netzfehler" heraus — und der
+  // Bericht riete dann „ein weiterer Lauf klärt es", was bei EACCES auf der
+  // Zwischenablage nie stimmt.
+  let inhalt: Buffer;
+  try {
+    inhalt = readFileSync(input.datei);
+  } catch (e) {
+    const f = e as { code?: string };
+    return {
+      stand: "fehlt",
+      grund:
+        f.code === "ENOENT"
+          ? "Keine gewandelte Fassung in der Zwischenablage"
+          : `Zwischenablage nicht lesbar (${f.code ?? "unbekannt"})`,
+    };
   }
 
   const bucket = BUCKET[input.art];
@@ -348,9 +402,12 @@ export async function ladeBildHoch(
   //
   // Die Frage ist der schnelle Weg, nicht die Instanz: scheitert sie, entscheidet
   // weiter unten der POST, der ein vorhandenes Objekt ohnehin abweist.
+  // Beide Aufrufe mit Zeitgrenze, aus demselben Grund wie in `legeKontoAn` —
+  // und hier ist der Hänger sogar BELEGT: ohne sie hält ein einziger hängender
+  // Aufruf einen Lauf über 70 Datensätze unbegrenzt an, ohne eine Zeile Ausgabe.
   try {
-    const da = await hole(oeffentlich, { method: "HEAD" });
-    if (da.ok) return { stand: "vorhanden" };
+    const da = await hole(oeffentlich, { method: "HEAD", signal: AbortSignal.timeout(15_000) });
+    if (da.ok) return { stand: "vorhanden", url: oeffentlich };
   } catch {
     /* der Upload entscheidet */
   }
@@ -359,21 +416,30 @@ export async function ladeBildHoch(
   try {
     antwort = await hole(`${input.basis}/storage/v1/object/${bucket}/${pfad}`, {
       method: "POST",
+      // KEIN `x-upsert`. Sein Fehlen IST die Zusicherung aus 6.3 — vorhandenes
+      // Objekt wird übersprungen, nicht ersetzt.
       headers: {
         Authorization: `Bearer ${input.schluessel}`,
         "Content-Type": "image/webp",
       },
-      body: new Uint8Array(readFileSync(input.datei)),
+      body: new Uint8Array(inhalt),
+      signal: AbortSignal.timeout(60_000),
     });
   } catch (e) {
-    return { stand: "fehlt", grund: `Netzfehler: ${(e as Error).name}` };
+    const f = e as Error;
+    return {
+      stand: "fehlt",
+      grund: `Netzfehler: ${f.name}${f.name === "TimeoutError" ? "" : ` (${(e as { code?: string }).code ?? "—"})`}`,
+    };
   }
 
   if (antwort.ok) return { stand: "hochgeladen", url: oeffentlich };
 
   // Der Rumpf entscheidet, nicht der Status — s. oben.
   const rumpf = (await antwort.json().catch(() => ({}))) as { error?: string };
-  if (rumpf.error === "Duplicate" || antwort.status === 409) return { stand: "vorhanden" };
+  if (rumpf.error === "Duplicate" || antwort.status === 409) {
+    return { stand: "vorhanden", url: oeffentlich };
+  }
 
   return {
     stand: "fehlt",

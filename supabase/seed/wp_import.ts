@@ -35,7 +35,15 @@ import {
   baueBericht,
   stdoutZeile,
 } from "./wp_bericht";
-import { BILDQUELLE, type Bildart, bildauftraege, ladeBildHoch, webpAblage } from "./wp_bilder";
+import {
+  BILDQUELLE,
+  type Bildart,
+  URLSPALTE,
+  bildauftraege,
+  ladeBildHoch,
+  verworfeneBildwerte,
+  webpAblage,
+} from "./wp_bilder";
 import { normalisiereAdresse, normalisiereKennung } from "./wp_felder";
 import { type Anweisung, legeKontoAn, schreibauftrag, stufeFuerNeuesKonto } from "./wp_schreiben";
 import {
@@ -203,24 +211,34 @@ export function verarbeite(input: {
     });
     const zusammenfuehrung = fuegeZusammen(ziel, vorhanden);
 
+    const auftraege = bildauftraege({
+      row,
+      basis: BILDQUELLE,
+      zwischenablage: input.zwischenablage,
+    });
+
+    // Ein Bildwert, den die Prüfung in `bildauftraege` verworfen hat, geht über
+    // dieselbe Liste in den Bericht wie ein nicht geschriebenes Feld — sonst
+    // verschwindet er spurlos (s. `verworfeneBildwerte`). Über diesen Weg steht
+    // er auch im TROCKENLAUF, und genau dort soll ein neu gezogener Export
+    // auffallen: bevor irgendetwas geschrieben ist.
+    const uebersprungen = [
+      ...zusammenfuehrung.uebersprungen,
+      ...verworfeneBildwerte({ row, auftraege }).map((art) => `profiles.${URLSPALTE[art]}`),
+    ];
+
     return {
       ergebnis: {
         ...gemeinsam,
         klasse: vorhanden ? "aktualisiert" : "angelegt",
-        ...(zusammenfuehrung.uebersprungen.length > 0
-          ? { uebersprungeneFelder: zusammenfuehrung.uebersprungen }
-          : {}),
+        ...(uebersprungen.length > 0 ? { uebersprungeneFelder: uebersprungen } : {}),
         ...(ziel.herkunft.beitritt ? { beitritt: ziel.herkunft.beitritt } : {}),
       },
       auftrag: {
         anmeldeadresse,
         uid: vorhanden?.uid ?? null,
         zusammenfuehrung,
-        bilder: bildauftraege({
-          row,
-          basis: BILDQUELLE,
-          zwischenablage: input.zwischenablage,
-        }).map((a) => ({ art: a.art, webp: webpAblage(a.ablage) })),
+        bilder: auftraege.map((a) => ({ art: a.art, webp: webpAblage(a.ablage) })),
       },
     };
   });
@@ -636,8 +654,10 @@ export async function schreibeDatensaetze(
             ? { art: bild.art, stand: "fehlt", grund: ergebnis.grund }
             : { art: bild.art, stand: ergebnis.stand },
         );
-        if (ergebnis.stand === "hochgeladen")
-          hochgeladen.push({ art: bild.art, url: ergebnis.url });
+        // AUCH bei `vorhanden` (Befund HIGH-1): das Objekt beweist, dass
+        // hochgeladen wurde, nicht dass geschrieben wurde. Der SQL-Riegel
+        // `is null` verhindert, dass daraus ein Überschreiben wird.
+        if (ergebnis.stand !== "fehlt") hochgeladen.push({ art: bild.art, url: ergebnis.url });
       }
       if (befunde.length > 0) bilder.set(nummer, befunde);
 

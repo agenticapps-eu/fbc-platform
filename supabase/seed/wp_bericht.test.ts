@@ -346,8 +346,12 @@ describe("baueBericht — die Bilder (6.3/6.4)", () => {
       }),
     );
 
-    expect(text).toMatch(/hochgeladen.*1/);
-    expect(text).toMatch(/schon vorhanden.*1/);
+    // Alle DREI Zahlen, und exakt: `/hochgeladen.*1/` akzeptierte auch 11, 100
+    // oder 21 — und „fehlt" prüfte die erste Fassung gar nicht (Befund LOW-8
+    // aus dem Code-Review).
+    expect(text).toContain("- hochgeladen: 1");
+    expect(text).toContain("- schon vorhanden (übersprungen, nicht ersetzt): 1");
+    expect(text).toContain("- fehlt: 1");
   });
 
   it("schweigt über Bilder, wo keine im Spiel waren", () => {

@@ -537,6 +537,64 @@ längst da sind. Der Berichtstext unterscheidet deshalb jetzt ausdrücklich
 zwischen „es gibt die Datei nicht" (nachzutragen) und „so hat der Dienst auf
 diesen Versuch geantwortet" (sagt nichts darüber, ob das Objekt liegt).
 
+### Das Objekt beweist „hochgeladen", nicht „geschrieben"
+
+Der Code-Review hat den Entwurf oben an einer Stelle widerlegt, und es ist die
+wichtigste Korrektur dieses Abschnitts. Die Lagen-Tabelle führte drei Fälle. Es
+gibt einen **vierten**, und er war der einzige, der still war:
+
+> Der Upload gelingt, danach kippt die Datensatz-Transaktion — Constraint,
+> Verbindungsabbruch, Strg-C. Das Objekt liegt, `avatar_url` ist `null`.
+
+Der nächste Lauf fand dann sein eigenes Objekt, meldete „vorhanden", schrieb
+**keine URL** — und der Datensatz ging diesmal durch. **Das Bild wäre dauerhaft
+weg gewesen**, gezählt unter „schon vorhanden (übersprungen, nicht ersetzt)" und
+nicht unterscheidbar von einem normalen zweiten Lauf. Kein fehlender Upload, kein
+gescheiterter Datensatz, keine Zeile im Bericht.
+
+Der Denkfehler steckte im Merker selbst: **das Objekt beweist, dass hochgeladen
+wurde, nicht dass geschrieben wurde.** Und der auslösende Fall ist nicht exotisch
+— dieser Abschnitt *rechnet* mit gescheiterten Datensätzen (eigene Fehlerkarte,
+eigene Berichtstabelle), und die dokumentierte Reaktion darauf ist „nochmal
+laufen lassen".
+
+Behoben, indem `vorhanden` die öffentliche URL **mitträgt** und wie ein frischer
+Upload in den `bildsatz` geht. Doppelt schreiben kann daraus nichts: der Riegel
+`and "avatar_url" is null` lässt das UPDATE null Zeilen treffen, wo schon etwas
+steht.
+
+**Der Preis, benannt statt verschwiegen:** hat jemand die Spalte nachträglich auf
+`null` gesetzt, holt ein späterer Lauf das Importbild zurück. Über den
+Profil-Editor geht das nicht (`uploadBild` gibt bei fehlendem Blob `bisher`
+zurück), über `src/lib/admin-profile.ts` schon. Für eine einmalige Migration ist
+der stille Totalverlust der deutlich grössere Schaden — und diese Richtung ist
+sichtbar und wiederholbar, die andere war es nicht.
+
+Am lokalen Stack nachgestellt: bei drei Profilen die Spalte geleert, Objekt
+liegen gelassen, Lauf gestartet. **55 → 58 URLs, kein neues Objekt, und jede
+wiederhergestellte URL zeigt auf das liegende Objekt.**
+
+### Ein verworfener Bildwert darf nicht spurlos verschwinden
+
+Zweiter Review-Befund, dieselbe Klasse von Fehler. `bildauftraege` weist einen
+unbrauchbaren Wert ab, indem es **keinen Auftrag** erzeugt — und Befunde
+entstehen nur aus Aufträgen. Der Kommentar dort behauptete „der Bericht nennt es
+(6.4)". Er nannte es nicht.
+
+Die Folge trifft genau das Szenario, für das die Prüfung geschrieben wurde: käme
+der vor dem Go-Live neu gezogene Export mit `2026/06/profile_photo.jpg` oder
+`.gif`, entstünde **kein einziger Auftrag** — und damit fiele der ganze Abschnitt
+„Bilder" aus dem Bericht. Kein Zähler, keine Null, keine Tabelle. Der Lauf sähe
+vollkommen normal aus, und 70 Profile hätten kein Bild. Eine Prüfung, die still
+filtert statt zu melden, ist das Gegenteil dessen, was zwei Zeilen darüber steht.
+
+Behoben über die Liste, die es schon gibt: ein verworfener Wert landet in
+`uebersprungeneFelder` als `profiles.avatar_url` und damit in der Tabelle
+„Nicht geschriebene Felder". Das kostet keine neue Berichtsfläche — und es wirkt
+im **Trockenlauf**, also genau dort, wo ein veränderter Export auffallen soll:
+bevor irgendetwas geschrieben ist. Ein LEERER Wert ist dabei kein Befund; 13 der
+70 führen kein Profilbild, das ist der Normalfall.
+
 ### Nur benannte Spalten werden gelesen
 
 Von 140 Spalten sind 26 lebendig. Der Rest ist Plugin-Zustand (`aioseo_*`,

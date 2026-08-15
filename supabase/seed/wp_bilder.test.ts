@@ -566,3 +566,52 @@ describe("ladeBildHoch — erst fragen, dann senden", () => {
     expect(ergebnis.stand).toBe("hochgeladen");
   });
 });
+
+describe("ladeBildHoch — das Ersetzen ist unmöglich gemacht, nicht nur unterlassen", () => {
+  it("schickt KEIN x-upsert — sein Fehlen IST die Zusicherung aus 6.3", async () => {
+    // Aus dem Code-Review (MEDIUM-5): der Test „ersetzt ein vorhandenes Objekt
+    // NICHT" zählte nur, dass ein POST stattfindet. Ein versehentlich
+    // hinzugefügtes `x-upsert: true` blieb grün, obwohl es genau die
+    // Anforderung aufhebt, um die es geht.
+    let kopf: Record<string, string> = {};
+    await hoch(async (_url, init) => {
+      kopf = init?.headers as Record<string, string>;
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    const namen = Object.keys(kopf).map((k) => k.toLowerCase());
+    expect(namen).not.toContain("x-upsert");
+  });
+
+  it("bricht einen hängenden Aufruf ab, statt den Lauf anzuhalten", async () => {
+    // Aus dem Code-Review (MEDIUM-4): auf genau dieser Fläche sind 60-Sekunden-
+    // Hänger belegt. Ohne Zeitgrenze hält ein einziger einen Lauf über 70
+    // Datensätze unbegrenzt an, ohne eine Zeile Ausgabe.
+    let signalGesehen: AbortSignal | undefined;
+    await hoch(async (_url, init) => {
+      signalGesehen = init?.signal ?? undefined;
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    expect(signalGesehen).toBeInstanceOf(AbortSignal);
+  });
+
+  it("meldet ein Rechteproblem auf der Zwischenablage NICHT als Netzfehler", async () => {
+    // Aus dem Code-Review (LOW-6): `readFileSync` stand im try um den POST, ein
+    // EACCES kam deshalb als „Netzfehler" heraus — und der Bericht riete dann
+    // „ein weiterer Lauf klärt es", was bei einem Rechteproblem nie stimmt.
+    const ordner = frisch();
+    const gesperrt = join(ordner, "gesperrt.webp");
+    writeFileSync(gesperrt, "x", { mode: 0o000 });
+
+    const ergebnis = await hoch(
+      async () => new Response(JSON.stringify({ Key: "…" }), { status: 200 }),
+      "profil",
+      gesperrt,
+    );
+
+    expect(ergebnis.stand).toBe("fehlt");
+    expect(grundVon(ergebnis)).not.toContain("Netzfehler");
+    expect(grundVon(ergebnis)).toContain("nicht lesbar");
+  });
+});
