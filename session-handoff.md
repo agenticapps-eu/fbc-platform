@@ -1,90 +1,93 @@
-# Session Handoff — 2026-08-15 (AGE-534: Gruppe 5 zu, Bildstrecke aufgeräumt)
+# Session Handoff — 2026-08-15 (AGE-534: Gruppe 5 zu, Bilder gesichert)
 
-Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `5d3a66d`.
-Arbeitsbaum sauber. **Gruppe 5 vollständig**, dazu 6.0. 33 von 51 Aufgaben zu.
+Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `46dd499`.
+Arbeitsbaum sauber. **Gruppe 5 vollständig**, Gruppe 6 bis auf 6.3/6.4.
+36 von 51 Aufgaben zu. **1049 Tests grün** (Sitzungsbeginn 989).
+
+Quelldatei (70 Datensätze, ausserhalb des Arbeitsbaums):
+`/Users/donald/Documents/Claude/Projects/Fair Business Club/user-export-318-6a7da0ec0d721.csv`
+Zwischenablage mit 110 Bildern liegt daneben: `…/wp-import-bilder/`.
 
 ## Next session: start here
 
-**Gruppe 6, Aufgabe 6.1** — der Bildabschnitt. Alles Nötige steht bereit: die
-Quelldatei ist bekannt (unten), `profile_photo` und `cover_photo` stehen seit
-6.0 unter dem Kopfzeilen-Wächter, `sharp@0.35.3` liegt seit Gruppe 1 als
-devDependency da und ist noch unbenutzt.
+**Aufgabe 6.3** — verkleinern, nach WebP, in den jeweiligen Bucket. `sharp@0.35.3`
+liegt seit Gruppe 1 unbenutzt bereit, die Bilder liegen alle auf der Platte, es
+braucht kein Netz mehr.
 
-Der Bildabschnitt ist die einzige Arbeit mit einer Frist, die **nicht in unserer
-Hand liegt**: die Bilder liegen ausschliesslich auf der alten Seite. 6.5 („einmal
-echt laufen lassen und die Zwischenablage füllen") ist der Punkt, ab dem Warten
-teuer wird — vor Gruppe 7 erledigen.
+**Vorher von Donald bestätigen lassen** (steht als Vorschlag in 6.3): Obergrenze
+Avatar **512 px**, Header **1600 px**. Und: das eine 1×1-px-Profilbild gehört in
+den Bericht statt in den Bucket. Gemessen wurde an den 110 Dateien — Profilbilder
+1 px bis 1000 px, Headerbilder 762 px bis 4032 px, also **nur verkleinern, nie
+vergrössern**.
 
-Quelldatei (ausserhalb des Arbeitsbaums, 70 Datensätze):
-`/Users/donald/Documents/Claude/Projects/Fair Business Club/user-export-318-6a7da0ec0d721.csv`
+Danach 6.4 zu Ende (die Bildbefunde in den Bericht) und Gruppe 7.
 
 ## Accomplished
 
-**Gruppe 5 komplett.** `wp_import.ts` trägt jetzt den ganzen Weg: `leseDatensaetze`
-(RFC 4180, BOM), `verarbeite` (Vorabprüfung → Abbildung → Merge → Klassifikation),
-`baueBestandsdaten`/`bestandsleser` (eine Abfrage, danach nur Nachschlagen),
-`baueLauf` (bis zum fertigen Bericht) und `main()` mit den wirkenden Adaptern.
+**Gruppe 5 komplett.** `wp_import.ts` trägt den ganzen Weg: `leseDatensaetze`
+(RFC 4180, BOM), `verarbeite`, `baueBestandsdaten`/`bestandsleser` (eine Abfrage,
+danach nur Nachschlagen), `baueLauf` und `main()` mit den wirkenden Adaptern.
 
-**5.3 gegen die echte Quelle gemessen:** 70 Datensätze, **70× angelegt, null
-Befunde** — keine Dublette, keine unbrauchbare Adresse, keine Kollision. Acht
-Zählwerte davor/danach gleich. Die Konsolenausgabe hatte 71 Zeilen und **kein
-einziges `@`**. Bericht mit `0600` neben der Quelle.
+**5.3 gegen die echte Quelle:** 70 Datensätze, **70× angelegt, null Befunde** —
+keine Dublette, keine unbrauchbare Adresse, keine Kollision. Acht Zählwerte
+davor/danach gleich, Konsolenausgabe ohne ein einziges `@`, Bericht mit `0600`.
 
-**Zwei Befunde geschlossen, die im Plan standen:** 5.2a (Widerspruch bei Konten
-ohne Kennung) und 5.2b (der Bericht nannte die anzulegenden nur als Zahl).
+**6.1, 6.2, 6.5 und 6.0**: `wp_bilder.ts` + `wp_bilder_holen.ts`. **110 von 110
+Bildern geholt, keins fehlt** (57 Profil-, 53 Headerbilder, 58 Konten, 17 MB).
+Zweiter Lauf: 0 geholt, 110 vorhanden, 0,4 s. **Das Risiko mit der fremden Frist
+ist damit erledigt** — die Bilder überleben das Abschalten der alten Seite.
 
-**6.0**: `profile_photo` und `cover_photo` unter den Wächter — 28 statt 26
-Quellfelder.
-
-**1032 Tests grün** (Sitzungsbeginn 989), `typecheck`, `typecheck:seed`, `lint`,
-`openspec validate --all` 29/29.
+Dazu geschlossen: 5.2a (Widerspruch bei Konten ohne Kennung) und 5.2b (der
+Bericht nannte die anzulegenden nur als Zahl).
 
 ## Decisions
 
-**Konto ohne Kennung: unterschieden an der Handschrift des Imports (5.2a).**
-`impact` + `activated_at is null` ist ein Rest eines abgebrochenen eigenen Laufs
-und wird ergänzt; alles andere bleibt Kollision. Selbstregistrierung ist `basic`,
-ein freigeschaltetes Konto benutzt jemand. Spec-Delta trägt Regel und Szenario.
+**Konto ohne Kennung (5.2a):** `impact` + `activated_at is null` ist ein Rest
+eines abgebrochenen eigenen Laufs und wird ergänzt; alles andere bleibt
+Kollision. Selbstregistrierung ist `basic`, ein freigeschaltetes Konto benutzt
+jemand. Spec-Delta trägt Regel und Szenario.
 
 **Beide Bilder werden geholt (Donald, 15.08.).** Profilbild →
 `avatars`/`avatar_url`, Headerbild → `covers`/`cover_url`. Der Plan kannte nur
-das Profilbild, obwohl **53 von 70** ein Headerbild haben und Spalte wie Bucket
-längst existieren. `synced_gravatar_hashed_id` bleibt draussen — Drittanbieter.
+das Profilbild, obwohl 53 von 70 ein Headerbild haben.
+`synced_gravatar_hashed_id` bleibt draussen — Drittanbieter.
+
+**Der Dateiname aus der Quelle wird geprüft, nicht zurechtgestutzt.** Er geht in
+eine URL UND einen Pfad; ein gestutzter Name fragte eine falsche URL an und
+verschluckte den Befund.
 
 **Der Bestand kommt synchron und vorher gefüllt herein**, die **Kennung schlägt
-die Adresse**, und `--schreiben` bricht ab, solange Gruppe 7 fehlt.
-
-**Streng gelesen beim CSV:** kein `relax_quotes`, kein `relax_column_count`.
+die Adresse**, `--schreiben` bricht ab, solange Gruppe 7 fehlt, und beim CSV gilt
+**kein** `relax_quotes`, **kein** `relax_column_count`.
 
 ## Was beim Bauen auffiel
 
-- **Die Gegenproben fanden acht Lücken in vier Läufen** (39 + 18 + 5 Mutationen).
-  Die teuerste: `baueBestandsdaten` reichte `socials`, `videos` und die
-  Kontaktfelder durch, ohne dass ein Test hinsah — **genau das, was die
-  Merge-Regel als „leeres Ziel" gelesen und überschrieben hätte.**
-- **Die zweitteuerste war Verdrahtung**: die Bestandsadressen erreichten die
-  Vorabprüfung ungeprüft. Jede Einzelfunktion getestet, die Leitung dazwischen
-  nicht — und es ist die aus 4.2, ohne die eine Kollision unbemerkt bliebe.
-- **Eine Frage hat mehr gefunden als jede Prüfung**: „was machen wir mit den
-  Mediendateien?" führte zum fehlenden zweiten Bild im Plan.
-- `count(*)` kommt aus `pg` als **Zeichenkette**. Gemessen mit
-  `scripts/probe-c10-bestandsabfrage.ts` — die SQL ist die einzige Stelle in
-  Gruppe 5, die kein Test erreicht.
+- **Neun Lücken in fünf Gegenproben** (39 + 18 + 5 + 12 Mutationen). Die
+  teuerste: `baueBestandsdaten` reichte `socials`, `videos` und die Kontaktfelder
+  durch, ohne dass ein Test hinsah — **genau das, was die Merge-Regel als „leeres
+  Ziel" gelesen und überschrieben hätte.** Die zweite: die Bestandsadressen
+  erreichten die Vorabprüfung ungeprüft (die Leitung aus 4.2).
+- **Donalds Frage „was machen wir mit den Mediendateien?" fand mehr als jede
+  Prüfung** — das fehlende zweite Bild im Plan.
+- **Zahlen im Design waren geraten, wo sie messbar sind:** „das Original ist
+  1000 px" stimmt für keine der beiden Bildarten. Ein Profilbild ist 1×1 Pixel.
+- `count(*)` kommt aus `pg` als **Zeichenkette** (`probe-c10-bestandsabfrage.ts`).
 - Skripte im Scratchpad können `pg` nicht auflösen; Proben gehören nach
   `scripts/`. Top-level `await` geht nur innerhalb des Projekts.
 
 ## Files modified
 
 - **neu** `supabase/seed/wp_import.ts` + `.test.ts` (40 Tests)
+- **neu** `supabase/seed/wp_bilder.ts` + `.test.ts` (17), `wp_bilder_holen.ts`
 - **neu** `scripts/probe-c10-bestandsabfrage.ts`
 - `supabase/seed/wp_import.lib.ts` + `.test.ts` — QUELLFELDER 26 → 28
 - `supabase/seed/wp_bericht.ts` + `.test.ts` — „Was der Lauf anlegen würde"
-- `openspec/.../specs/member-import/spec.md` — Regeln zu 5.2a und zu beiden Bildern
-- `openspec/.../design.md` — Nachtrag „es sind ZWEI Bilder"
-- `openspec/.../tasks.md` — 5.1–5.3, 5.2a, 5.2b, 6.0 zu; Gruppe 6 umgeschrieben
+- `openspec/.../spec.md`, `design.md`, `tasks.md`
 
 ## Open questions
 
+- **Obergrenzen für 6.3** (Vorschlag Avatar 512 px, Header 1600 px) und was mit
+  dem 1×1-px-Profilbild geschieht.
 - **`paid_until` (3.5)** — hängt an Detlevs Zahlungsständen.
 - **Was sollte in „Mitgliedschaft" (`infos_16`) stehen?** Bestätigen lassen.
 - **`demo_seed.lib.ts` trägt die überholte Annahme** „dev and prod are the SAME
