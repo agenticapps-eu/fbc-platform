@@ -336,6 +336,24 @@ export async function ladeBildHoch(
 
   const bucket = BUCKET[input.art];
   const pfad = `${input.uid}/${OBJEKTNAME[input.art]}`;
+  const oeffentlich = `${input.basis}/storage/v1/object/public/${bucket}/${pfad}`;
+
+  // ERST FRAGEN, DANN SENDEN — und das ist keine Sparsamkeit, sondern der Fix
+  // für einen gemessenen Fehler (15.08., lokaler Stack): schickt man den vollen
+  // Rumpf und wird mit `400 Duplicate` abgewiesen, BEVOR der Dienst ihn
+  // ausgelesen hat, bleibt die Verbindung mit ungelesenem Rumpf zurück. Über die
+  // 110 Anfragen eines Wiederholungslaufs hingen so VIER reproduzierbar je 60
+  // Sekunden und endeten in Kongs „The upstream server is timing out" — obwohl
+  // ihr Objekt längst lag. Einzeln angefragt antwortete jede in 5 ms.
+  //
+  // Die Frage ist der schnelle Weg, nicht die Instanz: scheitert sie, entscheidet
+  // weiter unten der POST, der ein vorhandenes Objekt ohnehin abweist.
+  try {
+    const da = await hole(oeffentlich, { method: "HEAD" });
+    if (da.ok) return { stand: "vorhanden" };
+  } catch {
+    /* der Upload entscheidet */
+  }
 
   let antwort: Response;
   try {
@@ -351,12 +369,7 @@ export async function ladeBildHoch(
     return { stand: "fehlt", grund: `Netzfehler: ${(e as Error).name}` };
   }
 
-  if (antwort.ok) {
-    return {
-      stand: "hochgeladen",
-      url: `${input.basis}/storage/v1/object/public/${bucket}/${pfad}`,
-    };
-  }
+  if (antwort.ok) return { stand: "hochgeladen", url: oeffentlich };
 
   // Der Rumpf entscheidet, nicht der Status — s. oben.
   const rumpf = (await antwort.json().catch(() => ({}))) as { error?: string };

@@ -318,12 +318,30 @@ function storage(status: number, koerper: unknown) {
   return async () => new Response(JSON.stringify(koerper), { status });
 }
 
-function hoch(
+function roh(
   hole: (url: string, init?: RequestInit) => Promise<Response>,
   art: Bildart = "profil",
   datei = ECHTES_WEBP,
 ) {
   return ladeBildHoch({ datei, art, uid: KONTO, basis: BASIS, schluessel: "geheim" }, hole);
+}
+
+/**
+ * Wie `roh`, beantwortet die Vorab-Frage aber selbst mit „liegt nicht" — so
+ * prüft jeder Test darunter den Upload-Weg. Die Frage selbst hat ihre eigenen
+ * Tests („erst fragen, dann senden").
+ */
+function hoch(
+  hole: (url: string, init?: RequestInit) => Promise<Response>,
+  art: Bildart = "profil",
+  datei = ECHTES_WEBP,
+) {
+  return roh(
+    async (url, init) =>
+      (init?.method ?? "GET") === "HEAD" ? new Response(null, { status: 400 }) : hole(url, init),
+    art,
+    datei,
+  );
 }
 
 describe("webpAblage", () => {
@@ -493,5 +511,58 @@ describe("BUCKET und OBJEKTNAME", () => {
   it("trennt die beiden Bildarten sauber", () => {
     expect(BUCKET).toEqual({ profil: "avatars", cover: "covers" });
     expect(OBJEKTNAME).toEqual({ profil: "import-avatar.webp", cover: "import-cover.webp" });
+  });
+});
+
+describe("ladeBildHoch — erst fragen, dann senden", () => {
+  it("sendet die Datei gar nicht, wenn das Objekt schon liegt", async () => {
+    // DER GRUND, am lokalen Stack gemessen (15.08.): schickt man den vollen
+    // Rumpf und wird mit `400 Duplicate` abgewiesen, BEVOR der Dienst ihn
+    // ausgelesen hat, bleibt die Verbindung mit ungelesenem Rumpf zurück. Über
+    // 110 Anfragen hinweg hingen so vier reproduzierbar 60 Sekunden und
+    // endeten in Kongs „upstream server is timing out" — obwohl das Objekt lag.
+    const wege: string[] = [];
+    const ergebnis = await roh(async (url, init) => {
+      wege.push(`${init?.method ?? "GET"} ${url}`);
+      return new Response(null, { status: 200 });
+    });
+
+    expect(ergebnis.stand).toBe("vorhanden");
+    expect(wege).toHaveLength(1);
+    expect(wege[0]).toBe(
+      `HEAD ${BASIS}/storage/v1/object/public/avatars/${KONTO}/import-avatar.webp`,
+    );
+  });
+
+  it("lädt hoch, wo nichts liegt", async () => {
+    const methoden: string[] = [];
+    const ergebnis = await roh(async (_url, init) => {
+      const methode = init?.method ?? "GET";
+      methoden.push(methode);
+      return methode === "HEAD"
+        ? new Response(null, { status: 400 })
+        : new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    expect(methoden).toEqual(["HEAD", "POST"]);
+    expect(ergebnis.stand).toBe("hochgeladen");
+  });
+
+  it("lässt den Upload entscheiden, wenn die Frage selbst scheitert", async () => {
+    // Die Frage ist der schnelle Weg, nicht die Instanz. Ein Netzfehler auf dem
+    // HEAD darf ein Bild nicht verhindern — der POST weist ein vorhandenes
+    // Objekt ohnehin ab.
+    let ersteFrage = true;
+    const ergebnis = await roh(async (_url, init) => {
+      if ((init?.method ?? "GET") === "HEAD") {
+        if (ersteFrage) {
+          ersteFrage = false;
+          throw new Error("ECONNRESET");
+        }
+      }
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    expect(ergebnis.stand).toBe("hochgeladen");
   });
 });

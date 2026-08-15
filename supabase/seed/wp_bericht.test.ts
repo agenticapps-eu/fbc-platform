@@ -365,3 +365,26 @@ describe("baueBericht — die Bilder (6.3/6.4)", () => {
     expect(text).not.toContain("Profilbild |");
   });
 });
+
+describe("baueBericht — ein Statuscode ist kein fehlendes Bild", () => {
+  it("behauptet NICHT, ein Bild mit Statusantwort sei nicht im Bucket", () => {
+    // Am lokalen Stack gemessen (15.08.): vier Uploads bekamen ein `Antwort
+    // 504`, während ihr Objekt im Bucket LAG und die URL gesetzt war. Die
+    // Ursache ist behoben (die Vorab-Frage in `ladeBildHoch`), der Unterschied
+    // bleibt: eine Antwort des Dienstes sagt nichts darüber, ob das Objekt
+    // liegt. Ein Bericht, der daraus „nicht im Bucket gelandet" macht, schickt
+    // jemanden Bilder von Hand nachtragen, die längst da sind.
+    const text = baueBericht(
+      lauf({
+        ergebnisse: [
+          ergebnis({ bilder: [{ art: "profil", stand: "fehlt", grund: "Antwort 504" }] }),
+        ],
+      }),
+    );
+
+    expect(text).not.toContain("sind nicht im Bucket gelandet");
+    // Der Unterschied muss dastehen, sonst kann ihn niemand lesen.
+    expect(text).toMatch(/Keine gewandelte Fassung/);
+    expect(text).toMatch(/weiterer Lauf/);
+  });
+});

@@ -239,8 +239,15 @@ export function baueBericht(daten: Berichtsdaten): string {
     const fehlend = alleBilder.filter(({ b }) => b.stand === "fehlt");
     if (fehlend.length > 0) {
       nachzutragen.push(
-        "Diese Bilder sind nicht im Bucket gelandet. Das Mitglied wurde trotzdem",
-        "angelegt; nachzutragen ist es von Hand über den Profil-Editor.",
+        "Das Mitglied wurde in jedem dieser Fälle angelegt — nur das Bild kam nicht",
+        "durch. **Der Grund sagt, was zu tun ist, und die zwei Sorten sind nicht",
+        "dasselbe:**",
+        "",
+        "- *Keine gewandelte Fassung* — es gibt die Datei nicht. Von Hand nachzutragen",
+        "  über den Profil-Editor.",
+        "- *Antwort `<Code>`* / *Netzfehler* — so hat der Storage-Dienst auf DIESEN",
+        "  Versuch geantwortet. Ob das Objekt liegt, ist damit NICHT gesagt. Ein",
+        "  weiterer Lauf klärt es; er lädt nichts doppelt hoch.",
         "",
         tabelle(
           ["Datensatz", "Kennung", "Name", "Bild", "Grund"],

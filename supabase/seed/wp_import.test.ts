@@ -974,11 +974,18 @@ function satzMitBildern(zwischenablage: string): Datensatzlauf[] {
   return lauf.saetze;
 }
 
-/** Ein `fetch`, das GoTrue und Storage unterschiedlich beantwortet. */
+/**
+ * Ein `fetch`, das GoTrue und Storage unterschiedlich beantwortet.
+ *
+ * Die Vorab-Frage (`HEAD` auf die öffentliche URL) beantwortet er immer mit
+ * „liegt nicht" — sonst prüfte kein Test darunter je den Upload-Weg. Der Fall
+ * „liegt schon" wird über `storageStatus` gestellt, wie ihn der Dienst stellt.
+ */
 function fakeDienste(storageStatus: Record<string, [number, unknown]> = {}) {
   const gerufen: string[] = [];
-  const hole = (async (url: string | URL | Request) => {
+  const hole = (async (url: string | URL | Request, init?: RequestInit) => {
     const s = String(url);
+    if ((init?.method ?? "GET") === "HEAD") return new Response(null, { status: 400 });
     gerufen.push(s);
     if (s.includes("/storage/v1/")) {
       const treffer = Object.entries(storageStatus).find(([teil]) => s.includes(teil));

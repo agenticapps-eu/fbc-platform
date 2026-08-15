@@ -491,6 +491,52 @@ Wirklichkeit rot. Der Grund kommt deshalb aus dem **Rumpf** (`error`), und
 geprüft wird gegen beide Stati, weil die Storage-Fassung lokal und in DEV/PROD
 nicht dieselbe sein muss.
 
+### Erst fragen, dann senden — der Abweisung-mit-Rumpf-Fehler
+
+Die erste Fassung schickte immer den vollen Dateikörper und liess den Dienst mit
+`400 Duplicate` entscheiden. Das ist korrekt und war **falsch**, und gefunden hat
+es nur der echte Lauf: in den Wiederholungsläufen 2–4 hingen **vier von 110
+Anfragen reproduzierbar je 60 Sekunden** und endeten in Kongs
+`{"message":"The upstream server is timing out"}`. Vier Läufe, jedes Mal
+dieselben vier Kennungen (362, 211, 334, 363).
+
+Der Weg zur Ursache, weil die naheliegenden Erklärungen alle falsch waren:
+
+| Vermutung | Messung | Urteil |
+|---|---|---|
+| Transient, ein weiterer Lauf klärt es | Läufe 3 und 4: **dieselben vier** | widerlegt |
+| Die Dateien sind zu gross | 211 ist 12 kB; grössere gehen durch | widerlegt |
+| Die Objekte sind kaputt | Zeilen in `storage.objects` formgleich | widerlegt |
+| Es liegt an den Bildern | einzeln angefragt: **5 ms**, `Duplicate` | widerlegt |
+| Es liegt an der **Abfolge** | nur die vier, ohne die 19 davor: alle sofort | **bestätigt** |
+
+Das Muster ist die Abweisung **vor** dem Auslesen des Rumpfes: der Dienst
+antwortet `400`, während der Client noch schreibt, und die Verbindung bleibt mit
+ungelesenem Rumpf zurück. Über 110 solcher Anfragen wedgt das die Wiederverwendung
+— in Lauf 1, wo jede Anfrage ein echter Upload mit `200` war, trat **kein
+einziger** 504 auf.
+
+Deshalb steht vor dem Upload jetzt eine **Vorab-Frage**: `HEAD` auf die
+öffentliche URL (beide Buckets sind öffentlich), 4–8 ms, `200` heisst „liegt".
+Sie ist der schnelle Weg, **nicht die Instanz** — scheitert sie, entscheidet
+weiterhin der POST, der ein vorhandenes Objekt ohnehin abweist. Damit bleibt die
+Semantik aus 6.3 unverändert und die Wiederholbarkeit hängt an keiner zweiten
+Wahrheit.
+
+Gemessen, derselbe Lauf vorher und nachher:
+
+| | Läufe 2–4 | Lauf 5 (mit Vorab-Frage) |
+|---|---|---|
+| gemeldet vorhanden | 105 | **109** |
+| gemeldet fehlend | 5 (4 davon falsch) | **1** (der echte 1×1-px-Fall) |
+| Dauer | > 4 Minuten | **1 Sekunde** |
+
+**Was daran über den Fehler hinausgeht:** ein Bericht, der ein Bild als fehlend
+führt, dessen Objekt liegt, schickt jemanden vier Bilder von Hand nachtragen, die
+längst da sind. Der Berichtstext unterscheidet deshalb jetzt ausdrücklich
+zwischen „es gibt die Datei nicht" (nachzutragen) und „so hat der Dienst auf
+diesen Versuch geantwortet" (sagt nichts darüber, ob das Objekt liegt).
+
 ### Nur benannte Spalten werden gelesen
 
 Von 140 Spalten sind 26 lebendig. Der Rest ist Plugin-Zustand (`aioseo_*`,
