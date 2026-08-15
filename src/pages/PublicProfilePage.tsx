@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ProfileHero, HeroImpactBadge } from "../components/profile/ProfileHero";
 import { Badge } from "../components/ui/Badge";
@@ -25,6 +25,7 @@ import {
 } from "../lib/public-profile";
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
 import { LEVELS, LEVEL_RANK } from "../config/levels";
+import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
 
 // Themen-Reihenfolge & Labels für Erfolgsradar/Interessen (Sein·Tun·Haben·Wirken).
@@ -187,13 +188,7 @@ function ExtendedSections({
       {profile.short_bio && (
         <Card className="flex flex-col gap-3">
           <CardTitle className="text-base">Über mich</CardTitle>
-          {/* whitespace-pre-line: die Absätze stehen im Feld und sollen stehen
-              bleiben. Ohne die Klasse faltet HTML jeden Umbruch zu einem
-              Leerzeichen — bei den importierten Biografien (AGE-534) wurden aus
-              fünf Absätzen 3877 Zeichen am Stück. */}
-          <p className="max-w-2xl text-sm leading-relaxed whitespace-pre-line text-ink/80">
-            {profile.short_bio}
-          </p>
+          <Biografie text={profile.short_bio} />
         </Card>
       )}
 
@@ -335,6 +330,57 @@ function ChipList({ items }: { items: string[] }) {
 }
 
 /** Angebote oder Gesuche als Liste — dieselbe Darstellung für beide Seiten. */
+/**
+ * „Über mich" — drei Zeilen, den Rest auf Klick.
+ *
+ * `whitespace-pre-line`: die Absätze stehen im Feld und sollen stehen bleiben.
+ * Ohne die Klasse faltet HTML jeden Umbruch zu einem Leerzeichen — bei den
+ * importierten Biografien (AGE-534) wurden aus fünf Absätzen 3877 Zeichen am
+ * Stück.
+ *
+ * WARUM GEMESSEN WIRD UND NICHT AN DER LÄNGE GERATEN: ob drei Zeilen reichen,
+ * hängt an Umbrüchen und Breite, nicht an der Zeichenzahl. Ein Zweizeiler mit
+ * einem „Mehr anzeigen", das nichts aufklappt, ist schlimmer als kein Weg.
+ * Gemessen wird EINMAL, im gekürzten Zustand — dort trennt `scrollHeight >
+ * clientHeight` sauber; danach bleibt der Weg stehen, weil er gebraucht wird.
+ */
+function Biografie({ text }: { text: string }) {
+  const [offen, setOffen] = useState(false);
+  const [gekuerzt, setGekuerzt] = useState(false);
+  const absatz = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = absatz.current;
+    // Die eine Zeile Toleranz fängt gerundete Zeilenhöhen ab: ohne sie meldete
+    // ein exakt dreizeiliger Text je nach Zoomstufe einmal Überlauf, einmal
+    // nicht.
+    if (el) setGekuerzt(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
+
+  return (
+    <>
+      <p
+        ref={absatz}
+        className={cn(
+          "max-w-2xl text-sm leading-relaxed whitespace-pre-line text-ink/80",
+          !offen && "line-clamp-3",
+        )}
+      >
+        {text}
+      </p>
+      {gekuerzt && (
+        <button
+          type="button"
+          onClick={() => setOffen((v) => !v)}
+          className="self-start text-sm font-medium text-accent-strong underline-offset-2 hover:underline"
+        >
+          {offen ? "Weniger anzeigen" : "Mehr anzeigen"}
+        </button>
+      )}
+    </>
+  );
+}
+
 function MatchingList({
   items,
 }: {
