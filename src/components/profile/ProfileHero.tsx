@@ -84,10 +84,19 @@ export function ProfileHero({
       <div className="px-6 pb-6 sm:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
+            {/* `relative z-10` ist NICHT Kosmetik, sondern trägt die Überlappung.
+                Der Banner oben ist `relative`, also POSITIONIERT — und
+                positionierte Elemente werden über statischem Inhalt gemalt,
+                unabhängig von der Reihenfolge im DOM. Ohne diese Klassen liegt
+                der Avatar deshalb IMMER unter dem Banner; `elementFromPoint` auf
+                der Überlappung traf das Banner-`img` statt den Avatar. Sichtbar
+                wurde es erst mit AGE-534, als die ersten Mitglieder ein
+                Headerbild bekamen — davor verdeckte ein heller Verlauf, was
+                genauso falsch stand. */}
             <Avatar
               name={name}
               src={avatarUrl}
-              className="-mt-10 h-24 w-24 shrink-0 text-2xl ring-4 ring-canvas sm:-mt-14 sm:h-28 sm:w-28"
+              className="relative z-10 -mt-10 h-24 w-24 shrink-0 text-2xl ring-4 ring-canvas sm:-mt-14 sm:h-28 sm:w-28"
             />
             {/* pb bringt den Textblock auf die Grundlinie des überlappenden
                 Avatars — ohne ihn steht der Name am oberen Bildrand. */}
