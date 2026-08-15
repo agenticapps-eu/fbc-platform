@@ -1,7 +1,7 @@
 # Session Handoff — 2026-08-15 (AGE-534: Gruppe 7 komplett, Sichtprobe gefahren)
 
-Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `0df65a7`.
-Arbeitsbaum sauber. **1101 Tests grün**, typecheck, typecheck:seed und lint sauber.
+Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `41ff0fb`.
+Arbeitsbaum sauber. **1109 Tests grün**, typecheck, typecheck:seed und lint sauber.
 
 Quelldatei (70 Datensätze, ausserhalb des Arbeitsbaums):
 `/Users/donald/Documents/Claude/Projects/Fair Business Club/user-export-318-6a7da0ec0d721.csv`
@@ -38,11 +38,17 @@ Hand freigeschaltet habe (Kennungen 254, 248, 355, 278, 45). Ein `supabase db re
 - **7.8** — Sichtprobe über fünf Profile, roh gegen die Quelle **und** im
   Browser. Die Abbildung stimmt Feld für Feld. Fünf Befunde, alle in der
   ANZEIGE (in `tasks.md` unter 7.8 einzeln festgehalten).
-- **Zwei davon behoben** (Donald gab sie frei): `zerlegeInteressen` trennt an
-  Komma und Umbruch — **38 Werte → 128 Chips**, längster 100 statt 162 Zeichen,
-  keiner endet auf Komma, Klammern geschützt; und `whitespace-pre-line` an
-  Biografie und `offers`/`needs` der Profilseite. Gegenprobe 3/3, beides im
-  Browser abgenommen.
+- **Drei davon behoben, plus Donalds Nachtrag:**
+  1. `zerlegeInteressen` trennt an Komma und Umbruch — **38 Werte → 128 Chips**,
+     längster 100 statt 162 Zeichen, keiner endet auf Komma, Klammern geschützt.
+  2. `whitespace-pre-line` an Biografie und `offers`/`needs` der Profilseite —
+     NICHT an der Verzeichniskarte, die mit `line-clamp-3` ein Teaser ist.
+  3. `markdownMarkerEntfernen` nimmt `**Paar**` und `#`-Überschriften weg; die
+     Listen bleiben unangetastet. 0 Marker nach dem Neulauf.
+  4. **Nachtrag Donald:** die Biografie kürzt auf drei Zeilen mit „Mehr
+     anzeigen" — den Weg gibt es nur, wo wirklich etwas fehlt (gemessen, nicht
+     an der Zeichenzahl geraten). Im Browser: 68 → 1342 px.
+  Gegenprobe je 2/2 bzw. 3/3, alles im Browser abgenommen.
 
 ## Decisions
 
@@ -74,6 +80,9 @@ Projekt zu wirken.
   gesetzt sein, bevor ihr Ergebnis zählt.
 - **Mein Wegwerf-Vergleichsskript hielt ein `Date` für leer** (keine eigenen
   Schlüssel) und meldete `member_since` als fehlend. Es stand korrekt da.
+- **`text-brand` ist kein Token dieses Projekts** und fiel still auf die
+  Textfarbe zurück — der „Mehr anzeigen"-Link sah aus wie Fließtext. `cn()` ist
+  ein Join ohne Prüfung, kein Test hätte es gemeldet. Richtig: `text-accent-strong`.
 - **`ls` ist der eza-Alias** — `$(ls -t …)` im Berichtsverzeichnis lieferte einen
   Optionsfehler statt eines Pfades. Bekannte Falle, dritte Wiederholung.
 - Ein tsx-Skript im Scratchpad findet die Repo-Abhängigkeiten nicht; es muss im
@@ -87,6 +96,10 @@ Projekt zu wirken.
 - `supabase/seed/wp_import.test.ts` — 44 → 54 Tests
 - `openspec/changes/add-wordpress-member-import/design.md` — drei Entscheidungen
 - `openspec/changes/add-wordpress-member-import/tasks.md` — 7.2–7.8 abgehakt
+- `supabase/seed/wp_felder.ts` + `.test.ts` — `markdownMarkerEntfernen`
+- `supabase/seed/wp_import.lib.ts` + `.test.ts` — `zerlegeInteressen`; `wert()`
+- `src/pages/PublicProfilePage.tsx` + `.test.ts` — `Biografie` (Kürzung),
+  `whitespace-pre-line` an Bio und `MatchingList`
 
 ## Open questions
 
@@ -100,8 +113,10 @@ Projekt zu wirken.
   15.08.): **nicht** umziehen — die Felder sind längst gefüllt, und zwar mit den
   besseren Werten. Der Widerspruch zur Zusage „nie automatisch angezeigt" bleibt
   bestehen, es ist der selbstgeschriebene Text der Mitglieder.
-- **Eine Biografie trägt Markdown** (`**…**`), die Sternchen stehen wörtlich da.
-  Offen: entfernen, rendern oder lassen.
+- **Rich Text für Profiltexte ist AGE-561** (Backlog, 15.08.). Entschieden:
+  Marker jetzt entfernen, Rendern als eigenes Feature — es bräuchte Renderer
+  **plus Sanitizer** (mitgliedergeschriebener Text = XSS-Fläche), wirkte auf
+  ALLE Profiltexte und wäre ohne Editor ein halbes Feature.
 - **Header-Grössen nach der ersten Migration prüfen** (Donald, 15.08.).
 - **`paid_until` (3.5)** — hängt an Detlevs Zahlungsständen.
 - **Was sollte in „Mitgliedschaft" (`infos_16`) stehen?** Bestätigen lassen.
