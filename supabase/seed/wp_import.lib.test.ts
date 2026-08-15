@@ -844,6 +844,7 @@ describe("pruefeVorab — schreibt nichts", () => {
 /** Ein leeres Bestandsprofil — die Tests setzen nur, worum es ihnen geht. */
 function bestand(werte: Partial<Bestand> = {}): Bestand {
   return {
+    uid: "uid-bestand",
     bereitsImportiert: false,
     profil: {
       name: null,

@@ -30,6 +30,7 @@ function quelle(zeilen: Record<string, string>[]): Quelle {
 
 function bestand(werte: Partial<Bestand> = {}): Bestand {
   return {
+    uid: "uid-bestand",
     bereitsImportiert: false,
     profil: {
       name: null,
@@ -206,6 +207,35 @@ describe("verarbeite — Klassifikation", () => {
 
     if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
     expect(lauf.saetze[0].ergebnis.klasse).toBe("aktualisiert");
+  });
+
+  it("reicht die Kennung des bestehenden Kontos an den Auftrag durch", () => {
+    // Ohne sie hat die Transaktion (7.1) kein Ziel: `profiles.id` und
+    // `profile_id` sind genau diese Kennung, und ein bestehendes Konto legt
+    // niemand ein zweites Mal an, um sie zu erfahren.
+    const lauf = verarbeite({
+      quelle: quelle([zeile()]),
+      bestandsadressenOhneKennung: [],
+      bestand: () => bestand({ uid: "uid-1" }),
+      schreibend: false,
+    });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].auftrag?.uid).toBe("uid-1");
+  });
+
+  it("lässt die Kennung offen, wo das Konto erst noch entsteht", () => {
+    // Sie entsteht in der Admin-Schnittstelle, nicht hier — `verarbeite` fasst
+    // nichts an, was wirkt.
+    const lauf = verarbeite({
+      quelle: quelle([zeile()]),
+      bestandsadressenOhneKennung: [],
+      bestand: KEIN_BESTAND,
+      schreibend: false,
+    });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].auftrag?.uid).toBeNull();
   });
 
   it("fragt den Bestand mit normalisierter Kennung und Adresse", () => {
@@ -487,6 +517,7 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
 describe("baueBestandsdaten", () => {
   function zeileAusDb(werte: Partial<Bestandszeile> = {}): Bestandszeile {
     return {
+      uid: "uid-bestand",
       kennung: null,
       adresse: "anna@example.org",
       tier: "basic",
@@ -525,6 +556,15 @@ describe("baueBestandsdaten", () => {
     expect(daten.nachKennung.get("318")?.bereitsImportiert).toBe(true);
     expect(daten.nachAdresse.get("anna@example.org")?.bereitsImportiert).toBe(true);
     expect(daten.adressenOhneKennung).toEqual([]);
+  });
+
+  it("trägt die Kennung der Profilzeile unter beiden Schlüsseln mit", () => {
+    // Sie ist das Ziel der Transaktion aus 7.1. Die Abfrage holte sie zuerst
+    // nicht — aufgefallen erst beim Bauen des schreibenden Teils.
+    const daten = baueBestandsdaten([zeileAusDb({ kennung: "318", uid: "uid-1" })]);
+
+    expect(daten.nachKennung.get("318")?.uid).toBe("uid-1");
+    expect(daten.nachAdresse.get("anna@example.org")?.uid).toBe("uid-1");
   });
 
   it("führt ein fremdes Konto ohne Kennung als Kollision", () => {

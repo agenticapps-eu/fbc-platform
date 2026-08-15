@@ -30,6 +30,7 @@ import pg from "pg";
 
 import { type Berichtskopf, type Datensatzergebnis, baueBericht, stdoutZeile } from "./wp_bericht";
 import { normalisiereAdresse, normalisiereKennung } from "./wp_felder";
+import type { Anweisung } from "./wp_schreiben";
 import {
   type Bestand,
   type Vorabbefund,
@@ -98,7 +99,12 @@ export type Bestandsleser = (schluessel: {
 export type Datensatzlauf = {
   ergebnis: Datensatzergebnis;
   /** `null` bei einem übersprungenen Datensatz — dort ist nichts zu schreiben. */
-  auftrag: { anmeldeadresse: string; zusammenfuehrung: Zusammenfuehrung } | null;
+  auftrag: {
+    anmeldeadresse: string;
+    /** `profiles.id`, wo das Konto schon besteht — sonst `null`, es entsteht erst. */
+    uid: string | null;
+    zusammenfuehrung: Zusammenfuehrung;
+  } | null;
 };
 
 export type Lauf =
@@ -190,7 +196,7 @@ export function verarbeite(input: {
           : {}),
         ...(ziel.herkunft.beitritt ? { beitritt: ziel.herkunft.beitritt } : {}),
       },
-      auftrag: { anmeldeadresse, zusammenfuehrung },
+      auftrag: { anmeldeadresse, uid: vorhanden?.uid ?? null, zusammenfuehrung },
     };
   });
 
@@ -308,6 +314,7 @@ const CA_PFAD = "scripts/supabase-root-2021-ca.crt";
  */
 export const BESTANDSABFRAGE = `
   select
+    p.id                                                               as uid,
     pl.legacy_source_id                                                as kennung,
     u.email                                                            as adresse,
     p.tier, p.activated_at,
@@ -328,6 +335,7 @@ export const BESTANDSABFRAGE = `
 `;
 
 export type Bestandszeile = {
+  uid: string;
   kennung: string | null;
   adresse: string | null;
   tier: string | null;
@@ -386,6 +394,7 @@ export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdat
     const eigenerRest = z.tier === "impact" && z.activated_at === null;
 
     const eintrag: Bestand = {
+      uid: z.uid,
       bereitsImportiert: kennung !== null,
       profil: {
         name: z.name,
@@ -419,6 +428,31 @@ export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdat
   }
 
   return daten;
+}
+
+/**
+ * Ein Datensatz, ganz oder gar nicht (7.1). Bricht eine der Anweisungen ab,
+ * bleibt keine halbe Person zurück — ein Profil ohne Kontaktzeile sähe im
+ * Verzeichnis aus wie ein gepflegtes.
+ *
+ * Das Anmeldekonto liegt AUSSERHALB dieser Klammer und kann es nicht anders:
+ * es entsteht in der Admin-Schnittstelle, nicht in dieser Verbindung. Deshalb
+ * erkennt der Lauf einen Datensatz über zwei Schlüssel wieder (Kennung und
+ * normalisierte Adresse) — ein Konto ohne Kennung ist der Rest eines Abbruchs
+ * genau hier.
+ */
+export async function fuehreDatensatzAus(
+  client: pg.Client,
+  anweisungen: readonly Anweisung[],
+): Promise<void> {
+  await client.query("begin");
+  try {
+    for (const anweisung of anweisungen) await client.query(anweisung.sql, anweisung.werte);
+    await client.query("commit");
+  } catch (fehler) {
+    await client.query("rollback");
+    throw fehler;
+  }
 }
 
 async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {

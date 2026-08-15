@@ -125,6 +125,57 @@ und, wo diese fehlt, die normalisierte Adresse.
 
 *Aufgenommen nach dem Review (codex, HIGH). Der Mechanismus war unbestimmt.*
 
+### Der Stufen-Riegel sitzt am Aufrufer, nicht in der Form der Anweisung
+
+**Gekippt gegenüber der ersten Fassung (Donald, 15.08.).** Sie setzte `tier` und
+`activated_at` als reine **Einfügespalten**: im `insert`, nicht im
+`do update set`, damit kein bestehendes Konto auf `impact` gehoben wird.
+
+Nachgemessen gegen den lokalen Stack: das greift nie.
+`on_auth_user_created` (`20260611115655_community_foundation.sql:82`) legt bei
+JEDEM Insert in `auth.users` schon eine Profilzeile an — auch auf dem Admin-Weg,
+mit `tier = 'basic'`. Das Upsert des Imports trifft deshalb **immer** eine
+bestehende Zeile, und eine reine Einfügespalte kommt nie an. Jedes importierte
+Konto wäre `basic` geblieben; acht Tests waren grün, weil sie den SQL-Text
+prüften statt der Datenbank.
+
+Geschrieben wird die Stufe seither, **wenn und nur wenn dieser Lauf das
+Anmeldekonto selbst angelegt hat**. Bei einem bestehenden Konto taucht sie in
+keiner Anweisung auf. Was der alte Riegel abwehren sollte — eine
+Selbstregistrierung unter einer bekannten Mitgliedsadresse erbt `impact` — fängt
+zusätzlich die Vorabprüfung 4.2 ab, die den ganzen Schreiblauf blockiert.
+
+*Verworfen:* ein `case`-Ausdruck im `do update set`, der nur `basic` ohne
+Freischaltung hebt. Er läge in genau dem Fall falsch, den 7.3 meint.
+
+### `email_confirm: true`, obwohl das Konto unaktiviert bleibt
+
+Zwei verschiedene Tore, und nur eines ist hier ein Gate.
+
+Das Gate ist `profiles.activated_at` (AGE-495): es steht auf `null` und bleibt
+es. Der Weg hinein führt über den Link aus dem **eigenen** Postfach —
+`send-activation` verschickt ihn, `redeem-activation` nimmt Token *und* neues
+Passwort entgegen und stempelt erst dann `activated_at`.
+
+`auth.users.email_confirmed_at` ist dagegen GoTrues eigenes Flag und auf dieser
+Plattform kein Gate (`config.toml`: `enable_confirmations = false`). Es nicht zu
+setzen, überspringt nichts — es sperrt aus. Gemessen am 15.08., mit genau dem
+Aufruf aus `redeem-activation:114`:
+
+```
+email_confirm:false → Passwort setzen 200, Anmeldung 400 email_not_confirmed
+email_confirm:true  → Passwort setzen 200, Anmeldung 200
+```
+
+Ohne das Flag klickt ein Mitglied seinen Aktivierungslink, setzt sein Passwort
+und kommt trotzdem nicht hinein — sichtbar erst nach dem Go-Live, bei allen 70
+zugleich.
+
+*Aufgenommen auf Donalds Nachfrage am 15.08., ob der Import nicht unaktiviert
+lassen und über Bestätigung plus Passwort-Setzen laufen sollte. Genau das tut er;
+die Nachfrage hat die Begründung im Code von einer Annahme zu einer Messung
+gemacht.*
+
 ### Vorabprüfung der ganzen Datei vor dem ersten Schreibvorgang
 
 Der geforderte Abbruch bei einer Dublette „ohne jeden Schreibvorgang" ist mit

@@ -631,6 +631,8 @@ export function bildeAb(row: Record<string, string>): Zielsatz {
  * hat trotzdem kein „Ich biete" geschrieben.
  */
 export type Bestand = {
+  /** `profiles.id` — das Ziel der Transaktion aus 7.1. */
+  uid: string;
   /**
    * Trägt dieses Profil bereits die Kennung dieses Imports? Der Unterschied
    * zwischen „hier stand noch nie etwas" und „hier hat jemand aufgeräumt".
