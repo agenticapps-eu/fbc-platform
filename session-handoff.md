@@ -1,7 +1,7 @@
 # Session Handoff — 2026-08-15 (AGE-534: Gruppe 7 komplett, Sichtprobe gefahren)
 
-Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `957c2c6`.
-Arbeitsbaum sauber. **1091 Tests grün**, typecheck, typecheck:seed und lint sauber.
+Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `0df65a7`.
+Arbeitsbaum sauber. **1101 Tests grün**, typecheck, typecheck:seed und lint sauber.
 
 Quelldatei (70 Datensätze, ausserhalb des Arbeitsbaums):
 `/Users/donald/Documents/Claude/Projects/Fair Business Club/user-export-318-6a7da0ec0d721.csv`
@@ -9,17 +9,16 @@ Daneben: `wp-import-bilder/` mit 110 Originalen **und** 109 WebP-Fassungen.
 
 ## Next session: start here
 
-**Donalds Entscheidung zu den zwei offenen Punkten einholen** (unten unter „Open
-questions"), dann **6.3 zu Ende**: die WebP-Dateien in die Buckets, Objektpfad
+**6.3 zu Ende**: die WebP-Dateien in die Buckets, Objektpfad
 `<uid>/…`. Die `uid` gibt es jetzt — 70 Konten stehen lokal in der Datenbank,
 und `profile_legacy.legacy_source_id` verbindet sie mit den Bilddateien.
 Danach Gruppe 8 (Abschluss): Trockenlauf gegen DEV als Gegenprobe, Bericht als
 Datenanforderung an Detlev, und der Diff-Review durch zwei Prüfer.
 
 **Lokaler Zustand, den die nächste Sitzung vorfindet:** 73 Konten (3 Demo + 70
-importiert), alle importierten `impact` und **unaktiviert** — bis auf **fünf**,
-die ich für die Sichtprobe von Hand freigeschaltet habe (Kennungen 254, 248,
-355, 278, 45). Ein `supabase db reset` räumt das weg. Der Sichtproben-Zugang war
+importiert, nach dem Fix der Chips einmal neu aufgesetzt), alle importierten
+`impact` und **unaktiviert** — bis auf **fünf**, die ich für die Sichtprobe von
+Hand freigeschaltet habe (Kennungen 254, 248, 355, 278, 45). Ein `supabase db reset` räumt das weg. Der Sichtproben-Zugang war
 `voll@example.test` / `LokalTesten123!`, `npx vite --port 5173`.
 
 ## Accomplished
@@ -39,6 +38,11 @@ die ich für die Sichtprobe von Hand freigeschaltet habe (Kennungen 254, 248,
 - **7.8** — Sichtprobe über fünf Profile, roh gegen die Quelle **und** im
   Browser. Die Abbildung stimmt Feld für Feld. Fünf Befunde, alle in der
   ANZEIGE (in `tasks.md` unter 7.8 einzeln festgehalten).
+- **Zwei davon behoben** (Donald gab sie frei): `zerlegeInteressen` trennt an
+  Komma und Umbruch — **38 Werte → 128 Chips**, längster 100 statt 162 Zeichen,
+  keiner endet auf Komma, Klammern geschützt; und `whitespace-pre-line` an
+  Biografie und `offers`/`needs` der Profilseite. Gegenprobe 3/3, beides im
+  Browser abgenommen.
 
 ## Decisions
 
@@ -86,19 +90,18 @@ Projekt zu wirken.
 
 ## Open questions
 
-- **Interessen an Kommas trennen?** Donald fragte, ob sich der Text sinnvoll auf
-  Einzelbegriffe abbilden lässt. Gemessen: **38 Werte → 131 Begriffe**, nur 5
-  davon länger als 40 Zeichen (in der Quelle Prosa). Braucht Komma **und**
-  Zeilenumbruch als Trenner, führende Spiegelstriche samt Exporter-Apostroph
-  weg, und die Regel „innerhalb von Klammern nicht trennen". Ändert die
-  Abbildungsmatrix — also Design **und** Spec-Delta. **Entscheidung offen.**
-- **`whitespace-pre-line` an den zwei Renderstellen?** Das Feld gibt es
-  (`profiles.short_bio`, angezeigt unter „Über mich") — es fehlt nur die Klasse.
-  Fremdgebiet innerhalb dieses Changes; eigenes Issue oder hier mitnehmen?
-  **Entscheidung offen.**
-- **Drei Biografien tragen Kontaktdaten** (1 E-Mail, 2 Telefon) und stehen
-  öffentlich auf derselben Seite, die „nie automatisch angezeigt" verspricht.
-  Selbstgeschriebener Text des Mitglieds — Widerspruch bleibt.
+- **Die Abbildung muss VOR dem ersten echten Lauf stimmen.** Die Merge-Regel
+  gibt einem bereits importierten Profil nichts mehr heraus („jede Lücke ist eine
+  Entscheidung"), eine geänderte Abbildung erreicht es also **nie**. Lokal
+  sichtbar geworden: der Lauf mit der neuen Chip-Regel schrieb null, bis die 70
+  Konten neu aufgesetzt waren. Für DEV/PROD heisst das: jede weitere
+  Matrix-Korrektur muss vor dem echten Lauf fallen, danach hilft nur Handarbeit.
+- **Zwei Biografien tragen Kontaktdaten im Fließtext.** Entschieden (Donald,
+  15.08.): **nicht** umziehen — die Felder sind längst gefüllt, und zwar mit den
+  besseren Werten. Der Widerspruch zur Zusage „nie automatisch angezeigt" bleibt
+  bestehen, es ist der selbstgeschriebene Text der Mitglieder.
+- **Eine Biografie trägt Markdown** (`**…**`), die Sternchen stehen wörtlich da.
+  Offen: entfernen, rendern oder lassen.
 - **Header-Grössen nach der ersten Migration prüfen** (Donald, 15.08.).
 - **`paid_until` (3.5)** — hängt an Detlevs Zahlungsständen.
 - **Was sollte in „Mitgliedschaft" (`infos_16`) stehen?** Bestätigen lassen.
