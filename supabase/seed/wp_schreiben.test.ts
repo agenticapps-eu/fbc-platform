@@ -176,10 +176,14 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
     expect(sql(anweisungen, "public.offers")).toHaveLength(2);
     expect(sql(anweisungen, "public.needs")).toHaveLength(1);
     expect(sql(anweisungen, "public.profile_interests")).toHaveLength(1);
-    // `source` steht ausdrücklich da: die Bestandsabfrage zählt nur die Zeilen
-    // des Freitext-Editors. Käme der Wert aus dem Spalten-Default, hinge die
-    // Wiederholbarkeit an einer Voreinstellung, die niemand hier sieht.
+    // `source` steht ausdrücklich da, UND der Wert wird geprüft: die
+    // Bestandsabfrage zählt nur `source = 'editor'`. Stünde hier `chip`, zählte
+    // sie beim zweiten Lauf null Zeilen — und die Merge-Regel legte jedes
+    // Angebot ein zweites Mal an. (Die Gegenprobe fand genau diese Lücke: der
+    // Test sah nur den Spaltennamen.)
     expect(sql(anweisungen, "public.offers")[0]).toContain('"source"');
+    expect(anweisungen.find((a) => a.sql.includes("public.offers"))?.werte).toContain("editor");
+    expect(anweisungen.find((a) => a.sql.includes("public.needs"))?.werte).toContain("editor");
     expect(anweisungen.at(-1)?.werte).toEqual(["uid-1", "Nachhaltigkeit", null]);
   });
 
@@ -238,6 +242,23 @@ describe("legeKontoAn — das Anmeldekonto über die Admin-Schnittstelle", () =>
     const gesendet = JSON.parse(String(gesehen.init?.body));
     expect(gesendet).not.toHaveProperty("password");
     expect(gesendet.email).toBe("anna@example.org");
+  });
+
+  it("bestätigt die Adresse, damit die Aktivierung nicht ins Leere führt", async () => {
+    // Das ist NICHT das Aktivierungs-Gate: `activated_at` bleibt `null`, und der
+    // Weg hinein führt über den Link aus dem eigenen Postfach.
+    // `email_confirmed_at` ist GoTrues eigenes Flag und hier kein Gate
+    // (`config.toml`: enable_confirmations = false). Gemessen am 15.08. mit dem
+    // Aufruf aus redeem-activation:114:
+    //   email_confirm:false → Passwort setzen 200, Anmeldung 400 email_not_confirmed
+    //   email_confirm:true  → Passwort setzen 200, Anmeldung 200
+    // Ohne das Flag klickt ein Mitglied seinen Link, setzt sein Passwort und
+    // kommt trotzdem nicht hinein — bei allen 70 zugleich, erst nach dem Go-Live.
+    const { hole, gesehen } = antwort(200, { id: "uid-1" });
+
+    await legeKontoAn(konto, hole);
+
+    expect(JSON.parse(String(gesehen.init?.body)).email_confirm).toBe(true);
   });
 
   it("gibt die Kennung des angelegten Kontos zurück", async () => {

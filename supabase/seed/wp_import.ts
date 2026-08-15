@@ -450,6 +450,12 @@ export async function fuehreDatensatzAus(
     for (const anweisung of anweisungen) await client.query(anweisung.sql, anweisung.werte);
     await client.query("commit");
   } catch (fehler) {
+    // Die Gegenprobe lässt `rollback` → `commit` grün, und das ist ausnahmsweise
+    // KEINE Testlücke: eine abgebrochene Transaktion nimmt Postgres auch auf
+    // COMMIT zurück — nachgemessen, der Server antwortet darauf wörtlich mit
+    // `ROLLBACK`. Kein Test könnte die beiden unterscheiden. Es steht hier
+    // trotzdem ausgeschrieben, weil der Leser die Absicht sehen soll und nicht
+    // auf eine Eigenheit des Servers vertrauen muss.
     await client.query("rollback");
     throw fehler;
   }
