@@ -412,7 +412,10 @@ describe("ladeBildHoch — der zweite Lauf bricht nicht ab", () => {
 
   it("hält auch einen echten HTTP 409 für „vorhanden\"", async () => {
     // Die Storage-Fassung muss lokal und in DEV/PROD nicht dieselbe sein.
-    const ergebnis = await hoch(storage(409, { error: "Duplicate" }));
+    // OHNE `error: "Duplicate"` im Rumpf — sonst prüft dieser Test den
+    // Rumpf-Zweig ein zweites Mal und den Status-Vergleich nie. Genau das war
+    // er in der ersten Fassung, aufgedeckt von der Mutations-Gegenprobe.
+    const ergebnis = await hoch(storage(409, { message: "already exists" }));
 
     expect(ergebnis.stand).toBe("vorhanden");
   });
@@ -444,6 +447,11 @@ describe("ladeBildHoch — was den Lauf nicht beenden darf (6.4)", () => {
 
     expect(ergebnis.stand).toBe("fehlt");
     expect(gefragt).toBe(false);
+    // Der GRUND muss den Fall benennen. Ohne diese Zusicherung ist der Test
+    // aus dem falschen Grund grün: nimmt man den Wächter weg, wirft
+    // `readFileSync` und wird als „Netzfehler" gefangen — `stand` bliebe
+    // `fehlt` und `gefragt` bliebe `false`. Von der Gegenprobe aufgedeckt.
+    expect(ergebnis.grund).toContain("Zwischenablage");
   });
 
   it("meldet einen abgewiesenen Upload als Befund, statt zu werfen", async () => {
