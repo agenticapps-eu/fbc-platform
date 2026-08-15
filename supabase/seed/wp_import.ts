@@ -306,10 +306,11 @@ const CA_PFAD = "scripts/supabase-root-2021-ca.crt";
  * Kategorie-Wählers (`source = 'chip'`) sind anderer Inhalt, und ein Mitglied
  * mit drei Kategorien hat trotzdem kein „Ich biete" geschrieben.
  */
-const BESTANDSABFRAGE = `
+export const BESTANDSABFRAGE = `
   select
     pl.legacy_source_id                                                as kennung,
     u.email                                                            as adresse,
+    p.tier, p.activated_at,
     p.name, p.headline, p.short_bio, p.region, p.website,
     coalesce(p.socials, '{}'::jsonb)                                   as socials,
     coalesce(p.videos, '{}'::text[])                                   as videos,
@@ -326,9 +327,11 @@ const BESTANDSABFRAGE = `
   left join public.profile_legacy pl  on pl.profile_id = p.id
 `;
 
-type Bestandszeile = {
+export type Bestandszeile = {
   kennung: string | null;
   adresse: string | null;
+  tier: string | null;
+  activated_at: Date | null;
   name: string | null;
   headline: string | null;
   short_bio: string | null;
@@ -348,18 +351,39 @@ type Bestandszeile = {
   interessen: string;
 };
 
-async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
-  const { rows } = await client.query<Bestandszeile>(BESTANDSABFRAGE);
-
+/**
+ * Macht aus den Zeilen der Abfrage das Verzeichnis, in dem der Lauf nachschlägt.
+ * Rein — damit die Regel unten prüfbar ist, ohne eine Datenbank zu brauchen.
+ *
+ * ── WELCHES KONTO OHNE KENNUNG IST EINE KOLLISION? ──────────────────────────
+ * Der Plan verlangte zweierlei vom selben Bestand: ein Konto ohne Kennung, das
+ * zu einer Quelladresse passt, soll den Schreiblauf BLOCKIEREN (4.2) — und ein
+ * Konto, dessen Kennung ein abgebrochener Lauf schuldig blieb, soll ERGÄNZT
+ * werden. Im Bestand sehen beide gleich aus.
+ *
+ * Unterschieden wird an der Handschrift dieses Imports (Entscheidung Donald,
+ * 15.08.): er legt Konten mit `impact` an und schaltet sie nicht frei (7.3),
+ * eine Selbstregistrierung dagegen ist `basic`. Nur ein `impact`-Konto OHNE
+ * Freischaltung gilt als eigener Rest und wird ergänzt; jedes andere bleibt
+ * Kollision. Ist es bereits freigeschaltet, benutzt es jemand — dann ist es
+ * keiner unserer Reste, egal welche Stufe es trägt.
+ *
+ * Der Restrisiko-Fall, der damit falsch läge: ein von Hand angelegtes, noch
+ * nicht freigeschaltetes `impact`-Konto. Es würde ergänzt statt blockiert — es
+ * trüge aber ohnehin schon die höchste Stufe, die Sorge aus 4.2 (eine Stufe
+ * verschenken) greift dort nicht.
+ */
+export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdaten {
   const daten: Bestandsdaten = {
     adressenOhneKennung: [],
     nachKennung: new Map(),
     nachAdresse: new Map(),
   };
 
-  for (const z of rows) {
+  for (const z of zeilen) {
     const kennung = normalisiereKennung(z.kennung ?? "");
     const adresse = normalisiereAdresse(z.adresse ?? "");
+    const eigenerRest = z.tier === "impact" && z.activated_at === null;
 
     const eintrag: Bestand = {
       bereitsImportiert: kennung !== null,
@@ -390,11 +414,16 @@ async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
     if (kennung) daten.nachKennung.set(kennung, eintrag);
     if (adresse) {
       daten.nachAdresse.set(adresse, eintrag);
-      if (!kennung) daten.adressenOhneKennung.push(adresse);
+      if (!kennung && !eigenerRest) daten.adressenOhneKennung.push(adresse);
     }
   }
 
   return daten;
+}
+
+async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
+  const { rows } = await client.query<Bestandszeile>(BESTANDSABFRAGE);
+  return baueBestandsdaten(rows);
 }
 
 function verbindungsUrl(ziel: ZielName): string | undefined {

@@ -41,6 +41,13 @@ Adresse und Kennung SHALL vor dem Vergleich normalisiert werden: Adressen
 getrimmt und auf Kleinschreibung gefaltet, Kennungen getrimmt und als nichtleer
 verlangt.
 
+Ein Konto ohne Kennung ist aber **nicht in jedem Fall** ein solcher Rest — es
+kann ebenso eine Selbstregistrierung sein, und beide sehen im Bestand gleich aus.
+Unterschieden SHALL an den Merkmalen werden, die der Import selbst setzt:
+Mitgliedsstufe `impact` und keine Freischaltung (`activated_at` nicht gesetzt).
+Nur ein so gekennzeichnetes Konto SHALL ergänzt werden; jedes andere Konto ohne
+Kennung fällt unter „Bestandskonten werden nicht übernommen und nicht erhoben".
+
 #### Scenario: Zweiter Lauf über denselben Bestand
 
 - **GIVEN** ein vollständiger schreibender Lauf ist durchgelaufen
@@ -55,6 +62,13 @@ verlangt.
 - **WHEN** der Import erneut über denselben Datensatz läuft
 - **THEN** erkennt er das Konto an seiner Adresse, ergänzt die fehlende Kennung
   und legt kein zweites Konto an
+
+#### Scenario: Ein fremdes Konto ohne Kennung wird nicht ergänzt
+
+- **GIVEN** ein Konto ohne Kennung, dessen Mitgliedsstufe nicht `impact` ist
+- **WHEN** der Import über einen Datensatz mit derselben Adresse läuft
+- **THEN** ergänzt er es nicht, sondern behandelt es als Kollision mit einem
+  Bestandskonto
 
 ### Requirement: Ein zweiter Lauf überschreibt keine Pflege des Mitglieds
 
@@ -116,7 +130,9 @@ beiden kann sich der Bestand geändert haben.
 ### Requirement: Bestandskonten werden nicht übernommen und nicht erhoben
 
 Auf der Zielplattform existieren Konten ohne Kennung aus dem Altsystem —
-Testkonten, Zweitkonten und jede Selbstregistrierung.
+Testkonten, Zweitkonten und jede Selbstregistrierung. **Nicht** dazu zählt ein
+Konto, das dieser Import selbst angelegt hat und dessen Kennung ein abgebrochener
+Lauf schuldig blieb; es trägt `impact` ohne Freischaltung und wird ergänzt.
 
 Trifft die Vorabprüfung eine Quelladresse, zu der bereits ein solches Konto
 besteht, SHALL sie den schreibenden Lauf blockieren und den Fall auflisten.

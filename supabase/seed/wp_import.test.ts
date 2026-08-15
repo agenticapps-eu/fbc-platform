@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { type Bestand, QUELLFELDER } from "./wp_import.lib";
 import {
   type Bestandsdaten,
+  type Bestandszeile,
   type Quelle,
+  baueBestandsdaten,
   baueLauf,
   bestandsleser,
   leseDatensaetze,
@@ -479,5 +481,123 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
 
     expect(bericht).toMatch(/\| angelegt \| 2 \|/);
     expect(bericht).toMatch(/\*\*Summe\*\* \| \*\*2\*\*/);
+  });
+});
+
+describe("baueBestandsdaten", () => {
+  function zeileAusDb(werte: Partial<Bestandszeile> = {}): Bestandszeile {
+    return {
+      kennung: null,
+      adresse: "anna@example.org",
+      tier: "basic",
+      activated_at: null,
+      name: null,
+      headline: null,
+      short_bio: null,
+      region: null,
+      website: null,
+      socials: null,
+      videos: null,
+      kontakt_email: null,
+      phone: null,
+      street: null,
+      postal_code: null,
+      city: null,
+      state: null,
+      country: null,
+      offers: "0",
+      needs: "0",
+      interessen: "0",
+      ...werte,
+    };
+  }
+
+  it("legt ein Konto mit Kennung unter beide Schlüssel und merkt es als importiert", () => {
+    // Der Normalfall nach dem Go-Live: importiert UND inzwischen freigeschaltet.
+    const daten = baueBestandsdaten([
+      zeileAusDb({
+        kennung: "318",
+        tier: "impact",
+        activated_at: new Date("2026-08-20T00:00:00Z"),
+      }),
+    ]);
+
+    expect(daten.nachKennung.get("318")?.bereitsImportiert).toBe(true);
+    expect(daten.nachAdresse.get("anna@example.org")?.bereitsImportiert).toBe(true);
+    expect(daten.adressenOhneKennung).toEqual([]);
+  });
+
+  it("führt ein fremdes Konto ohne Kennung als Kollision", () => {
+    const daten = baueBestandsdaten([zeileAusDb({ tier: "basic" })]);
+
+    expect(daten.adressenOhneKennung).toEqual(["anna@example.org"]);
+  });
+
+  it("führt den Rest eines abgebrochenen eigenen Laufs NICHT als Kollision", () => {
+    // `impact` ohne Freischaltung ist die Handschrift dieses Imports (7.3). Ein
+    // solches Konto zu blockieren hiesse, dass ein abgebrochener Lauf jeden
+    // weiteren aufhält — es wird ergänzt (Entscheidung Donald, 15.08.).
+    const daten = baueBestandsdaten([zeileAusDb({ tier: "impact", activated_at: null })]);
+
+    expect(daten.adressenOhneKennung).toEqual([]);
+    expect(daten.nachAdresse.get("anna@example.org")?.bereitsImportiert).toBe(false);
+  });
+
+  it("führt ein freigeschaltetes impact-Konto ohne Kennung als Kollision", () => {
+    // Freigeschaltet heisst: da benutzt jemand das Konto. Dann ist es keiner
+    // unserer Reste, egal welche Stufe es trägt.
+    const daten = baueBestandsdaten([
+      zeileAusDb({ tier: "impact", activated_at: new Date("2026-08-01T00:00:00Z") }),
+    ]);
+
+    expect(daten.adressenOhneKennung).toEqual(["anna@example.org"]);
+  });
+
+  it("wandelt die Zählwerte von `count(*)` in Zahlen", () => {
+    // `bigint` kommt als Zeichenkette — ungewandelt wäre "0" wahr, und die
+    // Merge-Regel hielte jedes Profil für belegt.
+    const daten = baueBestandsdaten([zeileAusDb({ offers: "1", needs: "2", interessen: "3" })]);
+    const eintrag = daten.nachAdresse.get("anna@example.org");
+
+    expect(eintrag?.offers).toBe(1);
+    expect(eintrag?.needs).toBe(2);
+    expect(eintrag?.interessen).toBe(3);
+  });
+
+  it("macht aus fehlenden socials und videos leere Werte, nicht null", () => {
+    const eintrag = baueBestandsdaten([zeileAusDb()]).nachAdresse.get("anna@example.org");
+
+    expect(eintrag?.profil.socials).toEqual({});
+    expect(eintrag?.profil.videos).toEqual([]);
+  });
+
+  it("reicht das durch, was im Ziel steht — sonst füllte die Merge-Regel es zu", () => {
+    // Was hier verloren ginge, sähe für `fuegeZusammen` wie ein leeres Ziel aus:
+    // der Import überschriebe die Pflege des Mitglieds, statt sie stehen zu
+    // lassen. Deshalb je ein belegtes Feld aus beiden Tabellen.
+    const eintrag = baueBestandsdaten([
+      zeileAusDb({
+        socials: { xing: "https://xing.example/anna" },
+        videos: ["https://youtu.be/abc"],
+        kontakt_email: "post@example.org",
+        phone: "+49 30 123",
+        city: "Bad Homburg",
+      }),
+    ]).nachAdresse.get("anna@example.org");
+
+    expect(eintrag?.profil.socials).toEqual({ xing: "https://xing.example/anna" });
+    expect(eintrag?.profil.videos).toEqual(["https://youtu.be/abc"]);
+    expect(eintrag?.kontakt.email).toBe("post@example.org");
+    expect(eintrag?.kontakt.phone).toBe("+49 30 123");
+    expect(eintrag?.kontakt.city).toBe("Bad Homburg");
+  });
+
+  it("normalisiert Adresse und Kennung aus der Datenbank", () => {
+    const daten = baueBestandsdaten([
+      zeileAusDb({ kennung: " 318 ", adresse: "  Anna@Example.ORG " }),
+    ]);
+
+    expect(daten.nachKennung.has("318")).toBe(true);
+    expect(daten.nachAdresse.has("anna@example.org")).toBe(true);
   });
 });
