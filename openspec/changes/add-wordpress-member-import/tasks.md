@@ -120,8 +120,10 @@
 ## 7. Schreibender Lauf
 
 - [ ] 7.1 Anmeldekonto über die Admin-Schnittstelle, **ohne Passwort**; danach eine Transaktion über `profiles`, `profile_contacts` und `profile_legacy`
+      — **die Anweisungen stehen, das Konto und die Transaktion nicht.** `wp_schreiben.ts` (`schreibsatz`, `NEUES_KONTO`), 8 Tests, 8/8 Mutationen rot. Zwei Dinge, die dort nicht verwechselt werden dürfen: **Spaltennamen gehen unparametrisiert in den Text, Werte niemals** — die Werte kommen aus einer fremden CSV, und ein Apostroph im Namen zerlegte ein zusammengesetztes Statement. Die Spalten sind deshalb eine feste Liste im Code; eine unbekannte **wirft**, statt still ausgelassen zu werden (sie käme aus der Abbildung, nicht aus der Datei). Ein Feld, das nicht im Auftrag steht, kommt auch nicht ins Statement — die Merge-Regel aus 3.7, bis hierher durchgehalten. Gegen den lokalen Stack gehalten (Transaktion mit Rollback): alle drei Anweisungen laufen, und der **zweite** Durchgang bricht nicht.
 - [ ] 7.2 Wiedererkennung über Kennung **und** normalisierte Adresse; Test: Konto ohne Kennung wird ergänzt statt doppelt angelegt
 - [ ] 7.3 Importierte Konten: `tier = 'impact'`, `activated_at = null` (Test)
+      — **die Regel ist gebaut und geprüft, der Lauf fehlt noch.** `NEUES_KONTO` steht in den Einfüge-, aber **nicht** in den `do update set`-Spalten. Das ist derselbe Riegel wie 4.2 an anderer Stelle: stünde `tier` dort, genügte eine Selbstregistrierung unter einer bekannten Mitgliedsadresse, um `impact` geschenkt zu bekommen. Zwei Mutationen halten es fest (`basic` statt `impact`, und eine gesetzte Freischaltung).
 - [ ] 7.4 Kein Versand, kein Token — Test belegt, dass ein Lauf über 70 Datensätze keinen Aktivierungsversand auslöst
 - [ ] 7.5 Ein fehlerhafter Datensatz beendet den Lauf nicht (Test mit absichtlich kaputtem Satz)
 - [ ] 7.6 Dublette im **letzten** Datensatz: null Schreibvorgänge (Test)
