@@ -440,6 +440,17 @@ export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdat
  * erkennt der Lauf einen Datensatz über zwei Schlüssel wieder (Kennung und
  * normalisierte Adresse) — ein Konto ohne Kennung ist der Rest eines Abbruchs
  * genau hier.
+ *
+ * ── WAS DER AUFRUFER VORHER GETAN HABEN MUSS ────────────────────────────────
+ * `stufeFuerNeuesKonto` läuft VOR dieser Klammer, in einer eigenen Anweisung.
+ * Das ist nicht Geschmack, sondern die Bedingung dafür, dass der obige Satz
+ * stimmt: `baueBestandsdaten` erkennt einen eigenen Rest an `impact` ohne
+ * Freischaltung. Stünde die Stufe in dieser Transaktion, hinterliesse ein
+ * Abbruch ein Konto mit `basic` — also KEINEN erkennbaren Rest, sondern eine
+ * Kollision, die jeden weiteren Schreiblauf blockiert (gefunden im Review).
+ *
+ * Und keine äussere Transaktion um diesen Aufruf legen: ein verschachteltes
+ * `begin` ist ein No-op, und das `commit` hier schlösse die äussere Klammer.
  */
 export async function fuehreDatensatzAus(
   client: pg.Client,
@@ -456,7 +467,15 @@ export async function fuehreDatensatzAus(
     // `ROLLBACK`. Kein Test könnte die beiden unterscheiden. Es steht hier
     // trotzdem ausgeschrieben, weil der Leser die Absicht sehen soll und nicht
     // auf eine Eigenheit des Servers vertrauen muss.
-    await client.query("rollback");
+    // Der Rücknahme-Befehl darf den Grund nicht ersetzen: bricht die Verbindung
+    // weg, wirft er selbst — und der Bericht (7.5) schriebe „Connection
+    // terminated" statt der Verletzung, die den Datensatz wirklich kippte.
+    // Zurückgenommen wird serverseitig ohnehin.
+    try {
+      await client.query("rollback");
+    } catch {
+      /* der eigentliche Fehler zählt */
+    }
     throw fehler;
   }
 }

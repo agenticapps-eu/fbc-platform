@@ -958,6 +958,24 @@ describe("fuegeZusammen — Verwaltungsfelder", () => {
     expect(ergebnis.legacy).toEqual({ legacy_source_id: "318", legacy_tier: "Premium-Mitglied" });
   });
 
+  it("löscht eine vorhandene Kennung NICHT, wenn die Quelle keine führt", () => {
+    // Aus dem Review. Die Kennung stand als Pflichtfeld im Ergebnis, `null`
+    // eingeschlossen — und `schreibsatz` schrieb sie damit über `do update set`
+    // in eine bestehende Zeile. Ein Datensatz ohne `source_user_id` (die
+    // Vorabprüfung lässt ihn durch) wird über die ADRESSE einem bereits
+    // importierten Profil zugeordnet und hätte dessen Kennung gelöscht.
+    //
+    // Die Folge wäre die Merge-Regel selbst gewesen: ohne Kennung ist
+    // `bereitsImportiert` beim nächsten Lauf `false`, und dann füllt er genau
+    // die Felder wieder auf, die ein Mitglied gelöscht hat.
+    const ergebnis = fuegeZusammen(
+      bildeAb(zeile({ source_user_id: "", Mitgliedschaft: "" })),
+      bestand({ bereitsImportiert: true }),
+    );
+
+    expect(ergebnis.legacy).toEqual({});
+  });
+
   it("löscht ein Verwaltungsfeld nicht, nur weil die Quelle es nicht führt", () => {
     // „Immer aktualisieren" heisst nicht „immer schreiben": 66 der 70
     // Datensätze führen keine Mitgliedschaft. Ein Update mit `null` nähme dem

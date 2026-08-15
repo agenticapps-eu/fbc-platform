@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Zusammenfuehrung } from "./wp_import.lib";
-import { NEUES_KONTO, legeKontoAn, schreibauftrag, schreibsatz } from "./wp_schreiben";
+import { legeKontoAn, schreibauftrag, schreibsatz, stufeFuerNeuesKonto } from "./wp_schreiben";
 
 describe("schreibsatz", () => {
   it("schreibt nur die Felder, die im Auftrag stehen", () => {
@@ -102,7 +102,6 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
   it("schreibt profiles, profile_contacts und profile_legacy unter derselben Kennung", () => {
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: true,
       zusammenfuehrung: zusammenfuehrung({
         kontakt: { email: "anna@example.org", city: "Bad Homburg" },
       }),
@@ -119,50 +118,68 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
     // übrigen zeigen alle auf `profiles.id`.
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: true,
       zusammenfuehrung: zusammenfuehrung({ offers: [{ title: "Beratung", description: "" }] }),
     });
 
     expect(anweisungen[0].sql).toContain("public.profiles");
   });
 
-  it("gibt einem frisch angelegten Konto impact — der Trigger legt die Zeile vor uns an", () => {
-    // GEMESSEN, nicht angenommen: `on_auth_user_created` legt beim Anlegen über
-    // die Admin-Schnittstelle bereits `public.profiles` an, mit `tier = 'basic'`
-    // (community_foundation.sql:82, six_level_model.sql:87). Das Upsert trifft
-    // deshalb IMMER eine bestehende Zeile — eine reine Einfügespalte käme nie an.
+  it("fasst die Stufe in KEINER Anweisung der Transaktion an", () => {
+    // Aus dem Review (beide Leser, unabhängig): stünde `tier` im `do update set`
+    // der Datensatz-Transaktion, hinge die Invariante aus 4.2/7.3 an einem
+    // Merker, den der Aufrufer richtig setzen muss. Sie hängt jetzt nicht mehr
+    // daran — die Stufe steht in einer EIGENEN Anweisung, die nur hinter einem
+    // frisch angelegten Konto gebaut werden kann (`stufeFuerNeuesKonto`).
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: true,
-      zusammenfuehrung: zusammenfuehrung(),
-    });
-
-    const profil = sql(anweisungen, "public.profiles")[0];
-    expect(profil).toContain('"tier" = excluded."tier"');
-    expect(profil).toContain('"activated_at" = excluded."activated_at"');
-    expect(anweisungen[0].werte).toContain("impact");
-  });
-
-  it("fasst die Stufe eines bestehenden Kontos nicht an", () => {
-    // Der Kern von 4.2/7.3: der Import hebt niemanden auf die höchste Stufe, der
-    // schon ein Konto hat. Bei „aktualisiert" kommt die Stufe in keiner Form vor.
-    const anweisungen = schreibauftrag({
-      uid: "uid-1",
-      neuAngelegt: false,
       zusammenfuehrung: zusammenfuehrung(),
     });
 
     for (const a of anweisungen) {
-      expect(a.sql).not.toContain('"tier"');
-      expect(a.sql).not.toContain('"activated_at"');
+      expect(a.sql).not.toContain("tier");
+      expect(a.sql).not.toContain("activated_at");
       expect(a.werte).not.toContain("impact");
     }
+  });
+
+  it("kann die Stufe nicht einmal versehentlich in den Auftrag bekommen", () => {
+    // `tier` und `activated_at` stehen NICHT mehr auf der Spaltenliste. Ein
+    // Auftrag, der sie doch trüge — Spaltenerweiterung, `as`, dynamisch gebaute
+    // Zusammenführung — wirft, statt still zu schreiben.
+    expect(() =>
+      schreibauftrag({
+        uid: "uid-1",
+        zusammenfuehrung: zusammenfuehrung({
+          profil: { tier: "impact" } as unknown as Zusammenfuehrung["profil"],
+        }),
+      }),
+    ).toThrow(/Unbekannte Spalte/);
+  });
+
+  it("gibt einem frisch angelegten Konto impact — in einer eigenen Anweisung", () => {
+    // GEMESSEN, nicht angenommen: `on_auth_user_created` legt beim Anlegen über
+    // die Admin-Schnittstelle bereits `public.profiles` an, mit `tier = 'basic'`
+    // (community_foundation.sql:82, six_level_model.sql:87). Die Stufe muss also
+    // geschrieben werden — aber nicht im Auftrag, sondern hier.
+    const anweisung = stufeFuerNeuesKonto({ stand: "angelegt", uid: "uid-1" });
+
+    expect(anweisung.sql).toContain("update public.profiles");
+    expect(anweisung.sql).toContain("'impact'");
+    expect(anweisung.werte).toEqual(["uid-1"]);
+  });
+
+  it("hebt mit dieser Anweisung nur ein unfreigeschaltetes Konto", () => {
+    // Sie kann nur hinter einem gerade angelegten Konto gebaut werden — der Typ
+    // erzwingt das. Die Bedingung ist der zweite Riegel: ein freigeschaltetes
+    // Konto benutzt jemand, und dann ist es keiner unserer Reste.
+    expect(stufeFuerNeuesKonto({ stand: "angelegt", uid: "uid-1" }).sql).toContain(
+      '"activated_at" is null',
+    );
   });
 
   it("legt Angebote, Gesuche und Interessen als eigene Zeilen an", () => {
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: false,
       zusammenfuehrung: zusammenfuehrung({
         offers: [
           { title: "Beratung", description: "seit 1998" },
@@ -190,7 +207,6 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
   it("schreibt nichts für eine leere Liste", () => {
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: false,
       zusammenfuehrung: zusammenfuehrung(),
     });
 
@@ -204,7 +220,6 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
     // in der Transaktion landen und im Bericht als Schreibvorgang zählen.
     const anweisungen = schreibauftrag({
       uid: "uid-1",
-      neuAngelegt: false,
       zusammenfuehrung: zusammenfuehrung({ profil: {}, kontakt: {} }),
     });
 
@@ -289,24 +304,20 @@ describe("legeKontoAn — das Anmeldekonto über die Admin-Schnittstelle", () =>
   });
 });
 
-describe("NEUES_KONTO — was nur beim Anlegen gilt", () => {
-  it("gibt einem neuen Konto impact und keine Freischaltung", () => {
-    expect(NEUES_KONTO).toEqual({ tier: "impact", activated_at: null });
-  });
-
-  it("kommt nur an Konten, die dieser Lauf selbst angelegt hat", () => {
-    // Der Kern von 4.2/7.3. Der Riegel sitzt am Aufrufer und NICHT in der Form
-    // der Anweisung: eine reine Einfügespalte käme nie an, weil der Trigger
-    // `on_auth_user_created` die Profilzeile vor uns anlegt (gemessen, 15.08.).
-    // Sonst genügte eine Selbstregistrierung unter einer bekannten
-    // Mitgliedsadresse, um die höchste Stufe geschenkt zu bekommen.
-    const satz = schreibsatz({
-      tabelle: "public.profiles",
-      schluessel: { spalte: "id", wert: "uid-1" },
-      felder: { name: "Anna Berg", ...NEUES_KONTO },
-    });
-
-    expect(satz?.sql).toContain('"tier" = excluded."tier"');
-    expect(satz?.werte).toEqual(["uid-1", "Anna Berg", "impact", null]);
+describe("die Stufe kommt an keinen Datensatz-Weg heran", () => {
+  it("weist `tier` auch dann ab, wenn es von Hand in einen Schreibsatz gerät", () => {
+    // Der Kern von 4.2/7.3, jetzt strukturell: `tier` und `activated_at` stehen
+    // nicht mehr auf der Spaltenliste. Der einzige Weg, auf dem die Stufe je
+    // geschrieben wird, ist `stufeFuerNeuesKonto` — und das verlangt den
+    // `angelegt`-Zweig von `Kontoergebnis`.
+    for (const spalte of ["tier", "activated_at"]) {
+      expect(() =>
+        schreibsatz({
+          tabelle: "public.profiles",
+          schluessel: { spalte: "id", wert: "uid-1" },
+          felder: { [spalte]: "impact" },
+        }),
+      ).toThrow(/Unbekannte Spalte/);
+    }
   });
 });

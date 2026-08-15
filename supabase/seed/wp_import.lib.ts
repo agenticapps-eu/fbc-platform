@@ -672,7 +672,7 @@ export type Bestand = {
 export type Zusammenfuehrung = {
   profil: Partial<Zielsatz["profil"]>;
   kontakt: Partial<Zielsatz["kontakt"]>;
-  legacy: { legacy_source_id: string | null; legacy_tier?: string };
+  legacy: { legacy_source_id?: string; legacy_tier?: string };
   offers: Zielsatz["offers"];
   needs: Zielsatz["needs"];
   interessen: Zielsatz["interessen"];
@@ -789,9 +789,15 @@ export function fuegeZusammen(ziel: Zielsatz, bestand: Bestand | null): Zusammen
 
   if (ziel.profil.member_since !== null) profil.member_since = ziel.profil.member_since;
 
-  const legacy: Zusammenfuehrung["legacy"] = {
-    legacy_source_id: ziel.legacy.legacy_source_id,
-  };
+  // Beide Verwaltungsfelder gleich behandelt, und beide nur, wenn die Quelle sie
+  // führt. Die Kennung stand hier als Pflichtfeld — `null` eingeschlossen — und
+  // wurde damit über `do update set` in eine bestehende Zeile geschrieben: ein
+  // Datensatz ohne `source_user_id` löschte die Kennung des Profils, dem er über
+  // die Adresse zugeordnet wurde. Beim nächsten Lauf wäre `bereitsImportiert`
+  // dadurch `false` und die Merge-Regel füllte die Löschungen des Mitglieds
+  // wieder auf — genau das, wogegen der Abschnitt oben geschrieben ist.
+  const legacy: Zusammenfuehrung["legacy"] = {};
+  if (ziel.legacy.legacy_source_id !== null) legacy.legacy_source_id = ziel.legacy.legacy_source_id;
   if (ziel.legacy.legacy_tier !== null) legacy.legacy_tier = ziel.legacy.legacy_tier;
 
   const liste = <T>(zeilen: T[], vorhanden: number, name: string): T[] => {

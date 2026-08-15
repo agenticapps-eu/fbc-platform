@@ -148,6 +148,30 @@ zusätzlich die Vorabprüfung 4.2 ab, die den ganzen Schreiblauf blockiert.
 *Verworfen:* ein `case`-Ausdruck im `do update set`, der nur `basic` ohne
 Freischaltung hebt. Er läge in genau dem Fall falsch, den 7.3 meint.
 
+**Zweite Korrektur, nach dem Code-Review (15.08.).** Die Fassung oben steuerte
+die Stufe über einen Merker `neuAngelegt` im Auftrag. Beide Reviewer fanden
+daran unabhängig dasselbe: die Invariante hing damit an der Sorgfalt eines
+Aufrufers, den es noch nicht gibt. Ein pauschales `true` in der Schleife von 7.2
+hätte jedes wiedererkannte Bestandskonto auf `impact` gehoben **und eine
+gesetzte Freischaltung auf `null` zurückgesetzt** — Letzteres war vorher
+unmöglich.
+
+Schwerer wog der zweite Befund: eine **abgebrochene** Transaktion hinterliess
+ein Konto mit `tier = 'basic'` (dem Trigger-Wert). `baueBestandsdaten` erkennt
+einen eigenen Rest aber an `impact` ohne Freischaltung — der Rest wäre also als
+**Kollision** gewertet worden und hätte über `pruefeVorab` **jeden weiteren
+Schreiblauf blockiert**, bis jemand das Konto von Hand löscht. Genau das, was
+7.5 ausschliessen soll.
+
+Beides fällt weg, wenn die Stufe dorthin gehört, wo das Konto entsteht: in eine
+**eigene Anweisung direkt hinter dem Anlegen und vor der Transaktion**
+(`stufeFuerNeuesKonto`). Dann steht die Handschrift des Imports schon da, bevor
+irgendetwas scheitern kann. Der Riegel ist seither der **Typ** — das Argument
+ist der `angelegt`-Zweig von `Kontoergebnis`, ein bestehendes Konto lässt sich
+gar nicht einsetzen — plus `activated_at is null` in der Anweisung selbst.
+`tier` und `activated_at` sind zusätzlich von der Spaltenliste genommen: ein
+Auftrag, der sie trüge, wirft.
+
 ### `email_confirm: true`, obwohl das Konto unaktiviert bleibt
 
 Zwei verschiedene Tore, und nur eines ist hier ein Gate.

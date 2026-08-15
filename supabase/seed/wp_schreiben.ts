@@ -18,38 +18,29 @@
 import type { Zusammenfuehrung } from "./wp_import.lib";
 
 /**
- * Was ein Konto bekommt, das DIESER Lauf gerade angelegt hat (Aufgabe 7.3).
- *
- * ── WARUM DAS AM AUFRUFER HÄNGT UND NICHT AN DER FORM DER ANWEISUNG ─────────
- * Eine frühere Fassung setzte diese beiden Werte als reine EINFÜGESPALTEN: sie
- * standen im `insert`, aber nicht im `do update set`, damit ein bestehendes
- * Konto nicht auf die höchste Stufe gehoben wird.
- *
- * Gemessen am 15.08. gegen den lokalen Stack: das greift nie.
- * `on_auth_user_created` (community_foundation.sql:82) legt bei JEDEM Insert in
- * `auth.users` schon eine Profilzeile an — auch auf dem Admin-Weg, mit
- * `tier = 'basic'`. Das Upsert des Imports trifft deshalb immer eine bestehende
- * Zeile, und eine reine Einfügespalte kommt nie an. Jedes importierte Konto wäre
- * `basic` geblieben, und die acht Tests davor haben es nicht gesehen, weil sie
- * den SQL-Text prüften statt der Datenbank.
- *
- * Der Riegel sitzt seither dort, wo er tragen kann (Entscheidung Donald,
- * 15.08.): geschrieben wird die Stufe, wenn und nur wenn dieser Lauf das
- * Anmeldekonto selbst angelegt hat. Bei einem bestehenden Konto taucht sie in
- * keiner Anweisung auf. Was der alte Riegel abwehren sollte — eine
- * Selbstregistrierung unter einer bekannten Mitgliedsadresse erbt `impact` —
- * fängt zusätzlich die Vorabprüfung 4.2 ab, die den ganzen Schreiblauf
- * blockiert, sobald eine Quelladresse einem Bestandskonto ohne Kennung gehört.
- *
- * `activated_at` bleibt `null`: der Zugang entsteht dadurch, dass ein Mitglied
- * seine Adresse selbst auf der Plattform eingibt. Das Aktivierungs-Gate ist bei
- * importierten Konten die einzige Hürde — der Import darf sie nicht wegnehmen.
+ * Die Zieltabellen, ausgeschrieben. Der Name geht — wie die Spalten —
+ * unparametrisiert in den Text; ein Union-Typ ist die kleinste Fassung, die
+ * verhindert, dass ihn je ein Aufrufer aus einer Abbildung reicht.
+ * (Aus dem Sicherheits-Review: Spalte geprüft, Tabelle nicht, war eine
+ * Asymmetrie, die genau dann auffällt, wenn sie schon benutzt wird.)
  */
-export const NEUES_KONTO = { tier: "impact", activated_at: null } as const;
+type Zieltabelle =
+  | "public.profiles"
+  | "public.profile_contacts"
+  | "public.profile_legacy"
+  | "public.offers"
+  | "public.needs"
+  | "public.profile_interests";
 
 /**
- * Jede Spalte, die dieser Import je schreibt. Die Liste ist die Grenze zwischen
- * „Text, den wir geschrieben haben" und „Wert, der aus der Quelle kommt".
+ * Jede Spalte, die dieser Import je in einem DATENSATZ schreibt. Die Liste ist
+ * die Grenze zwischen „Text, den wir geschrieben haben" und „Wert, der aus der
+ * Quelle kommt".
+ *
+ * `tier` und `activated_at` stehen bewusst NICHT darauf. Sie sind kein Feld des
+ * Datensatzes, sondern gehören zum Anlegen des Kontos — siehe
+ * `stufeFuerNeuesKonto`. Dadurch WIRFT jeder Versuch, sie über einen Auftrag zu
+ * schreiben, statt still durchzugehen.
  */
 const SPALTEN = new Set([
   // Schlüssel
@@ -66,8 +57,6 @@ const SPALTEN = new Set([
   "videos",
   "avatar_url",
   "cover_url",
-  "tier",
-  "activated_at",
   // profile_contacts
   "email",
   "phone",
@@ -110,7 +99,7 @@ export type Anweisung = { sql: string; werte: unknown[] };
  * gepflegt hat.
  */
 export function schreibsatz(input: {
-  tabelle: string;
+  tabelle: Zieltabelle;
   schluessel: { spalte: string; wert: string };
   felder: Record<string, unknown>;
 }): Anweisung | null {
@@ -136,9 +125,14 @@ export function schreibsatz(input: {
  * liesse, und sollen ihn auch nicht bekommen. Zweimal geschrieben werden sie
  * trotzdem nicht: die Merge-Regel aus 3.7 gibt eine Liste nur heraus, solange im
  * Ziel keine einzige Zeile steht.
+ *
+ * KEIN Leer-Wächter wie in `schreibsatz`, und das ist Absicht: ein leeres
+ * `felder` ergäbe hier gültiges SQL (`insert into t ("profile_id") values ($1)`)
+ * statt eines Syntaxfehlers — und erreichbar ist der Fall ohnehin nicht, weil
+ * jede Liste feste Felder mitbringt.
  */
 function einfuegesatz(input: {
-  tabelle: string;
+  tabelle: Zieltabelle;
   schluessel: { spalte: string; wert: string };
   felder: Record<string, unknown>;
 }): Anweisung {
@@ -164,8 +158,6 @@ function einfuegesatz(input: {
  */
 export function schreibauftrag(input: {
   uid: string;
-  /** Hat DIESER Lauf das Anmeldekonto angelegt? Entscheidet über `NEUES_KONTO`. */
-  neuAngelegt: boolean;
   zusammenfuehrung: Zusammenfuehrung;
 }): Anweisung[] {
   const { uid, zusammenfuehrung: auftrag } = input;
@@ -176,7 +168,7 @@ export function schreibauftrag(input: {
     schreibsatz({
       tabelle: "public.profiles",
       schluessel: alsProfil,
-      felder: { ...auftrag.profil, ...(input.neuAngelegt ? NEUES_KONTO : {}) },
+      felder: { ...auftrag.profil },
     }),
     schreibsatz({
       tabelle: "public.profile_contacts",
@@ -231,6 +223,48 @@ export function schreibauftrag(input: {
 export type Kontoergebnis = { stand: "angelegt"; uid: string } | { stand: "fehler"; grund: string };
 
 /**
+ * Die Stufe für ein Konto, das DIESER Lauf gerade angelegt hat (Aufgabe 7.3).
+ *
+ * ── WARUM DAS EINE EIGENE ANWEISUNG IST UND NICHT IM AUFTRAG STEHT ──────────
+ * Zwei Fassungen davor sind gefallen, beide gemessen:
+ *
+ * 1. Als reine EINFÜGESPALTE (`insert`, nicht `do update set`) kam sie nie an:
+ *    `on_auth_user_created` (community_foundation.sql:82) legt bei JEDEM Insert
+ *    in `auth.users` schon eine Profilzeile an — auch auf dem Admin-Weg, mit
+ *    `tier = 'basic'`. Jedes importierte Konto wäre `basic` geblieben, bei acht
+ *    grünen Tests, die den SQL-Text prüften statt der Datenbank.
+ *
+ * 2. Im `do update set` der Datensatz-Transaktion, gesteuert von einem Merker
+ *    `neuAngelegt`, hing die Invariante aus 4.2/7.3 an der Sorgfalt des
+ *    Aufrufers. Das Review fand daran zweierlei: ein pauschales `true` in der
+ *    Schleife hätte jedes wiedererkannte Bestandskonto auf `impact` gehoben UND
+ *    eine gesetzte Freischaltung auf `null` zurückgesetzt — und schwerer: eine
+ *    ABGEBROCHENE Transaktion hinterliess ein Konto mit `basic`, das
+ *    `baueBestandsdaten` nicht mehr als eigenen Rest erkennt (dort heisst die
+ *    Handschrift `impact` ohne Freischaltung). Es wäre als Kollision gewertet
+ *    worden und hätte JEDEN weiteren Schreiblauf blockiert.
+ *
+ * Beides fällt weg, wenn die Stufe dorthin gehört, wo das Konto entsteht: in
+ * eine eigene Anweisung, direkt hinter das Anlegen und VOR die Transaktion.
+ * Dann steht die Handschrift schon da, bevor irgendetwas scheitern kann.
+ *
+ * Der Riegel ist jetzt der TYP: das Argument ist der `angelegt`-Zweig von
+ * `Kontoergebnis`. Ein bestehendes Konto lässt sich hier gar nicht einsetzen,
+ * ohne sich die Herkunft auszudenken. `activated_at is null` ist der zweite
+ * Riegel — ein freigeschaltetes Konto benutzt jemand.
+ *
+ * `activated_at` selbst wird NICHT geschrieben. Der Trigger lässt es auf `null`
+ * (six_level_model.sql:87 setzt nur `id`, `name`, `tier`), und es zu setzen wäre
+ * der einzige Weg, auf dem dieser Import je eine Freischaltung wegnehmen könnte.
+ */
+export function stufeFuerNeuesKonto(konto: { stand: "angelegt"; uid: string }): Anweisung {
+  return {
+    sql: `update public.profiles set "tier" = 'impact' where "id" = $1 and "activated_at" is null`,
+    werte: [konto.uid],
+  };
+}
+
+/**
  * Legt das Anmeldekonto über die Admin-Schnittstelle des Anmeldedienstes an —
  * NICHT durch ein `insert` in `auth.users`. Dort hängen Identity-Zeilen und
  * interne Invarianten daran, die eine GoTrue-Version ändern darf und ein
@@ -269,6 +303,16 @@ export type Kontoergebnis = { stand: "angelegt"; uid: string } | { stand: "fehle
  *
  * `fetch` kommt als Parameter herein — die Plattformfunktion, nicht eigener
  * Code; geprüft wird hier nichts gegen einen Nachbau.
+ *
+ * ── PFLICHT DES AUFRUFERS: `basis` GEHÖRT ZUM GEPRÜFTEN ZIEL ────────────────
+ * `pruefeZiel` (1.4) hält die DATENBANK-Verbindung gegen das genannte Ziel.
+ * Diese beiden Parameter prüft es nicht. Stünden `SUPABASE_DB_URL_DEV` und ein
+ * PROD-Service-Key nebeneinander, legte ein Lauf 70 Konten in PROD an und
+ * schriebe die Profile nach DEV — und das Anlegen ist der unwiderrufliche Teil,
+ * ausserhalb jeder Transaktion. Auf dieser Plattform ist genau diese
+ * Verwechslung dokumentiert. Wer den Lauf verdrahtet (7.8), leitet `basis` aus
+ * derselben Zielauflösung ab wie die DB-URL und prüft die Kennung, bevor der
+ * erste Aufruf hier stattfindet. Aufgenommen aus dem Review.
  */
 export async function legeKontoAn(
   input: { adresse: string; basis: string; schluessel: string },
@@ -284,6 +328,10 @@ export async function legeKontoAn(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email: input.adresse, email_confirm: true }),
+      // Ohne Zeitgrenze hält ein hängender Aufruf einen Lauf über 70 Datensätze
+      // unbegrenzt an, ohne eine Zeile Ausgabe. Der Abbruch landet im `catch`
+      // darunter und wird als Netzfehler gemeldet.
+      signal: AbortSignal.timeout(30_000),
     });
   } catch (e) {
     return { stand: "fehler", grund: `Netzfehler: ${(e as Error).message}` };
