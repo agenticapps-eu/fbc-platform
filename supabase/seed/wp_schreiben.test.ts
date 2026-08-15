@@ -67,6 +67,22 @@ describe("schreibsatz", () => {
     expect(satz?.sql).toContain('"legacy_source_id" = excluded."legacy_source_id"');
   });
 
+  it("nimmt JEDES Feld in die Aktualisierung, nicht nur das erste", () => {
+    // Gefunden von der zweiten Gegenprobe: der Test, der das vorher nebenbei
+    // festhielt, ist mit `NEUES_KONTO` weggefallen. Mit nur einem Feld je Test
+    // bliebe `.slice(0, 1)` im `do update set` unbemerkt — und ein zweiter Lauf
+    // aktualisierte dann still nur noch die erste Spalte.
+    const satz = schreibsatz({
+      tabelle: "public.profile_contacts",
+      schluessel: { spalte: "profile_id", wert: "uid-1" },
+      felder: { email: "a@ex.org", phone: "+49 30", city: "Bad Homburg" },
+    });
+
+    for (const feld of ["email", "phone", "city"]) {
+      expect(satz?.sql).toContain(`"${feld}" = excluded."${feld}"`);
+    }
+  });
+
   it("weist eine Spalte ab, die nicht aus der Abbildung stammt", () => {
     // Die Spaltennamen dürfen NIE aus der Quelldatei kommen: sie gehen
     // unparametrisiert in den Text. Die Liste ist fest, und was nicht darauf
