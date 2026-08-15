@@ -509,6 +509,71 @@ export type Zielsatz = {
 const NETZWERKE = ["linkedin", "facebook", "instagram", "youtube", "twitter"] as const;
 
 /**
+ * Zerlegt `infos_28` in einzelne Interessen-Chips.
+ *
+ * ── WARUM DIESE VIER TRENNER UND KEINE MEHR (Sichtprobe 7.8, 15.08.) ────────
+ * Die erste Fassung nahm den Wert als GANZEN Chip („ein Wert = ein Chip"). Im
+ * Browser war das ein Chip über die halbe Karte: 22 der 38 Werte tragen Kommas,
+ * vier enden auf einem, der längste hatte 162 Zeichen. Gemessen ergibt das
+ * Trennen **38 Werte → 131 Begriffe**.
+ *
+ * Getrennt wird an KOMMA und ZEILENUMBRUCH, und der führende Spiegelstrich
+ * fällt samt dem Apostroph des Exporters weg — demselben, der beim Telefonfeld
+ * schon auffiel (2.4). Die Quelle mischt alle drei Schreibweisen, oft in einem
+ * Wert.
+ *
+ * NICHT getrennt wird an:
+ * - `/` und `&` — „Fitness/Calisthenics" und „Crypto & Investments" sind je ein
+ *   Begriff, kein Paar.
+ * - dem Punkt — fünf Werte sind Prosa und kein Verzeichnis („Mein Hobby ist
+ *   Elektronik wie Handys und Laptops. Solltest Du …"). Am Punkt zu trennen
+ *   machte daraus Halbsätze als Chips; als ein Chip ist es wenigstens wahr.
+ * - Kommas INNERHALB von Klammern. Ohne diese Regel zerfällt „Musik (Gitarre,
+ *   Gesang, Produktion)" in „Musik (Gitarre" und „Produktion)" — beim
+ *   Nachrechnen der Zerlegung aufgefallen, nicht beim Entwerfen.
+ */
+export function zerlegeInteressen(roh: string): string[] {
+  const teile: string[] = [];
+  let puffer = "";
+  let tiefe = 0;
+
+  for (const zeichen of roh) {
+    if (zeichen === "(") tiefe += 1;
+    else if (zeichen === ")") tiefe = Math.max(0, tiefe - 1);
+
+    if (zeichen === "\n" || zeichen === "\r" || (zeichen === "," && tiefe === 0)) {
+      teile.push(puffer);
+      puffer = "";
+    } else {
+      puffer += zeichen;
+    }
+  }
+  teile.push(puffer);
+
+  const gesehen = new Set<string>();
+  const begriffe: string[] = [];
+
+  for (const teil of teile) {
+    const sauber = wert(
+      teil
+        .replace(/^[\s'"]*[-–—•]+\s*/, "")
+        .replace(/^[\s'"]+/, "")
+        .replace(/[\s.,;]+$/, ""),
+    );
+    if (!sauber) continue;
+
+    // Dubletten entstehen erst durch das Trennen („Reisen, reisen"); ein
+    // doppelter Chip stünde im Profil zweimal nebeneinander.
+    const schluessel = sauber.toLocaleLowerCase("de");
+    if (gesehen.has(schluessel)) continue;
+    gesehen.add(schluessel);
+    begriffe.push(sauber);
+  }
+
+  return begriffe;
+}
+
+/**
  * Die Leerwertregel an einer Stelle: Markup raus, Rand beschneiden, und ein
  * Feld, von dem nichts übrig bleibt, ist `null` — nicht `''`. Ein `''` im
  * Profil sähe aus wie eine bewusste Eingabe des Mitglieds.
@@ -581,7 +646,6 @@ export function bildeAb(row: Record<string, string>): Zielsatz {
 
   const biete = wert(row["biete"]);
   const suche = wert(row["suche"]);
-  const interesse = wert(row["infos_28"]);
 
   return {
     anmeldeadresse: normalisiereAdresse(row["user_email"] ?? ""),
@@ -613,7 +677,7 @@ export function bildeAb(row: Record<string, string>): Zielsatz {
     },
     offers: biete ? [{ title: titelAus(biete), description: biete }] : [],
     needs: suche ? [{ title: titelAus(suche), description: suche }] : [],
-    interessen: interesse ? [{ label: interesse, theme: null }] : [],
+    interessen: zerlegeInteressen(row["infos_28"] ?? "").map((label) => ({ label, theme: null })),
     herkunft: { beitritt, ort },
   };
 }

@@ -137,6 +137,22 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.getByRole("heading", { name: "Erweiterte Profilangaben" })).toBeInTheDocument();
   });
 
+  // AGE-534, Sichtprobe 7.8: die importierten Biografien sind mehrzeilig (35 von
+  // 48, die längste 3877 Zeichen). Ohne `whitespace-pre-line` faltet HTML jeden
+  // Umbruch zu einem Leerzeichen, und aus fünf Absätzen wird eine Textwand.
+  //
+  // jsdom rechnet kein CSS, dieser Test kann den Umbruch also NICHT sehen — er
+  // hält die Klasse fest, die ihn im Browser bewirkt. Den sichtbaren Beleg gibt
+  // nur die Sichtprobe (7.8).
+  it("bewahrt die Absätze der Biografie und der Angebote", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    renderPage(authAsTier("discover"));
+
+    const bio = await screen.findByText(publicProfile.short_bio);
+    expect(bio.className).toContain("whitespace-pre-line");
+    expect(screen.getByText("DACH-Raum.").className).toContain("whitespace-pre-line");
+  });
+
   // §2 trennt zwei Schwellen, die bis AGE-311 beide auf Prime lagen: das
   // „vollständige Verzeichnis" (erweiterte Felder, ab `discover`) und das
   // Kontaktrecht (ab `exchange`). Genau diese Lücke ist der verteidigbare Kern —

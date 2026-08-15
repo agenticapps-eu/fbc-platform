@@ -187,7 +187,13 @@ function ExtendedSections({
       {profile.short_bio && (
         <Card className="flex flex-col gap-3">
           <CardTitle className="text-base">Über mich</CardTitle>
-          <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>
+          {/* whitespace-pre-line: die Absätze stehen im Feld und sollen stehen
+              bleiben. Ohne die Klasse faltet HTML jeden Umbruch zu einem
+              Leerzeichen — bei den importierten Biografien (AGE-534) wurden aus
+              fünf Absätzen 3877 Zeichen am Stück. */}
+          <p className="max-w-2xl text-sm leading-relaxed whitespace-pre-line text-ink/80">
+            {profile.short_bio}
+          </p>
         </Card>
       )}
 
@@ -312,7 +318,6 @@ function ExtendedSections({
           </div>
         </Card>
       )}
-
     </>
   );
 }
@@ -343,7 +348,12 @@ function MatchingList({
             <span className="font-medium text-ink">{item.title}</span>
             {item.category && <Badge variant="soft">{item.category}</Badge>}
           </div>
-          {item.description && <p className="mt-1 text-sm text-muted">{item.description}</p>}
+          {item.description && (
+            // Dasselbe wie bei der Biografie: „Ich biete" trägt beim Import
+            // mehrzeiligen Fließtext, und eine Aufzählung ohne Umbrüche liest
+            // sich als ein Satz.
+            <p className="mt-1 text-sm whitespace-pre-line text-muted">{item.description}</p>
+          )}
         </li>
       ))}
     </ul>

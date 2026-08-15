@@ -16,6 +16,7 @@ import {
   pruefeZiel,
   schreibeBericht,
   titelAus,
+  zerlegeInteressen,
 } from "./wp_import.lib";
 
 const DEV_REF = "foelowldexkcqzewvrcf";
@@ -613,10 +614,76 @@ describe("bildeAb — offers, needs, interessen", () => {
     expect(satz.offers[0].title.trim()).not.toBe("");
   });
 
-  it("macht aus infos_28 EINEN Chip ohne Thema", () => {
+  it("macht aus infos_28 je Begriff einen Chip ohne Thema", () => {
+    // Gekippt am 15.08. nach der Sichtprobe: die alte Regel „ein Wert = ein
+    // Chip" ergab einen Chip mit 162 Zeichen und Schluss-Komma.
     const satz = bildeAb(zeile({ infos_28: "Segeln, Bergsteigen und Jazz" }));
 
-    expect(satz.interessen).toEqual([{ label: "Segeln, Bergsteigen und Jazz", theme: null }]);
+    expect(satz.interessen).toEqual([
+      { label: "Segeln", theme: null },
+      { label: "Bergsteigen und Jazz", theme: null },
+    ]);
+  });
+});
+
+describe("zerlegeInteressen", () => {
+  it("trennt an Kommas", () => {
+    expect(zerlegeInteressen("Kunst, Lesen, Reisen")).toEqual(["Kunst", "Lesen", "Reisen"]);
+  });
+
+  it("trennt auch an Zeilenumbrüchen, CRLF eingeschlossen", () => {
+    // 13 der 38 Quellwerte trennen mit Umbruch statt Komma, oft gemischt.
+    expect(zerlegeInteressen("Yoga, Meditation,\r\nNatur\nTattoos")).toEqual([
+      "Yoga",
+      "Meditation",
+      "Natur",
+      "Tattoos",
+    ]);
+  });
+
+  it("trennt NICHT innerhalb von Klammern", () => {
+    // Ohne diese Regel zerfällt der Wert in „Musik (Gitarre" und „Produktion)".
+    expect(zerlegeInteressen("Programmierung\nMusik (Gitarre, Gesang, Produktion)")).toEqual([
+      "Programmierung",
+      "Musik (Gitarre, Gesang, Produktion)",
+    ]);
+  });
+
+  it("nimmt den Spiegelstrich samt Exporter-Apostroph weg", () => {
+    // Dasselbe führende Apostroph wie beim Telefonfeld (2.4).
+    expect(zerlegeInteressen("'- Wandern\n- Reisen\n'-Backgammon")).toEqual([
+      "Wandern",
+      "Reisen",
+      "Backgammon",
+    ]);
+  });
+
+  it("wirft das Schluss-Komma und leere Teile weg", () => {
+    expect(zerlegeInteressen("Angeln, Kochen,, ,\n")).toEqual(["Angeln", "Kochen"]);
+  });
+
+  it("trennt nicht an Schrägstrich oder kaufmännischem Und", () => {
+    // „Fitness/Calisthenics" und „Crypto & Investments" sind je EIN Begriff.
+    expect(zerlegeInteressen("Fitness/Calisthenics, Crypto & Investments")).toEqual([
+      "Fitness/Calisthenics",
+      "Crypto & Investments",
+    ]);
+  });
+
+  it("lässt einen Satz als einen Begriff stehen", () => {
+    // Am Punkt wird NICHT getrennt: fünf der Quellwerte sind Prosa, kein
+    // Verzeichnis. Sie zu zerlegen ergäbe Halbsätze als Chips.
+    expect(zerlegeInteressen("Ich spiele seit Jahren Schlagzeug und Handball.")).toEqual([
+      "Ich spiele seit Jahren Schlagzeug und Handball",
+    ]);
+  });
+
+  it("führt denselben Begriff nur einmal", () => {
+    expect(zerlegeInteressen("Reisen, reisen, REISEN")).toEqual(["Reisen"]);
+  });
+
+  it("gibt zu einem leeren Wert nichts zurück", () => {
+    expect(zerlegeInteressen("  ,\n- \n")).toEqual([]);
   });
 });
 

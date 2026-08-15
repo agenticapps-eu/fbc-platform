@@ -461,7 +461,7 @@ Befüllung am 14.08. gegen die echte Datei gemessen.
 | `beruf` | 17/70 | `profiles.headline` | — |
 | `infos` | 45/70 | `profiles.short_bio` | HTML entfernen |
 | `infos_15` | 24/70 | `profiles.short_bio` | anhängen, HTML entfernen |
-| `infos_28` | 38/70 | `profile_interests` (`label`, `theme` = `null`) | HTML entfernen, **ein Wert = ein Chip** |
+| `infos_28` | 38/70 | `profile_interests` (`label`, `theme` = `null`) | HTML entfernen, **an Komma und Umbruch zerlegen** (s. Nachtrag 15.08.) |
 | `biete` | 47/70 | `offers` (`description`, `title` abgeleitet) | Fließtext |
 | `suche` | 46/70 | `needs` (`description`, `title` abgeleitet) | Fließtext |
 | `Strasse` | 38/70 | `profile_contacts.street` | — |
@@ -609,6 +609,37 @@ Import anders steht als davor.
 
 **Leerwertregel:** ein leeres oder nur aus Leerzeichen bestehendes Quellfeld
 zählt als „nicht vorhanden" und schreibt `null`, nicht `''`.
+
+### Nachtrag 15.08.: „ein Wert = ein Chip" ist in der Anzeige gefallen
+
+Die Matrix sagte bis zur Sichtprobe (7.8) „ein Wert = ein Chip". Formal richtig —
+die Quelle liefert je Mitglied einen Wert — und im Browser ein Chip über die
+halbe Karte: 22 der 38 Werte tragen Kommas, vier enden auf einem, der längste
+hatte 162 Zeichen, einer enthielt Zeilenumbrüche.
+
+`zerlegeInteressen` trennt jetzt an **Komma und Zeilenumbruch** und nimmt den
+führenden Spiegelstrich samt dem Apostroph des Exporters weg — demselben, der
+beim Telefonfeld schon auffiel (2.4). Gemessen gegen die echte Datei: **38 Werte
+→ 128 Chips**, längster 100 statt 162 Zeichen, **keiner** endet mehr auf einem
+Komma.
+
+Nicht getrennt wird an `/`, `&` und am **Punkt**: „Fitness/Calisthenics" und
+„Crypto & Investments" sind je ein Begriff, und fünf der Werte sind Prosa statt
+Verzeichnis („Mein Hobby ist Elektronik wie Handys und Laptops. Solltest Du …").
+Am Punkt zu trennen machte daraus Halbsätze; als ein Chip ist es wenigstens wahr
+— diese fünf bleiben deshalb lang, gewollt.
+
+Kommas **innerhalb von Klammern** trennen nicht. Ohne die Regel zerfiel „Musik
+(Gitarre, Gesang, Produktion)" in „Musik (Gitarre" und „Produktion)" — beim
+Nachrechnen der Zerlegung aufgefallen, nicht beim Entwerfen.
+
+**Und eine Folge, die weit über diesen Chip hinausgeht:** die Merge-Regel gibt
+einer Liste nichts mehr heraus, sobald `bereitsImportiert` gilt („dann ist jede
+Lücke das Ergebnis einer Entscheidung"). Eine geänderte Abbildung erreicht ein
+bereits importiertes Profil also **nie**. Lokal war das sichtbar: der Lauf mit
+der neuen Regel schrieb null Chips, bis die 70 Konten neu aufgesetzt waren. Für
+DEV/PROD heisst das — **die Abbildung muss vor dem ERSTEN echten Lauf stimmen**;
+danach korrigiert sie kein zweiter Lauf mehr, nur noch Handarbeit.
 
 ### HTML wird entfernt, Entitäten aufgelöst
 
