@@ -202,9 +202,7 @@ export function baueBericht(daten: Berichtsdaten): string {
   // jedem steht ein Mensch, über den jemand entscheiden muss. Die Sichtprobe am
   // 14.08. zeigte ihn sonst als blosse Zahl, mit dem Grund allenfalls indirekt
   // über einen Vorabbefund.
-  const offen = ergebnisse.filter(
-    (e) => e.klasse === "fehlerhaft" || e.klasse === "uebersprungen",
-  );
+  const offen = ergebnisse.filter((e) => e.klasse === "fehlerhaft" || e.klasse === "uebersprungen");
   if (offen.length > 0) {
     nachzutragen.push(
       "### Fehlerhafte und übersprungene Datensätze",
@@ -244,6 +242,38 @@ export function baueBericht(daten: Berichtsdaten): string {
     );
   }
 
+  // ── Wer, nicht wie viele ──────────────────────────────────────────────────
+  // Die Klassentabelle sagt „2 angelegt" — vor dem echten Lauf ist aber die
+  // Frage, WER das ist. Die Anforderung „Der Trockenlauf benennt, was er
+  // schreiben würde" verlangt den Datensatz einzeln, mit der Adresse als
+  // Schlüssel; sie ist es auch, unter der ein Mensch sich später anmeldet.
+  //
+  // Fehlerhafte und übersprungene stehen NICHT hier: sie haben ihre eigene
+  // Tabelle mit dem Grund, und unter dieser Überschrift läsen sie sich, als
+  // würden sie geschrieben.
+  const trocken = daten.kopf.modus === "trocken";
+  const geschrieben = ergebnisse.filter(
+    (e) => e.klasse === "angelegt" || e.klasse === "aktualisiert",
+  );
+  const einzeln =
+    geschrieben.length === 0
+      ? []
+      : [
+          trocken ? "## Was der Lauf anlegen und ergänzen würde" : "## Angelegt und ergänzt",
+          "",
+          tabelle(
+            ["Datensatz", "Kennung", "Name", "Adresse", trocken ? "Vorhaben" : "Klasse"],
+            geschrieben.map((e) => [
+              String(e.zeile),
+              zelle(e.kennung),
+              zelle(e.name),
+              zelle(e.adresse),
+              trocken ? `würde ${KLASSENNAME[e.klasse]}` : KLASSENNAME[e.klasse],
+            ]),
+          ),
+          "",
+        ];
+
   return [
     "# WordPress-Import — Bericht",
     "",
@@ -260,6 +290,7 @@ export function baueBericht(daten: Berichtsdaten): string {
       ],
     ),
     "",
+    ...einzeln,
     ...(nachzutragen.length > 0 ? ["## Nachzutragen", "", ...nachzutragen] : []),
     ...befundzeilen(daten.befunde),
   ]

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  type Berichtsdaten,
-  type Datensatzergebnis,
-  baueBericht,
-  stdoutZeile,
-} from "./wp_bericht";
+import { type Berichtsdaten, type Datensatzergebnis, baueBericht, stdoutZeile } from "./wp_bericht";
 import { QUELLFELDER, pruefeVorab } from "./wp_import.lib";
 
 /** Alle Quellfelder leer — die Vorabprüfung liest nur zwei davon. */
@@ -250,14 +245,20 @@ describe("baueBericht — nachtragbare Fälle", () => {
 
 describe("stdoutZeile — was auf der Konsole erscheinen darf", () => {
   it("führt Datensatznummer, Kennung und Klasse", () => {
-    expect(stdoutZeile(ergebnis({ zeile: 12, kennung: "318" }))).toBe("Datensatz 12 · 318 · angelegt");
+    expect(stdoutZeile(ergebnis({ zeile: 12, kennung: "318" }))).toBe(
+      "Datensatz 12 · 318 · angelegt",
+    );
   });
 
   it("führt weder Namen noch Adresse", () => {
     // Sonst stehen die Personendaten von 70 Menschen in der Shell-History und
     // in jedem CI-Log, das den Lauf mitschneidet.
     const zeile = stdoutZeile(
-      ergebnis({ name: "Anna Berg", adresse: "anna@example.org", grund: "Anna Berg hat keine PLZ" }),
+      ergebnis({
+        name: "Anna Berg",
+        adresse: "anna@example.org",
+        grund: "Anna Berg hat keine PLZ",
+      }),
     );
 
     expect(zeile).not.toContain("Anna");
@@ -268,5 +269,46 @@ describe("stdoutZeile — was auf der Konsole erscheinen darf", () => {
     expect(stdoutZeile(ergebnis({ zeile: 7, kennung: null, klasse: "fehlerhaft" }))).toBe(
       "Datensatz 7 · ohne Kennung · fehlerhaft",
     );
+  });
+});
+
+describe("baueBericht — was der Lauf anlegen würde", () => {
+  it("nennt den Datensatz im Trockenlauf einzeln, mit der Adresse als Schlüssel", () => {
+    // Die Anforderung „Der Trockenlauf benennt, was er schreiben würde" verlangt
+    // genau das: als „würde angelegt", mit der E-Mail-Adresse. Eine Zahl in der
+    // Klassentabelle sagt nicht, WER es ist — und das ist die Frage vor dem
+    // echten Lauf.
+    const text = baueBericht(lauf({ ergebnisse: [ergebnis({ klasse: "angelegt" })] }));
+
+    expect(text).toContain("würde angelegt");
+    expect(text).toContain("anna@example.org");
+  });
+
+  it("schreibt im echten Lauf dieselbe Liste in der Vergangenheit", () => {
+    const text = baueBericht(
+      lauf({
+        kopf: { ...KOPF, modus: "schreibend" },
+        ergebnisse: [ergebnis({ klasse: "aktualisiert" })],
+      }),
+    );
+
+    expect(text).toMatch(/\| 318 \| Anna Berg \| anna@example\.org \| aktualisiert \|/);
+    expect(text).not.toContain("würde aktualisiert");
+  });
+
+  it("führt übersprungene und fehlerhafte Datensätze nicht in dieser Liste", () => {
+    // Sie haben ihre eigene Tabelle mit dem Grund; hier stünden sie unter einer
+    // Überschrift, die das Gegenteil behauptet.
+    const text = baueBericht(
+      lauf({
+        ergebnisse: [
+          ergebnis({ zeile: 1, klasse: "uebersprungen", grund: "Adresse fehlt" }),
+          ergebnis({ zeile: 2, klasse: "fehlerhaft", grund: "kaputt" }),
+        ],
+      }),
+    );
+
+    expect(text).not.toContain("würde angelegt");
+    expect(text).not.toContain("Was der Lauf anlegen");
   });
 });
