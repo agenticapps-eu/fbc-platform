@@ -287,3 +287,195 @@ describe("wandleBild", () => {
     expect(ergebnis.stand).toBe("untauglich");
   });
 });
+
+// ── Das Ablegen im Bucket (6.3) ─────────────────────────────────────────────
+
+import { beforeAll } from "vitest";
+
+import { BUCKET, type Bildart, OBJEKTNAME, ladeBildHoch, webpAblage } from "./wp_bilder";
+
+const BASIS = "http://127.0.0.1:54321";
+const KONTO = "b6f27715-8566-4fb5-8b19-3a1cf14d7270";
+
+/** Eine echte WebP-Datei — `ladeBildHoch` liest sie von der Platte. */
+let ECHTES_WEBP: string;
+
+beforeAll(async () => {
+  ECHTES_WEBP = join(frisch(), "profile_photo.webp");
+  await sharp({
+    create: { width: 64, height: 64, channels: 3, background: { r: 30, g: 90, b: 60 } },
+  })
+    .webp()
+    .toFile(ECHTES_WEBP);
+});
+
+/** Eine Antwort des Storage-Dienstes. Gemessen, nicht erfunden — s. design.md. */
+function storage(status: number, koerper: unknown) {
+  return async () => new Response(JSON.stringify(koerper), { status });
+}
+
+function hoch(
+  hole: (url: string, init?: RequestInit) => Promise<Response>,
+  art: Bildart = "profil",
+  datei = ECHTES_WEBP,
+) {
+  return ladeBildHoch({ datei, art, uid: KONTO, basis: BASIS, schluessel: "geheim" }, hole);
+}
+
+describe("webpAblage", () => {
+  it("setzt die Endung auf .webp, egal welche die Quelle führt", () => {
+    for (const endung of ["jpg", "jpeg", "png"]) {
+      expect(webpAblage(`/ausserhalb/354/profile_photo.${endung}`)).toBe(
+        "/ausserhalb/354/profile_photo.webp",
+      );
+    }
+  });
+});
+
+describe("ladeBildHoch — wohin es geht", () => {
+  it("legt das Profilbild als import-avatar.webp im Bucket avatars ab", async () => {
+    let gesehen = "";
+    const ergebnis = await hoch(async (url) => {
+      gesehen = url;
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    expect(gesehen).toBe(`${BASIS}/storage/v1/object/avatars/${KONTO}/import-avatar.webp`);
+    expect(ergebnis.stand).toBe("hochgeladen");
+  });
+
+  it("legt das Headerbild als import-cover.webp im Bucket covers ab", async () => {
+    let gesehen = "";
+    await hoch(async (url) => {
+      gesehen = url;
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    }, "cover");
+
+    expect(gesehen).toBe(`${BASIS}/storage/v1/object/covers/${KONTO}/import-cover.webp`);
+  });
+
+  it("gibt die öffentliche URL zurück — sie geht in profiles.avatar_url", async () => {
+    const ergebnis = await hoch(storage(200, { Key: "…" }));
+
+    expect(ergebnis).toEqual({
+      stand: "hochgeladen",
+      url: `${BASIS}/storage/v1/object/public/avatars/${KONTO}/import-avatar.webp`,
+    });
+  });
+
+  it("schickt den Schlüssel und den Bildtyp mit — covers lässt nur image/webp zu", async () => {
+    let kopf: Record<string, string> = {};
+    await hoch(async (_url, init) => {
+      kopf = init?.headers as Record<string, string>;
+      return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+    });
+
+    expect(kopf["Authorization"]).toBe("Bearer geheim");
+    expect(kopf["Content-Type"]).toBe("image/webp");
+  });
+
+  it("bindet den Objektnamen NICHT an den Dateinamen der Quelle", async () => {
+    // Der Objektname ist unser Merker für „schon gelegt". Käme er aus der
+    // Quelle, legte ein neu gezogener Export mit anderem Dateinamen beim
+    // zweiten Lauf ein ZWEITES Objekt an und überschriebe die URL.
+    const andersBenannt = join(frisch(), "voellig-anders.webp");
+    writeFileSync(andersBenannt, readFileSync(ECHTES_WEBP));
+
+    let gesehen = "";
+    await hoch(
+      async (url) => {
+        gesehen = url;
+        return new Response(JSON.stringify({ Key: "…" }), { status: 200 });
+      },
+      "profil",
+      andersBenannt,
+    );
+
+    expect(gesehen).toContain(OBJEKTNAME.profil);
+    expect(gesehen).not.toContain("voellig-anders");
+  });
+});
+
+describe("ladeBildHoch — der zweite Lauf bricht nicht ab", () => {
+  it("hält HTTP 400 mit „Duplicate\" im Rumpf für „vorhanden\", nicht für einen Fehler", async () => {
+    // DIE FALLE, am lokalen Stack gemessen (15.08.): der Storage-Dienst
+    // antwortet auf ein vorhandenes Objekt mit HTTP **400**, und erst im Rumpf
+    // steht `{"statusCode":"409","error":"Duplicate"}`. Ein Vergleich gegen
+    // `status === 409` meldete jeden Datensatz des zweiten Laufs als
+    // gescheitert — grüner Test, rote Wirklichkeit.
+    const ergebnis = await hoch(
+      storage(400, { statusCode: "409", error: "Duplicate", message: "The resource already exists" }),
+    );
+
+    expect(ergebnis.stand).toBe("vorhanden");
+  });
+
+  it("hält auch einen echten HTTP 409 für „vorhanden\"", async () => {
+    // Die Storage-Fassung muss lokal und in DEV/PROD nicht dieselbe sein.
+    const ergebnis = await hoch(storage(409, { error: "Duplicate" }));
+
+    expect(ergebnis.stand).toBe("vorhanden");
+  });
+
+  it("ersetzt ein vorhandenes Objekt NICHT", async () => {
+    let versuche = 0;
+    await hoch(async () => {
+      versuche++;
+      return new Response(JSON.stringify({ error: "Duplicate" }), { status: 400 });
+    });
+
+    expect(versuche).toBe(1);
+  });
+});
+
+describe("ladeBildHoch — was den Lauf nicht beenden darf (6.4)", () => {
+  it("meldet eine fehlende gewandelte Datei als Befund, statt zu werfen", async () => {
+    // Der Fall der Kennung 326: 1×1 px, von `wandleBild` als untauglich
+    // abgewiesen — es gibt keine .webp. Das Mitglied wird trotzdem angelegt.
+    let gefragt = false;
+    const ergebnis = await hoch(
+      async () => {
+        gefragt = true;
+        return new Response("{}", { status: 200 });
+      },
+      "profil",
+      join(frisch(), "gibtesnicht.webp"),
+    );
+
+    expect(ergebnis.stand).toBe("fehlt");
+    expect(gefragt).toBe(false);
+  });
+
+  it("meldet einen abgewiesenen Upload als Befund, statt zu werfen", async () => {
+    const ergebnis = await hoch(storage(413, { error: "PayloadTooLarge" }));
+
+    expect(ergebnis.stand).toBe("fehlt");
+    expect(ergebnis.grund).toContain("413");
+  });
+
+  it("meldet einen Netzfehler als Befund, statt den Lauf zu beenden", async () => {
+    const ergebnis = await hoch(async () => {
+      throw new Error("ECONNREFUSED");
+    });
+
+    expect(ergebnis.stand).toBe("fehlt");
+  });
+
+  it("trägt keinen Rumpftext in den Grund — er zitiert den Objektpfad (4.7)", async () => {
+    const ergebnis = await hoch(
+      storage(400, {
+        error: "InvalidRequest",
+        message: `The object avatars/${KONTO}/import-avatar.webp is bad`,
+      }),
+    );
+
+    expect(ergebnis.grund).not.toContain(KONTO);
+  });
+});
+
+describe("BUCKET und OBJEKTNAME", () => {
+  it("trennt die beiden Bildarten sauber", () => {
+    expect(BUCKET).toEqual({ profil: "avatars", cover: "covers" });
+    expect(OBJEKTNAME).toEqual({ profil: "import-avatar.webp", cover: "import-cover.webp" });
+  });
+});

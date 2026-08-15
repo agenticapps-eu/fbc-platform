@@ -442,6 +442,55 @@ Avatar, der wie ein Ladefehler aussieht, und niemand weiß warum.
 ist stattdessen ausdrücklich: vorhandenes Objekt wird übersprungen, nicht ersetzt,
 und der Bericht sagt welches — damit der zweite Lauf nicht an sich selbst scheitert.
 
+### Der Objektname ist unser Merker, nicht der der Quelle
+
+Das Objekt heisst `<uid>/import-avatar.webp` bzw. `<uid>/import-cover.webp` —
+ein **fester, von diesem Import gewählter** Name, nicht der aus der Quelle
+abgeleitete (`profile_photo.webp`). Der Editor legt daneben nach
+`<uid>/<zeitstempel>.webp` ab (`src/lib/profile.ts:306`); die beiden Namensräume
+kreuzen sich nicht.
+
+Das ist der Kern der Wiederholbarkeit: **das Objekt selbst ist der Merker**,
+dass dieser Import das Bild schon gelegt hat — genau wie
+`profile_legacy.legacy_source_id` es für den Datensatz ist. Ein aus der Quelle
+abgeleiteter Name bände die Wiederholbarkeit an einen fremden Dateinamen: bringt
+der vor dem Go-Live neu gezogene Export das Bild unter anderem Namen, legte der
+zweite Lauf ein ZWEITES Objekt an und überschriebe die URL — das Gegenteil von
+„vorhandenes wird übersprungen".
+
+Daraus folgt der ganze Rest ohne weitere Zustandshaltung:
+
+| Lage | Was geschieht |
+|---|---|
+| Erster Lauf | Objekt entsteht (200), `avatar_url` wird gesetzt |
+| Zweiter Lauf | Objekt besteht → `vorhanden`, **kein** Schreibvorgang |
+| Mitglied hat sein Bild selbst ersetzt | unser Objekt besteht weiter → `vorhanden`; seine URL bleibt unberührt |
+
+**Die Merge-Regel aus 3.7 wird dafür NICHT erweitert.** Sie hätte hier nichts zu
+entscheiden, was das Objekt nicht schon entscheidet, und `bereitsImportiert`
+träfe zusätzlich den Fall, den 6.3 gerade ausdrücklich will (ein Bild
+nachzuliefern, dessen Datensatz schon steht). `Bestand`, `BESTANDSABFRAGE` und
+`fuegeZusammen` bleiben deshalb unangetastet. Der einzige Riegel gegen das
+Überschreiben eines fremden Bildes steht in SQL und ist atomar:
+`update … set "avatar_url" = $1 where id = $2 and "avatar_url" is null`.
+
+**Gemessen am lokalen Stack (15.08.), vier Sonden — eine davon eine Falle:**
+
+| Sonde | Ergebnis |
+|---|---|
+| `service_role` → `avatars` | 200. Anders als auf den `public`-Tabellen hält er im Storage Rechte |
+| Zweiter Upload desselben Objekts | **HTTP 400**, im Rumpf `{"statusCode":"409","error":"Duplicate"}` |
+| `service_role` → `covers` (nur `image/webp`) | 200 |
+| Öffentliche URL | 200, 82 782 Bytes |
+
+Die zweite Zeile ist die Falle, und sie kostet den ganzen Abschnitt: **der
+HTTP-Status ist 400, nicht 409.** Code, der auf `status === 409` prüft, hielte
+„schon vorhanden" für einen Fehler und meldete jeden Datensatz des zweiten Laufs
+als gescheitert — der Test „zweiter Lauf bricht nicht ab" wäre grün und die
+Wirklichkeit rot. Der Grund kommt deshalb aus dem **Rumpf** (`error`), und
+geprüft wird gegen beide Stati, weil die Storage-Fassung lokal und in DEV/PROD
+nicht dieselbe sein muss.
+
 ### Nur benannte Spalten werden gelesen
 
 Von 140 Spalten sind 26 lebendig. Der Rest ist Plugin-Zustand (`aioseo_*`,

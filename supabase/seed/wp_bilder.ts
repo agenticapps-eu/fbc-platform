@@ -22,7 +22,7 @@
  * (15.08.): beide Bildarten antworten mit 200 und dem erwarteten Bildtyp.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
 import sharp from "sharp";
@@ -259,4 +259,111 @@ export async function wandleBild(input: {
   } catch (e) {
     return { stand: "untauglich", grund: `Nicht lesbar: ${(e as Error).message}` };
   }
+}
+
+// ── Ablegen im Bucket (Aufgabe 6.3) ─────────────────────────────────────────
+
+/** Wo die gewandelte Fassung neben dem Original liegt. */
+export function webpAblage(ablage: string): string {
+  return `${ablage.replace(/\.[^.]+$/, "")}.webp`;
+}
+
+export const BUCKET: Record<Bildart, "avatars" | "covers"> = {
+  profil: "avatars",
+  cover: "covers",
+};
+
+/**
+ * Der Name des Objekts im Bucket — FEST von diesem Import gewählt und NICHT aus
+ * dem Dateinamen der Quelle abgeleitet.
+ *
+ * Darauf steht und fällt die Wiederholbarkeit: das Objekt selbst ist der Merker,
+ * dass dieser Import das Bild schon gelegt hat — so wie
+ * `profile_legacy.legacy_source_id` es für den Datensatz ist. Ein abgeleiteter
+ * Name bände diesen Merker an einen fremden Dateinamen; bringt der vor dem
+ * Go-Live neu gezogene Export das Bild unter anderem Namen, legte der zweite
+ * Lauf ein ZWEITES Objekt an und überschriebe die URL.
+ *
+ * Der Editor legt daneben nach `<uid>/<zeitstempel>.webp` ab
+ * (`src/lib/profile.ts`) — die beiden Namensräume kreuzen sich nicht.
+ */
+export const OBJEKTNAME: Record<Bildart, string> = {
+  profil: "import-avatar.webp",
+  cover: "import-cover.webp",
+};
+
+/** Die Spalte, in die die öffentliche URL gehört. */
+export const URLSPALTE: Record<Bildart, "avatar_url" | "cover_url"> = {
+  profil: "avatar_url",
+  cover: "cover_url",
+};
+
+export type Hochladeergebnis =
+  | { stand: "hochgeladen"; url: string }
+  | { stand: "vorhanden" }
+  | { stand: "fehlt"; grund: string };
+
+/**
+ * Legt die gewandelte Fassung im Bucket ab und gibt die öffentliche URL zurück.
+ *
+ * ── DER ZWEITE LAUF DARF NICHT AN SICH SELBST SCHEITERN ─────────────────────
+ * Ohne `x-upsert` weist der Storage-Dienst ein vorhandenes Objekt ab — genau
+ * die Semantik, die 6.3 verlangt: übersprungen und berichtet, nicht ersetzt.
+ *
+ * ABER: er antwortet darauf mit **HTTP 400**, und erst im Rumpf steht
+ * `{"statusCode":"409","error":"Duplicate"}` (am lokalen Stack gemessen,
+ * 15.08.). Ein Vergleich gegen `status === 409` hielte „schon vorhanden" für
+ * einen Fehler und meldete jeden Datensatz des zweiten Laufs als gescheitert.
+ * Der Grund kommt deshalb aus dem RUMPF; gegen 409 wird zusätzlich geprüft,
+ * weil die Storage-Fassung lokal und in DEV/PROD nicht dieselbe sein muss.
+ *
+ * ── WAS DEN LAUF NICHT BEENDEN DARF (6.4) ───────────────────────────────────
+ * Eine fehlende gewandelte Datei (Kennung 326 ist 1×1 px und hat keine), ein
+ * abgewiesener Upload und ein Netzfehler ergeben je einen Befund. Das Mitglied
+ * wird trotzdem angelegt — ein fehlendes Bild hält 70 Menschen nicht auf.
+ *
+ * Der Grund trägt NUR Status und Fehlerwort, nie den Rumpftext: der zitiert den
+ * Objektpfad und damit die Kennung des Kontos, und er landet in Bericht UND
+ * Konsole (4.7).
+ */
+export async function ladeBildHoch(
+  input: { datei: string; art: Bildart; uid: string; basis: string; schluessel: string },
+  hole: (url: string, init?: RequestInit) => Promise<Response> = fetch,
+): Promise<Hochladeergebnis> {
+  if (!existsSync(input.datei)) {
+    return { stand: "fehlt", grund: "Keine gewandelte Fassung in der Zwischenablage" };
+  }
+
+  const bucket = BUCKET[input.art];
+  const pfad = `${input.uid}/${OBJEKTNAME[input.art]}`;
+
+  let antwort: Response;
+  try {
+    antwort = await hole(`${input.basis}/storage/v1/object/${bucket}/${pfad}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.schluessel}`,
+        "Content-Type": "image/webp",
+      },
+      body: new Uint8Array(readFileSync(input.datei)),
+    });
+  } catch (e) {
+    return { stand: "fehlt", grund: `Netzfehler: ${(e as Error).name}` };
+  }
+
+  if (antwort.ok) {
+    return {
+      stand: "hochgeladen",
+      url: `${input.basis}/storage/v1/object/public/${bucket}/${pfad}`,
+    };
+  }
+
+  // Der Rumpf entscheidet, nicht der Status — s. oben.
+  const rumpf = (await antwort.json().catch(() => ({}))) as { error?: string };
+  if (rumpf.error === "Duplicate" || antwort.status === 409) return { stand: "vorhanden" };
+
+  return {
+    stand: "fehlt",
+    grund: `Antwort ${antwort.status}${rumpf.error ? ` (${rumpf.error})` : ""}`,
+  };
 }
