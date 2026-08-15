@@ -1,0 +1,186 @@
+/**
+ * Die Bildstrecke des WordPress-Imports (AGE-534, Gruppe 6).
+ *
+ * Ein eigener, für sich wiederholbarer Abschnitt: er holt die Bilder von der
+ * alten Seite in eine Zwischenablage ausserhalb des Arbeitsbaums. Zwei Gründe,
+ * beide aus dem Plan-Review — Netzwerkarbeit gegen einen fremden Server darf
+ * einen Datenimport nicht in einen Halb-Zustand bringen, und die Zwischenablage
+ * ist die einzige Gegenmassnahme, die noch wirkt, wenn die alte Seite
+ * abgeschaltet ist.
+ *
+ * ── ES SIND ZWEI BILDER ─────────────────────────────────────────────────────
+ * `profile_photo` ist der Avatar, `cover_photo` das Headerbild der
+ * Profilansicht. Die Mengen sind NICHT deckungsgleich (gemessen 15.08.: 57 und
+ * 53 von 70), ein fehlendes Headerbild darf das Profilbild also nicht
+ * mitnehmen. Entschieden am 15.08. von Donald, nachdem der erste Entwurf dieser
+ * Gruppe nur den Avatar kannte.
+ *
+ * ── DER WERT AUS DER QUELLE TRÄGT NUR DIE ENDUNG ────────────────────────────
+ * Über die echten 70 Datensätze hat jede der beiden Spalten genau DREI
+ * verschiedene Werte, alle 15–18 Zeichen, keiner mit Pfad oder `http`. Der Pfad
+ * entsteht aus `source_user_id`. Mit HEAD-Anfragen gegen drei Kennungen belegt
+ * (15.08.): beide Bildarten antworten mit 200 und dem erwarteten Bildtyp.
+ */
+
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, join } from "node:path";
+
+/**
+ * Die alte Seite. Sie steht hier und nicht in der Umgebung: sie ist keine
+ * Zugangsinformation, sondern ein Teil der Aufgabenstellung — und ein Tippfehler
+ * darin fiele in einer Umgebungsvariablen erst beim Lauf auf.
+ */
+export const BILDQUELLE = "https://fairbusinessworld.de";
+
+/** Der Ordner, unter dem Ultimate Member die Dateien je Konto ablegt. */
+const UPLOADS = "wp-content/uploads/ultimatemember";
+
+export type Bildart = "profil" | "cover";
+
+export type Bildauftrag = {
+  kennung: string;
+  art: Bildart;
+  /** Der bereinigte Dateiname — ohne Grössensuffix, mit der Endung der Quelle. */
+  datei: string;
+  url: string;
+  /** Wohin in der Zwischenablage; ausserhalb des Arbeitsbaums. */
+  ablage: string;
+};
+
+/** Die beiden Quellspalten und die Bildart, die sie tragen. */
+const SPALTEN: ReadonlyArray<readonly [Bildart, string]> = [
+  ["profil", "profile_photo"],
+  ["cover", "cover_photo"],
+];
+
+/**
+ * Die Endungen, die die Quelle führt (gemessen: jpg, png, jpeg). Eine feste
+ * Liste und nicht „alles, was nach Endung aussieht": der Wert kommt aus einer
+ * fremden Datei und wird zu einem Dateinamen auf dieser Platte.
+ */
+const ENDUNGEN = new Set([".jpg", ".jpeg", ".png"]);
+
+/** Eine Kennung ist ein Bezeichner, kein Pfad — sie wird ein Verzeichnisname. */
+const KENNUNG_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Schneidet das Grössensuffix ab, das WordPress an seine Ableitungen hängt
+ * (`profile_photo-190x190.jpg`). Die Datei OHNE Suffix ist das Original; die
+ * 190×190-Fassung verschenkt 96 % der Bildinformation.
+ *
+ * Die Quelle nennt heute den nackten Namen, der Schnitt greift also nie — er
+ * steht hier für den neu gezogenen Export: träfe er den Ableitungsnamen, würde
+ * die Verkleinerung importiert, ohne dass irgendetwas auffiele.
+ */
+function ohneGroessensuffix(datei: string): string {
+  const endung = extname(datei);
+  return `${basename(datei, endung).replace(/-\d+x\d+$/, "")}${endung}`;
+}
+
+/**
+ * Was zu einem Datensatz zu holen ist — keines, eines oder beide Bilder. Rein:
+ * kein Netz, keine Datei, kein Zugriff.
+ *
+ * ── WARUM HIER GEPRÜFT WIRD ─────────────────────────────────────────────────
+ * Der Dateiname stammt aus der Quelldatei und geht in ZWEI Richtungen: in eine
+ * URL und in einen Pfad auf dieser Platte. Ein `../` darin schriebe ausserhalb
+ * der Zwischenablage; eine unbekannte Endung holte eine Datei, die kein Bild
+ * ist. Beides ist mit dem heutigen Export unmöglich (gemessen: drei Werte, kein
+ * Pfad) — aber die Quelle wird vor dem Go-Live neu gezogen, und dann prüft das
+ * hier, was niemand mehr nachmisst.
+ *
+ * Ein abgewiesener Wert ergibt KEINEN Auftrag und ist damit ein fehlendes Bild
+ * wie jedes andere: der Datensatz läuft weiter, der Bericht nennt es (6.4).
+ */
+export function bildauftraege(input: {
+  row: Record<string, string>;
+  basis: string;
+  zwischenablage: string;
+}): Bildauftrag[] {
+  const kennung = (input.row["source_user_id"] ?? "").trim();
+  if (!KENNUNG_PATTERN.test(kennung)) return [];
+
+  const auftraege: Bildauftrag[] = [];
+
+  for (const [art, spalte] of SPALTEN) {
+    const roh = (input.row[spalte] ?? "").trim();
+    // KEIN eigener Zweig für den leeren Wert: die Endungsprüfung unten weist ihn
+    // ohnehin ab (`extname("")` ist `""`). Die Mutations-Gegenprobe hat ihn als
+    // gleichwertig ausgewiesen — dritter toter Zweig dieser Art in diesem
+    // Change, und wie die beiden anderen ersatzlos weg.
+    //
+    // `basename` schneidet jeden Pfadanteil ab. Verglichen wird trotzdem gegen
+    // den Rohwert: ein Name, der einen Pfad TRUG, ist nicht der Name, den die
+    // alte Seite führt — ihn stillschweigend zurechtzustutzen hiesse, eine
+    // falsche URL anzufragen und den Befund zu verschlucken.
+    if (basename(roh) !== roh) continue;
+    if (!ENDUNGEN.has(extname(roh).toLowerCase())) continue;
+
+    const datei = ohneGroessensuffix(roh);
+    auftraege.push({
+      kennung,
+      art,
+      datei,
+      url: `${input.basis}/${UPLOADS}/${kennung}/${datei}`,
+      ablage: join(input.zwischenablage, kennung, datei),
+    });
+  }
+
+  return auftraege;
+}
+
+/** Wie ein Auftrag ausgegangen ist. `fehlt` beendet nie einen Lauf (6.4). */
+export type Holergebnis = {
+  auftrag: Bildauftrag;
+  stand: "geholt" | "vorhanden" | "fehlt";
+  grund?: string;
+};
+
+/** Nur echte Bildtypen. Eine Fehlerseite mit Status 200 ist kein Bild. */
+const BILDTYPEN = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * Holt ein Bild in die Zwischenablage. Der einzige Ort in dieser Datei, der
+ * wirkt — Netz und Platte.
+ *
+ * DREI DINGE, DIE EIN LAUF NICHT BEENDEN DÜRFEN: ein fehlendes Bild (404), eine
+ * Antwort, die kein Bild ist, und ein Netzfehler. Alle drei ergeben einen
+ * Befund; 70 Datensätze an einem 404 scheitern zu lassen, hiesse, dass ein
+ * einziges gelöschtes Bild die ganze Übernahme aufhält.
+ *
+ * WAS SCHON DA IST, WIRD NICHT NOCH EINMAL GEHOLT. Der Abschnitt ist
+ * wiederholbar, und die alte Seite ein zweites Mal um 140 Dateien zu bitten,
+ * wäre nicht nur unnötig — der zweite Lauf darf auch nicht an dem scheitern, was
+ * der erste angelegt hat.
+ *
+ * `fetch` kommt als Parameter herein, damit die drei Fälle prüfbar sind, ohne
+ * einen fremden Server dafür zu behelligen. Es ist die Plattformfunktion, nicht
+ * eigener Code — hier wird nichts gegen einen Nachbau geprüft.
+ */
+export async function holeBild(
+  auftrag: Bildauftrag,
+  hole: (url: string) => Promise<Response> = (url) => fetch(url, { redirect: "follow" }),
+): Promise<Holergebnis> {
+  if (existsSync(auftrag.ablage)) return { auftrag, stand: "vorhanden" };
+
+  let antwort: Response;
+  try {
+    antwort = await hole(auftrag.url);
+  } catch (e) {
+    return { auftrag, stand: "fehlt", grund: `Netzfehler: ${(e as Error).message}` };
+  }
+
+  if (!antwort.ok) {
+    return { auftrag, stand: "fehlt", grund: `Antwort ${antwort.status}` };
+  }
+
+  const typ = (antwort.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!BILDTYPEN.includes(typ)) {
+    return { auftrag, stand: "fehlt", grund: `Kein Bild, sondern "${typ}"` };
+  }
+
+  mkdirSync(dirname(auftrag.ablage), { recursive: true });
+  writeFileSync(auftrag.ablage, Buffer.from(await antwort.arrayBuffer()));
+
+  return { auftrag, stand: "geholt" };
+}

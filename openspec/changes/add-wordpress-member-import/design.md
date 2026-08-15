@@ -285,10 +285,29 @@ dasselbe — und nach dem Abschalten der alten Seite wäre es nicht nachholbar.
 Gravatar-Hash, kein Bild auf dem alten Server. Avatare von einem Drittanbieter
 nachzuladen, wäre eine Datenweitergabe, die kein Mitglied veranlasst hat.
 
-Die Datei **ohne** Größensuffix ist das Original (1000 px); die Ableitung
-`-190x190` verschenkt 96 % der Bildinformation. Die Endung steht im Datensatz —
-sie zu raten war die Empfehlung des Issues und hätte bei `jpeg` 14 Bilder
-gekostet.
+Die Datei **ohne** Größensuffix ist das Original; die Ableitung `-190x190`
+verschenkt 96 % der Bildinformation. Die Endung steht im Datensatz — sie zu raten
+war die Empfehlung des Issues und hätte bei `jpeg` 14 Bilder gekostet.
+
+**Korrektur 15.08., an den 110 geholten Dateien gemessen: „das Original" ist
+NICHT 1000 px.** Diese Fassung stand hier als feste Zahl und stimmt für keine der
+beiden Bildarten:
+
+| | kleinste | häufigste | größte |
+|---|---|---|---|
+| Profilbild (57) | **1 px** | 1000 px (24×) | 1000 px |
+| Headerbild (53) | 762 px | 1000 px (42×) | **4032 px** |
+
+Daraus folgt für 6.3 zweierlei. **Es wird nur verkleinert, nie vergrößert** — ein
+Profilbild mit 195 px auf 512 px hochzurechnen, erfände Bildinformation, die es
+nicht gibt. Und die Headerbilder sind die schweren: 4032 px ist ein Handyfoto,
+der `covers`-Bucket lässt 2 MB zu. Nach WebP liegt beides darunter (die größte
+geholte Datei ist heute < 2 MB), aber die Verkleinerung ist deshalb nicht
+optional.
+
+**Ein Profilbild ist 1 × 1 Pixel.** Das ist kein Bild, das ist ein Rest. Es
+gehört in den Bericht und nicht in den Bucket — sonst trägt ein Mitglied einen
+Avatar, der wie ein Ladefehler aussieht, und niemand weiß warum.
 
 **Zum Ablegen:** der `avatars`-Bucket ist **öffentlich**
 (`20260613081627_profile_editor_storage.sql:17`), nicht privat. Meine

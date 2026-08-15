@@ -103,11 +103,16 @@
 
 - [x] 6.0 `profile_photo` und `cover_photo` in die Quellfeldliste aufnehmen, damit der Kopfzeilen-Wächter sie deckt — heute stehen sie **nicht** darin, ein Export ohne sie liefe still bildlos durch (Test: fehlende Spalte bricht ab)
       — 28 statt 26 Quellfelder. `bildeAb` fasst sie NICHT an; sie stehen allein unter dem Wächter. Der Test führt die Namen weiterhin wörtlich, sonst prüfte er die Liste gegen sich selbst. Gegen die echte Kopfzeile gehalten: `{"kind":"ok"}`.
-- [ ] 6.1 Abschnitt „Bilder holen": URL aus `source_user_id` + Dateiname, Endung aus dem Datensatz (Test über `jpg`, `png`, `jpeg`), **je Bildart getrennt**, Ablage in die Zwischenablage außerhalb des Arbeitsbaums
-- [ ] 6.2 Original ohne Größensuffix ziehen; Test belegt, dass kein `-190x190` angefragt wird
+- [x] 6.1 Abschnitt „Bilder holen": URL aus `source_user_id` + Dateiname, Endung aus dem Datensatz (Test über `jpg`, `png`, `jpeg`), **je Bildart getrennt**, Ablage in die Zwischenablage außerhalb des Arbeitsbaums
+      — `wp_bilder.ts` (`bildauftraege`, `holeBild`) + eigener Einstieg `wp_bilder_holen.ts`, 17 Tests. URL-Form vorher mit HEAD-Anfragen gegen drei Kennungen belegt: `https://fairbusinessworld.de/wp-content/uploads/ultimatemember/<kennung>/<datei>`, beide Bildarten 200. **Der Dateiname wird geprüft, nicht geglaubt**: er kommt aus einer fremden Datei und geht in eine URL UND einen Pfad auf der Platte — ein Pfadanteil oder eine unbekannte Endung ergibt keinen Auftrag (und damit ein fehlendes Bild wie jedes andere). Ein zurechtgestutzter Name wäre schlimmer als keiner: er fragte eine falsche URL an und verschluckte den Befund.
+- [x] 6.2 Original ohne Größensuffix ziehen; Test belegt, dass kein `-190x190` angefragt wird
+      — zwei Richtungen geprüft: es wird keines angehängt, und ein Name, der bereits eines TRÄGT, wird beschnitten. Der zweite Fall greift heute nie — er steht für den neu gezogenen Export, denn dort führte er zum stillen Import der Verkleinerung.
 - [ ] 6.3 Verkleinern, nach WebP, in den **jeweiligen** Bucket (`avatars` bzw. `covers`); vorhandenes Objekt wird **übersprungen und berichtet**, nicht ersetzt (Test: zweiter Lauf bricht nicht ab)
+      — **gemessen an den 110 geholten Dateien, bevor jemand eine Zielgröße festlegt**: Profilbilder reichen von **1 px** bis 1000 px (24× genau 1000), Headerbilder von 762 px bis **4032 px** (42× genau 1000). Daraus: **nur verkleinern, nie vergrößern** — ein 195-px-Bild auf 512 px hochzurechnen, erfände Bildinformation. Vorschlag für die Obergrenzen: Avatar 512 px, Header 1600 px; von Donald zu bestätigen. Das 1-px-Bild gehört in den Bericht, nicht in den Bucket.
 - [ ] 6.4 Fehlendes/unerreichbares Bild: Mitglied wird dennoch angelegt, Zeile im Bericht (Test mit 404). Gilt je Bild — ein fehlendes Headerbild darf den Avatar nicht mitnehmen
-- [ ] 6.5 Den Abschnitt einmal echt gegen die alte Seite laufen lassen und die Zwischenablage füllen — **beide** Bildarten, bevor die Seite abgeschaltet wird
+      — **zur Hälfte**: `holeBild` meldet 404, „kein Bild" (Fehlerseite mit Status 200) und Netzfehler je als Befund statt zu werfen, je ein Test. Die Zeile im **Bericht** fehlt noch — sie hängt an 6.3, wo die Bildergebnisse in den Lauf einfließen.
+- [x] 6.5 Den Abschnitt einmal echt gegen die alte Seite laufen lassen und die Zwischenablage füllen — **beide** Bildarten, bevor die Seite abgeschaltet wird
+      — **110 von 110 geholt, keins fehlt** (57 Profil-, 53 Headerbilder, 58 Konten, 17 MB). Zweiter Lauf zur Probe: **0 geholt, 110 vorhanden, 0,4 Sekunden** — der Abschnitt ist wiederholbar und fragt die alte Seite nicht zweimal. Ablage: `wp-import-bilder` neben der Quelle, ohne Zeitstempel, damit sie das Abschalten überlebt. **Damit ist das Risiko mit der fremden Frist erledigt.**
 
 ## 7. Schreibender Lauf
 
