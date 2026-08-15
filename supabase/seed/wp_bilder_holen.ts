@@ -20,7 +20,14 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BILDQUELLE, type Holergebnis, bildauftraege, holeBild } from "./wp_bilder";
+import {
+  BILDQUELLE,
+  type Holergebnis,
+  KANTE,
+  bildauftraege,
+  holeBild,
+  wandleBild,
+} from "./wp_bilder";
 import { leseDatensaetze } from "./wp_import";
 import { ablageorte, pruefeQuellPfad } from "./wp_import.lib";
 
@@ -73,6 +80,33 @@ async function main(): Promise<void> {
   console.log(
     `\ngeholt ${zaehle("geholt")} · schon vorhanden ${zaehle("vorhanden")} · fehlt ${zaehle("fehlt")}`,
   );
+
+  // ── Wandeln: verkleinern und nach WebP, neben das Original ────────────────
+  // Im selben Abschnitt und nicht im Import: er hat kein Netz mehr nötig, und
+  // was hier entsteht, ist genau das, was spaeter in den Bucket geht (6.3).
+  console.log("\nWandeln:");
+  let gewandelt = 0;
+  let untauglich = 0;
+  let vorhanden = 0;
+
+  for (const { auftrag, stand } of ergebnisse) {
+    if (stand === "fehlt") continue;
+
+    const ergebnis = await wandleBild({
+      quelle: auftrag.ablage,
+      ziel: `${auftrag.ablage.replace(/\.[^.]+$/, "")}.webp`,
+      maxKante: auftrag.art === "profil" ? KANTE.avatar : KANTE.cover,
+    });
+
+    if (ergebnis.stand === "gewandelt") gewandelt++;
+    else if (ergebnis.stand === "vorhanden") vorhanden++;
+    else {
+      untauglich++;
+      console.log(`  ${auftrag.kennung} · ${auftrag.art} · UNTAUGLICH (${ergebnis.grund})`);
+    }
+  }
+
+  console.log(`gewandelt ${gewandelt} · schon vorhanden ${vorhanden} · untauglich ${untauglich}`);
 
   // Ein fehlendes Bild ist kein Fehler des Laufs (6.4) — der Ausgang bleibt 0.
   // Es steht oben einzeln da und geht in den Bericht des Imports ein.

@@ -25,6 +25,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
+import sharp from "sharp";
+
 /**
  * Die alte Seite. Sie steht hier und nicht in der Umgebung: sie ist keine
  * Zugangsinformation, sondern ein Teil der Aufgabenstellung — und ein Tippfehler
@@ -183,4 +185,78 @@ export async function holeBild(
   writeFileSync(auftrag.ablage, Buffer.from(await antwort.arrayBuffer()));
 
   return { auftrag, stand: "geholt" };
+}
+
+/**
+ * Die Obergrenzen der langen Kante, bestätigt von Donald am 15.08.
+ *
+ * Gemessen an den 110 geholten Dateien: Profilbilder reichen von 1 px bis
+ * 1000 px, Headerbilder von 762 px bis 4032 px. Verkleinert wird deshalb nur
+ * nach unten — `withoutEnlargement`. Ein Profilbild mit 195 px auf 512 px
+ * hochzurechnen, erfände Bildinformation und sähe im Profil schlechter aus als
+ * das kleine Original.
+ */
+export const KANTE = { avatar: 512, cover: 1600 } as const;
+
+/**
+ * Unterhalb dieser Kantenlänge ist es kein Bild mehr, sondern ein Rest. Eines
+ * der 57 Profilbilder ist 1 × 1 Pixel.
+ *
+ * Die 32 sind nicht gegriffen, sondern an der Lücke in den Daten gewählt: die
+ * gemessene Verteilung springt von 1 px auf 190 px. Dazwischen liegt nichts,
+ * was diese Schwelle fälschlich träfe — sie trennt den Defekt vom kleinsten
+ * echten Bild und nicht zwei echte Bilder voneinander.
+ */
+const MINDESTKANTE = 32;
+
+export type Wandlung = {
+  stand: "gewandelt" | "vorhanden" | "untauglich";
+  grund?: string;
+  /** Die Kantenlänge des Ergebnisses — für den Bericht. */
+  kante?: number;
+};
+
+/**
+ * Verkleinert ein geholtes Bild und schreibt es als WebP neben das Original.
+ * Der `covers`-Bucket lässt ausschliesslich `image/webp` zu; für den Avatar ist
+ * es dieselbe Wandlung, nur mit einer anderen Obergrenze.
+ *
+ * Unlesbar ist ein Befund, kein Abbruch: dieselbe Regel wie beim Holen — ein
+ * einziges kaputtes Bild darf 70 Menschen nicht aufhalten.
+ */
+export async function wandleBild(input: {
+  quelle: string;
+  ziel: string;
+  maxKante: number;
+}): Promise<Wandlung> {
+  if (existsSync(input.ziel)) return { stand: "vorhanden" };
+
+  try {
+    const bild = sharp(input.quelle);
+    const { width, height } = await bild.metadata();
+
+    if (!width || !height || width < MINDESTKANTE || height < MINDESTKANTE) {
+      return {
+        stand: "untauglich",
+        grund: `Nur ${width ?? "?"}×${height ?? "?"} Pixel — das ist kein Bild mehr.`,
+      };
+    }
+
+    mkdirSync(dirname(input.ziel), { recursive: true });
+    // `toFile` gibt die Maße des Ergebnisses zurück — ein zweiter Durchgang
+    // durch `sharp`, nur um sie zu erfahren, wandelte jedes Bild doppelt.
+    const info = await bild
+      .resize({
+        width: input.maxKante,
+        height: input.maxKante,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp()
+      .toFile(input.ziel);
+
+    return { stand: "gewandelt", kante: Math.max(info.width, info.height) };
+  } catch (e) {
+    return { stand: "untauglich", grund: `Nicht lesbar: ${(e as Error).message}` };
+  }
 }

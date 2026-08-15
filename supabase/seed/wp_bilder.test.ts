@@ -107,7 +107,7 @@ describe("bildauftraege — was aus einer fremden Datei kommt, wird geprüft", (
 
 // ── Das Holen selbst ────────────────────────────────────────────────────────
 
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -197,5 +197,93 @@ describe("holeBild", () => {
 
     expect(ergebnis.stand).toBe("fehlt");
     expect(ergebnis.grund).toContain("ENOTFOUND");
+  });
+});
+
+// ── Wandeln: verkleinern und nach WebP ──────────────────────────────────────
+
+import sharp from "sharp";
+
+import { KANTE, wandleBild } from "./wp_bilder";
+
+/** Ein echtes Bild, keine Attrappe — `sharp` liest es wie jedes andere. */
+async function bild(pfad: string, kante: number): Promise<string> {
+  await sharp({
+    create: { width: kante, height: kante, channels: 3, background: { r: 30, g: 90, b: 60 } },
+  })
+    .jpeg()
+    .toFile(pfad);
+  return pfad;
+}
+
+describe("wandleBild", () => {
+  it("verkleinert ein zu grosses Bild auf die Obergrenze", async () => {
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "gross.jpg"), 4032);
+    const ziel = join(ordner, "gross.webp");
+
+    const ergebnis = await wandleBild({ quelle, ziel, maxKante: KANTE.cover });
+
+    expect(ergebnis.stand).toBe("gewandelt");
+    const { width, format } = await sharp(ziel).metadata();
+    expect(width).toBe(KANTE.cover);
+    expect(format).toBe("webp");
+  });
+
+  it("vergrössert ein kleines Bild NICHT", async () => {
+    // Gemessen: ein Profilbild ist 195 px. Es auf 512 hochzurechnen, erfände
+    // Bildinformation, die es nicht gibt — und sähe im Profil schlechter aus
+    // als das kleine Original.
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "klein.jpg"), 195);
+    const ziel = join(ordner, "klein.webp");
+
+    await wandleBild({ quelle, ziel, maxKante: KANTE.avatar });
+
+    expect((await sharp(ziel).metadata()).width).toBe(195);
+  });
+
+  it("weist ein Bild ab, das keines mehr ist", async () => {
+    // Ein Profilbild in der echten Quelle ist 1 × 1 Pixel. Die gemessene
+    // Verteilung springt von 1 px auf 190 px — dazwischen liegt nichts, was
+    // eine Schwelle fälschlich träfe.
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "rest.jpg"), 1);
+
+    const ergebnis = await wandleBild({
+      quelle,
+      ziel: join(ordner, "rest.webp"),
+      maxKante: KANTE.avatar,
+    });
+
+    expect(ergebnis.stand).toBe("untauglich");
+    expect(ergebnis.grund).toContain("1×1");
+    expect(existsSync(join(ordner, "rest.webp"))).toBe(false);
+  });
+
+  it("überspringt ein bereits gewandeltes Bild", async () => {
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "da.jpg"), 300);
+    const ziel = join(ordner, "da.webp");
+    writeFileSync(ziel, "SCHON DA");
+
+    const ergebnis = await wandleBild({ quelle, ziel, maxKante: KANTE.avatar });
+
+    expect(ergebnis.stand).toBe("vorhanden");
+    expect(readFileSync(ziel, "utf8")).toBe("SCHON DA");
+  });
+
+  it("meldet eine unlesbare Datei als Befund, statt zu werfen", async () => {
+    const ordner = frisch();
+    const quelle = join(ordner, "kaputt.jpg");
+    writeFileSync(quelle, "das ist kein Bild");
+
+    const ergebnis = await wandleBild({
+      quelle,
+      ziel: join(ordner, "kaputt.webp"),
+      maxKante: KANTE.avatar,
+    });
+
+    expect(ergebnis.stand).toBe("untauglich");
   });
 });
