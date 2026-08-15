@@ -255,6 +255,37 @@ export function htmlEntfernen(roh: string): string {
 }
 
 /**
+ * Nimmt die Markdown-Marker weg, die die Quelle vereinzelt trägt — die
+ * AUSZEICHNUNG, nicht den Text.
+ *
+ * ── WARUM SO WENIG (Sichtprobe 7.8, 15.08.) ─────────────────────────────────
+ * Gemessen an den 48 belegten Biografien: **eine** ist in einem Markdown-Editor
+ * geschrieben (`### **Unsere Leistungen:**`) und zeigt die Zeichen sonst
+ * wörtlich im Verzeichnis. Vier tragen Strich-, drei Nummernlisten — die lesen
+ * sich als Klartext bereits als Liste und werden nicht angefasst.
+ *
+ * Behandelt werden deshalb nur zwei Formen, beide eindeutig:
+ * - `**Paar**` in EINER Zeile. Ein einzelner Stern ist in diesen Texten
+ *   Mathematik („5 * 3 Meter") oder Fußnote, keine Auszeichnung — und zwei
+ *   Sternchen am Anfang zweier Zeilen sind eine Aufzählung, kein Paar. Deshalb
+ *   kein `\n` innerhalb des Paars und kein `*einzeln*`.
+ * - `#` bis `######` am ZEILENANFANG, mit folgendem Leerzeichen. Ohne beide
+ *   Bedingungen fiele „Wir sind Platz #1" darunter.
+ *
+ * Das RENDERN von Markdown ist bewusst nicht hier: es wäre ein Feature für alle
+ * Profiltexte (Renderer, Sanitizer, Editor) und kein Import-Fix. Entschieden am
+ * 15.08. mit Donald, als eigenes Issue abgelegt.
+ */
+export function markdownMarkerEntfernen(roh: string): string {
+  if (!roh) return "";
+
+  return roh
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/^#{1,6} +/gm, "")
+    .trim();
+}
+
+/**
  * Die Anmeldeadresse ist der eine Schlüssel der Wiedererkennung, wo keine
  * Kennung vorliegt. Sie wird getrimmt und case-gefaltet.
  */

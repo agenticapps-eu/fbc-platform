@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   datumParsen,
   htmlEntfernen,
+  markdownMarkerEntfernen,
   normalisiereAdresse,
   normalisiereKennung,
   ortParsen,
@@ -253,5 +254,44 @@ describe("normalisieren", () => {
   it("liefert für eine leere Kennung null", () => {
     expect(normalisiereKennung("")).toBeNull();
     expect(normalisiereKennung("  ")).toBeNull();
+  });
+});
+
+describe("markdownMarkerEntfernen", () => {
+  it("nimmt die Sternchen einer Fettauszeichnung weg und lässt den Text stehen", () => {
+    // Der gemessene Fall: EINE der 48 importierten Biografien ist in einem
+    // Markdown-Editor geschrieben und zeigt die Sternchen sonst wörtlich.
+    expect(markdownMarkerEntfernen("**Über uns / Unsere Mission** Wir sind …")).toBe(
+      "Über uns / Unsere Mission Wir sind …",
+    );
+  });
+
+  it("nimmt die Rauten einer Überschrift am Zeilenanfang weg", () => {
+    expect(markdownMarkerEntfernen("### **Unsere Leistungen:**\nText")).toBe(
+      "Unsere Leistungen:\nText",
+    );
+  });
+
+  it("lässt eine Raute mitten im Satz stehen", () => {
+    // „Platz #1" ist keine Überschrift. Nur der Zeilenanfang zählt, und nur
+    // mit folgendem Leerzeichen.
+    expect(markdownMarkerEntfernen("Wir sind Platz #1 im Test")).toBe("Wir sind Platz #1 im Test");
+  });
+
+  it("lässt einzelne Sternchen unangetastet", () => {
+    // Der Grund, warum NUR das Paar `**` behandelt wird: ein einzelner Stern
+    // ist in diesen Texten Mathematik oder Fußnote, keine Auszeichnung.
+    expect(markdownMarkerEntfernen("Raum 5 * 3 Meter, Preis auf Anfrage*")).toBe(
+      "Raum 5 * 3 Meter, Preis auf Anfrage*",
+    );
+  });
+
+  it("greift nicht über einen Zeilenumbruch hinweg", () => {
+    // Zwei Sternchen am Anfang zweier Zeilen sind eine Aufzählung, kein Paar.
+    expect(markdownMarkerEntfernen("**Angebot\n**Nachfrage")).toBe("**Angebot\n**Nachfrage");
+  });
+
+  it("lässt einen Text ohne Marker unverändert", () => {
+    expect(markdownMarkerEntfernen("Ganz normaler Text.")).toBe("Ganz normaler Text.");
   });
 });

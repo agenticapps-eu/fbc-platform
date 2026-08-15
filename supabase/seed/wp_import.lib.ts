@@ -38,6 +38,7 @@ import {
   type Ort,
   datumParsen,
   htmlEntfernen,
+  markdownMarkerEntfernen,
   normalisiereAdresse,
   normalisiereKennung,
   ortParsen,
@@ -584,7 +585,9 @@ export function zerlegeInteressen(roh: string): string[] {
  * Profil, weil ein Feld nicht auf der Liste stand.
  */
 function wert(roh: string | undefined): string | null {
-  const s = htmlEntfernen(roh ?? "").trim();
+  // Erst HTML, dann die Markdown-Marker: `htmlEntfernen` löst Entitäten auf, und
+  // ein `&#42;` wäre vorher noch kein Sternchen gewesen.
+  const s = markdownMarkerEntfernen(htmlEntfernen(roh ?? "")).trim();
   return s === "" ? null : s;
 }
 
