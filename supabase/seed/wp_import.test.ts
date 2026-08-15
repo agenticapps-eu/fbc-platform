@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { type Bestand, QUELLFELDER } from "./wp_import.lib";
-import { type Quelle, leseDatensaetze, verarbeite } from "./wp_import";
+import {
+  type Bestandsdaten,
+  type Quelle,
+  baueLauf,
+  bestandsleser,
+  leseDatensaetze,
+  verarbeite,
+} from "./wp_import";
 
 /** Eine Quellzeile mit allen erwarteten Feldern — leer, sofern nicht überschrieben. */
 function zeile(werte: Record<string, string> = {}): Record<string, string> {
@@ -306,5 +313,171 @@ describe("verarbeite — was der Bericht braucht", () => {
       name: "Anna Berg",
       adresse: "anna@example.org",
     });
+  });
+});
+
+// ── 5.2: der gemeinsame Pfad ────────────────────────────────────────────────
+
+function bestandsdaten(werte: Partial<Bestandsdaten> = {}): Bestandsdaten {
+  return {
+    adressenOhneKennung: [],
+    nachKennung: new Map(),
+    nachAdresse: new Map(),
+    ...werte,
+  };
+}
+
+/** Eine Quelldatei aus Zeilenobjekten — die Kopfzeile sind die 26 Quellfelder. */
+function csv(zeilen: Record<string, string>[]): string {
+  const feld = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  return [
+    QUELLFELDER.join(","),
+    ...zeilen.map((z) => QUELLFELDER.map((f) => feld(z[f] ?? "")).join(",")),
+  ].join("\n");
+}
+
+const ZWEI_DATENSAETZE = csv([
+  zeile({ user_email: "anna@example.org", source_user_id: "318" }),
+  zeile({ user_email: "bert@example.org", source_user_id: "319", first_name: "Bert" }),
+]);
+
+describe("bestandsleser", () => {
+  it("findet über die Kennung", () => {
+    const eintrag = bestand();
+    const leser = bestandsleser(bestandsdaten({ nachKennung: new Map([["318", eintrag]]) }));
+
+    expect(leser({ kennung: "318", adresse: "anna@example.org" })).toBe(eintrag);
+  });
+
+  it("findet ein Konto ohne Kennung über die Adresse", () => {
+    // Der Fall aus der Anforderung: ein früherer Lauf brach ab, nachdem er das
+    // Anmeldekonto angelegt, aber die Kennung noch nicht geschrieben hatte.
+    const eintrag = bestand();
+    const leser = bestandsleser(
+      bestandsdaten({ nachAdresse: new Map([["anna@example.org", eintrag]]) }),
+    );
+
+    expect(leser({ kennung: "318", adresse: "anna@example.org" })).toBe(eintrag);
+  });
+
+  it("lässt die Kennung vor der Adresse gelten", () => {
+    // Sonst entschiede die Adresse über ein Profil, das seine Kennung schon
+    // trägt — und die Merge-Regel läse den falschen `bereitsImportiert`-Stand.
+    const ueberKennung = bestand({ bereitsImportiert: true });
+    const ueberAdresse = bestand({ bereitsImportiert: false });
+    const leser = bestandsleser(
+      bestandsdaten({
+        nachKennung: new Map([["318", ueberKennung]]),
+        nachAdresse: new Map([["anna@example.org", ueberAdresse]]),
+      }),
+    );
+
+    expect(leser({ kennung: "318", adresse: "anna@example.org" })).toBe(ueberKennung);
+  });
+
+  it("gibt null zurück, wo nichts steht", () => {
+    expect(bestandsleser(bestandsdaten())({ kennung: "318", adresse: "a@ex.org" })).toBeNull();
+  });
+});
+
+describe("baueLauf — beide Betriebsarten, ein Weg", () => {
+  const rahmen = {
+    inhalt: ZWEI_DATENSAETZE,
+    ziel: "lokal",
+    quelle: "/ausserhalb/wp-export.csv",
+    zeitpunkt: "2026-08-15T08:00:00.000Z",
+  };
+
+  it("klassifiziert im schreibenden Lauf genau wie im Trockenlauf", () => {
+    // Die Kernaussage von 5.2: ein Trockenlauf, der einen anderen Weg nimmt,
+    // sagt nichts über den echten aus.
+    const daten = bestandsdaten({ nachKennung: new Map([["319", bestand()]]) });
+
+    const trocken = baueLauf({ ...rahmen, bestandsdaten: daten, schreibend: false });
+    const schreibend = baueLauf({ ...rahmen, bestandsdaten: daten, schreibend: true });
+
+    if (trocken.lauf.art !== "lauf" || schreibend.lauf.art !== "lauf") {
+      throw new Error("Lauf erwartet");
+    }
+    expect(trocken.lauf.saetze.map((s) => s.ergebnis.klasse)).toEqual(["angelegt", "aktualisiert"]);
+    expect(schreibend.lauf.saetze.map((s) => s.ergebnis)).toEqual(
+      trocken.lauf.saetze.map((s) => s.ergebnis),
+    );
+  });
+
+  it("berechnet auch im Trockenlauf, was geschrieben würde", () => {
+    const { lauf } = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].auftrag?.zusammenfuehrung.profil.name).toBe("Anna Berg");
+  });
+
+  it("nennt die Betriebsart im Bericht", () => {
+    const trocken = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
+    const schreibend = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: true });
+
+    expect(trocken.bericht).toContain("Trockenlauf");
+    expect(schreibend.bericht).toContain("Schreibender Lauf");
+  });
+
+  it("hält Name und Adresse aus der Konsolenausgabe heraus", () => {
+    // 4.7 am zusammengesetzten Lauf, nicht nur an `stdoutZeile`: hier entsteht
+    // die Ausgabe wirklich.
+    const { konsole } = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
+
+    expect(konsole).toHaveLength(2);
+    expect(konsole.join("\n")).not.toMatch(/Anna|Berg|example\.org/);
+    expect(konsole[0]).toContain("318");
+  });
+
+  it("vermerkt die fehlenden Lieferungen, statt auf sie zu warten", () => {
+    const { bericht } = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
+
+    expect(bericht).toContain("Zahlungsstände");
+    expect(bericht).toContain("Ausgetretenen-Liste");
+  });
+
+  it("erzeugt beim Vorab-Abbruch den eigenen Berichtstyp und keine Datensatzzeile", () => {
+    const { lauf, bericht, konsole } = baueLauf({
+      ...rahmen,
+      inhalt: csv([zeile(), zeile()]),
+      bestandsdaten: bestandsdaten(),
+      schreibend: true,
+    });
+
+    expect(lauf.art).toBe("vorab-abbruch");
+    expect(bericht).toContain("Vorab-Abbruch");
+    expect(konsole).toEqual([]);
+  });
+});
+
+describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
+  const rahmen = {
+    inhalt: ZWEI_DATENSAETZE,
+    ziel: "lokal",
+    quelle: "/ausserhalb/wp-export.csv",
+    zeitpunkt: "2026-08-15T08:00:00.000Z",
+  };
+
+  it("reicht die Bestandsadressen bis in die Vorabprüfung durch", () => {
+    // Die sicherheitsrelevante Leitung (4.2): ginge sie verloren, bliebe die
+    // Kollision mit einem Bestandskonto im zusammengesetzten Lauf unbemerkt —
+    // und ein Selbstregistrierer bekäme `impact` geschenkt.
+    const { lauf, bericht } = baueLauf({
+      ...rahmen,
+      bestandsdaten: bestandsdaten({ adressenOhneKennung: ["anna@example.org"] }),
+      schreibend: false,
+    });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.klasse).toBe("uebersprungen");
+    expect(bericht).toContain("Kollision mit Bestandskonto");
+  });
+
+  it("trägt die Ergebnisse in den Bericht, nicht nur in den Rückgabewert", () => {
+    const { bericht } = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
+
+    expect(bericht).toMatch(/\| angelegt \| 2 \|/);
+    expect(bericht).toMatch(/\*\*Summe\*\* \| \*\*2\*\*/);
   });
 });

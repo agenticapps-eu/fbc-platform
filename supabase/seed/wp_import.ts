@@ -21,16 +21,28 @@
  * hiesse 70 Rundreisen und einen Bestand, der sich mitten im Lauf ändern kann.
  */
 
-import { parse } from "csv-parse/sync";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import type { Datensatzergebnis } from "./wp_bericht";
+import { parse } from "csv-parse/sync";
+import pg from "pg";
+
+import { type Berichtskopf, type Datensatzergebnis, baueBericht, stdoutZeile } from "./wp_bericht";
+import { normalisiereAdresse, normalisiereKennung } from "./wp_felder";
 import {
   type Bestand,
   type Vorabbefund,
+  type ZielName,
   type Zusammenfuehrung,
+  ablageorte,
   bildeAb,
   fuegeZusammen,
+  leseAufruf,
+  pruefeQuellPfad,
   pruefeVorab,
+  pruefeZiel,
+  schreibeBericht,
 } from "./wp_import.lib";
 
 /** Die gelesene Quelle: die Kopfzeile und die Datensätze darunter. */
@@ -183,4 +195,281 @@ export function verarbeite(input: {
   });
 
   return { art: "lauf", befunde: vorab.befunde, saetze };
+}
+
+// ── Der Bestand: eine Abfrage vor dem Lauf, danach nur noch Nachschlagen ─────
+
+/**
+ * Was im Ziel steht, aus EINER Abfrage. Derselbe Eintrag steht unter beiden
+ * Schlüsseln, unter denen ein Datensatz wiedererkannt werden kann.
+ */
+export type Bestandsdaten = {
+  /** Normalisierte Adressen bestehender Konten OHNE `legacy_source_id` (4.2). */
+  adressenOhneKennung: string[];
+  nachKennung: Map<string, Bestand>;
+  nachAdresse: Map<string, Bestand>;
+};
+
+/**
+ * Die Kennung schlägt die Adresse. Umgekehrt entschiede die Adresse über ein
+ * Profil, das seine Kennung schon trägt — und die Merge-Regel läse den falschen
+ * `bereitsImportiert`-Stand, also die Frage, ob eine Lücke im Profil eine
+ * Entscheidung des Mitglieds ist.
+ *
+ * Die Adresse bleibt trotzdem der zweite Weg: ein Konto, dessen Kennung ein
+ * abgebrochener Lauf nicht mehr geschrieben hat, ist über sie dasselbe Konto.
+ */
+export function bestandsleser(daten: Bestandsdaten): Bestandsleser {
+  return ({ kennung, adresse }) =>
+    (kennung ? daten.nachKennung.get(kennung) : undefined) ??
+    daten.nachAdresse.get(adresse) ??
+    null;
+}
+
+/**
+ * Was Detlev noch nicht geliefert hat (Stand 14.08.). Es blockiert nichts —
+ * entschieden am 14.08.: die Listen kommen, und die erste Zielumgebung ist DEV.
+ * Der Bericht führt die betroffenen Konten stattdessen einzeln auf.
+ *
+ * „Zahlungsstände" steht hier wörtlich: `wp_bericht.ts` hängt den Abschnitt
+ * `paid_until` an genau diese Zeichenkette.
+ */
+const FEHLENDE_LIEFERUNGEN = ["Zahlungsstände", "Ausgetretenen-Liste"];
+
+/**
+ * Der gemeinsame Weg beider Betriebsarten, von der gelesenen Datei bis zum
+ * fertigen Bericht. Was der schreibende Lauf mehr tut, tut er DANACH — hier
+ * unterscheidet ihn nur die Beschriftung und die Strenge der Vorabprüfung, und
+ * beide entscheidet nicht dieser Code, sondern `pruefeVorab`.
+ *
+ * Rein: liest keine Datei, schreibt keine, spricht mit keiner Datenbank.
+ */
+export function baueLauf(input: {
+  inhalt: string;
+  bestandsdaten: Bestandsdaten;
+  schreibend: boolean;
+  ziel: string;
+  quelle: string;
+  zeitpunkt: string;
+}): { lauf: Lauf; bericht: string; konsole: string[] } {
+  const lauf = verarbeite({
+    quelle: leseDatensaetze(input.inhalt),
+    bestandsadressenOhneKennung: input.bestandsdaten.adressenOhneKennung,
+    bestand: bestandsleser(input.bestandsdaten),
+    schreibend: input.schreibend,
+  });
+
+  const kopf: Berichtskopf = {
+    modus: input.schreibend ? "schreibend" : "trocken",
+    ziel: input.ziel,
+    quelle: input.quelle,
+    zeitpunkt: input.zeitpunkt,
+    fehlendeLieferungen: [...FEHLENDE_LIEFERUNGEN],
+  };
+
+  if (lauf.art === "vorab-abbruch") {
+    return {
+      lauf,
+      bericht: baueBericht({
+        art: "vorab-abbruch",
+        kopf,
+        datensaetze: lauf.datensaetze,
+        befunde: lauf.befunde,
+      }),
+      konsole: [],
+    };
+  }
+
+  return {
+    lauf,
+    bericht: baueBericht({
+      art: "lauf",
+      kopf,
+      befunde: lauf.befunde,
+      ergebnisse: lauf.saetze.map((s) => s.ergebnis),
+    }),
+    konsole: lauf.saetze.map((s) => stdoutZeile(s.ergebnis)),
+  };
+}
+
+// ── Ab hier wirkt es: Datenbank, Dateien, Konsole ───────────────────────────
+
+const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const LOKALE_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const CA_PFAD = "scripts/supabase-root-2021-ca.crt";
+
+/**
+ * Die eine Abfrage, aus der der ganze Bestand kommt. `left join`, weil ein
+ * Profil ohne Kontaktzeile und ohne Legacy-Zeile trotzdem dasselbe Konto ist.
+ *
+ * `offers` und `needs` zählen NUR die Zeilen des Freitext-Editors: die Chips des
+ * Kategorie-Wählers (`source = 'chip'`) sind anderer Inhalt, und ein Mitglied
+ * mit drei Kategorien hat trotzdem kein „Ich biete" geschrieben.
+ */
+const BESTANDSABFRAGE = `
+  select
+    pl.legacy_source_id                                                as kennung,
+    u.email                                                            as adresse,
+    p.name, p.headline, p.short_bio, p.region, p.website,
+    coalesce(p.socials, '{}'::jsonb)                                   as socials,
+    coalesce(p.videos, '{}'::text[])                                   as videos,
+    c.email as kontakt_email, c.phone, c.street, c.postal_code, c.city, c.state, c.country,
+    (select count(*) from public.offers o
+       where o.profile_id = p.id and o.source = 'editor')              as offers,
+    (select count(*) from public.needs n
+       where n.profile_id = p.id and n.source = 'editor')              as needs,
+    (select count(*) from public.profile_interests i
+       where i.profile_id = p.id)                                      as interessen
+  from public.profiles p
+  join auth.users u                on u.id = p.id
+  left join public.profile_contacts c on c.profile_id = p.id
+  left join public.profile_legacy pl  on pl.profile_id = p.id
+`;
+
+type Bestandszeile = {
+  kennung: string | null;
+  adresse: string | null;
+  name: string | null;
+  headline: string | null;
+  short_bio: string | null;
+  region: string | null;
+  website: string | null;
+  socials: Record<string, string> | null;
+  videos: string[] | null;
+  kontakt_email: string | null;
+  phone: string | null;
+  street: string | null;
+  postal_code: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  offers: string;
+  needs: string;
+  interessen: string;
+};
+
+async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
+  const { rows } = await client.query<Bestandszeile>(BESTANDSABFRAGE);
+
+  const daten: Bestandsdaten = {
+    adressenOhneKennung: [],
+    nachKennung: new Map(),
+    nachAdresse: new Map(),
+  };
+
+  for (const z of rows) {
+    const kennung = normalisiereKennung(z.kennung ?? "");
+    const adresse = normalisiereAdresse(z.adresse ?? "");
+
+    const eintrag: Bestand = {
+      bereitsImportiert: kennung !== null,
+      profil: {
+        name: z.name,
+        headline: z.headline,
+        short_bio: z.short_bio,
+        region: z.region,
+        website: z.website,
+        socials: z.socials ?? {},
+        videos: z.videos ?? [],
+      },
+      kontakt: {
+        email: z.kontakt_email,
+        phone: z.phone,
+        street: z.street,
+        postal_code: z.postal_code,
+        city: z.city,
+        state: z.state,
+        country: z.country,
+      },
+      // `count(*)` kommt als Zeichenkette (bigint) — ungewandelt wäre "0" wahr.
+      offers: Number(z.offers),
+      needs: Number(z.needs),
+      interessen: Number(z.interessen),
+    };
+
+    if (kennung) daten.nachKennung.set(kennung, eintrag);
+    if (adresse) {
+      daten.nachAdresse.set(adresse, eintrag);
+      if (!kennung) daten.adressenOhneKennung.push(adresse);
+    }
+  }
+
+  return daten;
+}
+
+function verbindungsUrl(ziel: ZielName): string | undefined {
+  if (ziel === "lokal") return LOKALE_DB_URL;
+  return ziel === "dev" ? process.env.SUPABASE_DB_URL_DEV : process.env.SUPABASE_DB_URL_PROD;
+}
+
+function abbruch(grund: string): never {
+  console.error(grund);
+  process.exit(1);
+}
+
+async function main(): Promise<void> {
+  const aufruf = leseAufruf(process.argv.slice(2));
+  if (aufruf.kind === "abbruch") abbruch(aufruf.grund);
+
+  const pfad = pruefeQuellPfad({
+    pfad: aufruf.quelle,
+    cwd: process.cwd(),
+    repoWurzel: REPO_WURZEL,
+  });
+  if (pfad.kind === "abbruch") abbruch(pfad.grund);
+
+  const dbUrl = verbindungsUrl(aufruf.ziel);
+  const geprueft = pruefeZiel({
+    dbUrl,
+    erwartetesZiel: aufruf.ziel,
+    devRef: readFileSync(resolve(REPO_WURZEL, "scripts/dev-project-ref.txt"), "utf8").trim(),
+    prodRef: readFileSync(resolve(REPO_WURZEL, "scripts/prod-project-ref.txt"), "utf8").trim(),
+  });
+  if (geprueft.kind === "abbruch") abbruch(geprueft.grund);
+
+  // Der schreibende Teil ist Gruppe 7. Bis dahin bricht dieser Lauf ab, statt
+  // einen Bericht zu schreiben, der von Schreibvorgängen spricht, die es nicht
+  // gab — ein Bericht, der lügt, ist schlimmer als keiner.
+  if (aufruf.schreiben) {
+    abbruch("Der schreibende Lauf ist noch nicht gebaut (Gruppe 7). Bis dahin nur Trockenlauf.");
+  }
+
+  const client = new pg.Client({
+    connectionString: dbUrl,
+    ssl:
+      aufruf.ziel === "lokal"
+        ? false
+        : { ca: readFileSync(resolve(REPO_WURZEL, CA_PFAD), "utf8"), rejectUnauthorized: true },
+  });
+  await client.connect();
+
+  try {
+    const zeitpunkt = new Date().toISOString();
+    const { lauf, bericht, konsole } = baueLauf({
+      inhalt: readFileSync(pfad.pfad, "utf8"),
+      bestandsdaten: await leseBestand(client),
+      schreibend: aufruf.schreiben,
+      ziel: geprueft.ziel,
+      quelle: pfad.pfad,
+      zeitpunkt,
+    });
+
+    for (const zeile of konsole) console.log(zeile);
+
+    const orte = ablageorte({ quellPfad: pfad.pfad, zeitstempel: zeitpunkt });
+    schreibeBericht(orte.bericht, bericht);
+
+    console.log(
+      lauf.art === "vorab-abbruch"
+        ? `Vorab-Abbruch — nichts verarbeitet. Bericht: ${orte.bericht}`
+        : `Trockenlauf über ${lauf.saetze.length} Datensätze. Bericht: ${orte.bericht}`,
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+// Nur als Programm, nicht beim Import aus den Tests.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
 }
