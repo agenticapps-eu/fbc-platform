@@ -284,6 +284,17 @@ export const QUELLFELDER: readonly string[] = [
   "biete", // → offers
   "suche", // → needs
   "infos_28", // → profile_interests, theme = null
+
+  // → Bildstrecke (Gruppe 6). NICHT Teil der Abbildung: `bildeAb` fasst sie
+  // nicht an, geholt werden die Dateien in einem eigenen Abschnitt. Unter dem
+  // Wächter stehen sie trotzdem — ein Export, der sie anders benennt, liefe
+  // sonst still bildlos durch, und die Bilder liegen nur auf der alten Seite.
+  //
+  // Der Wert trägt jeweils NUR die Endung (gemessen 15.08.: drei verschiedene
+  // Werte über 70 Datensätze, kein Pfad, kein `http`); der Pfad entsteht aus
+  // `source_user_id`.
+  "profile_photo", // → avatars / profiles.avatar_url
+  "cover_photo", // → covers / profiles.cover_url
 ];
 
 export type Kopfpruefung = { kind: "ok" } | { kind: "abbruch"; grund: string };
@@ -394,7 +405,11 @@ export function pruefeVorab(input: {
 }): Vorabergebnis {
   const kopf = pruefeKopfzeile(input.spalten);
   if (kopf.kind === "abbruch") {
-    return { abbruch: true, befunde: [{ art: "kopfzeile", grund: kopf.grund }], ausgeschlossen: [] };
+    return {
+      abbruch: true,
+      befunde: [{ art: "kopfzeile", grund: kopf.grund }],
+      ausgeschlossen: [],
+    };
   }
 
   const befunde: Vorabbefund[] = [];
@@ -439,7 +454,8 @@ export function pruefeVorab(input: {
   }
 
   const blockierend = befunde.some(
-    (b) => b.art === "dublette_kennung" || b.art === "dublette_adresse" || b.art === "kollision_bestand",
+    (b) =>
+      b.art === "dublette_kennung" || b.art === "dublette_adresse" || b.art === "kollision_bestand",
   );
 
   return {
@@ -520,7 +536,11 @@ const TITEL_GRENZE = 80;
  * vollständig in `description`, es geht nichts verloren.
  */
 export function titelAus(text: string): string {
-  const zeile = text.split("\n").map((z) => z.trim()).find((z) => z !== "") ?? "";
+  const zeile =
+    text
+      .split("\n")
+      .map((z) => z.trim())
+      .find((z) => z !== "") ?? "";
   if (zeile.length <= TITEL_GRENZE) return zeile;
 
   const schnitt = zeile.slice(0, TITEL_GRENZE);
@@ -760,7 +780,8 @@ export function fuegeZusammen(ziel: Zielsatz, bestand: Bestand | null): Zusammen
   // Präsentation des Mitglieds in seiner Reihenfolge, und Anhängen legte bei
   // jedem Lauf dasselbe Video ein zweites Mal ab.
   if (ziel.profil.videos.length > 0) {
-    if (darfSchreiben((bestand?.profil.videos.length ?? 0) === 0)) profil.videos = ziel.profil.videos;
+    if (darfSchreiben((bestand?.profil.videos.length ?? 0) === 0))
+      profil.videos = ziel.profil.videos;
     else uebersprungen.push("profiles.videos");
   }
 

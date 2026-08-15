@@ -290,6 +290,12 @@ nur so ihr wirkliches Datum behalten.
 
 ### Requirement: Bilder werden in voller Auflösung übernommen
 
+Die Quelle führt **zwei** Bilder je Mitglied: das Profilbild und das Headerbild
+der Profilansicht. Der Import SHALL **beide** übernehmen — das Profilbild nach
+`profiles.avatar_url`, das Headerbild nach `profiles.cover_url`, je in den Bucket,
+den die Oberfläche für dieses Bild liest. Beide liegen ausschließlich auf dem
+Altsystem; was der Import auslässt, ist mit dessen Abschaltung verloren.
+
 Das Altsystem legt neben jedem Bild verkleinerte Ableitungen mit einem
 Größensuffix ab. Der Import SHALL die Datei **ohne** Größensuffix ziehen.
 
@@ -316,6 +322,13 @@ scheitern. Sonst scheiterte der zweite Lauf an dem, was der erste angelegt hat.
 - **WHEN** derselbe Lauf ein zweites Mal läuft
 - **THEN** überspringt er das vorhandene Objekt, nennt es im Bericht und bricht
   nicht ab
+
+#### Scenario: Profilbild und Headerbild werden beide übernommen
+
+- **GIVEN** ein Datensatz nennt ein Profilbild **und** ein Headerbild
+- **WHEN** der Import den Bildabschnitt ausführt
+- **THEN** liegen beide Bilder in dem Bucket, aus dem die Oberfläche sie liest,
+  und jedes ist auf seiner eigenen Spalte des Profils verzeichnet
 
 #### Scenario: Die Ableitung wird nicht verwechselt
 

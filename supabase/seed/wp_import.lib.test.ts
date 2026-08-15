@@ -331,12 +331,17 @@ describe("schreibeBericht", () => {
 });
 
 /**
- * Die 26 Namen stehen hier WÖRTLICH und nicht aus `QUELLFELDER` abgeleitet.
+ * Die 28 Namen stehen hier WÖRTLICH und nicht aus `QUELLFELDER` abgeleitet.
  * Sonst prüfte der Test die Liste gegen sich selbst: eine gestrichene Zeile
  * bliebe grün. Die Namen sind am 14.08. gegen die Kopfzeile der echten Quelle
- * gehalten — alle 26 vorhanden.
+ * gehalten — alle vorhanden.
+ *
+ * Seit dem 15.08. sind es 28: `profile_photo` und `cover_photo` kamen dazu.
+ * Sie werden nicht abgebildet, sondern von der Bildstrecke gelesen (Gruppe 6) —
+ * unter dem Wächter stehen sie trotzdem, sonst liefe ein Export, der sie anders
+ * benennt, still bildlos durch.
  */
-const ERWARTETE_26 = [
+const ERWARTETE_28 = [
   "E-Mail",
   "Homepage",
   "Mitgliedschaft",
@@ -344,6 +349,7 @@ const ERWARTETE_26 = [
   "Telefonnummer",
   "beruf",
   "biete",
+  "cover_photo",
   "facebook",
   "first_name",
   "infos",
@@ -358,6 +364,7 @@ const ERWARTETE_26 = [
   "ort_27_28",
   "praesei_lang",
   "praesi_kurz",
+  "profile_photo",
   "source_user_id",
   "suche",
   "twitter",
@@ -366,8 +373,8 @@ const ERWARTETE_26 = [
 ];
 
 describe("QUELLFELDER", () => {
-  it("führt genau die 26 lebenden Quellfelder der Abbildungsmatrix", () => {
-    expect([...QUELLFELDER].sort()).toEqual(ERWARTETE_26);
+  it("führt genau die 28 gelesenen Quellfelder", () => {
+    expect([...QUELLFELDER].sort()).toEqual(ERWARTETE_28);
   });
 
   it("nennt kein Feld doppelt", () => {
@@ -377,20 +384,20 @@ describe("QUELLFELDER", () => {
 
 describe("pruefeKopfzeile", () => {
   it("nimmt eine Kopfzeile an, die alle erwarteten Felder trägt", () => {
-    expect(pruefeKopfzeile(ERWARTETE_26)).toEqual({ kind: "ok" });
+    expect(pruefeKopfzeile(ERWARTETE_28)).toEqual({ kind: "ok" });
   });
 
   it("ignoriert unbekannte Spalten, statt an ihnen abzubrechen", () => {
-    // Die echte Datei trägt 140 Spalten: 26 lebende, der Rest ist WordPress-
+    // Die echte Datei trägt 140 Spalten: 28 gelesene, der Rest ist WordPress-
     // Innenleben (`wp_*`, `aioseo_*`, `session_tokens`) und Reste gelöschter
     // Formularfelder. Ein Wächter, der daran abbricht, wäre nie grün.
-    const mitBallast = [...ERWARTETE_26, "wp_capabilities", "aioseo_twitter_url", "user_pass"];
+    const mitBallast = [...ERWARTETE_28, "wp_capabilities", "aioseo_twitter_url", "user_pass"];
 
     expect(pruefeKopfzeile(mitBallast)).toEqual({ kind: "ok" });
   });
 
   it("bricht ab, wenn ein erwartetes Feld fehlt, und nennt es", () => {
-    const ohneOrt = ERWARTETE_26.filter((f) => f !== "ort");
+    const ohneOrt = ERWARTETE_28.filter((f) => f !== "ort");
 
     const ergebnis = pruefeKopfzeile(ohneOrt);
 
@@ -402,7 +409,7 @@ describe("pruefeKopfzeile", () => {
     // Ein Wächter, der beim ersten Fund aussteigt, macht aus einem neu gezogenen
     // Export eine Kette von Einzelläufen — jeder deckt genau ein Feld auf.
     const ergebnis = pruefeKopfzeile(
-      ERWARTETE_26.filter((f) => f !== "biete" && f !== "suche" && f !== "beruf"),
+      ERWARTETE_28.filter((f) => f !== "biete" && f !== "suche" && f !== "beruf"),
     );
 
     expect(ergebnis.kind).toBe("abbruch");
@@ -418,7 +425,7 @@ describe("pruefeKopfzeile", () => {
     // abgebildet wird — steht aber ein erwartetes Feld nach einem neuen Export
     // an erster Stelle, meldete der Wächter es sonst als fehlend, obwohl es da
     // ist. Der Abbruchgrund zeigte dann auf die falsche Ursache.
-    const mitBom = ERWARTETE_26.map((f, i) => (i === 0 ? `\uFEFF${f}` : f));
+    const mitBom = ERWARTETE_28.map((f, i) => (i === 0 ? `\uFEFF${f}` : f));
 
     expect(pruefeKopfzeile(mitBom)).toEqual({ kind: "ok" });
   });
@@ -489,9 +496,7 @@ describe("bildeAb — profiles", () => {
   });
 
   it("hängt infos_15 an infos an und entfernt dabei das Markup", () => {
-    const satz = bildeAb(
-      zeile({ infos: "<p>Erster Teil</p>", infos_15: "Zweiter&nbsp;Teil" }),
-    );
+    const satz = bildeAb(zeile({ infos: "<p>Erster Teil</p>", infos_15: "Zweiter&nbsp;Teil" }));
 
     expect(satz.profil.short_bio).toBe("Erster Teil\n\nZweiter Teil");
   });
@@ -617,7 +622,9 @@ describe("bildeAb — offers, needs, interessen", () => {
 
 describe("bildeAb — profile_legacy", () => {
   it("führt die Stufe roh und die Kennung als Schlüssel", () => {
-    const satz = bildeAb(zeile({ Mitgliedschaft: "  Premium-Mitglied  ", source_user_id: " 318 " }));
+    const satz = bildeAb(
+      zeile({ Mitgliedschaft: "  Premium-Mitglied  ", source_user_id: " 318 " }),
+    );
 
     // Roh heisst: nicht normalisiert, nur der Rand beschnitten. Normalisiert
     // wäre die Herkunft weg und der Abgleich mit einer Rechnung unmöglich.
@@ -989,7 +996,9 @@ describe("fuegeZusammen — was der Import nie anfasst", () => {
 
 describe("fuegeZusammen — socials und videos", () => {
   it("führt socials pro Schlüssel zusammen und lässt fremde Netzwerke stehen", () => {
-    const satz = bildeAb(zeile({ linkedin: "https://linkedin.com/in/neu", facebook: "https://fb.com/b" }));
+    const satz = bildeAb(
+      zeile({ linkedin: "https://linkedin.com/in/neu", facebook: "https://fb.com/b" }),
+    );
 
     const ergebnis = fuegeZusammen(
       satz,
@@ -1041,8 +1050,10 @@ describe("fuegeZusammen — socials und videos", () => {
       "https://www.youtube.com/watch?v=abc123",
     ]);
     expect(
-      fuegeZusammen(satz, bestand({ profil: { ...bestand().profil, videos: ["https://vimeo.com/1"] } }))
-        .profil,
+      fuegeZusammen(
+        satz,
+        bestand({ profil: { ...bestand().profil, videos: ["https://vimeo.com/1"] } }),
+      ).profil,
     ).not.toHaveProperty("videos");
   });
 });

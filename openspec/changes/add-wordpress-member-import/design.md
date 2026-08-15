@@ -265,6 +265,26 @@ abgeschaltet wird — ein früher Trockenlauf persistiert nichts (codex).
 entsteht aus `source_user_id`. Am 14.08. mit HEAD-Anfragen belegt: der
 Uploads-Ordner ist offen lesbar (200, `image/jpeg`), kein Zugang nötig.
 
+**Nachtrag 15.08.: es sind ZWEI Bilder, nicht eines.** Diese Fassung sprach nur
+vom Profilbild. Die Quelle führt daneben `cover_photo` — das Headerbild der
+Profilansicht —, und zwar bei **53 von 70** Mitgliedern (`profile_photo`: 57).
+Beide Spalten sind gleich gebaut: drei verschiedene Werte über die ganze Datei,
+Länge 15–18 Zeichen, kein Pfad und kein `http` darin. Der Wert trägt also nur die
+Endung, alles andere entsteht aus `source_user_id`.
+
+Aufgefallen ist es an Donalds Frage, was mit den Mediendateien geschieht — die
+Annahme dahinter war, sie stünden gar nicht in der CSV. Sie stehen darin; was
+fehlte, war das zweite Bild im Plan. **Entschieden (Donald, 15.08.): beide
+werden geholt** — das Profilbild nach `avatars`/`profiles.avatar_url`, das
+Headerbild nach `covers`/`profiles.cover_url`. Beide Buckets sind öffentlich;
+`covers` lässt ausschliesslich `image/webp` zu, was die Wandlung aus 6.3 ohnehin
+verlangt. Die Kosten sind ein zweiter Durchgang je Mitglied, das Risiko ist
+dasselbe — und nach dem Abschalten der alten Seite wäre es nicht nachholbar.
+
+**`synced_gravatar_hashed_id` (68/70) bleibt draussen.** Das ist ein
+Gravatar-Hash, kein Bild auf dem alten Server. Avatare von einem Drittanbieter
+nachzuladen, wäre eine Datenweitergabe, die kein Mitglied veranlasst hat.
+
 Die Datei **ohne** Größensuffix ist das Original (1000 px); die Ableitung
 `-190x190` verschenkt 96 % der Bildinformation. Die Endung steht im Datensatz —
 sie zu raten war die Empfehlung des Issues und hätte bei `jpeg` 14 Bilder

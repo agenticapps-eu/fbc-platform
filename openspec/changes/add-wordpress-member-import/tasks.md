@@ -99,11 +99,15 @@
 
 ## 6. Bildstrecke (eigener, wiederholbarer Abschnitt)
 
-- [ ] 6.1 Abschnitt „Bilder holen": URL aus `source_user_id` + Dateiname, Endung aus dem Datensatz (Test über `jpg`, `png`, `jpeg`), Ablage in die Zwischenablage außerhalb des Arbeitsbaums
+> **Es sind ZWEI Bilder, nicht eines (entschieden Donald, 15.08.).** Der erste Entwurf dieser Gruppe kannte nur `profile_photo`. Die Quelle führt daneben `cover_photo` — das Headerbild der Profilansicht — bei **53 von 70** Mitgliedern (`profile_photo`: 57/70). Beide werden geholt: Profilbild → Bucket `avatars` + `profiles.avatar_url`, Headerbild → Bucket `covers` + `profiles.cover_url`. `covers` lässt nur `image/webp` zu, was 6.3 ohnehin verlangt. Gemessen: beide Spalten tragen **drei** verschiedene Werte über die ganze Datei (Länge 15–18, kein Pfad, kein `http`) — der Wert ist nur die Endung. `synced_gravatar_hashed_id` (68/70) bleibt draussen: ein Drittanbieter-Hash, kein Bild auf dem alten Server.
+
+- [x] 6.0 `profile_photo` und `cover_photo` in die Quellfeldliste aufnehmen, damit der Kopfzeilen-Wächter sie deckt — heute stehen sie **nicht** darin, ein Export ohne sie liefe still bildlos durch (Test: fehlende Spalte bricht ab)
+      — 28 statt 26 Quellfelder. `bildeAb` fasst sie NICHT an; sie stehen allein unter dem Wächter. Der Test führt die Namen weiterhin wörtlich, sonst prüfte er die Liste gegen sich selbst. Gegen die echte Kopfzeile gehalten: `{"kind":"ok"}`.
+- [ ] 6.1 Abschnitt „Bilder holen": URL aus `source_user_id` + Dateiname, Endung aus dem Datensatz (Test über `jpg`, `png`, `jpeg`), **je Bildart getrennt**, Ablage in die Zwischenablage außerhalb des Arbeitsbaums
 - [ ] 6.2 Original ohne Größensuffix ziehen; Test belegt, dass kein `-190x190` angefragt wird
-- [ ] 6.3 Verkleinern, nach WebP, in den Bucket; vorhandenes Objekt wird **übersprungen und berichtet**, nicht ersetzt (Test: zweiter Lauf bricht nicht ab)
-- [ ] 6.4 Fehlendes/unerreichbares Bild: Mitglied wird dennoch angelegt, Zeile im Bericht (Test mit 404)
-- [ ] 6.5 Den Abschnitt einmal echt gegen die alte Seite laufen lassen und die Zwischenablage füllen — bevor die Seite abgeschaltet wird
+- [ ] 6.3 Verkleinern, nach WebP, in den **jeweiligen** Bucket (`avatars` bzw. `covers`); vorhandenes Objekt wird **übersprungen und berichtet**, nicht ersetzt (Test: zweiter Lauf bricht nicht ab)
+- [ ] 6.4 Fehlendes/unerreichbares Bild: Mitglied wird dennoch angelegt, Zeile im Bericht (Test mit 404). Gilt je Bild — ein fehlendes Headerbild darf den Avatar nicht mitnehmen
+- [ ] 6.5 Den Abschnitt einmal echt gegen die alte Seite laufen lassen und die Zwischenablage füllen — **beide** Bildarten, bevor die Seite abgeschaltet wird
 
 ## 7. Schreibender Lauf
 
