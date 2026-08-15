@@ -1,104 +1,102 @@
-# Session Handoff — 2026-08-13 (AGE-533 / C9 gemergt, Deploy hängt)
+# Session Handoff — 2026-08-15 (AGE-534: Gruppe 5 bis auf die echte Quelle)
 
-C9 ist gebaut, dreifach gegengelesen, gemergt — und der Deploy steht hinter
-`drift-gate`. **Das ist keine Randnotiz: dadurch stehen gerade neun leere
-Karten im Live-Feed.**
-
-## Zuerst: was jetzt zu tun ist
-
-`migrate-prod` dispatchen, dann den Deploy nachziehen. Der Dry-Run dafür ist
-gelaufen und liegt vor: **PROD hat 0 `posts` und 0 `events`**, beide Backfills
-treffen dort null Zeilen. `migrate-prod` ist eine reine Schemaänderung ohne
-Datenrisiko.
-
-Danach `gh run rerun --failed` auf den `main`-Lauf zu `2c165a6` (deploy.yml hat
-kein `workflow_dispatch`; der Befehl gibt bei Erfolg nichts aus). Live-Beleg an
-einer **Zeichenkette aus dem Diff**, nicht an der Bundle-Größe — z. B.
-„Aus der Redaktion", „Meine Academy" oder „Neues Event".
-
-## Accomplished
-
-**PR #170 gemergt** (`2c165a6`, squash). Acht Checks auf der HEAD-SHA grün.
-
-- **Migration A** `posts.video_url`, von der DATENBANK aus dem Body abgeleitet
-  (Funktion + Trigger auf jedem Schreibzugriff), partieller Index, Backfill.
-- **Academy** als gefilterte Sicht auf `posts`: Reiter „Alle" und „Meine
-  Academy", letzterer mit zwei Regalen (selbst geteilt / eigene
-  „gefällt mir"-Liste), seitenweise über den Keyset-Cursor des Feeds.
-- **„Meine Kurse" entfällt**, `/meine-kurse` leitet auf `/academy` um.
-- **Migration B** `posts.kind` + `ref_id`, ein Trigger-Paar auf `events`,
-  `posts_write_own` und `post_media_insert_own` auf `kind = 'member'` verengt.
-- **Zweiter Kartentyp im Feed**, der zur Laufzeit auf `events` joint.
-
-**Belege:** 95 Dateien / 665 Tests · pgTAP 408 PASS (`plan(342) → plan(388)`) ·
-Parität SQL↔TS 46/46 · lint 0 Errors · build grün · Sichtprobe in beiden Themes
-und bei 375 px. Alles in `openspec/changes/academy-lite-and-feed-weave/`
-(`EVIDENCE.md`, `REVIEWS.md`, `DIFF-REVIEWS.md`).
-
-## Decisions
-
-**`video_url` wird auf dem SERVER abgeleitet, nicht im Client.** *Warum:* der
-erste Entwurf ließ den Client rechnen und versprach, Spalte und Embed könnten
-nicht auseinanderlaufen. Nicht durchsetzbar — `posts_write_own` erlaubt
-INSERT/UPDATE direkt auf `posts`. Nebeneffekt: die RPC `create_post_with_media`
-wird gar nicht angefasst, fünf Review-Befunde entfielen, der Change wurde
-kleiner.
-
-**Sichtbarkeit gespiegelt, nicht gejoint.** *Warum:* ein Join müsste an **vier**
-Stellen stehen (`posts_select_public_anon`, `posts_select_by_visibility`,
-`post_engagement_counts`, `post_media_lesbar`). Der Entwurf zählte drei und
-übersah die vierte — selbst das beste Argument gegen diesen Weg.
-
-**Event-Beiträge sind systemverwaltet.** *Warum:* der Host **ist** ihr Autor und
-konnte sie löschen, umschreiben oder die Sichtbarkeit zurückdrehen. Beide
-Policies (`posts`, `post_media`) verlangen jetzt `kind = 'member'`.
-
-**Das zweite Academy-Regal heißt „Gefällt mir", nicht „Gemerkt".** *Warum:*
-`post_engagement_counts` gibt den Like-Zähler an jeden aus — ein Like ist hier
-nicht privat, und „gemerkt" verspräche Privatheit, die es nicht gibt.
-
-**Die Asymmetrie bleibt ohne UI-Hinweis** (gemini verlangte eine Entscheidung):
-`members`-Posts brauchen Rang 4, `members`-Events nicht. Zum Go-Live sind alle
-`impact`, also folgenlos; per pgTAP gepint.
-
-## Files modified
-
-Alles in `2c165a6`. Die Stellen, an denen später jemand suchen wird:
-
-- `supabase/migrations/20260813090000_posts_video_url.sql` — `erste_video_url`
-  zerlegt Host und Pfad **getrennt**; Postgres kennt kein `(?i:…)`.
-- `supabase/migrations/20260813100000_posts_kind_event_trigger.sql` — EINE
-  Trigger-Funktion für alle vier `host_id`-Übergänge.
-- `supabase/tests/rls_test.sql` — §21 und §22, `plan(388)`.
-- `src/lib/video-url.ts` — neu: die reinen Parser, aus `feed.ts` gezogen, damit
-  ein Node-Skript sie aufrufen kann. `feed.ts` re-exportiert.
-- `scripts/probe-c9-bestand.ts`, `scripts/probe-c9-parser-paritaet.ts`.
+Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, Commit `44aaffe`.
+Arbeitsbaum sauber. **31 von 50 Aufgaben zu** (zwei kamen dazu: 5.2a, 5.2b).
+Gruppe 5 steht bis auf 5.3, und 5.3 fehlt nur noch die echte Exportdatei.
 
 ## Next session: start here
 
-**`migrate-prod` freigeben** (Dry-Run oben, kein Datenrisiko), dann
-`gh run rerun --failed` auf den `main`-Lauf zu `2c165a6`, dann den Live-Beleg an
-einer Zeichenkette aus dem Diff führen. Erst danach ist das Fenster mit den
-neun leeren Karten zu.
+**Zuerst Donald nach dem Pfad der echten Quelldatei fragen** — sie liegt
+ausserhalb des Arbeitsbaums, steht in keiner Notiz, und weder `~/Downloads`,
+`~/Desktop` noch `~/Sourcecode/factiv` führen eine CSV. Damit ist 5.3 in fünf
+Minuten zu: `pnpm tsx supabase/seed/wp_import.ts <pfad> --ziel=lokal`, davor und
+danach die fünf Zählwerte messen (Skript unten im Scratchpad-Absatz).
 
-Danach `openspec archive academy-lite-and-feed-weave` — **Szenario-Titel in
-MODIFIED-Blöcken unverändert lassen**, sonst bricht das Archivieren. Und
-`add-academy-content` (AGE-262) anmerken: sein `## REMOVED`-Block zeigt jetzt
-auf eine Anforderung, die es so nicht mehr gibt.
+Danach **Gruppe 6** (Bildstrecke) — sie ist die einzige Gruppe mit einer Frist,
+die nicht in unserer Hand liegt: die Bilder liegen nur auf der alten Seite, und
+6.5 („einmal echt laufen lassen, bevor die Seite abgeschaltet wird") ist der
+Punkt, an dem Warten teuer wird. Gruppe 7 kann danach.
+
+## Accomplished
+
+**5.1 — CSV lesen und die Pipeline zusammensetzen.** `leseDatensaetze` und
+`verarbeite` in `wp_import.ts`. Streng gelesen: **kein** `relax_quotes`, **kein**
+`relax_column_count`. Das BOM wird abgeschnitten statt geduldet.
+
+**5.2 — ein Weg für beide Betriebsarten.** `baueLauf` trägt alles von der
+gelesenen Datei bis zum fertigen Bericht, `main()` hängt nur Datenbank, Datei
+und Konsole daran. `--schreiben` bricht ab, solange Gruppe 7 fehlt.
+
+**5.2a — ein Widerspruch im Plan, von Donald entschieden.** Siehe unten.
+
+**5.2b — der Bericht nennt jetzt WER, nicht nur wie viele.**
+
+**5.3 zur Hälfte**: der ganze Weg lief gegen den lokalen Stack mit einer
+künstlichen Quelle. `profiles` 2→2, `profile_contacts` 0→0, `profile_legacy`
+0→0, `auth.users` 2→2, `storage.objects` 0→0. Konsole ohne Personendaten,
+Bericht mit `0600` neben der Quelle.
+
+**1032 Tests grün** (Sitzungsbeginn 989). `typecheck`, `typecheck:seed`, `lint`,
+`openspec validate --all` 29/29.
+
+## Decisions
+
+**Der Bestand kommt SYNCHRON und VORHER gefüllt herein.** Ein asynchroner Leser
+je Datensatz hiesse 70 Rundreisen und einen Bestand, der sich mitten im Lauf
+ändern kann. Damit bleibt der ganze Weg rein — das ist der Grund, warum 5.2
+überhaupt prüfbar ist.
+
+**Die Kennung schlägt die Adresse.** Umgekehrt entschiede die Adresse über ein
+Profil, das seine Kennung schon trägt, und die Merge-Regel läse den falschen
+`bereitsImportiert`-Stand.
+
+**Der Widerspruch aus 5.2a (Donald, 15.08.).** Ein Konto ohne Kennung, dessen
+Adresse ein Quelldatensatz trägt, sollte laut 4.2 den Schreiblauf *blockieren*
+und laut der Wiedererkennungs-Anforderung *ergänzt* werden — in der Datenbank
+sehen beide Fälle gleich aus. Unterschieden wird jetzt an der **Handschrift des
+Imports**: `impact` + `activated_at is null` ist ein eigener Rest und wird
+ergänzt, alles andere bleibt Kollision. Spec-Delta trägt Regel und Szenario.
+Restrisiko benannt: ein von Hand angelegtes, noch nicht freigeschaltetes
+`impact`-Konto würde ergänzt — es trägt aber ohnehin die höchste Stufe.
+
+## Was beim Bauen auffiel
+
+- **Die Gegenproben fanden acht Lücken in drei Läufen** (39 + 18 + 5 Mutationen).
+  Die teuerste: `baueBestandsdaten` reichte `socials`, `videos` und die
+  Kontaktfelder durch, ohne dass ein Test hinsah — **genau das, was die
+  Merge-Regel als „leeres Ziel" gelesen und überschrieben hätte.**
+- **Die zweitteuerste war Verdrahtung**: die Bestandsadressen erreichten die
+  Vorabprüfung ungeprüft. Jede Einzelfunktion war getestet, die Leitung dazwischen
+  nicht — und es ist die aus 4.2, ohne die eine Kollision unbemerkt bliebe.
+- **`count(*)` kommt aus `pg` als Zeichenkette.** Ungewandelt wäre `"0"` wahr und
+  die Merge-Regel hielte jedes Profil für belegt. Gemessen, nicht vermutet:
+  `scripts/probe-c10-bestandsabfrage.ts` läuft gegen den lokalen Stack, weil die
+  SQL-Zeichenkette die einzige Stelle in Gruppe 5 ist, die kein Test erreicht.
+- **Ein Skript im Scratchpad kann `pg` nicht auflösen** (kein `node_modules` in
+  der Nähe). Proben gehören nach `scripts/`, so wie die anderen `probe-c10-*`.
+- Top-level `await` geht nur innerhalb des Projekts — ausserhalb übersetzt `tsx`
+  nach CJS und bricht ab.
+
+## Files modified
+
+- **neu** `supabase/seed/wp_import.ts` + `.test.ts` — Lesen, Lauf, Bestand, `main`
+- **neu** `scripts/probe-c10-bestandsabfrage.ts` — die SQL gegen echte Schemata
+- `supabase/seed/wp_bericht.ts` + `.test.ts` — Abschnitt „Was der Lauf anlegen würde"
+- `openspec/.../specs/member-import/spec.md` — Regel + Szenario zu 5.2a
+- `openspec/.../tasks.md` — 5.1, 5.2, 5.2a, 5.2b zu; 5.3 zur Hälfte
+
+Scratchpad (`…/44f12453-…/scratchpad/`): `mutanten-g5.sh`, `mutanten-g52.sh`,
+`kunst-quelle.csv` (künstlich, keine echten Daten), `sonde-abfrage.ts`.
 
 ## Open questions
 
-- **Die Pipeline-Lücke ist jetzt zum zweiten Mal aufgetreten** und war beide
-  Male vorhersehbar: jede Migration mit Frontend-Abhängigkeit reißt zwischen
-  `migrate-dev` und der manuellen `migrate-prod`-Freigabe ein Fenster auf, in
-  dem live etwas falsch aussieht. Das ist eine Eigenschaft der Pipeline, keine
-  Panne — aber sie ist weiterhin von niemandem entschieden.
-- **Das Theme greift auf dem lokalen Stack nicht über `member_settings`
-  allein** — der Schalter stand auf „navy", `data-variant` auch, die
-  Inhaltsfläche blieb hell. Aufgelöst: `navy` überschreibt nur neun
-  Chrome-Token. Kein Fehler, aber die Beschriftung „Dunkles Design" verspricht
-  mehr, als das Theme tut. Nicht Teil von C9.
-- **`codex` als Reviewer fiel zweimal aus** (Plan-Review 26 min, Diff-Review
-  abgebrochen mit 0 Bytes). `opencode` (Kimi-K3) hat beide Male getragen.
-- Unverändert offen aus der Vorsession: `host_partner_id`, der tote Host-Zweig
-  in `event_attendees`, verwaiste Bucket-Objekte, keine Screenshot-Tests.
+- **Wo liegt die echte Exportdatei?** Einziger Blocker für 5.3.
+- **`paid_until` (3.5)** bleibt offen — hängt an Detlevs Zahlungsständen.
+- **Was sollte in „Mitgliedschaft" (`infos_16`) stehen?** Bestätigen lassen.
+- **`demo_seed.lib.ts` trägt die überholte Annahme** „dev and prod are the SAME
+  Supabase project" — eigener Nachlauf.
+- `pnpm format:check` war schon am HEAD rot (127 Dateien) — eigener Vorgang.
+  Neue Dateien wurden einzeln mit `prettier --write` formatiert, nie `pnpm format`.
+- Unverändert: AGE-497 · AGE-541 · AGE-258 · AGE-522 · AGE-512 ·
+  `finish-ui-polish` trägt AGE-291 und AGE-258 · `add-academy-content`
+  unarchivierbar.
