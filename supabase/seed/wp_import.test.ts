@@ -359,6 +359,35 @@ function bestandsdaten(werte: Partial<Bestandsdaten> = {}): Bestandsdaten {
   };
 }
 
+/** Eine Zeile, wie `BESTANDSABFRAGE` sie liefert — leer, sofern nicht überschrieben. */
+function zeileAusDb(werte: Partial<Bestandszeile> = {}): Bestandszeile {
+  return {
+    uid: "uid-bestand",
+    kennung: null,
+    adresse: "anna@example.org",
+    tier: "basic",
+    activated_at: null,
+    name: null,
+    headline: null,
+    short_bio: null,
+    region: null,
+    website: null,
+    socials: null,
+    videos: null,
+    kontakt_email: null,
+    phone: null,
+    street: null,
+    postal_code: null,
+    city: null,
+    state: null,
+    country: null,
+    offers: "0",
+    needs: "0",
+    interessen: "0",
+    ...werte,
+  };
+}
+
 /** Eine Quelldatei aus Zeilenobjekten — die Kopfzeile sind die 26 Quellfelder. */
 function csv(zeilen: Record<string, string>[]): string {
   const feld = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -506,6 +535,34 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
     expect(bericht).toContain("Kollision mit Bestandskonto");
   });
 
+  it("ergänzt ein Konto ohne Kennung, statt es ein zweites Mal anzulegen", () => {
+    // 7.2, und zwar als DURCHLEITUNG: die drei Bausteine sind einzeln geprüft,
+    // aber nur hier laufen sie so zusammen, wie `main()` sie zusammensetzt —
+    // Zeilen der Bestandsabfrage → `baueBestandsdaten` → `baueLauf`.
+    //
+    // Der Fall ist der Rest eines abgebrochenen Laufs: das Anmeldekonto steht
+    // schon (`impact`, nicht freigeschaltet — die Handschrift aus 7.3), die
+    // Kennung fehlt, weil die Transaktion danach kippte. Über die Adresse ist
+    // das dasselbe Konto. Fiele die Wiedererkennung hier aus, legte der Lauf
+    // ein ZWEITES Anmeldekonto zur selben Adresse an, und das ist der
+    // unwiderrufliche Teil — ausserhalb jeder Transaktion.
+    const { lauf } = baueLauf({
+      ...rahmen,
+      bestandsdaten: baueBestandsdaten([
+        zeileAusDb({ uid: "uid-rest", tier: "impact", activated_at: null }),
+      ]),
+      schreibend: true,
+    });
+
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+    expect(lauf.saetze[0].ergebnis.klasse).toBe("aktualisiert");
+    // Das Ziel der Transaktion ist das BESTEHENDE Konto, nicht ein neues.
+    expect(lauf.saetze[0].auftrag?.uid).toBe("uid-rest");
+    // Der zweite Datensatz teilt die Adresse nicht — er bleibt neu. Sonst
+    // bewiese der Test nur, dass alles als „aktualisiert" durchgeht.
+    expect(lauf.saetze[1].ergebnis.klasse).toBe("angelegt");
+  });
+
   it("trägt die Ergebnisse in den Bericht, nicht nur in den Rückgabewert", () => {
     const { bericht } = baueLauf({ ...rahmen, bestandsdaten: bestandsdaten(), schreibend: false });
 
@@ -515,34 +572,6 @@ describe("baueLauf — die Verdrahtung, die keine Einzelprüfung sieht", () => {
 });
 
 describe("baueBestandsdaten", () => {
-  function zeileAusDb(werte: Partial<Bestandszeile> = {}): Bestandszeile {
-    return {
-      uid: "uid-bestand",
-      kennung: null,
-      adresse: "anna@example.org",
-      tier: "basic",
-      activated_at: null,
-      name: null,
-      headline: null,
-      short_bio: null,
-      region: null,
-      website: null,
-      socials: null,
-      videos: null,
-      kontakt_email: null,
-      phone: null,
-      street: null,
-      postal_code: null,
-      city: null,
-      state: null,
-      country: null,
-      offers: "0",
-      needs: "0",
-      interessen: "0",
-      ...werte,
-    };
-  }
-
   it("legt ein Konto mit Kennung unter beide Schlüssel und merkt es als importiert", () => {
     // Der Normalfall nach dem Go-Live: importiert UND inzwischen freigeschaltet.
     const daten = baueBestandsdaten([
