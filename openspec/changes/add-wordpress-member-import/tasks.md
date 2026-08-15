@@ -78,8 +78,12 @@
 
 ## 5. Trockenlauf (`wp_import.ts`)
 
-- [ ] 5.1 CSV lesen (UTF-8 mit BOM, Kommas und Zeilenumbrüche in Freitextfeldern), Datensätze durch Vorabprüfung, Abbildung und Klassifikation führen
+- [x] 5.1 CSV lesen (UTF-8 mit BOM, Kommas und Zeilenumbrüche in Freitextfeldern), Datensätze durch Vorabprüfung, Abbildung und Klassifikation führen
+      — `leseDatensaetze()` und `verarbeite()` in `wp_import.ts`, 20 Tests. **Der Bestand kommt als Funktion herein und wird VORHER gefüllt**, nicht je Datensatz abgefragt: ein asynchroner Leser hiesse 70 Rundreisen und einen Bestand, der sich mitten im Lauf ändern kann — so wie `pruefeVorab` die Bestandsadressen schon fertig bekommt. Damit bleibt der ganze Weg synchron und rein, was 5.2 überhaupt erst prüfbar macht. **Streng gelesen, absichtlich**: kein `relax_quotes` (die Probe führt es, sie zählt nur — der Import schreibt) und kein `relax_column_count`; eine verrutschte Spalte muss lärmen, sonst stünde ab da jeder Wert im falschen Feld. Das BOM wird abgeschnitten statt nur geduldet: `pruefeKopfzeile` trimmt und meldete nichts, aber `row["<erstes Feld>"]` ginge ins Leere — das Feld sähe leer aus statt zu fehlen. Die Kopfzeile kommt über die `columns`-Funktion, sonst hätte eine Datei ohne Datensatz gar keine Spalten und der falsch gezogene Export wäre nicht als solcher zu melden.
+
+> Gegenprobe zu 5.1: 26 Mutationen, 25 sofort rot. Der eine Überlebende war eine echte Lücke — **kein Test prüfte, dass die Vorabbefunde beim durchlaufenden Lauf überhaupt weitergereicht werden**, also genau der Fall, für den es den Trockenlauf gibt: die Dublette hält ihn nicht auf und stünde deshalb nirgends. Test nachgezogen, Mutation danach rot (26/26).
 - [ ] 5.2 Gemeinsamer Pfad für beide Betriebsarten; abzweigen dürfen **nur** die wirkenden Adapter (Datenbank, Ablage, Netz) — Test belegt gleiche Klassifikation
+      — **offener Befund aus 5.1**: das Szenario „Der Trockenlauf benennt, was er schreiben würde" verlangt den Datensatz „als *würde angelegt*, **mit der E-Mail-Adresse als Schlüssel**". Der Bericht führt die angelegten heute nur als *Zahl* in der Klassentabelle (einzeln stehen nur fehlerhafte, übersprungene und die mit offenem Zahlungsstand), und die Klasse heisst in beiden Betriebsarten gleich. Beides gehört hierher, weil es den Trockenlauf betrifft.
 - [ ] 5.3 Trockenlauf gegen den lokalen Stack; Zeilenzahlen in `profiles`, `profile_contacts`, `profile_legacy`, `auth.users` **und** die Objektzahl in der Ablage davor/danach gleich (gemessen, nicht behauptet)
 
 ## 6. Bildstrecke (eigener, wiederholbarer Abschnitt)
