@@ -30,7 +30,7 @@ import pg from "pg";
 
 import { type Berichtskopf, type Datensatzergebnis, baueBericht, stdoutZeile } from "./wp_bericht";
 import { normalisiereAdresse, normalisiereKennung } from "./wp_felder";
-import type { Anweisung } from "./wp_schreiben";
+import { type Anweisung, legeKontoAn, schreibauftrag, stufeFuerNeuesKonto } from "./wp_schreiben";
 import {
   type Bestand,
   type Vorabbefund,
@@ -249,6 +249,19 @@ const FEHLENDE_LIEFERUNGEN = ["Zahlungsstände", "Ausgetretenen-Liste"];
  * beide entscheidet nicht dieser Code, sondern `pruefeVorab`.
  *
  * Rein: liest keine Datei, schreibt keine, spricht mit keiner Datenbank.
+ *
+ * ── WARUM DER SCHREIBENDE LAUF DAS HIER ZWEIMAL RUFT ────────────────────────
+ * Die Klassifikation entsteht VOR dem Schreiben — sie ist ja die Grundlage
+ * dafür, überhaupt zu wissen, was zu tun ist. Der Bericht muss aber sagen, was
+ * WIRKLICH geschah: ein Datensatz, den die Datenbank zurückwies, darf nicht als
+ * „angelegt" in der Summe stehen.
+ *
+ * `ausgaenge` schliesst die Lücke, ohne diese Funktion wirkend zu machen: der
+ * Lauf ruft sie einmal, um zu erfahren, was zu tun ist, und nach dem
+ * schreibenden Abschnitt noch einmal mit dem, was dabei fehlschlug. Zweimal
+ * dieselbe reine Funktion auf denselben Eingaben — damit ist „der Bericht
+ * beschreibt denselben Lauf" strukturell wahr und nicht bloss zugesichert
+ * (Aufgabe 5.2).
  */
 export function baueLauf(input: {
   inhalt: string;
@@ -257,6 +270,8 @@ export function baueLauf(input: {
   ziel: string;
   quelle: string;
   zeitpunkt: string;
+  /** Datensatznummer → Fehlergrund, aus dem schreibenden Abschnitt. */
+  ausgaenge?: ReadonlyMap<number, string>;
 }): { lauf: Lauf; bericht: string; konsole: string[] } {
   const lauf = verarbeite({
     quelle: leseDatensaetze(input.inhalt),
@@ -286,15 +301,20 @@ export function baueLauf(input: {
     };
   }
 
+  // Ein Ausgang schlägt die Klassifikation: sie sagte, was zu tun war, er sagt,
+  // was daraus wurde. Beides in einem Ergebnis zu führen, hiesse den Bericht
+  // zweideutig zu machen.
+  const ergebnisse = lauf.saetze.map((s) => {
+    const grund = input.ausgaenge?.get(s.ergebnis.zeile);
+    return grund === undefined
+      ? s.ergebnis
+      : { ...s.ergebnis, klasse: "fehlerhaft" as const, grund };
+  });
+
   return {
     lauf,
-    bericht: baueBericht({
-      art: "lauf",
-      kopf,
-      befunde: lauf.befunde,
-      ergebnisse: lauf.saetze.map((s) => s.ergebnis),
-    }),
-    konsole: lauf.saetze.map((s) => stdoutZeile(s.ergebnis)),
+    bericht: baueBericht({ art: "lauf", kopf, befunde: lauf.befunde, ergebnisse }),
+    konsole: ergebnisse.map((e) => stdoutZeile(e)),
   };
 }
 
@@ -302,6 +322,7 @@ export function baueLauf(input: {
 
 const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LOKALE_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const LOKALE_API = "http://127.0.0.1:54321";
 const CA_PFAD = "scripts/supabase-root-2021-ca.crt";
 
 /**
@@ -452,8 +473,15 @@ export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdat
  * Und keine äussere Transaktion um diesen Aufruf legen: ein verschachteltes
  * `begin` ist ein No-op, und das `commit` hier schlösse die äussere Klammer.
  */
+/**
+ * Was dieser Code von einer Verbindung braucht — nicht mehr. `pg.Client` erfüllt
+ * es; ein mitschreibender Doppelgänger im Test auch, ohne eine Datenbank und
+ * ohne eine Behauptung darüber, was `pg` sonst noch kann.
+ */
+export type Abfrager = { query: (sql: string, werte?: unknown[]) => Promise<unknown> };
+
 export async function fuehreDatensatzAus(
-  client: pg.Client,
+  client: Abfrager,
   anweisungen: readonly Anweisung[],
 ): Promise<void> {
   await client.query("begin");
@@ -480,6 +508,82 @@ export async function fuehreDatensatzAus(
   }
 }
 
+/**
+ * Der Grund eines gescheiterten Datensatzes — OHNE einen Wert aus der Quelle.
+ *
+ * Postgres zitiert bei einer verletzten Eindeutigkeit den Wert wörtlich
+ * (`Key (email)=(…) already exists`), und dieser Grund landet in Bericht UND
+ * Konsole. 4.7 hält beide Wege frei von Personendaten, also wird der Grund aus
+ * `code`, `constraint` und `table` gebaut: Bezeichner stammen aus dem Schema,
+ * Werte aus der Quelle, und nur die erste Sorte darf hier heraus.
+ *
+ * Der Rückfall auf `message` greift nur, wo kein `code` steht — dort kommt der
+ * Fehler aus diesem Code (etwa „Unbekannte Spalte") oder aus der Verbindung,
+ * und beide reden über Bezeichner, nicht über Werte.
+ */
+function grundOhneWerte(fehler: unknown): string {
+  const f = fehler as { code?: string; constraint?: string; table?: string; message?: string };
+  if (!f.code) return f.message ?? "Unbekannter Fehler";
+
+  const woran = f.constraint ?? f.table;
+  return `Datenbankfehler ${f.code}${woran ? ` (${woran})` : ""}`;
+}
+
+/**
+ * Der schreibende Abschnitt: je Datensatz erst das Anmeldekonto (wo es fehlt),
+ * dann die Stufe, dann die Transaktion. Gibt zurück, was NICHT durchkam —
+ * Datensatznummer → Grund.
+ *
+ * ── DIE REIHENFOLGE IST DIE INVARIANTE ──────────────────────────────────────
+ * Konto → Stufe → Transaktion, und die Stufe steht ausserhalb der Klammer.
+ * Bricht die Transaktion ab, bleibt ein `impact`-Konto ohne Freischaltung
+ * zurück — die Handschrift dieses Imports, an der `baueBestandsdaten` den
+ * eigenen Rest erkennt und ihn beim nächsten Lauf ergänzt statt blockiert.
+ * Stünde die Stufe innerhalb, hinterliesse derselbe Abbruch ein `basic`-Konto,
+ * und das ist eine Kollision, die jeden weiteren Schreiblauf sperrt.
+ *
+ * Ein Datensatz, dessen Konto nicht entstand, wird NICHT geschrieben: ohne
+ * Kennung gibt es kein Ziel. Der Lauf geht trotzdem weiter (7.5) — 69 gelungene
+ * Datensätze sind besser als ein Abbruch am siebten, und der Bericht führt die
+ * gescheiterten einzeln auf.
+ */
+export async function schreibeDatensaetze(
+  saetze: readonly Datensatzlauf[],
+  mittel: { client: Abfrager; basis: string; schluessel: string; hole?: typeof fetch },
+): Promise<Map<number, string>> {
+  const fehler = new Map<number, string>();
+
+  for (const satz of saetze) {
+    if (!satz.auftrag) continue;
+    const { anmeldeadresse, zusammenfuehrung } = satz.auftrag;
+    const nummer = satz.ergebnis.zeile;
+
+    try {
+      let uid = satz.auftrag.uid;
+
+      if (uid === null) {
+        const konto = await legeKontoAn(
+          { adresse: anmeldeadresse, basis: mittel.basis, schluessel: mittel.schluessel },
+          mittel.hole,
+        );
+        if (konto.stand === "fehler") {
+          fehler.set(nummer, konto.grund);
+          continue;
+        }
+        const stufe = stufeFuerNeuesKonto(konto);
+        await mittel.client.query(stufe.sql, stufe.werte);
+        uid = konto.uid;
+      }
+
+      await fuehreDatensatzAus(mittel.client, schreibauftrag({ uid, zusammenfuehrung }));
+    } catch (e) {
+      fehler.set(nummer, grundOhneWerte(e));
+    }
+  }
+
+  return fehler;
+}
+
 async function leseBestand(client: pg.Client): Promise<Bestandsdaten> {
   const { rows } = await client.query<Bestandszeile>(BESTANDSABFRAGE);
   return baueBestandsdaten(rows);
@@ -490,9 +594,30 @@ function verbindungsUrl(ziel: ZielName): string | undefined {
   return ziel === "dev" ? process.env.SUPABASE_DB_URL_DEV : process.env.SUPABASE_DB_URL_PROD;
 }
 
+/**
+ * Die Basis des Anmeldedienstes — ABGELEITET aus der Kennung, die `pruefeZiel`
+ * gerade gegen die Datenbank-Verbindung gehalten hat, nicht frei gewählt.
+ *
+ * Der Review zu 7.1 fand hier die Asymmetrie: der Wächter (1.4) prüfte nur die
+ * DB-Verbindung. `SUPABASE_DB_URL_DEV` neben einem PROD-Schlüssel hiesse 70
+ * Konten in PROD und die Profile nach DEV — und das Anlegen ist der
+ * unwiderrufliche Teil, ausserhalb jeder Transaktion. So kann ein Schlüssel des
+ * falschen Projekts nichts mehr anrichten: er trifft die richtige Adresse und
+ * wird dort abgewiesen.
+ */
+function apiBasis(geprueft: { ziel: ZielName; ref: string | null }): string | undefined {
+  if (geprueft.ziel === "lokal") return LOKALE_API;
+  return geprueft.ref ? `https://${geprueft.ref}.supabase.co` : undefined;
+}
+
 function abbruch(grund: string): never {
   console.error(grund);
   process.exit(1);
+}
+
+function pflicht<T>(wert: T | undefined, grund: string): T {
+  if (wert === undefined) abbruch(grund);
+  return wert;
 }
 
 async function main(): Promise<void> {
@@ -515,12 +640,21 @@ async function main(): Promise<void> {
   });
   if (geprueft.kind === "abbruch") abbruch(geprueft.grund);
 
-  // Der schreibende Teil ist Gruppe 7. Bis dahin bricht dieser Lauf ab, statt
-  // einen Bericht zu schreiben, der von Schreibvorgängen spricht, die es nicht
-  // gab — ein Bericht, der lügt, ist schlimmer als keiner.
-  if (aufruf.schreiben) {
-    abbruch("Der schreibende Lauf ist noch nicht gebaut (Gruppe 7). Bis dahin nur Trockenlauf.");
-  }
+  // Nur der schreibende Lauf braucht das — und dann VOR der ersten Verbindung,
+  // damit ein fehlender Schlüssel nicht erst auffällt, wenn schon Konten stehen.
+  const schreibmittel = aufruf.schreiben
+    ? {
+        basis: pflicht(apiBasis(geprueft), "Zum Ziel gibt es keine Projektkennung."),
+        schluessel: pflicht(
+          aufruf.ziel === "lokal"
+            ? process.env.LOKALER_SERVICE_KEY
+            : process.env.SUPABASE_SERVICE_ROLE_KEY,
+          aufruf.ziel === "lokal"
+            ? "LOKALER_SERVICE_KEY fehlt (aus `supabase status`)."
+            : "SUPABASE_SERVICE_ROLE_KEY fehlt — ohne ihn entsteht kein Konto.",
+        ),
+      }
+    : null;
 
   const client = new pg.Client({
     connectionString: dbUrl,
@@ -533,14 +667,25 @@ async function main(): Promise<void> {
 
   try {
     const zeitpunkt = new Date().toISOString();
-    const { lauf, bericht, konsole } = baueLauf({
+    const eingaben = {
       inhalt: readFileSync(pfad.pfad, "utf8"),
       bestandsdaten: await leseBestand(client),
       schreibend: aufruf.schreiben,
       ziel: geprueft.ziel,
       quelle: pfad.pfad,
       zeitpunkt,
-    });
+    };
+
+    // Erst erfahren, was zu tun ist; dann tun; dann berichten, was daraus wurde.
+    // Der zweite Aufruf hat dieselben Eingaben — deshalb beschreibt der Bericht
+    // denselben Lauf und nicht einen zweiten (s. Kopf von `baueLauf`).
+    const vorlauf = baueLauf(eingaben);
+    const ausgaenge =
+      schreibmittel && vorlauf.lauf.art === "lauf"
+        ? await schreibeDatensaetze(vorlauf.lauf.saetze, { client, ...schreibmittel })
+        : undefined;
+
+    const { lauf, bericht, konsole } = ausgaenge ? baueLauf({ ...eingaben, ausgaenge }) : vorlauf;
 
     for (const zeile of konsole) console.log(zeile);
 
@@ -550,7 +695,10 @@ async function main(): Promise<void> {
     console.log(
       lauf.art === "vorab-abbruch"
         ? `Vorab-Abbruch — nichts verarbeitet. Bericht: ${orte.bericht}`
-        : `Trockenlauf über ${lauf.saetze.length} Datensätze. Bericht: ${orte.bericht}`,
+        : `${aufruf.schreiben ? "Schreibender Lauf" : "Trockenlauf"} über ` +
+            `${lauf.saetze.length} Datensätze${
+              ausgaenge?.size ? `, davon ${ausgaenge.size} fehlerhaft` : ""
+            }. Bericht: ${orte.bericht}`,
     );
   } finally {
     await client.end();

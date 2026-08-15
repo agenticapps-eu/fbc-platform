@@ -4,11 +4,13 @@ import { type Bestand, QUELLFELDER } from "./wp_import.lib";
 import {
   type Bestandsdaten,
   type Bestandszeile,
+  type Datensatzlauf,
   type Quelle,
   baueBestandsdaten,
   baueLauf,
   bestandsleser,
   leseDatensaetze,
+  schreibeDatensaetze,
   verarbeite,
 } from "./wp_import";
 
@@ -668,5 +670,245 @@ describe("baueBestandsdaten", () => {
 
     expect(daten.nachKennung.has("318")).toBe(true);
     expect(daten.nachAdresse.has("anna@example.org")).toBe(true);
+  });
+});
+
+// ── 7.3–7.6: der schreibende Abschnitt ──────────────────────────────────────
+
+/** Ein Abfrager, der mitschreibt, statt zu wirken. */
+function fakeClient(werfeBei?: (sql: string) => unknown) {
+  const gestellt: { sql: string; werte?: unknown[] }[] = [];
+  return {
+    gestellt,
+    client: {
+      query: async (sql: string, werte?: unknown[]) => {
+        gestellt.push({ sql, werte });
+        const fehler = werfeBei?.(sql);
+        if (fehler) throw fehler;
+        return {};
+      },
+    },
+  };
+}
+
+/** Ein `fetch`, das jede Adresse mitschreibt und ein angelegtes Konto meldet. */
+function fakeFetch(uid = "uid-neu") {
+  const gerufen: string[] = [];
+  const hole = (async (url: string | URL | Request) => {
+    gerufen.push(String(url));
+    return new Response(JSON.stringify({ id: uid }), { status: 200 });
+  }) as unknown as typeof fetch;
+  return { gerufen, hole };
+}
+
+/**
+ * `anzahl` Datensätze aus EINEM Lauf — nicht aus `anzahl` Läufen. Die
+ * Datensatznummer ist die Identität im Bericht; einzeln gebaut trüge jeder die
+ * Nummer 1, und ein Test über drei fehlgeschlagene Sätze prüfte in Wahrheit
+ * einen (beim Schreiben aufgefallen).
+ */
+function saetzeOhneKonto(anzahl: number): Datensatzlauf[] {
+  const lauf = verarbeite({
+    quelle: quelle(
+      Array.from({ length: anzahl }, (_, i) =>
+        zeile({ user_email: `a${i + 1}@example.org`, source_user_id: String(i + 1) }),
+      ),
+    ),
+    bestandsadressenOhneKennung: [],
+    bestand: KEIN_BESTAND,
+    schreibend: false,
+  });
+  if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+  return lauf.saetze;
+}
+
+const MITTEL = { basis: "http://127.0.0.1:54321", schluessel: "dienst-schluessel" };
+
+describe("schreibeDatensaetze", () => {
+  it("legt das Konto an, setzt die Stufe VOR der Transaktion und schreibt dann", async () => {
+    // Die Reihenfolge ist die Invariante aus 7.1/7.3: stünde `tier` innerhalb
+    // der Klammer, hinterliesse ein Abbruch ein `basic`-Konto — also keinen
+    // erkennbaren Rest, sondern eine Kollision, die jeden weiteren Lauf sperrt.
+    const { gestellt, client } = fakeClient();
+    const { gerufen, hole } = fakeFetch("uid-neu");
+
+    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.size).toBe(0);
+    expect(gerufen).toEqual(["http://127.0.0.1:54321/auth/v1/admin/users"]);
+    expect(gestellt[0].sql).toMatch(/update public\.profiles set "tier" = 'impact'/);
+    expect(gestellt[0].werte).toEqual(["uid-neu"]);
+    expect(gestellt[1].sql).toBe("begin");
+    expect(gestellt.at(-1)?.sql).toBe("commit");
+    // Alles Geschriebene zeigt auf das gerade angelegte Konto.
+    expect(gestellt[2].werte?.[0]).toBe("uid-neu");
+  });
+
+  it("legt für ein bestehendes Konto keines an und rührt seine Stufe nicht an", async () => {
+    // 7.3, andere Seite: stünde `tier` unbedingt im Update, genügte eine
+    // Selbstregistrierung unter einer bekannten Adresse für `impact`.
+    const { gestellt, client } = fakeClient();
+    const { gerufen, hole } = fakeFetch();
+    const lauf = verarbeite({
+      quelle: quelle([zeile()]),
+      bestandsadressenOhneKennung: [],
+      bestand: () => bestand({ uid: "uid-alt" }),
+      schreibend: false,
+    });
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+
+    await schreibeDatensaetze(lauf.saetze, { ...MITTEL, client, hole });
+
+    expect(gerufen).toEqual([]);
+    expect(gestellt.map((g) => g.sql).join(" ")).not.toMatch(/"tier"/);
+    expect(gestellt[0].sql).toBe("begin");
+  });
+
+  it("löst über 70 Datensätze keinen Versand aus (7.4)", async () => {
+    // Der Endpunkt ist `admin/users`, nicht `/invite` und nicht
+    // `send-activation`. Geprüft wird die Menge der Adressen, die der Lauf
+    // überhaupt anfasst — nicht, dass wir keine Mail sehen.
+    const { client } = fakeClient();
+    const { gerufen, hole } = fakeFetch();
+    const saetze = saetzeOhneKonto(70);
+
+    await schreibeDatensaetze(saetze, { ...MITTEL, client, hole });
+
+    expect(gerufen).toHaveLength(70);
+    expect(new Set(gerufen)).toEqual(new Set(["http://127.0.0.1:54321/auth/v1/admin/users"]));
+  });
+
+  it("beendet den Lauf nicht, wenn ein Datensatz kippt (7.5)", async () => {
+    const { client } = fakeClient((sql) =>
+      sql.includes("insert into public.profiles")
+        ? Object.assign(new Error("kaputt"), { code: "23502" })
+        : null,
+    );
+    const { hole } = fakeFetch();
+    const saetze = saetzeOhneKonto(3);
+
+    const fehler = await schreibeDatensaetze(saetze, { ...MITTEL, client, hole });
+
+    // Alle drei kippen an derselben Stelle — entscheidend ist, dass der Lauf
+    // alle drei erreicht hat, statt am ersten zu enden.
+    expect([...fehler.keys()]).toEqual([1, 2, 3]);
+  });
+
+  it("hält den Wert aus der Quelle aus dem Fehlergrund heraus (4.7)", async () => {
+    // Postgres zitiert bei verletzter Eindeutigkeit den Wert wörtlich. Der
+    // Grund landet in Bericht UND Konsole — dort darf keine Adresse stehen.
+    const { client } = fakeClient((sql) =>
+      sql.includes("insert into public.profiles")
+        ? Object.assign(
+            new Error(
+              'duplicate key value violates unique constraint "x"\n' +
+                "Key (email)=(a1@example.org) already exists.",
+            ),
+            { code: "23505", constraint: "profiles_pkey", table: "profiles" },
+          )
+        : null,
+    );
+    const { hole } = fakeFetch();
+
+    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    const grund = fehler.get(1) ?? "";
+    expect(grund).toContain("23505");
+    expect(grund).toContain("profiles_pkey");
+    expect(grund).not.toContain("a1@example.org");
+    expect(grund).not.toContain("duplicate key");
+  });
+
+  it("überspringt die Transaktion, wo das Konto nicht entstand", async () => {
+    // Ohne Kennung gibt es kein Ziel — ein Schreibversuch träfe irgendetwas
+    // oder nichts. Der Datensatz ist fehlerhaft, der nächste läuft weiter.
+    const { gestellt, client } = fakeClient();
+    const hole = (async () =>
+      new Response(JSON.stringify({ error_code: "email_exists" }), {
+        status: 422,
+      })) as unknown as typeof fetch;
+
+    const fehler = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.get(1)).toContain("422");
+    expect(gestellt).toEqual([]);
+  });
+
+  it("schreibt nichts zu einem übersprungenen Datensatz", async () => {
+    const { gestellt, client } = fakeClient();
+    const { gerufen, hole } = fakeFetch();
+    const lauf = verarbeite({
+      quelle: quelle([zeile({ user_email: "kein-at-zeichen" })]),
+      bestandsadressenOhneKennung: [],
+      bestand: KEIN_BESTAND,
+      schreibend: false,
+    });
+    if (lauf.art !== "lauf") throw new Error("Lauf erwartet");
+
+    await schreibeDatensaetze(lauf.saetze, { ...MITTEL, client, hole });
+
+    expect(gestellt).toEqual([]);
+    expect(gerufen).toEqual([]);
+  });
+});
+
+describe("baueLauf — was beim Schreiben herauskam", () => {
+  const rahmen = {
+    inhalt: ZWEI_DATENSAETZE,
+    ziel: "lokal",
+    quelle: "/ausserhalb/wp-export.csv",
+    zeitpunkt: "2026-08-15T08:00:00.000Z",
+    bestandsdaten: {
+      adressenOhneKennung: [],
+      nachKennung: new Map(),
+      nachAdresse: new Map(),
+    } as Bestandsdaten,
+    schreibend: true,
+  };
+
+  it("macht aus einem gescheiterten Datensatz ein fehlerhaftes Ergebnis", async () => {
+    const { bericht, konsole } = baueLauf({
+      ...rahmen,
+      ausgaenge: new Map([[1, "Datenbankfehler 23505 (profiles_pkey)"]]),
+    });
+
+    expect(konsole[0]).toContain("fehlerhaft");
+    expect(konsole[1]).toContain("angelegt");
+    expect(bericht).toContain("Datenbankfehler 23505");
+    // Die Summe darf den gescheiterten Datensatz nicht als angelegt führen.
+    expect(bericht).toMatch(/\| angelegt \| 1 \|/);
+    expect(bericht).toMatch(/\| fehlerhaft \| 1 \|/);
+  });
+
+  it("lässt den Bericht unverändert, wo nichts fehlschlug", async () => {
+    expect(baueLauf({ ...rahmen, ausgaenge: new Map() }).bericht).toBe(baueLauf(rahmen).bericht);
+  });
+});
+
+describe("Dublette im letzten Datensatz (7.6)", () => {
+  it("schreibt gar nichts, auch nicht die gültigen davor", async () => {
+    // Der Grund, warum die Vorabprüfung über die GANZE Datei läuft: mit
+    // Transaktionen je Datensatz fände eine spät erkannte Dublette die
+    // früheren bereits geschrieben.
+    const { gestellt, client } = fakeClient();
+    const { gerufen, hole } = fakeFetch();
+    const { lauf } = baueLauf({
+      inhalt: csv([
+        zeile({ user_email: "a@example.org", source_user_id: "1" }),
+        zeile({ user_email: "b@example.org", source_user_id: "2" }),
+        zeile({ user_email: "a@example.org", source_user_id: "3" }),
+      ]),
+      bestandsdaten: { adressenOhneKennung: [], nachKennung: new Map(), nachAdresse: new Map() },
+      schreibend: true,
+      ziel: "lokal",
+      quelle: "/ausserhalb/wp-export.csv",
+      zeitpunkt: "2026-08-15T08:00:00.000Z",
+    });
+
+    expect(lauf.art).toBe("vorab-abbruch");
+    if (lauf.art === "lauf") await schreibeDatensaetze(lauf.saetze, { ...MITTEL, client, hole });
+
+    expect(gestellt).toEqual([]);
+    expect(gerufen).toEqual([]);
   });
 });

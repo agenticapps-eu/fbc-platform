@@ -200,6 +200,58 @@ lassen und über Bestätigung plus Passwort-Setzen laufen sollte. Genau das tut 
 die Nachfrage hat die Begründung im Code von einer Annahme zu einer Messung
 gemacht.*
 
+### Der Bericht entsteht ZWEIMAL, aus derselben reinen Funktion (15.08.)
+
+Ein schreibender Lauf muss berichten, was wirklich geschah — ein Datensatz, den
+die Datenbank zurückwies, darf nicht als „angelegt" in der Summe stehen. Die
+Klassifikation entsteht aber **vor** dem Schreiben; sie ist die Grundlage dafür,
+überhaupt zu wissen, was zu schreiben ist.
+
+Gewählt: `baueLauf` bleibt **rein und synchron** und bekommt einen optionalen
+Parameter `ausgaenge` — eine Abbildung Datensatznummer → Fehlergrund. Der Lauf
+ruft es zweimal auf: einmal, um zu erfahren, was zu tun ist, und nach dem
+schreibenden Abschnitt noch einmal mit dem, was dabei fehlschlug.
+
+Zwei Alternativen sind gefallen:
+
+- **`main()` setzt sich `verarbeite` und `baueBericht` selbst zusammen.** Dann
+  nähme der schreibende Lauf einen anderen Weg als der Trockenlauf — genau das,
+  was Aufgabe 5.2 verbietet und wogegen die Verdrahtungstests stehen.
+- **Die Wirkung als Rückruf in `baueLauf` hereinreichen** (und es `async`
+  machen). Verlockend, weil der Bestand schon so hereinkommt — aber es machte
+  eine Funktion wirkend, deren Kopf „schreibt keine, spricht mit keiner
+  Datenbank" verspricht, und hinge zehn bestehende Tests um.
+
+Der doppelte Aufruf kostet 70 Datensätze reiner Rechnung. Dafür ist „der Bericht
+beschreibt denselben Lauf" strukturell wahr statt zugesichert.
+
+### Der Fehlergrund trägt keinen Wert aus der Quelle (15.08.)
+
+Aufgabe 7.5 verlangt, dass ein fehlerhafter Datensatz den Lauf nicht beendet —
+also landet sein Grund im Bericht. Der naheliegende Grund ist `error.message`,
+und genau der ist hier eine **Preisgabe**: Postgres zitiert bei einer verletzten
+Eindeutigkeit den Wert wörtlich (`Key (email)=(…) already exists`). Der Bericht
+liegt zwar ausserhalb des Arbeitsbaums und mit `0600` (1.2), die Konsole aber
+nicht — und 4.7 hält beide Wege frei von Personendaten.
+
+Deshalb wird der Grund aus `code`, `constraint` und `table` gebaut, nie aus
+`message` oder `detail`. Bezeichner stammen aus dem Schema, Werte aus der Quelle;
+nur die erste Sorte darf in die Ausgabe. `legeKontoAn` hält es schon so.
+
+### Basis-URL und Schlüssel hängen an der geprüften Kennung (15.08.)
+
+Der Review zu 7.1 fand die Asymmetrie: `pruefeZiel` (1.4) hält die
+**Datenbank**-Verbindung gegen das genannte Ziel, die GoTrue-Basis ging als
+freier Parameter herein. `SUPABASE_DB_URL_DEV` neben einem PROD-Schlüssel hiesse
+70 Konten in PROD und die Profile nach DEV — und das Anlegen ist der
+unwiderrufliche Teil.
+
+Behoben, indem die Basis nicht mehr gewählt, sondern **abgeleitet** wird:
+`pruefeZiel` gibt die Kennung zurück, die es gerade geprüft hat, und die Basis
+ist `https://<ref>.supabase.co` (lokal: der Stack). Ein Schlüssel des falschen
+Projekts kann damit nichts mehr anrichten — er trifft die richtige Adresse und
+wird dort abgewiesen, statt im falschen Projekt zu wirken.
+
 ### Vorabprüfung der ganzen Datei vor dem ersten Schreibvorgang
 
 Der geforderte Abbruch bei einer Dublette „ohne jeden Schreibvorgang" ist mit
