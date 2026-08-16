@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BILDQUELLE, bildauftraege } from "./wp_bilder";
+import { BILDQUELLE, BILDSPALTEN, bildauftraege, fehlendeBildspalten } from "./wp_bilder";
 
 const ABLAGE = "/ausserhalb/wp-import-bilder";
 
@@ -217,17 +217,70 @@ async function bild(pfad: string, kante: number): Promise<string> {
 }
 
 describe("wandleBild", () => {
+  // Die beiden Kantenlängen stehen hier WÖRTLICH und nicht als `KANTE.*`.
+  // Vorher war `KANTE.cover` Eingabe UND Erwartungswert: eine Änderung von 1600
+  // auf irgendeinen anderen Wert liess den Test grün, obwohl sie die fachliche
+  // Festlegung kippt. (Befund LOW, codex, 16.08.)
+  it("hält die fachlich festgelegten Kantenlängen", () => {
+    expect(KANTE.avatar).toBe(512);
+    expect(KANTE.cover).toBe(1600);
+  });
+
   it("verkleinert ein zu grosses Bild auf die Obergrenze", async () => {
     const ordner = frisch();
     const quelle = await bild(join(ordner, "gross.jpg"), 4032);
     const ziel = join(ordner, "gross.webp");
 
-    const ergebnis = await wandleBild({ quelle, ziel, maxKante: KANTE.cover });
+    const ergebnis = await wandleBild({ quelle, ziel, maxKante: 1600 });
 
     expect(ergebnis.stand).toBe("gewandelt");
     const { width, format } = await sharp(ziel).metadata();
-    expect(width).toBe(KANTE.cover);
+    expect(width).toBe(1600);
     expect(format).toBe("webp");
+  });
+
+  it("wandelt eine halbe Zieldatei neu, statt sie als vorhanden zu nehmen", async () => {
+    // Die Zwischenablage von vor dem 16.08. entstand ohne Zwischennamen. Eine
+    // abgebrochene Wandlung liegt dort unter dem ENDNAMEN — `existsSync` sagt
+    // ja, der Upload geht durch, und im Profil steht ein abgeschnittenes Bild.
+    // (Befund MEDIUM, codex.)
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "gross.jpg"), 2000);
+    const ziel = join(ordner, "gross.webp");
+    writeFileSync(ziel, Buffer.from("RIFF halb, kein Bild"));
+
+    const ergebnis = await wandleBild({ quelle, ziel, maxKante: 1600 });
+
+    expect(ergebnis.stand).toBe("gewandelt");
+    const { width, format } = await sharp(ziel).metadata();
+    expect(format).toBe("webp");
+    expect(width).toBe(1600);
+  });
+
+  it("lässt eine vollständige Zieldatei unangetastet", async () => {
+    // Die Gegenrichtung: ohne sie prüfte der Test oben auch dann grün, wenn die
+    // Wandlung JEDE vorhandene Datei überschriebe — und der Wiederholungslauf
+    // über 110 Bilder rechnete jedes Mal alles neu.
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "gross.jpg"), 2000);
+    const ziel = join(ordner, "gross.webp");
+    await wandleBild({ quelle, ziel, maxKante: 1600 });
+    const vorher = readFileSync(ziel);
+
+    const ergebnis = await wandleBild({ quelle, ziel, maxKante: 1600 });
+
+    expect(ergebnis.stand).toBe("vorhanden");
+    expect(readFileSync(ziel).equals(vorher)).toBe(true);
+  });
+
+  it("lässt keinen Zwischennamen liegen", async () => {
+    const ordner = frisch();
+    const quelle = await bild(join(ordner, "gross.jpg"), 2000);
+    const ziel = join(ordner, "gross.webp");
+
+    await wandleBild({ quelle, ziel, maxKante: 1600 });
+
+    expect(existsSync(`${ziel}.halb`)).toBe(false);
   });
 
   it("vergrössert ein kleines Bild NICHT", async () => {
@@ -261,17 +314,11 @@ describe("wandleBild", () => {
     expect(existsSync(join(ordner, "rest.webp"))).toBe(false);
   });
 
-  it("überspringt ein bereits gewandeltes Bild", async () => {
-    const ordner = frisch();
-    const quelle = await bild(join(ordner, "da.jpg"), 300);
-    const ziel = join(ordner, "da.webp");
-    writeFileSync(ziel, "SCHON DA");
-
-    const ergebnis = await wandleBild({ quelle, ziel, maxKante: KANTE.avatar });
-
-    expect(ergebnis.stand).toBe("vorhanden");
-    expect(readFileSync(ziel, "utf8")).toBe("SCHON DA");
-  });
+  // „überspringt ein bereits gewandeltes Bild" stand hier bis zum 16.08. und
+  // legte als Zieldatei die Zeichenkette „SCHON DA" ab — kein Bild. Er sicherte
+  // damit genau das Verhalten ab, das der Befund MEDIUM (codex) benennt: dass
+  // blosse Existenz als Erfolg gilt. Ersetzt durch die beiden Fälle oben, die
+  // mit einer ECHTEN gewandelten Datei und mit einer halben arbeiten.
 
   it("meldet eine unlesbare Datei als Befund, statt zu werfen", async () => {
     const ordner = frisch();
@@ -613,5 +660,48 @@ describe("ladeBildHoch — das Ersetzen ist unmöglich gemacht, nicht nur unterl
     expect(ergebnis.stand).toBe("fehlt");
     expect(grundVon(ergebnis)).not.toContain("Netzfehler");
     expect(grundVon(ergebnis)).toContain("nicht lesbar");
+  });
+});
+
+// ── Befund MEDIUM des Diff-Reviews (codex, 16.08.) ──────────────────────────
+describe("fehlendeBildspalten", () => {
+  it("meldet nichts, wenn alle drei Spalten stehen", () => {
+    expect(
+      fehlendeBildspalten(["user_login", "source_user_id", "profile_photo", "cover_photo"]),
+    ).toEqual([]);
+  });
+
+  it("nennt jede fehlende Spalte einzeln", () => {
+    // Ein umbenannter Export meldete sonst erfolgreich „0 Bilder" — mit Ausgang
+    // 0, also wie ein geglückter Lauf. Nach Abschaltung der alten Seite ist das
+    // nicht mehr behebbar.
+    expect(fehlendeBildspalten(["user_login"])).toEqual([
+      "source_user_id",
+      "profile_photo",
+      "cover_photo",
+    ]);
+    expect(fehlendeBildspalten(["source_user_id", "profile_photo"])).toEqual(["cover_photo"]);
+  });
+
+  it("übersieht eine Spalte nicht wegen des BOM oder eines Leerzeichens", () => {
+    // Die echte Datei beginnt mit einem BOM, das am Namen der ersten Spalte
+    // klebt — dieselbe Falle wie in `pruefeKopfzeile`.
+    expect(fehlendeBildspalten(["﻿source_user_id", " profile_photo", "cover_photo "])).toEqual([]);
+  });
+
+  it("prüft genau die Spalten, die `bildauftraege` liest", () => {
+    // Die Liste wird aus derselben Quelle abgeleitet wie die Verwendung. Stünde
+    // sie daneben, prüfte dieser Test zwei Kopien gegeneinander und beide
+    // dürften abdriften.
+    for (const spalte of BILDSPALTEN) {
+      const row = {
+        source_user_id: "42",
+        profile_photo: "a.jpg",
+        cover_photo: "b.jpg",
+      } as Record<string, string>;
+      delete row[spalte];
+      const auftraege = bildauftraege({ row, basis: "https://x.test", zwischenablage: "/tmp/z" });
+      expect(auftraege.length).toBeLessThan(2);
+    }
   });
 });

@@ -17,6 +17,8 @@
 
 import pg from "pg";
 
+import { stufeFuerNeuesKonto } from "../supabase/seed/wp_schreiben";
+
 const API = "http://127.0.0.1:54321";
 const DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const SCHLUESSEL = process.env.LOKALER_SERVICE_KEY;
@@ -46,6 +48,8 @@ if (!konto.id) {
   process.exit(1);
 }
 
+const fehler: string[] = [];
+
 const client = new pg.Client({ connectionString: DB });
 await client.connect();
 
@@ -62,24 +66,27 @@ try {
     );
   }
 
-  // Und nun die Anweisung, die 7.1 baut: `tier` steht in den Einfüge-, nicht in
-  // den Update-Spalten. Was kommt dabei heraus?
-  await client.query(
-    `insert into public.profiles ("id", "name", "tier", "activated_at")
-     values ($1, $2, $3, $4)
-     on conflict ("id") do update set "name" = excluded."name"`,
-    [konto.id, "Probe Name", "impact", null],
-  );
+  // Und nun GENAU die Anweisung, die der Import heute fährt. Bis zum 16.08.
+  // stand hier der Upsert des ersten Entwurfs — den diese Probe selbst
+  // widerlegt hat. Sie prüfte damit einen Weg, den es im Code nicht mehr gibt,
+  // und meldete auch bei falscher Stufe Ausgang 0. (Befund LOW, codex.)
+  const stufe = stufeFuerNeuesKonto({ stand: "angelegt", uid: konto.id });
+  const gesetzt = await client.query(stufe.sql, stufe.werte);
+  console.log(`Stufen-UPDATE: ${gesetzt.rowCount} Zeile(n)`);
 
   const { rows: danach } = await client.query(
-    "select tier, activated_at, name from public.profiles where id = $1",
+    "select tier, activated_at from public.profiles where id = $1",
     [konto.id],
   );
-  console.log(`Nach dem Upsert des Imports: tier=${danach[0].tier}  name=${danach[0].name}`);
+
+  // Drei Zusicherungen, und jede einzeln benannt — „irgendetwas stimmt nicht"
+  // schickt den nächsten Leser auf die Suche.
+  if (gesetzt.rowCount !== 1) fehler.push(`Stufen-UPDATE traf ${gesetzt.rowCount} Zeilen, nicht 1`);
+  if (danach[0]?.tier !== "impact") fehler.push(`tier ist ${danach[0]?.tier}, nicht impact`);
+  if (danach[0]?.activated_at !== null) fehler.push("activated_at ist gesetzt, sollte null sein");
+
   console.log(
-    danach[0].tier === "impact"
-      ? "→ tier ist impact. Die Annahme des Plans hält."
-      : "→ tier ist NICHT impact. Der Trigger war schneller; 7.3 greift so nicht.",
+    `Nach dem Stufen-UPDATE: tier=${danach[0]?.tier} activated_at=${danach[0]?.activated_at}`,
   );
 } finally {
   await client.end();
@@ -89,3 +96,10 @@ try {
   });
   console.log(`Aufgeräumt: HTTP ${weg.status}`);
 }
+
+// Ein Ausgang ungleich 0, sonst ist die Probe kein Riegel, sondern ein Ausdruck.
+if (fehler.length > 0) {
+  console.error(`\nDie Stufe kommt NICHT wie zugesagt zustande:\n  ${fehler.join("\n  ")}`);
+  process.exit(1);
+}
+console.log("\nStufe wie zugesagt: impact, unaktiviert, genau eine Zeile.");

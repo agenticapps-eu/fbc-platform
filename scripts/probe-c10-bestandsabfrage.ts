@@ -22,6 +22,10 @@ import { BESTANDSABFRAGE, baueBestandsdaten, type Bestandszeile } from "../supab
 const LOKAL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
 const ERWARTET = [
+  // `uid` fehlte hier bis zum 16.08. (Befund LOW, codex). Ohne sie blieb die
+  // Sonde grün, während der Import mit `undefined` als Profilziel weiterarbeitet
+  // — also genau der Fall, gegen den sie gerichtet ist.
+  "uid",
   "kennung",
   "adresse",
   "tier",
@@ -71,6 +75,14 @@ async function main(): Promise<void> {
       if (typeof zeile.offers !== "string") {
         fehler.push(
           `offers kommt als ${typeof zeile.offers} — die Wandlung im Code rechnet mit einer Zeichenkette.`,
+        );
+      }
+      // Die Spalte allein genügt nicht: hiesse sie `uid`, führte aber `null`,
+      // ginge der Import mit `undefined` als Profilziel weiter. Der Wert wird
+      // ein Fremdschlüssel und ein Objektpfad im Bucket.
+      if (typeof zeile.uid !== "string" || zeile.uid.trim() === "") {
+        fehler.push(
+          "uid ist leer oder keine Zeichenkette — sie ist das Ziel jedes Schreibvorgangs.",
         );
       }
     } else {

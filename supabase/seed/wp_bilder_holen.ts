@@ -25,6 +25,7 @@ import {
   type Holergebnis,
   KANTE,
   bildauftraege,
+  fehlendeBildspalten,
   holeBild,
   wandleBild,
 } from "./wp_bilder";
@@ -62,7 +63,19 @@ async function main(): Promise<void> {
   // hinweg bestehen bleiben, sonst schützt sie nicht gegen das Abschalten.
   const { zwischenablage } = ablageorte({ quellPfad: pfad.pfad, zeitstempel: "" });
 
-  const { zeilen } = leseDatensaetze(readFileSync(pfad.pfad, "utf8"));
+  const { spalten, zeilen } = leseDatensaetze(readFileSync(pfad.pfad, "utf8"));
+
+  // Ohne diese Prüfung meldete ein umbenannter Export erfolgreich „0 Bilder",
+  // mit Ausgang 0 — also wie ein geglückter Lauf. Nach Abschaltung der alten
+  // Seite ist dieser Irrtum nicht mehr behebbar, und dieser Abschnitt ist genau
+  // die Vorsorge dagegen. (Befund MEDIUM, codex, 16.08.)
+  const fehlend = fehlendeBildspalten(spalten);
+  if (fehlend.length > 0) {
+    abbruch(
+      `Die Quelle führt ${fehlend.join(", ")} nicht. Ohne diese Spalten findet der ` +
+        "Abruf nichts, und ein Lauf, der das nicht meldet, sieht aus wie ein geglückter.",
+    );
+  }
   const auftraege = zeilen.flatMap((row) =>
     bildauftraege({ row, basis: BILDQUELLE, zwischenablage }),
   );

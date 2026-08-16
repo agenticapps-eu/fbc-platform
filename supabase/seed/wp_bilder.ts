@@ -22,7 +22,7 @@
  * (15.08.): beide Bildarten antworten mit 200 und dem erwarteten Bildtyp.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
 import sharp from "sharp";
@@ -49,11 +49,39 @@ export type Bildauftrag = {
   ablage: string;
 };
 
+/** Die Spalte, aus der die Kennung und damit die Bild-URL entsteht. */
+const KENNUNGSSPALTE = "source_user_id";
+
 /** Die beiden Quellspalten und die Bildart, die sie tragen. */
 const SPALTEN: ReadonlyArray<readonly [Bildart, string]> = [
   ["profil", "profile_photo"],
   ["cover", "cover_photo"],
 ];
+
+/**
+ * Genau die Spalten, ohne die `bildauftraege` nichts findet — hier abgeleitet
+ * und nicht danebengeschrieben, damit die Prüfung nicht von der Verwendung
+ * abdriften kann.
+ *
+ * WARUM NICHT `pruefeKopfzeile` (Befund MEDIUM, codex, 16.08.). Die prüft alle
+ * 28 Quellfelder. Der Bildabruf braucht drei davon, läuft für sich und ist der
+ * zeitkritische Teil: fällt die alte Seite ab, sind die Bilder weg. Ihn wegen
+ * einer fehlenden `Telefonnummer` anzuhalten, verlöre genau das, was er retten
+ * soll.
+ */
+export const BILDSPALTEN: readonly string[] = [KENNUNGSSPALTE, ...SPALTEN.map(([, s]) => s)];
+
+/**
+ * Welche der drei Spalten fehlen. Leer heisst: der Abruf kann etwas finden.
+ *
+ * Ohne diese Prüfung meldete ein umbenannter Export erfolgreich „0 Bilder" —
+ * mit Ausgang 0, also wie ein geglückter Lauf. Nach Abschaltung der alten Seite
+ * ist dieser Irrtum nicht mehr behebbar.
+ */
+export function fehlendeBildspalten(spalten: readonly string[]): string[] {
+  const vorhanden = new Set(spalten.map((s) => s.trim()));
+  return BILDSPALTEN.filter((s) => !vorhanden.has(s));
+}
 
 /**
  * Die Endungen, die die Quelle führt (gemessen: jpg, png, jpeg). Eine feste
@@ -64,6 +92,35 @@ const ENDUNGEN = new Set([".jpg", ".jpeg", ".png"]);
 
 /** Eine Kennung ist ein Bezeichner, kein Pfad — sie wird ein Verzeichnisname. */
 const KENNUNG_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Schreibt unter einem Zwischennamen und benennt erst danach um (Befund MEDIUM,
+ * codex, 16.08.).
+ *
+ * Beide Schritte dieses Abschnitts prüfen später nur, OB die Zieldatei da ist —
+ * `existsSync` in `holeBild` und in `wandleBild`. Wird der Prozess mitten im
+ * Schreiben abgebrochen, liegt unter dem Endnamen eine halbe Datei, und beide
+ * Prüfungen halten sie für fertig. Sie ginge dann in den Bucket, und weil der
+ * Objektname fest gewählt ist, wäre sie dort nicht mehr zu ersetzen.
+ *
+ * `renameSync` ist innerhalb desselben Dateisystems unteilbar — und
+ * Zwischenname und Ziel liegen im selben Verzeichnis, also immer auf demselben.
+ */
+/** Lässt sich die Datei als Bild lesen und hat sie Maße? Sonst ist sie halb. */
+async function istLesbaresBild(pfad: string): Promise<boolean> {
+  try {
+    const { width, height } = await sharp(pfad).metadata();
+    return Boolean(width && height);
+  } catch {
+    return false;
+  }
+}
+
+function schreibeFertig(ziel: string, inhalt: Buffer): void {
+  const zwischen = `${ziel}.halb`;
+  writeFileSync(zwischen, inhalt);
+  renameSync(zwischen, ziel);
+}
 
 /**
  * Schneidet das Grössensuffix ab, das WordPress an seine Ableitungen hängt
@@ -99,7 +156,7 @@ export function bildauftraege(input: {
   basis: string;
   zwischenablage: string;
 }): Bildauftrag[] {
-  const kennung = (input.row["source_user_id"] ?? "").trim();
+  const kennung = (input.row[KENNUNGSSPALTE] ?? "").trim();
   if (!KENNUNG_PATTERN.test(kennung)) return [];
 
   const auftraege: Bildauftrag[] = [];
@@ -208,7 +265,7 @@ export async function holeBild(
   }
 
   mkdirSync(dirname(auftrag.ablage), { recursive: true });
-  writeFileSync(auftrag.ablage, Buffer.from(await antwort.arrayBuffer()));
+  schreibeFertig(auftrag.ablage, Buffer.from(await antwort.arrayBuffer()));
 
   return { auftrag, stand: "geholt" };
 }
@@ -255,7 +312,15 @@ export async function wandleBild(input: {
   ziel: string;
   maxKante: number;
 }): Promise<Wandlung> {
-  if (existsSync(input.ziel)) return { stand: "vorhanden" };
+  // Vorhandensein allein genügt nicht. Die Zwischenablage von vor dem 16.08.
+  // entstand ohne Zwischennamen, kann also halbe Dateien tragen — und die sind
+  // genau die, die man nicht bemerkt: `existsSync` sagt ja, der Upload geht
+  // durch, und im Profil steht ein abgeschnittenes Bild. Ist die Datei
+  // unlesbar, wird sie neu gewandelt statt gemeldet: die Quelle liegt daneben,
+  // der Fall heilt sich also von selbst.
+  if (existsSync(input.ziel) && (await istLesbaresBild(input.ziel))) {
+    return { stand: "vorhanden" };
+  }
 
   try {
     const bild = sharp(input.quelle);
@@ -271,6 +336,13 @@ export async function wandleBild(input: {
     mkdirSync(dirname(input.ziel), { recursive: true });
     // `toFile` gibt die Maße des Ergebnisses zurück — ein zweiter Durchgang
     // durch `sharp`, nur um sie zu erfahren, wandelte jedes Bild doppelt.
+    //
+    // Geschrieben wird unter einem Zwischennamen und erst danach umbenannt
+    // (Befund MEDIUM, codex, 16.08.): ein Abbruch mitten in `toFile` hinterliesse
+    // sonst eine halbe `.webp`, die beim nächsten Lauf als „vorhanden" gilt,
+    // hochgeladen wird und wegen des festen Objektnamens nicht mehr zu
+    // ersetzen ist.
+    const zwischen = `${input.ziel}.halb`;
     const info = await bild
       .resize({
         width: input.maxKante,
@@ -279,7 +351,8 @@ export async function wandleBild(input: {
         withoutEnlargement: true,
       })
       .webp()
-      .toFile(input.ziel);
+      .toFile(zwischen);
+    renameSync(zwischen, input.ziel);
 
     return { stand: "gewandelt", kante: Math.max(info.width, info.height) };
   } catch (e) {

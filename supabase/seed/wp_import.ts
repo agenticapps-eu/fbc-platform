@@ -811,10 +811,24 @@ async function main(): Promise<void> {
       zwischenablage: ablageorte({ quellPfad: pfad.pfad, zeitstempel: "" }).zwischenablage,
     };
 
+    const orte = ablageorte({ quellPfad: pfad.pfad, zeitstempel: zeitpunkt });
+
     // Erst erfahren, was zu tun ist; dann tun; dann berichten, was daraus wurde.
     // Der zweite Aufruf hat dieselben Eingaben — deshalb beschreibt der Bericht
     // denselben Lauf und nicht einen zweiten (s. Kopf von `baueLauf`).
     const vorlauf = baueLauf(eingaben);
+
+    // DER BERICHTSPLATZ WIRD VOR DEM ERSTEN SCHREIBVORGANG BELEGT (Befund
+    // MEDIUM, codex, 16.08.). Sonst fiele ein nicht beschreibbares
+    // Quellverzeichnis erst auf, wenn 70 Konten stehen und die Uploads gelaufen
+    // sind — und der Bericht ist das einzige Gedächtnis zweier Dinge, die
+    // nirgends sonst festgehalten sind: der Auffüllgrad des Beitrittsdatums und
+    // die Felder, die die Merge-Regel stehen liess.
+    //
+    // Geschrieben wird der Vorlauf-Bericht, kein Platzhalter: bricht der Lauf
+    // mittendrin ab, liegt dann wenigstens da, was er vorhatte.
+    if (schreibmittel) schreibeBericht(orte.bericht, vorlauf.bericht);
+
     const ausgaenge =
       schreibmittel && vorlauf.lauf.art === "lauf"
         ? await schreibeDatensaetze(vorlauf.lauf.saetze, { client, ...schreibmittel })
@@ -826,7 +840,6 @@ async function main(): Promise<void> {
 
     for (const zeile of konsole) console.log(zeile);
 
-    const orte = ablageorte({ quellPfad: pfad.pfad, zeitstempel: zeitpunkt });
     schreibeBericht(orte.bericht, bericht);
 
     console.log(
