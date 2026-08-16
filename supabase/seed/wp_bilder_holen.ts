@@ -28,7 +28,7 @@ import {
   holeBild,
   wandleBild,
 } from "./wp_bilder";
-import { leseDatensaetze } from "./wp_import";
+import { echterPfadAufPlatte, leseDatensaetze } from "./wp_import";
 import { ablageorte, pruefeQuellPfad } from "./wp_import.lib";
 
 const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -50,7 +50,12 @@ async function main(): Promise<void> {
     abbruch("Aufruf: tsx supabase/seed/wp_bilder_holen.ts <quelldatei>");
   }
 
-  const pfad = pruefeQuellPfad({ pfad: argument, cwd: process.cwd(), repoWurzel: REPO_WURZEL });
+  const pfad = pruefeQuellPfad({
+    pfad: argument,
+    cwd: process.cwd(),
+    repoWurzel: REPO_WURZEL,
+    echterPfad: echterPfadAufPlatte,
+  });
   if (pfad.kind === "abbruch") abbruch(pfad.grund);
 
   // Die Zwischenablage ist NICHT zeitgestempelt (1.2): sie soll über Läufe

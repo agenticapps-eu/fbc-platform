@@ -21,7 +21,7 @@
  * hiesse 70 Rundreisen und einen Bestand, der sich mitten im Lauf ändern kann.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -528,7 +528,37 @@ export function baueBestandsdaten(zeilen: readonly Bestandszeile[]): Bestandsdat
  * es; ein mitschreibender Doppelgänger im Test auch, ohne eine Datenbank und
  * ohne eine Behauptung darüber, was `pg` sonst noch kann.
  */
+/**
+ * Der kanonische Pfad auf dieser Platte — die Antwort, die `pruefeQuellPfad`
+ * verlangt und als reine Funktion nicht selbst geben kann (Befund HIGH-2).
+ *
+ * Existiert der Pfad nicht, gibt `realpathSync` auf, und wir reichen das
+ * Genannte durch: dann greift der lexikalische Vergleich wie bisher, und der
+ * Lesefehler kommt gleich danach mit einer klareren Meldung. Ein Abbruch hier
+ * benennte dieselbe Ursache schlechter.
+ */
+export function echterPfadAufPlatte(pfad: string): string {
+  try {
+    return realpathSync(pfad);
+  } catch {
+    return pfad;
+  }
+}
+
 export type Abfrager = { query: (sql: string, werte?: unknown[]) => Promise<unknown> };
+
+/**
+ * `pg` legt die Zahl der getroffenen Zeilen als `rowCount` bei. `Abfrager` gibt
+ * bewusst `unknown` heraus — er soll nur „stellt Abfragen" bedeuten —, also
+ * wird hier gelesen statt getypt. Fehlt die Zahl, ist das keine Null: der
+ * Aufrufer soll den Unterschied zwischen „nichts getroffen" und „nicht
+ * gemessen" sehen können.
+ */
+export function zeilenZahl(ergebnis: unknown): number | null {
+  if (typeof ergebnis !== "object" || ergebnis === null || !("rowCount" in ergebnis)) return null;
+  const zahl = (ergebnis as { rowCount: unknown }).rowCount;
+  return typeof zahl === "number" ? zahl : null;
+}
 
 export async function fuehreDatensatzAus(
   client: Abfrager,
@@ -624,7 +654,18 @@ export async function schreibeDatensaetze(
           continue;
         }
         const stufe = stufeFuerNeuesKonto(konto);
-        await mittel.client.query(stufe.sql, stufe.werte);
+        const gesetzt = await mittel.client.query(stufe.sql, stufe.werte);
+        // `tier` entscheidet allein über die Rechte des Mitglieds, und dies ist
+        // die einzige Stelle, die es setzt — ein Auftrag darf die Spalte nicht
+        // führen (`SPALTEN` in wp_schreiben.ts). Ein UPDATE, das keine Zeile
+        // trifft, hiesse deshalb: das Konto sitzt still auf `basic`. Live ist
+        // der Fall nicht erreichbar (die Profilzeile steht durch den Trigger,
+        // `activated_at` ist frisch `null`), aber der Lauf geht gegen
+        // Produktivdaten. (Befund HIGH-1, codex, 16.08.)
+        if (zeilenZahl(gesetzt) !== 1) {
+          fehler.set(nummer, `Stufe nicht gesetzt (${zeilenZahl(gesetzt) ?? "ohne Zeilenzahl"})`);
+          continue;
+        }
         uid = konto.uid;
       }
 
@@ -717,6 +758,7 @@ async function main(): Promise<void> {
     pfad: aufruf.quelle,
     cwd: process.cwd(),
     repoWurzel: REPO_WURZEL,
+    echterPfad: echterPfadAufPlatte,
   });
   if (pfad.kind === "abbruch") abbruch(pfad.grund);
 

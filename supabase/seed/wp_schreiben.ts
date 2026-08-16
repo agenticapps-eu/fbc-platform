@@ -362,7 +362,15 @@ export async function legeKontoAn(
       signal: AbortSignal.timeout(30_000),
     });
   } catch (e) {
-    return { stand: "fehler", grund: `Netzfehler: ${(e as Error).message}` };
+    // NICHT einfach melden. Der POST kann serverseitig gelungen sein, während
+    // wir die Antwort nicht mehr gesehen haben — die Zeitgrenze oben ist genau
+    // dafür da, und beim Bilder-Schritt hingen am 15.08. vier von 110 Anfragen
+    // reproduzierbar je 60 s in „upstream server is timing out". Ein so
+    // entstandenes Konto trägt keine Stufe und keine Kennung, ist also `basic`
+    // und damit KEIN erkennbarer eigener Rest; beim nächsten Lauf ist es eine
+    // Bestandskollision, und die blockiert nicht diesen Datensatz, sondern
+    // jeden weiteren Lauf. Deshalb nachsehen. (Befund HIGH-1, codex, 16.08.)
+    return await sucheKonto(input, hole, `Netzfehler: ${(e as Error).message}`);
   }
 
   const koerper = (await antwort.json().catch(() => ({}))) as {
@@ -379,4 +387,54 @@ export async function legeKontoAn(
   }
 
   return { stand: "angelegt", uid: koerper.id };
+}
+
+/**
+ * Nachschau nach einem Konto, dessen Anlage wir angestossen haben, deren
+ * Ausgang wir aber nicht kennen. Findet sie eines, gilt es als von diesem Lauf
+ * angelegt — was es auch ist: der POST war unserer.
+ *
+ * NUR AUS DEM `catch`, nicht bei einer abweisenden Antwort. Ein `email_exists`
+ * ist zweideutig: dahinter kann ebensogut eine Selbstregistrierung stehen, die
+ * der Bestandsabzug noch nicht kannte. Sie zu übernehmen hiesse, ihr `impact`
+ * zu geben und fremde Daten darüberzuschreiben — der Fall, den 7.3 ausdrücklich
+ * ausschliesst. Eine unklare Antwort bleibt deshalb ein Fehler und geht an einen
+ * Menschen.
+ *
+ * DIE ADRESSE WIRD NACHGEPRÜFT. GoTrues `filter` ist eine Teilzeichenkette:
+ * „a1@example.org" träfe auch „a1@example.org.uk". Ein Treffer ohne
+ * Gleichheitsprüfung schriebe die Daten des einen Mitglieds auf das Konto eines
+ * anderen — der teuerste Fehler, den dieses Werkzeug machen könnte.
+ */
+async function sucheKonto(
+  input: { adresse: string; basis: string; schluessel: string },
+  hole: typeof fetch,
+  grundOhneTreffer: string,
+): Promise<Kontoergebnis> {
+  let antwort: Response;
+  try {
+    antwort = await hole(
+      `${input.basis}/auth/v1/admin/users?filter=${encodeURIComponent(input.adresse)}`,
+      {
+        method: "GET",
+        headers: { apikey: input.schluessel, Authorization: `Bearer ${input.schluessel}` },
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+  } catch {
+    return { stand: "fehler", grund: grundOhneTreffer };
+  }
+  if (!antwort.ok) return { stand: "fehler", grund: grundOhneTreffer };
+
+  const koerper = (await antwort.json().catch(() => ({}))) as {
+    users?: { id?: string; email?: string }[];
+  };
+  const gesucht = input.adresse.trim().toLowerCase();
+  const treffer = (koerper.users ?? []).find(
+    (u) => u.id && (u.email ?? "").trim().toLowerCase() === gesucht,
+  );
+
+  return treffer?.id
+    ? { stand: "angelegt", uid: treffer.id }
+    : { stand: "fehler", grund: grundOhneTreffer };
 }

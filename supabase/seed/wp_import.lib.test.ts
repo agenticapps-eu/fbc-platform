@@ -216,10 +216,17 @@ describe("leseAufruf", () => {
 
 describe("pruefeQuellPfad", () => {
   const repoWurzel = "/Users/x/Sourcecode/factiv/fbc-platform";
+  /** Identität: diese Fälle prüfen die Rechnung, nicht das Auflösen von Symlinks. */
+  const gleich = (p: string) => p;
 
   it("nimmt einen Pfad außerhalb des Arbeitsbaums an", () => {
     expect(
-      pruefeQuellPfad({ pfad: "/Users/x/Documents/export.csv", cwd: repoWurzel, repoWurzel }),
+      pruefeQuellPfad({
+        pfad: "/Users/x/Documents/export.csv",
+        cwd: repoWurzel,
+        repoWurzel,
+        echterPfad: gleich,
+      }),
     ).toEqual({ kind: "ok", pfad: "/Users/x/Documents/export.csv" });
   });
 
@@ -228,6 +235,7 @@ describe("pruefeQuellPfad", () => {
       pfad: `${repoWurzel}/daten/export.csv`,
       cwd: repoWurzel,
       repoWurzel,
+      echterPfad: gleich,
     });
 
     expect(ergebnis.kind).toBe("abbruch");
@@ -236,16 +244,23 @@ describe("pruefeQuellPfad", () => {
   });
 
   it("lehnt auch einen relativen Pfad ab, der im Arbeitsbaum landet", () => {
-    expect(pruefeQuellPfad({ pfad: "export.csv", cwd: repoWurzel, repoWurzel }).kind).toBe(
-      "abbruch",
-    );
     expect(
-      pruefeQuellPfad({ pfad: "../fbc-platform/export.csv", cwd: repoWurzel, repoWurzel }).kind,
+      pruefeQuellPfad({ pfad: "export.csv", cwd: repoWurzel, repoWurzel, echterPfad: gleich }).kind,
+    ).toBe("abbruch");
+    expect(
+      pruefeQuellPfad({
+        pfad: "../fbc-platform/export.csv",
+        cwd: repoWurzel,
+        repoWurzel,
+        echterPfad: gleich,
+      }).kind,
     ).toBe("abbruch");
   });
 
   it("löst einen relativen Pfad außerhalb des Arbeitsbaums absolut auf", () => {
-    expect(pruefeQuellPfad({ pfad: "../export.csv", cwd: repoWurzel, repoWurzel })).toEqual({
+    expect(
+      pruefeQuellPfad({ pfad: "../export.csv", cwd: repoWurzel, repoWurzel, echterPfad: gleich }),
+    ).toEqual({
       kind: "ok",
       pfad: "/Users/x/Sourcecode/factiv/export.csv",
     });
@@ -259,12 +274,70 @@ describe("pruefeQuellPfad", () => {
         pfad: `${repoWurzel}-daten/export.csv`,
         cwd: repoWurzel,
         repoWurzel,
+        echterPfad: gleich,
       }).kind,
     ).toBe("ok");
   });
 
   it("lehnt den Arbeitsbaum selbst ab", () => {
-    expect(pruefeQuellPfad({ pfad: repoWurzel, cwd: repoWurzel, repoWurzel }).kind).toBe("abbruch");
+    expect(
+      pruefeQuellPfad({ pfad: repoWurzel, cwd: repoWurzel, repoWurzel, echterPfad: gleich }).kind,
+    ).toBe("abbruch");
+  });
+
+  // ── Befund HIGH-2 des Diff-Reviews (codex, 16.08.) ──────────────────────────
+  it("lehnt einen Pfad ab, der erst über einen Symlink im Arbeitsbaum landet", () => {
+    // `resolve` und `relative` rechnen rein lexikalisch. Ist eine
+    // Vaterkomponente ein Symlink in den Arbeitsbaum, meldet die Prüfung
+    // „außerhalb", während Quelle, Bericht und Zwischenablage IM öffentlichen
+    // Repository liegen — genau der Schaden, den dieser Change verhindern soll.
+    const echterPfad = (p: string) =>
+      p === "/Users/x/Documents/fbc/export.csv" ? `${repoWurzel}/daten/export.csv` : p;
+
+    const ergebnis = pruefeQuellPfad({
+      pfad: "/Users/x/Documents/fbc/export.csv",
+      cwd: repoWurzel,
+      repoWurzel,
+      echterPfad,
+    });
+
+    expect(ergebnis.kind).toBe("abbruch");
+    if (ergebnis.kind !== "abbruch") return;
+    expect(ergebnis.grund).toMatch(/Arbeitsbaum/);
+  });
+
+  it("erkennt den Arbeitsbaum auch, wenn ER über einen Symlink erreicht wird", () => {
+    // Die andere Richtung: liegt der Arbeitsbaum selbst hinter einem Symlink
+    // (`/tmp/repo` → `/Users/x/…/fbc-platform`), verglichen die beiden Seiten
+    // zwei verschiedene Schreibweisen desselben Verzeichnisses und die Prüfung
+    // ginge durch.
+    const echterPfad = (p: string) => p.replace("/tmp/repo", repoWurzel);
+
+    expect(
+      pruefeQuellPfad({
+        pfad: `${repoWurzel}/daten/export.csv`,
+        cwd: repoWurzel,
+        repoWurzel: "/tmp/repo",
+        echterPfad,
+      }).kind,
+    ).toBe("abbruch");
+  });
+
+  it("gibt den kanonischen Pfad heraus, nicht den genannten", () => {
+    // Was danach gelesen und woneben der Bericht abgelegt wird, muss dasselbe
+    // Verzeichnis sein, das die Prüfung freigegeben hat.
+    expect(
+      pruefeQuellPfad({
+        pfad: "/Users/x/Documents/link.csv",
+        cwd: repoWurzel,
+        repoWurzel,
+        // Nur die Quelle liegt hinter einem Symlink. Ein Doppel, das JEDEN
+        // Pfad abbildet, träfe auch die Wurzel — dann vergliche die Prüfung
+        // den Pfad mit sich selbst und meldete „im Arbeitsbaum".
+        echterPfad: (p) =>
+          p === "/Users/x/Documents/link.csv" ? "/Users/x/Documents/echt/export.csv" : p,
+      }),
+    ).toEqual({ kind: "ok", pfad: "/Users/x/Documents/echt/export.csv" });
   });
 });
 
@@ -303,7 +376,9 @@ describe("ablageorte", () => {
     const orte = ablageorte({ quellPfad: quelle, zeitstempel: "2026-08-14T15:53:00.000Z" });
 
     for (const pfad of [orte.bericht, orte.zwischenablage]) {
-      expect(pruefeQuellPfad({ pfad, cwd: repoWurzel, repoWurzel }).kind).toBe("ok");
+      expect(
+        pruefeQuellPfad({ pfad, cwd: repoWurzel, repoWurzel, echterPfad: (p) => p }).kind,
+      ).toBe("ok");
     }
   });
 });

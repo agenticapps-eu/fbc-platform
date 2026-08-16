@@ -32,6 +32,7 @@ import {
   telefonParsen,
   type OrtGuete,
 } from "../supabase/seed/wp_felder";
+import { echterPfadAufPlatte } from "../supabase/seed/wp_import";
 import { pruefeQuellPfad } from "../supabase/seed/wp_import.lib";
 
 const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -62,6 +63,7 @@ const gepruefterPfad = pruefeQuellPfad({
   pfad: pfadArgument,
   cwd: process.cwd(),
   repoWurzel: REPO_WURZEL,
+  echterPfad: echterPfadAufPlatte,
 });
 if (gepruefterPfad.kind === "abbruch") {
   console.error(gepruefterPfad.grund);

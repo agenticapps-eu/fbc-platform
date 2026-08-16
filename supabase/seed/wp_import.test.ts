@@ -698,8 +698,14 @@ describe("baueBestandsdaten", () => {
 
 // ── 7.3–7.6: der schreibende Abschnitt ──────────────────────────────────────
 
-/** Ein Abfrager, der mitschreibt, statt zu wirken. */
-function fakeClient(werfeBei?: (sql: string) => unknown) {
+/**
+ * Ein Abfrager, der mitschreibt, statt zu wirken.
+ *
+ * `rowCount: 1` ist der Normalfall, weil `pg` bei jedem Befehl eine Zahl
+ * liefert und der Aufrufer sie beim Stufen-UPDATE prüft. `zeilenFuer` stellt
+ * den Ausnahmefall her, ohne dass jeder andere Test davon weiss.
+ */
+function fakeClient(werfeBei?: (sql: string) => unknown, zeilenFuer?: (sql: string) => number) {
   const gestellt: { sql: string; werte?: unknown[] }[] = [];
   return {
     gestellt,
@@ -708,7 +714,7 @@ function fakeClient(werfeBei?: (sql: string) => unknown) {
         gestellt.push({ sql, werte });
         const fehler = werfeBei?.(sql);
         if (fehler) throw fehler;
-        return {};
+        return { rowCount: zeilenFuer?.(sql) ?? 1 };
       },
     },
   };
@@ -857,6 +863,90 @@ describe("schreibeDatensaetze", () => {
 
     expect(fehler.get(1)).toContain("422");
     expect(gestellt).toEqual([]);
+  });
+
+  // ── Befund HIGH-1 des Diff-Reviews (codex, 16.08.) ────────────────────────
+  //
+  // Der POST kann serverseitig gelingen, während wir die Antwort nicht mehr
+  // sehen — 30 s Zeitgrenze, und beim Bilder-Schritt hingen am 15.08. vier von
+  // 110 Anfragen reproduzierbar je 60 s. Dann steht ein Konto ohne Stufe und
+  // ohne Kennung: `basic`, also KEIN erkennbarer eigener Rest
+  // (`wp_import.ts:465`), also eine Bestandskollision — und die ist ein
+  // blockierender Vorabbefund. EIN solcher Rest sperrt damit nicht seinen
+  // Datensatz, sondern JEDEN weiteren Lauf.
+  it("übernimmt das Konto, das ein abgebrochener POST serverseitig doch angelegt hat", async () => {
+    const { gestellt, client } = fakeClient();
+    const gerufen: string[] = [];
+    const hole = (async (url: string | URL | Request, init?: RequestInit) => {
+      gerufen.push(`${init?.method ?? "GET"} ${String(url)}`);
+      if ((init?.method ?? "GET") === "POST") throw new Error("The operation was aborted");
+      return new Response(
+        JSON.stringify({ users: [{ id: "uid-vorgefunden", email: "a1@example.org" }] }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.size).toBe(0);
+    // Nachgesehen wurde unter derselben Adresse, die der POST tragen sollte.
+    expect(gerufen[1]).toContain("a1%40example.org");
+    // Und der Rest des Laufs ist der normale: Stufe VOR der Klammer, dann alles
+    // auf die vorgefundene Kennung.
+    expect(gestellt[0].sql).toMatch(/update public\.profiles set "tier" = 'impact'/);
+    expect(gestellt[0].werte).toEqual(["uid-vorgefunden"]);
+    expect(gestellt[1].sql).toBe("begin");
+    expect(gestellt.at(-1)?.sql).toBe("commit");
+  });
+
+  it("meldet den Netzfehler weiter, wenn die Nachschau kein Konto findet", async () => {
+    // Die Gegenrichtung: ohne sie prüfte der Test oben nur, dass überhaupt
+    // nachgesehen wird — nicht, dass das Ergebnis der Nachschau zählt.
+    const { gestellt, client } = fakeClient();
+    const hole = (async (_url: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") throw new Error("The operation was aborted");
+      return new Response(JSON.stringify({ users: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.get(1)).toContain("Netzfehler");
+    expect(gestellt).toEqual([]);
+  });
+
+  it("übernimmt bei der Nachschau KEIN Konto mit bloss ähnlicher Adresse", async () => {
+    // GoTrues `filter` ist eine Teilzeichenkette. Ohne Gleichheitsprüfung
+    // schriebe der Lauf die Daten des einen Mitglieds auf das Konto eines
+    // anderen — teurer als jeder gemeldete Fehler.
+    const { gestellt, client } = fakeClient();
+    const hole = (async (_url: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") throw new Error("The operation was aborted");
+      return new Response(
+        JSON.stringify({ users: [{ id: "uid-fremd", email: "a1@example.org.uk" }] }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.get(1)).toContain("Netzfehler");
+    expect(gestellt).toEqual([]);
+  });
+
+  it("behandelt ein Stufen-UPDATE ohne getroffene Zeile als Fehler", async () => {
+    // Zweiter Teil desselben Befunds. Live ist der Fall nicht erreichbar — die
+    // Profilzeile steht durch den Trigger, `activated_at` ist frisch `null` —,
+    // aber ein ungeprüftes UPDATE hiesse: das Mitglied sitzt still auf `basic`
+    // statt auf `impact`, und `tier` ist die einzige Stelle, die das entscheidet.
+    const { gestellt, client } = fakeClient(undefined, (sql) => (sql.includes('"tier"') ? 0 : 1));
+    const { hole } = fakeFetch("uid-neu");
+
+    const { fehler } = await schreibeDatensaetze(saetzeOhneKonto(1), { ...MITTEL, client, hole });
+
+    expect(fehler.get(1)).toContain("Stufe");
+    // Keine Transaktion: ein Datensatz auf einem Konto ohne die zugesagte Stufe
+    // wäre schlimmer als keiner, weil er als vollständig gilt.
+    expect(gestellt.map((g) => g.sql)).not.toContain("begin");
   });
 
   it("schreibt nichts zu einem übersprungenen Datensatz", async () => {

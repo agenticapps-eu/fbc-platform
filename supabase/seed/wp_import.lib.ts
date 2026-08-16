@@ -210,14 +210,27 @@ export type Pfadpruefung = { kind: "ok"; pfad: string } | { kind: "abbruch"; gru
  *
  * Verglichen wird über `relative`, nicht über `startsWith`: ein Nachbar namens
  * `fbc-platform-daten` liegt neben dem Arbeitsbaum, nicht darin.
+ *
+ * ── WARUM `echterPfad` EIN PFLICHTPARAMETER IST (Befund HIGH-2, codex, 16.08.)
+ * `resolve` und `relative` rechnen rein lexikalisch. Ist eine Vaterkomponente
+ * ein Symlink in den Arbeitsbaum, meldet die Prüfung „außerhalb", während
+ * Quelle, Bericht und Zwischenablage IM öffentlichen Repository liegen. Beide
+ * Seiten müssen deshalb kanonisch verglichen werden — auch der Arbeitsbaum
+ * selbst, der ebensogut hinter einem Symlink liegen kann.
+ *
+ * Kein Vorgabewert. Ein `echterPfad = (p) => p` als Default liesse jeden
+ * Aufrufer, der ihn vergisst, still in die alte Lücke zurückfallen — und diese
+ * Datei ist bewusst frei von I/O, kann `realpathSync` also nicht selbst
+ * mitbringen. Wer sie ruft, muss die Frage beantworten.
  */
 export function pruefeQuellPfad(input: {
   pfad: string;
   cwd: string;
   repoWurzel: string;
+  echterPfad: (pfad: string) => string;
 }): Pfadpruefung {
-  const aufgeloest = resolve(input.cwd, input.pfad);
-  const dazu = relative(input.repoWurzel, aufgeloest);
+  const aufgeloest = input.echterPfad(resolve(input.cwd, input.pfad));
+  const dazu = relative(input.echterPfad(input.repoWurzel), aufgeloest);
 
   // Der Arbeitsbaum selbst ergibt `""` und fällt unter dieselbe Bedingung — ein
   // eigener Zweig dafür wäre toter Code, was die Mutations-Gegenprobe am 14.08.

@@ -152,3 +152,105 @@ außer einem, plus alle vier von `gemini`. Im Einzelnen:
 zweiter Lauf füllt **nur leere Felder**; Verwaltungsfelder immer,
 Aktivierungszeitpunkt und Anmeldeadresse nie (Donald, 14.08.). Steht als eigene
 Anforderung in der Delta.
+
+---
+
+# Diff-Review (Aufgabe 8.4) — 16.08.2026
+
+Gegenstand ist der **ganze** Branch-Diff ab `c648a41` (40 Dateien, ~10.800
+Zeilen), nicht nur die Seed-Commits: der Review vom 15.08. deckte `fc972a7` und
+die Gruppen 1–5 nicht ab.
+
+**Zur Belastbarkeit der zweiten Stimme.** Gemini hat vier Anläufe gebraucht und
+dreimal **still** versagt — jedes Mal mit Exit-Code 0: `--approval-mode plan`
+existiert in dieser Installation nicht, und beide Läufe mit dem Diff auf `stdin`
+(507 kB bzw. 137 kB) lieferten überhaupt keine Ausgabe. Der erste Lauf mit
+Repo-Zugriff produzierte drei HIGH-Befunde über eine Datei
+`supabase/seed/wp_import.handler.ts`, **die es nicht gibt**. Unter Belegpflicht
+antwortete es mit einem nackten `APPROVE` ohne einen einzigen Befund. Erst
+datei-einzeln mit kurzem Auftrag kam Brauchbares. Eine Sonde nebenbei: Gemini
+liest die Dateien wirklich, gibt aber falsche Zeilennummern aus (324 statt 374
+für `stdoutZeile`). Das ist bei der Bewertung seiner Befunde eingerechnet.
+
+## Reviewer: codex (gpt-5.2-codex)
+
+VERDICT: REQUEST-CHANGES — 2 HIGH, 4 MEDIUM, 4 LOW. Codex hat seine Befunde
+teils selbst nachgefahren (`typecheck:seed`).
+
+- [HIGH] `wp_import.ts:465-497, 615-628` — **Ein verwaistes Konto sperrt seine
+  Adresse dauerhaft.** Gelingt der GoTrue-POST serverseitig, läuft aber
+  clientseitig in `AbortSignal.timeout(30_000)`, meldet `legeKontoAn` einen
+  Netzfehler; der Code `continue`t, es läuft **keine** Transaktion, also gibt es
+  keine `legacy_source_id`. Der Trigger hat die Profilzeile längst angelegt —
+  auf `basic`. Beim nächsten Lauf greift `wp_import.ts:465`
+  (`eigenerRest = tier === "impact" && activated_at === null`) nicht, `:497`
+  schiebt die Adresse nach `adressenOhneKennung`, und die Kollisionsregel
+  blockiert den Datensatz. **NACHGEPRÜFT und übernommen.** Und die
+  Eintrittswahrscheinlichkeit ist hier nicht theoretisch: beim Bilder-Schritt
+  hingen am 15.08. reproduzierbar vier von 110 Anfragen je 60 s in Kongs
+  „upstream server is timing out".
+  Zweiter Teil des Befunds: `await mittel.client.query(stufe.sql, stufe.werte)`
+  prüft nicht, ob das Tier-UPDATE eine Zeile getroffen hat. Live ist der Fall
+  nicht erreichbar (die Zeile existiert, `activated_at` ist frisch `null`), aber
+  die Prüfung kostet nichts und der Lauf geht gegen Produktivdaten.
+- [HIGH] `wp_import.lib.ts:219-234` — **Die Pfadprüfung ist rein lexikalisch.**
+  `resolve()` + `relative()` ohne `realpath`. Ist eine Vaterkomponente des
+  Quellpfads ein Symlink in den Arbeitsbaum, meldet die Prüfung „außerhalb",
+  während Bericht und Zwischenablage IM öffentlichen Repository landen.
+  **NACHGEPRÜFT und übernommen** — die Eintrittswahrscheinlichkeit ist gering,
+  der Schaden wäre der, den dieser Change als Ganzes verhindern soll, und die
+  Behebung ist ein `realpathSync`.
+- [MEDIUM] `wp_import.ts:772-788` — Der Bericht wird erst nach Kontoanlage,
+  Uploads und Datenbankänderungen geöffnet. Übernommen.
+- [MEDIUM] `wp_import.ts:657-660`, `wp_schreiben.ts:172-176`,
+  `admin-profile.ts:170-171` — Ein Folgelauf holt das Importbild zurück, wenn
+  `avatar_url` auf `null` steht. **Das ist die am 15.08. bewusst getroffene
+  Entscheidung** („Das Objekt beweist hochgeladen, nicht geschrieben"), der
+  stille Totalverlust war als der grössere Schaden bewertet. Abgelehnt als
+  Befund — aber Codex nennt mit `admin-profile.ts:170-171` einen Weg, den die
+  Entscheidung nicht vor sich hatte: das Admin-Werkzeug. Als offene Frage
+  vermerkt, nicht als Diff.
+- [MEDIUM] `wp_bilder.ts:192-211, 258-282, 316-319` — Downloads und WebP werden
+  unter ihrem Endnamen geschrieben; danach gilt blosse Existenz als Erfolg. Ein
+  Prozessabbruch hinterlässt eine halbe Datei, die als „vorhanden" gilt.
+  Übernommen.
+- [MEDIUM] `wp_bilder_holen.ts:60-65` — Der Bildabruf validiert die Kopfzeile
+  nicht. Ein umbenannter Export meldete erfolgreich „0 Bilder", und nach
+  Abschaltung der alten Seite ist nichts mehr nachholbar. Übernommen — der
+  zeitkritischste der vier.
+- [LOW] `probe-c10-bestandsabfrage.ts:24-46` — `uid` fehlt in `ERWARTET`.
+  Übernommen.
+- [LOW] `wp_bilder.test.ts:225-229` — `KANTE.cover` ist Eingabe und
+  Erwartungswert zugleich. Übernommen (Vakuum-Test).
+- [LOW] `probe-c10-gotrue-trigger.ts:65-83` — Sonde fährt den verworfenen
+  Upsert und endet auch bei falscher Stufe mit 0. Übernommen.
+- [LOW] `PublicProfilePage.tsx:347-358` — Überlaufmessung nur bei Textwechsel,
+  kein `ResizeObserver`; offener Zustand überlebt den Profilwechsel. Übernommen.
+
+## Reviewer: gemini (gemini-3-pro)
+
+VERDICT: REQUEST-CHANGES — **alle vier Befunde gegen den Quelltext geprüft,
+keiner hält.**
+
+- [HIGH] `wp_schreiben.ts` — „`offers`/`needs` doppeln beim zweiten Lauf, weil
+  `einfuegesatz` ein reines INSERT ist." **Abgelehnt.** Die Idempotenz sitzt beim
+  Aufrufer: `wp_import.lib.ts:870-875` gibt eine Liste nur bei `vorhanden === 0`
+  heraus, sonst landet sie in `uebersprungen`. Der Kommentar über
+  `einfuegesatz` sagt genau das.
+- [HIGH] `wp_import.ts` — „`konto.grund` wird nicht wie Datenbankfehler durch
+  `grundOhneWerte` bereinigt, die Adresse kann in den Bericht." **Abgelehnt.**
+  `wp_schreiben.ts:368-376` parst die Antwort in `{ id?, error_code? }` — der
+  Freitext der Admin-API wird nie gelesen. Und `stdoutZeile` rendert `grund`
+  ohnehin nicht.
+- [HIGH] `wp_bilder.ts` — „HEAD-Treffer überspringt den Upload, die URL wird nie
+  geschrieben, das Bild ist dauerhaft verloren." **Abgelehnt** — das war Befund
+  HIGH-1 vom 15.08. und ist behoben. Geminis eigener Beleg zeigt es:
+  `return { stand: "vorhanden", url: oeffentlich }`.
+- [MEDIUM] `wp_import.lib.ts` — „Vorabbefunde tragen die Adresse und landen in
+  Logs." **Abgelehnt.** Der Vorab-Abbruch setzt `konsole: []`
+  (`wp_import.ts:348`); Befunde gehen ausschliesslich in den Bericht, und der
+  liegt mit `0600` ausserhalb des Arbeitsbaums.
+
+Dazu zwei kosmetische (absoluter Pfad in einer Fehlermeldung, `uid` in einer
+Storage-Fehlermeldung) — abgelehnt: der Pfad muss handlungsfähig machen, und die
+`uid` ist ein UUID im ohnehin PII-tragenden Bericht.
