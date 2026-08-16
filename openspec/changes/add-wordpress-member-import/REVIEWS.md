@@ -121,26 +121,26 @@ außer einem, plus alle vier von `gemini`. Im Einzelnen:
 
 **Nicht übernommen, mit Begründung**
 
-- [HIGH, codex] *„Die Access-Control-Spec erwartet, dass das Anlegen den
-  Aktivierungsversand anstößt; ohne ihn bleiben die Mitglieder ausgesperrt."* —
+- [HIGH, codex] _„Die Access-Control-Spec erwartet, dass das Anlegen den
+  Aktivierungsversand anstößt; ohne ihn bleiben die Mitglieder ausgesperrt."_ —
   **Widersprochen.** Der Ablauf ist bewusst umgekehrt und in AGE-534 §0
   festgelegt: die Rundmail nennt keinen Link, das Mitglied gibt seine Adresse auf
   der Seite ein und löst den Versand selbst aus (`issue_activation_token`). Ein
   Versand aus dem Import heraus wäre schädlich — er verschickte 70 Links, bevor
   Detlevs Rundmail draußen ist, und entwertete sie beim nächsten Lauf wieder
   (`access-control`: „ein neuer Versand entwertet das ausstehende Token").
-  Der berechtigte Kern des Befunds — dass dies nirgends *stand* — ist übernommen:
+  Der berechtigte Kern des Befunds — dass dies nirgends _stand_ — ist übernommen:
   das Design sagt jetzt ausdrücklich, dass der Import **nicht** versendet.
 
-- [MEDIUM, codex] *Mailversand erst nach finaler Freigabe, Rollback-Ledger für
-  Storage* — Sinnvoll, aber außerhalb dieses Changes: der Import versendet nicht
+- [MEDIUM, codex] _Mailversand erst nach finaler Freigabe, Rollback-Ledger für
+  Storage_ — Sinnvoll, aber außerhalb dieses Changes: der Import versendet nicht
   (siehe oben), und der Go-Live-Ablauf mit Backup und Stichproben ist in AGE-534 §5
   beschrieben, nicht hier. Als Anmerkung im Design vermerkt.
 
 **Zurückgenommen nach Donalds Entscheidung (14.08.)**
 
-- [HIGH, codex] *„Schreibmodus ohne vollständige, validierte Lieferungen hart
-  blockieren."* — Zuerst übernommen (Punkt 8 oben in der ersten Fassung), dann
+- [HIGH, codex] _„Schreibmodus ohne vollständige, validierte Lieferungen hart
+  blockieren."_ — Zuerst übernommen (Punkt 8 oben in der ersten Fassung), dann
   von Donald gekippt: die Liste kommt, und die erste Zielumgebung ist DEV. Ein
   dort zu viel importiertes Ex-Mitglied lässt sich folgenlos entfernen; ein
   Riegel hielte die Arbeit an einer Lieferung auf, die unterwegs ist.

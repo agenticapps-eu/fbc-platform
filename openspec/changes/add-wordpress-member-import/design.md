@@ -1,6 +1,6 @@
 ## Context
 
-Die Quelle ist ein CSV-Export aus WordPress mit dem Plugin *Ultimate Member*,
+Die Quelle ist ein CSV-Export aus WordPress mit dem Plugin _Ultimate Member_,
 gezogen am 13.08.2026: **140 Spalten, 70 Datensätze**. Er liegt außerhalb des
 Arbeitsbaums unter `~/Documents/Claude/Projects/Fair Business Club/` und trägt
 Klarnamen, Anschriften, Telefonnummern und `user_pass`-Hashes. Das Repository
@@ -10,12 +10,12 @@ Am 14.08.2026 gegen die echte Datei nachgemessen — die Zahlen im Issue stimmen
 in **26 von 26** Feldzählungen. Die Abbildung ist damit belastbar. Vier
 Aussagen des Issues stimmen jedoch nicht, und dieses Design ersetzt sie:
 
-| Issue | Gemessen |
-|---|---|
+| Issue                                                  | Gemessen                                                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Parser für Datum, Ort, PHP-Array, Telefon „liegen vor" | ~~`parser.py` enthält nur `php_array` und `ort_parsen`~~ — **diese Zeile war falsch**, siehe unten |
-| „Datum: 52 von 52 über elf Schreibweisen" | 11 Rohformen, **9 normalisiert**; **16 der 52 ohne Tag**, 6 ohne Monat |
-| Bildendungen „`.jpg` und `.png`, beide probieren" | **Drei**: `jpg`, `png`, `jpeg` — je 7 Datensätze hingen an der fehlenden dritten |
-| Ex-Mitglieder „über UM-Status erkennbar? — prüfen" | **Nein.** 70× `approved`. Detlevs Liste ist zwingend |
+| „Datum: 52 von 52 über elf Schreibweisen"              | 11 Rohformen, **9 normalisiert**; **16 der 52 ohne Tag**, 6 ohne Monat                             |
+| Bildendungen „`.jpg` und `.png`, beide probieren"      | **Drei**: `jpg`, `png`, `jpeg` — je 7 Datensätze hingen an der fehlenden dritten                   |
+| Ex-Mitglieder „über UM-Status erkennbar? — prüfen"     | **Nein.** 70× `approved`. Detlevs Liste ist zwingend                                               |
 
 **Nachtrag vom 14.08., beim Übertragen der Parser aufgefallen und hier
 korrigiert:** Der Vorlauf hat `parser.py` gelesen (13.08., 15:17) und daraus
@@ -54,7 +54,9 @@ als `date`. Keine Migration nötig.
 
 **Non-Goals**
 
-- Der echte Lauf gegen PROD. Das ist eine Handlung am Go-Live-Tag
+- Der **Go-Live-Lauf** gegen PROD. Das bleibt eine Handlung am Go-Live-Tag.
+  Nicht mehr Non-Goal ist der **Probelauf** gegen PROD — siehe die Entscheidung
+  vom 16.08. weiter unten
 - **Jeder Mailversand.** Siehe die Entscheidung unten — der Import verschickt nichts
 - Rundmail-Text (AGE-513), Odoo (AGE-263), Stufen unterhalb `impact`
 - `WhatsApp` und Xing (`Homepage_18_21`) — am 13.08. verworfen
@@ -72,7 +74,7 @@ Importierte Konten entstehen **ohne Passwort**. Der Zugang läuft über den
 Aktivierungsweg, und das ist der Grund, warum der ursprüngliche Plan mit einem
 geteilten Passwort in einer Rundmail verworfen wurde (AGE-534 §0).
 
-*Aufgenommen nach dem Review (gemini, HIGH).* Es stand vorher nur implizit in
+_Aufgenommen nach dem Review (gemini, HIGH)._ Es stand vorher nur implizit in
 einer Aufgabe.
 
 ### Der Import verschickt keine Mail
@@ -87,8 +89,8 @@ entwertete sie wieder — `access-control` legt fest, dass ein neuer Versand das
 ausstehende Token entwertet. Ein Mitglied hielte dann eine echte Mail mit einem
 toten Link in der Hand.
 
-*Der Review (codex, HIGH) las hier eine Aussperrung. Widersprochen — der
-Selbstauslöseweg ist der Zugang. Übernommen ist, dass es dastehen muss.*
+_Der Review (codex, HIGH) las hier eine Aussperrung. Widersprochen — der
+Selbstauslöseweg ist der Zugang. Übernommen ist, dass es dastehen muss._
 
 ### Der Wächter prüft die Projektkennung, nicht den Host
 
@@ -123,7 +125,7 @@ gemeinsam atomar. Bricht der Lauf dazwischen ab, bleibt ein Konto ohne Kennung
 zurück. Die Wiedererkennung braucht deshalb **zwei** Schlüssel: `legacy_source_id`
 und, wo diese fehlt, die normalisierte Adresse.
 
-*Aufgenommen nach dem Review (codex, HIGH). Der Mechanismus war unbestimmt.*
+_Aufgenommen nach dem Review (codex, HIGH). Der Mechanismus war unbestimmt._
 
 ### Der Stufen-Riegel sitzt am Aufrufer, nicht in der Form der Anweisung
 
@@ -145,7 +147,7 @@ keiner Anweisung auf. Was der alte Riegel abwehren sollte — eine
 Selbstregistrierung unter einer bekannten Mitgliedsadresse erbt `impact` — fängt
 zusätzlich die Vorabprüfung 4.2 ab, die den ganzen Schreiblauf blockiert.
 
-*Verworfen:* ein `case`-Ausdruck im `do update set`, der nur `basic` ohne
+_Verworfen:_ ein `case`-Ausdruck im `do update set`, der nur `basic` ohne
 Freischaltung hebt. Er läge in genau dem Fall falsch, den 7.3 meint.
 
 **Zweite Korrektur, nach dem Code-Review (15.08.).** Die Fassung oben steuerte
@@ -178,7 +180,7 @@ Zwei verschiedene Tore, und nur eines ist hier ein Gate.
 
 Das Gate ist `profiles.activated_at` (AGE-495): es steht auf `null` und bleibt
 es. Der Weg hinein führt über den Link aus dem **eigenen** Postfach —
-`send-activation` verschickt ihn, `redeem-activation` nimmt Token *und* neues
+`send-activation` verschickt ihn, `redeem-activation` nimmt Token _und_ neues
 Passwort entgegen und stempelt erst dann `activated_at`.
 
 `auth.users.email_confirmed_at` ist dagegen GoTrues eigenes Flag und auf dieser
@@ -195,10 +197,10 @@ Ohne das Flag klickt ein Mitglied seinen Aktivierungslink, setzt sein Passwort
 und kommt trotzdem nicht hinein — sichtbar erst nach dem Go-Live, bei allen 70
 zugleich.
 
-*Aufgenommen auf Donalds Nachfrage am 15.08., ob der Import nicht unaktiviert
+_Aufgenommen auf Donalds Nachfrage am 15.08., ob der Import nicht unaktiviert
 lassen und über Bestätigung plus Passwort-Setzen laufen sollte. Genau das tut er;
 die Nachfrage hat die Begründung im Code von einer Annahme zu einer Messung
-gemacht.*
+gemacht._
 
 ### Der Bericht entsteht ZWEIMAL, aus derselben reinen Funktion (15.08.)
 
@@ -265,7 +267,7 @@ Ein Vorab-Abbruch erzeugt einen eigenen Berichtstyp, in dem keine
 Datensatzklassen vorkommen — die Klassensumme gilt nur für Läufe, die den
 schreibenden Abschnitt erreichen.
 
-*Aufgenommen nach dem Review (codex, HIGH ×2, MEDIUM).*
+_Aufgenommen nach dem Review (codex, HIGH ×2, MEDIUM)._
 
 ### Die fehlenden Lieferungen blockieren nichts (entschieden 14.08., Donald)
 
@@ -281,9 +283,9 @@ Arbeit an einer Lieferung auf, die unterwegs ist.
 Der Bericht bleibt die Gegenmaßnahme: er führt die betroffenen Mitglieder
 einzeln, damit sie sich nach der Lieferung gezielt abarbeiten lassen.
 
-*Der Befund war richtig für einen Lauf gegen PROD. Die Antwort darauf ist der
+_Der Befund war richtig für einen Lauf gegen PROD. Die Antwort darauf ist der
 Go-Live-Ablauf (AGE-534 §5, Trockenlauf mit Durchsprache vor dem echten Lauf),
-nicht ein Riegel im Script.*
+nicht ein Riegel im Script._
 
 ### Kollision mit Bestandskonten blockiert, statt zu erheben
 
@@ -307,8 +309,8 @@ Ausgenommen sind die Verwaltungsfelder `paid_until`, `legacy_tier`,
 Mitglied, und werden immer aktualisiert. `activated_at` und die Anmeldeadresse
 werden **nie** vom Import angefasst.
 
-*Verworfen:* „WordPress gewinnt immer" — einfach, macht aber jeden Lauf nach dem
-Go-Live zu einem stillen Datenverlust. *Verworfen:* ein Schalter, der die Regel
+_Verworfen:_ „WordPress gewinnt immer" — einfach, macht aber jeden Lauf nach dem
+Go-Live zu einem stillen Datenverlust. _Verworfen:_ ein Schalter, der die Regel
 am Go-Live-Tag umstellt — eine weitere Sache, die falsch stehen kann.
 
 #### Nachtrag 14.08.: die zwei Sätze widersprechen sich, unterschieden wird am Profil
@@ -343,8 +345,8 @@ eigenem Xing-Eintrag verlöre sonst entweder das Xing oder die anderen fünf.
 `videos` dagegen als Feld: Anhängen legte bei jedem Lauf dasselbe Video ein
 zweites Mal ab.
 
-*`paid_until` und `legacy_price` kommen in der Zusammenführung überhaupt nicht
-vor.* Die Quelle führt sie nicht, und auf `paid_until` heißt `null`
+_`paid_until` und `legacy_price` kommen in der Zusammenführung überhaupt nicht
+vor._ Die Quelle führt sie nicht, und auf `paid_until` heißt `null`
 ausdrücklich „unbekannt" — ein Lauf, der sie mitschriebe, nähme den
 Bestandsschutz weg.
 
@@ -353,14 +355,14 @@ Bestandsschutz weg.
 Fehlender Tag → 1. des Monats, fehlender Monat → 1. Januar; jeder aufgefüllte
 Datensatz erscheint mit **Rohangabe** im Bericht.
 
-*Korrektur nach dem Review (codex, MEDIUM):* Die erste Fassung behauptete, die
+_Korrektur nach dem Review (codex, MEDIUM):_ Die erste Fassung behauptete, die
 Rohangabe bleibe „über `legacy_tier` nachvollziehbar". Das ist falsch —
 `legacy_tier` trägt die alte Mitgliedsstufe. Der Bericht ist der einzige Ort, an
 dem die Rohangabe erhalten bleibt, und deshalb aufzubewahren.
 
-*Verworfen:* nur vollständige Daten übernehmen — verlöre ein Drittel, darunter
+_Verworfen:_ nur vollständige Daten übernehmen — verlöre ein Drittel, darunter
 gerade die 19 Altmitglieder, wegen derer `infos_16` dem Registrierungsdatum
-überhaupt vorgezogen wird. *Verworfen:* eine Spalte `member_since_precision` —
+überhaupt vorgezogen wird. _Verworfen:_ eine Spalte `member_since_precision` —
 kostete Migration, Grant und Golden-Snapshot für eine Anzeigefeinheit.
 
 ### Personendaten: Quelle draußen, Bericht draußen, `stdout` sauber
@@ -373,7 +375,7 @@ mit Rechten `0600`.
 Adressen und Telefonnummern erscheinen **nur** im Bericht — sonst landen sie in
 Shell-History und CI-Logs.
 
-*Verschärft nach dem Review (gemini LOW, codex MEDIUM).* Die erste Fassung
+_Verschärft nach dem Review (gemini LOW, codex MEDIUM)._ Die erste Fassung
 verließ sich darauf, dass der Bericht ignoriert wird; „ignoriert" ist aber nicht
 „abwesend", und `git status` belegt keine Dateirechte.
 
@@ -420,10 +422,10 @@ war die Empfehlung des Issues und hätte bei `jpeg` 14 Bilder gekostet.
 NICHT 1000 px.** Diese Fassung stand hier als feste Zahl und stimmt für keine der
 beiden Bildarten:
 
-| | kleinste | häufigste | größte |
-|---|---|---|---|
-| Profilbild (57) | **1 px** | 1000 px (24×) | 1000 px |
-| Headerbild (53) | 762 px | 1000 px (42×) | **4032 px** |
+|                 | kleinste | häufigste     | größte      |
+| --------------- | -------- | ------------- | ----------- |
+| Profilbild (57) | **1 px** | 1000 px (24×) | 1000 px     |
+| Headerbild (53) | 762 px   | 1000 px (42×) | **4032 px** |
 
 Daraus folgt für 6.3 zweierlei. **Es wird nur verkleinert, nie vergrößert** — ein
 Profilbild mit 195 px auf 512 px hochzurechnen, erfände Bildinformation, die es
@@ -460,10 +462,10 @@ zweite Lauf ein ZWEITES Objekt an und überschriebe die URL — das Gegenteil vo
 
 Daraus folgt der ganze Rest ohne weitere Zustandshaltung:
 
-| Lage | Was geschieht |
-|---|---|
-| Erster Lauf | Objekt entsteht (200), `avatar_url` wird gesetzt |
-| Zweiter Lauf | Objekt besteht → `vorhanden`, **kein** Schreibvorgang |
+| Lage                                  | Was geschieht                                                         |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Erster Lauf                           | Objekt entsteht (200), `avatar_url` wird gesetzt                      |
+| Zweiter Lauf                          | Objekt besteht → `vorhanden`, **kein** Schreibvorgang                 |
 | Mitglied hat sein Bild selbst ersetzt | unser Objekt besteht weiter → `vorhanden`; seine URL bleibt unberührt |
 
 **Die Merge-Regel aus 3.7 wird dafür NICHT erweitert.** Sie hätte hier nichts zu
@@ -476,12 +478,12 @@ nachzuliefern, dessen Datensatz schon steht). `Bestand`, `BESTANDSABFRAGE` und
 
 **Gemessen am lokalen Stack (15.08.), vier Sonden — eine davon eine Falle:**
 
-| Sonde | Ergebnis |
-|---|---|
-| `service_role` → `avatars` | 200. Anders als auf den `public`-Tabellen hält er im Storage Rechte |
-| Zweiter Upload desselben Objekts | **HTTP 400**, im Rumpf `{"statusCode":"409","error":"Duplicate"}` |
-| `service_role` → `covers` (nur `image/webp`) | 200 |
-| Öffentliche URL | 200, 82 782 Bytes |
+| Sonde                                        | Ergebnis                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| `service_role` → `avatars`                   | 200. Anders als auf den `public`-Tabellen hält er im Storage Rechte |
+| Zweiter Upload desselben Objekts             | **HTTP 400**, im Rumpf `{"statusCode":"409","error":"Duplicate"}`   |
+| `service_role` → `covers` (nur `image/webp`) | 200                                                                 |
+| Öffentliche URL                              | 200, 82 782 Bytes                                                   |
 
 Die zweite Zeile ist die Falle, und sie kostet den ganzen Abschnitt: **der
 HTTP-Status ist 400, nicht 409.** Code, der auf `status === 409` prüft, hielte
@@ -502,13 +504,13 @@ dieselben vier Kennungen (362, 211, 334, 363).
 
 Der Weg zur Ursache, weil die naheliegenden Erklärungen alle falsch waren:
 
-| Vermutung | Messung | Urteil |
-|---|---|---|
-| Transient, ein weiterer Lauf klärt es | Läufe 3 und 4: **dieselben vier** | widerlegt |
-| Die Dateien sind zu gross | 211 ist 12 kB; grössere gehen durch | widerlegt |
-| Die Objekte sind kaputt | Zeilen in `storage.objects` formgleich | widerlegt |
-| Es liegt an den Bildern | einzeln angefragt: **5 ms**, `Duplicate` | widerlegt |
-| Es liegt an der **Abfolge** | nur die vier, ohne die 19 davor: alle sofort | **bestätigt** |
+| Vermutung                             | Messung                                      | Urteil        |
+| ------------------------------------- | -------------------------------------------- | ------------- |
+| Transient, ein weiterer Lauf klärt es | Läufe 3 und 4: **dieselben vier**            | widerlegt     |
+| Die Dateien sind zu gross             | 211 ist 12 kB; grössere gehen durch          | widerlegt     |
+| Die Objekte sind kaputt               | Zeilen in `storage.objects` formgleich       | widerlegt     |
+| Es liegt an den Bildern               | einzeln angefragt: **5 ms**, `Duplicate`     | widerlegt     |
+| Es liegt an der **Abfolge**           | nur die vier, ohne die 19 davor: alle sofort | **bestätigt** |
 
 Das Muster ist die Abweisung **vor** dem Auslesen des Rumpfes: der Dienst
 antwortet `400`, während der Client noch schreibt, und die Verbindung bleibt mit
@@ -525,11 +527,11 @@ Wahrheit.
 
 Gemessen, derselbe Lauf vorher und nachher:
 
-| | Läufe 2–4 | Lauf 5 (mit Vorab-Frage) |
-|---|---|---|
-| gemeldet vorhanden | 105 | **109** |
-| gemeldet fehlend | 5 (4 davon falsch) | **1** (der echte 1×1-px-Fall) |
-| Dauer | > 4 Minuten | **1 Sekunde** |
+|                    | Läufe 2–4          | Lauf 5 (mit Vorab-Frage)      |
+| ------------------ | ------------------ | ----------------------------- |
+| gemeldet vorhanden | 105                | **109**                       |
+| gemeldet fehlend   | 5 (4 davon falsch) | **1** (der echte 1×1-px-Fall) |
+| Dauer              | > 4 Minuten        | **1 Sekunde**                 |
 
 **Was daran über den Fehler hinausgeht:** ein Bericht, der ein Bild als fehlend
 führt, dessen Objekt liegt, schickt jemanden vier Bilder von Hand nachtragen, die
@@ -554,7 +556,7 @@ gescheiterter Datensatz, keine Zeile im Bericht.
 
 Der Denkfehler steckte im Merker selbst: **das Objekt beweist, dass hochgeladen
 wurde, nicht dass geschrieben wurde.** Und der auslösende Fall ist nicht exotisch
-— dieser Abschnitt *rechnet* mit gescheiterten Datensätzen (eigene Fehlerkarte,
+— dieser Abschnitt _rechnet_ mit gescheiterten Datensätzen (eigene Fehlerkarte,
 eigene Berichtstabelle), und die dokumentierte Reaktion darauf ist „nochmal
 laufen lassen".
 
@@ -605,36 +607,36 @@ und `user_pass` gleich mit.
 
 ### Die Abbildungsmatrix
 
-*Aufgenommen nach dem Review (codex, HIGH): sie stand nur im Linear-Issue.*
+_Aufgenommen nach dem Review (codex, HIGH): sie stand nur im Linear-Issue._
 Befüllung am 14.08. gegen die echte Datei gemessen.
 
-| Quelle | Befüllt | Ziel | Umformung |
-|---|---|---|---|
-| `first_name` + `last_name` | 70/70 | `profiles.name` | zusammensetzen |
-| `beruf` | 17/70 | `profiles.headline` | — |
-| `infos` | 45/70 | `profiles.short_bio` | HTML entfernen |
-| `infos_15` | 24/70 | `profiles.short_bio` | anhängen, HTML entfernen |
-| `infos_28` | 38/70 | `profile_interests` (`label`, `theme` = `null`) | HTML entfernen, **an Komma und Umbruch zerlegen** (s. Nachtrag 15.08.) |
-| `biete` | 47/70 | `offers` (`description`, `title` abgeleitet) | Fließtext |
-| `suche` | 46/70 | `needs` (`description`, `title` abgeleitet) | Fließtext |
-| `Strasse` | 38/70 | `profile_contacts.street` | — |
-| `ort` | 50/70 | `profile_contacts.postal_code` + `.city` | `ortParsen`, **ein Feld → zwei** |
-| `ort_27` | 34/70 | `profile_contacts.state` | — |
-| `ort_27_28` | 31/70 | `profiles.region` | Regionalgruppe, **nicht** der Wohnort |
-| — | — | `profile_contacts.country` | aus `ortParsen`, Vorgabe `DE` |
-| `infos_16` | 52/70 | `profiles.member_since` | `datumParsen` + Auffüllung |
-| `praesi_kurz`, `praesei_lang` | je 5/70 | `profiles.videos` **oder** `.short_bio` | pro Wert: parsebare URL → Video, sonst Text |
-| `linkedin`, `facebook`, `instagram`, `youtube`, `twitter` | 24/19/16/6/4 | `profiles.socials` | zusammenführen; **drei davon brauchen erst ein Formularfeld** |
-| `Homepage` | 38/70 | `profiles.website` | — |
-| `E-Mail` | 52/70 | `profile_contacts.email` | Kontaktadresse, **nicht** die Anmeldeadresse |
-| `Telefonnummer` | 52/70 | `profile_contacts.phone` | `telefonParsen` |
-| `user_email` | 70/70 | Anmeldeadresse | Schlüssel; trimmen + case-folden |
-| `source_user_id` | 70/70 | `profile_legacy.legacy_source_id` | Schlüssel der Wiedererkennung |
-| `Mitgliedschaft` | 4/70 | `profile_legacy.legacy_tier` | **roh**, nicht normalisiert |
-| *(Detlevs Liste)* | — | `profile_legacy.paid_until` | extern |
-| `WhatsApp`, `Homepage_18_21` | 49/7 | ❌ | verworfen 13.08. |
-| `user_pass` | 70/70 | ❌ | **nie gelesen** |
-| `Homepage_16…_26`, `aioseo_*`, `wp_*` | — | ❌ | tote Spalten |
+| Quelle                                                    | Befüllt      | Ziel                                            | Umformung                                                              |
+| --------------------------------------------------------- | ------------ | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `first_name` + `last_name`                                | 70/70        | `profiles.name`                                 | zusammensetzen                                                         |
+| `beruf`                                                   | 17/70        | `profiles.headline`                             | —                                                                      |
+| `infos`                                                   | 45/70        | `profiles.short_bio`                            | HTML entfernen                                                         |
+| `infos_15`                                                | 24/70        | `profiles.short_bio`                            | anhängen, HTML entfernen                                               |
+| `infos_28`                                                | 38/70        | `profile_interests` (`label`, `theme` = `null`) | HTML entfernen, **an Komma und Umbruch zerlegen** (s. Nachtrag 15.08.) |
+| `biete`                                                   | 47/70        | `offers` (`description`, `title` abgeleitet)    | Fließtext                                                              |
+| `suche`                                                   | 46/70        | `needs` (`description`, `title` abgeleitet)     | Fließtext                                                              |
+| `Strasse`                                                 | 38/70        | `profile_contacts.street`                       | —                                                                      |
+| `ort`                                                     | 50/70        | `profile_contacts.postal_code` + `.city`        | `ortParsen`, **ein Feld → zwei**                                       |
+| `ort_27`                                                  | 34/70        | `profile_contacts.state`                        | —                                                                      |
+| `ort_27_28`                                               | 31/70        | `profiles.region`                               | Regionalgruppe, **nicht** der Wohnort                                  |
+| —                                                         | —            | `profile_contacts.country`                      | aus `ortParsen`, Vorgabe `DE`                                          |
+| `infos_16`                                                | 52/70        | `profiles.member_since`                         | `datumParsen` + Auffüllung                                             |
+| `praesi_kurz`, `praesei_lang`                             | je 5/70      | `profiles.videos` **oder** `.short_bio`         | pro Wert: parsebare URL → Video, sonst Text                            |
+| `linkedin`, `facebook`, `instagram`, `youtube`, `twitter` | 24/19/16/6/4 | `profiles.socials`                              | zusammenführen; **drei davon brauchen erst ein Formularfeld**          |
+| `Homepage`                                                | 38/70        | `profiles.website`                              | —                                                                      |
+| `E-Mail`                                                  | 52/70        | `profile_contacts.email`                        | Kontaktadresse, **nicht** die Anmeldeadresse                           |
+| `Telefonnummer`                                           | 52/70        | `profile_contacts.phone`                        | `telefonParsen`                                                        |
+| `user_email`                                              | 70/70        | Anmeldeadresse                                  | Schlüssel; trimmen + case-folden                                       |
+| `source_user_id`                                          | 70/70        | `profile_legacy.legacy_source_id`               | Schlüssel der Wiedererkennung                                          |
+| `Mitgliedschaft`                                          | 4/70         | `profile_legacy.legacy_tier`                    | **roh**, nicht normalisiert                                            |
+| _(Detlevs Liste)_                                         | —            | `profile_legacy.paid_until`                     | extern                                                                 |
+| `WhatsApp`, `Homepage_18_21`                              | 49/7         | ❌                                              | verworfen 13.08.                                                       |
+| `user_pass`                                               | 70/70        | ❌                                              | **nie gelesen**                                                        |
+| `Homepage_16…_26`, `aioseo_*`, `wp_*`                     | —            | ❌                                              | tote Spalten                                                           |
 
 `branche` wird aus `infos` per Stichwortzuordnung abgeleitet (AGE-537); grob
 gefüllt ist besser als leer, jedes Mitglied kann es ändern.
@@ -747,7 +749,7 @@ Nachgelesen — es passt, aber nur unter drei Bedingungen, die beim Schreiben
   Abwählen einer Kategorie **nicht ohne Rückfrage** gelöscht werden. Ein
   versehentliches `'chip'` machte die Zeile dagegen kommentarlos löschbar und
   liefe zusätzlich in den Unique-Index `(profile_id, category) where source =
-  'chip'`.
+'chip'`.
 - **`theme` bleibt `null`.** Es gehört zum Facettenfilter des Kompass-Vokabulars;
   ein geratenes Thema stellte die Zeile in eine Facette, die das Mitglied nie
   gewählt hat.
@@ -809,6 +811,72 @@ neue Importdateien liefen ohne Typprüfung. Beides wird mit dem Change erledigt.
 Der CSV-Parser muss RFC 4180 beherrschen: die Freitextfelder tragen Kommas und
 Zeilenumbrüche.
 
+### Der Probelauf geht gegen PROD, nicht gegen DEV (entschieden 16.08., Donald)
+
+Aufgabe 8.2 lautete „Trockenlauf gegen DEV als Gegenprobe, ohne Schreibwirkung".
+Sie ist ersetzt durch einen **schreibenden Probelauf gegen PROD**.
+
+Der Grund ist, was die beiden Läufe jeweils belegen können. Ein Trockenlauf
+schreibt nichts und prüft damit genau die Hälfte nicht, an der es hier bisher
+gescheitert ist: `service_role` hält auf keiner `public`-Tabelle Rechte, die
+GoTrue-Admin-Schnittstelle steht in PROD unter ES256-Signaturschlüsseln, die
+Storage-Policies hängen an Default-Privileges, die je nach Anlagedatum der
+Instanz differieren, und der Trigger legt die Profilzeile vor dem Import an.
+Keiner dieser vier Fälle wird lokal oder im Trockenlauf sichtbar. Ein
+schreibender Lauf gegen PROD zeigt alle vier — und zwar an dem Tag, an dem sie
+folgenlos sind.
+
+Dazu kommt, was ein schreibender Lauf gegen **DEV** anrichten würde: DEV ist
+seit AGE-536 die Datenbank, die das ausgelieferte Frontend tatsächlich liest.
+Dort landeten die Klarnamen von 70 Menschen in genau der Umgebung, die Detlev
+mit Demodaten durchklickt, vermischt mit dem Demo-Seed.
+
+**Was die Entscheidung billig macht, ist die Wegwerf-Erlaubnis.** PROD darf vor
+dem Go-Live geleert und neu importiert werden. Damit ist der Probelauf keine
+Vorwegnahme des Go-Live, sondern eine Messung mit Rückweg — und der Preis dafür,
+dass PROD ab jetzt gefüllte Tabellen hat, ist bewusst gezahlt: die restlichen
+Migrationen laufen dann gegen echte Daten statt gegen eine leere Datenbank,
+womit sie genau das prüfen, wofür `migrate-dev` gebaut wurde.
+
+### Kein Datenbank-Umschalter in der ausgelieferten App (entschieden 16.08., Donald)
+
+Erwogen und verworfen: ein Umschalter beim Login, der die App zwischen DEV und
+PROD wechseln lässt, damit beide Datenbestände in derselben Oberfläche
+vergleichbar sind.
+
+**Am Aufwand lag es nicht.** `src/lib/supabase.ts` baut einen Singleton auf
+Modulebene, acht Dateien importieren ihn; zwei zusätzliche `VITE_`-Variablen,
+ein Wert im `localStorage` und ein `location.reload()` hätten gereicht. Die
+Sitzungen kollidierten nicht einmal — supabase-js bildet den Storage-Key ohnehin
+pro Projekt-Ref.
+
+Verworfen wurde er wegen dreier Eigenschaften, die einzeln harmlos sind und
+zusammen einen Weg ergeben: die Selbstregistrierung ist offen, die
+E-Mail-Bestätigung ist bewusst aus, und **jedes** eingeloggte Konto sieht das
+vollständige Mitgliederverzeichnis (der nach C3 verschobene Befund). Solange
+PROD leer ist, ist das folgenlos. Mit 70 echten Datensätzen darin und einem
+öffentlich erreichbaren Schalter darauf braucht ein Fremder drei Schritte:
+umschalten, mit beliebiger Adresse registrieren, Verzeichnis lesen. Der
+Aktivierungs-Riegel hält ihn nicht auf — der gilt für die importierten Konten,
+nicht für sein neues.
+
+Zweiter Grund: Edge Functions und ihre Secrets hängen am Projekt. CI deployt nur
+**geänderte** Functions, PROD hat also einen unvollständigen Stand; und von 15
+Function-Secrets sind erst 3 getrennt — Resend und Stripe sind byte-identisch.
+Ein Klick in der umgeschalteten Ansicht verschickte echte Mail.
+
+**Stattdessen ein zweites, unverlinktes Pages-Deployment** gegen die
+Infisical-Umgebung `prod`. Es leistet dasselbe, steht aber nicht im Produkt und
+verschwindet, indem man das Deployment löscht. Das ist der ausschlaggebende
+Unterschied: temporärer Code überlebt hier seine Frist — der
+Design-Varianten-Umschalter aus AGE-237 war für zwei Wochen gedacht und ist
+sieben Wochen später noch drin (AGE-440).
+
+Eine unverlinkte URL ist trotzdem keine Zugangskontrolle. Deshalb gehört zur
+Probe, die **E-Mail-Bestätigung in PROD für ihre Dauer anzuschalten**: sie
+kostet nichts, weil sich dort niemand legitim registriert, und schliesst den
+Weg über die Selbstregistrierung.
+
 ## Risks / Trade-offs
 
 **Die alte Seite fällt vor dem Go-Live ab** → Die Bilder liegen nur dort.
@@ -847,13 +915,18 @@ wird; für den Go-Live-Tag gehört es in den Ablauf aus AGE-534 §5, nicht hierh
 3. Trockenlauf gegen den lokalen Stack — Bericht mit Detlev-tauglicher Liste
 4. Schreibender Lauf lokal, **zweimal**; Zeilenzahl belegt die Wiederholbarkeit,
    und ein absichtlich geänderter Wert belegt die Merge-Regel
-5. Trockenlauf gegen DEV als Gegenprobe, ohne Schreibwirkung
-6. *(nicht in diesem Change)* Go-Live-Tag: Backup, Testkonten weg (AGE-522),
+5. **Probelauf gegen PROD** — schreibend, mit Wegwerf-Erlaubnis: PROD darf vor
+   dem Go-Live geleert und neu importiert werden (Donald, 16.08.). Dazu ein
+   zweites, unverlinktes Deployment, damit Detlev und Donald das Ergebnis in der
+   echten Oberfläche sehen
+6. _(nicht in diesem Change)_ Go-Live-Tag: Backup, Testkonten weg (AGE-522),
    Trockenlauf gegen PROD, Durchsprache, echter Lauf, fünf Stichproben, drei
    echte Aktivierungen, dann erst die Rundmail
 
-Rücknahme: bis Schritt 5 lokal und folgenlos. Ab Schritt 6 gilt das Backup aus
-Schritt 1 des Go-Live-Ablaufs.
+Rücknahme: bis Schritt 4 lokal und folgenlos. Schritt 5 ist rücknehmbar, weil
+die Daten dort ausdrücklich Wegwerfdaten sind — die Rücknahme ist das Leeren,
+nicht ein Backup. Ab Schritt 6 gilt das Backup aus Schritt 1 des
+Go-Live-Ablaufs.
 
 ## Open Questions
 

@@ -5,7 +5,7 @@ Linear-Issue: AGE-534
 ## Why
 
 Der Club hat 70 Bestandsmitglieder in einer WordPress-Installation mit dem
-Plugin *Ultimate Member*. Ohne sie ist die neue Plattform am Go-Live-Tag ein
+Plugin _Ultimate Member_. Ohne sie ist die neue Plattform am Go-Live-Tag ein
 leeres Verzeichnis, und der Nutzen der gebauten Funktionen — Suche, Matching,
 Kontaktanfragen, Feed — entsteht erst mit Mitgliedern darin. C10 ist der letzte
 Change vor dem Go-Live Ende August.
@@ -63,7 +63,7 @@ Go-Live-Tag, kein Diff — und er setzt Angaben voraus, die noch fehlen.
 
 ### Modified Capabilities
 
-Keine. Was importierte Profile *sind*, steht bereits in `member-profiles`
+Keine. Was importierte Profile _sind_, steht bereits in `member-profiles`
 („Ein importiertes Profil startet unbestätigt") und in `membership-tiers`; die
 Stufe `impact` für Bestandsmitglieder ist dort schon entschieden. Dieser Change
 beschreibt, wie sie **entstehen**, und wiederholt die Aussagen nicht.
@@ -71,12 +71,14 @@ beschreibt, wie sie **entstehen**, und wiederholt die Aussagen nicht.
 ## Impact
 
 **Neu**
+
 - `supabase/seed/wp_import.ts` — das Script
 - `supabase/seed/wp_felder.ts` (+ Test) — die Parser, ohne Datenbank testbar
 - `supabase/seed/wp_import.lib.ts` (+ Test) — Abbildung, Vorabprüfung,
   Merge-Regeln, Berichtsaufbau
 
 **Berührt**
+
 - `package.json` — die Skripte, plus `sharp` und ein RFC-4180-fähiger
   CSV-Parser; beide liegen heute nicht im Projekt
 - `supabase/seed/tsconfig.json` — führt heute eine feste `include`-Liste mit drei

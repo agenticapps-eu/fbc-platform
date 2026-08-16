@@ -55,29 +55,84 @@ const pruefe = (name: string, quellFeld: string, ist: number) => {
 
 console.log(`Datensätze: ${zeilen.length}\n`);
 console.log("Ein befülltes Quellfeld muss genau ein befülltes Ziel ergeben:");
-pruefe("beruf → headline", "beruf", zaehle((s) => s.profil.headline));
-pruefe("ort_27_28 → region", "ort_27_28", zaehle((s) => s.profil.region));
-pruefe("Homepage → website", "Homepage", zaehle((s) => s.profil.website));
-pruefe("Strasse → street", "Strasse", zaehle((s) => s.kontakt.street));
-pruefe("ort_27 → state", "ort_27", zaehle((s) => s.kontakt.state));
-pruefe("E-Mail → kontakt.email", "E-Mail", zaehle((s) => s.kontakt.email));
-pruefe("Telefonnummer → phone", "Telefonnummer", zaehle((s) => s.kontakt.phone));
-pruefe("Mitgliedschaft → legacy_tier", "Mitgliedschaft", zaehle((s) => s.legacy.legacy_tier));
-pruefe("source_user_id → legacy", "source_user_id", zaehle((s) => s.legacy.legacy_source_id));
-pruefe("user_email → Anmeldung", "user_email", zaehle((s) => s.anmeldeadresse));
-pruefe("biete → offers", "biete", zaehle((s) => s.offers));
-pruefe("suche → needs", "suche", zaehle((s) => s.needs));
-pruefe("infos_28 → interessen", "infos_28", zaehle((s) => s.interessen));
+pruefe(
+  "beruf → headline",
+  "beruf",
+  zaehle((s) => s.profil.headline),
+);
+pruefe(
+  "ort_27_28 → region",
+  "ort_27_28",
+  zaehle((s) => s.profil.region),
+);
+pruefe(
+  "Homepage → website",
+  "Homepage",
+  zaehle((s) => s.profil.website),
+);
+pruefe(
+  "Strasse → street",
+  "Strasse",
+  zaehle((s) => s.kontakt.street),
+);
+pruefe(
+  "ort_27 → state",
+  "ort_27",
+  zaehle((s) => s.kontakt.state),
+);
+pruefe(
+  "E-Mail → kontakt.email",
+  "E-Mail",
+  zaehle((s) => s.kontakt.email),
+);
+pruefe(
+  "Telefonnummer → phone",
+  "Telefonnummer",
+  zaehle((s) => s.kontakt.phone),
+);
+pruefe(
+  "Mitgliedschaft → legacy_tier",
+  "Mitgliedschaft",
+  zaehle((s) => s.legacy.legacy_tier),
+);
+pruefe(
+  "source_user_id → legacy",
+  "source_user_id",
+  zaehle((s) => s.legacy.legacy_source_id),
+);
+pruefe(
+  "user_email → Anmeldung",
+  "user_email",
+  zaehle((s) => s.anmeldeadresse),
+);
+pruefe(
+  "biete → offers",
+  "biete",
+  zaehle((s) => s.offers),
+);
+pruefe(
+  "suche → needs",
+  "suche",
+  zaehle((s) => s.needs),
+);
+pruefe(
+  "infos_28 → interessen",
+  "infos_28",
+  zaehle((s) => s.interessen),
+);
 
 console.log("\nZusammengesetzte Ziele (mehrere Quellen, deshalb kein 1:1):");
 const bioQuellen = zeilen.filter(
   (z, i) =>
     htmlEntfernen(z["infos"] ?? "").trim() !== "" ||
     htmlEntfernen(z["infos_15"] ?? "").trim() !== "" ||
-    saetze[i].profil.videos.length < [z["praesi_kurz"], z["praesei_lang"]].filter((v) => (v ?? "").trim() !== "").length,
+    saetze[i].profil.videos.length <
+      [z["praesi_kurz"], z["praesei_lang"]].filter((v) => (v ?? "").trim() !== "").length,
 ).length;
 const bioZiel = zaehle((s) => s.profil.short_bio);
-console.log(`  ${bioQuellen === bioZiel ? "ok  " : "FEHL"}  short_bio aus infos/infos_15/praesi   Quelle ${bioQuellen} → Ziel ${bioZiel}`);
+console.log(
+  `  ${bioQuellen === bioZiel ? "ok  " : "FEHL"}  short_bio aus infos/infos_15/praesi   Quelle ${bioQuellen} → Ziel ${bioZiel}`,
+);
 if (bioQuellen !== bioZiel) fehler.push(`short_bio: Quelle ${bioQuellen}, Ziel ${bioZiel}`);
 
 for (const netz of ["linkedin", "facebook", "instagram", "youtube", "twitter"]) {
@@ -85,8 +140,7 @@ for (const netz of ["linkedin", "facebook", "instagram", "youtube", "twitter"]) 
   pruefe(`${netz} → socials.${netz}`, netz, ist);
 }
 
-const praesiGesamt =
-  befuellt("praesi_kurz") + befuellt("praesei_lang");
+const praesiGesamt = befuellt("praesi_kurz") + befuellt("praesei_lang");
 const videos = saetze.reduce((n, s) => n + s.profil.videos.length, 0);
 const praesiImText = praesiGesamt - videos;
 console.log(
@@ -129,7 +183,9 @@ if (verfaelscht > 0) fehler.push(`${verfaelscht} Kontaktadressen verändert`);
 const ohneTitel = saetze.filter((s) =>
   [...s.offers, ...s.needs].some((e) => e.title.trim() === ""),
 ).length;
-console.log(`  ${ohneTitel === 0 ? "ok  " : "FEHL"}  offers/needs ohne Titel: ${ohneTitel} (die Spalte ist not null)`);
+console.log(
+  `  ${ohneTitel === 0 ? "ok  " : "FEHL"}  offers/needs ohne Titel: ${ohneTitel} (die Spalte ist not null)`,
+);
 if (ohneTitel > 0) fehler.push(`${ohneTitel} offers/needs-Zeilen ohne Titel`);
 
 // Der Passwort-Hash darf im Ergebnis nirgends auftauchen — auch nicht als Teil
