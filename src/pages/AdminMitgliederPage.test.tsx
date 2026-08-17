@@ -142,6 +142,31 @@ describe("Filter, Suche und Blätterung gehen an die Datenbank (5.7)", () => {
     await waitFor(() => expect(lastListArgs().p_query).toBe("bodo"));
   });
 
+  /**
+   * Diff-Review (AGE-566): das Feld schrieb direkt in den Query-Key, also war
+   * jeder Tastendruck eine RPC — und diese verbindet `profiles` mit
+   * `auth.users` und zählt zu jedem Treffer Angebote und Bedarfe. Der Nachbar
+   * `MemberDirectory.tsx` entprellt seit jeher mit 300 ms und schreibt den
+   * Grund dazu; diese Fläche tat es nicht.
+   *
+   * Geprüft wird die ZAHL der Abfragen, nicht das Vorhandensein eines Timers:
+   * ein Test auf „es gibt einen setTimeout" bestünde auch mit 0 ms.
+   */
+  it("löst nicht bei jedem Tastendruck eine Abfrage aus", async () => {
+    renderPage();
+    await screen.findByText("Bodo Unbestaetigt");
+    const vorher = listCalls();
+
+    const feld = screen.getByLabelText(/Suche/i);
+    fireEvent.change(feld, { target: { value: "b" } });
+    fireEvent.change(feld, { target: { value: "bo" } });
+    fireEvent.change(feld, { target: { value: "bod" } });
+
+    await waitFor(() => expect(lastListArgs().p_query).toBe("bod"));
+    // Drei Tastendrücke, EINE Abfrage — und zwar mit dem letzten Stand.
+    expect(listCalls() - vorher).toBe(1);
+  });
+
   it("zeigt auf Seite 2 andere Mitglieder als auf Seite 1", async () => {
     // Eine volle Seite plus eine Zusatzzeile — sonst gibt es keine Folgeseite,
     // und der Weiter-Knopf wäre zu Recht nicht da.
@@ -159,6 +184,45 @@ describe("Filter, Suche und Blätterung gehen an die Datenbank (5.7)", () => {
     expect(screen.queryByText("Erste 0")).toBeNull();
     // Das Blättern passiert in der Datenbank, nicht im Browser.
     await waitFor(() => expect(lastListArgs().p_offset).toBe(25));
+  });
+});
+
+/**
+ * Diff-Review (AGE-566): Die Blätterung rendert nur NEBEN Treffern. Wird auf
+ * der letzten Seite die letzte Zeile aktiviert — im Filter „Nicht aktiviert"
+ * der Normalfall —, lädt die Liste neu, hat null Treffer, und mit ihnen
+ * verschwindet der „Zurück"-Knopf. Der Admin sitzt dann auf einer leeren Seite
+ * fest und liest „Zu diesem Filter gibt es keine Treffer", obwohl es welche
+ * gibt: eine Seite weiter vorn.
+ */
+describe("Eine leer gewordene Folgeseite ist keine Sackgasse", () => {
+  it("bietet einen Weg zurück und holt damit wieder Treffer", async () => {
+    const seite1 = Array.from({ length: 26 }, (_, i) => member({ name: `Erste ${i}` }));
+    rpc.mockResolvedValueOnce({ data: seite1, error: null });
+    rpc.mockResolvedValueOnce({ data: [], error: null });
+
+    renderPage();
+    await screen.findByText("Erste 0");
+    fireEvent.click(screen.getByRole("button", { name: /Weiter/i }));
+
+    await screen.findByText(/Keine Mitglieder gefunden/i);
+    // Der Text der ersten Seite wäre hier falsch: es liegt nicht am Filter.
+    expect(screen.getByText(/kleiner geworden/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /ersten Seite/i }));
+
+    await waitFor(() => expect(lastListArgs().p_offset).toBe(0));
+    await screen.findByText("Erste 0");
+  });
+
+  it("bietet ihn auf der ERSTEN Seite nicht an", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    renderPage();
+
+    await screen.findByText(/Keine Mitglieder gefunden/i);
+    // Sonst stünde auf Seite 1 ein Knopf, der auf Seite 1 führt.
+    expect(screen.queryByRole("button", { name: /ersten Seite/i })).toBeNull();
+    expect(screen.getByText(/keine Treffer/i)).toBeInTheDocument();
   });
 });
 

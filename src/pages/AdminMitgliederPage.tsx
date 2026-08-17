@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MemberCard } from "../components/community/MemberDirectory";
 import { Badge } from "../components/ui/Badge";
@@ -57,9 +57,27 @@ export default function AdminMitgliederPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  /** Was im Feld steht. Der Abfrage liegt `query` zugrunde — entprellt, siehe unten. */
+  const [eingabe, setEingabe] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<AdminMemberStatus>("alle");
   const [seite, setSeite] = useState(0);
+
+  // 300 ms Entprellung, dieselbe Zahl und derselbe Grund wie im Verzeichnis
+  // (MemberDirectory.tsx): sonst löst JEDER Tastendruck eine RPC aus, und die
+  // hier verbindet `profiles` mit `auth.users` und zählt zu jedem Treffer
+  // Angebote und Bedarfe. Die Selects greifen weiterhin sofort — dort gibt es
+  // kein Tippen, das man abwarten könnte.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (eingabe === query) return;
+      setQuery(eingabe);
+      // Ein neuer Suchbegriff fängt wieder auf Seite 1 an — Seite 4 einer
+      // anderen Treffermenge ist keine sinnvolle Fortsetzung.
+      setSeite(0);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [eingabe, query]);
   const [sicht, setSicht] = useState<Sicht>("Tabelle");
   /** Das Mitglied, für das die Rückfrage offen ist — nicht ein blosses `true`:
    *  der Dialog muss es NAMENTLICH nennen. */
@@ -126,12 +144,9 @@ export default function AdminMitgliederPage() {
           {({ id }) => (
             <Input
               id={id}
-              value={query}
+              value={eingabe}
               placeholder="Name oder Anmeldeadresse"
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSeite(0);
-              }}
+              onChange={(e) => setEingabe(e.target.value)}
             />
           )}
         </Field>
@@ -179,8 +194,26 @@ export default function AdminMitgliederPage() {
         <Card className="p-5">
           <CardTitle>Keine Mitglieder gefunden</CardTitle>
           <p className="mt-1 text-sm text-muted">
-            Zu diesem Filter gibt es keine Treffer. Ohne Filter zeigt die Liste alle Konten.
+            {seite === 0
+              ? "Zu diesem Filter gibt es keine Treffer. Ohne Filter zeigt die Liste alle Konten."
+              : "Diese Seite ist leer — die Treffermenge ist kleiner geworden, seit sie geöffnet wurde."}
           </p>
+          {/* Die Blätterung unten rendert nur NEBEN Treffern. Ohne diesen Ausweg
+              säße der Admin auf einer leeren Seite fest: aktiviert er im Filter
+              „Nicht aktiviert" die letzte Zeile der letzten Seite, lädt die
+              Liste neu, hat null Treffer — und mit ihnen verschwindet der
+              „Zurück"-Knopf. Gefunden im Diff-Review (AGE-566). */}
+          {seite > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-4"
+              onClick={() => setSeite(0)}
+            >
+              Zur ersten Seite
+            </Button>
+          )}
         </Card>
       )}
 

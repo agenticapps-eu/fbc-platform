@@ -15,6 +15,15 @@ export interface SidebarNavSection {
   items: SidebarNavItem[];
 }
 
+/**
+ * Trägt ein anderer Eintrag desselben Abschnitts diesen Pfad als Anfang?
+ * `/admin` gegenüber `/admin/mitglieder`: ja. Der Schrägstrich im Vergleich ist
+ * nicht schmückend — ohne ihn wäre `/admin` auch der Anfang von `/administration`.
+ */
+function istPraefixEinesAnderen(pfad: string, items: SidebarNavItem[]): boolean {
+  return items.some((anderer) => anderer.path.startsWith(`${pfad}/`));
+}
+
 export interface SidebarNavProps {
   sections: SidebarNavSection[];
   /** Wird bei Klick auf einen Eintrag aufgerufen (z. B. Off-Canvas-Drawer schließen). */
@@ -54,7 +63,17 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               key={item.path}
               to={item.path}
               // `/` (Start) nur bei exaktem Match aktiv, sonst leuchtet es auf jeder Route.
-              end={item.path === "/"}
+              // Und ebenso jeder Eintrag, dessen Pfad der ANFANG eines anderen
+              // Eintrags ist: `NavLink` matcht ohne `end` als Präfix, also
+              // leuchteten auf `/admin/mitglieder` „Administration" UND
+              // „Mitglieder" (AGE-566, Diff-Review).
+              //
+              // ABGELEITET statt als Prop am Eintrag: eine Flagge, die der
+              // Aufrufer setzen muss, ist eine Flagge, die er beim nächsten
+              // Unterpfad vergisst — und dann leuchtet wieder alles, ohne dass
+              // ein Test darauf zeigt. Der Abschnitt kennt seine Einträge; er
+              // kann die Frage selbst beantworten.
+              end={item.path === "/" || istPraefixEinesAnderen(item.path, section.items)}
               onClick={onNavigate}
               // Eingeklappt ist das Icon die einzige Beschriftung — der Name muss
               // dann über title (Maus) und aria-label (Screenreader) kommen.
