@@ -124,6 +124,7 @@ export interface FeedComment {
  */
 export {
   extractFirstVideo,
+  ohneSchlussHashtags,
   parseVideoUrl,
   tokenizePostBody,
   type PostSegment,

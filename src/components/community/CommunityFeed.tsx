@@ -44,6 +44,7 @@ import {
   fetchFeed,
   parseVideoUrl,
   toggleLike,
+  ohneSchlussHashtags,
   tokenizePostBody,
   VISIBILITY_OPTIONS,
   type FeedCursor,
@@ -501,7 +502,7 @@ function PostComposer({ authorId }: { authorId: string }) {
             <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               multiple
               aria-label="Bilder auswählen"
               className="sr-only"
@@ -639,7 +640,10 @@ function PostCard({
   onBildFehler: (pfad: string) => void;
   kuratierteTags: Tag[];
 }) {
-  const segments = useMemo(() => tokenizePostBody(post.body), [post.body]);
+  // Ohne den abschliessenden Hashtag-Block: der steht als Chip unter dem
+  // Beitrag, und beides zusammen zeigte dasselbe Wort zweimal (AGE-566).
+  // Hashtags im Satzinneren bleiben — siehe `ohneSchlussHashtags`.
+  const segments = useMemo(() => ohneSchlussHashtags(tokenizePostBody(post.body)), [post.body]);
   // Seit AGE-533 aus der Spalte, nicht aus einem erneuten Parsen des Bodys:
   // die Academy filtert über `posts.video_url`, und zwei Quellen fürs Rendern
   // könnten auseinanderlaufen. Die Spalte trägt denselben rohen Token, den der
