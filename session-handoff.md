@@ -1,117 +1,94 @@
-# Session Handoff — 2026-08-17 (zweite Sitzung des Tages)
+# Session Handoff — 2026-08-17 (dritte Sitzung des Tages)
 
-**AGE-566 ist gebaut und am echten Bestand belegt.** Von 43 Aufgaben sind 39 zu;
-offen sind nur noch 6.4 (Diff-Review) und Gruppe 7 (Abschluss).
+**Aufgabe 6.4 ist erledigt: der Diff-Review lief, sechs Befunde sind behoben.**
+Von 43 Aufgaben ist nur noch Gruppe 7 offen (Abschluss).
 
-Branch `donald/age-566-admin-mitgliederliste`, fünf neue Commits, Arbeitsbaum
-sauber, **noch nicht gepusht**. `openspec validate --all` 29/29.
+Branch `donald/age-566-admin-mitgliederliste`, jetzt **acht** Commits,
+Arbeitsbaum sauber, **noch nicht gepusht**. `openspec validate --all` 29/29.
 
 ## Next session: start here
 
-**6.4, der Diff-Review** — ein Prüfer eines anderen Herstellers über den Diff,
-`REVIEWER_TIMEOUT=900` **von vornherein** (mit den voreingestellten 300 s endet
-codex hier regelmässig als Ausgang 4 und zählt dann nicht). Befunde beheben oder
-begründet ablehnen.
+**Gruppe 7.** Aber zuerst eine Sache, die nur Donald tun kann: es gibt eine
+**zweite Migration** (`20260817140000_admin_member_list_fixes.sql`), und
+20260817120000 liegt bereits auf DEV und PROD. Die neue muss auf beide
+Umgebungen — PROD von Hand im Terminal, `db:push:prod` verlangt ein TTY. Ohne
+das läuft die korrigierte Fassung nirgends ausser lokal.
 
-Danach Gruppe 7: `openspec archive` **vor** `add-admin-console` (die Reihenfolge
-steht jetzt in beiden Changes, umgekehrt kollidieren die Delta-Operationen),
-dann Branch pushen, PR, Linear.
-
-6.3 ist erledigt und belegt — siehe unten.
+Danach: `openspec archive` **vor** `add-admin-console` (die Reihenfolge steht in
+beiden Changes, umgekehrt kollidieren die Delta-Operationen), Branch pushen, PR,
+Linear.
 
 ## Accomplished
 
-**Aufgabe 1 — Doppelspurigkeit aufgelöst.** Die Mitgliederlisten-Anforderung ist
-aus `add-admin-console` heraus (sie verbot ausdrücklich die Login-Adresse, die
-AGE-566 braucht); das `REMOVED` auf „Admin member management is not
-implemented" **bleibt dort stehen**, und die Archivierungsreihenfolge ist in
-`proposal.md`, `tasks.md` und im Delta festgeschrieben.
+**Zwei fremde Prüfer über den Diff**, beide Ausgang 0, `REVIEWER_TIMEOUT=900`.
+gemini: **APPROVE ohne Befund**. codex: **REQUEST-CHANGES mit vier**. Alle vier
+nachgeprüft, alle vier zutreffend. Dazu zwei Befunde aus der eigenen
+Durchsicht. **Alle sechs übernommen, keiner abgelehnt** — Belege in
+`openspec/changes/add-admin-member-list/REVIEWS.md`.
 
-**Aufgaben 2–4 — zwei Funktionen, 42 pgTAP-Assertions**, rot vor grün.
-`admin_list_members` (vier Vorgabewerte, `p_status` mit 22023 bei Unbekanntem,
-Suche über Name **und** Anmeldeadresse, Blättern, Sortierung unbestätigte →
-`name` → `id`) und `admin_activate_member` (Spur in **derselben** Transaktion,
-22023 beim zweiten Aufruf).
-
-**Aufgabe 5 — die Fläche** unter `/admin/mitglieder`, drei Sichten, Sidebar-
-Eintrag, Paging, beide Handlungen, namentliche Rückfrage. `MemberCard` ist jetzt
-exportiert und nimmt ihr Ziel als Prop.
-
-**6.1** 855 Vitest-Tests, 482 pgTAP-Assertions, typecheck/lint/format grün.
-**6.2** Sichtprobe im echten Browser gegen den lokalen Stack.
+1. **[HIGH] Wettlauf** in `admin_activate_member` — Lesen ohne Zeilensperre.
+   Zwei gleichzeitige Aufrufe schrieben **zwei Auditzeilen für eine
+   Aktivierung**. `for update`.
+2. **[MEDIUM] `limit null`** hob die Grenze auf statt den Vorgabewert zu
+   nehmen — 74 statt 50 Zeilen. `coalesce`.
+3. **[MEDIUM] Leere Folgeseite** war eine Sackgasse (Blätterung rendert nur
+   neben Treffern). Ausweg plus eigener Text.
+4. **[LOW] Beide Sidebar-Einträge** leuchteten auf `/admin/mitglieder`.
+5. **Keine Entprellung** im Suchfeld — jeder Tastendruck eine RPC. (eigener)
+6. **`admin_member_list_test.sql` stand nicht in der CI-Liste** — die 45
+   Assertions dieses Changes sind in CI **noch nie gelaufen**. (eigener)
 
 ## Decisions
 
-**Die Datenbanktypen von Hand nachziehen, nicht generieren.** Die Datei sagt es
-selbst: ein volles `supabase gen types` markiert RPC-Rückgabespalten als
-non-null und bricht zwanzig fremde Testfixtures. Gemessen, nicht geglaubt — der
-generierte Diff war 662 Zeilen, fast alles Werkzeug-Drift.
+**Eine zweite Migration statt einer Korrektur in der ersten.** 20260817120000
+liegt auf DEV und PROD; eine Änderung IN der Datei erreichte keine der beiden,
+und der Quelltext behauptete etwas, das nirgends läuft.
 
-**Kein `is_public`-Filter in der Admin-Liste.** `search_directory` hat einen;
-eine Verwaltungsliste, die ein Mitglied verliert, sobald es sich aus dem
-Verzeichnis nimmt, verlöre genau die Fälle, für die man sie aufruft.
+**Die Sidebar-Regel wird abgeleitet, nicht als Flagge gesetzt.** Ein
+`end`-Prop am Eintrag hätte einen Test ergeben, der nur seine eigene Fixture
+prüft und grün bleibt, wenn der Aufrufer die Flagge beim nächsten Unterpfad
+vergisst.
 
-**Die Verzeichnisspalten stehen ohne ZAHL fest.** Der Katalogvergleich im Test
-bestimmt die Projektion. Eine Zahl war schon einmal falsch (dreizehn statt
-vierzehn) und wäre beim nächsten Feld wieder falsch.
+**Der Wettlauf-Test ist ein WÄCHTER, kein Verhaltenstest** — pgTAP läuft in
+einer Transaktion und kann keine zwei Sitzungen herstellen. Der Beleg ist die
+Zwei-Verbindungs-Messung, festgehalten in REVIEWS.md.
 
-**Eine Zeile mehr anfordern als anzeigen** statt einer zweiten, zählenden
-Abfrage — zwei Wege an dieselben Daten können sich widersprechen.
+**Ein APPROVE ist kein Befund.** gemini lobte namentlich „die Sortierung ist
+stabil, das Paging fehlerfrei" — genau die zwei Stellen, an denen codex dann
+etwas fand.
 
 ## Files modified
 
-- `supabase/migrations/20260817120000_admin_member_list.sql` — neu, beide RPCs
-- `supabase/tests/admin_member_list_test.sql` — neu, 42 Assertions
-- `src/lib/admin-members.ts` / `.test.ts` — neu, Datenzugriff mit Paging
-- `src/pages/AdminMitgliederPage.tsx` / `.test.tsx` — neu, die Fläche
-- `src/components/community/MemberDirectory.tsx` — `MemberCard` exportiert, `to`-Prop
-- `src/components/community/MemberDirectory.test.tsx` — Regressionstest auf `/p/:id`
-- `src/lib/database.types.ts` — beide Funktionen von Hand ergänzt
-- `src/App.tsx`, `src/components/AppShell.tsx` — Route und Sidebar
-- `openspec/changes/add-admin-console/` — proposal, tasks, Delta gekürzt
-- `openspec/changes/add-admin-member-list/tasks.md` — 38 Haken, Stand zu 6.3
+- `supabase/migrations/20260817140000_admin_member_list_fixes.sql` — neu, beide
+  RPCs per `create or replace`
+- `supabase/tests/admin_member_list_test.sql` — Abschnitt 11, plan(42)→plan(45)
+- `src/pages/AdminMitgliederPage.tsx` / `.test.tsx` — Entprellung, Ausweg
+- `src/components/ui/SidebarNav.tsx` — abgeleitetes `end`
+- `src/components/ui/SidebarNav.active.test.tsx` — neu
+- `.github/workflows/ci.yml` — die pgTAP-Datei eingetragen
+- `openspec/changes/add-admin-member-list/` — REVIEWS.md, tasks.md (6.4 zu)
 
-## Was beim Bauen auffiel
+## Wie es belegt ist
 
-- **Der Plan-Review hat sich ein zweites Mal bezahlt gemacht.** Der allererste
-  Testlauf lieferte `42883` statt `42501` — genau der Befund zu den fehlenden
-  Vorgabewerten, sichtbar in der ersten roten Assertion.
-- **Die Gegenprobe zur Parität trennt sauber:** ein verbogener WERT färbt nur
-  den Inhaltstest rot, eine umbenannte SPALTE die Spaltentests — und die
-  **benennen** die Abweichung (`regionen` zuviel, `region` fehlt). Beide
-  Verbiegungen liefen in der Datenbank, der Arbeitsbaum blieb unberührt.
-- **Zwei Befunde kamen ausschließlich aus dem Browser.** „Direkt aktivieren"
-  trug die Akzentfarbe und war fünfundzwanzig Mal untereinander der auffälligste
-  Punkt der Seite — ausgerechnet die unumkehrbare Handlung. Und die
-  Handlungszeile der Verzeichnis-Ansicht riss. jsdom war bei beidem grün und
-  blieb es nach der Korrektur.
-- **`send-activation` antwortete 2xx, während Resend mit 401 ablehnte** und die
-  Function ihr eigenes Token entwertete. Der Admin hätte einen Versand geglaubt
-  — genau deshalb lautet die Rückmeldung „angefordert". Kein Versand nach
-  draußen (lokaler Dummy-Schlüssel). **Nicht von diesem Change verursacht**,
-  aber ein Kandidat für ein eigenes Issue.
-- **Eine aktivierte Zeile verschwindet aus der aktuellen Seite.** Folge der
-  Sortierung, im Entwurf benannt, im Browser bestätigt. Der Toast ist die
-  einzige Rückmeldung — falls das stört, ist es eine Gestaltungsfrage, keine
-  Korrektur.
-- **Der Supabase-MCP zeigt hier nur `cparx`.** Meine Notiz „liest PROD
-  read-only" gilt für dieses Projekt nicht; der Weg war
-  `infisical run --env=prod -- supabase db push --dry-run`.
-- **Ein Wortlaut-Wächter für leere Zustände** (`EmptyState.wording.test.tsx`)
-  hat einen toten „Keine Treffer"-Zweig in der Blätterung gefunden.
+Rot vor grün für jede Korrektur: pgTAP **2 von 45 rot** auf der ersten Fassung,
+danach 45/45 · Vitest auf `HEAD` **genau die 3 neuen Prüfungen rot**, danach
+21/21 · Wettlauf **zwei Auditzeilen vorher, eine nachher**. Voller Lauf: 860
+Vitest grün, 485 pgTAP grün, typecheck und lint sauber. Im Browser gemessen:
+vier Tastendrücke → eine Anfrage; genau ein aktiver Leisteneintrag.
+
+`format:check` meldet 129 Dateien — eine davon war meine und ist formatiert, die
+übrigen 128 sind bestehende Drift. **Nie `pnpm format` laufen lassen.**
 
 ## Open questions
 
-- **DEV und PROD tragen die Migration** (PROD von Donald im Terminal —
-  `db:push:prod` verlangt ein TTY, der `!`-Präfix reicht nicht). `drift-gate`
-  ist damit wieder zu. **Aber:** kein `migrate-dev`-Workflowlauf existiert für
-  diesen Commit, beide Umgebungen wurden von Hand bespielt — nach dem Merge
-  einmal prüfen, ob der Deploy durchläuft.
-- **Lokaler Stack:** ein Probe-Admin `sichtprobe-admin@local.test` und ein
-  aktiviertes Seed-Mitglied (Adrian Mühleisen) sind übrig. Nur lokal, mit
-  `supabase db reset` weg.
-- Unverändert aus der Vorsitzung: Bericht an Detlev · Rücknahmeliste vor
-  Go-Live (`fbc-probe-a4664fb5`, `uri_allow_list`, `APP_URL`,
-  `mailer_autoconfirm`, Übergangspasswort) · Infisical `prod` gespalten ·
-  Secrets vom 16.08. rotieren · AGE-497 · AGE-541 · AGE-258 · AGE-522 ·
-  AGE-512 · AGE-561.
+- **Die leere Folgeseite ist nicht im Browser geprüft**, nur in jsdom (dort rot
+  vor der Korrektur). Der Zustand hätte eine echte Aktivierung gekostet.
+- **Kein `migrate-dev`-Workflowlauf** für diese Commits; beide Umgebungen wurden
+  von Hand bespielt. Nach dem Merge prüfen, ob der Deploy durchläuft.
+- **Lokaler Stack:** `sichtprobe-admin@local.test` und ein aktiviertes
+  Seed-Mitglied sind übrig. Die Adminrolle, die `voll@example.test` für die
+  Sichtprobe geliehen bekam, ist **zurückgenommen**.
+- Unverändert: Bericht an Detlev · Rücknahmeliste vor Go-Live · Infisical `prod`
+  gespalten · Secrets vom 16.08. rotieren · AGE-497 · AGE-541 · AGE-258 ·
+  AGE-522 · AGE-512 · AGE-561 · das eigene Issue für `send-activation`, die
+  2xx meldet, während Resend mit 401 ablehnt.
