@@ -11,6 +11,7 @@ import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
 import AdminMitgliedPage from "./pages/AdminMitgliedPage";
+import AdminMitgliederPage from "./pages/AdminMitgliederPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ChatPage from "./pages/ChatPage";
 import EventDetailPage from "./pages/EventDetailPage";
@@ -144,6 +145,20 @@ function AppInner() {
           element={
             <RequireAdmin>
               <AdminSettingsPage />
+            </RequireAdmin>
+          }
+        />
+        {/* Admin-Mitgliederliste (AGE-566). Derselbe Grund wie bei der Route
+            darunter, nur eine Ebene höher: über Verzeichnis, /p/:id und Suche
+            ist ein unbestätigtes Profil für NIEMANDEN sichtbar, auch nicht für
+            einen Admin. Diese Liste ist der einzige Ort, an dem die
+            importierten Mitglieder vorkommen. Die Grenze ist is_admin() im
+            Rumpf von admin_list_members; RequireAdmin ist Komfort. */}
+        <Route
+          path="/admin/mitglieder"
+          element={
+            <RequireAdmin>
+              <AdminMitgliederPage />
             </RequireAdmin>
           }
         />

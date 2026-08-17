@@ -240,7 +240,13 @@ function SidebarContent({
   if (staffRole === "admin") {
     sections.push({
       title: "Administration",
-      items: [{ path: "/admin", label: "Administration" }],
+      items: [
+        { path: "/admin", label: "Administration" },
+        // AGE-566: Die Mitgliederliste braucht einen Eintrag, weil sie sonst nur
+        // per URL erreichbar wäre — und sie ist der EINZIGE Ort, an dem die
+        // importierten, noch unbestätigten Mitglieder überhaupt vorkommen.
+        { path: "/admin/mitglieder", label: "Mitglieder" },
+      ],
     });
   }
   return (

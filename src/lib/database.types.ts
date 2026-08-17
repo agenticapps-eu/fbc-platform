@@ -1572,6 +1572,56 @@ export type Database = {
       };
       admin_get_profile: { Args: { target: string }; Returns: Json };
       admin_find_profile: { Args: { needle: string }; Returns: Json };
+      // Admin-Mitgliederliste (AGE-566), aus 20260817120000_admin_member_list.sql.
+      // Von Hand gepflegt wie der Rest dieses Blocks.
+      //
+      // Die ersten vierzehn Rueckgabespalten sind die von `search_directory`, in
+      // deren Reihenfolge — daran haengt die Verzeichnis-Ansicht, die dieselbe
+      // Karte speist. Ein pgTAP-Test haelt beide Spaltenlisten UND fuer ein
+      // bestaetigtes Mitglied den Zeileninhalt gegeneinander; laeuft eine weg,
+      // wird er rot und benennt die abweichende Spalte.
+      //
+      // ALLE VIER Argumente sind optional. Ohne Vorgabewerte scheiterte der
+      // argumentlose Aufruf mit 42883 statt der zugesicherten 42501 — hier steht
+      // deshalb `?`, weil es in der Datenbank ein `default` gibt, nicht umgekehrt.
+      admin_list_members: {
+        Args: {
+          /** Sucht in `name` UND `login_email`, ohne Ruecksicht auf die
+           *  Schreibung. Leer und null filtern nicht; Jokerzeichen sind Text. */
+          p_query?: string | null;
+          /** `alle` | `aktiviert` | `offen`. null wirkt wie `alle`; jeder andere
+           *  Wert bricht mit 22023 ab, statt still alles zu zeigen. */
+          p_status?: string | null;
+          p_limit?: number | null;
+          p_offset?: number | null;
+        };
+        Returns: {
+          id: string;
+          name: string | null;
+          avatar_url: string | null;
+          region: string | null;
+          company: string | null;
+          short_bio: string | null;
+          branche: string | null;
+          tier: string;
+          roles: string[] | null;
+          competencies: string[] | null;
+          has_offers: boolean;
+          has_needs: boolean;
+          /** Distinct, ohne NULL, leeres Array statt NULL — nie `null`. */
+          offer_categories: string[];
+          need_categories: string[];
+          /** Die Anmeldeadresse aus `auth.users`, NICHT die Kontaktadresse. */
+          login_email: string;
+          /** `activated_at is not null` — damit die Flaeche den Zustand anzeigt,
+           *  statt ihn zu erraten. */
+          bestaetigt: boolean;
+          member_since: string | null;
+        }[];
+      };
+      /** Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach
+       *  `admin_audit`. Bricht mit 22023 ab, wenn das Ziel schon bestaetigt ist. */
+      admin_activate_member: { Args: { target: string }; Returns: string };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
       // admin_list_feedback() RPC from 20260716103000_admin_feedback_rpc.sql (admin-only
       // enriched read of QM feedback with the author name; empty for non-admins).

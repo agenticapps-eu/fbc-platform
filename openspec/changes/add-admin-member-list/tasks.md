@@ -102,42 +102,42 @@
 
 ## 5. Die Fläche
 
-- [ ] 5.1 Route `/admin/mitglieder` unter dem vorhandenen `RequireAdmin`;
+- [x] 5.1 Route `/admin/mitglieder` unter dem vorhandenen `RequireAdmin`;
       Sidebar-Eintrag für Admins.
-- [ ] 5.2 Datenzugriff in `src/lib/` neben den vorhandenen Admin-Aufrufen, mit
+- [x] 5.2 Datenzugriff in `src/lib/` neben den vorhandenen Admin-Aufrufen, mit
       Paging-Zustand. Kein Nachladen aller Seiten im Hintergrund. Erzeugte
       Datenbank-Typen mitziehen.
-- [ ] 5.3 **`MemberCard` aus `MemberDirectory.tsx:360` exportieren und ein Ziel
+- [x] 5.3 **`MemberCard` aus `MemberDirectory.tsx:360` exportieren und ein Ziel
       als Prop annehmen.** Die Karte ist heute privat und verdrahtet
       `` to={`/p/${member.id}`} `` fest — „nichts Mitgliedersichtbares wird
       angefasst" war im ersten Entwurf falsch (Befund codex MEDIUM-4).
-- [ ] 5.4 **Regressionstest** (startet grün): das Mitgliederverzeichnis verweist
+- [x] 5.4 **Regressionstest** (startet grün): das Mitgliederverzeichnis verweist
       weiter auf `/p/:id`. Er sichert 5.3 ab — ein unachtsamer Umbau lenkte sonst
       das öffentliche Verzeichnis in den Admin-Bereich.
-- [ ] 5.5 Umschalter Tabelle | Karten | Verzeichnis. Test: „nicht aktiviert" ist
+- [x] 5.5 Umschalter Tabelle | Karten | Verzeichnis. Test: „nicht aktiviert" ist
       in **allen drei** sichtbar.
-- [ ] 5.6 Verzeichnis-Ansicht speist die exportierte Karte mit Ziel
+- [x] 5.6 Verzeichnis-Ansicht speist die exportierte Karte mit Ziel
       `/admin/mitglied/:id`. Test darauf.
-- [ ] 5.7 Blätterung sichtbar und benutzt. Test: Seite 2 zeigt andere Mitglieder
+- [x] 5.7 Blätterung sichtbar und benutzt. Test: Seite 2 zeigt andere Mitglieder
       als Seite 1. Statusfilter und Suchfeld angebunden.
-- [ ] 5.8 „Zugangslink schicken" ruft `send-activation`. Test: bei 202 spricht
+- [x] 5.8 „Zugangslink schicken" ruft `send-activation`. Test: bei 202 spricht
       die Rückmeldung von **angefordert**, nicht von verschickt.
-- [ ] 5.9 Test: bei 500 und 502 zeigt die Fläche einen **Fehler** und keine
+- [x] 5.9 Test: bei 500 und 502 zeigt die Fläche einen **Fehler** und keine
       Bestätigung. `send-activation` antwortet nicht immer 202 — auch 405, 400,
       500 und 502 (Befund codex MEDIUM-2; die erste Fassung behauptete das
       Gegenteil).
-- [ ] 5.10 „Direkt aktivieren" mit **namentlicher Rückfrage**, die die Folge
+- [x] 5.10 „Direkt aktivieren" mit **namentlicher Rückfrage**, die die Folge
       benennt. Nur an unbestätigten Zeilen. Tests: Rückfrage erscheint, Abbrechen
       ändert nichts, an einer bestätigten Zeile wird der Knopf nicht angeboten.
       Die Handlung ist durch die Anwendung nicht umkehrbar (Befund codex HIGH-4).
-- [ ] 5.11 Nach erfolgreicher Aktivierung die Liste neu laden, damit der Zustand
+- [x] 5.11 Nach erfolgreicher Aktivierung die Liste neu laden, damit der Zustand
       nicht veraltet stehenbleibt.
-- [ ] 5.12 **Regressionstest** (startet grün): es besteht keine Handlung, die ein
+- [x] 5.12 **Regressionstest** (startet grün): es besteht keine Handlung, die ein
       Passwort für ein fremdes Konto setzt.
 
 ## 6. Prüfen
 
-- [ ] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün. `supabase test db`
+- [x] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün. `supabase test db`
       **mit Dateiliste** aufrufen — ohne sie meldet der Befehl FAIL, obwohl die
       pgTAP-Dateien grün sind.
 - [ ] 6.2 **Sichtprobe im Browser**, nicht nur jsdom: alle drei Sichten, ein

@@ -317,3 +317,30 @@ describe("Suchbegriff aus der Adresszeile (AGE-540)", () => {
     await waitFor(() => expect(lastArgs().p_query).toBe("anna"));
   });
 });
+
+/**
+ * REGRESSIONSTEST (AGE-566, Aufgabe 5.4) — er startet grün und muss es
+ * bleiben.
+ *
+ * Die Admin-Fläche will dieselbe Karte benutzen, aber auf `/admin/mitglied/:id`
+ * verweisen. Dafür wird `MemberCard` exportiert und bekommt ihr Ziel als Prop;
+ * bis dahin ist sie privat und verdrahtet `/p/:id` fest. Der erste Entwurf des
+ * Changes behauptete noch, dabei werde „kein mitgliedersichtbarer Code
+ * angefasst" — das war falsch, und der Plan-Review hat es widerlegt.
+ *
+ * Was hier gesichert wird, ist die Gegenrichtung: ein unachtsamer Umbau lenkte
+ * sonst das ÖFFENTLICHE Verzeichnis in den Admin-Bereich, wo jedes Mitglied vor
+ * einer Weiterleitung landete.
+ */
+describe("Das öffentliche Verzeichnis verweist weiter auf /p/:id (AGE-566)", () => {
+  it("verlinkt die Karte eines Mitglieds auf seine öffentliche Profilseite", async () => {
+    const anna = member({ name: "Anna Beispiel" });
+    rpc.mockResolvedValue({ data: [anna], error: null });
+    renderDirectory();
+
+    const link = await screen.findByRole("link", { name: /Anna Beispiel/ });
+    expect(link).toHaveAttribute("href", `/p/${anna.id}`);
+    // Und ausdrücklich NICHT in den Admin-Bereich.
+    expect(link.getAttribute("href")).not.toContain("/admin");
+  });
+});
