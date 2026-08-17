@@ -692,7 +692,11 @@ function PostCard({
         </div>
       </header>
 
-      <PostBody segments={segments} skipRaw={video ?? undefined} mentionResolver={mentionResolver} />
+      <PostBody
+        segments={segments}
+        skipRaw={video ?? undefined}
+        mentionResolver={mentionResolver}
+      />
 
       <PostMedien media={post.media} urls={bildUrls} onFehler={onBildFehler} autor={author.name} />
 
@@ -779,11 +783,7 @@ function EventCard({
            Bild mit leerem `alt`, und ein Screenreader läse sonst die rohe URL
            vor. Der sichtbare Titel darunter hilft ihm nicht — das ist ein
            zweiter Link (Befund opencode im Diff-Review, LOW). */
-        <Link
-          to={`/events/${event.id}`}
-          className="block"
-          aria-label={`Titelbild: ${event.title}`}
-        >
+        <Link to={`/events/${event.id}`} className="block" aria-label={`Titelbild: ${event.title}`}>
           <img
             src={coverUrl}
             alt=""
@@ -880,7 +880,17 @@ function InteraktionsLeiste({
         </button>
       </footer>
 
-      {showComments && <CommentThread postId={post.id} currentUserId={currentUserId} />}
+      {/* Die letzten Kommentare stehen OFFEN unter dem Beitrag, statt hinter
+          einem Klick (AGE-566). Ein Feed, in dem jede Antwort erst
+          aufgeklappt werden muss, sieht aus wie ein Feed ohne Antworten —
+          und das Gespräch ist hier das Produkt.
+
+          Geladen wird nur, wo es etwas zu laden GIBT: ohne die Bedingung auf
+          `commentCount` stellte jede Karte eine eigene Abfrage, auch die
+          zwanzig ohne einen einzigen Kommentar. */}
+      {(showComments || post.commentCount > 0) && (
+        <CommentThread postId={post.id} currentUserId={currentUserId} ausgeklappt={showComments} />
+      )}
     </>
   );
 }
@@ -1016,8 +1026,7 @@ function Lightbox({
   // ERSTEN Fokus setzt weiterhin der Effekt unten, aus dem Grund, der dort steht.
   const overlay = useOverlay(true);
 
-  const weiter = (schritt: number) =>
-    onIndex((index + schritt + media.length) % media.length);
+  const weiter = (schritt: number) => onIndex((index + schritt + media.length) % media.length);
 
   // Ohne Abhängigkeitsliste, weil `weiter` den aktuellen `index` schließt — der
   // Zuhörer wird je Render neu gesetzt und wieder abgeräumt.
@@ -1168,16 +1177,24 @@ function PostBody({
 
 // ── Kommentare ────────────────────────────────────────────────────────────────
 
+/** Wie viele Kommentare ohne Zutun sichtbar sind. */
+const KOMMENTAR_VORSCHAU = 2;
+
 function CommentThread({
   postId,
   currentUserId,
+  ausgeklappt = false,
 }: {
   postId: string;
   currentUserId: string | null;
+  /** Über den Kommentar-Knopf der Leiste geöffnet: alles zeigen, samt Eingabe. */
+  ausgeklappt?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [body, setBody] = useState("");
+  /** „mehr" innerhalb der Vorschau — unabhängig vom Knopf in der Leiste. */
+  const [alleZeigen, setAlleZeigen] = useState(false);
 
   const comments = useQuery({
     queryKey: commentsQueryKey(currentUserId, postId),
@@ -1200,13 +1217,33 @@ function CommentThread({
     },
   });
 
+  const alle = comments.data ?? [];
+  const zeigeAlle = ausgeklappt || alleZeigen;
+  // Die LETZTEN zwei, nicht die ersten: `fetchComments` liefert aufsteigend,
+  // und der jüngste Beitrag zum Gespräch ist der, der den Feed lebendig macht.
+  const sichtbar = zeigeAlle ? alle : alle.slice(-KOMMENTAR_VORSCHAU);
+  const verborgen = alle.length - sichtbar.length;
+
   return (
     <div className="space-y-3 border-t border-line pt-4">
       {comments.isLoading && <p className="text-sm text-muted">Kommentare werden geladen…</p>}
       {comments.isError && (
         <p className="text-sm text-danger">Kommentare konnten nicht geladen werden.</p>
       )}
-      {comments.data?.map((c) => {
+
+      {verborgen > 0 && (
+        <button
+          type="button"
+          onClick={() => setAlleZeigen(true)}
+          className="rounded-md text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          {verborgen === 1
+            ? "1 weiteren Kommentar anzeigen"
+            : `${verborgen} weitere Kommentare anzeigen`}
+        </button>
+      )}
+
+      {sichtbar.map((c) => {
         const author = displayAuthor(c.author, currentUserId !== null);
         return (
           <div key={c.id} className="flex items-start gap-2.5">
@@ -1237,11 +1274,17 @@ function CommentThread({
         );
       })}
 
-      {comments.data?.length === 0 && (
+      {/* Nur im aufgeklappten Zustand: in der Vorschau erscheint der Bereich
+          ausschliesslich, wenn es schon Kommentare GIBT — „noch keine" wäre
+          dort eine Aussage über einen Beitrag, den niemand geöffnet hat. */}
+      {ausgeklappt && alle.length === 0 && !comments.isLoading && (
         <p className="text-sm text-muted">Noch keine Kommentare. Sei der/die Erste.</p>
       )}
 
-      {currentUserId && (
+      {/* Die Eingabe gehört zum Aufklappen. Ein Textfeld unter JEDEM Beitrag des
+          Feeds wäre zwanzig Aufforderungen auf einem Bildschirm — die Vorschau
+          soll zeigen, dass gesprochen wird, nicht zum Sprechen drängen. */}
+      {currentUserId && ausgeklappt && (
         <div className="flex items-end gap-2 pt-1">
           <Textarea
             value={body}

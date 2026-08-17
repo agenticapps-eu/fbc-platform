@@ -357,14 +357,29 @@ function DirectoryResults({
   );
 }
 
-function MemberCard({ member }: { member: DirectoryMember }) {
+/**
+ * Die Verzeichniskarte. EXPORTIERT seit AGE-566, damit die Admin-Fläche sie
+ * speisen kann statt sie nachzubauen — ein Nachbau wäre eine zweite Stelle, an
+ * der dieselbe Darstellung gepflegt werden müsste, und die Admin-Ansicht wäre
+ * dann gerade nicht mehr „was Mitglieder sehen", sondern etwas, das ihm ähnelt.
+ *
+ * `to` ist der Preis dafür: die Karte verdrahtete ihr Ziel fest auf `/p/:id`.
+ * Für ein unbestätigtes Mitglied — den Anlassfall der Admin-Fläche — meldet
+ * diese Seite „nicht gefunden", weil `profiles_public` ein bestätigtes
+ * ZIELPROFIL verlangt. Ohne den Prop führte die Admin-Ansicht also genau dort
+ * in eine Sackgasse, wo man sie braucht.
+ *
+ * Die Vorgabe bleibt `/p/:id`, und ein Regressionstest sichert zu, dass das
+ * öffentliche Verzeichnis weiter dorthin zeigt.
+ */
+export function MemberCard({ member, to }: { member: DirectoryMember; to?: string }) {
   const name = member.name ?? "Mitglied";
   const subtitle = (member.roles ?? []).filter(Boolean).join(" · ");
   const meta = [member.region, member.company].filter(Boolean).join(" · ");
 
   return (
     <Link
-      to={`/p/${member.id}`}
+      to={to ?? `/p/${member.id}`}
       className="block h-full rounded-[var(--radius-card)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
     >
       <Card className="flex h-full flex-col gap-4 p-5 transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">

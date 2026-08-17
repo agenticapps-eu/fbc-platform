@@ -1,104 +1,94 @@
-# Session Handoff — 2026-08-13 (AGE-533 / C9 gemergt, Deploy hängt)
+# Session Handoff — 2026-08-17 (dritte Sitzung des Tages)
 
-C9 ist gebaut, dreifach gegengelesen, gemergt — und der Deploy steht hinter
-`drift-gate`. **Das ist keine Randnotiz: dadurch stehen gerade neun leere
-Karten im Live-Feed.**
+**Aufgabe 6.4 ist erledigt: der Diff-Review lief, sechs Befunde sind behoben.**
+Von 43 Aufgaben ist nur noch Gruppe 7 offen (Abschluss).
 
-## Zuerst: was jetzt zu tun ist
-
-`migrate-prod` dispatchen, dann den Deploy nachziehen. Der Dry-Run dafür ist
-gelaufen und liegt vor: **PROD hat 0 `posts` und 0 `events`**, beide Backfills
-treffen dort null Zeilen. `migrate-prod` ist eine reine Schemaänderung ohne
-Datenrisiko.
-
-Danach `gh run rerun --failed` auf den `main`-Lauf zu `2c165a6` (deploy.yml hat
-kein `workflow_dispatch`; der Befehl gibt bei Erfolg nichts aus). Live-Beleg an
-einer **Zeichenkette aus dem Diff**, nicht an der Bundle-Größe — z. B.
-„Aus der Redaktion", „Meine Academy" oder „Neues Event".
-
-## Accomplished
-
-**PR #170 gemergt** (`2c165a6`, squash). Acht Checks auf der HEAD-SHA grün.
-
-- **Migration A** `posts.video_url`, von der DATENBANK aus dem Body abgeleitet
-  (Funktion + Trigger auf jedem Schreibzugriff), partieller Index, Backfill.
-- **Academy** als gefilterte Sicht auf `posts`: Reiter „Alle" und „Meine
-  Academy", letzterer mit zwei Regalen (selbst geteilt / eigene
-  „gefällt mir"-Liste), seitenweise über den Keyset-Cursor des Feeds.
-- **„Meine Kurse" entfällt**, `/meine-kurse` leitet auf `/academy` um.
-- **Migration B** `posts.kind` + `ref_id`, ein Trigger-Paar auf `events`,
-  `posts_write_own` und `post_media_insert_own` auf `kind = 'member'` verengt.
-- **Zweiter Kartentyp im Feed**, der zur Laufzeit auf `events` joint.
-
-**Belege:** 95 Dateien / 665 Tests · pgTAP 408 PASS (`plan(342) → plan(388)`) ·
-Parität SQL↔TS 46/46 · lint 0 Errors · build grün · Sichtprobe in beiden Themes
-und bei 375 px. Alles in `openspec/changes/academy-lite-and-feed-weave/`
-(`EVIDENCE.md`, `REVIEWS.md`, `DIFF-REVIEWS.md`).
-
-## Decisions
-
-**`video_url` wird auf dem SERVER abgeleitet, nicht im Client.** *Warum:* der
-erste Entwurf ließ den Client rechnen und versprach, Spalte und Embed könnten
-nicht auseinanderlaufen. Nicht durchsetzbar — `posts_write_own` erlaubt
-INSERT/UPDATE direkt auf `posts`. Nebeneffekt: die RPC `create_post_with_media`
-wird gar nicht angefasst, fünf Review-Befunde entfielen, der Change wurde
-kleiner.
-
-**Sichtbarkeit gespiegelt, nicht gejoint.** *Warum:* ein Join müsste an **vier**
-Stellen stehen (`posts_select_public_anon`, `posts_select_by_visibility`,
-`post_engagement_counts`, `post_media_lesbar`). Der Entwurf zählte drei und
-übersah die vierte — selbst das beste Argument gegen diesen Weg.
-
-**Event-Beiträge sind systemverwaltet.** *Warum:* der Host **ist** ihr Autor und
-konnte sie löschen, umschreiben oder die Sichtbarkeit zurückdrehen. Beide
-Policies (`posts`, `post_media`) verlangen jetzt `kind = 'member'`.
-
-**Das zweite Academy-Regal heißt „Gefällt mir", nicht „Gemerkt".** *Warum:*
-`post_engagement_counts` gibt den Like-Zähler an jeden aus — ein Like ist hier
-nicht privat, und „gemerkt" verspräche Privatheit, die es nicht gibt.
-
-**Die Asymmetrie bleibt ohne UI-Hinweis** (gemini verlangte eine Entscheidung):
-`members`-Posts brauchen Rang 4, `members`-Events nicht. Zum Go-Live sind alle
-`impact`, also folgenlos; per pgTAP gepint.
-
-## Files modified
-
-Alles in `2c165a6`. Die Stellen, an denen später jemand suchen wird:
-
-- `supabase/migrations/20260813090000_posts_video_url.sql` — `erste_video_url`
-  zerlegt Host und Pfad **getrennt**; Postgres kennt kein `(?i:…)`.
-- `supabase/migrations/20260813100000_posts_kind_event_trigger.sql` — EINE
-  Trigger-Funktion für alle vier `host_id`-Übergänge.
-- `supabase/tests/rls_test.sql` — §21 und §22, `plan(388)`.
-- `src/lib/video-url.ts` — neu: die reinen Parser, aus `feed.ts` gezogen, damit
-  ein Node-Skript sie aufrufen kann. `feed.ts` re-exportiert.
-- `scripts/probe-c9-bestand.ts`, `scripts/probe-c9-parser-paritaet.ts`.
+Branch `donald/age-566-admin-mitgliederliste`, jetzt **acht** Commits,
+Arbeitsbaum sauber, **noch nicht gepusht**. `openspec validate --all` 29/29.
 
 ## Next session: start here
 
-**`migrate-prod` freigeben** (Dry-Run oben, kein Datenrisiko), dann
-`gh run rerun --failed` auf den `main`-Lauf zu `2c165a6`, dann den Live-Beleg an
-einer Zeichenkette aus dem Diff führen. Erst danach ist das Fenster mit den
-neun leeren Karten zu.
+**Gruppe 7.** Aber zuerst eine Sache, die nur Donald tun kann: es gibt eine
+**zweite Migration** (`20260817140000_admin_member_list_fixes.sql`), und
+20260817120000 liegt bereits auf DEV und PROD. Die neue muss auf beide
+Umgebungen — PROD von Hand im Terminal, `db:push:prod` verlangt ein TTY. Ohne
+das läuft die korrigierte Fassung nirgends ausser lokal.
 
-Danach `openspec archive academy-lite-and-feed-weave` — **Szenario-Titel in
-MODIFIED-Blöcken unverändert lassen**, sonst bricht das Archivieren. Und
-`add-academy-content` (AGE-262) anmerken: sein `## REMOVED`-Block zeigt jetzt
-auf eine Anforderung, die es so nicht mehr gibt.
+Danach: `openspec archive` **vor** `add-admin-console` (die Reihenfolge steht in
+beiden Changes, umgekehrt kollidieren die Delta-Operationen), Branch pushen, PR,
+Linear.
+
+## Accomplished
+
+**Zwei fremde Prüfer über den Diff**, beide Ausgang 0, `REVIEWER_TIMEOUT=900`.
+gemini: **APPROVE ohne Befund**. codex: **REQUEST-CHANGES mit vier**. Alle vier
+nachgeprüft, alle vier zutreffend. Dazu zwei Befunde aus der eigenen
+Durchsicht. **Alle sechs übernommen, keiner abgelehnt** — Belege in
+`openspec/changes/add-admin-member-list/REVIEWS.md`.
+
+1. **[HIGH] Wettlauf** in `admin_activate_member` — Lesen ohne Zeilensperre.
+   Zwei gleichzeitige Aufrufe schrieben **zwei Auditzeilen für eine
+   Aktivierung**. `for update`.
+2. **[MEDIUM] `limit null`** hob die Grenze auf statt den Vorgabewert zu
+   nehmen — 74 statt 50 Zeilen. `coalesce`.
+3. **[MEDIUM] Leere Folgeseite** war eine Sackgasse (Blätterung rendert nur
+   neben Treffern). Ausweg plus eigener Text.
+4. **[LOW] Beide Sidebar-Einträge** leuchteten auf `/admin/mitglieder`.
+5. **Keine Entprellung** im Suchfeld — jeder Tastendruck eine RPC. (eigener)
+6. **`admin_member_list_test.sql` stand nicht in der CI-Liste** — die 45
+   Assertions dieses Changes sind in CI **noch nie gelaufen**. (eigener)
+
+## Decisions
+
+**Eine zweite Migration statt einer Korrektur in der ersten.** 20260817120000
+liegt auf DEV und PROD; eine Änderung IN der Datei erreichte keine der beiden,
+und der Quelltext behauptete etwas, das nirgends läuft.
+
+**Die Sidebar-Regel wird abgeleitet, nicht als Flagge gesetzt.** Ein
+`end`-Prop am Eintrag hätte einen Test ergeben, der nur seine eigene Fixture
+prüft und grün bleibt, wenn der Aufrufer die Flagge beim nächsten Unterpfad
+vergisst.
+
+**Der Wettlauf-Test ist ein WÄCHTER, kein Verhaltenstest** — pgTAP läuft in
+einer Transaktion und kann keine zwei Sitzungen herstellen. Der Beleg ist die
+Zwei-Verbindungs-Messung, festgehalten in REVIEWS.md.
+
+**Ein APPROVE ist kein Befund.** gemini lobte namentlich „die Sortierung ist
+stabil, das Paging fehlerfrei" — genau die zwei Stellen, an denen codex dann
+etwas fand.
+
+## Files modified
+
+- `supabase/migrations/20260817140000_admin_member_list_fixes.sql` — neu, beide
+  RPCs per `create or replace`
+- `supabase/tests/admin_member_list_test.sql` — Abschnitt 11, plan(42)→plan(45)
+- `src/pages/AdminMitgliederPage.tsx` / `.test.tsx` — Entprellung, Ausweg
+- `src/components/ui/SidebarNav.tsx` — abgeleitetes `end`
+- `src/components/ui/SidebarNav.active.test.tsx` — neu
+- `.github/workflows/ci.yml` — die pgTAP-Datei eingetragen
+- `openspec/changes/add-admin-member-list/` — REVIEWS.md, tasks.md (6.4 zu)
+
+## Wie es belegt ist
+
+Rot vor grün für jede Korrektur: pgTAP **2 von 45 rot** auf der ersten Fassung,
+danach 45/45 · Vitest auf `HEAD` **genau die 3 neuen Prüfungen rot**, danach
+21/21 · Wettlauf **zwei Auditzeilen vorher, eine nachher**. Voller Lauf: 860
+Vitest grün, 485 pgTAP grün, typecheck und lint sauber. Im Browser gemessen:
+vier Tastendrücke → eine Anfrage; genau ein aktiver Leisteneintrag.
+
+`format:check` meldet 129 Dateien — eine davon war meine und ist formatiert, die
+übrigen 128 sind bestehende Drift. **Nie `pnpm format` laufen lassen.**
 
 ## Open questions
 
-- **Die Pipeline-Lücke ist jetzt zum zweiten Mal aufgetreten** und war beide
-  Male vorhersehbar: jede Migration mit Frontend-Abhängigkeit reißt zwischen
-  `migrate-dev` und der manuellen `migrate-prod`-Freigabe ein Fenster auf, in
-  dem live etwas falsch aussieht. Das ist eine Eigenschaft der Pipeline, keine
-  Panne — aber sie ist weiterhin von niemandem entschieden.
-- **Das Theme greift auf dem lokalen Stack nicht über `member_settings`
-  allein** — der Schalter stand auf „navy", `data-variant` auch, die
-  Inhaltsfläche blieb hell. Aufgelöst: `navy` überschreibt nur neun
-  Chrome-Token. Kein Fehler, aber die Beschriftung „Dunkles Design" verspricht
-  mehr, als das Theme tut. Nicht Teil von C9.
-- **`codex` als Reviewer fiel zweimal aus** (Plan-Review 26 min, Diff-Review
-  abgebrochen mit 0 Bytes). `opencode` (Kimi-K3) hat beide Male getragen.
-- Unverändert offen aus der Vorsession: `host_partner_id`, der tote Host-Zweig
-  in `event_attendees`, verwaiste Bucket-Objekte, keine Screenshot-Tests.
+- **Die leere Folgeseite ist nicht im Browser geprüft**, nur in jsdom (dort rot
+  vor der Korrektur). Der Zustand hätte eine echte Aktivierung gekostet.
+- **Kein `migrate-dev`-Workflowlauf** für diese Commits; beide Umgebungen wurden
+  von Hand bespielt. Nach dem Merge prüfen, ob der Deploy durchläuft.
+- **Lokaler Stack:** `sichtprobe-admin@local.test` und ein aktiviertes
+  Seed-Mitglied sind übrig. Die Adminrolle, die `voll@example.test` für die
+  Sichtprobe geliehen bekam, ist **zurückgenommen**.
+- Unverändert: Bericht an Detlev · Rücknahmeliste vor Go-Live · Infisical `prod`
+  gespalten · Secrets vom 16.08. rotieren · AGE-497 · AGE-541 · AGE-258 ·
+  AGE-522 · AGE-512 · AGE-561 · das eigene Issue für `send-activation`, die
+  2xx meldet, während Resend mit 401 ablehnt.

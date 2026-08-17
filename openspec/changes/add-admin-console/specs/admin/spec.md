@@ -2,37 +2,15 @@
 
 ### Requirement: Admin member management is not implemented
 
-**Reason:** This change implements the admin member list, bulk mail, CRM, and topic
-newsletters, superseding the prior "not implemented" declaration.
+**Reason:** This change implements bulk mail, CRM, and topic newsletters,
+superseding the requirement that forbids them. The member list is **not** part of
+it any more — AGE-566 (`add-admin-member-list`) builds it and reshapes this same
+requirement with `MODIFIED`, so the requirement still stands when this change is
+archived and still forbids exactly the mass-mail this change delivers. That is why
+the `REMOVED` block belongs here and why this change SHALL be archived **after**
+`add-admin-member-list`.
 
 ## ADDED Requirements
-
-### Requirement: Admin member list with filters (no contact PII)
-
-The system SHALL provide an admin-only member-list view served by a
-`SECURITY DEFINER` RPC (fixed `search_path`, identity from `auth.uid()`, `EXECUTE`
-restricted to the API roles) that returns member rows with filterable non-contact
-fields (such as tier, status, and join date), gated so it returns rows only when
-`is_admin()`. The RPC SHALL NOT return contact PII (email, phone) — those remain
-owner-only per `member-profiles`; the bulk-send path resolves recipient addresses
-server-side without exposing them to the client. The `/admin` route is UI
-convenience only; the enforcing boundary is the database.
-
-#### Scenario: Admin lists and filters members
-
-- **WHEN** an admin opens the member list and applies a filter
-- **THEN** the RPC returns the matching member rows (non-contact fields) because
-  `is_admin()` is true
-
-#### Scenario: Non-admin gets no members
-
-- **WHEN** a member without the `admin` staff role calls the member-list RPC
-- **THEN** the `is_admin()` gate returns zero rows
-
-#### Scenario: Contact PII is never returned by the list
-
-- **WHEN** the member-list RPC returns rows to an admin
-- **THEN** no email or phone is included in the result
 
 ### Requirement: Bulk email resolves recipients server-side and honours suppression
 
