@@ -144,6 +144,17 @@
       unbestätigtes Mitglied, beide Handlungen samt Rückfrage, die Blätterung.
       In diesem Projekt sind mehrere Befunde ausschliesslich im echten Browser
       aufgefallen, während die Tests grün waren.
+> **Stand 6.3 (17.08.):** DEV ist bespielt (`pnpm db:push`, genau eine
+> Migration) und gegengelesen: beide Funktionen vorhanden, `authenticated` ja,
+> `anon` nein, `SECURITY DEFINER` ja. Der Bestand dort ist aber der falsche —
+> 41 Profile, davon **2** unbestätigt; die importierten Mitglieder liegen in
+> PROD. Der PROD-Trockenlauf ist **gelesen** und meldet ebenfalls genau eine
+> ausstehende Migration, die Historie ist sonst synchron. Das schreibende
+> Anwenden auf PROD blockt der Klassifikator (`db:push:prod`) — das ist Donalds
+> Schritt, danach ist 6.3 in Minuten messbar. `migrate-prod` scheidet vorher
+> aus: der Workflow sucht den `migrate-dev`-Lauf desselben Commits, und dieser
+> Branch ist noch nicht gepusht.
+
 - [ ] 6.3 Am echten Bestand messen: die Liste zeigt die importierten Mitglieder,
       die über jeden anderen Weg unsichtbar sind. Das ist der Anlass des Changes
       und die einzige Messung, die ihn belegt. **Keine Personendaten in die
