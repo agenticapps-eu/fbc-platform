@@ -59,7 +59,9 @@ export function EventCard({ event, coverUrl }: { event: EventListItem; coverUrl?
               ) : full ? (
                 <span className="text-danger">Ausgebucht · Warteliste</span>
               ) : (
-                <span className="text-muted">{remaining} Plätze frei</span>
+                <span className="text-muted">
+                  {remaining === 1 ? "1 Platz frei" : `${remaining} Plätze frei`}
+                </span>
               )}
             </span>
           </div>

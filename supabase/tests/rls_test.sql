@@ -138,9 +138,15 @@ insert into public.staff_roles (profile_id, role) values
   ('bbbbbbbb-0000-0000-0000-000000000002', 'matching_manager');
 
 -- Feedback von zwei verschiedenen Autoren — der Admin darf beide sehen, sonst niemand.
-insert into public.feedback (profile_id, rating, likes, misses, idea, route) values
-  ('11111111-1111-1111-1111-111111111111', 5, 'Der Compass', 'Nichts', 'Mehr Events', '/compass'),
-  ('66666666-6666-6666-6666-666666666666', 2, 'Das Design', 'Tempo',  'Schneller',    '/meine-chancen');
+-- Die IDs stehen ausdrücklich da, weil die Admin-Assertions (Abschnitt 11/12)
+-- sonst `count(*)` über die GANZE Tabelle bilden müssten. Eine einzige fremde
+-- Zeile — der Demo-Seed legt lokal welche an — liess damit gemessen die Tests
+-- „Admin liest fremdes Feedback" und „Admin bekommt … beide Feedback-Zeilen"
+-- fallen, obwohl an den Policies nichts falsch war. Ein Test, der am Bestand
+-- neben seinen Fixtures scheitert, misst den Bestand und nicht die Policy.
+insert into public.feedback (id, profile_id, rating, likes, misses, idea, route) values
+  ('f0000000-0000-0000-0000-00000000000a', '11111111-1111-1111-1111-111111111111', 5, 'Der Compass', 'Nichts', 'Mehr Events', '/compass'),
+  ('f0000000-0000-0000-0000-00000000000b', '66666666-6666-6666-6666-666666666666', 2, 'Das Design', 'Tempo',  'Schneller',    '/meine-chancen');
 
 -- ── Rollen-Impersonation (Muster aus den probe_*.sql) ────────────────────────
 create function pg_temp.count_as(uid uuid, q text) returns int language plpgsql as $$
@@ -422,7 +428,9 @@ select is(
 -- ist member-writable, ein Mitglied könnte sich sonst selbst freischalten.
 select is(
   pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
-    'select count(*)::int from public.feedback'),
+    'select count(*)::int from public.feedback
+      where id in (''f0000000-0000-0000-0000-00000000000a'',
+                   ''f0000000-0000-0000-0000-00000000000b'')'),
   2, 'Admin liest fremdes Feedback (beide Zeilen)');
 
 select is(
@@ -468,7 +476,9 @@ select is(
 -- '6666…' (Impact); genau deren Namen müssen im author_name auftauchen.
 select is(
   pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
-    'select count(*)::int from public.admin_list_feedback()'),
+    'select count(*)::int from public.admin_list_feedback()
+      where id in (''f0000000-0000-0000-0000-00000000000a'',
+                   ''f0000000-0000-0000-0000-00000000000b'')'),
   2, 'Admin bekommt aus admin_list_feedback() beide Feedback-Zeilen');
 
 select is(
