@@ -140,7 +140,7 @@
 - [x] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün. `supabase test db`
       **mit Dateiliste** aufrufen — ohne sie meldet der Befehl FAIL, obwohl die
       pgTAP-Dateien grün sind.
-- [ ] 6.2 **Sichtprobe im Browser**, nicht nur jsdom: alle drei Sichten, ein
+- [x] 6.2 **Sichtprobe im Browser**, nicht nur jsdom: alle drei Sichten, ein
       unbestätigtes Mitglied, beide Handlungen samt Rückfrage, die Blätterung.
       In diesem Projekt sind mehrere Befunde ausschliesslich im echten Browser
       aufgefallen, während die Tests grün waren.

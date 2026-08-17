@@ -257,13 +257,27 @@ export default function AdminMitgliederPage() {
           {sicht === "Verzeichnis" && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {members.map((m) => (
-                <div key={m.id} data-testid={`mitglied-${m.id}`} className="flex flex-col gap-2">
+                <div
+                  key={m.id}
+                  data-testid={`mitglied-${m.id}`}
+                  className="flex h-full flex-col gap-2"
+                >
                   {/* Dieselbe Karte wie /mitglieder, mit einem anderen Ziel.
                       Zustand und Handlungen stehen DANEBEN und nicht darin: die
                       Karte ist ein Link, und ein Knopf in einem Link ist weder
-                      gültiges HTML noch bedienbar. */}
-                  <MemberCard member={m} to={`/admin/mitglied/${m.id}`} />
-                  <div className="flex items-center justify-between gap-2">
+                      gültiges HTML noch bedienbar.
+
+                      `flex-1` an der Karte, damit die Handlungszeilen über die
+                      Spalten hinweg FLUCHTEN. Ohne das hing jede an ihrer
+                      unterschiedlich hohen Karte, und die Sichtprobe zeigte
+                      eine Treppe statt eines Rasters. */}
+                  <div className="flex-1">
+                    <MemberCard member={m} to={`/admin/mitglied/${m.id}`} />
+                  </div>
+                  {/* Umbrechend statt `justify-between`: in einer schmalen Spalte
+                      riss letzteres „Nicht aktiviert" auf zwei Zeilen und
+                      stapelte die Knöpfe. */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <Zustand member={m} />
                     <Handlungen
                       member={m}
@@ -322,14 +336,25 @@ function Handlungen({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="button" size="sm" variant="secondary" disabled={laeuft} onClick={onZugangslink}>
+      {/* GEWICHTUNG, gefunden in der Sichtprobe und nicht in den Tests: der
+          reguläre Weg trägt die Akzentfarbe, der unumkehrbare steht still
+          daneben. Zuerst war es umgekehrt — „Direkt aktivieren" war fünfundzwanzig
+          Mal untereinander der auffälligste Punkt der Seite, und das ist genau
+          die Handlung, die niemand versehentlich treffen soll. */}
+      <Button type="button" size="sm" variant="ghost" disabled={laeuft} onClick={onZugangslink}>
         Zugangslink schicken
       </Button>
       {/* NUR an unbestätigten Zeilen. An einer bestätigten bräche die RPC mit
           22023 ab — einen Knopf anzubieten, dessen einziger Ausgang ein Fehler
           ist, wäre eine Einladung zum Fehlklick. */}
       {!member.bestaetigt && (
-        <Button type="button" size="sm" variant="ghost" disabled={laeuft} onClick={onAktivieren}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={laeuft}
+          onClick={onAktivieren}
+        >
           Direkt aktivieren
         </Button>
       )}
