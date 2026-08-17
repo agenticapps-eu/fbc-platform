@@ -52,6 +52,13 @@ const ZIEL_PROJEKT = "viwntbodrtqxgmqyxluh";
 const CONFIRM = "fbc-import-vorschau";
 /** Präfix aller erzeugten Kennungen. Trägt das Aufräumen. */
 const PRAEFIX = "0ade0566";
+/**
+ * Der Zugang zum Anschauen. `.invalid` ist nach RFC 2606 nicht zustellbar —
+ * die Adresse kann kein echtes Mitglied tragen. An EINER Stelle, weil sie an
+ * drei Stellen gebraucht wird und drei Schreibweisen genau der Fehler wären,
+ * der das Konto bei der Zuordnung mitzählt.
+ */
+const VORSCHAU_ADRESSE = "vorschau@fbc.invalid";
 const BUCKET = "event-covers";
 
 /**
@@ -412,6 +419,37 @@ function optIn(): "seed" | "reset" {
 }
 
 /**
+ * TLS für die Verbindung.
+ *
+ * SICHER ALS VORGABE, mit zwei bewussten Ausnahmen — nie stillschweigend
+ * abgeschaltet. Die erste Fassung setzte hart `rejectUnauthorized: false`, und
+ * das war ausgerechnet hier am wenigsten vertretbar: an dieser Datenbank hängen
+ * die Daten echter Menschen, und die Verbindung war zwar verschlüsselt, der
+ * Server aber nicht authentifiziert. Befund aus dem Sicherheits-Review.
+ *
+ * Der Pooler zeigt ein Zertifikat aus Supabases eigener CA, die nicht im
+ * System-Vertrauensspeicher steht — die Prüfung schlägt deshalb ohne eine der
+ * beiden Angaben fehl. Das ist die beabsichtigte Reibung, nicht ein Fehler:
+ *   IMPORT_SEED_CA_CERT=<pem>   → gegen Supabases CA prüfen (der richtige Weg;
+ *                                 Download im Dashboard unter Database → SSL)
+ *   IMPORT_SEED_TLS_INSECURE=1  → verschlüsseln, aber nicht authentifizieren
+ *                                 (nur im vertrauenswürdigen Netz; warnt laut)
+ */
+function tls(): pg.ClientConfig["ssl"] {
+  const ca = process.env.IMPORT_SEED_CA_CERT;
+  if (ca) return { ca: readFileSync(ca, "utf8"), rejectUnauthorized: true };
+  if (process.env.IMPORT_SEED_TLS_INSECURE === "1") {
+    console.warn(
+      "⚠️  TLS-Prüfung abgeschaltet (IMPORT_SEED_TLS_INSECURE=1): die Verbindung ist " +
+        "verschlüsselt, der Server aber NICHT authentifiziert. An dieser Datenbank " +
+        "hängen echte Personendaten — nur im vertrauenswürdigen Netz verwenden.",
+    );
+    return { rejectUnauthorized: false };
+  }
+  return { rejectUnauthorized: true };
+}
+
+/**
  * Der Wächter am Ziel. Der Pooler-Host ist regionsweit derselbe — es ist der
  * BENUTZERNAME, der das Projekt nennt. Ein Wächter auf den Host prüfte die
  * Region und liesse einen Lauf gegen das falsche Projekt durch.
@@ -425,10 +463,42 @@ function zielPruefen(url: string): void {
   }
 }
 
+/**
+ * Der Kreis derer, die dieser Seed aktiviert — aus den Inhalten berechnet.
+ *
+ * BEIDE Läufe rufen dieselbe Funktion. Das ist der Punkt: `reset` darf nur
+ * zurücknehmen, was `seed` gesetzt hat. Die erste Fassung räumte statt dessen
+ * „alles Aktivierte ohne Anmeldung" ab — und hätte damit auch eine Aktivierung
+ * gelöscht, die ein Admin über die Mitgliederliste vorgenommen hat oder die aus
+ * einem echten, eingelösten Zugangslink stammt. Befund aus dem Sicherheits-
+ * Review über den Commit, und er sass.
+ */
+function aktiviertenKreis(ids: string[]): string[] {
+  const idx = [
+    ...BEITRAEGE.map((b) => b.a),
+    ...KOMMENTARE.map((k) => k.a),
+    ...TERMINE.map((t) => t.gastgeber),
+  ].map((i) => i % ids.length);
+  return [...new Set(idx)].sort((x, y) => x - y).map((i) => ids[i]);
+}
+
 async function mitglieder(c: pg.Client): Promise<string[]> {
   // Feste Reihenfolge nach `id`: derselbe Lauf ordnet dieselben Sätze denselben
   // Menschen zu. Nach `name` wäre die Zuordnung von der Schreibweise abhängig.
-  const { rows } = await c.query<{ id: string }>(`select id from public.profiles order by id`);
+  //
+  // OHNE das Vorschau-Konto, und das ist keine Kosmetik: es ist selbst ein
+  // Profil, seine Kennung reiht sich irgendwo ein, und jede Zeile dahinter
+  // verschöbe sich um eins. Beitrag 7 gehörte beim nächsten Lauf einem anderen
+  // Menschen, und `reset` nähme die Aktivierung des Falschen zurück. Die Liste
+  // muss genau die importierten Mitglieder sein — sonst hängt die Zuordnung
+  // daran, ob dieser Seed vorher schon einmal lief.
+  const { rows } = await c.query<{ id: string }>(
+    `select p.id from public.profiles p
+       join auth.users u on u.id = p.id
+      where u.email <> $1
+      order by p.id`,
+    [VORSCHAU_ADRESSE],
+  );
   return rows.map((r) => r.id);
 }
 
@@ -441,13 +511,8 @@ async function seed(c: pg.Client): Promise<void> {
   console.log(`→ ${ids.length} Mitglieder gefunden`);
 
   // 1. Wer hat beigetragen? Genau die werden aktiviert — siehe die Notiz oben.
-  const beitragende = [
-    ...BEITRAEGE.map((b) => b.a),
-    ...KOMMENTARE.map((k) => k.a),
-    ...TERMINE.map((t) => t.gastgeber),
-  ].map((i) => i % ids.length);
-  const aktivIdx = [...new Set(beitragende)].sort((x, y) => x - y);
-  const zuAktivieren = aktivIdx.map((i) => ids[i]);
+  const zuAktivieren = aktiviertenKreis(ids);
+  const aktivIdx = zuAktivieren.map((id) => ids.indexOf(id));
 
   await c.query(
     `update public.profiles set activated_at = now() - interval '30 days'
@@ -557,17 +622,31 @@ async function seed(c: pg.Client): Promise<void> {
 
 async function reset(c: pg.Client): Promise<void> {
   const like = `${PRAEFIX}-%`;
+
+  // Die Bilder ZUERST, solange die Events noch stehen: der Pfad hängt an der
+  // `host_id` des Events, und nach dem Löschen wäre er nicht mehr zu ermitteln.
+  // Ohne diesen Schritt blieben acht Objekte im Bucket liegen, auf die keine
+  // Zeile mehr zeigt — der dritte Befund des Sicherheits-Reviews.
+  await bilderEntfernen(c);
+
   const p = await c.query(`delete from public.posts where id::text like $1`, [like]);
   const e = await c.query(`delete from public.events where id::text like $1`, [like]);
-  // Die Aktivierungen dieses Laufs zurücknehmen — erkennbar am gesetzten Datum.
-  // Die zwei Konten, die sich wirklich angemeldet haben, bleiben verschont.
+
+  // Nur zurücknehmen, was DIESER Seed gesetzt hat — der Kreis wird aus denselben
+  // Inhalten berechnet wie beim Anlegen. Wer sich angemeldet hat, bleibt in
+  // jedem Fall verschont: eine echte Anmeldung ist der stärkste Beleg dafür,
+  // dass die Aktivierung nicht von hier stammt.
+  const ids = await mitglieder(c);
   const a = await c.query(
-    `update public.profiles set activated_at = null
-      where activated_at is not null and id not in (select id from auth.users where last_sign_in_at is not null)`,
+    `update public.profiles p set activated_at = null
+      where p.id = any($1::uuid[])
+        and p.activated_at is not null
+        and not exists (select 1 from auth.users u where u.id = p.id and u.last_sign_in_at is not null)`,
+    [aktiviertenKreis(ids)],
   );
   // Das Vorschau-Konto gehört zu diesem Lauf und geht mit ihm. Die Adresse
   // endet auf `.invalid` und kann deshalb kein echtes Mitglied treffen.
-  const v = await c.query(`delete from auth.users where email = 'vorschau@fbc.invalid'`);
+  const v = await c.query(`delete from auth.users where email = $1`, [VORSCHAU_ADRESSE]);
   console.log(
     `→ entfernt: ${p.rowCount} Beiträge, ${e.rowCount} Termine, ${v.rowCount} Vorschau-Konto; ` +
       `${a.rowCount} Aktivierungen zurückgenommen`,
@@ -655,7 +734,7 @@ async function vorschauKonto(c: pg.Client): Promise<void> {
     return;
   }
   const basis = `https://${ZIEL_PROJEKT}.supabase.co`;
-  const adresse = "vorschau@fbc.invalid";
+  const adresse = VORSCHAU_ADRESSE;
   const { rows } = await c.query<{ id: string }>(`select id from auth.users where email = $1`, [
     adresse,
   ]);
@@ -688,6 +767,35 @@ async function vorschauKonto(c: pg.Client): Promise<void> {
   console.log(`  └─────────────────────────────────────────────────────────────\n`);
 }
 
+/**
+ * Die hochgeladenen Titelbilder wieder aus dem Bucket nehmen.
+ *
+ * Ein Objekt im Storage hängt an keiner Fremdschlüsselbeziehung — es überlebt
+ * das Löschen seines Events klaglos und wäre danach nur noch über den rohen
+ * Pfad auffindbar. Deshalb hier, VOR dem Löschen der Events, und nur die Pfade
+ * dieses Seeds (`vorschau-`).
+ */
+async function bilderEntfernen(c: pg.Client): Promise<void> {
+  const key = await serviceKey();
+  if (!key) {
+    console.log("→ Titelbilder NICHT entfernt: kein service_role-Schlüssel erreichbar.");
+    return;
+  }
+  const { rows } = await c.query<{ cover_path: string }>(
+    `select cover_path from public.events
+      where id::text like $1 and cover_path is not null`,
+    [`${PRAEFIX}-%`],
+  );
+  if (rows.length === 0) return;
+  const r = await fetch(`https://${ZIEL_PROJEKT}.supabase.co/storage/v1/object/${BUCKET}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: rows.map((x) => x.cover_path) }),
+  });
+  if (!r.ok) throw new Error(`Bilder entfernen: ${r.status} ${await r.text()}`);
+  console.log(`→ Titelbilder aus dem Bucket entfernt: ${rows.length}`);
+}
+
 async function bilanz(c: pg.Client): Promise<void> {
   const { rows } = await c.query(`select
       (select count(*) from public.profiles) profile,
@@ -711,7 +819,7 @@ async function main(): Promise<void> {
   console.log(`\nImport-Vorschau — Modus: ${modus}`);
   console.log(`Ziel: Projekt ${ZIEL_PROJEKT} (die ECHTEN Mitglieder)\n`);
 
-  const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const c = new pg.Client({ connectionString: url, ssl: tls() });
   await c.connect();
   try {
     if (modus === "reset") await reset(c);
