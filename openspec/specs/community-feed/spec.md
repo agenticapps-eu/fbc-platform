@@ -279,19 +279,37 @@ dass nichts wirft.
 ### Requirement: Jeder Tag erscheint genau einmal
 
 Das System SHALL einen Tag pro Beitrag an genau einer Stelle darstellen: als
-Chip unterhalb des Textes. Hashtag-Segmente im Fließtext SHALL als normaler
-Text gerendert werden.
+Chip unterhalb des Textes.
+
+Ein ABSCHLIESSENDER Block von Hashtags SHALL deshalb nicht im Fließtext
+erscheinen — er ist Verschlagwortung und steht bereits als Chip. Hashtags im
+SATZINNEREN SHALL dagegen als normaler Text stehen bleiben: dort tragen sie
+Grammatik, und ihre Entfernung zerlegte den Satz („Wir waren beim #Sommerfest
+und …" würde zu „Wir waren beim und …"). Anklickbar SHALL in beiden Fällen nur
+der Chip sein.
 
 Der Grund SHALL festgehalten sein: die Chip-Reihe speist sich aus
 `posts.hashtags`, und dieses Feld wird beim Anlegen aus genau denselben
 Segmenten des Textes berechnet. Beide Darstellungen zeigen damit zwingend
 dieselbe Menge, nicht gelegentlich.
 
-#### Scenario: Ein Hashtag im Text erscheint nicht doppelt
+> **Korrigiert 17.08.2026 (AGE-566).** Die Anforderung hiess schon vorher „an
+> genau einer Stelle" und das Szenario „erscheint nicht doppelt" — die Zusage
+> darunter lieferte aber ausdrücklich beides, Chip UND Fließtext. Titel und
+> Inhalt widersprachen sich; aufgefallen ist es in der Vorführ-Umgebung, wo
+> `#Persönlichkeitsentwicklung` zweimal auf demselben Bildschirm stand.
 
-- **WHEN** ein Beitrag mit `#Netzwerken` im Fließtext dargestellt wird
-- **THEN** erscheint `#Netzwerken` einmal als Chip, und im Fließtext steht es als
-  normaler Text ohne Verweis
+#### Scenario: Ein Hashtag am Textende erscheint nur als Chip
+
+- **WHEN** ein Beitrag dargestellt wird, dessen Text auf `#Netzwerken` endet
+- **THEN** erscheint `#Netzwerken` einmal als Chip unterhalb des Textes, und der
+  Fließtext endet ohne ihn
+
+#### Scenario: Ein Hashtag im Satzinneren bleibt stehen
+
+- **WHEN** ein Beitrag mit `#Netzwerken` mitten im Satz dargestellt wird
+- **THEN** steht `#Netzwerken` weiterhin im Fließtext, als normaler Text ohne
+  Verweis, und erscheint zusätzlich als Chip
 
 #### Scenario: Erwähnungen und Links bleiben unberührt
 
