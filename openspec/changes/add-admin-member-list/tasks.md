@@ -171,8 +171,14 @@
       die über jeden anderen Weg unsichtbar sind. Das ist der Anlass des Changes
       und die einzige Messung, die ihn belegt. **Keine Personendaten in die
       Belege übernehmen** — Zahlen und Zustände, keine Namen.
-- [ ] 6.4 Diff-Review durch einen Prüfer eines anderen Herstellers; Befunde
-      beheben oder begründet ablehnen.
+- [x] 6.4 Diff-Review durch einen Prüfer eines anderen Herstellers; Befunde
+      beheben oder begründet ablehnen. **Zwei fremde Prüfer, beide Ausgang 0:
+      gemini APPROVE ohne Befund, codex REQUEST-CHANGES mit vier.** Alle vier
+      nachgeprüft und zutreffend, zwei davon gemessen (Wettlauf: zwei
+      Auditzeilen für eine Aktivierung; `p_limit = null`: 74 statt 50 Zeilen).
+      Dazu zwei Befunde aus der eigenen Durchsicht — die fehlende Entprellung
+      und die in CI **nicht eingetragene** pgTAP-Datei. Alle sechs übernommen,
+      keiner abgelehnt; Belege in REVIEWS.md.
 
 ## 7. Abschluss
 
