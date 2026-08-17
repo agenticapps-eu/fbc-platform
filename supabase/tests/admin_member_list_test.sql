@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(42);
+select plan(45);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -517,6 +517,54 @@ select ok(
                                where oid = 'public.admin_activate_member(uuid)'::regprocedure)) a
      where a.grantee = 0),
   'admin_activate_member: PUBLIC hält kein EXECUTE');
+
+-- ── 11. Die beiden Befunde aus dem Diff-Review (AGE-566, 17.08.) ───────────
+-- Migration: 20260817140000_admin_member_list_fixes.sql. Beide Zusagen sind
+-- ROT auf der ersten Fassung.
+
+-- Einundfünfzig Konten, eines mehr als der Vorgabewert. Ohne diese Zeilen wäre
+-- die Zusage „null wirkt wie 50" nicht messbar: bei weniger als fünfzig
+-- Treffern liefern `limit 50` und `limit null` dasselbe, und der Test bliebe
+-- grün, während die Grenze fehlte.
+insert into auth.users (id, aud, role, email)
+select ('d1000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
+       'authenticated', 'authenticated', 'grenze' || i || '@test.fbc'
+  from generate_series(1, 51) i;
+
+-- 11.1 Ein ausdrückliches `null` ist KEIN Vorgabewert. `limit null` heißt in
+-- Postgres „ohne Grenze"; `database.types.ts` erlaubt `p_limit: number | null`,
+-- und damit ist die zugesicherte serverseitige Blätterung mit einem einzigen
+-- `?? null` abschaltbar. Auf der ersten Fassung liefert dieser Aufruf 51.
+select is(
+  pg_temp.int_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::int from public.admin_list_members('grenze', null, null, null)$q$),
+  50, 'p_limit = null greift auf den Vorgabewert zurück statt die Grenze aufzuheben');
+
+-- 11.2 Und der Weg über das fehlende Argument führt auf denselben Wert. Beide
+-- Wege einzeln zu prüfen ist der Punkt: die 50 steht nach der Korrektur an zwei
+-- Stellen (Signatur und Rumpf), und ein Test, der nur einen Weg geht, ließe sie
+-- auseinanderlaufen.
+select is(
+  pg_temp.int_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::int from public.admin_list_members('grenze')$q$),
+  50, '… und das fehlende Argument führt auf denselben Wert');
+
+-- 11.3 WÄCHTER, kein Verhaltenstest — und das ist hier kein Versehen.
+-- Der Befund ist ein WETTLAUF: zwei gleichzeitige Aufrufe lesen beide `null`,
+-- kommen beide an der 22023-Prüfung vorbei und schreiben BEIDE eine Auditzeile
+-- für eine einzige Änderung. pgTAP läuft in EINER Transaktion und kann zwei
+-- nebenläufige Sitzungen nicht herstellen; ein Test, der es zu behaupten
+-- vorgäbe, prüfte etwas anderes als seinen Namen.
+--
+-- Der Beleg ist deshalb eine Messung mit zwei Verbindungen (17.08., lokaler
+-- Stack, festgehalten in REVIEWS.md): vorher zwei Auditzeilen für eine
+-- Aktivierung, nachher eine. Diese Assertion hält nur fest, dass die Sperre
+-- nicht wieder aus dem Rumpf verschwindet — sie ist das Gedächtnis der Messung,
+-- nicht ihr Ersatz.
+select alike(
+  pg_get_functiondef('public.admin_activate_member(uuid)'::regprocedure),
+  '%for update%',
+  'admin_activate_member liest die Zielzeile gesperrt (for update) — Gedächtnis der Wettlauf-Messung');
 
 select * from finish();
 rollback;
