@@ -15,68 +15,68 @@
 
 ## 1. Doppelspurigkeit mit `add-admin-console` auflösen — zuerst, nicht zuletzt
 
-- [ ] 1.1 In `add-admin-console/specs/admin/spec.md` die Anforderung
+- [x] 1.1 In `add-admin-console/specs/admin/spec.md` die Anforderung
       „Admin member list with filters (no contact PII)" entfernen — sie ist hier
       spezifiziert, und zwar mit `login_email`, was jener Anforderung
       widerspricht.
-- [ ] 1.2 Das `## REMOVED Requirements` auf „Admin member management is not
+- [x] 1.2 Das `## REMOVED Requirements` auf „Admin member management is not
       implemented" dort **stehen lassen**. Dieser Change fasst die Anforderung
       mit `MODIFIED` neu; sie besteht danach unter demselben Titel weiter und
       verbietet Massen-Mail, CRM und Newsletter. Nähme man das `REMOVED` heraus,
       verböte die dauerhafte Wahrheit später genau das, was `add-admin-console`
       baut. (Befund codex HIGH-1 — die erste Fassung dieser Aufgabe hatte es
       löschen wollen.)
-- [ ] 1.3 In `add-admin-console` festschreiben, dass es **nach** AGE-566
+- [x] 1.3 In `add-admin-console` festschreiben, dass es **nach** AGE-566
       archiviert wird, und die Mitgliederlisten-Aufgaben aus dessen `tasks.md`
       entfernen. In umgekehrter Reihenfolge kollidieren die Delta-Operationen.
-- [ ] 1.4 `add-admin-console/proposal.md` kürzen, mit einem Satz, wohin die
+- [x] 1.4 `add-admin-console/proposal.md` kürzen, mit einem Satz, wohin die
       Mitgliederliste gegangen ist (AGE-566).
-- [ ] 1.5 `openspec validate --all` grün. **Beleg:** beide Changes einzeln in der
+- [x] 1.5 `openspec validate --all` grün. **Beleg:** beide Changes einzeln in der
       Prüfliste, nicht nur die Gesamtzahl — die ist ein schlechter Zeuge, wenn
       auf verschiedenen Branches verschiedene Changes liegen.
 
 ## 2. `admin_list_members` — Test zuerst
 
-- [ ] 2.1 pgTAP: ein Nicht-Admin bekommt beim **argumentlosen** Aufruf `42501`.
+- [x] 2.1 pgTAP: ein Nicht-Admin bekommt beim **argumentlosen** Aufruf `42501`.
       Fehlercode prüfen, nicht nur „schlägt fehl" — und dieser Test fängt
       zugleich fehlende Vorgabewerte ab, die als „function does not exist"
       erschienen (Befund codex MEDIUM-1). RED.
-- [ ] 2.2 pgTAP: ein Profil mit `activated_at is null` **ist** in der Rückgabe
+- [x] 2.2 pgTAP: ein Profil mit `activated_at is null` **ist** in der Rückgabe
       und trägt `bestaetigt = false`. RED.
-- [ ] 2.3 pgTAP: `p_status` — `offen` liefert genau die unbestätigten,
+- [x] 2.3 pgTAP: `p_status` — `offen` liefert genau die unbestätigten,
       `aktiviert` genau die bestätigten, `alle` und `null` alle, ein unbekannter
       Wert bricht mit `22023` ab. RED. (Ohne diese Prüfung erfüllte eine
       Umsetzung, die `p_status` ignoriert, jedes andere Szenario — Befund
       codex HIGH-3.)
-- [ ] 2.4 pgTAP: `p_query` findet über `name` **und** über `login_email`,
+- [x] 2.4 pgTAP: `p_query` findet über `name` **und** über `login_email`,
       unabhängig von Gross-/Kleinschreibung; leer und `null` filtern nicht. RED.
-- [ ] 2.5 pgTAP: keine Spalte aus `profile_contacts`. Gegen die **Spaltenliste**
+- [x] 2.5 pgTAP: keine Spalte aus `profile_contacts`. Gegen die **Spaltenliste**
       prüfen, nicht gegen einen Beispieldatensatz. RED.
-- [ ] 2.6 pgTAP: `p_limit = 2, p_offset = 2` über fünf Mitglieder — darunter zwei
+- [x] 2.6 pgTAP: `p_limit = 2, p_offset = 2` über fünf Mitglieder — darunter zwei
       gleichnamige und eines ohne Namen — liefert die Nummern drei und vier, und
       zwei Aufrufe liefern dasselbe. Ohne den `id`-Stichentscheid ist das nicht
       erfüllbar. RED.
-- [ ] 2.7 pgTAP: Suchbegriff `%` liefert nicht die gesamte Mitgliedschaft. RED.
-- [ ] 2.8 Migration: `admin_list_members(p_query text default null, p_status text
+- [x] 2.7 pgTAP: Suchbegriff `%` liefert nicht die gesamte Mitgliedschaft. RED.
+- [x] 2.8 Migration: `admin_list_members(p_query text default null, p_status text
       default null, p_limit int default 50, p_offset int default 0)`,
       `security definer`, `set search_path = ''`, `is_admin()` zuerst.
       Sortierung: **unbestätigte zuerst, dann `name`, dann `id`** — im
       Migrationskopf begründen, samt der Folge, dass eine Aktivierung eine Zeile
       zwischen den Seiten wandern lässt. GREEN für 2.1–2.7.
-- [ ] 2.9 Rechte aussprechen: `revoke execute … from public, anon`,
+- [x] 2.9 Rechte aussprechen: `revoke execute … from public, anon`,
       `grant execute … to authenticated` (AGE-312), mit Test.
 
 ## 3. Parität — Spalten **und** Inhalt
 
-- [ ] 3.1 Test über die Spaltenliste beider Funktionen. Er muss die
+- [x] 3.1 Test über die Spaltenliste beider Funktionen. Er muss die
       **abweichende Spalte benennen**, nicht nur „ungleich" melden. Die Zahl der
       Spalten wird dabei **nicht** festgeschrieben: `search_directory` hat heute
       vierzehn, und eine Zahl im Test ist beim nächsten Feld wieder falsch
       (Befund codex LOW-1).
-- [ ] 3.2 Test über den **Inhalt**: für ein bestätigtes Mitglied liefern beide
+- [x] 3.2 Test über den **Inhalt**: für ein bestätigtes Mitglied liefern beide
       Funktionen dieselben Werte in den Verzeichnisspalten. Das fasst eine
       Abweichung, die die Spaltennamen unberührt lässt (Befund gemini HIGH).
-- [ ] 3.3 Gegenprobe: je eine Spalte umbenennen und einen Wert verbiegen, und
+- [x] 3.3 Gegenprobe: je eine Spalte umbenennen und einen Wert verbiegen, und
       belegen, dass 3.1 und 3.2 rot werden. Ohne diese Probe ist unbelegt, dass
       sie überhaupt etwas prüfen.
 

@@ -1,20 +1,24 @@
-# Add admin console: member list, bulk mail, CRM and topic newsletters
+# Add admin console: bulk mail, CRM and topic newsletters
+
+> **Die Mitgliederliste ist am 17.08.2026 an AGE-566 (`add-admin-member-list`)
+> abgegeben worden** — dort wird sie als `admin_list_members` unter
+> `/admin/mitglieder` gebaut, und zwar mit `login_email`, was die hier zuvor
+> spezifizierte Anforderung ausdrücklich verbot. Dieser Change wird deshalb
+> **nach** jenem archiviert.
 
 ## Why
 
 The built admin surface is limited to the platform-settings toggle, the
-matching-manager routing queue, and the read-only feedback view; the member-list
-and mass-mail capability is explicitly not implemented (`admin`). Staff still run
+matching-manager routing queue, and the read-only feedback view; the mass-mail
+capability is explicitly not implemented (`admin`). Staff still run
 outreach out of Odoo. Phase 2 replaces that with an in-platform admin console:
-a filterable member list, bulk email to segments, an in-platform CRM, and
-topic-based newsletters with honored opt-in/opt-out. Linear: **AGE-304** (member
-list, bulk mail, newsletter actions), **AGE-301** (in-platform CRM replacing
-Odoo) and **AGE-305** (topic newsletter opt-in/out).
+bulk email to segments, an in-platform CRM, and topic-based newsletters with
+honored opt-in/opt-out. Linear: **AGE-304** (bulk mail, newsletter actions),
+**AGE-301** (in-platform CRM replacing Odoo) and **AGE-305** (topic newsletter
+opt-in/out).
 
 ## What Changes
 
-- Add an admin member-list view (filters, `is_admin()`-gated) that returns
-  **non-contact** fields only — no email/phone.
 - Add a bulk-email action whose recipients are resolved **server-side** from a
   validated segment definition, honouring the shared suppression list, individualised
   delivery, campaign idempotency, and a step-up + rate-limit on mass-send.
