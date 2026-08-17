@@ -1,86 +1,139 @@
 # Aufgaben — Admin-Mitgliederliste (AGE-566)
 
-> **TDD, rot vor grün.** Jede Aufgabe mit einer Zusicherung beginnt mit dem Test,
-> der ohne den Code fehlschlägt. Fallen, die dieses Projekt schon gestellt hat:
-> in pgTAP heisst es `alike()`, nicht `like()`; `try_as()` meldet **jeden**
-> Fehler als DENIED, ein Test muss also den Fehlercode prüfen; Rechte werden
-> nicht vererbt.
+> **TDD, rot vor grün** — aber nur, wo es rot werden *kann*. Zwei Prüfungen hier
+> beschreiben bestehendes Verhalten und starten grün; sie sind als
+> **Regressionstest** gekennzeichnet, nicht als RED. Das eine als das andere
+> auszugeben hiesse, eine Zusicherung zu behaupten, die nie gemessen wurde.
+>
+> Fallen, die dieses Projekt schon gestellt hat: in pgTAP heisst es `alike()`,
+> nicht `like()`; `try_as()` meldet **jeden** Fehler als DENIED, ein Test muss
+> also den Fehlercode prüfen; Rechte werden nicht vererbt.
+>
+> Überarbeitet nach dem Plan-Review (`REVIEWS.md`, zwei Prüfer, beide
+> REQUEST-CHANGES). Die Aufgaben 1, 3, 4 und 5 sehen deshalb anders aus als in
+> der ersten Fassung.
 
-## 1. Konflikt mit `add-admin-console` auflösen — zuerst, nicht zuletzt
+## 1. Doppelspurigkeit mit `add-admin-console` auflösen — zuerst, nicht zuletzt
 
-- [ ] 1.1 In `openspec/changes/add-admin-console/specs/admin/spec.md` das
-      `## REMOVED Requirements` auf „Admin member management is not implemented"
-      entfernen. Dieser Change fasst die Anforderung neu, statt sie zu löschen;
-      zwei Operationen auf derselben Anforderung sperren später das Archivieren.
-- [ ] 1.2 Ebendort die Anforderung „Admin member list with filters (no contact
-      PII)" entfernen — sie ist hier spezifiziert. Massen-Mail, CRM und
-      Newsletter bleiben dort.
-- [ ] 1.3 `add-admin-console/proposal.md` entsprechend kürzen und einen Satz
-      aufnehmen, der sagt, wohin die Mitgliederliste gegangen ist (AGE-566).
-- [ ] 1.4 `openspec validate --all` grün. **Beleg:** beide Changes einzeln in der
+- [ ] 1.1 In `add-admin-console/specs/admin/spec.md` die Anforderung
+      „Admin member list with filters (no contact PII)" entfernen — sie ist hier
+      spezifiziert, und zwar mit `login_email`, was jener Anforderung
+      widerspricht.
+- [ ] 1.2 Das `## REMOVED Requirements` auf „Admin member management is not
+      implemented" dort **stehen lassen**. Dieser Change fasst die Anforderung
+      mit `MODIFIED` neu; sie besteht danach unter demselben Titel weiter und
+      verbietet Massen-Mail, CRM und Newsletter. Nähme man das `REMOVED` heraus,
+      verböte die dauerhafte Wahrheit später genau das, was `add-admin-console`
+      baut. (Befund codex HIGH-1 — die erste Fassung dieser Aufgabe hatte es
+      löschen wollen.)
+- [ ] 1.3 In `add-admin-console` festschreiben, dass es **nach** AGE-566
+      archiviert wird, und die Mitgliederlisten-Aufgaben aus dessen `tasks.md`
+      entfernen. In umgekehrter Reihenfolge kollidieren die Delta-Operationen.
+- [ ] 1.4 `add-admin-console/proposal.md` kürzen, mit einem Satz, wohin die
+      Mitgliederliste gegangen ist (AGE-566).
+- [ ] 1.5 `openspec validate --all` grün. **Beleg:** beide Changes einzeln in der
       Prüfliste, nicht nur die Gesamtzahl — die ist ein schlechter Zeuge, wenn
       auf verschiedenen Branches verschiedene Changes liegen.
 
 ## 2. `admin_list_members` — Test zuerst
 
-- [ ] 2.1 pgTAP: ein Nicht-Admin bekommt `42501`. **Fehlercode prüfen**, nicht
-      nur „schlägt fehl" — `try_as()` meldet jeden Fehler als DENIED, auch einen
-      Tippfehler im Funktionsnamen. RED.
+- [ ] 2.1 pgTAP: ein Nicht-Admin bekommt beim **argumentlosen** Aufruf `42501`.
+      Fehlercode prüfen, nicht nur „schlägt fehl" — und dieser Test fängt
+      zugleich fehlende Vorgabewerte ab, die als „function does not exist"
+      erschienen (Befund codex MEDIUM-1). RED.
 - [ ] 2.2 pgTAP: ein Profil mit `activated_at is null` **ist** in der Rückgabe
       und trägt `bestaetigt = false`. RED.
-- [ ] 2.3 pgTAP: keine Spalte aus `profile_contacts` in der Rückgabe. Gegen die
-      Spaltenliste der Funktion prüfen, nicht gegen einen Beispieldatensatz —
-      ein leeres Feld sähe sonst aus wie ein fehlendes. RED.
-- [ ] 2.4 pgTAP: `p_limit = 2, p_offset = 2` über fünf Mitglieder liefert genau
-      die Nummern drei und vier, und zwei Aufrufe liefern dieselbe Reihenfolge.
-      RED.
-- [ ] 2.5 pgTAP: Suchbegriff `%` liefert nicht die gesamte Mitgliedschaft. RED.
-- [ ] 2.6 Migration schreiben: `admin_list_members(p_query text, p_status text,
-      p_limit int default 50, p_offset int default 0)`, `security definer`,
-      `set search_path = ''`, `is_admin()` als erste Anweisung. Sortierung
-      festlegen **und im Migrationskopf begründen** (offene Frage aus design.md).
-      GREEN für 2.1–2.5.
-- [ ] 2.7 Rechte aussprechen: `revoke execute … from public, anon`,
-      `grant execute … to authenticated` (AGE-312). Test, der das belegt.
+- [ ] 2.3 pgTAP: `p_status` — `offen` liefert genau die unbestätigten,
+      `aktiviert` genau die bestätigten, `alle` und `null` alle, ein unbekannter
+      Wert bricht mit `22023` ab. RED. (Ohne diese Prüfung erfüllte eine
+      Umsetzung, die `p_status` ignoriert, jedes andere Szenario — Befund
+      codex HIGH-3.)
+- [ ] 2.4 pgTAP: `p_query` findet über `name` **und** über `login_email`,
+      unabhängig von Gross-/Kleinschreibung; leer und `null` filtern nicht. RED.
+- [ ] 2.5 pgTAP: keine Spalte aus `profile_contacts`. Gegen die **Spaltenliste**
+      prüfen, nicht gegen einen Beispieldatensatz. RED.
+- [ ] 2.6 pgTAP: `p_limit = 2, p_offset = 2` über fünf Mitglieder — darunter zwei
+      gleichnamige und eines ohne Namen — liefert die Nummern drei und vier, und
+      zwei Aufrufe liefern dasselbe. Ohne den `id`-Stichentscheid ist das nicht
+      erfüllbar. RED.
+- [ ] 2.7 pgTAP: Suchbegriff `%` liefert nicht die gesamte Mitgliedschaft. RED.
+- [ ] 2.8 Migration: `admin_list_members(p_query text default null, p_status text
+      default null, p_limit int default 50, p_offset int default 0)`,
+      `security definer`, `set search_path = ''`, `is_admin()` zuerst.
+      Sortierung: **unbestätigte zuerst, dann `name`, dann `id`** — im
+      Migrationskopf begründen, samt der Folge, dass eine Aktivierung eine Zeile
+      zwischen den Seiten wandern lässt. GREEN für 2.1–2.7.
+- [ ] 2.9 Rechte aussprechen: `revoke execute … from public, anon`,
+      `grant execute … to authenticated` (AGE-312), mit Test.
 
-## 3. Der Paritätstest — die Auflage aus dem Entwurf
+## 3. Parität — Spalten **und** Inhalt
 
-- [ ] 3.1 Test, der die Verzeichnisspalten von `admin_list_members` gegen die von
-      `search_directory` hält. Er muss die **abweichende Spalte benennen**, nicht
-      nur „ungleich" melden.
-- [ ] 3.2 Gegenprobe: eine Spalte in einer der beiden versuchsweise umbenennen
-      und belegen, dass der Test rot wird. Ohne diese Probe ist unbelegt, dass er
-      überhaupt etwas prüft.
+- [ ] 3.1 Test über die Spaltenliste beider Funktionen. Er muss die
+      **abweichende Spalte benennen**, nicht nur „ungleich" melden. Die Zahl der
+      Spalten wird dabei **nicht** festgeschrieben: `search_directory` hat heute
+      vierzehn, und eine Zahl im Test ist beim nächsten Feld wieder falsch
+      (Befund codex LOW-1).
+- [ ] 3.2 Test über den **Inhalt**: für ein bestätigtes Mitglied liefern beide
+      Funktionen dieselben Werte in den Verzeichnisspalten. Das fasst eine
+      Abweichung, die die Spaltennamen unberührt lässt (Befund gemini HIGH).
+- [ ] 3.3 Gegenprobe: je eine Spalte umbenennen und einen Wert verbiegen, und
+      belegen, dass 3.1 und 3.2 rot werden. Ohne diese Probe ist unbelegt, dass
+      sie überhaupt etwas prüfen.
 
-## 4. `admin_activate_member`
+## 4. `admin_activate_member` — mit Spur, in einer Transaktion
 
-- [ ] 4.1 pgTAP: ein Nicht-Admin bekommt `42501` und `activated_at` bleibt
-      unverändert. RED.
-- [ ] 4.2 pgTAP: `mark_activated` gelingt weiterhin ohne Admin-Rolle — der
-      Einlöseweg von `redeem-activation` darf nicht brechen. RED, und dieser Test
-      muss auch nach 4.3 grün bleiben.
-- [ ] 4.3 Migration: `admin_activate_member(target uuid)` als Hülle. GREEN.
-- [ ] 4.4 Rechte aussprechen wie in 2.7.
+- [ ] 4.1 pgTAP: ein Nicht-Admin bekommt `42501`, `activated_at` bleibt
+      unverändert, und es entsteht **keine** `admin_audit`-Zeile. RED.
+- [ ] 4.2 pgTAP: ein Admin aktiviert, und es entsteht eine `admin_audit`-Zeile
+      mit handelndem Konto, Zielkonto und Art der Änderung. RED. Das erfüllt die
+      bestehende Anforderung „Privilegierte Änderungen hinterlassen eine Spur"
+      (`openspec/specs/admin/spec.md:360`), die verlangt, dass die Spur **mit**
+      der Fähigkeit entsteht (Befund codex HIGH-2 / gemini MEDIUM).
+- [ ] 4.3 pgTAP: schlägt das Schreiben nach `admin_audit` fehl, bleibt
+      `activated_at` ungesetzt. RED — belegt die eine Transaktion.
+- [ ] 4.4 pgTAP: ein zweiter Aufruf auf ein bereits bestätigtes Profil bricht mit
+      `22023` ab und erzeugt keine zweite Protokollzeile. RED.
+- [ ] 4.5 **Regressionstest** (startet grün, kein RED): `mark_activated` gelingt
+      weiterhin ohne Admin-Rolle. Er sichert, dass 4.6 den Einlöseweg von
+      `redeem-activation` nicht bricht.
+- [ ] 4.6 Migration: `admin_activate_member(target uuid)`. GREEN für 4.1–4.4,
+      4.5 bleibt grün.
+- [ ] 4.7 Rechte aussprechen wie in 2.9.
 
 ## 5. Die Fläche
 
 - [ ] 5.1 Route `/admin/mitglieder` unter dem vorhandenen `RequireAdmin`;
       Sidebar-Eintrag für Admins.
 - [ ] 5.2 Datenzugriff in `src/lib/` neben den vorhandenen Admin-Aufrufen, mit
-      Paging-Zustand. Kein Nachladen aller Seiten im Hintergrund.
-- [ ] 5.3 Umschalter Tabelle | Karten | Verzeichnis. Test: der Zustand „nicht
-      aktiviert" ist in **allen drei** sichtbar.
-- [ ] 5.4 Verzeichnis-Ansicht speist die vorhandene Verzeichniskarte. Test: der
-      Verweis geht auf `/admin/mitglied/:id` und **nicht** auf `/p/:id`.
-- [ ] 5.5 Blätterung sichtbar und benutzt. Test: Seite 2 zeigt andere Mitglieder
-      als Seite 1.
-- [ ] 5.6 „Zugangslink schicken" ruft `send-activation`. Test: die Rückmeldung
-      spricht von **angefordert**, nicht von verschickt oder zugestellt — der
-      202 belegt keinen Versand.
-- [ ] 5.7 „Direkt aktivieren" ruft `admin_activate_member`, optisch getrennt vom
-      Zugangslink und anders beschriftet.
-- [ ] 5.8 Test, der belegt, dass es **keine** Handlung zum Setzen eines fremden
-      Passworts gibt.
+      Paging-Zustand. Kein Nachladen aller Seiten im Hintergrund. Erzeugte
+      Datenbank-Typen mitziehen.
+- [ ] 5.3 **`MemberCard` aus `MemberDirectory.tsx:360` exportieren und ein Ziel
+      als Prop annehmen.** Die Karte ist heute privat und verdrahtet
+      `` to={`/p/${member.id}`} `` fest — „nichts Mitgliedersichtbares wird
+      angefasst" war im ersten Entwurf falsch (Befund codex MEDIUM-4).
+- [ ] 5.4 **Regressionstest** (startet grün): das Mitgliederverzeichnis verweist
+      weiter auf `/p/:id`. Er sichert 5.3 ab — ein unachtsamer Umbau lenkte sonst
+      das öffentliche Verzeichnis in den Admin-Bereich.
+- [ ] 5.5 Umschalter Tabelle | Karten | Verzeichnis. Test: „nicht aktiviert" ist
+      in **allen drei** sichtbar.
+- [ ] 5.6 Verzeichnis-Ansicht speist die exportierte Karte mit Ziel
+      `/admin/mitglied/:id`. Test darauf.
+- [ ] 5.7 Blätterung sichtbar und benutzt. Test: Seite 2 zeigt andere Mitglieder
+      als Seite 1. Statusfilter und Suchfeld angebunden.
+- [ ] 5.8 „Zugangslink schicken" ruft `send-activation`. Test: bei 202 spricht
+      die Rückmeldung von **angefordert**, nicht von verschickt.
+- [ ] 5.9 Test: bei 500 und 502 zeigt die Fläche einen **Fehler** und keine
+      Bestätigung. `send-activation` antwortet nicht immer 202 — auch 405, 400,
+      500 und 502 (Befund codex MEDIUM-2; die erste Fassung behauptete das
+      Gegenteil).
+- [ ] 5.10 „Direkt aktivieren" mit **namentlicher Rückfrage**, die die Folge
+      benennt. Nur an unbestätigten Zeilen. Tests: Rückfrage erscheint, Abbrechen
+      ändert nichts, an einer bestätigten Zeile wird der Knopf nicht angeboten.
+      Die Handlung ist durch die Anwendung nicht umkehrbar (Befund codex HIGH-4).
+- [ ] 5.11 Nach erfolgreicher Aktivierung die Liste neu laden, damit der Zustand
+      nicht veraltet stehenbleibt.
+- [ ] 5.12 **Regressionstest** (startet grün): es besteht keine Handlung, die ein
+      Passwort für ein fremdes Konto setzt.
 
 ## 6. Prüfen
 
@@ -88,12 +141,13 @@
       **mit Dateiliste** aufrufen — ohne sie meldet der Befehl FAIL, obwohl die
       pgTAP-Dateien grün sind.
 - [ ] 6.2 **Sichtprobe im Browser**, nicht nur jsdom: alle drei Sichten, ein
-      unbestätigtes Mitglied, beide Handlungen, die Blätterung. In diesem Projekt
-      sind mehrere Befunde ausschliesslich im echten Browser aufgefallen, während
-      die Tests grün waren.
+      unbestätigtes Mitglied, beide Handlungen samt Rückfrage, die Blätterung.
+      In diesem Projekt sind mehrere Befunde ausschliesslich im echten Browser
+      aufgefallen, während die Tests grün waren.
 - [ ] 6.3 Am echten Bestand messen: die Liste zeigt die importierten Mitglieder,
       die über jeden anderen Weg unsichtbar sind. Das ist der Anlass des Changes
-      und die einzige Messung, die ihn belegt.
+      und die einzige Messung, die ihn belegt. **Keine Personendaten in die
+      Belege übernehmen** — Zahlen und Zustände, keine Namen.
 - [ ] 6.4 Diff-Review durch einen Prüfer eines anderen Herstellers; Befunde
       beheben oder begründet ablehnen.
 
@@ -101,6 +155,6 @@
 
 - [ ] 7.1 `openspec validate --all` grün, Arbeitsbaum sauber, Feature-Branch.
 - [ ] 7.2 `openspec archive` — erst wenn 6.3 gemessen ist, nicht wenn der Code
-      existiert.
+      existiert. **Vor** `add-admin-console`.
 - [ ] 7.3 AGE-566 in Linear auf Done — vorher `get_issue` lesen; die Automation
       schaltet den Status bei PR-Merge womöglich schon selbst.
