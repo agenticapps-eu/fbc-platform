@@ -34,6 +34,13 @@ belegt an Zeichenketten — enthält `viwntbodrtqxgmqyxluh`, **kein**
 `foelowldexkcqzewvrcf`, dazu `admin_list_members`, „weitere Kommentare
 anzeigen", „Zur ersten Seite" und den HEIC-Hinweis.
 
+**Schlagworte am Textende stehen nur noch als Chip (17.08.).** Der Spec sagte
+im Titel „an genau einer Stelle" und im Szenarionamen „erscheint nicht
+doppelt" — der `THEN`-Satz lieferte aber ausdrücklich beides. Aufgelöst: der
+abschliessende Block verschwindet aus dem Fließtext, Hashtags im Satzinneren
+bleiben (dort tragen sie Grammatik). Spec mitgezogen, mit Notiz. An der
+Probe-Adresse ausgeloggt gegengeprüft.
+
 **Aus dem Test in der Probe-Umgebung kam ein echter Fehler (17.08.):** der
 Bildzuschnitt lud die Datei nur über `img.onload`, ohne `onerror`. Bei einer
 nicht dekodierbaren Datei — HEIC vom iPhone ist der Regelfall, und
