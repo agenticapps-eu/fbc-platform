@@ -25,7 +25,17 @@ import { useOverlay } from "../ui/useOverlay";
  */
 const STARS = [1, 2, 3, 4, 5] as const;
 
-/** Sprechblase — dieselbe Strichstärke wie die Icons der Navigation. */
+/**
+ * Fanfare, keine Sprechblase — dieselbe Strichstärke wie die Icons der
+ * Navigation.
+ *
+ * Die erste Fassung war eine Sprechblase und damit ZEICHENGLEICH mit dem
+ * Eintrag „Aktivität" zwei Zeilen darüber (`NavIcon.tsx`). Zwei Einträge
+ * derselben Leiste mit demselben Symbol heben sich gegenseitig auf: das Symbol
+ * unterscheidet dann nicht mehr, es dekoriert nur noch. Und inhaltlich stimmt
+ * die Fanfare besser — Feedback ist ein Zuruf an uns, kein Gespräch unter
+ * Mitgliedern.
+ */
 function FeedbackIcon() {
   return (
     <svg
@@ -38,7 +48,13 @@ function FeedbackIcon() {
       className="h-5 w-5 shrink-0"
       aria-hidden="true"
     >
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+      {/* Trichter */}
+      <path d="M3 11v2a1 1 0 0 0 1 1h2.5L11 17.5V6.5L6.5 10H4a1 1 0 0 0-1 1Z" />
+      {/* Schallwellen — zwei Bögen, nach aussen schwächer */}
+      <path d="M15 9.2a4 4 0 0 1 0 5.6" />
+      <path d="M17.8 6.8a8 8 0 0 1 0 10.4" />
+      {/* Halteschlaufe, damit die Form nicht als Lautsprecher liest */}
+      <path d="M7.5 17.5 8.6 20a1.2 1.2 0 0 0 2.3-.4v-1.4" />
     </svg>
   );
 }
