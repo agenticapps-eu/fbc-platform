@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(24);
+select plan(42);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -361,6 +361,162 @@ select is(
          from public.search_directory() t
         where t.id = 'b1000000-0000-0000-0000-000000000005'$q$),
   'Für ein bestätigtes Mitglied liefern beide Funktionen dieselben Werte in den Verzeichnisspalten');
+
+-- ── 10. `admin_activate_member`: die Spur entsteht MIT der Fähigkeit ───────
+-- Das ist keine Zutat dieses Changes, sondern die Erfüllung einer BESTEHENDEN
+-- Anforderung: „Privilegierte Änderungen hinterlassen eine Spur"
+-- (openspec/specs/admin/spec.md:360) verlangt für jede Admin-Änderung an einem
+-- fremden Konto eine Zeile in `public.admin_audit`, ausdrücklich „mit der
+-- Fähigkeit zusammen" und „SHALL NOT nachgereicht". Der Plan-Review hat den
+-- Verstoß gefunden, bevor eine Zeile Code stand.
+--
+-- Hier wiegt sie besonders schwer: die Änderung macht die Angaben eines
+-- Menschen für andere sichtbar, und die Anwendung kennt keinen Weg zurück.
+
+insert into auth.users (id, aud, role, email) values
+  ('e1000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'ziel-offen@test.fbc'),
+  ('e1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'ziel-bestaetigt@test.fbc'),
+  ('e1000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'ziel-transaktion@test.fbc'),
+  ('e1000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'ziel-einloeseweg@test.fbc');
+
+update public.profiles set name = 'Ziel Offen',        activated_at = null  where id = 'e1000000-0000-0000-0000-000000000001';
+update public.profiles set name = 'Ziel Bestaetigt',   activated_at = now() where id = 'e1000000-0000-0000-0000-000000000002';
+update public.profiles set name = 'Ziel Transaktion',  activated_at = null  where id = 'e1000000-0000-0000-0000-000000000003';
+update public.profiles set name = 'Ziel Einloeseweg',  activated_at = null  where id = 'e1000000-0000-0000-0000-000000000004';
+
+-- `mark_activated` liegt bei `service_role` (AGE-312: service_role hält keine
+-- Tabellenrechte und arbeitet ausschließlich über DEFINER-Funktionen). Der
+-- Regressionstest weiter unten braucht deshalb diese Rolle, nicht ein Mitglied.
+create function pg_temp.state_as_service(q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role service_role';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    return SQLSTATE;
+  end;
+  reset role;
+  return 'KEIN FEHLER';
+end $$;
+
+-- 10.1 Die Abwehr — und sie darf auch keine Spur hinterlassen. Ein Protokoll,
+-- das abgewehrte Versuche als Änderungen führt, erzählt später die falsche
+-- Geschichte.
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000c0',
+    $q$select public.admin_activate_member('e1000000-0000-0000-0000-000000000001')$q$),
+  '42501', 'Ein Nicht-Admin kann nicht aktivieren (42501)');
+
+select is(
+  (select activated_at from public.profiles where id = 'e1000000-0000-0000-0000-000000000001'),
+  null, '… das Zielprofil bleibt unbestätigt …');
+
+select is(
+  (select count(*)::int from public.admin_audit
+    where target = 'e1000000-0000-0000-0000-000000000001'),
+  0, '… und es entsteht KEINE admin_audit-Zeile');
+
+-- 10.2 Der Erfolgsfall samt Spur.
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select public.admin_activate_member('e1000000-0000-0000-0000-000000000001')$q$),
+  'KEIN FEHLER', 'Ein Admin aktiviert ein unbestätigtes Mitglied');
+
+select isnt(
+  (select activated_at from public.profiles where id = 'e1000000-0000-0000-0000-000000000001'),
+  null, '… activated_at ist gesetzt …');
+
+select is(
+  (select count(*)::int from public.admin_audit
+    where target = 'e1000000-0000-0000-0000-000000000001'),
+  1, '… genau eine Protokollzeile ist entstanden …');
+
+select is(
+  (select actor::text || '|' || action || '|' || target::text from public.admin_audit
+    where target = 'e1000000-0000-0000-0000-000000000001'),
+  'a0000000-0000-0000-0000-0000000000ad|activate_member|e1000000-0000-0000-0000-000000000001',
+  '… und sie nennt handelndes Konto, Art der Änderung und Zielkonto');
+
+-- 10.3 Eine Transaktion, nicht zwei Anweisungen. Ohne diese Probe bliebe
+-- unbelegt, dass eine Sichtbarkeitsänderung ohne Spur unmöglich ist — genau der
+-- Zustand, den die bestehende Anforderung ausschließt. Ein Rumpf, der den
+-- Protokollfehler abfinge (`exception when others then null`), käme sonst durch.
+create function pg_temp.spur_verweigern() returns trigger language plpgsql as $$
+begin
+  raise exception 'Protokoll nicht schreibbar' using errcode = '58030';
+end $$;
+
+create trigger spur_bricht before insert on public.admin_audit
+  for each row execute function pg_temp.spur_verweigern();
+
+select isnt(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select public.admin_activate_member('e1000000-0000-0000-0000-000000000003')$q$),
+  'KEIN FEHLER', 'Schlägt das Schreiben der Spur fehl, schlägt der ganze Aufruf fehl …');
+
+select is(
+  (select activated_at from public.profiles where id = 'e1000000-0000-0000-0000-000000000003'),
+  null, '… und activated_at bleibt ungesetzt — beides steht in EINER Transaktion');
+
+drop trigger spur_bricht on public.admin_audit;
+
+-- 10.4 Ein zweiter Aufruf ist ein Irrtum oder ein Doppelklick. Beides soll
+-- nicht zu einer zweiten Protokollzeile über eine Änderung führen, die gar
+-- nicht stattfand.
+--
+-- Das Ziel ist bewusst „…001" — dasselbe Mitglied, das 10.2 gerade über DIESE
+-- Funktion aktiviert hat, mit genau einer Protokollzeile im Rücken. Ein per
+-- Fixture bestätigtes Profil belegte nur „0 bleibt 0" und liesse eine Umsetzung
+-- durch, die beim echten zweiten Klick nachprotokolliert.
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select public.admin_activate_member('e1000000-0000-0000-0000-000000000001')$q$),
+  '22023', 'Ein zweiter Aufruf auf dasselbe Profil bricht mit 22023 ab …');
+
+select is(
+  (select count(*)::int from public.admin_audit
+    where target = 'e1000000-0000-0000-0000-000000000001'),
+  1, '… und es bleibt bei EINER Protokollzeile');
+
+-- Und derselbe Abbruch für ein Profil, das auf anderem Weg bestätigt wurde —
+-- etwa über den Einlöselink des Mitglieds selbst.
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select public.admin_activate_member('e1000000-0000-0000-0000-000000000002')$q$),
+  '22023', 'Ein anderweitig bestätigtes Profil ebenso …');
+
+select is(
+  (select count(*)::int from public.admin_audit
+    where target = 'e1000000-0000-0000-0000-000000000002'),
+  0, '… und hinterlässt keine Protokollzeile');
+
+-- 10.5 REGRESSIONSTEST (startet grün, kein RED): der Einlöseweg bleibt
+-- unangetastet. `mark_activated` prüft `is_admin()` bewusst NICHT — sie wird von
+-- `redeem-activation` mit `service_role` gerufen. Ihr eine Admin-Prüfung
+-- hinzuzufügen bräche die Selbstaktivierung jedes Mitglieds; diese zwei
+-- Assertions sind die Sicherung dagegen.
+select is(
+  pg_temp.state_as_service(
+    $q$select public.mark_activated('e1000000-0000-0000-0000-000000000004')$q$),
+  'KEIN FEHLER', 'mark_activated gelingt weiterhin OHNE Admin-Rolle (Einlöseweg)');
+
+select isnt(
+  (select activated_at from public.profiles where id = 'e1000000-0000-0000-0000-000000000004'),
+  null, '… und setzt activated_at wirklich');
+
+-- 10.6 Rechte, ausgesprochen statt geerbt (AGE-312).
+select is(has_function_privilege('anon', 'public.admin_activate_member(uuid)', 'execute'),
+  false, 'admin_activate_member: anon darf nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.admin_activate_member(uuid)', 'execute'),
+  true, 'admin_activate_member: authenticated darf — die Abwehr steht IN der Funktion');
+select ok(
+  not exists (
+    select 1 from aclexplode((select proacl from pg_proc
+                               where oid = 'public.admin_activate_member(uuid)'::regprocedure)) a
+     where a.grantee = 0),
+  'admin_activate_member: PUBLIC hält kein EXECUTE');
 
 select * from finish();
 rollback;

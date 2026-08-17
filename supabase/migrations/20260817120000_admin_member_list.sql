@@ -171,3 +171,80 @@ comment on function public.admin_list_members(text, text, int, int) is
   'bricht mit 22023 ab. Sortiert unbestaetigte zuerst, dann name, dann id — '
   'eine Aktivierung laesst eine Zeile deshalb zwischen den Seiten wandern. '
   'Kein is_public-Filter: die Verwaltungsliste ist keine Verzeichnisansicht.';
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- `admin_activate_member` — die zweite Funktion dieses Changes.
+--
+-- ══ WARUM SIE NEBEN `mark_activated` STEHT UND NICHT AN IHRER STELLE ═══════
+-- `mark_activated` prüft `is_admin()` BEWUSST NICHT: sie wird von
+-- `redeem-activation` mit `service_role` gerufen, und `service_role` hält seit
+-- AGE-312 auf keiner Tabelle in `public` ein Recht, läuft also ohnehin nur über
+-- DEFINER-Funktionen. Ihr eine Admin-Prüfung hinzuzufügen bräche die
+-- Selbstaktivierung JEDES Mitglieds. Diese Hülle prüft `is_admin()` und ruft
+-- dieselbe Logik; ein Regressionstest hält den Einlöseweg fest.
+--
+-- ══ WARUM DIE SPUR HIER KEINE ZUTAT IST ═══════════════════════════════════
+-- `openspec/specs/admin/spec.md:360` — „Privilegierte Änderungen hinterlassen
+-- eine Spur" — verlangt für JEDE Admin-Änderung an einem fremden Konto eine
+-- Zeile in `public.admin_audit`, ausdrücklich „mit der Fähigkeit zusammen" und
+-- „SHALL NOT nachgereicht werden". Der erste Entwurf dieses Changes übersah das
+-- und begründete es zusätzlich falsch (das Protokoll liege noch in
+-- `add-dsgvo-compliance`); `admin_audit` existiert seit 20260811090300. Der
+-- Plan-Review hat den Verstoß gefunden, bevor eine Zeile Code stand.
+--
+-- EINE Transaktion, nicht zwei Anweisungen — und ausdrücklich KEIN
+-- `exception`-Block um das INSERT: sonst könnte eine Sichtbarkeitsänderung ohne
+-- Spur bestehen, und genau diesen Zustand schliesst die Anforderung aus.
+--
+-- ══ WARUM EIN ZWEITER AUFRUF ABBRICHT ═════════════════════════════════════
+-- `mark_activated` schreibt `coalesce(activated_at, now())` und ist damit
+-- idempotent — ein zweiter Aufruf änderte nichts, schriebe aber eine zweite
+-- Protokollzeile über eine Änderung, die nicht stattfand. Ein Doppelklick
+-- erzeugte so eine Historie, die es nie gab.
+--
+-- WAS DIESE FUNKTION NICHT KANN: zurück. Es gibt keinen Rücksetzweg, und die
+-- Oberfläche kann einen Fehlklick deshalb nicht heilen — daher die namentliche
+-- Rückfrage dort. Das ist eine Eigenschaft des Bestands, nicht dieses Changes,
+-- aber sie gehört an diese Stelle geschrieben.
+
+create function public.admin_activate_member(target uuid)
+returns timestamptz
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_zeit timestamptz;
+begin
+  if not public.is_admin() then
+    raise exception 'forbidden: admin_activate_member' using errcode = '42501';
+  end if;
+
+  select p.activated_at into v_zeit from public.profiles p where p.id = target;
+  if not found then
+    raise exception 'Profil % existiert nicht', target using errcode = 'P0002';
+  end if;
+  if v_zeit is not null then
+    raise exception 'Profil % ist bereits bestaetigt', target using errcode = '22023';
+  end if;
+
+  v_zeit := public.mark_activated(target);
+
+  insert into public.admin_audit (actor, action, target)
+  values ((select auth.uid()), 'activate_member', target);
+
+  return v_zeit;
+end $$;
+
+revoke execute on function public.admin_activate_member(uuid) from public, anon;
+grant  execute on function public.admin_activate_member(uuid) to authenticated;
+
+comment on function public.admin_activate_member(uuid) is
+  'Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach '
+  'admin_audit (AGE-566). Erfuellt die bestehende Anforderung "Privilegierte '
+  'Aenderungen hinterlassen eine Spur" — die Spur entsteht MIT der Faehigkeit, '
+  'nicht nachtraeglich. Bricht mit 22023 ab, wenn das Ziel schon bestaetigt '
+  'ist: mark_activated ist idempotent, eine zweite Protokollzeile waere es '
+  'nicht. Steht NEBEN mark_activated, die bewusst ohne Admin-Pruefung bleibt '
+  '(Einloeseweg von redeem-activation mit service_role).';

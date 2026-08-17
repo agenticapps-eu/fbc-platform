@@ -82,23 +82,23 @@
 
 ## 4. `admin_activate_member` — mit Spur, in einer Transaktion
 
-- [ ] 4.1 pgTAP: ein Nicht-Admin bekommt `42501`, `activated_at` bleibt
+- [x] 4.1 pgTAP: ein Nicht-Admin bekommt `42501`, `activated_at` bleibt
       unverändert, und es entsteht **keine** `admin_audit`-Zeile. RED.
-- [ ] 4.2 pgTAP: ein Admin aktiviert, und es entsteht eine `admin_audit`-Zeile
+- [x] 4.2 pgTAP: ein Admin aktiviert, und es entsteht eine `admin_audit`-Zeile
       mit handelndem Konto, Zielkonto und Art der Änderung. RED. Das erfüllt die
       bestehende Anforderung „Privilegierte Änderungen hinterlassen eine Spur"
       (`openspec/specs/admin/spec.md:360`), die verlangt, dass die Spur **mit**
       der Fähigkeit entsteht (Befund codex HIGH-2 / gemini MEDIUM).
-- [ ] 4.3 pgTAP: schlägt das Schreiben nach `admin_audit` fehl, bleibt
+- [x] 4.3 pgTAP: schlägt das Schreiben nach `admin_audit` fehl, bleibt
       `activated_at` ungesetzt. RED — belegt die eine Transaktion.
-- [ ] 4.4 pgTAP: ein zweiter Aufruf auf ein bereits bestätigtes Profil bricht mit
+- [x] 4.4 pgTAP: ein zweiter Aufruf auf ein bereits bestätigtes Profil bricht mit
       `22023` ab und erzeugt keine zweite Protokollzeile. RED.
-- [ ] 4.5 **Regressionstest** (startet grün, kein RED): `mark_activated` gelingt
+- [x] 4.5 **Regressionstest** (startet grün, kein RED): `mark_activated` gelingt
       weiterhin ohne Admin-Rolle. Er sichert, dass 4.6 den Einlöseweg von
       `redeem-activation` nicht bricht.
-- [ ] 4.6 Migration: `admin_activate_member(target uuid)`. GREEN für 4.1–4.4,
+- [x] 4.6 Migration: `admin_activate_member(target uuid)`. GREEN für 4.1–4.4,
       4.5 bleibt grün.
-- [ ] 4.7 Rechte aussprechen wie in 2.9.
+- [x] 4.7 Rechte aussprechen wie in 2.9.
 
 ## 5. Die Fläche
 
