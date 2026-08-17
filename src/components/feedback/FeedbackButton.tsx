@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 
 import { submitPlatformFeedback } from "../../lib/feedback";
@@ -7,7 +8,14 @@ import { Button, Textarea, useToast } from "../ui";
 import { useOverlay } from "../ui/useOverlay";
 
 /**
- * QM-Feedback (AGE-300) — Spec §3.5. Schwebender Button, überall im AppShell.
+ * QM-Feedback (AGE-300) — Spec §3.5. Eintrag am FUSS DER SEITENLEISTE, über
+ * dem Einklapp-Schalter.
+ *
+ * SEIT AGE-566 nicht mehr schwebend: der Knopf hing über dem Inhalt und deckte
+ * auf der Startseite den Aufruf „Mitglieder entdecken" halb zu. Das war kein
+ * Zufall, sondern die zweite Kollision derselben Art — die erste (AGE-529, über
+ * der Kachel „Frage" auf 375 px) wurde durch Verschieben gelöst, und genau das
+ * hat sich jetzt gerächt. In der Leiste konkurriert er mit nichts.
  *
  * Kein Nav-Eintrag: `src/config/nav.test.ts` nagelt die Navigation exakt an Spec §2
  * fest (6+5+1). Ein Eintrag hier bräche beides. Der Route-Kontext tritt an die Stelle
@@ -17,7 +25,25 @@ import { useOverlay } from "../ui/useOverlay";
  */
 const STARS = [1, 2, 3, 4, 5] as const;
 
-export function FeedbackButton() {
+/** Sprechblase — dieselbe Strichstärke wie die Icons der Navigation. */
+function FeedbackIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5 shrink-0"
+      aria-hidden="true"
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+    </svg>
+  );
+}
+
+export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const { toast } = useToast();
@@ -87,82 +113,96 @@ export function FeedbackButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mx-auto mb-8 block rounded-full border border-accent/30 bg-canvas px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong sm:fixed sm:bottom-20 sm:right-5 sm:z-40 sm:mx-0 sm:mb-0"
+        title={collapsed ? "Feedback" : undefined}
+        aria-label={collapsed ? "Feedback" : undefined}
+        className={
+          "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" +
+          (collapsed ? " justify-center px-2" : "")
+        }
       >
-        Feedback
+        <FeedbackIcon />
+        {!collapsed && <span>Feedback</span>}
       </button>
 
-      {open && (
-        <div
-          ref={overlay}
-          className="fixed inset-0 z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Feedback geben"
-        >
-          <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={close} />
-          <div className="absolute bottom-0 right-0 max-h-[90vh] w-full overflow-y-auto rounded-t-[var(--radius-card)] bg-canvas p-6 shadow-soft sm:bottom-5 sm:right-5 sm:w-[26rem] sm:rounded-[var(--radius-card)]">
-            <h2 className="text-lg font-semibold text-ink">Wie gefällt dir die Plattform?</h2>
+      {/* PORTAL an document.body, seit der Auslöser in der Seitenleiste sitzt:
+          ein Vorfahre mit `transform`, `filter` oder `backdrop-filter` wird zum
+          Containing Block für `position: fixed`, und das Overlay schrumpfte
+          dann auf die Leiste. In diesem Projekt schon zweimal passiert
+          (AGE-529). Die Leiste trägt heute keines davon — aber sie muss es
+          auch nie wieder dürfen. */}
+      {open &&
+        createPortal(
+          <div
+            ref={overlay}
+            className="fixed inset-0 z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Feedback geben"
+          >
+            <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={close} />
+            <div className="absolute bottom-0 right-0 max-h-[90vh] w-full overflow-y-auto rounded-t-[var(--radius-card)] bg-canvas p-6 shadow-soft sm:bottom-5 sm:right-5 sm:w-[26rem] sm:rounded-[var(--radius-card)]">
+              <h2 className="text-lg font-semibold text-ink">Wie gefällt dir die Plattform?</h2>
 
-            <div className="mt-4" role="radiogroup" aria-label="Sternebewertung">
-              {STARS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="radio"
-                  aria-checked={rating === n}
-                  aria-label={`${n} von 5 Sternen`}
-                  onClick={() => setRating(n)}
-                  className="px-1 text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
-                >
-                  <span aria-hidden="true">{n <= rating ? "★" : "☆"}</span>
-                </button>
-              ))}
+              <div className="mt-4" role="radiogroup" aria-label="Sternebewertung">
+                {STARS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={rating === n}
+                    aria-label={`${n} von 5 Sternen`}
+                    onClick={() => setRating(n)}
+                    className="px-1 text-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                  >
+                    <span aria-hidden="true">{n <= rating ? "★" : "☆"}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="mt-4 block text-sm font-medium text-ink" htmlFor="fb-likes">
+                Was gefällt dir?
+              </label>
+              <Textarea
+                id="fb-likes"
+                rows={2}
+                value={likes}
+                onChange={(e) => setLikes(e.target.value)}
+              />
+
+              <label className="mt-3 block text-sm font-medium text-ink" htmlFor="fb-misses">
+                Was fehlt dir?
+              </label>
+              <Textarea
+                id="fb-misses"
+                rows={2}
+                value={misses}
+                onChange={(e) => setMisses(e.target.value)}
+              />
+
+              <label className="mt-3 block text-sm font-medium text-ink" htmlFor="fb-idea">
+                Welche Idee hast du?
+              </label>
+              <Textarea
+                id="fb-idea"
+                rows={2}
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+              />
+
+              {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+
+              <div className="mt-5 flex justify-end gap-2">
+                <Button variant="ghost" onClick={close}>
+                  Abbrechen
+                </Button>
+                <Button onClick={submit} disabled={rating === 0 || saving}>
+                  Absenden
+                </Button>
+              </div>
             </div>
-
-            <label className="mt-4 block text-sm font-medium text-ink" htmlFor="fb-likes">
-              Was gefällt dir?
-            </label>
-            <Textarea
-              id="fb-likes"
-              rows={2}
-              value={likes}
-              onChange={(e) => setLikes(e.target.value)}
-            />
-
-            <label className="mt-3 block text-sm font-medium text-ink" htmlFor="fb-misses">
-              Was fehlt dir?
-            </label>
-            <Textarea
-              id="fb-misses"
-              rows={2}
-              value={misses}
-              onChange={(e) => setMisses(e.target.value)}
-            />
-
-            <label className="mt-3 block text-sm font-medium text-ink" htmlFor="fb-idea">
-              Welche Idee hast du?
-            </label>
-            <Textarea
-              id="fb-idea"
-              rows={2}
-              value={idea}
-              onChange={(e) => setIdea(e.target.value)}
-            />
-
-            {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={close}>
-                Abbrechen
-              </Button>
-              <Button onClick={submit} disabled={rating === 0 || saving}>
-                Absenden
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

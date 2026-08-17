@@ -102,8 +102,20 @@ export const OFFERING_OPTIONS = [
 
 /** True, sobald irgendein Filter (inkl. Suchtext) gesetzt ist. */
 export function hasActiveFilters(f: DirectoryFilters): boolean {
+  return f.query.trim() !== "" || hasAdvancedFilters(f);
+}
+
+/**
+ * Dasselbe OHNE den Suchtext — alles, was hinter „Erweiterte Suche" liegt.
+ *
+ * Getrennt, weil die Verzeichnisfläche zwei verschiedene Fragen stellt: „darf
+ * ich Zurücksetzen anbieten?" (das schliesst den Suchtext ein) und „muss ich
+ * sagen, dass eingeklappt gefiltert wird?" (der Suchtext steht sichtbar im
+ * Feld, er gehört also nicht dazu). Mit einem einzigen Prädikat meldete jedes
+ * getippte Zeichen „erweiterte Filter sind aktiv" (AGE-566).
+ */
+export function hasAdvancedFilters(f: DirectoryFilters): boolean {
   return (
-    f.query.trim() !== "" ||
     f.theme !== "" ||
     f.branche !== "" ||
     f.region !== "" ||

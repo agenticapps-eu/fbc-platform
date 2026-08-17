@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(15);
+select plan(19);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -238,6 +238,46 @@ select lives_ok(
   $$insert into public.offers (profile_id, category, title, source)
     values ('d1000000-0000-0000-0000-000000000002', 'kapital', 'Beas zweites Kapitalangebot', 'editor')$$,
   'mehrere reiche Zeilen derselben Kategorie bleiben erlaubt');
+
+-- ── 6. Praefixsuche: angefangene Woerter treffen (AGE-566) ──────────────────
+-- „Det" fand „Detlev" nicht, weil `websearch_to_tsquery` volle Lexeme erzeugt.
+-- Hier stellvertretend „Ann" fuer „Anna".
+select is(
+  pg_temp.dir($q$
+    select string_agg(name, ',' order by name) from public.search_directory(p_query => 'Ann')
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Anna',
+  'ein angefangenes Wort findet das Mitglied (Praefixsuche)');
+
+select is(
+  pg_temp.dir($q$
+    select string_agg(name, ',' order by name) from public.search_directory(p_query => 'Anna')
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Anna',
+  '… und der ausgeschriebene Name weiterhin auch');
+
+-- Ein Fremdwort darf NICHT alles zurueckgeben: sonst waere „findet immer etwas"
+-- keine Suche, sondern eine Liste.
+select is(
+  pg_temp.dir($q$
+    select coalesce(string_agg(name, ',' order by name), '(leer)')
+      from public.search_directory(p_query => 'Zzz') where name = any(pg_temp.fixtures())
+  $q$),
+  '(leer)',
+  'ein Begriff ohne Treffer liefert nichts');
+
+-- Sonderzeichen duerfen keinen Syntaxfehler ausloesen: `to_tsquery` bricht bei
+-- einem einzelnen & ab, und ein Tippfehler im Suchfeld darf nicht als
+-- Fehlermeldung ankommen.
+select is(
+  pg_temp.dir($q$
+    select coalesce(string_agg(name, ',' order by name), '(leer)')
+      from public.search_directory(p_query => '&&&') where name = any(pg_temp.fixtures())
+  $q$),
+  '(leer)',
+  'reine Sonderzeichen ergeben eine leere Treffermenge statt eines Fehlers');
 
 select * from finish();
 rollback;

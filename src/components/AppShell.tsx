@@ -358,6 +358,13 @@ export default function AppShell() {
           <SidebarContent collapsed={collapsed} />
         </div>
 
+        {/* Feedback direkt über dem Einklapp-Schalter (AGE-566). Vorher schwebte
+            der Knopf über dem Inhalt und deckte auf der Startseite den Aufruf
+            „Mitglieder entdecken" halb zu. */}
+        <div className="shrink-0 border-t border-chrome-border p-2">
+          <FeedbackButton collapsed={collapsed} />
+        </div>
+
         {/* Einklappen — unten, damit der Schalter nicht mit der Navigation
             konkurriert. Der Zustand überlebt den Reload. */}
         <div className="shrink-0 border-t border-chrome-border p-2">
@@ -497,14 +504,14 @@ export default function AppShell() {
             )}
           >
             <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+            {/* Auch in der Schublade: die Leiste ist auf dem Telefon der einzige
+                Ort, an dem der Zugang jetzt noch steht. */}
+            <div className="mt-6 border-t border-chrome-border pt-2">
+              <FeedbackButton />
+            </div>
           </div>
         </div>
       )}
-
-      {/* QM-Feedback (AGE-300, Spec §3.5) — bewusst außerhalb von <main>, damit der
-          Button beim Seitenwechsel stehen bleibt und die Route mitwandert. Rendert
-          sich selbst weg, wenn niemand eingeloggt ist. */}
-      <FeedbackButton />
     </div>
   );
 }

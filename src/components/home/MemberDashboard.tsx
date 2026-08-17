@@ -11,12 +11,35 @@ import { levelLabel } from "../../config/levels";
 import { dashboardQueryKey, fetchDashboard } from "../../lib/dashboard";
 import { displayAuthor } from "../../lib/displayAuthor";
 import { eventsListKey, fetchEvents, formatEventDate, partitionEvents } from "../../lib/events";
-import { feedQueryKey, fetchFeed } from "../../lib/feed";
+import { feedQueryKey, fetchFeed, type FeedPost } from "../../lib/feed";
+import { signaturQueryKey, signPostMedia, SIGNATUR_STALE_MS } from "../../lib/post-media";
 import {
   directoryQueryKey,
   emptyDirectoryFilters,
   fetchDirectoryBaseline,
 } from "../../lib/directory";
+
+/**
+ * Die eine Zeile, die ein Beitrag in der Übersicht bekommt.
+ *
+ * DREI Fälle, und der dritte fehlte: ein Event-Beitrag trägt einen leeren Body
+ * (AGE-533) — das war bedacht. Ein Beitrag mit NUR BILDERN trägt ebenfalls
+ * einen leeren Body, und dafür stand hier nichts: die Karte blieb leer, es war
+ * nur der Name des Autors zu sehen. Genau so aufgefallen (17.08., zwei
+ * Beiträge von Detlev mit vier bzw. einem Bild und ohne Text).
+ */
+function vorschauZeile(post: FeedPost): string {
+  if (post.kind === "event" && post.event) {
+    const datum = post.event.startsAt ? ` · ${formatEventDate(post.event.startsAt)}` : "";
+    return `Neues Event: ${post.event.title}${datum}`;
+  }
+  if (post.body.trim() !== "") return post.body;
+  if (post.media.length > 0) {
+    return post.media.length === 1 ? "Ein Bild" : `${post.media.length} Bilder`;
+  }
+  if (post.videoUrl) return "Ein Video";
+  return "Beitrag";
+}
 
 /** Tageszeit-Gruß. Die Referenz schreibt „Guten Morgen" in die Eyebrow-Zeile —
  *  fest verdrahtet wäre das ab mittags falsch. */
@@ -53,6 +76,20 @@ export function MemberDashboard({ uid }: { uid: string }) {
   const membersQuery = useQuery({
     queryKey: directoryQueryKey(emptyDirectoryFilters),
     queryFn: fetchDirectoryBaseline,
+  });
+
+  // Vorschaubilder der gezeigten Beiträge. NUR das erste Bild je Beitrag: die
+  // Zeile trägt eine Kachel, und jede weitere Signatur wäre eine Anfrage für
+  // etwas, das niemand sieht.
+  const vorschauPfade = (feedQuery.data?.posts ?? [])
+    .slice(0, 3)
+    .map((p) => p.media[0]?.storagePath)
+    .filter((p): p is string => !!p);
+  const bildSignaturen = useQuery({
+    queryKey: signaturQueryKey(vorschauPfade),
+    queryFn: () => signPostMedia(vorschauPfade),
+    enabled: vorschauPfade.length > 0,
+    staleTime: SIGNATUR_STALE_MS,
   });
 
   if (dashQuery.isLoading) return <DashboardSkeleton />;
@@ -130,34 +167,36 @@ export function MemberDashboard({ uid }: { uid: string }) {
             <ul className="space-y-4">
               {posts.map((post) => {
                 const author = displayAuthor(post.author, true);
+                const bildPfad = post.media[0]?.storagePath;
+                const bildUrl = bildPfad ? bildSignaturen.data?.[bildPfad] : undefined;
                 return (
                   <li key={post.id}>
-                    <Card className="space-y-3">
-                      <header className="flex items-center gap-3">
-                        <Avatar
-                          name={author.name}
-                          src={author.avatarUrl}
-                          masked={author.masked}
-                          size="sm"
-                          className="ring-1 ring-accent/40"
-                        />
+                    {/* KOMPAKT: eine Zeile je Beitrag statt Kopf und Absatz
+                        untereinander. Die Startseite ist die Übersicht, nicht
+                        der Feed — wer mehr will, geht auf „Zur Aktivität". */}
+                    <Card className="flex items-center gap-3">
+                      <Avatar
+                        name={author.name}
+                        src={author.avatarUrl}
+                        masked={author.masked}
+                        size="sm"
+                        className="shrink-0 ring-1 ring-accent/40"
+                      />
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2">
                           <span className="font-display text-sm font-semibold text-ink">
                             {author.name}
                           </span>
                           {post.author.tier && <TierBadge tier={post.author.tier} />}
                         </div>
-                      </header>
-                      {/* Ein Event-Beitrag traegt einen LEEREN Body (AGE-533) — ohne
-                          diese Unterscheidung stuende hier eine Karte ohne Text.
-                          Titel und Datum kommen zur Laufzeit aus `events`. */}
-                      {post.kind === "event" && post.event ? (
-                        <p className="line-clamp-2 text-sm text-ink/90">
-                          Neues Event: {post.event.title}
-                          {post.event.startsAt && <> · {formatEventDate(post.event.startsAt)}</>}
-                        </p>
-                      ) : (
-                        <p className="line-clamp-2 text-sm text-ink/90">{post.body}</p>
+                        <p className="line-clamp-1 text-sm text-muted">{vorschauZeile(post)}</p>
+                      </div>
+                      {bildUrl && (
+                        <img
+                          src={bildUrl}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-[var(--radius-card)] object-cover"
+                        />
                       )}
                     </Card>
                   </li>

@@ -18,6 +18,7 @@ beforeEach(() => {
 
 function renderAt(
   route: string,
+  optionen: { collapsed?: boolean } = {},
   user: AuthContextValue["user"] | null = { id: "u1" } as AuthContextValue["user"],
 ) {
   const value = fakeAuthValue({ user, tier: "basic", levelRank: 1 });
@@ -25,7 +26,7 @@ function renderAt(
     <MemoryRouter initialEntries={[route]}>
       <AuthFixture value={value}>
         <ToastProvider>
-          <FeedbackButton />
+          <FeedbackButton collapsed={optionen.collapsed} />
         </ToastProvider>
       </AuthFixture>
     </MemoryRouter>,
@@ -34,7 +35,7 @@ function renderAt(
 
 describe("FeedbackButton", () => {
   it("bleibt für nicht eingeloggte Besucher unsichtbar — sie können ohnehin nicht speichern", () => {
-    renderAt("/", null);
+    renderAt("/", {}, null);
     expect(screen.queryByRole("button", { name: /feedback/i })).toBeNull();
   });
 
@@ -102,20 +103,30 @@ describe("FeedbackButton", () => {
     expect(document.body.style.position).toBe("");
   });
 
-  it("schwebt unter sm nicht mehr — dort verdeckte er die Composer-Kacheln", () => {
-    // Gemessen auf 375×812 (AGE-528, Task 9.7): der feste Knopf lag über der
-    // kuratierten Kachel „Frage", `elementFromPoint` in deren Mitte lieferte
-    // „Feedback".
+  it("schwebt GAR NICHT MEHR — er steht in der Seitenleiste", () => {
+    // Vorgeschichte in zwei Stufen: AGE-528 mass auf 375×812, dass der feste
+    // Knopf über der Kachel „Frage" lag, und band das Schweben an `sm`.
+    // AGE-566 traf dieselbe Kollision auf dem Desktop, über „Mitglieder
+    // entdecken" — zweimal dasselbe Muster ist kein Zufall. Jetzt sitzt er im
+    // Fluss der Seitenleiste und kann nichts mehr verdecken.
     //
-    // Diese Zusicherung ist bewusst SCHWACH und sagt das auch: jsdom hat kein
-    // Layout und kennt keine Breakpoints, `elementFromPoint` liefert dort
-    // nichts Brauchbares. Geprüft wird nur, dass das Schweben an `sm` hängt —
-    // die echte Messung braucht einen Browser und steht in der Abnahme (4.3).
+    // Die Zusicherung ist bewusst SCHWACH und sagt das auch: jsdom hat kein
+    // Layout. Geprüft wird, dass KEINE Variante von `fixed` mehr am Auslöser
+    // hängt — das ist die Eigenschaft, die die Kollision überhaupt erlaubte.
     renderAt("/");
     const knopf = screen.getByRole("button", { name: /feedback/i });
     const klassen = knopf.className.split(/\s+/);
 
-    expect(klassen).toContain("sm:fixed");
-    expect(klassen).not.toContain("fixed");
+    expect(klassen.filter((k) => k.endsWith("fixed"))).toEqual([]);
+  });
+
+  it("zeigt eingeklappt nur das Symbol, mit zugänglichem Namen", () => {
+    // In der schmalen Leiste trägt das Icon allein — der Name muss dann über
+    // `aria-label` kommen, sonst heisst der Knopf für einen Screenreader nichts.
+    renderAt("/", { collapsed: true });
+    const knopf = screen.getByRole("button", { name: "Feedback" });
+
+    expect(knopf).toHaveAttribute("aria-label", "Feedback");
+    expect(knopf.textContent).toBe("");
   });
 });

@@ -187,7 +187,16 @@ function ExtendedSections({
       {profile.short_bio && (
         <Card className="flex flex-col gap-3">
           <CardTitle className="text-base">Über mich</CardTitle>
-          <p className="max-w-2xl text-sm leading-relaxed text-ink/80">{profile.short_bio}</p>
+          {/* `whitespace-pre-line`: der Text kommt aus einem `<textarea>` und
+              trägt echte Zeilenumbrüche. Ohne diese Regel faltet HTML sie zu
+              Leerzeichen, und aus einer gegliederten Selbstbeschreibung mit
+              Absätzen und Aufzählung wird ein Block — genau so gemeldet
+              (17.08.: „nur in der Edit-Ansicht formatiert"). `pre-line` und
+              nicht `pre-wrap`: Umbrüche bleiben, aber eingefügte Leerzeichen-
+              kolonnen aus einer Textverarbeitung reissen die Spalte nicht auf. */}
+          <p className="max-w-2xl text-sm leading-relaxed whitespace-pre-line text-ink/80">
+            {profile.short_bio}
+          </p>
         </Card>
       )}
 
@@ -312,7 +321,6 @@ function ExtendedSections({
           </div>
         </Card>
       )}
-
     </>
   );
 }

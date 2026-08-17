@@ -20,6 +20,7 @@ import {
   emptyDirectoryFilters,
   fetchDirectoryBaseline,
   hasActiveFilters,
+  hasAdvancedFilters,
   NEED_CATEGORY_OPTIONS,
   OFFER_CATEGORY_OPTIONS,
   OFFERING_OPTIONS,
@@ -93,6 +94,14 @@ export default function MemberDirectory() {
   });
 
   const active = hasActiveFilters(filters);
+  /**
+   * Die erweiterte Suche ist zugeklappt, bis jemand sie öffnet.
+   *
+   * Anfangswert `active` und nicht `false`: kommt man über einen Link mit
+   * gesetzten Filtern hierher, stünde sonst eine gefilterte Liste ohne ein
+   * einziges sichtbares Filterfeld da.
+   */
+  const [erweitert, setErweitert] = useState(() => hasAdvancedFilters(filters));
   const members = results.data ?? [];
 
   function setFilter<K extends keyof DirectoryFilters>(key: K, value: DirectoryFilters[K]) {
@@ -143,60 +152,87 @@ export default function MemberDirectory() {
           />
         </div>
 
-        <FilterSelect
-          label="Thema"
-          value={filters.theme}
-          onChange={(v) => setFilter("theme", v)}
-          allLabel="Alle Themen"
-          options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
-        />
-        <FilterSelect
-          label="Branche"
-          value={filters.branche}
-          onChange={(v) => setFilter("branche", v)}
-          allLabel="Alle Branchen"
-          options={facets.branchen.map((b) => ({ value: b, label: b }))}
-        />
-        <FilterSelect
-          label="Region"
-          value={filters.region}
-          onChange={(v) => setFilter("region", v)}
-          allLabel="Alle Regionen"
-          options={facets.regionen.map((r) => ({ value: r, label: r }))}
-        />
-        <FilterSelect
-          label="Kompetenz"
-          value={filters.competency}
-          onChange={(v) => setFilter("competency", v)}
-          allLabel="Alle Kompetenzen"
-          options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
-        />
-        <FilterSelect
-          label="Sucht / bietet"
-          value={filters.offering}
-          onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
-          allLabel="Egal"
-          options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-        />
+        {/* Der Standard ist EINE Zeile. Fünf Auswahlfelder und zwölf Chips
+            beim ersten Blick sind ein Formular, keine Suche — und die
+            allermeisten Wege gehen über den Namen (AGE-566).
 
-        {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
+            Die Zeile darunter ist nicht bloss ein Schalter: sie sagt auch,
+            wenn eingeklappt gefiltert wird. Ein aktiver, aber unsichtbarer
+            Filter erklärt sonst eine kurze Trefferliste nicht — und das ist
+            genau die Verwechslung, die „keine Treffer" hier schon einmal
+            erzeugt hat. */}
+        <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            type="button"
+            onClick={() => setErweitert((v) => !v)}
+            aria-expanded={erweitert}
+            className="rounded-md text-sm font-medium text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {erweitert ? "Erweiterte Suche schließen" : "Erweiterte Suche"}
+          </button>
+          {!erweitert && hasAdvancedFilters(filters) && (
+            <span className="text-sm text-muted">Erweiterte Filter sind aktiv.</span>
+          )}
+        </div>
+
+        {erweitert && (
+          <>
+            <FilterSelect
+              label="Thema"
+              value={filters.theme}
+              onChange={(v) => setFilter("theme", v)}
+              allLabel="Alle Themen"
+              options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+            />
+            <FilterSelect
+              label="Branche"
+              value={filters.branche}
+              onChange={(v) => setFilter("branche", v)}
+              allLabel="Alle Branchen"
+              options={facets.branchen.map((b) => ({ value: b, label: b }))}
+            />
+            <FilterSelect
+              label="Region"
+              value={filters.region}
+              onChange={(v) => setFilter("region", v)}
+              allLabel="Alle Regionen"
+              options={facets.regionen.map((r) => ({ value: r, label: r }))}
+            />
+            <FilterSelect
+              label="Kompetenz"
+              value={filters.competency}
+              onChange={(v) => setFilter("competency", v)}
+              allLabel="Alle Kompetenzen"
+              options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
+            />
+            <FilterSelect
+              label="Sucht / bietet"
+              value={filters.offering}
+              onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
+              allLabel="Egal"
+              options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            />
+
+            {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
             Gruppen, Mehrfachauswahl: ODER innerhalb einer Gruppe, UND zwischen
             beiden. Sechs Optionen je Seite, nicht elf: die Elf aus dem Issue ist
             die Vereinigung, `immobilien` steht in beiden. */}
-        <div className="sm:col-span-2 lg:col-span-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
-          <ChipFilterGroup
-            label="Bietet"
-            options={OFFER_CATEGORY_OPTIONS}
-            selected={filters.offers}
-            onToggle={(v) => toggleCategory("offers", v)}
-          />
-          <ChipFilterGroup
-            label="Sucht"
-            options={NEED_CATEGORY_OPTIONS}
-            selected={filters.needs}
-            onToggle={(v) => toggleCategory("needs", v)}
-          />
-        </div>
+            <div className="sm:col-span-2 lg:col-span-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
+              <ChipFilterGroup
+                label="Bietet"
+                options={OFFER_CATEGORY_OPTIONS}
+                selected={filters.offers}
+                onToggle={(v) => toggleCategory("offers", v)}
+              />
+              <ChipFilterGroup
+                label="Sucht"
+                options={NEED_CATEGORY_OPTIONS}
+                selected={filters.needs}
+                onToggle={(v) => toggleCategory("needs", v)}
+              />
+            </div>
+          </>
+        )}
 
         {active && (
           <div className="flex items-end">
