@@ -501,7 +501,7 @@ function PostComposer({ authorId }: { authorId: string }) {
             <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               multiple
               aria-label="Bilder auswählen"
               className="sr-only"

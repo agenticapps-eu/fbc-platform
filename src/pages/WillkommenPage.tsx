@@ -17,11 +17,7 @@ import {
   type OnboardingFreetext,
   type OnboardingProfile,
 } from "../lib/member-onboarding";
-import {
-  markOnboarded,
-  memberOnboardingQueryKey,
-  vertageOnboarding,
-} from "../lib/member-settings";
+import { markOnboarded, memberOnboardingQueryKey, vertageOnboarding } from "../lib/member-settings";
 import {
   categoryOptionsForSide,
   fetchCategorySelection,
@@ -366,9 +362,7 @@ function Strecke({
                 seite === "offer"
                   ? ([neueOffers, setNeueOffers] as const)
                   : ([neueNeeds, setNeueNeeds] as const);
-              setzen(
-                liste.includes(value) ? liste.filter((v) => v !== value) : [...liste, value],
-              );
+              setzen(liste.includes(value) ? liste.filter((v) => v !== value) : [...liste, value]);
             }}
           />
         )}
@@ -607,7 +601,7 @@ function ProfilSchritt({
             )}
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               aria-label="Profilbild auswählen"
               onChange={(e) => {
                 const datei = e.target.files?.[0];

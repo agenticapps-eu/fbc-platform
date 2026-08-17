@@ -269,7 +269,7 @@ function ProfileEditor({ uid }: { uid: string }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={onFileChange("avatar")}
               className="hidden"
             />
@@ -308,7 +308,7 @@ function ProfileEditor({ uid }: { uid: string }) {
           <input
             ref={coverInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/gif"
             onChange={onFileChange("cover")}
             className="hidden"
           />

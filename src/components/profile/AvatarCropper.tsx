@@ -93,6 +93,8 @@ export function AvatarCropper({
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
 
   const [ready, setReady] = useState(false);
+  /** Gesetzt, wenn der Browser die Datei nicht dekodieren konnte. */
+  const [fehler, setFehler] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   // Die natürliche Bildgröße als STATE, nicht als ref: die Geometrie hängt
@@ -110,6 +112,18 @@ export function AvatarCropper({
   const { viewWidth, viewHeight } = geo;
 
   // Bild aus der gewählten Datei laden, Basis-Skalierung („cover“) bestimmen.
+  //
+  // MIT `onerror`, und das ist der Punkt: vorher gab es nur `onload`. Konnte der
+  // Browser die Datei nicht dekodieren, feuerte gar nichts — `ready` blieb
+  // false, der Dialog zeigte eine leere Fläche und einen toten
+  // „Übernehmen"-Knopf, ohne ein Wort. Für das Mitglied sah das aus, als liesse
+  // sich schlicht kein Bild hochladen (gemeldet 17.08. aus der Probe-Umgebung).
+  //
+  // Die Ursache ist zusätzlich an der Wurzel behoben: die Dateifelder nennen
+  // jetzt die Formate einzeln statt `image/*`, damit der Dialog HEIC vom iPhone
+  // gar nicht erst anbietet. Dieser Zweig bleibt trotzdem — `accept` ist ein
+  // Vorschlag an den Dialog, keine Zusage: Ziehen-und-Ablegen und „alle
+  // Dateien" gehen daran vorbei.
   useEffect(() => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -118,7 +132,18 @@ export function AvatarCropper({
       setNatural({ width: img.naturalWidth, height: img.naturalHeight });
       setZoom(1);
       setOffset({ x: 0, y: 0 });
+      // Zurücksetzen im ERFOLGSPFAD, nicht im Effektkörper: ein synchrones
+      // setState im Effekt löst eine Kaskade aus (react-hooks/set-state-in-effect).
+      setFehler(null);
       setReady(true);
+    };
+    img.onerror = () => {
+      imgRef.current = null;
+      setReady(false);
+      setFehler(
+        "Dieses Bild konnte nicht gelesen werden. Fotos vom iPhone liegen oft als " +
+          "HEIC vor — bitte als JPG oder PNG auswählen.",
+      );
     };
     img.src = url;
     return () => URL.revokeObjectURL(url);
@@ -212,36 +237,47 @@ export function AvatarCropper({
     >
       <div className="w-full max-w-sm rounded-[var(--radius-card)] border border-line bg-canvas p-6 shadow-soft">
         <h2 className="font-display text-lg font-semibold text-ink">{label}</h2>
-        <p className="mt-1 text-sm text-muted">Ziehen zum Verschieben, Slider zum Zoomen.</p>
+        <p className="mt-1 text-sm text-muted">
+          {fehler ?? "Ziehen zum Verschieben, Slider zum Zoomen."}
+        </p>
 
-        <div className="mt-4 flex justify-center">
-          <canvas
-            ref={canvasRef}
-            width={viewWidth}
-            height={viewHeight}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            className={`touch-none cursor-grab border border-line bg-soft active:cursor-grabbing ${
-              aspect === 1 ? "rounded-full" : "rounded-[var(--radius-card)]"
-            }`}
-            style={{ width: viewWidth, height: viewHeight }}
-          />
-        </div>
+        {/* Die Fläche bleibt bei einem Lesefehler weg: ein leerer Kreis neben
+            der Meldung sähe aus, als fehlte nur noch ein Klick.
+            BEDINGT GERENDERT, nicht per `hidden` umgeschaltet: `hidden` und
+            `flex` auf demselben Element entscheidet die CSS-Reihenfolge, nicht
+            die Klassenreihenfolge — in diesem Projekt schon einmal passiert. */}
+        {!fehler && (
+          <>
+            <div className="mt-4 flex justify-center">
+              <canvas
+                ref={canvasRef}
+                width={viewWidth}
+                height={viewHeight}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                className={`touch-none cursor-grab border border-line bg-soft active:cursor-grabbing ${
+                  aspect === 1 ? "rounded-full" : "rounded-[var(--radius-card)]"
+                }`}
+                style={{ width: viewWidth, height: viewHeight }}
+              />
+            </div>
 
-        <label className="mt-4 flex items-center gap-3 text-sm text-muted">
-          Zoom
-          <input
-            type="range"
-            min={1}
-            max={3}
-            step={0.01}
-            value={zoom}
-            onChange={(e) => changeZoom(Number(e.target.value))}
-            className="flex-1 accent-accent-strong"
-            aria-label="Zoom"
-          />
-        </label>
+            <label className="mt-4 flex items-center gap-3 text-sm text-muted">
+              Zoom
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.01}
+                value={zoom}
+                onChange={(e) => changeZoom(Number(e.target.value))}
+                className="flex-1 accent-accent-strong"
+                aria-label="Zoom"
+              />
+            </label>
+          </>
+        )}
 
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="ghost" size="sm" onClick={onCancel}>
