@@ -144,18 +144,30 @@
       unbestätigtes Mitglied, beide Handlungen samt Rückfrage, die Blätterung.
       In diesem Projekt sind mehrere Befunde ausschliesslich im echten Browser
       aufgefallen, während die Tests grün waren.
-> **Stand 6.3 (17.08.):** DEV ist bespielt (`pnpm db:push`, genau eine
-> Migration) und gegengelesen: beide Funktionen vorhanden, `authenticated` ja,
-> `anon` nein, `SECURITY DEFINER` ja. Der Bestand dort ist aber der falsche —
-> 41 Profile, davon **2** unbestätigt; die importierten Mitglieder liegen in
-> PROD. Der PROD-Trockenlauf ist **gelesen** und meldet ebenfalls genau eine
-> ausstehende Migration, die Historie ist sonst synchron. Das schreibende
-> Anwenden auf PROD blockt der Klassifikator (`db:push:prod`) — das ist Donalds
-> Schritt, danach ist 6.3 in Minuten messbar. `migrate-prod` scheidet vorher
-> aus: der Workflow sucht den `migrate-dev`-Lauf desselben Commits, und dieser
-> Branch ist noch nicht gepusht.
+> **6.3 gemessen am 17.08. auf PROD** (Migration von Donald im Terminal
+> angewendet, `db:push:prod` verlangt ein TTY). Beide Funktionen dort vorhanden,
+> `authenticated` ja, `anon` nein, `SECURITY DEFINER` ja. Derselbe Admin, derselbe
+> Moment, drei Lesepfade:
+>
+> | Lesepfad | sichtbare Mitglieder |
+> |---|---|
+> | `admin_list_members` | **71** — davon **69 unbestätigt**, 2 bestätigt |
+> | `search_directory` | 2 |
+> | `profiles_public` | 2 |
+>
+> `p_status = 'offen'` liefert genau 69, die erste Seite genau 25. Keine
+> Personendaten in den Beleg übernommen.
+>
+> **Nebenbefund, der eine Annahme umdreht:** alle 71 Konten tragen einen
+> bcrypt-Hash (60 Zeichen) — GoTrue schreibt beim Anlegen ohne Passwort trotzdem
+> einen, und der Import hat `user_pass` bewusst nicht mitgenommen. **Angemeldet
+> hat sich bisher 2×**, das sind die beiden Admins. Den Hash der 69 kennt
+> niemand. Daraus folgt: „Direkt aktivieren" macht ein Profil nur SICHTBAR und
+> verschafft keinen Zugang; der Zugangslink ist der einzige Weg hinein, weil das
+> Mitglied sich beim Einlösen sein Passwort selbst setzt. Die beiden Handlungen
+> sind keine Alternativen füreinander.
 
-- [ ] 6.3 Am echten Bestand messen: die Liste zeigt die importierten Mitglieder,
+- [x] 6.3 Am echten Bestand messen: die Liste zeigt die importierten Mitglieder,
       die über jeden anderen Weg unsichtbar sind. Das ist der Anlass des Changes
       und die einzige Messung, die ihn belegt. **Keine Personendaten in die
       Belege übernehmen** — Zahlen und Zustände, keine Namen.

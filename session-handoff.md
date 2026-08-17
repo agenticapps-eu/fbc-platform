@@ -1,30 +1,23 @@
 # Session Handoff — 2026-08-17 (zweite Sitzung des Tages)
 
-**AGE-566 ist gebaut.** Von 43 Aufgaben sind 38 zu; offen sind nur noch 6.3
-(am echten Bestand messen), 6.4 (Diff-Review) und Gruppe 7 (Abschluss).
+**AGE-566 ist gebaut und am echten Bestand belegt.** Von 43 Aufgaben sind 39 zu;
+offen sind nur noch 6.4 (Diff-Review) und Gruppe 7 (Abschluss).
 
 Branch `donald/age-566-admin-mitgliederliste`, fünf neue Commits, Arbeitsbaum
 sauber, **noch nicht gepusht**. `openspec validate --all` 29/29.
 
 ## Next session: start here
 
-**Zwei Dinge, in dieser Reihenfolge.**
+**6.4, der Diff-Review** — ein Prüfer eines anderen Herstellers über den Diff,
+`REVIEWER_TIMEOUT=900` **von vornherein** (mit den voreingestellten 300 s endet
+codex hier regelmässig als Ausgang 4 und zählt dann nicht). Befunde beheben oder
+begründet ablehnen.
 
-Erstens: `pnpm db:push:prod`. Der Trockenlauf ist gelesen und sauber — genau
-eine ausstehende Migration (meine), die Historie sonst synchron. Den Befehl
-blockt der Klassifikator, er gehört Donald; in dieser Sitzung geht er als
-`! pnpm db:push:prod`. Danach ist **6.3 in Minuten messbar**: einloggen,
-`/admin/mitglieder`, Statusfilter „Nicht aktiviert" — die ~69 importierten
-Mitglieder müssen dort stehen, und nirgends sonst. Zahlen und Zustände in den
-Beleg, keine Namen.
+Danach Gruppe 7: `openspec archive` **vor** `add-admin-console` (die Reihenfolge
+steht jetzt in beiden Changes, umgekehrt kollidieren die Delta-Operationen),
+dann Branch pushen, PR, Linear.
 
-Zweitens 6.4: Diff-Review durch einen Prüfer eines anderen Herstellers,
-`REVIEWER_TIMEOUT=900` **von vornherein** — mit den voreingestellten 300 s endet
-codex hier regelmäßig als Ausgang 4 und zählt dann nicht.
-
-Erst danach Gruppe 7. **7.2 archiviert vor `add-admin-console`** — die
-Reihenfolge steht jetzt in beiden Changes, in umgekehrter Richtung kollidieren
-die Delta-Operationen.
+6.3 ist erledigt und belegt — siehe unten.
 
 ## Accomplished
 
@@ -109,14 +102,11 @@ Abfrage — zwei Wege an dieselben Daten können sich widersprechen.
 
 ## Open questions
 
-- **6.3 hängt an PROD** — siehe oben. Bis dahin ist der Change nicht
-  archivierbar (7.2 verlangt die Messung ausdrücklich).
-- **`migrate-prod` scheidet als Weg vorerst aus:** der Workflow sucht den
-  `migrate-dev`-Lauf **desselben Commits**, und DEV wurde hier von Hand
-  bespielt. Nach dem Merge auf `main` ist der Workflow wieder der Weg.
-- **DEV ist bespielt, PROD nicht** — laut Notiz überspringt `drift-gate` danach
-  jeden Frontend-Deploy, bis `migrate-prod` gelaufen ist. Vor dem nächsten
-  Deploy prüfen.
+- **DEV und PROD tragen die Migration** (PROD von Donald im Terminal —
+  `db:push:prod` verlangt ein TTY, der `!`-Präfix reicht nicht). `drift-gate`
+  ist damit wieder zu. **Aber:** kein `migrate-dev`-Workflowlauf existiert für
+  diesen Commit, beide Umgebungen wurden von Hand bespielt — nach dem Merge
+  einmal prüfen, ob der Deploy durchläuft.
 - **Lokaler Stack:** ein Probe-Admin `sichtprobe-admin@local.test` und ein
   aktiviertes Seed-Mitglied (Adrian Mühleisen) sind übrig. Nur lokal, mit
   `supabase db reset` weg.
