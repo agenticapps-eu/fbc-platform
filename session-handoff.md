@@ -12,19 +12,43 @@ falsche Fläche** — siehe unten.
 Anmeldungen, 7 Academy-Videos. **36 von 71 Mitgliedern aktiviert**, und zwar
 genau die mit Beitrag/Kommentar/Termin.
 
-**Offen bleibt: es zeigt keine gebaute Fläche auf dieses Projekt.** Angesehen
-wird es über einen lokalen Server:
+**Angesehen wird es auf `https://fbc-probe-a4664fb5.pages.dev`** — einem
+EIGENEN Cloudflare-Pages-Projekt (nicht ein Preview von `fbc-platform`), das
+gegen `viwntbodrtqxgmqyxluh` läuft. Angelegt in AGE-534/8.5; ich hatte es
+vergessen und musste von Donald darauf gestossen werden. Steht jetzt als
+Memory `probe-deployment-gegen-import-db`.
+
+**CI liefert dieses Projekt NICHT aus.** Nach jeder UI-Änderung von Hand:
 
 ```
-VITE_SUPABASE_URL=https://viwntbodrtqxgmqyxluh.supabase.co \
-VITE_SUPABASE_ANON_KEY=<anon-Key des Projekts> \
-npx vite --port 5175 --strictPort
+KEY=<anon-Key von viwntbodrtqxgmqyxluh, Management-API, PAT liegt in dev>
+infisical run --env=prod -- env \
+  VITE_SUPABASE_URL=https://viwntbodrtqxgmqyxluh.supabase.co \
+  VITE_SUPABASE_ANON_KEY="$KEY" pnpm build
+infisical run --env=dev -- npx wrangler pages deploy ./dist \
+  --project-name=fbc-probe-a4664fb5 --branch=main --commit-dirty=true
 ```
 
-Der anon-Key kommt aus der Management-API
-(`/v1/projects/viwntbodrtqxgmqyxluh/api-keys`), der PAT steht als
-`SUPABASE_ACCESS_TOKEN` in Infisical. Zugang: `vorschau@fbc.invalid`, Passwort
-hat Donald einmalig im Terminal bekommen — es steht **in keiner Datei**.
+Am 17.08. zweimal neu ausgeliefert, zuletzt `index-BVjBVXar.js`:
+belegt an Zeichenketten — enthält `viwntbodrtqxgmqyxluh`, **kein**
+`foelowldexkcqzewvrcf`, dazu `admin_list_members`, „weitere Kommentare
+anzeigen", „Zur ersten Seite" und den HEIC-Hinweis.
+
+**Aus dem Test in der Probe-Umgebung kam ein echter Fehler (17.08.):** der
+Bildzuschnitt lud die Datei nur über `img.onload`, ohne `onerror`. Bei einer
+nicht dekodierbaren Datei — HEIC vom iPhone ist der Regelfall, und
+`accept="image/*"` bot es an — blieb der Dialog stumm: leere Fläche, toter
+Knopf, kein Wort. Behoben auf zwei Ebenen (Formate im `accept` einzeln
+benannt, plus ein Fehlerpfad mit lesbarer Meldung), vier Prüfungen, davon
+drei rot auf dem alten Stand.
+
+**Ein Merge oder PR-Preview zeigt die Import-Welt NIE**: Preview baut mit
+`dev`, `main` mit `prod`, beide setzen `VITE_SUPABASE_URL` auf die Demo-DB
+(`deploy.yml:626`). Das ist Absicht — sonst zeigte die Live-Seite die echten
+Daten.
+
+Zugang: `vorschau@fbc.invalid`, Passwort hat Donald einmalig im Terminal
+bekommen — es steht **in keiner Datei**.
 
 Aufräumen vor dem Go-Live: `IMPORT_SEED_MODE=reset` (löscht nach dem
 Kennungspräfix `0ade0566`, nimmt die Aktivierungen zurück und entfernt das
