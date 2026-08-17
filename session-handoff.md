@@ -6,6 +6,32 @@ falsche Fläche** — siehe unten.
 
 ## Next session: start here
 
+**Erledigt seit dem ersten Schreiben dieses Handoffs:** die Import-Datenbank
+`viwntbodrtqxgmqyxluh` ist bespielt — `supabase/seed/import_world_seed.ts`,
+18 Beiträge, 11 Kommentare, 87 Likes, 8 Termine mit Titelbildern, 97
+Anmeldungen, 7 Academy-Videos. **36 von 71 Mitgliedern aktiviert**, und zwar
+genau die mit Beitrag/Kommentar/Termin.
+
+**Offen bleibt: es zeigt keine gebaute Fläche auf dieses Projekt.** Angesehen
+wird es über einen lokalen Server:
+
+```
+VITE_SUPABASE_URL=https://viwntbodrtqxgmqyxluh.supabase.co \
+VITE_SUPABASE_ANON_KEY=<anon-Key des Projekts> \
+npx vite --port 5175 --strictPort
+```
+
+Der anon-Key kommt aus der Management-API
+(`/v1/projects/viwntbodrtqxgmqyxluh/api-keys`), der PAT steht als
+`SUPABASE_ACCESS_TOKEN` in Infisical. Zugang: `vorschau@fbc.invalid`, Passwort
+hat Donald einmalig im Terminal bekommen — es steht **in keiner Datei**.
+
+Aufräumen vor dem Go-Live: `IMPORT_SEED_MODE=reset` (löscht nach dem
+Kennungspräfix `0ade0566`, nimmt die Aktivierungen zurück und entfernt das
+Vorschau-Konto).
+
+---
+
 **Donalds Korrektur vom 17.08., und sie kehrt meine Benennung um:**
 
 - `foelowldexkcqzewvrcf` ist die **PROD-UI** (`fbc-platform.pages.dev`). Was ich
