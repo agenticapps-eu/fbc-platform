@@ -184,7 +184,13 @@ insert into public.comments (id, post_id, author_id, body, created_at) values
   ('00000000-0000-0000-0000-0000000254c4', '${POST.p12}', '${P.maximilian}', 'Sehr gerne — bei uns hat die Übergabe knapp vier Jahre gedauert.', now() - interval '7 days'),
   ('00000000-0000-0000-0000-0000000254c5', '${POST.p13}', '${P.friederike}', 'Das freut mich sehr zu lesen. Glückwunsch!', now() - interval '30 hours'),
   ('00000000-0000-0000-0000-0000000254c6', '${POST.p7}', '${P.tobias}', 'Habe ihn zweimal geschaut. Der zweite Teil trägt.', now() - interval '6 days'),
-  ('00000000-0000-0000-0000-0000000254c7', '${POST.p14}', '${P.markus}', 'Beeindruckende Zahlen — und dahinter echte Gespräche.', now() - interval '12 hours')
+  ('00000000-0000-0000-0000-0000000254c7', '${POST.p14}', '${P.markus}', 'Beeindruckende Zahlen — und dahinter echte Gespräche.', now() - interval '12 hours'),
+  -- Ein Beitrag trägt bewusst VIER Kommentare. Die Vorschau im Feed zeigt zwei
+  -- und bietet den Rest über „2 weitere Kommentare anzeigen" an — ohne einen
+  -- solchen Faden gäbe es die Handlung in der Demo-Welt nirgends zu sehen.
+  ('00000000-0000-0000-0000-0000000254c8', '${POST.p14}', '${P.beatrice}', 'Die zwei Beteiligungen sind beide aus dem Mastermind entstanden, oder?', now() - interval '10 hours'),
+  ('00000000-0000-0000-0000-0000000254c9', '${POST.p14}', '${P.eleonora}', 'Eine davon, ja. Die zweite kam über eine Vorstellung beim Dinner im Juni.', now() - interval '9 hours'),
+  ('00000000-0000-0000-0000-0000000254ca', '${POST.p14}', '${P.tobias}', 'Genau deshalb sind die Präsenztermine den Aufwand wert.', now() - interval '6 hours')
 on conflict (id) do update set
   body       = excluded.body,
   created_at = excluded.created_at;
