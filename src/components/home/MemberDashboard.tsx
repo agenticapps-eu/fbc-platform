@@ -122,7 +122,13 @@ export function MemberDashboard({ uid }: { uid: string }) {
         subtitle="Entdecke neue Chancen, spannende Menschen und wertvolle Impulse."
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Zwei Aufgaben links, der Zustand rechts (AGE-566).
+          Vorher standen alle drei als gleichwertige Kacheln in einem
+          Vierer-Raster — bei DREI Kacheln, weshalb die Reihe nie aufging. Und
+          „Mein Plan" ist keine Aufgabe: Kompass und Event fordern zum Handeln
+          auf, die Mitgliedschaft sagt, wo man steht. Gleiche Gestalt behauptet
+          gleiche Art. */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_minmax(0,0.85fr)]">
         <DashTile
           label="Mein Kompass"
           value={`${profile.profile_completion}%`}
@@ -147,12 +153,13 @@ export function MemberDashboard({ uid }: { uid: string }) {
           cta="Zum Event"
         />
         <DashTile
-          label="Mein Plan"
+          label="Mitgliedschaft"
           value={levelLabel(profile.tier)}
           valueClassName="text-2xl"
-          sub="Deine aktuelle Mitgliedschaft"
+          sub="Deine aktuelle Stufe"
           to="/mitgliedschaft"
           cta="Plan verwalten"
+          ton="zustand"
         />
       </section>
 
@@ -325,6 +332,7 @@ function DashTile({
   to,
   cta,
   valueClassName = "text-3xl",
+  ton = "aufgabe",
 }: {
   label: string;
   value: ReactNode;
@@ -332,9 +340,15 @@ function DashTile({
   to?: string;
   cta: string;
   valueClassName?: string;
+  /** `zustand` hebt die Kachel ab — sie fordert nichts, sie sagt etwas. */
+  ton?: "aufgabe" | "zustand";
 }) {
   return (
-    <Card className="flex flex-col gap-1">
+    <Card
+      className={
+        "flex flex-col gap-1" + (ton === "zustand" ? " border-accent/30 bg-accent-soft/35" : "")
+      }
+    >
       <span className="text-sm text-muted">{label}</span>
       <p className={`font-display font-semibold text-ink ${valueClassName}`}>{value}</p>
       <p className="truncate text-sm text-muted">{sub}</p>
