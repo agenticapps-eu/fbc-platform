@@ -79,21 +79,43 @@ drei Folgen für Gruppe 4 stehen in `messungen/gruppe-1-2026-08-20.md`.
 Erst die Absicherung, dann das Werkzeug. Ein Spiegel, dessen Zielprüfung
 nachgereicht wird, hat ein Zeitfenster, in dem ein Tippfehler PROD leert.
 
-- [ ] 2.1 RED: ein Lauf mit der **PROD**-Kennung im Ziel bricht ab, bevor er
+**Gebaut am 2026-08-20:** `scripts/sync-dev.logic.ts` (rein),
+`scripts/sync-dev.test.ts` (19 Zusagen), `scripts/sync-dev-waechter.ts` (CLI,
+wie `assert-target.ts` über `db-push-prod.logic.ts`). Sieben Verbiegungen der
+Logik wurden einzeln rot gemessen; die Tests greifen also.
+
+- [x] 2.1 RED: ein Lauf mit der **PROD**-Kennung im Ziel bricht ab, bevor er
       schreibt
-- [ ] 2.2 RED: eine **vertauschte Quelle** — ein anderes Projekt als PROD, auch
+- [x] 2.2 RED: eine **vertauschte Quelle** — ein anderes Projekt als PROD, auch
       DEV selbst — bricht ab, bevor er liest. Der erste Entwurf prüfte nur das
       Ziel; eine falsche Quelle hätte alle Tests bestanden
-- [ ] 2.3 RED: **gemischte Zugangsdaten** brechen ab — DEV-Datenbank-URL neben
+- [x] 2.3 RED: **gemischte Zugangsdaten** brechen ab — DEV-Datenbank-URL neben
       PROD-Storage-URL oder PROD-Service-Key. Der Datenbankwächter allein
       schützt weder Ablage noch GoTrue-Admin-API, und die Spaltung dieser Werte
-      ist im Projekt dokumentiert
-- [ ] 2.4 GREEN: Kennung je Wertepaar aus dem Benutzernamen (`postgres.<ref>`)
+      ist im Projekt dokumentiert. **An den echten Werten belegt:** gegen
+      Infisical `prod` meldet der Wächter „dbUrl → viwnt…, aber apiUrl →
+      foelo…" — die dokumentierte Spaltung, jetzt gefangen statt notiert
+- [x] 2.3a Der Schlüssel muss auch die **Rolle** `service_role` tragen. Gefunden
+      bei ebendieser Sichtprobe: der anon-Schlüssel desselben Projekts trägt
+      dieselbe Kennung, kam durch und wäre erst zur Laufzeit gescheitert — dort
+      dann aussehend wie ein RLS-Problem
+- [x] 2.4 GREEN: Kennung je Wertepaar aus dem Benutzernamen (`postgres.<ref>`)
       gegen feste Allowlists — **nicht** gegen den Host, der ist regionsweit
-      gleich
-- [ ] 2.5 Test: unbekannte, gleiche oder nicht auflösbare Kennungen brechen ab
-- [ ] 2.6 Test: die Richtung ist fest verdrahtet — kein Schalter macht PROD zum
+      gleich. (Gemessen liegen die beiden sogar auf verschiedenen Clustern,
+      `aws-0` und `aws-1` — sich darauf zu stützen bliebe trotzdem falsch)
+- [x] 2.5 Test: unbekannte, gleiche oder nicht auflösbare Kennungen brechen ab
+- [x] 2.6 Test: die Richtung ist fest verdrahtet — kein Schalter macht PROD zum
       Ziel
+- [ ] 2.7 **Zugangsdaten, die es noch nicht gibt — Voraussetzung für Gruppe 3.**
+      Gemessen am 2026-08-20 fehlen im Secret-Store drei Werte, ohne die kein
+      Lauf möglich ist. Sie anzulegen ist Donalds Schritt, nicht der des
+      Werkzeugs:
+      · `SUPABASE_SERVICE_ROLE_KEY_DEV` — **fehlt ganz**. Ohne ihn lässt sich in
+        DEV kein Objekt in die Buckets schreiben und kein Konto anlegen
+      · `SUPABASE_URL_PROD` und `SUPABASE_URL_DEV` — heute gibt es nur
+        `VITE_SUPABASE_URL`, und die zeigt in **beiden** Umgebungen auf DEV
+      · Beide Datenbank-URLs müssen **einem** Lauf zugleich vorliegen; jede
+        liegt heute allein in ihrer eigenen Infisical-Umgebung (1.1)
 
 ## 2a. Die Zugänge entschärfen — Voraussetzung, nicht Nacharbeit
 
