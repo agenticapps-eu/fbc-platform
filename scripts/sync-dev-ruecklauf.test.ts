@@ -12,6 +12,7 @@ import { describe, expect, test } from "vitest";
 import {
   PFLICHTDATEIEN,
   entferneRestrict,
+  authTabellenZumLeeren,
   planeLeeren,
   pruefeAuszug,
   vergleicheManifest,
@@ -156,6 +157,50 @@ describe("4.2/4.3 Leeren", () => {
 
   test("RED: eine leere Tabellenliste ist kein Zustand, sondern ein Fehler", () => {
     expect(() => planeLeeren([], ["auth.users"])).toThrow(/kein Zustand/);
+  });
+
+  /**
+   * Der DEV-Lauf vom 2026-08-20 ist an genau dieser Stelle abgebrochen. Geleert
+   * wurden `auth.users` und `auth.identities` — eine Liste mit zwei Eintraegen.
+   * Zurueck blieben 13 `sessions`, 81 `refresh_tokens`, 13 `mfa_amr_claims` und
+   * ein `one_time_token` der alten DEV-Konten.
+   *
+   * Alle diese Fremdschluessel sind `ON DELETE CASCADE`. Getragen haetten sie
+   * trotzdem nicht: `session_replication_role = replica` legt die
+   * Cascade-Trigger mit still. Wer im replica-Modus loescht, loescht **nur**,
+   * was er benennt — und deshalb darf hier keine Namensliste stehen.
+   */
+  test("RED: auth wird per Regel geleert, nicht per Namensliste", () => {
+    const vorhanden = [
+      "audit_log_entries",
+      "identities",
+      "mfa_amr_claims",
+      "one_time_tokens",
+      "refresh_tokens",
+      "schema_migrations",
+      "sessions",
+      "users",
+    ];
+    const plan = authTabellenZumLeeren(vorhanden);
+    // Was GoTrue morgen dazustellt, ist mit drin, ohne dass jemand es nachtraegt.
+    for (const t of vorhanden) {
+      if (t === "schema_migrations") continue;
+      expect(plan).toContain(`auth.${t}`);
+    }
+  });
+
+  test("RED: schema_migrations bleibt stehen — das ist GoTrues eigene Historie", () => {
+    expect(authTabellenZumLeeren(["schema_migrations", "users"])).toEqual(["auth.users"]);
+  });
+
+  test("users kommt zuletzt, damit die Reihenfolge auch ohne den Schalter traegt", () => {
+    const plan = authTabellenZumLeeren(["users", "sessions", "identities"]);
+    expect(plan[plan.length - 1]).toBe("auth.users");
+    expect(plan.indexOf("auth.identities")).toBeLessThan(plan.indexOf("auth.users"));
+  });
+
+  test("RED: ohne auth.users ist die Liste nicht die, die gemeint war", () => {
+    expect(() => authTabellenZumLeeren(["sessions"])).toThrow(/auth\.users/);
   });
 });
 

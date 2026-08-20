@@ -94,6 +94,37 @@ export function pruefeAuszug(input: {
  * ein Leeren, das auch ohne den Schalter richtig herum liefe, ist ein Fehler
  * weniger, wenn der Schalter einmal nicht greift.
  */
+/**
+ * Welche `auth`-Tabellen vor dem Rücklauf zu leeren sind — **als Regel, nicht
+ * als Liste**.
+ *
+ * Der DEV-Lauf vom 2026-08-20 ist an dieser Stelle abgebrochen: geleert wurden
+ * `auth.users` und `auth.identities`, stehen blieben 13 `sessions`,
+ * 81 `refresh_tokens`, 13 `mfa_amr_claims` und ein `one_time_token` der alten
+ * DEV-Konten. Die 4.1b-Prüfung hat sie als verwaist gemeldet — richtig.
+ *
+ * Dass alle diese Fremdschlüssel `ON DELETE CASCADE` tragen, half nicht:
+ * `session_replication_role = replica` legt die Cascade-Trigger mit still.
+ * **Im replica-Modus verschwindet nur, was man benennt.** Eine Namensliste ist
+ * hier deshalb nicht bloss unvollständig, sondern die falsche Bauform — GoTrue
+ * stellt Tabellen dazu (`oauth_consents`, `webauthn_*` sind neu), und keine
+ * davon fände je den Weg in eine von Hand gepflegte Liste.
+ *
+ * `schema_migrations` ist ausgenommen: das ist GoTrues eigene Historie, sie
+ * gehört zur laufenden Fassung des Dienstes und nicht zum Bestand.
+ */
+export function authTabellenZumLeeren(vorhandene: string[]): string[] {
+  const ohneHistorie = vorhandene.filter((t) => t !== "schema_migrations");
+  if (!ohneHistorie.includes("users")) {
+    throw new Error(
+      "auth.users fehlt in der Tabellenliste — gegen einen leeren auth-Bestand wird nicht geleert.",
+    );
+  }
+  // `users` zuletzt: die Reihenfolge trägt damit auch dann, wenn der
+  // replica-Schalter einmal nicht greift, statt sich darauf zu verlassen.
+  return [...ohneHistorie.filter((t) => t !== "users").sort(), "users"].map((t) => `auth.${t}`);
+}
+
 export function planeLeeren(publicTabellen: string[], authTabellen: string[]): string[] {
   if (publicTabellen.length === 0) throw new Error("Keine public-Tabellen — das ist kein Zustand.");
   const zitiert = (voll: string) => {

@@ -47,6 +47,7 @@ import pg from "pg";
 
 import { sichererPfad } from "./sync-dev-auszug.logic";
 import {
+  authTabellenZumLeeren,
   entferneRestrict,
   planeLeeren,
   pruefeAuszug,
@@ -58,7 +59,6 @@ import { pruefeLauf, wertMitNamen, type Zugang } from "./sync-dev.logic";
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const CA = join(HIER, "supabase-root-2021-ca.crt");
-const AUTH_TABELLEN = ["auth.identities", "auth.users"];
 /** §3a: was DEV zusätzlich zum Spiegel trägt. */
 const DEKLARATION: Deklaration = {
   zusatzZeilen: { "public.staff_roles": 1 },
@@ -225,12 +225,34 @@ const publicTabellen = (
   await db.query(`select table_name from information_schema.tables
                    where table_schema='public' and table_type='BASE TABLE' order by 1`)
 ).rows.map((r) => r.table_name as string);
-for (const sql of planeLeeren(publicTabellen, AUTH_TABELLEN)) await db.query(sql);
-const restAuth = (await db.query("select count(*)::int as n from auth.users")).rows[0].n;
+const authTabellen = authTabellenZumLeeren(
+  (
+    await db.query(`select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                     where n.nspname='auth' and c.relkind='r' order by 1`)
+  ).rows.map((r) => r.relname as string),
+);
+for (const sql of planeLeeren(publicTabellen, authTabellen)) await db.query(sql);
 const restProfile = (await db.query("select count(*)::int as n from public.profiles")).rows[0].n;
-if (restAuth !== 0 || restProfile !== 0)
-  ende(`Nach dem Leeren: auth.users=${restAuth}, profiles=${restProfile}.`);
-beleg(`${publicTabellen.length} public-Tabellen und ${AUTH_TABELLEN.length} auth-Tabellen geleert`);
+if (restProfile !== 0) ende(`Nach dem Leeren trägt public.profiles noch ${restProfile} Zeilen.`);
+
+// Die Zusage, die am 2026-08-20 gefehlt hat: nicht „auth.users ist leer",
+// sondern **jede** geleerte auth-Tabelle ist leer. Der Abbruch kam damals erst
+// vier Schritte später aus der Fremdschlüsselprüfung, mit einem bereits
+// halb eingespielten Ziel.
+const nochBelegt: string[] = [];
+for (const t of authTabellen) {
+  const n = (await db.query(`select count(*)::int as n from ${t.replace(".", '."')}"`)).rows[0].n;
+  if (n > 0) nochBelegt.push(`${t}=${n}`);
+}
+if (nochBelegt.length > 0) {
+  ende(
+    `Nach dem Leeren tragen auth-Tabellen noch Zeilen: ${nochBelegt.join(", ")}. ` +
+      "Im replica-Modus verschwindet nur, was benannt wird.",
+  );
+}
+beleg(
+  `${publicTabellen.length} public-Tabellen und ${authTabellen.length} auth-Tabellen geleert (${authTabellen.join(", ")}), alle nachgezählt auf 0`,
+);
 
 schritt("auth zurückspielen — Konten UND Identitäten");
 await db.query(authSql);
