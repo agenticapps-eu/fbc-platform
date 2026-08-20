@@ -1,115 +1,115 @@
-# Session Handoff — 2026-08-20
+# Session Handoff — 2026-08-20 (sechste Sitzung)
 
-**Migrations-Hygiene abgeschlossen.** Eine Störzeile in der PROD-Historie hielt
-das Drift-Gate rot — gefunden, belegt, behoben. PR #190 gemergt, beide
-ausgelieferten Flächen sind aktuell.
-
-## Next session: start here
-
-Nichts ist halb fertig, es gibt keinen offenen Zweig und keinen laufenden
-Eingriff. `main` steht auf `31297c6`, Arbeitsbaum sauber, Dateien/DEV/PROD
-deckungsgleich bei **70 Migrationen**.
-
-**Erste Aktion ist eine Entscheidung, kein Befehl:** sollen für die Vorführung
-**alle 71 Mitglieder sichtbar sein?** Zurzeit sind **36 aktiviert** — nur die
-mit Beitrag, Kommentar oder Termin, weshalb „Bernard Peranic" im Verzeichnis
-nicht auftaucht. Das ist kein Suchfehler. Wer das ändern will, fasst
-`supabase/seed/import_world_seed.ts` an (die Stufenlogik steht im Memory
-`import-impact-selbstregistrierung-basic`); wer es so lässt, sollte es Detlev
-vorher sagen.
-
-**Vor dem ersten Merge wissen:** `drift-gate` läuft **nur auf `main`** und ist
-auf jedem PR-Branch `skipped`, nicht grün. Vier grüne Pflichtchecks sagen also
-nichts über die PROD-Historie. Die Sonde dauert zwei Minuten und ist rein
-lesend:
-
-```
-infisical run --env=prod --silent -- sh -c \
-  'pnpm tsx scripts/migration-drift-gate.ts "$SUPABASE_DB_URL_PROD"'
-```
+**AGE-576 ist fertig und liegt als PR #194.** Gruppe 6 vollständig, der Change
+ist archiviert. Der Diff-Review hat vier echte Löcher gefunden — alle behoben,
+alle gemessen.
 
 ## Accomplished
 
-**Die Störzeile.** `20260817171033 admin_member_list_fixes` lag auf PROD ohne
-Datei im Repo und machte `drift-gate` rot (`remote-nur`). Ihr Inhalt war ein
-einziges Statement: ein `delete` auf `supabase_migrations.schema_migrations`.
-Eine frühere Sitzung wollte ihre `apply_migration`-Reste aufräumen und ließ den
-Aufräumbefehl **als Migration** laufen — er löschte die alten Phantomzeilen und
-trug sich dabei selbst als neue ein.
+**5.5 auf der ausgelieferten Fläche** (`7cd2de1`). Der einzige Teil des
+Spiegels, den noch niemand angesehen hatte. `fbc-platform.pages.dev` liest gegen
+DEV — im Bundle nachgelesen, nicht aus der Konfiguration geschlossen.
+Verzeichnis 36 Mitglieder, Profile vollständig, Aktivität mit echten
+Autorennamen, 7 kommende Events mit Anmeldezahlen, Admin-Liste mit Paging,
+**Konsole über alle Seiten leer**. Dafür trug `vorschau@fbc.invalid` (TLD
+existiert nicht) kurz ein Wegwerf-Passwort; zurückgenommen und dreiteilig belegt
+(1/72 → 0/72 und „Invalid login credentials" an der Fläche).
 
-**Das Schema war die ganze Zeit korrekt**, was eigens zu belegen war, weil
-`20260817140000` **0 Statements** trägt (nachgetragen per `migration repair`,
-nie ausgeführt). Gegenprobe an PROD: `admin_activate_member` trägt die
-Zeilensperre, `admin_list_members` die Paging-Signatur mit `coalesce`. Zusätzlich
-`db-drift-scan` gegen PROD: 54 Funktionen, 13 Trigger, 34 Tabellen, 54 Policies,
-keine verwaisten Objekte — der doppelt angewendete Lauf hat nichts hinterlassen.
+**6.1** — Exit 0, 1326 → nach den Behebungen 1333 Tests, typecheck sauber,
+lint 0 Fehler. **Prettier ist kein Gate**: kein Workflow ruft es auf, und
+`prettier --check .` meldet auf HEAD 139 Bestandsdateien.
 
-Behoben mit `supabase migration repair --status reverted 20260817171033`.
-Danach beide Gates grün (PROD und DEV), Historie 70/70/70.
+**6.2** (`e8d90fa`). Beide Dokumente nachgezogen, Schritt 0 des Neuaufbau-Plans
+geschlossen (Weg A).
 
-**PR #190 gemergt** (`31297c6`, Branch gelöscht) — in dieser Reihenfolge: erst
-reparieren, dann mergen. Auf `main` liefen daraufhin `drift-gate`, `functions`,
-`deploy`, `migrations`, `verify`, `edge-functions`, `migrate-dev` grün.
+**6.3** (`5a9e705`, `4fbafd7`, `6693679`). gemini APPROVE, codex
+REQUEST-CHANGES mit 10 Befunden. **Keiner übernommen, alle zehn am Code
+nachgeprüft.** Vier behoben (Donalds Entscheidung), vier folgenlos, zwei
+Bauform.
 
-**Vorführ-Fläche von Hand deployt** (CI liefert sie nie aus). Beide Flächen
-geprüft, am Bündelinhalt statt an der Größe:
-
-| Fläche | Bündel | Datenbank | Pluralfix |
-|---|---|---|---|
-| `fbc-probe-a4664fb5.pages.dev` | `index-Brvg9eUV.js` | `viwntbodrtqxgmqyxluh` ✓, Demo-DB nicht enthalten ✓ | drin |
-| `fbc-platform.pages.dev` | `index-DqM2dMDQ.js` | `foelowldexkcqzewvrcf` ✓ | drin |
-
-**Zwei Korrekturen am vorigen Handoff.** Es sind **zwei Datenbanken, nicht
-drei** — die „Import-DB" *ist* PROD (`SUPABASE_DB_URL_PROD` löst auf
-`postgres.viwntbodrtqxgmqyxluh` auf). Und verdächtigt war die falsche Migration:
-die Präfixsuche `20260817180000` liegt regulär auf beiden.
+**6.4/6.5** (`63bb1b7`). `openspec archive` gelaufen, `validate --all` 31/31.
+PR #194 offen, Linear steht durch die Automation auf In Progress.
 
 ## Decisions
 
-- **Historienzeile entfernen statt Leerdatei nachlegen.** Eine Datei
-  `20260817171033_*.sql`, die nichts tut, hätte einen Unfall dauerhaft ins Repo
-  geschrieben und müsste für immer erklären, warum sie leer ist.
-- **`migration repair --status reverted`, nicht `delete`.** Genau der Fehler,
-  der die Zeile erzeugt hat: Historie aufräumen darf nie als Migration laufen.
-- **Erst reparieren, dann mergen.** Umgekehrt hätte der Merge einen
-  übersprungenen Deploy für zwei Fixes produziert, die ausgeliefert werden
-  sollten.
-- **Am Bündelinhalt prüfen, nicht an der Größe** — und ein altes Bündel heißt
-  nicht „Deploy gescheitert" (siehe unten).
+- **Alle vier tragenden Befunde behoben, nicht nur die billigen.** Donalds
+  Entscheidung. Der schwerste: **4.13 stand am Ende des Laufs** — dazwischen
+  lagen `public.sql`, zwei Prüfschritte, der Drift-Scan und 125 Uploads über das
+  Netz. Jedes `ende()` darin liess DEV mit gültigen PROD-Hashes zurück, bei
+  offener Selbstregistrierung. *Warum das mehr wiegt als ein Ablauffehler:* die
+  Neutralisierung ist einer der zwei Ausgleiche für „keine Anonymisierung".
+- **`dateien` im Manifest ist Pflicht, ohne Toleranzpfad.** *Warum:* ein
+  fehlendes Feld durchzuwinken liesse die Lücke für genau die Auszüge offen, die
+  sie haben. **Folge: der gespeicherte Auszug vom 20.08. ist nicht mehr
+  einspielbar.** Die Prüfsummen nachträglich zu ergänzen wäre unehrlich — sie
+  beschrieben die Datei von heute, nicht die vom Erzeugungszeitpunkt.
+- **Bucket-Vergleich in beide Richtungen.** *Warum:* dieselbe Regel wie beim
+  Migrations-Drift; ein Gate, das nur eine Richtung sieht, ist die Hälfte eines
+  Gates.
+- **Die Demo-Dokumente wurden als historisch gekennzeichnet, nicht angepasst.**
+  *Warum:* eine neue Demo zu erfinden war nicht Aufgabe. Auf DEV nachgezählt:
+  **0** Konten auf `@fbcdemo.com`, **0** auf `@demo.fbc.invalid`, von 72.
+- **Der „drei Werte"-Widerspruch wurde NICHT gefixt.** Die MODIFIED-Anforderung
+  nennt `SUPABASE_DB_PASSWORD` beim Wechsel des Frontend-Routings, das Runbook
+  sagt „zwei Werte, nicht drei". *Warum nicht:* der Fehler steht schon im
+  Hauptspec, ist Bestand und gehört nicht in diesen Diff. **Eigenes Issue wert.**
 
 ## Files modified
 
-Im Repo nur über PR #190 (`31297c6`), die Änderungen selbst stammen aus der
-Vorsitzung:
+- `scripts/sync-dev-ruecklauf.ts` — 4.13 hinter den auth-Rücklauf, pgcrypto aus
+  dem Katalog, `pruefeSqlDateien` und `vergleicheBuckets` vor dem Löschen, alle
+  56 Tabellen einzeln nachgezählt
+- `scripts/sync-dev-ruecklauf.logic.ts` — `pruefeSqlDateien`, `vergleicheBuckets`,
+  `Manifest.dateien`
+- `scripts/sync-dev-auszug.ts` / `.logic.ts` — Prüfsummen beider Dumps ins
+  Manifest, `SQL_DATEIEN`
+- `scripts/sync-dev-ruecklauf.test.ts` — 7 neue Tests, alle erst rot
+- `docs/supabase-environments.md` — Abschnitt „Der Spiegel DEV ← PROD"; **vier
+  Bestandsaussagen korrigiert**, die durch den Spiegel falsch geworden waren
+- `docs/prod-neuaufbau-plan.md` — Schritt 0 geschlossen, Schritt 1 auf das
+  Werkzeug, **neuer Schritt 3b** für die Bild-URLs
+- `docs/demo-zugang.md`, `docs/demo-script.md` — HISTORISCH
+- `docs/foundation-acceptance.md`, `docs/w4-acceptance.md` — Nachtrag
+- `openspec/changes/archive/2026-08-20-sync-dev-from-prod/` — archiviert
+- `openspec/specs/environment-sync/` (neu), `deployment-environments/`
 
-- `src/components/events/EventCard.tsx` — Pluralfix „1 Platz frei"
-- `src/components/events/EventCard.test.tsx` — Assertion dazu
-- `supabase/tests/rls_test.sql` — `feedback`-Assertions zählen nur eigene Fixtures
-- `session-handoff.md` — vorige Fassung
+## Next session: start here
 
-**Außerhalb des Repos:**
+**PR #194, CI-Stand prüfen** — `gh api repos/agenticapps-eu/fbc-platform/commits/<HEAD-SHA>/check-runs`,
+nur die HEAD-SHA zählt. Bei grün mergen (Freigabe steht generell), danach
+`gh pr view 194 --json state` gegenprüfen — `gh pr merge` kann still
+fehlschlagen. Linear schaltet beim Merge selbst auf Done.
 
-- **PROD-DB `viwntbodrtqxgmqyxluh`** — eine Historienzeile entfernt. Kein Schema.
-- **Cloudflare Pages `fbc-probe-a4664fb5`** — neues Produktions-Deploy `e9a1beac`
-- Memory: `dev-equals-prod-supabase`, `drift-gate-blockt-frontend-deploy`,
-  `live-deploy-check-fallen`, `MEMORY.md` — je um die neuen Fallen ergänzt
+Der Change hat **keine Migrationen**, also kein `drift-gate`-Problem und kein
+`migrate-prod`.
+
+Danach ist der PROD-Neuaufbau dran (`docs/prod-neuaufbau-plan.md`, jetzt mit
+geschlossenem Schritt 0 und Schritt 3b). **Erster Handgriff dort ist ein neuer
+Auszug aus PROD** — der alte ist mit diesem Code nicht mehr einspielbar, und
+beides fällt beim Klassifikator, gehört also an Donalds Terminal mit `!`.
 
 ## Open questions
 
-- **Alle 71 sichtbar für die Vorführung?** Siehe oben — die einzige echte
-  Entscheidung.
-- **GitHub-Störung lief am 17.08. noch** (503): der automatische Pages-Job
-  (`dynamic/pages/pages-build-deployment`, liefert `docs/` aus) fiel darüber und
-  ließ sich nicht neu starten. **Beim nächsten Push auf `main` prüfen, ob er von
-  selbst grün wurde.** Er kommt nicht vom Code — und `docs/secrets.md` enthält
-  entgegen erster Vermutung keine echten Werte, nur Präfix-Beispiele.
-- **Dritte ausgelieferte Fläche**, die im Handoff bisher fehlte:
-  `https://agenticapps-eu.github.io/fbc-platform/` ist aktiv und öffentlich
-  (Quelle `main//docs`). Nur Dokumentation, aber sie gehört auf die
-  Rücknahmeliste, falls sie zum Go-Live nicht bleiben soll.
-- **Rücknahmeliste vor Go-Live:** Pages-Projekt `fbc-probe-a4664fb5` löschen ·
-  Probe-Adresse aus `uri_allow_list` · `APP_URL` · `mailer_autoconfirm` ·
-  `IMPORT_SEED_MODE=reset` · ggf. GitHub Pages.
-- Unverändert: Bericht an Detlev · Secrets vom 16.08. rotieren · AGE-497 ·
-  AGE-541 · AGE-258 · AGE-522 · AGE-512 · AGE-561 · eigenes Issue für
-  `send-activation` (2xx trotz Resend-401).
+- **`avatar_url`/`cover_url` sind absolute PROD-URLs** (56 bzw. 53 Zeilen, keine
+  einzige relativ). Der Spiegel kopiert die 111 Objekte korrekt — dasselbe
+  Objekt liefert auf beiden Seiten 35364 Bytes — sie werden nur nie gelesen. Für
+  Weg (A) folgenlos; unter neuer Kennung zeigen 109 Bild-URLs ins Leere. Steht
+  als Schritt 3b im Plan. **Dauerhaft wäre die Umstellung auf relative Pfade —
+  Anwendungscode, eigenes Issue.**
+- **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** mit
+  PROD-identischem Resend-Zugang. Heute verstellt durch neutralisierte Hashes und
+  `contact_requests = 0`, aber die Selbstregistrierung ist offen. Rücknahmeliste
+  vor Go-Live.
+- **Zwei Befunde bewusst offen** (`REVIEWS.md`): eine deklarierte Abweichung
+  entschuldigt die **ganze** Tabelle, und Katalognamen wie `a"b` werden nicht als
+  SQL-Identifier quotiert.
+- **`socials` ist auf keiner öffentlichen Fläche sichtbar** — 34 Profile tragen
+  Netzwerke, `profiles_public` führt die Spalte nicht. Bestandscode.
+- **4.7 ist nur zu einem Drittel gemessen** — die Post- und
+  Benachrichtigungshälften liefen leer (`contact_requests = 0`,
+  `notifications = 0`).
+- Unverändert offen: Detlevs Zahlungsliste (AGE-534) · Downgrade (AGE-516) ·
+  `admin_list_feedback()` ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 ·
+  AGE-513 · AGE-258 · eigenes Issue für `send-activation` (2xx trotz
+  Resend-401) · `demo_personas.sql` scheitert lokal an einem Fremdschlüssel
+  (vorbestehend).

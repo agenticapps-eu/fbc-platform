@@ -3,9 +3,14 @@
 > Gilt ab **AGE-496 / C4**. Löst den Zustand aus ADR-0003 ab (ein geteiltes
 > Projekt für dev und prod). Entscheidungsgrundlage: `docs/decisions/0004-split-prod-dev-supabase.md`.
 >
-> **Stand dieses Dokuments:** 2026-08-05. Das PROD-Projekt existiert
+> **Stand dieses Dokuments:** 2026-08-20. Das PROD-Projekt existiert
 > (`viwntbodrtqxgmqyxluh`), Auth- und Storage-Konfiguration sind angewendet
 > und nachgemessen. Was noch aussteht, steht unter „Offene Nachläufe".
+>
+> **Seit dem 2026-08-20 trägt DEV einen Spiegel von PROD** (AGE-576) — echte
+> Mitglieder statt Demo-Personas. Das ändert zwei Aussagen weiter unten
+> materiell; beide sind an Ort und Stelle nachgezogen. Siehe „Der Spiegel
+> DEV ← PROD".
 
 ## Die zwei Projekte
 
@@ -14,10 +19,10 @@
 | Projekt-Ref | `foelowldexkcqzewvrcf` | `viwntbodrtqxgmqyxluh` |
 | Region | `eu-central-1` | `eu-central-1` |
 | Organisation | `factiv` | `factiv` |
-| Inhalt | Demo-Personas (`@demo.fbc.invalid`) | **echte Mitglieder** |
+| Inhalt | **Spiegel von PROD** (echte Mitglieder + erfundene Aktivität), seit 2026-08-20 — vorher Demo-Personas | **echte Mitglieder** |
 | Infisical-Umgebung | `dev` | `prod` |
 | Erreicht durch | Pull-Request-Previews, `pnpm dev` | Push auf `main` |
-| Demo-Seed erlaubt | ja | **nein, nie** |
+| Demo-Seed erlaubt | **nein, solange der Spiegel steht** — `demo:seed`/`demo:reset` räumen ihn weg | **nein, nie** |
 | Auth-Konfiguration | Dashboard (bewusst nicht versioniert) | `supabase/config.toml` |
 | DB-Zugangsdaten | eigene | **eigene** — nie geteilt |
 
@@ -66,13 +71,21 @@ das ist in CI grün und scheitert erst an Daten. Genau das fängt der automatisc
 DEV-Lauf ab, wo es folgenlos ist. Auf PROD bleibt es eine Entscheidung, weil ein
 DDL-Rollback kein `git revert` ist.
 
-> **Was DEV nicht fängt.** DEV trägt Demo-Personas. Alles, was an der
-> *Beschaffenheit* echter Daten hängt — Dubletten unter einem neuen
-> Unique-Index, Kardinalitäten, gewachsene Altwerte, die ein neuer Check
-> ablehnt — sieht es nie. **Der `--dry-run` von `migrate-prod` wird deshalb
-> gelesen, nicht durchgeklickt**, und ein PROD-Lauf gehört nicht in die letzte
-> Stunde vor einem Termin. Die eigentliche Antwort wäre ein anonymisierter
-> Abgleich DEV←PROD; er ist ein eigener, noch offener Change.
+> **Was DEV nicht fängt — und was sich am 2026-08-20 daran geändert hat.**
+> Bis dahin trug DEV Demo-Personas: alles, was an der *Beschaffenheit* echter
+> Daten hängt — Dubletten unter einem neuen Unique-Index, Kardinalitäten,
+> gewachsene Altwerte, die ein neuer Check ablehnt — sah es nie. Der Satz
+> endete mit „die eigentliche Antwort wäre ein Abgleich DEV←PROD; er ist ein
+> eigener, noch offener Change". **Dieser Change ist gefahren (AGE-576), und
+> DEV trägt jetzt echte Daten.**
+>
+> Damit fängt der automatische `migrate-dev`-Lauf genau die Klasse Fehler, für
+> die es ihn gibt. **Zwei Einschränkungen bleiben, und sie sind nicht klein:**
+> der Spiegel ist eine Momentaufnahme und altert ab dem Tag seiner Erzeugung,
+> und PROD trägt Bestand, den DEV per Entscheidung nicht spiegelt (drei
+> deklarierte Abweichungen, siehe unten). **Der `--dry-run` von `migrate-prod`
+> wird deshalb weiter gelesen, nicht durchgeklickt**, und ein PROD-Lauf gehört
+> nicht in die letzte Stunde vor einem Termin.
 
 **Drift heißt Abweichung in beide Richtungen.** Nicht nur „lokal vorhanden,
 remote fehlend": auch remote-only oder umsortierte Historie ist Drift. Das ist
@@ -181,6 +194,104 @@ gh api -X PUT repos/agenticapps-eu/fbc-platform/environments/production \
   -f "wait_timer=0" -F "prevent_self_review=false" \
   -f "reviewers[][type]=User" -F "reviewers[][id]=<GitHub-User-ID>"
 ```
+
+## Der Spiegel DEV ← PROD
+
+Seit AGE-576 (2026-08-20) gibt es einen Weg, DEV mit dem Bestand von PROD zu
+überschreiben. Er beantwortet den Nachlauf „DEV regelmäßig aus PROD auffrischen",
+der in diesem Dokument seit dem 05.08. als offen stand.
+
+```bash
+pnpm sync:dev          # infisical run --env=prod -- tsx scripts/sync-dev-ruecklauf.ts --ziel=dev
+```
+
+**Zwei Werkzeuge, nicht eines.** Der Auszug liest PROD, der Rücklauf schreibt
+das Ziel:
+
+| | Befehl | Wirkung |
+|---|---|---|
+| Auszug | `infisical run --env=prod -- npx tsx scripts/sync-dev-auszug.ts` | **liest nur**; öffnet keine Verbindung zu DEV |
+| Rücklauf | `npx tsx scripts/sync-dev-ruecklauf.ts --ziel=lokal\|dev <ablage>` | **löscht** und ersetzt `auth`, `public` und alle Buckets des Ziels |
+
+Der Auszug landet **ausserhalb des Arbeitsbaums** (`~/.fbc-spiegel/…`,
+Verzeichnis `0700`, Dateien `0600`) — er trägt echte Anschriften, und das
+Repository ist öffentlich. `manifest.json` wird als letztes geschrieben und ist
+damit das Vollständigkeitszeichen: ein Verzeichnis ohne Manifest ist ein
+abgebrochener Lauf und darf nicht eingespielt werden.
+
+### Keine Anonymisierung — Entscheidung, nicht Versäumnis
+
+Entschieden gegen zwei HIGH-Reviews. Der Ausgleich sind zwei Dinge, und sie
+sind Teil des Werkzeugs, nicht der Disziplin: **alle Passwort-Hashes werden
+neutralisiert** (4.13), und die Demo-Zugänge sind entschärft. Nach einem
+`--ziel=dev`-Lauf kann sich auf DEV **niemand** anmelden.
+
+### Was DEV danach ist — drei deklarierte Abweichungen
+
+Die Abnahme ist ein **Manifestvergleich mit benannten Abweichungen**, nicht
+„gleiche Zeilenzahlen wie PROD". Am 2026-08-20 unabhängig nachgerechnet:
+36 Tabellen, 858 Zeilen (857 aus dem Auszug + eine), 125 Objekte mit **allen
+125 eTags gleich**, und genau drei Abweichungen:
+
+| Tabelle | Abweichung | Warum |
+|---|---|---|
+| `auth.users` | Zeilenhash | 4.13 neutralisiert die Hashes |
+| `public.profiles` | Zeilenhash | eine Handvoll `tier`-Zuweisungen — PROD trägt ausschliesslich `impact`, ohne sie liesse sich Stufen-Gating auf DEV nicht mehr prüfen |
+| `public.staff_roles` | 3 → 4 | `matching_manager`; PROD kennt die Rolle nicht |
+
+**Verglichen wird gegen `manifest.json` des Auszugs, nie gegen „PROD jetzt".**
+Zwischen 11:18 und 15:38 desselben Tages wichen `auth.users` und
+`public.profiles` im Zeilenhash ab, bei unveränderter Zeilenzahl — drei Zeilen
+hatten sich bewegt. Ein frischer PROD-Vergleich misst also Bewegung auf PROD,
+nicht die Güte des Rücklaufs.
+
+### `--sicherung` — wann der Auszug „Sicherung" heissen darf
+
+`--sicherung` lässt **zwei** Dinge aus: die Hash-Neutralisierung (4.13) **und**
+den DEV-eigenen Bestand (4.9/4.10). Das Ergebnis ist genau der Bestand des
+Manifests — anmeldefähig, ohne Dekoration. Nur mit diesem Schalter ist der
+Auszug ein Rückweg.
+
+**Gegen `--ziel=dev` ist der Schalter abgelehnt, nicht abgeraten**, und der
+Abbruch kommt vor jedem Verbindungsaufbau: neutralisierte Hashes sind einer der
+zwei Ausgleiche für „keine Anonymisierung", und die gefährliche Fassung
+unterscheidet sich von der harmlosen um ein Wort in einer kopierten
+Befehlszeile.
+
+Belegt am 2026-08-20 gegen den lokalen Stack, dreiteilig: ohne Schalter stehen
+**0/72** Hashes wie im Auszug und die Anmeldung antwortet HTTP 400; mit Schalter
+**72/72 byteweise** und die Abnahme meldet **null** Abweichungen; und dass die
+Anmeldung überhaupt am Hash hängt, ist eigens kontrolliert (bekannter
+bcrypt-Hash per SQL → HTTP 200 mit Token).
+
+### Zwei Fallen, die Läufe gekostet haben
+
+**`auth` wird per Regel geleert, nicht per Namensliste.** Der erste DEV-Lauf
+räumte nur `auth.users` und `auth.identities`; stehen blieben 13 `sessions`,
+81 `refresh_tokens`, 13 `mfa_amr_claims` und ein `one_time_token`. Alle diese
+Fremdschlüssel sind `ON DELETE CASCADE` — das trug nicht, weil
+**`session_replication_role = replica` die Cascade-Trigger mit stilllegt**. Im
+replica-Modus verschwindet nur, was benannt wird. Eine Namensliste wäre die
+falsche Bauform gewesen: `oauth_consents` und `webauthn_*` sind neu und stünden
+in keiner handgepflegten Liste.
+
+**Startup-Optionen verschluckt der Pooler lautlos.** `session_replication_role`
+geht nur per `SET` in der Sitzung und wird nachgelesen, nicht angenommen. Ein
+Schalter, den man setzt und nicht nachsieht, schreibt hier mit lebenden
+Triggern.
+
+### Was der Spiegel nicht mitbringt
+
+`profiles.avatar_url` und `profiles.cover_url` tragen **absolute URLs mit der
+PROD-Projektkennung** (56 bzw. 53 Zeilen, keine einzige relativ). Die 111
+Objekte in `avatars`/`covers` werden korrekt nach DEV kopiert — dasselbe Objekt
+liefert auf beiden Seiten byteweise dieselbe Größe — **aber nie gelesen**: der
+Browser holt sie von PROD. `event-covers` und `post-media` laufen über Pfade und
+signierte URLs und lesen tatsächlich aus DEV.
+
+Folgenlos, solange beide Projekte bestehen und beide Buckets öffentlich sind.
+**Nicht folgenlos bei einem Neuaufbau unter neuer Kennung** — siehe
+`docs/prod-neuaufbau-plan.md`.
 
 ## Rollback
 
@@ -465,7 +576,8 @@ Deploy-URL hinterher.
 | Stripe-Webhook-URL auf `viwntbodrtqxgmqyxluh` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
 | Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
 | Umzug der drei prod-Werte | Go-Live-Woche | siehe oben |
-| DEV regelmäßig aus PROD auffrischen | offen | bräuchte Anonymisierung — eigener Change |
+| ~~DEV regelmäßig aus PROD auffrischen~~ | AGE-576 | **erledigt 2026-08-20** — `pnpm sync:dev`, **ohne** Anonymisierung (entschieden gegen zwei HIGH-Reviews; der Ausgleich sind neutralisierte Passwort-Hashes und entschärfte Demo-Zugänge) |
+| **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** | Rücknahmeliste vor Go-Live | neu seit dem Spiegel; der Resend-Zugang ist zu PROD byte-identisch. Heute verstellt durch neutralisierte Hashes und `contact_requests = 0`, aber die Selbstregistrierung ist offen |
 
 ### Warum der eigene SMTP kein Nice-to-have ist
 

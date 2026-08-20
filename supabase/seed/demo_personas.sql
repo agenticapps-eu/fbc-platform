@@ -22,6 +22,19 @@ begin;
 --    …25415–…25423 (AGE-357) füllen exchange/discover/basic — vorher hatte das
 --    Verzeichnis nur connect und impact besetzt. Alle tragen dasselbe Dummy-
 --    Passwort wie die übrigen: Verzeichnis-Inhalt, KEINE Logins. ────────────
+--
+--    ACHTUNG, am 2026-08-20 nachgemessen: bis dahin war dieser Satz eine
+--    Absicht, kein Mechanismus. Der Hash stand als Klartext
+--    ('demo-not-a-real-password') in diesem OEFFENTLICHEN Repository, und die
+--    Konten liessen sich damit anmelden — 24 der 41 DEV-Konten, ueber alle
+--    sechs Stufen bis `impact`. Ein Login davon las das komplette Verzeichnis
+--    (38 Mitglieder). Solange DEV Demo-Daten traegt, ist das harmlos; mit dem
+--    Spiegel DEV <- PROD (AGE-576) waeren es echte Mitglieder gewesen.
+--    Deshalb jetzt ein Zufallswert, den niemand kennt: die Spalte bleibt
+--    gefuellt (GoTrue erwartet sie), aber es gibt kein Passwort dazu.
+--    `encrypted_password is null` waere als Probe nutzlos — GoTrue schreibt
+--    auch ohne Passwort einen Hash. Die richtige Probe ist ein
+--    Anmeldeversuch.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
@@ -30,7 +43,7 @@ insert into auth.users (
 )
 select
   '00000000-0000-0000-0000-000000000000', v.id, 'authenticated', 'authenticated',
-  v.email, extensions.crypt('demo-not-a-real-password', extensions.gen_salt('bf')),
+  v.email, extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf')),
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}', jsonb_build_object('name', v.name),
   '', '', '', ''

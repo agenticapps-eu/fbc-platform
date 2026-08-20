@@ -29,7 +29,10 @@ gegen die DB. Beides läuft mit erhöhten Rechten und umgeht den Client.
 ### Anlegen + Stufen setzen (Supabase Studio → SQL Editor)
 
 ```sql
--- Drei bestätigte Test-Accounts direkt anlegen. Passwort für alle: Test1234!
+-- Drei bestätigte Test-Accounts direkt anlegen.
+-- Das Passwort steht NICHT mehr in diesem Repository: es liegt als
+-- DEMO_LOGIN_PASSWORD_DEV in Infisical (--env=prod) und wird unten eingesetzt.
+-- Vor dem Ausführen im SQL-Editor :passwort durch den Wert ersetzen.
 -- Der Trigger handle_new_user legt automatisch ein profiles-Row mit tier='discover' an.
 insert into auth.users
   (instance_id, id, aud, role, email, encrypted_password,
@@ -39,7 +42,7 @@ insert into auth.users
 select
   '00000000-0000-0000-0000-000000000000', gen_random_uuid(),
   'authenticated', 'authenticated', e.email,
-  extensions.crypt('Test1234!', extensions.gen_salt('bf')),
+  extensions.crypt(:'passwort', extensions.gen_salt('bf')),
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, '', '', '', ''
 from (values ('discover@fbcdemo.com'), ('prime@fbcdemo.com'), ('legacy@fbcdemo.com')) as e(email)

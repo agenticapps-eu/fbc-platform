@@ -1,0 +1,173 @@
+{
+  "seite": "prod",
+  "ref": "viwntbodrtqxgmqyxluh",
+  "tabellen": {
+    "public.activation_attempts": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.activation_tokens": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.admin_audit": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.badges": {
+      "zeilen": 4,
+      "hash": "fab9a721b5290abbd1c034b24fa95283"
+    },
+    "public.comments": {
+      "zeilen": 13,
+      "hash": "675cb34c1bd34994eb299f6f6cb4cc61"
+    },
+    "public.compass_responses": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.contact_requests": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.event_registrations": {
+      "zeilen": 97,
+      "hash": "e69d69d11d98490740e9a81178d6bd36"
+    },
+    "public.events": {
+      "zeilen": 8,
+      "hash": "c6b54a932ee0eb0eae541cfc3ce0242c"
+    },
+    "public.feedback": {
+      "zeilen": 1,
+      "hash": "0c3d00b9d2f4acc54bf2d9d0097c02ac"
+    },
+    "public.goals": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.matches": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.member_settings": {
+      "zeilen": 2,
+      "hash": "3c29e2efa7dda10f10a66c6425af9ca8"
+    },
+    "public.membership_tiers": {
+      "zeilen": 6,
+      "hash": "92e0f1c79b5039cc845652be8fc2ac26"
+    },
+    "public.message_threads": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.messages": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.needs": {
+      "zeilen": 50,
+      "hash": "5f014b2b59477d5b4c29a72b24411228"
+    },
+    "public.notifications": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.offers": {
+      "zeilen": 52,
+      "hash": "6817d9127d88eb68201e746e9752beed"
+    },
+    "public.partner_categories": {
+      "zeilen": 6,
+      "hash": "cca22cc950baa57db16a33d421aa3af7"
+    },
+    "public.partners": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.platform_settings": {
+      "zeilen": 1,
+      "hash": "523524472426c7ce2740655f65fc32fd"
+    },
+    "public.post_likes": {
+      "zeilen": 88,
+      "hash": "a736b3d164d14d43983f3b601f92a90e"
+    },
+    "public.post_media": {
+      "zeilen": 6,
+      "hash": "c952b337327ca1da02b35672620a855c"
+    },
+    "public.posts": {
+      "zeilen": 29,
+      "hash": "b09e89c27773f7fc3edea8e0a371393d"
+    },
+    "public.profile_badges": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.profile_contacts": {
+      "zeilen": 54,
+      "hash": "7603619b2342bc5a740d22ea763d4f71"
+    },
+    "public.profile_interests": {
+      "zeilen": 128,
+      "hash": "ec72e69a82a808f6a40e8208f87a2245"
+    },
+    "public.profile_legacy": {
+      "zeilen": 70,
+      "hash": "2222b4a1408083d565f6201e05eaabac"
+    },
+    "public.profile_theme_scores": {
+      "zeilen": 8,
+      "hash": "70664d3bbbe74aaf3b1745fb310bf7e4"
+    },
+    "public.profiles": {
+      "zeilen": 72,
+      "hash": "805244f9487d50a0f4ca851c645c7702"
+    },
+    "public.routing_queue": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.staff_roles": {
+      "zeilen": 3,
+      "hash": "1f8cd8faee53d89ec8ca8210a011882b"
+    },
+    "public.tags": {
+      "zeilen": 15,
+      "hash": "1e4563d584a2a50bf166b3c51f964133"
+    },
+    "auth.users": {
+      "zeilen": 72,
+      "hash": "65f7738e9b9b622350cf08b12c5f3490"
+    },
+    "auth.identities": {
+      "zeilen": 72,
+      "hash": "6c3f77c95f1d312adf711ae6d361ccf7"
+    }
+  },
+  "buckets": {
+    "avatars": {
+      "objekte": 57,
+      "bytes": 1357274,
+      "hash": "768d7d3e6f6bc84a0384f91c0fa101d8"
+    },
+    "covers": {
+      "objekte": 54,
+      "bytes": 3116570,
+      "hash": "743730fb79d58472589b13dff99b3288"
+    },
+    "event-covers": {
+      "objekte": 8,
+      "bytes": 1279092,
+      "hash": "b2de7e91b19c5618a52132e72ae4ee22"
+    },
+    "post-media": {
+      "objekte": 6,
+      "bytes": 1889206,
+      "hash": "9af2a4674bc07484a140ff68fcae3071"
+    }
+  },
+  "objekte": 125
+}

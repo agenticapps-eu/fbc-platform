@@ -1,5 +1,12 @@
 # Foundation Acceptance — W1 · Fundament (Smoke Test)
 
+> **Nachtrag 2026-08-20 (AGE-576):** Wo dieses Dokument die Demo-Personas
+> (`@fbcdemo.com`, `@demo.fbc.invalid`, Jonas/Carla/Eleonora) als Prüfweg
+> benutzt, ist es **nicht mehr nachvollziehbar**: DEV trägt seit dem Spiegel die
+> echten Mitglieder, und von diesen Konten existiert dort keines mehr
+> (nachgezählt: 0 von 72). Die damals belegten Befunde bleiben gültig — der
+> beschriebene Weg, sie zu wiederholen, nicht. Siehe `docs/demo-script.md`.
+
 > **Nachtrag 2026-08-10 (ADR-0037):** Die Axiom-Destination wurde entfernt.
 > `/api/log` schreibt jetzt eine strukturierte JSON-Zeile in die Workers Logs
 > statt an Axiom zu senden; es gibt kein `AXIOM_TOKEN` und keinen `502`-Pfad
@@ -43,7 +50,9 @@
 
 Im `auth.users` direkt angelegt (bestätigt) — Stufen über `public.profiles.tier`
 gesetzt (Client kann `tier` nicht schreiben; siehe `docs/tier-testing.md`).
-Passwort aller Accounts: `Test1234!`.
+Passwort aller Accounts: `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`).
+(Bis 2026-08-20 stand hier `Test1234!`; ersetzt, weil dieselben Konten seit dem
+Spiegel DEV ← PROD neben echten Mitgliederdaten stehen.)
 
 | E-Mail | UUID | `tier` | `level_rank` | bestätigt |
 | --- | --- | --- | --- | --- |

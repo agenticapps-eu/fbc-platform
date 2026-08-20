@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "db:push": "infisical run --env=dev -- sh -c 'supabase db push --db-url \"$SUPABASE_DB_URL_DEV\"'",
     "db:push:prod": "infisical run --env=prod -- tsx scripts/push-prod.ts db",
+    "sync:dev": "infisical run --env=prod -- tsx scripts/sync-dev-ruecklauf.ts --ziel=dev",
     "config:push:prod": "infisical run --env=prod -- tsx scripts/push-prod.ts config",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

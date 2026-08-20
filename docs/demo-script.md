@@ -1,3 +1,25 @@
+> # ⚠ HISTORISCH — die hier beschriebene Demo-Welt existiert nicht mehr
+>
+> **Stand 2026-08-20.** Seit dem Spiegel DEV ← PROD (AGE-576) trägt DEV die
+> echten Mitglieder aus PROD. Am selben Tag auf DEV nachgezählt:
+> **0 Konten** auf `@fbcdemo.com` und **0** auf `@demo.fbc.invalid` — von 72.
+>
+> Die drei Zugänge unten (`discover@`, `prime@`, `legacy@fbcdemo.com`)
+> **existieren nicht mehr**, und ein Passwort einzusetzen hilft nicht: es gibt
+> kein Konto dazu. Zusätzlich sind **alle 72 übernommenen Hashes
+> neutralisiert** — auf DEV ist derzeit kein Konto anmeldefähig.
+>
+> Auch die Stufen stimmen nicht mehr: dieses Dokument spricht von
+> *Discover → Prime → Legacy*. Gültig ist seit AGE-311 das Sechs-Stufen-Modell
+> `basic → connect → discover → exchange → focus → impact`.
+>
+> **Nicht ausführen:** `pnpm demo:seed` oder `pnpm demo:reset` gegen DEV
+> zerstören den Spiegel.
+>
+> Das Dokument bleibt als Beleg dessen stehen, was Phase 1 vorgeführt hat.
+> Wer heute vorführen will, braucht eine neue Entscheidung darüber, woran —
+> nicht dieses Drehbuch.
+
 # FBC Plattform — Demo-Drehbuch (Phase 1)
 
 > **Für:** Detlev · **Dauer:** ~8–10 Min · **Live-URL:** <https://fbc-platform.pages.dev>
@@ -7,7 +29,8 @@
 
 ## Vorbereitung (vor der Demo)
 
-- Drei Tabs/Logins bereitlegen. **Alle Passwörter: `Test1234!`**
+- Drei Tabs/Logins bereitlegen. **Passwort für alle drei:** `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`)
+  (steht seit 2026-08-20 nicht mehr im Repository, siehe `docs/demo-zugang.md`)
   - **Discover:** `discover@fbcdemo.com` → *Jonas Keller* (Gründer, frühe Phase)
   - **Prime:** `prime@fbcdemo.com` → *Carla Reinhardt* (Strategieberaterin, Connectorin)
   - **Legacy:** `legacy@fbcdemo.com` → *Eleonora Voss* (Beteiligungskapital, Deal Keeperin)
