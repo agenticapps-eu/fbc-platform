@@ -125,7 +125,17 @@ Er enthält Namen, Anschriften und Anmeldeadressen echter Menschen, und das
 Repository ist öffentlich.
 
 Zum Auszug SHALL ein Manifest gehören: je Tabelle die Zeilenzahl und ein Hash
-über die Zeilen, je Objekt Größe und Prüfsumme.
+über die Zeilen, je Objekt Größe und Prüfsumme, **und für jede der beiden
+SQL-Dateien ebenfalls Größe und Prüfsumme**. Das Werkzeug SHALL beide Dateien
+byteweise gegen das Manifest halten, bevor es den ersten löschenden Befehl
+absetzt — dieselbe Zusage wie für die Objekte. Ein Auszug, dessen Manifest diese
+Prüfsummen nicht führt, SHALL abgewiesen werden; er SHALL NOT mit einer Warnung
+durchgelassen werden.
+
+Das Werkzeug SHALL ausserdem die Bucket-Liste des Manifests gegen die des Ziels
+halten, ebenfalls vor dem ersten löschenden Befehl, und in **beide** Richtungen:
+ein auf dem Ziel fehlender Bucket SHALL genauso zum Abbruch führen wie ein
+zusätzlicher.
 
 #### Scenario: Ein Abbruch beim Auszug lässt DEV unberührt
 
@@ -139,12 +149,65 @@ Zum Auszug SHALL ein Manifest gehören: je Tabelle die Zeilenzahl und ein Hash
 - **THEN** ist der über `realpath` aufgelöste Ablageort kein Pfad unterhalb des
   Arbeitsbaums, und der Lauf bricht sonst ab
 
+#### Scenario: Eine beschädigte SQL-Datei fällt auf, bevor gelöscht wird
+
+- **WHEN** `public.sql` nach dem Erzeugen des Auszugs auch nur um ein Byte
+  gekürzt oder verändert wird
+- **THEN** bricht der Lauf mit dem Verweis auf Größe und Prüfsumme ab, und zwar
+  bevor eine Verbindung zum Ziel aufgebaut ist — nicht erst, wenn das Ziel
+  bereits geleert ist
+
+#### Scenario: Ein Auszug ohne Prüfsummen für die SQL-Dateien wird abgewiesen
+
+- **WHEN** ein Auszug eingespielt werden soll, dessen Manifest das Feld für die
+  SQL-Dateien nicht führt
+- **THEN** bricht der Lauf ab mit der Aufforderung, den Auszug neu zu ziehen —
+  ein fehlendes Feld zu tolerieren liesse die Lücke für genau die Auszüge offen,
+  die sie haben
+
+#### Scenario: Abweichende Buckets fallen auf, bevor gelöscht wird
+
+- **WHEN** die Bucket-Liste des Ziels von der des Auszugs abweicht, in welcher
+  Richtung auch immer
+- **THEN** bricht der Lauf ab, bevor der erste Bucket geleert wird
+
 #### Scenario: Der Arbeitsbaum wächst durch den Lauf nicht
 
 - **WHEN** `git status --porcelain --ignored` vor und nach einem Lauf verglichen
   wird
 - **THEN** ist die Differenz leer — die Ausgabe selbst ist es nicht, sie führt
   schon vorher ignorierte Pfade
+
+### Requirement: Die übernommenen Passwort-Hashes werden neutralisiert, so früh wie möglich
+
+Der Spiegel überträgt echte Personendaten ohne Anonymisierung. Einer der zwei
+Ausgleiche dafür ist, dass **kein übernommenes Konto auf DEV anmeldefähig ist**:
+das Werkzeug SHALL jeden Passwort-Hash durch einen Zufallswert ersetzen.
+
+Das SHALL unmittelbar nach dem Einspielen der Konten geschehen — an der
+frühestmöglichen Stelle, an der es überhaupt Hashes gibt — und SHALL NOT hinter
+weitere Schritte gestellt werden. Jeder Abbruch zwischen dem Einspielen und der
+Neutralisierung liesse das Ziel mit gültigen Produktions-Hashes zurück, und die
+Selbstregistrierung auf DEV ist offen.
+
+Das Ergebnis SHALL gemessen und nicht behauptet werden: das Werkzeug SHALL
+belegen, dass **kein** Konto mehr einen Hash aus dem Auszug trägt.
+
+Ausgenommen ist allein der ausdrückliche Sicherungslauf, dessen Zweck der
+anmeldefähige Bestand ist und der gegen DEV abgelehnt wird.
+
+#### Scenario: Nach einem Lauf gegen DEV ist kein übernommenes Konto anmeldefähig
+
+- **WHEN** ein Lauf gegen DEV beendet ist
+- **THEN** trägt keines der übernommenen Konten noch seinen Hash aus dem Auszug,
+  und eine Anmeldung mit einem Produktionspasswort scheitert
+
+#### Scenario: Ein Abbruch nach dem Einspielen lässt keine echten Hashes zurück
+
+- **WHEN** der Lauf nach dem Einspielen der Konten aus einem beliebigen Grund
+  abbricht
+- **THEN** sind die Hashes zu diesem Zeitpunkt bereits ersetzt, weil die
+  Neutralisierung vor allen weiteren Schritten steht
 
 ### Requirement: Der Spiegel überträgt Datenbank und Ablage gemeinsam
 
