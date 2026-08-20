@@ -174,3 +174,65 @@ auf `impact` (der deklarierte DEV-Bestand aus §3a fehlt), kein
 `session_replication_role` steht wieder auf `origin` — nachgelesen. Der
 Wiederholungslauf räumt den Rest selbst; ein Eingriff von Hand ist nicht nötig
 und wäre schädlich, weil er die Ausgangslage des nächsten Laufs verschöbe.
+
+---
+
+# Nachtrag 2 — 5.2 und 5.3: der zweite Lauf gegen DEV, Exit 0
+
+**2026-08-20, 19:32.** Derselbe Auszug, dieselbe Ablage, mit der Regel aus dem
+ersten Nachtrag. Durchgelaufen bis zur Abnahme.
+
+Der Leeren-Schritt räumte diesmal **22 auth-Tabellen statt 2** und zählte jede
+davon auf 0 nach. 4.1b meldete 61 Fremdschlüssel ohne eine verwaiste Zeile.
+
+## Unabhängig nachgerechnet, nicht aus dem Eigenprotokoll
+
+Das Skript nimmt sich selbst ab; das ist ein Zirkelschluss, solange niemand
+danebenrechnet. Also ein zweiter Manifestlauf gegen DEV und ein Vergleich gegen
+`manifest.json` **des Auszugs**:
+
+| | |
+|---|---|
+| Zeilen | 876 vorher → **858** (857 aus dem Auszug + 1) |
+| Tabellen | 36, alle mit passender Zeilenzahl |
+| Objekte | 125, **alle 125 eTags gleich** |
+| `auth`-Reste | nur `users` (72), `identities` (72), `schema_migrations` (77) |
+| Stufen | `basic`…`focus` je 1, `impact` 67 |
+| Rollen | `admin` 3, `matching_manager` 1 |
+
+**Genau drei Abweichungen, alle vorher deklariert:** `auth.users` (Hash — 4.13
+neutralisiert die Passwörter), `public.profiles` (Hash — Stufen zugewiesen) und
+`public.staff_roles` (3 → 4 — die `matching_manager`-Zeile).
+
+## 4.8a ist belegt
+
+`notify_contact_request_webhook()` und `contact_requests_email_webhook` stehen
+nach dem Lauf beide noch, und die Funktion zeigt unverändert auf
+`…/functions/v1/notify-contact-request`. Lokal war das nur eine Warnung, weil
+beide dort gar nicht existieren.
+
+## 4.7 ist zu einem Drittel belegt — und das ist wichtig
+
+Echt gemessen ist `trg_event_feed_post`: acht Events wurden eingespielt,
+`public.posts` steht danach auf **29 wie im Manifest**, also null
+Zusatzbeiträge.
+
+Die beiden anderen Hälften sind **leer gelaufen, nicht bestanden**: der Auszug
+trägt `contact_requests = 0` und `notifications = 0`. Es gab nichts, worauf
+`contact_requests_lifecycle` und `contact_requests_email_webhook` hätten feuern
+können. Wer das später als „gegen Post geprüft" liest, liest mehr als dasteht.
+
+## Was DEV jetzt ist — und wo das eine offene Flanke hat
+
+DEV trägt **72 Konten mit 72 echten Adressen** und einen **lebenden
+E-Mail-Webhook**, der auf die DEV-Edge-Function zeigt. Nach der
+Secret-Trennung (`dev-prod-secret-split-unvollstaendig`) ist der Resend-Zugang
+zwischen DEV und PROD byte-identisch — eine Kontaktanfrage auf DEV schickt
+damit **echte Post an echte Mitglieder**, abgeschickt aus einer Testumgebung.
+
+Was heute davor steht: alle 72 Passwort-Hashes sind neutralisiert, es kann sich
+niemand anmelden, und `contact_requests` ist leer. Die Selbstregistrierung ist
+aber offen (`import-impact-selbstregistrierung-basic`).
+
+**Kein Blocker für diese Änderung, aber ein eigener Posten** — er gehört auf die
+Rücknahmeliste vor Go-Live, nicht in diesen Diff.

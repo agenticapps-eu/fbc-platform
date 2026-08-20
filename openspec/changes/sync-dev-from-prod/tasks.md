@@ -272,16 +272,26 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       `20260715150000`). Wird der Weg doch über `truncate … cascade` gegangen,
       zusätzlich belegen, dass `auth.users` unberührt bleibt (1.8)
 - [x] 4.6 `public` zurückspielen
-- [ ] 4.7 Test: der Restore erzeugt **keine** zusätzlichen Beiträge aus
+- [x] 4.7 Test: der Restore erzeugt **keine** zusätzlichen Beiträge aus
       `trg_event_feed_post`, keine Benachrichtigungen aus
       `contact_requests_lifecycle` und **keine Post** aus
       `contact_requests_email_webhook` — **die Zusage muss gegen DEV fallen,
-      nicht lokal** (siehe 5.1)
+      nicht lokal** (siehe 5.1). **Am 2026-08-20 gegen DEV gefallen — aber nur
+      zu einem Drittel als Messung.** Echt belegt ist `trg_event_feed_post`:
+      acht Events wurden eingespielt, `public.posts` steht danach auf 29 wie im
+      Manifest, also **null** Zusatzbeiträge. Die beiden anderen Hälften sind
+      **leer gelaufen, nicht bestanden**: der Auszug trägt `contact_requests=0`
+      und `notifications=0` — es gab schlicht nichts, worauf die beiden Trigger
+      hätten feuern können. Wer das später als „gegen Post geprüft" liest,
+      liest mehr, als dasteht
 - [x] 4.8 Objekte in die vier Buckets schreiben, **`upsert: false`**
-- [ ] 4.8a Test: `notify_contact_request_webhook()` und
-      `contact_requests_email_webhook` stehen nach dem Lauf noch. **Gebaut und
-      lokal gelaufen — dort aber nur als Warnung**, weil beide auf dem lokalen
-      Stack gar nicht existieren. Ein Beleg wird daraus erst gegen DEV. Sie stehen in
+- [x] 4.8a Test: `notify_contact_request_webhook()` und
+      `contact_requests_email_webhook` stehen nach dem Lauf noch. **Am
+      2026-08-20 gegen DEV belegt** — beide stehen, und die Funktion zeigt
+      unverändert auf
+      `foelowldexkcqzewvrcf.supabase.co/functions/v1/notify-contact-request`.
+      Lokal war das nur eine Warnung, weil beide auf dem lokalen Stack gar
+      nicht existieren. Sie stehen in
       keiner Migration (1.9) — still verloren sähe aus wie ein sauberer Lauf
 - [x] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen.
       **Stark verkleinert am 2026-08-20** (design.md §3a): keine Demo-Zugänge,
@@ -358,11 +368,24 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       kennt. **Blinder Fleck:** lokal fehlt genau
       `contact_requests_email_webhook` (17 statt 18 Trigger), weil er in keiner
       Migration steht — über „keine Post" sagt ein grüner lokaler Lauf nichts
-- [ ] 5.2 `pnpm sync:dev` in `package.json` eintragen und einmal gegen DEV
+- [x] 5.2 `pnpm sync:dev` in `package.json` eintragen und einmal gegen DEV
       ausführen — **die beiden DB-URLs liegen in getrennten
       Infisical-Umgebungen** (1.1), ein einzelner `infisical run --env=…`
-      liefert nie beide
-- [ ] 5.3 Abnahme als **Manifestvergleich mit benannten Abweichungen**: DEV
+      liefert nie beide. **Am 2026-08-20 gelaufen, im zweiten Anlauf, Exit 0.**
+      Der erste Lauf (19:20) brach bei 4.1b ab: geleert wurden nur `auth.users`
+      und `auth.identities`, stehen blieben 13 `sessions`, 81 `refresh_tokens`,
+      13 `mfa_amr_claims` und ein `one_time_token` der alten DEV-Demokonten.
+      `ON DELETE CASCADE` trug nicht — `session_replication_role = replica`
+      legt die Cascade-Trigger mit still. Behoben mit
+      `authTabellenZumLeeren()`: eine Regel statt einer Namensliste, plus
+      Nachzählung jeder geleerten auth-Tabelle **im Leeren-Schritt**
+- [x] 5.3 **Am 2026-08-20 abgenommen, unabhängig nachgerechnet** (nicht aus
+      dem Eigenprotokoll des Laufs): 36 Tabellen und 125 Objekte gegen
+      `manifest.json`, alle 125 eTags gleich. Genau drei Abweichungen, alle
+      deklariert — `auth.users` (Hash; 4.13 neutralisiert die Hashes),
+      `public.profiles` (Hash; Stufen zugewiesen) und `public.staff_roles`
+      (3 → 4; `matching_manager`). 858 Zeilen = 857 aus dem Auszug + eine.
+      Ursprünglicher Wortlaut: Abnahme als **Manifestvergleich mit benannten Abweichungen**: DEV
       trägt den Bestand des Auszugs **plus** den deklarierten DEV-Bestand.
       Nicht „gleiche Zeilenzahlen wie PROD" — das ist mit 4.10 unvereinbar und
       damit unerfüllbar. **Und in Gruppe 3 gemessen, warum auch ein frischer
