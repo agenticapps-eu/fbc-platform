@@ -1,139 +1,124 @@
-# Session Handoff — 2026-08-20 (dritte Sitzung)
+# Session Handoff — 2026-08-20 (vierte Sitzung)
 
-**Der Spiegel DEV ← PROD ist gemessen, abgesichert und entschärft — aber noch
-nicht gebaut.** Gruppen 1, 2, 2a und 2.7 sind durch, kein Auszug existiert.
-Zwei Behauptungen des Entwurfs sind dabei als falsch nachgewiesen worden, und
-eine echte Sicherheitslücke ist geschlossen.
+**Der Spiegel läuft — lokal, vollständig, aus einem echten PROD-Auszug.**
+Gruppen 3 und 4 sind gebaut und gemessen, der Probelauf aus 5.1 ist grün.
+**DEV ist nicht berührt worden.** Drei Behauptungen des Entwurfs sind dabei als
+falsch nachgewiesen worden, zwei davon hätten in Gruppe 4 lautlos Schaden
+angerichtet.
 
 ## Accomplished
 
-**Gruppe 1 — beide blockierenden Gates halten** (`36b55d0`). `pg_dump 18.4`
-trägt die Pooler-Verbindung gegen PROD (Exit 0) und liest das `auth`-Schema mit
-den vorhandenen Rechten. Der `pg_restore`-Weg trägt also. Drei Befunde ändern
-ihn trotzdem:
+**Gruppe 3 — Auszug, Manifest, Ablage** (`c9ee493`, `dec4cbb`, `40a43e6`).
+35 Zusagen, sieben Verbiegungen einzeln rot gemessen, vier echte Läufe gegen
+PROD (rein lesend). Der Auszug liegt in
+`~/.fbc-spiegel/spiegel-viwntbodrtqxgmqyxluh-20260820T165007Z` (8 MB,
+`0700`/`0600`): `auth.sql`, `public.sql`, 125 Objekte, `manifest.json`.
+36 Tabellen / 857 Zeilen, alle 125 Objekte byteweise bestätigt.
 
-- **Der geplante Mechanismus wäre gescheitert.** `ALTER TABLE … DISABLE TRIGGER`
-  verlangt Eigentümerrechte — die fehlen an `auth.users` (`supabase_auth_admin`)
-  und beiden `storage`-Tabellen (`supabase_storage_admin`), also an genau den
-  drei Tabellen, auf die es ankommt. Was trägt: **`set
-  session_replication_role = replica`**, auf beiden Projekten erlaubt; alle 18
-  Trigger tragen `tgenabled='O'`, der eine Schalter legt sie sämtlich still.
-  Lokal mit Gegenprobe belegt (origin: 1 Profilzeile, replica: 0).
-- **Es sind 18 Trigger, nicht 13** — vier auf `storage` standen in keinem
-  Review; zwei stehen dem Leeren der Buckets im Weg.
-- **Der lokale Probelauf hat einen blinden Fleck**, und zwar den schlimmsten:
-  lokal fehlt genau `contact_requests_email_webhook`, weil er bewusst in keiner
-  Migration steht. Über „keine Post" sagt ein grüner lokaler Lauf nichts.
+Vier Zusagen sind an echten Läufen gefallen, nicht am Strukturargument: der
+Ablageort wird **nach `realpath`** geprüft (ein Symlink in den Arbeitsbaum
+fliegt raus, und in beide Richtungen); die Objektliste kommt aus
+`storage.objects` statt aus `list()` und blättert **per Keyset**; die
+`git status`-Differenz vor/nach dem Lauf ist leer; und **der Auszug kennt DEV
+nicht** — mit einem nicht auflösenden DEV-Host und einem DEV-Schlüssel ohne
+gültige Signatur lief er einmal durch und einmal in den Abbruch, beide Male
+ohne einen Mucks aus Richtung DEV.
 
-Ausserdem: Auth-Umfang ist `users` + `identities` und sonst nichts; beide Seiten
-schemagleich (70 Migrationen zeichengleich, `db-drift-scan` beidseitig sauber);
-Vorher-Manifest beider Seiten liegt in `messungen/`.
+**Gruppe 4 — der Rücklauf** (`9f14905`, `1b753e0`). 22 Zusagen, sieben Läufe
+gegen den lokalen Stack. Aus einem leeren, frisch migrierten Schema entsteht der
+volle Bestand: 72 Konten, 72 Identitäten, 36 Tabellen, 125 Objekte, Exit 0.
+Belegt sind unter anderem **4.5** (nach dem `auth`-Rücklauf trägt
+`public.profiles` **0** Zeilen — der Trigger hat nicht gefeuert), **4.1b**
+(**61** Fremdschlüssel einzeln geprüft, keine verwaiste Zeile) und **5.4**
+(zweimal derselbe Auszug → **36 von 37 Tabellen bitgleich**).
 
-**Gruppe 2 — der Wächter** (`37d711e`, `b6930a7`). `sync-dev.logic.ts` (rein) +
-`sync-dev-waechter.ts` (CLI), 22 Zusagen, **sieben Verbiegungen einzeln rot
-gemessen**. Prüft die Kennung je Wert (DB-URL, API-URL, Service-Key) aus
-Benutzername bzw. JWT-Nutzlast, nie am Host, und **beide** Seiten. Zwei Dinge
-hat erst die Sichtprobe an echten Werten gezeigt: der Wächter fängt die
-dokumentierte Spaltung des Secret-Stores, und er nahm den **anon**-Schlüssel an
-(gleiche Kennung) — die Rolle wird jetzt mitgeprüft.
-
-**Gruppe 2.7 — Zugangsdaten** (von Donald gesetzt). Alles liegt in Infisical
-`prod`, ein Lauf sieht beide Seiten. Kein `SUPABASE_SERVICE_ROLE_KEY_PROD`:
-bewusst abgewichen, der Wächter fällt auf den etablierten Namen zurück und
-schreibt hin, welchen er gelesen hat.
-
-**Gruppe 2a — und der eigentliche Fund** (`35d18cf`). Geplant war ein Passwort
-in einem Dokument; gefunden wurden fünf Dokumente mit `Test1234!` **und ein
-zweites Passwort im Quelltext**: `demo_personas.sql` legte Konten mit
-`crypt('demo-not-a-real-password', …)` an — Klartext im öffentlichen Repo, der
-Kommentar daneben behauptete „KEINE Logins". Nachgemessen: **24 der 41
-DEV-Konten** trugen es, über alle sechs Stufen bis `impact`, und ein Login damit
-las das **komplette Verzeichnis**. Heute Demo-Profile — nach dem ersten
-Spiegellauf die 72 echten Mitglieder. Behoben in beide Richtungen (Seeds setzen
-einen Zufallswert, die 24 lebenden Konten sind neutralisiert, Gegenprobe grün).
+Berichte: `openspec/changes/sync-dev-from-prod/messungen/gruppe-3-…md` und
+`gruppe-4-…md`.
 
 ## Decisions
 
-- **`session_replication_role = replica` statt `ALTER … DISABLE TRIGGER`.**
-  *Warum:* die Eigentümerrechte fehlen an den drei entscheidenden Tabellen, und
-  ein `ALTER` überlebt die Sitzung — ein versehentlich abgeschaltet gebliebener
-  Signup-Trigger fiele erst Tage später auf. Folge: der Kunstgriff in 4.5
-  entfällt, aber die internen RI-Trigger schweigen mit, also muss die
-  Fremdschlüssel-Integrität jetzt **eigens gemessen** werden.
-- **Kein zweiter PROD-Service-Key unter `…_PROD`.** *Warum:* zwei
-  Vollzugriffs-Schlüssel, von denen eine Rotation nur einen erwischt.
-- **Der DEV-Bestand schrumpft auf zwei Zeilen — Demo-Welt entfällt** (`c8179b8`).
-  *Warum:* Donald und Detlev haben je ein eigenes `impact`-Konto, das PROD kennt,
-  samt Admin-Zeile auf PROD. Gemessen, was das kostet: PROD trägt
-  **ausschliesslich `impact`** (72), aber **35 der 72 sind nicht aktiviert** —
-  das Aktivierungs-Gate überlebt also ohne Testkonto, die **Stufenvielfalt und
-  `matching_manager` fallen weg**. Deshalb bleibt ein *kleiner* deklarierter
-  Bestand ohne eigene Logins: `matching_manager` plus eine Handvoll
-  `tier`-Zuweisungen auf übernommenen Konten.
-- **Zwei Behauptungen des Entwurfs als falsch nachgewiesen und korrigiert:**
-  (1) „ohne `auth.identities` kann sich niemand anmelden" — die drei
-  Demo-Zugänge tragen **null** Identitätszeilen und melden sich an; die
-  Entscheidung bleibt, ihr Grund ist ausgetauscht (PROD abbilden statt einer
-  Teilmenge, die zufällig funktioniert). (2) Meine eigene Aussage, Detlev sei
-  ausgesperrt — er hat vier eigene DEV-Konten.
+- **`PGOPTIONS` trägt den Replica-Schalter NICHT — der Auszug ist jetzt
+  ausführbares SQL** (`--format=plain --column-inserts` statt `--format=custom`).
+  *Warum:* Supavisor schreibt das Startup-Paket um und verwirft **jede** Option
+  **ohne Fehler** (belegt: ein gesetzter `application_name` kommt als
+  `Supavisor` zurück); über die Direktverbindung antwortet der Server mit
+  `permission denied to set parameter`. Nur `SET` in der laufenden Sitzung
+  trägt. `pg_restore` öffnet seine Verbindung selbst — ein Rücklauf darüber
+  liefe mit **lebenden Triggern**, über den Pooler lautlos. `pg_restore` kommt
+  nicht mehr vor.
+- **Buckets werden über die Storage-API geleert, ausserhalb der
+  replica-Sitzung.** *Warum:* `storage.protect_delete()` hat eine dokumentierte
+  Hintertür (`set storage.allow_delete_query`), aber der Trigger schützt vor
+  etwas Echtem — **verwaisten Blobs im S3**. Im replica-Modus schwiege er, und
+  bei jedem Lauf kämen 125 Waisen dazu.
+- **`matching_manager` geht auf ein DRITTES übernommenes Konto**, nicht auf
+  Donald und Detlev. *Warum:* `staff_roles.profile_id` ist Primärschlüssel — die
+  Zeile ersetzte ihre Admin-Zeile. Und sie brächte nichts: `is_matching_manager()`
+  akzeptiert `role in ('matching_manager','admin')`. Der Zweck der Zeile ist der
+  Fall **`matching_manager` ohne `admin`**, den PROD nicht kennt.
+- **Stufen: je ein übernommenes Konto auf `basic`…`focus`, Rest `impact`** —
+  ausgewählt per **Regel** (kleinste `auth.users.id`), nicht per Namensliste,
+  damit keine fünf echten Adressen ins öffentliche Repository wandern. **Die
+  Admin-Konten sind ausgenommen:** `has_level` kennt keine Admin-Ausnahme.
+- **Fixture-Zeitstempel hängen am Auszug, nicht an `now()`.** *Warum:* sonst
+  wanderten `staff_roles.created_at` und `profiles.updated_at` je Lauf mit, und
+  5.4 liesse sich nicht mehr messen.
 
 ## Files modified
 
-- `scripts/mess-spiegel-gruppe1.ts` · `-manifest.ts` · `-replica.ts` — neu, rein
-  lesend (die Replica-Sonde rollt zurück, Ziel fest auf localhost verdrahtet)
-- `scripts/sync-dev.logic.ts` · `.test.ts` · `sync-dev-waechter.ts` — neu, der
-  Wächter
-- `supabase/seed/demo_personas.sql` · `demo_legacy_profile.sql` — öffentliches
-  Passwort raus, `crypt(gen_random_uuid()::text, …)` rein, Begründung im Kopf
-- `docs/demo-zugang.md` · `demo-script.md` · `foundation-acceptance.md` ·
-  `w4-acceptance.md` · `tier-testing.md` — `Test1234!` raus, Zeiger auf Infisical
-- `openspec/changes/sync-dev-from-prod/` — `design.md` (Decision 2, 2a, neu 3a),
-  `tasks.md` (Gruppen 1, 2, 2a, 4.9/4.10 umgeschrieben), Spec-Delta,
-  `messungen/` (Bericht + zwei Manifeste)
-- **Ausserhalb des Repos:** Infisical `prod` um 4 Werte ergänzt
-  (`SUPABASE_SERVICE_ROLE_KEY_DEV`, `SUPABASE_URL_PROD`, `SUPABASE_URL_DEV`,
-  `SUPABASE_DB_URL_DEV`) plus `DEMO_LOGIN_PASSWORD_DEV`; 24 DEV-Konten
-  neutralisiert; drei Presenter-Passwörter rotiert. Memory: neu
-  `trigger-stilllegen-nur-per-replica`, korrigiert
-  `infisical-prod-umgebung-ist-gespalten`, `demo-seed-fallen`,
-  `go-live-zielbild-prod-dev`
+- `scripts/sync-dev-auszug.logic.ts` · `.test.ts` · `sync-dev-auszug.ts` — neu,
+  der Auszug (Ablageort, Objektpfade, Plan, Keyset-Blätterung, Manifest)
+- `scripts/sync-dev-ruecklauf.logic.ts` · `.test.ts` · `sync-dev-ruecklauf.ts` —
+  neu, der Rücklauf (Auszugsprüfung, Leeren, Einspielen, Abnahme)
+- `openspec/changes/sync-dev-from-prod/` — `design.md` (neu 2b, 5a, §3a
+  konkretisiert), `tasks.md` (Gruppen 3 und 4 abgehakt, 4.1/4.3/4.9/4.12
+  umgeschrieben), zwei neue Berichte in `messungen/`
+- **Ausserhalb des Repos:** ein Auszug in `~/.fbc-spiegel/`; der lokale Stack
+  trägt den Spiegel. Memory: neu `pgoptions-wird-vom-pooler-verschluckt` und
+  `pgdump18-restrict-metabefehle`
 
 ## Next session: start here
 
-Nichts ist halb fertig. Branch `donald/age-576-spiegel-dev-prod`, HEAD `c8179b8`,
-Arbeitsbaum sauber, **kein PR**. Erste Aktion ist **Aufgabengruppe 3** aus
-`openspec/changes/sync-dev-from-prod/tasks.md`: Ablageort ausserhalb des
-Arbeitsbaums (`0700`/`0600`, über `realpath` geprüft), Auszug aus PROD getrennt
-nach `public` und `auth`, Manifest, Objekte der vier Buckets rekursiv und über
-alle Seiten. Der Wächter steht und ist zu **benutzen**, nicht neu zu bauen —
-`infisical run --env=prod -- npx tsx scripts/sync-dev-waechter.ts` muss grün
-sein, bevor irgendetwas liest. `scripts/mess-spiegel-manifest.ts` ist die
-Vorlage für 3.4; die Bucket-Liste kommt dort aus `storage.buckets`, nicht aus
-den Objekten.
+Branch `donald/age-576-spiegel-dev-prod`, HEAD `c0ce71e`, Arbeitsbaum sauber,
+**kein PR**. `pnpm test` (1318), typecheck und lint sind grün.
 
-Drei Fallen dieser Sitzung: in Skripten **ausserhalb** des Repos scheitert `tsx`
-an Top-Level-`await` (CJS) und findet `pg` nicht — Sonden gehören nach
-`scripts/`. `tr -dc … | head -c` erzeugt unter `set -o pipefail` SIGPIPE (Exit
-141). Und `scripts/db-drift-scan.ts` reicht keine Root-CA durch, braucht lokal
-`NODE_EXTRA_CA_CERTS=scripts/supabase-root-2021-ca.crt`.
+**Erste Aktion ist 5.5 — die Sichtprobe, und die Daten liegen schon da.** Der
+lokale Stack trägt den vollen Spiegel. Es fehlt nur ein anmeldefähiges Konto
+(4.13 hat alle Hashes neutralisiert): lokal per GoTrue-Admin ein Passwort auf
+ein übernommenes Konto setzen, `pnpm dev` gegen den lokalen Stack, und fünf
+echte Profile mit Bild, Anschrift und Netzwerken ansehen. Grüne Tests haben hier
+schon einmal ein sichtbar falsches Ergebnis durchgewunken.
+
+**Danach 5.2, und dafür braucht es Donalds Freigabe** — er hat „erst lokal
+proben, dann fragen" gewählt. Der Lauf gegen DEV leert `auth`, `public` und alle
+vier Buckets, und `fbc-platform.pages.dev` liest gegen DEV. Der Befehl steht:
+`infisical run --env=prod -- npx tsx scripts/sync-dev-ruecklauf.ts --ziel=dev
+<ablage>`. **Auflage aus 1.1:** die beiden DB-URLs liegen in getrennten
+Infisical-Umgebungen — ein einzelner `--env=` liefert nie beide, für den
+Rücklauf reicht `prod` (dort liegen inzwischen alle sechs Werte).
+
+Drei Fallen dieser Sitzung: `ls` ist ein `eza`-Alias und liefert Langformat statt
+Pfaden (`$(ls -d …)` zerlegt jedes Skript). Sonden mit Top-Level-`await` müssen
+nach `scripts/`, sonst scheitert `tsx` an CJS. Und `prettier --check` meldet
+repo-weit **138** Dateien — CI erzwingt es nicht, also ist eine Warnung an
+fremdem Code kein Befund.
 
 ## Open questions
 
-- **Wer hält künftig `matching_manager`?** Die Rolle braucht ein übernommenes
-  Konto; PROD kennt sie nicht. Entscheidung gehört in 4.9.
-- **Welche Stufen sollen auf DEV besetzt sein?** PROD ist komplett `impact`.
-  Ohne `tier`-Zuweisungen lässt sich Stufen-Gating nicht mehr prüfen.
-- **Offene Zusage aus 1.3:** beide Server sind 17.6, der einzige Client ist
-  18.4; ein Rücklauf in einen älteren Server ist von PostgreSQL nicht zugesagt.
-  Fällt in 5.1.
-- **`demo_personas.sql` scheitert lokal an einem Fremdschlüssel** — vorbestehend
-  (mit `HEAD` identisch), nicht durch diese Sitzung verursacht. Eigenes Issue
-  wert, wenn die Demo-Welt überhaupt bleiben soll.
-- **Die Demo-Dokumente sind nach dem ersten Lauf überholt** —
-  `docs/demo-zugang.md`, `demo-script.md` und die drei Abnahmedokumente. Und
-  `pnpm demo:seed`/`demo:reset` gegen DEV zu fahren würde den Spiegel zerstören.
-- Unverändert offen: Detlevs Zahlungsliste (C10-Aufgabe 3.5, AGE-534 bleibt *In
-  Progress*) · Downgrade existiert nirgends (AGE-516) · `admin_list_feedback()`
-  ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 · AGE-513 · AGE-258 ·
-  Rücknahmeliste vor Go-Live · eigenes Issue für `send-activation` (2xx trotz
-  Resend-401).
+- **4.7 Post-Hälfte, 4.8a:** lokal fehlen `notify_contact_request_webhook()`
+  und `contact_requests_email_webhook`. Über „keine Post" sagt der grüne
+  Probelauf **nichts** — die Zusage fällt erst gegen DEV.
+- **5.6 ist halb belegt.** Der Bestand entsteht aus leerem Schema; die
+  **Anmeldefähigkeit** nicht, weil 4.13 sie absichtlich nimmt. Für die
+  Sicherungs-Rolle (PROD-Wiederaufbau) braucht der Rücklauf einen Schalter, der
+  4.13 auslässt — den gibt es noch nicht.
+- **4.10 Dokumente:** `docs/demo-zugang.md`, `docs/demo-script.md` und die drei
+  Abnahmedokumente sind nach dem ersten DEV-Lauf überholt und noch **nicht**
+  nachgezogen. `pnpm demo:seed`/`demo:reset` gegen DEV zerstörte den Spiegel.
+- **Der Pooler ist beim Rücklauf ungeprüft.** Dass `SET` über Supavisor trägt,
+  ist gemessen; dass der **ganze** Rücklauf darüber trägt, nicht.
+- Unverändert offen: Detlevs Zahlungsliste (AGE-534) · Downgrade (AGE-516) ·
+  `admin_list_feedback()` ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 ·
+  AGE-513 · AGE-258 · Rücknahmeliste vor Go-Live · eigenes Issue für
+  `send-activation` (2xx trotz Resend-401) · `demo_personas.sql` scheitert lokal
+  an einem Fremdschlüssel (vorbestehend).
