@@ -151,3 +151,115 @@ ich, zwei lege ich Donald vor, drei weise ich begründet zurück.
     Datei, `realpath`-Prüfung und ein Manifest werden übernommen. Eine
     Verschlüsselungsschicht dazu ist ohne Schlüsselverwaltung Theater: der
     Schlüssel läge auf derselben Platte wie der Auszug.
+
+---
+
+# Diff-Review (Aufgabe 6.3) — 2026-08-20
+
+Zwei Prüfer anderer Hersteller über den **Code**-Diff des Changes
+(`git diff $(git merge-base main HEAD)..HEAD -- scripts/ src/ supabase/
+package.json .github/`, 2983 Zeilen). Der Review oben galt dem Plan, dieser
+dem Ergebnis.
+
+| Prüfer | Modell | Urteil |
+|---|---|---|
+| gemini | gemini-3-pro (Vorgabe) | **APPROVE**, keine Befunde |
+| codex | gpt-5.2-codex | **REQUEST-CHANGES**, 10 Befunde |
+
+**Jeder Befund wurde am Code nachgeprüft, keiner übernommen.** Das Ergebnis ist
+gemischt: vier tragen, vier sind richtig beschrieben aber folgenlos, zwei sind
+Bauform statt Fehler.
+
+## Was gemini geprüft und bestätigt hat — von mir gegengelesen
+
+Drei seiner vier Punkte habe ich am Code nachvollzogen, statt sie zu glauben:
+
+- **Ziel-Wächter.** `--ziel` ist eine harte Weissliste `lokal|dev`
+  (`sync-dev-ruecklauf.ts:83`); jeder andere Wert — auch `prod` — fällt in
+  `ende()`, **vor** jedem Verbindungsaufbau. Für `dev` kommt die Ziel-URL
+  ausschliesslich aus `SUPABASE_DB_URL_DEV` und wird gegen
+  `dev-project-ref.txt` gehalten.
+- **Pfadsicherheit.** `sichererPfad` prüft zweistufig: Segmente auf `..` **und**
+  die aufgelöste Eingrenzung unter der Bucket-Wurzel. Eine der beiden allein
+  wäre umgehbar.
+- **Tests.** Kein einziges `vi.mock` in den drei neuen Testdateien; sie
+  importieren die echten Logikmodule. Die Mock-Zirkelschluss-Falle ist nicht
+  gestellt.
+
+## codex — Befund für Befund, mit Urteil
+
+### Bestätigt und ernst
+
+**[HIGH] Die echten PROD-Hashes liegen bis 4.13 auf DEV** —
+`sync-dev-ruecklauf.ts:271` gegen `:395`. Zwischen dem auth-Rücklauf und der
+Neutralisierung liegen: `public.sql` einspielen, Sitzung zurücksetzen, neue
+Verbindung, Trigger- und Fremdschlüsselprüfung, der Drift-Scan und **125
+Objekt-Uploads über das Netz** — der längste Schritt des Laufs. Jedes `ende()`
+darin lässt DEV mit gültigen PROD-Hashes zurück, und die Selbstregistrierung auf
+DEV ist offen.
+
+Das wiegt schwerer als ein normaler Ablauffehler: **die Neutralisierung ist
+einer der zwei Ausgleiche für „keine Anonymisierung"**. Ein Fenster darin ist
+ein Fenster im Ausgleich. **Bestätigt.**
+
+**[MEDIUM] „alle nachgezählt auf 0" zählt nur `public.profiles`** —
+`sync-dev-ruecklauf.ts:248` gegen den Beleg in `:267`. Die auth-Tabellen werden
+seit dem Abbruch vom 20.08. **einzeln** nachgezählt; für die public-Seite ist
+genau diese Lehre nicht gezogen worden. Der Beleg sagt trotzdem „alle". Das ist
+die Fehlerklasse, an der dieser Change selbst schon einmal gescheitert ist —
+eine Zusage, die mehr behauptet als sie misst. **Bestätigt.**
+
+**[HIGH] Die beiden SQL-Dateien werden nicht auf Unversehrtheit geprüft** —
+`sync-dev-ruecklauf.ts:168`. Die 125 Objekte werden byteweise gegen `sha256` aus
+dem Manifest gehalten; `auth.sql` und `public.sql` werden **nur auf Anwesenheit**
+geprüft (`pruefeAuszug`, `PFLICHTDATEIEN`), und der `Manifest`-Typ führt für sie
+weder Grösse noch Hash. Ihre Länge wird protokolliert, nicht verglichen.
+Gelöscht wird davor. **Bestätigt** — mit einer Einschränkung: der häufigste Fall,
+ein abgebrochener Auszug, ist abgedeckt, weil `manifest.json` als letztes
+geschrieben wird. Es bleibt die nachträgliche Beschädigung, und die Asymmetrie
+zu den Objekten ist nicht zu rechtfertigen.
+
+**[HIGH] Die Buckets kommen nicht aus dem Auszug** —
+`sync-dev-ruecklauf.ts:199`. Geleert wird, was auf dem **Ziel** steht
+(`select id from storage.buckets`); `soll.buckets` aus dem Manifest wird
+**nirgends gelesen** (nachgezählt: null Vorkommen). Fehlt auf DEV ein Bucket,
+den PROD hat, scheitert der Upload — nach dem Löschen. Ein zusätzlicher Bucket
+auf DEV überlebt unbemerkt. **Bestätigt** in der Mechanik; heute folgenlos, weil
+die Buckets aus Migrationen kommen und beide Projekte dieselben tragen.
+
+### Richtig beschrieben, aber ohne heutige Wirkung
+
+**[HIGH] `ENABLE ALWAYS`-Trigger** — `:226`. Die Vorprüfung **protokolliert**
+`alle tgenabled='O': true|false` und bricht bei `false` nicht ab; erst die
+Nachprüfung in `:313` tut das — nach dem Rücklauf. Die Beschreibung stimmt
+genau. Wirkung heute: keine, alle Trigger stehen auf `'O'`, und der genannte
+Ausloeser (`contact_requests_email_webhook`) hätte nichts zu feuern —
+`contact_requests` ist im Auszug 0.
+
+**[MEDIUM] Die Abnahme prüft bei Objekten nur die Anzahl** — `:520`. Stimmt:
+verglichen wird `count(*)`, nicht Name, Bucket, Grösse oder Prüfsumme. Die
+125 eTags wurden am 20.08. **ausserhalb** des Skripts nachgerechnet; im Werkzeug
+steht die Zusage nicht.
+
+**[MEDIUM] Objektbytes liegen ausserhalb des Snapshots** —
+`sync-dev-auszug.ts:230`. Zutreffend: der exportierte Snapshot bindet die
+DB-Lesungen, nicht den Download der Blobs.
+
+**[MEDIUM] Der Testfall „Tabelle nur im Ist" ist im echten Lauf unerreichbar** —
+`ist` wird aus `Object.keys(soll.tabellen)` aufgebaut, eine zusätzliche
+Zieltabelle gelangt nie in `vergleicheManifest()`. Stimmt. Der Test prüft einen
+Zweig, den die Aufrufstelle nicht erzeugen kann.
+
+### Bauform, kein Fehler
+
+**[MEDIUM] Deklarierte Abweichungen entschuldigen die ganze Tabelle** —
+`sync-dev-ruecklauf.logic.ts:288`. Richtig beschrieben, aber so gewollt:
+`hashWeichtAb` heisst „der Hash darf abweichen", und ein feinerer Vergleich
+müsste die erlaubte Änderung selbst modellieren. Bei drei Tabellen mit je einer
+benannten Ursache ist das nicht der Aufwand wert. **Nicht behoben, bewusst.**
+
+**[MEDIUM] Katalognamen als SQL-Identifier** —
+`sync-dev-ruecklauf.logic.ts:179`. Technisch zutreffend für `a"b` oder `a.b`.
+Die Namen stammen aus `information_schema` bzw. `pg_class` der Schemata
+`public` und `auth` — von Migrationen erzeugt, nicht von Nutzern. **Nicht
+behoben.**
