@@ -181,6 +181,46 @@ werden. Die übrigen 17 `auth`-Tabellen sind leer.
 Der Befund von der anderen Seite: DEV trägt heute **41 `users`, aber nur 14
 `identities`** — 27 DEV-Konten sind bereits jetzt nicht anmeldefähig.
 
+### 3a. Der DEV-Bestand schrumpft auf drei Zeilen — Entscheidung vom 2026-08-20
+
+**Donald, nachdem gemessen war, wem welche Konten gehören:** die Demo-Zugänge
+und die Testkonten dürfen **weg**. Weder er noch Detlev braucht sie — beide
+haben ein eigenes Konto, das PROD kennt und der Spiegel mitbringt
+(`donald@factiv.eu` und `detlev.krause@dkrealinvest.com`, beide `impact`,
+beide aktiviert, beide mit Admin-Zeile **auf PROD**).
+
+Was damit ersatzlos wegfällt, ist gemessen und nicht geraten:
+
+| | PROD (kommt nach DEV) | DEV heute |
+|---|---|---|
+| Stufen | **impact = 72**, sonst nichts | sechs Stufen besetzt |
+| Aktivierung | 37 ja / **35 nein** | 39 ja / 2 nein |
+
+Das **Aktivierungs-Gate überlebt** — 35 nicht aktivierte Konten kommen mit, es
+braucht dafür kein eigenes Testkonto. Zwei Dinge fallen aber weg:
+
+1. **Jede Stufenvielfalt.** Danach ist auf DEV alles `impact`; Stufen-Gating
+   lässt sich nicht mehr prüfen. Das wiegt, weil der Stufenweg ~eine Woche nach
+   dem Go-Live freigeschaltet wird.
+2. **`matching_manager`.** Heute hält ihn allein `prime@fbcdemo.com`; PROD
+   kennt die Rolle nicht.
+
+*Deshalb bleibt der deklarierte DEV-Bestand bestehen — nur klein.* Er besteht
+nicht mehr aus einer Demo-Welt, sondern aus:
+
+- `staff_roles`: die zwei Admin-Zeilen (kommen aus PROD) **plus**
+  `matching_manager` auf einem der übernommenen Konten
+- eine Handvoll `tier`-Zuweisungen auf übernommenen Konten, damit die sechs
+  Stufen besetzt sind
+
+Das braucht **keine eigenen Logins** und keinen Seed. Aufgabe 4.10 verliert
+damit ihren grössten Teil: es gibt keine „Demo-Welt (Jonas, Carla, Eleonora)"
+mehr herzustellen.
+
+*Was das für 2a bedeutet:* die Arbeit war trotzdem nötig und bleibt gültig. Die
+24 Konten mit dem öffentlichen Passwort waren die eigentliche Lücke, und die
+ist unabhängig davon geschlossen, ob die Demo-Welt bleibt.
+
 ### 3. Der geschützte Bestand wird hergestellt, nicht ausgespart
 
 `staff_roles` und die drei `@fbcdemo.com`-Zugänge werden vom Vollersatz

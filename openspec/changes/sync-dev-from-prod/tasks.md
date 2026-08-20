@@ -166,9 +166,10 @@ DEV-Konten öffnete.
       erwartet sie), aber es gibt kein Passwort dazu. Und die 24 lebenden Konten
       auf DEV sind neutralisiert. Gegenprobe: drei Personas werden abgewiesen,
       die drei Presenter-Konten gehen weiter
-- [ ] 2a.4 Die neuen Werte gehören in den deklarierten DEV-Bestand (4.9), sonst
-      nimmt sie der nächste Vollersatz mit — der Name steht fest
-      (`DEMO_LOGIN_PASSWORD_DEV`), die Deklaration entsteht in Gruppe 4
+- [x] 2a.4 ~~Die neuen Werte gehören in den deklarierten DEV-Bestand (4.9)~~ —
+      **entfällt durch die Entscheidung vom 2026-08-20** (design.md §3a): die
+      Demo-Zugänge werden nicht wiederhergestellt. `DEMO_LOGIN_PASSWORD_DEV`
+      bleibt in Infisical, bis der erste Lauf sie ohnehin entfernt
 
 ## 3. Auszug, Manifest und Ablage
 
@@ -228,15 +229,26 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 4.8a Test: `notify_contact_request_webhook()` und
       `contact_requests_email_webhook` stehen nach dem Lauf noch. Sie stehen in
       keiner Migration (1.9) — still verloren sähe aus wie ein sauberer Lauf
-- [ ] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen:
-      Demo-Zugänge samt ihrer Profilangaben und der neuen Passwörter,
-      `staff_roles` samt `matching_manager`. **Ohne die Feedback-Zeilen** —
-      entschieden am 2026-08-20, sie werden mitersetzt
-- [ ] 4.10 Nachbereitung: den deklarierten Bestand **herstellen**. Drei Logins
-      allein genügen nicht — ihre Profilzeilen entstehen leer und `basic`, die
-      Demo-Welt (Jonas, Carla, Eleonora samt Stufen und Beziehungen) wäre weg.
-      Entweder vollständig herstellen oder ausdrücklich festhalten, dass DEV
-      danach nicht mehr vorführbar ist, und `docs/demo-zugang.md` ändern
+- [ ] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen.
+      **Stark verkleinert am 2026-08-20** (design.md §3a): keine Demo-Zugänge,
+      keine Demo-Welt, keine Testkonten. Es bleiben zwei Dinge, beide auf
+      **übernommenen** Konten:
+      · `staff_roles`: `matching_manager` (PROD kennt die Rolle nicht; die zwei
+        Admin-Zeilen kommen aus PROD mit)
+      · eine Handvoll `tier`-Zuweisungen, damit die sechs Stufen besetzt sind —
+        PROD trägt **ausschliesslich `impact`**, ohne das liesse sich
+        Stufen-Gating auf DEV nicht mehr prüfen
+      **Ohne die Feedback-Zeilen** — entschieden am 2026-08-20, sie werden
+      mitersetzt. Das Aktivierungs-Gate braucht nichts: 35 der 72 übernommenen
+      Konten sind nicht aktiviert
+- [ ] 4.10 Nachbereitung: den deklarierten Bestand **herstellen** — nach §3a nur
+      noch `matching_manager` und die `tier`-Zuweisungen. **Und ausdrücklich
+      festhalten, dass DEV danach nicht mehr im bisherigen Sinn vorführbar
+      ist:** keine Jonas/Carla/Eleonora-Welt, keine Demo-Zugänge.
+      `docs/demo-zugang.md`, `docs/demo-script.md` und die drei
+      Abnahmedokumente sind danach überholt — entweder anpassen oder als
+      historisch kennzeichnen. `pnpm demo:seed`/`demo:reset` gegen DEV zu
+      fahren würde den Spiegel zerstören
 - [ ] 4.11 `admin_roles.sql` prüft sich nicht selbst: es braucht externe
       Adressen, kann still no-op laufen und legt `matching_manager` nicht an.
       Der Rollensatz wird deklariert und danach verglichen
