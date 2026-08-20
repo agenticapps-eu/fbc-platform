@@ -87,9 +87,17 @@ Das System SHALL den zur Anmeldefähigkeit nötigen Umfang des `auth`-Schemas
 übertragen und diesen Umfang aufgeschrieben haben.
 
 `auth.users` allein SHALL NOT als Auth-Restore gelten: GoTrue pflegt Identitäten
-ausserhalb dieser Tabelle. Gemessen am 2026-08-20 trägt `auth.identities` **72
-Zeilen** — ein Restore ohne sie erzeugt 72 Konten, an denen sich niemand
-anmelden kann, und der Fehler zeigt sich erst beim ersten Anmeldeversuch.
+ausserhalb dieser Tabelle, und der Spiegel SHALL PROD abbilden statt einer
+Teilmenge, die zufällig noch funktioniert. Gemessen am 2026-08-20 trägt
+`auth.identities` **72 Zeilen**.
+
+Die Begründung SHALL NOT lauten, ohne Identitäten sei keine Anmeldung möglich —
+das ist nachgemessen **falsch**: die drei DEV-Demo-Zugänge tragen null
+Identitätszeilen und melden sich per Passwort an. Der Grund ist ein anderer:
+alles, was an Identitäten hängt — Verknüpfung von Anmeldeverfahren,
+`identity_data`, das Verhalten künftiger GoTrue-Fassungen — wäre ohne sie
+stillschweigend anders, und ein Unterschied, den kein Test sieht, ist die
+teuerste Sorte.
 
 #### Scenario: Ein übertragenes Konto ist anmeldefähig
 
@@ -99,8 +107,10 @@ anmelden kann, und der Fehler zeigt sich erst beim ersten Anmeldeversuch.
 
 #### Scenario: Fehlende Identitäten brechen den Lauf, statt still zu bleiben
 
-- **WHEN** der Auszug Konten ohne zugehörige Identitäten enthält
-- **THEN** endet der Lauf mit einem Fehler, statt unbenutzbare Konten anzulegen
+- **WHEN** der Auszug Konten enthält, deren Identitätszeilen in PROD vorhanden
+  sind, in DEV nach dem Lauf aber fehlen
+- **THEN** endet der Lauf mit einem Fehler, statt eine unbemerkte Abweichung
+  zu hinterlassen
 
 ### Requirement: Der Auszug entsteht vollständig, bevor das Ziel angefasst wird
 

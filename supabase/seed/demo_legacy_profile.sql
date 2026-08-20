@@ -25,7 +25,7 @@ values (
   '00000000-0000-0000-0000-000000000238',
   'authenticated', 'authenticated',
   'maximilian.bauer@demo.fbc.invalid',
-  extensions.crypt('demo-not-a-real-password', extensions.gen_salt('bf')),
+  extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf')),
   now(), now(), now(),
   '{"provider":"email","providers":["email"]}',
   '{"name":"Maximilian Bauer"}',

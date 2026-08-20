@@ -25,7 +25,7 @@ zweigleisig, mit echten Demo-Personas:
   die drei Presenter-Personas. Interaktive Schreibpfade wurden **reversibel** geprüft
   (Like an/aus, Event-Anmeldung/-Abmeldung) und der Ausgangszustand wiederhergestellt.
 
-**Presenter-Personas** (Login-Accounts, Passwort `Test1234!`):
+**Presenter-Personas** (Login-Accounts, Passwort: `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`)):
 
 | E-Mail | Persona | Stufe (`level_rank`) |
 | --- | --- | --- |

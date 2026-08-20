@@ -43,7 +43,9 @@
 
 Im `auth.users` direkt angelegt (bestätigt) — Stufen über `public.profiles.tier`
 gesetzt (Client kann `tier` nicht schreiben; siehe `docs/tier-testing.md`).
-Passwort aller Accounts: `Test1234!`.
+Passwort aller Accounts: `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`).
+(Bis 2026-08-20 stand hier `Test1234!`; ersetzt, weil dieselben Konten seit dem
+Spiegel DEV ← PROD neben echten Mitgliederdaten stehen.)
 
 | E-Mail | UUID | `tier` | `level_rank` | bestätigt |
 | --- | --- | --- | --- | --- |

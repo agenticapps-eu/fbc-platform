@@ -151,11 +151,24 @@ diesen Fehler nicht machen.
 
 ### 2a. Der Auth-Umfang wird gemessen, nicht angenommen
 
-**Neu nach dem Plan-Review.** Der erste Entwurf sprach von „`auth.users`
-zurückspielen". Gemessen: `auth.identities` trägt **72 Zeilen**, `auth.sessions`
-drei. GoTrue pflegt Identitäten ausserhalb von `auth.users` — ein Restore ohne
-sie erzeugt 72 Konten, an denen sich **niemand anmelden kann**, und der Fehler
-zeigt sich erst beim ersten Anmeldeversuch, nicht im Lauf.
+**Neu nach dem Plan-Review — und die Begründung ist am 2026-08-20 korrigiert
+worden.** Der erste Entwurf sprach von „`auth.users` zurückspielen". Gemessen:
+`auth.identities` trägt **72 Zeilen**, `auth.sessions` drei.
+
+*Was der Entwurf behauptete:* ein Restore ohne Identitäten erzeuge 72 Konten,
+an denen sich **niemand anmelden kann**. **Das stimmt nicht.** Die drei
+`@fbcdemo.com`-Zugänge auf DEV tragen **null** Identitätszeilen und haben sich
+am 2026-08-20 anstandslos per Passwort angemeldet — sie stammen aus einem
+direkten `insert into auth.users` (`docs/tier-testing.md`), und der legt nie
+eine Identität an. Von den 41 DEV-Konten haben 14 eine.
+
+*Warum die Entscheidung trotzdem bleibt:* der Spiegel soll PROD **abbilden**,
+nicht eine Teilmenge, die zufällig noch funktioniert. Die 72 PROD-Konten sind
+über die GoTrue-Admin-API entstanden und **haben** Identitäten; alles, was an
+ihnen hängt — Verknüpfung von Anmeldeverfahren, `identity_data`, das Verhalten
+künftiger GoTrue-Fassungen — wäre in einem Spiegel ohne sie stillschweigend
+anders. Ein Unterschied, den kein Test sieht, ist genau die Sorte, die dieser
+Entwurf vermeiden soll.
 
 **Gemessen am 2026-08-20 (Aufgabe 1.6): der Umfang ist `auth.users` +
 `auth.identities`, sonst nichts.** Zeilen tragen auf PROD ausserdem

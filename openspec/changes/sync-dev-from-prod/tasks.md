@@ -130,14 +130,45 @@ Aus Decision 6. Diese Gruppe SHALL abgeschlossen sein, **bevor** der erste Lauf
 echte Personendaten nach DEV bringt: solange `Test1234!` im öffentlichen
 Repository steht, gibt jeder Leser sich Zugriff auf das Verzeichnis.
 
-- [ ] 2a.1 Neue Passwörter für die drei `@fbcdemo.com`-Zugänge setzen
-- [ ] 2a.2 Sie aus `docs/demo-zugang.md` entfernen; das Dokument nennt künftig
+**Erledigt am 2026-08-20 — und die Gruppe war grösser als geplant.** Sie nannte
+`docs/demo-zugang.md` und ein Passwort. Gefunden wurden **fünf** Dokumente mit
+`Test1234!` und, schwerer, ein **zweites** Passwort im Quelltext, das 24 der 41
+DEV-Konten öffnete.
+
+- [x] 2a.1 Neue Passwörter für die drei `@fbcdemo.com`-Zugänge setzen — ein
+      Zufallswert (24 Zeichen) für alle drei, abgelegt als
+      `DEMO_LOGIN_PASSWORD_DEV` in Infisical `prod`. **Reihenfolge war Absicht:**
+      erst ablegen, zurücklesen, vergleichen — dann erst die Konten anfassen.
+      Andersherum wäre der Wert bei einem Fehlschlag verloren, und für
+      `@fbcdemo.com` gibt es keinen Reset per Mail. Beide Richtungen belegt:
+      alle drei melden sich mit dem neuen Wert an, `Test1234!` wird abgewiesen
+- [x] 2a.2 Sie aus `docs/demo-zugang.md` entfernen; das Dokument nennt künftig
       den Ablageort (Infisical), nicht den Wert
-- [ ] 2a.3 Prüfen, ob die alten Werte anderswo im Repository stehen — ein
+- [x] 2a.3 Prüfen, ob die alten Werte anderswo im Repository stehen — ein
       entfernter Wert, der in einem zweiten Dokument weiterlebt, ist nicht
-      entfernt
+      entfernt. **Fünf Dokumente**, nicht eines: `demo-zugang.md`,
+      `demo-script.md`, `foundation-acceptance.md`, `w4-acceptance.md` und
+      `tier-testing.md` (dort *erzeugte* das SQL Konten damit — jetzt ein
+      `:passwort`-Platzhalter). Die verbliebenen zwei Nennungen sind
+      Rückblicke auf einen nun abgewiesenen Wert
+- [x] 2a.3a **Der eigentliche Fund, und er stand in keiner Aufgabe.**
+      `demo_personas.sql` und `demo_legacy_profile.sql` legen Konten mit
+      `crypt('demo-not-a-real-password', …)` an — Klartext im **öffentlichen**
+      Repository. Der Kommentar daneben sagt „Verzeichnis-Inhalt, KEINE Logins";
+      nachgemessen ist das eine Absicht, kein Mechanismus:
+      · **24 der 41 DEV-Konten** trugen dieses Passwort, über **alle sechs
+        Stufen** bis `impact`
+      · ein Login damit (`hans-peter.stadler@…`) las das **komplette
+        Verzeichnis** — heute 38 Demo-Profile, nach dem ersten Spiegellauf die
+        72 echten Mitglieder
+      Behoben in beide Richtungen: die Seed-Dateien setzen jetzt
+      `crypt(gen_random_uuid()::text, …)` — die Spalte bleibt gefüllt (GoTrue
+      erwartet sie), aber es gibt kein Passwort dazu. Und die 24 lebenden Konten
+      auf DEV sind neutralisiert. Gegenprobe: drei Personas werden abgewiesen,
+      die drei Presenter-Konten gehen weiter
 - [ ] 2a.4 Die neuen Werte gehören in den deklarierten DEV-Bestand (4.9), sonst
-      nimmt sie der nächste Vollersatz mit
+      nimmt sie der nächste Vollersatz mit — der Name steht fest
+      (`DEMO_LOGIN_PASSWORD_DEV`), die Deklaration entsteht in Gruppe 4
 
 ## 3. Auszug, Manifest und Ablage
 

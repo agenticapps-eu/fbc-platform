@@ -1,8 +1,14 @@
 # Demo-Zugang für Detlev — FBC Plattform (Phase-1-Prototyp)
 
 > Fertiger Nachrichtentext zum Kopieren (Mail/Slack). Begleitend zum `docs/demo-script.md`.
-> Die Logins sind **Demo-Test-Accounts** auf der Demo-Welt — keine echten Personen, keine echten
-> Geheimnisse (dieselben Test-Credentials stehen auch in `docs/tier-testing.md`).
+> Die Logins sind **Demo-Test-Accounts** auf der Demo-Welt — keine echten Personen.
+>
+> **Das Passwort steht nicht mehr hier.** Es liegt als `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`)
+> und ist vor dem Versenden einzusetzen. Grund: seit dem Spiegel DEV ← PROD
+> (AGE-576) tragen dieselben Konten echte Mitgliederdaten, und dieses
+> Repository ist öffentlich — ein Passwort darin gäbe jedem Leser Zugriff auf
+> das Verzeichnis. Am 2026-08-20 wurde `Test1234!` deshalb ersetzt und ist
+> abgewiesen.
 
 ---
 
@@ -15,7 +21,7 @@ Mitgliedsstufen erleben kannst, hast du drei Test-Logins. **Login:** auf
 **https://fbc-platform.pages.dev** auf „Login" klicken, E-Mail + Passwort eintippen (keine
 Registrierung, kein Bestätigungslink nötig).
 
-**Passwort für alle drei: `Test1234!`**
+**Passwort für alle drei: _hier vor dem Versenden einsetzen_** — `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`).
 
 | Stufe | E-Mail | Persona |
 |---|---|---|

@@ -7,7 +7,8 @@
 
 ## Vorbereitung (vor der Demo)
 
-- Drei Tabs/Logins bereitlegen. **Alle Passwörter: `Test1234!`**
+- Drei Tabs/Logins bereitlegen. **Passwort für alle drei:** `DEMO_LOGIN_PASSWORD_DEV` in Infisical (`--env=prod`)
+  (steht seit 2026-08-20 nicht mehr im Repository, siehe `docs/demo-zugang.md`)
   - **Discover:** `discover@fbcdemo.com` → *Jonas Keller* (Gründer, frühe Phase)
   - **Prime:** `prime@fbcdemo.com` → *Carla Reinhardt* (Strategieberaterin, Connectorin)
   - **Legacy:** `legacy@fbcdemo.com` → *Eleonora Voss* (Beteiligungskapital, Deal Keeperin)
