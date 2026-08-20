@@ -60,7 +60,10 @@ describe("Enthaltensein an der Segmentgrenze", () => {
 
 describe("3.1/3.2 Ablageort — ausserhalb des Arbeitsbaums", () => {
   test("ein Ort ausserhalb wird angenommen und aufgelöst zurückgegeben", async () => {
-    const e = await pruefeAblageort({ kandidat: join(spielfeld, "ablage"), arbeitsbaum: ARBEITSBAUM });
+    const e = await pruefeAblageort({
+      kandidat: join(spielfeld, "ablage"),
+      arbeitsbaum: ARBEITSBAUM,
+    });
     expect(e.kind).toBe("ok");
     if (e.kind === "ok") expect(e.pfad).toBe(join(spielfeld, "ablage"));
   });

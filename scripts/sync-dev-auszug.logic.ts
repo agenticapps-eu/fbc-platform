@@ -118,7 +118,10 @@ export async function pruefeAblageort(input: {
  */
 export function auszugName(zeit: Date, prodRef: string): string {
   if (!REF.test(prodRef)) throw new Error(`Keine Projektkennung: "${prodRef}"`);
-  const z = zeit.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const z = zeit
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
   return `spiegel-${prodRef}-${z}`;
 }
 

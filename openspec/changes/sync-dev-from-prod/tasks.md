@@ -173,25 +173,48 @@ DEV-Konten öffnete.
 
 ## 3. Auszug, Manifest und Ablage
 
-- [ ] 3.1 Ablageort ausserhalb des Arbeitsbaums: Verzeichnis `0700`, Dateien
-      `0600`, Auflösung über `realpath` gegen den Arbeitsbaum geprüft
-- [ ] 3.2 RED: ein Ablageort **innerhalb** des Arbeitsbaums wird abgelehnt —
-      auch wenn ein Symlink hineinzeigt
-- [ ] 3.3 Auszug aus PROD: `public` und der in 1.6 bestimmte `auth`-Umfang,
-      getrennt, weil Gruppe 4 sie in verschiedenen Schritten zurückspielt
-- [ ] 3.4 **Manifest** erzeugen: je Tabelle Zeilenzahl und Zeilenhash, je Objekt
-      Größe und Prüfsumme. Ohne Manifest gibt es keine belastbare Abnahme
-- [ ] 3.5 Test: bricht das Erzeugen ab, ist gegen DEV **kein** schreibender
-      Befehl abgesetzt worden
-- [ ] 3.6 Objekte der vier Buckets holen — **rekursiv und über alle Seiten**.
+**Erledigt am 2026-08-20** — `scripts/sync-dev-auszug.ts` über
+`sync-dev-auszug.logic.ts`, 34 Zusagen, sieben Verbiegungen einzeln rot, drei
+echte Läufe gegen PROD (rein lesend). Bericht:
+`messungen/gruppe-3-2026-08-20.md`. Der Auszug liegt in
+`~/.fbc-spiegel/spiegel-viwntbodrtqxgmqyxluh-20260820T133810Z`.
+
+- [x] 3.1 Ablageort ausserhalb des Arbeitsbaums: Verzeichnis `0700`, Dateien
+      `0600`, Auflösung über `realpath` gegen den Arbeitsbaum geprüft — **in
+      beide Richtungen**: ein Ort, der den Arbeitsbaum *enthält*, wird
+      ebenfalls abgelehnt (er nähme beim Aufräumen den Quelltext mit)
+- [x] 3.2 RED: ein Ablageort **innerhalb** des Arbeitsbaums wird abgelehnt —
+      auch wenn ein Symlink hineinzeigt. Gemessen: der Zeichenkettenvergleich
+      sieht `/var/folders/…` und liesse durch
+- [x] 3.3 Auszug aus PROD: `public` und der in 1.6 bestimmte `auth`-Umfang,
+      getrennt, weil Gruppe 4 sie in verschiedenen Schritten zurückspielt.
+      **`--format=custom`, `--data-only`, beide mit demselben `--snapshot`**
+- [x] 3.4 **Manifest** erzeugen: je Tabelle Zeilenzahl und Zeilenhash, je Objekt
+      Größe und Prüfsumme. Ohne Manifest gibt es keine belastbare Abnahme.
+      Gemessen: 36 Tabellen / 857 Zeilen, 125 Objekte. Die Prüfsumme wird
+      **selbst gerechnet** (sha256 über die empfangenen Bytes); `eTag` steht
+      nur zum Vergleich mit PROD daneben
+- [x] 3.5 Test: bricht das Erzeugen ab, ist gegen DEV **kein** schreibender
+      Befehl abgesetzt worden. Nicht als Strukturargument, sondern gemessen:
+      mit einem nicht auflösenden DEV-Host und einem DEV-Service-Key ohne
+      gültige Signatur lief der Auszug einmal **durch** (Exit 0) und einmal in
+      den **Abbruch** (Exit 1) — beide Male ohne Fehler aus Richtung DEV
+- [x] 3.6 Objekte der vier Buckets holen — **rekursiv und über alle Seiten**.
       Die heutigen 125 Objekte dürfen nicht als Beleg dienen, dass eine
-      Seitengrenze nie erreicht wird
-- [ ] 3.7 Test: ein Objektname mit Pfadanteilen nach oben kann den Ablageort
-      nicht verlassen
-- [ ] 3.8 Auszüge tragen eindeutige Namen und überschreiben einander nicht
-- [ ] 3.9 Test: die **Differenz** von `git status --porcelain --ignored` vor und
+      Seitengrenze nie erreicht wird. **Abweichung, bewusst:** die Liste kommt
+      aus `storage.objects`, nicht aus `list()` — dort steht jeder Schlüssel
+      voll ausgeschrieben, es gibt keine synthetischen Präfixe abzusteigen.
+      Geblättert wird **per Keyset** über `(bucket_id, name)`, nicht per
+      `offset`; Seitengröße 50, also kleiner als der Bestand
+- [x] 3.7 Test: ein Objektname mit Pfadanteilen nach oben kann den Ablageort
+      nicht verlassen. Zweifach geprüft: an den Segmenten und am aufgelösten
+      Ergebnis. Der Bucket-Name ist ebenfalls Fremddaten
+- [x] 3.8 Auszüge tragen eindeutige Namen und überschreiben einander nicht.
+      Erzwungen wird das vom Anlegen (`mkdir` ohne `recursive`), nicht vom
+      Namen; drei Läufe standen nebeneinander
+- [x] 3.9 Test: die **Differenz** von `git status --porcelain --ignored` vor und
       nach dem Lauf ist leer. Nicht die Ausgabe selbst — sie führt schon vorher
-      17 Pfade
+      20 Pfade. Am echten Lauf gemessen
 
 ## 4. Ersetzen
 
@@ -201,7 +224,11 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 4.1 `set session_replication_role = replica` für die Sitzung — **nicht**
       13 einzelne `ALTER TABLE … DISABLE TRIGGER`: an `auth.users` und beiden
       `storage`-Tabellen fehlen dafür die Eigentümerrechte (1.5). Test, dass
-      der Schalter gesetzt war, solange geschrieben wurde
+      der Schalter gesetzt war, solange geschrieben wurde.
+      **Auflage aus Gruppe 3:** der Auszug ist `--format=custom`, und
+      `pg_restore` lässt kein eigenes SQL vor dem Rücklauf zu — der Schalter
+      muss über **`PGOPTIONS`** an die Verbindung. `psql` ist hier kein Weg.
+      Das ist zu belegen, bevor 4.1 als erfüllt gilt
 - [ ] 4.1a Test: nach dem Lauf ist `session_replication_role` wieder `origin`
       und alle 18 Trigger tragen weiter `tgenabled='O'`
 - [ ] 4.1b **Fremdschlüssel-Integrität eigens messen.** Im replica-Modus
@@ -274,7 +301,11 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 5.3 Abnahme als **Manifestvergleich mit benannten Abweichungen**: DEV
       trägt den Bestand des Auszugs **plus** den deklarierten DEV-Bestand.
       Nicht „gleiche Zeilenzahlen wie PROD" — das ist mit 4.10 unvereinbar und
-      damit unerfüllbar
+      damit unerfüllbar. **Und in Gruppe 3 gemessen, warum auch ein frischer
+      PROD-Vergleich nicht taugt:** zwischen 11:18 und 15:38 wichen
+      `auth.users` und `public.profiles` im Zeilenhash ab, bei unveränderter
+      Zeilenzahl — drei Zeilen hatten sich bewegt. Verglichen wird gegen
+      `manifest.json` **des Auszugs**, nie gegen „PROD jetzt"
 - [ ] 5.4 Idempotenz **aus demselben gespeicherten Auszug** zweimal einspielen
       und Zeilenhashes plus Objektprüfsummen vergleichen. Zwei Läufe gegen die
       laufende Quelle belegen nichts — sie können verschiedene Stände gelesen

@@ -262,6 +262,29 @@ für ein noch unverknüpftes Objekt verweigert wird — der Fehler zeigt dann au
 die RLS, obwohl die Policy richtig ist. Da DEVs Buckets vorher geleert werden,
 gibt es ohnehin nichts zu überschreiben.
 
+### 5a. Ein Snapshot trägt Auszug und Manifest — Nachtrag vom 2026-08-20
+
+**Gemessen in Gruppe 3.** Die lesende Transaktion exportiert ihren Snapshot
+(`pg_export_snapshot()`, `repeatable read read only`); beide `pg_dump`-Läufe und
+jede Zählung des Manifests hängen sich mit `--snapshot` daran.
+
+Der Grund ist nicht Eleganz, sondern ein gemessener Befund: PROD bewegt sich
+während des Lesens. Das Manifest von 11:18 und das von 15:38 weichen in
+`auth.users` und `public.profiles` ab — bei **unveränderter Zeilenzahl** (72),
+drei Zeilen hatten nur ihr `updated_at`/`last_sign_in_at` geändert. Ohne den
+gemeinsamen Snapshot beschriebe das Manifest also einen anderen Stand als die
+Datei daneben, und die Abnahme in Gruppe 5 könnte einen fehlerhaften Rücklauf
+nicht mehr von einer Bewegung auf PROD unterscheiden.
+
+Zwei Folgen: die Abnahme vergleicht DEV gegen **das Manifest des Auszugs**, nie
+gegen „PROD jetzt". Und `auth` und `public` sind zueinander konsistent — was
+der Fremdschlüssel von `public.profiles` auf `auth.users` braucht.
+
+**Nebenbefund:** `manifest.json` wird als letztes geschrieben und ist damit das
+Vollständigkeitszeichen. Ein abgebrochener Lauf hinterlässt sein Verzeichnis
+ohne Manifest; Gruppe 4 fasst ein solches nicht an. Beim Abbruch aufzuräumen
+wäre die schlechtere Wahl — es verwischte die Spur.
+
 ### 6. Keine Anonymisierung — dafür entschärfte Zugänge und neutralisierte Hashes
 
 **Entscheidung Donald, 2026-08-20, gegen beide Prüfer** (REVIEWS.md §8/§9). Die
