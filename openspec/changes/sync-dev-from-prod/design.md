@@ -66,9 +66,14 @@ trägt, schlägt zwei, von denen eines selten läuft und deshalb verrottet.
 
 ### 2. Trigger sind ein Inventar, kein Einzelfall
 
-**Korrigiert nach dem Plan-Review (REVIEWS.md).** Der erste Entwurf behandelte
+**Korrigiert nach dem Plan-Review, dann nachgemessen (Gruppe 1, siehe
+`messungen/gruppe-1-2026-08-20.md`).** Der erste Entwurf behandelte
 `on_auth_user_created` und hielt das Problem damit für gelöst. Gemessen am
-2026-08-20 trägt `public` **13 nicht-interne Trigger**:
+2026-08-20 sind es **18 nicht-interne Trigger**: 13 auf `public`, einer auf
+`auth`, **vier auf `storage`** — die vier standen in keinem der beiden Reviews
+und in keiner Fassung dieses Entwurfs. Zwei davon (`protect_objects_delete`,
+`protect_buckets_delete`) sind `BEFORE DELETE`-Statement-Trigger und stehen dem
+Leeren der Buckets in 4.3 im Weg. Die 13 auf `public`:
 
 | Trigger | Was er beim Restore täte |
 |---|---|
@@ -83,23 +88,52 @@ beiden Reviews: **ein Restore, der E-Mails an echte Mitglieder auslöst, ist kei
 Restore.** Dass `contact_requests` heute leer ist, ist ein Zufall des Zeitpunkts
 und kein Entwurf.
 
-Der Ablauf für den Signup-Trigger bleibt richtig und kommt ohne erhöhte Rechte
-aus:
+**Der Mechanismus ist nach der Messung ein anderer.** Geplant war, je Trigger
+ein `ALTER TABLE … DISABLE TRIGGER` abzusetzen. Gemessen gehört `auth.users` der
+Rolle `supabase_auth_admin` und `storage.objects`/`storage.buckets` gehören
+`supabase_storage_admin` — **an genau den drei Tabellen, auf die es ankommt,
+wäre der geplante Weg gescheitert.** Nur die neun `public`-Tabellen gehören
+`postgres`.
+
+Was trägt: **`set session_replication_role = replica`**, auf beiden Projekten
+erlaubt. Alle 18 Trigger tragen `tgenabled = 'O'`, also legt der eine Schalter
+sie sämtlich still — ohne ein `ALTER`, ohne Eigentümerrechte, und der Zustand
+endet mit der Verbindung statt in der Datenbank zu bleiben.
+
+Empirisch belegt gegen den lokalen Stack, beide Einfügungen in einer
+zurückgerollten Transaktion (`scripts/mess-spiegel-replica.ts`):
 
 ```
+origin : insert auth.users → 1 Zeile in public.profiles (tier=basic)   [Gegenprobe]
+replica: insert auth.users → 0 Zeilen in public.profiles               [Messung]
+```
+
+Damit lautet der Ablauf:
+
+```
+0. set session_replication_role = replica     (gilt für die ganze Sitzung)
 1. auth-Bestand in DEV leeren   → kaskadiert in public.profiles
-2. public.* leeren
-3. auth zurückspielen           → Trigger legt Zeilen in profiles an (tier `basic`)
-4. truncate public.profiles cascade   (räumt genau diese weg)
-5. public.* zurückspielen
-6. Nachbereitung
+2. public.* leeren, Buckets leeren
+3. auth zurückspielen           → der Signup-Trigger feuert NICHT
+4. public.* zurückspielen
+5. Nachbereitung, Fremdschlüssel-Integrität eigens messen
 ```
 
-Schritt 4 ist der Kunstgriff: die erzeugten Zeilen werden weggeräumt,
-**nachdem** der Trigger gefeuert hat, statt ihn am Feuern zu hindern.
-`truncate ... cascade` folgt Fremdschlüsseln, die **auf** `profiles` zeigen —
-`auth.users` wird von `profiles` referenziert, nicht umgekehrt. Das ist in
-Aufgabe 1.8 zu **belegen**, nicht anzunehmen; der ganze Ablauf hängt daran.
+**Der Kunstgriff des ersten Entwurfs entfällt.** Er räumte weg, was
+`on_auth_user_created` erzeugt; im replica-Modus erzeugt der Trigger nichts.
+Aufgabe 4.5 bleibt als *Zusage* stehen — „der Trigger hat nicht gefeuert" —
+nicht als Arbeitsschritt.
+
+Belegt ist auch, was daran hing: `public.profiles --profiles_id_fkey-->
+auth.users`, `profiles` ist die referenzierende Seite, `truncate … cascade`
+folgt nur Schlüsseln, die **auf** die geleerte Tabelle zeigen. `auth.users`
+bleibt unberührt (Aufgabe 1.8, 31 Fremdschlüssel auf `profiles`, 9 auf
+`auth.users`).
+
+*Der Preis:* replica legt auch die internen RI-Trigger still — Fremdschlüssel
+werden während des Laufs **nicht geprüft**. Für die Restore-Reihenfolge ist das
+bequem, für die Abnahme heißt es, dass die Integrität danach eigens gemessen
+werden muss. Sie ergibt sich nicht mehr von selbst.
 
 *Korrektur am ersten Entwurf:* er schrieb, der Trigger setze `discover`. Er
 setzt **`basic`** — die gelesene Definition stammte aus `20260611171003`, die
@@ -107,17 +141,13 @@ geltende steht in `20260715150000` und in der laufenden Datenbank. Für den
 Ablauf ändert das nichts (die Zeilen fallen ohnehin), für die Verlässlichkeit
 des Entwurfs schon.
 
-*Für die übrigen zwölf gilt dieser Kunstgriff nicht.* Sie feuern beim
-Zurückspielen von `public` und erzeugen Zustand, den der Auszug nicht enthält.
-Aufgabe 1.4/1.5 entscheidet je Trigger, ob er stillgelegt werden kann — **und
-wenn nicht, fällt dieser Entwurf**, statt eine Ausnahme zu bekommen. Der
-`pg_restore`-Weg ist dann zu verwerfen.
-
-*Verworfen:* `alter table auth.users disable trigger` als alleinige Antwort. Es
-verlangt Eigentümer- oder Superuser-Rechte an einer Tabelle im `auth`-Schema —
-ungemessen, und im lokalen Stack ist `postgres` nachweislich kein Superuser.
-Bleibt ein Trigger versehentlich abgeschaltet, legt jede spätere Anmeldung auf
-DEV kein Profil mehr an, und das fällt erst Tage später auf.
+*Verworfen, und jetzt nicht mehr nur vermutet:* `alter table … disable trigger`
+als Weg. Es verlangt Eigentümerrechte, und die fehlen an `auth.users`,
+`storage.objects` und `storage.buckets` — gemessen, nicht geschätzt. Zweiter
+Grund, der bleibt: ein `ALTER` überlebt die Sitzung. Bliebe ein Trigger
+versehentlich abgeschaltet, legte jede spätere Anmeldung auf DEV kein Profil
+mehr an, und das fiele erst Tage später auf. `session_replication_role` kann
+diesen Fehler nicht machen.
 
 ### 2a. Der Auth-Umfang wird gemessen, nicht angenommen
 
@@ -127,8 +157,16 @@ drei. GoTrue pflegt Identitäten ausserhalb von `auth.users` — ein Restore ohn
 sie erzeugt 72 Konten, an denen sich **niemand anmelden kann**, und der Fehler
 zeigt sich erst beim ersten Anmeldeversuch, nicht im Lauf.
 
-Welche Tabellen dazugehören, bestimmt Aufgabe 1.6 durch Messung. Der Umfang
-wird aufgeschrieben, damit die nächste Änderung ihn nicht wieder raten muss.
+**Gemessen am 2026-08-20 (Aufgabe 1.6): der Umfang ist `auth.users` +
+`auth.identities`, sonst nichts.** Zeilen tragen auf PROD ausserdem
+`refresh_tokens` (23), `sessions` (3) und `mfa_amr_claims` (3) — das sind
+laufende Anmeldungen echter Personen, sie ergäben übertragen tote Token und
+wären der unangenehmste Teil des Spiegels. `auth.schema_migrations` (77) ist
+GoTrues **eigener** Versionsstand des DEV-Projekts und darf nicht ersetzt
+werden. Die übrigen 17 `auth`-Tabellen sind leer.
+
+Der Befund von der anderen Seite: DEV trägt heute **41 `users`, aber nur 14
+`identities`** — 27 DEV-Konten sind bereits jetzt nicht anmeldefähig.
 
 ### 3. Der geschützte Bestand wird hergestellt, nicht ausgespart
 

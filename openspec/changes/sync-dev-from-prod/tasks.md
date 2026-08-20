@@ -5,42 +5,74 @@ entscheidet, ob der Entwurf überhaupt trägt. Beide Prüfer haben angemerkt, da
 `design.md` durchgehend so geschrieben ist, als sei das Ergebnis schon bekannt.
 Fällt 1.2 oder 1.7 aus, wird der Entwurf geändert, nicht die Messung.
 
-- [ ] 1.1 Auflösen, worauf `SUPABASE_DB_URL_PROD` und `SUPABASE_DB_URL_DEV`
+**Gemessen am 2026-08-20 — beide Gates halten.** Ergebnisse, Manifeste und die
+drei Folgen für Gruppe 4 stehen in `messungen/gruppe-1-2026-08-20.md`.
+
+- [x] 1.1 Auflösen, worauf `SUPABASE_DB_URL_PROD` und `SUPABASE_DB_URL_DEV`
       zeigen: Host, Port, Benutzername. Festhalten, ob Pooler-Form
-      (`postgres.<ref>`, Port 6543) oder direkte Verbindung
-- [ ] 1.2 `pg_dump --schema-only --table=public.profiles` gegen **PROD** — der
+      (`postgres.<ref>`, Port 6543) oder direkte Verbindung —
+      **beides Pooler in Session-Form, Port 5432.** Die Hosts sind NICHT gleich
+      (`aws-0` vs. `aws-1`), und jede URL liegt nur in ihrer eigenen
+      Infisical-Umgebung: ein `infisical run --env=…` liefert nie beide
+- [x] 1.2 `pg_dump --schema-only --table=public.profiles` gegen **PROD** — der
       billigste Vollbeweis, dass `pg_dump` diese Verbindung trägt. Rein lesend.
       Scheitert es, ist `supabase db dump` der Ersatz, und alle folgenden
-      Aufgaben nennen dieses Werkzeug
-- [ ] 1.3 Serverversion beider Projekte lesen und gegen `pg_dump 18.4` stellen
-- [ ] 1.4 **Vollständiges Trigger-Inventar** auf `public` und `auth` — je
+      Aufgaben nennen dieses Werkzeug — **Exit 0, 405 Zeilen, leeres stderr**
+- [x] 1.3 Serverversion beider Projekte lesen und gegen `pg_dump 18.4` stellen
+      — **beide 17.6, Client nur 18.4.** Zurückspielen in einen älteren Server
+      ist von PostgreSQL nicht zugesagt; die Zusage fällt in 5.1
+- [x] 1.4 **Vollständiges Trigger-Inventar** auf `public` und `auth` — je
       Trigger entscheiden, ob er beim Restore feuern darf. Gemessen am
       2026-08-20 sind es **13 nicht-interne auf `public`**;
-      `contact_requests_email_webhook` ist der Ernstfall, weil er Post
-      verschicken kann. Ergebnis ist eine Liste, keine Zahl
-- [ ] 1.5 Für jeden Trigger, der nicht feuern darf: prüfen, ob er mit den
+      `contact_requests_email_webhook` — **die Zusage muss gegen DEV fallen,
+      nicht lokal** (siehe 5.1) ist der Ernstfall, weil er Post
+      verschicken kann. Ergebnis ist eine Liste, keine Zahl — **es sind 18,
+      nicht 13**: 13 `public`, 1 `auth`, **4 `storage`**, alle `tgenabled='O'`.
+      Zwei `storage`-Trigger stehen dem Leeren der Buckets (4.3) im Weg
+- [x] 1.5 Für jeden Trigger, der nicht feuern darf: prüfen, ob er mit den
       vorhandenen Rechten stillgelegt werden kann. **Geht das nicht, fällt
       Decision 2** — dann ist der `pg_restore`-Weg zu verwerfen, nicht eine
-      Ausnahme zu bauen
-- [ ] 1.6 **Auth-Umfang messen:** welche `auth`-Tabellen tragen Zeilen und
+      Ausnahme zu bauen. **Ergebnis: `ALTER` scheitert an `auth.users` und
+      beiden `storage`-Tabellen (fremde Eigentümer). `set
+      session_replication_role = replica` ist auf beiden Projekten erlaubt und
+      legt alle 18 still — mit Gegenprobe lokal belegt.** Decision 2 hält, ihr
+      Mechanismus ist ein anderer
+- [x] 1.6 **Auth-Umfang messen:** welche `auth`-Tabellen tragen Zeilen und
       welche braucht ein anmeldefähiges Konto. `auth.identities` trägt 72 —
-      `auth.users` allein ist kein Restore. Ergebnis aufschreiben
-- [ ] 1.7 Prüfen, ob `pg_dump` das `auth`-Schema mit den gegebenen Rechten
-      ausliest und die Rolle `truncate`/`insert` auf `auth.users` darf
-- [ ] 1.8 Fremdschlüsselrichtung `profiles → auth.users` **belegen**, statt sie
+      `auth.users` allein ist kein Restore. Ergebnis aufschreiben —
+      **Umfang: `auth.users` + `auth.identities`, sonst nichts.**
+      `sessions`/`refresh_tokens` sind laufende Anmeldungen echter Personen,
+      `auth.schema_migrations` ist GoTrues eigener DEV-Versionsstand
+- [x] 1.7 Prüfen, ob `pg_dump` das `auth`-Schema mit den gegebenen Rechten
+      ausliest und die Rolle `truncate`/`insert` auf `auth.users` darf —
+      **Exit 0, 23 `CREATE TABLE auth.*`; alle fünf Rechte auf `auth.users`
+      und `auth.identities` vorhanden**
+- [x] 1.8 Fremdschlüsselrichtung `profiles → auth.users` **belegen**, statt sie
       anzunehmen — `truncate public.profiles cascade` darf `auth.users` nicht
-      berühren, und der ganze Ablauf hängt daran
-- [ ] 1.9 Schemagleichheit **normalisiert** vergleichen, nicht an der
+      berühren, und der ganze Ablauf hängt daran — **belegt: `profiles` ist die
+      referenzierende Seite; 31 Fremdschlüssel zeigen auf `profiles`, 9 auf
+      `auth.users`**
+- [x] 1.9 Schemagleichheit **normalisiert** vergleichen, nicht an der
       Migrationszahl: „70 auf beiden Seiten" beweist nichts und veraltet sofort.
-      Vollständige Versionslisten plus `db-drift-scan` gegen beide
+      Vollständige Versionslisten plus `db-drift-scan` gegen beide —
+      **Listen zeichengleich (je 70); Scan beidseitig „54 Funktionen, 13
+      Trigger, 34 Tabellen, 1 View, 54 Policies, keine Abweichung".** Lokal
+      braucht der Scan `NODE_EXTRA_CA_CERTS`. Und:
+      `contact_requests_email_webhook` — **die Zusage muss gegen DEV fallen,
+      nicht lokal** (siehe 5.1) steht bewusst in keiner Migration —
+      der Vollersatz muss danach prüfen, dass das Paar noch steht
 - [x] 1.10 ~~Donald fragen, ob die 21 Feedback-Zeilen den Ersatz überleben~~ —
       **entschieden 2026-08-20: nein, mitersetzen.** Testeingaben, keine Arbeit;
       sie stehen NICHT im deklarierten DEV-Bestand
 - [x] 1.11 ~~Donald vorlegen: Anonymisierung~~ — **entschieden 2026-08-20:
       keine Anonymisierung** (Decision 6). Stattdessen Zugänge entschärfen und
       Hashes neutralisieren, siehe Gruppe 2a
-- [ ] 1.12 Manifest des Vorher-Stands beider Seiten: je Tabelle Zeilenzahl und
-      Zeilenhash, je Objekt Größe und Prüfsumme
+- [x] 1.12 Manifest des Vorher-Stands beider Seiten: je Tabelle Zeilenzahl und
+      Zeilenhash, je Objekt Größe und Prüfsumme — **liegt als
+      `messungen/manifest-{prod,dev}-2026-08-20.json`.** PROD 713 Zeilen /
+      125 Objekte, DEV 821 / 18. Die Bucket-Liste kommt aus `storage.buckets`,
+      nicht aus den Objekten, sonst verschwände ein leer gewordener Bucket
+      still aus dem Manifest
 
 ## 2. Der Wächter, vor allem anderen
 
@@ -102,26 +134,40 @@ Repository steht, gibt jeder Leser sich Zugriff auf das Verzeichnis.
 
 ## 4. Ersetzen
 
-Reihenfolge nach `design.md` §Decisions 2 — **gültig nur, wenn 1.4/1.5 sie
-tragen**. Schritt 4.5 ist der Kunstgriff: die vom Signup-Trigger erzeugten
-Zeilen werden weggeräumt, nachdem er gefeuert hat.
+Reihenfolge nach `design.md` §Decisions 2. **1.4/1.5 tragen sie — aber mit
+einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 
-- [ ] 4.1 Die in 1.5 bestimmten Trigger stilllegen; Test, dass der Zustand
-      danach wiederhergestellt ist — ein versehentlich abgeschaltet gebliebener
-      Signup-Trigger fällt erst Tage später auf
+- [ ] 4.1 `set session_replication_role = replica` für die Sitzung — **nicht**
+      13 einzelne `ALTER TABLE … DISABLE TRIGGER`: an `auth.users` und beiden
+      `storage`-Tabellen fehlen dafür die Eigentümerrechte (1.5). Test, dass
+      der Schalter gesetzt war, solange geschrieben wurde
+- [ ] 4.1a Test: nach dem Lauf ist `session_replication_role` wieder `origin`
+      und alle 18 Trigger tragen weiter `tgenabled='O'`
+- [ ] 4.1b **Fremdschlüssel-Integrität eigens messen.** Im replica-Modus
+      schweigen auch die internen RI-Trigger, Fremdschlüssel werden während des
+      Laufs also nicht geprüft — was sich vorher von selbst ergab, ist jetzt
+      eine Zusage, die jemand aussprechen muss
 - [ ] 4.2 `auth`-Bestand in DEV leeren (kaskadiert in `public.profiles`)
-- [ ] 4.3 `public`-Tabellen leeren, Buckets leeren
+- [ ] 4.3 `public`-Tabellen leeren, Buckets leeren — **`protect_objects_delete`
+      und `protect_buckets_delete` stehen dem im Weg** (1.4); im replica-Modus
+      schweigen sie, ausserhalb nicht
 - [ ] 4.4 `auth`-Umfang zurückspielen — Konten **und Identitäten**
-- [ ] 4.5 `truncate public.profiles cascade` — räumt die vom Signup-Trigger
-      erzeugten Zeilen weg (sie tragen `basic`, nicht `discover`: die aktuelle
-      Definition steht in `20260715150000`, nicht in der Juni-Fassung). Test,
-      dass `auth.users` dabei unberührt bleibt
+- [ ] 4.5 **Zusage statt Arbeitsschritt.** Der Kunstgriff entfällt: im
+      replica-Modus erzeugt `on_auth_user_created` nichts. Zu belegen ist
+      genau das — nach 4.4 trägt `public.profiles` **keine** vom Trigger
+      erzeugte Zeile (er setzte `basic`, nicht `discover`; geltende Definition
+      `20260715150000`). Wird der Weg doch über `truncate … cascade` gegangen,
+      zusätzlich belegen, dass `auth.users` unberührt bleibt (1.8)
 - [ ] 4.6 `public` zurückspielen
 - [ ] 4.7 Test: der Restore erzeugt **keine** zusätzlichen Beiträge aus
       `trg_event_feed_post`, keine Benachrichtigungen aus
       `contact_requests_lifecycle` und **keine Post** aus
-      `contact_requests_email_webhook`
+      `contact_requests_email_webhook` — **die Zusage muss gegen DEV fallen,
+      nicht lokal** (siehe 5.1)
 - [ ] 4.8 Objekte in die vier Buckets schreiben, **`upsert: false`**
+- [ ] 4.8a Test: `notify_contact_request_webhook()` und
+      `contact_requests_email_webhook` stehen nach dem Lauf noch. Sie stehen in
+      keiner Migration (1.9) — still verloren sähe aus wie ein sauberer Lauf
 - [ ] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen:
       Demo-Zugänge samt ihrer Profilangaben und der neuen Passwörter,
       `staff_roles` samt `matching_manager`. **Ohne die Feedback-Zeilen** —
@@ -144,9 +190,15 @@ Zeilen werden weggeräumt, nachdem er gefeuert hat.
 ## 5. Einmal echt laufen lassen
 
 - [ ] 5.1 Vollständiger Restore-Probelauf gegen den **lokalen** Stack, bevor DEV
-      berührt wird — dort ist ein Fehlschlag folgenlos
+      berührt wird — dort ist ein Fehlschlag folgenlos. Hier fällt auch die
+      offene Zusage aus 1.3: ein mit `pg_dump 18.4` erzeugter Auszug muss in
+      einen 17.6-Server zurückgehen. **Blinder Fleck:** lokal fehlt genau
+      `contact_requests_email_webhook` (17 statt 18 Trigger), weil er in keiner
+      Migration steht — über „keine Post" sagt ein grüner lokaler Lauf nichts
 - [ ] 5.2 `pnpm sync:dev` in `package.json` eintragen und einmal gegen DEV
-      ausführen
+      ausführen — **die beiden DB-URLs liegen in getrennten
+      Infisical-Umgebungen** (1.1), ein einzelner `infisical run --env=…`
+      liefert nie beide
 - [ ] 5.3 Abnahme als **Manifestvergleich mit benannten Abweichungen**: DEV
       trägt den Bestand des Auszugs **plus** den deklarierten DEV-Bestand.
       Nicht „gleiche Zeilenzahlen wie PROD" — das ist mit 4.10 unvereinbar und

@@ -1,0 +1,173 @@
+{
+  "seite": "dev",
+  "ref": "foelowldexkcqzewvrcf",
+  "tabellen": {
+    "public.activation_attempts": {
+      "zeilen": 21,
+      "hash": "1cabae141ff1856a583fa535b058205f"
+    },
+    "public.activation_tokens": {
+      "zeilen": 6,
+      "hash": "881352960ef8cdf925f0c1f0731ecbc6"
+    },
+    "public.admin_audit": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.badges": {
+      "zeilen": 4,
+      "hash": "fab9a721b5290abbd1c034b24fa95283"
+    },
+    "public.comments": {
+      "zeilen": 13,
+      "hash": "199a0f49fb23cb692a3177e2c29becd3"
+    },
+    "public.compass_responses": {
+      "zeilen": 48,
+      "hash": "78daabb342d95965aaac8b81dbe38826"
+    },
+    "public.contact_requests": {
+      "zeilen": 4,
+      "hash": "20ece2d24b6fa67f0e9a1d7f91459631"
+    },
+    "public.event_registrations": {
+      "zeilen": 49,
+      "hash": "a9633c98d13bc9e2a4a974d337d3a298"
+    },
+    "public.events": {
+      "zeilen": 13,
+      "hash": "377a1fa320fbda5e74fb2a8ecf0bc0a6"
+    },
+    "public.feedback": {
+      "zeilen": 21,
+      "hash": "5a33ff4679d4714c5d0893e6496bbff2"
+    },
+    "public.goals": {
+      "zeilen": 11,
+      "hash": "4565e61040c1618e95ef0c28610b9e85"
+    },
+    "public.matches": {
+      "zeilen": 164,
+      "hash": "a468d8f5ae49203569ae4ffcc1ffc9f9"
+    },
+    "public.member_settings": {
+      "zeilen": 6,
+      "hash": "52b5215b2312d2304ad9b62494c62ae3"
+    },
+    "public.membership_tiers": {
+      "zeilen": 6,
+      "hash": "92e0f1c79b5039cc845652be8fc2ac26"
+    },
+    "public.message_threads": {
+      "zeilen": 2,
+      "hash": "966e9430a986349baa7498eddaf3a915"
+    },
+    "public.messages": {
+      "zeilen": 4,
+      "hash": "ed145f19d4f7bc42bcc3cef92f5cf003"
+    },
+    "public.needs": {
+      "zeilen": 49,
+      "hash": "c525d490d7bb9a797cd26a8761d3ea22"
+    },
+    "public.notifications": {
+      "zeilen": 4,
+      "hash": "96c8f8017b50c1e844abe773934acbd4"
+    },
+    "public.offers": {
+      "zeilen": 50,
+      "hash": "2d0d902a78356fa30f6243939638a78f"
+    },
+    "public.partner_categories": {
+      "zeilen": 6,
+      "hash": "cca22cc950baa57db16a33d421aa3af7"
+    },
+    "public.partners": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.platform_settings": {
+      "zeilen": 1,
+      "hash": "3dd660ad5ff73ebebfc9f50b0b80abe1"
+    },
+    "public.post_likes": {
+      "zeilen": 34,
+      "hash": "ac4f9edd4633d217c580ba881462a245"
+    },
+    "public.post_media": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.posts": {
+      "zeilen": 34,
+      "hash": "780540e9ade1c94cab9970ec304956c6"
+    },
+    "public.profile_badges": {
+      "zeilen": 6,
+      "hash": "80c15adbc2a052e1f0b60f5d89bee3b4"
+    },
+    "public.profile_contacts": {
+      "zeilen": 26,
+      "hash": "4ced011a44cf30df53780abca136e532"
+    },
+    "public.profile_interests": {
+      "zeilen": 25,
+      "hash": "72a06b62cdab7b0c0a5a0a60a187ed59"
+    },
+    "public.profile_legacy": {
+      "zeilen": 0,
+      "hash": "-"
+    },
+    "public.profile_theme_scores": {
+      "zeilen": 152,
+      "hash": "4f940f34734315f12ff98bfd6c6910d6"
+    },
+    "public.profiles": {
+      "zeilen": 41,
+      "hash": "05797f32aef0604dc3e12609d9f7f048"
+    },
+    "public.routing_queue": {
+      "zeilen": 3,
+      "hash": "99ef62e8ec3a356ff73d95a04ed4a7ba"
+    },
+    "public.staff_roles": {
+      "zeilen": 3,
+      "hash": "d992964c108dcf971c13e0de3a33ad6b"
+    },
+    "public.tags": {
+      "zeilen": 15,
+      "hash": "1e4563d584a2a50bf166b3c51f964133"
+    },
+    "auth.users": {
+      "zeilen": 41,
+      "hash": "c9a6e54bc89d6d4326daa4e781b02aa2"
+    },
+    "auth.identities": {
+      "zeilen": 14,
+      "hash": "f5f254c8e2801bfa6c34922d6b032b50"
+    }
+  },
+  "buckets": {
+    "avatars": {
+      "objekte": 5,
+      "bytes": 158652,
+      "hash": "80e40917b14358130e93d9d24b812d99"
+    },
+    "covers": {
+      "objekte": 0,
+      "bytes": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "event-covers": {
+      "objekte": 13,
+      "bytes": 1941798,
+      "hash": "82b9c32a19e292d7cebbf2a05a8499c0"
+    },
+    "post-media": {
+      "objekte": 0,
+      "bytes": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  },
+  "objekte": 18
+}
