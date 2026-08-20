@@ -5,6 +5,11 @@
  *   npx tsx scripts/sync-dev-ruecklauf.ts --ziel=lokal <ablage>
  *   infisical run --env=prod -- npx tsx scripts/sync-dev-ruecklauf.ts --ziel=dev <ablage>
  *
+ * `--sicherung` lässt 4.13 **und** den DEV-Bestand aus 4.9/4.10 aus und stellt
+ * damit genau den Bestand des Manifests her — anmeldefähig, ohne Dekoration
+ * (5.6). Gegen `--ziel=dev` ist der Schalter abgelehnt, nicht bloss abgeraten;
+ * die Begründung steht bei `pruefeSicherungslauf`.
+ *
  * **Dieser Lauf löscht.** Er leert `auth`, `public` und alle Buckets des Ziels
  * und ersetzt sie durch den Auszug. `--ziel` hat keinen Vorgabewert: wer nichts
  * angibt, bekommt einen Abbruch, keine Vermutung.
@@ -51,6 +56,7 @@ import {
   entferneRestrict,
   planeLeeren,
   pruefeAuszug,
+  pruefeSicherungslauf,
   vergleicheManifest,
   type Deklaration,
   type Manifest,
@@ -78,6 +84,13 @@ const zielArt = process.argv.find((a) => a.startsWith("--ziel="))?.slice("--ziel
 if (zielArt !== "lokal" && zielArt !== "dev") {
   ende("--ziel=lokal oder --ziel=dev ist Pflicht. Ohne Angabe wird nichts vermutet.");
 }
+const sicherungsSchalter = pruefeSicherungslauf({
+  zielArt,
+  sicherung: process.argv.includes("--sicherung"),
+});
+if (sicherungsSchalter.kind === "abbruch") ende(sicherungsSchalter.grund);
+const { neutralisieren, devBestand } = sicherungsSchalter;
+
 const ablage = process.argv.find((a) => !a.startsWith("-") && a.endsWith("Z"));
 if (!ablage) ende("Kein Ablageverzeichnis angegeben.");
 const ablagePfad = resolve(ablage);
@@ -378,84 +391,105 @@ for (const o of soll.objekte) {
 beleg(`${hoch} Objekte geschrieben`);
 
 // ── 6. 4.13 Hashes neutralisieren ─────────────────────────────────────────────
-schritt("4.13: Produktions-Passwort-Hashes neutralisieren");
-const neutral = (
-  await db2.query(`update auth.users
-                      set encrypted_password = crypt(gen_random_uuid()::text, gen_salt('bf'))
-                    where encrypted_password is not null
-                    returning 1`)
-).rowCount;
-beleg(`${neutral} Hashes durch Zufallswerte ersetzt`);
+if (neutralisieren) {
+  schritt("4.13: Produktions-Passwort-Hashes neutralisieren");
+  const neutral = (
+    await db2.query(`update auth.users
+                        set encrypted_password = crypt(gen_random_uuid()::text, gen_salt('bf'))
+                      where encrypted_password is not null
+                      returning 1`)
+  ).rowCount;
+  beleg(`${neutral} Hashes durch Zufallswerte ersetzt`);
+} else {
+  // 5.6: der Rückweg. Hier steht der Bestand anmeldefähig — das ist der Zweck
+  // und zugleich das, was auf DEV nie passieren darf (siehe pruefeSicherungslauf).
+  schritt("4.13 ausgelassen — SICHERUNGSLAUF, die Hashes bleiben echt");
+  const echt = (
+    await db2.query(
+      "select count(*)::int as n from auth.users where encrypted_password is not null",
+    )
+  ).rows[0].n;
+  beleg(`${echt} Konten behalten ihren Produktions-Hash und sind anmeldefähig`);
+}
 
 // ── 7. 4.9/4.10 Der deklarierte DEV-Bestand ───────────────────────────────────
-schritt("4.9/4.10: den deklarierten DEV-Bestand herstellen");
-const admins = (
-  await db2.query(
-    "select profile_id from public.staff_roles where role='admin' order by profile_id",
-  )
-).rows.map((r) => r.profile_id as string);
-beleg(`${admins.length} Admin-Zeilen aus dem Auszug übernommen`);
+if (!devBestand) {
+  // 5.6: im Sicherungslauf entfällt er ganz. Stufen und die
+  // matching_manager-Zeile sind DEV-Dekoration; im Manifest stehen sie nicht.
+  schritt("4.9/4.10 ausgelassen — SICHERUNGSLAUF, kein DEV-Bestand");
+  beleg("Stufen und matching_manager bleiben, wie der Auszug sie trägt");
+} else {
+  schritt("4.9/4.10: den deklarierten DEV-Bestand herstellen");
+  const admins = (
+    await db2.query(
+      "select profile_id from public.staff_roles where role='admin' order by profile_id",
+    )
+  ).rows.map((r) => r.profile_id as string);
+  beleg(`${admins.length} Admin-Zeilen aus dem Auszug übernommen`);
 
-const frei = (
-  await db2.query(
-    `select id from public.profiles
+  const frei = (
+    await db2.query(
+      `select id from public.profiles
       where id <> all($1::uuid[])
       order by id`,
-    [admins],
-  )
-).rows.map((r) => r.id as string);
-if (frei.length < STUFEN.length + 1)
-  ende(`Nur ${frei.length} freie Konten — zu wenig für Stufen und matching_manager.`);
+      [admins],
+    )
+  ).rows.map((r) => r.id as string);
+  if (frei.length < STUFEN.length + 1)
+    ende(`Nur ${frei.length} freie Konten — zu wenig für Stufen und matching_manager.`);
 
-// Die Zeitstempel des Zuschlags werden auf den Auszug festgenagelt, statt
-// `now()` zu nehmen. Sonst wanderte der Zielzustand von Lauf zu Lauf, und die
-// Idempotenz-Zusage aus 5.4 — zweimal derselbe Auszug, zweimal derselbe
-// Zeilenhash — liesse sich gar nicht mehr prüfen. Der Zuschlag ist eine
-// Vorrichtung, kein Vorgang; er darf kein „wann" tragen.
-const stempel = soll.erzeugt ?? new Date(0).toISOString();
-const managerId = frei[0];
-await db2.query(
-  `insert into public.staff_roles (profile_id, role, created_at) values ($1,'matching_manager',$2)
-     on conflict (profile_id) do update set role=excluded.role, created_at=excluded.created_at`,
-  [managerId, stempel],
-);
-beleg(`matching_manager auf einem dritten Konto (…${managerId.slice(-6)}) — nicht auf einem Admin`);
-
-const fuerStufen = frei.slice(1, 1 + STUFEN.length);
-// `profiles_set_updated_at` würde `updated_at` auf `now()` ziehen. Im
-// replica-Modus schweigt er, und der Wert bleibt der des Auszugs — dieselbe
-// Überlegung wie beim Zeitstempel oben.
-await db2.query("set session_replication_role = replica");
-for (let i = 0; i < STUFEN.length; i += 1) {
-  await db2.query("update public.profiles set tier=$1 where id=$2", [STUFEN[i], fuerStufen[i]]);
-}
-await db2.query("reset session_replication_role");
-if (
-  (await db2.query("select current_setting('session_replication_role') as v")).rows[0].v !==
-  "origin"
-) {
-  ende("session_replication_role blieb nach dem Zuschlag auf replica.");
-}
-beleg(
-  `Stufen besetzt: ${STUFEN.join(", ")} — Admins ausgenommen (has_level kennt keine Admin-Ausnahme)`,
-);
-const jeStufe = (
-  await db2.query("select tier, count(*)::int as n from public.profiles group by 1 order by 1")
-).rows;
-beleg(`Verteilung: ${jeStufe.map((r) => `${r.tier}=${r.n}`).join(", ")}`);
-
-// 4.11 — admin_roles.sql prüft sich nicht selbst; der Rollensatz wird verglichen
-const rollen = (
-  await db2.query("select role, count(*)::int as n from public.staff_roles group by 1 order by 1")
-).rows;
-beleg(`4.11: Rollensatz ist ${rollen.map((r) => `${r.role}=${r.n}`).join(", ")}`);
-const ohneKonto = (
+  // Die Zeitstempel des Zuschlags werden auf den Auszug festgenagelt, statt
+  // `now()` zu nehmen. Sonst wanderte der Zielzustand von Lauf zu Lauf, und die
+  // Idempotenz-Zusage aus 5.4 — zweimal derselbe Auszug, zweimal derselbe
+  // Zeilenhash — liesse sich gar nicht mehr prüfen. Der Zuschlag ist eine
+  // Vorrichtung, kein Vorgang; er darf kein „wann" tragen.
+  const stempel = soll.erzeugt ?? new Date(0).toISOString();
+  const managerId = frei[0];
   await db2.query(
-    "select count(*)::int as n from public.staff_roles s left join auth.users u on u.id=s.profile_id where u.id is null",
-  )
-).rows[0].n;
-if (ohneKonto > 0) ende(`4.12: ${ohneKonto} Rollenzeile(n) zeigen auf kein Konto.`);
-beleg("4.12: jede Rollenzeile zeigt auf ein vorhandenes Konto");
+    `insert into public.staff_roles (profile_id, role, created_at) values ($1,'matching_manager',$2)
+     on conflict (profile_id) do update set role=excluded.role, created_at=excluded.created_at`,
+    [managerId, stempel],
+  );
+  beleg(
+    `matching_manager auf einem dritten Konto (…${managerId.slice(-6)}) — nicht auf einem Admin`,
+  );
+
+  const fuerStufen = frei.slice(1, 1 + STUFEN.length);
+  // `profiles_set_updated_at` würde `updated_at` auf `now()` ziehen. Im
+  // replica-Modus schweigt er, und der Wert bleibt der des Auszugs — dieselbe
+  // Überlegung wie beim Zeitstempel oben.
+  await db2.query("set session_replication_role = replica");
+  for (let i = 0; i < STUFEN.length; i += 1) {
+    await db2.query("update public.profiles set tier=$1 where id=$2", [STUFEN[i], fuerStufen[i]]);
+  }
+  await db2.query("reset session_replication_role");
+  if (
+    (await db2.query("select current_setting('session_replication_role') as v")).rows[0].v !==
+    "origin"
+  ) {
+    ende("session_replication_role blieb nach dem Zuschlag auf replica.");
+  }
+  beleg(
+    `Stufen besetzt: ${STUFEN.join(", ")} — Admins ausgenommen (has_level kennt keine Admin-Ausnahme)`,
+  );
+  const jeStufe = (
+    await db2.query("select tier, count(*)::int as n from public.profiles group by 1 order by 1")
+  ).rows;
+  beleg(`Verteilung: ${jeStufe.map((r) => `${r.tier}=${r.n}`).join(", ")}`);
+
+  // 4.11 — admin_roles.sql prüft sich nicht selbst; der Rollensatz wird verglichen
+  const rollen = (
+    await db2.query("select role, count(*)::int as n from public.staff_roles group by 1 order by 1")
+  ).rows;
+  beleg(`4.11: Rollensatz ist ${rollen.map((r) => `${r.role}=${r.n}`).join(", ")}`);
+  const ohneKonto = (
+    await db2.query(
+      "select count(*)::int as n from public.staff_roles s left join auth.users u on u.id=s.profile_id where u.id is null",
+    )
+  ).rows[0].n;
+  if (ohneKonto > 0) ende(`4.12: ${ohneKonto} Rollenzeile(n) zeigen auf kein Konto.`);
+  beleg("4.12: jede Rollenzeile zeigt auf ein vorhandenes Konto");
+}
 
 // ── 8. Abnahme ────────────────────────────────────────────────────────────────
 schritt("5.3: Abnahme gegen das Manifest des Auszugs");
@@ -469,7 +503,14 @@ for (const voll of Object.keys(soll.tabellen)) {
   ).rows[0];
   ist[voll] = { zeilen: r.zeilen, hash: r.hash };
 }
-const abnahme = vergleicheManifest({ soll, ist, deklaration: DEKLARATION });
+// Im Sicherungslauf ist nichts deklariert, weil nichts abweichen darf: der
+// Bestand des Manifests soll entstehen, nicht ein DEV-Bestand mit echten
+// Hashes. Null Abweichungen ist hier die Zusage, nicht zwei.
+const abnahme = vergleicheManifest({
+  soll,
+  ist,
+  deklaration: devBestand ? DEKLARATION : { zusatzZeilen: {}, hashWeichtAb: [] },
+});
 for (const d of abnahme.deklariert) console.log(`   · gewollt abweichend: ${d.was} (${d.grund})`);
 if (abnahme.unerwartet.length > 0) {
   for (const u of abnahme.unerwartet)

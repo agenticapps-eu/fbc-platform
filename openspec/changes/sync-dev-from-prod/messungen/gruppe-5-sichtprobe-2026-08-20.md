@@ -236,3 +236,72 @@ aber offen (`import-impact-selbstregistrierung-basic`).
 
 **Kein Blocker für diese Änderung, aber ein eigener Posten** — er gehört auf die
 Rücknahmeliste vor Go-Live, nicht in diesen Diff.
+
+---
+
+# Nachtrag 3 — 5.6: der Auszug darf „Sicherung" heissen
+
+**2026-08-20.** Bis hierher war 5.6 halb belegt: der Bestand entstand aus einem
+leeren Schema, die **Anmeldefähigkeit** nicht — 4.13 nimmt sie absichtlich.
+
+## Der Schalter lässt zwei Dinge aus, nicht eines
+
+`--sicherung` überspringt 4.13 **und** den deklarierten DEV-Bestand aus
+4.9/4.10. Das zweite ist beim Bauen aufgefallen, nicht beim Planen: mit nur
+4.13 ausgelassen meldete die Abnahme **zwei** Abweichungen statt null — fünf
+umgeschriebene Stufen und die `matching_manager`-Zeile. Das ist kein
+Manifest-Bestand, sondern ein **DEV-Bestand mit echten Hashes**, also die
+schlechteste der drei möglichen Fassungen.
+
+Im Sicherungslauf ist die Deklaration deshalb leer: es darf nichts abweichen,
+und jede Abweichung wäre ab da ein Abbruch.
+
+## Gegen DEV ist er abgelehnt, nicht abgeraten
+
+```
+$ … --ziel=dev --sicherung <ablage>
+::error::--sicherung ist gegen dev abgelehnt. Der Schalter gehört zur
+Sicherungs-Rolle (PROD-Wiederaufbau); auf DEV nähme er den Ausgleich zurück,
+der die fehlende Anonymisierung trägt.
+```
+
+Der Abbruch kommt **vor jedem Verbindungsaufbau** — keine „Wächter frei"-Zeile
+davor. Ein Warnhinweis hätte hier nicht gereicht: der Schalter kommt aus einer
+Befehlszeile, die man kopiert, und die gefährliche Fassung unterscheidet sich
+von der harmlosen um ein einziges Wort.
+
+## Die drei Messungen
+
+Alle gegen den lokalen Stack, aus demselben gespeicherten Auszug.
+
+**(a) Rot — ohne Schalter.** 72 Hashes durch Zufallswerte ersetzt.
+**0 von 72** stehen byteweise im Auszug. Anmeldung mit dem bekannten
+Kontrollpasswort: **HTTP 400, „Invalid login credentials"**.
+
+**(b) Grün — mit Schalter.** **72 von 72** Hashes stehen byteweise so im
+Auszug. Die Abnahme meldet **0 gewollte Abweichungen** (ohne Schalter: 3).
+36 Tabellen und 125 Objekte stimmen.
+
+**(c) Die Kontrolle, ohne die (b) nichts belegte.** Dass „Hash steht wieder da"
+gleich „Konto ist anmeldefähig" ist, wäre sonst eine Annahme. Also eigens
+gemessen: ein per SQL gesetzter, **bekannter** bcrypt-Hash — auf demselben Weg,
+den 4.13 zum Neutralisieren benutzt — ergibt **HTTP 200 mit Token**. GoTrue
+prüft also gegen genau die Spalte, die der Rücklauf schreibt.
+
+Aus (b) und (c) zusammen folgt die Anmeldefähigkeit. **Ein echtes
+PROD-Passwort ist dabei nicht verwendet worden** und wird auch nicht gebraucht;
+es ist hier niemandem bekannt, und es zu erfahren wäre kein zulässiger Weg zu
+diesem Beleg.
+
+## Hinterher aufgeräumt
+
+Nach (b) trug der lokale Stack echte Produktions-Hashes. Ein Lauf ohne den
+Schalter hat sie wieder neutralisiert — nachgezählt: **0/72** stehen noch im
+Auszug, die Abnahme meldet wieder ihre drei deklarierten Abweichungen.
+
+## Was der Schalter nicht ist
+
+Er ist **kein** PROD-Wiederaufbau. `--ziel` kennt `lokal` und `dev`; ein
+`--ziel=prod` gibt es nicht und ist hier auch nicht gebaut worden — für einen
+Aufrufer, den es nicht gibt, wird nichts vorgehalten. Was 5.6 verlangt, ist der
+Beleg, dass der Auszug diese Rolle **tragen kann**, und der steht.

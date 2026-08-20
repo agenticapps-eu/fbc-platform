@@ -413,10 +413,22 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       Spiegel-Defekt). Belegt wurden sie unter `/profil/bearbeiten`: Strasse,
       PLZ, Ort, Bundesland, Land und fünf Netzwerke kamen vollständig durch.
       Bericht: `messungen/gruppe-5-sichtprobe-2026-08-20.md`
-- [ ] 5.6 **Halb belegt am 2026-08-20.** Der Bestand entsteht aus einem leeren
-      Schema (siehe 5.1) — die **Anmeldefähigkeit** nicht: 4.13 macht die Konten
-      absichtlich *un*anmeldefähig. Für die Sicherungs-Rolle braucht der
-      Rücklauf einen Schalter, der 4.13 auslässt; den gibt es noch nicht.
+- [x] 5.6 **Am 2026-08-20 vollständig belegt.** `--sicherung` lässt 4.13 **und**
+      den DEV-Bestand aus 4.9/4.10 aus. Beides, nicht nur 4.13: ein
+      Sicherungslauf, der fünf Stufen umschreibt und eine
+      `matching_manager`-Zeile dazustellt, ergibt nicht den Bestand des
+      Manifests, sondern einen DEV-Bestand mit echten Hashes.
+      **Gegen `--ziel=dev` ist der Schalter abgelehnt** — gemessen, und der
+      Abbruch kommt vor jedem Verbindungsaufbau.
+      Belege, alle gegen den lokalen Stack:
+      **(a)** ohne Schalter 72 Hashes ersetzt, **0/72** stehen im Auszug,
+      Anmeldung HTTP 400; **(b)** mit Schalter **72/72** Hashes byteweise wie
+      im Auszug und die Abnahme meldet **null** Abweichungen statt zwei;
+      **(c)** dass die Anmeldung überhaupt am Hash hängt, ist eigens
+      kontrolliert — ein per SQL gesetzter bekannter bcrypt-Hash (derselbe Weg,
+      den 4.13 benutzt) ergibt HTTP 200 mit Token. Aus (b) und (c) zusammen
+      folgt die Anmeldefähigkeit; das echte PROD-Passwort ist hier niemandem
+      bekannt und wird auch nicht gebraucht.
       Ursprünglicher Wortlaut: **Rückweg gehen:** den Auszug gegen ein leeres, frisch migriertes
       Schema einspielen und belegen, dass daraus der Bestand des Manifests
       entsteht und die Konten anmeldefähig sind. Ohne diesen Lauf darf der

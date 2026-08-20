@@ -95,6 +95,55 @@ export function pruefeAuszug(input: {
  * weniger, wenn der Schalter einmal nicht greift.
  */
 /**
+ * 5.6 — der Sicherungsschalter, und die einzige Stelle, die über ihn
+ * entscheidet.
+ *
+ * **Warum es ihn gibt.** Ohne ihn darf der Auszug nicht „Sicherung" heissen:
+ * 4.13 ersetzt jeden Passwort-Hash durch einen Zufallswert, und aus einem
+ * Bestand, in den sich niemand anmelden kann, lässt sich PROD nicht wieder
+ * aufbauen. Der Rückweg ist erst dann gegangen, wenn er die Konten auch
+ * **anmeldefähig** herstellt.
+ *
+ * **Warum er zwei Dinge auslässt, nicht eines.** 4.13 ist das offensichtliche;
+ * der deklarierte DEV-Bestand aus 4.9/4.10 ist das leicht übersehene. Ein
+ * Sicherungslauf, der fünf Stufen umschreibt und eine `matching_manager`-Zeile
+ * dazustellt, ergibt nicht den Bestand des Manifests, sondern einen
+ * DEV-Bestand mit echten Hashes — die schlechteste der drei möglichen
+ * Fassungen. Messbar wird der Unterschied an der Abnahme: mit dem Schalter
+ * muss sie **null** Abweichungen melden, nicht zwei.
+ *
+ * **Warum er gegen DEV nicht bloss unerwünscht, sondern abgelehnt ist.** Für
+ * den Spiegel ist entschieden worden, die Daten *nicht* zu anonymisieren; der
+ * Ausgleich dafür sind genau zwei Dinge, und neutralisierte Hashes sind eines
+ * davon. Produktions-Hashes auf DEV nähmen diesen Ausgleich zurück, ohne dass
+ * es jemandem auffiele — DEV sähe hinterher aus wie immer.
+ *
+ * Ein Warnhinweis reicht dafür nicht. Der Schalter kommt aus einer
+ * Befehlszeile, die man kopiert, und die gefährliche Fassung unterscheidet
+ * sich von der harmlosen um ein einziges Wort.
+ *
+ * Der lokale Stack bleibt offen: dort fällt der Beleg für 5.6, und dort ist ein
+ * Fehlgriff folgenlos.
+ */
+export function pruefeSicherungslauf(input: {
+  zielArt: "lokal" | "dev";
+  sicherung: boolean;
+}):
+  | { kind: "frei"; neutralisieren: boolean; devBestand: boolean }
+  | { kind: "abbruch"; grund: string } {
+  if (input.sicherung && input.zielArt === "dev") {
+    return {
+      kind: "abbruch",
+      grund:
+        "--sicherung ist gegen dev abgelehnt. Der Schalter gehört zur " +
+        "Sicherungs-Rolle (PROD-Wiederaufbau); auf DEV nähme er den Ausgleich " +
+        "zurück, der die fehlende Anonymisierung trägt.",
+    };
+  }
+  return { kind: "frei", neutralisieren: !input.sicherung, devBestand: !input.sicherung };
+}
+
+/**
  * Welche `auth`-Tabellen vor dem Rücklauf zu leeren sind — **als Regel, nicht
  * als Liste**.
  *

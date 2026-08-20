@@ -14,6 +14,7 @@ import {
   entferneRestrict,
   authTabellenZumLeeren,
   planeLeeren,
+  pruefeSicherungslauf,
   pruefeAuszug,
   vergleicheManifest,
   type Manifest,
@@ -201,6 +202,53 @@ describe("4.2/4.3 Leeren", () => {
 
   test("RED: ohne auth.users ist die Liste nicht die, die gemeint war", () => {
     expect(() => authTabellenZumLeeren(["sessions"])).toThrow(/auth\.users/);
+  });
+});
+
+describe("5.6 Der Sicherungsschalter", () => {
+  /**
+   * Ohne ihn darf der Auszug nicht „Sicherung" heissen: 4.13 nimmt den Konten
+   * absichtlich die Anmeldefähigkeit, und aus einem Bestand, in den sich
+   * niemand anmelden kann, lässt sich PROD nicht wieder aufbauen.
+   *
+   * Er ist zugleich der gefährlichste Schalter im Skript. Produktions-Hashes
+   * auf DEV wären genau das, was die Entscheidung „keine Anonymisierung" durch
+   * neutralisierte Hashes ausgeglichen hat. Deshalb ist er gegen DEV nicht
+   * bloss unerwünscht, sondern **abgelehnt** — und zwar bevor gelöscht wird.
+   */
+  test("RED: gegen DEV wird der Schalter abgelehnt", () => {
+    const w = pruefeSicherungslauf({ zielArt: "dev", sicherung: true });
+    expect(w.kind).toBe("abbruch");
+    if (w.kind === "abbruch") expect(w.grund).toMatch(/dev/i);
+  });
+
+  test("gegen den lokalen Stack ist er erlaubt — dort fällt der Beleg", () => {
+    expect(pruefeSicherungslauf({ zielArt: "lokal", sicherung: true })).toEqual({
+      kind: "frei",
+      neutralisieren: false,
+      devBestand: false,
+    });
+  });
+
+  test("ohne Schalter wird neutralisiert und der DEV-Bestand hergestellt", () => {
+    for (const zielArt of ["lokal", "dev"] as const) {
+      expect(pruefeSicherungslauf({ zielArt, sicherung: false })).toEqual({
+        kind: "frei",
+        neutralisieren: true,
+        devBestand: true,
+      });
+    }
+  });
+
+  /**
+   * Der Schalter lässt **beides** aus, nicht nur 4.13. Ein Sicherungslauf, der
+   * fünf Stufen umschreibt und eine `matching_manager`-Zeile dazustellt, stellt
+   * nicht den Bestand des Manifests her, sondern einen DEV-Bestand mit echten
+   * Hashes — die schlechteste der drei möglichen Fassungen.
+   */
+  test("RED: im Sicherungslauf entfällt auch der deklarierte DEV-Bestand", () => {
+    const w = pruefeSicherungslauf({ zielArt: "lokal", sicherung: true });
+    expect(w.kind === "frei" && w.devBestand).toBe(false);
   });
 });
 
