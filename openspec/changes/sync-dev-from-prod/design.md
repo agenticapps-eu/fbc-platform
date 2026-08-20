@@ -208,7 +208,7 @@ braucht dafür kein eigenes Testkonto. Zwei Dinge fallen aber weg:
 *Deshalb bleibt der deklarierte DEV-Bestand bestehen — nur klein.* Er besteht
 nicht mehr aus einer Demo-Welt, sondern aus:
 
-- `staff_roles`: die zwei Admin-Zeilen (kommen aus PROD) **plus**
+- `staff_roles`: die Admin-Zeilen (kommen aus PROD — **gemessen drei, nicht zwei**) **plus**
   `matching_manager` auf einem der übernommenen Konten
 - eine Handvoll `tier`-Zuweisungen auf übernommenen Konten, damit die sechs
   Stufen besetzt sind

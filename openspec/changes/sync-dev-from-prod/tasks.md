@@ -220,10 +220,16 @@ echte Läufe gegen PROD (rein lesend). Bericht:
 
 ## 4. Ersetzen
 
+**Gebaut und lokal vollständig geprobt am 2026-08-20** —
+`scripts/sync-dev-ruecklauf.ts`, 22 Zusagen als Test, sieben Läufe gegen den
+lokalen Stack. **DEV ist nicht berührt worden.** Bericht:
+`messungen/gruppe-4-2026-08-20.md`. Was offen bleibt, steht bei 4.7, 4.8a und
+4.10 — und es ist jedes Mal dasselbe: der lokale Stack kann es nicht zeigen.
+
 Reihenfolge nach `design.md` §Decisions 2. **1.4/1.5 tragen sie — aber mit
 einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 
-- [ ] 4.1 `set session_replication_role = replica` für die Sitzung — **nicht**
+- [x] 4.1 `set session_replication_role = replica` für die Sitzung — **nicht**
       13 einzelne `ALTER TABLE … DISABLE TRIGGER`: an `auth.users` und beiden
       `storage`-Tabellen fehlen dafür die Eigentümerrechte (1.5). Test, dass
       der Schalter gesetzt war, solange geschrieben wurde.
@@ -237,14 +243,14 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       damit mit **lebenden Triggern** — über den Pooler lautlos. Deshalb ist
       der Auszug ausführbares SQL, und Gruppe 4 spielt ihn in einer selbst
       gehaltenen Sitzung ein. `pg_restore` kommt nicht mehr vor
-- [ ] 4.1a Test: nach dem Lauf ist `session_replication_role` wieder `origin`
+- [x] 4.1a Test: nach dem Lauf ist `session_replication_role` wieder `origin`
       und alle 18 Trigger tragen weiter `tgenabled='O'`
-- [ ] 4.1b **Fremdschlüssel-Integrität eigens messen.** Im replica-Modus
+- [x] 4.1b **Fremdschlüssel-Integrität eigens messen.** Im replica-Modus
       schweigen auch die internen RI-Trigger, Fremdschlüssel werden während des
       Laufs also nicht geprüft — was sich vorher von selbst ergab, ist jetzt
       eine Zusage, die jemand aussprechen muss
-- [ ] 4.2 `auth`-Bestand in DEV leeren (kaskadiert in `public.profiles`)
-- [ ] 4.3 `public`-Tabellen leeren, Buckets leeren. **Am 2026-08-20 korrigiert,
+- [x] 4.2 `auth`-Bestand in DEV leeren (kaskadiert in `public.profiles`)
+- [x] 4.3 `public`-Tabellen leeren, Buckets leeren. **Am 2026-08-20 korrigiert,
       nachdem der Rumpf der Trigger gelesen wurde:** `protect_objects_delete`
       und `protect_buckets_delete` rufen beide `storage.protect_delete()`, und
       die Funktion trägt eine dokumentierte Hintertür —
@@ -258,24 +264,26 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
         dorthin: die Storage-API hält ihre **eigene** Datenbankverbindung, der
         Schalter unserer Sitzung erreicht sie ohnehin nicht. Symmetrisch zu
         4.8, das ebenfalls über die API schreibt (Decision 5)
-- [ ] 4.4 `auth`-Umfang zurückspielen — Konten **und Identitäten**
-- [ ] 4.5 **Zusage statt Arbeitsschritt.** Der Kunstgriff entfällt: im
+- [x] 4.4 `auth`-Umfang zurückspielen — Konten **und Identitäten**
+- [x] 4.5 **Zusage statt Arbeitsschritt.** Der Kunstgriff entfällt: im
       replica-Modus erzeugt `on_auth_user_created` nichts. Zu belegen ist
       genau das — nach 4.4 trägt `public.profiles` **keine** vom Trigger
       erzeugte Zeile (er setzte `basic`, nicht `discover`; geltende Definition
       `20260715150000`). Wird der Weg doch über `truncate … cascade` gegangen,
       zusätzlich belegen, dass `auth.users` unberührt bleibt (1.8)
-- [ ] 4.6 `public` zurückspielen
+- [x] 4.6 `public` zurückspielen
 - [ ] 4.7 Test: der Restore erzeugt **keine** zusätzlichen Beiträge aus
       `trg_event_feed_post`, keine Benachrichtigungen aus
       `contact_requests_lifecycle` und **keine Post** aus
       `contact_requests_email_webhook` — **die Zusage muss gegen DEV fallen,
       nicht lokal** (siehe 5.1)
-- [ ] 4.8 Objekte in die vier Buckets schreiben, **`upsert: false`**
+- [x] 4.8 Objekte in die vier Buckets schreiben, **`upsert: false`**
 - [ ] 4.8a Test: `notify_contact_request_webhook()` und
-      `contact_requests_email_webhook` stehen nach dem Lauf noch. Sie stehen in
+      `contact_requests_email_webhook` stehen nach dem Lauf noch. **Gebaut und
+      lokal gelaufen — dort aber nur als Warnung**, weil beide auf dem lokalen
+      Stack gar nicht existieren. Ein Beleg wird daraus erst gegen DEV. Sie stehen in
       keiner Migration (1.9) — still verloren sähe aus wie ein sauberer Lauf
-- [ ] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen.
+- [x] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen.
       **Stark verkleinert am 2026-08-20** (design.md §3a): keine Demo-Zugänge,
       keine Demo-Welt, keine Testkonten. Es bleiben zwei Dinge, beide auf
       **übernommenen** Konten:
@@ -315,31 +323,36 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       ist:** keine Jonas/Carla/Eleonora-Welt, keine Demo-Zugänge.
       `docs/demo-zugang.md`, `docs/demo-script.md` und die drei
       Abnahmedokumente sind danach überholt — entweder anpassen oder als
-      historisch kennzeichnen. `pnpm demo:seed`/`demo:reset` gegen DEV zu
+      historisch kennzeichnen. **Stand 2026-08-20: der Bestand wird hergestellt
+      (gemessen: `basic`…`focus` je einmal, `impact` 67, `matching_manager` auf
+      einem dritten Konto), die Dokumente sind noch NICHT nachgezogen.** `pnpm demo:seed`/`demo:reset` gegen DEV zu
       fahren würde den Spiegel zerstören
-- [ ] 4.11 `admin_roles.sql` prüft sich nicht selbst: es braucht externe
+- [x] 4.11 `admin_roles.sql` prüft sich nicht selbst: es braucht externe
       Adressen, kann still no-op laufen und legt `matching_manager` nicht an.
       Der Rollensatz wird deklariert und danach verglichen
-- [ ] 4.12 **Überholt durch §3a und ersetzt.** Es gibt keine Demo-Zugänge mehr,
+- [x] 4.12 **Überholt durch §3a und ersetzt.** Es gibt keine Demo-Zugänge mehr,
       an denen sich Anmeldefähigkeit prüfen liesse — und 4.13 macht die
       übernommenen Konten ausdrücklich *un*anmeldefähig. Was an ihre Stelle
-      tritt: Test, dass die zwei Admin-Konten aus PROD **mit ihrer eigenen
+      tritt: Test, dass die Admin-Konten aus PROD (gemessen: drei) **mit ihrer eigenen
       Kennung** (`auth.users.id`) durchkommen, also die Admin- und
       `matching_manager`-Zeilen aus 4.9 auf vorhandene Konten zeigen und nicht
       ins Leere. Eine Rollenzeile auf einer nicht existierenden Kennung ist die
       Art Fehler, die erst beim Anmelden auffiele — und niemand meldet sich
       hier an
-- [ ] 4.13 **Produktions-Passwort-Hashes neutralisieren** (Decision 6). Test:
+- [x] 4.13 **Produktions-Passwort-Hashes neutralisieren** (Decision 6). Test:
       ein übertragenes Mitgliedskonto lässt sich auf DEV **nicht** mit seinem
       PROD-Passwort anmelden. Die Zusage ist negativ formuliert, weil ein
       positiver Test hier nichts belegen könnte
 
 ## 5. Einmal echt laufen lassen
 
-- [ ] 5.1 Vollständiger Restore-Probelauf gegen den **lokalen** Stack, bevor DEV
+- [x] 5.1 Vollständiger Restore-Probelauf gegen den **lokalen** Stack, bevor DEV
       berührt wird — dort ist ein Fehlschlag folgenlos. Hier fällt auch die
       offene Zusage aus 1.3: ein mit `pg_dump 18.4` erzeugter Auszug muss in
-      einen 17.6-Server zurückgehen. **Entschärft**: seit dem Formatwechsel
+      einen 17.6-Server zurückgehen. **Am 2026-08-20 gelaufen, Exit 0** —
+      36 Tabellen, 857 Zeilen, 125 Objekte aus einem leeren, frisch migrierten
+      Schema. Die Versionsfrage ist damit beantwortet: 18.4-SQL geht in 17.6.
+      **Entschärft**: seit dem Formatwechsel
       ist der Auszug ausführbares SQL, die Archivformat-Hälfte der Zusage
       entfällt; offen bleibt nur, ob 18.4 SQL-Syntax schreibt, die 17.6 nicht
       kennt. **Blinder Fleck:** lokal fehlt genau
@@ -357,14 +370,18 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       `auth.users` und `public.profiles` im Zeilenhash ab, bei unveränderter
       Zeilenzahl — drei Zeilen hatten sich bewegt. Verglichen wird gegen
       `manifest.json` **des Auszugs**, nie gegen „PROD jetzt"
-- [ ] 5.4 Idempotenz **aus demselben gespeicherten Auszug** zweimal einspielen
+- [x] 5.4 Idempotenz **aus demselben gespeicherten Auszug** zweimal einspielen
       und Zeilenhashes plus Objektprüfsummen vergleichen. Zwei Läufe gegen die
       laufende Quelle belegen nichts — sie können verschiedene Stände gelesen
       haben
 - [ ] 5.5 Sichtprobe in der laufenden lokalen Oberfläche: fünf echte Profile mit
       Bild, Anschrift und Netzwerken. Grüne Tests haben hier schon einmal ein
       sichtbar falsches Ergebnis durchgewunken
-- [ ] 5.6 **Rückweg gehen:** den Auszug gegen ein leeres, frisch migriertes
+- [ ] 5.6 **Halb belegt am 2026-08-20.** Der Bestand entsteht aus einem leeren
+      Schema (siehe 5.1) — die **Anmeldefähigkeit** nicht: 4.13 macht die Konten
+      absichtlich *un*anmeldefähig. Für die Sicherungs-Rolle braucht der
+      Rücklauf einen Schalter, der 4.13 auslässt; den gibt es noch nicht.
+      Ursprünglicher Wortlaut: **Rückweg gehen:** den Auszug gegen ein leeres, frisch migriertes
       Schema einspielen und belegen, dass daraus der Bestand des Manifests
       entsteht und die Konten anmeldefähig sind. Ohne diesen Lauf darf der
       Auszug nicht „Sicherung" heißen
