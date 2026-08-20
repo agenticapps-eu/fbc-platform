@@ -8,10 +8,13 @@ vi.mock("../lib/platform-settings", async (importOriginal) => {
   return { ...actual, fetchPlatformSettings: vi.fn(), updateOpenContact: vi.fn() };
 });
 import { fetchPlatformSettings, updateOpenContact } from "../lib/platform-settings";
+vi.mock("../lib/feedback", () => ({ fetchAdminFeedback: vi.fn() }));
+import { fetchAdminFeedback } from "../lib/feedback";
 import AdminSettingsPage from "./AdminSettingsPage";
 
 const mockedFetch = vi.mocked(fetchPlatformSettings);
 const mockedUpdate = vi.mocked(updateOpenContact);
+const mockedAdminFeedback = vi.mocked(fetchAdminFeedback);
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -28,6 +31,8 @@ beforeEach(() => {
   mockedFetch.mockReset();
   mockedUpdate.mockReset();
   mockedUpdate.mockResolvedValue(undefined);
+  mockedAdminFeedback.mockReset();
+  mockedAdminFeedback.mockResolvedValue([]);
 });
 
 describe("AdminSettingsPage (AGE-455)", () => {
@@ -50,5 +55,41 @@ describe("AdminSettingsPage (AGE-455)", () => {
     });
     fireEvent.click(toggle);
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith(false));
+  });
+});
+
+describe("QM-Feedback in der Administration (AGE-578)", () => {
+  it("zeigt die Feedback-Sicht mit Inhalt und Autor", async () => {
+    mockedFetch.mockResolvedValue({ openContact: true });
+    mockedAdminFeedback.mockResolvedValue([
+      {
+        id: "f1",
+        rating: 4,
+        likes: "Der Compass ist klar",
+        misses: null,
+        idea: null,
+        route: "/compass",
+        ref_type: null,
+        created_at: "2026-07-16T10:00:00Z",
+        author_name: "Anna Müller",
+      },
+    ]);
+    renderPage();
+
+    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
+    expect(await screen.findByText("Der Compass ist klar")).toBeInTheDocument();
+    expect(screen.getByText("Anna Müller", { exact: false })).toBeInTheDocument();
+  });
+
+  // Die Seite hängt hinter RequireAdmin (App.tsx), das staffRole !== "admin" auf
+  // "/" umleitet — deshalb fragt die Card hier NICHT mehr selbst nach der Rolle.
+  // Diese Zusage hält fest, dass sie dafür auch wirklich bedingungslos rendert:
+  // ein zurückgebliebenes Gating würde sie beim Admin-Fixture nicht auffallen.
+  it("rendert die Sicht ohne eigene Rollenabfrage", async () => {
+    mockedFetch.mockResolvedValue({ openContact: false });
+    renderPage();
+
+    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
+    expect(mockedAdminFeedback).toHaveBeenCalled();
   });
 });
