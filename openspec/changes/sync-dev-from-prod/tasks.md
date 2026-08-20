@@ -448,8 +448,14 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün
-- [ ] 6.2 `docs/supabase-environments.md` um den Spiegel ergänzen; in
+- [x] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün — **am 2026-08-20
+      am Stück gelaufen, Exit 0**: typecheck sauber, lint 0 Fehler (4
+      Bestandswarnungen `react-refresh/only-export-components`), 1326 Tests in
+      125 Dateien. Prettier ist **kein** Gate: kein Workflow ruft es auf, und
+      `prettier --check .` meldet auf HEAD 139 Bestandsdateien (fast alle
+      `openspec/`-Markdown) — ein `--write` darüber wäre der Fehler, den
+      `pnpm format` schon einmal gemacht hat
+- [x] 6.2 `docs/supabase-environments.md` um den Spiegel ergänzen; in
       `docs/prod-neuaufbau-plan.md` Schritt 1 auf das entstandene Werkzeug
       umstellen **und Schritt 0 schließen** — die Frage „welches Projekt ist
       PROD" ist am 2026-08-20 entschieden, das Dokument führt sie noch offen.
@@ -458,7 +464,21 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       PROD-Projektkennung** (56 bzw. 53 Zeilen, keine einzige relativ). Ein
       Neuaufbau unter neuer Kennung lässt alle 109 Bild-URLs ins Leere zeigen,
       obwohl die Objekte mitgezogen wären. Gehört als eigener Schritt in den
-      Plan, nicht als Fußnote
+      Plan, nicht als Fußnote.
+      **Am 2026-08-20 erledigt.** `supabase-environments.md`: neuer Abschnitt
+      „Der Spiegel DEV ← PROD" (zwei Werkzeuge, keine Anonymisierung samt
+      Ausgleich, die drei deklarierten Abweichungen, `--sicherung`, die zwei
+      Fallen, und was der Spiegel nicht mitbringt); dazu vier Aussagen im
+      Bestand nachgezogen, weil sie durch den Spiegel **falsch** geworden
+      waren — die Inhaltszeile der Projekttabelle, „Demo-Seed erlaubt: ja",
+      „Was DEV nicht fängt" (DEV trägt jetzt echte Daten, der
+      `migrate-dev`-Lauf fängt damit die Klasse Fehler, für die es ihn gibt)
+      und die Nachlaufzeile „DEV regelmäßig aus PROD auffrischen".
+      `prod-neuaufbau-plan.md`: **Schritt 0 geschlossen** (Weg A, mit den vier
+      daran hängenden Festlegungen), Schritt 1 auf den Auszug plus
+      `--sicherung` umgestellt (das Werkzeug musste nicht geschrieben werden),
+      **neuer Schritt 3b** für die 109 Bild-URLs, und der Schlussabsatz „Was
+      dieser Plan nicht entscheidet" aufgelöst
 - [ ] 6.3 Diff-Review durch zwei Prüfer anderer Hersteller
 - [ ] 6.4 `openspec archive` — erst wenn 5.3, 5.4 und 5.6 gemessen sind, nicht
       wenn der Code existiert
