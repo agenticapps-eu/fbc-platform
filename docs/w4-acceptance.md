@@ -1,5 +1,12 @@
 # Week-4 Acceptance — W4 · Community & Demo
 
+> **Nachtrag 2026-08-20 (AGE-576):** Wo dieses Dokument die Demo-Personas
+> (`@fbcdemo.com`, `@demo.fbc.invalid`, Jonas/Carla/Eleonora) als Prüfweg
+> benutzt, ist es **nicht mehr nachvollziehbar**: DEV trägt seit dem Spiegel die
+> echten Mitglieder, und von diesen Konten existiert dort keines mehr
+> (nachgezählt: 0 von 72). Die damals belegten Befunde bleiben gültig — der
+> beschriebene Weg, sie zu wiederholen, nicht. Siehe `docs/demo-script.md`.
+
 > **Issues:** AGE-250 … AGE-255 · **Datum:** 2026-06-16 · **Tester:** Claude Code (automatisiert)
 > **Live-URL (Prüfgegenstand):** <https://fbc-platform.pages.dev> (Default-Domain, `pages.dev`)
 > **Supabase:** Projekt `foelowldexkcqzewvrcf` (EU `eu-central-1` / Frankfurt) ·

@@ -327,7 +327,7 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       **Ohne die Feedback-Zeilen** — entschieden am 2026-08-20, sie werden
       mitersetzt. Das Aktivierungs-Gate braucht nichts: 35 der 72 übernommenen
       Konten sind nicht aktiviert
-- [ ] 4.10 Nachbereitung: den deklarierten Bestand **herstellen** — nach §3a nur
+- [x] 4.10 Nachbereitung: den deklarierten Bestand **herstellen** — nach §3a nur
       noch `matching_manager` und die `tier`-Zuweisungen. **Und ausdrücklich
       festhalten, dass DEV danach nicht mehr im bisherigen Sinn vorführbar
       ist:** keine Jonas/Carla/Eleonora-Welt, keine Demo-Zugänge.
@@ -336,7 +336,17 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       historisch kennzeichnen. **Stand 2026-08-20: der Bestand wird hergestellt
       (gemessen: `basic`…`focus` je einmal, `impact` 67, `matching_manager` auf
       einem dritten Konto), die Dokumente sind noch NICHT nachgezogen.** `pnpm demo:seed`/`demo:reset` gegen DEV zu
-      fahren würde den Spiegel zerstören
+      fahren würde den Spiegel zerstören.
+      **Die Dokumentenhälfte am 2026-08-20 nachgezogen** — als historisch
+      gekennzeichnet, nicht angepasst: eine neue Demo zu erfinden war nicht
+      Aufgabe. `docs/demo-zugang.md` und `docs/demo-script.md` bekommen einen
+      Kopf, der sagt, dass die drei Zugänge nicht mehr existieren (auf DEV
+      nachgezählt: **0** auf `@fbcdemo.com` und **0** auf
+      `@demo.fbc.invalid`, von 72), dass ohnehin alle Hashes neutralisiert sind
+      und dass das Drehbuch noch vom alten Drei-Stufen-Modell spricht.
+      `docs/foundation-acceptance.md` und `docs/w4-acceptance.md` bekommen
+      einen Nachtrag: die Befunde bleiben gültig, der Weg sie zu wiederholen
+      nicht. `w2-` und `w3-acceptance.md` nennen die Personas nicht
 - [x] 4.11 `admin_roles.sql` prüft sich nicht selbst: es braucht externe
       Adressen, kann still no-op laufen und legt `matching_manager` nicht an.
       Der Rollensatz wird deklariert und danach verglichen
@@ -499,6 +509,10 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       `messungen/gruppe-6-review-behebung-2026-08-20.md`.
       **Folge:** der Auszug vom 20.08. ist nicht mehr einspielbar (kein
       `dateien`) — der nächste `sync:dev` braucht einen neuen Auszug
-- [ ] 6.4 `openspec archive` — erst wenn 5.3, 5.4 und 5.6 gemessen sind, nicht
-      wenn der Code existiert
+- [x] 6.4 `openspec archive` — erst wenn 5.3, 5.4 und 5.6 gemessen sind, nicht
+      wenn der Code existiert. **Am 2026-08-20 gelaufen**, nachdem alle drei
+      gemessen waren: 1 Anforderung in `deployment-environments` ersetzt,
+      10 in `environment-sync` neu. Der Lauf meldete 3 offene Aufgaben und lief
+      wegen `--yes` darüber hinweg — 4.10 war eine davon und ist danach
+      geschlossen worden, nicht weggelassen
 - [ ] 6.5 AGE-576 in Linear auf Done — vorher `get_issue` lesen
