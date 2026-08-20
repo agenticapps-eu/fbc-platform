@@ -44,6 +44,11 @@ Das Verzeichnis meldete **36 Mitglieder** — 37 aktivierte Profile minus das
 eigene. Stufenabzeichen standen richtig (`IMPACT`, bei einem Konto `CONNECT`).
 Alle Bilder kamen aus dem lokalen Storage, keins blieb leer.
 
+> **Korrigiert in Nachtrag 4:** die zweite Haelfte stimmt, die erste nicht.
+> Avatare und Titelbilder kamen von **PROD** — `avatar_url`/`cover_url` tragen
+> absolute URLs mit der PROD-Projektkennung. Lokal kamen nur `event-covers`
+> und `post-media`.
+
 **Die Konsole war über alle Seiten hinweg leer** (keine `error`, keine `warn`).
 
 ## Anschrift und Netzwerke — die Zusage trägt, aber nicht dort, wo 5.5 sie sucht
@@ -305,3 +310,122 @@ Er ist **kein** PROD-Wiederaufbau. `--ziel` kennt `lokal` und `dev`; ein
 `--ziel=prod` gibt es nicht und ist hier auch nicht gebaut worden — für einen
 Aufrufer, den es nicht gibt, wird nichts vorgehalten. Was 5.6 verlangt, ist der
 Beleg, dass der Auszug diese Rolle **tragen kann**, und der steht.
+
+---
+
+# Nachtrag 4 — 5.5 auf der ausgelieferten Flaeche
+
+**Datum:** 2026-08-20, abends · **Ziel:** `https://fbc-platform.pages.dev`,
+also DEV. Das ist der einzige Teil des Spiegels, den bis hierher niemand
+angesehen hatte: 5.5 lief gegen den **lokalen** Stack, und ein lokaler Build
+sagt nichts ueber das, was ausgeliefert ist.
+
+## Dass die Flaeche wirklich gegen DEV liest, ist gemessen
+
+Das Bundle wurde mit `Cache-Control: no-cache` geholt (1,3 MB — kein 404, das
+sich als Bundle tarnt) und enthaelt **genau eine** Supabase-Projekt-URL:
+`foelowldexkcqzewvrcf`. Nicht aus der Konfiguration geschlossen, sondern im
+ausgelieferten Bundle gelesen.
+
+## Anmeldung: warum es dafuer einen Eingriff brauchte
+
+Nach 4.13 tragen alle 72 Konten einen zufaelligen Hash — auf DEV kann sich
+niemand anmelden, und ohne Anmeldung ist das Verzeichnis gesperrt. Fuer die
+Probe hat **ein** Konto voruebergehend ein Wegwerf-Passwort bekommen, gesetzt
+per SQL ueber denselben Weg, den 4.13 zum Neutralisieren benutzt
+(`crypt(…, gen_salt('bf'))`).
+
+Gewaehlt wurde `vorschau@fbc.invalid`: die TLD `.invalid` existiert nicht, das
+Konto hat also keinen erreichbaren Posteingang — kein echtes Mitglied wurde
+angefasst. Das Passwort stand nie im Repo und ist zurueckgenommen:
+
+| Schritt | Beleg |
+|---|---|
+| gesetzt | `1/72` Konten tragen es |
+| zurueckgenommen | `0/72` Konten tragen es |
+| Gegenprobe an der Flaeche | Anmeldung antwortet **„Invalid login credentials"** |
+
+Die dritte Zeile ist die eigentliche: die DB-Zaehlung allein wuerde nur
+behaupten, dass aufgeraeumt ist.
+
+## Was gesehen wurde
+
+Ausgeloggt:
+
+| Flaeche | Ergebnis |
+|---|---|
+| Startseite | laedt, 3 echte oeffentliche Beitraege |
+| Events auf der Startseite | „keine Events geplant" — **kein Defekt**, alle 8 Events sind `visibility='members'` |
+| `/mitglieder` | gesperrt („ab Discover verfuegbar"), keine Mitgliedsdaten sichtbar |
+| Beitragsautoren | „Ein Mitglied" — bekannt (AGE-530), `anon` haelt kein Recht auf `profiles_public` |
+
+Eingeloggt:
+
+| Flaeche | Ergebnis |
+|---|---|
+| Verzeichnis | **36 Mitglieder**, echte Namen, Stufenabzeichen, Kopfzeilen, Orte |
+| Profil (Detlev Krause) | Titelbild, Avatar, Ueber mich, Beruf, Hobbys, Ich biete, Ich suche, 3 Aktivitaeten, Eckdaten „Mitglied seit Juli 2018", Erfolgsradar, Video, Kontakt-Gate |
+| Aktivitaet | Beitraege mit **echten Autorennamen** (0 × „Ein Mitglied"), Tags, Zeitangaben |
+| Events | **7 kommende, 1 vergangene** — deckt sich mit der DB; Anmeldezahlen (17/22/9/10/14/8/6) und Kontingente sind mitgekommen |
+| `/admin/mitglieder` | echte Namen und Anmeldeadressen, Zustand, Paging („Mitglieder 1–25") |
+| Konsole | ueber **alle** Seiten leer (keine `error`, keine `warn`) |
+
+**Nicht angefasst:** „Kontaktanfrage senden" und „Zugangslink schicken". DEV
+traegt 72 echte Adressen und einen lebenden E-Mail-Webhook mit
+PROD-identischem Resend-Zugang — beide Knoepfe haetten echte Post ausgeloest.
+
+## Der Befund: `avatar_url` und `cover_url` sind absolute **PROD**-URLs
+
+Im Verzeichnis zeigen die Bild-URLs auf `viwntbodrtqxgmqyxluh` — auf PROD, auf
+einer Flaeche, die ihre Daten aus DEV liest. Das kommt nicht aus dem Bundle
+(dort steht nur die DEV-URL), sondern aus den Daten:
+
+| Spalte | gesetzt | zeigt auf PROD | zeigt auf DEV | relativ |
+|---|---|---|---|---|
+| `profiles.avatar_url` | 56 | **56** | 0 | 0 |
+| `profiles.cover_url` | 53 | **53** | 0 | 0 |
+
+Ein Durchlauf ueber **alle** `text`-Spalten aller `public`-Tabellen findet genau
+diese zwei — sonst keine. `event-covers` und `post-media` laufen ueber Pfade und
+signierte URLs und lesen daher tatsaechlich aus DEV.
+
+Im Browser gemessen, nicht geschlossen: auf der Profilseite sind beide Bilder
+**geladen** (`naturalWidth` 1500×500 und 512×512) — von PROD.
+
+**Der Spiegel selbst ist in Ordnung.** Dasselbe Objekt, beide Seiten:
+
+```
+viwntbodrtqxgmqyxluh   HTTP 200  35364 Bytes
+foelowldexkcqzewvrcf   HTTP 200  35364 Bytes
+```
+
+Byteweise dieselbe Groesse. Die 111 kopierten `avatars`/`covers`-Objekte auf DEV
+sind vollstaendig — sie werden nur **nie gelesen**, weil die gespeicherte URL
+woanders hinzeigt.
+
+### Korrektur an 5.5
+
+Der Satz weiter oben, „Alle Bilder kamen aus dem lokalen Storage", ist fuer
+Avatare und Titelbilder **falsch**. Auch lokal trug die Zeile eine absolute
+PROD-URL; die Bilder kamen ueber das Internet von PROD, nicht aus
+`127.0.0.1:54321`. Nur `event-covers` und `post-media` kamen wirklich lokal.
+Der Sichtbefund „keins blieb leer" stimmt — die Herkunft war falsch zugeordnet.
+
+### Warum das ueber diese Aufgabe hinaus zaehlt
+
+Die URL enthaelt die **Projektkennung**. Ein PROD-Neuaufbau unter einer neuen
+Kennung laesst alle 109 Bild-URLs ins Leere zeigen, obwohl die Objekte
+mitgezogen waeren. Das gehoert in `docs/prod-neuaufbau-plan.md` (6.2) — als
+Schritt, nicht als Fussnote.
+
+Zweitens: solange das so steht, laedt jede DEV-Seite Bilder von PROD. Folgenlos,
+weil beide Buckets oeffentlich sind — aber es heisst, dass DEV nicht fuer sich
+allein steht.
+
+## Sieben „kaputte" Bilder, die keine waren
+
+Die erste Messung auf `/aktivitaet` meldete 7 Bilder mit `naturalWidth = 0`.
+Nach einmal Scrollen blieben 2, beide mit `loading="lazy"` und ausserhalb des
+Sichtfensters; beide antworten einzeln geholt mit HTTP 200. Kein kaputtes Bild —
+`complete && naturalWidth > 0` misst bei Lazy-Loading den Ladezustand, nicht die
+Erreichbarkeit.

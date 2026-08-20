@@ -405,14 +405,26 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [x] 5.5 Sichtprobe in der laufenden lokalen Oberfläche: fünf echte Profile mit
       Bild, Anschrift und Netzwerken. Grüne Tests haben hier schon einmal ein
       sichtbar falsches Ergebnis durchgewunken. **Am 2026-08-20 gelaufen** —
-      fünf Profile einzeln aufgerufen, alle mit Titelbild und Avatar aus dem
-      lokalen Storage, Verzeichnis meldet 36 Mitglieder, Konsole über alle
+      fünf Profile einzeln aufgerufen, alle mit Titelbild und Avatar
+      (Herkunft im Nachtrag korrigiert — sie kamen von PROD, nicht aus dem
+      lokalen Storage), Verzeichnis meldet 36 Mitglieder, Konsole über alle
       Seiten leer. **Anschrift und Netzwerke stehen nicht auf der öffentlichen
       Profilseite** — `profiles_public` führt `socials`/`website` gar nicht, und
       keine Komponente rendert sie öffentlich (Bestandscode, kein
       Spiegel-Defekt). Belegt wurden sie unter `/profil/bearbeiten`: Strasse,
       PLZ, Ort, Bundesland, Land und fünf Netzwerke kamen vollständig durch.
-      Bericht: `messungen/gruppe-5-sichtprobe-2026-08-20.md`
+      Bericht: `messungen/gruppe-5-sichtprobe-2026-08-20.md`.
+      **Nachtrag am selben Abend: auch auf der ausgelieferten Flaeche gelaufen**
+      (`fbc-platform.pages.dev`, liest gegen DEV — im Bundle nachgelesen, nicht
+      aus der Konfiguration geschlossen). Verzeichnis 36 Mitglieder, Profile,
+      Aktivitaet mit echten Autorennamen, 7 kommende Events mit Anmeldezahlen,
+      Admin-Liste mit Paging, Konsole ueber alle Seiten leer. Dafuer trug ein
+      Konto (`vorschau@fbc.invalid`, TLD existiert nicht) voruebergehend ein
+      Wegwerf-Passwort; zurueckgenommen und dreiteilig belegt (1/72 → 0/72 und
+      „Invalid login credentials" an der Flaeche). **Ein Befund:**
+      `avatar_url`/`cover_url` sind absolute **PROD**-URLs (56 bzw. 53, keine
+      einzige auf DEV) — der Spiegel ist vollstaendig, wird fuer Avatare und
+      Titelbilder aber nie gelesen. Gehoert in 6.2
 - [x] 5.6 **Am 2026-08-20 vollständig belegt.** `--sicherung` lässt 4.13 **und**
       den DEV-Bestand aus 4.9/4.10 aus. Beides, nicht nur 4.13: ein
       Sicherungslauf, der fünf Stufen umschreibt und eine
@@ -440,7 +452,13 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 6.2 `docs/supabase-environments.md` um den Spiegel ergänzen; in
       `docs/prod-neuaufbau-plan.md` Schritt 1 auf das entstandene Werkzeug
       umstellen **und Schritt 0 schließen** — die Frage „welches Projekt ist
-      PROD" ist am 2026-08-20 entschieden, das Dokument führt sie noch offen
+      PROD" ist am 2026-08-20 entschieden, das Dokument führt sie noch offen.
+      **Dazugekommen aus 5.5 (ausgelieferte Fläche):** `profiles.avatar_url`
+      und `profiles.cover_url` tragen **absolute URLs mit der
+      PROD-Projektkennung** (56 bzw. 53 Zeilen, keine einzige relativ). Ein
+      Neuaufbau unter neuer Kennung lässt alle 109 Bild-URLs ins Leere zeigen,
+      obwohl die Objekte mitgezogen wären. Gehört als eigener Schritt in den
+      Plan, nicht als Fußnote
 - [ ] 6.3 Diff-Review durch zwei Prüfer anderer Hersteller
 - [ ] 6.4 `openspec archive` — erst wenn 5.3, 5.4 und 5.6 gemessen sind, nicht
       wenn der Code existiert
