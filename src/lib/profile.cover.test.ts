@@ -68,7 +68,7 @@ function werte(over: Partial<ProfileFormValues> = {}): ProfileFormValues {
     competencies: [],
     website: "",
     dev_focus: "",
-    socials: { linkedin: "", instagram: "", xing: "" },
+    socials: { linkedin: "", instagram: "", xing: "", facebook: "", youtube: "", twitter: "" },
     interests: [],
     goals: [],
     videos: [],

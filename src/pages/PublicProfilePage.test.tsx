@@ -137,6 +137,85 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.getByRole("heading", { name: "Erweiterte Profilangaben" })).toBeInTheDocument();
   });
 
+  // AGE-534, Sichtprobe 7.8: die importierten Biografien sind mehrzeilig (35 von
+  // 48, die längste 3877 Zeichen). Ohne `whitespace-pre-line` faltet HTML jeden
+  // Umbruch zu einem Leerzeichen, und aus fünf Absätzen wird eine Textwand.
+  //
+  // jsdom rechnet kein CSS, dieser Test kann den Umbruch also NICHT sehen — er
+  // hält die Klasse fest, die ihn im Browser bewirkt. Den sichtbaren Beleg gibt
+  // nur die Sichtprobe (7.8).
+  it("bewahrt die Absätze der Biografie und der Angebote", async () => {
+    mockedFetch.mockResolvedValue(fullView);
+    renderPage(authAsTier("discover"));
+
+    const bio = await screen.findByText(publicProfile.short_bio);
+    expect(bio.className).toContain("whitespace-pre-line");
+    expect(screen.getByText("DACH-Raum.").className).toContain("whitespace-pre-line");
+  });
+
+  // AGE-534: die importierten Biografien sind bis 3877 Zeichen lang; ausgeklappt
+  // schöben sie alles andere aus dem Bild. Drei Zeilen und ein „Mehr anzeigen".
+  //
+  // jsdom RECHNET KEIN LAYOUT — `scrollHeight` und `clientHeight` sind dort
+  // beide 0, und ohne Nachhilfe fände dieser Test nie einen gekürzten Text.
+  // Gestellt wird deshalb genau das, was jsdom fehlt (die zwei Masse des
+  // Browsers), nicht eigener Code. Dass die Kürzung SICHTBAR eintritt, belegt
+  // allein die Sichtprobe.
+  describe("lange Biografie", () => {
+    function stelleLayout(scrollHeight: number, clientHeight: number) {
+      const alt = {
+        scroll: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight"),
+        client: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight"),
+      };
+      Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+        configurable: true,
+        get: () => scrollHeight,
+      });
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => clientHeight,
+      });
+      return () => {
+        if (alt.scroll) Object.defineProperty(HTMLElement.prototype, "scrollHeight", alt.scroll);
+        if (alt.client) Object.defineProperty(HTMLElement.prototype, "clientHeight", alt.client);
+      };
+    }
+
+    it("kürzt auf drei Zeilen und klappt auf Klick auf", async () => {
+      const zurueck = stelleLayout(600, 60);
+      try {
+        mockedFetch.mockResolvedValue(fullView);
+        renderPage(authAsTier("discover"));
+
+        const bio = await screen.findByText(publicProfile.short_bio);
+        expect(bio.className).toContain("line-clamp-3");
+
+        const mehr = screen.getByRole("button", { name: /mehr anzeigen/i });
+        fireEvent.click(mehr);
+
+        expect(screen.getByText(publicProfile.short_bio).className).not.toContain("line-clamp-3");
+        expect(screen.getByRole("button", { name: /weniger anzeigen/i })).toBeInTheDocument();
+      } finally {
+        zurueck();
+      }
+    });
+
+    it("zeigt bei einer kurzen Biografie keinen Aufklapp-Weg", async () => {
+      // Sonst stünde unter einem Zweizeiler ein „Mehr anzeigen", das nichts
+      // aufklappt — der Grund, warum überhaupt gemessen wird.
+      const zurueck = stelleLayout(60, 60);
+      try {
+        mockedFetch.mockResolvedValue(fullView);
+        renderPage(authAsTier("discover"));
+
+        await screen.findByText(publicProfile.short_bio);
+        expect(screen.queryByRole("button", { name: /mehr anzeigen/i })).not.toBeInTheDocument();
+      } finally {
+        zurueck();
+      }
+    });
+  });
+
   // §2 trennt zwei Schwellen, die bis AGE-311 beide auf Prime lagen: das
   // „vollständige Verzeichnis" (erweiterte Felder, ab `discover`) und das
   // Kontaktrecht (ab `exchange`). Genau diese Lücke ist der verteidigbare Kern —
