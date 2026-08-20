@@ -1,138 +1,115 @@
-# Session Handoff — 2026-08-16 (AGE-534: Gruppe 8 bis auf den PROD-Lauf fertig)
+# Session Handoff — 2026-08-20
 
-Branch `donald/age-534-c10-mitglieder-migration-aus-wordpress`, letzter Commit
-`ab65391`. Arbeitsbaum sauber. **1169 Tests grün** (vorher 1162), `typecheck`,
-`typecheck:seed` und `lint` sauber (4 Altwarnungen, fremde Dateien),
-`openspec validate --all` 29/29.
-
-Quelldatei (70 Datensätze, ausserhalb des Arbeitsbaums):
-`/Users/donald/Documents/Claude/Projects/Fair Business Club/user-export-318-6a7da0ec0d721.csv`
-Daneben `wp-import-bilder/` mit 110 Originalen und 109 WebP-Fassungen.
-
-## Accomplished
-
-**8.1, 8.3 und 8.4 sind fertig.** Offen sind 8.2 (Probelauf gegen PROD), 8.5
-(zweites Deployment) und 8.6 (Admins) — alles Handlungen im Terminal, keine
-Diffs.
-
-- **8.1** — Suiten grün. `format:check` läuft **nicht** ganz: es war schon an der
-  Basis `c648a41` rot. Pro Datei gegen die Basis-Fassung gemessen: von 11
-  Warnungen sind 6 Altlast auf `main`, 5 hat dieser Branch angelegt — die sind
-  formatiert. Nie `pnpm format`.
-- **8.3** — belegt, und nicht nur am Befehl: `--ignored` faltet Verzeichnisse
-  zusammen. Zusätzlich gegen Dateinamen und gegen die Export-Kennung
-  `6a7da0ec0d721` in `dist/`, `.wrangler/`, `supabase/.temp/`, `.env*` und
-  `.claude/` gesucht — null Treffer.
-- **8.4** — codex: 2 HIGH, 4 MEDIUM, 4 LOW. Acht behoben, einer begründet
-  abgelehnt, einer als Nachlauf offen. gemini: vier Befunde, **keiner hält**,
-  alle einzeln mit Fundstelle widerlegt.
-
-## Decisions
-
-**Der Probelauf geht schreibend gegen PROD statt als Trockenlauf gegen DEV**
-(Donald, 16.08.). Ein Trockenlauf prüft die Hälfte nicht, an der es hier bisher
-gescheitert ist: `service_role` ohne Tabellenrechte, ES256 in der
-GoTrue-Admin-Schnittstelle, Storage-Policies auf abweichenden
-Default-Privileges, der Trigger vor dem Import. Und ein schreibender Lauf gegen
-DEV legte 70 Klarnamen in die Datenbank, die das ausgelieferte Frontend liest
-(AGE-536). Billig wird das durch die **Wegwerf-Erlaubnis: PROD darf vor dem
-Go-Live geleert und neu importiert werden.**
-
-**Kein Datenbank-Umschalter in der ausgelieferten App** (Donald, 16.08.). Am
-Aufwand lag es nicht — Singleton, acht Importeure, Storage-Key ohnehin pro Ref.
-Verworfen, weil offene Selbstregistrierung + abgeschaltete E-Mail-Bestätigung +
-der C3-Befund (jedes eingeloggte Konto sieht das ganze Verzeichnis) zusammen
-einen Dreischritt für Fremde ergeben, sobald 70 echte Datensätze in PROD liegen.
-Stattdessen ein **zweites, unverlinktes Pages-Deployment** — das verschwindet,
-indem man es löscht, während temporärer Code hier seine Frist überlebt (der
-Design-Umschalter aus AGE-237 ist sieben Wochen später noch drin).
-
-**HIGH-1 wurde mit einer Nachschau behoben, nicht mit einem Merker in den
-Auth-Metadaten.** codex schlug beides vor. Die Nachschau schliesst das
-30-Sekunden-Fenster, in dem der Fehler entsteht; der Merker deckte zusätzlich
-das Millisekunden-Fenster „Prozess zwischen POST und Nachschau getötet" ab.
-Dieser Rest fällt als blockierender Kollisionsbefund auf, der den Datensatz
-benennt — sichtbar und von Hand behebbar, so wie das Design Kollisionen ohnehin
-behandelt.
-
-**Die Nachschau läuft NUR aus dem `catch`, nicht bei `email_exists`.** Ein
-`email_exists` ist zweideutig: dahinter kann eine Selbstregistrierung stehen,
-die der Bestandsabzug noch nicht kannte. Sie zu übernehmen hiesse, ihr `impact`
-zu geben und fremde Daten darüberzuschreiben — der Fall, den 7.3 ausschliesst.
-
-**`echterPfad` ist Pflichtparameter ohne Vorgabewert.** Ein Identitäts-Default
-liesse jeden Aufrufer, der ihn vergisst, still in die Symlink-Lücke
-zurückfallen. Der Typprüfer hat daraufhin alle drei Aufrufer benannt — einer
-davon war eine Sonde, an die ich nicht gedacht hätte.
-
-## Files modified
-
-- `supabase/seed/wp_schreiben.ts` — `sucheKonto`; `legeKontoAn` sieht aus dem
-  `catch` nach, mit Gleichheitsprüfung der Adresse (GoTrues `filter` ist eine
-  Teilzeichenkette)
-- `supabase/seed/wp_import.ts` — `zeilenZahl`, `echterPfadAufPlatte`,
-  Stufen-UPDATE auf getroffene Zeile geprüft, Berichtsplatz vor dem ersten
-  Schreibvorgang belegt
-- `supabase/seed/wp_import.lib.ts` — `pruefeQuellPfad` kanonisch, beide Seiten
-- `supabase/seed/wp_bilder.ts` — `BILDSPALTEN`, `fehlendeBildspalten`,
-  `schreibeFertig` (Zwischenname + `renameSync`), `istLesbaresBild`
-- `supabase/seed/wp_bilder_holen.ts` — Kopfzeilenprüfung vor dem Abruf
-- `scripts/probe-c10-bestandsabfrage.ts` — `uid` in `ERWARTET` **und** im Wert
-- `scripts/probe-c10-gotrue-trigger.ts` — fährt `stufeFuerNeuesKonto`, Ausgang 1
-- `scripts/probe-c10-parser-paritaet.ts` — `echterPfad`
-- `openspec/changes/add-wordpress-member-import/` — `REVIEWS.md` (Abschnitt
-  „Diff-Review"), `design.md` (zwei Entscheidungen, Non-Goals, Migration Plan),
-  `tasks.md` (8.1/8.3/8.4 abgehakt, 8.2 neu gefasst, 8.5/8.6 neu)
+**Migrations-Hygiene abgeschlossen.** Eine Störzeile in der PROD-Historie hielt
+das Drift-Gate rot — gefunden, belegt, behoben. PR #190 gemergt, beide
+ausgelieferten Flächen sind aktuell.
 
 ## Next session: start here
 
-**8.2, und die erste Handlung ist LESEN, nicht schreiben:** den Migrationsstand
-von PROD prüfen. `migrate-prod` zu dispatchen heisst anwenden — `apply` startet
-direkt hinter `plan` —, also den Dry-Run ausserhalb des Workflows lesen.
-Danach der schreibende Lauf **in Donalds Terminal**, nicht aus Claude Code
-heraus: Infisical braucht ein TTY, und schreibende Prod-Wege blockt der
-Klassifikator hier ohnehin. Der Aufruf ist
-`npx tsx supabase/seed/wp_import.ts <quelle> --ziel=prod --schreiben` unter
-`infisical run --env=prod`; `SUPABASE_DB_URL_PROD` und
-`SUPABASE_SERVICE_ROLE_KEY` kommen von dort, die GoTrue-Basis leitet das Script
-aus der geprüften Kennung ab. Erst den Lauf OHNE `--schreiben` lesen.
+Nichts ist halb fertig, es gibt keinen offenen Zweig und keinen laufenden
+Eingriff. `main` steht auf `31297c6`, Arbeitsbaum sauber, Dateien/DEV/PROD
+deckungsgleich bei **70 Migrationen**.
 
-Danach 8.5 (zweites, unverlinktes Deployment gegen die Infisical-Umgebung
-`prod`; E-Mail-Bestätigung in PROD für die Dauer der Probe an) und 8.6 (Donald
-und Detlev in `staff_roles`, **nach** dem Import und erst nachdem geprüft ist,
-ob einer von beiden in der CSV steht).
+**Erste Aktion ist eine Entscheidung, kein Befehl:** sollen für die Vorführung
+**alle 71 Mitglieder sichtbar sein?** Zurzeit sind **36 aktiviert** — nur die
+mit Beitrag, Kommentar oder Termin, weshalb „Bernard Peranic" im Verzeichnis
+nicht auftaucht. Das ist kein Suchfehler. Wer das ändern will, fasst
+`supabase/seed/import_world_seed.ts` an (die Stufenlogik steht im Memory
+`import-impact-selbstregistrierung-basic`); wer es so lässt, sollte es Detlev
+vorher sagen.
 
-## Was beim Bauen auffiel
+**Vor dem ersten Merge wissen:** `drift-gate` läuft **nur auf `main`** und ist
+auf jedem PR-Branch `skipped`, nicht grün. Vier grüne Pflichtchecks sagen also
+nichts über die PROD-Historie. Die Sonde dauert zwei Minuten und ist rein
+lesend:
 
-- **Gemini versagt still, mit Exit-Code 0** — dreimal: unbekanntes Flag
-  (`--approval-mode plan`), und zweimal gar keine Ausgabe bei Diff auf `stdin`
-  (507 kB und 137 kB). Der einzige produktive Lauf erfand eine Datei. Es liest
-  richtig, gibt aber falsche Zeilennummern (324 statt 374). Beim nächsten Mal
-  von vornherein datei-einzeln mit kurzem Auftrag.
-- **Ein bestehender Test WAR der Befund.** „überspringt ein bereits gewandeltes
-  Bild" legte als Zieldatei die Zeichenkette „SCHON DA" ab — kein Bild. Er
-  sicherte damit genau ab, dass blosse Existenz als Erfolg gilt.
-- **Ein Test-Doppel, das JEDEN Pfad abbildet, trifft auch die Repo-Wurzel** —
-  dann vergleicht die Prüfung den Pfad mit sich selbst und meldet „im
-  Arbeitsbaum". Grün war der Code, rot der Test.
-- **`perl -0pi` mit `[^}]*?` über verschachtelte Klammern zerlegt Dateien.** Es
-  traf zwei `${repoWurzel}`-Template-Literale mitten im Ausdruck. Zurücksetzen
-  ging nicht, weil im selben File ungesicherte neue Tests lagen.
+```
+infisical run --env=prod --silent -- sh -c \
+  'pnpm tsx scripts/migration-drift-gate.ts "$SUPABASE_DB_URL_PROD"'
+```
+
+## Accomplished
+
+**Die Störzeile.** `20260817171033 admin_member_list_fixes` lag auf PROD ohne
+Datei im Repo und machte `drift-gate` rot (`remote-nur`). Ihr Inhalt war ein
+einziges Statement: ein `delete` auf `supabase_migrations.schema_migrations`.
+Eine frühere Sitzung wollte ihre `apply_migration`-Reste aufräumen und ließ den
+Aufräumbefehl **als Migration** laufen — er löschte die alten Phantomzeilen und
+trug sich dabei selbst als neue ein.
+
+**Das Schema war die ganze Zeit korrekt**, was eigens zu belegen war, weil
+`20260817140000` **0 Statements** trägt (nachgetragen per `migration repair`,
+nie ausgeführt). Gegenprobe an PROD: `admin_activate_member` trägt die
+Zeilensperre, `admin_list_members` die Paging-Signatur mit `coalesce`. Zusätzlich
+`db-drift-scan` gegen PROD: 54 Funktionen, 13 Trigger, 34 Tabellen, 54 Policies,
+keine verwaisten Objekte — der doppelt angewendete Lauf hat nichts hinterlassen.
+
+Behoben mit `supabase migration repair --status reverted 20260817171033`.
+Danach beide Gates grün (PROD und DEV), Historie 70/70/70.
+
+**PR #190 gemergt** (`31297c6`, Branch gelöscht) — in dieser Reihenfolge: erst
+reparieren, dann mergen. Auf `main` liefen daraufhin `drift-gate`, `functions`,
+`deploy`, `migrations`, `verify`, `edge-functions`, `migrate-dev` grün.
+
+**Vorführ-Fläche von Hand deployt** (CI liefert sie nie aus). Beide Flächen
+geprüft, am Bündelinhalt statt an der Größe:
+
+| Fläche | Bündel | Datenbank | Pluralfix |
+|---|---|---|---|
+| `fbc-probe-a4664fb5.pages.dev` | `index-Brvg9eUV.js` | `viwntbodrtqxgmqyxluh` ✓, Demo-DB nicht enthalten ✓ | drin |
+| `fbc-platform.pages.dev` | `index-DqM2dMDQ.js` | `foelowldexkcqzewvrcf` ✓ | drin |
+
+**Zwei Korrekturen am vorigen Handoff.** Es sind **zwei Datenbanken, nicht
+drei** — die „Import-DB" *ist* PROD (`SUPABASE_DB_URL_PROD` löst auf
+`postgres.viwntbodrtqxgmqyxluh` auf). Und verdächtigt war die falsche Migration:
+die Präfixsuche `20260817180000` liegt regulär auf beiden.
+
+## Decisions
+
+- **Historienzeile entfernen statt Leerdatei nachlegen.** Eine Datei
+  `20260817171033_*.sql`, die nichts tut, hätte einen Unfall dauerhaft ins Repo
+  geschrieben und müsste für immer erklären, warum sie leer ist.
+- **`migration repair --status reverted`, nicht `delete`.** Genau der Fehler,
+  der die Zeile erzeugt hat: Historie aufräumen darf nie als Migration laufen.
+- **Erst reparieren, dann mergen.** Umgekehrt hätte der Merge einen
+  übersprungenen Deploy für zwei Fixes produziert, die ausgeliefert werden
+  sollten.
+- **Am Bündelinhalt prüfen, nicht an der Größe** — und ein altes Bündel heißt
+  nicht „Deploy gescheitert" (siehe unten).
+
+## Files modified
+
+Im Repo nur über PR #190 (`31297c6`), die Änderungen selbst stammen aus der
+Vorsitzung:
+
+- `src/components/events/EventCard.tsx` — Pluralfix „1 Platz frei"
+- `src/components/events/EventCard.test.tsx` — Assertion dazu
+- `supabase/tests/rls_test.sql` — `feedback`-Assertions zählen nur eigene Fixtures
+- `session-handoff.md` — vorige Fassung
+
+**Außerhalb des Repos:**
+
+- **PROD-DB `viwntbodrtqxgmqyxluh`** — eine Historienzeile entfernt. Kein Schema.
+- **Cloudflare Pages `fbc-probe-a4664fb5`** — neues Produktions-Deploy `e9a1beac`
+- Memory: `dev-equals-prod-supabase`, `drift-gate-blockt-frontend-deploy`,
+  `live-deploy-check-fallen`, `MEMORY.md` — je um die neuen Fallen ergänzt
 
 ## Open questions
 
-- **Das Admin-Werkzeug als Löschweg** (`admin-profile.ts:170-171`). Die
-  Entscheidung vom 15.08. („ein späterer Lauf holt das Importbild zurück, wenn
-  die Spalte `null` ist") wurde getroffen, als nur das Mitglied die Spalte
-  leeren konnte. codex nennt den Admin-Weg. Nicht angefasst — eigener Nachlauf.
-- **LOW aus dem Diff-Review, bewusst offen:** `PublicProfilePage.tsx:347-358`,
-  Überlaufmessung nur bei Textwechsel, kein `ResizeObserver`, offener Zustand
-  überlebt den Profilwechsel.
-- **Header-Grössen nach der ersten Migration prüfen** (Donald, 15.08.).
-- **`paid_until` (3.5)** — hängt weiter an Detlevs Zahlungsständen.
-- **Was sollte in „Mitgliedschaft" (`infos_16`) stehen?** Bestätigen lassen.
-- **`demo_seed.lib.ts` trägt die überholte Annahme** „dev and prod are the SAME
-  Supabase project" — eigener Nachlauf.
-- Unverändert: AGE-497 · AGE-541 · AGE-258 · AGE-522 · AGE-512 · AGE-561 ·
-  `finish-ui-polish` trägt AGE-291 und AGE-258 · `add-academy-content`
-  unarchivierbar.
+- **Alle 71 sichtbar für die Vorführung?** Siehe oben — die einzige echte
+  Entscheidung.
+- **GitHub-Störung lief am 17.08. noch** (503): der automatische Pages-Job
+  (`dynamic/pages/pages-build-deployment`, liefert `docs/` aus) fiel darüber und
+  ließ sich nicht neu starten. **Beim nächsten Push auf `main` prüfen, ob er von
+  selbst grün wurde.** Er kommt nicht vom Code — und `docs/secrets.md` enthält
+  entgegen erster Vermutung keine echten Werte, nur Präfix-Beispiele.
+- **Dritte ausgelieferte Fläche**, die im Handoff bisher fehlte:
+  `https://agenticapps-eu.github.io/fbc-platform/` ist aktiv und öffentlich
+  (Quelle `main//docs`). Nur Dokumentation, aber sie gehört auf die
+  Rücknahmeliste, falls sie zum Go-Live nicht bleiben soll.
+- **Rücknahmeliste vor Go-Live:** Pages-Projekt `fbc-probe-a4664fb5` löschen ·
+  Probe-Adresse aus `uri_allow_list` · `APP_URL` · `mailer_autoconfirm` ·
+  `IMPORT_SEED_MODE=reset` · ggf. GitHub Pages.
+- Unverändert: Bericht an Detlev · Secrets vom 16.08. rotieren · AGE-497 ·
+  AGE-541 · AGE-258 · AGE-522 · AGE-512 · AGE-561 · eigenes Issue für
+  `send-activation` (2xx trotz Resend-401).

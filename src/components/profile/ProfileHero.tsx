@@ -67,8 +67,20 @@ export function ProfileHero({
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
       {/* Hintergrundbild — ohne Bild ein heller Akzent-Verlauf aus Tokens, der
-          dem Theme folgt. Das Profilbild ragt hinein (siehe unten). */}
-      <div className="relative h-28 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-40">
+          dem Theme folgt. Das Profilbild ragt hinein (siehe unten).
+
+          DIE HÖHE WÄCHST MIT DER BREITE (AGE-566). Vorher stand sie fest auf
+          h-28/sm:h-40 — auf einem 1150 px breiten Schirm ergab das ein
+          Seitenverhältnis von rund 7:1, und `object-cover` schnitt aus jedem
+          normalen Foto einen waagerechten Splitter heraus. Gemeldet als „zu
+          klein, skaliert nicht gut".
+
+          Feste Stufen statt `aspect-[…]`: die Bahn soll auf grossen Schirmen
+          NICHT unbegrenzt mitwachsen, sonst schiebt sie den Namen unter die
+          Falz. 256 px bei 1150 px Breite sind rund 4,5:1 — genug, dass ein
+          Motiv erkennbar bleibt, ohne den Kopfbereich zu einer Bildseite zu
+          machen. */}
+      <div className="relative h-32 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-44 lg:h-56 xl:h-64">
         {banner && (
           <img
             src={banner}

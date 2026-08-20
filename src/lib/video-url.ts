@@ -153,3 +153,55 @@ export function extractFirstVideo(
   }
   return null;
 }
+
+/**
+ * Die Segmente ohne den ABSCHLIESSENDEN Hashtag-Block.
+ *
+ * Ein Beitrag endet in aller Regel so: „…die ehrlichste halbe Stunde zum Thema.
+ * #Persönlichkeitsentwicklung". Dieser Teil ist Verschlagwortung, kein Satz —
+ * und da die Chip-Reihe unter dem Beitrag aus genau denselben Segmenten
+ * entsteht, stand das Wort zweimal auf dem Bildschirm. Die Anforderung
+ * „ein Tag pro Beitrag an genau einer Stelle" (community-feed) war damit nur
+ * dem Titel nach erfüllt.
+ *
+ * NUR AM ENDE, und das ist der ganze Witz der Funktion: mitten im Satz trägt
+ * ein Hashtag Grammatik. Aus „Wir waren beim #Sommerfest und…" würde sonst
+ * „Wir waren beim und…". Solche bleiben deshalb stehen — sichtbar als Text,
+ * anklickbar ist weiterhin nur der Chip.
+ *
+ * Reiner Leerraum zwischen den Hashtags zählt zum Block; alles andere beendet
+ * ihn. Besteht der Beitrag AUSSCHLIESSLICH aus Hashtags, bleibt er unverändert:
+ * ein leerer Beitragstext wäre schlechter als eine Dopplung.
+ */
+export function ohneSchlussHashtags(segments: PostSegment[]): PostSegment[] {
+  let ende = segments.length;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    if (seg.type === "hashtag") {
+      ende = i;
+      continue;
+    }
+    if (seg.type === "text" && seg.value.trim() === "") continue;
+    break;
+  }
+  if (ende === segments.length) return segments;
+  const rest = segments.slice(0, ende);
+  // Nur Hashtags im ganzen Beitrag: dann lieber doppelt als leer.
+  if (rest.every((s) => s.type === "text" && s.value.trim() === "")) return segments;
+  // Der Leerraum, der zum entfernten Block gehörte, geht mit — und zwar auch
+  // dann, wenn er am ENDE eines sonst gefüllten Textsegments klebt („… zum
+  // Thema. " vor dem Hashtag). Nur ganze Leerraum-Segmente zu entfernen liess
+  // ein nachlaufendes Leerzeichen stehen.
+  while (rest.length > 0) {
+    const letzte = rest[rest.length - 1];
+    if (letzte.type !== "text") break;
+    const gekuerzt = letzte.value.replace(/\s+$/, "");
+    if (gekuerzt === "") {
+      rest.pop();
+      continue;
+    }
+    rest[rest.length - 1] = { type: "text", value: gekuerzt, raw: gekuerzt };
+    break;
+  }
+  return rest;
+}

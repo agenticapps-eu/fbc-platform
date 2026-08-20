@@ -74,4 +74,9 @@ describe("EventCard", () => {
     zeige(evt({ registeredCount: 1 }));
     expect(screen.getByText("1 nimmt teil")).toBeInTheDocument();
   });
+
+  it("nennt auch den letzten freien Platz in der Einzahl", () => {
+    zeige(evt({ capacity: 25, registeredCount: 24 }));
+    expect(screen.getByText("1 Platz frei")).toBeInTheDocument();
+  });
 });

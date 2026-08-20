@@ -1,7 +1,7 @@
 import { captureException } from "@sentry/react";
 
 import { type Json } from "./database.types";
-import { type PostMediaEingabe } from "./post-media";
+import { POST_MEDIA_BUCKET, uploadPostMedia, type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
 import { tokenizePostBody } from "./video-url";
 
@@ -124,6 +124,7 @@ export interface FeedComment {
  */
 export {
   extractFirstVideo,
+  ohneSchlussHashtags,
   parseVideoUrl,
   tokenizePostBody,
   type PostSegment,
@@ -533,5 +534,124 @@ export async function addComment(input: {
   const { error } = await supabase
     .from("comments")
     .insert({ post_id: input.postId, author_id: input.authorId, body: input.body });
+  if (error) throw error;
+}
+
+// ── Bearbeiten und Löschen (AGE-566) ────────────────────────────────────────
+
+/**
+ * Die Schlagworte nach einer Textänderung.
+ *
+ * `posts.hashtags` trägt ZWEI Quellen, die dort nicht mehr unterscheidbar sind:
+ * die aus dem Text geparsten und die im Composer angeklickten kuratierten
+ * (`create_post_with_media` vereinigt `p_hashtags` und `p_tags`). Ein blosses
+ * `parseHashtags(neuerText)` würde die angeklickten also stillschweigend
+ * wegräumen — der Beitrag verlöre beim Korrigieren eines Tippfehlers seine
+ * Einordnung.
+ *
+ * Rekonstruiert wird deshalb über die Differenz: was im ALTEN Bestand steht,
+ * aber nicht aus dem ALTEN Text kam, war angeklickt und bleibt.
+ */
+export function hashtagsNachBearbeitung(
+  alterText: string,
+  alteHashtags: string[],
+  neuerText: string,
+): string[] {
+  const ausAltemText = new Set(parseHashtags(alterText));
+  const kuratiert = alteHashtags.filter((t) => !ausAltemText.has(t));
+  const ausNeuemText = parseHashtags(neuerText);
+  const zusammen = [...ausNeuemText];
+  for (const t of kuratiert) if (!zusammen.includes(t)) zusammen.push(t);
+  return zusammen;
+}
+
+/**
+ * Text und Sichtbarkeit eines eigenen Beitrags ändern.
+ *
+ * Direkt auf die Tabelle, nicht über eine RPC: `posts_write_own` gilt `for all`
+ * und trägt die Regel bereits (eigener Beitrag, `kind = 'member'`). Eine eigene
+ * Funktion hätte dieselbe Bedingung ein zweites Mal formuliert — und zwei
+ * Formulierungen derselben Regel laufen auseinander.
+ */
+export async function updatePost(input: {
+  postId: string;
+  alterText: string;
+  alteHashtags: string[];
+  body: string;
+  visibility: PostVisibility;
+}): Promise<void> {
+  const { error } = await supabase
+    .from("posts")
+    .update({
+      body: input.body,
+      hashtags: hashtagsNachBearbeitung(input.alterText, input.alteHashtags, input.body),
+      visibility: input.visibility,
+    })
+    .eq("id", input.postId);
+  if (error) throw error;
+}
+
+/**
+ * Einen eigenen Beitrag löschen. `post_media`, Kommentare und Likes hängen mit
+ * `on delete cascade` daran.
+ *
+ * Die OBJEKTE im Bucket hängen an keiner Fremdschlüsselbeziehung und müssen
+ * getrennt weg — sonst bleibt bezahlter Speicher liegen, auf den nichts mehr
+ * zeigt. Deshalb erst die Pfade lesen, dann die Zeile, dann der Bucket.
+ */
+export async function deletePost(postId: string): Promise<void> {
+  const { data: medien } = await supabase
+    .from("post_media")
+    .select("storage_path")
+    .eq("post_id", postId);
+  const { error } = await supabase.from("posts").delete().eq("id", postId);
+  if (error) throw error;
+  const pfade = (medien ?? []).map((m) => m.storage_path);
+  if (pfade.length > 0) await supabase.storage.from(POST_MEDIA_BUCKET).remove(pfade);
+}
+
+/**
+ * Ein einzelnes Bild aus einem Beitrag nehmen — Zeile UND Objekt.
+ *
+ * Reihenfolge mit Absicht: erst die Zeile, dann das Objekt. Andersherum bliebe
+ * bei einem Abbruch dazwischen eine Zeile stehen, die auf ein Bild zeigt, das
+ * es nicht mehr gibt — und die Kachel bliebe für immer leer. So herum ist der
+ * schlimmste Ausgang ein verwaistes Objekt, das niemand sieht.
+ */
+export async function removePostMedia(storagePath: string): Promise<void> {
+  // Über den PFAD, nicht über eine Zeilen-Kennung: `post_media` trägt
+  // `unique (storage_path)`, und die Feed-Antwort führt keine `id` mit. Ein
+  // Feld weniger, das mitgeschleppt und falsch werden kann.
+  const { error } = await supabase.from("post_media").delete().eq("storage_path", storagePath);
+  if (error) throw error;
+  await supabase.storage.from(POST_MEDIA_BUCKET).remove([storagePath]);
+}
+
+/**
+ * Bilder zu einem bestehenden Beitrag hinzufügen.
+ *
+ * `sort` läuft hinter dem höchsten bestehenden Wert weiter: die Spalte trägt
+ * `unique (post_id, sort)`, und bei 0 beginnend kollidierte jedes Nachtragen.
+ */
+export async function addPostMedia(input: {
+  uid: string;
+  postId: string;
+  abSort: number;
+  bilder: { blob: Blob; width: number; height: number }[];
+}): Promise<void> {
+  const zeilen = await uploadPostMedia({
+    uid: input.uid,
+    postId: input.postId,
+    bilder: input.bilder,
+  });
+  const { error } = await supabase.from("post_media").insert(
+    zeilen.map((z, i) => ({
+      post_id: input.postId,
+      storage_path: z.storage_path,
+      sort: input.abSort + i,
+      width: z.width,
+      height: z.height,
+    })),
+  );
   if (error) throw error;
 }

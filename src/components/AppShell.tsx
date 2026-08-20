@@ -240,7 +240,13 @@ function SidebarContent({
   if (staffRole === "admin") {
     sections.push({
       title: "Administration",
-      items: [{ path: "/admin", label: "Administration" }],
+      items: [
+        { path: "/admin", label: "Administration" },
+        // AGE-566: Die Mitgliederliste braucht einen Eintrag, weil sie sonst nur
+        // per URL erreichbar wäre — und sie ist der EINZIGE Ort, an dem die
+        // importierten, noch unbestätigten Mitglieder überhaupt vorkommen.
+        { path: "/admin/mitglieder", label: "Mitglieder" },
+      ],
     });
   }
   return (
@@ -350,6 +356,13 @@ export default function AppShell() {
 
         <div className={cn("min-h-0 flex-1 overflow-y-auto py-6", collapsed ? "px-2" : "px-4")}>
           <SidebarContent collapsed={collapsed} />
+        </div>
+
+        {/* Feedback direkt über dem Einklapp-Schalter (AGE-566). Vorher schwebte
+            der Knopf über dem Inhalt und deckte auf der Startseite den Aufruf
+            „Mitglieder entdecken" halb zu. */}
+        <div className="shrink-0 border-t border-chrome-border p-2">
+          <FeedbackButton collapsed={collapsed} />
         </div>
 
         {/* Einklappen — unten, damit der Schalter nicht mit der Navigation
@@ -491,14 +504,14 @@ export default function AppShell() {
             )}
           >
             <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+            {/* Auch in der Schublade: die Leiste ist auf dem Telefon der einzige
+                Ort, an dem der Zugang jetzt noch steht. */}
+            <div className="mt-6 border-t border-chrome-border pt-2">
+              <FeedbackButton />
+            </div>
           </div>
         </div>
       )}
-
-      {/* QM-Feedback (AGE-300, Spec §3.5) — bewusst außerhalb von <main>, damit der
-          Button beim Seitenwechsel stehen bleibt und die Route mitwandert. Rendert
-          sich selbst weg, wenn niemand eingeloggt ist. */}
-      <FeedbackButton />
     </div>
   );
 }

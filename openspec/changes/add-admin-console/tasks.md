@@ -1,11 +1,13 @@
 # Tasks
 
-## 1. Admin member list
-
-- [ ] 1.1 `SECURITY DEFINER` RPC returning filterable non-contact fields, gated on
-      `is_admin()` (fixed `search_path`, `auth.uid()` identity, `EXECUTE` to API roles);
-      excludes email/phone
-- [ ] 1.2 Build the admin member-list UI with filters under `/admin`
+> **Archive this change *after* `add-admin-member-list` (AGE-566).** That change
+> reshapes "Admin member management is not implemented" with `MODIFIED`; this one
+> then `REMOVED`s it. In the other order the delta operations collide — `MODIFIED`
+> would target a requirement that no longer exists.
+>
+> The **admin member list is no longer part of this change.** AGE-566 builds it
+> (`admin_list_members`, `/admin/mitglieder`), and it carries `login_email`, which
+> the member-list requirement removed from here explicitly forbade.
 
 ## 2. Bulk / mass email
 
@@ -35,8 +37,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Test: a non-admin cannot read the member list, CRM, or mutate CRM rows
-- [ ] 5.2 Test: the member-list RPC never returns email/phone
+- [ ] 5.1 Test: a non-admin cannot read the CRM or mutate CRM rows
 - [ ] 5.3 Test: a bulk send resolves recipients server-side, excludes suppressed
       members, and is idempotent per campaign key
 - [ ] 5.4 Test: a member opted out of a topic (or with no record) is excluded from

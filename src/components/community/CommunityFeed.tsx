@@ -35,15 +35,20 @@ import { formatEventDate } from "../../lib/events";
 import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
 import {
   addComment,
+  addPostMedia,
   buildMentionResolver,
   commentsQueryKey,
   createPostWithMedia,
   feedListKey,
   feedSeitenKey,
+  deletePost,
   fetchComments,
   fetchFeed,
   parseVideoUrl,
+  removePostMedia,
   toggleLike,
+  updatePost,
+  ohneSchlussHashtags,
   tokenizePostBody,
   VISIBILITY_OPTIONS,
   type FeedCursor,
@@ -501,7 +506,7 @@ function PostComposer({ authorId }: { authorId: string }) {
             <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               multiple
               aria-label="Bilder auswählen"
               className="sr-only"
@@ -639,13 +644,24 @@ function PostCard({
   onBildFehler: (pfad: string) => void;
   kuratierteTags: Tag[];
 }) {
-  const segments = useMemo(() => tokenizePostBody(post.body), [post.body]);
+  // Ohne den abschliessenden Hashtag-Block: der steht als Chip unter dem
+  // Beitrag, und beides zusammen zeigte dasselbe Wort zweimal (AGE-566).
+  // Hashtags im Satzinneren bleiben — siehe `ohneSchlussHashtags`.
+  const segments = useMemo(() => ohneSchlussHashtags(tokenizePostBody(post.body)), [post.body]);
   // Seit AGE-533 aus der Spalte, nicht aus einem erneuten Parsen des Bodys:
   // die Academy filtert über `posts.video_url`, und zwei Quellen fürs Rendern
   // könnten auseinanderlaufen. Die Spalte trägt denselben rohen Token, den der
   // Body enthält — `skipRaw` unterdrückt ihn deshalb weiterhin im Fließtext.
   const video = post.videoUrl;
   const author = displayAuthor(post.author, currentUserId !== null);
+
+  // Bearbeiten darf nur der Verfasser, und nur an einem MITGLIEDSBEITRAG:
+  // Event-Beiträge sind systemverwaltet, `posts_write_own` verlangt
+  // `kind = 'member'`, und ein Knopf, dessen einziger Ausgang eine
+  // RLS-Ablehnung ist, wäre eine Einladung zum Fehlklick (AGE-566).
+  const eigener = currentUserId !== null && currentUserId === post.author.id;
+  const bearbeitbar = eigener && post.kind === "member";
+  const [bearbeiten, setBearbeiten] = useState(false);
 
   return (
     <Card className="space-y-4">
@@ -690,11 +706,40 @@ function PostCard({
             {post.visibility === "members" ? "Nur für Mitglieder" : "Öffentlich"}
           </p>
         </div>
+        {bearbeitbar && !bearbeiten && (
+          <button
+            type="button"
+            onClick={() => setBearbeiten(true)}
+            className="shrink-0 rounded-md px-2 py-1 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Bearbeiten
+          </button>
+        )}
       </header>
 
-      <PostBody segments={segments} skipRaw={video ?? undefined} mentionResolver={mentionResolver} />
+      {bearbeiten ? (
+        <PostEditor
+          post={post}
+          uid={currentUserId as string}
+          urls={bildUrls}
+          onFertig={() => setBearbeiten(false)}
+        />
+      ) : (
+        <>
+          <PostBody
+            segments={segments}
+            skipRaw={video ?? undefined}
+            mentionResolver={mentionResolver}
+          />
 
-      <PostMedien media={post.media} urls={bildUrls} onFehler={onBildFehler} autor={author.name} />
+          <PostMedien
+            media={post.media}
+            urls={bildUrls}
+            onFehler={onBildFehler}
+            autor={author.name}
+          />
+        </>
+      )}
 
       {video && <VideoEmbed url={video} title={`Video von ${author.name}`} />}
 
@@ -779,11 +824,7 @@ function EventCard({
            Bild mit leerem `alt`, und ein Screenreader läse sonst die rohe URL
            vor. Der sichtbare Titel darunter hilft ihm nicht — das ist ein
            zweiter Link (Befund opencode im Diff-Review, LOW). */
-        <Link
-          to={`/events/${event.id}`}
-          className="block"
-          aria-label={`Titelbild: ${event.title}`}
-        >
+        <Link to={`/events/${event.id}`} className="block" aria-label={`Titelbild: ${event.title}`}>
           <img
             src={coverUrl}
             alt=""
@@ -880,7 +921,17 @@ function InteraktionsLeiste({
         </button>
       </footer>
 
-      {showComments && <CommentThread postId={post.id} currentUserId={currentUserId} />}
+      {/* Die letzten Kommentare stehen OFFEN unter dem Beitrag, statt hinter
+          einem Klick (AGE-566). Ein Feed, in dem jede Antwort erst
+          aufgeklappt werden muss, sieht aus wie ein Feed ohne Antworten —
+          und das Gespräch ist hier das Produkt.
+
+          Geladen wird nur, wo es etwas zu laden GIBT: ohne die Bedingung auf
+          `commentCount` stellte jede Karte eine eigene Abfrage, auch die
+          zwanzig ohne einen einzigen Kommentar. */}
+      {(showComments || post.commentCount > 0) && (
+        <CommentThread postId={post.id} currentUserId={currentUserId} ausgeklappt={showComments} />
+      )}
     </>
   );
 }
@@ -1016,8 +1067,7 @@ function Lightbox({
   // ERSTEN Fokus setzt weiterhin der Effekt unten, aus dem Grund, der dort steht.
   const overlay = useOverlay(true);
 
-  const weiter = (schritt: number) =>
-    onIndex((index + schritt + media.length) % media.length);
+  const weiter = (schritt: number) => onIndex((index + schritt + media.length) % media.length);
 
   // Ohne Abhängigkeitsliste, weil `weiter` den aktuellen `index` schließt — der
   // Zuhörer wird je Render neu gesetzt und wieder abgeräumt.
@@ -1168,16 +1218,24 @@ function PostBody({
 
 // ── Kommentare ────────────────────────────────────────────────────────────────
 
+/** Wie viele Kommentare ohne Zutun sichtbar sind. */
+const KOMMENTAR_VORSCHAU = 2;
+
 function CommentThread({
   postId,
   currentUserId,
+  ausgeklappt = false,
 }: {
   postId: string;
   currentUserId: string | null;
+  /** Über den Kommentar-Knopf der Leiste geöffnet: alles zeigen, samt Eingabe. */
+  ausgeklappt?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [body, setBody] = useState("");
+  /** „mehr" innerhalb der Vorschau — unabhängig vom Knopf in der Leiste. */
+  const [alleZeigen, setAlleZeigen] = useState(false);
 
   const comments = useQuery({
     queryKey: commentsQueryKey(currentUserId, postId),
@@ -1200,13 +1258,33 @@ function CommentThread({
     },
   });
 
+  const alle = comments.data ?? [];
+  const zeigeAlle = ausgeklappt || alleZeigen;
+  // Die LETZTEN zwei, nicht die ersten: `fetchComments` liefert aufsteigend,
+  // und der jüngste Beitrag zum Gespräch ist der, der den Feed lebendig macht.
+  const sichtbar = zeigeAlle ? alle : alle.slice(-KOMMENTAR_VORSCHAU);
+  const verborgen = alle.length - sichtbar.length;
+
   return (
     <div className="space-y-3 border-t border-line pt-4">
       {comments.isLoading && <p className="text-sm text-muted">Kommentare werden geladen…</p>}
       {comments.isError && (
         <p className="text-sm text-danger">Kommentare konnten nicht geladen werden.</p>
       )}
-      {comments.data?.map((c) => {
+
+      {verborgen > 0 && (
+        <button
+          type="button"
+          onClick={() => setAlleZeigen(true)}
+          className="rounded-md text-sm font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          {verborgen === 1
+            ? "1 weiteren Kommentar anzeigen"
+            : `${verborgen} weitere Kommentare anzeigen`}
+        </button>
+      )}
+
+      {sichtbar.map((c) => {
         const author = displayAuthor(c.author, currentUserId !== null);
         return (
           <div key={c.id} className="flex items-start gap-2.5">
@@ -1237,11 +1315,17 @@ function CommentThread({
         );
       })}
 
-      {comments.data?.length === 0 && (
+      {/* Nur im aufgeklappten Zustand: in der Vorschau erscheint der Bereich
+          ausschliesslich, wenn es schon Kommentare GIBT — „noch keine" wäre
+          dort eine Aussage über einen Beitrag, den niemand geöffnet hat. */}
+      {ausgeklappt && alle.length === 0 && !comments.isLoading && (
         <p className="text-sm text-muted">Noch keine Kommentare. Sei der/die Erste.</p>
       )}
 
-      {currentUserId && (
+      {/* Die Eingabe gehört zum Aufklappen. Ein Textfeld unter JEDEM Beitrag des
+          Feeds wäre zwanzig Aufforderungen auf einem Bildschirm — die Vorschau
+          soll zeigen, dass gesprochen wird, nicht zum Sprechen drängen. */}
+      {currentUserId && ausgeklappt && (
         <div className="flex items-end gap-2 pt-1">
           <Textarea
             value={body}
@@ -1333,5 +1417,212 @@ function CommentIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+// ── Beitrag bearbeiten (AGE-566) ────────────────────────────────────────────
+
+/**
+ * Text, Sichtbarkeit und Bilder eines eigenen Beitrags ändern.
+ *
+ * WARUM DIE BILDER SOFORT WIRKEN UND DER TEXT ERST BEIM SPEICHERN:
+ * Ein Bild lebt in zwei Welten — einer Zeile in `post_media` und einem Objekt
+ * im Bucket. Beides bis zum „Speichern" aufzuheben hiesse, Hochladen,
+ * Löschen und Textänderung in EINE Zusage zu bündeln, die keine Transaktion
+ * trägt: bricht der Lauf in der Mitte ab, bleibt ein halber Zustand zurück, den
+ * niemand sieht und niemand aufräumt. Jede Bildänderung ist deshalb für sich
+ * abgeschlossen und sofort belegt, der Text bleibt ein Formular.
+ *
+ * Das ist ehrlicher als ein „Speichern", das drei Dinge verspricht und zwei
+ * halten kann — und es sagt es dem Mitglied auch (Hinweiszeile unten).
+ */
+function PostEditor({
+  post,
+  uid,
+  urls,
+  onFertig,
+}: {
+  post: FeedPost;
+  uid: string;
+  urls: Record<string, string>;
+  onFertig: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [text, setText] = useState(post.body);
+  const [sichtbarkeit, setSichtbarkeit] = useState<PostVisibility>(
+    post.visibility as PostVisibility,
+  );
+  const [laedt, setLaedt] = useState(false);
+
+  function neuLaden() {
+    void queryClient.invalidateQueries({ queryKey: ["feed"] });
+  }
+
+  const speichern = useMutation({
+    mutationFn: () =>
+      updatePost({
+        postId: post.id,
+        alterText: post.body,
+        alteHashtags: post.hashtags,
+        body: text,
+        visibility: sichtbarkeit,
+      }),
+    onSuccess: () => {
+      neuLaden();
+      onFertig();
+      toast({ title: "Beitrag geändert", variant: "success" });
+    },
+    onError: (e) =>
+      toast({ variant: "error", title: "Ändern fehlgeschlagen", description: errorMessage(e) }),
+  });
+
+  const loeschen = useMutation({
+    mutationFn: () => deletePost(post.id),
+    onSuccess: () => {
+      neuLaden();
+      toast({ title: "Beitrag gelöscht", variant: "success" });
+    },
+    onError: (e) =>
+      toast({ variant: "error", title: "Löschen fehlgeschlagen", description: errorMessage(e) }),
+  });
+
+  const bildWeg = useMutation({
+    mutationFn: (m: FeedMedia) => removePostMedia(m.storagePath),
+    onSuccess: () => {
+      neuLaden();
+      toast({ title: "Bild entfernt", variant: "success" });
+    },
+    onError: (e) => toast({ variant: "error", title: "Bild bleibt", description: errorMessage(e) }),
+  });
+
+  async function bilderWaehlen(dateien: File[]) {
+    const frei = MAX_BILDER - post.media.length;
+    if (frei <= 0) {
+      toast({ variant: "error", title: `Mehr als ${MAX_BILDER} Bilder gehen nicht` });
+      return;
+    }
+    setLaedt(true);
+    try {
+      const fertig: { blob: Blob; width: number; height: number }[] = [];
+      for (const datei of dateien.slice(0, frei)) {
+        const { blob, width, height } = await shrinkToWebp(datei);
+        fertig.push({ blob, width, height });
+      }
+      // `sort` läuft hinter dem höchsten bestehenden Wert weiter — die Spalte
+      // trägt `unique (post_id, sort)`.
+      const abSort = post.media.reduce((max, m) => Math.max(max, m.sort), -1) + 1;
+      await addPostMedia({ uid, postId: post.id, abSort, bilder: fertig });
+      neuLaden();
+      toast({
+        title: fertig.length === 1 ? "Bild hinzugefügt" : "Bilder hinzugefügt",
+        variant: "success",
+      });
+    } catch (fehler) {
+      toast({
+        variant: "error",
+        title: "Hinzufügen fehlgeschlagen",
+        description: errorMessage(fehler),
+      });
+    } finally {
+      setLaedt(false);
+    }
+  }
+
+  const beschaeftigt = speichern.isPending || loeschen.isPending || bildWeg.isPending || laedt;
+
+  return (
+    <div className="space-y-3 rounded-[var(--radius-card)] border border-line bg-soft/40 p-3">
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        aria-label="Beitragstext bearbeiten"
+      />
+
+      {post.media.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {post.media.map((m) => (
+            <div key={m.storagePath} className="relative">
+              <img
+                src={urls[m.storagePath]}
+                alt=""
+                className="h-20 w-20 rounded-[var(--radius-card)] object-cover"
+              />
+              <button
+                type="button"
+                disabled={beschaeftigt}
+                onClick={() => bildWeg.mutate(m)}
+                aria-label="Bild entfernen"
+                className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-canvas text-sm text-ink shadow-soft hover:bg-danger hover:text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="text-sm text-muted">
+          <span className="sr-only">Bilder hinzufügen</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            disabled={beschaeftigt || post.media.length >= MAX_BILDER}
+            onChange={(e) => {
+              const dateien = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              if (dateien.length > 0) void bilderWaehlen(dateien);
+            }}
+            className="text-sm text-muted"
+          />
+        </label>
+        <Select
+          value={sichtbarkeit}
+          onChange={(e) => setSichtbarkeit(e.target.value as PostVisibility)}
+          aria-label="Sichtbarkeit"
+          className="w-auto"
+        >
+          {VISIBILITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {/* Sagt, was sofort gilt — siehe die Notiz über dieser Komponente. */}
+      <p className="text-xs text-muted">
+        Bildänderungen wirken sofort. Text und Sichtbarkeit erst mit „Speichern".
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={beschaeftigt || text.trim() === ""}
+          onClick={() => speichern.mutate()}
+        >
+          Speichern
+        </Button>
+        <Button size="sm" variant="ghost" disabled={beschaeftigt} onClick={onFertig}>
+          Abbrechen
+        </Button>
+        <button
+          type="button"
+          disabled={beschaeftigt}
+          onClick={() => {
+            // Namentliche Rückfrage wäre hier zu viel Apparat für einen eigenen
+            // Beitrag — aber ungefragt löschen ist unumkehrbar. Ein `confirm`
+            // wäre ein blockierender Browserdialog; stattdessen zwei Klicks.
+            if (loeschen.isIdle) loeschen.mutate();
+          }}
+          className="ml-auto rounded-md px-2 py-1 text-sm text-danger transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+        >
+          Beitrag löschen
+        </button>
+      </div>
+    </div>
   );
 }
