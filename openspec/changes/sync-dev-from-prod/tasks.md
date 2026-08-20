@@ -369,14 +369,27 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       PROD-Vergleich nicht taugt:** zwischen 11:18 und 15:38 wichen
       `auth.users` und `public.profiles` im Zeilenhash ab, bei unveränderter
       Zeilenzahl — drei Zeilen hatten sich bewegt. Verglichen wird gegen
-      `manifest.json` **des Auszugs**, nie gegen „PROD jetzt"
+      `manifest.json` **des Auszugs**, nie gegen „PROD jetzt". **Ein Posten
+      steht schon fest** (5.5): `storage.objects.owner`/`owner_id` sind im
+      Spiegel bei allen 125 Objekten leer, auf PROD nur bei 117 — das Manifest
+      führt `owner` nicht, und der Rücklauf lädt mit dem Dienstschlüssel hoch.
+      Rechtefolgen hat das keine: keine der 14 Policies auf `storage.objects`
+      nennt `owner`, alle entscheiden über den Pfadanfang
 - [x] 5.4 Idempotenz **aus demselben gespeicherten Auszug** zweimal einspielen
       und Zeilenhashes plus Objektprüfsummen vergleichen. Zwei Läufe gegen die
       laufende Quelle belegen nichts — sie können verschiedene Stände gelesen
       haben
-- [ ] 5.5 Sichtprobe in der laufenden lokalen Oberfläche: fünf echte Profile mit
+- [x] 5.5 Sichtprobe in der laufenden lokalen Oberfläche: fünf echte Profile mit
       Bild, Anschrift und Netzwerken. Grüne Tests haben hier schon einmal ein
-      sichtbar falsches Ergebnis durchgewunken
+      sichtbar falsches Ergebnis durchgewunken. **Am 2026-08-20 gelaufen** —
+      fünf Profile einzeln aufgerufen, alle mit Titelbild und Avatar aus dem
+      lokalen Storage, Verzeichnis meldet 36 Mitglieder, Konsole über alle
+      Seiten leer. **Anschrift und Netzwerke stehen nicht auf der öffentlichen
+      Profilseite** — `profiles_public` führt `socials`/`website` gar nicht, und
+      keine Komponente rendert sie öffentlich (Bestandscode, kein
+      Spiegel-Defekt). Belegt wurden sie unter `/profil/bearbeiten`: Strasse,
+      PLZ, Ort, Bundesland, Land und fünf Netzwerke kamen vollständig durch.
+      Bericht: `messungen/gruppe-5-sichtprobe-2026-08-20.md`
 - [ ] 5.6 **Halb belegt am 2026-08-20.** Der Bestand entsteht aus einem leeren
       Schema (siehe 5.1) — die **Anmeldefähigkeit** nicht: 4.13 macht die Konten
       absichtlich *un*anmeldefähig. Für die Sicherungs-Rolle braucht der
