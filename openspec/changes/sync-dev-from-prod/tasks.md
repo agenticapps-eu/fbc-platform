@@ -106,16 +106,23 @@ Logik wurden einzeln rot gemessen; die Tests greifen also.
 - [x] 2.5 Test: unbekannte, gleiche oder nicht auflösbare Kennungen brechen ab
 - [x] 2.6 Test: die Richtung ist fest verdrahtet — kein Schalter macht PROD zum
       Ziel
-- [ ] 2.7 **Zugangsdaten, die es noch nicht gibt — Voraussetzung für Gruppe 3.**
-      Gemessen am 2026-08-20 fehlen im Secret-Store drei Werte, ohne die kein
-      Lauf möglich ist. Sie anzulegen ist Donalds Schritt, nicht der des
-      Werkzeugs:
-      · `SUPABASE_SERVICE_ROLE_KEY_DEV` — **fehlt ganz**. Ohne ihn lässt sich in
-        DEV kein Objekt in die Buckets schreiben und kein Konto anlegen
-      · `SUPABASE_URL_PROD` und `SUPABASE_URL_DEV` — heute gibt es nur
+- [x] 2.7 **Zugangsdaten — erledigt am 2026-08-20 (Donald).** Der Spiegel liest
+      alles aus Infisical `prod`; ein Lauf sieht damit beide Seiten zugleich:
+      · `SUPABASE_SERVICE_ROLE_KEY_DEV` neu angelegt (fehlte ganz) — über die
+        Management-API geholt, ohne den Wert je anzuzeigen. **Lesend an der
+        DEV-Ablage belegt:** listet alle vier Buckets
+      · `SUPABASE_URL_PROD` / `SUPABASE_URL_DEV` neu — vorher gab es nur
         `VITE_SUPABASE_URL`, und die zeigt in **beiden** Umgebungen auf DEV
-      · Beide Datenbank-URLs müssen **einem** Lauf zugleich vorliegen; jede
-        liegt heute allein in ihrer eigenen Infisical-Umgebung (1.1)
+      · `SUPABASE_DB_URL_DEV` nach `prod` kopiert; jede lag zuvor allein in
+        ihrer eigenen Umgebung (1.1)
+      · **Kein `SUPABASE_SERVICE_ROLE_KEY_PROD`** — bewusst abgewichen. Der
+        PROD-Schlüssel liegt unter dem etablierten Namen
+        `SUPABASE_SERVICE_ROLE_KEY`, den auch der WordPress-Import liest; ihn zu
+        verdoppeln hiesse, zwei Vollzugriffs-Schlüssel zu führen, von denen eine
+        Rotation nur einen erwischt. Der Wächter fällt auf den vorhandenen
+        Namen zurück und **schreibt hin, welchen er gelesen hat**
+      · `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` blieben unberührt: sie
+        zeigen absichtlich auf DEV, und `deploy.yml` baut mit `--env=prod`
 
 ## 2a. Die Zugänge entschärfen — Voraussetzung, nicht Nacharbeit
 

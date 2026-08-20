@@ -191,3 +191,24 @@ export function pruefeLauf(input: {
     zielRef: (z as { kind: "ok"; ref: string }).ref,
   };
 }
+
+/**
+ * Sucht den ersten Namen, der einen Wert trägt, und gibt **beides** zurück.
+ *
+ * Der zurückgegebene Name ist der Punkt, nicht nur der Wert: der PROD-Schlüssel
+ * liegt unter dem etablierten Namen `SUPABASE_SERVICE_ROLE_KEY` (den auch der
+ * WordPress-Import liest), und ihn für den Spiegel unter `…_PROD` zu
+ * verdoppeln hiesse, zwei Vollzugriffs-Schlüssel zu führen, von denen eine
+ * Rotation nur einen erwischt. Also wird der vorhandene gelesen — aber der
+ * Lauf schreibt hin, welchen, statt es stillschweigend zu tun.
+ */
+export function wertMitNamen(
+  env: Record<string, string | undefined>,
+  kandidaten: string[],
+): { name: string; wert: string } | null {
+  for (const name of kandidaten) {
+    const wert = env[name];
+    if (wert) return { name, wert };
+  }
+  return null;
+}

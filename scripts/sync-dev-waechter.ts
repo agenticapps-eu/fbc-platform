@@ -10,8 +10,14 @@
  *
  * Je Seite drei Werte, aus der Umgebung:
  *
- *   Quelle (PROD)  SUPABASE_DB_URL_PROD · SUPABASE_URL_PROD · SUPABASE_SERVICE_ROLE_KEY_PROD
+ *   Quelle (PROD)  SUPABASE_DB_URL_PROD · SUPABASE_URL_PROD
+ *                  SUPABASE_SERVICE_ROLE_KEY_PROD, ersatzweise SUPABASE_SERVICE_ROLE_KEY
  *   Ziel   (DEV)   SUPABASE_DB_URL_DEV  · SUPABASE_URL_DEV  · SUPABASE_SERVICE_ROLE_KEY_DEV
+ *
+ * Der Rückfall auf den unsuffigierten Namen ist Absicht: dort liegt der
+ * PROD-Schlüssel bereits, und ihn zu verdoppeln hiesse, zwei
+ * Vollzugriffs-Schlüssel zu führen, von denen eine Rotation nur einen
+ * erwischt. Welcher Name gelesen wurde, schreibt der Lauf hin.
  *
  * WARUM DIE API-URL EIN EIGENER GESPEICHERTER WERT IST und nicht aus der
  * Kennung abgeleitet wird: abgeleitet stimmte sie immer, und die Prüfung
@@ -25,26 +31,35 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { pruefeLauf, pruefeZugang, type Zugang } from "./sync-dev.logic";
+import { pruefeLauf, pruefeZugang, wertMitNamen, type Zugang } from "./sync-dev.logic";
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const ref = (umgebung: "prod" | "dev") =>
   readFileSync(join(HIER, `${umgebung}-project-ref.txt`), "utf8").trim();
 
-/** Erlaubt, den Namen zu überschreiben — für die Sichtprobe an vorhandenen Werten. */
-function ausUmgebung(name: string, ersatz?: string): string | undefined {
-  return process.env[ersatz ?? name] ?? process.env[name];
+/** Gelesene Namen, damit der Lauf sie ausgeben kann. */
+const gelesen: string[] = [];
+
+function hole(...kandidaten: (string | undefined)[]): string | undefined {
+  const treffer = wertMitNamen(process.env, kandidaten.filter((k): k is string => Boolean(k)));
+  if (!treffer) return undefined;
+  gelesen.push(treffer.name);
+  return treffer.wert;
 }
 
 const quelle: Zugang = {
-  dbUrl: ausUmgebung("SUPABASE_DB_URL_PROD"),
-  apiUrl: ausUmgebung("SUPABASE_URL_PROD", process.env.SYNC_QUELLE_URL_NAME),
-  serviceKey: ausUmgebung("SUPABASE_SERVICE_ROLE_KEY_PROD", process.env.SYNC_QUELLE_KEY_NAME),
+  dbUrl: hole("SUPABASE_DB_URL_PROD"),
+  apiUrl: hole(process.env.SYNC_QUELLE_URL_NAME, "SUPABASE_URL_PROD"),
+  serviceKey: hole(
+    process.env.SYNC_QUELLE_KEY_NAME,
+    "SUPABASE_SERVICE_ROLE_KEY_PROD",
+    "SUPABASE_SERVICE_ROLE_KEY",
+  ),
 };
 const ziel: Zugang = {
-  dbUrl: ausUmgebung("SUPABASE_DB_URL_DEV"),
-  apiUrl: ausUmgebung("SUPABASE_URL_DEV", process.env.SYNC_ZIEL_URL_NAME),
-  serviceKey: ausUmgebung("SUPABASE_SERVICE_ROLE_KEY_DEV", process.env.SYNC_ZIEL_KEY_NAME),
+  dbUrl: hole("SUPABASE_DB_URL_DEV"),
+  apiUrl: hole(process.env.SYNC_ZIEL_URL_NAME, "SUPABASE_URL_DEV"),
+  serviceKey: hole(process.env.SYNC_ZIEL_KEY_NAME, "SUPABASE_SERVICE_ROLE_KEY_DEV"),
 };
 
 const seite = process.argv.find((a) => a.startsWith("--seite="))?.slice("--seite=".length);
@@ -71,4 +86,5 @@ if (seite === "quelle" || seite === "ziel") {
     process.exit(1);
   }
   console.log(`Quelle ${e.quelleRef} (PROD)  →  Ziel ${e.zielRef} (DEV)`);
+  console.log(`Gelesen aus: ${gelesen.join(", ")}`);
 }

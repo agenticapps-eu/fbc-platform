@@ -12,6 +12,7 @@ import {
   refAusApiUrl,
   refAusServiceKey,
   rolleAusServiceKey,
+  wertMitNamen,
   type Zugang,
 } from "./sync-dev.logic";
 
@@ -190,5 +191,29 @@ describe("Die Richtung ist fest verdrahtet (2.6)", () => {
     const e = pruefeLauf({ quelle: zugang(PROD), ziel: zugang(DEV), prodRef: PROD, devRef: DEV });
 
     expect(e).toEqual({ kind: "frei", quelleRef: PROD, zielRef: DEV });
+  });
+});
+
+describe("Welcher Name gelesen wurde, muss gesagt werden (2.7)", () => {
+  // `SUPABASE_SERVICE_ROLE_KEY` ist der etablierte Name — der WP-Import liest
+  // ihn, die Edge Functions bekommen ihn von der Plattform. Ihn fuer den
+  // Spiegel unter `…_PROD` zu verdoppeln hiesse: zwei Vollzugriffs-Schluessel,
+  // von denen die Rotation nur einen erwischt. Also wird der vorhandene
+  // gelesen — aber sichtbar, nicht stillschweigend.
+  test("nimmt den ersten Kandidaten, der einen Wert traegt", () => {
+    const env = { A: "", B: "zwei", C: "drei" };
+    expect(wertMitNamen(env, ["A", "B", "C"])).toEqual({ name: "B", wert: "zwei" });
+  });
+
+  test("liefert null, wenn keiner traegt — statt einen leeren Wert durchzureichen", () => {
+    expect(wertMitNamen({ A: "", B: undefined }, ["A", "B"])).toBeNull();
+    expect(wertMitNamen({}, ["A"])).toBeNull();
+  });
+
+  test("der bevorzugte Name gewinnt gegen den Rueckfall", () => {
+    const env = { SUPABASE_SERVICE_ROLE_KEY_PROD: "neu", SUPABASE_SERVICE_ROLE_KEY: "alt" };
+    expect(wertMitNamen(env, ["SUPABASE_SERVICE_ROLE_KEY_PROD", "SUPABASE_SERVICE_ROLE_KEY"])).toEqual(
+      { name: "SUPABASE_SERVICE_ROLE_KEY_PROD", wert: "neu" },
+    );
   });
 });
