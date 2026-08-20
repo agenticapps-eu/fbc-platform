@@ -1,114 +1,113 @@
-# Session Handoff — 2026-08-20 (fünfte Sitzung)
+# Session Handoff — 2026-08-20 (sechste Sitzung)
 
-**DEV trägt den Spiegel.** Gruppe 5 ist vollständig, der Auszug darf
-„Sicherung" heißen. Der erste DEV-Lauf ist abgebrochen — an einem Fehler, den
-kein lokaler Lauf hätte zeigen können, und genau dafür gab es 5.2.
+**AGE-576 ist fertig und liegt als PR #194.** Gruppe 6 vollständig, der Change
+ist archiviert. Der Diff-Review hat vier echte Löcher gefunden — alle behoben,
+alle gemessen.
 
 ## Accomplished
 
-**5.5 Sichtprobe** (`4901afc`). Fünf echte Profile in der laufenden Oberfläche,
-alle mit Titelbild und Avatar aus dem Storage, Verzeichnis meldet 36 Mitglieder,
-**Konsole über alle Seiten leer**. Anmeldefähig gemacht wurde ein übernommenes
-Konto lokal per GoTrue-Admin; die Oberfläche lief als nacktes `vite` gegen
-`127.0.0.1:54321` — `pnpm dev` hätte über Infisical gegen DEV geredet.
+**5.5 auf der ausgelieferten Fläche** (`7cd2de1`). Der einzige Teil des
+Spiegels, den noch niemand angesehen hatte. `fbc-platform.pages.dev` liest gegen
+DEV — im Bundle nachgelesen, nicht aus der Konfiguration geschlossen.
+Verzeichnis 36 Mitglieder, Profile vollständig, Aktivität mit echten
+Autorennamen, 7 kommende Events mit Anmeldezahlen, Admin-Liste mit Paging,
+**Konsole über alle Seiten leer**. Dafür trug `vorschau@fbc.invalid` (TLD
+existiert nicht) kurz ein Wegwerf-Passwort; zurückgenommen und dreiteilig belegt
+(1/72 → 0/72 und „Invalid login credentials" an der Fläche).
 
-**5.2/5.3, zweiter Anlauf** (`fe102f5`, `bf798f6`). Der erste Lauf brach bei
-4.1b ab. Behoben, dann Exit 0. **Unabhängig nachgerechnet**, nicht aus dem
-Eigenprotokoll: 858 Zeilen (857 + `matching_manager`), 36 Tabellen, 125 Objekte
-mit **allen 125 eTags gleich**, genau drei deklarierte Abweichungen.
+**6.1** — Exit 0, 1326 → nach den Behebungen 1333 Tests, typecheck sauber,
+lint 0 Fehler. **Prettier ist kein Gate**: kein Workflow ruft es auf, und
+`prettier --check .` meldet auf HEAD 139 Bestandsdateien.
 
-**5.6 Sicherungslauf** (`feac273`). `--sicherung` lässt 4.13 **und** 4.9/4.10
-aus. Dreiteilig belegt: ohne Schalter 0/72 Hashes im Auszug und Anmeldung
-HTTP 400; mit Schalter **72/72 byteweise** und **null** Abweichungen; plus die
-Kontrolle, dass die Anmeldung überhaupt am Hash hängt (bekannter bcrypt-Hash
-per SQL → HTTP 200). Kein echtes PROD-Passwort verwendet.
+**6.2** (`e8d90fa`). Beide Dokumente nachgezogen, Schritt 0 des Neuaufbau-Plans
+geschlossen (Weg A).
 
-Auch gefallen: **4.7** (nur zu einem Drittel, siehe unten) und **4.8a**.
+**6.3** (`5a9e705`, `4fbafd7`, `6693679`). gemini APPROVE, codex
+REQUEST-CHANGES mit 10 Befunden. **Keiner übernommen, alle zehn am Code
+nachgeprüft.** Vier behoben (Donalds Entscheidung), vier folgenlos, zwei
+Bauform.
 
-Bericht: `openspec/changes/sync-dev-from-prod/messungen/gruppe-5-sichtprobe-2026-08-20.md`
-(drei Nachträge).
+**6.4/6.5** (`63bb1b7`). `openspec archive` gelaufen, `validate --all` 31/31.
+PR #194 offen, Linear steht durch die Automation auf In Progress.
 
 ## Decisions
 
-- **`auth` wird per Regel geleert, nicht per Namensliste.** *Warum:* der erste
-  DEV-Lauf räumte nur `auth.users` und `auth.identities`; stehen blieben
-  13 `sessions`, 81 `refresh_tokens`, 13 `mfa_amr_claims` und ein
-  `one_time_token`. Alle diese Fremdschlüssel sind `ON DELETE CASCADE` — das
-  trug nicht, weil **`session_replication_role = replica` die Cascade-Trigger
-  mit stilllegt**. Im replica-Modus verschwindet nur, was benannt wird. Eine
-  Namensliste war die falsche Bauform: `oauth_consents` und `webauthn_*` sind
-  neu und stünden in keiner handgepflegten Liste. `schema_migrations` bleibt.
-- **Jede geleerte auth-Tabelle wird im Leeren-Schritt nachgezählt.** *Warum:*
-  geprüft wurde „`auth.users` ist leer". Der Abbruch kam dadurch vier Schritte
-  später aus der Fremdschlüsselprüfung — mit halb eingespieltem Ziel.
-- **`--sicherung` lässt zwei Dinge aus, nicht eines.** *Warum:* mit nur 4.13
-  übersprungen meldete die Abnahme zwei Abweichungen statt null — fünf Stufen
-  und die `matching_manager`-Zeile. Das ist ein **DEV-Bestand mit echten
-  Hashes**, die schlechteste der drei Fassungen. Im Sicherungslauf ist die
-  Deklaration daher leer: null Abweichungen ist die Zusage.
-- **Gegen `--ziel=dev` ist `--sicherung` abgelehnt, nicht abgeraten.** *Warum:*
-  neutralisierte Hashes sind einer der zwei Ausgleiche für „keine
-  Anonymisierung". Der Schalter kommt aus einer kopierten Befehlszeile, und die
-  gefährliche Fassung unterscheidet sich um ein Wort. Abbruch vor jedem
-  Verbindungsaufbau.
-- **Kein `--ziel=prod` gebaut.** *Warum:* 5.6 verlangt den Beleg, dass der
-  Auszug die Rolle *tragen kann*. Für einen Aufrufer, den es nicht gibt, wird
-  nichts vorgehalten.
+- **Alle vier tragenden Befunde behoben, nicht nur die billigen.** Donalds
+  Entscheidung. Der schwerste: **4.13 stand am Ende des Laufs** — dazwischen
+  lagen `public.sql`, zwei Prüfschritte, der Drift-Scan und 125 Uploads über das
+  Netz. Jedes `ende()` darin liess DEV mit gültigen PROD-Hashes zurück, bei
+  offener Selbstregistrierung. *Warum das mehr wiegt als ein Ablauffehler:* die
+  Neutralisierung ist einer der zwei Ausgleiche für „keine Anonymisierung".
+- **`dateien` im Manifest ist Pflicht, ohne Toleranzpfad.** *Warum:* ein
+  fehlendes Feld durchzuwinken liesse die Lücke für genau die Auszüge offen, die
+  sie haben. **Folge: der gespeicherte Auszug vom 20.08. ist nicht mehr
+  einspielbar.** Die Prüfsummen nachträglich zu ergänzen wäre unehrlich — sie
+  beschrieben die Datei von heute, nicht die vom Erzeugungszeitpunkt.
+- **Bucket-Vergleich in beide Richtungen.** *Warum:* dieselbe Regel wie beim
+  Migrations-Drift; ein Gate, das nur eine Richtung sieht, ist die Hälfte eines
+  Gates.
+- **Die Demo-Dokumente wurden als historisch gekennzeichnet, nicht angepasst.**
+  *Warum:* eine neue Demo zu erfinden war nicht Aufgabe. Auf DEV nachgezählt:
+  **0** Konten auf `@fbcdemo.com`, **0** auf `@demo.fbc.invalid`, von 72.
+- **Der „drei Werte"-Widerspruch wurde NICHT gefixt.** Die MODIFIED-Anforderung
+  nennt `SUPABASE_DB_PASSWORD` beim Wechsel des Frontend-Routings, das Runbook
+  sagt „zwei Werte, nicht drei". *Warum nicht:* der Fehler steht schon im
+  Hauptspec, ist Bestand und gehört nicht in diesen Diff. **Eigenes Issue wert.**
 
 ## Files modified
 
-- `scripts/sync-dev-ruecklauf.logic.ts` — neu `authTabellenZumLeeren()` und
-  `pruefeSicherungslauf()`
-- `scripts/sync-dev-ruecklauf.ts` — auth-Tabellen zur Laufzeit ermitteln,
-  Nachzählung im Leeren-Schritt, 4.13 und 4.9/4.10 hinter dem Schalter,
-  Deklaration im Sicherungslauf leer
-- `scripts/sync-dev-ruecklauf.test.ts` — 8 neue Tests (4 Leeren-Regel,
-  4 Sicherungsschalter), alle erst rot
-- `package.json` — `sync:dev` (mit `--env=prod`, siehe 1.1)
-- `openspec/changes/sync-dev-from-prod/` — `tasks.md` (4.7, 4.8a, 5.2, 5.3,
-  5.5, 5.6 abgehakt; `owner`-Posten in 5.3), ein Bericht mit drei Nachträgen
-- **Ausserhalb des Repos:** DEV trägt jetzt den Spiegel. Der lokale Stack
-  ebenfalls, mit neutralisierten Hashes (nach dem Sicherungslauf wieder
-  aufgeräumt, nachgezählt 0/72).
+- `scripts/sync-dev-ruecklauf.ts` — 4.13 hinter den auth-Rücklauf, pgcrypto aus
+  dem Katalog, `pruefeSqlDateien` und `vergleicheBuckets` vor dem Löschen, alle
+  56 Tabellen einzeln nachgezählt
+- `scripts/sync-dev-ruecklauf.logic.ts` — `pruefeSqlDateien`, `vergleicheBuckets`,
+  `Manifest.dateien`
+- `scripts/sync-dev-auszug.ts` / `.logic.ts` — Prüfsummen beider Dumps ins
+  Manifest, `SQL_DATEIEN`
+- `scripts/sync-dev-ruecklauf.test.ts` — 7 neue Tests, alle erst rot
+- `docs/supabase-environments.md` — Abschnitt „Der Spiegel DEV ← PROD"; **vier
+  Bestandsaussagen korrigiert**, die durch den Spiegel falsch geworden waren
+- `docs/prod-neuaufbau-plan.md` — Schritt 0 geschlossen, Schritt 1 auf das
+  Werkzeug, **neuer Schritt 3b** für die Bild-URLs
+- `docs/demo-zugang.md`, `docs/demo-script.md` — HISTORISCH
+- `docs/foundation-acceptance.md`, `docs/w4-acceptance.md` — Nachtrag
+- `openspec/changes/archive/2026-08-20-sync-dev-from-prod/` — archiviert
+- `openspec/specs/environment-sync/` (neu), `deployment-environments/`
 
 ## Next session: start here
 
-Branch `donald/age-576-spiegel-dev-prod`, HEAD `feac273`, Arbeitsbaum sauber,
-**kein PR**. `pnpm test` (1326), typecheck, lint und Prettier grün.
+**PR #194, CI-Stand prüfen** — `gh api repos/agenticapps-eu/fbc-platform/commits/<HEAD-SHA>/check-runs`,
+nur die HEAD-SHA zählt. Bei grün mergen (Freigabe steht generell), danach
+`gh pr view 194 --json state` gegenprüfen — `gh pr merge` kann still
+fehlschlagen. Linear schaltet beim Merge selbst auf Done.
 
-**Erste Aktion ist die zurückgestellte Sichtprobe auf `fbc-platform.pages.dev`**
-— die ausgelieferte Fläche liest gegen DEV und zeigt seit heute die echten
-Mitglieder statt der Demo-Personas. Das ist der einzige Teil des Spiegels, den
-noch niemand angesehen hat. Danach Gruppe 6, und dort ist **6.2 die eigentliche
-Arbeit**: `docs/supabase-environments.md` und `docs/prod-neuaufbau-plan.md`
-(Schritt 1 auf `--sicherung` umstellen, Schritt 0 schließen). 6.1 ist faktisch
-schon grün, muss aber am Stück laufen. Dann 6.3 (zwei Prüfer anderer
-Hersteller), 6.4 `openspec archive`, 6.5 Linear — vorher `get_issue` lesen, die
-Automation schaltet selbst.
+Der Change hat **keine Migrationen**, also kein `drift-gate`-Problem und kein
+`migrate-prod`.
 
-Eine Falle aus dieser Sitzung: der DEV-Lauf **fällt beim Klassifikator** wie
-`db:push:prod`. Nicht umgehen — Donald den Befehl mit `!` geben.
+Danach ist der PROD-Neuaufbau dran (`docs/prod-neuaufbau-plan.md`, jetzt mit
+geschlossenem Schritt 0 und Schritt 3b). **Erster Handgriff dort ist ein neuer
+Auszug aus PROD** — der alte ist mit diesem Code nicht mehr einspielbar, und
+beides fällt beim Klassifikator, gehört also an Donalds Terminal mit `!`.
 
 ## Open questions
 
-- **4.10 Dokumente sind weiter nicht nachgezogen** und jetzt tatsächlich
-  überholt: `docs/demo-zugang.md`, `docs/demo-script.md` und die drei
-  Abnahmedokumente. `pnpm demo:seed`/`demo:reset` gegen DEV zerstört den
-  Spiegel.
-- **Neue Flanke: DEV trägt 72 echte Adressen und einen lebenden
-  E-Mail-Webhook** (`…/functions/v1/notify-contact-request`), und der
-  Resend-Zugang ist zu PROD byte-identisch. Heute verstellt durch
-  neutralisierte Hashes und `contact_requests = 0`, aber die
-  Selbstregistrierung ist offen. Gehört auf die Rücknahmeliste vor Go-Live.
-- **4.7 ist nur zu einem Drittel gemessen.** `trg_event_feed_post` ist echt
-  belegt (8 Events, `posts` bleibt 29). Die Post- und
-  Benachrichtigungshälften sind **leer gelaufen**: der Auszug trägt
-  `contact_requests = 0` und `notifications = 0`. Nicht größer lesen.
-- **`socials` ist auf keiner öffentlichen Fläche sichtbar.** 34 Profile tragen
-  Netzwerke, `profiles_public` führt die Spalte nicht, keine Komponente
-  rendert sie. Bestandscode, eigenes Issue wert.
-- **`storage.objects.owner` ist im Spiegel überall leer**, auf PROD bei 8 von
-  125 gesetzt. Folgenlos — keine der 14 Policies nennt `owner`.
+- **`avatar_url`/`cover_url` sind absolute PROD-URLs** (56 bzw. 53 Zeilen, keine
+  einzige relativ). Der Spiegel kopiert die 111 Objekte korrekt — dasselbe
+  Objekt liefert auf beiden Seiten 35364 Bytes — sie werden nur nie gelesen. Für
+  Weg (A) folgenlos; unter neuer Kennung zeigen 109 Bild-URLs ins Leere. Steht
+  als Schritt 3b im Plan. **Dauerhaft wäre die Umstellung auf relative Pfade —
+  Anwendungscode, eigenes Issue.**
+- **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** mit
+  PROD-identischem Resend-Zugang. Heute verstellt durch neutralisierte Hashes und
+  `contact_requests = 0`, aber die Selbstregistrierung ist offen. Rücknahmeliste
+  vor Go-Live.
+- **Zwei Befunde bewusst offen** (`REVIEWS.md`): eine deklarierte Abweichung
+  entschuldigt die **ganze** Tabelle, und Katalognamen wie `a"b` werden nicht als
+  SQL-Identifier quotiert.
+- **`socials` ist auf keiner öffentlichen Fläche sichtbar** — 34 Profile tragen
+  Netzwerke, `profiles_public` führt die Spalte nicht. Bestandscode.
+- **4.7 ist nur zu einem Drittel gemessen** — die Post- und
+  Benachrichtigungshälften liefen leer (`contact_requests = 0`,
+  `notifications = 0`).
 - Unverändert offen: Detlevs Zahlungsliste (AGE-534) · Downgrade (AGE-516) ·
   `admin_list_feedback()` ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 ·
   AGE-513 · AGE-258 · eigenes Issue für `send-activation` (2xx trotz
