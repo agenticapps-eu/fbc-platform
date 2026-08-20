@@ -64,36 +64,71 @@ Vorbild) — aber sein Ergebnis wäre ein Vorgang, keine wiederherstellbare Date
 und als Sicherung vor dem Leeren damit schwächer. Ein Werkzeug, das beide Rollen
 trägt, schlägt zwei, von denen eines selten läuft und deshalb verrottet.
 
-### 2. Der Trigger wird nicht abgeschaltet, sondern eingeplant
+### 2. Trigger sind ein Inventar, kein Einzelfall
 
-`on_auth_user_created` feuert beim Zurückspielen von `auth.users` und legt 72
-Profilzeilen mit `tier = 'discover'` an. Danach kollidiert das Zurückspielen von
-`public.profiles` auf dem Primärschlüssel.
+**Korrigiert nach dem Plan-Review (REVIEWS.md).** Der erste Entwurf behandelte
+`on_auth_user_created` und hielt das Problem damit für gelöst. Gemessen am
+2026-08-20 trägt `public` **13 nicht-interne Trigger**:
 
-Der Ablauf umgeht das **ohne erhöhte Rechte**:
+| Trigger | Was er beim Restore täte |
+|---|---|
+| `trg_event_feed_post` | zu jedem zurückgespielten Termin ein **zusätzlicher** Beitrag |
+| `trg_event_feed_sync` | Folgeänderungen an eben diesen Beiträgen |
+| `contact_requests_lifecycle` | zusätzliche Benachrichtigungen, Threads, Statuswechsel |
+| `contact_requests_email_webhook` | **verschickt Post** |
+| `trg_posts_video_url`, `post_media_hoechstens_sechs`, `trg_profiles_completion`, fünf `*_updated_at`, `platform_settings_touch` | schreiben abgeleitete Werte, überschreiben also Zurückgespieltes |
+
+`contact_requests_email_webhook` ist der Ernstfall und stand in keinem der
+beiden Reviews: **ein Restore, der E-Mails an echte Mitglieder auslöst, ist kein
+Restore.** Dass `contact_requests` heute leer ist, ist ein Zufall des Zeitpunkts
+und kein Entwurf.
+
+Der Ablauf für den Signup-Trigger bleibt richtig und kommt ohne erhöhte Rechte
+aus:
 
 ```
-1. auth.users in DEV leeren      → kaskadiert in public.profiles
+1. auth-Bestand in DEV leeren   → kaskadiert in public.profiles
 2. public.* leeren
-3. auth.users zurückspielen      → Trigger legt 72 Zeilen in profiles an
-4. public.profiles leeren        (cascade; alles andere in public ist leer)
+3. auth zurückspielen           → Trigger legt Zeilen in profiles an (tier `basic`)
+4. truncate public.profiles cascade   (räumt genau diese weg)
 5. public.* zurückspielen
 6. Nachbereitung
 ```
 
-Schritt 4 ist der ganze Kunstgriff: die vom Trigger erzeugten Zeilen werden
-weggeräumt, **nachdem** er gefeuert hat, statt ihn am Feuern zu hindern.
-`truncate public.profiles cascade` folgt Fremdschlüsseln, die **auf** `profiles`
-zeigen — `auth.users` wird von `profiles` referenziert, nicht umgekehrt, und
-bleibt unberührt.
+Schritt 4 ist der Kunstgriff: die erzeugten Zeilen werden weggeräumt,
+**nachdem** der Trigger gefeuert hat, statt ihn am Feuern zu hindern.
+`truncate ... cascade` folgt Fremdschlüsseln, die **auf** `profiles` zeigen —
+`auth.users` wird von `profiles` referenziert, nicht umgekehrt. Das ist in
+Aufgabe 1.8 zu **belegen**, nicht anzunehmen; der ganze Ablauf hängt daran.
 
-*Verworfen:* `alter table auth.users disable trigger on_auth_user_created`. Es
-ist der kürzere Weg, verlangt aber Eigentümer- oder Superuser-Rechte an einer
-Tabelle im `auth`-Schema. Ob die `postgres`-Rolle sie auf dem gehosteten Projekt
-hält, ist **nicht gemessen** — und im lokalen Stack ist `postgres`
-nachweislich kein Superuser. Ein Weg, der ohne die Frage auskommt, ist der
-sicherere. Bleibt der Trigger versehentlich abgeschaltet, legt ausserdem jede
-spätere Anmeldung auf DEV kein Profil mehr an, und das fällt erst Tage später auf.
+*Korrektur am ersten Entwurf:* er schrieb, der Trigger setze `discover`. Er
+setzt **`basic`** — die gelesene Definition stammte aus `20260611171003`, die
+geltende steht in `20260715150000` und in der laufenden Datenbank. Für den
+Ablauf ändert das nichts (die Zeilen fallen ohnehin), für die Verlässlichkeit
+des Entwurfs schon.
+
+*Für die übrigen zwölf gilt dieser Kunstgriff nicht.* Sie feuern beim
+Zurückspielen von `public` und erzeugen Zustand, den der Auszug nicht enthält.
+Aufgabe 1.4/1.5 entscheidet je Trigger, ob er stillgelegt werden kann — **und
+wenn nicht, fällt dieser Entwurf**, statt eine Ausnahme zu bekommen. Der
+`pg_restore`-Weg ist dann zu verwerfen.
+
+*Verworfen:* `alter table auth.users disable trigger` als alleinige Antwort. Es
+verlangt Eigentümer- oder Superuser-Rechte an einer Tabelle im `auth`-Schema —
+ungemessen, und im lokalen Stack ist `postgres` nachweislich kein Superuser.
+Bleibt ein Trigger versehentlich abgeschaltet, legt jede spätere Anmeldung auf
+DEV kein Profil mehr an, und das fällt erst Tage später auf.
+
+### 2a. Der Auth-Umfang wird gemessen, nicht angenommen
+
+**Neu nach dem Plan-Review.** Der erste Entwurf sprach von „`auth.users`
+zurückspielen". Gemessen: `auth.identities` trägt **72 Zeilen**, `auth.sessions`
+drei. GoTrue pflegt Identitäten ausserhalb von `auth.users` — ein Restore ohne
+sie erzeugt 72 Konten, an denen sich **niemand anmelden kann**, und der Fehler
+zeigt sich erst beim ersten Anmeldeversuch, nicht im Lauf.
+
+Welche Tabellen dazugehören, bestimmt Aufgabe 1.6 durch Messung. Der Umfang
+wird aufgeschrieben, damit die nächste Änderung ihn nicht wieder raten muss.
 
 ### 3. Der geschützte Bestand wird hergestellt, nicht ausgespart
 
@@ -107,14 +142,26 @@ Zusage lautet „danach anmeldefähig", und die lässt sich messen.
 `supabase/seed/admin_roles.sql` trägt die `staff_roles` bereits; der
 Nachbereitungsschritt ist damit kein neues Wissen, sondern ein Aufruf.
 
-### 4. Die Zielprüfung liest den Benutzernamen, nicht den Host
+### 4. Der Wächter prüft beide Seiten und jedes Zugangspaar
 
 Der Pooler-Host ist regionsweit gleich und unterscheidet die Projekte nicht —
 die Kennung steht im Benutzernamen (`postgres.<ref>`). Ein Wächter, der den Host
-prüft, hielte PROD und DEV für dasselbe Projekt und ginge durch.
+prüft, hielte PROD und DEV für dasselbe Projekt. Der WP-Import löst das bereits
+so (`wp_import.ts`, Aufgabe 1.4); der Spiegel nimmt denselben Weg.
 
-Der WP-Import löst dieselbe Aufgabe bereits so (`wp_import.ts`, Aufgabe 1.4);
-der Spiegel nimmt denselben Weg statt eines zweiten.
+**Zwei Erweiterungen nach dem Plan-Review**, beide von codex, beide zutreffend:
+
+*Auch die Quelle.* Der erste Entwurf prüfte nur, dass das **Ziel** DEV ist. Eine
+vertauschte oder fremde **Quelle** hätte jeden vorgesehenen Test bestanden — im
+schlimmsten Fall spiegelt DEV auf sich selbst und der Bestand ist weg, ohne dass
+ein Auszug entstand, der ihn trüge.
+
+*Auch die anderen Zugangsdaten.* Datenbank-URL, Storage-URL und Service-Key sind
+**getrennte** projektgebundene Werte. Eine DEV-Datenbank-URL neben einem
+PROD-Service-Key leert PROD-Buckets oder legt Konten in PROD an, während die
+Datenbankprüfung grün meldet. Dass diese Werte hier bereits auseinanderlaufen,
+ist im Projekt dokumentiert und keine hypothetische Sorge. Geprüft wird deshalb
+jedes Paar einzeln, und dass alle demselben Projekt zugeordnet sind.
 
 ### 5. Die Ablage wird gespiegelt, nicht neu erzeugt
 
@@ -138,9 +185,16 @@ nicht. Beide Seiten sind derselbe Dienst und dieselbe Version; zu prüfen ist es
 trotzdem einmal, nicht zu unterstellen.
 
 **Der Auszug trägt Personendaten in den Arbeitsbaum** → Ablage ausserhalb des
-Arbeitsbaums, Rechte `0600`, und `git status --porcelain --ignored` als Zusage.
-Das Repository ist öffentlich, und der Arbeitsbaum trägt dauerhaft untrackte
-Dateien — eine falsche Ablage fiele in keinem Diff auf.
+Arbeitsbaums, Verzeichnis `0700`, Dateien `0600`, Auflösung über `realpath`
+gegen den Arbeitsbaum geprüft. Das Repository ist öffentlich, und der
+Arbeitsbaum trägt dauerhaft untrackte Dateien — eine falsche Ablage fiele in
+keinem Diff auf. Gemessen wird die **Differenz** von `git status --porcelain
+--ignored` vor und nach dem Lauf: die Ausgabe selbst ist schon heute nicht leer,
+sie führt 17 Pfade, und eine Zusage auf „leer" wäre nie erfüllbar gewesen.
+
+*Verschlüsselung des Auszugs* — nach Abwägung nicht übernommen (REVIEWS.md §12).
+Ohne Schlüsselverwaltung läge der Schlüssel auf derselben Platte wie der Auszug;
+das ist Aufwand ohne Schutz. Die Rechte und der geprüfte Ablageort tragen.
 
 **Ein Abbruch mitten im Lauf lässt DEV halb ersetzt zurück** → Hingenommen. DEV
 ist per Entscheidung 1 ein ersetzbares Abbild; die Antwort auf einen halben Lauf
@@ -150,27 +204,69 @@ Schreiben nach DEV.
 
 **Nach dem Go-Live kopiert derselbe Lauf echte Gespräche** → Nicht in diesem
 Change gelöst, aber verortet: der Nachbereitungsschritt ist die Stelle, an der
-eine Anonymisierung ansetzt. Sie hier zu bauen, hiesse sie ohne echte Daten zu
-entwerfen.
+eine Anonymisierung ansetzt. **Beide Prüfer halten das für zu wenig** — siehe
+Open Questions, die Frage liegt bei Donald.
+
+**Zwölf Trigger ausser dem einen** → Der schwerste Befund des Plan-Reviews. Er
+kann diesen Entwurf zu Fall bringen, nicht nur verändern: lässt sich
+`contact_requests_email_webhook` nicht zuverlässig stilllegen, verschickt ein
+Restore Post an echte Mitglieder. Aufgabe 1.4/1.5 klärt das **vor** der ersten
+Zeile Code, und ein negatives Ergebnis verwirft den `pg_restore`-Weg.
+
+**Der Wächter deckt nur, was er kennt** → Datenbank, Ablage und
+GoTrue-Admin-API sind drei getrennte Zugänge. Der erste Entwurf prüfte einen und
+las sich, als schütze er alle drei. Ein Wächter, der teilweise deckt, ist
+gefährlicher als keiner, weil er Zutrauen erzeugt.
 
 ## Migration Plan
 
-Kein Deploy, keine Migration, kein Anwendungscode. Der erste Lauf ist von Hand
-und wird gemessen: Zeilenzahlen je Tabelle und Objektzahlen je Bucket vorher und
-nachher, auf beiden Seiten.
+Kein Deploy, keine Migration, kein Anwendungscode. Der erste vollständige
+Probelauf findet gegen den **lokalen Stack** statt, nicht gegen DEV — dort ist
+ein Fehlschlag folgenlos, und die Trigger-Frage aus Decision 2 lässt sich dort
+klären, ohne die ausgelieferte Fläche anzufassen.
 
-**Rückweg:** DEVs heutiger Bestand ist die Demo-Welt, die
-`supabase/seed/demo_seed.ts` erzeugt — sie ist reproduzierbar und braucht keine
-Sicherung. Das ist der Grund, warum dieser Change ohne Netz gegen DEV laufen darf
-und der Neuaufbau gegen PROD nicht.
+**Die Abnahme ist ein Manifestvergleich mit benannten Abweichungen**, nicht ein
+Zahlenvergleich. Der erste Entwurf forderte „dieselben Zeilenzahlen wie PROD"
+und im selben Atemzug einen Nachbereitungsschritt, der Konten hinzufügt — das
+kann nicht beides gelten, und codex hat die Abnahme zu Recht als unerfüllbar
+bezeichnet. Verglichen wird gegen **Auszug plus deklarierter DEV-Bestand**,
+über Zeilenhashes und Objektprüfsummen. Zahlen belegen ohnehin keinen Inhalt.
+
+Die Idempotenz wird **aus demselben gespeicherten Auszug** gemessen. Zwei Läufe
+gegen die laufende Quelle können verschiedene Stände gelesen haben und belegen
+nichts.
+
+**Rückweg:** DEVs heutiger Bestand ist die Demo-Welt aus
+`supabase/seed/demo_seed.ts` — reproduzierbar, braucht keine Sicherung. Das ist
+der Grund, warum dieser Change ohne Netz gegen DEV laufen darf und der Neuaufbau
+gegen PROD nicht. Für den Auszug selbst gilt das Umgekehrte: er heißt erst
+„Sicherung", wenn er einmal gegen ein leeres Schema zurückgespielt wurde
+(Aufgabe 5.6).
 
 ## Open Questions
 
+- **Anonymisierung: im ersten Bau oder gar nicht?** Beide Prüfer verlangen sie
+  im ersten Bau (REVIEWS.md §8). Meine Gegenposition: anonymisierte Namen und
+  Texte nähmen dem Spiegel genau den Zweck — Fehler zu finden, die nur an echten
+  Daten auftreten. Das Risiko liegt in der **Kombination** aus echten Daten, den
+  im öffentlichen Repository dokumentierten Zugängen (`Test1234!`) und der bis
+  zur Umschaltung auf DEV zeigenden Fläche. Vorschlag: Zugänge entschärfen statt
+  Daten verfälschen. **Donald hat noch nicht entschieden.**
+- **Dürfen Produktions-Passwort-Hashes nach DEV?** Auch wenn die Namen bleiben:
+  die Hashes müssen es nicht. Sie zu neutralisieren kostet den Spiegel nichts,
+  weil sich auf DEV ohnehin niemand mit einem echten Mitgliedskonto anmelden
+  soll. Empfehlung: neutralisieren, unabhängig von der Frage darüber.
+  **Nicht entschieden.**
 - **Sollen die 21 Feedback-Zeilen auf DEV den Ersatz überleben?** Donald hat für
   `demo:reset` gesagt, sie stören nicht. Beim Spiegel ist die Lage anders:
-  `feedback` wird mit ersetzt, PROD trägt genau eine Zeile. Täglich synchron
+  `feedback` wird mitersetzt, PROD trägt genau eine Zeile. Täglich synchron
   **und** eigenen Bestand behalten geht bei derselben Tabelle nicht beides. Bis
-  zur Antwort führt der Entwurf `feedback` **nicht** im geschützten Bestand —
-  die Zeilen sind Testeingaben, keine Arbeit.
-- **Trägt `SUPABASE_DB_URL_DEV` eine direkte Verbindung?** Entscheidet zusammen
-  mit dem Pooler-Risiko über das Werkzeug. Vor der ersten Zeile Code zu messen.
+  zur Antwort stehen sie **nicht** im deklarierten DEV-Bestand.
+- **Bleibt DEV eine vorführbare Demo?** Der Nachbereitungsschritt stellt
+  Zugänge her, aber drei Logins sind nicht die Demo-Welt: ihre Profilzeilen
+  entstehen leer und `basic`. Entweder der benannte Bestand wird vollständig
+  rekonstruiert, oder `docs/demo-zugang.md` muss sagen, dass es diese Demo nicht
+  mehr gibt.
+- **Trägt `pg_dump` die Pooler-Verbindung, und lassen sich die zwölf übrigen
+  Trigger stilllegen?** Beides entscheidet über den Bestand des Entwurfs, nicht
+  über ein Detail. Aufgaben 1.2, 1.4, 1.5 — vor der ersten Zeile Code.
