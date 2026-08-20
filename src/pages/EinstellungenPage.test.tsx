@@ -168,37 +168,16 @@ describe("EinstellungenPage", () => {
     expect(screen.getByText(/stimmen nicht überein/i)).toBeInTheDocument();
   });
 
-  it("zeigt die QM-Feedback-Card mit Inhalt und Autor für einen Admin (AGE-358)", async () => {
-    mockedAdminFeedback.mockResolvedValue([
-      {
-        id: "f1",
-        rating: 4,
-        likes: "Der Compass ist klar",
-        misses: null,
-        idea: null,
-        route: "/compass",
-        ref_type: null,
-        created_at: "2026-07-16T10:00:00Z",
-        author_name: "Anna Müller",
-      },
-    ]);
+  // AGE-578: Die QM-Feedback-Card ist nach /admin umgezogen. Vorher standen hier
+  // drei Zusagen, die das Rollen-Gating prüften — das gibt es nicht mehr, also
+  // prüften sie nichts. Die eine Zusage, die den Umzug wirklich belegt, ist die
+  // für den ADMIN: bei ihm stand die Card, bei ihm muss sie verschwunden sein.
+  it("zeigt die QM-Feedback-Card nicht mehr — auch einem Admin nicht (AGE-578)", async () => {
     renderPage("admin");
-    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
-    expect(await screen.findByText("Der Compass ist klar")).toBeInTheDocument();
-    expect(screen.getByText("Anna Müller", { exact: false })).toBeInTheDocument();
-  });
-
-  it("zeigt die QM-Feedback-Card NICHT für ein gewöhnliches Mitglied", async () => {
-    renderPage(null);
     await screen.findByRole("heading", { name: "Einstellungen" });
     expect(screen.queryByText("QM-Feedback")).toBeNull();
-    expect(mockedAdminFeedback).not.toHaveBeenCalled();
-  });
-
-  it("zeigt die QM-Feedback-Card NICHT für einen matching_manager — QM ist nicht die Deal-Queue", async () => {
-    renderPage("matching_manager");
-    await screen.findByRole("heading", { name: "Einstellungen" });
-    expect(screen.queryByText("QM-Feedback")).toBeNull();
+    // Nicht nur unsichtbar, sondern gar nicht erst angefragt: eine Card, die
+    // lädt und dann nichts zeigt, wäre kein Umzug.
     expect(mockedAdminFeedback).not.toHaveBeenCalled();
   });
 });
