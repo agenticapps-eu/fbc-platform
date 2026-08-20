@@ -33,12 +33,12 @@ Fällt 1.2 oder 1.7 aus, wird der Entwurf geändert, nicht die Messung.
 - [ ] 1.9 Schemagleichheit **normalisiert** vergleichen, nicht an der
       Migrationszahl: „70 auf beiden Seiten" beweist nichts und veraltet sofort.
       Vollständige Versionslisten plus `db-drift-scan` gegen beide
-- [ ] 1.10 **Donald fragen**, ob die 21 Feedback-Zeilen auf DEV den Ersatz
-      überleben sollen — sie stehen sonst nicht im deklarierten DEV-Bestand
-- [ ] 1.11 **Donald vorlegen** (REVIEWS.md §8/§9): Anonymisierung im ersten Bau
-      oder Zugänge entschärfen; und ob Produktions-Passwort-Hashes nach DEV
-      dürfen. Bis zur Antwort wird der Nachbereitungsschritt so gebaut, dass
-      eine Neutralisierung dort ansetzen kann
+- [x] 1.10 ~~Donald fragen, ob die 21 Feedback-Zeilen den Ersatz überleben~~ —
+      **entschieden 2026-08-20: nein, mitersetzen.** Testeingaben, keine Arbeit;
+      sie stehen NICHT im deklarierten DEV-Bestand
+- [x] 1.11 ~~Donald vorlegen: Anonymisierung~~ — **entschieden 2026-08-20:
+      keine Anonymisierung** (Decision 6). Stattdessen Zugänge entschärfen und
+      Hashes neutralisieren, siehe Gruppe 2a
 - [ ] 1.12 Manifest des Vorher-Stands beider Seiten: je Tabelle Zeilenzahl und
       Zeilenhash, je Objekt Größe und Prüfsumme
 
@@ -62,6 +62,21 @@ nachgereicht wird, hat ein Zeitfenster, in dem ein Tippfehler PROD leert.
 - [ ] 2.5 Test: unbekannte, gleiche oder nicht auflösbare Kennungen brechen ab
 - [ ] 2.6 Test: die Richtung ist fest verdrahtet — kein Schalter macht PROD zum
       Ziel
+
+## 2a. Die Zugänge entschärfen — Voraussetzung, nicht Nacharbeit
+
+Aus Decision 6. Diese Gruppe SHALL abgeschlossen sein, **bevor** der erste Lauf
+echte Personendaten nach DEV bringt: solange `Test1234!` im öffentlichen
+Repository steht, gibt jeder Leser sich Zugriff auf das Verzeichnis.
+
+- [ ] 2a.1 Neue Passwörter für die drei `@fbcdemo.com`-Zugänge setzen
+- [ ] 2a.2 Sie aus `docs/demo-zugang.md` entfernen; das Dokument nennt künftig
+      den Ablageort (Infisical), nicht den Wert
+- [ ] 2a.3 Prüfen, ob die alten Werte anderswo im Repository stehen — ein
+      entfernter Wert, der in einem zweiten Dokument weiterlebt, ist nicht
+      entfernt
+- [ ] 2a.4 Die neuen Werte gehören in den deklarierten DEV-Bestand (4.9), sonst
+      nimmt sie der nächste Vollersatz mit
 
 ## 3. Auszug, Manifest und Ablage
 
@@ -108,8 +123,9 @@ Zeilen werden weggeräumt, nachdem er gefeuert hat.
       `contact_requests_email_webhook`
 - [ ] 4.8 Objekte in die vier Buckets schreiben, **`upsert: false`**
 - [ ] 4.9 **Deklaration** des DEV-eigenen Bestands an einer Stelle anlegen:
-      Demo-Zugänge samt ihrer Profilangaben, `staff_roles` samt
-      `matching_manager`, und — je nach 1.10 — die Feedback-Zeilen
+      Demo-Zugänge samt ihrer Profilangaben und der neuen Passwörter,
+      `staff_roles` samt `matching_manager`. **Ohne die Feedback-Zeilen** —
+      entschieden am 2026-08-20, sie werden mitersetzt
 - [ ] 4.10 Nachbereitung: den deklarierten Bestand **herstellen**. Drei Logins
       allein genügen nicht — ihre Profilzeilen entstehen leer und `basic`, die
       Demo-Welt (Jonas, Carla, Eleonora samt Stufen und Beziehungen) wäre weg.
@@ -120,6 +136,10 @@ Zeilen werden weggeräumt, nachdem er gefeuert hat.
       Der Rollensatz wird deklariert und danach verglichen
 - [ ] 4.12 Test: die Demo-Zugänge sind **anmeldefähig**, nicht nur vorhanden —
       `last_sign_in_at`, nicht das Vorhandensein einer Zeile
+- [ ] 4.13 **Produktions-Passwort-Hashes neutralisieren** (Decision 6). Test:
+      ein übertragenes Mitgliedskonto lässt sich auf DEV **nicht** mit seinem
+      PROD-Passwort anmelden. Die Zusage ist negativ formuliert, weil ein
+      positiver Test hier nichts belegen könnte
 
 ## 5. Einmal echt laufen lassen
 

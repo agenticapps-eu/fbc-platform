@@ -113,7 +113,7 @@ ich, zwei lege ich Donald vor, drei weise ich begründet zurück.
    `--ignored`-Zusage wird auf eine Vorher/Nachher-Differenz umgestellt, weil
    die Ausgabe schon heute 17 Pfade führt.
 
-### Liegt bei Donald
+### Von Donald entschieden, 2026-08-20
 
 8. **Anonymisierung (beide, HIGH).** Beide Prüfer verlangen sie im ersten Bau.
    Ich halte das Risiko für real und die Abhilfe für falsch: anonymisierte
@@ -123,13 +123,19 @@ ich, zwei lege ich Donald vor, drei weise ich begründet zurück.
    **Kombination** aus echten Daten, den im öffentlichen Repo dokumentierten
    Zugängen (`Test1234!`) und der bis zur Umschaltung auf DEV zeigenden
    Fläche. Vorschlag: Zugänge entschärfen statt Daten verfälschen.
-   **Nicht entschieden — Donald hat auf die Frage vom 2026-08-20 noch nicht
-   geantwortet.**
+   **Entschieden: keine Anonymisierung.** Die Daten bleiben echt; stattdessen
+   werden die Demo-Passwörter geändert und aus dem öffentlichen Repository
+   genommen (neue Aufgabengruppe 2a, Voraussetzung für den ersten Lauf). Beide
+   Prüfer bleiben damit unbefriedigt, und das steht hier, damit es nicht als
+   Versehen gelesen wird: es ist eine abgewogene Entscheidung gegen zwei
+   HIGH-Befunde, mit benannter Gegenmaßnahme. Siehe design.md Decision 6.
 9. **Produktions-Passwort-Hashes (HIGH, Teilaspekt von 8).** Auch wenn Namen
    bleiben: die Hashes müssen nicht mit. Sie zu neutralisieren kostet den
    Spiegel nichts, weil sich auf DEV ohnehin niemand mit einem echten
-   Mitgliedskonto anmelden soll. Empfehlung: neutralisieren, unabhängig von 8.
-   **Nicht entschieden.**
+   Mitgliedskonto anmelden soll.
+   **Entschieden: neutralisieren** (Aufgabe 4.13), mit einer negativ
+   formulierten Zusage — ein übertragenes Konto darf sich auf DEV NICHT mit
+   seinem PROD-Passwort anmelden. Ein positiver Test könnte hier nichts belegen.
 
 ### Wird begründet zurückgewiesen
 

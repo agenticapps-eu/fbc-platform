@@ -171,6 +171,37 @@ für ein noch unverknüpftes Objekt verweigert wird — der Fehler zeigt dann au
 die RLS, obwohl die Policy richtig ist. Da DEVs Buckets vorher geleert werden,
 gibt es ohnehin nichts zu überschreiben.
 
+### 6. Keine Anonymisierung — dafür entschärfte Zugänge und neutralisierte Hashes
+
+**Entscheidung Donald, 2026-08-20, gegen beide Prüfer** (REVIEWS.md §8/§9). Die
+Daten bleiben echt: Namen, Biografien, Firmen, Anschriften und Beiträge wandern
+unverfälscht nach DEV.
+
+Der Grund ist der Zweck des Spiegels. Anonymisierte Namen und Texte nähmen ihm
+genau das, wofür er gebaut wird — die acht Befunde vom 17.08. (Markdown-Zeichen
+im Verzeichnis, verlorene Absätze, überlaufende Ortsangaben) wurden alle an
+echten Datensätzen gefunden, keiner an einer Persona. Eine anonymisierte Kopie
+unterschiede sich kaum von der heutigen Demo-Welt, und der Auszug taugte nicht
+mehr als Sicherung für den PROD-Neuaufbau.
+
+Das Risiko ist damit nicht bestritten, sondern anders adressiert. Es liegt in
+der **Kombination**, nicht in den Daten allein — und zwei der drei Faktoren
+werden entfernt:
+
+| Faktor | Antwort |
+|---|---|
+| Echte Daten auf DEV | bleibt, ist der Zweck |
+| Zugänge mit `Test1234!` im **öffentlichen** Repository | **Passwörter ändern, aus `docs/demo-zugang.md` nehmen** |
+| Produktions-Passwort-Hashes wandern mit | **neutralisieren** — auf DEV soll sich ohnehin niemand mit einem echten Mitgliedskonto anmelden |
+
+Die Neutralisierung der Hashes kostet den Spiegel nichts und nimmt dem
+schlimmsten Fall — ein Leak der DEV-Datenbank — seine schärfste Spitze. Sie
+gehört in den Nachbereitungsschritt, der damit die Stelle bleibt, an der eine
+spätere, weitergehende Anonymisierung ansetzt.
+
+**Was das nicht löst:** nach dem Go-Live kopierte derselbe Lauf echte Gespräche,
+Nachrichten und Kontaktanfragen. Diese Frage ist verschoben, nicht beantwortet.
+
 ## Risks / Trade-offs
 
 **`pg_dump` über den Pooler schlägt fehl** → Der Transaktions-Modus (Port 6543)
@@ -202,10 +233,12 @@ ist ein zweiter. Deshalb ist der Auszug vollständig, **bevor** DEV angefasst
 wird: der teure und unwiederholbare Teil ist das Lesen aus PROD, nicht das
 Schreiben nach DEV.
 
-**Nach dem Go-Live kopiert derselbe Lauf echte Gespräche** → Nicht in diesem
-Change gelöst, aber verortet: der Nachbereitungsschritt ist die Stelle, an der
-eine Anonymisierung ansetzt. **Beide Prüfer halten das für zu wenig** — siehe
-Open Questions, die Frage liegt bei Donald.
+**Nach dem Go-Live kopiert derselbe Lauf echte Gespräche** → Bewusst verschoben
+(Decision 6). Heute sind die Inhalte erfunden, die Personen echt; nach dem
+Go-Live wären beide echt. Der Nachbereitungsschritt ist die Stelle, an der eine
+weitergehende Anonymisierung dann ansetzt — sie hier zu bauen, hiesse sie ohne
+die Daten zu entwerfen, für die sie gedacht ist. **Beide Prüfer halten das für
+zu wenig; Donald hat am 2026-08-20 anders entschieden.**
 
 **Zwölf Trigger ausser dem einen** → Der schwerste Befund des Plan-Reviews. Er
 kann diesen Entwurf zu Fall bringen, nicht nur verändern: lässt sich
@@ -245,23 +278,8 @@ gegen PROD nicht. Für den Auszug selbst gilt das Umgekehrte: er heißt erst
 
 ## Open Questions
 
-- **Anonymisierung: im ersten Bau oder gar nicht?** Beide Prüfer verlangen sie
-  im ersten Bau (REVIEWS.md §8). Meine Gegenposition: anonymisierte Namen und
-  Texte nähmen dem Spiegel genau den Zweck — Fehler zu finden, die nur an echten
-  Daten auftreten. Das Risiko liegt in der **Kombination** aus echten Daten, den
-  im öffentlichen Repository dokumentierten Zugängen (`Test1234!`) und der bis
-  zur Umschaltung auf DEV zeigenden Fläche. Vorschlag: Zugänge entschärfen statt
-  Daten verfälschen. **Donald hat noch nicht entschieden.**
-- **Dürfen Produktions-Passwort-Hashes nach DEV?** Auch wenn die Namen bleiben:
-  die Hashes müssen es nicht. Sie zu neutralisieren kostet den Spiegel nichts,
-  weil sich auf DEV ohnehin niemand mit einem echten Mitgliedskonto anmelden
-  soll. Empfehlung: neutralisieren, unabhängig von der Frage darüber.
-  **Nicht entschieden.**
-- **Sollen die 21 Feedback-Zeilen auf DEV den Ersatz überleben?** Donald hat für
-  `demo:reset` gesagt, sie stören nicht. Beim Spiegel ist die Lage anders:
-  `feedback` wird mitersetzt, PROD trägt genau eine Zeile. Täglich synchron
-  **und** eigenen Bestand behalten geht bei derselben Tabelle nicht beides. Bis
-  zur Antwort stehen sie **nicht** im deklarierten DEV-Bestand.
+**Zwei Fragen sind am 2026-08-20 von Donald entschieden worden** und stehen
+jetzt als Entscheidung 6 beziehungsweise im deklarierten DEV-Bestand.
 - **Bleibt DEV eine vorführbare Demo?** Der Nachbereitungsschritt stellt
   Zugänge her, aber drei Logins sind nicht die Demo-Welt: ihre Profilzeilen
   entstehen leer und `basic`. Entweder der benannte Bestand wird vollständig
