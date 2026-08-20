@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MemberLookup } from "../components/admin/MemberLookup";
+import { AdminFeedbackCard } from "../components/feedback/AdminFeedbackCard";
 import { Card, CardTitle } from "../components/ui/Card";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { ToggleRow } from "../components/ui/ToggleRow";
@@ -58,6 +59,12 @@ export default function AdminSettingsPage() {
           disabled={save.isPending}
         />
       </Card>
+
+      {/* QM-Feedback (AGE-358, hierher verlegt mit AGE-578). Ohne Rollenabfrage:
+          diese Seite hängt hinter RequireAdmin, das staffRole !== "admin" auf "/"
+          umleitet. Die echte Grenze ist ohnehin is_admin() im Rumpf von
+          admin_list_feedback — das UI-Gating war immer nur Komfort. */}
+      <AdminFeedbackCard />
     </div>
   );
 }
