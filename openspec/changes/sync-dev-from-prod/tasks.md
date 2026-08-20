@@ -451,7 +451,8 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [x] 6.1 `pnpm test`, `pnpm typecheck`, `pnpm lint` grün — **am 2026-08-20
       am Stück gelaufen, Exit 0**: typecheck sauber, lint 0 Fehler (4
       Bestandswarnungen `react-refresh/only-export-components`), 1326 Tests in
-      125 Dateien. Prettier ist **kein** Gate: kein Workflow ruft es auf, und
+      125 Dateien. **Nach den Behebungen aus 6.3 erneut gelaufen: 1333 Tests,
+      typecheck sauber, lint unverändert 0 Fehler.** Prettier ist **kein** Gate: kein Workflow ruft es auf, und
       `prettier --check .` meldet auf HEAD 139 Bestandsdateien (fast alle
       `openspec/`-Markdown) — ein `--write` darüber wäre der Fehler, den
       `pnpm format` schon einmal gemacht hat
@@ -479,7 +480,25 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       `--sicherung` umgestellt (das Werkzeug musste nicht geschrieben werden),
       **neuer Schritt 3b** für die 109 Bild-URLs, und der Schlussabsatz „Was
       dieser Plan nicht entscheidet" aufgelöst
-- [ ] 6.3 Diff-Review durch zwei Prüfer anderer Hersteller
+- [x] 6.3 Diff-Review durch zwei Prüfer anderer Hersteller — **am 2026-08-20
+      gelaufen.** gemini APPROVE ohne Befunde, codex REQUEST-CHANGES mit 10.
+      **Keiner übernommen, alle zehn am Code nachgeprüft:** vier tragen, vier
+      sind richtig beschrieben aber heute folgenlos, zwei sind Bauform.
+      Donalds Entscheidung: alle vier behoben. 4.13 steht jetzt unmittelbar
+      hinter dem auth-Rücklauf (vorher lagen public.sql, zwei Prüfschritte, der
+      Drift-Scan und 125 Uploads dazwischen — jedes `ende()` darin liess DEV mit
+      gültigen PROD-Hashes zurück); `dateien` im Manifest mit sha256 für beide
+      Dumps; `vergleicheBuckets` in beide Richtungen vor dem Löschen; und jede
+      der 56 Tabellen wird einzeln nachgezählt statt nur `public.profiles`.
+      7 neue Tests, alle erst rot; 1333 statt 1326.
+      **Ein Rückfall, den nur der echte Lauf fand:** `pg_dump` leert den
+      `search_path` der Sitzung, also lösten `crypt`/`gen_salt` am neuen Platz
+      nicht mehr auf — behoben per Katalogabfrage nach dem pgcrypto-Schema.
+      Vollständiger Lauf gegen den lokalen Stack Exit 0, `--sicherung` 72/72
+      byteweise, hinterher 0/72. Bericht:
+      `messungen/gruppe-6-review-behebung-2026-08-20.md`.
+      **Folge:** der Auszug vom 20.08. ist nicht mehr einspielbar (kein
+      `dateien`) — der nächste `sync:dev` braucht einen neuen Auszug
 - [ ] 6.4 `openspec archive` — erst wenn 5.3, 5.4 und 5.6 gemessen sind, nicht
       wenn der Code existiert
 - [ ] 6.5 AGE-576 in Linear auf Done — vorher `get_issue` lesen

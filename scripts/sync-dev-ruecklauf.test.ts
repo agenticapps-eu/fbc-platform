@@ -16,6 +16,8 @@ import {
   planeLeeren,
   pruefeSicherungslauf,
   pruefeAuszug,
+  pruefeSqlDateien,
+  vergleicheBuckets,
   vergleicheManifest,
   type Manifest,
 } from "./sync-dev-ruecklauf.logic";
@@ -35,6 +37,10 @@ const manifest = (ueber: Partial<Manifest> = {}): Manifest => ({
   },
   buckets: ["avatars"],
   objekte: [],
+  dateien: {
+    "auth.sql": { groesse: 10, sha256: "aaa" },
+    "public.sql": { groesse: 20, sha256: "bbb" },
+  },
   ...ueber,
 });
 
@@ -315,5 +321,60 @@ describe("5.3 Abnahme: Abweichungen werden benannt, nicht gezählt", () => {
     ist["auth.identities"] = { zeilen: 72, hash: "VERAENDERT" };
     const e = vergleicheManifest({ soll: manifest(), ist, deklaration });
     expect(e.unerwartet.map((u) => u.was)).toEqual(["auth.identities"]);
+  });
+});
+
+describe("6.3/HIGH: die beiden SQL-Dateien werden byteweise geprüft, nicht nur gezählt", () => {
+  // Der Befund aus dem Diff-Review: die 125 Objekte gehen byteweise gegen
+  // sha256 aus dem Manifest, `auth.sql` und `public.sql` wurden nur auf
+  // Anwesenheit geprüft — und gelöscht wird davor. Eine nachträglich gekürzte
+  // public.sql passierte die Vorprüfung und spielte eine Teilmenge ein.
+  const ist = { "auth.sql": { groesse: 10, sha256: "aaa" }, "public.sql": { groesse: 20, sha256: "bbb" } };
+
+  test("stimmen Grösse und sha256 beider Dateien, ist der Auszug frei", () => {
+    expect(pruefeSqlDateien(manifest(), ist).kind).toBe("ok");
+  });
+
+  test("RED: eine gekürzte public.sql wird abgewiesen", () => {
+    const e = pruefeSqlDateien(manifest(), { ...ist, "public.sql": { groesse: 12, sha256: "bbb" } });
+    expect(e.kind).toBe("abbruch");
+    if (e.kind === "abbruch") expect(e.grund).toContain("public.sql");
+  });
+
+  test("RED: gleiche Länge, anderer Inhalt — genau dafür ist der Hash da", () => {
+    const e = pruefeSqlDateien(manifest(), { ...ist, "auth.sql": { groesse: 10, sha256: "xxx" } });
+    expect(e.kind).toBe("abbruch");
+    if (e.kind === "abbruch") expect(e.grund).toContain("auth.sql");
+  });
+
+  test("RED: ein Manifest OHNE `dateien` wird abgelehnt, nicht durchgewunken", () => {
+    // Ein Auszug von vor diesem Befund trägt das Feld nicht. Ihn zu tolerieren
+    // hiesse, die Lücke für genau die Auszüge offenzulassen, die sie haben.
+    const ohne = manifest();
+    delete (ohne as { dateien?: unknown }).dateien;
+    const e = pruefeSqlDateien(ohne, ist);
+    expect(e.kind).toBe("abbruch");
+    if (e.kind === "abbruch") expect(e.grund).toMatch(/erneut|neuer Auszug|älter/i);
+  });
+});
+
+describe("6.3/HIGH: die Buckets kommen aus dem Manifest, nicht vom Ziel", () => {
+  // Geleert wurde, was auf dem ZIEL stand; `soll.buckets` wurde nirgends
+  // gelesen. Fehlte auf DEV ein Bucket, den PROD hat, scheiterte der Upload
+  // nach dem Löschen.
+  test("gleiche Mengen sind frei", () => {
+    expect(vergleicheBuckets(["avatars", "covers"], ["covers", "avatars"]).kind).toBe("ok");
+  });
+
+  test("RED: ein Bucket fehlt auf dem Ziel — der Upload schlüge nach dem Löschen fehl", () => {
+    const e = vergleicheBuckets(["avatars", "covers"], ["avatars"]);
+    expect(e.kind).toBe("abbruch");
+    if (e.kind === "abbruch") expect(e.grund).toContain("covers");
+  });
+
+  test("RED: ein zusätzlicher Bucket auf dem Ziel überlebte sonst unbemerkt", () => {
+    const e = vergleicheBuckets(["avatars"], ["avatars", "demo-welt"]);
+    expect(e.kind).toBe("abbruch");
+    if (e.kind === "abbruch") expect(e.grund).toContain("demo-welt");
   });
 });

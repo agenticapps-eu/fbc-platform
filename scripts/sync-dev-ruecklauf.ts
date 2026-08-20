@@ -14,7 +14,7 @@
  * und ersetzt sie durch den Auszug. `--ziel` hat keinen Vorgabewert: wer nichts
  * angibt, bekommt einen Abbruch, keine Vermutung.
  *
- * FÜNF ENTSCHEIDUNGEN, DIE IM KOPF STEHEN.
+ * SECHS ENTSCHEIDUNGEN, DIE IM KOPF STEHEN.
  *
  * 1. **Der Auszug wird VOLLSTÄNDIG geprüft, bevor irgendetwas gelöscht wird** —
  *    inklusive sha256 über jedes Objekt auf der Platte. Ein unvollständiger
@@ -40,6 +40,16 @@
  *
  * 5. **Jeder Schritt hinterlässt einen Beleg, keine Behauptung.** Das Protokoll
  *    ist die Abnahme; wo eine Zusage nicht messbar war, steht das da.
+ *
+ * 6. **4.13 steht unmittelbar hinter dem auth-Rücklauf, nicht am Ende.**
+ *    Nachgezogen nach dem Diff-Review (6.3). Vorher lagen dazwischen der
+ *    public-Rücklauf, zwei Prüfschritte, der Drift-Scan und 125 Objekt-Uploads
+ *    über das Netz; jedes `ende()` darin liess DEV mit gültigen PROD-Hashes
+ *    zurück, bei offener Selbstregistrierung. Die Neutralisierung ist einer der
+ *    zwei Ausgleiche für „keine Anonymisierung" — ein Fenster darin ist ein
+ *    Fenster im Ausgleich. Sie steht jetzt an der frühestmöglichen Stelle, an
+ *    der es überhaupt Hashes gibt, und zählt nach, dass **keiner** aus dem
+ *    Auszug überlebt hat.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -56,6 +66,8 @@ import {
   entferneRestrict,
   planeLeeren,
   pruefeAuszug,
+  pruefeSqlDateien,
+  vergleicheBuckets,
   pruefeSicherungslauf,
   vergleicheManifest,
   type Deklaration,
@@ -171,6 +183,22 @@ const roh = {
 if (/session_replication_role/i.test(roh.auth + roh.public)) {
   ende("Der Auszug dreht selbst an session_replication_role — das war beim Erzeugen nicht so.");
 }
+// 6.3/HIGH: byteweise gegen das Manifest, wie die Objekte auch. Vor dieser
+// Zusage wurden die beiden Dumps nur auf Anwesenheit geprüft — und gelöscht
+// wird danach.
+const sqlGeprueft = pruefeSqlDateien(soll, {
+  "auth.sql": {
+    groesse: Buffer.byteLength(roh.auth),
+    sha256: createHash("sha256").update(roh.auth).digest("hex"),
+  },
+  "public.sql": {
+    groesse: Buffer.byteLength(roh.public),
+    sha256: createHash("sha256").update(roh.public).digest("hex"),
+  },
+});
+if (sqlGeprueft.kind === "abbruch") ende(sqlGeprueft.grund);
+beleg("auth.sql und public.sql byteweise gegen das Manifest bestätigt");
+
 const gesaeubert = Object.fromEntries(
   Object.entries(roh).map(([name, text]) => {
     const e = entferneRestrict(text);
@@ -199,6 +227,13 @@ schritt("Buckets leeren — über die Storage-API, nicht per SQL");
 const zielBuckets = (await db.query("select id from storage.buckets order by id")).rows.map(
   (r) => r.id as string,
 );
+// 6.3/HIGH: erst vergleichen, dann löschen. Bis hierher wurde geleert, was auf
+// dem ZIEL stand; `soll.buckets` las niemand. Ein auf DEV fehlender Bucket fiel
+// deshalb erst beim ersten Upload auf — nach dem Löschen.
+const bucketsGeprueft = vergleicheBuckets(soll.buckets, zielBuckets);
+if (bucketsGeprueft.kind === "abbruch") ende(bucketsGeprueft.grund);
+beleg(`${zielBuckets.length} Buckets stimmen mit dem Auszug überein: ${zielBuckets.join(", ")}`);
+
 for (const bucket of zielBuckets) {
   const namen = (
     await db.query("select name from storage.objects where bucket_id = $1 order by name", [bucket])
@@ -245,26 +280,30 @@ const authTabellen = authTabellenZumLeeren(
   ).rows.map((r) => r.relname as string),
 );
 for (const sql of planeLeeren(publicTabellen, authTabellen)) await db.query(sql);
-const restProfile = (await db.query("select count(*)::int as n from public.profiles")).rows[0].n;
-if (restProfile !== 0) ende(`Nach dem Leeren trägt public.profiles noch ${restProfile} Zeilen.`);
-
 // Die Zusage, die am 2026-08-20 gefehlt hat: nicht „auth.users ist leer",
-// sondern **jede** geleerte auth-Tabelle ist leer. Der Abbruch kam damals erst
-// vier Schritte später aus der Fremdschlüsselprüfung, mit einem bereits
-// halb eingespielten Ziel.
+// sondern **jede** geleerte Tabelle ist leer. Der Abbruch kam damals erst vier
+// Schritte später aus der Fremdschlüsselprüfung, mit einem bereits halb
+// eingespielten Ziel.
+//
+// 6.3/MEDIUM: die Lehre war zunächst nur auf der auth-Seite gezogen — die
+// public-Seite prüfte allein `public.profiles`, während der Beleg darunter
+// „alle nachgezählt auf 0" sagte. Eine Zusage, die mehr behauptet als sie
+// misst, ist genau der Fehler, an dem dieser Lauf schon einmal gescheitert ist.
 const nochBelegt: string[] = [];
-for (const t of authTabellen) {
-  const n = (await db.query(`select count(*)::int as n from ${t.replace(".", '."')}"`)).rows[0].n;
+for (const t of [...publicTabellen.map((t) => `public.${t}`), ...authTabellen]) {
+  const [schema, name] = t.split(".");
+  const n = (await db.query(`select count(*)::int as n from ${schema}."${name}"`)).rows[0].n;
   if (n > 0) nochBelegt.push(`${t}=${n}`);
 }
 if (nochBelegt.length > 0) {
   ende(
-    `Nach dem Leeren tragen auth-Tabellen noch Zeilen: ${nochBelegt.join(", ")}. ` +
+    `Nach dem Leeren tragen Tabellen noch Zeilen: ${nochBelegt.join(", ")}. ` +
       "Im replica-Modus verschwindet nur, was benannt wird.",
   );
 }
 beleg(
-  `${publicTabellen.length} public-Tabellen und ${authTabellen.length} auth-Tabellen geleert (${authTabellen.join(", ")}), alle nachgezählt auf 0`,
+  `${publicTabellen.length} public-Tabellen und ${authTabellen.length} auth-Tabellen geleert (${authTabellen.join(", ")}), ` +
+    `alle ${publicTabellen.length + authTabellen.length} einzeln nachgezählt auf 0`,
 );
 
 schritt("auth zurückspielen — Konten UND Identitäten");
@@ -281,6 +320,70 @@ if (vomTrigger !== 0) {
   );
 }
 beleg("4.5: public.profiles ist leer — on_auth_user_created hat nicht gefeuert");
+
+// ── 4.13 Hashes neutralisieren — SOFORT, nicht am Ende ───────────────────────
+// 6.3/HIGH: bis zum Diff-Review stand dieser Schritt hinter dem public-Rücklauf,
+// zwei Prüfschritten, dem Drift-Scan und 125 Objekt-Uploads über das Netz — dem
+// längsten Schritt des Laufs. Jedes `ende()` darin liess DEV mit **gültigen
+// PROD-Hashes** zurück, bei offener Selbstregistrierung.
+//
+// Das wiegt schwerer als ein gewöhnlicher Ablauffehler: die Neutralisierung ist
+// einer der zwei Ausgleiche für „keine Anonymisierung". Ein Fenster darin ist
+// ein Fenster im Ausgleich. Deshalb steht sie jetzt unmittelbar hinter dem
+// auth-Rücklauf — der frühestmöglichen Stelle, an der es überhaupt Hashes gibt.
+if (neutralisieren) {
+  schritt("4.13: Produktions-Passwort-Hashes neutralisieren");
+  // `auth.sql` setzt `search_path` auf LEER — jeder pg_dump tut das (Zeile 16
+  // des Auszugs). Unqualifiziert lösen `crypt`/`gen_salt` danach nicht mehr
+  // auf; auf dem alten Platz fiel das nicht auf, weil dort eine frische
+  // Verbindung lief, die den Dump nie gesehen hatte.
+  //
+  // Das Schema kommt aus dem Katalog statt aus einer Annahme: Supabase legt
+  // pgcrypto nach `extensions`, ein nacktes Postgres nach `public`.
+  const pgcrypto = (
+    await db.query(
+      `select n.nspname as schema from pg_extension e
+         join pg_namespace n on n.oid = e.extnamespace
+        where e.extname = 'pgcrypto'`,
+    )
+  ).rows[0]?.schema as string | undefined;
+  if (!pgcrypto) ende("pgcrypto ist auf dem Ziel nicht installiert — 4.13 kann nicht rechnen.");
+  beleg(`pgcrypto liegt in "${pgcrypto}"`);
+  // Die alten Hashes werden vorher festgehalten, damit die Zusage danach
+  // MESSBAR ist: nicht "das UPDATE lief", sondern "kein Konto trägt noch einen
+  // Hash aus dem Auszug". Ohne diesen Schnappschuss gäbe es nach dem UPDATE
+  // nichts mehr, wogegen man vergleichen könnte.
+  await db.query(
+    "create temp table _hashes_vorher as select id, encrypted_password from auth.users",
+  );
+  const neutral = (
+    await db.query(`update auth.users
+                       set encrypted_password = ${pgcrypto}.crypt(
+                             gen_random_uuid()::text, ${pgcrypto}.gen_salt('bf'))
+                     where encrypted_password is not null
+                     returning 1`)
+  ).rowCount;
+  const geblieben = (
+    await db.query(`select count(*)::int as n
+                      from auth.users u
+                      join _hashes_vorher v on v.id = u.id
+                     where v.encrypted_password is not null
+                       and v.encrypted_password = u.encrypted_password`)
+  ).rows[0].n;
+  if (geblieben !== 0) ende(`${geblieben} Konten tragen noch ihren Hash aus dem Auszug.`);
+  await db.query("drop table _hashes_vorher");
+  beleg(`${neutral} Hashes durch Zufallswerte ersetzt, 0 aus dem Auszug übrig`);
+} else {
+  // 5.6: der Rückweg. Hier steht der Bestand anmeldefähig — das ist der Zweck
+  // und zugleich das, was auf DEV nie passieren darf (siehe pruefeSicherungslauf).
+  schritt("4.13 ausgelassen — SICHERUNGSLAUF, die Hashes bleiben echt");
+  const echt = (
+    await db.query(
+      "select count(*)::int as n from auth.users where encrypted_password is not null",
+    )
+  ).rows[0].n;
+  beleg(`${echt} Konten behalten ihren Produktions-Hash und sind anmeldefähig`);
+}
 
 schritt("public zurückspielen");
 await db.query(publicSql);
@@ -389,28 +492,6 @@ for (const o of soll.objekte) {
   hoch += 1;
 }
 beleg(`${hoch} Objekte geschrieben`);
-
-// ── 6. 4.13 Hashes neutralisieren ─────────────────────────────────────────────
-if (neutralisieren) {
-  schritt("4.13: Produktions-Passwort-Hashes neutralisieren");
-  const neutral = (
-    await db2.query(`update auth.users
-                        set encrypted_password = crypt(gen_random_uuid()::text, gen_salt('bf'))
-                      where encrypted_password is not null
-                      returning 1`)
-  ).rowCount;
-  beleg(`${neutral} Hashes durch Zufallswerte ersetzt`);
-} else {
-  // 5.6: der Rückweg. Hier steht der Bestand anmeldefähig — das ist der Zweck
-  // und zugleich das, was auf DEV nie passieren darf (siehe pruefeSicherungslauf).
-  schritt("4.13 ausgelassen — SICHERUNGSLAUF, die Hashes bleiben echt");
-  const echt = (
-    await db2.query(
-      "select count(*)::int as n from auth.users where encrypted_password is not null",
-    )
-  ).rows[0].n;
-  beleg(`${echt} Konten behalten ihren Produktions-Hash und sind anmeldefähig`);
-}
 
 // ── 7. 4.9/4.10 Der deklarierte DEV-Bestand ───────────────────────────────────
 if (!devBestand) {

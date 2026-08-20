@@ -130,6 +130,14 @@ export function auszugName(zeit: Date, prodRef: string): string {
  * Namens, dann das aufgelöste Ergebnis. Die zweite Prüfung ist nicht
  * überflüssig — sie fängt, was die erste Regel künftig durchliesse.
  */
+/**
+ * Die beiden Dumps des Auszugs. Sie stehen hier und nicht in der
+ * Rücklauf-Logik, weil der Auszug sie erzeugt — die Abhängigkeitsrichtung
+ * zwischen den beiden Modulen ist `ruecklauf -> auszug`.
+ */
+export type SqlDatei = "auth.sql" | "public.sql";
+export const SQL_DATEIEN: readonly SqlDatei[] = ["auth.sql", "public.sql"];
+
 export function sichererPfad(
   wurzel: string,
   bucket: string,

@@ -30,6 +30,8 @@
  *    Abweichung daneben.
  */
 
+import { SQL_DATEIEN, type SqlDatei } from "./sync-dev-auszug.logic";
+
 /** Die Dateien, ohne die ein Ablageverzeichnis kein Auszug ist. */
 export const PFLICHTDATEIEN = ["manifest.json", "auth.sql", "public.sql"] as const;
 
@@ -48,7 +50,15 @@ export type Manifest = {
     sha256: string;
     mimetype: string | null;
   }[];
+  /**
+   * Grösse und sha256 der beiden SQL-Dateien. **Nicht optional**, obwohl
+   * Auszüge von vor dem Diff-Review (6.3) das Feld nicht tragen: ein fehlendes
+   * Feld zu tolerieren liesse die Lücke für genau die Auszüge offen, die sie
+   * haben. Ein alter Auszug wird abgewiesen und muss neu gezogen werden.
+   */
+  dateien: Record<SqlDatei, { groesse: number; sha256: string }>;
 };
+
 
 /**
  * Prüft, dass ein Verzeichnis ein **vollständiger** Auszug ist und aus der
@@ -81,6 +91,78 @@ export function pruefeAuszug(input: {
     };
   }
   return { kind: "ok", manifest: input.manifest };
+}
+
+/**
+ * `auth.sql` und `public.sql` byteweise gegen das Manifest — der Befund aus
+ * dem Diff-Review (6.3, HIGH).
+ *
+ * Bis hierher wurden die 125 Objekte byteweise geprüft und die beiden SQL-
+ * Dateien nur auf **Anwesenheit**. Gelöscht wird davor. Eine nachträglich
+ * gekürzte `public.sql` passierte die Vorprüfung, und der Rücklauf spielte eine
+ * gültige Teilmenge in ein bereits geleertes Ziel — der einzige Zustand ohne
+ * Rückweg.
+ *
+ * Der häufigste Fall, ein abgebrochener Auszug, war schon abgedeckt:
+ * `manifest.json` wird als letztes geschrieben. Was fehlte, ist die
+ * nachträgliche Beschädigung — und die Asymmetrie zu den Objekten war durch
+ * nichts zu rechtfertigen.
+ */
+export function pruefeSqlDateien(
+  manifest: Manifest,
+  ist: Record<SqlDatei, { groesse: number; sha256: string }>,
+): { kind: "ok" } | Abbruch {
+  if (!manifest.dateien) {
+    return {
+      kind: "abbruch",
+      grund:
+        "Das Manifest führt keine Prüfsummen für auth.sql und public.sql — der Auszug ist älter als 6.3. " +
+        "Bitte den Auszug erneut ziehen; ein Auszug ohne diese Zusage wird nicht eingespielt.",
+    };
+  }
+  for (const datei of SQL_DATEIEN) {
+    const soll = manifest.dateien[datei];
+    if (!soll) {
+      return { kind: "abbruch", grund: `Das Manifest führt ${datei} nicht.` };
+    }
+    const hat = ist[datei];
+    if (hat.groesse !== soll.groesse || hat.sha256 !== soll.sha256) {
+      return {
+        kind: "abbruch",
+        grund:
+          `${datei} weicht vom Manifest ab: ${hat.groesse} B / ${hat.sha256.slice(0, 12)}… ` +
+          `statt ${soll.groesse} B / ${soll.sha256.slice(0, 12)}….`,
+      };
+    }
+  }
+  return { kind: "ok" };
+}
+
+/**
+ * Die Bucket-Liste des Auszugs gegen die des Ziels — der zweite Befund aus 6.3.
+ *
+ * Geleert wurde bisher, was auf dem **Ziel** stand; `manifest.buckets` wurde
+ * nirgends gelesen. Fehlte auf dem Ziel ein Bucket, den die Quelle hat,
+ * scheiterte der erste Upload — **nach** dem Löschen. Ein zusätzlicher Bucket
+ * auf dem Ziel überlebte unbemerkt und widersprach der Zusage "das Ziel trägt
+ * den Bestand des Auszugs".
+ *
+ * Abgebrochen wird in **beide** Richtungen. Das ist dieselbe Regel wie beim
+ * Migrations-Drift: "remote-nur" ist genauso eine Abweichung wie "lokal-nur",
+ * und ein Gate, das nur eine Richtung sieht, ist die Hälfte eines Gates.
+ */
+export function vergleicheBuckets(soll: string[], ist: string[]): { kind: "ok" } | Abbruch {
+  const fehlend = soll.filter((b) => !ist.includes(b));
+  const zusaetzlich = ist.filter((b) => !soll.includes(b));
+  if (fehlend.length === 0 && zusaetzlich.length === 0) return { kind: "ok" };
+  return {
+    kind: "abbruch",
+    grund:
+      `Die Buckets des Ziels weichen vom Auszug ab — auf dem Ziel fehlt: ` +
+      `${fehlend.join(", ") || "nichts"}; zusätzlich auf dem Ziel: ` +
+      `${zusaetzlich.join(", ") || "nichts"}. Buckets kommen aus Migrationen; ` +
+      `weichen sie ab, ist das Schema auseinandergelaufen und nicht der Auszug schuld.`,
+  };
 }
 
 /**

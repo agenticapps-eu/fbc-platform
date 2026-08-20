@@ -63,6 +63,7 @@ import {
   planeAuszug,
   pruefeAblageort,
   sichererPfad,
+  SQL_DATEIEN,
   zerlegeUrl,
   type Objekt,
 } from "./sync-dev-auszug.logic";
@@ -247,6 +248,21 @@ for (const o of objekte) {
 }
 console.log(`Objekte geholt: ${objektManifest.length}`);
 
+// ── Prüfsummen der beiden SQL-Dateien ─────────────────────────────────────────
+// Der Befund aus dem Diff-Review (6.3): die Objekte gingen byteweise gegen
+// sha256, die beiden Dumps nur auf Anwesenheit — und der Rücklauf löscht, bevor
+// er einspielt. Gerechnet wird über die Datei auf der Platte, also über genau
+// das, was der Rücklauf später liest.
+const sqlDateien: Record<string, { groesse: number; sha256: string }> = {};
+for (const datei of SQL_DATEIEN) {
+  const bytes = await readFile(join(ablage, datei));
+  sqlDateien[datei] = {
+    groesse: bytes.byteLength,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  console.log(`${datei}: ${bytes.byteLength} B, sha256 ${sqlDateien[datei].sha256.slice(0, 12)}…`);
+}
+
 // ── Manifest schreiben ────────────────────────────────────────────────────────
 await schreibe(
   join(ablage, "manifest.json"),
@@ -262,6 +278,7 @@ await schreibe(
       tabellen,
       buckets,
       objekte: objektManifest,
+      dateien: sqlDateien,
     },
     null,
     2,
