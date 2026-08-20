@@ -208,6 +208,23 @@ export type Befehl = {
  *
  * Beide tragen denselben `--snapshot`: sie beschreiben damit **einen** Stand,
  * und zwar denselben, den das Manifest zählt.
+ *
+ * **`--format=plain --column-inserts`, nicht `--format=custom` — geändert am
+ * 2026-08-20 nach einer Messung, die den geplanten Weg für Gruppe 4 gekippt
+ * hat.** `session_replication_role` (Decision 2) lässt sich **nur mit einem
+ * `SET` in der laufenden Sitzung** setzen, nie über das Startup-Paket: über
+ * den Pooler wird die Option **stillschweigend verschluckt** (Supavisor
+ * schreibt das Paket um — `application_name` kommt als `Supavisor` zurück),
+ * über die Direktverbindung antwortet der Server mit `permission denied to set
+ * parameter`. `pg_restore` öffnet seine Verbindung selbst und kann den
+ * Schalter deshalb nicht bekommen — ein Rücklauf über `pg_restore` liefe mit
+ * **lebenden Triggern**, und über den Pooler ohne jede Fehlermeldung.
+ *
+ * Also muss der Rücklauf in einer Sitzung stattfinden, die wir selbst halten,
+ * und dafür braucht er ausführbares SQL statt eines Archivs. `--column-inserts`
+ * statt `--inserts`, weil letzteres `INSERT INTO t VALUES …` **ohne
+ * Spaltenliste** schreibt und damit an der Spaltenreihenfolge hängt. Bei 857
+ * Zeilen kostet die ausführliche Form nichts.
  */
 export function planeAuszug(input: {
   verbindung: Verbindung;
@@ -229,15 +246,16 @@ export function planeAuszug(input: {
     `--username=${v.benutzer}`,
     `--dbname=${v.datenbank}`,
     "--no-password",
-    "--format=custom",
+    "--format=plain",
+    "--column-inserts",
     "--data-only",
     "--no-owner",
     "--no-privileges",
     `--snapshot=${snapshot}`,
   ];
 
-  const auth = join(ziel, "auth.dump");
-  const oeffentlich = join(ziel, "public.dump");
+  const auth = join(ziel, "auth.sql");
+  const oeffentlich = join(ziel, "public.sql");
   return [
     {
       name: "auth",

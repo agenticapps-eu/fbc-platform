@@ -262,6 +262,33 @@ für ein noch unverknüpftes Objekt verweigert wird — der Fehler zeigt dann au
 die RLS, obwohl die Policy richtig ist. Da DEVs Buckets vorher geleert werden,
 gibt es ohnehin nichts zu überschreiben.
 
+### 2b. `PGOPTIONS` trägt den Schalter nicht — Nachtrag vom 2026-08-20
+
+Decision 2 hat ihren Mechanismus schon einmal getauscht (`ALTER TABLE … DISABLE
+TRIGGER` → `session_replication_role = replica`). **Gemessen in Gruppe 3: auch
+der Weg, auf dem der Schalter an `pg_restore` kommen sollte, trägt nicht.**
+
+Er lässt sich **nur mit einem `SET` in der laufenden Sitzung** setzen. Über das
+Startup-Paket verwirft **Supavisor jede Option ohne Fehler** — belegt daran,
+dass ein gesetzter `application_name` als `Supavisor` zurückkommt; über die
+Direktverbindung (`db.<ref>.supabase.co`, nur IPv6) antwortet der Server mit
+`permission denied to set parameter`.
+
+`pg_restore` öffnet seine Verbindung selbst. Es könnte den Schalter also nie
+bekommen — und liefe mit **lebenden Triggern**, über den Pooler lautlos. Das ist
+genau die Klasse, gegen die dieser Entwurf gebaut ist: es sähe aus wie ein
+sauberer Lauf.
+
+**Folge:** der Auszug ist `--format=plain --column-inserts` statt
+`--format=custom`, und Gruppe 4 spielt ihn in einer Sitzung ein, die sie selbst
+hält. `pg_restore` kommt nicht mehr vor. `--column-inserts` und nicht
+`--inserts`, weil letzteres ohne Spaltenliste schreibt und damit an der
+Spaltenreihenfolge hängt.
+
+*Nebenwirkung, geprüft:* die Präambel des Auszugs setzt zehn GUCs, aber
+`session_replication_role` ist nicht darunter — der von Gruppe 4 gesetzte
+Schalter überlebt das Einspielen.
+
 ### 5a. Ein Snapshot trägt Auszug und Manifest — Nachtrag vom 2026-08-20
 
 **Gemessen in Gruppe 3.** Die lesende Transaktion exportiert ihren Snapshot

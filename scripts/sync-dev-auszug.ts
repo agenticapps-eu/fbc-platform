@@ -15,8 +15,8 @@
  * Anschriften):
  *
  *   <ablage>/spiegel-<prodref>-<zeit>/
- *     auth.dump       auth.users + auth.identities, --data-only, custom
- *     public.dump     Schema public, --data-only, custom
+ *     auth.sql        auth.users + auth.identities, --data-only, --column-inserts
+ *     public.sql      Schema public, --data-only, --column-inserts
  *     objekte/<bucket>/<name>     die Objekte der Ablage, byteweise
  *     manifest.json   je Tabelle Zeilen und Hash, je Objekt Größe und Prüfsumme
  *
@@ -170,7 +170,7 @@ for (const befehl of plan) {
   if (lauf.stderr?.trim()) console.warn(`  ${befehl.name}: ${lauf.stderr.trim()}`);
   await chmod(befehl.ausgabe, 0o600);
   geschrieben.push(befehl.ausgabe);
-  console.log(`  ${befehl.name}.dump — ${(await stat(befehl.ausgabe)).size} Bytes`);
+  console.log(`  ${befehl.name}.sql — ${(await stat(befehl.ausgabe)).size} Bytes`);
 }
 
 // ── Manifest: Tabellen ────────────────────────────────────────────────────────

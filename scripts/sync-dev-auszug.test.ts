@@ -208,6 +208,18 @@ describe("3.5 Der Auszug kennt DEV nicht", () => {
     expect(plan[1].argumente).not.toContain("--table=auth.users");
   });
 
+  test("der Auszug ist ausführbares SQL mit Spaltenliste, kein Archiv", () => {
+    // Der Rücklauf muss in einer Sitzung laufen, die wir selbst halten:
+    // `session_replication_role` geht nur per SET, nicht über das
+    // Startup-Paket (gemessen 2026-08-20). Ein Archiv wäre dafür unbrauchbar.
+    for (const b of plan) {
+      expect(b.argumente).toContain("--format=plain");
+      expect(b.argumente).toContain("--column-inserts");
+      expect(b.argumente).not.toContain("--format=custom");
+      expect(b.ausgabe).toMatch(/\.sql$/);
+    }
+  });
+
   test("beide Auszüge tragen denselben Snapshot und schreiben in die Ablage", () => {
     for (const b of plan) {
       expect(b.argumente).toContain("--snapshot=00000003-0000001F-1");

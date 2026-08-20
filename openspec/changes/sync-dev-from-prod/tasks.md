@@ -174,10 +174,10 @@ DEV-Konten öffnete.
 ## 3. Auszug, Manifest und Ablage
 
 **Erledigt am 2026-08-20** — `scripts/sync-dev-auszug.ts` über
-`sync-dev-auszug.logic.ts`, 34 Zusagen, sieben Verbiegungen einzeln rot, drei
+`sync-dev-auszug.logic.ts`, 35 Zusagen, sieben Verbiegungen einzeln rot, vier
 echte Läufe gegen PROD (rein lesend). Bericht:
 `messungen/gruppe-3-2026-08-20.md`. Der Auszug liegt in
-`~/.fbc-spiegel/spiegel-viwntbodrtqxgmqyxluh-20260820T133810Z`.
+`~/.fbc-spiegel/spiegel-viwntbodrtqxgmqyxluh-20260820T134854Z`.
 
 - [x] 3.1 Ablageort ausserhalb des Arbeitsbaums: Verzeichnis `0700`, Dateien
       `0600`, Auflösung über `realpath` gegen den Arbeitsbaum geprüft — **in
@@ -188,7 +188,9 @@ echte Läufe gegen PROD (rein lesend). Bericht:
       sieht `/var/folders/…` und liesse durch
 - [x] 3.3 Auszug aus PROD: `public` und der in 1.6 bestimmte `auth`-Umfang,
       getrennt, weil Gruppe 4 sie in verschiedenen Schritten zurückspielt.
-      **`--format=custom`, `--data-only`, beide mit demselben `--snapshot`**
+      **`--format=plain --column-inserts --data-only`, beide mit demselben
+      `--snapshot`** — das Archivformat ist am 2026-08-20 verworfen worden,
+      siehe die Änderung an 4.1
 - [x] 3.4 **Manifest** erzeugen: je Tabelle Zeilenzahl und Zeilenhash, je Objekt
       Größe und Prüfsumme. Ohne Manifest gibt es keine belastbare Abnahme.
       Gemessen: 36 Tabellen / 857 Zeilen, 125 Objekte. Die Prüfsumme wird
@@ -225,10 +227,16 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       13 einzelne `ALTER TABLE … DISABLE TRIGGER`: an `auth.users` und beiden
       `storage`-Tabellen fehlen dafür die Eigentümerrechte (1.5). Test, dass
       der Schalter gesetzt war, solange geschrieben wurde.
-      **Auflage aus Gruppe 3:** der Auszug ist `--format=custom`, und
-      `pg_restore` lässt kein eigenes SQL vor dem Rücklauf zu — der Schalter
-      muss über **`PGOPTIONS`** an die Verbindung. `psql` ist hier kein Weg.
-      Das ist zu belegen, bevor 4.1 als erfüllt gilt
+      **Der Mechanismus ist am 2026-08-20 ein zweites Mal ausgetauscht
+      worden** (Gruppe 3, Sonden gegen DEV): `PGOPTIONS` trägt **nicht**.
+      Supavisor schreibt das Startup-Paket um und verwirft jede Option
+      **ohne Fehler** (`application_name` kommt als `Supavisor` zurück),
+      und über die Direktverbindung antwortet der Server mit
+      `permission denied to set parameter`. Nur ein `SET` **in der laufenden
+      Sitzung** trägt. `pg_restore` öffnet seine Verbindung selbst und liefe
+      damit mit **lebenden Triggern** — über den Pooler lautlos. Deshalb ist
+      der Auszug ausführbares SQL, und Gruppe 4 spielt ihn in einer selbst
+      gehaltenen Sitzung ein. `pg_restore` kommt nicht mehr vor
 - [ ] 4.1a Test: nach dem Lauf ist `session_replication_role` wieder `origin`
       und alle 18 Trigger tragen weiter `tgenabled='O'`
 - [ ] 4.1b **Fremdschlüssel-Integrität eigens messen.** Im replica-Modus
@@ -291,7 +299,10 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 5.1 Vollständiger Restore-Probelauf gegen den **lokalen** Stack, bevor DEV
       berührt wird — dort ist ein Fehlschlag folgenlos. Hier fällt auch die
       offene Zusage aus 1.3: ein mit `pg_dump 18.4` erzeugter Auszug muss in
-      einen 17.6-Server zurückgehen. **Blinder Fleck:** lokal fehlt genau
+      einen 17.6-Server zurückgehen. **Entschärft**: seit dem Formatwechsel
+      ist der Auszug ausführbares SQL, die Archivformat-Hälfte der Zusage
+      entfällt; offen bleibt nur, ob 18.4 SQL-Syntax schreibt, die 17.6 nicht
+      kennt. **Blinder Fleck:** lokal fehlt genau
       `contact_requests_email_webhook` (17 statt 18 Trigger), weil er in keiner
       Migration steht — über „keine Post" sagt ein grüner lokaler Lauf nichts
 - [ ] 5.2 `pnpm sync:dev` in `package.json` eintragen und einmal gegen DEV
