@@ -37,10 +37,17 @@ export type Abbruch = { kind: "abbruch"; grund: string };
 
 export type Manifest = {
   quelle: string;
+  erzeugt?: string;
   snapshot: string;
   tabellen: Record<string, { zeilen: number; hash: string }>;
   buckets: string[];
-  objekte: { bucket: string; name: string; groesse: number; sha256: string }[];
+  objekte: {
+    bucket: string;
+    name: string;
+    groesse: number;
+    sha256: string;
+    mimetype: string | null;
+  }[];
 };
 
 /**
@@ -99,40 +106,129 @@ export function planeLeeren(publicTabellen: string[], authTabellen: string[]): s
   ];
 }
 
-export type Abweichung = { was: string; ausAuszug: number; zuschlag: number; ist: number };
+/**
+ * `pg_dump` 18 klammert seine Ausgabe in zwei **psql-Metabefehle**:
+ * `\restrict <token>` am Anfang, `\unrestrict <token>` am Ende. Sie
+ * verhindern, dass ein Metabefehl, den jemand in einen Objektnamen geschrieben
+ * hat, in psql zur Ausführung kommt. `--no-restrict` gibt es in 18.4 nicht,
+ * nur `--restrict-key`.
+ *
+ * Für uns sind es **Syntaxfehler**: der Rücklauf geht durch `node-pg`, das
+ * keine Metabefehle kennt (und deshalb auch nicht angreifbar ist). Also raus —
+ * aber **token-genau und je genau einmal**, statt per Musterzeile:
+ *
+ * Eine Zeile `\restrict …` kann auch **in einem Datenwert** stehen; eine
+ * Biografie darf alles enthalten. Würde blind jede passende Zeile entfernt,
+ * risse das lautlos ein Loch in die Daten — die Sorte Schaden, die kein Test
+ * findet, weil die Zeilenzahl stimmt. Der Token ist je Auszug zufällig: wer
+ * ihn in einem Datenwert trifft, hat ihn geraten.
+ *
+ * Die Datei selbst bleibt unverändert und damit für `psql` weiter sicher.
+ */
+export function entferneRestrict(sql: string): { kind: "ok"; sql: string } | Abbruch {
+  const zeilen = sql.split("\n");
+  const treffer = (praefix: string) =>
+    zeilen.reduce<number[]>((a, z, i) => (z.startsWith(praefix) ? [...a, i] : a), []);
+
+  const auf = treffer("\\restrict ");
+  const zu = treffer("\\unrestrict ");
+  if (auf.length === 0 && zu.length === 0) return { kind: "ok", sql };
+  if (auf.length !== 1 || zu.length !== 1) {
+    return {
+      kind: "abbruch",
+      grund: `Erwartet je genau ein \\restrict/\\unrestrict, gefunden ${auf.length}/${zu.length}. Blind zu entfernen risse ein Loch in die Daten.`,
+    };
+  }
+  const token = zeilen[auf[0]].slice("\\restrict ".length).trim();
+  if (!token || zeilen[zu[0]].slice("\\unrestrict ".length).trim() !== token) {
+    return { kind: "abbruch", grund: "\\restrict und \\unrestrict tragen verschiedene Token." };
+  }
+  if (auf[0] > zu[0]) return { kind: "abbruch", grund: "\\unrestrict steht vor \\restrict." };
+
+  return {
+    kind: "ok",
+    sql: zeilen.filter((_, i) => i !== auf[0] && i !== zu[0]).join("\n"),
+  };
+}
+
+export type Abweichung = {
+  was: string;
+  grund: "zeilen" | "hash";
+  soll: string;
+  ist: string;
+};
+
+/**
+ * Der deklarierte DEV-eigene Bestand (§3a) in der Form, in der die Abnahme ihn
+ * braucht — und das sind **zwei** Formen, nicht eine:
+ *
+ * · `zusatzZeilen` für echte Zusatzsätze (`staff_roles`: eine Zeile
+ *   `matching_manager`).
+ * · `hashWeichtAb` für Tabellen, deren **Zeilenzahl stimmt und deren Inhalt
+ *   trotzdem abweicht**. Das ist der Normalfall hier, nicht die Ausnahme:
+ *   `tier` ist eine Spalte auf `public.profiles`, die fünf Zuweisungen
+ *   erzeugen keine Zeile; und `auth.users` trägt nach 4.13 neutralisierte
+ *   Passwort-Hashes. Wer nur Zeilen zählte, hielte beides für sauber — und
+ *   sähe umgekehrt jede echte inhaltliche Abweichung nie.
+ */
+export type Deklaration = {
+  zusatzZeilen: Record<string, number>;
+  hashWeichtAb: string[];
+};
 
 /**
  * Vergleicht den Ist-Stand gegen das Manifest des Auszugs — **nicht** gegen
  * „PROD jetzt". PROD bewegt sich beim Lesen: gemessen am 2026-08-20 wichen
  * zwei Tabellen im Zeilenhash ab, während die Zeilenzahl gleich blieb.
  *
- * `zuschlag` ist der deklarierte DEV-eigene Bestand (§3a). Er wird in den
- * Sollwert **eingerechnet**, nicht als Entschuldigung verbucht: eine Tabelle
- * mit Zuschlag, deren Zahl trotzdem nicht aufgeht, ist genauso ein Fehler wie
- * jede andere. Was `deklariert` zurückgibt, ist deshalb kein Befund, sondern
- * die Liste der Stellen, an denen DEV **absichtlich** von PROD abweicht — sie
+ * Die Deklaration wird **eingerechnet**, nicht als Entschuldigung verbucht:
+ * eine Tabelle mit Zuschlag, deren Zahl trotzdem nicht aufgeht, ist genauso ein
+ * Fehler wie jede andere. `deklariert` ist deshalb kein Befund, sondern die
+ * Liste der Stellen, an denen DEV **absichtlich** von PROD abweicht — sie
  * gehört in die Abnahme, damit niemand sie später für einen Fehler hält.
  */
 export function vergleicheManifest(input: {
   soll: Manifest;
-  istTabellen: Record<string, number>;
-  zuschlag: Record<string, number>;
+  ist: Record<string, { zeilen: number; hash: string }>;
+  deklaration: Deklaration;
 }): { unerwartet: Abweichung[]; deklariert: Abweichung[] } {
   const unerwartet: Abweichung[] = [];
   const deklariert: Abweichung[] = [];
 
   const namen = new Set([
     ...Object.keys(input.soll.tabellen),
-    ...Object.keys(input.istTabellen),
-    ...Object.keys(input.zuschlag),
+    ...Object.keys(input.ist),
+    ...Object.keys(input.deklaration.zusatzZeilen),
   ]);
+
   for (const was of [...namen].sort()) {
-    const ausAuszug = input.soll.tabellen[was]?.zeilen ?? 0;
-    const zuschlag = input.zuschlag[was] ?? 0;
-    const ist = input.istTabellen[was] ?? 0;
-    const eintrag = { was, ausAuszug, zuschlag, ist };
-    if (ist !== ausAuszug + zuschlag) unerwartet.push(eintrag);
-    else if (zuschlag !== 0) deklariert.push(eintrag);
+    const soll = input.soll.tabellen[was];
+    const ist = input.ist[was];
+    const zusatz = input.deklaration.zusatzZeilen[was] ?? 0;
+    const darfAbweichen = input.deklaration.hashWeichtAb.includes(was) || zusatz !== 0;
+
+    const sollZeilen = (soll?.zeilen ?? 0) + zusatz;
+    const istZeilen = ist?.zeilen ?? 0;
+    if (sollZeilen !== istZeilen) {
+      unerwartet.push({
+        was,
+        grund: "zeilen",
+        soll: String(sollZeilen),
+        ist: String(istZeilen),
+      });
+      continue;
+    }
+
+    const gleich = soll !== undefined && ist !== undefined && soll.hash === ist.hash;
+    if (gleich) continue;
+
+    const eintrag: Abweichung = {
+      was,
+      grund: "hash",
+      soll: soll?.hash ?? "(fehlt)",
+      ist: ist?.hash ?? "(fehlt)",
+    };
+    (darfAbweichen ? deklariert : unerwartet).push(eintrag);
   }
   return { unerwartet, deklariert };
 }

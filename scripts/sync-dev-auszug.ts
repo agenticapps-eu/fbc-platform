@@ -198,7 +198,7 @@ const buckets = (await db.query("select id from storage.buckets order by id")).r
 const objekte = await alleObjekte(async (nachBucket, nachName, limit) => {
   const r = await db.query(
     `select bucket_id, name, coalesce((metadata->>'size')::bigint, 0)::int as groesse,
-            metadata->>'eTag' as etag
+            metadata->>'eTag' as etag, metadata->>'mimetype' as mimetype
        from storage.objects
       where (bucket_id, name) > ($1, $2)
       order by bucket_id, name
@@ -219,6 +219,7 @@ const objektManifest: {
   name: string;
   groesse: number;
   etag: string | null;
+  mimetype: string | null;
   sha256: string;
 }[] = [];
 
@@ -240,6 +241,7 @@ for (const o of objekte) {
     name: o.name,
     groesse: bytes.byteLength,
     etag: o.etag,
+    mimetype: o.mimetype,
     sha256: createHash("sha256").update(bytes).digest("hex"),
   });
 }

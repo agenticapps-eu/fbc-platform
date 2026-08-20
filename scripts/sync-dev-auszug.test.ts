@@ -236,11 +236,11 @@ describe("3.5 Der Auszug kennt DEV nicht", () => {
 
 describe("3.6 Objekte über alle Seiten", () => {
   const bestand: Objekt[] = [
-    { bucket_id: "avatars", name: "a.jpg", groesse: 1, etag: "1" },
-    { bucket_id: "avatars", name: "b/c.jpg", groesse: 2, etag: "2" },
-    { bucket_id: "avatars", name: "b/d.jpg", groesse: 3, etag: "3" },
-    { bucket_id: "logos", name: "e.png", groesse: 4, etag: "4" },
-    { bucket_id: "logos", name: "f.png", groesse: 5, etag: "5" },
+    { bucket_id: "avatars", name: "a.jpg", groesse: 1, etag: "1", mimetype: "image/webp" },
+    { bucket_id: "avatars", name: "b/c.jpg", groesse: 2, etag: "2", mimetype: "image/webp" },
+    { bucket_id: "avatars", name: "b/d.jpg", groesse: 3, etag: "3", mimetype: "image/webp" },
+    { bucket_id: "logos", name: "e.png", groesse: 4, etag: "4", mimetype: "image/webp" },
+    { bucket_id: "logos", name: "f.png", groesse: 5, etag: "5", mimetype: "image/webp" },
   ];
   /** Steht für die Datenbank, nicht für eigenen Code: Keyset wie im SQL. */
   const seiten: number[] = [];

@@ -274,7 +274,19 @@ export function planeAuszug(input: {
   ];
 }
 
-export type Objekt = { bucket_id: string; name: string; groesse: number; etag: string | null };
+/**
+ * `mimetype` gehört ins Manifest, weil er zum Objekt gehört und nicht aus dem
+ * Namen folgt: Buckets führen eine Positivliste erlaubter Typen, und ein
+ * Rücklauf ohne Angabe schickt `text/plain` — den die Liste zurückweist.
+ * Gemessen am 2026-08-20 im ersten lokalen Probelauf.
+ */
+export type Objekt = {
+  bucket_id: string;
+  name: string;
+  groesse: number;
+  etag: string | null;
+  mimetype: string | null;
+};
 
 /**
  * Blättert die Objektliste über alle Seiten — mit Keyset, nicht mit `offset`.
