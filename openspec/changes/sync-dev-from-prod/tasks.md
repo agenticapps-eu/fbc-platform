@@ -244,9 +244,20 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       Laufs also nicht geprüft — was sich vorher von selbst ergab, ist jetzt
       eine Zusage, die jemand aussprechen muss
 - [ ] 4.2 `auth`-Bestand in DEV leeren (kaskadiert in `public.profiles`)
-- [ ] 4.3 `public`-Tabellen leeren, Buckets leeren — **`protect_objects_delete`
-      und `protect_buckets_delete` stehen dem im Weg** (1.4); im replica-Modus
-      schweigen sie, ausserhalb nicht
+- [ ] 4.3 `public`-Tabellen leeren, Buckets leeren. **Am 2026-08-20 korrigiert,
+      nachdem der Rumpf der Trigger gelesen wurde:** `protect_objects_delete`
+      und `protect_buckets_delete` rufen beide `storage.protect_delete()`, und
+      die Funktion trägt eine dokumentierte Hintertür —
+      `set storage.allow_delete_query = 'true'`. Sie zu benutzen wäre trotzdem
+      **falsch**, und im replica-Modus zu löschen ebenso: der Trigger schützt
+      vor etwas Echtem, nämlich **verwaisten Objekten im S3**, die eine
+      SQL-Löschung hinterlässt. Bei jedem Spiegellauf kämen 125 dazu, dauerhaft.
+      · Also: `public`-Tabellen per SQL im replica-Modus leeren.
+      · Die **Buckets aber über die Storage-API** (`remove()`) — sie löscht das
+        Blob mit. Das geht **ausserhalb** der replica-Sitzung, und es muss
+        dorthin: die Storage-API hält ihre **eigene** Datenbankverbindung, der
+        Schalter unserer Sitzung erreicht sie ohnehin nicht. Symmetrisch zu
+        4.8, das ebenfalls über die API schreibt (Decision 5)
 - [ ] 4.4 `auth`-Umfang zurückspielen — Konten **und Identitäten**
 - [ ] 4.5 **Zusage statt Arbeitsschritt.** Der Kunstgriff entfällt: im
       replica-Modus erzeugt `on_auth_user_created` nichts. Zu belegen ist
@@ -268,11 +279,33 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
       **Stark verkleinert am 2026-08-20** (design.md §3a): keine Demo-Zugänge,
       keine Demo-Welt, keine Testkonten. Es bleiben zwei Dinge, beide auf
       **übernommenen** Konten:
-      · `staff_roles`: `matching_manager` (PROD kennt die Rolle nicht; die zwei
-        Admin-Zeilen kommen aus PROD mit)
-      · eine Handvoll `tier`-Zuweisungen, damit die sechs Stufen besetzt sind —
-        PROD trägt **ausschliesslich `impact`**, ohne das liesse sich
-        Stufen-Gating auf DEV nicht mehr prüfen
+      · `staff_roles`: `matching_manager` auf **einem dritten übernommenen
+        Konto** — entschieden am 2026-08-20, nachdem die erste Antwort
+        („Donald und Detlev") am Schema scheiterte: `staff_roles.profile_id`
+        ist **Primärschlüssel**, ein Konto hält genau EINE Rolle, die Zeile
+        ersetzte also ihre Admin-Zeile. Und sie brächte nichts:
+        `is_matching_manager()` akzeptiert `role in ('matching_manager',
+        'admin')`, beide Admin-Konten bedienen die Matching-Fläche bereits.
+        Der Zweck der Zeile ist ein anderer — sie stellt den Fall
+        **`matching_manager` OHNE `admin`** her, den PROD nicht kennt und den
+        sonst niemand prüfen könnte. Die zwei Admin-Zeilen kommen aus PROD mit
+      · `tier`-Zuweisungen, damit die sechs Stufen besetzt sind — PROD trägt
+        **ausschliesslich `impact`**, ohne das liesse sich Stufen-Gating auf
+        DEV nicht mehr prüfen. **Entschieden am 2026-08-20: je ein
+        übernommenes Konto auf `basic`, `connect`, `discover`, `exchange`,
+        `focus`; alle übrigen bleiben `impact`.** Fünf Konten, keine neuen —
+        und die Auswahl folgt einer **Regel** statt einer Namensliste
+        (kleinste `auth.users.id` zuerst): deterministisch, idempotent, und
+        ohne fünf echte Mitgliedsadressen ins öffentliche Repository zu
+        schreiben.
+        **Die beiden Admin-Konten sind ausgenommen.** `has_level` kennt keine
+        Admin-Ausnahme — ein Admin auf `basic` sähe ein **leeres**
+        Verzeichnis, und damit wären Donalds und Detlevs DEV-Konten unbrauchbar.
+        Ebenso ausgenommen: das `matching_manager`-Konto.
+        **Achtung, kein Zeilenzuschlag:** `tier` ist eine **Spalte** auf
+        `public.profiles`. Die fünf Zuweisungen ändern die Zeilenzahl nicht,
+        wohl aber den Zeilenhash — die Abnahme in 5.3 muss `public.profiles`
+        deshalb als „Zahl gleich, Hash abweichend" führen, nicht als Fehler
       **Ohne die Feedback-Zeilen** — entschieden am 2026-08-20, sie werden
       mitersetzt. Das Aktivierungs-Gate braucht nichts: 35 der 72 übernommenen
       Konten sind nicht aktiviert
@@ -287,8 +320,15 @@ einem anderen Mechanismus**, und das ändert 4.1, 4.3 und 4.5.
 - [ ] 4.11 `admin_roles.sql` prüft sich nicht selbst: es braucht externe
       Adressen, kann still no-op laufen und legt `matching_manager` nicht an.
       Der Rollensatz wird deklariert und danach verglichen
-- [ ] 4.12 Test: die Demo-Zugänge sind **anmeldefähig**, nicht nur vorhanden —
-      `last_sign_in_at`, nicht das Vorhandensein einer Zeile
+- [ ] 4.12 **Überholt durch §3a und ersetzt.** Es gibt keine Demo-Zugänge mehr,
+      an denen sich Anmeldefähigkeit prüfen liesse — und 4.13 macht die
+      übernommenen Konten ausdrücklich *un*anmeldefähig. Was an ihre Stelle
+      tritt: Test, dass die zwei Admin-Konten aus PROD **mit ihrer eigenen
+      Kennung** (`auth.users.id`) durchkommen, also die Admin- und
+      `matching_manager`-Zeilen aus 4.9 auf vorhandene Konten zeigen und nicht
+      ins Leere. Eine Rollenzeile auf einer nicht existierenden Kennung ist die
+      Art Fehler, die erst beim Anmelden auffiele — und niemand meldet sich
+      hier an
 - [ ] 4.13 **Produktions-Passwort-Hashes neutralisieren** (Decision 6). Test:
       ein übertragenes Mitgliedskonto lässt sich auf DEV **nicht** mit seinem
       PROD-Passwort anmelden. Die Zusage ist negativ formuliert, weil ein

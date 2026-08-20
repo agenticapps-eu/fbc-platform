@@ -221,6 +221,14 @@ mehr herzustellen.
 24 Konten mit dem öffentlichen Passwort waren die eigentliche Lücke, und die
 ist unabhängig davon geschlossen, ob die Demo-Welt bleibt.
 
+**Konkretisiert am 2026-08-20 (Antworten Donald):** `matching_manager` halten
+**Donalds und Detlevs** übernommene Konten — beide sollen unabhängig prüfen
+können. Die Stufen werden mit **je einem übernommenen Konto auf `basic`,
+`connect`, `discover`, `exchange` und `focus`** besetzt, alle übrigen bleiben
+`impact`. Fünf Zeilen, keine neuen Konten. Sie werden **namentlich deklariert**,
+nicht zur Laufzeit gewählt: sonst wanderte der DEV-Bestand von Lauf zu Lauf und
+die Idempotenz-Zusage aus 5.4 wäre nicht mehr prüfbar.
+
 ### 3. Der geschützte Bestand wird hergestellt, nicht ausgespart
 
 `staff_roles` und die drei `@fbcdemo.com`-Zugänge werden vom Vollersatz
