@@ -575,7 +575,7 @@ Deploy-URL hinterher.
 | `notify-contact-request` auf PROD ist ein älterer Stand | 11.4 | `ezbr_sha256` weicht von DEV ab — vor dem Umzug klären |
 | Stripe-Webhook-URL auf `viwntbodrtqxgmqyxluh` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
 | Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
-| Umzug der drei prod-Werte | Go-Live-Woche | siehe oben |
+| Umzug der zwei prod-Frontend-Werte | Go-Live-Woche | siehe oben |
 | ~~DEV regelmäßig aus PROD auffrischen~~ | AGE-576 | **erledigt 2026-08-20** — `pnpm sync:dev`, **ohne** Anonymisierung (entschieden gegen zwei HIGH-Reviews; der Ausgleich sind neutralisierte Passwort-Hashes und entschärfte Demo-Zugänge) |
 | **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** | Rücknahmeliste vor Go-Live | neu seit dem Spiegel; der Resend-Zugang ist zu PROD byte-identisch. Heute verstellt durch neutralisierte Hashes und `contact_requests = 0`, aber die Selbstregistrierung ist offen |
 
