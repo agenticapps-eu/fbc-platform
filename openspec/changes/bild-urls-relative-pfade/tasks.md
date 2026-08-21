@@ -11,7 +11,7 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 
 ### 1. Der Auflöser (TDD, rot vor grün)
 
-- [ ] 1.1 Testliste **zuerst**, jeder Fall erst rot:
+- [x] 1.1 Testliste **zuerst**, jeder Fall erst rot:
       nackter Pfad → Host + Bucket davor ·
       `https://…` → unverändert ·
       **`http://127.0.0.1:54321/…` → unverändert** (der lokale Stack, Port aus
@@ -19,23 +19,23 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
       `blob:…` → unverändert ·
       `https://i.pravatar.cc/…` → unverändert (der Demo-Seed schreibt das) ·
       `null` → `null` · richtiger Bucket je Spalte.
-- [ ] 1.2 **„Absolut" heisst: trägt ein URI-Schema.** Keine Liste erlaubter
+- [x] 1.2 **„Absolut" heisst: trägt ein URI-Schema.** Keine Liste erlaubter
       Schemata — eine Liste ist genau das, was `http:` übersehen hat.
-- [ ] 1.3 `bildUrl(bucket, wert)` als **reine** Funktion. Kein `async`, keine
+- [x] 1.3 `bildUrl(bucket, wert)` als **reine** Funktion. Kein `async`, keine
       Lookup-Map: beide Buckets sind öffentlich.
-- [ ] 1.4 Grün, und **Gegenprobe**: eine Verbiegung der Funktion muss mindestens
+- [x] 1.4 Grün, und **Gegenprobe**: eine Verbiegung der Funktion muss mindestens
       einen Test rot machen. Wo eine Verbiegung grün bleibt, fehlt ein Test.
       (Der Commit davor muss stehen — `git checkout` und `git stash` verwerfen
       ungesicherte Korrekturen.)
 
 ### 2. Die drei Anzeigestellen
 
-- [ ] 2.1 `src/components/ui/Avatar.tsx` — deckt alle Profilbilder ab,
+- [x] 2.1 `src/components/ui/Avatar.tsx` — deckt alle Profilbilder ab,
       einschließlich `ProfilPage:262`.
-- [ ] 2.2 `src/components/profile/ProfileHero.tsx` — Hintergrundbild.
-- [ ] 2.3 `src/pages/ProfilPage.tsx:287` — Cover-Vorschau, rendert an
+- [x] 2.2 `src/components/profile/ProfileHero.tsx` — Hintergrundbild.
+- [x] 2.3 `src/pages/ProfilPage.tsx:287` — Cover-Vorschau, rendert an
       `ProfileHero` **vorbei**.
-- [ ] 2.4 Vollständigkeit als **Suche**, nicht als Augenschein (gemini): kein
+- [x] 2.4 Vollständigkeit als **Suche**, nicht als Augenschein (gemini): kein
       `<img src>` und kein `url(...)` ausserhalb dieser drei bindet
       `avatar_url`/`cover_url`.
 
@@ -49,7 +49,7 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 
 ### 4. Stufe 1 ausliefern
 
-- [ ] 4.1 `pnpm test`, `typecheck`, `lint` — Ausgaben lesen.
+- [x] 4.1 `pnpm test`, `typecheck`, `lint` — Ausgaben lesen.
 - [ ] 4.2 Code-Review auf den **Diff**.
 - [ ] 4.3 PR, Merge per `gh pr view --json state` gegengeprüft.
 - [ ] 4.4 **Am ausgelieferten Bundle belegen, dass Stufe 1 live ist** — an einer

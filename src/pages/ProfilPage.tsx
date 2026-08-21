@@ -27,6 +27,7 @@ import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/toast-context";
+import { bildUrl } from "../lib/bild-url";
 import { cn } from "../lib/cn";
 import {
   EMPTY_PROFILE_FORM,
@@ -201,6 +202,12 @@ function ProfileEditor({ uid }: { uid: string }) {
     );
   }
 
+  // Die Cover-Vorschau rendert an `ProfileHero` VORBEI und ist deshalb eine
+  // eigene Anzeigestelle. `coverPreview` ist eine `blob:`-URL aus
+  // `URL.createObjectURL` — `bildUrl` reicht sie unverändert durch, sonst
+  // zerbräche die Vorschau beim Hochladen (AGE-580).
+  const coverAnzeige = bildUrl("covers", coverPreview ?? values.cover_url ?? null);
+
   return (
     <div className="flex flex-col gap-6">
       <form
@@ -283,9 +290,9 @@ function ProfileEditor({ uid }: { uid: string }) {
             className="relative h-24 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-28"
             data-testid="cover-vorschau"
           >
-            {(coverPreview ?? values.cover_url) && (
+            {coverAnzeige && (
               <img
-                src={coverPreview ?? values.cover_url ?? undefined}
+                src={coverAnzeige}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
               />

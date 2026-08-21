@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { bildUrl } from "../../lib/bild-url";
 import { Avatar } from "../ui/Avatar";
 import { CountUp } from "../ui/Motion";
 import { levelLabel } from "../../config/levels";
@@ -63,7 +64,9 @@ export function ProfileHero({
   children,
 }: ProfileHeroProps) {
   const meta = [region, company].filter(Boolean).join(" · ");
-  const banner = bannerUrl ?? coverUrl;
+  // `bannerUrl` und `coverUrl` sind zwei Namen für dasselbe Hintergrundbild;
+  // aufgelöst wird gegen den Bucket `covers` (AGE-580).
+  const banner = bildUrl("covers", bannerUrl ?? coverUrl ?? null);
   return (
     <header className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft">
       {/* Hintergrundbild — ohne Bild ein heller Akzent-Verlauf aus Tokens, der
