@@ -102,14 +102,32 @@ describe("saveProfile — Hintergrundbild", () => {
     // Bucket-Policy, nicht an einer Namenskonvention.
     expect(uploads[0].path.split("/")[0]).toBe(UID);
     expect(uploads[0].path.endsWith(".webp")).toBe(true);
-    expect(updatePayload?.cover_url).toBe(`https://cdn.test/covers/${uploads[0].path}`);
+    // Seit AGE-580 der PFAD, nicht die absolute URL — und zwar GENAU der Pfad,
+    // unter dem gerade abgelegt wurde. Zeigte die Spalte woanders hin, merkte
+    // das keine Zeilenzählung. Die Zusicherung, dass keine Projektkennung mehr
+    // hineingerät, steht daneben.
+    expect(updatePayload?.cover_url).toBe(uploads[0].path);
+    expect(updatePayload?.cover_url).not.toMatch(/^https?:/);
   });
 
-  it("lässt cover_url unangetastet, wenn kein Bild dabei ist", async () => {
+  it("kanonisiert cover_url, wenn kein Bild dabei ist — nichts geht verloren", async () => {
+    // Bis AGE-580 wurde der Altwert unverändert zurückgeschrieben. Genau das
+    // trug nach der Migration die alte absolute URL wieder ein: `uploadBild`
+    // gibt ohne Blob den Altwert zurück, und `saveProfile` schreibt ihn
+    // bedingungslos. Jetzt läuft auch dieser Zweig durch `bildPfad`.
     await saveProfile(UID, werte({ cover_url: "https://cdn.test/covers/alt.webp" }), null, null);
 
     expect(uploads).toHaveLength(0);
-    expect(updatePayload?.cover_url).toBe("https://cdn.test/covers/alt.webp");
+    expect(updatePayload?.cover_url).toBe("alt.webp");
+  });
+
+  it("lässt ein fremd gehostetes Bild in Ruhe", async () => {
+    // Der Demo-Seed schreibt i.pravatar.cc. Kanonisieren gäbe es nicht zu
+    // kanonisieren — verlorengehen darf es aber auch nicht.
+    const fremd = "https://i.pravatar.cc/300?u=x";
+    await saveProfile(UID, werte({ cover_url: fremd }), null, null);
+
+    expect(updatePayload?.cover_url).toBe(fremd);
   });
 
   it("entfernt das Bild, indem es die Verknüpfung löst — nicht das Objekt", async () => {

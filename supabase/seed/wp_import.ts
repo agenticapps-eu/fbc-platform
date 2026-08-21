@@ -677,7 +677,7 @@ export async function schreibeDatensaetze(
       // Ein fehlgeschlagener Upload ist ein Bildbefund, KEIN Datensatzfehler
       // (6.4): ein fehlendes Bild darf ein Mitglied nicht kosten.
       const befunde: Bildbefund[] = [];
-      const hochgeladen: { art: Bildart; url: string }[] = [];
+      const hochgeladen: { art: Bildart; pfad: string }[] = [];
 
       for (const bild of satz.auftrag.bilder) {
         const ergebnis = await ladeBildHoch(
@@ -698,7 +698,7 @@ export async function schreibeDatensaetze(
         // AUCH bei `vorhanden` (Befund HIGH-1): das Objekt beweist, dass
         // hochgeladen wurde, nicht dass geschrieben wurde. Der SQL-Riegel
         // `is null` verhindert, dass daraus ein Überschreiben wird.
-        if (ergebnis.stand !== "fehlt") hochgeladen.push({ art: bild.art, url: ergebnis.url });
+        if (ergebnis.stand !== "fehlt") hochgeladen.push({ art: bild.art, pfad: ergebnis.pfad });
       }
       if (befunde.length > 0) bilder.set(nummer, befunde);
 

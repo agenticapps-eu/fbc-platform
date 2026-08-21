@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bildPfad } from "./bild-url";
 import { parseVideoUrl } from "./feed";
 import { recomputeMyMatches } from "./matches";
 import { supabase } from "./supabase";
@@ -296,19 +297,33 @@ function buildSocials(socials: ProfileFormValues["socials"]): Record<string, str
  * denselben Weg. Sie ist der EINZIGE Teil von `profile.ts`, den sie
  * wiederverwendet — geschrieben wird dort feldbezogen.
  */
+/**
+ * Lädt ein Bild hoch und liefert den **Pfad** für die Spalte (AGE-580).
+ *
+ * Bis Stufe 2 gab die Funktion `getPublicUrl(...)` zurück — eine absolute URL
+ * mit der Projektkennung darin. Unter einer neuen Kennung zeigte sie ins Leere.
+ *
+ * Der Zweig OHNE neues Bild ist der heiklere. Er gab bisher `bisher`
+ * unverändert zurück, und `saveProfile` schreibt das Ergebnis bedingungslos
+ * zurück (ebenso `admin_update_profile`). Ein Editor, der vor der Migration
+ * geladen wurde, trüge die alte absolute URL damit wieder ein, und die
+ * Umstellung konvergierte nie. Deshalb läuft auch dieser Zweig durch
+ * `bildPfad` — das schneidet nur, was zu dieser Instanz und diesem Bucket
+ * gehört, und lässt fremd gehostete Bilder in Ruhe.
+ */
 export async function uploadBild(
   bucket: "avatars" | "covers",
   uid: string,
   blob: Blob | null,
   bisher: string | null,
 ): Promise<string | null> {
-  if (!blob) return bisher;
+  if (!blob) return bildPfad(bucket, bisher);
   const path = `${uid}/${Date.now()}.webp`;
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, blob, { contentType: "image/webp" });
   if (error) throw error;
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  return path;
 }
 
 /**

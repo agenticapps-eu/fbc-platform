@@ -26,7 +26,7 @@ vi.mock("./supabase", () => ({
   },
 }));
 
-import { bildUrl } from "./bild-url";
+import { bildPfad, bildUrl } from "./bild-url";
 
 describe("bildUrl — nackte Pfade bekommen Bucket und Host", () => {
   it("setzt den avatars-Bucket vor einen Pfad", () => {
@@ -94,5 +94,54 @@ describe("bildUrl — leere Werte", () => {
     // Sonst entstünde die URL des Bucket-Wurzelverzeichnisses und daraus ein
     // kaputtes <img> statt der Initialen.
     expect(bildUrl("avatars", "")).toBeNull();
+  });
+});
+
+describe("bildPfad — die Umkehrung, gegen die Nachzügler", () => {
+  it("macht aus einer eigenen Storage-URL den Pfad", () => {
+    expect(
+      bildPfad("avatars", "https://projekt.test/storage/v1/object/public/avatars/a/1.webp"),
+    ).toBe("a/1.webp");
+  });
+
+  it("lässt einen Pfad, der schon einer ist, in Ruhe", () => {
+    // Idempotenz — sonst schnitte ein zweiter Lauf am falschen Ende.
+    expect(bildPfad("avatars", "a/1.webp")).toBe("a/1.webp");
+  });
+
+  it("lässt eine URL eines FREMDEN Hosts unangetastet", () => {
+    // Selbe Bucket-Bezeichnung, andere Instanz. Zuschneiden ergäbe einen Pfad,
+    // unter dem hier nichts liegt — aus einem gültigen Wert würde ein toter.
+    const fremd = "https://fremd.supabase.co/storage/v1/object/public/avatars/a/1.webp";
+    expect(bildPfad("avatars", fremd)).toBe(fremd);
+  });
+
+  it("lässt ein fremd gehostetes Bild unangetastet", () => {
+    const fremd = "https://i.pravatar.cc/300?u=x";
+    expect(bildPfad("avatars", fremd)).toBe(fremd);
+  });
+
+  it("schneidet nicht über Bucket-Grenzen hinweg", () => {
+    // Eine covers-URL, die als avatar_url gespeichert würde, ist ein Fehler —
+    // aber ein stiller Zuschnitt machte daraus einen unrettbaren.
+    const coversUrl = "https://projekt.test/storage/v1/object/public/covers/a/1.webp";
+    expect(bildPfad("avatars", coversUrl)).toBe(coversUrl);
+  });
+
+  it("lässt eine blob:-Vorschau unangetastet", () => {
+    const vorschau = "blob:http://localhost:5173/9f1c";
+    expect(bildPfad("avatars", vorschau)).toBe(vorschau);
+  });
+
+  it("gibt null für null zurück", () => {
+    expect(bildPfad("avatars", null)).toBeNull();
+  });
+
+  it("ist die Umkehrung von bildUrl", () => {
+    // Die tragende Eigenschaft: was der Auflöser baut, nimmt der Kanonisierer
+    // wieder auseinander. Genau diese Inversion braucht auch die Migration.
+    const pfad = "abc-123/1699999999.webp";
+    expect(bildPfad("avatars", bildUrl("avatars", pfad))).toBe(pfad);
+    expect(bildPfad("covers", bildUrl("covers", pfad))).toBe(pfad);
   });
 });

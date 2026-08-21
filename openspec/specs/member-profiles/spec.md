@@ -314,10 +314,10 @@ Für **Lesezugriffe** SHALL ausgeschrieben sein, was das Gate konstruktionsbedin
 nicht erreicht: beide Buckets sind `public` und tragen bewusst keine
 SELECT-Policy, Objekte rendern über ihre URL. Wovor das Gate schützt, ist das
 **Erfahren** der URL — `profiles.avatar_url` und `profiles.cover_url` liegen
-dahinter. Ein nicht aktiviertes Konto SHALL keine Bild-URL erhalten; ein Abruf
-mit bereits bekannter URL SHALL als benannte, vorbestehende Restfläche gelten
-und nicht als Zusage dieses Requirements. Dasselbe SHALL für abgelöste Bilder
-gelten: ein ersetztes oder entkoppeltes Objekt bleibt abrufbar.
+dahinter. Ein nicht aktiviertes Konto SHALL weder Bild-URL noch Bild-Pfad
+erhalten; ein Abruf mit bereits bekannter URL SHALL als benannte, vorbestehende
+Restfläche gelten und nicht als Zusage dieses Requirements. Dasselbe SHALL für
+abgelöste Bilder gelten: ein ersetztes oder entkoppeltes Objekt bleibt abrufbar.
 
 #### Scenario: A member uploads only into their own avatar folder
 
@@ -954,4 +954,102 @@ Fehlen des einen SHALL das andere nicht verdecken.
 
 - **WHEN** ein Profil ohne `member_since` und ohne `member_number` angezeigt wird
 - **THEN** erscheint keine Eckdatenzeile im Profilkopf
+
+### Requirement: Bildspalten tragen Pfade, keine projektgebundenen URLs
+
+Der Geltungsbereich SHALL auf **Supabase-verwaltete** Profilmedien begrenzt sein:
+Objekte in den Buckets `avatars` und `covers`. Ein fremd gehostetes Bild — etwa
+aus dem Demo-Seed — SHALL weiterhin als absolute URL zulässig sein; diese
+Anforderung SHALL NOT als Verbot fremder Hosts gelesen werden.
+
+Für Supabase-verwaltete Bilder SHALL `profiles.avatar_url` und
+`profiles.cover_url` den **Pfad des Objekts innerhalb seines Buckets** tragen.
+Die Projektkennung der Supabase-Instanz SHALL NOT in einem solchen Spaltenwert
+vorkommen. **Sollzustand:** nach abgeschlossener Migration SHALL kein
+Spaltenwert mehr auf ein Objekt der eigenen Instanz über eine absolute URL
+zeigen.
+
+Die anzeigende Fläche SHALL die URL beim Lesen aus Bucket und Pfad herstellen.
+Beide Buckets sind öffentlich; die Herstellung SHALL deshalb ohne Signatur und
+ohne Netzwerkrunde auskommen.
+
+Der Auflöser SHALL als **absolut** behandeln, was ein URI-Schema trägt, und
+SHALL NOT eine Liste einzelner erlaubter Schemata führen. Diese Unterscheidung
+ist tragend: der lokale Entwicklungs-Stack liefert `http:`-URLs, die eine Liste
+aus `https`, `blob` und `data` beschädigt hätte.
+
+Das Durchreichen absoluter Werte SHALL als Aussage über die **Eingabe der
+Anzeigefunktion** gelten, nicht als Erlaubnis für Spaltenwerte — beides SHALL
+NOT vermengt werden. Es deckt drei Eingaben, von denen nur die erste je in einer
+Spalte steht: einen Bestandswert vor der Migration oder aus einer älteren
+ausgelieferten Fassung (Übergang), eine fremd gehostete URL (dauerhaft erlaubt)
+und die `blob:`-URL der Bildvorschau im Editor, die überhaupt nie gespeichert
+wird.
+
+Eine Migration SHALL die Bestandszeilen auf Pfade zurückschneiden. Sie SHALL
+einen Wert nur dann umschneiden, wenn das bezeichnete Objekt **in der eigenen
+Instanz nachweislich existiert**; sie SHALL jeden anderen Wert unangetastet
+lassen. Damit SHALL sie ohne hart geschriebene Projektkennung auskommen und
+zugleich eine gleich aufgebaute URL einer **fremden** Supabase-Instanz nicht
+erfassen.
+
+Die Auslieferung SHALL den Leser **vor** dem Schreiber in Betrieb nehmen. Eine
+Reihenfolge, in der Spaltenwerte zu Pfaden werden, bevor die ausgelieferte
+Fläche sie auflösen kann, SHALL NOT gewählt werden.
+
+#### Scenario: Ein neu hochgeladenes Bild hinterlässt keine Projektkennung
+
+- **WHEN** ein Mitglied ein Profil- oder Hintergrundbild hochlädt
+- **THEN** trägt die Spalte den Pfad innerhalb des Buckets, und die
+  Projektkennung kommt darin nicht vor
+
+#### Scenario: Ein Bestandswert mit absoluter URL wird weiterhin angezeigt
+
+- **WHEN** eine Spalte noch eine absolute URL trägt
+- **THEN** reicht der Auflöser sie unverändert durch, und das Bild erscheint
+
+#### Scenario: Die Vorschau im Editor überlebt den Auflöser
+
+- **WHEN** im Profil-Editor ein Bild ausgewählt, aber noch nicht gespeichert ist
+  und die Vorschau als `blob:`-URL vorliegt
+- **THEN** reicht der Auflöser sie unverändert durch, statt ihr einen Bucket-Host
+  voranzustellen
+
+#### Scenario: Die Migration lässt fremde Werte in Ruhe
+
+- **WHEN** ein Spaltenwert eine Storage-URL trägt, deren Objekt in der eigenen
+  Instanz nicht existiert — etwa aus einer fremden Supabase-Instanz mit
+  gleichnamigem Bucket
+- **THEN** bleibt er unverändert, statt zugeschnitten zu werden
+
+#### Scenario: Ein fremd gehostetes Bild bleibt zulässig
+
+- **WHEN** ein Spaltenwert auf einen fremden Host zeigt, der kein Supabase-Bucket
+  dieser Instanz ist
+- **THEN** verstößt er nicht gegen diese Anforderung, und der Auflöser reicht ihn
+  unverändert durch
+
+#### Scenario: Eine lokale Entwicklungs-URL überlebt den Auflöser
+
+- **WHEN** ein Wert eine `http:`-URL des lokalen Stacks trägt
+- **THEN** reicht der Auflöser sie unverändert durch, weil „absolut" am
+  vorhandenen URI-Schema erkannt wird und nicht an einer Liste
+
+#### Scenario: Der Leser geht vor dem Schreiber in Betrieb
+
+- **WHEN** die Umstellung ausgeliefert wird
+- **THEN** ist die auflösende Fläche nachweislich live, bevor ein Spaltenwert zu
+  einem Pfad wird — sonst renderte eine ältere Fassung den Pfad relativ zum
+  Anwendungs-Origin
+
+#### Scenario: Die Migration ist wiederholbar
+
+- **WHEN** die Migration ein zweites Mal über denselben Bestand läuft
+- **THEN** ändert sie nichts mehr, weil ein Pfad ihrem Muster nicht entspricht
+
+#### Scenario: Ein Wechsel der Projektkennung lässt die Bilder stehen
+
+- **WHEN** derselbe Bestand unter einer anderen Projektkennung betrieben wird
+- **THEN** zeigen die Bilder weiterhin auf vorhandene Objekte, weil kein
+  Spaltenwert die alte Kennung trägt
 

@@ -158,8 +158,12 @@ function einfuegesatz(input: {
  * davon abhängen.
  */
 /**
- * Setzt die öffentliche URL eines hochgeladenen Bildes — mit dem Riegel gegen
- * das Überschreiben eines fremden Bildes IN SQL (Aufgabe 6.3).
+ * Setzt den PFAD eines hochgeladenen Bildes — mit dem Riegel gegen das
+ * Überschreiben eines fremden Bildes IN SQL (Aufgabe 6.3).
+ *
+ * Bis AGE-580 war es die absolute öffentliche URL, mit der Projektkennung
+ * darin; unter einer neuen Kennung zeigte sie ins Leere. Die anzeigende Fläche
+ * stellt die URL jetzt aus Bucket und Pfad her (`src/lib/bild-url.ts`).
  *
  * `and "avatar_url" is null` ist der einzige Schutz an dieser Stelle, und er
  * gehört genau hierher: ein Vergleich in TypeScript läse einen Stand, der
@@ -169,11 +173,11 @@ function einfuegesatz(input: {
  * Es ist bewusst KEIN Teil des `profiles`-Upserts: dort stünde die Spalte im
  * `do update set` und überschriebe bedingungslos.
  */
-function bildsatz(input: { uid: string; art: Bildart; url: string }): Anweisung {
+function bildsatz(input: { uid: string; art: Bildart; pfad: string }): Anweisung {
   const name = spalte(URLSPALTE[input.art]);
   return {
     sql: `update public.profiles set ${name} = $1 where "id" = $2 and ${name} is null`,
-    werte: [input.url, input.uid],
+    werte: [input.pfad, input.uid],
   };
 }
 
@@ -181,7 +185,7 @@ export function schreibauftrag(input: {
   uid: string;
   zusammenfuehrung: Zusammenfuehrung;
   /** Was der Bildabschnitt gerade hochgeladen hat — leer, wo nichts entstand. */
-  bilder?: ReadonlyArray<{ art: Bildart; url: string }>;
+  bilder?: ReadonlyArray<{ art: Bildart; pfad: string }>;
 }): Anweisung[] {
   const { uid, zusammenfuehrung: auftrag } = input;
   const alsProfil = { spalte: "id", wert: uid };
@@ -238,7 +242,7 @@ export function schreibauftrag(input: {
 
   // Die Bild-URLs zuletzt: sie ergänzen die Profilzeile, die oben steht.
   for (const bild of input.bilder ?? []) {
-    anweisungen.push(bildsatz({ uid, art: bild.art, url: bild.url }));
+    anweisungen.push(bildsatz({ uid, art: bild.art, pfad: bild.pfad }));
   }
 
   // Eine Tabelle ohne zu schreibendes Feld fällt hier heraus — ein Statement,
