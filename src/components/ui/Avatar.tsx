@@ -1,3 +1,4 @@
+import { bildUrl } from "../../lib/bild-url";
 import { cn } from "../../lib/cn";
 
 type AvatarSize = "sm" | "md" | "lg";
@@ -17,6 +18,11 @@ function initials(name: string): string {
 
 export interface AvatarProps {
   name: string;
+  /**
+   * Der Spaltenwert aus `profiles.avatar_url` — Pfad im Bucket `avatars` oder
+   * (Altbestand, fremder Host, Editor-Vorschau) eine bereits absolute URL.
+   * `bildUrl` unterscheidet das; siehe dort, warum am URI-Schema erkannt wird.
+   */
   src?: string | null;
   size?: AvatarSize;
   className?: string;
@@ -25,6 +31,11 @@ export interface AvatarProps {
 }
 
 export function Avatar({ name, src, size = "md", className, masked }: AvatarProps) {
+  // Hier, nicht in den Mappern: `directory.ts` reicht mit `Returns[number]` den
+  // rohen RPC-Typ durch — es gibt dort keinen Mapper, und das Loch läge
+  // ausgerechnet auf der meistbesuchten Fläche. Diese Komponente ist der
+  // einzige Trichter: nachgemessen bindet KEIN `<img>` daneben einen Avatar.
+  const url = bildUrl("avatars", src ?? null);
   return (
     <span
       className={cn(
@@ -38,8 +49,8 @@ export function Avatar({ name, src, size = "md", className, masked }: AvatarProp
           <circle cx="12" cy="8" r="3.2" fill="currentColor" />
           <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" fill="currentColor" />
         </svg>
-      ) : src ? (
-        <img src={src} alt={name} loading="lazy" className="h-full w-full object-cover" />
+      ) : url ? (
+        <img src={url} alt={name} loading="lazy" className="h-full w-full object-cover" />
       ) : (
         initials(name)
       )}
