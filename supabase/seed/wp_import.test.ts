@@ -1175,7 +1175,7 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
     expect(ergebnis.bilder.get(1)?.map((b) => b.stand)).toEqual(["vorhanden", "vorhanden"]);
   });
 
-  it("setzt die URL AUCH dann, wenn das Objekt schon liegt", async () => {
+  it("setzt den Pfad AUCH dann, wenn das Objekt schon liegt", async () => {
     // DER STILLE ENDZUSTAND, aus dem Code-Review. Kippt die Transaktion NACH
     // einem gelungenen Upload (Constraint, Verbindungsabbruch, Strg-C), liegt
     // das Objekt und die Spalte ist leer. Gäbe „vorhanden" keine URL heraus,
@@ -1194,8 +1194,15 @@ describe("schreibeDatensaetze — die Bilder (6.3)", () => {
 
     const gesetzt = urlSaetze(gestellt);
     expect(gesetzt).toHaveLength(2);
-    expect(gesetzt[0].werte?.[0]).toContain("/storage/v1/object/public/avatars/");
-    expect(gesetzt[1].werte?.[0]).toContain("/storage/v1/object/public/covers/");
+    // Seit AGE-580 ist es der PFAD, nicht die absolute URL. Die Zusicherung
+    // wird dadurch schärfer statt schwächer: sie verlangt jetzt ausdrücklich,
+    // dass KEINE Projektkennung im Wert landet — das war der ganze Befund.
+    for (const satz of gesetzt) {
+      const wert = satz.werte?.[0] as string;
+      expect(wert).toMatch(/^[^/]+\/import-(avatar|cover)\.webp$/);
+      expect(wert).not.toContain("/storage/v1/object/");
+      expect(wert).not.toMatch(/^https?:/);
+    }
   });
 
   it("lässt ein fehlendes Headerbild das Profilbild nicht mitnehmen (6.4)", async () => {

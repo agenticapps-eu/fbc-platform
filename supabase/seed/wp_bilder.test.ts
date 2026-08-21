@@ -423,13 +423,39 @@ describe("ladeBildHoch — wohin es geht", () => {
     expect(gesehen).toBe(`${BASIS}/storage/v1/object/covers/${KONTO}/import-cover.webp`);
   });
 
-  it("gibt die öffentliche URL zurück — sie geht in profiles.avatar_url", async () => {
+  it("gibt den PFAD zurück — er geht in profiles.avatar_url (AGE-580)", async () => {
+    // Bis AGE-580 stand hier die absolute URL, mit der Projektkennung darin.
+    // Unter einer neuen Kennung zeigte sie ins Leere. Die absolute URL wird
+    // weiter GEBRAUCHT — für den HEAD-Check auf ein vorhandenes Objekt — aber
+    // sie wird nicht mehr gespeichert.
     const ergebnis = await hoch(storage(200, { Key: "…" }));
 
     expect(ergebnis).toEqual({
       stand: "hochgeladen",
-      url: `${BASIS}/storage/v1/object/public/avatars/${KONTO}/import-avatar.webp`,
+      pfad: `${KONTO}/import-avatar.webp`,
     });
+  });
+
+  it("gibt den Pfad auch zurück, wenn das Objekt schon da ist (HEAD)", async () => {
+    // `roh`, nicht `hoch`: `hoch` beantwortet die Vorab-Frage selbst mit 400,
+    // damit die Tests darunter den Upload-Weg prüfen.
+    const ergebnis = await roh(async (_url, init) =>
+      init?.method === "HEAD"
+        ? new Response(null, { status: 200 })
+        : new Response(null, { status: 500 }),
+    );
+
+    expect(ergebnis).toEqual({ stand: "vorhanden", pfad: `${KONTO}/import-avatar.webp` });
+  });
+
+  it("gibt den Pfad auch beim 409/Duplicate zurück", async () => {
+    const ergebnis = await hoch(async (_url, init) =>
+      init?.method === "HEAD"
+        ? new Response(null, { status: 404 })
+        : new Response(JSON.stringify({ error: "Duplicate" }), { status: 400 }),
+    );
+
+    expect(ergebnis).toEqual({ stand: "vorhanden", pfad: `${KONTO}/import-avatar.webp` });
   });
 
   it("schickt den Schlüssel und den Bildtyp mit — covers lässt nur image/webp zu", async () => {

@@ -338,14 +338,14 @@ describe("die Stufe kommt an keinen Datensatz-Weg heran", () => {
   });
 });
 
-describe("schreibauftrag — die Bild-URLs (6.3)", () => {
+describe("schreibauftrag — die Bild-Pfade (6.3)", () => {
   it("setzt avatar_url und cover_url in eigenen Anweisungen", () => {
     const anweisungen = schreibauftrag({
       uid: "uid-1",
       zusammenfuehrung: zusammenfuehrung(),
       bilder: [
-        { art: "profil", url: "https://例/avatars/uid-1/import-avatar.webp" },
-        { art: "cover", url: "https://例/covers/uid-1/import-cover.webp" },
+        { art: "profil", pfad: "uid-1/import-avatar.webp" },
+        { art: "cover", pfad: "uid-1/import-cover.webp" },
       ],
     });
 
@@ -362,22 +362,24 @@ describe("schreibauftrag — die Bild-URLs (6.3)", () => {
     const [satz] = schreibauftrag({
       uid: "uid-1",
       zusammenfuehrung: zusammenfuehrung(),
-      bilder: [{ art: "profil", url: "https://例/a.webp" }],
+      bilder: [{ art: "profil", pfad: "uid-1/a.webp" }],
     }).filter((a) => a.sql.startsWith("update"));
 
     expect(satz.sql).toContain('"avatar_url" is null');
   });
 
-  it("schreibt die URL als Wert, nie in den Text", () => {
-    const url = "https://例/avatars/uid-1/import-avatar.webp";
+  it("schreibt den Pfad als Wert, nie in den Text", () => {
+    // Ein Pfad, kein URL — seit AGE-580 steht das in der Spalte. Der Test
+    // bleibt derselbe: der Wert geht als Parameter, nie in den SQL-Text.
+    const pfad = "uid-1/import-avatar.webp";
     const [satz] = schreibauftrag({
       uid: "uid-1",
       zusammenfuehrung: zusammenfuehrung(),
-      bilder: [{ art: "profil", url }],
+      bilder: [{ art: "profil", pfad }],
     }).filter((a) => a.sql.startsWith("update"));
 
-    expect(satz.sql).not.toContain(url);
-    expect(satz.werte).toEqual([url, "uid-1"]);
+    expect(satz.sql).not.toContain(pfad);
+    expect(satz.werte).toEqual([pfad, "uid-1"]);
   });
 
   it("baut ohne Bilder keine einzige zusätzliche Anweisung", () => {
@@ -392,7 +394,7 @@ describe("schreibauftrag — die Bild-URLs (6.3)", () => {
     const anweisungen = schreibauftrag({
       uid: "uid-1",
       zusammenfuehrung: zusammenfuehrung(),
-      bilder: [{ art: "profil", url: "https://例/a.webp" }],
+      bilder: [{ art: "profil", pfad: "uid-1/a.webp" }],
     });
 
     const profil = anweisungen.findIndex((a) => a.sql.includes("insert into public.profiles"));

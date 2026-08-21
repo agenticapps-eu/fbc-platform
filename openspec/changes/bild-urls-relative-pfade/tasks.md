@@ -41,10 +41,10 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 
 ### 3. Sichtprobe im Browser — nicht verhandelbar
 
-- [ ] 3.1 `blob:` ist in jsdom unsichtbar, weil jsdom kein Bild lädt. Die
+- [x] 3.1 `blob:` ist in jsdom unsichtbar, weil jsdom kein Bild lädt. Die
       Vorschau beim Hochladen **im Browser** ansehen, Profilbild und
       Hintergrundbild je einmal.
-- [ ] 3.2 Verzeichnis, Profilansicht und Aktivität mit echten Daten — grüne
+- [x] 3.2 Verzeichnis, Profilansicht und Aktivität mit echten Daten — grüne
       Tests haben hier schon ein visuell falsches Ergebnis durchgewunken.
 
 ### 4. Stufe 1 ausliefern
@@ -59,13 +59,13 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 
 ### 5. Die Erzeuger schreiben Pfade
 
-- [ ] 5.1 `uploadBild` (`src/lib/profile.ts:311`) gibt den Pfad zurück.
-- [ ] 5.2 **Und kanonisiert beim Speichern**: ein eingehender absoluter
+- [x] 5.1 `uploadBild` (`src/lib/profile.ts:311`) gibt den Pfad zurück.
+- [x] 5.2 **Und kanonisiert beim Speichern**: ein eingehender absoluter
       Supabase-Wert wird zum Pfad. Das schließt die Nachzügler —
       `uploadBild` gibt ohne neuen Blob den ALTEN Wert zurück (`:305`), und
       `saveProfile` (`:343`) wie `admin-profile.ts:170` schreiben ihn
       bedingungslos zurück.
-- [ ] 5.3 `supabase/seed/wp_bilder.ts` — **Prüf-URL und persistierten Pfad
+- [x] 5.3 `supabase/seed/wp_bilder.ts` — **Prüf-URL und persistierten Pfad
       trennen.** Die absolute URL wird für den `HEAD`-Check auf vorhandene
       Objekte weiter gebraucht (`:490`); nur der Rückgabewert wird zum Pfad.
       Alle drei Zweige einzeln testen: hochgeladen · vorhanden via `HEAD` ·
@@ -73,24 +73,24 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 
 ### 6. Die Migration
 
-- [ ] 6.1 **Nur umschneiden, wenn das Objekt lokal existiert** — gegen
+- [x] 6.1 **Nur umschneiden, wenn das Objekt lokal existiert** — gegen
       `storage.objects` mit passendem `bucket_id` und `name`. Damit ist sie
       weder an eine Projektkennung gebunden noch je zu breit, und das Szenario
       „fremde Werte bleiben unangetastet" hält auch gegen ein fremdes
       Supabase-Projekt mit gleichnamigem Bucket.
-- [ ] 6.2 Jede Spalte nur gegen ihren eigenen Bucket.
-- [ ] 6.3 Migrations-Kopf mit Begründung und **verworfener Alternative** (das
+- [x] 6.2 Jede Spalte nur gegen ihren eigenen Bucket.
+- [x] 6.3 Migrations-Kopf mit Begründung und **verworfener Alternative** (das
       harte Schreiben der Kennung, und warum die Existenzprüfung besser ist).
-- [ ] 6.4 **Automatisierter** Migrationstest, nicht ein Handlauf: eigener Host ·
+- [x] 6.4 **Automatisierter** Migrationstest, nicht ein Handlauf: eigener Host ·
       fremder Supabase-Host mit gleichem Bucket · falscher Bucket · nackter
       Pfad · `null` · **Idempotenz** · ein nach der Migration geschriebener
       Altwert.
-- [ ] 6.5 Lokal gegen `supabase start` fahren und die Wirkung zählen.
+- [x] 6.5 Lokal gegen `supabase start` fahren und die Wirkung zählen.
 
 ### 7. Abschluss
 
 - [ ] 7.1 Zählen: `avatar_url`/`cover_url` mit Projektkennung → **0**.
-- [ ] 7.2 Sichtprobe im Browser, dass die Bilder danach wirklich da sind — eine
+- [x] 7.2 Sichtprobe im Browser, dass die Bilder danach wirklich da sind — eine
       Zeilenzählung sagt darüber nichts.
 - [ ] 7.3 `openspec archive`, danach erneut `validate --all`.
 - [ ] 7.4 PR, Merge gegengeprüft; Linear-Status lesen, nicht blind schreiben.

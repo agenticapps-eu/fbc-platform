@@ -412,8 +412,11 @@ export const URLSPALTE: Record<Bildart, "avatar_url" | "cover_url"> = {
  * `is null` lässt das UPDATE null Zeilen treffen, wo schon etwas steht.
  */
 export type Hochladeergebnis =
-  | { stand: "hochgeladen"; url: string }
-  | { stand: "vorhanden"; url: string }
+  // PFAD, nicht URL (AGE-580). Die absolute URL wird weiter gebraucht — für
+  // den HEAD-Check unten — aber nicht mehr gespeichert: sie trüge die
+  // Projektkennung in die Spalte, und unter einer neuen zeigte sie ins Leere.
+  | { stand: "hochgeladen"; pfad: string }
+  | { stand: "vorhanden"; pfad: string }
   | { stand: "fehlt"; grund: string };
 
 /**
@@ -480,7 +483,7 @@ export async function ladeBildHoch(
   // Aufruf einen Lauf über 70 Datensätze unbegrenzt an, ohne eine Zeile Ausgabe.
   try {
     const da = await hole(oeffentlich, { method: "HEAD", signal: AbortSignal.timeout(15_000) });
-    if (da.ok) return { stand: "vorhanden", url: oeffentlich };
+    if (da.ok) return { stand: "vorhanden", pfad };
   } catch {
     /* der Upload entscheidet */
   }
@@ -506,12 +509,12 @@ export async function ladeBildHoch(
     };
   }
 
-  if (antwort.ok) return { stand: "hochgeladen", url: oeffentlich };
+  if (antwort.ok) return { stand: "hochgeladen", pfad };
 
   // Der Rumpf entscheidet, nicht der Status — s. oben.
   const rumpf = (await antwort.json().catch(() => ({}))) as { error?: string };
   if (rumpf.error === "Duplicate" || antwort.status === 409) {
-    return { stand: "vorhanden", url: oeffentlich };
+    return { stand: "vorhanden", pfad };
   }
 
   return {

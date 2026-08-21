@@ -54,3 +54,33 @@ export function bildUrl(bucket: "avatars" | "covers", wert: string | null): stri
   if (HAT_SCHEMA.test(wert)) return wert;
   return supabase.storage.from(bucket).getPublicUrl(wert).data.publicUrl;
 }
+
+/**
+ * Die Umkehrung: macht aus einer URL **dieser** Instanz wieder den Pfad.
+ *
+ * Gebraucht wird sie gegen die **Nachzügler**. `uploadBild` gibt ohne neuen
+ * Blob den ALTEN Spaltenwert zurück, und `saveProfile` wie
+ * `admin_update_profile` schreiben ihn bedingungslos zurück. Ohne diesen
+ * Schritt trüge ein Editor, der vor der Migration geladen wurde, die alte
+ * absolute URL wieder ein — die Umstellung konvergierte nie ganz.
+ *
+ * Zugeschnitten wird **nur**, was nachweislich zu dieser Instanz und zu genau
+ * diesem Bucket gehört. Alles andere bleibt, wie es ist:
+ *
+ *   - ein Pfad, der schon einer ist (Idempotenz),
+ *   - eine URL einer FREMDEN Supabase-Instanz mit gleich heißendem Bucket —
+ *     zuschneiden ergäbe einen Pfad, unter dem hier nichts liegt, und machte
+ *     aus einem gültigen Wert einen toten,
+ *   - ein fremd gehostetes Bild (der Demo-Seed schreibt `i.pravatar.cc`),
+ *   - eine `blob:`-Vorschau,
+ *   - ein Wert des jeweils ANDEREN Buckets. Dass er dort steht, ist ein
+ *     Fehler — aber ein stiller Zuschnitt machte ihn unrettbar.
+ *
+ * Die Präfix-Grenze wird beim Client erfragt statt zusammengesetzt, damit sie
+ * mit `bildUrl` deckungsgleich bleibt: beide fragen dieselbe Quelle.
+ */
+export function bildPfad(bucket: "avatars" | "covers", wert: string | null): string | null {
+  if (!wert) return null;
+  const praefix = supabase.storage.from(bucket).getPublicUrl("").data.publicUrl;
+  return wert.startsWith(praefix) ? wert.slice(praefix.length) : wert;
+}
