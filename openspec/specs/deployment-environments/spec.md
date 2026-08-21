@@ -29,22 +29,36 @@ ausdrücklich benannte DEV-Bestand aus `environment-sync`.
 Kein Vorgang SHALL Daten von DEV nach PROD übertragen.
 
 Der Wechsel des **Frontend-Laufzeit-Routings** einer Umgebung auf ein anderes
-Projekt SHALL ausschließlich durch das Ändern der drei Werte
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` und `SUPABASE_DB_PASSWORD` in der
-betreffenden Infisical-Umgebung plus einen Re-Deploy erfolgen. Kein
-Anwendungscode SHALL das Zielprojekt kennen oder unterscheiden.
+Projekt SHALL ausschließlich durch das Ändern der zwei Werte
+`VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` in der betreffenden
+Infisical-Umgebung plus einen Re-Deploy erfolgen. Beide SHALL dabei stets
+gemeinsam und auf dasselbe Projekt gesetzt werden. Kein Anwendungscode SHALL das
+Zielprojekt kennen oder unterscheiden.
+
+Die Aufzählung SHALL abschließend sein: kein weiterer Wert SHALL für den Wechsel
+des Frontend-Routings gesetzt werden müssen. Insbesondere SHALL
+`SUPABASE_DB_PASSWORD` für diesen Wechsel NOT erforderlich sein und SHALL NOT im
+ausgelieferten Client-Bundle erscheinen.
 
 Diese Aussage SHALL NOT auf die übrige projektgebundene Konfiguration ausgedehnt
 werden: Migrationsläufe, Function-Bereitstellung und Function-Secrets tragen ihr
-Ziel jeweils eigenständig und wandern nicht mit diesen drei Werten mit.
+Ziel jeweils eigenständig und wandern nicht mit diesen zwei Werten mit.
 
 #### Scenario: Der Wechsel des Frontend-Routings lässt die Infrastruktur unberührt
 
-- **WHEN** die drei Frontend-Werte einer Umgebung auf ein anderes Projekt
+- **WHEN** die zwei Frontend-Werte einer Umgebung auf ein anderes Projekt
   gesetzt werden
 - **THEN** zeigt das ausgelieferte Bundle auf das neue Projekt, während
   Migrationsziele, Function-Bereitstellung und Function-Secrets unverändert auf
   ihre jeweils eigenen Ziele zeigen
+
+#### Scenario: Das Datenbank-Passwort erreicht das Bundle nicht
+
+- **WHEN** ein Build mit gesetztem `SUPABASE_DB_PASSWORD` erzeugt und das
+  Erzeugnis nach diesem Wert durchsucht wird
+- **THEN** kommt er darin nicht vor, während `VITE_SUPABASE_URL` darin
+  auffindbar ist — ein Wechsel, der `SUPABASE_DB_PASSWORD` mitsetzt, ändert am
+  Bundle also nichts
 
 #### Scenario: Echte Daten auf DEV verletzen die Rollentrennung nicht
 
@@ -70,7 +84,7 @@ SHALL NOT als Nebenwirkung des Aufsetzens eintreten.
 #### Scenario: Das Aufsetzen von PROD lenkt keinen Verkehr um
 
 - **WHEN** das PROD-Projekt angelegt, migriert und bestückt ist
-- **THEN** zeigt `main` weiterhin auf das DEV/DEMO-Projekt, bis die drei
+- **THEN** zeigt `main` weiterhin auf das DEV/DEMO-Projekt, bis die zwei
   Frontend-Werte bewusst umgestellt werden
 
 #### Scenario: Demo-Daten erreichen PROD nicht
