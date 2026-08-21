@@ -50,9 +50,9 @@ und werden durchgereicht. Genau das macht sie sicher auslieferbar.
 ### 4. Stufe 1 ausliefern
 
 - [x] 4.1 `pnpm test`, `typecheck`, `lint` — Ausgaben lesen.
-- [ ] 4.2 Code-Review auf den **Diff**.
-- [ ] 4.3 PR, Merge per `gh pr view --json state` gegengeprüft.
-- [ ] 4.4 **Am ausgelieferten Bundle belegen, dass Stufe 1 live ist** — an einer
+- [x] 4.2 Code-Review auf den **Diff**.
+- [x] 4.3 PR, Merge per `gh pr view --json state` gegengeprüft.
+- [x] 4.4 **Am ausgelieferten Bundle belegen, dass Stufe 1 live ist** — an einer
       Zeichenkette aus dem Diff, nicht an der Bundle-Größe. Erst danach Stufe 2.
 
 ## Stufe 2 — Erzeuger und Migration. Erst wenn Stufe 1 nachweislich live ist.
