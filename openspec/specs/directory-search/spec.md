@@ -239,6 +239,23 @@ bleiben, der sie in der Datenbank vorsieht. Der Verweis ist Teil der
 Anforderung: „ausstehend" ohne Adresse ist der Zustand, aus dem diese Fassung
 herausführt.
 
+**Der Auslöser, ab dem die Preisgabe wirksam wird (festgeschrieben 22.08.2026):**
+Solange **alle** Konten auf `impact` stehen, ist sie folgenlos — es gibt keine
+Stufe, gegen die abgestuft werden könnte, und jedes Konto dürfte die Namen
+ohnehin sehen. Gemessen am selben Tag auf der Import-Datenbank: 71 von 71
+Profilen auf `impact`. Die Preisgabe SHALL deshalb **nicht** als „später" oder
+als Terminfrage geführt werden, sondern an genau dieser Bedingung hängen:
+
+- **WENN** das erste Konto eine Stufe **unterhalb** von `impact` trägt — also
+  mit der Freischaltung des normalen Stufenwegs ab `basic` für Neuzugänge —
+- **DANN** SHALL die stufenweise Auflösung aus AGE-291 gebaut sein, **bevor**
+  dieses Konto entsteht; ab ihm liest ein `basic`-Konto sonst jeden
+  öffentlichen Mitgliedsnamen.
+
+Der Auslöser ist ein Zustand der Daten, keine Kalenderzeile: er lässt sich
+jederzeit prüfen (`select count(*) from profiles where tier <> 'impact'` > 0)
+und rutscht deshalb nicht durch, wenn der Go-Live sich verschiebt.
+
 #### Scenario: Anonymous reader sees a masked author name
 
 - **WHEN** an anonymous caller reads a post whose author's profile row is not

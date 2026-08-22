@@ -2,6 +2,21 @@
 
 ## 1. Tiered name resolution (AGE-291, spec-relevant)
 
+**Auslöser, festgeschrieben 22.08.2026 — hier steht, WANN diese vier Aufgaben
+fällig werden.** Sie sind es heute nicht: `profiles_public` gibt jedem
+aktivierten Konto jeden öffentlichen Namen, aber alle 71 Profile der
+Import-Datenbank stehen auf `impact` (an dem Tag gemessen). Es gibt keine Stufe,
+gegen die abgestuft werden könnte, also ist die Preisgabe folgenlos.
+
+Fällig werden sie mit dem **ersten Konto unterhalb von `impact`** — praktisch
+mit der Freischaltung des normalen Stufenwegs ab `basic` für Neuzugänge, laut
+Go-Live-Zielbild etwa eine Woche nach dem Start. Ab diesem Konto liest ein
+`basic`-Zugang jeden öffentlichen Mitgliedsnamen. Prüfbar an den Daten, nicht am
+Kalender: `select count(*) from profiles where tier <> 'impact'` > 0.
+
+Der Auslöser steht ebenso in `openspec/specs/directory-search/spec.md` und als
+Kommentar an AGE-291.
+
 - [ ] 1.1 Add a shared `resolve_display_name` predicate/function keyed off the
       caller's own tier (`auth.uid()` → rank), returning the full name for self and
       `has_level(4)` callers, else the "Mitglied" masked label
