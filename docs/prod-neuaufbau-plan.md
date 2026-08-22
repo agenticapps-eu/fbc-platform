@@ -10,6 +10,13 @@ nicht aus Dokumenten übernommen.
 > Schritt 3b neu dazugekommen ist. Die Zahlen der Befunde 1–3 stammen weiter
 > vom 17.08.; wo sie überholt sind, steht das dort.
 
+> **Nachgezogen am 2026-08-22.** Drei Stellen waren überholt und sind ersetzt:
+> **Befund 3** (PROD steht jetzt auf demselben Migrationsstand wie DEV, 71),
+> **Schritt 3b** (die Bild-URLs sind relative Pfade, der Schritt entfällt) und
+> die **Bestandstabelle** — PROD ist nicht mehr inhaltlich leer, sondern trägt
+> seit dem Spiegel denselben Bestand wie DEV, samt der erfundenen Aktivität.
+> Alle Zahlen an diesem Tag an beiden Datenbanken gemessen.
+
 ---
 
 ## Vorab: drei Befunde, die den Plan verändern
@@ -49,34 +56,97 @@ Datenbank, die weiterhin niemand benutzt.
 > nicht als erster. Am selben Tag am ausgelieferten Bundle nachgemessen: es
 > enthält genau eine Projekt-URL, `foelowldexkcqzewvrcf`.
 
-### 3. PROD trägt die Korrektur-Migration NICHT
+### 3. ~~PROD trägt die Korrektur-Migration NICHT~~ — erledigt am 2026-08-22
 
-Letzte Migration auf PROD ist `20260817120000`. `20260817140000`
-(Zeilensperre gegen den Wettlauf, `coalesce` gegen `limit null`) fehlt dort —
-auf DEV liegt sie seit dem heutigen `migrate-dev`-Lauf. Was auch immer heute
-nach PROD geschoben wurde, diese Migration war nicht dabei.
+Am 17.08. war die letzte Migration auf PROD `20260817120000`; `20260817140000`
+fehlte dort. **Das stimmt nicht mehr.** Seit dem `migrate-prod`-Lauf
+32563367673 stehen DEV und PROD identisch auf **71 Migrationen**, letzte
+`20260821120000` — genau die 71 Dateien in `supabase/migrations/`.
+Nachgemessen am 2026-08-22 an beiden Datenbanken.
 
 ---
 
 ## Was auf PROD unwiederbringlich ist
 
-Gemessen, damit die Antwort nicht geschätzt wird:
+Gemessen, damit die Antwort nicht geschätzt wird — **die Zahlen unten stammen
+vom 2026-08-22**, die vom 17.08. stehen in der letzten Spalte daneben, weil sie
+den Plan an mehreren Stellen noch tragen:
 
-| Bestand | Zahl | Ersetzbar? |
-|---|---|---|
-| `profiles` | 71 | **Nein ohne Quelle** — aus dem WordPress-Export erzeugt |
-| davon aktiviert | **2** | die zwei sind die einzigen mit echter Historie |
-| `auth.users` mit je einer Anmeldung | **2** | dito |
-| `posts`, `events`, `messages`, `contact_requests`, `admin_audit` | **je 0** | nichts zu verlieren |
+| Bestand | Heute (22.08.) | Am 17.08. | Ersetzbar? |
+|---|---|---|---|
+| `profiles` | **72** | 71 | **Nein ohne Quelle** — 71 aus dem WordPress-Export, eines danach dazugekommen |
+| davon aktiviert | **37** | 2 | ja — der Aktivierungsstand wird über die Links neu erworben |
+| `auth.users` mit je einer Anmeldung | **2** | 2 | die zwei sind die einzigen mit echter Historie |
+| `posts` | **29** | 0 | **erfundene Aktivität** — 26 Urheber, Beiträge vom 03.–18.08. |
+| `events` | **8** | 0 | dito |
+| `storage.objects` | **125** | — | Profil- und Titelbilder, hängen an den Profilen |
+| `messages`, `contact_requests`, `admin_audit` | **je 0** | je 0 | nichts zu verlieren |
 
-**Das ist die gute Nachricht des Plans:** auf PROD steht kein Gespräch, kein
-Termin, keine Nachricht und keine Protokollzeile. Der gesamte schützenswerte
-Bestand sind 71 Profilzeilen, von denen 69 noch nie jemand benutzt hat.
+**Die gute Nachricht des Plans steht weiter, nur anders begründet:** auf PROD
+steht kein Gespräch, keine Nachricht und keine Protokollzeile — kein einziger
+Datensatz, den ein Mitglied selbst erzeugt hat (nur 2 von 72 Konten haben sich
+je angemeldet). Die 29 Beiträge und 8 Termine sind die **erfundene Aktivität**,
+die der Go-Live ausdrücklich NICHT mitnehmen soll; sie zu löschen ist Ziel des
+Neuaufbaus, nicht sein Preis.
+
+> **Der Plan hiess PROD einmal „inhaltlich leer".** Das war am 17.08. wahr und
+> ist es nicht mehr. DEV und PROD tragen seit dem Spiegel (20.08.) **denselben
+> Bestand** — `posts`, `events` und `profiles` haben auf beiden Datenbanken
+> identische Id-Mengen (md5 über die sortierten Ids, am 22.08. verglichen).
 
 > **Seit dem 2026-08-20 ist „unwiederbringlich" die falsche Überschrift.**
 > Schritt 1 hat ein Werkzeug, das den ganzen Bestand samt Storage sichert und
 > dessen Rückweg gemessen ist. Die Zeile „Nein ohne Quelle" gilt nur noch für
 > den Fall, dass niemand vorher den Auszug gefahren hat.
+
+---
+
+## Ausgeführt am 2026-08-22: der Reset statt des Neuaufbaus
+
+**Die Schritte 2 bis 4 sind nicht gelaufen und werden nicht mehr gebraucht.**
+Der Plan setzte voraus, dass PROD auf einem alten Migrationsstand steht und
+inhaltlich leer ist. Beides gilt nicht mehr: PROD trägt seit dem
+`migrate-prod`-Lauf dieselben 71 Migrationen wie das Repo, und die Inhalte, die
+weg sollten, stammen sämtlich aus **einem** Seed mit **eigenem Rückweg**
+(`supabase/seed/import_world_seed.ts`, AGE-566, Präfix `0ade0566`).
+
+Gelaufen ist deshalb nur:
+
+```bash
+infisical run --env=prod -- env IMPORT_SEED_CONFIRM=fbc-import-vorschau \
+  IMPORT_SEED_MODE=reset \
+  IMPORT_SEED_CA_CERT=scripts/supabase-root-2021-ca.crt \
+  npx tsx supabase/seed/import_world_seed.ts
+```
+
+`IMPORT_SEED_CA_CERT` ist Pflicht — ohne die Root-CA bricht der Lauf mit
+„self-signed certificate in certificate chain" ab, vor dem ersten Statement.
+
+**Ergebnis, unabhängig nachgemessen (nicht der Bilanz des Skripts geglaubt):**
+
+| | vor dem Reset | danach |
+|---|---|---|
+| `profiles` / `auth.users` | 72 | **71** (das Vorschau-Konto ging mit) |
+| aktiviert | 37 | **2** — die einzigen mit echter Anmeldung |
+| `posts` | 29 | **3** (Detlevs echte, 0 mit Seed-Präfix) |
+| `events` / `event_registrations` / `post_likes` | 8 / 97 / 88 | **0 / 0 / 0** |
+| `comments` | 13 | **1** |
+| `storage.objects` `event-covers` | 8 | **0** |
+| Avatare / Titelbilder / `post-media` | 57 / 54 / 6 | **unverändert**, 0 tote Verweise |
+| `staff_roles` | 3 | **2** (Donald, Detlev) |
+
+**Zwei Dinge, die der Plan so nicht gesehen hatte:**
+
+- **Detlev hat drei echte Beiträge geschrieben** (17./18.08.), einer mit sechs
+  Bildern. Ein Wipe hätte sie gelöscht. Donalds Entscheidung am 22.08.: sie
+  **bleiben** stehen. Von seinen zwei Kommentaren ist einer mitgegangen — er
+  hing unter einem erfundenen Beitrag und kaskadierte mit ihm.
+- **`staff_roles` legt keine Migration an.** Nach einem Wipe wäre niemand Admin
+  gewesen, bis `supabase/seed/admin_roles.sql` von Hand läuft (und das braucht
+  `psql`). Tags, `platform_settings`, Badges, Partner-Kategorien und Stufen
+  kämen dagegen aus Migrationen zurück.
+
+Bleibt aus diesem Plan: **Schritt 5**, die Umgebung nachziehen.
 
 ---
 
@@ -184,13 +254,13 @@ an `public` und blieben sonst als verwaiste Objekte liegen.
 infisical run --env=prod -- supabase db push --db-url "$SUPABASE_DB_URL_PROD"
 ```
 
-Alle 70 Migrationen von vorn, in Reihenfolge. `db:push:prod` verlangt ein TTY —
+Alle 71 Migrationen von vorn, in Reihenfolge. `db:push:prod` verlangt ein TTY —
 das läuft im Terminal, nicht aus einem Agenten heraus.
 
 **Prüfung, und diese ist die wichtigste:**
 
 - `select count(*) from supabase_migrations.schema_migrations` = Zahl der
-  Dateien in `supabase/migrations/` (heute **70**, mit `20260817140000`).
+  Dateien in `supabase/migrations/` (heute **71**, letzte `20260821120000`).
 - Der Grant-Test läuft durch: `supabase test db … grants_test.sql rls_test.sql
   directory_search_test.sql admin_member_list_test.sql` gegen PROD. **Nicht das
   ganze Verzeichnis** — die `probe_*.sql` sind kein pgTAP und lassen den Befehl
@@ -198,7 +268,15 @@ das läuft im Terminal, nicht aus einem Agenten heraus.
 - Die vier Aktivierungs-Functions sind deployt. Ein Deploy wendet weder
   Migrationen noch Functions an; das sind drei getrennte Befehle.
 
-### Schritt 3b — Die Bild-URLs, die an der Projektkennung hängen
+### ~~Schritt 3b — Die Bild-URLs, die an der Projektkennung hängen~~ — gegenstandslos seit 2026-08-22
+
+> **Dieser Schritt ist erledigt und entfällt.** AGE-580 hat die Spalten auf
+> **relative Pfade** umgestellt: die Erzeuger schreiben Pfade, ein Auflöser
+> baut die URL beim Anzeigen, und die Migration `20260821120000` hat den
+> Bestand nachgezogen. Am 22.08. auf **beiden** Datenbanken nachgemessen:
+> **0** absolute Werte, 56 `avatar_url` + 53 `cover_url` als Pfade. Ein Aufbau
+> unter neuer Kennung liesse die Bilder damit nicht mehr ins Leere zeigen —
+> das Risiko unten ist weg. Der Abschnitt bleibt als Befund stehen.
 
 **Neu am 2026-08-20, gefunden auf der ausgelieferten Fläche.** Zwei Spalten
 tragen keine Pfade, sondern **absolute URLs mit der Projektkennung darin**:
@@ -233,9 +311,12 @@ neuen Kennung wirklich liegt.
 Trigger `handle_new_user` legt die Profilzeile an, und reine Einfügespalten
 kommen bei einem nachträglichen Update nie an.
 
-**Prüfung:** 71 Profile, davon 0 aktiviert (der Aktivierungsstand ist Absicht:
-er wird über die Links neu erworben) — oder 2, wenn die beiden echten Konten
-ihren Stand behalten sollen. Auch das ist eine Entscheidung, keine Technik.
+**Prüfung:** 71 Profile aus dem Export (heute liegen 72 auf PROD — eines ist
+nach dem 17.08. dazugekommen und gehört gesondert entschieden), davon 0
+aktiviert (der Aktivierungsstand ist Absicht: er wird über die Links neu
+erworben) — oder 2, wenn die beiden echten Konten ihren Stand behalten sollen.
+Auch das ist eine Entscheidung, keine Technik. **Und 0 `posts`, 0 `events`** —
+die erfundene Aktivität kommt nicht zurück.
 
 ### Schritt 5 — Die Umgebung nachziehen
 
