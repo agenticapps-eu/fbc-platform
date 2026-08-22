@@ -158,13 +158,34 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       Passwort. Reihenfolge beim Messen: Mitschnitt leeren → handeln →
       **Netzwerk lesen** → Screenshot.
 - [ ] 6.4 Belegen, dass `activated_at` dabei **unverändert** geblieben ist.
+      — **Am Code belegt (22.08.), die Laufzeitmessung steht noch aus.** Der
+      Reset-Weg teilt sich die Kette mit der Aktivierung: `/passwort-vergessen`
+      und `/passwort-neu` rendern beide `ActivationRedeemPage` mit
+      `zweck="reset"` (`App.tsx:190-191`), und `redeem-activation` ruft
+      `markActivated` **ohne Fallunterscheidung** (`redeem.ts:140`) — der
+      Reset läuft also durch dieselbe Zeile wie eine Aktivierung. Genau hier
+      läge der befürchtete Fehler.
+      Er ist abgefangen, aber nicht im Aufrufer, sondern in der Funktion:
+      `mark_activated` setzt `activated_at = coalesce(activated_at, now())`
+      (`20260806080200_activation_rpcs.sql:185`). Für ein bereits aktiviertes
+      Konto ist der Aufruf damit ein No-op auf dem Zeitstempel, und ein
+      Passwort-Reset kann die Aktivierung strukturell nicht zurücksetzen oder
+      verschieben.
+      **Was das nicht ersetzt:** dass der Wert im echten Lauf gleich bleibt,
+      ist damit *hergeleitet*, nicht *gemessen*. Der Beleg gehört zu 6.3 und
+      wird mit ihm nachgetragen — Wert vorher lesen, Lauf fahren, Wert
+      nachlesen.
 
 ## 7. Nachlauf
 
-- [ ] 7.1 AGE-505 in Linear auf Done — vorher `get_issue` lesen, die Automation
-      schaltet den Status bei PR-Merge selbst.
-- [ ] 7.2 11.7 in `member-activation-flow/tasks.md` als hierher verlagert
-      abhaken, mit Verweis auf AGE-505.
+- [x] 7.1 AGE-505 in Linear auf Done — vorher `get_issue` lesen, die Automation
+      schaltet den Status bei PR-Merge selbst. **22.08. gelesen: steht seit dem
+      08.08. 18:28 auf Done, vier PRs angehängt (#134, #139, #140, #142).
+      Nichts geschrieben.**
+- [x] 7.2 11.7 in `member-activation-flow/tasks.md` als hierher verlagert
+      abhaken, mit Verweis auf AGE-505. **22.08.: der Haken stand schon, der
+      Verweis fehlte — nachgetragen in
+      `archive/2026-08-09-member-activation-flow/tasks.md`.**
 - [ ] 7.3 `openspec archive` erst, wenn 6.3 gemessen ist — nicht, wenn der Code
       existiert.
 

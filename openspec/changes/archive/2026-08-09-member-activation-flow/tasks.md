@@ -843,6 +843,10 @@ nie seine Aufgabe, einen Ort zu bekommen schon._
       (`ActivationRedeemPage.tsx:80-82` setzt `setAngefordert(true)` im
       `finally`). Nach C10 ist „aktiviert" der Normalfall. Eigene Anforderung,
       nicht Teil dieses Changes.
+      — **Verlagert nach AGE-505**, dort gebaut im Change `password-reset-flow`
+      (`/passwort-vergessen` → `/passwort-neu`, Token-Status `issued_reset`).
+      Nachgetragen am 22.08., weil der Verweis hier fehlte und die Aufgabe
+      sonst als offener Befund ohne Adresse dastand.
 - [x] 11.8 **Der Fehlversand auf dem angemeldeten Weg sperrt den anonymen zu**
       (E2). `resend-activation` entwertet über `request_own_activation_token`
       und gibt neu aus, **bevor** es sendet. Lehnt Resend ab, antwortet die
