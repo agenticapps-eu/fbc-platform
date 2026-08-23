@@ -118,27 +118,52 @@ und standen im ersten Entwurf nicht drin.
 
 ## 5. `admin_list_members` erweitern
 
-- [ ] 5.1 **RED:** die fünf `p_status`-Werte; Ausschluss von Deaktivierten aus
+- [x] 5.1 **RED:** die fünf `p_status`-Werte; Ausschluss von Deaktivierten aus
       `alle`/`aktiviert`/`offen`; ein Mitglied ohne `profile_legacy`-Zeile fällt
       nicht aus der Liste; ein gelöschtes **und** deaktiviertes erscheint unter
-      `geloescht`, nicht unter beiden.
-- [ ] 5.2 **[PR] `drop function` + `create`, nicht `create or replace`.**
+      `geloescht`, nicht unter beiden. Abschnitt 12 in
+      `admin_member_list_test.sql`, zwölf Zusagen über fünf Sondenkonten mit
+      eigenem Suchbegriff `zyklusliste`. Der rote Lauf benannte sechs davon
+      einzeln und brach dann am ersten `22023` ab; die beiden Zusagen „ist ein
+      bekannter Wert" stehen deshalb **vor** den Mengenzusagen.
+- [x] 5.2 **[PR] `drop function` + `create`, nicht `create or replace`.**
       Postgres kann den Rückgabetyp nicht ändern und bricht mit „cannot change
       return type of existing function" ab — gemessen. Mit dem Abwurf gehen
       Grants, Kommentar und **Parameter-Vorgabewerte** verloren; alle drei
       wiederherstellen, sonst meldet ein argumentloser Aufruf wieder
-      „function does not exist" statt `42501`.
-- [ ] 5.3 Neue Spalten: `deaktiviert_seit`, `geloescht_seit`, `paid_until`,
-      `payment_type` — **hinter** den Verzeichnisspalten, damit der bestehende
-      Paritätstest gegen `search_directory` ohne Änderung grün bleibt.
-- [ ] 5.4 **[PR]** `admin_update_profile` um `payment_type` erweitern — an
+      „function does not exist" statt `42501`. Alle drei stehen in
+      `20260823140000_admin_member_list_lifecycle.sql` wieder da; der
+      bestehende Test auf den argumentlosen Aufruf (`42501`) bleibt grün und
+      ist damit der Beleg für die Vorgabewerte.
+- [x] 5.3 Neue Spalten: `deaktiviert_seit`, `geloescht_seit`, `paid_until`,
+      `payment_type` — **hinter** den Verzeichnisspalten.
+      **KORREKTUR zur ersten Fassung dieser Zeile:** der Paritätstest bleibt
+      dadurch NICHT ohne Änderung grün. Er vergleicht Spalten*mengen*, nicht
+      Positionen, und zählt die Verwaltungsspalten namentlich auf — aus drei
+      werden sieben. Beide Zusagen in Abschnitt 9 sind mitgeändert, und dass sie
+      brechen mussten, ist ihre Aufgabe (wie bei 6.3). Die hintere Position
+      bleibt trotzdem richtig: sie hält die Verzeichnisprojektion in ihrer
+      Reihenfolge zusammen.
+- [x] 5.4 **[PR]** `admin_update_profile` um `payment_type` erweitern — an
       **allen vier** Stellen: Weissliste, Präsenztest (`patch ?| array[…]`),
       INSERT-Spalten und `on conflict do update`-Zuweisung. Nur die Weissliste
-      zu ändern speichert nichts.
-- [ ] 5.5 TypeScript-Typen neu erzeugen (beide Funktionen ändern ihre Signatur).
-- [ ] 5.6 **GREEN:** 5.1 läuft, der Paritätstest ebenso, und ein Test liest den
-      gespeicherten `payment_type` nach einem Neuladen zurück, leert ihn per
-      JSON-null und weist einen ungültigen Wert ab.
+      zu ändern speichert nichts. Alle vier sind in der Migration einzeln
+      benannt und **einzeln gegengeprobt** (siehe 5.6).
+- [x] 5.5 TypeScript-Typen von Hand nachgezogen — `database.types.ts` ist in
+      diesem Projekt handgepflegt (der Block sagt es selbst) und trägt
+      Kommentare, die ein `supabase gen types` wegwürfe. `admin_update_profile`
+      ändert seine Signatur NICHT: `patch` ist dort `Json`, die neue Weissliste
+      schlägt sich im Typ nicht nieder. Der Fixture-Bauer in
+      `AdminMitgliederPage.test.tsx` brauchte die vier neuen Felder, sonst
+      bricht `tsc`.
+- [x] 5.6 **GREEN:** 5.1 läuft, der Paritätstest ebenso, und Abschnitt 18.5c in
+      `rls_test.sql` liest den gespeicherten `payment_type` über
+      `admin_list_members` zurück, leert ihn per JSON-null und weist `bitcoin`
+      ab. **575 pgTAP-Tests grün** (vorher 555), 1361 Vitest-Tests grün.
+      **Sechs Mutations-Gegenproben** (gegen die Datenbank, nicht gegen das
+      Repo): jede der vier `payment_type`-Stellen einzeln entfernt, der
+      Ausschluss der Entfernten auf `true` gesetzt, der `left join` zum `join`
+      verengt — jede Mutation rot, jede Wiederherstellung grün.
 
 ## 6. `event_attendees` und `my_activation_state`
 

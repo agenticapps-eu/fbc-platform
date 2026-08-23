@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(45);
+select plan(57);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -322,14 +322,21 @@ select ok(
 -- einmal falsch (dreizehn statt vierzehn), und beim nächsten Feld wäre sie es
 -- wieder. Der Katalogvergleich bestimmt die Projektion.
 
+-- Diese beiden Zusagen MUSSTEN mit AGE-581 brechen, und das ist ihre Aufgabe:
+-- die Admin-Liste bekommt vier neue Verwaltungsspalten (`deaktiviert_seit`,
+-- `geloescht_seit`, `paid_until`, `payment_type`), und eine Zusage, die neue
+-- Spalten stillschweigend hinnähme, wäre keine. Die Namen stehen deshalb
+-- weiterhin einzeln da — wer eine fünfte hinzufügt, kommt hier wieder vorbei.
+
 select is(
   (select array_agg(s order by s) from (
      select unnest(pg_temp.rueckgabespalten('public.admin_list_members(text,text,int,int)'::regprocedure))
      except
      select unnest(pg_temp.rueckgabespalten(
        'public.search_directory(text,text,text,text,text,text,text[],text[])'::regprocedure))) x(s)),
-  array['bestaetigt', 'login_email', 'member_since'],
-  'Die Admin-Liste hat genau die drei Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
+  array['bestaetigt', 'deaktiviert_seit', 'geloescht_seit', 'login_email',
+        'member_since', 'paid_until', 'payment_type'],
+  'Die Admin-Liste hat genau die sieben Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
 
 select is(
   (select array_agg(s order by s) from (
@@ -353,7 +360,9 @@ select is(
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
-    $q$select (to_jsonb(t) - 'login_email' - 'bestaetigt' - 'member_since')::text
+    $q$select (to_jsonb(t) - 'login_email' - 'bestaetigt' - 'member_since'
+                         - 'deaktiviert_seit' - 'geloescht_seit'
+                         - 'paid_until' - 'payment_type')::text
          from public.admin_list_members(null, null, 1000) t
         where t.id = 'b1000000-0000-0000-0000-000000000005'$q$),
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000c0',
@@ -565,6 +574,142 @@ select alike(
   pg_get_functiondef('public.admin_activate_member(uuid)'::regprocedure),
   '%for update%',
   'admin_activate_member liest die Zielzeile gesperrt (for update) — Gedächtnis der Wettlauf-Messung');
+
+-- ── 12. Lebenszyklus in der Admin-Liste (AGE-581) ──────────────────────────
+-- Fünf Sondenkonten mit eigenem Suchbegriff `zyklusliste`. Ein eigener Begriff
+-- und nicht `blaettern`: die Mengenzusagen dort stehen auf genau fünf Treffern,
+-- und ein sechster machte sie stillschweigend falsch.
+--
+-- Die fünf decken die Kreuzung ab, an der sich die Filter entscheiden:
+-- aktiviert · unbestätigt · deaktiviert · gelöscht · deaktiviert UND gelöscht.
+-- Das letzte ist der eigentliche Grund für diesen Block — ohne es bliebe
+-- unbelegt, dass `deaktiviert` und `geloescht` nicht dieselbe Zeile zweimal
+-- zeigen, und genau das ist beim Löschen der Normalfall: es bringt die Sperre
+-- mit.
+
+insert into auth.users (id, aud, role, email) values
+  ('f5000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'zyklusliste1@test.fbc'),
+  ('f5000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'zyklusliste2@test.fbc'),
+  ('f5000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'zyklusliste3@test.fbc'),
+  ('f5000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'zyklusliste4@test.fbc'),
+  ('f5000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'zyklusliste5@test.fbc');
+
+update public.profiles set name = 'Zyklus Aktiv',        activated_at = now()
+ where id = 'f5000000-0000-0000-0000-000000000001';
+update public.profiles set name = 'Zyklus Offen',        activated_at = null
+ where id = 'f5000000-0000-0000-0000-000000000002';
+update public.profiles set name = 'Zyklus Deaktiviert',  activated_at = now(),
+       disabled_at = timestamptz '2026-08-01 10:00:00+00'
+ where id = 'f5000000-0000-0000-0000-000000000003';
+update public.profiles set name = 'Zyklus Geloescht',    activated_at = now(),
+       deleted_at  = timestamptz '2026-08-02 11:00:00+00'
+ where id = 'f5000000-0000-0000-0000-000000000004';
+update public.profiles set name = 'Zyklus Beides',       activated_at = now(),
+       disabled_at = timestamptz '2026-08-03 12:00:00+00',
+       deleted_at  = timestamptz '2026-08-04 13:00:00+00'
+ where id = 'f5000000-0000-0000-0000-000000000005';
+
+-- Nur das erste Konto bekommt eine Altdatenzeile. Das zweite bleibt bewusst
+-- ohne — es ist der Beleg für den `left join`.
+insert into public.profile_legacy (profile_id, paid_until, payment_type) values
+  ('f5000000-0000-0000-0000-000000000001', date '2027-01-31', 'copecart');
+
+-- 12.1/12.2 Erst die beiden neuen Statuswerte überhaupt: sie sind heute
+-- unbekannt und brechen mit 22023 ab. Diese zwei Zusagen stehen VOR den
+-- Mengenzusagen, weil ein 22023 dort die ganze Datei abbräche und der rote Lauf
+-- dann nicht mehr sagte, WORAN es liegt.
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select * from public.admin_list_members('zyklusliste', 'deaktiviert')$q$),
+  'KEIN FEHLER', 'p_status = deaktiviert ist ein bekannter Wert');
+
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select * from public.admin_list_members('zyklusliste', 'geloescht')$q$),
+  'KEIN FEHLER', 'p_status = geloescht ebenso');
+
+-- 12.3–12.6 Die drei bestehenden Filter beantworten Fragen über die
+-- MITGLIEDSCHAFT. Ein entferntes Mitglied gehört nicht dazu — es fällt aus
+-- `alle`, `aktiviert` und `offen` heraus, nicht bloss aus einem davon.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', 'alle')$q$),
+  'f5000000-0000-0000-0000-000000000001,f5000000-0000-0000-0000-000000000002',
+  'p_status = alle zeigt weder Deaktivierte noch Gelöschte');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', null)$q$),
+  'f5000000-0000-0000-0000-000000000001,f5000000-0000-0000-0000-000000000002',
+  '… und der fehlende Filter ist derselbe Fall, nicht die Rohtabelle');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', 'aktiviert')$q$),
+  'f5000000-0000-0000-0000-000000000001',
+  'p_status = aktiviert zeigt das aktivierte, nicht die drei entfernten');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', 'offen')$q$),
+  'f5000000-0000-0000-0000-000000000002',
+  'p_status = offen zeigt das unbestätigte');
+
+-- 12.7/12.8 Und die beiden neuen Reiter teilen sich die Entfernten
+-- überschneidungsfrei: das doppelt getroffene Konto steht unter `geloescht`.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', 'deaktiviert')$q$),
+  'f5000000-0000-0000-0000-000000000003',
+  'p_status = deaktiviert zeigt NUR das rein deaktivierte — nicht das zusätzlich gelöschte');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text, ',' order by id)
+         from public.admin_list_members('zyklusliste', 'geloescht')$q$),
+  'f5000000-0000-0000-0000-000000000004,f5000000-0000-0000-0000-000000000005',
+  'p_status = geloescht zeigt beide gelöschten, auch das zusätzlich deaktivierte');
+
+-- 12.9/12.10 Zeitpunkte, keine Wahrheitswerte. Verglichen wird gegen den
+-- gesetzten Zeitstempel und nicht gegen seine Textfassung: die hinge an der
+-- Zeitzone der Sitzung, und der Test spräche dann über die Umgebung.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select (t.deaktiviert_seit = timestamptz '2026-08-01 10:00:00+00')::text
+              || '|' || (t.geloescht_seit is null)::text
+         from public.admin_list_members('zyklusliste3', 'deaktiviert') t$q$),
+  'true|true',
+  'deaktiviert_seit trägt den Zeitpunkt der Deaktivierung, geloescht_seit bleibt leer');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select (t.deaktiviert_seit is null)::text || '|' || (t.geloescht_seit is null)::text
+         from public.admin_list_members('zyklusliste1') t$q$),
+  'true|true',
+  '… und ein unversehrtes Mitglied trägt in beiden Spalten null');
+
+-- 12.11/12.12 Die beiden Spalten für den Reiter „Mitgliedschaft" — und der
+-- Beleg, dass sie über einen `left join` kommen. Ohne ihn fiele jedes Mitglied
+-- ohne Altdatenzeile aus der Liste: lautlos, auf genau der Fläche, die
+-- entstanden ist, weil Mitglieder anderswo lautlos fehlten.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select t.paid_until::text || '|' || t.payment_type
+         from public.admin_list_members('zyklusliste1') t$q$),
+  '2027-01-31|copecart',
+  'paid_until und payment_type kommen aus profile_legacy mit');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select coalesce(t.paid_until::text, '-') || '|' || coalesce(t.payment_type, '-')
+         from public.admin_list_members('zyklusliste2', 'offen') t$q$),
+  '-|-',
+  'Ein Mitglied ohne Altdatenzeile bleibt in der Liste und trägt in beiden Spalten null');
 
 select * from finish();
 rollback;

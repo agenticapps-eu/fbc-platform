@@ -1589,8 +1589,11 @@ export type Database = {
           /** Sucht in `name` UND `login_email`, ohne Ruecksicht auf die
            *  Schreibung. Leer und null filtern nicht; Jokerzeichen sind Text. */
           p_query?: string | null;
-          /** `alle` | `aktiviert` | `offen`. null wirkt wie `alle`; jeder andere
-           *  Wert bricht mit 22023 ab, statt still alles zu zeigen. */
+          /** `alle` | `aktiviert` | `offen` | `deaktiviert` | `geloescht`
+           *  (AGE-581). null wirkt wie `alle`; jeder andere Wert bricht mit
+           *  22023 ab, statt still alles zu zeigen. Die ersten drei schliessen
+           *  Deaktivierte und Geloeschte AUS — sie beantworten Fragen ueber die
+           *  Mitgliedschaft, nicht ueber den Tabelleninhalt. */
           p_status?: string | null;
           p_limit?: number | null;
           p_offset?: number | null;
@@ -1617,6 +1620,14 @@ export type Database = {
            *  statt ihn zu erraten. */
           bestaetigt: boolean;
           member_since: string | null;
+          /** Zeitpunkte, keine Wahrheitswerte (AGE-581): die Flaeche soll sagen
+           *  koennen, SEIT WANN. Beide null heisst unversehrt. */
+          deaktiviert_seit: string | null;
+          geloescht_seit: string | null;
+          /** Aus `profile_legacy`, ueber einen LEFT JOIN — ein Mitglied ohne
+           *  Altdatenzeile faellt nicht aus der Liste, es traegt hier null. */
+          paid_until: string | null;
+          payment_type: string | null;
         }[];
       };
       /** Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach

@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(420);
+select plan(428);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -1686,6 +1686,73 @@ select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
   $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
       '{"interests":["x"]}'::jsonb)$q$),
   'DENIED:%', 'profiles.interests ebenso');
+
+-- 18.5c `payment_type` — der Schreibweg, an ALLEN VIER Stellen (AGE-581).
+-- Ein Altdatenfeld steht in `admin_update_profile` viermal: Weissliste,
+-- Präsenztest, INSERT-Spaltenliste und `on conflict do update`. Nur die
+-- Weissliste zu ändern nähme den Wert widerspruchslos entgegen, schriebe eine
+-- Auditzeile — und speicherte nichts. Diese acht Zusagen sind so gebaut, dass
+-- jede der vier Stellen einzeln fehlen kann und mindestens eine bricht:
+--   * Weissliste fehlt      → (a) prallt ab
+--   * Präsenztest fehlt     → (b) liest null zurück (der Patch trägt NUR das Feld)
+--   * INSERT-Liste fehlt    → (h) liest null zurück (Profil ohne Altdatenzeile)
+--   * on-conflict fehlt     → (b) liest null zurück (Profil MIT Altdatenzeile)
+
+-- (a) Ein Patch, der NUR die Zahlungsart trägt. Das Zielprofil hat aus 18.1
+-- bereits eine Altdatenzeile — dieser Aufruf geht also durch den
+-- `on conflict`-Zweig.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":"copecart"}'::jsonb)$q$),
+  'OK', 'payment_type steht in der Weissliste …');
+
+-- (b) Das Neuladen, und zwar über die LESEFLÄCHE statt über die Tabelle: so
+-- belegt derselbe Test den Schreibweg und die neue Spalte in
+-- `admin_list_members` in einem Zug.
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select t.payment_type from public.admin_list_members('importiert@test.fbc') t$q$),
+  'copecart', '… und der Wert ist nach dem Neuladen wirklich da');
+
+-- (c)/(d) Die acht Werte stehen in der DATENBANK, nicht bloss in einem
+-- Auswahlfeld. Ein Wert daneben ist ein Fehler — und lässt den alten stehen,
+-- statt ihn zu leeren.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":"bitcoin"}'::jsonb)$q$),
+  'DENIED:%', 'Eine unbekannte Zahlungsart bricht ab …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'copecart', '… und lässt den vorherigen Wert stehen');
+
+-- (e)/(f) Fehlend und leer sind zweierlei: `null` heisst NICHT ERFASST und
+-- muss sich setzen lassen, sonst wäre eine irrtümlich erfasste Zahlungsart
+-- nicht mehr zurückzunehmen.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":null}'::jsonb)$q$),
+  'OK', 'JSON-null wird angenommen …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und leert die Zahlungsart wieder');
+
+-- (g)/(h) Und derselbe Weg für ein Profil OHNE Altdatenzeile. Ohne dieses Paar
+-- bliebe die INSERT-Spaltenliste ungeprüft: jedes selbst registrierte Konto
+-- kommt ohne Zeile in `profile_legacy` an, und der Fehler zeigte sich erst beim
+-- ersten Admin, der die Zahlungsart eines solchen Kontos erfasst.
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000b2', 'authenticated', 'authenticated', 'ohne-altdaten@test.fbc');
+
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b2',
+      '{"payment_type":"rechnung"}'::jsonb)$q$),
+  'OK', 'Ein Profil ohne Altdatenzeile nimmt die Zahlungsart an …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b2'),
+  'rechnung', '… und die Zeile entsteht dabei mit dem Wert, nicht ohne ihn');
 
 -- 18.6 Der Lesepfad — ohne ihn wäre der Schreibweg unerreichbar.
 select is(

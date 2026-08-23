@@ -47,6 +47,10 @@ function member(overrides: Partial<AdminMember> = {}): AdminMember {
     login_email: "anna@test.fbc",
     bestaetigt: true,
     member_since: null,
+    deaktiviert_seit: null,
+    geloescht_seit: null,
+    paid_until: null,
+    payment_type: null,
     ...overrides,
   };
 }
