@@ -1,115 +1,119 @@
-# Session Handoff — 2026-08-20 (sechste Sitzung)
+# Session Handoff — 2026-08-23 (zehnte Sitzung)
 
-**AGE-576 ist fertig und liegt als PR #194.** Gruppe 6 vollständig, der Change
-ist archiviert. Der Diff-Review hat vier echte Löcher gefunden — alle behoben,
-alle gemessen.
+PR #200 gemerged, acht offene Entscheidungen getroffen, und **AGE-581** von der
+Idee bis zur halb gebauten Datenbankschicht durchgezogen. Branch:
+`donald/age-581-admin-mitgliederverwaltung`, fünf Commits, **555 pgTAP-Tests
+grün**, nichts gepusht.
 
 ## Accomplished
 
-**5.5 auf der ausgelieferten Fläche** (`7cd2de1`). Der einzige Teil des
-Spiegels, den noch niemand angesehen hatte. `fbc-platform.pages.dev` liest gegen
-DEV — im Bundle nachgelesen, nicht aus der Konfiguration geschlossen.
-Verzeichnis 36 Mitglieder, Profile vollständig, Aktivität mit echten
-Autorennamen, 7 kommende Events mit Anmeldezahlen, Admin-Liste mit Paging,
-**Konsole über alle Seiten leer**. Dafür trug `vorschau@fbc.invalid` (TLD
-existiert nicht) kurz ein Wegwerf-Passwort; zurückgenommen und dreiteilig belegt
-(1/72 → 0/72 und „Invalid login credentials" an der Fläche).
+**PR #200 gemerged** (`4a4b890`), vier Pflichtchecks grün auf der HEAD-SHA,
+Deploy und CI danach ebenfalls grün — `drift-gate` hat diesmal nicht zugeschlagen.
 
-**6.1** — Exit 0, 1326 → nach den Behebungen 1333 Tests, typecheck sauber,
-lint 0 Fehler. **Prettier ist kein Gate**: kein Workflow ruft es auf, und
-`prettier --check .` meldet auf HEAD 139 Bestandsdateien.
+**Detlevs Übersicht der aktiven Mitglieder** (zwei Screenshots, 23.08.) gegen
+PROD abgeglichen. 60 Einträge, alle acht Kategoriezahlen stimmen mit den
+Gruppenüberschriften — die Liste ist nachweislich vollständig gelesen. **59
+Treffer**, einer ohne Konto; **12 Konten ohne Listeneintrag**, davon eines das
+eigene ⇒ **11 zu deaktivieren**. `paid_until` gerechnet: 57 Daten, 3 leer, 0
+unlesbar. Beleg: `docs/age-581-mitgliederabgleich.md`.
 
-**6.2** (`e8d90fa`). Beide Dokumente nachgezogen, Schritt 0 des Neuaufbau-Plans
-geschlossen (Weg A).
+**AGE-581 angelegt und als OpenSpec-Change durchgeplant** — Proposal, Design mit
+9 Entscheidungen, Delta über `admin`/`access-control`/`community-feed`, 73
+Aufgaben. Zwei Reviewer (gemini, codex), **beide REQUEST-CHANGES**, 15 Befunde,
+alle eingearbeitet oder begründet abgelehnt (`REVIEWS.md`).
 
-**6.3** (`5a9e705`, `4fbafd7`, `6693679`). gemini APPROVE, codex
-REQUEST-CHANGES mit 10 Befunden. **Keiner übernommen, alle zehn am Code
-nachgeprüft.** Vier behoben (Donalds Entscheidung), vier folgenlos, zwei
-Bauform.
+**Gebaut: Teil A und B der Datenbankschicht.** 18 von 73 Aufgaben.
 
-**6.4/6.5** (`63bb1b7`). `openspec archive` gelaufen, `validate --all` 31/31.
-PR #194 offen, Linear steht durch die Automation auf In Progress.
+- Zugangs-Gate um `disabled_at`/`deleted_at` erweitert. Der Umfang wurde
+  **gemessen statt geschätzt**: `grep` über die forward-only Migrationen zählt
+  86 Vorkommen allein in einer Datei, gegen den echten DB-Stand sind es **fünf**
+  direkte Stellen — zwei Prädikate, eine Policy, eine View; ~40 Policies erben.
+- Vier Lebenszyklus-Funktionen mit **vollständiger Übergangstabelle** und
+  `FOR UPDATE`, `payment_type` mit DB-Einschränkung, `my_activation_state` um
+  `blocked` erweitert.
+- **Drei Mutations-Gegenproben** machen die Tests rot, die Wiederherstellung grün.
 
 ## Decisions
 
-- **Alle vier tragenden Befunde behoben, nicht nur die billigen.** Donalds
-  Entscheidung. Der schwerste: **4.13 stand am Ende des Laufs** — dazwischen
-  lagen `public.sql`, zwei Prüfschritte, der Drift-Scan und 125 Uploads über das
-  Netz. Jedes `ende()` darin liess DEV mit gültigen PROD-Hashes zurück, bei
-  offener Selbstregistrierung. *Warum das mehr wiegt als ein Ablauffehler:* die
-  Neutralisierung ist einer der zwei Ausgleiche für „keine Anonymisierung".
-- **`dateien` im Manifest ist Pflicht, ohne Toleranzpfad.** *Warum:* ein
-  fehlendes Feld durchzuwinken liesse die Lücke für genau die Auszüge offen, die
-  sie haben. **Folge: der gespeicherte Auszug vom 20.08. ist nicht mehr
-  einspielbar.** Die Prüfsummen nachträglich zu ergänzen wäre unehrlich — sie
-  beschrieben die Datei von heute, nicht die vom Erzeugungszeitpunkt.
-- **Bucket-Vergleich in beide Richtungen.** *Warum:* dieselbe Regel wie beim
-  Migrations-Drift; ein Gate, das nur eine Richtung sieht, ist die Hälfte eines
-  Gates.
-- **Die Demo-Dokumente wurden als historisch gekennzeichnet, nicht angepasst.**
-  *Warum:* eine neue Demo zu erfinden war nicht Aufgabe. Auf DEV nachgezählt:
-  **0** Konten auf `@fbcdemo.com`, **0** auf `@demo.fbc.invalid`, von 72.
-- **Der „drei Werte"-Widerspruch wurde NICHT gefixt.** Die MODIFIED-Anforderung
-  nennt `SUPABASE_DB_PASSWORD` beim Wechsel des Frontend-Routings, das Runbook
-  sagt „zwei Werte, nicht drei". *Warum nicht:* der Fehler steht schon im
-  Hauptspec, ist Bestand und gehört nicht in diesen Diff. **Eigenes Issue wert.**
+- **og:image**: mechanischer Zuschnitt aus `hero-start.webp`. **AGE-541**:
+  Kennzahlen echt rechnen, Testimonials raus (heute hartkodiert `"120+"`/`"24"`,
+  real 71/0). **PROD-Umschaltung: erst nach dem Admin-Ausbau.**
+  **Reset-Test 6.3**: gegen DEV mit `+reset`-Adresse, ganz am Ende.
+- **Deaktivieren = echter GoTrue-Ban + DB-Gate.** *Warum:* „kein Login zulassen"
+  heißt kein Login; ein Konto, das sich anmeldet und dann auf einen Sperrhinweis
+  läuft, hat sich angemeldet.
+- **Gelöschte Mitglieder: Inhalte bleiben, Autor wird „Ehemaliges Mitglied".**
+  *Warum:* ein Beitrag, der aus einem Faden verschwindet, in dem andere
+  geantwortet haben, verändert fremde Beiträge.
+- **Deaktivierte nur im eigenen Reiter**, nicht unter „Alle". *Warum:* „Alle"
+  beantwortet „wer ist Mitglied?", nicht „was steht in der Tabelle?".
+- **Stufe im Mitgliedschaft-Reiter nur lesbar.** *Warum:* ein Stufenwechsel
+  berührt Rechte und Preise (AGE-516) — nebenbei in einer Tabellenzeile wäre er
+  die folgenreichste und zugleich unauffälligste Änderung der Fläche.
+- **EXECUTE der vier RPCs bei `service_role`, nicht `authenticated`.** *Warum:*
+  sonst ruft ein Admin die DB-Funktion direkt und überspringt den Ban — die
+  Doppelsperre wäre eine Gewohnheit statt einer Zusage. Folge: `auth.uid()` ist
+  leer, die handelnde Person kommt als `actor` mit.
+- **Löschen fasst `disabled_at` NICHT an.** *Warum:* sonst ist der Vorzustand
+  verloren und das Wiederherstellen hat keine richtige Antwort mehr.
+- **Reihenfolge je Richtung**: Schließen = DB zuerst, Öffnen = Ban zuerst.
+  *Warum:* andersherum verschwindet beim Öffnen die Handlung aus der Oberfläche,
+  mit der man den halben Zustand repariert.
+- **`is_activated()` behält seinen Namen** trotz erweiterter Bedingung. *Warum:*
+  ein Rename berührt ~40 Policies — 40 Gelegenheiten, die Bedingung falsch zu
+  schreiben. Ausgleich: Warnung im Funktionskommentar (gemini LOW, so
+  abgelehnt und ausgeglichen).
+- **Datenpflege**: 12 Adressen weichen ab → angleichen, **3 ausgenommen** (eine
+  ohne `@`, eine doppelt vergeben, und Detlev als aktiver Admin).
 
 ## Files modified
 
-- `scripts/sync-dev-ruecklauf.ts` — 4.13 hinter den auth-Rücklauf, pgcrypto aus
-  dem Katalog, `pruefeSqlDateien` und `vergleicheBuckets` vor dem Löschen, alle
-  56 Tabellen einzeln nachgezählt
-- `scripts/sync-dev-ruecklauf.logic.ts` — `pruefeSqlDateien`, `vergleicheBuckets`,
-  `Manifest.dateien`
-- `scripts/sync-dev-auszug.ts` / `.logic.ts` — Prüfsummen beider Dumps ins
-  Manifest, `SQL_DATEIEN`
-- `scripts/sync-dev-ruecklauf.test.ts` — 7 neue Tests, alle erst rot
-- `docs/supabase-environments.md` — Abschnitt „Der Spiegel DEV ← PROD"; **vier
-  Bestandsaussagen korrigiert**, die durch den Spiegel falsch geworden waren
-- `docs/prod-neuaufbau-plan.md` — Schritt 0 geschlossen, Schritt 1 auf das
-  Werkzeug, **neuer Schritt 3b** für die Bild-URLs
-- `docs/demo-zugang.md`, `docs/demo-script.md` — HISTORISCH
-- `docs/foundation-acceptance.md`, `docs/w4-acceptance.md` — Nachtrag
-- `openspec/changes/archive/2026-08-20-sync-dev-from-prod/` — archiviert
-- `openspec/specs/environment-sync/` (neu), `deployment-environments/`
+- `supabase/migrations/20260823120000_member_lifecycle_schema.sql` — **neu**:
+  Spalten, `is_activated`, `is_activated_profile`, `is_admin`,
+  `is_matching_manager`, Policy, `profiles_public`, `my_activation_state`
+- `supabase/migrations/20260823130000_member_lifecycle_rpcs.sql` — **neu**:
+  `is_admin_uid`, `lifecycle_guard`, `is_banned` und die vier Funktionen
+- `supabase/tests/member_lifecycle_test.sql` — **neu**, 32 Tests (Gate, beide Seiten)
+- `supabase/tests/member_lifecycle_rpc_test.sql` — **neu**, 34 Tests (Übergänge)
+- `supabase/tests/rls_test.sql` — Signaturzusage auf `my_activation_state`
+  nachgezogen (zwei → drei Felder); sie **musste** brechen, das ist ihre Aufgabe
+- `openspec/changes/add-admin-member-lifecycle/` — **neu**, 5 Artefakte
+- `docs/age-581-mitgliederabgleich.md` — **neu**, Beleg ohne PII
+- `scripts/probe-age581-{gate-stellen,gotrue-ban,admins,abgleich}.ts`,
+  `scripts/age581-abgleich-tabelle.mjs` — **neu**, die Messungen
 
 ## Next session: start here
 
-**PR #194, CI-Stand prüfen** — `gh api repos/agenticapps-eu/fbc-platform/commits/<HEAD-SHA>/check-runs`,
-nur die HEAD-SHA zählt. Bei grün mergen (Freigabe steht generell), danach
-`gh pr view 194 --json state` gegenprüfen — `gh pr merge` kann still
-fehlschlagen. Linear schaltet beim Merge selbst auf Done.
-
-Der Change hat **keine Migrationen**, also kein `drift-gate`-Problem und kein
-`migrate-prod`.
-
-Danach ist der PROD-Neuaufbau dran (`docs/prod-neuaufbau-plan.md`, jetzt mit
-geschlossenem Schritt 0 und Schritt 3b). **Erster Handgriff dort ist ein neuer
-Auszug aus PROD** — der alte ist mit diesem Code nicht mehr einspielbar, und
-beides fällt beim Klassifikator, gehört also an Donalds Terminal mit `!`.
+**Weiter bei Aufgabe 5.1** in
+`openspec/changes/add-admin-member-lifecycle/tasks.md` — `admin_list_members`
+erweitern. Erst den RED-Test (fünf `p_status`-Werte, Ausschluss Deaktivierter
+aus `alle`/`aktiviert`/`offen`, Mitglied ohne `profile_legacy`-Zeile fällt nicht
+raus), dann die Funktion mit **`drop function` + `create`** — `create or replace`
+kann den Rückgabetyp nicht ändern, das ist gemessen und hätte die Migration
+zerrissen. Vorgabewerte, Grants und Kommentar nach dem Abwurf wiederherstellen,
+sonst meldet ein argumentloser Aufruf „function does not exist" statt `42501`.
+Danach 5.4 (`payment_type` an **allen vier** Stellen in `admin_update_profile`,
+nicht nur der Weißliste), dann Abschnitt 4 (Edge Function) und 7–10 (Frontend).
+Der lokale Stack läuft; die Testliste ist
+`rls_test grants_test admin_member_list_test directory_search_test
+member_lifecycle_test member_lifecycle_rpc_test` — **immer mit Dateiliste**.
 
 ## Open questions
 
-- **`avatar_url`/`cover_url` sind absolute PROD-URLs** (56 bzw. 53 Zeilen, keine
-  einzige relativ). Der Spiegel kopiert die 111 Objekte korrekt — dasselbe
-  Objekt liefert auf beiden Seiten 35364 Bytes — sie werden nur nie gelesen. Für
-  Weg (A) folgenlos; unter neuer Kennung zeigen 109 Bild-URLs ins Leere. Steht
-  als Schritt 3b im Plan. **Dauerhaft wäre die Umstellung auf relative Pfade —
-  Anwendungscode, eigenes Issue.**
-- **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** mit
-  PROD-identischem Resend-Zugang. Heute verstellt durch neutralisierte Hashes und
-  `contact_requests = 0`, aber die Selbstregistrierung ist offen. Rücknahmeliste
-  vor Go-Live.
-- **Zwei Befunde bewusst offen** (`REVIEWS.md`): eine deklarierte Abweichung
-  entschuldigt die **ganze** Tabelle, und Katalognamen wie `a"b` werden nicht als
-  SQL-Identifier quotiert.
-- **`socials` ist auf keiner öffentlichen Fläche sichtbar** — 34 Profile tragen
-  Netzwerke, `profiles_public` führt die Spalte nicht. Bestandscode.
-- **4.7 ist nur zu einem Drittel gemessen** — die Post- und
-  Benachrichtigungshälften liefen leer (`contact_requests = 0`,
-  `notifications = 0`).
-- Unverändert offen: Detlevs Zahlungsliste (AGE-534) · Downgrade (AGE-516) ·
-  `admin_list_feedback()` ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 ·
-  AGE-513 · AGE-258 · eigenes Issue für `send-activation` (2xx trotz
-  Resend-401) · `demo_personas.sql` scheitert lokal an einem Fremdschlüssel
-  (vorbestehend).
+- **Detlevs Anmeldeadresse**: Liste `@fairbusinessclub.de`, DB
+  `@dkrealinvest.com`. Er ist Admin und aktiviert — falsch gesetzt sperrt sie
+  ihn aus der Fläche aus, auf der man sie korrigiert. Bis zu seiner Bestätigung
+  ausgenommen.
+- **Gabriel A. Prunty** steht auf der Deaktivierungsliste und ist auf DEV
+  `matching_manager` (auf PROD ohne Rolle). Mit der Verschärfung verliert er die
+  Rolle. Braucht die Zuteilungsliste einen anderen Bearbeiter?
+- **Was Entfernte außerhalb von Feed und Teilnahme hinterlassen** — Nachrichten,
+  Kontaktanfragen, Treffer, Angebote, Gesuche — ist **ausdrücklich nicht**
+  behandelt und als Nachfolge-Notiz benannt, nicht stillschweigend offen.
+- **AGE-534 steht auf Done**, obwohl seine Abnahme gesetztes `paid_until`
+  verlangt und 0 von 70 gesetzt sind. Wieder aufmachen? (unverändert offen)
+- Unverändert: Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging ·
+  AGE-497 · AGE-512 · AGE-256 · AGE-513 · AGE-258 · eigenes Issue für
+  `send-activation` (2xx trotz Resend-401) · `demo_personas.sql` scheitert lokal
+  an einem Fremdschlüssel · `socials` auf keiner öffentlichen Fläche · WP-Quelldatei
+  unauffindbar · `branche`-Ableitung aus `infos` existiert nicht (AGE-537).
