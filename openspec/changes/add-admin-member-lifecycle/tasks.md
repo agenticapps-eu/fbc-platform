@@ -25,14 +25,14 @@ und standen im ersten Entwurf nicht drin.
 - [x] 1.4 **[PR]** Geprüft, dass die `is_admin()`-Verschärfung niemanden
       aussperrt (`scripts/probe-age581-admins.ts`): PROD zwei Admins, DEV drei
       Admins + ein Matching-Manager, **alle aktiviert**.
-- [ ] 1.5 **[PR]** Prüfen, ob ein Profil ohne Zeile in `auth.users` bestehen
-      kann. `admin_list_members` verbindet heute mit `join`, nicht `left join` —
-      ein solches Profil fiele lautlos aus der Liste. Ergebnis festhalten, die
-      Verbindungsart der Antwort folgen lassen.
+- [x] 1.5 **[PR]** Geprüft: **es kann keines geben.** `profiles_id_fkey` ist
+      ein Fremdschlüssel von `profiles.id` auf `auth.users.id`; die Verbindung
+      ist strukturell garantiert. Der `join` bleibt richtig, ein `left join`
+      wäre irreführend.
 
 ## 2. Schema und Prädikate
 
-- [ ] 2.1 **RED, zwei Seiten:** pgTAP `member_lifecycle_test.sql`.
+- [x] 2.1 **RED, zwei Seiten:** pgTAP `member_lifecycle_test.sql`.
       (a) **Zielseite** — ein deaktiviertes und ein gelöschtes Profil erscheinen
       weder über die `profiles`-Policy noch in `profiles_public` noch über
       `search_directory`.
@@ -42,37 +42,37 @@ und standen im ersten Entwurf nicht drin.
       Der bestehende Aktivierungstest arbeitet mit `activated_at = null` und
       bliebe grün, während die neue Bedingung fehlt — (b) ist der einzige Beleg,
       dass sie greift.
-- [ ] 2.2 Migration: `profiles.disabled_at`, `profiles.deleted_at`
+- [x] 2.2 Migration: `profiles.disabled_at`, `profiles.deleted_at`
       (`timestamptz`, nullable, kein Default); `profile_legacy.payment_type`
       mit `check` auf die acht Werte. **Kein** UPDATE-Grant für Client-Rollen
       auf den drei Spalten.
-- [ ] 2.3 `is_activated()` und `is_activated_profile(uuid)` ersetzen:
+- [x] 2.3 `is_activated()` und `is_activated_profile(uuid)` ersetzen:
       `and disabled_at is null and deleted_at is null`. Der Kommentar beginnt
       mit einer ausdrücklichen **Warnung**, dass der Name unvollständig ist
       (gemini, LOW) — der Rename bleibt Nachfolge-Notiz.
-- [ ] 2.4 `profiles_select_self_or_discover` und `profiles_public` ersetzen;
+- [x] 2.4 `profiles_select_self_or_discover` und `profiles_public` ersetzen;
       `security_invoker=off` an der View **erhalten**.
-- [ ] 2.5 **[PR]** `is_admin()` und `is_matching_manager()` um die
+- [x] 2.5 **[PR]** `is_admin()` und `is_matching_manager()` um die
       Zugangsbedingung erweitern. Ohne das behält ein deaktivierter Admin jede
       Fähigkeit über `admin_get_profile`, `admin_find_profile`,
       `admin_update_profile`, `admin_list_members` und die Lesepolicy auf
       `admin_audit`.
-- [ ] 2.6 **GREEN:** 2.1 läuft. Zusätzlich: die **489 bestehenden Tests bleiben
+- [x] 2.6 **GREEN:** 2.1 läuft. Zusätzlich: die **489 bestehenden Tests bleiben
       unverändert grün** — der Beleg, dass die erbenden Policies nicht gekippt
       sind.
-- [ ] 2.7 Gegenprobe, dass der Test etwas prüft: `disabled_at is null` in 2.3
+- [x] 2.7 Gegenprobe, dass der Test etwas prüft: `disabled_at is null` in 2.3
       versuchsweise entfernen, Test muss ROT werden. **Vorher committen** — ohne
       Commit nimmt jedes Zurücknehmen ungesicherte Korrekturen mit.
 
 ## 3. Die vier Lebenszyklus-Funktionen
 
-- [ ] 3.1 **RED:** pgTAP über die **vollständige Übergangstabelle** aus dem
+- [x] 3.1 **RED:** pgTAP über die **vollständige Übergangstabelle** aus dem
       Delta — jede Handlung gegen jeden Ausgangszustand, mit dem zugesagten
       Fehlercode. Nicht nur der Fall „zweimal deaktivieren".
-- [ ] 3.2 `admin_disable_member(uuid, text)` / `admin_enable_member(uuid)`,
+- [x] 3.2 `admin_disable_member(uuid, text)` / `admin_enable_member(uuid)`,
       `SECURITY DEFINER`, `set search_path = ''`, Audit-INSERT in derselben
       Transaktion **ohne** `exception`-Block.
-- [ ] 3.3 `admin_delete_member(uuid, text)` / `admin_restore_member(uuid)`.
+- [x] 3.3 `admin_delete_member(uuid, text)` / `admin_restore_member(uuid)`.
       **[PR] Löschen fasst `disabled_at` NICHT an** — `deleted_at` gatet selbst.
       Wiederherstellen entbannt nur, wenn `disabled_at` null ist. Sonst ginge
       der Vorzustand verloren und das Wiederherstellen hätte keine richtige
@@ -82,14 +82,14 @@ und standen im ersten Entwurf nicht drin.
       Sichtbarkeitsprädikat an. Eingabemenge begrenzt. Mit Profil-IDs wäre die
       Zusage „nur aus sichtbaren Beiträgen" eine Bitte an den Aufrufer statt
       einer Eigenschaft der Funktion.
-- [ ] 3.5 **[PR]** Jeder Übergang sperrt seine Zeile (`select … for update` oder
+- [x] 3.5 **[PR]** Jeder Übergang sperrt seine Zeile (`select … for update` oder
       bedingtes `update … returning`). Zwei gleichzeitige Aufrufe schreiben eine
       Protokollzeile, nicht zwei.
-- [ ] 3.6 **[PR]** EXECUTE der vier Funktionen liegt bei **`service_role`**,
+- [x] 3.6 **[PR]** EXECUTE der vier Funktionen liegt bei **`service_role`**,
       nicht bei `authenticated`. Die `is_admin()`-Prüfung im Rumpf bleibt als
       zweite Schranke. Kommentar an jeder Funktion begründet die Abweichung vom
       Hausmuster.
-- [ ] 3.7 **GREEN:** 3.1 läuft, samt eines Tests, dass ein direkter Aufruf als
+- [x] 3.7 **GREEN:** 3.1 läuft, samt eines Tests, dass ein direkter Aufruf als
       `authenticated` abgewiesen wird.
 
 ## 4. Die Anmeldung sperren
