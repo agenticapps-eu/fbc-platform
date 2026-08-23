@@ -28,7 +28,7 @@
 --     Suchbegriff, sonst ist sie eine Aussage über den Seed.
 
 begin;
-select plan(32);
+select plan(50);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -295,6 +295,221 @@ select throws_ok(
   '23514',
   null,
   'Eine unbekannte Zahlungsart weist die Datenbank ab, nicht die Oberflaeche');
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 7. Die Feed-Auskunft: „Ehemaliges Mitglied" (AGE-581, Aufgabe 3.4)
+--
+-- Beiträge und Kommentare eines entfernten Mitglieds BLEIBEN stehen — sie zu
+-- löschen veränderte fremde Beiträge, denn ein Faden, aus dem der Anfang
+-- verschwindet, ist für alle anderen kaputt. Nur der Name geht.
+--
+-- ══ WARUM DIE FUNKTION BEITRAGS-IDs NIMMT UND KEINE PROFIL-IDs ═════════════
+-- Der Plan-Review hat den ersten Entwurf mit HIGH verworfen: einer Funktion,
+-- der man Profil-IDs übergibt, kann man nicht ansehen, woher der Aufrufer sie
+-- hat. Die Zusage „nur über Autoren aus sichtbaren Beiträgen" wäre eine Bitte
+-- an den Aufrufer, keine Eigenschaft der Funktion — jeder Angemeldete könnte
+-- beliebige bekannte IDs durchreichen und erführe, wer aus dem Verein entfernt
+-- wurde. Nimmt sie Beitrags-IDs, löst sie den Urheber SELBST auf und wendet
+-- dabei dasselbe Sichtbarkeitsprädikat an, das für den Beitrag gilt.
+--
+-- Genau das prüfen die beiden Zusagen mit `Lz Basic`: sie ist bestätigt und
+-- darf `public` lesen, aber nicht `members` (`has_level(4)`). Über einen
+-- Beitrag, den sie nicht sehen darf, bekommt sie keine Auskunft — und die
+-- Wächter-Zusage daneben belegt, dass sie überhaupt Auskünfte bekommt.
+-- ════════════════════════════════════════════════════════════════════════════
+
+insert into auth.users (id, aud, role, email) values
+  ('d0000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'lz-basic@test.fbc'),
+  ('d0000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'lz-privat@test.fbc'),
+  ('d0000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'lz-nie-bestaetigt@test.fbc');
+
+-- Bestätigt, aber auf `basic`: sie sieht `public` und nicht `members`.
+update public.profiles
+   set name = 'Lz Basic', activated_at = now(), is_public = true, tier = 'basic'
+ where id = 'd0000000-0000-0000-0000-000000000005';
+-- Da, aber zurückgezogen. Im Feed heisst sie seit AGE-530 „Ein Mitglied" —
+-- ein anderer Sachverhalt als „entfernt", und beide dürfen nicht auf denselben
+-- Text fallen.
+update public.profiles
+   set name = 'Lz Privat', activated_at = now(), is_public = false, tier = 'impact'
+ where id = 'd0000000-0000-0000-0000-000000000006';
+-- Nie bestätigt. Die Falle für eine Umsetzung, die `not is_activated_profile()`
+-- schreibt statt nach den beiden Sperrfeldern zu fragen: dieses Konto ist nicht
+-- aktiviert, aber es wurde auch nie entfernt.
+update public.profiles
+   set name = 'Lz Nie Bestaetigt', activated_at = null, is_public = true, tier = 'impact'
+ where id = 'd0000000-0000-0000-0000-000000000007';
+
+insert into public.posts (id, author_id, body, visibility) values
+  ('bb000000-0000-4000-8000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Von einem aktiven Mitglied',      'public'),
+  ('bb000000-0000-4000-8000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'Von einem deaktivierten Mitglied','public'),
+  ('bb000000-0000-4000-8000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'Von einem geloeschten Mitglied',  'public'),
+  ('bb000000-0000-4000-8000-000000000004', 'd0000000-0000-0000-0000-000000000003', 'Nur fuer Mitglieder',             'members'),
+  ('bb000000-0000-4000-8000-000000000005', 'd0000000-0000-0000-0000-000000000006', 'Von einem zurueckgezogenen Mitglied', 'public'),
+  ('bb000000-0000-4000-8000-000000000006', 'd0000000-0000-0000-0000-000000000007', 'Von einem nie bestaetigten Konto','public');
+
+insert into public.comments (id, post_id, author_id, body) values
+  ('cc000000-0000-4000-8000-000000000001', 'bb000000-0000-4000-8000-000000000001',
+   'd0000000-0000-0000-0000-000000000001', 'Kommentar eines aktiven Mitglieds'),
+  ('cc000000-0000-4000-8000-000000000002', 'bb000000-0000-4000-8000-000000000001',
+   'd0000000-0000-0000-0000-000000000003', 'Kommentar eines geloeschten Mitglieds'),
+  ('cc000000-0000-4000-8000-000000000003', 'bb000000-0000-4000-8000-000000000004',
+   'd0000000-0000-0000-0000-000000000003', 'Kommentar unter einem unsichtbaren Beitrag');
+
+create function pg_temp.text_as(uid uuid, q text) returns text language plpgsql as $$
+declare t text;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute q into t;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return t;
+end $$;
+
+-- 7.1 Gegenprobe zuerst: der Beobachter sieht die fünf öffentlichen und den
+-- Mitglieder-Beitrag. Ohne sie prüfte alles darunter eine Funktion über
+-- Beiträge, die vielleicht gar nicht sichtbar sind.
+select is(
+  pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
+    $$select count(*)::int from public.posts where id::text like 'bb000000%'$$),
+  6, 'Gegenprobe: der Beobachter sieht alle sechs Sondenbeiträge');
+
+-- 7.2–7.4 Die Auskunft selbst.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000001']::uuid[])$q$),
+  'false', 'Der Beitrag eines aktiven Mitglieds ist nicht der eines Ehemaligen');
+
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000002']::uuid[])$q$),
+  'true', 'Der Beitrag eines DEAKTIVIERTEN Mitglieds schon …');
+
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000003']::uuid[])$q$),
+  'true', '… und der eines GELÖSCHTEN ebenso — beide tragen denselben Wert');
+
+-- 7.5 Zurückgezogen ist nicht entfernt. „Ein Mitglied" und „Ehemaliges
+-- Mitglied" sind zwei verschiedene Sachverhalte; fielen sie auf denselben Text,
+-- hätte der Feed für „Autor fehlt" zwei Ursachen, die gleich aussehen.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000005']::uuid[])$q$),
+  'false', 'Ein Mitglied, das nur sein Profil zurückhält, ist kein Ehemaliges');
+
+-- 7.6 Und ein nie bestätigtes Konto ebenso wenig. Diese Zusage ist die
+-- Löschprobe gegen `not is_activated_profile(author_id)` — die kürzeste
+-- Umsetzung, die alle Zusagen darüber erfüllt und hier bricht.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000006']::uuid[])$q$),
+  'false', 'Ein nie bestätigtes Konto wurde nicht entfernt — es ist nur nie angekommen');
+
+-- 7.7/7.8 Die Sichtbarkeit ist eine Eigenschaft der Funktion, keine Bitte.
+-- Erst der Wächter: `Lz Basic` bekommt über einen ÖFFENTLICHEN Beitrag Auskunft.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000005',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000003']::uuid[])$q$),
+  'true', 'Wächter: auch ein basic-Konto bekommt über einen öffentlichen Beitrag Auskunft');
+
+select is(
+  pg_temp.int_as('d0000000-0000-0000-0000-000000000005',
+    $q$select count(*)::int from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000004']::uuid[])$q$),
+  0, '… über einen Beitrag, den es nicht lesen darf, aber KEINE — auch nicht "false"');
+
+-- 7.9/7.10 Kommentare zählen gleich. Ein Faden, in dem nur die Beitragsautoren
+-- neutralisiert sind, hält die Zusage nicht.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         '{}'::uuid[], array['cc000000-0000-4000-8000-000000000001']::uuid[])$q$),
+  'false', 'Der Kommentar eines aktiven Mitglieds ist nicht der eines Ehemaligen');
+
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select former::text from public.former_member_entries(
+         '{}'::uuid[], array['cc000000-0000-4000-8000-000000000002']::uuid[])$q$),
+  'true', '… der eines gelöschten schon');
+
+-- 7.11 Und die Sichtbarkeit gilt auch auf der Kommentarseite: hängt der
+-- Kommentar unter einem unsichtbaren Beitrag, gibt es keine Auskunft.
+select is(
+  pg_temp.int_as('d0000000-0000-0000-0000-000000000005',
+    $q$select count(*)::int from public.former_member_entries(
+         '{}'::uuid[], array['cc000000-0000-4000-8000-000000000003']::uuid[])$q$),
+  0, 'Ein Kommentar unter einem unsichtbaren Beitrag bleibt ohne Auskunft');
+
+-- 7.12 Ein Aufruf mit beiden Listen liefert beide Arten, unterscheidbar.
+select is(
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000004',
+    $q$select string_agg(kind || ':' || former::text, ',' order by kind)
+         from public.former_member_entries(
+           array['bb000000-0000-4000-8000-000000000002']::uuid[],
+           array['cc000000-0000-4000-8000-000000000001']::uuid[])$q$),
+  'comment:false,post:true',
+  'Ein Aufruf trägt beide Arten, und die Art steht dabei');
+
+-- 7.13 Die Rückgabe trägt kein Mitgliedsdatum. Geprüft wird die SPALTENLISTE
+-- und nicht ein Beispieldatensatz: ein leeres Feld sähe aus wie ein fehlendes.
+select is(
+  (select array_agg(a.name order by a.ord)
+     from pg_proc p,
+          unnest(p.proargnames, p.proargmodes) with ordinality as a(name, modus, ord)
+    where p.oid = 'public.former_member_entries(uuid[],uuid[])'::regprocedure
+      and a.modus = 't'),
+  array['kind', 'entry_id', 'former'],
+  'Die Rückgabe trägt Art, ID und einen Wahrheitswert — keinen Namen, kein Bild, keine Stufe, keinen Zeitpunkt');
+
+-- 7.14 Die Eingabemenge ist begrenzt. Eine unbegrenzte Liste machte die
+-- Funktion zu einem Weg, den ganzen Bestand in einem Aufruf durchzuprüfen.
+select is(
+  pg_temp.state_as('d0000000-0000-0000-0000-000000000004',
+    $q$select * from public.former_member_entries(
+         (select array_agg(gen_random_uuid()) from generate_series(1, 201)))$q$),
+  '22023', 'Mehr IDs als erlaubt weist die Funktion ab, statt sie abzuarbeiten');
+
+-- 7.15–7.17 Rechte werden ausgesprochen, nicht geerbt (AGE-312). Ohne Session
+-- wird sie nicht gerufen — wie die Autorenabfrage auch (AGE-530).
+select is(has_function_privilege('anon', 'public.former_member_entries(uuid[],uuid[])', 'execute'),
+  false, 'former_member_entries: anon darf nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.former_member_entries(uuid[],uuid[])', 'execute'),
+  true, 'former_member_entries: authenticated darf');
+select ok(
+  not exists (
+    select 1 from aclexplode((select proacl from pg_proc
+                               where oid = 'public.former_member_entries(uuid[],uuid[])'::regprocedure)) a
+     where a.grantee = 0),
+  'former_member_entries: PUBLIC hält kein EXECUTE');
+
+-- 7.18 DER WÄCHTER ÜBER DIE KOPIE.
+--
+-- `former_member_entries` ist SECURITY DEFINER, also ist die RLS auf `posts`
+-- ausgeschaltet und das Sichtbarkeitsprädikat steht dort ein ZWEITES Mal —
+-- abgeschrieben von `posts_select_by_visibility`. Dieselbe Falle wie bei
+-- `profiles_public`, wo vier DEFINER-RPCs ihr Prädikat duplizieren: eine neue
+-- Sichtbarkeitsregel kommt an einer Stelle an und an der anderen nicht.
+--
+-- Kein Verhaltenstest fängt das. Ändert jemand die POLICY, laufen alle Zusagen
+-- oben weiter grün — sie rufen ja nur die Funktion, und die trägt dann eben die
+-- alte Regel. Deshalb hier ein Wortlaut-Vergleich: bricht er, ist das die
+-- Aufforderung, die Kopie in der Migration nachzuziehen, nicht ihn anzupassen.
+select is(
+  (select pg_get_expr(polqual, polrelid) from pg_policy
+    where polrelid = 'public.posts'::regclass
+      and polname = 'posts_select_by_visibility'),
+  '(is_activated() AND ((visibility = ''public''::text) OR ((visibility = ''members''::text) '
+  'AND has_level(4)) OR (author_id = ( SELECT auth.uid() AS uid))))',
+  'posts_select_by_visibility unveraendert — sonst ist die Kopie in former_member_entries nachzuziehen');
 
 select * from finish();
 rollback;

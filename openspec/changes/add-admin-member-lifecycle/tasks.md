@@ -77,11 +77,32 @@ und standen im ersten Entwurf nicht drin.
       Wiederherstellen entbannt nur, wenn `disabled_at` null ist. Sonst ginge
       der Vorzustand verloren und das Wiederherstellen hätte keine richtige
       Antwort mehr.
-- [ ] 3.4 **[PR]** Die Feed-Auskunft nimmt **Beitrags- und Kommentar-IDs**,
+- [x] 3.4 **[PR]** Die Feed-Auskunft nimmt **Beitrags- und Kommentar-IDs**,
       nicht Profil-IDs, löst den Urheber selbst auf und wendet dabei dasselbe
       Sichtbarkeitsprädikat an. Eingabemenge begrenzt. Mit Profil-IDs wäre die
       Zusage „nur aus sichtbaren Beiträgen" eine Bitte an den Aufrufer statt
       einer Eigenschaft der Funktion.
+      `former_member_entries(uuid[], uuid[])` in
+      `20260823160000_former_member_entries.sql`, Rückgabe `(kind, entry_id,
+      former)`, höchstens 200 IDs je Aufruf, EXECUTE nur bei `authenticated`.
+      Achtzehn Zusagen in `member_lifecycle_test.sql` §7.
+      **`former` ist `disabled_at is not null or deleted_at is not null` und
+      NICHT `not is_activated_profile()`** — letzteres wäre auch für ein nie
+      bestätigtes Konto wahr, und das wurde nicht entfernt, es ist nur nie
+      angekommen. Ein Test hält genau diesen Unterschied fest.
+      **Sie ist SECURITY DEFINER, also steht das Prädikat aus
+      `posts_select_by_visibility` ein zweites Mal da.** SECURITY INVOKER wäre
+      der Ausweg, bräuchte aber einen für `authenticated` ausführbaren Helfer
+      „ist dieses Profil entfernt?" — genau der Aufzählungsweg, den der Review
+      verworfen hat, eine Ebene tiefer. Die Kopie hält ein
+      **Wortlaut-Wächter** über die Policy fest (§7.18); kein Verhaltenstest
+      fände diese Drift, weil alle anderen Zusagen nur die Funktion rufen.
+      **Der TypeScript-Typ fehlt noch** — bewusst: die Funktion hat vor
+      Abschnitt 10 keinen Aufrufer, und `database.types.ts` ist handgepflegt.
+      Vier Gegenproben: falsches Prädikat für `former`, aufgehobene
+      Sichtbarkeit, abgeschaltete Obergrenze, ungebundene Kommentarseite —
+      jede rot, jede Wiederherstellung grün. Plus eine fünfte auf den Wächter
+      selbst: die Policy allein verbogen macht §7.18 rot.
 - [x] 3.5 **[PR]** Jeder Übergang sperrt seine Zeile (`select … for update` oder
       bedingtes `update … returning`). Zwei gleichzeitige Aufrufe schreiben eine
       Protokollzeile, nicht zwei.
