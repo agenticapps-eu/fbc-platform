@@ -117,6 +117,14 @@ export interface BanErgebnis {
  * diese Fläche hat kein Feld dafür — ein Parameter ohne Aufrufer, benannt statt
  * verschwiegen.
  *
+ * FEHLER WERDEN ÜBERSETZT. supabase-js verpackt jedes Nicht-2xx in einen
+ * `FunctionsHttpError` mit der immer gleichen Meldung „Edge Function returned a
+ * non-2xx status code"; Status und `detail` stecken nur in `error.context`.
+ * Ungelesen sähe ein Admin also genau diesen englischen Satz — und „darf
+ * nicht", „gibt es nicht" und „ist schon so" wären ununterscheidbar, obwohl
+ * `statusFuerPgFehler` in der Function sie ausdrücklich auseinanderhält.
+ * Gefunden in der Diff-Prüfung.
+ *
  * DER TEILZUSTAND IST KEIN `error`. Die Function antwortet auf ihn mit `207`,
  * und supabase-js behandelt jedes 2xx als Erfolg — `error` bliebe null. Die
  * Unterscheidung hängt deshalb am Rumpf, und zwar an BEIDEN Feldern: `banned`
@@ -132,8 +140,42 @@ export async function setMemberBan(
   const { data, error } = await supabase.functions.invoke("admin-set-member-ban", {
     body: { action, target },
   });
-  if (error) throw error;
+  if (error) throw new Error(await uebersetzeFehler(error));
 
   const rumpf = (data ?? {}) as { hidden?: boolean; banned?: boolean };
   return { halb: rumpf.hidden === true && rumpf.banned === false };
+}
+
+/**
+ * Macht aus dem Statuscode der Function einen Satz, den ein Admin lesen kann.
+ *
+ * `409` ist der häufigste Ausgang und der einzige, der kein Fehler im
+ * eigentlichen Sinn ist: die Zeile war schon in dem Zustand, in den sie
+ * gebracht werden sollte — meist, weil jemand anderes schneller war.
+ */
+async function uebersetzeFehler(error: unknown): Promise<string> {
+  const context = (error as { context?: Response }).context;
+  const status = context?.status;
+  const satz: Record<number, string> = {
+    400: "Die Anfrage war unbrauchbar. Das ist ein Fehler dieser Fläche, nicht deiner.",
+    403: "Dafür fehlt die Berechtigung — oder das eigene Konto ist nicht mehr freigeschaltet.",
+    404: "Dieses Mitglied gibt es nicht mehr.",
+    409: "Die Zeile ist schon in diesem Zustand. Die Liste zeigt ihn gleich neu.",
+    502: "Der Anmeldedienst antwortet nicht. Es hat sich nichts geändert — noch einmal versuchen.",
+  };
+  if (status !== undefined && satz[status]) return satz[status];
+
+  // Kein bekannter Status: den Rumpf lesen, bevor die generische Meldung von
+  // supabase-js übrig bleibt. `context.json()` kann fehlschlagen (leerer Rumpf,
+  // schon gelesen) — dann bleibt der Rohtext, und der ist immer noch mehr als
+  // „non-2xx status code".
+  try {
+    const rumpf = (await context?.json()) as { detail?: string; error?: string } | undefined;
+    const detail = rumpf?.detail ?? rumpf?.error;
+    if (detail) return detail;
+  } catch {
+    // Leerer oder bereits gelesener Rumpf — dann bleibt die Rohmeldung, und
+    // die ist immer noch mehr als nichts.
+  }
+  return (error as { message?: string }).message ?? "Unbekannter Fehler.";
 }

@@ -697,3 +697,105 @@ describe("Das Menü liegt ausserhalb der Zeile (7.2)", () => {
     expect(menue.parentElement).toBe(document.body);
   });
 });
+
+/**
+ * Befunde der Diff-Prüfung (Stufe 4), beide im Browser nachgemessen.
+ *
+ * Die erste Fassung dieser Datei hatte 37 grüne Zusagen und ließ beide durch.
+ * Der Grund ist derselbe: `fireEvent.click` in jsdom VERSCHIEBT DEN FOKUS
+ * NICHT. Im Browser bekommt ein `<button>` beim `mousedown` den Fokus, und
+ * genau daraus entsteht der Fehler. Diese Tests stellen die Reihenfolge des
+ * Browsers nach — `blur` mit `relatedTarget`, dann `click` —, statt sie zu
+ * unterstellen.
+ */
+describe("Der Auslöser schliesst das Menü wieder (Diff-Prüfung)", () => {
+  it("schliesst beim zweiten Klick, auch wenn der Fokus vorher hinauswandert", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    const zeile = screen.getByTestId(`mitglied-${AKTIV.id}`);
+    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+
+    // Was der Browser zwischen mousedown und click tut: der Fokus springt vom
+    // Menüeintrag auf den Auslöser. Ohne diese Zeile ist der Test grün und
+    // prüft nichts.
+    fireEvent.blur(menue, { relatedTarget: knopf });
+    fireEvent.click(knopf);
+
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(knopf).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("Tab verlässt das Menü nicht ins Nirgendwo (Diff-Prüfung)", () => {
+  it("schliesst und setzt den Fokus auf den Auslöser zurück", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    const zeile = screen.getByTestId(`mitglied-${AKTIV.id}`);
+    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+
+    fireEvent.keyDown(menue, { key: "Tab" });
+
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    // Das Menü hängt am ENDE von `document.body`. Ohne Rückgabe landet der
+    // nächste Tab hinter der ganzen Anwendung — nicht in der nächsten Zeile,
+    // wie der frühere Kommentar behauptete.
+    expect(document.activeElement).toBe(knopf);
+  });
+});
+
+/**
+ * Der dritte Befund der Diff-Prüfung: die Function unterscheidet 403, 404, 409,
+ * 502 und 500 ausdrücklich (`statusFuerPgFehler`) — und ungelesen kam davon
+ * nichts an. supabase-js verpackt jedes Nicht-2xx in dieselbe englische
+ * Meldung.
+ */
+describe("Die Statusabbildung der Function kommt an (Diff-Prüfung)", () => {
+  /** Was supabase-js aus einer Nicht-2xx-Antwort macht. */
+  function httpFehler(status: number, rumpf: unknown) {
+    const error = new Error("Edge Function returned a non-2xx status code");
+    (error as unknown as { context: unknown }).context = {
+      status,
+      json: async () => rumpf,
+    };
+    return error;
+  }
+
+  it.each([
+    [409, /schon in diesem Zustand/i],
+    [404, /gibt es nicht mehr/i],
+    [403, /Berechtigung/i],
+    [502, /Anmeldedienst/i],
+  ])("übersetzt %i in einen lesbaren Satz", async (status, erwartet) => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    invoke.mockResolvedValue({ data: null, error: httpFehler(status, { error: "db_failed" }) });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Deaktivieren$/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Deaktivieren$/i }));
+
+    await screen.findByText(erwartet);
+    // Und der englische Rohsatz taucht NICHT auf — sonst belegte die Zeile
+    // darüber nur, dass irgendwo irgendein Text steht.
+    expect(screen.queryByText(/non-2xx status code/i)).toBeNull();
+  });
+
+  it("fällt bei unbekanntem Status auf den Rumpf zurück, nicht auf den Rohsatz", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    invoke.mockResolvedValue({
+      data: null,
+      error: httpFehler(500, { error: "db_failed", detail: "Verbindung weg" }),
+    });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Deaktivieren$/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Deaktivieren$/i }));
+
+    await screen.findByText(/Verbindung weg/i);
+  });
+});

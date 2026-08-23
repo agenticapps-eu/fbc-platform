@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { MemberCard } from "../components/community/MemberDirectory";
@@ -183,7 +183,7 @@ export default function AdminMitgliederPage() {
           title: "Nur zur Hälfte ausgeführt",
           description:
             `${m.name ?? "Das Mitglied"} ist nicht mehr sichtbar, kann sich aber ` +
-            "weiterhin anmelden. Die Handlung noch einmal auslösen holt den Rest nach.",
+            "weiterhin anmelden. Der Zustand ist unvollständig und muss nachgezogen werden.",
           variant: "error",
         });
       } else {
@@ -514,7 +514,27 @@ function Zeilenmenue({
   const [pos, setPos] = useState({ top: 0, right: 0 });
   const knopfRef = useRef<HTMLButtonElement>(null);
   const menueRef = useRef<HTMLDivElement>(null);
+  /** Der Kasten des Auslösers zum Zeitpunkt des Öffnens — die Klapprichtung
+   *  unten braucht ihn, und bis dahin ist das Menü schon aufgeklappt. */
+  const ankerRef = useRef<DOMRect | null>(null);
   const eintraege = handlungenFuer(member);
+
+  // KLAPPRICHTUNG. Nach unten, ausser es passt nicht mehr — dann nach oben.
+  // Ohne das ragt das Menü an einer Zeile am unteren Rand hinaus, und weil es
+  // `fixed` liegt, lässt es sich nicht heranscrollen: JEDER Scroll schliesst
+  // es (siehe `onWeg`). Gemessen am 23.08. bei 62vh Vorlauf — 139 px
+  // Überstand, „Löschen" per `elementFromPoint` nicht mehr getroffen.
+  //
+  // `useLayoutEffect`, damit die Korrektur VOR dem Zeichnen greift; sonst
+  // springt das Menü sichtbar. In jsdom sind alle Höhen 0, dort klappt es
+  // deshalb nie — geprüft wird das im Browser (7.6).
+  useLayoutEffect(() => {
+    const anker = ankerRef.current;
+    const hoehe = menueRef.current?.getBoundingClientRect().height ?? 0;
+    if (!offen || !anker || hoehe === 0) return;
+    if (anker.bottom + 4 + hoehe <= window.innerHeight - 8) return;
+    setPos((p) => ({ ...p, top: Math.max(8, anker.top - 4 - hoehe) }));
+  }, [offen]);
 
   // Der Fokus wandert beim Öffnen auf den ERSTEN Eintrag. Ohne das wäre das
   // Menü mit der Tastatur nicht erreichbar: der Auslöser behielte den Fokus,
@@ -559,10 +579,13 @@ function Zeilenmenue({
       schliessen(true);
       return;
     }
-    // Tab schliesst, hält den Fokus aber NICHT fest: ein Zeilenmenü ist kein
-    // Dialog, und wer weitertabbt, will weiter.
+    // Tab schliesst UND gibt den Fokus an den Auslöser zurück. Nicht aus
+    // Dialog-Denken: das Menü hängt am ENDE von `document.body`, ein
+    // weiterlaufender Tab landete also hinter der ganzen Anwendung statt in
+    // der nächsten Zeile. Vom Auslöser aus geht es normal weiter.
     if (e.key === "Tab") {
-      setOffen(false);
+      e.preventDefault();
+      schliessen(true);
       return;
     }
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
@@ -603,7 +626,10 @@ function Zeilenmenue({
             return;
           }
           const r = knopfRef.current?.getBoundingClientRect();
-          if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+          if (r) {
+            ankerRef.current = r;
+            setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+          }
           setOffen(true);
         }}
       >
@@ -620,8 +646,20 @@ function Zeilenmenue({
               // „Schliessen beim Verlassen" (7.4) — auch für die Tastatur, nicht
               // nur für den Zeiger. `relatedTarget` ist der Knoten, der den Fokus
               // BEKOMMT; liegt er ausserhalb, ist das Menü verlassen.
+              //
+              // AUSSER er ist der Auslöser. Im Browser bekommt ein `<button>`
+              // beim `mousedown` den Fokus, also feuert ein Klick auf
+              // „Handlungen" ERST dieses `focusout` und DANN seinen `onClick`.
+              // Schlösse es hier, sähe der Klick ein bereits geschlossenes
+              // Menü und öffnete es sofort wieder — der Auslöser könnte sein
+              // eigenes Menü nie schliessen. In jsdom verschiebt
+              // `fireEvent.click` den Fokus nicht; siebenunddreissig grüne
+              // Zusagen haben das übersehen, die Diff-Prüfung nicht.
               const ziel = e.relatedTarget as Node | null;
-              if (ziel && !menueRef.current?.contains(ziel)) setOffen(false);
+              if (!ziel) return;
+              if (menueRef.current?.contains(ziel)) return;
+              if (knopfRef.current?.contains(ziel)) return;
+              setOffen(false);
             }}
             style={{ position: "fixed", top: pos.top, right: pos.right }}
             className="z-50 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas py-1 shadow-soft"

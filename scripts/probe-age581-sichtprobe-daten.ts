@@ -4,6 +4,7 @@
  * Legt einen Admin und vier Mitglieder in den vier Lebenszyklus-Zuständen an.
  */
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 
 const API = "http://127.0.0.1:54321";
@@ -12,7 +13,15 @@ const admin = createClient(API, process.env.SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
 });
 
-const PW = "SichtprobePasswort!2026";
+/**
+ * Bei jedem Lauf neu gewürfelt und am Ende ausgegeben — KEIN Literal.
+ *
+ * Dieses Repo ist öffentlich, und ein Passwort aus einem öffentlichen Repo war
+ * hier schon einmal ein echter Befund (Demo-Personas, behoben am 20.08.). Dass
+ * die Konten nur auf `127.0.0.1` entstehen, ist die zweite Schranke, nicht die
+ * erste.
+ */
+const PW = `Sichtprobe!${randomUUID().slice(0, 12)}`;
 const KONTEN = [
   { mail: "age581-admin@local.host", name: "Adam Admin", zustand: "admin" },
   { mail: "age581-aktiv@local.host", name: "Carla Aktiv", zustand: "aktiv" },
