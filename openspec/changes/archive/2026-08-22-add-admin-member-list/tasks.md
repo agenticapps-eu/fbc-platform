@@ -182,8 +182,14 @@
 
 ## 7. Abschluss
 
-- [ ] 7.1 `openspec validate --all` grün, Arbeitsbaum sauber, Feature-Branch.
-- [ ] 7.2 `openspec archive` — erst wenn 6.3 gemessen ist, nicht wenn der Code
-      existiert. **Vor** `add-admin-console`.
-- [ ] 7.3 AGE-566 in Linear auf Done — vorher `get_issue` lesen; die Automation
-      schaltet den Status bei PR-Merge womöglich schon selbst.
+- [x] 7.1 `openspec validate --all` grün, Arbeitsbaum sauber, Feature-Branch.
+      **22.08.: 31 passed, 0 failed**; Branch
+      `donald/age-492-seitentitel-und-metadaten`, Arbeitsbaum bis auf die
+      Handoff-Datei sauber.
+- [x] 7.2 `openspec archive` — erst wenn 6.3 gemessen ist, nicht wenn der Code
+      existiert. **Vor** `add-admin-console`. **22.08. archiviert**; 6.3 und 6.4
+      waren am 17.08. gemessen, der Rest war nur noch Abschluss.
+- [x] 7.3 AGE-566 in Linear auf Done — vorher `get_issue` lesen; die Automation
+      schaltet den Status bei PR-Merge womöglich schon selbst. **Genau so: am
+      22.08. gelesen, Status stand seit 17.08. 18:27 auf Done (vier PRs
+      angehängt, #187–#190). Nichts geschrieben.**

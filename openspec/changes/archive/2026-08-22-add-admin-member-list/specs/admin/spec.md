@@ -1,6 +1,6 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: Admin member management is not implemented
+### Requirement: Die Admin-Fläche kennt eine Mitgliederliste, aber keinen Massenversand
 
 The system SHALL NOT provide, in the current prototype, a mass-mail/broadcast
 capability, an in-platform CRM, or topic newsletters (AGE-304). Die gebaute
@@ -34,8 +34,6 @@ Mustern, nicht mehr vor dem Aufzählen.
 - **THEN** bietet sie Filtern, Blättern und die Handlungen je **einzelnem**
   Mitglied — und keine Mehrfachauswahl, kein „an alle", keine Übernahme der
   Treffermenge in eine andere Fläche
-
-## ADDED Requirements
 
 ### Requirement: Ein Admin listet Mitglieder über eine Funktion, die unbestätigte einschliesst
 
@@ -316,3 +314,23 @@ Die Handlung SHALL nur auf unbestätigten Zeilen angeboten werden.
 
 - **WHEN** ein Admin eine Zeile eines bereits bestätigten Mitglieds ansieht
 - **THEN** wird „direkt aktivieren" dort nicht angeboten
+
+## REMOVED Requirements
+
+### Requirement: Admin member management is not implemented
+
+**Reason**: Die Anforderung sagte „es gibt keine Mitgliederliste". Genau die baut
+dieser Change — die Aussage ist damit nicht geändert, sondern hinfällig. Ihr
+Szenario „No member-list or mass-mail surface exists" behauptet dasselbe und geht
+mit ihr.
+
+Sie war zuvor als MODIFIED geführt, mit umbenanntem Szenario. Das ist der Grund,
+warum `openspec archive` am 22.08. abbrach: ein umbenanntes Szenario in einem
+MODIFIED-Block löscht das alte still, und das Werkzeug verweigert genau das.
+REMOVED + ADDED sagt dasselbe, ohne etwas zu verschlucken.
+
+**Migration**: Ersetzt durch „Die Admin-Fläche kennt eine Mitgliederliste, aber
+keinen Massenversand". Was bestehen bleibt, steht dort ausdrücklich: kein
+Massenversand, kein CRM, keine Themen-Newsletter (AGE-304), und die Liste ist
+keine Empfängerauswahl. Was entfällt, ist allein die Behauptung, es gebe keine
+Liste.
