@@ -583,6 +583,13 @@ function Zeilenmenue({
         type="button"
         size="sm"
         variant="secondary"
+        // `w-fit` gegen das `align-self: stretch` der Kartensicht: dort ist die
+        // Karte ein `flex-col`, und ohne das zieht sich der Auslöser über ihre
+        // ganze Breite und liest sich als Hauptaktion statt als Menü. In der
+        // Tabelle und im Verzeichnis wirkt die Klasse nicht — dort ist die
+        // Breite ohnehin inhaltsbestimmt. Gefunden in der Sichtprobe (7.6);
+        // jsdom kennt keine Breiten.
+        className="w-fit"
         disabled={laeuft}
         aria-haspopup="menu"
         aria-expanded={offen}
@@ -659,24 +666,24 @@ const RUECKFRAGEN: Record<
   aktivieren: {
     titel: (name) => `${name} jetzt aktivieren?`,
     folge:
-      "Die Angaben werden damit für andere Mitglieder im Verzeichnis sichtbar. " +
-      "Das lässt sich hier nicht rückgängig machen.",
+      "wird damit für andere Mitglieder im Verzeichnis sichtbar. Das lässt sich " +
+      "hier nicht rückgängig machen.",
     ausweg: "Der reguläre Weg ist „Zugangslink schicken“ — dann bestätigt das Mitglied selbst.",
     knopf: "Aktivieren",
   },
   deaktivieren: {
     titel: (name) => `${name} deaktivieren?`,
     folge:
-      "Das Mitglied kann sich danach nicht mehr anmelden und verschwindet aus dem " +
-      "Verzeichnis. Beiträge und Kommentare bleiben stehen, als „Ehemaliges Mitglied“.",
+      "kann sich danach nicht mehr anmelden und verschwindet aus dem Verzeichnis. " +
+      "Beiträge und Kommentare bleiben stehen, als „Ehemaliges Mitglied“.",
     ausweg: "„Reaktivieren“ nimmt beides wieder zurück.",
     knopf: "Deaktivieren",
   },
   loeschen: {
     titel: (name) => `${name} löschen?`,
     folge:
-      "Das Mitglied kann sich danach nicht mehr anmelden und verschwindet aus dem " +
-      "Verzeichnis. Beiträge und Kommentare bleiben stehen, als „Ehemaliges Mitglied“.",
+      "kann sich danach nicht mehr anmelden und verschwindet aus dem Verzeichnis. " +
+      "Beiträge und Kommentare bleiben stehen, als „Ehemaliges Mitglied“.",
     ausweg: "„Wiederherstellen“ nimmt es zurück, solange die Zeile besteht.",
     knopf: "Löschen",
   },
@@ -721,8 +728,11 @@ function Rueckfrage({
       <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={onAbbrechen} />
       <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-6 shadow-soft">
         <h2 className="font-display text-lg font-semibold text-ink">{text.titel(name)}</h2>
+        {/* Der Name ist das SATZSUBJEKT, nicht ein vorangestelltes Etikett.
+            „Carla Aktiv: Das Mitglied kann sich…" nannte sie zweimal und las
+            sich wie ein Protokolleintrag. Gefunden in der Sichtprobe (7.6). */}
         <p className="mt-2 text-sm text-muted">
-          <strong>{name}</strong>: {text.folge}
+          <strong>{name}</strong> {text.folge}
         </p>
         <p className="mt-2 text-sm text-muted">{text.ausweg}</p>
         <div className="mt-5 flex justify-end gap-2">

@@ -275,20 +275,51 @@ und standen im ersten Entwurf nicht drin.
 
 ## 7. Frontend — Zeilenmenü
 
-- [ ] 7.1 **RED:** das Menü zeigt an einer deaktivierten Zeile „reaktivieren"
-      und nicht „deaktivieren".
-- [ ] 7.2 Menükomponente. **Overlay an `document.body` portalieren** — ein
-      `fixed`-Overlay wird hier an zwei Stellen eingefangen (`.fbc-card:hover`
-      durch `transform`, `<header>` durch `backdrop-blur`).
-- [ ] 7.3 Rückfragen für Deaktivieren und Löschen, beide **namentlich**.
-- [ ] 7.4 Tastaturbedienung und Schliessen beim Verlassen.
-- [ ] 7.5 **[PR]** Handlungsmatrix **serverseitig erzwungen**, vom Menü nur
-      gespiegelt. Kombinierte Zustände abdecken: einem unaktivierten **und
-      gelöschten** Mitglied darf weder „Zugangslink schicken" noch „direkt
-      aktivieren" angeboten werden; „reaktivieren" darf ein gelöschtes nicht
-      wiederbeleben.
-- [ ] 7.6 **GREEN**, danach **Sichtprobe im Browser**: Höhe des Overlays messen
-      und `elementFromPoint` prüfen — jsdom sieht das Einfangen nie.
+- [x] 7.1 **RED:** das Menü zeigt an einer deaktivierten Zeile „reaktivieren"
+      und nicht „deaktivieren". Echter RED — die Schaltfläche „Handlungen"
+      existierte nicht.
+- [x] 7.2 Menükomponente, an `document.body` portaliert. **Drei Fallen, nicht
+      zwei:** neben `.fbc-card:hover` (`transform`) und `<header>`
+      (`backdrop-blur`) schnitte auch der `overflow-x-auto` der Tabelle ein
+      `absolute` positioniertes Menü ab. Ein eigener Test hält die Ursache fest
+      (`menue.parentElement === document.body`), weil kein Verhaltenstest sie
+      fände.
+- [x] 7.3 Rückfragen für Deaktivieren und Löschen, beide namentlich und mit der
+      Folge („kann sich danach nicht mehr anmelden"). Die Rückfrage ist
+      verallgemeinert statt verdoppelt; welche Handlungen eine brauchen, steht
+      in `BRAUCHT_RUECKFRAGE` und wird vom Verteiler gelesen.
+- [x] 7.4 Tastaturbedienung (Fokus ins Menü beim Öffnen, Pfeiltasten mit
+      Umlauf, Escape schliesst und gibt den Fokus zurück) und Schliessen beim
+      Verlassen — per Zeiger, per `focusout` und beim Scrollen.
+- [x] 7.5 **[PR]** Matrix gespiegelt, kombinierte Zustände abgedeckt.
+      **ABWEICHUNG, offen:** „serverseitig erzwungen" gilt für die VIER
+      Lebenszyklus-RPCs, nicht für die beiden Aktivierungswege.
+      `admin_activate_member` und `issue_activation_token` kennen
+      `disabled_at`/`deleted_at` nicht — dort ist das Ausblenden im Menü heute
+      die einzige Hürde. Das Gate hält weiter (ein gelöschtes Konto bliebe
+      unsichtbar und gesperrt), der Schaden wäre ein falsches `activated_at`
+      und eine irreführende Mail. Siehe „Offene Fragen" im Handoff.
+      Zusätzlich nicht gespiegelt: dass ein Admin sich nicht selbst
+      deaktivieren oder löschen kann — die Fläche kennt den Aufrufer hier
+      nicht, die Datenbank weist es mit `22023` ab.
+- [x] 7.6 **GREEN** (37 Zusagen in `AdminMitgliederPage.test.tsx`, 1385 Vitest
+      gesamt), danach **Sichtprobe im Browser** gegen den lokalen Stack:
+      - **Gegenprobe zuerst:** ein NICHT portaliertes `fixed; inset:0` in
+        derselben Karte misst **361×154** statt **1688×1234** — die Falle
+        schnappt zu, die Messung darunter misst also etwas.
+      - Das portalierte Menü: **224×154**, `parentElement === BODY`, ganz im
+        Ansichtsfenster, **alle** Einträge per `elementFromPoint` getroffen —
+        in allen drei Sichten.
+      - **Echter Durchstich** (Menü → Rückfrage → Edge Function → RPC +
+        GoTrue): `disabled_at` UND `banned_until` gesetzt, **genau eine**
+        `admin_audit`-Zeile (`disable_member`). Konsole ohne Fehler.
+      - **Zwei Befunde, die nur die Sichtprobe fand:** der Auslöser streckte
+        sich in der Kartensicht über die ganze Karte (`align-self: stretch`) —
+        behoben mit `w-fit`; und die Rückfrage nannte den Namen zweimal
+        („Carla Aktiv: Das Mitglied kann sich…") — er ist jetzt das
+        Satzsubjekt.
+      - Datengrundlage: `scripts/probe-age581-sichtprobe-daten.ts`
+        (wiederholbar, nur gegen `127.0.0.1`).
 
 ## 8. Frontend — Reiter
 

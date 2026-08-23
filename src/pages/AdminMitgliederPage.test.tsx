@@ -573,6 +573,24 @@ describe("Der halbe Zustand wird gemeldet, nicht gefeiert (4.5)", () => {
     expect(screen.queryByText(/Carla Aktiv: deaktiviert/i)).toBeNull();
   });
 
+  /**
+   * Die Falle in der anderen Richtung: ein gelungenes „reaktivieren" liefert
+   * `{hidden: false, banned: false}`. Wer den Teilzustand an `banned === false`
+   * allein festmacht, warnt hier — bei einer Handlung, die vollständig gelungen
+   * ist. Kein anderer Test dieser Datei fiele darauf herein.
+   */
+  it("meldet ein gelungenes Reaktivieren als Erfolg, nicht als halben Zustand", async () => {
+    rpc.mockResolvedValue({ data: [DEAKTIVIERT], error: null });
+    invoke.mockResolvedValue({ data: { hidden: false, banned: false }, error: null });
+    renderPage();
+    const menue = await oeffneMenue(DEAKTIVIERT.id);
+
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Reaktivieren$/i }));
+
+    await screen.findByText(/reaktiviert/i);
+    expect(screen.queryByText(/weiterhin anmelden/i)).toBeNull();
+  });
+
   it("meldet den vollen Vollzug als Erfolg", async () => {
     rpc.mockResolvedValue({ data: [AKTIV], error: null });
     invoke.mockResolvedValue({ data: { hidden: true, banned: true }, error: null });
