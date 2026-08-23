@@ -172,14 +172,18 @@ und standen im ersten Entwurf nicht drin.
       (`disabled_at` und `deleted_at`) und je eine Wächter-Zusage, dass die
       Reihe um genau ihn schrumpft statt leer zu werden. Roter Lauf: drei
       Fehlschläge, die beiden Wächter grün.
-- [ ] 6.2 **[PR]** `my_activation_state` bekommt ein drittes Feld
+- [x] 6.2 **[PR]** `my_activation_state` bekommt ein drittes Feld
       `blocked boolean` — wahr bei deaktiviert **oder** gelöscht. Ein
       Zustandswort statt eines Wahrheitswerts verriete dem Betroffenen, welche
-      der beiden Handlungen ein Admin vorgenommen hat.
-- [ ] 6.3 **[PR]** `rls_test.sql:705` hält die Signatur **wörtlich** fest
+      der beiden Handlungen ein Admin vorgenommen hat. **Erledigt in Teil A**
+      (`20260823120000`), hier nur nachgetragen; die Oberfläche liest es seit
+      6.5.
+- [x] 6.3 **[PR]** `rls_test.sql:705` hält die Signatur **wörtlich** fest
       („genau ZWEI Felder") und bricht dadurch. Er ist mitzuändern, und die
       `access-control`-Ausnahme im Spec ebenfalls — beides ist im Delta bereits
-      geschrieben. Dass er bricht, ist seine Aufgabe.
+      geschrieben. Dass er bricht, ist seine Aufgabe. **Erledigt in Teil A**,
+      hier nur nachgetragen: die Zusage steht jetzt auf drei Feldern und ist
+      unverändert eine WÖRTLICHE Signaturprüfung, kein „enthält mindestens".
 - [x] 6.4 `my_activation_state` wurde in Teil A mit `drop` + `create` ersetzt
       (aus zwei Feldern wurden drei). **Bei `event_attendees` trifft die
       Begründung nicht zu:** ihr Rückgabetyp bleibt `(profile_id, status)`, die
