@@ -701,10 +701,23 @@ select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.my_activation_state() where activated = false'),
   1, 'my_activation_state meldet „nicht aktiviert"');
+-- GEÄNDERT MIT AGE-581: aus zwei Feldern wurden drei. `blocked` sagt, ob dem
+-- Konto der Zugang entzogen wurde — ohne das Feld zeigte die Oberfläche einem
+-- gesperrten Konto den Aktivierungsbildschirm und lüde es ein, sich einen
+-- Zugangslink schicken zu lassen, für einen Zugang, den es nicht mehr gibt.
+--
+-- Dass diese Zusicherung brechen MUSSTE, ist ihre Aufgabe: sie hält fest, dass
+-- jedes weitere Feld eine Entscheidung ist und kein Versehen. Die Zusage selbst
+-- bleibt unverändert scharf — es ist eine WÖRTLICHE Signaturprüfung, kein
+-- „enthält mindestens".
+--
+-- `blocked` ist ein Wahrheitswert und kein Zustandswort. Ein Feld mit den
+-- Werten `deaktiviert`/`geloescht` verriete dem Betroffenen, welche der beiden
+-- Handlungen ein Admin vorgenommen hat.
 select is(
   pg_get_function_result('public.my_activation_state()'::regprocedure),
-  'TABLE(activated boolean, display_name text)',
-  'my_activation_state gibt genau ZWEI Felder zurück — jedes weitere wäre eines, '
+  'TABLE(activated boolean, blocked boolean, display_name text)',
+  'my_activation_state gibt genau DREI Felder zurück — jedes weitere wäre eines, '
   'das ein Angreifer mit dem verteilten Passwort abholt');
 select is(has_function_privilege('anon', 'public.my_activation_state()', 'execute'),
   false, 'anon darf my_activation_state nicht ausführen');
