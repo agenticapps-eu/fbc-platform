@@ -92,3 +92,48 @@ export async function activateMember(id: string): Promise<void> {
   const { error } = await supabase.rpc("admin_activate_member", { target: id });
   if (error) throw error;
 }
+
+/** Die vier Handlungen, die `admin-set-member-ban` kennt. */
+export type LebenszyklusHandlung = "disable" | "enable" | "delete" | "restore";
+
+export interface BanErgebnis {
+  /**
+   * Wahr, wenn nur die HÄLFTE gelang: das Mitglied ist unsichtbar, kann sich
+   * aber weiterhin anmelden (oder umgekehrt entbannt, aber noch gesperrt).
+   */
+  halb: boolean;
+}
+
+/**
+ * Der einzige Weg der Oberfläche zu den vier Lebenszyklus-Handlungen.
+ *
+ * NICHT über `supabase.rpc`: die vier RPCs sind nur die eine Hälfte der Sperre.
+ * Die andere ist `banned_until` in `auth.users`, und die setzt allein die Edge
+ * Function mit dem `service_role`-Schlüssel. Ein direkter RPC-Aufruf von hier
+ * ergäbe ein Profil, das aus dem Verzeichnis verschwindet und sich weiterhin
+ * anmeldet.
+ *
+ * `grund` wird nicht mitgegeben. Die RPCs führen ihn als `default null`, und
+ * diese Fläche hat kein Feld dafür — ein Parameter ohne Aufrufer, benannt statt
+ * verschwiegen.
+ *
+ * DER TEILZUSTAND IST KEIN `error`. Die Function antwortet auf ihn mit `207`,
+ * und supabase-js behandelt jedes 2xx als Erfolg — `error` bliebe null. Die
+ * Unterscheidung hängt deshalb am Rumpf, und zwar an BEIDEN Feldern: `banned`
+ * allein reicht nicht, weil ein gelungenes „reaktivieren" ebenfalls
+ * `banned: false` liefert. Genau `hidden && !banned` kommt in keinem der beiden
+ * Erfolgsfälle vor — Schliessen gelingt als `{hidden, banned}`, Öffnen als
+ * `{!hidden, !banned}`.
+ */
+export async function setMemberBan(
+  action: LebenszyklusHandlung,
+  target: string,
+): Promise<BanErgebnis> {
+  const { data, error } = await supabase.functions.invoke("admin-set-member-ban", {
+    body: { action, target },
+  });
+  if (error) throw error;
+
+  const rumpf = (data ?? {}) as { hidden?: boolean; banned?: boolean };
+  return { halb: rumpf.hidden === true && rumpf.banned === false };
+}
