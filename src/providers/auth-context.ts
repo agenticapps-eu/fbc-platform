@@ -36,6 +36,21 @@ export interface AuthContextValue {
    * zeigt oder eine Fehlermeldung mit Wiederholen-Option (AGE-495, Befund F2).
    */
   activationLookupFailed: boolean;
+  /**
+   * true, wenn dem Konto der Zugang entzogen wurde — deaktiviert oder gelöscht
+   * (AGE-581).
+   *
+   * Steht NEBEN `isActivated`, nicht darin: die Sperre deutet die Bestätigung
+   * nicht um. Ein gesperrtes, zuvor bestätigtes Konto trägt `isActivated: true`
+   * und `isBlocked: true` — käme es nur auf `isActivated` an, liefe es durch
+   * die Wand und schaute auf lauter leere Seiten, weil die RLS ihm überall
+   * nichts liefert.
+   *
+   * Trägt bewusst NICHT, WELCHE der beiden Handlungen ein Admin vorgenommen
+   * hat: die Unterscheidung geht den Betroffenen nichts an, und die Oberfläche
+   * braucht sie nicht — sie zeigt in beiden Fällen denselben Hinweis.
+   */
+  isBlocked: boolean;
   /** Anzeigename aus `my_activation_state()` — für die Anrede auf dem Aktivierungsschirm. */
   activationName: string | null;
   /**

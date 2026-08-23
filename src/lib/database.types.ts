@@ -1557,7 +1557,12 @@ export type Database = {
       is_activated: { Args: never; Returns: boolean };
       my_activation_state: {
         Args: never;
-        Returns: { activated: boolean; display_name: string | null }[];
+        /** `blocked` seit AGE-581: wahr bei deaktiviert ODER geloescht. Ein
+         *  Wahrheitswert und kein Zustandswort — welche der beiden Handlungen
+         *  ein Admin vorgenommen hat, geht den Betroffenen so wenig an wie
+         *  einen Leser des Feeds. `activated` behaelt seine Bedeutung („hat je
+         *  bestaetigt") und wird davon NICHT umgedeutet. */
+        Returns: { activated: boolean; blocked: boolean; display_name: string | null }[];
       };
       // Admin-Bearbeitung fremder Profile (AGE-498), aus
       // 20260811090300_admin_profile_functions.sql. Von Hand gepflegt wie der

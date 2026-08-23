@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(428);
+select plan(433);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2455,6 +2455,56 @@ select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
   $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
      where status <> 'registered'$$),
   0, 'event_attendees: Warteliste und Abmeldung bleiben vor Nicht-Hosts verborgen');
+
+-- 20.3b Der Lebenszyklus auf der ZIELSEITE (AGE-581). Die Aufruferseite ist
+-- schon zu: `event_attendees` ruft `is_activated()`, und die trägt seit Teil A
+-- beide neuen Bedingungen. Die Zielseite dagegen prüft hier von Hand
+-- `p.activated_at is not null` — sie ist eine der fünf direkten Stellen aus der
+-- Inventur und muss mitgezogen werden.
+--
+-- Ohne das bliebe ein entferntes Mitglied ausgerechnet dort stehen, wo sein
+-- Gesicht neben denen der anderen Teilnehmer erscheint: die Avatarreihe eines
+-- Events. `a2` ist eines der beiden Profile, die `a3` in 20.3 sieht.
+--
+-- Beide Wege einzeln, nicht nur einer: `deleted_at` gatet selbstständig und
+-- fasst `disabled_at` nicht an — ein Test nur über `disabled_at` liesse eine
+-- Umsetzung durch, die das Löschen vergisst.
+
+update public.profiles set disabled_at = now()
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a2'$$),
+  0, 'event_attendees: ein DEAKTIVIERTER Teilnehmer verschwindet aus der Reihe …');
+
+-- Und zwar er allein. Ohne diese Zeile wäre die Zusage darüber auch dann grün,
+-- wenn die Funktion für alle nichts mehr lieferte.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  1, '… und die Reihe schrumpft um genau ihn, statt leer zu werden');
+
+update public.profiles set disabled_at = null
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  2, '… die Rücknahme bringt ihn zurück — der Zustand hängt am Feld, nicht am Zufall');
+
+update public.profiles set deleted_at = now()
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a2'$$),
+  0, 'event_attendees: ein GELÖSCHTER Teilnehmer ebenso — deleted_at gatet eigenständig');
+
+update public.profiles set deleted_at = null
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  2, '… und auch hier steht der Ausgangszustand danach wieder — die Zusagen unten bauen darauf');
 
 select alike(pg_temp.try_as_anon(
   $$select * from public.event_attendees('c8000002-0000-4000-8000-000000000002')$$),

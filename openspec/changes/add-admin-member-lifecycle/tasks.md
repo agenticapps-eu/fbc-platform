@@ -167,8 +167,11 @@ und standen im ersten Entwurf nicht drin.
 
 ## 6. `event_attendees` und `my_activation_state`
 
-- [ ] 6.1 **RED:** ein entfernter Teilnehmer erscheint nicht mehr in
-      `event_attendees`.
+- [x] 6.1 **RED:** ein entfernter Teilnehmer erscheint nicht mehr in
+      `event_attendees`. Abschnitt 20.3b in `rls_test.sql`, beide Wege einzeln
+      (`disabled_at` und `deleted_at`) und je eine Wächter-Zusage, dass die
+      Reihe um genau ihn schrumpft statt leer zu werden. Roter Lauf: drei
+      Fehlschläge, die beiden Wächter grün.
 - [ ] 6.2 **[PR]** `my_activation_state` bekommt ein drittes Feld
       `blocked boolean` — wahr bei deaktiviert **oder** gelöscht. Ein
       Zustandswort statt eines Wahrheitswerts verriete dem Betroffenen, welche
@@ -177,11 +180,31 @@ und standen im ersten Entwurf nicht drin.
       („genau ZWEI Felder") und bricht dadurch. Er ist mitzuändern, und die
       `access-control`-Ausnahme im Spec ebenfalls — beides ist im Delta bereits
       geschrieben. Dass er bricht, ist seine Aufgabe.
-- [ ] 6.4 Beide Funktionen mit `drop` + `create` (Rückgabetyp ändert sich).
-- [ ] 6.5 Die Oberfläche zeigt einem gesperrten Konto einen **Sperrhinweis**,
+- [x] 6.4 `my_activation_state` wurde in Teil A mit `drop` + `create` ersetzt
+      (aus zwei Feldern wurden drei). **Bei `event_attendees` trifft die
+      Begründung nicht zu:** ihr Rückgabetyp bleibt `(profile_id, status)`, die
+      Änderung sitzt im Prädikat. Dort genügt `create or replace`, und Grants
+      und Kommentar bleiben damit erhalten. Statt `p.activated_at is not null`
+      steht jetzt `is_activated_profile(p.id)` — eine sechste Kopie derselben
+      Regel hiesse, dass die nächste Änderung an der Zugangsbedingung sechs
+      Orte finden müsste statt fünf. Migration
+      `20260823150000_event_attendees_lifecycle.sql`.
+- [x] 6.5 Die Oberfläche zeigt einem gesperrten Konto einen **Sperrhinweis**,
       nicht den Aktivierungsbildschirm mit dem Angebot, einen Zugangslink
-      anzufordern.
-- [ ] 6.6 **GREEN.**
+      anzufordern. `blocked` läuft von der RPC bis zum Schirm: `activation.ts`,
+      `database.types.ts`, `auth-context.ts`, `AuthProvider.tsx`,
+      `auth-fixtures.tsx`, `ActivationGate.tsx`. Der Zweig steht **vor** der
+      Aktivierungswand und unabhängig von ihr — ein gesperrtes, zuvor
+      bestätigtes Konto trägt `activated = true` und käme sonst durch.
+      Sechs Zusagen in `ActivationGate.test.tsx`, darunter eine Löschprobe
+      (ohne `isBlocked` bleibt alles beim Alten) und eine, die belegt, dass der
+      Schirm die beiden Handlungen nicht unterscheidet.
+      **Sichtprobe im Browser** gegen den lokalen Stack, nicht nur jsdom: ein
+      angemeldetes Konto erst deaktiviert, dann gelöscht — beide Male derselbe
+      Schirm, kein Zugangslink, keine Konsolenmeldung.
+- [x] 6.6 **GREEN.** 580 pgTAP-Tests, 1367 Vitest-Tests. Gegenprobe für
+      `event_attendees`: das Prädikat zurück auf `p.activated_at is not null`
+      macht `rls_test` rot, die Wiederherstellung grün.
 
 ## 7. Frontend — Zeilenmenü
 

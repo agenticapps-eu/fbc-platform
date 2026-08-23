@@ -87,12 +87,8 @@ describe("ActivationGate", () => {
     it("zeigt eine Fehlermeldung mit Wiederholen-Option statt dauerhaft nichts", () => {
       renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: true });
       expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /Noch ein Schritt/i }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /erneut versuchen/i }),
-      ).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Noch ein Schritt/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /erneut versuchen/i })).toBeInTheDocument();
     });
 
     it("löst beim Klick auf den Wiederholen-Knopf einen Seiten-Reload aus", () => {
@@ -119,6 +115,62 @@ describe("ActivationGate", () => {
       // erscheint NICHT von selbst, nur weil isActivated null ist.
       renderMit({ user: einNutzer, isActivated: null, activationLookupFailed: false });
       expect(screen.queryByRole("button", { name: /erneut versuchen/i })).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * AGE-581: dem Konto wurde der Zugang entzogen — deaktiviert oder gelöscht.
+   *
+   * Ohne eigenen Zweig liefe ein gesperrtes Konto in einen von zwei falschen
+   * Bildschirmen. Hat es nie bestätigt, sieht es den Aktivierungsbildschirm und
+   * darf sich einen Zugangslink schicken lassen, für einen Zugang, den es nicht
+   * mehr gibt. Hat es bestätigt, kommt es sogar DURCH die Wand — `activated`
+   * behält seine Bedeutung („hat je bestätigt") und wird von der Sperre nicht
+   * umgedeutet — und schaut dann auf lauter leere Seiten, weil die RLS ihm
+   * überall nichts liefert.
+   */
+  describe("wenn dem Konto der Zugang entzogen wurde (isBlocked)", () => {
+    it("zeigt den Sperrhinweis statt des Inhalts — auch wenn das Konto bestätigt hat", () => {
+      // Der wichtigere der beiden Fälle: `isActivated: true` käme ohne den
+      // neuen Zweig durch und landete auf leeren Seiten.
+      renderMit({ user: einNutzer, isActivated: true, isBlocked: true });
+      expect(screen.queryByText("Geschützter Inhalt")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Zugang gesperrt/i })).toBeInTheDocument();
+    });
+
+    it("zeigt den Sperrhinweis auch dem nie bestätigten Konto — nicht die Aktivierungswand", () => {
+      renderMit({ user: einNutzer, isActivated: false, isBlocked: true });
+      expect(screen.queryByRole("heading", { name: /Noch ein Schritt/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Zugang gesperrt/i })).toBeInTheDocument();
+    });
+
+    it("bietet KEINEN Zugangslink an — der Zugang ist weg, nicht unbestätigt", () => {
+      renderMit({ user: einNutzer, isActivated: false, isBlocked: true });
+      expect(screen.queryByRole("button", { name: /link/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /erneut senden/i })).not.toBeInTheDocument();
+    });
+
+    it("verrät nicht, WELCHE der beiden Handlungen ein Admin vorgenommen hat", () => {
+      // `blocked` ist ein Wahrheitswert und kein Zustandswort. Stünde
+      // „deaktiviert" oder „gelöscht" auf dem Schirm, wäre die Entscheidung
+      // gegen ein Zustandswort in der Datenbank an der Oberfläche wieder
+      // aufgehoben.
+      renderMit({ user: einNutzer, isActivated: true, isBlocked: true });
+      expect(document.body.textContent).not.toMatch(/deaktiviert|gelöscht|geloescht/i);
+    });
+
+    it("lässt einen Weg offen: abmelden", () => {
+      renderMit({ user: einNutzer, isActivated: true, isBlocked: true });
+      expect(screen.getByRole("button", { name: /abmelden/i })).toBeInTheDocument();
+    });
+
+    it("bleibt ohne isBlocked beim alten Verhalten", () => {
+      // Löschprobe für die fünf Zusagen oben: der neue Zweig darf sich nicht
+      // von selbst einschalten, sonst sähe JEDES unbestätigte Konto den
+      // Sperrhinweis statt der Wand.
+      renderMit({ user: einNutzer, isActivated: false, isBlocked: false });
+      expect(screen.getByRole("heading", { name: /Noch ein Schritt/i })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Zugang gesperrt/i })).not.toBeInTheDocument();
     });
   });
 });
