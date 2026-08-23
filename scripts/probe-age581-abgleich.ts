@@ -53,7 +53,7 @@ for (const e of ergebnis.filter((e) => e.treffer.length === 0))
   console.log(`  ${e.kategorie.padEnd(12)} ${e.vorname} ${e.nachname}  <${e.email}>`);
 console.log("\n## Mehrdeutig (>1 Treffer)");
 for (const e of ergebnis.filter((e) => e.treffer.length > 1))
-  console.log(`  ${e.vorname} ${e.nachname} <${e.email}> -> ${e.treffer.map((t: any) => `${t.name} <${t.login_email}>`).join(" | ")}`);
+  console.log(`  ${e.vorname} ${e.nachname} <${e.email}> -> ${e.treffer.map((t) => `${t.name} <${t.login_email}>`).join(" | ")}`);
 console.log("\n## Getroffen, aber nur über den Namen (Adresse weicht ab)");
 for (const e of ergebnis.filter((e) => e.treffer.length === 1 && e.wie !== "email"))
   console.log(`  ${e.vorname} ${e.nachname}: Liste <${e.email}>  DB <${e.treffer[0].login_email}> / kontakt <${e.treffer[0].kontakt_email ?? "-"}>`);
