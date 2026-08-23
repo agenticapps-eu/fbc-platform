@@ -115,27 +115,69 @@ und standen im ersten Entwurf nicht drin.
 
 ## 4. Die Anmeldung sperren
 
-- [ ] 4.1 **RED:** die Edge Function antwortet ohne Admin-Session mit 401/403.
-- [ ] 4.2 Edge Function `admin-set-member-ban`. Liest `sub` aus dem
+- [x] 4.1 **RED:** die Edge Function antwortet ohne Admin-Session mit 401/403.
+      Der rote Lauf war `deno test` gegen ein `ban.ts`, das es noch nicht gab;
+      die Abwehr selbst ist in `scripts/probe-age581-ban-abnahme.ts` gemessen —
+      ohne Kopfzeile 401, als Nicht-Admin 403, und das Ziel trägt danach kein
+      `disabled_at`. Gemessen mit `--no-verify-jwt`, also **ohne** die
+      Gateway-Prüfung: die Abwehr steht damit nachweislich IM Handler und nicht
+      nur davor.
+- [x] 4.2 Edge Function `admin-set-member-ban`. Liest `sub` aus dem
       **Gateway-geprüften JWT**, nicht über `getUser()`/`getClaims()` — beide
-      scheitern unter den asymmetrischen Signierschlüsseln in PROD.
-- [ ] 4.3 Die Function prüft die Admin-Eigenschaft über eine DEFINER-RPC, nicht
+      scheitern unter den asymmetrischen Signierschlüsseln in PROD. `jwtSub`
+      aus `checkout.ts` wiederverwendet, wie `admin-change-email` es tut.
+      In `config.toml` mit `verify_jwt = true` eingetragen.
+- [x] 4.3 Die Function prüft die Admin-Eigenschaft über eine DEFINER-RPC, nicht
       über einen Tabellenzugriff: `service_role` hält auf keiner
       `public`-Tabelle ein Recht, das scheitert erst zur Laufzeit.
-- [ ] 4.4 **[PR] Reihenfolge je Richtung**, nicht pauschal:
+      `is_admin_uid(actor)`, und `actor` kommt aus dem Token, nie aus dem Rumpf.
+- [x] 4.4 **[PR] Reihenfolge je Richtung**, nicht pauschal:
       **Schliessen** = DB, dann Ban. **Öffnen** = Ban, dann DB. Andersherum
       wäre das Profil beim Öffnen sichtbar, während die Anmeldung noch gesperrt
       ist — und die Handlung verschwände aus der Oberfläche.
+      Die Richtung steht als `istSchliessen()` in `ban.ts` samt Begründung; der
+      Handler ruft „erster Schritt / zweiter Schritt" und nicht „DB / Ban".
+      Daraus folgt der Zuschnitt von `fasseAusgangZusammen`: der ZWEITE Schritt
+      ist in beiden Richtungen der, der einen halben Zustand hinterlassen kann.
 - [ ] 4.5 **[PR]** Teilfehlschlag: Antwort **`207`** mit
       `{hidden: true, banned: false}`; die Fläche zeigt eine **Warnung**, keinen
       Erfolg; der Teilfehlschlag steht im `admin_audit`-`payload`.
-- [ ] 4.6 **[PR]** Der halbe Zustand ist **heilbar**: ist `disabled_at` gesetzt
+      **Zwei von drei Hälften stehen und sind gemessen** (23.08., erzwungen
+      durch eine unbrauchbare `ban_duration`): HTTP 207 mit
+      `{hidden: true, banned: false, detail: …}`, `disabled_at` gesetzt, kein
+      Bann, das Ziel meldet sich weiterhin an — und **zwei** Protokollzeilen,
+      `disable_member` und `ban_failed`.
+      **Abweichung von der Vorgabe, bewusst:** der Teilfehlschlag steht in einer
+      EIGENEN Zeile und nicht im `payload` der ersten. Die RPC schreibt ihre
+      Zeile in derselben Transaktion wie die Änderung an `disabled_at` — also
+      bevor irgendwer wissen kann, ob der Bann gelingt. Sie nachträglich zu
+      ändern hiesse, eine Protokollzeile zu überschreiben; ein Protokoll, das
+      sich ändern lässt, ist keins. Die zweite Zeile behauptet keine zweite
+      Änderung, sie hält fest, dass die erste halb blieb.
+      **OFFEN ist die dritte Hälfte: die Warnung in der Oberfläche.** Sie
+      gehört zum Zeilenmenü und wird in Abschnitt 7 gebaut.
+- [x] 4.6 **[PR]** Der halbe Zustand ist **heilbar**: ist `disabled_at` gesetzt
       und der Ban fehlt, bricht ein erneutes Deaktivieren nicht mit `22023` ab,
       sondern setzt den Ban nach. Gilt gespiegelt fürs Öffnen.
-- [ ] 4.7 Bann über `ban_duration: "876000h"`, Aufhebung über `"none"` —
-      gemessen, nicht geraten (Entscheidung 9).
-- [ ] 4.8 **GREEN:** 4.1 läuft; ein Durchlauf gegen den lokalen Stack belegt,
+      In der Abnahme gemessen: halber Zustand von Hand hergestellt, das Konto
+      meldet sich darin wieder an, ein erneutes „deaktivieren" antwortet 200
+      statt 409, der Bann steht wieder — und es bleibt bei EINER
+      `disable_member`-Zeile, weil die Datenbank sich nicht geändert hat.
+- [x] 4.7 Bann über `ban_duration: "876000h"`, Aufhebung über `"none"` —
+      gemessen, nicht geraten (Entscheidung 9). Beides in `banDauerFuer()`, mit
+      einem Test darauf: die Werte sind das Ergebnis einer Messung und dürfen
+      nicht beiläufig umgeschrieben werden.
+- [x] 4.8 **GREEN:** 4.1 läuft; ein Durchlauf gegen den lokalen Stack belegt,
       dass ein deaktiviertes Konto sich nicht mehr anmelden kann.
+      `scripts/probe-age581-ban-abnahme.ts` — **25 von 25 Zusagen**, darunter
+      die entscheidende: nach dem Deaktivieren antwortet der Anmeldedienst mit
+      `400` und `user_banned`, es entsteht gar keine Sitzung. Vorher und
+      nachher meldet sich dasselbe Konto an; ohne diese beiden Gegenproben
+      bewiese „kommt nicht herein" nur, dass das Passwort falsch war.
+      10 Deno-Tests über `ban.ts`, `deno check` über beide Dateien grün.
+      Nebenbefund, in der Probe behandelt: `admin_audit.actor` verweist ohne
+      `on delete cascade` auf `profiles`, ein Admin mit Protokollzeilen liess
+      sich also nicht löschen — die Löschung scheiterte dabei still.
 
 ## 5. `admin_list_members` erweitern
 
