@@ -3,14 +3,7 @@ import { bildUrl } from "../../lib/bild-url";
 import { Avatar } from "../ui/Avatar";
 import { CountUp } from "../ui/Motion";
 import { levelLabel } from "../../config/levels";
-
-function CrownIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M3 7l4 4 5-7 5 7 4-4-1.5 11h-15L3 7zm1.8 13h14.4v1.5H4.8V20z" />
-    </svg>
-  );
-}
+import { Icon } from "../ui/icons";
 
 export interface ProfileHeroProps {
   name: string;
@@ -118,7 +111,7 @@ export function ProfileHero({
             <div className="min-w-0 pb-1">
               {tier && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-strong uppercase">
-                  <CrownIcon className="h-3.5 w-3.5" />
+                  <Icon name="crown" className="h-3.5 w-3.5" />
                   {levelLabel(tier)} Member
                 </span>
               )}

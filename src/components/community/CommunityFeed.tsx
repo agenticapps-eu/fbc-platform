@@ -33,6 +33,7 @@ import {
 import { coverSignaturKey, signEventCovers } from "../../lib/event-cover";
 import { formatEventDate } from "../../lib/events";
 import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
+import { Icon } from "../ui/icons";
 import {
   addComment,
   addPostMedia,
@@ -1376,48 +1377,15 @@ function timeAgo(iso: string): string {
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill={filled ? "currentColor" : "none"}
-      aria-hidden="true"
-    >
-      <path
-        d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="heart" variant={filled ? "solid" : "line"} className="h-4 w-4" />;
 }
 
 function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v3m10-3v3M3.5 9h17M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V7A1.5 1.5 0 0 1 5 5.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="calendar" className="h-3.5 w-3.5" />;
 }
 
 function CommentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="comment" className="h-4 w-4" />;
 }
 
 // ── Beitrag bearbeiten (AGE-566) ────────────────────────────────────────────

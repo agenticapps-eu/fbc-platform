@@ -1,27 +1,44 @@
 ## 1. Icon-Satz und Bereichs-Kanon
 
-- [ ] 1.1 Den Icon-Satz anlegen: `Name → Pfade`, ein Stil (24er-Viewbox,
+- [x] 1.1 Den Icon-Satz anlegen: `Name → Pfade`, ein Stil (24er-Viewbox,
       `currentColor`, gleiche Strichstärke und Endenform), ohne Icon-Bibliothek
-- [ ] 1.2 Die elf Menü-Glyphen aus `NavIcon.tsx` in den Satz überführen; `NavIcon`
+      — `src/components/ui/icons.tsx`, 28 Glyphen. Die Vorlagen trugen 1.6, 1.75,
+      1.8 und 2.0; vereinheitlicht auf **1.6** (sichtbare, gewollte Änderung an
+      Chevron, Fanfare und Lupe)
+- [x] 1.2 Die elf Menü-Glyphen aus `NavIcon.tsx` in den Satz überführen; `NavIcon`
       bleibt als Bauteil bestehen und bezieht sie von dort (gefüllte Fassung
-      inbegriffen)
-- [ ] 1.3 Die neun Streu-Glyphen auflösen: `ChevronLeftIcon`, `BellIcon`,
+      inbegriffen) — die Datei schrumpft von 186 auf 43 Zeilen und ist nur noch
+      die Zuordnung Route → Glyph. Der Rückfall-Punkt wurde als Glyph `dot`
+      mitgenommen; der Test hatte ihn sonst zu Recht als Fremdkörper gemeldet
+- [x] 1.3 Die neun Streu-Glyphen auflösen: `ChevronLeftIcon`, `BellIcon`,
       `MenuIcon`, `ChevronDownIcon` (`AppShell.tsx`), `FeedbackIcon`, `SearchIcon`,
       `HeartIcon`, `CalendarIcon`, `CommentIcon`
-- [ ] 1.4 Den doppelten `CrownIcon` auflösen — er steht byte-gleich in
-      `mein-bereich/building-blocks.tsx` und `profile/ProfileHero.tsx`
-- [ ] 1.5 `matching/CategoryIcon.tsx` in den Satz überführen; das Bauteil bleibt,
+- [x] 1.4 Den doppelten `CrownIcon` auflösen — er steht byte-gleich in
+      `mein-bereich/building-blocks.tsx` und `profile/ProfileHero.tsx`. Beide
+      beziehen ihn jetzt aus dem Satz; `building-blocks` behält den Export, weil
+      `profil-widgets.tsx` ihn importiert
+- [x] 1.5 `matching/CategoryIcon.tsx` in den Satz überführen; das Bauteil bleibt,
       sein eigener `Record` entfällt
-- [ ] 1.6 **Die Ausnahmen namentlich festlegen** und begründen: Markenmarke
-      (eigene Anforderung), `CompassMark.tsx`, `Avatar.tsx`, sowie die
-      Diagramm-Vektoren in `profil-widgets.tsx`, `AdminMitgliederPage.tsx`,
-      `EventDetailPage.tsx`, `MeineChancenPage.tsx`. Gemessen: SVGs liegen in **14**
-      Dateien außerhalb `src/vision`, nicht in neun
-- [ ] 1.7 Den erzwingenden Test bauen — **ein Mechanismus, keine Absicht**: er
+- [x] 1.6 **Die Ausnahmen namentlich festlegen** und begründen — sie stehen mit
+      Grund in `icons.test.ts` (`AUSNAHMEN`). Gemessen: SVGs lagen in **14**
+      Dateien außerhalb `src/vision`, nicht in neun. Donalds Wahl vom 25.08.:
+      **sieben** Ausnahmen. Drei sind echte Nicht-Glyphen (`CompassMark` als
+      Markenmarke, `profil-widgets` als Datenvektor `200x48`, `Avatar` als
+      Platzhalter); vier sind **vertagt** und tragen sehr wohl Glyphen — siehe
+      1.15
+- [x] 1.7 Den erzwingenden Test bauen — **ein Mechanismus, keine Absicht**: er
       läuft gegen den Quellbaum, führt die Ausnahmen aus 1.6 als benannte Liste und
-      fällt, sobald ein neuer Glyph außerhalb des Satzes entsteht
-- [ ] 1.8 Gegenprobe: einen Glyph versuchsweise wieder in eine Feature-Datei legen
-      und belegen, dass der Test rot wird (sonst prüft er nichts)
+      fällt, sobald ein neuer Glyph außerhalb des Satzes entsteht.
+      `src/components/ui/icons.test.ts`, 9 Zusagen. Er trägt **zwei** Prüfungen,
+      nicht eine: die zweite meldet eine Ausnahme, die ihr `<svg>` verloren hat —
+      ohne sie deckt ein toter Listeneintrag ab da jeden künftigen Glyph in
+      derselben Datei (so ist `redirect-targets.test.ts` einmal blind geworden)
+- [x] 1.8 Gegenprobe: einen Glyph versuchsweise wieder in eine Feature-Datei legen
+      und belegen, dass der Test rot wird (sonst prüft er nichts). **Zweimal
+      gemessen**: (a) ein erfundener `SchmuggelIcon` in `FeedbackButton.tsx` →
+      rot, Datei namentlich gemeldet; (b) das `<svg>` aus der Ausnahme
+      `Avatar.tsx` entfernt → rot in der zweiten Prüfung. Danach beide Dateien aus
+      einer Kopie zurückgespielt (nicht `git checkout`/`stash`), Suite wieder grün
 - [ ] 1.9 Bereichsfarben als Tokens in `src/index.css` — **einmal** definiert, im
       Inhaltsschicht-Block. **Nicht** je Theme: der navy-Block überschreibt
       absichtlich nur Chrome
@@ -35,7 +52,24 @@
 - [ ] 1.13 Kanon auf die bestehenden Karten anwenden: Dashboard, Events,
       Mitgliederverzeichnis, Aktivität
 - [ ] 1.14 Sichtprobe im Browser gegen den lokalen Stack: beide Themes, Kontrast
-      auf Kartengrund, 375 px und breit
+      auf Kartengrund, 375 px und breit. **Teilweise erledigt am 25.08.** (helles
+      Theme, breit): alle elf Menü-Glyphen, die gefüllte Fassung im aktiven
+      Eintrag, Glocke, beide Chevrons, Lupe und Fanfare gesehen, Konsole ohne
+      Fehler. **Offen bleiben** mangels Daten auf DEV: die Kategorien `mentor`
+      und `users` (die beiden zusammengeführten), der Kalender am Beitrag mit
+      14 px, Herz und Kommentarzahl, die Krone — plus das dunkle Theme und 375 px
+- [ ] 1.15 **Vertagt am 25.08. (Donalds Wahl), namentlich festhalten** — vier
+      Ausnahmen tragen wiederverwendbare Glyphen und lösen sich später auf:
+      `EventDetailPage.DETAIL_ICONS` (ein zweiter Satz aus vier Glyphen; `kalender`
+      steht damit weiter **dreimal** im Baum), das Drei-Punkte-Symbol in
+      `AdminMitgliederPage.tsx`, der Leerzustands-Glyph in `MeineChancenPage.tsx`
+      und `CheckIcon` in `building-blocks.tsx`. Grund für die Vertagung: den Diff
+      vor dem Go-Live klein halten
+- [ ] 1.16 **Drei Motive wurden zusammengeführt**, weil sie sonst am ersten Tag
+      doppelt *im Satz* stünden — bei der Sichtprobe gegenlesen: `calendar`
+      (Menü + Beitrag), `comment` (Menü „Aktivität" + Kommentarzahl), `academy`
+      (Menü + Kategorie `mentor`), `members` (Menü + Kategorie `users`). Jeweils
+      die Menü-Zeichnung behalten, weil nur sie eine gefüllte Fassung hat
 
 ## 2. Speichern — `post_saves`
 

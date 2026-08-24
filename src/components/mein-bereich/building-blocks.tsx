@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { Card, CardTitle } from "../ui/Card";
+import { Icon } from "../ui/icons";
 
 export const dateFmt = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
@@ -78,11 +79,7 @@ export function EmptyHint({ children }: { children: ReactNode }) {
 }
 
 export function CrownIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M3 7l4 4 5-7 5 7 4-4-1.5 11h-15L3 7zm1.8 13h14.4v1.5H4.8V20z" />
-    </svg>
-  );
+  return <Icon name="crown" className={className} />;
 }
 
 export function CheckIcon({ className }: { className?: string }) {
