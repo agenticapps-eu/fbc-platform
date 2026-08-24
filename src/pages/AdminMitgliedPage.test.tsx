@@ -65,6 +65,8 @@ const DATEN: AdminProfileData = {
   },
   loginEmail: "login@alt.de",
   activated: false,
+  deaktiviert: false,
+  geloescht: false,
 };
 
 beforeEach(() => {
@@ -192,5 +194,66 @@ describe("AdminMitgliedPage (AGE-498)", () => {
 
     expect(await screen.findByText(/Sitzungen/i)).toBeInTheDocument();
     expect(screen.queryByText(/fehlgeschlagen/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Die Kopfzeile nennt den Lebenszyklus (Sichtprobe 11.6)", () => {
+  /**
+   * Gefunden im Browser, nicht von einem Test: über einem GELÖSCHTEN Mitglied
+   * stand „bestätigt" und darunter ein voll bearbeitbares Formular. Die Zeile
+   * las allein `activated`; `admin_get_profile` liefert die Profilzeile als
+   * `to_jsonb(p)` und trug `disabled_at`/`deleted_at` die ganze Zeit mit — sie
+   * wurden nur nie gelesen.
+   */
+  it("meldet ein gelöschtes Mitglied als gelöscht, nicht als bestätigt", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      geloescht: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/gelöscht —/)).toBeInTheDocument();
+    // Der Kern der Zusage: NICHT bloss „gelöscht steht da", sondern dass das
+    // gegenteilige Wort weg ist. Ein gelöschtes Mitglied KANN vorher bestätigt
+    // gewesen sein — genau deshalb stand hier vorher das Falsche.
+    expect(screen.queryByText("bestätigt")).toBeNull();
+  });
+
+  it("meldet ein deaktiviertes Mitglied als deaktiviert", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      deaktiviert: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/deaktiviert —/)).toBeInTheDocument();
+    expect(screen.queryByText("bestätigt")).toBeNull();
+  });
+
+  /** Gelöscht schlägt deaktiviert — dieselbe Rangfolge wie in der Liste. */
+  it("nennt bei beiden Merkmalen die Löschung", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      deaktiviert: true,
+      geloescht: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/gelöscht —/)).toBeInTheDocument();
+    expect(screen.queryByText(/deaktiviert —/)).toBeNull();
+  });
+
+  it("lässt die beiden bisherigen Fälle unberührt", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, activated: true });
+    const { unmount } = renderPage();
+    expect(await screen.findByText("bestätigt")).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, activated: false });
+    renderPage();
+    expect(await screen.findByText(/nicht bestätigt —/)).toBeInTheDocument();
   });
 });

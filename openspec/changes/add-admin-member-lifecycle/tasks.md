@@ -671,7 +671,7 @@ und standen im ersten Entwurf nicht drin.
         dem GoTrue-Aufruf) · `event_attendees`-RPC ohne Paging · Draft und
         Server-Baseline sind derselbe Zustand · die zwei LOW-Zusagen vor ihrem
         Fixture.
-- [ ] 11.6 Sichtprobe der gesamten Fläche im Browser, gegen den lokalen Stack.
+- [x] 11.6 Sichtprobe der gesamten Fläche im Browser, gegen den lokalen Stack.
       **Angefangen: Liste, Zustandsreiter und Zeilenmenü.** Das Menü öffnet im
       echten Browser (jsdom prüft das nie) und zeigt an einer gelöschten Zeile
       genau „Wiederherstellen" — die Matrix stimmt. **Ein Befund:** auf den
@@ -688,7 +688,41 @@ und standen im ersten Entwurf nicht drin.
       jeder Zeile die Breite verschoben. Vier Zusagen dazu, Gegenprobe: drei
       fallen mit der alten Fassung um, die vierte (Gegenprobe auf
       „Aktiviert"/„Nicht aktiviert") bleibt grün.
-      Offen: Detailseite, Reiter „Mitgliedschaft", Karten-/Verzeichnissicht.
+      **Zu Ende gebracht am 24.08.** Abgegangen: alle fuenf Reiter, alle drei
+      Ansichten (Tabelle, Karten, Verzeichnis), das Zeilenmenue an jedem
+      Zustand, beide Rueckfragen und die Detailseite. Dazu DREI echte
+      Handlungen durch die Edge Function gegen den lokalen Stack, jede in der
+      Datenbank nachgeprueft statt an der Oberflaeche geglaubt:
+      - **deaktivieren** — `disabled_at` UND `banned_until` (2126) gesetzt,
+        Auditzeile `disable_member`. Beide Haelften, nicht eine.
+      - **wiederherstellen auf eine Zeile, die deaktiviert bleibt** — der
+        Zustand aus HIGH-1, von Hand hergestellt (deaktiviert + geloescht,
+        Ban FEHLT). Danach: `deleted_at` geleert, `disabled_at` steht,
+        **`banned_until` gesetzt** — der Ban wurde NACHGESETZT. Unter der alten
+        Fassung waere gar kein Auth-Schritt gelaufen und die Antwort ein
+        sauberes 200 fuer ein anmeldefaehiges Konto. Der Fix im echten Weg
+        belegt, nicht nur im Test.
+      - **direkt aktivieren** — `activated_at` gesetzt. Die Gegenprobe zum
+        neuen Lebenszyklus-Waechter: er blockiert den legitimen Weg nicht.
+      Ausserdem das Speichern der Mitgliedschaft mit **nur** der Zahlungsart —
+      genau der Patch, der vor `5a1ed03` lautlos nichts tat: `payment_type`
+      steht in `profile_legacy`, `paid_until` unberuehrt, Auditzeile da.
+
+      **Zweiter Befund, behoben:** die Detailseite meldete ueber einem
+      GELOESCHTEN Mitglied „bestaetigt" — und darunter ein voll bearbeitbares
+      Formular. Die Kopfzeile las allein `activated`; `admin_get_profile`
+      liefert die Zeile als `to_jsonb(p)` und trug `disabled_at`/`deleted_at`
+      die ganze Zeit mit, nur las sie niemand. Jetzt vier Faelle in einer Kette
+      mit derselben Rangfolge wie in der Liste. Vier Zusagen, Gegenprobe: drei
+      fallen mit der alten Kette um.
+
+      **Zwei Beobachtungen, kein Befund:** im Verzeichnis stehen Zustand und
+      Menue UNTER der Karte statt darin — Absicht laut Kommentar (die geteilte
+      Karte soll nicht gegabelt werden), und im Raster steht jede Plakette
+      unter ihrer eigenen Karte. Und die Bestaetigung „Deaktivieren" traegt
+      Akzentblau statt einer Warnfarbe: `Button` kennt nur
+      primary/secondary/ghost, Farbe als Bedeutungstraeger ist seit AGE-237
+      abgeschafft. Der Dialogtext traegt das Gewicht.
 
 ## 12. Datenpflege (NACH dem Merge, nicht in der Migration)
 

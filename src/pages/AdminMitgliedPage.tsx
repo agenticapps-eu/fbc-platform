@@ -172,9 +172,28 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
           Mitglied bearbeiten
         </h1>
+        {/* DER LEBENSZYKLUS GEHT VOR, und bis zur Sichtprobe am 24.08. kam er
+            hier gar nicht vor: die Zeile las allein `activated`, also stand
+            über einem GELÖSCHTEN Mitglied „bestätigt" — und darunter ein voll
+            bearbeitbares Formular. Dass im Test „Egon Geloescht" steht, war der
+            einzige Hinweis, und der ist ein Testname; ein echtes entferntes
+            Mitglied gab gar keinen.
+
+            Vier Fälle in einer Kette statt vier Plaketten: es gilt immer genau
+            einer, und die Reihenfolge ist die Rangfolge. Gelöscht schlägt
+            deaktiviert schlägt unbestätigt — dieselbe Rangfolge wie in der
+            Zustandsspalte der Liste. */}
         <p className="mt-1 text-sm text-muted">
           {data.form.name || "Ohne Namen"} ·{" "}
-          {data.activated ? (
+          {data.geloescht ? (
+            <span className="font-medium text-ink">
+              gelöscht — dieses Profil ist entfernt und für niemanden sichtbar
+            </span>
+          ) : data.deaktiviert ? (
+            <span className="font-medium text-ink">
+              deaktiviert — dieses Mitglied kann sich nicht anmelden und ist für niemanden sichtbar
+            </span>
+          ) : data.activated ? (
             <span>bestätigt</span>
           ) : (
             <span className="font-medium text-ink">
