@@ -73,7 +73,7 @@ function MiniCompassTab() {
 export default function CompassPage() {
   return (
     <div className="flex flex-col gap-6">
-      <FormatHero meta={FORMAT_HERO["/kompass"]} />
+      <FormatHero meta={FORMAT_HERO["/kompass"]} bereich="kompass" />
       <Tabs
         tabs={[
           { value: "compass", label: "Mini-Kompass", content: <MiniCompassTab /> },

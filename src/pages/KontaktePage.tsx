@@ -23,7 +23,7 @@ function Inner({ uid }: { uid: string }) {
   }
   return (
     <div className="flex flex-col gap-6">
-      <FormatHero meta={FORMAT_HERO["/kontakte"]} className="" />
+      <FormatHero meta={FORMAT_HERO["/kontakte"]} bereich="kontakte" className="" />
       <MeineAnfragenWidget uid={uid} />
       {/* Kein Grid mehr: „Meine Communities" ist ersatzlos entfernt (erfundene
           Zahlen über das Mitglied, AGE-494 Task 7.6), und ein zweispaltiges

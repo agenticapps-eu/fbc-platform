@@ -73,39 +73,44 @@
       nichts die Tokens nutzte): eine Fläche wählt selbst → rot; der Kanon bekommt
       `hover:` → rot; ein Token im navy-Block → rot. Je aus einer Kopie zurück
 - [x] 1.13 Kanon auf die bestehenden Karten anwenden: Dashboard, Events,
-      Mitgliederverzeichnis, Aktivität. **Dashboard erledigt** — `DashTile`
-      („Mein Kompass", „Nächstes Event") und `SectionHeader` („Neu in der
-      Aktivität", „Neue Mitglieder für dich") tragen die Marke; im Browser gesehen.
-      „Mitgliedschaft" bekommt bewusst **keine**: eine Mitgliedsstufe ist kein
-      Bereich, und der Kanon kennt für sie keinen Eintrag.
-      **Offen:** Events, Mitgliederverzeichnis und Aktivität sind
-      Ein-Bereichs-Seiten — dort trägt *jede* Karte denselben Bereich, und eine
-      Marke auf allen wäre Rauschen statt Unterscheidung. Das ist eine
-      Gestaltungsfrage, keine Umsetzungsfrage → siehe 1.17
-- [ ] 1.14 Sichtprobe im Browser gegen den lokalen Stack: beide Themes, Kontrast
-      auf Kartengrund, 375 px und breit. **Teilweise erledigt am 25.08.** (helles
+      Mitgliederverzeichnis, Aktivität. **Dashboard**: `DashTile` („Mein
+      Kompass", „Nächstes Event") und `SectionHeader` („Neu in der Aktivität",
+      „Neue Mitglieder für dich"). „Mitgliedschaft" bekommt bewusst **keine**:
+      eine Mitgliedsstufe ist kein Bereich. **Ein-Bereichs-Seiten**: nur die
+      Seitenüberschrift — siehe 1.17. Beides im Browser gesehen
+- [x] 1.14 Sichtprobe im Browser gegen den lokalen Stack. **Gemacht** (helles
       Theme, breit): alle elf Menü-Glyphen, die gefüllte Fassung im aktiven
-      Eintrag, Glocke, beide Chevrons, Lupe und Fanfare gesehen, Konsole ohne
-      Fehler. **Offen bleiben** mangels Daten auf DEV: die Kategorien `mentor`
-      und `users` (die beiden zusammengeführten), der Kalender am Beitrag mit
-      14 px, Herz und Kommentarzahl, die Krone — plus das dunkle Theme und 375 px
-- [ ] 1.15 **Vertagt am 25.08. (Donalds Wahl), namentlich festhalten** — vier
+      Eintrag, Glocke, beide Chevrons, Lupe, Fanfare, die vier Bereichsmarken auf
+      dem Dashboard und zwei Seitenköpfe — Konsole ohne Fehler.
+      **Nicht geprüft, und das ist abgenommen** (Donald, 25.08.: „alles gut
+      egal"): dunkles Theme, 375 px (die Fenstermindestbreite von macOS
+      verhindert die Messung über dieses Werkzeug) sowie alles, was Daten
+      braucht — Herz, Kommentarzahl, Krone, die zwei zusammengeführten
+      Kategorien. DEV trägt weder Beiträge noch Angebote
+- [x] 1.15 **Vertagt am 25.08. (Donalds Wahl), namentlich festgehalten** — vier
       Ausnahmen tragen wiederverwendbare Glyphen und lösen sich später auf:
       `EventDetailPage.DETAIL_ICONS` (ein zweiter Satz aus vier Glyphen; `kalender`
       steht damit weiter **dreimal** im Baum), das Drei-Punkte-Symbol in
       `AdminMitgliederPage.tsx`, der Leerzustands-Glyph in `MeineChancenPage.tsx`
       und `CheckIcon` in `building-blocks.tsx`. Grund für die Vertagung: den Diff
-      vor dem Go-Live klein halten
-- [ ] 1.17 **Entscheidung offen:** bekommt auf einer Ein-Bereichs-Seite (Events,
-      Mitgliederverzeichnis, Aktivität) jede Karte die Bereichsmarke, oder nur die
-      Seitenüberschrift? Alle Karten zu markieren wiederholt dieselbe Auskunft
-      pro Zeile; gar keine Marke lässt die Seite ohne Bezug zum Kanon. Der
-      Vorschlag ist: nur die Überschrift der Seite
-- [ ] 1.16 **Drei Motive wurden zusammengeführt**, weil sie sonst am ersten Tag
-      doppelt *im Satz* stünden — bei der Sichtprobe gegenlesen: `calendar`
-      (Menü + Beitrag), `comment` (Menü „Aktivität" + Kommentarzahl), `academy`
-      (Menü + Kategorie `mentor`), `members` (Menü + Kategorie `users`). Jeweils
-      die Menü-Zeichnung behalten, weil nur sie eine gefüllte Fassung hat
+      vor dem Go-Live klein halten. Zur Kenntnis genommen (Donald, 25.08.)
+- [x] 1.17 **Entschieden (Donald, 25.08.): nur die Seitenüberschrift.** Auf einer
+      Ein-Bereichs-Seite trägt jede Karte denselben Bereich; eine Marke auf allen
+      wiederholte dieselbe Auskunft pro Zeile, statt zu unterscheiden. Umgesetzt
+      in `FormatHero` für die **fünf** Kopf-Routen, die im Kanon stehen —
+      `/kompass`, `/events`, `/mitglieder`, `/aktivitaet`, `/kontakte`. Nicht für
+      `/academy`, `/mitgliedschaft` und `/meine-chancen`: die sind keine
+      Gegenstandsbereiche. Alle fünf statt nur der drei aus 1.13, weil eine
+      Teilmenge willkürlich wäre
+- [x] 1.16 **Vier Motive wurden zusammengeführt**, weil sie sonst am ersten Tag
+      doppelt *im Satz* stünden: `calendar` (Menü + Beitrag), `comment` (Menü
+      „Aktivität" + Kommentarzahl), `academy` (Menü + Kategorie `mentor`),
+      `members` (Menü + Kategorie `users`). Jeweils die Menü-Zeichnung behalten,
+      weil nur sie eine gefüllte Fassung hat.
+      Gegengelesen, soweit sichtbar: alle vier stehen in der Menüleiste und im
+      Seitenkopf und sitzen dort richtig. Ihre **zweiten** Auftritte — Kalender
+      und Kommentarzahl am Beitrag, die zwei Kategorien — brauchen Daten und
+      fallen unter dieselbe Abnahme wie 1.14 (Donald, 25.08.)
 
 ## 2. Speichern — `post_saves`
 
