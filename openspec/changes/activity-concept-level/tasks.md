@@ -265,25 +265,68 @@
 
 ## 4. Aggregate für die Sidebar
 
-- [ ] 4.1 `feed_tag_counts()`: **`security invoker`**, `stable`, `set search_path`,
-      Obergrenze. Das Sichtbarkeitsprädikat wird **nicht kopiert** — unter der RLS
-      des Aufrufers greift `posts_select_by_visibility` selbst
-- [ ] 4.2 Gezählt wird über `public.tags` mit `active = true`, nicht über
-      `unnest(posts.hashtags)`
-- [ ] 4.3 `feed_top_authors(p_limit)`: dasselbe Vorgehen, Namen aus
-      `profiles_public`, **fünf** Einträge, gezählt nach **Beiträgen**
-- [ ] 4.4 Deterministischer Tie-Break für beide Funktionen; Verhalten bei
-      ungültigem `p_limit` festlegen und zusagen
-- [ ] 4.5 pgTAP: ein Tag an fünf Beiträgen, davon zwei sichtbar, zählt zwei
-- [ ] 4.6 pgTAP: ein Tag ohne sichtbaren Beitrag erscheint **gar nicht** — auch
-      nicht mit der Zahl null
-- [ ] 4.7 pgTAP: ein freies oder stillgelegtes Schlagwort erscheint nicht
-- [ ] 4.8 pgTAP: ein deaktiviertes Mitglied fällt aus „Aktivste Mitglieder", und
-      seine Beiträge zählen für niemanden mit
-- [ ] 4.9 `EXPLAIN` für beide Funktionen messen; entscheiden und festhalten, ob
-      `hashtags` einen GIN-Index braucht — er käme auch `.overlaps()` zugute
-- [ ] 4.10 Grants für beide Funktionen aussprechen und prüfen, ob eine
-      Funktionszeile im Golden-Snapshot betroffen ist
+- [x] 4.1 `feed_tag_counts()`: **`security invoker`**, `stable`,
+      `set search_path = ''`, Obergrenze 50. Das Sichtbarkeitsprädikat ist
+      **nicht kopiert** — `posts_select_by_visibility` greift selbst.
+      `20260824170000_feed_sidebar_aggregate.sql`
+- [x] 4.2 Gezählt wird über `public.tags` mit `active = true`, nicht über
+      `unnest(posts.hashtags)`. **Inner Join, kein `left join` mit `having`:**
+      ein Tag ohne sichtbaren Beitrag fällt dadurch von selbst heraus, statt
+      über eine Zeile, die man vergessen kann
+- [x] 4.3 `feed_top_authors(p_limit)`: dasselbe Vorgehen, Namen aus
+      `profiles_public`, Vorgabe **fünf**, gezählt nach **Beiträgen**.
+      **Nicht an `anon` vergeben** — dort hält `profiles_public` kein Recht, der
+      Aufruf liefe in einen Fehler. Das steht als GRANT und nicht nur als
+      Vorsatz im Client
+- [x] 4.4 Tie-Break: Tags nach `count desc, sort, key`, Autoren nach
+      `count desc, name, id` — beide Schlussmerkmale sind eindeutig, die Ordnung
+      ist also total. `p_limit` wird auf **1..20 geklemmt**, `null` wird zu 5;
+      ein ungültiger Wert wird zurechtgebogen statt abgewiesen, weil ein `raise`
+      aus einer Sidebar-Kachel einen Seitenfehler machte. Alle vier Fälle
+      zugesagt — für die obere Klemme stehen **25 Autoren** im Fixture, sonst
+      bewiese `p_limit => 999` nichts
+- [x] 4.5 pgTAP: ein Tag an fünf Beiträgen, davon zwei sichtbar, zählt zwei —
+      **und derselbe Tag zählt für den `exchange`-Betrachter fünf**. Eine Zusage
+      aus nur einer Perspektive wäre mit einer Funktion vereinbar, die immer
+      alles oder immer nur das Öffentliche zählt
+- [x] 4.6 pgTAP: ein Tag ohne sichtbaren Beitrag erscheint **gar nicht** — auch
+      nicht mit der Zahl null; plus die Gegenprobe, dass derselbe Tag für den
+      höherstufigen Betrachter sehr wohl da ist
+- [x] 4.7 pgTAP: ein stillgelegtes Schlagwort erscheint nicht, **obwohl sein
+      Beitrag öffentlich ist**; ein freies erscheint nicht, **obwohl es öfter
+      vorkommt als ein kuratiertes**. Beide Fixtures sind so gebaut, dass ein
+      Durchfallen nur eine Ursache haben kann
+- [x] 4.8 pgTAP: ein deaktiviertes Mitglied fällt aus „Aktivste Mitglieder", und
+      seine Beiträge zählen für niemanden mit — mit Vorbedingung („er steht
+      drin") vor der Deaktivierung
+- [x] 4.9 `EXPLAIN` für beide gemessen (lokal, 20 000 Beiträge, als bestätigtes
+      Mitglied; gemessen wurde der **Rumpf**, weil `set search_path` das
+      Einbetten verhindert): `feed_tag_counts` **507 ms / 71 067 Puffer**,
+      `feed_top_authors` **472 ms / 78 001**.
+      **Entscheidung: kein neuer Index — und das ist eine Messung, keine
+      Bequemlichkeit.** Der Verdacht lag auf dem Tag-Join, weil der Planer den
+      vorhandenen `posts_hashtags_gin` nicht nimmt. Er ist falsch: die vom
+      Design verworfene `unnest`-Fassung bringt **489 ms** statt 507, also
+      nichts. Derselbe `count(*)` über dieselben Beiträge kostet **0,79 ms /
+      364 Puffer ohne RLS** und **464 ms / 71 065 unter RLS** — Faktor 195,
+      bevor irgendetwas aggregiert wird. Die Grenze ist
+      `posts_select_by_visibility` mit seinem `has_level(4)` je Zeile, und die
+      anzufassen hiesse, die Regel zu ändern, an der der ganze Feed hängt.
+      **Nachtrag für Donald, nicht für diesen Change.** Heute ohne Wirkung:
+      PROD 4 Beiträge, DEV 29
+- [x] 4.10 Grants ausgesprochen (`feed_tag_counts` an `anon` + `authenticated`,
+      `feed_top_authors` nur `authenticated`, beide `revoke … from public`).
+      Der Golden-Snapshot ist **nicht** betroffen: `grants_test.sql` führt
+      Tabellen- und Spalten-Grants, keine Funktions-Grants. Die Funktionszeile
+      steht deshalb als eigene Zusage in `feed_sidebar_test.sql` §5
+- [x] 4.11 Gegenproben am lebenden Katalog, jede einzeln zurückgenommen:
+      **(a)** beide auf `security definer` → 5 Zusagen fallen, darunter die
+      `basic`-Zahl und die des ausgeloggten Besuchers — genau die Stellen, an
+      denen `invoker` die Arbeit macht;
+      **(b)** EXECUTE an `anon` auf `feed_top_authors` → die Grant-Zusage fällt;
+      **(c)** die vom Design verworfene `unnest`-Fassung eingesetzt → das
+      stillgelegte **und** das freie Schlagwort erscheinen
+- [x] 4.12 Gesamtlauf nach Abschnitt 4: **9 pgTAP-Dateien, 671 Zusagen, PASS**
 
 ## 5. Datenschicht des Feeds
 

@@ -139,6 +139,7 @@ jobs:
           supabase/tests/member_lifecycle_rpc_test.sql
           supabase/tests/post_saves_test.sql
           supabase/tests/feed_popularity_test.sql
+          supabase/tests/feed_sidebar_test.sql
 
   # Enforce a Conventional-Commit-style PR title (the squash-merge commit subject).
   pr-title:
