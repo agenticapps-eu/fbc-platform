@@ -133,13 +133,33 @@ dass er sichtbar ist.
 
 Nachgerechnet: reagieren auf A (`A+1`), Zeile auf B umschreiben (kein Trigger —
 A bleibt bei +1, B bekommt nichts), Reaktion zurücknehmen (DELETE mit
-`OLD.post_id = B` → **B geht auf −1**). Beliebig wiederholbar, auf einem Beitrag,
-den der Angreifer nicht einmal sehen muss.
+`OLD.post_id = B` → **B geht auf −1**). Beliebig wiederholbar.
+
+**Korrektur vom 24.08., gemessen statt gerechnet.** Hier stand, der Angriff
+treffe „einen Beitrag, den der Angreifer nicht einmal sehen muss". Das stimmt
+nicht: der `exists (select 1 from posts …)`-Ausdruck in `likes_write_own` läuft
+unter der RLS des Aufrufers, und ein Verschieben auf einen **unsichtbaren**
+Beitrag scheitert schon heute mit „new row violates row-level security policy".
+
+Das entschärft den Befund nicht, es begrenzt nur seine Reichweite: der Angriff
+trifft jeden Beitrag, den der Angreifer **sehen** kann — ab `exchange` also den
+gesamten Club, für ein `basic`-Konto jeden öffentlichen Beitrag. Gemessen mit
+dem ungünstigsten Angreifer, der noch funktioniert (`basic`, fremder
+öffentlicher Beitrag): `UPDATE 1`, die Zeile stand danach auf B. Der Entzug
+bleibt die Antwort.
 
 Der Entzug ist nicht die bequeme, sondern die richtige Antwort: eine Reaktion hat
 keinen Änderungsfall. Sie entsteht und sie vergeht. Der Client schreibt
 `post_likes` ausschließlich per `upsert` und `delete` — das Recht ist schon heute
 unbenutzt.
+
+**Was der Entzug tragend macht:** das `upsert` trägt `ignoreDuplicates: true`,
+wird dadurch zu `on conflict do nothing` und kommt ohne UPDATE-Recht aus.
+Gemessen am laufenden PostgREST: mit dem Flag **HTTP 201**, ohne das Flag
+(`resolution=merge-duplicates`, also `on conflict do update`) **HTTP 403 /
+42501**. Das Flag ist damit keine Feinheit mehr, sondern Voraussetzung — und in
+`src/lib/feed.like.test.ts` festgehalten, weil sein Verlust erst zur Laufzeit
+und nur beim zweiten Klick auffiele.
 
 *Verworfen — `UPDATE OF post_id` im Trigger behandeln:* möglich, aber es hielte
 ein Recht am Leben, das niemand braucht, und verlangte für jeden künftigen

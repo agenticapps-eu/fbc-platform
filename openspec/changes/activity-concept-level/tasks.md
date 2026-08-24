@@ -164,14 +164,42 @@
 
 ## 3. Beliebtheitszähler und Rechte auf den Quelltabellen
 
-- [ ] 3.1 Vorher messen: Zahl der `posts`- und `post_likes`-Zeilen auf PROD lesen,
-      damit der Nachtrag eine gemessene und keine geschätzte Größe hat
-- [ ] 3.2 **Zuerst die Quelle dichtmachen:** pgTAP, das den Angriffsablauf
-      nachstellt — reagieren auf A, Zeile per UPDATE auf B verschieben, Reaktion
-      zurücknehmen. Der Test ist **rot**, solange das UPDATE-Recht besteht
-- [ ] 3.3 Migration: `revoke update on public.post_likes from authenticated`;
-      `grants_test.sql` §1 nachziehen. Der Client schreibt die Tabelle nur per
-      `upsert` und `delete` — belegen, nicht annehmen
+- [x] 3.1 Vorher messen: Zahl der `posts`- und `post_likes`-Zeilen auf PROD lesen,
+      damit der Nachtrag eine gemessene und keine geschätzte Größe hat.
+      **PROD: 4 Beiträge, 0 Reaktionen** — der Nachtrag setzt dort vier Zeilen
+      auf 0 und braucht keine Stapelung. **DEV: 29 Beiträge, 88 Reaktionen**,
+      18 Beiträge mit mindestens einer, höchste Zahl an einem Beitrag 8. Beide
+      nur lesend (`default_transaction_read_only`), Kennung gegen
+      `*-project-ref.txt` geprüft
+- [x] 3.2 **Zuerst die Quelle dichtmachen:** pgTAP, das den Angriffsablauf
+      nachstellt — `supabase/tests/feed_popularity_test.sql` §1, 5 Zusagen. Der
+      Test war **rot** (4 von 5), solange das UPDATE-Recht bestand; der Diff las
+      sich als `have: …-000b` — die Reaktionszeile war gewandert.
+      **Am Design korrigiert:** der Angriff trifft NICHT „einen Beitrag, den der
+      Angreifer nicht einmal sehen muss". Der `exists`-Ausdruck in
+      `likes_write_own` läuft unter der RLS des Aufrufers; auf einen
+      unsichtbaren Beitrag scheitert das Verschieben schon heute. Reichweite ist
+      also „jeder sichtbare Beitrag" — ab `exchange` der ganze Club. Das Fixture
+      nimmt darum den ungünstigsten Angreifer, der noch funktioniert: `basic`
+      auf einem fremden öffentlichen Beitrag
+- [x] 3.3 Migration: `revoke update on public.post_likes from authenticated`
+      (`20260824140000_post_likes_ohne_update.sql`); `grants_test.sql` §1
+      nachgezogen. Der Client schreibt die Tabelle nur per `upsert` und `delete`
+      — **belegt, nicht angenommen**, und zwar auf zwei Ebenen:
+      *(a) Quelltext:* `from("post_likes")` steht dreimal in `src/lib/feed.ts`
+      (499 lesend, 620 `.delete()`, 629 `.upsert()`), `academy.ts` liest, die
+      beiden Seed-Dateien schreiben ausserhalb von `authenticated`; ein
+      `.update()` gibt es nirgends.
+      *(b) Laufzeit:* dieselben Wege durch echtes PostgREST gegen den lokalen
+      Stack — echter Upsert **201**, Doppelklick **201**, `delete` **204**,
+      Verschiebe-Angriff per PATCH **403/42501**
+- [x] 3.3a **Folge des Entzugs, nicht geplant:** `ignoreDuplicates: true` im
+      `upsert` ist ab jetzt tragend. Ohne das Flag sendet PostgREST
+      `resolution=merge-duplicates`, also `on conflict do update` — gemessen
+      **403/42501**, der Like-Knopf wäre kaputt, und zwar erst zur Laufzeit und
+      nur beim zweiten Klick. Festgehalten in `src/lib/feed.like.test.ts`
+      (4 Zusagen), gegengeprobt mit `false` und mit entferntem Flag — beide rot,
+      `feed.ts` danach unverändert
 - [ ] 3.4 Migration: `like_count` auf `posts`, Trigger auf `post_likes`
       (INSERT/DELETE), Nachtrag für den Bestand — alles in einer Transaktion
 - [ ] 3.5 Triggerfunktion härten: `set search_path`, `execute` für `public`, `anon`

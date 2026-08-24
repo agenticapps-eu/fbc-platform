@@ -1,0 +1,53 @@
+-- Eine Reaktion ist nicht verschiebbar: `post_likes` verliert UPDATE (AGE-582).
+-- Donald, 2026-08-24. Change: openspec/changes/activity-concept-level/.
+--
+-- ══ WARUM DAS VOR DEM ZÄHLER STEHT ═════════════════════════════════════════
+-- Der nächste Schritt legt `posts.like_count` an, geführt von einem Trigger auf
+-- INSERT und DELETE von `post_likes`. Ein solcher Trigger führt eine richtige
+-- Zahl nur, wenn die Reaktionszeile nicht VERSCHOBEN werden kann. Sie konnte
+-- es: `authenticated` hielt UPDATE, und `likes_write_own` ist `for all` auf die
+-- eigene Zeile.
+--
+-- Der Ablauf:
+--   1. auf A reagieren             → Trigger zählt A hoch
+--   2. die Zeile auf B umschreiben → KEIN Trigger; A bleibt oben, B unberührt
+--   3. die Reaktion zurücknehmen   → DELETE mit OLD.post_id = B → B geht auf −1
+-- Beliebig wiederholbar. Ein Zähler über einem verschiebbaren Datum ist eine
+-- Einladung, deshalb fällt das Recht ZUERST und der Zähler kommt danach.
+--
+-- ══ WAS DIE MESSUNG AM BEFUND KORRIGIERT ═══════════════════════════════════
+-- Die Plan-Review schrieb, der Angriff treffe „einen Beitrag, den der Angreifer
+-- nicht einmal sehen muss". Am 24.08. nachgemessen: das stimmt NICHT. Der
+-- `exists (select 1 from posts …)`-Ausdruck in `likes_write_own` läuft unter
+-- der RLS des Aufrufers; ein Verschieben auf einen UNSICHTBAREN Beitrag
+-- scheitert schon heute mit „new row violates row-level security policy".
+--
+-- Das entschärft nichts, es verschiebt nur die Reichweite: der Angriff trifft
+-- jeden Beitrag, den der Angreifer SEHEN kann — für ein Mitglied ab `exchange`
+-- also den gesamten Club, für ein `basic`-Konto jeden öffentlichen Beitrag.
+-- Gemessen mit dem ungünstigsten Angreifer, der noch funktioniert: `basic`,
+-- fremder öffentlicher Beitrag. `UPDATE 1`, die Zeile stand danach auf B.
+--
+-- ══ WARUM ENTZUG UND NICHT `UPDATE OF post_id` IM TRIGGER ══════════════════
+-- Möglich wäre beides. Der Entzug ist die richtige Antwort, weil eine Reaktion
+-- keinen Änderungsfall hat — sie entsteht und sie vergeht. Ein Trigger, der den
+-- Sonderfall behandelt, hielte ein Recht am Leben, das niemand braucht, und
+-- verlangte für jeden künftigen Zähler dieselbe Sorgfalt noch einmal.
+--
+-- ══ BELEGT, NICHT ANGENOMMEN ═══════════════════════════════════════════════
+-- Gesucht wurde in `src/`, `supabase/functions/`, `supabase/seed/` und
+-- `scripts/`. `from("post_likes")` steht dreimal in `src/lib/feed.ts`: einmal
+-- lesend (499), einmal `.delete()` (620), einmal `.upsert()` (629). Das Upsert
+-- trägt `ignoreDuplicates: true`, wird also zu `on conflict do nothing` und
+-- braucht kein UPDATE-Recht — nachgeprüft am laufenden PostgREST, nicht nur am
+-- Quelltext. `academy.ts` liest. Die beiden Seed-Dateien schreiben ausserhalb
+-- von `authenticated`. Ein `.update()` auf `post_likes` gibt es nirgends.
+--
+-- Die Policy `likes_write_own` bleibt unangetastet `for all`: ohne das Grant
+-- hat ihr UPDATE-Zweig keinen Aufrufer mehr. Sie hier zu zerlegen wäre eine
+-- zweite, unnötige Änderung an einer Regel, die vier Migrationen weit
+-- zurückreicht.
+--
+-- Forward-only.
+
+revoke update on public.post_likes from authenticated;
