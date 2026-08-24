@@ -1136,3 +1136,21 @@ describe("Ein Reiterwechsel fängt wieder auf Seite 1 an", () => {
     ).toHaveLength(1);
   });
 });
+
+describe("Der Auslöser zeigt drei Punkte und heisst trotzdem etwas", () => {
+  it("trägt keinen sichtbaren Text, aber einen zugänglichen Namen mit dem Mitglied", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+    const zeile = await screen.findByTestId(`mitglied-${AKTIV.id}`);
+
+    const knopf = within(zeile).getByRole("button", { name: "Handlungen für Carla Aktiv" });
+
+    // Seit der Auslöser nur noch ein Symbol zeigt, ist das `aria-label` die
+    // EINZIGE Auskunft darüber, was er tut und zu wem er gehört. Diese Zusage
+    // ist gegen den späteren Aufräum-Diff gerichtet, der es entfernt, weil „das
+    // steht doch dran" — dann hiesse der Knopf für eine Vorleseausgabe nichts.
+    expect(knopf.textContent).toBe("");
+    // Und das Symbol selbst darf nicht mitgelesen werden.
+    expect(knopf.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});

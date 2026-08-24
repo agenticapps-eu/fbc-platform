@@ -739,19 +739,30 @@ function Zeilenmenue({
         type="button"
         size="sm"
         variant="secondary"
-        // `w-fit` gegen das `align-self: stretch` der Kartensicht: dort ist die
-        // Karte ein `flex-col`, und ohne das zieht sich der Auslöser über ihre
-        // ganze Breite und liest sich als Hauptaktion statt als Menü. In der
-        // Tabelle und im Verzeichnis wirkt die Klasse nicht — dort ist die
-        // Breite ohnehin inhaltsbestimmt. Gefunden in der Sichtprobe (7.6);
-        // jsdom kennt keine Breiten.
-        className="w-fit"
+        // FESTE Breite statt `w-fit`. Sie leistet zweierlei: sie hält den
+        // Auslöser quadratisch, und sie ist zugleich der Riegel gegen das
+        // `align-self: stretch` der Kartensicht — dort ist die Karte ein
+        // `flex-col`, und ohne eine gesetzte Breite zöge sich der Auslöser über
+        // ihre ganze Breite und läse sich als Hauptaktion statt als Menü
+        // (Sichtprobe 7.6; jsdom kennt keine Breiten).
+        //
+        // `w-10` und NICHT `w-9`: `size="sm"` bringt `px-3` mit, also 12 px auf
+        // jeder Seite. 40 − 24 lässt genau die 16 px, die das Symbol braucht.
+        // Das Padding hier mit `px-0` zu überschreiben wäre der Fehler: `cn()`
+        // ist ein blosser Join ohne `tailwind-merge`, über den Vorrang
+        // entschiede also die Reihenfolge im Stylesheet und nicht die im
+        // Attribut.
+        className="w-10 shrink-0"
         disabled={laeuft}
         aria-haspopup="menu"
         aria-expanded={offen}
         // NAMENTLICH: auf einer Seite mit fünfundzwanzig Zeilen sind
         // fünfundzwanzig Schaltflächen namens „Handlungen" für eine
         // Vorleseausgabe nicht auseinanderzuhalten.
+        // NAMENTLICH und HIER UNVERZICHTBAR: seit der Auslöser nur noch drei
+        // Punkte zeigt, ist dieses Label die EINZIGE Auskunft darüber, was er
+        // tut und zu wem er gehört. Ohne es hiesse er für eine Vorleseausgabe
+        // „Schaltfläche".
         aria-label={`Handlungen für ${member.name ?? "dieses Mitglied"}`}
         onClick={() => {
           if (offen) {
@@ -766,7 +777,25 @@ function Zeilenmenue({
           setOffen(true);
         }}
       >
-        Handlungen
+        {/* Drei Punkte statt des Wortes „Handlungen" (Donald, 24.08.): der
+            Auslöser eines Zeilenmenüs soll die Zeile nicht dominieren.
+            Inline und ohne Icon-Bibliothek, wie `ui/NavIcon.tsx` — hier sogar
+            gefüllt statt gestrichelt, weil drei Kreise mit 1.6 px Kontur bei
+            dieser Grösse zu Ringen würden.
+
+            `aria-hidden`: das Symbol trägt keine Auskunft, die es nicht schon
+            im `aria-label` des Knopfes gäbe. Ohne diese Zeile läse eine
+            Vorleseausgabe im schlechteren Fall beides. */}
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4 shrink-0"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <circle cx="5" cy="12" r="1.75" />
+          <circle cx="12" cy="12" r="1.75" />
+          <circle cx="19" cy="12" r="1.75" />
+        </svg>
       </Button>
       {offen &&
         createPortal(

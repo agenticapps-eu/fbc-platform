@@ -325,6 +325,22 @@ und standen im ersten Entwurf nicht drin.
         Satzsubjekt.
       - Datengrundlage: `scripts/probe-age581-sichtprobe-daten.ts`
         (wiederholbar, nur gegen `127.0.0.1`).
+      - **NACHTRAG 24.08. (Donald): drei Punkte statt des Wortes „Handlungen".**
+        Der Auslöser soll die Zeile nicht dominieren. Das Delta legt nur „eine
+        Schaltfläche am Zeilenende" fest, nicht ihre Beschriftung — also keine
+        Delta-Änderung. Der Name wandert damit vollständig ins `aria-label`:
+        ohne es hiesse der Knopf für eine Vorleseausgabe „Schaltfläche", und
+        das Symbol trägt `aria-hidden`. Eine eigene Zusage hält beides fest,
+        gerichtet gegen den späteren Aufräum-Diff, der das Label entfernt, weil
+        „das steht doch dran".
+        `w-10` statt `w-9`, weil `size="sm"` `px-3` mitbringt: 40 − 24 lässt
+        genau die 16 px des Symbols. Das Padding mit `px-0` zu überschreiben
+        wäre der Fehler — `cn()` ist ein Join ohne `tailwind-merge`, über den
+        Vorrang entschiede das Stylesheet und nicht das Attribut.
+        Im Browser nachgemessen: 40×36 in allen drei Sichten, in der Kartensicht
+        also weiterhin kein `align-self: stretch` (der Befund aus 7.6), Menü
+        weiter am `body` und alle Einträge per `elementFromPoint` getroffen,
+        Konsole ohne Fehler.
 
 - [x] 7.7 **Diff-Prüfung (Stufe 4) und ihre Folgen.** Fünf Befunde gemeldet,
       vier davon bestätigt und behoben, einer war bereits bekannt (die Reiter
