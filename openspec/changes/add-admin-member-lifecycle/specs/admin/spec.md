@@ -503,8 +503,17 @@ berührt Rechte und Preise und hat einen eigenen Weg (AGE-516); ihn nebenbei in
 einer Tabellenzeile zu erlauben, wäre die folgenreichste Änderung auf dieser
 Fläche und zugleich die unauffälligste.
 
-Ein Mitglied ohne `paid_until` SHALL als „unbekannt" erscheinen und SHALL NOT ein
-geratenes Datum tragen.
+Ein Mitglied ohne `paid_until` SHALL ein LEERES Feld zeigen und SHALL NOT ein
+geratenes Datum tragen. Das leere Feld ist die Auskunft; ein Wort daneben SHALL
+NOT dieselbe Aussage ein zweites Mal machen.
+
+*Geändert am 24.08. auf Donalds Befund an der laufenden Fläche.* Die erste
+Fassung verlangte das Wort „unbekannt" neben dem Feld. Sie war für eine reine
+Anzeige geschrieben; im Reiter steht dort aber ein Eingabefeld, und daneben ein
+Auswahlfeld, das mit „nicht erfasst" bereits dasselbe sagt. Schlimmer als die
+Dopplung war die Wirkung: das Wort erschien nur an den leeren Zeilen und schob
+in jeder von ihnen die folgenden Felder um seine eigene Breite. Die eigentliche
+Zusage — **es wird nichts vorbelegt** — hing nie an dem Wort.
 
 Die drei bestehenden Sichten (Tabelle, Karten, Verzeichnis) SHALL erhalten
 bleiben und SHALL innerhalb der Reiter umschaltbar sein.
@@ -521,7 +530,8 @@ verliert.
 #### Scenario: Ein Mitglied ohne bezahlt-bis wird nicht geraten
 
 - **WHEN** der Reiter „Mitgliedschaft" ein Mitglied ohne `paid_until` zeigt
-- **THEN** steht dort „unbekannt" und kein Datum
+- **THEN** bleibt das Feld leer und trägt kein Datum — und kein Wort daneben
+  wiederholt die Auskunft
 
 #### Scenario: Der Reiter überlebt ein Neuladen
 

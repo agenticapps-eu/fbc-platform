@@ -15,6 +15,7 @@ import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/toast-context";
 import {
@@ -24,6 +25,7 @@ import {
   saveAdminProfile,
   type AdminLegacy,
 } from "../lib/admin-profile";
+import { ZAHLUNGSARTEN } from "../lib/admin-members";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
 
 /**
@@ -67,6 +69,7 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
     legacy_tier: "",
     legacy_price: "",
     legacy_source_id: "",
+    payment_type: "",
   });
   const [loginEmail, setLoginEmail] = useState("");
 
@@ -216,6 +219,24 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
                   value={legacy.paid_until}
                   onChange={(e) => setLegacy({ ...legacy, paid_until: e.target.value })}
                 />
+              )}
+            </Field>
+            <Field label="Zahlungsart">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={legacy.payment_type}
+                  onChange={(e) => setLegacy({ ...legacy, payment_type: e.target.value })}
+                >
+                  {/* Leer ist keine neunte Zahlungsart, sondern `null` in der
+                      Spalte — „nicht erfasst" statt einer geratenen. */}
+                  <option value="">nicht erfasst</option>
+                  {ZAHLUNGSARTEN.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.label}
+                    </option>
+                  ))}
+                </Select>
               )}
             </Field>
             <Field label="Alte Stufe">

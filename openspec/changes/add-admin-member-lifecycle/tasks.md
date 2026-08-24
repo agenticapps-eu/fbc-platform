@@ -523,11 +523,48 @@ und standen im ersten Entwurf nicht drin.
       Verbiegung IM Patch war rot. Eine grüne Gegenprobe heisst zuerst „falsch
       gezielt", nicht „der Test prüft nichts".
 
-- **Offen aus Abschnitt 9:** die Kartensicht bricht Stufe/bezahlt-bis und
-  Zahlungsart/Speichern auf zwei Zeilen um; tragbar, aber ungleichmässig.
-  Und `payment_type` fehlt weiterhin auf `/admin/mitglied/:id`, wo `paid_until`
-  schon steht — die Einzelbearbeitung kennt die neue Spalte nicht. Bewusst
-  nicht mitgenommen: der Plan nennt sie nicht, und sie ist ein eigener Diff.
+- [x] 9.7 **Nachträge (Donald, 24.08.).** Drei Stück, alle mit RED zuerst:
+
+  1. **„unbekannt" ist weg.** Neben dem „nicht erfasst" des Auswahlfeldes war
+     es dieselbe Aussage ein zweites Mal — und weil es nur an den LEEREN Zeilen
+     erschien, verschob es dort die folgenden Felder um seine eigene Breite.
+     **Das Spec-Delta ist mitgeändert**, samt Begründung im Text: die
+     ursprüngliche Fassung war für eine reine Anzeige geschrieben, im Reiter
+     steht dort aber ein Eingabefeld. Die eigentliche Zusage — es wird nichts
+     vorbelegt — hing nie an dem Wort und wird weiter geprüft. Der
+     Szenario-TITEL bleibt unangetastet (ein umgetaufter Titel löscht beim
+     Archivieren den alten).
+  2. **Die Tabelle bekommt vier eigene Spalten** statt einer Sammelzelle. In
+     einer Tabelle fluchten Felder, weil sie in derselben Spalte stehen — nicht,
+     weil sie zufällig gleich breit sind. Karten und Verzeichnis tragen
+     stattdessen ein zweispaltiges Raster Aufschrift : Feld, das in einer
+     schmalen Karte nicht umbricht.
+  3. **`payment_type` in der Einzelbearbeitung** (`/admin/mitglied/:id`), wo
+     `paid_until` schon stand. Drei Stellen in `admin-profile.ts` (Typ,
+     Lesepfad, Patch) plus das Feld. `admin_get_profile` gibt die Altdatenzeile
+     als `to_jsonb(l)` zurück und zählt keine Spalten auf — die Spalte kam also
+     längst an, es fehlte nur der Weg ins Formular. **Keine Migration.**
+
+  **Ein stiller Fehlschlag dabei, benannt:** die Ersetzung der
+  Spaltenüberschriften lief ohne `assert` und traf ihr Muster nicht (Prettier
+  hatte die Zeile vorher zusammengezogen). Ergebnis waren VIER Überschriften
+  über ACHT Zellen — jsdom grün, und im Browser stand „Aktionen" über dem
+  Datumsfeld. Gefunden hat es die Sichtprobe. Der Test dagegen zählt jetzt
+  Überschriften GEGEN Zellen.
+
+  **Sechs weitere Gegenproben**, je rot: Lesepfad ohne Zahlungsart · Patch ohne
+  Zahlungsart · leer als `""` statt `null` · eine fehlende Spaltenüberschrift ·
+  „unbekannt" zurückgeholt · das Auswahlfeld der Einzelbearbeitung entfernt.
+
+  **Sichtprobe, beide Richtungen:** in der Liste gesetzt → in der
+  Einzelbearbeitung sichtbar; dort auf „Rechnung" geändert und gespeichert →
+  in allen drei Sichten der Liste sichtbar, `paid_until` unverändert. Konsole
+  stumm. (Das Speichern der Einzelbearbeitung scheiterte zunächst an ihrer
+  eigenen Pflichtprüfung — „Kurzbeschreibung ist erforderlich" — - das ist
+  bestehendes Verhalten der Seite, nicht Folge dieser Änderung.)
+
+- **Offen aus Abschnitt 9:** in der Kartensicht stehen „Speichern" und das
+  Zeilenmenü auf zwei Zeilen untereinander; tragbar.
 
 ## 10. Feed — „Ehemaliges Mitglied"
 

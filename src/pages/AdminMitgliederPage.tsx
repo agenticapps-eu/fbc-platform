@@ -451,7 +451,20 @@ export default function AdminMitgliederPage() {
                           JEDER Sicht, und ein Reiter, der ihn wegnimmt, machte
                           aus drei Sichten auf dieselben Zeilen wieder drei
                           verschiedene Wahrheiten. */}
-                      {reiter === "mitgliedschaft" && <th className="py-2 pr-4">Mitgliedschaft</th>}
+                      {reiter === "mitgliedschaft" && (
+                        <>
+                          <th className="py-2 pr-4">Stufe</th>
+                          <th className="py-2 pr-4">bezahlt bis</th>
+                          <th className="py-2 pr-4">Zahlungsart</th>
+                          {/* Über der Knopfspalte steht nichts Sichtbares — der
+                              Knopf sagt selbst, was er tut. Für eine
+                              Vorleseausgabe bleibt sie trotzdem benannt, sonst
+                              ist die Spalte namenlos. */}
+                          <th className="py-2 pr-4">
+                            <span className="sr-only">Speichern</span>
+                          </th>
+                        </>
+                      )}
                       <th className="py-2">Aktionen</th>
                     </tr>
                   </thead>
@@ -471,11 +484,7 @@ export default function AdminMitgliederPage() {
                         <td className="py-2 pr-4">
                           <Zustand member={m} />
                         </td>
-                        {reiter === "mitgliedschaft" && (
-                          <td className="py-2 pr-4">
-                            <Mitgliedschaft member={m} />
-                          </td>
-                        )}
+                        {reiter === "mitgliedschaft" && <Mitgliedschaft member={m} alsZellen />}
                         <td className="py-2">
                           <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                         </td>
@@ -611,7 +620,7 @@ function Zustand({ member }: { member: AdminMember }) {
  * zurückfällt. (Der Plan sah dafür `Controller` vor; die Begründung dieser
  * Abweichung steht in `tasks.md` unter 9.3.)
  */
-function Mitgliedschaft({ member }: { member: AdminMember }) {
+function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const name = member.name ?? "Ohne Namen";
@@ -641,64 +650,107 @@ function Mitgliedschaft({ member }: { member: AdminMember }) {
       }),
   });
 
+  /**
+   * DIE STUFE IST NUR LESBAR. Sie steht als Plakette da, nicht als Auswahlfeld:
+   * ein Stufenwechsel berührt Rechte und Preise und hat einen eigenen Weg
+   * (AGE-516). Ihn nebenbei in einer Tabellenzeile zu erlauben, wäre die
+   * folgenreichste Änderung auf dieser Fläche und zugleich die unauffälligste.
+   */
+  const stufe = <TierBadge tier={member.tier} />;
+
+  /**
+   * EIN LEERES FELD IST DIE AUSKUNFT „nicht erfasst", und daneben stand bis
+   * zum 24.08. noch das Wort „unbekannt". Es ist weg: neben dem „nicht
+   * erfasst" des Auswahlfeldes war es dieselbe Aussage ein zweites Mal, und
+   * weil es nur an den leeren Zeilen erschien, verschob es in JEDER Zeile die
+   * folgenden Felder um seine eigene Breite. Die Zusage „kein geratenes Datum"
+   * hängt nicht an dem Wort, sondern daran, dass hier nichts vorbelegt wird —
+   * und genau das prüft der Test.
+   */
+  const bezahltBis = (
+    <Input
+      type="date"
+      // Der zugängliche Name trägt das MITGLIED. Die Spaltenüberschrift steht
+      // einmal, das Feld 25-mal; ohne den Namen hiesse jedes davon für eine
+      // Vorleseausgabe dasselbe.
+      aria-label={`bezahlt bis für ${name}`}
+      className="h-9 w-40"
+      value={datum}
+      onChange={(e) => setDatum(e.target.value)}
+    />
+  );
+
+  const zahlungsart = (
+    <Select
+      aria-label={`Zahlungsart für ${name}`}
+      className="h-9 w-44"
+      value={art}
+      onChange={(e) => setArt(e.target.value)}
+    >
+      {/* Der leere Wert ist keine neunte Zahlungsart, sondern die Auskunft,
+          dass keine erfasst ist — `null` in der Spalte. */}
+      <option value="">nicht erfasst</option>
+      {ZAHLUNGSARTEN.map((z) => (
+        <option key={z.id} value={z.id}>
+          {z.label}
+        </option>
+      ))}
+    </Select>
+  );
+
+  {
+    /* Je Zeile ein eigener Knopf und kein Speichern beim Verlassen des Feldes:
+       auf einer Fläche mit 25 Zeilen ist ein Tastendruck neben dem Feld sonst
+       ein Schreibzugriff, den niemand ausgelöst hat. */
+  }
+  const knopf = (
+    <Button
+      type="button"
+      size="sm"
+      variant="secondary"
+      aria-label={`Mitgliedschaft speichern für ${name}`}
+      disabled={!geaendert || speichern.isPending}
+      onClick={() => speichern.mutate()}
+    >
+      {speichern.isPending ? "Speichert …" : "Speichern"}
+    </Button>
+  );
+
+  /**
+   * In der Tabelle EIGENE SPALTEN, sonst ein beschrifteter Block.
+   *
+   * Nicht aus Geschmack: in einer Tabelle fluchten Felder, weil sie in
+   * derselben Spalte stehen — nicht, weil sie zufällig gleich breit sind. Die
+   * erste Fassung setzte alle vier in EINE Zelle, und damit hing die
+   * Ausrichtung an der Breite der Nachbarn; eine Zeile ohne „unbekannt" schob
+   * ihre Felder gegenüber den anderen. Ausserdem stand jede Aufschrift
+   * 25-mal untereinander, obwohl eine Spaltenüberschrift sie einmal trägt.
+   *
+   * Karten und Verzeichnis haben keine Spalten, dort tragen die Aufschriften
+   * die Zuordnung — als zweispaltiges Raster, damit die Felder auch in einer
+   * schmalen Karte untereinander fluchten statt umzubrechen.
+   */
+  if (alsZellen) {
+    return (
+      <>
+        <td className="py-2 pr-4">{stufe}</td>
+        <td className="py-2 pr-4">{bezahltBis}</td>
+        <td className="py-2 pr-4">{zahlungsart}</td>
+        <td className="py-2 pr-4">{knopf}</td>
+      </>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-muted">Stufe</span>
-        {/* Eine Plakette, kein Feld — die Zusage aus dem Delta ist genau diese
-            Abwesenheit, und sie ist im Test als solche geprüft. */}
-        <TierBadge tier={member.tier} />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-muted">bezahlt bis</span>
-        <div className="flex items-center gap-2">
-          {/* Der zugängliche Name trägt das MITGLIED. Die Aufschrift daneben
-              steht 25-mal auf der Seite; ohne den Namen hiesse jedes dieser
-              Felder für eine Vorleseausgabe dasselbe. */}
-          <Input
-            type="date"
-            aria-label={`bezahlt bis für ${name}`}
-            className="h-9 w-40"
-            value={datum}
-            onChange={(e) => setDatum(e.target.value)}
-          />
-          {datum === "" && <span className="text-xs text-muted">unbekannt</span>}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-muted">Zahlungsart</span>
-        <Select
-          aria-label={`Zahlungsart für ${name}`}
-          className="h-9 w-44"
-          value={art}
-          onChange={(e) => setArt(e.target.value)}
-        >
-          {/* Der leere Wert ist keine neunte Zahlungsart, sondern die Auskunft,
-              dass keine erfasst ist — `null` in der Spalte. */}
-          <option value="">nicht erfasst</option>
-          {ZAHLUNGSARTEN.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.label}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Je Zeile ein eigener Knopf und kein Speichern beim Verlassen des
-          Feldes: auf einer Fläche mit 25 Zeilen ist ein Tastendruck neben dem
-          Feld sonst ein Schreibzugriff, den niemand ausgelöst hat. */}
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        aria-label={`Mitgliedschaft speichern für ${name}`}
-        disabled={!geaendert || speichern.isPending}
-        onClick={() => speichern.mutate()}
-      >
-        {speichern.isPending ? "Speichert …" : "Speichern"}
-      </Button>
+    <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+      <span className="text-xs text-muted">Stufe</span>
+      <span>{stufe}</span>
+      <span className="text-xs text-muted">bezahlt bis</span>
+      {bezahltBis}
+      <span className="text-xs text-muted">Zahlungsart</span>
+      {zahlungsart}
+      <span />
+      <span>{knopf}</span>
     </div>
   );
 }

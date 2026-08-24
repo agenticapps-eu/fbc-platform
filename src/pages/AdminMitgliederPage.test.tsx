@@ -1176,20 +1176,55 @@ const MIT_DATUM = member({
 });
 
 describe("Der Reiter „Mitgliedschaft“ rät kein Datum (9.1)", () => {
-  it("zeigt „unbekannt“ statt eines geratenen Datums, wenn `paid_until` fehlt", async () => {
+  it("lässt das Feld leer, statt ein Datum zu erfinden", async () => {
     rpc.mockResolvedValue({ data: [OHNE_DATUM, MIT_DATUM], error: null });
     renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
 
     const ohne = await screen.findByTestId(`mitglied-${OHNE_DATUM.id}`);
-    expect(within(ohne).getByText("unbekannt")).toBeInTheDocument();
-    // Und kein geratenes Datum: das Feld steht leer, es trägt nicht „heute".
     expect(within(ohne).getByLabelText(/^bezahlt bis für/)).toHaveValue("");
 
-    // Die Gegenprobe. Ohne sie bliebe der Test auch grün, wenn „unbekannt"
-    // unbesehen an jeder Zeile stünde.
+    // Die Gegenprobe. Ohne sie bliebe der Test auch grün, wenn die Fläche gar
+    // kein Datum anzeigte.
     const mit = screen.getByTestId(`mitglied-${MIT_DATUM.id}`);
-    expect(within(mit).queryByText("unbekannt")).toBeNull();
     expect(within(mit).getByLabelText(/^bezahlt bis für/)).toHaveValue("2026-12-31");
+  });
+
+  it("verdoppelt die Auskunft nicht durch ein Wort daneben", async () => {
+    rpc.mockResolvedValue({ data: [OHNE_DATUM, MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+    await screen.findByTestId(`mitglied-${OHNE_DATUM.id}`);
+
+    // Bis zum 24.08. stand neben dem leeren Feld noch „unbekannt". Das
+    // Auswahlfeld daneben sagt mit „nicht erfasst" dasselbe, und weil das Wort
+    // nur an den leeren Zeilen erschien, verschob es in jeder Zeile die
+    // folgenden Felder um seine eigene Breite. Diese Zusage ist gegen den
+    // späteren Diff gerichtet, der es „zur Verdeutlichung" zurückbringt.
+    expect(screen.queryByText("unbekannt")).toBeNull();
+  });
+});
+
+describe("Die Tabelle beschriftet die Mitgliedschaftsspalten einzeln", () => {
+  it("trägt so viele Überschriften wie Zellen — sonst rutscht die Zuordnung", async () => {
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+
+    expect(screen.getAllByRole("columnheader").map((t) => t.textContent)).toEqual([
+      "Name",
+      "Anmeldeadresse",
+      "Zustand",
+      "Stufe",
+      "bezahlt bis",
+      "Zahlungsart",
+      "Speichern",
+      "Aktionen",
+    ]);
+
+    // Und die Zeile trägt genauso viele Zellen. Diese Zusage ist der Grund,
+    // aus dem es sie gibt: die erste Fassung hatte VIER Überschriften über
+    // ACHT Zellen, jsdom war grün, und erst der Browser zeigte, dass
+    // „Aktionen" über dem Datumsfeld stand.
+    expect(within(zeile).getAllByRole("cell")).toHaveLength(8);
   });
 });
 

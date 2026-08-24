@@ -37,6 +37,9 @@ export interface AdminLegacy {
   legacy_tier: string;
   legacy_price: string;
   legacy_source_id: string;
+  /** Eine der acht Zahlungsarten oder leer für „nicht erfasst" (AGE-581).
+   *  Leer und nicht `undefined`: das Auswahlfeld ist kontrolliert. */
+  payment_type: string;
 }
 
 export interface AdminProfileData {
@@ -128,6 +131,7 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
       legacy_tier: text(l.legacy_tier),
       legacy_price: l.legacy_price == null ? "" : String(l.legacy_price),
       legacy_source_id: text(l.legacy_source_id),
+      payment_type: text(l.payment_type),
     },
     loginEmail: text(paket.login_email),
     activated: p.activated_at != null,
@@ -190,6 +194,7 @@ export async function saveAdminProfile(
     legacy_tier: leerZuNull(legacy.legacy_tier),
     legacy_price: preis,
     legacy_source_id: leerZuNull(legacy.legacy_source_id),
+    payment_type: leerZuNull(legacy.payment_type),
   };
 
   // `patch` ist ein jsonb-Argument; der generierte Typ ist `Json`, und ein

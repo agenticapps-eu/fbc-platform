@@ -56,7 +56,13 @@ const DATEN: AdminProfileData = {
       country: "DE",
     },
   },
-  legacy: { paid_until: "2027-06-30", legacy_tier: "Premium", legacy_price: "1200", legacy_source_id: "wp-4711" },
+  legacy: {
+    paid_until: "2027-06-30",
+    legacy_tier: "Premium",
+    legacy_price: "1200",
+    legacy_source_id: "wp-4711",
+    payment_type: "copecart",
+  },
   loginEmail: "login@alt.de",
   activated: false,
 };
@@ -131,6 +137,27 @@ describe("AdminMitgliedPage (AGE-498)", () => {
     const [, form] = vi.mocked(saveAdminProfile).mock.calls[0];
     expect(form.contact.city).toBe("Nürnberg");
     expect(form.contact.street).toBe("Altstr. 3");
+  });
+
+  it("zeigt die Zahlungsart und schickt sie im Patch mit (AGE-581)", async () => {
+    renderPage();
+
+    // Vorbelegt aus den geladenen Altdaten — und zwar NACH dem Aufbau: die
+    // Daten kommen aus einer Abfrage, ein `useState(wert)` beim ersten Zeichnen
+    // nähme sie nie an. Genau diese Zeitachse prüft das `findBy`.
+    const feld = await screen.findByLabelText("Zahlungsart");
+    expect(feld).toHaveValue("copecart");
+
+    fireEvent.change(feld, { target: { value: "rechnung" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(saveAdminProfile).toHaveBeenCalled());
+    const [, , legacy] = vi.mocked(saveAdminProfile).mock.calls[0];
+    expect(legacy.payment_type).toBe("rechnung");
+    // Die Gegenprobe: die Nachbarfelder reisen unverändert mit, statt vom
+    // Auswahlfeld überschrieben zu werden.
+    expect(legacy.paid_until).toBe("2027-06-30");
+    expect(legacy.legacy_source_id).toBe("wp-4711");
   });
 
   it("speichert über saveAdminProfile", async () => {
