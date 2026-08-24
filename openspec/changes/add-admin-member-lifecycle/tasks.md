@@ -291,7 +291,12 @@ und standen im ersten Entwurf nicht drin.
 - [x] 7.4 Tastaturbedienung (Fokus ins Menü beim Öffnen, Pfeiltasten mit
       Umlauf, Escape schliesst und gibt den Fokus zurück) und Schliessen beim
       Verlassen — per Zeiger, per `focusout` und beim Scrollen.
-- [x] 7.5 **[PR]** Matrix gespiegelt, kombinierte Zustände abgedeckt.
+- [x] 7.5 **[PR]** Matrix gespiegelt, kombinierte Zustände abgedeckt. Der
+      Nachsetz-Weg für einen fehlenden Ban ist seit dem 24.08. erreichbar:
+      `admin_list_members` liefert `gebannt` mit, und „Deaktivieren" erscheint
+      an einer deaktivierten Zeile **genau dann, wenn der Ban fehlt**. Damit
+      lösen sich zwei Delta-Zusagen auf, die sich vorher widersprachen (Details
+      unter 7.7).
       **ABWEICHUNG, offen:** „serverseitig erzwungen" gilt für die VIER
       Lebenszyklus-RPCs, nicht für die beiden Aktivierungswege.
       `admin_activate_member` und `issue_activation_token` kennen
@@ -320,6 +325,70 @@ und standen im ersten Entwurf nicht drin.
         Satzsubjekt.
       - Datengrundlage: `scripts/probe-age581-sichtprobe-daten.ts`
         (wiederholbar, nur gegen `127.0.0.1`).
+
+- [x] 7.7 **Diff-Prüfung (Stufe 4) und ihre Folgen.** Fünf Befunde gemeldet,
+      vier davon bestätigt und behoben, einer war bereits bekannt (die Reiter
+      aus Abschnitt 8). Auf die Prüfung hin gefunden und ebenfalls behoben:
+      zwei Widersprüche IM DELTA und eine CI-Lücke.
+
+  - **Der Auslöser konnte sein eigenes Menü nicht schliessen.** Im Browser
+    bekommt ein `<button>` beim `mousedown` den Fokus; das `focusout` des
+    Menüeintrags schloss, und der folgende `click` öffnete wieder. Mit echten
+    CDP-Eingaben gemessen: `aria-expanded` blieb nach zwei Klicks `true`.
+    Vierunddreissig grüne jsdom-Zusagen sahen es nicht, weil `fireEvent.click`
+    den Fokus **nicht verschiebt**. Der neue Test stellt die Reihenfolge nach.
+  - **Das Menü klappte nur nach unten.** 139 px Überstand an einer Zeile am
+    unteren Rand, „Löschen" per `elementFromPoint` nicht getroffen — und weil
+    es `fixed` liegt, nicht heranscrollbar (Scrollen schliesst es). Klappt
+    jetzt nach oben; gemessen 1093–1211 bei Fensterhöhe 1234.
+  - **Die Statusabbildung der Function kam nicht an.** supabase-js verpackt
+    jedes Nicht-2xx in dieselbe englische Meldung. 403/404/409/502 werden jetzt
+    übersetzt; 409 („ist schon so") ist der häufigste Ausgang und gar kein
+    Fehler.
+  - **`entbannen` hatte null Leser.** `admin_restore_member` rechnet aus, ob
+    entbannt werden soll — die Function ignorierte es und entbannte
+    **unbedingt zuerst**. Wer deaktiviert, dann gelöscht, dann wiederhergestellt
+    wurde, war danach **deaktiviert und anmeldefähig**: genau der Zustand, den
+    dieses Vorhaben verhindern soll, still und mit Erfolgston.
+
+  - **ENTSCHEIDUNG (Donald, 24.08.): die Datenbank kommt in BEIDEN Richtungen
+    zuerst.** *Warum:* die alte Regel („Öffnen: Ban zuerst") erzeugte zwei
+    Zustände, die dasselbe Delta an anderer Stelle verbietet — den obigen, und
+    „reaktivieren" auf ein gelöschtes Profil, das die Sperre aufhob, **bevor**
+    die RPC mit `22023` ablehnte. Der Preis ist der umgekehrte halbe Zustand
+    (sichtbar, aber ausgesperrt), und der ist über das Menü heilbar. Delta und
+    `design.md`-Begründung sind mitgeändert; die Ordnungsregel ist damit eine
+    **Änderung am Plan**, nicht eine nachträgliche Rechtfertigung des Codes.
+  - **Folge: `207` heisst jetzt „verborgen und gesperrt stimmen nicht überein".**
+    Beim Schliessen `{hidden: true, banned: false}`, beim Öffnen
+    `{hidden: false, banned: true}` — nicht derselbe Zustand aus zwei
+    Richtungen, wie die erste Fassung behauptete. Das Kriterium der Fläche ist
+    entsprechend `hidden !== banned`; `hidden && !banned` hätte die zweite
+    Hälfte als Erfolg durchgehen lassen.
+  - **ENTSCHEIDUNG (Donald, 24.08.): `gebannt` kommt in die Liste**
+    (`20260824100000_admin_member_list_ban.sql`). *Warum:* das Delta verlangte
+    „fehlt der Ban, SHALL derselbe Aufruf ihn nachsetzen" UND „‚deaktivieren'
+    SHALL NOT an bereits deaktivierten erscheinen". Zusammen war der
+    Nachsetz-Weg über die Oberfläche unerreichbar — nach der eigenen
+    Formulierung des Delta „keine Handlung, sondern eine Falle". Mit der Spalte
+    gilt beides. Ein **abgelaufener** Ban zählt nicht; das hält ein eigener
+    Wächter fest.
+  - **CI-LÜCKE:** `member_lifecycle_test.sql` und
+    `member_lifecycle_rpc_test.sql` (46k, beide vollwertiges pgTAP mit
+    `plan()`) standen seit dem 23.08. im Repo und liefen **kein einziges Mal in
+    CI** — sie fehlten in der Dateiliste von `ci.yml`, vor der der Kommentar
+    darüber ausdrücklich warnt. Eingetragen; beide laufen grün.
+  - **Belege:** 1399 Vitest (51 in `AdminMitgliederPage.test.tsx`), 601 pgTAP
+    über sechs Dateien, 12 Deno. Acht weitere Mutations-Gegenproben über alle
+    vier Schichten (Fläche, Modul, Function, Migration) — je rot, je
+    Wiederherstellung grün. Dazu der echte Durchstich gegen den lokalen Stack:
+    deaktivieren → löschen → wiederherstellen lässt `disabled_at` UND den Ban
+    stehen (`bleibt_deaktiviert: true` im Protokoll), ein nur gelöschtes
+    Mitglied wird entbannt, und „reaktivieren" auf ein gelöschtes antwortet
+    `409`, **ohne die Sperre anzurühren**.
+  - **OFFEN:** für eine GELÖSCHTE Zeile mit fehlendem Ban gibt es keinen
+    Nachsetz-Weg — die Übergangstabelle bricht „löschen" dort in jedem Fall ab.
+    Die Fläche erfindet keinen und verspricht in der Warnung auch keinen.
 
 ## 8. Frontend — Reiter
 

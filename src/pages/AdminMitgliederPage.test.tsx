@@ -51,6 +51,9 @@ function member(overrides: Partial<AdminMember> = {}): AdminMember {
     geloescht_seit: null,
     paid_until: null,
     payment_type: null,
+    // Vorgabe: der Ban steht. Ein deaktiviertes Mitglied OHNE Ban ist der halbe
+    // Zustand, und der ist der Sonderfall — nicht die Regel.
+    gebannt: true,
     ...overrides,
   };
 }
@@ -797,5 +800,131 @@ describe("Die Statusabbildung der Function kommt an (Diff-Prüfung)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^Deaktivieren$/i }));
 
     await screen.findByText(/Verbindung weg/i);
+  });
+});
+
+/**
+ * Die neue Ordnung beim Öffnen (24.08.): Datenbank zuerst, Bann danach.
+ *
+ * Dadurch hat der halbe Zustand beim Öffnen die ANDERE Gestalt als beim
+ * Schliessen — sichtbar, aber ausgesperrt statt unsichtbar, aber anmeldefähig.
+ * Ein Kriterium, das nur auf `hidden && !banned` schaut, sähe ihn gar nicht und
+ * meldete einen Erfolg.
+ */
+describe("Der halbe Zustand hat zwei Gestalten (Ordnungswechsel)", () => {
+  it("warnt, wenn beim Reaktivieren die Aufhebung der Sperre fehlt", async () => {
+    rpc.mockResolvedValue({ data: [DEAKTIVIERT], error: null });
+    invoke.mockResolvedValue({
+      data: { hidden: false, banned: true, detail: "auth down" },
+      error: null,
+    });
+    renderPage();
+    const menue = await oeffneMenue(DEAKTIVIERT.id);
+
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Reaktivieren$/i }));
+
+    await screen.findByText(/nicht anmelden|ausgesperrt/i);
+    expect(screen.queryByText(/Dora Deaktiviert: reaktiviert/i)).toBeNull();
+  });
+
+  it("meldet ein Wiederherstellen, das deaktiviert bleibt, als genau das", async () => {
+    rpc.mockResolvedValue({ data: [GELOESCHT], error: null });
+    // `admin_restore_member` gab `entbannen: false` zurück: das Mitglied war vor
+    // dem Löschen deaktiviert und bleibt es. Verborgen UND gesperrt ist hier der
+    // RICHTIGE Ausgang — kein halber Zustand, aber auch kein schlichtes
+    // „wiederhergestellt": das Mitglied kommt weiterhin nicht herein.
+    invoke.mockResolvedValue({ data: { hidden: true, banned: true }, error: null });
+    renderPage();
+    const menue = await oeffneMenue(GELOESCHT.id);
+
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Wiederherstellen$/i }));
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("admin-set-member-ban", {
+        body: { action: "restore", target: GELOESCHT.id },
+      }),
+    );
+    await screen.findByText(/bleibt deaktiviert/i);
+    // Und keine Warnung — das ist kein Teilfehlschlag.
+    expect(screen.queryByText(/unvollständig/i)).toBeNull();
+  });
+});
+
+/**
+ * Der Nachsetz-Weg für einen fehlenden Ban (Diff-Prüfung, 24.08.).
+ *
+ * Das Delta verlangt zweierlei, was sich ohne `gebannt` widerspricht: „fehlt
+ * der Ban, SHALL derselbe Aufruf ihn nachsetzen" und „‚deaktivieren' SHALL NOT
+ * an bereits deaktivierten erscheinen". Mit der Spalte gilt beides — der
+ * Eintrag erscheint GENAU DANN, wenn der Ban fehlt.
+ */
+describe("Der halbe Zustand ist über das Menü heilbar (gebannt)", () => {
+  it("bietet „Deaktivieren“ an einer deaktivierten Zeile OHNE Ban", async () => {
+    rpc.mockResolvedValue({ data: [member({ ...DEAKTIVIERT, gebannt: false })], error: null });
+    renderPage();
+
+    const menue = await oeffneMenue(DEAKTIVIERT.id);
+
+    // Das ist der Zustand nach einem 207: `disabled_at` steht, `banned_until`
+    // fehlt. `admin_disable_member` bricht hier NICHT ab, sondern setzt nach.
+    expect(within(menue).getByRole("menuitem", { name: /^Deaktivieren$/i })).toBeInTheDocument();
+  });
+
+  it("verbirgt ihn, sobald der Ban steht", async () => {
+    rpc.mockResolvedValue({ data: [member({ ...DEAKTIVIERT, gebannt: true })], error: null });
+    renderPage();
+
+    const menue = await oeffneMenue(DEAKTIVIERT.id);
+
+    // Vollständiger Zustand — hier wäre der einzige Ausgang eine 22023.
+    expect(within(menue).queryByRole("menuitem", { name: /^Deaktivieren$/i })).toBeNull();
+    expect(within(menue).getByRole("menuitem", { name: /^Reaktivieren$/i })).toBeInTheDocument();
+  });
+
+  it("bietet ihn an einer GELÖSCHTEN Zeile auch ohne Ban nicht an", async () => {
+    rpc.mockResolvedValue({ data: [member({ ...GELOESCHT, gebannt: false })], error: null });
+    renderPage();
+
+    const menue = await oeffneMenue(GELOESCHT.id);
+
+    // Die Matrix kennt für „gelöscht" keinen Nachsetz-Weg: `admin_delete_member`
+    // bricht dort mit 22023 ab, gleichgültig ob der Ban steht. Das ist eine
+    // Lücke im Bestand und keine Freiheit dieser Fläche — sie erfindet keine.
+    expect(within(menue).queryByRole("menuitem", { name: /^Löschen$/i })).toBeNull();
+    expect(within(menue).getByRole("menuitem", { name: /^Wiederherstellen$/i })).toBeInTheDocument();
+  });
+});
+
+describe("Die Warnung verspricht nur, was das Menü hergibt", () => {
+  it("verweist nach einem halben Deaktivieren auf die Wiederholung", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    invoke.mockResolvedValue({ data: { hidden: true, banned: false }, error: null });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Deaktivieren$/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Deaktivieren$/i }));
+
+    // Zulässig, weil die Zeile danach `gebannt = false` trägt und das Menü
+    // „Deaktivieren" deshalb wieder anbietet.
+    await screen.findByText(/noch einmal auslösen/i);
+  });
+
+  it("verspricht sie nach einem halben Löschen NICHT", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    invoke.mockResolvedValue({ data: { hidden: true, banned: false }, error: null });
+    renderPage();
+    const menue = await oeffneMenue(AKTIV.id);
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /^Löschen$/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Löschen$/i }));
+
+    // An einer gelöschten Zeile blendet das Menü „Löschen" aus — die Matrix
+    // kennt dort keinen Nachsetz-Weg. Eine Warnung, die ihn verspräche, schickte
+    // den Admin auf die Suche nach einem Eintrag, den es nicht gibt.
+    await screen.findByText(/unvollständig/i);
+    expect(screen.queryByText(/noch einmal auslösen/i)).toBeNull();
   });
 });

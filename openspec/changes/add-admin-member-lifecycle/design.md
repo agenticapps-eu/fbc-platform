@@ -91,15 +91,39 @@ fürs Schliessen richtig.
 | Richtung | Reihenfolge | Warum |
 |---|---|---|
 | **Schliessen** (deaktivieren, löschen) | DB, dann Ban | Bricht der Ban ab, ist das Mitglied unsichtbar und kommt noch herein — die kleinere Hälfte des Schadens |
-| **Öffnen** (reaktivieren, wiederherstellen) | Ban, dann DB | Andersherum ist das Profil sichtbar, während die Anmeldung noch gesperrt ist — und die Zeile gilt nicht mehr als deaktiviert, also **verschwindet die Handlung aus der Oberfläche**, mit der man es reparieren würde |
+| **Öffnen** (reaktivieren, wiederherstellen) | ~~Ban, dann DB~~ → **DB, dann Ban** | Siehe die Korrektur darunter |
 
-Der zweite Punkt ist der eigentliche: nicht die Sichtbarkeit für ein paar
+Der zweite Punkt war der eigentliche: nicht die Sichtbarkeit für ein paar
 Sekunden, sondern dass der halbe Zustand unerreichbar wird. Dieselbe Überlegung
 verlangt, dass **beide Richtungen wiederholbar** sind, solange der Zustand
 unvollständig ist. Eine Handlung, die ihren eigenen halben Ausgang nicht heilen
 kann, ist eine Falle.
 
 *Gefunden im Plan-Review (codex), bevor eine Zeile Code stand.*
+
+**KORRIGIERT AM 2026-08-24 (Diff-Prüfung, Entscheidung Donald).** Für das
+Öffnen war „Ban zuerst" falsch, und zwar aus dem Grund, der die Zeile
+ursprünglich trug: Sie sollte verhindern, dass ein halber Zustand unerreichbar
+wird — und erzeugte dabei zwei, die diese Planung an anderer Stelle ausdrücklich
+verbietet.
+
+- **Lehnt die Datenbank ab, ist der Ban schon weg.** „Reaktivieren" auf ein
+  gelöschtes Profil bricht mit `22023` ab. Vorgezogen entbannt bleibt „ein
+  gelöschtes Mitglied mit aufgehobener Sperre" — der Zustand, den die
+  Übergangstabelle ausschliesst.
+- **Die Antwort kommt zu spät.** `admin_restore_member` sagt in `entbannen`
+  erst, OB entbannt werden soll. Wer vorher entbannt, kann sie nicht befolgen —
+  und genau das geschah: das Feld hatte einen Schreiber und **null Leser**.
+
+Der Preis ist der umgekehrte halbe Zustand: sichtbar, aber ausgesperrt. Der ist
+über die Oberfläche heilbar (deaktivieren, dann reaktivieren) — die Überlegung
+oben bleibt also gültig, sie fällt nur zugunsten der anderen Reihenfolge aus.
+
+Die Forderung nach Wiederholbarkeit hat eine zweite Folge, die erst hier sichtbar
+wurde: sie verlangt, dass die Fläche den Ban-Zustand **sehen** kann. Sonst sieht
+eine deaktivierte Zeile mit fehlendem Ban aus wie jede andere, und der
+Nachsetz-Weg ist unerreichbar. Deshalb liefert `admin_list_members` seit dem
+24.08. `gebannt` mit.
 
 *Verworfen: nur das DB-Gate.* Der Auftrag lautete „kein Login zulassen". Ein
 Konto, das sich anmelden kann und dann auf einen Sperrhinweis läuft, hat sich

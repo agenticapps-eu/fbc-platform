@@ -1633,6 +1633,12 @@ export type Database = {
            *  Altdatenzeile faellt nicht aus der Liste, es traegt hier null. */
           paid_until: string | null;
           payment_type: string | null;
+          /** Steht ein GoTrue-Ban in der ZUKUNFT? (AGE-581) Die einzige Auskunft
+           *  der Flaeche ueber `banned_until`. Das Zeilenmenue braucht sie, um
+           *  den Nachsetz-Weg fuer einen fehlenden Ban anzubieten: eine
+           *  deaktivierte Zeile OHNE Ban ist ein halber Zustand und sieht sonst
+           *  aus wie jede andere. Ein ABGELAUFENER Ban zaehlt nicht. */
+          gebannt: boolean;
         }[];
       };
       /** Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach

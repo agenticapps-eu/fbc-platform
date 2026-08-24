@@ -37,18 +37,24 @@
 // erst zur Laufzeit, nicht im Test. `is_admin_uid` ist die DEFINER-Fassung und
 // prüft seit AGE-581 auch, dass der Admin selbst nicht gesperrt ist.
 //
-// ══ DIE REIHENFOLGE IST JE RICHTUNG EINE ANDERE ════════════════════════════
-// Schliessen: Datenbank, dann Bann. Öffnen: Bann, dann Datenbank. Die
-// Begründung steht bei `istSchliessen` in ban.ts — sie gehört zur Logik, nicht
-// zur Verdrahtung.
+// ══ DIE DATENBANK KOMMT IN BEIDEN RICHTUNGEN ZUERST ════════════════════════
+// Seit dem 24.08. auch beim Öffnen (vorher: Bann zuerst). Die Begründung steht
+// bei `istSchliessen` in ban.ts — sie gehört zur Logik, nicht zur Verdrahtung.
+// Kurz: nur die Datenbank weiss, OB entbannt werden soll, und ob sie den
+// Übergang überhaupt zulässt. Wer vorher entbannt, kann beides nicht mehr
+// befolgen.
 //
 // ══ DER HALBE ZUSTAND ══════════════════════════════════════════════════════
-// Scheitert der ZWEITE Schritt, antwortet die Function mit `207` und
-// `{hidden: true, banned: false}`. Kein Erfolgston: das Mitglied ist unsichtbar
-// und kann sich weiterhin anmelden. Heilbar ist der Zustand, weil
+// Scheitert der ZWEITE Schritt, antwortet die Function mit `207`. Der Rumpf
+// sagt, WELCHE Hälfte fehlt: beim Schliessen `{hidden: true, banned: false}` —
+// unsichtbar, aber anmeldefähig; beim Öffnen `{hidden: false, banned: true}` —
+// sichtbar, aber ausgesperrt. Kein Erfolgston in beiden Fällen. Die Regel
+// dahinter ist eine Invariante: verborgen und gesperrt gehören zusammen, und
+// `207` heisst genau, dass sie es gerade nicht tun.
+//
+// Heilbar sind beide über die Oberfläche: der erste, weil
 // `admin_disable_member` bei fehlendem Bann nachsetzt statt mit 22023
-// abzubrechen — sonst müsste der Admin erst reaktivieren und liesse das Konto
-// dabei kurz wieder sichtbar werden.
+// abzubrechen; der zweite über deaktivieren und wieder reaktivieren.
 //
 // Scheitert der ERSTE Schritt, hat sich nichts geändert; der Aufrufer bekommt
 // den übersetzten Fehler und kann es schlicht erneut versuchen.
@@ -143,31 +149,38 @@ Deno.serve(async (req) => {
       ban_duration: banDauerFuer(eingabe.action),
     });
 
-  // Erster Schritt. Scheitert er, hat sich nichts geändert.
-  if (schliesst) {
-    const { error } = await datenbankSchritt();
-    if (error) {
-      log("warn", "db_step_failed", {
-        action: eingabe.action,
-        target: eingabe.target,
-        code: error.code,
-      });
-      return antwort({ error: "db_failed", detail: error.message }, statusFuerPgFehler(error.code));
-    }
-  } else {
-    const { error } = await bannSchritt();
-    if (error) {
-      log("error", "unban_failed", { target: eingabe.target, message: error.message });
-      // 502 und nicht 500: der Fehler liegt beim Anmeldedienst, und es hat sich
-      // nichts geändert — ein erneuter Versuch ist der ganze Ausweg.
-      return antwort({ error: "auth_failed", detail: error.message }, 502);
-    }
+  // ERSTER SCHRITT IST IN BEIDEN RICHTUNGEN DIE DATENBANK. Scheitert er, hat
+  // sich nichts geändert, und der Aufrufer bekommt den übersetzten Fehlercode.
+  //
+  // Beim Öffnen war das bis zum 24.08. andersherum, und daran hingen zwei
+  // Fehler: „reaktivieren" auf ein gelöschtes Profil hob die Sperre auf, BEVOR
+  // die RPC mit 22023 ablehnte — ein gelöschtes Mitglied, das sich anmelden
+  // kann, also genau der Zustand, den beide Handlungen ausschliessen sollen.
+  // Und `admin_restore_member` beantwortet in `entbannen` erst, OB entbannt
+  // werden soll; wer vorher entbannt, kann die Antwort nicht mehr befolgen.
+  const ersterSchritt = await datenbankSchritt();
+  if (ersterSchritt.error) {
+    const fehler = ersterSchritt.error;
+    log("warn", "db_step_failed", {
+      action: eingabe.action,
+      target: eingabe.target,
+      code: fehler.code,
+    });
+    return antwort({ error: "db_failed", detail: fehler.message }, statusFuerPgFehler(fehler.code));
   }
 
-  // Zweiter Schritt. Scheitert er, bleibt der halbe Zustand — benannt, nicht
-  // verschwiegen.
-  const zweiter = schliesst ? await bannSchritt() : await datenbankSchritt();
-  const zweiterFehler = zweiter.error?.message ?? null;
+  // Was die Datenbank über den Bann sagt. Nur `admin_restore_member` hat dazu
+  // eine Meinung: war das Mitglied vor dem Löschen deaktiviert, bleibt es das
+  // danach — und dann darf die Sperre NICHT fallen. Alle anderen drei kennen
+  // das Feld nicht, und für sie gilt die Richtung.
+  const antwortRumpf = ersterSchritt.data as { entbannen?: boolean } | null;
+  const sollEntbannen = antwortRumpf?.entbannen ?? true;
+
+  // ZWEITER SCHRITT: der Bann. Beim Schliessen wird er gesetzt, beim Öffnen
+  // aufgehoben — und beim Öffnen nur, wenn die Datenbank es sagt. Scheitert er,
+  // bleibt der halbe Zustand: benannt, nicht verschwiegen.
+  const zweiterNoetig = schliesst || sollEntbannen;
+  const zweiterFehler = zweiterNoetig ? ((await bannSchritt()).error?.message ?? null) : null;
 
   if (zweiterFehler !== null) {
     log("error", "half_state", {
@@ -185,7 +198,7 @@ Deno.serve(async (req) => {
     if (auditFehler) log("error", "audit_failed", { message: auditFehler.message });
   }
 
-  const ergebnis = fasseAusgangZusammen(eingabe.action, zweiterFehler);
+  const ergebnis = fasseAusgangZusammen(eingabe.action, sollEntbannen, zweiterFehler);
   log(zweiterFehler === null ? "info" : "warn", "done", {
     actor,
     action: eingabe.action,

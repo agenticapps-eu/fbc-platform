@@ -37,10 +37,22 @@ export function parseBanRequest(body: unknown): BanRequest | null {
  * - **Schliessen** (deaktivieren, löschen): Datenbank zuerst, Bann danach.
  *   Scheitert der Bann, ist das Mitglied unsichtbar und kommt noch herein —
  *   die kleinere Hälfte des Schadens.
- * - **Öffnen** (reaktivieren, wiederherstellen): Bann zuerst, Datenbank danach.
- *   Andersherum wäre das Profil sichtbar, während die Anmeldung noch gesperrt
- *   ist — und die Handlung verschwände aus der Oberfläche, weil die Zeile nicht
- *   mehr als deaktiviert gilt. Der halbe Zustand wäre dann unerreichbar.
+ * - **Öffnen** (reaktivieren, wiederherstellen): **Datenbank zuerst**, Bann
+ *   danach — geändert am 24.08. nach der Diff-Prüfung.
+ *
+ * Die frühere Ordnung („Bann zuerst") wollte vermeiden, dass ein Profil
+ * sichtbar wird, während die Anmeldung noch gesperrt ist. Sie erzeugte dafür
+ * zwei Zustände, die das Spec an anderer Stelle ausdrücklich verbietet: Lehnt
+ * die RPC ab — „reaktivieren" auf ein GELÖSCHTES Profil bricht mit `22023` ab —,
+ * war der Bann schon aufgehoben. Und `admin_restore_member` gibt in `entbannen`
+ * zurück, ob überhaupt entbannt werden soll; wer vorher entbannt, kann die
+ * Antwort nicht mehr befolgen. Beides ergab ein entferntes Mitglied, das sich
+ * anmelden kann.
+ *
+ * Der Preis ist der umgekehrte halbe Zustand: sichtbar, aber ausgesperrt. Der
+ * ist über die Oberfläche erreichbar (deaktivieren, dann reaktivieren) und
+ * damit die kleinere Hälfte des Schadens — dieselbe Abwägung wie beim
+ * Schliessen, nur andersherum.
  */
 export function istSchliessen(action: BanAction): boolean {
   return action === "disable" || action === "delete";
@@ -101,25 +113,38 @@ export interface BanErgebnis {
 /**
  * Fasst zusammen, was nach dem ZWEITEN Schritt gilt.
  *
- * Der zweite Schritt ist in beiden Richtungen der, der einen halben Zustand
- * hinterlassen kann — beim Schliessen der Bann, beim Öffnen die Datenbank. Der
- * erste kann es nicht: scheitert er, hat sich nichts geändert, und der Aufrufer
- * bekommt den übersetzten Fehler.
+ * DIE REGEL IST EINE INVARIANTE, KEINE TABELLE: verborgen und gesperrt gehören
+ * zusammen. Ein Mitglied, das nicht mehr sichtbar ist, darf sich nicht anmelden
+ * können, und eines, das wieder dabei ist, darf nicht ausgesperrt sein. `200`
+ * heisst deshalb genau „die beiden Hälften stimmen überein", `207` genau „sie
+ * tun es nicht" — welche Hälfte fehlt, sagt der Rumpf.
  *
- * Dass beide Teilfehlschläge auf denselben Rumpf führen, ist kein Zufall: es
- * IST derselbe Zustand, aus zwei Richtungen erreicht — unsichtbar, aber
- * anmeldefähig. `207` und nicht `200`, weil die Oberfläche eine Warnung zeigen
- * muss und keinen Erfolgston: das Mitglied ist nicht mehr sichtbar, kann sich
- * aber weiterhin anmelden, bis der Vorgang wiederholt wird.
+ * Beim SCHLIESSEN kann der Bann fehlen: unsichtbar, aber anmeldefähig.
+ * Beim ÖFFNEN kann die Aufhebung fehlen: sichtbar, aber ausgesperrt. Das ist
+ * NICHT derselbe Zustand aus zwei Richtungen — eine frühere Fassung dieser
+ * Funktion behauptete das und meldete für beide „unsichtbar und anmeldefähig",
+ * also für das Öffnen das Gegenteil der Wahrheit.
+ *
+ * `sollEntbannen` kommt aus `admin_restore_member`: war das Mitglied vor dem
+ * Löschen deaktiviert, bleibt es das danach, und dann ist „verborgen und
+ * gesperrt" der RICHTIGE Ausgang und kein halber. `admin_enable_member` kennt
+ * die Frage nicht — dort ist es immer `true`.
  */
 export function fasseAusgangZusammen(
   action: BanAction,
+  sollEntbannen: boolean,
   zweiterSchrittFehler: string | null,
 ): BanErgebnis {
-  if (zweiterSchrittFehler !== null) {
-    return { status: 207, body: { hidden: true, banned: false, detail: zweiterSchrittFehler } };
-  }
-  return istSchliessen(action)
-    ? { status: 200, body: { hidden: true, banned: true } }
-    : { status: 200, body: { hidden: false, banned: false } };
+  const [hidden, banned] = istSchliessen(action)
+    ? [true, zweiterSchrittFehler === null]
+    : sollEntbannen
+      ? [false, zweiterSchrittFehler !== null]
+      : // Kein zweiter Schritt: es wurde gar nicht erst entbannt.
+        [true, true];
+
+  const body =
+    zweiterSchrittFehler === null
+      ? { hidden, banned }
+      : { hidden, banned, detail: zweiterSchrittFehler };
+  return { status: hidden === banned ? 200 : 207, body };
 }

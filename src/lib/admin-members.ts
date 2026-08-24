@@ -97,11 +97,11 @@ export async function activateMember(id: string): Promise<void> {
 export type LebenszyklusHandlung = "disable" | "enable" | "delete" | "restore";
 
 export interface BanErgebnis {
-  /**
-   * Wahr, wenn nur die HÄLFTE gelang: das Mitglied ist unsichtbar, kann sich
-   * aber weiterhin anmelden (oder umgekehrt entbannt, aber noch gesperrt).
-   */
+  /** Wahr, wenn nur die HÄLFTE gelang — siehe die Invariante unten. */
   halb: boolean;
+  /** Ob das Mitglied danach noch verborgen ist. Trägt beim Wiederherstellen
+   *  die Auskunft „bleibt deaktiviert". */
+  verborgen: boolean;
 }
 
 /**
@@ -127,11 +127,17 @@ export interface BanErgebnis {
  *
  * DER TEILZUSTAND IST KEIN `error`. Die Function antwortet auf ihn mit `207`,
  * und supabase-js behandelt jedes 2xx als Erfolg — `error` bliebe null. Die
- * Unterscheidung hängt deshalb am Rumpf, und zwar an BEIDEN Feldern: `banned`
- * allein reicht nicht, weil ein gelungenes „reaktivieren" ebenfalls
- * `banned: false` liefert. Genau `hidden && !banned` kommt in keinem der beiden
- * Erfolgsfälle vor — Schliessen gelingt als `{hidden, banned}`, Öffnen als
- * `{!hidden, !banned}`.
+ * Unterscheidung hängt deshalb am Rumpf.
+ *
+ * DAS KRITERIUM IST EINE INVARIANTE, KEINE FALLUNTERSCHEIDUNG: verborgen und
+ * gesperrt gehören zusammen. Wer nicht mehr sichtbar ist, darf sich nicht
+ * anmelden können; wer wieder dabei ist, darf nicht ausgesperrt sein. Ein
+ * halber Zustand ist genau die Verletzung dieser Gleichung, aus welcher
+ * Richtung auch immer.
+ *
+ * `hidden && !banned` — die erste Fassung — sah nur die eine Hälfte. Seit die
+ * Datenbank beim Öffnen zuerst kommt (24.08.), gibt es auch die andere:
+ * sichtbar, aber ausgesperrt. Die hätte sie als Erfolg durchgehen lassen.
  */
 export async function setMemberBan(
   action: LebenszyklusHandlung,
@@ -143,7 +149,7 @@ export async function setMemberBan(
   if (error) throw new Error(await uebersetzeFehler(error));
 
   const rumpf = (data ?? {}) as { hidden?: boolean; banned?: boolean };
-  return { halb: rumpf.hidden === true && rumpf.banned === false };
+  return { halb: rumpf.hidden !== rumpf.banned, verborgen: rumpf.hidden === true };
 }
 
 /**

@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(57);
+select plan(60);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -323,10 +323,13 @@ select ok(
 -- wieder. Der Katalogvergleich bestimmt die Projektion.
 
 -- Diese beiden Zusagen MUSSTEN mit AGE-581 brechen, und das ist ihre Aufgabe:
--- die Admin-Liste bekommt vier neue Verwaltungsspalten (`deaktiviert_seit`,
--- `geloescht_seit`, `paid_until`, `payment_type`), und eine Zusage, die neue
+-- die Admin-Liste bekommt neue Verwaltungsspalten, und eine Zusage, die neue
 -- Spalten stillschweigend hinnähme, wäre keine. Die Namen stehen deshalb
--- weiterhin einzeln da — wer eine fünfte hinzufügt, kommt hier wieder vorbei.
+-- weiterhin einzeln da — wer eine hinzufügt, kommt hier wieder vorbei.
+--
+-- Und genau das ist am 24.08. passiert: `gebannt` kam dazu (Diff-Prüfung), die
+-- Zusage brach, und dieser Kommentar wurde zum zweiten Mal umgeschrieben. Sie
+-- tut also, wozu sie da ist.
 
 select is(
   (select array_agg(s order by s) from (
@@ -334,9 +337,9 @@ select is(
      except
      select unnest(pg_temp.rueckgabespalten(
        'public.search_directory(text,text,text,text,text,text,text[],text[])'::regprocedure))) x(s)),
-  array['bestaetigt', 'deaktiviert_seit', 'geloescht_seit', 'login_email',
+  array['bestaetigt', 'deaktiviert_seit', 'gebannt', 'geloescht_seit', 'login_email',
         'member_since', 'paid_until', 'payment_type'],
-  'Die Admin-Liste hat genau die sieben Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
+  'Die Admin-Liste hat genau die acht Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
 
 select is(
   (select array_agg(s order by s) from (
@@ -362,7 +365,7 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
     $q$select (to_jsonb(t) - 'login_email' - 'bestaetigt' - 'member_since'
                          - 'deaktiviert_seit' - 'geloescht_seit'
-                         - 'paid_until' - 'payment_type')::text
+                         - 'paid_until' - 'payment_type' - 'gebannt')::text
          from public.admin_list_members(null, null, 1000) t
         where t.id = 'b1000000-0000-0000-0000-000000000005'$q$),
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000c0',
@@ -609,6 +612,18 @@ update public.profiles set name = 'Zyklus Beides',       activated_at = now(),
        deleted_at  = timestamptz '2026-08-04 13:00:00+00'
  where id = 'f5000000-0000-0000-0000-000000000005';
 
+-- Drei Ban-Zustände für §12.13–12.15. Sie liegen auf den BESTEHENDEN
+-- Sondenkonten statt auf neuen: der Ban ist keine eigene Zeilenart, sondern die
+-- zweite Hälfte eines Zustands, den `disabled_at`/`deleted_at` schon tragen.
+--
+--   3 (deaktiviert)         → Ban steht  ⇒ vollständig
+--   5 (deaktiviert+gelöscht)→ Ban FEHLT  ⇒ der halbe Zustand
+--   1 (aktiv)               → Ban ABGELAUFEN ⇒ kein Ban
+update auth.users set banned_until = now() + interval '100 years'
+ where id = 'f5000000-0000-0000-0000-000000000003';
+update auth.users set banned_until = now() - interval '1 day'
+ where id = 'f5000000-0000-0000-0000-000000000001';
+
 -- Nur das erste Konto bekommt eine Altdatenzeile. Das zweite bleibt bewusst
 -- ohne — es ist der Beleg für den `left join`.
 insert into public.profile_legacy (profile_id, paid_until, payment_type) values
@@ -710,6 +725,40 @@ select is(
          from public.admin_list_members('zyklusliste2', 'offen') t$q$),
   '-|-',
   'Ein Mitglied ohne Altdatenzeile bleibt in der Liste und trägt in beiden Spalten null');
+
+-- ── 12.13–12.15 `gebannt`: die zweite Hälfte des Zustands ─────────────────
+-- Die Spalte existiert wegen eines WIDERSPRUCHS im Delta: „fehlt der Ban, SHALL
+-- derselbe Aufruf ihn nachsetzen" gegen „‚deaktivieren' SHALL NOT an bereits
+-- deaktivierten erscheinen". Ohne sie sieht der halbe Zustand in der Liste aus
+-- wie jede andere deaktivierte Zeile, und der Nachsetz-Weg ist über die
+-- Oberfläche unerreichbar.
+--
+-- Eine reine Namenszusage genügt hier NICHT. Eine Spalte, die immer `false`
+-- liefert, bestünde jede Katalogprüfung und trüge trotzdem nichts bei.
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select t.gebannt::text
+         from public.admin_list_members('zyklusliste3', 'deaktiviert') t$q$),
+  'true',
+  'gebannt ist wahr, wenn banned_until in der Zukunft liegt');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select t.gebannt::text
+         from public.admin_list_members('zyklusliste5', 'geloescht') t$q$),
+  'false',
+  '… und falsch, wo die Sperre fehlt — DAS ist der halbe Zustand, den die Fläche sehen muss');
+
+-- Der Wächter gegen die naheliegende Vereinfachung `banned_until is not null`.
+-- Ein abgelaufener Ban ist keiner; wer ihn mitzählt, bietet „Deaktivieren" nie
+-- wieder an und macht den Nachsetz-Weg genauso unerreichbar wie vorher.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select t.gebannt::text
+         from public.admin_list_members('zyklusliste1') t$q$),
+  'false',
+  'Ein ABGELAUFENES banned_until zählt nicht — gebannt fragt nach der Zukunft');
 
 select * from finish();
 rollback;

@@ -35,28 +35,51 @@ haben, die die Datenbank nicht selbst herstellen kann. Die `is_admin()`-Prüfung
 im Rumpf SHALL dennoch bestehen bleiben: sie ist die zweite Schranke, nicht die
 erste.
 
-**Die Reihenfolge SHALL je Richtung festgelegt sein, und sie ist nicht
-dieselbe.**
+**Die Datenbank SHALL in BEIDEN Richtungen zuerst kommen**, der Ban danach.
+Scheitert der erste Schritt, hat sich nichts geändert, und der Aufrufer bekommt
+den übersetzten Fehlercode.
 
-- **Schliessen** (deaktivieren, löschen): **Datenbank zuerst**, Ban danach.
-  Scheitert der Ban, ist das Mitglied unsichtbar und kommt noch herein — die
-  kleinere Hälfte des Schadens.
-- **Öffnen** (reaktivieren, wiederherstellen): **Ban zuerst**, Datenbank danach.
-  Andersherum wäre das Profil sichtbar, während die Anmeldung noch gesperrt ist,
-  und — schlimmer — die Handlung verschwände aus der Oberfläche, weil die Zeile
-  nicht mehr als deaktiviert gilt. Der halbe Zustand wäre dann nicht mehr
-  erreichbar.
+*Geändert am 2026-08-24.* Die erste Fassung schrieb für das Öffnen die
+umgekehrte Reihenfolge vor, um zu vermeiden, dass ein Profil sichtbar wird,
+während die Anmeldung noch gesperrt ist. Sie erzeugte dafür zwei Zustände, die
+dieses Dokument an anderer Stelle ausdrücklich verbietet:
+
+- **Lehnt die Datenbank ab, ist der Ban schon weg.** „Reaktivieren" auf ein
+  gelöschtes Profil bricht mit `22023` ab — nach einem vorgezogenen Entbannen
+  bleibt „ein gelöschtes Mitglied mit aufgehobener Sperre", also genau das, was
+  die Übergangstabelle ausschliessen soll.
+- **Die Antwort kommt zu spät.** `admin_restore_member` sagt in `entbannen`
+  erst, OB entbannt werden soll; war das Mitglied vor dem Löschen deaktiviert,
+  darf die Sperre nicht fallen. Wer vorher entbannt, kann die Antwort nicht mehr
+  befolgen.
+
+Der Preis ist der umgekehrte halbe Zustand — sichtbar, aber ausgesperrt. Er ist
+über die Oberfläche erreichbar (deaktivieren, dann reaktivieren) und damit die
+kleinere Hälfte des Schadens; dieselbe Abwägung wie beim Schliessen, nur
+andersherum.
 
 Beide Richtungen SHALL **wiederholbar** sein, solange der Zustand unvollständig
 ist. Eine Handlung, die ihren eigenen halben Ausgang nicht heilen kann, ist keine
 Handlung, sondern eine Falle.
 
 **Der halbe Zustand SHALL benannt werden, nicht verschwiegen.** Gelingt der
-Datenbankteil und scheitert der Ban, SHALL die Edge Function mit **`207`**
-antworten und im Rumpf `{ hidden: true, banned: false }` führen. Die Oberfläche
-SHALL daraufhin eine **Warnung** zeigen, die beides sagt: dass das Mitglied
-nicht mehr sichtbar ist, und dass es sich weiterhin anmelden kann, bis der
-Vorgang wiederholt wird. Sie SHALL NOT diesen Ausgang als Erfolg darstellen.
+Datenbankteil und scheitert der Ban-Schritt, SHALL die Edge Function mit
+**`207`** antworten. Die Oberfläche SHALL daraufhin eine **Warnung** zeigen und
+SHALL NOT diesen Ausgang als Erfolg darstellen.
+
+**Verborgen und gesperrt SHALL zusammengehören, und der Statuscode SHALL genau
+das ausdrücken:** `200` heisst, dass beide Hälften übereinstimmen, `207`, dass
+sie es nicht tun. Welche fehlt, SHALL der Rumpf sagen — beim Schliessen
+`{ hidden: true, banned: false }` (unsichtbar, aber anmeldefähig), beim Öffnen
+`{ hidden: false, banned: true }` (sichtbar, aber ausgesperrt). Die beiden sind
+**nicht** derselbe Zustand aus zwei Richtungen; ein Rumpf, der für beide
+dasselbe meldet, sagt für eine der Richtungen das Gegenteil der Wahrheit.
+
+Ein Wiederherstellen, das laut `entbannen` **nicht** entbannen soll, ist
+`{ hidden: true, banned: true }` und damit ein **Erfolg**, kein halber Zustand:
+das Mitglied ist zurück in der Mitgliedschaft und bleibt deaktiviert. Die
+Oberfläche SHALL das als solches melden und SHALL NOT ein schlichtes
+„wiederhergestellt" zeigen — sonst sucht jemand den Fehler, der keiner ist.
 
 Die `admin_audit`-Zeile SHALL in diesem Fall dennoch entstehen — sie
 protokolliert die Änderung an `disabled_at`, und die hat stattgefunden. Der
@@ -382,10 +405,26 @@ Schaltfläche am Zeilenende geöffnet wird, statt sie als einzelne Knöpfe
 nebeneinanderzustellen.
 
 Das Menü SHALL nur anbieten, was auf die jeweilige Zeile anwendbar ist:
-„direkt aktivieren" SHALL NOT an bestätigten Zeilen erscheinen, „deaktivieren"
-SHALL NOT an bereits deaktivierten, „reaktivieren" SHALL nur dort. Einen Knopf
-anzubieten, dessen einziger Ausgang ein Fehler ist, ist eine Einladung zum
-Fehlklick.
+„direkt aktivieren" SHALL NOT an bestätigten Zeilen erscheinen, „reaktivieren"
+SHALL nur an deaktivierten. Einen Knopf anzubieten, dessen einziger Ausgang ein
+Fehler ist, ist eine Einladung zum Fehlklick.
+
+„deaktivieren" SHALL NOT an einer bereits deaktivierten Zeile erscheinen,
+**deren Ban steht** — dort wäre `22023` der einzige Ausgang. **Fehlt der Ban,
+SHALL es erscheinen**, denn dann ist der Aufruf kein Fehler, sondern der
+Nachsetz-Weg aus der Anforderung weiter oben. Ohne diese Unterscheidung
+widersprechen sich die beiden Zusagen: der halbe Zustand sieht in der Liste aus
+wie jede andere deaktivierte Zeile, und die Handlung könnte ihren eigenen
+halben Ausgang nicht heilen — nach der Formulierung dieses Dokuments also
+„keine Handlung, sondern eine Falle".
+
+Damit die Fläche das unterscheiden kann, SHALL die Mitgliederliste den
+Ban-Zustand je Zeile mitliefern. Ein **abgelaufener** Ban SHALL NOT als Ban
+zählen.
+
+Für eine **gelöschte** Zeile besteht kein solcher Weg: die Übergangstabelle
+bricht „löschen" dort in jedem Fall ab. Das Menü SHALL ihn folglich nicht
+anbieten und SHALL NOT einen erfinden.
 
 **Deaktivieren und Löschen SHALL je eine Rückfrage verlangen**, die das Mitglied
 **namentlich** nennt und die Folge benennt. Beide sind umkehrbar, aber beide
@@ -397,8 +436,25 @@ schliessen.
 
 #### Scenario: Das Menü zeigt nur Anwendbares
 
-- **WHEN** ein Admin das Menü einer bereits deaktivierten Zeile öffnet
+- **WHEN** ein Admin das Menü einer bereits deaktivierten Zeile öffnet, deren
+  Ban steht
 - **THEN** steht dort „reaktivieren", aber nicht „deaktivieren"
+
+#### Scenario: Der fehlende Ban macht die Handlung wieder sichtbar
+
+- **GIVEN** eine deaktivierte Zeile, deren Ban fehlt — der halbe Zustand nach
+  einem `207`
+- **WHEN** ein Admin ihr Menü öffnet
+- **THEN** steht dort „deaktivieren", und ein Aufruf setzt den Ban nach, statt
+  mit `22023` abzubrechen
+
+#### Scenario: Wiederherstellen weckt eine Deaktivierung nicht auf
+
+- **GIVEN** ein Mitglied, das erst deaktiviert und danach gelöscht wurde
+- **WHEN** ein Admin „wiederherstellen" auslöst
+- **THEN** ist `deleted_at` geleert, `disabled_at` steht weiter, die Sperre
+  bleibt bestehen — und die Oberfläche meldet „bleibt deaktiviert" statt eines
+  schlichten „wiederhergestellt"
 
 #### Scenario: Deaktivieren fragt namentlich nach
 

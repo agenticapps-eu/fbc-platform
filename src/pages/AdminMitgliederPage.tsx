@@ -73,6 +73,12 @@ interface OffeneRueckfrage {
   art: Rueckfragenart;
 }
 
+/** Dieselbe Zweiteilung wie in der Edge Function: die beiden Handlungen, die
+ *  jemandem den Zugang nehmen, gegen die beiden, die ihn zurückgeben. */
+function istSchliessen(was: LebenszyklusHandlung): boolean {
+  return was === "disable" || was === "delete";
+}
+
 /** Was der Erfolgston nach einer Lebenszyklus-Handlung meldet. */
 const VOLLZUG: Record<LebenszyklusHandlung, string> = {
   disable: "deaktiviert",
@@ -173,18 +179,36 @@ export default function AdminMitgliederPage() {
       setMemberBan(was, m.id),
     onSuccess: async (ergebnis, { m, was }) => {
       setRueckfrage(null);
+      const wer = m.name ?? "Das Mitglied";
       if (ergebnis.halb) {
-        // KEIN Erfolgston. Der Vorgang ist zur Hälfte gelungen: die Datenbank
-        // führt das Mitglied als entfernt, `banned_until` in `auth.users` ist
-        // aber nicht gesetzt — es kann sich weiterhin anmelden. Das ist der
-        // 207-Ausgang von `admin-set-member-ban`, und supabase-js meldet ihn
-        // nicht als Fehler, weil er ein 2xx ist.
+        // KEIN Erfolgston. Der Vorgang ist zur Hälfte gelungen, und WELCHE
+        // Hälfte fehlt, hängt an der Richtung: beim Schliessen ist das Mitglied
+        // unsichtbar und kommt noch herein, beim Öffnen ist es wieder da und
+        // kommt nicht herein. Beides ist der 207-Ausgang von
+        // `admin-set-member-ban`, und supabase-js meldet ihn nicht als Fehler,
+        // weil er ein 2xx ist.
         toast({
           title: "Nur zur Hälfte ausgeführt",
-          description:
-            `${m.name ?? "Das Mitglied"} ist nicht mehr sichtbar, kann sich aber ` +
-            "weiterhin anmelden. Der Zustand ist unvollständig und muss nachgezogen werden.",
+          description: ergebnis.verborgen
+            ? `${wer} ist nicht mehr sichtbar, kann sich aber weiterhin anmelden. ` +
+              (was === "disable"
+                ? "„Deaktivieren“ noch einmal auslösen holt den Rest nach."
+                : "Der Zustand ist unvollständig und muss nachgezogen werden.")
+            : `${wer} ist wieder sichtbar, kann sich aber nicht anmelden. ` +
+              "Der Zustand ist unvollständig — deaktivieren und wieder reaktivieren zieht ihn nach.",
           variant: "error",
+        });
+      } else if (!istSchliessen(was) && ergebnis.verborgen) {
+        // Kein halber Zustand, aber auch kein schlichtes „wiederhergestellt":
+        // `admin_restore_member` hat `deleted_at` geleert und `disabled_at`
+        // stehen lassen, weil das Mitglied schon vor dem Löschen deaktiviert
+        // war. Es ist zurück in der Mitgliedschaft und kommt trotzdem nicht
+        // herein — das muss dastehen, sonst sucht jemand den Fehler.
+        toast({
+          title: `${wer}: wiederhergestellt — bleibt deaktiviert`,
+          description:
+            "Es war schon vor dem Löschen deaktiviert. „Reaktivieren“ hebt auch das auf.",
+          variant: "success",
         });
       } else {
         toast({ title: `${m.name ?? "Mitglied"}: ${VOLLZUG[was]}`, variant: "success" });
@@ -474,7 +498,16 @@ function handlungenFuer(m: AdminMember): { id: Zeilenhandlung; label: string; ge
   // Nur an unbestätigten Zeilen. An einer bestätigten bräche
   // `admin_activate_member` mit 22023 ab.
   if (!gesperrt && !m.bestaetigt) eintraege.push({ id: "aktivieren", label: "Direkt aktivieren" });
-  if (!gesperrt) eintraege.push({ id: "deaktivieren", label: "Deaktivieren", gefahr: true });
+  // NICHT bloss `!gesperrt`. Eine deaktivierte Zeile, deren Ban FEHLT, ist ein
+  // halber Zustand — `admin_disable_member` bricht dort nicht mit 22023 ab,
+  // sondern setzt den Ban nach. Ohne diesen Zweig wäre der Nachsetz-Weg über
+  // die Oberfläche unerreichbar, und das Delta nennt eine Handlung, die ihren
+  // eigenen halben Ausgang nicht heilen kann, „keine Handlung, sondern eine
+  // Falle". Für GELÖSCHT gibt es keinen solchen Weg: die Matrix bricht dort in
+  // jedem Fall ab, und diese Fläche erfindet keinen.
+  if (!geloescht && (!deaktiviert || !m.gebannt)) {
+    eintraege.push({ id: "deaktivieren", label: "Deaktivieren", gefahr: true });
+  }
   if (deaktiviert && !geloescht) eintraege.push({ id: "reaktivieren", label: "Reaktivieren" });
   // Auch an einer bereits deaktivierten Zeile: Löschen setzt dort `deleted_at`
   // zusätzlich und lässt `disabled_at` stehen — ein gültiger Übergang.

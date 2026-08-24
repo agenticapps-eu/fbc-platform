@@ -78,27 +78,66 @@ Deno.test("die Fehlercodes der Datenbank werden übersetzt, nicht verschluckt", 
 });
 
 Deno.test("gelingt beides, ist es ein Erfolg — und die Richtung steht im Rumpf", () => {
-  assertEquals(fasseAusgangZusammen("disable", null), {
+  assertEquals(fasseAusgangZusammen("disable", true, null), {
     status: 200,
     body: { hidden: true, banned: true },
   });
-  assertEquals(fasseAusgangZusammen("enable", null), {
+  assertEquals(fasseAusgangZusammen("enable", true, null), {
     status: 200,
     body: { hidden: false, banned: false },
   });
 });
 
-Deno.test("der halbe Zustand wird benannt, nicht als Erfolg ausgegeben", () => {
-  // Der ZWEITE Schritt ist in beiden Richtungen der, der einen halben Zustand
-  // hinterlassen kann — beim Schließen der Bann, beim Öffnen die Datenbank.
-  // Dass beide auf denselben Rumpf führen, ist kein Zufall: es IST derselbe
-  // Zustand, aus zwei Richtungen erreicht — unsichtbar, aber anmeldefähig.
-  assertEquals(fasseAusgangZusammen("disable", "auth down"), {
+/**
+ * Die Ordnung beim Öffnen ist seit dem 24.08. DATENBANK ZUERST (AGE-581,
+ * Diff-Prüfung). Vorher entbannte die Function unbedingt und rief die RPC
+ * danach — dabei entstanden zwei Zustände, die das Spec ausdrücklich verbietet:
+ * ein GELÖSCHTES Mitglied mit aufgehobener Sperre (die RPC lehnte danach mit
+ * 22023 ab, der Ban war schon weg), und ein DEAKTIVIERTES mit aufgehobener
+ * Sperre (`admin_restore_member` gibt `entbannen: false` zurück, und niemand
+ * las es).
+ */
+Deno.test("wiederherstellen entbannt NICHT, wenn das Mitglied deaktiviert bleibt", () => {
+  // `entbannen: false` — die RPC hat `deleted_at` geleert, `disabled_at` steht
+  // weiter. Der Ban bleibt, und das ist kein halber Zustand, sondern der
+  // richtige: verborgen UND gesperrt.
+  assertEquals(fasseAusgangZusammen("restore", false, null), {
+    status: 200,
+    body: { hidden: true, banned: true },
+  });
+});
+
+Deno.test("der halbe Zustand ist die Ungleichheit von verborgen und gesperrt", () => {
+  // Schliessen: die Datenbank ist umgestellt, der Bann fehlt.
+  assertEquals(fasseAusgangZusammen("disable", true, "auth down"), {
     status: 207,
     body: { hidden: true, banned: false, detail: "auth down" },
   });
-  assertEquals(fasseAusgangZusammen("restore", "db down"), {
+  // Öffnen: die Datenbank ist umgestellt, die Aufhebung fehlt. Das ist die
+  // ANDERE Hälfte als früher — sichtbar, aber ausgesperrt. Vorher meldete die
+  // Function hier „unsichtbar und anmeldefähig", also das Gegenteil.
+  assertEquals(fasseAusgangZusammen("restore", true, "auth down"), {
     status: 207,
-    body: { hidden: true, banned: false, detail: "db down" },
+    body: { hidden: false, banned: true, detail: "auth down" },
   });
+  assertEquals(fasseAusgangZusammen("enable", true, "auth down"), {
+    status: 207,
+    body: { hidden: false, banned: true, detail: "auth down" },
+  });
+});
+
+Deno.test("verborgen und gesperrt fallen in JEDEM Erfolgsfall zusammen", () => {
+  // Die Regel hinter dem Statuscode, als Zusage: 200 heisst „die beiden Hälften
+  // stimmen überein", 207 heisst „sie tun es nicht". Ohne sie wäre die Zuordnung
+  // eine Tabelle, die man beim nächsten Fall wieder raten muss.
+  for (const fall of [
+    fasseAusgangZusammen("disable", true, null),
+    fasseAusgangZusammen("delete", true, null),
+    fasseAusgangZusammen("enable", true, null),
+    fasseAusgangZusammen("restore", true, null),
+    fasseAusgangZusammen("restore", false, null),
+  ]) {
+    assertEquals(fall.status, 200);
+    assertEquals(fall.body.hidden, fall.body.banned);
+  }
 });
