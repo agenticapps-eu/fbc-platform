@@ -600,12 +600,22 @@ und standen im ersten Entwurf nicht drin.
 
 ## 11. Abnahme
 
-- [ ] 11.1 `supabase test db` mit ausdrücklicher Dateiliste, alle grün.
-- [ ] 11.2 `pnpm verify` grün; **nicht** `pnpm format` — es schreibt rund
+- [x] 11.1 `supabase test db` mit ausdrücklicher Dateiliste, alle grün.
+      **601 Zusagen, sechs Dateien**, `Result: PASS`. Die Liste ist keine
+      Bequemlichkeit: ohne sie zieht der Befehl die elf `probe_*.sql` mit, die
+      kein pgTAP sind, und meldet FAIL, obwohl alles grün ist.
+- [x] 11.2 `pnpm verify` grün; **nicht** `pnpm format` — es schreibt rund
       sechzig fremde Dateien um.
-- [ ] 11.3 `openspec validate --all` grün.
-- [ ] 11.4 `grants_test.sql` grün (laut 1.3 ohne Nachziehen — falls doch, hier
+      *`pnpm verify` gibt es in diesem Repo nicht* — gemeint sind die vier
+      Einzelgates, und die sind grün: `lint` (0 Fehler, 4 bekannte
+      `react-refresh`-Warnungen), `typecheck`, `test` (1425 Zusagen, 128
+      Dateien), `build`. Prettier lief nur über die eine Datei, die es brauchte.
+- [x] 11.3 `openspec validate --all` grün. **31 von 31.**
+- [x] 11.4 `grants_test.sql` grün (laut 1.3 ohne Nachziehen — falls doch, hier
       vermerken warum).
+      **Ohne Nachziehen grün, wie in 1.3 vorhergesagt.** Der Change hat keine
+      neue Tabelle mit Table-Grant angelegt — `former_member_entries` ist eine
+      Funktion, und Funktions-Grants berührt der Golden-Snapshot nicht.
 - [ ] 11.5 Code-Review auf dem **Diff**, durch einen anderen Anbieter als den,
       der ihn geschrieben hat.
 - [ ] 11.6 Sichtprobe der gesamten Fläche im Browser, gegen den lokalen Stack.
