@@ -1,135 +1,113 @@
-# Session Handoff — 2026-08-24 (achtzehnte Sitzung)
+# Session Handoff — 2026-08-24 (neunzehnte Sitzung, spät)
 
-**AGE-582 ist geplant, nicht gebaut.** Der OpenSpec-Change
-`activity-concept-level` steht mit allen vier Artefakten plus `REVIEWS.md`,
-`openspec validate --all` ist 32/32 grün, PR #205 ist offen. Kein Code, keine
-Migration, keine Zeile Frontend.
+**AGE-582 Abschnitt 1 ist gebaut, nicht mehr nur geplant.** Alle 17 Aufgaben
+abgehakt, fünf Commits auf `donald/age-582-aktivitaet-auf-konzeptstand`, PR #205
+offen, CI grün auf der HEAD-SHA. Abschnitte 2–7 sind unberührt.
 
-**Die Plan-Review hat zwei Fehler gefunden, die ich sonst gebaut hätte.** Beide
-stehen unten unter Decisions, weil sie den Entwurf gedreht haben.
+Zwei Messungen haben den Plan gedreht — beide stehen unten unter Decisions.
 
 ## Accomplished
 
-**Altlast geschlossen.** PR #204 (Handoff-Commit) hatte alle vier Pflichtchecks
-grün → gemergt (`01bbeee`). Der Linear-Kommentar zu AGE-582, den die
-siebzehnte Sitzung nicht schreiben konnte (Klassifikator), ist geschrieben —
-mit den Entscheidungen, den fünf Korrekturen am Issue-Text und den offenen
-Punkten.
+**Der Icon-Satz steht** (1.1–1.8). `src/components/ui/icons.tsx` hält 30 Glyphen
+in einem Stil und ist die einzige Datei im Baum, die ein `<svg>` öffnen darf —
+außer sieben namentlich begründeten Ausnahmen. Vorher: SVGs in **14** Dateien,
+`CrownIcon` byte-gleich zweimal, der Kalender dreimal, Strichstärken 1.6/1.75/
+1.8/2.0. `NavIcon` schrumpfte von 186 auf 43 Zeilen, `CategoryIcon` verlor
+seinen eigenen Record.
 
-**Der Change steht.** `openspec/changes/activity-concept-level/`: Proposal,
-Design, zwei Spec-Deltas (19 Anforderungen), 77 Aufgaben in sieben Abschnitten,
-`REVIEWS.md`. Umfragen (§5) sind **bewusst draußen** — Change B.
+**Zwei erzwingende Tests, fünf Rot-Messungen.** `icons.test.ts` (9 Zusagen)
+prüft **zwei** Dinge: kein `<svg>` außerhalb des Satzes — *und* jede benannte
+Ausnahme hält noch eins. Ohne die zweite deckt ein toter Listeneintrag ab da
+jeden künftigen Glyph in derselben Datei; genau so ist `redirect-targets.test.ts`
+einmal blind geworden. `bereiche.test.ts` (12 Zusagen) misst die Grenze zum
+interaktiven Akzent. Jede Zusage ist mit einer Gegenprobe belegt (Kopie per `cp`,
+nicht `git checkout`/`stash`).
 
-**Fünf Stellen, an denen AGE-582 aus dem Konzeptbild statt aus dem Code
-zitiert**, sind im Delta korrigiert: neun statt sieben Streu-Glyphen (SVGs
-liegen in **14** Dateien außerhalb `src/vision`) · `CrownIcon` steht
-**byte-gleich zweimal** (`building-blocks.tsx`, `ProfileHero.tsx`) ·
-`matching/CategoryIcon.tsx` ist ein zweiter Satz · Icon-Satz und Bereichs-Kanon
-sind zwei Dinge · die vier Dashboard-Karten aus dem Issue gibt es bei uns nicht
-(wir haben „Neu in der Aktivität", „Neue Mitglieder für dich", „Deine nächsten
-Schritte").
+**Bereichsfarben und Kanon** (1.9–1.13, 1.17). Sieben `--color-bereich-*` in
+`index.css`, **einmal** definiert. `config/bereiche.ts` hält den Kanon als eine
+Modulkonstante. Angewendet auf vier Dashboard-Karten und fünf Seitenköpfe.
 
-**Plan-Review mit zwei fremden Vendoren** (gemini, codex; Delta von Claude),
-beide REQUEST-CHANGES, **fünf HIGH bestätigt, einer widerlegt**. Jeder Befund
-am Code nachgeprüft, bevor er angenommen wurde.
-
-**Ein Befund war beim Nachrechnen schärfer als gemeldet:** `authenticated` hält
-UPDATE auf `post_likes`, `likes_write_own` ist `for all`, und ihr `with check`
-verlangt vom Zielbeitrag nur, dass er **existiert** — nicht, dass er sichtbar
-ist. „Reagieren auf A · Zeile auf B schieben · zurücknehmen" lässt A dauerhaft
-zu hoch stehen und treibt **B ins Negative**, auf einem Beitrag, den der
-Angreifer nicht sehen muss. Ohne den geplanten Zähler heute folgenlos.
+**Im Browser gesehen** gegen den lokalen Stack (helles Theme, breit): alle
+Menü-Glyphen, die gefüllte Fassung im aktiven Eintrag, die vier Dashboard-Marken,
+zwei Seitenköpfe. Konsole ohne Fehler.
 
 ## Decisions
 
-- **Zwei Changes, Umfragen separat.** *Warum:* §5 ist als einziger Teil ein
-  eigenes Datenmodell und hängt an keinem anderen Teil außer einem Knopf im
-  Composer. Vor dem Go-Live ist das der Unterschied zwischen „etwas ist fertig"
-  und „nichts ist fertig".
-- **Eine Umfrage bleibt ein `kind='member'`-Beitrag**, `poll_options`/
-  `poll_votes` hängen über `post_id`. *Warum:* `posts_kind_ref_id_check` bindet
-  `event ⇔ ref_id gesetzt` und `member ⇔ ref_id leer`; eine Umfrage passt in
-  keine der beiden Hälften, und `kind` bedeutet ohnehin „wer darf schreiben".
-- **Umfrage mit Ende; bis dahin sieht das Ergebnis nur, wer abstimmte, danach
-  alle.** *Warum:* ohne Ende sähe ein Nichtwähler es nie.
-- **Bereichsfarben: die bestehende Anforderung wird MODIFIZIERT, nicht
-  umgangen.** *Warum:* `design-system` sagt wörtlich „Blue SHALL be the only
-  accent family … SHALL NOT define … a per-format accent palette", mit
-  prüfendem Szenario. Die neue Grenze: **interaktiver** Akzent bleibt Blau
-  allein; eine zweite Familie darf nur einen Bereich **identifizieren** und nie
-  an Link, Knopf, Fokusring oder aktivem Zustand erscheinen.
-- **Bereichs-Tokens werden EINMAL definiert, nicht je Theme.** *Warum:* sie sind
-  Inhaltsschicht, und dieselbe Anforderung verlangt dort identische Werte in
-  beiden Themes — der navy-Block überschreibt absichtlich nur Chrome. Meine
-  erste Formulierung („im dunklen Block zufällig richtig") war schlicht falsch.
-- **Die zwei Aggregat-Funktionen werden `security invoker`, nicht `definer`.**
-  *Warum:* sie aggregieren nur, was der Aufrufer ohnehin sehen darf. Unter
-  `invoker` stimmt die Zahl, **weil die Regel wirkt** — nicht, weil eine
-  Abschrift sie nachspricht. Spart die vierte und fünfte Kopie des Prädikats.
-- **`post_likes` verliert UPDATE.** *Warum:* eine Reaktion hat keinen
-  Änderungsfall; sie entsteht und vergeht. Der Client schreibt nur `upsert` und
-  `delete` — das Recht ist schon heute unbenutzt.
-- **`posts` verliert INSERT ganz.** *Warum:* `create_post_with_media` ist
-  `security definer`, und `from("posts")` steht fünfmal im Quelltext — dreimal
-  lesend, einmal `update`, einmal `delete`. Kein Weg benutzt es.
-- **Sortierung: echter Umschalter inkl. „Beliebteste".** Donalds Wahl, und die
-  teuerste — sie erzwingt den materialisierten Zähler und damit beide
-  Rechte-Entzüge.
-- **Fünf aktivste Mitglieder, gezählt nach Beiträgen; Reiter NICHT in der URL.**
-- **Der Icon-Satz trägt nur wiederverwendbare Glyphen.** *Warum:* „kein `<svg>`
-  außerhalb des Satzes" war gegen den Baum falsch und stand gegen die
-  bestehende Anforderung an die Markenmarke. Ausnahmen namentlich benannt.
+- **Sieben Ausnahmen wie geplant, nicht drei** (Donalds Wahl). Meine Messung
+  ergab, dass vier der sieben sehr wohl wiederverwendbare Glyphen tragen —
+  `DETAIL_ICONS` (vier Stück), das Drei-Punkte-Symbol, der Leerzustands-Glyph,
+  `CheckIcon`. *Warum trotzdem vertagt:* den Diff vor dem Go-Live klein halten.
+  *Preis:* `kalender` steht weiter **dreimal** im Baum. Festgehalten als 1.15.
+- **Eine Farbfamilie, sieben Stufen — nicht sieben Töne.** *Warum:* gemessen
+  belegen Akzent-Blau (Ton 218), `success` (161), `warning` (36) und `danger`
+  (0) vier der sechs unterscheidbaren Farbregionen. Der naheliegende Kandidat für
+  „Highlights" lag auf **0°** von `danger`, also exakt auf der Fehlerfarbe. Frei
+  ist praktisch nur der Bogen Violett–Magenta — und das Delta sagt ohnehin „one
+  further colour family".
+- **Kontrastziel 4.5:1 gegen Karte UND Seitenfläche.** *Warum:* strenger als die
+  3:1, die WCAG 1.4.11 für Nicht-Text verlangt, weil die Marke neben ihrer
+  Beschriftung steht und `--color-muted` im selben Block dieselbe Latte zieht.
+  Erreicht: 5.70–10.95 gegen `canvas`, 5.36–10.30 gegen `soft`, kleinster
+  Abstand zwischen zwei Bereichen **ΔE 10.5**.
+- **Verworfen: auf maximalen Abstand optimieren.** ΔE 32.7 wäre erreichbar, die
+  Suche liefert aber `#f106f9` neben `#261e3e` — Neon neben Fast-Schwarz.
+- **Nur die Seitenüberschrift trägt die Marke, nicht jede Karte** (Donalds
+  Entscheidung). *Warum:* auf `/mitglieder` ist jede Karte ein Mitglied; siebzig
+  gleiche Marken sagen nichts. Umgesetzt für **fünf** Kopf-Routen statt der drei
+  aus 1.13, weil eine Teilmenge willkürlich wäre — das ist die eine Stelle, an
+  der ich weiter gefasst habe als die Frage lautete.
+- **Vier Motive zusammengeführt**, weil sie sonst am ersten Tag doppelt *im Satz*
+  stünden: `calendar`, `comment`, `academy`/`mentor`, `members`/`users`. Jeweils
+  die Menü-Zeichnung behalten — nur sie hat eine gefüllte Fassung.
+- **1.14 als-ist abgenommen** (Donald: „alles gut egal"): dunkles Theme, 375 px
+  und alles, was Daten braucht, sind ungeprüft. DEV trägt weder Beiträge noch
+  Angebote, und macOS lässt kein Fenster unter 500 px zu.
 
 ## Files modified
 
-- `openspec/changes/activity-concept-level/proposal.md` — **neu**
-- `openspec/changes/activity-concept-level/design.md` — **neu**, acht
-  Entscheidungen mit verworfenen Alternativen
-- `openspec/changes/activity-concept-level/specs/community-feed/spec.md` —
-  **neu**, 14 Anforderungen (12 ADDED, 2 MODIFIED)
-- `openspec/changes/activity-concept-level/specs/design-system/spec.md` —
-  **neu**, 5 Anforderungen, davon die MODIFIED gegen „Blue only"
-- `openspec/changes/activity-concept-level/tasks.md` — **neu**, 77 Aufgaben
-- `openspec/changes/activity-concept-level/REVIEWS.md` — **neu**, jeder Befund
-  mit BESTÄTIGT/WIDERLEGT und Auflösung
-- `session-handoff.md` — diese Datei
+- `src/components/ui/icons.tsx` — **neu**, 30 Glyphen, `Icon`-Bauteil
+- `src/components/ui/icons.test.ts` — **neu**, der erzwingende Test
+- `src/config/bereiche.ts` — **neu**, der Kanon
+- `src/config/bereiche.test.ts` — **neu**, die Grenze zum Akzent
+- `src/index.css` — sieben `--color-bereich-*` im Inhaltsschicht-Block
+- `src/components/ui/NavIcon.tsx` — 186 → 43 Zeilen, nur noch Route → Glyph
+- `src/components/ui/FormatHero.tsx` — optionaler Bereich im Seitenkopf
+- `src/components/matching/CategoryIcon.tsx` — eigener Record entfällt
+- `src/components/home/MemberDashboard.tsx` — Marken auf `DashTile`/`SectionHeader`
+- `AppShell.tsx`, `CommunityFeed.tsx`, `FeedbackButton.tsx`, `HeaderSearch.tsx`,
+  `ProfileHero.tsx`, `building-blocks.tsx` — beziehen aus dem Satz
+- `AktivitaetPage`, `EventsPage`, `MitgliederPage`, `CompassPage`,
+  `KontaktePage` — reichen ihren Bereich durch
+- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 1 abgehakt,
+  1.15/1.16/1.17 ergänzt
 
-Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`
-(AGE-583, Chat-Testkonten gegen den lokalen Stack, aus einer früheren Sitzung).
+Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 
 ## Next session: start here
 
-**Erste Handlung: Abschnitt 1 der Aufgabenliste bauen** (Icon-Satz), weil alles
-andere daran hängt — und darin zuerst 1.7/1.8: der erzwingende Test **mit
-Gegenprobe**, sonst ist er eine Absicht statt eines Mechanismus. Der Branch
-`donald/age-582-aktivitaet-auf-konzeptstand` ist gepusht, PR #205 offen, der Bau
-läuft auf demselben Branch weiter.
+**Erste Handlung: Abschnitt 2 bauen** (`post_saves`) — Migration mit
+Kopfkommentar, Policies für SELECT/INSERT/DELETE mit `is_activated()`, Grants
+aussprechen (neue Tabellen erben hier nichts), `grants_test.sql` §1 nachziehen,
+pgTAP. Der hängt an keiner offenen Entscheidung. `supabase test db` **mit
+ausdrücklicher Dateiliste** laufen lassen — ohne Liste meldet der Befehl FAIL,
+obwohl grün.
 
-Alternative, falls die Entscheidungen frisch bleiben sollen: **Change B
-(Umfragen) als Plan danebenlegen**, solange Laufzeit, Sichtbarkeit und
-Datenmodell entschieden sind. Das kostet eine Sitzung und blockiert Change A
-nicht.
-
-Vor dem Bau von Abschnitt 3 gilt die Reihenfolge in den Aufgaben **wörtlich**:
-erst der rote pgTAP zum Verschiebe-Angriff (3.2), dann der Entzug (3.3) — und
-erst dann der Zähler. Ein Zähler vor dem Entzug ist eine Einladung.
+Vor Abschnitt 3 gilt die Reihenfolge wörtlich: erst der rote pgTAP zum
+Verschiebe-Angriff (3.2), dann der Rechte-Entzug (3.3), und **erst dann** der
+Zähler. Ein Zähler vor dem Entzug ist eine Einladung.
 
 ## Open questions
 
-- **Farbwerte der sieben Bereiche und das Kontrastziel.** „Erkennbar" ist nicht
-  abnehmbar; die Zahl entsteht beim Bau von Abschnitt 1.
-- **PostgREST-Form des Typfilters** (Anti-Join für „Text", Inner-Join für
-  „Bild"). Belegt nur ein Integrationstest gegen den lokalen Stack.
-- **Der Aktivierungsversand steht weiter aus** — 69 der 72 PROD-Konten sind
-  nicht aktiviert, und `app.fairbusinessclub.de` hat **weiter keinen
-  DNS-Eintrag**. Das ist der Go-Live-Punkt und deine Entscheidung.
-- **Das Onlinetreffen ist am 25.08.**, also morgen.
-- Unverändert offen aus der siebzehnten Sitzung: drei abweichende
+- **Der Aktivierungsversand steht weiter aus** — 69 der 72 PROD-Konten sind nicht
+  aktiviert, `app.fairbusinessclub.de` hat **weiter keinen DNS-Eintrag**, und das
+  **Onlinetreffen ist am 25.08., also morgen**. Das ist der Go-Live-Punkt und
+  deine Entscheidung — dringender als jeder Teil dieses Changes.
+- Vier gepushte Commit-Messages tragen den **falschen Tag** (25.08. statt
+  24.08.). Quelltext und Aufgabenliste sind in `afa20c3` korrigiert; die Historie
+  ist es nicht, weil sie schon auf dem Remote liegt.
+- Unverändert offen aus der achtzehnten Sitzung: drei abweichende
   Anmeldeadressen · ein echter Mitgliedsname in der Git-Historie · Rotation des
-  PROD-DB-Passworts · vier Review-Befunde aus 11.5 (HIGH-2 Zeilensperre vor dem
-  GoTrue-Aufruf, `event_attendees`-RPC ohne Paging, Draft = Server-Baseline,
-  zwei pgTAP-Zusagen vor ihrem Fixture) · 7.5 halb · kein Nachsetz-Weg für eine
-  gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
-  `on delete cascade` · Downgrade (AGE-516) · `admin_list_feedback()` ohne
-  Paging · **DEV ist nicht mitgepflegt** (eines der elf deaktivierten Konten ist
-  dort `matching_manager`).
+  PROD-DB-Passworts · vier Review-Befunde aus 11.5 · 7.5 halb · kein Nachsetz-Weg
+  für eine gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor`
+  ohne `on delete cascade` · Downgrade (AGE-516) · `admin_list_feedback()` ohne
+  Paging · **DEV ist nicht mitgepflegt**.
