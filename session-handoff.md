@@ -1,156 +1,135 @@
-# Session Handoff — 2026-08-24 (siebzehnte Sitzung)
+# Session Handoff — 2026-08-24 (achtzehnte Sitzung)
 
-**Abschnitt 12 ist durch: die Datenpflege steht auf PROD und ist unabhängig
-abgenommen.** 12.0 bis 12.7 alle erledigt, 76 von 76 Aufgaben. PR #202 gemergt
-(`9d7b09f`, squash). Kein Deploy nötig — nur Skripte und Belege. 1457 Vitest.
+**AGE-582 ist geplant, nicht gebaut.** Der OpenSpec-Change
+`activity-concept-level` steht mit allen vier Artefakten plus `REVIEWS.md`,
+`openspec validate --all` ist 32/32 grün, PR #205 ist offen. Kein Code, keine
+Migration, keine Zeile Frontend.
 
-**Dabei ist mir ein Fehler unterlaufen, der auf PROD gewirkt hat.** Er ist
-behoben und die Invariante hergestellt; die Lehre steht in der Auto-Memory unter
-`schluessel-den-ein-spaeterer-schritt-aendert`.
+**Die Plan-Review hat zwei Fehler gefunden, die ich sonst gebaut hätte.** Beide
+stehen unten unter Decisions, weil sie den Entwurf gedreht haben.
 
 ## Accomplished
 
-**12.7, erste Hälfte — der Trockenlauf, und er hat sofort geliefert.**
-`scripts/probe-age581-datenpflege-trockenlauf.ts` fand: **zwei
-Übersichtszeilen trafen dasselbe Konto.** Eine Partner-Zeile trägt die
-Firmenadresse einer anderen Person, und zwar über den *stärksten*
-Zuordnungsweg. Ungeprüft hätte 12.1 zwei Jahrestage in dieselbe Zeile
-geschrieben und 12.5 hätte das richtige Konto deaktiviert. Der Beleg vom 23.08.
-beschrieb den Fall in Prosa, meldete aber trotzdem 59 Treffer, die der Rechenweg
-nicht hergab (58).
+**Altlast geschlossen.** PR #204 (Handoff-Commit) hatte alle vier Pflichtchecks
+grün → gemergt (`01bbeee`). Der Linear-Kommentar zu AGE-582, den die
+siebzehnte Sitzung nicht schreiben konnte (Klassifikator), ist geschrieben —
+mit den Entscheidungen, den fünf Korrekturen am Issue-Text und den offenen
+Punkten.
 
-**Der Durchgang auf PROD.** 60 `payment_type` · 57 `paid_until` (3 bewusst
-leer) · 12 Anmeldeadressen angeglichen, 3 ausgenommen · 11 Konten ohne
-Listeneintrag deaktiviert · ein Nachzügler angelegt und geschlossen. **72
-Profile.** Keine Post an Mitglieder (`email_confirm: true`).
+**Der Change steht.** `openspec/changes/activity-concept-level/`: Proposal,
+Design, zwei Spec-Deltas (19 Anforderungen), 77 Aufgaben in sieben Abschnitten,
+`REVIEWS.md`. Umfragen (§5) sind **bewusst draußen** — Change B.
 
-**DER FEHLER: 12.4 hat 12.5 vergiftet.** Die feste Zuordnung hing an der
-**Anmeldeadresse** — und 12.4 gleicht Anmeldeadressen an. Danach zeigte der
-Schlüssel ins Leere, die Zeile galt als „ohne Konto", **12.5 deaktivierte ein
-Mitglied, das auf der Liste steht**, und 12.6 versuchte es ein zweites Mal
-anzulegen. Nur GoTrues „already registered" verhinderte das Zweitkonto — Zufall,
-kein Entwurf. Die Doppelbelegungs-Sperre schwieg zu Recht: aus der
-Doppelbelegung war eine **Nicht**-Belegung geworden, und der Trockenlauf prüft
-den Zustand VOR 12.4, nicht den ZWISCHEN den Schritten.
+**Fünf Stellen, an denen AGE-582 aus dem Konzeptbild statt aus dem Code
+zitiert**, sind im Delta korrigiert: neun statt sieben Streu-Glyphen (SVGs
+liegen in **14** Dateien außerhalb `src/vision`) · `CrownIcon` steht
+**byte-gleich zweimal** (`building-blocks.tsx`, `ProfileHero.tsx`) ·
+`matching/CategoryIcon.tsx` ist ein zweiter Satz · Icon-Satz und Bereichs-Kanon
+sind zwei Dinge · die vier Dashboard-Karten aus dem Issue gibt es bei uns nicht
+(wir haben „Neu in der Aktivität", „Neue Mitglieder für dich", „Deine nächsten
+Schritte").
 
-**Behoben mit zwei Bedingungen statt einer Reparatur.** Schlüssel ist jetzt
-`profiles.id`; ein Test stellt die Reihenfolge nach (dieselbe Zeile vor und nach
-der Angleichung) und ist gegen den alten Entwurf **rot** — belegt. Dazu der
-Schritt `heilen`: *wer auf der Liste steht, ist offen*, idempotent.
+**Plan-Review mit zwei fremden Vendoren** (gemini, codex; Delta von Claude),
+beide REQUEST-CHANGES, **fünf HIGH bestätigt, einer widerlegt**. Jeder Befund
+am Code nachgeprüft, bevor er angenommen wurde.
 
-**Abnahme mit einem ZWEITEN Lauf**
-(`scripts/probe-age581-datenpflege-abnahme.ts`), der die Quelldatei nicht kennt.
-Der Zähler im Schreibskript hatte alle sieben Kennzahlen ✓ gemeldet, während die
-Zuordnung kaputt war. **22 Zusagen grün**, darunter drei Invarianten statt
-Zählungen: kein Datum vor dem Stichtag, Verteilung je Kategorie einzeln,
-Doppelsperre in **beide** Richtungen.
+**Ein Befund war beim Nachrechnen schärfer als gemeldet:** `authenticated` hält
+UPDATE auf `post_likes`, `likes_write_own` ist `for all`, und ihr `with check`
+verlangt vom Zielbeitrag nur, dass er **existiert** — nicht, dass er sichtbar
+ist. „Reagieren auf A · Zeile auf B schieben · zurücknehmen" lässt A dauerhaft
+zu hoch stehen und treibt **B ins Negative**, auf einem Beitrag, den der
+Angreifer nicht sehen muss. Ohne den geplanten Zähler heute folgenlos.
 
 ## Decisions
 
-- **Der Schlüssel einer Hand-Zuordnung ist die Kennung, nie eine Adresse.**
-  *Warum:* ein Schlüssel, den ein späterer Schritt desselben Durchgangs
-  verändert, ist keiner. Genau das kostete ein Mitglied den Zugang.
-- **Die Abnahme braucht ein zweites Werkzeug ohne die Quelldatei.** *Warum:* der
-  Zähler im Schreibskript teilt Rechenkern und Quelle mit dem Schreiber und
-  meldet einen gemeinsamen Fehler als Erfolg.
-- **Invarianten statt Summen prüfen.** *Warum:* „60 gesetzt" stimmte auch mit
-  den falschen sechzig; die Verteilung je Kategorie nicht.
-- **`heilen` stellt die Invariante her, nicht den Einzelfall.** *Warum:* eine
-  Reparatur gilt einmal, eine Invariante bei jedem Lauf.
-- **12.1/12.2 über `admin_update_profile`, nicht per direktem UPDATE.** *Warum:*
-  die RPC pflegt `payment_type` an allen vier Stellen und hinterlässt die
-  `admin_audit`-Spur. Die trägt jetzt auch den Fehler: 13 × `disable_member`,
-  1 × `enable_member`.
-- **Admin-Token per `generateLink` + sofortiges Einlösen.** *Warum:* kein
-  Passwort nötig, kein Versand; `service_role` trägt kein `sub` und liefe in 401.
-- **`29.02.` bekommt grundsätzlich eine Meldung statt eines Ergebnisses.**
-  *Warum:* sonst hinge die Antwort am Jahr des Stichtags.
-
-**Zu AGE-582 (Aktivität auf Konzeptstand), Donald am 24.08. — beide bisher
-offenen Fragen entschieden, damit gebaut werden kann:**
-
-- **Tags-Filter: ODER.** Mehrere angehakte Tags zeigen Beiträge, die
-  **mindestens einen** davon tragen. *Warum:* Auswahlkästchen versprechen
-  Mehrfachauswahl. Für den Code heisst das `.overlaps("hashtags", tags)` statt
-  des heutigen `.contains(...)` — `contains` ist UND und lieferte bei zwei Haken
-  fast immer eine leere Liste.
-- **Umfrage-Ergebnis: erst nach eigener Stimme.** Wer noch nicht abgestimmt hat,
-  sieht die Optionen, aber keine Zahlen. *Warum:* die Umfrage soll die Antwort
-  nicht vorprägen. **Das ist eine Frage der Abfrage, nicht der Anzeige** — die
-  Zählung darf serverseitig nicht herausgehen, bevor die eigene Stimme steht;
-  ein Ausblenden im Bauteil wäre Kulisse, die Zahlen stünden in der Antwort.
+- **Zwei Changes, Umfragen separat.** *Warum:* §5 ist als einziger Teil ein
+  eigenes Datenmodell und hängt an keinem anderen Teil außer einem Knopf im
+  Composer. Vor dem Go-Live ist das der Unterschied zwischen „etwas ist fertig"
+  und „nichts ist fertig".
+- **Eine Umfrage bleibt ein `kind='member'`-Beitrag**, `poll_options`/
+  `poll_votes` hängen über `post_id`. *Warum:* `posts_kind_ref_id_check` bindet
+  `event ⇔ ref_id gesetzt` und `member ⇔ ref_id leer`; eine Umfrage passt in
+  keine der beiden Hälften, und `kind` bedeutet ohnehin „wer darf schreiben".
+- **Umfrage mit Ende; bis dahin sieht das Ergebnis nur, wer abstimmte, danach
+  alle.** *Warum:* ohne Ende sähe ein Nichtwähler es nie.
+- **Bereichsfarben: die bestehende Anforderung wird MODIFIZIERT, nicht
+  umgangen.** *Warum:* `design-system` sagt wörtlich „Blue SHALL be the only
+  accent family … SHALL NOT define … a per-format accent palette", mit
+  prüfendem Szenario. Die neue Grenze: **interaktiver** Akzent bleibt Blau
+  allein; eine zweite Familie darf nur einen Bereich **identifizieren** und nie
+  an Link, Knopf, Fokusring oder aktivem Zustand erscheinen.
+- **Bereichs-Tokens werden EINMAL definiert, nicht je Theme.** *Warum:* sie sind
+  Inhaltsschicht, und dieselbe Anforderung verlangt dort identische Werte in
+  beiden Themes — der navy-Block überschreibt absichtlich nur Chrome. Meine
+  erste Formulierung („im dunklen Block zufällig richtig") war schlicht falsch.
+- **Die zwei Aggregat-Funktionen werden `security invoker`, nicht `definer`.**
+  *Warum:* sie aggregieren nur, was der Aufrufer ohnehin sehen darf. Unter
+  `invoker` stimmt die Zahl, **weil die Regel wirkt** — nicht, weil eine
+  Abschrift sie nachspricht. Spart die vierte und fünfte Kopie des Prädikats.
+- **`post_likes` verliert UPDATE.** *Warum:* eine Reaktion hat keinen
+  Änderungsfall; sie entsteht und vergeht. Der Client schreibt nur `upsert` und
+  `delete` — das Recht ist schon heute unbenutzt.
+- **`posts` verliert INSERT ganz.** *Warum:* `create_post_with_media` ist
+  `security definer`, und `from("posts")` steht fünfmal im Quelltext — dreimal
+  lesend, einmal `update`, einmal `delete`. Kein Weg benutzt es.
+- **Sortierung: echter Umschalter inkl. „Beliebteste".** Donalds Wahl, und die
+  teuerste — sie erzwingt den materialisierten Zähler und damit beide
+  Rechte-Entzüge.
+- **Fünf aktivste Mitglieder, gezählt nach Beiträgen; Reiter NICHT in der URL.**
+- **Der Icon-Satz trägt nur wiederverwendbare Glyphen.** *Warum:* „kein `<svg>`
+  außerhalb des Satzes" war gegen den Baum falsch und stand gegen die
+  bestehende Anforderung an die Markenmarke. Ausnahmen namentlich benannt.
 
 ## Files modified
 
-- `scripts/age581-datenpflege.logic.ts` — **neu**, Rechenkern (`paidUntilAus`,
-  `ordneZu`, `findeDoppelbelegung`, `adresseWeichtAb`)
-- `scripts/age581-datenpflege.logic.test.ts` — **neu**, 24 Zusagen
-- `scripts/probe-age581-datenpflege-trockenlauf.ts` — **neu**, 12.7 erste Hälfte
-- `scripts/age581-datenpflege-schreiben.ts` — **neu**, sechs Schritte einzeln
-  aufrufbar, jeder idempotent
-- `scripts/probe-age581-datenpflege-abnahme.ts` — **neu**, 22 Zusagen, kennt die
-  Quelldatei nicht
-- `docs/age-581-mitgliederabgleich.md` — gemessene statt abgelesene Zahlen, der
-  Vorfall, der Endstand
-- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 12.0 bis 12.7
+- `openspec/changes/activity-concept-level/proposal.md` — **neu**
+- `openspec/changes/activity-concept-level/design.md` — **neu**, acht
+  Entscheidungen mit verworfenen Alternativen
+- `openspec/changes/activity-concept-level/specs/community-feed/spec.md` —
+  **neu**, 14 Anforderungen (12 ADDED, 2 MODIFIED)
+- `openspec/changes/activity-concept-level/specs/design-system/spec.md` —
+  **neu**, 5 Anforderungen, davon die MODIFIED gegen „Blue only"
+- `openspec/changes/activity-concept-level/tasks.md` — **neu**, 77 Aufgaben
+- `openspec/changes/activity-concept-level/REVIEWS.md` — **neu**, jeder Befund
+  mit BESTÄTIGT/WIDERLEGT und Auflösung
+- `session-handoff.md` — diese Datei
+
+Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`
+(AGE-583, Chat-Testkonten gegen den lokalen Stack, aus einer früheren Sitzung).
 
 ## Next session: start here
 
-**AGE-581 ist inhaltlich fertig.** Der nächste Schritt ist der
-**Aktivierungsversand** — 69 der 72 PROD-Konten sind nicht aktiviert und kommen
-erst darüber herein; ein deaktiviertes Konto bekommt dabei keinen Link (Status
-`blocked`). Vorher zu klären: **`app.fairbusinessclub.de` hat weiter keinen
-DNS-Eintrag**, und das ist der Go-Live-Punkt.
+**Erste Handlung: Abschnitt 1 der Aufgabenliste bauen** (Icon-Satz), weil alles
+andere daran hängt — und darin zuerst 1.7/1.8: der erzwingende Test **mit
+Gegenprobe**, sonst ist er eine Absicht statt eines Mechanismus. Der Branch
+`donald/age-582-aktivitaet-auf-konzeptstand` ist gepusht, PR #205 offen, der Bau
+läuft auf demselben Branch weiter.
 
-Die Quelldatei mit den festen Zuordnungen liegt **nicht im Repo** (Rechte 0600,
-Sitzungs-Ablageordner) und ist mit der Sitzung weg. Sie ist Detlevs Original
-plus eine sechste Spalte `konto_id` mit zwei Kennungen (Zeilen 8 und 19). Wer
-sie neu braucht: aus den Screenshots ablesen und die zwei Kennungen aus PROD
-holen — die Regel steht in `docs/age-581-mitgliederabgleich.md`.
+Alternative, falls die Entscheidungen frisch bleiben sollen: **Change B
+(Umfragen) als Plan danebenlegen**, solange Laufzeit, Sichtbarkeit und
+Datenmodell entschieden sind. Das kostet eine Sitzung und blockiert Change A
+nicht.
 
-**Danach steht AGE-582 an** („Aktivität auf Konzeptstand"), Priorität High,
-Backlog, angelegt am 24.08. Es hält Donalds Rückmeldungen aus dem
-Screenshot-Vergleich fest: die zusätzlichen Infos in der Sidebar (§4), die
-Aktivitäts-Box, die über der Sidebar statt in der Feed-Spalte sitzt (§1,
-`CommunityFeed.tsx:156` rendert sie **vor** dem Raster), die farbigen Icons im
-Dashboard (§0) und die Icons zum Erstellen (§1). Dazu Reiter + „Gespeichert"
-(§2/§3, neue Tabelle `post_saves`) und Umfragen (§5, im Datenmodell bisher gar
-nicht vorhanden).
-
-Das Issue sagte selbst „direkt nach Abschnitt 11 von AGE-581, nicht davor" —
-diese Bedingung ist seit heute erfüllt. **Beide Fragen, die es blockierten, sind
-jetzt entschieden** (siehe Decisions). Erste Handlung: ein OpenSpec-Change
-anlegen, mit §0 (Icon-/Farbkanon) zuerst — alle anderen Teile hängen daran.
-Zwei Fallen stehen im Issue: `grants_test.sql` kippt bei jeder neuen Tabelle mit
-Table-Grant, und die Sidebar-Zähler dürfen nichts zählen, was der Betrachter
-nicht sehen darf (dasselbe Prädikat wie `posts_select_by_visibility`).
+Vor dem Bau von Abschnitt 3 gilt die Reihenfolge in den Aufgaben **wörtlich**:
+erst der rote pgTAP zum Verschiebe-Angriff (3.2), dann der Entzug (3.3) — und
+erst dann der Zähler. Ein Zähler vor dem Entzug ist eine Einladung.
 
 ## Open questions
 
-- **Drei Anmeldeadressen bleiben abweichend** und brauchen eine Entscheidung:
-  eine ohne `@`, eine, die in die Kollision mit einer Firmenadresse liefe, und
-  die des zweiten Admins (er bestätigt selbst, welche stimmt).
-- **Ein echter Mitgliedsname stand in `tasks.md`** (öffentliches Repo). Aus dem
-  Text ist er raus, aus der Git-Historie nicht. Deine Entscheidung.
-- **Ich habe am 24.08. das PROD-DB-Passwort ins Terminal ausgegeben** (frühere
-  Sitzung). Rotation ist offen.
-- **Vier Review-Befunde aus 11.5 bleiben offen:** HIGH-2 (Zeilensperre endet vor
-  dem GoTrue-Aufruf) · `event_attendees`-RPC ohne Paging · Draft und
-  Server-Baseline sind derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor
-  ihrem Fixture.
+- **Farbwerte der sieben Bereiche und das Kontrastziel.** „Erkennbar" ist nicht
+  abnehmbar; die Zahl entsteht beim Bau von Abschnitt 1.
+- **PostgREST-Form des Typfilters** (Anti-Join für „Text", Inner-Join für
+  „Bild"). Belegt nur ein Integrationstest gegen den lokalen Stack.
+- **Der Aktivierungsversand steht weiter aus** — 69 der 72 PROD-Konten sind
+  nicht aktiviert, und `app.fairbusinessclub.de` hat **weiter keinen
+  DNS-Eintrag**. Das ist der Go-Live-Punkt und deine Entscheidung.
 - **Das Onlinetreffen ist am 25.08.**, also morgen.
-- **AGE-582 §5: braucht eine Umfrage eine Laufzeit?** Noch offen — und es hängt
-  an der heutigen Entscheidung: sieht das Ergebnis nur, wer abgestimmt hat, dann
-  sieht ein Nichtwähler es **nie**. Bei einer laufenden Umfrage ist das gewollt,
-  bei einer beendeten vermutlich nicht. Naheliegend: nach Ablauf für alle
-  sichtbar — was ein Ende voraussetzt.
-- **Der Kommentar zu AGE-582 in Linear konnte nicht geschrieben werden**
-  (Klassifikator blockte den MCP-Aufruf). Die beiden Entscheidungen stehen
-  deshalb **nur hier**, nicht am Issue. Wer AGE-582 aufnimmt, trägt sie dort
-  nach.
-- Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
+- Unverändert offen aus der siebzehnten Sitzung: drei abweichende
+  Anmeldeadressen · ein echter Mitgliedsname in der Git-Historie · Rotation des
+  PROD-DB-Passworts · vier Review-Befunde aus 11.5 (HIGH-2 Zeilensperre vor dem
+  GoTrue-Aufruf, `event_attendees`-RPC ohne Paging, Draft = Server-Baseline,
+  zwei pgTAP-Zusagen vor ihrem Fixture) · 7.5 halb · kein Nachsetz-Weg für eine
   gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
-  `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
-  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging.
-- **DEV ist nicht mitgepflegt.** Eines der elf Konten ist dort
-  `matching_manager`; wird es auch auf DEV deaktiviert, verliert es die Rolle.
+  `on delete cascade` · Downgrade (AGE-516) · `admin_list_feedback()` ohne
+  Paging · **DEV ist nicht mitgepflegt** (eines der elf deaktivierten Konten ist
+  dort `matching_manager`).
