@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(420);
+select plan(433);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -701,10 +701,23 @@ select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.my_activation_state() where activated = false'),
   1, 'my_activation_state meldet „nicht aktiviert"');
+-- GEÄNDERT MIT AGE-581: aus zwei Feldern wurden drei. `blocked` sagt, ob dem
+-- Konto der Zugang entzogen wurde — ohne das Feld zeigte die Oberfläche einem
+-- gesperrten Konto den Aktivierungsbildschirm und lüde es ein, sich einen
+-- Zugangslink schicken zu lassen, für einen Zugang, den es nicht mehr gibt.
+--
+-- Dass diese Zusicherung brechen MUSSTE, ist ihre Aufgabe: sie hält fest, dass
+-- jedes weitere Feld eine Entscheidung ist und kein Versehen. Die Zusage selbst
+-- bleibt unverändert scharf — es ist eine WÖRTLICHE Signaturprüfung, kein
+-- „enthält mindestens".
+--
+-- `blocked` ist ein Wahrheitswert und kein Zustandswort. Ein Feld mit den
+-- Werten `deaktiviert`/`geloescht` verriete dem Betroffenen, welche der beiden
+-- Handlungen ein Admin vorgenommen hat.
 select is(
   pg_get_function_result('public.my_activation_state()'::regprocedure),
-  'TABLE(activated boolean, display_name text)',
-  'my_activation_state gibt genau ZWEI Felder zurück — jedes weitere wäre eines, '
+  'TABLE(activated boolean, blocked boolean, display_name text)',
+  'my_activation_state gibt genau DREI Felder zurück — jedes weitere wäre eines, '
   'das ein Angreifer mit dem verteilten Passwort abholt');
 select is(has_function_privilege('anon', 'public.my_activation_state()', 'execute'),
   false, 'anon darf my_activation_state nicht ausführen');
@@ -1674,6 +1687,73 @@ select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
       '{"interests":["x"]}'::jsonb)$q$),
   'DENIED:%', 'profiles.interests ebenso');
 
+-- 18.5c `payment_type` — der Schreibweg, an ALLEN VIER Stellen (AGE-581).
+-- Ein Altdatenfeld steht in `admin_update_profile` viermal: Weissliste,
+-- Präsenztest, INSERT-Spaltenliste und `on conflict do update`. Nur die
+-- Weissliste zu ändern nähme den Wert widerspruchslos entgegen, schriebe eine
+-- Auditzeile — und speicherte nichts. Diese acht Zusagen sind so gebaut, dass
+-- jede der vier Stellen einzeln fehlen kann und mindestens eine bricht:
+--   * Weissliste fehlt      → (a) prallt ab
+--   * Präsenztest fehlt     → (b) liest null zurück (der Patch trägt NUR das Feld)
+--   * INSERT-Liste fehlt    → (h) liest null zurück (Profil ohne Altdatenzeile)
+--   * on-conflict fehlt     → (b) liest null zurück (Profil MIT Altdatenzeile)
+
+-- (a) Ein Patch, der NUR die Zahlungsart trägt. Das Zielprofil hat aus 18.1
+-- bereits eine Altdatenzeile — dieser Aufruf geht also durch den
+-- `on conflict`-Zweig.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":"copecart"}'::jsonb)$q$),
+  'OK', 'payment_type steht in der Weissliste …');
+
+-- (b) Das Neuladen, und zwar über die LESEFLÄCHE statt über die Tabelle: so
+-- belegt derselbe Test den Schreibweg und die neue Spalte in
+-- `admin_list_members` in einem Zug.
+select is(
+  pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
+    $q$select t.payment_type from public.admin_list_members('importiert@test.fbc') t$q$),
+  'copecart', '… und der Wert ist nach dem Neuladen wirklich da');
+
+-- (c)/(d) Die acht Werte stehen in der DATENBANK, nicht bloss in einem
+-- Auswahlfeld. Ein Wert daneben ist ein Fehler — und lässt den alten stehen,
+-- statt ihn zu leeren.
+select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":"bitcoin"}'::jsonb)$q$),
+  'DENIED:%', 'Eine unbekannte Zahlungsart bricht ab …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  'copecart', '… und lässt den vorherigen Wert stehen');
+
+-- (e)/(f) Fehlend und leer sind zweierlei: `null` heisst NICHT ERFASST und
+-- muss sich setzen lassen, sonst wäre eine irrtümlich erfasste Zahlungsart
+-- nicht mehr zurückzunehmen.
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b1',
+      '{"payment_type":null}'::jsonb)$q$),
+  'OK', 'JSON-null wird angenommen …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b1'),
+  null, '… und leert die Zahlungsart wieder');
+
+-- (g)/(h) Und derselbe Weg für ein Profil OHNE Altdatenzeile. Ohne dieses Paar
+-- bliebe die INSERT-Spaltenliste ungeprüft: jedes selbst registrierte Konto
+-- kommt ohne Zeile in `profile_legacy` an, und der Fehler zeigte sich erst beim
+-- ersten Admin, der die Zahlungsart eines solchen Kontos erfasst.
+insert into auth.users (id, aud, role, email) values
+  ('c6c6c6c6-0000-0000-0000-0000000000b2', 'authenticated', 'authenticated', 'ohne-altdaten@test.fbc');
+
+select is(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
+  $q$select public.admin_update_profile('c6c6c6c6-0000-0000-0000-0000000000b2',
+      '{"payment_type":"rechnung"}'::jsonb)$q$),
+  'OK', 'Ein Profil ohne Altdatenzeile nimmt die Zahlungsart an …');
+
+select is((select payment_type from public.profile_legacy
+            where profile_id = 'c6c6c6c6-0000-0000-0000-0000000000b2'),
+  'rechnung', '… und die Zeile entsteht dabei mit dem Wert, nicht ohne ihn');
+
 -- 18.6 Der Lesepfad — ohne ihn wäre der Schreibweg unerreichbar.
 select is(
   pg_temp.text_as('aaaaaaaa-0000-0000-0000-000000000001',
@@ -2375,6 +2455,56 @@ select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
   $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
      where status <> 'registered'$$),
   0, 'event_attendees: Warteliste und Abmeldung bleiben vor Nicht-Hosts verborgen');
+
+-- 20.3b Der Lebenszyklus auf der ZIELSEITE (AGE-581). Die Aufruferseite ist
+-- schon zu: `event_attendees` ruft `is_activated()`, und die trägt seit Teil A
+-- beide neuen Bedingungen. Die Zielseite dagegen prüft hier von Hand
+-- `p.activated_at is not null` — sie ist eine der fünf direkten Stellen aus der
+-- Inventur und muss mitgezogen werden.
+--
+-- Ohne das bliebe ein entferntes Mitglied ausgerechnet dort stehen, wo sein
+-- Gesicht neben denen der anderen Teilnehmer erscheint: die Avatarreihe eines
+-- Events. `a2` ist eines der beiden Profile, die `a3` in 20.3 sieht.
+--
+-- Beide Wege einzeln, nicht nur einer: `deleted_at` gatet selbstständig und
+-- fasst `disabled_at` nicht an — ein Test nur über `disabled_at` liesse eine
+-- Umsetzung durch, die das Löschen vergisst.
+
+update public.profiles set disabled_at = now()
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a2'$$),
+  0, 'event_attendees: ein DEAKTIVIERTER Teilnehmer verschwindet aus der Reihe …');
+
+-- Und zwar er allein. Ohne diese Zeile wäre die Zusage darüber auch dann grün,
+-- wenn die Funktion für alle nichts mehr lieferte.
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  1, '… und die Reihe schrumpft um genau ihn, statt leer zu werden');
+
+update public.profiles set disabled_at = null
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  2, '… die Rücknahme bringt ihn zurück — der Zustand hängt am Feld, nicht am Zufall');
+
+update public.profiles set deleted_at = now()
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')
+     where profile_id = 'c8c8c8c8-0000-0000-0000-0000000000a2'$$),
+  0, 'event_attendees: ein GELÖSCHTER Teilnehmer ebenso — deleted_at gatet eigenständig');
+
+update public.profiles set deleted_at = null
+ where id = 'c8c8c8c8-0000-0000-0000-0000000000a2';
+
+select is(pg_temp.count_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select count(*)::int from public.event_attendees('c8000001-0000-4000-8000-000000000001')$$),
+  2, '… und auch hier steht der Ausgangszustand danach wieder — die Zusagen unten bauen darauf');
 
 select alike(pg_temp.try_as_anon(
   $$select * from public.event_attendees('c8000002-0000-4000-8000-000000000002')$$),

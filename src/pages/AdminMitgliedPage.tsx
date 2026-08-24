@@ -15,6 +15,7 @@ import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/toast-context";
 import {
@@ -24,6 +25,7 @@ import {
   saveAdminProfile,
   type AdminLegacy,
 } from "../lib/admin-profile";
+import { ZAHLUNGSARTEN } from "../lib/admin-members";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
 
 /**
@@ -67,6 +69,7 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
     legacy_tier: "",
     legacy_price: "",
     legacy_source_id: "",
+    payment_type: "",
   });
   const [loginEmail, setLoginEmail] = useState("");
 
@@ -169,9 +172,28 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
           Mitglied bearbeiten
         </h1>
+        {/* DER LEBENSZYKLUS GEHT VOR, und bis zur Sichtprobe am 24.08. kam er
+            hier gar nicht vor: die Zeile las allein `activated`, also stand
+            über einem GELÖSCHTEN Mitglied „bestätigt" — und darunter ein voll
+            bearbeitbares Formular. Dass im Test „Egon Geloescht" steht, war der
+            einzige Hinweis, und der ist ein Testname; ein echtes entferntes
+            Mitglied gab gar keinen.
+
+            Vier Fälle in einer Kette statt vier Plaketten: es gilt immer genau
+            einer, und die Reihenfolge ist die Rangfolge. Gelöscht schlägt
+            deaktiviert schlägt unbestätigt — dieselbe Rangfolge wie in der
+            Zustandsspalte der Liste. */}
         <p className="mt-1 text-sm text-muted">
           {data.form.name || "Ohne Namen"} ·{" "}
-          {data.activated ? (
+          {data.geloescht ? (
+            <span className="font-medium text-ink">
+              gelöscht — dieses Profil ist entfernt und für niemanden sichtbar
+            </span>
+          ) : data.deaktiviert ? (
+            <span className="font-medium text-ink">
+              deaktiviert — dieses Mitglied kann sich nicht anmelden und ist für niemanden sichtbar
+            </span>
+          ) : data.activated ? (
             <span>bestätigt</span>
           ) : (
             <span className="font-medium text-ink">
@@ -216,6 +238,24 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
                   value={legacy.paid_until}
                   onChange={(e) => setLegacy({ ...legacy, paid_until: e.target.value })}
                 />
+              )}
+            </Field>
+            <Field label="Zahlungsart">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={legacy.payment_type}
+                  onChange={(e) => setLegacy({ ...legacy, payment_type: e.target.value })}
+                >
+                  {/* Leer ist keine neunte Zahlungsart, sondern `null` in der
+                      Spalte — „nicht erfasst" statt einer geratenen. */}
+                  <option value="">nicht erfasst</option>
+                  {ZAHLUNGSARTEN.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.label}
+                    </option>
+                  ))}
+                </Select>
               )}
             </Field>
             <Field label="Alte Stufe">

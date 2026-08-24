@@ -37,6 +37,9 @@ export interface AdminLegacy {
   legacy_tier: string;
   legacy_price: string;
   legacy_source_id: string;
+  /** Eine der acht Zahlungsarten oder leer für „nicht erfasst" (AGE-581).
+   *  Leer und nicht `undefined`: das Auswahlfeld ist kontrolliert. */
+  payment_type: string;
 }
 
 export interface AdminProfileData {
@@ -44,6 +47,19 @@ export interface AdminProfileData {
   legacy: AdminLegacy;
   loginEmail: string;
   activated: boolean;
+  /**
+   * Der Lebenszyklus (AGE-581). Steht NEBEN `activated` und nicht darin: ein
+   * entferntes Konto kann vorher bestätigt gewesen sein, und beim
+   * Wiederherstellen gilt die Bestätigung weiter — zwei Sachverhalte auf einen
+   * Wahrheitswert zu legen verlöre genau diese Unterscheidung.
+   *
+   * `admin_get_profile` liefert die Zeile als `to_jsonb(p)` und trug die beiden
+   * Spalten von Anfang an mit; bis zur Sichtprobe am 24.08. hat sie hier nur
+   * niemand gelesen. Die Seite meldete deshalb für ein GELÖSCHTES Mitglied
+   * „bestätigt" und sonst nichts.
+   */
+  deaktiviert: boolean;
+  geloescht: boolean;
 }
 
 export interface AdminSearchHit {
@@ -128,9 +144,12 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
       legacy_tier: text(l.legacy_tier),
       legacy_price: l.legacy_price == null ? "" : String(l.legacy_price),
       legacy_source_id: text(l.legacy_source_id),
+      payment_type: text(l.payment_type),
     },
     loginEmail: text(paket.login_email),
     activated: p.activated_at != null,
+    deaktiviert: p.disabled_at != null,
+    geloescht: p.deleted_at != null,
   };
 }
 
@@ -190,6 +209,7 @@ export async function saveAdminProfile(
     legacy_tier: leerZuNull(legacy.legacy_tier),
     legacy_price: preis,
     legacy_source_id: leerZuNull(legacy.legacy_source_id),
+    payment_type: leerZuNull(legacy.payment_type),
   };
 
   // `patch` ist ein jsonb-Argument; der generierte Typ ist `Json`, und ein

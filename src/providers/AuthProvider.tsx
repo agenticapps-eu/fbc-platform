@@ -40,6 +40,8 @@ interface LoadedProfile {
   staffRole: string | null;
   /** null = noch unbekannt (Fehler/ausstehend). Siehe auth-context. */
   isActivated: boolean | null;
+  /** true, wenn dem Konto der Zugang entzogen wurde (AGE-581). Siehe auth-context. */
+  isBlocked: boolean;
   /** true nur in der endgültigen Aufgeben-Lage nach drei Fehlversuchen. Siehe auth-context. */
   activationLookupFailed: boolean;
   activationName: string | null;
@@ -146,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           levelRank: profileRes.data?.membership_tiers?.level_rank ?? null,
           staffRole: staffRes.data?.role ?? null,
           isActivated: aktivierung.activated,
+          isBlocked: aktivierung.blocked,
           activationLookupFailed: false,
           activationName: aktivierung.displayName,
         });
@@ -178,6 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         levelRank: null,
         staffRole: null,
         isActivated: null,
+        // Nicht `true`: „wir wissen es nicht" darf kein Konto aussperren. Der
+        // Gate-Guard wartet hier ohnehin an `isActivated === null`, und die
+        // Datenbank hält die Sperre unabhängig von dieser Zeile.
+        isBlocked: false,
         activationLookupFailed: true,
         activationName: null,
       });
@@ -197,10 +204,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Ausgeloggt gibt es nichts zu aktivieren; eingeloggt und noch nicht geladen
   // ist `null` = unbekannt, und der Gate-Guard wartet darauf.
   const isActivated = !userId ? true : profileLoaded ? profile.isActivated : null;
+  // Ausgeloggt gibt es nichts zu sperren, und solange nichts geladen ist, hält
+  // schon `isActivated === null` die Wand geschlossen.
+  const isBlocked = !!userId && profileLoaded && profile.isBlocked;
   // Der Versandstatus zählt nur für das Konto, für das er erhoben wurde.
-  const activationMailStatus = mailStatus && mailStatus.userId === userId ? mailStatus.status : null;
-  const activationLookupFailed =
-    userId && profileLoaded ? profile.activationLookupFailed : false;
+  const activationMailStatus =
+    mailStatus && mailStatus.userId === userId ? mailStatus.status : null;
+  const activationLookupFailed = userId && profileLoaded ? profile.activationLookupFailed : false;
   const activationName = userId && profileLoaded ? profile.activationName : null;
   // isLoading = nur Session-Bereitschaft (für RequireAuth/LoginPage, die nur
   // `user` brauchen). Die Stufen-Bereitschaft ist separat (tierLoading).
@@ -217,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       tierLoading,
       isActivated,
+      isBlocked,
       activationLookupFailed,
       activationName,
       activationMailStatus,
@@ -276,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       tierLoading,
       isActivated,
+      isBlocked,
       activationLookupFailed,
       activationName,
       activationMailStatus,

@@ -122,6 +122,12 @@ jobs:
       # directory_search_test.sql (AGE-494) prüft die dritte Frage: WELCHE FELDER
       # die Verzeichnis-RPC preisgibt. Die Kompass-Kategorien sagen jetzt, was
       # jemand sucht — nicht mehr nur, dass er sucht.
+      #
+      # Die beiden member_lifecycle-Dateien kamen am 24.08. dazu — sie standen
+      # seit dem 23.08. als vollwertiges pgTAP im Repo (plan()/finish(), 46k
+      # zusammen) und liefen KEIN EINZIGES MAL in CI, weil niemand sie in diese
+      # Zeile eingetragen hatte. Genau der Fall, vor dem der Absatz darüber
+      # warnt. Gefunden bei der Diff-Prüfung zu AGE-581.
       - name: Verify the grant + RLS rights matrix (pgTAP)
         run: >
           supabase test db
@@ -129,6 +135,8 @@ jobs:
           supabase/tests/rls_test.sql
           supabase/tests/directory_search_test.sql
           supabase/tests/admin_member_list_test.sql
+          supabase/tests/member_lifecycle_test.sql
+          supabase/tests/member_lifecycle_rpc_test.sql
 
   # Enforce a Conventional-Commit-style PR title (the squash-merge commit subject).
   pr-title:

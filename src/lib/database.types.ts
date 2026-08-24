@@ -1557,7 +1557,12 @@ export type Database = {
       is_activated: { Args: never; Returns: boolean };
       my_activation_state: {
         Args: never;
-        Returns: { activated: boolean; display_name: string | null }[];
+        /** `blocked` seit AGE-581: wahr bei deaktiviert ODER geloescht. Ein
+         *  Wahrheitswert und kein Zustandswort — welche der beiden Handlungen
+         *  ein Admin vorgenommen hat, geht den Betroffenen so wenig an wie
+         *  einen Leser des Feeds. `activated` behaelt seine Bedeutung („hat je
+         *  bestaetigt") und wird davon NICHT umgedeutet. */
+        Returns: { activated: boolean; blocked: boolean; display_name: string | null }[];
       };
       // Admin-Bearbeitung fremder Profile (AGE-498), aus
       // 20260811090300_admin_profile_functions.sql. Von Hand gepflegt wie der
@@ -1589,8 +1594,11 @@ export type Database = {
           /** Sucht in `name` UND `login_email`, ohne Ruecksicht auf die
            *  Schreibung. Leer und null filtern nicht; Jokerzeichen sind Text. */
           p_query?: string | null;
-          /** `alle` | `aktiviert` | `offen`. null wirkt wie `alle`; jeder andere
-           *  Wert bricht mit 22023 ab, statt still alles zu zeigen. */
+          /** `alle` | `aktiviert` | `offen` | `deaktiviert` | `geloescht`
+           *  (AGE-581). null wirkt wie `alle`; jeder andere Wert bricht mit
+           *  22023 ab, statt still alles zu zeigen. Die ersten drei schliessen
+           *  Deaktivierte und Geloeschte AUS — sie beantworten Fragen ueber die
+           *  Mitgliedschaft, nicht ueber den Tabelleninhalt. */
           p_status?: string | null;
           p_limit?: number | null;
           p_offset?: number | null;
@@ -1617,6 +1625,20 @@ export type Database = {
            *  statt ihn zu erraten. */
           bestaetigt: boolean;
           member_since: string | null;
+          /** Zeitpunkte, keine Wahrheitswerte (AGE-581): die Flaeche soll sagen
+           *  koennen, SEIT WANN. Beide null heisst unversehrt. */
+          deaktiviert_seit: string | null;
+          geloescht_seit: string | null;
+          /** Aus `profile_legacy`, ueber einen LEFT JOIN — ein Mitglied ohne
+           *  Altdatenzeile faellt nicht aus der Liste, es traegt hier null. */
+          paid_until: string | null;
+          payment_type: string | null;
+          /** Steht ein GoTrue-Ban in der ZUKUNFT? (AGE-581) Die einzige Auskunft
+           *  der Flaeche ueber `banned_until`. Das Zeilenmenue braucht sie, um
+           *  den Nachsetz-Weg fuer einen fehlenden Ban anzubieten: eine
+           *  deaktivierte Zeile OHNE Ban ist ein halber Zustand und sieht sonst
+           *  aus wie jede andere. Ein ABGELAUFENER Ban zaehlt nicht. */
+          gebannt: boolean;
         }[];
       };
       /** Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach
@@ -1695,6 +1717,27 @@ export type Database = {
           post_id: string;
           like_count: number;
           comment_count: number;
+        }[];
+      };
+      // Von Hand nachgetragen, wie die Nachbarn (AGE-358). Spiegelt
+      // former_member_entries(uuid[], uuid[]) aus
+      // 20260823160000_former_member_entries.sql (AGE-581).
+      former_member_entries: {
+        Args: {
+          /** BEITRAGS-IDs, keine Profil-IDs — die Funktion loest den Urheber
+           *  selbst auf und prueft dabei dieselbe Sichtbarkeit wie fuer den
+           *  Beitrag. Mit Profil-IDs waere sie ein Weg, den Bestand nach
+           *  Entfernten durchzufragen. */
+          p_post_ids?: string[];
+          p_comment_ids?: string[];
+        };
+        Returns: {
+          /** `post` oder `comment`. */
+          kind: string;
+          entry_id: string;
+          /** Deaktiviert ODER geloescht — welche der beiden Handlungen ein
+           *  Admin vorgenommen hat, gibt sie bewusst NICHT preis. */
+          former: boolean;
         }[];
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-245). Mirrors the

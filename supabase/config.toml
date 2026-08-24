@@ -526,6 +526,21 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 
+# admin-set-member-ban (AGE-581): die ZWEITE Haelfte der Sperre. `disabled_at`
+# allein haelt eine bestehende Sitzung nicht auf und hindert niemanden am
+# Anmelden; `auth.users.banned_until` tut beides. Diese Function ist der
+# EINZIGE Eingang zu den vier Lebenszyklus-RPCs — deren EXECUTE liegt bei
+# service_role und nicht bei authenticated, damit ein Admin die Doppelsperre
+# nicht halbieren kann, indem er die Datenbankfunktion direkt ruft.
+#
+# verify_jwt = true wie bei admin-change-email und aus demselben Grund: das
+# Gateway prueft das ES256-Token, der Handler liest `sub` aus genau diesem
+# geprueften Token, und die Admin-Eigenschaft wird serverseitig ueber
+# is_admin_uid geprueft — nie aus dem Rumpf des Aufrufs.
+[functions.admin-set-member-ban]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

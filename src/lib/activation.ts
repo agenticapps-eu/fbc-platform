@@ -49,6 +49,15 @@ export type ResendStatus =
 
 export interface ActivationState {
   activated: boolean;
+  /**
+   * Dem Konto wurde der Zugang entzogen — deaktiviert oder gelöscht (AGE-581).
+   *
+   * Steht NEBEN `activated` und nicht darin: ein gesperrtes, zuvor bestätigtes
+   * Konto trägt beides als `true`. `activated` heißt weiter „hat je bestätigt",
+   * sonst hinge an einem Feld zweierlei und die Oberfläche könnte „muss noch
+   * bestätigen" nicht von „darf nicht mehr" unterscheiden.
+   */
+  blocked: boolean;
   displayName: string | null;
 }
 
@@ -56,8 +65,8 @@ export interface ActivationState {
  * Der Aktivierungszustand des eingeloggten Kontos.
  *
  * Über die RPC `my_activation_state()`, NICHT über die Profilzeile: die ist
- * nach dem Gate auch für den Eigentümer gesperrt. Die RPC gibt genau ein
- * Boolean und einen Anzeigenamen zurück — die kleinste Fläche, die den
+ * nach dem Gate auch für den Eigentümer gesperrt. Die RPC gibt genau zwei
+ * Booleans und einen Anzeigenamen zurück — die kleinste Fläche, die den
  * Bildschirm trägt.
  *
  * Wirft bei einem Fehler, statt `false` zu liefern: Der Aufrufer muss „noch
@@ -70,6 +79,7 @@ export async function fetchActivationState(): Promise<ActivationState> {
   const row = Array.isArray(data) ? data[0] : data;
   return {
     activated: !!row?.activated,
+    blocked: !!row?.blocked,
     displayName: row?.display_name ?? null,
   };
 }

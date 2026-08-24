@@ -63,6 +63,22 @@ describe("fetchAdminProfile", () => {
     expect(daten.loginEmail).toBe("login@alt.de");
   });
 
+  it("liest die Zahlungsart mit (AGE-581)", async () => {
+    rpcAntwort = {
+      profile: { name: "Importiert" },
+      contact: null,
+      legacy: { paid_until: "2027-06-30", payment_type: "copecart" },
+      login_email: "login@alt.de",
+    };
+
+    const daten = await fetchAdminProfile(ZIEL);
+
+    // `admin_get_profile` gibt die Altdatenzeile als `to_jsonb(l)` zurück und
+    // zählt keine Spalten auf — die neue Spalte kommt also schon an. Was
+    // fehlte, war allein der Weg ins Formular.
+    expect(daten.legacy.payment_type).toBe("copecart");
+  });
+
   it("verträgt ein Profil ohne Kontakt- und Altdatenzeile", async () => {
     rpcAntwort = { profile: { name: "Nackt" }, contact: null, legacy: null, login_email: "a@b.de" };
 
@@ -70,6 +86,10 @@ describe("fetchAdminProfile", () => {
 
     expect(daten.form.contact.email).toBe("");
     expect(daten.legacy.paid_until).toBe("");
+    // Leerer Text, nicht `undefined`: das Auswahlfeld ist kontrolliert, und ein
+    // `undefined` machte daraus ein unkontrolliertes — React meldet das als
+    // Warnung und der erste Tastendruck verlöre den Wert.
+    expect(daten.legacy.payment_type).toBe("");
   });
 });
 
@@ -109,7 +129,7 @@ describe("saveAdminProfile", () => {
       paid_until: "2027-06-30",
       legacy_tier: "Premium",
       legacy_price: "1200",
-      legacy_source_id: "wp-4711",
+      legacy_source_id: "wp-4711", payment_type: "",
     });
 
     expect(rpcCalls).toHaveLength(1);
@@ -122,7 +142,7 @@ describe("saveAdminProfile", () => {
       paid_until: "2027-06-30",
       legacy_tier: "",
       legacy_price: "1200.50",
-      legacy_source_id: "",
+      legacy_source_id: "", payment_type: "",
     });
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
@@ -136,7 +156,7 @@ describe("saveAdminProfile", () => {
       paid_until: "",
       legacy_tier: "",
       legacy_price: "",
-      legacy_source_id: "",
+      legacy_source_id: "", payment_type: "",
     });
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
@@ -145,13 +165,40 @@ describe("saveAdminProfile", () => {
     expect(patch.email).toBeNull();
   });
 
+  it("schickt die Zahlungsart mit und macht aus der leeren null (AGE-581)", async () => {
+    await saveAdminProfile(ZIEL, form, {
+      paid_until: "",
+      legacy_tier: "",
+      legacy_price: "",
+      legacy_source_id: "",
+      payment_type: "stripe",
+    });
+
+    const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(patch.payment_type).toBe("stripe");
+
+    // Und die Gegenprobe: leer heisst „nicht erfasst", also `null`. Ein `""`
+    // verletzte die `check`-Bedingung auf `profile_legacy.payment_type`, die
+    // nur die acht Werte und `null` zulässt.
+    rpcCalls.length = 0;
+    await saveAdminProfile(ZIEL, form, {
+      paid_until: "",
+      legacy_tier: "",
+      legacy_price: "",
+      legacy_source_id: "",
+      payment_type: "",
+    });
+    const leer = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
+    expect(leer.payment_type).toBeNull();
+  });
+
   // Aus dem Review auf dem Diff: der Editor zeigt die Videos, der Patch trug
   // sie nicht — Speichern meldete Erfolg und verwarf die Änderung.
   it("schickt die Videos mit, die das Formular anbietet", async () => {
     await saveAdminProfile(
       ZIEL,
       { ...form, videos: ["https://youtu.be/abc"] },
-      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
+      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "", payment_type: "" },
     );
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
@@ -167,7 +214,7 @@ describe("saveAdminProfile", () => {
         paid_until: "",
         legacy_tier: "",
         legacy_price: "zwölfhundert",
-        legacy_source_id: "",
+        legacy_source_id: "", payment_type: "",
       }),
     ).rejects.toThrow(/Betrag/i);
 
@@ -193,7 +240,7 @@ describe("saveAdminProfile", () => {
           country: "DE",
         },
       },
-      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "" },
+      { paid_until: "", legacy_tier: "", legacy_price: "", legacy_source_id: "", payment_type: "" },
     );
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
@@ -210,7 +257,7 @@ describe("saveAdminProfile", () => {
       paid_until: "",
       legacy_tier: "",
       legacy_price: "",
-      legacy_source_id: "",
+      legacy_source_id: "", payment_type: "",
     });
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;
@@ -223,7 +270,7 @@ describe("saveAdminProfile", () => {
       paid_until: "",
       legacy_tier: "",
       legacy_price: "",
-      legacy_source_id: "",
+      legacy_source_id: "", payment_type: "",
     });
 
     const patch = (rpcCalls[0].args as { patch: Record<string, unknown> }).patch;

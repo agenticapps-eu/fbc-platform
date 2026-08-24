@@ -26,6 +26,12 @@ export interface AuthorIdentity {
   id: string;
   name: string;
   avatarUrl?: string | null;
+  /**
+   * Der Urheber ist kein Mitglied mehr (AGE-581). Gesetzt wird das Feld im
+   * Lesepfad (`feed.ts`, `former_member_entries`), nicht hier — diese Ebene
+   * entscheidet nur, wie es AUSSIEHT.
+   */
+  former?: boolean;
 }
 
 export interface DisplayedAuthor {
@@ -37,6 +43,18 @@ export interface DisplayedAuthor {
 export function displayAuthor(author: AuthorIdentity, isLoggedIn: boolean): DisplayedAuthor {
   if (!isLoggedIn) {
     return { name: "Ein Mitglied", avatarUrl: null, masked: true };
+  }
+  // Entfernte Urheber tragen `masked`, und das ist hier kein Beiwort, sondern
+  // die Zusage selbst (AGE-581, 10.3): die Karte hängt Profilverweis, Bild und
+  // Stufenplakette AN DIESEM WAHRHEITSWERT auf — ein maskierter Autor bekommt
+  // ein `<span>` statt eines `<Link to={`/p/${id}`}>`. Ein Verweis auf ein
+  // Profil, das es nicht mehr gibt, wäre ein Link ins Leere.
+  //
+  // Der TEXT kommt aus `author.name` und wird hier NICHT wiederholt: der
+  // Lesepfad hat ihn schon auf „Ehemaliges Mitglied" gesetzt. Zwei Stellen mit
+  // derselben Zeichenkette laufen auseinander, sobald eine geändert wird.
+  if (author.former) {
+    return { name: author.name, avatarUrl: null, masked: true };
   }
   return { name: author.name, avatarUrl: author.avatarUrl ?? null, masked: false };
 }

@@ -1,115 +1,108 @@
-# Session Handoff — 2026-08-20 (sechste Sitzung)
+# Session Handoff — 2026-08-24 (fünfzehnte Sitzung)
 
-**AGE-576 ist fertig und liegt als PR #194.** Gruppe 6 vollständig, der Change
-ist archiviert. Der Diff-Review hat vier echte Löcher gefunden — alle behoben,
-alle gemessen.
+**Die Live-Seite liest seit heute PROD.** Dazu AGE-581 Abschnitt 10 gebaut,
+Abnahme 11.1–11.4 belegt, Branch gepusht (**PR #201**), und AGE-582 für den
+Aktivitäts-Ausbau angelegt. 62 von 76 Aufgaben. 1425 Vitest, 601 pgTAP.
 
 ## Accomplished
 
-**5.5 auf der ausgelieferten Fläche** (`7cd2de1`). Der einzige Teil des
-Spiegels, den noch niemand angesehen hatte. `fbc-platform.pages.dev` liest gegen
-DEV — im Bundle nachgelesen, nicht aus der Konfiguration geschlossen.
-Verzeichnis 36 Mitglieder, Profile vollständig, Aktivität mit echten
-Autorennamen, 7 kommende Events mit Anmeldezahlen, Admin-Liste mit Paging,
-**Konsole über alle Seiten leer**. Dafür trug `vorschau@fbc.invalid` (TLD
-existiert nicht) kurz ein Wegwerf-Passwort; zurückgenommen und dreiteilig belegt
-(1/72 → 0/72 und „Invalid login credentials" an der Fläche).
+**Umschaltung PROD-UI → PROD-DB, vollzogen und belegt.** Zwei Werte in Infisical
+`prod` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) auf
+`viwntbodrtqxgmqyxluh`, dann `gh run rerun 32645682952`. Alle vier Jobs grün,
+**`drift-gate` inklusive** — es misst jetzt PROD und fand keine Abweichung.
 
-**6.1** — Exit 0, 1326 → nach den Behebungen 1333 Tests, typecheck sauber,
-lint 0 Fehler. **Prettier ist kein Gate**: kein Workflow ruft es auf, und
-`prettier --check .` meldet auf HEAD 139 Bestandsdateien.
+**Abschnitt 10 — „Ehemaliges Mitglied".** Entfernte Urheber im Feed ohne Name,
+Bild und Verweis, unterscheidbar von „Ein Mitglied". Über `former_member_entries`
+mit Beitrags- und Kommentar-IDs, in Blöcken zu 200.
 
-**6.2** (`e8d90fa`). Beide Dokumente nachgezogen, Schritt 0 des Neuaufbau-Plans
-geschlossen (Weg A).
+**Abnahme 11.1–11.4.** 601 pgTAP (sechs Dateien), `openspec validate --all`
+31/31, Lint/Typecheck/Test/Build grün, `grants_test.sql` ohne Nachziehen grün.
 
-**6.3** (`5a9e705`, `4fbafd7`, `6693679`). gemini APPROVE, codex
-REQUEST-CHANGES mit 10 Befunden. **Keiner übernommen, alle zehn am Code
-nachgeprüft.** Vier behoben (Donalds Entscheidung), vier folgenlos, zwei
-Bauform.
-
-**6.4/6.5** (`63bb1b7`). `openspec archive` gelaufen, `validate --all` 31/31.
-PR #194 offen, Linear steht durch die Automation auf In Progress.
+**AGE-582 angelegt** — Aktivität auf Konzeptstand plus Icon-/Farbkanon.
 
 ## Decisions
 
-- **Alle vier tragenden Befunde behoben, nicht nur die billigen.** Donalds
-  Entscheidung. Der schwerste: **4.13 stand am Ende des Laufs** — dazwischen
-  lagen `public.sql`, zwei Prüfschritte, der Drift-Scan und 125 Uploads über das
-  Netz. Jedes `ende()` darin liess DEV mit gültigen PROD-Hashes zurück, bei
-  offener Selbstregistrierung. *Warum das mehr wiegt als ein Ablauffehler:* die
-  Neutralisierung ist einer der zwei Ausgleiche für „keine Anonymisierung".
-- **`dateien` im Manifest ist Pflicht, ohne Toleranzpfad.** *Warum:* ein
-  fehlendes Feld durchzuwinken liesse die Lücke für genau die Auszüge offen, die
-  sie haben. **Folge: der gespeicherte Auszug vom 20.08. ist nicht mehr
-  einspielbar.** Die Prüfsummen nachträglich zu ergänzen wäre unehrlich — sie
-  beschrieben die Datei von heute, nicht die vom Erzeugungszeitpunkt.
-- **Bucket-Vergleich in beide Richtungen.** *Warum:* dieselbe Regel wie beim
-  Migrations-Drift; ein Gate, das nur eine Richtung sieht, ist die Hälfte eines
-  Gates.
-- **Die Demo-Dokumente wurden als historisch gekennzeichnet, nicht angepasst.**
-  *Warum:* eine neue Demo zu erfinden war nicht Aufgabe. Auf DEV nachgezählt:
-  **0** Konten auf `@fbcdemo.com`, **0** auf `@demo.fbc.invalid`, von 72.
-- **Der „drei Werte"-Widerspruch wurde NICHT gefixt.** Die MODIFIED-Anforderung
-  nennt `SUPABASE_DB_PASSWORD` beim Wechsel des Frontend-Routings, das Runbook
-  sagt „zwei Werte, nicht drei". *Warum nicht:* der Fehler steht schon im
-  Hauptspec, ist Bestand und gehört nicht in diesen Diff. **Eigenes Issue wert.**
+- **Der Code folgt dem Delta, nicht umgekehrt** (Donald). Der Rückfall in
+  `authorOf` heisst jetzt „Ein Mitglied" statt „Mitglied". *Warum:* er trifft
+  jemanden, der da ist und sich nur zurückgezogen hat — denselben Sachverhalt,
+  den `displayAuthor` ausgeloggt schon so nennt. Der Rest des Hauses behält
+  `?? "Mitglied"`; die Unterscheidung wird nur im Feed gebraucht.
+- **Der Text steht im Lesepfad, das Maskieren in `displayAuthor`.** *Warum:* die
+  Karte hängt Verweis, Bild und Stufenplakette schon an `masked` auf — 10.3 fällt
+  damit von selbst. Zwei Stellen mit derselben Zeichenkette laufen auseinander.
+- **Bei der Umschaltung nur das Projekt gewechselt, nicht die Schlüsselform.**
+  PROD bietet auch `sb_publishable_…` an; genommen wurde der klassische anon-JWT,
+  den beide Umgebungen tragen. *Warum:* zwei Änderungen gleichzeitig machen einen
+  Fehler ununterscheidbar von seinem Nachbarn.
+- **`database.types.ts` von Hand ergänzt statt neu erzeugt.** *Warum:* die volle
+  Neugenerierung ergab 3659 Zeilen Formatierungsdiff und verlor den
+  `__InternalSupabase`-Block — die lokale CLI ist älter als die, mit der die
+  Datei entstand. Die Nachbarn sind ebenfalls handgepflegt.
+- **AGE-582 statt Anbau an AGE-581** (Donald), Umfragen **drin**. *Warum:* von
+  fünf Punkten ist genau einer reines Layout; „Speichern" und die Zähler brauchen
+  Tabellen und RPCs, Umfragen existieren im Datenmodell gar nicht.
 
 ## Files modified
 
-- `scripts/sync-dev-ruecklauf.ts` — 4.13 hinter den auth-Rücklauf, pgcrypto aus
-  dem Katalog, `pruefeSqlDateien` und `vergleicheBuckets` vor dem Löschen, alle
-  56 Tabellen einzeln nachgezählt
-- `scripts/sync-dev-ruecklauf.logic.ts` — `pruefeSqlDateien`, `vergleicheBuckets`,
-  `Manifest.dateien`
-- `scripts/sync-dev-auszug.ts` / `.logic.ts` — Prüfsummen beider Dumps ins
-  Manifest, `SQL_DATEIEN`
-- `scripts/sync-dev-ruecklauf.test.ts` — 7 neue Tests, alle erst rot
-- `docs/supabase-environments.md` — Abschnitt „Der Spiegel DEV ← PROD"; **vier
-  Bestandsaussagen korrigiert**, die durch den Spiegel falsch geworden waren
-- `docs/prod-neuaufbau-plan.md` — Schritt 0 geschlossen, Schritt 1 auf das
-  Werkzeug, **neuer Schritt 3b** für die Bild-URLs
-- `docs/demo-zugang.md`, `docs/demo-script.md` — HISTORISCH
-- `docs/foundation-acceptance.md`, `docs/w4-acceptance.md` — Nachtrag
-- `openspec/changes/archive/2026-08-20-sync-dev-from-prod/` — archiviert
-- `openspec/specs/environment-sync/` (neu), `deployment-environments/`
+- `src/lib/feed.ts` — `former` am `FeedAuthor`, Rückfall umbenannt,
+  `fetchFormerEntries` (blockweise), beide Lesepfade verdrahtet
+- `src/lib/displayAuthor.ts` — entfernte Urheber tragen `masked`
+- `src/lib/database.types.ts` — `former_member_entries` von Hand ergänzt
+- `src/lib/feed.former-member.test.ts` — **neu**, 6 Zusagen
+- `src/components/community/CommunityFeed.test.tsx` — Komponententest für 10.3
+- `src/lib/anon-anreicherung.test.ts` — Rückfall-Zusage nachgezogen
+- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 10.1–10.5, 11.1–11.4
+- **Ausserhalb des Repos:** Infisical `prod` (zwei Werte), zwei Memory-Dateien
 
 ## Next session: start here
 
-**PR #194, CI-Stand prüfen** — `gh api repos/agenticapps-eu/fbc-platform/commits/<HEAD-SHA>/check-runs`,
-nur die HEAD-SHA zählt. Bei grün mergen (Freigabe steht generell), danach
-`gh pr view 194 --json state` gegenprüfen — `gh pr merge` kann still
-fehlschlagen. Linear schaltet beim Merge selbst auf Done.
+**Erste Handlung: `gh pr checks 201` und die vier Pflichtchecks auf der
+HEAD-SHA ansehen** — nicht `gh run list`, das zeigt grün für alte SHAs.
 
-Der Change hat **keine Migrationen**, also kein `drift-gate`-Problem und kein
-`migrate-prod`.
+Danach **11.5**, der Diff-Review durch einen anderen Anbieter als den, der ihn
+geschrieben hat. Der Diff ist gross: **52 Dateien, 9064 Zeilen**. Codex braucht
+dafür deutlich mehr als die Standard-300 s (Exit 4 heisst „nicht gezählt"), also
+Zeitlimit hochsetzen. Danach 11.6, die Sichtprobe der gesamten Fläche.
 
-Danach ist der PROD-Neuaufbau dran (`docs/prod-neuaufbau-plan.md`, jetzt mit
-geschlossenem Schritt 0 und Schritt 3b). **Erster Handgriff dort ist ein neuer
-Auszug aus PROD** — der alte ist mit diesem Code nicht mehr einspielbar, und
-beides fällt beim Klassifikator, gehört also an Donalds Terminal mit `!`.
+**Vor dem Merge von #201 unbedingt lesen:** der PR bringt **sechs Migrationen**.
+`migrate-dev` wendet sie auf DEV an — **PROD braucht `migrate-prod`**, und seit
+heute misst `drift-gate` PROD. Ohne den Lauf blockiert es **jeden** weiteren
+Deploy, auch einen eiligen Fix. Der erste Merge zahlt. Ausserdem ist
+`admin-set-member-ban` eine **neue** Edge Function; der `functions`-Job liefert
+sie an beide Projekte, aber nur, wenn der Lauf nicht übersprungen wird.
+
+Der lokale Stack läuft, Vite auf `http://localhost:5173`. Lokal liegen
+Sichtprobe-Beiträge (`11111111-…`) und -Kommentare (`22222222-…`) für alle vier
+Autorenfälle; sie sind für 11.6 nützlich. pgTAP **immer mit Dateiliste**.
+**Nie `pnpm format`.**
 
 ## Open questions
 
-- **`avatar_url`/`cover_url` sind absolute PROD-URLs** (56 bzw. 53 Zeilen, keine
-  einzige relativ). Der Spiegel kopiert die 111 Objekte korrekt — dasselbe
-  Objekt liefert auf beiden Seiten 35364 Bytes — sie werden nur nie gelesen. Für
-  Weg (A) folgenlos; unter neuer Kennung zeigen 109 Bild-URLs ins Leere. Steht
-  als Schritt 3b im Plan. **Dauerhaft wäre die Umstellung auf relative Pfade —
-  Anwendungscode, eigenes Issue.**
-- **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** mit
-  PROD-identischem Resend-Zugang. Heute verstellt durch neutralisierte Hashes und
-  `contact_requests = 0`, aber die Selbstregistrierung ist offen. Rücknahmeliste
-  vor Go-Live.
-- **Zwei Befunde bewusst offen** (`REVIEWS.md`): eine deklarierte Abweichung
-  entschuldigt die **ganze** Tabelle, und Katalognamen wie `a"b` werden nicht als
-  SQL-Identifier quotiert.
-- **`socials` ist auf keiner öffentlichen Fläche sichtbar** — 34 Profile tragen
-  Netzwerke, `profiles_public` führt die Spalte nicht. Bestandscode.
-- **4.7 ist nur zu einem Drittel gemessen** — die Post- und
-  Benachrichtigungshälften liefen leer (`contact_requests = 0`,
-  `notifications = 0`).
-- Unverändert offen: Detlevs Zahlungsliste (AGE-534) · Downgrade (AGE-516) ·
-  `admin_list_feedback()` ohne Paging · AGE-497 · AGE-541 · AGE-512 · AGE-256 ·
-  AGE-513 · AGE-258 · eigenes Issue für `send-activation` (2xx trotz
-  Resend-401) · `demo_personas.sql` scheitert lokal an einem Fremdschlüssel
-  (vorbestehend).
+- **`app.fairbusinessclub.de` hat KEINEN DNS-Eintrag.** Die Adresse steht in der
+  Auth-Freigabeliste von PROD auf Vorrat, ist aber nicht erreichbar (HTTP 000).
+  Wer den Club unter diesem Namen erwartet, braucht DNS **und** die Custom
+  Domain in Cloudflare Pages. Go-Live-Punkt, kein Umschaltfehler.
+- **69 von 71 Mitgliedern auf PROD sind nicht aktiviert.** Nur Donald und Detlev
+  sind bestätigt und haben sich je angemeldet — beide `impact`, beide Admin. Die
+  übrigen 69 kommen erst über den Aktivierungsversand hinein.
+- **PROD verlangt E-Mail-Bestätigung, DEV nicht** (`mailer_autoconfirm` False vs
+  True). Für die 71 importierten Konten folgenlos, sie sind alle bestätigt; es
+  trifft nur Neuanmeldungen — und für die ist **kein eigener SMTP** gesetzt, die
+  Bestätigungsmail liefe über Supabases Standardversand samt dessen Drosselung.
+- **Die Trennung der Function-Secrets bleibt ungemessen.** Der PAT darf
+  `/v1/projects/<ref>/secrets` nicht lesen (403). Der frühere Befund — nur 3 von
+  15 getrennt, Stripe und Resend byte-identisch — ist damit weder bestätigt noch
+  widerlegt. Seit die Seite gegen PROD läuft, ist er teurer geworden.
+- **Auf PROD liegen bereits 4 Beiträge, 1 Kommentar, 1 Event** — echter Inhalt
+  (Sommerfest-Impressionen, „Frankfurt immer eine Reise wert"), kein Testmüll.
+  Das **Onlinetreffen ist am 25.08.**, also morgen.
+- **„EM" als Initialen.** Der zurückgezogene Autor bekommt jetzt „EM" im
+  Bildkreis statt „M" — Nebeneffekt der Umbenennung, liest sich wie die Initialen
+  einer Person. Nicht angefasst, liegt ausserhalb von Abschnitt 10.
+- **Dreimal in dieser Sitzung** hat ein deutsches Schlusszeichen `“` in einem
+  Python- oder JS-String die Zeichenkette beendet. Bei skriptgestützten
+  Ersetzungen mit deutschen Anführungszeichen zeilenweise arbeiten.
+- Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
+  gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
+  `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
+  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging.

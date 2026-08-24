@@ -28,5 +28,16 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },
+  // Die Sondenskripte unter `scripts/` laufen in Node, nicht im Browser. Fuer
+  // die .ts-Dateien dort spielt das keine Rolle — typescript-eslint schaltet
+  // `no-undef` fuer TypeScript ab, weil der Compiler die Frage besser
+  // beantwortet. Eine .mjs-Datei faellt aber unter `js.configs.recommended`,
+  // und dort meldet `no-undef` dann `process` und `console` als undefiniert.
+  // Ohne diesen Block ist `pnpm lint` rot, sobald jemand ein Node-Skript in
+  // JavaScript schreibt (AGE-581, 23.08.).
+  {
+    files: ["**/*.mjs", "**/*.cjs"],
+    languageOptions: { globals: globals.node },
+  },
   prettier,
 );

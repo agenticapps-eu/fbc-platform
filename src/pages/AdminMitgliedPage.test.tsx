@@ -56,9 +56,17 @@ const DATEN: AdminProfileData = {
       country: "DE",
     },
   },
-  legacy: { paid_until: "2027-06-30", legacy_tier: "Premium", legacy_price: "1200", legacy_source_id: "wp-4711" },
+  legacy: {
+    paid_until: "2027-06-30",
+    legacy_tier: "Premium",
+    legacy_price: "1200",
+    legacy_source_id: "wp-4711",
+    payment_type: "copecart",
+  },
   loginEmail: "login@alt.de",
   activated: false,
+  deaktiviert: false,
+  geloescht: false,
 };
 
 beforeEach(() => {
@@ -133,6 +141,27 @@ describe("AdminMitgliedPage (AGE-498)", () => {
     expect(form.contact.street).toBe("Altstr. 3");
   });
 
+  it("zeigt die Zahlungsart und schickt sie im Patch mit (AGE-581)", async () => {
+    renderPage();
+
+    // Vorbelegt aus den geladenen Altdaten — und zwar NACH dem Aufbau: die
+    // Daten kommen aus einer Abfrage, ein `useState(wert)` beim ersten Zeichnen
+    // nähme sie nie an. Genau diese Zeitachse prüft das `findBy`.
+    const feld = await screen.findByLabelText("Zahlungsart");
+    expect(feld).toHaveValue("copecart");
+
+    fireEvent.change(feld, { target: { value: "rechnung" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(saveAdminProfile).toHaveBeenCalled());
+    const [, , legacy] = vi.mocked(saveAdminProfile).mock.calls[0];
+    expect(legacy.payment_type).toBe("rechnung");
+    // Die Gegenprobe: die Nachbarfelder reisen unverändert mit, statt vom
+    // Auswahlfeld überschrieben zu werden.
+    expect(legacy.paid_until).toBe("2027-06-30");
+    expect(legacy.legacy_source_id).toBe("wp-4711");
+  });
+
   it("speichert über saveAdminProfile", async () => {
     renderPage();
     const name = await screen.findByDisplayValue("Importiert");
@@ -165,5 +194,66 @@ describe("AdminMitgliedPage (AGE-498)", () => {
 
     expect(await screen.findByText(/Sitzungen/i)).toBeInTheDocument();
     expect(screen.queryByText(/fehlgeschlagen/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("Die Kopfzeile nennt den Lebenszyklus (Sichtprobe 11.6)", () => {
+  /**
+   * Gefunden im Browser, nicht von einem Test: über einem GELÖSCHTEN Mitglied
+   * stand „bestätigt" und darunter ein voll bearbeitbares Formular. Die Zeile
+   * las allein `activated`; `admin_get_profile` liefert die Profilzeile als
+   * `to_jsonb(p)` und trug `disabled_at`/`deleted_at` die ganze Zeit mit — sie
+   * wurden nur nie gelesen.
+   */
+  it("meldet ein gelöschtes Mitglied als gelöscht, nicht als bestätigt", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      geloescht: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/gelöscht —/)).toBeInTheDocument();
+    // Der Kern der Zusage: NICHT bloss „gelöscht steht da", sondern dass das
+    // gegenteilige Wort weg ist. Ein gelöschtes Mitglied KANN vorher bestätigt
+    // gewesen sein — genau deshalb stand hier vorher das Falsche.
+    expect(screen.queryByText("bestätigt")).toBeNull();
+  });
+
+  it("meldet ein deaktiviertes Mitglied als deaktiviert", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      deaktiviert: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/deaktiviert —/)).toBeInTheDocument();
+    expect(screen.queryByText("bestätigt")).toBeNull();
+  });
+
+  /** Gelöscht schlägt deaktiviert — dieselbe Rangfolge wie in der Liste. */
+  it("nennt bei beiden Merkmalen die Löschung", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({
+      ...DATEN,
+      activated: true,
+      deaktiviert: true,
+      geloescht: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/gelöscht —/)).toBeInTheDocument();
+    expect(screen.queryByText(/deaktiviert —/)).toBeNull();
+  });
+
+  it("lässt die beiden bisherigen Fälle unberührt", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, activated: true });
+    const { unmount } = renderPage();
+    expect(await screen.findByText("bestätigt")).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, activated: false });
+    renderPage();
+    expect(await screen.findByText(/nicht bestätigt —/)).toBeInTheDocument();
   });
 });

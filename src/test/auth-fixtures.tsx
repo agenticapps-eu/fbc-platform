@@ -22,6 +22,9 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     // Aktivierungs-Gate und sollen nicht daran hängenbleiben. Wer das Gate
     // prüft, setzt isActivated ausdrücklich (AGE-495).
     isActivated: true,
+    // Vorgabe „nicht gesperrt", aus demselben Grund wie isActivated oben: wer
+    // die Sperre prüft, setzt sie ausdrücklich (AGE-581).
+    isBlocked: false,
     activationLookupFailed: false,
     activationName: null,
     activationMailStatus: null,

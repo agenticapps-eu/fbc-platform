@@ -21,7 +21,7 @@ import { Card, CardDescription, CardTitle } from "./ui/Card";
  * stehengelassen hat, und um die `AppShell`-Routen.
  */
 export default function ActivationGate({ children }: { children: ReactNode }) {
-  const { user, isLoading, isActivated, activationLookupFailed } = useAuth();
+  const { user, isLoading, isActivated, isBlocked, activationLookupFailed } = useAuth();
 
   // Session noch nicht aufgelöst: nichts entscheiden (kein Flackern beim Reload).
   if (isLoading) return null;
@@ -40,9 +40,56 @@ export default function ActivationGate({ children }: { children: ReactNode }) {
     return activationLookupFailed ? <ActivationLookupError /> : null;
   }
 
+  // Die Sperre steht VOR der Aktivierungswand und unabhängig von ihr (AGE-581).
+  //
+  // Vor ihr, weil ein gesperrtes Konto, das nie bestätigt hat, sonst den
+  // Aktivierungsbildschirm sähe — mit dem Angebot, sich einen Zugangslink
+  // schicken zu lassen, für einen Zugang, den es nicht mehr gibt.
+  //
+  // Unabhängig von ihr, weil `isActivated` seine Bedeutung behält („hat je
+  // bestätigt") und von der Sperre nicht umgedeutet wird. Ein gesperrtes,
+  // zuvor bestätigtes Konto trägt beides als `true` und käme ohne diese Zeile
+  // durch die Wand — auf lauter leere Seiten, weil die RLS ihm überall nichts
+  // liefert. Ein leerer Verein sieht aus wie ein Defekt, nicht wie eine
+  // Entscheidung.
+  if (isBlocked) return <BlockedNotice />;
+
   if (!isActivated) return <ActivationScreen />;
 
   return <>{children}</>;
+}
+
+/**
+ * Der Sperrhinweis. Ein Bildschirm für beide Fälle — deaktiviert und gelöscht.
+ *
+ * Er nennt den Grund NICHT und unterscheidet die beiden Handlungen nicht: das
+ * ist dieselbe Entscheidung, die in der Datenbank aus zwei Zuständen einen
+ * Wahrheitswert `blocked` gemacht hat. Welche Handlung ein Admin vorgenommen
+ * hat, geht den Betroffenen so wenig an wie einen Leser des Feeds — und wäre
+ * hier obendrein eine Auskunft, die niemand geprüft hat.
+ *
+ * Kein Knopf für einen Zugangslink: der Zugang ist entzogen, nicht unbestätigt.
+ * Ein Link, der nichts aufschliesst, wäre die zweite Enttäuschung nach der
+ * ersten. Was bleibt, ist der Weg nach draussen und die Anschrift des Vereins.
+ */
+function BlockedNotice() {
+  const { signOut } = useAuth();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-soft px-6">
+      <Card className="w-full max-w-md text-center">
+        <CardTitle>Zugang gesperrt</CardTitle>
+        <CardDescription>
+          Für dieses Konto ist der Zugang zum Fair Business Club derzeit nicht freigeschaltet. Wenn
+          du glaubst, dass das ein Irrtum ist, wende dich bitte an den Verein.
+        </CardDescription>
+        <div className="mt-6 flex justify-center">
+          <Button variant="primary" onClick={() => void signOut()}>
+            Abmelden
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 /** Aufgeben-Lage von ActivationGate: die Prüfung ist nach drei Versuchen

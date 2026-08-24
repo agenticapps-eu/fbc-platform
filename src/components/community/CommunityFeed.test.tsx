@@ -142,3 +142,74 @@ describe("CommunityFeed — ältere Beiträge sind erreichbar", () => {
     expect(screen.queryByRole("button", { name: /ältere beiträge/i })).toBeNull();
   });
 });
+
+/**
+ * „Ehemaliges Mitglied" — der entfernte Urheber trägt keinen Verweis
+ * (AGE-581, Aufgabe 10.3).
+ *
+ * ── WARUM DIESER TEST NEBEN DEM IN `feed.former-member.test.ts` STEHT ───────
+ * Jener prüft die DATENSCHICHT: dass der Lesepfad die Auskunft holt und den
+ * Autor umbenennt. Er wäre auch dann grün, wenn die Karte den Namen brav
+ * anzeigte UND ihn weiterhin nach `/p/:id` verlinkte — die Zusage „ohne
+ * Verweis auf ein Profil, das nicht mehr erreichbar ist" hängt an gerendertem
+ * Markup, nicht an einem Wahrheitswert. Deshalb hier, an einem `<a>`.
+ *
+ * Eingeloggt gerendert, und das ist tragend: ausgeloggt maskiert
+ * `displayAuthor` ohnehin jeden Autor, der Test wäre vorher wie nachher grün
+ * und bewiese nichts.
+ */
+describe("CommunityFeed — ein entferntes Mitglied bekommt keinen Verweis", () => {
+  function renderAngemeldet(posts: FeedPost[]) {
+    vi.mocked(fetchFeed).mockResolvedValue({ posts, nextCursor: null });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <AuthFixture
+        value={fakeAuthValue({ user: { id: "ich" } as never, tier: "impact", levelRank: 6 })}
+      >
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <MemoryRouter>
+              <CommunityFeed />
+            </MemoryRouter>
+          </ToastProvider>
+        </QueryClientProvider>
+      </AuthFixture>,
+    );
+  }
+
+  it("zeigt „Ehemaliges Mitglied“ ohne Link, während ein anwesender Autor seinen behält", async () => {
+    // BEIDE Autoren in einem Test, aus demselben Grund wie in der
+    // Datenschicht: eine Zusicherung „kein Link" allein ginge auch dann durch,
+    // wenn die Karte GAR KEINE Autorenlinks mehr rendert.
+    renderAngemeldet([
+      post({
+        id: "p-da",
+        author: { id: "a1", name: "Detlev Meier", avatarUrl: null, tier: "impact" },
+      }),
+      post({
+        id: "p-weg",
+        body: "Beitrag eines entfernten Mitglieds — der Faden bleibt lesbar.",
+        author: {
+          id: "a2",
+          name: "Ehemaliges Mitglied",
+          avatarUrl: null,
+          tier: null,
+          former: true,
+        },
+      }),
+    ]);
+
+    const anwesend = await screen.findByText("Detlev Meier");
+    expect(anwesend.closest("a")).not.toBeNull();
+    expect(anwesend.closest("a")).toHaveAttribute("href", "/p/a1");
+
+    const entfernt = await screen.findByText("Ehemaliges Mitglied");
+    expect(entfernt.closest("a")).toBeNull();
+    // Und kein Verweis auf dieses Profil an anderer Stelle der Karte — das
+    // Bild ist im selben Kopf und wäre der zweite Weg dorthin.
+    expect(document.querySelector('a[href="/p/a2"]')).toBeNull();
+
+    // Der Beitrag selbst bleibt stehen: nur der Name geht, nicht der Text.
+    expect(screen.getByText(/der Faden bleibt lesbar/)).toBeInTheDocument();
+  });
+});

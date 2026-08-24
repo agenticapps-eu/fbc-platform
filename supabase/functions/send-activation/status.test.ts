@@ -3,15 +3,20 @@ import { assertEquals } from "jsr:@std/assert@1";
 import { versandArt } from "./status.ts";
 
 // Die Liste stammt aus dem `comment on function` von issue_activation_token
-// (20260807200000): unknown | rate_limited | pending | rate_limited_day |
-// issued | issued_reset. Wer dort einen Status hinzufügt, muss hier vorbei.
+// (zuletzt 20260824120000): unknown | blocked | rate_limited | pending |
+// rate_limited_day | issued | issued_reset. Wer dort einen Status hinzufügt,
+// muss hier vorbei.
 Deno.test("die beiden Erfolgsfälle werden auseinandergehalten", () => {
   assertEquals(versandArt("issued"), "aktivierung");
   assertEquals(versandArt("issued_reset"), "reset");
 });
 
-Deno.test("die vier stillen Ausgänge senden nichts und sind trotzdem erwartet", () => {
+Deno.test("die fünf stillen Ausgänge senden nichts und sind trotzdem erwartet", () => {
   assertEquals(versandArt("unknown"), "kein_versand");
+  // AGE-581: ein entferntes Konto bekommt keinen Link, und der Ausgang muss
+  // von "unknown" ununterscheidbar bleiben -- sonst waere der Statuscode ein
+  // Orakel dafuer, welche Adresse zu einem gesperrten Mitglied gehoert.
+  assertEquals(versandArt("blocked"), "kein_versand");
   assertEquals(versandArt("rate_limited"), "kein_versand");
   assertEquals(versandArt("pending"), "kein_versand");
   assertEquals(versandArt("rate_limited_day"), "kein_versand");
