@@ -106,6 +106,23 @@ const GLYPHS = {
       <path d="M7.5 17.5 8.6 20a1.2 1.2 0 0 0 2.3-.4v-1.4" />
     </>
   ),
+  /** Nachrichten als Gegenstandsbereich — die Sprechblase `comment` gehört
+   *  schon der Aktivität, und zwei Bereiche mit demselben Glyph wären genau die
+   *  Verwechslung, gegen die der Kanon existiert. */
+  mail: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.6 7.2 8.4 5.9 8.4-5.9" />
+    </>
+  ),
+  /** Highlights. Bewusst NICHT der Stern aus `membership` und nicht die Krone:
+   *  beide bezeichnen eine Mitgliedsstufe, nicht einen Bereich. */
+  sparkle: (
+    <>
+      <path d="M12 3.2 13.8 9.2 19.8 11 13.8 12.8 12 18.8 10.2 12.8 4.2 11 10.2 9.2z" />
+      <path d="M18.5 3.5 19.2 5.8 21.5 6.5 19.2 7.2 18.5 9.5 17.8 7.2 15.5 6.5 17.8 5.8z" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />
