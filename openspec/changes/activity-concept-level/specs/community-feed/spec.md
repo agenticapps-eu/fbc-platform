@@ -32,6 +32,12 @@ ausschließlich **eigene** Zeilen zum Lesen, Anlegen und Löschen freigeben; wer
 etwas gespeichert hat, SHALL für niemanden sonst sichtbar sein — auch nicht für
 den Autor des Beitrags und auch nicht als Zahl.
 
+Alle drei Policies SHALL zusätzlich `is_activated()` verlangen. Jede andere
+Feed-Interaktion ist serverseitig so gegatet — `posts_write_own`,
+`likes_write_own` und `post_media_insert_own` tragen es alle. Ohne dieses
+Prädikat dürfte ein nie bestätigtes oder deaktiviertes Konto weiter speichern,
+lesen und löschen, während ihm alles andere verwehrt ist.
+
 Die Rechte der Tabelle SHALL in der Migration ausgesprochen werden. Neue Tabellen
 erben in diesem Projekt keine Rechte, und der Golden-Snapshot in
 `grants_test.sql` SHALL im selben Zug mitgepflegt werden.
@@ -57,6 +63,39 @@ zweimaliges Speichern desselben Beitrags SHALL keine zweite Zeile erzeugen.
 - **WHEN** ein Mitglied einen Beitrag speichert und ihn danach wieder löst
 - **THEN** erscheint er im Reiter „Gespeichert" und verschwindet dort wieder,
   ohne dass die Seite neu geladen werden muss
+
+#### Scenario: Ein unbestätigtes Konto speichert nicht
+
+- **WHEN** ein angemeldetes, aber nicht bestätigtes oder ein deaktiviertes Konto
+  eine Zeile in `post_saves` anzulegen, zu lesen oder zu löschen versucht
+- **THEN** wird es abgewiesen, wie bei jeder anderen Feed-Interaktion auch
+
+### Requirement: Die Beitragskarte weiß, ob sie gespeichert ist
+
+Das System SHALL zu jedem Beitrag einer geladenen Seite mitliefern, ob der
+Betrachter ihn gespeichert hat, und zwar **gebündelt** über die IDs der Seite —
+nicht je Karte einzeln. Ohne das kennt die Karte in den Reitern „Alle Beiträge"
+und „Beiträge von mir" ihren eigenen Zustand nicht und müsste ihn raten.
+
+Der Lesepfad SHALL unter der RLS von `post_saves` laufen und deshalb ohnehin nur
+eigene Zeilen zurückgeben; ein Filter im Client SHALL NOT die Grenze sein.
+
+Speichern und Lösen SHALL den Zustand der Karte **und** den Reiter
+„Gespeichert" gemeinsam fortschreiben — sonst zeigt die eine Fläche einen
+Zustand, den die andere schon verworfen hat.
+
+#### Scenario: Der Knopf kennt seinen Zustand ohne Umweg
+
+- **WHEN** eine Feed-Seite im Reiter „Alle Beiträge" geladen wird und einer der
+  20 Beiträge gespeichert ist
+- **THEN** zeigt genau dessen Karte den Knopf im gespeicherten Zustand, und für
+  die Seite wurde **eine** Abfrage nach den Speicherungen gestellt, nicht zwanzig
+
+#### Scenario: Lösen wirkt auf beiden Flächen
+
+- **WHEN** ein Beitrag im Reiter „Alle Beiträge" gelöst wird, nachdem der Reiter
+  „Gespeichert" bereits geladen war
+- **THEN** zeigt der Reiter „Gespeichert" ihn beim nächsten Betreten nicht mehr
 
 ### Requirement: Ein gespeicherter Beitrag verliert seine Sichtbarkeit still
 
@@ -105,6 +144,46 @@ denselben Wert liefern.
 - **THEN** stimmt die Zahl an der Zeile für jeden Beitrag mit `like_count` aus
   der Funktion überein
 
+### Requirement: Ein Zähler ist nur so echt wie die Rechte auf seiner Quelle
+
+Das System SHALL `authenticated` **kein** UPDATE-Recht auf `public.post_likes`
+gewähren.
+
+Ein Trigger, der nur auf INSERT und DELETE hört, führt den Zähler falsch,
+solange die Reaktionszeile **verschoben** werden kann. Heute kann sie das:
+`authenticated` hält UPDATE auf `post_likes`, `likes_write_own` ist `for all`
+auf die eigene Zeile, und ihr `with check` verlangt vom Zielbeitrag nur, dass er
+**existiert** — nicht, dass er sichtbar ist. Aus „reagieren, verschieben,
+zurücknehmen" wird damit ein Zähler, der am Ursprungsbeitrag zu hoch bleibt und
+am Zielbeitrag ins Negative läuft.
+
+Der Entzug ist der richtige Weg und nicht der bequeme: eine Reaktion **hat**
+keinen Änderungsfall. Sie entsteht und sie vergeht; der Client schreibt
+`post_likes` ausschließlich über `upsert` und `delete`. Das Recht ist damit
+schon heute unbenutzt.
+
+Wird das Recht später doch gebraucht, SHALL der Trigger den Fall `UPDATE OF
+post_id` als Abzug beim alten und Zuschlag beim neuen Beitrag behandeln — nicht
+gar nicht.
+
+#### Scenario: Die Reaktionszeile lässt sich nicht verschieben
+
+- **WHEN** ein Mitglied versucht, `post_id` seiner eigenen Reaktionszeile auf
+  einen anderen Beitrag zu setzen
+- **THEN** wird das Recht verweigert
+
+#### Scenario: Der Angriffsablauf trägt nicht
+
+- **WHEN** die Folge „reagieren auf A · Zeile auf B verschieben · Reaktion
+  zurücknehmen" versucht wird
+- **THEN** scheitert sie am zweiten Schritt, und die Zähler von A und B stehen
+  danach auf ihren richtigen Werten
+
+#### Scenario: Reagieren und Zurücknehmen bleiben möglich
+
+- **WHEN** ein Mitglied auf einen Beitrag reagiert und die Reaktion zurücknimmt
+- **THEN** gelingt beides wie zuvor, auch mehrfach hintereinander
+
 ### Requirement: Das Schreibrecht auf `posts` nennt seine Spalten
 
 Das System SHALL `authenticated` auf `public.posts` **kein** INSERT-Recht
@@ -122,8 +201,9 @@ Begründet ist beides einzeln:
   Spalte seiner eigenen Zeile setzen — mit der Beliebtheitszahl also seine eigene
   Reichweite.
 
-Der Golden-Snapshot in `grants_test.sql` SHALL beide Änderungen abbilden: die
-Tabellenzeile für `posts` und eine neue Spalten-Zeile `posts.UPDATE=…`.
+Der Golden-Snapshot in `grants_test.sql` SHALL alle Änderungen abbilden: die
+Tabellenzeilen für `posts` und `post_likes` und eine neue Spalten-Zeile
+`posts.UPDATE=…`.
 
 #### Scenario: Die Zahl ist nicht fälschbar
 
@@ -146,16 +226,26 @@ Tabellenzeile für `posts` und eine neue Spalten-Zeile `posts.UPDATE=…`.
 ### Requirement: Die Sidebar zählt nur, was der Betrachter sehen darf
 
 Das System SHALL die Zähler der beliebten Tags über eine aggregierende
-`SECURITY DEFINER`-Funktion liefern, die **dasselbe Sichtbarkeitsprädikat**
-anwendet wie `posts_select_by_visibility`. Eine Zahl über Beiträge, die der
-Betrachter nicht sehen darf, verrät genau diese Beiträge.
+Funktion liefern, die **unter der RLS des Aufrufers** läuft (`security invoker`).
+Eine Zahl über Beiträge, die der Betrachter nicht sehen darf, verrät genau diese
+Beiträge.
 
-Die Kopie des Prädikats SHALL durch eine pgTAP-Zusage festgehalten werden, wie es
-`former_member_entries` vormacht — sonst driftet die Kopie von ihrem Original ab,
-ohne dass ein Test das merkt.
+Die Funktion SHALL das Sichtbarkeitsprädikat **nicht kopieren**. Unter
+`security invoker` greift `posts_select_by_visibility` selbst, und die Zahl ist
+richtig, weil die Regel wirkt — nicht, weil eine Abschrift sie nachspricht.
+Dieses Repo führt das Prädikat bereits an drei Stellen (`posts_select_by_visibility`,
+`post_engagement_counts`, `former_member_entries`); eine vierte und fünfte Kopie
+wäre Aufwand für ein Ergebnis, das ohne sie schon stimmt. Ein `security definer`-Weg
+SHALL nur bestehen, wenn ein konkreter, belegter Rechtebedarf ihn verlangt.
 
-Die Funktion SHALL eine Obergrenze je Aufruf tragen und SHALL NOT für `anon`
-ausführbar sein.
+Gezählt SHALL ausschließlich über die **aktiven kuratierten Tags** aus
+`public.tags` werden. Eine Zählung über `unnest(posts.hashtags)` legte freie und
+stillgelegte Schlagworte offen und stellte sie womöglich vor die kuratierten.
+
+Die Reihenfolge SHALL eindeutig sein: bei gleicher Zahl entscheidet ein
+festgelegtes zweites Merkmal, damit zwei Aufrufe dieselbe Liste ergeben.
+
+Die Funktion SHALL eine Obergrenze je Aufruf tragen.
 
 #### Scenario: Ein Tag zählt nur sichtbare Beiträge
 
@@ -169,15 +259,35 @@ ausführbar sein.
 - **THEN** erscheint der Tag nicht in der Liste — auch nicht mit der Zahl null,
   denn schon sein Erscheinen verriete, dass es ihn gibt
 
+#### Scenario: Ein freies Schlagwort erscheint nicht
+
+- **WHEN** ein Beitrag ein Schlagwort trägt, das nicht in `public.tags` steht
+  oder dort stillgelegt ist
+- **THEN** erscheint es nicht in der Liste, unabhängig davon, wie oft es vorkommt
+
+#### Scenario: Gleiche Zahl ergibt dieselbe Reihenfolge
+
+- **WHEN** zwei Tags dieselbe Zahl tragen und die Liste zweimal geholt wird
+- **THEN** stehen sie beide Male in derselben Reihenfolge
+
 ### Requirement: „Aktivste Mitglieder" nennt nur zeigbare Profile
 
 Das System SHALL die Liste der aktivsten Mitglieder über eine aggregierende
-Funktion liefern, die Beiträge nach demselben Sichtbarkeitsprädikat zählt und
-Namen ausschließlich aus `profiles_public` bezieht. Ein zurückgezogenes,
-unbestätigtes, deaktiviertes oder gelöschtes Profil SHALL NOT erscheinen.
+Funktion liefern, die **unter der RLS des Aufrufers** läuft und Namen
+ausschließlich aus `profiles_public` bezieht. Ein zurückgezogenes,
+unbestätigtes, deaktiviertes oder gelöschtes Profil SHALL NOT erscheinen —
+`profiles_public` schließt sie selbst aus, und ein eigenes Prädikat hier wäre
+eine weitere Kopie.
+
+Die Liste SHALL **fünf** Mitglieder umfassen, und gezählt SHALL nach
+**Beiträgen** werden, nicht nach Beiträgen und Kommentaren. Kommentare
+mitzuzählen zöge ein zweites Sichtbarkeitsprädikat (`comments_select_visible`)
+in dieselbe Funktion, für eine Zahl, die dasselbe aussagt.
 
 Die Zahl SHALL kein Umweg zur Sichtbarkeit sein: Beiträge, die der Betrachter
 nicht sehen darf, zählen nicht mit.
+
+Die Reihenfolge SHALL bei gleicher Zahl eindeutig entschieden sein.
 
 #### Scenario: Ein deaktiviertes Mitglied verschwindet aus der Liste
 
@@ -208,14 +318,64 @@ Vorhandensein einer `post_media`-Zeile, Text als Beitrag ohne all das.
 - **THEN** enthält die Liste genau die sichtbaren Beiträge mit mindestens einem
   Bild, und das Blättern bleibt seitenweise
 
+### Requirement: Ohne Sitzung bleibt die Aktivität ein Schaufenster
+
+Die Aktivitätsseite ist **ohne Anmeldung erreichbar** — sie trägt in der
+Navigation weder `requiresAuth` noch eine Mindeststufe, und die Aktivierungswand
+lässt Ausgeloggte durch. Alles, was dieser Change hinzufügt, SHALL deshalb seinen
+anonymen Fall benennen.
+
+Ohne Sitzung SHALL gelten:
+
+- Es SHALL **nur** „Alle Beiträge" bestehen. Die Reiter „Beiträge von mir" und
+  „Gespeichert" SHALL NOT erscheinen.
+- Es SHALL **kein** Speichern-Knopf erscheinen.
+- „Aktivste Mitglieder" SHALL NOT erscheinen. `profiles_public` hält für `anon`
+  kein Recht; ein Aufruf liefe in einen Fehler, und der Name eines Mitglieds
+  gehört ohnehin nicht ins Schaufenster.
+- Die Tag-Zähler SHALL entweder nachweislich nur öffentliche Beiträge zählen
+  oder ebenfalls entfallen. Eine Zahl, die für `anon` aus einem Fehler eine Null
+  macht, SHALL NOT gezeigt werden.
+
+„Beiträge von mir" ohne Kennung SHALL NOT zu „alle Beiträge" entarten. Ein
+fehlender Autorenfilter ist kein leerer Filter, sondern ein Fehler im
+Aufrufweg — und ein Reiter, den es ohne Sitzung nicht gibt, SHALL erst gar nicht
+abgefragt werden können.
+
+#### Scenario: Der ausgeloggte Besucher sieht einen Reiter
+
+- **WHEN** die Aktivitätsseite ohne Sitzung geöffnet wird
+- **THEN** erscheint weder ein Reiter „Beiträge von mir" noch „Gespeichert",
+  noch ein Speichern-Knopf an einer Karte
+
+#### Scenario: Ohne Kennung keine Autorenliste
+
+- **WHEN** der Reiter „Beiträge von mir" ohne Kennung angefordert wird
+- **THEN** liefert die Abfrage keine Liste aller Beiträge, sondern verweigert
+  sich
+
+#### Scenario: Keine Mitgliedernamen im Schaufenster
+
+- **WHEN** die Seite ohne Sitzung geöffnet wird
+- **THEN** wird „Aktivste Mitglieder" weder angezeigt noch angefordert
+
 ### Requirement: Der Composer steht über der Feed-Spalte
 
 Das System SHALL den Composer innerhalb der Feed-Spalte anordnen, nicht über
 Feed und Sidebar zugleich. Die Sidebar SHALL oben auf gleicher Höhe beginnen wie
 der Composer.
 
-Auf schmalen Schirmen SHALL die bestehende Reihenfolge erhalten bleiben: der
-Composer über dem Feed, die Sidebar darunter.
+Auf schmalen Schirmen **ändert sich die Reihenfolge**, und das ist eine
+Entscheidung, keine Nebenwirkung. Heute steht die Filterleiste im Markup vor dem
+Feed und liegt auf dem Telefon über ihm — was mit einer Leiste aus wenigen Chips
+trug. Die gefüllte Spalte trägt Zähler, aktivste Mitglieder und den Typfilter und
+wäre an derselben Stelle eine Wand vor dem Inhalt.
+
+Auf schmalen Schirmen SHALL deshalb gelten: der Composer zuoberst, darunter der
+Feed. Die Inhalte der Spalte SHALL erreichbar bleiben, ohne dass der Besucher an
+zwanzig Karten vorbeikommen muss — als zusammengeklappter Bereich über dem Feed
+oder als eigene Fläche. Sie SHALL NOT ungeklappt zwischen Composer und ersten
+Beitrag treten, und sie SHALL NOT ersatzlos unter zwanzig Karten wandern.
 
 #### Scenario: Sidebar und Composer beginnen auf gleicher Höhe
 
@@ -223,10 +383,12 @@ Composer über dem Feed, die Sidebar darunter.
 - **THEN** liegt die Oberkante der Sidebar auf der Oberkante des Composers, und
   der Composer reicht nicht über die Sidebar hinweg
 
-#### Scenario: Auf dem Telefon bleibt die Reihenfolge
+#### Scenario: Auf dem Telefon versperrt die Spalte den Feed nicht
 
 - **WHEN** dieselbe Seite bei 375 px Breite geöffnet wird
-- **THEN** steht der Composer über dem Feed und die Sidebar unter ihm
+- **THEN** steht der Composer zuoberst, der erste Beitrag folgt ohne eine
+  ausgeklappte Filterspalte dazwischen, und die Filter sind erreichbar, ohne bis
+  ans Ende der Liste zu blättern
 
 ## MODIFIED Requirements
 

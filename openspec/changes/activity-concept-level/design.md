@@ -63,16 +63,36 @@ Ablehnung schon begründet, und sie gilt weiter: hunderte ungenutzte Symbole und
 ein zweiter Stil für einige Dutzend Pfade. Der Satz wächst hier um ~12 Glyphen,
 nicht um 300.
 
-### 2. Bereichsfarben als eigene Token-Familie, abgeleitet aus dem Bestand
+### 2. Bereichsfarben brechen eine bestehende Anforderung — also wird sie geändert, nicht umgangen
 
-Neue Tokens der Form `--color-bereich-<name>` plus eine gedämpfte Fassung für
-Flächen hinter dem Icon, definiert im hellen `:root`-Block **und** im
-`data-variant`-Block für navy.
+**Die erste Fassung dieses Entwurfs war hier falsch, und die Plan-Review hat es
+gefunden.** Die bestehende `design-system`-Spec sagt wörtlich: *„Blue SHALL be
+the only accent family… SHALL NOT define a second accent, a gold token, or a
+per-format accent palette"*, mit einem Szenario, das genau darauf prüft. Ein
+Bereichs-Kanon mit Farben ist genau das. Ein Delta, das die Anforderung
+unerwähnt lässt und nebenher das Gegenteil einführt, ist kein Delta, sondern ein
+Widerspruch mit zwei Absendern.
+
+Entschieden (Donald, 24.08.): **die Anforderung wird ausdrücklich modifiziert.**
+Die Grenze verläuft nicht zwischen „blau" und „bunt", sondern zwischen zwei
+Aufgaben von Farbe:
+
+- **Interaktiver Akzent** — bedeutet „das kannst du anklicken, das hat Fokus, das
+  ist aktiv". Bleibt Blau, allein und ohne Ausnahme.
+- **Bereichsidentität** — bedeutet „das hier ist ein Event". Darf eine eigene
+  Familie sein, erscheint nur an der Kennmarke oder der Fläche dahinter, und
+  niemals an einem Link, einem Knopf, einem Fokusring oder einem aktiven Zustand.
+
+*Zweite Korrektur aus derselben Review:* die Tokens werden **einmal** definiert,
+nicht je Theme. Sie sind Inhaltsschicht, und die Spec verlangt für die
+Inhaltsschicht identische Werte in beiden Themes — der navy-Block überschreibt
+absichtlich nur Chrome. Die frühere Formulierung, ein nur im hellen Block
+definiertes Token sei im dunklen „zufällig richtig", war schlicht falsch: CSS
+vererbt deterministisch.
 
 *Warum nicht `--color-blue-400` und Freunde direkt:* die Rampe ist eine
 **Helligkeitsleiter einer Farbe**, kein Bereichsvokabular. Ein Bauteil, das
-`--color-blue-400` schreibt, sagt „hellblau", nicht „Events" — und beim nächsten
-Themewechsel stimmt das eine, aber nicht das andere.
+`--color-blue-400` schreibt, sagt „hellblau", nicht „Events".
 
 *Warum nicht `success/warning/danger` mitbenutzen:* die tragen eine **Wertung**.
 Ein grünes Mitglieder-Icon behauptete, Mitglieder seien gut gelaufen.
@@ -101,6 +121,29 @@ zweiter Ladeweg wurde.
 während des Blätterns, kann ein Beitrag doppelt oder gar nicht erscheinen. Das
 ist der Ordnung eigen und wird nicht ausgeglichen — der Ausgleich wäre ein
 Schnappschuss je Sitzung, also Zustand, den niemand aufräumt.
+
+### 4a. `post_likes` verliert UPDATE — sonst ist der Zähler eine Behauptung
+
+**Der schärfste Befund der Plan-Review.** Ein Trigger auf INSERT und DELETE
+genügt nur, wenn die Reaktionszeile nicht **verschoben** werden kann. Sie kann
+es: `authenticated` hält UPDATE auf `post_likes`, `likes_write_own` ist `for all`
+auf die eigene Zeile, und ihr `with check` verlangt vom Zielbeitrag lediglich,
+dass er **existiert** (`exists (select 1 from posts p where p.id = ...)`) — nicht,
+dass er sichtbar ist.
+
+Nachgerechnet: reagieren auf A (`A+1`), Zeile auf B umschreiben (kein Trigger —
+A bleibt bei +1, B bekommt nichts), Reaktion zurücknehmen (DELETE mit
+`OLD.post_id = B` → **B geht auf −1**). Beliebig wiederholbar, auf einem Beitrag,
+den der Angreifer nicht einmal sehen muss.
+
+Der Entzug ist nicht die bequeme, sondern die richtige Antwort: eine Reaktion hat
+keinen Änderungsfall. Sie entsteht und sie vergeht. Der Client schreibt
+`post_likes` ausschließlich per `upsert` und `delete` — das Recht ist schon heute
+unbenutzt.
+
+*Verworfen — `UPDATE OF post_id` im Trigger behandeln:* möglich, aber es hielte
+ein Recht am Leben, das niemand braucht, und verlangte für jeden künftigen
+Zähler dieselbe Sorgfalt noch einmal.
 
 ### 4. `authenticated` verliert INSERT auf `posts` und bekommt UPDATE nur auf drei Spalten
 
@@ -141,22 +184,55 @@ nachzuladen:* die RLS auf `posts` ist das Gate. Ein Join lässt sie greifen; ein
 Länge nicht zur Seitengröße passt, und die Sichtbarkeit müsste danach im Client
 korrigiert werden — genau die Kulisse, die dieses Repo nicht will.
 
-### 6. Die zwei neuen Aggregat-RPCs kopieren das Prädikat und werden dabei festgehalten
+### 6. Die zwei neuen Aggregat-RPCs kopieren das Prädikat NICHT — sie laufen darunter
 
-`feed_tag_counts()` und `feed_top_authors(limit)`, beide `security definer`,
-`stable`, `set search_path`, mit Obergrenze, **ohne** `execute` für `anon`.
+`feed_tag_counts()` und `feed_top_authors(p_limit)`, beide **`security invoker`**,
+`stable`, `set search_path`, mit Obergrenze.
 
-*Warum `security definer` trotz vorhandener RLS:* ein `group by` über `posts`
-unter RLS ist zwar korrekt, aber der Zähler soll ausdrücklich dieselbe Regel
-tragen wie die Kopie in `post_engagement_counts` — und diese Absicht muss
-prüfbar sein. Sie wird per pgTAP festgehalten, wie bei `former_member_entries`.
+**Auch hier hat die Plan-Review den Entwurf gedreht.** Die erste Fassung wählte
+`security definer` mit einer wörtlichen Abschrift des Sichtbarkeitsprädikats,
+festgehalten per pgTAP — nach dem Vorbild von `former_member_entries`. Der
+Einwand saß: diese Funktionen aggregieren ausschließlich Tabellen, die der
+Aufrufer **ohnehin** unter RLS lesen darf. Ein privilegierter Zugriff wird nicht
+gebraucht, also wären die Kopien Nummer vier und fünf reiner Aufwand für ein
+Ergebnis, das ohne sie schon stimmt.
 
-*Namen aus `profiles_public`, nicht aus `profiles`:* `profiles_public` schließt
-zurückgezogene, unbestätigte, deaktivierte und gelöschte Profile selbst aus. Ein
-eigenes Prädikat hier wäre eine fünfte Kopie.
+Unter `security invoker` ist die Zahl richtig, **weil die Regel wirkt** — nicht,
+weil eine Abschrift sie nachspricht. Das ist der bessere Zustand: eine Abschrift
+kann driften, eine Policy nicht. `former_member_entries` bleibt ein gültiges
+Vorbild für seinen Fall (dort wird tatsächlich mehr gebraucht, als der Aufrufer
+sehen darf); dieser Fall ist ein anderer.
+
+*Namen aus `profiles_public`:* die View schließt zurückgezogene, unbestätigte,
+deaktivierte und gelöschte Profile selbst aus.
+
+*Gezählt wird über die aktiven kuratierten Tags aus `public.tags`*, nicht über
+`unnest(posts.hashtags)` — sonst erschienen freie und stillgelegte Schlagworte in
+der Liste, womöglich noch vor den kuratierten.
 
 *Ein Tag mit null sichtbaren Beiträgen erscheint gar nicht* — nicht mit der Zahl
 null. Seine bloße Anwesenheit verriete, dass es ihn gibt.
+
+*Der Preis von `invoker`* ist, dass die Aggregation je Aufruf durch die Policy
+läuft. Deshalb gehören zu beiden Funktionen ein gemessener `EXPLAIN` und die
+Prüfung, ob `hashtags` einen GIN-Index braucht — der auch `.overlaps()` im Feed
+zugutekäme.
+
+### 8. Was der anonyme Besucher sieht, steht ausgeschrieben
+
+`/aktivitaet` ist **ohne Anmeldung erreichbar**: der Navigationseintrag trägt
+weder `requiresAuth` noch `minTier`, und `ActivationGate` gibt bei `!user` durch.
+Der erste Entwurf hat das übersehen und drei Reiter samt Speichern-Knopf und
+Mitgliedernamen unbedingt vorgeschrieben.
+
+Ohne Sitzung: nur „Alle Beiträge", kein Speichern, keine Namen. `profiles_public`
+hält für `anon` kein Recht — ein Aufruf liefe in einen Fehler, und ein Fehler,
+den eine Fläche als Null zeigt, ist die schlechteste aller Zahlen.
+
+*Und der stille Fall:* „Beiträge von mir" ohne Kennung darf nicht zu „alle
+Beiträge" entarten. Ein `if (autorId) query = query.eq(...)` tut genau das,
+sobald `autorId` fehlt — heute harmlos, weil der Aufrufer die Kennung immer hat,
+mit einem Reiter aber ein Weg, der ohne Absicht entsteht.
 
 ### 7. Reiter, Ordnung und Filter sind Argumente von `fetchFeed`, keine zweite Ladefunktion
 
@@ -207,17 +283,40 @@ heutige Ein-Tag-Filter bricht also nicht.
 5. **Frontend** — Composer-Spalte, Reiter, Ordnungen, Sidebar, Typ-Filter.
 6. **Sichtprobe** — beide Themes, 375 px und breit, gegen den lokalen Stack.
 
-*Rücknahme:* Schritte 2–4 sind additiv und einzeln zurücknehmbar. Schritt 3
-enthält als einziger einen **Rechte-Entzug**; seine Rücknahme ist ein
-`grant insert, update on public.posts to authenticated` und das Zurückdrehen der
-zwei Golden-Strings.
+*Rücknahme — forward-only, und das ist eine Korrektur aus der Plan-Review.* Die
+erste Fassung nannte als Rücknahme ein `grant insert, update on public.posts` —
+was bei weiterhin bestehender Zählerspalte **genau die Lücke wieder öffnete**,
+die Schritt 3 schließt. Es gilt stattdessen:
+
+- Ein breites UPDATE auf `posts` oder `post_likes` kehrt **nicht** zurück,
+  solange Zählerspalte, Trigger und die Sortierung nach Beliebtheit bestehen. Wer
+  zurück will, entfernt zuerst die Ordnung, dann den Trigger, dann die Spalte.
+- **Vorzugsweise bleibt UPDATE dauerhaft spaltenbegrenzt** — es ist unabhängig
+  von diesem Change der richtige Zustand.
+- `post_saves` wird **nicht gelöscht**. Das wären Mitgliederdaten, und eine
+  Tabelle stillzulegen kostet nichts.
+- Vor dem Entzug wird **jeder** Schreibweg auf `posts` gesucht, nicht nur in
+  `src/`: Edge Functions eingeschlossen. Geprüft — dort steht heute keiner.
 
 ## Open Questions
 
-- **Wie viele aktivste Mitglieder zeigt die Liste?** Das Konzeptbild zeigt eine
-  kurze Liste; fünf ist die naheliegende Zahl, entschieden ist sie nicht.
-- **Zählt „aktivste" Beiträge oder Beiträge plus Kommentare?** Beiträge ist das
-  billigere und das erklärbarere; Kommentare mitzuzählen hieße, ein zweites
-  Prädikat (`comments_select_visible`) mitzuführen.
-- **Bleibt der gewählte Reiter über einen Seitenwechsel erhalten?** Ein Parameter
-  in der URL wäre teilbar, kostet aber Routing-Arbeit, die das Issue nicht nennt.
+Die drei Fragen, die hier standen, sind entschieden — beide Reviewer haben
+unabhängig darauf bestanden, dass sie **vor** dem Bau fallen, und sie hatten
+recht: zwei davon stehen im Vertrag einer Funktion, nicht in ihrer Oberfläche.
+
+- **Wie viele aktivste Mitglieder?** → **Fünf.**
+- **Was zählt als „aktiv"?** → **Beiträge**, nicht Beiträge plus Kommentare.
+  Kommentare zögen `comments_select_visible` als zweites Prädikat in dieselbe
+  Funktion, für eine Zahl, die dasselbe aussagt.
+- **Reiter in der URL?** → **Nein**, nur im Zustand der Seite. Das Issue verlangt
+  es nicht, und ein Query-Parameter zöge die Frage nach sich, was bei einem
+  ungültigen Wert geschieht — samt Zusage dafür.
+
+Offen bleibt:
+
+- **Die genauen Farbwerte der sieben Bereiche und das Kontrastziel.** „Erkennbar"
+  ist nicht abnehmbar; die Werte brauchen eine gemessene Zahl gegen den
+  Kartengrund, und die entsteht beim Bau von Abschnitt 1.
+- **Die konkrete PostgREST-Form des Typfilters.** Anti-Join für „Text" und
+  Inner-Join für „Bild" sind entworfen, aber nicht belegt. Das entscheidet ein
+  Integrationstest gegen den lokalen Stack, nicht ein Mock des Query-Builders.
