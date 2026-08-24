@@ -2917,13 +2917,23 @@ select is(
   0, 'Der Host löscht seinen Event-Beitrag NICHT (die Policy lässt keine Zeile durch)');
 
 -- 22.15 … und schreibt ihn auch nicht auf `member` um.
-select is(
-  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
-    $$with u as (
-        update public.posts set kind = 'member', ref_id = null
-         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
-      select count(*)::int from u$$),
-  0, 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
+--
+-- Diese Zusage misst seit dem 24.08. (AGE-582) eine ANDERE Schranke als vorher,
+-- und das ist der Grund, warum sie hier umgeschrieben steht: bis dahin hielt
+-- `authenticated` tabellenweites UPDATE auf `posts`, die Anweisung lief also
+-- durch bis zur Policy und ergab NULL ZEILEN. Seit 20260824160000 ist UPDATE
+-- auf `body`, `hashtags`, `visibility` begrenzt — `kind` und `ref_id` gehören
+-- dem Event-Trigger. Das GRANT weist jetzt vor der Policy ab, mit `42501`.
+--
+-- `count_as` fängt keinen Fehler und riss den ganzen Lauf mit; also `try_as`.
+-- Die Aussage über die POLICY geht dabei nicht verloren: 22.14 (delete) und
+-- 22.16 (visibility, weiterhin grantbar) messen sie unverändert an derselben
+-- Zeile.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$update public.posts set kind = 'member', ref_id = null
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  'DENIED:%', 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
 
 -- 22.16 … und dreht die gespiegelte Sichtbarkeit nicht zurück.
 select is(

@@ -200,28 +200,68 @@
       nur beim zweiten Klick. Festgehalten in `src/lib/feed.like.test.ts`
       (4 Zusagen), gegengeprobt mit `false` und mit entferntem Flag — beide rot,
       `feed.ts` danach unverändert
-- [ ] 3.4 Migration: `like_count` auf `posts`, Trigger auf `post_likes`
+- [x] 3.4 Migration: `like_count` auf `posts`, Trigger auf `post_likes`
       (INSERT/DELETE), Nachtrag für den Bestand — alles in einer Transaktion
-- [ ] 3.5 Triggerfunktion härten: `set search_path`, `execute` für `public`, `anon`
-      und `authenticated` entziehen; pgTAP-Zusagen dafür
-- [ ] 3.6 Index für die neue Ordnung `(like_count desc, created_at desc, id desc)`;
-      `EXPLAIN` vorher und nachher, beide Ausgaben festhalten
-- [ ] 3.7 pgTAP: eine Reaktion und ihre Rücknahme führen die Zahl auf den
-      Ausgangswert zurück
-- [ ] 3.8 pgTAP: die Zahl an der Zeile stimmt für jeden Beitrag mit `like_count`
-      aus `post_engagement_counts` überein
-- [ ] 3.9 **Alle** Schreibwege auf `posts` suchen, nicht nur in `src/` — Edge
-      Functions eingeschlossen; das Ergebnis im Task festhalten
-- [ ] 3.10 **Belegen, bevor entzogen wird:** pgTAP, dass ein Beitrag über
-      `create_post_with_media` auch **ohne** INSERT-Recht auf `posts` entsteht —
-      Voraussetzung für 3.11, nicht seine Bestätigung
-- [ ] 3.11 Migration: `revoke insert, update on public.posts from authenticated`,
+      (`20260824150000_posts_like_count.sql`). **Statt `greatest(…, 0)` eine
+      Prüfbedingung `like_count >= 0`:** `greatest` fänge eine negative Zahl
+      STILL ab und machte jedes künftige Loch unsichtbar; die Prüfbedingung
+      fällt laut aus, an der Stelle, an der das Loch entsteht
+- [x] 3.5 Triggerfunktion gehärtet: `security definer` (als INVOKER liefe das
+      UPDATE unter `posts_write_own` — der Zähler wäre genau dort falsch, wo er
+      zählt), `set search_path = ''`, `execute` für `public`, `anon` und
+      `authenticated` entzogen. Postgres prüft EXECUTE beim ANLEGEN des
+      Triggers, nicht bei jedem Feuern; der Entzug kostet also nichts.
+      pgTAP-Zusagen für beides
+- [x] 3.6 Index `(like_count desc, created_at desc, id desc)`
+      (`20260824151000_posts_beliebtheit_index.sql`); `EXPLAIN` vorher und
+      nachher, lokal an 20 000 Beiträgen, beide Ausgaben im Kopf der Migration:
+      **vorher** Seq Scan über 20 000 Zeilen + top-N heapsort, `Buffers: shared
+      hit=286`; **nachher** Index Only Scan, 20 Zeilen, `hit=13 read=2`. Der
+      Sortierschritt entfällt ganz. Die pgTAP-Zusage lautet auf die
+      SPALTENFOLGE und die Richtung, nicht auf den Namen
+- [x] 3.7 pgTAP: eine Reaktion und ihre Rücknahme führen die Zahl auf den
+      Ausgangswert zurück (1 → 2 → 1)
+- [x] 3.8 pgTAP: die Zahl an der Zeile stimmt für jeden Beitrag mit `like_count`
+      aus `post_engagement_counts` überein — die Gegenrechnung, die live über
+      `post_likes` zählt
+- [x] 3.9 **Alle** Schreibwege auf `posts` gesucht, nicht nur in `src/`:
+      `from("posts")` steht **fünfmal**, dreimal lesend
+      (`public-profile.ts:111`, `dashboard.ts:260`, `feed.ts:421`), einmal
+      `.update()` (`feed.ts:693`, schreibt genau `body`, `hashtags`,
+      `visibility`), einmal `.delete()` (`feed.ts:716`). In
+      `supabase/functions/` kommt `posts` **gar nicht** vor, in `supabase/seed/`
+      nur als rohes SQL ausserhalb von `authenticated`. **Kein einziges INSERT**
+- [x] 3.10 **Belegt, bevor entzogen wurde:** pgTAP, dass ein Beitrag über
+      `create_post_with_media` auch **ohne** INSERT-Recht entsteht. Der Test
+      entzieht das Recht **innerhalb seiner eigenen Transaktion** — dadurch
+      misst die Zusage auch dann noch etwas, wenn das Recht längst fort ist.
+      Voraussetzung des Entzugs, nicht seine Bestätigung
+- [x] 3.11 Migration: `revoke insert, update on public.posts from authenticated`,
       danach `grant update (body, hashtags, visibility)`
-- [ ] 3.12 pgTAP: ein direktes UPDATE auf `like_count` des eigenen Beitrags wird
-      verweigert; Bearbeiten von Text, Schlagworten und Sichtbarkeit gelingt weiter
-- [ ] 3.13 `grants_test.sql` §1 (`posts` ohne INSERT, `post_likes` ohne UPDATE)
-      **und** §2 (`posts` in die `table_name in (...)`-Liste, neue Zeile
-      `posts.UPDATE=body,hashtags,visibility`) im selben Commit nachziehen
+      (`20260824160000_posts_rechte_enger.sql`)
+- [x] 3.12 pgTAP: ein direktes UPDATE auf `like_count` des eigenen Beitrags wird
+      verweigert; Bearbeiten von Text, Schlagworten und Sichtbarkeit gelingt
+      weiter. **Der Befund war real, nicht theoretisch:** vor dem Entzug las die
+      Zusage `'OK'` — der Autor konnte `update posts set like_count = 999` auf
+      seinem eigenen Beitrag absetzen und stand danach oben in „Beliebteste"
+- [x] 3.13 `grants_test.sql` §1 (`posts` als `DELETE,SELECT`, `post_likes` ohne
+      UPDATE) **und** §2 (`posts` in die `table_name in (...)`-Liste, neue Zeile
+      `posts.UPDATE=body,hashtags,visibility`) im selben Commit nachgezogen
+- [x] 3.14 **Nicht geplant, vom Entzug verursacht:** `rls_test.sql` 22.15
+      schreibt `kind`/`ref_id` und lief bis dahin bis zur Policy durch (null
+      Zeilen). Jetzt weist das Grant vorher mit `42501` ab, und `count_as` fängt
+      keinen Fehler — der ganze Lauf riss mit (386 von 433 gelaufen). Auf
+      `try_as`/`alike` umgestellt, mit dem Grund im Kommentar. Die Aussage über
+      die POLICY geht nicht verloren: 22.14 und 22.16 messen sie unverändert
+- [x] 3.15 Gegenproben am lebenden Katalog, jede einzeln zurückgenommen:
+      **Zähler** — Trigger entfernt → 4 Zusagen fallen; `definer` → `invoker`
+      → dieselben 4 plus die Härtung (der Zähler wird still falsch, nicht
+      laut); EXECUTE an `authenticated` → die Härtungszusage fällt.
+      **Rechte** — tabellenweites UPDATE zurück → 3 fallen; INSERT zurück →
+      2 fallen; **nur `like_count`** in die Spaltenliste → 2 fallen, die
+      Selbstbeförderung ist sofort wieder offen
+- [x] 3.16 Gesamtlauf nach Abschnitt 3: **8 pgTAP-Dateien, 653 Zusagen, PASS**;
+      Vitest 132 Dateien / 1482 Zusagen; `tsc --noEmit` sauber
 
 ## 4. Aggregate für die Sidebar
 

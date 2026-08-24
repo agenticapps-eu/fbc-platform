@@ -1,0 +1,43 @@
+-- Die Ordnung „Beliebteste" bekommt ihren Index (AGE-582).
+-- Donald, 2026-08-24. Change: openspec/changes/activity-concept-level/.
+--
+-- ══ WARUM DIESE DREI SPALTEN IN DIESER REIHENFOLGE ═════════════════════════
+-- Der Feed blättert per Keyset-Cursor, nicht per `offset` (AGE-528). Ein
+-- Keyset-Cursor braucht eine Ordnung, die TOTAL ist — sonst kann dieselbe Zeile
+-- auf zwei Seiten erscheinen oder auf keiner. `like_count` allein ist es nicht:
+-- zwanzig Beiträge mit je drei Reaktionen haben keine definierte Reihenfolge.
+-- `created_at desc` bricht den Gleichstand, `id desc` bricht den Rest.
+--
+-- Der Index trägt genau diese drei in genau dieser Richtung. Eine andere
+-- Reihenfolge wäre für die Abfrage wertlos — ein Index über
+-- `(created_at, like_count)` könnte den Sortierschritt nicht sparen.
+--
+-- ══ GEMESSEN, NICHT GESCHÄTZT ══════════════════════════════════════════════
+-- Lokal, 20 000 Beiträge, `explain (analyze, buffers)` auf
+-- `order by like_count desc, created_at desc, id desc limit 20`:
+--
+--   VORHER   Seq Scan on posts (actual rows=20000) → Sort, top-N heapsort
+--            Buffers: shared hit=286
+--   NACHHER  Index Only Scan using posts_like_count_created_at_id_idx
+--            (actual rows=20), Heap Fetches: 20
+--            Buffers: shared hit=13 read=2
+--
+-- Also 286 → 15 Puffer, und der Scan berührt 20 Zeilen statt 20 000. Der
+-- Sortierschritt entfällt ganz.
+--
+-- *Was diese Messung NICHT sagt:* die echte Feedabfrage läuft zusätzlich unter
+-- `posts_select_by_visibility`. Ein selektives Prädikat kann den Planer zu einem
+-- anderen Weg bewegen — die Messung oben belegt, dass die ORDNUNG bedient wird,
+-- nicht dass jede Abfrage diesen Index nimmt.
+--
+-- ══ WARUM KEIN TEILINDEX AUF `visibility` ══════════════════════════════════
+-- Naheliegend wäre `where visibility = 'public'`, weil der ausgeloggte Besucher
+-- nur diese sieht. Verworfen: das angemeldete Mitglied — der weit häufigere
+-- Fall — sieht beide, und ein zweiter Index für den selteneren Fall ist Aufwand
+-- auf jeder Schreiboperation. Bei vier Beiträgen auf PROD und 29 auf DEV wäre
+-- er ohnehin nicht messbar.
+--
+-- Forward-only.
+
+create index posts_like_count_created_at_id_idx
+  on public.posts (like_count desc, created_at desc, id desc);
