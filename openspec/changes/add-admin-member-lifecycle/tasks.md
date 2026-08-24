@@ -482,18 +482,52 @@ und standen im ersten Entwurf nicht drin.
 
 ## 9. Frontend — Reiter „Mitgliedschaft"
 
-- [ ] 9.1 **RED:** ein Mitglied ohne `paid_until` zeigt „unbekannt", kein Datum.
-- [ ] 9.2 Zeile mit Stufe, bezahlt-bis und Zahlungsart. **Stufe nur lesbar**,
-      kein Eingabefeld (AGE-516).
-- [ ] 9.3 Das Auswahlfeld für die Zahlungsart über `Controller`, nicht über
-      `register` — wächst die passende Option erst nach einem `reset()` nach,
-      fällt der Browser still auf die erste zurück und das nächste Speichern
-      löscht den Wert.
-- [ ] 9.4 Speichern über `admin_update_profile`, nicht über einen direkten
-      Tabellenzugriff — und **nicht** über `saveProfile`, das alle Profilspalten
-      schreibt und Interessen und Ziele dabei löscht.
-- [ ] 9.5 **GREEN**, plus Sichtprobe: Wert setzen, Seite neu laden, Wert steht
-      noch da.
+- [x] 9.1 **RED:** ein Mitglied ohne `paid_until` zeigt „unbekannt", kein Datum.
+      Zwei Zeilen mit gegensätzlichem Befund, nicht eine — „unbekannt" allein
+      wäre auch grün, wenn das Wort an JEDER Zeile stünde.
+- [x] 9.2 Zeile mit Stufe, bezahlt-bis und Zahlungsart. **Stufe nur lesbar**,
+      kein Eingabefeld (AGE-516). Als `TierBadge`, und die Zusage ist über die
+      ZAHL der Auswahlfelder geprüft (genau eines, die Zahlungsart): ein
+      Stufenfeld hätte unter jedem beliebigen Namen dieselbe Wirkung.
+      **Die Felder stehen in ALLEN DREI Sichten**, nach derselben Regel wie
+      `Zustand` (5.5) — im Verzeichnis NEBEN der Karte, weil die ein Link ist.
+      Die Spalte kommt HINZU, sie ersetzt „Zustand" nicht.
+- [~] 9.3 **Abweichung, begründet.** Der Plan sah `Controller` vor, gegen die
+      Falle, dass ein `<select>` nach einem `reset()` still auf die erste Option
+      zurückfällt. Gebaut ist `useState` **ohne `reset()`** — und ohne `reset()`
+      gibt es die Falle nicht. Die acht Optionen sind eine Modulkonstante und
+      stehen sofort da; sie können nicht nachwachsen. „Geändert" ist ein
+      VERGLEICH gegen das Mitglied statt eines zweiten Zustands, also stellt das
+      Nachladen die Zeile von selbst wieder sauber. `useForm` je Zeile hiesse
+      25 Formularspeicher für zwei Felder. **Nicht abgenommen.**
+- [x] 9.4 Speichern über `admin_update_profile`, nicht über einen direkten
+      Tabellenzugriff — und **nicht** über `saveAdminProfile`, das einen Patch
+      aus dreissig Feldern baut und jedes davon schreibt. Der Test prüft mit
+      `toEqual` den GANZEN Patch (zwei Schlüssel), nicht `objectContaining`:
+      die ganze Zusage ist, dass nichts sonst mitreist. Leer geht als `null`
+      hinaus, nicht als `""` — die Funktion castet `paid_until` nach `date`.
+- [x] 9.5 **GREEN** (1413 Vitest, 65 in dieser Datei), plus Sichtprobe gegen den
+      lokalen Stack: bei „Carla Aktiv" 31.03.2027 + CopeCart gesetzt,
+      gespeichert, in der Datenbank nachgelesen (`paid_until = 2027-03-31`,
+      `payment_type = 'copecart'`), Seite neu geladen — der Wert steht noch da,
+      „unbekannt" ist bei ihr weg und bei den beiden anderen noch da, und der
+      Knopf ist wieder aus. Gegenprobe: der Reiter „Alle" trägt weiterhin vier
+      Spalten und kein einziges Feld. Konsole stumm.
+- [x] 9.6 **Sechs Mutations-Gegenproben**, je genau die zugehörige Zusage rot,
+      danach wiederhergestellt grün: „unbekannt" entfernt · ein geratenes Datum
+      vorbelegt · die Stufe zum Auswahlfeld gemacht · ein drittes Feld in den
+      Patch · den `null`-Umweg entfernt · den Knopf immer aktiv.
+      **Die vierte Gegenprobe war beim ersten Versuch falsch gezielt** — ein
+      Zusatzschlüssel im ARGUMENT erreicht den Patch gar nicht, weil
+      `updateMitgliedschaft` ihn selbst baut — und blieb grün. Erst die
+      Verbiegung IM Patch war rot. Eine grüne Gegenprobe heisst zuerst „falsch
+      gezielt", nicht „der Test prüft nichts".
+
+- **Offen aus Abschnitt 9:** die Kartensicht bricht Stufe/bezahlt-bis und
+  Zahlungsart/Speichern auf zwei Zeilen um; tragbar, aber ungleichmässig.
+  Und `payment_type` fehlt weiterhin auf `/admin/mitglied/:id`, wo `paid_until`
+  schon steht — die Einzelbearbeitung kennt die neue Spalte nicht. Bewusst
+  nicht mitgenommen: der Plan nennt sie nicht, und sie ist ein eigener Diff.
 
 ## 10. Feed — „Ehemaliges Mitglied"
 

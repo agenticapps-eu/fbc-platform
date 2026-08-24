@@ -1154,3 +1154,136 @@ describe("Der Auslöser zeigt drei Punkte und heisst trotzdem etwas", () => {
     expect(knopf.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 });
+
+/**
+ * Der Reiter „Mitgliedschaft" (Abschnitt 9).
+ *
+ * Zwei Zeilen mit gegensätzlichem Befund, nicht eine: „unbekannt" allein wäre
+ * auch dann grün, wenn die Fläche das Wort an JEDER Zeile zeigte — die
+ * Gegenprobe an einem Mitglied MIT Datum ist der Teil, der die Zusage trägt.
+ */
+const OHNE_DATUM = member({
+  name: "Elke Ohnedatum",
+  login_email: "elke@test.fbc",
+  paid_until: null,
+  payment_type: null,
+});
+const MIT_DATUM = member({
+  name: "Frank Bezahlt",
+  login_email: "frank@test.fbc",
+  paid_until: "2026-12-31",
+  payment_type: "rechnung",
+});
+
+describe("Der Reiter „Mitgliedschaft“ rät kein Datum (9.1)", () => {
+  it("zeigt „unbekannt“ statt eines geratenen Datums, wenn `paid_until` fehlt", async () => {
+    rpc.mockResolvedValue({ data: [OHNE_DATUM, MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+
+    const ohne = await screen.findByTestId(`mitglied-${OHNE_DATUM.id}`);
+    expect(within(ohne).getByText("unbekannt")).toBeInTheDocument();
+    // Und kein geratenes Datum: das Feld steht leer, es trägt nicht „heute".
+    expect(within(ohne).getByLabelText(/^bezahlt bis für/)).toHaveValue("");
+
+    // Die Gegenprobe. Ohne sie bliebe der Test auch grün, wenn „unbekannt"
+    // unbesehen an jeder Zeile stünde.
+    const mit = screen.getByTestId(`mitglied-${MIT_DATUM.id}`);
+    expect(within(mit).queryByText("unbekannt")).toBeNull();
+    expect(within(mit).getByLabelText(/^bezahlt bis für/)).toHaveValue("2026-12-31");
+  });
+});
+
+describe("Die Stufe ist im Reiter „Mitgliedschaft“ nur lesbar (9.2)", () => {
+  it("zeigt sie an, bietet sie aber nicht als Eingabefeld an", async () => {
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+
+    // Angezeigt: die Plakette trägt den Klartext der Stufe.
+    expect(within(zeile).getByText("Impact")).toBeInTheDocument();
+
+    // Aber nicht änderbar. Die Zeile trägt GENAU EIN Auswahlfeld, und das ist
+    // die Zahlungsart — ein zweites wäre der Stufenwechsel, der hier nicht
+    // hingehört (AGE-516). Die Zusage ist eine ABWESENHEIT; sie ist über die
+    // Zahl geprüft und nicht über den Namen, weil ein Stufenfeld unter jedem
+    // beliebigen Namen dieselbe Wirkung hätte.
+    const auswahlfelder = within(zeile).getAllByRole("combobox");
+    expect(auswahlfelder).toHaveLength(1);
+    expect(auswahlfelder[0]).toHaveAccessibleName(`Zahlungsart für ${MIT_DATUM.name}`);
+  });
+});
+
+describe("Der Reiter „Mitgliedschaft“ speichert über `admin_update_profile` (9.4)", () => {
+  it("schickt GENAU die zwei geänderten Felder, nicht das ganze Profil", async () => {
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+
+    fireEvent.change(within(zeile).getByLabelText(/^bezahlt bis für/), {
+      target: { value: "2027-01-31" },
+    });
+    fireEvent.change(within(zeile).getByLabelText(/^Zahlungsart für/), {
+      target: { value: "stripe" },
+    });
+    fireEvent.click(within(zeile).getByRole("button", { name: /^Mitgliedschaft speichern für/ }));
+
+    await waitFor(() =>
+      expect(rpc.mock.calls.some((c) => c[0] === "admin_update_profile")).toBe(true),
+    );
+
+    // `toEqual` und nicht `objectContaining`: die ganze Zusage von 9.4 ist, dass
+    // NICHTS SONST mitgeschrieben wird. `saveAdminProfile` baut einen Patch aus
+    // dreissig Feldern — Name, Anschrift, Rollen, Kompetenzen, Videos — und
+    // räumte aus diesem Zwei-Felder-Formular alles weg, was es nicht kennt.
+    const [, args] = rpc.mock.calls.find((c) => c[0] === "admin_update_profile")!;
+    expect(args).toEqual({
+      target: MIT_DATUM.id,
+      patch: { paid_until: "2027-01-31", payment_type: "stripe" },
+    });
+  });
+
+  it("schickt ein geleertes Feld als null, nicht als leeren Text", async () => {
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+
+    fireEvent.change(within(zeile).getByLabelText(/^bezahlt bis für/), { target: { value: "" } });
+    fireEvent.change(within(zeile).getByLabelText(/^Zahlungsart für/), { target: { value: "" } });
+    fireEvent.click(within(zeile).getByRole("button", { name: /^Mitgliedschaft speichern für/ }));
+
+    await waitFor(() =>
+      expect(rpc.mock.calls.some((c) => c[0] === "admin_update_profile")).toBe(true),
+    );
+
+    // `admin_update_profile` castet `paid_until` nach `date`. Ein `""` liesse
+    // den Cast scheitern, und der Admin sähe einen Fehler für ein Feld, das er
+    // gerade absichtlich geleert hat.
+    const [, args] = rpc.mock.calls.find((c) => c[0] === "admin_update_profile")!;
+    expect((args as { patch: Record<string, unknown> }).patch).toEqual({
+      paid_until: null,
+      payment_type: null,
+    });
+  });
+
+  it("bietet das Speichern erst an, wenn sich etwas geändert hat", async () => {
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+
+    const knopf = within(zeile).getByRole("button", { name: /^Mitgliedschaft speichern für/ });
+    expect(knopf).toBeDisabled();
+
+    fireEvent.change(within(zeile).getByLabelText(/^bezahlt bis für/), {
+      target: { value: "2027-01-31" },
+    });
+    expect(knopf).toBeEnabled();
+
+    // Und zurück auf den Ausgangswert heisst wieder „nichts zu tun": „geändert"
+    // ist ein VERGLEICH gegen das Mitglied, kein Merker, der einmal umfällt.
+    fireEvent.change(within(zeile).getByLabelText(/^bezahlt bis für/), {
+      target: { value: "2026-12-31" },
+    });
+    expect(knopf).toBeDisabled();
+  });
+});

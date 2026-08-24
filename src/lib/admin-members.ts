@@ -192,3 +192,55 @@ async function uebersetzeFehler(error: unknown): Promise<string> {
   }
   return (error as { message?: string }).message ?? "Unbekannter Fehler.";
 }
+
+/**
+ * Die acht Zahlungsarten (AGE-581) — und die Liste ist hier eine ABBILDUNG auf
+ * Beschriftungen, nicht die Regel selbst. Die Regel steht als `check`-Bedingung
+ * auf `profile_legacy.payment_type`: eine Zahlungsart, die nur ein Auswahlfeld
+ * kennt, ist beim nächsten Skript ein freier Text.
+ *
+ * `null` heisst NICHT ERFASST und ist kein neunter Wert. Im Auswahlfeld trägt es
+ * die leere Kennung — „nicht erfasst" ist eine Auskunft, keine Zahlungsart.
+ */
+export const ZAHLUNGSARTEN: { id: string; label: string }[] = [
+  { id: "rechnung", label: "Rechnung" },
+  { id: "stripe", label: "Stripe" },
+  { id: "copecart", label: "CopeCart" },
+  { id: "paypal", label: "PayPal" },
+  { id: "digistore24", label: "Digistore24" },
+  { id: "ehren", label: "Ehrenmitglied" },
+  { id: "partner", label: "Partner" },
+  { id: "offen", label: "Offen" },
+];
+
+/**
+ * Ändert bezahlt-bis und Zahlungsart eines Mitglieds — und NUR diese beiden.
+ *
+ * Geht über `admin_update_profile`, weil dort die Weissliste, der `is_admin()`-
+ * Riegel und die Spur in `admin_audit` sitzen; ein direkter Tabellenzugriff auf
+ * `profile_legacy` hätte keines davon.
+ *
+ * NICHT über `saveAdminProfile`: die Funktion baut einen Patch aus DREISSIG
+ * Feldern und schreibt jedes davon — Name, Anschrift, Rollen, Kompetenzen,
+ * Videos. Aus einem Zwei-Felder-Formular räumte sie lautlos alles weg, was die
+ * Liste gar nicht kennt. Der Patch hier trägt genau die zwei Schlüssel, die
+ * geändert werden sollen; die RPC lässt jedes nicht genannte Feld stehen.
+ *
+ * Leer heisst `null`, nicht `""`: die Funktion castet `paid_until` nach `date`,
+ * und ein leerer Text liesse den Cast scheitern. Für `payment_type` ist es die
+ * Unterscheidung zwischen „nicht erfasst" und einem Wert, den die
+ * `check`-Bedingung nicht kennt.
+ */
+export async function updateMitgliedschaft(
+  id: string,
+  werte: { paid_until: string; payment_type: string },
+): Promise<void> {
+  const { error } = await supabase.rpc("admin_update_profile", {
+    target: id,
+    patch: {
+      paid_until: werte.paid_until === "" ? null : werte.paid_until,
+      payment_type: werte.payment_type === "" ? null : werte.payment_type,
+    },
+  });
+  if (error) throw error;
+}

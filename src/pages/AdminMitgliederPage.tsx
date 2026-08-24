@@ -8,7 +8,9 @@ import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
+import { TierBadge } from "../components/ui/TierBadge";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
 import { requestActivationLink } from "../lib/activation";
@@ -18,6 +20,8 @@ import {
   fetchAdminMembers,
   SEITENGROESSE,
   setMemberBan,
+  updateMitgliedschaft,
+  ZAHLUNGSARTEN,
   type AdminMember,
   type AdminMemberStatus,
   type LebenszyklusAktion,
@@ -443,6 +447,11 @@ export default function AdminMitgliederPage() {
                       <th className="py-2 pr-4">Name</th>
                       <th className="py-2 pr-4">Anmeldeadresse</th>
                       <th className="py-2 pr-4">Zustand</th>
+                      {/* Additiv, nicht ersetzend: „Zustand" gilt laut 5.5 in
+                          JEDER Sicht, und ein Reiter, der ihn wegnimmt, machte
+                          aus drei Sichten auf dieselben Zeilen wieder drei
+                          verschiedene Wahrheiten. */}
+                      {reiter === "mitgliedschaft" && <th className="py-2 pr-4">Mitgliedschaft</th>}
                       <th className="py-2">Aktionen</th>
                     </tr>
                   </thead>
@@ -462,6 +471,11 @@ export default function AdminMitgliederPage() {
                         <td className="py-2 pr-4">
                           <Zustand member={m} />
                         </td>
+                        {reiter === "mitgliedschaft" && (
+                          <td className="py-2 pr-4">
+                            <Mitgliedschaft member={m} />
+                          </td>
+                        )}
                         <td className="py-2">
                           <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                         </td>
@@ -487,6 +501,7 @@ export default function AdminMitgliederPage() {
                       <Zustand member={m} />
                     </div>
                     <p className="text-sm text-muted">{m.login_email}</p>
+                    {reiter === "mitgliedschaft" && <Mitgliedschaft member={m} />}
                     <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                   </Card>
                 ))}
@@ -520,6 +535,11 @@ export default function AdminMitgliederPage() {
                       <Zustand member={m} />
                       <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                     </div>
+                    {/* Die Felder stehen NEBEN der Verzeichniskarte, nicht darin:
+                        die Karte ist ein Link, und ein Eingabefeld in einem Link
+                        ist weder gültiges HTML noch bedienbar — derselbe Grund,
+                        aus dem schon Zustand und Menü daneben stehen. */}
+                    {reiter === "mitgliedschaft" && <Mitgliedschaft member={m} />}
                   </div>
                 ))}
               </div>
@@ -564,6 +584,122 @@ function Zustand({ member }: { member: AdminMember }) {
     <Badge variant="soft">Aktiviert</Badge>
   ) : (
     <Badge variant="neutral">Nicht aktiviert</Badge>
+  );
+}
+
+/**
+ * Die Mitgliedschaftsfelder EINER Zeile — nur im Reiter „Mitgliedschaft"
+ * (AGE-581, Abschnitt 9).
+ *
+ * DIE STUFE IST NUR LESBAR. Sie steht als Plakette da, nicht als Auswahlfeld:
+ * ein Stufenwechsel berührt Rechte und Preise und hat einen eigenen Weg
+ * (AGE-516). Ihn nebenbei in einer Tabellenzeile zu erlauben, wäre die
+ * folgenreichste Änderung auf dieser Fläche und zugleich die unauffälligste.
+ *
+ * „UNBEKANNT" STEHT NEBEN DEM LEEREN FELD, statt es zu füllen. Ein leeres
+ * Datumsfeld allein sagt nicht, ob niemand es je erfasst hat oder ob die Zeile
+ * gerade lädt — und ein vorbelegtes „heute" wäre ein geratenes Datum, genau das
+ * also, was das Delta ausschliesst.
+ *
+ * DER ZUSTAND LIEGT IN `useState` OHNE `reset()`. Die Zeile ist nach `m.id`
+ * verschlüsselt, die Anfangswerte stehen beim Aufbau schon da (Zeilen werden
+ * erst gezeichnet, wenn die Liste da ist), und „geändert" ist ein VERGLEICH
+ * gegen das Mitglied statt eines zweiten Zustands: nach dem Speichern liefert
+ * die neu geladene Liste genau die getippten Werte, und die Zeile ist von
+ * selbst wieder sauber. Damit gibt es hier kein `reset()` — und ohne `reset()`
+ * auch nicht die Falle, an der ein Auswahlfeld still auf die erste Option
+ * zurückfällt. (Der Plan sah dafür `Controller` vor; die Begründung dieser
+ * Abweichung steht in `tasks.md` unter 9.3.)
+ */
+function Mitgliedschaft({ member }: { member: AdminMember }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const name = member.name ?? "Ohne Namen";
+  const [datum, setDatum] = useState(member.paid_until ?? "");
+  const [art, setArt] = useState(member.payment_type ?? "");
+
+  /** Ein VERGLEICH gegen das Mitglied, kein zweiter Zustand. Nach dem
+   *  Speichern bringt die neu geladene Liste genau diese Werte mit, und die
+   *  Zeile ist von selbst wieder sauber — ein Merker müsste dafür von Hand
+   *  zurückgestellt werden und bliebe irgendwann stehen. */
+  const geaendert = datum !== (member.paid_until ?? "") || art !== (member.payment_type ?? "");
+
+  const speichern = useMutation({
+    mutationFn: () => updateMitgliedschaft(member.id, { paid_until: datum, payment_type: art }),
+    onSuccess: async () => {
+      toast({ title: `Mitgliedschaft von ${name} gespeichert`, variant: "success" });
+      // Nachladen. Nicht nur der Kosmetik wegen: `geaendert` misst gegen das
+      // Mitglied aus der Liste, und ohne das Nachladen bliebe die Zeile für
+      // immer „geändert" — der Knopf lüde zum zweiten, wirkungslosen Klick ein.
+      await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+    },
+    onError: (e) =>
+      toast({
+        title: "Speichern fehlgeschlagen",
+        description: fehlerText(e),
+        variant: "error",
+      }),
+  });
+
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-muted">Stufe</span>
+        {/* Eine Plakette, kein Feld — die Zusage aus dem Delta ist genau diese
+            Abwesenheit, und sie ist im Test als solche geprüft. */}
+        <TierBadge tier={member.tier} />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-muted">bezahlt bis</span>
+        <div className="flex items-center gap-2">
+          {/* Der zugängliche Name trägt das MITGLIED. Die Aufschrift daneben
+              steht 25-mal auf der Seite; ohne den Namen hiesse jedes dieser
+              Felder für eine Vorleseausgabe dasselbe. */}
+          <Input
+            type="date"
+            aria-label={`bezahlt bis für ${name}`}
+            className="h-9 w-40"
+            value={datum}
+            onChange={(e) => setDatum(e.target.value)}
+          />
+          {datum === "" && <span className="text-xs text-muted">unbekannt</span>}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-muted">Zahlungsart</span>
+        <Select
+          aria-label={`Zahlungsart für ${name}`}
+          className="h-9 w-44"
+          value={art}
+          onChange={(e) => setArt(e.target.value)}
+        >
+          {/* Der leere Wert ist keine neunte Zahlungsart, sondern die Auskunft,
+              dass keine erfasst ist — `null` in der Spalte. */}
+          <option value="">nicht erfasst</option>
+          {ZAHLUNGSARTEN.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.label}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {/* Je Zeile ein eigener Knopf und kein Speichern beim Verlassen des
+          Feldes: auf einer Fläche mit 25 Zeilen ist ein Tastendruck neben dem
+          Feld sonst ein Schreibzugriff, den niemand ausgelöst hat. */}
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        aria-label={`Mitgliedschaft speichern für ${name}`}
+        disabled={!geaendert || speichern.isPending}
+        onClick={() => speichern.mutate()}
+      >
+        {speichern.isPending ? "Speichert …" : "Speichern"}
+      </Button>
+    </div>
   );
 }
 
