@@ -1,128 +1,119 @@
-# Session Handoff — 2026-08-23 (elfte Sitzung)
+# Session Handoff — 2026-08-24 (zwölfte Sitzung)
 
-Die **ganze Serverseite von AGE-581** gebaut: Abschnitte 3–6 vollständig, sechs
-Commits auf `donald/age-581-admin-mitgliederverwaltung`, **nichts gepusht**.
-28 → **38 von 73 Aufgaben**. 598 pgTAP-Tests, 1367 Vitest-Tests, 10 Deno-Tests.
+**Abschnitt 7 von AGE-581 gebaut**, danach die Diff-Prüfung — und die führte auf
+zwei Widersprüche im Delta selbst, die Donald entschieden hat. Vier Commits auf
+`donald/age-581-admin-mitgliederverwaltung`, **nichts gepusht**.
+38 → **45 von 73 Aufgaben**. 1399 Vitest, 601 pgTAP (sechs Dateien), 12 Deno.
 
 ## Accomplished
 
-**Abschnitt 5 — `admin_list_members`** (`20260823140000_..._lifecycle.sql`).
-Fünf `p_status`-Werte statt drei, vier neue Spalten (`deaktiviert_seit`,
-`geloescht_seit`, `paid_until`, `payment_type`). `drop` + `create`, weil der
-Rückgabetyp sich ändert; Grants, Kommentar und Vorgabewerte wiederhergestellt.
-`payment_type` in `admin_update_profile` an **allen vier** Stellen.
+**Abschnitt 7 — das Zeilenmenü.** Sechs Handlungen hinter einer Schaltfläche,
+an `document.body` portaliert. **Drei** Fallen, nicht die zwei aus dem Plan:
+neben `.fbc-card:hover` (`transform`) und `<header>` (`backdrop-blur`) schnitte
+auch der `overflow-x-auto` der Tabelle ein `absolute` Menü ab.
 
-**Abschnitt 6 — `event_attendees` und der Sperrhinweis**
-(`20260823150000_...`). Die Zielseite von `event_attendees` prüft jetzt
-`is_activated_profile()`. `blocked` läuft von der RPC bis zum Schirm; ein
-gesperrtes, zuvor bestätigtes Konto kam bisher **durch** die Aktivierungswand
-und landete auf leeren Seiten.
+**Sichtprobe im Browser (7.6), mit Gegenprobe zuerst.** Ein *nicht* portaliertes
+`fixed; inset:0` in derselben Karte misst 361×154 statt 1688×1234 — die Falle
+schnappt zu. Das portalierte Menü: 224×154, `parentElement === BODY`, alle
+Einträge per `elementFromPoint` getroffen, in allen drei Sichten. Zwei Befunde,
+die nur die Sichtprobe fand: der Auslöser streckte sich über die ganze Karte
+(`align-self: stretch` → `w-fit`), und die Rückfrage nannte den Namen zweimal.
 
-**Aufgabe 3.4 — `former_member_entries`** (`20260823160000_...`). Die Auskunft
-hinter „Ehemaliges Mitglied", über Beitrags- und Kommentar-IDs.
+**Diff-Prüfung (Stufe 4): fünf Befunde, vier bestätigt.** Drei behoben in
+`ce28925`, der vierte führte tiefer (siehe Entscheidungen). Dazu eine CI-Lücke,
+die auf demselben Weg auffiel.
 
-**Abschnitt 4 — Edge Function `admin-set-member-ban`.** Der einzige Eingang zu
-den vier Lebenszyklus-RPCs, mit richtungsabhängiger Reihenfolge und 207 für den
-halben Zustand.
-
-**Nebenbefund behoben:** `pnpm lint` war auf dem Branch **rot**, und CI führt den
-Befehl aus. Drei Fehler aus den Sondenskripten vom 23.08.; die `.mjs`-Datei war
-die erste mit Node-Globals im Repo.
-
-**Gemessen statt hergeleitet:** zwölf Mutations-Gegenproben (je rot, je
-Wiederherstellung grün), eine Browser-Sichtprobe, und eine
-End-to-End-Abnahme mit **25 von 25** Zusagen.
+**Belegt statt behauptet.** 23 Mutations-Gegenproben über vier Schichten
+(Fläche, Modul, Edge Function, Migration) — je rot, je Wiederherstellung grün.
+Zwei davon deckten echte Lücken auf. Plus zwei End-to-End-Durchstiche gegen den
+lokalen Stack mit Prüfung in der Datenbank.
 
 ## Decisions
 
-- **Aufgabe 5.3 war falsch formuliert und ist korrigiert.** Sie behauptete, der
-  Paritätstest gegen `search_directory` bleibe ohne Änderung grün. Er vergleicht
-  Spalten*mengen* und zählt die Verwaltungsspalten namentlich auf — aus drei
-  werden sieben, er musste brechen.
-- **`database.types.ts` wird von Hand gepflegt, nicht generiert.** *Warum:* die
-  Datei sagt es selbst; ein `supabase gen types` würfe die Anmerkungen weg und
-  bringt Nullability-Drift in unbeteiligten Typen mit.
-- **`former` ist `disabled_at is not null or deleted_at is not null`**, nicht
-  `not is_activated_profile()`. *Warum:* letzteres ist kürzer, erfüllt jede
-  naheliegende Zusage — und wäre auch für ein nie bestätigtes Konto wahr. Das
-  wurde nicht entfernt, es ist nur nie angekommen.
-- **`former_member_entries` bleibt SECURITY DEFINER mit abgeschriebenem
-  Prädikat.** *Warum:* SECURITY INVOKER bräuchte einen für `authenticated`
-  ausführbaren Helfer „ist dieses Profil entfernt?" — genau der Aufzählungsweg,
-  den der Review als HIGH verworfen hat, nur eine Ebene tiefer. Ausgleich: ein
-  **Wortlaut-Wächter** über die Policy (§7.18), weil kein Verhaltenstest diese
-  Drift fände.
-- **Der Teilfehlschlag steht in einer EIGENEN Protokollzeile (`ban_failed`)**,
-  nicht im Payload der ersten — Abweichung von Aufgabe 4.5. *Warum:* die RPC
-  schreibt ihre Zeile in derselben Transaktion wie die Änderung an
-  `disabled_at`, also bevor irgendwer wissen kann, ob der Bann gelingt. Ein
-  Protokoll, das sich nachträglich ändern lässt, ist keins.
-- **Der Sperrhinweis nennt den Grund nicht.** *Warum:* dieselbe Entscheidung,
-  die in der Datenbank aus zwei Zuständen einen Wahrheitswert gemacht hat.
-- **`event_attendees` mit `create or replace`, nicht `drop`.** *Warum:* ihr
-  Rückgabetyp bleibt; die Begründung aus Aufgabe 6.4 trifft nur auf
-  `my_activation_state` zu.
+- **Die Datenbank kommt in BEIDEN Richtungen zuerst** (Donald, 24.08.). *Warum:*
+  „Öffnen: Ban zuerst" erzeugte zwei Zustände, die dasselbe Delta verbietet —
+  ein wiederhergestelltes Mitglied blieb deaktiviert **und wurde anmeldefähig**
+  (`entbannen` hatte null Leser), und „reaktivieren" auf ein gelöschtes Profil
+  hob die Sperre auf, *bevor* die RPC mit `22023` ablehnte. Delta **und**
+  `design.md` sind mitgeändert: Änderung am Plan, nicht Rechtfertigung des Codes.
+- **`207` heisst jetzt „verborgen und gesperrt stimmen nicht überein".** Beim
+  Schliessen `{hidden, !banned}`, beim Öffnen `{!hidden, banned}` — **nicht**
+  derselbe Zustand aus zwei Richtungen. Kriterium der Fläche: `hidden !== banned`.
+  `hidden && !banned` hätte die zweite Hälfte als Erfolg durchgehen lassen.
+- **`gebannt` kommt in `admin_list_members`** (Donald, 24.08.). *Warum:* das
+  Delta verlangte „fehlt der Ban, SHALL derselbe Aufruf ihn nachsetzen" UND
+  „‚deaktivieren' SHALL NOT an bereits deaktivierten erscheinen" — zusammen war
+  der Nachsetz-Weg unerreichbar, nach der eigenen Formulierung des Delta „keine
+  Handlung, sondern eine Falle". Ein **abgelaufener** Ban zählt nicht.
+- **Beide Aktivierungswege hängen an `gesperrt`** (deaktiviert *oder* gelöscht),
+  wie `blocked` in `my_activation_state`. Für „gelöscht" verlangt es 7.5; der
+  deaktivierte Fall ist derselbe Sachverhalt — das Konto ist gebannt.
+- **Nicht gespiegelt:** dass ein Admin sich nicht selbst sperren kann. Die
+  Fläche kennt den Aufrufer dort nicht, die Datenbank weist es mit `22023` ab.
 
 ## Files modified
 
-- `supabase/migrations/20260823140000_admin_member_list_lifecycle.sql` — **neu**
-- `supabase/migrations/20260823150000_event_attendees_lifecycle.sql` — **neu**
-- `supabase/migrations/20260823160000_former_member_entries.sql` — **neu**
-- `supabase/functions/admin-set-member-ban/{index,ban,ban.test}.ts` — **neu**
-- `supabase/config.toml` — Function mit `verify_jwt = true` eingetragen
-- `scripts/probe-age581-ban-abnahme.ts` — **neu**, die 25 Abnahme-Zusagen
-- `supabase/tests/admin_member_list_test.sql` — §12 (Lebenszyklus), Parität auf
-  sieben Verwaltungsspalten nachgezogen
-- `supabase/tests/member_lifecycle_test.sql` — §7 (`former_member_entries`),
-  achtzehn Zusagen samt Prädikat-Wächter
-- `supabase/tests/rls_test.sql` — §18.5c (`payment_type`), §20.3b
-  (`event_attendees`)
-- `src/components/ActivationGate.{tsx,test.tsx}` — Sperrhinweis + sechs Zusagen
-- `src/{lib/activation.ts,lib/database.types.ts,providers/auth-context.ts,providers/AuthProvider.tsx,test/auth-fixtures.tsx}`
-  — `blocked` durchgereicht
-- `eslint.config.js`, `scripts/probe-age581-abgleich.ts` — der Lint-Fix
-- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 3.4, 4.1–4.8, 5, 6
+- `src/pages/AdminMitgliederPage.tsx` — `Zeilenmenue` + `handlungenFuer` statt
+  `Handlungen`; `Rueckfrage` verallgemeinert (drei Arten); Klapprichtung,
+  Fokusregeln, Meldungen je Ausgang
+- `src/pages/AdminMitgliederPage.test.tsx` — 20 → **51** Zusagen
+- `src/lib/admin-members.ts` — `setMemberBan`, Statusübersetzung (403/404/409/502)
+- `src/lib/database.types.ts` — `gebannt`
+- `supabase/migrations/20260824100000_admin_member_list_ban.sql` — **neu**
+- `supabase/functions/admin-set-member-ban/{index,ban,ban.test}.ts` — Ordnung
+  umgestellt, `fasseAusgangZusammen` auf die Invariante
+- `supabase/tests/admin_member_list_test.sql` — §12.13–12.15, plan(57)→plan(60)
+- `.github/workflows/ci.yml` — die zwei nie gelaufenen Lebenszyklus-Suiten
+- `openspec/changes/add-admin-member-lifecycle/{tasks,design,specs/admin/spec}.md`
+- `scripts/probe-age581-sichtprobe-daten.ts` — **neu**, wiederholbar, nur `127.0.0.1`
 
 ## Next session: start here
 
-**Abschnitt 7, Aufgabe 7.1** in
-`openspec/changes/add-admin-member-lifecycle/tasks.md` — das Zeilenmenü der
-Admin-Mitgliederliste. Erst den RED-Test in `AdminMitgliederPage.test.tsx`
-(Fixture-Bauer trägt die vier neuen Felder bereits), dann die Fläche. **Die
-Warnung für den 207-Ausgang gehört hierher** — sie ist die letzte offene Hälfte
-von 4.5 und muss beides sagen: unsichtbar, aber weiterhin anmeldefähig; kein
-Erfolgston. Der Client ruft `supabase.functions.invoke("admin-set-member-ban",
-{ body: { action, target, grund } })`; `action` ist
-`disable|enable|delete|restore`, und **207 ist kein `error`** — der
-supabase-js-Client behandelt 2xx als Erfolg, die Unterscheidung muss also am
-Rumpf hängen (`banned === false`). `AdminMemberStatus` in
-`src/lib/admin-members.ts` steht noch auf drei Werten; die Reiter sind laut
-Delta **nicht** die fünf `p_status`-Werte (Abschnitt 8). Der lokale Stack läuft;
-`supabase functions serve` läuft **nicht** mehr. Testliste unverändert, **immer
-mit Dateiliste**.
+**Abschnitt 8, Aufgabe 8.1** — die fünf Reiter. Erst der RED-Test in
+`AdminMitgliederPage.test.tsx` („ein deaktiviertes Mitglied fehlt unter ‚Alle'
+und steht unter ‚Deaktiviert'"), dann die Fläche. Die Abbildung Reiter →
+`p_status` steht **im Delta** und ist nicht zu raten: „Mitgliedschaft" ist ein
+Darstellungsmodus über `p_status = 'alle'`, `aktiviert` hat keinen Reiter.
+`AdminMemberStatus` in `src/lib/admin-members.ts` steht noch auf **drei** Werten
+— die RPC kennt fünf. Der gewählte Reiter gehört als Suchparameter in die
+Adresse; 8.4 verlangt ausdrücklich einen Test, der von **aussen** dorthin
+navigiert und zurückgeht (`location.key`, siehe Gedächtnis).
+
+**Wichtig:** Abschnitt 7 ist erst mit Abschnitt 8 bedienbar. „Alle" schliesst
+Deaktivierte und Gelöschte korrekt aus, also sind „Reaktivieren" und
+„Wiederherstellen" heute über die Fläche **nicht erreichbar**.
+
+Der lokale Stack läuft, die Migration ist lokal angewendet.
+`supabase functions serve` und Vite laufen **nicht** mehr.
+`pnpm exec tsx scripts/probe-age581-sichtprobe-daten.ts` legt fünf Konten in den
+Lebenszyklus-Zuständen an (Passwort wird gewürfelt und ausgegeben).
+pgTAP **immer mit Dateiliste**, jetzt sechs Dateien.
 
 ## Open questions
 
-- **`admin_audit.actor` verweist ohne `on delete cascade` auf `profiles`.** Ein
-  Admin mit Protokollzeilen lässt sich nicht löschen, und die Löschung
-  **scheitert dabei still** — die GoTrue-Admin-API meldet keinen Fehler. In der
-  Abnahmeprobe umgangen, im Schema unangetastet: das ist eine Entscheidung über
-  Aufbewahrung, keine für nebenbei.
-- **Abweichung bei 4.5** (eigene `ban_failed`-Zeile statt Payload) — begründet
-  in `tasks.md`, aber nicht abgenommen.
-- **Die Anmeldeadresse des Vorsitzenden** weicht zwischen Liste und DB ab (zwei
-  verschiedene Domains). Falsch gesetzt sperrt sie ihn aus der Fläche aus, auf
-  der man sie korrigiert. Bis zu seiner Bestätigung ausgenommen. Wer ist wer:
-  `docs/age-581-mitgliederabgleich.md`, nicht hier — **das Repo ist öffentlich**.
-- **Ein Konto auf der Deaktivierungsliste ist auf DEV `matching_manager`** (auf
-  PROD ohne Rolle). Mit der Verschärfung verliert es die Rolle. Braucht die
-  Zuteilungsliste einen anderen Bearbeiter?
-- **Was Entfernte ausserhalb von Feed und Teilnahme hinterlassen** — Nachrichten,
-  Kontaktanfragen, Treffer, Angebote, Gesuche — ist ausdrücklich nicht behandelt.
-- **AGE-534 steht auf Done**, obwohl seine Abnahme gesetztes `paid_until`
-  verlangt und 0 von 70 gesetzt sind. Wieder aufmachen? (unverändert offen)
-- Unverändert: Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging ·
+- **7.5 stimmt nur zur Hälfte.** „Serverseitig erzwungen" gilt für die vier
+  Lebenszyklus-RPCs. `admin_activate_member` und `issue_activation_token` kennen
+  `disabled_at`/`deleted_at` **nicht** — dort ist das Ausblenden im Menü die
+  einzige Hürde. Das Gate hält weiter; der Schaden wäre ein falsches
+  `activated_at` und eine irreführende Mail an ein ehemaliges Mitglied.
+  `admin_activate_member` wäre billig zu schliessen, `issue_activation_token`
+  teilt sich den Weg mit der Selbstanforderung und ihrer Aufzählungsabwehr.
+- **Für eine GELÖSCHTE Zeile mit fehlendem Ban gibt es keinen Nachsetz-Weg** —
+  die Übergangstabelle bricht „löschen" dort in jedem Fall ab. Die Fläche
+  erfindet keinen und verspricht in der Warnung auch keinen.
+- **`grund` hat weiterhin keinen Aufrufer.** Die RPCs führen ihn als
+  `default null`, die Fläche hat kein Feld. Bewusst nicht erfunden.
+- **`admin_audit.actor` ohne `on delete cascade`** — am 23.08. live eingetreten:
+  nach einer echten Handlung liess sich das Admin-Konto nicht mehr löschen, und
+  **GoTrue meldete keinen Fehler**. Das Probe-Skript räumt jetzt zuerst das
+  Protokoll ab; im Schema unangetastet.
+- **Abweichung bei 4.5** (eigene `ban_failed`-Zeile statt Payload) — begründet,
+  nicht abgenommen.
+- Unverändert: Anmeldeadresse des Vorsitzenden · ein Konto auf der
+  Deaktivierungsliste ist auf DEV `matching_manager` · was Entfernte ausserhalb
+  von Feed und Teilnahme hinterlassen · AGE-534 steht auf Done ohne gesetztes
+  `paid_until` · Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging ·
   AGE-497 · AGE-512 · AGE-256 · AGE-513 · AGE-258 · eigenes Issue für
-  `send-activation` (2xx trotz Resend-401) · `demo_personas.sql` scheitert lokal
-  an einem Fremdschlüssel · `socials` auf keiner öffentlichen Fläche ·
-  WP-Quelldatei unauffindbar · `branche`-Ableitung aus `infos` existiert nicht.
+  `send-activation` · `demo_personas.sql` scheitert lokal an einem Fremdschlüssel
+  · `socials` auf keiner öffentlichen Fläche · WP-Quelldatei unauffindbar ·
+  `branche`-Ableitung aus `infos` existiert nicht.
