@@ -54,21 +54,23 @@ await db.connect();
 await db.query("set default_transaction_read_only = on");
 await db.query("set statement_timeout = '30s'");
 
-// Sechste Spalte optional: die heutige Anmeldeadresse des gemeinten Kontos,
-// gesetzt nur dort, wo Adresse und Name die Zuordnung nicht tragen.
+// Sechste Spalte optional: die KENNUNG des gemeinten Kontos, gesetzt nur dort,
+// wo Adresse und Name die Zuordnung nicht tragen. Die Kennung und nicht die
+// Adresse — 12.4 ändert Adressen, und ein Schlüssel, den ein späterer Schritt
+// desselben Durchgangs verändert, ist keiner.
 const zeilen: Uebersichtszeile[] = (await readFile(tsvPfad, "utf8"))
   .trim()
   .split("\n")
   .slice(1)
   .map((l) => {
-    const [kategorie, vorname, nachname, jahrestag, email, kontoEmail] = l.split("\t");
+    const [kategorie, vorname, nachname, jahrestag, email, kontoId] = l.split("\t");
     return {
       kategorie: kategorie.trim(),
       vorname,
       nachname,
       jahrestag,
       email,
-      ...(kontoEmail?.trim() ? { kontoEmail: kontoEmail.trim() } : {}),
+      ...(kontoId?.trim() ? { kontoId: kontoId.trim() } : {}),
     };
   });
 

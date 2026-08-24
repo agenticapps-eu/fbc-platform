@@ -19,7 +19,7 @@ export type Uebersichtszeile = {
   jahrestag: string;
   email: string;
   /**
-   * FESTE ZUORDNUNG — die heutige Anmeldeadresse des gemeinten Kontos.
+   * FESTE ZUORDNUNG — die **Kennung** (`profiles.id`) des gemeinten Kontos.
    *
    * Nur gesetzt, wo Adresse UND Name die Zuordnung nicht tragen. Das kommt vor:
    * eine Übersichtszeile kann die Adresse einer ANDEREN Person tragen, und dann
@@ -27,10 +27,19 @@ export type Uebersichtszeile = {
    * Werte an die falsche Person und lässt das richtige Konto als „ohne Eintrag"
    * zurück, wo es deaktiviert würde.
    *
-   * Die Zuordnung steht deshalb in der QUELLDATEI und nicht hier: das Repo ist
-   * öffentlich, und eine Zuordnungstabelle ist eine Identitätstabelle.
+   * ══ WARUM DIE KENNUNG UND NICHT DIE ADRESSE ══════════════════════════════
+   * Die erste Fassung hielt hier die damalige Anmeldeadresse. Das ging am
+   * 24.08. auf PROD schief, und zwar genau so: Schritt 12.4 gleicht
+   * Anmeldeadressen an, danach zeigte die festgesetzte Adresse ins Leere, die
+   * Zeile galt als „ohne Konto" — und ein Mitglied wurde in 12.5 deaktiviert
+   * und in 12.6 beinahe ein zweites Mal angelegt. Eine Zuordnung, deren
+   * Schlüssel ein SPÄTERER Schritt desselben Durchgangs verändert, ist keine.
+   *
+   * Die Kennung ändert sich nie. Sie steht in der QUELLDATEI und nicht hier:
+   * das Repo ist öffentlich, und eine Zuordnungstabelle ist eine
+   * Identitätstabelle.
    */
-  kontoEmail?: string;
+  kontoId?: string;
 };
 
 /** Ein Konto, so wie es der Trockenlauf aus PROD liest. */
@@ -117,8 +126,8 @@ export type Zuordnung = {
  */
 export function ordneZu(zeilen: Uebersichtszeile[], konten: Konto[]): Zuordnung[] {
   return zeilen.map((zeile, i) => {
-    if (zeile.kontoEmail) {
-      const fest = konten.filter((k) => norm(k.login_email) === norm(zeile.kontoEmail!));
+    if (zeile.kontoId) {
+      const fest = konten.filter((k) => k.id === zeile.kontoId);
       return { zeile, nummer: i + 1, wie: fest.length ? "fest" : "-", treffer: fest };
     }
     const perEmail = konten.filter(

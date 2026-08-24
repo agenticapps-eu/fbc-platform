@@ -739,24 +739,48 @@ Grundlage: Detlevs Übersicht vom 23.08., 60 Zeilen, gegen PROD abgeglichen
       der Datenbank und der nicht eingecheckten Quelldatei. Am 24.08. auf die
       **gemessenen** Zahlen aus 12.7 gehoben: die Fassung vom 23.08. war in Prosa
       gezählt und wich an drei Stellen ab.
-- [ ] 12.1 `paid_until` aus dem Jahrestag: **nächstes** Vorkommen von Tag/Monat
+- [x] 12.1 `paid_until` aus dem Jahrestag: **nächstes** Vorkommen von Tag/Monat
       nach dem **festen** Stichtag `2026-08-23`, minus einen Tag. Nicht „heute"
       — sonst hängt das Ergebnis am Ausführungstag. Erst als Tabelle ausgeben
       und lesen, dann schreiben.
-- [ ] 12.2 `payment_type` aus der Kategorie setzen (8 Werte, 60 Zeilen).
-- [ ] 12.3 Die drei Stripe-Einträge, deren Übersicht als Jahrestag „Ohne"
+      **57 Werte gesetzt** (56 bestehende + der Nachzügler), über
+      `admin_update_profile`. Der Stichtag steht als Parameter im Rechenkern,
+      damit der Aufrufer ihn festschreiben MUSS. Unabhängig nachgemessen: kein
+      Wert liegt vor dem Stichtag, keiner mehr als ein Jahr voraus.
+- [x] 12.2 `payment_type` aus der Kategorie setzen (8 Werte, 60 Zeilen).
+      **60 gesetzt**, Verteilung einzeln gegen die Gruppenüberschriften geprüft:
+      rechnung 28 · stripe 15 · copecart 6 · partner 5 · ehren 3 ·
+      digistore24 1 · paypal 1 · offen 1.
+- [x] 12.3 Die drei Stripe-Einträge, deren Übersicht als Jahrestag „Ohne"
       führt, behalten `paid_until = null`.
-- [ ] 12.4 Zehn Anmeldeadressen auf die Listenfassung angleichen, über
+      **Drei ohne Datum, alle drei `stripe`** — beides einzeln nachgemessen, weil
+      „drei leer" auch dann stimmte, wenn es die falschen drei wären.
+- [x] 12.4 Zehn Anmeldeadressen auf die Listenfassung angleichen, über
       `admin-change-email`. **Drei ausgenommen und zu melden** (Begründung je
       Fall in `docs/age-581-mitgliederabgleich.md`): eine Adresse ohne `@`, eine
       bereits an eine andere Person vergebene, und die des zweiten Admins — bei
       ihm sperrte eine falsch gesetzte Adresse ihn aus genau der Fläche aus, auf
       der man sie korrigieren würde.
-- [ ] 12.5 Die 11 Konten ohne Listeneintrag deaktivieren — über die **Edge
+      **Zwölf angeglichen, drei ausgenommen** — nicht zehn: die Prosa-Zählung
+      vom 23.08. hatte zwei Zeilen übersehen (siehe 12.0). Die drei Ausnahmen
+      sind die vorhergesagten, und alle drei hat der Lauf selbst erkannt, statt
+      sie aus einer Liste abzulesen. Es ging dabei KEINE Post an Mitglieder:
+      `admin-change-email` setzt `email_confirm: true`, GoTrue verschickt
+      nichts.
+- [x] 12.5 Die 11 Konten ohne Listeneintrag deaktivieren — über die **Edge
       Function**, nicht mit einem `update` auf `disabled_at`, sonst entsteht
       genau der halbe Zustand, den 4.5 beschreibt.
-- [ ] 12.6 Bastian Niklas anlegen und sofort deaktivieren.
-- [ ] 12.7 **[PR]** Vorher ein **Trockenlauf**, der die Umgebung nennt und die
+      **11 deaktiviert — aber der Lauf schloss 12.** Ein Mitglied traf es zu
+      Unrecht; die Ursache steht bei 12.7. Geheilt über `enable`, und die
+      Doppelsperre danach in BEIDE Richtungen nachgemessen: null verborgen-ohne-
+      Bann, null offen-aber-gebannt. Die `admin_audit`-Spur trägt den Fehler und
+      seine Rücknahme (13 × `disable_member`, 1 × `enable_member`) — ein
+      Protokoll, das nur die geglückten Schritte zeigt, ist keins.
+- [x] 12.6 Den Nachzügler aus „Zahlung offen" anlegen und sofort deaktivieren.
+      Angelegt mit `email_confirm: true`, `tier = impact` (die Vorgabe ist
+      `basic`, und alle übrigen 71 stehen auf `impact`), Zahlungsart und
+      `paid_until` gesetzt, dann geschlossen — `{hidden:true, banned:true}`.
+- [x] 12.7 **[PR]** Vorher ein **Trockenlauf**, der die Umgebung nennt und die
       erwarteten Zahlen ausgibt; erst nach dem Lesen schreiben. Nachher zählen
       und gegen die Abnahme in AGE-581 halten.
       **Erste Hälfte erledigt** (24.08.):
@@ -780,5 +804,27 @@ Grundlage: Detlevs Übersicht vom 23.08., 60 Zeilen, gegen PROD abgeglichen
       12.6: **72 Profile · 60 payment_type · 57 paid_until · 12 deaktiviert ·
       0 gelöscht.** Die Abnahme in AGE-581 nennt 59/56/11 — derselbe Zustand
       **vor** 12.6.
-      Offen: die zweite Hälfte (nachher zählen), und sie kommt erst nach
-      12.1–12.6.
+      **Zweite Hälfte erledigt** — und sie hat sich gelohnt.
+      **DER FEHLER, DEN 12.4 IN 12.5 GETRAGEN HAT.** Die feste Zuordnung hing
+      an der ANMELDEADRESSE. 12.4 gleicht Anmeldeadressen an; danach zeigte der
+      Schlüssel ins Leere, die Zeile galt als „ohne Konto" — und 12.5
+      deaktivierte ein Mitglied, das auf der Liste steht, während 12.6 versuchte,
+      es ein zweites Mal anzulegen. Dass GoTrue das mit „already registered"
+      ablehnte, war Zufall, kein Entwurf. Ein Schlüssel, den ein SPÄTERER Schritt
+      desselben Durchgangs verändert, ist keiner.
+      Warum die Sperre aus der ersten Hälfte nicht ansprang: aus der
+      Doppelbelegung wurde eine Nicht-Belegung, und der Trockenlauf prüfte den
+      Zustand VOR 12.4, nicht den ZWISCHEN den Schritten.
+      Behoben: der Schlüssel ist `profiles.id` und ändert sich nie. Ein Test
+      stellt die Reihenfolge nach (dieselbe Zeile vor und nach der Angleichung)
+      und ist gegen den alten Entwurf **rot**. Dazu der Schritt `heilen`, der die
+      Invariante herstellt statt des Einzelfalls: wer auf der Liste steht, ist
+      offen.
+      **Abgenommen mit einem ZWEITEN Lauf**
+      (`scripts/probe-age581-datenpflege-abnahme.ts`), der die Quelldatei nicht
+      kennt und nur Fragen an die Datenbank stellt — der Zähler im Schreibskript
+      teilt sich Rechenkern und Quelle mit dem Schreiber und hätte denselben
+      Fehler mitgemeldet. 22 Zusagen grün: 72 Profile, alle `impact` · 60
+      `payment_type` mit richtiger Verteilung je Kategorie · 57 `paid_until`,
+      keines vor dem Stichtag · 12 deaktiviert · 0 gelöscht · Doppelsperre in
+      beide Richtungen sauber.

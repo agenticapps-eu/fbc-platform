@@ -171,11 +171,28 @@ describe("feste Zuordnung", () => {
     expect(ohne[0].treffer.map((t) => t.id)).toEqual(["cleo"]);
 
     const mit = ordneZu(
-      [{ ...zeile("Bodo", "Beispielpartner", "info@firma.test"), kontoEmail: "info@eigene.test" }],
+      [{ ...zeile("Bodo", "Beispielpartner", "info@firma.test"), kontoId: "bodo" }],
       [cleo, bodo],
     );
     expect(mit[0].wie).toBe("fest");
     expect(mit[0].treffer.map((t) => t.id)).toEqual(["bodo"]);
+  });
+
+  it("überlebt die Adressangleichung aus 12.4", () => {
+    // DER FEHLER VOM 24.08., als Zusage. Die erste Fassung hielt hier die
+    // damalige Anmeldeadresse als Schlüssel. Schritt 12.4 gleicht
+    // Anmeldeadressen an — danach zeigte der Schlüssel ins Leere, die Zeile
+    // galt als „ohne Konto", das Mitglied wurde in 12.5 deaktiviert und in
+    // 12.6 beinahe ein zweites Mal angelegt.
+    //
+    // Hier ist derselbe Ablauf: dieselbe Zeile, einmal vor und einmal nach der
+    // Angleichung. Beide Male muss sie dasselbe Konto treffen.
+    const vorher = konto({ id: "patrick", name: "Pat Doppelname", login_email: "alt@t.test" });
+    const nachher = { ...vorher, login_email: "neu@t.test" };
+    const z = { ...zeile("Pat", "Anders", "neu@t.test"), kontoId: "patrick" };
+
+    expect(ordneZu([z], [vorher])[0].treffer.map((t) => t.id)).toEqual(["patrick"]);
+    expect(ordneZu([z], [nachher])[0].treffer.map((t) => t.id)).toEqual(["patrick"]);
   });
 
   it("findet KEIN Konto, wenn die feste Zuordnung ins Leere zeigt — statt still zurückzufallen", () => {
@@ -185,7 +202,7 @@ describe("feste Zuordnung", () => {
       [
         {
           ...zeile("Bodo", "Beispielpartner", "info@firma.test"),
-          kontoEmail: "tippfehler@eigene.test",
+          kontoId: "gibt-es-nicht",
         },
       ],
       [cleo, bodo],
@@ -213,7 +230,7 @@ describe("findeDoppelbelegung", () => {
   it("schweigt, sobald die feste Zuordnung die Zeilen trennt", () => {
     const zs = ordneZu(
       [
-        { ...zeile("Bodo", "Beispielpartner", "info@firma.test"), kontoEmail: "info@eigene.test" },
+        { ...zeile("Bodo", "Beispielpartner", "info@firma.test"), kontoId: "bodo" },
         zeile("Cleo", "Rechnungsfrau", "info@firma.test"),
       ],
       [cleo, bodo],
