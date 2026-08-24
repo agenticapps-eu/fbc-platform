@@ -39,18 +39,49 @@
       rot, Datei namentlich gemeldet; (b) das `<svg>` aus der Ausnahme
       `Avatar.tsx` entfernt → rot in der zweiten Prüfung. Danach beide Dateien aus
       einer Kopie zurückgespielt (nicht `git checkout`/`stash`), Suite wieder grün
-- [ ] 1.9 Bereichsfarben als Tokens in `src/index.css` — **einmal** definiert, im
+- [x] 1.9 Bereichsfarben als Tokens in `src/index.css` — **einmal** definiert, im
       Inhaltsschicht-Block. **Nicht** je Theme: der navy-Block überschreibt
-      absichtlich nur Chrome
-- [ ] 1.10 Kontrast der sieben Farben gegen `--color-canvas` **messen** und die
-      Zahl festhalten; „erkennbar" ist nicht abnehmbar
-- [ ] 1.11 Den Kanon `Bereich → { icon, farbToken }` als **eine** Modulkonstante
-      anlegen; Bedien-Symbole stehen ausdrücklich nicht darin
-- [ ] 1.12 Test: kein Bereichs-Token erscheint an einem Link, Knopf, Fokusring oder
+      absichtlich nur Chrome. Sieben `--color-bereich-*`, EINE Familie
+      (Violett→Magenta) statt sieben Töne — siehe die Messung in 1.10 und den
+      Kopfkommentar im Token-Block. Ein Test hält den navy-Block frei davon
+- [x] 1.10 Kontrast der sieben Farben gegen `--color-canvas` **messen** und die Zahl
+      festhalten; „erkennbar" ist nicht abnehmbar. **Gemessen** und im Token-Block
+      festgehalten: alle sieben zwischen **5.70:1** und **10.95:1** gegen
+      `--color-canvas`, zwischen **5.36:1** und **10.30:1** gegen `--color-soft`.
+      Ziel war 4.5:1 gegen beide (strenger als die 3:1 aus WCAG 1.4.11 für
+      Nicht-Text, weil die Marke neben ihrer Beschriftung steht). Kleinster
+      Abstand zwischen zwei Bereichen: **ΔE 10.5**.
+      **Der Befund, der den Entwurf gedreht hat:** Akzent-Blau (Ton 218),
+      `success` (161), `warning` (36) und `danger` (0) belegen vier der sechs
+      unterscheidbaren Farbregionen. Sieben eigene Töne kollidierten alle — der
+      naheliegende Kandidat für „Highlights" lag auf **0°** von `danger`, also
+      exakt auf der Fehlerfarbe. Donalds Entscheidung vom 25.08.: eine Familie
+- [x] 1.11 Den Kanon `Bereich → { icon, farbToken }` als **eine** Modulkonstante
+      anlegen; Bedien-Symbole stehen ausdrücklich nicht darin — `src/config/bereiche.ts`.
+      Zwei Glyphen kamen dafür in den Satz: `mail` (die Sprechblase gehört schon
+      der Aktivität) und `sparkle` (Stern und Krone bezeichnen eine
+      Mitgliedsstufe, keinen Bereich)
+- [x] 1.12 Test: kein Bereichs-Token erscheint an einem Link, Knopf, Fokusring oder
       aktiven Zustand — die Abgrenzung zum interaktiven Akzent ist der Grund, aus
-      dem die bestehende Anforderung geändert werden durfte
-- [ ] 1.13 Kanon auf die bestehenden Karten anwenden: Dashboard, Events,
-      Mitgliederverzeichnis, Aktivität
+      dem die bestehende Anforderung geändert werden durfte.
+      `src/config/bereiche.test.ts`, 12 Zusagen. Der Test prüft die **Form** der
+      Klasse (`^(text|bg)-bereich-[a-z]+$`) statt eine Liste verbotener Präfixe —
+      eine Liste deckt nur ab, woran jemand gedacht hat. Dazu: der Name einer
+      Bereichsfarbe darf nur im Token-Block und im Kanon stehen, sonst sucht sich
+      eine Fläche die Farbe selbst.
+      **Drei Gegenproben gefahren** (der Test war sonst trivial grün, weil noch
+      nichts die Tokens nutzte): eine Fläche wählt selbst → rot; der Kanon bekommt
+      `hover:` → rot; ein Token im navy-Block → rot. Je aus einer Kopie zurück
+- [x] 1.13 Kanon auf die bestehenden Karten anwenden: Dashboard, Events,
+      Mitgliederverzeichnis, Aktivität. **Dashboard erledigt** — `DashTile`
+      („Mein Kompass", „Nächstes Event") und `SectionHeader` („Neu in der
+      Aktivität", „Neue Mitglieder für dich") tragen die Marke; im Browser gesehen.
+      „Mitgliedschaft" bekommt bewusst **keine**: eine Mitgliedsstufe ist kein
+      Bereich, und der Kanon kennt für sie keinen Eintrag.
+      **Offen:** Events, Mitgliederverzeichnis und Aktivität sind
+      Ein-Bereichs-Seiten — dort trägt *jede* Karte denselben Bereich, und eine
+      Marke auf allen wäre Rauschen statt Unterscheidung. Das ist eine
+      Gestaltungsfrage, keine Umsetzungsfrage → siehe 1.17
 - [ ] 1.14 Sichtprobe im Browser gegen den lokalen Stack: beide Themes, Kontrast
       auf Kartengrund, 375 px und breit. **Teilweise erledigt am 25.08.** (helles
       Theme, breit): alle elf Menü-Glyphen, die gefüllte Fassung im aktiven
@@ -65,6 +96,11 @@
       `AdminMitgliederPage.tsx`, der Leerzustands-Glyph in `MeineChancenPage.tsx`
       und `CheckIcon` in `building-blocks.tsx`. Grund für die Vertagung: den Diff
       vor dem Go-Live klein halten
+- [ ] 1.17 **Entscheidung offen:** bekommt auf einer Ein-Bereichs-Seite (Events,
+      Mitgliederverzeichnis, Aktivität) jede Karte die Bereichsmarke, oder nur die
+      Seitenüberschrift? Alle Karten zu markieren wiederholt dieselbe Auskunft
+      pro Zeile; gar keine Marke lässt die Seite ohne Bezug zum Kanon. Der
+      Vorschlag ist: nur die Überschrift der Seite
 - [ ] 1.16 **Drei Motive wurden zusammengeführt**, weil sie sonst am ersten Tag
       doppelt *im Satz* stünden — bei der Sichtprobe gegenlesen: `calendar`
       (Menü + Beitrag), `comment` (Menü „Aktivität" + Kommentarzahl), `academy`
