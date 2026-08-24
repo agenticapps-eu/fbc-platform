@@ -63,6 +63,7 @@ platform_settings/authenticated=SELECT
 post_likes/authenticated=DELETE,INSERT,SELECT,UPDATE
 post_media/anon=SELECT
 post_media/authenticated=DELETE,INSERT,SELECT
+post_saves/authenticated=DELETE,INSERT,SELECT
 posts/anon=SELECT
 posts/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_badges/authenticated=SELECT
@@ -85,6 +86,14 @@ tags/authenticated=SELECT$$,
 -- entsteht. Und `tags` trägt fuer BEIDE Rollen nur SELECT — die Liste ist
 -- redaktionell, ein INSERT hier waere der Weg, sich einen kuratierten Tag
 -- selbst zu verleihen.
+
+-- AGE-582 hat `post_saves` dazugelegt — eine private Merkliste, und die Zeile
+-- sagt vor allem, was NICHT darauf steht: kein UPDATE. An einer Speicherung
+-- gibt es nichts zu aendern; wer sie loesen will, loescht die Zeile. Und kein
+-- `anon`: die Liste hat einem ausgeloggten Besucher keine Frage zu beantworten.
+-- Die RLS traegt dieselbe Aussage ein zweites Mal (drei Policies, keine fuer
+-- UPDATE), damit die Tabelle auch dann unveraenderlich bleibt, wenn ein Grant
+-- auf dem Weg zurueckkehrt, der AGE-312 ausgeloest hat.
 
 -- ── 2. Spalten-Grants ────────────────────────────────────────────────────────
 -- Nur die drei Tabellen, bei denen das Grant ENGER ist als seine Policy. Die

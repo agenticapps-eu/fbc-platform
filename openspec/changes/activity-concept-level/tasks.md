@@ -114,21 +114,53 @@
 
 ## 2. Speichern — `post_saves`
 
-- [ ] 2.1 Migration: Tabelle `post_saves (profile_id, post_id, created_at)`,
+- [x] 2.1 Migration: Tabelle `post_saves (profile_id, post_id, created_at)`,
       Primärschlüssel über beide, `on delete cascade` auf beiden Fremdschlüsseln,
-      RLS an, Kopfkommentar mit Begründung und verworfener Alternative
-- [ ] 2.2 Policies für SELECT, INSERT und DELETE: nur eigene Zeilen **und**
+      RLS an, Kopfkommentar mit Begründung und verworfener Alternative —
+      `20260824130000_post_saves.sql`. Dazugekommen gegenüber dem Plan: ein Index
+      auf `post_id`. Nicht fürs Lesen (dafür führt der Schlüssel), sondern fürs
+      kaskadierende Löschen eines Beitrags — der Schlüssel beginnt mit der
+      falschen Spalte
+- [x] 2.2 Policies für SELECT, INSERT und DELETE: nur eigene Zeilen **und**
       `is_activated()` — wie `posts_write_own`, `likes_write_own` und
-      `post_media_insert_own` es alle tragen
-- [ ] 2.3 Grants aussprechen (`select, insert, delete` für `authenticated`, nichts
-      für `anon`) — neue Tabellen erben hier nichts
-- [ ] 2.4 `grants_test.sql` §1: Golden-String um die `post_saves`-Zeile ergänzen
-- [ ] 2.5 pgTAP: fremde Zeile weder lesbar noch löschbar; zweimal speichern ergibt
-      genau eine Zeile
-- [ ] 2.6 pgTAP: ein unbestätigtes **und** ein deaktiviertes Konto kommen an
-      `post_saves` nicht heran — weder lesend noch schreibend
-- [ ] 2.7 `supabase test db` mit ausdrücklicher Dateiliste laufen lassen (ohne
-      Liste meldet der Befehl FAIL, obwohl grün)
+      `post_media_insert_own` es alle tragen. **Drei Policies statt eines
+      `for all`** wie bei `likes_write_own`: `for all` schlösse UPDATE ein, und
+      an einer Speicherung gibt es nichts zu ändern. Das Grant allein trüge die
+      Aussage nicht — bis AGE-312 kam der Ist-Zustand aus Supabases
+      `alter default privileges`, also steht sie zweimal
+- [x] 2.3 Grants aussprechen (`select, insert, delete` für `authenticated`, nichts
+      für `anon`) — neue Tabellen erben hier nichts. Gemessen: `service_role`
+      hält auf `post_saves` genau `REFERENCES,TRIGGER,TRUNCATE`, byte-gleich mit
+      `posts`, `post_likes` und `post_media` — kein Sonderfall entstanden
+- [x] 2.4 `grants_test.sql` §1: Golden-String um die `post_saves`-Zeile ergänzt
+      (Position 28, zwischen `post_media/authenticated` und `posts/anon`), samt
+      Absatz, der sagt, was NICHT darauf steht: kein UPDATE, kein `anon`
+- [x] 2.5 pgTAP: fremde Zeile weder lesbar noch löschbar; zweimal speichern ergibt
+      genau eine Zeile — `supabase/tests/post_saves_test.sql`, 24 Zusagen. Die
+      Lesezusage lautet auf die **Zahl** der sichtbaren Zeilen bei einer fremden
+      Zeile im Bestand, und der fremde Leser ist der **Autor** des Beitrags: wenn
+      irgendwer sie sehen dürfte, dann er. Die Löschzusage lautet auf den
+      überlebenden Bestand, nicht auf einen Fehlercode — ein von der RLS
+      abgewiesenes DELETE ergibt null Zeilen und meldet `OK`
+- [x] 2.6 pgTAP: ein unbestätigtes **und** ein deaktiviertes Konto kommen an
+      `post_saves` nicht heran — weder lesend noch schreibend. Für beide liegt
+      eine **eigene** Zeile im Bestand, die ein Superuser angelegt hat; ohne sie
+      prüfte „liest nichts" nur eine leere Tabelle
+- [x] 2.7 `supabase test db` mit ausdrücklicher Dateiliste laufen lassen (ohne
+      Liste meldet der Befehl FAIL, obwohl grün) — **7 Dateien, 630 Zusagen,
+      PASS**
+- [x] 2.8 **Nicht im Plan, aber ohne sie läuft der Test nie:** die neue Datei in
+      die `supabase test db`-Zeile von `ci.yml` eintragen. Genau dieser Schritt
+      fehlte am 23.08. für die beiden `member_lifecycle`-Dateien — sie standen
+      als vollwertiges pgTAP im Repo und liefen kein einziges Mal in CI
+- [x] 2.9 Gegenproben am lebenden Katalog (`cp`/`alter policy`, kein
+      `git checkout`), jede einzeln zurückgenommen:
+      **(a)** `is_activated()` aus allen drei Policies entfernt → genau die
+      sechs Zusagen aus 2.6 fallen, unbestätigt **und** deaktiviert;
+      **(b)** SELECT-Policy auf `true` → die vier Lesezusagen fallen, darunter
+      „auch der Autor sieht nur seine eigene Zeile";
+      **(c)** eine UPDATE-Policy dazugelegt → die Policy-Liste fällt.
+      Vorher stand der ganze Lauf rot (22/22, Tabelle fehlte)
 
 ## 3. Beliebtheitszähler und Rechte auf den Quelltabellen
 
