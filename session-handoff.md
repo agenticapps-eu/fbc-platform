@@ -1,110 +1,116 @@
-# Session Handoff — 2026-08-24 (sechzehnte Sitzung)
+# Session Handoff — 2026-08-24 (siebzehnte Sitzung)
 
-**AGE-581 ist gemergt und auf PROD.** 11.5 (Fremd-Review) und 11.6 (Sichtprobe)
-abgeschlossen, sechs Befunde, vier davon behoben. PR #201 gemergt, `migrate-prod`
-gelaufen, alle drei Flächen einzeln belegt. 67 von 76 Aufgaben. 1433 Vitest,
-606 pgTAP, 90 Deno.
+**Abschnitt 12 ist durch: die Datenpflege steht auf PROD und ist unabhängig
+abgenommen.** 12.0 bis 12.7 alle erledigt, 76 von 76 Aufgaben. PR #202 gemergt
+(`9d7b09f`, squash). Kein Deploy nötig — nur Skripte und Belege. 1457 Vitest.
+
+**Dabei ist mir ein Fehler unterlaufen, der auf PROD gewirkt hat.** Er ist
+behoben und die Invariante hergestellt; die Lehre steht in der Auto-Memory unter
+`schluessel-den-ein-spaeterer-schritt-aendert`.
 
 ## Accomplished
 
-**11.5 — Diff-Review durch zwei Fremdanbieter.** codex 7 Befunde, gemini 10.
-Jeder gegen den Code nachgeprüft; **6 von geminis 10 widerlegt** (der als HIGH
-gemeldete `payment_type`-Fehler war seit `5a1ed03` behoben, `log_admin_action`
-existiert, Zeilenzustand überlebt die Paginierung nicht — `key={m.id}`).
+**12.7, erste Hälfte — der Trockenlauf, und er hat sofort geliefert.**
+`scripts/probe-age581-datenpflege-trockenlauf.ts` fand: **zwei
+Übersichtszeilen trafen dasselbe Konto.** Eine Partner-Zeile trägt die
+Firmenadresse einer anderen Person, und zwar über den *stärksten*
+Zuordnungsweg. Ungeprüft hätte 12.1 zwei Jahrestage in dieselbe Zeile
+geschrieben und 12.5 hätte das richtige Konto deaktiviert. Der Beleg vom 23.08.
+beschrieb den Fall in Prosa, meldete aber trotzdem 59 Treffer, die der Rechenweg
+nicht hergab (58).
 
-**Vier Befunde behoben, jeder mit Gegenprobe** (Donalds Entscheidung: die drei
-billigen plus HIGH-1 vor den Merge):
+**Der Durchgang auf PROD.** 60 `payment_type` · 57 `paid_until` (3 bewusst
+leer) · 12 Anmeldeadressen angeglichen, 3 ausgenommen · 11 Konten ohne
+Listeneintrag deaktiviert · ein Nachzügler angelegt und geschlossen. **72
+Profile.** Keine Post an Mitglieder (`email_confirm: true`).
 
-| Befund | Fix |
-|---|---|
-| HIGH `[true,true]` war eine Behauptung | `sollGebannt()`, Auth-Schritt läuft immer |
-| `array_length` zählte Dimensionen | Migration `20260824110000`, `cardinality` + `ndims` |
-| Aktivierungswege ohne Lebenszyklus | Migration `20260824120000`, drei Stellen + Status `blocked` |
-| Zustandsspalte sagte „Aktiviert" | Lebenszyklus geht vor, `muted` |
+**DER FEHLER: 12.4 hat 12.5 vergiftet.** Die feste Zuordnung hing an der
+**Anmeldeadresse** — und 12.4 gleicht Anmeldeadressen an. Danach zeigte der
+Schlüssel ins Leere, die Zeile galt als „ohne Konto", **12.5 deaktivierte ein
+Mitglied, das auf der Liste steht**, und 12.6 versuchte es ein zweites Mal
+anzulegen. Nur GoTrues „already registered" verhinderte das Zweitkonto — Zufall,
+kein Entwurf. Die Doppelbelegungs-Sperre schwieg zu Recht: aus der
+Doppelbelegung war eine **Nicht**-Belegung geworden, und der Trockenlauf prüft
+den Zustand VOR 12.4, nicht den ZWISCHEN den Schritten.
 
-**11.6 — Sichtprobe, zweiter Befund gefunden und behoben.** Die Detailseite
-meldete über einem GELÖSCHTEN Mitglied „bestätigt", darunter ein voll
-bearbeitbares Formular. Rein clientseitig behoben, keine Migration.
+**Behoben mit zwei Bedingungen statt einer Reparatur.** Schlüssel ist jetzt
+`profiles.id`; ein Test stellt die Reihenfolge nach (dieselbe Zeile vor und nach
+der Angleichung) und ist gegen den alten Entwurf **rot** — belegt. Dazu der
+Schritt `heilen`: *wer auf der Liste steht, ist offen*, idempotent.
 
-**Auf PROD gebracht, dreifach belegt.** PR #201 → `7e7f113`; `migrate-prod`
-plan+apply grün; danach **unabhängig gelesen**: PROD 79/79, null fehlend, null
-nur-remote, und die vier geänderten Funktionsrümpfe tragen den neuen Inhalt.
-Deploy per `gh run rerun --failed` nachgezogen — `drift-gate` danach grün,
-`functions` lieferte `admin-set-member-ban` (neu, v1) und `send-activation`
-(v5). Live-Bündel trägt die Zeichenketten aus dem jüngsten Commit.
+**Abnahme mit einem ZWEITEN Lauf**
+(`scripts/probe-age581-datenpflege-abnahme.ts`), der die Quelldatei nicht kennt.
+Der Zähler im Schreibskript hatte alle sieben Kennzahlen ✓ gemeldet, während die
+Zuordnung kaputt war. **22 Zusagen grün**, darunter drei Invarianten statt
+Zählungen: kein Datum vor dem Stichtag, Verteilung je Kategorie einzeln,
+Doppelsperre in **beide** Richtungen.
 
 ## Decisions
 
-- **Der Lebenszyklus ERSETZT die Aktivierungsplakette, statt danebenzustehen.**
-  *Warum:* ob ein entferntes Konto einmal bestätigt war, ist Vorgeschichte und
-  kommt beim Wiederherstellen zurück; zwei Plaketten hätten in jeder Zeile die
-  Breite verschoben, wie „unbekannt" schon einmal.
-- **Der Wächter steht in `mark_activated`, nicht nur in den Aufrufern.**
-  *Warum:* ein Gate, das nur in den Aufrufern steht, fehlt beim nächsten
-  Aufrufer. `admin_activate_member` trägt ihn ein zweites Mal, damit der Admin
-  den Grund genannt bekommt statt eines Fehlers aus einer fremden Funktion.
-- **`blocked` als neuer Status statt `unknown` zurückzugeben.** *Warum:* nach
-  aussen sind beide 202 und ununterscheidbar (Anti-Aufzählung), im Protokoll
-  steht aber der wahre Grund. Die Erlaubnisliste in `status.ts` erzwingt, dass
-  ein neuer Status bewusst nachgezogen wird.
-- **`array_ndims > 1` wird zusätzlich abgewiesen.** *Warum:* `cardinality()`
-  allein zählte richtig, liesse aber weiter mehrdimensionale Arrays zu, für die
-  das Ergebnis der Funktion sinnlos ist.
-- **HIGH-2, Paging der Teilnehmer-RPC, Draft-Überschreiben und zwei
-  LOW-Zusagen NICHT behoben** — als Folge notiert. *Warum:* HIGH-2 braucht zwei
-  gleichzeitige Admins und einen eigenen Entwurf (Outbox/Versionswert).
+- **Der Schlüssel einer Hand-Zuordnung ist die Kennung, nie eine Adresse.**
+  *Warum:* ein Schlüssel, den ein späterer Schritt desselben Durchgangs
+  verändert, ist keiner. Genau das kostete ein Mitglied den Zugang.
+- **Die Abnahme braucht ein zweites Werkzeug ohne die Quelldatei.** *Warum:* der
+  Zähler im Schreibskript teilt Rechenkern und Quelle mit dem Schreiber und
+  meldet einen gemeinsamen Fehler als Erfolg.
+- **Invarianten statt Summen prüfen.** *Warum:* „60 gesetzt" stimmte auch mit
+  den falschen sechzig; die Verteilung je Kategorie nicht.
+- **`heilen` stellt die Invariante her, nicht den Einzelfall.** *Warum:* eine
+  Reparatur gilt einmal, eine Invariante bei jedem Lauf.
+- **12.1/12.2 über `admin_update_profile`, nicht per direktem UPDATE.** *Warum:*
+  die RPC pflegt `payment_type` an allen vier Stellen und hinterlässt die
+  `admin_audit`-Spur. Die trägt jetzt auch den Fehler: 13 × `disable_member`,
+  1 × `enable_member`.
+- **Admin-Token per `generateLink` + sofortiges Einlösen.** *Warum:* kein
+  Passwort nötig, kein Versand; `service_role` trägt kein `sub` und liefe in 401.
+- **`29.02.` bekommt grundsätzlich eine Meldung statt eines Ergebnisses.**
+  *Warum:* sonst hinge die Antwort am Jahr des Stichtags.
 
 ## Files modified
 
-- `supabase/functions/admin-set-member-ban/ban.ts` — `sollGebannt()`,
-  `banDauerFuer(boolean)`, Invariante statt Fallunterscheidung
-- `supabase/functions/admin-set-member-ban/index.ts` — zweiter Schritt läuft immer
-- `supabase/functions/admin-set-member-ban/ban.test.ts` — +2 Zusagen
-- `supabase/functions/send-activation/status.ts` + `.test.ts` — `blocked`
-- `supabase/migrations/20260824110000_former_member_entries_cardinality.sql` — **neu**
-- `supabase/migrations/20260824120000_aktivierung_prueft_lebenszyklus.sql` — **neu**
-- `supabase/tests/member_lifecycle_rpc_test.sql` — +5 Zusagen, plan(39)
-- `src/pages/AdminMitgliederPage.tsx` + `.test.tsx` — Zustandsspalte, +4 Zusagen
-- `src/pages/AdminMitgliedPage.tsx` + `.test.tsx` — Kopfzeile, +4 Zusagen
-- `src/lib/admin-profile.ts` — `deaktiviert`/`geloescht` in `AdminProfileData`
-- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 11.5, 11.6
+- `scripts/age581-datenpflege.logic.ts` — **neu**, Rechenkern (`paidUntilAus`,
+  `ordneZu`, `findeDoppelbelegung`, `adresseWeichtAb`)
+- `scripts/age581-datenpflege.logic.test.ts` — **neu**, 24 Zusagen
+- `scripts/probe-age581-datenpflege-trockenlauf.ts` — **neu**, 12.7 erste Hälfte
+- `scripts/age581-datenpflege-schreiben.ts` — **neu**, sechs Schritte einzeln
+  aufrufbar, jeder idempotent
+- `scripts/probe-age581-datenpflege-abnahme.ts` — **neu**, 22 Zusagen, kennt die
+  Quelldatei nicht
+- `docs/age-581-mitgliederabgleich.md` — gemessene statt abgelesene Zahlen, der
+  Vorfall, der Endstand
+- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 12.0 bis 12.7
 
 ## Next session: start here
 
-**Abschnitt 12, die Datenpflege auf PROD** — 12.0 bis 12.7, und sie ist Teil der
-ABNAHME von AGE-581 („59 Mitglieder mit gesetzter Zahlungsart, 56 mit
-`paid_until`, 11 deaktiviert"). Linear steht trotzdem schon auf **Done**, weil
-die GitHub-Automation beim Merge schaltet — der Status ist also kein Beleg.
-Erste Handlung: **12.7, der Trockenlauf**, der die Umgebung nennt und die
-Wirkung zeigt, BEVOR 12.1–12.6 laufen. Danach 12.0, der zeilenweise Abgleich als
-Beleg ins Repo — dabei die Regel beachten, dass **keine Klarnamen und keine
-Adressen** ins öffentliche Repo dürfen.
+**AGE-581 ist inhaltlich fertig.** Der nächste Schritt ist der
+**Aktivierungsversand** — 69 der 72 PROD-Konten sind nicht aktiviert und kommen
+erst darüber herein; ein deaktiviertes Konto bekommt dabei keinen Link (Status
+`blocked`). Vorher zu klären: **`app.fairbusinessclub.de` hat weiter keinen
+DNS-Eintrag**, und das ist der Go-Live-Punkt.
 
-Werkzeuge stehen: `scripts/probe-age581-abgleich.ts` und
-`scripts/age581-abgleich-tabelle.mjs`. PROD lesen geht per `infisical run
---env=prod -- node <datei im Repo>` mit `SUPABASE_DB_URL_PROD` und
-`scripts/supabase-root-2021-ca.crt` — die Datei MUSS im Repo liegen, sonst
-findet node `pg` nicht; danach löschen. Schreibende PROD-Wege blockt der
-Klassifikator, bis Donald sie ausdrücklich freigibt.
+Die Quelldatei mit den festen Zuordnungen liegt **nicht im Repo** (Rechte 0600,
+Sitzungs-Ablageordner) und ist mit der Sitzung weg. Sie ist Detlevs Original
+plus eine sechste Spalte `konto_id` mit zwei Kennungen (Zeilen 8 und 19). Wer
+sie neu braucht: aus den Screenshots ablesen und die zwei Kennungen aus PROD
+holen — die Regel steht in `docs/age-581-mitgliederabgleich.md`.
 
 ## Open questions
 
-- **Ich habe das PROD-DB-Passwort ins Terminal ausgegeben** (`infisical secrets
-  --env=prod` ohne Maskierung, 24.08.). Es steht nicht im Repo, aber im
-  Sitzungsprotokoll. Rotation ist Donalds Entscheidung.
-- **Vier Review-Befunde bleiben offen:** HIGH-2 (Zeilensperre endet vor dem
-  GoTrue-Aufruf; braucht zwei gleichzeitige Admins) · `event_attendees`-RPC ohne
-  `limit`/`offset` · Draft und Server-Baseline sind in der Mitgliedschaftszeile
-  derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor ihrem Fixture.
-- **`app.fairbusinessclub.de` hat weiter keinen DNS-Eintrag.** Go-Live-Punkt.
-- **69 von 71 Mitgliedern auf PROD sind nicht aktiviert** — sie kommen erst über
-  den Aktivierungsversand herein. Seit heute gilt: ein deaktiviertes oder
-  gelöschtes Konto bekommt dabei KEINEN Link mehr (Status `blocked`).
+- **Drei Anmeldeadressen bleiben abweichend** und brauchen eine Entscheidung:
+  eine ohne `@`, eine, die in die Kollision mit einer Firmenadresse liefe, und
+  die des zweiten Admins (er bestätigt selbst, welche stimmt).
+- **Ein echter Mitgliedsname stand in `tasks.md`** (öffentliches Repo). Aus dem
+  Text ist er raus, aus der Git-Historie nicht. Deine Entscheidung.
+- **Ich habe am 24.08. das PROD-DB-Passwort ins Terminal ausgegeben** (frühere
+  Sitzung). Rotation ist offen.
+- **Vier Review-Befunde aus 11.5 bleiben offen:** HIGH-2 (Zeilensperre endet vor
+  dem GoTrue-Aufruf) · `event_attendees`-RPC ohne Paging · Draft und
+  Server-Baseline sind derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor
+  ihrem Fixture.
 - **Das Onlinetreffen ist am 25.08.**, also morgen.
 - Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
   gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
   `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
   Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging.
-- **Der lokale Stack trägt jetzt veränderte Testdaten** (Carla deaktiviert +
-  Zahlungsart Stripe, Bodo aktiviert, Dora deaktiviert ohne Löschung).
-  `scripts/probe-age581-sichtprobe-daten.ts` stellt sie mit neuem Passwort her.
+- **DEV ist nicht mitgepflegt.** Eines der elf Konten ist dort
+  `matching_manager`; wird es auch auf DEV deaktiviert, verliert es die Rolle.
