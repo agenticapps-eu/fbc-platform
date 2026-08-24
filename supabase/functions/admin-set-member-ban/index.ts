@@ -76,6 +76,7 @@ import {
   istSchliessen,
   parseBanRequest,
   rpcNameFuer,
+  sollGebannt,
   statusFuerPgFehler,
 } from "./ban.ts";
 
@@ -144,9 +145,9 @@ Deno.serve(async (req) => {
     : { target: eingabe.target, actor };
 
   const datenbankSchritt = () => admin.rpc(rpc, rpcArgs);
-  const bannSchritt = () =>
+  const bannSchritt = (gebannt: boolean) =>
     admin.auth.admin.updateUserById(eingabe.target, {
-      ban_duration: banDauerFuer(eingabe.action),
+      ban_duration: banDauerFuer(gebannt),
     });
 
   // ERSTER SCHRITT IST IN BEIDEN RICHTUNGEN DIE DATENBANK. Scheitert er, hat
@@ -176,11 +177,18 @@ Deno.serve(async (req) => {
   const antwortRumpf = ersterSchritt.data as { entbannen?: boolean } | null;
   const sollEntbannen = antwortRumpf?.entbannen ?? true;
 
-  // ZWEITER SCHRITT: der Bann. Beim Schliessen wird er gesetzt, beim Öffnen
-  // aufgehoben — und beim Öffnen nur, wenn die Datenbank es sagt. Scheitert er,
+  // ZWEITER SCHRITT: der Bann, in der Richtung des SOLL-Zustands. Scheitert er,
   // bleibt der halbe Zustand: benannt, nicht verschwiegen.
-  const zweiterNoetig = schliesst || sollEntbannen;
-  const zweiterFehler = zweiterNoetig ? ((await bannSchritt()).error?.message ?? null) : null;
+  //
+  // Er läuft IMMER, auch beim Wiederherstellen eines Mitglieds, das
+  // deaktiviert bleibt. Bis zum 24.08. wurde dieser Fall übersprungen und der
+  // Bann danach als vorhanden behauptet — fehlte er, meldete die Function
+  // `200` „verborgen und gesperrt" für ein Konto, das sich anmelden kann. Der
+  // Aufruf ist in dem Fall ein NACHSETZEN und in GoTrue folgenlos, wenn der
+  // Bann schon steht; genau denselben Weg kennt `admin_disable_member` an der
+  // deaktivierten Zeile ohne Ban.
+  const zweiterFehler = (await bannSchritt(sollGebannt(eingabe.action, sollEntbannen))).error
+    ?.message ?? null;
 
   if (zweiterFehler !== null) {
     log("error", "half_state", {

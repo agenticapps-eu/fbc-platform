@@ -32,7 +32,7 @@
 --   * `alike()`, nicht `like()`.
 
 begin;
-select plan(34);
+select plan(39);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -314,6 +314,67 @@ select is(
       'e0000000-0000-0000-0000-0000000000ad',
       'e0000000-0000-0000-0000-0000000000ad')$$),
   '22023', 'Ein Admin kann sich nicht selbst loeschen');
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- AGE-581, Befund aus dem Diff-Review zu 11.5: die AKTIVIERUNGSWEGE kannten den
+-- Lebenszyklus nicht. Sie fragten nur `activated_at` — ein Admin konnte eine
+-- geloeschte Person aktivieren, und `issue_activation_token` stellte ihr einen
+-- Zugangslink aus. Migration 20260824120000.
+-- ════════════════════════════════════════════════════════════════════════════
+
+update public.profiles set disabled_at = now(), deleted_at = null, activated_at = null
+ where id = 'e0000000-0000-0000-0000-000000000002';
+update public.profiles set deleted_at = now(), disabled_at = null, activated_at = null
+ where id = 'e0000000-0000-0000-0000-000000000003';
+-- Die GEGENPROBE-Zeile: unbestaetigt, aber nicht entfernt. Ohne sie belegte
+-- dieser Block nur, dass mark_activated ueberhaupt abbricht — nicht, dass sie
+-- am richtigen Merkmal abbricht.
+update public.profiles set disabled_at = null, deleted_at = null, activated_at = null
+ where id = 'e0000000-0000-0000-0000-000000000005';
+
+select is(
+  pg_temp.state_svc($$select public.mark_activated(
+      'e0000000-0000-0000-0000-000000000002')$$),
+  '22023', 'mark_activated aktiviert kein DEAKTIVIERTES Profil');
+
+select is(
+  pg_temp.state_svc($$select public.mark_activated(
+      'e0000000-0000-0000-0000-000000000003')$$),
+  '22023', 'mark_activated aktiviert kein GELOESCHTES Profil');
+
+select is(
+  pg_temp.state_svc($$select public.mark_activated(
+      'e0000000-0000-0000-0000-000000000005')$$),
+  'KEIN FEHLER', 'mark_activated aktiviert ein unbestaetigtes Profil weiterhin');
+
+-- Der Admin-Weg traegt denselben Waechter ein zweites Mal — nicht doppelt
+-- gemoppelt, sondern damit der Admin den GRUND genannt bekommt, statt einen
+-- Fehler aus einer Funktion zu sehen, die er nicht gerufen hat.
+--
+-- DER AUSGANGSZUSTAND WIRD HIER NEU GESETZT, und das ist keine Umstaendlichkeit:
+-- ohne diese Zeile war die Zusage auch OHNE den Waechter gruen. Die Zusage
+-- darueber hatte unter der alten Fassung `mark_activated` erfolgreich laufen
+-- lassen, `activated_at` stand also — und der Admin-Weg brach mit demselben
+-- 22023 ab, nur wegen „bereits bestaetigt". Gemessen in der Gegenprobe am
+-- 24.08.: 3 von 5 neuen Zusagen fielen um, diese nicht.
+update public.profiles set deleted_at = now(), disabled_at = null, activated_at = null
+ where id = 'e0000000-0000-0000-0000-000000000003';
+
+select is(
+  pg_temp.state_auth('e0000000-0000-0000-0000-0000000000ad',
+    $$select public.admin_activate_member(
+        'e0000000-0000-0000-0000-000000000003')$$),
+  '22023', 'admin_activate_member aktiviert kein GELOESCHTES Profil');
+
+-- Und die Arbeitsgrenze von former_member_entries zaehlt jetzt Elemente:
+-- `array_length(x,1)` sah in `{{a,b}}` genau EINE Zeile, `= any(...)` aber
+-- beide Werte. Migration 20260824110000.
+select is(
+  pg_temp.state_auth('e0000000-0000-0000-0000-0000000000ad',
+    $$select * from public.former_member_entries(
+        array[array['e0000000-0000-0000-0000-000000000001'::uuid,
+                    'e0000000-0000-0000-0000-000000000002'::uuid]], '{}')$$),
+  '22023', 'former_member_entries weist mehrdimensionale Arrays ab');
 
 select * from finish();
 rollback;

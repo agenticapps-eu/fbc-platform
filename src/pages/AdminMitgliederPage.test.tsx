@@ -436,6 +436,57 @@ const OFFEN_GELOESCHT = member({
   geloescht_seit: "2026-08-02T10:00:00Z",
 });
 
+describe("Die Zustandsspalte nennt den Lebenszyklus (Sichtprobe 11.6)", () => {
+  /**
+   * Gefunden im Browser, nicht von einem Test: auf den Reitern „Deaktiviert“
+   * und „Gelöscht“ stand in der Spalte „Zustand“ die Plakette **Aktiviert**.
+   * Die Spalte las allein `bestaetigt`; `deaktiviert_seit` und `geloescht_seit`
+   * kommen aus derselben RPC und wurden nirgends gezeigt. Auf „Alle“ fehlen
+   * diese Zeilen ganz — der Reiter war das einzige Signal, und die Zeile sagte
+   * das Gegenteil.
+   */
+  it("zeigt an einer deaktivierten Zeile „Deaktiviert“ statt „Aktiviert“", async () => {
+    rpc.mockResolvedValue({ data: [DEAKTIVIERT], error: null });
+    renderPage();
+
+    const zeile = await screen.findByTestId(`mitglied-${DEAKTIVIERT.id}`);
+    expect(within(zeile).getByText("Deaktiviert")).toBeInTheDocument();
+    // Der Kern der Zusage ist die ABWESENHEIT des gegenteiligen Wortes.
+    expect(within(zeile).queryByText("Aktiviert")).toBeNull();
+  });
+
+  it("zeigt an einer gelöschten Zeile „Gelöscht“", async () => {
+    rpc.mockResolvedValue({ data: [GELOESCHT], error: null });
+    renderPage();
+
+    const zeile = await screen.findByTestId(`mitglied-${GELOESCHT.id}`);
+    expect(within(zeile).getByText("Gelöscht")).toBeInTheDocument();
+    expect(within(zeile).queryByText("Aktiviert")).toBeNull();
+  });
+
+  it("lässt den Lebenszyklus vorgehen, wenn die Zeile AUCH unbestätigt ist", async () => {
+    rpc.mockResolvedValue({ data: [OFFEN_GELOESCHT], error: null });
+    renderPage();
+
+    const zeile = await screen.findByTestId(`mitglied-${OFFEN_GELOESCHT.id}`);
+    expect(within(zeile).getByText("Gelöscht")).toBeInTheDocument();
+    // „Nicht aktiviert“ ist an einer gelöschten Zeile keine geltende Aussage
+    // mehr, sondern Vorgeschichte — und sie kommt mit dem Wiederherstellen
+    // zurück.
+    expect(within(zeile).queryByText("Nicht aktiviert")).toBeNull();
+  });
+
+  it("lässt die beiden bisherigen Zustände unberührt", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV, OFFEN], error: null });
+    renderPage();
+
+    const aktiv = await screen.findByTestId(`mitglied-${AKTIV.id}`);
+    expect(within(aktiv).getByText("Aktiviert")).toBeInTheDocument();
+    const offen = await screen.findByTestId(`mitglied-${OFFEN.id}`);
+    expect(within(offen).getByText("Nicht aktiviert")).toBeInTheDocument();
+  });
+});
+
 describe("Kombinierte Zustände (7.5)", () => {
   it("bietet einem unaktivierten UND gelöschten Mitglied keinen Aktivierungsweg", async () => {
     rpc.mockResolvedValue({ data: [OFFEN_GELOESCHT], error: null });

@@ -18,9 +18,9 @@ export type VersandArt = "aktivierung" | "reset" | "kein_versand" | "unerwartet"
 
 /**
  * Die erlaubten Status stehen im `comment on function` von
- * `issue_activation_token` (`20260807200000`): unknown, rate_limited, pending,
- * rate_limited_day, issued, issued_reset. Wer dort einen ergänzt, kommt hier
- * vorbei — sonst meldet diese Function ihn als Fehler.
+ * `issue_activation_token` (zuletzt `20260824120000`): unknown, blocked,
+ * rate_limited, pending, rate_limited_day, issued, issued_reset. Wer dort einen
+ * ergänzt, kommt hier vorbei — sonst meldet diese Function ihn als Fehler.
  */
 export function versandArt(status: string | undefined): VersandArt {
   switch (status) {
@@ -28,9 +28,16 @@ export function versandArt(status: string | undefined): VersandArt {
       return "aktivierung";
     case "issued_reset":
       return "reset";
-    // Kein Versand, aber erwartet: unbekannte Adresse, 60-s-Sperre, offener Link
-    // im 24-h-Schutzfenster, Tagesgrenze. Alle vier sind Normalbetrieb.
+    // Kein Versand, aber erwartet: unbekannte Adresse, entferntes Konto,
+    // 60-s-Sperre, offener Link im 24-h-Schutzfenster, Tagesgrenze. Alle fuenf
+    // sind Normalbetrieb.
+    //
+    // `blocked` (AGE-581) steht hier und NICHT bei den Erfolgsfaellen: ein
+    // deaktiviertes oder geloeschtes Konto bekommt keinen Link. Nach aussen
+    // ist es von `unknown` nicht zu unterscheiden -- beide 202 --, im
+    // Protokoll steht der wahre Grund.
     case "unknown":
+    case "blocked":
     case "rate_limited":
     case "pending":
     case "rate_limited_day":

@@ -59,6 +59,22 @@ export function istSchliessen(action: BanAction): boolean {
 }
 
 /**
+ * Der SOLL-Zustand des Banns nach dieser Handlung.
+ *
+ * Nicht dasselbe wie „schliesst": beim Wiederherstellen eines Mitglieds, das
+ * DEAKTIVIERT bleibt (`entbannen: false`), ist der Soll-Zustand gebannt,
+ * obwohl geöffnet wird. Bis zum 24.08. sprang der Aufrufer in diesem Fall über
+ * den Auth-Schritt und BEHAUPTETE danach „gesperrt". Fehlte der Bann
+ * tatsächlich — der halbe Zustand aus einem früheren Lauf, den dieselbe Datei
+ * eine Zeile weiter oben beschreibt —, meldete „Wiederherstellen" ein sauberes
+ * `200` für ein Konto, das sich anmelden kann. Gefunden im Diff-Review zu
+ * 11.5.
+ */
+export function sollGebannt(action: BanAction, sollEntbannen: boolean): boolean {
+  return istSchliessen(action) || !sollEntbannen;
+}
+
+/**
  * Was die GoTrue-Admin-API entgegennimmt.
  *
  * Eine DAUER, kein Zeitpunkt — gemessen am 23.08. gegen den lokalen Stack
@@ -67,8 +83,8 @@ export function istSchliessen(action: BanAction): boolean {
  * sich nicht setzen. Die Umkehrung ist ein eigener Wert (`"none"`), kein
  * Nullwert.
  */
-export function banDauerFuer(action: BanAction): string {
-  return istSchliessen(action) ? "876000h" : "none";
+export function banDauerFuer(gebannt: boolean): string {
+  return gebannt ? "876000h" : "none";
 }
 
 /** Jede Handlung hat ihre eigene Datenbankfunktion; alle vier nur für `service_role`. */
@@ -135,12 +151,14 @@ export function fasseAusgangZusammen(
   sollEntbannen: boolean,
   zweiterSchrittFehler: string | null,
 ): BanErgebnis {
-  const [hidden, banned] = istSchliessen(action)
-    ? [true, zweiterSchrittFehler === null]
-    : sollEntbannen
-      ? [false, zweiterSchrittFehler !== null]
-      : // Kein zweiter Schritt: es wurde gar nicht erst entbannt.
-        [true, true];
+  // Verborgen und gesperrt sind DASSELBE Soll — das ist die Invariante oben,
+  // nicht eine Tabelle mit drei Zeilen. Was der zweite Schritt entscheidet, ist
+  // allein, ob der Bann dem Soll folgt: gelingt er, tut er es; scheitert er,
+  // steht der Bann auf dem Gegenteil. Auch im Fall „wiederherstellen, bleibt
+  // deaktiviert" wird jetzt ein Auth-Schritt AUSGEFÜHRT und sein Ausgang
+  // gemeldet — vorher stand hier `[true, true]`, also eine Behauptung.
+  const hidden = sollGebannt(action, sollEntbannen);
+  const banned = hidden ? zweiterSchrittFehler === null : zweiterSchrittFehler !== null;
 
   const body =
     zweiterSchrittFehler === null

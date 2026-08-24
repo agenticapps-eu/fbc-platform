@@ -586,9 +586,29 @@ export default function AdminMitgliederPage() {
   );
 }
 
-/** Der Aktivierungszustand — in JEDER Sicht, sonst hiesse „drei Sichten auf
- *  dieselben Zeilen" drei verschiedene Wahrheiten. */
+/**
+ * Der Zustand einer Zeile — in JEDER Sicht, sonst hiesse „drei Sichten auf
+ * dieselben Zeilen" drei verschiedene Wahrheiten. Gemeint sind die drei
+ * ANSICHTEN (Tabelle, Karten, Verzeichnis), nicht die Reiter.
+ *
+ * DER LEBENSZYKLUS GEHT VOR, und bis zur Sichtprobe am 24.08. kam er hier gar
+ * nicht vor: die Spalte las allein `bestaetigt`, also stand auf den Reitern
+ * „Deaktiviert" und „Gelöscht" in der Spalte „Zustand" das Wort **Aktiviert**.
+ * Auf „Alle" tauchen diese Zeilen nicht auf — der Reiter war damit das einzige
+ * Signal, und die Zeile sagte das Gegenteil.
+ *
+ * Er ERSETZT die Aktivierungsplakette und steht nicht daneben: ob ein
+ * entferntes Konto einmal bestätigt war, ist keine geltende Aussage mehr,
+ * sondern Vorgeschichte — und sie kommt zurück, sobald die Zeile
+ * wiederhergestellt ist. Zwei Plaketten nebeneinander hätten ausserdem in
+ * jeder Zeile die Breite verschoben, wie es „unbekannt" schon einmal tat.
+ *
+ * `muted` für beide: die Varianten tragen Gewicht, keine Farbe (AGE-237). Eine
+ * entfernte Zeile ist die leise, nicht die laute — das Wort sagt, was gilt.
+ */
 function Zustand({ member }: { member: AdminMember }) {
+  if (member.geloescht_seit !== null) return <Badge variant="muted">Gelöscht</Badge>;
+  if (member.deaktiviert_seit !== null) return <Badge variant="muted">Deaktiviert</Badge>;
   return member.bestaetigt ? (
     <Badge variant="soft">Aktiviert</Badge>
   ) : (

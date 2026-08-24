@@ -616,9 +616,79 @@ und standen im ersten Entwurf nicht drin.
       **Ohne Nachziehen grün, wie in 1.3 vorhergesagt.** Der Change hat keine
       neue Tabelle mit Table-Grant angelegt — `former_member_entries` ist eine
       Funktion, und Funktions-Grants berührt der Golden-Snapshot nicht.
-- [ ] 11.5 Code-Review auf dem **Diff**, durch einen anderen Anbieter als den,
+- [x] 11.5 Code-Review auf dem **Diff**, durch einen anderen Anbieter als den,
       der ihn geschrieben hat.
+      **Zwei Anbieter gelaufen, beide gegen den Code nachgeprüft.**
+      `codex` (exit 0, ~20 min — die Standard-300 s reichen hier nie) fand
+      sieben Befunde, `gemini` zehn. Nachgeprüft wurde jeder einzelne; von
+      Geminis zehn sind **sechs widerlegt**: `payment_type` steht sehr wohl an
+      allen vier Stellen (5a1ed03), `log_admin_action` existiert seit
+      `20260811090300:380`, und der Zeilenzustand überlebt die Paginierung
+      **nicht**, weil die Zeilen `key={m.id}` tragen. Was übrig bleibt und
+      belegt ist:
+      - **HIGH** `admin-set-member-ban/ban.ts:142` — bei `entbannen=false`
+        gibt `fasseAusgangZusammen` fest `[true, true]` zurück. Das ist eine
+        BEHAUPTUNG, keine Messung: fehlt der Ban tatsächlich (nach einem
+        halben Zustand aus einem früheren Lauf), meldet „Wiederherstellen"
+        `200` „verborgen und gesperrt", während das Konto sich anmelden kann —
+        genau die Invariante, die dieser Change schützt.
+      - **HIGH** `admin-set-member-ban/index.ts:161` — die Zeilensperre endet
+        mit dem DB-RPC, der GoTrue-Aufruf steht danach. Zwei gleichzeitige
+        Admins können gegensätzlich enden. Braucht zwei parallele Admins.
+      - **MEDIUM** `20260823160000_former_member_entries.sql:80` —
+        `array_length(…,1)` zählt nur die erste Dimension. In der DB gegen
+        geprüft: ein zweidimensionales Array mit 3 UUIDs liefert `dim1=1` bei
+        `cardinality=3`. Die 200er-Grenze ist damit umgehbar. `cardinality()`
+        plus `array_ndims > 1` ablehnen.
+      - **MEDIUM** `20260817140000_admin_member_list_fixes.sql:158` —
+        `admin_activate_member` liest nur `activated_at`, nicht `disabled_at`
+        und `deleted_at`. Eine gelöschte Person ist per RPC aktivierbar.
+      - **MEDIUM** `20260823150000_event_attendees_lifecycle.sql:30` — die
+        listende RPC hat weder `limit` noch `offset`.
+      - **MEDIUM** `AdminMitgliederPage.tsx:627` — Draft und Server-Baseline
+        sind derselbe Zustand; ein Refetch nach fremder Änderung macht die
+        Zeile „geändert", und Speichern überschreibt den frischeren Stand.
+      - **LOW** `member_lifecycle_test.sql:205/244` — zwei Negativzusagen
+        laufen vor ihrem Fixture und wären auch ohne Policy grün.
+
+      **Behoben, jeder mit Gegenprobe** (Donalds Entscheidung, 24.08.: die drei
+      billigen und HIGH-1 vor den Merge, der Rest als Folge):
+      - HIGH-1 → `sollGebannt()` in `ban.ts`; der Auth-Schritt läuft jetzt
+        IMMER, auch bei „wiederherstellen, bleibt deaktiviert", und sein Ausgang
+        wird gemeldet statt behauptet. `hidden` ist in allen drei Fällen gleich
+        dem Soll-Ban, aus der Fallunterscheidung wurde damit die Invariante, die
+        der Kommentar ohnehin behauptete. Gegenprobe: mit der alten Fassung
+        fällt genau die neue Zusage um (12 grün, 1 rot).
+      - `cardinality` → Migration **20260824110000**. `array_ndims > 1` wird
+        zusätzlich abgewiesen, weil `cardinality()` allein zwar richtig zählt,
+        das Ergebnis für ein mehrdimensionales Array aber sinnlos bleibt.
+      - Aktivierungs-Gate → Migration **20260824120000**, an DREI Stellen:
+        `mark_activated` (der innerste — beide Aufrufer gehen hindurch),
+        `admin_activate_member` (damit der Admin den Grund genannt bekommt) und
+        `issue_activation_token` (neuer Status `blocked`, vor den Rate-Limits;
+        die Erlaubnisliste in `send-activation/status.ts` ist nachgezogen).
+      - **Nicht behoben, als Folge notiert:** HIGH-2 (die Zeilensperre endet vor
+        dem GoTrue-Aufruf) · `event_attendees`-RPC ohne Paging · Draft und
+        Server-Baseline sind derselbe Zustand · die zwei LOW-Zusagen vor ihrem
+        Fixture.
 - [ ] 11.6 Sichtprobe der gesamten Fläche im Browser, gegen den lokalen Stack.
+      **Angefangen: Liste, Zustandsreiter und Zeilenmenü.** Das Menü öffnet im
+      echten Browser (jsdom prüft das nie) und zeigt an einer gelöschten Zeile
+      genau „Wiederherstellen" — die Matrix stimmt. **Ein Befund:** auf den
+      Reitern „Deaktiviert" und „Gelöscht" trägt die Spalte *Zustand* die
+      Plakette „**Aktiviert**". `Zustand` liest nur `member.bestaetigt`
+      (Zeile 591); `deaktiviert_seit`/`geloescht_seit` kommen aus der RPC, aber
+      keine Sicht zeigt sie. Unter der Überschrift „Zustand" steht damit das
+      gegenteilige Wort, und der Reiter ist das einzige Signal.
+      **Der Befund ist behoben und im Browser nachgesehen:** die Spalte zeigt
+      jetzt „Deaktiviert" bzw. „Gelöscht" (`muted` — die Varianten tragen
+      Gewicht, keine Farbe, AGE-237). Der Lebenszyklus ERSETZT die
+      Aktivierungsplakette und steht nicht daneben: ob ein entferntes Konto
+      einmal bestätigt war, ist Vorgeschichte, und zwei Plaketten hätten in
+      jeder Zeile die Breite verschoben. Vier Zusagen dazu, Gegenprobe: drei
+      fallen mit der alten Fassung um, die vierte (Gegenprobe auf
+      „Aktiviert"/„Nicht aktiviert") bleibt grün.
+      Offen: Detailseite, Reiter „Mitgliedschaft", Karten-/Verzeichnissicht.
 
 ## 12. Datenpflege (NACH dem Merge, nicht in der Migration)
 

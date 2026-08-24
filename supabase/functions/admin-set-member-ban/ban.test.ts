@@ -10,6 +10,7 @@ import {
   istSchliessen,
   parseBanRequest,
   rpcNameFuer,
+  sollGebannt,
   statusFuerPgFehler,
 } from "./ban.ts";
 
@@ -54,10 +55,18 @@ Deno.test("der Bann ist eine DAUER, kein Zeitpunkt — und die Aufhebung ein eig
   // Gemessen am 23.08. gegen den lokalen Stack: die Admin-API nimmt
   // `ban_duration`, nicht `banned_until`; `"none"` hebt auf. Ein Zeitpunkt
   // hätte sich gar nicht setzen lassen.
-  assertEquals(banDauerFuer("disable"), "876000h");
-  assertEquals(banDauerFuer("delete"), "876000h");
-  assertEquals(banDauerFuer("enable"), "none");
-  assertEquals(banDauerFuer("restore"), "none");
+  assertEquals(banDauerFuer(true), "876000h");
+  assertEquals(banDauerFuer(false), "none");
+});
+
+Deno.test("der Soll-Bann folgt nicht der Richtung, sondern dem Ergebnis", () => {
+  assertEquals(sollGebannt("disable", true), true);
+  assertEquals(sollGebannt("delete", true), true);
+  assertEquals(sollGebannt("enable", true), false);
+  assertEquals(sollGebannt("restore", true), false);
+  // DER FALL, DER DEN BEFUND TRUG: geöffnet wird, gebannt bleibt es. Wer hier
+  // `false` liest, hebt die Sperre eines Mitglieds auf, das deaktiviert bleibt.
+  assertEquals(sollGebannt("restore", false), true);
 });
 
 Deno.test("jede Handlung trifft ihre eigene RPC", () => {
@@ -123,6 +132,14 @@ Deno.test("der halbe Zustand ist die Ungleichheit von verborgen und gesperrt", (
   assertEquals(fasseAusgangZusammen("enable", true, "auth down"), {
     status: 207,
     body: { hidden: false, banned: true, detail: "auth down" },
+  });
+  // Wiederherstellen auf eine Zeile, die deaktiviert BLEIBT: der zweite Schritt
+  // setzt den Bann nach, und wenn er scheitert, ist das Mitglied verborgen und
+  // anmeldefähig. Bis zum 24.08. meldete dieser Fall `200 {hidden, banned}` —
+  // ohne dass je ein Auth-Schritt gelaufen wäre. Der Befund aus 11.5.
+  assertEquals(fasseAusgangZusammen("restore", false, "auth down"), {
+    status: 207,
+    body: { hidden: true, banned: false, detail: "auth down" },
   });
 });
 
