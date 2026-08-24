@@ -18,8 +18,15 @@ import type { Database } from "./database.types";
 
 export type AdminMember = Database["public"]["Functions"]["admin_list_members"]["Returns"][number];
 
-/** Die drei Werte, die `p_status` kennt. Ein vierter bricht in der Datenbank ab. */
-export type AdminMemberStatus = "alle" | "aktiviert" | "offen";
+/**
+ * Die fünf Werte, die `p_status` kennt. Ein sechster bricht in der Datenbank
+ * mit `22023` ab.
+ *
+ * Es sind NICHT die fünf Reiter der Fläche: `aktiviert` hat keinen, und
+ * „Mitgliedschaft" ist ein Darstellungsmodus über `alle`. Die Abbildung steht
+ * in `AdminMitgliederPage.tsx` und ist dort ausgeschrieben, nicht vermutet.
+ */
+export type AdminMemberStatus = "alle" | "aktiviert" | "offen" | "deaktiviert" | "geloescht";
 
 export interface AdminMemberFilters {
   query: string;

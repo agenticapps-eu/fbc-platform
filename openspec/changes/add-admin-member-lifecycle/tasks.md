@@ -392,16 +392,71 @@ und standen im ersten Entwurf nicht drin.
 
 ## 8. Frontend — Reiter
 
-- [ ] 8.1 **RED:** ein deaktiviertes Mitglied fehlt unter „Alle" und steht unter
-      „Deaktiviert".
-- [ ] 8.2 Fünf Reiter, gewählter Reiter als Suchparameter in der Adresse.
-      **[PR]** Die Abbildung Reiter → `p_status` ist die aus dem Delta:
-      „Mitgliedschaft" ist ein Darstellungsmodus über `p_status = 'alle'`, kein
-      eigener Filter; `aktiviert` hat keinen Reiter.
-- [ ] 8.3 Die drei bestehenden Sichten bleiben innerhalb der Reiter erhalten.
-- [ ] 8.4 **GREEN**, plus ein Test, der von aussen zum Reiter navigiert und
-      zurückgeht — ein Zustand, den nur `location` trägt, wird sonst nie von
-      aussen geprüft.
+- [x] 8.1 **RED:** ein deaktiviertes Mitglied fehlt unter „Alle" und steht unter
+      „Deaktiviert". Echter RED — `role="tab"` gab es nicht.
+      Der Test filtert nicht selbst: `listeNachStatus` stellt die
+      `case p_status`-Verzweigung der Migration nach. Ein Test nur auf die
+      ÜBERGEBENEN Argumente sagte nichts über das, was ein Admin sieht; ein Test
+      nur auf die sichtbaren Zeilen bestünde auch mit einer Fläche, die
+      clientseitig filtert und die RPC unbehelligt lässt.
+- [x] 8.2 Fünf Reiter, gewählter Reiter als Suchparameter in der Adresse
+      (`?tab=geloescht`). **[PR]** Die Abbildung steht ausgeschrieben in
+      `REITER` — „Mitgliedschaft" trägt `status: "alle"`, und dass `aktiviert`
+      keinen Reiter hat, ist im Kopf der Tabelle benannt statt verschwiegen.
+      Das Status-Auswahlfeld ist damit ersetzt, nicht ergänzt.
+      **Der Reiter wird ABGELEITET, nicht gespiegelt:** kein `useState` daneben,
+      sonst bliebe der zweite Ort beim Zurückgehen stehen. Ein unbekannter Wert
+      in der Adresse fällt auf „Alle" zurück, statt `p_status` in die `22023`
+      der Datenbank laufen zu lassen.
+      Der Seitenrücksprung beim Reiterwechsel passiert WÄHREND des Aufbaus und
+      nicht in einem Effekt — der Effekt liefe erst nach dem Zeichnen, also ginge
+      dazwischen eine Abfrage mit dem alten `p_offset` hinaus, deren Ergebnis
+      aufblitzt und im Zwischenspeicher landet. Ein eigener Test hält das fest.
+- [x] 8.3 Die drei bestehenden Sichten bleiben innerhalb der Reiter erhalten —
+      der Sichtzustand liegt ausserhalb der Reitertafel und wird beim Wechsel
+      nicht angefasst. Im Browser gegengeprüft: Verzeichnis-Ansicht gewählt,
+      Reiter auf „Gelöscht" gewechselt, Ansicht steht noch.
+- [x] 8.4 **GREEN** (59 Zusagen in `AdminMitgliederPage.test.tsx`, 1407 Vitest
+      gesamt), plus der Test, der von aussen navigiert: `createMemoryRouter`
+      statt `MemoryRouter`, weil letzterer keinen Weg kennt, von aussen zu
+      navigieren oder zurückzugehen. Vier Wege einzeln belegt — Klick schreibt
+      in die Adresse, Aufbau liest sie, `navigate(-1)` nimmt den Reiter zurück,
+      unbekannter Wert fällt auf „Alle".
+
+- [x] 8.5 **Gegenproben und Sichtprobe.** Sechs Mutationen, je genau die
+      zugehörige Zusage rot, danach wiederhergestellt grün:
+      Rückfall in `leseReiter` entfernt (1 rot) · `leseReiter` liest die Adresse
+      gar nicht (6 rot) · der Reiterklick schreibt nicht in die Adresse (5 rot) ·
+      kein Seitenrücksprung (1 rot) · „Mitgliedschaft" auf `offen` abgebildet
+      (1 rot) · der Reiterklick wirft die Sicht weg (1 rot).
+
+  - **BEFUND DER SICHTPROBE, behoben:** `overflow-x-auto` setzt `overflow-y`
+    implizit auf `auto`. Der 1px-Überstand des negativen Aussenabstands
+    (`-mb-px`, aus `components/ui/Tabs.tsx` übernommen) genügte für einen
+    VERTIKALEN Scrollbalken, der 15 px Breite frass — gemessen `clientWidth`
+    1105 bei 1120 px Elementbreite, `scrollHeight` 34 bei `clientHeight` 33.
+    Die graue Linie sitzt jetzt am Umschlag statt an der scrollbaren Leiste;
+    danach `clientWidth` 1120 und `scrollHeight` gleich `clientHeight`.
+    Kein Test hätte das gefunden: jsdom rechnet kein Layout.
+  - **Im Browser belegt** (lokaler Stack, fünf Konten aus
+    `scripts/probe-age581-sichtprobe-daten.ts`): „Alle" zeigt drei von fünf
+    Konten — die deaktivierte und die gelöschte Zeile fehlen dort und stehen
+    unter ihrem Reiter. Klick schreibt `?tab=deaktiviert`, ein NEULADEN behält
+    ihn, die ZURÜCK-TASTE führt auf „Alle" zurück (echtes POP, nicht ein
+    nachgestelltes). „Mitgliedschaft" zeigt dieselben drei wie „Alle".
+    Das Zeilenmenü hängt weiterhin am `body` (224×46, ganz im Bild, Eintrag per
+    `elementFromPoint` getroffen) — die neue Tafel-Hülle hat die Portal-Falle
+    nicht wieder aufgemacht. Konsole ohne Fehler und Warnungen.
+  - **OFFEN, nicht behoben:** in schmaler Sicht (gemessen bei 500 px — macOS
+    gibt kein Fenster darunter her) läuft die Reiterleiste über und scrollt
+    waagerecht; die Seite selbst läuft NICHT über, und der letzte Reiter ist
+    durch Scrollen erreichbar und per `elementFromPoint` getroffen. Wer aber
+    über `?tab=mitgliedschaft` direkt hereinkommt, sieht den gewählten Reiter
+    nicht — die Leiste scrollt nicht von selbst dorthin. Ein `scrollIntoView`
+    wäre billig, aber in jsdom nicht prüfbar; bewusst nicht gebaut.
+  - **Der Inhalt von „Mitgliedschaft" folgt in Abschnitt 9.** Heute zeigt der
+    Reiter dieselbe Darstellung wie „Alle" — dieselbe Menge ist zugesagt, die
+    eigenen Spalten (Stufe, bezahlt-bis, Zahlungsart) sind es noch nicht.
 
 ## 9. Frontend — Reiter „Mitgliedschaft"
 

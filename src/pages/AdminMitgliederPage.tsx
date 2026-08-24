@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { MemberCard } from "../components/community/MemberDirectory";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
-import { Select } from "../components/ui/Select";
 import { PageSkeleton } from "../components/ui/Skeleton";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
@@ -48,6 +47,44 @@ import {
 type Sicht = "Tabelle" | "Karten" | "Verzeichnis";
 
 const SICHTEN: Sicht[] = ["Tabelle", "Karten", "Verzeichnis"];
+
+/**
+ * Die fünf Reiter (AGE-581, Abschnitt 8) — und ihre Abbildung auf `p_status`
+ * ist NICHT die Identität. Genau deshalb steht sie hier ausgeschrieben statt
+ * aus dem Namen erraten zu werden:
+ *
+ * - „Mitgliedschaft" ist ein **Darstellungsmodus über derselben Menge wie
+ *   „Alle"**, kein eigener Filter — beide fragen `alle` ab. Was sie
+ *   unterscheidet, ist die Darstellung, und die hängt an der Kennung des
+ *   Reiters, nicht an einem zweiten Feld ohne Leser.
+ * - `aktiviert` hat **keinen Reiter**. Der Wert bleibt in der Funktion und ist
+ *   über sie erreichbar; diese Fläche benutzt ihn nicht. Benannt statt
+ *   verschwiegen — ein Parameterwert ohne Aufrufer sieht sonst wie ein
+ *   vergessener aus.
+ * - „Alle" schliesst Deaktivierte und Gelöschte AUS. Das ist ein bewusster
+ *   Bruch mit dem Wort: die Fläche beantwortet „wer ist Mitglied?", nicht „was
+ *   steht in der Tabelle?". Die Auswahl trifft die Datenbank (`case p_status`
+ *   in `admin_list_members`), nicht diese Liste.
+ */
+type Reiter = "alle" | "offen" | "deaktiviert" | "geloescht" | "mitgliedschaft";
+
+const REITER: { id: Reiter; label: string; status: AdminMemberStatus }[] = [
+  { id: "alle", label: "Alle", status: "alle" },
+  { id: "offen", label: "Nicht aktiviert", status: "offen" },
+  { id: "deaktiviert", label: "Deaktiviert", status: "deaktiviert" },
+  { id: "geloescht", label: "Gelöscht", status: "geloescht" },
+  { id: "mitgliedschaft", label: "Mitgliedschaft", status: "alle" },
+];
+
+/** Der Reiter steht in der Adresse (`?tab=geloescht`), damit ein Neuladen ihn
+ *  nicht verliert — auf einer Fläche, die beim Aufräumen oft neu geladen wird. */
+const REITER_PARAM = "tab";
+
+/** Ein unbekannter oder fehlender Wert fällt auf „Alle" zurück, statt eine leere
+ *  Liste oder einen Fehler zu zeigen: die Adresszeile ist Eingabe von aussen. */
+function leseReiter(wert: string | null): Reiter {
+  return REITER.some((r) => r.id === wert) ? (wert as Reiter) : "alle";
+}
 
 /** Was im Zeilenmenü stehen kann. Nicht jede Handlung an jeder Zeile — was wo
  *  gilt, entscheidet `handlungenFuer`. */
@@ -101,8 +138,35 @@ export default function AdminMitgliederPage() {
   /** Was im Feld steht. Der Abfrage liegt `query` zugrunde — entprellt, siehe unten. */
   const [eingabe, setEingabe] = useState("");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<AdminMemberStatus>("alle");
   const [seite, setSeite] = useState(0);
+
+  /**
+   * Der Reiter wird ABGELEITET, nicht gespiegelt. Ein `useState` daneben wäre
+   * ein zweiter Ort für denselben Wert — und der, den die Adresszeile trägt,
+   * bliebe beim Zurückgehen unbemerkt stehen.
+   */
+  const [suchparameter, setSuchparameter] = useSearchParams();
+  const reiter = leseReiter(suchparameter.get(REITER_PARAM));
+  const status = REITER.find((r) => r.id === reiter)!.status;
+  /** Ein Reiter und eine Tafel: alle fünf zeigen dieselbe Liste unter einem
+   *  anderen Filter. Beschriftet wird sie deshalb vom GEWÄHLTEN Reiter. */
+  const tafelId = "reiter-tafel";
+
+  /**
+   * Ein Reiterwechsel fängt wieder auf Seite 1 an — Seite 3 der Deaktivierten
+   * ist keine Fortsetzung von Seite 3 der Offenen.
+   *
+   * WÄHREND DES AUFBAUS und nicht in einem Effekt: der Effekt liefe erst NACH
+   * dem Zeichnen, also ginge dazwischen eine Abfrage mit dem alten `p_offset`
+   * über die Leitung, deren Ergebnis aufblitzt und im Zwischenspeicher landet.
+   * Und nicht im Klick-Behandler: der Reiter kommt auch von AUSSEN (Adresszeile,
+   * Zurück-Taste), und dort gibt es keinen Klick, der zurücksetzen könnte.
+   */
+  const [letzterReiter, setLetzterReiter] = useState(reiter);
+  if (letzterReiter !== reiter) {
+    setLetzterReiter(reiter);
+    setSeite(0);
+  }
 
   // 300 ms Entprellung, dieselbe Zahl und derselbe Grund wie im Verzeichnis
   // (MemberDirectory.tsx): sonst löst JEDER Tastendruck eine RPC aus, und die
@@ -256,6 +320,51 @@ export default function AdminMitgliederPage() {
         </p>
       </header>
 
+      {/* Eigene Leiste statt `components/ui/Tabs`: die dortige Komponente hält
+          den gewählten Reiter in einem eigenen `useState` und verlangt je Reiter
+          einen eigenen Inhalt. Hier trägt die Adresse den Zustand, und alle fünf
+          Reiter zeigen dieselbe Liste unter einem anderen Filter — die Optik ist
+          übernommen, die Zustandsführung nicht. */}
+      {/* Die graue Linie sitzt am UMSCHLAG, nicht an der scrollbaren Leiste.
+          Beides in einem Element hiess `overflow-x-auto` — und das setzt
+          `overflow-y` implizit auf `auto`. Der 1px-Überstand des negativen
+          Aussenabstands genügte dann für einen VERTIKALEN Scrollbalken, der
+          15 px Breite frass (gemessen: clientWidth 1105 bei 1120 px Breite,
+          scrollHeight 34 bei clientHeight 33). Nur die Sichtprobe zeigte ihn. */}
+      <div className="border-b border-line">
+        <div role="tablist" aria-label="Zustand" className="flex gap-6 overflow-x-auto">
+          {REITER.map((r) => {
+            const gewaehlt = r.id === reiter;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="tab"
+                id={`reiter-${r.id}`}
+                aria-selected={gewaehlt}
+                aria-controls={tafelId}
+                onClick={() => {
+                  // `setSuchparameter` und nicht `setStatus`: der Reiter GEHÖRT in
+                  // die Adresse. `replace` wäre hier falsch — ein Reiterwechsel ist
+                  // eine Navigation, und die Zurück-Taste soll ihn zurücknehmen.
+                  const naechste = new URLSearchParams(suchparameter);
+                  naechste.set(REITER_PARAM, r.id);
+                  setSuchparameter(naechste);
+                }}
+                className={
+                  "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
+                  (gewaehlt
+                    ? "border-accent text-accent-strong"
+                    : "border-transparent text-muted hover:text-ink")
+                }
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Suche" className="min-w-56 flex-1">
           {({ id }) => (
@@ -265,22 +374,6 @@ export default function AdminMitgliederPage() {
               placeholder="Name oder Anmeldeadresse"
               onChange={(e) => setEingabe(e.target.value)}
             />
-          )}
-        </Field>
-        <Field label="Status" className="w-48">
-          {({ id }) => (
-            <Select
-              id={id}
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value as AdminMemberStatus);
-                setSeite(0);
-              }}
-            >
-              <option value="alle">Alle</option>
-              <option value="offen">Nicht aktiviert</option>
-              <option value="aktiviert">Aktiviert</option>
-            </Select>
           )}
         </Field>
         <div className="flex gap-1" role="group" aria-label="Ansicht">
@@ -299,110 +392,116 @@ export default function AdminMitgliederPage() {
         </div>
       </div>
 
-      {isLoading && <PageSkeleton />}
-      {isError && (
-        <Card className="p-5">
-          <CardTitle>Die Liste konnte nicht geladen werden</CardTitle>
-          <p className="mt-1 text-sm text-muted">{fehlerText(error)}</p>
-        </Card>
-      )}
+      <div
+        role="tabpanel"
+        id={tafelId}
+        aria-labelledby={`reiter-${reiter}`}
+        className="flex flex-col gap-6"
+      >
+        {isLoading && <PageSkeleton />}
+        {isError && (
+          <Card className="p-5">
+            <CardTitle>Die Liste konnte nicht geladen werden</CardTitle>
+            <p className="mt-1 text-sm text-muted">{fehlerText(error)}</p>
+          </Card>
+        )}
 
-      {!isLoading && !isError && members.length === 0 && (
-        <Card className="p-5">
-          <CardTitle>Keine Mitglieder gefunden</CardTitle>
-          <p className="mt-1 text-sm text-muted">
-            {seite === 0
-              ? "Zu diesem Filter gibt es keine Treffer. Ohne Filter zeigt die Liste alle Konten."
-              : "Diese Seite ist leer — die Treffermenge ist kleiner geworden, seit sie geöffnet wurde."}
-          </p>
-          {/* Die Blätterung unten rendert nur NEBEN Treffern. Ohne diesen Ausweg
+        {!isLoading && !isError && members.length === 0 && (
+          <Card className="p-5">
+            <CardTitle>Keine Mitglieder gefunden</CardTitle>
+            <p className="mt-1 text-sm text-muted">
+              {seite === 0
+                ? "Zu diesem Filter gibt es keine Treffer. Ohne Filter zeigt die Liste alle Konten."
+                : "Diese Seite ist leer — die Treffermenge ist kleiner geworden, seit sie geöffnet wurde."}
+            </p>
+            {/* Die Blätterung unten rendert nur NEBEN Treffern. Ohne diesen Ausweg
               säße der Admin auf einer leeren Seite fest: aktiviert er im Filter
               „Nicht aktiviert" die letzte Zeile der letzten Seite, lädt die
               Liste neu, hat null Treffer — und mit ihnen verschwindet der
               „Zurück"-Knopf. Gefunden im Diff-Review (AGE-566). */}
-          {seite > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="mt-4"
-              onClick={() => setSeite(0)}
-            >
-              Zur ersten Seite
-            </Button>
-          )}
-        </Card>
-      )}
+            {seite > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="mt-4"
+                onClick={() => setSeite(0)}
+              >
+                Zur ersten Seite
+              </Button>
+            )}
+          </Card>
+        )}
 
-      {!isLoading && !isError && members.length > 0 && (
-        <>
-          {sicht === "Tabelle" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line text-xs tracking-wide text-muted uppercase">
-                  <tr>
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Anmeldeadresse</th>
-                    <th className="py-2 pr-4">Zustand</th>
-                    <th className="py-2">Handlungen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m) => (
-                    <tr
-                      key={m.id}
-                      data-testid={`mitglied-${m.id}`}
-                      className="border-b border-line"
-                    >
-                      <td className="py-2 pr-4">
-                        <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
-                          {m.name ?? "Ohne Namen"}
-                        </Link>
-                      </td>
-                      <td className="py-2 pr-4 text-muted">{m.login_email}</td>
-                      <td className="py-2 pr-4">
-                        <Zustand member={m} />
-                      </td>
-                      <td className="py-2">
-                        <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
-                      </td>
+        {!isLoading && !isError && members.length > 0 && (
+          <>
+            {sicht === "Tabelle" && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line text-xs tracking-wide text-muted uppercase">
+                    <tr>
+                      <th className="py-2 pr-4">Name</th>
+                      <th className="py-2 pr-4">Anmeldeadresse</th>
+                      <th className="py-2 pr-4">Zustand</th>
+                      <th className="py-2">Handlungen</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {members.map((m) => (
+                      <tr
+                        key={m.id}
+                        data-testid={`mitglied-${m.id}`}
+                        className="border-b border-line"
+                      >
+                        <td className="py-2 pr-4">
+                          <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
+                            {m.name ?? "Ohne Namen"}
+                          </Link>
+                        </td>
+                        <td className="py-2 pr-4 text-muted">{m.login_email}</td>
+                        <td className="py-2 pr-4">
+                          <Zustand member={m} />
+                        </td>
+                        <td className="py-2">
+                          <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-          {sicht === "Karten" && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {members.map((m) => (
-                <Card
-                  key={m.id}
-                  data-testid={`mitglied-${m.id}`}
-                  className="flex flex-col gap-3 p-5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
-                      {m.name ?? "Ohne Namen"}
-                    </Link>
-                    <Zustand member={m} />
-                  </div>
-                  <p className="text-sm text-muted">{m.login_email}</p>
-                  <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
-                </Card>
-              ))}
-            </div>
-          )}
+            {sicht === "Karten" && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {members.map((m) => (
+                  <Card
+                    key={m.id}
+                    data-testid={`mitglied-${m.id}`}
+                    className="flex flex-col gap-3 p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
+                        {m.name ?? "Ohne Namen"}
+                      </Link>
+                      <Zustand member={m} />
+                    </div>
+                    <p className="text-sm text-muted">{m.login_email}</p>
+                    <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                  </Card>
+                ))}
+              </div>
+            )}
 
-          {sicht === "Verzeichnis" && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {members.map((m) => (
-                <div
-                  key={m.id}
-                  data-testid={`mitglied-${m.id}`}
-                  className="flex h-full flex-col gap-2"
-                >
-                  {/* Dieselbe Karte wie /mitglieder, mit einem anderen Ziel.
+            {sicht === "Verzeichnis" && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {members.map((m) => (
+                  <div
+                    key={m.id}
+                    data-testid={`mitglied-${m.id}`}
+                    className="flex h-full flex-col gap-2"
+                  >
+                    {/* Dieselbe Karte wie /mitglieder, mit einem anderen Ziel.
                       Zustand und Handlungen stehen DANEBEN und nicht darin: die
                       Karte ist ein Link, und ein Knopf in einem Link ist weder
                       gültiges HTML noch bedienbar.
@@ -411,30 +510,31 @@ export default function AdminMitgliederPage() {
                       Spalten hinweg FLUCHTEN. Ohne das hing jede an ihrer
                       unterschiedlich hohen Karte, und die Sichtprobe zeigte
                       eine Treppe statt eines Rasters. */}
-                  <div className="flex-1">
-                    <MemberCard member={m} to={`/admin/mitglied/${m.id}`} />
-                  </div>
-                  {/* Umbrechend statt `justify-between`: in einer schmalen Spalte
+                    <div className="flex-1">
+                      <MemberCard member={m} to={`/admin/mitglied/${m.id}`} />
+                    </div>
+                    {/* Umbrechend statt `justify-between`: in einer schmalen Spalte
                       riss letzteres „Nicht aktiviert" auf zwei Zeilen und
                       stapelte die Knöpfe. */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Zustand member={m} />
-                    <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Zustand member={m} />
+                      <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          <Blaetterung
-            seite={seite}
-            anzahl={members.length}
-            hatWeitere={data?.hatWeitere ?? false}
-            onZurueck={() => setSeite((s) => Math.max(0, s - 1))}
-            onWeiter={() => setSeite((s) => s + 1)}
-          />
-        </>
-      )}
+            <Blaetterung
+              seite={seite}
+              anzahl={members.length}
+              hatWeitere={data?.hatWeitere ?? false}
+              onZurueck={() => setSeite((s) => Math.max(0, s - 1))}
+              onWeiter={() => setSeite((s) => s + 1)}
+            />
+          </>
+        )}
+      </div>
 
       {rueckfrage && (
         <Rueckfrage

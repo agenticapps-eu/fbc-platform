@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
 import type { AdminMember } from "../lib/admin-members";
@@ -131,11 +131,14 @@ describe("Die Verzeichnis-Ansicht führt nicht in die Sackgasse (5.6)", () => {
 });
 
 describe("Filter, Suche und Blätterung gehen an die Datenbank (5.7)", () => {
+  // Seit Abschnitt 8 kommt der Status vom Reiter und nicht mehr aus einem
+  // Auswahlfeld. Die Zusage selbst bleibt dieselbe: gefiltert wird in der
+  // Datenbank, die Fläche reicht `p_status` durch.
   it("reicht den Statusfilter durch", async () => {
     renderPage();
     await screen.findByText("Bodo Unbestaetigt");
 
-    fireEvent.change(screen.getByLabelText(/Status/i), { target: { value: "offen" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Nicht aktiviert" }));
 
     await waitFor(() => expect(lastListArgs().p_status).toBe("offen"));
   });
@@ -891,7 +894,9 @@ describe("Der halbe Zustand ist über das Menü heilbar (gebannt)", () => {
     // bricht dort mit 22023 ab, gleichgültig ob der Ban steht. Das ist eine
     // Lücke im Bestand und keine Freiheit dieser Fläche — sie erfindet keine.
     expect(within(menue).queryByRole("menuitem", { name: /^Löschen$/i })).toBeNull();
-    expect(within(menue).getByRole("menuitem", { name: /^Wiederherstellen$/i })).toBeInTheDocument();
+    expect(
+      within(menue).getByRole("menuitem", { name: /^Wiederherstellen$/i }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -926,5 +931,208 @@ describe("Die Warnung verspricht nur, was das Menü hergibt", () => {
     // den Admin auf die Suche nach einem Eintrag, den es nicht gibt.
     await screen.findByText(/unvollständig/i);
     expect(screen.queryByText(/noch einmal auslösen/i)).toBeNull();
+  });
+});
+
+/**
+ * Abschnitt 8 — die fünf Reiter.
+ *
+ * Gefiltert wird in der DATENBANK, nicht hier: die Fläche reicht `p_status`
+ * durch. Ein Test, der nur die Argumente prüft, sagte deshalb nichts über das,
+ * was ein Admin sieht — und ein Test, der nur die sichtbaren Zeilen prüft,
+ * bestünde auch mit einer Fläche, die clientseitig filtert und die RPC
+ * unbehelligt lässt. Deshalb stellt `listeNachStatus` die `case p_status`-Regel
+ * der Migration nach, und die Zusagen prüfen beides: was übergeben wird UND was
+ * daraufhin dasteht.
+ */
+function listeNachStatus(zeilen: AdminMember[]) {
+  rpc.mockImplementation((fn: string, args: Record<string, unknown>) => {
+    if (fn !== "admin_list_members") return Promise.resolve({ data: null, error: null });
+    const status = args.p_status as string | null;
+    const treffer = zeilen.filter((m) => {
+      switch (status) {
+        case "deaktiviert":
+          return m.deaktiviert_seit !== null && m.geloescht_seit === null;
+        case "geloescht":
+          return m.geloescht_seit !== null;
+        case "aktiviert":
+          return m.bestaetigt && m.deaktiviert_seit === null && m.geloescht_seit === null;
+        case "offen":
+          return !m.bestaetigt && m.deaktiviert_seit === null && m.geloescht_seit === null;
+        // `alle` UND `null`: dieselbe Bedingung, genau wie das `else` im `case`
+        // der Migration.
+        default:
+          return m.deaktiviert_seit === null && m.geloescht_seit === null;
+      }
+    });
+    return Promise.resolve({ data: treffer, error: null });
+  });
+}
+
+const DEAKTIVIERT_8 = member({
+  name: "Dora Deaktiviert",
+  login_email: "dora@test.fbc",
+  deaktiviert_seit: "2026-08-20T10:00:00.000Z",
+});
+
+describe("Die Reiter trennen die Zustände (8.1)", () => {
+  it("führt ein deaktiviertes Mitglied nicht unter „Alle“, sondern unter „Deaktiviert“", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    renderPage();
+
+    // „Alle" heisst die Mitgliedschaft, nicht den Datenbestand.
+    await screen.findByText("Carla Aktiv");
+    expect(screen.queryByText("Dora Deaktiviert")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Deaktiviert" }));
+
+    await screen.findByText("Dora Deaktiviert");
+    expect(screen.queryByText("Carla Aktiv")).toBeNull();
+    await waitFor(() => expect(lastListArgs().p_status).toBe("deaktiviert"));
+  });
+});
+
+describe("Die drei Sichten überleben den Reiterwechsel (8.3)", () => {
+  it("bleibt in „Karten“, wenn der Reiter wechselt", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    renderPage();
+    await screen.findByText("Carla Aktiv");
+
+    fireEvent.click(screen.getByRole("button", { name: "Karten" }));
+    // Die Kartensicht rendert keine Tabelle — daran hängt die Unterscheidung,
+    // nicht an der Knopfstellung allein.
+    expect(screen.queryByRole("table")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Deaktiviert" }));
+    await screen.findByText("Dora Deaktiviert");
+
+    expect(screen.getByRole("button", { name: "Karten" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+/**
+ * Der Reiter steht in der ADRESSE (8.2, 8.4).
+ *
+ * `MemoryRouter` allein reichte hier nicht: er kennt keinen Weg, von aussen zu
+ * navigieren oder zurückzugehen. Genau das ist aber die Zusage — ein Zustand,
+ * den nur `location` trägt, wird sonst nie von aussen geprüft, und in diesem
+ * Projekt ist schon einmal ein Zustand grün getestet worden, den die
+ * Zurück-Taste zerlegte.
+ */
+function renderMitRouter(eintrag: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const router = createMemoryRouter(
+    [{ path: "/admin/mitglieder", element: <AdminMitgliederPage /> }],
+    { initialEntries: [eintrag] },
+  );
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  return router;
+}
+
+describe("Der Reiter steht in der Adresse (8.2, 8.4)", () => {
+  it("schreibt ihn beim Klick hinein", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    const router = renderMitRouter("/admin/mitglieder");
+    await screen.findByText("Carla Aktiv");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Deaktiviert" }));
+
+    await waitFor(() => expect(router.state.location.search).toBe("?tab=deaktiviert"));
+  });
+
+  it("liest ihn beim Aufbau — ein Neuladen verliert ihn nicht", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    renderMitRouter("/admin/mitglieder?tab=deaktiviert");
+
+    // Kein Klick: der Reiter kommt allein aus der Adresse.
+    await screen.findByText("Dora Deaktiviert");
+    expect(screen.getByRole("tab", { name: "Deaktiviert" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(lastListArgs().p_status).toBe("deaktiviert");
+  });
+
+  it("folgt einer Navigation von aussen und der Zurück-Taste", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    const router = renderMitRouter("/admin/mitglieder");
+    await screen.findByText("Carla Aktiv");
+
+    // Von AUSSEN, ohne Klick auf einen Reiter.
+    await router.navigate("/admin/mitglieder?tab=deaktiviert");
+    await screen.findByText("Dora Deaktiviert");
+    expect(screen.queryByText("Carla Aktiv")).toBeNull();
+
+    // Und zurück. Das ist der Weg, den ein `useState` neben der Adresse
+    // verschluckt hätte: der Wert dort bliebe auf „deaktiviert" stehen.
+    await router.navigate(-1);
+    await screen.findByText("Carla Aktiv");
+    expect(screen.queryByText("Dora Deaktiviert")).toBeNull();
+    expect(screen.getByRole("tab", { name: "Alle" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(lastListArgs().p_status).toBe("alle"));
+  });
+
+  it("fällt für einen unbekannten Wert auf „Alle“ zurück", async () => {
+    listeNachStatus([AKTIV, DEAKTIVIERT_8]);
+    renderMitRouter("/admin/mitglieder?tab=quatsch");
+
+    // Die Adresszeile ist Eingabe von aussen. Ein unbekannter Wert an `p_status`
+    // liefe in der Datenbank in eine 22023 — die Fläche zeigt statt dessen die
+    // Mitgliedschaft.
+    await screen.findByText("Carla Aktiv");
+    expect(screen.getByRole("tab", { name: "Alle" })).toHaveAttribute("aria-selected", "true");
+    expect(lastListArgs().p_status).toBe("alle");
+  });
+});
+
+describe("„Mitgliedschaft“ ist ein Darstellungsmodus, kein Filter (8.2)", () => {
+  it("zeigt dieselbe Menge wie „Alle“ und fragt denselben Status ab", async () => {
+    listeNachStatus([AKTIV, OFFEN, DEAKTIVIERT_8]);
+    const router = renderMitRouter("/admin/mitglieder");
+    await screen.findByText("Carla Aktiv");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Mitgliedschaft" }));
+
+    // Dieselbe Menge: beide Reiter fragen `alle` ab. Deaktivierte stehen in
+    // keinem von beiden — wer nicht mehr dabei ist, hat keinen
+    // Zahlungszeitraum, der noch etwas bedeutet.
+    await waitFor(() => expect(router.state.location.search).toBe("?tab=mitgliedschaft"));
+    expect(lastListArgs().p_status).toBe("alle");
+    expect(screen.getByText("Carla Aktiv")).toBeInTheDocument();
+    expect(screen.getByText("Bodo Unbestaetigt")).toBeInTheDocument();
+    expect(screen.queryByText("Dora Deaktiviert")).toBeNull();
+  });
+});
+
+describe("Ein Reiterwechsel fängt wieder auf Seite 1 an", () => {
+  it("setzt den Versatz zurück, auch wenn der Reiter von aussen kommt", async () => {
+    // Eine volle Seite plus Zusatzzeile, damit es überhaupt eine zweite gibt.
+    const seite1 = Array.from({ length: 26 }, (_, i) => member({ name: `Erste ${i}` }));
+    rpc.mockResolvedValueOnce({ data: seite1, error: null });
+    rpc.mockResolvedValue({ data: [member({ name: "Zweite Seite" })], error: null });
+
+    const router = renderMitRouter("/admin/mitglieder");
+    await screen.findByText("Erste 0");
+    fireEvent.click(screen.getByRole("button", { name: /Weiter/i }));
+    await waitFor(() => expect(lastListArgs().p_offset).toBe(25));
+
+    // Von aussen, also ohne den Klick, der zurücksetzen könnte.
+    await router.navigate("/admin/mitglieder?tab=geloescht");
+
+    // Seite 3 der Deaktivierten ist keine Fortsetzung von Seite 3 der Offenen —
+    // und eine Abfrage mit dem ALTEN Versatz darf dazwischen gar nicht erst
+    // hinausgehen.
+    await waitFor(() => expect(lastListArgs().p_status).toBe("geloescht"));
+    expect(lastListArgs().p_offset).toBe(0);
+    expect(
+      rpc.mock.calls.filter((c) => c[0] === "admin_list_members" && c[1].p_status === "geloescht"),
+    ).toHaveLength(1);
   });
 });
