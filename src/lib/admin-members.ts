@@ -91,7 +91,7 @@ export async function fetchAdminMembers(f: AdminMemberFilters): Promise<AdminMem
  * `service_role`) und schreibt keine Spur. Die erste tut beides, in einer
  * Transaktion.
  *
- * Die Handlung ist durch die Anwendung nicht umkehrbar — es gibt keinen
+ * Die Aktion ist durch die Anwendung nicht umkehrbar — es gibt keinen
  * Rücksetzweg. Deshalb steht vor ihr eine namentliche Rückfrage, und deshalb
  * wirft diese Funktion, statt einen Fehlschlag zu schlucken.
  */
@@ -100,8 +100,8 @@ export async function activateMember(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Die vier Handlungen, die `admin-set-member-ban` kennt. */
-export type LebenszyklusHandlung = "disable" | "enable" | "delete" | "restore";
+/** Die vier Aktionen, die `admin-set-member-ban` kennt. */
+export type LebenszyklusAktion = "disable" | "enable" | "delete" | "restore";
 
 export interface BanErgebnis {
   /** Wahr, wenn nur die HÄLFTE gelang — siehe die Invariante unten. */
@@ -112,7 +112,7 @@ export interface BanErgebnis {
 }
 
 /**
- * Der einzige Weg der Oberfläche zu den vier Lebenszyklus-Handlungen.
+ * Der einzige Weg der Oberfläche zu den vier Lebenszyklus-Aktionen.
  *
  * NICHT über `supabase.rpc`: die vier RPCs sind nur die eine Hälfte der Sperre.
  * Die andere ist `banned_until` in `auth.users`, und die setzt allein die Edge
@@ -147,7 +147,7 @@ export interface BanErgebnis {
  * sichtbar, aber ausgesperrt. Die hätte sie als Erfolg durchgehen lassen.
  */
 export async function setMemberBan(
-  action: LebenszyklusHandlung,
+  action: LebenszyklusAktion,
   target: string,
 ): Promise<BanErgebnis> {
   const { data, error } = await supabase.functions.invoke("admin-set-member-ban", {

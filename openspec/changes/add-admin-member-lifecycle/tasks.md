@@ -325,7 +325,13 @@ und standen im ersten Entwurf nicht drin.
         Satzsubjekt.
       - Datengrundlage: `scripts/probe-age581-sichtprobe-daten.ts`
         (wiederholbar, nur gegen `127.0.0.1`).
-      - **NACHTRAG 24.08. (Donald): drei Punkte statt des Wortes „Handlungen".**
+      - **NACHTRAG 24.08. (Donald): „Aktionen" statt „Handlungen"** — Spaltenkopf,
+        `aria-label` und die Bezeichner der Fläche. Das Delta behält sein Wort
+        („Handlungen einer Zeile"): es beschreibt die Anforderung und beschriftet
+        nichts, und die beiden Stellen, an denen der Code es wörtlich ZITIERT
+        („keine Handlung, sondern eine Falle"), bleiben Zitat. Die Edge Function
+        ist nicht mitumbenannt — andere Schicht, eigene Sprache.
+      - **NACHTRAG 24.08. (Donald): drei Punkte statt eines Wortes.**
         Der Auslöser soll die Zeile nicht dominieren. Das Delta legt nur „eine
         Schaltfläche am Zeilenende" fest, nicht ihre Beschriftung — also keine
         Delta-Änderung. Der Name wandert damit vollständig ins `aria-label`:

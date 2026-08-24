@@ -286,7 +286,7 @@ describe("Zugangslink schicken (5.8, 5.9)", () => {
 });
 
 describe("Direkt aktivieren verlangt eine namentliche Rückfrage (5.10, 5.11)", () => {
-  it("bietet die Handlung an einer bestätigten Zeile nicht an", async () => {
+  it("bietet die Aktion an einer bestätigten Zeile nicht an", async () => {
     renderPage();
     const bestaetigt = await oeffneMenue(AKTIV.id);
 
@@ -310,7 +310,7 @@ describe("Direkt aktivieren verlangt eine namentliche Rückfrage (5.10, 5.11)", 
     // Der Name steht in der ÜBERSCHRIFT, nicht bloss irgendwo im Fliesstext —
     // wer schnell klickt, liest genau diese Zeile.
     expect(within(dialog).getByRole("heading", { name: /Bodo Unbestaetigt/ })).toBeInTheDocument();
-    // Und die Folge wird benannt, nicht nur die Handlung.
+    // Und die Folge wird benannt, nicht nur die Aktion.
     expect(within(dialog).getByText(/sichtbar/i)).toBeInTheDocument();
   });
 
@@ -352,12 +352,12 @@ describe("Direkt aktivieren verlangt eine namentliche Rückfrage (5.10, 5.11)", 
  * Mitglied anmelden und dessen Nachrichten lesen, ohne dass es irgendwo steht.
  * Der Knopf heißt deshalb „Zugangslink schicken".
  *
- * Geprüft wird beides: die Fläche zeigt keine solche Handlung, UND die
+ * Geprüft wird beides: die Fläche zeigt keine solche Aktion, UND die
  * Admin-Module rufen keine setzende Passwort-API. Nur das erste wäre zu wenig —
  * eine Funktion ohne Knopf bliebe eine Funktion.
  */
 describe("Kein Weg, ein fremdes Passwort zu setzen (5.12)", () => {
-  it("bietet die Fläche keine Passwort-Handlung an", async () => {
+  it("bietet die Fläche keine Passwort-Aktion an", async () => {
     renderPage();
     await screen.findByText("Bodo Unbestaetigt");
 
@@ -382,9 +382,9 @@ describe("Kein Weg, ein fremdes Passwort zu setzen (5.12)", () => {
 /**
  * Das Zeilenmenü (AGE-581, Abschnitt 7).
  *
- * Die Handlungen stehen nicht mehr nebeneinander, sondern hinter EINER
+ * Die Aktionen stehen nicht mehr nebeneinander, sondern hinter EINER
  * Schaltfläche am Zeilenende. Der Grund ist nicht Platz: mit vier
- * Lebenszyklus-Handlungen zusätzlich zu den beiden bestehenden stünden an einer
+ * Lebenszyklus-Aktionen zusätzlich zu den beiden bestehenden stünden an einer
  * Zeile bis zu vier Knöpfe, und der gefährlichste — „löschen" — läge zwischen
  * ihnen wie jeder andere.
  *
@@ -402,7 +402,7 @@ const DEAKTIVIERT = member({
 /** Öffnet das Menü der Zeile und liefert es zurück. */
 async function oeffneMenue(mitgliedId: string): Promise<HTMLElement> {
   const zeile = await screen.findByTestId(`mitglied-${mitgliedId}`);
-  fireEvent.click(within(zeile).getByRole("button", { name: /Handlungen/i }));
+  fireEvent.click(within(zeile).getByRole("button", { name: /Aktionen/i }));
   return await screen.findByRole("menu");
 }
 
@@ -470,7 +470,7 @@ describe("Kombinierte Zustände (7.5)", () => {
 
     // Der Übergang „deaktiviert → gelöscht" steht in der Matrix: er setzt
     // `deleted_at` und lässt `disabled_at` stehen. Ihn auszublenden, weil die
-    // Zeile schon entfernt aussieht, nähme eine gültige Handlung weg.
+    // Zeile schon entfernt aussieht, nähme eine gültige Aktion weg.
     const menue = await oeffneMenue(DEAKTIVIERT.id);
     expect(within(menue).getByRole("menuitem", { name: /^Löschen$/i })).toBeInTheDocument();
   });
@@ -486,7 +486,7 @@ describe("Rückfragen für Deaktivieren und Löschen (7.3)", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Carla Aktiv/ })).toBeInTheDocument();
-    // Die FOLGE, nicht bloss die Handlung: aus dem Wort „deaktivieren" allein
+    // Die FOLGE, nicht bloss die Aktion: aus dem Wort „deaktivieren" allein
     // liest niemand ab, dass die Anmeldung endet.
     expect(within(dialog).getByText(/nicht mehr anmelden/i)).toBeInTheDocument();
   });
@@ -535,7 +535,7 @@ describe("Rückfragen für Deaktivieren und Löschen (7.3)", () => {
     await waitFor(() => expect(listCalls()).toBeGreaterThan(vorher));
   });
 
-  it("reaktiviert ohne Rückfrage — die Handlung gibt zurück, sie nimmt nicht", async () => {
+  it("reaktiviert ohne Rückfrage — die Aktion gibt zurück, sie nimmt nicht", async () => {
     rpc.mockResolvedValue({ data: [DEAKTIVIERT], error: null });
     invoke.mockResolvedValue({ data: { hidden: false, banned: false }, error: null });
     renderPage();
@@ -582,7 +582,7 @@ describe("Der halbe Zustand wird gemeldet, nicht gefeiert (4.5)", () => {
   /**
    * Die Falle in der anderen Richtung: ein gelungenes „reaktivieren" liefert
    * `{hidden: false, banned: false}`. Wer den Teilzustand an `banned === false`
-   * allein festmacht, warnt hier — bei einer Handlung, die vollständig gelungen
+   * allein festmacht, warnt hier — bei einer Aktion, die vollständig gelungen
    * ist. Kein anderer Test dieser Datei fiele darauf herein.
    */
   it("meldet ein gelungenes Reaktivieren als Erfolg, nicht als halben Zustand", async () => {
@@ -650,7 +650,7 @@ describe("Das Menü ist mit der Tastatur bedienbar und schliesst beim Verlassen 
     renderPage();
     const menue = await oeffneMenue(DEAKTIVIERT.id);
     const zeile = screen.getByTestId(`mitglied-${DEAKTIVIERT.id}`);
-    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+    const knopf = within(zeile).getByRole("button", { name: /Aktionen/i });
 
     fireEvent.keyDown(menue, { key: "Escape" });
 
@@ -674,7 +674,7 @@ describe("Das Menü ist mit der Tastatur bedienbar und schliesst beim Verlassen 
     rpc.mockResolvedValue({ data: [DEAKTIVIERT], error: null });
     renderPage();
     const zeile = await screen.findByTestId(`mitglied-${DEAKTIVIERT.id}`);
-    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+    const knopf = within(zeile).getByRole("button", { name: /Aktionen/i });
 
     expect(knopf).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(knopf);
@@ -720,7 +720,7 @@ describe("Der Auslöser schliesst das Menü wieder (Diff-Prüfung)", () => {
     renderPage();
     const menue = await oeffneMenue(AKTIV.id);
     const zeile = screen.getByTestId(`mitglied-${AKTIV.id}`);
-    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+    const knopf = within(zeile).getByRole("button", { name: /Aktionen/i });
 
     // Was der Browser zwischen mousedown und click tut: der Fokus springt vom
     // Menüeintrag auf den Auslöser. Ohne diese Zeile ist der Test grün und
@@ -739,7 +739,7 @@ describe("Tab verlässt das Menü nicht ins Nirgendwo (Diff-Prüfung)", () => {
     renderPage();
     const menue = await oeffneMenue(AKTIV.id);
     const zeile = screen.getByTestId(`mitglied-${AKTIV.id}`);
-    const knopf = within(zeile).getByRole("button", { name: /Handlungen/i });
+    const knopf = within(zeile).getByRole("button", { name: /Aktionen/i });
 
     fireEvent.keyDown(menue, { key: "Tab" });
 
@@ -1143,7 +1143,7 @@ describe("Der Auslöser zeigt drei Punkte und heisst trotzdem etwas", () => {
     renderPage();
     const zeile = await screen.findByTestId(`mitglied-${AKTIV.id}`);
 
-    const knopf = within(zeile).getByRole("button", { name: "Handlungen für Carla Aktiv" });
+    const knopf = within(zeile).getByRole("button", { name: "Aktionen für Carla Aktiv" });
 
     // Seit der Auslöser nur noch ein Symbol zeigt, ist das `aria-label` die
     // EINZIGE Auskunft darüber, was er tut und zu wem er gehört. Diese Zusage

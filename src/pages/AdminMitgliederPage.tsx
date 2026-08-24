@@ -20,7 +20,7 @@ import {
   setMemberBan,
   type AdminMember,
   type AdminMemberStatus,
-  type LebenszyklusHandlung,
+  type LebenszyklusAktion,
 } from "../lib/admin-members";
 
 /**
@@ -86,13 +86,13 @@ function leseReiter(wert: string | null): Reiter {
   return REITER.some((r) => r.id === wert) ? (wert as Reiter) : "alle";
 }
 
-/** Was im Zeilenmenü stehen kann. Nicht jede Handlung an jeder Zeile — was wo
- *  gilt, entscheidet `handlungenFuer`. */
-type Zeilenhandlung =
+/** Was im Zeilenmenü stehen kann. Nicht jede Aktion an jeder Zeile — was wo
+ *  gilt, entscheidet `aktionenFuer`. */
+type Zeilenaktion =
   "zugangslink" | "aktivieren" | "deaktivieren" | "reaktivieren" | "loeschen" | "wiederherstellen";
 
 /**
- * Die drei Handlungen mit Rückfrage — und die Liste ist die Regel selbst, nicht
+ * Die drei Aktionen mit Rückfrage — und die Liste ist die Regel selbst, nicht
  * ihre Beschreibung: der Verteiler liest sie, statt die Fälle ein zweites Mal
  * aufzuzählen.
  *
@@ -110,14 +110,14 @@ interface OffeneRueckfrage {
   art: Rueckfragenart;
 }
 
-/** Dieselbe Zweiteilung wie in der Edge Function: die beiden Handlungen, die
+/** Dieselbe Zweiteilung wie in der Edge Function: die beiden Aktionen, die
  *  jemandem den Zugang nehmen, gegen die beiden, die ihn zurückgeben. */
-function istSchliessen(was: LebenszyklusHandlung): boolean {
+function istSchliessen(was: LebenszyklusAktion): boolean {
   return was === "disable" || was === "delete";
 }
 
-/** Was der Erfolgston nach einer Lebenszyklus-Handlung meldet. */
-const VOLLZUG: Record<LebenszyklusHandlung, string> = {
+/** Was der Erfolgston nach einer Lebenszyklus-Aktion meldet. */
+const VOLLZUG: Record<LebenszyklusAktion, string> = {
   disable: "deaktiviert",
   enable: "reaktiviert",
   delete: "gelöscht",
@@ -184,7 +184,7 @@ export default function AdminMitgliederPage() {
     return () => clearTimeout(id);
   }, [eingabe, query]);
   const [sicht, setSicht] = useState<Sicht>("Tabelle");
-  /** Das Mitglied UND die Handlung, für die die Rückfrage offen ist — nicht ein
+  /** Das Mitglied UND die Aktion, für die die Rückfrage offen ist — nicht ein
    *  blosses `true`: der Dialog muss beides nennen, und zwar das Mitglied
    *  NAMENTLICH. */
   const [rueckfrage, setRueckfrage] = useState<OffeneRueckfrage | null>(null);
@@ -234,12 +234,12 @@ export default function AdminMitgliederPage() {
   });
 
   /**
-   * Die vier Lebenszyklus-Handlungen — EINE Mutation für alle vier, weil sich
+   * Die vier Lebenszyklus-Aktionen — EINE Mutation für alle vier, weil sich
    * nur der Wert von `action` unterscheidet und die Nachbehandlung dieselbe
    * ist.
    */
   const lebenszyklus = useMutation({
-    mutationFn: ({ m, was }: { m: AdminMember; was: LebenszyklusHandlung }) =>
+    mutationFn: ({ m, was }: { m: AdminMember; was: LebenszyklusAktion }) =>
       setMemberBan(was, m.id),
     onSuccess: async (ergebnis, { m, was }) => {
       setRueckfrage(null);
@@ -278,12 +278,12 @@ export default function AdminMitgliederPage() {
         toast({ title: `${m.name ?? "Mitglied"}: ${VOLLZUG[was]}`, variant: "success" });
       }
       // In JEDEM Fall nachladen, auch beim halben. Die Zeile hat ihren Zustand
-      // gewechselt, und das Menü der nächsten Handlung hängt daran.
+      // gewechselt, und das Menü der nächsten Aktion hängt daran.
       await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
     },
     onError: (e) => {
       setRueckfrage(null);
-      toast({ title: "Handlung fehlgeschlagen", description: fehlerText(e), variant: "error" });
+      toast({ title: "Aktion fehlgeschlagen", description: fehlerText(e), variant: "error" });
     },
   });
 
@@ -296,7 +296,7 @@ export default function AdminMitgliederPage() {
    * etwas nehmen, gehen erst durch die Rückfrage. Welche das sind, steht in
    * `BRAUCHT_RUECKFRAGE` und nicht hier — sonst stünde die Regel zweimal.
    */
-  function handlung(m: AdminMember, was: Zeilenhandlung) {
+  function aktion(m: AdminMember, was: Zeilenaktion) {
     if (BRAUCHT_RUECKFRAGE.includes(was as Rueckfragenart)) {
       setRueckfrage({ member: m, art: was as Rueckfragenart });
       return;
@@ -443,7 +443,7 @@ export default function AdminMitgliederPage() {
                       <th className="py-2 pr-4">Name</th>
                       <th className="py-2 pr-4">Anmeldeadresse</th>
                       <th className="py-2 pr-4">Zustand</th>
-                      <th className="py-2">Handlungen</th>
+                      <th className="py-2">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -463,7 +463,7 @@ export default function AdminMitgliederPage() {
                           <Zustand member={m} />
                         </td>
                         <td className="py-2">
-                          <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                          <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                         </td>
                       </tr>
                     ))}
@@ -487,7 +487,7 @@ export default function AdminMitgliederPage() {
                       <Zustand member={m} />
                     </div>
                     <p className="text-sm text-muted">{m.login_email}</p>
-                    <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                    <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                   </Card>
                 ))}
               </div>
@@ -502,11 +502,11 @@ export default function AdminMitgliederPage() {
                     className="flex h-full flex-col gap-2"
                   >
                     {/* Dieselbe Karte wie /mitglieder, mit einem anderen Ziel.
-                      Zustand und Handlungen stehen DANEBEN und nicht darin: die
+                      Zustand und Aktionen stehen DANEBEN und nicht darin: die
                       Karte ist ein Link, und ein Knopf in einem Link ist weder
                       gültiges HTML noch bedienbar.
 
-                      `flex-1` an der Karte, damit die Handlungszeilen über die
+                      `flex-1` an der Karte, damit die Aktionszeilen über die
                       Spalten hinweg FLUCHTEN. Ohne das hing jede an ihrer
                       unterschiedlich hohen Karte, und die Sichtprobe zeigte
                       eine Treppe statt eines Rasters. */}
@@ -518,7 +518,7 @@ export default function AdminMitgliederPage() {
                       stapelte die Knöpfe. */}
                     <div className="flex flex-wrap items-center gap-2">
                       <Zustand member={m} />
-                      <Zeilenmenue member={m} laeuft={laeuft} onHandlung={handlung} />
+                      <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                     </div>
                   </div>
                 ))}
@@ -588,12 +588,12 @@ function Zustand({ member }: { member: AdminMember }) {
  * hier nicht, und der Ausgang ist eine Fehlermeldung statt einer stillen
  * Änderung. Benannt statt verschwiegen.
  */
-function handlungenFuer(m: AdminMember): { id: Zeilenhandlung; label: string; gefahr?: boolean }[] {
+function aktionenFuer(m: AdminMember): { id: Zeilenaktion; label: string; gefahr?: boolean }[] {
   const deaktiviert = m.deaktiviert_seit !== null;
   const geloescht = m.geloescht_seit !== null;
   const gesperrt = deaktiviert || geloescht;
 
-  const eintraege: { id: Zeilenhandlung; label: string; gefahr?: boolean }[] = [];
+  const eintraege: { id: Zeilenaktion; label: string; gefahr?: boolean }[] = [];
   if (!gesperrt) eintraege.push({ id: "zugangslink", label: "Zugangslink schicken" });
   // Nur an unbestätigten Zeilen. An einer bestätigten bräche
   // `admin_activate_member` mit 22023 ab.
@@ -619,9 +619,9 @@ function handlungenFuer(m: AdminMember): { id: Zeilenhandlung; label: string; ge
 /**
  * Das Zeilenmenü (AGE-581).
  *
- * WARUM EIN MENÜ: mit den vier Lebenszyklus-Handlungen stünden an einer Zeile
+ * WARUM EIN MENÜ: mit den vier Lebenszyklus-Aktionen stünden an einer Zeile
  * bis zu vier Knöpfe nebeneinander, und „Löschen" läge zwischen ihnen wie jeder
- * andere. Ein Menü macht aus dem Fehlklick zwei Handlungen statt einer.
+ * andere. Ein Menü macht aus dem Fehlklick zwei Aktionen statt einer.
  *
  * WARUM AN `document.body` PORTALIERT: ein `fixed`-Overlay wird auf dieser
  * Fläche an zwei Stellen eingefangen — `.fbc-card:hover` setzt ein `transform`
@@ -637,11 +637,11 @@ function handlungenFuer(m: AdminMember): { id: Zeilenhandlung; label: string; ge
 function Zeilenmenue({
   member,
   laeuft,
-  onHandlung,
+  onAktion,
 }: {
   member: AdminMember;
   laeuft: boolean;
-  onHandlung: (m: AdminMember, was: Zeilenhandlung) => void;
+  onAktion: (m: AdminMember, was: Zeilenaktion) => void;
 }) {
   const [offen, setOffen] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
@@ -650,7 +650,7 @@ function Zeilenmenue({
   /** Der Kasten des Auslösers zum Zeitpunkt des Öffnens — die Klapprichtung
    *  unten braucht ihn, und bis dahin ist das Menü schon aufgeklappt. */
   const ankerRef = useRef<DOMRect | null>(null);
-  const eintraege = handlungenFuer(member);
+  const eintraege = aktionenFuer(member);
 
   // KLAPPRICHTUNG. Nach unten, ausser es passt nicht mehr — dann nach oben.
   // Ohne das ragt das Menü an einer Zeile am unteren Rand hinaus, und weil es
@@ -757,13 +757,13 @@ function Zeilenmenue({
         aria-haspopup="menu"
         aria-expanded={offen}
         // NAMENTLICH: auf einer Seite mit fünfundzwanzig Zeilen sind
-        // fünfundzwanzig Schaltflächen namens „Handlungen" für eine
+        // fünfundzwanzig Schaltflächen namens „Aktionen" für eine
         // Vorleseausgabe nicht auseinanderzuhalten.
         // NAMENTLICH und HIER UNVERZICHTBAR: seit der Auslöser nur noch drei
         // Punkte zeigt, ist dieses Label die EINZIGE Auskunft darüber, was er
         // tut und zu wem er gehört. Ohne es hiesse er für eine Vorleseausgabe
         // „Schaltfläche".
-        aria-label={`Handlungen für ${member.name ?? "dieses Mitglied"}`}
+        aria-label={`Aktionen für ${member.name ?? "dieses Mitglied"}`}
         onClick={() => {
           if (offen) {
             setOffen(false);
@@ -777,7 +777,7 @@ function Zeilenmenue({
           setOffen(true);
         }}
       >
-        {/* Drei Punkte statt des Wortes „Handlungen" (Donald, 24.08.): der
+        {/* Drei Punkte statt eines Wortes (Donald, 24.08.): der
             Auslöser eines Zeilenmenüs soll die Zeile nicht dominieren.
             Inline und ohne Icon-Bibliothek, wie `ui/NavIcon.tsx` — hier sogar
             gefüllt statt gestrichelt, weil drei Kreise mit 1.6 px Kontur bei
@@ -802,7 +802,7 @@ function Zeilenmenue({
           <div
             ref={menueRef}
             role="menu"
-            aria-label={`Handlungen für ${member.name ?? "dieses Mitglied"}`}
+            aria-label={`Aktionen für ${member.name ?? "dieses Mitglied"}`}
             onKeyDown={onKey}
             onBlur={(e) => {
               // „Schliessen beim Verlassen" (7.4) — auch für die Tastatur, nicht
@@ -811,7 +811,7 @@ function Zeilenmenue({
               //
               // AUSSER er ist der Auslöser. Im Browser bekommt ein `<button>`
               // beim `mousedown` den Fokus, also feuert ein Klick auf
-              // „Handlungen" ERST dieses `focusout` und DANN seinen `onClick`.
+              // den Auslöser ERST dieses `focusout` und DANN seinen `onClick`.
               // Schlösse es hier, sähe der Klick ein bereits geschlossenes
               // Menü und öffnete es sofort wieder — der Auslöser könnte sein
               // eigenes Menü nie schliessen. In jsdom verschiebt
@@ -838,7 +838,7 @@ function Zeilenmenue({
                 }
                 onClick={() => {
                   schliessen(true);
-                  onHandlung(member, h.id);
+                  onAktion(member, h.id);
                 }}
               >
                 {h.label}
@@ -855,7 +855,7 @@ function Zeilenmenue({
  * Der Wortlaut je Rückfrage.
  *
  * Jede nennt das Mitglied NAMENTLICH in der Überschrift — wer schnell klickt,
- * liest genau diese Zeile — und benennt die FOLGE, nicht bloss die Handlung.
+ * liest genau diese Zeile — und benennt die FOLGE, nicht bloss die Aktion.
  * Bei den beiden Sperren steht ausdrücklich da, dass die Anmeldung endet: das
  * ist die Wirkung, die man aus dem Wort „deaktivieren" allein nicht abliest.
  */
@@ -890,7 +890,7 @@ const RUECKFRAGEN: Record<
 };
 
 /**
- * Die Rückfrage vor den drei nehmenden Handlungen.
+ * Die Rückfrage vor den drei nehmenden Aktionen.
  *
  * Sie nennt das Mitglied NAMENTLICH und benennt die Folge. Das ist keine
  * Höflichkeit: bei „direkt aktivieren" schreibt `mark_activated`
