@@ -1,108 +1,110 @@
-# Session Handoff — 2026-08-24 (fünfzehnte Sitzung)
+# Session Handoff — 2026-08-24 (sechzehnte Sitzung)
 
-**Die Live-Seite liest seit heute PROD.** Dazu AGE-581 Abschnitt 10 gebaut,
-Abnahme 11.1–11.4 belegt, Branch gepusht (**PR #201**), und AGE-582 für den
-Aktivitäts-Ausbau angelegt. 62 von 76 Aufgaben. 1425 Vitest, 601 pgTAP.
+**AGE-581 ist gemergt und auf PROD.** 11.5 (Fremd-Review) und 11.6 (Sichtprobe)
+abgeschlossen, sechs Befunde, vier davon behoben. PR #201 gemergt, `migrate-prod`
+gelaufen, alle drei Flächen einzeln belegt. 67 von 76 Aufgaben. 1433 Vitest,
+606 pgTAP, 90 Deno.
 
 ## Accomplished
 
-**Umschaltung PROD-UI → PROD-DB, vollzogen und belegt.** Zwei Werte in Infisical
-`prod` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) auf
-`viwntbodrtqxgmqyxluh`, dann `gh run rerun 32645682952`. Alle vier Jobs grün,
-**`drift-gate` inklusive** — es misst jetzt PROD und fand keine Abweichung.
+**11.5 — Diff-Review durch zwei Fremdanbieter.** codex 7 Befunde, gemini 10.
+Jeder gegen den Code nachgeprüft; **6 von geminis 10 widerlegt** (der als HIGH
+gemeldete `payment_type`-Fehler war seit `5a1ed03` behoben, `log_admin_action`
+existiert, Zeilenzustand überlebt die Paginierung nicht — `key={m.id}`).
 
-**Abschnitt 10 — „Ehemaliges Mitglied".** Entfernte Urheber im Feed ohne Name,
-Bild und Verweis, unterscheidbar von „Ein Mitglied". Über `former_member_entries`
-mit Beitrags- und Kommentar-IDs, in Blöcken zu 200.
+**Vier Befunde behoben, jeder mit Gegenprobe** (Donalds Entscheidung: die drei
+billigen plus HIGH-1 vor den Merge):
 
-**Abnahme 11.1–11.4.** 601 pgTAP (sechs Dateien), `openspec validate --all`
-31/31, Lint/Typecheck/Test/Build grün, `grants_test.sql` ohne Nachziehen grün.
+| Befund | Fix |
+|---|---|
+| HIGH `[true,true]` war eine Behauptung | `sollGebannt()`, Auth-Schritt läuft immer |
+| `array_length` zählte Dimensionen | Migration `20260824110000`, `cardinality` + `ndims` |
+| Aktivierungswege ohne Lebenszyklus | Migration `20260824120000`, drei Stellen + Status `blocked` |
+| Zustandsspalte sagte „Aktiviert" | Lebenszyklus geht vor, `muted` |
 
-**AGE-582 angelegt** — Aktivität auf Konzeptstand plus Icon-/Farbkanon.
+**11.6 — Sichtprobe, zweiter Befund gefunden und behoben.** Die Detailseite
+meldete über einem GELÖSCHTEN Mitglied „bestätigt", darunter ein voll
+bearbeitbares Formular. Rein clientseitig behoben, keine Migration.
+
+**Auf PROD gebracht, dreifach belegt.** PR #201 → `7e7f113`; `migrate-prod`
+plan+apply grün; danach **unabhängig gelesen**: PROD 79/79, null fehlend, null
+nur-remote, und die vier geänderten Funktionsrümpfe tragen den neuen Inhalt.
+Deploy per `gh run rerun --failed` nachgezogen — `drift-gate` danach grün,
+`functions` lieferte `admin-set-member-ban` (neu, v1) und `send-activation`
+(v5). Live-Bündel trägt die Zeichenketten aus dem jüngsten Commit.
 
 ## Decisions
 
-- **Der Code folgt dem Delta, nicht umgekehrt** (Donald). Der Rückfall in
-  `authorOf` heisst jetzt „Ein Mitglied" statt „Mitglied". *Warum:* er trifft
-  jemanden, der da ist und sich nur zurückgezogen hat — denselben Sachverhalt,
-  den `displayAuthor` ausgeloggt schon so nennt. Der Rest des Hauses behält
-  `?? "Mitglied"`; die Unterscheidung wird nur im Feed gebraucht.
-- **Der Text steht im Lesepfad, das Maskieren in `displayAuthor`.** *Warum:* die
-  Karte hängt Verweis, Bild und Stufenplakette schon an `masked` auf — 10.3 fällt
-  damit von selbst. Zwei Stellen mit derselben Zeichenkette laufen auseinander.
-- **Bei der Umschaltung nur das Projekt gewechselt, nicht die Schlüsselform.**
-  PROD bietet auch `sb_publishable_…` an; genommen wurde der klassische anon-JWT,
-  den beide Umgebungen tragen. *Warum:* zwei Änderungen gleichzeitig machen einen
-  Fehler ununterscheidbar von seinem Nachbarn.
-- **`database.types.ts` von Hand ergänzt statt neu erzeugt.** *Warum:* die volle
-  Neugenerierung ergab 3659 Zeilen Formatierungsdiff und verlor den
-  `__InternalSupabase`-Block — die lokale CLI ist älter als die, mit der die
-  Datei entstand. Die Nachbarn sind ebenfalls handgepflegt.
-- **AGE-582 statt Anbau an AGE-581** (Donald), Umfragen **drin**. *Warum:* von
-  fünf Punkten ist genau einer reines Layout; „Speichern" und die Zähler brauchen
-  Tabellen und RPCs, Umfragen existieren im Datenmodell gar nicht.
+- **Der Lebenszyklus ERSETZT die Aktivierungsplakette, statt danebenzustehen.**
+  *Warum:* ob ein entferntes Konto einmal bestätigt war, ist Vorgeschichte und
+  kommt beim Wiederherstellen zurück; zwei Plaketten hätten in jeder Zeile die
+  Breite verschoben, wie „unbekannt" schon einmal.
+- **Der Wächter steht in `mark_activated`, nicht nur in den Aufrufern.**
+  *Warum:* ein Gate, das nur in den Aufrufern steht, fehlt beim nächsten
+  Aufrufer. `admin_activate_member` trägt ihn ein zweites Mal, damit der Admin
+  den Grund genannt bekommt statt eines Fehlers aus einer fremden Funktion.
+- **`blocked` als neuer Status statt `unknown` zurückzugeben.** *Warum:* nach
+  aussen sind beide 202 und ununterscheidbar (Anti-Aufzählung), im Protokoll
+  steht aber der wahre Grund. Die Erlaubnisliste in `status.ts` erzwingt, dass
+  ein neuer Status bewusst nachgezogen wird.
+- **`array_ndims > 1` wird zusätzlich abgewiesen.** *Warum:* `cardinality()`
+  allein zählte richtig, liesse aber weiter mehrdimensionale Arrays zu, für die
+  das Ergebnis der Funktion sinnlos ist.
+- **HIGH-2, Paging der Teilnehmer-RPC, Draft-Überschreiben und zwei
+  LOW-Zusagen NICHT behoben** — als Folge notiert. *Warum:* HIGH-2 braucht zwei
+  gleichzeitige Admins und einen eigenen Entwurf (Outbox/Versionswert).
 
 ## Files modified
 
-- `src/lib/feed.ts` — `former` am `FeedAuthor`, Rückfall umbenannt,
-  `fetchFormerEntries` (blockweise), beide Lesepfade verdrahtet
-- `src/lib/displayAuthor.ts` — entfernte Urheber tragen `masked`
-- `src/lib/database.types.ts` — `former_member_entries` von Hand ergänzt
-- `src/lib/feed.former-member.test.ts` — **neu**, 6 Zusagen
-- `src/components/community/CommunityFeed.test.tsx` — Komponententest für 10.3
-- `src/lib/anon-anreicherung.test.ts` — Rückfall-Zusage nachgezogen
-- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 10.1–10.5, 11.1–11.4
-- **Ausserhalb des Repos:** Infisical `prod` (zwei Werte), zwei Memory-Dateien
+- `supabase/functions/admin-set-member-ban/ban.ts` — `sollGebannt()`,
+  `banDauerFuer(boolean)`, Invariante statt Fallunterscheidung
+- `supabase/functions/admin-set-member-ban/index.ts` — zweiter Schritt läuft immer
+- `supabase/functions/admin-set-member-ban/ban.test.ts` — +2 Zusagen
+- `supabase/functions/send-activation/status.ts` + `.test.ts` — `blocked`
+- `supabase/migrations/20260824110000_former_member_entries_cardinality.sql` — **neu**
+- `supabase/migrations/20260824120000_aktivierung_prueft_lebenszyklus.sql` — **neu**
+- `supabase/tests/member_lifecycle_rpc_test.sql` — +5 Zusagen, plan(39)
+- `src/pages/AdminMitgliederPage.tsx` + `.test.tsx` — Zustandsspalte, +4 Zusagen
+- `src/pages/AdminMitgliedPage.tsx` + `.test.tsx` — Kopfzeile, +4 Zusagen
+- `src/lib/admin-profile.ts` — `deaktiviert`/`geloescht` in `AdminProfileData`
+- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 11.5, 11.6
 
 ## Next session: start here
 
-**Erste Handlung: `gh pr checks 201` und die vier Pflichtchecks auf der
-HEAD-SHA ansehen** — nicht `gh run list`, das zeigt grün für alte SHAs.
+**Abschnitt 12, die Datenpflege auf PROD** — 12.0 bis 12.7, und sie ist Teil der
+ABNAHME von AGE-581 („59 Mitglieder mit gesetzter Zahlungsart, 56 mit
+`paid_until`, 11 deaktiviert"). Linear steht trotzdem schon auf **Done**, weil
+die GitHub-Automation beim Merge schaltet — der Status ist also kein Beleg.
+Erste Handlung: **12.7, der Trockenlauf**, der die Umgebung nennt und die
+Wirkung zeigt, BEVOR 12.1–12.6 laufen. Danach 12.0, der zeilenweise Abgleich als
+Beleg ins Repo — dabei die Regel beachten, dass **keine Klarnamen und keine
+Adressen** ins öffentliche Repo dürfen.
 
-Danach **11.5**, der Diff-Review durch einen anderen Anbieter als den, der ihn
-geschrieben hat. Der Diff ist gross: **52 Dateien, 9064 Zeilen**. Codex braucht
-dafür deutlich mehr als die Standard-300 s (Exit 4 heisst „nicht gezählt"), also
-Zeitlimit hochsetzen. Danach 11.6, die Sichtprobe der gesamten Fläche.
-
-**Vor dem Merge von #201 unbedingt lesen:** der PR bringt **sechs Migrationen**.
-`migrate-dev` wendet sie auf DEV an — **PROD braucht `migrate-prod`**, und seit
-heute misst `drift-gate` PROD. Ohne den Lauf blockiert es **jeden** weiteren
-Deploy, auch einen eiligen Fix. Der erste Merge zahlt. Ausserdem ist
-`admin-set-member-ban` eine **neue** Edge Function; der `functions`-Job liefert
-sie an beide Projekte, aber nur, wenn der Lauf nicht übersprungen wird.
-
-Der lokale Stack läuft, Vite auf `http://localhost:5173`. Lokal liegen
-Sichtprobe-Beiträge (`11111111-…`) und -Kommentare (`22222222-…`) für alle vier
-Autorenfälle; sie sind für 11.6 nützlich. pgTAP **immer mit Dateiliste**.
-**Nie `pnpm format`.**
+Werkzeuge stehen: `scripts/probe-age581-abgleich.ts` und
+`scripts/age581-abgleich-tabelle.mjs`. PROD lesen geht per `infisical run
+--env=prod -- node <datei im Repo>` mit `SUPABASE_DB_URL_PROD` und
+`scripts/supabase-root-2021-ca.crt` — die Datei MUSS im Repo liegen, sonst
+findet node `pg` nicht; danach löschen. Schreibende PROD-Wege blockt der
+Klassifikator, bis Donald sie ausdrücklich freigibt.
 
 ## Open questions
 
-- **`app.fairbusinessclub.de` hat KEINEN DNS-Eintrag.** Die Adresse steht in der
-  Auth-Freigabeliste von PROD auf Vorrat, ist aber nicht erreichbar (HTTP 000).
-  Wer den Club unter diesem Namen erwartet, braucht DNS **und** die Custom
-  Domain in Cloudflare Pages. Go-Live-Punkt, kein Umschaltfehler.
-- **69 von 71 Mitgliedern auf PROD sind nicht aktiviert.** Nur Donald und Detlev
-  sind bestätigt und haben sich je angemeldet — beide `impact`, beide Admin. Die
-  übrigen 69 kommen erst über den Aktivierungsversand hinein.
-- **PROD verlangt E-Mail-Bestätigung, DEV nicht** (`mailer_autoconfirm` False vs
-  True). Für die 71 importierten Konten folgenlos, sie sind alle bestätigt; es
-  trifft nur Neuanmeldungen — und für die ist **kein eigener SMTP** gesetzt, die
-  Bestätigungsmail liefe über Supabases Standardversand samt dessen Drosselung.
-- **Die Trennung der Function-Secrets bleibt ungemessen.** Der PAT darf
-  `/v1/projects/<ref>/secrets` nicht lesen (403). Der frühere Befund — nur 3 von
-  15 getrennt, Stripe und Resend byte-identisch — ist damit weder bestätigt noch
-  widerlegt. Seit die Seite gegen PROD läuft, ist er teurer geworden.
-- **Auf PROD liegen bereits 4 Beiträge, 1 Kommentar, 1 Event** — echter Inhalt
-  (Sommerfest-Impressionen, „Frankfurt immer eine Reise wert"), kein Testmüll.
-  Das **Onlinetreffen ist am 25.08.**, also morgen.
-- **„EM" als Initialen.** Der zurückgezogene Autor bekommt jetzt „EM" im
-  Bildkreis statt „M" — Nebeneffekt der Umbenennung, liest sich wie die Initialen
-  einer Person. Nicht angefasst, liegt ausserhalb von Abschnitt 10.
-- **Dreimal in dieser Sitzung** hat ein deutsches Schlusszeichen `“` in einem
-  Python- oder JS-String die Zeichenkette beendet. Bei skriptgestützten
-  Ersetzungen mit deutschen Anführungszeichen zeilenweise arbeiten.
+- **Ich habe das PROD-DB-Passwort ins Terminal ausgegeben** (`infisical secrets
+  --env=prod` ohne Maskierung, 24.08.). Es steht nicht im Repo, aber im
+  Sitzungsprotokoll. Rotation ist Donalds Entscheidung.
+- **Vier Review-Befunde bleiben offen:** HIGH-2 (Zeilensperre endet vor dem
+  GoTrue-Aufruf; braucht zwei gleichzeitige Admins) · `event_attendees`-RPC ohne
+  `limit`/`offset` · Draft und Server-Baseline sind in der Mitgliedschaftszeile
+  derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor ihrem Fixture.
+- **`app.fairbusinessclub.de` hat weiter keinen DNS-Eintrag.** Go-Live-Punkt.
+- **69 von 71 Mitgliedern auf PROD sind nicht aktiviert** — sie kommen erst über
+  den Aktivierungsversand herein. Seit heute gilt: ein deaktiviertes oder
+  gelöschtes Konto bekommt dabei KEINEN Link mehr (Status `blocked`).
+- **Das Onlinetreffen ist am 25.08.**, also morgen.
 - Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
   gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
   `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
   Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging.
+- **Der lokale Stack trägt jetzt veränderte Testdaten** (Carla deaktiviert +
+  Zahlungsart Stripe, Bodo aktiviert, Dora deaktiviert ohne Löschung).
+  `scripts/probe-age581-sichtprobe-daten.ts` stellt sie mit neuem Passwort her.
