@@ -66,6 +66,20 @@ Doppelsperre in **beide** Richtungen.
 - **`29.02.` bekommt grundsätzlich eine Meldung statt eines Ergebnisses.**
   *Warum:* sonst hinge die Antwort am Jahr des Stichtags.
 
+**Zu AGE-582 (Aktivität auf Konzeptstand), Donald am 24.08. — beide bisher
+offenen Fragen entschieden, damit gebaut werden kann:**
+
+- **Tags-Filter: ODER.** Mehrere angehakte Tags zeigen Beiträge, die
+  **mindestens einen** davon tragen. *Warum:* Auswahlkästchen versprechen
+  Mehrfachauswahl. Für den Code heisst das `.overlaps("hashtags", tags)` statt
+  des heutigen `.contains(...)` — `contains` ist UND und lieferte bei zwei Haken
+  fast immer eine leere Liste.
+- **Umfrage-Ergebnis: erst nach eigener Stimme.** Wer noch nicht abgestimmt hat,
+  sieht die Optionen, aber keine Zahlen. *Warum:* die Umfrage soll die Antwort
+  nicht vorprägen. **Das ist eine Frage der Abfrage, nicht der Anzeige** — die
+  Zählung darf serverseitig nicht herausgehen, bevor die eigene Stimme steht;
+  ein Ausblenden im Bauteil wäre Kulisse, die Zahlen stünden in der Antwort.
+
 ## Files modified
 
 - `scripts/age581-datenpflege.logic.ts` — **neu**, Rechenkern (`paidUntilAus`,
@@ -94,6 +108,23 @@ plus eine sechste Spalte `konto_id` mit zwei Kennungen (Zeilen 8 und 19). Wer
 sie neu braucht: aus den Screenshots ablesen und die zwei Kennungen aus PROD
 holen — die Regel steht in `docs/age-581-mitgliederabgleich.md`.
 
+**Danach steht AGE-582 an** („Aktivität auf Konzeptstand"), Priorität High,
+Backlog, angelegt am 24.08. Es hält Donalds Rückmeldungen aus dem
+Screenshot-Vergleich fest: die zusätzlichen Infos in der Sidebar (§4), die
+Aktivitäts-Box, die über der Sidebar statt in der Feed-Spalte sitzt (§1,
+`CommunityFeed.tsx:156` rendert sie **vor** dem Raster), die farbigen Icons im
+Dashboard (§0) und die Icons zum Erstellen (§1). Dazu Reiter + „Gespeichert"
+(§2/§3, neue Tabelle `post_saves`) und Umfragen (§5, im Datenmodell bisher gar
+nicht vorhanden).
+
+Das Issue sagte selbst „direkt nach Abschnitt 11 von AGE-581, nicht davor" —
+diese Bedingung ist seit heute erfüllt. **Beide Fragen, die es blockierten, sind
+jetzt entschieden** (siehe Decisions). Erste Handlung: ein OpenSpec-Change
+anlegen, mit §0 (Icon-/Farbkanon) zuerst — alle anderen Teile hängen daran.
+Zwei Fallen stehen im Issue: `grants_test.sql` kippt bei jeder neuen Tabelle mit
+Table-Grant, und die Sidebar-Zähler dürfen nichts zählen, was der Betrachter
+nicht sehen darf (dasselbe Prädikat wie `posts_select_by_visibility`).
+
 ## Open questions
 
 - **Drei Anmeldeadressen bleiben abweichend** und brauchen eine Entscheidung:
@@ -108,6 +139,15 @@ holen — die Regel steht in `docs/age-581-mitgliederabgleich.md`.
   Server-Baseline sind derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor
   ihrem Fixture.
 - **Das Onlinetreffen ist am 25.08.**, also morgen.
+- **AGE-582 §5: braucht eine Umfrage eine Laufzeit?** Noch offen — und es hängt
+  an der heutigen Entscheidung: sieht das Ergebnis nur, wer abgestimmt hat, dann
+  sieht ein Nichtwähler es **nie**. Bei einer laufenden Umfrage ist das gewollt,
+  bei einer beendeten vermutlich nicht. Naheliegend: nach Ablauf für alle
+  sichtbar — was ein Ende voraussetzt.
+- **Der Kommentar zu AGE-582 in Linear konnte nicht geschrieben werden**
+  (Klassifikator blockte den MCP-Aufruf). Die beiden Entscheidungen stehen
+  deshalb **nur hier**, nicht am Issue. Wer AGE-582 aufnimmt, trägt sie dort
+  nach.
 - Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
   gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
   `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
