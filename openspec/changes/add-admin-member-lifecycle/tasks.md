@@ -729,10 +729,16 @@ und standen im ersten Entwurf nicht drin.
 Grundlage: Detlevs Übersicht vom 23.08., 60 Zeilen, gegen PROD abgeglichen
 (59 Treffer).
 
-- [ ] 12.0 **[PR]** Den Abgleich als **zeilenweisen Beleg ins Repo** schreiben
+- [x] 12.0 **[PR]** Den Abgleich als **zeilenweisen Beleg ins Repo** schreiben
       (`docs/age-581-mitgliederabgleich.md`): alle 60 Listeneinträge, alle 71
       Konten, jede Ausnahme, die erwarteten Endzahlen. Ein Beleg in einem
       Ablageordner ausserhalb des Arbeitsbaums ist für den nächsten Leser keiner.
+      **Der Beleg steht, aber ohne die zeilenweise Tabelle** — das Repo ist
+      öffentlich, und sechzig Klarnamen mit Adressen gehören nicht hinein. Er
+      trägt Zahlen, Regeln und Ausnahmen; die Zuordnung entsteht zur Laufzeit aus
+      der Datenbank und der nicht eingecheckten Quelldatei. Am 24.08. auf die
+      **gemessenen** Zahlen aus 12.7 gehoben: die Fassung vom 23.08. war in Prosa
+      gezählt und wich an drei Stellen ab.
 - [ ] 12.1 `paid_until` aus dem Jahrestag: **nächstes** Vorkommen von Tag/Monat
       nach dem **festen** Stichtag `2026-08-23`, minus einen Tag. Nicht „heute"
       — sonst hängt das Ergebnis am Ausführungstag. Erst als Tabelle ausgeben
@@ -753,3 +759,26 @@ Grundlage: Detlevs Übersicht vom 23.08., 60 Zeilen, gegen PROD abgeglichen
 - [ ] 12.7 **[PR]** Vorher ein **Trockenlauf**, der die Umgebung nennt und die
       erwarteten Zahlen ausgibt; erst nach dem Lesen schreiben. Nachher zählen
       und gegen die Abnahme in AGE-581 halten.
+      **Erste Hälfte erledigt** (24.08.):
+      `scripts/probe-age581-datenpflege-trockenlauf.ts`, gegen PROD gelaufen,
+      Kennung gegen `scripts/prod-project-ref.txt` geprüft,
+      `default_transaction_read_only = on`. Rechenkern getrennt in
+      `scripts/age581-datenpflege.logic.ts` (+ 23 Zusagen), damit die
+      `paid_until`-Regel rot werden kann, statt erst auf PROD.
+      **Der Lauf hat einen Fehler gefunden, der ein aktives Mitglied gekostet
+      hätte.** Zwei Übersichtszeilen trafen dasselbe Konto — eine Partner-Zeile
+      trägt die Firmenadresse einer anderen Person, und zwar über den
+      *stärksten* Zuordnungsweg. Ungeprüft hätte 12.1 zwei Jahrestage
+      nacheinander in dieselbe Zeile geschrieben (die zweite gewinnt, lautlos)
+      und das richtige Konto wäre als „ohne Eintrag" in 12.5 deaktiviert worden.
+      Gegenmittel: `findeDoppelbelegung()` beendet den Lauf mit Fehlercode, und
+      eine **feste Zuordnung** in der sechsten Spalte der Quelldatei schlägt die
+      Automatik (zwei der sechzig Zeilen brauchen sie).
+      Gemessener Plan: 59 zugeordnet · 1 anzulegen · 11 zu deaktivieren ·
+      12 Adressen anzugleichen, 3 ausgenommen · 56 `paid_until` zu setzen,
+      3 bleiben leer · 59 `payment_type` zu setzen. Erwartete Endzahlen nach
+      12.6: **72 Profile · 60 payment_type · 57 paid_until · 12 deaktiviert ·
+      0 gelöscht.** Die Abnahme in AGE-581 nennt 59/56/11 — derselbe Zustand
+      **vor** 12.6.
+      Offen: die zweite Hälfte (nachher zählen), und sie kommt erst nach
+      12.1–12.6.

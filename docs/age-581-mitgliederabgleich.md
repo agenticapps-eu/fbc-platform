@@ -1,8 +1,14 @@
-# AGE-581 — Mitgliederabgleich, Stand 23.08.2026
+# AGE-581 — Mitgliederabgleich, Stand 24.08.2026
 
 Grundlage ist Detlevs Übersicht der aktiven Mitglieder vom 23.08.2026
 (zwei Bildschirmfotos, nach Zahlungskategorie gruppiert), abgeglichen gegen die
 PROD-Datenbank `viwntbodrtqxgmqyxluh`.
+
+**Die Zahlen hier sind am 24.08. gemessen, nicht abgelesen.** Sie stammen aus
+`scripts/probe-age581-datenpflege-trockenlauf.ts` — einem Lauf, der die Umgebung
+prüft, `default_transaction_read_only` setzt und die Wirkung von 12.1 bis 12.6
+ausgibt, bevor irgendetwas geschrieben wird. Wo die erste Fassung dieses Belegs
+(23.08., in Prosa gezählt) abweicht, steht die Messung.
 
 ## Dieses Dokument trägt keine Namen und keine Adressen
 
@@ -18,7 +24,12 @@ bleibt es.
 Der Beleg trägt deshalb **Zahlen, Regeln und Ausnahmen**, aber keine
 Identitäten. Die zeilenweise Zuordnung entsteht zur Laufzeit aus der Datenbank
 und einer nicht eingecheckten Quelldatei; wer sie braucht, erzeugt sie mit
-`scripts/probe-age581-abgleich.ts` neu.
+`scripts/probe-age581-datenpflege-trockenlauf.ts` neu.
+
+Der ältere `scripts/probe-age581-abgleich.ts` kennt die feste Zuordnung aus dem
+übernächsten Abschnitt **nicht** und meldet deshalb 58 statt 59 Treffer. Er
+bleibt als reiner Abgleich brauchbar, taugt aber nicht mehr als Grundlage für
+die Datenpflege.
 
 ## Die Zahlen
 
@@ -27,6 +38,7 @@ und einer nicht eingecheckten Quelldatei; wer sie braucht, erzeugt sie mit
 | Einträge in der Übersicht | **60** |
 | Konten in PROD | **71** |
 | davon eindeutig zugeordnet | **59** |
+| davon **von Hand festgesetzt** | **2** |
 | Übersichtseinträge **ohne** Konto | **1** |
 | Konten **ohne** Übersichtseintrag | **12** |
 | davon das eigene Admin-Konto | 1 |
@@ -52,6 +64,40 @@ Die tatsächlich gelesenen Zeilen stimmen mit allen acht überein:
 Das ist der Beleg, dass keine Liste am unteren Bildrand abgeschnitten war — die
 naheliegendste Fehlerquelle beim Ablesen eines Bildschirmfotos.
 
+## Zwei Zeilen trafen dasselbe Konto — gefunden erst im Trockenlauf
+
+Die Zuordnung beantwortet je Zeile die Frage „welches Konto?". Sie kann nicht
+sehen, dass sie für **zwei** Zeilen dieselbe Antwort gegeben hat.
+
+Genau das war der Fall. Ein Partner-Eintrag trägt in der Übersicht die
+Firmenadresse einer anderen Person (siehe Fall 2 unten). Beide Zeilen trafen
+darüber dasselbe Konto, und zwar über die Adresse — also über den **stärksten**
+der drei Wege, nicht über den schwächsten. Ungeprüft hätte der Durchgang
+
+1. zwei verschiedene Jahrestage nacheinander in dieselbe Zeile geschrieben; die
+   zweite Schreibung hätte gewonnen, ohne Fehler und ohne Meldung, und
+2. das **richtige** Konto des Partners als „ohne Übersichtseintrag" übrig
+   gelassen — womit es in 12.5 deaktiviert worden wäre.
+
+Ein aktives Partner-Mitglied hätte seinen Zugang verloren, weil in einer Tabelle
+eine Adresse falsch stand. Die Prosa-Fassung dieses Belegs vom 23.08. hat den
+Fall beschrieben, aber die Zählung ging trotzdem von einer sauberen Zuordnung
+aus: sie meldete 59 Treffer, die der Rechenweg gar nicht hergab.
+
+Zwei Gegenmittel, beide am 24.08. eingebaut:
+
+- **`findeDoppelbelegung()`** meldet jede Mehrfachbelegung und **beendet den
+  Trockenlauf mit Fehlercode**. Eine Sperre, die nur in der Ausgabe steht, hängt
+  daran, dass jemand die Ausgabe liest.
+- Eine **feste Zuordnung** je Zeile — die heutige Anmeldeadresse des gemeinten
+  Kontos — schlägt alle drei Automatismen. Zwei der sechzig Zeilen brauchen sie:
+  der Partner-Eintrag oben und der Eintrag aus Fall 1. Zeigt sie ins Leere, gilt
+  die Zeile als **nicht zugeordnet**; sie fällt NICHT still auf den Adresstreffer
+  zurück, sonst wirkte die Korrektur nur, bis sie es nicht mehr tut.
+
+Die Zuordnungstabelle steht in der **nicht eingecheckten Quelldatei** (sechste
+Spalte), nicht hier: eine Zuordnungstabelle ist eine Identitätstabelle.
+
 ## Wie `bezahlt bis` gerechnet wird
 
 Der Jahrestag sagt, wann sich der Plan erneuert. Bezahlt ist also bis zum Tag
@@ -70,6 +116,14 @@ Tatsache in der Datenbank.
 Der früheste berechnete Wert liegt auf dem **25.08.2026** — zwei Tage nach dem
 Stichtag. Diese Mitgliedschaft erneuert sich also unmittelbar.
 
+Zwei Schreibweisen bekommen bewusst **kein** gerechnetes Ergebnis, sondern eine
+Meldung: der **29.02.** und jeder andere Tag, den es im Zielmonat nicht gibt.
+`Date.UTC(2026, 1, 29)` liefert klaglos den 01.03.2026 — ein erfundenes Datum,
+kein Rundungsfehler. Der 29.02. gilt auch in einem Schaltjahr als unlesbar,
+sonst hinge die Antwort daran, in welchem Jahr der Stichtag liegt. In den
+sechzig Zeilen kommt keiner der beiden Fälle vor; die Regel steht für den
+nächsten Durchgang.
+
 ## Die drei Einträge, die nicht glatt aufgehen
 
 1. **Ein Name weicht ab, die Adresse enthält einen Tippfehler.** Die Übersicht
@@ -79,7 +133,9 @@ Stichtag. Diese Mitgliedschaft erneuert sich also unmittelbar.
 2. **Eine Adresse steht in der Übersicht bei zwei Personen.** Ein
    Partner-Eintrag trägt dieselbe Firmenadresse wie ein Rechnungs-Eintrag zwei
    Kategorien weiter. In der Datenbank hat die betroffene Person eine eigene,
-   andere Adresse. Die Übersicht ist hier die fehlerhafte Quelle.
+   andere Adresse. Die Übersicht ist hier die fehlerhafte Quelle. Dieser Fall
+   ist die Doppelbelegung aus dem Abschnitt oben — er ist nicht bloss unschön,
+   er hätte ein aktives Mitglied deaktiviert.
 3. **Ein Eintrag hat kein Konto.** Der einzige der Kategorie „Zahlung offen".
    Er wird angelegt und sofort deaktiviert.
 
@@ -99,15 +155,16 @@ Verschärfung von `is_matching_manager()` verliert es dort seine Rolle, sobald e
 deaktiviert wird. Vor dem Deaktivieren auf DEV ist zu klären, ob die
 Zuteilungsliste einen anderen Bearbeiter braucht.
 
-## Die zwölf abweichenden Anmeldeadressen
+## Die fünfzehn abweichenden Anmeldeadressen
 
 Die Anmeldeadresse ist die, an die der Zugangslink geht. Weicht sie von der
 Übersicht ab, bekommt das Mitglied seinen Link an ein Postfach, das es
-möglicherweise nicht mehr liest. Bei zwölf der sechzig ist das der Fall — von
-einem einzelnen Bindestrich bis zu einer vollständig anderen Domain, in einem
-Fall zu einer Platzhalteradresse auf `local.host`, die nie ankommen kann.
+möglicherweise nicht mehr liest. Bei **fünfzehn** der sechzig ist das der Fall —
+von einem einzelnen doppelten Buchstaben bis zu einer vollständig anderen
+Domain, in einem Fall zu einer Platzhalteradresse auf `local.host`, die nie
+ankommen kann.
 
-Entscheidung vom 23.08.: **auf die Fassung der Übersicht angleichen.** Zehn
+Entscheidung vom 23.08.: **auf die Fassung der Übersicht angleichen.** **Zwölf**
 werden angeglichen, **drei bleiben ausgenommen**:
 
 | Ausnahme | Grund |
@@ -116,19 +173,29 @@ werden angeglichen, **drei bleiben ausgenommen**:
 | Der Eintrag mit der doppelt vergebenen Firmenadresse | Angleichen liefe in eine Kollision mit dem rechtmässigen Inhaber |
 | Der zweite Admin | Admin und aktiviert — eine falsch gesetzte Adresse sperrt ihn aus genau der Fläche aus, auf der man sie korrigieren würde. Er bestätigt selbst, welche stimmt |
 
-Zehn plus drei ergibt dreizehn, nicht zwölf: der zweite Fall steht in der Liste
-der abweichenden Adressen nicht, weil er dort gar nicht als Abweichung erkannt
-wurde — er wurde über den Namen zugeordnet.
+Die Prosa-Fassung vom 23.08. zählte hier zwölf Abweichungen, zehn Angleichungen
+und drei Ausnahmen — und merkte selbst an, dass zehn plus drei dreizehn ergibt
+und nicht zwölf. Diese sichtbare Kante war der Rand eines Zählfehlers. Der
+Trockenlauf misst **15 = 12 + 3**. Die drei Zeilen Unterschied sind die beiden
+von Hand festgesetzten (deren Abweichung erst sichtbar wird, wenn sie überhaupt
+zugeordnet sind) und eine beim Ablesen übersehene.
 
 ## Erwartete Endzahlen
 
 Vor dem Schreiben festzuhalten, danach zu messen. Ein Durchlauf, der seine
 eigenen Ergebniszahlen erst hinterher bestimmt, kann nicht fehlschlagen.
 
-| Kennzahl | erwartet |
-|---|---|
-| Profile in PROD | 72 (71 + der eine Nachzügler) |
-| deaktiviert | 12 (11 + der Nachzügler) |
-| mit gesetzter `payment_type` | 60 |
-| mit gesetztem `paid_until` | 57 |
-| gelöscht | 0 |
+| Kennzahl | jetzt | erwartet |
+|---|---|---|
+| Profile in PROD | 71 | 72 (71 + der eine Nachzügler) |
+| deaktiviert | 0 | 12 (11 + der Nachzügler) |
+| mit gesetzter `payment_type` | 0 | 60 |
+| mit gesetztem `paid_until` | 0 | 57 |
+| gelöscht | 0 | 0 |
+| angeglichene Anmeldeadressen | 0 | 12 |
+
+**Die Abnahme in AGE-581 nennt 59 / 56 / 11** — Zahlungsart, `paid_until`,
+deaktiviert. Das ist derselbe Zustand, nur **vor 12.6** gezählt: der Nachzügler
+fehlt in jeder der drei Zeilen. Nach 12.6 lauten dieselben drei Zahlen
+60 / 57 / 12. Beide Zählungen sind richtig; sie stehen an verschiedenen Punkten
+des Durchgangs.
