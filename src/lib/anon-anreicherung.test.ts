@@ -194,7 +194,12 @@ describe("Feed — Autoren", () => {
     expect(angefragt).not.toContain("profiles_public");
     // Und der Feed liefert trotzdem seine Beiträge — die Sperre nimmt nichts mit.
     expect(seite.posts).toHaveLength(1);
-    expect(seite.posts[0].author.name).toBe("Mitglied");
+    // „Ein Mitglied", nicht „Mitglied": der Rückfall in `authorOf` heisst seit
+    // AGE-581 wie die Maskierung von `displayAuthor`, weil es derselbe
+    // Sachverhalt ist — da, zeigt sich nur nicht. Ausgeloggt ist der Wert
+    // ohnehin nicht sichtbar (`displayAuthor` maskiert), aber dieser Test
+    // misst die Datenschicht, und dort steht er.
+    expect(seite.posts[0].author.name).toBe("Ein Mitglied");
     expect(seite.posts[0].author.avatarUrl).toBeNull();
     expect(seite.posts[0].author.tier).toBeNull();
   });

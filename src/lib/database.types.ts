@@ -1719,6 +1719,27 @@ export type Database = {
           comment_count: number;
         }[];
       };
+      // Von Hand nachgetragen, wie die Nachbarn (AGE-358). Spiegelt
+      // former_member_entries(uuid[], uuid[]) aus
+      // 20260823160000_former_member_entries.sql (AGE-581).
+      former_member_entries: {
+        Args: {
+          /** BEITRAGS-IDs, keine Profil-IDs — die Funktion loest den Urheber
+           *  selbst auf und prueft dabei dieselbe Sichtbarkeit wie fuer den
+           *  Beitrag. Mit Profil-IDs waere sie ein Weg, den Bestand nach
+           *  Entfernten durchzufragen. */
+          p_post_ids?: string[];
+          p_comment_ids?: string[];
+        };
+        Returns: {
+          /** `post` oder `comment`. */
+          kind: string;
+          entry_id: string;
+          /** Deaktiviert ODER geloescht — welche der beiden Handlungen ein
+           *  Admin vorgenommen hat, gibt sie bewusst NICHT preis. */
+          former: boolean;
+        }[];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-245). Mirrors the
       // recompute_my_matches() RPC from 20260614090000_match_engine.sql (returns the
       // number of matches upserted for the logged-in member).

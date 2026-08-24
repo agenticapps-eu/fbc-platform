@@ -568,15 +568,35 @@ und standen im ersten Entwurf nicht drin.
 
 ## 10. Feed — „Ehemaliges Mitglied"
 
-- [ ] 10.1 **RED:** ein zurückgezogener Autor heisst „Ein Mitglied", ein
+- [x] 10.1 **RED:** ein zurückgezogener Autor heisst „Ein Mitglied", ein
       entfernter „Ehemaliges Mitglied" — **beide im selben Test**, sonst prüft
       er die Unterscheidung nicht.
-- [ ] 10.2 Die Auskunft im Feed aufrufen, nur mit Session.
-- [ ] 10.3 Kein Verweis auf ein Profil für entfernte Autoren.
-- [ ] 10.4 **[PR]** Auch **Kommentarautoren** neutralisieren, nicht nur
+      *Vorher entschieden (Donald, 24.08.): der CODE folgt dem Delta.* Der
+      Rückfall in `authorOf` hiess „Mitglied"; er heisst jetzt „Ein Mitglied",
+      wie die Maskierung in `displayAuthor` (AGE-530) — es ist derselbe
+      Sachverhalt. Der Rest des Hauses (Chat, Events, Verzeichnis, Matching …)
+      schreibt weiterhin `?? "Mitglied"`: die Unterscheidung wird im Feed
+      gebraucht, und nur dort steht ihr Gegenstück.
+- [x] 10.2 Die Auskunft im Feed aufrufen, nur mit Session.
+      `fetchFormerEntries` kehrt ohne `uid` sofort um; ein Test misst das am
+      RPC-NAMEN, nicht am Aussehen.
+- [x] 10.3 Kein Verweis auf ein Profil für entfernte Autoren.
+      Über `masked` in `displayAuthor` — die Karte hängt Verweis, Bild und
+      Stufenplakette schon daran auf. Der Nachweis steht als
+      **Komponententest** (`CommunityFeed.test.tsx`), nicht in der
+      Datenschicht: die Zusage hängt an gerendertem Markup, und ein Test auf
+      einen Wahrheitswert wäre auch dann grün, wenn die Karte weiterverlinkte.
+- [x] 10.4 **[PR]** Auch **Kommentarautoren** neutralisieren, nicht nur
       Beitragsautoren — ein Faden, in dem nur die Beiträge neutral sind, hält
       die Zusage nicht.
-- [ ] 10.5 **GREEN.**
+      Dabei gefunden: `fetchComments` holt ALLE Kommentare eines Beitrags,
+      ungedeckelt — die Funktion nimmt höchstens 200 IDs. Deshalb fragt der
+      Client in Blöcken; ein einziger Aufruf mit 201 IDs käme als `22023`
+      zurück und nähme dem GANZEN Faden die Unterscheidung.
+- [x] 10.5 **GREEN.** 1425 Vitest (128 Dateien), Typecheck und Lint sauber.
+      Vier Gegenproben, je die zugehörige Zusage rot, danach wiederhergestellt
+      grün. Sichtprobe im Browser gegen den lokalen Stack: alle vier Fälle
+      nebeneinander, Konsole ohne Fehler.
 
 ## 11. Abnahme
 

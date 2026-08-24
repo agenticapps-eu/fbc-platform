@@ -42,6 +42,20 @@ export interface FeedAuthor {
   name: string;
   avatarUrl: string | null;
   tier: string | null;
+  /**
+   * Der Urheber ist kein Mitglied mehr — deaktiviert ODER gelöscht (AGE-581).
+   *
+   * OPTIONAL, und das ist Absicht: die beiden Lesepfade hier setzen das Feld
+   * ausnahmslos, aber `FeedAuthor` wird auch in Test-Fixtures gebaut, und ein
+   * Pflichtfeld zwänge dort zehn Dateien zu einer Antwort auf eine Frage, die
+   * sie nicht stellen. Fehlt es, gilt „nicht entfernt" — die harmlose
+   * Richtung: der Autor behält höchstens seinen Namen, er bekommt keinen.
+   *
+   * WELCHE der beiden Handlungen ein Admin vorgenommen hat, steht hier
+   * bewusst NICHT. Das geht einen Leser des Feeds so wenig an wie den
+   * Betroffenen selbst (`my_activation_state.blocked`, dieselbe Entscheidung).
+   */
+  former?: boolean;
 }
 
 /** Ein Bild des Beitrags. Die Maße stehen hier, damit die Karte ihr Layout
@@ -217,8 +231,81 @@ export const VISIBILITY_OPTIONS: { value: PostVisibility; label: string }[] = [
 
 // ── Lesen ────────────────────────────────────────────────────────────────────
 
+/**
+ * Der Autor aus der Anreicherung — oder der Rückfall, wenn er dort fehlt.
+ *
+ * DER RÜCKFALL HEISST „Ein Mitglied", NICHT „Mitglied" (AGE-581, entschieden
+ * am 24.08.). Er trifft ein Mitglied, das da ist und sich nur zurückgezogen
+ * hat: `is_public = false` oder nie bestätigt. Ausgeloggt maskiert
+ * `displayAuthor` auf denselben Text (AGE-530) — beides ist derselbe
+ * Sachverhalt, also trägt es denselben Namen. Ein entferntes Mitglied fällt
+ * NICHT hierher: es geht über `former_member_entries` und heisst
+ * „Ehemaliges Mitglied".
+ *
+ * Der Rest des Hauses schreibt weiterhin `?? "Mitglied"` (Chat, Events,
+ * Verzeichnis, Matching …). Das ist keine Nachlässigkeit, sondern der Umfang:
+ * die Unterscheidung wird im Feed gebraucht, und nur dort steht ihr
+ * Gegenstück.
+ */
 function authorOf(byId: Map<string, FeedAuthor>, id: string): FeedAuthor {
-  return byId.get(id) ?? { id, name: "Mitglied", avatarUrl: null, tier: null };
+  return byId.get(id) ?? { id, name: "Ein Mitglied", avatarUrl: null, tier: null, former: false };
+}
+
+/** Der Urheber ist entfernt: kein Name, kein Bild, keine Stufe (AGE-581). */
+function ehemaligesMitglied(id: string): FeedAuthor {
+  return { id, name: "Ehemaliges Mitglied", avatarUrl: null, tier: null, former: true };
+}
+
+/**
+ * Höchstens so viele IDs je Aufruf — die Grenze steht in der Funktion selbst
+ * (`20260823160000_former_member_entries.sql`, `errcode 22023`) und wird hier
+ * eingehalten, statt sie auszulösen.
+ */
+const FORMER_GRENZE = 200;
+
+/**
+ * Welche dieser Einträge stammen von einem entfernten Mitglied?
+ *
+ * Der Feed kann das nicht selbst sehen: aus `profiles_public` ist ein
+ * entferntes Profil verschwunden, aber ein fehlender Treffer heisst dort schon
+ * etwas anderes („zurückgezogen"). Die Unterscheidung liegt in einer
+ * `SECURITY DEFINER`-Funktion, die BEITRAGS- und KOMMENTAR-IDs nimmt und den
+ * Urheber selbst auflöst — nicht Profil-IDs, sonst wäre sie ein Weg, den
+ * Bestand nach Entfernten durchzufragen.
+ *
+ * OHNE SESSION wird nicht gefragt (10.2, dieselbe Regel wie AGE-530):
+ * `execute` liegt bei `authenticated`, `anon` ist es entzogen.
+ *
+ * BEST EFFORT wie Zähler und Bilder: schlägt die Auskunft fehl, behält der
+ * Feed seine Beiträge, und die betroffenen Autoren heissen „Ein Mitglied"
+ * statt „Ehemaliges Mitglied". Das gibt KEINEN Namen preis — wer entfernt ist,
+ * steht ohnehin nicht in `profiles_public`. Still ist es trotzdem nicht: der
+ * Fehler geht an Sentry.
+ */
+async function fetchFormerEntries(
+  uid: string | null,
+  art: "post" | "comment",
+  ids: string[],
+): Promise<Set<string>> {
+  const entfernt = new Set<string>();
+  if (!uid || ids.length === 0) return entfernt;
+  // In Blöcken, weil ein langer Kommentarfaden die Grenze reissen kann:
+  // `fetchComments` holt ALLE Kommentare eines Beitrags, ungedeckelt. Ein
+  // einziger Aufruf mit 201 IDs käme als `22023` zurück und nähme dem ganzen
+  // Faden die Unterscheidung — auch den ersten zweihundert.
+  for (let i = 0; i < ids.length; i += FORMER_GRENZE) {
+    const teil = ids.slice(i, i + FORMER_GRENZE);
+    const { data, error } = await supabase.rpc("former_member_entries", {
+      p_post_ids: art === "post" ? teil : [],
+      p_comment_ids: art === "comment" ? teil : [],
+    });
+    if (error) {
+      captureException(error, { tags: { area: "feed.former" } });
+      return entfernt;
+    }
+    for (const zeile of data ?? []) if (zeile.former) entfernt.add(zeile.entry_id);
+  }
+  return entfernt;
 }
 
 /**
@@ -250,6 +337,10 @@ export async function fetchAuthors(
       name: p.name ?? "Mitglied",
       avatarUrl: p.avatar_url,
       tier: p.tier,
+      // ABGELEITET, nicht geraten: die View schliesst `disabled_at` und
+      // `deleted_at` seit AGE-581 selbst aus (20260823120000, Zeile 234). Wer
+      // hier auftaucht, kann kein entferntes Mitglied sein.
+      former: false,
     });
   }
   return byId;
@@ -371,13 +462,17 @@ export async function fetchFeed({
   const postIds = rows.map((r) => r.id);
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
 
-  const [authors, countsRes, mediaRes] = await Promise.all([
+  const [authors, countsRes, mediaRes, entfernteBeitraege] = await Promise.all([
     fetchAuthors(uid, authorIds),
     supabase.rpc("post_engagement_counts", { p_post_ids: postIds }),
     supabase
       .from("post_media")
       .select("post_id, storage_path, sort, width, height")
       .in("post_id", postIds),
+    // BEITRAGS-IDs, nicht die Autoren-IDs von zwei Zeilen weiter oben: die
+    // Funktion löst den Urheber selbst auf und wendet dabei dasselbe
+    // Sichtbarkeitsprädikat an, das für den Beitrag gilt.
+    fetchFormerEntries(uid, "post", postIds),
   ]);
 
   // Wie bei den Zählern: ein Fehler hier nimmt dem Feed die Bilder, nicht die
@@ -412,7 +507,9 @@ export async function fetchFeed({
   return {
     posts: rows.map((r) => ({
       id: r.id,
-      author: authorOf(authors, r.author_id),
+      author: entfernteBeitraege.has(r.id)
+        ? ehemaligesMitglied(r.author_id)
+        : authorOf(authors, r.author_id),
       body: r.body,
       hashtags: r.hashtags ?? [],
       visibility: r.visibility,
@@ -451,11 +548,23 @@ export async function fetchComments(uid: string | null, postId: string): Promise
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = data ?? [];
-  const authors = await fetchAuthors(uid, [...new Set(rows.map((r) => r.author_id))]);
+  // Auch Kommentarautoren werden neutralisiert, nicht nur Beitragsautoren
+  // (10.4): ein Faden, in dem nur die Beiträge neutral sind, hält die Zusage
+  // nicht — derselbe Mensch stünde als Kommentator weiter mit Namen da.
+  const [authors, entfernteKommentare] = await Promise.all([
+    fetchAuthors(uid, [...new Set(rows.map((r) => r.author_id))]),
+    fetchFormerEntries(
+      uid,
+      "comment",
+      rows.map((r) => r.id),
+    ),
+  ]);
   return rows.map((r) => ({
     id: r.id,
     postId: r.post_id,
-    author: authorOf(authors, r.author_id),
+    author: entfernteKommentare.has(r.id)
+      ? ehemaligesMitglied(r.author_id)
+      : authorOf(authors, r.author_id),
     body: r.body,
     createdAt: r.created_at,
   }));
