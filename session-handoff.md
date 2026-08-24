@@ -1,112 +1,109 @@
-# Session Handoff — 2026-08-24 (zwölfte Sitzung)
+# Session Handoff — 2026-08-24 (dreizehnte Sitzung)
 
-**Abschnitt 7 von AGE-581 gebaut**, danach die Diff-Prüfung — und die führte auf
-zwei Widersprüche im Delta selbst, die Donald entschieden hat. Vier Commits auf
+**Abschnitt 8 von AGE-581 gebaut** (die fünf Reiter), danach zwei
+Nachträge von Donald an der Fläche. Drei Commits auf
 `donald/age-581-admin-mitgliederverwaltung`, **nichts gepusht**.
-38 → **45 von 73 Aufgaben**. 1399 Vitest, 601 pgTAP (sechs Dateien), 12 Deno.
+45 → **50 von 75 Aufgaben**. 1408 Vitest, 601 pgTAP (sechs Dateien), 12 Deno.
 
 ## Accomplished
 
-**Abschnitt 7 — das Zeilenmenü.** Sechs Handlungen hinter einer Schaltfläche,
-an `document.body` portaliert. **Drei** Fallen, nicht die zwei aus dem Plan:
-neben `.fbc-card:hover` (`transform`) und `<header>` (`backdrop-blur`) schnitte
-auch der `overflow-x-auto` der Tabelle ein `absolute` Menü ab.
+**Abschnitt 8 — die fünf Reiter.** Das Status-Auswahlfeld ist ersetzt, nicht
+ergänzt: Alle · Nicht aktiviert · Deaktiviert · Gelöscht · Mitgliedschaft. Die
+Abbildung auf `p_status` steht ausgeschrieben in `REITER`, weil sie nicht die
+Identität ist. Der gewählte Reiter steht in der Adresse (`?tab=geloescht`).
 
-**Sichtprobe im Browser (7.6), mit Gegenprobe zuerst.** Ein *nicht* portaliertes
-`fixed; inset:0` in derselben Karte misst 361×154 statt 1688×1234 — die Falle
-schnappt zu. Das portalierte Menü: 224×154, `parentElement === BODY`, alle
-Einträge per `elementFromPoint` getroffen, in allen drei Sichten. Zwei Befunde,
-die nur die Sichtprobe fand: der Auslöser streckte sich über die ganze Karte
-(`align-self: stretch` → `w-fit`), und die Rückfrage nannte den Namen zweimal.
+**Sechs Mutations-Gegenproben**, je genau die zugehörige Zusage rot, danach
+wiederhergestellt grün. Plus Sichtprobe im Browser gegen den lokalen Stack.
 
-**Diff-Prüfung (Stufe 4): fünf Befunde, vier bestätigt.** Drei behoben in
-`ce28925`, der vierte führte tiefer (siehe Entscheidungen). Dazu eine CI-Lücke,
-die auf demselben Weg auffiel.
-
-**Belegt statt behauptet.** 23 Mutations-Gegenproben über vier Schichten
-(Fläche, Modul, Edge Function, Migration) — je rot, je Wiederherstellung grün.
-Zwei davon deckten echte Lücken auf. Plus zwei End-to-End-Durchstiche gegen den
-lokalen Stack mit Prüfung in der Datenbank.
+**Zwei Nachträge (Donald, 24.08.):** der Auslöser des Zeilenmenüs zeigt drei
+Punkte statt eines Wortes, und die Fläche sagt durchgehend **„Aktionen"**
+statt „Handlungen".
 
 ## Decisions
 
-- **Die Datenbank kommt in BEIDEN Richtungen zuerst** (Donald, 24.08.). *Warum:*
-  „Öffnen: Ban zuerst" erzeugte zwei Zustände, die dasselbe Delta verbietet —
-  ein wiederhergestelltes Mitglied blieb deaktiviert **und wurde anmeldefähig**
-  (`entbannen` hatte null Leser), und „reaktivieren" auf ein gelöschtes Profil
-  hob die Sperre auf, *bevor* die RPC mit `22023` ablehnte. Delta **und**
-  `design.md` sind mitgeändert: Änderung am Plan, nicht Rechtfertigung des Codes.
-- **`207` heisst jetzt „verborgen und gesperrt stimmen nicht überein".** Beim
-  Schliessen `{hidden, !banned}`, beim Öffnen `{!hidden, banned}` — **nicht**
-  derselbe Zustand aus zwei Richtungen. Kriterium der Fläche: `hidden !== banned`.
-  `hidden && !banned` hätte die zweite Hälfte als Erfolg durchgehen lassen.
-- **`gebannt` kommt in `admin_list_members`** (Donald, 24.08.). *Warum:* das
-  Delta verlangte „fehlt der Ban, SHALL derselbe Aufruf ihn nachsetzen" UND
-  „‚deaktivieren' SHALL NOT an bereits deaktivierten erscheinen" — zusammen war
-  der Nachsetz-Weg unerreichbar, nach der eigenen Formulierung des Delta „keine
-  Handlung, sondern eine Falle". Ein **abgelaufener** Ban zählt nicht.
-- **Beide Aktivierungswege hängen an `gesperrt`** (deaktiviert *oder* gelöscht),
-  wie `blocked` in `my_activation_state`. Für „gelöscht" verlangt es 7.5; der
-  deaktivierte Fall ist derselbe Sachverhalt — das Konto ist gebannt.
-- **Nicht gespiegelt:** dass ein Admin sich nicht selbst sperren kann. Die
-  Fläche kennt den Aufrufer dort nicht, die Datenbank weist es mit `22023` ab.
+- **Der Reiter wird aus der Adresse ABGELEITET, nicht daneben gespiegelt.**
+  *Warum:* ein `useState` daneben bliebe beim Zurückgehen stehen — genau die
+  Falle aus `location.key`. Ein unbekannter Wert fällt auf „Alle" zurück,
+  statt `p_status` in die `22023` der Datenbank laufen zu lassen.
+- **Der Seitenrücksprung beim Reiterwechsel passiert WÄHREND des Aufbaus**,
+  nicht in einem Effekt. *Warum:* der Effekt liefe erst nach dem Zeichnen, also
+  ginge dazwischen eine Abfrage mit dem alten `p_offset` hinaus, deren Ergebnis
+  aufblitzt und im Zwischenspeicher landet. Und nicht im Klick-Behandler: der
+  Reiter kommt auch von aussen, dort gibt es keinen Klick.
+- **`createMemoryRouter` statt `MemoryRouter`** in den neuen Tests. *Warum:*
+  letzterer kennt keinen Weg, von aussen zu navigieren oder zurückzugehen —
+  und genau das ist die Zusage von 8.4.
+- **Eigene Reiterleiste statt `components/ui/Tabs`.** *Warum:* die dortige
+  Komponente hält den Reiter in eigenem `useState` und verlangt je Reiter einen
+  eigenen Inhalt. Hier trägt die Adresse den Zustand, und alle fünf zeigen
+  dieselbe Liste unter einem anderen Filter. Optik übernommen, Zustand nicht.
+- **`w-10` am Auslöser, nicht `w-9` mit `px-0`.** *Warum:* `size="sm"` bringt
+  `px-3` mit, 40 − 24 lässt genau die 16 px des Symbols. `cn()` ist ein Join
+  ohne `tailwind-merge` — über den Vorrang zweier `px-`Klassen entschiede das
+  Stylesheet, nicht das Attribut. Die feste Breite ersetzt zugleich `w-fit` als
+  Riegel gegen das `align-self: stretch` der Kartensicht (Befund aus 7.6).
+- **„Aktionen" überall in der Fläche, „Handlungen" nur noch in zwei Zitaten.**
+  Die beiden Kommentare, die das Delta wörtlich zitieren, bleiben Zitat. Das
+  Delta selbst behält sein Wort; die Edge Function ist nicht mitumbenannt.
 
 ## Files modified
 
-- `src/pages/AdminMitgliederPage.tsx` — `Zeilenmenue` + `handlungenFuer` statt
-  `Handlungen`; `Rueckfrage` verallgemeinert (drei Arten); Klapprichtung,
-  Fokusregeln, Meldungen je Ausgang
-- `src/pages/AdminMitgliederPage.test.tsx` — 20 → **51** Zusagen
-- `src/lib/admin-members.ts` — `setMemberBan`, Statusübersetzung (403/404/409/502)
-- `src/lib/database.types.ts` — `gebannt`
-- `supabase/migrations/20260824100000_admin_member_list_ban.sql` — **neu**
-- `supabase/functions/admin-set-member-ban/{index,ban,ban.test}.ts` — Ordnung
-  umgestellt, `fasseAusgangZusammen` auf die Invariante
-- `supabase/tests/admin_member_list_test.sql` — §12.13–12.15, plan(57)→plan(60)
-- `.github/workflows/ci.yml` — die zwei nie gelaufenen Lebenszyklus-Suiten
-- `openspec/changes/add-admin-member-lifecycle/{tasks,design,specs/admin/spec}.md`
-- `scripts/probe-age581-sichtprobe-daten.ts` — **neu**, wiederholbar, nur `127.0.0.1`
+- `src/pages/AdminMitgliederPage.tsx` — `REITER`/`leseReiter`/`REITER_PARAM`,
+  Reiterleiste + Tafel, Status aus der Adresse, Seitenrücksprung beim Aufbau;
+  Auslöser als Drei-Punkte-Symbol; „Handlungen" → „Aktionen"
+- `src/pages/AdminMitgliederPage.test.tsx` — 51 → **60** Zusagen
+- `src/lib/admin-members.ts` — `AdminMemberStatus` auf **fünf** Werte,
+  `LebenszyklusHandlung` → `LebenszyklusAktion`
+- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 8.1–8.4 abgehakt,
+  **8.5 neu** (Gegenproben + Sichtprobe), zwei Nachträge unter 7.6
 
 ## Next session: start here
 
-**Abschnitt 8, Aufgabe 8.1** — die fünf Reiter. Erst der RED-Test in
-`AdminMitgliederPage.test.tsx` („ein deaktiviertes Mitglied fehlt unter ‚Alle'
-und steht unter ‚Deaktiviert'"), dann die Fläche. Die Abbildung Reiter →
-`p_status` steht **im Delta** und ist nicht zu raten: „Mitgliedschaft" ist ein
-Darstellungsmodus über `p_status = 'alle'`, `aktiviert` hat keinen Reiter.
-`AdminMemberStatus` in `src/lib/admin-members.ts` steht noch auf **drei** Werten
-— die RPC kennt fünf. Der gewählte Reiter gehört als Suchparameter in die
-Adresse; 8.4 verlangt ausdrücklich einen Test, der von **aussen** dorthin
-navigiert und zurückgeht (`location.key`, siehe Gedächtnis).
+**Abschnitt 9, Aufgabe 9.1** — der Inhalt des Reiters „Mitgliedschaft". Erst
+der RED-Test in `AdminMitgliederPage.test.tsx` („ein Mitglied ohne `paid_until`
+zeigt ‚unbekannt', kein Datum"), dann die Darstellung.
 
-**Wichtig:** Abschnitt 7 ist erst mit Abschnitt 8 bedienbar. „Alle" schliesst
-Deaktivierte und Gelöschte korrekt aus, also sind „Reaktivieren" und
-„Wiederherstellen" heute über die Fläche **nicht erreichbar**.
+**Was heute schon steht:** der Reiter existiert, trägt `?tab=mitgliedschaft`
+und fragt `p_status = 'alle'` ab — er zeigt aber noch dieselbe Darstellung wie
+„Alle". Die RPC liefert `paid_until` und `payment_type` bereits mit (siehe
+`20260824100000_admin_member_list_ban.sql`), sie werden nur nicht angezeigt.
+Der Umschaltpunkt ist `reiter === "mitgliedschaft"` in `AdminMitgliederPage.tsx`;
+ein eigenes Feld dafür gibt es bewusst nicht (ein Feld ohne Leser).
 
-Der lokale Stack läuft, die Migration ist lokal angewendet.
-`supabase functions serve` und Vite laufen **nicht** mehr.
+**Die Fallen für Abschnitt 9 stehen schon im Plan:** Stufe **nur lesbar**
+(AGE-516, 9.2) · das Auswahlfeld für die Zahlungsart über `Controller` statt
+`register` (9.3, siehe Gedächtnis `select-option-nach-reset`) · Speichern über
+`admin_update_profile` und **nicht** über `saveProfile`, das alle Profilspalten
+schreibt und Interessen und Ziele dabei löscht (9.4).
+
+Der lokale Stack läuft, alle Migrationen sind lokal angewendet.
+**Vite läuft noch** auf `http://localhost:5173` (angemeldet als
+`age581-admin@local.host`); `supabase functions serve` läuft **nicht**.
 `pnpm exec tsx scripts/probe-age581-sichtprobe-daten.ts` legt fünf Konten in den
-Lebenszyklus-Zuständen an (Passwort wird gewürfelt und ausgegeben).
-pgTAP **immer mit Dateiliste**, jetzt sechs Dateien.
+Lebenszyklus-Zuständen an (Passwort wird gewürfelt und ausgegeben) — braucht
+`DB_URL` und `SERVICE_ROLE_KEY` aus `supabase status`.
+pgTAP **immer mit Dateiliste**, sechs Dateien.
 
 ## Open questions
 
+- **Der gewählte Reiter ist beim Direkteinstieg in schmaler Sicht unsichtbar.**
+  Gemessen bei 500 px (macOS gibt kein Fenster darunter her): die Leiste läuft
+  über und scrollt waagerecht, die Seite selbst nicht, und der letzte Reiter ist
+  durch Scrollen erreichbar. Wer aber über `?tab=mitgliedschaft` hereinkommt,
+  sieht keinen aktiven Reiter — die Leiste scrollt nicht von selbst dorthin. Ein
+  `scrollIntoView` wäre billig, ist in jsdom aber nicht prüfbar; nicht gebaut.
 - **7.5 stimmt nur zur Hälfte.** „Serverseitig erzwungen" gilt für die vier
   Lebenszyklus-RPCs. `admin_activate_member` und `issue_activation_token` kennen
   `disabled_at`/`deleted_at` **nicht** — dort ist das Ausblenden im Menü die
   einzige Hürde. Das Gate hält weiter; der Schaden wäre ein falsches
   `activated_at` und eine irreführende Mail an ein ehemaliges Mitglied.
-  `admin_activate_member` wäre billig zu schliessen, `issue_activation_token`
-  teilt sich den Weg mit der Selbstanforderung und ihrer Aufzählungsabwehr.
 - **Für eine GELÖSCHTE Zeile mit fehlendem Ban gibt es keinen Nachsetz-Weg** —
-  die Übergangstabelle bricht „löschen" dort in jedem Fall ab. Die Fläche
-  erfindet keinen und verspricht in der Warnung auch keinen.
+  die Übergangstabelle bricht „löschen" dort in jedem Fall ab.
 - **`grund` hat weiterhin keinen Aufrufer.** Die RPCs führen ihn als
   `default null`, die Fläche hat kein Feld. Bewusst nicht erfunden.
-- **`admin_audit.actor` ohne `on delete cascade`** — am 23.08. live eingetreten:
-  nach einer echten Handlung liess sich das Admin-Konto nicht mehr löschen, und
-  **GoTrue meldete keinen Fehler**. Das Probe-Skript räumt jetzt zuerst das
-  Protokoll ab; im Schema unangetastet.
+- **`admin_audit.actor` ohne `on delete cascade`** — nach einer echten Aktion
+  liess sich das Admin-Konto nicht mehr löschen, und **GoTrue meldete keinen
+  Fehler**. Das Probe-Skript räumt zuerst das Protokoll ab; Schema unangetastet.
 - **Abweichung bei 4.5** (eigene `ban_failed`-Zeile statt Payload) — begründet,
   nicht abgenommen.
 - Unverändert: Anmeldeadresse des Vorsitzenden · ein Konto auf der
