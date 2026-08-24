@@ -18,7 +18,7 @@ import { cn } from "../../lib/cn";
  *  Marke (AGE-582, Aufgabe 1.17). Bewusst nur die Überschrift und nicht jede
  *  Karte: auf einer Ein-Bereichs-Seite trägt jede Zeile denselben Bereich, und
  *  eine Marke auf allen wiederholte dieselbe Auskunft, statt zu unterscheiden.
- *  Entscheidung Donald, 25.08.
+ *  Entscheidung Donald, 24.08.
  *
  *  Nicht jede Kopf-Route ist ein Bereich: `/academy`, `/mitgliedschaft` und
  *  `/meine-chancen` stehen nicht im Kanon und bleiben ohne Marke. */

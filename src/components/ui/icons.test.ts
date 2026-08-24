@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 const SATZ = "src/components/ui/icons.tsx";
 
 /**
- * Ausnahmen — **namentlich, mit Grund** (Aufgabe 1.6, Donalds Wahl vom 25.08.).
+ * Ausnahmen — **namentlich, mit Grund** (Aufgabe 1.6, Donalds Wahl vom 24.08.).
  *
  * Eine Ausnahme ist eine Datei, deren `<svg>` kein wiederverwendbarer Glyph ist
  * oder deren Auflösung bewusst vertagt wurde. Sie ist kein Freibrief: siehe die
@@ -36,13 +36,13 @@ const AUSNAHMEN: Record<string, string> = {
   "src/components/ui/Avatar.tsx":
     "Platzhalter-Silhouette im Bauteil selbst; sie hat außerhalb des Avatars keinen Aufrufer",
   "src/pages/EventDetailPage.tsx":
-    "VERTAGT (25.08.): `DETAIL_ICONS` ist ein zweiter Satz (kalender/ort/personen/ticket). `kalender` bleibt damit dreimal im Baum — bewusst, um den Diff vor dem Go-Live klein zu halten",
+    "VERTAGT (24.08.): `DETAIL_ICONS` ist ein zweiter Satz (kalender/ort/personen/ticket). `kalender` bleibt damit dreimal im Baum — bewusst, um den Diff vor dem Go-Live klein zu halten",
   "src/pages/AdminMitgliederPage.tsx":
-    "VERTAGT (25.08.): Drei-Punkte-Symbol des Zeilenmenüs, gefüllt statt gestrichelt",
+    "VERTAGT (24.08.): Drei-Punkte-Symbol des Zeilenmenüs, gefüllt statt gestrichelt",
   "src/pages/MeineChancenPage.tsx":
-    "VERTAGT (25.08.): zwei verbundene Kreise als Leerzustands-Symbol — dasselbe Motiv wie `network` im Kategoriensatz",
+    "VERTAGT (24.08.): zwei verbundene Kreise als Leerzustands-Symbol — dasselbe Motiv wie `network` im Kategoriensatz",
   "src/components/mein-bereich/building-blocks.tsx":
-    "VERTAGT (25.08.): `CheckIcon` bleibt hier. `CrownIcon` verlässt die Datei trotzdem (Aufgabe 1.4), weil er doppelt stand",
+    "VERTAGT (24.08.): `CheckIcon` bleibt hier. `CrownIcon` verlässt die Datei trotzdem (Aufgabe 1.4), weil er doppelt stand",
 };
 
 function quelldateien(dir: string, acc: string[] = []): string[] {

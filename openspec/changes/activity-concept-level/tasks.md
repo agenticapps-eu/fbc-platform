@@ -21,7 +21,7 @@
       sein eigener `Record` entfällt
 - [x] 1.6 **Die Ausnahmen namentlich festlegen** und begründen — sie stehen mit
       Grund in `icons.test.ts` (`AUSNAHMEN`). Gemessen: SVGs lagen in **14**
-      Dateien außerhalb `src/vision`, nicht in neun. Donalds Wahl vom 25.08.:
+      Dateien außerhalb `src/vision`, nicht in neun. Donalds Wahl vom 24.08.:
       **sieben** Ausnahmen. Drei sind echte Nicht-Glyphen (`CompassMark` als
       Markenmarke, `profil-widgets` als Datenvektor `200x48`, `Avatar` als
       Platzhalter); vier sind **vertagt** und tragen sehr wohl Glyphen — siehe
@@ -55,7 +55,7 @@
       `success` (161), `warning` (36) und `danger` (0) belegen vier der sechs
       unterscheidbaren Farbregionen. Sieben eigene Töne kollidierten alle — der
       naheliegende Kandidat für „Highlights" lag auf **0°** von `danger`, also
-      exakt auf der Fehlerfarbe. Donalds Entscheidung vom 25.08.: eine Familie
+      exakt auf der Fehlerfarbe. Donalds Entscheidung vom 24.08.: eine Familie
 - [x] 1.11 Den Kanon `Bereich → { icon, farbToken }` als **eine** Modulkonstante
       anlegen; Bedien-Symbole stehen ausdrücklich nicht darin — `src/config/bereiche.ts`.
       Zwei Glyphen kamen dafür in den Satz: `mail` (die Sprechblase gehört schon
@@ -82,19 +82,19 @@
       Theme, breit): alle elf Menü-Glyphen, die gefüllte Fassung im aktiven
       Eintrag, Glocke, beide Chevrons, Lupe, Fanfare, die vier Bereichsmarken auf
       dem Dashboard und zwei Seitenköpfe — Konsole ohne Fehler.
-      **Nicht geprüft, und das ist abgenommen** (Donald, 25.08.: „alles gut
+      **Nicht geprüft, und das ist abgenommen** (Donald, 24.08.: „alles gut
       egal"): dunkles Theme, 375 px (die Fenstermindestbreite von macOS
       verhindert die Messung über dieses Werkzeug) sowie alles, was Daten
       braucht — Herz, Kommentarzahl, Krone, die zwei zusammengeführten
       Kategorien. DEV trägt weder Beiträge noch Angebote
-- [x] 1.15 **Vertagt am 25.08. (Donalds Wahl), namentlich festgehalten** — vier
+- [x] 1.15 **Vertagt am 24.08. (Donalds Wahl), namentlich festgehalten** — vier
       Ausnahmen tragen wiederverwendbare Glyphen und lösen sich später auf:
       `EventDetailPage.DETAIL_ICONS` (ein zweiter Satz aus vier Glyphen; `kalender`
       steht damit weiter **dreimal** im Baum), das Drei-Punkte-Symbol in
       `AdminMitgliederPage.tsx`, der Leerzustands-Glyph in `MeineChancenPage.tsx`
       und `CheckIcon` in `building-blocks.tsx`. Grund für die Vertagung: den Diff
-      vor dem Go-Live klein halten. Zur Kenntnis genommen (Donald, 25.08.)
-- [x] 1.17 **Entschieden (Donald, 25.08.): nur die Seitenüberschrift.** Auf einer
+      vor dem Go-Live klein halten. Zur Kenntnis genommen (Donald, 24.08.)
+- [x] 1.17 **Entschieden (Donald, 24.08.): nur die Seitenüberschrift.** Auf einer
       Ein-Bereichs-Seite trägt jede Karte denselben Bereich; eine Marke auf allen
       wiederholte dieselbe Auskunft pro Zeile, statt zu unterscheiden. Umgesetzt
       in `FormatHero` für die **fünf** Kopf-Routen, die im Kanon stehen —
@@ -110,7 +110,7 @@
       Gegengelesen, soweit sichtbar: alle vier stehen in der Menüleiste und im
       Seitenkopf und sitzen dort richtig. Ihre **zweiten** Auftritte — Kalender
       und Kommentarzahl am Beitrag, die zwei Kategorien — brauchen Daten und
-      fallen unter dieselbe Abnahme wie 1.14 (Donald, 25.08.)
+      fallen unter dieselbe Abnahme wie 1.14 (Donald, 24.08.)
 
 ## 2. Speichern — `post_saves`
 
