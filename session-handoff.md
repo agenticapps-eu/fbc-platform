@@ -120,9 +120,8 @@ Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 ## Next session: start here
 
 **Erste Handlung: Abschnitt 5, die Datenschicht des Feeds.** Der Review ist
-gelaufen und abgearbeitet, es liegt nichts mehr davor. Zu prüfen ist nur, ob CI
-auf `566a96f` grün ist — der Lauf war beim Schreiben dieses Handoffs noch
-unterwegs.
+gelaufen und abgearbeitet, CI ist grün auf `1967d527` (der HEAD-SHA, nicht auf
+einer älteren) — es liegt nichts mehr davor.
 
 **Abschnitt 5 ist Frontend, und dafür gilt Donalds Regel:** erst eine laufende
 lokale Version zeigen, dann committen. Das braucht `pnpm dev`, und das braucht
