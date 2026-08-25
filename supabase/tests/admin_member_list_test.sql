@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(60);
+select plan(74);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -759,6 +759,141 @@ select is(
          from public.admin_list_members('zyklusliste1') t$q$),
   'false',
   'Ein ABGELAUFENES banned_until zählt nicht — gebannt fragt nach der Zukunft');
+
+-- ── 13. `admin_member_counts()` — die Zahlen an den Reitern (AGE-587) ───────
+-- Change: openspec/changes/admin-und-profilflaechen/.
+--
+-- WARUM HIER UND NICHT IN EINER EIGENEN DATEI:
+-- Die Kernzusage ist ein VERGLEICH mit `admin_list_members`. In einer eigenen
+-- Datei müsste der ganze Zustands-Fixturensatz ein zweites Mal entstehen — und
+-- zwei Abschriften desselben Bestands sind genau die Drift, gegen die dieser
+-- Abschnitt antritt.
+
+-- Ein matching_manager: die Zähl-RPC muss ihn abweisen wie ein gewöhnliches
+-- Mitglied. `staff_roles` allein genügt nicht als Berechtigung — das ist der
+-- Unterschied zwischen „Personal" und „Admin", und ohne diesen Fixture bliebe
+-- er ungeprüft.
+insert into auth.users (id, aud, role, email) values
+  ('f6000000-0000-0000-0000-0000000000aa', 'authenticated', 'authenticated', 'zaehler-manager@test.fbc');
+insert into public.staff_roles (profile_id, role) values
+  ('f6000000-0000-0000-0000-0000000000aa', 'matching_manager');
+update public.profiles set name = 'Zaehler Manager', activated_at = now()
+ where id = 'f6000000-0000-0000-0000-0000000000aa';
+
+-- Ein Konto, das NIE AKTIVIERT UND DANN GELÖSCHT wurde: `activated_at is
+-- null`, `disabled_at is null`, `deleted_at` gesetzt. Es gehört nach
+-- `geloescht` und ausdrücklich NICHT nach `offen`.
+--
+-- Dieses Fixture ist nicht dekorativ, sondern die Antwort auf eine LÜCKE, die
+-- erst die Gegenprobe gezeigt hat. Der `offen`-Zweig der geteilten Bedingung
+-- trägt drei Bedingungen; die dritte (`p_deleted_at is null`) liess sich
+-- entfernen, ohne dass irgendeine der 72 Zusagen fiel — weil kein Bestand eine
+-- Zeile enthielt, an der sie einen Unterschied macht. Grün war sie trotzdem.
+--
+-- Nebenbei macht sie die fünf Zustandsmengen paarweise verschieden gross
+-- (`offen` 2, `deaktiviert` 1, `geloescht` 3), was der Plan-Review für den
+-- Vergleich in 13.1 verlangt hat. Ein Fixture, zwei Gründe — und der erste ist
+-- der wichtigere.
+insert into auth.users (id, aud, role, email) values
+  ('f5000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'nieaktivgeloescht@test.fbc');
+update public.profiles set name = 'Nie Aktiv Geloescht', activated_at = null,
+       deleted_at = timestamptz '2026-08-05 09:00:00+00'
+ where id = 'f5000000-0000-0000-0000-000000000007';
+
+select is(
+  pg_temp.int_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::int from public.admin_list_members('nieaktivgeloescht', 'offen')$q$),
+  0, 'Ein nie aktiviertes, aber gelöschtes Konto steht NICHT unter offen — Löschen sticht');
+
+select is(
+  pg_temp.int_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::int from public.admin_list_members('nieaktivgeloescht', 'geloescht')$q$),
+  1, '… sondern unter geloescht, wie jede andere gelöschte Zeile auch');
+
+-- 13.1 Die Kernzusage: für JEDEN Zustand stimmen Zahl und Liste überein.
+-- Verglichen wird die ganze Abbildung auf einmal statt fünfmal einzeln — ein
+-- roter Lauf zeigt dann, WELCHER Zustand auseinanderläuft, statt nur DASS einer
+-- es tut. `p_query => null` und `p_offset => 0`, und ein Limit weit über dem
+-- Bestand: die Zahl ist global, die Liste wäre es ohne beides nicht.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(status || '=' || anzahl, ',' order by status)
+         from public.admin_member_counts()$q$),
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(s || '=' || (select count(*)
+                                        from public.admin_list_members(null, s, 1000000, 0)),
+                         ',' order by s)
+         from unnest(array['aktiviert','alle','deaktiviert','geloescht','offen']) s$q$),
+  'Zähler und Liste stimmen für jeden Zustand überein — sie fragen dieselbe Bedingung');
+
+-- 13.2 Eine Zeile je Zustand, und zwar genau diese fünf. Ohne diese Zusage
+-- könnte die Funktion einen Zustand weglassen und 13.1 bliebe grün, weil
+-- `string_agg` über eine fehlende Zeile hinwegsieht — auf beiden Seiten.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(status, ',' order by status) from public.admin_member_counts()$q$),
+  'aktiviert,alle,deaktiviert,geloescht,offen',
+  'Die Funktion liefert genau fünf Zeilen, eine je Zustand');
+
+-- 13.3 Ein Zustand OHNE Mitglieder erscheint mit der Zahl null, nicht gar
+-- nicht. Der leere Zustand wird eigens hergestellt: im vorhandenen Bestand ist
+-- keiner leer, und eine Zusage über einen Fall, den die Fixtures nie erzeugen,
+-- ist grün ohne etwas zu prüfen. Die Lehre aus AGE-582, 6.6 in der Datenbank:
+-- „keine Zahl" und „die Zahl null" sind zwei verschiedene Auskünfte.
+savepoint leerer_zustand;
+update public.profiles set deleted_at = null where deleted_at is not null;
+select is(
+  pg_temp.int_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select anzahl::int from public.admin_member_counts() where status = 'geloescht'$q$),
+  0, 'Ein Zustand ohne Mitglieder trägt die Zahl null — er fehlt nicht');
+rollback to savepoint leerer_zustand;
+
+-- 13.4–13.6 Der Unterschied zu `admin_list_feedback` ist gewollt: dort ist eine
+-- leere Liste eine gültige Antwort, hier wäre eine Zeile mit lauter Nullen eine
+-- AUSSAGE ÜBER DEN BESTAND. Wer kein Recht am Bestand hat, darf sie nicht
+-- bekommen. Deshalb `42501` und nicht „leer".
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000c0',
+    $q$select * from public.admin_member_counts()$q$),
+  '42501', 'Ein gewöhnliches Mitglied bekommt einen Fehler, keine Zeile mit Nullen');
+
+select is(
+  pg_temp.state_as('f6000000-0000-0000-0000-0000000000aa',
+    $q$select * from public.admin_member_counts()$q$),
+  '42501', '… und ein matching_manager ebenso — Personal ist nicht Admin');
+
+select is(
+  pg_temp.state_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select * from public.admin_member_counts()$q$),
+  'KEIN FEHLER', 'Der Admin dagegen bekommt seine Zahlen — der Fehler ist das Gate, nicht die Funktion');
+
+-- 13.7–13.12 Rechte werden ausgesprochen, nicht geerbt (AGE-312).
+select is(has_function_privilege('anon', 'public.admin_member_counts()', 'execute'),
+  false, 'admin_member_counts: anon darf nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.admin_member_counts()', 'execute'),
+  true, 'admin_member_counts: authenticated darf — die Abwehr findet IN der Funktion statt');
+select ok(
+  not exists (
+    select 1 from aclexplode((select proacl from pg_proc
+                               where oid = 'public.admin_member_counts()'::regprocedure)) a
+     where a.grantee = 0),
+  'admin_member_counts: PUBLIC hält kein EXECUTE');
+
+-- `member_state_matches` ist eine INTERNE Bedingung. Sie braucht für niemanden
+-- ein Ausführungsrecht: beide Aufrufer sind SECURITY DEFINER mit Eigentümer
+-- `postgres`, und dort wird das Recht gegen den EIGENTÜMER geprüft, nicht gegen
+-- den Aufrufer — derselbe Weg, den `is_banned` in AGE-581 schon ging. Deshalb
+-- ist hier auch `authenticated` false, und das ist kein Versehen.
+select is(has_function_privilege('anon', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)', 'execute'),
+  false, 'member_state_matches: anon darf nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)', 'execute'),
+  false, 'member_state_matches: auch authenticated nicht — sie ist keine Fläche, sondern eine Bedingung');
+select ok(
+  not exists (
+    select 1 from aclexplode((select proacl from pg_proc
+                               where oid = 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)'::regprocedure)) a
+     where a.grantee = 0),
+  'member_state_matches: PUBLIC hält kein EXECUTE');
 
 select * from finish();
 rollback;

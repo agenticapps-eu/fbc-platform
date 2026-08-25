@@ -16,7 +16,9 @@ import { useToast } from "../components/ui/toast-context";
 import { requestActivationLink } from "../lib/activation";
 import {
   activateMember,
+  adminMemberCountsQueryKey,
   adminMembersQueryKey,
+  fetchAdminMemberCounts,
   fetchAdminMembers,
   SEITENGROESSE,
   setMemberBan,
@@ -199,6 +201,23 @@ export default function AdminMitgliederPage() {
     queryFn: () => fetchAdminMembers(filter),
   });
 
+  /**
+   * Die Zahlen an den Reitern (AGE-587).
+   *
+   * Bewusst OHNE `query` und ohne `seite` — weder im Schlüssel noch im Aufruf.
+   * Der Reiter beantwortet „wie viele gibt es", nicht „wie viele meiner
+   * Treffer", und die Antwort darauf ändert sich nicht dadurch, dass jemand
+   * einen Namen eintippt. Der Preis ist ein scheinbarer Widerspruch — Reiter
+   * sagt 12, Liste zeigt zwei —, und der ist gewollt.
+   *
+   * Ein Fehler wird NICHT zu Nullen geglättet: `zahlen` bleibt dann undefined,
+   * und die Reiter zeigen wie beim Laden gar keine Zahl.
+   */
+  const { data: zahlen } = useQuery({
+    queryKey: adminMemberCountsQueryKey,
+    queryFn: fetchAdminMemberCounts,
+  });
+
   const zugangslink = useMutation({
     mutationFn: (m: AdminMember) => requestActivationLink(m.login_email),
     onSuccess: () =>
@@ -363,6 +382,32 @@ export default function AdminMitgliederPage() {
                 }
               >
                 {r.label}
+                {/* `aria-hidden`, und das ist der Punkt: der zugängliche NAME
+                    des Reiters bleibt seine Beschriftung. Stünde die Zahl darin,
+                    läse eine Vorleseausgabe „Nicht aktiviert 2" als Bezeichnung
+                    eines Bedienelements vor — und dieser Name änderte sich bei
+                    jeder Aktivierung.
+
+                    Solange die Zahl fehlt, steht KEINE da. Nicht die Null: die
+                    behauptete einen leeren Verein, solange nur die Antwort noch
+                    unterwegs ist (die Lehre aus AGE-582, 6.6). Aus demselben
+                    Grund erscheint auch nach einem Fehler keine.
+
+                    `r.status` und nicht `r.id`: „Mitgliedschaft" ist ein
+                    Darstellungsmodus über derselben Menge wie „Alle" und trägt
+                    deshalb dieselbe Zahl. `admin_list_members(…,
+                    'mitgliedschaft')` würfe 22023. */}
+                {zahlen?.[r.status] !== undefined && (
+                  <span
+                    aria-hidden="true"
+                    className={
+                      "ml-1.5 text-xs tabular-nums " +
+                      (gewaehlt ? "text-accent-strong" : "text-muted")
+                    }
+                  >
+                    {zahlen[r.status]}
+                  </span>
+                )}
               </button>
             );
           })}

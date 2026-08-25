@@ -10,6 +10,7 @@ import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
+import AdminFeedbackPage from "./pages/AdminFeedbackPage";
 import AdminMitgliedPage from "./pages/AdminMitgliedPage";
 import AdminMitgliederPage from "./pages/AdminMitgliederPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
@@ -145,6 +146,21 @@ function AppInner() {
           element={
             <RequireAdmin>
               <AdminSettingsPage />
+            </RequireAdmin>
+          }
+        />
+        {/* QM-Feedback (AGE-358, eigene Fläche seit AGE-587). Stand bis dahin als
+            Karte auf /admin und holte dabei JEDE Zeile auf einmal — die letzte
+            listende Fläche ohne Blätterung. Eager importiert wie die anderen
+            Admin-Seiten: sie sind selten besucht, aber klein, und ein
+            Ladezustand mitten in der Verwaltung wäre teurer als das Bündel.
+            Die echte Grenze ist is_admin() im Rumpf von admin_list_feedback;
+            RequireAdmin ist Komfort. */}
+        <Route
+          path="/admin/feedback"
+          element={
+            <RequireAdmin>
+              <AdminFeedbackPage />
             </RequireAdmin>
           }
         />

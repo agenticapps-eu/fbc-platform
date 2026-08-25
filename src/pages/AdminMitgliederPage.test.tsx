@@ -18,10 +18,17 @@ import type { AdminMember } from "../lib/admin-members";
  * Befunde ausschließlich dort aufgefallen, während jsdom grün war.
  */
 const rpc = vi.fn();
+const countsRpc = vi.fn();
 const invoke = vi.fn();
 vi.mock("../lib/supabase", () => ({
   supabase: {
-    rpc: (...args: unknown[]) => rpc(...args),
+    // Die Zähl-RPC (AGE-587) bekommt einen EIGENEN Spion, statt in `rpc`
+    // mitzulaufen. Sonst leerte sie die `mockResolvedValueOnce`-Warteschlange
+    // mit, die mehrere Zusagen benutzen, um Seite 1 von Seite 2 zu
+    // unterscheiden — und die Blätterungs-Zusagen fielen aus einem Grund, der
+    // mit dem Blättern nichts zu tun hat.
+    rpc: (...args: unknown[]) =>
+      args[0] === "admin_member_counts" ? countsRpc(...args) : rpc(...args),
     functions: { invoke: (...args: unknown[]) => invoke(...args) },
   },
 }));
@@ -88,10 +95,26 @@ function listCalls(): number {
   return rpc.mock.calls.filter((c) => c[0] === "admin_list_members").length;
 }
 
+/** Die Zahlen für die Reiter (AGE-587) — bewusst PAARWEISE VERSCHIEDEN, damit
+ *  eine vertauschte Zuordnung Reiter → Zustand auffällt. */
+const ZAEHLER = [
+  { status: "alle", anzahl: 12 },
+  { status: "aktiviert", anzahl: 10 },
+  { status: "offen", anzahl: 2 },
+  { status: "deaktiviert", anzahl: 1 },
+  { status: "geloescht", anzahl: 3 },
+];
+
+function countCalls(): number {
+  return countsRpc.mock.calls.length;
+}
+
 beforeEach(() => {
   rpc.mockReset();
+  countsRpc.mockReset();
   invoke.mockReset();
   rpc.mockResolvedValue({ data: [OFFEN, AKTIV], error: null });
+  countsRpc.mockResolvedValue({ data: ZAEHLER, error: null });
   invoke.mockResolvedValue({ data: null, error: null });
 });
 
@@ -1371,5 +1394,120 @@ describe("Der Reiter „Mitgliedschaft“ speichert über `admin_update_profile`
       target: { value: "2026-12-31" },
     });
     expect(knopf).toBeDisabled();
+  });
+});
+
+/**
+ * Die Zahlen an den Reitern (AGE-587, Abschnitt 6).
+ *
+ * Sie beantworten „wie viele gibt es", nicht „wie viele meiner Treffer" — und
+ * genau dieser Unterschied ist die Zusage, die verhindert, dass ein späterer
+ * Leser „Reiter sagt 70, Liste zeigt zwei" für einen Fehler hält.
+ */
+describe("Zähler an den Reitern (AGE-587)", () => {
+  it("zeigt an jedem Reiter seine Zahl", async () => {
+    renderPage();
+    await screen.findByText("Bodo Unbestaetigt");
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument();
+    });
+    expect(
+      within(screen.getByRole("tab", { name: "Nicht aktiviert" })).getByText("2"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tab", { name: "Deaktiviert" })).getByText("1"),
+    ).toBeInTheDocument();
+    expect(within(screen.getByRole("tab", { name: "Gelöscht" })).getByText("3")).toBeInTheDocument();
+  });
+
+  it("gibt „Alle“ und „Mitgliedschaft“ dieselbe Zahl — es ist dieselbe Menge", async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument(),
+    );
+
+    expect(
+      within(screen.getByRole("tab", { name: "Mitgliedschaft" })).getByText("12"),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * Der Name des Bedienelements bleibt der NAME des Reiters. Stünde die Zahl im
+   * zugänglichen Namen, läse eine Vorleseausgabe „Nicht aktiviert 2" als
+   * Bezeichnung eines Knopfes vor — und der Name änderte sich bei jeder
+   * Aktivierung.
+   */
+  it("mischt die Zahl NICHT in den zugänglichen Namen des Reiters", async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument(),
+    );
+
+    expect(screen.getByRole("tab", { name: "Nicht aktiviert" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Nicht aktiviert\s*2/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * „Keine Zahl" und „die Zahl null" sind zwei verschiedene Auskünfte. Eine
+   * voreilige Null behauptet einen leeren Verein, solange nur die Antwort fehlt
+   * — die Lehre aus AGE-582, 6.6.
+   */
+  it("zeigt KEINE Zahl, solange die Zahlen nicht da sind — nicht die Null", async () => {
+    countsRpc.mockReturnValue(new Promise(() => {})); // bleibt offen
+
+    renderPage();
+    await screen.findByText("Bodo Unbestaetigt");
+
+    const reiter = screen.getByRole("tab", { name: "Alle" });
+    expect(within(reiter).queryByText("0")).not.toBeInTheDocument();
+    expect(reiter.textContent).toBe("Alle");
+  });
+
+  /**
+   * Die gewollte Seite des scheinbaren Widerspruchs: der Reiter sagt 12, die
+   * Liste zeigt zwei Treffer. Ohne diese Zusage hält ein späterer Leser die
+   * Globalität für einen Fehler und „repariert" sie.
+   */
+  it("lässt die Zahlen global, wenn eine Suche läuft", async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument(),
+    );
+    const vorher = countCalls();
+
+    fireEvent.change(screen.getByPlaceholderText("Name oder Anmeldeadresse"), {
+      target: { value: "meier" },
+    });
+    await waitFor(() => expect(lastListArgs().p_query).toBe("meier"));
+
+    // Die Zahl steht unverändert da …
+    expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument();
+    // … und der Suchbegriff hat die Zähl-RPC nicht einmal erreicht.
+    expect(countCalls()).toBe(vorher);
+    expect(countsRpc.mock.calls.every((c) => c[1] === undefined)).toBe(true);
+  });
+
+  /**
+   * Aufgabe 4.4: geprüft wird MUTATION → NACHLADEN, nicht das erste Rendern.
+   * Läge der Schlüssel der Zähl-Abfrage neben dem Präfix `["admin-members"]`
+   * statt darunter, blieben die Zahlen nach einer Aktivierung stehen — und ein
+   * Test auf das erste Rendern bliebe dabei grün.
+   */
+  it("holt die Zahlen nach einer Zustandsänderung neu", async () => {
+    renderPage();
+    await screen.findByText("Bodo Unbestaetigt");
+    await waitFor(() => expect(countCalls()).toBeGreaterThan(0));
+    const vorher = countCalls();
+
+    const menue = await oeffneMenue(OFFEN.id);
+    fireEvent.click(within(menue).getByRole("menuitem", { name: /Direkt aktivieren/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /Aktivieren/i }));
+
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("admin_activate_member", { target: OFFEN.id }),
+    );
+    await waitFor(() => expect(countCalls()).toBeGreaterThan(vorher));
   });
 });

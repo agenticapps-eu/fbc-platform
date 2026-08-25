@@ -32,7 +32,7 @@ beforeEach(() => {
   mockedUpdate.mockReset();
   mockedUpdate.mockResolvedValue(undefined);
   mockedAdminFeedback.mockReset();
-  mockedAdminFeedback.mockResolvedValue([]);
+  mockedAdminFeedback.mockResolvedValue({ feedbacks: [], hatWeitere: false });
 });
 
 describe("AdminSettingsPage (AGE-455)", () => {
@@ -58,38 +58,32 @@ describe("AdminSettingsPage (AGE-455)", () => {
   });
 });
 
-describe("QM-Feedback in der Administration (AGE-578)", () => {
-  it("zeigt die Feedback-Sicht mit Inhalt und Autor", async () => {
+/**
+ * Das QM-Feedback ist NICHT mehr hier (AGE-587).
+ *
+ * Die Zusage wird GEDREHT und nicht gelöscht — wie AGE-578 es mit
+ * `EinstellungenPage.test.tsx` tat, als das Feedback von den Einstellungen
+ * hierher zog. Ein gelöschter Test wäre keine Zusage, sondern eine Lücke: die
+ * Karte könnte zurückkehren und stünde dann an zwei Orten, ohne dass etwas rot
+ * würde.
+ */
+describe("QM-Feedback ist nicht mehr auf /admin (AGE-587)", () => {
+  it("zeigt die Feedback-Karte nicht mehr", async () => {
     mockedFetch.mockResolvedValue({ openContact: true });
-    mockedAdminFeedback.mockResolvedValue([
-      {
-        id: "f1",
-        rating: 4,
-        likes: "Der Compass ist klar",
-        misses: null,
-        idea: null,
-        route: "/compass",
-        ref_type: null,
-        created_at: "2026-07-16T10:00:00Z",
-        author_name: "Anna Müller",
-      },
-    ]);
     renderPage();
 
-    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
-    expect(await screen.findByText("Der Compass ist klar")).toBeInTheDocument();
-    expect(screen.getByText("Anna Müller", { exact: false })).toBeInTheDocument();
+    // Erst warten, bis die Seite wirklich steht — sonst wäre die
+    // Abwesenheitsprüfung nur ein Beleg dafür, dass noch nichts gerendert ist.
+    await screen.findByRole("switch", { name: "Kontaktanfragen für alle freischalten" });
+
+    expect(screen.queryByText("QM-Feedback")).not.toBeInTheDocument();
   });
 
-  // Die Seite hängt hinter RequireAdmin (App.tsx), das staffRole !== "admin" auf
-  // "/" umleitet — deshalb fragt die Card hier NICHT mehr selbst nach der Rolle.
-  // Diese Zusage hält fest, dass sie dafür auch wirklich bedingungslos rendert:
-  // ein zurückgebliebenes Gating würde sie beim Admin-Fixture nicht auffallen.
-  it("rendert die Sicht ohne eigene Rollenabfrage", async () => {
+  it("holt gar kein Feedback mehr — die Fläche fragt nicht danach", async () => {
     mockedFetch.mockResolvedValue({ openContact: false });
     renderPage();
+    await screen.findByRole("switch", { name: "Kontaktanfragen für alle freischalten" });
 
-    expect(await screen.findByText("QM-Feedback")).toBeInTheDocument();
-    expect(mockedAdminFeedback).toHaveBeenCalled();
+    expect(mockedAdminFeedback).not.toHaveBeenCalled();
   });
 });

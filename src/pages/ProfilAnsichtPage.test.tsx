@@ -12,6 +12,7 @@ vi.mock("../lib/dashboard", async (importOriginal) => {
 import { fetchDashboard } from "../lib/dashboard";
 import {
   AuszeichnungenWidget,
+  BeitraegeWidget,
   EntwicklungWidget,
   ErfolgsradarWidget,
   ZieleWidget,
@@ -338,5 +339,109 @@ describe("Die vertagten Widgets bleiben lauffähig im Code", () => {
     renderWidget(<EntwicklungWidget profile={GEFUELLT.profile} />);
     expect(screen.getByRole("heading", { name: "Meine Entwicklung" })).toBeInTheDocument();
     expect(screen.getByText("Erstes Vernetzungsgespräch")).toBeInTheDocument();
+  });
+});
+
+/**
+ * „Meine Beiträge" führt in den Feed (AGE-587, Abschnitt 8).
+ *
+ * DIESELBE Zusage steht in `PublicProfilePage.test.tsx` für die
+ * Aktivitäten-Karte der öffentlichen Seite. Das Spec-Delta sagt „jede Zeile,
+ * auf JEDEM Profil"; der erste Plan verlinkte nur die öffentliche und hätte
+ * die eigene stumm gelassen (Befund codex). Wer eine der beiden ändert, soll
+ * die andere finden.
+ */
+describe("Meine Beiträge: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => {
+  function renderWidget(data: DashboardData) {
+    return render(
+      <MemoryRouter>
+        <BeitraegeWidget data={data} />
+      </MemoryRouter>,
+    );
+  }
+
+  const mitBeitraegen = (posts: DashboardData["posts"]): DashboardData => ({
+    ...GEFUELLT,
+    posts,
+  });
+
+  it("macht jede Zeile zu einem Link auf IHREN Beitrag", () => {
+    renderWidget(
+      mitBeitraegen([
+        {
+          id: "post-eins",
+          body: "Erster Gedanke",
+          hashtags: [],
+          created_at: "2026-08-01T09:00:00Z",
+          visibility: "members",
+        },
+        {
+          id: "post-zwei",
+          body: "Zweiter Gedanke",
+          hashtags: [],
+          created_at: "2026-08-02T09:00:00Z",
+          visibility: "members",
+        },
+      ]),
+    );
+
+    expect(screen.getByRole("link", { name: /Erster Gedanke/ })).toHaveAttribute(
+      "href",
+      "/aktivitaet?post=post-eins",
+    );
+    expect(screen.getByRole("link", { name: /Zweiter Gedanke/ })).toHaveAttribute(
+      "href",
+      "/aktivitaet?post=post-zwei",
+    );
+  });
+
+  /** Ein `div` mit `onClick` bestünde `fireEvent.click` und wäre trotzdem nicht
+   *  bedienbar (Befund gemini). Geprüft wird die Rolle, nicht ein Klick. */
+  it("ist ein echtes Verweiselement, kein anklickbarer Kasten", () => {
+    renderWidget(
+      mitBeitraegen([
+        {
+          id: "p1",
+          body: "Ein Gedanke",
+          hashtags: [],
+          created_at: "2026-08-01T09:00:00Z",
+          visibility: "members",
+        },
+      ]),
+    );
+
+    const link = screen.getByRole("link", { name: /Ein Gedanke/ });
+    expect(link.tagName).toBe("A");
+  });
+
+  /** „Beitrag ohne Text", nicht „Beitrag mit Bild" — die Karte weiss nichts
+   *  über Bilder, und ein leerer Text hat mindestens zwei andere Ursachen. */
+  it("gibt einer textlosen Zeile einen Ersatztext, statt leer zu bleiben", () => {
+    renderWidget(
+      mitBeitraegen([
+        {
+          id: "p-leer",
+          body: "",
+          hashtags: [],
+          created_at: "2026-08-01T09:00:00Z",
+          visibility: "members",
+        },
+      ]),
+    );
+
+    expect(screen.getByRole("link", { name: /Beitrag ohne Text/ })).toHaveAttribute(
+      "href",
+      "/aktivitaet?post=p-leer",
+    );
+    expect(screen.queryByText(/Beitrag mit Bild/)).not.toBeInTheDocument();
+  });
+
+  /** Der Leerzustand bleibt, was er war: eine Einladung, keine Liste mit einer
+   *  Ersatzzeile darin (AGE-539). */
+  it("lässt den Leerzustand unangetastet", () => {
+    renderWidget(mitBeitraegen([]));
+
+    expect(screen.getByText(/noch nichts zu lesen/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Beitrag ohne Text/ })).not.toBeInTheDocument();
   });
 });

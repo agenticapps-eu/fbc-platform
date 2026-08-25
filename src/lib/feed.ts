@@ -280,6 +280,22 @@ export const feedSeitenKey = (uid: string | null, auswahl: FeedAuswahl) =>
     auswahl.typ,
     "seiten",
   ] as const;
+/**
+ * Der EINE Beitrag hinter `?post=<id>` (AGE-587).
+ *
+ * Liegt bewusst UNTER `feedListKey` — dem Präfix, den Reaktion, Speichern und
+ * Kommentar entwerten. Ein Schlüssel daneben hiesse: eine Reaktion auf den
+ * vorangestellten Beitrag lässt ihn veraltet stehen, der Knopf sagt weiter
+ * „Speichern", und der zweite Klick schickt dieselbe Operation noch einmal
+ * (Diff-Review codex). Derselbe Fehler, den dieser Change bei den Zählern der
+ * Reiter schon einmal vermieden hat.
+ *
+ * `feedSeitenKey` bleibt davon unberührt: der Parameter steht dort NICHT drin,
+ * sonst verwürfe jeder Deeplink den geladenen Feed.
+ */
+export const postDeeplinkQueryKey = (uid: string | null, postId: string) =>
+  [...feedListKey(uid), "einzeln", postId] as const;
+
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 
@@ -459,6 +475,17 @@ export interface FetchFeedArgs {
   /** Nur Beiträge dieses Autors — das Regal „selbst geteilt". */
   autorId?: string | null;
   /**
+   * GENAU EIN Beitrag, über seine Kennung (AGE-587). Der Weg für den Deeplink
+   * `?post=<id>`.
+   *
+   * Auch das bekommt keine eigene Ladefunktion, aus demselben Grund wie
+   * `nurVideos`: es ist dieselbe Abfrage mit einem Filter mehr, und eine zweite
+   * Funktion müsste Autoren-Anreicherung, Zähler, Medien und die entfernten
+   * Mitglieder nachbauen. Die RLS entscheidet wie überall — ein unsichtbarer
+   * Beitrag liefert null Zeilen, genau wie ein erfundener.
+   */
+  postId?: string | null;
+  /**
    * Der Reiter (AGE-582). Vorgabe „alle" — der einzige, den es ohne Sitzung
    * gibt. Die beiden anderen VERLANGEN `uid`; siehe den Wächter unten.
    */
@@ -558,6 +585,7 @@ export async function fetchFeed({
   cursor,
   nurVideos,
   autorId,
+  postId = null,
   reiter = "alle",
   ordnung = "neueste",
   tags,
@@ -613,6 +641,7 @@ export async function fetchFeed({
   // gilt für den Typ und den Reiter genauso wie für die Academy.
   if (nurVideos) query = query.not("video_url", "is", null);
   if (autorId) query = query.eq("author_id", autorId);
+  if (postId) query = query.eq("id", postId);
   // `null`, sobald der Reiter ein anderer ist — und belegt, sobald er „meine"
   // ist, weil der Wächter oben nichts anderes durchlässt.
   const nurVonMir = reiter === "meine" ? uid : null;
@@ -727,6 +756,25 @@ export async function fetchFeed({
         : { createdAt: letzte.created_at, id: letzte.id }
       : null,
   };
+}
+
+/**
+ * EIN Beitrag über seine Kennung (AGE-587) — der Deeplink aus den
+ * Aktivitäten-Karten der Profilflächen.
+ *
+ * `null` heisst „nicht abrufbar", und zwar UNUNTERSCHEIDBAR: die RLS liefert
+ * für einen vorhandenen, aber unsichtbaren Beitrag dieselben null Zeilen wie
+ * für einen erfundenen. Es gibt hier bewusst kein `if`, das die zwei Fälle
+ * trennt — es gäbe nichts, woran es sie unterscheiden könnte, und der Versuch
+ * wäre ein Existenz-Orakel wie das, das AGE-582 in `post_saves` geschlossen
+ * hat.
+ */
+export async function fetchPostById(
+  uid: string | null,
+  postId: string,
+): Promise<FeedPost | null> {
+  const seite = await fetchFeed({ uid, postId });
+  return seite.posts[0] ?? null;
 }
 
 /** Kommentare eines Beitrags, chronologisch (RLS: nur wenn der Post sichtbar ist).
