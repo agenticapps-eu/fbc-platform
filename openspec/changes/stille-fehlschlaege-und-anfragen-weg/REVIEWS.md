@@ -193,3 +193,69 @@ Nichts abgelehnt. Der einzige Befund, dessen radikalere Variante nicht umgesetzt
 wird, ist der erste HIGH (beide Registrierungsausgänge ununterscheidbar bauen) —
 begründet oben, und in der Spec als ausdrückliche Nicht-Zusage vermerkt statt
 verschwiegen.
+
+
+---
+
+# Diff-Review (Schritt 4) — 2026-08-25
+
+Nach der Umsetzung, auf `git diff main...HEAD` über `src/` und `scripts/`
+(1847 Zeilen). Beide Vendoren fremd, `timeout 1500`, beide exit 0.
+
+**Ein Hinweis zur Belastbarkeit, weil er zum Ergebnis gehört:** Der erste
+codex-Lauf lieferte gar keine Befunde — er las stattdessen Skill-Dokumente aus
+seiner eigenen Umgebung. Erst ein Auftrag, der ausdrücklich untersagt, andere
+Dateien zu lesen, brachte eine Prüfung des Diffs zustande. Ein Reviewer-Lauf,
+der „nichts gefunden" meldet, ist ohne diesen Nachweis wertlos.
+
+## Reviewer: codex (gpt-5.6-sol) — 4 × MEDIUM
+
+- **[MEDIUM] Der Hinweis bleibt beim Wechsel in den Login-Modus stehen.**
+  `onZumLogin` rief nur `setMode("login")`, nicht `setOhneSitzung(false)`.
+  → **ÜBERNOMMEN, echter Fehler.** Und ein lehrreicher: Der Moduswechsel-Knopf
+  UNTEN räumte den Hinweis korrekt, der Knopf IM Hinweis nicht — zwei Wege zum
+  selben Zustand, einer davon vergessen. Die Zusage prüfte nur, dass das
+  Passwortfeld erscheint; sie ist um die Abwesenheit des Hinweises erweitert und
+  war damit erst rot, dann grün.
+
+- **[MEDIUM] `levelRank === null` gibt die Anmeldung frei.**
+  → **BEWUSST SO, nicht übernommen.** Das ist keine Lücke, sondern die
+  ausdrückliche Zusage der Anforderung („SHALL NOT sperren, solange die Stufe
+  unbekannt ist"). Die Hürde ist `register_for_event`, nicht diese Zeile; ein
+  Ladezustand, der ein berechtigtes Mitglied aussperrt, wäre der teurere Fehler.
+  Richtig ist der Kern des Befunds: In diesem Zustand spiegelt der Knopf die
+  Schwelle nicht — deshalb steht die Grenze als Nicht-Zusage in der Spec und
+  nicht bloß im Code.
+
+- **[MEDIUM] `finally` läuft bei Strg-C nicht.**
+  → **ÜBERNOMMEN, und der Kommentar war schlicht falsch.** Er behauptete, ein
+  Abbruch dürfe die Zeilen nicht stehen lassen; ohne eigenen Signal-Handler
+  beendet Node sofort. Jetzt merkt ein `SIGINT`/`SIGTERM`-Handler den Abbruch
+  und löst die Warteschleife regulär auf — `process.exit()` im Handler wäre
+  derselbe Fehler eine Ebene höher gewesen. **Gemessen:** SIGINT an den Prozess,
+  danach `req=0 notif=0`, und das Protokoll zeigt den Aufräumlauf.
+
+- **[MEDIUM] Das Aufräumen greift zu weit.**
+  → **ÜBERNOMMEN.** Der erste Entwurf löschte jede Benachrichtigung der
+  Beteiligten seit `beginn` und jeden Thread zwischen ihnen — auch was parallel
+  echt entsteht, während der Kommentar „damit nichts Fremdes fällt" behauptete.
+  Jetzt zusätzlich auf die beiden Typen eingeschränkt, die dieser Trigger
+  überhaupt erzeugt, und beim Thread darauf, dass der EMPFÄNGER eine der beiden
+  Seiten ist.
+
+## Reviewer: gemini — keine Befunde
+
+> „Ich finde keine ernsten Fehler. Die Änderungen sind durchdacht, die
+> Begründungen in den Kommentaren schlüssig, und die Tests decken die kritischen
+> Randfälle ab."
+
+**Das ist als Freigabe wenig wert und wird hier nicht als solche gezählt.** Ein
+Satz auf 1847 Diff-Zeilen belegt keine Prüfung, und codex hat im selben Diff
+vier Befunde gefunden, drei davon berechtigt. Notiert als das, was es ist: ein
+Lauf ohne Widerspruch, keine zweite Bestätigung.
+
+## Resolution des Diff-Reviews
+
+Drei von vier Befunden eingearbeitet, der vierte begründet abgelehnt und die
+Begründung in die Spec gehoben. `pnpm test` 1632 grün, `tsc --noEmit` sauber,
+`eslint` ohne Fehler (vier vorbestehende Warnungen, keine aus diesem Diff).

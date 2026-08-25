@@ -11,4 +11,6 @@
 - [x] 1.6 `darfSichAnmelden` als reine Funktion; `RegistrationPanel` liest
       `levelRank` aus dem Auth-Context. Unbekannte Stufe sperrt NICHT.
 - [x] 1.7 Grün laufen sehen, Gegenprobe durch Verbiegung.
-- [ ] 1.8 `openspec validate --all`, archivieren, PR.
+- [x] 1.8 Diff-Review (gemeinsam mit dem Nachbar-Change, Befund zu
+      `levelRank === null` begruendet abgelehnt).
+- [ ] 1.9 `openspec validate --all`, archivieren, PR.

@@ -37,6 +37,26 @@ if (ziel.hostname !== "127.0.0.1" || ziel.port !== "54322") {
 const db = new pg.Client({ connectionString: LOKAL });
 await db.connect();
 
+/**
+ * Strg-C führt den `finally`-Block NICHT aus.
+ *
+ * Der Kommentar dort behauptete das ursprünglich — er war falsch, und der
+ * Diff-Review hat es gemeldet. Node beendet den Prozess bei `SIGINT` sofort;
+ * ohne eigenen Handler bleiben die Sondenzeilen liegen, und zwar genau in dem
+ * Fall, in dem man am ehesten abbricht.
+ *
+ * `process.exit()` im Handler wäre wieder derselbe Fehler, nur eine Ebene
+ * höher: Es beendet, ohne auf das laufende Aufräumen zu warten. Deshalb wird
+ * der Abbruch nur GEMERKT; die Warteschleife unten löst sich daraufhin auf und
+ * läuft regulär in den `finally`-Block.
+ */
+let abgebrochen = false;
+const merkeAbbruch = () => {
+  abgebrochen = true;
+};
+process.once("SIGINT", merkeAbbruch);
+process.once("SIGTERM", merkeAbbruch);
+
 /** Die angelegten Zeilen, damit das Aufräumen nichts Fremdes trifft. */
 const angelegt: string[] = [];
 /** Alle beteiligten Profile — Empfänger und Absender. */
@@ -73,10 +93,23 @@ try {
   }
   console.log(`${angelegt.length} offene Anfrage(n) an ${empfaengerLogin} angelegt.`);
   console.log("Sichtprobe machen. Danach Enter drücken — dann wird aufgeräumt.");
-  await new Promise<void>((auf) => process.stdin.once("data", () => auf()));
+  await new Promise<void>((auf) => {
+    const fertig = () => {
+      process.stdin.off("data", fertig);
+      clearInterval(takt);
+      auf();
+    };
+    process.stdin.once("data", fertig);
+    // Der Abbruch kommt nicht über stdin, sondern über das Signal oben.
+    const takt = setInterval(() => {
+      if (abgebrochen) fertig();
+    }, 200);
+  });
 } finally {
-  // IM finally, nicht danach: Auch ein Abbruch mit Strg-C oder ein Fehler
-  // mittendrin darf die Zeilen nicht stehen lassen.
+  // IM finally, nicht danach: Ein Fehler mittendrin darf die Zeilen nicht
+  // stehen lassen. Für Strg-C reicht das ALLEIN NICHT — dafür sorgt der
+  // Signal-Handler weiter oben, der den Abbruch merkt und die Warteschleife
+  // regulär auflöst.
   if (angelegt.length > 0) {
     const weg = await db.query("delete from public.contact_requests where id = any($1::uuid[])", [
       angelegt,
@@ -93,18 +126,29 @@ try {
     // waren. Ein Skript, das „aufgeräumt" meldet und Reste hinterlässt, ist
     // schlimmer als Handarbeit — es beendet das Nachsehen.
     //
-    // Eingegrenzt auf Zeitraum UND Beteiligte, damit nichts Fremdes fällt.
+    // ENG gefasst — der erste Entwurf löschte jede Benachrichtigung der
+    // Beteiligten seit `beginn` und jeden Thread zwischen ihnen. Das trifft
+    // auch, was parallel echt entsteht, und der Kommentar behauptete das
+    // Gegenteil (Befund des Diff-Reviews). Drei Einschränkungen statt zwei:
+    // Zeitraum, die beiden Typen, die dieser Trigger überhaupt erzeugt, und —
+    // beim Thread — dass der EMPFÄNGER eine der beiden Seiten ist. Sonst fiele
+    // auch ein Thread zwischen zwei Absendern, mit dem die Sonde nichts zu tun
+    // hat.
+    const empfaenger = beteiligte[0];
     const nachrichten = await db.query(
       `delete from public.notifications
-        where created_at >= $1 and profile_id = any($2::uuid[])`,
+        where created_at >= $1
+          and profile_id = any($2::uuid[])
+          and type in ('contact_request', 'contact_request_accepted')`,
       [beginn, beteiligte],
     );
     const threads = await db.query(
       `delete from public.message_threads
         where created_at >= $1
           and a_profile_id = any($2::uuid[])
-          and b_profile_id = any($2::uuid[])`,
-      [beginn, beteiligte],
+          and b_profile_id = any($2::uuid[])
+          and $3::uuid in (a_profile_id, b_profile_id)`,
+      [beginn, beteiligte, empfaenger],
     );
     console.log(
       `Aufgeräumt: ${weg.rowCount} Anfrage(n), ${threads.rowCount} Thread(s), ` +

@@ -107,6 +107,6 @@ umgedreht werden muss.
       Eintrag auch bei 0 zeigen · Eintrag bei Fehler weglassen · `isError`
       zurück in die Leer-Bedingung · `hatSession` immer `true` · Nebenwirkungen
       zurück an `!error`. Vorher committen.
-- [ ] 4.7 Diff-Review durch zwei fremde Vendoren, eigener Abschnitt in
+- [x] 4.7 Diff-Review durch zwei fremde Vendoren, eigener Abschnitt in
       `REVIEWS.md`.
 - [ ] 4.8 `openspec validate --all`, archivieren, PR.

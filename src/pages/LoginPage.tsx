@@ -263,7 +263,18 @@ export default function LoginPage() {
           </div>
         )}
 
-        {ohneSitzung && <RegistrierungOhneSitzung onZumLogin={() => setMode("login")} />}
+        {ohneSitzung && (
+          <RegistrierungOhneSitzung
+            onZumLogin={() => {
+              setMode("login");
+              // Den Hinweis MIT wegräumen. Ohne diese Zeile stand er über dem
+              // Login-Formular weiter da und behauptete etwas über einen
+              // Vorgang, den es nicht mehr gibt — derselbe Fehlermodus, gegen
+              // den diese Fläche gebaut ist. Befund des Diff-Reviews.
+              setOhneSitzung(false);
+            }}
+          />
+        )}
 
         {formError && <p className="text-sm text-danger">{formError}</p>}
 

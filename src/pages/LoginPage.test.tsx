@@ -235,6 +235,11 @@ describe("LoginPage", () => {
 
       // Der Login-Modus ist daran erkennbar, dass es wieder ein Passwortfeld gibt.
       expect(screen.getByLabelText("Passwort")).toBeInTheDocument();
+      // UND der Hinweis ist weg. Ohne diese Zeile belegte der Test nur den
+      // Moduswechsel — ein Registrierungshinweis, der über dem Login-Formular
+      // stehen bleibt, behauptet etwas über einen Vorgang, den es nicht mehr
+      // gibt. Befund des Diff-Reviews (codex, MEDIUM).
+      expect(screen.queryByRole("status")).toBeNull();
     });
 
     /**
