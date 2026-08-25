@@ -78,3 +78,20 @@ Alle Zahlen in `MESSUNG.md`. Kurz:
   Radar 210→0 px **trotz gesetzter Scores**, Seite 2994→2146 px.
 - 4.3 `vitest run` 1661 grün, `tsc --noEmit` sauber, `eslint` ohne Fehler.
 - 4.4 zwölf Mutationen, jede färbt mindestens einen Test rot.
+
+## Zweite Runde — nach der Code-Review auf den Diff
+
+- [x] 5.1 Marke hängt an der **Kategorie**, nicht an `source` — der Editor
+      verlangt für jede Zeile eine, und `source` überlebt das Speichern.
+- [x] 5.2 Titel entfällt, wenn er den **Klartext der Kategorie** wiederholt,
+      nicht schon deshalb, weil die Zeile `chip` ist.
+- [x] 5.3 Karte hängt daran, ob **etwas erscheint** — keine Überschrift über
+      nichts mehr; der Test, der den Gegenzustand festhielt, ist umgedreht.
+- [x] 5.4 `.test()` auf einem `/g`-Regex im Prüfskript beseitigt.
+- [x] 5.5 Prüfskript ruft `kompassAnzeige`, statt die Blöcke nachzubauen.
+- [x] 5.6 Falsche Zeile zu `AngeboteGesuchePage` in `REVIEWS.md` richtiggestellt.
+- [x] 5.7 Mutationen erneut: **zwölf**, jede rot, davon drei auf die neuen
+      Zusagen (Marke ohne `source`, Titel erhalten, Karte entfällt).
+- [x] 5.8 Sichtprobe wiederholt: chip mit eigenem Titel zeigt Marke **und**
+      Satz, editor mit Kategorie zeigt Marke **und** Text, `zeitreisen` nirgends,
+      kein Überlauf, keine waagerechte Scrollleiste.

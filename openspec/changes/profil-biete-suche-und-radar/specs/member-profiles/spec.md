@@ -117,16 +117,40 @@ jemand im Editor eine Kategorie wählt, entsteht eine Zeile mit Kategorie *und*
 Beschreibung, und eine Umsetzung, die auf `category` prüft, zeigte deren Text
 nicht mehr an.
 
-**Einträge aus der Marken-Oberfläche** (`source = 'chip'`) SHALL als Marken in
-einer gemeinsamen Reihe erscheinen, mit dem lesbaren Namen der Kategorie. Ihr
-`title` SHALL NOT zusätzlich gezeigt werden: über alle Profile trägt jede
-Kategorie genau einen einzigen Titel-Wert, und dieser ist exakt der Name der
-Kategorie. Der rohe Schlüssel (`know_how`) SHALL NOT erscheinen — heute steht er
-als Marke neben seinem eigenen Klartext, was jede Zeile doppelt.
+Wie beweglich dieser Zustand ist, hat sich beim Messen selbst gezeigt: zwischen
+zwei Lesungen im Abstand von 23 Minuten wuchs der Bestand von 112 auf 117
+Zeilen und die Marken von 19 auf 24. Keine Zahl in diesem Abschnitt ist eine
+Zusage; sie tragen die Begründung, nicht die Regel.
 
-Trägt eine solche Zeile **doch** eine Beschreibung, SHALL diese unter der
-Markenreihe erscheinen statt verloren zu gehen. Der Editor kann das erzeugen,
-auch wenn es im heutigen Bestand nicht vorkommt.
+**Jede Zeile mit bekannter Kategorie** SHALL eine Marke in einer gemeinsamen,
+umlaufenden Reihe bekommen, mit dem lesbaren Namen der Kategorie. Der rohe
+Schlüssel (`know_how`) SHALL NOT erscheinen — heute steht er als Marke neben
+seinem eigenen Klartext, was jede Zeile doppelt.
+
+Die Marke SHALL **nicht** an `source` hängen. Der reiche Editor unter
+`/kompass` → „Suche & Biete" verlangt für jede Zeile eine Kategorie aus der
+bekannten Liste, und `source` überlebt den Speicherlauf: sobald ein Mitglied
+sein Such-/Bieteprofil dort einmal speichert, trägt **jede** seiner Zeilen eine
+Kategorie, auch die mit `source = 'editor'`. Eine Markenreihe, die nur
+`chip`-Zeilen betrachtet, verschwiege sie.
+
+Ein `title` SHALL entfallen, wo er nur wiederholt, was ohnehin schon dasteht —
+und zwar nach **zwei** Regeln, die dieselbe Begründung haben:
+
+1. Er ist der **Klartext seiner eigenen Kategorie**. Über alle Profile trägt
+   heute jede Kategorie genau einen einzigen Titel-Wert, und dieser ist exakt
+   der Kategoriename; die Marke *ist* dann der Inhalt.
+2. Er ist der **Anfang seiner Beschreibung** (Regel unten).
+
+Er SHALL NOT allein deshalb entfallen, weil die Zeile `source = 'chip'` trägt.
+Der Editor stellt für **jede** Zeile ein Pflichtfeld „Titel" — ein Mitglied kann
+also den Chip „Kapital" wählen und ihn anschließend auf „Eigenkapital bis 500k"
+ändern, ohne dass die Zeile aufhört, `chip` zu sein. Eine Umsetzung, die den
+Titel an `source` festmacht, löschte diesen Satz von der Seite, während das
+Formular ihn weiter anzeigt.
+
+Trägt eine solche Zeile eine Beschreibung, SHALL diese unter der Markenreihe
+erscheinen statt verloren zu gehen.
 
 Für eine Kategorie ohne hinterlegten Klartext SHALL die Marke **entfallen**
 statt den Schlüssel zu zeigen. Der vorhandene Helfer fällt auf eine
@@ -189,6 +213,18 @@ Regeln **kein** Abschnitt leer, und keiner trägt mehr als einen Textblock.
 - **THEN** erscheint die Marke, und die Beschreibung erscheint unter der
   Markenreihe
 
+#### Scenario: Ein selbst geschriebener Titel auf einer Marken-Zeile bleibt
+
+- **WHEN** eine Zeile mit `source = 'chip'` einen `title` trägt, der nicht der
+  Klartext ihrer Kategorie ist
+- **THEN** erscheint die Marke **und** der Titel
+
+#### Scenario: Eine Editor-Zeile mit Kategorie bekommt ihre Marke
+
+- **WHEN** eine Zeile mit `source = 'editor'` eine bekannte `category` trägt
+- **THEN** erscheint deren Marke in der Reihe
+- **AND** ihre Beschreibung erscheint unverändert darunter
+
 #### Scenario: Eine unbekannte Kategorie zeigt keinen rohen Schlüssel
 
 - **WHEN** ein Eintrag eine `category` trägt, für die kein Klartext hinterlegt
@@ -229,6 +265,13 @@ Regeln **kein** Abschnitt leer, und keiner trägt mehr als einen Textblock.
 - **WHEN** ein Titel oder eine Beschreibung mit Apostroph und Bindestrich beginnt
 - **THEN** erscheint die Zeile ohne diese Zeichen
 - **AND** der gespeicherte Wert bleibt unverändert
+
+#### Scenario: Ein Abschnitt, von dem nichts übrig bleibt, verschwindet ganz
+
+- **WHEN** die einzige Zeile eines Abschnitts eine unbekannte Kategorie und
+  keine Beschreibung trägt, sodass weder Marke noch Text entstehen
+- **THEN** fehlt die ganze Karte samt Überschrift, statt als Überschrift über
+  nichts zu erscheinen
 
 #### Scenario: Ein sehr langer Eintrag sprengt die Karte nicht
 

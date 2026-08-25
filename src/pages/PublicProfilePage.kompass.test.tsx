@@ -102,14 +102,17 @@ beforeEach(() => {
 });
 
 describe("Marken-Einträge (source = chip)", () => {
-  it("zeigt den Klartext der Kategorie — nicht den rohen Schlüssel und nicht den Titel", async () => {
-    // Der Titel ist hier ABSICHTLICH nicht der Kategoriename: sonst wäre „kein
-    // zusätzlicher Titel" am Text gar nicht von „Titel gezeigt" zu unterscheiden.
-    zeige({ offers: [zeile({ source: "chip", category: "know_how", title: "Know-how (Altwert)" })] });
+  it("zeigt den Klartext der Kategorie genau EINMAL — nicht den rohen Schlüssel daneben", async () => {
+    // Der Titel ist hier der Kategoriename, so wie bei allen 19 gemessenen
+    // Marken-Zeilen. Geprüft wird deshalb die ANZAHL: bis AGE-597 stand der
+    // Klartext als Titel und der rohe Schlüssel als Marke daneben — zweimal
+    // dasselbe. Ein ABWEICHENDER Titel bleibt dagegen stehen, dafür gibt es
+    // den nächsten Test.
+    zeige({ offers: [zeile({ source: "chip", category: "know_how", title: "Know-how" })] });
 
-    expect(await screen.findByText("Know-how")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Ich biete" });
+    expect(screen.getAllByText("Know-how")).toHaveLength(1);
     expect(screen.queryByText("know_how")).not.toBeInTheDocument();
-    expect(screen.queryByText("Know-how (Altwert)")).not.toBeInTheDocument();
   });
 
   it("verliert die Beschreibung einer Marken-Zeile nicht", async () => {
@@ -132,16 +135,52 @@ describe("Marken-Einträge (source = chip)", () => {
   });
 
   it("zeigt für eine unbekannte Kategorie GAR KEINE Marke — auch nicht den großgeschriebenen Schlüssel", async () => {
-    zeige({ offers: [zeile({ source: "chip", category: "zeitreisen", title: "Zeitreisen" })] });
+    // Der Titel ist hier bewusst NICHT die großgeschriebene Fassung des
+    // Schlüssels: geprüft wird, dass `Zeitreisen` nirgends auftaucht — weder als
+    // Marke noch sonstwo. Der Titel der Zeile geht dabei nicht verloren.
+    zeige({
+      offers: [
+        zeile({ source: "chip", category: "zeitreisen", title: "Reisen in die Vergangenheit" }),
+        zeile({ source: "chip", category: "kapital", title: "Kapital" }),
+      ],
+    });
 
-    await screen.findByRole("heading", { name: "Ich biete" });
+    expect(await screen.findByText("Kapital")).toBeInTheDocument();
     expect(screen.queryByText(/zeitreisen/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Reisen in die Vergangenheit")).toBeInTheDocument();
+  });
+
+  it("lässt die ganze Karte weg, wenn von ihrer einzigen Zeile nichts übrig bleibt", async () => {
+    // Die erste Fassung dieses Tests hielt genau den Gegenzustand fest — eine
+    // Überschrift über nichts — und verletzte damit die bestehende Anforderung
+    // „Ein Abschnitt ohne Inhalt SHALL entfallen" (Befund der Code-Review).
+    // Unbekannte Kategorie, leerer Titel, keine Beschreibung — aus dem Import
+    // erreichbar, weil `title` dort nur `not null` ist, nicht nichtleer.
+    zeige({ offers: [zeile({ source: "chip", category: "zeitreisen", title: "" })] });
+
+    await screen.findByRole("heading", { name: "Eckdaten" });
+    expect(screen.queryByRole("heading", { name: "Ich biete" })).not.toBeInTheDocument();
+  });
+
+  it("behält einen selbst geschriebenen Titel auf einer Marken-Zeile", async () => {
+    // Der reiche Editor unter /kompass → „Suche & Biete" stellt für JEDE Zeile
+    // ein Pflichtfeld „Titel", und `source` überlebt das Speichern. Ein
+    // Mitglied kann den Chip wählen und den Titel danach ändern; die alte
+    // Fassung löschte den Satz von der Seite, während das Formular ihn weiter
+    // zeigte (Befund der Code-Review).
+    zeige({
+      offers: [zeile({ source: "chip", category: "kapital", title: "Eigenkapital bis 500k" })],
+    });
+
+    expect(await screen.findByText("Kapital")).toBeInTheDocument();
+    expect(screen.getByText("Eigenkapital bis 500k")).toBeInTheDocument();
   });
 
   it("stellt sieben Marken in EINE umlaufende Reihe, nicht in sieben Kästen", async () => {
     // Gemessen am 25.08.: elf Marken auf einem Profil, verteilt auf beide
     // Abschnitte — eine einzelne Reihe trägt höchstens sechs. Geprüft wird mit
     // sieben, also über dem Höchstwert.
+    const LABEL = ["Kapital", "Kontakte", "Know-how", "Immobilien", "Beteiligungen", "Leistungen", "Mentoring"];
     const schluessel = [
       "kapital",
       "kontakte",
@@ -152,9 +191,12 @@ describe("Marken-Einträge (source = chip)", () => {
       "mentoring",
     ];
     zeige({
-      offers: schluessel.map((k) => zeile({ source: "chip", category: k, title: k })),
-      needs: ["investoren", "projekte", "partner", "experten"].map((k) =>
-        zeile({ source: "chip", category: k, title: k }),
+      // Titel = Klartext der Kategorie, wie im gemessenen Bestand: sonst
+      // erschienen sie zu Recht zusätzlich als Text und die Zusage „eine Reihe"
+      // wäre nicht mehr das, was der Test misst.
+      offers: schluessel.map((k, i) => zeile({ source: "chip", category: k, title: LABEL[i] })),
+      needs: ["investoren", "projekte", "partner", "experten"].map((k, i) =>
+        zeile({ source: "chip", category: k, title: ["Investoren", "Projekte", "Partner", "Experten"][i] }),
       ),
     });
 
@@ -173,6 +215,29 @@ describe("Marken-Einträge (source = chip)", () => {
 });
 
 describe("Freitext-Einträge (source = editor)", () => {
+  it("zeigt die Marke einer Editor-Zeile mit Kategorie und behält ihren Text", async () => {
+    // Sobald ein Mitglied sein Such-/Bieteprofil einmal im Editor speichert,
+    // trägt JEDE seiner Zeilen eine Kategorie — das Schema verlangt sie —,
+    // während `source` auf `editor` bleibt. Eine Markenreihe, die nur
+    // `chip`-Zeilen ansieht, verschwiege sie (Befund der Code-Review).
+    zeige({
+      offers: [
+        zeile({
+          source: "editor",
+          category: "leistungen",
+          title: "Bootsbau und Restaurierung",
+          description: "Wir arbeiten ausschließlich mit heimischen Hölzern.",
+        }),
+      ],
+    });
+
+    expect(await screen.findByText("Leistungen")).toBeInTheDocument();
+    expect(screen.getByText("Bootsbau und Restaurierung")).toBeInTheDocument();
+    expect(
+      screen.getByText("Wir arbeiten ausschließlich mit heimischen Hölzern."),
+    ).toBeInTheDocument();
+  });
+
   it("bewahrt die Absätze der Beschreibung", async () => {
     zeige({
       offers: [

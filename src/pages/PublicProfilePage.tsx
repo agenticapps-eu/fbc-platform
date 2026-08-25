@@ -24,8 +24,7 @@ import {
   type PublicProfile,
 } from "../lib/public-profile";
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
-import { findCategory, type MatchingSide } from "../config/matching";
-import { putzen, wiederholtDenAnfang } from "../lib/kompass-anzeige";
+import { kompassAnzeige, type KompassAnzeige } from "../lib/kompass-anzeige";
 import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
@@ -189,6 +188,13 @@ function ExtendedSections({
   })).filter((g) => g.items.length > 0);
   const untheured = extended.interests.filter((i) => !i.theme);
   const hatHobbys = interestsByTheme.length > 0 || untheured.length > 0;
+  // An „zeigt etwas" gehaengt, nicht an `offers.length > 0`: eine Zeile mit
+  // unbekannter Kategorie und ohne Beschreibung ergibt weder Marke noch Text,
+  // und eine Ueberschrift ueber nichts verletzt „Ein Abschnitt ohne Inhalt
+  // SHALL entfallen" (Befund der Code-Review).
+  const biete = kompassAnzeige(extended.offers, "offer");
+  const suche = kompassAnzeige(extended.needs, "need");
+  const zeigt = (a: KompassAnzeige) => a.marken.length > 0 || a.eintraege.length > 0;
   const beruf = [profile.company, extended.branche, extended.headline].filter(Boolean);
 
   return (
@@ -226,17 +232,17 @@ function ExtendedSections({
       )}
 
       {/* Kompass-Kategorien aus C2 — KEINE zweite Kategorienliste. */}
-      {extended.offers.length > 0 && (
+      {zeigt(biete) && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Ich biete</CardTitle>
-          <MatchingList items={extended.offers} side="offer" />
+          <MatchingList ansicht={biete} />
         </Card>
       )}
 
-      {extended.needs.length > 0 && (
+      {zeigt(suche) && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Ich suche</CardTitle>
-          <MatchingList items={extended.needs} side="need" />
+          <MatchingList ansicht={suche} />
         </Card>
       )}
 
@@ -380,65 +386,15 @@ function Biografie({ text }: { text: string }) {
 }
 
 /**
- * Angebote oder Gesuche — zwei Bauarten, nicht eine Zeilenform für beide
- * (AGE-597).
- *
- * Unterschieden wird an `source`, NICHT an `category`: der Rich-Editor verlangt
- * eine Kategorie und erlaubt zugleich Titel und Beschreibung, also verlöre eine
- * Prüfung auf `category` den Text einer solchen Zeile (Befund codex). Dass beide
- * Spalten heute deckungsgleich sind (chip 19 · editor 93), ist ein Zustand des
- * Bestands, keine Zusage.
- *
- * `chip`   → Marke mit dem Klartext der Kategorie. Der `title` entfällt: über
- *            alle 19 Marken-Zeilen ist er exakt der Name der Kategorie, und
- *            daneben stand bisher zusätzlich der rohe Schlüssel — jede Zeile
- *            doppelte sich also zweimal.
- * `editor` → Fließtext mit erhaltenen Umbrüchen; der `title` entfällt, wo er
- *            nur dessen Anfang ist.
+ * Angebote oder Gesuche. Was gezeigt wird, entscheidet `kompassAnzeige` —
+ * hier steht nur, wie es aussieht: eine umlaufende Markenreihe, darunter die
+ * Texte.
  */
-function MatchingList({
-  items,
-  side,
-}: {
-  items: {
-    id: string;
-    title: string;
-    description: string | null;
-    category: string | null;
-    source: string;
-  }[];
-  side: MatchingSide;
-}) {
-  const marken = items.filter((i) => i.source === "chip");
-
-  // `findCategory` statt `categoryLabel`: der Helfer fällt für unbekannte
-  // Schlüssel auf `future_key` → „Future_key" zurück und hielte die Zusage
-  // „kein roher Schlüssel" damit nicht ein. Ohne Klartext keine Marke.
-  const label = [
-    ...new Set(
-      marken
-        .map((i) => findCategory(side, i.category)?.label)
-        .filter((l): l is string => l !== undefined),
-    ),
-  ];
-
-  // Der Text einer Marken-Zeile steht UNTER der Reihe, statt zu verschwinden.
-  // Im Bestand kommt das nicht vor (0 von 19), der Editor kann es aber anlegen.
-  const eintraege = [
-    ...marken.map((i) => ({ id: i.id, titel: "", text: putzen(i.description ?? "") })),
-    ...items
-      .filter((i) => i.source !== "chip")
-      .map((i) => ({
-        id: i.id,
-        titel: wiederholtDenAnfang(i.title, i.description ?? "") ? "" : putzen(i.title),
-        text: putzen(i.description ?? ""),
-      })),
-  ].filter((e) => e.titel !== "" || e.text !== "");
-
+function MatchingList({ ansicht }: { ansicht: KompassAnzeige }) {
   return (
     <div className="flex flex-col gap-3">
-      {label.length > 0 && <ChipList items={label} />}
-      {eintraege.map((e) => (
+      {ansicht.marken.length > 0 && <ChipList items={ansicht.marken} />}
+      {ansicht.eintraege.map((e) => (
         <div key={e.id}>
           {e.titel !== "" && <p className="font-medium text-ink">{e.titel}</p>}
           {e.text !== "" && (

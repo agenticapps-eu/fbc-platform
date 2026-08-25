@@ -28,13 +28,18 @@ await db.query("set default_transaction_read_only = on");
 
 const AUFZAEHLUNG = /^[ \t]*'-[ \t]*/gm;
 const putzen = (t: string) => t.replace(AUFZAEHLUNG, "").trim();
+// EIGENE, NICHTGLOBALE Fassung fuers Erkennen: `.test()` auf einem /g-Regex
+// merkt sich `lastIndex` zwischen den Aufrufen und beginnt beim naechsten Mal
+// mitten in der Zeichenkette — das zaehlt zu wenig. `replace` oben ist davon
+// nicht betroffen, es setzt `lastIndex` selbst zurueck.
+const AUFZAEHLUNG_ERKENNEN = /(^|\n)[ \t]*'-/;
 
-type Zeile = { seite: "offer" | "need"; source: string; category: string | null; title: string; description: string | null; profile_id: string };
+type Zeile = { id: string; seite: "offer" | "need"; source: string; category: string | null; title: string; description: string | null; profile_id: string };
 
 const r = await db.query<Zeile>(`
-  select 'offer' as seite, source, category, title, description, profile_id from public.offers
+  select id, 'offer' as seite, source, category, title, description, profile_id from public.offers
   union all
-  select 'need'  as seite, source, category, title, description, profile_id from public.needs`);
+  select id, 'need'  as seite, source, category, title, description, profile_id from public.needs`);
 const zeilen = r.rows;
 
 const z = (b: boolean) => (b ? 1 : 0);
@@ -71,7 +76,7 @@ console.table([
 ]);
 
 // Aufzaehlungszeichen.
-const hatArtefakt = (t: string) => AUFZAEHLUNG.test(t.replace(/\r/g, "")) || /(^|\n)[ \t]*'-/.test(t);
+const hatArtefakt = (t: string) => AUFZAEHLUNG_ERKENNEN.test(t.replace(/\r/g, ""));
 console.log("\n### Aufzaehlungszeichen '-");
 console.table([
   { Merkmal: "Titel beginnt mit '-", Zahl: summe((x) => /^[ \t]*'-/.test(x.title)) },
@@ -108,7 +113,7 @@ console.table(Object.entries(kand).map(([Regel, Treffer]) => ({ Regel, Treffer }
 // Die Regel LAEUFT AUS DEM ECHTEN CODE (`src/lib/kompass-anzeige.ts`), nicht
 // aus einer Kopie: eine nachgebaute Fassung haette gemessen, was dieses Skript
 // tut, nicht was die Seite zeigt.
-const { putzen: putzenEcht, wiederholtDenAnfang } = await import("../src/lib/kompass-anzeige");
+const { putzen: putzenEcht, wiederholtDenAnfang, kompassAnzeige } = await import("../src/lib/kompass-anzeige");
 const gekuerzt = freitext.filter((x) => putzenEcht(x.title).endsWith("\u2026"));
 console.log("\n### Die umgesetzte Regel");
 console.table([
@@ -132,24 +137,14 @@ let leereAbschnitte = 0;
 let maxMarken = 0;
 let maxTextZeichen = 0;
 let maxTextBloecke = 0;
-for (const [, gruppe] of jeProfilSeite) {
-  const marken = gruppe.filter((x) => x.source === "chip");
-  const labels = new Set(
-    marken.map((x) => (x.seite === "offer" ? OFFER_CATEGORIES : NEED_CATEGORIES).find((c) => c.key === x.category)?.label)
-      .filter((l) => l !== undefined),
-  );
-  const bloecke = [
-    ...marken.map((x) => ({ titel: "", text: putzenEcht(x.description ?? "") })),
-    ...gruppe.filter((x) => x.source !== "chip").map((x) => ({
-      titel: wiederholtDenAnfang(x.title, x.description ?? "") ? "" : putzenEcht(x.title),
-      text: putzenEcht(x.description ?? ""),
-    })),
-  ].filter((b) => b.titel !== "" || b.text !== "");
+for (const [schluessel, gruppe] of jeProfilSeite) {
+  const seite = schluessel.endsWith("|offer") ? "offer" : "need";
+  const a = kompassAnzeige(gruppe, seite);
   // Ein Abschnitt, der zwar Zeilen hat, aber nichts Anzeigbares uebrig laesst.
-  if (labels.size === 0 && bloecke.length === 0) leereAbschnitte++;
-  maxMarken = Math.max(maxMarken, labels.size);
-  maxTextBloecke = Math.max(maxTextBloecke, bloecke.length);
-  for (const b of bloecke) maxTextZeichen = Math.max(maxTextZeichen, b.text.length);
+  if (a.marken.length === 0 && a.eintraege.length === 0) leereAbschnitte++;
+  maxMarken = Math.max(maxMarken, a.marken.length);
+  maxTextBloecke = Math.max(maxTextBloecke, a.eintraege.length);
+  for (const e of a.eintraege) maxTextZeichen = Math.max(maxTextZeichen, e.text.length);
 }
 console.log(`\n### Was die Seite zeigt — ueber alle ${jeProfilSeite.size} Abschnitte mit Inhalt`);
 console.table([

@@ -11,6 +11,23 @@ Alles am 25.08.2026 erhoben. Zwei Werkzeuge:
 - Chrome DevTools gegen den lokalen Stack, mit **selbst geschriebenen**
   Fixtures, die die gemessenen Formen an ihren Extremwerten nachbilden.
 
+## Der Bestand bewegt sich, während man ihn misst
+
+Zwei Lesungen, 23 Minuten auseinander, beide am 25.08.:
+
+| | 20:49 | 21:12 |
+|---|---|---|
+| Zeilen gesamt | 112 | **117** |
+| `source = chip` | 19 | **24** |
+| `source = editor` | 93 | 93 |
+| Abschnitte mit Inhalt | 97 | **98** |
+
+Fünf neue Marken-Zeilen, alle mit bekanntem Schlüssel und einem Titel, der exakt
+der Kategoriename ist. PROD ist in Benutzung, während hier gemessen wird — und
+das ist genau der Grund, warum keine dieser Zahlen als Invariante in die
+Anforderung geschrieben wurde. Die Zahlen unten sind die Lesung von **20:49**,
+sofern nicht anders vermerkt; die Regeln hängen an keiner von ihnen.
+
 ## Der Bestand — 112 Zeilen (offers + needs), 50 Profile
 
 | Merkmal | Zahl |
@@ -117,3 +134,29 @@ zurückgenommen; **jede** färbt mindestens einen Test rot.
 | Erfolgsradar wieder im Hinweistext | 1 |
 | Themen-Scores wieder abfragen | 1 |
 | `source` nicht mitlesen | 1 |
+
+## Zweite Runde — was die Code-Review auf den Diff geändert hat
+
+Vier Befunde, alle angenommen (Herleitung in `REVIEWS.md`). Zwei davon hingen an
+einem Irrtum in meiner eigenen Plan-Review-Auflösung: `AngeboteGesuchePage` ist
+zwar nicht geroutet, exportiert aber `AngeboteGesucheEditor`, den `CompassPage`
+als Reiter „Suche & Biete" unter `/kompass` einhängt. Der reiche Editor **lebt**,
+und er verlangt für jede Zeile Titel *und* Kategorie, während `source` das
+Speichern überlebt.
+
+| vorher (erste Fassung) | jetzt |
+|---|---|
+| Marke nur für `source = 'chip'` | Marke für **jede** Zeile mit bekannter Kategorie |
+| `chip`-Titel entfällt immer | Titel entfällt, wenn er den **Klartext der Kategorie** oder den Anfang der Beschreibung wiederholt |
+| Karte an `offers.length > 0` | Karte daran, ob **etwas erscheint** |
+| Prüfskript baut die Blöcke nach | Prüfskript ruft `kompassAnzeige` — denselben Code wie die Seite |
+
+Für den heutigen Bestand ändert das **nichts**: alle 24 chip-Titel sind exakt
+der Kategoriename, keine der 93 Editor-Zeilen trägt eine Kategorie, kein
+Abschnitt bliebe leer. Die Regel steht damit auf ihrer Begründung, nicht auf
+einem Zustand — was die Bewegung von 112 auf 117 Zeilen oben unterstreicht.
+
+Der vierte Befund war eine Falle, die ich in der Umsetzung bewusst vermieden und
+im Prüfskript wieder aufgemacht hatte: `.test()` auf einem `/g`-Regex merkt sich
+`lastIndex` und zählt beim nächsten Aufruf zu wenig. Erkennung läuft jetzt über
+eine eigene, nichtglobale Fassung; `String.replace` war nie betroffen.

@@ -95,7 +95,7 @@ Vier Nachprüfungen am Code, alle bestätigend:
   |---|---|
   | `PublicProfilePage` | **lebendig** — die Fläche dieses Changes |
   | `MeineChancenPage` | nicht geroutet; `nav.ts:92` sagt, die Seite bleibe im Code, das Zurückholen sei „ein navItem plus …" |
-  | `AngeboteGesuchePage` | weder in `nav.ts` noch in `App.tsx` |
+  | `AngeboteGesuchePage` | ~~weder in `nav.ts` noch in `App.tsx`~~ — **falsch, korrigiert 25.08. nach der Code-Review** |
   | `MatchingWidget` (`kontakte-widgets.tsx:207`) | exportiert, **kein Importeur** — AGE-450 hat „Mein Matching" entfernt |
   | `ProfilPage:563` | Marken-**Auswahl**, keine Zeilendarstellung |
   | `OnboardingPage`, `WillkommenPage` | Auswahl während der Einrichtung |
@@ -104,8 +104,52 @@ Vier Nachprüfungen am Code, alle bestätigend:
   dieses Repo enthält regelmäßig tote Flächen, und „acht Treffer" hätte hier zu
   sieben unnötigen Änderungen geführt.
 
+  **NACHTRAG 25.08., nach der Code-Review auf den Diff: die Zeile zu
+  `AngeboteGesuchePage` war falsch, und sie hat zwei Fehler durchgelassen.** Die
+  Datei ist nicht geroutet — aber sie exportiert `AngeboteGesucheEditor`
+  (`AngeboteGesuchePage.tsx:56`), und `CompassPage.tsx:80` hängt genau den als
+  Reiter „Suche & Biete" unter `/kompass`, das in `nav.ts:107` steht. Der Editor
+  ist also **lebendig**. Ich hatte den Namen der *Seite* gesucht und nicht den
+  ihres Exports — dieselbe Falle wie „acht Treffer, eine lebendig", nur in die
+  andere Richtung: eine Fläche kann unter einem anderen Namen leben.
+
+  Die Folgen stehen unten unter „Zweite Runde".
+
 Nicht angenommen: nichts.
 
 ## Not counted
 
 Keine. Beide Reviewer liefen mit Exit 0.
+
+## Zweite Runde — Code-Review auf den Diff (25.08.)
+
+Vier Befunde, alle angenommen. Die ersten beiden hängen an demselben Irrtum
+oben: der reiche Editor ist erreichbar, und er verlangt für **jede** Zeile
+sowohl einen Titel (`min(1)`) als auch eine Kategorie aus der bekannten Liste
+(`matching-profile.ts:20–47`), während `source` den Speicherlauf überlebt
+(`matching-profile.ts:155`).
+
+- **[MEDIUM] Eine `chip`-Zeile verliert ihren Titel bedingungslos.** Ein
+  Mitglied wählt den Chip „Kapital", öffnet `/kompass` → „Suche & Biete" und
+  schreibt in das Pflichtfeld „Eigenkapital bis 500k". Die Zeile bleibt `chip`,
+  und die Profilseite zeigte nur noch die Marke. Angenommen: der Titel entfällt
+  jetzt, wenn er den **Klartext der Kategorie wiederholt** — die tatsächliche
+  Begründung der Anforderung —, nicht schon deshalb, weil die Zeile `chip` ist.
+- **[LOW/MEDIUM] Eine `editor`-Zeile verlor ihre Kategorie.** Weil der Editor
+  eine verlangt, bekommt jede Zeile beim ersten Speichern eine. Angenommen: die
+  Markenreihe entsteht aus **jeder** Zeile mit bekannter Kategorie, unabhängig
+  von `source`. Der Text hängt weiterhin nicht an `category` — der Kern von
+  codex' erstem Befund bleibt unangetastet.
+- **[LOW] Überschrift über nichts.** Eine `chip`-Zeile mit unbekannter Kategorie
+  und ohne Beschreibung ergab eine leere Karte — gegen die bestehende
+  Anforderung „Ein Abschnitt ohne Inhalt SHALL entfallen". Schlimmer: mein
+  eigener Test hielt den Zustand fest. Angenommen: die Karte hängt jetzt daran,
+  ob etwas erscheint, nicht an `offers.length > 0`.
+- **[LOW] `.test()` auf einem `/g`-Regex im Prüfskript.** Zustandsbehaftet, also
+  falsch-negative Zählungen. Angenommen — und lehrreich, weil ich genau diese
+  Falle in der Umsetzung bewusst vermieden und im Skript wieder aufgemacht habe.
+
+Was die neue Regel für den heutigen Bestand ändert: **nichts.** Alle 19
+chip-Titel sind exakt der Kategoriename, keine der 93 Editor-Zeilen trägt eine
+Kategorie. Die Regel ist damit nicht an einem Zustand gebaut, sondern an der
+Begründung.
