@@ -205,6 +205,16 @@ function SidebarContent({
         // per URL erreichbar wäre — und sie ist der EINZIGE Ort, an dem die
         // importierten, noch unbestätigten Mitglieder überhaupt vorkommen.
         { path: "/admin/mitglieder", label: "Mitglieder" },
+        // AGE-587: Dasselbe Argument wie eine Zeile höher. Als Karte auf
+        // /admin brauchte das QM-Feedback keinen eigenen Eintrag; als eigene
+        // Fläche wäre es ohne ihn nur per Adresszeile erreichbar — und ein Menü,
+        // das eine seiner Flächen auslässt, täuscht über den Umfang der
+        // Verwaltung.
+        //
+        // NICHT im Menü steht /admin/mitglied/:id: eine Route mit Parameter
+        // lässt sich ohne ihren Parameter gar nicht öffnen. Sie wird aus der
+        // Mitgliederliste erreicht.
+        { path: "/admin/feedback", label: "QM-Feedback" },
       ],
     });
   }

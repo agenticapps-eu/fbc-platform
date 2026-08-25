@@ -39,7 +39,7 @@ beforeEach(() => {
   mockedSaveTheme.mockReset();
   mockedSaveTheme.mockResolvedValue();
   mockedAdminFeedback.mockReset();
-  mockedAdminFeedback.mockResolvedValue([]);
+  mockedAdminFeedback.mockResolvedValue({ feedbacks: [], hatWeitere: false });
   localStorage.clear();
 });
 

@@ -40,7 +40,14 @@ vi.mock("./supabase", () => ({
   },
 }));
 
-import { activateMember, fetchAdminMembers, SEITENGROESSE } from "./admin-members";
+import {
+  activateMember,
+  adminMemberCountsQueryKey,
+  adminMembersQueryKey,
+  fetchAdminMemberCounts,
+  fetchAdminMembers,
+  SEITENGROESSE,
+} from "./admin-members";
 import { requestActivationLink } from "./activation";
 
 beforeEach(() => {
@@ -143,5 +150,84 @@ describe("requestActivationLink aus der Admin-Fläche", () => {
     invokeFehler = { message: "Internal Server Error" };
 
     await expect(requestActivationLink("wer@test.fbc")).rejects.toBeTruthy();
+  });
+});
+
+/**
+ * Die Zahlen an den Reitern (AGE-587).
+ *
+ * Sie kommen aus einer EIGENEN RPC und nicht aus einer erweiterten
+ * `admin_list_members`: deren Signatur und Spaltensatz sind je durch eine
+ * ausdrückliche Zusage bewacht, und sie zu erweitern machte aus zwei Wächtern
+ * zwei Hindernisse. Ausserdem sind die Zahlen global, während die Liste
+ * gefiltert und geblättert ist — zwei verschiedene Fragen.
+ */
+describe("fetchAdminMemberCounts", () => {
+  it("liest über die Zähl-RPC, ohne Argumente — die Zahlen sind global", async () => {
+    rpcAntwort = [];
+
+    await fetchAdminMemberCounts();
+
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("admin_member_counts");
+    // Kein `p_query`: der Reiter beantwortet „wie viele gibt es", nicht „wie
+    // viele meiner Treffer". Ein durchgereichter Suchbegriff wäre die andere,
+    // nicht bestellte Frage.
+    expect(rpcCalls[0].args).toBeUndefined();
+  });
+
+  it("bildet die Zeilen auf eine Zuordnung Zustand → Zahl ab", async () => {
+    rpcAntwort = [
+      { status: "alle", anzahl: 12 },
+      { status: "aktiviert", anzahl: 10 },
+      { status: "offen", anzahl: 2 },
+      { status: "deaktiviert", anzahl: 1 },
+      { status: "geloescht", anzahl: 3 },
+    ];
+
+    expect(await fetchAdminMemberCounts()).toEqual({
+      alle: 12,
+      aktiviert: 10,
+      offen: 2,
+      deaktiviert: 1,
+      geloescht: 3,
+    });
+  });
+
+  it("gibt die Zahl null weiter, statt sie zu verschlucken", async () => {
+    rpcAntwort = [{ status: "geloescht", anzahl: 0 }];
+
+    // „Keine Zahl" und „die Zahl null" sind zwei verschiedene Auskünfte. Die
+    // RPC unterscheidet sie ausdrücklich; die Datenschicht darf das nicht
+    // wieder einebnen.
+    expect(await fetchAdminMemberCounts()).toEqual({ geloescht: 0 });
+  });
+
+  it("reicht einen Fehler durch, statt lauter Nullen zu erfinden", async () => {
+    rpcFehler = { message: "forbidden: admin_member_counts" };
+
+    await expect(fetchAdminMemberCounts()).rejects.toMatchObject({
+      message: "forbidden: admin_member_counts",
+    });
+  });
+});
+
+describe("adminMemberCountsQueryKey", () => {
+  /**
+   * Der Schlüssel MUSS unter demselben Präfix liegen wie die Liste. Die
+   * Lebenszyklus-Aktionen entwerten `["admin-members"]` als Präfix; ein eigener
+   * Schlüssel daneben liesse die Zahlen nach jeder Aktivierung stehen — und
+   * jeder Test auf das erste Rendern bliebe dabei grün.
+   */
+  it("liegt unter demselben Präfix wie die Liste", () => {
+    expect(adminMemberCountsQueryKey[0]).toBe(
+      adminMembersQueryKey({ query: "", status: "alle", seite: 0 })[0],
+    );
+  });
+
+  it("ist trotzdem ein anderer Schlüssel als der der Liste", () => {
+    expect(adminMemberCountsQueryKey).not.toEqual(
+      adminMembersQueryKey({ query: "", status: "alle", seite: 0 }),
+    );
   });
 });

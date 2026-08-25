@@ -236,12 +236,29 @@ function ExtendedSections({
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Aktivitäten</CardTitle>
           <ul className="flex flex-col divide-y divide-line">
+            {/* Jede Zeile ist ein `<a>` auf IHREN Beitrag (AGE-587) — nicht die
+                Karte in den Feed. Ausdrücklich kein `div` mit `onClick`: das
+                bestünde `fireEvent.click` und wäre trotzdem nicht bedienbar —
+                keine Tastatur, kein „in neuem Tab öffnen".
+
+                Ersatztext „Beitrag ohne Text" und NICHT „Beitrag mit Bild":
+                `create_post_with_media` nimmt leeren Text UND leere Medien an,
+                und das Spalten-UPDATE-Recht aus AGE-582 lässt ein Mitglied den
+                eigenen Text nachträglich leeren, ohne dass Bilder entstünden.
+                Die Karte behauptete sonst etwas, das sie nicht geprüft hat. */}
             {extended.posts.map((post) => (
               <li key={post.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-sm text-ink/80">{post.body}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {new Date(post.created_at).toLocaleDateString("de-DE")}
-                </p>
+                <Link
+                  to={`/aktivitaet?post=${post.id}`}
+                  className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <p className="text-sm text-ink/80 hover:text-ink">
+                    {post.body.trim() === "" ? "Beitrag ohne Text" : post.body}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {new Date(post.created_at).toLocaleDateString("de-DE")}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

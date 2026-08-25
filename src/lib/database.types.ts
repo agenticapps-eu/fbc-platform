@@ -1688,10 +1688,18 @@ export type Database = {
        *  `admin_audit`. Bricht mit 22023 ab, wenn das Ziel schon bestaetigt ist. */
       admin_activate_member: { Args: { target: string }; Returns: string };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
-      // admin_list_feedback() RPC from 20260716103000_admin_feedback_rpc.sql (admin-only
-      // enriched read of QM feedback with the author name; empty for non-admins).
+      // admin_list_feedback(int, int) RPC from
+      // 20260825120000_admin_zaehler_und_feedback_blaetterung.sql (admin-only enriched
+      // read of QM feedback with the author name; empty for non-admins, geblaettert).
       admin_list_feedback: {
-        Args: never;
+        Args: {
+          /** 1..100, geklemmt statt abgewiesen; null faellt auf 25 zurueck. */
+          p_limit?: number | null;
+          /** >= 0, geklemmt. Die Ordnung ist `created_at desc, id desc` und
+           *  damit total — ohne den zweiten Schluessel koennte dieselbe Zeile
+           *  auf zwei Seiten stehen. */
+          p_offset?: number | null;
+        };
         Returns: {
           id: string;
           rating: number | null;
@@ -1702,6 +1710,23 @@ export type Database = {
           ref_type: string | null;
           created_at: string;
           author_name: string;
+          profile_id: string;
+        }[];
+      };
+      // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
+      // admin_member_counts() RPC from
+      // 20260825120000_admin_zaehler_und_feedback_blaetterung.sql (wie viele Mitglieder
+      // in jedem Zustand stehen — eine Zeile je Zustand EINSCHLIESSLICH der mit null,
+      // global und ohne Suchbegriff; bricht fuer Nicht-Admins mit 42501 ab, statt
+      // Nullen zu liefern).
+      admin_member_counts: {
+        Args: never;
+        Returns: {
+          /** `alle` | `aktiviert` | `offen` | `deaktiviert` | `geloescht` —
+           *  dieselben Zustaende, die `admin_list_members.p_status` kennt, und
+           *  entschieden von derselben `member_state_matches`. */
+          status: string;
+          anzahl: number;
         }[];
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the

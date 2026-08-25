@@ -329,3 +329,72 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.queryByText(/row-level security/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Die Aktivitäten-Karte führt in den Feed (AGE-587, Abschnitt 8).
+ *
+ * DIESELBE Zusage steht in `ProfilAnsichtPage.test.tsx` für „Meine Beiträge".
+ * Das Spec-Delta sagt „jede Zeile, auf JEDEM Profil", und der erste Plan
+ * verlinkte nur diese Seite hier — die eigene wäre stumm geblieben (Befund
+ * codex). Wer eine der beiden Zusagen ändert, soll die andere finden.
+ */
+describe("Aktivitäten-Karte: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => {
+  const mitBeitraegen = (posts: { id: string; body: string; created_at: string }[]) => ({
+    ...fullView,
+    extended: { ...fullView.extended!, posts },
+  });
+
+  it("macht jede Zeile zu einem Link auf IHREN Beitrag", async () => {
+    mockedFetch.mockResolvedValue(
+      mitBeitraegen([
+        { id: "post-eins", body: "Erster Gedanke", created_at: "2026-08-01T10:00:00Z" },
+        { id: "post-zwei", body: "Zweiter Gedanke", created_at: "2026-08-02T10:00:00Z" },
+      ]),
+    );
+    renderPage(authAsTier("discover"));
+
+    // Auf IHREN — nicht beide auf denselben und nicht beide auf den Feed.
+    expect(await screen.findByRole("link", { name: /Erster Gedanke/ })).toHaveAttribute(
+      "href",
+      "/aktivitaet?post=post-eins",
+    );
+    expect(screen.getByRole("link", { name: /Zweiter Gedanke/ })).toHaveAttribute(
+      "href",
+      "/aktivitaet?post=post-zwei",
+    );
+  });
+
+  /**
+   * Ein `div` mit `onClick` bestünde `fireEvent.click` und wäre trotzdem nicht
+   * bedienbar: keine Tastatur, kein Kontextmenü, kein „in neuem Tab öffnen"
+   * (Befund gemini). Geprüft wird deshalb die ROLLE, nicht ein Klick.
+   */
+  it("ist ein echtes Verweiselement, kein anklickbarer Kasten", async () => {
+    mockedFetch.mockResolvedValue(
+      mitBeitraegen([{ id: "p1", body: "Ein Gedanke", created_at: "2026-08-01T10:00:00Z" }]),
+    );
+    renderPage(authAsTier("discover"));
+
+    const link = await screen.findByRole("link", { name: /Ein Gedanke/ });
+    expect(link.tagName).toBe("A");
+    expect(link).toHaveAttribute("href");
+  });
+
+  /**
+   * „Beitrag ohne Text" und NICHT „Beitrag mit Bild": `create_post_with_media`
+   * nimmt leeren Text UND leere Medien an, und das Spalten-UPDATE-Recht aus
+   * AGE-582 lässt ein Mitglied den eigenen Text nachträglich leeren, ohne dass
+   * Bilder entstünden. Die Karte behauptete sonst etwas, das sie nicht geprüft
+   * hat (Befund codex, Donalds Entscheidung vom 25.08.).
+   */
+  it("gibt einer textlosen Zeile einen Ersatztext, statt leer zu bleiben", async () => {
+    mockedFetch.mockResolvedValue(
+      mitBeitraegen([{ id: "p-leer", body: "", created_at: "2026-08-01T10:00:00Z" }]),
+    );
+    renderPage(authAsTier("discover"));
+
+    const link = await screen.findByRole("link", { name: /Beitrag ohne Text/ });
+    expect(link).toHaveAttribute("href", "/aktivitaet?post=p-leer");
+    expect(screen.queryByText(/Beitrag mit Bild/)).not.toBeInTheDocument();
+  });
+});

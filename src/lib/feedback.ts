@@ -42,13 +42,51 @@ export async function submitPlatformFeedback(input: PlatformFeedbackInput): Prom
 export type AdminFeedbackRow =
   Database["public"]["Functions"]["admin_list_feedback"]["Returns"][number];
 
+export interface AdminFeedbackSeite {
+  feedbacks: AdminFeedbackRow[];
+  hatWeitere: boolean;
+}
+
 /**
- * Admin-Sicht auf alles QM-Feedback (AGE-358). Ruft die SECURITY-DEFINER-RPC
- * `admin_list_feedback`, die nur einem `admin` Zeilen liefert (für alle anderen
- * leer) — die Rolle wird server-seitig in der Funktion geprüft, nicht hier.
+ * Wie viele Feedback-Zeilen eine Seite zeigt — dieselbe Zahl wie die
+ * Mitgliederliste, damit sich die zwei Verwaltungsflächen gleich anfühlen.
  */
-export async function fetchAdminFeedback(): Promise<AdminFeedbackRow[]> {
-  const { data, error } = await supabase.rpc("admin_list_feedback");
+export const FEEDBACK_SEITENGROESSE = 25;
+
+/**
+ * Der Schlüssel trägt die SEITE. Ohne sie hielte React Query alle Seiten für
+ * dieselbe Abfrage und zeigte auf Seite 2 den zwischengespeicherten Inhalt von
+ * Seite 1 (AGE-587, 4.2).
+ */
+export const adminFeedbackQueryKey = (seite: number) => ["admin-feedback", seite] as const;
+
+/**
+ * Eine Seite der Admin-Sicht auf alles QM-Feedback (AGE-358, Blätterung AGE-587).
+ * Ruft die SECURITY-DEFINER-RPC `admin_list_feedback`, die nur einem `admin`
+ * Zeilen liefert (für alle anderen leer) — die Rolle wird server-seitig in der
+ * Funktion geprüft, nicht hier.
+ *
+ * Es wird EINE Zeile mehr angefordert als angezeigt, genau wie bei
+ * `fetchAdminMembers`: die RPC liefert keine Gesamtzahl, und eine zweite,
+ * zählende Abfrage wäre ein zweiter Weg an dieselben Daten — mit der
+ * Möglichkeit, dass beide sich widersprechen.
+ *
+ * Wirft bei einem Fehler, statt eine leere Liste zu liefern. Eine leere Liste
+ * heisst hier „kein Feedback" — und genauso sieht auch ein Nicht-Admin die
+ * Fläche. Eine dritte, stumme Ursache für dieselbe Ansicht braucht es nicht.
+ *
+ * @param seite Nullbasiert.
+ */
+export async function fetchAdminFeedback(seite: number): Promise<AdminFeedbackSeite> {
+  const { data, error } = await supabase.rpc("admin_list_feedback", {
+    p_limit: FEEDBACK_SEITENGROESSE + 1,
+    p_offset: seite * FEEDBACK_SEITENGROESSE,
+  });
   if (error) throw error;
-  return data ?? [];
+
+  const zeilen = data ?? [];
+  return {
+    feedbacks: zeilen.slice(0, FEEDBACK_SEITENGROESSE),
+    hatWeitere: zeilen.length > FEEDBACK_SEITENGROESSE,
+  };
 }

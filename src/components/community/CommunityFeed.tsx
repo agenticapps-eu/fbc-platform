@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
@@ -50,6 +50,7 @@ import {
   createPostWithMedia,
   feedListKey,
   feedSeitenKey,
+  fetchPostById,
   type FeedAuswahl,
   type FeedOrdnung,
   type FeedReiter,
@@ -130,10 +131,51 @@ export default function CommunityFeed() {
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
   });
-  const posts = useMemo(
+  const geladenePosts = useMemo(
     () => (feed.data?.pages ?? []).flatMap((seite) => seite.posts),
     [feed.data],
   );
+
+  /**
+   * Der Deeplink `?post=<id>` (AGE-587) — aus den Aktivitäten-Karten beider
+   * Profilflächen.
+   *
+   * Der Beitrag wird GEHOLT, nicht gesucht. Der erste Entwurf wollte bis zu
+   * fünf Feed-Seiten durchlaufen; ein sichtbarer Beitrag auf Seite 6 wäre damit
+   * unerreichbar gewesen, und zwar durch korrekten Code. Eine Anfrage über die
+   * Kennung erreicht jeden sichtbaren Beitrag, unabhängig vom Alter.
+   *
+   * Der Parameter steht AUSDRÜCKLICH NICHT in `feedSeitenKey`. Er ändert
+   * nicht, was der Feed lädt — stünde er darin, wäre jeder Deeplink eine andere
+   * Abfrage und verwürfe den geladenen Feed samt aller nachgeladenen Seiten.
+   */
+  const [feedParameter] = useSearchParams();
+  const verlinkteId = feedParameter.get("post");
+  const verlinkter = useQuery({
+    queryKey: ["feed", "einzeln", uid, verlinkteId] as const,
+    queryFn: () => fetchPostById(uid, verlinkteId!),
+    enabled: verlinkteId !== null,
+  });
+
+  /**
+   * Der geholte Beitrag steht dem Feed VORAN und wird darunter herausgefiltert.
+   * Ohne den Filter stünde er zweimal da und sähe wie ein Dublettenfehler aus.
+   */
+  const posts = useMemo(() => {
+    const oben = verlinkter.data;
+    if (!oben) return geladenePosts;
+    return [oben, ...geladenePosts.filter((p) => p.id !== oben.id)];
+  }, [geladenePosts, verlinkter.data]);
+
+  /**
+   * Nicht abrufbar — und das ist EINE Auskunft, nicht zwei.
+   *
+   * Ein vorhandener, aber unsichtbarer Beitrag liefert aus derselben Anfrage
+   * dieselben null Zeilen wie ein erfundener. Es gibt hier deshalb kein `if`,
+   * das die Fälle trennt: es gäbe nichts, woran es sie unterscheiden könnte,
+   * und der Versuch wäre ein Existenz-Orakel.
+   */
+  const verlinkterFehlt = verlinkteId !== null && verlinkter.isSuccess && !verlinkter.data;
 
   // Erwähnungen (@name) werden gegen die im Feed bekannten Autoren aufgelöst — ein
   // Treffer wird zum Profil-Link, sonst bleibt es dezenter Akzent-Text (kein Fake-Link).
@@ -320,6 +362,12 @@ export default function CommunityFeed() {
                 Filter entfernen
               </button>
             </div>
+          )}
+
+          {verlinkterFehlt && (
+            <p className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-muted">
+              Dieser Beitrag ist nicht verfügbar.
+            </p>
           )}
 
           <FeedList

@@ -261,10 +261,21 @@ export function BeitraegeWidget({ data }: { data: DashboardData }) {
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
+          {/* Dieselbe Bauart wie die Aktivitäten-Karte auf der öffentlichen
+              Profilseite (AGE-587): jede Zeile ein `<a>` auf IHREN Beitrag,
+              samt Ersatztext für den leeren Rumpf. Das Spec-Delta sagt „jede
+              Zeile, auf JEDEM Profil" — die eigene Seite hier eingeschlossen. */}
           {data.posts.map((post) => (
             <li key={post.id}>
-              <p className="line-clamp-2 text-sm font-medium text-ink">{post.body}</p>
-              <p className="text-xs text-muted">{formatDate(post.created_at, dateFmt)}</p>
+              <Link
+                to={`/aktivitaet?post=${post.id}`}
+                className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <p className="line-clamp-2 text-sm font-medium text-ink hover:text-accent-strong">
+                  {post.body.trim() === "" ? "Beitrag ohne Text" : post.body}
+                </p>
+                <p className="text-xs text-muted">{formatDate(post.created_at, dateFmt)}</p>
+              </Link>
             </li>
           ))}
         </ul>

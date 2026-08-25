@@ -83,6 +83,45 @@ export async function fetchAdminMembers(f: AdminMemberFilters): Promise<AdminMem
   };
 }
 
+/** Wie viele Mitglieder in jedem Zustand stehen. Ein fehlender Schlüssel heisst
+ *  „noch nicht bekannt", NICHT „null" — die beiden dürfen an der Fläche nicht
+ *  gleich aussehen (die Lehre aus AGE-582, 6.6). */
+export type AdminMemberCounts = Partial<Record<AdminMemberStatus, number>>;
+
+/**
+ * Der Schlüssel der Zähl-Abfrage liegt bewusst UNTER dem Präfix der Liste.
+ *
+ * `["admin-members"]` ist der Präfix, den die Lebenszyklus-Aktionen entwerten
+ * (`AdminMitgliederPage`). Läge die Zähl-Abfrage unter einem eigenen Namen
+ * daneben, blieben die Zahlen nach jeder Aktivierung oder Deaktivierung stehen
+ * — und ein Test, der nur das erste Rendern prüft, bliebe dabei grün.
+ */
+export const adminMemberCountsQueryKey = ["admin-members", "counts"] as const;
+
+/**
+ * Die Zahlen für die Reiter (AGE-587).
+ *
+ * Eine EIGENE RPC statt einer erweiterten `admin_list_members`: deren Signatur
+ * und Spaltensatz sind je durch eine ausdrückliche Zusage bewacht, und sie zu
+ * erweitern machte aus zwei Wächtern zwei Hindernisse. Die Zahlen sind ausserdem
+ * global, während die Liste gefiltert und geblättert ist.
+ *
+ * Wirft bei einem Fehler. Lauter Nullen zurückzugeben hiesse „der Verein hat
+ * keine Mitglieder" — die RPC bricht für Nicht-Admins genau deshalb mit 42501
+ * ab, statt Nullen zu liefern, und diese Schicht darf das nicht rückgängig
+ * machen.
+ */
+export async function fetchAdminMemberCounts(): Promise<AdminMemberCounts> {
+  const { data, error } = await supabase.rpc("admin_member_counts");
+  if (error) throw error;
+
+  const zahlen: AdminMemberCounts = {};
+  for (const zeile of data ?? []) {
+    zahlen[zeile.status as AdminMemberStatus] = zeile.anzahl;
+  }
+  return zahlen;
+}
+
 /**
  * Aktiviert ein Mitglied unmittelbar — der Ausnahmeweg neben dem Zugangslink.
  *
