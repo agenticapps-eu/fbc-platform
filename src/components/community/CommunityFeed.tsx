@@ -98,7 +98,7 @@ export default function CommunityFeed() {
   const [reiter, setReiter] = useState<FeedReiter>("alle");
   const [ordnung, setOrdnung] = useState<FeedOrdnung>("neueste");
   const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
-  const [typ, setTyp] = useState<FeedTyp | null>(null);
+  const [typen, setTypen] = useState<FeedTyp[]>([]);
 
   /**
    * Ohne Sitzung gibt es NUR „Alle Beiträge" (6.8).
@@ -114,8 +114,8 @@ export default function CommunityFeed() {
   const aktiverReiter: FeedReiter = uid ? reiter : "alle";
 
   const auswahl: FeedAuswahl = useMemo(
-    () => ({ reiter: aktiverReiter, ordnung, tags: gewaehlteTags, typ }),
-    [aktiverReiter, ordnung, gewaehlteTags, typ],
+    () => ({ reiter: aktiverReiter, ordnung, tags: gewaehlteTags, typen }),
+    [aktiverReiter, ordnung, gewaehlteTags, typen],
   );
 
   // Seitenweise (AGE-528): eine feste Obergrenze ohne Nachladen wäre mit Bildern
@@ -282,6 +282,14 @@ export default function CommunityFeed() {
     );
   }
 
+  /** Ein Beitragstyp wird an- oder abgehakt. Mehrere wirken als ODER, genau wie
+   *  die Marken darueber — und genau das versprechen Auswahlkaestchen (AGE-590). */
+  function typUmschalten(typ: FeedTyp) {
+    setTypen((bisher) =>
+      bisher.includes(typ) ? bisher.filter((t) => t !== typ) : [...bisher, typ],
+    );
+  }
+
   /** „Filter entfernen" — an ZWEI Stellen angeboten: im Filter-Banner und im
    *  Leerzustand der Liste. Beide leeren dieselben Achsen, und der Reiter und die
    *  Ordnung bleiben stehen, weil sie keine Filter sind. Steht das hier, kann
@@ -289,7 +297,7 @@ export default function CommunityFeed() {
    *  (Befund gemini, LOW). */
   function filterLeeren() {
     setGewaehlteTags([]);
-    setTyp(null);
+    setTypen([]);
   }
 
   return (
@@ -321,8 +329,8 @@ export default function CommunityFeed() {
             autoren={topAutoren.data ?? []}
             autorenFehler={topAutoren.isError}
             zeigeAutoren={uid !== null}
-            typ={typ}
-            onTyp={setTyp}
+            typen={typen}
+            onTypUmschalten={typUmschalten}
           />
         </aside>
 
@@ -350,7 +358,7 @@ export default function CommunityFeed() {
               auf dem Telefon ist die Spalte ZUSAMMENGEKLAPPT, und ohne diese
               Zeile sähe ein Mitglied dort nicht, dass überhaupt gefiltert
               wird — es sähe nur einen kurzen Feed. */}
-          {(gewaehlteTags.length > 0 || typ !== null) && (
+          {(gewaehlteTags.length > 0 || typen.length > 0) && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted">Gefiltert nach</span>
               {gewaehlteTags.map((tag) => (
@@ -361,11 +369,14 @@ export default function CommunityFeed() {
                   #{tag}
                 </span>
               ))}
-              {typ && (
-                <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
-                  {TYPEN.find((t) => t.value === typ)?.label}
+              {typen.map((gewaehlt) => (
+                <span
+                  key={gewaehlt}
+                  className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong"
+                >
+                  {TYPEN.find((t) => t.value === gewaehlt)?.label}
                 </span>
-              )}
+              ))}
               <button
                 type="button"
                 onClick={filterLeeren}
@@ -393,7 +404,7 @@ export default function CommunityFeed() {
             gewaehlteTags={gewaehlteTags}
             onTagUmschalten={tagUmschalten}
             onFilterLeeren={filterLeeren}
-            gefiltert={gewaehlteTags.length > 0 || typ !== null}
+            gefiltert={gewaehlteTags.length > 0 || typen.length > 0}
             mentionResolver={mentionResolver}
             bildUrls={bildUrls}
             onBildFehler={onBildFehler}
@@ -417,9 +428,17 @@ const ORDNUNGEN: { value: FeedOrdnung; label: string }[] = [
   { value: "beliebteste", label: "Beliebteste" },
 ];
 
-/** Die fünf wählbaren Beitragstypen (6.6). `null` heißt „alle". */
-const TYPEN: { value: FeedTyp | ""; label: string }[] = [
-  { value: "", label: "Alle Typen" },
+/**
+ * Die vier wählbaren Beitragstypen (6.6, AGE-590).
+ *
+ * KEIN Eintrag „Alle Typen": „alle" ist der Zustand ohne Haken, nicht eine
+ * fünfte Wahl. Als Kästchen neben den vieren wäre er ein Widerspruch —
+ * angehakt und alle vier angehakt müssten dasselbe heißen.
+ *
+ * Die Reihenfolge ist `FEED_TYPEN`, dieselbe, auf der der Cache-Schlüssel
+ * kanonisiert: so steht in der Spalte und im Schlüssel dieselbe Ordnung.
+ */
+const TYPEN: { value: FeedTyp; label: string }[] = [
   { value: "bild", label: "Bild" },
   { value: "video", label: "Video" },
   { value: "event", label: "Event" },
@@ -502,8 +521,8 @@ function FeedSidebar({
   autoren,
   autorenFehler,
   zeigeAutoren,
-  typ,
-  onTyp,
+  typen,
+  onTypUmschalten,
 }: {
   zaehler: TagZaehler[];
   /** Ein gescheiterter Aufruf sieht sonst GENAU SO AUS wie „es gibt nichts" —
@@ -516,8 +535,8 @@ function FeedSidebar({
   autoren: TopAutor[];
   autorenFehler: boolean;
   zeigeAutoren: boolean;
-  typ: FeedTyp | null;
-  onTyp: (typ: FeedTyp | null) => void;
+  typen: FeedTyp[];
+  onTypUmschalten: (typ: FeedTyp) => void;
 }) {
   const [offen, setOffen] = useState(false);
   return (
@@ -596,17 +615,24 @@ function FeedSidebar({
 
         <Card className="space-y-3">
           <h2 className="font-display text-sm font-semibold text-ink">Beitragstyp</h2>
-          <Select
-            value={typ ?? ""}
-            onChange={(e) => onTyp((e.target.value || null) as FeedTyp | null)}
-            aria-label="Beitragstyp"
-          >
+          {/* Auswahlkästchen wie bei „Beliebte Tags" darüber — dieselbe Form für
+              dieselbe Bedeutung, damit nebeneinander nicht zwei Bedienlogiken
+              stehen. Mehrere Typen wirken als ODER (AGE-590). */}
+          <ul aria-label="Beitragstyp" className="space-y-1.5">
             {TYPEN.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
+              <li key={t.value}>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={typen.includes(t.value)}
+                    onChange={() => onTypUmschalten(t.value)}
+                    className="size-4 rounded border-line text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{t.label}</span>
+                </label>
+              </li>
             ))}
-          </Select>
+          </ul>
         </Card>
       </div>
     </>

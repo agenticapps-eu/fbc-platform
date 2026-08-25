@@ -257,7 +257,7 @@ export interface FeedAuswahl {
   reiter: FeedReiter;
   ordnung: FeedOrdnung;
   tags: string[];
-  typ: FeedTyp | null;
+  typen: FeedTyp[];
 }
 
 /**
@@ -269,6 +269,38 @@ export interface FeedAuswahl {
  */
 const normalisierteTags = (tags: string[]) => [...new Set(tags)].sort();
 
+/**
+ * Die vier Typen in fester Reihenfolge. Sie ist die Sortierordnung der
+ * Kanonisierung und die Anzeigereihenfolge der Kaestchen — die Kanonisierung
+ * arbeitet auf den BEZEICHNERN, nie auf den Beschriftungen, sonst haengt der
+ * Cache-Schluessel an einem Anzeigetext.
+ */
+export const FEED_TYPEN: readonly FeedTyp[] = ["bild", "video", "event", "text"];
+
+/**
+ * Kanonische Form einer Typmenge: ohne Dubletten, in der festen Typreihenfolge —
+ * und die VOLLE Menge wird auf die leere abgebildet.
+ *
+ * Die Dublettenfreiheit und die feste Reihenfolge haben denselben Grund wie bei
+ * `normalisierteTags`: der Schluessel darf nicht davon abhaengen, in welcher
+ * Reihenfolge die Haken gesetzt wurden.
+ *
+ * Die Abbildung der vollen Menge auf die leere ist der Grund, warum `null` als
+ * dritter Zustand entfallen ist: alle vier angehakt liefert dieselbe Liste wie
+ * gar keiner angehakt — die vier Typen decken den Bestand lueckenlos ab, weil
+ * „Text" als Abwesenheit der drei anderen bestimmt ist. Ohne die Abbildung
+ * stuenden zwei Schluessel fuer ein Ergebnis, und der Feed laedt dieselbe
+ * Auswahl ein zweites Mal.
+ *
+ * Sie sitzt HIER und nicht im Zustand der Oberflaeche: wer vier Haken gesetzt
+ * hat, soll weiter vier Haken sehen.
+ */
+export const normalisierteTypen = (typen: FeedTyp[]): FeedTyp[] => {
+  const gewaehlt = new Set(typen);
+  if (gewaehlt.size >= FEED_TYPEN.length) return [];
+  return FEED_TYPEN.filter((t) => gewaehlt.has(t));
+};
+
 export const feedSeitenKey = (uid: string | null, auswahl: FeedAuswahl) =>
   [
     "feed",
@@ -277,7 +309,7 @@ export const feedSeitenKey = (uid: string | null, auswahl: FeedAuswahl) =>
     normalisierteTags(auswahl.tags),
     auswahl.reiter,
     auswahl.ordnung,
-    auswahl.typ,
+    normalisierteTypen(auswahl.typen),
     "seiten",
   ] as const;
 /**
@@ -497,9 +529,28 @@ export interface FetchFeedArgs {
    * über denselben Weg und wird hier eingemischt, statt daneben zu bestehen.
    */
   tags?: string[];
-  /** Beitragstyp; `null` heißt „alle Typen". */
-  typ?: FeedTyp | null;
+  /** Gewählte Beitragstypen als ODER; die leere Menge heißt „alle Typen". */
+  typen?: FeedTyp[];
 }
+
+/**
+ * Der Teilausdruck je Beitragstyp, je Typ genau einmal.
+ *
+ * Als Tabelle und nicht als Folge von `if`, weil das Ganze eine ZEICHENKETTE
+ * ist: ein Tippfehler ergibt `PGRST100` zur Laufzeit, keinen Typfehler beim
+ * Uebersetzen. Eine Stelle je Typ ist die einzige Stelle, an der er falsch sein
+ * kann.
+ *
+ * `text` ist die Verneinung der drei anderen und damit die zerbrechlichste
+ * Zeile: kommt je ein fuenfter Typ dazu, ist sie MITZUAENDERN, sonst faellt der
+ * neue Typ still auch unter „Text".
+ */
+const TYP_AUSDRUCK: Record<FeedTyp, string> = {
+  bild: "post_media.not.is.null",
+  video: "video_url.not.is.null",
+  event: "kind.eq.event",
+  text: "and(video_url.is.null,kind.neq.event,post_media.is.null)",
+};
 
 /**
  * Die Spalten einer Feed-Zeile.
@@ -589,7 +640,7 @@ export async function fetchFeed({
   reiter = "alle",
   ordnung = "neueste",
   tags,
-  typ = null,
+  typen = [],
 }: FetchFeedArgs): Promise<FeedSeite> {
   // DER STILLE FALL, und der Wächter steht VOR der ersten Zeile Anfrage.
   // Ein fehlender Autorenfilter ist kein leerer Filter: `if (uid) query =
@@ -647,15 +698,22 @@ export async function fetchFeed({
   const nurVonMir = reiter === "meine" ? uid : null;
   if (nurVonMir) query = query.eq("author_id", nurVonMir);
 
-  // Der Typ kommt aus dem Bestand (siehe `FeedTyp`), nicht aus einem Feld am
-  // Beitrag. „Text" ist deshalb drei Bedingungen und nicht eine.
-  if (typ === "video") query = query.not("video_url", "is", null);
-  if (typ === "event") query = query.eq("kind", "event");
-  if (typ === "bild") query = query.not("post_media", "is", null);
-  if (typ === "text") {
-    query = query.is("video_url", null).neq("kind", "event").is("post_media", null);
+  // Die Typen kommen aus dem Bestand (siehe `FeedTyp`), nicht aus einem Feld am
+  // Beitrag. „Text" ist deshalb eine Konjunktion und nicht eine Bedingung.
+  //
+  // EINE Gruppe, nicht vier angehaengte Filter: angehaengte Filter verknuepft
+  // PostgREST mit UND, und „Video UND Bild" ist fast immer die leere Menge.
+  const gewaehlteTypen = normalisierteTypen(typen);
+  if (gewaehlteTypen.length > 0) {
+    query = query.or(gewaehlteTypen.map((t) => TYP_AUSDRUCK[t]).join(","));
   }
 
+  // Das ZWEITE `or=` derselben Anfrage, sobald ein Typfilter gesetzt ist.
+  // PostgREST verknuepft wiederholte `or=`-Parameter mit UND — auf DEV gemessen
+  // (AGE-590): `or(A,B)` und `or(B,C)` zusammen liefern genau `[B]`. Das ist die
+  // gewollte Bedeutung, Typvereinigung UND Blaettergrenze. Wer die beiden
+  // Gruppen zu einer zusammenzieht, macht daraus ein ODER und laesst Beitraege
+  // ausserhalb der Grenze durch.
   if (cursor) query = query.or(cursorAusdruck(ordnung, cursor));
 
   const { data: posts, error } = await query;
@@ -769,10 +827,7 @@ export async function fetchFeed({
  * wäre ein Existenz-Orakel wie das, das AGE-582 in `post_saves` geschlossen
  * hat.
  */
-export async function fetchPostById(
-  uid: string | null,
-  postId: string,
-): Promise<FeedPost | null> {
+export async function fetchPostById(uid: string | null, postId: string): Promise<FeedPost | null> {
   const seite = await fetchFeed({ uid, postId });
   return seite.posts[0] ?? null;
 }

@@ -127,11 +127,11 @@ describe("Filter entfernen — beide Stellen leeren beide Achsen", () => {
     await screen.findByText(/viel gelernt/);
 
     fireEvent.click(screen.getByRole("checkbox", { name: /netzwerken/i }));
-    fireEvent.change(screen.getByLabelText(/beitragstyp/i), { target: { value: "bild" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
     await waitFor(() => {
       const letzter = letzterAufruf();
       expect(letzter.tags).toEqual(["netzwerken"]);
-      expect(letzter.typ).toBe("bild");
+      expect(letzter.typen).toEqual(["bild"]);
     });
 
     const banner = screen.getByText(/gefiltert nach/i).closest("div") as HTMLElement;
@@ -140,7 +140,7 @@ describe("Filter entfernen — beide Stellen leeren beide Achsen", () => {
     await waitFor(() => {
       const letzter = letzterAufruf();
       expect(letzter.tags ?? []).toEqual([]);
-      expect(letzter.typ ?? null).toBeNull();
+      expect(letzter.typen ?? []).toEqual([]);
     });
   });
 
@@ -267,9 +267,92 @@ describe("Die gefüllte Sidebar (6.6)", () => {
     renderFeed();
     await screen.findByText(/viel gelernt/);
 
-    fireEvent.change(screen.getByLabelText(/beitragstyp/i), { target: { value: "bild" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
 
-    await waitFor(() => expect(letzterAufruf().typ).toBe("bild"));
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["bild"]));
+  });
+
+  it("filtert nach MEHREREN Beitragstypen — der zweite Haken loescht den ersten nicht", async () => {
+    // Die Zusage, um die es in AGE-590 geht: Kaestchen versprechen
+    // Mehrfachauswahl. Ein Umschalter, der den ersten Haken beim zweiten Klick
+    // zuruecknimmt, waere ein Aufklappmenue in Kaestchenform.
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^video$/i }));
+
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["bild", "video"]));
+    expect(screen.getByRole("checkbox", { name: /^bild$/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^video$/i })).toBeChecked();
+  });
+
+  it("ein zweiter Klick nimmt GENAU EINEN Typ zurueck", async () => {
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^video$/i }));
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["bild", "video"]));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
+
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["video"]));
+    expect(screen.getByRole("checkbox", { name: /^bild$/i })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^video$/i })).toBeChecked();
+  });
+
+  it("das Banner nennt JEDEN gewaehlten Typ, nicht nur einen", async () => {
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /^bild$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^video$/i }));
+
+    const banner = await screen.findByText(/gefiltert nach/i);
+    const zeile = banner.closest("div") as HTMLElement;
+    expect(within(zeile).getByText("Bild")).toBeInTheDocument();
+    expect(within(zeile).getByText("Video")).toBeInTheDocument();
+  });
+
+  it("die Spalte trägt GENAU die vier Typen", async () => {
+    // Ohne diese Zusage koennte „Event" und „Text" wegfallen und die Suite
+    // bliebe gruen (Diff-Review codex).
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    const liste = screen.getByRole("list", { name: /beitragstyp/i });
+    const kaestchen = within(liste).getAllByRole("checkbox");
+    expect(kaestchen).toHaveLength(4);
+    expect(kaestchen.map((k) => k.closest("label")!.textContent)).toEqual([
+      "Bild",
+      "Video",
+      "Event",
+      "Text",
+    ]);
+  });
+
+  it("alle vier angehakt bleiben alle vier angehakt — und die Abfrage kanonisiert", async () => {
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    const liste = screen.getByRole("list", { name: /beitragstyp/i });
+    for (const k of within(liste).getAllByRole("checkbox")) fireEvent.click(k);
+
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["bild", "video", "event", "text"]));
+    // Die Oberflaeche zeigt weiter vier Haken: die Abbildung der vollen Menge
+    // auf die leere sitzt in der Kanonisierung, NICHT im Zustand der Oberflaeche.
+    for (const k of within(liste).getAllByRole("checkbox")) expect(k).toBeChecked();
+  });
+
+  it("es gibt KEINEN Eintrag „Alle Typen“ mehr", async () => {
+    // „Alle" ist der Zustand ohne Haken. Als fuenftes Kaestchen waere er ein
+    // Widerspruch: angehakt und alle vier angehakt muessten dasselbe heissen.
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    expect(screen.queryByRole("checkbox", { name: /alle typen/i })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /beitragstyp/i })).toBeNull();
   });
 
   /* Ein gescheiterter Aufruf sieht sonst GENAU SO AUS wie „es gibt nichts":
@@ -300,7 +383,7 @@ describe("Die gefüllte Sidebar (6.6)", () => {
     renderFeed();
 
     expect(await screen.findByRole("list", { name: /aktivste mitglieder/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/beitragstyp/i)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /beitragstyp/i })).toBeInTheDocument();
   });
 });
 

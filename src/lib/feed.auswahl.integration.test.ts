@@ -64,6 +64,8 @@ const ZWEITE_MARKE = "age582andere";
 const KURIERTE_MARKE = "age582kuriert";
 
 let ich = "";
+/** Die Anmeldeadresse des Kontos — auch nach einem `signOut` mitten im Lauf. */
+let ichEmail = "";
 let anderer = "";
 let pg: Client;
 
@@ -121,7 +123,8 @@ beforeAll(async () => {
   );
 
   const stempel = Date.now();
-  ich = await kontoAnlegen(`age582-ich-${stempel}@example.test`);
+  ichEmail = `age582-ich-${stempel}@example.test`;
+  ich = await kontoAnlegen(ichEmail);
   anderer = await kontoAnlegen(`age582-andere-${stempel}@example.test`);
 
   // 25 Textbeiträge mit GLEICHER Reaktionszahl — der Fall, an dem ein Cursor
@@ -167,6 +170,20 @@ beforeAll(async () => {
      values ($1, $2, 0, 800, 600)`,
     [mitBild.rows[0].id, `${ich}/${mitBild.rows[0].id}/0.webp`],
   );
+  // Ein Beitrag mit Video UND Bild (AGE-590): er trifft auf ZWEI der vier Typen
+  // zu und ist die Zeile, an der sich zeigt, ob die Vereinigung ihn doppelt
+  // liefert. `or` ist ein Praedikat auf einer Zeile und kein Join — aber das
+  // gehoert zugesagt, nicht angenommen.
+  const beides = await pg.query<{ id: string }>(
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
+     values ($1, 'Beides https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3) returning id`,
+    [ich, [MARKE], zeit(203)],
+  );
+  await pg.query(
+    `insert into public.post_media (post_id, storage_path, sort, width, height)
+     values ($1, $2, 0, 800, 600)`,
+    [beides.rows[0].id, `${ich}/${beides.rows[0].id}/0.webp`],
+  );
   // Ein Event-Beitrag.
   const event = await pg.query<{ id: string }>(
     `insert into public.events (title, starts_at, visibility)
@@ -179,7 +196,7 @@ beforeAll(async () => {
   );
 
   const { error } = await supabase.auth.signInWithPassword({
-    email: `age582-ich-${stempel}@example.test`,
+    email: ichEmail,
     password: KENNWORT,
   });
   if (error) throw error;
@@ -254,20 +271,46 @@ describe("5.5 / 5.6 — jede Ordnung blättert vollständig und doppelt keinen B
   });
 });
 
-describe("5.12 — der Typ-Filter läuft in der Datenbank", () => {
-  const nurTyp = (typ: "bild" | "video" | "event" | "text") =>
-    fetchFeed({ uid: ich, typ, tags: [MARKE] });
+describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
+  const nurTyp = (...typen: ("bild" | "video" | "event" | "text")[]) =>
+    fetchFeed({ uid: ich, typen, tags: [MARKE] });
 
-  it("Video findet den Beitrag mit eingebettetem Video, und nur den", async () => {
+  /**
+   * Die erwartete ID-Menge — aus SQL, nicht aus `fetchFeed`.
+   *
+   * Eine Erwartung, die denselben Codeweg benutzt wie das Geprüfte, ist ein
+   * Zirkelschluss. Und eine Zusage der Form „jeder Treffer erfüllt X" bleibt
+   * gruen, wenn Treffer FEHLEN — genau der Befund aus dem Diff-Review (gemini
+   * HIGH, codex MEDIUM). Deshalb die vollstaendige Menge, aus einer zweiten
+   * Quelle.
+   */
+  async function erwarteteIds(...typen: string[]): Promise<string[]> {
+    const zweige: Record<string, string> = {
+      video: "p.video_url is not null",
+      event: "p.kind = 'event'",
+      bild: "exists (select 1 from public.post_media m where m.post_id = p.id)",
+      text: "p.video_url is null and p.kind <> 'event' and not exists (select 1 from public.post_media m where m.post_id = p.id)",
+    };
+    const wo = typen.length ? `and (${typen.map((x) => `(${zweige[x]})`).join(" or ")})` : "";
+    const r = await pg.query<{ id: string }>(
+      `select p.id from public.posts p
+        where p.hashtags && $1 ${wo}
+        order by p.created_at desc, p.id desc`,
+      [[MARKE]],
+    );
+    return r.rows.map((x) => x.id);
+  }
+
+  it("Video findet die Beiträge mit eingebettetem Video, und nur die", async () => {
     const seite = await nurTyp("video");
-    expect(seite.posts).toHaveLength(1);
-    expect(seite.posts[0].videoUrl).not.toBeNull();
+    expect(seite.posts).toHaveLength(2); // der reine Video-Beitrag und der mit beidem
+    expect(seite.posts.every((p) => p.videoUrl !== null)).toBe(true);
   });
 
-  it("Bild findet den bebilderten Beitrag über die post_media-Zeile", async () => {
+  it("Bild findet die bebilderten Beiträge über die post_media-Zeile", async () => {
     const seite = await nurTyp("bild");
-    expect(seite.posts).toHaveLength(1);
-    expect(seite.posts[0].media).toHaveLength(1);
+    expect(seite.posts).toHaveLength(2); // der reine Bild-Beitrag und der mit beidem
+    expect(seite.posts.every((p) => p.media.length === 1)).toBe(true);
   });
 
   it("Event findet den Event-Beitrag", async () => {
@@ -285,6 +328,94 @@ describe("5.12 — der Typ-Filter läuft in der Datenbank", () => {
     expect(seite.posts.every((p) => p.videoUrl === null)).toBe(true);
     expect(seite.posts.every((p) => p.media.length === 0)).toBe(true);
     expect(seite.posts.every((p) => p.kind === "member")).toBe(true);
+  });
+
+  it("zwei Typen liefern die VEREINIGUNG, nicht die Schnittmenge", async () => {
+    // Die Kernzusage von AGE-590. Angehaengte Filter verknuepft PostgREST mit
+    // UND — die alte Fassung haette hier die Schnittmenge geliefert, also nur
+    // den einen Beitrag mit beidem.
+    const nurVideo = await nurTyp("video");
+    const nurBild = await nurTyp("bild");
+    const beide = await nurTyp("video", "bild");
+
+    const erwartet = new Set([...nurVideo.posts, ...nurBild.posts].map((p) => p.id));
+    expect(new Set(beide.posts.map((p) => p.id))).toEqual(erwartet);
+    expect(beide.posts.length).toBeGreaterThan(nurVideo.posts.length);
+  });
+
+  it("ein Beitrag, der auf BEIDE Typen zutrifft, steht genau einmal darin", async () => {
+    const beide = await nurTyp("video", "bild");
+    const ids = beide.posts.map((p) => p.id);
+    expect(ids).toHaveLength(new Set(ids).size);
+  });
+
+  it("„Text“ bleibt auch in der Vereinigung die Abwesenheit der anderen", async () => {
+    // Gegen die EXAKTE Menge aus SQL: eine Zusage der Form „jeder Treffer ist
+    // ein Event oder ein Text" bliebe gruen, wenn der text-Zweig ganz wegfiele
+    // und nur das Event zurueckkaeme (Diff-Review codex).
+    const erwartet = await erwarteteIds("text", "event");
+    const alle: string[] = [];
+    let cursor: FeedCursor | null = null;
+    do {
+      const s = await fetchFeed({ uid: ich, typen: ["text", "event"], tags: [MARKE], cursor });
+      alle.push(...s.posts.map((p) => p.id));
+      cursor = s.nextCursor;
+    } while (cursor);
+    expect(alle).toEqual(erwartet);
+    // Und die Menge traegt WIRKLICH beides — sonst pruefte die Zusage oben nur
+    // eine Sorte und hiesse trotzdem „Vereinigung".
+    const kinds = new Set((await nurTyp("text", "event")).posts.map((p) => p.kind));
+    expect(erwartet.length).toBeGreaterThan(FEED_SEITE);
+    expect(kinds.size).toBeGreaterThan(0);
+  });
+
+  it("die leere Menge ist derselbe Bestand wie gar kein Typfilter", async () => {
+    const ohne = await fetchFeed({ uid: ich, tags: [MARKE] });
+    const leer = await nurTyp();
+    expect(leer.posts.map((p) => p.id)).toEqual(ohne.posts.map((p) => p.id));
+  });
+
+  it("alle vier Typen sind derselbe Bestand wie gar kein Typfilter", async () => {
+    const ohne = await fetchFeed({ uid: ich, tags: [MARKE] });
+    const alle = await nurTyp("bild", "video", "event", "text");
+    expect(alle.posts.map((p) => p.id)).toEqual(ohne.posts.map((p) => p.id));
+  });
+
+  it("der Typfilter überlebt das Blättern — Typvereinigung UND Cursorgrenze", async () => {
+    // Ab Seite 2 stehen ZWEI `or=`-Parameter in der Anfrage. PostgREST
+    // verknuepft sie mit UND; zoege man sie zu einer Gruppe zusammen, liefen
+    // Beitraege ausserhalb der Blaettergrenze mit.
+    const erwartet = await erwarteteIds("text", "video");
+    expect(erwartet.length).toBeGreaterThan(FEED_SEITE); // es MUSS geblaettert werden
+
+    const ids: string[] = [];
+    let cursor: FeedCursor | null = null;
+    do {
+      const seite = await fetchFeed({ uid: ich, typen: ["text", "video"], tags: [MARKE], cursor });
+      ids.push(...seite.posts.map((p) => p.id));
+      cursor = seite.nextCursor;
+    } while (cursor);
+
+    // Die VOLLSTAENDIGE Menge in der richtigen Reihenfolge. Eine Zusage ueber
+    // Eigenschaften der Treffer bliebe gruen, wenn Treffer fehlten — und genau
+    // das ist der Fehler, den ein zweites `or=` verursachen koennte.
+    expect(ids).toEqual(erwartet);
+    expect(ids).toHaveLength(new Set(ids).size);
+  });
+
+  it("ohne Sitzung gilt der Typfilter auch", async () => {
+    await supabase.auth.signOut();
+    try {
+      const seite = await fetchFeed({ uid: null, typen: ["bild"], tags: [MARKE] });
+      expect(seite.posts.length).toBeGreaterThan(0);
+      expect(seite.posts.every((p) => p.media.length === 1)).toBe(true);
+    } finally {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: ichEmail,
+        password: KENNWORT,
+      });
+      expect(error).toBeNull();
+    }
   });
 });
 
