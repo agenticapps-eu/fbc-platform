@@ -52,15 +52,27 @@ Konto ist angelegt und die Sitzung besteht, bevor der Versand beginnt.
 
 ## ADDED Requirements
 
-### Requirement: Eine Registrierung ohne Sitzung ist kein stiller Erfolg
+### Requirement: Eine Registrierung auf eine bekannte Adresse führt weiter
 
-Der Anmeldedienst antwortet auf eine Registrierung mit einer **bereits bekannten**
-Adresse bewusst mit Erfolg, **ohne Fehler und ohne Sitzung** — das ist sein Schutz
-gegen das Aufzählen vorhandener Adressen und SHALL NOT umgangen werden.
+Wie der Anmeldedienst auf eine Registrierung mit einer **bereits bekannten**
+Adresse antwortet, hängt an einer seiner Einstellungen. **Gemessen am
+2026-08-25:**
 
-Die Oberfläche SHALL diesen Fall dennoch **sichtbar** beantworten. Bleibt nach
-einer Registrierung sowohl ein Fehler als auch eine Sitzung aus, SHALL sie einen
-Hinweis zeigen, der weiterführt.
+- Ist die eingebaute E-Mail-Bestätigung **aus**, antwortet er mit **HTTP 422 und
+  dem Code `user_already_exists`** — also mit einem Fehler, dessen Text
+  („User already registered") englisch ist und die Existenz des Kontos
+  ausspricht.
+- Ist sie **an**, antwortet er mit Erfolg, **ohne Fehler und ohne Sitzung**. Das
+  ist sein Schutz gegen das Aufzählen vorhandener Adressen und SHALL NOT
+  umgangen werden.
+
+Die Oberfläche SHALL **beide** Ausgänge auf **denselben** Hinweis führen, der
+weiterführt. Sie SHALL NOT den rohen Fehlertext des Anmeldedienstes anzeigen.
+
+Der Grund, beide gleich zu behandeln: Welcher der beiden eintritt, ist eine
+Betriebseinstellung und kein Unterschied, der die betroffene Person etwas angeht.
+Sie will wissen, wie sie hineinkommt. Und der Fehlertext des ersten Falls sagt
+ausgerechnet das, was der Aufzählungsschutz des zweiten sorgfältig vermeidet.
 
 Der Hinweis SHALL **zum Anfordern eines Zugangslinks** führen und daneben zur
 Anmeldung. Er SHALL NOT „Passwort zurücksetzen" als ersten Weg anbieten: Die
@@ -75,7 +87,10 @@ der Anmeldedienst nennt ihr den Grund nicht, und sie SHALL NOT nach ihm fragen.
 
 **Was diese Anforderung ausdrücklich NICHT zusagt.** Sie macht die beiden
 Ausgänge nicht von außen ununterscheidbar. Eine unbekannte Adresse erzeugt eine
-Sitzung und löst die Seite ab; eine bekannte bleibt auf ihr stehen. Dieser
+Sitzung und löst die Seite ab; eine bekannte bleibt auf ihr stehen. Sie
+**verbessert** die Lage allerdings gegenüber heute: Der rohe Satz „User already
+registered" verschwindet, und damit die einzige Stelle, an der die Oberfläche die
+Existenz eines Kontos ausdrücklich behauptet hat. Dieser
 Unterschied ist heute schon beobachtbar und folgt daraus, dass die eingebaute
 E-Mail-Bestätigung ausgeschaltet ist — ihn zu schließen hieße, den ganzen
 Registrierungsverlauf umzubauen. Der Hinweis fügt **keinen neuen** Beobachtungsweg
@@ -91,6 +106,17 @@ Fehlermeldung. Fehlen beide, bleibt **kein** Zweig, der etwas sagt.
 - **WHEN** eine Registrierung ohne Fehler zurückkommt, aber keine Sitzung entsteht
 - **THEN** erscheint ein sichtbarer Hinweis, der zum Anfordern eines Zugangslinks
   und zur Anmeldung führt
+
+#### Scenario: Registrierung mit `user_already_exists`
+
+- **WHEN** eine Registrierung mit dem Code `user_already_exists` fehlschlägt
+- **THEN** erscheint **derselbe** Hinweis, und der rohe Fehlertext des
+  Anmeldedienstes erscheint nirgends
+
+#### Scenario: Jeder andere Fehler bleibt sichtbar
+
+- **WHEN** eine Registrierung mit einem anderen Fehler fehlschlägt
+- **THEN** wird dessen Meldung angezeigt und NICHT durch den Hinweis ersetzt
 
 #### Scenario: Der Hinweis nennt keinen Grund
 

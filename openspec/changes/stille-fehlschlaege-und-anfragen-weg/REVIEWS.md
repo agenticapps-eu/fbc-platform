@@ -167,6 +167,26 @@ Name wird deshalb zusammengesetzt; Aufgabe 1.4 hält es fest.
 Erledigt sich durch die Entscheidung oben: Jetzt **wird** der Eintrag bedingt
 gerendert, und Proposal wie Design sagen das gleichlautend.
 
+### Beim Bauen dazugekommen — eine Messung, die die Prämisse verschoben hat
+
+Keiner der beiden Reviewer konnte das sehen, und der Plan hat es geglaubt statt
+geprüft: **Der stumme 200er ohne Sitzung hängt an einer Einstellung des
+Anmeldedienstes.** Er tritt nur auf, solange die eingebaute E-Mail-Bestätigung
+EINGESCHALTET ist — so stand PROD vom 16. bis zum 25.08., daher die Beobachtung.
+Seit `mailer_autoconfirm` wieder `true` ist, antwortet GoTrue mit HTTP 422
+`user_already_exists`. Am 2026-08-25 gegen den lokalen Stack gemessen, der
+dieselbe Einstellung trägt.
+
+Der heute live sichtbare Fehler ist damit ein anderer: Das Formular zeigte den
+rohen Satz „User already registered" — englisch, führt nirgendwohin, und er
+spricht die Existenz des Kontos aus. Das ist ausgerechnet die Aussage, gegen die
+der erste HIGH-Befund die Zusage geschärft hat.
+
+Beide Wege enden jetzt im selben neutralen Hinweis; der Zweig „ohne Sitzung"
+bleibt, weil das Umlegen jener Einstellung ihn sofort wieder aktiv macht. Das ist
+eine **Erweiterung** des Issues gegenüber dem gegengelesenen Plan und steht
+deshalb hier, nicht stillschweigend im Diff.
+
 ### Nicht übernommen
 
 Nichts abgelehnt. Der einzige Befund, dessen radikalere Variante nicht umgesetzt

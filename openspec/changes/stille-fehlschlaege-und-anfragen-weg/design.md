@@ -128,7 +128,40 @@ Attrappe liefert `{ data: { user: { id } }, error: null }`, also nie eine
 Sitzung, und prüfte damit den Versand ausgerechnet im Fall, in dem er nicht
 laufen darf.
 
-### 5. Der Fluchtweg heißt Zugangslink, nicht Passwort zurücksetzen
+### 5. Gemessen: die Prämisse des Issues hat sich verschoben — der Zweig bleibt
+
+**Beim Bauen nachgeprüft, statt geglaubt.** Der stumme 200er ohne Sitzung tritt
+nur auf, solange die eingebaute E-Mail-Bestätigung **eingeschaltet** ist. Genau so
+stand PROD zwischen dem 16. und dem 25.08. — daher die Beobachtung, die dieses
+Issue ausgelöst hat. Seit `mailer_autoconfirm` wieder `true` ist, antwortet GoTrue
+auf eine Wiederholung mit **HTTP 422 `user_already_exists`**. Am 2026-08-25 gegen
+den lokalen Stack gemessen (`enable_confirmations = false`, dieselbe Einstellung
+wie PROD).
+
+Damit ist der heute live sichtbare Fehler ein **anderer**, aber kein kleinerer:
+Das Formular zeigte `error.message` roh an — „User already registered". Englisch,
+führt nirgendwohin, und es verrät geradeheraus, dass die Adresse vergeben ist.
+Ausgerechnet die Aussage, die der Aufzählungsschutz im anderen Zweig sorgfältig
+vermeidet. Für die betroffene Gruppe — importierte, nicht aktivierte Mitglieder —
+ist das genauso eine Sackgasse wie die Stille, nur eine gesprächigere.
+
+**Beide Wege enden deshalb im selben neutralen Hinweis.** Erkannt wird der Fall am
+`code` und nicht am Text: Der Text kommt vom Server, ist englisch und kann sich
+mit jeder Version ändern — eine Prüfung darauf wäre genau die Art Zusage, die
+still ausfällt.
+
+**Der Zweig „ohne Sitzung" bleibt trotzdem**, obwohl er auf PROD heute nicht
+erreicht wird. Wird die Bestätigung wieder eingeschaltet — und das ist eine
+Betriebseinstellung, keine Naturkonstante —, ist er sofort wieder der aktive.
+Ihn mit „kommt ja nicht vor" wegzulassen hieße, die Stille an eine Einstellung zu
+hängen, die niemand beim Umlegen mit diesem Code in Verbindung bringt.
+
+**Was NICHT passiert: alle Fehler einsammeln.** Nur `user_already_exists` wird
+umgeleitet. Ein Formular, das jeden Fehler in denselben freundlichen Hinweis
+übersetzt, ist wieder genau die Fläche, die nichts sagt — dafür gibt es eine
+eigene Gegenprobe.
+
+### 6. Der Fluchtweg heißt Zugangslink, nicht Passwort zurücksetzen
 
 Der erste Entwurf führte den Hinweis auf „Passwort zurücksetzen". Der
 Plan-Review hat den Adressaten dagegengehalten: **70 von 73 Konten** sind
@@ -139,7 +172,7 @@ Formular „Bestätigungslink anfordern" zeigt — dorthin, wo ihr Problem gelö
 wird. Daneben steht der Weg zur Anmeldung, für den kleinen Rest, der schon ein
 Passwort hat.
 
-### 6. `isError` bekommt einen eigenen Zweig — aber nur ohne Daten
+### 7. `isError` bekommt einen eigenen Zweig — aber nur ohne Daten
 
 Das Widget rendert im Fehlerfall eine Karte mit Hinweis; `data.length === 0`
 liefert weiter `null`.

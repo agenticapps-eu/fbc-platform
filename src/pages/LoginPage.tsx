@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { AuthError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
@@ -26,6 +27,19 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 type Mode = "login" | "register";
+
+/**
+ * Sagt der Anmeldedienst „diese Adresse gibt es schon"?
+ *
+ * Am `code` festgemacht und nicht am Text: Der Text ist englisch, kommt vom
+ * Server und kann sich mit jeder Version ändern — eine Prüfung darauf wäre
+ * genau die Art Zusage, die still ausfällt. `AuthError.code` ist seit
+ * auth-js 2.x typisiert (`ErrorCode`) und für diesen Fall
+ * `user_already_exists`.
+ */
+function istBereitsRegistriert(error: AuthError): boolean {
+  return error.code === "user_already_exists";
+}
 
 /**
  * Der Hinweis für den dritten Ausgang der Registrierung (AGE-591).
@@ -127,16 +141,27 @@ export default function LoginPage() {
     }
 
     const { error, hatSession } = await signUp(values.email, values.name);
-    if (error) {
+    if (error && !istBereitsRegistriert(error)) {
       setFormError(error.message);
       return;
     }
-    // Kein Fehler UND keine Sitzung: Das ist GoTrues Aufzählungsschutz — auf
-    // eine bereits bekannte Adresse antwortet er mit Erfolg, ohne Sitzung. Bis
-    // AGE-591 fiel dieser Ausgang durch beide Zweige hindurch und der Knopf tat
-    // wortlos nichts. Warum die Seite hier keinen Grund nennen kann: Sie kennt
-    // ihn nicht. GoTrue nennt ihn nicht, und sie fragt nicht nach.
-    if (!hatSession) {
+    // ZWEI Wege enden hier, und welcher es ist, hängt an einer Einstellung des
+    // Anmeldedienstes (AGE-591):
+    //
+    //  - `user_already_exists` (HTTP 422), solange die eingebaute
+    //    E-Mail-Bestätigung AUS ist. Das ist der Stand auf PROD seit dem 25.08.,
+    //    und der Grund, warum hier nicht `error.message` steht: Der rohe Satz
+    //    lautet „User already registered" — englisch, führt nirgendwohin, und er
+    //    verrät geradeheraus, dass die Adresse vergeben ist.
+    //  - kein Fehler und keine Sitzung, solange die Bestätigung AN ist. Dann
+    //    greift GoTrues Aufzählungsschutz, der genau diese Aussage vermeidet.
+    //    So stand PROD zwischen dem 16. und dem 25.08. — daher die stumme Seite,
+    //    die dieses Issue ausgelöst hat.
+    //
+    // Beide bekommen denselben neutralen Hinweis. Die Seite nennt keinen Grund;
+    // im zweiten Fall kennt sie ihn nicht einmal, und im ersten geht er
+    // niemanden etwas an, der nur wissen will, wie er hineinkommt.
+    if (error || !hatSession) {
       setOhneSitzung(true);
       return;
     }

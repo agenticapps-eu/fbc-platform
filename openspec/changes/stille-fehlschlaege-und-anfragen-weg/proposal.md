@@ -21,11 +21,15 @@ Diese drei Löcher bleiben und sind Code.
   `mein-bereich`, es gibt also **keinen Menüeintrag**. Ein Eintrag **„Meine
   Anfragen"** erscheint unter „Mein Bereich", **solange** offene Anfragen
   vorliegen, mit ihrer Anzahl.
-- **Registrierung ohne Sitzung (AGE-591).** GoTrue antwortet bei einer bereits
-  bekannten Adresse mit **200, ohne Fehler und ohne Sitzung**
-  (`user_repeated_signup`, Aufzählungsschutz). `LoginPage.onSubmit` prüft nur
-  `error !== null` und meldet deshalb nichts. Der Fall bekommt eine sichtbare
-  Rückmeldung, die zum **Zugangslink** führt.
+- **Registrierung auf eine bekannte Adresse (AGE-591).** Beim Bauen gemessen und
+  dabei korrigiert: GoTrue antwortet **je nach Einstellung verschieden**. Mit
+  eingeschalteter E-Mail-Bestätigung mit 200 ohne Fehler und ohne Sitzung
+  (Aufzählungsschutz) — so stand PROD vom 16. bis 25.08., daher die stumme Seite.
+  Seit `mailer_autoconfirm` wieder `true` ist, mit **HTTP 422
+  `user_already_exists`**, und das Formular zeigte dessen rohen englischen Text
+  „User already registered" — der nirgendwohin führt und die Existenz des Kontos
+  ausspricht. **Beide** Ausgänge bekommen jetzt denselben neutralen Hinweis, der
+  zum **Zugangslink** führt. Jeder andere Fehler bleibt im Klartext.
 - **Die Nebenwirkungen der Registrierung hängen am falschen Zweig.** In
   `AuthProvider.signUp` laufen `logEvent("signup")` und das sitzungsgebundene
   `resendActivationLink()` unter `if (!error)` — also **auch** bei einer

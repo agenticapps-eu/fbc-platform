@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import type { AuthError } from "@supabase/supabase-js";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
+import type { AuthContextValue } from "../providers/auth-context";
 import { DesignVariantProvider } from "../providers/DesignVariantProvider";
 import LoginPage from "./LoginPage";
 
@@ -13,7 +15,16 @@ import LoginPage from "./LoginPage";
  * (MemberDirectory.tsx:235). Deshalb wird hier geprüft, was tatsächlich AN
  * `signUp` ÜBERGEBEN wird, nicht nur, dass ein Feld existiert.
  */
-function renderLogin(signUp = vi.fn(async () => ({ error: null, hatSession: true }))) {
+/**
+ * Der Rückgabetyp wird ausdrücklich genannt, statt ihn aus der Vorgabe ableiten
+ * zu lassen: Sonst schließt TypeScript auf `error: null` und jeder Test, der
+ * einen FEHLER durchspielt, passt nicht mehr in dieselbe Stelle.
+ */
+type SignUpAttrappe = ReturnType<typeof vi.fn<AuthContextValue["signUp"]>>;
+
+function renderLogin(
+  signUp: SignUpAttrappe = vi.fn(async () => ({ error: null, hatSession: true })),
+) {
   render(
     <AuthFixture value={fakeAuthValue({ signUp })}>
       <DesignVariantProvider>
@@ -180,7 +191,7 @@ describe("LoginPage", () => {
   // „Aktivieren" wählen; das sind 70 von 73 Konten.
   describe("Registrierung ohne Fehler und ohne Sitzung", () => {
     /** Registriert mit der angegebenen Adresse und wartet, bis `signUp` durch ist. */
-    async function registriere(signUp: ReturnType<typeof vi.fn>, email: string) {
+    async function registriere(signUp: SignUpAttrappe, email: string) {
       toRegisterMode();
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Anna Muster" } });
       fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: email } });
@@ -267,6 +278,67 @@ describe("LoginPage", () => {
      * Fehlermodus, nur andersherum: Die Oberfläche behauptet etwas über einen
      * Vorgang, der längst ein anderer ist.
      */
+    /**
+     * GEMESSEN am 25.08. gegen den lokalen Stack, und es hat die Prämisse dieses
+     * Issues verschoben.
+     *
+     * Der stumme 200er ohne Sitzung tritt nur auf, solange die eingebaute
+     * E-Mail-Bestätigung EINGESCHALTET ist. Genau so stand PROD zwischen dem
+     * 16. und dem 25.08. — daher die Beobachtung. Seit `mailer_autoconfirm` auf
+     * PROD wieder `true` ist, antwortet GoTrue auf eine Wiederholung mit
+     * **HTTP 422 `user_already_exists`**, also mit einem FEHLER.
+     *
+     * Damit ist der heute live sichtbare Fehler ein anderer, aber kein
+     * kleinerer: Das Formular zeigte `error.message` roh an — „User already
+     * registered". Englisch, führt nirgendwohin, und es verrät geradeheraus,
+     * dass die Adresse vergeben ist. Ausgerechnet die Aussage, die GoTrues
+     * Aufzählungsschutz im anderen Zweig sorgfältig vermeidet.
+     *
+     * Beide Wege enden deshalb im selben neutralen Hinweis. Der Zweig „ohne
+     * Sitzung" bleibt: Wird die Bestätigung wieder eingeschaltet, ist er sofort
+     * wieder der aktive — und dann wäre die Stille zurück, hätte man ihn mit
+     * der Begründung „kommt ja nicht vor" weggelassen.
+     */
+    it("fängt auch den 422 user_already_exists ab und zeigt denselben Hinweis", async () => {
+      const signUp = vi.fn(async () => ({
+        error: {
+          code: "user_already_exists",
+          message: "User already registered",
+          status: 422,
+        } as unknown as AuthError,
+        hatSession: false,
+      }));
+      renderLogin(signUp);
+      await registriere(signUp, "bekannt@example.org");
+
+      const hinweis = await screen.findByRole("status");
+      expect(hinweis).toBeInTheDocument();
+      // Der rohe englische Satz darf NIRGENDS auf der Seite stehen.
+      expect(screen.queryByText(/User already registered/i)).toBeNull();
+    });
+
+    /**
+     * Die Gegenprobe, ohne die aus dem Fix ein Fehlerschlucker würde: JEDER
+     * andere Fehler muss weiterhin gemeldet werden. Ein Formular, das alles in
+     * denselben freundlichen Hinweis übersetzt, ist wieder genau die Fläche, die
+     * nichts sagt.
+     */
+    it("meldet jeden ANDEREN Fehler weiterhin im Klartext", async () => {
+      const signUp = vi.fn(async () => ({
+        error: {
+          code: "over_email_send_rate_limit",
+          message: "Zu viele Versuche. Bitte später erneut probieren.",
+          status: 429,
+        } as unknown as AuthError,
+        hatSession: false,
+      }));
+      renderLogin(signUp);
+      await registriere(signUp, "anna@example.org");
+
+      expect(await screen.findByText(/Zu viele Versuche/)).toBeInTheDocument();
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+
     it("verschwindet beim Wechsel in den Login-Modus", async () => {
       const signUp = renderLogin(ohneSitzung());
       await registriere(signUp, "anna@example.org");
