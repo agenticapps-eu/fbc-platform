@@ -105,10 +105,85 @@ Layout rechnet. Die Höhe selbst ist Sache der Sichtprobe (4.1).
 
 ## 4. Abnahme
 
-- [ ] 4.1 Sichtprobe im Browser mit einem echten angenommenen Kontakt —
+- [x] 4.1 Sichtprobe im Browser mit einem echten angenommenen Kontakt —
       Reiter, Zähler, Cover, keine Chips. Zusätzlich die Admin-Mitgliederliste,
       weil sie dieselbe Karte benutzt.
-- [ ] 4.2 `pnpm test` grün, `tsc` sauber, `eslint` ohne Fehler,
+- [x] 4.2 `pnpm test` grün, `tsc` sauber, `eslint` ohne Fehler,
       `supabase test db` mit Dateiliste grün.
-- [ ] 4.3 Mindestens eine Mutation je neuem Test.
-- [ ] 4.4 `openspec validate --all` grün.
+- [x] 4.3 Mindestens eine Mutation je neuem Test.
+
+**Zwölf Verbiegungen, alle rot — aber erst nach drei Korrekturen**
+
+| Verbiegung | Zusage, die bricht |
+|---|---|
+| Marke wieder eingebaut | zeigt auf der Karte KEINE Kompass-Marken mehr |
+| roher Pfad statt Auflöser | zeigt das Cover über den Bild-Auflöser |
+| `aspect-[3/1]` entfernt | passt das Bild ein |
+| `object-contain` → `-cover` | passt das Bild ein |
+| Bildfeld nur mit Bild | behält das Bildfeld auch ohne Cover |
+| Zähler aus der ID-Menge | zählt die dargestellten Karten |
+| Fehler als leere Menge gelesen | gescheiterte Kontaktabfrage ist keine Null |
+| Zustand 4 fällt mit 3 zusammen | Kontakte ohne sichtbare Karte, eigener Hinweis |
+| `removeQueries` entfernt | verwirft die Kontaktmenge des vorigen Kontos |
+| Kennung aus dem Schlüssel | trennt zwei Konten voneinander |
+| Richtung ignoriert (immer `to_id`) | die Anfrage ging VOM Gegenüber aus |
+| Zähler auch während des Ladens | ein Ladezustand zeigt keinen Zähler |
+
+**Zwei der drei ersten „grün" waren Fehler der MESSUNG, nicht der Zusagen** —
+und beide hätten als Freispruch durchgehen können: die eingebaute Marke sass
+innerhalb von `member.branche && …`, und das Fixture trägt keine Branche, also
+stand sie nie im DOM; das zweite `-t`-Muster traf den Umlaut in
+„Bild-Auflöser" nicht und übersprang **alle 21** Zusagen. Eine Verbiegung, die
+gar nicht ankommt, ist kein Beleg — die Zeile „21 skipped" ist der Unterschied.
+
+**Der dritte war ein echter Befund.** Die Kennung aus dem Schlüssel zu nehmen
+blieb grün, weil das `removeQueries` beim Identitätswechsel den Fehler
+**verdeckt**: der Zwischenspeicher wird ohnehin geleert. Zwei Vorkehrungen, von
+denen nur eine geprüft ist, sind eine geprüft — daher zwei zusätzliche Zusagen
+direkt an `contactsQueryKey`, wo die Verdeckung wegfällt.
+- [x] 4.4 `openspec validate --all` grün.
+
+## Messung der Abnahme
+
+**4.1 Sichtprobe im Browser** — gegen den LOKALEN Stack, weil die Migration nur
+dort liegt; `pnpm dev` zeigte auf DEV und bekäme die alte Signatur. Eigener Port
+(5175), damit der Vite-Server der Vorsitzung unangetastet bleibt.
+
+Gemessen am Element, nicht am Bild, und nicht an der Fensterbreite:
+
+| Karte | Cover | Kartenhöhe | Feld-Verhältnis | Bild geladen |
+|---|---|---|---|---|
+| Bea Kontakt | 400×400 (1:1) | 395 px | 3,000 | ja |
+| Carl Fremd | **keines** | 395 px | 3,000 | — |
+| Dana Fremd | 600×100 (6:1) | 395 px | 3,000 | ja |
+| Donald Sichtprobe | 600×100 (6:1) | 395 px | 3,000 | ja |
+
+**Alle vier exakt gleich hoch, auch die ohne Bild** — das Raster franst nicht
+aus. `object-fit: contain` am Bild, beide Extremverhältnisse vollständig
+sichtbar. `naturalWidth > 0` ist dabei der Punkt, den jsdom nie liefern kann:
+der Pfad→URL-Weg trägt wirklich, die Bilder sind da statt nur verlinkt.
+
+Keine einzige „Bietet"/„Sucht"-Marke, obwohl das Fixture Carl Fremd Kategorien
+in `offers` und `needs` gibt. Reiter: „Alle Mitglieder 4" · „Meine Kontakte 1",
+die Zahl je `aria-hidden` neben der Beschriftung. Unter „Meine Kontakte" steht
+genau das eine Gegenüber, dessen Anfrage **eingehend** angenommen wurde.
+
+Suchbegriff „Carl" über den Reiterwechsel: Feld behält den Wert, die Zähler
+gehen auf **1 / 0**, und es erscheint „Dazu passt keiner deiner Kontakte" —
+nicht die Einladung. Konsole ohne Fehler und Warnungen.
+
+**Admin-Ansicht** (Rolle geliehen und zurückgenommen, `staff_roles` danach
+wieder leer): dieselbe Karte, Cover geladen, Verhältnis 3,000, keine Marken.
+Die Kartenhöhen unterscheiden sich dort zwischen den Rasterzeilen (392/392/392
+und 369/369) — innerhalb einer Zeile fluchten sie. Das ist die
+Grid-Zeilenhöhe und die bestehende `flex-1`-Anordnung der Admin-Fläche, nicht
+diese Änderung.
+
+**4.2** `pnpm test` 1690 grün · `tsc` sauber · `eslint src` 0 Fehler (4
+Warnungen, alle in nicht angefassten Dateien) · `supabase test db` mit
+Dateiliste: 10 Dateien, **719** Zusagen grün.
+
+**Zwei Fallen auf dem Weg zur Sichtprobe**, beide von der Sorte „prüft einen
+Namen statt einer Sache": der Opt-in-Wächter des Demo-Seeds sieht den Zielhost
+**gar nicht** an, und `resolveSsl` erkennt lokal am Wort `localhost` — unter
+`127.0.0.1`, das `supabase status` ausgibt, nimmt es den TLS-Weg und scheitert.
