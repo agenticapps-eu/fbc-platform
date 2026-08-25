@@ -315,6 +315,36 @@ describe("Die gefüllte Sidebar (6.6)", () => {
     expect(within(zeile).getByText("Video")).toBeInTheDocument();
   });
 
+  it("die Spalte trägt GENAU die vier Typen", async () => {
+    // Ohne diese Zusage koennte „Event" und „Text" wegfallen und die Suite
+    // bliebe gruen (Diff-Review codex).
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    const liste = screen.getByRole("list", { name: /beitragstyp/i });
+    const kaestchen = within(liste).getAllByRole("checkbox");
+    expect(kaestchen).toHaveLength(4);
+    expect(kaestchen.map((k) => k.closest("label")!.textContent)).toEqual([
+      "Bild",
+      "Video",
+      "Event",
+      "Text",
+    ]);
+  });
+
+  it("alle vier angehakt bleiben alle vier angehakt — und die Abfrage kanonisiert", async () => {
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    const liste = screen.getByRole("list", { name: /beitragstyp/i });
+    for (const k of within(liste).getAllByRole("checkbox")) fireEvent.click(k);
+
+    await waitFor(() => expect(letzterAufruf().typen).toEqual(["bild", "video", "event", "text"]));
+    // Die Oberflaeche zeigt weiter vier Haken: die Abbildung der vollen Menge
+    // auf die leere sitzt in der Kanonisierung, NICHT im Zustand der Oberflaeche.
+    for (const k of within(liste).getAllByRole("checkbox")) expect(k).toBeChecked();
+  });
+
   it("es gibt KEINEN Eintrag „Alle Typen“ mehr", async () => {
     // „Alle" ist der Zustand ohne Haken. Als fuenftes Kaestchen waere er ein
     // Widerspruch: angehakt und alle vier angehakt muessten dasselbe heissen.

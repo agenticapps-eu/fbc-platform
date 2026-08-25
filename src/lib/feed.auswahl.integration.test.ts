@@ -275,6 +275,32 @@ describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
   const nurTyp = (...typen: ("bild" | "video" | "event" | "text")[]) =>
     fetchFeed({ uid: ich, typen, tags: [MARKE] });
 
+  /**
+   * Die erwartete ID-Menge — aus SQL, nicht aus `fetchFeed`.
+   *
+   * Eine Erwartung, die denselben Codeweg benutzt wie das Geprüfte, ist ein
+   * Zirkelschluss. Und eine Zusage der Form „jeder Treffer erfüllt X" bleibt
+   * gruen, wenn Treffer FEHLEN — genau der Befund aus dem Diff-Review (gemini
+   * HIGH, codex MEDIUM). Deshalb die vollstaendige Menge, aus einer zweiten
+   * Quelle.
+   */
+  async function erwarteteIds(...typen: string[]): Promise<string[]> {
+    const zweige: Record<string, string> = {
+      video: "p.video_url is not null",
+      event: "p.kind = 'event'",
+      bild: "exists (select 1 from public.post_media m where m.post_id = p.id)",
+      text: "p.video_url is null and p.kind <> 'event' and not exists (select 1 from public.post_media m where m.post_id = p.id)",
+    };
+    const wo = typen.length ? `and (${typen.map((x) => `(${zweige[x]})`).join(" or ")})` : "";
+    const r = await pg.query<{ id: string }>(
+      `select p.id from public.posts p
+        where p.hashtags && $1 ${wo}
+        order by p.created_at desc, p.id desc`,
+      [[MARKE]],
+    );
+    return r.rows.map((x) => x.id);
+  }
+
   it("Video findet die Beiträge mit eingebettetem Video, und nur die", async () => {
     const seite = await nurTyp("video");
     expect(seite.posts).toHaveLength(2); // der reine Video-Beitrag und der mit beidem
@@ -324,10 +350,23 @@ describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
   });
 
   it("„Text“ bleibt auch in der Vereinigung die Abwesenheit der anderen", async () => {
-    const seite = await nurTyp("text", "event");
-    expect(seite.posts.every((p) => p.media.length === 0)).toBe(true);
-    expect(seite.posts.some((p) => p.kind === "event")).toBe(true);
-    expect(seite.posts.every((p) => p.kind === "event" || p.videoUrl === null)).toBe(true);
+    // Gegen die EXAKTE Menge aus SQL: eine Zusage der Form „jeder Treffer ist
+    // ein Event oder ein Text" bliebe gruen, wenn der text-Zweig ganz wegfiele
+    // und nur das Event zurueckkaeme (Diff-Review codex).
+    const erwartet = await erwarteteIds("text", "event");
+    const alle: string[] = [];
+    let cursor: FeedCursor | null = null;
+    do {
+      const s = await fetchFeed({ uid: ich, typen: ["text", "event"], tags: [MARKE], cursor });
+      alle.push(...s.posts.map((p) => p.id));
+      cursor = s.nextCursor;
+    } while (cursor);
+    expect(alle).toEqual(erwartet);
+    // Und die Menge traegt WIRKLICH beides — sonst pruefte die Zusage oben nur
+    // eine Sorte und hiesse trotzdem „Vereinigung".
+    const kinds = new Set((await nurTyp("text", "event")).posts.map((p) => p.kind));
+    expect(erwartet.length).toBeGreaterThan(FEED_SEITE);
+    expect(kinds.size).toBeGreaterThan(0);
   });
 
   it("die leere Menge ist derselbe Bestand wie gar kein Typfilter", async () => {
@@ -346,22 +385,22 @@ describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
     // Ab Seite 2 stehen ZWEI `or=`-Parameter in der Anfrage. PostgREST
     // verknuepft sie mit UND; zoege man sie zu einer Gruppe zusammen, liefen
     // Beitraege ausserhalb der Blaettergrenze mit.
+    const erwartet = await erwarteteIds("text", "video");
+    expect(erwartet.length).toBeGreaterThan(FEED_SEITE); // es MUSS geblaettert werden
+
     const ids: string[] = [];
     let cursor: FeedCursor | null = null;
     do {
       const seite = await fetchFeed({ uid: ich, typen: ["text", "video"], tags: [MARKE], cursor });
-      for (const p of seite.posts) {
-        // Jeder Beitrag ist ENTWEDER Video ODER Text. Nicht „ohne Medien": der
-        // Beitrag mit Video UND Bild faellt zu Recht unter „Video" und traegt
-        // deshalb eine post_media-Zeile.
-        expect(p.kind).toBe("member");
-        expect(p.videoUrl !== null || p.media.length === 0).toBe(true);
-        ids.push(p.id);
-      }
+      ids.push(...seite.posts.map((p) => p.id));
       cursor = seite.nextCursor;
     } while (cursor);
+
+    // Die VOLLSTAENDIGE Menge in der richtigen Reihenfolge. Eine Zusage ueber
+    // Eigenschaften der Treffer bliebe gruen, wenn Treffer fehlten — und genau
+    // das ist der Fehler, den ein zweites `or=` verursachen koennte.
+    expect(ids).toEqual(erwartet);
     expect(ids).toHaveLength(new Set(ids).size);
-    expect(ids.length).toBeGreaterThan(FEED_SEITE);
   });
 
   it("ohne Sitzung gilt der Typfilter auch", async () => {

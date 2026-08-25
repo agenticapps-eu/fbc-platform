@@ -109,3 +109,71 @@ ausgeräumt. Beide Verhaltensweisen sind **auf DEV** gemessen, nicht nur lokal
 (lokal: postgrest/14.5; DEV/PROD melden hinter Cloudflare keine Version). Für
 PROD bleibt sie eine Annahme, gestützt darauf, dass beide Projekte dieselbe
 verwaltete Plattform sind.
+
+---
+
+# Diff-Review — Schritt 4 (nach der Implementierung)
+
+Eigener Durchgang auf dem **Diff**, nicht auf dem Plan. Er ersetzt den
+Plan-Review oben nicht. Grundlage: `git diff main...HEAD -- src/`,
+Prompt-SHA `650d0c6d76770d51`. Beide Vendoren fremd, `REVIEWER_TIMEOUT=900`, beide exit 0.
+
+## Reviewer: gemini — VERDICT: REQUEST-CHANGES
+
+Zur Umsetzung selbst: „the canonicalization for cache keys is robust, the
+PostgREST query construction is correct, and the UI changes are clean." Die
+Befunde treffen ausschliesslich die **Tests**.
+
+- [HIGH] `feed.auswahl.integration.test.ts` (Blätter-Zusage) — Die Zusage im
+  Blättertest ist zu schwach: `p.videoUrl !== null || p.media.length === 0`
+  ist auch für den Event-Fixture wahr. Der wichtigste Test der Neuerung — Typ
+  UND Cursor zugleich — prüft damit zu wenig.
+- [MEDIUM] `feed.auswahl.integration.test.ts` (text + event) — Prüft eine
+  Eigenschaft der Testdaten statt der Filterlogik.
+
+## Reviewer: codex — VERDICT: REQUEST-CHANGES
+
+- [MEDIUM] text+event ist **vakuös**: gäbe der `text`-Zweig gar nichts zurück
+  und käme nur das Event, blieben alle Zusagen grün.
+- [MEDIUM] Der Blättertest prüft nur Eindeutigkeit und `length > FEED_SEITE`;
+  irgendwelche 21 von 27 erwarteten Beiträgen kämen durch. Seite 2 könnte still
+  Beiträge verlieren.
+- [LOW] `CommunityFeed.flaeche.test.tsx` — Keine Zusage, dass **vier**
+  Kästchen dastehen; „Event" und „Text" könnten wegfallen und die Suite bliebe
+  grün.
+
+## Resolution (Diff-Review)
+
+**Alle fünf Befunde angenommen — und sie treffen alle denselben Nerv:** eine
+Zusage der Form „jeder Treffer erfüllt X" bleibt grün, wenn Treffer **fehlen**.
+Genau das ist der Fehler, den ein falsch verknüpftes zweites `or=` erzeugen
+würde. Die Tests hätten ihn nicht gesehen.
+
+Beide Integrationszusagen prüfen jetzt die **vollständige ID-Menge in der
+richtigen Reihenfolge** gegen eine neue Hilfsfunktion `erwarteteIds()`, die die
+Erwartung **in SQL** bildet — über `pg`, nicht über `fetchFeed`. Eine Erwartung
+aus demselben Codeweg wie das Geprüfte wäre ein Zirkelschluss gewesen.
+
+Der Blättertest sichert zusätzlich vorab zu, dass überhaupt geblättert werden
+**muss** (`erwartet.length > FEED_SEITE`) — sonst prüfte er das Blättern gar
+nicht.
+
+Zwei neue Flächen-Zusagen (codex LOW): genau vier Kästchen mit genau diesen
+Beschriftungen in dieser Reihenfolge, und „alle vier angehakt bleiben angehakt,
+während die Abfrage kanonisiert".
+
+**Gegenprobe auf die verschärften Zusagen**, weil längere Tests nicht
+automatisch bessere sind:
+
+| Verbiegung | Ergebnis |
+|---|---|
+| `text`-Zweig fällt weg (nur Events kämen zurück) | ROT ✅ |
+| Kästchen „Text" entfernt | ROT ✅ |
+
+Vorher schon geprüft, gegen die erste Fassung: `or`-Gruppe → angehängte
+Einzelfilter · Vollmengen-Abbildung entfernt · `text` auf eine Bedingung
+verkürzt · beide `or`-Gruppen zusammengezogen · Umschalter ersetzt statt
+ergänzt. **Alle fünf ROT.**
+
+Kein Befund betraf die Umsetzung selbst; an `feed.ts` und `CommunityFeed.tsx`
+wurde aufgrund dieses Reviews nichts geändert.

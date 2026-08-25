@@ -138,7 +138,7 @@ wird.
       aneinandergehängte Filter ersetzen) muss die zugehörige Zusage rot machen.
       Wo eine Verbiegung grün bleibt, fehlt ein Test. Vorher committen — das
       Messwerkzeug verwirft ungesicherte Änderungen.
-- [ ] 5.5 **Diff**-Review durch zwei fremde Vendoren — Schritt 4 der Schleife,
+- [x] 5.5 **Diff**-Review durch zwei fremde Vendoren — Schritt 4 der Schleife,
       auf dem Diff, nicht auf dem Plan. Der Plan-Review ist bereits gelaufen und
       steht in `REVIEWS.md`; die Diff-Befunde kommen als eigener Abschnitt dazu
       und ersetzen ihn nicht (codex).
