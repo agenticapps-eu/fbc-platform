@@ -142,4 +142,4 @@ wird.
       auf dem Diff, nicht auf dem Plan. Der Plan-Review ist bereits gelaufen und
       steht in `REVIEWS.md`; die Diff-Befunde kommen als eigener Abschnitt dazu
       und ersetzen ihn nicht (codex).
-- [ ] 5.6 `openspec validate --all` grün, dann archivieren und PR.
+- [x] 5.6 `openspec validate --all` grün, dann archivieren und PR.
