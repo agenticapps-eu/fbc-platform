@@ -84,7 +84,9 @@ function renderFeed() {
 
 /** Aus der ruhigen Zeile den vollen Composer aufklappen (6.1). */
 function oeffneComposer() {
-  fireEvent.click(screen.getByRole("button", { name: /was möchtest du mit der community teilen/i }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /was möchtest du mit der community teilen/i }),
+  );
 }
 
 function waehleBilder(...dateien: File[]) {
@@ -107,7 +109,11 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((rueckruf) => {
     rueckruf(new Blob(["webp"], { type: "image/webp" }));
   });
-  vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:vorschau", revokeObjectURL: () => {} });
+  vi.stubGlobal("URL", {
+    ...URL,
+    createObjectURL: () => "blob:vorschau",
+    revokeObjectURL: () => {},
+  });
 });
 
 afterEach(() => {
@@ -132,26 +138,31 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
     fireEvent.click(within(tagAuswahl).getByRole("button", { name: "Netzwerken" }));
     fireEvent.click(screen.getByRole("button", { name: /posten/i }));
 
-    await waitFor(() => expect(rpcAufrufe).toHaveLength(1));
+    /* Nur DIESE RPC zählen. Seit 6.6 holt die Spalte ihre zwei Aggregate
+       ebenfalls über `rpc`, und ein Zähler über alle Aufrufe misst ab da
+       Nachbarn statt der Zusage: der Beitrag und seine Bildzeilen entstehen in
+       EINEM Schritt. */
+    const anlegen = () => rpcAufrufe.filter((r) => r.name === "create_post_with_media");
+    await waitFor(() => expect(anlegen()).toHaveLength(1));
 
     // Der Pfad trägt dieselbe Beitrags-id wie die RPC — sie entsteht im Client,
     // VOR dem Upload, sonst gäbe es keinen Pfad zum Hochladen.
-    const postId = rpcAufrufe[0].args.p_post_id as string;
+    const postId = anlegen()[0].args.p_post_id as string;
     expect(uploads.map((u) => u.path)).toEqual([
       expect.stringMatching(new RegExp(`^test-user/${postId}/0-\\d+\\.webp$`)),
       expect.stringMatching(new RegExp(`^test-user/${postId}/1-\\d+\\.webp$`)),
     ]);
 
-    expect(rpcAufrufe[0].name).toBe("create_post_with_media");
+    expect(anlegen()[0].name).toBe("create_post_with_media");
     // 4032×3024 → 1600×1200: die echte `zielMasse` hat gerechnet.
-    expect(rpcAufrufe[0].args.p_media).toEqual([
+    expect(anlegen()[0].args.p_media).toEqual([
       { storage_path: uploads[0].path, sort: 0, width: 1600, height: 1200 },
       { storage_path: uploads[1].path, sort: 1, width: 1600, height: 1200 },
     ]);
     // Getippt und geklickt gehen GETRENNT hinein; vereinigt wird in der RPC.
-    expect(rpcAufrufe[0].args.p_hashtags).toEqual(["allgäu"]);
-    expect(rpcAufrufe[0].args.p_tags).toEqual(["netzwerken"]);
-    expect(rpcAufrufe[0].args.p_visibility).toBe("members");
+    expect(anlegen()[0].args.p_hashtags).toEqual(["allgäu"]);
+    expect(anlegen()[0].args.p_tags).toEqual(["netzwerken"]);
+    expect(anlegen()[0].args.p_visibility).toBe("members");
   });
 
   it("begrenzt hart auf sechs Bilder — mit sichtbarer Rückmeldung, nicht stillem Verschlucken", async () => {
@@ -186,7 +197,7 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
    * teilen sich denselben Aktionsbereich. Vorher lagen sie in getrennten
    * Zeilen, und genau daran ist diese Zusicherung rot gewesen.
    */
-  it("legt die Dateiauswahl in dieselbe Aktionszeile wie „Posten\"", () => {
+  it('legt die Dateiauswahl in dieselbe Aktionszeile wie „Posten"', () => {
     renderFeed();
     oeffneComposer();
 
@@ -212,11 +223,66 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
     oeffneComposer();
 
     fireEvent.change(screen.getByLabelText("Neuer Beitrag"), { target: { value: "Text" } });
+    // Seit 6.3 liegt das Feld hinter der Medientyp-Zeile — es ist nicht mehr
+    // von vornherein da.
+    fireEvent.click(screen.getByRole("button", { name: /^video$/i }));
     fireEvent.change(screen.getByLabelText(/video-link/i), {
       target: { value: "https://evil.example.com/embed/x" },
     });
 
     expect(screen.getByRole("button", { name: /posten/i })).toBeDisabled();
     expect(screen.getByText(/nur youtube- oder vimeo-links/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Die Medientyp-Zeile (AGE-582, 6.3).
+ *
+ * Sie benennt, was dieser Composer annimmt — und was er ausdrücklich NICHT
+ * annimmt. Ein Knopf „Event" oder „Umfrage" gehört nicht dazu: Events entstehen
+ * in `/events` und erscheinen im Feed als eigene Karte, eine Umfrage gibt es
+ * nicht. Ein Knopf, dessen einziger Ausgang eine Enttäuschung ist, ist schlechter
+ * als kein Knopf.
+ */
+describe("Composer — die Medientyp-Zeile", () => {
+  it("bietet Bild und Video an, jedes mit einem Symbol", () => {
+    renderFeed();
+    oeffneComposer();
+
+    const zeile = screen.getByRole("group", { name: /medien/i });
+    const bild = within(zeile).getByText("Bild");
+    const video = within(zeile).getByRole("button", { name: /^video$/i });
+
+    // Das Symbol ist Teil der Zusage, nicht Zierde: 6.3 verlangt Icons aus dem
+    // Satz. Geprüft wird am gezeichneten `<svg>`, nicht an einem Klassennamen.
+    expect(bild.closest("label")!.querySelector("svg")).not.toBeNull();
+    expect(video.querySelector("svg")).not.toBeNull();
+  });
+
+  it("trägt weder einen Event- noch einen Umfrage-Knopf", () => {
+    renderFeed();
+    oeffneComposer();
+
+    const zeile = screen.getByRole("group", { name: /medien/i });
+    expect(within(zeile).queryByText(/event/i)).toBeNull();
+    expect(within(zeile).queryByText(/umfrage/i)).toBeNull();
+  });
+
+  it("zeigt das Videofeld erst auf Wunsch — und behält es, sobald etwas darin steht", () => {
+    renderFeed();
+    oeffneComposer();
+
+    expect(screen.queryByLabelText(/video-link/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /^video$/i }));
+    const feld = screen.getByLabelText(/video-link/i);
+
+    /* Der zweite Klick klappt wieder zu — aber nur, solange nichts drinsteht.
+       Ein eingegebener Link, den ein Fehlklick unsichtbar macht, ginge beim
+       Veröffentlichen trotzdem mit: der Composer hängt ihn an den Body. Das
+       wäre ein Beitrag mit einem Video, von dem sein Verfasser nichts weiss. */
+    fireEvent.change(feld, { target: { value: "https://www.youtube.com/watch?v=abc12345678" } });
+    fireEvent.click(screen.getByRole("button", { name: /^video$/i }));
+    expect(screen.getByLabelText(/video-link/i)).toBeInTheDocument();
   });
 });

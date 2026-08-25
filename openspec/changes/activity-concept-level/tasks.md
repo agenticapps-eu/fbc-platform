@@ -423,11 +423,13 @@ nachgemessen statt geglaubt, alle abgearbeitet.
       zwei unabhängige Abfragen nacheinander kosteten auf jeder Seite eine
       Rundreise mehr. Test prüft die Zahl der Abfragen (1, nicht 20) und dass
       ohne Sitzung **gar nicht** gefragt wird
-- [ ] 5.11 Invalidierung beider Schlüssel. **Bewusst offen und nach 6.10
-      verschoben.** Der Mechanismus steht und ist zugesichert (`feedListKey`
-      bleibt Präfix jeder Auswahl, 5.7), und `toggleSave` gibt es; was fehlt,
-      ist die Mutation an der Karte — und eine `useMutation` ohne den Knopf aus
-      6.10 wäre Code ohne Aufrufer
+- [x] 5.11 Invalidierung beider Schlüssel. **Mit 6.10 nachgeholt**, wie
+      vorgesehen: die `save`-Mutation an der Karte invalidiert über
+      `feedListKey(uid)` und damit über den PRÄFIX jeder Auswahl (5.7).
+      **Im Browser gemessen, nicht behauptet:** im Reiter „Gespeichert" standen
+      die vier gespeicherten Beiträge (23, 16, 9, 2); nach dem Lösen von 23
+      blieben dort drei (16, 9, 2) — und in „Alle Beiträge" zeigte 23 den Knopf
+      ungedrückt. Beide Flächen fortgeschrieben, mit einer Invalidierung
 - [x] 5.12 Typ-Filter in der Abfrage: Video über `video_url`, Event über `kind`,
       Bild über `post_media=not.is.null`, Text als Verneinung über **drei**
       Quellen. Dafür trägt das Select-Literal `post_media(post_id)` mit —
@@ -456,28 +458,97 @@ nachgemessen statt geglaubt, alle abgearbeitet.
 
 ## 6. Fläche
 
-- [ ] 6.1 Composer in die Feed-Spalte verschieben (`CommunityFeed.tsx:156` rendert
-      ihn heute vor dem Raster); Sidebar beginnt oben bündig
-- [ ] 6.2 Den Non-goal-Kommentar in `CommunityFeed.tsx:213` mitändern — er begründet
-      heute das Gegenteil dessen, was die Datei dann tut
-- [ ] 6.3 Medientyp-Zeile im Composer mit Icons aus dem Kanon (Bild, Video);
-      **kein** Event- und **kein** Umfrage-Knopf
-- [ ] 6.4 Drei Reiter; ein Reiterwechsel setzt das Blättern zurück. Der Reiter lebt
-      im Zustand der Seite, **nicht** in der URL
-- [ ] 6.5 Umschalter für die Ordnung; ein Ordnungswechsel setzt das Blättern zurück
-- [ ] 6.6 Sidebar: Tags als Auswahlkästchen mit Zählern, aktivste Mitglieder,
-      Beitragstyp
-- [ ] 6.7 Die Spalte darf **nicht** verschwinden, wenn keine kuratierten Tags
-      bestehen (heute gibt `TagFilter` in dem Fall `null` zurück)
-- [ ] 6.8 **Der anonyme Fall:** ohne Sitzung nur „Alle Beiträge", kein
-      Speichern-Knopf, keine aktivsten Mitglieder — und die Zähler entweder
-      nachweislich öffentlich-nur oder gar nicht. Kein Aufruf, der in 401 läuft
-- [ ] 6.9 **Mobil:** die gefüllte Spalte darf nicht ungeklappt zwischen Composer und
-      ersten Beitrag treten und nicht ersatzlos unter zwanzig Karten wandern —
-      zusammengeklappt über dem Feed oder als eigene Fläche
-- [ ] 6.10 Speichern-Knopf an der Beitragskarte, mit Zustand und Rücknahme
-- [ ] 6.11 Der Wert kommt in mehreren Fällen erst **nach** dem Mount — kein
-      `useState(wert)` als Erstbelegung, sonst prüft der Test die falsche Zeitachse
+- [x] 6.1 Composer in die Feed-Spalte verschoben; er ist jetzt ein Rasterkind auf
+      Spalte 1 statt eines Geschwisters VOR dem Raster. Die Spalte beginnt oben
+      bündig (beide auf Zeile 1). **Die Spannweite der Spalte hängt daran, ob es
+      den Composer gibt** (`lg:row-span-2` gegen `lg:row-span-1`) — fest auf zwei
+      gesetzt entstünde ausgeloggt eine LEERE zweite Zeile samt ihrem Abstand.
+      Im Browser bei 1440 px gesehen, eingeloggt und ausgeloggt
+- [x] 6.2 Der Non-goal-Kommentar ist mit `TagFilter` entfallen — er begründete,
+      dass Zähler und aktivste Mitglieder NICHT in die Spalte gehören, und genau
+      das tut sie jetzt. Der Kopfkommentar der Datei sagte außerdem
+      „chronologische Beitragsliste"; auch das stimmt seit der wählbaren Ordnung
+      nicht mehr und ist mitgeändert
+- [x] 6.3 Medientyp-Zeile im Composer: `Bild` und `Video`, jedes mit einem Symbol
+      aus dem Satz (`image`, `video` — zwei neue Glyphen, denn der Satz ist die
+      einzige Datei, die ein `<svg>` öffnen darf). **Kein** Event- und **kein**
+      Umfrage-Knopf; drei Zusagen, eine davon prüft ausdrücklich deren Abwesenheit.
+      Das Videofeld liegt seither hinter der Zeile — **bleibt aber stehen, sobald
+      etwas darin steht**: der Composer hängt den Link beim Veröffentlichen an den
+      Body, ein Fehlklick ergäbe sonst einen Beitrag mit einem Video, von dem sein
+      Verfasser nichts weiß. Die Zeile liegt INNERHALB der Aktionsgruppe (`span`,
+      nicht `div`), damit Donalds Anordnung vom 12.08. bestehen bleibt
+- [x] 6.4 Drei Reiter. Der Wechsel setzt das Blättern zurück, **ohne eine Zeile
+      dafür**: `feedSeitenKey` trägt die ganze Auswahl (5.7), eine andere Auswahl
+      ist also eine andere Abfrage und beginnt bei ihrer ersten Seite. Die Zusage
+      ist deshalb scharf gefasst — nicht „die Liste beginnt oben", sondern die
+      ERSTE Anfrage der neuen Auswahl trägt keinen Cursor.
+      Bewusst Knöpfe mit `aria-pressed` statt `role="tab"`: echte Reiter
+      verlangen Pfeiltasten und einen wandernden `tabindex`, und eine halbe
+      Umsetzung davon ist für eine Vorleseausgabe schlechter als keine. Der Reiter
+      lebt im Zustand der Seite, nicht in der URL.
+      **Live belegt:** „Gespeichert" lieferte genau die vier gespeicherten
+      Beiträge — der `!inner`-Join unter der RLS, nicht eine Filterung im Client
+- [x] 6.5 Umschalter für die Ordnung neben den Reitern; ein Wechsel setzt das
+      Blättern aus demselben Grund zurück. **Alle drei live gefahren:**
+      „Beliebteste" ergab 11, 22, 9, 20, 7 (Reaktionszahlen 12, 11, 11, 10, 10 —
+      absteigend, mit Gleichstand), „Älteste zuerst" 0, 1, 2, 3, 4
+- [x] 6.6 Sidebar: die kuratierten Tags als **Auswahlkästchen mit Zählern** aus
+      `feed_tag_counts`, die aktivsten Mitglieder aus `feed_top_authors`, der
+      Beitragstyp als Auswahlliste. Datenschicht in `src/lib/feed-sidebar.ts`
+      (8 Zusagen), Fläche in `CommunityFeed.tsx`.
+      **Zwei Haken sind ein ODER, live gemessen:** „Marketing" allein vier
+      Beiträge, mit „Investitionen" acht — die Vereinigung, nicht der
+      Durchschnitt. **Alle vier Typfilter live:** Video 5 (mit fünf Einbettungen),
+      Bild 4, Text 15, Event keiner — mit dem richtigen Leerzustand.
+      Kein Fehler wird zu einer leeren Liste geglättet — **und die Fläche sagt
+      es auch.** Im Selbst-Review gefunden: ein gescheiterter Aufruf sah genau
+      so aus wie „es gibt nichts", beide Male keine Kästchen. Das ist derselbe
+      Fehler wie eine Null aus einem Fehler, nur eine Ebene tiefer. Beide Karten
+      tragen jetzt eine eigene Zeile dafür, je mit einer Zusage
+- [x] 6.7 Die Spalte bleibt stehen, wenn kein kuratierter Tag einen sichtbaren
+      Beitrag hat: nur die Tag-Karte entfällt, aktivste Mitglieder und Typfilter
+      hängen nicht daran. Zugesichert, und ausgeloggt auch **live** so gesehen —
+      dort fehlt die Autorenkarte, und die Spalte steht trotzdem
+- [x] 6.8 **Der anonyme Fall, im Browser belegt und nicht nur zugesichert.**
+      Ausgeloggt: EIN Reiter, kein Speichern-Knopf, keine aktivsten Mitglieder.
+      Die schärfere Zusage ist „wird gar nicht erst angefordert" — `enabled` an
+      der Abfrage, kein Rückfall auf eine leere Liste; `feed_top_authors` ist an
+      `anon` nicht vergeben, und ein Fehler, den eine Fläche als Null zeigt, ist
+      die schlechteste aller Zahlen.
+      **Die Tag-Zähler bleiben, und die Messung ist der Beleg:** derselbe Feed
+      zeigte ausgeloggt 4/2/2 und eingeloggt 8/8/4/4/4/4. `security invoker`
+      wirkt also wirklich — es zählen nur öffentliche Beiträge, wie es die Spec
+      verlangt.
+      Der Reiter ist ABGELEITET (`uid ? reiter : "alle"`), nicht per `useEffect`
+      nachgeführt: eine Sitzung kann auch ENDEN, während die Seite offen steht,
+      und ein Effekt stellte den Zustand erst eine Runde später zurück —
+      dazwischen liefe die Anfrage
+- [x] 6.9 **Mobil:** die Spalte steht zwischen Composer und Feed und ist
+      ZUSAMMENGEKLAPPT. **Bei echten 375 px gemessen** (`emulate`, nicht
+      `resize_page` — macOS lässt kein Fenster unter 500 px zu, und `innerWidth`
+      wüchse mit dem Fehler mit): Composer 342, Filter-Schalter 453, Reiter 527,
+      dann die Karten; das Panel `display: none`, aufgeklappt `block` mit sechs
+      Kästchen und drei Mitgliedern, kein Element rechts über 375 px hinaus.
+      EINE Fassung im DOM (`hidden lg:block`), nicht eine Telefon- und eine
+      Schirmfassung: zwei lägen in jsdom beide im Baum, und jede Abfrage nach
+      einem Kästchen fände es doppelt
+- [x] 6.10 Speichern-Knopf an der Beitragskarte, mit Zustand und Rücknahme.
+      **Er heißt „Beitrag speichern" und nicht „Speichern"** — beim Bearbeiten
+      steht der Absendeknopf des Editors mit genau diesem Namen auf DERSELBEN
+      Karte, und `CommunityFeed.bearbeiten.test.tsx` ist genau daran rot geworden.
+      Der Name bleibt in beiden Zuständen derselbe; der Zustand steht in
+      `aria-pressed` und im gefüllten Symbol. Ein Knopf, der zeitweise
+      „Gespeichert" hieße, trüge denselben Namen wie der Reiter daneben.
+      Der Glyph `bookmark` behält gefüllt seine Kontur (`MASSIV_MIT_KONTUR`),
+      aus demselben Grund wie das Herz: er wechselt unter dem Finger, und ohne
+      Kontur schrumpfte er dabei um eine halbe Strichstärke je Seite
+- [x] 6.11 Kein `useState(wert)` als Erstbelegung: `savedByMe` kommt aus der
+      Abfrage und wird direkt gelesen, wie `likedByMe` daneben. Eine Zusage misst
+      genau diese Zeitachse — sie verzögert die Antwort und prüft, dass die Karte
+      den erst NACH dem Mount eintreffenden Zustand annimmt. Läge er in einem
+      `useState(post.savedByMe)`, nähme sie ihn nie an: beim ersten Rendern gibt
+      es den Beitrag noch nicht
 
 ## 7. Abnahme
 

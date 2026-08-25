@@ -129,6 +129,30 @@ const GLYPHS = {
       <path d="m20 20-3.5-3.5" />
     </>
   ),
+  /** Die zwei Medientypen des Composers (AGE-582, 6.3). Sie stehen im Satz und
+   *  NICHT im Bereichs-Kanon: ein Bild ist kein Gegenstandsbereich, und eine
+   *  Bereichsfarbe dafür wäre erfunden.
+   *
+   *  Der Rahmen ist bewusst ein anderer als bei `mail` und `calendar` — die drei
+   *  stehen zwar nie nebeneinander, aber ein Rechteck allein unterscheidet
+   *  nichts. Sonne und Bergzug tragen hier die Bedeutung. */
+  image: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.6" cy="10" r="1.5" />
+      <path d="m3.6 16.8 4.6-4.3 3 2.8 3.6-4 5.6 5.5" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="3" y="6" width="12.5" height="12" rx="2" />
+      <path d="M15.5 11.2 21 8v8l-5.5-3.2z" />
+    </>
+  ),
+  /** Der Speichern-Knopf am Beitrag (AGE-582, 6.10). Wie das Herz wechselt er
+   *  UNTER DEM FINGER die Fassung und behält deshalb in beiden seine Kontur —
+   *  siehe `MASSIV_MIT_KONTUR`. */
+  bookmark: <path d="M6.5 3.8h11a1 1 0 0 1 1 1v15.4l-6.5-4-6.5 4V4.8a1 1 0 0 1 1-1Z" />,
   heart: (
     <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z" />
   ),
@@ -207,6 +231,7 @@ export type GlyphName = keyof typeof GLYPHS;
  *  Symbol, das auf jeder Fläche funktioniert, und einem, das auf hellem Chrome
  *  richtig und auf dunklem falsch aussieht. */
 const MASSIV: Partial<Record<GlyphName, ReactElement>> = {
+  bookmark: <path d="M6.5 3.8h11a1 1 0 0 1 1 1v15.4l-6.5-4-6.5 4V4.8a1 1 0 0 1 1-1Z" />,
   home: <path d="M12 3.2 21.5 10.5v9.3a1 1 0 0 1-1 1h-5v-5.6h-7V20.8h-5a1 1 0 0 1-1-1v-9.3z" />,
   compass: (
     <path
@@ -289,7 +314,7 @@ const NUR_MASSIV = new Set<GlyphName>(["crown"]);
  *  Gefunden im Code-Review zum Diff, nicht beim Ansehen: die Sichtprobe der
  *  neunzehnten Sitzung deckte Menü, Dashboard und zwei Seitenköpfe ab — den
  *  Like-Knopf nicht. */
-const MASSIV_MIT_KONTUR = new Set<GlyphName>(["heart"]);
+const MASSIV_MIT_KONTUR = new Set<GlyphName>(["heart", "bookmark"]);
 
 export function Icon({
   name,

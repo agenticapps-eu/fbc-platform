@@ -24,6 +24,10 @@ let abgelehnt: string[] = [];
 
 const AUTOR = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const TAGS = [{ key: "netzwerken", label: "Netzwerken", sort: 10 }];
+/** Was `feed_tag_counts` liefert (AGE-582, 6.6). Die Spalte zieht ihre Kästchen
+ *  aus diesem Aggregat und nicht mehr aus `tags`: ein kuratierter Tag OHNE
+ *  sichtbaren Beitrag erscheint dort gar nicht. */
+const TAG_ZAEHLER = [{ tag_key: "netzwerken", tag_label: "Netzwerken", post_count: 3 }];
 
 vi.mock("../../lib/supabase", () => {
   const zeilen = (table: string): unknown[] => {
@@ -53,7 +57,10 @@ vi.mock("../../lib/supabase", () => {
         };
         return kette;
       },
-      rpc: async () => ({ data: [], error: null }),
+      rpc: async (name: string) => ({
+        data: name === "feed_tag_counts" ? TAG_ZAEHLER : [],
+        error: null,
+      }),
       storage: {
         from: () => ({
           createSignedUrls: async (pfade: string[]) => {
@@ -265,8 +272,10 @@ describe("Tag-Filterleiste", () => {
     renderFeed();
     await screen.findByText(/Erlebnistag/);
 
-    // Die Leiste trägt das LABEL, die Chips am Beitrag den normalisierten Wert.
-    fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
+    // Die Spalte trägt das LABEL samt Zähler, die Chips am Beitrag den
+    // normalisierten Wert. Seit 6.6 ist es ein Auswahlkästchen und kein Chip —
+    // Mehrfachauswahl wirkt als ODER, und das versprechen Kästchen auch.
+    fireEvent.click(screen.getByRole("checkbox", { name: /netzwerken/i }));
 
     // Seit AGE-582 `.overlaps(…)` statt `.contains(…)`: bei EINER gewählten
     // Marke sind beide gleichbedeutend, bei mehreren ist `contains` ein UND.
@@ -280,9 +289,9 @@ describe("Tag-Filterleiste", () => {
     renderFeed();
     expect(await screen.findByText(/noch keine beiträge/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /netzwerken/i }));
 
-    expect(await screen.findByText(/keine beiträge mit diesem hashtag/i)).toBeInTheDocument();
+    expect(await screen.findByText(/keine beiträge zu diesem filter/i)).toBeInTheDocument();
   });
 });
 
