@@ -1,158 +1,135 @@
-# Session Handoff — 2026-08-25 (zwanzigste Sitzung, AGE-582 Abschnitte 2–4)
+# Session Handoff — 2026-08-25 (einundzwanzigste Sitzung, AGE-582 Abschnitt 5)
 
-**Die Abschnitte 2, 3 und 4 sind gebaut, der Code-Review ist gelaufen und seine
-fünf Befunde sind abgearbeitet.** Sieben Commits auf
-`donald/age-582-aktivitaet-auf-konzeptstand`, PR #205. **5, 6 und 7 sind
-unberührt — und dort beginnt das Frontend.**
-
-Drei Messungen haben Behauptungen umgestossen, die vorher als sicher galten —
-eine davon meine eigene.
+**Abschnitt 5, die Datenschicht des Feeds, ist gebaut, gemessen und gepusht.**
+Ein Commit auf `donald/age-582-aktivitaet-auf-konzeptstand` (`b3c5c2d`), PR #205,
+**CI grün auf dieser SHA** — und zwar nachgelesen im Log, nicht am Status
+geglaubt. **Abschnitt 6 (Fläche) und 7 (Abnahme) sind unberührt.**
 
 ## Accomplished
 
-**Abschnitt 2 — `post_saves`** (`c2bc588`). Private Merkliste, PK
-`(profile_id, post_id)`, beidseitig kaskadierend, **drei** Policies statt eines
-`for all`. 24 Zusagen in `post_saves_test.sql`.
+**13 von 14 Aufgaben aus Abschnitt 5.** `fetchFeed` nimmt jetzt `reiter`,
+`ordnung`, `tags` und `typ` — kein zweiter Ladeweg. **44 neue Zusagen**: 27 über
+die Abfrageform (`feed.auswahl.test.ts`, gemockter Builder) und 17 gegen den
+**laufenden lokalen Stack** (`feed.auswahl.integration.test.ts` — echtes Konto
+über GoTrue-Admin, Fixtures über `pg`, echtes PostgREST).
 
-**Abschnitt 3 — Zähler und Rechte** (`5b32b8a`, `253413b`), in der Reihenfolge,
-die der Plan wörtlich verlangt hat: erst der rote Angriffstest, dann der Entzug
-auf `post_likes`, dann der Zähler, dann der Entzug auf `posts`. Der Angriffstest
-stand rot mit `have: …-000b` — die Reaktionszeile war gewandert.
-`posts.like_count` mit Trigger, Prüfbedingung `>= 0` und Index. 23 Zusagen.
+**Der Integrationslauf hängt im CI-Job `migrations`**, der den Stack ohnehin
+hochfährt (`pnpm test:integration`, `FBC_INTEGRATION=1`). Belegt: das Job-Log
+sagt `feed.auswahl.integration.test.ts (17 tests)` und `Tests 17 passed`. Ohne
+diese Prüfung wäre auch ein Lauf über null Dateien mit Exit 0 durchgegangen.
 
-**Abschnitt 4 — Sidebar-Aggregate** (`b368e26`). `feed_tag_counts()` und
-`feed_top_authors(p_limit)`, beide `security invoker` — das
-Sichtbarkeitsprädikat wird **nicht** kopiert. 18 Zusagen.
+**Vier Gegenproben, jede einzeln zurückgenommen, die Rücknahme belegt:**
+`.contains()` statt `.overlaps()` · Beliebtheits-Cursor über das führende Feld
+allein · `post_media`-Einbettung entfernt · `!inner`-Join entfernt. Jede macht
+genau die gemeinte Zusage rot. Zurückgespielt aus einer Kopie unter `/tmp`,
+**nicht** per `git stash`.
 
-**Gemessen, nicht behauptet.** Jeder Abschnitt stand vorher rot, und zu jeder
-tragenden Zusage gibt es eine Gegenprobe am lebenden Katalog (`alter policy` /
-`alter function` / `grant`), jede einzeln zurückgenommen. Zwölf Gegenproben
-insgesamt; die schärfste: `like_count` allein in die Spaltenliste
-zurückzulegen öffnet die Selbstbeförderung sofort wieder.
-
-**Code-Review (Schritt 4)** über `main...HEAD`, 41 Dateien. Fünf Befunde, alle
-nachgemessen und abgearbeitet (`566a96f`, Einzelheiten in `tasks.md` §4b). Der
-schwerste: **mein Entzug des INSERT-Rechts auf `posts` hat vier Zusagen in
-`rls_test.sql` ausgehöhlt.** Das ACL antwortet seither VOR der Policy, also
-blieben sie grün, während das gemeinte Gate ausgebaut war — genau die Falle, die
-ich bei 22.15 repariert und an vier weiteren Stellen übersehen hatte.
-
-**Gesamtstand:** 9 pgTAP-Dateien, **671 Zusagen**, PASS. Vitest **133/1485**.
-`tsc --noEmit` sauber.
+**Gesamtstand:** Vitest **1512/1512** (134 Dateien) plus 17 im Integrationslauf.
+`tsc --noEmit`, `pnpm lint`, `pnpm build` sauber.
 
 ## Decisions
 
-- **Drei Policies auf `post_saves` statt eines `for all`** wie bei
-  `likes_write_own`. *Warum:* `for all` schlösse UPDATE ein, und an einer
-  Speicherung gibt es nichts zu ändern. Das Grant allein trägt die Aussage
-  nicht — bis AGE-312 kam der Ist-Zustand aus Supabases `alter default
-  privileges`. Also steht sie zweimal.
-- **Prüfbedingung `like_count >= 0` statt `greatest(…, 0)`.** *Warum:*
-  `greatest` fängt eine negative Zahl **still** ab und macht jedes künftige Loch
-  unsichtbar. Die Prüfbedingung fällt laut aus, dort wo das Loch entsteht.
-- **`posts` verliert INSERT und tabellenweites UPDATE.** *Warum:* der Befund war
-  real — vor dem Entzug las die Zusage `'OK'`, ein Autor konnte
-  `update posts set like_count = 999` auf seinem eigenen Beitrag absetzen.
-- **Das Design war an einer Stelle falsch, korrigiert statt übernommen.** Die
-  Plan-Review schrieb, der Verschiebe-Angriff treffe „einen Beitrag, den der
-  Angreifer nicht einmal sehen muss". Gemessen: **stimmt nicht** — der
-  `exists`-Ausdruck in `likes_write_own` läuft unter der RLS des Aufrufers. Die
-  Reichweite ist „jeder sichtbare Beitrag", ab `exchange` der ganze Club. Der
-  Entzug bleibt richtig, die Begründung ist berichtigt (`design.md` §4a).
-- **Kein neuer Index für die Sidebar (4.9) — und das ist eine Messung.** Der
-  Verdacht lag auf dem Tag-Join, weil der Planer `posts_hashtags_gin` nicht
-  nimmt. Falsch: die verworfene `unnest`-Fassung bringt 489 ms statt 507.
-  Derselbe `count(*)` über 20 000 Beiträge kostet **0,79 ms / 364 Puffer ohne
-  RLS** und **464 ms / 71 065 unter RLS** — Faktor 195, bevor irgendetwas
-  aggregiert wird. Die Grenze ist `posts_select_by_visibility` mit `has_level(4)`
-  je Zeile. **Gehört nicht in diesen Change, gehört aber aufgeschrieben.**
-- **Eine gelöschte Policy ist keine gültige Gegenprobe.** Bei eingeschalteter
-  RLS ohne Policy gilt Default-Deny — es wird alles abgewiesen, und der Test
-  bleibt grün, ganz gleich was er misst. Nur das AUFWEICHEN misst
-  (`alter policy … using (true)`, oder gezielt ein Prädikatsteil heraus). Mit
-  `using(true)` fallen 10 Zusagen; nimmt man nur `is_activated()` heraus, fällt
-  **genau eine** — die reparierte. Das gilt für jede künftige RLS-Gegenprobe in
-  diesem Repo.
-- **Event-Beiträge zählen für „Aktivste Mitglieder" mit** (Donald, 25.08.).
-  *Warum:* ein Event-Beitrag steht als Karte im Feed; eine Liste, die eine
-  sichtbare Karte nicht mitzählte, wäre schwerer zu erklären. *Preis:* ein
-  Gastgeber steht oben, ohne je geschrieben zu haben. Drehen = eine Zeile
-  (`and p.kind = 'member'`).
-- **`feed_top_authors` ist nicht an `anon` vergeben**, `feed_tag_counts` schon.
-  *Warum:* `profiles_public` hält für `anon` kein Recht. Das steht als GRANT und
-  nicht als Vorsatz im Client — ein Aufrufweg, den es nicht gibt, entsteht nicht
-  versehentlich.
+- **Zwei Select-Literale statt eines immer mitgeführten Joins.** *Warum, und das
+  ist eine Messung, keine Vorsicht:* `anon` mit eingebettetem `post_saves`
+  bekommt **HTTP 401 / `42501`** auf die GANZE Abfrage — die Einbettung bleibt
+  nicht etwa leer. Ein Schaufenster ohne Beiträge wäre die Folge. Der Union-Typ
+  aus zwei Literalen trägt in TypeScript; mit einer Sonde geprüft, dass er nicht
+  still zu `any` zerfällt.
+- **`post_media(post_id)` steht im Select-Literal, obwohl die Bilder weiter über
+  eine eigene Abfrage kommen.** *Warum:* ohne die Einbettung kennt PostgREST die
+  Beziehung im Filter nicht, und die Typen „Bild" und „Text" fallen. Gegenprobe
+  C belegt, dass sie tragend ist und nicht Zierde.
+- **`savedByMe` ist ein PFLICHTFELD an `FeedPost`**, anders als `former?`
+  daneben. *Warum:* es ist der Zwilling von `likedByMe` und trägt einen Knopf,
+  dessen falscher Zustand dem Mitglied etwas über die eigene Handlung vorlügt.
+  Sechs Fixtures kostet das je eine Zeile.
+- **`FeedCursor.likeCount` ist nur in „Beliebteste" belegt**, und ein Cursor ohne
+  sie **wirft** dort. *Warum:* sonst entstünde `like_count.lt.undefined`. Und
+  ein Cursor, der Felder einer fremden Ordnung trägt, sähe gültig aus.
+- **Der Wächter gegen den stillen Fall steht VOR der ersten Zeile Anfrage.**
+  *Warum:* „liefert nichts" wäre auch dann wahr, wenn der Bestand schon gelesen
+  wurde. Eine eigene Zusage prüft, dass gar nicht gefragt wird.
+- **Der Integrationslauf ist GETRENNT, nicht zur Laufzeit übersprungen.**
+  *Warum:* ein `skipIf(!stackErreichbar)` ist überall grün, auch dort, wo nie
+  etwas lief — derselbe Fehler wie die beiden `member_lifecycle`-Dateien am
+  23.08. Er löscht ausserdem **nur die eigenen Fixtures**; `delete from
+  public.posts` nähme einem Entwickler seinen Demo-Bestand.
+- **`database.types.ts` von Hand nachgezogen, nicht neu erzeugt.** *Warum:* ein
+  volles `supabase gen types` schreibt die Datei stillos um (2117 statt 1919
+  Zeilen, alle Semikolons weg) und meldet RPC-Rückgabespalten als non-null — die
+  Datei warnt im Kopf selbst davor (AGE-498). Die Formen stammen trotzdem aus
+  dem erzeugten Schema; nur `avatar_url` ist gegen den Generator auf
+  `string | null` berichtigt.
+- **5.11 bleibt offen und wandert zu 6.10.** *Warum:* der Mechanismus steht und
+  ist zugesichert (`feedListKey` bleibt Präfix jeder Auswahl), `toggleSave` gibt
+  es — aber eine `useMutation` ohne den Speichern-Knopf wäre Code ohne Aufrufer.
+  Ein Haken dafür wäre eine Lüge im Plan.
 
 ## Files modified
 
-**Neu — Migrationen** (alle forward-only, **nirgends ausser lokal angewendet**):
-`20260824130000_post_saves.sql` · `20260824140000_post_likes_ohne_update.sql` ·
-`20260824150000_posts_like_count.sql` ·
-`20260824151000_posts_beliebtheit_index.sql` ·
-`20260824160000_posts_rechte_enger.sql` ·
-`20260824170000_feed_sidebar_aggregate.sql`
+**Neu:** `src/lib/feed.auswahl.test.ts` (27) ·
+`src/lib/feed.auswahl.integration.test.ts` (17)
 
-**Neu — Tests:** `supabase/tests/post_saves_test.sql` (24) ·
-`feed_popularity_test.sql` (23) · `feed_sidebar_test.sql` (18) ·
-`src/lib/feed.like.test.ts` (4)
-
-- `supabase/tests/grants_test.sql` — §1 um `post_saves` ergänzt, `post_likes`
-  ohne UPDATE, `posts` auf `DELETE,SELECT`; §2 um `posts.UPDATE=body,hashtags,
-  visibility` und `posts` in der `table_name in (…)`-Liste
-- `supabase/tests/rls_test.sql` — **nur 22.15**: schrieb `kind`/`ref_id`, lief
-  bis dahin bis zur Policy durch und riss nach dem Entzug den ganzen Lauf mit
-  (386 von 433). Auf `try_as`/`alike` umgestellt, Grund im Kommentar
-- `.github/workflows/ci.yml` — die **drei** neuen pgTAP-Dateien eingetragen.
-  Ohne diesen Schritt läuft eine Datei nie; genau so sind die beiden
-  `member_lifecycle`-Dateien am 23.08. an CI vorbeigelaufen
-- `openspec/changes/activity-concept-level/tasks.md` — 2, 3, 4 abgehakt
-- `openspec/changes/activity-concept-level/design.md` — §4a berichtigt
-- **Aus dem Review:** `supabase/tests/rls_test.sql` (vier weitere Zusagen: 645
-  und 22.13 geben das INSERT-Recht in der Transaktion kurz zurück, 22.11/22.12
-  laufen als Eigentümer über `throws_ok` auf `23505`/`23514`) ·
-  `src/components/ui/icons.tsx` (`MASSIV_MIT_KONTUR`, das Herz behält seine
-  Kontur) · `src/components/ui/icons.render.test.tsx` **neu** ·
-  `src/config/bereiche.test.ts` (Anker wird zugesichert — die Zusage war
-  selbstblind)
+- `src/lib/feed.ts` — `FeedReiter`/`FeedOrdnung`/`FeedTyp`/`FeedAuswahl`,
+  `FeedCursor.likeCount`, `savedByMe`, zwei Select-Literale, `cursorAusdruck()`,
+  der Wächter, Typ-Filter, `toggleSave`, und Reaktionen + Speicherungen
+  gemeinsam in **einem** `Promise.all` statt nacheinander
+- `src/lib/database.types.ts` — `post_saves`, `posts.like_count`,
+  `feed_tag_counts`, `feed_top_authors`
+- `src/components/community/CommunityFeed.tsx` — `FeedAuswahl` als eine Quelle
+  für Abfrage und Schlüssel; steht noch auf den Vorgaben (bedienbar in 6)
+- `src/lib/academy.ts` + fünf `CommunityFeed.*.test.tsx` + `HomePage.test.tsx` —
+  `savedByMe: false`
+- `CommunityFeed.media.test.tsx` — Mock und Zusage von `contains` auf `overlaps`
+- `vite.config.ts` — `FBC_INTEGRATION`-Weiche für Include/Exclude; die
+  Dreifach-Schrägstrich-Referenz entfiel (Waise meiner eigenen Änderung)
+- `package.json` — `test:integration`
+- `.github/workflows/ci.yml` — der Integrationsschritt im Job `migrations`
+- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 5
 
 Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 
 ## Next session: start here
 
-**Erste Handlung: Abschnitt 5, die Datenschicht des Feeds.** Der Review ist
-gelaufen und abgearbeitet, CI ist grün auf `1967d527` (der HEAD-SHA, nicht auf
-einer älteren) — es liegt nichts mehr davor.
+**Erste Handlung: Abschnitt 6, die Fläche** — elf Aufgaben, Composer in die
+Feed-Spalte, drei Reiter, Ordnungs-Umschalter, gefüllte Sidebar, Speichern-Knopf
+(und mit ihm 5.11). Es liegt nichts davor: CI ist grün auf `b3c5c2d`.
 
-**Abschnitt 5 ist Frontend, und dafür gilt Donalds Regel:** erst eine laufende
-lokale Version zeigen, dann committen. Das braucht `pnpm dev`, und das braucht
-eine Infisical-Sitzung in einem **echten Terminal** — aus Claude Code heraus
-geht der Login nicht (kein TTY). Donald muss ihn vorher gemacht haben.
+**Die Infisical-Hürde entfällt für die Sichtprobe.** Der lokale Stack läuft, und
+`vite` lässt sich direkt daran hängen:
 
-Vor dem ersten Frontend-Zugriff auf `like_count` oder die neuen RPCs:
-`src/lib/database.types.ts` ist **nicht** nachgezogen. Die Spalte und die beiden
-Funktionen fehlen dort. `tsc` ist heute sauber, weil noch niemand sie anfasst —
-mit der ersten Zeile in Abschnitt 5 ist das vorbei.
+```
+VITE_SUPABASE_URL=http://127.0.0.1:54321 \
+VITE_SUPABASE_ANON_KEY="$(supabase status -o env | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')" \
+  npx vite
+```
+
+Damit gilt Donalds Regel „erst eine laufende lokale Version zeigen, dann
+committen" ohne Login in einem echten Terminal. Vorher lohnt ein `pnpm
+demo:seed`-Ersatz von Hand oder ein paar Beiträge per `pg`, sonst ist der Feed
+leer. **jsdom sieht von 6.9 (375 px), 6.1 (Spaltenhöhe) und 6.7 nichts** — die
+Sichtprobe ist dort der Beleg, nicht der Testlauf.
 
 ## Open questions
 
-- **Der Aktivierungsversand.** 69 von 72 PROD-Konten nicht aktiviert,
-  `app.fairbusinessclub.de` weiterhin ohne DNS-Eintrag. Donald am 25.08. dazu:
-  „das ist okay" — also **kein Auftrag an mich**, aber der Punkt ist damit nicht
-  erledigt, sondern seine Sache.
-- **Die RLS-Kosten von `posts_select_by_visibility`** (Faktor 195, siehe oben).
-  Neuer Befund dieser Sitzung, bewusst nicht angefasst.
-- **Kein `offset` in den zwei Sidebar-Aggregaten.** Der Review hat es gegen die
-  stehende Paging-Regel gehalten. Meine Abwägung steht im Kopf der Migration:
-  Spitzenwerte sind keine Listen, „die fünf aktivsten Mitglieder, Seite 2" ist
-  keine Frage. **Donald kann das überstimmen** — dann `p_offset` an beide.
-- `post_engagement_counts` prüft noch `visibility = 'prime'` und `'legacy'` —
-  Werte, die es seit dem 6-Stufen-Modell nicht mehr gibt. Tote Zweige,
-  aufgefallen beim Lesen, nicht angefasst (ausserhalb des Auftrags).
-- Vier gepushte Commit-Messages aus der Vorsitzung tragen den **falschen Tag**;
-  Quelltext korrigiert, Historie nicht (liegt auf dem Remote).
-- Unverändert offen: drei abweichende Anmeldeadressen · ein echter Mitgliedsname
-  in der Git-Historie · Rotation des PROD-DB-Passworts · vier Review-Befunde aus
-  11.5 · 7.5 halb · kein Nachsetz-Weg für eine gelöschte Zeile ohne Ban ·
-  `grund` ohne Aufrufer · `admin_audit.actor` ohne `on delete cascade` ·
-  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging · **DEV ist nicht
-  mitgepflegt**.
+- **Die sechs Migrationen aus 2–4 sind nirgends ausser lokal angewendet.** Beim
+  Merge zahlt `drift-gate` die Rechnung: er läuft nur auf `main`, ist auf PRs
+  `skipped`, und blockt danach jeden Deploy, bis `migrate-prod` lief.
+- **Kein `offset` in den zwei Sidebar-Aggregaten** — Donald kann das überstimmen,
+  dann `p_offset` an beide.
+- **Die RLS-Kosten von `posts_select_by_visibility`** (Faktor 195, Messung aus
+  der Vorsitzung). Bewusst nicht angefasst.
+- `post_engagement_counts` prüft noch `visibility = 'prime'`/`'legacy'` — Werte,
+  die es seit dem 6-Stufen-Modell nicht gibt. Tote Zweige.
+- **Der Aktivierungsversand**: 69 von 72 PROD-Konten nicht aktiviert,
+  `app.fairbusinessclub.de` weiter ohne DNS-Eintrag. Donald am 25.08.: „das ist
+  okay" — kein Auftrag, aber nicht erledigt.
+- `academy.ts` ist unformatiert — **vorbestehend**, am HEAD von vorher geprüft,
+  nicht angefasst. `pnpm format:check` meldet 172 Dateien insgesamt; `pnpm
+  format` bleibt verboten.
+- Unverändert offen: vier gepushte Commit-Messages mit falschem Tag · drei
+  abweichende Anmeldeadressen · ein echter Mitgliedsname in der Git-Historie ·
+  Rotation des PROD-DB-Passworts · vier Review-Befunde aus 11.5 · 7.5 halb ·
+  kein Nachsetz-Weg für eine gelöschte Zeile ohne Ban · `grund` ohne Aufrufer ·
+  `admin_audit.actor` ohne `on delete cascade` · Downgrade (AGE-516) ·
+  `admin_list_feedback()` ohne Paging · **DEV ist nicht mitgepflegt**.
