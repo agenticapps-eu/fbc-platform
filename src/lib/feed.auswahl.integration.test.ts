@@ -64,6 +64,8 @@ const ZWEITE_MARKE = "age582andere";
 const KURIERTE_MARKE = "age582kuriert";
 
 let ich = "";
+/** Die Anmeldeadresse des Kontos — auch nach einem `signOut` mitten im Lauf. */
+let ichEmail = "";
 let anderer = "";
 let pg: Client;
 
@@ -121,7 +123,8 @@ beforeAll(async () => {
   );
 
   const stempel = Date.now();
-  ich = await kontoAnlegen(`age582-ich-${stempel}@example.test`);
+  ichEmail = `age582-ich-${stempel}@example.test`;
+  ich = await kontoAnlegen(ichEmail);
   anderer = await kontoAnlegen(`age582-andere-${stempel}@example.test`);
 
   // 25 Textbeiträge mit GLEICHER Reaktionszahl — der Fall, an dem ein Cursor
@@ -167,6 +170,20 @@ beforeAll(async () => {
      values ($1, $2, 0, 800, 600)`,
     [mitBild.rows[0].id, `${ich}/${mitBild.rows[0].id}/0.webp`],
   );
+  // Ein Beitrag mit Video UND Bild (AGE-590): er trifft auf ZWEI der vier Typen
+  // zu und ist die Zeile, an der sich zeigt, ob die Vereinigung ihn doppelt
+  // liefert. `or` ist ein Praedikat auf einer Zeile und kein Join — aber das
+  // gehoert zugesagt, nicht angenommen.
+  const beides = await pg.query<{ id: string }>(
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
+     values ($1, 'Beides https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3) returning id`,
+    [ich, [MARKE], zeit(203)],
+  );
+  await pg.query(
+    `insert into public.post_media (post_id, storage_path, sort, width, height)
+     values ($1, $2, 0, 800, 600)`,
+    [beides.rows[0].id, `${ich}/${beides.rows[0].id}/0.webp`],
+  );
   // Ein Event-Beitrag.
   const event = await pg.query<{ id: string }>(
     `insert into public.events (title, starts_at, visibility)
@@ -179,7 +196,7 @@ beforeAll(async () => {
   );
 
   const { error } = await supabase.auth.signInWithPassword({
-    email: `age582-ich-${stempel}@example.test`,
+    email: ichEmail,
     password: KENNWORT,
   });
   if (error) throw error;
@@ -254,20 +271,20 @@ describe("5.5 / 5.6 — jede Ordnung blättert vollständig und doppelt keinen B
   });
 });
 
-describe("5.12 — der Typ-Filter läuft in der Datenbank", () => {
-  const nurTyp = (typ: "bild" | "video" | "event" | "text") =>
-    fetchFeed({ uid: ich, typ, tags: [MARKE] });
+describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
+  const nurTyp = (...typen: ("bild" | "video" | "event" | "text")[]) =>
+    fetchFeed({ uid: ich, typen, tags: [MARKE] });
 
-  it("Video findet den Beitrag mit eingebettetem Video, und nur den", async () => {
+  it("Video findet die Beiträge mit eingebettetem Video, und nur die", async () => {
     const seite = await nurTyp("video");
-    expect(seite.posts).toHaveLength(1);
-    expect(seite.posts[0].videoUrl).not.toBeNull();
+    expect(seite.posts).toHaveLength(2); // der reine Video-Beitrag und der mit beidem
+    expect(seite.posts.every((p) => p.videoUrl !== null)).toBe(true);
   });
 
-  it("Bild findet den bebilderten Beitrag über die post_media-Zeile", async () => {
+  it("Bild findet die bebilderten Beiträge über die post_media-Zeile", async () => {
     const seite = await nurTyp("bild");
-    expect(seite.posts).toHaveLength(1);
-    expect(seite.posts[0].media).toHaveLength(1);
+    expect(seite.posts).toHaveLength(2); // der reine Bild-Beitrag und der mit beidem
+    expect(seite.posts.every((p) => p.media.length === 1)).toBe(true);
   });
 
   it("Event findet den Event-Beitrag", async () => {
@@ -285,6 +302,81 @@ describe("5.12 — der Typ-Filter läuft in der Datenbank", () => {
     expect(seite.posts.every((p) => p.videoUrl === null)).toBe(true);
     expect(seite.posts.every((p) => p.media.length === 0)).toBe(true);
     expect(seite.posts.every((p) => p.kind === "member")).toBe(true);
+  });
+
+  it("zwei Typen liefern die VEREINIGUNG, nicht die Schnittmenge", async () => {
+    // Die Kernzusage von AGE-590. Angehaengte Filter verknuepft PostgREST mit
+    // UND — die alte Fassung haette hier die Schnittmenge geliefert, also nur
+    // den einen Beitrag mit beidem.
+    const nurVideo = await nurTyp("video");
+    const nurBild = await nurTyp("bild");
+    const beide = await nurTyp("video", "bild");
+
+    const erwartet = new Set([...nurVideo.posts, ...nurBild.posts].map((p) => p.id));
+    expect(new Set(beide.posts.map((p) => p.id))).toEqual(erwartet);
+    expect(beide.posts.length).toBeGreaterThan(nurVideo.posts.length);
+  });
+
+  it("ein Beitrag, der auf BEIDE Typen zutrifft, steht genau einmal darin", async () => {
+    const beide = await nurTyp("video", "bild");
+    const ids = beide.posts.map((p) => p.id);
+    expect(ids).toHaveLength(new Set(ids).size);
+  });
+
+  it("„Text“ bleibt auch in der Vereinigung die Abwesenheit der anderen", async () => {
+    const seite = await nurTyp("text", "event");
+    expect(seite.posts.every((p) => p.media.length === 0)).toBe(true);
+    expect(seite.posts.some((p) => p.kind === "event")).toBe(true);
+    expect(seite.posts.every((p) => p.kind === "event" || p.videoUrl === null)).toBe(true);
+  });
+
+  it("die leere Menge ist derselbe Bestand wie gar kein Typfilter", async () => {
+    const ohne = await fetchFeed({ uid: ich, tags: [MARKE] });
+    const leer = await nurTyp();
+    expect(leer.posts.map((p) => p.id)).toEqual(ohne.posts.map((p) => p.id));
+  });
+
+  it("alle vier Typen sind derselbe Bestand wie gar kein Typfilter", async () => {
+    const ohne = await fetchFeed({ uid: ich, tags: [MARKE] });
+    const alle = await nurTyp("bild", "video", "event", "text");
+    expect(alle.posts.map((p) => p.id)).toEqual(ohne.posts.map((p) => p.id));
+  });
+
+  it("der Typfilter überlebt das Blättern — Typvereinigung UND Cursorgrenze", async () => {
+    // Ab Seite 2 stehen ZWEI `or=`-Parameter in der Anfrage. PostgREST
+    // verknuepft sie mit UND; zoege man sie zu einer Gruppe zusammen, liefen
+    // Beitraege ausserhalb der Blaettergrenze mit.
+    const ids: string[] = [];
+    let cursor: FeedCursor | null = null;
+    do {
+      const seite = await fetchFeed({ uid: ich, typen: ["text", "video"], tags: [MARKE], cursor });
+      for (const p of seite.posts) {
+        // Jeder Beitrag ist ENTWEDER Video ODER Text. Nicht „ohne Medien": der
+        // Beitrag mit Video UND Bild faellt zu Recht unter „Video" und traegt
+        // deshalb eine post_media-Zeile.
+        expect(p.kind).toBe("member");
+        expect(p.videoUrl !== null || p.media.length === 0).toBe(true);
+        ids.push(p.id);
+      }
+      cursor = seite.nextCursor;
+    } while (cursor);
+    expect(ids).toHaveLength(new Set(ids).size);
+    expect(ids.length).toBeGreaterThan(FEED_SEITE);
+  });
+
+  it("ohne Sitzung gilt der Typfilter auch", async () => {
+    await supabase.auth.signOut();
+    try {
+      const seite = await fetchFeed({ uid: null, typen: ["bild"], tags: [MARKE] });
+      expect(seite.posts.length).toBeGreaterThan(0);
+      expect(seite.posts.every((p) => p.media.length === 1)).toBe(true);
+    } finally {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: ichEmail,
+        password: KENNWORT,
+      });
+      expect(error).toBeNull();
+    }
   });
 });
 

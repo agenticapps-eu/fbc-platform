@@ -22,7 +22,12 @@ interface Aufruf {
   select?: string;
   order: { spalte: string; ascending?: boolean }[];
   limit?: number;
-  or?: string;
+  /**
+   * ALLE `or(...)`-Aufrufe, nicht der letzte. `fetchFeed` setzt ab Seite 2 zwei
+   * davon — die Typvereinigung UND die Cursorgrenze — und eine einzelne
+   * Zeichenkette hier ueberschriebe still den ersten (Plan-Review codex).
+   */
+  or: string[];
   eq: [string, unknown][];
   in?: [string, unknown[]];
   overlaps?: [string, unknown[]];
@@ -38,7 +43,7 @@ let zeilenJeTabelle: Record<string, Record<string, unknown>[]> = {};
 vi.mock("./supabase", () => ({
   supabase: {
     from: (table: string) => {
-      const eintrag: Aufruf = { table, order: [], eq: [], not: [], is: [], neq: [] };
+      const eintrag: Aufruf = { table, order: [], eq: [], not: [], is: [], neq: [], or: [] };
       aufrufe.push(eintrag);
       const kette = {
         select: (spalten: string) => {
@@ -54,7 +59,7 @@ vi.mock("./supabase", () => ({
           return kette;
         },
         or: (ausdruck: string) => {
-          eintrag.or = ausdruck;
+          eintrag.or.push(ausdruck);
           return kette;
         },
         eq: (spalte: string, wert: unknown) => {
@@ -117,7 +122,7 @@ const auswahl = (teil: Partial<FeedAuswahl> = {}): FeedAuswahl => ({
   reiter: "alle",
   ordnung: "neueste",
   tags: [],
-  typ: null,
+  typen: [],
   ...teil,
 });
 
@@ -194,9 +199,9 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
       { spalte: "created_at", ascending: true },
       { spalte: "id", ascending: true },
     ]);
-    expect(postsAufruf().or).toBe(
+    expect(postsAufruf().or).toEqual([
       "created_at.gt.2026-08-01T10:00:00Z,and(created_at.eq.2026-08-01T10:00:00Z,id.gt.p20)",
-    );
+    ]);
   });
 
   it("Beliebteste: like_count führt, created_at und id entscheiden den Gleichstand", async () => {
@@ -217,11 +222,11 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
       ordnung: "beliebteste",
       cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20", likeCount: 7 },
     });
-    expect(postsAufruf().or).toBe(
+    expect(postsAufruf().or).toEqual([
       "like_count.lt.7," +
         "and(like_count.eq.7,created_at.lt.2026-08-01T10:00:00Z)," +
         "and(like_count.eq.7,created_at.eq.2026-08-01T10:00:00Z,id.lt.p20)",
-    );
+    ]);
   });
 
   it("ein Cursor OHNE Reaktionszahl in der Ordnung „Beliebteste“ ist ein Fehler", async () => {
@@ -257,29 +262,79 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
   });
 });
 
-describe("5.12 — der Typ steht in der Anfrage, nicht in einer Nachfilterung", () => {
+describe("5.12 / AGE-590 — die Typen stehen in der Anfrage, nicht in einer Nachfilterung", () => {
+  const TEXT_AUSDRUCK = "and(video_url.is.null,kind.neq.event,post_media.is.null)";
+
   it("Video über video_url", async () => {
-    await fetchFeed({ uid: ICH, typ: "video" });
-    expect(postsAufruf().not).toContainEqual(["video_url", "is", null]);
+    await fetchFeed({ uid: ICH, typen: ["video"] });
+    expect(postsAufruf().or).toEqual(["video_url.not.is.null"]);
   });
 
   it("Event über kind", async () => {
-    await fetchFeed({ uid: ICH, typ: "event" });
-    expect(postsAufruf().eq).toContainEqual(["kind", "event"]);
+    await fetchFeed({ uid: ICH, typen: ["event"] });
+    expect(postsAufruf().or).toEqual(["kind.eq.event"]);
   });
 
   it("Bild über das Vorhandensein einer post_media-Zeile", async () => {
-    await fetchFeed({ uid: ICH, typ: "bild" });
-    expect(postsAufruf().not).toContainEqual(["post_media", "is", null]);
+    await fetchFeed({ uid: ICH, typen: ["bild"] });
+    expect(postsAufruf().or).toEqual(["post_media.not.is.null"]);
     // Ohne die Einbettung im select kennt PostgREST die Beziehung im Filter nicht.
     expect(postsAufruf().select).toContain("post_media(");
   });
 
   it("Text ist der Beitrag ohne all das — drei Bedingungen, nicht eine", async () => {
-    await fetchFeed({ uid: ICH, typ: "text" });
-    expect(postsAufruf().is).toContainEqual(["video_url", null]);
-    expect(postsAufruf().is).toContainEqual(["post_media", null]);
-    expect(postsAufruf().neq).toContainEqual(["kind", "event"]);
+    await fetchFeed({ uid: ICH, typen: ["text"] });
+    expect(postsAufruf().or).toEqual([TEXT_AUSDRUCK]);
+  });
+
+  it("zwei Typen stehen als EIN ODER in EINER Gruppe", async () => {
+    // Nicht zwei angehaengte Filter: die verknuepft PostgREST mit UND, und
+    // „Video und Bild zugleich" ist fast immer die leere Menge.
+    await fetchFeed({ uid: ICH, typen: ["video", "bild"] });
+    expect(postsAufruf().or).toEqual(["post_media.not.is.null,video_url.not.is.null"]);
+  });
+
+  it("die Reihenfolge der Haken aendert den Ausdruck nicht", async () => {
+    await fetchFeed({ uid: ICH, typen: ["bild", "video"] });
+    const einmal = postsAufruf().or;
+    aufrufe = [];
+    await fetchFeed({ uid: ICH, typen: ["video", "bild"] });
+    expect(postsAufruf().or).toEqual(einmal);
+  });
+
+  it("die leere Menge setzt GAR KEINE Typgruppe", async () => {
+    await fetchFeed({ uid: ICH, typen: [] });
+    expect(postsAufruf().or).toEqual([]);
+  });
+
+  it("alle vier Typen sind dasselbe wie kein Typ", async () => {
+    await fetchFeed({ uid: ICH, typen: ["bild", "video", "event", "text"] });
+    expect(postsAufruf().or).toEqual([]);
+  });
+
+  it("ab Seite 2 stehen ZWEI Gruppen: Typvereinigung UND Cursorgrenze", async () => {
+    // Der Cursor benutzt `or()` bereits (feed.ts). Wer beide Gruppen zu einer
+    // zusammenzoege, machte aus dem UND ein ODER und liesse Beitraege
+    // ausserhalb der Blaettergrenze durch. PostgREST verknuepft wiederholte
+    // `or=`-Parameter mit UND — auf DEV gemessen (AGE-590, Entscheidung 1b).
+    await fetchFeed({
+      uid: ICH,
+      typen: ["video", "bild"],
+      cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20" },
+    });
+    expect(postsAufruf().or).toEqual([
+      "post_media.not.is.null,video_url.not.is.null",
+      "created_at.lt.2026-08-01T10:00:00Z,and(created_at.eq.2026-08-01T10:00:00Z,id.lt.p20)",
+    ]);
+  });
+
+  it("die Typen liegen NICHT als angehaengte Einzelfilter vor", async () => {
+    // Die Gegenprobe zur alten Fassung: vier `if`-Zweige mit `.not`/`.eq`/`.is`
+    // wuerden mit UND verknuepft und waeren bei zwei Typen die Schnittmenge.
+    await fetchFeed({ uid: ICH, typen: ["video", "bild"] });
+    expect(postsAufruf().not).not.toContainEqual(["video_url", "is", null]);
+    expect(postsAufruf().not).not.toContainEqual(["post_media", "is", null]);
+    expect(postsAufruf().eq).not.toContainEqual(["kind", "event"]);
   });
 });
 
@@ -323,7 +378,7 @@ describe("5.7 — der Query-Schlüssel ist vollständig", () => {
     expect(feedSeitenKey(ICH, auswahl({ reiter: "gespeichert" }))).not.toEqual(basis);
     expect(feedSeitenKey(ICH, auswahl({ ordnung: "beliebteste" }))).not.toEqual(basis);
     expect(feedSeitenKey(ICH, auswahl({ tags: ["bau"] }))).not.toEqual(basis);
-    expect(feedSeitenKey(ICH, auswahl({ typ: "bild" }))).not.toEqual(basis);
+    expect(feedSeitenKey(ICH, auswahl({ typen: ["bild"] }))).not.toEqual(basis);
   });
 
   it("dieselbe Tagmenge in anderer Reihenfolge ist derselbe Schlüssel", async () => {
@@ -339,6 +394,27 @@ describe("5.7 — der Query-Schlüssel ist vollständig", () => {
     );
   });
 
+  it("dieselbe Typmenge in anderer Reihenfolge ist derselbe Schlüssel", async () => {
+    expect(feedSeitenKey(ICH, auswahl({ typen: ["video", "bild"] }))).toEqual(
+      feedSeitenKey(ICH, auswahl({ typen: ["bild", "video"] })),
+    );
+  });
+
+  it("und ein doppelt gewählter Typ zählt einmal", async () => {
+    // Die Deduplizierung war zugesagt, aber ungeprüft (Plan-Review codex).
+    expect(feedSeitenKey(ICH, auswahl({ typen: ["bild", "bild"] }))).toEqual(
+      feedSeitenKey(ICH, auswahl({ typen: ["bild"] })),
+    );
+  });
+
+  it("alle vier Typen sind derselbe Schlüssel wie gar keiner", async () => {
+    // Sonst stuenden zwei Schlüssel für EIN Ergebnis, und der Feed lädt
+    // dieselbe Auswahl ein zweites Mal.
+    expect(feedSeitenKey(ICH, auswahl({ typen: ["bild", "video", "event", "text"] }))).toEqual(
+      feedSeitenKey(ICH, auswahl({ typen: [] })),
+    );
+  });
+
   it("feedListKey bleibt Präfix — sonst erreicht eine Invalidierung nur eine Fläche", async () => {
     // 5.11: Speichern und Lösen schreiben Kartenzustand UND den Reiter
     // „Gespeichert“ gemeinsam fort. Das trägt der gemeinsame Präfix.
@@ -346,7 +422,7 @@ describe("5.7 — der Query-Schlüssel ist vollständig", () => {
     for (const a of [
       auswahl(),
       auswahl({ reiter: "gespeichert" }),
-      auswahl({ ordnung: "beliebteste", tags: ["bau"], typ: "video" }),
+      auswahl({ ordnung: "beliebteste", tags: ["bau"], typen: ["video"] }),
     ]) {
       expect(feedSeitenKey(ICH, a).slice(0, praefix.length)).toEqual([...praefix]);
     }

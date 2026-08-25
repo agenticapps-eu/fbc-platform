@@ -101,8 +101,10 @@ wird.
       stehen.
 - [ ] 4.4 Chip-Leiste: ein Chip je gewähltem Typ, jeder einzeln abwählbar;
       `gefiltert` auf `typen.length > 0` umstellen.
-- [ ] 4.5 Zusage (RED): **einen** Typ-Chip entfernen lässt den anderen stehen und
-      setzt einen `fetchFeed`-Aufruf mit der verbleibenden Menge ab (codex).
+- [ ] 4.5 Zusage (RED): ein zweiter Klick auf ein Kästchen nimmt **genau einen**
+      Typ zurück und lässt den anderen angehakt; das Banner nennt **jeden**
+      gewählten Typ (codex, angepasst — die Chips sind Anzeige, nicht
+      Bedienelement, siehe Design Entscheidung 4).
 - [ ] 4.6 Die bestehenden Zusagen zu **beiden** „Filter entfernen"-Wegen auf
       `typen` umstellen — sie stehen heute auf dem Einzelwert `typ` und würden
       sonst still am alten Begriff hängenbleiben.

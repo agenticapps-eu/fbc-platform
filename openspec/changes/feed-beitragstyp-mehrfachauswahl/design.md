@@ -146,8 +146,19 @@ Haken gesetzt hat, sieht weiter vier Haken.
 ### 4. Die Chip-Leiste zeigt einen Chip je Typ
 
 Heute ein Chip für den einen Typ, dazu `gefiltert = gewaehlteTags.length > 0 ||
-typ !== null`. Künftig ein Chip je gewähltem Typ, jeder einzeln abwählbar, und
+typ !== null`. Künftig ein Chip je gewähltem Typ und
 `gefiltert = gewaehlteTags.length > 0 || typen.length > 0`.
+
+**Korrektur an einer früheren Fassung dieses Abschnitts:** dort stand „jeder
+einzeln abwählbar, wie bei den Tags". Das war falsch — die Tag-Chips sind
+**Anzeige**, kein Bedienelement; abgewählt wird an den Kästchen in der Spalte,
+und die Leiste bietet nur das globale „Filter entfernen". Typ-Chips einzeln
+abwählbar zu machen, während die Tag-Chips daneben es nicht sind, wäre eine
+Ungleichheit ohne Anlass und über das Gewünschte hinaus. Die Chips bleiben
+Anzeige.
+
+Der Rückweg ist dadurch nicht schlechter: das Kästchen in der Spalte ist der
+eine Ort, an dem ein Typ an- und abgeht — genau wie bei den Marken.
 
 ## Risks / Trade-offs
 
