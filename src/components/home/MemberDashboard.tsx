@@ -168,8 +168,23 @@ export function MemberDashboard({ uid }: { uid: string }) {
         />
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <section className="space-y-4 lg:col-span-2">
+      {/* ZWEI Spalten, nicht drei (Donald, 25.08.).
+          Links das, was man LIEST — Aktivität und neue Mitglieder,
+          untereinander. Rechts eine schmale Schiene mit dem, was man TUT.
+
+          Vorher stand „Neue Mitglieder für dich" allein im rechten Drittel, und
+          sein Titel brach dort dreizeilig um, während der Link „Alle Mitglieder"
+          daneben klemmte. In der breiten linken Spalte hat er Platz.
+
+          Die Schiene ist bewusst als Schiene gebaut und nicht als eine weitere
+          Spalte für genau eine Karte: dort kommt später mehr hinein, und dann
+          soll sich am Raster nichts ändern müssen.
+
+          Unterhalb von `lg` bricht alles auf EINE Spalte um; die Schiene wandert
+          dabei unter die Leseinhalte — sie ist Beiwerk, nicht der Anfang. */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]">
+        <div className="space-y-8">
+        <section className="space-y-4">
           <SectionHeader
             title="Neu in der Aktivität"
             to="/aktivitaet"
@@ -267,29 +282,40 @@ export function MemberDashboard({ uid }: { uid: string }) {
             </ul>
           )}
         </section>
-      </div>
+        </div>
 
-      <section className="space-y-4">
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
-          Deine nächsten Schritte
-        </h2>
-        <ul className="grid gap-3 sm:grid-cols-3">
-          {steps.map((step) => (
-            <li key={step.label}>
-              <Link
-                to={step.to}
-                className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition-colors hover:border-accent/50"
-              >
-                <span className="font-display text-base font-semibold text-ink">{step.label}</span>
-                <span className="text-sm text-muted">{step.detail}</span>
-                <span className="mt-auto pt-2 text-sm font-medium text-accent-strong">
-                  Los geht's →
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+        {/* Die Schiene. `space-y-8` wie links, damit ein zweiter Block hier
+            später ohne Zutun richtig sitzt. */}
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
+              Deine nächsten Schritte
+            </h2>
+            {/* Drei nebeneinander, SOLANGE die Reihe voll breit ist — also
+                unterhalb von `lg`, wo die Schiene unter den Leseinhalten steht.
+                In der Schiene selbst wäre eine Dreierreihe eine Zeile aus drei
+                Wortresten, deshalb dort gestapelt. */}
+            <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {steps.map((step) => (
+                <li key={step.label}>
+                  <Link
+                    to={step.to}
+                    className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-4 transition-colors hover:border-accent/50"
+                  >
+                    <span className="font-display text-base font-semibold text-ink">
+                      {step.label}
+                    </span>
+                    <span className="text-sm text-muted">{step.detail}</span>
+                    <span className="mt-auto pt-2 text-sm font-medium text-accent-strong">
+                      Los geht's →
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
 
       <section className="rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft/25 px-6 py-6 sm:px-8">
         <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
