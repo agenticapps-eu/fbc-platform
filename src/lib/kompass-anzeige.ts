@@ -13,7 +13,7 @@
  * Zeichen, und die Beschreibung trägt an genau dieser Stelle ein Leerzeichen
  * (25.08., `scripts/probe-age597-kompass-bestand.ts`).
  */
-export const AUSLASSUNG = "\u2026";
+const AUSLASSUNG = "\u2026";
 
 /**
  * Führende Aufzählungszeichen aus dem Altbestand — Apostroph-Bindestrich am
