@@ -141,6 +141,13 @@ nicht `127.0.0.1`.** Theme umschalten: `localStorage['fbc.designVariant']` auf
   nicht echt" hellgelb auf hellgelb: **1,05:1 gemessen** gegen 7,63:1 hell.
   Vorbestehend seit AGE-496. Ein Zeichen Arbeit, fremder Diff — **Donalds
   Entscheidung**, ob als eigener Fix oder im nächsten Vorbeigehen.
+- **Neu: §5 von AGE-582 (Umfragen) ist ungebaut und jetzt AGE-586.** Der Change
+  hatte es beim Planen bewusst ausgeklammert und einen „Change B" angekündigt —
+  der wurde nie angelegt, und die GitHub-Automation hat AGE-582 beim Merge
+  trotzdem auf `Done` gesetzt. Ausgelagert nach **AGE-586** (Backlog, Medium),
+  der Punkt in AGE-582 ist als verlagert markiert. **Zwei Entscheidungen stehen
+  dort vor dem Bau:** Ergebnis erst nach eigener Stimme oder immer? Und
+  Laufzeit/Ende ja oder nein? Beide ändern die Abfrage, nicht die Anzeige.
 - **Neu: `like` in `InteraktionsLeiste` hat dieselbe Form wie das behobene
   `save`** — `onSuccess` ohne `return`. Vorbestehend, gleiche Wirkung.
 - **Kein `offset` in den zwei Sidebar-Aggregaten.** Die Begründung steht
