@@ -10,10 +10,10 @@ reviewed_artifacts_sha: 6d8a139ba2c51efeefc1c2244f73c63d494123a1ce28a7a9c0ce30ed
 Plan-Review nach Schritt 2b, **vor der ersten Zeile Code**. Beide Vendoren fremd,
 `REVIEWER_TIMEOUT=900`, beide exit 0.
 
-> **STATUS: Befunde erfasst, Auflösungen AUSSTEHEND.** Die Sitzung endete an
-> dieser Stelle auf Donalds Wunsch. Nichts hiervon ist eingearbeitet — die
-> Artefakte stehen unverändert so da, wie die Reviewer sie gelesen haben. Erste
-> Handlung der nächsten Sitzung: auflösen, dann erst Code.
+> **STATUS: aufgelöst am 2026-08-25, vor der ersten Zeile Code.** Alle drei HIGH
+> und alle sieben MEDIUM sind eingearbeitet; die Auflösungen stehen unten, Befund
+> für Befund. Der `reviewed_artifacts_sha` im Kopf zeigt weiter auf den Stand, den
+> die Reviewer gelesen haben — die Artefakte sind seither absichtlich geändert.
 
 ## Reviewer: codex (gpt-5.6-sol) — REQUEST-CHANGES
 
@@ -72,12 +72,104 @@ Plan-Review nach Schritt 2b, **vor der ersten Zeile Code**. Beide Vendoren fremd
 
 ## Resolution
 
-**Ausstehend.** Siehe Status oben.
+Aufgelöst 2026-08-25. **Drei der Befunde haben den Entwurf geändert, nicht nur den
+Text** — und einer hat einen echten Fehler im bestehenden Code freigelegt, der
+nicht einmal Teil des Changes war.
 
-Erste Einschätzung, damit die nächste Sitzung nicht bei null anfängt — sie ist
-noch keine Entscheidung: Die drei HIGH sind sachlich richtig und alle drei
-verlangen eine Änderung am Entwurf, nicht nur am Text. Besonders der dritte ist
-unangenehm treffend: ein Zähler, der bei Fehler verschwindet, ist derselbe
-Fehler, den dieser Change behebt. Der MEDIUM zu AGE-494 ist ebenfalls berechtigt
-— mein Proposal behauptet, keine Rücknahme zu sein, und das stimmt nicht, solange
-der Eintrag statisch steht.
+### Übernommen — codex
+
+**[HIGH] Das Delta widerspricht sich selbst.** Berechtigt und in der schärferen
+Lesart übernommen. Das Szenario „Der Hinweis verrät nicht, ob die Adresse
+vergeben ist" war **unerfüllbar**: Eine unbekannte Adresse erzeugt eine Sitzung
+und löst die Seite ab, sie kann denselben Hinweis gar nicht zeigen. Von den zwei
+angebotenen Auswegen ist der zweite (beide Ausgänge ununterscheidbar bauen) ein
+Umbau des Registrierungsverlaufs samt der Entscheidung aus AGE-445 — außerhalb
+dieses Vorgangs. Gewählt ist der erste: Die Anforderung verlangt jetzt, dass die
+**Meldung selbst keinen Grund nennt**, und benennt die verbleibende
+Unterscheidbarkeit ausdrücklich als **Nicht-Zusage** statt sie als Szenario zu
+behaupten. Neu ist auch der Satz, dass die Oberfläche den Grund gar nicht erfragen
+darf.
+
+**[HIGH] Die Nebenwirkungen hängen am falschen Zweig.** Am Code bestätigt:
+`AuthProvider.tsx` hat `if (!error) { logEvent("signup"); … resendActivationLink() }`.
+Beides zieht hinter `data.session`. Das ist **ein Fehler im ausgelieferten Code**,
+den der ursprüngliche Change nicht adressiert hätte — er steht jetzt als eigener
+Punkt im Proposal, als MODIFIED-Anforderung in `access-control` und als Aufgaben
+2.1–2.3.
+
+Der Nachschlag beim Nachprüfen: Der bestehende Test in `AuthProvider.test.tsx`
+**schreibt die Lücke fest**. Seine Attrappen liefern `{ data: { user: { id } },
+error: null }` — nie eine Sitzung — und behaupten damit, der Versand gehöre genau
+in den Fall, in dem er verboten ist. Der Kommentar darüber sagt derweil „die
+Sitzung besteht, bevor der Versand beginnt". Aufgabe 2.1 dreht ihn um.
+
+**[HIGH] Der Zähler wird selbst ein stilles Loch.** Übernommen, und der Befund
+wird durch die Entscheidung zum bedingten Eintrag (siehe unten) noch schärfer:
+Dann fehlte bei einem gescheiterten Abruf nicht nur die Zahl, sondern der **ganze
+Weg**. Neue Anforderung in `contact-requests`: Bei Fehler erscheint der Eintrag
+**ohne** Zahl, kenntlich als „unbekannt", mit eigenem zugänglichem Namen. Fail
+loud, und in die sichere Richtung.
+
+**[MEDIUM] Der Fluchtweg passt nicht zur betroffenen Gruppe.** Übernommen. Der
+Hinweis führt auf `/aktivierung` — die Seite zeigt ohne Token das Formular
+„Bestätigungslink anfordern", also genau das, was 70 von 73 Konten brauchen.
+„Passwort zurücksetzen" ist als erster Weg raus; die Anmeldung steht daneben.
+
+**[MEDIUM] „Ein Schlüssel heißt eine Anfrage" stimmt nicht.** Übernommen, in
+beiden Teilen. `ANFRAGEN_STALE_TIME_MS = 30_000` wird ausgesprochen und von
+beiden Flächen geteilt; Proposal und Design sagen jetzt, dass
+`fetchIncomingRequests` bei vorhandenen Zeilen **zwei** Supabase-Anfragen absetzt
+und der geteilte Cache daraus eine **Ladung** macht, nicht eine Anfrage.
+
+**[MEDIUM] Fehler beim Nachladen ≠ Fehler beim ersten Laden.** Übernommen. Die
+Bedingung heißt `isError && !data`; über vorliegenden Anfragen bleibt die Liste
+stehen und bekommt eine Zeile zum veralteten Stand. Als eigenes Szenario in der
+Spec (3.2).
+
+**[MEDIUM] Der Menüeintrag IST eine Rücknahme von AGE-494.** Berechtigt — das
+Proposal behauptete das Gegenteil und lag falsch. **Donald hat am 25.08.
+entschieden: der Eintrag wird bedingt gerendert**, nicht der Change zur Rücknahme
+erklärt. `/kontakte` bleibt `section: "sub"`; die Sidebar bekommt für den offenen
+Vorgang einen eigenen Eintrag, der mit ihm kommt und geht.
+
+**[MEDIUM] Eine nackte „2" bedeutet nicht „zwei Entscheidungen offen".**
+Übernommen, und es hat das Label geändert: Der Eintrag heißt **„Meine Anfragen"**,
+nicht „Meine Kontakte" — unter der Bedingung „es liegt eine Anfrage an" wäre der
+alte Name für seinen Anlass falsch. Dazu ein zugänglicher Name, der sagt, was
+gezählt wurde („Meine Anfragen, 2 offen").
+
+**[MEDIUM] Die bestehende Anforderung gehört MODIFIZIERT.** Übernommen. Das
+access-control-Delta ist von `ADDED` auf `MODIFIED` + `ADDED` umgestellt; der neue
+Wortlaut bindet „erfolgreich" an die **Sitzung** statt an den ausbleibenden
+Fehler. Genau diese Zweideutigkeit trägt den Fehler aus dem zweiten HIGH.
+
+**[LOW] Die Impact-Liste ist unvollständig.** Übernommen: `auth-context.ts`,
+`src/test/auth-fixtures.tsx`, die `signUp`-Attrappen in `LoginPage.test.tsx` und
+`AuthProvider.test.tsx` sowie `SidebarNav.tsx` und `lib/contact-requests.ts`
+stehen jetzt drin.
+
+### Übernommen — gemini
+
+**[MEDIUM] Kein `staleTime` festgelegt.** Übernommen, siehe oben — derselbe
+Befund wie codex' fünfter, aus der anderen Richtung.
+
+**[MEDIUM] Aufgabe 4.1 verlässt sich auf Handarbeit.** Übernommen. Die Sonde ist
+jetzt ein Skript nach dem Muster der `scripts/probe-*.ts`, das im `finally`
+aufräumt.
+
+**[LOW] Das Abzeichen braucht eine zugängliche Benennung.** Übernommen, und beim
+Umsetzen kam eine Falle dazu, die keiner der beiden Reviewer sehen konnte: Die
+eingeklappte Leiste setzt `aria-label` am Link, und ein `aria-label` **ersetzt**
+den Inhalt — ein Abzeichen darin wäre für Screenreader unsichtbar gewesen. Der
+Name wird deshalb zusammengesetzt; Aufgabe 1.4 hält es fest.
+
+**[LOW] Das Proposal liest sich, als würde der Eintrag bedingt gerendert.**
+Erledigt sich durch die Entscheidung oben: Jetzt **wird** der Eintrag bedingt
+gerendert, und Proposal wie Design sagen das gleichlautend.
+
+### Nicht übernommen
+
+Nichts abgelehnt. Der einzige Befund, dessen radikalere Variante nicht umgesetzt
+wird, ist der erste HIGH (beide Registrierungsausgänge ununterscheidbar bauen) —
+begründet oben, und in der Spec als ausdrückliche Nicht-Zusage vermerkt statt
+verschwiegen.

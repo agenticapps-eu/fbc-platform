@@ -18,16 +18,26 @@ Diese drei Löcher bleiben und sind Code.
 - **Der Weg zu eingehenden Anfragen (AGE-592).** „Meine Anfragen" steht heute
   ausschließlich auf `/kontakte`, und dieser Routeneintrag trägt
   `section: "sub"` — `SIDEBAR_SECTIONS` rendert nur `entdecken` und
-  `mein-bereich`, es gibt also **keinen Menüeintrag**. Der Eintrag kommt zurück,
-  **mit Zähler**, sobald offene Anfragen vorliegen.
+  `mein-bereich`, es gibt also **keinen Menüeintrag**. Ein Eintrag **„Meine
+  Anfragen"** erscheint unter „Mein Bereich", **solange** offene Anfragen
+  vorliegen, mit ihrer Anzahl.
 - **Registrierung ohne Sitzung (AGE-591).** GoTrue antwortet bei einer bereits
   bekannten Adresse mit **200, ohne Fehler und ohne Sitzung**
   (`user_repeated_signup`, Aufzählungsschutz). `LoginPage.onSubmit` prüft nur
   `error !== null` und meldet deshalb nichts. Der Fall bekommt eine sichtbare
-  Rückmeldung.
+  Rückmeldung, die zum **Zugangslink** führt.
+- **Die Nebenwirkungen der Registrierung hängen am falschen Zweig.** In
+  `AuthProvider.signUp` laufen `logEvent("signup")` und das sitzungsgebundene
+  `resendActivationLink()` unter `if (!error)` — also **auch** bei einer
+  Wiederholung ohne Sitzung. Das ist die `42501`-Anfrage aus den PROD-Logs und
+  eine Registrierungszählung, die Wiederholungen mitzählt. Beides zieht hinter
+  `data.session`. **Dieser Punkt kam erst aus dem Plan-Review** und ist ein
+  echter Fehler, kein Textproblem.
 - **Anfragen-Widget bei Fehler (AGE-593).** `isError` steht in derselben
   Bedingung wie „nichts da"; ein gescheiterter Abruf ist von einem leeren
-  Posteingang nicht zu unterscheiden. `isError` wird getrennt.
+  Posteingang nicht zu unterscheiden. `isError` wird getrennt — aber nur dort,
+  wo **keine** Daten vorliegen; ein gescheitertes Nachladen über vorhandenen
+  Anfragen darf sie nicht verstecken.
 
 ## Capabilities
 
@@ -37,29 +47,50 @@ Keine.
 
 ### Modified Capabilities
 
-- `contact-requests`: Zwei neue Anforderungen — eine offene eingehende Anfrage
-  SHALL ohne Vorwissen erreichbar sein, und ein gescheiterter Abruf SHALL NOT wie
-  ein leerer Posteingang aussehen.
+- `contact-requests`: Drei neue Anforderungen — eine offene eingehende Anfrage
+  SHALL ohne Vorwissen erreichbar sein, ein **unbekannter** Stand SHALL NOT wie
+  „keine" aussehen, und ein gescheiterter Abruf SHALL NOT wie ein leerer
+  Posteingang aussehen.
 - `access-control`: Die bestehende Anforderung „Eine Selbstregistrierung löst den
-  Bestätigungslink selbst aus" setzt ausdrücklich voraus, dass „die Sitzung
-  besteht, bevor der Versand beginnt". Genau diese Annahme bricht bei einer
-  bekannten Adresse. Der Fall wird ergänzt.
+  Bestätigungslink selbst aus" wird **modifiziert**, nicht nur ergänzt. Sie sagt
+  „nach einer erfolgreichen Selbstregistrierung", und genau diese Zweideutigkeit
+  — HTTP-Erfolg gegen tatsächlich entstandene Sitzung — trägt den Fehler. Der
+  neue Wortlaut bindet „erfolgreich" an die Sitzung. Dazu eine neue Anforderung
+  für den stummen Fall.
 
 ## Impact
 
-Kein Migrationsbedarf, keine RLS-, RPC- oder Datenmodelländerung. Der Zähler
-liest dieselbe Abfrage, die das Widget schon benutzt (`fetchIncomingRequests`) —
-**kein zweiter Weg zur selben Wahrheit**.
+Kein Migrationsbedarf, keine RLS-, RPC- oder Datenmodelländerung.
 
-Betroffener Code: `src/config/nav.ts` (Sektion des `/kontakte`-Eintrags) ·
-`src/components/AppShell.tsx` (Zähler am Eintrag) ·
+Betroffener Code: `src/config/nav.ts` · `src/components/AppShell.tsx` ·
+`src/components/ui/SidebarNav.tsx` (Abzeichen) ·
 `src/components/mein-bereich/kontakte-widgets.tsx` (Fehlerzustand) ·
-`src/pages/LoginPage.tsx` und `src/providers/AuthProvider.tsx` (Sitzung aus
-`signUp` durchreichen).
+`src/lib/contact-requests.ts` (gemeinsame Frischezeit) ·
+`src/pages/LoginPage.tsx` · `src/providers/AuthProvider.tsx` ·
+`src/providers/auth-context.ts` (Signatur von `signUp`) ·
+`src/test/auth-fixtures.tsx` und die bestehenden `signUp`-Attrappen in
+`LoginPage.test.tsx` und `AuthProvider.test.tsx` — sobald `hatSession` Teil der
+Rückgabe ist, müssen sie es mitführen.
 
-**Was AGE-494 richtig gesehen hat und was nicht.** Der Menüeintrag wurde damals
-mit „Kontakte erreicht man über das Profil und den Chat" entfernt. Für einen
-bestehenden **Kontakt** stimmt das. Für eine **offene eingehende Anfrage** nicht:
-der Chat wird erst nach der Annahme freigeschaltet, und die Profilseite hilft nur,
-wenn man die des Absenders gezielt aufruft. Der Eintrag kommt deshalb nicht als
-Rücknahme jener Entscheidung zurück, sondern für den Fall, den sie nicht traf.
+**Der Zähler bekommt keine eigene Wahrheit.** Er ruft `fetchIncomingRequests`
+unter demselben `queryKey` wie das Widget; React Query teilt den Eintrag. Was er
+NICHT ist: „genau eine Netzwerkanfrage". `fetchIncomingRequests` setzt bei
+vorhandenen Zeilen **zwei** Supabase-Anfragen ab (Anfragen, dann Profile), und
+mit den Vorgaben von React Query v5 (`staleTime: 0`) holt jedes Mounten, jeder
+Fokuswechsel und jedes Reconnect neu. Deshalb bekommt die Abfrage eine
+ausgesprochene Frischezeit, die sich beide Flächen teilen.
+
+**Was AGE-494 richtig gesehen hat, und warum der Eintrag bedingt ist.** Der
+Menüeintrag wurde damals mit „Kontakte erreicht man über das Profil und den Chat"
+entfernt. Für einen bestehenden **Kontakt** stimmt das. Für eine **offene
+eingehende Anfrage** nicht: der Chat wird erst nach der Annahme freigeschaltet,
+und die Profilseite hilft nur, wenn man die des Absenders gezielt aufruft.
+
+Der erste Entwurf zog `/kontakte` deshalb dauerhaft nach `mein-bereich` und
+behauptete dabei, das sei keine Rücknahme von AGE-494. Der Plan-Review hat das
+zerlegt, und zu Recht: ein statischer Eintrag steht **jedem** eingeloggten
+Mitglied im Menü, auch ohne jede Anfrage — das ist genau der ständige
+Kontakte-Punkt, den AGE-494 entfernt hat. Der Eintrag ist deshalb **bedingt**
+(Entscheidung Donald, 25.08.) und heißt **„Meine Anfragen"**, nicht „Meine
+Kontakte": Er erscheint für einen offenen Vorgang und verschwindet mit ihm.
+AGE-494 bleibt unangetastet.
