@@ -26,6 +26,29 @@ vi.mock("../../lib/feed", async (importOriginal) => ({
   fetchFeed: vi.fn(),
   fetchPostById: vi.fn(),
 }));
+/**
+ * Die Seitenleiste wird MITGEMOCKT, obwohl sie mit dem Deeplink nichts zu tun
+ * hat — und genau deshalb.
+ *
+ * Die Ununterscheidbarkeits-Zusage unten vergleicht den GANZEN Container, und
+ * darin steckt die Tag-Leiste. Ungemockt greift sie ins Netz, scheitert und
+ * zeigt „Tags konnten nicht geladen werden." — mal rechtzeitig, mal nicht. CI
+ * hat den Test daran fallen lassen, lokal war er grün: die zwei Läufe
+ * unterschieden sich in der Seitenleiste, nicht im Deeplink.
+ *
+ * Der Vergleich bleibt trotzdem der ganze Container. Ihn auf die Feed-Spalte zu
+ * verengen wäre die schwächere Zusage — eine Auskunft über den verlinkten
+ * Beitrag könnte auch daneben stehen. Deterministisch machen, nicht verkleinern.
+ */
+vi.mock("../../lib/tags", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/tags")>()),
+  fetchAktiveTags: vi.fn(async () => []),
+}));
+vi.mock("../../lib/feed-sidebar", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/feed-sidebar")>()),
+  fetchTagZaehler: vi.fn(async () => []),
+  fetchTopAutoren: vi.fn(async () => []),
+}));
 vi.mock("../../lib/post-media", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/post-media")>()),
   signPostMedia: vi.fn(async (pfade: string[]) =>
