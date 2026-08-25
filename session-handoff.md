@@ -1,148 +1,160 @@
-# Session Handoff — 2026-08-25 (zweiundzwanzigste Sitzung, AGE-582 Abschnitt 6)
+# Session Handoff — 2026-08-25 (dreiundzwanzigste Sitzung, AGE-582 Abschnitt 7)
 
-**Abschnitt 6, die Fläche des Feeds, ist gebaut, im Browser gemessen und
-gepusht.** Ein Commit auf `donald/age-582-aktivitaet-auf-konzeptstand`
-(`22fd5aa`), PR #205. **Abschnitt 7 (Abnahme) ist unberührt** — und ein Teil
-seiner Sichtproben ist heute nebenbei schon gefahren worden, siehe unten.
+**Abschnitt 7, die Abnahme, ist vollständig — alle acht Aufgaben abgehakt, und
+PR #205 ist GEMERGT** (`480f529`, per `gh pr view --json state` bestätigt).
+Damit ist der ganze Change durchgearbeitet: Abschnitte 1–7.
+
+**Der Stand nach dem Merge, gemessen an der HEAD-SHA von `main`:**
+
+| Check | Ergebnis |
+|---|---|
+| `verify`, `migrations`, `edge-functions`, `build` | success |
+| **`migrate-dev`** | **success — die sieben Migrationen sind jetzt auf DEV** |
+| **`drift-gate`** | **failure — sie fehlen auf PROD** |
+| `deploy` (Workflow „Deploy") | **skipped**, vom Gate geblockt |
+
+Das `deploy: success` in der Liste gehört zu `pages-build-deployment`, einer
+FREMDEN Workflow. Die Fläche ist also **nicht** ausgeliefert.
 
 ## Accomplished
 
-**Alle elf Aufgaben aus Abschnitt 6, plus das aus Abschnitt 5 vertagte 5.11.**
-Composer in der Feed-Spalte, drei Reiter, Ordnungs-Umschalter, gefüllte Sidebar
-(Tag-Zähler, aktivste Mitglieder, Beitragstyp), Speichern-Knopf an der Karte,
-Medientyp-Zeile im Composer, der anonyme Fall und die zusammengeklappte
-Filterspalte auf dem Telefon.
+**7.1** lint (0 Fehler, 4 vorbestehende Warnungen), typecheck, **1546/1546**,
+build. **7.2** `supabase test db` mit ausdrücklicher Dateiliste: **9 Dateien,
+684 Zusagen, PASS**. Ohne die Liste meldet der Befehl FAIL, obwohl grün.
+Integrationslauf 17/17.
 
-**+30 Zusagen**: 19 in `CommunityFeed.flaeche.test.tsx` (neu), 8 in
-`feed-sidebar.test.ts` (neu), 3 im Composer-Test. **1542/1542 grün**,
-`tsc --noEmit`, `pnpm lint`, `pnpm build` sauber; **17/17 im Integrationslauf**
-gegen den laufenden lokalen Stack.
+**7.7 — die Zähler verraten nichts, per pgTAP.** `feed_sidebar_test.sql` von 18
+auf 26 Zusagen. Die alten maßen zwei Ränge; das Prädikat hat aber **drei**
+Zweige, und der dritte ist `author_id = auth.uid()`. Zwei Betrachter DESSELBEN
+Rangs bekommen für denselben Tag verschiedene Zahlen, wenn einer der Verfasser
+ist. Dazu das Gegenstück zu `sbverdeckt` auf der Autorenseite und der scharfe
+Gesamtabgleich: für jeden aktiven kuratierten Tag ist die Zahl der Funktion
+**exakt** die Zahl der Beiträge, die derselbe Aufrufer aufzählen kann.
 
-**Die Sichtprobe ist der eigentliche Beleg**, nicht der Testlauf — gegen den
-lokalen Stack mit 24 Beiträgen und drei Konten:
+**7.3–7.6 im Browser**, gegen den lokalen Stack. Beide Themes maßgleich bis auf
+den Pixel, bei 1440 und bei 375. Ausgeloggt: ein Reiter, kein Speichern-Knopf,
+„Ein Mitglied" als Verfasser, `feed_top_authors` **gar nicht erst angefragt**.
+Speichern füllt und leert „Gespeichert" in beide Richtungen ohne Neuladen. Zwei
+Haken: 4 + 4 = **8**, die Vereinigung.
 
-- **Zähler ausgeloggt 4/2/2, eingeloggt 8/8/4/4/4/4.** Damit ist `security
-  invoker` gemessen und nicht behauptet: es zählen wirklich nur die Beiträge,
-  die der Aufrufer sehen darf.
-- **Zwei Haken sind die Vereinigung** — „Marketing" allein vier Beiträge, mit
-  „Investitionen" acht. ODER, nicht UND.
-- **Alle drei Ordnungen, alle vier Typfilter.** „Beliebteste" ergab 11, 22, 9,
-  20, 7 (Reaktionszahlen 12, 11, 11, 10, 10 — mit Gleichstand).
-- **5.11 live:** in „Gespeichert" standen 23, 16, 9, 2; nach dem Lösen von 23
-  blieben 16, 9, 2 — und in „Alle Beiträge" stand 23 ungedrückt. Eine
-  Invalidierung, beide Flächen.
-- **Echte 375 px** (`emulate`, nicht `resize_page`): Composer 342,
-  Filter-Schalter 453, Reiter 527, Panel `display: none`, kein Überlauf.
-- Konsole durchgehend ohne Fehler und ohne 401.
+**7.8 — zwei fremde Vendoren, sieben Befunde, alle behoben.** codex
+(`gpt-5.2-codex`, ~35 min, liest das Repo selbst) und gemini (`gemini-3-pro`,
+Diff auf stdin, ~2 min). Beide REQUEST-CHANGES. **Jede Behebung trägt eine
+Zusage, die unter einer absichtlichen Verbiegung rot wird.**
 
-**Zwei Befunde beim Bauen, beide behoben und beide von einem Test gefunden:**
-der Speichern-Knopf hieß zuerst „Speichern" wie der Absendeknopf des Editors auf
-DERSELBEN Karte (`bearbeiten.test.tsx` wurde rot); und ein gescheiterter
-Sidebar-Aufruf sah aus wie „es gibt nichts".
+- **[MEDIUM] `post_saves` war ein Existenz-Orakel.** Gegen den lokalen Stack
+  nachgestellt, BEVOR eine Zeile geschrieben wurde: ein `basic`-Mitglied liest
+  einen `members`-Beitrag nicht (null Zeilen), kann ihn aber speichern — mit
+  einer erfundenen Kennung bricht dieselbe Anweisung an `23503`. Die Auskunft kam
+  nicht aus der Policy, sondern aus dem **Fremdschlüssel**, dessen Prüfung
+  ausdrücklich an der RLS vorbeiläuft. Neue Migration
+  `20260825090000_post_saves_kein_existenz_orakel.sql`; +5 Zusagen (24 → 29).
+- **[MEDIUM] Die Sidebar-Zähler blieben nach dem Veröffentlichen stehen.**
+  Live behoben und live gemessen: Marketing 4 → 5, Autor 6 → 7.
+- **[MEDIUM] `onSuccess` gab das Invalidierungs-Promise nicht zurück** — der
+  Speichern-Knopf wurde aktiv, bevor der neue Zustand da war.
+- **[LOW ×3, codex]** Tie-Break-Test verglich zwei identische Aufrufe · die
+  Ordnung von `feed_top_authors` war nirgends zugesichert · Vakuum-Test im
+  Integrationslauf (Schleife über null Zeilen).
+- **[LOW, gemini]** Filter-Leeren stand an zwei Stellen.
 
 ## Decisions
 
-- **Der anonyme Reiter ist ABGELEITET (`uid ? reiter : "alle"`), nicht per
-  `useEffect` nachgeführt.** *Warum:* die Reiter erscheinen ausgeloggt gar nicht,
-  aber eine Sitzung kann auch ENDEN, während die Seite offen steht. Ein Effekt
-  stellte den Zustand erst eine Runde später zurück — dazwischen liefe die
-  Anfrage in den Wächter aus 5.2.
-- **`feed_top_authors` wird ohne Kennung gar nicht erst angefordert** (`enabled`),
-  nicht bloß nicht angezeigt. *Warum:* sie ist an `anon` nicht vergeben, und ein
-  Fehler, den eine Fläche als Null zeigt, ist die schlechteste aller Zahlen.
-- **Kein Zurücksetzen des Blätterns von Hand.** *Warum:* `feedSeitenKey` trägt
-  die ganze Auswahl (5.7) — eine andere Auswahl IST eine andere Abfrage. Die
-  Zusage ist deshalb scharf gefasst: nicht „die Liste beginnt oben", sondern die
-  erste Anfrage der neuen Auswahl trägt keinen Cursor.
-- **Knöpfe mit `aria-pressed` statt `role="tab"`.** *Warum:* echte Reiter
-  verlangen Pfeiltasten und einen wandernden `tabindex`; eine halbe Umsetzung ist
-  für eine Vorleseausgabe schlechter als keine. Die Datei führt dieselbe Form
-  schon an den Tag-Chips.
-- **Der Speichern-Knopf heißt „Beitrag speichern" und behält den Namen in beiden
-  Zuständen.** *Warum:* „Speichern" kollidiert mit dem Editor-Knopf auf derselben
-  Karte, „Gespeichert" mit dem Reiter daneben. Der Zustand steht in
-  `aria-pressed` und im gefüllten Symbol.
-- **EINE Fassung der Sidebar im DOM (`hidden lg:block`), nicht eine Telefon- und
-  eine Schirmfassung.** *Warum:* zwei lägen in jsdom beide im Baum, und jede
-  Abfrage nach einem Kästchen fände es doppelt.
-- **Die Spannweite der Spalte hängt am Composer** (`lg:row-span-2` gegen
-  `lg:row-span-1`). *Warum:* fest auf zwei gesetzt entstünde ausgeloggt eine
-  leere zweite Zeile samt ihrem Abstand.
-- **Die Medientyp-Zeile liegt INNERHALB der Aktionsgruppe** (`span`, nicht `div`).
-  *Warum:* Donalds Anordnung vom 12.08. — Handelndes zusammen und nach rechts —
-  bleibt damit bestehen. Das Videofeld liegt seither hinter der Zeile, **bleibt
-  aber stehen, sobald etwas darin steht**: der Link geht beim Veröffentlichen
-  mit, ein Fehlklick ergäbe sonst ein Video, von dem der Verfasser nichts weiß.
-- **`src/lib/feed-sidebar.ts` als eigene Datei**, nicht in `feed.ts`. *Warum:*
-  die Regel „`feed_top_authors` nie ohne Kennung" gehört neben die Funktion, und
-  `feed.ts` ist mit 1000 Zeilen der Beitragspfad.
+- **Das `exists` in der neuen Policy ist keine vierte Kopie des Prädikats.** Ein
+  Policy-Ausdruck läuft mit den Rechten des Aufrufers, das `exists` **wendet**
+  `posts_select_by_visibility` also an. *Warum wichtig:* dieses Projekt trägt
+  schon drei Abschriften (`profiles_public` + DEFINER-RPCs), und jede weitere
+  kann driften. Diese kann es nicht.
+- **Die Zusage lautet nicht „unsichtbar wird abgelehnt", sondern „beide Wege
+  enden ZEICHENGLEICH".** *Warum:* eine Ablehnung, die sich von der anderen
+  unterscheidet, ist wieder ein Kanal. Zwei Muster-Prüfungen einzeln hätten das
+  offengelassen.
+- **`like` bleibt unangetastet**, obwohl es dieselbe Form hat wie das behobene
+  `save`. *Warum:* vorbestehend, außerhalb dieses Diffs — Folgearbeit, kein
+  „while I'm here".
+- **Der `EnvironmentBanner`-Befund wurde NICHT gefixt.** Vorbestehend seit
+  AGE-496, fremder Diff.
+- **Die Fixture des Integrationslaufs legt jetzt einen eigenen kuratierten Tag
+  an.** *Warum:* `MARKE` ist ein FREI getipptes Schlagwort und steht in `tags`
+  gar nicht — die Typzusage hing am Bestand des Stacks, auf dem sie lief.
 
 ## Files modified
 
-**Neu:** `src/lib/feed-sidebar.ts` · `src/lib/feed-sidebar.test.ts` (8) ·
-`src/components/community/CommunityFeed.flaeche.test.tsx` (19)
+**Neu:** `supabase/migrations/20260825090000_post_saves_kein_existenz_orakel.sql`
 
-- `src/components/community/CommunityFeed.tsx` — vier Zustandsachsen statt einem
-  Hashtag, `aktiverReiter`, zwei Sidebar-Abfragen, `ReiterLeiste`, `FeedSidebar`
-  (ersetzt `TagFilter`), Sortierung, Filter-Banner, Speichern-Knopf in
-  `InteraktionsLeiste`, Medientyp-Zeile im Composer; `FeedList`/`PostCard` von
-  `activeHashtag` auf `gewaehlteTags` umgestellt
-- `src/components/ui/icons.tsx` — drei Glyphen: `image`, `video`, `bookmark`
-  (letzterer mit Kontur auch gefüllt, wie `heart`)
-- `CommunityFeed.media.test.tsx` — Tag-Filter auf Kästchen aus `feed_tag_counts`
-- `CommunityFeed.composer.test.tsx` — Medientyp-Zeile (3 neue), und der
-  RPC-Zähler filtert jetzt auf `create_post_with_media` (die Sidebar ruft `rpc`
-  ebenfalls)
-- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 6 und 5.11
+- `supabase/tests/feed_sidebar_test.sql` — 18 → 26 (7.7 plus die Ordnungs-Zusage)
+- `supabase/tests/post_saves_test.sql` — 24 → 29 (kein Existenz-Orakel)
+- `src/components/community/CommunityFeed.tsx` — `filterLeeren` als eine
+  Funktion; Invalidierung nach dem Veröffentlichen um beide Sidebar-Schlüssel
+  erweitert und als `Promise.all` zurückgegeben; `save.onSuccess` gibt zurück
+- `CommunityFeed.flaeche.test.tsx` — +3 (Filter entfernen ×2, Speichern-Sperre)
+- `CommunityFeed.composer.test.tsx` — +1 (Sidebar-Invalidierung)
+- `src/lib/feed.auswahl.integration.test.ts` — kuratierte Fixture-Marke, Zusage
+  auf den Bestand vor der Form
+- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 7 vollständig
 
 Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 
 ## Next session: start here
 
-**Erste Handlung: Abschnitt 7, die Abnahme** — acht Aufgaben. Vier davon sind
-heute faktisch schon gefahren und brauchen nur noch das dunkle Theme
-beziehungsweise das Abhaken: 7.3 (nur helles Theme geprüft), 7.4, 7.5, 7.6.
-**Offen und echte Arbeit sind 7.2** (`supabase test db` mit ausdrücklicher
-Dateiliste), **7.7** (pgTAP-Beleg, dass die Zähler nichts verraten — per Test,
-nicht per Sichtprobe) und **7.8** (zweite Meinung auf den Diff, Vendor ungleich
-dem des Deltas).
+**Erste Handlung ist eine ENTSCHEIDUNG von Donald, keine Arbeit:** `drift-gate`
+hat den Deploy geblockt und benennt die sieben fehlenden Versionen auf PROD
+(`viwntbodrtqxgmqyxluh`) namentlich:
 
-**Der lokale Stack trägt jetzt Sichtprobe-Daten** — drei Konten
+```
+20260824130000  20260824140000  20260824150000  20260824151000
+20260824160000  20260824170000  20260825090000
+```
+
+Der Gate sagt selbst, was zu tun ist: „Erst `migrate-prod` freigeben, dann
+deployen." **`migrate-prod` zu dispatchen HEISST anwenden** — `apply` startet
+direkt hinter `plan`, ohne Reviewer-Regel. Das ist von der generellen
+Merge-Freigabe ausdrücklich NICHT gedeckt und liegt bei Donald. Den Dry-Run
+vorher zu lesen geht nur außerhalb des Workflows.
+
+Ist `migrate-prod` gelaufen, geht der Deploy nur per `gh run rerun --failed` auf
+Lauf `32825716380` (deploy.yml hat kein `workflow_dispatch`), und der Befehl gibt
+bei Erfolg nichts aus. Danach das Live-Bündel an einer Zeichenkette aus dem Diff
+prüfen, nicht an der Größe.
+
+**Danach** `openspec archive activity-concept-level` — dabei auf die
+Szenario-Titel achten (ein umgetauftes Szenario in einem MODIFIED-Block löscht
+das alte; `validate` bleibt dabei grün).
+
+**Der lokale Stack trägt weiterhin Sichtprobe-Daten** — drei Konten
 (`sicht-ich@example.test`, `sicht-andere@`, `sicht-dritte@`, Kennwort
-`sichtprobe-nur-lokal-8f2b`) und 24 Beiträge in vier Typen. Sie bleiben liegen,
-damit die nächste Sichtprobe ohne Vorlauf startet; nur lokal, nichts davon
-berührt DEV oder PROD.
-
-**Ein Stolperstein, der zwei Minuten gekostet hat:** `posts.video_url` setzt der
-Trigger `trg_posts_video_url` aus dem **Body**. Die Spalte direkt zu beschreiben
-ist wirkungslos — der Typfilter „Video" sah deshalb erst kaputt aus und war es
-nicht.
+`sichtprobe-nur-lokal-8f2b`) und jetzt **25** Beiträge: einer ist bei der
+Live-Messung von 7.8 dazugekommen („Ein Beitrag zur Abnahme 7.8"), Marketing
+steht deshalb auf 5. Nur lokal, nichts davon berührt DEV oder PROD.
 
 Vite hängt sich per
-`VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=… npx vite`
-direkt an den lokalen Stack (Infisical entfällt); Port 5173 und 5174 sind von
-fremden Servern belegt, 5175 ist frei. **`localhost`, nicht `127.0.0.1`** — vite
-lauscht auf IPv6.
+`VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=… npx vite
+--port 5175` direkt an den lokalen Stack (Infisical entfällt). **`localhost`,
+nicht `127.0.0.1`.** Theme umschalten: `localStorage['fbc.designVariant']` auf
+`navy`, dann neu laden — Shift+D wirkt per `dispatchEvent` nicht.
 
 ## Open questions
 
-- **Kein `offset` in den zwei Sidebar-Aggregaten.** Donalds generelle Regel
-  („`limit`/`offset` in die erste Fassung jeder listenden RPC") steht gegen den
-  Entwurf, der bewusst keines vorsieht. Die Fläche blättert dort nicht — aber
-  ein `p_offset` an beiden wäre eine Migration, und die sechs aus 2–4 sind
-  ohnehin noch nirgends außer lokal angewendet. **Donalds Entscheidung.**
-- **Die sechs Migrationen aus 2–4 sind nirgends außer lokal angewendet.** Beim
-  Merge zahlt `drift-gate` die Rechnung: er läuft nur auf `main`, ist auf PRs
-  `skipped`, und blockt danach jeden Deploy, bis `migrate-prod` lief.
-- **Das dunkle Theme ist nicht geprüft** (7.3 verlangt beide).
+- **Neu: `EnvironmentBanner.tsx:24` trägt die einzige `dark:`-Regel im ganzen
+  `src/`.** Sie hängt an `prefers-color-scheme`, nicht am Theme dieser App. Auf
+  einem Rechner mit dunkler Systemeinstellung wird „Testumgebung — Daten sind
+  nicht echt" hellgelb auf hellgelb: **1,05:1 gemessen** gegen 7,63:1 hell.
+  Vorbestehend seit AGE-496. Ein Zeichen Arbeit, fremder Diff — **Donalds
+  Entscheidung**, ob als eigener Fix oder im nächsten Vorbeigehen.
+- **Neu: `like` in `InteraktionsLeiste` hat dieselbe Form wie das behobene
+  `save`** — `onSuccess` ohne `return`. Vorbestehend, gleiche Wirkung.
+- **Kein `offset` in den zwei Sidebar-Aggregaten.** Die Begründung steht
+  ausführlich im Kopf der Migration; Donalds generelle Regel steht dagegen.
+  Unverändert **Donalds Entscheidung**.
 - Unverändert offen: die RLS-Kosten von `posts_select_by_visibility` (Faktor
   195) · `post_engagement_counts` prüft noch tote `prime`/`legacy`-Zweige · der
-  Aktivierungsversand (69 von 72 PROD-Konten, `app.fairbusinessclub.de` ohne
-  DNS; Donald am 25.08.: „das ist okay") · `academy.ts` unformatiert
-  (vorbestehend, `pnpm format` bleibt verboten) · vier gepushte
-  Commit-Messages mit falschem Tag · drei abweichende Anmeldeadressen · ein
-  echter Mitgliedsname in der Git-Historie · Rotation des PROD-DB-Passworts ·
-  vier Review-Befunde aus 11.5 · kein Nachsetz-Weg für eine gelöschte Zeile ohne
-  Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne `on delete cascade` ·
-  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging · **DEV ist nicht
-  mitgepflegt**.
+  Aktivierungsversand (69 von 72 PROD-Konten; Donald am 25.08.: „das ist okay")
+  · `academy.ts` unformatiert (vorbestehend, `pnpm format` bleibt verboten) ·
+  vier gepushte Commit-Messages mit falschem Tag · drei abweichende
+  Anmeldeadressen · ein echter Mitgliedsname in der Git-Historie · Rotation des
+  PROD-DB-Passworts · vier Review-Befunde aus 11.5 · kein Nachsetz-Weg für eine
+  gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
+  `on delete cascade` · Downgrade (AGE-516) · `admin_list_feedback()` ohne
+  Paging.
+- **Erledigt und deshalb hier gestrichen: „DEV ist nicht mitgepflegt".**
+  `migrate-dev` lief beim Merge durch — DEV trägt die sieben Migrationen jetzt.
