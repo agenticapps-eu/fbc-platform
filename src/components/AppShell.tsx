@@ -12,6 +12,7 @@ import { Logo } from "./ui/Logo";
 import { SidebarNav } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { useOverlay } from "./ui/useOverlay";
+import { Icon } from "./ui/icons";
 
 // Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
 // Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
@@ -46,65 +47,23 @@ function readCollapsed(): boolean {
 
 function ChevronLeftIcon({ flipped }: { flipped: boolean }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
+    <Icon
+      name="chevronLeft"
       className={cn("h-4 w-4 transition-transform", flipped && "rotate-180")}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m14 6-6 6 6 6" />
-    </svg>
+    />
   );
 }
 
 function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="bell" className="h-5 w-5" />;
 }
 
 function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M4 7h16M4 12h16M4 17h16"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return <Icon name="menu" className="h-5 w-5" />;
 }
 
 function ChevronDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="hidden h-4 w-4 text-muted sm:block"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="m6 9 6 6 6-6"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="chevronDown" className="hidden h-4 w-4 text-muted sm:block" />;
 }
 
 /** Profil-Menü hinter dem Avatar (E-Mail, Stufe, Links, Logout) — klappt per Klick

@@ -6,6 +6,7 @@ import { Avatar } from "../ui/Avatar";
 import { useOverlay } from "../ui/useOverlay";
 import { LEVEL_RANK, levelLabel } from "../../config/levels";
 import { useAuth } from "../../providers/auth-context";
+import { Icon } from "../ui/icons";
 import {
   directoryUrlForQuery,
   HEADER_SEARCH_MIN_CHARS,
@@ -505,19 +506,5 @@ function einordnung(m: DirectoryMember): string {
 }
 
 function SearchIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
+  return <Icon name="search" className="h-4 w-4" />;
 }

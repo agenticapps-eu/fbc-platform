@@ -34,6 +34,15 @@ import { coverSignaturKey, signEventCovers } from "../../lib/event-cover";
 import { formatEventDate } from "../../lib/events";
 import { fetchAktiveTags, istKuratiert, tagsQueryKey, type Tag } from "../../lib/tags";
 import {
+  fetchTagZaehler,
+  fetchTopAutoren,
+  tagZaehlerKey,
+  topAutorenKey,
+  type TagZaehler,
+  type TopAutor,
+} from "../../lib/feed-sidebar";
+import { Icon } from "../ui/icons";
+import {
   addComment,
   addPostMedia,
   buildMentionResolver,
@@ -41,6 +50,11 @@ import {
   createPostWithMedia,
   feedListKey,
   feedSeitenKey,
+  type FeedAuswahl,
+  type FeedOrdnung,
+  type FeedReiter,
+  type FeedTyp,
+  toggleSave,
   deletePost,
   fetchComments,
   fetchFeed,
@@ -60,22 +74,59 @@ import {
 } from "../../lib/feed";
 
 /**
- * Community-Feed (AGE-250). Composer + chronologische Beitragsliste im
- * Look. Sichtbarkeit entscheidet AUSSCHLIESSLICH die RLS (siehe lib/feed.ts) — anon
- * sieht nur `public`, eingeloggte zusätzlich `members`/rang-gegated. Der Composer ist
- * nur für eingeloggte Mitglieder sichtbar.
+ * Community-Feed (AGE-250). Composer, Beitragsliste und die Filterspalte.
+ *
+ * Sichtbarkeit entscheidet AUSSCHLIESSLICH die RLS (siehe lib/feed.ts) — anon
+ * sieht nur `public`, eingeloggte zusätzlich `members`/rang-gegated. Der Composer
+ * ist nur für eingeloggte Mitglieder sichtbar.
+ *
+ * Die Liste ist seit AGE-582 nicht mehr zwingend chronologisch: Reiter, Ordnung,
+ * Tagmenge und Beitragstyp bilden EINE Auswahl, die Abfrage und Cache-Schlüssel
+ * gemeinsam bestimmen. Zwei der drei Reiter verlangen eine Kennung; ohne Sitzung
+ * gibt es nur „Alle Beiträge", keinen Speichern-Knopf und keine Mitgliedernamen
+ * (siehe `aktiverReiter` und die Sidebar).
  */
 export default function CommunityFeed() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
-  const [hashtag, setHashtag] = useState<string | null>(null);
+
+  // Die Auswahl, die Abfrage UND Schlüssel bestimmt (AGE-582). Vier Achsen,
+  // eine Quelle: die Anfrage und der Cache-Schlüssel lesen dieselben Werte,
+  // damit nicht zwei Stellen gepflegt werden müssen.
+  const [reiter, setReiter] = useState<FeedReiter>("alle");
+  const [ordnung, setOrdnung] = useState<FeedOrdnung>("neueste");
+  const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
+  const [typ, setTyp] = useState<FeedTyp | null>(null);
+
+  /**
+   * Ohne Sitzung gibt es NUR „Alle Beiträge" (6.8).
+   *
+   * Abgeleitet und nicht als Zustand nachgeführt: „Beiträge von mir" und
+   * „Gespeichert" verlangen eine Kennung, und `fetchFeed` wirft ohne sie (5.2).
+   * Die Reiter erscheinen ausgeloggt gar nicht — aber eine Sitzung kann auch
+   * ENDEN, während die Seite offen steht. Dann ist der gewählte Reiter mit
+   * einem Schlag unerfüllbar, und die Ableitung fängt genau diesen Übergang.
+   * Ein `useEffect`, der den Zustand zurückstellt, täte dasselbe eine Runde
+   * später — und dazwischen liefe die Anfrage.
+   */
+  const aktiverReiter: FeedReiter = uid ? reiter : "alle";
+
+  const auswahl: FeedAuswahl = useMemo(
+    () => ({ reiter: aktiverReiter, ordnung, tags: gewaehlteTags, typ }),
+    [aktiverReiter, ordnung, gewaehlteTags, typ],
+  );
 
   // Seitenweise (AGE-528): eine feste Obergrenze ohne Nachladen wäre mit Bildern
   // eine stille Kappung — ältere Beiträge blieben unauffindbar. Der Cursor läuft
-  // über (created_at, id), siehe lib/feed.ts.
+  // je Ordnung über einen eigenen Keyset-Pfad, siehe lib/feed.ts.
+  //
+  // Der Schlüssel trägt die ganze Auswahl (5.7). Deshalb braucht ein Wechsel von
+  // Reiter, Ordnung, Tagmenge oder Typ KEIN Zurücksetzen von Hand: die neue
+  // Auswahl ist eine andere Abfrage und beginnt bei ihrer ersten Seite. Ein
+  // mitgeschleppter Cursor der alten Ordnung wäre in der neuen bedeutungslos.
   const feed = useInfiniteQuery({
-    queryKey: feedSeitenKey(uid, hashtag),
-    queryFn: ({ pageParam }) => fetchFeed({ uid, hashtag, cursor: pageParam }),
+    queryKey: feedSeitenKey(uid, auswahl),
+    queryFn: ({ pageParam }) => fetchFeed({ uid, ...auswahl, cursor: pageParam }),
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
   });
@@ -151,28 +202,119 @@ export default function CommunityFeed() {
 
   const tags = useQuery({ queryKey: tagsQueryKey, queryFn: fetchAktiveTags });
 
-  return (
-    <section className="space-y-6">
-      {user && <PostComposer authorId={user.id} />}
+  /**
+   * Die zwei Aggregate der Spalte (6.6). Beide laufen `security invoker` — die
+   * Zahlen hängen also am Betrachter, und die Schlüssel tragen ihn deshalb.
+   *
+   * `feed_top_authors` ist an `anon` NICHT vergeben (`profiles_public` hält
+   * dort kein Recht). Ohne Sitzung wird die Abfrage deshalb gar nicht erst
+   * gestellt — `enabled`, nicht ein Rückfall auf eine leere Liste: ein Fehler,
+   * den eine Fläche als Null zeigt, ist die schlechteste aller Zahlen (6.8).
+   * `feed_tag_counts` dagegen IST an `anon` vergeben und zählt dort
+   * nachweislich nur öffentliche Beiträge.
+   */
+  const tagZaehler = useQuery({ queryKey: tagZaehlerKey(uid), queryFn: fetchTagZaehler });
+  const topAutoren = useQuery({
+    queryKey: topAutorenKey(uid),
+    queryFn: fetchTopAutoren,
+    enabled: uid !== null,
+  });
 
-      {/* Die Leiste steht im Markup VOR dem Feed: auf dem Telefon liegt sie
-          damit über ihm, auf großen Schirmen schiebt sie das Raster in die
-          rechte Spalte (Mockup). */}
+  /** Ein Tag wird an- oder abgehakt. Mehrere wirken als ODER (`.overlaps()`),
+   *  und genau das versprechen Auswahlkästchen auch. */
+  function tagUmschalten(tag: string) {
+    setGewaehlteTags((bisher) =>
+      bisher.includes(tag) ? bisher.filter((t) => t !== tag) : [...bisher, tag],
+    );
+  }
+
+  /** „Filter entfernen" — an ZWEI Stellen angeboten: im Filter-Banner und im
+   *  Leerzustand der Liste. Beide leeren dieselben Achsen, und der Reiter und die
+   *  Ordnung bleiben stehen, weil sie keine Filter sind. Steht das hier, kann
+   *  eine dritte Achse nicht an einer der beiden Stellen vergessen werden
+   *  (Befund gemini, LOW). */
+  function filterLeeren() {
+    setGewaehlteTags([]);
+    setTyp(null);
+  }
+
+  return (
+    <section>
+      {/* Drei Rasterkinder, und die Reihenfolge im Markup ist die Reihenfolge auf
+          dem Telefon (6.9): Composer, zusammengeklappte Filter, Feed. Auf breiten
+          Schirmen setzt nur die Spalte sich ausdrücklich nach rechts oben; die
+          beiden anderen sind auf Spalte 1 festgenagelt und finden ihre Zeile
+          selbst. Damit beginnen Spalte und Composer oben bündig (6.1), ohne dass
+          eine leere Zeile entsteht, wenn der Composer fehlt (ausgeloggt). */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <aside className="lg:col-start-2 lg:row-start-1">
-          <TagFilter tags={tags.data ?? []} aktiv={hashtag} onWaehlen={setHashtag} />
+        {user && (
+          <div className="lg:col-start-1">
+            <PostComposer authorId={user.id} />
+          </div>
+        )}
+
+        {/* Die Spannweite hängt daran, ob der Composer eine eigene Zeile
+            belegt. Fest auf zwei gesetzt entstünde ausgeloggt eine LEERE zweite
+            Zeile unter dem Feed — samt ihrem Abstand. */}
+        <aside
+          className={`lg:col-start-2 lg:row-start-1 ${user ? "lg:row-span-2" : "lg:row-span-1"}`}
+        >
+          <FeedSidebar
+            zaehler={tagZaehler.data ?? []}
+            zaehlerFehler={tagZaehler.isError}
+            gewaehlteTags={gewaehlteTags}
+            onTagUmschalten={tagUmschalten}
+            autoren={topAutoren.data ?? []}
+            autorenFehler={topAutoren.isError}
+            zeigeAutoren={uid !== null}
+            typ={typ}
+            onTyp={setTyp}
+          />
         </aside>
 
-        <div className="space-y-6 lg:col-start-1 lg:row-start-1">
-          {hashtag && (
-            <div className="flex items-center gap-2 text-sm">
+        <div className="space-y-6 lg:col-start-1">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ReiterLeiste aktiv={aktiverReiter} onWaehlen={setReiter} eingeloggt={uid !== null} />
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <span className="whitespace-nowrap">Sortierung</span>
+              <Select
+                value={ordnung}
+                onChange={(e) => setOrdnung(e.target.value as FeedOrdnung)}
+                className="h-9 w-auto"
+                aria-label="Sortierung"
+              >
+                {ORDNUNGEN.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
+
+          {/* Die Zeile bleibt, obwohl die Haken in der Spalte stehen (AGE-528):
+              auf dem Telefon ist die Spalte ZUSAMMENGEKLAPPT, und ohne diese
+              Zeile sähe ein Mitglied dort nicht, dass überhaupt gefiltert
+              wird — es sähe nur einen kurzen Feed. */}
+          {(gewaehlteTags.length > 0 || typ !== null) && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted">Gefiltert nach</span>
-              <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
-                #{hashtag}
-              </span>
+              {gewaehlteTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong"
+                >
+                  #{tag}
+                </span>
+              ))}
+              {typ && (
+                <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 font-medium text-accent-strong">
+                  {TYPEN.find((t) => t.value === typ)?.label}
+                </span>
+              )}
               <button
                 type="button"
-                onClick={() => setHashtag(null)}
+                onClick={filterLeeren}
                 className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Filter entfernen
@@ -188,8 +330,10 @@ export default function CommunityFeed() {
             isFetchingNextPage={feed.isFetchingNextPage}
             onNextPage={() => void feed.fetchNextPage()}
             currentUserId={user?.id ?? null}
-            activeHashtag={hashtag}
-            onHashtag={setHashtag}
+            gewaehlteTags={gewaehlteTags}
+            onTagUmschalten={tagUmschalten}
+            onFilterLeeren={filterLeeren}
+            gefiltert={gewaehlteTags.length > 0 || typ !== null}
             mentionResolver={mentionResolver}
             bildUrls={bildUrls}
             onBildFehler={onBildFehler}
@@ -202,52 +346,210 @@ export default function CommunityFeed() {
   );
 }
 
-// ── Tag-Filterleiste ────────────────────────────────────────────────────────
+// ── Reiter, Ordnung, Sidebar ────────────────────────────────────────────────
+
+/** Die drei Ordnungen (6.5). Ihre Werte sind die von `FeedOrdnung`; die
+ *  Beschriftungen stehen hier und nicht in `lib/feed.ts`, weil die Datenschicht
+ *  keine Sprache trägt. */
+const ORDNUNGEN: { value: FeedOrdnung; label: string }[] = [
+  { value: "neueste", label: "Neueste zuerst" },
+  { value: "aelteste", label: "Älteste zuerst" },
+  { value: "beliebteste", label: "Beliebteste" },
+];
+
+/** Die fünf wählbaren Beitragstypen (6.6). `null` heißt „alle". */
+const TYPEN: { value: FeedTyp | ""; label: string }[] = [
+  { value: "", label: "Alle Typen" },
+  { value: "bild", label: "Bild" },
+  { value: "video", label: "Video" },
+  { value: "event", label: "Event" },
+  { value: "text", label: "Text" },
+];
+
+const REITER: { value: FeedReiter; label: string }[] = [
+  { value: "alle", label: "Alle Beiträge" },
+  { value: "meine", label: "Beiträge von mir" },
+  { value: "gespeichert", label: "Gespeichert" },
+];
 
 /**
- * Die kuratierten Tags als Filter (AGE-528). Bewusst EINE Auswahl zur Zeit:
- * der Feed filtert über `.contains("hashtags", [tag])`, und mehrere Tags wären
- * eine andere Abfrage — nicht eine andere Leiste. Ein zweiter Klick auf
- * denselben Tag hebt den Filter auf.
+ * Die Reiterleiste (6.4).
  *
- * „Beliebte Tags" mit Zählern und „Aktivste Mitglieder" aus dem Mockup gehören
- * NICHT hierher (Non-goals): die rechte Spalte trägt in dieser Fassung nur den
- * Filter.
+ * Bewusst Knöpfe mit `aria-pressed` statt `role="tab"`: echte Reiter verlangen
+ * Pfeiltasten-Navigation und einen wandernden `tabindex`, und eine halbe
+ * Umsetzung davon ist für eine Vorleseausgabe schlechter als gar keine. Die
+ * Datei führt dieselbe Form schon an den Tag-Chips.
+ *
+ * Ausgeloggt bleibt EIN Eintrag stehen (6.8) — die beiden anderen erscheinen
+ * nicht, statt abgeblendet dazustehen: sie sind ohne Kennung nicht „gerade
+ * nicht möglich", sondern gibt es nicht.
  */
-function TagFilter({
-  tags,
+function ReiterLeiste({
   aktiv,
   onWaehlen,
+  eingeloggt,
 }: {
-  tags: Tag[];
-  aktiv: string | null;
-  onWaehlen: (tag: string | null) => void;
+  aktiv: FeedReiter;
+  onWaehlen: (reiter: FeedReiter) => void;
+  eingeloggt: boolean;
 }) {
-  if (tags.length === 0) return null;
+  const sichtbar = eingeloggt ? REITER : REITER.filter((r) => r.value === "alle");
   return (
-    <Card className="space-y-3">
-      <h2 className="font-display text-sm font-semibold text-ink">Tags</h2>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((tag) => {
-          const gewaehlt = aktiv === tag.key;
-          return (
-            <button
-              key={tag.key}
-              type="button"
-              aria-pressed={gewaehlt}
-              onClick={() => onWaehlen(gewaehlt ? null : tag.key)}
-              className={`rounded-full px-2.5 py-0.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                gewaehlt
-                  ? "bg-accent text-chrome"
-                  : "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
-              }`}
-            >
-              {tag.label}
-            </button>
-          );
-        })}
+    <div role="group" aria-label="Reiter" className="flex flex-wrap gap-1.5">
+      {sichtbar.map((r) => {
+        const gewaehlt = aktiv === r.value;
+        return (
+          <button
+            key={r.value}
+            type="button"
+            aria-pressed={gewaehlt}
+            onClick={() => onWaehlen(r.value)}
+            className={`rounded-full px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              gewaehlt ? "bg-accent text-chrome" : "border border-line text-muted hover:text-ink"
+            }`}
+          >
+            {r.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Die rechte Spalte (6.6, 6.7, 6.9).
+ *
+ * Sie trägt drei Dinge — Tags mit Zählern, die aktivsten Mitglieder und den
+ * Beitragstyp — und verschwindet NICHT mehr, wenn es keinen kuratierten Tag mit
+ * sichtbarem Beitrag gibt: die anderen beiden hängen davon nicht ab (6.7). Vorher
+ * gab `TagFilter` in dem Fall `null` zurück und nahm die ganze Spalte mit.
+ *
+ * Auf dem Telefon ist sie ZUSAMMENGEKLAPPT und steht zwischen Composer und Feed
+ * (6.9). Sie darf dort weder ungeklappt zwischen beide treten — sie wäre eine
+ * Wand vor dem Inhalt — noch ersatzlos unter zwanzig Karten wandern, wo sie
+ * niemand findet.
+ *
+ * EINE Fassung im DOM, nicht zwei: `hidden lg:block` schaltet die Fläche, statt
+ * eine Telefon- und eine Schirmfassung nebeneinanderzustellen. Zwei Fassungen
+ * lägen in jsdom beide im Baum, und jede Abfrage nach einem Kästchen fände es
+ * doppelt.
+ */
+function FeedSidebar({
+  zaehler,
+  zaehlerFehler,
+  gewaehlteTags,
+  onTagUmschalten,
+  autoren,
+  autorenFehler,
+  zeigeAutoren,
+  typ,
+  onTyp,
+}: {
+  zaehler: TagZaehler[];
+  /** Ein gescheiterter Aufruf sieht sonst GENAU SO AUS wie „es gibt nichts" —
+   *  beide Male keine Kästchen. Die Spalte behauptete damit etwas über den
+   *  Bestand, was sie nicht weiß. Dieselbe Regel wie „keine Null aus einem
+   *  Fehler", nur eine Ebene tiefer. */
+  zaehlerFehler: boolean;
+  gewaehlteTags: string[];
+  onTagUmschalten: (tag: string) => void;
+  autoren: TopAutor[];
+  autorenFehler: boolean;
+  zeigeAutoren: boolean;
+  typ: FeedTyp | null;
+  onTyp: (typ: FeedTyp | null) => void;
+}) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        aria-controls="feed-filter"
+        className="mb-3 inline-flex w-full items-center justify-between rounded-md border border-line px-3 py-2 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden"
+      >
+        Filter
+        <Icon name="chevronDown" className={`h-4 w-4 ${offen ? "rotate-180" : ""}`} />
+      </button>
+
+      <div id="feed-filter" className={`space-y-4 ${offen ? "" : "hidden"} lg:block`}>
+        {zaehlerFehler && (
+          <Card>
+            <p className="text-sm text-muted">Tags konnten nicht geladen werden.</p>
+          </Card>
+        )}
+
+        {zaehler.length > 0 && (
+          <Card className="space-y-3">
+            <h2 className="font-display text-sm font-semibold text-ink">Beliebte Tags</h2>
+            {/* Auswahlkästchen und keine Chips: sie versprechen Mehrfachauswahl,
+                und genau die gibt es hier — mehrere Marken wirken als ODER. */}
+            <ul className="space-y-1.5">
+              {zaehler.map((t) => (
+                <li key={t.key}>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={gewaehlteTags.includes(t.key)}
+                      onChange={() => onTagUmschalten(t.key)}
+                      className="size-4 rounded border-line text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                    <span className="min-w-0 flex-1 truncate">{t.label}</span>
+                    <span className="text-xs text-muted tabular-nums">{t.anzahl}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {/* Nur mit Sitzung (6.8): `feed_top_authors` ist an `anon` nicht
+            vergeben, und ein Mitgliedsname gehört ohnehin nicht ins
+            Schaufenster. Angefordert wird die Liste dort gar nicht erst — das
+            entscheidet `enabled` an der Abfrage, nicht diese Bedingung. */}
+        {zeigeAutoren && autorenFehler && (
+          <Card>
+            <p className="text-sm text-muted">Aktivste Mitglieder konnten nicht geladen werden.</p>
+          </Card>
+        )}
+
+        {zeigeAutoren && autoren.length > 0 && (
+          <Card className="space-y-3">
+            <h2 className="font-display text-sm font-semibold text-ink">Aktivste Mitglieder</h2>
+            <ul aria-label="Aktivste Mitglieder" className="space-y-2">
+              {autoren.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    to={`/p/${a.id}`}
+                    className="flex items-center gap-2 text-sm text-ink hover:text-accent-strong"
+                  >
+                    <Avatar name={a.name} src={a.avatarUrl} size="sm" />
+                    <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                    <span className="text-xs text-muted tabular-nums">{a.anzahl}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        <Card className="space-y-3">
+          <h2 className="font-display text-sm font-semibold text-ink">Beitragstyp</h2>
+          <Select
+            value={typ ?? ""}
+            onChange={(e) => onTyp((e.target.value || null) as FeedTyp | null)}
+            aria-label="Beitragstyp"
+          >
+            {TYPEN.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
+        </Card>
       </div>
-    </Card>
+    </>
   );
 }
 
@@ -273,6 +575,10 @@ function PostComposer({ authorId }: { authorId: string }) {
   const [offen, setOffen] = useState(false);
   const [body, setBody] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  /** Ob das Videofeld sichtbar ist (6.3). Der Wert selbst steht in `videoUrl`
+   *  und bleibt beim Zuklappen erhalten — deshalb hält das Feld sich offen,
+   *  sobald etwas darin steht. */
+  const [videoOffen, setVideoOffen] = useState(false);
   const [visibility, setVisibility] = useState<PostVisibility>("members");
   const [bilder, setBilder] = useState<GewaehltesBild[]>([]);
   const [bildFehler, setBildFehler] = useState<string | null>(null);
@@ -343,6 +649,7 @@ function PostComposer({ authorId }: { authorId: string }) {
     onSuccess: () => {
       setBody("");
       setVideoUrl("");
+      setVideoOffen(false);
       setVisibility("members");
       for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
       setBilder([]);
@@ -352,7 +659,18 @@ function PostComposer({ authorId }: { authorId: string }) {
       toast({ variant: "success", title: "Beitrag veröffentlicht" });
       // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
       // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
-      queryClient.invalidateQueries({ queryKey: feedListKey(authorId) });
+      //
+      // Und die zwei Sidebar-Zähler dazu (Befund codex, MEDIUM): ein neuer
+      // Beitrag ändert BEIDE — er trägt Tags, und er zählt für seinen Autor.
+      // Ihre Schlüssel liegen aber nicht unter `feed/list`, das Präfix erreicht
+      // sie also nicht. Ohne die zwei Zeilen stünde der Beitrag in der Liste,
+      // während die Zahl daneben noch die von vorhin ist — zwei Flächen
+      // nebeneinander, die sich widersprechen.
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: feedListKey(authorId) }),
+        queryClient.invalidateQueries({ queryKey: tagZaehlerKey(authorId) }),
+        queryClient.invalidateQueries({ queryKey: topAutorenKey(authorId) }),
+      ]);
     },
     onError: (error) => {
       toast({
@@ -451,26 +769,33 @@ function PostComposer({ authorId }: { authorId: string }) {
         </div>
       )}
 
-      <div>
-        <input
-          type="url"
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="Optional: YouTube-/Vimeo-Link"
-          aria-label="Video-Link (optional)"
-          aria-invalid={!videoValid || undefined}
-          className={`h-10 w-full rounded-md border bg-canvas px-3 text-sm text-ink transition-colors placeholder:text-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-soft ${
-            videoValid
-              ? "border-line focus-visible:border-accent focus-visible:ring-accent"
-              : "border-danger focus-visible:ring-danger"
-          }`}
-        />
-        {!videoValid && (
-          <p className="mt-1 text-xs text-danger">
-            Nur YouTube- oder Vimeo-Links werden eingebettet.
-          </p>
-        )}
-      </div>
+      {/* Das Feld erscheint auf Wunsch (6.3) — aber es VERSCHWINDET nicht mehr,
+          sobald etwas darin steht. Der Composer hängt den Link beim
+          Veröffentlichen an den Body; ein Fehlklick, der ihn unsichtbar macht,
+          ergäbe einen Beitrag mit einem Video, von dem sein Verfasser nichts
+          weiß. */}
+      {(videoOffen || videoUrl.trim() !== "") && (
+        <div>
+          <input
+            type="url"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="Optional: YouTube-/Vimeo-Link"
+            aria-label="Video-Link (optional)"
+            aria-invalid={!videoValid || undefined}
+            className={`h-10 w-full rounded-md border bg-canvas px-3 text-sm text-ink transition-colors placeholder:text-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-soft ${
+              videoValid
+                ? "border-line focus-visible:border-accent focus-visible:ring-accent"
+                : "border-danger focus-visible:ring-danger"
+            }`}
+          />
+          {!videoValid && (
+            <p className="mt-1 text-xs text-danger">
+              Nur YouTube- oder Vimeo-Links werden eingebettet.
+            </p>
+          )}
+        </div>
+      )}
 
       {bildFehler && <p className="text-xs text-danger">{bildFehler}</p>}
 
@@ -499,24 +824,48 @@ function PostComposer({ authorId }: { authorId: string }) {
             Telefon um, landet ein einzelnes Element sonst am ZEILENANFANG —
             die Gruppe stünde dort links. Gemessen auf 375 px. */}
         <div className="ml-auto flex items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center text-sm text-muted">
-            {/* Beschriftung bleibt „Bild", bis auch Dateien gehen (AGE-532).
-                Ein Knopf, der „Datei anhängen" verspricht und nur Bilder
-                annimmt, ist schlechter als der genaue Name. */}
-            <span className="rounded-md border border-line px-3 py-1.5">Bild</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              aria-label="Bilder auswählen"
-              className="sr-only"
-              onChange={(e) => {
-                const dateien = [...(e.target.files ?? [])];
-                e.target.value = "";
-                void waehleBilder(dateien);
-              }}
-            />
-          </label>
+          {/* Die Medientyp-Zeile (6.3): sie benennt, was dieser Composer
+              annimmt — Bild und Video, sonst nichts. KEIN „Event"-Knopf (Events
+              entstehen in `/events` und erscheinen hier als eigene Karte) und
+              KEIN „Umfrage"-Knopf (die gibt es nicht). Ein Knopf, dessen
+              einziger Ausgang eine Enttäuschung ist, ist schlechter als kein
+              Knopf.
+
+              Ein `span` und kein `div`: die Zeile liegt INNERHALB der
+              Aktionsgruppe, damit Donalds Anordnung vom 12.08. bestehen bleibt
+              — Handelndes zusammen und nach rechts. */}
+          <span role="group" aria-label="Medien" className="inline-flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center text-sm text-muted">
+              {/* Beschriftung bleibt „Bild", bis auch Dateien gehen (AGE-532).
+                  Ein Knopf, der „Datei anhängen" verspricht und nur Bilder
+                  annimmt, ist schlechter als der genaue Name. */}
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 transition-colors hover:text-ink">
+                <Icon name="image" className="h-4 w-4" />
+                Bild
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                aria-label="Bilder auswählen"
+                className="sr-only"
+                onChange={(e) => {
+                  const dateien = [...(e.target.files ?? [])];
+                  e.target.value = "";
+                  void waehleBilder(dateien);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setVideoOffen((v) => !v)}
+              aria-expanded={videoOffen || videoUrl.trim() !== ""}
+              className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <Icon name="video" className="h-4 w-4" />
+              Video
+            </button>
+          </span>
           <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
             {create.isPending ? "Wird veröffentlicht…" : "Posten"}
           </Button>
@@ -536,8 +885,10 @@ function FeedList({
   isFetchingNextPage,
   onNextPage,
   currentUserId,
-  activeHashtag,
-  onHashtag,
+  gewaehlteTags,
+  onTagUmschalten,
+  onFilterLeeren,
+  gefiltert,
   mentionResolver,
   bildUrls,
   onBildFehler,
@@ -551,8 +902,12 @@ function FeedList({
   isFetchingNextPage: boolean;
   onNextPage: () => void;
   currentUserId: string | null;
-  activeHashtag: string | null;
-  onHashtag: (tag: string | null) => void;
+  gewaehlteTags: string[];
+  onTagUmschalten: (tag: string) => void;
+  onFilterLeeren: () => void;
+  /** Ob überhaupt gefiltert wird — Marken ODER Beitragstyp. Der leere Zustand
+   *  muss weiter unterscheiden, ob es NICHTS gibt oder nur nichts Passendes. */
+  gefiltert: boolean;
   mentionResolver: MentionResolver;
   bildUrls: Record<string, string>;
   onBildFehler: (pfad: string) => void;
@@ -570,15 +925,15 @@ function FeedList({
   if (posts.length === 0) {
     return (
       <EmptyState
-        title={activeHashtag ? "Keine Beiträge mit diesem Hashtag" : "Noch keine Beiträge"}
+        title={gefiltert ? "Keine Beiträge zu diesem Filter" : "Noch keine Beiträge"}
         description={
-          activeHashtag
-            ? "Für diesen Hashtag gibt es noch nichts zu sehen."
+          gefiltert
+            ? "Zu dieser Auswahl gibt es noch nichts zu sehen."
             : "Teile den ersten Beitrag — ruhig und mit Substanz. Qualität vor Reichweite."
         }
         action={
-          activeHashtag ? (
-            <Button variant="secondary" size="sm" onClick={() => onHashtag(null)}>
+          gefiltert ? (
+            <Button variant="secondary" size="sm" onClick={onFilterLeeren}>
               Filter entfernen
             </Button>
           ) : undefined
@@ -600,8 +955,8 @@ function FeedList({
               <PostCard
                 post={post}
                 currentUserId={currentUserId}
-                activeHashtag={activeHashtag}
-                onHashtag={onHashtag}
+                gewaehlteTags={gewaehlteTags}
+                onTagUmschalten={onTagUmschalten}
                 mentionResolver={mentionResolver}
                 bildUrls={bildUrls}
                 onBildFehler={onBildFehler}
@@ -628,8 +983,8 @@ function FeedList({
 function PostCard({
   post,
   currentUserId,
-  activeHashtag,
-  onHashtag,
+  gewaehlteTags,
+  onTagUmschalten,
   mentionResolver,
   bildUrls,
   onBildFehler,
@@ -637,8 +992,8 @@ function PostCard({
 }: {
   post: FeedPost;
   currentUserId: string | null;
-  activeHashtag: string | null;
-  onHashtag: (tag: string | null) => void;
+  gewaehlteTags: string[];
+  onTagUmschalten: (tag: string) => void;
   mentionResolver: MentionResolver;
   bildUrls: Record<string, string>;
   onBildFehler: (pfad: string) => void;
@@ -755,9 +1110,10 @@ function PostCard({
                 key={tag}
                 type="button"
                 data-kuratiert={kuratiert}
-                onClick={() => onHashtag(tag)}
+                aria-pressed={gewaehlteTags.includes(tag)}
+                onClick={() => onTagUmschalten(tag)}
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  activeHashtag === tag
+                  gewaehlteTags.includes(tag)
                     ? "bg-accent text-chrome"
                     : kuratiert
                       ? "bg-accent-soft/60 text-accent-strong hover:bg-accent-soft"
@@ -892,6 +1248,32 @@ function InteraktionsLeiste({
     },
   });
 
+  /**
+   * Speichern und Lösen (6.10, und damit 5.11).
+   *
+   * Die Invalidierung läuft über `feedListKey` und damit über den PRÄFIX jeder
+   * Auswahl (5.7): sie schreibt den Zustand dieser Karte UND den Reiter
+   * „Gespeichert" gemeinsam fort. Ohne das zeigte die eine Fläche einen Zustand,
+   * den die andere schon verworfen hat — ein gelöster Beitrag stünde beim
+   * nächsten Betreten weiter unter den gespeicherten.
+   */
+  const save = useMutation({
+    mutationFn: () =>
+      toggleSave({ postId: post.id, profileId: currentUserId as string, saved: post.savedByMe }),
+    onSuccess: () =>
+      /* Das Promise wird ZURÜCKGEGEBEN (Befund codex, MEDIUM). Ohne das endet
+         `isPending`, sobald der Schreibvorgang durch ist — aber `post.savedByMe`
+         stammt aus der Liste und trägt bis zum Nachladen noch den alten Wert.
+         In diesem Fenster ist der Knopf wieder aktiv und zeigt den Zustand von
+         vorhin; ein zweiter Klick schickte deshalb DIESELBE Anweisung noch
+         einmal statt zurückzuschalten — beim Speichern ein doppelter Schlüssel
+         und eine Fehlermeldung für etwas, das gelungen ist. */
+      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) }),
+    onError: (error) => {
+      toast({ variant: "error", title: "Aktion fehlgeschlagen", description: errorMessage(error) });
+    },
+  });
+
   return (
     <>
       <footer className="flex items-center gap-4 border-t border-line pt-3 text-sm">
@@ -919,6 +1301,33 @@ function InteraktionsLeiste({
           <span>{post.commentCount}</span>
           <span className="sr-only">Kommentare</span>
         </button>
+        {/* Ohne Sitzung erscheint der Knopf GAR NICHT (6.8) — nicht abgeblendet
+            wie Herz und Kommentar daneben. Die beiden zeigen eine Zahl, die auch
+            ein Ausgeloggter lesen darf; Speichern hat nichts anzuzeigen, was
+            ohne Kennung bestünde.
+
+            Der Name bleibt in beiden Zuständen derselbe: der Zustand steht in
+            `aria-pressed` und im gefüllten Symbol. Ein Knopf, der zeitweise
+            „Gespeichert" hiesse, trüge denselben Namen wie der Reiter.
+
+            Und er heisst „Beitrag speichern", nicht „Speichern": beim
+            Bearbeiten steht der Absendeknopf des Editors mit genau diesem Namen
+            auf DERSELBEN Karte. Für eine Vorleseausgabe wären das zwei gleich
+            benannte Bedienelemente mit völlig verschiedener Wirkung. */}
+        {currentUserId && (
+          <button
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate()}
+            aria-pressed={post.savedByMe}
+            className={`ml-auto inline-flex items-center gap-1.5 rounded-md px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+              post.savedByMe ? "text-accent-strong" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Icon name="bookmark" variant={post.savedByMe ? "solid" : "line"} className="h-4 w-4" />
+            <span className="sr-only">Beitrag speichern</span>
+          </button>
+        )}
       </footer>
 
       {/* Die letzten Kommentare stehen OFFEN unter dem Beitrag, statt hinter
@@ -1376,48 +1785,15 @@ function timeAgo(iso: string): string {
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill={filled ? "currentColor" : "none"}
-      aria-hidden="true"
-    >
-      <path
-        d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="heart" variant={filled ? "solid" : "line"} className="h-4 w-4" />;
 }
 
 function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v3m10-3v3M3.5 9h17M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V7A1.5 1.5 0 0 1 5 5.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="calendar" className="h-3.5 w-3.5" />;
 }
 
 function CommentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon name="comment" className="h-4 w-4" />;
 }
 
 // ── Beitrag bearbeiten (AGE-566) ────────────────────────────────────────────

@@ -1,156 +1,148 @@
-# Session Handoff — 2026-08-24 (siebzehnte Sitzung)
+# Session Handoff — 2026-08-25 (zweiundzwanzigste Sitzung, AGE-582 Abschnitt 6)
 
-**Abschnitt 12 ist durch: die Datenpflege steht auf PROD und ist unabhängig
-abgenommen.** 12.0 bis 12.7 alle erledigt, 76 von 76 Aufgaben. PR #202 gemergt
-(`9d7b09f`, squash). Kein Deploy nötig — nur Skripte und Belege. 1457 Vitest.
-
-**Dabei ist mir ein Fehler unterlaufen, der auf PROD gewirkt hat.** Er ist
-behoben und die Invariante hergestellt; die Lehre steht in der Auto-Memory unter
-`schluessel-den-ein-spaeterer-schritt-aendert`.
+**Abschnitt 6, die Fläche des Feeds, ist gebaut, im Browser gemessen und
+gepusht.** Ein Commit auf `donald/age-582-aktivitaet-auf-konzeptstand`
+(`22fd5aa`), PR #205. **Abschnitt 7 (Abnahme) ist unberührt** — und ein Teil
+seiner Sichtproben ist heute nebenbei schon gefahren worden, siehe unten.
 
 ## Accomplished
 
-**12.7, erste Hälfte — der Trockenlauf, und er hat sofort geliefert.**
-`scripts/probe-age581-datenpflege-trockenlauf.ts` fand: **zwei
-Übersichtszeilen trafen dasselbe Konto.** Eine Partner-Zeile trägt die
-Firmenadresse einer anderen Person, und zwar über den *stärksten*
-Zuordnungsweg. Ungeprüft hätte 12.1 zwei Jahrestage in dieselbe Zeile
-geschrieben und 12.5 hätte das richtige Konto deaktiviert. Der Beleg vom 23.08.
-beschrieb den Fall in Prosa, meldete aber trotzdem 59 Treffer, die der Rechenweg
-nicht hergab (58).
+**Alle elf Aufgaben aus Abschnitt 6, plus das aus Abschnitt 5 vertagte 5.11.**
+Composer in der Feed-Spalte, drei Reiter, Ordnungs-Umschalter, gefüllte Sidebar
+(Tag-Zähler, aktivste Mitglieder, Beitragstyp), Speichern-Knopf an der Karte,
+Medientyp-Zeile im Composer, der anonyme Fall und die zusammengeklappte
+Filterspalte auf dem Telefon.
 
-**Der Durchgang auf PROD.** 60 `payment_type` · 57 `paid_until` (3 bewusst
-leer) · 12 Anmeldeadressen angeglichen, 3 ausgenommen · 11 Konten ohne
-Listeneintrag deaktiviert · ein Nachzügler angelegt und geschlossen. **72
-Profile.** Keine Post an Mitglieder (`email_confirm: true`).
+**+30 Zusagen**: 19 in `CommunityFeed.flaeche.test.tsx` (neu), 8 in
+`feed-sidebar.test.ts` (neu), 3 im Composer-Test. **1542/1542 grün**,
+`tsc --noEmit`, `pnpm lint`, `pnpm build` sauber; **17/17 im Integrationslauf**
+gegen den laufenden lokalen Stack.
 
-**DER FEHLER: 12.4 hat 12.5 vergiftet.** Die feste Zuordnung hing an der
-**Anmeldeadresse** — und 12.4 gleicht Anmeldeadressen an. Danach zeigte der
-Schlüssel ins Leere, die Zeile galt als „ohne Konto", **12.5 deaktivierte ein
-Mitglied, das auf der Liste steht**, und 12.6 versuchte es ein zweites Mal
-anzulegen. Nur GoTrues „already registered" verhinderte das Zweitkonto — Zufall,
-kein Entwurf. Die Doppelbelegungs-Sperre schwieg zu Recht: aus der
-Doppelbelegung war eine **Nicht**-Belegung geworden, und der Trockenlauf prüft
-den Zustand VOR 12.4, nicht den ZWISCHEN den Schritten.
+**Die Sichtprobe ist der eigentliche Beleg**, nicht der Testlauf — gegen den
+lokalen Stack mit 24 Beiträgen und drei Konten:
 
-**Behoben mit zwei Bedingungen statt einer Reparatur.** Schlüssel ist jetzt
-`profiles.id`; ein Test stellt die Reihenfolge nach (dieselbe Zeile vor und nach
-der Angleichung) und ist gegen den alten Entwurf **rot** — belegt. Dazu der
-Schritt `heilen`: *wer auf der Liste steht, ist offen*, idempotent.
+- **Zähler ausgeloggt 4/2/2, eingeloggt 8/8/4/4/4/4.** Damit ist `security
+  invoker` gemessen und nicht behauptet: es zählen wirklich nur die Beiträge,
+  die der Aufrufer sehen darf.
+- **Zwei Haken sind die Vereinigung** — „Marketing" allein vier Beiträge, mit
+  „Investitionen" acht. ODER, nicht UND.
+- **Alle drei Ordnungen, alle vier Typfilter.** „Beliebteste" ergab 11, 22, 9,
+  20, 7 (Reaktionszahlen 12, 11, 11, 10, 10 — mit Gleichstand).
+- **5.11 live:** in „Gespeichert" standen 23, 16, 9, 2; nach dem Lösen von 23
+  blieben 16, 9, 2 — und in „Alle Beiträge" stand 23 ungedrückt. Eine
+  Invalidierung, beide Flächen.
+- **Echte 375 px** (`emulate`, nicht `resize_page`): Composer 342,
+  Filter-Schalter 453, Reiter 527, Panel `display: none`, kein Überlauf.
+- Konsole durchgehend ohne Fehler und ohne 401.
 
-**Abnahme mit einem ZWEITEN Lauf**
-(`scripts/probe-age581-datenpflege-abnahme.ts`), der die Quelldatei nicht kennt.
-Der Zähler im Schreibskript hatte alle sieben Kennzahlen ✓ gemeldet, während die
-Zuordnung kaputt war. **22 Zusagen grün**, darunter drei Invarianten statt
-Zählungen: kein Datum vor dem Stichtag, Verteilung je Kategorie einzeln,
-Doppelsperre in **beide** Richtungen.
+**Zwei Befunde beim Bauen, beide behoben und beide von einem Test gefunden:**
+der Speichern-Knopf hieß zuerst „Speichern" wie der Absendeknopf des Editors auf
+DERSELBEN Karte (`bearbeiten.test.tsx` wurde rot); und ein gescheiterter
+Sidebar-Aufruf sah aus wie „es gibt nichts".
 
 ## Decisions
 
-- **Der Schlüssel einer Hand-Zuordnung ist die Kennung, nie eine Adresse.**
-  *Warum:* ein Schlüssel, den ein späterer Schritt desselben Durchgangs
-  verändert, ist keiner. Genau das kostete ein Mitglied den Zugang.
-- **Die Abnahme braucht ein zweites Werkzeug ohne die Quelldatei.** *Warum:* der
-  Zähler im Schreibskript teilt Rechenkern und Quelle mit dem Schreiber und
-  meldet einen gemeinsamen Fehler als Erfolg.
-- **Invarianten statt Summen prüfen.** *Warum:* „60 gesetzt" stimmte auch mit
-  den falschen sechzig; die Verteilung je Kategorie nicht.
-- **`heilen` stellt die Invariante her, nicht den Einzelfall.** *Warum:* eine
-  Reparatur gilt einmal, eine Invariante bei jedem Lauf.
-- **12.1/12.2 über `admin_update_profile`, nicht per direktem UPDATE.** *Warum:*
-  die RPC pflegt `payment_type` an allen vier Stellen und hinterlässt die
-  `admin_audit`-Spur. Die trägt jetzt auch den Fehler: 13 × `disable_member`,
-  1 × `enable_member`.
-- **Admin-Token per `generateLink` + sofortiges Einlösen.** *Warum:* kein
-  Passwort nötig, kein Versand; `service_role` trägt kein `sub` und liefe in 401.
-- **`29.02.` bekommt grundsätzlich eine Meldung statt eines Ergebnisses.**
-  *Warum:* sonst hinge die Antwort am Jahr des Stichtags.
-
-**Zu AGE-582 (Aktivität auf Konzeptstand), Donald am 24.08. — beide bisher
-offenen Fragen entschieden, damit gebaut werden kann:**
-
-- **Tags-Filter: ODER.** Mehrere angehakte Tags zeigen Beiträge, die
-  **mindestens einen** davon tragen. *Warum:* Auswahlkästchen versprechen
-  Mehrfachauswahl. Für den Code heisst das `.overlaps("hashtags", tags)` statt
-  des heutigen `.contains(...)` — `contains` ist UND und lieferte bei zwei Haken
-  fast immer eine leere Liste.
-- **Umfrage-Ergebnis: erst nach eigener Stimme.** Wer noch nicht abgestimmt hat,
-  sieht die Optionen, aber keine Zahlen. *Warum:* die Umfrage soll die Antwort
-  nicht vorprägen. **Das ist eine Frage der Abfrage, nicht der Anzeige** — die
-  Zählung darf serverseitig nicht herausgehen, bevor die eigene Stimme steht;
-  ein Ausblenden im Bauteil wäre Kulisse, die Zahlen stünden in der Antwort.
+- **Der anonyme Reiter ist ABGELEITET (`uid ? reiter : "alle"`), nicht per
+  `useEffect` nachgeführt.** *Warum:* die Reiter erscheinen ausgeloggt gar nicht,
+  aber eine Sitzung kann auch ENDEN, während die Seite offen steht. Ein Effekt
+  stellte den Zustand erst eine Runde später zurück — dazwischen liefe die
+  Anfrage in den Wächter aus 5.2.
+- **`feed_top_authors` wird ohne Kennung gar nicht erst angefordert** (`enabled`),
+  nicht bloß nicht angezeigt. *Warum:* sie ist an `anon` nicht vergeben, und ein
+  Fehler, den eine Fläche als Null zeigt, ist die schlechteste aller Zahlen.
+- **Kein Zurücksetzen des Blätterns von Hand.** *Warum:* `feedSeitenKey` trägt
+  die ganze Auswahl (5.7) — eine andere Auswahl IST eine andere Abfrage. Die
+  Zusage ist deshalb scharf gefasst: nicht „die Liste beginnt oben", sondern die
+  erste Anfrage der neuen Auswahl trägt keinen Cursor.
+- **Knöpfe mit `aria-pressed` statt `role="tab"`.** *Warum:* echte Reiter
+  verlangen Pfeiltasten und einen wandernden `tabindex`; eine halbe Umsetzung ist
+  für eine Vorleseausgabe schlechter als keine. Die Datei führt dieselbe Form
+  schon an den Tag-Chips.
+- **Der Speichern-Knopf heißt „Beitrag speichern" und behält den Namen in beiden
+  Zuständen.** *Warum:* „Speichern" kollidiert mit dem Editor-Knopf auf derselben
+  Karte, „Gespeichert" mit dem Reiter daneben. Der Zustand steht in
+  `aria-pressed` und im gefüllten Symbol.
+- **EINE Fassung der Sidebar im DOM (`hidden lg:block`), nicht eine Telefon- und
+  eine Schirmfassung.** *Warum:* zwei lägen in jsdom beide im Baum, und jede
+  Abfrage nach einem Kästchen fände es doppelt.
+- **Die Spannweite der Spalte hängt am Composer** (`lg:row-span-2` gegen
+  `lg:row-span-1`). *Warum:* fest auf zwei gesetzt entstünde ausgeloggt eine
+  leere zweite Zeile samt ihrem Abstand.
+- **Die Medientyp-Zeile liegt INNERHALB der Aktionsgruppe** (`span`, nicht `div`).
+  *Warum:* Donalds Anordnung vom 12.08. — Handelndes zusammen und nach rechts —
+  bleibt damit bestehen. Das Videofeld liegt seither hinter der Zeile, **bleibt
+  aber stehen, sobald etwas darin steht**: der Link geht beim Veröffentlichen
+  mit, ein Fehlklick ergäbe sonst ein Video, von dem der Verfasser nichts weiß.
+- **`src/lib/feed-sidebar.ts` als eigene Datei**, nicht in `feed.ts`. *Warum:*
+  die Regel „`feed_top_authors` nie ohne Kennung" gehört neben die Funktion, und
+  `feed.ts` ist mit 1000 Zeilen der Beitragspfad.
 
 ## Files modified
 
-- `scripts/age581-datenpflege.logic.ts` — **neu**, Rechenkern (`paidUntilAus`,
-  `ordneZu`, `findeDoppelbelegung`, `adresseWeichtAb`)
-- `scripts/age581-datenpflege.logic.test.ts` — **neu**, 24 Zusagen
-- `scripts/probe-age581-datenpflege-trockenlauf.ts` — **neu**, 12.7 erste Hälfte
-- `scripts/age581-datenpflege-schreiben.ts` — **neu**, sechs Schritte einzeln
-  aufrufbar, jeder idempotent
-- `scripts/probe-age581-datenpflege-abnahme.ts` — **neu**, 22 Zusagen, kennt die
-  Quelldatei nicht
-- `docs/age-581-mitgliederabgleich.md` — gemessene statt abgelesene Zahlen, der
-  Vorfall, der Endstand
-- `openspec/changes/add-admin-member-lifecycle/tasks.md` — 12.0 bis 12.7
+**Neu:** `src/lib/feed-sidebar.ts` · `src/lib/feed-sidebar.test.ts` (8) ·
+`src/components/community/CommunityFeed.flaeche.test.tsx` (19)
+
+- `src/components/community/CommunityFeed.tsx` — vier Zustandsachsen statt einem
+  Hashtag, `aktiverReiter`, zwei Sidebar-Abfragen, `ReiterLeiste`, `FeedSidebar`
+  (ersetzt `TagFilter`), Sortierung, Filter-Banner, Speichern-Knopf in
+  `InteraktionsLeiste`, Medientyp-Zeile im Composer; `FeedList`/`PostCard` von
+  `activeHashtag` auf `gewaehlteTags` umgestellt
+- `src/components/ui/icons.tsx` — drei Glyphen: `image`, `video`, `bookmark`
+  (letzterer mit Kontur auch gefüllt, wie `heart`)
+- `CommunityFeed.media.test.tsx` — Tag-Filter auf Kästchen aus `feed_tag_counts`
+- `CommunityFeed.composer.test.tsx` — Medientyp-Zeile (3 neue), und der
+  RPC-Zähler filtert jetzt auf `create_post_with_media` (die Sidebar ruft `rpc`
+  ebenfalls)
+- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 6 und 5.11
+
+Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 
 ## Next session: start here
 
-**AGE-581 ist inhaltlich fertig.** Der nächste Schritt ist der
-**Aktivierungsversand** — 69 der 72 PROD-Konten sind nicht aktiviert und kommen
-erst darüber herein; ein deaktiviertes Konto bekommt dabei keinen Link (Status
-`blocked`). Vorher zu klären: **`app.fairbusinessclub.de` hat weiter keinen
-DNS-Eintrag**, und das ist der Go-Live-Punkt.
+**Erste Handlung: Abschnitt 7, die Abnahme** — acht Aufgaben. Vier davon sind
+heute faktisch schon gefahren und brauchen nur noch das dunkle Theme
+beziehungsweise das Abhaken: 7.3 (nur helles Theme geprüft), 7.4, 7.5, 7.6.
+**Offen und echte Arbeit sind 7.2** (`supabase test db` mit ausdrücklicher
+Dateiliste), **7.7** (pgTAP-Beleg, dass die Zähler nichts verraten — per Test,
+nicht per Sichtprobe) und **7.8** (zweite Meinung auf den Diff, Vendor ungleich
+dem des Deltas).
 
-Die Quelldatei mit den festen Zuordnungen liegt **nicht im Repo** (Rechte 0600,
-Sitzungs-Ablageordner) und ist mit der Sitzung weg. Sie ist Detlevs Original
-plus eine sechste Spalte `konto_id` mit zwei Kennungen (Zeilen 8 und 19). Wer
-sie neu braucht: aus den Screenshots ablesen und die zwei Kennungen aus PROD
-holen — die Regel steht in `docs/age-581-mitgliederabgleich.md`.
+**Der lokale Stack trägt jetzt Sichtprobe-Daten** — drei Konten
+(`sicht-ich@example.test`, `sicht-andere@`, `sicht-dritte@`, Kennwort
+`sichtprobe-nur-lokal-8f2b`) und 24 Beiträge in vier Typen. Sie bleiben liegen,
+damit die nächste Sichtprobe ohne Vorlauf startet; nur lokal, nichts davon
+berührt DEV oder PROD.
 
-**Danach steht AGE-582 an** („Aktivität auf Konzeptstand"), Priorität High,
-Backlog, angelegt am 24.08. Es hält Donalds Rückmeldungen aus dem
-Screenshot-Vergleich fest: die zusätzlichen Infos in der Sidebar (§4), die
-Aktivitäts-Box, die über der Sidebar statt in der Feed-Spalte sitzt (§1,
-`CommunityFeed.tsx:156` rendert sie **vor** dem Raster), die farbigen Icons im
-Dashboard (§0) und die Icons zum Erstellen (§1). Dazu Reiter + „Gespeichert"
-(§2/§3, neue Tabelle `post_saves`) und Umfragen (§5, im Datenmodell bisher gar
-nicht vorhanden).
+**Ein Stolperstein, der zwei Minuten gekostet hat:** `posts.video_url` setzt der
+Trigger `trg_posts_video_url` aus dem **Body**. Die Spalte direkt zu beschreiben
+ist wirkungslos — der Typfilter „Video" sah deshalb erst kaputt aus und war es
+nicht.
 
-Das Issue sagte selbst „direkt nach Abschnitt 11 von AGE-581, nicht davor" —
-diese Bedingung ist seit heute erfüllt. **Beide Fragen, die es blockierten, sind
-jetzt entschieden** (siehe Decisions). Erste Handlung: ein OpenSpec-Change
-anlegen, mit §0 (Icon-/Farbkanon) zuerst — alle anderen Teile hängen daran.
-Zwei Fallen stehen im Issue: `grants_test.sql` kippt bei jeder neuen Tabelle mit
-Table-Grant, und die Sidebar-Zähler dürfen nichts zählen, was der Betrachter
-nicht sehen darf (dasselbe Prädikat wie `posts_select_by_visibility`).
+Vite hängt sich per
+`VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=… npx vite`
+direkt an den lokalen Stack (Infisical entfällt); Port 5173 und 5174 sind von
+fremden Servern belegt, 5175 ist frei. **`localhost`, nicht `127.0.0.1`** — vite
+lauscht auf IPv6.
 
 ## Open questions
 
-- **Drei Anmeldeadressen bleiben abweichend** und brauchen eine Entscheidung:
-  eine ohne `@`, eine, die in die Kollision mit einer Firmenadresse liefe, und
-  die des zweiten Admins (er bestätigt selbst, welche stimmt).
-- **Ein echter Mitgliedsname stand in `tasks.md`** (öffentliches Repo). Aus dem
-  Text ist er raus, aus der Git-Historie nicht. Deine Entscheidung.
-- **Ich habe am 24.08. das PROD-DB-Passwort ins Terminal ausgegeben** (frühere
-  Sitzung). Rotation ist offen.
-- **Vier Review-Befunde aus 11.5 bleiben offen:** HIGH-2 (Zeilensperre endet vor
-  dem GoTrue-Aufruf) · `event_attendees`-RPC ohne Paging · Draft und
-  Server-Baseline sind derselbe Zustand · zwei pgTAP-Negativzusagen laufen vor
-  ihrem Fixture.
-- **Das Onlinetreffen ist am 25.08.**, also morgen.
-- **AGE-582 §5: braucht eine Umfrage eine Laufzeit?** Noch offen — und es hängt
-  an der heutigen Entscheidung: sieht das Ergebnis nur, wer abgestimmt hat, dann
-  sieht ein Nichtwähler es **nie**. Bei einer laufenden Umfrage ist das gewollt,
-  bei einer beendeten vermutlich nicht. Naheliegend: nach Ablauf für alle
-  sichtbar — was ein Ende voraussetzt.
-- **Der Kommentar zu AGE-582 in Linear konnte nicht geschrieben werden**
-  (Klassifikator blockte den MCP-Aufruf). Die beiden Entscheidungen stehen
-  deshalb **nur hier**, nicht am Issue. Wer AGE-582 aufnimmt, trägt sie dort
-  nach.
-- Unverändert offen: 7.5 stimmt nur zur Hälfte · kein Nachsetz-Weg für eine
-  gelöschte Zeile ohne Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne
-  `on delete cascade` · Abweichungen 4.5 und 9.3 begründet, nicht abgenommen ·
-  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging.
-- **DEV ist nicht mitgepflegt.** Eines der elf Konten ist dort
-  `matching_manager`; wird es auch auf DEV deaktiviert, verliert es die Rolle.
+- **Kein `offset` in den zwei Sidebar-Aggregaten.** Donalds generelle Regel
+  („`limit`/`offset` in die erste Fassung jeder listenden RPC") steht gegen den
+  Entwurf, der bewusst keines vorsieht. Die Fläche blättert dort nicht — aber
+  ein `p_offset` an beiden wäre eine Migration, und die sechs aus 2–4 sind
+  ohnehin noch nirgends außer lokal angewendet. **Donalds Entscheidung.**
+- **Die sechs Migrationen aus 2–4 sind nirgends außer lokal angewendet.** Beim
+  Merge zahlt `drift-gate` die Rechnung: er läuft nur auf `main`, ist auf PRs
+  `skipped`, und blockt danach jeden Deploy, bis `migrate-prod` lief.
+- **Das dunkle Theme ist nicht geprüft** (7.3 verlangt beide).
+- Unverändert offen: die RLS-Kosten von `posts_select_by_visibility` (Faktor
+  195) · `post_engagement_counts` prüft noch tote `prime`/`legacy`-Zweige · der
+  Aktivierungsversand (69 von 72 PROD-Konten, `app.fairbusinessclub.de` ohne
+  DNS; Donald am 25.08.: „das ist okay") · `academy.ts` unformatiert
+  (vorbestehend, `pnpm format` bleibt verboten) · vier gepushte
+  Commit-Messages mit falschem Tag · drei abweichende Anmeldeadressen · ein
+  echter Mitgliedsname in der Git-Historie · Rotation des PROD-DB-Passworts ·
+  vier Review-Befunde aus 11.5 · kein Nachsetz-Weg für eine gelöschte Zeile ohne
+  Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne `on delete cascade` ·
+  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging · **DEV ist nicht
+  mitgepflegt**.

@@ -1,0 +1,59 @@
+-- `posts`: kein INSERT, UPDATE nur auf drei Spalten (AGE-582).
+-- Donald, 2026-08-24. Change: openspec/changes/activity-concept-level/.
+--
+-- ══ WARUM JETZT ════════════════════════════════════════════════════════════
+-- 20260824150000 hat `posts.like_count` angelegt. Damit steht ein Wert, nach
+-- dem sortiert wird, in einer Tabelle, auf der `posts_write_own` ein `for all`
+-- auf `author_id = auth.uid()` hält — und `authenticated` bis eben
+-- tabellenweites UPDATE. Gemessen: ein Autor konnte
+-- `update posts set like_count = 999 where id = <eigener Beitrag>` absetzen und
+-- stand danach oben in „Beliebteste". Der Test las `'OK'`, wo `'DENIED'` stehen
+-- muss.
+--
+-- Ein Zähler, den sein Besitzer selbst schreiben darf, ist keine Beliebtheit,
+-- sondern ein Eingabefeld.
+--
+-- ══ WARUM INSERT GANZ WEG ══════════════════════════════════════════════════
+-- Beiträge entstehen über `create_post_with_media` (`security definer`),
+-- Event-Beiträge über den Trigger aus 20260813100000. Der Client fügt an keiner
+-- Stelle direkt ein — gesucht in `src/`, `supabase/functions/` und
+-- `supabase/seed/`: `from("posts")` steht FÜNFMAL, dreimal lesend
+-- (`public-profile.ts:111`, `dashboard.ts:260`, `feed.ts:421`), einmal
+-- `.update()` (`feed.ts:693`), einmal `.delete()` (`feed.ts:716`). In den Edge
+-- Functions kommt `posts` gar nicht vor.
+--
+-- Belegt statt angenommen ist auch die Gegenrichtung: `feed_popularity_test.sql`
+-- entzieht INSERT INNERHALB seiner Transaktion und legt danach einen Beitrag
+-- über die RPC an. Diese Zusage misst also weiter etwas, wenn das Recht längst
+-- fort ist — sie ist die Voraussetzung des Entzugs, nicht seine Bestätigung.
+--
+-- ══ WARUM DREI SPALTEN UND NICHT VIER ══════════════════════════════════════
+-- Genau die, die `updatePost` schreibt (`feed.ts:693`): `body`, `hashtags`,
+-- `visibility`. Alles andere gehört jemand anderem — `author_id` und
+-- `created_at` der Entstehung, `kind` und `ref_id` dem Event-Trigger,
+-- `like_count` dem Zähler, `video_url` einem Weg, den es im Client nicht mehr
+-- gibt.
+--
+-- *Verworfen — stattdessen ein Trigger, der `like_count` festnagelt:* ginge
+-- auch, wäre aber eine Regel, die nur zur Laufzeit spricht. Ein Grant steht im
+-- Golden-Snapshot von `grants_test.sql` und fällt beim nächsten Versehen als
+-- Testfehler auf, bevor irgendetwas ausgeliefert ist.
+--
+-- ══ WAS BLEIBT ═════════════════════════════════════════════════════════════
+-- `select` für `anon` und `authenticated` (die Sichtbarkeit trägt weiterhin
+-- `posts_select_by_visibility`), `delete` für `authenticated` (`deletePost`).
+-- Die Policy `posts_write_own` bleibt unverändert `for all`: sie sagt, WELCHE
+-- ZEILE, das Grant sagt, WELCHE SPALTE. Beide zusammen ergeben die Regel.
+--
+-- ══ DER RÜCKWEG ════════════════════════════════════════════════════════════
+-- Ein breites UPDATE kehrt NICHT zurück, solange Zählerspalte, Trigger und die
+-- Sortierung nach Beliebtheit bestehen. Wer zurück will, entfernt zuerst die
+-- Ordnung, dann den Trigger, dann die Spalte. Vorzugsweise bleibt UPDATE
+-- dauerhaft spaltenbegrenzt — das ist unabhängig von diesem Change der richtige
+-- Zustand.
+--
+-- Forward-only.
+
+revoke insert, update on public.posts from authenticated;
+
+grant update (body, hashtags, visibility) on public.posts to authenticated;

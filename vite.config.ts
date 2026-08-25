@@ -1,8 +1,8 @@
-/// <reference types="vitest/config" />
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 
 // Source-Map-Upload nur, wenn ein Auth-Token vorliegt (CI-/Build-Env). So
 // bleiben lokale Builds und der CI-`verify`-Build (ohne Secret) grün; das
@@ -43,12 +43,25 @@ export default defineConfig({
     // (functions/) laufen anders als die Supabase Edge Functions in einer
     // Node-kompatiblen Runtime und passen deshalb hierher statt in den
     // Deno-Job `edge-functions`.
-    include: [
-      "src/**/*.test.{ts,tsx}",
-      "functions/**/*.test.ts",
-      "supabase/seed/**/*.test.ts",
-      "scripts/**/*.test.ts",
-    ],
+    // `*.integration.test.ts` spricht den LOKALEN Supabase-Stack an und laeuft
+    // deshalb in einem eigenen Lauf (`pnpm test:integration`), nicht in
+    // `pnpm test` — dort gibt es keinen Stack.
+    //
+    // Getrennt statt zur Laufzeit uebersprungen, und das ist der Punkt: ein
+    // `describe.skipIf(!erreichbar)` waere ueberall gruen, auch dort, wo nie
+    // etwas lief. Der Lauf haengt stattdessen im CI-Job `migrations`, der den
+    // Stack ohnehin hochfaehrt.
+    include: process.env.FBC_INTEGRATION
+      ? ["src/**/*.integration.test.ts"]
+      : [
+          "src/**/*.test.{ts,tsx}",
+          "functions/**/*.test.ts",
+          "supabase/seed/**/*.test.ts",
+          "scripts/**/*.test.ts",
+        ],
+    exclude: process.env.FBC_INTEGRATION
+      ? [...configDefaults.exclude]
+      : [...configDefaults.exclude, "**/*.integration.test.ts"],
     // Dummy-Supabase-Config, damit src/lib/supabase.ts beim Import nicht wirft
     // (Unit-Tests sprechen kein Netzwerk an).
     env: {

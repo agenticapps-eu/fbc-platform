@@ -136,6 +136,49 @@
   --color-warning: #b4761a;
   --color-danger: #b23b3b;
 
+  /* Bereichsfarben (AGE-582). EINE Familie, sieben Stufen — Violett → Magenta.
+   *
+   * Warum eine Familie und nicht sieben Farben: gemessen belegen Akzent-Blau
+   * (Ton 218), `success` (161), `warning` (36) und `danger` (0) vier der sechs
+   * unterscheidbaren Farbregionen. Sieben eigene Töne kollidierten alle — der
+   * naheliegende Kandidat für „Highlights" war #b91c1c und lag damit auf **0°**
+   * von `danger`, also exakt auf der Fehlerfarbe. Frei ist praktisch nur der
+   * Bogen Violett–Magenta. Die Anforderung sagt ohnehin „one further colour
+   * family", und sieben Töne wären keine Familie gewesen.
+   *
+   * Verworfen: (a) sieben eigene Töne mit Kollision — „Highlights" hätte wie ein
+   * Fehler gelesen; (b) nur drei Bereiche einfärben — der Kanon verlangt sieben;
+   * (c) auf maximalen Abstand optimieren — das treibt in die Gamut-Ecken und
+   * lieferte #f106f9 neben #261e3e, also Neon neben Fast-Schwarz.
+   *
+   * Gemessen (1.10), Kontrast gegen `--color-canvas` / `--color-soft`:
+   *   kompass     #4c1d95  10.95 / 10.30
+   *   highlights  #701a75  10.03 /  9.43
+   *   nachrichten #5b21b6   8.98 /  8.44
+   *   kontakte    #86198f   8.24 /  7.74
+   *   mitglieder  #7e22ce   6.98 /  6.56
+   *   events      #a21caf   6.32 /  5.94
+   *   aktivitaet  #7c3aed   5.70 /  5.36
+   * Ziel war 4.5:1 gegen BEIDE Flächen — strenger als die 3:1, die WCAG 1.4.11
+   * für Nicht-Text verlangt, weil die Marke neben ihrer Beschriftung steht und
+   * `--color-muted` im selben Block dieselbe Latte zieht. Kleinster Abstand
+   * zwischen zwei Bereichen: ΔE 10.5.
+   *
+   * **Einmal** definiert, nicht je Theme: das ist Inhaltsschicht, und der
+   * navy-Block überschreibt absichtlich nur Chrome. Ein zweiter Satz im
+   * navy-Block wäre nicht „auch richtig", sondern eine zweite Wahrheit.
+   *
+   * Diese Farben identifizieren einen Bereich. Sie SIGNALISIEREN NICHTS: kein
+   * Link, kein Knopf, kein Fokusring, kein aktiver Zustand. Das bleibt Blau
+   * allein — erzwungen von `src/config/bereiche.test.ts`. */
+  --color-bereich-kompass: #4c1d95;
+  --color-bereich-highlights: #701a75;
+  --color-bereich-nachrichten: #5b21b6;
+  --color-bereich-kontakte: #86198f;
+  --color-bereich-mitglieder: #7e22ce;
+  --color-bereich-events: #a21caf;
+  --color-bereich-aktivitaet: #7c3aed;
+
   /* Typografie — Fraunces trägt nur h1–h3 und Display, Inter alles andere. */
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

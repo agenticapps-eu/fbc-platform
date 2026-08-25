@@ -18,6 +18,7 @@ function makePost(body: string): FeedPost {
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
+    savedByMe: false,
     media: [],
     // Die Fixtur leitet `videoUrl` aus dem Body ab, weil die DATENBANK das tut
     // (trg_posts_video_url → erste_video_url, 20260813090000). Ein fest

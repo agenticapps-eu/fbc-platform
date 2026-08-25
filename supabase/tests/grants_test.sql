@@ -60,11 +60,12 @@ partner_categories/anon=SELECT
 partner_categories/authenticated=SELECT
 partners/authenticated=SELECT
 platform_settings/authenticated=SELECT
-post_likes/authenticated=DELETE,INSERT,SELECT,UPDATE
+post_likes/authenticated=DELETE,INSERT,SELECT
 post_media/anon=SELECT
 post_media/authenticated=DELETE,INSERT,SELECT
+post_saves/authenticated=DELETE,INSERT,SELECT
 posts/anon=SELECT
-posts/authenticated=DELETE,INSERT,SELECT,UPDATE
+posts/authenticated=DELETE,SELECT
 profile_badges/authenticated=SELECT
 profile_contacts/authenticated=INSERT,SELECT,UPDATE
 profile_interests/authenticated=DELETE,INSERT,SELECT,UPDATE
@@ -86,12 +87,27 @@ tags/authenticated=SELECT$$,
 -- redaktionell, ein INSERT hier waere der Weg, sich einen kuratierten Tag
 -- selbst zu verleihen.
 
+-- AGE-582 hat `post_saves` dazugelegt — eine private Merkliste, und die Zeile
+-- sagt vor allem, was NICHT darauf steht: kein UPDATE. An einer Speicherung
+-- gibt es nichts zu aendern; wer sie loesen will, loescht die Zeile. Und kein
+-- `anon`: die Liste hat einem ausgeloggten Besucher keine Frage zu beantworten.
+-- Die RLS traegt dieselbe Aussage ein zweites Mal (drei Policies, keine fuer
+-- UPDATE), damit die Tabelle auch dann unveraenderlich bleibt, wenn ein Grant
+-- auf dem Weg zurueckkehrt, der AGE-312 ausgeloest hat.
+
 -- ── 2. Spalten-Grants ────────────────────────────────────────────────────────
--- Nur die drei Tabellen, bei denen das Grant ENGER ist als seine Policy. Die
+-- Nur die Tabellen, bei denen das Grant ENGER ist als seine Policy. Die
 -- Policy erlaubt UPDATE auf der Zeile, schreibbar ist aber nur diese Liste;
 -- abgeleitete Felder (tier, potential_score, profile_completion, ...) gehoeren
 -- Triggern und RPCs. Faellt eine Spalte hier still dazu, waere das eine
 -- Rechteausweitung, die rls_test.sql nicht sieht.
+--
+-- `posts` kam am 24.08. dazu (AGE-582). Der Grund steht in einer Zahl: seit
+-- `posts.like_count` existiert, sortiert der Feed nach einem Wert, der in einer
+-- Zeile steht, die ihrem Autor gehoert. Mit tabellenweitem UPDATE konnte er ihn
+-- selbst setzen — gemessen, nicht befuerchtet: `update posts set like_count =
+-- 999` auf dem eigenen Beitrag ging durch. Die drei Spalten hier sind die, die
+-- `updatePost` wirklich schreibt.
 
 select is(
   (select coalesce(string_agg(table_name || '.UPDATE=' || cols, E'\n' order by table_name), '(leer)')
@@ -99,10 +115,12 @@ select is(
          from information_schema.role_column_grants
          where table_schema = 'public' and grantee = 'authenticated'
            and privilege_type = 'UPDATE'
-           and table_name in ('profiles', 'contact_requests', 'routing_queue', 'platform_settings')
+           and table_name in ('profiles', 'contact_requests', 'routing_queue', 'platform_settings',
+                              'posts')
          group by 1) t),
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
+posts.UPDATE=body,hashtags,visibility
 profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');

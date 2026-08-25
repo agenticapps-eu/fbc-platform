@@ -13,6 +13,9 @@ import { displayAuthor } from "../../lib/displayAuthor";
 import { eventsListKey, fetchEvents, formatEventDate, partitionEvents } from "../../lib/events";
 import { feedQueryKey, fetchFeed, type FeedPost } from "../../lib/feed";
 import { signaturQueryKey, signPostMedia, SIGNATUR_STALE_MS } from "../../lib/post-media";
+import { BEREICHE, type Bereich } from "../../config/bereiche";
+import { Icon } from "../ui/icons";
+import { cn } from "../../lib/cn";
 import {
   directoryQueryKey,
   emptyDirectoryFilters,
@@ -131,6 +134,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_minmax(0,0.85fr)]">
         <DashTile
           label="Mein Kompass"
+          bereich="kompass"
           value={`${profile.profile_completion}%`}
           sub="Profilvollständigkeit"
           to="/profil/bearbeiten"
@@ -140,6 +144,7 @@ export function MemberDashboard({ uid }: { uid: string }) {
             fürs Sommerfest raus. */}
         <DashTile
           label="Nächstes Event"
+          bereich="events"
           value={nextEvent ? nextEvent.title : "—"}
           valueClassName="text-xl"
           sub={
@@ -165,7 +170,12 @@ export function MemberDashboard({ uid }: { uid: string }) {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <section className="space-y-4 lg:col-span-2">
-          <SectionHeader title="Neu in der Aktivität" to="/aktivitaet" cta="Zur Aktivität" />
+          <SectionHeader
+            title="Neu in der Aktivität"
+            to="/aktivitaet"
+            cta="Zur Aktivität"
+            bereich="aktivitaet"
+          />
           {feedQuery.isLoading ? (
             <p className="text-sm text-muted">Beiträge werden geladen…</p>
           ) : posts.length === 0 ? (
@@ -214,7 +224,12 @@ export function MemberDashboard({ uid }: { uid: string }) {
         </section>
 
         <section className="space-y-4">
-          <SectionHeader title="Neue Mitglieder für dich" to="/mitglieder" cta="Alle Mitglieder" />
+          <SectionHeader
+            title="Neue Mitglieder für dich"
+            to="/mitglieder"
+            cta="Alle Mitglieder"
+            bereich="mitglieder"
+          />
           {membersQuery.isLoading ? (
             <p className="text-sm text-muted">Mitglieder werden geladen…</p>
           ) : members.length === 0 ? (
@@ -333,6 +348,7 @@ function DashTile({
   cta,
   valueClassName = "text-3xl",
   ton = "aufgabe",
+  bereich,
 }: {
   label: string;
   value: ReactNode;
@@ -342,6 +358,10 @@ function DashTile({
   valueClassName?: string;
   /** `zustand` hebt die Kachel ab — sie fordert nichts, sie sagt etwas. */
   ton?: "aufgabe" | "zustand";
+  /** Bezeichnet die Kachel einen Gegenstandsbereich, trägt sie dessen Marke
+   *  (AGE-582). „Mitgliedschaft" bekommt bewusst keine: eine Mitgliedsstufe ist
+   *  kein Bereich, und der Kanon kennt für sie keinen Eintrag. */
+  bereich?: Bereich;
 }) {
   return (
     <Card
@@ -349,7 +369,15 @@ function DashTile({
         "flex flex-col gap-1" + (ton === "zustand" ? " border-accent/30 bg-accent-soft/35" : "")
       }
     >
-      <span className="text-sm text-muted">{label}</span>
+      <span className="flex items-center gap-1.5 text-sm text-muted">
+        {bereich && (
+          <Icon
+            name={BEREICHE[bereich].icon}
+            className={cn("h-4 w-4 shrink-0", BEREICHE[bereich].farbe)}
+          />
+        )}
+        {label}
+      </span>
       <p className={`font-display font-semibold text-ink ${valueClassName}`}>{value}</p>
       <p className="truncate text-sm text-muted">{sub}</p>
       {to && (
@@ -364,10 +392,26 @@ function DashTile({
   );
 }
 
-function SectionHeader({ title, to, cta }: { title: string; to: string; cta: string }) {
+function SectionHeader({
+  title,
+  to,
+  cta,
+  bereich,
+}: {
+  title: string;
+  to: string;
+  cta: string;
+  bereich: Bereich;
+}) {
   return (
     <div className="flex items-end justify-between gap-3">
-      <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="flex items-center gap-2 font-display text-2xl font-semibold tracking-tight text-ink">
+        <Icon
+          name={BEREICHE[bereich].icon}
+          className={cn("h-5 w-5 shrink-0", BEREICHE[bereich].farbe)}
+        />
+        {title}
+      </h2>
       <Link to={to} className="shrink-0 text-sm font-medium text-accent-strong hover:underline">
         {cta} →
       </Link>

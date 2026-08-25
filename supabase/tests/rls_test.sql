@@ -641,9 +641,23 @@ select is(
 select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'insert into public.offers (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kaperangebot'')'),
   'DENIED:%', 'Gate: kein Angebot unter fremdem Namen');
+-- Diese eine Zusage braucht seit dem 25.08. (AGE-582) eine Vorbereitung, sonst
+-- misst sie NICHTS mehr: 20260824160000 hat `authenticated` das INSERT-Recht auf
+-- `posts` genommen, und das ACL antwortet VOR der Policy. Nachgemessen: mit
+-- komplett GELÖSCHTER `posts_write_own` scheitert das INSERT trotzdem — mit
+-- `42501` aus dem fehlenden Grant. Die Zusage bliebe also grün, während das
+-- Aktivierungs-Gate ausgebaut ist.
+--
+-- Das Recht wird darum INNERHALB dieser Transaktion kurz zurückgegeben. Danach
+-- kann `42501` nur noch aus der Policy kommen, und genau die ist gemeint.
+grant insert on public.posts to authenticated;
+
 select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'insert into public.posts (author_id, body, visibility) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kaperbeitrag'', ''public'')'),
-  'DENIED:%', 'Gate: kein Beitrag unter fremdem Namen');
+  'DENIED:%', 'Gate: kein Beitrag unter fremdem Namen — abgewiesen von der '
+              'POLICY, nicht vom fehlenden Grant');
+
+revoke insert on public.posts from authenticated;
 select alike(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
   'insert into public.needs (profile_id, title) values (''dddddddd-0000-0000-0000-00000000000d'', ''Kapergesuch'')'),
   'DENIED:%', 'Gate: kein Gesuch unter fremdem Namen');
@@ -2881,29 +2895,45 @@ select is(
 
 -- 22.11 Zwei Beiträge zu EINEM Event sind unmöglich — sonst stünde derselbe
 -- Eintrag doppelt im Feed, sobald ein Trigger zweimal liefe.
-select alike(
-  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
-    $$insert into public.posts (author_id, body, visibility, kind, ref_id)
-      values ('c9c9c9c9-0000-0000-0000-0000000000b1', '', 'public', 'event',
-              'c9e00001-0000-4000-8000-000000000001')$$),
-  'DENIED:%', 'Ein zweiter Beitrag zu demselben Event wird abgelehnt');
+--
+-- Läuft bewusst als EIGENTÜMER und über den FEHLERCODE, nicht als `authenticated`
+-- über 'DENIED:%'. Der Anspruch gilt dem UNIQUE-INDEX `posts_event_ref_id_key`,
+-- und der kam als `authenticated` nie zum Zug: `posts_write_own` verlangt
+-- `kind = 'member'` und wies schon vorher ab, seit dem 25.08. sogar das ACL. Die
+-- alte Fassung wäre auch dann grün geblieben, wenn der Index gefallen wäre —
+-- und dann stünde ein Event doppelt im Feed.
+select throws_ok(
+  $$insert into public.posts (author_id, body, visibility, kind, ref_id)
+    values ('c9c9c9c9-0000-0000-0000-0000000000b1', '', 'public', 'event',
+            'c9e00001-0000-4000-8000-000000000001')$$,
+  '23505', null,
+  'Ein zweiter Beitrag zu demselben Event wird abgelehnt — vom Unique-Index');
 
--- 22.12 Die zwei Spalten müssen zusammenpassen.
-select alike(
-  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
-    $$insert into public.posts (author_id, body, kind, ref_id)
-      values ('c9c9c9c9-0000-0000-0000-0000000000b1', 'x', 'member',
-              'c9e00001-0000-4000-8000-000000000001')$$),
-  'DENIED:%', 'kind=member mit ref_id wird abgelehnt');
+-- 22.12 Die zwei Spalten müssen zusammenpassen. Aus demselben Grund wie 22.11
+-- als Eigentümer und über den Fehlercode: gemeint ist `posts_kind_ref_id_check`.
+select throws_ok(
+  $$insert into public.posts (author_id, body, kind, ref_id)
+    values ('c9c9c9c9-0000-0000-0000-0000000000b1', 'x', 'member',
+            'c9e00001-0000-4000-8000-000000000001')$$,
+  '23514', null,
+  'kind=member mit ref_id wird abgelehnt — von der Prüfbedingung');
 
 -- ── Die vier Umgehungen (codex, HIGH) ──────────────────────────────────────
--- 22.13 Ein Mitglied legt keinen Event-Beitrag an.
+-- 22.13 Ein Mitglied legt keinen Event-Beitrag an. HIER ist die Policy gemeint
+-- (`posts_write_own` verlangt `kind = 'member'`), also wird das INSERT-Recht
+-- wie oben kurz zurückgegeben — sonst antwortete das ACL zuerst und die Zusage
+-- bliebe auch ohne jede Policy grün.
+grant insert on public.posts to authenticated;
+
 select alike(
   pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b3',
     $$insert into public.posts (author_id, body, visibility, kind, ref_id)
       values ('c9c9c9c9-0000-0000-0000-0000000000b3', '', 'public', 'event',
               'c9e00002-0000-4000-8000-000000000002')$$),
-  'DENIED:%', 'Ein Mitglied kann keinen kind=event-Beitrag anlegen');
+  'DENIED:%', 'Ein Mitglied kann keinen kind=event-Beitrag anlegen — abgewiesen '
+              'von der POLICY, nicht vom fehlenden Grant');
+
+revoke insert on public.posts from authenticated;
 
 -- 22.14 Der HOST kann seinen eigenen Event-Beitrag nicht löschen — obwohl er
 -- dessen Autor ist. Das ist der Kern des Befunds: `posts_write_own` hing allein
@@ -2917,13 +2947,23 @@ select is(
   0, 'Der Host löscht seinen Event-Beitrag NICHT (die Policy lässt keine Zeile durch)');
 
 -- 22.15 … und schreibt ihn auch nicht auf `member` um.
-select is(
-  pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b1',
-    $$with u as (
-        update public.posts set kind = 'member', ref_id = null
-         where ref_id = 'c9e00001-0000-4000-8000-000000000001' returning 1)
-      select count(*)::int from u$$),
-  0, 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
+--
+-- Diese Zusage misst seit dem 24.08. (AGE-582) eine ANDERE Schranke als vorher,
+-- und das ist der Grund, warum sie hier umgeschrieben steht: bis dahin hielt
+-- `authenticated` tabellenweites UPDATE auf `posts`, die Anweisung lief also
+-- durch bis zur Policy und ergab NULL ZEILEN. Seit 20260824160000 ist UPDATE
+-- auf `body`, `hashtags`, `visibility` begrenzt — `kind` und `ref_id` gehören
+-- dem Event-Trigger. Das GRANT weist jetzt vor der Policy ab, mit `42501`.
+--
+-- `count_as` fängt keinen Fehler und riss den ganzen Lauf mit; also `try_as`.
+-- Die Aussage über die POLICY geht dabei nicht verloren: 22.14 (delete) und
+-- 22.16 (visibility, weiterhin grantbar) messen sie unverändert an derselben
+-- Zeile.
+select alike(
+  pg_temp.try_as('c9c9c9c9-0000-0000-0000-0000000000b1',
+    $$update public.posts set kind = 'member', ref_id = null
+       where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
+  'DENIED:%', 'Der Host schreibt seinen Event-Beitrag nicht auf kind=member um');
 
 -- 22.16 … und dreht die gespiegelte Sichtbarkeit nicht zurück.
 select is(

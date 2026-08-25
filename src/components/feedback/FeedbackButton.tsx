@@ -6,6 +6,7 @@ import { submitPlatformFeedback } from "../../lib/feedback";
 import { useAuth } from "../../providers/auth-context";
 import { Button, Textarea, useToast } from "../ui";
 import { useOverlay } from "../ui/useOverlay";
+import { Icon } from "../ui/icons";
 
 /**
  * QM-Feedback (AGE-300) — Spec §3.5. Eintrag am FUSS DER SEITENLEISTE, über
@@ -37,26 +38,7 @@ const STARS = [1, 2, 3, 4, 5] as const;
  * Mitgliedern.
  */
 function FeedbackIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5 shrink-0"
-      aria-hidden="true"
-    >
-      {/* Trichter */}
-      <path d="M3 11v2a1 1 0 0 0 1 1h2.5L11 17.5V6.5L6.5 10H4a1 1 0 0 0-1 1Z" />
-      {/* Schallwellen — zwei Bögen, nach aussen schwächer */}
-      <path d="M15 9.2a4 4 0 0 1 0 5.6" />
-      <path d="M17.8 6.8a8 8 0 0 1 0 10.4" />
-      {/* Halteschlaufe, damit die Form nicht als Lautsprecher liest */}
-      <path d="M7.5 17.5 8.6 20a1.2 1.2 0 0 0 2.3-.4v-1.4" />
-    </svg>
-  );
+  return <Icon name="feedback" className="h-5 w-5 shrink-0" />;
 }
 
 export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {

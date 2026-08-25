@@ -10,7 +10,7 @@ import { FORMAT_HERO } from "../config/formatHero";
 export default function AktivitaetPage() {
   return (
     <div className="flex flex-col gap-6">
-      <FormatHero meta={FORMAT_HERO["/aktivitaet"]} />
+      <FormatHero meta={FORMAT_HERO["/aktivitaet"]} bereich="aktivitaet" />
       <CommunityFeed />
     </div>
   );
