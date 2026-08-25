@@ -14,18 +14,17 @@ import type { Database } from "./database.types";
  *    IST das von der RLS entschiedene Signal.
  */
 
-type ThemeScore = Pick<
-  Database["public"]["Tables"]["profile_theme_scores"]["Row"],
-  "theme" | "score"
->;
 type Interest = Pick<Database["public"]["Tables"]["profile_interests"]["Row"], "theme" | "label">;
+/** `source` unterscheidet die Bauart der Zeile (`chip` | `editor`) und entscheidet
+ *  die Darstellung (AGE-597). NICHT `category`: der Editor darf sie ebenfalls
+ *  setzen, und eine Prüfung darauf verlöre den Text einer solchen Zeile. */
 type Offer = Pick<
   Database["public"]["Tables"]["offers"]["Row"],
-  "id" | "category" | "theme" | "title" | "description"
+  "id" | "category" | "theme" | "title" | "description" | "source"
 >;
 type Need = Pick<
   Database["public"]["Tables"]["needs"]["Row"],
-  "id" | "category" | "theme" | "title" | "description"
+  "id" | "category" | "theme" | "title" | "description" | "source"
 >;
 
 export interface PublicProfile {
@@ -58,7 +57,6 @@ export interface ExtendedProfile {
   potential_score: number;
   competencies: string[];
   videos: string[];
-  themeScores: ThemeScore[];
   interests: Interest[];
   offers: Offer[];
   needs: Need[];
@@ -83,7 +81,10 @@ export const publicProfileQueryKey = (id: string) => ["public-profile", id] as c
  * und `extended` wird zusammengebaut; sonst bleibt es `null`.
  */
 export async function fetchPublicProfile(id: string): Promise<PublicProfileData> {
-  const [publicRes, baseRes, themeRes, interestsRes, offersRes, needsRes, postsRes] =
+  // `profile_theme_scores` wird NICHT mehr gelesen (AGE-597): der Erfolgsradar ist
+  // aus dieser Ansicht entfallen, und ein Rundlauf ohne Leser ist kein „Erhalten".
+  // Tabelle und `recompute_potential_score` bleiben bestehen.
+  const [publicRes, baseRes, interestsRes, offersRes, needsRes, postsRes] =
     await Promise.all([
     supabase
       .from("profiles_public")
@@ -95,16 +96,15 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
       .select("headline, branche, member_since, potential_score, competencies, videos")
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("profile_theme_scores").select("theme, score").eq("profile_id", id),
     supabase.from("profile_interests").select("theme, label").eq("profile_id", id).order("label"),
     supabase
       .from("offers")
-      .select("id, category, theme, title, description")
+      .select("id, category, theme, title, description, source")
       .eq("profile_id", id)
       .order("created_at"),
     supabase
       .from("needs")
-      .select("id, category, theme, title, description")
+      .select("id, category, theme, title, description, source")
       .eq("profile_id", id)
       .order("created_at"),
     supabase
@@ -148,7 +148,6 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
         potential_score: base.potential_score,
         competencies: base.competencies ?? [],
         videos: base.videos,
-        themeScores: themeRes.data ?? [],
         interests: interestsRes.data ?? [],
         offers: offersRes.data ?? [],
         needs: needsRes.data ?? [],

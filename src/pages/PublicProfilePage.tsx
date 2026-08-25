@@ -24,11 +24,14 @@ import {
   type PublicProfile,
 } from "../lib/public-profile";
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
+import { findCategory, type MatchingSide } from "../config/matching";
+import { putzen, wiederholtDenAnfang } from "../lib/kompass-anzeige";
 import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
 
-// Themen-Reihenfolge & Labels für Erfolgsradar/Interessen (Sein·Tun·Haben·Wirken).
+// Themen-Reihenfolge & Labels der Interessen (Sein·Tun·Haben·Wirken). Der
+// Erfolgsradar, der sie ebenfalls benutzte, ist entfallen (AGE-597).
 const THEME_ORDER = ["sein", "tun", "haben", "wirken"] as const;
 const THEME_LABEL: Record<string, string> = {
   sein: "Sein",
@@ -102,7 +105,10 @@ export default function PublicProfilePage() {
         <Card className="border-dashed">
           <CardTitle className="text-base">Erweiterte Profilangaben</CardTitle>
           <p className="mt-1 text-sm text-muted">
-            Erfolgsradar, Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der
+            {/* „Erfolgsradar" stand hier bis AGE-597 an erster Stelle. Eine Fähigkeit
+                zu bewerben, die es nicht mehr gibt, ist ein falsches Versprechen —
+                und es stünde ausgerechnet vor denen, die kaufen sollen. */}
+            Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der
             Mitgliedsstufe <span className="font-medium text-ink">{LEVELS.discover.label}</span>{" "}
             sichtbar.
           </p>
@@ -160,8 +166,11 @@ function ProfileHeader({
 /**
  * Die Abschnitte nach dem Mockup vom 29.07. (AGE-498), in dieser Reihenfolge:
  * Über mich · Beruf · Hobbys · Ich biete · Ich suche · Aktivitäten · Eckdaten.
- * Erfolgsradar, Kompetenzen und Videos bleiben dazwischen erhalten — sie waren
- * schon da, und das Mockup verbietet sie nicht.
+ * Kompetenzen und Videos bleiben dazwischen erhalten — sie waren schon da, und
+ * das Mockup verbietet sie nicht. Der Erfolgsradar dagegen ist entfallen
+ * (AGE-597): AGE-539 hatte ihn auf der EIGENEN Seite bereits entfernt, und ein
+ * Betrachter sah hier eine Fläche, über die der Eigentümer selbst keine Auskunft
+ * mehr geben kann.
  *
  * Jeder Abschnitt hat GENAU EINE Quelle (siehe Spec-Delta), und ein leerer
  * Abschnitt entfällt, statt einen Platzhalter zu zeigen: dieselbe Regel, die
@@ -179,7 +188,6 @@ function ExtendedSections({
     items: extended.interests.filter((i) => i.theme === theme),
   })).filter((g) => g.items.length > 0);
   const untheured = extended.interests.filter((i) => !i.theme);
-  const hasRadar = extended.themeScores.length > 0;
   const hatHobbys = interestsByTheme.length > 0 || untheured.length > 0;
   const beruf = [profile.company, extended.branche, extended.headline].filter(Boolean);
 
@@ -221,14 +229,14 @@ function ExtendedSections({
       {extended.offers.length > 0 && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Ich biete</CardTitle>
-          <MatchingList items={extended.offers} />
+          <MatchingList items={extended.offers} side="offer" />
         </Card>
       )}
 
       {extended.needs.length > 0 && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Ich suche</CardTitle>
-          <MatchingList items={extended.needs} />
+          <MatchingList items={extended.needs} side="need" />
         </Card>
       )}
 
@@ -294,32 +302,6 @@ function ExtendedSections({
         </dl>
       </Card>
 
-      {hasRadar && (
-        <Card className="flex flex-col gap-4">
-          <CardTitle className="text-base">Erfolgsradar</CardTitle>
-          <ul className="flex flex-col gap-3">
-            {THEME_ORDER.map((theme) => {
-              const score = extended.themeScores.find((s) => s.theme === theme)?.score;
-              if (score == null) return null;
-              return (
-                <li key={theme} className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-sm text-muted">{THEME_LABEL[theme]}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-soft">
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${(score / 10) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-10 shrink-0 text-right text-sm font-medium text-ink">
-                    {score.toFixed(1)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
       {extended.videos.length > 0 && (
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Videos</CardTitle>
@@ -346,7 +328,6 @@ function ChipList({ items }: { items: string[] }) {
   );
 }
 
-/** Angebote oder Gesuche als Liste — dieselbe Darstellung für beide Seiten. */
 /**
  * „Über mich" — drei Zeilen, den Rest auf Klick.
  *
@@ -398,28 +379,77 @@ function Biografie({ text }: { text: string }) {
   );
 }
 
+/**
+ * Angebote oder Gesuche — zwei Bauarten, nicht eine Zeilenform für beide
+ * (AGE-597).
+ *
+ * Unterschieden wird an `source`, NICHT an `category`: der Rich-Editor verlangt
+ * eine Kategorie und erlaubt zugleich Titel und Beschreibung, also verlöre eine
+ * Prüfung auf `category` den Text einer solchen Zeile (Befund codex). Dass beide
+ * Spalten heute deckungsgleich sind (chip 19 · editor 93), ist ein Zustand des
+ * Bestands, keine Zusage.
+ *
+ * `chip`   → Marke mit dem Klartext der Kategorie. Der `title` entfällt: über
+ *            alle 19 Marken-Zeilen ist er exakt der Name der Kategorie, und
+ *            daneben stand bisher zusätzlich der rohe Schlüssel — jede Zeile
+ *            doppelte sich also zweimal.
+ * `editor` → Fließtext mit erhaltenen Umbrüchen; der `title` entfällt, wo er
+ *            nur dessen Anfang ist.
+ */
 function MatchingList({
   items,
+  side,
 }: {
-  items: { id: string; title: string; description: string | null; category: string | null }[];
+  items: {
+    id: string;
+    title: string;
+    description: string | null;
+    category: string | null;
+    source: string;
+  }[];
+  side: MatchingSide;
 }) {
+  const marken = items.filter((i) => i.source === "chip");
+
+  // `findCategory` statt `categoryLabel`: der Helfer fällt für unbekannte
+  // Schlüssel auf `future_key` → „Future_key" zurück und hielte die Zusage
+  // „kein roher Schlüssel" damit nicht ein. Ohne Klartext keine Marke.
+  const label = [
+    ...new Set(
+      marken
+        .map((i) => findCategory(side, i.category)?.label)
+        .filter((l): l is string => l !== undefined),
+    ),
+  ];
+
+  // Der Text einer Marken-Zeile steht UNTER der Reihe, statt zu verschwinden.
+  // Im Bestand kommt das nicht vor (0 von 19), der Editor kann es aber anlegen.
+  const eintraege = [
+    ...marken.map((i) => ({ id: i.id, titel: "", text: putzen(i.description ?? "") })),
+    ...items
+      .filter((i) => i.source !== "chip")
+      .map((i) => ({
+        id: i.id,
+        titel: wiederholtDenAnfang(i.title, i.description ?? "") ? "" : putzen(i.title),
+        text: putzen(i.description ?? ""),
+      })),
+  ].filter((e) => e.titel !== "" || e.text !== "");
+
   return (
-    <ul className="flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item.id} className="rounded-[var(--radius-card)] border border-line bg-soft p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-ink">{item.title}</span>
-            {item.category && <Badge variant="soft">{item.category}</Badge>}
-          </div>
-          {item.description && (
+    <div className="flex flex-col gap-3">
+      {label.length > 0 && <ChipList items={label} />}
+      {eintraege.map((e) => (
+        <div key={e.id}>
+          {e.titel !== "" && <p className="font-medium text-ink">{e.titel}</p>}
+          {e.text !== "" && (
             // Dasselbe wie bei der Biografie: „Ich biete" trägt beim Import
             // mehrzeiligen Fließtext, und eine Aufzählung ohne Umbrüche liest
             // sich als ein Satz.
-            <p className="mt-1 text-sm whitespace-pre-line text-muted">{item.description}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-line text-ink/80">{e.text}</p>
           )}
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

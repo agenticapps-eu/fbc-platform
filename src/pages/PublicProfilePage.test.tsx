@@ -67,27 +67,25 @@ const fullView: PublicProfileData = {
     potential_score: 842,
     competencies: ["M&A", "Mentoring"],
     videos: [],
-    themeScores: [
-      { theme: "sein", score: 8.5 },
-      { theme: "wirken", score: 6.4 },
-    ],
     interests: [{ theme: "tun", label: "Unternehmensaufbau" }],
     offers: [
       {
         id: "o1",
-        category: "Kapital",
+        category: null,
         theme: "haben",
         title: "Beteiligungskapital",
         description: "Eigenkapital.",
+        source: "editor",
       },
     ],
     needs: [
       {
         id: "n1",
-        category: "Projekte",
+        category: null,
         theme: "wirken",
         title: "Impact-Projekte",
         description: "DACH-Raum.",
+        source: "editor",
       },
     ],
   },
@@ -129,7 +127,10 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.getByText(/Impact Member/i)).toBeInTheDocument();
 
     // Erweiterte Blöcke fehlen — die RLS gab sie nicht frei (extended === null).
-    expect(screen.queryByRole("heading", { name: "Erfolgsradar" })).not.toBeInTheDocument();
+    // Geprüft an „Hobbys" statt am Erfolgsradar: der ist seit AGE-597 fort, und
+    // eine Zusage über eine Fläche, die es nirgends mehr gibt, wäre konstant
+    // erfüllt und prüfte nichts.
+    expect(screen.queryByRole("heading", { name: "Hobbys" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kompetenzen" })).not.toBeInTheDocument();
     expect(screen.queryByText("842")).not.toBeInTheDocument();
     // Kein Kontakt-Senden-Button für Basic; stattdessen der Upgrade-Hinweis-Block.
@@ -224,7 +225,11 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     mockedFetch.mockResolvedValue(fullView);
     renderPage(authAsTier("discover"));
 
-    expect(await screen.findByRole("heading", { name: "Erfolgsradar" })).toBeInTheDocument();
+    // „Hobbys" (aus `profile_interests`) steht stellvertretend für die
+    // erweiterten Angaben — bis AGE-597 stand hier der Erfolgsradar. Er ist
+    // entfallen, die SCHWELLE, die dieser Test prüft, ist es nicht: sie darf
+    // nicht mit der Anzeige verschwinden (Befund codex im Plan-Review).
+    expect(await screen.findByRole("heading", { name: "Hobbys" })).toBeInTheDocument();
     // AGE-498: „Kompetenzen" ist als eigene Karte weggefallen — sie steht jetzt
     // unter „Beruf", und „Such- & Bieteprofil" heißt nach dem Mockup „Ich biete"
     // und „Ich suche". Die SCHWELLE, die dieser Test prüft, ist unverändert:
@@ -246,7 +251,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     mockedFetch.mockResolvedValue(fullView);
     renderPage(authAsTier("exchange"));
 
-    expect(await screen.findByRole("heading", { name: "Erfolgsradar" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Hobbys" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontaktanfrage senden" })).toBeInTheDocument();
   });
 
