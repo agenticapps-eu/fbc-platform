@@ -107,6 +107,63 @@ beforeEach(() => {
   vi.mocked(fetchAktiveTags).mockReset().mockResolvedValue([]);
 });
 
+// ── „Filter entfernen" ──────────────────────────────────────────────────────
+
+/**
+ * Der Knopf steht an ZWEI Stellen: im Filter-Banner über der Liste und im
+ * Leerzustand darin. Beide riefen bis zum Diff-Review dieselben zwei Setter je
+ * einzeln auf — eine Doppelung, die eine dritte Filterachse an genau einer der
+ * beiden Stellen hätte vergessen lassen (Befund gemini, LOW). Sie sind jetzt
+ * eine Funktion, und weil KEIN Test den Knopf bisher berührt hat, wäre die
+ * Zusammenlegung sonst unbelegt geblieben.
+ *
+ * Gemessen wird an der ANFRAGE, nicht am Verschwinden der Marken: dass die
+ * Fläche nach dem Klick wieder ungefiltert lädt, ist die Aussage — ein
+ * geleerter Zustand, der keine neue Abfrage auslöst, wäre eine leere Zusage.
+ */
+describe("Filter entfernen — beide Stellen leeren beide Achsen", () => {
+  it("im Banner über der Liste", async () => {
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /netzwerken/i }));
+    fireEvent.change(screen.getByLabelText(/beitragstyp/i), { target: { value: "bild" } });
+    await waitFor(() => {
+      const letzter = letzterAufruf();
+      expect(letzter.tags).toEqual(["netzwerken"]);
+      expect(letzter.typ).toBe("bild");
+    });
+
+    const banner = screen.getByText(/gefiltert nach/i).closest("div") as HTMLElement;
+    fireEvent.click(within(banner).getByRole("button", { name: /filter entfernen/i }));
+
+    await waitFor(() => {
+      const letzter = letzterAufruf();
+      expect(letzter.tags ?? []).toEqual([]);
+      expect(letzter.typ ?? null).toBeNull();
+    });
+  });
+
+  it("im Leerzustand der Liste", async () => {
+    vi.mocked(fetchFeed).mockResolvedValue({ posts: [], nextCursor: null });
+    renderFeed();
+    await screen.findByText(/noch keine beiträge/i);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /immobilien/i }));
+    await waitFor(() => expect(letzterAufruf().tags).toEqual(["immobilien"]));
+
+    /* Jetzt trägt die Liste den gefilterten Leerzustand — und der Knopf dort ist
+       ein anderer als der im Banner. Beide heissen gleich, also wird der aus dem
+       Leerzustand ausdrücklich über seine Überschrift gefunden. */
+    const leer = (await screen.findByRole("heading", { name: /keine beiträge zu diesem filter/i }))
+      .parentElement as HTMLElement;
+    expect(screen.getAllByRole("button", { name: /filter entfernen/i })).toHaveLength(2);
+    fireEvent.click(within(leer).getByRole("button", { name: /filter entfernen/i }));
+
+    await waitFor(() => expect(letzterAufruf().tags ?? []).toEqual([]));
+  });
+});
+
 // ── 6.4 Reiter ──────────────────────────────────────────────────────────────
 
 describe("Die drei Reiter (6.4)", () => {
@@ -332,6 +389,47 @@ describe("Der Speichern-Knopf an der Karte (6.10)", () => {
         saved: true,
       }),
     );
+  });
+
+  it("bleibt gesperrt, bis der neue Zustand wirklich da ist", async () => {
+    /* Befund codex (MEDIUM, Abschnitt 7.8): `onSuccess` gab das Promise der
+       Invalidierung nicht zurück. `isPending` endete damit schon, wenn der
+       Schreibvorgang durch war — aber `post.savedByMe` kommt aus der LISTE und
+       trägt bis zum Nachladen noch den alten Wert. In diesem Fenster stand ein
+       aktiver Knopf mit dem Zustand von vorhin da, und ein zweiter Klick
+       schickte dieselbe Anweisung noch einmal: beim Speichern ein doppelter
+       Schlüssel, also eine Fehlermeldung für etwas, das gelungen ist.
+
+       Der Nachladevorgang wird hier deshalb ANGEHALTEN. Ohne das Anhalten ist
+       das Fenster in jsdom zu kurz, um es zu treffen — und ein Test, der es
+       nicht trifft, bliebe auch ohne das `return` grün. */
+    let zweiteSeiteFreigeben: () => void = () => {};
+    let aufrufe = 0;
+    vi.mocked(fetchFeed).mockImplementation(() => {
+      aufrufe += 1;
+      if (aufrufe === 1) return Promise.resolve({ posts: [post()], nextCursor: null });
+      return new Promise((aufloesen) => {
+        zweiteSeiteFreigeben = () =>
+          aufloesen({ posts: [post({ savedByMe: true })], nextCursor: null });
+      });
+    });
+
+    renderFeed();
+    await screen.findByText(/viel gelernt/);
+
+    const knopf = screen.getByRole("button", { name: /^beitrag speichern$/i });
+    fireEvent.click(knopf);
+
+    await waitFor(() => expect(toggleSave).toHaveBeenCalledTimes(1));
+    /* Der Schreibvorgang ist durch, das Nachladen nicht — und genau hier muss
+       der Knopf gesperrt bleiben. */
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute("aria-pressed", "false");
+
+    zweiteSeiteFreigeben();
+    await waitFor(() => expect(knopf).toHaveAttribute("aria-pressed", "true"));
+    expect(knopf).not.toBeDisabled();
+    expect(toggleSave).toHaveBeenCalledTimes(1);
   });
 
   /* 6.11 — der Zustand kommt ERST NACH dem Mount aus der Abfrage. Läge er in

@@ -552,19 +552,125 @@ nachgemessen statt geglaubt, alle abgearbeitet.
 
 ## 7. Abnahme
 
-- [ ] 7.1 `pnpm lint && pnpm typecheck && pnpm test && pnpm build` grün — **nie**
-      `pnpm format` (schreibt rund 60 fremde Dateien um)
-- [ ] 7.2 `supabase test db` mit ausdrücklicher Dateiliste grün, `grants_test.sql`
-      eingeschlossen
-- [ ] 7.3 Sichtprobe im Browser gegen den lokalen Stack: beide Themes, 375 px und
-      breit — Composer-Spalte, Sidebar-Höhe, Kästchen, Überlauf. jsdom sieht davon
-      nichts
-- [ ] 7.4 Sichtprobe **ausgeloggt**: die Seite trägt einen Reiter, keinen
-      Speichern-Knopf, keine Namen — und die Konsole zeigt keinen 401
-- [ ] 7.5 Sichtprobe: Speichern füllt und leert den Reiter ohne Neuladen
-- [ ] 7.6 Sichtprobe: zwei Haken bei den Tags zeigen die Vereinigung, nicht die
-      Schnittmenge
-- [ ] 7.7 Belegen, dass die Zähler nichts verraten — per pgTAP, nicht per
-      Sichtprobe
-- [ ] 7.8 Zweite Meinung auf den Diff (Schritt 4 der Schleife), Vendor ungleich dem
-      des Deltas
+- [x] 7.1 `pnpm lint` (0 Fehler, 4 vorbestehende Warnungen in fremden Dateien),
+      `pnpm typecheck`, `pnpm test` **1546/1546**, `pnpm build` — alle vier grün.
+      `pnpm format` blieb ungefahren
+- [x] 7.2 `supabase test db` mit der Dateiliste aus `ci.yml`, alle neun Dateien
+      einzeln benannt: **9 Dateien, 684 Zusagen, PASS**, `grants_test.sql`
+      eingeschlossen. Ohne die Liste meldete der Befehl FAIL, obwohl grün — die
+      elf `probe_*.sql` sind kein pgTAP
+- [x] 7.3 Sichtprobe gegen den lokalen Stack, **beide Themes und beide Breiten**.
+      „Beide Themes" heißt hier `hell` und `navy` über `data-variant` — **nicht**
+      die Einstellung des Betriebssystems. Die Spec sagt es ausdrücklich: die
+      Themes unterscheiden sich NUR in der Rahmung, ein dunkles Inhaltsthema gibt
+      es nicht. Der erste Anlauf maß die falsche Achse.
+      Bei 1440 px sind beide Themes **maßgleich bis auf den Pixel**: Composer
+      825×92 auf x=288, Spalte 825×6627, Sidebar-Säule 256 breit mit 584 hohem
+      Inhalt, Raster `825px 256px`, sechs Kästchen, kein Überlauf (1425 gegen
+      1440). Bei 375 px ebenso identisch: Composer bei y=317, Filter-Schalter 453,
+      Reiter 527, Sidebar `display: none`, eine Spalte zu 343 px. Überlauf am
+      **Inhaltsbedarf** gemessen, nicht an `scrollWidth` (das lügt): 375 gegen
+      375, im geöffneten Filterpanel 359 gegen 375.
+      **Ein Befund, vorbestehend und außerhalb dieses Diffs:**
+      `EnvironmentBanner.tsx:24` trägt ein verirrtes `dark:text-amber-200`. Es ist
+      die einzige `dark:`-Regel im ganzen `src/`, hängt also an
+      `prefers-color-scheme` und nicht am Theme dieser App. Auf einem Rechner mit
+      dunkler Systemeinstellung wird der Warnhinweis „Testumgebung — Daten sind
+      nicht echt" damit **hellgelb auf hellgelb: gemessen 1,05:1 statt 7,63:1**.
+      Stammt aus AGE-496, nicht aus diesem Change — als Folgearbeit vermerkt,
+      nicht hier gefixt
+- [x] 7.4 Sichtprobe ausgeloggt: **ein** Reiter („Alle Beiträge"), kein Composer,
+      kein Speichern-Knopf, als Verfasser durchgehend „Ein Mitglied". Tag-Zähler
+      4/2/2 gegen 8/8/4/4/4/4 eingeloggt. Konsole ohne Fehler und ohne Warnung,
+      und in der Netzwerkliste steht `feed_tag_counts` mit 200, während
+      **`feed_top_authors` gar nicht erst angefragt wird** — `enabled` wirkt, es
+      ist kein verschwiegener 401
+- [x] 7.5 Sichtprobe im Theme `navy`, ohne einen einzigen Neuladevorgang:
+      „Gespeichert" trug 16, 9, 2. In „Alle Beiträge" den Speichern-Knopf an
+      Beitrag 23 gedrückt (`aria-pressed` false→true), danach stand „Gespeichert"
+      auf 23, 16, 9, 2. Dort wieder gelöst: zurück auf 16, 9, 2 — **und in „Alle
+      Beiträge" ist Beitrag 23 ungedrückt.** Eine Invalidierung, beide Flächen,
+      beide Richtungen
+- [x] 7.6 Sichtprobe: „Marketing" allein 4 Beiträge, „Investitionen" allein 4,
+      **beide zusammen 8** — die Vereinigung. Ohne Filter 20 (die erste Seite).
+      Die Gegenprobe ist Teil der Messung: eine Schnittmenge ergäbe hier 0, ein
+      Fehler in der Reihenfolge 4
+- [x] 7.7 Sieben neue Zusagen in `feed_sidebar_test.sql` (18 → **25**), und die
+      Datei misst jetzt von einer **dritten** Seite (mit der Ordnungs-Zusage
+      aus 7.8 sind es 26). Die zwei alten Seiten waren
+      die Ränge `basic` und `exchange`; das Prädikat hat aber drei Zweige, und der
+      dritte ist `author_id = auth.uid()`. Zwei Betrachter DESSELBEN Rangs
+      bekommen für denselben Tag verschiedene Zahlen, wenn einer der Verfasser
+      ist — der Zähler folgt also der Person, nicht nur der Stufe.
+      Neu außerdem das Gegenstück zu `sbverdeckt` auf der Autorenseite (ein Autor
+      ohne einen einzigen sichtbaren Beitrag fehlt GANZ, nicht mit der Zahl null)
+      und der scharfe Gesamtabgleich: für jeden aktiven kuratierten Tag ist die
+      Zahl der Funktion **exakt** die Zahl der Beiträge, die derselbe Aufrufer
+      selbst aufzählen kann.
+      **Grün ist hier kein Beleg, zwei Gegenproben sind es.** Beide im
+      zurückgerollten Rahmen gefahren: (a) beide Funktionen auf `security
+      definer` gedreht → 9 Zusagen rot; (b) eine Abschrift, die nur
+      `visibility = 'public'` kennt → 9 Zusagen rot. Jede der sieben neuen fällt
+      in mindestens einer der beiden
+- [x] 7.8 Zwei fremde Vendoren auf den Diff (das Delta stammt von Claude):
+      **codex** (`gpt-5.2-codex`, liest das Repo selbst) und **gemini**
+      (`gemini-3-pro`, bekommt den Diff auf stdin). Beide REQUEST-CHANGES,
+      zusammen **sieben Befunde** — alle nachgeprüft, alle angenommen, alle
+      behoben, und **jede Behebung trägt eine Zusage, die unter einer
+      absichtlichen Verbiegung rot wird**:
+
+      **[MEDIUM, codex] `post_saves` war ein Existenz-Orakel.** Gegen den
+      lokalen Stack nachgestellt, bevor eine Zeile geschrieben wurde: ein
+      `basic`-Mitglied liest einen `members`-Beitrag NICHT (null Zeilen), kann
+      ihn aber SPEICHERN — während dieselbe Anweisung mit einer erfundenen
+      Kennung an `23503` bricht. Zwei verschiedene Antworten auf dieselbe Frage.
+      Die Auskunft kam nicht aus der Policy, sondern aus dem Fremdschlüssel,
+      dessen Prüfung ausdrücklich an der RLS vorbeiläuft.
+      Behoben in `20260825090000_post_saves_kein_existenz_orakel.sql`: das
+      `with check` verlangt zusätzlich, dass der Beitrag für den Aufrufer
+      sichtbar ist. Der Ausdruck einer Policy läuft mit den Rechten des
+      Aufrufers, das `exists` wendet `posts_select_by_visibility` also AN,
+      statt es abzuschreiben — keine vierte Kopie. Beide Wege enden jetzt in
+      `42501`; gemessen, und als Zusage festgehalten, dass die zwei
+      Fehlermeldungen ZEICHENGLEICH sind. Fünf neue Zusagen in
+      `post_saves_test.sql` (24 → 29), darunter die Gegenprobe, dass ein
+      sichtbarer Beitrag weiterhin speicherbar bleibt
+
+      **[MEDIUM, codex] Nach dem Veröffentlichen blieben die Sidebar-Zähler
+      stehen.** Invalidiert wurde nur `feed/list`; die Schlüssel der zwei
+      Aggregate liegen nicht darunter. **Live gesehen und live behoben:**
+      „Marketing" ging 4 → 5 und rutschte in der Ordnung nach oben, „Donald
+      Probst" 6 → 7 — beides im selben Rendern wie der neue Beitrag
+
+      **[MEDIUM, codex] `onSuccess` gab das Promise der Invalidierung nicht
+      zurück.** `isPending` endete, sobald geschrieben war — `post.savedByMe`
+      kommt aber aus der Liste und trug bis zum Nachladen den alten Wert. In
+      diesem Fenster stand ein aktiver Knopf mit dem Zustand von vorhin da, und
+      ein zweiter Klick schickte DIESELBE Anweisung noch einmal. Der Test hält
+      den Nachladevorgang eigens an — ohne das ist das Fenster in jsdom zu kurz,
+      und die Zusage bliebe auch ohne das `return` grün. **`like` daneben hat
+      dieselbe Form, ist aber vorbestehend und außerhalb dieses Diffs — als
+      Folgearbeit vermerkt, nicht mitgeändert**
+
+      **[LOW, codex] Der Tie-Break-Test verglich zwei identische Aufrufe.**
+      Nimmt man `t.sort, t.key` heraus, liefern beide Aufrufe im selben Plan
+      weiter dieselbe zufällige Folge — grün, während die Ordnung dem Planer
+      gehört. Jetzt gegen die ERWARTETE Folge geprüft
+
+      **[LOW, codex] Die Ordnung von `feed_top_authors` war nirgends
+      zugesichert.** Ohne das `order by count(*) desc` blieb jede Zusage grün,
+      während die Sidebar beliebige statt der aktivsten Mitglieder zeigte
+
+      **[LOW, codex] Ein Vakuum-Test im Integrationslauf.** Die Typzusage für
+      `feed_tag_counts` lief in einer Schleife über `data ?? []` — bei null
+      Zeilen null Mal. `MARKE` ist ein FREI getipptes Schlagwort und steht in
+      `tags` gar nicht; auf einem frischen CI-Stack kam die Schleife über
+      nichts. Die Fixture legt jetzt eigens einen kuratierten Tag mit einem
+      öffentlichen Beitrag an und räumt ihn wieder ab
+
+      **[LOW, gemini] `setGewaehlteTags([]); setTyp(null);` stand an zwei
+      Stellen** — im Filter-Banner und im Leerzustand der Liste. Eine dritte
+      Filterachse wäre an genau einer der beiden zu vergessen gewesen. Jetzt
+      eine Funktion; und weil **kein einziger Test den Knopf bisher berührt
+      hatte**, wäre die Zusammenlegung sonst unbelegt geblieben — zwei neue
+      Zusagen, je eine pro Stelle

@@ -165,6 +165,37 @@ describe("Composer — ein Beitrag mit Bildern und Tags", () => {
     expect(anlegen()[0].args.p_visibility).toBe("members");
   });
 
+  it("frischt nach dem Veröffentlichen auch die zwei Sidebar-Zähler auf", async () => {
+    /* Befund codex (MEDIUM, Abschnitt 7.8): invalidiert wurde nur `feed/list`.
+       Die Schlüssel der zwei Aggregate liegen nicht darunter, das Präfix
+       erreichte sie also nicht — der neue Beitrag stand in der Liste, während
+       die Zahl daneben noch die von vorhin war. Zwei Flächen nebeneinander,
+       die sich widersprechen.
+
+       Gemessen wird am ZWEITEN Aufruf der RPC, nicht an einer Zahl auf dem
+       Schirm: die Zahl käme aus demselben Mock und bewiese nichts. */
+    const zaehler = (name: string) => rpcAufrufe.filter((r) => r.name === name).length;
+
+    renderFeed();
+    await waitFor(() => expect(zaehler("feed_tag_counts")).toBe(1));
+    expect(zaehler("feed_top_authors")).toBe(1);
+
+    oeffneComposer();
+    fireEvent.change(screen.getByLabelText("Neuer Beitrag"), {
+      target: { value: "Ein Beitrag mit einem Tag. #Netzwerken" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /posten/i }));
+
+    await waitFor(() =>
+      expect(rpcAufrufe.filter((r) => r.name === "create_post_with_media")).toHaveLength(1),
+    );
+
+    /* Beide, nicht nur der Tag-Zähler: ein Beitrag zählt auch für seinen Autor,
+       und die Liste der aktivsten Mitglieder ist damit ebenso veraltet. */
+    await waitFor(() => expect(zaehler("feed_tag_counts")).toBe(2));
+    await waitFor(() => expect(zaehler("feed_top_authors")).toBe(2));
+  });
+
   it("begrenzt hart auf sechs Bilder — mit sichtbarer Rückmeldung, nicht stillem Verschlucken", async () => {
     renderFeed();
     oeffneComposer();

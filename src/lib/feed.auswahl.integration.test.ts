@@ -58,6 +58,10 @@ import { supabase } from "./supabase";
 const KENNWORT = "integration-nur-lokal-8f2b";
 const MARKE = "age582tag";
 const ZWEITE_MARKE = "age582andere";
+/** Anders als die beiden darueber steht diese Marke in `public.tags` — nur
+ *  solche zaehlt `feed_tag_counts`. `tags_key_ist_label` verlangt
+ *  key = lower(label), `tags_key_tippbar` nur Buchstaben und Ziffern. */
+const KURIERTE_MARKE = "age582kuriert";
 
 let ich = "";
 let anderer = "";
@@ -105,6 +109,17 @@ beforeAll(async () => {
   // Lauf dieser Datei aber sehr wohl.
   await pg.query("delete from public.posts where hashtags && $1", [[MARKE, ZWEITE_MARKE]]);
 
+  // MARKE ist ein FREI getipptes Schlagwort und steht damit in `tags` gar
+  // nicht — `feed_tag_counts` zaehlt aber ausschliesslich ueber die kuratierte
+  // Liste. Ohne diese Zeile haenge die Typzusage weiter unten am Bestand des
+  // Stacks, auf dem sie laeuft (Befund codex, LOW, 7.8): auf einem frischen
+  // CI-Stack kaeme sie ueber null Zeilen und pruefte nichts.
+  await pg.query(
+    `insert into public.tags (key, label, sort, active) values ($1, $2, 995, true)
+     on conflict (key) do nothing`,
+    [KURIERTE_MARKE, "Age582kuriert"],
+  );
+
   const stempel = Date.now();
   ich = await kontoAnlegen(`age582-ich-${stempel}@example.test`);
   anderer = await kontoAnlegen(`age582-andere-${stempel}@example.test`);
@@ -127,6 +142,13 @@ beforeAll(async () => {
       [anderer, `Nur zweite Marke ${i}`, [ZWEITE_MARKE], zeit(100 + i)],
     );
   }
+  // Ein oeffentlicher Beitrag unter dem KURATIERTEN Tag. Er ist die Zeile, die
+  // `feed_tag_counts` garantiert liefert.
+  await pg.query(
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
+     values ($1, 'Unter einer kuratierten Marke', $2, 'public', $3)`,
+    [ich, [KURIERTE_MARKE], zeit(300)],
+  );
   // Ein Beitrag mit Video (der Trigger leitet `video_url` aus dem Body ab —
   // die Spalte von Hand zu setzen prüfte den Bestand, nicht den Weg).
   await pg.query(
@@ -170,6 +192,8 @@ afterAll(async () => {
   // geht deshalb einzeln.
   await pg?.query("delete from auth.users where id = any($1)", [[ich, anderer]]);
   await pg?.query("delete from public.events where title = $1", ["AGE-582 Testtermin"]);
+  // Wie der Termin haengt auch die kuratierte Marke an keinem Konto.
+  await pg?.query("delete from public.tags where key = $1", [KURIERTE_MARKE]);
   await pg?.end();
 });
 
@@ -338,9 +362,16 @@ describe("5.14 — die von Hand nachgezogenen Typen stimmen mit dem Schema über
   it("feed_tag_counts liefert die aufgeschriebenen Spalten", async () => {
     const { data, error } = await supabase.rpc("feed_tag_counts");
     expect(error).toBeNull();
-    // Die kuratierten Marken sind eine eigene Tabelle; ob eine davon hier
-    // auftaucht, hängt am Bestand. Geprüft wird die FORM, nicht die Zahl.
-    for (const zeile of data ?? []) {
+    /* ZUERST der Bestand, dann die Form. Eine Schleife über `data ?? []` läuft
+       bei null Zeilen null Mal, und der Test bliebe auch dann grün, wenn ein
+       kaputter Join gar nichts mehr lieferte — er prüfte dann nur noch, dass
+       der Aufruf keinen Fehler wirft. Die Fixture legt eigens einen kuratierten
+       Tag mit einem öffentlichen Beitrag an, damit diese Zusage etwas hat,
+       woran sie scheitern kann. */
+    const zeilen = data ?? [];
+    expect(zeilen.length).toBeGreaterThan(0);
+    expect(zeilen.some((z) => z.tag_key === KURIERTE_MARKE)).toBe(true);
+    for (const zeile of zeilen) {
       expect(typeof zeile.tag_key).toBe("string");
       expect(typeof zeile.tag_label).toBe("string");
       expect(typeof zeile.post_count).toBe("number");

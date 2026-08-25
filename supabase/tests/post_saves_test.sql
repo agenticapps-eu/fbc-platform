@@ -30,7 +30,7 @@
 --     die Fixture-IDs eingeschränkt und nie auf `count(*)` der ganzen Tabelle.
 
 begin;
-select plan(24);
+select plan(29);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -261,6 +261,77 @@ select is(
   (select count(*)::int from public.post_saves
     where profile_id = '5a000000-0000-0000-0000-000000000001'),
   0, 'Danach ist die Zeile wirklich fort');
+
+-- ── 8. Kein Existenz-Orakel (7.8, Befund codex MEDIUM) ─────────────────────
+-- Der Befund lag nicht in der Policy, sondern im FREMDSCHLÜSSEL: dessen Prüfung
+-- läuft ausdrücklich an der RLS vorbei. Die alte `post_saves_insert_own` fragte
+-- nur, WER schreibt, nie WORAUF. Ein unsichtbarer, aber vorhandener Beitrag
+-- liess sich also speichern, ein nicht vorhandener brach mit `23503` — zwei
+-- verschiedene Antworten auf dieselbe Frage, und damit eine Auskunft über einen
+-- Bestand, den der Aufrufer nicht sehen darf.
+--
+-- Die Zusage ist deshalb NICHT „unsichtbares Speichern wird abgelehnt". Das
+-- allein wäre mit dem Orakel vereinbar, solange die Ablehnungen sich
+-- unterscheiden. Die Zusage ist, dass beide Wege in DERSELBEN Ablehnung enden.
+
+-- Ein `basic`-Betrachter und ein Beitrag, den nur Mitglieder sehen.
+insert into auth.users (id, aud, role, email) values
+  ('5a000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'sp-basic@test.fbc');
+update public.profiles set tier = 'basic', name = 'Sp Basic', activated_at = now()
+ where id = '5a000000-0000-0000-0000-000000000005';
+
+insert into public.posts (id, author_id, body, visibility) values
+  ('5b000000-0000-0000-0000-0000000000cc', '5a000000-0000-0000-0000-000000000002',
+   'Nur fuer Mitglieder — fuer den basic-Betrachter unsichtbar.', 'members');
+
+select is(
+  pg_temp.count_as('5a000000-0000-0000-0000-000000000005',
+    $$select count(*)::int from public.posts
+       where id = '5b000000-0000-0000-0000-0000000000cc'$$),
+  0, 'Vorbedingung: der basic-Betrachter sieht diesen Beitrag nicht');
+
+select alike(
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+    $$insert into public.post_saves (profile_id, post_id)
+      values ('5a000000-0000-0000-0000-000000000005',
+              '5b000000-0000-0000-0000-0000000000cc')$$),
+  'DENIED:%row-level security%',
+  'Ein unsichtbarer Beitrag laesst sich nicht speichern — und die Ablehnung '
+  'kommt aus der Policy, nicht aus dem Fremdschluessel');
+
+select alike(
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+    $$insert into public.post_saves (profile_id, post_id)
+      values ('5a000000-0000-0000-0000-000000000005',
+              '5b000000-0000-0000-0000-0000000000ff')$$),
+  'DENIED:%row-level security%',
+  'Eine Kennung, die es gar nicht gibt, wird GENAUSO abgelehnt — kein 23503, '
+  'also kein Unterschied, aus dem sich die Existenz ablesen liesse');
+
+-- Der Kern in einer Zusage: die beiden Antworten sind ZEICHENGLEICH. Sie
+-- einzeln auf ein Muster zu prüfen liesse zwei verschiedene Meldungen zu, die
+-- beide „row-level security" enthalten — und schon das waere wieder ein Kanal.
+select is(
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+    $$insert into public.post_saves (profile_id, post_id)
+      values ('5a000000-0000-0000-0000-000000000005',
+              '5b000000-0000-0000-0000-0000000000cc')$$),
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+    $$insert into public.post_saves (profile_id, post_id)
+      values ('5a000000-0000-0000-0000-000000000005',
+              '5b000000-0000-0000-0000-0000000000ff')$$),
+  'Vorhanden-aber-unsichtbar und gar-nicht-vorhanden liefern dieselbe '
+  'Zeichenkette — das Orakel ist zu');
+
+-- Die Gegenprobe zur Verschaerfung: ein SICHTBARER Beitrag bleibt speicherbar.
+-- Ohne sie waere die Zusage oben auch mit einer Policy vereinbar, die einfach
+-- gar nichts mehr durchlaesst.
+select is(
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+    $$insert into public.post_saves (profile_id, post_id)
+      values ('5a000000-0000-0000-0000-000000000005',
+              '5b000000-0000-0000-0000-0000000000aa')$$),
+  'OK', 'Ein oeffentlicher Beitrag laesst sich weiterhin speichern');
 
 select * from finish();
 rollback;

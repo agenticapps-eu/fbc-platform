@@ -228,6 +228,16 @@ export default function CommunityFeed() {
     );
   }
 
+  /** „Filter entfernen" — an ZWEI Stellen angeboten: im Filter-Banner und im
+   *  Leerzustand der Liste. Beide leeren dieselben Achsen, und der Reiter und die
+   *  Ordnung bleiben stehen, weil sie keine Filter sind. Steht das hier, kann
+   *  eine dritte Achse nicht an einer der beiden Stellen vergessen werden
+   *  (Befund gemini, LOW). */
+  function filterLeeren() {
+    setGewaehlteTags([]);
+    setTyp(null);
+  }
+
   return (
     <section>
       {/* Drei Rasterkinder, und die Reihenfolge im Markup ist die Reihenfolge auf
@@ -304,10 +314,7 @@ export default function CommunityFeed() {
               )}
               <button
                 type="button"
-                onClick={() => {
-                  setGewaehlteTags([]);
-                  setTyp(null);
-                }}
+                onClick={filterLeeren}
                 className="text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Filter entfernen
@@ -325,10 +332,7 @@ export default function CommunityFeed() {
             currentUserId={user?.id ?? null}
             gewaehlteTags={gewaehlteTags}
             onTagUmschalten={tagUmschalten}
-            onFilterLeeren={() => {
-              setGewaehlteTags([]);
-              setTyp(null);
-            }}
+            onFilterLeeren={filterLeeren}
             gefiltert={gewaehlteTags.length > 0 || typ !== null}
             mentionResolver={mentionResolver}
             bildUrls={bildUrls}
@@ -655,7 +659,18 @@ function PostComposer({ authorId }: { authorId: string }) {
       toast({ variant: "success", title: "Beitrag veröffentlicht" });
       // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
       // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
-      queryClient.invalidateQueries({ queryKey: feedListKey(authorId) });
+      //
+      // Und die zwei Sidebar-Zähler dazu (Befund codex, MEDIUM): ein neuer
+      // Beitrag ändert BEIDE — er trägt Tags, und er zählt für seinen Autor.
+      // Ihre Schlüssel liegen aber nicht unter `feed/list`, das Präfix erreicht
+      // sie also nicht. Ohne die zwei Zeilen stünde der Beitrag in der Liste,
+      // während die Zahl daneben noch die von vorhin ist — zwei Flächen
+      // nebeneinander, die sich widersprechen.
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: feedListKey(authorId) }),
+        queryClient.invalidateQueries({ queryKey: tagZaehlerKey(authorId) }),
+        queryClient.invalidateQueries({ queryKey: topAutorenKey(authorId) }),
+      ]);
     },
     onError: (error) => {
       toast({
@@ -1245,9 +1260,15 @@ function InteraktionsLeiste({
   const save = useMutation({
     mutationFn: () =>
       toggleSave({ postId: post.id, profileId: currentUserId as string, saved: post.savedByMe }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) });
-    },
+    onSuccess: () =>
+      /* Das Promise wird ZURÜCKGEGEBEN (Befund codex, MEDIUM). Ohne das endet
+         `isPending`, sobald der Schreibvorgang durch ist — aber `post.savedByMe`
+         stammt aus der Liste und trägt bis zum Nachladen noch den alten Wert.
+         In diesem Fenster ist der Knopf wieder aktiv und zeigt den Zustand von
+         vorhin; ein zweiter Klick schickte deshalb DIESELBE Anweisung noch
+         einmal statt zurückzuschalten — beim Speichern ein doppelter Schlüssel
+         und eine Fehlermeldung für etwas, das gelungen ist. */
+      queryClient.invalidateQueries({ queryKey: feedListKey(currentUserId) }),
     onError: (error) => {
       toast({ variant: "error", title: "Aktion fehlgeschlagen", description: errorMessage(error) });
     },
