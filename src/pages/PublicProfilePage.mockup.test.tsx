@@ -38,10 +38,16 @@ const VOLL: PublicProfileData = {
     potential_score: 42,
     competencies: ["Finanzierung"],
     videos: [],
-    themeScores: [],
     interests: [{ theme: "tun", label: "Segeln" }],
-    offers: [{ id: "o1", category: "kapital", theme: null, title: "Kapital", description: null }],
-    needs: [{ id: "n1", category: "vertrieb", theme: null, title: "Vertrieb", description: null }],
+    // `source: "chip"` und ein Schlüssel, den `config/matching` KENNT (AGE-597):
+    // die Fixture trug bis dahin `vertrieb`, das dort gar nicht steht. Der Fall
+    // „unbekannter Schlüssel" hat jetzt einen eigenen Test.
+    offers: [
+      { id: "o1", category: "kapital", theme: null, title: "Kapital", description: null, source: "chip" },
+    ],
+    needs: [
+      { id: "n1", category: "partner", theme: null, title: "Partner", description: null, source: "chip" },
+    ],
     branche: "Immobilien",
     member_since: "2019-04-01",
     posts: [{ id: "p1", body: "Mein Beitrag", created_at: "2026-07-01T10:00:00Z" }],
@@ -98,7 +104,7 @@ describe("PublicProfilePage — Aufbau nach dem Mockup (AGE-498)", () => {
   it("nimmt „Ich biete“ und „Ich suche“ aus dem Kompass — keine zweite Liste", async () => {
     renderPage();
     expect(await screen.findByText("Kapital")).toBeInTheDocument();
-    expect(screen.getByText("Vertrieb")).toBeInTheDocument();
+    expect(screen.getByText("Partner")).toBeInTheDocument();
   });
 
   it("lässt leere Abschnitte weg, statt Platzhalter zu zeigen", async () => {
