@@ -21,6 +21,7 @@
     "typecheck:functions": "tsc --noEmit -p functions/tsconfig.json",
     "typecheck:seed": "tsc --noEmit -p supabase/seed/tsconfig.json",
     "test": "vitest run",
+    "test:integration": "FBC_INTEGRATION=1 vitest run",
     "test:watch": "vitest",
     "demo:seed": "infisical run --env=dev -- tsx supabase/seed/demo_seed.ts",
     "demo:reset": "infisical run --env=dev -- env DEMO_SEED_MODE=reset tsx supabase/seed/demo_seed.ts"

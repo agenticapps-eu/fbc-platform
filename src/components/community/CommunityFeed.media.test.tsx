@@ -17,7 +17,7 @@ import { AuthFixture, authAsTier } from "../../test/auth-fixtures";
  */
 
 let signaturAufrufe: string[][] = [];
-let containsAufrufe: [string, unknown][] = [];
+let tagFilterAufrufe: [string, unknown][] = [];
 let postZeilen: Record<string, unknown>[] = [];
 let mediaZeilen: Record<string, unknown>[] = [];
 let abgelehnt: string[] = [];
@@ -42,8 +42,8 @@ vi.mock("../../lib/supabase", () => {
           order: () => kette,
           limit: () => kette,
           or: () => kette,
-          contains: (spalte: string, wert: unknown) => {
-            containsAufrufe.push([spalte, wert]);
+          overlaps: (spalte: string, wert: unknown) => {
+            tagFilterAufrufe.push([spalte, wert]);
             return kette;
           },
           eq: () => kette,
@@ -113,7 +113,7 @@ function renderFeed(vorbelegen?: (qc: QueryClient) => void) {
 
 beforeEach(() => {
   signaturAufrufe = [];
-  containsAufrufe = [];
+  tagFilterAufrufe = [];
   postZeilen = [];
   mediaZeilen = [];
   abgelehnt = [];
@@ -268,8 +268,9 @@ describe("Tag-Filterleiste", () => {
     // Die Leiste trägt das LABEL, die Chips am Beitrag den normalisierten Wert.
     fireEvent.click(screen.getByRole("button", { name: "Netzwerken" }));
 
-    // Der bestehende Weg, unverändert: `.contains("hashtags", […])` (8.2).
-    await waitFor(() => expect(containsAufrufe).toContainEqual(["hashtags", ["netzwerken"]]));
+    // Seit AGE-582 `.overlaps(…)` statt `.contains(…)`: bei EINER gewählten
+    // Marke sind beide gleichbedeutend, bei mehreren ist `contains` ein UND.
+    await waitFor(() => expect(tagFilterAufrufe).toContainEqual(["hashtags", ["netzwerken"]]));
     expect(screen.getByText(/gefiltert nach/i)).toBeInTheDocument();
   });
 
@@ -308,6 +309,7 @@ describe("Der Feed teilt seinen Cache-Eintrag mit niemandem", () => {
             likeCount: 0,
             commentCount: 0,
             likedByMe: false,
+            savedByMe: false,
             media: [],
           },
         ],

@@ -1012,6 +1012,46 @@ export type Database = {
           },
         ];
       };
+      post_saves: {
+        Row: {
+          created_at: string;
+          post_id: string;
+          profile_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          post_id: string;
+          profile_id: string;
+        };
+        Update: {
+          created_at?: string;
+          post_id?: string;
+          profile_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "post_saves_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_saves_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_saves_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles_public";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       posts: {
         Row: {
           author_id: string;
@@ -1020,6 +1060,7 @@ export type Database = {
           hashtags: string[] | null;
           id: string;
           kind: string;
+          like_count: number;
           ref_id: string | null;
           video_url: string | null;
           visibility: string;
@@ -1031,6 +1072,7 @@ export type Database = {
           hashtags?: string[] | null;
           id?: string;
           kind?: string;
+          like_count?: number;
           ref_id?: string | null;
           video_url?: string | null;
           visibility?: string;
@@ -1042,6 +1084,7 @@ export type Database = {
           hashtags?: string[] | null;
           id?: string;
           kind?: string;
+          like_count?: number;
           ref_id?: string | null;
           video_url?: string | null;
           visibility?: string;
@@ -1738,6 +1781,32 @@ export type Database = {
           /** Deaktiviert ODER geloescht — welche der beiden Handlungen ein
            *  Admin vorgenommen hat, gibt sie bewusst NICHT preis. */
           former: boolean;
+        }[];
+      };
+      // Von Hand nachgetragen (AGE-582). Spiegelt die beiden Aggregate aus
+      // 20260824170000_feed_sidebar_aggregate.sql. Beide sind `security invoker`
+      // — sie kopieren das Sichtbarkeitspraedikat NICHT, es gilt das des
+      // Aufrufers.
+      feed_tag_counts: {
+        Args: never;
+        Returns: {
+          tag_key: string;
+          tag_label: string;
+          /** `bigint` aus `count(*)` — supabase-js liefert es als number. */
+          post_count: number;
+        }[];
+      };
+      feed_top_authors: {
+        /** Wird auf 1..20 geklemmt, `null` wird zu 5. */
+        Args: { p_limit?: number };
+        Returns: {
+          profile_id: string;
+          name: string;
+          /** NICHT `string`, anders als der Typgenerator meldet: `avatar_url`
+           *  ist in `profiles_public` nullbar, und die meisten Profile tragen
+           *  keines. Dieselbe Werkzeug-Drift wie im Dateikopf beschrieben. */
+          avatar_url: string | null;
+          post_count: number;
         }[];
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-245). Mirrors the

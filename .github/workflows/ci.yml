@@ -141,6 +141,33 @@ jobs:
           supabase/tests/feed_popularity_test.sql
           supabase/tests/feed_sidebar_test.sql
 
+      # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
+      #
+      # Sie haengt an diesem Job und nicht an `verify`, weil sie einen echten
+      # PostgREST braucht: `.overlaps()` gegen `.contains()`, das Filtern von
+      # Eltern nach Kindern (`post_media=is.null`), der `post_saves!inner`-Join
+      # unter der RLS und der Keyset-Cursor sind alles Zusagen ueber das, was
+      # der SERVER tut. Ein Mock des Query-Builders zeichnet nur auf, was der
+      # Client sagt — und war damit gruen, waehrend `.contains()` bei zwei
+      # gewaehlten Marken null Zeilen lieferte.
+      #
+      # Der Lauf ist bewusst getrennt und NICHT zur Laufzeit uebersprungen: ein
+      # `skipIf(!stackErreichbar)` waere ueberall gruen, auch dort, wo nie etwas
+      # lief — derselbe Fehler wie die beiden member_lifecycle-Dateien oben.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Feed data layer against the running stack (vitest)
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          SUPABASE_ANON_KEY="$ANON_KEY" \
+          SUPABASE_SERVICE_KEY="$SERVICE_ROLE_KEY" \
+            pnpm test:integration
+
   # Enforce a Conventional-Commit-style PR title (the squash-merge commit subject).
   pr-title:
     if: github.event_name == 'pull_request'

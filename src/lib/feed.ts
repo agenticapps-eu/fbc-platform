@@ -37,6 +37,29 @@ export type PostVisibility = "public" | "members";
  */
 export type PostKind = "member" | "event";
 
+/**
+ * Die drei Reiter des Feeds (AGE-582).
+ *
+ * `meine` und `gespeichert` VERLANGEN eine Kennung — sie sind keine Filter, die
+ * ohne Kennung eben nicht greifen. Siehe den Waechter in `fetchFeed`.
+ */
+export type FeedReiter = "alle" | "meine" | "gespeichert";
+
+/**
+ * Die drei Ordnungen. Jede hat ihren EIGENEN Keyset-Pfad; keine entsteht durch
+ * blosses Umdrehen der Sortierrichtung einer anderen, weil der Cursor-Ausdruck
+ * mitdrehen muss (`lt` gegen `gt`) und bei `beliebteste` ein Feld mehr traegt.
+ */
+export type FeedOrdnung = "neueste" | "aelteste" | "beliebteste";
+
+/**
+ * Beitragstyp. ABGELEITET aus dem Bestand, nicht als zusaetzliches Feld am
+ * Beitrag gefuehrt: Video an `video_url`, Event an `kind`, Bild am Vorhandensein
+ * einer `post_media`-Zeile, Text als Beitrag ohne all das. Ein eigenes Feld
+ * waere eine zweite Wahrheit, die mit der ersten auseinanderlaufen kann.
+ */
+export type FeedTyp = "bild" | "video" | "event" | "text";
+
 export interface FeedAuthor {
   id: string;
   name: string;
@@ -94,6 +117,16 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  /**
+   * Der Betrachter hat den Beitrag gespeichert (AGE-582).
+   *
+   * PFLICHTFELD, anders als `former` daneben — und aus demselben Grund, aus dem
+   * `likedByMe` eines ist: es traegt einen Knopf, dessen falscher Zustand dem
+   * Mitglied etwas ueber seine eigene Handlung vorluegt. Ein weggelassenes Feld
+   * hiesse hier „nicht gespeichert", und das ist keine harmlose Richtung,
+   * sondern die Haelfte der moeglichen Luegen.
+   */
+  savedByMe: boolean;
   media: FeedMedia[];
   /**
    * Erste einbettbare Video-URL des Beitrags — aus der Spalte `posts.video_url`,
@@ -210,10 +243,43 @@ export const feedQueryKey = (uid: string | null, hashtag: string | null) =>
  * Feed, und die Startseite verlöre umgekehrt ihre Beiträge.
  *
  * Das Anhängsel steht am ENDE, damit `feedListKey` weiter als Präfix greift:
- * eine Invalidierung nach dem Veröffentlichen erreicht beide Formen.
+ * eine Invalidierung nach dem Veröffentlichen erreicht beide Formen. Genau
+ * daran haengt auch 5.11 — Speichern und Lösen schreiben Kartenzustand UND den
+ * Reiter „Gespeichert" gemeinsam fort, weil eine Invalidierung über den Präfix
+ * jede Auswahl erreicht und nicht nur die gerade sichtbare.
+ *
+ * Der Schlüssel trägt die GANZE Auswahl (AGE-582), nicht nur den Tag: Reiter,
+ * Ordnung, normalisierte Tagmenge und Typ. Fehlte eines davon, verwendete ein
+ * Wechsel die Seiten der alten Auswahl weiter — bei „Beliebteste" nach
+ * „Neueste" wären das Beiträge in einer Reihenfolge, die nie angefragt wurde.
  */
-export const feedSeitenKey = (uid: string | null, hashtag: string | null) =>
-  ["feed", "list", uid, hashtag, "seiten"] as const;
+export interface FeedAuswahl {
+  reiter: FeedReiter;
+  ordnung: FeedOrdnung;
+  tags: string[];
+  typ: FeedTyp | null;
+}
+
+/**
+ * Kanonische Form einer Tagmenge: ohne Dubletten, sortiert.
+ *
+ * Der Schluessel darf nicht davon abhaengen, in welcher Reihenfolge die Haken
+ * gesetzt wurden — sonst laedt ein Klick, der nur die Reihenfolge dreht, dieselbe
+ * Auswahl ein zweites Mal.
+ */
+const normalisierteTags = (tags: string[]) => [...new Set(tags)].sort();
+
+export const feedSeitenKey = (uid: string | null, auswahl: FeedAuswahl) =>
+  [
+    "feed",
+    "list",
+    uid,
+    normalisierteTags(auswahl.tags),
+    auswahl.reiter,
+    auswahl.ordnung,
+    auswahl.typ,
+    "seiten",
+  ] as const;
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 
@@ -359,6 +425,13 @@ export const FEED_SEITE = 20;
 export interface FeedCursor {
   createdAt: string;
   id: string;
+  /**
+   * Nur in der Ordnung „Beliebteste" belegt — dort führt `like_count`, und eine
+   * Grenze über `created_at` allein überspränge bei gleicher Reaktionszahl
+   * still Beiträge. In den beiden Zeit-Ordnungen fehlt das Feld absichtlich:
+   * ein Cursor, der Felder einer FREMDEN Ordnung trägt, sähe gültig aus.
+   */
+  likeCount?: number;
 }
 
 export interface FeedSeite {
@@ -385,6 +458,75 @@ export interface FetchFeedArgs {
   nurVideos?: boolean;
   /** Nur Beiträge dieses Autors — das Regal „selbst geteilt". */
   autorId?: string | null;
+  /**
+   * Der Reiter (AGE-582). Vorgabe „alle" — der einzige, den es ohne Sitzung
+   * gibt. Die beiden anderen VERLANGEN `uid`; siehe den Wächter unten.
+   */
+  reiter?: FeedReiter;
+  /** Die Ordnung. Vorgabe „neueste" — der Bestandszustand. */
+  ordnung?: FeedOrdnung;
+  /**
+   * Gewählte Marken, als ODER (`overlaps`). Der Ein-Tag-Filter `hashtag` läuft
+   * über denselben Weg und wird hier eingemischt, statt daneben zu bestehen.
+   */
+  tags?: string[];
+  /** Beitragstyp; `null` heißt „alle Typen". */
+  typ?: FeedTyp | null;
+}
+
+/**
+ * Die Spalten einer Feed-Zeile.
+ *
+ * `post_media(post_id)` steht mit drin, obwohl die Bilder selbst weiter über
+ * eine eigene Abfrage kommen: OHNE die Einbettung im `select` kennt PostgREST
+ * die Beziehung im Filter nicht, und die Typen „Bild" und „Text" hängen genau
+ * daran (`post_media=not.is.null` bzw. `=is.null`).
+ */
+const FEED_SPALTEN =
+  "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+
+/**
+ * Dasselbe mit dem Pflicht-Join auf die EIGENEN Speicherungen — der Reiter
+ * „Gespeichert".
+ *
+ * ZWEI Literale statt eines zusammengesetzten, aus demselben Grund wie unten:
+ * supabase-js leitet die Form der Antwort aus dem Literal ab.
+ *
+ * Und GETRENNT statt immer mitgeführt, weil `anon` auf `post_saves` kein Recht
+ * hält. Gemessen am lokalen Stack: die Einbettung nimmt der GANZEN Abfrage die
+ * Antwort — HTTP 401, `42501 permission denied for table post_saves` —, sie
+ * bleibt nicht etwa leer. Ein Schaufenster ohne Beiträge wäre die Folge.
+ *
+ * `!inner` heißt: nur Beiträge mit eigener Speicherzeile. Die RLS von
+ * `post_saves` gibt ohnehin nur eigene zurück — sie bleibt das Gate, der Join
+ * ist der Weg dorthin und keine Nachkorrektur im Client.
+ */
+const FEED_SPALTEN_GESPEICHERT =
+  "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, like_count, post_media(post_id), post_saves!inner(profile_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+
+/**
+ * Der Keyset-Ausdruck der jeweiligen Ordnung.
+ *
+ * Je Ordnung ein eigener Pfad, nicht eine gedrehte Richtung: „Älteste zuerst"
+ * braucht `gt` statt `lt`, und „Beliebteste" ein Feld mehr. Bei gleichen Werten
+ * im führenden Feld überspränge eine Grenze über dieses Feld allein Beiträge
+ * still — sie stünden weder auf der einen noch auf der nächsten Seite.
+ */
+function cursorAusdruck(ordnung: FeedOrdnung, c: FeedCursor): string {
+  if (ordnung === "beliebteste") {
+    if (c.likeCount === undefined) {
+      // Laut statt still: sonst entstünde `like_count.lt.undefined` — eine
+      // Anfrage, die der Server abweist oder, schlimmer, anders auslegt.
+      throw new Error("Cursor ohne likeCount in der Ordnung \u201Ebeliebteste\u201C");
+    }
+    return (
+      `like_count.lt.${c.likeCount},` +
+      `and(like_count.eq.${c.likeCount},created_at.lt.${c.createdAt}),` +
+      `and(like_count.eq.${c.likeCount},created_at.eq.${c.createdAt},id.lt.${c.id})`
+    );
+  }
+  const op = ordnung === "aelteste" ? "gt" : "lt";
+  return `created_at.${op}.${c.createdAt},and(created_at.eq.${c.createdAt},id.${op}.${c.id})`;
 }
 
 /**
@@ -416,39 +558,76 @@ export async function fetchFeed({
   cursor,
   nurVideos,
   autorId,
+  reiter = "alle",
+  ordnung = "neueste",
+  tags,
+  typ = null,
 }: FetchFeedArgs): Promise<FeedSeite> {
-  let query = supabase
-    .from("posts")
-    // Das Event wird ÜBER DEN FREMDSCHLÜSSEL eingebettet, nicht kopiert
-    // (AGE-533). Der Name `posts_ref_id_fkey` ist in der Migration
-    // ausgeschrieben, genau damit diese Zeile ihn nennen kann. Die RLS von
-    // `events` wertet die Einbettung selbst aus — zweite Verteidigungslinie
-    // neben der gespiegelten Sichtbarkeit, kein Ersatz dafür.
-    // EIN Zeichenketten-Literal, nicht zusammengesetzt: supabase-js leitet die
-    // Form der Antwort aus dem Literal ab. Ein `+` daraus macht `string`, und
-    // die eingebettete Zeile faellt auf `GenericStringError` zurueck.
-    .select(
-      "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)",
-    )
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
+  // DER STILLE FALL, und der Wächter steht VOR der ersten Zeile Anfrage.
+  // Ein fehlender Autorenfilter ist kein leerer Filter: `if (uid) query =
+  // query.eq("author_id", uid)` liefert ohne Kennung den GANZEN Bestand — also
+  // genau das, was der Reiter ausschliessen soll. Heute hat der einzige
+  // Aufrufer die Kennung immer; mit einem Reiter entsteht der Weg ohne Absicht.
+  if (reiter !== "alle" && !uid) {
+    throw new Error(`Reiter \u201E${reiter}\u201C ohne Kennung angefordert`);
+  }
+
+  const basis = supabase.from("posts");
+  // Das Event wird ÜBER DEN FREMDSCHLÜSSEL eingebettet, nicht kopiert
+  // (AGE-533). Der Name `posts_ref_id_fkey` ist in der Migration
+  // ausgeschrieben, genau damit das Literal ihn nennen kann. Die RLS von
+  // `events` wertet die Einbettung selbst aus — zweite Verteidigungslinie
+  // neben der gespiegelten Sichtbarkeit, kein Ersatz dafür.
+  // EIN Zeichenketten-Literal je Fall, nicht zusammengesetzt: supabase-js
+  // leitet die Form der Antwort aus dem Literal ab. Ein `+` daraus macht
+  // `string`, und die eingebettete Zeile faellt auf `GenericStringError`
+  // zurueck.
+  let query = (
+    reiter === "gespeichert" ? basis.select(FEED_SPALTEN_GESPEICHERT) : basis.select(FEED_SPALTEN)
+  )
     // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
     // Seite" das einzige Indiz dafür, dass es weitergeht — und bei genau 20
     // sichtbaren Beiträgen verspricht das eine nächste Seite, die garantiert
     // leer ist. Der Knopf holte sie, bevor er verschwände.
     .limit(FEED_SEITE + 1);
-  if (hashtag) query = query.contains("hashtags", [hashtag]);
+
+  // Die Ordnung, je einen eigenen Pfad. `like_count` führt nur in
+  // „Beliebteste"; `created_at` und `id` entscheiden dort den Gleichstand und
+  // sind in den beiden Zeit-Ordnungen selbst die Ordnung.
+  if (ordnung === "beliebteste") query = query.order("like_count", { ascending: false });
+  const aufsteigend = ordnung === "aelteste";
+  query = query
+    .order("created_at", { ascending: aufsteigend })
+    .order("id", { ascending: aufsteigend });
+
+  // Der Ein-Tag-Filter läuft über denselben Weg wie die Mehrfachauswahl, statt
+  // daneben zu bestehen — sonst gäbe es zwei Regeln für dieselbe Frage.
+  const gewaehlteTags = normalisierteTags([...(tags ?? []), ...(hashtag ? [hashtag] : [])]);
+  // ODER, nicht UND: `contains` verlangt ALLE gewählten Marken am Beitrag.
+  // Hinter Auswahlkästchen, die Mehrfachauswahl versprechen, wäre das eine
+  // Lüge an der Oberfläche — und bei zwei Haken fast immer eine leere Liste.
+  if (gewaehlteTags.length > 0) query = query.overlaps("hashtags", gewaehlteTags);
   // Der Filter sitzt in der ANFRAGE, nicht hinterher im Client: sonst trüge
-  // eine Seite von 20 gelesenen Zeilen nur die paar mit Video, und „Ältere
-  // Beiträge" liefe durch den ganzen Bestand, um eine Seite zu füllen.
+  // eine Seite von 20 gelesenen Zeilen nur die paar passenden, und „Ältere
+  // Beiträge" liefe durch den ganzen Bestand, um eine Seite zu füllen. Das
+  // gilt für den Typ und den Reiter genauso wie für die Academy.
   if (nurVideos) query = query.not("video_url", "is", null);
   if (autorId) query = query.eq("author_id", autorId);
-  if (cursor) {
-    query = query.or(
-      `created_at.lt.${cursor.createdAt},` +
-        `and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
-    );
+  // `null`, sobald der Reiter ein anderer ist — und belegt, sobald er „meine"
+  // ist, weil der Wächter oben nichts anderes durchlässt.
+  const nurVonMir = reiter === "meine" ? uid : null;
+  if (nurVonMir) query = query.eq("author_id", nurVonMir);
+
+  // Der Typ kommt aus dem Bestand (siehe `FeedTyp`), nicht aus einem Feld am
+  // Beitrag. „Text" ist deshalb drei Bedingungen und nicht eine.
+  if (typ === "video") query = query.not("video_url", "is", null);
+  if (typ === "event") query = query.eq("kind", "event");
+  if (typ === "bild") query = query.not("post_media", "is", null);
+  if (typ === "text") {
+    query = query.is("video_url", null).neq("kind", "event").is("post_media", null);
   }
+
+  if (cursor) query = query.or(cursorAusdruck(ordnung, cursor));
 
   const { data: posts, error } = await query;
   if (error) throw error;
@@ -493,14 +672,23 @@ export async function fetchFeed({
   const counts = new Map((countsRes.data ?? []).map((c) => [c.post_id, c]));
 
   let myLikes = new Set<string>();
+  let meineSpeicherungen = new Set<string>();
   if (uid) {
-    // owner-only SELECT (likes_write_own) → liefert nur meine eigenen Like-Zeilen.
-    const { data, error: likesError } = await supabase
-      .from("post_likes")
-      .select("post_id")
-      .in("post_id", postIds);
-    if (likesError) throw likesError;
-    myLikes = new Set((data ?? []).map((l) => l.post_id));
+    // Beide owner-only (`likes_write_own` / `saves_read_own`) → sie liefern
+    // ohnehin nur eigene Zeilen. Der Filter im Client ist NICHT die Grenze;
+    // die Grenze ist die Policy.
+    //
+    // JE EIN gebündelter Aufruf über die IDs der Seite, nicht einer je Karte —
+    // und die beiden GEMEINSAM statt nacheinander: zwei unabhängige Abfragen
+    // hintereinander kosten auf jeder Seite eine Rundreise mehr.
+    const [likesRes, savesRes] = await Promise.all([
+      supabase.from("post_likes").select("post_id").in("post_id", postIds),
+      supabase.from("post_saves").select("post_id").in("post_id", postIds),
+    ]);
+    if (likesRes.error) throw likesRes.error;
+    if (savesRes.error) throw savesRes.error;
+    myLikes = new Set((likesRes.data ?? []).map((l) => l.post_id));
+    meineSpeicherungen = new Set((savesRes.data ?? []).map((z) => z.post_id));
   }
 
   const letzte = rows[rows.length - 1];
@@ -517,6 +705,7 @@ export async function fetchFeed({
       likeCount: counts.get(r.id)?.like_count ?? 0,
       commentCount: counts.get(r.id)?.comment_count ?? 0,
       likedByMe: myLikes.has(r.id),
+      savedByMe: meineSpeicherungen.has(r.id),
       media: media.get(r.id) ?? [],
       videoUrl: r.video_url,
       // Verengung an der Grenze: die Datenbank liefert `text`, der Constraint
@@ -528,7 +717,15 @@ export async function fetchFeed({
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
     // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.
-    nextCursor: gibtMehr ? { createdAt: letzte.created_at, id: letzte.id } : null,
+    //
+    // Die Reaktionszahl steht NUR in „Beliebteste" mit drin: dort führt sie,
+    // und ohne sie wäre der Cursor unvollständig. In den Zeit-Ordnungen bliebe
+    // sie ein Feld, das gültig aussieht und nichts bedeutet.
+    nextCursor: gibtMehr
+      ? ordnung === "beliebteste"
+        ? { createdAt: letzte.created_at, id: letzte.id, likeCount: letzte.like_count }
+        : { createdAt: letzte.created_at, id: letzte.id }
+      : null,
   };
 }
 
@@ -629,6 +826,41 @@ export async function toggleLike(input: {
       .upsert(
         { post_id: input.postId, profile_id: input.profileId },
         { onConflict: "post_id,profile_id", ignoreDuplicates: true },
+      );
+    if (error) throw error;
+  }
+}
+
+/**
+ * Einen Beitrag speichern oder wieder lösen (AGE-582).
+ *
+ * Gebaut wie `toggleLike` darüber, mit EINEM Unterschied in der Begründung: eine
+ * Speicherung ist privat. `post_saves` hat drei Policies und KEINE für UPDATE —
+ * an einer Speicherung gibt es nichts zu ändern, es gibt sie oder nicht.
+ *
+ * Der `upsert` mit `ignoreDuplicates` wird deshalb zu `on conflict do nothing`
+ * und braucht kein UPDATE-Recht; die Tabelle hält auch keines. Idempotent muss
+ * er trotzdem sein: ein Doppelklick liefe sonst am `(profile_id, post_id)`-PK
+ * in einen `23505`, den die Karte als Fehler zeigte.
+ */
+export async function toggleSave(input: {
+  postId: string;
+  profileId: string;
+  saved: boolean;
+}): Promise<void> {
+  if (input.saved) {
+    const { error } = await supabase
+      .from("post_saves")
+      .delete()
+      .eq("post_id", input.postId)
+      .eq("profile_id", input.profileId);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("post_saves")
+      .upsert(
+        { post_id: input.postId, profile_id: input.profileId },
+        { onConflict: "profile_id,post_id", ignoreDuplicates: true },
       );
     if (error) throw error;
   }

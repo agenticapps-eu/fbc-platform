@@ -375,38 +375,84 @@ nachgemessen statt geglaubt, alle abgearbeitet.
 
 ## 5. Datenschicht des Feeds
 
-- [ ] 5.1 `FetchFeedArgs` um `reiter`, `ordnung`, `tags: string[]` und `typ`
-      erweitern; `hashtag` (Einzahl) auf den neuen Weg führen, ohne den bestehenden
-      Ein-Tag-Filter zu brechen
-- [ ] 5.2 **Der stille Fall:** „Beiträge von mir" ohne Kennung darf nicht zu „alle
-      Beiträge" entarten — ein `if (autorId)` tut genau das. Test dafür
-- [ ] 5.3 `.contains()` → `.overlaps()` für die Tags; Test, dass ein Beitrag mit
-      nur **einem** von zwei gewählten Tags erscheint (rot gegen die alte Fassung)
-- [ ] 5.4 Den Cursor auf die drei Ordnungen erweitern — je ein eigener Keyset-Pfad,
-      bei „Beliebteste" über `(like_count, created_at, id)`
-- [ ] 5.5 Test: mehr als 20 Beiträge mit **gleicher** Reaktionszahl; jeder erscheint
-      auf genau einer Seite, keiner fällt zwischen zwei Seiten
-- [ ] 5.6 Test: „Älteste zuerst" blättert vollständig, ohne einen Beitrag doppelt
-      zu zeigen
-- [ ] 5.7 **Den React-Query-Schlüssel vollständig machen:** Reiter, Ordnung,
-      normalisierte Tagmenge und Typ gehören hinein. Test, dass ein Wechsel keine
-      Seiten der alten Auswahl weiterverwendet
-- [ ] 5.8 Reiter „Gespeichert": Join über `post_saves` auf `posts`, damit die RLS
-      das Gate bleibt — kein `in (ids)` mit Nachkorrektur im Client
-- [ ] 5.9 Test: ein gespeicherter, danach unsichtbar gewordener Beitrag verschwindet
-      aus der Liste, ohne Fehler, und seine `post_saves`-Zeile bleibt bestehen
-- [ ] 5.10 `savedByMe` als Datenfeld: **ein** gebündelter Aufruf über die IDs der
-      Seite, nicht zwanzig. Test, der die Zahl der Abfragen prüft
-- [ ] 5.11 Speichern und Lösen schreiben Kartenzustand **und** den Reiter
-      „Gespeichert" gemeinsam fort (Invalidierung beider Schlüssel)
-- [ ] 5.12 Typ-Filter in der Abfrage: Video über `video_url`, Event über `kind`,
-      Bild über `post_media`, Text als Beitrag ohne all das
-- [ ] 5.13 **Integrationstest gegen den lokalen Stack** für den Typ-Filter: mehr als
-      20 gemischte Beiträge, Reiter/Tag/Typ kombiniert. Ein Mock des Query-Builders
-      belegt die PostgREST-Form nicht
-- [ ] 5.14 `src/lib/database.types.ts` nachziehen: `post_saves`, `posts.like_count`,
-      die Beziehungen und beide RPC-Signaturen. Gegen das lokale Schema abgleichen,
-      **nicht** ungeprüft neu erzeugen
+- [x] 5.1 `FetchFeedArgs` um `reiter`, `ordnung`, `tags: string[]` und `typ`
+      erweitert; `hashtag` (Einzahl) läuft über denselben Weg — beide werden in
+      **eine** normalisierte Menge gemischt, statt als zwei Regeln
+      nebeneinander zu bestehen. Der Ein-Tag-Filter bricht nicht: bei einer
+      gewählten Marke sind `overlaps` und `contains` gleichbedeutend
+- [x] 5.2 **Der stille Fall.** Der Wächter steht VOR der ersten Zeile der
+      Anfrage, nicht als leerer Filter darin: `reiter !== "alle" && !uid` wirft.
+      Vier Zusagen, darunter die schärfere „stellt dabei gar keine Anfrage" —
+      „liefert nichts" wäre auch dann wahr, wenn der Bestand schon gelesen wurde
+- [x] 5.3 `.contains()` → `.overlaps()`. **Gegen den lokalen Stack gemessen**,
+      nicht gegen einen Mock: ein Beitrag mit nur EINER von zwei gewählten
+      Marken erscheint. Gegenprobe A — zurück auf `.contains()` — macht genau
+      diese Zusage rot
+- [x] 5.4 Drei Keyset-Pfade, je einer je Ordnung: `neueste` (created_at, id ·
+      `lt`), `aelteste` (dieselben Felder aufsteigend · `gt`), `beliebteste`
+      (like_count, created_at, id · dreiteiliges `or`). `FeedCursor.likeCount`
+      ist **nur** in „Beliebteste" belegt; ein Cursor ohne sie wirft dort, statt
+      `like_count.lt.undefined` abzusetzen. Beim Bauen gefunden und vom Test
+      gefangen: die Sortierrichtung war invertiert
+- [x] 5.5 25 Beiträge mit **gleicher** Reaktionszahl, vollständig durchgeblättert:
+      keiner doppelt, keiner verloren. **Gegenprobe B** — den Cursor auf
+      `like_count.lt.N` allein zurückgenommen — fällt genau hier
+- [x] 5.6 „Älteste zuerst" blättert vollständig ohne Dublette; dazu die schärfere
+      Zusage, dass „Älteste" und „Neueste" denselben Bestand sehen, nur
+      andersherum. Ein Filter, der in einer Richtung Zeilen verlöre, fiele daran
+- [x] 5.7 `feedSeitenKey(uid, auswahl)` trägt Reiter, Ordnung, **normalisierte**
+      Tagmenge und Typ. Sechs Zusagen: jede Achse trennt, dieselbe Menge in
+      anderer Reihenfolge trennt NICHT, eine doppelt gewählte Marke zählt
+      einmal — und `feedListKey` bleibt Präfix, woran 5.11 hängt
+- [x] 5.8 Reiter „Gespeichert" als `post_saves!inner(profile_id)`-Join auf
+      `posts` — kein `in (ids)` mit Nachkorrektur. **Gegenprobe D** (Join
+      entfernt) macht ihn rot.
+      **Gemessen, und es hat den Entwurf entschieden:** `anon` mit eingebettetem
+      `post_saves` bekommt HTTP **401** (`42501`) auf die GANZE Abfrage — nicht
+      etwa eine leere Einbettung. Deshalb ZWEI Select-Literale statt eines
+      immer mitgeführten Joins; ein Schaufenster ohne Beiträge wäre die Folge
+- [x] 5.9 Der gespeicherte, danach unsichtbar gewordene Beitrag verschwindet
+      still; die `post_saves`-Zeile bleibt. Gegen den lokalen Stack gefahren.
+      **Der Test stand zuerst falsch grün-gerechnet:** sein Ziel gehörte dem
+      Betrachter selbst, und `posts_select_by_visibility` trägt ein
+      `or author_id = auth.uid()` — ein Autor sieht seinen Beitrag auf jeder
+      Stufe. Der `?? drei[2]`-Rückfall verdeckte das; er ist raus, der Test
+      wählt jetzt ausdrücklich einen fremden Beitrag und wirft, wenn es keinen gibt
+- [x] 5.10 `savedByMe` aus **einer** gebündelten Abfrage über die IDs der Seite.
+      Sie läuft gemeinsam mit der Reaktionsabfrage in einem `Promise.all` —
+      zwei unabhängige Abfragen nacheinander kosteten auf jeder Seite eine
+      Rundreise mehr. Test prüft die Zahl der Abfragen (1, nicht 20) und dass
+      ohne Sitzung **gar nicht** gefragt wird
+- [ ] 5.11 Invalidierung beider Schlüssel. **Bewusst offen und nach 6.10
+      verschoben.** Der Mechanismus steht und ist zugesichert (`feedListKey`
+      bleibt Präfix jeder Auswahl, 5.7), und `toggleSave` gibt es; was fehlt,
+      ist die Mutation an der Karte — und eine `useMutation` ohne den Knopf aus
+      6.10 wäre Code ohne Aufrufer
+- [x] 5.12 Typ-Filter in der Abfrage: Video über `video_url`, Event über `kind`,
+      Bild über `post_media=not.is.null`, Text als Verneinung über **drei**
+      Quellen. Dafür trägt das Select-Literal `post_media(post_id)` mit —
+      **Gegenprobe C** (Einbettung entfernt) macht „Bild" und „Text" rot, die
+      Einbettung ist also tragend und keine Zierde
+- [x] 5.13 **Integrationstest gegen den lokalen Stack** —
+      `src/lib/feed.auswahl.integration.test.ts`, 17 Zusagen. Echtes Konto über
+      GoTrue-Admin (`email_confirm: true`), Fixtures über `pg`, 29 Beiträge in
+      vier Typen. Er läuft **nicht** in `pnpm test` mit, sondern als
+      `pnpm test:integration` im CI-Job `migrations`, der den Stack ohnehin
+      hochfährt. Getrennt statt `skipIf(!erreichbar)`: ein zur Laufzeit
+      übersprungener Test ist überall grün, auch dort, wo nie etwas lief — genau
+      der Fehler der beiden `member_lifecycle`-Dateien vom 23.08.
+      Er räumt vollständig hinter sich auf und löscht **nur** die eigenen
+      Fixtures; `delete from public.posts` nähme einem Entwickler den Demo-Bestand
+- [x] 5.14 `database.types.ts` **von Hand** nachgezogen: `post_saves`,
+      `posts.like_count`, die drei Beziehungen, `feed_tag_counts` und
+      `feed_top_authors`. Nicht neu erzeugt — ein volles `supabase gen types`
+      schreibt die Datei stillos um (2117 statt 1919 Zeilen, alle Semikolons
+      weg) und meldet RPC-Rückgabespalten als non-null; die Datei warnt im Kopf
+      selbst davor (AGE-498). Die **Formen** stammen trotzdem aus dem erzeugten
+      Schema, nur `avatar_url` ist gegen den Generator auf `string | null`
+      berichtigt (die Migration sagt `text`, `profiles_public` ist dort nullbar).
+      Ein Typ-Fix hat kein Laufzeitverhalten — belegt wird er deshalb in 5.13:
+      drei Zusagen rufen die beiden RPCs wirklich auf und prüfen die Spalten
 
 ## 6. Fläche
 

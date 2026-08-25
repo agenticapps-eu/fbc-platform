@@ -47,6 +47,7 @@ function eventPost(overrides: Partial<FeedPost> = {}): FeedPost {
     likeCount: 2,
     commentCount: 0,
     likedByMe: false,
+    savedByMe: false,
     media: [],
     videoUrl: null,
     kind: "event",

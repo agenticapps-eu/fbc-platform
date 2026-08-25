@@ -42,6 +42,7 @@ import {
   createPostWithMedia,
   feedListKey,
   feedSeitenKey,
+  type FeedAuswahl,
   deletePost,
   fetchComments,
   fetchFeed,
@@ -71,12 +72,20 @@ export default function CommunityFeed() {
   const uid = user?.id ?? null;
   const [hashtag, setHashtag] = useState<string | null>(null);
 
+  // Die Auswahl, die Abfrage UND Schlüssel bestimmt (AGE-582). Bedienbar wird
+  // sie in Abschnitt 6; hier steht sie zunächst auf den Vorgaben, damit beide
+  // Seiten dieselbe Quelle haben und nicht zwei Stellen gepflegt werden.
+  const auswahl: FeedAuswahl = useMemo(
+    () => ({ reiter: "alle", ordnung: "neueste", tags: hashtag ? [hashtag] : [], typ: null }),
+    [hashtag],
+  );
+
   // Seitenweise (AGE-528): eine feste Obergrenze ohne Nachladen wäre mit Bildern
   // eine stille Kappung — ältere Beiträge blieben unauffindbar. Der Cursor läuft
-  // über (created_at, id), siehe lib/feed.ts.
+  // je Ordnung über einen eigenen Keyset-Pfad, siehe lib/feed.ts.
   const feed = useInfiniteQuery({
-    queryKey: feedSeitenKey(uid, hashtag),
-    queryFn: ({ pageParam }) => fetchFeed({ uid, hashtag, cursor: pageParam }),
+    queryKey: feedSeitenKey(uid, auswahl),
+    queryFn: ({ pageParam }) => fetchFeed({ uid, ...auswahl, cursor: pageParam }),
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzteSeite) => letzteSeite.nextCursor,
   });

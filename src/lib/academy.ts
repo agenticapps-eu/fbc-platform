@@ -144,6 +144,10 @@ export async function fetchGelikteVideos({
       commentCount: 0,
       // Es ist die eigene Like-Liste — jede Zeile hier ist geliked.
       likedByMe: true,
+      // Das Regal trägt keinen Speichern-Knopf: es zeigt, was geliked wurde,
+      // und Speichern ist die andere Handlung. `false` ist hier keine Aussage
+      // über den Bestand, sondern der Umstand, dass niemand danach fragt.
+      savedByMe: false,
       media: [],
       videoUrl: p.video_url,
       // Ein gelikter Beitrag mit Video ist immer ein Mitgliedsbeitrag: an einem
