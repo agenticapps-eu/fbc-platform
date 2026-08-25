@@ -187,3 +187,35 @@ Dateiliste: 10 Dateien, **719** Zusagen grün.
 Namen statt einer Sache": der Opt-in-Wächter des Demo-Seeds sieht den Zielhost
 **gar nicht** an, und `resolveSsl` erkennt lokal am Wort `localhost` — unter
 `127.0.0.1`, das `supabase status` ausgibt, nimmt es den TLS-Weg und scheitert.
+
+## 5. Code-Review (Stufe 2, auf dem Diff)
+
+Vier Befunde, **alle vier echt**, alle behoben. Zwei davon hat meine eigene
+Sichtprobe übersehen, obwohl sie danebenstand.
+
+- **HIGH — `p-0` löscht die Kartenpolsterung nicht.** `cn()` ist ein reiner Join
+  ohne tailwind-merge, `Card` setzt unter `padded` (Vorgabe `true`) selbst
+  `p-6`, und beide standen im Attribut. Gemessen im Browser: computed
+  `padding: 24px`, das Cover **25 px eingerückt** statt randlos, der Kartenrumpf
+  bei 24+20 = 44 px. Die Sichtprobe hatte Höhe und Verhältnis gemessen — beide
+  stimmten, weil der Fehler ALLE Karten gleich traf. Behoben mit
+  `padded={false}`, der eigenen API der Komponente. Nachgemessen: Polsterung
+  0 px, Feld exakt 1 px innen auf allen Seiten (der Rahmen), Karten 363 px und
+  weiterhin alle gleich. Neue Zusage auf den Klassenvertrag.
+- **MEDIUM — die Baseline konnte Kontakte verstecken.** `hatSichtbareKontakte`
+  hängt an der ungefilterten Baseline, einer EIGENEN Abfrage; ihr Ladezustand
+  fehlte im `isLoading`, und der Zweig „nicht sichtbar" stand VOR dem Blick auf
+  `members`. Fiel die Baseline aus, erklärte der Reiter Kontakte für unsichtbar,
+  während ihre Karten danebenlagen. Der bestehende Mock konnte es nicht zeigen:
+  EIN Spion beantwortete beide Aufrufe gleich. Behoben durch Umordnen (erst
+  zeigen, dann über Abwesenheit reden) plus `facetsQuery.isLoading`; zwei neue
+  Zusagen trennen Baseline (`{}`) von Trefferabfrage (acht Schlüssel).
+- **LOW — der `drop` nahm den Funktionskommentar mit.** Die Vorgängerfassung kam
+  mit `create or replace` aus, dort überlebte er. Kein Test las
+  `obj_description`, also wäre der Grund der Funktion lautlos verschwunden.
+  Kommentar wiederhergestellt, plus eine pgTAP-Zusage, die ihn beim nächsten
+  Drop einfordert.
+- **LOW — die Reiterleiste war nicht verdrahtet.** Keine `id`/`aria-controls`,
+  keine `aria-labelledby` an der Tafel. Nachgezogen wie in der
+  Admin-Mitgliederliste, mit einer Zusage, die auch prüft, dass die Beschriftung
+  dem gewählten Reiter FOLGT.

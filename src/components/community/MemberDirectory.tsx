@@ -329,7 +329,9 @@ export default function MemberDirectory() {
                 key={r.id}
                 type="button"
                 role="tab"
+                id={`verzeichnis-reiter-${r.id}`}
                 aria-selected={gewaehlt}
+                aria-controls="verzeichnis-tafel"
                 onClick={() => setReiter(r.id)}
                 className={
                   "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
@@ -362,7 +364,17 @@ export default function MemberDirectory() {
         </div>
       </div>
 
-      <div role="tabpanel">
+      {/* `aria-labelledby` und `aria-controls` gehören zusammen: ohne sie hört
+          jemand mit einer Vorleseausgabe eine unbeschriftete Tafel und erfährt
+          nicht, zu welchem der beiden Reiter sie gehört. `tabIndex={0}`, damit
+          die Tafel selbst anfahrbar ist. Dieselbe Verdrahtung wie in der
+          Admin-Mitgliederliste. */}
+      <div
+        role="tabpanel"
+        id="verzeichnis-tafel"
+        aria-labelledby={`verzeichnis-reiter-${reiter}`}
+        tabIndex={0}
+      >
         {reiter === "alle" ? (
           <DirectoryResults
             isLoading={results.isLoading}
@@ -373,7 +385,7 @@ export default function MemberDirectory() {
           />
         ) : (
           <KontakteResults
-            isLoading={results.isLoading || contacts.isLoading}
+            isLoading={results.isLoading || contacts.isLoading || facetsQuery.isLoading}
             isError={results.isError}
             kontaktabfrageGescheitert={contacts.isError}
             hatKontakte={contactIds.size > 0}
@@ -526,7 +538,30 @@ function KontakteResults({
       />
     );
   }
-  // 4. Kontakte ja, sichtbare Karten nein. Die Einladung aus 3 wäre hier
+  // 4. Es gibt Karten — also zeigen, bevor irgendein Zweig über ihre
+  //    Abwesenheit redet. Diese Zeile stand ursprünglich UNTEN, und das war ein
+  //    echter Fehler: `hatSichtbareKontakte` hängt an der ungefilterten
+  //    Baseline, einer EIGENEN Abfrage. Fiel die aus, war die Menge leer, und
+  //    der Reiter erklärte einem Mitglied seine Kontakte für unsichtbar,
+  //    während ihre Karten daneben lagen. Eine Aussage über eine leere Menge
+  //    darf nie vor dem Blick in die nicht-leere kommen.
+  if (members.length > 0) {
+    return (
+      <>
+        <p className="text-sm text-muted">
+          {members.length} {members.length === 1 ? "Kontakt" : "Kontakte"}
+        </p>
+        <Stagger className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {members.map((m) => (
+            <StaggerItem key={m.id} className="h-full">
+              <MemberCard member={m} />
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </>
+    );
+  }
+  // 5. Kontakte ja, sichtbare Karten nein. Die Einladung aus 3 wäre hier
   //    schlicht falsch: dieses Mitglied HAT Kontakte. Sichtbarkeit im
   //    Verzeichnis (`is_public`, Rang, Aktivierung) und der Status der
   //    Kontaktanfrage sind voneinander unabhängig — die Kante ist real.
@@ -545,9 +580,9 @@ function KontakteResults({
       />
     );
   }
-  // 5. Sichtbare Kontakte gibt es, nur passt keiner zum Filter. Ein Ausweg,
+  // 6. Sichtbare Kontakte gibt es, nur passt keiner zum Filter. Ein Ausweg,
   //    keine Sackgasse.
-  if (members.length === 0) {
+  {
     return (
       <EmptyState
         title="Dazu passt keiner deiner Kontakte"
@@ -560,21 +595,6 @@ function KontakteResults({
       />
     );
   }
-
-  return (
-    <>
-      <p className="text-sm text-muted">
-        {members.length} {members.length === 1 ? "Kontakt" : "Kontakte"}
-      </p>
-      <Stagger className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {members.map((m) => (
-          <StaggerItem key={m.id} className="h-full">
-            <MemberCard member={m} />
-          </StaggerItem>
-        ))}
-      </Stagger>
-    </>
-  );
 }
 
 function DirectoryResults({
@@ -675,7 +695,13 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
       to={to ?? `/p/${member.id}`}
       className="block h-full rounded-[var(--radius-card)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
     >
-      <Card className="flex h-full flex-col overflow-hidden p-0 transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
+{/* `padded={false}` und NICHT `p-0` in der className: `cn()` ist ein reiner
+          Join ohne tailwind-merge, ein `p-0` löscht das `p-6` also nicht,
+          sondern stellt sich daneben — und bei gleicher Spezifität entscheidet
+          die Reihenfolge im Stylesheet. Das Cover sass dadurch 25 px eingerückt
+          statt randlos, und die Sichtprobe hat es nicht gesehen, weil Höhe und
+          Verhältnis trotzdem stimmten. */}
+      <Card padded={false} className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
         {/* AGE-595: das Hintergrundbild des Profils, randlos über der Karte.
             Gebaut wie `EventCover` und aus demselben Grund:
 

@@ -347,6 +347,29 @@ describe("Kompass-Filter (AGE-494)", () => {
     expect(img?.className).not.toMatch(/object-cover/);
   });
 
+  /* Der Kommentar an der Karte behauptet „randlos über der Karte". Diese Zusage
+     prüft, dass er WAHR ist — und sie fehlte: die Sichtprobe hat Höhe und
+     Verhältnis gemessen und dabei übersehen, dass das Feld 25 px eingerückt
+     stand.
+
+     Der Grund ist `cn()`: ein reiner Join ohne tailwind-merge. Ein `p-0` in der
+     `className` LÖSCHT das `p-6` nicht, das `Card` unter `padded` (Vorgabe
+     `true`) selbst setzt — beide stehen im Attribut, und bei gleicher
+     Spezifität entscheidet die Reihenfolge im Stylesheet, nicht die im
+     Attribut. Der Weg ist `padded={false}`, die eigene API der Komponente.
+
+     jsdom rechnet kein Layout, also prüft die Zusage den Klassenvertrag; die
+     Breite selbst gehört in die Sichtprobe. */
+  it("lässt das Cover randlos sitzen — keine geerbte Kartenpolsterung", async () => {
+    rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
+    const { container } = renderDirectory();
+    erweiterteSucheOeffnen();
+    await screen.findByText("Anna Beispiel");
+
+    const karte = container.querySelector<HTMLElement>(".fbc-card");
+    expect(karte?.className).not.toMatch(/\bp-6\b/);
+  });
+
   it("behält das Bildfeld auch ohne Cover — sonst franst das Raster aus", async () => {
     rpc.mockResolvedValue({ data: [member({ cover_url: null })], error: null });
     const { container } = renderDirectory();

@@ -124,6 +124,27 @@ $$;
 revoke all on function public.search_directory(text, text, text, text, text, text, text[], text[]) from public;
 grant execute on function public.search_directory(text, text, text, text, text, text, text[], text[]) to authenticated;
 
+-- Der Drop nimmt auch den KOMMENTAR mit. Die Vorgaengermigration (20260817180000)
+-- kam mit `create or replace` aus, dort ueberlebte er — hier nicht, und niemand
+-- merkt es: kein Test liest `obj_description`. In einem Repository, dessen
+-- Entscheidungen in Migrations- und Funktionskoepfen stehen, ist ein still
+-- verschwundener Kommentar ein verlorener Grund. Wortgleich zu 20260804200000,
+-- um `cover_url` ergaenzt.
+comment on function public.search_directory(text, text, text, text, text, text, text[], text[]) is
+  'Mitgliederverzeichnis-Suche: deutsche Volltextsuche (search_doc, seit AGE-566 '
+  'ueber suchbegriff_zu_tsquery praefixfaehig) + Facetten '
+  '(theme/branche/region/competency, bietet/sucht) + Kompass-Kategorien '
+  '(p_offers/p_needs: ODER in der Gruppe, UND zwischen den Gruppen; leeres Array = '
+  'kein Filter). Gibt zusaetzlich offer_categories/need_categories zurueck — distinct, '
+  'ohne NULL, leeres Array statt NULL — sowie seit AGE-595 cover_url, den relativen '
+  'PFAD im Bucket covers (keine fertige URL; der Client loest ueber bildUrl auf). '
+  'SECURITY INVOKER — die RLS '
+  '(profiles_select_self_or_discover) ist die Sichtbarkeitsgrenze: unterhalb von '
+  '`discover` (rank 3) sieht ein Aufrufer hoechstens die eigene Zeile. Listet nur '
+  'is_public-Profile. Die Kategorien vergroessern die PREISGABE (was jemand sucht, '
+  'nicht mehr nur dass er sucht), nicht die GRENZE; cover_url vergroessert auch die '
+  'Preisgabe nicht — die Spalte steht bereits in profiles_public.';
+
 -- ── 2. `admin_list_members` — dieselbe Spalte, derselbe Zwang ───────────────
 -- Auch hier ändert sich der Rückgabetyp, also auch hier `drop` + `create`
 -- statt `create or replace` (`42P13`). Die vorherigen Fassungen dieser Funktion

@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(22);
+select plan(23);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -320,6 +320,17 @@ select is(
   $q$),
   'OK',
   'authenticated behält das Ausführungsrecht an der neuen Signatur');
+
+-- Der Kommentar ist kein Beiwerk: ein `drop function` nimmt ihn mit, und die
+-- Vorgaengerfassung kam mit `create or replace` aus, wo er ueberlebte. Ohne
+-- diese Zusage verschwindet der Grund einer Funktion beim naechsten Drop, ohne
+-- dass irgendetwas rot wird.
+select isnt(
+  obj_description(
+    'public.search_directory(text,text,text,text,text,text,text[],text[])'::regprocedure,
+    'pg_proc'),
+  null,
+  'search_directory traegt nach dem drop/create wieder einen Kommentar');
 
 select * from finish();
 rollback;

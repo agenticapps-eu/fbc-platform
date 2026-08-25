@@ -110,6 +110,25 @@ describe("Beide Reiter stehen immer", () => {
     expect(within(reiter(/Alle Mitglieder/)).getByText("3")).toBeInTheDocument();
   });
 
+  /* Die Reiterleiste ist ohne Verdrahtung nur optisch eine: wer die Tafel
+     anfaehrt, hoert eine unbeschriftete Flaeche und erfaehrt nicht, zu welchem
+     Reiter sie gehoert. Und `aria-labelledby` muss dem gewaehlten Reiter
+     FOLGEN — ein fest verdrahteter Wert waere nach dem ersten Wechsel falsch. */
+  it("verdrahtet Reiter und Tafel miteinander", async () => {
+    renderDirectory();
+    await screen.findByText("Anna Allgemein");
+
+    const tafel = document.querySelector('[role="tabpanel"]')!;
+    expect(reiter(/Alle Mitglieder/).getAttribute("aria-controls")).toBe(tafel.id);
+    expect(reiter(/Meine Kontakte/).getAttribute("aria-controls")).toBe(tafel.id);
+    expect(tafel.getAttribute("aria-labelledby")).toBe(reiter(/Alle Mitglieder/).id);
+
+    kontakteOeffnen();
+    expect(
+      document.querySelector('[role="tabpanel"]')!.getAttribute("aria-labelledby"),
+    ).toBe(reiter(/Meine Kontakte/).id);
+  });
+
   /* Die Zahl steht `aria-hidden` NEBEN der Beschriftung, nicht darin. Stuende
      sie im zugaenglichen Namen, laese eine Vorleseausgabe „Meine Kontakte 2"
      als Bezeichnung eines Bedienelements vor — und dieser Name aenderte sich
@@ -235,6 +254,48 @@ describe("Die fuenf Zustaende sind unterscheidbar", () => {
 
     expect(await screen.findByText(/passt keiner deiner Kontakte/i)).toBeInTheDocument();
     expect(screen.queryByText(/Kn.pf die erste Verbindung/i)).not.toBeInTheDocument();
+  });
+});
+
+/* Die ungefilterte Baseline ist eine EIGENE Abfrage (sie speist die
+   Facetten-Auswahl) und beantwortet hier die Frage „hat dieses Mitglied
+   ueberhaupt einen im Verzeichnis sichtbaren Kontakt". Faellt sie aus oder ist
+   sie noch unterwegs, ist die Menge leer — und der Reiter erklaerte einem
+   Mitglied, seine Kontakte seien unsichtbar, waehrend ihre Karten danebenlagen.
+
+   Der bestehende Mock konnte das nicht zeigen: EIN `rpc`-Spion beantwortet
+   beide Aufrufe im selben Tick mit denselben Daten. Hier werden sie getrennt —
+   die Baseline ruft mit `{}`, die Trefferabfrage mit acht Schluesseln. */
+describe("Die Baseline ist eine eigene Abfrage", () => {
+  const nurBaseline = (baseline: unknown, treffer: unknown) =>
+    rpc.mockImplementation((_fn: string, args: Record<string, unknown>) =>
+      Object.keys(args ?? {}).length === 0 ? baseline : treffer,
+    );
+
+  it("versteckt vorhandene Kontakte nicht, wenn die Baseline scheitert", async () => {
+    contactSelect.mockResolvedValue({ data: [ausgehend(BODO.id)], error: null });
+    nurBaseline(
+      Promise.resolve({ data: null, error: { message: "baseline kaputt" } }),
+      Promise.resolve({ data: [ANNA, BODO, CARLA], error: null }),
+    );
+    renderDirectory();
+    await screen.findByText("Anna Allgemein");
+    kontakteOeffnen();
+
+    expect(await screen.findByText("Bodo Kontakt")).toBeInTheDocument();
+    expect(screen.queryByText(/im Verzeichnis nicht sichtbar/i)).not.toBeInTheDocument();
+  });
+
+  it("behauptet nichts, solange die Baseline noch laeuft", async () => {
+    contactSelect.mockResolvedValue({ data: [ausgehend(BODO.id)], error: null });
+    nurBaseline(new Promise(() => {}), Promise.resolve({ data: [ANNA, BODO, CARLA], error: null }));
+    renderDirectory();
+    await screen.findByText("Anna Allgemein");
+    kontakteOeffnen();
+
+    // Ein Ladezustand, KEIN „nicht sichtbar" — die Aussage stuende sonst fest,
+    // bevor die Menge feststeht, und wuerde gleich darauf widerrufen.
+    expect(screen.queryByText(/im Verzeichnis nicht sichtbar/i)).not.toBeInTheDocument();
   });
 });
 
