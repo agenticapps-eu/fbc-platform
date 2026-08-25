@@ -7,6 +7,7 @@ import { Card, CardTitle } from "../ui/Card";
 import { useToast } from "../ui/toast-context";
 import { CategoryIcon } from "../matching/CategoryIcon";
 import {
+  ANFRAGEN_STALE_TIME_MS,
   fetchIncomingRequests,
   incomingRequestsQueryKey,
   respondToContactRequest,
@@ -34,10 +35,38 @@ export function MeineAnfragenWidget({ uid }: { uid: string }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: incomingRequestsQueryKey(uid),
     queryFn: () => fetchIncomingRequests(uid),
+    // Geteilt mit dem Navigationseintrag in der Seitenleiste (AGE-592), damit
+    // die beiden nicht unterschiedlich oft nachladen. Siehe die Konstante.
+    staleTime: ANFRAGEN_STALE_TIME_MS,
   });
 
+  // AGE-593: Ein gescheiterter Abruf hat einen EIGENEN Zweig. Bis hierher stand
+  // `isError` in derselben Bedingung wie „nichts da" und lieferte `null` — ein
+  // `42501` sah damit exakt aus wie ein leerer Posteingang, und die Fläche, die
+  // eine wartende Kontaktanfrage anzeigen soll, schwieg genau dann, wenn sie es
+  // nicht durfte.
+  //
+  // `&& !data` ist kein Zierrat: Scheitert ein NACHLADEN über bereits
+  // vorliegenden Anfragen, dürfen sie nicht hinter einer Fehlermeldung
+  // verschwinden — eine beantwortbare Anfrage zu verstecken, weil ihre
+  // Aktualisierung scheiterte, richtet mehr Schaden an als der veraltete Stand.
+  // Gemessen: Das heutige React Query hält in diesem Fall ohnehin `status:
+  // "success"`, ein nackter `isError` wäre also HEUTE gleichwertig. Die Zusage
+  // hängt dann aber an der Statuslogik der Bibliothek statt an unserer — und
+  // das ist eine Zusage, die ein Versionssprung still kassiert.
+  if (isError && !data) {
+    return (
+      <Card id="meine-anfragen" className="flex scroll-mt-24 flex-col gap-2">
+        <CardTitle className="text-base">Meine Anfragen</CardTitle>
+        <p className="text-sm text-danger">
+          Deine Anfragen konnten nicht geladen werden. Bitte lade die Seite neu.
+        </p>
+      </Card>
+    );
+  }
+
   // Leise sein, solange nichts anliegt — kein Leerzustand, der das Dashboard zumüllt.
-  if (isLoading || isError || !data || data.length === 0) return null;
+  if (isLoading || !data || data.length === 0) return null;
 
   return (
     <Card id="meine-anfragen" className="flex scroll-mt-24 flex-col gap-4">

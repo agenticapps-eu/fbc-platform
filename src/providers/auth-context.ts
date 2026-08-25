@@ -75,8 +75,16 @@ export interface AuthContextValue {
    * des Bestätigungslinks. Was der Anmeldedienst bis dahin braucht, erzeugt der
    * Provider selbst — ein optionales Argument hätte einen zweiten Weg offen
    * gelassen, den niemand geht und auf dem niemand das Passwort ersetzt.
+   *
+   * **`hatSession` unterscheidet den dritten Ausgang** (AGE-591): kein Fehler,
+   * aber auch keine Sitzung. Den liefert GoTrue bei einer bereits bekannten
+   * Adresse, und ohne dieses Feld ist er vom Erfolg nicht zu unterscheiden —
+   * die Seite bliebe stumm, und der Knopf täte wortlos nichts.
    */
-  signUp: (email: string, fullName: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    fullName: string,
+  ) => Promise<{ error: AuthError | null; hatSession: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   /**

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
@@ -13,7 +13,7 @@ import LoginPage from "./LoginPage";
  * (MemberDirectory.tsx:235). Deshalb wird hier geprüft, was tatsächlich AN
  * `signUp` ÜBERGEBEN wird, nicht nur, dass ein Feld existiert.
  */
-function renderLogin(signUp = vi.fn(async () => ({ error: null }))) {
+function renderLogin(signUp = vi.fn(async () => ({ error: null, hatSession: true }))) {
   render(
     <AuthFixture value={fakeAuthValue({ signUp })}>
       <DesignVariantProvider>
@@ -87,7 +87,6 @@ describe("LoginPage", () => {
     toRegisterMode();
     expect(screen.queryByRole("link", { name: /Passwort vergessen/i })).not.toBeInTheDocument();
   });
-
 
   /**
    * AGE-527. Das Passwort entsteht erst nach der Bestätigung der Mail — beim
@@ -171,5 +170,111 @@ describe("LoginPage", () => {
 
     expect(await screen.findByText(/Bitte dein Passwort eingeben/i)).toBeInTheDocument();
     expect(signIn).not.toHaveBeenCalled();
+  });
+  // ── AGE-591: der dritte Ausgang der Registrierung ─────────────────────────
+  //
+  // GoTrue beantwortet eine Registrierung auf eine BEREITS BEKANNTE Adresse mit
+  // 200, ohne Fehler und ohne Sitzung (Aufzählungsschutz). `onSubmit` prüfte nur
+  // `error !== null` — der Knopf tat wortlos nichts. Das trifft ausgerechnet die
+  // importierten Mitglieder, die den naheliegenden Weg „Registrieren" statt
+  // „Aktivieren" wählen; das sind 70 von 73 Konten.
+  describe("Registrierung ohne Fehler und ohne Sitzung", () => {
+    /** Registriert mit der angegebenen Adresse und wartet, bis `signUp` durch ist. */
+    async function registriere(signUp: ReturnType<typeof vi.fn>, email: string) {
+      toRegisterMode();
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Anna Muster" } });
+      fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: email } });
+      fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
+      await waitFor(() => expect(signUp).toHaveBeenCalled());
+    }
+
+    const ohneSitzung = () => vi.fn(async () => ({ error: null, hatSession: false }));
+
+    it("zeigt einen sichtbaren Hinweis statt zu schweigen", async () => {
+      const signUp = renderLogin(ohneSitzung());
+      await registriere(signUp, "anna@example.org");
+
+      expect(await screen.findByRole("status")).toBeInTheDocument();
+    });
+
+    /**
+     * Der Fluchtweg heißt ZUGANGSLINK, nicht „Passwort zurücksetzen" (Befund des
+     * Plan-Reviews). Die Betroffenen sind importierte, nicht aktivierte
+     * Mitglieder — sie haben gar kein Passwort, das sich zurücksetzen ließe, und
+     * eine Oberfläche, die es ihnen anbietet, verspricht etwas anderes als das,
+     * was sie brauchen. `/aktivierung` zeigt ohne Token das Formular
+     * „Bestätigungslink anfordern".
+     */
+    it("führt zum Zugangslink, nicht zum Zurücksetzen des Passworts", async () => {
+      const signUp = renderLogin(ohneSitzung());
+      await registriere(signUp, "anna@example.org");
+
+      const hinweis = await screen.findByRole("status");
+      const ziele = Array.from(hinweis.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+      expect(ziele).toContain("/aktivierung");
+      expect(ziele).not.toContain("/passwort-vergessen");
+    });
+
+    it("bietet daneben den Weg zur Anmeldung an", async () => {
+      const signUp = renderLogin(ohneSitzung());
+      await registriere(signUp, "anna@example.org");
+
+      const hinweis = await screen.findByRole("status");
+      fireEvent.click(within(hinweis).getByRole("button", { name: /Anmelden/i }));
+
+      // Der Login-Modus ist daran erkennbar, dass es wieder ein Passwortfeld gibt.
+      expect(screen.getByLabelText("Passwort")).toBeInTheDocument();
+    });
+
+    /**
+     * Der Hinweis darf keinen GRUND nennen. Die Oberfläche kennt ihn auch gar
+     * nicht — GoTrue nennt ihn nicht, und sie fragt nicht nach.
+     *
+     * Zwei Zusagen in einem Test, weil sie zusammen erst die Aussage tragen:
+     * der Text ist für zwei verschiedene Adressen ZEICHENGLEICH (er hängt also
+     * an nichts, was die Adresse betrifft), und er enthält keine der Wendungen,
+     * mit denen man eine Existenz behauptet.
+     *
+     * Was hier NICHT zugesagt wird: dass die beiden Ausgänge von außen
+     * ununterscheidbar sind. Eine unbekannte Adresse erzeugt eine Sitzung und
+     * löst die Seite ab — das ist beobachtbar, war es vorher schon, und es zu
+     * schließen hieße den Registrierungsverlauf umzubauen. Steht als
+     * Nicht-Zusage in der Spec.
+     */
+    it("nennt keinen Grund und lautet für jede Adresse gleich", async () => {
+      const signUp = renderLogin(ohneSitzung());
+      await registriere(signUp, "bekannt@example.org");
+      const ersterText = (await screen.findByRole("status")).textContent;
+
+      cleanup();
+      const signUp2 = renderLogin(ohneSitzung());
+      await registriere(signUp2, "voellig.anders@example.com");
+      const zweiterText = (await screen.findByRole("status")).textContent;
+
+      expect(zweiterText).toBe(ersterText);
+      expect(ersterText).not.toMatch(/vergeben|existiert|bereits registriert|schon ein Konto/i);
+    });
+
+    it("erscheint NICHT, wenn eine Sitzung entstanden ist", async () => {
+      const signUp = renderLogin(vi.fn(async () => ({ error: null, hatSession: true })));
+      await registriere(signUp, "neu@example.org");
+
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    /**
+     * Ein stehengebliebener Hinweis über einem neuen Versuch ist derselbe
+     * Fehlermodus, nur andersherum: Die Oberfläche behauptet etwas über einen
+     * Vorgang, der längst ein anderer ist.
+     */
+    it("verschwindet beim Wechsel in den Login-Modus", async () => {
+      const signUp = renderLogin(ohneSitzung());
+      await registriere(signUp, "anna@example.org");
+      expect(await screen.findByRole("status")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /Schon ein Konto\? Zum Login/ }));
+
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
   });
 });

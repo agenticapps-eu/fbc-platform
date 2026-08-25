@@ -8,6 +8,21 @@ import { NavIcon } from "./NavIcon";
 export interface SidebarNavItem {
   path: string;
   label: string;
+  /**
+   * Abzeichen am Eintrag (AGE-592) — ein offener Vorgang, der auf eine
+   * Entscheidung wartet.
+   *
+   * `text` ist das Sichtbare (eine Zahl, oder „!" wenn der Stand unbekannt ist),
+   * `label` seine Benennung. Beides gehört zusammen: Eine nackte Ziffer neben
+   * einem Wort ist keine Aussage darüber, WAS gezählt wurde — „2" neben „Meine
+   * Anfragen" könnte genauso „zwei Kontakte" heißen —, und für einen
+   * Screenreader ist sie eine Zahl ohne Gegenstand.
+   *
+   * Fehlt das Feld, erscheint nichts. Insbesondere gibt es KEINE Null: Eine Null
+   * ist keine Aufforderung, und ein Zähler, der dauernd Null zeigt, wird nicht
+   * mehr gelesen (so schon bei den Reiter-Zählern in AGE-587 entschieden).
+   */
+  abzeichen?: { text: string; label: string };
 }
 
 export interface SidebarNavSection {
@@ -22,6 +37,15 @@ export interface SidebarNavSection {
  */
 function istPraefixEinesAnderen(pfad: string, items: SidebarNavItem[]): boolean {
   return items.some((anderer) => anderer.path.startsWith(`${pfad}/`));
+}
+
+/**
+ * Der zugängliche Name eines Eintrags — Beschriftung plus, falls vorhanden, die
+ * Benennung seines Abzeichens. Zusammengesetzt statt zweier Quellen, weil ein
+ * `aria-label` den Inhalt ersetzt und nicht ergänzt.
+ */
+function zugaenglicherName(item: SidebarNavItem): string {
+  return item.abzeichen ? `${item.label}, ${item.abzeichen.label}` : item.label;
 }
 
 export interface SidebarNavProps {
@@ -77,8 +101,15 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               onClick={onNavigate}
               // Eingeklappt ist das Icon die einzige Beschriftung — der Name muss
               // dann über title (Maus) und aria-label (Screenreader) kommen.
-              title={collapsed ? item.label : undefined}
-              aria-label={collapsed ? item.label : undefined}
+              //
+              // Das Abzeichen MUSS in diesen Namen hinein: Ein `aria-label`
+              // ERSETZT den Inhalt des Elements, es ergänzt ihn nicht. Stünde
+              // hier nur `item.label`, wäre die Zahl im Abzeichen für einen
+              // Screenreader unsichtbar — sichtbar fürs Auge, stumm für alle
+              // anderen, und ausgerechnet an dem einen Signal, für das dieser
+              // Eintrag existiert.
+              title={collapsed ? zugaenglicherName(item) : undefined}
+              aria-label={collapsed || item.abzeichen ? zugaenglicherName(item) : undefined}
               className={({ isActive }) =>
                 cn(
                   "relative flex items-center rounded-md text-sm transition-colors",
@@ -103,6 +134,25 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
                   )}
                   <NavIcon path={item.path} active={isActive} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
+                  {item.abzeichen && (
+                    // Ausgeklappt am rechten Rand der Zeile, eingeklappt als
+                    // kleine Marke über der oberen rechten Ecke des Icons. Der
+                    // Link trägt `relative`, die Marke hängt also an ihm und
+                    // nicht am Icon — sie darf es anstoßen, nicht verdecken.
+                    //
+                    // `aria-hidden`, weil der zugängliche Name des Links den
+                    // Inhalt schon trägt (siehe aria-label oben); ohne dies
+                    // stünde die Zahl dort zweimal.
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome",
+                        collapsed ? "absolute -top-0.5 right-0.5" : "ml-auto",
+                      )}
+                    >
+                      {item.abzeichen.text}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
