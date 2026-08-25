@@ -1,135 +1,148 @@
-# Session Handoff — 2026-08-25 (einundzwanzigste Sitzung, AGE-582 Abschnitt 5)
+# Session Handoff — 2026-08-25 (zweiundzwanzigste Sitzung, AGE-582 Abschnitt 6)
 
-**Abschnitt 5, die Datenschicht des Feeds, ist gebaut, gemessen und gepusht.**
-Ein Commit auf `donald/age-582-aktivitaet-auf-konzeptstand` (`b3c5c2d`), PR #205,
-**CI grün auf dieser SHA** — und zwar nachgelesen im Log, nicht am Status
-geglaubt. **Abschnitt 6 (Fläche) und 7 (Abnahme) sind unberührt.**
+**Abschnitt 6, die Fläche des Feeds, ist gebaut, im Browser gemessen und
+gepusht.** Ein Commit auf `donald/age-582-aktivitaet-auf-konzeptstand`
+(`22fd5aa`), PR #205. **Abschnitt 7 (Abnahme) ist unberührt** — und ein Teil
+seiner Sichtproben ist heute nebenbei schon gefahren worden, siehe unten.
 
 ## Accomplished
 
-**13 von 14 Aufgaben aus Abschnitt 5.** `fetchFeed` nimmt jetzt `reiter`,
-`ordnung`, `tags` und `typ` — kein zweiter Ladeweg. **44 neue Zusagen**: 27 über
-die Abfrageform (`feed.auswahl.test.ts`, gemockter Builder) und 17 gegen den
-**laufenden lokalen Stack** (`feed.auswahl.integration.test.ts` — echtes Konto
-über GoTrue-Admin, Fixtures über `pg`, echtes PostgREST).
+**Alle elf Aufgaben aus Abschnitt 6, plus das aus Abschnitt 5 vertagte 5.11.**
+Composer in der Feed-Spalte, drei Reiter, Ordnungs-Umschalter, gefüllte Sidebar
+(Tag-Zähler, aktivste Mitglieder, Beitragstyp), Speichern-Knopf an der Karte,
+Medientyp-Zeile im Composer, der anonyme Fall und die zusammengeklappte
+Filterspalte auf dem Telefon.
 
-**Der Integrationslauf hängt im CI-Job `migrations`**, der den Stack ohnehin
-hochfährt (`pnpm test:integration`, `FBC_INTEGRATION=1`). Belegt: das Job-Log
-sagt `feed.auswahl.integration.test.ts (17 tests)` und `Tests 17 passed`. Ohne
-diese Prüfung wäre auch ein Lauf über null Dateien mit Exit 0 durchgegangen.
+**+30 Zusagen**: 19 in `CommunityFeed.flaeche.test.tsx` (neu), 8 in
+`feed-sidebar.test.ts` (neu), 3 im Composer-Test. **1542/1542 grün**,
+`tsc --noEmit`, `pnpm lint`, `pnpm build` sauber; **17/17 im Integrationslauf**
+gegen den laufenden lokalen Stack.
 
-**Vier Gegenproben, jede einzeln zurückgenommen, die Rücknahme belegt:**
-`.contains()` statt `.overlaps()` · Beliebtheits-Cursor über das führende Feld
-allein · `post_media`-Einbettung entfernt · `!inner`-Join entfernt. Jede macht
-genau die gemeinte Zusage rot. Zurückgespielt aus einer Kopie unter `/tmp`,
-**nicht** per `git stash`.
+**Die Sichtprobe ist der eigentliche Beleg**, nicht der Testlauf — gegen den
+lokalen Stack mit 24 Beiträgen und drei Konten:
 
-**Gesamtstand:** Vitest **1512/1512** (134 Dateien) plus 17 im Integrationslauf.
-`tsc --noEmit`, `pnpm lint`, `pnpm build` sauber.
+- **Zähler ausgeloggt 4/2/2, eingeloggt 8/8/4/4/4/4.** Damit ist `security
+  invoker` gemessen und nicht behauptet: es zählen wirklich nur die Beiträge,
+  die der Aufrufer sehen darf.
+- **Zwei Haken sind die Vereinigung** — „Marketing" allein vier Beiträge, mit
+  „Investitionen" acht. ODER, nicht UND.
+- **Alle drei Ordnungen, alle vier Typfilter.** „Beliebteste" ergab 11, 22, 9,
+  20, 7 (Reaktionszahlen 12, 11, 11, 10, 10 — mit Gleichstand).
+- **5.11 live:** in „Gespeichert" standen 23, 16, 9, 2; nach dem Lösen von 23
+  blieben 16, 9, 2 — und in „Alle Beiträge" stand 23 ungedrückt. Eine
+  Invalidierung, beide Flächen.
+- **Echte 375 px** (`emulate`, nicht `resize_page`): Composer 342,
+  Filter-Schalter 453, Reiter 527, Panel `display: none`, kein Überlauf.
+- Konsole durchgehend ohne Fehler und ohne 401.
+
+**Zwei Befunde beim Bauen, beide behoben und beide von einem Test gefunden:**
+der Speichern-Knopf hieß zuerst „Speichern" wie der Absendeknopf des Editors auf
+DERSELBEN Karte (`bearbeiten.test.tsx` wurde rot); und ein gescheiterter
+Sidebar-Aufruf sah aus wie „es gibt nichts".
 
 ## Decisions
 
-- **Zwei Select-Literale statt eines immer mitgeführten Joins.** *Warum, und das
-  ist eine Messung, keine Vorsicht:* `anon` mit eingebettetem `post_saves`
-  bekommt **HTTP 401 / `42501`** auf die GANZE Abfrage — die Einbettung bleibt
-  nicht etwa leer. Ein Schaufenster ohne Beiträge wäre die Folge. Der Union-Typ
-  aus zwei Literalen trägt in TypeScript; mit einer Sonde geprüft, dass er nicht
-  still zu `any` zerfällt.
-- **`post_media(post_id)` steht im Select-Literal, obwohl die Bilder weiter über
-  eine eigene Abfrage kommen.** *Warum:* ohne die Einbettung kennt PostgREST die
-  Beziehung im Filter nicht, und die Typen „Bild" und „Text" fallen. Gegenprobe
-  C belegt, dass sie tragend ist und nicht Zierde.
-- **`savedByMe` ist ein PFLICHTFELD an `FeedPost`**, anders als `former?`
-  daneben. *Warum:* es ist der Zwilling von `likedByMe` und trägt einen Knopf,
-  dessen falscher Zustand dem Mitglied etwas über die eigene Handlung vorlügt.
-  Sechs Fixtures kostet das je eine Zeile.
-- **`FeedCursor.likeCount` ist nur in „Beliebteste" belegt**, und ein Cursor ohne
-  sie **wirft** dort. *Warum:* sonst entstünde `like_count.lt.undefined`. Und
-  ein Cursor, der Felder einer fremden Ordnung trägt, sähe gültig aus.
-- **Der Wächter gegen den stillen Fall steht VOR der ersten Zeile Anfrage.**
-  *Warum:* „liefert nichts" wäre auch dann wahr, wenn der Bestand schon gelesen
-  wurde. Eine eigene Zusage prüft, dass gar nicht gefragt wird.
-- **Der Integrationslauf ist GETRENNT, nicht zur Laufzeit übersprungen.**
-  *Warum:* ein `skipIf(!stackErreichbar)` ist überall grün, auch dort, wo nie
-  etwas lief — derselbe Fehler wie die beiden `member_lifecycle`-Dateien am
-  23.08. Er löscht ausserdem **nur die eigenen Fixtures**; `delete from
-  public.posts` nähme einem Entwickler seinen Demo-Bestand.
-- **`database.types.ts` von Hand nachgezogen, nicht neu erzeugt.** *Warum:* ein
-  volles `supabase gen types` schreibt die Datei stillos um (2117 statt 1919
-  Zeilen, alle Semikolons weg) und meldet RPC-Rückgabespalten als non-null — die
-  Datei warnt im Kopf selbst davor (AGE-498). Die Formen stammen trotzdem aus
-  dem erzeugten Schema; nur `avatar_url` ist gegen den Generator auf
-  `string | null` berichtigt.
-- **5.11 bleibt offen und wandert zu 6.10.** *Warum:* der Mechanismus steht und
-  ist zugesichert (`feedListKey` bleibt Präfix jeder Auswahl), `toggleSave` gibt
-  es — aber eine `useMutation` ohne den Speichern-Knopf wäre Code ohne Aufrufer.
-  Ein Haken dafür wäre eine Lüge im Plan.
+- **Der anonyme Reiter ist ABGELEITET (`uid ? reiter : "alle"`), nicht per
+  `useEffect` nachgeführt.** *Warum:* die Reiter erscheinen ausgeloggt gar nicht,
+  aber eine Sitzung kann auch ENDEN, während die Seite offen steht. Ein Effekt
+  stellte den Zustand erst eine Runde später zurück — dazwischen liefe die
+  Anfrage in den Wächter aus 5.2.
+- **`feed_top_authors` wird ohne Kennung gar nicht erst angefordert** (`enabled`),
+  nicht bloß nicht angezeigt. *Warum:* sie ist an `anon` nicht vergeben, und ein
+  Fehler, den eine Fläche als Null zeigt, ist die schlechteste aller Zahlen.
+- **Kein Zurücksetzen des Blätterns von Hand.** *Warum:* `feedSeitenKey` trägt
+  die ganze Auswahl (5.7) — eine andere Auswahl IST eine andere Abfrage. Die
+  Zusage ist deshalb scharf gefasst: nicht „die Liste beginnt oben", sondern die
+  erste Anfrage der neuen Auswahl trägt keinen Cursor.
+- **Knöpfe mit `aria-pressed` statt `role="tab"`.** *Warum:* echte Reiter
+  verlangen Pfeiltasten und einen wandernden `tabindex`; eine halbe Umsetzung ist
+  für eine Vorleseausgabe schlechter als keine. Die Datei führt dieselbe Form
+  schon an den Tag-Chips.
+- **Der Speichern-Knopf heißt „Beitrag speichern" und behält den Namen in beiden
+  Zuständen.** *Warum:* „Speichern" kollidiert mit dem Editor-Knopf auf derselben
+  Karte, „Gespeichert" mit dem Reiter daneben. Der Zustand steht in
+  `aria-pressed` und im gefüllten Symbol.
+- **EINE Fassung der Sidebar im DOM (`hidden lg:block`), nicht eine Telefon- und
+  eine Schirmfassung.** *Warum:* zwei lägen in jsdom beide im Baum, und jede
+  Abfrage nach einem Kästchen fände es doppelt.
+- **Die Spannweite der Spalte hängt am Composer** (`lg:row-span-2` gegen
+  `lg:row-span-1`). *Warum:* fest auf zwei gesetzt entstünde ausgeloggt eine
+  leere zweite Zeile samt ihrem Abstand.
+- **Die Medientyp-Zeile liegt INNERHALB der Aktionsgruppe** (`span`, nicht `div`).
+  *Warum:* Donalds Anordnung vom 12.08. — Handelndes zusammen und nach rechts —
+  bleibt damit bestehen. Das Videofeld liegt seither hinter der Zeile, **bleibt
+  aber stehen, sobald etwas darin steht**: der Link geht beim Veröffentlichen
+  mit, ein Fehlklick ergäbe sonst ein Video, von dem der Verfasser nichts weiß.
+- **`src/lib/feed-sidebar.ts` als eigene Datei**, nicht in `feed.ts`. *Warum:*
+  die Regel „`feed_top_authors` nie ohne Kennung" gehört neben die Funktion, und
+  `feed.ts` ist mit 1000 Zeilen der Beitragspfad.
 
 ## Files modified
 
-**Neu:** `src/lib/feed.auswahl.test.ts` (27) ·
-`src/lib/feed.auswahl.integration.test.ts` (17)
+**Neu:** `src/lib/feed-sidebar.ts` · `src/lib/feed-sidebar.test.ts` (8) ·
+`src/components/community/CommunityFeed.flaeche.test.tsx` (19)
 
-- `src/lib/feed.ts` — `FeedReiter`/`FeedOrdnung`/`FeedTyp`/`FeedAuswahl`,
-  `FeedCursor.likeCount`, `savedByMe`, zwei Select-Literale, `cursorAusdruck()`,
-  der Wächter, Typ-Filter, `toggleSave`, und Reaktionen + Speicherungen
-  gemeinsam in **einem** `Promise.all` statt nacheinander
-- `src/lib/database.types.ts` — `post_saves`, `posts.like_count`,
-  `feed_tag_counts`, `feed_top_authors`
-- `src/components/community/CommunityFeed.tsx` — `FeedAuswahl` als eine Quelle
-  für Abfrage und Schlüssel; steht noch auf den Vorgaben (bedienbar in 6)
-- `src/lib/academy.ts` + fünf `CommunityFeed.*.test.tsx` + `HomePage.test.tsx` —
-  `savedByMe: false`
-- `CommunityFeed.media.test.tsx` — Mock und Zusage von `contains` auf `overlaps`
-- `vite.config.ts` — `FBC_INTEGRATION`-Weiche für Include/Exclude; die
-  Dreifach-Schrägstrich-Referenz entfiel (Waise meiner eigenen Änderung)
-- `package.json` — `test:integration`
-- `.github/workflows/ci.yml` — der Integrationsschritt im Job `migrations`
-- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 5
+- `src/components/community/CommunityFeed.tsx` — vier Zustandsachsen statt einem
+  Hashtag, `aktiverReiter`, zwei Sidebar-Abfragen, `ReiterLeiste`, `FeedSidebar`
+  (ersetzt `TagFilter`), Sortierung, Filter-Banner, Speichern-Knopf in
+  `InteraktionsLeiste`, Medientyp-Zeile im Composer; `FeedList`/`PostCard` von
+  `activeHashtag` auf `gewaehlteTags` umgestellt
+- `src/components/ui/icons.tsx` — drei Glyphen: `image`, `video`, `bookmark`
+  (letzterer mit Kontur auch gefüllt, wie `heart`)
+- `CommunityFeed.media.test.tsx` — Tag-Filter auf Kästchen aus `feed_tag_counts`
+- `CommunityFeed.composer.test.tsx` — Medientyp-Zeile (3 neue), und der
+  RPC-Zähler filtert jetzt auf `create_post_with_media` (die Sidebar ruft `rpc`
+  ebenfalls)
+- `openspec/changes/activity-concept-level/tasks.md` — Abschnitt 6 und 5.11
 
 Untracked und **absichtlich nicht committet**: `scripts/chat-testkonten.ts`.
 
 ## Next session: start here
 
-**Erste Handlung: Abschnitt 6, die Fläche** — elf Aufgaben, Composer in die
-Feed-Spalte, drei Reiter, Ordnungs-Umschalter, gefüllte Sidebar, Speichern-Knopf
-(und mit ihm 5.11). Es liegt nichts davor: CI ist grün auf `b3c5c2d`.
+**Erste Handlung: Abschnitt 7, die Abnahme** — acht Aufgaben. Vier davon sind
+heute faktisch schon gefahren und brauchen nur noch das dunkle Theme
+beziehungsweise das Abhaken: 7.3 (nur helles Theme geprüft), 7.4, 7.5, 7.6.
+**Offen und echte Arbeit sind 7.2** (`supabase test db` mit ausdrücklicher
+Dateiliste), **7.7** (pgTAP-Beleg, dass die Zähler nichts verraten — per Test,
+nicht per Sichtprobe) und **7.8** (zweite Meinung auf den Diff, Vendor ungleich
+dem des Deltas).
 
-**Die Infisical-Hürde entfällt für die Sichtprobe.** Der lokale Stack läuft, und
-`vite` lässt sich direkt daran hängen:
+**Der lokale Stack trägt jetzt Sichtprobe-Daten** — drei Konten
+(`sicht-ich@example.test`, `sicht-andere@`, `sicht-dritte@`, Kennwort
+`sichtprobe-nur-lokal-8f2b`) und 24 Beiträge in vier Typen. Sie bleiben liegen,
+damit die nächste Sichtprobe ohne Vorlauf startet; nur lokal, nichts davon
+berührt DEV oder PROD.
 
-```
-VITE_SUPABASE_URL=http://127.0.0.1:54321 \
-VITE_SUPABASE_ANON_KEY="$(supabase status -o env | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')" \
-  npx vite
-```
+**Ein Stolperstein, der zwei Minuten gekostet hat:** `posts.video_url` setzt der
+Trigger `trg_posts_video_url` aus dem **Body**. Die Spalte direkt zu beschreiben
+ist wirkungslos — der Typfilter „Video" sah deshalb erst kaputt aus und war es
+nicht.
 
-Damit gilt Donalds Regel „erst eine laufende lokale Version zeigen, dann
-committen" ohne Login in einem echten Terminal. Vorher lohnt ein `pnpm
-demo:seed`-Ersatz von Hand oder ein paar Beiträge per `pg`, sonst ist der Feed
-leer. **jsdom sieht von 6.9 (375 px), 6.1 (Spaltenhöhe) und 6.7 nichts** — die
-Sichtprobe ist dort der Beleg, nicht der Testlauf.
+Vite hängt sich per
+`VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=… npx vite`
+direkt an den lokalen Stack (Infisical entfällt); Port 5173 und 5174 sind von
+fremden Servern belegt, 5175 ist frei. **`localhost`, nicht `127.0.0.1`** — vite
+lauscht auf IPv6.
 
 ## Open questions
 
-- **Die sechs Migrationen aus 2–4 sind nirgends ausser lokal angewendet.** Beim
+- **Kein `offset` in den zwei Sidebar-Aggregaten.** Donalds generelle Regel
+  („`limit`/`offset` in die erste Fassung jeder listenden RPC") steht gegen den
+  Entwurf, der bewusst keines vorsieht. Die Fläche blättert dort nicht — aber
+  ein `p_offset` an beiden wäre eine Migration, und die sechs aus 2–4 sind
+  ohnehin noch nirgends außer lokal angewendet. **Donalds Entscheidung.**
+- **Die sechs Migrationen aus 2–4 sind nirgends außer lokal angewendet.** Beim
   Merge zahlt `drift-gate` die Rechnung: er läuft nur auf `main`, ist auf PRs
   `skipped`, und blockt danach jeden Deploy, bis `migrate-prod` lief.
-- **Kein `offset` in den zwei Sidebar-Aggregaten** — Donald kann das überstimmen,
-  dann `p_offset` an beide.
-- **Die RLS-Kosten von `posts_select_by_visibility`** (Faktor 195, Messung aus
-  der Vorsitzung). Bewusst nicht angefasst.
-- `post_engagement_counts` prüft noch `visibility = 'prime'`/`'legacy'` — Werte,
-  die es seit dem 6-Stufen-Modell nicht gibt. Tote Zweige.
-- **Der Aktivierungsversand**: 69 von 72 PROD-Konten nicht aktiviert,
-  `app.fairbusinessclub.de` weiter ohne DNS-Eintrag. Donald am 25.08.: „das ist
-  okay" — kein Auftrag, aber nicht erledigt.
-- `academy.ts` ist unformatiert — **vorbestehend**, am HEAD von vorher geprüft,
-  nicht angefasst. `pnpm format:check` meldet 172 Dateien insgesamt; `pnpm
-  format` bleibt verboten.
-- Unverändert offen: vier gepushte Commit-Messages mit falschem Tag · drei
-  abweichende Anmeldeadressen · ein echter Mitgliedsname in der Git-Historie ·
-  Rotation des PROD-DB-Passworts · vier Review-Befunde aus 11.5 · 7.5 halb ·
-  kein Nachsetz-Weg für eine gelöschte Zeile ohne Ban · `grund` ohne Aufrufer ·
-  `admin_audit.actor` ohne `on delete cascade` · Downgrade (AGE-516) ·
-  `admin_list_feedback()` ohne Paging · **DEV ist nicht mitgepflegt**.
+- **Das dunkle Theme ist nicht geprüft** (7.3 verlangt beide).
+- Unverändert offen: die RLS-Kosten von `posts_select_by_visibility` (Faktor
+  195) · `post_engagement_counts` prüft noch tote `prime`/`legacy`-Zweige · der
+  Aktivierungsversand (69 von 72 PROD-Konten, `app.fairbusinessclub.de` ohne
+  DNS; Donald am 25.08.: „das ist okay") · `academy.ts` unformatiert
+  (vorbestehend, `pnpm format` bleibt verboten) · vier gepushte
+  Commit-Messages mit falschem Tag · drei abweichende Anmeldeadressen · ein
+  echter Mitgliedsname in der Git-Historie · Rotation des PROD-DB-Passworts ·
+  vier Review-Befunde aus 11.5 · kein Nachsetz-Weg für eine gelöschte Zeile ohne
+  Ban · `grund` ohne Aufrufer · `admin_audit.actor` ohne `on delete cascade` ·
+  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging · **DEV ist nicht
+  mitgepflegt**.
