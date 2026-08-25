@@ -273,6 +273,24 @@ const MASSIV: Partial<Record<GlyphName, ReactElement>> = {
  *  Kontur falsch lesen. */
 const NUR_MASSIV = new Set<GlyphName>(["crown"]);
 
+/** Glyphen, die ihre Kontur AUCH gefüllt behalten.
+ *
+ *  Die Regel darüber (`massiv` ⇒ `stroke="none"`) stammt aus `NavIcon` und ist
+ *  dort richtig: ein Menü-Glyph wechselt beim Aktivwerden die Fassung, aber die
+ *  Umschaltung ist eine ZUSTANDSANZEIGE neben anderen und wird nicht angesehen.
+ *
+ *  Das Herz am Beitrag ist etwas anderes: es wechselt UNTER DEM FINGER. Ohne
+ *  Kontur ist die gefüllte Fassung um eine halbe Strichstärke je Seite KLEINER
+ *  als die ungefüllte — bei `h-4` sichtbar. Die Fassung vor der Zusammenführung
+ *  (`HeartIcon` in `CommunityFeed.tsx`) behielt `stroke` in BEIDEN Zuständen und
+ *  schaltete nur `fill`; das Herz wuchs beim Klick, statt zu schrumpfen. Genau
+ *  das stellt dieser Satz wieder her.
+ *
+ *  Gefunden im Code-Review zum Diff, nicht beim Ansehen: die Sichtprobe der
+ *  neunzehnten Sitzung deckte Menü, Dashboard und zwei Seitenköpfe ab — den
+ *  Like-Knopf nicht. */
+const MASSIV_MIT_KONTUR = new Set<GlyphName>(["heart"]);
+
 export function Icon({
   name,
   variant = "line",
@@ -289,7 +307,7 @@ export function Icon({
       viewBox="0 0 24 24"
       className={className ?? "h-5 w-5 shrink-0"}
       fill={massiv ? "currentColor" : "none"}
-      stroke={massiv ? "none" : "currentColor"}
+      stroke={massiv && !MASSIV_MIT_KONTUR.has(name) ? "none" : "currentColor"}
       strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"

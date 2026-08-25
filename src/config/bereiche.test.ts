@@ -76,8 +76,23 @@ describe("Bereichsfarben (AGE-582)", () => {
    */
   it("kein Bereichs-Token wird im navy-Block überschrieben", () => {
     const css = readFileSync("src/index.css", "utf8");
-    const navy = css.slice(css.indexOf('html[data-variant="navy"]'));
-    expect(navy.slice(0, navy.indexOf("\n}")).includes("bereich-")).toBe(false);
+
+    // Der Anker MUSS gefunden werden, sonst prüft diese Zusage nichts mehr.
+    // Ohne die zwei Zeilen war sie selbstblind: `indexOf` liefert −1,
+    // `css.slice(-1)` ist dann das einzelne "}" am Dateiende, `indexOf("\n}")`
+    // darin wieder −1 und `slice(0, -1)` die leere Zeichenkette — die Zusage
+    // lautete `expect(false).toBe(false)` und wäre grün geblieben, während im
+    // navy-Block ein `--color-bereich-*` steht. Gefunden im Code-Review zum
+    // Diff (AGE-582); dieselbe Falle, gegen die `icons.test.ts` seine zweite
+    // Prüfung trägt.
+    const start = css.indexOf('html[data-variant="navy"]');
+    expect(start, "Anker html[data-variant=\"navy\"] nicht in index.css gefunden").toBeGreaterThan(-1);
+
+    const navy = css.slice(start);
+    const ende = navy.indexOf("\n}");
+    expect(ende, "Ende des navy-Blocks nicht gefunden").toBeGreaterThan(-1);
+
+    expect(navy.slice(0, ende).includes("bereich-")).toBe(false);
   });
 
   it("jedes Farb-Token des Kanons ist in index.css definiert", () => {

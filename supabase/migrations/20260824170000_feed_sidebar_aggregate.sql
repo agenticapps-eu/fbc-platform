@@ -63,6 +63,22 @@
 -- hat keinen Fehlerfall, den ein Aufrufer sinnvoll behandeln könnte, und ein
 -- `raise` an dieser Stelle machte aus einer Sidebar-Kachel einen Seitenfehler.
 --
+-- ══ KEIN `offset` — ABGEWOGEN GEGEN DIE STEHENDE REGEL ══════════════════════
+-- In diesem Projekt gilt: `limit`/`offset` gehören in die ERSTE Fassung jeder
+-- listenden RPC, ausdrücklich auch bei kleinen Beständen. Der Code-Review zum
+-- Diff hat zu Recht gefragt, warum das hier fehlt.
+--
+-- Weil beides keine LISTEN sind, sondern Spitzenwerte. „Die fünf aktivsten
+-- Mitglieder, Seite 2" ist keine Frage, die jemand stellt — und die kuratierte
+-- Tagliste ist mit 15 Einträgen redaktionell begrenzt, nicht durch die Abfrage.
+-- Ein `p_offset` hätte hier keinen Aufrufer, und ein Parameter ohne Aufrufer ist
+-- eine Fläche, die man pflegen muss, ohne dass sie etwas leistet.
+--
+-- Die Regel bleibt richtig für das, wofür sie geschrieben wurde: `feed_saved`,
+-- `feed_mine` und das Verzeichnis blättern und tragen ihr Paging ab der ersten
+-- Fassung. Sollte die Sidebar je ein „mehr anzeigen" bekommen, ist das der
+-- Moment für `p_offset` — nicht jetzt auf Verdacht.
+--
 -- ══ GEZÄHLT WIRD NACH BEITRÄGEN, NICHT NACH BEITRÄGEN UND KOMMENTAREN ══════
 -- Kommentare mitzuzählen zöge ein zweites Sichtbarkeitsprädikat
 -- (`comments_select_visible`) in dieselbe Funktion, für eine Zahl, die dasselbe

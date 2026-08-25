@@ -333,6 +333,46 @@
       zu erklären. Keine Codeänderung — das ist das gebaute Verhalten; die
       Begründung steht jetzt im Kopf der Migration statt als offene Frage
 
+## 4b. Code-Review über den Diff der Abschnitte 1–4 (Schritt 4 des Workflows)
+
+Gelaufen am 25.08. über `main...HEAD` (41 Dateien). Fünf Befunde, alle
+nachgemessen statt geglaubt, alle abgearbeitet.
+
+- [x] 4b.1 **[medium] Vier Zusagen in `rls_test.sql` waren hohl geworden.** Der
+      INSERT-Entzug aus 3.11 lässt das ACL VOR der Policy antworten. Nachgemessen:
+      mit aufgeweichter `posts_write_own` blieben sie grün. Repariert auf zwei
+      Wegen — 645 und 22.13 geben das Recht **innerhalb der Transaktion** kurz
+      zurück (dann kann `42501` nur noch aus der Policy kommen); 22.11 und 22.12
+      laufen jetzt als **Eigentümer über `throws_ok`** auf `23505`/`23514`, weil
+      dort der Unique-Index und die Prüfbedingung gemeint sind — die haben sie
+      **noch nie** gemessen, auch vor diesem Change nicht, weil `posts_write_own`
+      mit `kind = 'member'` immer zuerst abwies
+- [x] 4b.2 **Die naheliegende Gegenprobe war selbst falsch.** Eine GELÖSCHTE
+      Policy beweist nichts: bei eingeschalteter RLS ohne Policy gilt
+      Default-Deny, alles wird abgewiesen. Erst das AUFWEICHEN misst. Mit
+      `using(true)` fallen 10 Zusagen, und nimmt man nur `is_activated()` heraus,
+      fällt **genau eine** — die reparierte
+- [x] 4b.3 **[low] Das Herz schrumpfte beim Klick.** Die Regel „gefüllt ⇒ keine
+      Kontur" stammt aus `NavIcon` und ist dort richtig; auf das Herz angewandt
+      wird die gefüllte Fassung um eine halbe Strichstärke je Seite kleiner. Die
+      alte `HeartIcon` behielt `stroke` in beiden Zuständen. `MASSIV_MIT_KONTUR`
+      stellt das her, `icons.render.test.tsx` hält es fest. Die Sichtprobe der
+      neunzehnten Sitzung deckte den Like-Knopf nicht ab
+- [x] 4b.4 **[low] `bereiche.test.ts` war selbstblind** — findet `indexOf` den
+      navy-Anker nicht, prüft die Zusage `expect(false).toBe(false)`. Dieselbe
+      Falle, gegen die `icons.test.ts` seine zweite Prüfung trägt. Anker wird
+      jetzt zugesichert; gegengeprobt durch Umbenennen des Selektors
+- [x] 4b.5 **[low] Kein `offset` in den beiden Aggregaten** — abgewogen gegen die
+      stehende Paging-Regel und im Kopf der Migration begründet: das sind keine
+      Listen, sondern Spitzenwerte. „Die fünf aktivsten Mitglieder, Seite 2" ist
+      keine Frage. Ein Parameter ohne Aufrufer bleibt draussen, bis die Sidebar
+      ein „mehr anzeigen" bekommt
+- [x] 4b.6 Als **unbegründet** zurückgewiesen wurde nichts — der Review hat die
+      riskanten Stellen des Rechte-Entzugs eigenständig nachgeprüft
+      (`create_post_with_media` und `event_feed_post_sync` sind beide DEFINER,
+      `updatePost` schreibt genau die drei Spalten, kein `updated_at`-Trigger auf
+      `posts`, Sortierung des Golden-Snapshots stimmt) und für tragfähig befunden
+
 ## 5. Datenschicht des Feeds
 
 - [ ] 5.1 `FetchFeedArgs` um `reiter`, `ordnung`, `tags: string[]` und `typ`
