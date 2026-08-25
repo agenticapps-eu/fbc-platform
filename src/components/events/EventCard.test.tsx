@@ -52,9 +52,12 @@ describe("EventCard", () => {
   });
 
   it("behält die Kachel ohne Titelbild — der Platzhalter hält die Höhe", () => {
+    // Seit AGE-596 ist das Feld 3:1 statt 16:9 — das Verhältnis, auf das der
+    // Zuschneider festlegt. Die Zusage dieses Tests ist unverändert: bebilderte
+    // und unbebilderte Kacheln stehen gleich hoch nebeneinander.
     const { container } = zeige(evt({ coverPath: null }));
     expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelector(".aspect-\\[16\\/9\\]")).not.toBeNull();
+    expect(container.querySelector(".aspect-\\[3\\/1\\]")).not.toBeNull();
   });
 
   it("zeigt das Titelbild, wenn eine signierte URL vorliegt", () => {

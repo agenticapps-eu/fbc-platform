@@ -70,24 +70,32 @@ export function ProfileHero({
       {/* Hintergrundbild — ohne Bild ein heller Akzent-Verlauf aus Tokens, der
           dem Theme folgt. Das Profilbild ragt hinein (siehe unten).
 
-          DIE HÖHE WÄCHST MIT DER BREITE (AGE-566). Vorher stand sie fest auf
-          h-28/sm:h-40 — auf einem 1150 px breiten Schirm ergab das ein
-          Seitenverhältnis von rund 7:1, und `object-cover` schnitt aus jedem
-          normalen Foto einen waagerechten Splitter heraus. Gemeldet als „zu
-          klein, skaliert nicht gut".
+          DIE BAHN IST 3:1 UND HAT KEINEN HÖHENDECKEL (AGE-596). Vorher standen
+          hier feste Stufen (h-32/sm:h-44/lg:h-56/xl:h-64) mit der Begründung
+          aus AGE-566, eine mitwachsende Bahn schiebe den Namen unter die Falz.
+          Die Begründung bleibt richtig und ist der bewusst gezahlte Preis:
+          gemessen war die Bahn bei 1370 px Fensterbreite 1217 x 256 px, also
+          selbst 4,75:1 — und in einem 4,75:1-Feld kann ein 2,70:1-Bild nur
+          beschnitten (43,2 % der Höhe fielen weg) oder von breiten Balken
+          umgeben sein. Deckel und „ganzes Bild ohne Balken" schließen einander
+          aus; entschieden wurde am 25.08. für das ganze Bild.
 
-          Feste Stufen statt `aspect-[…]`: die Bahn soll auf grossen Schirmen
-          NICHT unbegrenzt mitwachsen, sonst schiebt sie den Namen unter die
-          Falz. 256 px bei 1150 px Breite sind rund 4,5:1 — genug, dass ein
-          Motiv erkennbar bleibt, ohne den Kopfbereich zu einer Bildseite zu
-          machen. */}
-      <div className="relative h-32 bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-44 lg:h-56 xl:h-64">
+          3:1 ist kein gewählter Geschmack, sondern das Verhältnis, auf das
+          `ProfilPage` bereits zuschneidet.
+
+          Der Verlauf bleibt als Untergrund der Bahn stehen, auch mit Bild: er
+          trägt die Fläche, die das eingepasste Bild frei lässt. */}
+      <div className="relative aspect-[3/1] bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))]">
         {banner && (
+          // `object-contain`, nicht `-cover`: die gespeicherten Bilder liegen
+          // zwischen 1,33:1 und 3,00:1 (55 gemessen, Median 2,70:1), keines ist
+          // breiter als das Feld. Sie bekommen damit schmale Ränder statt
+          // Verluste an den Kanten.
           <img
             src={banner}
             alt=""
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-contain"
           />
         )}
       </div>

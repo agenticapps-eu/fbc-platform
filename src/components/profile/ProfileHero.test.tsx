@@ -79,3 +79,49 @@ describe("ProfileHero — der Avatar liegt über dem Headerbild", () => {
     expect(avatar).toHaveClass("z-10");
   });
 });
+
+/**
+ * Das Bildfeld trägt das Verhältnis, auf das der Zuschneider festlegt (AGE-596).
+ *
+ * Auch diese Zusagen sind ausdrücklich STRUKTURELL — siehe die Begründung in
+ * `EventCover.test.tsx`. Der Beleg ist eine Messung im Browser: bei 1370 px
+ * Fensterbreite war die Bahn 1217 x 256 px, also 4,75:1, und schnitt von einem
+ * 2,70:1-Bild 43,2 % der Höhe weg (gemessen am 25.08. vor dem Fix).
+ */
+describe("ProfileHero — die Bahn trägt das Verhältnis des Zuschnitts", () => {
+  function bahn(container: HTMLElement) {
+    return container.querySelector("header")!.firstElementChild as HTMLElement;
+  }
+
+  it("legt die Bahn auf 3:1", () => {
+    const { container } = render(<ProfileHero name="Anna Berg" coverUrl="/c.webp" />);
+    expect(bahn(container).className).toMatch(/aspect-\[3\/1\]/);
+  });
+
+  it("führt keine feste Höhe mehr — ein Deckel IST auf breiter Seite selbst 6:1", () => {
+    // Nimmt die Höhenstufen aus AGE-566 zurück. Deren Begründung — eine
+    // mitwachsende Bahn schiebt den Namen unter die Falz — bleibt richtig und
+    // ist der bewusst gezahlte Preis: in einer gedeckelten Bahn kann ein
+    // 2,70:1-Bild nur beschnitten oder von breiten Balken umgeben sein.
+    // Das Muster fasst `max-h-` und `min-h-` mit und lässt beliebige Werte
+    // (`h-[400px]`) nicht durch. Eine engere Fassung (`(^|\s|:)h-\d`) prüfte
+    // genau die Form NICHT, in der ein Deckel nach einer Beschwerde über den
+    // 458-px-Kopf am ehesten zurückkäme.
+    const { container } = render(<ProfileHero name="Anna Berg" coverUrl="/c.webp" />);
+    expect(bahn(container).className).not.toMatch(/(^|\s|:)(min-|max-)?h-[\d[]/);
+  });
+
+  it("passt das Bild ein, statt es zu beschneiden", () => {
+    const { container } = render(<ProfileHero name="Anna Berg" coverUrl="/c.webp" />);
+    const img = container.querySelector('header > div > img');
+    expect(img?.className).toMatch(/object-contain/);
+    expect(img?.className).not.toMatch(/object-cover/);
+  });
+
+  it("behält den Akzent-Verlauf als Untergrund, auch MIT Bild", () => {
+    // Er trägt die frei bleibende Fläche neben dem eingepassten Bild. Fiele er
+    // im Bild-Zweig weg, schiene die Fläche des Elternteils durch.
+    const { container } = render(<ProfileHero name="Anna Berg" coverUrl="/c.webp" />);
+    expect(bahn(container).className).toMatch(/linear-gradient/);
+  });
+});
