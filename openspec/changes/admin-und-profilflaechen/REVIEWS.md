@@ -174,3 +174,69 @@ Zwei Befunde haben die Bauart geändert (HIGH von codex, MEDIUM von gemini), ein
 hat den Plan verbessert statt ihn zu bemängeln (die fünf Wächter), einer ist
 widerlegt worden. Alle dreizehn wurden gefunden, **bevor eine Zeile Code
 existierte** — der billigste Moment.
+
+
+---
+
+## Diff-Review (Schritt 4 der Schleife) — 2026-08-25
+
+Auf den Commit `e9fe15e`, von zwei fremden Vendoren. Sieben Befunde: **zwei
+echte Fehler behoben, drei widerlegt, einer als Messung festgehalten, einer als
+Test-Schwaeche behoben.**
+
+### Behoben (codex, beide MEDIUM)
+
+1. **Der Deeplink-Beitrag lag NEBEN dem Praefix, den die Mutationen entwerten.**
+   `["feed","einzeln",…]` gegen `feedListKey` = `["feed","list",uid]`. Eine
+   Reaktion oder ein Speichern am vorangestellten Beitrag liess ihn veraltet
+   stehen — der Knopf sagte weiter „Speichern", und der zweite Klick schickte
+   dieselbe Operation noch einmal. Es ist derselbe Fehler, den dieser Change
+   bei den Zaehlern der Reiter schon einmal vermieden hat (Aufgabe 4.3), an
+   einer zweiten Stelle. Behoben mit `postDeeplinkQueryKey`, das unter dem
+   Praefix liegt; `feedSeitenKey` bleibt unberuehrt.
+
+2. **Der verlinkte Beitrag bekam keine signierte Bild-URL.** Die Signaturen
+   entstanden ausschliesslich aus den geladenen Feed-SEITEN — ein Beitrag
+   ausserhalb davon, also genau der Fall, fuer den der Deeplink gebaut ist,
+   verlor sein Bild stillschweigend. **Die Sichtprobe hat es nicht gezeigt:
+   ihre Fixtures trugen nur Text.** Der Test dazu war rot, bevor der Code stand.
+
+### Widerlegt
+
+3. **[HIGH, gemini] „Der verlinkte Beitrag bleibt kleben."** `verlinkteId` steht
+   im Schluessel, also wechselt der Schluessel und `data` ist `undefined`. Das
+   Szenario wurde als Test gebaut — mit demselben Query-Client und echter
+   Navigation von aussen — und ist gruen. Gegenprobe: mit der Bauart, die der
+   Befund vermutet (letzter Beitrag in einem eigenen Zustand festgehalten),
+   faellt genau diese Zusage. Der Waechter bleibt stehen, weil die Bauart
+   naheliegend ist.
+
+4. **[LOW, gemini] `/admin/mitglied/null`.** `feedback.profile_id` ist
+   `not null` mit `on delete cascade` — im Katalog gemessen. Die Zeile kann
+   nicht existieren.
+
+### Festgehalten statt geaendert
+
+5. **[MEDIUM, gemini] Fuenf Scans der `profiles`-Tabelle.** Im Mechanismus
+   richtig: `explain analyze` zeigt `loops=5`. Im Ausmass nicht: 0,24 ms, und
+   der Verein steuert auf einige hundert Mitglieder zu. Die einpassige Fassung
+   nennt jeden Zustand ZWEIMAL und waere dieselbe Klasse von Verdopplung, gegen
+   die diese Migration antritt. Messung und Abwaegung stehen jetzt im
+   Migrationskopf.
+
+### Test-Schwaeche behoben
+
+6. **[LOW, codex] Die Weiterleitungs-Zusage prueft nur eine fehlende
+   Ueberschrift.** Jetzt wird das ZIEL geprueft, zeichengleich (`"/"`), nicht
+   per Teilzeichenkette. Gegenprobe: eine Weiterleitung auf `/einstellungen`
+   laesst sie fallen.
+
+### Angenommen, nicht behoben
+
+7. **[MEDIUM, codex] Die Ununterscheidbarkeits-Zusage zwingt beide Laeufe auf
+   `null`.** Berechtigt als Kritik an der Test-STAERKE: sie kann eine kuenftige
+   Abweichung in `fetchPostById` nicht finden. Die Eigenschaft selbst lebt
+   aber eine Ebene tiefer — die RLS filtert einen unsichtbaren Beitrag aus
+   derselben Anfrage heraus, aus der eine erfundene Kennung null Zeilen
+   liefert; ein Fehlerpfad, der die zwei trennte, existiert nicht. Als offener
+   Punkt notiert, nicht als Fehler.

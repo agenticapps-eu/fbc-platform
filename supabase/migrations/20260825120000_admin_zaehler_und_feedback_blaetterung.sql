@@ -239,6 +239,20 @@ end $$;
 -- Die Zahlen sind GLOBAL. Es gibt bewusst kein `p_query`: der Reiter
 -- beantwortet „wie viele gibt es", nicht „wie viele meiner Treffer" — und die
 -- Antwort darauf ändert sich nicht dadurch, dass jemand einen Namen eintippt.
+--
+-- FÜNF UNTERABFRAGEN, UND DAS IST GEMESSEN, NICHT ÜBERSEHEN:
+-- `explain analyze` zeigt `loops=5` — `profiles` wird wirklich fünfmal
+-- gelesen. Ein Diff-Review hat das als Skalierungsproblem gemeldet, zu Recht im
+-- Mechanismus. Die Grössenordnung trägt es nicht: der Verein steuert auf einige
+-- hundert Mitglieder zu, gemessen 0,24 ms.
+--
+-- Die einpassige Fassung wäre `count(*) filter (…)` über einen Scan, danach per
+-- `values` wieder in fünf Zeilen aufgefaltet. Sie nennt jeden Zustand ZWEIMAL —
+-- einmal im Filter, einmal in der Werteliste. Das ist dieselbe Klasse von
+-- Verdopplung, gegen die diese Migration im Kopf oben antritt. Die Fassung mit
+-- `unnest` nennt ihn genau einmal. Wenn der Bestand je in eine Grössenordnung
+-- wächst, in der die vier zusätzlichen Scans zählen, ist das eine bewusste
+-- Umstellung wert — heute wäre sie ein Tausch von Lesbarkeit gegen nichts.
 create function public.admin_member_counts()
 returns table (status text, anzahl bigint)
 language plpgsql

@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CommunityFeed from "./CommunityFeed";
 import { ToastProvider } from "../ui/Toast";
-import { fetchFeed, fetchPostById, type FeedPost } from "../../lib/feed";
+import { fetchFeed, fetchPostById, feedListKey, postDeeplinkQueryKey, type FeedPost } from "../../lib/feed";
+import { signPostMedia } from "../../lib/post-media";
 import { AuthFixture, fakeAuthValue } from "../../test/auth-fixtures";
 
 /**
@@ -24,6 +25,12 @@ vi.mock("../../lib/feed", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/feed")>()),
   fetchFeed: vi.fn(),
   fetchPostById: vi.fn(),
+}));
+vi.mock("../../lib/post-media", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/post-media")>()),
+  signPostMedia: vi.fn(async (pfade: string[]) =>
+    Object.fromEntries(pfade.map((p) => [p, `https://signiert.test/${p}`])),
+  ),
 }));
 
 function post(overrides: Partial<FeedPost> = {}): FeedPost {
@@ -194,5 +201,105 @@ describe("Unsichtbar und nicht vorhanden sind ununterscheidbar (7.4, 7.6)", () =
 
     expect(await screen.findByText(/nicht verfügbar/i)).toBeInTheDocument();
     expect(screen.getByText(/viel gelernt/)).toBeInTheDocument();
+  });
+});
+
+describe("Der verlinkte Beitrag bleibt nicht kleben (Review-Befund gemini, HIGH)", () => {
+  /**
+   * Das Szenario aus dem Diff-Review: von `?post=alt` weg auf `/aktivitaet`
+   * ohne Parameter — bleibt der vorangestellte Beitrag oben stehen, weil React
+   * Query ihn noch im Zwischenspeicher hält?
+   *
+   * Er bleibt nicht: `verlinkteId` steht IM Schlüssel, also wechselt der
+   * Schlüssel und `data` ist undefined. Der Befund ist damit widerlegt — aber
+   * die Zusage bleibt stehen, weil die Bauart, die ihn wahr machen würde
+   * (den letzten Beitrag in einem eigenen Zustand festhalten), naheliegend ist.
+   *
+   * Geprüft mit DEMSELBEM Query-Client und echter Navigation von aussen, ohne
+   * Neuaufbau des Baums: ein Test, der frisch rendert, fände es nie. Dieses
+   * Projekt hat schon einmal einen Zustand übersehen, weil kein Test von aussen
+   * navigierte (`location.key`, AGE-582).
+   */
+  it("verschwindet, sobald der Parameter aus der Adresse fällt", async () => {
+    vi.mocked(fetchPostById).mockResolvedValue(ALT);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+
+    function Umschalter() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button onClick={() => navigate("/aktivitaet")}>ohne Parameter</button>
+          <CommunityFeed />
+        </>
+      );
+    }
+
+    render(
+      <AuthFixture value={fakeAuthValue()}>
+        <QueryClientProvider client={client}>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/aktivitaet?post=p-alt"]}>
+              <Umschalter />
+            </MemoryRouter>
+          </ToastProvider>
+        </QueryClientProvider>
+      </AuthFixture>,
+    );
+
+    await screen.findByText(/ganz unten/);
+
+    fireEvent.click(screen.getByRole("button", { name: "ohne Parameter" }));
+
+    await waitFor(() => expect(screen.queryByText(/ganz unten/)).not.toBeInTheDocument());
+    // Der Feed selbst steht unverändert da — es verschwindet der Deeplink, nicht die Liste.
+    expect(screen.getByText(/viel gelernt/)).toBeInTheDocument();
+  });
+});
+
+describe("Der vorangestellte Beitrag ist vollwertig (Review-Befunde codex)", () => {
+  /**
+   * BEFUND 1 (MEDIUM): der Deeplink-Beitrag lag unter einem EIGENEN Schlüssel,
+   * während Reaktion, Speichern und Kommentar den Präfix `feedListKey`
+   * entwerten. Eine Reaktion auf den vorangestellten Beitrag liess ihn damit
+   * veraltet stehen — der Knopf sagte weiter „Speichern", und der zweite Klick
+   * schickte dieselbe Operation noch einmal.
+   *
+   * Dieselbe Lehre, die dieser Change bei den Zählern schon einmal gezogen hat
+   * (Aufgabe 4.3): ein Schlüssel NEBEN dem Präfix ist keiner.
+   */
+  it("liegt unter demselben Präfix, den die Mutationen entwerten", () => {
+    const praefix = feedListKey("u1");
+    const schluessel = postDeeplinkQueryKey("u1", "p-alt");
+
+    expect(schluessel.slice(0, praefix.length)).toEqual([...praefix]);
+    // Und trotzdem ein anderer Schlüssel als die Liste selbst.
+    expect(schluessel).not.toEqual([...praefix]);
+  });
+
+  /**
+   * BEFUND 2 (MEDIUM): die Bildsignaturen entstanden ausschliesslich aus den
+   * geladenen Feed-SEITEN. Ein verlinkter Beitrag ausserhalb dieser Seiten —
+   * also genau der Fall, für den der Deeplink gebaut ist — bekam keine
+   * signierte URL, und `PostMedien` verwarf sein Bild.
+   *
+   * Die Sichtprobe hat das nicht gezeigt: ihre Fixtures trugen nur Text.
+   */
+  it("bekommt eine signierte URL für sein Bild, auch ausserhalb der geladenen Seiten", async () => {
+    vi.mocked(fetchPostById).mockResolvedValue(
+      post({
+        id: "p-bild",
+        body: "Alter Bildbeitrag",
+        media: [{ storagePath: "u1/altes-bild.jpg", sort: 0, width: 800, height: 600 }],
+      }),
+    );
+
+    renderAt("/aktivitaet?post=p-bild");
+    await screen.findByText(/Alter Bildbeitrag/);
+
+    await waitFor(() =>
+      expect(vi.mocked(signPostMedia).mock.calls.flat(2)).toContain("u1/altes-bild.jpg"),
+    );
   });
 });

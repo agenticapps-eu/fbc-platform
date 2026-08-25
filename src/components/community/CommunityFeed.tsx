@@ -51,6 +51,7 @@ import {
   feedListKey,
   feedSeitenKey,
   fetchPostById,
+  postDeeplinkQueryKey,
   type FeedAuswahl,
   type FeedOrdnung,
   type FeedReiter,
@@ -152,7 +153,7 @@ export default function CommunityFeed() {
   const [feedParameter] = useSearchParams();
   const verlinkteId = feedParameter.get("post");
   const verlinkter = useQuery({
-    queryKey: ["feed", "einzeln", uid, verlinkteId] as const,
+    queryKey: postDeeplinkQueryKey(uid, verlinkteId ?? ""),
     queryFn: () => fetchPostById(uid, verlinkteId!),
     enabled: verlinkteId !== null,
   });
@@ -185,9 +186,20 @@ export default function CommunityFeed() {
   // steckt in der URL, und ein Schlüssel über alle geladenen Seiten würde beim
   // Nachladen auch die alten Bilder neu signieren — der Browser lüde sie dann
   // erneut. Je Seite bleibt die Zeichenkette stabil, solange die Seite es ist.
+  //
+  // Der VERLINKTE Beitrag bekommt eine eigene Abfrage in derselben Liste. Er
+  // liegt in aller Regel ausserhalb der geladenen Seiten — das ist der Zweck
+  // des Deeplinks —, und ohne diesen Eintrag bliebe genau sein Bild ohne
+  // signierte URL. `PostMedien` verwürfe es dann stillschweigend, und die
+  // Karte zeigte nur den Text (Diff-Review codex). Die Sichtprobe hat es nicht
+  // gezeigt: ihre Fixtures trugen nur Text.
+  const signaturSeiten = [
+    ...(feed.data?.pages ?? []).map((seite) => seite.posts),
+    ...(verlinkter.data ? [[verlinkter.data]] : []),
+  ];
   const signaturen = useQueries({
-    queries: (feed.data?.pages ?? []).map((seite) => {
-      const pfade = seite.posts.flatMap((p) => p.media.map((m) => m.storagePath));
+    queries: signaturSeiten.map((seitenPosts) => {
+      const pfade = seitenPosts.flatMap((p) => p.media.map((m) => m.storagePath));
       return {
         queryKey: signaturQueryKey(pfade),
         queryFn: () => signPostMedia(pfade),
@@ -207,8 +219,8 @@ export default function CommunityFeed() {
   // erneut. Ein Pfad ohne Signatur ist der NORMALFALL (fremdes members-Event),
   // kein Fehler — die Karte erscheint dann ohne Bild.
   const coverSignaturen = useQueries({
-    queries: (feed.data?.pages ?? []).map((seite) => {
-      const pfade = seite.posts
+    queries: signaturSeiten.map((seitenPosts) => {
+      const pfade = seitenPosts
         .map((p) => p.event?.coverPath)
         .filter((pfad): pfad is string => !!pfad);
       return {

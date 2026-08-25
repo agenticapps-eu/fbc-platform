@@ -206,5 +206,5 @@
       **ohne Neuladen**
 - [x] 9.7 Sichtprobe: die Feedback-Seite blättert; `/admin` trägt die Karte nicht
       mehr
-- [ ] 9.8 Zweite Meinung auf den Diff (Schritt 4 der Schleife), Vendor ungleich
+- [x] 9.8 Zweite Meinung auf den Diff (Schritt 4 der Schleife), Vendor ungleich
       dem des Deltas

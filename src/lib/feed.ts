@@ -280,6 +280,22 @@ export const feedSeitenKey = (uid: string | null, auswahl: FeedAuswahl) =>
     auswahl.typ,
     "seiten",
   ] as const;
+/**
+ * Der EINE Beitrag hinter `?post=<id>` (AGE-587).
+ *
+ * Liegt bewusst UNTER `feedListKey` — dem Präfix, den Reaktion, Speichern und
+ * Kommentar entwerten. Ein Schlüssel daneben hiesse: eine Reaktion auf den
+ * vorangestellten Beitrag lässt ihn veraltet stehen, der Knopf sagt weiter
+ * „Speichern", und der zweite Klick schickt dieselbe Operation noch einmal
+ * (Diff-Review codex). Derselbe Fehler, den dieser Change bei den Zählern der
+ * Reiter schon einmal vermieden hat.
+ *
+ * `feedSeitenKey` bleibt davon unberührt: der Parameter steht dort NICHT drin,
+ * sonst verwürfe jeder Deeplink den geladenen Feed.
+ */
+export const postDeeplinkQueryKey = (uid: string | null, postId: string) =>
+  [...feedListKey(uid), "einzeln", postId] as const;
+
 export const commentsQueryKey = (uid: string | null, postId: string) =>
   ["feed", "comments", uid, postId] as const;
 

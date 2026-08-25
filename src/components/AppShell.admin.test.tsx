@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { ToastProvider } from "./ui/Toast";
@@ -89,6 +89,12 @@ describe("Das Administrationsmenü trägt seine Flächen vollständig (AGE-587)"
 });
 
 describe("Der Weg zur Feedback-Fläche steht nur Admins offen (AGE-587, 5.8)", () => {
+  /** Zeigt an, WO die Anwendung gerade steht — damit die Weiterleitung an ihrem
+   *  Ziel geprüft wird und nicht an der Abwesenheit einer Überschrift. */
+  function Standort() {
+    return <span data-testid="standort">{useLocation().pathname}</span>;
+  }
+
   function renderAt(path: string, value: AuthContextValue) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
@@ -96,6 +102,7 @@ describe("Der Weg zur Feedback-Fläche steht nur Admins offen (AGE-587, 5.8)", (
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <MemoryRouter initialEntries={[path]}>
+              <Standort />
               <App />
             </MemoryRouter>
           </ToastProvider>
@@ -108,17 +115,22 @@ describe("Der Weg zur Feedback-Fläche steht nur Admins offen (AGE-587, 5.8)", (
     renderAt("/admin/feedback", ADMIN);
 
     expect(screen.getByRole("heading", { name: "QM-Feedback" })).toBeInTheDocument();
+    expect(screen.getByTestId("standort").textContent).toBe("/admin/feedback");
   });
 
   /**
-   * Ohne diese Zusage bliebe eine Route OHNE `RequireAdmin` grün: die Seite
-   * selbst rendert dieselbe Überschrift, gleichgültig wer sie aufruft, und die
-   * RPC dahinter gäbe einem Nicht-Admin bloss eine leere Liste — also genau das
-   * Bild einer Fläche, auf der man nichts zu suchen hat, aber sein darf.
+   * Geprüft wird das ZIEL der Weiterleitung, nicht nur die Abwesenheit der
+   * Überschrift. Ein Gate, das für Nicht-Admins `null` rendert oder auf eine
+   * falsche Route umleitet, liesse den Nutzer auf einer leeren Seite stehen —
+   * und eine Zusage, die nur „Überschrift fehlt" sagt, bliebe dabei grün
+   * (Diff-Review codex).
    */
-  it("leitet ein gewöhnliches Mitglied weg", () => {
+  it("leitet ein gewöhnliches Mitglied weg — und zwar auf die Startseite", () => {
     renderAt("/admin/feedback", MITGLIED);
 
     expect(screen.queryByRole("heading", { name: "QM-Feedback" })).not.toBeInTheDocument();
+    // Zeichengleich und nicht per Teilzeichenkette: `toHaveTextContent("/")`
+    // trifft JEDEN Pfad und wäre auch bei einer falschen Weiterleitung grün.
+    expect(screen.getByTestId("standort").textContent).toBe("/");
   });
 });
