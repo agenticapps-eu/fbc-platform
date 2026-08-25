@@ -35,6 +35,26 @@ describe("Umgebungs-Hinweis", () => {
     expect(screen.getByText(/Testumgebung/i)).toBeInTheDocument();
   });
 
+  /**
+   * Die Themes hängen an `<html data-variant>`, nicht an `prefers-color-scheme`
+   * — und `navy` überschreibt nur die Chrome-Tokens, der Inhaltsbereich bleibt
+   * in BEIDEN Themes hell. Ein `dark:`-Zusatz hier hängt also am falschen
+   * Signal: Er feuert nach der Betriebssystem-Einstellung und setzte helles
+   * Amber auf hellen Grund — im Browser gemessen 1,05:1.
+   *
+   * Ein Kontrastwert lässt sich in jsdom nicht messen (keine Layout-Engine).
+   * Geprüft wird deshalb die Ursache, die messbar ist: dass die Kennzeichnung
+   * ihre Farbe NICHT von der Betriebssystem-Einstellung abhängig macht.
+   */
+  it("macht seine Schriftfarbe nicht von prefers-color-scheme abhängig", () => {
+    vi.stubEnv("VITE_ENVIRONMENT", "dev");
+
+    render(<EnvironmentBanner />);
+
+    const hinweis = screen.getByText(/Testumgebung/i);
+    expect(hinweis.className).not.toMatch(/\bdark:/);
+  });
+
   it("erscheint in der Produktivumgebung nicht", () => {
     vi.stubEnv("VITE_ENVIRONMENT", "prod");
 
