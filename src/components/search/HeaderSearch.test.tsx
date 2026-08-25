@@ -32,6 +32,7 @@ function member(name: string, overrides: Partial<DirectoryMember> = {}): Directo
     id: `id-${name.toLowerCase().replace(/\s/g, "-")}`,
     name,
     avatar_url: null,
+    cover_url: null,
     region: null,
     company: "Beispiel GmbH",
     short_bio: null,

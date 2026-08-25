@@ -87,7 +87,11 @@ update public.profiles set
     tier         = 'impact',
     roles        = array['Vorstand', 'Beirat'],
     competencies = array['Finanzierung', 'Strategie'],
-    member_since = date '2019-03-01'
+    member_since = date '2019-03-01',
+    -- AGE-595: ohne einen Wert hier verglichen beide Funktionen `null` mit
+    -- `null` — die Parität von `cover_url` wäre ein Vakuum. Als PFAD, nicht als
+    -- URL: die Spalte trägt seit AGE-580 einen relativen Pfad im Bucket `covers`.
+    cover_url    = 'b1000000-0000-0000-0000-000000000005/1699999999.webp'
  where id = 'b1000000-0000-0000-0000-000000000005';
 
 insert into public.offers (profile_id, title, category, source) values
@@ -357,8 +361,9 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
     $q$select t.company || '|' || array_to_string(t.offer_categories, ',')
               || '|' || array_to_string(t.need_categories, ',')
+              || '|' || coalesce(t.cover_url, '(null)')
          from public.admin_list_members('blaettern5') t$q$),
-  'Blatt & Partner|kapital|vertrieb',
+  'Blatt & Partner|kapital|vertrieb|b1000000-0000-0000-0000-000000000005/1699999999.webp',
   'Das Vergleichsmitglied trägt wirklich Werte in den Verzeichnisspalten');
 
 select is(

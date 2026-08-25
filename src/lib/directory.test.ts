@@ -18,6 +18,7 @@ function member(overrides: Partial<DirectoryMember>): DirectoryMember {
     id: crypto.randomUUID(),
     name: "Mitglied",
     avatar_url: null,
+    cover_url: null,
     region: null,
     company: null,
     short_bio: null,

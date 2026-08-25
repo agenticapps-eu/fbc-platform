@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { bildUrl } from "../../lib/bild-url";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -10,7 +11,6 @@ import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { cn } from "../../lib/cn";
-import { categoryLabel } from "../../config/matching";
 import { levelLabel } from "../../config/levels";
 import {
   deriveFacets,
@@ -412,13 +412,40 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
   const name = member.name ?? "Mitglied";
   const subtitle = (member.roles ?? []).filter(Boolean).join(" · ");
   const meta = [member.region, member.company].filter(Boolean).join(" · ");
+  // `?? null` und nicht direkt: zwischen Merge und `db push` antwortet die alte
+  // Signatur ohne `cover_url`, und `bildUrl` bekäme `undefined`. Derselbe
+  // Deploy-Fall, an dem AGE-494 die Mitgliederseite schon einmal weiß gemacht hat.
+  const cover = bildUrl("covers", member.cover_url ?? null);
 
   return (
     <Link
       to={to ?? `/p/${member.id}`}
       className="block h-full rounded-[var(--radius-card)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
     >
-      <Card className="flex h-full flex-col gap-4 p-5 transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
+      <Card className="flex h-full flex-col overflow-hidden p-0 transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
+        {/* AGE-595: das Hintergrundbild des Profils, randlos über der Karte.
+            Gebaut wie `EventCover` und aus demselben Grund:
+
+            Das Feld steht IMMER da, auch ohne Bild. Sonst wäre eine Karte mit
+            Cover höher als ihre Nachbarn und das Raster franste bei gemischtem
+            Bestand aus — und gemischt ist es, 55 von 74 Mitgliedern tragen eines.
+
+            `object-contain`, nicht `-cover`: gemessen streuen die Cover im
+            Bucket um einen Median von 2,70:1, nur zwei sind wirklich 3:1. Unter
+            `cover` fiele bei jedem übrigen etwas weg, das jemand hochgeladen
+            hat, weil er es zeigen wollte.
+
+            Der Verlauf liegt VOR dem Bild im Baum: beide sind `absolute` und
+            unter gleichem z-index entscheidet die Reihenfolge. Umgestellt malte
+            er das Bild zu. */}
+        <div data-testid="karten-cover" className="relative aspect-[3/1] overflow-hidden bg-soft">
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-soft to-line" />
+          {cover && (
+            <img src={cover} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col gap-4 p-5">
         {/* AGE-450: Das Tier-Label stand rechts in der Namenszeile und schnitt lange
             Namen ab (Screenshot Detlev). Jetzt unter dem Namen — der bekommt die
             volle Breite und truncatet erst am Kartenrand. */}
@@ -440,46 +467,21 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
           <p className="line-clamp-3 text-sm leading-relaxed text-muted">{member.short_bio}</p>
         )}
 
-        {/* AGE-494: Statt der pauschalen „Bietet"/„Sucht"-Marken die Kategorien
-            selbst — das war der Punkt der RPC-Erweiterung.
-            Zwei Rückfälle, aus zwei verschiedenen Gründen:
-            1. Der Typ verspricht hier ein Array, die alte RPC liefert das Feld gar
-               nicht. Beim Merge geht das Frontend automatisch live, die Migration
-               erreicht Prod nur per manuellem `supabase db push` — dazwischen
-               antwortet die alte Signatur, und ein `.length` auf `undefined`
-               macht die Mitgliederseite weiß. Deshalb `?? []`.
-            2. Eine Zeile ohne `category` setzt `has_offers`, taucht aber in keinem
-               Array auf — dafür bleiben die pauschalen Marken. */}
-        {(() => {
-          const offerCats = member.offer_categories ?? [];
-          const needCats = member.need_categories ?? [];
-          if (
-            !member.branche &&
-            offerCats.length === 0 &&
-            needCats.length === 0 &&
-            !member.has_offers &&
-            !member.has_needs
-          ) {
-            return null;
-          }
-          return (
-            <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-              {member.branche && <Badge variant="neutral">{member.branche}</Badge>}
-              {offerCats.map((c) => (
-                <Badge key={`o-${c}`} variant="soft">
-                  Bietet: {categoryLabel("offer", c)}
-                </Badge>
-              ))}
-              {needCats.map((c) => (
-                <Badge key={`n-${c}`} variant="soft">
-                  Sucht: {categoryLabel("need", c)}
-                </Badge>
-              ))}
-              {member.has_offers && offerCats.length === 0 && <Badge variant="soft">Bietet</Badge>}
-              {member.has_needs && needCats.length === 0 && <Badge variant="soft">Sucht</Badge>}
-            </div>
-          );
-        })()}
+        {/* AGE-595: die vier Kompass-Zweige sind hier weg — beide `map`-Läufe
+            über die Kategorien und beide pauschalen Marken. Übrig bleibt die
+            Branche, die einordnet statt aufzuzählen.
+
+            Das nimmt AGE-494 NUR an dieser Stelle zurück. `offer_categories`
+            und `need_categories` bleiben trotzdem im Rückgabesatz der RPC:
+            eine Änderung an der Darstellung darf keine Datenschicht mitreißen,
+            und ihre Entfernung wäre eine dritte Signaturänderung an derselben
+            Funktion für einen Nutzen, den niemand hat. */}
+        {member.branche && (
+          <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
+            <Badge variant="neutral">{member.branche}</Badge>
+          </div>
+        )}
+        </div>
       </Card>
     </Link>
   );

@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MemberDirectory from "./MemberDirectory";
 import type { DirectoryMember } from "../../lib/directory";
+import { bildUrl } from "../../lib/bild-url";
 
 /**
  * Kompass-Filter über der Mitgliederliste (AGE-494).
@@ -18,6 +19,16 @@ const rpc = vi.fn();
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpc(...args),
+    // `bildUrl` löst den Bucket-Pfad hierüber auf. Ohne diesen Zweig wäre
+    // `supabase.storage` undefined und die Karte stürzte ab — der Mock bildet
+    // die Grenze nach, nicht das Verhalten der Karte.
+    storage: {
+      from: (bucket: string) => ({
+        getPublicUrl: (pfad: string) => ({
+          data: { publicUrl: `https://test.local/storage/v1/object/public/${bucket}/${pfad}` },
+        }),
+      }),
+    },
   },
 }));
 
@@ -26,6 +37,7 @@ function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
     id: crypto.randomUUID(),
     name: "Anna Beispiel",
     avatar_url: null,
+    cover_url: null,
     region: null,
     company: null,
     short_bio: null,
@@ -197,12 +209,40 @@ describe("Kompass-Filter (AGE-494)", () => {
     );
   });
 
-  it("zeigt die Kategorien auf der Karte, nicht nur „Bietet“/„Sucht“", async () => {
+  /* AGE-595 dreht AGE-494 an DIESER Stelle um — und nur hier. Der Grund ist
+     Menge, nicht Richtigkeit: ein gepflegter Kompass trug zehn Marken, die
+     Karte wurde doppelt so hoch wie ihre Nachbarn, und im Raster liest sich
+     das als Unordnung. Filter und Profil behalten die Kategorien. */
+  it("zeigt auf der Karte KEINE Kompass-Marken mehr", async () => {
     renderDirectory();
     erweiterteSucheOeffnen();
 
-    expect(await screen.findByText("Bietet: Kapital")).toBeInTheDocument();
-    expect(screen.getByText("Sucht: Experten")).toBeInTheDocument();
+    const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
+    expect(karte.queryByText("Bietet: Kapital")).not.toBeInTheDocument();
+    expect(karte.queryByText("Sucht: Experten")).not.toBeInTheDocument();
+    expect(karte.queryByText(/^Bietet: /)).not.toBeInTheDocument();
+    expect(karte.queryByText(/^Sucht: /)).not.toBeInTheDocument();
+  });
+
+  /* Die Kategorien sollen NUR aus der Karte verschwinden. Ohne diese Zusage
+     wäre „alle Marken weg" auch von einem Diff erfüllt, der den Filter mit
+     abräumt — und der Filter ist der Ort, an dem sie eine Frage beantworten. */
+  it("… behält sie aber im Filter über der Liste", async () => {
+    renderDirectory();
+    erweiterteSucheOeffnen();
+
+    expect(
+      await screen.findByRole("button", { name: "Kapital & Beteiligungen" }),
+    ).toBeInTheDocument();
+  });
+
+  it("zeigt die Branche weiterhin", async () => {
+    rpc.mockResolvedValue({ data: [member({ branche: "Beratung" })], error: null });
+    renderDirectory();
+    erweiterteSucheOeffnen();
+
+    const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
+    expect(karte.getByText("Beratung")).toBeInTheDocument();
   });
 
   /* AGE-494, Deploy-Fenster: Das Frontend geht bei einem Merge automatisch live,
@@ -220,16 +260,33 @@ describe("Kompass-Filter (AGE-494)", () => {
     erweiterteSucheOeffnen();
 
     expect(await screen.findByText("Anna Beispiel")).toBeInTheDocument();
-    // Auf die Karte einschränken: „Bietet"/„Sucht" stehen auch über den
-    // Filtergruppen, und ein ungenauer Treffer wäre kein Beleg.
+    // Seit AGE-595 trägt die Karte gar keine Marken mehr, also ist die Zusage
+    // nicht mehr „sie fällt auf die pauschale Marke zurück", sondern die
+    // eigentliche: die Seite wird nicht weiß. Das Deploy-Fenster gilt jetzt
+    // zusätzlich für `cover_url` — die alte Signatur liefert das Feld nicht.
     const karte = within(screen.getByRole("link", { name: /Anna Beispiel/ }));
-    expect(karte.getByText("Bietet")).toBeInTheDocument();
-    expect(karte.getByText("Sucht")).toBeInTheDocument();
+    expect(karte.queryByText("Bietet")).not.toBeInTheDocument();
+    expect(karte.queryByText("Sucht")).not.toBeInTheDocument();
+  });
+
+  it("überlebt eine Antwort der alten RPC ohne cover_url", async () => {
+    const alteAntwort = member();
+    delete (alteAntwort as Partial<DirectoryMember>).cover_url;
+    rpc.mockResolvedValue({ data: [alteAntwort], error: null });
+
+    renderDirectory();
+    erweiterteSucheOeffnen();
+
+    const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
+    expect(karte.queryByRole("presentation")).not.toBeInTheDocument();
+    expect(screen.getByText("Anna Beispiel")).toBeInTheDocument();
   });
 
   /* Altbestand: eine offers-Zeile ohne `category` setzt `has_offers`, taucht aber
-     in keinem Array auf. Ohne den Rückfall verlöre die Karte jeden Hinweis. */
-  it("fällt für kategorielose Einträge auf die pauschale Marke zurück", async () => {
+     in keinem Array auf. Bis AGE-595 fiel die Karte dafür auf eine NACKTE Marke
+     „Bietet" zurück. Auch die fällt weg — sie war der Zweig, der auf dem
+     Screenshot als einzelnes, zusammenhangloses Wort stand. */
+  it("erzeugt für kategorielose Einträge auch keine nackte Marke", async () => {
     rpc.mockResolvedValue({
       data: [member({ offer_categories: [], need_categories: [], has_needs: false })],
       error: null,
@@ -237,8 +294,62 @@ describe("Kompass-Filter (AGE-494)", () => {
     renderDirectory();
     erweiterteSucheOeffnen();
 
-    expect(await screen.findByText("Bietet")).toBeInTheDocument();
-    expect(screen.queryByText(/^Bietet: /)).not.toBeInTheDocument();
+    const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
+    expect(karte.queryByText("Bietet")).not.toBeInTheDocument();
+    expect(karte.queryByText(/^Bietet: /)).not.toBeInTheDocument();
+  });
+
+  /* ── Das Cover auf der Karte (AGE-595) ──────────────────────────────────
+     Die Zusagen sind ausdrücklich STRUKTURELL, wie bei `EventCover`: jsdom
+     rechnet kein Layout, also belegt hier NICHTS eine gemessene Höhe. Was sie
+     belegen, ist der Vertrag, aus dem die Höhe folgt — ein 3:1-Feld, das auch
+     ohne Bild im Baum steht, und ein eingepasstes statt beschnittenes Bild.
+     Die Höhe selbst gehört in die Sichtprobe im Browser. */
+  const COVER_PFAD = "b1000000-0000-0000-0000-000000000005/1699999999.webp";
+  const bildfeld = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-testid="karten-cover"]');
+
+  it("zeigt das Cover über den Bild-Auflöser, nicht als rohen Pfad", async () => {
+    rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
+    const { container } = renderDirectory();
+    erweiterteSucheOeffnen();
+    await screen.findByText("Anna Beispiel");
+
+    const img = bildfeld(container)?.querySelector("img");
+    expect(img).not.toBeNull();
+    // Der springende Punkt: `cover_url` trägt seit AGE-580 einen PFAD. Wer ihn
+    // direkt in `src` schreibt, rendert tote Bilder — und ein Fixture mit
+    // `https://…` wäre dabei grün. Deshalb beides: aufgelöst wie der echte
+    // Auflöser es tut, UND nachweislich nicht der rohe Wert.
+    expect(img?.getAttribute("src")).toBe(bildUrl("covers", COVER_PFAD));
+    expect(img?.getAttribute("src")).not.toBe(COVER_PFAD);
+  });
+
+  it("passt das Bild ein, statt es zu beschneiden", async () => {
+    rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
+    const { container } = renderDirectory();
+    erweiterteSucheOeffnen();
+    await screen.findByText("Anna Beispiel");
+
+    const feld = bildfeld(container);
+    expect(feld?.className).toMatch(/aspect-\[3\/1\]/);
+    const img = feld?.querySelector("img");
+    expect(img?.className).toMatch(/object-contain/);
+    expect(img?.className).not.toMatch(/object-cover/);
+  });
+
+  it("behält das Bildfeld auch ohne Cover — sonst franst das Raster aus", async () => {
+    rpc.mockResolvedValue({ data: [member({ cover_url: null })], error: null });
+    const { container } = renderDirectory();
+    erweiterteSucheOeffnen();
+    await screen.findByText("Anna Beispiel");
+
+    const feld = bildfeld(container);
+    // Das Feld steht da, in derselben Bauart — nur ohne Bild darin. Genau das
+    // hält zwei Karten nebeneinander auf gleicher Höhe.
+    expect(feld).not.toBeNull();
+    expect(feld?.className).toMatch(/aspect-\[3\/1\]/);
+    expect(feld?.querySelector("img")).toBeNull();
   });
 });
 

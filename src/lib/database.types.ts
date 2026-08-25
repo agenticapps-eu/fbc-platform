@@ -1623,7 +1623,7 @@ export type Database = {
       // Admin-Mitgliederliste (AGE-566), aus 20260817120000_admin_member_list.sql.
       // Von Hand gepflegt wie der Rest dieses Blocks.
       //
-      // Die ersten vierzehn Rueckgabespalten sind die von `search_directory`, in
+      // Die ersten fuenfzehn Rueckgabespalten sind die von `search_directory`, in
       // deren Reihenfolge — daran haengt die Verzeichnis-Ansicht, die dieselbe
       // Karte speist. Ein pgTAP-Test haelt beide Spaltenlisten UND fuer ein
       // bestaetigtes Mitglied den Zeileninhalt gegeneinander; laeuft eine weg,
@@ -1650,6 +1650,10 @@ export type Database = {
           id: string;
           name: string | null;
           avatar_url: string | null;
+          /** Relativer PFAD im Bucket `covers`, keine fertige URL (AGE-580).
+           *  Die Karte uebersetzt ihn ueber `bildUrl("covers", …)`; wer den Wert
+           *  direkt in `src` schreibt, rendert tote Bilder. */
+          cover_url: string | null;
           region: string | null;
           company: string | null;
           short_bio: string | null;
@@ -1868,6 +1872,10 @@ export type Database = {
           id: string;
           name: string | null;
           avatar_url: string | null;
+          /** Relativer PFAD im Bucket `covers`, keine fertige URL (AGE-580).
+           *  Die Karte uebersetzt ihn ueber `bildUrl("covers", …)`; wer den Wert
+           *  direkt in `src` schreibt, rendert tote Bilder. */
+          cover_url: string | null;
           region: string | null;
           company: string | null;
           short_bio: string | null;
