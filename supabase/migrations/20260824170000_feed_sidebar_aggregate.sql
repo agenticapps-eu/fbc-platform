@@ -68,11 +68,19 @@
 -- (`comments_select_visible`) in dieselbe Funktion, für eine Zahl, die dasselbe
 -- aussagt.
 --
--- OFFEN und bewusst nicht entschieden: gezählt werden ALLE sichtbaren Beiträge,
--- also auch die `kind = 'event'`-Beiträge, die der Trigger dem Gastgeber
--- anlegt. Die Spezifikation sagt „nach Beiträgen" und schweigt dazu. Wer sie
--- ausnehmen will, hängt `and p.kind = 'member'` an — eine Zeile, eine
--- Testanpassung.
+-- ENTSCHIEDEN am 25.08. (Donald): gezählt werden ALLE sichtbaren Beiträge, also
+-- auch die `kind = 'event'`-Beiträge, die der Trigger dem Gastgeber anlegt. Die
+-- Spezifikation sagt „nach Beiträgen" und schwieg dazu; die Frage lag beim Bau
+-- ausdrücklich vor.
+--
+-- *Warum mitzählen:* ein Event-Beitrag steht als Karte IM Feed. Wer ihn dort
+-- sieht, sieht eine Aktivität dieses Mitglieds — die Liste wäre schwerer zu
+-- erklären, wenn sie eine sichtbare Karte nicht mitzählte. Und ein Verein, der
+-- Veranstaltungen ausrichtet, hält das Ausrichten für Aktivität.
+--
+-- *Der Preis:* ein Gastgeber vieler Veranstaltungen steht weiter oben, ohne je
+-- etwas geschrieben zu haben. Wer das drehen will, hängt `and p.kind =
+-- 'member'` an — eine Zeile, eine Testanpassung.
 --
 -- ══ EXPLAIN, GEMESSEN — UND DIE ENTSCHEIDUNG GEGEN EINEN NEUEN INDEX ═══════
 -- Lokal, 20 000 Beiträge, 30 aktive Tags, 20 Autoren, als bestätigtes Mitglied

@@ -327,6 +327,11 @@
       **(c)** die vom Design verworfene `unnest`-Fassung eingesetzt → das
       stillgelegte **und** das freie Schlagwort erscheinen
 - [x] 4.12 Gesamtlauf nach Abschnitt 4: **9 pgTAP-Dateien, 671 Zusagen, PASS**
+- [x] 4.13 **Offene Frage entschieden** (Donald, 25.08.): Event-Beiträge zählen
+      für „Aktivste Mitglieder" **mit**. Ein Event-Beitrag steht als Karte im
+      Feed; eine Liste, die eine sichtbare Karte nicht mitzählte, wäre schwerer
+      zu erklären. Keine Codeänderung — das ist das gebaute Verhalten; die
+      Begründung steht jetzt im Kopf der Migration statt als offene Frage
 
 ## 5. Datenschicht des Feeds
 
