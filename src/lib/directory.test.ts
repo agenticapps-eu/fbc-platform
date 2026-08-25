@@ -6,6 +6,8 @@ import {
   emptyDirectoryFilters,
   filtersToArgs,
   hasActiveFilters,
+  contactsKeyPrefix,
+  contactsQueryKey,
   headerSearchKeyPrefix,
   headerSearchQueryKey,
   NEED_CATEGORY_OPTIONS,
@@ -18,6 +20,7 @@ function member(overrides: Partial<DirectoryMember>): DirectoryMember {
     id: crypto.randomUUID(),
     name: "Mitglied",
     avatar_url: null,
+    cover_url: null,
     region: null,
     company: null,
     short_bio: null,
@@ -181,6 +184,24 @@ describe("headerSearchQueryKey (AGE-540)", () => {
   it("liegt unter dem Präfix, das beim Abmelden entfernt wird", () => {
     const kopf = headerSearchQueryKey("konto-a", "anna") as readonly unknown[];
     expect(kopf.slice(0, headerSearchKeyPrefix.length)).toEqual([...headerSearchKeyPrefix]);
+  });
+});
+
+describe("contactsQueryKey (AGE-595)", () => {
+  /* Diese Zusage steht hier und nicht in der Flaechen-Datei, und der Grund ist
+     eine Mutations-Gegenprobe: nimmt man die Kennung aus dem Schluessel, bleibt
+     die Zusage „Konto B sieht die Kontakte von A nicht" GRUEN — weil das
+     `removeQueries` beim Identitaetswechsel den Fehler verdeckt.
+
+     Die Anforderung verlangt aber beides, und zwei Vorkehrungen, von denen nur
+     eine geprueft ist, sind eine geprueft. Hier faellt die Verdeckung weg. */
+  it("trennt zwei Konten voneinander", () => {
+    expect(contactsQueryKey("konto-a")).not.toEqual(contactsQueryKey("konto-b"));
+  });
+
+  it("liegt unter dem Praefix, das beim Identitaetswechsel entfernt wird", () => {
+    const schluessel = contactsQueryKey("konto-a") as readonly unknown[];
+    expect(schluessel.slice(0, contactsKeyPrefix.length)).toEqual([...contactsKeyPrefix]);
   });
 });
 

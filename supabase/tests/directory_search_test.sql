@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(19);
+select plan(23);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -41,6 +41,15 @@ update public.profiles set tier = 'impact', name = 'Dora', is_public = true
 -- Egon steht unter `discover` (rank 3) — er ist der Sichtbarkeits-Gegenbeweis.
 update public.profiles set tier = 'basic', name = 'Egon', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000005';
+
+-- Cover als PFAD, nicht als URL (AGE-595). Seit AGE-580 steht in `cover_url` ein
+-- relativer Pfad im Bucket `covers`; gerendert wird über `bildUrl("covers", …)`.
+-- Ein Fixture mit `https://…` wäre grün, während in Produktion tote Bilder
+-- erscheinen — es prüfte dann die Spalte, nicht den Vertrag. Bea bekommt
+-- bewusst KEINES: ohne die Gegenprobe wäre „liefert den Wert durch" auch von
+-- einer Funktion erfüllt, die stumpf denselben Pfad für jeden zurückgibt.
+update public.profiles set cover_url = 'd1000000-0000-0000-0000-000000000001/1699999999.webp'
+  where id = 'd1000000-0000-0000-0000-000000000001';
 
 -- Aktivierungs-Gate (AGE-495). Die Fixtures entstehen NACH dem Backfill aus
 -- 20260806080000 und sind deshalb unbestätigt; `search_directory` ist SECURITY
@@ -278,6 +287,50 @@ select is(
   $q$),
   '(leer)',
   'reine Sonderzeichen ergeben eine leere Treffermenge statt eines Fehlers');
+
+-- ── 9. Das Cover steht im Rückgabesatz (AGE-595) ───────────────────────────
+-- Die Karte im Verzeichnis soll das Hintergrundbild zeigen, ohne eine zweite
+-- Abfrage je Mitglied. Der Wert wird WÖRTLICH durchgereicht — die Übersetzung in
+-- eine darstellbare Adresse ist Sache des Clients, und eine Funktion, die hier
+-- eine URL bastelte, verteilte die Bucket-Kenntnis auf zwei Schichten.
+select is(
+  pg_temp.dir($q$
+    select coalesce(string_agg(name || '=' || coalesce(cover_url, '(null)'), ',' order by name), '(leer)')
+      from public.search_directory() where name in ('Anna', 'Bea')
+  $q$),
+  'Anna=d1000000-0000-0000-0000-000000000001/1699999999.webp,Bea=(null)',
+  'cover_url kommt als gespeicherter Pfad zurück — gesetzt bei Anna, null bei Bea');
+
+-- Ein Mitglied ohne Cover darf den Aufruf nicht zerlegen. Das ist nicht dieselbe
+-- Zusage wie oben: dort steht `cover_url` in einer Aggregation über zwei Zeilen,
+-- hier wird die Zeile allein gelesen.
+select is(
+  pg_temp.dir($q$
+    select coalesce((select cover_url from public.search_directory() where name = 'Bea'), '(null)')
+  $q$),
+  '(null)',
+  'ein Mitglied ohne Cover liefert null statt eines Fehlers');
+
+-- Die Gegenprobe zu Abschnitt 7: `revoke ... from public` allein wäre grün dort
+-- und nähme der Anwendung den Zugriff. Beide Richtungen gehören geprüft, sonst
+-- ist ein vergessenes `grant` erst zur Laufzeit sichtbar.
+select is(
+  pg_temp.try_as_role('authenticated', $q$
+    select 1 from public.search_directory()
+  $q$),
+  'OK',
+  'authenticated behält das Ausführungsrecht an der neuen Signatur');
+
+-- Der Kommentar ist kein Beiwerk: ein `drop function` nimmt ihn mit, und die
+-- Vorgaengerfassung kam mit `create or replace` aus, wo er ueberlebte. Ohne
+-- diese Zusage verschwindet der Grund einer Funktion beim naechsten Drop, ohne
+-- dass irgendetwas rot wird.
+select isnt(
+  obj_description(
+    'public.search_directory(text,text,text,text,text,text,text[],text[])'::regprocedure,
+    'pg_proc'),
+  null,
+  'search_directory traegt nach dem drop/create wieder einen Kommentar');
 
 select * from finish();
 rollback;

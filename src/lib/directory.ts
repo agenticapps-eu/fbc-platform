@@ -193,6 +193,52 @@ export async function fetchDirectoryBaseline(): Promise<DirectoryMember[]> {
   return data ?? [];
 }
 
+// ── Die eigenen Kontakte (AGE-595) ──────────────────────────────────────────
+
+/** Präfix aller Kontakt-Schlüssel — zum Entfernen beim Identitätswechsel. */
+export const contactsKeyPrefix = ["directory", "contacts"] as const;
+
+/**
+ * Der Schlüssel trägt die Kennung des Betrachters.
+ *
+ * Dieselbe Regel wie bei `headerSearchQueryKey`, und aus demselben Grund: der
+ * `QueryClient` überlebt einen Kontowechsel im selben Browser. Ein Schlüssel
+ * ohne Kennung gäbe Konto B die Kontaktmenge von Konto A — und anders als bei
+ * einer Trefferliste wäre das nicht bloß ein veralteter Ausschnitt, sondern die
+ * Aussage „mit diesen Menschen bist du verbunden" über fremde Beziehungen.
+ */
+export const contactsQueryKey = (uid: string) => [...contactsKeyPrefix, uid] as const;
+
+/**
+ * Die Kennungen der Mitglieder, mit denen eine ANGENOMMENE Kontaktanfrage besteht.
+ *
+ * Beide Richtungen: wer angefragt hat, ist für „sind wir verbunden" ohne Belang.
+ * Die Spalten heißen `from_id`/`to_id` — ein früherer Entwurf hat
+ * `requester_id`/`recipient_id` erfunden, und die Abfrage wäre zur Laufzeit
+ * gescheitert. Dieselbe Nebenbedingung stellt `dashboard.ts` für seinen Zähler.
+ *
+ * KEIN Paging, und das ist eine bewusste Entscheidung mit einer benannten
+ * Schwelle: `search_directory` liefert selbst alle Zeilen ohne Grenze, also ist
+ * der Schnitt der beiden Mengen im Client vollständig. Sobald das Verzeichnis
+ * pagiert — und das sollte es —, ist dieser Weg falsch, weil er nur die geladene
+ * Seite sähe; dann gehört der Filter als Parameter an die RPC. Die Schwelle ist
+ * das Paging, nicht eine Mitgliederzahl.
+ *
+ * Ein Fehler wird GEWORFEN und nicht zu einer leeren Menge geglättet: „die
+ * Abfrage ist gescheitert" und „du hast keine Kontakte" sind zwei verschiedene
+ * Auskünfte, und die zweite an der Stelle der ersten ist genau der stille
+ * Fehlschlag, gegen den AGE-591/593 gebaut wurden.
+ */
+export async function fetchContactIds(uid: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("contact_requests")
+    .select("from_id, to_id")
+    .eq("status", "accepted")
+    .or(`from_id.eq.${uid},to_id.eq.${uid}`);
+  if (error) throw error;
+  return (data ?? []).map((r) => (r.from_id === uid ? r.to_id : r.from_id));
+}
+
 // ── Kopfzeilen-Suche (AGE-540) ──────────────────────────────────────────────
 
 /** Höchstzahl der Treffer im Dropdown der Kopfzeile. */

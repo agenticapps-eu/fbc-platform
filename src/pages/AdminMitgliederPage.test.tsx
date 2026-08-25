@@ -5,6 +5,7 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-d
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
 import type { AdminMember } from "../lib/admin-members";
+import { bildUrl } from "../lib/bild-url";
 
 /**
  * Die Admin-Mitgliederliste (AGE-566).
@@ -30,6 +31,17 @@ vi.mock("../lib/supabase", () => ({
     rpc: (...args: unknown[]) =>
       args[0] === "admin_member_counts" ? countsRpc(...args) : rpc(...args),
     functions: { invoke: (...args: unknown[]) => invoke(...args) },
+    // AGE-595: die Verzeichniskarte löst `cover_url` über den Storage-Client
+    // auf. Ohne diesen Zweig war die Datei nur deshalb grün, weil ihr Fixture
+    // `cover_url: null` trug und `bildUrl` vorzeitig aussteigt — die Zusage
+    // darunter hätte eine kaputte Admin-Ansicht nicht bemerkt.
+    storage: {
+      from: (bucket: string) => ({
+        getPublicUrl: (pfad: string) => ({
+          data: { publicUrl: `https://test.local/storage/v1/object/public/${bucket}/${pfad}` },
+        }),
+      }),
+    },
   },
 }));
 
@@ -40,6 +52,7 @@ function member(overrides: Partial<AdminMember> = {}): AdminMember {
     id: crypto.randomUUID(),
     name: "Anna Beispiel",
     avatar_url: null,
+    cover_url: null,
     region: null,
     company: null,
     short_bio: null,
@@ -1509,5 +1522,80 @@ describe("Zähler an den Reitern (AGE-587)", () => {
       expect(rpc).toHaveBeenCalledWith("admin_activate_member", { target: OFFEN.id }),
     );
     await waitFor(() => expect(countCalls()).toBeGreaterThan(vorher));
+  });
+});
+
+/**
+ * AGE-595, Gegenprobe zu Aufgabe 2.7.
+ *
+ * Die Admin-Ansicht speist DIESELBE `MemberCard` wie `/mitglieder`, übergibt ihr
+ * aber `AdminMember` statt `DirectoryMember`. Das ist der Grund, aus dem
+ * `cover_url` in BEIDE RPCs musste: die Spalte fehlte hier sonst im Typ, und die
+ * Seite bräche beim Übersetzen.
+ *
+ * Die Zusage setzt ausdrücklich EIN COVER. Mit `cover_url: null` — dem Wert des
+ * Standard-Fixtures — steigt `bildUrl` in der ersten Zeile aus und der
+ * Storage-Weg wird nie betreten; die Datei war bis hierher grün, ohne ihn je
+ * geprüft zu haben.
+ */
+describe("Die Verzeichniskarte in der Admin-Ansicht (AGE-595)", () => {
+  const PFAD = "b1000000-0000-0000-0000-000000000009/1699999999.webp";
+
+  /* Die Seite startet auf „Tabelle"; die Verzeichniskarte steht nur unter
+     „Verzeichnis". Ohne diesen Klick prüften die Zusagen darunter eine Ansicht,
+     in der die Karte gar nicht vorkommt — und wären grün gewesen, wenn ich sie
+     auf „nicht vorhanden" formuliert hätte. */
+  const verzeichnisAnsicht = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Verzeichnis" }));
+
+  it("zeigt das Cover eines Mitglieds über den Bild-Auflöser", async () => {
+    rpc.mockResolvedValue({
+      data: [member({ name: "Cover Traegerin", cover_url: PFAD })],
+      error: null,
+    });
+    const { container } = renderPage();
+    await screen.findByText("Cover Traegerin");
+    verzeichnisAnsicht();
+
+    const img = container
+      .querySelector<HTMLElement>('[data-testid="karten-cover"]')
+      ?.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(bildUrl("covers", PFAD));
+    expect(img?.getAttribute("src")).not.toBe(PFAD);
+  });
+
+  it("behält das Bildfeld auch für ein Mitglied ohne Cover", async () => {
+    rpc.mockResolvedValue({
+      data: [member({ name: "Ohne Cover", cover_url: null })],
+      error: null,
+    });
+    const { container } = renderPage();
+    await screen.findByText("Ohne Cover");
+    verzeichnisAnsicht();
+
+    const feld = container.querySelector<HTMLElement>('[data-testid="karten-cover"]');
+    expect(feld).not.toBeNull();
+    expect(feld?.querySelector("img")).toBeNull();
+  });
+
+  it("zeigt auch hier keine Kompass-Marken mehr", async () => {
+    rpc.mockResolvedValue({
+      data: [
+        member({
+          name: "Mit Kategorien",
+          offer_categories: ["kapital"],
+          need_categories: ["experten"],
+          has_offers: true,
+          has_needs: true,
+        }),
+      ],
+      error: null,
+    });
+    renderPage();
+    await screen.findByText("Mit Kategorien");
+    verzeichnisAnsicht();
+
+    expect(screen.queryByText(/^Bietet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Sucht/)).not.toBeInTheDocument();
   });
 });
