@@ -28,7 +28,11 @@ export function fakeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
     activationLookupFailed: false,
     activationName: null,
     activationMailStatus: null,
-    signUp: async () => ({ error: null }),
+    // Vorgabe „mit Sitzung" (AGE-591): Der Erfolgsfall ist, was die meisten
+    // Tests meinen, wenn sie `signUp` überhaupt anfassen. Wer den stummen
+    // dritten Ausgang prüft — kein Fehler, keine Sitzung —, setzt
+    // `hatSession: false` ausdrücklich.
+    signUp: async () => ({ error: null, hatSession: true }),
     signIn: async () => ({ error: null }),
     signOut: async () => {},
     updatePassword: async () => ({ error: null }),

@@ -9,6 +9,7 @@ import { TierBadge } from "../components/ui/TierBadge";
 import { useToast } from "../components/ui/toast-context";
 import { EventForm } from "../components/events/EventForm";
 import { useAuth } from "../providers/auth-context";
+import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { EventCard } from "../components/events/EventCard";
 import { EventCover } from "../components/events/EventCover";
 import { useEventCovers } from "../components/events/useEventCovers";
@@ -524,11 +525,40 @@ function DescriptionCard({ event }: { event: EventListItem }) {
   );
 }
 
+/**
+ * Darf dieses Mitglied sich zu diesem Event anmelden (AGE-594)?
+ *
+ * Spiegelt `register_for_event` (Migration 20260722070000) — und zwar nur die
+ * Stufenschwelle: `public` steht jedem eingeloggten, aktivierten Mitglied offen,
+ * `members` verlangt `discover` (rank 3) ODER den Host.
+ *
+ * DIE HÜRDE BLEIBT DIE FUNKTION, nicht diese Zeile. Was hier passiert, ist
+ * ausschließlich, dem Mitglied VOR dem Klick zu sagen, was es sonst erst danach
+ * erfährt — und dann als rohen englischen Datenbanktext („membership level too
+ * low to register"). Ein Knopf, der etwas verspricht, das die Stufe nicht
+ * hergibt, ist derselbe Fehler wie eine Fläche, die schweigt, nur andersherum.
+ *
+ * `null` heißt „Stufe noch nicht geladen": Dann wird NICHT gesperrt. Ein
+ * Ladezustand darf niemanden aussperren, und die Funktion hält ohnehin.
+ */
+function darfSichAnmelden(
+  event: EventListItem,
+  uid: string | null,
+  levelRank: number | null,
+): boolean {
+  if (event.visibility === "public") return true;
+  if (event.host?.kind === "profile" && event.host.id === uid) return true;
+  if (levelRank === null) return true;
+  return levelRank >= LEVEL_RANK.discover;
+}
+
 function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string | null }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { levelRank } = useAuth();
   const full = isFull(event.capacity, event.registeredCount);
   const past = isPastEvent(event.startsAt, new Date());
+  const zugelassen = darfSichAnmelden(event, uid, levelRank);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: eventDetailKey(uid, event.id) });
@@ -596,9 +626,21 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
           Abmelden
         </Button>
       ) : (
-        <Button size="sm" disabled={busy} onClick={() => register.mutate()}>
-          {full ? "Auf Warteliste" : "Anmelden"}
-        </Button>
+        <>
+          <Button size="sm" disabled={busy || !zugelassen} onClick={() => register.mutate()}>
+            {full ? "Auf Warteliste" : "Anmelden"}
+          </Button>
+          {/* Der Grund steht DANEBEN, nicht statt des Knopfes: Ein grauer Knopf
+              ohne Erklärung ist seinerseits eine Fläche, die nichts sagt. */}
+          {!zugelassen && (
+            <p className="text-sm text-muted">
+              Dieses Event ist Mitgliedern ab Stufe „{LEVELS.discover.label}" vorbehalten.{" "}
+              <Link to="/mitgliedschaft" className="text-accent-strong hover:underline">
+                Mitgliedschaft ansehen
+              </Link>
+            </p>
+          )}
+        </>
       )}
     </div>
   );

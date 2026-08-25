@@ -1,7 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/cn";
 import { navItems, type NavSection } from "../config/nav";
+import {
+  ANFRAGEN_STALE_TIME_MS,
+  fetchIncomingRequests,
+  incomingRequestsQueryKey,
+} from "../lib/contact-requests";
 import { useAuth } from "../providers/auth-context";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
@@ -9,7 +15,7 @@ import { FeedbackButton } from "./feedback/FeedbackButton";
 import HeaderSearch from "./search/HeaderSearch";
 import { RouteTransition } from "./ui/Motion";
 import { Logo } from "./ui/Logo";
-import { SidebarNav } from "./ui/SidebarNav";
+import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { useOverlay } from "./ui/useOverlay";
 import { Icon } from "./ui/icons";
@@ -171,6 +177,56 @@ const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
   // rendert die Sidebar eine Überschrift ohne einen einzigen Eintrag darunter.
 ];
 
+/**
+ * Der Navigationseintrag für offene eingehende Kontaktanfragen, oder `null`
+ * (AGE-592).
+ *
+ * Liest die Anfragen unter DEMSELBEN `queryKey` wie `MeineAnfragenWidget`.
+ * React Query teilt den Eintrag, es entsteht eine Ladung statt zweier, und die
+ * Zahl im Menü kann nicht von der Liste auf `/kontakte` abweichen. Eine schlanke
+ * `count`-RPC wäre die zweite Wahrheit über denselben Bestand gewesen — genau
+ * das Muster, das hier schon einmal dazu führte, dass eine Zahl und eine Liste
+ * verschiedene Dinge behaupteten.
+ *
+ * DREI Ausgänge, nicht zwei:
+ *  - offene Anfragen  → Eintrag mit ihrer Anzahl,
+ *  - Abruf gescheitert → Eintrag OHNE Zahl, als unbekannt gekennzeichnet,
+ *  - nichts offen / ausgeloggt / lädt → kein Eintrag.
+ *
+ * Der mittlere ist der Grund, warum es diesen Kommentar gibt. Verschwände der
+ * Eintrag bei einem gescheiterten Abruf, wäre „Abruf kaputt" von „nichts da"
+ * nicht zu unterscheiden — der Weg zu einer wartenden Anfrage wäre selbst der
+ * stille Fehlschlag, gegen den dieser ganze Change gebaut ist. Also fail LOUD,
+ * und in die sichere Richtung: Ein Eintrag zu viel kostet eine Zeile im Menü,
+ * ein Eintrag zu wenig kostet die Anfrage.
+ */
+function useOffeneAnfragen(uid: string | null): SidebarNavSection["items"][number] | null {
+  const { data, isError } = useQuery({
+    // Der leere Schlüssel wird nie abgefragt (`enabled` unten) — er existiert
+    // nur, weil useQuery einen braucht, bevor die Kennung feststeht.
+    queryKey: incomingRequestsQueryKey(uid ?? ""),
+    queryFn: () => fetchIncomingRequests(uid as string),
+    enabled: !!uid,
+    staleTime: ANFRAGEN_STALE_TIME_MS,
+  });
+
+  if (!uid) return null;
+  if (isError) {
+    return {
+      path: "/kontakte",
+      label: "Meine Anfragen",
+      abzeichen: { text: "!", label: "konnte nicht geladen werden" },
+    };
+  }
+  const offene = data?.length ?? 0;
+  if (offene === 0) return null;
+  return {
+    path: "/kontakte",
+    label: "Meine Anfragen",
+    abzeichen: { text: String(offene), label: `${offene} offen` },
+  };
+}
+
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
  *  Reine Navigation: die Abschnitte aus `navItems`, für Admins ein eigener dazu. */
 function SidebarContent({
@@ -181,18 +237,36 @@ function SidebarContent({
   collapsed?: boolean;
 }) {
   const { user, staffRole } = useAuth();
+  const anfragen = useOffeneAnfragen(user?.id ?? null);
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
   // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
   // ohne Konto wäre ein Versprechen ins Leere.
-  const sections: { title: string; items: { path: string; label: string }[] }[] =
-    SIDEBAR_SECTIONS.filter(({ section }) => user || section === "entdecken").map(
-      ({ section, title }) => ({
-        title,
-        items: navItems
-          .filter((i) => i.section === section)
-          .map((i) => ({ path: i.path, label: i.label })),
-      }),
-    );
+  const sections: SidebarNavSection[] = SIDEBAR_SECTIONS.filter(
+    ({ section }) => user || section === "entdecken",
+  ).map(({ section, title }) => ({
+    title,
+    items: navItems
+      .filter((i) => i.section === section)
+      .map((i) => ({ path: i.path, label: i.label })),
+  }));
+  // AGE-592: Der Weg zu einer offenen eingehenden Anfrage. Er hängt an einem
+  // VORGANG, nicht an einem Ort — deshalb steht er nicht in `navItems`, sondern
+  // wird hier angehängt, solange es etwas zu entscheiden gibt. `/kontakte`
+  // bleibt `section: "sub"`; die Route ändert sich nicht.
+  //
+  // Warum bedingt und nicht dauerhaft: Ein ständiger Eintrag wäre genau der
+  // Kontakte-Menüpunkt, den AGE-494 entfernt hat („Kontakte erreicht man über
+  // das Profil und den Chat"). Für einen bestehenden KONTAKT stimmt das; für
+  // eine noch OFFENE Anfrage nicht — der Chat wird erst nach der Annahme
+  // freigeschaltet, und die Profilseite des Absenders hilft nur, wenn man sie
+  // gezielt aufruft, also schon von der Anfrage weiß. Genau diesen Fall traf
+  // AGE-494 nicht, und nur für ihn kommt der Eintrag.
+  if (anfragen) {
+    const meinBereich = sections.find((s) => s.title === "Mein Bereich");
+    // Vor „Einstellungen", damit die Kontoverwaltung den Abschnitt beschließt.
+    const vor = meinBereich?.items.findIndex((i) => i.path === "/einstellungen") ?? -1;
+    meinBereich?.items.splice(vor < 0 ? meinBereich.items.length : vor, 0, anfragen);
+  }
   // Admin-Bereich: eigener, nur für `admin` sichtbarer Abschnitt (AGE-455). Bewusst
   // KEIN navItem — /admin wird in App.tsx über RequireAdmin geroutet, nicht über die
   // navItems-Schleife.

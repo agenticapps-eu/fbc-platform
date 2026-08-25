@@ -239,7 +239,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: neuesZufallspasswort(),
           options: { data: { full_name: fullName } },
         });
-        if (!error) {
+        // GEGEN DIE SITZUNG, nicht gegen den ausbleibenden Fehler (AGE-591).
+        // GoTrue beantwortet eine Registrierung auf eine bereits bekannte
+        // Adresse mit 200, ohne Fehler und OHNE Sitzung — sein Schutz gegen das
+        // Aufzählen vorhandener Adressen. `!error` allein hielt das für Erfolg,
+        // und beide Nebenwirkungen darunter liefen dann ins Leere: Der Versand
+        // ist sitzungsgebunden und scheiterte mit `42501` (die Zeile aus den
+        // PROD-Logs vom 25.08.), die Zählung addierte eine Registrierung, die
+        // nie stattfand. Der zurückgegebene `user` hilft nicht — er ist
+        // verschleiert und gehört dem Aufrufer nicht.
+        const hatSession = !!data.session;
+        if (!error && hatSession) {
           logEvent("signup");
           // AGE-526: Der Bestätigungslink geht hier raus, nicht erst auf Knopf-
           // druck. Ein selbst registriertes Konto trägt keinen
@@ -248,9 +258,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Registrierung war eine Sackgasse, die wie ein Erfolg aussah (Demo
           // vom 2026-08-10).
           //
-          // Die Sitzung besteht an dieser Stelle bereits, weil die eingebaute
-          // E-Mail-Bestätigung ausgeschaltet ist (AGE-445) — nur deshalb trägt
-          // der sitzungsgebundene Weg schon direkt nach der Registrierung.
+          // Die Sitzung besteht an dieser Stelle bereits — jetzt geprüft statt
+          // angenommen. Dass sie im Normalfall da ist, liegt daran, dass die
+          // eingebaute E-Mail-Bestätigung ausgeschaltet ist (AGE-445); nur
+          // deshalb trägt der sitzungsgebundene Weg direkt nach der
+          // Registrierung. Dieser Satz stand hier schon vorher und wurde als
+          // Invariante gelesen, obwohl er nur den Normalfall beschrieb.
           //
           // Der Fehlschlag wird gefangen und NICHT weitergereicht: Konto und
           // Sitzung stehen schon. Wer hier einen Fehler meldete, schickte den
@@ -263,7 +276,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const status = await resendActivationLink().catch(() => "error" as const);
           setMailStatus({ userId: data.user?.id ?? null, status });
         }
-        return { error };
+        // `hatSession` statt der Sitzung selbst: Der Aufrufer braucht die
+        // Antwort auf „gibt es eine Sitzung?", nicht das Objekt. Ein
+        // Sitzungsobjekt in der Seite wäre eine zweite Quelle neben dem
+        // Auth-Zuhörer.
+        return { error, hatSession };
       },
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });

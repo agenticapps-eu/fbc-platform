@@ -68,6 +68,23 @@ export const incomingRequestsQueryKey = (uid: string) =>
   ["contact-requests", "incoming", uid] as const;
 
 /**
+ * Wie lange die geladenen Anfragen als frisch gelten (AGE-592).
+ *
+ * Ausgesprochen und geteilt, weil sich seit AGE-592 ZWEI Flächen aus derselben
+ * Abfrage speisen: das Widget „Meine Anfragen" und der Navigationseintrag samt
+ * Abzeichen. Der Eintrag hängt in der Seitenleiste und ist damit auf JEDER Seite
+ * montiert — mit der Vorgabe von React Query v5 (`staleTime: 0`) ist jeder Wert
+ * sofort veraltet, und Mounten, Fensterfokus und Reconnect holen neu. Das ist
+ * für eine eingehende Kontaktanfrage sinnlos oft; sie ist kein Sekundengeschäft.
+ *
+ * Dass beide denselben `queryKey` benutzen, macht daraus EINE Ladung — aber
+ * nicht eine Anfrage: `fetchIncomingRequests` setzt bei vorhandenen Zeilen zwei
+ * Supabase-Anfragen ab (Anfragen, dann Profile). Der Plan-Review hatte die
+ * ursprüngliche Behauptung „ein Schlüssel heißt eine Anfrage" zu Recht zerlegt.
+ */
+export const ANFRAGEN_STALE_TIME_MS = 30_000;
+
+/**
  * Lädt die offenen eingehenden Anfragen (`to_id = uid`, `status = 'pending'`) und
  * reichert den Absender über `profiles_public` an. RLS `cr_select_participants`
  * gibt nur Zeilen mit eigener Beteiligung frei.

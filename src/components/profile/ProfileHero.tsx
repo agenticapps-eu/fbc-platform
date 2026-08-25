@@ -40,8 +40,13 @@ export interface ProfileHeroProps {
  * Größen-/Mobile-Probleme. Das Mockup verlangt die Überlappung, und sie ist
  * hier auf den negativen Rand am Avatar-Block beschränkt: der Banner behält
  * seine Höhe, der Textblock bleibt im Fluss, und auf schmalen Schirmen
- * überlappt weniger (-mt-10 statt -mt-14). Der alte Kommentar ist ersetzt und
+ * überlappt weniger (-mt-12 statt -mt-16). Der alte Kommentar ist ersetzt und
  * nicht stehen gelassen — er beschriebe sonst Code, den es nicht mehr gibt.
+ *
+ * NACHTRAG 25.08.: Die Überlappung gab es bis dahin nur auf dem Papier. Siehe
+ * die Begründung an `sm:items-start` weiter unten — gemessen ragte der Avatar
+ * 12 px von 112 in den Banner, und auch das nur als Nebenprodukt der
+ * Textblockhöhe.
  */
 export function ProfileHero({
   name,
@@ -91,7 +96,18 @@ export function ProfileHero({
           Body: so überlappt nur das Bild, und Name/Rollen bleiben im Fluss. */}
       <div className="px-6 pb-6 sm:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
+          {/* `sm:items-start`, NICHT `items-end` (Befund vom 25.08., gemessen).
+              Mit `items-end` richtet Flexbox die Unterkanten aus, und ein
+              `margin-top` verschiebt die Marginbox-UNTERKANTE nicht — der
+              negative Rand am Avatar war damit wirkungslos. Die Überlappung, die
+              trotzdem entstand, war ein Nebenprodukt: Der Avatar ist höher als
+              der Textblock und ragte um genau diese Differenz heraus, gemessen
+              12 px von 112 (10 %). Sie hing also an der Zeilenzahl des Textes —
+              ein Mitglied mit Rollenzeile hätte gar keine gehabt.
+
+              Oben ausgerichtet greift der negative Rand wie beabsichtigt, und
+              die Überlappung ist ein fester Wert statt eines Zufalls. */}
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
             {/* `relative z-10` ist NICHT Kosmetik, sondern trägt die Überlappung.
                 Der Banner oben ist `relative`, also POSITIONIERT — und
                 positionierte Elemente werden über statischem Inhalt gemalt,
@@ -104,22 +120,24 @@ export function ProfileHero({
             <Avatar
               name={name}
               src={avatarUrl}
-              className="relative z-10 -mt-10 h-24 w-24 shrink-0 text-2xl ring-4 ring-canvas sm:-mt-14 sm:h-28 sm:w-28"
+              className="relative z-10 -mt-12 h-24 w-24 shrink-0 text-2xl ring-4 ring-canvas sm:-mt-16 sm:h-28 sm:w-28"
             />
-            {/* pb bringt den Textblock auf die Grundlinie des überlappenden
-                Avatars — ohne ihn steht der Name am oberen Bildrand. */}
-            <div className="min-w-0 pb-1">
+            {/* `pt` setzt den Textblock knapp unter die Bannerkante, also neben
+                die untere Hälfte des Avatars. Vorher stand hier `pb-1` für die
+                Ausrichtung an der Grundlinie — die gibt es mit `items-start`
+                nicht mehr. */}
+            <div className="min-w-0 pt-2 sm:pt-3">
               {tier && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-strong uppercase">
                   <Icon name="crown" className="h-3.5 w-3.5" />
                   {levelLabel(tier)} Member
                 </span>
               )}
-              <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink">
+              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
                 {name}
               </h1>
               {roles.length > 0 ? (
-                <ul className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-sm text-accent-strong">
+                <ul className="mt-2.5 flex flex-wrap gap-x-2 gap-y-1 text-sm text-accent-strong">
                   {roles.map((role, i) => (
                     <li key={role} className="flex items-center gap-2">
                       {i > 0 && <span className="text-muted">·</span>}
@@ -128,9 +146,9 @@ export function ProfileHero({
                   ))}
                 </ul>
               ) : (
-                headline && <p className="mt-1.5 text-sm text-accent-strong">{headline}</p>
+                headline && <p className="mt-2.5 text-sm text-accent-strong">{headline}</p>
               )}
-              {meta && <p className="mt-1.5 text-sm text-muted">{meta}</p>}
+              {meta && <p className="mt-2 text-sm text-muted">{meta}</p>}
             </div>
           </div>
           {action && <div className="shrink-0">{action}</div>}

@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { AuthError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
@@ -27,11 +28,72 @@ type FormValues = z.infer<typeof schema>;
 
 type Mode = "login" | "register";
 
+/**
+ * Sagt der Anmeldedienst „diese Adresse gibt es schon"?
+ *
+ * Am `code` festgemacht und nicht am Text: Der Text ist englisch, kommt vom
+ * Server und kann sich mit jeder Version ändern — eine Prüfung darauf wäre
+ * genau die Art Zusage, die still ausfällt. `AuthError.code` ist seit
+ * auth-js 2.x typisiert (`ErrorCode`) und für diesen Fall
+ * `user_already_exists`.
+ */
+function istBereitsRegistriert(error: AuthError): boolean {
+  return error.code === "user_already_exists";
+}
+
+/**
+ * Der Hinweis für den dritten Ausgang der Registrierung (AGE-591).
+ *
+ * Er nennt KEINEN Grund. Nicht aus Zurückhaltung, sondern weil die Seite ihn
+ * nicht kennt: GoTrue antwortet auf eine Registrierung mit einer bereits
+ * bekannten Adresse mit 200 ohne Fehler und ohne Sitzung, und dieser
+ * Aufzählungsschutz ist richtig so — die Oberfläche fragt nicht nach dem Grund
+ * und behauptet keinen.
+ *
+ * Der erste Weg ist der ZUGANGSLINK und nicht „Passwort zurücksetzen". Wer hier
+ * landet, ist ganz überwiegend ein importiertes, noch nicht aktiviertes Mitglied,
+ * das den naheliegenden Knopf „Registrieren" statt „Aktivieren" gedrückt hat —
+ * 70 von 73 Konten. Ein Passwort, das sich zurücksetzen ließe, hat es gar nicht.
+ * `/aktivierung` zeigt ohne Token genau das richtige Formular.
+ */
+function RegistrierungOhneSitzung({ onZumLogin }: { onZumLogin: () => void }) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft p-4"
+    >
+      <p className="text-sm font-medium text-ink">Wir konnten dich nicht direkt anmelden.</p>
+      <p className="text-sm text-muted">
+        Wenn du schon Mitglied bist — auch, wenn du dich hier noch nie angemeldet hast —, führt dich
+        dein Zugangslink hinein. Wir schicken ihn dir per E-Mail.
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-3">
+        <Link to="/aktivierung">
+          <Button variant="primary" size="sm">
+            Zugangslink anfordern
+          </Button>
+        </Link>
+        <button
+          type="button"
+          onClick={onZumLogin}
+          className="text-sm font-medium text-accent-strong hover:underline"
+        >
+          Mit Passwort anmelden
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const { user, isLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
   const [formError, setFormError] = useState<string | null>(null);
+  // AGE-591: der dritte Ausgang der Registrierung — kein Fehler, keine Sitzung.
+  // Bewusst ein eigener Zustand und nicht `formError`: Das ist kein Fehler, es
+  // ist ein Weg, der woanders weitergeht, und er sieht auch nicht so aus.
+  const [ohneSitzung, setOhneSitzung] = useState(false);
 
   const {
     register,
@@ -47,6 +109,9 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
+    // Ein stehengebliebener Hinweis über einem neuen Versuch behauptet etwas
+    // über einen Vorgang, der längst ein anderer ist.
+    setOhneSitzung(false);
 
     if (mode === "login") {
       // Beim ANMELDEN nur auf „leer" prüfen, nicht auf Länge (Befund aus dem
@@ -75,9 +140,29 @@ export default function LoginPage() {
       return;
     }
 
-    const { error } = await signUp(values.email, values.name);
-    if (error) {
+    const { error, hatSession } = await signUp(values.email, values.name);
+    if (error && !istBereitsRegistriert(error)) {
       setFormError(error.message);
+      return;
+    }
+    // ZWEI Wege enden hier, und welcher es ist, hängt an einer Einstellung des
+    // Anmeldedienstes (AGE-591):
+    //
+    //  - `user_already_exists` (HTTP 422), solange die eingebaute
+    //    E-Mail-Bestätigung AUS ist. Das ist der Stand auf PROD seit dem 25.08.,
+    //    und der Grund, warum hier nicht `error.message` steht: Der rohe Satz
+    //    lautet „User already registered" — englisch, führt nirgendwohin, und er
+    //    verrät geradeheraus, dass die Adresse vergeben ist.
+    //  - kein Fehler und keine Sitzung, solange die Bestätigung AN ist. Dann
+    //    greift GoTrues Aufzählungsschutz, der genau diese Aussage vermeidet.
+    //    So stand PROD zwischen dem 16. und dem 25.08. — daher die stumme Seite,
+    //    die dieses Issue ausgelöst hat.
+    //
+    // Beide bekommen denselben neutralen Hinweis. Die Seite nennt keinen Grund;
+    // im zweiten Fall kennt sie ihn nicht einmal, und im ersten geht er
+    // niemanden etwas an, der nur wissen will, wie er hineinkommt.
+    if (error || !hatSession) {
+      setOhneSitzung(true);
       return;
     }
     // Hier stand ein Hinweis „Registrierung erfolgreich …". Er ist mit AGE-526
@@ -152,30 +237,43 @@ export default function LoginPage() {
             erhoben (AGE-527) — es entsteht beim Einlösen des
             Bestätigungslinks, und zwar genau einmal. */}
         {mode === "login" && (
-        <div className="flex flex-col gap-1">
-          <label htmlFor="password" className="text-sm font-medium text-ink">
-            Passwort
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            {...register("password")}
-            className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          />
-          {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
-          {/* AGE-505. Der Weg gehört genau hierhin: Wer sein Passwort vergessen
+          <div className="flex flex-col gap-1">
+            <label htmlFor="password" className="text-sm font-medium text-ink">
+              Passwort
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              {...register("password")}
+              className="h-11 rounded-md border border-line bg-canvas px-3 text-sm text-ink transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+            {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
+            {/* AGE-505. Der Weg gehört genau hierhin: Wer sein Passwort vergessen
               hat, scheitert an DIESEM Feld und sucht ihn nirgendwo sonst. Die
               frühere Bedingung `mode === "login"` steht seit AGE-527 eine Ebene
               höher am ganzen Feld — im Registrierungsmodus gibt es weder das
               eine noch das andere. */}
-          <Link
-            to="/passwort-vergessen"
-            className="self-start text-sm text-muted hover:underline"
-          >
-            Passwort vergessen?
-          </Link>
-        </div>
+            <Link
+              to="/passwort-vergessen"
+              className="self-start text-sm text-muted hover:underline"
+            >
+              Passwort vergessen?
+            </Link>
+          </div>
+        )}
+
+        {ohneSitzung && (
+          <RegistrierungOhneSitzung
+            onZumLogin={() => {
+              setMode("login");
+              // Den Hinweis MIT wegräumen. Ohne diese Zeile stand er über dem
+              // Login-Formular weiter da und behauptete etwas über einen
+              // Vorgang, den es nicht mehr gibt — derselbe Fehlermodus, gegen
+              // den diese Fläche gebaut ist. Befund des Diff-Reviews.
+              setOhneSitzung(false);
+            }}
+          />
         )}
 
         {formError && <p className="text-sm text-danger">{formError}</p>}
@@ -190,7 +288,8 @@ export default function LoginPage() {
         onClick={() => {
           setMode((m) => (m === "login" ? "register" : "login"));
           setFormError(null);
-              }}
+          setOhneSitzung(false);
+        }}
         className="mt-4 text-sm font-medium text-accent-strong hover:underline"
       >
         {mode === "login" ? "Noch kein Konto? Registrieren" : "Schon ein Konto? Zum Login"}

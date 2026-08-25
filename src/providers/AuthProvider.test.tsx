@@ -47,6 +47,7 @@ vi.mock("../lib/supabase", () => ({
 
 vi.mock("../lib/log", () => ({ logEvent: vi.fn() }));
 
+const { logEvent } = await import("../lib/log");
 const { AuthProvider } = await import("./AuthProvider");
 const { useAuth } = await import("./auth-context");
 
@@ -54,10 +55,7 @@ const { useAuth } = await import("./auth-context");
 function Registrieren() {
   const { signUp: melden } = useAuth();
   return (
-    <button
-      onClick={() => void melden("neu@test.fbc", "Neu Mitglied")}
-      type="button"
-    >
+    <button onClick={() => void melden("neu@test.fbc", "Neu Mitglied")} type="button">
       los
     </button>
   );
@@ -72,15 +70,44 @@ function renderUndRegistrieren() {
   screen.getByRole("button", { name: "los" }).click();
 }
 
+/**
+ * Eine GELUNGENE Registrierung — mit Sitzung.
+ *
+ * Bis AGE-591 stand hier `{ data: { user: { id } }, error: null }`, also nie
+ * eine Sitzung. Das war der Fehler dieser Datei: Sie prüfte den Versand
+ * ausgerechnet in dem Fall, in dem er nicht laufen darf, und schrieb ihn damit
+ * fest. Der Kommentar zwei Tests weiter unten sagte derweil schon immer „das
+ * Konto ist angelegt und die Sitzung besteht, bevor der Versand beginnt" —
+ * beschrieben, aber nie modelliert.
+ *
+ * Was GoTrue bei einer Wiederholung liefert (200, kein Fehler, KEINE Sitzung),
+ * hat jetzt einen eigenen Test und einen eigenen Namen: WIEDERHOLUNG.
+ */
+const ERFOLG = (id: string) => ({
+  data: { user: { id }, session: { access_token: "t", user: { id } } },
+  error: null,
+});
+
+/**
+ * Der Aufzählungsschutz von GoTrue: Eine Registrierung auf eine BEREITS
+ * BEKANNTE Adresse antwortet mit Erfolg, ohne Fehler — und ohne Sitzung. Der
+ * zurückgegebene Nutzer ist verschleiert und gehört dem Aufrufer nicht.
+ */
+const WIEDERHOLUNG = {
+  data: { user: { id: "verschleiert" }, session: null },
+  error: null,
+};
+
 describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
   beforeEach(() => {
     signUp.mockReset();
     invoke.mockReset();
+    vi.mocked(logEvent).mockClear();
     invoke.mockResolvedValue({ data: { status: "issued" }, error: null });
   });
 
   it("fordert nach erfolgreicher Registrierung den Bestätigungslink an", async () => {
-    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-neu" } }, error: null });
+    signUp.mockResolvedValueOnce(ERFOLG("nutzer-neu"));
 
     renderUndRegistrieren();
 
@@ -95,7 +122,10 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
    * könnte.
    */
   it("versendet nichts, wenn die Registrierung fehlschlägt", async () => {
-    signUp.mockResolvedValueOnce({ data: { user: null }, error: { message: "User already registered" } });
+    signUp.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: "User already registered" },
+    });
 
     renderUndRegistrieren();
 
@@ -110,7 +140,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
    * vergeben", während sein Konto längst existiert.
    */
   it("meldet die Registrierung als erfolgreich, auch wenn der Versand wirft", async () => {
-    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-x" } }, error: null });
+    signUp.mockResolvedValueOnce(ERFOLG("nutzer-x"));
     invoke.mockRejectedValueOnce(new Error("network"));
 
     let ergebnis: { error: unknown } | undefined;
@@ -148,7 +178,7 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
    * nur an einer Stelle, an die niemand gedacht hatte.
    */
   it("räumt den Versandstatus, wenn das Konto wechselt", async () => {
-    signUp.mockResolvedValueOnce({ data: { user: { id: "nutzer-a" } }, error: null });
+    signUp.mockResolvedValueOnce(ERFOLG("nutzer-a"));
 
     const gesehen: (string | null)[] = [];
     function Zeigen() {
@@ -221,5 +251,75 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
     // `minimum_password_length = 10` (config.toml). Darunter lehnt der
     // Anmeldedienst ab — und zwar serverseitig, also still.
     expect((signUp.mock.calls[0][0].password as string).length).toBeGreaterThanOrEqual(10);
+  });
+
+  /**
+   * AGE-591, der Befund aus dem Plan-Review (codex, HIGH).
+   *
+   * GoTrue beantwortet eine Registrierung auf eine BEREITS BEKANNTE Adresse mit
+   * 200, ohne Fehler und ohne Sitzung — sein Schutz gegen das Aufzählen
+   * vorhandener Adressen. `signUp` prüfte nur `!error` und hielt das für
+   * Erfolg. Zwei Folgen, beide echt:
+   *
+   *  - `resendActivationLink()` ist SITZUNGSGEBUNDEN. Ohne Sitzung läuft es in
+   *    `42501` — genau die Zeile, die am 25.08. in den PROD-Logs stand.
+   *  - `logEvent("signup")` zählt eine Registrierung, die nie stattfand.
+   *
+   * Der zurückgegebene Nutzer hilft dabei nicht weiter: Er ist verschleiert und
+   * gehört dem Aufrufer nicht. Die Sitzung ist das einzige verlässliche
+   * Zeichen, dass hier wirklich ein Konto entstanden ist.
+   */
+  it("versendet nichts und zählt nichts, wenn keine Sitzung entsteht", async () => {
+    signUp.mockResolvedValueOnce(WIEDERHOLUNG);
+
+    renderUndRegistrieren();
+
+    await waitFor(() => expect(signUp).toHaveBeenCalled());
+    expect(invoke).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalledWith("signup");
+  });
+
+  /**
+   * Der Aufrufer muss den dritten Ausgang unterscheiden können — sonst bleibt
+   * `LoginPage` stumm, egal wie richtig der Provider sich verhält. Bewusst
+   * `hatSession: boolean` und NICHT das Sitzungsobjekt: Die Seite braucht die
+   * Antwort auf „gibt es eine Sitzung?", und ein Sitzungsobjekt in der Seite
+   * wäre eine zweite Quelle neben dem Auth-Zuhörer.
+   */
+  it("meldet dem Aufrufer, ob eine Sitzung entstanden ist", async () => {
+    const ergebnisse: { error: unknown; hatSession: boolean }[] = [];
+    function Prüfen() {
+      const { signUp: melden } = useAuth();
+      return (
+        <button
+          type="button"
+          onClick={() => void melden("x@test.fbc", "X").then((r) => ergebnisse.push(r))}
+        >
+          los
+        </button>
+      );
+    }
+
+    signUp.mockResolvedValueOnce(ERFOLG("mit-sitzung"));
+    const { container: a } = render(
+      <AuthProvider>
+        <Prüfen />
+      </AuthProvider>,
+    );
+    within(a).getByRole("button", { name: "los" }).click();
+    await waitFor(() => expect(ergebnisse).toHaveLength(1));
+    expect(ergebnisse[0].hatSession).toBe(true);
+
+    signUp.mockResolvedValueOnce(WIEDERHOLUNG);
+    const { container: b } = render(
+      <AuthProvider>
+        <Prüfen />
+      </AuthProvider>,
+    );
+    within(b).getByRole("button", { name: "los" }).click();
+    await waitFor(() => expect(ergebnisse).toHaveLength(2));
+    expect(ergebnisse[1].hatSession).toBe(false);
+    // Und der Fehler bleibt null: Es IST kein Fehler, es ist nur kein Erfolg.
+    expect(ergebnisse[1].error).toBeNull();
   });
 });
