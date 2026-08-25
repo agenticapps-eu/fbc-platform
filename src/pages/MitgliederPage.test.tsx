@@ -1,8 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import MitgliederPage from "./MitgliederPage";
+
+/* AGE-595: `MemberDirectory` liest seit den Reitern die eigene Kennung, um
+   die Kontaktmenge zu laden. Ohne diesen Mock wirft `useAuth` „muss innerhalb
+   von <AuthProvider> verwendet werden" — die Datei praefte dann gar nichts
+   mehr. Ein Konto mit Kennung und ohne Kontakte ist hier der neutrale Fall. */
+vi.mock("../providers/auth-context", () => ({
+  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" } }),
+}));
+
 
 /** MemberDirectory sucht serverseitig (Query) und verlinkt Profile (Router). */
 function renderPage() {

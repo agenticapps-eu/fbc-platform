@@ -67,24 +67,41 @@ Layout rechnet. Die Höhe selbst ist Sache der Sichtprobe (4.1).
 
 ## 3. Reiter (RED vor GREEN)
 
-- [ ] 3.1 Test: beide Reiter stehen ohne einen einzigen Kontakt, Zähler 0.
-- [ ] 3.2 Test: ein angenommener Kontakt erscheint — in **beide** Richtungen
+- [x] 3.1 Test: beide Reiter stehen ohne einen einzigen Kontakt, Zähler 0.
+- [x] 3.2 Test: ein angenommener Kontakt erscheint — in **beide** Richtungen
       der Anfrage, geprüft über `from_id` und `to_id`.
-- [ ] 3.3 Test: `pending`/`declined` erscheinen nicht.
-- [ ] 3.4 Test: der Zähler zählt die dargestellten Karten, nicht die
+- [x] 3.3 Test: `pending`/`declined` erscheinen nicht.
+- [x] 3.4 Test: der Zähler zählt die dargestellten Karten, nicht die
       angenommenen Anfragen. Aufbau: ein Kontakt, der im Verzeichnisergebnis
       fehlt.
-- [ ] 3.5 Test: die fünf Zustände sind unterscheidbar — lädt (kein Zähler),
+- [x] 3.5 Test: die fünf Zustände sind unterscheidbar — lädt (kein Zähler),
       Kontaktabfrage gescheitert (Fehler, nicht „0"), keine Kontakte
       (Einladung), Kontakte ohne sichtbare Karte (eigener Hinweis), Filter
       schließt alle aus (Filterhinweis).
-- [ ] 3.6 Test: Suchbegriff überlebt den Reiterwechsel, beide Zähler zeigen die
+- [x] 3.6 Test: Suchbegriff überlebt den Reiterwechsel, beide Zähler zeigen die
       gefilterte Zahl.
-- [ ] 3.7 Test: Kontowechsel im selben `QueryClient` zeigt nicht die
+- [x] 3.7 Test: Kontowechsel im selben `QueryClient` zeigt nicht die
       Kontaktmenge des vorigen Kontos.
-- [ ] 3.8 Umsetzung: `contactsQueryKey(uid)`, Abfrage auf `contact_requests`
+- [x] 3.8 Umsetzung: `contactsQueryKey(uid)`, Abfrage auf `contact_requests`
       (`from_id`/`to_id`, `status = 'accepted'`), Reiter, Zähler aus der
       gefilterten Liste.
+
+**Drei Befunde aus Abschnitt 3**
+
+1. **Zustand 4 gegen Zustand 5 braucht eine zweite Menge.** „Kein Kontakt ist
+   sichtbar" und „der Filter schliesst alle aus" lassen sich aus der
+   GEFILTERTEN Liste nicht auseinanderhalten. Aufgelöst über die ungefilterte
+   Baseline, die es für die Facetten ohnehin schon gibt — keine neue Abfrage.
+2. **Der Schlüssel allein erfüllt die Anforderung nicht.** Er verhindert, dass
+   Konto B die Menge von Konto A *sieht*; verworfen wird sie dadurch nicht. Die
+   Anforderung verlangt beides, also zusätzlich `removeQueries` beim
+   Identitätswechsel — mit einer eigenen Zusage, die rot wird, wenn man es
+   herausnimmt.
+3. **Drei bestehende Testdateien brachen**, weil `MemberDirectory` jetzt
+   `useAuth` ruft und sie ohne `AuthProvider` rendern. Und eine ältere eigene
+   Zusage war zu ungenau: sie prüfte „Bodo steht nicht auf der Seite", während
+   Bodo als gewöhnliches Mitglied sehr wohl dort steht — sie prüft jetzt im
+   Reiter.
 
 ## 4. Abnahme
 

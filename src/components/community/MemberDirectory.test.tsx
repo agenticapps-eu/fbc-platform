@@ -32,6 +32,15 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
+
+/* AGE-595: `MemberDirectory` liest seit den Reitern die eigene Kennung, um
+   die Kontaktmenge zu laden. Ohne diesen Mock wirft `useAuth` „muss innerhalb
+   von <AuthProvider> verwendet werden" — die Datei praefte dann gar nichts
+   mehr. Ein Konto mit Kennung und ohne Kontakte ist hier der neutrale Fall. */
+vi.mock("../../providers/auth-context", () => ({
+  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" } }),
+}));
+
 function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
   return {
     id: crypto.randomUUID(),

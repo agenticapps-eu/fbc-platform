@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../providers/auth-context";
 import { bildUrl } from "../../lib/bild-url";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
@@ -27,6 +28,9 @@ import {
   searchDirectory,
   THEME_OPTIONS,
   type DirectoryFilters,
+  contactsKeyPrefix,
+  contactsQueryKey,
+  fetchContactIds,
   type DirectoryMember,
 } from "../../lib/directory";
 
@@ -93,6 +97,42 @@ export default function MemberDirectory() {
     queryFn: () => searchDirectory(filters),
   });
 
+  // ── Die zwei Reiter (AGE-595) ─────────────────────────────────────────────
+  //
+  // Der Reiter ist ein ORT, kein Vorgang: beide stehen immer da, auch mit einer
+  // Null. Das ist ausdrücklich die andere Entscheidung als beim bedingten
+  // Navigationseintrag für offene Anfragen (AGE-592) — ein Ort, der erscheint
+  // und verschwindet, macht die Navigation unvorhersehbar.
+  //
+  // Der Reiter steht NEBEN Suche und Filter, nicht darüber: ein Wechsel ändert
+  // die Grundmenge, nicht die Frage an sie. Deshalb liegt er auch nicht im
+  // Filterzustand und setzt ihn nicht zurück.
+  const [reiter, setReiter] = useState<"alle" | "kontakte">("alle");
+
+  const { user } = useAuth();
+  const uid = user?.id ?? null;
+  const contacts = useQuery({
+    queryKey: contactsQueryKey(uid ?? ""),
+    queryFn: () => fetchContactIds(uid!),
+    enabled: uid !== null,
+  });
+  const contactIds = useMemo(() => new Set(contacts.data ?? []), [contacts.data]);
+
+  // Der Schlüssel trägt die Kennung, ein zweites Konto sähe die Zeilen des
+  // ersten also ohnehin nicht. Das allein genügt aber nicht: die Menge ist
+  // RLS-gefiltert und gehört einem beendeten Konto, sie soll nicht im Speicher
+  // liegen bleiben. Auf den Abbau der Komponente zu bauen wäre zu schwach — bei
+  // einem Sitzungsablauf bleibt sie gemountet. Dieselbe Vorkehrung wie in
+  // `HeaderSearch`, und aus demselben Grund.
+  const queryClient = useQueryClient();
+  const vorigeKennung = useRef(uid);
+  useEffect(() => {
+    if (vorigeKennung.current === uid) return;
+    vorigeKennung.current = uid;
+    queryClient.removeQueries({ queryKey: contactsKeyPrefix });
+    setReiter("alle");
+  }, [uid, queryClient]);
+
   const active = hasActiveFilters(filters);
   /**
    * Die erweiterte Suche ist zugeklappt, bis jemand sie öffnet.
@@ -102,7 +142,39 @@ export default function MemberDirectory() {
    * einziges sichtbares Filterfeld da.
    */
   const [erweitert, setErweitert] = useState(() => hasAdvancedFilters(filters));
-  const members = results.data ?? [];
+  // `useMemo` und nicht `results.data ?? []`: der Kurzschluss erzeugt bei jedem
+  // Rendern ein NEUES leeres Array, und die beiden Schnitte darunter liefen
+  // dann jedes Mal neu. Kein Fehler, aber eine unnötige Runde je Tastendruck.
+  const members = useMemo(() => results.data ?? [], [results.data]);
+
+  // Der Schnitt zweier Mengen, zweimal — und der Unterschied trägt zwei der
+  // fünf Zustände:
+  //
+  //   * gegen die GEFILTERTE Liste entsteht, was der Reiter zeigt, und daraus
+  //     kommt sein Zähler. Eine Zahl aus einer anderen Quelle als ihre Liste
+  //     wäre eine zweite Wahrheit.
+  //   * gegen die UNGEFILTERTE Baseline (die es für die Facetten ohnehin gibt)
+  //     entsteht die Antwort auf „hat dieses Mitglied überhaupt einen im
+  //     Verzeichnis sichtbaren Kontakt". Ohne sie fielen „keiner ist sichtbar"
+  //     und „der Filter schliesst alle aus" zusammen, und der eine Hinweis
+  //     stünde an der Stelle des anderen.
+  const kontakte = useMemo(
+    () => members.filter((m) => contactIds.has(m.id)),
+    [members, contactIds],
+  );
+  const sichtbareKontakteUngefiltert = useMemo(
+    () => (facetsQuery.data ?? []).filter((m) => contactIds.has(m.id)),
+    [facetsQuery.data, contactIds],
+  );
+
+  // Ein Zähler erscheint erst, wenn seine Menge WIRKLICH feststeht. Eine Null,
+  // die gleich zu einer Sieben wird, ist eine falsche Aussage und kein
+  // Ladezustand — und eine Null nach einem Fehlschlag behauptet einen Bestand,
+  // den niemand gemessen hat (die Lehre aus AGE-582).
+  const zahlAlle = results.isLoading || results.isError ? null : members.length;
+  const kontakteBereit =
+    !results.isLoading && !results.isError && !contacts.isLoading && !contacts.isError;
+  const zahlKontakte = kontakteBereit ? kontakte.length : null;
 
   function setFilter<K extends keyof DirectoryFilters>(key: K, value: DirectoryFilters[K]) {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -243,13 +315,74 @@ export default function MemberDirectory() {
         )}
       </div>
 
-      <DirectoryResults
-        isLoading={results.isLoading}
-        isError={results.isError}
-        members={members}
-        active={active}
-        onReset={reset}
-      />
+      <div className="border-b border-line">
+        <div role="tablist" aria-label="Verzeichnis" className="flex gap-6 overflow-x-auto">
+          {(
+            [
+              { id: "alle", label: "Alle Mitglieder", zahl: zahlAlle },
+              { id: "kontakte", label: "Meine Kontakte", zahl: zahlKontakte },
+            ] as const
+          ).map((r) => {
+            const gewaehlt = r.id === reiter;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="tab"
+                aria-selected={gewaehlt}
+                onClick={() => setReiter(r.id)}
+                className={
+                  "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
+                  (gewaehlt
+                    ? "border-accent text-accent-strong"
+                    : "border-transparent text-muted hover:text-ink")
+                }
+              >
+                {r.label}
+                {/* `aria-hidden`, und das ist der Punkt: der zugängliche NAME des
+                    Reiters bleibt seine Beschriftung. Stünde die Zahl darin,
+                    läse eine Vorleseausgabe „Meine Kontakte 2" als Bezeichnung
+                    eines Bedienelements vor — und der Name änderte sich bei
+                    jeder angenommenen Anfrage. Dasselbe Muster wie in der
+                    Admin-Mitgliederliste. */}
+                {r.zahl !== null && (
+                  <span
+                    aria-hidden="true"
+                    className={
+                      "ml-1.5 text-xs tabular-nums " +
+                      (gewaehlt ? "text-accent-strong" : "text-muted")
+                    }
+                  >
+                    {r.zahl}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div role="tabpanel">
+        {reiter === "alle" ? (
+          <DirectoryResults
+            isLoading={results.isLoading}
+            isError={results.isError}
+            members={members}
+            active={active}
+            onReset={reset}
+          />
+        ) : (
+          <KontakteResults
+            isLoading={results.isLoading || contacts.isLoading}
+            isError={results.isError}
+            kontaktabfrageGescheitert={contacts.isError}
+            hatKontakte={contactIds.size > 0}
+            hatSichtbareKontakte={sichtbareKontakteUngefiltert.length > 0}
+            members={kontakte}
+            onReset={reset}
+          />
+        )}
+      </div>
     </section>
   );
 }
@@ -321,6 +454,126 @@ function ChipFilterGroup({
         })}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * Der Reiter „Meine Kontakte" (AGE-595).
+ *
+ * Eine eigene Komponente und keine Fahne an `DirectoryResults`, weil sich nicht
+ * ein Text unterscheidet, sondern die ZAHL der Zustände: das Verzeichnis kennt
+ * drei (lädt · Fehler · leer), der Kontaktreiter fünf. Sie in eine Komponente
+ * zu falten hiesse, jede ihrer Verzweigungen um eine Bedingung zu erweitern,
+ * die für die andere Hälfte der Aufrufe nie zutrifft.
+ *
+ * Die fünf sind ausdrücklich NICHT zu „leer" zusammenzufassen. Der wichtigste
+ * ist der zweite: `undefined` als leere Menge zu lesen macht aus einem
+ * Fehlschlag eine beruhigende Null.
+ */
+function KontakteResults({
+  isLoading,
+  isError,
+  kontaktabfrageGescheitert,
+  hatKontakte,
+  hatSichtbareKontakte,
+  members,
+  onReset,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  kontaktabfrageGescheitert: boolean;
+  hatKontakte: boolean;
+  hatSichtbareKontakte: boolean;
+  members: DirectoryMember[];
+  onReset: () => void;
+}) {
+  // 1. Es läuft noch. Vor jeder Aussage über den Bestand.
+  if (isLoading) {
+    return <p className="text-sm text-muted">Deine Kontakte werden geladen…</p>;
+  }
+  // 2. Die KONTAKTabfrage ist gescheitert — nicht „keine Kontakte". Zuerst
+  //    geprüft, weil ein Fehlschlag jede Aussage darunter wertlos macht:
+  //    `contactIds` wäre leer, und die Einladung aus 3 stünde vor jemandem, der
+  //    womöglich zwanzig Kontakte hat.
+  if (kontaktabfrageGescheitert) {
+    return (
+      <p className="text-sm text-danger">
+        Deine Kontakte konnten nicht geladen werden. Bitte neu laden.
+      </p>
+    );
+  }
+  if (isError) {
+    return (
+      <p className="text-sm text-danger">
+        Das Verzeichnis konnte nicht geladen werden. Bitte neu laden.
+      </p>
+    );
+  }
+  // 3. Wirklich keine Kontakte — der Normalzustand eines neuen Mitglieds und
+  //    ausdrücklich keine Fehlermeldung.
+  if (!hatKontakte) {
+    return (
+      <EmptyState
+        title="Knüpf die erste Verbindung"
+        description="Sobald eine Kontaktanfrage angenommen ist, findest du das Mitglied hier wieder — mit Kontaktdaten und Chat."
+        action={
+          <Link to="/mitglieder">
+            <Button variant="primary" size="sm">
+              Im Verzeichnis stöbern
+            </Button>
+          </Link>
+        }
+      />
+    );
+  }
+  // 4. Kontakte ja, sichtbare Karten nein. Die Einladung aus 3 wäre hier
+  //    schlicht falsch: dieses Mitglied HAT Kontakte. Sichtbarkeit im
+  //    Verzeichnis (`is_public`, Rang, Aktivierung) und der Status der
+  //    Kontaktanfrage sind voneinander unabhängig — die Kante ist real.
+  if (!hatSichtbareKontakte) {
+    return (
+      <EmptyState
+        title="Deine Kontakte sind im Verzeichnis nicht sichtbar"
+        description="Du hast angenommene Kontakte, aber keiner von ihnen erscheint gerade im Verzeichnis — etwa, weil das Profil auf privat steht. Über deine Nachrichten erreichst du sie trotzdem."
+        action={
+          <Link to="/nachrichten">
+            <Button variant="secondary" size="sm">
+              Zu den Nachrichten
+            </Button>
+          </Link>
+        }
+      />
+    );
+  }
+  // 5. Sichtbare Kontakte gibt es, nur passt keiner zum Filter. Ein Ausweg,
+  //    keine Sackgasse.
+  if (members.length === 0) {
+    return (
+      <EmptyState
+        title="Dazu passt keiner deiner Kontakte"
+        description={'Diese Kombination aus Suche und Filtern trifft auf keinen deiner Kontakte. Nimm einen Filter weg \u2014 oder wechsle zu \u201eAlle Mitglieder\u201c.'}
+        action={
+          <Button variant="secondary" size="sm" onClick={onReset}>
+            Filter zurücksetzen
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <>
+      <p className="text-sm text-muted">
+        {members.length} {members.length === 1 ? "Kontakt" : "Kontakte"}
+      </p>
+      <Stagger className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map((m) => (
+          <StaggerItem key={m.id} className="h-full">
+            <MemberCard member={m} />
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </>
   );
 }
 
