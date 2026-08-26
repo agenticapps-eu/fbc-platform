@@ -139,7 +139,7 @@ und standen im ersten Entwurf nicht drin.
       Handler ruft „erster Schritt / zweiter Schritt" und nicht „DB / Ban".
       Daraus folgt der Zuschnitt von `fasseAusgangZusammen`: der ZWEITE Schritt
       ist in beiden Richtungen der, der einen halben Zustand hinterlassen kann.
-- [ ] 4.5 **[PR]** Teilfehlschlag: Antwort **`207`** mit
+- [x] 4.5 **[PR]** Teilfehlschlag: Antwort **`207`** mit
       `{hidden: true, banned: false}`; die Fläche zeigt eine **Warnung**, keinen
       Erfolg; der Teilfehlschlag steht im `admin_audit`-`payload`.
       **Zwei von drei Hälften stehen und sind gemessen** (23.08., erzwungen
@@ -154,8 +154,21 @@ und standen im ersten Entwurf nicht drin.
       ändern hiesse, eine Protokollzeile zu überschreiben; ein Protokoll, das
       sich ändern lässt, ist keins. Die zweite Zeile behauptet keine zweite
       Änderung, sie hält fest, dass die erste halb blieb.
-      **OFFEN ist die dritte Hälfte: die Warnung in der Oberfläche.** Sie
-      gehört zum Zeilenmenü und wird in Abschnitt 7 gebaut.
+      **Die dritte Hälfte war seit Abschnitt 7 gebaut, nur nie hier
+      abgehakt** (26.08. nachgeprüft, kein neuer Code). Die Warnung steht in
+      `AdminMitgliederPage.tsx:270-286`: Titel „Nur zur Hälfte ausgeführt",
+      `variant: "error"` — der Erfolgston fehlt, und der Satz benennt WELCHE
+      Hälfte fehlt, denn die hängt an der Richtung.
+      Getragen wird sie von drei Zusagen in `AdminMitgliederPage.test.tsx:650`:
+      die Warnung selbst, plus **zwei** Gegenproben (gelungenes Reaktivieren,
+      voller Vollzug) — ohne sie belegte die erste nur, dass die Fläche nie
+      einen Erfolg meldet.
+      **Mutationsprobe statt Vertrauen auf grün** (80/80 grün sagt für sich
+      nichts): Warnzweig auf `if (false)` → **4 rot**; Kriterium zurück auf die
+      halbblinde erste Fassung `hidden && !banned` → **1 rot**, gefangen vom
+      Ordnungswechsel-Test, der die andere Gestalt des halben Zustands prüft
+      (sichtbar, aber ausgesperrt). Beide Verbiegungen zurückgenommen, danach
+      wieder 80/80.
 - [x] 4.6 **[PR]** Der halbe Zustand ist **heilbar**: ist `disabled_at` gesetzt
       und der Ban fehlt, bricht ein erneutes Deaktivieren nicht mit `22023` ab,
       sondern setzt den Ban nach. Gilt gespiegelt fürs Öffnen.
