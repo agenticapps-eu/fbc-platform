@@ -10,8 +10,9 @@ import { tokenizePostBody } from "./video-url";
  *
  * Der Client macht NUR, was die RLS (§7 der RLS-Policies) erlaubt:
  *  - `fetchFeed` liest `posts` (Sichtbarkeit erzwingt `posts_select_by_visibility`:
- *    anon nur 'public', 'members' ab Rang 4 `exchange`). Autoren werden über die
- *    View `profiles_public` angereichert.
+ *    anon nur 'public', 'members' für jedes AKTIVIERTE Mitglied — seit AGE-601
+ *    ohne Stufenschwelle). Autoren werden über die View `profiles_public`
+ *    angereichert.
  *  - Like-/Kommentarzähler kommen aus der read-only RPC `post_engagement_counts`,
  *    weil `post_likes` bewusst owner-only lesbar ist (20260612090845) — ein echter
  *    Zähler ist sonst clientseitig nicht berechenbar. Die RPC liefert nur Zahlen.
@@ -334,9 +335,12 @@ export const commentsQueryKey = (uid: string | null, postId: string) =>
 /**
  * Sichtbarkeitsstufen für den Composer (Default `members`).
  *
- * Gestufte Beitrags-Sichtbarkeit gibt es im MVP nicht (AGE-311): die Stufung sitzt in
- * der RLS — `members` ist ab Rang 4 (`exchange`) lesbar —, nicht im Wert. Wer hier eine
- * Option ergänzt, ändert zuerst `posts_visibility_check`, sonst scheitert das Speichern.
+ * Gestufte Beitrags-Sichtbarkeit gibt es nicht: die Stufung sitzt in der RLS, nicht
+ * im Wert. Seit AGE-601 ist `members` für jedes AKTIVIERTE Mitglied lesbar — die
+ * frühere Schwelle Rang 4 (`exchange`) ist entfallen, weil in der Produktion jeder
+ * Beitrag `members` trägt und der Feed darunter nicht dünner, sondern leer war.
+ * Wer hier eine Option ergänzt, ändert zuerst `posts_visibility_check`, sonst
+ * scheitert das Speichern.
  */
 export const VISIBILITY_OPTIONS: { value: PostVisibility; label: string }[] = [
   { value: "members", label: "Mitglieder" },

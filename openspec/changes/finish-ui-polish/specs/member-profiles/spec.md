@@ -6,7 +6,7 @@ The system SHALL expose a fixed public field subset (`id`, `name`, `avatar_url`,
 `region`, `company`, `short_bio`, `tier`, `roles`) of `is_public` profiles through
 the `profiles_public` view, granting SELECT to `authenticated` only. The `name`
 column SHALL be the **tier-resolved display name**: the full name when the caller is
-the profile owner or clears `has_level(4)` (`exchange`), otherwise the masked
+the profile owner or is an **activated** member, otherwise the masked
 "Mitglied" label — so a below-threshold caller never receives another member's full
 name through the view. The view SHALL be read-only to clients: `anon` and
 `authenticated` hold no INSERT/UPDATE/DELETE, and `anon` holds no SELECT.
@@ -15,7 +15,7 @@ name through the view. The view SHALL be read-only to clients: `anon` and
 
 - **WHEN** an authenticated member selects from `profiles_public`
 - **THEN** the public field subset of every `is_public` profile is returned, with
-  `name` resolved to the full name only if the caller is the owner or clears `has_level(4)`
+  `name` resolved to the full name only if the caller is the owner or is activated
 
 #### Scenario: Below-threshold caller gets masked names
 
@@ -40,7 +40,7 @@ The system SHALL resolve a member's shown name through a single shared resolver
 keyed off the authenticated caller's own tier (never a client-supplied parameter),
 and every name-bearing read surface — directory, community feed, events, matching,
 and profile views — SHALL use it. The full name is shown to the profile owner and to
-callers who clear `has_level(4)` (`exchange`); all other callers see the masked
+callers who are activated members; all other callers see the masked
 "Mitglied" label. "Full name" here means `profiles.name`; contact fields (email,
 phone) remain governed by the contact-request disclosure rules and are out of scope
 for this resolver.

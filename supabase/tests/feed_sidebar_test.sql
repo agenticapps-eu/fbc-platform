@@ -34,7 +34,7 @@
 --   * In pgTAP heisst es `alike()`, nicht `like()`.
 
 begin;
-select plan(26);
+select plan(27);
 
 -- ── Fixtures: Betrachter ────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -139,22 +139,43 @@ begin
 end $$;
 
 -- ── 1. Der Tag-Zähler folgt der Sichtbarkeit ────────────────────────────────
+-- AGE-601 hat die MESSACHSE dieser Datei verschoben, und das ist hier die
+-- wichtigste Aenderung. Bis dahin war der Unterschied `basic` (2) gegen
+-- `exchange` (5) der Messwert. Seit `members` jedes AKTIVIERTE Mitglied meint,
+-- sehen beide fuenf — zwischen aktivierten Betrachtern gibt es NICHTS mehr zu
+-- verbergen, und eine Zusage darueber waere ab jetzt gegenstandslos.
+--
+-- Die Zusage selbst bleibt aber notwendig: die Zahl darf kein Umweg zu
+-- Beitraegen sein, die der Aufrufer nicht sehen darf. Die verbliebene Achse ist
+-- die SITZUNG — ohne sie zaehlen nur `public`-Beitraege. Sie laeuft durch
+-- denselben Code-Pfad (`security invoker`, kein kopiertes Praedikat) und ist
+-- damit dieselbe Aussage, an der einzigen Stelle gemessen, an der sie sich noch
+-- messen laesst.
 select is(
-  pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
+  pg_temp.text_as_anon(
     $$select post_count::text from public.feed_tag_counts()
        where tag_key = 'sbsichtbar'$$),
-  '2', 'Ein Tag an fünf Beiträgen, von denen der basic-Betrachter zwei sehen '
+  '2', 'Ein Tag an fünf Beiträgen, von denen der ausgeloggte Besucher zwei sehen '
        'darf, zählt ZWEI');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
     $$select post_count::text from public.feed_tag_counts()
        where tag_key = 'sbsichtbar'$$),
-  '5', 'Derselbe Tag zählt für den exchange-Betrachter FÜNF — dieselbe '
+  '5', 'Derselbe Tag zählt für den eingeloggten Betrachter FÜNF — dieselbe '
        'Funktion, dieselben Beiträge, ein anderer Aufrufer');
 
+-- Und der Beleg, dass die Stufe dabei KEINE Rolle mehr spielt (AGE-601): ein
+-- `basic`-Konto bekommt dieselbe Fuenf wie ein `exchange`-Konto. Ohne diese
+-- Zeile bliebe offen, ob die Fuenf oben an der Stufe oder an der Sitzung haengt.
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
+    $$select post_count::text from public.feed_tag_counts()
+       where tag_key = 'sbsichtbar'$$),
+  '5', 'Auch der basic-Betrachter zählt FÜNF — die Stufe ist keine Schranke mehr');
+
+select is(
+  pg_temp.text_as_anon(
     $$select coalesce(string_agg(tag_key, ','), '(fehlt)')
         from public.feed_tag_counts() where tag_key = 'sbverdeckt'$$),
   '(fehlt)',
@@ -219,8 +240,14 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000001'$$),
-  '2', 'Für den basic-Betrachter steht derselbe Autor mit ZWEI — die Zahl ist '
-       'kein Umweg zur Sichtbarkeit');
+  '5', 'Für den basic-Betrachter steht derselbe Autor ebenfalls mit FÜNF '
+       '(AGE-601) — zwischen aktivierten Betrachtern gibt es hier nichts mehr '
+       'zu verbergen. Ausgeloggt ist diese Liste laut Spec gar nicht zu zeigen '
+       '(profiles_public haelt fuer anon kein Recht), und ein unbestaetigter '
+       'Betrachter taugt nicht als Gegenprobe: bei ihm haette eine leere Liste '
+       'ZWEI Ursachen. Die Sichtbarkeits-Zusage fuer diesen Code-Pfad traegt '
+       'deshalb Abschnitt 1 ueber feed_tag_counts — dieselbe Regel, derselbe '
+       'security-invoker-Weg, nur an der Stelle gemessen, wo sie messbar ist.');
 
 -- Die ORDNUNG, und warum sie eine eigene Zusage braucht (Befund codex, LOW,
 -- 7.8): oben stehen nur Zeilenzahlen und einzelne Autoren. Nimmt man das
@@ -337,9 +364,23 @@ insert into public.posts (author_id, body, visibility) values
   ('a1000000-0000-0000-0000-000000000003', 'D1', 'members'),
   ('a1000000-0000-0000-0000-000000000003', 'D2', 'members');
 
--- `sbeigen` trägt zwei verdeckte Beiträge: einen vom `basic`-Betrachter SELBST,
--- einen von Autor Eins. Für den Verfasser ist die Zahl 1, für den zweiten
--- `basic`-Betrachter fehlt der Tag ganz — derselbe Rang, verschiedene Zahlen.
+-- `sbeigen` trägt zwei `members`-Beiträge: einen vom `basic`-Betrachter SELBST,
+-- einen von Autor Eins.
+--
+-- DIESER ABSCHNITT HAT SEINEN MESSWERT AN AGE-601 VERLOREN, und das steht hier
+-- statt einer stillen Anpassung. Er war gebaut, um den DRITTEN Zweig des
+-- Praedikats zu zeigen (`author_id = auth.uid()`): zwei Betrachter desselben
+-- Rangs bekamen verschiedene Zahlen, wenn einer der Verfasser war. Seit
+-- `members` jedes aktivierte Mitglied meint, sehen beide beide Beitraege — der
+-- dritte Zweig ist fuer aktivierte Aufrufer nicht mehr BEOBACHTBAR, weil der
+-- zweite Zweig ihn vollstaendig ueberdeckt.
+--
+-- Der Zweig bleibt trotzdem im Praedikat, und das ist kein Versehen: er ist die
+-- Zusage „ein Verfasser sieht seinen eigenen Beitrag IMMER", unabhaengig davon,
+-- was die Sichtbarkeitsregel gerade sagt. Verengt sie sich je wieder, traegt er
+-- sofort. Belegt wird er weiterhin in `rls_test.sql` (Abschnitt 8, „Basic sieht
+-- den EIGENEN members-Beitrag") — dort ueber einen Aufrufer, bei dem der zweite
+-- Zweig nicht greift.
 insert into public.tags (key, label, sort, active) values ('sbeigen', 'SbEigen', 906, true);
 insert into public.posts (author_id, body, visibility, hashtags) values
   ('a0000000-0000-0000-0000-00000000000b', 'E1', 'members', array['sbeigen']),
@@ -357,31 +398,40 @@ select is(
     $$select coalesce(string_agg(profile_id::text || '=' || post_count, ','), '(fehlt)')
         from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000003'$$),
-  '(fehlt)',
-  'Ein Autor ohne einen einzigen sichtbaren Beitrag fehlt GANZ — nicht mit der '
-  'Zahl null, die verriete, dass er geschrieben hat');
+  'a1000000-0000-0000-0000-000000000003=2',
+  'Autor Drei steht seit AGE-601 auch fuer den basic-Betrachter mit ZWEI — seine '
+  'members-Beitraege sind nicht mehr verdeckt. Die Zusage „ein Autor ohne '
+  'sichtbaren Beitrag fehlt GANZ statt mit der Zahl null" ist damit nicht '
+  'aufgehoben, sondern gegenstandslos geworden: es gibt fuer ein aktiviertes '
+  'Konto keinen solchen Autor mehr. Gemessen wird sie weiterhin ausgeloggt, in '
+  'Abschnitt 1 ueber feed_tag_counts.');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_tag_counts()
        where tag_key = 'sbeigen'$$),
-  '1', 'Der Verfasser zählt seinen eigenen verdeckten Beitrag mit — auf basic, '
-       'über den dritten Zweig des Prädikats');
+  '2', 'Der Verfasser zählt seit AGE-601 BEIDE Beiträge — seinen eigenen und '
+       'den fremden. Vor AGE-601 stand hier 1, und die Differenz WAR der dritte '
+       'Zweig; jetzt überdeckt ihn der zweite.');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000c',
     $$select coalesce(string_agg(tag_key, ','), '(fehlt)')
         from public.feed_tag_counts() where tag_key = 'sbeigen'$$),
-  '(fehlt)',
-  'Für einen ANDEREN basic-Betrachter fehlt derselbe Tag ganz — die Zahl hängt '
-  'an der Person, nicht nur an der Stufe');
+  'sbeigen',
+  'Für einen ANDEREN basic-Betrachter erscheint derselbe Tag jetzt ebenfalls — '
+  'die Zahl hängt seit AGE-601 weder an der Stufe noch an der Person, solange '
+  'der Aufrufer aktiviert ist');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a0000000-0000-0000-0000-00000000000b'$$),
-  '1', 'Derselbe dritte Zweig wirkt auch in der Autorenliste: der Verfasser '
-       'steht dort mit seinem eigenen verdeckten Beitrag');
+  '1', 'Der Verfasser steht in der Autorenliste mit seinem eigenen Beitrag. '
+       'Die Eins kommt hier aus der ZAEHLUNG (er hat genau einen), nicht aus '
+       'dem dritten Zweig — der ist seit AGE-601 nicht mehr beobachtbar. Die '
+       'frühere Formulierung „derselbe dritte Zweig wirkt auch hier" war nach '
+       'AGE-601 eine falsche Abdeckungs-Behauptung (Befund codex, LOW).');
 
 -- Die scharfe Fassung der Zusage, und der Grund, warum die Einzelzahlen oben
 -- nicht genügen: sie prüfen ausgewählte Tags. Hier wird für JEDEN aktiven

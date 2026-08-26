@@ -30,7 +30,7 @@
 --     die Fixture-IDs eingeschränkt und nie auf `count(*)` der ganzen Tabelle.
 
 begin;
-select plan(29);
+select plan(31);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -274,35 +274,57 @@ select is(
 -- allein wäre mit dem Orakel vereinbar, solange die Ablehnungen sich
 -- unterscheiden. Die Zusage ist, dass beide Wege in DERSELBEN Ablehnung enden.
 
--- Ein `basic`-Betrachter und ein Beitrag, den nur Mitglieder sehen.
-insert into auth.users (id, aud, role, email) values
-  ('5a000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'sp-basic@test.fbc');
-update public.profiles set tier = 'basic', name = 'Sp Basic', activated_at = now()
- where id = '5a000000-0000-0000-0000-000000000005';
+-- AGE-601 HAT DIE VORBEDINGUNG DIESES ABSCHNITTS ENTZOGEN, und das gehoert
+-- ausgesprochen statt still umgangen: seit `members` jedes AKTIVIERTE Mitglied
+-- meint, gibt es fuer einen aktivierten Aufrufer keinen „vorhanden, aber
+-- unsichtbar"-Beitrag mehr. Beide zulaessigen Sichtbarkeiten (`public`,
+-- `members`) sind fuer ihn lesbar. Ein `basic`-Betrachter taugt hier also nicht
+-- mehr als Ausgesperrter.
+--
+-- Der Fall verschwindet damit NICHT — er wandert an die Aktivierung. Fuer ein
+-- nicht aktiviertes Konto existieren Beitraege weiterhin und sind weiterhin
+-- unsichtbar, und genau dort muss das Orakel zu bleiben. Traeger ist jetzt
+-- `Sp Deaktiviert` (bestaetigt UND wieder deaktiviert) — laut dem Kommentar
+-- oben der wichtigere der beiden Wege, an denen `is_activated()` faellt.
+--
+-- EHRLICH ZUR ABDECKUNG: die Ablehnung kommt fuer dieses Konto aus dem
+-- `is_activated()`-Konjunkt, nicht aus dem `exists`-Konjunkt. Beobachtbar ist
+-- dieselbe Zusage — zwei ununterscheidbare Antworten —, aber der `exists`-Zweig
+-- wird dadurch nicht mehr durchlaufen. Damit ihn niemand als ueberfluessig
+-- streicht, steht er unten als eigener Wortlaut-Waechter.
 
 insert into public.posts (id, author_id, body, visibility) values
   ('5b000000-0000-0000-0000-0000000000cc', '5a000000-0000-0000-0000-000000000002',
-   'Nur fuer Mitglieder — fuer den basic-Betrachter unsichtbar.', 'members');
+   'Nur fuer Mitglieder — fuer ein nicht aktiviertes Konto unsichtbar.', 'members');
 
 select is(
-  pg_temp.count_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.count_as('5a000000-0000-0000-0000-000000000004',
     $$select count(*)::int from public.posts
        where id = '5b000000-0000-0000-0000-0000000000cc'$$),
-  0, 'Vorbedingung: der basic-Betrachter sieht diesen Beitrag nicht');
+  0, 'Vorbedingung: das nicht aktivierte Konto sieht diesen Beitrag nicht');
+
+-- Gegenprobe zur Vorbedingung: ein AKTIVIERTES Konto sieht ihn sehr wohl. Ohne
+-- sie belegte die Null oben nur, dass die Abfrage nichts findet — etwa weil der
+-- Beitrag gar nicht angelegt wurde.
+select is(
+  pg_temp.count_as('5a000000-0000-0000-0000-000000000001',
+    $$select count(*)::int from public.posts
+       where id = '5b000000-0000-0000-0000-0000000000cc'$$),
+  1, 'Gegenprobe: ein aktiviertes Konto sieht ihn (AGE-601 — ohne Stufenschwelle)');
 
 select alike(
-  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000004',
     $$insert into public.post_saves (profile_id, post_id)
-      values ('5a000000-0000-0000-0000-000000000005',
+      values ('5a000000-0000-0000-0000-000000000004',
               '5b000000-0000-0000-0000-0000000000cc')$$),
   'DENIED:%row-level security%',
   'Ein unsichtbarer Beitrag laesst sich nicht speichern — und die Ablehnung '
   'kommt aus der Policy, nicht aus dem Fremdschluessel');
 
 select alike(
-  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000004',
     $$insert into public.post_saves (profile_id, post_id)
-      values ('5a000000-0000-0000-0000-000000000005',
+      values ('5a000000-0000-0000-0000-000000000004',
               '5b000000-0000-0000-0000-0000000000ff')$$),
   'DENIED:%row-level security%',
   'Eine Kennung, die es gar nicht gibt, wird GENAUSO abgelehnt — kein 23503, '
@@ -312,26 +334,48 @@ select alike(
 -- einzeln auf ein Muster zu prüfen liesse zwei verschiedene Meldungen zu, die
 -- beide „row-level security" enthalten — und schon das waere wieder ein Kanal.
 select is(
-  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000004',
     $$insert into public.post_saves (profile_id, post_id)
-      values ('5a000000-0000-0000-0000-000000000005',
+      values ('5a000000-0000-0000-0000-000000000004',
               '5b000000-0000-0000-0000-0000000000cc')$$),
-  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000004',
     $$insert into public.post_saves (profile_id, post_id)
-      values ('5a000000-0000-0000-0000-000000000005',
+      values ('5a000000-0000-0000-0000-000000000004',
               '5b000000-0000-0000-0000-0000000000ff')$$),
   'Vorhanden-aber-unsichtbar und gar-nicht-vorhanden liefern dieselbe '
   'Zeichenkette — das Orakel ist zu');
+
+-- WAECHTER UEBER DEN `exists`-KONJUNKT (AGE-601).
+-- Er wird von den Zusagen oben nicht mehr durchlaufen, seit die Ablehnung an
+-- `is_activated()` faellt. Ohne diesen Waechter koennte ihn jemand als
+-- „unerreichbar, also tot" streichen — und das Orakel waere in dem Moment
+-- wieder offen, in dem die Sichtbarkeit sich erneut verengt. Bricht er, ist das
+-- die Aufforderung, die Abdeckung oben zu pruefen, nicht ihn anzupassen.
+-- Befund aus dem Diff-Review (codex, MEDIUM): die erste Fassung dieses Waechters
+-- pruefte nur `EXISTS ( SELECT 1 ... FROM posts` und liess damit genau den Teil
+-- offen, auf den es ankommt — die KORRELATION `p.id = post_saves.post_id`. Ohne
+-- sie waere auch `exists (select 1 from posts)` — irgendein Beitrag existiert —
+-- eine gueltige Uebereinstimmung, und die Policy pruefte nichts mehr. Deshalb
+-- steht hier jetzt der VOLLSTAENDIGE Ausdruck, wortgleich.
+select is(
+  (select pg_get_expr(polwithcheck, polrelid) from pg_policy
+    where polrelid = 'public.post_saves'::regclass
+      and polname = 'post_saves_insert_own'),
+  '(is_activated() AND (profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1'
+  || E'\n   FROM posts p\n  WHERE (p.id = post_saves.post_id))))',
+  'post_saves_insert_own fragt weiterhin WORAUF geschrieben wird, nicht nur WER '
+  '— samt der Korrelation auf post_id, ohne die der exists-Zweig leerliefe');
 
 -- Die Gegenprobe zur Verschaerfung: ein SICHTBARER Beitrag bleibt speicherbar.
 -- Ohne sie waere die Zusage oben auch mit einer Policy vereinbar, die einfach
 -- gar nichts mehr durchlaesst.
 select is(
-  pg_temp.try_as('5a000000-0000-0000-0000-000000000005',
+  pg_temp.try_as('5a000000-0000-0000-0000-000000000001',
     $$insert into public.post_saves (profile_id, post_id)
-      values ('5a000000-0000-0000-0000-000000000005',
-              '5b000000-0000-0000-0000-0000000000aa')$$),
-  'OK', 'Ein oeffentlicher Beitrag laesst sich weiterhin speichern');
+      values ('5a000000-0000-0000-0000-000000000001',
+              '5b000000-0000-0000-0000-0000000000cc')$$),
+  'OK', 'Ein AKTIVIERTES Konto speichert denselben members-Beitrag sehr wohl — '
+        'die Policy laesst nicht einfach gar nichts mehr durch');
 
 select * from finish();
 rollback;
