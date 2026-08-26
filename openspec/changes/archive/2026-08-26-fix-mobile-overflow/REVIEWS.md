@@ -7,7 +7,7 @@ Zwei Reviewer, beide von anderen Anbietern als der Autor des Deltas.
 |---|---|---|
 | gemini 0.28.2 | Google | APPROVE, 4 Befunde |
 | opencode 1.18.7 | (fremd) | **REJECT**, 8 Befunde |
-| codex-cli 0.145.0 | OpenAI | lief zum Zeitpunkt des Schreibens noch — Ergebnis unten nachgetragen, wenn es eintrifft |
+| codex-cli 0.145.0 | OpenAI | **REJECT**, 10 Befunde (174k Token, ~40 min) |
 
 Ein drittes Werkzeug (`cursor-agent`) war nicht nutzbar: es verlangt ein
 interaktives Login, das aus dieser Umgebung heraus nicht geht.
@@ -81,6 +81,48 @@ der *Stelle* falsch — uebernommen wurde die Sache.
 (`ul.grid > li > Link > Card`) — das ist die **ausgeloggte** Seite. Die Messung
 lief eingeloggt. Der Befund trifft trotzdem, aber als Folge von Befund 1: der
 Plan nannte die falsche Datei, und in jener Datei stimmt die Aussage nicht.
+
+## Was codex zusaetzlich fand — alle uebernommen
+
+codex bestaetigte die Befunde 1–4 **unabhaengig** von opencode und legte fuenf
+weitere nach, die alle trafen:
+
+**7. Die Anforderung widersprach ihrem eigenen Plan.** Sie mass allein
+`documentElement.scrollWidth`, waehrend `design.md` genau begruendet, warum
+dieser Wert Inhaltsueberlauf uebersieht. Die Messmethode steht jetzt in der
+Anforderung selbst, samt der zwei noetigen Ausnahmen (`position: fixed`,
+`.sr-only`).
+
+**8. Sieben weitere Routen fehlten**, nicht nur `/intern/routing`: `/academy`,
+`/kompass`, `/meine-events`, `/kontakte`, `/admin/feedback`,
+`/admin/mitglied/:id`. Die Aufgabe leitet die Liste jetzt aus `App.tsx` ab,
+statt sie von Hand zu fuehren — eine Handliste deckt nur ab, woran jemand
+gedacht hat.
+
+**9. „lesbar", „bedienbar", „erreichbar" sind nicht abnehmbar.** Das Szenario
+nennt jetzt **200 px** als Mindestbreite eines gestapelten Eingabefeldes. Die
+heutigen 26 px verfehlen das um eine Groessenordnung — vorher war genau das
+nicht sagbar.
+
+**10. Die bestehende 1440-px-Zusage wurde nirgends gegengemessen.** Neu als
+Szenario und als Aufgabe 5.7. `min-width: 0` sollte oberhalb der Spurbreite
+wirkungslos sein — sollte, gemessen ist besser.
+
+**5. Regel 1 ist nicht fehlalarmfrei**, wie `design.md` behauptete: `[2rem_1fr]`
+passt bei 320 px und wuerde gemeldet; `vw`, `%` und `var()` entgehen ihr. Die
+Behauptung ist ersetzt durch die Beschreibung dessen, was die Regel wirklich
+ist — konservativ, nicht exakt.
+
+## Was der Waechter beim ersten Lauf ueber sich selbst verriet
+
+Die Verbiegungsprobe (synthetische Zeichenketten statt der bekannten Zeilen)
+schlug sofort fehl: der Ausdruck fand den echten Verstoss
+`grid-cols-[10rem_1fr_auto]` **nicht**. Ursache war ein `\b` hinter der
+Einheit — Tailwind trennt Spalten mit `_`, und `_` ist ein Wortzeichen, also
+liegt zwischen `10rem` und `_1fr` gar keine Wortgrenze.
+
+Ohne diese Probe waere der Waechter gruen gewesen und haette nichts geprueft.
+Das ist der Grund, warum sie in den Aufgaben steht und nicht als Kuer.
 
 ## Folge
 

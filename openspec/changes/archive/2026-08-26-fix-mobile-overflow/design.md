@@ -42,8 +42,15 @@ Zwei Regeln, beide aus dem, was gemessen wurde — keine dritte auf Verdacht.
 
 **Regel 1 — feste Spalten brauchen einen Breakpoint.** Eine Rasterdefinition mit
 einer festen Laenge (`rem`, `px`, `ch`) ohne vorangestelltes `sm:`/`md:`/`lg:`/
-`xl:` ist verboten. Das ist eine reine Textpruefung, ohne Fehlalarme, und trifft
-heute genau zwei Zeilen.
+`xl:` ist verboten. Eine reine Textpruefung; sie trifft heute genau zwei Zeilen.
+
+**Nicht fehlalarmfrei, und das steht hier statt in einer Ueberraschung.** Ein
+Raster wie `[2rem_1fr]` passt bei 320 px muehelos und wuerde trotzdem gemeldet.
+Umgekehrt entgehen ihr feste Werte in `vw`, `%` oder `var()`. Beides ist heute
+gegenstandslos — es gibt keinen solchen Fall im Baum —, aber die Regel ist
+konservativ, nicht exakt: sie verlangt, dass eine feste Spalte **bewusst** hinter
+einen Breakpoint gestellt wird, auch wo sie harmlos waere. Der Preis ist ein
+Praefix, der Ertrag, dass niemand je abwaegen muss.
 
 **Regel 2 gibt es nicht mehr.** Sie sollte von einem kuerzenden Element die
 JSX-Vorfahren hinaufgehen und beim ersten Flex-/Grid-Kind `min-w-0` verlangen.

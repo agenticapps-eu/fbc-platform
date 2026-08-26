@@ -181,3 +181,49 @@ nicht an einer Checkliste:
   der eingefrorene Vision-Dummy — eigener Namensraum, von nirgends importiert,
   in keinem Bundle)
 - keine Schrift von einem fremden CDN in `src/` oder `index.html`
+
+## 8. Schmale Geräte: 320 px ist die Untergrenze
+
+Die Anwendung wird **ab 320 px Fensterbreite** unterstützt (iPhone SE 1. Gen und
+Android-Kleingeräte). Darunter gilt keine Zusage. Ohne diese Zahl ist „läuft
+über" keine prüfbare Aussage, sondern eine Meinung über ein Gerät.
+
+**Ab 320 px lässt sich keine Seite seitlich schieben.** Gemessen wird nicht nur
+`documentElement.scrollWidth` — dieser Wert übersieht Inhaltsüberlauf, den ein
+Vorfahr beschneidet, und in der Geräte-Emulation wächst die Vergleichsgröße mit
+dem Fehler mit. Gemessen wird **je Element**: sein rechter Rand gegen
+`documentElement.clientWidth`, und sein eigener `scrollWidth − clientWidth`.
+Ausgenommen sind `position: fixed` (hängt am Viewport, eigener Fehlerfall) und
+`.sr-only` (absichtlich beschnittener Vorlesertext).
+
+**`overflow-x: hidden` oder `clip` auf einem Seitencontainer ist keine
+Erfüllung.** Beides versteckt den Überlauf und schneidet Inhalt ab, den niemand
+mehr erreicht. Ein Bereich, dessen Inhalt bei dieser Breite nicht sinnvoll
+umbrechen kann — eine Tabelle mit mehreren Datenspalten —, bekommt einen
+**eigenen** waagerecht scrollbaren Rahmen; die Seite selbst bleibt unverschoben.
+
+### Die zwei Fallen, die das in AGE-584 verursacht haben
+
+**`truncate` ohne `min-w-0` kehrt sich in sein Gegenteil um.** `truncate` ist
+`overflow:hidden; text-overflow:ellipsis; white-space:nowrap`. Kürzen kann es
+nur, wenn es eingeengt wird — Flex- und Grid-Kinder stehen aber per
+Voreinstellung auf `min-width: auto` und schrumpfen **nicht** unter ihren
+Inhalt. Der `nowrap`-Text fordert dann seine volle Breite und drückt den Träger
+auf. Gemessen: eine Karte von 418 px in einer 288-px-Spur.
+
+Deshalb tragen die geteilten Bausteine `min-w-0` selbst — `Card` und
+`StaggerItem` —, nicht ihre Aufrufstellen. Zwischen dem kürzenden Text und dem
+Rasterkind liegt fast immer eine Komponentengrenze; eine Regel an der
+Aufrufstelle ist genau dort verletzbar, wo niemand hinsieht.
+
+**Eine feste Rasterspalte gilt erst ab einem Breakpoint.** `grid-cols-[10rem_…]`
+gilt sonst auch bei 320 px. Der Prüfstein ist nicht der Überlauf, sondern die
+schmalste Spalte: gemessen löste `[10rem_1fr_5rem_auto]` zu
+`160px 26px 80px 91px` auf — die 26 px waren ein Eingabefeld, unbedienbar,
+bevor die Zeile überhaupt überlief. **Ein Raster, das erst beim Überlauf
+auffällt, war lange vorher schon kaputt.**
+
+`src/components/ui/schmale-geraete.test.ts` hält beides fest. Was es **nicht**
+kann: den Überlauf selbst messen — jsdom rechnet kein Layout. Eine dritte,
+hier nicht gemessene Ursache liefe durch. Die Ergebnismessung ist Handarbeit
+(AGE-607).

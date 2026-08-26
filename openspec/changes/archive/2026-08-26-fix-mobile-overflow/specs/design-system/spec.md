@@ -3,8 +3,16 @@
 ### Requirement: Keine Seite laesst sich seitlich schieben
 
 Die Anwendung SHALL ab einer Fensterbreite von **320 px** ohne waagerechtes
-Schieben bedienbar sein. Auf keiner Route SHALL `documentElement.scrollWidth`
-groesser sein als `clientWidth`.
+Schieben bedienbar sein.
+
+Die Zusage SHALL **nicht allein** an `documentElement.scrollWidth > clientWidth`
+gemessen werden. Dieser Wert uebersieht Inhaltsueberlauf, der von einem
+Vorfahren beschnitten wird, und in der Geraete-Emulation waechst die
+Vergleichsgroesse mit dem Fehler mit. Gemessen SHALL **je Element** werden:
+sein rechter Rand gegen `documentElement.clientWidth`, und sein eigener
+`scrollWidth − clientWidth`. Elemente mit `position: fixed` und `.sr-only`
+SHALL dabei ausgenommen sein — beide sind absichtlich vom Fluss geloest und
+melden sich sonst auf jeder Route.
 
 320 px SHALL als **Mindestbreite** festgeschrieben sein — darunter wird nicht
 unterstuetzt. Ohne eine benannte Zahl ist „laeuft ueber" keine pruefbare
@@ -72,6 +80,14 @@ erweiterte die Regel ueber ihre Begruendung hinaus.
 - **THEN** bleibt die Karte so breit wie ihre Spalte
 - **AND** der Text wird gekuerzt dargestellt
 
+#### Scenario: Breite Fenster bleiben unveraendert
+
+- **WHEN** dieselben Flaechen bei 1440 px dargestellt werden
+- **THEN** loesen Rasterspuren und Kartenbreiten auf wie zuvor
+- **AND** die bestehende Zusage, dass das Dashboard seine Spalten bekommt,
+  gilt unveraendert weiter — `min-width: 0` senkt nur den Boden und ist
+  oberhalb der Spurbreite wirkungslos
+
 #### Scenario: Der Baustein traegt es, nicht die Aufrufstelle
 
 - **WHEN** eine neue Flaeche die Karte in ein Raster stellt, ohne selbst etwas
@@ -93,7 +109,10 @@ das erst beim Ueberlauf auffaellt, war lange vorher schon kaputt.
 
 - **WHEN** eine Zeile mit fester erster Spalte bei 320 px dargestellt wird
 - **THEN** stapeln ihre Felder untereinander
-- **AND** jedes Feld ist mindestens so breit, dass sein Inhalt lesbar bleibt
+- **AND** jedes Eingabefeld ist mindestens **200 px** breit — bei 320 px
+  Fensterbreite bleiben nach Seiten- und Kartenrand rund 240 px, ein gestapeltes
+  Feld nutzt sie also nahezu ganz. Die heutige Auflösung zu **26 px** verfehlt
+  das um eine Groessenordnung, und „lesbar" ohne Zahl ist nicht abnehmbar.
 
 #### Scenario: Der Waechter faengt eine neue feste Spalte
 
