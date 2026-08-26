@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { useDesignVariantValue } from "../../providers/design-variant-context";
+import { Icon } from "./icons";
 import { NavIcon } from "./NavIcon";
 
 export interface SidebarNavItem {
@@ -28,6 +29,20 @@ export interface SidebarNavItem {
 export interface SidebarNavSection {
   title?: string;
   items: SidebarNavItem[];
+  /**
+   * Inline-Akkordeon (AGE-292): der Titel wird zur Schaltfläche, die ihre
+   * Einträge auf- und zuklappt.
+   *
+   * Der Zuschnitt löst AGE-293 gleich mit: eine Überschrift, die nur dasteht,
+   * ist genau das tote Label, das dort weg soll — eine, die etwas tut, ist ein
+   * Bedienelement. Die Hauptnavigation bekommt deshalb GAR KEINEN Titel mehr
+   * statt eines klappbaren; über ihr sagt ein Wort nichts, was die Einträge
+   * nicht selbst sagen.
+   *
+   * Höchstens EINE Ebene tief — der persönliche Bereich soll schlank bleiben,
+   * nicht zu einem zweiten Menü werden.
+   */
+  klappbar?: boolean;
 }
 
 /**
@@ -62,9 +77,29 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
   // SidebarNav; ein geteilter layoutId würde den Indicator zwischen der sichtbaren
   // und der (display:none) versteckten Instanz springen lassen.
   const indicatorId = useId();
+  /**
+   * Die ZUGEKLAPPTEN Abschnitte, nicht die offenen (AGE-292).
+   *
+   * Andersherum — eine Menge der offenen — müsste der Anfangszustand jeden
+   * klappbaren Abschnitt aufzählen, und ein später hinzugefügter stünde
+   * stillschweigend zu. Ein Abschnitt, den niemand angefasst hat, ist offen.
+   */
+  const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
+  const umschalten = (titel: string) =>
+    setZugeklappt((vorher) => {
+      const naechste = new Set(vorher);
+      if (!naechste.delete(titel)) naechste.add(titel);
+      return naechste;
+    });
   return (
     <nav className={cn("flex flex-col", collapsed ? "gap-4" : "gap-7")}>
-      {sections.map((section, i) => (
+      {sections.map((section, i) => {
+        // Klappbar nur ausgeklappt und nur mit Titel: in der schmalen Leiste
+        // gibt es keine Überschrift, also auch keinen Griff — ein Akkordeon
+        // ohne sichtbaren Griff versteckte seine Einträge unerreichbar.
+        const istKlappbar = Boolean(section.klappbar && section.title && !collapsed);
+        const offen = !istKlappbar || !zugeklappt.has(section.title as string);
+        return (
         <div
           key={section.title ?? i}
           className={cn(
@@ -77,12 +112,31 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
             i > 0 && "mt-1 border-t border-chrome-border pt-4",
           )}
         >
-          {section.title && !collapsed && (
+          {section.title && !collapsed && !istKlappbar && (
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">
               {section.title}
             </p>
           )}
-          {section.items.map((item) => (
+          {istKlappbar && (
+            <button
+              type="button"
+              onClick={() => umschalten(section.title as string)}
+              aria-expanded={offen}
+              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {/* Aus dem Icon-Satz, nicht inline gezeichnet: `icons.test.ts`
+                  hält fest, dass jeder wiederverwendbare Glyph dort steht — ein
+                  eigener Chevron hier wäre der vierte im Baum.
+                  `Icon` setzt `aria-hidden` selbst; die Richtung steht ohnehin
+                  in `aria-expanded`, und „Dreieck" ergänzt dort nichts. */}
+              <Icon
+                name="chevronDown"
+                className={cn("h-3.5 w-3.5 transition-transform", offen ? "rotate-0" : "-rotate-90")}
+              />
+              {section.title}
+            </button>
+          )}
+          {offen && section.items.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -158,7 +212,8 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
             </NavLink>
           ))}
         </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }

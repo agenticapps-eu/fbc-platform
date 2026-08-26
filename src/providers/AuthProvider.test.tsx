@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -49,6 +50,27 @@ vi.mock("../lib/log", () => ({ logEvent: vi.fn() }));
 
 const { logEvent } = await import("../lib/log");
 const { AuthProvider } = await import("./AuthProvider");
+const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
+
+/**
+ * `AuthProvider` liest seit AGE-258 den QueryClient (er leert ihn beim
+ * Sitzungswechsel) und liegt in `main.tsx` deshalb INNERHALB des
+ * `QueryClientProvider`. Die Tests bilden diese Schachtelung nach — ohne sie
+ * wirft jedes Rendern „No QueryClient set".
+ *
+ * Ein EIGENER Client je Aufruf, kein geteilter: ein Test, der den Cache leert,
+ * dürfte den nächsten sonst nicht mehr messen können.
+ */
+function Umgebung({ children }: { children: React.ReactNode }) {
+  // Der Client entsteht beim MOUNTEN, nicht bei jedem Rendern: inline im JSX
+  // angelegt wechselte der Provider bei jedem Durchlauf seinen Wert.
+  const [client] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={client}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
+}
 const { useAuth } = await import("./auth-context");
 
 /** Ruft `signUp` einmal beim Rendern und zeigt das Ergebnis an. */
@@ -63,9 +85,9 @@ function Registrieren() {
 
 function renderUndRegistrieren() {
   render(
-    <AuthProvider>
+    <Umgebung>
       <Registrieren />
-    </AuthProvider>,
+    </Umgebung>,
   );
   screen.getByRole("button", { name: "los" }).click();
 }
@@ -156,9 +178,9 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
       );
     }
     render(
-      <AuthProvider>
+      <Umgebung>
         <Prüfen />
-      </AuthProvider>,
+      </Umgebung>,
     );
     screen.getByRole("button", { name: "los" }).click();
 
@@ -191,9 +213,9 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
       );
     }
     render(
-      <AuthProvider>
+      <Umgebung>
         <Zeigen />
-      </AuthProvider>,
+      </Umgebung>,
     );
     // Erst den Mount zu Ende laufen lassen: `getSession()` löst mit `null` auf
     // und setzt die Sitzung ein zweites Mal. Ohne dieses Abwarten überholt es
@@ -227,9 +249,9 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
     // Container gebunden sein, sonst findet sie beide Knöpfe.
     for (let lauf = 0; lauf < 2; lauf++) {
       const { container } = render(
-        <AuthProvider>
+        <Umgebung>
           <Registrieren />
-        </AuthProvider>,
+        </Umgebung>,
       );
       within(container).getByRole("button", { name: "los" }).click();
     }
@@ -302,9 +324,9 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
 
     signUp.mockResolvedValueOnce(ERFOLG("mit-sitzung"));
     const { container: a } = render(
-      <AuthProvider>
+      <Umgebung>
         <Prüfen />
-      </AuthProvider>,
+      </Umgebung>,
     );
     within(a).getByRole("button", { name: "los" }).click();
     await waitFor(() => expect(ergebnisse).toHaveLength(1));
@@ -312,14 +334,102 @@ describe("AuthProvider.signUp — automatischer Aktivierungsversand", () => {
 
     signUp.mockResolvedValueOnce(WIEDERHOLUNG);
     const { container: b } = render(
-      <AuthProvider>
+      <Umgebung>
         <Prüfen />
-      </AuthProvider>,
+      </Umgebung>,
     );
     within(b).getByRole("button", { name: "los" }).click();
     await waitFor(() => expect(ergebnisse).toHaveLength(2));
     expect(ergebnisse[1].hatSession).toBe(false);
     // Und der Fehler bleibt null: Es IST kein Fehler, es ist nur kein Erfolg.
     expect(ergebnisse[1].error).toBeNull();
+  });
+});
+
+/**
+ * Der Cache gehört dem angemeldeten Menschen, nicht dem Tab (AGE-258).
+ *
+ * WAS HIER FESTGEHALTEN WIRD. `AuthProvider` leerte beim Abmelden `profile` und
+ * die Onboarding-Vertagung — den React-Query-Cache aber nicht. Der überlebt den
+ * Sitzungswechsel im selben Tab, und mit ihm jede Antwort, die für den vorigen
+ * Menschen geholt wurde: das Verzeichnis, der Feed, offene Kontaktanfragen. Auf
+ * einem geteilten Gerät — dem Anmeldetisch einer Veranstaltung etwa — ist der
+ * Nächste einen Wimpernschlag lang im Bestand des Vorigen.
+ *
+ * `clear()` und nicht `invalidateQueries()`: Invalidieren markiert die Einträge
+ * nur als veraltet, sie werden weiterhin AUSGELIEFERT, während im Hintergrund
+ * neu geholt wird. Genau dieses Fenster ist der Schaden.
+ *
+ * DIE REGEL IST EINE, NICHT ZWEI. Abmelden und Kontowechsel sind derselbe
+ * Vorgang — der handelnde Mensch wechselt. Zwei Zweige, die dasselbe meinen,
+ * driften; einer, der die Kennung vergleicht, kann es nicht.
+ */
+describe("Der Cache überlebt den Menschen nicht (AGE-258)", () => {
+  /** Bindet einen ECHTEN QueryClient ein — kein Mock, sonst bezeugt der Test
+   *  nur seinen eigenen Spion statt der Wirkung auf den Cache. */
+  async function mitCache() {
+    const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
+    const client = new QueryClient();
+    client.setQueryData(["verzeichnis"], "Bestand des Vorigen");
+    render(
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <div />
+        </AuthProvider>
+      </QueryClientProvider>,
+    );
+    return client;
+  }
+
+  const sitzung = (id: string) => ({ access_token: "t", user: { id } });
+
+  it("leert den Cache beim Abmelden", async () => {
+    const client = await mitCache();
+    await act(async () => authRückruf?.("SIGNED_IN", sitzung("a")));
+    expect(client.getQueryData(["verzeichnis"])).toBe("Bestand des Vorigen");
+
+    await act(async () => authRückruf?.("SIGNED_OUT", null));
+
+    expect(client.getQueryData(["verzeichnis"])).toBeUndefined();
+  });
+
+  it("leert ihn auch beim Kontowechsel OHNE Abmelden", async () => {
+    const client = await mitCache();
+    await act(async () => authRückruf?.("SIGNED_IN", sitzung("a")));
+    expect(client.getQueryData(["verzeichnis"])).toBe("Bestand des Vorigen");
+
+    // Kein Abmelden dazwischen. Wer nur auf `!session` prüft, lässt hier alles stehen.
+    await act(async () => authRückruf?.("SIGNED_IN", sitzung("b")));
+
+    expect(client.getQueryData(["verzeichnis"])).toBeUndefined();
+  });
+
+  /**
+   * Die Gegenprobe, ohne die die beiden oben auch von `clear()` bei JEDEM
+   * Rückruf erfüllt wären. Ein Token erneuert sich im Minutentakt; würde das
+   * den Cache leeren, holte die App ihren gesamten Bestand im Minutentakt neu.
+   * Grün wäre der Test trotzdem.
+   */
+  it("lässt ihn bei einer Token-Erneuerung derselben Person STEHEN", async () => {
+    const client = await mitCache();
+    await act(async () => authRückruf?.("SIGNED_IN", sitzung("a")));
+
+    await act(async () => authRückruf?.("TOKEN_REFRESHED", sitzung("a")));
+
+    expect(client.getQueryData(["verzeichnis"])).toBe("Bestand des Vorigen");
+  });
+
+  /**
+   * Und die zweite Gegenprobe: der Start. Beim Mounten meldet Supabase die
+   * bestehende Sitzung (`INITIAL_SESSION`). Wer das als Wechsel liest, leert den
+   * Cache bei jedem Seitenaufbau — teuer, und von den drei Zusagen oben nicht
+   * bemerkt.
+   */
+  it("leert ihn beim ersten Rückruf nach dem Mounten NICHT", async () => {
+    const client = await mitCache();
+
+    await act(async () => authRückruf?.("INITIAL_SESSION", sitzung("a")));
+
+    expect(client.getQueryData(["verzeichnis"])).toBe("Bestand des Vorigen");
   });
 });
