@@ -229,126 +229,6 @@ copy can drift out of sync.
 - **WHEN** any code references `member_settings.visible_in_directory`
 - **THEN** the column does not exist (it was dropped by the single-source migration)
 
-### Requirement: Author name masking is only partially resolved
-
-Der Kopf dieser Anforderung bleibt wahr und **soll** wahr bleiben: die Maskierung
-ist teilweise gelöst. Falsch war, **welcher** Teil gelöst ist, **wie**, und was
-in der Zwischenzeit gilt. Diese Fassung sagt alle drei.
-
-**Gelöst — die Verdeckung gegenüber Ausgeloggten, auf zwei Ebenen.** Ein
-ausgeloggter Besucher SHALL weder Name noch Avatarbild eines Mitglieds sehen. Die
-untere Ebene SHALL die tragende sein:
-
-1. **Daten.** Ohne Session SHALL eine für `anon` gesperrte Relation **gar nicht
-   erst angefragt** werden. `profiles_public` und `partners` tragen für `anon`
-   kein Leserecht; eine Abfrage käme als `42501` zurück. Die Bedingung SHALL an
-   der ohnehin durchgereichten Profil-Kennung hängen, nicht an einer zweiten
-   Abfrage des Sitzungszustands.
-2. **Anzeige.** `displayAuthor` SHALL ausgeloggt jeden Autor als „Ein Mitglied"
-   ohne Avatarbild führen, unabhängig davon, was der Aufrufer übergibt.
-
-Die Anzeige-Ebene SHALL NOT als Sicherheitsgrenze gelten. Die Grenze ist das
-fehlende Recht in der Datenbank; die Maskierung sorgt dafür, dass der Ausfall der
-Anreicherung wie eine Gestaltungsentscheidung aussieht statt wie ein Fehler.
-
-Diese Verdeckung SHALL sich auf **strukturierte Identitätsfelder** aus Profil-
-und Host-Daten beziehen. Selbstverfasste öffentliche Inhalte — Beitragstexte,
-Eventbeschreibungen — SHALL ausdrücklich **nicht** erfasst sein: sie können Namen
-als gewöhnlichen Text tragen, und nichts prüft das. Wer die Anforderung breiter
-liest, hält sie schon heute für gebrochen.
-
-**Nicht gelöst — und dies ist die Lage, die bisher nirgends stand:** Ein
-**eingeloggtes, aktiviertes** Konto SHALL heute jeden öffentlichen Mitgliedsnamen
-lesen können, **unabhängig von seiner Stufe** — ein frei registriertes `basic`
-eingeschlossen. `profiles_public` läuft mit `security_invoker = off`
-(`20260612082726_rls_policies.sql:64`) und trägt `grant select … to
-authenticated` (`20260715140000_explicit_grants.sql:118`); die Stufen-Policy
-`profiles_select_self_or_discover` der Basistabelle wird dort **nicht**
-ausgewertet.
-
-Diese Preisgabe SHALL als **derzeit hingenommen und offen** geführt werden, nicht
-als abgeschlossen und nicht als Versehen. Es SHALL NOT behauptet werden, die RLS
-gattere Namen bereits nach Stufe — das trifft auf **Zeilen** über
-`search_directory` zu (`has_level(3)`), nicht auf **Namen** über
-`profiles_public`. Wer eine stufenweise Auflösung für redundant hält, hat diese
-beiden Wege verwechselt.
-
-Die stufenweise Auflösung SHALL im Change `finish-ui-polish` (AGE-291) geführt
-bleiben, der sie in der Datenbank vorsieht. Der Verweis ist Teil der
-Anforderung: „ausstehend" ohne Adresse ist der Zustand, aus dem diese Fassung
-herausführt.
-
-**Der Auslöser, ab dem die Preisgabe wirksam wird (festgeschrieben 22.08.2026):**
-Solange **alle** Konten auf `impact` stehen, ist sie folgenlos — es gibt keine
-Stufe, gegen die abgestuft werden könnte, und jedes Konto dürfte die Namen
-ohnehin sehen. Gemessen am selben Tag auf der Import-Datenbank: 71 von 71
-Profilen auf `impact`. Die Preisgabe SHALL deshalb **nicht** als „später" oder
-als Terminfrage geführt werden, sondern an genau dieser Bedingung hängen:
-
-- **WENN** das erste Konto eine Stufe **unterhalb** von `impact` trägt — also
-  mit der Freischaltung des normalen Stufenwegs ab `basic` für Neuzugänge —
-- **DANN** SHALL die stufenweise Auflösung aus AGE-291 gebaut sein, **bevor**
-  dieses Konto entsteht; ab ihm liest ein `basic`-Konto sonst jeden
-  öffentlichen Mitgliedsnamen.
-
-Der Auslöser ist ein Zustand der Daten, keine Kalenderzeile: er lässt sich
-jederzeit prüfen (`select count(*) from profiles where tier <> 'impact'` > 0)
-und rutscht deshalb nicht durch, wenn der Go-Live sich verschiebt.
-
-#### Scenario: Anonymous reader sees a masked author name
-
-- **WHEN** an anonymous caller reads a post whose author's profile row is not
-  readable to them
-- **THEN** the author renders as a masked label without an avatar
-- **AND** this is produced by the display masking, not by a failed query — the
-  query is not issued at all
-
-#### Scenario: Tiered name resolution is not yet in effect
-
-- **WHEN** the current behaviour is inspected for graduated, tier-based name
-  reveal
-- **THEN** none exists — every activated authenticated caller reads every public
-  member's full name through `profiles_public`, regardless of tier
-- **AND** the pending work is the database-side resolver planned in the
-  `finish-ui-polish` change (AGE-291), not an unassigned follow-up
-
-#### Scenario: Ausgeloggt wird die gesperrte Relation nicht angefragt
-
-- **WHEN** ein ausgeloggter Besucher die Startseite, die Aktivitätenseite, die
-  Eventliste oder ein einzelnes Event öffnet
-- **THEN** wird weder `profiles_public` noch `partners` angefragt
-- **AND** die Beiträge und Events erscheinen trotzdem
-
-#### Scenario: Ausgeloggt trägt jeder Autor denselben verdeckten Namen
-
-- **WHEN** ein ausgeloggter Besucher einen Beitrag sieht
-- **THEN** heißt der Autor „Ein Mitglied" und trägt kein Avatarbild
-- **AND** dieses Ergebnis stammt aus der Maskierung der Anzeige, nicht aus dem
-  Fehlschlag einer Abfrage
-
-#### Scenario: Eingeloggt werden Autoren im Feed weiterhin aufgelöst
-
-- **WHEN** ein authentifiziertes, aktiviertes Mitglied den Feed oder die
-  Kommentare eines Beitrags öffnet
-- **THEN** wird `profiles_public` angefragt
-- **AND** Name, Avatarbild und Stufen-Badge des Autors erscheinen
-
-#### Scenario: Eingeloggt werden Event-Hosts beider Arten aufgelöst
-
-- **WHEN** ein authentifiziertes, aktiviertes Mitglied Events öffnet, deren Hosts
-  teils Profile und teils Partner sind
-- **THEN** werden `profiles_public` **und** `partners` angefragt
-- **AND** der Profil-Host trägt Name, Avatarbild und Stufen-Badge, der
-  Partner-Host Name und Logo **ohne** Stufen-Badge
-
-#### Scenario: Ein basic-Konto liest heute jeden öffentlichen Namen
-
-- **WHEN** ein aktiviertes Konto der Stufe `basic` `profiles_public` liest
-- **THEN** bekommt es die vollen Namen aller öffentlichen, aktivierten Profile
-- **AND** dies ist der hingenommene Ist-Zustand, keine Zusicherung für die
-  Zukunft und keine Aussage über `search_directory`, das ihm nur die eigene
-  Zeile gibt
-
 ### Requirement: Der anon-Wächter reicht so weit, wie er reicht
 
 Es SHALL geprüft werden, dass die ausgeloggten Lesepfade ausschließlich
@@ -933,4 +813,81 @@ die Suchergebnisse („Suchergebnisse überleben keinen Wechsel der Identität")
 
 - **WHEN** „Meine Kontakte" ohne einen einzigen Kontakt geöffnet wird
 - **THEN** erscheint ein einladender Hinweis und keine Fehlermeldung
+
+### Requirement: Directory names are resolved by the viewer's activation
+
+The directory SHALL display each member's name via the shared display-name resolver
+(see `member-profiles`): a caller who is the member themselves, or who is an
+**activated** member, SHALL see the full name; every other caller SHALL see the
+masked "Mitglied" label. Resolution SHALL occur in the database read path
+(`profiles_public` / `search_directory`), so the full name is never sent to a
+below-threshold caller.
+
+**The threshold is activation, not a tier.** An earlier plan set it at
+`level_rank >= 4` (`exchange`). Because "members" now means every activated member,
+that threshold would have masked every author of a feed the same members may read —
+a full feed in which nobody has a name. The two do not conflict technically; they
+conflict in purpose, and the feed's purpose wins.
+
+**The resolver SHALL apply even where a gate already excludes the caller.** Every
+surface that carries a name today is additionally gated on activation, so a caller
+the resolver would mask receives no rows at all and the masked branch is unreachable.
+That is the point: the resolver is the second of two independent defences, and a
+future surface that omits the gate must still not disclose a name. The duplication is
+therefore deliberate and SHALL NOT be factored away — two checks that would fail
+together are one check.
+
+**Masking the returned column is not sufficient by itself.** Ordering and full-text
+search are disclosure channels of their own: a masked row at its alphabetical
+position discloses the name the column withholds, and a search term that keeps a
+masked row on screen answers the same question. Both SHALL be bound to the same
+right as the column.
+
+**What "the name" means here SHALL stay narrow.** The requirement binds
+**structured identity fields** carried by profile and host data — the `name`
+column and what is derived from it. Self-authored public content — post bodies,
+event descriptions — SHALL explicitly **not** be in scope: it may carry names as
+ordinary prose, the resolver does not read it, and nothing checks it. This scoping
+is carried over from the superseded requirement because it did not become obsolete
+with the resolver: a reader who takes the requirement more broadly concludes it is
+already broken.
+
+#### Scenario: An activated viewer sees the full name
+
+- **WHEN** an activated caller reads another member in the directory
+- **THEN** that member's full name is returned
+
+#### Scenario: A viewer below the threshold sees the masked label
+
+- **WHEN** a caller who is not activated resolves another member's name
+- **THEN** the "Mitglied" masked label is returned and the full name is absent from
+  the payload
+
+#### Scenario: A member always sees their own full name
+
+- **WHEN** a caller reads their own directory row
+- **THEN** their full name is returned, whether or not they are activated
+
+#### Scenario: Anonymous caller keeps the masked fallback
+
+- **WHEN** an anonymous caller cannot read an author's profile row
+- **THEN** the name renders as the "Mitglied" fallback
+
+#### Scenario: The masked name does not leak through ordering
+
+- **WHEN** the directory is ordered by name
+- **THEN** it is ordered by the resolved name, so a masked row does not occupy the
+  alphabetical position of the name it withholds
+
+#### Scenario: The masked name does not leak through search
+
+- **WHEN** a caller who may not see names searches the directory by free text
+- **THEN** the search does not answer whether a masked row matches the term, so the
+  search cannot be used as an oracle on the withheld name
+
+#### Scenario: A surface without the gate still masks
+
+- **WHEN** a read path reaches profile rows without the activation gate in front of it
+- **THEN** the resolver still returns the masked label to a caller below the
+  threshold, because it re-checks the caller itself
 

@@ -38,6 +38,15 @@ position discloses the name the column withholds, and a search term that keeps a
 masked row on screen answers the same question. Both SHALL be bound to the same
 right as the column.
 
+**What "the name" means here SHALL stay narrow.** The requirement binds
+**structured identity fields** carried by profile and host data — the `name`
+column and what is derived from it. Self-authored public content — post bodies,
+event descriptions — SHALL explicitly **not** be in scope: it may carry names as
+ordinary prose, the resolver does not read it, and nothing checks it. This scoping
+is carried over from the superseded requirement because it did not become obsolete
+with the resolver: a reader who takes the requirement more broadly concludes it is
+already broken.
+
 #### Scenario: An activated viewer sees the full name
 
 - **WHEN** an activated caller reads another member in the directory
