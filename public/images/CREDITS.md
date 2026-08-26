@@ -14,13 +14,21 @@ Pfadname des Bildes auf `images.unsplash.com`.
 | `hero-compass.webp`        | `/compass`                  | Bergpfad in den Wolken            | `photo-1749661368537-729b6de42864` |
 | `hero-academy.webp`        | `/academy`, `/meine-kurse`  | Vortrag vor Publikum              | `photo-1544531586-fde5298cdd40`    |
 | `hero-events.webp`         | `/events`                   | Gedeckter Tisch, Restaurant       | `photo-1414235077428-338989a2e8c0` |
-| `hero-mitglieder.webp`     | `/mitglieder`               | Zwei Menschen im Gespräch         | `photo-1573496546038-82f9c39f6365` |
+| `hero-mitglieder.webp`     | `/mitglieder` **und `/login`** | Zwei Menschen im Gespräch      | `photo-1573496546038-82f9c39f6365` |
 | `hero-aktivitaet.webp`     | `/aktivitaet`               | Gespräch auf einer Veranstaltung  | `photo-1523379882969-04477e5c1e90` |
 | `hero-kontakte.webp`       | `/kontakte`                 | Zwei Menschen am Laptop           | `photo-1543269865-4430f94492b9`    |
 | `hero-mitgliedschaft.webp` | `/mitgliedschaft`           | Glasfassade                       | `photo-1579445505461-acecf2596190` |
 
 Lizenz für alle: [Unsplash License](https://unsplash.com/license) — kommerzielle
 Nutzung erlaubt, Namensnennung nicht verlangt, aber empfohlen.
+
+**Eine Doppelverwendung, absichtlich (AGE-616):** `hero-mitglieder.webp` trägt
+seit dem 26.08. auch das Bildpanel der Anmeldeseite. Alle neun Motive waren
+bereits an Routen vergeben, ein freies gab es nicht. Die Eindeutigkeitsregel im
+Design-System bindet die **aus der Navigation erreichbaren** Seiten — der Login
+ist keine. Entscheidend war etwas anderes: `/mitglieder` liegt hinter der
+Anmeldung. Ein Gast, der die Anmeldeseite sieht, begegnet diesem Motiv nirgends
+sonst; für ihn wiederholt sich nichts.
 
 **Offen:** Die Fotografennamen fehlen. Die Kennung im CDN-Pfad ist nicht die
 Foto-ID der Unsplash-Seite, und über sie ließ sich die Seite nicht auflösen. Ohne

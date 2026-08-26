@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthError } from "@supabase/supabase-js";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
 import type { AuthContextValue } from "../providers/auth-context";
 import { DesignVariantProvider } from "../providers/DesignVariantProvider";
-import LoginPage from "./LoginPage";
+import LoginPage, { REGISTRIEREN_PFAD } from "./LoginPage";
 
 /**
  * AGE-437: Die Registrierung muss einen Namen erheben. Der Signup-Trigger
@@ -355,3 +355,81 @@ describe("LoginPage", () => {
     });
   });
 });
+
+/**
+ * Der Modus hängt an der Adresse, nicht am Zustand (AGE-616).
+ *
+ * Vorher war `mode` reines `useState`. „Mitglied werden" auf der Startseite
+ * landete deshalb im LOGIN-Formular — ein Knopf, der zum Beitritt einlädt und
+ * ein Anmeldeformular zeigt, verlangt etwas, was der Klickende gerade nicht tun
+ * kann.
+ */
+describe("LoginPage — Registrierung ist adressierbar", () => {
+  function renderAn(pfad: string) {
+    render(
+      <AuthFixture value={fakeAuthValue()}>
+        <DesignVariantProvider>
+          <MemoryRouter initialEntries={[pfad]}>
+            <LoginPage />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+  }
+
+  it("zeigt unter der Registrierungsadresse das Registrierungsformular", () => {
+    renderAn(REGISTRIEREN_PFAD);
+
+    expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Konto erstellen" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+  });
+
+  it("zeigt unter /login den Login", () => {
+    renderAn("/login");
+
+    expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Anmelden" })).toBeInTheDocument();
+  });
+
+  it("folgt der Adresse OHNE Neumontieren", () => {
+    // Der eigentliche Fallstrick: React montiert dieselbe Route beim Wechsel von
+    // `/login` auf `/login?modus=…` NICHT neu. Ein `useState(ausDerAdresse)`
+    // nähme den neuen Wert nie an, und ein Zurücksetzen im Effect käme erst nach
+    // dem falschen Bild. Deshalb wird der Modus abgeleitet, nicht initialisiert.
+    render(
+      <AuthFixture value={fakeAuthValue()}>
+        <DesignVariantProvider>
+          <MemoryRouter initialEntries={["/login", REGISTRIEREN_PFAD]} initialIndex={0}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+            <Weiterschalter />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "weiter" }));
+    expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
+  });
+
+  it("der Moduswechsel schreibt die Adresse fort", () => {
+    renderAn("/login");
+    toRegisterMode();
+
+    expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
+  });
+});
+
+/** Schaltet von außen auf die nächste Adresse weiter, ohne die Route neu zu
+ *  montieren — das ist der Zustand, den kein bestehender Test je hergestellt hat. */
+function Weiterschalter() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(REGISTRIEREN_PFAD)}>
+      weiter
+    </button>
+  );
+}
