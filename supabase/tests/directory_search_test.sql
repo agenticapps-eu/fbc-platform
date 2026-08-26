@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(23);
+select plan(24);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -214,12 +214,32 @@ select is(
   'unterhalb von discover verrät der Kategoriefilter weder Zeilen noch Kategorien');
 
 -- ── 7. anon bekommt kein Ausführungsrecht auf die neue Signatur ─────────────
+-- Bis AGE-602 stand hier ein Vergleich gegen die FEHLERMELDUNG eines Aufrufs.
+-- Die war lokal grün — aber nicht, weil der Entzug wirkte, sondern weil `anon`
+-- das Recht auf diesem Stack ohnehin nie hielt. In PROD hielt es `anon` sehr wohl
+-- (die Default-ACL der Instanz erteilt es), und diese Zusage hat das zwei Monate
+-- lang nicht gesehen. Sie prüfte eine Wirkung, nicht den Zustand, der sie erzeugt.
+--
+-- Deshalb steht hier jetzt das PRIVILEGIEN-BIT. Die Gegenprobe dazu — dass diese
+-- Messung überhaupt in beide Richtungen ausschlägt — steht in `grants_test.sql`
+-- (Abschnitt 7) an einer Wegwerf-Funktion; hier wäre sie ein zweiter Ort für
+-- dieselbe Aussage.
+
 select is(
-  pg_temp.try_as_role('anon', $q$
-    select 1 from public.search_directory(p_offers => array['kapital'])
-  $q$),
-  'DENIED:permission denied for function search_directory',
-  'anon darf die neue Signatur nicht ausführen');
+  has_function_privilege(
+    'anon',
+    'public.search_directory(text,text,text,text,text,text,text[],text[])',
+    'execute'),
+  false,
+  'anon hält KEIN Ausführungsrecht auf der neuen Signatur');
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'public.search_directory(text,text,text,text,text,text,text[],text[])',
+    'execute'),
+  true,
+  'authenticated hält es weiterhin — der Entzug hat nicht zu viel mitgenommen');
 
 -- ── 8. Chip-Zeilen sind eindeutig, reiche Zeilen nicht ──────────────────────
 -- Der Potenzial-Score summiert count(*) über offers/needs

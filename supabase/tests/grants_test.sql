@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(5);
+select plan(9);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -165,6 +165,82 @@ select is(
   0,
   'activation_tokens hat bewusst KEINE Policy — deny-by-default ist hier das '
   'Feature, nicht eine Luecke, die jemand schliessen sollte');
+
+create function public.age602_wegwerf() returns int language sql immutable as $$ select 1 $$;
+
+-- ── 5. Funktions-EXECUTE: dieselbe Luecke, eine Ebene tiefer (AGE-602) ──────
+-- Abschnitt 3 entschaerft den Default fuer TABELLEN, und dort wirkt er: eine neu
+-- angelegte Tabelle traegt danach exakt die Default-ACL und anon hat kein SELECT
+-- (am 26.08.2026 gegengeprueft).
+--
+-- Fuer FUNKTIONEN geht dieser Weg NICHT, und das ist der Grund, warum hier kein
+-- Gegenstueck zu Abschnitt 3 steht. Gemessen, drei Varianten:
+--
+--   alter default privileges ... GRANT execute ... to anon   -> wirkt
+--   alter default privileges ... REVOKE execute ... from public -> WIRKUNGSLOS
+--   revoke execute on function <name> from public            -> wirkt
+--
+-- Postgres vergibt EXECUTE auf Funktionen implizit an PUBLIC, und dieser implizite
+-- Grant laesst sich ueber die Default-ACL nicht wegnehmen: eine neu angelegte
+-- Funktion behaelt `proacl = null`, und anon ist Mitglied von PUBLIC. Eine
+-- Migrationszeile `alter default privileges ... revoke execute on functions`
+-- waere hier ein No-op, der wie Schutz aussieht -- also genau die Sorte stille
+-- Zusicherung, deretwegen AGE-602 ueberhaupt entstand. Sie steht deshalb nicht da.
+--
+-- Was stattdessen traegt, ist Abschnitt 6: die abgeschlossene Liste. Jede Funktion
+-- muss ihr `revoke ... from public, anon` selbst aussprechen, und wer es vergisst,
+-- faellt dort auf -- nicht erst in PROD.
+
+select is(
+  (select has_function_privilege('anon', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'age602_wegwerf'),
+  true,
+  'eine neu angelegte Funktion erbt EXECUTE ueber PUBLIC — deshalb muss jede '
+  'Funktion es selbst entziehen, und deshalb gibt es die Liste unten');
+
+-- ── 6. Welche Funktionen anon ausfuehren darf — als abgeschlossene Liste ─────
+-- Bewusst EIN Gesamtvergleich, aus demselben Grund wie bei den Tabellen oben:
+-- eine Aufzaehlung bekannter Verstoesse liesse den naechsten ungenannten durch
+-- und verlangte, dass jemand ihn vorher erraet. Jede der sechs Zeilen hier ist
+-- eine ausdrueckliche `grant ... to anon`-Entscheidung in ihrer Migration.
+--
+-- Faellt diese Assertion, ist das kein Testfehler: eine Funktion ist fuer
+-- ausgeloggte Besucher erreichbar geworden. Das gehoert entschieden, nicht
+-- nachgepflegt. Weil eine neue Funktion das Recht laut Abschnitt 5 GESCHENKT
+-- bekommt, ist das der Normalfall und nicht die Ausnahme.
+
+select is(
+  (select coalesce(string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+                              E'\n' order by p.proname), '(keine)')
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+     and p.proname <> 'age602_wegwerf'
+     and has_function_privilege('anon', p.oid, 'execute')),
+$$event_cover_lesbar(objektname text)
+event_registration_counts(p_event_ids uuid[])
+feed_tag_counts()
+post_engagement_counts(p_post_ids uuid[])
+post_media_lesbar(objektname text)
+suchbegriff_zu_tsquery(p_query text)$$,
+  'genau diese sechs Funktionen darf anon ausfuehren, keine weitere');
+
+-- ── 7. Gegenprobe: misst Abschnitt 6 ueberhaupt etwas? ──────────────────────
+-- Ohne sie waere die Liste dort blind, wo eine Rolle das Recht ohnehin nie hielt.
+-- Die Wegwerf-Funktion wird angelegt, ihr Recht entzogen und wieder erteilt; beide
+-- Richtungen werden gemessen. Laeuft in der Testtransaktion und wird zurueckgerollt.
+
+revoke execute on function public.age602_wegwerf() from public;
+select is(
+  has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
+  false,
+  'Gegenprobe A: ein ausgesprochener Entzug wird gemessen');
+
+grant execute on function public.age602_wegwerf() to anon;
+select is(
+  has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
+  true,
+  'Gegenprobe B: ein erteiltes Recht wird gemessen — die Zusage ist nicht blind');
 
 select * from finish();
 rollback;
