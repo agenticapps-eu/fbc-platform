@@ -153,11 +153,55 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
   neuen Meldungen — „vollständige E-Mail-Adresse" (8.7) und „konnte gerade nicht
   gestellt werden" (8.2).
 
-- [ ] 6.3 Am echten Konto messen, nicht am Testdoppel: aktiviertes Konto →
+- [x] 6.3 Am echten Konto messen, nicht am Testdoppel: aktiviertes Konto →
       `/passwort-vergessen` → Mail → `/passwort-neu` → Anmeldung mit dem neuen
       Passwort. Reihenfolge beim Messen: Mitschnitt leeren → handeln →
       **Netzwerk lesen** → Screenshot.
-- [ ] 6.4 Belegen, dass `activated_at` dabei **unverändert** geblieben ist.
+
+  **Gemessen am 26.08.2026 auf DEV**, Konto `donald@factiv.eu` (aktiviert seit
+  06.08., `impact`), Flaeche `fbc-probe-a4664fb5.pages.dev`. Lesesonde:
+  `scripts/probe-age505-reset-messung.ts`. Das gesetzte Passwort steht
+  bewusst nicht im Repo.
+
+  **Warum diese Flaeche und nicht die lokale Instanz.** Der Reset-Versand geht
+  ueber die Resend-HTTPS-API, nicht ueber SMTP — Mailpit faengt ihn also nicht.
+  Und die Datenbank haelt nur den **sha256-Hash** des Tokens; das Token selbst
+  existiert ausschliesslich in der Mail. Lokal waere 6.3 nur mit genau dem
+  Testdoppel messbar, das die Aufgabe ausschliesst. Beide `APP_URL` wurden
+  vorher per Digest gegen oeffentliche Kandidaten aufgeloest, ohne einen
+  Klartextwert abzurufen: PROD `https://fbc-platform.pages.dev`, DEV
+  `https://fbc-probe-a4664fb5.pages.dev`. Die Messung beruehrt PROD nicht.
+
+  **Erster Lauf: der `pending`-Zweig, live belegt.** Vor dem Handeln wurde der
+  Token-Stand gelesen — auf DEV lag ein offenes, unbenutztes Token vom 25.08.
+  11:44 (`sperrt_pending: true`). Die Anforderung darauf antwortete
+  `POST …/functions/v1/send-activation [202]`, und die Datenbank zeigte danach
+  **null neue Token**. Genau der Fall, in dem die Antwort nichts belegt (E1).
+  Die Flaeche sagt ihn inzwischen selbst an: *„Wurde in den letzten 24 Stunden
+  schon ein Link angefordert, gilt weiter der aus jener Mail."* Ohne den Blick
+  in die Tabelle waere dieser Lauf als Erfolg durchgegangen.
+
+  **Nebenbefund, mitbelegt.** Der sha256 des Tokens aus jener Mail trifft
+  **genau eine** DEV-Zeile — die Mail kam also von DEV, und ihr Link zeigte auf
+  `fbc-platform.pages.dev`, die PROD-lesende Flaeche. Sie stammt aus der Zeit
+  vor der `APP_URL`-Korrektur (DEV-Secret aktualisiert am 25.08. 14:59, die Mail
+  ging um 11:44 raus). Das Alt-Token wurde entwertet, damit der Messlauf nicht
+  an der Ratenbegrenzung haengenbleibt.
+
+  **Zweiter Lauf, die eigentliche Messung.** `[202]` vom DEV-Projekt
+  `foelowldexkcqzewvrcf`, Token angelegt `09:27:34.868`, Mail zugestellt
+  `09:27:35` — und ihr Link zeigt jetzt auf die Probe-Flaeche, die
+  `APP_URL`-Korrektur traegt also. `/passwort-neu` →
+  `POST …/functions/v1/redeem-activation [200]`, Flaeche meldet „Dein neues
+  Passwort ist gesetzt". Anmeldung mit dem neuen Passwort erfolgreich
+  (eingeloggte Startseite, Stufe Impact), in der Datenbank an
+  `last_sign_in_at = 2026-08-26T09:30:03.164Z` nachgelesen. Token `used_at`
+  gesetzt, also einmalig verbraucht.
+
+  Screenshots liegen unter `docs/legacy-planning/qa-screens/age505-*` — der
+  dritte absichtlich nur als Element-Ausschnitt: die eingeloggte Startseite
+  listet Klarnamen anderer Mitglieder, und das Repo ist oeffentlich.
+- [x] 6.4 Belegen, dass `activated_at` dabei **unverändert** geblieben ist.
       — **Am Code belegt (22.08.), die Laufzeitmessung steht noch aus.** Der
       Reset-Weg teilt sich die Kette mit der Aktivierung: `/passwort-vergessen`
       und `/passwort-neu` rendern beide `ActivationRedeemPage` mit
@@ -176,6 +220,21 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       wird mit ihm nachgetragen — Wert vorher lesen, Lauf fahren, Wert
       nachlesen.
 
+      **Nachgetragen am 26.08.2026 — gemessen, nicht mehr hergeleitet:**
+
+      | | vorher | nachher |
+      |---|---|---|
+      | `activated_at` | `2026-08-06T10:07:56.653Z` | `2026-08-06T10:07:56.653Z` |
+      | `auth_updated_at` | `2026-08-25T15:00:38.597Z` | `2026-08-26T09:28:52.774Z` |
+      | Token `used_at` | `null` | `2026-08-26T09:28:52.627Z` |
+
+      **Die zweite Zeile ist die Gegenprobe und der eigentliche Punkt.** Ein
+      unveraendertes `activated_at` allein ist auch mit einem Lauf vereinbar,
+      der ueberhaupt nichts geschrieben hat — und der erste Lauf des Tages war
+      genau so einer (`pending`, siehe 6.3). Erst das mitwandernde
+      `auth_updated_at` belegt, dass in derselben Sekunde geschrieben wurde,
+      und macht das stehengebliebene `activated_at` zu einem echten Negativ.
+
 ## 7. Nachlauf
 
 - [x] 7.1 AGE-505 in Linear auf Done — vorher `get_issue` lesen, die Automation
@@ -186,8 +245,8 @@ supabase test db supabase/tests/grants_test.sql supabase/tests/rls_test.sql \
       abhaken, mit Verweis auf AGE-505. **22.08.: der Haken stand schon, der
       Verweis fehlte — nachgetragen in
       `archive/2026-08-09-member-activation-flow/tasks.md`.**
-- [ ] 7.3 `openspec archive` erst, wenn 6.3 gemessen ist — nicht, wenn der Code
-      existiert.
+- [x] 7.3 `openspec archive` erst, wenn 6.3 gemessen ist — nicht, wenn der Code
+      existiert. **26.08.: 6.3 und 6.4 sind gemessen, damit erfuellt.**
 
 ## 8. Nach dem Review (08.08., 5.4)
 
