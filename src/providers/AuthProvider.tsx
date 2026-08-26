@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
-import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchActivationState, resendActivationLink, type ResendStatus } from "../lib/activation";
 import { logEvent } from "../lib/log";
@@ -48,7 +49,21 @@ interface LoadedProfile {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
+  /**
+   * Wer beim vorigen Rückruf angemeldet war (AGE-258).
+   *
+   * `undefined` heißt „noch kein Rückruf gesehen" und ist deshalb NICHT dasselbe
+   * wie `null` („niemand angemeldet"): Beim Mounten meldet Supabase die
+   * bestehende Sitzung, und wer das als Wechsel läse, leerte den Cache bei jedem
+   * Seitenaufbau.
+   *
+   * Ein Ref und kein State: Der Rückruf wird EINMAL hinterlegt und schließt über
+   * den Wert von damals. Aus `session` gelesen wäre der Vergleich dauerhaft gegen
+   * `null` — und damit gegen den Zustand beim Mounten statt gegen den letzten.
+   */
+  const letzteKennung = useRef<string | null | undefined>(undefined);
   const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<LoadedProfile | null>(null);
   // AGE-526: Ergebnis des Versands, den die Registrierung selbst ausgelöst hat.
@@ -86,6 +101,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => setAuthReady(true));
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      // Der Cache gehört dem angemeldeten Menschen, nicht dem Tab (AGE-258).
+      //
+      // EINE Regel für Abmelden UND Kontowechsel, weil es derselbe Vorgang ist:
+      // der handelnde Mensch wechselt. Ein Zweig auf `!nextSession` allein ließe
+      // den Bestand des Vorigen stehen, wenn sich im selben Tab jemand anders
+      // anmeldet, ohne dass vorher abgemeldet wurde.
+      //
+      // `clear()`, nicht `invalidateQueries()`: Invalidieren markiert die
+      // Einträge nur als veraltet — ausgeliefert werden sie weiterhin, während
+      // im Hintergrund neu geholt wird. Genau dieses Fenster ist der Schaden.
+      const jetzt = nextSession?.user.id ?? null;
+      if (letzteKennung.current !== undefined && letzteKennung.current !== jetzt) {
+        queryClient.clear();
+      }
+      letzteKennung.current = jetzt;
+
       setSession(nextSession);
       setAuthReady(true);
       if (!nextSession) {
@@ -100,6 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => sub.subscription.unsubscribe();
+    // `queryClient` ist über die Lebenszeit des Providers stabil (eine Instanz in
+    // main.tsx); die leere Liste hält den Rückruf bei genau einer Registrierung.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Aktivierungszustand und Mitgliedsstufe des eingeloggten Nutzers laden.

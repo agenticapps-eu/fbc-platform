@@ -169,9 +169,15 @@ function UserMenu({
 }
 
 /** Reihenfolge und Titel der Sidebar-Abschnitte (Spec §2). `sub` erscheint nie. */
-const SIDEBAR_SECTIONS: Array<{ section: NavSection; title: string }> = [
-  { section: "entdecken", title: "Entdecken" },
-  { section: "mein-bereich", title: "Mein Bereich" },
+const SIDEBAR_SECTIONS: Array<{ section: NavSection; title?: string; klappbar?: boolean }> = [
+  // AGE-293: „Entdecken" ist ersatzlos entfallen. Über der Hauptnavigation sagt
+  // die Überschrift nichts, was die fünf Einträge darunter nicht selbst sagen —
+  // sie kostete eine Zeile Höhe und trug keine Information.
+  { section: "entdecken" },
+  // AGE-292 + AGE-293 in einer Zeile: der persönliche Bereich wird ein
+  // Inline-Akkordeon. Damit ist seine Überschrift kein totes Label mehr,
+  // sondern der Griff — das eine Anliegen erledigt das andere.
+  { section: "mein-bereich", title: "Mein Bereich", klappbar: true },
   // AGE-494: „Service" ist entfallen. Mitgliedschaft fällt aus dem Menü,
   // Einstellungen steht jetzt unter „Mein Bereich" — bliebe die Zeile hier,
   // rendert die Sidebar eine Überschrift ohne einen einzigen Eintrag darunter.
@@ -241,14 +247,23 @@ function SidebarContent({
   // Alle Mitglieder sehen dieselbe Navigation (Spec §1) — Rechte gaten die Inhalte
   // (MembershipGate), nicht das Menü. Anon sieht nur „Entdecken": „Meine Kontakte"
   // ohne Konto wäre ein Versprechen ins Leere.
-  const sections: SidebarNavSection[] = SIDEBAR_SECTIONS.filter(
+  // Der Abschnitts-SCHLÜSSEL wird mitgeführt, nicht nur der Titel: gefunden wird
+  // der persönliche Bereich weiter unten über ihn. Vorher stand dort
+  // `s.title === "Mein Bereich"` — eine Suche über die BESCHRIFTUNG, deren
+  // Fehlschlag ein `?.` verschluckt. Seit AGE-293 die Titel anfasst, wäre der
+  // Eintrag „Meine Anfragen" bei der nächsten Umbenennung lautlos verschwunden,
+  // ohne dass eine Zusage darauf zeigte.
+  const abschnitte = SIDEBAR_SECTIONS.filter(
     ({ section }) => user || section === "entdecken",
-  ).map(({ section, title }) => ({
+  ).map(({ section, title, klappbar }) => ({
+    section,
     title,
+    klappbar,
     items: navItems
       .filter((i) => i.section === section)
       .map((i) => ({ path: i.path, label: i.label })),
   }));
+  const sections: SidebarNavSection[] = abschnitte;
   // AGE-592: Der Weg zu einer offenen eingehenden Anfrage. Er hängt an einem
   // VORGANG, nicht an einem Ort — deshalb steht er nicht in `navItems`, sondern
   // wird hier angehängt, solange es etwas zu entscheiden gibt. `/kontakte`
@@ -262,7 +277,7 @@ function SidebarContent({
   // gezielt aufruft, also schon von der Anfrage weiß. Genau diesen Fall traf
   // AGE-494 nicht, und nur für ihn kommt der Eintrag.
   if (anfragen) {
-    const meinBereich = sections.find((s) => s.title === "Mein Bereich");
+    const meinBereich = abschnitte.find((s) => s.section === "mein-bereich");
     // Vor „Einstellungen", damit die Kontoverwaltung den Abschnitt beschließt.
     const vor = meinBereich?.items.findIndex((i) => i.path === "/einstellungen") ?? -1;
     meinBereich?.items.splice(vor < 0 ? meinBereich.items.length : vor, 0, anfragen);
@@ -273,6 +288,10 @@ function SidebarContent({
   if (staffRole === "admin") {
     sections.push({
       title: "Administration",
+      // Aus demselben Grund klappbar wie „Mein Bereich" (AGE-292/293): drei
+      // Einträge, die ein Admin selten braucht, unter einer Überschrift, die
+      // sonst nur dasteht.
+      klappbar: true,
       items: [
         { path: "/admin", label: "Administration" },
         // AGE-566: Die Mitgliederliste braucht einen Eintrag, weil sie sonst nur
