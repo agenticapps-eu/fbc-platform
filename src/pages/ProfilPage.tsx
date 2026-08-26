@@ -342,7 +342,11 @@ function ProfileEditor({ uid }: { uid: string }) {
           ) : (
             <ul className="flex flex-col gap-3">
               {interests.fields.map((row, index) => (
-                <li key={row.id} className="grid grid-cols-[10rem_1fr_auto] gap-2">
+                // Die festen Spalten gelten erst ab `sm:`. Darunter gestapelt:
+                // bei 320 px löste `[10rem_1fr_auto]` zu `160px 26px 91px` auf
+                // — die 26 px waren das Bezeichnungsfeld, unbenutzbar, bevor
+                // die Zeile überhaupt überlief (AGE-584).
+                <li key={row.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_1fr_auto]">
                   <Select {...register(`interests.${index}.theme`)} aria-label="Thema">
                     <option value="">Ohne Thema</option>
                     {THEMES.map((t) => (
@@ -387,7 +391,13 @@ function ProfileEditor({ uid }: { uid: string }) {
           ) : (
             <ul className="flex flex-col gap-3">
               {goals.fields.map((row, index) => (
-                <li key={row.id} className="grid grid-cols-[10rem_1fr_5rem_auto] gap-2">
+                // Wie oben, eine Spalte schlimmer: `[10rem_1fr_5rem_auto]` löste
+                // bei 320 px zu `160px 26px 80px 91px` auf — 240 px fest belegt,
+                // bevor Inhalt kommt (AGE-584).
+                <li
+                  key={row.id}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_1fr_5rem_auto]"
+                >
                   <Select {...register(`goals.${index}.category`)} aria-label="Kategorie">
                     {GOAL_CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>
