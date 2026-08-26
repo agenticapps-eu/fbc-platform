@@ -1,5 +1,21 @@
 # Add EasyBill invoicing and proration
 
+> **ABGEBROCHEN am 2026-08-26 — nicht gebaut, nicht geplant.**
+>
+> Das tragende Issue **AGE-298 („Rechnungsstellung via EasyBill")** steht in
+> Linear auf **`Canceled`**, im Projekt *„FBC Plattform – Roadmap Phasen 1–4
+> (abgelöst 08/2026)"*. Damit hat dieser Change keinen Auftraggeber mehr.
+>
+> Er wird mit `--skip-specs` archiviert: seine Deltas dürfen **nicht** in
+> `openspec/specs/` wandern. Insbesondere enthält der Delta ein `REMOVED` auf
+> die `billing-upgrades`-Anforderung, die Rechnungsstellung und Proration
+> ausdrücklich als *out of scope* führt — und genau diese Anforderung ist heute
+> die zutreffende Wahrheit. Ein Falten hätte sie gelöscht und die Spec damit
+> stillschweigend so gestellt, als sei die Rechnungsstellung offen.
+>
+> Der Text unten bleibt unverändert stehen, als Vorarbeit für den Fall, dass die
+> Rechnungsstellung wieder aufgenommen wird.
+
 ## Why
 
 Members can upgrade their tier via Stripe today (`billing-upgrades`), but the

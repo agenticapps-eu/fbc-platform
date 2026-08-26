@@ -1,5 +1,22 @@
 # Add data-driven Academy content, enrollment and tier-gated access
 
+> **ABGEBROCHEN am 2026-08-26 — nicht gebaut, überholt.**
+>
+> Das tragende Issue **AGE-262 („Academy & Library: echte Inhalte statt
+> Platzhalter")** steht in Linear auf **`Done`**. Gelöst hat es nicht dieser
+> Change, sondern **AGE-533** („C9 — Academy aus geteilten Videos + Events und
+> Videos im Aktivitätsfeed", ebenfalls `Done`, Projekt *Go-Live August 2026*) —
+> mit einem deutlich kleineren Zuschnitt: die Academy speist sich aus geteilten
+> Videos, statt ein eigenes Kurs-/Lektions-/Fortschrittsmodell zu tragen.
+>
+> Der hier beschriebene datengetriebene Vollausbau (Kurse, Lektionen,
+> Einschreibung, Fortschritt, `min_tier`-Gate) ist damit **nicht erledigt**,
+> sondern **nicht mehr beauftragt**. Wird er wieder aufgenommen, braucht er ein
+> eigenes Issue — AGE-262 ist geschlossen und trägt ihn nicht mehr.
+>
+> Archiviert mit `--skip-specs`: nichts davon ist gebaut, also darf nichts davon
+> in `openspec/specs/` als Wahrheit stehen.
+
 ## Why
 
 The Academy is a placeholder today: it renders a small, hard-coded list of
