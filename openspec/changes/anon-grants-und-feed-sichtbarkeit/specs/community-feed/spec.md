@@ -89,9 +89,12 @@ Für `anon` SHALL das nur für Objekte gelten, die zu einem Beitrag mit
 gelten wie in `posts_select_by_visibility`: `public.is_activated()` und
 (`public`, oder `members`, oder Autorschaft) — **ohne Stufenschwelle**.
 
-Das Prädikat SHALL NOT dupliziert werden: die Policy SHALL es über eine
-`SECURITY DEFINER`-Funktion aus dem Beitrag ableiten, damit eine Änderung der
-Regel an einer Stelle geschieht.
+Die Policy SHALL das Prädikat **nicht selbst** tragen, sondern an **einen**
+Helfer (`post_media_lesbar`) delegieren. Dieser Helfer ist eine **bewusste,
+benannte Abschrift** des Post-Prädikats — die einzige an dieser Stelle. So
+kostet eine Änderung der Regel hier genau eine Zeile statt einer je Policy;
+sie kostet aber nicht null, und dieser Change zählt den Helfer deshalb zu den
+vier Stellen, die gemeinsam wandern müssen.
 
 Die Funktion SHALL den zugehörigen Beitrag über die `post_media`-Zeile mit
 diesem `storage_path` bestimmen und SHALL NOT den Objektnamen zerlegen. Der
@@ -184,3 +187,66 @@ Die Funktion SHALL eine Obergrenze je Aufruf tragen.
 - **WHEN** die Sichtbarkeitsregel für `members` geändert wird und die
   aggregierende Funktion unverändert bleibt
 - **THEN** zählt sie nach der neuen Regel, weil sie unter `security invoker` läuft
+
+### Requirement: Der Feed-Beitrag folgt seinem Event über dessen Lebenszyklus
+
+Das System SHALL den gespiegelten Feed-Beitrag eines Events dessen Lebenszyklus
+folgen lassen: eine Sichtbarkeitsänderung zieht ihn nach, ein Hostwechsel zieht
+den Autor nach, und ein entzogener Host entfernt den Beitrag, während das Event
+bestehen bleibt.
+
+`host_id → null` SHALL den Beitrag entfernen und NOT ihn beim alten Autor
+belassen: `posts.author_id` ist `not null`, es gäbe also niemanden, dem er
+gehört. Das ist dieselbe Regel wie beim Anlegen, nur später angewandt.
+
+**Die frühere Asymmetrie zwischen Event und Beitrag entfällt.** Bis AGE-601 war
+der gespiegelte Beitrag **strenger** als sein Event: `events` sind für jedes
+aktivierte Konto sichtbar, `members`-Posts waren es erst ab Rang 4. Ein Mitglied
+unter Rang 4 sah das Event, aber nicht seinen Feed-Eintrag — eine Richtung, die
+als „ungefährlich, aber ohne Benennung ein Rätsel" ausgeschrieben war. Da
+`members` jetzt jedes aktivierte Mitglied meint, SHALL beides **übereinstimmen**:
+wer das Event sieht, sieht auch seinen Beitrag. Das Rätsel ist damit nicht
+benannt, sondern aufgelöst.
+
+Ausgeloggt SHALL weiterhin **keines von beiden** erscheinen.
+
+#### Scenario: Der Beitrag eines members-Events ist ausgeloggt unsichtbar
+
+- **WHEN** ein Host ein Event mit `visibility = 'members'` anlegt und ein
+  ausgeloggter Besucher den Feed öffnet
+- **THEN** erscheint weder das Event noch sein Beitrag
+
+#### Scenario: Eine spätere Sichtbarkeitsänderung zieht den Beitrag nach
+
+- **WHEN** ein Host die Sichtbarkeit seines Events von `public` auf `members`
+  ändert
+- **THEN** trägt auch sein Feed-Beitrag danach `members`, und ein ausgeloggter
+  Besucher sieht ihn nicht mehr
+
+#### Scenario: Ein später zugewiesener Host bringt das Event in den Feed
+
+- **WHEN** ein Event ohne Host besteht und ihm später ein Host zugewiesen wird
+- **THEN** entsteht in diesem Moment sein Feed-Beitrag
+
+#### Scenario: Ein Hostwechsel zieht den Autor nach
+
+- **WHEN** der Host eines Events auf ein anderes Profil geändert wird
+- **THEN** trägt der Feed-Beitrag danach das neue Profil als Autor
+
+#### Scenario: Ein entzogener Host entfernt den Beitrag
+
+- **WHEN** `events.host_id` auf null gesetzt wird
+- **THEN** verschwindet der Feed-Beitrag, und das Event bleibt bestehen
+
+#### Scenario: Ein nicht aktiviertes Konto sieht keinen Event-Beitrag
+
+- **WHEN** ein eingeloggtes, aber nicht aktiviertes Konto den Feed liest
+- **THEN** liefert die Abfrage keinen Event-Beitrag, so wenig wie einen
+  Mitgliedsbeitrag
+
+#### Scenario: Event und Beitrag stimmen unterhalb von Rang 4 überein
+
+- **WHEN** ein aktiviertes Mitglied mit Rang unter 4 den Feed liest und ein
+  `members`-Event besteht
+- **THEN** erscheint dessen Feed-Beitrag, ebenso wie das Event unter /events
+  sichtbar ist

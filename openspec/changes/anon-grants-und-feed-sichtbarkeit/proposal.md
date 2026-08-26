@@ -45,6 +45,10 @@ Aktivierung wird damit die einzige Hürde vor dem Feed. Die Variante „Anmeldun
 zusätzlich schließen" wurde erwogen und **nicht** gewählt. Das kippt AGE-311 an
 dieser einen Stelle.
 
+**Ausgeloggt ändert sich nichts** — und das Schaufenster bleibt vorerst leer, weil
+in PROD kein Beitrag `public` ist. Das ist eine Inhalts-, keine Rechtefrage und
+nicht Gegenstand dieses Changes.
+
 **Der Nebenbefund ist der eigentliche Auslöser.** `/aktivitaet` trägt in
 `src/config/nav.ts` weder `minTier` noch `requiresAuth` — anders als `/mitglieder`.
 Die Fläche lädt heute jedes Mitglied ein und kann ihm nichts zeigen. Nach AGE-601
@@ -89,11 +93,20 @@ stimmt das Versprechen des Menüeintrags zum ersten Mal.
   Kontaktanfrage-Schwelle und die Event-Teilnahme sind eigene Entscheidungen und
   nicht Gegenstand von AGE-601.
 
-**Der Menüeintrag sagt die Wahrheit.**
+**Der Menüeintrag bleibt, wie er ist — die dritte Aufgabe entfällt.**
 
-- `/aktivitaet` bekommt `requiresAuth: true` in `src/config/nav.ts`. Ein `minTier`
-  wäre nach dieser Änderung **falsch** — der Feed ist ab jetzt für jedes aktivierte
-  Mitglied gefüllt, und eine Stufenwand davor widerspräche der Entscheidung.
+Der Handoff notierte als Lücke, `/aktivitaet` trage kein `minTier`. Das ist ein
+Fehlschluss, und der Plan-Review hat ihn gefunden. `community-feed` sagt wörtlich:
+*„Die Aktivitätsseite ist ohne Anmeldung erreichbar — sie trägt in der Navigation
+weder `requiresAuth` noch eine Mindeststufe."* Das Fehlen **ist** die
+Entscheidung, kein Versehen.
+
+Und `requiresAuth` wäre aktiv schädlich: `App.tsx:37` wickelt eine
+`entdecken`-Route damit in `MembershipGate` — also genau eine Wand vor dem
+Schaufenster, das die Anforderung offen halten will.
+
+Das eigentliche Problem war nie die Navigation, sondern der leere Feed dahinter.
+AGE-601 behebt das. **`src/config/nav.ts` wird nicht angefasst.**
 
 ## Impact
 
@@ -103,5 +116,6 @@ stimmt das Versprechen des Menüeintrags zum ersten Mal.
   Sichtbarkeits-Ausweitung sind je für sich zurücknehmbar.
 - **`membership-tiers`/AGE-311:** an genau einer Stelle gekippt. `exchange` bleibt
   die Schwelle für Kontaktanfragen und Event-Teilnahme.
-- **Kein Frontend-Verhalten ändert sich** außer dem einen Nav-Feld; die RLS liefert
-  ab jetzt mehr Zeilen an dieselben Abfragen.
+- **Kein Frontend-Verhalten ändert sich.** Die RLS liefert ab jetzt mehr Zeilen an
+  dieselben Abfragen. Angefasst werden nur zwei **Kommentare** in `src/lib/feed.ts`
+  (Zeilen 13 und 338), die die alte Rang-Regel beschreiben.

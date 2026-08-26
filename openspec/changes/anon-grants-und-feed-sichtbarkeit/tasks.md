@@ -28,8 +28,11 @@ jede für sich zurücknehmbar bleibt.
       plus die vier weiteren Funktionen. Muss vor der Migration **rot** sein —
       und wenn es lokal grün ist, ist das der Beweis, dass die Zusage allein
       nichts belegt (siehe nächste Aufgabe).
-- [ ] **Gegenprobe im Test:** Recht erteilen → `true` messen → entziehen →
-      `false` messen. Ohne sie ist auch die neue Zusage vakuum-grün.
+- [ ] **Gegenprobe auf einer Wegwerf-Funktion** (nicht auf einer echten):
+      anlegen → messen, dass `anon` sie **nicht** darf (belegt den neuen Default)
+      → Recht erteilen → `true` messen → entziehen → `false` messen. Auf einer
+      echten Funktion belegte die Gegenprobe nur, dass `has_function_privilege`
+      den Katalog liest.
 - [ ] **Abgeschlossene Liste:** Zusage „genau diese Funktionen sind für `anon`
       ausführbar, keine andere" — als Menge, nicht als Aufzählung von Verstößen.
       Trifft die sechs beabsichtigten.
@@ -37,6 +40,11 @@ jede für sich zurücknehmbar bleibt.
       `revoke execute … from public, anon` für `search_directory`,
       `register_for_event`, `set_event_check_in`, `array_jaccard`,
       `fbc_profile_search_doc`.
+- [ ] **`PUBLIC` bei den beiden beabsichtigten entfernen:**
+      `post_engagement_counts` und `event_registration_counts` tragen `=X/postgres`
+      neben den benannten Rollen (lokal gemessen). `revoke … from public` plus
+      ausdrücklicher `grant to anon, authenticated` — sonst behauptet die
+      Anforderung „ausdrücklich erteilt", wo geerbt wurde.
 - [ ] Prüfen, ob `grants_test.sql` durch die neue Liste bricht
       (Golden-Snapshot-Falle).
 
@@ -54,14 +62,21 @@ jede für sich zurücknehmbar bleibt.
 - [ ] `feed_tag_counts` / `feed_top_authors` **nicht** anfassen und belegen, dass
       sie trotzdem folgen (`security invoker`) — das ist der Nutzen der
       Nicht-Abschreiben-Regel.
+- [ ] **Alle vier Kopien einzeln zusichern**, nicht nur die Policy:
+      `former_member_entries`, `post_media`-Zeilen, Kommentare und der
+      gespiegelte Event-Beitrag. Plus `feed_tag_counts`/`feed_top_authors` als
+      Beleg, dass die nicht abgeschriebenen Wege von selbst folgen.
 - [ ] Die übrigen `has_level(4)`-Vorkommen unangetastet lassen
       (Kontaktanfrage-Schwelle, Event-Teilnahme) und im Diff nachweisen.
 
-## 3. Der Menüeintrag
+## 3. Der Menüeintrag — entfällt
 
-- [ ] **RED:** Test — `/aktivitaet` verlangt eine Sitzung.
-- [ ] **GREEN:** `requiresAuth: true` in `src/config/nav.ts`. **Kein** `minTier` —
-      das wäre nach AGE-601 falsch.
+- [x] **Gestrichen nach dem Plan-Review.** `community-feed` legt ausdrücklich fest,
+      dass `/aktivitaet` weder `requiresAuth` noch `minTier` trägt; `App.tsx:37`
+      machte aus `requiresAuth` eine Wand vor dem ausgeloggten Schaufenster.
+      `src/config/nav.ts` wird **nicht** angefasst.
+- [ ] Stattdessen: die zwei veralteten **Kommentare** in `src/lib/feed.ts`
+      (Zeilen 13, 338) auf die neue Regel bringen.
 
 ## 4. Abnahme
 
@@ -73,9 +88,22 @@ jede für sich zurücknehmbar bleibt.
 - [ ] **Sichtprobe** gegen den lokalen Stack: ein aktiviertes `basic`-Konto sieht
       den Feed gefüllt, mit Bildern und Zählern. Grüne Tests haben hier schon ein
       visuell falsches Ergebnis durchgewunken.
+- [ ] **Bestehende Gegen-Zusagen suchen und umdrehen:** `rls_test.sql` erwartet
+      heute ausdrücklich, dass Rang 1 Medienzeilen, Bilder und gespiegelte
+      Event-Beiträge **nicht** bekommt. Diese Zusagen namentlich auflisten, bevor
+      eine geändert wird — eine übersehene macht die Suite rot und eine
+      stillschweigend gelöschte macht sie wertlos.
+- [ ] **Nutzlast messen** für ein `basic`-Konto (gemini MEDIUM): der Feed pagiert,
+      die Zahl gehört trotzdem gemessen statt behauptet.
 - [ ] Code-Review auf dem **Diff** (Stufe 2), Befunde abarbeiten.
 
 ## 5. Nach `migrate-prod` — der Schritt, dessen Fehlen der Fehler war
+
+> **Reihenfolge, aus dem Plan-Review:** `migrate-prod` hängt am `migrate-dev`-Lauf
+> desselben Commits, und der läuft erst nach dem Merge auf `main`. Diese Zahlen
+> sind also vor dem Merge **nicht** eintragbar. Bis sie stehen, gilt der
+> PROD-Rechte-Zustand laut Anforderung als unbelegt — das ist kein Mangel des
+> Changes, sondern die Reihenfolge der Pipeline, und sie ist hier benannt.
 
 - [ ] **PROD-Katalog erneut messen** und die Zahlen hier eintragen:
       welche Funktionen `anon` ausführen darf (erwartet: **sechs**, die
