@@ -11,13 +11,16 @@ import { useToast } from "../components/ui/toast-context";
 import {
   fetchMessages,
   fetchThreads,
+  markThreadRead,
   mergeMessage,
   messagesQueryKey,
   sendMessage,
   subscribeToThread,
   threadsQueryKey,
+  unreadQueryKey,
   type ChatMessage,
 } from "../lib/chat";
+import { useUngelesen } from "../components/chat/use-ungelesen";
 import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
 
@@ -48,6 +51,10 @@ export default function ChatPage() {
     enabled: Boolean(myId),
   });
 
+  // Derselbe Query-Schlüssel wie Kopfzeile und Profilkachel — React Query
+  // bündelt die drei, und sie können nicht auseinanderlaufen (AGE-583).
+  const { stand: ungelesen } = useUngelesen(myId || null);
+
   const activeId = threadId ?? null;
   const activeThread = threadsQuery.data?.find((t) => t.id === activeId) ?? null;
 
@@ -56,6 +63,18 @@ export default function ChatPage() {
     queryFn: () => fetchMessages(activeId!),
     enabled: Boolean(activeId),
   });
+
+  // Gelesen-Markierung (AGE-583). Hängt an `activeId`, NICHT an den Nachrichten:
+  // ein Effect über `messages` schriebe je eingegangener Zeile erneut, und das
+  // Öffnen eines Gesprächs soll EIN Schreibvorgang sein.
+  useEffect(() => {
+    if (!activeId || !myId) return;
+    void markThreadRead(activeId, myId)
+      .then(() => queryClient.invalidateQueries({ queryKey: unreadQueryKey(myId) }))
+      // Ein fehlgeschlagenes Markieren darf das Gespräch nicht kosten. Es bleibt
+      // ungelesen, der Zähler zeigt weiter darauf — der sichere Ausgang.
+      .catch(() => {});
+  }, [activeId, myId, queryClient]);
 
   // Realtime: neue Nachrichten des OFFENEN Threads live einspielen (§9).
   // Bekannte Phase-1-Lücke: zwischen initialem fetchMessages und aktivem Channel
@@ -67,6 +86,15 @@ export default function ChatPage() {
         mergeMessage(prev ?? [], incoming),
       );
       void queryClient.invalidateQueries({ queryKey: threadsQueryKey(myId) });
+      // Der Lesestand rückt SOFORT nach, weil das Gespräch offen vor einem
+      // liegt. Ohne das stiege die Summe in der Kopfzeile auf 1 und fiele beim
+      // nächsten Abgleich zurück — ein Zucken, das wie ein Fehler aussieht.
+      // Nur für fremde Nachrichten: die eigene zählt ohnehin nie.
+      if (myId && incoming.senderId !== myId) {
+        void markThreadRead(activeId, myId)
+          .then(() => queryClient.invalidateQueries({ queryKey: unreadQueryKey(myId) }))
+          .catch(() => {});
+      }
     });
     return unsubscribe;
   }, [activeId, myId, queryClient]);
@@ -111,7 +139,7 @@ export default function ChatPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-6">
-        <h1 className="font-display text-3xl font-semibold text-ink">Chat</h1>
+        <h1 className="font-display text-3xl font-semibold text-ink">Nachrichten</h1>
         <p className="mt-1 text-sm text-muted">
           Direktnachrichten mit deinen freigegebenen Kontakten — in Echtzeit.
         </p>
@@ -149,6 +177,7 @@ export default function ChatPage() {
               threads={threads}
               activeId={activeId}
               onSelect={(id) => navigate(`/chat/${id}`)}
+              ungelesenJeThread={ungelesen.jeThread}
             />
           </div>
 

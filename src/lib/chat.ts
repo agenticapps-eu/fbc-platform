@@ -122,6 +122,111 @@ export function mergeMessage(messages: ChatMessage[], incoming: ChatMessage): Ch
   );
 }
 
+// ── Ungelesen (AGE-583) ──────────────────────────────────────────────────────
+
+/** Eine Zeile aus `unread_message_counts()`. */
+type UngelesenZeile = Database["public"]["Functions"]["unread_message_counts"]["Returns"][number];
+
+export interface UngelesenStand {
+  /** Summe über alle Threads. Die Zahl an Kopfzeile und Profilkachel. */
+  gesamt: number;
+  jeThread: Map<string, number>;
+  hatUngelesen: (threadId: string) => boolean;
+}
+
+/**
+ * Verdichtet die RPC-Zeilen zu einer Summe und einer Zuordnung je Thread.
+ *
+ * `unread_message_counts()` liefert Threads OHNE Ungelesenes GAR NICHT — nicht
+ * als Zeile mit 0. Ein Thread, der fehlt, hat deshalb null und ist nicht
+ * unbekannt. Diese Umdeutung steht hier an EINER Stelle, statt an jeder der drei
+ * Aufrufstellen erneut geraten zu werden.
+ */
+export function fasseUngelesenZusammen(zeilen: UngelesenZeile[]): UngelesenStand {
+  const jeThread = new Map(zeilen.map((z) => [z.thread_id, z.unread_count]));
+  let gesamt = 0;
+  for (const n of jeThread.values()) gesamt += n;
+  return { gesamt, jeThread, hatUngelesen: (id) => (jeThread.get(id) ?? 0) > 0 };
+}
+
+export const unreadQueryKey = (uid: string) => ["chat", "unread", uid] as const;
+
+/** Ungelesene je Thread. RLS entscheidet, was sichtbar ist — die Funktion ist
+ *  SECURITY INVOKER und bringt kein eigenes Gate mit. */
+export async function fetchUnreadCounts(): Promise<UngelesenStand> {
+  const { data, error } = await supabase.rpc("unread_message_counts");
+  if (error) throw error;
+  return fasseUngelesenZusammen(data ?? []);
+}
+
+/**
+ * Setzt den eigenen Lesestand auf jetzt. Ein Upsert auf die eigene Zeile — die
+ * `trp_own`-Policy erzwingt serverseitig, dass `profile_id` der Aufrufer ist und
+ * dass er am Thread teilnimmt.
+ *
+ * `last_read_at` steht hier als PLATZHALTER im Rumpf, und sein Wert ist egal.
+ *
+ * Beides ist nötig, und die erste Fassung hatte es falsch — gefunden hat es die
+ * Diff-Review (gemini, HIGH), weil der Kommentar an dieser Stelle das Gegenteil
+ * dessen behauptete, was der Code tat:
+ *
+ *  - **Die Spalte MUSS im Rumpf stehen.** PostgREST baut aus einem Upsert ein
+ *    `on conflict do update set <nur die gesendeten Spalten>`. Ohne sie rückte
+ *    der Lesestand beim ZWEITEN Markieren nicht an — lautlos.
+ *  - **Ihr Wert darf NICHT vom Client kommen.** Verglichen wird gegen
+ *    `messages.created_at`, also die Serveruhr; eine zweite Uhr im selben
+ *    Vergleich hieße, dass eine vorgehende Client-Uhr Nachrichten als gelesen
+ *    gelten lässt, bevor es sie gibt. Ein Trigger (`…_serveruhr`) überschreibt
+ *    den Wert deshalb serverseitig mit `clock_timestamp()`.
+ *
+ * Der Platzhalter ist bewusst der Epoch-Anfang und nicht `new Date()`: ein
+ * plausibel aussehender Wert würde bei einem entfernten Trigger nicht auffallen,
+ * dieser hier schon.
+ */
+export async function markThreadRead(threadId: string, uid: string): Promise<void> {
+  const { error } = await supabase.from("thread_read_positions").upsert(
+    { thread_id: threadId, profile_id: uid, last_read_at: "1970-01-01T00:00:00Z" },
+    { onConflict: "thread_id,profile_id" },
+  );
+  if (error) throw error;
+}
+
+/**
+ * Abonniert ALLE eingehenden Nachrichten des Kontos — ohne Thread-Filter, weil
+ * der Zähler auf jeder Seite stimmen muss und nicht nur im offenen Gespräch.
+ *
+ * Gefiltert wird über die RLS: Postgres liefert nur Zeilen, die das Konto auch
+ * per SELECT sähe. Das ist eine Zusage der Plattform, keine dieses Repositorys —
+ * sie ist deshalb im Browser gegen den FEHLSCHLAG geprüft (ein unbeteiligtes
+ * Konto darf kein Ereignis bekommen), nicht nur gegen den Glücksfall.
+ *
+ * `subscribeToThread` bleibt daneben bestehen: es spielt die Nachricht in den
+ * offenen Verlauf ein, dieses Abo hält nur den Zähler nach.
+ */
+export function subscribeToAllMessages(onInsert: (message: ChatMessage) => void): () => void {
+  // Der Themenname trägt eine Zufallskennung, und das ist keine Zierde.
+  //
+  // Mit einem FESTEN Namen („messages:alle") gibt `channel()` beim zweiten
+  // Aufruf denselben, bereits abonnierten Kanal zurück, und `.on()` wirft:
+  //   cannot add `postgres_changes` callbacks for realtime:messages:alle
+  //   after `subscribe()`
+  // Das passiert bei jedem erneuten Montieren — im Entwicklungsmodus schon beim
+  // ersten Rendern, im Browser nach jedem Abmelden und Anmelden. Der Zähler
+  // wäre danach dauerhaft tot, ohne dass irgendetwas sichtbar kaputtginge.
+  //
+  // Gefunden hat es `WillkommenPage.test.tsx` — eine Suite, die die ganze
+  // Anwendung zweimal rendert und mit Nachrichten nichts zu tun hat.
+  const channel: RealtimeChannel = supabase
+    .channel(`messages:alle:${crypto.randomUUID()}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) =>
+      onInsert(mapMessageRow(payload.new as MessageRow)),
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 // ── Lesen ─────────────────────────────────────────────────────────────────────
 
 export const threadsQueryKey = (uid: string) => ["chat", "threads", uid] as const;
