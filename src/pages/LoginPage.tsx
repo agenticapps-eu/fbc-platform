@@ -118,11 +118,34 @@ export default function LoginPage() {
     setzeSuchParameter(naechste, { replace: true });
   }
 
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormErrorRoh] = useState<string | null>(null);
   // AGE-591: der dritte Ausgang der Registrierung — kein Fehler, keine Sitzung.
   // Bewusst ein eigener Zustand und nicht `formError`: Das ist kein Fehler, es
   // ist ein Weg, der woanders weitergeht, und er sieht auch nicht so aus.
-  const [ohneSitzung, setOhneSitzung] = useState(false);
+  const [ohneSitzung, setOhneSitzungRoh] = useState(false);
+
+  // In WELCHEM Modus die stehende Meldung entstanden ist.
+  //
+  // Der Umschalt-Knopf räumt beide Meldungen selbst weg, aber der Modus hängt
+  // seit AGE-616 an der ADRESSE und kann sich auch ohne ihn ändern: über den
+  // Zurück-Knopf, über einen Link von der Startseite, über einen Lesezeichen.
+  // Ohne diese Zuordnung stünde nach einem gescheiterten Login die
+  // Login-Fehlermeldung über dem Registrierungsformular. Gefunden im
+  // Diff-Review.
+  //
+  // Zugeordnet statt im Effect zurückgesetzt: ein Reset im Effect läuft NACH
+  // dem Rendern, die falsche Meldung wäre also einen Bildaufbau lang zu sehen.
+  const [meldungFuer, setMeldungFuer] = useState<Mode>("login");
+  const meldungGilt = meldungFuer === mode;
+
+  function setFormError(text: string | null) {
+    setMeldungFuer(mode);
+    setFormErrorRoh(text);
+  }
+  function setOhneSitzung(wert: boolean) {
+    setMeldungFuer(mode);
+    setOhneSitzungRoh(wert);
+  }
 
   const {
     register,
@@ -352,7 +375,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {ohneSitzung && (
+        {ohneSitzung && meldungGilt && (
           <RegistrierungOhneSitzung
             onZumLogin={() => {
               setMode("login");
@@ -365,7 +388,7 @@ export default function LoginPage() {
           />
         )}
 
-        {formError && <p className="text-sm text-danger">{formError}</p>}
+        {formError && meldungGilt && <p className="text-sm text-danger">{formError}</p>}
 
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           {mode === "login" ? "Anmelden" : "Konto erstellen"}

@@ -6,6 +6,7 @@ import App from "../App";
 import { ToastProvider } from "./ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
+import { REGISTRIEREN_PFAD } from "../pages/LoginPage";
 
 afterEach(() => localStorage.clear());
 
@@ -46,7 +47,10 @@ describe("MembershipGate für Entdecken-Routen", () => {
     expect(
       screen.getByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mitglied werden" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mitglied werden" })).toHaveAttribute(
+      "href",
+      REGISTRIEREN_PFAD,
+    );
     // Academy-Inhalt bleibt gesperrt.
     expect(screen.queryByText("Mit dem „Warum“ beginnen")).not.toBeInTheDocument();
   });
@@ -70,7 +74,10 @@ describe("MembershipGate für Entdecken-Routen", () => {
       screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
     ).toBeInTheDocument();
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
+    // Seit AGE-616 ist der CTA ein Link — beide Rollen prüfen, sonst ginge eine
+    // Rückkehr zum Knopf hier unbemerkt durch.
     expect(screen.queryByRole("button", { name: "Mitglied werden" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mitglied werden" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zur Startseite" })).toBeInTheDocument();
   });
 
@@ -114,7 +121,10 @@ describe("Stufen-Gating für /mitglieder (min Discover)", () => {
   it("zeigt anonymen Besuchern die Wand mit „Mitglied werden“ — kein Verzeichnis", () => {
     renderAt("/mitglieder", fakeAuthValue());
 
-    expect(screen.getByRole("button", { name: "Mitglied werden" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mitglied werden" })).toHaveAttribute(
+      "href",
+      REGISTRIEREN_PFAD,
+    );
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../providers/auth-context";
 import { LEVEL_RANK, levelLabel, type MembershipLevel } from "../config/levels";
 import { FORMAT_HERO } from "../config/formatHero";
 import { FormatHero } from "./ui/FormatHero";
-import { Button } from "./ui/Button";
+import { Button, buttonKlassen } from "./ui/Button";
+import { REGISTRIEREN_PFAD } from "../pages/LoginPage";
 
 /**
  * Gate für Routen mit `minTier` sowie für auth-pflichtige `entdecken`-Routen
@@ -52,9 +53,13 @@ function MembershipWall({ min, loggedIn }: { min?: MembershipLevel; loggedIn: bo
               Upgrade
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => navigate("/login")}>
+            // Führt in die REGISTRIERUNG, nicht in den Login (AGE-616). Wer
+            // hier steht, hat kein Konto — das sagt die Bedingung eine Zeile
+            // höher. Ein Anmeldeformular verlangt von ihm etwas, was er gerade
+            // nicht tun kann. Bis zum 26.08. tat es genau das.
+            <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("primary")}>
               Mitglied werden
-            </Button>
+            </Link>
           )}
           <Button variant="ghost" onClick={() => navigate("/")}>
             Zur Startseite

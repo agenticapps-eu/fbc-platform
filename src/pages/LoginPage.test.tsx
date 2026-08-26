@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthError } from "@supabase/supabase-js";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
@@ -415,11 +415,67 @@ describe("LoginPage — Registrierung ist adressierbar", () => {
     expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
   });
 
-  it("der Moduswechsel schreibt die Adresse fort", () => {
-    renderAn("/login");
+  it("der Moduswechsel schreibt die ADRESSE fort", () => {
+    // Die erste Fassung prüfte nur die Überschrift und hätte damit gar nicht
+    // gemerkt, wenn der Modus wieder reiner Zustand geworden wäre. Befund des
+    // Diff-Reviews: ein Test, der die Adresse im Namen führt, muss sie ansehen.
+    render(
+      <AuthFixture value={fakeAuthValue()}>
+        <DesignVariantProvider>
+          <MemoryRouter initialEntries={["/login"]}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+            <Adresssonde />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+
+    expect(screen.getByTestId("adresse")).toHaveTextContent("/login");
+    expect(screen.getByTestId("adresse").textContent).not.toContain("modus");
+
     toRegisterMode();
 
     expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
+    expect(screen.getByTestId("adresse")).toHaveTextContent("modus=registrieren");
+  });
+
+  it("eine Meldung aus dem einen Modus steht nicht über dem anderen", async () => {
+    // Der Umschalt-Knopf räumt beide Meldungen selbst weg — aber der Modus
+    // hängt an der Adresse und kann sich auch ohne ihn ändern. Ohne die
+    // Zuordnung stünde nach einem gescheiterten Login die Fehlermeldung über
+    // dem Registrierungsformular. Gefunden im Diff-Review.
+    render(
+      <AuthFixture
+        value={fakeAuthValue({
+          signIn: async () => ({ error: { message: "Ungültige Anmeldedaten" } as AuthError }),
+        })}
+      >
+        <DesignVariantProvider>
+          <MemoryRouter initialEntries={["/login"]}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+            <Weiterschalter />
+          </MemoryRouter>
+        </DesignVariantProvider>
+      </AuthFixture>,
+    );
+
+    fireEvent.change(screen.getByLabelText("E-Mail"), {
+      target: { value: "wer@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "geheim1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+    await waitFor(() => expect(screen.getByText(/Ungültige Anmeldedaten/)).toBeInTheDocument());
+
+    // Jetzt OHNE den Umschalt-Knopf in die Registrierung, so wie es ein Link
+    // von der Startseite oder der Zurück-Knopf täte.
+    fireEvent.click(screen.getByRole("button", { name: "weiter" }));
+
+    expect(screen.getByRole("heading", { name: "Registrieren" })).toBeInTheDocument();
+    expect(screen.queryByText(/Ungültige Anmeldedaten/)).toBeNull();
   });
 });
 
@@ -432,4 +488,11 @@ function Weiterschalter() {
       weiter
     </button>
   );
+}
+
+/** Zeigt die aktuelle Adresse an, damit ein Test sie ANSEHEN kann, statt sie aus
+ *  der Überschrift zu erschließen. */
+function Adresssonde() {
+  const ort = useLocation();
+  return <span data-testid="adresse">{`${ort.pathname}${ort.search}`}</span>;
 }

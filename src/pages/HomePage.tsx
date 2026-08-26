@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button";
+import { buttonKlassen } from "../components/ui/Button";
 import { PageHero } from "../components/ui/PageHero";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
@@ -51,7 +51,6 @@ export default function HomePage() {
 function PublicHome() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
-  const navigate = useNavigate();
 
   const eventsQuery = useQuery({
     queryKey: eventsListKey(uid),
@@ -75,17 +74,24 @@ function PublicHome() {
         subtitle="Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: lerne andere Mitglieder kennen, entdecke Events und finde die richtigen Verbindungen."
       >
         {!user && (
-          // Beide Knöpfe laden zum Beitritt ein und landeten bis AGE-616 im
+          // Beide laden zum Beitritt ein und landeten bis AGE-616 im
           // LOGIN-Formular: `mode` war lokaler Zustand ohne Adresse. Wer auf
           // „Mitglied werden" klickt und ein Anmeldeformular bekommt, wird
           // aufgefordert, etwas zu tun, was er gerade nicht kann.
+          //
+          // LINKS, keine Knöpfe: seit die Registrierung eine Adresse hat, soll
+          // man sie auch in einem neuen Tab öffnen können, und ein Screenreader
+          // soll „Link" sagen für etwas, das navigiert. Der Diff-Review hat
+          // zusätzlich gezeigt, dass ein Knopf hier den Test unterläuft — eine
+          // Abfrage nach `role: link` fand ihn nicht, ein Rückfall auf
+          // `/login` wäre also grün durchgegangen.
           <div className="flex flex-wrap gap-3">
-            <Button variant="primary" onClick={() => navigate(REGISTRIEREN_PFAD)}>
+            <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("primary")}>
               Kompass kostenlos starten
-            </Button>
-            <Button variant="ghost" onClick={() => navigate(REGISTRIEREN_PFAD)}>
+            </Link>
+            <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("ghost")}>
               Mitglied werden
-            </Button>
+            </Link>
           </div>
         )}
       </PageHero>
@@ -190,10 +196,7 @@ function Stufenschiene() {
         })}
       </ul>
 
-      <Link
-        to={REGISTRIEREN_PFAD}
-        className="block rounded-md bg-accent px-4 py-3 text-center text-sm font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
-      >
+      <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("primary", "md", "w-full")}>
         Mitglied werden
       </Link>
     </aside>

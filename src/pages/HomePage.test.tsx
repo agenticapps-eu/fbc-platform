@@ -141,26 +141,53 @@ describe("Öffentliche Startseite — Gästeansicht", () => {
     }
   });
 
-  it("nennt zu jeder Stufe, was sie freischaltet und was sie kostet", () => {
+  it("nennt zu JEDER Stufe, was sie freischaltet und was sie kostet", () => {
     zeigeGaesteseite();
 
-    expect(screen.getByText(LEVELS.discover.summary)).toBeInTheDocument();
-    // Preis mit Intervall, nicht als nackte Zahl.
-    expect(screen.getByText(/150/)).toBeInTheDocument();
-    // Die kostenlosen Stufen sagen das, statt „0 €" zu zeigen.
-    expect(screen.getAllByText(/kostenlos/i).length).toBeGreaterThan(0);
+    // Über alle sechs, nicht über eine Stichprobe: die erste Fassung dieses
+    // Tests prüfte eine Zusammenfassung und einen Preis und hätte fünf fehlende
+    // Stufen durchgelassen. Befund des Diff-Reviews.
+    for (const key of LEVEL_ORDER) {
+      const stufe = LEVELS[key];
+      expect(screen.getByText(stufe.summary)).toBeInTheDocument();
+
+      if (stufe.priceYear === 0) {
+        // Kostenlose Stufen sagen das, statt „0 €" zu zeigen.
+        expect(screen.getAllByText(/kostenlos/i).length).toBeGreaterThan(0);
+      } else {
+        // Jahrespreis vorn, Monatspreis darunter — beide, weil zwölf
+        // Monatsbeiträge NICHT den Jahresbeitrag ergeben (150 gegen 180 bei
+        // `discover`). Nur einer von beiden verschwiege den Unterschied.
+        expect(screen.getByText(`${stufe.priceYear} € / Jahr`)).toBeInTheDocument();
+        expect(screen.getByText(`oder ${stufe.priceMonth} € monatlich`)).toBeInTheDocument();
+      }
+    }
   });
 
-  it("führt die Einladung in die Registrierung, nicht in den Login", () => {
+  it("führt JEDE Einladung in die Registrierung, nicht in den Login", () => {
     zeigeGaesteseite();
 
     // „Mitglied werden" landete bis AGE-616 im LOGIN-Formular: `mode` war
-    // lokaler Zustand ohne Adresse. Ein Knopf, der zum Beitritt einlädt und
+    // lokaler Zustand ohne Adresse. Ein Element, das zum Beitritt einlädt und
     // ein Anmeldeformular zeigt, verlangt etwas Unmögliches.
-    const einladungen = screen.getAllByRole("link", { name: /Mitglied werden/i });
-    expect(einladungen.length).toBeGreaterThan(0);
+    //
+    // Die erste Fassung dieses Tests fragte nur nach `role: link` — die zwei
+    // Einladungen im Seitenkopf waren aber `<button>`, und ein Rückfall auf
+    // `/login` wäre grün durchgegangen. Genau der Defekt, den dieser Change
+    // behebt, war ungetestet. Sie sind jetzt Links, und der Test fordert, dass
+    // ALLE es sind: ein Knopf hier lässt ihn scheitern statt ihn zu unterlaufen.
+    const einladungen = screen.getAllByRole("link", {
+      name: /Mitglied werden|Kompass kostenlos starten/i,
+    });
+    expect(einladungen).toHaveLength(3);
     for (const link of einladungen) {
       expect(link.getAttribute("href")).toBe(REGISTRIEREN_PFAD);
     }
+
+    // Und kein Knopf trägt dieselbe Aufforderung — sonst führe einer davon
+    // weiterhin woandershin, ohne dass es auffällt.
+    expect(
+      screen.queryAllByRole("button", { name: /Mitglied werden|Kompass kostenlos starten/i }),
+    ).toHaveLength(0);
   });
 });
