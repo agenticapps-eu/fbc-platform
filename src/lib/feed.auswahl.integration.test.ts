@@ -452,40 +452,59 @@ describe("5.8 / 5.9 / 5.10 — Gespeichert", () => {
     await toggleSave({ postId: ziel.id, profileId: ich, saved: true });
   });
 
-  it("ein unsichtbar gewordener Beitrag verschwindet still — die Speicherzeile bleibt", async () => {
-    // Der Fall aus der Anforderung: gespeichert, danach auf `members`
-    // zurückgedreht, während der Betrachter die Stufe dafür nicht trägt.
-    // Der Zielbeitrag muss einem ANDEREN gehoeren: `posts_select_by_visibility`
-    // traegt ein `or author_id = auth.uid()`, ein Autor sieht seinen eigenen
-    // Beitrag also auf jeder Stufe. Ein Rueckfall auf „irgendeinen" verdeckte
-    // genau das — dieser Test stand damit gruen, ohne etwas zu messen.
+  it("ein verschwundener Beitrag laesst den Reiter nicht brechen", async () => {
+    /* Der Fall aus der Anforderung, mit dem Weg, der nach AGE-601 UEBRIG ist.
+     *
+     * Bis AGE-601 drehte dieser Test die Sichtbarkeit auf `members` zurueck und
+     * senkte die Stufe des Betrachters. Seit `members` jedes AKTIVIERTE Mitglied
+     * meint, macht das einen Beitrag nicht mehr unsichtbar — und es gibt fuer ein
+     * aktiviertes Konto ueberhaupt keinen Weg mehr, einen einzelnen Beitrag
+     * unsichtbar werden zu lassen: beide zulaessigen Sichtbarkeiten sind ihm
+     * lesbar, und die einzige verbliebene Sperre (die Aktivierung) nimmt ihm
+     * SAEMTLICHE Beitraege, laesst den Reiter also leer laufen.
+     *
+     * Die Anforderung nennt drei Wege — Autor entfernt, Sichtbarkeit
+     * zurueckgedreht, Beitrag geloescht. Der mittlere ist entfallen; die beiden
+     * anderen laufen ueber `on delete cascade` (post_saves.post_id -> posts,
+     * posts.author_id -> profiles, beide CASCADE, am Katalog geprueft). Die
+     * Speicherzeile UEBERLEBT dabei nicht — sie geht mit. Deshalb prueft dieser
+     * Test jetzt, was uebrig bleibt und worauf es der Anforderung wirklich
+     * ankommt: der Reiter verliert die Zeile STILL, ohne Fehler und ohne leer
+     * zu laufen.
+     *
+     * Der Zielbeitrag muss einem ANDEREN gehoeren: `posts_select_by_visibility`
+     * traegt ein `or author_id = auth.uid()`, ein Autor saehe seinen eigenen
+     * Beitrag sonst weiterhin. */
     const seite = await fetchFeed({ uid: ich, tags: [MARKE] });
     const fremd = seite.posts.find((p) => p.author.id === anderer);
     if (!fremd) throw new Error("kein Beitrag eines anderen Kontos auf der ersten Seite");
     const drei = [fremd, ...seite.posts.filter((p) => p.id !== fremd.id).slice(0, 2)];
     for (const p of drei) await toggleSave({ postId: p.id, profileId: ich, saved: false });
 
+    // Vorbedingung: alle drei stehen im Reiter. Ohne sie belegte das Fehlen
+    // unten nur, dass nie etwas da war.
+    const vorher = await fetchFeed({ uid: ich, reiter: "gespeichert" });
+    for (const p of drei) expect(vorher.posts.map((x) => x.id)).toContain(p.id);
+
     const verschwindet = fremd;
-    await pg.query("update public.posts set visibility = 'members' where id = $1", [
-      verschwindet.id,
-    ]);
-    await pg.query("update public.profiles set tier = 'connect' where id = $1", [ich]);
+    await pg.query("delete from public.posts where id = $1", [verschwindet.id]);
 
     const reiter = await fetchFeed({ uid: ich, reiter: "gespeichert" });
     expect(reiter.posts.map((p) => p.id)).not.toContain(verschwindet.id);
-    expect(reiter.posts.length).toBeGreaterThan(0); // läuft nicht leer
+    expect(reiter.posts.length).toBeGreaterThan(0); // laeuft nicht leer
 
     const { rows } = await pg.query<{ n: string }>(
       "select count(*) as n from public.post_saves where profile_id = $1 and post_id = $2",
       [ich, verschwindet.id],
     );
-    expect(rows[0].n).toBe("1"); // eine Speicherung begründet kein Recht — und verliert keines
+    // Die Zeile geht per CASCADE mit. Das ist kein Widerspruch zu „eine
+    // Speicherung begruendet kein Recht": sie begruendet keines und ueberdauert
+    // ihren Beitrag auch nicht.
+    expect(rows[0].n).toBe("0");
 
-    await pg.query("update public.profiles set tier = 'impact' where id = $1", [ich]);
-    await pg.query("update public.posts set visibility = 'public' where id = $1", [
-      verschwindet.id,
-    ]);
-    for (const p of drei) await toggleSave({ postId: p.id, profileId: ich, saved: true });
+    for (const p of drei.filter((x) => x.id !== verschwindet.id)) {
+      await toggleSave({ postId: p.id, profileId: ich, saved: true });
+    }
   });
 });
 

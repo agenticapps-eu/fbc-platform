@@ -81,6 +81,12 @@ jede für sich zurücknehmbar bleibt.
 
 ## 4. Abnahme
 
+- [x] **Integrationstests eigens fahren.** `vitest run` allein überspringt sie —
+      sie hängen an `FBC_INTEGRATION=1` (`pnpm test:integration`) und laufen in CI
+      im **`migrations`**-Job, nicht in `verify`. Genau dort ist der Lauf zuerst
+      rot geworden, nachdem lokal alles grün war: `feed.auswahl.integration.test.ts`
+      erzeugte Unsichtbarkeit über die Stufe. Merksatz: eine grüne lokale Suite ist
+      erst dann die CI-Suite, wenn beide Kommandos gelaufen sind.
 - [x] Volle Suite grün · `tsc` sauber · `eslint` 0 Fehler · pgTAP alle Dateien
       (mit **Dateiliste**, sonst lügt `supabase test db`).
 - [x] **Mutationsprobe — acht Verbiegungen, Sicherungen ausserhalb von git:**

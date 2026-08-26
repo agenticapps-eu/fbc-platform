@@ -250,3 +250,44 @@ Ausgeloggt SHALL weiterhin **keines von beiden** erscheinen.
   `members`-Event besteht
 - **THEN** erscheint dessen Feed-Beitrag, ebenso wie das Event unter /events
   sichtbar ist
+
+### Requirement: Ein gespeicherter Beitrag verliert seine Sichtbarkeit still
+
+Das System SHALL den Reiter „Gespeichert" über dieselbe Sichtbarkeitsregel führen
+wie den übrigen Feed. Wird ein gespeicherter Beitrag später unsichtbar — weil sein
+Autor entfernt wurde oder weil der Beitrag gelöscht ist —, SHALL er aus der Liste
+verschwinden, **ohne** einen Fehler zu erzeugen und ohne den Reiter leer laufen zu
+lassen, solange andere gespeicherte Beiträge sichtbar bleiben.
+
+Eine gespeicherte Zeile SHALL kein Recht begründen: sie hält fest, dass gespeichert
+wurde, und niemals, dass gezeigt werden darf.
+
+**Der dritte Weg — „die Sichtbarkeit wurde zurückgedreht" — ist mit AGE-601
+entfallen und SHALL nicht mehr zugesichert werden.** Für ein aktiviertes Mitglied
+sind beide zulässigen Sichtbarkeiten lesbar; ein einzelner Beitrag kann ihm also
+nicht mehr unsichtbar werden. Die einzige verbliebene Sperre ist die Aktivierung,
+und die nimmt ihm **sämtliche** Beiträge — sie lässt den Reiter leer laufen statt
+eine Zeile aus ihm zu entfernen, ist also kein Fall dieser Anforderung.
+
+Die Regel selbst SHALL bestehen bleiben. Sie ist die Zusicherung, dass der Reiter
+über `posts` joint und dort die Regel entscheiden lässt, statt aus der
+Speicherzeile ein Zeigerecht abzuleiten — und sie trägt sofort wieder, wenn die
+Sichtbarkeit sich je erneut verengt.
+
+Es SHALL benannt sein, dass die Speicherzeile die beiden verbliebenen Wege **nicht
+überdauert**: `post_saves.post_id → posts` und `posts.author_id → profiles` sind
+beide `on delete cascade`. Das widerspricht der Regel nicht — eine Speicherung
+begründet kein Recht und überdauert ihren Beitrag auch nicht.
+
+#### Scenario: Ein gelöschter Beitrag bricht den Reiter nicht
+
+- **WHEN** ein Mitglied drei Beiträge gespeichert hat und einer davon gelöscht wird
+- **THEN** zeigt der Reiter die zwei verbliebenen Beiträge und meldet keinen Fehler
+- **AND** die Speicherzeile des gelöschten Beitrags ist per Kaskade mit ihm
+  verschwunden
+
+#### Scenario: Eine Speicherzeile begründet kein Zeigerecht
+
+- **WHEN** der Reiter „Gespeichert" gelesen wird
+- **THEN** entscheidet die Sichtbarkeitsregel auf `posts`, welche Zeilen erscheinen
+- **AND** nicht das Vorhandensein einer Zeile in `post_saves`
