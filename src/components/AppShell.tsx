@@ -71,11 +71,11 @@ function BellIcon() {
  * einen Ort, und ein Ort gehört in die Adresszeile und ins Kontextmenü.
  *
  * DREI AUSGÄNGE, nicht zwei — dasselbe Muster wie `useOffeneAnfragen`:
- *  - ungelesen        → Kuvert mit Zahl,
- *  - Abruf gescheitert → Kuvert mit „!", als unbekannt gekennzeichnet,
- *  - nichts ungelesen  → Kuvert OHNE alles.
+ *  - ungelesen        → Sprechblase mit Zahl,
+ *  - Abruf gescheitert → Sprechblase mit „!", als unbekannt gekennzeichnet,
+ *  - nichts ungelesen  → Sprechblase OHNE alles.
  *
- * Das Kuvert bleibt in allen drei Fällen. Verschwände es bei null, wäre der Weg
+ * Die Blase bleibt in allen drei Fällen. Verschwände sie bei null, wäre der Weg
  * zu den Nachrichten wieder unauffindbar — und genau das ist der Befund, gegen
  * den dieser Change gebaut ist. Anders als der Sidebar-Eintrag für Anfragen, der
  * ein VORGANG ist und mit ihm verschwinden darf, ist dies eine FLÄCHE.
@@ -98,7 +98,7 @@ function NachrichtenEinstieg({ anzahl, unbekannt }: { anzahl: number; unbekannt:
       aria-label={name}
       className="relative rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
-      <Icon name="mail" className="h-5 w-5" />
+      <Icon name="messages" className="h-5 w-5" />
       {blase !== null && (
         // `aria-hidden`, weil die Zahl schon im Namen des Links steht — sonst
         // liest ein Screenreader sie zweimal.

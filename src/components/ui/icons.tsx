@@ -106,13 +106,28 @@ const GLYPHS = {
       <path d="M7.5 17.5 8.6 20a1.2 1.2 0 0 0 2.3-.4v-1.4" />
     </>
   ),
-  /** Nachrichten als Gegenstandsbereich — die Sprechblase `comment` gehört
-   *  schon der Aktivität, und zwei Bereiche mit demselben Glyph wären genau die
-   *  Verwechslung, gegen die der Kanon existiert. */
+  /** Briefkasten-Sinnbild. Steht seit AGE-583 NICHT mehr für Nachrichten —
+   *  dafür gibt es `messages` (siehe dort). */
   mail: (
     <>
       <rect x="3" y="5.5" width="18" height="13" rx="2" />
       <path d="m3.6 7.2 8.4 5.9 8.4-5.9" />
+    </>
+  ),
+  /** Nachrichten zwischen Mitgliedern (AGE-583, Entscheidung Donald).
+   *
+   *  Eine Sprechblase MIT drei Punkten. Der Kanon hatte hier ein Kuvert, weil
+   *  die schlichte Blase `comment` schon der Aktivität gehört und zwei Bereiche
+   *  mit demselben Glyph genau die Verwechslung wären, gegen die er existiert.
+   *  Dieser Einwand trifft die Punkte-Blase nicht: sie ist ein eigener Glyph,
+   *  unterscheidbar auf einen Blick, und ein Kuvert bezeichnet eher E-Mail als
+   *  ein Gespräch im Club. */
+  messages: (
+    <>
+      <path d="M20.5 12c0 4.1-3.8 7.5-8.5 7.5-1.2 0-2.4-.2-3.4-.6L3.5 20.5l1.7-4.4C4.1 14.9 3.5 13.5 3.5 12c0-4.1 3.8-7.5 8.5-7.5s8.5 3.4 8.5 7.5Z" />
+      <circle cx="8.4" cy="12" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="15.6" cy="12" r="1.05" fill="currentColor" stroke="none" />
     </>
   ),
   /** Highlights. Bewusst NICHT der Stern aus `membership` und nicht die Krone:
