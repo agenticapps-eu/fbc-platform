@@ -21,14 +21,28 @@ Gemessen am 26.08. wird die Komponente an fuenf Stellen gerendert:
 | Ort | Datei | ohne Konto erreichbar |
 | -- | -- | -- |
 | Startseite, Beitragsvorschau | `src/pages/HomePage.tsx:238` | **ja** |
-| Oeffentliches Profil | `src/pages/PublicProfilePage.tsx:316` | **ja** |
+| „Oeffentliches" Profil | `src/pages/PublicProfilePage.tsx:316` | **nein** — siehe unten |
 | Aktivitaetsfeed | `src/components/community/CommunityFeed.tsx:1185` | nein |
 | Academy | `src/pages/AcademyPage.tsx:75`, `:302` | nein |
 | Profil-Editor, Vorschau | `src/components/profile/VideoLinksInput.tsx:64` | nein |
 
-Die ersten beiden Zeilen sind der eigentliche Punkt: ein Besucher ohne Konto
-loest den Drittanbieter-Aufruf aus, ohne je gefragt worden zu sein. Die Seite
-sagt das heute selbst — `src/content/legal/datenschutz.ts:43` und
+**Korrektur an der ersten Fassung dieses Proposals.** Sie fuehrte das
+oeffentliche Profil als zweite ohne Konto erreichbare Flaeche. Das ist falsch:
+`/p/:id` liegt in `src/App.tsx:118-128` hinter `RequireAuth`, und
+`profiles_public` ist nur fuer `authenticated` lesbar. Es gibt **genau eine**
+ausgeloggt erreichbare Flaeche mit Video, die Startseite.
+
+Der Fehler stand im Linear-Vorgang, im Proposal und in den Tasks, und **keiner
+der drei Reviewer hat ihn gefunden** — sie lasen den vorgelegten Text, und der
+behauptete es. Gefunden hat ihn erst der Versuch, die Flaeche ausgeloggt
+aufzurufen.
+
+Am Befund aendert das nichts, an seiner Groesse schon: betroffen ist ein
+Besucher ohne Konto **auf der Startseite**. Fuer die vier uebrigen Flaechen
+bleibt das Tor richtig, aber dort geht es um eingeloggte Mitglieder, die noch
+nicht gefragt wurden — nicht um Fremde.
+
+Die Seite sagt das heute selbst — `src/content/legal/datenschutz.ts:43` und
 `src/content/legal/cookies.ts:26` fuehren es als offenen Punkt sichtbar auf.
 
 ### Warum Zwei-Klick und nicht das Consent-Banner aus AGE-260
