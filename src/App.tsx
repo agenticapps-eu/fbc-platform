@@ -22,6 +22,8 @@ import OnboardingPage from "./pages/OnboardingPage";
 import WillkommenPage from "./pages/WillkommenPage";
 import ActivationRedeemPage from "./pages/ActivationRedeemPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import LegalRoute from "./pages/LegalRoute";
+import { rechtsseiten } from "./content/legal/meta";
 
 // Dev-only: aus dem Prod-Build heraustree-shaken (DEV ist statisch false).
 const StyleguidePage = import.meta.env.DEV ? lazy(() => import("./pages/StyleguidePage")) : null;
@@ -193,6 +195,17 @@ function AppInner() {
           }
         />
       </Route>
+      {/* Rechtsseiten (AGE-497) — BEWUSST ausserhalb des AppShell-Blocks, wie
+          /login. Die Shell liegt hinter <ActivationGate>; ein eingeloggtes,
+          noch unbestaetigtes Konto saehe dort ausschliesslich den
+          Aktivierungsbildschirm. Das Impressum waere damit genau fuer die
+          Gruppe unerreichbar, die es am dringendsten braucht: Menschen, die
+          gerade ein Konto bestaetigen und vor dem Passwortsetzen sehen wollen,
+          worauf sie sich einlassen. § 5 DDG und Art. 13 DSGVO kennen keine
+          Aktivierungswand. */}
+      {rechtsseiten.map((seite) => (
+        <Route key={seite.slug} path={`/${seite.slug}`} element={<LegalRoute seite={seite} />} />
+      ))}
       <Route path="/login" element={<LoginPage />} />
       {/* Einlösung — außerhalb der Shell (wie /login) und bewusst OHNE
           RequireAuth und ohne ActivationGate: Das Token trägt die Identität,
