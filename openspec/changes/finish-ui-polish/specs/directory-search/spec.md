@@ -13,7 +13,7 @@ retained by the new requirements.
 
 The directory SHALL display each member's name via the shared display-name resolver
 (see `member-profiles`): a caller who is the member themselves, or whose tier clears
-`has_level(4)` (`exchange`), SHALL see the full name; every other authenticated
+is an activated member, SHALL see the full name; every other authenticated
 caller (`level_rank < 4`) and any anonymous caller SHALL see the masked "Mitglied"
 label. Resolution SHALL occur in the database read path (`profiles_public` /
 `search_directory`), so the full name is never sent to a below-threshold caller.

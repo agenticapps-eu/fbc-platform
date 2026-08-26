@@ -19,9 +19,9 @@ Kommentar an AGE-291.
 
 - [ ] 1.1 Add a shared `resolve_display_name` predicate/function keyed off the
       caller's own tier (`auth.uid()` → rank), returning the full name for self and
-      `has_level(4)` callers, else the "Mitglied" masked label
+      activated callers, else the "Mitglied" masked label
 - [ ] 1.2 Make `profiles_public.name` (and `search_directory`) return the resolved
-      name so a below-`exchange` or anonymous caller never receives another member's
+      name so a non-activated or anonymous caller never receives another member's
       full name; ensure ordering/full-text search do not leak it
 - [ ] 1.3 Route every name-bearing surface (directory, feed, events, matching,
       profile views) through the shared resolver
@@ -43,7 +43,7 @@ Kommentar an AGE-291.
 
 ## 5. Verification
 
-- [ ] 5.1 Test: an `exchange`+ viewer sees another member's full name; a below-`exchange`
+- [ ] 5.1 Test: an activated viewer sees another member's full name; a non-activated
       viewer and `anon` see "Mitglied", enforced server-side
 - [ ] 5.2 Test: a member always sees their own full name
 - [ ] 5.3 Test: the full name does not leak via directory search/ordering for a
