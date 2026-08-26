@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button";
+import { buttonKlassen } from "../components/ui/Button";
 import { PageHero } from "../components/ui/PageHero";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
+import { LEVELS, LEVEL_ORDER } from "../config/levels";
 import { displayAuthor } from "../lib/displayAuthor";
+import { REGISTRIEREN_PFAD } from "./LoginPage";
 import {
   eventsListKey,
   fetchEvents,
@@ -22,7 +24,14 @@ import { useAuth } from "../providers/auth-context";
  * Öffentliche Startseite (`/`) — eine kuratierte Übersicht ÜBER den Community-
  * Formaten, für alle (auch ausgeloggte) Besucher sichtbar. Sie ist NICHT die
  * Community selbst: kommende Events, neue öffentliche Beiträge (anonymisiert für
- * Gäste), Testimonials, KPIs und CTAs. Tiefe Feeds bleiben in /community.
+ * Gäste) und eine Schiene mit den Mitgliedsstufen. Tiefe Feeds bleiben in
+ * /community.
+ *
+ * Was hier BEWUSST NICHT steht (AGE-541): Kennzahlen und Stimmen. „120+
+ * Mitglieder" neben rund siebzig echten Konten und zwei Zitate, zugeschrieben
+ * an „Ein Impact-Mitglied", waren erfunden. Sie sind ersatzlos entfallen, nicht
+ * durch echte Zähler ersetzt — ein Zähler ist eine Produktentscheidung, kein
+ * Nebenprodukt des Aufräumens.
  *
  * Datenschicht: beides RLS-gegated und für anon nutzbar — `fetchEvents` liefert nur
  * sichtbare Events, `fetchFeed` für anon NUR `visibility = 'public'` (posts_select_by_
@@ -42,7 +51,6 @@ export default function HomePage() {
 function PublicHome() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
-  const navigate = useNavigate();
 
   const eventsQuery = useQuery({
     queryKey: eventsListKey(uid),
@@ -66,22 +74,39 @@ function PublicHome() {
         subtitle="Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: lerne andere Mitglieder kennen, entdecke Events und finde die richtigen Verbindungen."
       >
         {!user && (
+          // Beide laden zum Beitritt ein und landeten bis AGE-616 im
+          // LOGIN-Formular: `mode` war lokaler Zustand ohne Adresse. Wer auf
+          // „Mitglied werden" klickt und ein Anmeldeformular bekommt, wird
+          // aufgefordert, etwas zu tun, was er gerade nicht kann.
+          //
+          // LINKS, keine Knöpfe: seit die Registrierung eine Adresse hat, soll
+          // man sie auch in einem neuen Tab öffnen können, und ein Screenreader
+          // soll „Link" sagen für etwas, das navigiert. Der Diff-Review hat
+          // zusätzlich gezeigt, dass ein Knopf hier den Test unterläuft — eine
+          // Abfrage nach `role: link` fand ihn nicht, ein Rückfall auf
+          // `/login` wäre also grün durchgegangen.
           <div className="flex flex-wrap gap-3">
-            <Button variant="primary" onClick={() => navigate("/login")}>
+            <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("primary")}>
               Kompass kostenlos starten
-            </Button>
-            <Button variant="ghost" onClick={() => navigate("/login")}>
+            </Link>
+            <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("ghost")}>
               Mitglied werden
-            </Button>
+            </Link>
           </div>
         )}
       </PageHero>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Kpi value="120+" label="Mitglieder" />
-        <Kpi value="24" label="Events 2026" />
-      </section>
+      {/* ZWEI Spalten wie auf der eingeloggten Startseite — dasselbe Raster wie
+          `MemberDashboard`, NICHT das des Feeds (`1fr/16rem`): die beiden sind
+          verschieden, und eine Startseite ist die nähere Entsprechung einer
+          Startseite. Der Seitenkopf läuft darüber über die volle Breite; in der
+          schmaleren Hauptspalte litten sein langer Untertitel und die zwei
+          Knöpfe.
 
+          Unterhalb von `lg` bricht es auf eine Spalte um, und die Schiene
+          wandert UNTER den Leseinhalt — sie ist Beiwerk, nicht der Anfang. */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]">
+        <div className="space-y-12">
       <section className="space-y-4">
         <SectionHeader title="Neue Events" to="/events" linkLabel="Alle Events" />
         {eventsQuery.isLoading ? (
@@ -120,32 +145,75 @@ function PublicHome() {
         )}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-ink">
-          Stimmen aus dem Club
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Testimonial
-            quote="Im Club habe ich Partner gefunden, die meine Werte teilen — nicht nur Kontakte, sondern echte Zusammenarbeit."
-            author="Ein Impact-Mitglied"
-          />
-          <Testimonial
-            quote="Die Events sind kein Networking-Theater. Man kommt mit konkreten nächsten Schritten nach Hause."
-            author="Ein Focus-Mitglied"
-          />
         </div>
-      </section>
+
+        <Stufenschiene />
+      </div>
     </div>
   );
 }
 
-function Kpi({ value, label }: { value: string; label: string }) {
+/**
+ * Die rechte Schiene der Gästeseite (AGE-616).
+ *
+ * Inhalt bewusst nur, was ohne Abfrage echt ist: die Stufen, die die Anwendung
+ * ohnehin definiert, und eine Einladung. Auf dieser Seite standen bis AGE-541
+ * vier erfundene Angaben; die Schiene ist nicht der Ort, an dem neue entstehen.
+ *
+ * Gelesen wird aus `LEVEL_ORDER` und `LEVELS`, nicht aus einer abgeschriebenen
+ * Liste: eine zweite Liste driftet von dem weg, was die Plattform verkauft.
+ */
+function Stufenschiene() {
   return (
-    <Card className="text-center">
-      <p className="font-display text-4xl font-semibold text-accent-strong">{value}</p>
-      <p className="mt-1 text-sm text-muted">{label}</p>
-    </Card>
+    <aside className="space-y-4" aria-labelledby="stufen-titel">
+      <h2
+        id="stufen-titel"
+        className="font-display text-2xl font-semibold tracking-tight text-ink"
+      >
+        Mitglied werden
+      </h2>
+      <p className="text-sm text-muted">
+        Sechs Stufen, aufsteigend. Du startest kostenlos und wechselst, wenn du mehr brauchst.
+      </p>
+
+      <ul className="space-y-2">
+        {LEVEL_ORDER.map((key) => {
+          const stufe = LEVELS[key];
+          return (
+            <li key={key}>
+              <Card className="p-4" padded={false}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium text-ink">{stufe.label}</span>
+                  <span className="shrink-0 text-sm text-muted">{preis(stufe)}</span>
+                </div>
+                {stufe.priceYear > 0 && (
+                  <p className="text-xs text-muted">oder {stufe.priceMonth} € monatlich</p>
+                )}
+                <p className="mt-1 text-sm text-muted">{stufe.summary}</p>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+
+      <Link to={REGISTRIEREN_PFAD} className={buttonKlassen("primary", "md", "w-full")}>
+        Mitglied werden
+      </Link>
+    </aside>
   );
+}
+
+/** Preis mit Intervall, nicht als nackte Zahl — und „kostenlos" statt „0 €",
+ *  weil eine Null neben fünf Preisen wie ein Fehler aussieht.
+ *
+ *  Der JAHRESPREIS steht vorn, der Monatspreis darunter. Das ist keine Frage
+ *  des Geschmacks: bei `discover` sind es 150 € im Jahr, aber 15 € im Monat —
+ *  zwölf Monate ergäben 180. Der Monatspreis allein verschwiege also, dass die
+ *  Jahreszahlung günstiger ist, und das wäre auf genau der Seite falsch, deren
+ *  Zweck es ist, keine unbelegten Angaben mehr zu machen. */
+function preis(stufe: { priceMonth: number; priceYear: number }) {
+  if (stufe.priceMonth === 0 && stufe.priceYear === 0) return "kostenlos";
+  return `${stufe.priceYear} € / Jahr`;
 }
 
 function SectionHeader({ title, to, linkLabel }: { title: string; to: string; linkLabel: string }) {
@@ -246,11 +314,3 @@ export function PostPreview({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: 
   );
 }
 
-function Testimonial({ quote, author }: { quote: string; author: string }) {
-  return (
-    <Card className="space-y-3">
-      <p className="text-sm italic text-ink/90">„{quote}"</p>
-      <p className="text-xs font-medium text-muted">— {author}</p>
-    </Card>
-  );
-}

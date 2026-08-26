@@ -29,6 +29,16 @@ const sizes: Record<Size, string> = {
   md: "h-11 px-5 text-sm",
 };
 
+/** Dieselben Klassen für ein Element, das ein LINK sein muss statt ein Knopf.
+ *
+ *  Nötig geworden mit AGE-616: seit die Registrierung eine Adresse hat, sollen
+ *  die Einladungen dorthin auch eine tragen — mittlere Maustaste, neuer Tab,
+ *  Ziel in der Statusleiste, und ein Screenreader sagt „Link" statt „Schaltfläche"
+ *  für etwas, das navigiert. Ein `<button onClick={navigate}>` kann davon nichts. */
+export function buttonKlassen(variant: Variant = "primary", size: Size = "md", extra?: string) {
+  return cn(base, variants[variant], sizes[size], extra);
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { className, variant = "primary", size = "md", type = "button", ...props },
   ref,

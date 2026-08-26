@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
@@ -86,15 +86,66 @@ function RegistrierungOhneSitzung({ onZumLogin }: { onZumLogin: () => void }) {
   );
 }
 
+const MODUS_PARAM = "modus";
+const MODUS_REGISTRIEREN = "registrieren";
+
+/** Die Adresse, unter der die Registrierung erreichbar ist (AGE-616).
+ *
+ *  Bis dahin war `mode` reiner Zustand in dieser Komponente. „Mitglied werden"
+ *  auf der Startseite landete deshalb im LOGIN-Formular — ein Knopf, der zum
+ *  Beitritt einlädt und ein Anmeldeformular zeigt, verlangt etwas Unmögliches,
+ *  und zwar genau in dem Moment, in dem jemand sich entschieden hat.
+ *
+ *  Der Modus wird jetzt aus der Adresse ABGELEITET, nicht aus ihr initialisiert.
+ *  Ein `useState(ausDerAdresse)` nähme einen späteren Wert nie an: React
+ *  montiert diese Route beim Wechsel von `/login` auf `/login?modus=…` nicht
+ *  neu, und ein Zurücksetzen im Effect käme erst nach dem falschen Bild. */
+export const REGISTRIEREN_PFAD = `/login?${MODUS_PARAM}=${MODUS_REGISTRIEREN}`;
+
 export default function LoginPage() {
   const { user, isLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("login");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [suchParameter, setzeSuchParameter] = useSearchParams();
+  const mode: Mode =
+    suchParameter.get(MODUS_PARAM) === MODUS_REGISTRIEREN ? "register" : "login";
+
+  function setMode(naechster: Mode) {
+    const naechste = new URLSearchParams(suchParameter);
+    if (naechster === "register") naechste.set(MODUS_PARAM, MODUS_REGISTRIEREN);
+    else naechste.delete(MODUS_PARAM);
+    // `replace`: der Moduswechsel ist kein eigener Schritt in der Historie —
+    // sonst führt der Zurück-Knopf durch jedes Umschalten statt zur Herkunft.
+    setzeSuchParameter(naechste, { replace: true });
+  }
+
+  const [formError, setFormErrorRoh] = useState<string | null>(null);
   // AGE-591: der dritte Ausgang der Registrierung — kein Fehler, keine Sitzung.
   // Bewusst ein eigener Zustand und nicht `formError`: Das ist kein Fehler, es
   // ist ein Weg, der woanders weitergeht, und er sieht auch nicht so aus.
-  const [ohneSitzung, setOhneSitzung] = useState(false);
+  const [ohneSitzung, setOhneSitzungRoh] = useState(false);
+
+  // In WELCHEM Modus die stehende Meldung entstanden ist.
+  //
+  // Der Umschalt-Knopf räumt beide Meldungen selbst weg, aber der Modus hängt
+  // seit AGE-616 an der ADRESSE und kann sich auch ohne ihn ändern: über den
+  // Zurück-Knopf, über einen Link von der Startseite, über einen Lesezeichen.
+  // Ohne diese Zuordnung stünde nach einem gescheiterten Login die
+  // Login-Fehlermeldung über dem Registrierungsformular. Gefunden im
+  // Diff-Review.
+  //
+  // Zugeordnet statt im Effect zurückgesetzt: ein Reset im Effect läuft NACH
+  // dem Rendern, die falsche Meldung wäre also einen Bildaufbau lang zu sehen.
+  const [meldungFuer, setMeldungFuer] = useState<Mode>("login");
+  const meldungGilt = meldungFuer === mode;
+
+  function setFormError(text: string | null) {
+    setMeldungFuer(mode);
+    setFormErrorRoh(text);
+  }
+  function setOhneSitzung(wert: boolean) {
+    setMeldungFuer(mode);
+    setOhneSitzungRoh(wert);
+  }
 
   const {
     register,
@@ -180,19 +231,79 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
-      {/* Variant-bewusster Hero: dark-glow-Panel (b/d) bzw. heller Hero (a/c),
-          Shimmer-Sweep, Marken-Logo. */}
-      <div className="fbc-hero overflow-hidden rounded-[var(--radius-card)] border border-accent/25 px-6 py-8 text-center shadow-soft">
-        <div className="flex justify-center">
+    <main className="grid min-h-screen lg:grid-cols-2">
+      {/* Das Bildpanel — dasselbe Mittel wie ein Seitenkopf, nur an der anderen
+          Achse: Foto plus Verlauf mit ZWEI Stopps in der Flächenfarbe, damit
+          Marke und Claim auf voll deckendem Grund stehen und nichts auf dem
+          Foto sitzt.
+
+          Beside statt over ist die ganze Unterscheidung: `design-system`
+          verbietet einen Bildkopf ÜBER einem Formular, weil er sich vor die
+          Aufgabe stellt. Neben dem Formular tut er das nicht.
+
+          `hero-mitglieder.webp` ist bewusst wiederverwendet — es gibt kein
+          freies Motiv, alle neun sind an Routen vergeben. `/mitglieder` liegt
+          hinter der Anmeldung: ein Gast sieht dieses Bild nirgends sonst, für
+          ihn wiederholt sich nichts. Vermerkt in CREDITS.md. */}
+      {/* Das Foto liegt als HINTERGRUND, nicht als <img>. Der Grund ist
+          gemessen, nicht gemutmaßt: Chrome fordert ein `<img>` auch dann an,
+          wenn sein Elternteil `display: none` trägt — bei 375 px ging der
+          Abruf hinaus, obwohl das Panel gar nicht sichtbar war. Für ein
+          Hintergrundbild unterbleibt er. Das spart 72 kB auf genau dem
+          Bildschirm, den die meisten Mitglieder zuerst sehen, und zwar dort,
+          wo am ehesten über Funk geladen wird.
+
+          Semantisch kostet es nichts: das Bild war ohnehin dekorativ und mit
+          `aria-hidden` aus dem Baum genommen — ein Hintergrundbild steht dort
+          von vornherein nicht drin. KEIN `aria-hidden` auf diesem Panel: es
+          trägt Marke und Claim, und die kompakte Fassung darunter ist
+          `lg:hidden`. Hier ausgeblendet wären sie auf dem Desktop für
+          Screenreader nirgends mehr vorhanden. */}
+      <div
+        className="relative isolate hidden overflow-hidden bg-cover bg-center lg:block"
+        style={{ backgroundImage: "url('/images/hero-mitglieder.webp')" }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            // Vier Stopps, nicht zwei: mit einem harten Übergang von deckend auf
+            // halbtransparent entstand bei 26 % eine sichtbare Kante, an der das
+            // Foto wie abgeschnitten aussah, und die Mitte wurde milchig. Die
+            // Rampe läuft jetzt lang und flach aus, sodass die deckende Fläche
+            // unter dem Text in das freie Bild darüber übergeht, ohne dass eine
+            // Grenze erkennbar wird.
+            background:
+              "linear-gradient(0deg, var(--color-canvas) 0%, var(--color-canvas) 22%, color-mix(in srgb, var(--color-canvas) 70%, transparent) 32%, color-mix(in srgb, var(--color-canvas) 25%, transparent) 44%, transparent 58%)",
+          }}
+        />
+        <div className="relative flex h-full flex-col justify-end gap-4 p-10">
           <Logo lockup="full" />
+          <p className="max-w-sm font-display text-2xl font-semibold tracking-tight text-ink">
+            Gemeinsam erfolgreich
+          </p>
+          <p className="max-w-sm text-sm text-muted">
+            Das Business-Netzwerk, das auf Werten statt Visitenkarten aufbaut: verbinden,
+            wachsen, vertrauen.
+          </p>
         </div>
-        <p className="mt-4 text-sm font-medium tracking-wide text-[var(--hero-muted)]">
-          Gemeinsam erfolgreich · verbinden, wachsen, vertrauen
-        </p>
       </div>
 
-      <div>
+      {/* Die Formularspalte. Der 760-px-Deckel aus `design-system` gilt IHR,
+          nicht der Komposition — was er schützt, ist die Feldbreite, nicht die
+          Leere daneben. */}
+      <div className="mx-auto flex w-full max-w-md flex-col justify-center gap-6 p-6 sm:p-10">
+        {/* Unterhalb von `lg` weicht das Panel — aber nicht die Marke. Sie hier
+            ersatzlos zu verlieren wäre ein Rückschritt für genau die Geräte, auf
+            denen die meisten sich anmelden. Gefunden in der Plan-Review. */}
+        <div className="flex flex-col items-start gap-2 lg:hidden">
+          <Logo lockup="full" />
+          <p className="text-sm font-medium tracking-wide text-muted">
+            Gemeinsam erfolgreich · verbinden, wachsen, vertrauen
+          </p>
+        </div>
+
+        <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
           {mode === "login" ? "Login" : "Registrieren"}
         </h1>
@@ -264,7 +375,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {ohneSitzung && (
+        {ohneSitzung && meldungGilt && (
           <RegistrierungOhneSitzung
             onZumLogin={() => {
               setMode("login");
@@ -277,7 +388,7 @@ export default function LoginPage() {
           />
         )}
 
-        {formError && <p className="text-sm text-danger">{formError}</p>}
+        {formError && meldungGilt && <p className="text-sm text-danger">{formError}</p>}
 
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           {mode === "login" ? "Anmelden" : "Konto erstellen"}
@@ -287,7 +398,7 @@ export default function LoginPage() {
       <button
         type="button"
         onClick={() => {
-          setMode((m) => (m === "login" ? "register" : "login"));
+          setMode(mode === "login" ? "register" : "login");
           setFormError(null);
           setOhneSitzung(false);
         }}
@@ -296,15 +407,18 @@ export default function LoginPage() {
         {mode === "login" ? "Noch kein Konto? Registrieren" : "Schon ein Konto? Zum Login"}
       </button>
 
-      <Link to="/" className="mt-4 block text-sm text-muted hover:underline">
-        ← Zurück zur Startseite
-      </Link>
+        <Link to="/" className="mt-4 block text-sm text-muted hover:underline">
+          ← Zurück zur Startseite
+        </Link>
 
-      {/* AGE-497: Hier wird ein Vertrag geschlossen und eine E-Mail-Adresse
-          erhoben. § 312i BGB verlangt die AGB bei Vertragsschluss, Art. 13
-          DSGVO die Information bei Erhebung — beides an dieser Stelle, nicht
-          im Footer einer Seite, die ein frisch registriertes Konto nie sieht. */}
-      <RechtsLinks className="mt-6 border-t border-line pt-4" />
+        {/* AGE-497: Hier wird ein Vertrag geschlossen und eine E-Mail-Adresse
+            erhoben. § 312i BGB verlangt die AGB bei Vertragsschluss, Art. 13
+            DSGVO die Information bei Erhebung — beides an dieser Stelle, nicht
+            im Footer einer Seite, die ein frisch registriertes Konto nie sieht.
+            Sie stehen in der FORMULARSPALTE, nicht unter beiden Spalten: sie
+            gehören zu dem, was hier abgeschickt wird. */}
+        <RechtsLinks className="mt-6 border-t border-line pt-4" />
+      </div>
     </main>
   );
 }
