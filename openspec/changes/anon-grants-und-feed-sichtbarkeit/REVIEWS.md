@@ -55,22 +55,43 @@ VERDICT: REQUEST-CHANGES
 
 ## Resolution
 
-### HIGH `fbc_profile_search_doc` — **widerlegt, gemessen**
+### HIGH `fbc_profile_search_doc` — **BESTÄTIGT.** Meine erste Widerlegung war falsch.
 
-`profiles.search_doc` **ist** `attgenerated='s'` und `proacl` **ist** `null`
-(= `EXECUTE` an `PUBLIC`) — insoweit stimmt die Prämisse. Die Folgerung stimmt
-nicht. In einer Transaktion gemessen, mit Gegenprobe:
+Diese Auflösung stand hier zuerst als „widerlegt, gemessen", mit einer Tabelle.
+Sie war falsch, und wie sie falsch wurde, ist die eigentliche Lehre.
 
-| nach `revoke … from public, anon` | |
-|---|---|
-| `has_function_privilege('authenticated', …)` | **false** (`proacl = {postgres=X}`) |
-| **direkter** Aufruf als `authenticated` | `42501 permission denied` |
-| `UPDATE`, der die generierte Spalte neu berechnet | **geht durch** |
+Die Prämisse stimmte: `profiles.search_doc` ist `attgenerated = 's'` und der
+`proacl` der Funktion ist `null`, `authenticated` hält das Recht also allein über
+`PUBLIC`. Meine Gegenmessung sollte zeigen, dass ein `UPDATE` trotzdem durchgeht —
+und sie zeigte das auch. Nur hatte sie nichts gemessen: die Sonde lief als
+`authenticated` **ohne gesetzte JWT-Claims**, ihr `UPDATE` traf wegen RLS **null
+Zeilen**, und die generierte Spalte wurde nie berechnet. „Ging durch" hieß in
+Wahrheit „hat nichts angefasst".
 
-Der Entzug greift also nachweislich; Postgres prüft `EXECUTE` beim Auswerten
-eines Generierungsausdrucks trotzdem nicht. **Kein `grant` an `authenticated`
-nötig** — der wäre eine Fläche, die niemand braucht. Der direkte Aufruf ist die
-Gegenprobe, ohne die „ging durch" auch „Entzug hat nicht gegriffen" heißen könnte.
+Aufgefallen ist es erst an `rls_test.sql` Abschnitt 15, wo der Schreibweg mit
+echter Identität läuft:
+
+```
+have: DENIED:permission denied for function fbc_profile_search_doc
+want: OK
+```
+
+Postgres prüft `EXECUTE` beim Auswerten eines Generierungsausdrucks also **sehr
+wohl**, und gegen den Schreibenden. Ohne einen Grant fiele jedes Profil-UPDATE
+eines Mitglieds.
+
+**Behoben:** die Migration gibt `authenticated` das Recht ausdrücklich zurück;
+`anon` bleibt außen vor, weil ein ausgeloggter Aufrufer kein Profil schreibt. Am
+Katalog gegengeprüft, welche weiteren Objekte an den entzogenen Funktionen
+hängen: nur `profiles.search_doc`, und `array_jaccard` hängt an keiner
+generierten Spalte, keinem Index und keiner View — es bleibt zu Recht entzogen.
+
+**Merksatz, der hier gefehlt hat:** ein `UPDATE`, das null Zeilen trifft, ist kein
+bestandener Test. Das steht so schon in den Projektnotizen — eine fremde
+Schreiboperation endet unter RLS mit null Zeilen statt mit `42501` — und ich habe
+es beim Bauen der Sonde nicht angewandt. Eine Sonde braucht dieselbe Gegenprobe,
+die dieser Change von seinen Zusagen verlangt: erst zeigen, dass sie überhaupt
+ausschlägt.
 
 ### HIGH Default Privileges — **angenommen** (und unabhängig selbst gefunden)
 

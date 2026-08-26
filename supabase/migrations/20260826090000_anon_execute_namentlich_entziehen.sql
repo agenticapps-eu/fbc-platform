@@ -70,16 +70,33 @@ grant execute on function
 grant execute on function public.register_for_event(uuid)          to authenticated;
 grant execute on function public.set_event_check_in(uuid, boolean) to authenticated;
 
--- `array_jaccard` und `fbc_profile_search_doc` bekommen BEWUSST keinen Grant zurueck:
---   * `array_jaccard` hat genau einen Aufrufer, `generate_matches_for` — und der ist
---     `SECURITY DEFINER` und fuer `authenticated` nicht einmal ausfuehrbar. Der
---     verschachtelte Aufruf laeuft als `postgres`.
---   * `fbc_profile_search_doc` wird nur vom Generierungsausdruck der gespeicherten
---     Spalte `profiles.search_doc` aufgerufen. Gegen die naheliegende Sorge gemessen:
---     nach dem Entzug faellt ein DIREKTER Aufruf als `authenticated` mit 42501,
---     waehrend ein UPDATE, das die generierte Spalte neu berechnet, weiterhin
---     durchgeht — Postgres prueft EXECUTE beim Generierungsausdruck nicht. Ein
---     Grant "sicherheitshalber" waere eine Flaeche ohne Aufrufer.
+-- `fbc_profile_search_doc` bekommt `authenticated` ZURUECK — und das ist der Punkt,
+-- an dem eine erste Messung dieses Changes falsch war.
+--
+-- `profiles.search_doc` ist eine GESPEICHERTE generierte Spalte ueber dieser
+-- Funktion (`attgenerated = 's'`), und Postgres prueft EXECUTE beim Auswerten des
+-- Generierungsausdrucks sehr wohl — gegen den SCHREIBENDEN, nicht gegen den
+-- Eigentuemer. Ohne diesen Grant faellt jedes Profil-UPDATE eines Mitglieds mit
+-- `permission denied for function fbc_profile_search_doc`.
+--
+-- Die erste Sonde hatte das Gegenteil behauptet. Sie lief als `authenticated`
+-- OHNE gesetzte JWT-Claims, ihr UPDATE traf wegen RLS null Zeilen, und die
+-- generierte Spalte wurde nie berechnet — "ging durch" hiess in Wahrheit "hat
+-- nichts angefasst". Aufgefallen ist es erst an `rls_test.sql` (Abschnitt 15),
+-- wo der Schreibweg mit echter Identitaet laeuft. Merksatz fuer die naechste
+-- Sonde: ein UPDATE, das null Zeilen trifft, ist kein bestandener Test.
+--
+-- `anon` bleibt aussen vor: ein ausgeloggter Aufrufer schreibt kein Profil.
+grant execute on function
+  public.fbc_profile_search_doc(text, text, text, text, text, text[], text[], text[])
+  to authenticated;
+
+-- `array_jaccard` bekommt BEWUSST keinen Grant zurueck: es hat genau einen
+-- Aufrufer, `generate_matches_for` — und der ist `SECURITY DEFINER` und fuer
+-- `authenticated` nicht einmal ausfuehrbar, der verschachtelte Aufruf laeuft also
+-- als `postgres`. Am Katalog gegengeprueft: die Funktion haengt an keiner
+-- generierten Spalte, keinem Index und keiner View. Ein Grant
+-- "sicherheitshalber" waere eine Flaeche ohne Aufrufer.
 
 -- ── 2. Die beiden beabsichtigten: geerbtes PUBLIC durch Ausgesprochenes ersetzen ──
 -- Beide tragen `=X/postgres` (PUBLIC) NEBEN den benannten Rollen. Sie sollen fuer

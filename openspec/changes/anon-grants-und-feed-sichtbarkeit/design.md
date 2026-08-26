@@ -99,6 +99,10 @@ Vorgabe; getrennte Migrationen sind der Preis, der das trotzdem beherrschbar hä
   `has_level(4)` macht das Prädikat **billiger**, nicht teurer — ein
   `SECURITY DEFINER`-Aufruf je `members`-Zeile entfällt. Die offene Frage zu den
   RLS-Kosten wird davon entschärft, nicht verschärft.
+- **Eine Sonde ohne Gegenprobe hat in diesem Change schon einmal das Falsche
+  belegt.** Die erste Messung zu `fbc_profile_search_doc` lief als
+  `authenticated` ohne JWT-Claims; ihr `UPDATE` traf unter RLS null Zeilen und
+  bestand deshalb scheinbar. Jede Sonde hier zeigt zuerst, dass sie ausschlägt.
 - **Die Gegenprobe im pgTAP-Test erteilt kurzzeitig ein Recht.** Sie läuft in der
   Test-Transaktion und wird zurückgerollt; sie darf **nicht** gegen eine echte
   Instanz laufen.

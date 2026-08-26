@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(433);
+select plan(435);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -361,11 +361,25 @@ select is(
     'insert into public.messages (thread_id, sender_id, body) select id, ''44444444-4444-4444-4444-444444444444'', ''hallo'' from public.message_threads where a_profile_id = ''44444444-4444-4444-4444-444444444444'' and b_profile_id = ''66666666-6666-6666-6666-666666666666'''),
   'OK', 'Nach dem Annehmen geht die Nachricht durch');
 
--- ── 8. posts — „Aktivität" ab `exchange` (rank 4) ────────────────────────────
+-- ── 8. posts — „Aktivität" für JEDES aktivierte Mitglied (AGE-601) ──────────
+-- Bis AGE-601 verlangte der `members`-Zweig zusätzlich `has_level(4)`. In PROD
+-- trägt jeder Beitrag `members` und keiner `public` — unter Rang 4 war der Feed
+-- also nicht dünner, sondern LEER. Die Hürde ist jetzt allein `is_activated()`.
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  0, 'Discover sieht die Aktivität nicht (members-Post gesperrt)');
+  1, 'Discover sieht den members-Beitrag (AGE-601: keine Stufenschwelle mehr)');
+
+-- Die Gegenrichtung, ohne die die Ausweitung nur belegt, dass etwas offener wurde:
+-- ein BESTÄTIGTES, aber nicht aktiviertes Konto bekommt weiterhin nichts.
+-- Bewusst 'dddd…0d' (Nichtaktiv, activated_at = null ab Zeile 56) und NICHT
+-- '9999…': das wird erst in Abschnitt 13 deaktiviert und wäre hier noch aktiviert —
+-- die Zusage wäre grün aus dem falschen Grund.
+select is(
+  pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+    'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
+  0, 'Ohne Aktivierung bleibt der members-Beitrag verschlossen — die Ausweitung '
+     'verschiebt die Hürde, sie entfernt sie nicht');
 
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
@@ -382,11 +396,17 @@ select is(
     'select count(*)::int from public.posts where id = ''dddddddd-dddd-dddd-dddd-dddddddddddd'''),
   1, 'Basic sieht den EIGENEN members-Beitrag (author-Klausel, rang-unabhängig)');
 
+select is(
+  pg_temp.count_as('11111111-1111-1111-1111-111111111111',
+    'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
+  1, 'Basic sieht auch einen FREMDEN members-Beitrag (AGE-601) — das ist die '
+     'eigentliche Ausweitung, die Autoren-Klausel darüber ist es nicht');
+
 -- ── 9. Kommentare erben die Sichtbarkeit des Eltern-Posts ────────────────────
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  0, 'Kommentar auf gesperrtem Post ist für Discover unsichtbar (kein Gate-Loch)');
+  1, 'Kommentar folgt seinem Post — nach AGE-601 sieht Discover beide');
 
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
@@ -2056,7 +2076,9 @@ select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select public.post_media_lesbar(
       'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp')$$),
-  false, 'Rang 1 kommt an das Bild eines fremden members-Beitrags nicht heran');
+  true, 'Rang 1 kommt an das Bild eines fremden members-Beitrags heran (AGE-601) — '
+        'post_media_lesbar ist die eine bewusste Abschrift des Post-Prädikats und '
+        'muss deshalb mitwandern');
 
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select public.post_media_lesbar(
@@ -2066,7 +2088,7 @@ select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a1',
   $$select public.post_media_lesbar(
       'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp')$$),
-  true, 'Ab Rang 4 geht das Bild eines fremden members-Beitrags auf');
+  true, 'Auch ab Rang 4 geht es weiter auf — die Ausweitung nimmt niemandem etwas');
 
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a3',
   $$select public.post_media_lesbar(
@@ -2092,7 +2114,7 @@ select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
 select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select count(*)::int from storage.objects where bucket_id = 'post-media'
       and name = 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000002-0000-4000-8000-000000000002/0.webp'$$),
-  0, '… und das eines fremden members-Beitrags nicht');
+  1, '… und seit AGE-601 auch das eines fremden members-Beitrags');
 
 -- 19.4 Schreiben. Hier GIBT es einen Fehler, und er ist der Beleg.
 select is(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
@@ -2157,7 +2179,8 @@ select is(pg_temp.count_as_anon(
 select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select count(*)::int from public.post_media
       where post_id = 'c7000002-0000-4000-8000-000000000002'$$),
-  0, 'post_media: Rang 1 liest die Bildzeile eines fremden members-Beitrags nicht …');
+  1, 'post_media: Rang 1 liest seit AGE-601 auch die Bildzeile eines fremden '
+     'members-Beitrags — die Zeile ist genauso lesbar wie ihr Beitrag …');
 
 select is(pg_temp.count_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select count(*)::int from public.post_media
@@ -2992,9 +3015,10 @@ select is(
        where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
   0, 'Ausgeloggt ist der Beitrag eines members-Events unsichtbar');
 
--- 22.19 Die benannte Asymmetrie, in einem Paar gemessen: Rang 1 sieht das
--- EVENT, aber nicht seinen Feed-Beitrag. Die Richtung ist die ungefährliche
--- (strenger, nicht undichter) — unbenannt wäre sie ein Rätsel.
+-- 22.19 Die frühere Asymmetrie ist AUFGELÖST (AGE-601), in einem Paar gemessen:
+-- Rang 1 sieht das EVENT und jetzt auch seinen Feed-Beitrag. Bis AGE-601 war der
+-- gespiegelte Beitrag strenger als sein Event — ungefährlich, aber ein Rätsel,
+-- das die Spec eigens benennen musste. Jetzt stimmen beide überein.
 select is(
   pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
     $$select count(*)::int from public.events
@@ -3005,7 +3029,7 @@ select is(
   pg_temp.count_as('c9c9c9c9-0000-0000-0000-0000000000b3',
     $$select count(*)::int from public.posts
        where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
-  0, '… aber NICHT seinen Feed-Beitrag (members-Posts erst ab Rang 4)');
+  1, '… und jetzt auch seinen Feed-Beitrag (AGE-601 löst die Asymmetrie auf)');
 
 -- 22.20 Die asymmetrische Kaskade, gepint statt nur beschrieben (opencode, LOW):
 -- ein gelöschtes Host-Profil nimmt den BEITRAG mit, das EVENT bleibt.

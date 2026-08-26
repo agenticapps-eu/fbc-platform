@@ -28,7 +28,7 @@
 --     Suchbegriff, sonst ist sie eine Aussage über den Seed.
 
 begin;
-select plan(50);
+select plan(51);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -421,11 +421,24 @@ select is(
          array['bb000000-0000-4000-8000-000000000003']::uuid[])$q$),
   'true', 'Wächter: auch ein basic-Konto bekommt über einen öffentlichen Beitrag Auskunft');
 
+-- AGE-601 hat die untere Haelfte dieses Paars verschoben, nicht abgeschafft.
+-- Bis dahin war `Lz Basic` der Ausgesperrte: `members` verlangte Rang 4. Jetzt
+-- meint `members` jedes AKTIVIERTE Mitglied, also bekommt sie auch hier Auskunft
+-- — und die Sperre, die es weiterhin zu pruefen gilt, ist die AKTIVIERUNG.
+-- Deshalb steht die Gegenprobe jetzt auf `Lz Nie Bestaetigt` (activated_at null).
+-- Ohne diese Umstellung waere die Zusage ersatzlos entfallen, und mit ihr der
+-- Beleg, dass die Sichtbarkeit eine Eigenschaft der Funktion ist und keine Bitte.
 select is(
-  pg_temp.int_as('d0000000-0000-0000-0000-000000000005',
+  pg_temp.text_as('d0000000-0000-0000-0000-000000000005',
+    $q$select former::text from public.former_member_entries(
+         array['bb000000-0000-4000-8000-000000000004']::uuid[])$q$),
+  'true', '… und seit AGE-601 auch ueber einen members-Beitrag');
+
+select is(
+  pg_temp.int_as('d0000000-0000-0000-0000-000000000007',
     $q$select count(*)::int from public.former_member_entries(
          array['bb000000-0000-4000-8000-000000000004']::uuid[])$q$),
-  0, '… über einen Beitrag, den es nicht lesen darf, aber KEINE — auch nicht "false"');
+  0, 'Ein NICHT aktiviertes Konto bekommt KEINE Auskunft — auch nicht "false"');
 
 -- 7.9/7.10 Kommentare zählen gleich. Ein Faden, in dem nur die Beitragsautoren
 -- neutralisiert sind, hält die Zusage nicht.
@@ -444,10 +457,11 @@ select is(
 -- 7.11 Und die Sichtbarkeit gilt auch auf der Kommentarseite: hängt der
 -- Kommentar unter einem unsichtbaren Beitrag, gibt es keine Auskunft.
 select is(
-  pg_temp.int_as('d0000000-0000-0000-0000-000000000005',
+  pg_temp.int_as('d0000000-0000-0000-0000-000000000007',
     $q$select count(*)::int from public.former_member_entries(
          '{}'::uuid[], array['cc000000-0000-4000-8000-000000000003']::uuid[])$q$),
-  0, 'Ein Kommentar unter einem unsichtbaren Beitrag bleibt ohne Auskunft');
+  0, 'Ein Kommentar unter einem fuer den Aufrufer unsichtbaren Beitrag bleibt '
+     'ohne Auskunft (Aufrufer nicht aktiviert — nach AGE-601 die einzige Sperre)');
 
 -- 7.12 Ein Aufruf mit beiden Listen liefert beide Arten, unterscheidbar.
 select is(
@@ -507,8 +521,12 @@ select is(
   (select pg_get_expr(polqual, polrelid) from pg_policy
     where polrelid = 'public.posts'::regclass
       and polname = 'posts_select_by_visibility'),
-  '(is_activated() AND ((visibility = ''public''::text) OR ((visibility = ''members''::text) '
-  'AND has_level(4)) OR (author_id = ( SELECT auth.uid() AS uid))))',
+  -- AGE-601: der `members`-Zweig traegt keine Stufenschwelle mehr. Dieser
+  -- Waechter hat beim Umstellen gebrochen und damit genau das geleistet, wofuer
+  -- er da ist — die Kopie in `former_member_entries` wurde in derselben
+  -- Migration nachgezogen (20260826100000).
+  '(is_activated() AND ((visibility = ''public''::text) OR (visibility = ''members''::text) '
+  'OR (author_id = ( SELECT auth.uid() AS uid))))',
   'posts_select_by_visibility unveraendert — sonst ist die Kopie in former_member_entries nachzuziehen');
 
 select * from finish();
