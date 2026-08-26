@@ -11,75 +11,50 @@ eine falsche Auskunft für jeden, der die Regel sucht. Ersetzt durch
 `posts_select_by_visibility` wird zu `visibility = 'members'`. `is_activated()`
 steht bereits davor und bleibt die Hürde.
 
+### Requirement: Ein Bild ist genau so sichtbar wie sein Beitrag
+
+**Reason:** Ersetzt durch „Ein Bild folgt der Sichtbarkeit seines Beitrags". Zwei
+Gründe, und der zweite ist mechanisch: erstens trägt die Regel nach AGE-601 keine
+eigene Stufenschwelle mehr, der neue Name sagt das genauer. Zweitens heisst ein
+Szenario der alten Fassung „Ein Mitglied unter Rang 4 sieht das Bild nicht" und ist
+falsch geworden — der Titel eines Szenarios ist beim Archivieren sein Schlüssel,
+und ein Umbenennen innerhalb eines `MODIFIED`-Blocks bricht `openspec archive` ab
+(`validate` bleibt dabei grün). Eine Anforderung als Ganzes zu ersetzen ist der
+Weg, ein Szenario loszuwerden.
+
+**Migration:** `post_media_lesbar` verliert in derselben Migration wie die Policy
+den `has_level(4)`-Konjunkt.
+
+### Requirement: Der Feed-Beitrag folgt seinem Event über dessen Lebenszyklus
+
+**Reason:** Ersetzt durch „Der Feed-Beitrag folgt seinem Event und stimmt mit ihm
+überein". Die alte Fassung schrieb ausdrücklich eine **Asymmetrie** fest — das
+Event sei für jedes aktivierte Konto sichtbar, sein gespiegelter Beitrag erst ab
+Rang 4 — und trug dafür ein eigenes Szenario („Ein Mitglied unter Rang 4 sieht den
+Beitrag eines members-Events nicht"). AGE-601 löst genau diese Asymmetrie auf, die
+dort selbst als „ohne Benennung ein Rätsel" bezeichnet wurde. Name und Szenario
+wandern deshalb mit.
+
+**Migration:** Keine eigene — die Symmetrie entsteht dadurch, dass
+`posts_select_by_visibility` dieselbe Hürde trägt wie `events_select_by_visibility`.
+
+### Requirement: Ein gespeicherter Beitrag verliert seine Sichtbarkeit still
+
+**Reason:** Ersetzt durch „Ein gespeicherter Beitrag verschwindet still aus dem
+Reiter". Die alte Fassung nannte drei Wege, auf denen ein gespeicherter Beitrag
+unsichtbar werden kann, und ihr einziges Szenario („Der unsichtbar gewordene
+Beitrag bricht den Reiter nicht") wählte davon den **mittleren** — die
+zurückgedrehte Sichtbarkeit bei zu niedriger Stufe. Genau der ist mit AGE-601
+entfallen: für ein aktiviertes Mitglied kann ein einzelner Beitrag nicht mehr
+unsichtbar werden. Die Regel bleibt, ihr Beispiel muss ein anderes sein.
+
+**Migration:** Der Integrationstest stellt auf den gelöschten Beitrag um; die
+Speicherzeile geht dabei per `on delete cascade` mit, was die neue Fassung
+ausspricht.
+
 ## ADDED Requirements
 
-### Requirement: Post readability is gated by activation
-
-The system SHALL, via RLS, permit an authenticated member to read a post only
-when the member is activated **and** the post is `public`, or the post is
-`members`, or the member is the post's author.
-
-Der `members`-Zweig SHALL **keine** Stufenschwelle tragen. In der Produktion trägt
-jeder Beitrag `members`; eine Schwelle darüber macht den Feed für jedes Mitglied
-darunter nicht dünner, sondern **leer**. Der Preis SHALL ausgesprochen sein: die
-Anmeldung ist offen, `basic` ist der Selbstregistrierungs-Rang, und die
-**Aktivierung ist damit die einzige Hürde** vor dem Feed.
-
-Diese Regel SHALL NOT auf andere `exchange`-Schwellen übertragen werden.
-Kontaktanfragen und Event-Teilnahme bleiben eigene Entscheidungen mit eigenen
-Schwellen.
-
-#### Scenario: Ein aktiviertes Mitglied sieht members-Beiträge unabhängig vom Rang
-
-- **WHEN** ein aktiviertes Mitglied mit Rang unter 4 den Feed liest
-- **THEN** werden Beiträge mit `visibility = 'members'` zurückgegeben, die es
-  nicht selbst verfasst hat
-
-#### Scenario: Ohne Aktivierung bleibt der Feed verschlossen
-
-- **WHEN** ein bestätigtes, aber nicht aktiviertes Konto den Feed liest
-- **THEN** wird keine Zeile zurückgegeben — auch keine `public`-Zeile und auch
-  kein selbst verfasster Beitrag
-
-#### Scenario: Author always sees their own post
-
-- **WHEN** an activated member reads a post they authored
-- **THEN** the post is returned regardless of its visibility or the member's rank
-
-## MODIFIED Requirements
-
-### Requirement: Engagement counts are aggregate-only and visibility-scoped
-
-The system SHALL expose like and comment counts through a `SECURITY DEFINER`
-function `post_engagement_counts(uuid[])` that returns only numeric counts (never
-the identity of who liked or commented), computes counts only for posts the caller
-is already permitted to see under the same visibility predicate as the post RLS,
-and caps the input array at 200 ids.
-
-Weil die Funktion das Prädikat **abschreibt**, SHALL jede Änderung der
-Sichtbarkeitsregel diese Abschrift mitziehen. Eine Zahl, die zu einer Zeile
-gehört, die der Aufrufer nicht bekommt — oder die für eine Zeile fehlt, die er
-bekommt — verrät oder verbirgt genau diese Zeile.
-
-#### Scenario: Counts are returned only for visible posts
-
-- **WHEN** the caller passes a mix of post ids, some of which they cannot see
-- **THEN** the function returns count rows only for the posts visible to them and
-  omits the rest
-
-#### Scenario: Die Zähler folgen der Sichtbarkeitsregel ohne Stufenschwelle
-
-- **WHEN** ein aktiviertes Mitglied mit Rang unter 4 Zähler für einen fremden
-  `members`-Beitrag anfragt, den es lesen darf
-- **THEN** wird eine Zählzeile zurückgegeben
-
-#### Scenario: No identities are disclosed
-
-- **WHEN** the function returns counts for a post
-- **THEN** the result contains only `post_id`, `like_count`, and `comment_count`,
-  and never reveals which members liked or commented
-
-### Requirement: Ein Bild ist genau so sichtbar wie sein Beitrag
+### Requirement: Ein Bild folgt der Sichtbarkeit seines Beitrags
 
 Das System SHALL über eine SELECT-Policy auf `storage.objects` entscheiden, wer
 sich für ein Objekt in `post-media` eine Signatur ausstellen lassen darf.
@@ -153,42 +128,40 @@ er weder Pfad noch Maße — und die eines `members`-Beitrags nicht.
 - **THEN** erhält er die Zeilen von `public`-Beiträgen und keine Zeile eines
   `members`-Beitrags
 
-### Requirement: Die Sidebar zählt nur, was der Betrachter sehen darf
+### Requirement: Post readability is gated by activation
 
-Das System SHALL die Zähler der beliebten Tags über eine aggregierende
-Funktion liefern, die **unter der RLS des Aufrufers** läuft (`security invoker`).
-Eine Zahl über Beiträge, die der Betrachter nicht sehen darf, verrät genau diese
-Beiträge.
+The system SHALL, via RLS, permit an authenticated member to read a post only
+when the member is activated **and** the post is `public`, or the post is
+`members`, or the member is the post's author.
 
-Die Funktion SHALL das Sichtbarkeitsprädikat **nicht kopieren**. Unter
-`security invoker` greift `posts_select_by_visibility` selbst, und die Zahl ist
-richtig, weil die Regel wirkt — nicht, weil eine Abschrift sie nachspricht.
-Dieses Repo führt das Prädikat bereits an **vier** Stellen
-(`posts_select_by_visibility`, `post_engagement_counts`, `post_media_lesbar`,
-`former_member_entries`); eine fünfte und sechste Kopie wäre Aufwand für ein
-Ergebnis, das ohne sie schon stimmt. Ein `security definer`-Weg SHALL nur
-bestehen, wenn ein konkreter, belegter Rechtebedarf ihn verlangt.
+Der `members`-Zweig SHALL **keine** Stufenschwelle tragen. In der Produktion trägt
+jeder Beitrag `members`; eine Schwelle darüber macht den Feed für jedes Mitglied
+darunter nicht dünner, sondern **leer**. Der Preis SHALL ausgesprochen sein: die
+Anmeldung ist offen, `basic` ist der Selbstregistrierungs-Rang, und die
+**Aktivierung ist damit die einzige Hürde** vor dem Feed.
 
-**Der Nutzen dieser Regel SHALL an einer Änderung der Sichtbarkeit ablesbar
-sein:** wo das Prädikat nicht abgeschrieben ist, folgt die Zahl der neuen Regel,
-ohne dass die Funktion angefasst wird.
+Diese Regel SHALL NOT auf andere `exchange`-Schwellen übertragen werden.
+Kontaktanfragen und Event-Teilnahme bleiben eigene Entscheidungen mit eigenen
+Schwellen.
 
-Gezählt SHALL ausschließlich über die **aktiven kuratierten Tags** aus
-`public.tags` werden. Eine Zählung über `unnest(posts.hashtags)` legte freie und
-stillgelegte Schlagworte offen und stellte sie womöglich vor die kuratierten.
+#### Scenario: Ein aktiviertes Mitglied sieht members-Beiträge unabhängig vom Rang
 
-Die Reihenfolge SHALL eindeutig sein: bei gleicher Zahl entscheidet ein
-festgelegtes zweites Merkmal, damit zwei Aufrufe dieselbe Liste ergeben.
+- **WHEN** ein aktiviertes Mitglied mit Rang unter 4 den Feed liest
+- **THEN** werden Beiträge mit `visibility = 'members'` zurückgegeben, die es
+  nicht selbst verfasst hat
 
-Die Funktion SHALL eine Obergrenze je Aufruf tragen.
+#### Scenario: Ohne Aktivierung bleibt der Feed verschlossen
 
-#### Scenario: Die Zahl folgt der geänderten Regel ohne eigene Änderung
+- **WHEN** ein bestätigtes, aber nicht aktiviertes Konto den Feed liest
+- **THEN** wird keine Zeile zurückgegeben — auch keine `public`-Zeile und auch
+  kein selbst verfasster Beitrag
 
-- **WHEN** die Sichtbarkeitsregel für `members` geändert wird und die
-  aggregierende Funktion unverändert bleibt
-- **THEN** zählt sie nach der neuen Regel, weil sie unter `security invoker` läuft
+#### Scenario: Author always sees their own post
 
-### Requirement: Der Feed-Beitrag folgt seinem Event über dessen Lebenszyklus
+- **WHEN** an activated member reads a post they authored
+- **THEN** the post is returned regardless of its visibility or the member's rank
+
+### Requirement: Der Feed-Beitrag folgt seinem Event und stimmt mit ihm überein
 
 Das System SHALL den gespiegelten Feed-Beitrag eines Events dessen Lebenszyklus
 folgen lassen: eine Sichtbarkeitsänderung zieht ihn nach, ein Hostwechsel zieht
@@ -251,7 +224,7 @@ Ausgeloggt SHALL weiterhin **keines von beiden** erscheinen.
 - **THEN** erscheint dessen Feed-Beitrag, ebenso wie das Event unter /events
   sichtbar ist
 
-### Requirement: Ein gespeicherter Beitrag verliert seine Sichtbarkeit still
+### Requirement: Ein gespeicherter Beitrag verschwindet still aus dem Reiter
 
 Das System SHALL den Reiter „Gespeichert" über dieselbe Sichtbarkeitsregel führen
 wie den übrigen Feed. Wird ein gespeicherter Beitrag später unsichtbar — weil sein
@@ -291,3 +264,102 @@ begründet kein Recht und überdauert ihren Beitrag auch nicht.
 - **WHEN** der Reiter „Gespeichert" gelesen wird
 - **THEN** entscheidet die Sichtbarkeitsregel auf `posts`, welche Zeilen erscheinen
 - **AND** nicht das Vorhandensein einer Zeile in `post_saves`
+
+
+## MODIFIED Requirements
+
+### Requirement: Engagement counts are aggregate-only and visibility-scoped
+
+The system SHALL expose like and comment counts through a `SECURITY DEFINER`
+function `post_engagement_counts(uuid[])` that returns only numeric counts (never
+the identity of who liked or commented), computes counts only for posts the caller
+is already permitted to see under the same visibility predicate as the post RLS,
+and caps the input array at 200 ids.
+
+Weil die Funktion das Prädikat **abschreibt**, SHALL jede Änderung der
+Sichtbarkeitsregel diese Abschrift mitziehen. Eine Zahl, die zu einer Zeile
+gehört, die der Aufrufer nicht bekommt — oder die für eine Zeile fehlt, die er
+bekommt — verrät oder verbirgt genau diese Zeile.
+
+#### Scenario: Counts are returned only for visible posts
+
+- **WHEN** the caller passes a mix of post ids, some of which they cannot see
+- **THEN** the function returns count rows only for the posts visible to them and
+  omits the rest
+
+#### Scenario: Die Zähler folgen der Sichtbarkeitsregel ohne Stufenschwelle
+
+- **WHEN** ein aktiviertes Mitglied mit Rang unter 4 Zähler für einen fremden
+  `members`-Beitrag anfragt, den es lesen darf
+- **THEN** wird eine Zählzeile zurückgegeben
+
+#### Scenario: No identities are disclosed
+
+- **WHEN** the function returns counts for a post
+- **THEN** the result contains only `post_id`, `like_count`, and `comment_count`,
+  and never reveals which members liked or commented
+
+### Requirement: Die Sidebar zählt nur, was der Betrachter sehen darf
+
+Das System SHALL die Zähler der beliebten Tags über eine aggregierende
+Funktion liefern, die **unter der RLS des Aufrufers** läuft (`security invoker`).
+Eine Zahl über Beiträge, die der Betrachter nicht sehen darf, verrät genau diese
+Beiträge.
+
+Die Funktion SHALL das Sichtbarkeitsprädikat **nicht kopieren**. Unter
+`security invoker` greift `posts_select_by_visibility` selbst, und die Zahl ist
+richtig, weil die Regel wirkt — nicht, weil eine Abschrift sie nachspricht.
+Dieses Repo führt das Prädikat bereits an **vier** Stellen
+(`posts_select_by_visibility`, `post_engagement_counts`, `post_media_lesbar`,
+`former_member_entries`); eine fünfte und sechste Kopie wäre Aufwand für ein
+Ergebnis, das ohne sie schon stimmt. Ein `security definer`-Weg SHALL nur
+bestehen, wenn ein konkreter, belegter Rechtebedarf ihn verlangt.
+
+**Der Nutzen dieser Regel SHALL an einer Änderung der Sichtbarkeit ablesbar
+sein:** wo das Prädikat nicht abgeschrieben ist, folgt die Zahl der neuen Regel,
+ohne dass die Funktion angefasst wird.
+
+Gezählt SHALL ausschließlich über die **aktiven kuratierten Tags** aus
+`public.tags` werden. Eine Zählung über `unnest(posts.hashtags)` legte freie und
+stillgelegte Schlagworte offen und stellte sie womöglich vor die kuratierten.
+
+Die Reihenfolge SHALL eindeutig sein: bei gleicher Zahl entscheidet ein
+festgelegtes zweites Merkmal, damit zwei Aufrufe dieselbe Liste ergeben.
+
+Die Funktion SHALL eine Obergrenze je Aufruf tragen.
+
+#### Scenario: Ein Tag zählt nur sichtbare Beiträge
+
+- **WHEN** ein Tag an fünf Beiträgen hängt, von denen der Betrachter nur zwei
+  sehen darf
+- **THEN** nennt der Zähler zwei
+
+#### Scenario: Ein Tag ohne sichtbaren Beitrag erscheint nicht
+
+- **WHEN** alle Beiträge zu einem Tag für den Betrachter unsichtbar sind
+- **THEN** erscheint der Tag nicht in der Liste — auch nicht mit der Zahl null,
+  denn schon sein Erscheinen verriete, dass es ihn gibt
+
+#### Scenario: Ein freies Schlagwort erscheint nicht
+
+- **WHEN** ein Beitrag ein Schlagwort trägt, das nicht in `public.tags` steht
+  oder dort stillgelegt ist
+- **THEN** erscheint es nicht in der Liste, unabhängig davon, wie oft es vorkommt
+
+#### Scenario: Gleiche Zahl ergibt dieselbe Reihenfolge
+
+- **WHEN** zwei Tags dieselbe Zahl tragen und die Liste zweimal geholt wird
+- **THEN** stehen sie beide Male in derselben Reihenfolge
+
+#### Scenario: Die Zahl folgt der geänderten Regel ohne eigene Änderung
+
+- **WHEN** die Sichtbarkeitsregel für `members` geändert wird und die
+  aggregierende Funktion unverändert bleibt
+- **THEN** zählt sie nach der neuen Regel, weil sie unter `security invoker` läuft
+
+#### Scenario: Die verbliebene messbare Achse ist die Sitzung
+
+- **WHEN** derselbe Tag ausgeloggt und eingeloggt gezählt wird
+- **THEN** nennt der ausgeloggte Zähler nur die öffentlichen Beiträge und der
+  eingeloggte alle — zwischen aktivierten Betrachtern gibt es keinen Unterschied
+  mehr zu messen
