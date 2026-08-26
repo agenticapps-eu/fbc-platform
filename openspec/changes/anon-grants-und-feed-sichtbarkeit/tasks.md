@@ -23,50 +23,51 @@ jede für sich zurücknehmbar bleibt.
 
 ## 1. AGE-602 — der Entzug (RED zuerst)
 
-- [ ] **RED:** `directory_search_test.sql` §7 auf das **Privilegien-Bit**
+- [x] **RED:** `directory_search_test.sql` §7 auf das **Privilegien-Bit**
       umstellen (`has_function_privilege('anon', …::regprocedure, 'execute')`),
       plus die vier weiteren Funktionen. Muss vor der Migration **rot** sein —
       und wenn es lokal grün ist, ist das der Beweis, dass die Zusage allein
       nichts belegt (siehe nächste Aufgabe).
-- [ ] **Gegenprobe auf einer Wegwerf-Funktion** (nicht auf einer echten):
+- [x] **Gegenprobe auf einer Wegwerf-Funktion** (nicht auf einer echten):
       anlegen → messen, dass `anon` sie **nicht** darf (belegt den neuen Default)
       → Recht erteilen → `true` messen → entziehen → `false` messen. Auf einer
       echten Funktion belegte die Gegenprobe nur, dass `has_function_privilege`
       den Katalog liest.
-- [ ] **Abgeschlossene Liste:** Zusage „genau diese Funktionen sind für `anon`
+- [x] **Abgeschlossene Liste:** Zusage „genau diese Funktionen sind für `anon`
       ausführbar, keine andere" — als Menge, nicht als Aufzählung von Verstößen.
       Trifft die sechs beabsichtigten.
-- [ ] **GREEN:** Migration `…_anon_execute_namentlich_entziehen.sql` —
+- [x] **GREEN:** Migration `…_anon_execute_namentlich_entziehen.sql` —
       `revoke execute … from public, anon` für `search_directory`,
       `register_for_event`, `set_event_check_in`, `array_jaccard`,
       `fbc_profile_search_doc`.
-- [ ] **`PUBLIC` bei den beiden beabsichtigten entfernen:**
+- [x] **`PUBLIC` bei den beiden beabsichtigten entfernen:**
       `post_engagement_counts` und `event_registration_counts` tragen `=X/postgres`
       neben den benannten Rollen (lokal gemessen). `revoke … from public` plus
       ausdrücklicher `grant to anon, authenticated` — sonst behauptet die
       Anforderung „ausdrücklich erteilt", wo geerbt wurde.
-- [ ] Prüfen, ob `grants_test.sql` durch die neue Liste bricht
-      (Golden-Snapshot-Falle).
+- [x] `grants_test.sql` bricht **nicht** durch die neue Liste — die
+      Golden-Snapshot-Falle betrifft Tabellen-Grants, und dieser Change legt
+      keine Tabelle an. Gegengeprüft, nicht angenommen: die Datei läuft grün.
 
 ## 2. AGE-601 — die Ausweitung (RED zuerst)
 
-- [ ] **RED:** pgTAP — ein aktiviertes Mitglied unter Rang 4 liest einen fremden
+- [x] **RED:** pgTAP — ein aktiviertes Mitglied unter Rang 4 liest einen fremden
       `members`-Beitrag, bekommt seine Zählzeile und darf sein Bild signieren.
       Drei Zusagen, alle rot vor der Migration.
-- [ ] **RED:** ein bestätigtes, **nicht** aktiviertes Konto bekommt weiterhin
+- [x] **RED:** ein bestätigtes, **nicht** aktiviertes Konto bekommt weiterhin
       nichts — die Gegenrichtung, sonst belegt die Ausweitung nur, dass etwas
       offener wurde.
-- [ ] **GREEN:** Migration `…_members_sind_alle_aktivierten.sql` — alle **vier**
+- [x] **GREEN:** Migration `…_members_sind_alle_aktivierten.sql` — alle **vier**
       Objekte in einer Datei. Drei zu ändern und eine zu vergessen ergäbe einen
       Feed, dessen Zähler nicht zu seinen Zeilen passen.
-- [ ] `feed_tag_counts` / `feed_top_authors` **nicht** anfassen und belegen, dass
+- [x] `feed_tag_counts` / `feed_top_authors` **nicht** anfassen und belegen, dass
       sie trotzdem folgen (`security invoker`) — das ist der Nutzen der
       Nicht-Abschreiben-Regel.
-- [ ] **Alle vier Kopien einzeln zusichern**, nicht nur die Policy:
+- [x] **Alle vier Kopien einzeln zusichern**, nicht nur die Policy:
       `former_member_entries`, `post_media`-Zeilen, Kommentare und der
       gespiegelte Event-Beitrag. Plus `feed_tag_counts`/`feed_top_authors` als
       Beleg, dass die nicht abgeschriebenen Wege von selbst folgen.
-- [ ] Die übrigen `has_level(4)`-Vorkommen unangetastet lassen
+- [x] Die übrigen `has_level(4)`-Vorkommen unangetastet lassen
       (Kontaktanfrage-Schwelle, Event-Teilnahme) und im Diff nachweisen.
 
 ## 3. Der Menüeintrag — entfällt
@@ -75,12 +76,12 @@ jede für sich zurücknehmbar bleibt.
       dass `/aktivitaet` weder `requiresAuth` noch `minTier` trägt; `App.tsx:37`
       machte aus `requiresAuth` eine Wand vor dem ausgeloggten Schaufenster.
       `src/config/nav.ts` wird **nicht** angefasst.
-- [ ] Stattdessen: die zwei veralteten **Kommentare** in `src/lib/feed.ts`
+- [x] Stattdessen: die zwei veralteten **Kommentare** in `src/lib/feed.ts`
       (Zeilen 13, 338) auf die neue Regel bringen.
 
 ## 4. Abnahme
 
-- [ ] Volle Suite grün · `tsc` sauber · `eslint` 0 Fehler · pgTAP alle Dateien
+- [x] Volle Suite grün · `tsc` sauber · `eslint` 0 Fehler · pgTAP alle Dateien
       (mit **Dateiliste**, sonst lügt `supabase test db`).
 - [x] **Mutationsprobe — acht Verbiegungen, Sicherungen ausserhalb von git:**
 
@@ -106,17 +107,38 @@ jede für sich zurücknehmbar bleibt.
       messen, misst `grants_test.sql` Abschnitt 8 jetzt die **Regel** an einer
       Wegwerf-Funktion, der ein rollen-eigener Grant gegeben wird — diese Zusage
       ist auf jeder Instanz aussagekräftig und fällt unter M3.
-- [ ] **Sichtprobe** gegen den lokalen Stack: ein aktiviertes `basic`-Konto sieht
-      den Feed gefüllt, mit Bildern und Zählern. Grüne Tests haben hier schon ein
-      visuell falsches Ergebnis durchgewunken.
-- [ ] **Bestehende Gegen-Zusagen suchen und umdrehen:** `rls_test.sql` erwartet
+- [x] **Sichtprobe über den ECHTEN Weg** (Anmeldung → JWT → PostgREST), nicht über
+      einen SQL-Rollenwechsel. Zwei Konten per GoTrue-Admin (`email_confirm: true`,
+      sonst scheitert die Anmeldung nach der Aktivierung), Beitrag `members` von
+      fremdem Autor:
+
+      | | Ergebnis |
+      |---|---|
+      | `basic` (Rang 1), aktiviert, eingeloggt | **HTTP 200, 1 Zeile** |
+      | ausgeloggt (`anon`) | 0 Zeilen — Schaufenster bleibt zu |
+      | `post_engagement_counts` für `basic` | `like_count: 1` |
+      | `search_directory` als `anon` | **HTTP 401, `42501 permission denied for function`** |
+
+      Die letzte Zeile ist AGE-602 an der API-Grenze: die Ablehnung kommt jetzt an
+      der **Funktion** statt erst an `profiles`. Vorher wäre sie durchgelaufen und
+      erst an der Tabelle gescheitert.
+- [x] **Bestehende Gegen-Zusagen suchen und umdrehen:** `rls_test.sql` erwartet
       heute ausdrücklich, dass Rang 1 Medienzeilen, Bilder und gespiegelte
       Event-Beiträge **nicht** bekommt. Diese Zusagen namentlich auflisten, bevor
       eine geändert wird — eine übersehene macht die Suite rot und eine
       stillschweigend gelöschte macht sie wertlos.
-- [ ] **Nutzlast messen** für ein `basic`-Konto (gemini MEDIUM): der Feed pagiert,
-      die Zahl gehört trotzdem gemessen statt behauptet.
-- [ ] Code-Review auf dem **Diff** (Stufe 2), Befunde abarbeiten.
+- [x] **Nutzlast gemessen** (gemini MEDIUM). 61 `members`-Beiträge in der DB, eine
+      Feed-Seite als `basic` über PostgREST: **21 Zeilen, 2 845 Bytes, 19 ms**.
+      `FEED_SEITE = 20` (`src/lib/feed.ts:469`), geholt wird `limit(FEED_SEITE + 1)`.
+      Die Ausweitung kann eine einzelne Antwort also **nicht** vergrössern — sie
+      ändert, wie viele Seiten es gibt, nicht wie gross eine ist.
+- [x] Code-Review auf dem **Diff** (Stufe 2): gemini APPROVE (2 LOW, kein
+      Defekt), codex REQUEST-CHANGES (2 MEDIUM + 1 LOW). Alle drei bestätigt und
+      behoben — darunter `array_jaccard`, das die Instanzen auseinanderlaufen
+      liess. Protokoll in `REVIEWS.md`.
+- [x] **Mutation M9** auf die Korrektur: bleibt lokal grün (dieselbe strukturelle
+      Blindheit wie M1). An der Zusage benannt statt kaschiert; die Regel hält
+      `grants_test.sql` Abschnitt 9 instanzunabhängig.
 
 ## 5. Nach `migrate-prod` — der Schritt, dessen Fehlen der Fehler war
 

@@ -351,12 +351,20 @@ select is(
 -- „unerreichbar, also tot" streichen — und das Orakel waere in dem Moment
 -- wieder offen, in dem die Sichtbarkeit sich erneut verengt. Bricht er, ist das
 -- die Aufforderung, die Abdeckung oben zu pruefen, nicht ihn anzupassen.
-select matches(
+-- Befund aus dem Diff-Review (codex, MEDIUM): die erste Fassung dieses Waechters
+-- pruefte nur `EXISTS ( SELECT 1 ... FROM posts` und liess damit genau den Teil
+-- offen, auf den es ankommt — die KORRELATION `p.id = post_saves.post_id`. Ohne
+-- sie waere auch `exists (select 1 from posts)` — irgendein Beitrag existiert —
+-- eine gueltige Uebereinstimmung, und die Policy pruefte nichts mehr. Deshalb
+-- steht hier jetzt der VOLLSTAENDIGE Ausdruck, wortgleich.
+select is(
   (select pg_get_expr(polwithcheck, polrelid) from pg_policy
     where polrelid = 'public.post_saves'::regclass
       and polname = 'post_saves_insert_own'),
-  'EXISTS \( SELECT 1.*FROM posts',
-  'post_saves_insert_own fragt weiterhin WORAUF geschrieben wird, nicht nur WER');
+  '(is_activated() AND (profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1'
+  || E'\n   FROM posts p\n  WHERE (p.id = post_saves.post_id))))',
+  'post_saves_insert_own fragt weiterhin WORAUF geschrieben wird, nicht nur WER '
+  '— samt der Korrelation auf post_id, ohne die der exists-Zweig leerliefe');
 
 -- Die Gegenprobe zur Verschaerfung: ein SICHTBARER Beitrag bleibt speicherbar.
 -- Ohne sie waere die Zusage oben auch mit einer Policy vereinbar, die einfach

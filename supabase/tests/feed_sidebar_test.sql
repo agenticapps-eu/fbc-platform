@@ -427,8 +427,11 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a0000000-0000-0000-0000-00000000000b'$$),
-  '1', 'Derselbe dritte Zweig wirkt auch in der Autorenliste: der Verfasser '
-       'steht dort mit seinem eigenen verdeckten Beitrag');
+  '1', 'Der Verfasser steht in der Autorenliste mit seinem eigenen Beitrag. '
+       'Die Eins kommt hier aus der ZAEHLUNG (er hat genau einen), nicht aus '
+       'dem dritten Zweig — der ist seit AGE-601 nicht mehr beobachtbar. Die '
+       'frühere Formulierung „derselbe dritte Zweig wirkt auch hier" war nach '
+       'AGE-601 eine falsche Abdeckungs-Behauptung (Befund codex, LOW).');
 
 -- Die scharfe Fassung der Zusage, und der Grund, warum die Einzelzahlen oben
 -- nicht genügen: sie prüfen ausgewählte Tags. Hier wird für JEDEN aktiven

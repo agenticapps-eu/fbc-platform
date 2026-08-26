@@ -394,7 +394,12 @@ select is(
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.posts where id = ''dddddddd-dddd-dddd-dddd-dddddddddddd'''),
-  1, 'Basic sieht den EIGENEN members-Beitrag (author-Klausel, rang-unabhängig)');
+  1, 'Basic sieht den EIGENEN members-Beitrag. ACHTUNG, KEINE Abdeckung der '
+     'Autoren-Klausel mehr (Befund codex, LOW): seit AGE-601 traegt ihn schon '
+     'der members-Zweig, diese Zusage bliebe also auch ohne `author_id = '
+     'auth.uid()` gruen. Der Zweig ist fuer aktivierte Aufrufer NICHT MEHR '
+     'BEOBACHTBAR — er wird allein vom Wortlaut-Waechter in '
+     'member_lifecycle_test.sql (7.18) gehalten, der ihn im Policy-Text pinnt.');
 
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
@@ -2104,7 +2109,9 @@ select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a2',
   $$select public.post_media_lesbar(
       'c7c7c7c7-0000-0000-0000-0000000000a2/c7000003-0000-4000-8000-000000000003/0.webp')$$),
-  true, '… an das Bild seines EIGENEN members-Beitrags aber schon (Autoren-Klausel)');
+  true, '… an das Bild seines EIGENEN members-Beitrags auch. Ebenfalls KEINE '
+        'Abdeckung der Autoren-Klausel mehr — der members-Zweig traegt es seit '
+        'AGE-601 allein (siehe Abschnitt 8).');
 
 select is(pg_temp.bool_as('c7c7c7c7-0000-0000-0000-0000000000a1',
   $$select public.post_media_lesbar(

@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(11);
+select plan(14);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -242,7 +242,48 @@ select is(
   true,
   'Gegenprobe B: ein erteiltes Recht wird gemessen — die Zusage ist nicht blind');
 
--- ── 8. WARUM `from public` ALLEIN NICHT GENUEGT — der Mechanismus (AGE-602) ──
+-- ── 8. Die Rechte der von AGE-602 angefassten Funktionen, vollstaendig ──────
+-- Die Liste in Abschnitt 6 deckt nur `anon`. Ein rollen-eigener
+-- `authenticated`-Grant kann daneben stehenbleiben, ohne dass irgendetwas faellt
+-- — und genau das war in PROD bei `array_jaccard` der Fall, waehrend `proacl`
+-- lokal null war. Ein `revoke ... from public, anon` haette lokal alles genommen
+-- und in PROD `authenticated=X` gelassen: dieselbe Divergenz, eine Rolle weiter.
+-- Deshalb steht hier fuer JEDE angefasste Funktion beides.
+
+select is(
+  (select coalesce(string_agg(
+            p.proname || ': anon=' || has_function_privilege('anon', p.oid, 'execute')::text
+                      || ' auth=' || has_function_privilege('authenticated', p.oid, 'execute')::text,
+            E'\n' order by p.proname), '(keine)')
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+     and p.proname in ('search_directory','register_for_event','set_event_check_in',
+                       'array_jaccard','fbc_profile_search_doc',
+                       'post_engagement_counts','event_registration_counts')),
+$$array_jaccard: anon=false auth=false
+event_registration_counts: anon=true auth=true
+fbc_profile_search_doc: anon=false auth=true
+post_engagement_counts: anon=true auth=true
+register_for_event: anon=false auth=true
+search_directory: anon=false auth=true
+set_event_check_in: anon=false auth=true$$,
+  'die sieben von AGE-602 angefassten Funktionen tragen genau die Rechte, die '
+  'ihre Migration ausspricht — fuer beide Client-Rollen');
+
+-- EHRLICH ZUR REICHWEITE DIESER ZUSAGE. Sie haelt den Ziel-Zustand fest, aber
+-- sie kann die falsche FORMULIERUNG lokal nicht bemerken. Gemessen (Mutation M9):
+-- nimmt man `authenticated` aus dem revoke auf `array_jaccard` heraus, bleibt sie
+-- gruen — denn hier haelt `authenticated` das Recht ohnehin nur ueber PUBLIC, und
+-- das nimmt schon `from public` mit. In PROD steht dort ein rollen-eigenes
+-- `authenticated=X`, das stehenbliebe. Dieselbe Blindheit wie bei Mutation M1.
+--
+-- Was diese Luecke schliesst, ist NICHT ein weiterer lokaler Test, sondern die
+-- Messung am PROD-Katalog nach `migrate-prod` (tasks.md, Abschnitt 5). Bis die
+-- vorliegt, gilt der PROD-Rechte-Zustand laut `directory-search` ausdruecklich
+-- als UNBELEGT. Die REGEL dahinter — warum die Formulierung beide Rollen nennen
+-- muss — haelt Abschnitt 9, und die ist instanzunabhaengig.
+
+-- ── 9. WARUM `from public` ALLEIN NICHT GENUEGT — der Mechanismus (AGE-602) ──
 -- Diese Zusage ist als Antwort auf eine Mutationsprobe entstanden. Baut man den
 -- Originalfehler zurueck (`revoke ... from public` statt `from public, anon`),
 -- bleibt die ganze Suite lokal GRUEN: hier haelt `anon` das Recht nur ueber die
@@ -272,6 +313,24 @@ select is(
   false,
   'erst der namentliche Entzug nimmt ihn — deshalb lautet die Formulierung '
   'ueberall `from public, anon` und nicht nur `from public`');
+
+-- Dieselbe Regel gilt fuer `authenticated`, und sie hat in diesem Change schon
+-- einmal zugeschlagen: `array_jaccard` traegt in PROD ein rollen-eigenes
+-- `authenticated=X`, lokal war `proacl` null. Wer nur `from public, anon`
+-- schreibt, laesst es in PROD stehen — und die Instanzen laufen an genau dieser
+-- Funktion auseinander, was der Ausgangsbefund von AGE-602 war.
+grant execute on function public.age602_mechanik() to authenticated;
+revoke execute on function public.age602_mechanik() from public, anon;
+select is(
+  has_function_privilege('authenticated', 'public.age602_mechanik()', 'execute'),
+  true,
+  '`from public, anon` laesst einen rollen-eigenen authenticated-Grant STEHEN');
+
+revoke execute on function public.age602_mechanik() from authenticated;
+select is(
+  has_function_privilege('authenticated', 'public.age602_mechanik()', 'execute'),
+  false,
+  'jede Rolle, der das Recht nicht zusteht, gehoert NAMENTLICH in den revoke');
 
 select * from finish();
 rollback;

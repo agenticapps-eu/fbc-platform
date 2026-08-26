@@ -144,3 +144,67 @@ beschreiben und mitgezogen werden.
 ### gemini LOW Nutzer-Kommunikation — **an Donald verwiesen**
 
 Produktentscheidung, kein technischer Befund. Im Handoff festgehalten.
+
+---
+
+# Code-Review auf dem Diff (Schritt 4)
+
+Zwei fremde Anbieter, beide Exit 0. Eigener Anbieter (claude) ausgeschlossen.
+
+## Reviewer: gemini (CLI 0.28.2) — VERDICT: APPROVE
+
+Zwei LOW, beide ausdrücklich als „kein Defekt" formuliert: sie bestätigen die
+Verlagerungen der Testabsicht (`feed_top_authors` → Abschnitt 1 über
+`feed_tag_counts`; `post_saves` → Wortlaut-Wächter) als richtig begründet und
+dokumentiert. Keine Änderung.
+
+## Reviewer: codex (gpt-5.6-sol) — VERDICT: REQUEST-CHANGES
+
+### MEDIUM `array_jaccard` behält `authenticated` in PROD — **bestätigt, behoben**
+
+Der beste Befund des Durchgangs, weil er **genau die Fehlerklasse ist, die dieser
+Change behebt**. Am PROD-Katalog nachgemessen:
+
+| `array_jaccard` | |
+|---|---|
+| PROD `proacl` | `{=X, postgres=X, anon=X, **authenticated=X**, service_role=X}` |
+| lokal (vorher) | `null` — alles nur über `PUBLIC` |
+
+`revoke … from public, anon` hätte lokal auch `authenticated` mitgenommen, in
+PROD aber nicht. Die Migration hätte die Instanzen an dieser Funktion
+**auseinanderlaufen lassen** — und mein Migrationskommentar behauptete zugleich,
+`authenticated` habe hier keinen Aufrufer.
+
+**Behoben:** `from public, anon, authenticated`. Zwei Zusagen ergänzt: eine, die
+für alle sieben angefassten Funktionen **beide** Client-Rollen festhält, und eine
+Ausdehnung der Mechanik-Zusage auf `authenticated`.
+
+**Und die ehrliche Einschränkung, gemessen (Mutation M9):** die Zustands-Zusage
+bemerkt diesen Fehler **lokal nicht** — nimmt man `authenticated` aus dem revoke,
+bleibt sie grün, weil das Recht hier ohnehin nur über `PUBLIC` kommt. Dieselbe
+Blindheit wie M1. Was die Lücke schliesst, ist die PROD-Katalog-Messung nach
+`migrate-prod`; die instanzunabhängige **Regel** hält Abschnitt 9.
+
+### MEDIUM `post_saves`-Orakel-Wächter ist zu locker — **bestätigt, behoben**
+
+Der Wächter prüfte `EXISTS \( SELECT 1.*FROM posts` und liess die **Korrelation**
+`p.id = post_saves.post_id` offen — `exists (select 1 from posts)` hätte
+gematcht, und die Policy prüfte nichts mehr. Ersetzt durch einen Vergleich des
+**vollständigen** Ausdrucks.
+
+Codex' zweite Beobachtung stimmt ebenfalls: bei einem deaktivierten Aufrufer
+fällt `is_activated()` vor dem `exists`. Das steht seit dem Umbau als Kommentar
+in der Datei; der Wächter ist die Kompensation und ist jetzt scharf genug, um sie
+einzulösen.
+
+### LOW falsche Abdeckungs-Behauptungen zur Autoren-Klausel — **bestätigt, behoben**
+
+Drei Zusagen behaupteten, den dritten Prädikat-Zweig (`author_id = auth.uid()`)
+zu prüfen. Seit AGE-601 trägt sie der `members`-Zweig allein; sie blieben auch
+ohne den dritten Zweig grün. Die Beschriftungen sagen das jetzt und verweisen
+auf den Wortlaut-Wächter in `member_lifecycle_test.sql` (7.18), der den Zweig im
+Policy-Text pinnt — die einzige Stelle, die ihn noch hält.
+
+### Abnahme nach den Korrekturen
+
+pgTAP 10 Dateien / **738 Zusagen**, vitest **1694**, `tsc` sauber, eslint 0 Fehler.

@@ -58,7 +58,15 @@ revoke execute on function
 
 revoke execute on function public.register_for_event(uuid)                from public, anon;
 revoke execute on function public.set_event_check_in(uuid, boolean)       from public, anon;
-revoke execute on function public.array_jaccard(text[], text[])           from public, anon;
+-- `array_jaccard` auch von `authenticated` — Befund aus dem Diff-Review (codex,
+-- MEDIUM), und ausgerechnet dieselbe Falle, die dieser Change behebt: in PROD
+-- haelt `authenticated` hier einen ROLLEN-EIGENEN Grant
+-- (`{=X,postgres=X,anon=X,authenticated=X,service_role=X}`), lokal war `proacl`
+-- null. Ein `revoke from public, anon` haette lokal alles genommen und in PROD
+-- `authenticated=X` stehen lassen — die Instanzen waeren an genau dieser
+-- Funktion auseinandergelaufen. Wer nur eine Instanz ansieht, sieht das nie.
+revoke execute on function public.array_jaccard(text[], text[])
+  from public, anon, authenticated;
 revoke execute on function
   public.fbc_profile_search_doc(text, text, text, text, text, text[], text[], text[])
   from public, anon;
