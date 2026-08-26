@@ -163,11 +163,17 @@ function EventPreview({ event }: { event: EventListItem }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
+      className="block h-full rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
     >
-      <Card className="space-y-2 transition-colors hover:border-accent/50">
+      {/* `h-full` an Link und Karte: seit der Untertitel umbricht, ist eine Karte
+          der Reihe zweizeilig und die andere einzeilig. Ohne das füllt die
+          niedrigere Karte ihre Rasterzelle nicht und die Reihe steht ungleich. */}
+      <Card className="h-full space-y-2 transition-colors hover:border-accent/50">
         <h3 className="font-display text-lg font-semibold text-ink">{event.title}</h3>
-        <p className="truncate text-sm text-muted">
+        {/* Kein `truncate`: Datum und Ort sind beide Information. Eine vollständige
+            Veranstaltungsadresse braucht bei 1440 px rund 591 px in einem 495-px-Kasten
+            und wurde mitten im Straßennamen abgeschnitten (AGE-612). */}
+        <p className="text-sm text-muted">
           {formatEventDate(event.startsAt)}
           {event.location && <> · {event.location}</>}
         </p>
