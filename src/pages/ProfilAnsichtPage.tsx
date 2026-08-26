@@ -6,6 +6,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { MembershipSummary } from "../components/membership/MembershipSummary";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
 import { StatTile, formatDate, monthFmt } from "../components/mein-bereich/building-blocks";
+import { useUngelesen } from "../components/chat/use-ungelesen";
 import {
   BeitraegeWidget,
   InteressenWidget,
@@ -24,6 +25,9 @@ function ProfilView({ uid }: { uid: string }) {
     queryKey: dashboardQueryKey(uid),
     queryFn: () => fetchDashboard(uid),
   });
+  // Derselbe Query-Schlüssel wie in der Kopfzeile — React Query bündelt beide,
+  // und die zwei Flächen können nicht auseinanderlaufen (AGE-583).
+  const { stand: ungelesen } = useUngelesen(uid);
   if (isLoading) return <DashboardSkeleton />;
   if (isError || !data) {
     return (
@@ -69,9 +73,29 @@ function ProfilView({ uid }: { uid: string }) {
             AGE-539: „Matches" ist hier raus — Matching ist unerreichbar (AGE-450),
             der Zähler verwies also auf eine Oberfläche, die niemand öffnen kann.
             Nicht der Wert war das Problem, sondern das Ziel. */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        {/* AGE-583: „Nachrichten" nur bei >0 — und dann als LINK, weil die Zahl
+            sonst dasselbe Problem hätte wie der entfernte Matches-Zähler: sie
+            benennt etwas, ohne hinzuführen. Bei 0 fällt die Kachel weg; am
+            Go-Live steht sie bei jedem auf 0, und eine Null wäre keine Auskunft.
+
+            Die Spaltenzahl wird BERECHNET, nicht per `cn()` überlagert: dieses
+            Projekt hat kein tailwind-merge, ein zweites `grid-cols-*` daneben
+            entschiede über die Reihenfolge im Stylesheet und nicht über die
+            Absicht. */}
+        <div
+          className={`mt-4 grid gap-3 ${ungelesen.gesamt > 0 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}
+        >
           <StatTile label="Netzwerk" value={data.contactsCount} />
           <StatTile label="Events" value={data.eventsCount} />
+          {ungelesen.gesamt > 0 && (
+            <Link
+              to="/chat"
+              aria-label={`Nachrichten, ${ungelesen.gesamt} ungelesen`}
+              className="rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <StatTile label="Nachrichten" value={ungelesen.gesamt} />
+            </Link>
+          )}
         </div>
       </ProfileHero>
 

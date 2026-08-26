@@ -1573,6 +1573,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      /** Lesestand je Mitglied und Thread (AGE-583). Eigentuemerprivat: die
+       *  Zeile des Gegenuebers ist nicht lesbar. Deshalb liegt der Wert hier
+       *  und NICHT als Spalte auf `message_threads` — dort gibt
+       *  `threads_select` jedem Teilnehmer die ganze Zeile, und der Lesestand
+       *  waere eine Lesebestaetigung. */
+      thread_read_positions: {
+        Row: {
+          last_read_at: string;
+          profile_id: string;
+          thread_id: string;
+        };
+        Insert: {
+          last_read_at?: string;
+          profile_id: string;
+          thread_id: string;
+        };
+        Update: {
+          last_read_at?: string;
+          profile_id?: string;
+          thread_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "thread_read_positions_thread_id_fkey";
+            columns: ["thread_id"];
+            isOneToOne: false;
+            referencedRelation: "message_threads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "thread_read_positions_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Functions: {
       create_post_with_media: {
@@ -1598,6 +1636,22 @@ export type Database = {
       // Nullability-Drift in unbeteiligten Typen mit und gehoert in einen
       // eigenen Change.
       is_activated: { Args: never; Returns: boolean };
+      /** Ungelesene Nachrichten je Thread fuer den Aufrufer (AGE-583).
+       *
+       *  `unread_count` ist in der Datenbank `bigint` (der Typ von `count(*)`),
+       *  kommt ueber PostgREST aber als JSON-**Zahl** an — am 26.08. gegen den
+       *  lokalen Stack gemessen, nicht angenommen: `typeof` ist `number` und
+       *  `wert + 1` ergibt 3, nicht "21". Die Genauigkeitsgrenze von
+       *  JS-Zahlen liegt bei 2^53 und ist fuer eine Zahl ungelesener
+       *  Nachrichten ohne Belang.
+       *
+       *  Threads OHNE Ungelesenes kommen GAR NICHT vor — nicht als Zeile mit 0.
+       *  Ein nicht aktiviertes Konto bekommt null Zeilen; die Funktion ist
+       *  SECURITY INVOKER und erbt das Gate aus den Policies. */
+      unread_message_counts: {
+        Args: never;
+        Returns: { thread_id: string; unread_count: number }[];
+      };
       my_activation_state: {
         Args: never;
         /** `blocked` seit AGE-581: wahr bei deaktiviert ODER geloescht. Ein

@@ -152,5 +152,11 @@ export const navItems: NavItem[] = [
   // Chat bewusst OHNE minTier (AGE-311): §2 stellt Nachrichten an akzeptierte Kontakte
   // allen ab `basic` frei. Die Schranke ist die Freigabe, nicht die Stufe — und sie
   // sitzt in der RLS (messages_insert verlangt eine akzeptierte contact_request).
-  { path: "/chat", label: "Chat", Component: ChatPage, section: "sub", requiresAuth: true },
+  //
+  // AGE-583: Label „Chat" → „Nachrichten". Der Pfad bleibt `/chat` (Lesezeichen),
+  // und `section: "sub"` bleibt ebenfalls — der Einstieg ist das Kuvert in der
+  // Kopfzeile, kein Menüeintrag (Entscheidung Donald, 24.08.). Das Label trägt
+  // Seitentitel und Bröselpfad; hieße es weiter „Chat", benennte die Kopfzeile
+  // ein anderes Ziel als die Seite, auf der man landet.
+  { path: "/chat", label: "Nachrichten", Component: ChatPage, section: "sub", requiresAuth: true },
 ];

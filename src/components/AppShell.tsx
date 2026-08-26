@@ -10,6 +10,7 @@ import {
   incomingRequestsQueryKey,
 } from "../lib/contact-requests";
 import { useAuth } from "../providers/auth-context";
+import { useUngelesen, useUngelesenLive } from "./chat/use-ungelesen";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
@@ -63,6 +64,53 @@ function ChevronLeftIcon({ flipped }: { flipped: boolean }) {
 
 function BellIcon() {
   return <Icon name="bell" className="h-5 w-5" />;
+}
+
+/**
+ * Einstieg zu den Nachrichten (AGE-583). Ein Link, kein Knopf — er führt an
+ * einen Ort, und ein Ort gehört in die Adresszeile und ins Kontextmenü.
+ *
+ * DREI AUSGÄNGE, nicht zwei — dasselbe Muster wie `useOffeneAnfragen`:
+ *  - ungelesen        → Kuvert mit Zahl,
+ *  - Abruf gescheitert → Kuvert mit „!", als unbekannt gekennzeichnet,
+ *  - nichts ungelesen  → Kuvert OHNE alles.
+ *
+ * Das Kuvert bleibt in allen drei Fällen. Verschwände es bei null, wäre der Weg
+ * zu den Nachrichten wieder unauffindbar — und genau das ist der Befund, gegen
+ * den dieser Change gebaut ist. Anders als der Sidebar-Eintrag für Anfragen, der
+ * ein VORGANG ist und mit ihm verschwinden darf, ist dies eine FLÄCHE.
+ *
+ * Die Zahl steht im zugänglichen Namen, nicht nur in der Blase: Farbe trägt in
+ * diesem Projekt nie allein eine Bedeutung, und eine Ziffer ohne Gegenstand ist
+ * für einen Screenreader nichts.
+ */
+function NachrichtenEinstieg({ anzahl, unbekannt }: { anzahl: number; unbekannt: boolean }) {
+  const name = unbekannt
+    ? "Nachrichten — Anzahl konnte nicht geladen werden"
+    : anzahl > 0
+      ? `Nachrichten, ${anzahl} ungelesen`
+      : "Nachrichten";
+  const blase = unbekannt ? "!" : anzahl > 0 ? String(anzahl) : null;
+
+  return (
+    <Link
+      to="/chat"
+      aria-label={name}
+      className="relative rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+    >
+      <Icon name="mail" className="h-5 w-5" />
+      {blase !== null && (
+        // `aria-hidden`, weil die Zahl schon im Namen des Links steht — sonst
+        // liest ein Screenreader sie zweimal.
+        <span
+          aria-hidden="true"
+          className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-accent px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
+        >
+          {blase}
+        </span>
+      )}
+    </Link>
+  );
 }
 
 function MenuIcon() {
@@ -332,6 +380,12 @@ export default function AppShell() {
   const { user, tier, signOut } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  // Ungelesen-Zähler (AGE-583). Das Live-Abo hängt an GENAU DIESER Stelle: die
+  // Hülle steht auf jeder angemeldeten Seite, und jede weitere Aufrufstelle
+  // würde einen zweiten Kanal öffnen.
+  const { stand: ungelesen, isError: ungelesenFehlt } = useUngelesen(user?.id ?? null);
+  useUngelesenLive(user?.id ?? null, pathname);
   // Exakter Pfad-Vergleich: /profil (Bento) nutzt die Breite, /profil/bearbeiten
   // (Editor) bleibt eine Lesespalte.
   const isNarrow = NARROW_ROUTES.includes(pathname);
@@ -508,6 +562,7 @@ export default function AppShell() {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {user ? (
               <>
+                <NachrichtenEinstieg anzahl={ungelesen.gesamt} unbekannt={ungelesenFehlt} />
                 <button
                   type="button"
                   aria-label="Benachrichtigungen"

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { mapMessageRow, mapThreadRow, mergeMessage, type ChatMessage } from "./chat";
+import {
+  fasseUngelesenZusammen,
+  mapMessageRow,
+  mapThreadRow,
+  mergeMessage,
+  type ChatMessage,
+} from "./chat";
 
 const uid = "me-uuid";
 const partnerId = "partner-uuid";
@@ -170,5 +176,46 @@ describe("mergeMessage (§9 optimistisches Senden + Realtime)", () => {
       createdAt: sameTime,
     };
     expect(mergeMessage([b], a).map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("fasseUngelesenZusammen (AGE-583)", () => {
+  it("summiert über alle Threads und ordnet je Thread zu", () => {
+    const z = fasseUngelesenZusammen([
+      { thread_id: "t1", unread_count: 2 },
+      { thread_id: "t2", unread_count: 5 },
+    ]);
+    expect(z.gesamt).toBe(7);
+    expect(z.jeThread.get("t1")).toBe(2);
+    expect(z.jeThread.get("t2")).toBe(5);
+  });
+
+  // Die RPC liefert Threads OHNE Ungelesenes gar nicht zurück. Ein Thread, nach
+  // dem gefragt wird und der nicht in der Antwort steht, hat also 0 — und NICHT
+  // „unbekannt". Ohne diese Zusage müsste jede Aufrufstelle für sich raten, und
+  // eine davon würde falsch raten.
+  it("ein Thread ohne Zeile hat null, nicht undefined", () => {
+    const z = fasseUngelesenZusammen([{ thread_id: "t1", unread_count: 2 }]);
+    expect(z.hatUngelesen("t2")).toBe(false);
+    expect(z.hatUngelesen("t1")).toBe(true);
+  });
+
+  it("keine Zeilen heißt Gesamtzahl null", () => {
+    const z = fasseUngelesenZusammen([]);
+    expect(z.gesamt).toBe(0);
+    expect(z.hatUngelesen("t1")).toBe(false);
+  });
+
+  // Gegen die Falle, die beim Schreiben der Typen fast passiert wäre: hielte man
+  // `unread_count` für eine Zeichenkette, ergäbe die Summe "02" statt 2. Gemessen
+  // ist es eine Zahl — dieser Test hält das fest, falls PostgREST seine Meinung
+  // ändert, statt es beim nächsten Leser wieder zur Vermutung zu machen.
+  it("summiert numerisch, nicht als Zeichenkette", () => {
+    const z = fasseUngelesenZusammen([
+      { thread_id: "t1", unread_count: 2 },
+      { thread_id: "t2", unread_count: 3 },
+    ]);
+    expect(z.gesamt).toBe(5);
+    expect(typeof z.gesamt).toBe("number");
   });
 });

@@ -75,7 +75,8 @@ profiles_public/authenticated=SELECT
 routing_queue/authenticated=SELECT
 staff_roles/authenticated=SELECT
 tags/anon=SELECT
-tags/authenticated=SELECT$$,
+tags/authenticated=SELECT
+thread_read_positions/authenticated=INSERT,SELECT,UPDATE$$,
   'Tabellen-Grants: exakt das, was die Policies decken — und sonst nichts');
 
 -- AGE-528 hat zwei Tabellen dazugelegt, und beide Zeilen sind eine Aussage:
@@ -116,14 +117,33 @@ select is(
          where table_schema = 'public' and grantee = 'authenticated'
            and privilege_type = 'UPDATE'
            and table_name in ('profiles', 'contact_requests', 'routing_queue', 'platform_settings',
-                              'posts')
+                              'posts', 'message_threads', 'thread_read_positions')
          group by 1) t),
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
 posts.UPDATE=body,hashtags,visibility
 profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
-routing_queue.UPDATE=assigned_to,status$$,
+routing_queue.UPDATE=assigned_to,status
+thread_read_positions.UPDATE=last_read_at,profile_id,thread_id$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
+
+-- `message_threads` steht am 26.08. in der Liste oben, ERZEUGT dort aber
+-- bewusst KEINE Zeile (AGE-583). Das ist die Aussage: die Tabelle traegt
+-- ueberhaupt kein UPDATE-Recht, auch kein spaltenweises.
+--
+-- Warum das eine eigene Vorkehrung braucht: ein SPALTEN-Grant taucht in
+-- `role_table_grants` NICHT auf. Jemand koennte also
+-- `grant update (a_last_read_at) on message_threads` schreiben, und die erste
+-- Assertion oben bliebe gruen — die Zeile `message_threads/authenticated=
+-- INSERT,SELECT` aendert sich davon nicht. Nur diese zweite Assertion faengt es,
+-- und auch nur, weil der Tabellenname in ihrer `in (…)`-Liste steht. Eine Liste
+-- prueft still nicht, was nicht drinsteht.
+--
+-- Der Anlass ist konkret: der Linear-Vorgang zu AGE-583 schlug genau diese zwei
+-- Spalten auf `message_threads` vor. Sie waeren fuer den Gesprächspartner
+-- lesbar gewesen und damit eine Lesebestaetigung. Der Lesestand liegt deshalb
+-- in `thread_read_positions` — und dessen Zeile oben ist zugleich die
+-- Positivkontrolle dafuer, dass diese Assertion ueberhaupt etwas misst.
 
 -- ── 3. Default privileges ────────────────────────────────────────────────────
 -- Der Kern von AGE-312: Ohne das hier erbt die naechste per Migration angelegte
