@@ -19,6 +19,13 @@ column set per member (`id`, `name`, `avatar_url`, `cover_url`, `region`, `compa
 The function SHALL be `SECURITY INVOKER`, so the caller's own RLS decides which
 profile rows are returned, and SHALL list only `is_public` members.
 
+Das Ausführungsrecht SHALL `authenticated` allein halten und SHALL **namentlich**
+entzogen werden — `from public, anon` —, nicht allein über `public`. Ein Entzug
+von `public` entfernt einen rollen-eigenen Grant nicht, und die Default
+Privileges einer Supabase-Instanz können `anon` ein solches Recht ausdrücklich
+erteilen. Wo das zutrifft, ist die Funktion für `anon` ausführbar, obwohl die
+Migration das Gegenteil auszusprechen scheint.
+
 `p_offers` and `p_needs` SHALL be `text[]` category filters matching
 `offers.category` and `needs.category`. Within one array the categories SHALL be
 combined with OR (a member matching any listed category qualifies); the two
@@ -114,9 +121,15 @@ contact details are never released automatically is untouched.
 
 #### Scenario: Anonymous callers cannot execute the new signature
 
-- **WHEN** an `anon` caller invokes the eight-argument `search_directory`
-- **THEN** execution is denied, because the grant was re-issued to `authenticated`
-  only and no privilege was inherited by the new signature
+- **WHEN** der Rechte-Zustand der acht-argumentigen `search_directory` gelesen wird
+- **THEN** hält `anon` **kein** `EXECUTE` — geprüft am Privilegien-Bit des Katalogs,
+  nicht an der Fehlermeldung eines Aufrufs
+- **AND** `authenticated` hält es weiterhin
+
+> Die frühere Begründung dieses Szenarios — „kein Recht wurde auf die neue
+> Signatur vererbt" — war **nachweislich falsch**: genau das war geschehen, und
+> weil die Zusage eine Fehlermeldung statt des Zustands verglich, blieb sie lokal
+> grün, während `anon` die Funktion in der Produktion ausführen durfte.
 
 #### Scenario: A below-rank caller learns no other member's categories
 
@@ -363,6 +376,14 @@ als eigene Sicherheitsentscheidung behandelt werden und SHALL NOT als
 Nebenwirkung eines Oberflächen-Changes entstehen — zumal ihn, wie oben benannt,
 keine bestehende Prüfung bemerken würde.
 
+**Eine dritte Grenze SHALL benannt sein: ein lokal laufender Test kann eine
+Abweichung des Rechte-Zustands zwischen den Instanzen nicht sehen.** Die Default
+Privileges der lokalen Instanz sind andere als die der Produktionsinstanz. Eine
+Zusage, die lokal grün ist, belegt den Rechte-Zustand der Produktion **nicht**.
+Wo eine Anforderung einen Rechte-Zustand zusichert, SHALL der Beleg für die
+Produktion aus einer **Messung am Katalog der Produktionsinstanz** stammen, und
+diese Messung SHALL im Change mit ihrem Ergebnis festgehalten sein.
+
 #### Scenario: Ausgeloggt wird nur angefragt, was anon lesen darf
 
 - **WHEN** die vom Prüfstand aufgerufenen ausgeloggten Lesepfade laufen
@@ -374,6 +395,13 @@ keine bestehende Prüfung bemerken würde.
 - **WHEN** jemand den Prüfstand liest, um sich auf ihn zu berufen
 - **THEN** findet er dort, dass weder nicht aufgerufene Lesepfade noch
   Funktionsaufrufe erfasst sind
+
+#### Scenario: Ein lokal grüner Rechte-Test belegt die Produktion nicht
+
+- **WHEN** eine Zusage über ein Ausführungsrecht lokal grün ist
+- **THEN** gilt der Rechte-Zustand der Produktionsinstanz als **unbelegt**, bis er
+  dort am Katalog gemessen wurde
+- **AND** das Ergebnis dieser Messung steht im Change
 
 #### Scenario: Eine neue anon-Fläche bringt ihren eigenen Nachweis mit
 
