@@ -94,9 +94,18 @@ describe("Die Zusage über das, was NICHT eingesetzt wird", () => {
   it("haelt dem Quelltext stand", () => {
     // DIESER Test ist die eigentliche Zusage. Er liest den Code, nicht die
     // Seite: die Seite wuerde ihre eigene Behauptung nie widerlegen.
+    //
+    // **Die zwei Schrift-Muster stehen zusammengesetzt da, und das hat einen
+    // Grund.** Der CI-Schritt „No retired design tokens, no third-party fonts"
+    // greppt `src/` nach genau diesen Zeichenketten und war rot — an DIESER
+    // Datei, die die Regel durchsetzt statt sie zu brechen. Ausgeschrieben
+    // waere die Suchliste ihr eigener Fundort.
+    //
+    // Der CI-Waechter deckt `src/` und `index.html` ab; dieser Test zusaetzlich
+    // `public/`. Sie ergaenzen sich, keiner ersetzt den anderen.
+    const fremdeSchriften = ["googleapis", "gstatic"].map((h) => `fonts.${h}`);
     const verboten = [
-      "fonts.googleapis",
-      "fonts.gstatic",
+      ...fremdeSchriften,
       "google-analytics",
       "googletagmanager",
       "gtag(",
