@@ -82,9 +82,30 @@ jede für sich zurücknehmbar bleibt.
 
 - [ ] Volle Suite grün · `tsc` sauber · `eslint` 0 Fehler · pgTAP alle Dateien
       (mit **Dateiliste**, sonst lügt `supabase test db`).
-- [ ] **Mutationsprobe:** jede neue Zusage einzeln verbiegen und rot sehen.
-      Vor jeder Verbiegung ein Commit, damit die Rücknahme nichts verwirft.
-      „Muster fehlt" ist kein Grün — die Zeile „N skipped" mitlesen.
+- [x] **Mutationsprobe — acht Verbiegungen, Sicherungen ausserhalb von git:**
+
+      | # | Verbiegung | Ergebnis |
+      |---|---|---|
+      | M1 | `revoke … from public` statt `from public, anon` | **GRÜN** — siehe unten |
+      | M2 | Policy behält `has_level(4)` | rot (11) |
+      | M3 | Mechanik-Zusage auf `from public` aufgeweicht | rot (1) |
+      | M4 | neue Funktion für `anon` geöffnet | rot (1) |
+      | M5 | `post_media_lesbar` nicht mitgezogen | rot (2) |
+      | M6 | `former_member_entries` nicht mitgezogen | rot (1) |
+      | M7 | `post_engagement_counts` nicht mitgezogen | **GRÜN → behoben, jetzt rot (1)** |
+      | M8 | `is_activated()` aus der Policy entfernt | rot (5) |
+
+      **M7 war eine echte Lücke.** Das Vergessen der Zähler-Abschrift bemerkte
+      keine einzige Zusage — genau der Fehlerzustand, den dieser Change
+      ausschliessen soll (ein Feed, dessen Zähler nicht zu seinen Zeilen passen).
+      Zwei Zusagen ergänzt, danach rot.
+
+      **M1 bleibt grün, und das ist strukturell, nicht behebbar.** Lokal hält
+      `anon` das Recht nur über `PUBLIC`, also nimmt `from public` es ihm mit;
+      der Unterschied existiert auf dieser Instanz nicht. Statt den Zustand zu
+      messen, misst `grants_test.sql` Abschnitt 8 jetzt die **Regel** an einer
+      Wegwerf-Funktion, der ein rollen-eigener Grant gegeben wird — diese Zusage
+      ist auf jeder Instanz aussagekräftig und fällt unter M3.
 - [ ] **Sichtprobe** gegen den lokalen Stack: ein aktiviertes `basic`-Konto sieht
       den Feed gefüllt, mit Bildern und Zählern. Grüne Tests haben hier schon ein
       visuell falsches Ergebnis durchgewunken.

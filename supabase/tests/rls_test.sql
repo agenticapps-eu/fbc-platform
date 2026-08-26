@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(435);
+select plan(437);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -401,6 +401,27 @@ select is(
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
   1, 'Basic sieht auch einen FREMDEN members-Beitrag (AGE-601) — das ist die '
      'eigentliche Ausweitung, die Autoren-Klausel darüber ist es nicht');
+
+-- DIE ZAEHLER-ABSCHRIFT, eigens zugesichert. `post_engagement_counts` ist
+-- SECURITY DEFINER und traegt das Sichtbarkeitspraedikat ein ZWEITES Mal. Eine
+-- Mutationsprobe hat gezeigt, dass ihr Vergessen von KEINER Zusage bemerkt
+-- wurde: die Suite blieb gruen, waehrend die Karte eines sichtbaren Beitrags
+-- ihre Zahlen verloren haette. Genau der Fehlerzustand, den dieser Change
+-- ausschliessen soll — ein Feed, dessen Zaehler nicht zu seinen Zeilen passen.
+select is(
+  pg_temp.count_as('33333333-3333-3333-3333-333333333333',
+    'select count(*)::int from public.post_engagement_counts(
+       array[''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa''::uuid])'),
+  1, 'Der Zaehler folgt der Zeile: wer den members-Beitrag SIEHT, bekommt auch '
+     'seine Zahlen (AGE-601 — die Abschrift muss mitwandern)');
+
+-- Und die Gegenrichtung, damit die Eins oben nicht auch mit einer Funktion
+-- vereinbar ist, die einfach jede Kennung durchreicht.
+select is(
+  pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
+    'select count(*)::int from public.post_engagement_counts(
+       array[''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa''::uuid])'),
+  0, 'Ohne Aktivierung gibt es auch keine Zahlen');
 
 -- ── 9. Kommentare erben die Sichtbarkeit des Eltern-Posts ────────────────────
 select is(

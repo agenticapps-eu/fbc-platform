@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(9);
+select plan(11);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -215,7 +215,7 @@ select is(
                               E'\n' order by p.proname), '(keine)')
    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f'
-     and p.proname <> 'age602_wegwerf'
+     and p.proname not in ('age602_wegwerf', 'age602_mechanik')
      and has_function_privilege('anon', p.oid, 'execute')),
 $$event_cover_lesbar(objektname text)
 event_registration_counts(p_event_ids uuid[])
@@ -241,6 +241,37 @@ select is(
   has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
   true,
   'Gegenprobe B: ein erteiltes Recht wird gemessen — die Zusage ist nicht blind');
+
+-- ── 8. WARUM `from public` ALLEIN NICHT GENUEGT — der Mechanismus (AGE-602) ──
+-- Diese Zusage ist als Antwort auf eine Mutationsprobe entstanden. Baut man den
+-- Originalfehler zurueck (`revoke ... from public` statt `from public, anon`),
+-- bleibt die ganze Suite lokal GRUEN: hier haelt `anon` das Recht nur ueber die
+-- Pseudo-Rolle PUBLIC, und ein Entzug von PUBLIC nimmt es ihm mit. In PROD hielt
+-- `anon` einen ROLLEN-EIGENEN Grant aus der Default-ACL der Instanz — und den
+-- laesst `from public` unberuehrt. Genau diese Differenz ist AGE-602.
+--
+-- Ein Zustands-Test kann das lokal nicht sehen; er misst eine Instanz, auf der
+-- der Unterschied nicht existiert. Deshalb misst diese Zusage nicht den Zustand,
+-- sondern die REGEL — an einer Wegwerf-Funktion, der beide Grant-Arten
+-- nacheinander gegeben werden. Sie ist damit auf jeder Instanz aussagekraeftig
+-- und faellt, sobald jemand die Formulierung fuer austauschbar haelt.
+
+create function public.age602_mechanik() returns int language sql immutable as $$ select 1 $$;
+grant execute on function public.age602_mechanik() to anon;   -- rollen-eigen, wie in PROD
+
+revoke execute on function public.age602_mechanik() from public;
+select is(
+  has_function_privilege('anon', 'public.age602_mechanik()', 'execute'),
+  true,
+  'revoke ... FROM PUBLIC laesst einen rollen-eigenen anon-Grant STEHEN — '
+  'das ist der Fehler, den AGE-602 in PROD vorgefunden hat');
+
+revoke execute on function public.age602_mechanik() from anon;
+select is(
+  has_function_privilege('anon', 'public.age602_mechanik()', 'execute'),
+  false,
+  'erst der namentliche Entzug nimmt ihn — deshalb lautet die Formulierung '
+  'ueberall `from public, anon` und nicht nur `from public`');
 
 select * from finish();
 rollback;
