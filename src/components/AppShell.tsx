@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { navItems, type NavSection } from "../config/nav";
 import {
@@ -545,6 +546,10 @@ export default function AppShell() {
           </RouteTransition>
         </div>
       </main>
+
+      {/* Pflichtlinks (AGE-497). Traegt `fbc-shell-offset` wie <main>, sonst
+          laege er ab lg unter der fixierten Sidebar. */}
+      <AppFooter />
 
       {/* Off-Canvas-Sidebar (< lg). */}
       {mobileNavOpen && (

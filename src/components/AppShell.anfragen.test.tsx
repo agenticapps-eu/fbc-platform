@@ -134,7 +134,9 @@ describe("Der Weg zu offenen Anfragen steht in der Navigation (AGE-592)", () => 
     holen.mockResolvedValue([anfrage("a")]);
     renderApp(GAST);
 
-    await waitFor(() => expect(screen.getByRole("navigation")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("navigation", { name: "Hauptnavigation" })).toBeInTheDocument(),
+    );
     expect(holen).not.toHaveBeenCalled();
     expect(screen.queryByRole("link", { name: /Meine Anfragen/ })).toBeNull();
   });

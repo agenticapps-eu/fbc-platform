@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ActivationScreen from "./ActivationScreen";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
@@ -36,7 +37,11 @@ function renderMit(auth: Parameters<typeof fakeAuthValue>[0] = {}) {
         ...auth,
       })}
     >
-      <ActivationScreen />
+      {/* MemoryRouter seit AGE-497: der Bildschirm traegt jetzt die
+          Rechtslinks, und <Link> braucht einen Router-Kontext. */}
+      <MemoryRouter>
+        <ActivationScreen />
+      </MemoryRouter>
     </AuthFixture>,
   );
 }
@@ -156,7 +161,9 @@ describe("ActivationScreen", () => {
             activationMailStatus: "issued",
           })}
         >
-          <ActivationScreen />
+          <MemoryRouter>
+            <ActivationScreen />
+          </MemoryRouter>
         </AuthFixture>,
       );
 

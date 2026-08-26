@@ -48,7 +48,10 @@ function renderApp(value: AuthContextValue) {
 
 /** Die Navigationslinks unterhalb der Überschrift „Administration". */
 function adminLinks(): string[] {
-  const abschnitt = screen.getByRole("navigation").querySelectorAll("a");
+  // Seit AGE-497 gibt es zwei Navigationen im Rahmen (Sidebar + Footer).
+  const abschnitt = screen
+    .getByRole("navigation", { name: "Hauptnavigation" })
+    .querySelectorAll("a");
   return Array.from(abschnitt)
     .map((a) => a.getAttribute("href") ?? "")
     .filter((href) => href.startsWith("/admin"));

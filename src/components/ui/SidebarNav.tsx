@@ -92,7 +92,13 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
       return naechste;
     });
   return (
-    <nav className={cn("flex flex-col", collapsed ? "gap-4" : "gap-7")}>
+    // Benannt seit AGE-497: der Footer bringt eine zweite Navigation in den
+    // Rahmen, und zwei unbenannte Landmarken derselben Rolle sind fuer
+    // Screenreader wie fuer Tests nicht auseinanderzuhalten.
+    <nav
+      aria-label="Hauptnavigation"
+      className={cn("flex flex-col", collapsed ? "gap-4" : "gap-7")}
+    >
       {sections.map((section, i) => {
         // Klappbar nur ausgeklappt und nur mit Titel: in der schmalen Leiste
         // gibt es keine Überschrift, also auch keinen Griff — ein Akkordeon

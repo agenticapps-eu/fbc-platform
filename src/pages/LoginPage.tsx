@@ -6,6 +6,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
+import RechtsLinks from "../components/RechtsLinks";
 import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
@@ -298,6 +299,12 @@ export default function LoginPage() {
       <Link to="/" className="mt-4 block text-sm text-muted hover:underline">
         ← Zurück zur Startseite
       </Link>
+
+      {/* AGE-497: Hier wird ein Vertrag geschlossen und eine E-Mail-Adresse
+          erhoben. § 312i BGB verlangt die AGB bei Vertragsschluss, Art. 13
+          DSGVO die Information bei Erhebung — beides an dieser Stelle, nicht
+          im Footer einer Seite, die ein frisch registriertes Konto nie sieht. */}
+      <RechtsLinks className="mt-6 border-t border-line pt-4" />
     </main>
   );
 }

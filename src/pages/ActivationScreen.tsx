@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import RechtsLinks from "../components/RechtsLinks";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
 import { resendActivationLink, type ResendStatus } from "../lib/activation";
@@ -179,6 +180,12 @@ export default function ActivationScreen() {
           .
         </p>
       </div>
+
+      {/* AGE-497: Der einzige Bildschirm, den ein unbestaetigtes Konto sieht —
+          und der Moment VOR dem Passwortsetzen. Der Footer des Rahmens
+          erreicht diese Gruppe nicht, weil das ActivationGate die Shell
+          gar nicht erst rendert. */}
+      <RechtsLinks className="mt-8 border-t border-line pt-4" />
     </main>
   );
 }
