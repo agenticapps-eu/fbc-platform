@@ -85,8 +85,26 @@ export function tokenizePostBody(body: string): PostSegment[] {
   return segments;
 }
 
+/** Die gebaute Adresse ist die datensparsamste, die der Anbieter anbietet:
+ *  `youtube-nocookie.com` bei YouTube, `dnt=1` bei Vimeo (AGE-611).
+ *
+ *  Was hier steht, ist eine Aussage darüber, was WIR anfragen — nicht darüber,
+ *  was der Anbieter danach tut. Eine Zusage über fremdes Cookie-Verhalten wäre
+ *  aus diesem Repository nicht belegbar und deshalb keine Anforderung.
+ *
+ *  Betroffen ist ausschließlich die GEBAUTE URL. Die akzeptierten QUELL-Hosts
+ *  bleiben unverändert — `youtube-nocookie.com` als Eingabe wird weiterhin
+ *  abgelehnt. Das ist die Arbeitsteilung aus Migration 20260813090000: SQL
+ *  entscheidet, OB ein Body ein Video enthält und WELCHE URL das ist,
+ *  TypeScript entscheidet, WIE sie eingebettet wird. Die Paritätsprobe
+ *  `scripts/probe-c9-parser-paritaet.ts` vergleicht die Quell-URL und bleibt
+ *  davon unberührt. */
 function youtube(id: string) {
-  return { provider: "youtube" as const, embedUrl: `https://www.youtube.com/embed/${id}` };
+  return { provider: "youtube" as const, embedUrl: `https://www.youtube-nocookie.com/embed/${id}` };
+}
+
+function vimeo(id: string) {
+  return { provider: "vimeo" as const, embedUrl: `https://player.vimeo.com/video/${id}?dnt=1` };
 }
 
 /**
@@ -128,11 +146,11 @@ export function parseVideoUrl(
   }
   if (host === "vimeo.com") {
     const m = url.pathname.match(/^\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
+    return m ? vimeo(m[1]) : null;
   }
   if (host === "player.vimeo.com") {
     const m = url.pathname.match(/^\/video\/(\d+)$/);
-    return m ? { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` } : null;
+    return m ? vimeo(m[1]) : null;
   }
   return null;
 }

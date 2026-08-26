@@ -88,7 +88,7 @@ describe("extractFirstVideo", () => {
     expect(extractFirstVideo("Schau https://example.com und https://youtu.be/abc an")).toEqual({
       url: "https://youtu.be/abc",
       provider: "youtube",
-      embedUrl: "https://www.youtube.com/embed/abc",
+      embedUrl: "https://www.youtube-nocookie.com/embed/abc",
     });
   });
 
@@ -123,33 +123,33 @@ describe("parseVideoUrl", () => {
   it("YouTube watch/short/embed → sichere Embed-URL", () => {
     expect(parseVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({
       provider: "youtube",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
     });
     expect(parseVideoUrl("https://youtu.be/dQw4w9WgXcQ?t=42")).toEqual({
       provider: "youtube",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
     });
     expect(parseVideoUrl("https://www.youtube.com/embed/dQw4w9WgXcQ")).toEqual({
       provider: "youtube",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
     });
   });
 
   it("Vimeo → Player-Embed-URL", () => {
     expect(parseVideoUrl("https://vimeo.com/123456789")).toEqual({
       provider: "vimeo",
-      embedUrl: "https://player.vimeo.com/video/123456789",
+      embedUrl: "https://player.vimeo.com/video/123456789?dnt=1",
     });
   });
 
   it("akzeptiert m.youtube.com und player.vimeo.com", () => {
     expect(parseVideoUrl("https://m.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({
       provider: "youtube",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
     });
     expect(parseVideoUrl("https://player.vimeo.com/video/123456789")).toEqual({
       provider: "vimeo",
-      embedUrl: "https://player.vimeo.com/video/123456789",
+      embedUrl: "https://player.vimeo.com/video/123456789?dnt=1",
     });
   });
 
@@ -164,5 +164,14 @@ describe("parseVideoUrl", () => {
     expect(parseVideoUrl("javascript:alert(1)")).toBeNull();
     expect(parseVideoUrl("nur text")).toBeNull();
     expect(parseVideoUrl("")).toBeNull();
+  });
+
+  it("akzeptiert youtube-nocookie.com als QUELLE weiterhin nicht (AGE-611)", () => {
+    // Die Umstellung betrifft nur die GEBAUTE Adresse. Nähme diese Funktion den
+    // Host auch als Eingabe an, wiche sie vom SQL-Erkenner in Migration
+    // 20260813090000 ab — und `posts.video_url` trüge Werte, die die Academy
+    // filtert und die Karte anders einbettet. Genau die Drift, gegen die die
+    // Migration antritt.
+    expect(parseVideoUrl("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ")).toBeNull();
   });
 });

@@ -40,7 +40,7 @@ export const datenschutz: Rechtsdokument = {
     "Als Verantwortlicher ist hier „Fair Business Club“ genannt — so wie im Impressum, in den Geschäftsbedingungen und in der Cookie-Richtlinie. Der Entwurf des Anwalts nannte an dieser Stelle stattdessen die „DK Real Invest eG, Rotebühlplatz 23, 70178 Stuttgart“. Welche der beiden Stellen verantwortlich ist, wird derzeit geklärt.",
     "Für Cloudflare, Resend und Stripe ist die Verarbeitungsregion noch nicht belegt. Sie wird nachgetragen, nicht geschätzt.",
     "Verträge zur Auftragsverarbeitung mit den genannten Diensten sind noch nicht abgeschlossen. Ob ein Dienst als Auftragsverarbeiter oder als eigener Verantwortlicher einzuordnen ist, ist rechtlich noch nicht geprüft; die Dienste sind deshalb neutral als Empfänger mit Zweck aufgeführt.",
-    "Die eingebetteten Videos von YouTube und Vimeo werden geladen, bevor eine Einwilligung eingeholt wurde.",
+    "Der Abschnitt zu eingebetteten Videos weicht vom Entwurf des Anwalts ab: Er beschreibt das seit dem 26. August 2026 eingebaute Verfahren, bei dem ein Video erst auf Ihren Klick hin geladen wird. Ob dieser Klick den rechtlichen Anforderungen an eine Einwilligung in vollem Umfang genügt, ist anwaltlich noch nicht bestätigt.",
     "Konkrete Speicherfristen sind noch nicht festgelegt.",
   ],
   abschnitte: [
@@ -460,13 +460,25 @@ export const datenschutz: Rechtsdokument = {
         {
           art: "absatz",
           inhalt: [
-            "Beim Aufruf einer Seite mit einem solchen Video wird eine Verbindung zu dem jeweiligen Anbieter hergestellt. Dabei erhält er unter anderem Ihre IP-Adresse, und zwar auch dann, wenn Sie kein Konto bei uns und keines bei ihm haben.",
+            "Diese Videos werden nicht von selbst geladen. Solange Sie es nicht ausdrücklich verlangen, sehen Sie an ihrer Stelle eine Fläche, die von unserem eigenen Server stammt — es wird keine Verbindung zu YouTube oder Vimeo hergestellt und dorthin auch nichts übertragen.",
           ],
         },
         {
           art: "absatz",
           inhalt: [
-            "Diese Verbindung wird derzeit hergestellt, ohne Sie vorher um Einwilligung zu fragen. Wir halten das für einen Mangel und arbeiten daran; bis dahin nennen wir es hier ausdrücklich, statt es zu verschweigen.",
+            "Erst wenn Sie die Fläche anklicken, wird die Verbindung zu dem jeweiligen Anbieter hergestellt. Dabei erhält er unter anderem Ihre IP-Adresse, und zwar auch dann, wenn Sie kein Konto bei uns und keines bei ihm haben. Die Fläche nennt dies, bevor Sie sie anklicken.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Ihre Entscheidung gilt für dieses eine Video und wird nicht gespeichert. Rufen Sie die Seite erneut auf, ist wieder nichts geladen. Wir bitten Sie also bei jedem Video erneut, statt eine einmal erteilte Zustimmung fortzuschreiben.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Für den Abruf nach Ihrem Klick verwenden wir die datensparsamste Adresse, die der jeweilige Anbieter anbietet: bei YouTube die Variante „youtube-nocookie.com“, bei Vimeo den Parameter „dnt“ für „Do Not Track“. Was der Anbieter danach tatsächlich speichert, entzieht sich unserer Kenntnis und unserem Einfluss.",
           ],
         },
       ],

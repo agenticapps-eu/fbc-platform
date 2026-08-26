@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { extractFirstVideo, type FeedPost } from "../lib/feed";
@@ -43,13 +43,32 @@ describe("PostPreview — Startseiten-Vorschau", () => {
   it("bettet einen YouTube-Link ein und zeigt nicht die nackte URL", () => {
     renderPreview("Einfach mal entspannen! https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 
+    // Seit AGE-611 steht hier zunächst die Einwilligungsfläche statt des
+    // Rahmens — auf DIESER Seite, die ausgeloggt erreichbar ist, ist das der
+    // ganze Punkt. Der Rahmen kommt erst nach der Aktivierung.
+    expect(document.querySelector("iframe")).toBeNull();
+    const knopf = screen.getByRole("button", { name: /Video von YouTube laden/i });
+
+    fireEvent.click(knopf);
     const iframe = document.querySelector("iframe");
     expect(iframe).not.toBeNull();
-    expect(iframe?.getAttribute("src")).toContain("youtube.com/embed/dQw4w9WgXcQ");
+    expect(iframe?.getAttribute("src")).toContain("youtube-nocookie.com/embed/dQw4w9WgXcQ");
 
     // Der rohe Watch-Link darf nicht mehr im Text stehen; der übrige Text bleibt.
+    // Diese Zusage ist von AGE-611 unberührt und bleibt deshalb stehen.
     expect(screen.queryByText(/youtube\.com\/watch/)).toBeNull();
     expect(screen.getByText(/Einfach mal entspannen!/)).toBeInTheDocument();
+  });
+
+  it("lädt den Anbieter nicht, solange die Fläche nicht aktiviert wurde", () => {
+    // Die Regressionsschwelle für den Befund aus AGE-611: ein Besucher OHNE
+    // Konto darf mit dem blossen Seitenaufruf keinen Drittanbieter-Aufruf
+    // auslösen. jsdom stellt keine Verbindungen her — geprüft wird deshalb das
+    // Fehlen des Rahmens, der sie auslösen würde.
+    renderPreview("Kurzvorstellung https://vimeo.com/76979871");
+
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(screen.getByRole("button", { name: /Video von Vimeo laden/i })).toBeInTheDocument();
   });
 
   it("zeigt reinen Text ohne Embed, wenn kein Video enthalten ist", () => {

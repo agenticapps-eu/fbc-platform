@@ -22,8 +22,7 @@ export const cookies: Rechtsdokument = {
   quelle: "04 FBC Cookie Richtlinie.docx (Stand Juli 2026)",
   provisorisch: true,
   offenePunkte: [
-    "Das hier beschriebene Einwilligungs- und Widerrufsverfahren gibt es noch nicht. Es existiert kein Cookie-Dialog, in dem sich eine Einwilligung erteilen oder zurücknehmen ließe.",
-    "Auf der öffentlichen Startseite werden Videos von YouTube und Vimeo eingebettet. Diese Inhalte werden heute geladen, ohne vorher um Einwilligung zu fragen — auch für Besucherinnen und Besucher ohne Konto.",
+    "Das hier beschriebene allgemeine Einwilligungs- und Widerrufsverfahren gibt es noch nicht. Es existiert kein Cookie-Dialog, in dem sich eine Einwilligung erteilen oder zurücknehmen ließe. Für eingebettete Videos gibt es seit dem 26. August 2026 ein eigenes Verfahren, das in Abschnitt 3.1 beschrieben ist; der Text weicht insoweit vom Quelldokument ab, das dort ein Banner voraussetzt.",
     "Die Aufstellung der tatsächlich gesetzten Cookies und ihrer Speicherdauern stammt aus dem Quelldokument und ist nicht gegen den laufenden Betrieb abgeglichen worden.",
   ],
   abschnitte: [
@@ -598,7 +597,18 @@ export const cookies: Rechtsdokument = {
             "Soweit der Einsatz von Cookies oder vergleichbaren Technologien gesetzlich eine Einwilligung erfordert, werden diese erst nach Ihrer ausdrücklichen Zustimmung aktiviert.",
           ],
         },
-        { art: "absatz", inhalt: ["Ihre Einwilligung erfolgt über unser Cookie-Consent-Banner."] },
+        {
+          art: "absatz",
+          inhalt: [
+            "Ein allgemeines Cookie-Banner, über das Sie eine solche Einwilligung erteilen oder zurücknehmen könnten, gibt es derzeit nicht. Das Quelldokument dieser Richtlinie setzt eines voraus; wir nennen die Abweichung hier, statt sie zu verschweigen.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Für eingebettete Videos von YouTube und Vimeo erteilen Sie Ihre Einwilligung stattdessen unmittelbar am Video selbst: An seiner Stelle steht eine Fläche von unserem eigenen Server, und erst Ihr Klick darauf stellt die Verbindung zum Anbieter her. Diese Entscheidung gilt für dieses eine Video und wird nicht gespeichert.",
+          ],
+        },
         {
           art: "absatz",
           inhalt: [
