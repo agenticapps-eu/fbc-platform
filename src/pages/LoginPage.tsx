@@ -222,15 +222,24 @@ export default function LoginPage() {
           freies Motiv, alle neun sind an Routen vergeben. `/mitglieder` liegt
           hinter der Anmeldung: ein Gast sieht dieses Bild nirgends sonst, für
           ihn wiederholt sich nichts. Vermerkt in CREDITS.md. */}
-      <div className="relative isolate hidden overflow-hidden lg:block">
-        <img
-          src="/images/hero-mitglieder.webp"
-          alt=""
-          aria-hidden="true"
-          loading="eager"
-          fetchPriority="high"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+      {/* Das Foto liegt als HINTERGRUND, nicht als <img>. Der Grund ist
+          gemessen, nicht gemutmaßt: Chrome fordert ein `<img>` auch dann an,
+          wenn sein Elternteil `display: none` trägt — bei 375 px ging der
+          Abruf hinaus, obwohl das Panel gar nicht sichtbar war. Für ein
+          Hintergrundbild unterbleibt er. Das spart 72 kB auf genau dem
+          Bildschirm, den die meisten Mitglieder zuerst sehen, und zwar dort,
+          wo am ehesten über Funk geladen wird.
+
+          Semantisch kostet es nichts: das Bild war ohnehin dekorativ und mit
+          `aria-hidden` aus dem Baum genommen — ein Hintergrundbild steht dort
+          von vornherein nicht drin. KEIN `aria-hidden` auf diesem Panel: es
+          trägt Marke und Claim, und die kompakte Fassung darunter ist
+          `lg:hidden`. Hier ausgeblendet wären sie auf dem Desktop für
+          Screenreader nirgends mehr vorhanden. */}
+      <div
+        className="relative isolate hidden overflow-hidden bg-cover bg-center lg:block"
+        style={{ backgroundImage: "url('/images/hero-mitglieder.webp')" }}
+      >
         <div
           aria-hidden="true"
           className="absolute inset-0"
