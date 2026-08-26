@@ -5,6 +5,16 @@ import { Icon } from "./icons";
 
 const ANBIETER = { youtube: "YouTube", vimeo: "Vimeo" } as const;
 
+/** Ein Video wächst sonst mit seiner Karte: in einer 1300 px breiten
+ *  Beitragskarte macht `aspect-video` daraus 733 px Höhe — mehr als ein
+ *  Bildschirm, für einen Beitrag unter vielen. Mit dem Einwilligungstor fiel es
+ *  auf, weil die ungeklickte Fläche dieselbe Höhe als Grau einnimmt; der Player
+ *  davor war genauso groß, nur füllte ihn ein Bild.
+ *
+ *  Die Grenze gilt für BEIDE Zustände. Nur die Fläche zu begrenzen ließe die
+ *  Seite beim Aktivieren springen. */
+const BREITE = "w-full max-w-2xl";
+
 /**
  * Sicheres, responsives Video-Embed (AGE-252 / W4-3). Akzeptiert NUR YouTube- und
  * Vimeo-URLs — `parseVideoUrl` lässt ausschließlich diese Anbieter und valide IDs zu,
@@ -42,7 +52,9 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
   const video = parseVideoUrl(url);
   if (!video) {
     return (
-      <div className="flex aspect-video items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line bg-soft p-4 text-center text-sm text-muted">
+      <div
+        className={`${BREITE} flex aspect-video items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line bg-soft p-4 text-center text-sm text-muted`}
+      >
         Video kann nicht eingebettet werden. Nur YouTube- und Vimeo-Links werden unterstützt.
       </div>
     );
@@ -52,7 +64,7 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
 
   if (!offen) {
     return (
-      <div className="space-y-2">
+      <div className={`${BREITE} space-y-2`}>
         <button
           type="button"
           onClick={() => setFreigegeben(url)}
@@ -87,7 +99,9 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
   src.searchParams.set("autoplay", "1");
 
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[var(--radius-card)] border border-line bg-chrome">
+    <div
+      className={`${BREITE} relative aspect-video overflow-hidden rounded-[var(--radius-card)] border border-line bg-chrome`}
+    >
       <iframe
         ref={rahmen}
         src={src.toString()}
