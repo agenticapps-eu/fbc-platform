@@ -154,15 +154,47 @@ jede für sich zurücknehmbar bleibt.
 > PROD-Rechte-Zustand laut Anforderung als unbelegt — das ist kein Mangel des
 > Changes, sondern die Reihenfolge der Pipeline, und sie ist hier benannt.
 
-- [ ] **PROD-Katalog erneut messen** und die Zahlen hier eintragen:
-      welche Funktionen `anon` ausführen darf (erwartet: **sechs**, die
-      beabsichtigten) und ob die vier Objekte das Prädikat ohne `has_level(4)`
-      tragen.
-- [ ] Ohne diese Zeile gilt der PROD-Rechte-Zustand als **unbelegt** — so steht es
-      ab jetzt in der Anforderung.
+- [x] **PROD-Katalog gemessen, 26.08.2026 nach `migrate-prod` (Lauf 32940376062, grün).**
+      Vorher lesend geprüft: `migrate-dev` auf dem Merge-Commit grün, Trockenlauf
+      **genau zwei** fehlende Migrationen, **null** Zeilen nur in PROD.
 
-## Bekannte Falle beim Archivieren
+      | Prüfung | Ergebnis |
+      |---|---|
+      | Historie | **90/90**, beide neuen angewandt |
+      | `anon` darf ausführen | genau die **sechs** beabsichtigten (vorher 11) |
+      | `array_jaccard` | `anon=false`, `authenticated=false` |
+      | `fbc_profile_search_doc` | `anon=false`, `authenticated=true` |
+      | `search_directory`, `register_for_event`, `set_event_check_in` | `anon=false`, `authenticated=true` |
+      | `post_engagement_counts`, `event_registration_counts` | `anon=true`, `authenticated=true` |
+      | Policy `posts_select_by_visibility` | trägt `visibility = 'members'` **ohne** `has_level` |
+      | drei Abschriften | rufen `has_level(4)` **nicht** mehr |
+      | Default-ACL Funktionen | unverändert — die No-op-Zeile ist bewusst nicht ausgeliefert |
 
-Dieser Change **benennt Szenarien um** und ersetzt eine Anforderung per
-`REMOVED` + `ADDED` (OpenSpec 1.6 kennt kein `RENAMED`). `openspec validate` ist
-dabei grün; `openspec archive` kann daran abbrechen. Beim Archivieren einplanen.
+      Die Rechte der sieben angefassten Funktionen stimmen **zeichengleich** mit der
+      Golden-Liste in `grants_test.sql` Abschnitt 8 überein. Damit gilt der
+      PROD-Rechte-Zustand als **belegt** — der dritte Schritt, dessen Fehlen der
+      Ausgangsfehler von AGE-602 war.
+
+      **Eine Falle bei dieser Messung, notiert:** die erste Fassung der Prüfung
+      meldete zwei Objekte, die `has_level(4)` angeblich noch tragen. Das war der
+      **eigene Kommentar** — beide neu geschriebenen Funktionen enthalten die Zeile
+      „AGE-601: kein `has_level(4)` mehr", und ein `like` über
+      `pg_get_functiondef` trifft Kommentare mit. Eine Migration, die dokumentiert
+      was sie entfernt, stolpert über ihre eigene Prüfung. Richtig gemessen wird
+      über `regexp_replace(def, '--[^\n]*', '', 'g')`.
+
+      Wirkungsumfang zum Zeitpunkt der Anwendung: 5 Beiträge (alle `members`,
+      keiner `public`), 7 aktivierte Konten, davon **genau 1** unter Rang 4 — die
+      Ausweitung betrifft heute ein einziges Konto. 67 nicht aktivierte Konten
+      bleiben ausgesperrt.
+
+- [x] Damit ist der PROD-Rechte-Zustand belegt; die Einschränkung in
+      `directory-search` („gilt als unbelegt, bis am Katalog gemessen") ist für
+      diesen Change eingelöst.
+
+## 6. Deploy
+
+- [x] `drift-gate` hatte nach `migrate-dev` jeden Deploy blockiert (erwartet).
+      Nach `migrate-prod` per `gh run rerun --failed` freigemacht — Lauf
+      32939189470 jetzt grün, alle vier Jobs (`drift-gate`, `migrate-dev`,
+      `deploy`, `functions`).
