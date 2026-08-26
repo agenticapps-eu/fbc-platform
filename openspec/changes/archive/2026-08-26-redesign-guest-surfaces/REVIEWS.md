@@ -116,3 +116,26 @@ VERDICT: REQUEST-CHANGES
 | **LOW** Platz der Rechtslinks (gemini) | **Übernommen**, in der Anforderung festgelegt. |
 | **MED** Spec-Ablage (opencode) | **Nicht geändert, aber begründet.** `design-system` trägt bereits „Every main page opens empty with an invitation, not a status report" — eine Inhaltsregel, keine Gestaltungsregel. Der Präzedenzfall steht dort, und ein dritter Ort für dieselbe Frage ist der Anfang der Drift, die der Befund beklagt. |
 | **LOW** „was kostet es mich" (opencode) | **Widerlegt**, siehe Tabelle oben. `levels.ts` führt beide Preise. |
+
+---
+
+# Diff-Review (Schritt 4, nach dem Code)
+
+Zwei Fremdanbieter auf dem **Diff**, nicht auf dem Plan: opencode
+(`hf:moonshotai/Kimi-K3`) und codex. Beide REQUEST-CHANGES. Fünf Befunde
+übernommen.
+
+| Befund | Entscheidung |
+| -- | -- |
+| **Vakuumtest** (opencode, codex): der Test fragte nach `role: link`, die zwei Einladungen im Seitenkopf waren `<button>`. Ein Rückfall auf `/login` wäre grün durchgegangen | **Übernommen** — und über opencodes zweiten Befund gelöst: aus den Knöpfen werden **Links**, weil die Registrierung jetzt eine Adresse hat. Der Test fordert, dass alle drei Links sind und **kein** Knopf dieselbe Aufforderung trägt |
+| **`MembershipGate`** führt den Gäste-CTA weiter nach `/login` (codex, HIGH) | **Übernommen.** Dieselbe kaputte Reise, nur woanders |
+| **Moduswechsel über die Adresse räumt `formError`/`ohneSitzung` nicht weg** (codex) | **Übernommen.** Die Meldung trägt jetzt den Modus, in dem sie entstand — zugeordnet, nicht im Effect zurückgesetzt: ein Reset im Effect liefe nach dem Rendern, die falsche Meldung wäre einen Bildaufbau lang sichtbar. Mit einer Mutation gegengeprüft: Bedingung raus → Test fällt |
+| **Der Adress-Test sah die Adresse nie an** (opencode) | **Übernommen**, Sonde auf `useLocation` |
+| **Der Preis-Test prüfte eine Stufe von sechs** (codex) | **Übernommen**, läuft über `LEVEL_ORDER` |
+| **Das Bild lud auf dem Telefon trotz `display:none`** (opencode, codex) | **Bereits behoben**, bevor die Review eintraf — als Hintergrundbild unterbleibt der Abruf. Gemessen: 375 px, geladene Bilder = `[]`. Die Review bestätigt es unabhängig |
+
+**Nicht übernommen, benannt:** `AppShell.tsx:29` führt `/login` in
+`NARROW_ROUTES` und deckelte es damit auf 760 px. Der Eintrag ist **tot** —
+`/login` hängt seit jeher außerhalb der Shell (`App.tsx:209`), und die Messung
+zeigt es: Panel 0–720, Formular 720–1440 bei einem angeblichen 760-px-Deckel.
+Älter als dieser Diff, eigener Vorgang.
