@@ -1020,17 +1020,35 @@ component, with no per-surface exception. Deferring the request through lazy
 loading SHALL NOT be treated as satisfying this requirement: it postpones the
 request rather than withholding it.
 
-An activation SHALL apply to exactly one source URL in one rendered placeholder.
-It SHALL NOT carry over to a different URL, to another placeholder on the same
-page, or beyond the lifetime of the rendered instance. Persisting it would
-itself be consent management, which this requirement does not establish.
+An activation SHALL be recorded **per provider** and SHALL persist on the
+visitor's device until it is withdrawn. While a provider is released, that
+provider's players SHALL load without a further placeholder, on this page and on
+later visits. A release SHALL NOT extend to any other provider.
+
+This reverses the earlier decision that an activation applies to exactly one
+source URL and is never persisted. That decision made the gate ask again for
+every video and after every reload, which no comparable surface does. Persisting
+the answer is consent management, and this requirement therefore establishes the
+smallest form of it that can carry a release: one recorded decision per provider,
+no identifier, withdrawable from the privacy notice.
+
+A player loaded **because a release was already recorded** SHALL NOT autoplay and
+SHALL NOT take keyboard focus. Only the placeholder the visitor has just
+activated SHALL do either. Carrying the activation behaviour over to a recorded
+release would make every video on a page start at once and would move the focus
+during page load.
+
+Where the device storage is unavailable, the gate SHALL still hold: no release is
+recorded, no release is read, and each placeholder behaves as it did before this
+change. Failing to store a release SHALL NOT prevent the page from rendering.
 
 The placeholder SHALL occupy the same area as the player that replaces it, so
 that activation moves no surrounding content.
 
 #### Scenario: A logged-out visitor opens a page carrying a video
 
-- **WHEN** a visitor with no session opens a page on which a video is embedded
+- **WHEN** a visitor with no session and no recorded release opens a page on
+  which a video is embedded
 - **THEN** no network request is issued to any media provider's origin, and the
   placeholder is shown in the player's place
 
@@ -1050,8 +1068,8 @@ that activation moves no surrounding content.
 
 - **WHEN** the placeholder is rendered
 - **THEN** it names the provider, states that activation connects to that
-  provider and transmits the visitor's IP address, and links to the privacy
-  notice
+  provider and transmits the visitor's IP address, states that the decision is
+  remembered until it is withdrawn, and links to the privacy notice
 
 #### Scenario: The placeholder is operable without a pointing device
 
@@ -1060,19 +1078,70 @@ that activation moves no surrounding content.
   loading a video from the named provider, it activates by keyboard, and after
   activation the focus moves to the player rather than being lost
 
-#### Scenario: Activating one video does not load another
+#### Scenario: Activating one video releases the same provider on that page
 
-- **WHEN** two videos are embedded on the same page and the visitor activates
-  one of them
-- **THEN** the other remains a placeholder and issues no request to its
-  provider
+- **WHEN** two videos from the same provider are embedded on one page and the
+  visitor activates one of them
+- **THEN** the other loads its player as well, without a reload and without a
+  second activation
 
-#### Scenario: Changing the source URL withdraws the activation
+#### Scenario: A release does not extend to another provider
 
-- **WHEN** a placeholder has been activated and the URL it was activated for is
-  replaced by a different one while the same instance remains rendered
+- **WHEN** a page carries one YouTube video and one Vimeo video and the visitor
+  activates the YouTube one
+- **THEN** the Vimeo placeholder remains, and no request is issued to Vimeo's
+  origin
+
+#### Scenario: A recorded release survives a reload
+
+- **WHEN** a visitor who has released a provider opens a page carrying that
+  provider's video again
+- **THEN** the player is loaded without a placeholder and without a further
+  activation
+
+#### Scenario: A player loaded from a recorded release neither plays nor takes focus
+
+- **WHEN** a page carrying two videos of a released provider is opened
+- **THEN** neither player starts playing on its own, and the keyboard focus stays
+  where the page put it
+
+#### Scenario: A freshly activated player plays and takes focus
+
+- **WHEN** the visitor activates a placeholder in the current view
+- **THEN** that one player starts playing and receives the keyboard focus, while
+  players loaded from the recorded release do neither
+
+#### Scenario: Changing the source URL to a released provider needs no new activation
+
+- **WHEN** the URL rendered by a placeholder is replaced by another URL of a
+  provider that is already released
+- **THEN** the new player is requested without a further activation
+
+#### Scenario: Changing the source URL to an unreleased provider shows the gate
+
+- **WHEN** the URL rendered by a placeholder is replaced by a URL of a provider
+  that has not been released
 - **THEN** the placeholder is shown again, and the new URL's player is not
   requested until it is activated in turn
+
+#### Scenario: The visitor withdraws a release
+
+- **WHEN** the visitor withdraws a provider's release from the privacy notice
+- **THEN** that provider's videos show the placeholder again on the next page
+  carrying one, and no request is issued to that provider's origin
+
+#### Scenario: The withdrawal is reachable without an account
+
+- **WHEN** a visitor with no session opens the privacy notice
+- **THEN** the withdrawal for each released provider is present and operable
+  there
+
+#### Scenario: Device storage is unavailable
+
+- **WHEN** reading or writing the recorded release fails
+- **THEN** the page renders, the placeholder is shown, activating it loads that
+  one player, and no release is carried to another placeholder or to a later
+  visit
 
 #### Scenario: Every embedding surface behaves identically
 
