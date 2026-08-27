@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { VideoFreigabeWiderruf } from "../components/VideoFreigabeWiderruf";
 import { Logo } from "../components/ui/Logo";
 import { rechtsseiten } from "../content/legal/meta";
 import type { Block, Inline, Rechtsdokument } from "../content/legal/types";
@@ -157,6 +158,13 @@ export default function LegalPage({ dokument }: { dokument: Rechtsdokument }) {
           </section>
         ))}
       </div>
+
+      {/* Der Widerruf zur Video-Freigabe (AGE-621) steht NEBEN dem Dokument,
+          nicht darin: `content/legal/types.ts` begründet, warum das
+          Inhaltsmodell genau drei Blockarten hat, und ein Knopf ist kein
+          Fließtext. Nur auf der Datenschutzseite, weil der Text dort auf ihn
+          verweist — die Fläche unter jedem Video nennt genau diesen Ort. */}
+      {dokument.slug === "datenschutz" && <VideoFreigabeWiderruf />}
 
       <hr className="mt-12 border-line" />
 
