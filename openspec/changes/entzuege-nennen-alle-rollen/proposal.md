@@ -114,13 +114,21 @@ bestätigt und denselben Satz als falsch markiert.
   wieder über Nacht unter dem Repo wegwandert. Gepinnt wird auf die **neue,
   strengere** Sorte, damit weitere zu enge Entzüge weiterhin auffallen statt
   zugedeckt zu werden.
-- **Der Pin ist nicht bloß Hygiene — er ist der Biss.** Drei der neuen Szenarien
-  können auf dem alten lokalen Stack gar nicht rot werden: dort hält `anon`
-  EXECUTE nur über `PUBLIC`, `authenticated` und `service_role` halten von sich
-  aus nichts, und ein Vergleich zweier Instanz-Sorten ist innerhalb einer
-  Instanz ohnehin nicht führbar. Diese Szenarien messen ausschließlich auf der
-  gepinnten CI-Sorte etwas. Das Delta sagt das aus, statt es implizit zu lassen
-  — eine Zusage, die überall grün ist, hat sonst niemand als solche erkannt.
+- **Die Gegenprobe in `grants_test.sql` wird repariert.** Sie entzog bis heute
+  nur `from public` und behauptete damit, genau die Formulierung wirke, die
+  AGE-602 als unzureichend beschreibt. Auf dem alten lokalen Stack ging das
+  durch; auf der neuen Sorte fällt sie. **Eine Gegenprobe, die die falsche Form
+  vorführt, ist schlimmer als keine — sie schreibt den Irrtum fest, den sie
+  aufdecken soll.** Neu dazu kommt eine dritte Probe, die den rollen-eigenen
+  Grant **selbst herstellt** und dann zeigt, dass `from public` ihn nicht
+  mitnimmt. Die misst auf **jeder** Instanz-Sorte etwas.
+- **Der Pin ist nicht bloß Hygiene — er ist der Biss.** Zwei der neuen Szenarien
+  können auf dem alten lokalen Stack gar nicht rot werden: dort halten
+  `authenticated` und `service_role` von sich aus nichts, und ein Vergleich
+  zweier Instanz-Sorten ist innerhalb einer Instanz ohnehin nicht führbar. Diese
+  Szenarien messen ausschließlich auf der gepinnten CI-Sorte etwas. Das Delta
+  sagt das aus, statt es implizit zu lassen — eine Zusage, die überall grün ist,
+  hat sonst niemand als solche erkannt.
 
 ## Impact
 

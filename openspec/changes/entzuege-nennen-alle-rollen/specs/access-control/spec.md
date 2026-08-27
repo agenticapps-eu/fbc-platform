@@ -72,10 +72,19 @@ nachweislich offen — `notify-contact-request` liest drei Tabellen als
 
 #### Scenario: Ein Entzug allein über `public` genügt nicht
 
-- **WHEN** eine Migration `execute` nur `from public` entzieht, während die
-  Default Privileges der Instanz `anon` dieses Recht erteilt haben
-- **THEN** hält `anon` das Recht weiterhin, und die Zusage über die abgeschlossene
-  Liste schlägt fehl
+- **WHEN** `anon` ein **rollen-eigenes** `execute` hält — hergestellt durch ein
+  ausdrückliches `grant`, nicht vorausgesetzt aus den Default Privileges — und
+  danach `execute` nur `from public` entzogen wird
+- **THEN** hält `anon` das Recht weiterhin
+- **AND** die Zusage misst dies auf **jeder** Instanz-Sorte, weil sie den
+  rollen-eigenen Grant selbst herstellt
+
+#### Scenario: Die Gegenprobe führt die richtige Entzugsform vor
+
+- **WHEN** die Gegenprobe zeigt, dass ein Entzug überhaupt messbar ist
+- **THEN** entzieht sie `from public, anon` und nicht nur `from public` — eine
+  Gegenprobe, die die unzureichende Form vorführt, schreibt den Irrtum fest,
+  den sie aufdecken soll
 
 #### Scenario: Ein Entzug, der `authenticated` nicht nennt, lässt es stehen
 

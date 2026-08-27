@@ -90,3 +90,18 @@ die zurückgerollt wurde:
       PROD-Katalog: `proacl` mit eigenem Grant für `anon`, `authenticated`
       **und** `service_role`. Der echte Beleg für diesen Change ist der grüne
       CI-Lauf auf der gepinnten, frischen Abbildung.
+
+## 10. Nachtrag — die Gegenprobe war selbst der Fehler
+
+Der erste CI-Lauf auf diesem Branch brachte die vier Fehler auf **einen**
+herunter. Uebrig blieb `grants_test.sql` Test 8, „Gegenprobe A".
+
+- [x] Ursache: die Gegenprobe entzog `from public` — und behauptete damit, genau
+      die Form wirke, die AGE-602 im Kopf seiner eigenen Migration als
+      unzureichend beschreibt. Lokal ging das durch, weil `anon` dort kein
+      eigenes Recht haelt.
+- [x] Repariert: `revoke ... from public, anon`.
+- [x] **Gegenprobe C** ergaenzt: stellt den rollen-eigenen Grant selbst her und
+      zeigt, dass `from public` ihn NICHT mitnimmt. Instanz-unabhaengig, faellt
+      also auch lokal, wenn jemand die Form wieder aufweicht. `plan(14)` -> `plan(15)`.
+- [x] Lokal gruen: `grants_test.sql` PASS mit 15 Zusagen.
