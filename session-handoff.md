@@ -1,150 +1,165 @@
-# Session Handoff — 2026-08-27 (zweiundvierzigste Sitzung, nachmittags)
+# Session Handoff — 2026-08-27 (dreiundvierzigste Sitzung, abends)
 
-**PROD ist migriert** (beide Migrationen aus der Vormittagssitzung), fünf
-Vorgänge sind gebaut, drei davon live. Der wichtigste offene Punkt steht unter
-„Next session".
+Zwei Vorgänge gebaut, **beide gemergt**. Ein dritter ist als Befund angelegt,
+aber nicht begonnen.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-631** Vorauswahl „letzte Woche" | ✅ gemergt (#250) |
-| **AGE-633** Preise nur für Nicht-`impact` | ✅ gemergt (#251) |
-| **AGE-632** Release-Note als Modal + Screenshots | ✅ gemergt (#252) |
-| **AGE-635** Event-Cover in der Aktivitätsliste | ✅ gemergt (#254) |
-| **AGE-634** Admin setzt die Stufe | 🔶 PR #253, rebast, CI läuft — **danach `migrate-prod`** |
+| **AGE-636** Archiv der Neuigkeiten-Fläche | ✅ #256 gemergt, `migrate-prod` grün auf `4a9c6b8` |
+| **AGE-638** Ausbuchtung statt zweier Schalter | ✅ #257 gemergt (18:55), CI war komplett grün |
+| **AGE-639** Angedockte Chatfenster unten | 📋 nur Issue, nichts gebaut |
+
+**Nicht geprüft: ob der Deploy von #257 wirklich ausgeliefert hat.** Er trägt
+keine Migration, das drift-gate sollte also nicht blocken — aber gemessen ist
+das nicht. Erster Handgriff der nächsten Sitzung, siehe unten.
 
 ## Accomplished
 
-### PROD-Migration (der Punkt 1 des Vormittags-Handoffs)
+### AGE-636 — Zugestelltes und „nicht relevant" wandern ins Archiv
 
-`migrate-prod` dispatcht, `plan` und `apply` grün, danach Drift-Gate **und**
-Objekt-Drift-Scan grün. Damit war der seit drei Läufen blockierte Frontend-Deploy
-wieder frei.
+Ein Eintrag steht jetzt in genau einem von zwei Zuständen. Archiviert wird er
+durch **Zustellung** (endgültig) oder durch ein zweites Kästchen je Zeile,
+**„nicht relevant"** (geteilt zwischen allen Admins, rücknehmbar). Das Archiv
+ist ein zugeklapptes `<details>` und nennt zu jedem Eintrag den Grund.
 
-**Nicht gemessen:** die Rückfüll-Kontrolle aus AGE-627 (Threads mit Nachricht und
-leerem `last_message_at`, erwartet null) — das FBC-Projekt hängt nicht an der
-Supabase-MCP-Verbindung (dort ist nur `cparx`), die PROD-DB-URL liegt hinter
-einem TTY. **Bleibt offen.**
+Neue Tabelle `release_entry_skips`: `slug` als Primärschlüssel, `skipped_by` mit
+`default auth.uid()` — und die Insert-Policy verlangt genau das. **DELETE ist
+hier erlaubt**, anders als bei `release_notes`: eine Markierung verschickt
+nichts. 16 pgTAP-Zusagen, Golden-Snapshot mitgepflegt.
 
-### AGE-631 — die letzte Woche ist vorangehakt
+### AGE-638 — beide Leisten klappen über dieselbe Ausbuchtung ein
 
-`ausLetzterWoche(eintraege, heute)` hakt die Einträge der letzten sieben Tage
-vor; die Liste bleibt vollständig, älteres steht ungehakt darin. Der Zustand ist
-**abgeleitet**: `gewaehlt === null` heisst „noch nicht angefasst", `[]` heisst
-„nichts gewählt" — ohne die Unterscheidung stünden nach dem Zustellen sofort
-wieder Häkchen da.
-
-### AGE-632 — Modal, Bilder, Deep-Link
-
-Portal an `document.body` (`.fbc-card:hover` und der `backdrop-filter` des Kopfes
-fangen `fixed` sonst ein), `useOverlay` aus AGE-529, Offen-Zustand als
-`?note=<id>`. Drei Screenshots unter `public/release/`, gegen den lokalen Stack
-mit erfundenen Konten.
-
-### AGE-634 — `admin_set_tier`
-
-Setzt in **beide** Richtungen (das kann `apply_upgrade` nicht), mit
-Pflichtbegründung und einer `admin_audit`-Zeile, die alte **und** neue Stufe
-trägt. 12 pgTAP-Zusagen in `ci.yml`; `code_as()` gibt den SQLSTATE zurück, weil
-`try_as()` jeden Fehler als `DENIED:` meldet.
+`LeistenPill`, zweimal montiert und gespiegelt, oben am inneren Rand. Die untere
+Einklapp-Zeile links **und** der Knopf im Kopf der rechten Leiste entfallen; die
+Sprechblase im eingeklappten rechten Rail wird zur **Anzeige**.
 
 ## Decisions
 
-- **Kein YouTube-Standbild in der Aktivitätsliste (AGE-635).** Es käme von
-  `img.youtube.com` — derselbe Aufruf an den Anbieter samt IP, den das
-  Einwilligungstor aus AGE-611/621 verhindert; `VideoEmbed.tsx:34` sagt das
-  ausdrücklich, ein Test hält es fest. Ausgeliefert wurde nur das **Event-Cover**
-  (eigener Bucket). Der saubere Weg für Videos wäre ein Standbild erst nach
-  erteilter Freigabe (`useFreigabe`) — **Donalds Entscheidung, noch offen.**
-- **Bilder hängen am Change, nicht an der Note.** Verworfen: eine Spalte auf
-  `release_notes` mit Upload — sie kostete Migration, Bucket und Policies und
-  bräche die Konstruktion „was im Bündel steht, ist ausgeliefert".
-- **`tier` bleibt draussen aus `admin_update_profile`.** Eine Stufe zu setzen ist
-  kein Pflegen von Stammdaten; eigene RPC, eigene Spur, eigene Begründung.
-- **„Alles Admin-mässige raus" betrifft nur den TEXT der Release-Note**, nicht die
-  Auswahl und nicht die App (Donald, ausdrücklich). Die technischen Changes
-  bleiben angehakt, damit sie als angekündigt verbucht sind.
+- **Die Seitengrenze von 20 fiel in AGE-636 mit.** Sie war als Folgevorgang
+  weggeschoben; beide Plan-Reviewer sagten HIGH. Zu Recht: das Archiv sagt
+  Vollständigkeit zu, ab Note 21 wären zugestellte Einträge wieder offen und
+  würden ein **zweites Mal** angekündigt. Neue, ungeseitete `fetchAngekuendigt()`
+  ohne `body` — **mit eigenem Query-Key**, weil `/neues` unter dem alten
+  Schlüssel `n.body` rendert.
+- **„Zugestellt schlägt nicht relevant"**, und deshalb prüft
+  `send_release_note` die Markierungen NICHT. Ein Riegel dort machte aus einer
+  redaktionellen Vormerkung ein Veto. (codex forderte ihn, abgelehnt.)
+- **`skipped_by` bleibt**, gegen einen Reviewer: `release_notes.created_by` setzt
+  im selben Modul den Präzedenzfall, und bei einer **geteilten** Markierung ist
+  „wer hat das entschieden?" genau die Frage, die zwischen zwei Admins aufkommt.
+- **Der Pill ist eine Ausbuchtung, kein Knopf darauf** (Donald am Bildschirm).
+  Das kehrt einen Reviewer-Befund um, der eigene Farben verlangte — gebaut war
+  das schon, mit gemessenen 5,0:1. Der Reviewer hatte technisch recht und
+  gestalterisch unrecht: „an beiden gleich aussehen" war nie das Ziel, sondern
+  „an beiden dieselbe **Geste**". Abgehoben wird über den **Schatten**; ohne ihn
+  wäre die Wölbung im hellen Theme unsichtbar (Leiste und Kopf sind beide weiss,
+  gemessen).
+- **Kein `role="status"` für den Ungelesen-Zähler.** Ich hatte es eingebaut und
+  mir damit selbst widerlegt: es machte `getByRole("status")` in der ganzen
+  Hülle mehrdeutig und brach zwei bestehende Tests. Die Zahl steht ohnehin schon
+  im Namen des Topbar-Links (`AppShell.tsx:126`).
 
 ## Files modified
 
-- **AGE-631** `src/lib/release-notes.ts` (+`ausLetzterWoche`), `AdminNeuigkeitenPage.tsx`
-- **AGE-633** `MitgliedschaftPage.tsx`, `AppShell.tsx` (Profilmenü)
-- **AGE-632** `src/components/release/ReleaseNoteModal.tsx` (neu),
-  `NeuesPage.tsx`, `HinweisGlocke.tsx`, `src/content/release-bilder.ts` (neu),
-  `src/types/release.ts`, `public/release/*.png` (3 Screenshots)
-- **AGE-635** `src/components/home/MemberDashboard.tsx`
-- **AGE-634** `supabase/migrations/20260827160000_admin_set_tier.sql` (neu),
-  `supabase/tests/admin_set_tier_test.sql` (neu), `ci.yml`, `admin-members.ts`,
-  `admin-profile.ts`, `database.types.ts`, `AdminMitgliedPage.tsx`
-- Changes: `openspec/changes/release-notes-modal/`, `openspec/changes/admin-setzt-stufe/`
+**AGE-636** (auf `main`)
+- `supabase/migrations/20260827180000_release_entry_skips.sql` (neu)
+- `supabase/tests/release_entry_skips_test.sql` (neu), `grants_test.sql`, `ci.yml`
+- `src/lib/release-notes.ts` — `teileAuf()` ersetzt `nochNichtAngekuendigt()`,
+  dazu `fetchAngekuendigt`, `fetchUebersprungene`, `markiereUebersprungen`,
+  `holeZurueck`
+- `src/pages/AdminNeuigkeitenPage.tsx`, beide Testdateien, `database.types.ts`
+- `openspec/changes/neuigkeiten-archiv/`
+
+**AGE-638** (Branch `donald/age-638-sidebar-pill`)
+- `src/components/LeistenPill.tsx` (neu)
+- `src/components/AppShell.tsx`, `AppShell.chatleiste.test.tsx`
+- `openspec/changes/sidebar-pill/`
 
 ## Next session: start here
 
-**1. AGE-634 (#253) landen — und danach `migrate-prod` dispatchen.** Der PR trägt
-`20260827160000_admin_set_tier.sql`; ohne die Migration auf PROD blockt das
-drift-gate den nächsten Frontend-Deploy **still**. Nach dem Merge läuft
-deploy.yml auf main automatisch; er wird ohne die Migration nichts ausliefern.
+**Zuerst nachsehen, ob der Deploy von #257 durchgelaufen ist.** Beide PRs sind
+gemergt; geprüft habe ich nur den Merge, nicht die Auslieferung.
 
-**2. Die erste Release-Note zustellen.** Der Textentwurf steht im Verlauf dieser
-Sitzung; er ist admin- und technikfrei. Zustellen geht **genau einmal** und an
-alle aktivierten Mitglieder — das ist Donalds/Detlevs Handlung, nicht die des
-Agenten.
+```
+gh run list --branch main --limit 5
+```
 
-## Was in dieser Sitzung schiefging (und wie man es merkt)
+Der `deploy`-Job muss auf der **HEAD-SHA von main** grün sein — ein grüner Lauf
+auf einer älteren SHA sagt nichts. Bleibt er auf `skipping`, ist es das
+drift-gate, und dann fehlt PROD eine Migration (bei #257 unwahrscheinlich, sie
+trägt keine).
 
-Ein Re-Run des alten Laufs **33077648634** (Commit `45bbb40`) hat das frische
-Deployment von `3524c2a` **überschrieben** — der `functions`-Job meldete das
-korrekt als „RUECKFALL auf HEAD^ … ist kein Vorfahr von HEAD", aber `deploy` war
-da schon durch. Live stand danach der Stand VOR drei Merges.
-
-**Der erste Beleg dafür, dass alles live sei, war wertlos:** geprüft wurde
-`Aus … Änderungen einen Entwurf machen` — eine Zeichenkette, die es **vor** dem
-Diff schon gab (nur die Variable dahinter wurde umbenannt). Sie kann die
-Versionen nicht unterscheiden.
-
-Brauchbar sind zwei Proben:
-
-* eine Zeichenkette, die **nur** der neue Stand trägt (hier `release-note-titel`),
-* und für eine Datei der **`content-type`**: der SPA-Fallback antwortet auf JEDEN
-  unbekannten Pfad mit `200`, `text/html` und 3487 Bytes. `/release/xyz.png`
-  „existiert" damit immer. Erst `content-type: image/png` plus die echte
-  Dateigrösse belegt etwas.
-
-Eingefangen wurde es durch den Merge von #254, der einen sauberen Deploy auf dem
-aktuellen main auslöste. Danach gemessen: Bundle `index-CodyLEBR.js`,
-`release-note-titel` vorhanden, `nachrichtenleiste.png` mit `image/png` und
-295 523 Bytes.
+**Danach: die drei Changes archivieren.** `neuigkeiten-archiv`,
+`admin-setzt-stufe` und `release-notes-modal` liegen unarchiviert. Bis dahin
+steht ihre Wahrheit nicht in `openspec/specs/` — und sie fehlen in der
+Neuigkeiten-Liste, weil die aus `openspec/changes/archive/` erzeugt wird. Beim
+Archivieren gilt: Szenario-Titel sind der Schlüssel, und `validate` ist grün,
+auch wenn ein umgetauftes Szenario das alte löscht.
 
 ## Open questions
 
-- **Video-Standbilder nach Freigabe?** Siehe Decisions — eigener Vorgang.
-- **Rückfüll-Kontrolle aus AGE-627** ist weiterhin ungemessen (kein PROD-Zugang
-  ohne TTY).
-- **Plan-Reviews fehlen** für `release-notes-modal` und `admin-setzt-stufe` —
-  die drei Fremd-Reviewer waren am 27.08. alle kaputt.
-- **CI-Flake:** der `migrations`-Job scheiterte einmal an `address already in use`
-  (Port 54324, inbucket) — nicht am Code. Neustart geht hier nur per
-  Close/Reopen des PRs; danach stehen **alte und neue Check-Runs auf derselben
-  SHA**, und eine Abfrage ohne `group_by(.name) | max_by(.started_at)` liest die
-  Karteileiche als Fehlschlag.
-- **`gh pr merge` schlägt still fehl**, wenn der Branch hinter `main` liegt
-  („not up to date"): der Befehl gibt nichts aus, der PR bleibt offen. Immer
-  `gh pr view --json state` nachschieben — hier einmal passiert.
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation des
-  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **Die erste Release-Note ist weiterhin nicht zugestellt.** Das bleibt Donalds
+  bzw. Detlevs Handlung; sie geht genau einmal und an alle aktivierten
+  Mitglieder. Mit AGE-636 lässt sich die Liste vorher aufräumen — 22 Einträge
+  liegen ausserhalb des Vorauswahl-Fensters.
+- **AGE-639 braucht eine Design-Runde vor dem Proposal.** Zwei bestehende
+  Zusagen stehen dagegen: „eine Adresse = ein Gespräch"
+  (`messaging/spec.md:268`) und „never rounded or floating"
+  (`design-system/spec.md:262`). Beide sind zu ändern oder ausdrücklich
+  abzugrenzen.
+- **Unbelegt in AGE-638:** das Auslösen des Pills per Enter/Leertaste (belegt
+  ist nur, dass es ein echtes `<button>` mit Fokus ist) und ein **zweistelliger**
+  Ungelesen-Zähler im Browser. Steht als offener Haken in `tasks.md`.
+- **Unbelegt in AGE-636:** der Query-Key-Konflikt ist auf die Begründung der
+  Reviewer hin behoben, **nicht reproduziert**. Der Browserversuch benutzte ein
+  `<a>`, das einen echten Seitenwechsel auslöst — also einen frischen Cache und
+  damit nicht die Bedingung, die der Befund braucht. Was ihn festnageln würde:
+  ein Test, der beide Seiten unter **einem** `QueryClient` montiert.
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
+  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
-## Lokaler Stack
+## Umgebung — zwei Stolpersteine für die nächste Sitzung
 
-Wurde für die Migration **zurückgesetzt**; die Konten der Vormittagssitzung sind
-weg. Neu angelegt: `st-admin@test.local` (Admin) und `st-ziel@test.local`,
-Passwort `Probe-2026-lokal`, beide `impact` und aktiviert. `st-ziel` steht nach
-der Sichtprobe auf `connect`.
+**Dieser Worktree heisst `.neuigkeiten-archiv`, trägt aber den Branch
+`donald/age-638-sidebar-pill`.** Kein Fehler, sondern eine Umgehung: die Sitzung
+ist an ihren Worktree gepinnt, `EnterWorktree` nimmt nur Pfade unter
+`.claude/worktrees/`, und ein `cd` in einen `wt`-Worktree wird zurückgesetzt.
+Der frisch angelegte wurde deshalb mit `wt remove --no-delete-branch` wieder
+entfernt und der Branch hier ausgecheckt. Wer den Namen geradeziehen will,
+macht das ausserhalb der Sitzung.
 
-Vite läuft auf **5203** (5201/5202 belegen noch die Server der beiden gemergten
-Worktrees vom Vormittag):
+**Lokaler Stack:** zurückgesetzt (`supabase db reset`). Ein Konto steht:
+`archiv-admin@test.local` / `Probe-2026-lokal`, `impact`, aktiviert, Adminrolle.
+`release_entry_skips` und `release_notes` sind leer geräumt.
+
+Vite lief zuletzt auf **5205**; 5203 und 5204 belegen ältere Server.
 
 ```
 VITE_SUPABASE_URL=http://127.0.0.1:54321 \
 VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
 VITE_ENVIRONMENT=local \
-npx vite --port 5203 --strictPort
+npx vite --port 5205 --strictPort
 ```
+
+## Was in dieser Sitzung schiefging (und wie man es merkt)
+
+**Fünf von sechs neuen Tests waren gegen den ALTEN Code grün.** Sie prüften
+zugängliche Namen — und die gab es schon, weil die alten Schalter genauso
+hiessen. Ein Test, der einen Umbau treiben soll, muss auf das zielen, was sich
+**ändert**: das Verschwinden des Wortes „Einklappen", die Zahl der Treffer eines
+Namens, ein Markierungsattribut. Erst danach fielen fünf.
+
+**Zwei Reviewer-Befunde standen auf einem „falls" und waren falsch.** „Der Pill
+verschwindet unter dem Kopf, **falls** der z-50 ist" — er ist z-30, die Leisten
+sind z-40. „`ChevronLeftIcon` ist tot, **wie der Diff stark nahelegt**" — es hat
+zwei verbliebene Verwender. Ein Diff zeigt, was sich ändert, nicht was bleibt;
+beide Male half ein `grep` in zehn Sekunden.
+
+**codex gibt ohne die Auflage „lies keine Dateien" kein Urteil ab.** Der erste
+Lauf durchsuchte 8027 Zeilen lang das Repository und endete damit, `REVIEWS.md`
+auszugeben. Mit dem Zusatz kam beim zweiten Versuch sofort eine Antwort.
+
+**Ein erster Kontrast-Fix wirkte nicht, und nur die Messung zeigte es.**
+`bg-soft` statt `bg-canvas` kam auf **1,05:1**. Im hellen Theme gibt es kein
+neutrales Flächen-Token, das trägt — `canvas` und `chrome` sind dort selbst
+weiss. (Am Ende ist es ohnehin der Schatten geworden, auf Donalds Ansage.)
