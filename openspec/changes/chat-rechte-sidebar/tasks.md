@@ -51,22 +51,34 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
 
 ## 2. `fetchThreads` liest die neue Form
 
-- [ ] **RED**: Vertragstest — die Abfrage geht gegen `message_threads`, trägt
+- [x] **RED**: Vertragstest — die Abfrage geht gegen `message_threads`, trägt
       `order(last_message_at desc)` und ein `range`, und liest **`messages`
       gar nicht mehr**. An den Argumenten der Attrappe messen, nicht am
-      Ergebnis.
-- [ ] `fetchThreads(uid, { limit, offset })`; `threadsQueryKey` bekommt die
-      Seitenparameter.
-- [ ] **`nullsFirst: false` beim `order`.** `desc` ist in Postgres
+      Ergebnis. → `src/lib/chat.threads-seite.test.ts`, 10/10 rot vorher.
+- [x] `fetchThreads(uid, { limit, offset })` gibt `{ threads, nextOffset }`.
+- [x] **`nullsFirst: false` beim `order`.** `desc` ist in Postgres
       `nulls first` — ein Thread ohne einzige Nachricht stünde sonst GANZ OBEN,
       und der Index (`… desc nulls last`) käme nicht zum Zug.
-- [ ] Alle Invalidierungen nachziehen — `ChatPage.tsx:88,123` invalidiert heute
-      unter dem alten Schlüssel.
+- [x] **Abweichung vom Plan: `useInfiniteQuery` unter EINEM Schlüssel, statt
+      Seitenparameter im Schlüssel.** Der Plan wollte die Parameter in den
+      Schlüssel legen, damit Seite und Leiste sich nicht denselben
+      Cache-Eintrag mit unterschiedlich vollständigen Ergebnissen
+      überschreiben. `useInfiniteQuery` löst genau das an der Wurzel: beide
+      Flächen teilen sich ausdrücklich `{pages, pageParams}`. „Eine
+      Datenquelle, ein Umfang" wird damit eine Eigenschaft des Caches statt
+      einer Verabredung zwischen zwei Flächen — und es ist das Muster, das
+      `CommunityFeed` und `AcademyPage` in diesem Repo schon tragen.
+- [x] Alle Invalidierungen nachziehen — **entfällt durch die Abweichung**:
+      `ChatPage.tsx:88,123` invalidieren weiterhin unter `threadsQueryKey(uid)`,
+      und das ist jetzt der Schlüssel der Infinite-Query. Geprüft, nicht
+      angenommen.
 - [ ] `ChatPage` lädt dieselbe Seite wie das Panel. Eine Datenquelle, ein
-      Umfang.
-- [ ] **Nachladen sichtbar machen:** „Mehr laden" auf beiden Flächen. Ohne das
-      ist der Rest jenseits der ersten Seite dauerhaft unerreichbar — und ein
-      Szenario der eigenen Spec unerfüllt.
+      Umfang. → Der Mechanismus steht (ein Schlüssel); **belegen lässt es sich
+      erst mit dem Panel** — Band 6.
+- [x] **Nachladen sichtbar machen** auf `/chat`: „Weitere Gespräche", nur wenn
+      ein Versatz folgt. Gegenprobe: Bedingung durch `true` ersetzt → genau der
+      Test „bietet sie NICHT an" fällt. → `src/pages/ChatPage.seite.test.tsx`.
+- [ ] Dasselbe auf der Leiste — Band 6.
 
 ## 3. Realtime — ein Abo bleibt ein Abo
 
