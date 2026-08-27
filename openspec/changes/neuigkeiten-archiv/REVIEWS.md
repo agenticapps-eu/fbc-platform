@@ -103,8 +103,118 @@ VERDICT: REQUEST-CHANGES
   zwei Admins aufkommt. Nachträglich kostete die Spalte eine Migration; jetzt
   kostet sie eine Zeile. Sie wird bewusst nicht angezeigt — Anzeige verlangte
   einen Join auf `profiles` für eine Frage, die selten gestellt wird.
-- **Annahme „Slugs sind unveränderlich" (gemini).** Zutreffend und beabsichtigt:
+- **Annahme „Slugs sind unveränderlich" (gemini, und codex auf dem Diff erneut).**
+  Zutreffend und beabsichtigt:
   der Verzeichnisname im Archiv ist laut AGE-631 der einzige verlässliche
   Schlüssel. Wird ein archiviertes Verzeichnis je umbenannt, verliert die
   Markierung ihren Bezug — genau wie `release_notes.entry_slugs` es heute schon
   täte. Kein neuer Bruch, keine Gegenmassnahme in diesem Change.
+
+---
+
+# Code-Review auf dem DIFF (Schritt 4)
+
+Andere Runde, anderer Gegenstand: hier lasen die Reviewer den fertigen Diff
+(`git diff --cached`, 1311 Zeilen), nicht den Plan. Beide Urteile:
+**REQUEST-CHANGES**, und diese Runde hat mehr gefunden als die erste.
+
+## Reviewer: gemini
+
+VERDICT: REQUEST-CHANGES
+
+- **[MEDIUM]** `AdminNeuigkeitenPage.tsx` — `markieren.onSuccess` liest `auswahl`
+  aus einem veralteten Abschluss. Zwei schnelle Klicks: der zweite setzt den
+  Stand von vor beiden, der erste Eintrag ist wieder ausgewählt.
+
+## Reviewer: opencode (`hf:moonshotai/Kimi-K3`)
+
+VERDICT: REQUEST-CHANGES
+
+- **[HIGH]** derselbe veraltete Abschluss, mit einem zweiten Weg dorthin: ein
+  Häkchen, das während der laufenden Mutation entfernt wird, kommt zurück.
+- **[MEDIUM]** Die Archiv-Karte umgeht das Fail-closed-Tor. „Archiv (1)" oder
+  „Noch nichts archiviert." stünde als Tatsachenbehauptung da, während die
+  Grundlage fehlt — dieselbe Lüge wie in der Liste, nur eine Karte tiefer.
+- **[MEDIUM]** `fetchAngekuendigt` schreibt eine Zeile **ohne `body`** unter den
+  Schlüssel `["release-notes","sent"]` — denselben, den `/neues` liest und aus
+  dem es `n.body` rendert.
+- **[MEDIUM]** „Entwurf machen → markieren → erneut speichern → zustellen":
+  `unveraendert` bewacht die Slug-Liste, nicht den Fliesstext. Der Text nennt
+  die aussortierte Änderung weiter.
+- **[LOW]** doppeltes Leerzeichen, wenn `sent_at` null ist.
+- **[LOW]** `frueher(null, null)` lässt die Eingabereihenfolge entscheiden.
+- **[LOW]** kein Format-CHECK auf `slug`.
+- **Was die Tests nicht fangen:** ob PostgREST für
+  `resolution=ignore-duplicates` ein UPDATE-Recht verlangt, das diese Tabelle
+  bewusst nicht hat.
+
+## Reviewer: codex (gpt-5.6-sol) — zweiter Anlauf
+
+Der erste Anlauf lieferte **kein Urteil**: der Arm durchsuchte stattdessen das
+Repository und gab am Ende `REVIEWS.md` aus. Erst ein Prompt mit „lies keine
+Dateien, urteile nur über den Diff" brachte eine Antwort.
+
+VERDICT: REQUEST-CHANGES
+
+- **[HIGH]** derselbe Schlüsselkonflikt wie bei opencode, unabhängig gefunden.
+- **[HIGH]** `speichern.onSuccess` merkt sich den Bildschirm zum
+  ANTWORTZEITPUNKT, nicht den abgeschickten Stand. Wer während des Speicherns
+  weitertippt, bekommt seinen neuen Stand als „gespeichert" quittiert.
+- **[HIGH]** `send_release_note` prüft `entry_slugs` nicht gegen die
+  Markierungen.
+- **[MEDIUM]** `auswahl` nicht mit `offen` geschnitten (derselbe Wettlauf).
+
+## Resolution
+
+Der Wettlauf (gemini HIGH/MEDIUM, opencode HIGH, codex MEDIUM) **war beim
+Eintreffen der Reviews bereits behoben** — gefunden im eigenen Durchgang, und
+zwar nicht mit einem funktionalen `setState`, wie alle drei vorschlugen, sondern
+durch Wegfall des Mechanismus: `auswahl` ist auf `offen` geschnitten, und
+`markieren.onSuccess` räumt gar nichts mehr auf. Gemessen im Browser: zwei
+Klicks unmittelbar hintereinander, 30 → 28 offene, Archiv 1 → 3.
+
+| Befund | Was sich geändert hat |
+| --- | --- |
+| Schlüsselkonflikt (opencode + codex, HIGH) | Eigener Schlüssel `alle-zugestellten`; `sent` bleibt `/neues`. Beide werden nach dem Zustellen einzeln entwertet. Der Grund steht bei `releaseNotesQueryKey`. |
+| Speichern-Schnappschuss (codex, HIGH) | Der Stand geht als **Variable der Mutation** hinein und kommt in `onSuccess` von dort zurück. Test mit aufgehaltener Zusage. |
+| Archiv umgeht das Tor (opencode, MEDIUM) | `unvollstaendig` an EINER Stelle gerechnet, von beiden Karten gelesen; ohne Grundlage nennt das Archiv keine Zahl. Eigener Test. |
+| Veralteter Entwurfstext (opencode, MEDIUM) | `textVeraltet` sperrt das Zustellen und benennt den Grund. **Kein** automatisches Neuerzeugen — das überschriebe die Redaktion, und die ist der Kern von AGE-631. Eigener Test. |
+| Doppeltes Leerzeichen (opencode, LOW) | Datum nur noch, wenn vorhanden. |
+
+**Gemessen statt behauptet:** der Konflikt-Pfad des `upsert` durch PostgREST,
+mit echtem Admin-JWT gegen den lokalen Stack — dreimal derselbe Slug, dreimal
+`201`, danach **genau eine** Zeile. `resolution=ignore-duplicates` verlangt auf
+dieser Tabelle **kein** UPDATE-Recht. Die Sorge ist damit ausgeräumt, und zwar
+an der Stelle, an der weder vitest noch pgTAP hinsehen.
+
+**Nicht übernommen, mit Grund:**
+
+- **`send_release_note` soll Entwürfe mit markierten Slugs abweisen (codex,
+  HIGH).** Abgelehnt. Die Spec sagt ausdrücklich „zugestellt schlägt nicht
+  relevant" — eine Zustellung ist die stärkere Handlung, und ein Admin, der
+  bewusst zustellt, überstimmt eine Notiz eines anderen. Ein harter Riegel in
+  der Zustellfunktion machte aus einer redaktionellen Vormerkung ein
+  Veto, das niemand aufheben kann, ohne die Markierung zu suchen. Der Diff
+  gehört ausserdem in genau den Pfad, dessen bedingter Zustandswechsel der
+  Riegel gegen die Doppelzustellung ist.
+- **Format-CHECK auf `slug` (opencode, LOW).** Abgelehnt. Ein Junk-Slug ist
+  inert: er trifft keinen Eintrag und ist unsichtbar. Ein Regex koppelte das
+  Schema an die heutige Namenskonvention von
+  `scripts/generate-release-entries.ts` und bräche an dem Tag, an dem sie sich
+  ändert.
+- **`frueher(null, null)` (opencode, LOW).** Abgelehnt. Eine Note mit
+  `status='sent'` und leerem `sent_at` kann nicht entstehen —
+  `send_release_note` setzt beides im selben `update`. Der Null-Zweig steht
+  nur da, damit die Ordnung nicht davon abhängt, dass das so bleibt; zwischen
+  zwei unmöglichen Zeilen ist Reihenfolge-Abhängigkeit kein Mangel, der eine
+  zusätzliche Vergleichsspalte rechtfertigt.
+
+## Was NICHT belegt ist
+
+Der Schlüsselkonflikt ist **auf die Begründung der beiden Reviewer hin behoben,
+nicht reproduziert.** Der Versuch, ihn im Browser zu stellen, hat nichts
+gezeigt — und der Grund ist der Versuchsaufbau: der eingefügte `<a href="/neues">`
+löst einen echten Seitenwechsel aus und damit einen frischen Cache, also genau
+nicht die Bedingung, die der Befund braucht. Was ihn festnageln würde, ist ein
+Test, der BEIDE Seiten unter EINEM `QueryClient` montiert. Den gibt es nicht;
+er ist der Folgevorgang.

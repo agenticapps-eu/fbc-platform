@@ -1441,6 +1441,34 @@ export type Database = {
           },
         ];
       };
+      release_entry_skips: {
+        // `skipped_by` und `skipped_at` stehen NUR in Row: beide füllt die
+        // Datenbank (`default auth.uid()` bzw. `default now()`), und die
+        // Insert-Policy verlangt `skipped_by = auth.uid()`. Ein Client, der sie
+        // mitschickt, wird abgewiesen — der Typ sagt es ihm vorher.
+        //
+        // Kein `Update`: die Tabelle trägt kein UPDATE-Recht. Zurückgenommen
+        // wird per DELETE, und das ist dieselbe Zeile, weil `slug` der
+        // Primärschlüssel ist.
+        Row: {
+          skipped_at: string;
+          skipped_by: string | null;
+          slug: string;
+        };
+        Insert: {
+          slug: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [
+          {
+            foreignKeyName: "release_entry_skips_skipped_by_fkey";
+            columns: ["skipped_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       release_notes: {
         // `status` steht bewusst in Insert UND Update — der Client DARF ihn
         // schreiben, aber nur als 'draft'; das hält die Policy
