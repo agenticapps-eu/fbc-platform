@@ -11,6 +11,8 @@ import {
 } from "../lib/contact-requests";
 import { useAuth } from "../providers/auth-context";
 import { useUngelesen, useUngelesenLive } from "./chat/use-ungelesen";
+import { HinweisGlocke } from "./hinweise/HinweisGlocke";
+import { useHinweise, useHinweiseLive, useHinweisMarkieren } from "./hinweise/use-hinweise";
 import { Avatar } from "./ui/Avatar";
 import { Button } from "./ui/Button";
 import { FeedbackButton } from "./feedback/FeedbackButton";
@@ -60,10 +62,6 @@ function ChevronLeftIcon({ flipped }: { flipped: boolean }) {
       className={cn("h-4 w-4 transition-transform", flipped && "rotate-180")}
     />
   );
-}
-
-function BellIcon() {
-  return <Icon name="bell" className="h-5 w-5" />;
 }
 
 /**
@@ -302,16 +300,16 @@ function SidebarContent({
   // Fehlschlag ein `?.` verschluckt. Seit AGE-293 die Titel anfasst, wäre der
   // Eintrag „Meine Anfragen" bei der nächsten Umbenennung lautlos verschwunden,
   // ohne dass eine Zusage darauf zeigte.
-  const abschnitte = SIDEBAR_SECTIONS.filter(
-    ({ section }) => user || section === "entdecken",
-  ).map(({ section, title, klappbar }) => ({
-    section,
-    title,
-    klappbar,
-    items: navItems
-      .filter((i) => i.section === section)
-      .map((i) => ({ path: i.path, label: i.label })),
-  }));
+  const abschnitte = SIDEBAR_SECTIONS.filter(({ section }) => user || section === "entdecken").map(
+    ({ section, title, klappbar }) => ({
+      section,
+      title,
+      klappbar,
+      items: navItems
+        .filter((i) => i.section === section)
+        .map((i) => ({ path: i.path, label: i.label })),
+    }),
+  );
   const sections: SidebarNavSection[] = abschnitte;
   // AGE-592: Der Weg zu einer offenen eingehenden Anfrage. Er hängt an einem
   // VORGANG, nicht an einem Ort — deshalb steht er nicht in `navItems`, sondern
@@ -386,6 +384,12 @@ export default function AppShell() {
   // würde einen zweiten Kanal öffnen.
   const { stand: ungelesen, isError: ungelesenFehlt } = useUngelesen(user?.id ?? null);
   useUngelesenLive(user?.id ?? null, pathname);
+
+  // Die Glocke (AGE-620). Sie war seit Juni ein toter Knopf, waehrend drei
+  // Typen laengst in `notifications` schrieben.
+  const { hinweise, isError: hinweiseFehlen } = useHinweise(user?.id ?? null);
+  const { markiere, markiereAlle } = useHinweisMarkieren(user?.id ?? null);
+  useHinweiseLive(user?.id ?? null);
   // Exakter Pfad-Vergleich: /profil (Bento) nutzt die Breite, /profil/bearbeiten
   // (Editor) bleibt eine Lesespalte.
   const isNarrow = NARROW_ROUTES.includes(pathname);
@@ -563,13 +567,12 @@ export default function AppShell() {
             {user ? (
               <>
                 <NachrichtenEinstieg anzahl={ungelesen.gesamt} unbekannt={ungelesenFehlt} />
-                <button
-                  type="button"
-                  aria-label="Benachrichtigungen"
-                  className="rounded-full p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  <BellIcon />
-                </button>
+                <HinweisGlocke
+                  hinweise={hinweise}
+                  unbekannt={hinweiseFehlen}
+                  onMarkiere={markiere}
+                  onAlle={markiereAlle}
+                />
                 <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
               </>
             ) : (

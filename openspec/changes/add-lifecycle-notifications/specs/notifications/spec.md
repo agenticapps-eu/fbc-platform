@@ -1,35 +1,5 @@
 ## ADDED Requirements
 
-### Requirement: In-app bell reflects and clears unread notifications
-
-The system SHALL wire the notification bell to the member's own `notifications`
-rows, surfacing a live unread count and letting the member mark notifications read.
-Marking read SHALL set only `read_at` (server timestamp) through the existing
-owner-only `notifications_own` policy; no other column is mutable from the bell, and
-the bell shows and mutates only the member's own rows. The unread count SHALL stay
-current for the open session (realtime subscription or poll).
-
-#### Scenario: Bell shows the member's unread count
-
-- **WHEN** a member with unread `notifications` rows opens the app
-- **THEN** the bell surfaces the count of their own rows where `read_at` is null
-
-#### Scenario: Marking a notification read sets only read_at
-
-- **WHEN** the member marks a notification read from the bell
-- **THEN** only its `read_at` is set to the server time via the owner-only policy
-  and the unread count decreases
-
-#### Scenario: Empty state
-
-- **WHEN** a member has no notifications
-- **THEN** the bell shows a zero/empty state and offers no mark-read action
-
-#### Scenario: A member cannot mark another member's notification read
-
-- **WHEN** a mark-read is attempted against a row the member does not own
-- **THEN** the owner-only policy denies it and no row changes
-
 ### Requirement: Scheduled lifecycle mails are sent idempotently via Resend
 
 The system SHALL provide a scheduled lifecycle-mail sender that delivers lifecycle

@@ -1,4 +1,4 @@
-# Glocke verdrahten und fünf In-App-Hinweistypen
+# Glocke verdrahten und vier Hinweistypen
 
 Linear: **AGE-620**
 
@@ -6,108 +6,152 @@ Linear: **AGE-620**
 
 Die Glocke in der Kopfzeile ist ein toter Knopf. Gemessen in `AppShell.tsx:566`:
 ein `<button>` mit `aria-label="Benachrichtigungen"`, ohne `onClick`, ohne
-Zähler. Und im ganzen Frontend gibt es **null** Lesezugriffe auf
-`notifications` — die einzigen Treffer stehen in einem Kommentar und in den
-generierten Typen.
+Zähler. Und im Frontend gibt es **null** Lesezugriffe auf `notifications`.
 
-Gleichzeitig schreiben schon **drei** Typen in die Tabelle
-(`contact_request`, `contact_request_accepted`, `contact_request_declined`),
-jeweils aus `SECURITY DEFINER`-Funktionen. Diese Hinweise entstehen seit Juni
-und hat noch nie jemand gesehen.
-
-Fünf weitere Anlässe fehlen ganz: neues Mitglied, neuer Beitrag, neues Event,
-Kommentar auf meinen Beitrag, Like auf meinen Beitrag.
+Gleichzeitig schreiben schon **drei** Typen in die Tabelle (`contact_request`,
+`contact_request_accepted`, `contact_request_declined`), aus
+`SECURITY DEFINER`-Funktionen. Diese Hinweise entstehen seit Juni und hat noch
+nie jemand gesehen.
 
 ## What Changes
 
 - Die Glocke liest die eigenen `notifications`, zeigt die Ungelesen-Zahl und
-  markiert gelesen. Die Anforderung dafür wird aus
-  `add-lifecycle-notifications` (AGE-299) **herausgelöst**; dieser Change
-  behält den Mail-Teil und bleibt im Nach-Go-Live-Backlog.
-- Fünf neue Typen, geschrieben von Triggern auf `profiles`, `posts`, `events`,
+  markiert gelesen — einzeln und alle. Bei null zeigt sie **keine** Zahl.
+- **Vier** neue Typen, geschrieben von Triggern auf `posts`, `events`,
   `comments` und `post_likes`.
 - **Opt-out je Mitglied und je Typ** in den Einstellungen, per Default AN.
-- Kein Mailversand. Keine Änderung an den drei bestehenden Typen.
+- Die Anforderung für die Glocke wird aus `add-lifecycle-notifications`
+  (AGE-299) **herausgelöst**; jener Change behält den Mail-Teil.
 
-## Der Befund, der den Entwurf dreht
+## Zwei Korrekturen aus der Plan-Review, beide nachgemessen
 
-Der Vorgang sagt „Fan-out je aktiviertem Mitglied". So gebaut wäre er ein Leck.
+Der erste Entwurf hatte einen **falschen Kernbefund** und einen Typ zu viel.
 
-Jeder der drei Fan-out-Gegenstände hat eine **eigene** Sichtbarkeitsgrenze in
-der RLS. Gemessen in `20260806080100_activation_gate.sql`, Ränge aus
-`20260715150000_six_level_model.sql` (`basic=1 connect=2 discover=3 exchange=4
-focus=5 impact=6`):
+### 1. Die Stufenschwelle für Beiträge gibt es nicht mehr
 
-| Gegenstand | Policy | Wer darf ihn sehen |
-| --- | --- | --- |
-| Profil | `profiles_select_self_or_discover` | `has_level(3)` — **discover+** |
-| Beitrag | `posts_select_by_visibility` | `public` → alle · **`members` → `has_level(4)`, exchange+** · `prime`/`legacy` → nur der Autor |
-| Event | `events_select_by_visibility` | `public`/`members` → alle · `prime`/`legacy` → nur der Host |
+Der erste Entwurf behauptete, ein Fan-out „an alle aktivierten" umgehe eine
+RLS-Grenze, weil `posts_select_by_visibility` bei `visibility='members'` ein
+`has_level(4)` verlange — und `'members'` ist der Default.
 
-Und `posts.visibility` hat den **Default `'members'`**. Der Normalfall eines
-Beitrags ist also exchange-und-höher.
+**Das war an einer überholten Fassung gemessen.** `20260826100000_members_sind_alle_aktivierten.sql`
+(AGE-601) hat die Policy am **26.08.** ersetzt, einen Tag vor der Messung:
 
-Ein Hinweis „Neuer Beitrag von Max Mustermann" an ein `connect`-Mitglied gäbe
-diesem sowohl den Namen als auch die Tatsache preis, die die RLS ihm gerade
-verweigert — und führte auf einen Beitrag, den es nicht öffnen kann. Ein Hinweis
-ist keine Ausnahme von der Sichtbarkeit; er ist eine zweite Kopie davon.
+```sql
+public.is_activated()
+and ( visibility = 'public' or visibility = 'members' or author_id = auth.uid() )
+```
 
-**Die Empfängermenge folgt deshalb je Typ genau dem Prädikat des Gegenstands.**
-Das ist kein Zusatzaufwand, sondern dieselbe Bedingung ein zweites Mal
-hingeschrieben — und der Grund, warum sie in **einer** Funktion steht und nicht
-fünfmal abgeschrieben wird.
+Keine Schwelle. Der Kommentar der Migration sagt auch warum: *„in PROD trägt
+jeder Beitrag `members`, eine Schwelle darüber machte den Feed nicht dünner,
+sondern leer."*
 
-Zwei Typen brauchen das gar nicht: Kommentar und Like gehen an den
-**Beitragseigentümer**, und der sieht seinen Beitrag immer.
+Dazu: `prime` und `legacy` sind seit `20260715150000` per **Check-Constraint**
+verboten (`check (visibility in ('public','members'))`) — für `posts` wie für
+`events`. Die Beispiele des ersten Entwurfs („ein Beitrag, den nur sein Autor
+lesen darf") sind damit nicht einmal herstellbar.
 
-Beim Go-Live ist der Effekt gedämpft, weil der Import alle Konten auf `impact`
-setzt. Der Stufenweg kommt laut Zielbild rund eine Woche später — dann greift
-die Grenze, und dann wäre der Fehler live.
+**Die Empfängermenge ist also schlicht: jedes aktivierte Mitglied außer dem
+Auslöser.** Das ist weniger dramatisch als der erste Entwurf, und es ist wahr.
+
+### 2. Der Typ „neues Mitglied" entfällt
+
+Donald am 27.08., nachdem die Startwoche durchgerechnet war: aktivieren sich
+~70 Mitglieder nacheinander, bekommt das zuletzt aktivierte **69** Hinweise
+„neues Mitglied" auf einmal. Keine Lastfrage — eine Bedienfrage: die Glocke
+wäre in Woche eins praktisch nur dafür da, und die übrigen Typen gingen darin
+unter.
+
+Der Typ ist zugleich der mit dem geringsten Nutzen — wer neu ist, steht ohnehin
+im Verzeichnis. Nachzurüsten ist trivial, sobald der Zustrom bei ein bis zwei
+pro Woche liegt.
+
+**Damit entfällt der Trigger auf `profiles` ganz** — und mit ihm die gesamte
+Frage nach dem richtigen Ereignis (INSERT? UPDATE von `activated_at`?), nach
+Reaktivierung, nach dem Import und nach einem Schutzschalter. Vier von
+opencodes Pflicht-Änderungen lösen sich dadurch auf, statt beantwortet zu
+werden.
+
+## Der Befund, der stattdessen trägt
+
+Ein Event mit Host wird von `trg_event_feed_post`
+(`20260813100000_posts_kind_event_trigger.sql:220`) **synchron als
+`posts`-Zeile gespiegelt**, mit `kind='event'`, gleicher `visibility` und dem
+Host als Autor. Ein Fan-out über `posts` ohne Rücksicht darauf kündigte jedes
+Event **zweimal** an, an denselben Empfängerkreis.
+
+Der Trigger auf `posts` feuert deshalb nur für `kind = 'member'`. Der Trigger
+auf `events` bleibt eigenständig — sonst bekäme ein Event **ohne** Host gar
+keine Ankündigung, weil für dieses kein Spiegelbeitrag entsteht.
+
+## Wie der Fehler oben NICHT wiederkommt
+
+Der erste Entwurf schrieb das Sichtbarkeits-Prädikat ein zweites Mal hin. Genau
+davor warnt `20260826100000:36-40` selbst — und genau daran ist dieser Plan
+binnen 24 Stunden gescheitert.
+
+**Der Test prüft deshalb Parität, nicht Mitgliedschaft in einer eingefrorenen
+Menge.** Je geschriebener Hinweiszeile wird der Empfänger per
+`request.jwt.claim` impersoniert (das Muster steht 13× in `rls_test.sql`) und
+behauptet, dass er den angekündigten Gegenstand **sieht**. Eine Abschrift hat
+ein Verfallsdatum; eine Paritätszusage fängt das nächste AGE-601.
 
 ## Impact
 
 - Betroffene Fähigkeit: `notifications`.
-- **Migration**, entgegen der ersten Einschätzung. Die Glocke selbst braucht
-  keine: `notifications` hat `read_at`, Grants `select, insert, update, delete`
-  für `authenticated` und die Policy `notifications_own` (aktiviert + eigene
-  Zeile). Das **Opt-out** braucht eine — `member_settings` trägt heute nur
-  `notify_email_requests`, `notify_email_events`, `notify_email_digest`.
-- Fünf neue Spalten auf `member_settings`, je Typ eine, `not null default true`.
-- Fünf Trigger plus **eine** gemeinsame `SECURITY DEFINER`-Funktion. `DEFINER`
-  ist nötig, weil die Funktion die `member_settings` **des Empfängers** liest
-  und `member_settings_own` streng eigene-Zeile ist — als anfragende Rolle sähe
-  sie die fremde Zeile nie und das Opt-out liefe still ins Leere. Dasselbe
-  Muster wie `is_contactable`.
-- **Keine neuen Grants nötig, und beide Grant-Prüfungen bleiben grün** — am
-  Testfile gemessen, nicht angenommen: `grants_test.sql:51` führt
-  `member_settings/authenticated=INSERT,SELECT,UPDATE` **tabellenweit**, neue
-  Spalten ändern daran nichts; und die Spalten-Grants-Assertion (`:116`) deckt
-  eine feste Tabellenliste ab, in der `member_settings` nicht vorkommt.
-- Kein neuer Server, kein Mailversand, keine neue Tabelle.
+- **Migration**, entgegen der ersten Einschätzung des Handoffs. Die Glocke selbst
+  braucht keine: `notifications` hat `read_at`, Grants
+  `select, insert, update, delete` für `authenticated` und `notifications_own`.
+  Das **Opt-out** braucht eine — `member_settings` trägt heute **keinen einzigen
+  In-App-Schalter** (nur `notify_email_requests/_events/_digest` plus
+  `visible_in_directory`, `contactable_by_prime`, `onboarded_at`, `updated_at`).
+- Vier neue Spalten auf `member_settings`, je Typ eine, `not null default true`.
+- Vier Trigger plus **eine** `SECURITY DEFINER`-Funktion für das Opt-out. Sie
+  wird ausschließlich aus den Trigger-Funktionen gerufen und bekommt deshalb
+  **kein** Ausführrecht zurück — anders als `is_contactable`, das aus
+  Policy-Ausdrücken als die anfragende Rolle läuft. Ihre Entzüge nennen alle
+  vier Rollen (AGE-622).
+- **Keine neuen Grants nötig**, am Testfile gemessen: `grants_test.sql:51` führt
+  `member_settings` tabellenweit; die Spalten-Assertion (`:113-127`) deckt eine
+  feste Tabellenliste ab, in der `member_settings` nicht vorkommt.
+- Kein Mailversand, keine neue Tabelle, keine Änderung an den drei bestehenden
+  Typen.
+
+## Entscheidungen, festgehalten statt übersehen
+
+**Der Name des Handelnden bleibt in der Nutzlast**, auch wenn der Empfänger das
+Profil sonst nicht sähe (unter `discover` greift
+`profiles_select_self_or_discover`, und `profiles_public` zeigt nur
+`is_public = true`). Begründung: wer auf einem fremden Beitrag handelt, tut
+einen öffentlichen Akt gegenüber genau dieser Person; der Name gehört zur
+Handlung. Das bestehende `contact_request` hält es seit Juni ebenso
+(`from_name` in der Nutzlast). Beim Go-Live ohnehin gegenstandslos, weil der
+Import alle Konten auf `impact` setzt.
+
+**Kein Beitragstext in der Nutzlast.** Eine Hinweiszeile unterliegt nach dem
+Schreiben nicht mehr der Sichtbarkeit ihres Gegenstands; Text darin überlebte
+eine spätere Verschärfung. Kennungen und ein kurzer Anzeigetext genügen.
+
+**Die Nutzlast ist mitgliederkontrollierter Text** — `contact_request` trägt
+seit Juni ein frei formuliertes `message`. Die Glocke rendert sie als **Text**,
+nie als Markup.
+
+**Kein Dedup beim Like.** Ein Like, zurückgenommen und neu gesetzt, erzeugt
+zwei Hinweise, und der erste bleibt stehen. Bewusst nicht behandelt: die
+kleinste Lösung wäre ein Löschen beim Unlike, und das ist eine
+Verhaltensänderung an einer fremden Tabelle für einen Randfall.
 
 ## Die Kosten, offen benannt
 
-Ein Beitrag erzeugt bei rund 70 aktivierten Konten bis zu 70 Zeilen, **synchron
-in der Transaktion, die den Beitrag schreibt**. Dasselbe für jedes Event und
-jedes neu aktivierte Mitglied.
+Ein Beitrag erzeugt bei rund 70 aktivierten Konten bis zu 69 Zeilen, **synchron
+in der Transaktion**, die den Beitrag schreibt. `opencode` hat es
+durchgerechnet: ~15 kB WAL, einstellige Millisekunden, und selbst der
+theoretische Massenfall wäre trivial. Bedingung: Fan-out als **ein**
+`insert … select`, nicht als Schleife in plpgsql.
 
-Donald hat das am 27.08. entschieden: **sofort scharf, Opt-out per Default AN.**
-Die Alternative — Trigger bauen, aber über eine zentrale Flagge bis nach dem
-Go-Live ausgeschaltet lassen — wurde erwogen und verworfen.
+Der Präzedenzfall steht im Repo: `event_feed_post_sync` ist ein synchroner
+`after insert`-Row-Trigger, der in derselben Transaktion schreibt. Statement-
+Level oder Deferred gibt es nirgends.
 
-Die Sorge bleibt hier festgehalten, damit sie nachlesbar ist und nicht als
-Überraschung wiederkehrt: das sind Schreib-Trigger auf fünf Tabellen, wenige
-Tage vor dem Go-Live, und die erste echte Fan-out-Last trifft PROD in derselben
-Woche.
-
-## Nutzlast
-
-Die Nutzlast trägt Kennungen **und** einen kurzen Anzeigetext (Name des
-Handelnden, Titel des Events). Das folgt dem bestehenden Muster: die drei
-Kontaktanfrage-Typen legen seit Juni `from_name` und `message` in die Nutzlast
-(`20260614100000_contact_request_flow.sql:45-56`).
-
-Das ist vertretbar, weil die Empfängermenge bereits garantiert, dass der
-Empfänger den Gegenstand lesen darf. Was es **nicht** heilt: wird die
-Sichtbarkeit eines Beitrags später verschärft, bleibt der alte Hinweis stehen.
-Der Hinweis trägt deshalb **keinen Beitragstext**, nur Herkunft und Anlass.
+Donald hat am 27.08. entschieden: **sofort scharf, Opt-out per Default AN.** Die
+Alternative — über eine zentrale Flagge bis nach dem Go-Live ausgeschaltet —
+wurde erwogen und verworfen.

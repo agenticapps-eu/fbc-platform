@@ -547,6 +547,12 @@ export type Database = {
           notify_email_digest: boolean;
           notify_email_events: boolean;
           notify_email_requests: boolean;
+          // AGE-620 — die vier In-App-Schalter der Glocke. `not null default true`
+          // in der Migration, also hier ohne `| null`.
+          notify_inapp_comment: boolean;
+          notify_inapp_event: boolean;
+          notify_inapp_like: boolean;
+          notify_inapp_post: boolean;
           onboarded_at: string | null;
           profile_id: string;
           theme: string;
@@ -557,6 +563,10 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
+          notify_inapp_comment?: boolean;
+          notify_inapp_event?: boolean;
+          notify_inapp_like?: boolean;
+          notify_inapp_post?: boolean;
           onboarded_at?: string | null;
           profile_id: string;
           theme?: string;
@@ -567,6 +577,10 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
+          notify_inapp_comment?: boolean;
+          notify_inapp_event?: boolean;
+          notify_inapp_like?: boolean;
+          notify_inapp_post?: boolean;
           onboarded_at?: string | null;
           profile_id?: string;
           theme?: string;

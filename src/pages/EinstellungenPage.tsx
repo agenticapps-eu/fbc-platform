@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
-import { Card, CardTitle } from "../components/ui/Card";
+import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { Field } from "../components/ui/Field";
 import { Input } from "../components/ui/Input";
 import { DashboardSkeleton } from "../components/ui/Skeleton";
@@ -240,6 +240,41 @@ export default function EinstellungenPage() {
           label="Wöchentlicher Digest"
           checked={settings.notify_email_digest}
           onChange={(v) => toggle("notify_email_digest", v)}
+          disabled={save.isPending}
+        />
+      </Card>
+
+      {/* AGE-620. Eine eigene Karte, nicht vier weitere Zeilen in der obigen:
+          die drei darüber verschicken E-Mail, diese vier bleiben in der
+          Anwendung. Eine Überschrift, die beides zusammenwirft, ließe ein
+          Mitglied glauben, es schalte Post ab. */}
+      <Card className="flex flex-col gap-2">
+        <CardTitle>Hinweise in der Glocke</CardTitle>
+        <CardDescription>
+          Diese Hinweise erscheinen nur hier in der Anwendung. Es wird nichts versendet.
+        </CardDescription>
+        <ToggleRow
+          label="Wenn jemand einen Beitrag schreibt"
+          checked={settings.notify_inapp_post}
+          onChange={(v) => toggle("notify_inapp_post", v)}
+          disabled={save.isPending}
+        />
+        <ToggleRow
+          label="Wenn ein Event angelegt wird"
+          checked={settings.notify_inapp_event}
+          onChange={(v) => toggle("notify_inapp_event", v)}
+          disabled={save.isPending}
+        />
+        <ToggleRow
+          label="Wenn jemand meinen Beitrag kommentiert"
+          checked={settings.notify_inapp_comment}
+          onChange={(v) => toggle("notify_inapp_comment", v)}
+          disabled={save.isPending}
+        />
+        <ToggleRow
+          label="Wenn jemandem mein Beitrag gefällt"
+          checked={settings.notify_inapp_like}
+          onChange={(v) => toggle("notify_inapp_like", v)}
           disabled={save.isPending}
         />
       </Card>

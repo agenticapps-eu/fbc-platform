@@ -158,6 +158,7 @@ jobs:
           supabase/tests/feed_popularity_test.sql
           supabase/tests/feed_sidebar_test.sql
           supabase/tests/thread_read_positions_test.sql
+          supabase/tests/hinweistypen_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
