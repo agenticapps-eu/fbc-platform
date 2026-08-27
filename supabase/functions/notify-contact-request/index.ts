@@ -29,6 +29,7 @@ import {
   renderDeclined,
   renderNewRequest,
   selectNotification,
+  type MailAuskunft,
   type RenderedEmail,
   type WebhookPayload,
 } from "./emails.ts";
@@ -98,25 +99,26 @@ Deno.serve(async (req) => {
   // invented row and picks recipient, sender name and message text freely; the
   // mail then leaves under the club's own From address. So the row is looked up
   // and compared before anything is sent.
-  const [contactRes, otherRes, echtRes] = await Promise.all([
-    supabase
-      .from("profile_contacts")
-      .select("email")
-      .eq("profile_id", decision.recipientId)
-      .maybeSingle(),
-    supabase.from("profiles").select("name").eq("id", decision.otherId).maybeSingle(),
-    supabase
-      .from("contact_requests")
-      .select("id, from_id, to_id, status, message")
-      .eq("id", decision.request.id)
-      .maybeSingle(),
-  ]);
+  // Gelesen wird über eine SECURITY-DEFINER-RPC, nicht über `.from(...)`
+  // (AGE-623). Ein direkter Tabellenzugriff stünde auf einer Eigenschaft der
+  // Instanz, die kein Migrationsstand ausspricht: `service_role` hält seine
+  // Tabellenrechte aus den Default Privileges, nicht aus diesem Repository.
+  // Die RPC bindet Empfänger und Gegenüber ausserdem in der DATENBANK an die
+  // Anfragezeile — die Prüfung unten hält damit auch dann, wenn sie hier fiele.
+  const { data: daten, error: datenFehler } = await supabase
+    .rpc("notify_contact_request_daten", {
+      p_request_id: decision.request.id,
+      p_recipient_id: decision.recipientId,
+      p_other_id: decision.otherId,
+    })
+    .returns<MailAuskunft[]>()
+    .maybeSingle();
 
-  if (echtRes.error) {
-    log("error", "request_lookup_failed", { kind: decision.kind, error: echtRes.error.code });
+  if (datenFehler) {
+    log("error", "request_lookup_failed", { kind: decision.kind, error: datenFehler.code });
     return new Response("Lookup failed", { status: 502 });
   }
-  if (!passtZurDatenbank(decision.request, echtRes.data)) {
+  if (!passtZurDatenbank(decision.request, daten)) {
     // Kein 200 mit `skipped`: das hier ist kein uninteressantes Ereignis,
     // sondern ein Aufruf, der etwas behauptet, was nicht in der Tabelle steht.
     log("warn", "record_mismatch", { kind: decision.kind, requestId: decision.request.id });
@@ -124,16 +126,12 @@ Deno.serve(async (req) => {
   }
   // Der Text kommt ab hier aus der Datenbank, nicht aus dem Payload — das ist
   // stärker, als ihn zu vergleichen.
-  const echteNachricht = echtRes.data?.message ?? null;
+  const echteNachricht = daten?.message ?? null;
 
-  // A query ERROR is transient (don't confuse it with "no row") — surface it so
-  // the failure is visible, rather than silently dropping the mail as no_email.
-  if (contactRes.error) {
-    log("error", "recipient_lookup_failed", { kind: decision.kind, error: contactRes.error.code });
-    return new Response("Lookup failed", { status: 502 });
-  }
-
-  const toEmail = contactRes.data?.email?.trim();
+  // Eine fehlende Adresse ist KEINE fehlende Zeile: die RPC verbindet
+  // `profile_contacts` mit einem LEFT JOIN, damit dieser Fall hier ankommt und
+  // nicht schon oben als `record_mismatch` (409) endet.
+  const toEmail = daten?.recipient_email?.trim();
   if (!toEmail) {
     // No address on file is not a retryable error — ack so the webhook stops.
     log("warn", "recipient_has_no_email", {
@@ -147,7 +145,7 @@ Deno.serve(async (req) => {
   }
 
   // Name lookup failure degrades gracefully (templates fall back to generic copy).
-  const otherName = otherRes.data?.name ?? "";
+  const otherName = daten?.other_name ?? "";
   let email: RenderedEmail;
   switch (decision.kind) {
     case "new_request":

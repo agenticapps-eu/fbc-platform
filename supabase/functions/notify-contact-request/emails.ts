@@ -18,6 +18,28 @@ export interface ContactRequestRow {
   created_at: string;
 }
 
+/**
+ * Was `notify_contact_request_daten` liefert (AGE-623) — die Anfragezeile plus
+ * die beiden Angaben, für die früher zwei eigene Tabellenzugriffe nötig waren.
+ *
+ * `recipient_email` und `other_name` sind bewusst nullable: die RPC verbindet
+ * beide Quellen mit einem LEFT JOIN, damit „keine Adresse hinterlegt" eine
+ * Zeile mit leerem Feld ergibt und nicht die leere Menge. Wären sie hier nicht
+ * nullable, verdeckte der Typ genau den Fall, den der Aufrufer als
+ * `200 skipped: no_email` behandeln muss.
+ *
+ * `status` erbt die drei Werte von `ContactRequestRow`, obwohl die RPC `text`
+ * liefert. Das ist keine Annahme, sondern von der Datenbank gedeckt:
+ * `contact_requests` trägt `CHECK (status = ANY (ARRAY['pending','accepted',
+ * 'declined']))`. Käme je ein anderer Wert, schlüge der Abgleich in
+ * `passtZurDatenbank` fehl und es ginge keine Mail hinaus — fail closed.
+ */
+export interface MailAuskunft
+  extends Pick<ContactRequestRow, "id" | "from_id" | "to_id" | "message" | "status"> {
+  recipient_email: string | null;
+  other_name: string | null;
+}
+
 /** Supabase Database Webhook envelope for contact_requests. */
 export interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE";
