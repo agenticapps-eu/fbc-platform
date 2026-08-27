@@ -1,0 +1,135 @@
+# Entwurf — woher die Unterhaltungsliste ihre Seite bekommt
+
+Dieses Dokument existiert, weil die Plan-Review (REVIEWS.md) an genau dieser
+Stelle beide Anbieter unabhängig voneinander zu **REQUEST-CHANGES** gebracht
+hat. Die erste Fassung des Vorschlags versprach eine serverseitig sortierte,
+begrenzte Seite **und** „keine Migration, kein Server". Das ist nicht beides zu
+haben.
+
+## Das Problem, genau benannt
+
+Die Liste braucht: **die N zuletzt bewegten Threads, je mit einer Vorschauzeile.**
+
+Heute (`src/lib/chat.ts:240–265`) entsteht das so:
+
+1. alle Threads laden (kein Limit),
+2. alle Nachrichten aller dieser Threads laden (kein Limit), absteigend,
+3. im Client per `reduce` die jüngste je Thread nehmen.
+
+Schritt 2 ist der Kostentreiber. Aber er lässt sich nicht einfach begrenzen:
+
+**PostgREST kann nicht nach einer Aggregatfunktion über eine to-many-Relation
+sortieren.** `max(messages.created_at)` je Thread als Sortierschlüssel der
+Thread-Abfrage ist nicht ausdrückbar — nach Kindspalten sortieren geht nur für
+to-one-Beziehungen. Und „genau eine Nachricht je Thread" ist in einer einzigen
+PostgREST-Abfrage ebenfalls nicht ausdrückbar; `limit` gilt für das Ergebnis,
+nicht je Gruppe.
+
+Ohne Server-Artefakt bleibt also nur: alles laden und im Client sortieren —
+also genau das, was abgeschafft werden soll.
+
+## Die Entscheidung: denormalisierte Aktivitätsspalten mit DEFINER-Trigger
+
+`message_threads` bekommt drei Spalten, geschrieben von einem Trigger auf
+`messages`:
+
+| Spalte | Wofür |
+| --- | --- |
+| `last_message_at` | Sortierschlüssel — macht `order` + `limit` serverseitig möglich |
+| `last_message_body` | die Vorschauzeile, ohne eine zweite Abfrage |
+| `last_message_sender_id` | „Du: …" vs. Name des Partners |
+
+Danach ist die Liste **eine** Abfrage: `message_threads` nach
+`last_message_at desc`, mit `range`, plus die Partnerzeilen. Die
+`messages`-Tabelle wird für die Liste **gar nicht mehr angefasst**.
+
+Verworfen: **eine DEFINER-RPC**, die die Seite fertig liefert (`distinct on` +
+Fensterfunktion). Sie käme ohne Schema-Umbau aus, aber sie legt das
+Sichtbarkeitsprädikat an eine zweite Stelle neben die RLS — genau die Falle, die
+`profiles_public` mit seinen vier Funktionen aufgemacht hat. Eine Spalte, die
+unter der bestehenden Policy liegt, dupliziert nichts.
+
+## Warum diese Spalten keine Lesebestätigung sind
+
+`supabase/tests/grants_test.sql:130–146` hält ausdrücklich fest, dass
+`message_threads` **kein UPDATE-Recht** trägt, auch kein spaltenweises — und
+warum: AGE-583 hatte zwei Lesestand-Spalten genau hier vorgeschlagen; sie wären
+für den Gesprächspartner lesbar gewesen und damit eine Lesebestätigung. Der
+Lesestand liegt seitdem in `thread_read_positions`.
+
+Dieser Entwurf steht **nicht** im Widerspruch dazu, und das ist gemessen, nicht
+angenommen:
+
+- `threads_select` gibt eine Thread-Zeile den **zwei Teilnehmern** frei
+  (`20260806080100:214–219`).
+- `messages_select` gibt eine Nachricht **denselben zwei Teilnehmern** frei
+  (`20260806080100:221–231`).
+
+Beide Prädikate reichen exakt gleich weit. Wer `last_message_body` lesen kann,
+konnte dieselbe Nachricht schon vorher lesen. **Es entsteht keine neue
+Preisgabe** — anders als bei einem Lesestand, der eine Information über das
+*Verhalten* des anderen wäre, die es sonst nirgends gibt.
+
+Und das UPDATE-Recht bleibt weg: der Trigger ist `security definer`. Der Client
+schreibt diese Spalten nie, kann es nicht, und der Golden-Snapshot in
+`grants_test.sql` bleibt unverändert — er listet UPDATE-Spalten-Grants, und wir
+sprechen keinen aus.
+
+## Paging: Offset oder Cursor
+
+Codex hat zu Recht angemerkt, dass Offset-Paging auf einer live nach Aktivität
+sortierten Liste instabil ist: eine neue Nachricht schiebt Threads zwischen den
+Seiten, beim nächsten Offset erscheinen Einträge doppelt oder werden
+übersprungen.
+
+**Entscheidung: Offset — bewusst, mit Begründung.**
+
+Der Fehler tritt auf, wenn zwischen zwei Seitenabrufen eine Nachricht eintrifft.
+Die Liste zeigt zwanzig Threads je Seite; ein Mitglied, das über die erste Seite
+hinaus blättert, hat mehr als zwanzig laufende Unterhaltungen. Bei der heutigen
+Größe des Clubs ist das niemand. Cursor-Paging nach `(last_message_at, id)` ist
+die richtige Lösung, wenn es so weit ist — und der Trigger legt schon jetzt
+genau den Schlüssel an, den ein Cursor bräuchte.
+
+Was daraus folgt und in der Spec steht: die **Sortierung** ist serverseitig und
+verbindlich, das **Blättern** ist es noch nicht. Ein `limit` ohne stabile
+Sortierung wäre wertlos; ein Cursor ohne Bedarf wäre Vorrat.
+
+## Realtime: ein Abo, nicht zwei
+
+`useUngelesenLive` (`use-ungelesen.ts:63–92`) besitzt heute das **einzige**
+globale `messages`-Abo und invalidiert daraus **nur** `unreadQueryKey(uid)`.
+`subscribeToAllMessages` (`chat.ts:206`) baut den Kanalnamen mit
+`crypto.randomUUID()` — ein zweiter Aufruf macht also ausdrücklich einen
+**zweiten Kanal** auf.
+
+Deshalb: **kein zweites Abo.** Der bestehende Hook invalidiert künftig beides,
+den Zähler und die Threads-Seite. Das ist eine Zeile mehr in einem Hook, der
+schon die richtige Lebensdauer, die richtige Entprellung und das richtige
+Aufräumen hat.
+
+Ohne diesen Punkt wäre der sichtbare Fehler: der Ungelesen-Marker erscheint,
+aber Vorschautext und Reihenfolge der Liste bleiben stehen. Ein Panel, dessen
+Zähler sich bewegt und dessen Liste nicht, sieht kaputt aus — und ist es auch.
+
+## Query-Keys
+
+`threadsQueryKey(uid)` (`chat.ts:232`) kennt keinen Paging-Parameter, und
+`ChatPage.tsx` invalidiert unter diesem Schlüssel. Panel und `/chat` würden sich
+sonst denselben Cache-Eintrag teilen und einander mit unterschiedlich
+vollständigen Ergebnissen überschreiben.
+
+Der Schlüssel bekommt die Seitenparameter. Beide Flächen lesen dieselbe
+Funktion mit denselben Parametern — `/chat` ist damit **nicht** unverändert,
+sondern lädt ebenfalls eine Seite. Das ist die Auflösung des Widerspruchs, den
+beide Reviewer gefunden haben: es gibt nur **eine** Datenquelle mit **einem**
+Umfang, und beide Flächen zeigen denselben.
+
+## Was das Panel auf `/chat` selbst tut
+
+Auf `/chat` und `/chat/:threadId` stünde die Liste sonst zweimal auf einem
+Schirm — einmal als Seitenkarte im `18rem + 1fr`-Raster der Seite, einmal im
+Panel. Auf 1280 px bliebe für die Konversation eine Spalte von etwa 330 px.
+
+**Das Panel blendet auf Chatrouten aus.** Es ist die Abkürzung zu einer Fläche;
+auf der Fläche selbst ist es Doppelung.
