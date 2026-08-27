@@ -32,9 +32,28 @@ allein und zuerst.
       gemeinsam.
 - [x] Weiche in `src/lib/supabase.ts`: `Capacitor.isNativePlatform()` entscheidet.
       Im Web-Zweig **kein** Wrapper — `localStorage` unverändert durchreichen.
-- [ ] **Beleg (Browser, nicht jsdom):** vor dem Umbau anmelden, umbauen, Seite
+- [x] **Beleg (Browser, nicht jsdom):** vor dem Umbau anmelden, umbauen, Seite
       neu laden, weiterhin angemeldet. Das ist die Abnahme aus dem Issue, und
       sie lässt sich in jsdom nicht führen.
+
+      **Gefahren am 27.08. gegen den lokalen Stack**, mit dem *echten*
+      Reihenfolgen-Aufbau statt einer nachgestellten Sitzung:
+
+      1. `src/lib/supabase.ts` auf den Stand **vor** A1 zurückgesetzt, Vite
+         gestartet, im Browser über den Client angemeldet. Geschrieben wurde
+         `sb-127-auth-token` — der Schlüssel, den die Bibliothek selbst bildet.
+      2. Die neue Fassung eingespielt, Seite neu geladen.
+      3. Ergebnis: derselbe Schlüssel noch da, `sitzungsprobe@local.test` in der
+         Sitzung, **keine** Umleitung auf `/login`, und der Client stellt
+         REST-Anfragen. Die Aktivierungswand erscheint — richtig so: das Konto
+         ist ein reiner GoTrue-Nutzer ohne `activated_at`, und diese Wand sieht
+         nur, wer **angemeldet** ist. Sie ist damit selbst ein Beleg.
+
+      Nebenbefund, nicht Teil dieses Changes: das Anmeldeformular liess sich
+      über gesetzte Feldwerte **nicht** absenden — es ging keine einzige
+      `/auth/v1/token`-Anfrage raus, ohne dass eine Fehlermeldung erschien. Ob
+      das nur an der Automatisierung liegt oder auch einen Passwortmanager
+      betrifft, ist offen. **Eigene Aufgabe wert, hier bewusst nicht verfolgt.**
 - [ ] **Beleg (Gerät), sobald Phase B steht — nicht erst in Phase E.** Alle drei
       RED-Tests oben laufen in jsdom gegen eine **Attrappe** von `Preferences`.
       Ein Adapter, dessen `removeItem` auf dem Gerät ins Leere läuft, wäre dort
