@@ -29,7 +29,7 @@
 --     (AGE-622). Die Rechtezusagen unten pruefen deshalb alle vier Rollen.
 
 begin;
-select plan(32);
+select plan(41);
 
 -- ── Impersonierung ──────────────────────────────────────────────────────────
 -- Eigene Kopie: `rls_test.sql` definiert dasselbe, aber jede Testdatei laeuft in
@@ -416,6 +416,140 @@ select is(
   (select count(*)::int from public.notifications
     where profile_id = 'c0000000-0000-0000-0000-00000000000b'),
   'Lesen bleibt: das Mitglied sieht weiterhin alle eigenen Hinweise');
+
+-- ── 9. Der fuenfte Typ: Chat-Nachrichten (AGE-641) ──────────────────────────
+-- Der Hauptgrund fuer die App war der einzige Vorgang der Plattform ohne
+-- Hinweis. Der Gespraechsfaden zwischen 00a und 00b entstand oben bei der
+-- angenommenen Kontaktanfrage.
+
+-- 00b bekommt die Hinweise (00a hat oben notify_app_contact abgeschaltet, das
+-- betrifft `message` nicht — die Schalter sind je Ereignis, nicht je Person).
+
+insert into public.messages (thread_id, sender_id, body)
+select t.id, 'c0000000-0000-0000-0000-00000000000a',
+       'Streng vertraulicher Satz, der nirgends auftauchen darf'
+  from public.message_threads t
+ where t.a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                              'c0000000-0000-0000-0000-00000000000b'::uuid)
+   and t.b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                 'c0000000-0000-0000-0000-00000000000b'::uuid);
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  1, 'das Gegenueber bekommt genau eine Zeile');
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000a'),
+  0, 'der Absender bekommt nichts ueber die eigene Nachricht');
+
+-- DER KERN. Nicht „der Text ist gekuerzt", sondern: er ist GAR NICHT DA.
+-- Geprueft wird die ganze Nutzlast als Text, nicht ein einzelner Schluessel —
+-- ein Trigger, der den Satz unter anderem Namen ablegte, kaeme sonst durch.
+select is(
+  (select payload::text like '%Streng vertraulicher Satz%'
+     from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  false, 'die Nutzlast enthaelt den Nachrichtentext an keiner Stelle');
+
+-- Positivkontrolle: sie ist auch nicht einfach leer.
+select is(
+  (select payload->>'sender_name' from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  'Hin Autor', 'die Nutzlast nennt den Absender');
+
+select isnt(
+  (select payload->>'thread_id' from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  null, 'die Nutzlast nennt das Gespraech, damit der Hinweis sich oeffnen laesst');
+
+-- ── 9b. Eine Zeile je GESPRAECH, nicht je Nachricht ─────────────────────────
+-- Zwanzig Nachrichten am Stueck sind ein Gespraech, kein zwanzigfacher Anlass.
+-- Solange der Hinweis ungelesen ist, kommt keiner dazu — sonst wuerde die
+-- Glocke bei jedem Chat volllaufen und das Telefon zwanzigmal wecken. Genau
+-- der Laerm, der dazu fuehrt, dass jemand Push GANZ abschaltet.
+
+insert into public.messages (thread_id, sender_id, body)
+select t.id, 'c0000000-0000-0000-0000-00000000000a', 'Noch ein Satz'
+  from public.message_threads t
+ where t.a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                              'c0000000-0000-0000-0000-00000000000b'::uuid)
+   and t.b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                 'c0000000-0000-0000-0000-00000000000b'::uuid);
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  1, 'die zweite Nachricht erzeugt keine zweite ungelesene Zeile');
+
+-- Und die Gegenprobe: nach dem Lesen meldet sich das Gespraech wieder. Ohne
+-- sie waere „keine zweite Zeile" auch von einem Trigger erfuellt, der nach der
+-- ersten Nachricht nie wieder etwas tut.
+update public.notifications set read_at = now()
+ where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b';
+
+insert into public.messages (thread_id, sender_id, body)
+select t.id, 'c0000000-0000-0000-0000-00000000000a', 'Nach dem Lesen'
+  from public.message_threads t
+ where t.a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                              'c0000000-0000-0000-0000-00000000000b'::uuid)
+   and t.b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                 'c0000000-0000-0000-0000-00000000000b'::uuid);
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'
+      and read_at is null),
+  1, 'nach dem Lesen meldet sich das Gespraech wieder');
+
+-- ── 9c. Schalter und Aktivierung ────────────────────────────────────────────
+
+update public.member_settings set notify_app_message = false
+ where profile_id = 'c0000000-0000-0000-0000-00000000000b';
+insert into public.member_settings (profile_id, notify_app_message)
+select 'c0000000-0000-0000-0000-00000000000b', false
+ where not exists (select 1 from public.member_settings
+                    where profile_id = 'c0000000-0000-0000-0000-00000000000b');
+
+update public.notifications set read_at = now()
+ where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b';
+
+insert into public.messages (thread_id, sender_id, body)
+select t.id, 'c0000000-0000-0000-0000-00000000000a', 'Mit abgeschaltetem Schalter'
+  from public.message_threads t
+ where t.a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                              'c0000000-0000-0000-0000-00000000000b'::uuid)
+   and t.b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                 'c0000000-0000-0000-0000-00000000000b'::uuid);
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'
+      and read_at is null),
+  0, 'abgeschaltetes notify_app_message schreibt nichts');
+
+-- Ein nie bestaetigtes Konto (00d) bekommt nichts — dieselbe Grenze wie bei
+-- den vier aelteren Typen, und sie muss hier eigens gezogen werden, weil ein
+-- Gespraechsfaden aelter sein kann als eine Deaktivierung.
+insert into public.message_threads (a_profile_id, b_profile_id)
+values (least('c0000000-0000-0000-0000-00000000000a'::uuid,
+              'c0000000-0000-0000-0000-00000000000d'::uuid),
+        greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                 'c0000000-0000-0000-0000-00000000000d'::uuid));
+
+insert into public.messages (thread_id, sender_id, body)
+select t.id, 'c0000000-0000-0000-0000-00000000000a', 'An ein unbestaetigtes Konto'
+  from public.message_threads t
+ where t.a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                              'c0000000-0000-0000-0000-00000000000d'::uuid)
+   and t.b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                 'c0000000-0000-0000-0000-00000000000d'::uuid);
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000d'),
+  0, 'ein nicht aktiviertes Konto bekommt keinen Nachrichten-Hinweis');
 
 select * from finish();
 rollback;
