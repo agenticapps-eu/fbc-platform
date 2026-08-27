@@ -261,14 +261,30 @@ html[data-variant="navy"] {
   width: var(--fbc-sidebar-w, 16rem);
   transition: width 180ms ease;
 }
+/* Die Nachrichten-Leiste rechts (AGE-627). Eigene Variable, eigener Speicher —
+   sie ist eine zweite angedockte Leiste, keine Spiegelung der linken: sie steht
+   nur angemeldet, nur ausserhalb der Chatrouten, und ihr Startwert ist
+   EINGEKLAPPT. Ist sie nicht da, traegt die Variable 0rem und die Regel unten
+   wirkt wie zuvor. */
+.fbc-chat-rail {
+  width: var(--fbc-chat-w, 0rem);
+  transition: width 180ms ease;
+}
 @media (min-width: 1024px) {
+  /* Beide Versaetze in DERSELBEN Regel, beide mit Uebergang. Stuenden sie in
+     zwei Regeln, ueberblendete nur einer von beiden — bis AGE-627 gab es hier
+     nur `padding-left`. */
   .fbc-shell-offset {
     padding-left: var(--fbc-sidebar-w, 16rem);
-    transition: padding-left 180ms ease;
+    padding-right: var(--fbc-chat-w, 0rem);
+    transition:
+      padding-left 180ms ease,
+      padding-right 180ms ease;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .fbc-sidebar,
+  .fbc-chat-rail,
   .fbc-shell-offset {
     transition: none;
   }

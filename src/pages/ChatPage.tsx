@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -10,7 +10,6 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { useToast } from "../components/ui/toast-context";
 import {
   fetchMessages,
-  fetchThreads,
   markThreadRead,
   mergeMessage,
   messagesQueryKey,
@@ -21,6 +20,7 @@ import {
   type ChatMessage,
 } from "../lib/chat";
 import { useUngelesen } from "../components/chat/use-ungelesen";
+import { useThreadsSeite } from "../components/chat/use-threads-seite";
 import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
 
@@ -45,20 +45,11 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // `useInfiniteQuery` unter EINEM Schlüssel, und das ist die Antwort auf den
-  // Befund der Plan-Review: Seite und stehende Leiste teilen sich damit
-  // ausdrücklich einen Cache-Eintrag samt `{pages, pageParams}`, statt einander
-  // mit unterschiedlich vollständigen Ergebnissen zu überschreiben. „Eine
-  // Datenquelle, ein Umfang" ist so eine Eigenschaft des Caches und keine
-  // Verabredung zwischen zwei Flächen. Die Invalidierungen weiter unten stehen
-  // deshalb unverändert unter demselben Schlüssel.
-  const threadsQuery = useInfiniteQuery({
-    queryKey: threadsQueryKey(myId),
-    queryFn: ({ pageParam }) => fetchThreads(myId, { offset: pageParam }),
-    initialPageParam: 0,
-    getNextPageParam: (letzteSeite) => letzteSeite.nextOffset,
-    enabled: Boolean(myId),
-  });
+  // DERSELBE Hook wie die stehende Leiste — eine Datenquelle, ein Umfang, und
+  // zwar als Eigenschaft des Caches statt als Verabredung zwischen zwei
+  // Flächen. Die Invalidierungen weiter unten stehen unverändert unter
+  // demselben Schlüssel.
+  const threadsQuery = useThreadsSeite(myId || null);
 
   // Derselbe Query-Schlüssel wie Kopfzeile und Profilkachel — React Query
   // bündelt die drei, und sie können nicht auseinanderlaufen (AGE-583).

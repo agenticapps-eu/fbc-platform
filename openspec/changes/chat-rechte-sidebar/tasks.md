@@ -98,66 +98,103 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
       Test festgehalten, sonst wäre „invalidiert" von „invalidiert immer" nicht
       zu trennen.
 
-## 4. Die rechte Leiste (Shell, ≥ lg)
+## 4. Die rechte Leiste (Shell, ≥ **xl** — nicht `lg`, siehe Band 7)
 
-- [ ] **RED**: Test, dass die Hülle bei `lg` zwei angedockte Leisten rendert
-      und der Inhalt dazwischen liegt.
-- [ ] **RED**: Test, dass die rechte Leiste **ausgeloggt gar nicht** erscheint.
-- [ ] `--fbc-chat-w` analog `--fbc-sidebar-w`; `.fbc-shell-offset` bekommt
-      `padding-right` **in derselben Regel, mit Transition** — `index.css:264–269`
-      überblendet heute nur `padding-left`.
-- [ ] `<aside>` rechts: `fixed inset-y-0 right-0`, `border-l`, `hidden lg:flex`,
-      Fläche über `SIDEBAR_SURFACE` — gespiegelt zu `AppShell.tsx:455`.
-- [ ] Zuklapp-Knopf über `Icon name="chevronLeft"` (**kein** Inline-`<svg>`),
+- [x] **RED**: Test, dass die Hülle zwei angedockte Leisten rendert und der
+      Inhalt dazwischen liegt. → `src/components/AppShell.chatleiste.test.tsx`.
+- [x] **RED**: Test, dass die rechte Leiste **ausgeloggt gar nicht** erscheint.
+      Gegenprobe: `Boolean(user)` entfernt → genau dieser Test fällt.
+- [x] `--fbc-chat-w` analog `--fbc-sidebar-w`; `.fbc-shell-offset` bekommt
+      `padding-right` **in derselben Regel, mit Transition**.
+- [x] `<aside>` rechts: `fixed inset-y-0 right-0`, `border-l`, `hidden xl:flex`.
+- [x] Zuklapp-Knopf über `Icon name="chevronLeft"` (**kein** Inline-`<svg>`),
       `aria-expanded`, eigener Name je Zustand.
-- [ ] Eigener Speicherschlüssel, getrennt von `fbc.sidebarCollapsed`; Startwert
-      **eingeklappt**; Lesen und Schreiben in `try`/`catch`.
-- [ ] **RED→GRÜN**: beide Leisten merken sich unabhängig.
-- [ ] **Threads erst laden, wenn geöffnet.** Der Rail braucht nur den Zähler,
-      den es getrennt schon gibt. Ladebedingung testen.
-- [ ] **RED**: Test, dass das Panel auf `/chat` und `/chat/:threadId`
-      **ausblendet**.
+- [x] Eigener Speicherschlüssel `fbc.chatCollapsed`, getrennt von
+      `fbc.sidebarCollapsed`; Startwert **eingeklappt**; Lesen und Schreiben in
+      `try`/`catch`.
+- [x] **RED→GRÜN**: beide Leisten merken sich unabhängig.
+- [x] **Threads erst laden, wenn geöffnet** — und zwar über die **Montage**,
+      nicht über einen Schalter am Panel. Die Bedingung steht damit an EINER
+      Stelle. Gemessen sind zwei Fälle: eingeklappt, und *aufgeklappt unter
+      `xl`* (CSS verbirgt, es hält keine Abfrage an).
+- [x] **RED**: Test, dass das Panel auf `/chat` und `/chat/:threadId`
+      **ausblendet**. Gegenprobe: Routenprüfung entfernt → genau diese zwei
+      Tests fallen.
+- [x] **Beim Umbau selbst gefunden:** der Startwert von `istBreit` las noch
+      `lg`, während der Effect schon `xl` prüfte — der erste Anstrich montierte
+      das Panel und holte eine Seite Threads, bevor der Effect es zurücknahm.
+      Aufgefallen ist das nur, weil ein Test die Breite **1152 px** stellt.
 
-## 5. Unter `lg`: Drawer von rechts
+## 5. Unter `xl`: Drawer von rechts
 
-- [ ] Eigener Öffner in der Topbar, gespiegelt zum Hamburger
-      (`AppShell.tsx:513–520`): `lg:hidden`, eigener zugänglicher Name.
-      Die Sprechblase bleibt ein Link auf `/chat` — der Grundsatz in
-      `AppShell.tsx:68` wird **nicht** gebrochen.
-- [ ] **RED**: Test, dass das Öffnen des einen Drawers den anderen schließt.
-- [ ] **RED**: Test, dass ein Sprung über `lg` den rechten Drawer schließt —
-      dieselbe Behandlung wie `AppShell.tsx:421–432`.
-- [ ] **RED**: Test, dass die Wahl eines Threads den Drawer schließt. Sonst
-      steht er samt Scroll-Sperre über der neuen Seite (links tut das
-      `onNavigate`, `AppShell.tsx:631`).
-- [ ] Escape, Backdrop, Fokus-Rückgabe, Dialog-Benennung — als Tests, nicht nur
-      in der Sichtprobe. `useOverlay` bringt Sperre und Tab-Falle mit, **kein**
-      Escape; das ist links ein eigener Effect (`AppShell.tsx:408–415`).
+- [x] Eigener Öffner in der Topbar, `xl:hidden`, eigener zugänglicher Name
+      („Nachrichten-Leiste öffnen"). Die Sprechblase bleibt ein Link auf
+      `/chat` — der Grundsatz in `AppShell.tsx:68` wird **nicht** gebrochen.
+- [x] **Anderes Glyph als die Sprechblase daneben** (`chevronLeft`, nicht
+      `messages`): zwei gleiche Sprechblasen nebeneinander wären zwei Namen für
+      dasselbe. Der Pfeil sagt, was passiert — eine Leiste kommt von rechts.
+- [x] **RED**: Test, dass das Öffnen des einen Drawers den anderen schließt —
+      **in beide Richtungen**. Zwei Gegenproben, zwei gefallene Tests.
+- [x] **RED**: Test, dass ein Sprung über `xl` den rechten Drawer schließt,
+      **und die Scroll-Sperre freigibt**. Das ist der teure Teil, nicht die
+      unsichtbare Schublade.
+- [x] **RED**: Test, dass die Wahl eines Threads die Sperre freigibt.
+- [x] Escape, Backdrop, Dialog-Benennung — als Tests. `useOverlay` bringt Sperre
+      und Tab-Falle mit, **kein** Escape; das ist ein eigener Effect daneben.
 
 ## 6. Inhalt der Leiste
 
-- [ ] Unterhaltungsliste aus `ThreadList` wiederverwenden, nicht neu bauen.
-- [ ] Ungelesen-Marker je Zeile; Null wird **nicht** gerendert (Spec).
-- [ ] Klick öffnet `/chat/:threadId` — eine Adresse je Gespräch.
-- [ ] Eingeklappt: Sprechblase + Zähler im Rail, mit zugänglichem Namen.
-- [ ] **Drei Zustände, nicht einer:** Laden · Fehler · echte Leere. `data ?? []`
-      zeigt einen RLS-Fehler als „keine Kontakte".
-- [ ] Der leere Zustand hängt an **Threads**, nicht an akzeptierten Kontakten —
-      Threads überleben einen späteren Statuswechsel.
+- [x] Unterhaltungsliste aus `ThreadList` wiederverwendet, nicht neu gebaut.
+- [x] Ungelesen-Marker je Zeile; Null wird **nicht** gerendert — mit
+      Positivkontrolle am Nachbar-Thread, der gar keine Zahl trägt.
+- [x] Klick öffnet `/chat/:threadId` — eine Adresse je Gespräch.
+- [x] Eingeklappt: Sprechblase + Zähler im Rail, mit zugänglichem Namen (die
+      Zahl steht im NAMEN, nicht nur in der Blase).
+- [x] **Drei Zustände, nicht einer:** Laden · Fehler · echte Leere. Gegenprobe:
+      Fehlerzweig entfernt → genau der Test „nennt es NICHT Leere" fällt.
+- [x] Der leere Zustand hängt an **Threads**, nicht an akzeptierten Kontakten.
+- [x] „Weitere Gespräche" auch hier — dieselbe Zusage wie auf `/chat`.
 
 ## 7. Nachweis am laufenden Bild (nicht in jsdom)
 
-- [ ] Breite über den **ganzen Bereich 1024–1280 px** messen, beide Leisten
-      offen und eingeklappt. Am Inhaltsbedarf messen, **nicht** an `scrollWidth`
-      (AGE-502).
-- [ ] Nicht nur das Mitgliederverzeichnis: auch `/chat` selbst und die
-      `NARROW_ROUTES` mit ihrem Lesespalten-Deckel.
-- [ ] Beide Themes (hell und navy über `data-variant`).
-- [ ] Telefonbreite: beide Drawer, gegenseitiger Ausschluss, Fokus, Escape.
-- [ ] **Die zwei Nachrichten-Bedienelemente unter `lg` ansehen** — Sprechblase
-      und neuer Öffner nebeneinander. Wenn es zu eng wirkt, ist das der Moment,
-      eins davon zu streichen.
-- [ ] Donald die laufende lokale Fassung zeigen, **bevor** committet wird.
+Gefahren am 27.08. gegen den lokalen Stack, mit vier angelegten Konten, drei
+angenommenen Kontakten und drei Threads. **Diese Sichtprobe hat zwei
+Entscheidungen umgeworfen — beide waren in jsdom unsichtbar.**
+
+- [x] Breite über den **ganzen Bereich 1024–1440 px** gemessen, beide Leisten
+      offen und eingeklappt, am Inhaltsbedarf statt an `scrollWidth`.
+
+      **Befund 1 — der Umbruchpunkt.** Angedockt ab `lg` mit 20 rem blieben bei
+      1024 px noch **433 px** Inhalt, und im Verzeichnis standen Namen auf EIN
+      Zeichen gekürzt. Ursache ist nicht die Leiste allein: die Raster des
+      Hauses (`MemberDirectory:554` — `sm:grid-cols-2 lg:grid-cols-3`) hängen am
+      **Viewport**, nicht an der Spalte, und bleiben dreispaltig, während die
+      Spalte schrumpft. Umgebaut auf **`xl` und 18 rem**. Gemessen danach:
+      1024 px → 753 px Inhalt (unverändert gegenüber vorher), 1280 px → 721 px,
+      1440 px → 881 px, überall **null** Überläufer.
+
+- [x] Nicht nur das Verzeichnis: `/chat` selbst (Leiste blendet aus, volle
+      Breite) und `/einstellungen` als `NARROW_ROUTE` — Lesespalte bei 760 px
+      gedeckelt, rechte Kante 1077 px, Leiste beginnt bei 1137 px.
+
+- [x] Beide Themes über `data-variant`.
+
+      **Befund 2 — zwei Flächen statt einer.** Im navy-Theme stand ein navyer
+      Kopf über einer weissen Liste. Im hellen Theme ist das unsichtbar, weil
+      dort beide Flächen weiss sind. Aufgelöst: eingeklappt ist die Leiste
+      **Chrome** (Rail wie links), aufgeklappt ist sie **Inhalt** — `ThreadList`
+      schreibt in `text-ink` auf `hover:bg-soft` und wäre auf Chrome unlesbar.
+
+- [x] Telefonbreite (375 px und 320 px): Drawer von rechts, gegenseitiger
+      Ausschluss, Escape, Backdrop, Sperre wird freigegeben. Null Überläufer.
+
+- [x] **Die zwei Nachrichten-Bedienelemente unter `xl` angesehen.** Sie bleiben
+      beide: die Kopfzeile braucht bei 320 px **268 px** und hat 52 px Reserve,
+      und die beiden tragen verschiedene Glyphen (Sprechblase = der Ort,
+      Pfeil = die Leiste). Der Grundsatz „ein Link, kein Knopf" bleibt heil.
+
+- [ ] Donald die laufende lokale Fassung zeigen. Server läuft auf
+      `http://localhost:5201` (`mess-a@test.local` / `Probe-2026-lokal`).
 
 ## 8. Abschluss
 

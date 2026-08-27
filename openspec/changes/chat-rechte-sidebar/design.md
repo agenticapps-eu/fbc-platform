@@ -160,3 +160,39 @@ Panel. Auf 1280 px bliebe für die Konversation eine Spalte von etwa 330 px.
 
 **Das Panel blendet auf Chatrouten aus.** Es ist die Abkürzung zu einer Fläche;
 auf der Fläche selbst ist es Doppelung.
+
+
+## Nachtrag aus der Sichtprobe: `xl`, nicht `lg`
+
+Der Plan sagte „angedockt ab `lg`". Am laufenden Bild hält das nicht, und der
+Grund liegt nicht in dieser Leiste, sondern in den Rastern, neben denen sie
+steht: `MemberDirectory` schaltet mit `sm:grid-cols-2 lg:grid-cols-3` am
+**Viewport**, nicht an der Spalte, die es tatsächlich bekommt. Die Leiste
+verengt die Spalte, das Raster merkt davon nichts und bleibt dreispaltig.
+
+Gemessen bei 1024 px mit 20 rem angedockt: **433 px** Inhaltsspalte, Namen im
+Verzeichnis auf ein Zeichen gekürzt. Mit `xl` und 18 rem sind es bei 1280 px
+**721 px** — praktisch die Dichte, die die Anwendung bei 1024 px ohnehin
+ausliefert. Das ist die Schwelle, und sie ist ausgerechnet, nicht gewählt: *die
+angedockte Leiste darf der Inhaltsspalte nie weniger lassen, als die Anwendung
+an ihrer schmalsten angedockten Breite schon ausliefert.*
+
+Zwischen `lg` und `xl` bleibt die Liste als Schublade erreichbar. Es geht also
+nichts verloren; es steht nur nicht dauerhaft im Weg.
+
+**Was das offen lässt:** die viewport-gebundenen Raster sind ein allgemeiner
+Mangel, den diese Änderung sichtbar gemacht, aber nicht verursacht hat. Container
+Queries wären die Antwort — als eigener Vorgang, nicht hier.
+
+## Nachtrag: die Leiste hat zwei Flächen, nicht eine
+
+Im navy-Theme stand ein navyer Kopf über einer weissen Liste. Auflösung:
+
+* **Eingeklappt** ist sie ein Rail wie links — **Chrome**, navy im navy-Theme.
+* **Aufgeklappt** trägt sie eine Liste, und die ist **Inhalt**: `ThreadList`
+  schreibt `text-ink` auf `hover:bg-soft` und wäre auf Chrome-Fläche unlesbar.
+  Ein zweiter, chrome-fähiger Aufguss der Liste widerspräche der Vorgabe, sie
+  wiederzuverwenden.
+
+Im hellen Theme ist der Unterschied unsichtbar, weil dort beide Flächen weiss
+sind. Er war nur im navy-Theme zu sehen — und nur im Browser.
