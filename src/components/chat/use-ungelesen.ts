@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import {
   fetchUnreadCounts,
   subscribeToAllMessages,
+  threadsQueryKey,
   unreadQueryKey,
   type UngelesenStand,
 } from "../../lib/chat";
@@ -81,6 +82,13 @@ export function useUngelesenLive(uid: string | null, offenerPfad: string): void 
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
         void queryClient.invalidateQueries({ queryKey: unreadQueryKey(uid) });
+        // Und die Liste selbst (AGE-627). Ohne diese Zeile bewegte sich die
+        // Blase an der Kopfzeile, während Vorschautext und Reihenfolge der
+        // Unterhaltungen stehen blieben — eine Fläche, deren Zahl läuft und
+        // deren Liste nicht, sieht kaputt aus. KEIN zweites Abo dafür:
+        // `subscribeToAllMessages` baut den Kanalnamen mit `randomUUID()`, ein
+        // zweiter Aufruf öffnete einen zweiten Kanal.
+        void queryClient.invalidateQueries({ queryKey: threadsQueryKey(uid) });
       }, ENTPRELLUNG_MS);
     });
     return () => {

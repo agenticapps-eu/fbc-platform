@@ -232,52 +232,88 @@ export function subscribeToAllMessages(onInsert: (message: ChatMessage) => void)
 export const threadsQueryKey = (uid: string) => ["chat", "threads", uid] as const;
 export const messagesQueryKey = (threadId: string) => ["chat", "messages", threadId] as const;
 
+/** Wieviele Threads eine Seite trägt. */
+export const THREADS_SEITE = 20;
+
+/** Eine Seite der Unterhaltungsliste; `nextOffset` ist null, wenn keine folgt. */
+export interface ChatThreadSeite {
+  threads: ChatThread[];
+  nextOffset: number | null;
+}
+
 /**
- * Lädt meine Threads (RLS: nur eigene), reichert den Partner über `profiles_public`
- * an und hängt die letzte Nachricht je Thread als Vorschau + Sortierschlüssel an.
- * Absteigend nach letzter Aktivität sortiert.
+ * Lädt EINE SEITE meiner Threads (RLS: nur eigene) und reichert den Partner an.
+ *
+ * Sortierung und Grenze liegen beim Server: `last_message_at` ist eine Spalte
+ * auf `message_threads` (Migration 20260827120000), gefuehrt von einem Trigger
+ * auf `messages`. Vorher lud diese Funktion ALLE Threads und ALLE Nachrichten
+ * aller dieser Threads und nahm im Client die jüngste je Thread — eine Last,
+ * die mit dem wächst, was Mitglieder SCHREIBEN, und die deshalb genau dann am
+ * größten ist, wenn der Chat funktioniert.
+ *
+ * `nullsFirst: false` ist Pflicht, nicht Kosmetik: `desc` ist in Postgres
+ * `nulls first`, ein Thread ohne einzige Nachricht stünde sonst ganz oben — und
+ * der Index (`… desc nulls last`) käme nicht zum Zug.
+ *
+ * Nicht nachsortieren: die Ordnung kommt vom Server, VOR der Grenze. Eine Seite
+ * nach dem Schneiden zu sortieren kann nur noch ordnen, was der Schnitt schon
+ * gewählt hat.
  */
-export async function fetchThreads(uid: string): Promise<ChatThread[]> {
+export async function fetchThreads(
+  uid: string,
+  { limit = THREADS_SEITE, offset = 0 }: { limit?: number; offset?: number } = {},
+): Promise<ChatThreadSeite> {
   const { data: threads, error } = await supabase
     .from("message_threads")
-    .select("id, a_profile_id, b_profile_id, created_at");
+    // Eine Zeichenkette am Stück: aus einer ZUSAMMENGESETZTEN leitet
+    // postgrest-js die Spaltentypen nicht mehr ab und das Ergebnis fällt auf
+    // `GenericStringError` zurück.
+    // prettier-ignore
+    .select("id, a_profile_id, b_profile_id, created_at, last_message_at, last_message_body, last_message_sender_id")
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   const rows = threads ?? [];
-  if (rows.length === 0) return [];
+  const nextOffset = rows.length === limit ? offset + limit : null;
+  if (rows.length === 0) return { threads: [], nextOffset: null };
 
   const partnerIds = [
     ...new Set(rows.map((t) => (t.a_profile_id === uid ? t.b_profile_id : t.a_profile_id))),
   ];
-  const threadIds = rows.map((t) => t.id);
 
-  const [profilesRes, lastMsgRes] = await Promise.all([
-    // Partner aus der Basistabelle `profiles` (NICHT `profiles_public`): die Chat-Route
-    // ist Prime+, und `profiles_select_self_or_prime` gibt Prime+ jede Profilzeile frei.
-    // So sieht man den Namen eines freigegebenen Kontakts auch dann, wenn dieser sein
-    // Profil NICHT öffentlich gestellt hat (profiles_public filtert `where is_public`).
-    supabase.from("profiles").select("id, name, avatar_url, company, tier").in("id", partnerIds),
-    // Neueste zuerst; pro Thread nimmt der Reduce die erste (= jüngste) Zeile.
-    supabase
-      .from("messages")
-      .select("thread_id, body, created_at, sender_id")
-      .in("thread_id", threadIds)
-      .order("created_at", { ascending: false }),
-  ]);
-  if (profilesRes.error) throw profilesRes.error;
-  if (lastMsgRes.error) throw lastMsgRes.error;
+  // Partner aus der Basistabelle `profiles` (NICHT `profiles_public`): die Chat-Route
+  // ist Prime+, und `profiles_select_self_or_prime` gibt Prime+ jede Profilzeile frei.
+  // So sieht man den Namen eines freigegebenen Kontakts auch dann, wenn dieser sein
+  // Profil NICHT öffentlich gestellt hat (profiles_public filtert `where is_public`).
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, name, avatar_url, company, tier")
+    .in("id", partnerIds);
+  if (profilesError) throw profilesError;
 
-  const partnerById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
-  const lastByThread = new Map<string, { body: string; created_at: string; sender_id: string }>();
-  for (const m of lastMsgRes.data ?? []) {
-    if (!lastByThread.has(m.thread_id)) lastByThread.set(m.thread_id, m);
-  }
-
+  const partnerById = new Map((profiles ?? []).map((p) => [p.id, p]));
   const partnerId = (t: (typeof rows)[number]) =>
     t.a_profile_id === uid ? t.b_profile_id : t.a_profile_id;
 
-  return rows
-    .map((t) => mapThreadRow(t, uid, partnerById.get(partnerId(t)), lastByThread.get(t.id) ?? null))
-    .sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+  return {
+    threads: rows.map((t) =>
+      mapThreadRow(
+        t,
+        uid,
+        partnerById.get(partnerId(t)),
+        t.last_message_at !== null &&
+          t.last_message_body !== null &&
+          t.last_message_sender_id !== null
+          ? {
+              body: t.last_message_body,
+              created_at: t.last_message_at,
+              sender_id: t.last_message_sender_id,
+            }
+          : null,
+      ),
+    ),
+    nextOffset,
+  };
 }
 
 /** Lädt die Nachrichten eines Threads, chronologisch (RLS: nur Teilnehmer). */

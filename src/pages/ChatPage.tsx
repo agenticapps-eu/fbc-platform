@@ -10,7 +10,6 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { useToast } from "../components/ui/toast-context";
 import {
   fetchMessages,
-  fetchThreads,
   markThreadRead,
   mergeMessage,
   messagesQueryKey,
@@ -21,6 +20,7 @@ import {
   type ChatMessage,
 } from "../lib/chat";
 import { useUngelesen } from "../components/chat/use-ungelesen";
+import { useThreadsSeite } from "../components/chat/use-threads-seite";
 import { cn } from "../lib/cn";
 import { useAuth } from "../providers/auth-context";
 
@@ -45,18 +45,19 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const threadsQuery = useQuery({
-    queryKey: threadsQueryKey(myId),
-    queryFn: () => fetchThreads(myId),
-    enabled: Boolean(myId),
-  });
+  // DERSELBE Hook wie die stehende Leiste — eine Datenquelle, ein Umfang, und
+  // zwar als Eigenschaft des Caches statt als Verabredung zwischen zwei
+  // Flächen. Die Invalidierungen weiter unten stehen unverändert unter
+  // demselben Schlüssel.
+  const threadsQuery = useThreadsSeite(myId || null);
 
   // Derselbe Query-Schlüssel wie Kopfzeile und Profilkachel — React Query
   // bündelt die drei, und sie können nicht auseinanderlaufen (AGE-583).
   const { stand: ungelesen } = useUngelesen(myId || null);
 
   const activeId = threadId ?? null;
-  const activeThread = threadsQuery.data?.find((t) => t.id === activeId) ?? null;
+  const threads = threadsQuery.data?.pages.flatMap((seite) => seite.threads) ?? [];
+  const activeThread = threads.find((t) => t.id === activeId) ?? null;
 
   const messagesQuery = useQuery({
     queryKey: messagesQueryKey(activeId ?? ""),
@@ -134,8 +135,6 @@ export default function ChatPage() {
     }
   }
 
-  const threads = threadsQuery.data ?? [];
-
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-6">
@@ -179,6 +178,21 @@ export default function ChatPage() {
               onSelect={(id) => navigate(`/chat/${id}`)}
               ungelesenJeThread={ungelesen.jeThread}
             />
+            {/* Ohne diesen Knopf wäre alles jenseits der ersten Seite dauerhaft
+                unerreichbar — eine Grenze ohne Weg dahinter ist keine Seite,
+                sondern eine stille Kappung. */}
+            {threadsQuery.hasNextPage && (
+              <div className="flex justify-center p-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void threadsQuery.fetchNextPage()}
+                  disabled={threadsQuery.isFetchingNextPage}
+                >
+                  {threadsQuery.isFetchingNextPage ? "Wird geladen…" : "Weitere Gespräche"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Konversation: mobil nur sichtbar, wenn ausgewählt. */}

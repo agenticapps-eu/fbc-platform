@@ -10,6 +10,7 @@ import {
   incomingRequestsQueryKey,
 } from "../lib/contact-requests";
 import { useAuth } from "../providers/auth-context";
+import { ChatPanel } from "./chat/ChatPanel";
 import { useUngelesen, useUngelesenLive } from "./chat/use-ungelesen";
 import { HinweisGlocke } from "./hinweise/HinweisGlocke";
 import { useHinweise, useHinweiseLive, useHinweisMarkieren } from "./hinweise/use-hinweise";
@@ -52,6 +53,41 @@ function readCollapsed(): boolean {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+/** Breite der angedockten Nachrichten-Leiste, offen und eingeklappt (AGE-627).
+ *
+ *  18rem und nicht 20rem, und angedockt erst ab `xl` — beides ist gemessen, nicht
+ *  gewählt. Die Inhaltsspalte trägt bei 1024 px ohne diese Leiste 753 px, und die
+ *  Raster des Hauses (`sm:grid-cols-2 lg:grid-cols-3`) hängen am VIEWPORT, nicht
+ *  an der Spalte: sie bleiben dreispaltig, während die Spalte schrumpft. Mit
+ *  20rem angedockt ab `lg` blieben bei 1024 px noch 433 px, und im Verzeichnis
+ *  standen Namen auf EIN Zeichen gekürzt — im Bild nachgesehen, nicht vermutet.
+ *  Ab `xl` mit 18rem sind es 721 px, also praktisch die Dichte, die die Anwendung
+ *  bei 1024 px ohnehin ausliefert. */
+const CHAT_W_OPEN = "18rem";
+const CHAT_W_RAIL = "4.5rem";
+
+/** EIGENER Schlüssel, getrennt von `fbc.sidebarCollapsed`. Die beiden Leisten
+ *  merken sich unabhängig voneinander, was sie sind — eine gemeinsame
+ *  Einstellung hiesse, dass das Einklappen der Navigation die Nachrichten
+ *  mitnimmt, und das hat nie jemand verlangt. */
+const CHAT_COLLAPSED_KEY = "fbc.chatCollapsed";
+
+/** Der Umbruchpunkt der Nachrichten-Leiste — `xl`, nicht `lg`. Er steht als
+ *  Zeichenkette hier, weil ihn zwei Stellen brauchen: die Zustandsgrösse
+ *  `istBreit` und der Effect, der die Schublade beim Sprung schliesst. */
+const CHAT_MQ = "(min-width: 1280px)";
+
+/** Startwert EINGEKLAPPT, anders als links. Die Leiste holt im offenen Zustand
+ *  eine Seite Threads; niemand soll dafür bezahlen, bevor er sie aufgemacht
+ *  hat. Wer sie aufklappt, findet sie beim nächsten Mal offen vor. */
+function readChatCollapsed(): boolean {
+  try {
+    return localStorage.getItem(CHAT_COLLAPSED_KEY) !== "0";
+  } catch {
+    return true;
   }
 }
 
@@ -405,6 +441,36 @@ export default function AppShell() {
       // Privater Modus o. Ä. — die Leiste funktioniert, sie merkt sich nur nichts.
     }
   }, [collapsed]);
+
+  // ── Die Nachrichten-Leiste rechts (AGE-627) ───────────────────────────────
+  //
+  // Sie steht NICHT auf den Chatrouten: dort ist die Liste schon die Seite, und
+  // eine zweite Kopie nähme der Konversation die Breite, für die sie da ist.
+  // Und sie steht nicht für einen Gast: der Rahmen wird ihm auch gerendert, und
+  // ein Einstieg in eine Fähigkeit, die er nicht hat, ist ein Versprechen ins
+  // Leere.
+  const aufChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
+  const chatLeisteSteht = Boolean(user) && !aufChatRoute;
+
+  const [chatCollapsed, setChatCollapsed] = useState(readChatCollapsed);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_COLLAPSED_KEY, chatCollapsed ? "1" : "0");
+    } catch {
+      // Wie links: die Leiste funktioniert, sie merkt sich nur nichts.
+    }
+  }, [chatCollapsed]);
+
+  // Die angedockte Leiste liegt unter `lg` per CSS verborgen, ist aber montiert.
+  // Ohne diese Zustandsgrösse holte sie dort eine Seite Threads, die niemand zu
+  // sehen bekommt — CSS verbirgt, es hält keine Abfrage an.
+  // `xl`, nicht `lg` — siehe die Begründung an CHAT_W_OPEN. Der Startwert liest
+  // DIESELBE Abfrage wie der Effect unten: stünde hier eine andere, montierte
+  // der erste Anstrich das Panel und holte eine Seite Threads, bevor der Effect
+  // es zurücknimmt. Genau das ist beim Umbau passiert und nur aufgefallen, weil
+  // ein Test die Breite 1152 stellt.
+  const [istBreit, setIstBreit] = useState(() => window.matchMedia(CHAT_MQ).matches);
   useEffect(() => {
     if (!mobileNavOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -419,9 +485,33 @@ export default function AppShell() {
   // niemandem auf; mit der Scroll-Sperre daran (AGE-529) wäre die Seite danach
   // DAUERHAFT gesperrt, ohne sichtbaren Grund. Also hier schließen.
   useEffect(() => {
+    if (!chatDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setChatDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [chatDrawerOpen]);
+
+  useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const auf = () => {
       if (mq.matches) setMobileNavOpen(false);
+    };
+    auf();
+    mq.addEventListener("change", auf);
+    return () => mq.removeEventListener("change", auf);
+  }, []);
+
+  // Eigener Umbruchpunkt für die Nachrichten-Leiste. Dieselbe Behandlung wie
+  // links, und aus demselben Grund: ab `xl` verschwindet die Schublade NUR per
+  // CSS, der Zustand bliebe offen — samt Scroll-Sperre, und die Seite wäre
+  // danach dauerhaft gesperrt, ohne sichtbaren Grund.
+  useEffect(() => {
+    const mq = window.matchMedia(CHAT_MQ);
+    const auf = () => {
+      setIstBreit(mq.matches);
+      if (mq.matches) setChatDrawerOpen(false);
     };
     auf();
     mq.addEventListener("change", auf);
@@ -432,6 +522,15 @@ export default function AppShell() {
   // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon
   // erscheint. Genau dort zählt die iOS-feste Sperre am meisten.
   const mobileNav = useOverlay(mobileNavOpen);
+  const chatDrawer = useOverlay(chatDrawerOpen);
+
+  /** Ein Thread wird gewählt: Adresse auf, Schublade zu. Ohne das Schliessen
+   *  stünde sie samt Scroll-Sperre über der neuen Seite — links tut das
+   *  `onNavigate`. */
+  function chatOeffnen(threadId: string) {
+    setChatDrawerOpen(false);
+    navigate(`/chat/${threadId}`);
+  }
 
   async function handleSignOut() {
     await signOut();
@@ -444,6 +543,13 @@ export default function AppShell() {
       style={
         {
           "--fbc-sidebar-w": collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN,
+          // Steht die Leiste nicht — oder ist der Schirm schmaler als `xl` —,
+          // ist der Versatz 0, und die Regel in index.css wirkt wie vor
+          // AGE-627. Das erspart eine ZWEITE Media Query im Stylesheet: der
+          // Umbruchpunkt der Leiste ist ein anderer als der der Navigation,
+          // und zwei Regeln mit zwei Grenzen liefen auseinander.
+          "--fbc-chat-w":
+            chatLeisteSteht && istBreit ? (chatCollapsed ? CHAT_W_RAIL : CHAT_W_OPEN) : "0rem",
         } as React.CSSProperties
       }
     >
@@ -506,6 +612,88 @@ export default function AppShell() {
         </div>
       </aside>
 
+      {/* Nachrichten-Leiste (≥ lg, AGE-627): gespiegelt zur linken — bündig an
+          der rechten Viewport-Kante, `border-l` statt `border-r`, dieselbe
+          Fläche. Sie ist KEINE Kopie: sie steht nur angemeldet und nur
+          ausserhalb der Chatrouten, und ihr Startzustand ist eingeklappt. */}
+      {/* Zwei Flächen, nicht eine — und das ist im navy-Theme gemessen, nicht
+          gewählt. EINGEKLAPPT ist die Leiste ein Rail wie links: Chrome, navy
+          im navy-Theme. AUFGEKLAPPT trägt sie eine LISTE, und die ist Inhalt:
+          `ThreadList` schreibt in `text-ink` auf `hover:bg-soft`. Auf
+          Chrome-Fläche wäre sie unlesbar, und ein zweiter, chrome-fähiger
+          Aufguss der Liste widerspräche der Vorgabe, sie wiederzuverwenden.
+          Ohne diese Fallunterscheidung stand im navy-Theme ein navyer Kopf über
+          einer weissen Liste — im Bild gesehen, im hellen Theme unsichtbar,
+          weil dort beide Flächen weiss sind. */}
+      {chatLeisteSteht && (
+        <aside
+          className={cn(
+            "fbc-chat-rail fixed inset-y-0 right-0 z-40 hidden flex-col border-l xl:flex",
+            chatCollapsed ? cn("border-chrome-border", SIDEBAR_SURFACE) : "border-line bg-canvas",
+          )}
+        >
+          {chatCollapsed ? (
+            // Eingeklappt: NUR die Sprechblase mit dem Zähler. Kein Thread wird
+            // dafür geladen — die Zahl führt `useUngelesen` ohnehin getrennt.
+            <div className="flex h-16 shrink-0 items-center justify-center border-b border-chrome-border px-2">
+              <button
+                type="button"
+                onClick={() => setChatCollapsed(false)}
+                aria-expanded={false}
+                aria-label={
+                  ungelesenFehlt
+                    ? "Nachrichten ausklappen — Anzahl konnte nicht geladen werden"
+                    : ungelesen.gesamt > 0
+                      ? `Nachrichten ausklappen, ${ungelesen.gesamt} ungelesen`
+                      : "Nachrichten ausklappen"
+                }
+                className="relative rounded-md p-2 text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <Icon name="messages" className="h-5 w-5" />
+                {(ungelesenFehlt || ungelesen.gesamt > 0) && (
+                  // `aria-hidden`: die Zahl steht schon im Namen des Knopfes.
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-accent px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
+                  >
+                    {ungelesenFehlt ? "!" : ungelesen.gesamt}
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
+              <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
+              <button
+                type="button"
+                onClick={() => setChatCollapsed(true)}
+                aria-expanded={true}
+                aria-label="Nachrichten einklappen"
+                title="Einklappen"
+                className="rounded-md p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <ChevronLeftIcon flipped />
+              </button>
+            </div>
+          )}
+
+          {/* `istBreit` gehört in die MONTAGE, nicht in einen Schalter am Panel:
+              unter `lg` liegt diese Leiste per CSS verborgen, aber montiert —
+              CSS verbirgt, es hält keine Abfrage an. Ohne diese Bedingung
+              holte sie dort eine Seite Threads, die niemand zu sehen bekommt. */}
+          {!chatCollapsed && istBreit && (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ChatPanel
+                uid={user?.id ?? null}
+                activeId={null}
+                onSelect={chatOeffnen}
+                ungelesenJeThread={ungelesen.jeThread}
+              />
+            </div>
+          )}
+        </aside>
+      )}
+
       {/* Header — beginnt rechts neben der Sidebar, nicht darüber. Links
           Hamburger/Logo (nur mobil), Suche mittig, rechts Avatar/Benachrichtigungen. */}
       <header className="fbc-shell-offset sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur">
@@ -513,7 +701,10 @@ export default function AppShell() {
           <button
             type="button"
             aria-label="Menü öffnen"
-            onClick={() => setMobileNavOpen(true)}
+            onClick={() => {
+              setChatDrawerOpen(false);
+              setMobileNavOpen(true);
+            }}
             className="rounded-md p-2 text-ink transition-colors hover:bg-ink/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden"
           >
             <MenuIcon />
@@ -567,6 +758,29 @@ export default function AppShell() {
             {user ? (
               <>
                 <NachrichtenEinstieg anzahl={ungelesen.gesamt} unbekannt={ungelesenFehlt} />
+                {/* Eigener Öffner für die Schublade, gespiegelt zum Hamburger
+                    links — und ausdrücklich NICHT die Sprechblase daneben zum
+                    Umschalter gemacht: die führt an einen Ort, und ein Ort
+                    gehört in die Adresszeile und ins Kontextmenü (der Grundsatz
+                    an `NachrichtenEinstieg`). Deshalb auch ein anderes Glyph:
+                    zwei gleiche Sprechblasen nebeneinander wären zwei Namen für
+                    dasselbe. Der Pfeil sagt, was passiert — eine Leiste kommt
+                    von rechts herein. */}
+                {chatLeisteSteht && (
+                  <button
+                    type="button"
+                    aria-label="Nachrichten-Leiste öffnen"
+                    onClick={() => {
+                      // Gegenseitiger Ausschluss: zwei offene Schubladen
+                      // hielten zwei Sperren auf demselben Body.
+                      setMobileNavOpen(false);
+                      setChatDrawerOpen(true);
+                    }}
+                    className="rounded-md p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent xl:hidden"
+                  >
+                    <ChevronLeftIcon flipped={false} />
+                  </button>
+                )}
                 <HinweisGlocke
                   hinweise={hinweise}
                   unbekannt={hinweiseFehlen}
@@ -633,6 +847,45 @@ export default function AppShell() {
                 Ort, an dem der Zugang jetzt noch steht. */}
             <div className="mt-6 border-t border-chrome-border pt-2">
               <FeedbackButton />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nachrichten-Schublade (< lg, AGE-627) — von rechts, gespiegelt zur
+          Navigation links. `useOverlay` bringt Sperre und Tab-Falle mit; Escape
+          liegt als eigener Effect daneben, genau wie links. */}
+      {chatDrawerOpen && chatLeisteSteht && (
+        <div
+          ref={chatDrawer}
+          className="fixed inset-0 z-50 xl:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Nachrichten"
+        >
+          <div
+            className="absolute inset-0 bg-scrim backdrop-blur-sm"
+            onClick={() => setChatDrawerOpen(false)}
+          />
+          <div className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-canvas shadow-soft">
+            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
+              <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
+              <button
+                type="button"
+                onClick={() => setChatDrawerOpen(false)}
+                aria-label="Nachrichten-Leiste schließen"
+                className="rounded-md p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <ChevronLeftIcon flipped />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ChatPanel
+                uid={user?.id ?? null}
+                activeId={null}
+                onSelect={chatOeffnen}
+                ungelesenJeThread={ungelesen.jeThread}
+              />
             </div>
           </div>
         </div>

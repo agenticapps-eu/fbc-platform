@@ -647,11 +647,19 @@ export type Database = {
         Relationships: [];
       };
       message_threads: {
+        // last_message_* fuehrt messages_thread_aktivitaet() (AGE-627). Die
+        // drei Spalten stehen bewusst NUR in Row: authenticated haelt kein
+        // UPDATE auf dieser Tabelle, und ein beim INSERT mitgegebener Wert
+        // wird vom BEFORE-Trigger verworfen. Sie in Insert/Update zu fuehren
+        // hiesse, einen Schreibweg anzubieten, den es nicht gibt.
         Row: {
           a_profile_id: string;
           b_profile_id: string;
           created_at: string;
           id: string;
+          last_message_at: string | null;
+          last_message_body: string | null;
+          last_message_sender_id: string | null;
         };
         Insert: {
           a_profile_id: string;
