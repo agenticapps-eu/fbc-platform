@@ -21,11 +21,22 @@ vi.mock("../../lib/directory", async (o) => ({
   ...(await o<typeof import("../../lib/directory")>()),
   fetchDirectoryBaseline: vi.fn(),
 }));
+vi.mock("../../lib/event-cover", async (o) => ({
+  ...(await o<typeof import("../../lib/event-cover")>()),
+  signEventCovers: vi.fn(),
+}));
+vi.mock("../../lib/post-media", async (o) => ({
+  ...(await o<typeof import("../../lib/post-media")>()),
+  signPostMedia: vi.fn(),
+}));
 
 import { fetchDashboard } from "../../lib/dashboard";
 import { fetchEvents } from "../../lib/events";
 import { fetchFeed } from "../../lib/feed";
 import { fetchDirectoryBaseline } from "../../lib/directory";
+import { signEventCovers } from "../../lib/event-cover";
+import { signPostMedia } from "../../lib/post-media";
+import type { FeedPost } from "../../lib/feed";
 import { MemberDashboard } from "./MemberDashboard";
 
 const DASH: DashboardData = {
@@ -80,6 +91,8 @@ beforeEach(() => {
   vi.mocked(fetchDashboard).mockReset().mockResolvedValue(DASH);
   vi.mocked(fetchEvents).mockReset().mockResolvedValue([]);
   vi.mocked(fetchFeed).mockReset().mockResolvedValue({ posts: [], nextCursor: null });
+  vi.mocked(signEventCovers).mockReset().mockResolvedValue({});
+  vi.mocked(signPostMedia).mockReset().mockResolvedValue({});
   vi.mocked(fetchDirectoryBaseline).mockReset().mockResolvedValue(MEMBERS);
 });
 
@@ -120,5 +133,67 @@ describe("MemberDashboard", () => {
   it("zeigt einen Leerzustand statt Fake-Daten, wenn kein Event ansteht", async () => {
     renderDash();
     expect(await screen.findByText("Aktuell kein Event geplant")).toBeInTheDocument();
+  });
+});
+
+/** Ein Beitrag mit allen Pflichtfeldern; die Abweichung kommt je Test dazu. */
+function beitrag(over: Partial<FeedPost> = {}): FeedPost {
+  return {
+    id: "p1",
+    author: { id: "a1", name: "Carla Beispiel", avatarUrl: null, tier: "impact" },
+    body: "",
+    hashtags: [],
+    visibility: "public",
+    createdAt: "2026-08-27T10:00:00Z",
+    likeCount: 0,
+    commentCount: 0,
+    likedByMe: false,
+    savedByMe: false,
+    media: [],
+    videoUrl: null,
+    kind: "member",
+    event: null,
+    ...over,
+  } as FeedPost;
+}
+
+describe("Vorschaubilder in der Aktivitätsliste (AGE-635)", () => {
+  it("zeigt das Cover eines Event-Beitrags", async () => {
+    vi.mocked(fetchFeed).mockResolvedValue({
+      posts: [
+        beitrag({
+          kind: "event",
+          event: {
+            id: "e1",
+            title: "FBC Weekly Onlinetreffen",
+            startsAt: "2026-09-01T18:00:00Z",
+            location: null,
+            coverPath: "e1/cover.jpg",
+          },
+        }),
+      ],
+      nextCursor: null,
+    });
+    vi.mocked(signEventCovers).mockResolvedValue({ "e1/cover.jpg": "blob:signiert-cover" });
+
+    renderDash();
+
+    const bild = await screen.findByRole("img", { name: "FBC Weekly Onlinetreffen" });
+    expect(bild).toHaveAttribute("src", "blob:signiert-cover");
+  });
+
+  it("lässt bei einem Beitrag ohne Bild und ohne Event die Fläche ganz weg", async () => {
+    // Kein Platzhalterkasten: eine leere Fläche rechts sieht aus wie ein Bild,
+    // das nicht geladen hat, und lässt die Zeile springen.
+    vi.mocked(fetchFeed).mockResolvedValue({
+      posts: [beitrag({ body: "Nur Text." })],
+      nextCursor: null,
+    });
+
+    renderDash();
+
+    await screen.findByText("Nur Text.");
+    const liste = screen.getByText("Nur Text.").closest("li")!;
+    expect(liste.querySelector("img")).toBeNull();
   });
 });
