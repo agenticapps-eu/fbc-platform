@@ -167,3 +167,40 @@ bei der heutigen Clubgröße hat niemand mehr als eine Seite. Die Anforderung
 steht trotzdem, weil sie generell gilt (Donald: „Listen immer mit Paging") und
 weil der teure Teil ohnehin die *Nachrichten*menge war, die der Trigger jetzt
 komplett aus der Abfrage nimmt.
+
+---
+
+## Diff-Review nach der Umsetzung (27.08.) — NICHT ZUSTANDE GEKOMMEN
+
+Der Ablauf verlangt an dieser Stelle eine Diff-Review durch einen fremden
+Anbieter. **Alle drei am 27.08. verfügbaren Arme haben versagt**, und zwar auf
+drei verschiedene Weisen. Das steht hier, weil ein fehlender Beleg leicht wie
+ein erbrachter aussieht, sobald niemand mehr danach fragt.
+
+| Arm | Ergebnis |
+| --- | --- |
+| `opencode run` | Antwortet mit **gar nichts**. Der Lauf über den ganzen Diff las die Datei in vier Stücken und endete dann still (Exit 0, sechs Zeilen Ausgabe, keine Befunde). Ein zweiter, auf zwei Dateien verengter Lauf gab nur noch die Kopfzeile `> build · hf:moonshotai/Kimi-K3` aus. |
+| `codex exec` | Lud die **gstack-Skill-Sammlung** in seine Antwort statt zu prüfen: 4354 Zeilen Ausgabe, darin die Anweisungstexte von `/plan-tune`, `gstack-team-init` und der Review-Gates — und kein einziger Befund zum Diff. |
+| `cursor-agent -p` | `Authentication required. Please run 'agent login' first`. Bekannt, siehe Memory. |
+
+**Was stattdessen als Beleg dasteht.** Kein Ersatz für eine fremde Sicht, aber
+auch nicht nichts:
+
+* **Zehn Gegenproben**, je eine Mutation an genau einer Stelle, und jedes Mal
+  fiel genau der gemeinte Test — nicht mehr und nicht weniger:
+  BEFORE-INSERT-Trigger entfernt · Vorwärts-Bedingung entfernt · Routenprüfung
+  entfernt · Anmeldeprüfung entfernt · `istBreit` aus der Montage entfernt ·
+  Ausschluss am Chat-Öffner entfernt · Ausschluss am Hamburger entfernt ·
+  `xl`-Sprung schliesst nicht · Fehlerzustand entfernt · Umbruchpunkt zurück
+  auf `lg`.
+* **Die Sichtprobe am laufenden Bild** hat zwei Planentscheidungen umgeworfen
+  (Umbruchpunkt und Flächentrennung) — beides Dinge, die eine Diff-Review am
+  Text kaum gefunden hätte.
+* **Ein echter Fehler ist beim Umbau durch einen Test aufgefallen**, nicht durch
+  Nachdenken: der Startwert von `istBreit` las noch `lg`, während der Effect
+  schon `xl` prüfte.
+
+**Offen bleibt**, was nur eine fremde Sicht liefert: eine unabhängige Prüfung
+der Trigger-Korrektheit unter Nebenläufigkeit und der Frage, ob die drei neuen
+Spalten irgendwo weiter reichen als die Nachrichten, die sie zusammenfassen.
+Beides ist hier argumentiert und in pgTAP gemessen, aber von derselben Hand.

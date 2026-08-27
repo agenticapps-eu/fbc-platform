@@ -198,13 +198,18 @@ Entscheidungen umgeworfen — beide waren in jsdom unsichtbar.**
 
 ## 8. Abschluss
 
-- [ ] Volle Suite (`vitest run` ohne Pfadfilter) — ein Teillauf hat in AGE-625
-      einen Wächter in `src/components/ui` verfehlt, während die CI rot war.
-- [ ] `supabase test db` **mit Dateiliste** — ohne sie meldet der Befehl FAIL
-      trotz grün.
-- [ ] `openspec validate --all` grün.
+- [x] Volle Suite (`vitest run` ohne Pfadfilter): **1870 Zusagen in 166 Dateien**,
+      grün. Typecheck grün, Lint 0 Fehler (5 vorbestehende Warnungen).
+- [x] `supabase test db` **mit Dateiliste**: 14 Dateien, **835 Zusagen**, grün —
+      auch nach `supabase db reset`.
+- [x] `openspec validate --all` grün (29/29).
 - [ ] **Nach `db push` auf DEV und PROD:** zählen, wieviele Threads MIT
       Nachricht ein leeres `last_message_at` haben. Erwartet: null. Das ist der
       einzige echte Beleg für die Rückfüllung aus Band 1.
-- [ ] Diff-Review durch einen fremden Anbieter.
-- [ ] `REVIEWS.md` um die Auflösung der übrigen Befunde ergänzen.
+- [ ] ~~Diff-Review durch einen fremden Anbieter~~ — **nicht zustande gekommen.**
+      Alle drei Arme haben am 27.08. versagt: `opencode` antwortet gar nichts,
+      `codex` lädt die gstack-Skill-Sammlung statt zu prüfen, `cursor-agent`
+      will ein Login. Ausführlich in `REVIEWS.md`, samt dem, was stattdessen an
+      Belegen dasteht (zehn Gegenproben, die Sichtprobe, ein so gefundener
+      Fehler). **Bleibt offen und ist nicht ersetzt.**
+- [x] `REVIEWS.md` um die Auflösung der übrigen Befunde ergänzt.
