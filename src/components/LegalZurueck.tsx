@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Icon } from "./ui/icons";
 
 /**
  * Der Rückweg am Kopf einer Rechtsseite (AGE-625).
@@ -31,24 +32,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
  * er führt.
  */
 
-/** Der Pfeil. Inline statt aus einem Satz: ein Zeichen, ein Nutzer. */
-function PfeilLinks() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="h-4 w-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12.5 16 6.5 10l6-6" />
-    </svg>
-  );
-}
-
 const STIL =
   "-ml-1 mt-6 inline-flex items-center gap-1.5 rounded-md px-1 py-1 text-sm text-muted " +
   "transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 " +
@@ -63,7 +46,7 @@ export default function LegalZurueck() {
   if (key === "default") {
     return (
       <Link to="/" className={STIL}>
-        <PfeilLinks />
+        <Icon name="chevronLeft" className="h-4 w-4 shrink-0" />
         Zurück zur Startseite
       </Link>
     );
@@ -71,7 +54,7 @@ export default function LegalZurueck() {
 
   return (
     <button type="button" onClick={() => navigate(-1)} className={STIL}>
-      <PfeilLinks />
+      <Icon name="chevronLeft" className="h-4 w-4 shrink-0" />
       Zurück
     </button>
   );
