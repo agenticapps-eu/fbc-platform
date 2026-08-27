@@ -1,127 +1,150 @@
-# Session Handoff — 2026-08-27 (einundvierzigste Sitzung)
+# Session Handoff — 2026-08-27 (zweiundvierzigste Sitzung, nachmittags)
 
-> **Beide Worktrees dieser Sitzung sind gemergt** (#244, #245) und können weg:
-> `../fbc-platform.donald-age-627-chat-rechte-sidebar` und
-> `../fbc-platform.age-631-release-notes`. Der 583er-Branch
-> `donald/handoff-27-08` ist weiter überholt.
-
-Zwei Vorgänge komplett gebaut und **beide gemergt**, ein neuer Vorgang angelegt.
-**Was jetzt fehlt, ist der `db push` — und daran hängt der nächste
-Frontend-Deploy.**
+**PROD ist migriert** (beide Migrationen aus der Vormittagssitzung), fünf
+Vorgänge sind gebaut, drei davon live. Der wichtigste offene Punkt steht unter
+„Next session".
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-627** Chat als rechte Leiste | ✅ **gemergt** (#244), 8 Bänder |
-| **AGE-631** Release-Notes an alle | ✅ **gemergt** (#245), 6 Bänder |
+| **AGE-631** Vorauswahl „letzte Woche" | ✅ gemergt (#250) |
+| **AGE-633** Preise nur für Nicht-`impact` | ✅ gemergt (#251) |
+| **AGE-632** Release-Note als Modal + Screenshots | ✅ gemergt (#252) |
+| **AGE-635** Event-Cover in der Aktivitätsliste | ✅ gemergt (#254) |
+| **AGE-634** Admin setzt die Stufe | 🔶 PR #253, rebast, CI läuft — **danach `migrate-prod`** |
 
 ## Accomplished
 
-### AGE-627 — Bänder 1 bis 8, gemergt als #244
+### PROD-Migration (der Punkt 1 des Vormittags-Handoffs)
 
-Datenschicht: `message_threads` trägt drei Aktivitätsspalten, geführt von einem
-`security definer`-Trigger; `fetchThreads` lädt eine serverseitig sortierte,
-begrenzte Seite statt aller Threads samt aller Nachrichten. Fläche: angedockte
-Leiste rechts, darunter Schublade.
+`migrate-prod` dispatcht, `plan` und `apply` grün, danach Drift-Gate **und**
+Objekt-Drift-Scan grün. Damit war der seit drei Läufen blockierte Frontend-Deploy
+wieder frei.
 
-**Zwei Dinge, die der Plan nicht hatte** — die INSERT-Tür (ein Mitglied konnte
-beim Anlegen des Threads eine erfundene Vorschauzeile setzen) und der
-Vorwärts-nur-Sortierschlüssel (`messages.created_at` ist vom Client setzbar).
+**Nicht gemessen:** die Rückfüll-Kontrolle aus AGE-627 (Threads mit Nachricht und
+leerem `last_message_at`, erwartet null) — das FBC-Projekt hängt nicht an der
+Supabase-MCP-Verbindung (dort ist nur `cparx`), die PROD-DB-URL liegt hinter
+einem TTY. **Bleibt offen.**
 
-**Zwei Dinge, die die Sichtprobe umgeworfen hat:** angedockt ab `xl` mit 18rem
-statt ab `lg` mit 20rem — bei 1024 px blieben sonst 433 px Inhaltsspalte und im
-Verzeichnis standen Namen auf EIN Zeichen gekürzt, weil die Raster des Hauses am
-**Viewport** hängen und nicht an der Spalte. Und die Leiste hat zwei Flächen:
-eingeklappt Chrome, aufgeklappt Inhalt (im navy-Theme stand sonst ein navyer
-Kopf über einer weissen Liste).
+### AGE-631 — die letzte Woche ist vorangehakt
 
-### AGE-631 — neu angelegt und gleich gebaut
+`ausLetzterWoche(eintraege, heute)` hakt die Einträge der letzten sieben Tage
+vor; die Liste bleibt vollständig, älteres steht ungehakt darin. Der Zustand ist
+**abgeleitet**: `gewaehlt === null` heisst „noch nicht angefasst", `[]` heisst
+„nichts gewählt" — ohne die Unterscheidung stünden nach dem Zustellen sofort
+wieder Häkchen da.
 
-Ein Admin sieht unter `/admin/neuigkeiten`, was seit dem letzten Mal
-ausgeliefert wurde, fasst mehrere Änderungen zu **einer** Nachricht zusammen,
-schreibt sie um und stellt sie allen aktivierten Mitgliedern zu. `/neues` hält
-sie danach, die Glocke verlinkt dorthin.
+### AGE-632 — Modal, Bilder, Deep-Link
 
-Drei tragende Entscheidungen, alle in `design.md` begründet: die Liste entsteht
-**zur Bauzeit** (kein `service_role`-Weg aus der CI in die PROD-Datenbank), der
-**bedingte Zustandswechsel** vor dem Fan-out ist der Riegel gegen die
-Doppelzustellung, und es gibt **kein Opt-out** — der Ausgleich ist `/neues`.
+Portal an `document.body` (`.fbc-card:hover` und der `backdrop-filter` des Kopfes
+fangen `fixed` sonst ein), `useOverlay` aus AGE-529, Offen-Zustand als
+`?note=<id>`. Drei Screenshots unter `public/release/`, gegen den lokalen Stack
+mit erfundenen Konten.
+
+### AGE-634 — `admin_set_tier`
+
+Setzt in **beide** Richtungen (das kann `apply_upgrade` nicht), mit
+Pflichtbegründung und einer `admin_audit`-Zeile, die alte **und** neue Stufe
+trägt. 12 pgTAP-Zusagen in `ci.yml`; `code_as()` gibt den SQLSTATE zurück, weil
+`try_as()` jeden Fehler als `DENIED:` meldet.
 
 ## Decisions
 
-- **AGE-627 dockt ab `xl`, nicht ab `lg`** — ausgerechnet, nicht gewählt: die
-  Leiste darf der Inhaltsspalte nie weniger lassen, als die Anwendung an ihrer
-  schmalsten angedockten Breite ohnehin ausliefert (1024 px → 753 px).
-- **AGE-631: kein Opt-out für `release_note`.** Die vier Schalter aus AGE-620
-  schützen vor dem Lärm *anderer Mitglieder*. Eine Release-Note ist eine
-  Mitteilung über das Werkzeug selbst. Technisch fällt das von selbst heraus:
-  `hinweis_erwuenscht` antwortet für einen Typ ohne Schalter mit `true`.
-- **AGE-631 widerspricht `specs/admin` NICHT.** Die Klausel „die Mitgliederliste
-  ist keine Empfängerauswahl" bleibt unberührt — die neue Fläche hat gar keine.
-  Die Klausel gegen Massen-Mail/CRM bekommt eine benannte Ausnahme.
-- **Nur `release_note` bekommt ein Ziel in der Glocke.** Den anderen sieben eines
-  anzudichten wäre eine Änderung an sieben Flächen in einem Change, der von einer
-  handelt.
+- **Kein YouTube-Standbild in der Aktivitätsliste (AGE-635).** Es käme von
+  `img.youtube.com` — derselbe Aufruf an den Anbieter samt IP, den das
+  Einwilligungstor aus AGE-611/621 verhindert; `VideoEmbed.tsx:34` sagt das
+  ausdrücklich, ein Test hält es fest. Ausgeliefert wurde nur das **Event-Cover**
+  (eigener Bucket). Der saubere Weg für Videos wäre ein Standbild erst nach
+  erteilter Freigabe (`useFreigabe`) — **Donalds Entscheidung, noch offen.**
+- **Bilder hängen am Change, nicht an der Note.** Verworfen: eine Spalte auf
+  `release_notes` mit Upload — sie kostete Migration, Bucket und Policies und
+  bräche die Konstruktion „was im Bündel steht, ist ausgeliefert".
+- **`tier` bleibt draussen aus `admin_update_profile`.** Eine Stufe zu setzen ist
+  kein Pflegen von Stammdaten; eigene RPC, eigene Spur, eigene Begründung.
+- **„Alles Admin-mässige raus" betrifft nur den TEXT der Release-Note**, nicht die
+  Auswahl und nicht die App (Donald, ausdrücklich). Die technischen Changes
+  bleiben angehakt, damit sie als angekündigt verbucht sind.
 
 ## Files modified
 
-- **AGE-627** (auf `main` via #244): `supabase/migrations/20260827120000_*`,
-  `supabase/tests/thread_aktivitaet_test.sql`, `src/lib/chat.ts`,
-  `src/components/AppShell.tsx`, `src/components/chat/ChatPanel.tsx`,
-  `use-threads-seite.ts`, `src/pages/ChatPage.tsx`, `src/index.css`
-- **AGE-631** (Branch): `supabase/migrations/20260827140000_release_notes.sql`,
-  `supabase/tests/release_notes_test.sql`, `scripts/release-entries.logic.ts`,
-  `scripts/generate-release-entries.ts`, `src/content/release-entries.generated.ts`,
-  `src/lib/release-notes.ts`, `src/lib/release-entwurf.ts`,
-  `src/pages/AdminNeuigkeitenPage.tsx`, `src/pages/NeuesPage.tsx`,
-  `src/components/hinweise/HinweisGlocke.tsx`, `nav.ts`, `App.tsx`, `ci.yml`,
-  `grants_test.sql`, `package.json` (`release:entries`, `prebuild`)
+- **AGE-631** `src/lib/release-notes.ts` (+`ausLetzterWoche`), `AdminNeuigkeitenPage.tsx`
+- **AGE-633** `MitgliedschaftPage.tsx`, `AppShell.tsx` (Profilmenü)
+- **AGE-632** `src/components/release/ReleaseNoteModal.tsx` (neu),
+  `NeuesPage.tsx`, `HinweisGlocke.tsx`, `src/content/release-bilder.ts` (neu),
+  `src/types/release.ts`, `public/release/*.png` (3 Screenshots)
+- **AGE-635** `src/components/home/MemberDashboard.tsx`
+- **AGE-634** `supabase/migrations/20260827160000_admin_set_tier.sql` (neu),
+  `supabase/tests/admin_set_tier_test.sql` (neu), `ci.yml`, `admin-members.ts`,
+  `admin-profile.ts`, `database.types.ts`, `AdminMitgliedPage.tsx`
+- Changes: `openspec/changes/release-notes-modal/`, `openspec/changes/admin-setzt-stufe/`
 
 ## Next session: start here
 
-**1. `supabase db push` für BEIDE Migrationen** (`20260827120000` und
-`20260827140000`). Ohne das blockt das drift-gate jeden Frontend-Deploy — still.
-Und die einzige echte Prüfung der Rückfüllung aus AGE-627 gehört dorthin:
-zählen, wieviele Threads MIT Nachricht ein leeres `last_message_at` haben.
-Erwartet null. Lokal ist das nicht messbar, weil die Rückfüllung vor jedem
-Fixture läuft und es keine `seed.sql` gibt.
+**1. AGE-634 (#253) landen — und danach `migrate-prod` dispatchen.** Der PR trägt
+`20260827160000_admin_set_tier.sql`; ohne die Migration auf PROD blockt das
+drift-gate den nächsten Frontend-Deploy **still**. Nach dem Merge läuft
+deploy.yml auf main automatisch; er wird ohne die Migration nichts ausliefern.
 
-**2. Dann AGE-629 oder AGE-630** — beide haben noch offene Produktfragen, siehe
-unten.
+**2. Die erste Release-Note zustellen.** Der Textentwurf steht im Verlauf dieser
+Sitzung; er ist admin- und technikfrei. Zustellen geht **genau einmal** und an
+alle aktivierten Mitglieder — das ist Donalds/Detlevs Handlung, nicht die des
+Agenten.
+
+## Was in dieser Sitzung schiefging (und wie man es merkt)
+
+Ein Re-Run des alten Laufs **33077648634** (Commit `45bbb40`) hat das frische
+Deployment von `3524c2a` **überschrieben** — der `functions`-Job meldete das
+korrekt als „RUECKFALL auf HEAD^ … ist kein Vorfahr von HEAD", aber `deploy` war
+da schon durch. Live stand danach der Stand VOR drei Merges.
+
+**Der erste Beleg dafür, dass alles live sei, war wertlos:** geprüft wurde
+`Aus … Änderungen einen Entwurf machen` — eine Zeichenkette, die es **vor** dem
+Diff schon gab (nur die Variable dahinter wurde umbenannt). Sie kann die
+Versionen nicht unterscheiden.
+
+Brauchbar sind zwei Proben:
+
+* eine Zeichenkette, die **nur** der neue Stand trägt (hier `release-note-titel`),
+* und für eine Datei der **`content-type`**: der SPA-Fallback antwortet auf JEDEN
+  unbekannten Pfad mit `200`, `text/html` und 3487 Bytes. `/release/xyz.png`
+  „existiert" damit immer. Erst `content-type: image/png` plus die echte
+  Dateigrösse belegt etwas.
+
+Eingefangen wurde es durch den Merge von #254, der einen sauberen Deploy auf dem
+aktuellen main auslöste. Danach gemessen: Bundle `index-CodyLEBR.js`,
+`release-note-titel` vorhanden, `nachrichtenleiste.png` mit `image/png` und
+295 523 Bytes.
 
 ## Open questions
 
-- **Alle drei Fremd-Reviewer sind kaputt** (27.08.): `opencode` antwortet gar
-  nichts (Exit 0, keine Befunde), `codex` lädt die gstack-Skill-Sammlung in
-  seine Antwort statt zu prüfen, `cursor-agent` will ein Login. Damit fehlen
-  **die Plan-Review zu AGE-631 und die Diff-Review zu beiden Changes**. Steht
-  ausführlich in beiden `REVIEWS.md` als offene Flanke, nicht als erledigt.
-  **Nachholen, sobald wieder einer antwortet.**
-- **Donald hat die laufende Fassung noch nicht gesehen.** Server laufen lokal:
-  `localhost:5201` (AGE-627) und `localhost:5202` (AGE-631), Login
-  `mess-a@test.local` / `Probe-2026-lokal` (auf 5202 ist das Konto Admin).
-- **`routing_queue` steht in `database.types.ts` unter `Views` statt `Tables`.**
-  Vorbestehend, nicht angefasst, aber es erklärt, warum dort kein Insert geht.
-- **AGE-629** (Suche als Inhaltsspalte): drei offene Produktfragen.
-- **AGE-630** (Event-Vorlagen): materialisieren oder zur Laufzeit berechnen?
-- **AGE-628**: anonymes Feedback UND Anchatten des Verfassers geht nicht beides.
-- Unverändert offen: AGE-610 (Detlev/Anwalt) · AGE-512 (Stripe-/Resend-Secrets
-  ungetrennt) · Aktivierungsversand 69 von 72 · Rotation des PROD-DB-Passworts ·
-  AGE-598 · AGE-256 · AGE-606 (Prettier-Gate).
+- **Video-Standbilder nach Freigabe?** Siehe Decisions — eigener Vorgang.
+- **Rückfüll-Kontrolle aus AGE-627** ist weiterhin ungemessen (kein PROD-Zugang
+  ohne TTY).
+- **Plan-Reviews fehlen** für `release-notes-modal` und `admin-setzt-stufe` —
+  die drei Fremd-Reviewer waren am 27.08. alle kaputt.
+- **CI-Flake:** der `migrations`-Job scheiterte einmal an `address already in use`
+  (Port 54324, inbucket) — nicht am Code. Neustart geht hier nur per
+  Close/Reopen des PRs; danach stehen **alte und neue Check-Runs auf derselben
+  SHA**, und eine Abfrage ohne `group_by(.name) | max_by(.started_at)` liest die
+  Karteileiche als Fehlschlag.
+- **`gh pr merge` schlägt still fehl**, wenn der Branch hinter `main` liegt
+  („not up to date"): der Befehl gibt nichts aus, der PR bleibt offen. Immer
+  `gh pr view --json state` nachschieben — hier einmal passiert.
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation des
+  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
 ## Lokaler Stack
 
-Trägt Testdaten dieser Sitzung: die Konten `mess-a` bis `mess-d@test.local`
-(Passwort oben), drei Threads mit Nachrichten, eine zugestellte Release-Note.
-`mess-a` hat eine Adminzeile in `staff_roles`. Nur lokal, nicht in DEV oder PROD.
+Wurde für die Migration **zurückgesetzt**; die Konten der Vormittagssitzung sind
+weg. Neu angelegt: `st-admin@test.local` (Admin) und `st-ziel@test.local`,
+Passwort `Probe-2026-lokal`, beide `impact` und aktiviert. `st-ziel` steht nach
+der Sichtprobe auf `connect`.
 
-`pnpm dev` geht aus einer Agenten-Sitzung nicht (Infisical braucht ein TTY):
+Vite läuft auf **5203** (5201/5202 belegen noch die Server der beiden gemergten
+Worktrees vom Vormittag):
 
 ```
 VITE_SUPABASE_URL=http://127.0.0.1:54321 \
 VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
 VITE_ENVIRONMENT=local \
-npx vite --port 5202 --strictPort
+npx vite --port 5203 --strictPort
 ```
-
-`--strictPort` ist wichtig, und **`localhost`, nicht `127.0.0.1`** — vite lauscht
-auf IPv6.
