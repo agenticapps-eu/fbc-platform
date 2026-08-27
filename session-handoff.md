@@ -87,6 +87,29 @@ den alten Titel behalten und das Neue als eigenes Szenario danebenstellen.
   im Gerätespeicher; der LRU-Stand überlebt kein Neuladen (begründet im Design).
 - **Folgevorgang**: die Threadliste markiert offene Gespräche nicht —
   `ThreadList` trägt genau ein `activeId`, drei Fenster brauchten eine Menge.
+
+## Vier neue Vorgänge für die Nachrichten (angelegt am 27.08.)
+
+Donald fragte, ob Reaktionen, Antworten, Gruppen und Emoji geplant seien.
+Nachgesehen: **nichts davon**, weder in den Specs noch in Linear. Angelegt, in
+dieser Reihenfolge — sie ist nach Kosten sortiert, nicht nach Lust:
+
+| | Umfang |
+| --- | --- |
+| **AGE-645** Emoji-Auswahl | **klein.** Emoji funktionieren schon (`body` ist `text`); es fehlt nur der Picker. Keine Migration. Enthält die Ja/Nein-Frage, ob `:-)` gedeutet wird. |
+| **AGE-646** Antworten | **mittel-klein.** `messages.reply_to_id`, eine Spalte, **keine** neue Tabelle — also kein Grant und kein Golden-Snapshot. |
+| **AGE-647** Reaktionen | **mittel.** Neue Tabelle ⇒ Grants, `grants_test.sql`-Snapshot, zwei Policies, und die Publikation `supabase_realtime` samt `DELETE`. |
+| **AGE-648** Gruppen-Chats | **gross, eigene Design-Runde.** Kein fehlendes Feature, sondern eine gebaute Entscheidung: `message_threads_unique_pair` und die Anforderung „One thread per member pair". |
+
+**Zwei Dinge daraus, die auch ohne diese Vorgänge gelten:**
+
+- **Threads werden an ZWEI Stellen eingefügt** —
+  `20260614100000_contact_request_flow.sql:69` und
+  `20260614120000_volume_routing_queue.sql:195`. Wer am Thread-Modell arbeitet
+  und nur die erste findet, baut die Hälfte.
+- **Spec-Drift gefunden**: `community-feed/spec.md:6` sagt „threaded comments",
+  aber `public.comments` hat kein `parent_id` — Kommentare sind flach. Steht in
+  AGE-646 vermerkt; eigener Vorgang, falls es geradegezogen werden soll.
 - Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
   des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
