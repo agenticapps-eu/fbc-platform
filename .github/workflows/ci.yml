@@ -99,7 +99,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
-          version: latest
+          # Feste Nummer statt `latest` (AGE-622). `latest` hat am 27.08. `main`
+          # rot gemacht, ohne dass sich eine Zeile geaendert hatte: derselbe
+          # Commit war am Vorabend gruen. Die neue Abbildung vergibt Rechte
+          # ROLLEN-EIGEN statt ueber `public`, und drei zu eng geschriebene
+          # Entzuege fielen damit auf.
+          #
+          # Gepinnt wird auf die NEUE Sorte, nicht zurueck auf die alte. Sie ist
+          # die, die PROD gleicht — AGE-602 hat das am PROD-Katalog gemessen
+          # (proacl mit anon/authenticated/service_role je EIGENEM Grant). Auf
+          # die alte zu pinnen haette `main` in einer Minute gruen gemacht und
+          # die Zusagen dauerhaft blind gestellt.
+          #
+          # Wer diese Nummer anhebt, hebt damit die Rechte-Grundlage an: erst
+          # `supabase test db` mit der FRISCHEN Abbildung laufen lassen, nicht
+          # gegen einen bestehenden lokalen Datentraeger. Der traegt die alte
+          # Sorte weiter und ist gegen genau diese Fehlerklasse blind.
+          version: 2.116.0
       - name: Start local Supabase stack
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
       - name: Apply all migrations from a clean database

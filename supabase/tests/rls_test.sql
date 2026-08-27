@@ -1861,14 +1861,27 @@ select alike(pg_temp.try_as('aaaaaaaa-0000-0000-0000-000000000001',
 
 -- 18.8 Der Weg der Edge Function. GEFUNDEN BEI DER SICHTPROBE, nicht hier:
 -- admin-change-email las zuerst `staff_roles` direkt mit service_role und lief
--- in „permission denied for table staff_roles". Der Grund ist kein Versehen,
--- sondern der Lockdown aus AGE-312: service_role hält auf KEINER Tabelle in
--- `public` ein SELECT/INSERT — alles, was es tut, geht durch SECURITY-DEFINER-
--- Funktionen (issue_activation_token, mark_activated, revoke_sessions …).
+-- in „permission denied for table staff_roles".
 --
--- Die erste Assertion hält genau diese Voraussetzung fest. Fiele sie eines Tages
--- weg, wäre die zweite Hälfte des Musters (die beiden Funktionen unten) nur noch
--- Umweg — und das soll auffallen, statt sich anzuschleichen.
+-- HIER STAND, das sei „der Lockdown aus AGE-312: service_role hält auf KEINER
+-- Tabelle in `public` ein SELECT/INSERT — alles, was es tut, geht durch
+-- SECURITY-DEFINER-Funktionen". Beide Hälften sind falsch (AGE-622, belegt in
+-- zwei unabhängigen Plan-Reviews):
+--
+--   * AGE-312 hat `service_role` NIE angetastet. Der Entzug lautet
+--     `revoke all on all tables in schema public from anon, authenticated`
+--     (20260715140000_explicit_grants.sql:44), und der Kopf derselben Datei
+--     sagt ausdrücklich: „service_role bleibt unangetastet: es umgeht RLS per
+--     Definition und traegt die Edge Functions."
+--   * Es geht NICHT alles durch DEFINER-Funktionen.
+--     notify-contact-request/index.ts:91-111 liest drei Tabellen direkt mit
+--     dem Service-Schlüssel — und auf PROD, wo `service_role` bedient wird,
+--     steht der Mailweg der Kontaktanfragen heute genau darauf (AGE-623).
+--
+-- Was die Zusage unten wirklich trägt, ist EINE Tabelle: `staff_roles`. Seit
+-- AGE-622 wird das dort ausgesprochen (Migration 20260827070000), statt sich
+-- auf eine Instanz-Eigenschaft zu verlassen. Über die übrigen 35 Tabellen sagt
+-- sie nichts — wer einen Grundsatz braucht, muss ihn messen, nicht hier lesen.
 select is(has_table_privilege('service_role', 'public.staff_roles', 'SELECT'),
   false, 'service_role liest staff_roles NICHT direkt (AGE-312-Lockdown)');
 
