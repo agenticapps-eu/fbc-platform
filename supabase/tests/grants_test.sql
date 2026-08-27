@@ -54,7 +54,7 @@ membership_tiers/authenticated=SELECT
 message_threads/authenticated=INSERT,SELECT
 messages/authenticated=INSERT,SELECT
 needs/authenticated=DELETE,INSERT,SELECT,UPDATE
-notifications/authenticated=DELETE,INSERT,SELECT,UPDATE
+notifications/authenticated=SELECT,UPDATE
 offers/authenticated=DELETE,INSERT,SELECT,UPDATE
 partner_categories/anon=SELECT
 partner_categories/authenticated=SELECT
@@ -72,6 +72,7 @@ profile_interests/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_theme_scores/authenticated=DELETE,INSERT,SELECT,UPDATE
 profiles/authenticated=SELECT
 profiles_public/authenticated=SELECT
+push_tokens/authenticated=DELETE,INSERT,SELECT,UPDATE
 release_entry_skips/authenticated=DELETE,INSERT,SELECT
 release_notes/authenticated=INSERT,SELECT,UPDATE
 routing_queue/authenticated=SELECT
@@ -101,6 +102,19 @@ thread_read_positions/authenticated=INSERT,SELECT,UPDATE$$,
 -- `release_notes_admin_edit` laesst es nur fuer Admins UND nur auf Zeilen mit
 -- `status = 'draft'` zu, in `using` UND `with check`. Der Wechsel auf `sent`
 -- gehoert allein `send_release_note()`.
+
+-- AGE-641 hat `push_tokens` dazugelegt — alle vier Verben, und das ist hier
+-- die Ausnahme und nicht die Regel. Eine Zeile in dieser Tabelle IST ein
+-- Zustellweg zu einem Menschen: das Geraet meldet sich an (INSERT), meldet
+-- sich bei jedem Start erneut (UPDATE auf `letzter_kontakt`) und meldet sich
+-- beim Abmelden ab (DELETE). Alle vier gehoeren demselben Menschen, und die
+-- Policy `push_tokens_own` deckt sie mit derselben Bedingung fuer `using` und
+-- `with check`.
+--
+-- Kein `anon`: ein ausgeloggter Besucher hat mit Zustellwegen nichts zu tun.
+-- Und das ist der Grund, warum `anon` in dieser Zeile fehlt statt mit leerer
+-- Rechteliste dazustehen — wer kein Recht haelt, taucht in `proacl` gar nicht
+-- erst auf.
 
 -- AGE-636 hat `release_entry_skips` dazugelegt, und die Zeile ist die
 -- SPIEGELUNG der darueber: hier steht ein DELETE und kein UPDATE, dort ein

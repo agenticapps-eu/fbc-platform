@@ -29,7 +29,7 @@
 --     (AGE-622). Die Rechtezusagen unten pruefen deshalb alle vier Rollen.
 
 begin;
-select plan(29);
+select plan(32);
 
 -- ── Impersonierung ──────────────────────────────────────────────────────────
 -- Eigene Kopie: `rls_test.sql` definiert dasselbe, aber jede Testdatei laeuft in
@@ -362,6 +362,60 @@ select is(
       and b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
                                   'c0000000-0000-0000-0000-00000000000b'::uuid)),
   1, 'der Gespraechsfaden entsteht trotz abgeschaltetem Hinweis');
+
+-- ── 8. Kein Client schreibt sich selbst Hinweise (AGE-641) ──────────────────
+-- GEFUNDEN VON DER PLAN-REVIEW (R2). `20260715140000:77` erteilte
+-- `insert` und `delete` auf `notifications` an `authenticated`, und
+-- `notifications_own` laesst eigene Zeilen durch — jedes aktivierte Mitglied
+-- konnte sich also beliebig viele Hinweiszeilen schreiben.
+--
+-- Ohne Push war das folgenlos: man haette die eigene Glocke vollgemuellt.
+-- MIT Push ist jede solche Zeile ein Auftrag an FCM/APNs, also Arbeit und
+-- Kontingent auf fremde Kosten — und sie umgeht dabei jeden Trigger, jede
+-- Sichtbarkeitspruefung und jedes Opt-out, weil sie gar nicht erst durch sie
+-- hindurchmuss.
+--
+-- Nachgemessen vor dem Entzug: `grep 'from("notifications")' src/` findet
+-- ausschliesslich ein `select` und zwei `update` (`hinweise.ts:42,68,79`).
+-- Kein einziger Insert, kein einziges Delete. Der Grant war ungenutzt.
+
+create function pg_temp.try_as(uid uuid, q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    perform set_config('request.jwt.claims', '', true);
+    return 'DENIED:' || SQLERRM;
+  end;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return 'OK';
+end $$;
+
+select alike(
+  pg_temp.try_as('c0000000-0000-0000-0000-00000000000b',
+    $$insert into public.notifications (profile_id, type, payload)
+      values ('c0000000-0000-0000-0000-00000000000b', 'message', '{}'::jsonb)$$),
+  'DENIED:%', 'ein Mitglied kann sich selbst keinen Hinweis schreiben');
+
+select alike(
+  pg_temp.try_as('c0000000-0000-0000-0000-00000000000b',
+    $$delete from public.notifications
+       where profile_id = 'c0000000-0000-0000-0000-00000000000b'$$),
+  'DENIED:%', 'ein Mitglied kann seine Hinweise nicht loeschen');
+
+-- Positivkontrolle: Lesen und Auf-gelesen-setzen bleiben, sonst waere die
+-- Glocke kaputt und die zwei Zusagen darueber nur ein teurer Weg dorthin.
+select is(
+  pg_temp.count_as('c0000000-0000-0000-0000-00000000000b',
+    'select count(*)::int from public.notifications'),
+  (select count(*)::int from public.notifications
+    where profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  'Lesen bleibt: das Mitglied sieht weiterhin alle eigenen Hinweise');
 
 select * from finish();
 rollback;

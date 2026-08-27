@@ -126,10 +126,39 @@ Issue. Siehe `REVIEWS.md`.
       abgeschalteter Schalter schickt nichts · deaktiviertes Konto bekommt
       nichts · keine Nutzlast im Text.
 - [ ] Secrets nach Infisical, **getrennt für DEV und PROD**.
-- [ ] ⏳ **Offen (R2, M5): Zustellzustand.** Ob je `(notification_id, token_id)`
-      ein dauerhafter Zustand mit Wiederholung und Idempotenz gebaut wird, oder
-      ob bestmühte Zustellung mit dokumentiertem Verlust bei 5xx genügt —
-      **Donalds Entscheidung**, siehe `REVIEWS.md`. Nicht ohne sie beginnen.
+- [ ] Commit.
+
+### A5b · **(R2)** Dauerhafter Zustellzustand
+
+Donald am 27.08.: **bauen**, nicht bestmüht zustellen. Ein verlorener Push wäre
+zwar nicht der verlorene Hinweis — der steht weiter in der Glocke —, aber die
+Doppelzustellung bei einem Betriebs-Replay ist die peinlichere Hälfte, und
+beides fällt mit derselben Mechanik.
+
+- [ ] **RED**: ein Anbieter-5xx lässt die Zeile auf „offen" mit erhöhtem
+      Zähler stehen · ein zweiter Lauf über dieselbe `(notification_id,
+      token_id)` stellt **nicht** zweimal zu · zwei gleichzeitige Läufe greifen
+      sich dieselbe Zeile nicht doppelt · ein dauerhaft abgelehntes Token
+      beendet den Vorgang, statt ihn zu wiederholen.
+- [ ] Tabelle `push_zustellungen`, Primärschlüssel `(notification_id, token_id)`
+      — der Schlüssel **ist** die Idempotenz. Zustand, Versuchszähler,
+      nächster Versuch.
+- [ ] Anspruch atomar: `update … set zustand = 'laeuft' where zustand = 'offen'
+      … returning`. Kein `select`-dann-`update`; zwei Läufe holten sonst
+      dieselbe Zeile.
+- [ ] **Wiederholung über `pg_cron`.** Gemessen: lokal verfügbar (1.6.4), nicht
+      installiert; es gibt **keinen** zeitgesteuerten GitHub-Workflow, in den
+      man das sonst legen müsste — und eine zustellkritische Schleife gehört
+      ohnehin nicht in die CI. Der Drift-Scanner sieht das nicht: er prüft
+      Funktionen, Trigger, Tabellen und Policies in `public`
+      (`db-drift-scan.ts:73-100`), keine Extensions und nichts im
+      `cron`-Schema.
+- [ ] ⚠️ **Zuerst auf DEV messen, dann PROD.** `create extension pg_cron` ist
+      ein Eingriff in die Instanz, und der lokale Stack ist darin nicht von
+      PROD unterscheidbar — `postgres` hat hier andere Rechte. Schlägt es auf
+      DEV fehl, ist das die Stelle zum Umplanen, nicht PROD.
+- [ ] Zurückgestellte Zeilen aufräumen: was nach N Versuchen nicht zugestellt
+      ist, wird beendet und nicht ewig wiederholt.
 - [ ] Commit.
 
 ### A6 · Abnahme Phase A
