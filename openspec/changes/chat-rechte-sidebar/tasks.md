@@ -82,12 +82,21 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
 
 ## 3. Realtime — ein Abo bleibt ein Abo
 
-- [ ] **RED**: Test, dass ein eingehendes `messages`-INSERT **auch** die
+- [x] **RED**: Test, dass ein eingehendes `messages`-INSERT **auch** die
       Threads-Seite invalidiert, nicht nur den Zähler.
-- [ ] `useUngelesenLive` (`use-ungelesen.ts:63–92`) erweitern. **Kein** zweiter
-      `subscribeToAllMessages`-Aufruf — der Kanalname trägt `randomUUID()`,
-      ein zweiter Aufruf macht einen zweiten Kanal auf.
-- [ ] **RED→GRÜN**: genau **eine** Subscription über die Lebensdauer der Hülle.
+      → `src/components/chat/use-ungelesen.live.test.tsx`.
+- [x] `useUngelesenLive` (`use-ungelesen.ts:63–92`) erweitert — **eine Zeile**
+      im schon vorhandenen, entprellten Zeitgeber. **Kein** zweiter
+      `subscribeToAllMessages`-Aufruf.
+- [x] **RED→GRÜN**: genau **eine** Subscription über die Lebensdauer der Hülle,
+      gemessen über einen Pfadwechsel hinweg (mit demselben `QueryClient` —
+      ein neuer stünde in der Abhängigkeitsliste und löste ein Neu-Abonnieren
+      aus, das mit dem Pfad nichts zu tun hat).
+- [x] Die Ausnahme bleibt: fällt die Nachricht in den **offenen** Pfad
+      (`/chat/:threadId`), invalidiert der Hook **gar nichts** — `ChatPage`
+      fragt ohnehin neu ab, und zwar NACH seinem Schreibvorgang. Als eigener
+      Test festgehalten, sonst wäre „invalidiert" von „invalidiert immer" nicht
+      zu trennen.
 
 ## 4. Die rechte Leiste (Shell, ≥ lg)
 
