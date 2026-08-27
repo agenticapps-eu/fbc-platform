@@ -1490,6 +1490,48 @@ export type Database = {
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
       // routing_queue table from 20260614120000_volume_routing_queue.sql (§8 manager
       // queue; rows inserted only by the lifecycle trigger, manager-only RLS).
+      release_notes: {
+        // `status` steht bewusst in Insert UND Update — der Client DARF ihn
+        // schreiben, aber nur als 'draft'; das hält die Policy
+        // `release_notes_admin_draft`/`_edit` fest, in `using` und
+        // `with check`. Der Wechsel auf 'sent' gehört allein
+        // `send_release_note()`, und die drei Spalten, die dabei entstehen,
+        // stehen deshalb NUR in Row.
+        Row: {
+          body: string;
+          created_at: string;
+          created_by: string | null;
+          entry_slugs: string[];
+          id: string;
+          recipient_count: number | null;
+          sent_at: string | null;
+          status: string;
+          title: string;
+        };
+        Insert: {
+          body: string;
+          created_by?: string | null;
+          entry_slugs?: string[];
+          id?: string;
+          status?: string;
+          title: string;
+        };
+        Update: {
+          body?: string;
+          entry_slugs?: string[];
+          status?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "release_notes_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       routing_queue: {
         Row: {
           assigned_to: string | null;
@@ -1647,6 +1689,10 @@ export type Database = {
         Returns: string;
       };
       current_tier_rank: { Args: never; Returns: number };
+      /** AGE-631: stellt eine Release-Note genau EINMAL zu; gibt die Zahl der
+       *  wirklich beschriebenen Mitglieder zurueck. Wirft, wenn der Aufrufer
+       *  kein Admin ist oder die Note schon zugestellt wurde. */
+      send_release_note: { Args: { p_id: string }; Returns: number };
       is_matching_manager: { Args: never; Returns: boolean };
       // `is_prime_plus` stand hier bis 2026-08-06 und existierte in der Datenbank
       // seit AGE-311 nicht mehr (gedroppt in 20260715150000:319, nachdem alle
