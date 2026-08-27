@@ -15,11 +15,13 @@
       einzige Grep-Treffer ist ein Kommentar, der genau das verwirft
       (`20260811090300:347`). Damit stammen sie aus den Default Privileges der
       Instanz.
-- [ ] **PROD-Sonde** (reines Lesen, mit Positivkontrolle) laufen lassen und das
-      Ergebnis festhalten. Sie entscheidet die Dringlichkeit, nicht das Ziel.
-      **Offen** — sie braucht ein echtes Terminal (Infisical) und damit Donalds
-      Hand. Der Umbau hängt nicht daran: er ist in beiden Fällen richtig, nur
-      die Antwort auf „Vorsorge oder Fix?" bleibt bis dahin offen.
+- [x] **PROD-Messung** (reines Lesen, mit Positivkontrolle). Sie brauchte am
+      Ende kein Terminal — die Frage ließ sich lesend am PROD-Katalog
+      beantworten: **35 von 36** Tabellen mit `service_role`-`SELECT`, die eine
+      Ausnahme `staff_roles`, Positivkontrolle (`authenticated` auf `profiles`)
+      `true`. Identisch mit dem lokalen Stand.
+      **Damit ist „Vorsorge oder Fix?" beantwortet: Vorsorge.** PROD ist die
+      großzügige Sorte, der Mailweg funktionierte.
 
 ## 2. RED — die Zusagen schreiben, bevor die Funktion existiert
 
@@ -89,6 +91,18 @@
 
 - [x] Plan-Review (Schritt 2b) vor der ersten Codezeile, ≥2 Reviewer anderer
       Anbieter, `REVIEWS.md`.
-- [ ] Code-Review auf den **Diff**.
+- [x] Code-Review auf den **Diff** (codex, gemini). Fünf Befunde, drei
+      übernommen, zwei begründet abgelehnt — siehe `REVIEWS.md`.
 - [x] `openspec validate --all --strict` grün.
-- [ ] PR, CI grün, Migration auf PROD anwenden, Linear schließen.
+- [x] PR #240, CI grün **auf der HEAD-SHA gemessen** (nicht am `gh pr checks`,
+      das hier eine ältere SHA meldete), gemergt.
+- [x] Migration auf PROD angewandt (`migrate-prod`, plan + apply grün) und am
+      Katalog verifiziert: `prosecdef = true`, `provolatile = s`,
+      `proacl = {postgres=X/postgres, service_role=X/postgres}`.
+- [x] Edge Function auf PROD deployt. Der Deploy zum Merge war erwartungsgemäß
+      am `drift-gate` gescheitert (Migration fehlte PROD noch); nach der
+      Migration per `gh run rerun --failed` nachgeholt. Verifiziert am
+      **Inhalt** der laufenden Fassung, nicht am Versionszähler: sie ruft
+      `notify_contact_request_daten` und trägt kein `.from(` mehr.
+- [x] Linear: AGE-623 auf Done (Automation beim Merge), Messergebnis als
+      Kommentar nachgetragen.
