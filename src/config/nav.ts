@@ -3,6 +3,7 @@ import type { MembershipLevel } from "./levels";
 import AcademyPage from "../pages/AcademyPage";
 import AktivitaetPage from "../pages/AktivitaetPage";
 import ChatPage from "../pages/ChatPage";
+import NeuesPage from "../pages/NeuesPage";
 import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
 import EventsPage from "../pages/EventsPage";
@@ -159,4 +160,15 @@ export const navItems: NavItem[] = [
   // Seitentitel und Bröselpfad; hieße es weiter „Chat", benennte die Kopfzeile
   // ein anderes Ziel als die Seite, auf der man landet.
   { path: "/chat", label: "Nachrichten", Component: ChatPage, section: "sub", requiresAuth: true },
+  // „Neu in der App" (AGE-631). `section: "sub"` wie `/chat`: der Weg dorthin
+  // ist der Hinweis in der Glocke, nicht ein Daueeintrag im Menue — eine
+  // Aenderungsliste ist nichts, was man taeglich aufsucht. Kein `minTier`: was
+  // die Anwendung kann, ist keine Frage der Mitgliedsstufe.
+  {
+    path: "/neues",
+    label: "Neu in der App",
+    Component: NeuesPage,
+    section: "sub",
+    requiresAuth: true,
+  },
 ];

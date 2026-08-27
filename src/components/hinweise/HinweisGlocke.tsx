@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Hinweis } from "../../lib/hinweise";
 import { Icon } from "../ui/icons";
 
@@ -94,9 +95,27 @@ export function HinweisGlocke({
               <ul className="max-h-80 divide-y divide-line overflow-y-auto">
                 {hinweise.map((h) => (
                   <li key={h.id} className="flex items-start gap-2 px-4 py-3">
-                    <p data-testid="hinweis-text" className="flex-1 text-sm text-ink">
-                      {hinweisText(h)}
-                    </p>
+                    {/* Ein Ziel gibt es bisher NUR fuer `release_note`
+                        (AGE-631), und das ist Absicht: die uebrigen sieben
+                        Typen haben seit AGE-620 keines, und ihnen hier eines
+                        anzudichten waere eine Aenderung an sieben Flaechen in
+                        einem Change, der von einer handelt. Wer die anderen
+                        verlinken will, tut das dort, wo er sie auch pruefen
+                        kann. */}
+                    {hinweisZiel(h) ? (
+                      <Link
+                        to={hinweisZiel(h)!}
+                        onClick={() => setOffen(false)}
+                        data-testid="hinweis-text"
+                        className="flex-1 rounded-md text-sm text-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        {hinweisText(h)}
+                      </Link>
+                    ) : (
+                      <p data-testid="hinweis-text" className="flex-1 text-sm text-ink">
+                        {hinweisText(h)}
+                      </p>
+                    )}
                     {/* Ein Textknopf, kein Haken-Glyph: der Name `check` steht
                         nicht im Icon-Vorrat (48 Namen, gepruft), und ein
                         erfundener Name faellt in jsdom NICHT auf — `Icon`
@@ -139,7 +158,9 @@ export function HinweisGlocke({
 function hinweisText(h: Hinweis): string {
   const p = h.payload ?? {};
   const wer = text(p.from_name) ?? text(p.to_name) ?? text(p.autor_name) ?? "Ein Mitglied";
-  const titel = text(p.titel);
+  // `titel` schreibt AGE-620, `title` schreibt AGE-631 — beide lesen, statt
+  // eine der beiden Nutzlasten nachtraeglich umzubenennen.
+  const titel = text(p.titel) ?? text(p.title);
 
   switch (h.type) {
     case "contact_request":
@@ -158,11 +179,27 @@ function hinweisText(h: Hinweis): string {
       return `${wer} hat Ihren Beitrag kommentiert.`;
     case "like_on_post":
       return `${wer} gefällt Ihr Beitrag.`;
+    case "release_note":
+      // Der Titel steht in der Nutzlast, weil die Note selbst geloescht sein
+      // koennte — und weil ein Hinweis, der erst eine zweite Abfrage braucht,
+      // um etwas zu sagen, in der Glocke leer stuende.
+      return titel ? `Neu in der App: ${titel}` : "Es gibt Neues in der App.";
     default:
       // Kein Rohtyp in der Anzeige: `post_created_v2` waere fuer ein Mitglied
       // kein Satz, sondern ein Bezeichner aus unserer Datenbank.
       return "Es gibt etwas Neues.";
   }
+}
+
+/**
+ * Wohin ein Hinweis fuehrt — oder `null`, wenn er nirgendwohin fuehrt.
+ *
+ * Heute kennt nur `release_note` ein Ziel. Die Funktion existiert trotzdem
+ * getrennt vom Text: ein Ziel ist etwas anderes als ein Satz, und die naechste
+ * Verlinkung soll eine Zeile hier sein und keine Umbauaktion an der Liste.
+ */
+function hinweisZiel(h: Hinweis): string | null {
+  return h.type === "release_note" ? "/neues" : null;
 }
 
 function text(wert: unknown): string | null {

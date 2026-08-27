@@ -72,6 +72,7 @@ profile_interests/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_theme_scores/authenticated=DELETE,INSERT,SELECT,UPDATE
 profiles/authenticated=SELECT
 profiles_public/authenticated=SELECT
+release_notes/authenticated=INSERT,SELECT,UPDATE
 routing_queue/authenticated=SELECT
 staff_roles/authenticated=SELECT
 tags/anon=SELECT
@@ -87,6 +88,18 @@ thread_read_positions/authenticated=INSERT,SELECT,UPDATE$$,
 -- entsteht. Und `tags` trägt fuer BEIDE Rollen nur SELECT — die Liste ist
 -- redaktionell, ein INSERT hier waere der Weg, sich einen kuratierten Tag
 -- selbst zu verleihen.
+
+-- AGE-631 hat `release_notes` dazugelegt, und die Zeile sagt vor allem, was
+-- NICHT darauf steht: **kein DELETE**. Eine zugestellte Mitteilung soll nicht
+-- verschwinden koennen — die Hinweise dazu stehen dann schon in siebzig
+-- Postfaechern —, und ein Entwurf wird ueberschrieben statt geloescht. Kein
+-- `anon`: eine Aenderung an der Anwendung geht einen ausgeloggten Besucher
+-- nichts an, solange es keine oeffentliche Changelog-Seite gibt.
+--
+-- Das UPDATE-Recht steht hier tabellenweit und ist trotzdem eng: die Policy
+-- `release_notes_admin_edit` laesst es nur fuer Admins UND nur auf Zeilen mit
+-- `status = 'draft'` zu, in `using` UND `with check`. Der Wechsel auf `sent`
+-- gehoert allein `send_release_note()`.
 
 -- AGE-582 hat `post_saves` dazugelegt — eine private Merkliste, und die Zeile
 -- sagt vor allem, was NICHT darauf steht: kein UPDATE. An einer Speicherung
