@@ -547,12 +547,15 @@ export type Database = {
           notify_email_digest: boolean;
           notify_email_events: boolean;
           notify_email_requests: boolean;
-          // AGE-620 — die vier In-App-Schalter der Glocke. `not null default true`
-          // in der Migration, also hier ohne `| null`.
-          notify_inapp_comment: boolean;
-          notify_inapp_event: boolean;
-          notify_inapp_like: boolean;
-          notify_inapp_post: boolean;
+          // AGE-641 (war AGE-620) — die sechs App-Schalter. Ein Schalter je
+          // EREIGNIS, nicht je Transport: Glocke und Push gemeinsam.
+          // `not null default true` in der Migration, also hier ohne `| null`.
+          notify_app_comment: boolean;
+          notify_app_contact: boolean;
+          notify_app_event: boolean;
+          notify_app_like: boolean;
+          notify_app_message: boolean;
+          notify_app_post: boolean;
           onboarded_at: string | null;
           profile_id: string;
           theme: string;
@@ -563,10 +566,12 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
-          notify_inapp_comment?: boolean;
-          notify_inapp_event?: boolean;
-          notify_inapp_like?: boolean;
-          notify_inapp_post?: boolean;
+          notify_app_comment?: boolean;
+          notify_app_contact?: boolean;
+          notify_app_event?: boolean;
+          notify_app_like?: boolean;
+          notify_app_message?: boolean;
+          notify_app_post?: boolean;
           onboarded_at?: string | null;
           profile_id: string;
           theme?: string;
@@ -577,10 +582,12 @@ export type Database = {
           notify_email_digest?: boolean;
           notify_email_events?: boolean;
           notify_email_requests?: boolean;
-          notify_inapp_comment?: boolean;
-          notify_inapp_event?: boolean;
-          notify_inapp_like?: boolean;
-          notify_inapp_post?: boolean;
+          notify_app_comment?: boolean;
+          notify_app_contact?: boolean;
+          notify_app_event?: boolean;
+          notify_app_like?: boolean;
+          notify_app_message?: boolean;
+          notify_app_post?: boolean;
           onboarded_at?: string | null;
           profile_id?: string;
           theme?: string;

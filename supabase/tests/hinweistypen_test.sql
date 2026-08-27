@@ -29,7 +29,7 @@
 --     (AGE-622). Die Rechtezusagen unten pruefen deshalb alle vier Rollen.
 
 begin;
-select plan(20);
+select plan(29);
 
 -- ── Impersonierung ──────────────────────────────────────────────────────────
 -- Eigene Kopie: `rls_test.sql` definiert dasselbe, aber jede Testdatei laeuft in
@@ -73,7 +73,7 @@ update public.profiles set tier = 'impact', name = 'Hin Gesperrt',
 -- Genau EIN Mitglied schaltet genau EINEN Typ ab. Die uebrigen haben gar keine
 -- Zeile in member_settings — das ist der Normalfall und zugleich die
 -- Positivkontrolle fuer „Default AN".
-insert into public.member_settings (profile_id, notify_inapp_post)
+insert into public.member_settings (profile_id, notify_app_post)
 values ('c0000000-0000-0000-0000-00000000000c', false);
 
 -- ── 1. Der Rundruf beim Beitrag ─────────────────────────────────────────────
@@ -257,6 +257,111 @@ select is(
   (select count(*)::int from unnest(array['anon','authenticated','service_role']) r
     where has_function_privilege(r, 'public.hinweis_rundruf(text, uuid, jsonb)', 'execute')),
   0, 'hinweis_rundruf ist fuer KEINE Client-Rolle ausfuehrbar');
+
+-- ── 6. Die zwei neuen Schalter (AGE-641) ────────────────────────────────────
+-- `notify_app_message` und `notify_app_contact` kommen mit der Umbenennung
+-- dazu. Hier steht nur, dass sie DA sind und auf AN stehen; WAS sie steuern,
+-- pruefen der Nachrichten-Trigger und die Zustellung in eigenen Abschnitten.
+--
+-- Geprueft wird an 'Hin Optout' — dem einzigen Konto mit einer Zeile in
+-- member_settings. Gerade weil dort schon EIN Schalter ausdruecklich gesetzt
+-- wurde, ist das die schaerfere Probe: der Default muss auch dann greifen,
+-- wenn die Zeile bereits existiert, und nicht nur bei fehlender Zeile.
+
+select is(
+  (select notify_app_message from public.member_settings
+    where profile_id = 'c0000000-0000-0000-0000-00000000000c'),
+  true, 'notify_app_message steht auch in einer bestehenden Zeile auf AN');
+
+select is(
+  (select notify_app_contact from public.member_settings
+    where profile_id = 'c0000000-0000-0000-0000-00000000000c'),
+  true, 'notify_app_contact steht auch in einer bestehenden Zeile auf AN');
+
+-- ── 7. Kontaktanfragen: Schalter und Freitext (AGE-641) ─────────────────────
+-- Der Trigger aus dem Juni schrieb seine drei Hinweise UNBEDINGT und fragte
+-- `hinweis_erwuenscht` nie. Die Spalte `notify_app_contact` allein anzulegen
+-- haette einen Schalter erzeugt, der in den Einstellungen steht und nichts tut.
+--
+-- Zweitens trug die Nutzlast den Freitext der Anfrage (`message`). Die Glocke
+-- las ihn nie; ein Push haette ihn auf einen fremden Sperrbildschirm gestellt.
+
+update public.member_settings set notify_app_contact = false
+ where profile_id = 'c0000000-0000-0000-0000-00000000000c';
+
+insert into public.contact_requests (from_id, to_id, message)
+values ('c0000000-0000-0000-0000-00000000000a',
+        'c0000000-0000-0000-0000-00000000000c',
+        'Bitte diesen Satz nirgends anzeigen');
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'contact_request'
+      and profile_id = 'c0000000-0000-0000-0000-00000000000c'),
+  0, 'abgeschaltetes notify_app_contact schreibt keine Anfrage-Zeile');
+
+-- Die Gegenprobe zum Opt-out: es unterdrueckt den HINWEIS, nicht den Vorgang.
+-- Ein Schalter, der die Anfrage selbst verschluckte, waere ein Datenverlust.
+select is(
+  (select count(*)::int from public.contact_requests
+    where from_id = 'c0000000-0000-0000-0000-00000000000a'
+      and to_id   = 'c0000000-0000-0000-0000-00000000000c'),
+  1, 'die Anfrage selbst steht trotz abgeschaltetem Hinweis da');
+
+insert into public.contact_requests (from_id, to_id, message)
+values ('c0000000-0000-0000-0000-00000000000a',
+        'c0000000-0000-0000-0000-00000000000b',
+        'Auch dieser Satz gehoert nicht auf einen Sperrbildschirm');
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'contact_request'
+      and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  1, 'ohne Abschaltung entsteht genau eine Anfrage-Zeile');
+
+-- Der Kern: der Freitext ist nicht bloss unsichtbar, er ist GAR NICHT DA.
+select is(
+  (select (payload ? 'message') from public.notifications
+    where type = 'contact_request'
+      and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  false, 'die Nutzlast traegt den Freitext der Anfrage nicht');
+
+-- Positivkontrolle zur Zeile darueber: die Nutzlast ist nicht etwa leer.
+-- Ohne diese Zusage waere „kein message-Schluessel" auch von einem kaputten
+-- Trigger erfuellt, der gar nichts schreibt.
+select is(
+  (select payload->>'from_name' from public.notifications
+    where type = 'contact_request'
+      and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
+  'Hin Autor', 'die Nutzlast traegt weiterhin den Absendernamen');
+
+-- Annahme: der Hinweis geht an den ANFRAGENDEN (from_id). Der schaltet ab.
+update public.member_settings set notify_app_contact = false
+ where profile_id = 'c0000000-0000-0000-0000-00000000000a';
+insert into public.member_settings (profile_id, notify_app_contact)
+select 'c0000000-0000-0000-0000-00000000000a', false
+ where not exists (select 1 from public.member_settings
+                    where profile_id = 'c0000000-0000-0000-0000-00000000000a');
+
+update public.contact_requests set status = 'accepted'
+ where from_id = 'c0000000-0000-0000-0000-00000000000a'
+   and to_id   = 'c0000000-0000-0000-0000-00000000000b';
+
+select is(
+  (select count(*)::int from public.notifications
+    where type = 'contact_request_accepted'
+      and profile_id = 'c0000000-0000-0000-0000-00000000000a'),
+  0, 'derselbe Schalter deckt auch die Annahme ab');
+
+-- Und wieder die Gegenprobe: der Gespraechsfaden entsteht trotzdem. Wer keine
+-- Hinweise will, hat damit nicht auf den Chat verzichtet.
+select is(
+  (select count(*)::int from public.message_threads
+    where a_profile_id = least('c0000000-0000-0000-0000-00000000000a'::uuid,
+                               'c0000000-0000-0000-0000-00000000000b'::uuid)
+      and b_profile_id = greatest('c0000000-0000-0000-0000-00000000000a'::uuid,
+                                  'c0000000-0000-0000-0000-00000000000b'::uuid)),
+  1, 'der Gespraechsfaden entsteht trotz abgeschaltetem Hinweis');
 
 select * from finish();
 rollback;
