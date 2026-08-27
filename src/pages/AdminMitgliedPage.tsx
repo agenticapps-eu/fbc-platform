@@ -25,7 +25,8 @@ import {
   saveAdminProfile,
   type AdminLegacy,
 } from "../lib/admin-profile";
-import { ZAHLUNGSARTEN } from "../lib/admin-members";
+import { ZAHLUNGSARTEN, setzeStufe } from "../lib/admin-members";
+import { LEVELS, LEVEL_ORDER } from "../config/levels";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
 
 /**
@@ -72,6 +73,12 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
     payment_type: "",
   });
   const [loginEmail, setLoginEmail] = useState("");
+  // Stufe und Begründung stehen NEBEN dem grossen Formular, weil sie einen
+  // eigenen Weg gehen (AGE-634). Anfangswert leer und im Effect gesetzt: beim
+  // Mount ist die Abfrage noch nicht zurück, ein `useState(data.tier)` nähme
+  // den Wert also nie an.
+  const [stufe, setStufe] = useState("");
+  const [stufenGrund, setStufenGrund] = useState("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey,
@@ -97,6 +104,7 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
       reset(data.form);
       setLegacy(data.legacy);
       setLoginEmail(data.loginEmail);
+      setStufe(data.tier);
       initialized.current = true;
     }
   }, [data, reset]);
@@ -111,6 +119,24 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
       toast({
         variant: "error",
         title: "Speichern fehlgeschlagen",
+        description: errorMessage(error),
+      }),
+  });
+
+  const stufeSetzen = useMutation({
+    mutationFn: () => setzeStufe(targetId, stufe, stufenGrund.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      // Die Begründung wird geleert, die Stufe nicht: die neue Stufe IST jetzt
+      // der Stand. Eine stehengebliebene Begründung liefe Gefahr, beim nächsten
+      // Mal unbesehen wiederverwendet zu werden.
+      setStufenGrund("");
+      toast({ variant: "success", title: "Stufe gesetzt" });
+    },
+    onError: (error) =>
+      toast({
+        variant: "error",
+        title: "Stufe nicht gesetzt",
         description: errorMessage(error),
       }),
   });
@@ -203,7 +229,11 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
         </p>
       </header>
 
-      <form onSubmit={handleSubmit(() => speichern.mutate())} className="flex flex-col gap-6" noValidate>
+      <form
+        onSubmit={handleSubmit(() => speichern.mutate())}
+        className="flex flex-col gap-6"
+        noValidate
+      >
         <ProfileBasicsFieldset {...felder} />
         <ProfileRolesFieldset {...felder} />
         <ProfileDevelopmentFieldset {...felder} />
@@ -224,9 +254,8 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
           <div>
             <CardTitle className="text-base">Altmitgliedschaft</CardTitle>
             <CardDescription>
-              Trägt den Bestandsschutz: die höchste Stufe gilt bis zum genannten Tag
-              einschließlich. Leer heißt „unbekannt", nicht „unbefristet". Für Mitglieder
-              unsichtbar.
+              Trägt den Bestandsschutz: die höchste Stufe gilt bis zum genannten Tag einschließlich.
+              Leer heißt „unbekannt", nicht „unbefristet". Für Mitglieder unsichtbar.
             </CardDescription>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -296,6 +325,58 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
         </div>
       </form>
 
+      {/* Stufe: eigener Weg, eigener Knopf (AGE-634). `tier` steht auf der
+          AUSSCHLUSSliste von `admin_update_profile` — ein Patch damit bräche mit
+          22023 ab, und das ist richtig so: eine Stufe zu setzen verschiebt
+          Rechte und verlangt eine Begründung, die kein Feld jenes Formulars
+          kennt. */}
+      <Card className="flex flex-col gap-4">
+        <div>
+          <CardTitle className="text-base">Stufe</CardTitle>
+          <CardDescription>
+            Setzt die wirksame Mitgliedsstufe — auch nach unten, was über Stripe nicht geht. Für
+            Zahlungen ausserhalb von Stripe und für die Korrektur von Importfehlern. Jede Änderung
+            landet mit alter Stufe, neuer Stufe und Begründung im Admin-Protokoll. Kauft das
+            Mitglied später eine <strong>höhere Stufe</strong>, überschreibt Stripe diese Angabe;
+            eine niedrigere lässt sie unberührt.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="min-w-48">
+            <Field label="Stufe">
+              {({ id }) => (
+                <Select id={id} value={stufe} onChange={(e) => setStufe(e.target.value)}>
+                  {LEVEL_ORDER.map((key) => (
+                    <option key={key} value={key}>
+                      {LEVELS[key].label}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
+          <div className="min-w-64 flex-1">
+            <Field label="Begründung">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={stufenGrund}
+                  onChange={(e) => setStufenGrund(e.target.value)}
+                  placeholder="z. B. Überweisung eingegangen"
+                />
+              )}
+            </Field>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => stufeSetzen.mutate()}
+            disabled={stufeSetzen.isPending || stufenGrund.trim() === "" || stufe === ""}
+          >
+            {stufeSetzen.isPending ? "Wird gesetzt…" : "Stufe setzen"}
+          </Button>
+        </div>
+      </Card>
+
       {/* Login-Adresse: eigener Weg, eigener Knopf — sie liegt in auth.users und
           geht über die Edge Function, nicht über admin_update_profile. Ein
           gemeinsames Absenden fasste zwei Fehlerfälle in einem Button zusammen. */}
@@ -303,10 +384,9 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
         <div>
           <CardTitle className="text-base">Login-Adresse</CardTitle>
           <CardDescription>
-            Der Fallback, wenn jemand nicht mehr an sein altes Postfach kommt. Die neue
-            Adresse gilt sofort, ohne Bestätigungsmail; bestehende Sitzungen werden
-            beendet. Ein bereits ausgegebener Zugriffstoken bleibt bis zu einer Stunde
-            gültig.
+            Der Fallback, wenn jemand nicht mehr an sein altes Postfach kommt. Die neue Adresse gilt
+            sofort, ohne Bestätigungsmail; bestehende Sitzungen werden beendet. Ein bereits
+            ausgegebener Zugriffstoken bleibt bis zu einer Stunde gültig.
           </CardDescription>
         </div>
         <div className="flex flex-wrap items-end gap-4">

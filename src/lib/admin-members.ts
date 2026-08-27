@@ -283,3 +283,24 @@ export async function updateMitgliedschaft(
   });
   if (error) throw error;
 }
+
+/**
+ * Setzt die wirksame Stufe eines Mitglieds — in beide Richtungen (AGE-634).
+ *
+ * **Nicht über `admin_update_profile`.** Dort steht `tier` ausdrücklich auf der
+ * AUSSCHLUSSliste; ein Patch damit bräche mit `22023` ab. Und das ist richtig
+ * so: eine Stufe zu setzen ist kein Pflegen von Stammdaten. Es verschiebt
+ * Rechte, es hat eine Gegenpartei (Stripe) und es verlangt eine Begründung, die
+ * kein anderes Feld jener Funktion kennt.
+ *
+ * Die Begründung ist Pflicht — die Datenbank weist eine leere ab. Sie steht
+ * zusammen mit alter und neuer Stufe in `admin_audit`.
+ */
+export async function setzeStufe(id: string, tier: string, grund: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_set_tier", {
+    p_profile_id: id,
+    p_tier: tier,
+    p_grund: grund,
+  });
+  if (error) throw error;
+}
