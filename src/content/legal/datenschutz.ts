@@ -40,7 +40,7 @@ export const datenschutz: Rechtsdokument = {
     "Als Verantwortlicher ist hier „Fair Business Club“ genannt — so wie im Impressum, in den Geschäftsbedingungen und in der Cookie-Richtlinie. Der Entwurf des Anwalts nannte an dieser Stelle stattdessen die „DK Real Invest eG, Rotebühlplatz 23, 70178 Stuttgart“. Welche der beiden Stellen verantwortlich ist, wird derzeit geklärt.",
     "Für Cloudflare, Resend und Stripe ist die Verarbeitungsregion noch nicht belegt. Sie wird nachgetragen, nicht geschätzt.",
     "Verträge zur Auftragsverarbeitung mit den genannten Diensten sind noch nicht abgeschlossen. Ob ein Dienst als Auftragsverarbeiter oder als eigener Verantwortlicher einzuordnen ist, ist rechtlich noch nicht geprüft; die Dienste sind deshalb neutral als Empfänger mit Zweck aufgeführt.",
-    "Der Abschnitt zu eingebetteten Videos weicht vom Entwurf des Anwalts ab: Er beschreibt das seit dem 26. August 2026 eingebaute Verfahren, bei dem ein Video erst auf Ihren Klick hin geladen wird. Ob dieser Klick den rechtlichen Anforderungen an eine Einwilligung in vollem Umfang genügt, ist anwaltlich noch nicht bestätigt.",
+    "Der Abschnitt zu eingebetteten Videos weicht vom Entwurf des Anwalts ab: Er beschreibt das seit dem 26. August 2026 eingebaute Verfahren, bei dem ein Video erst auf Ihren Klick hin geladen wird — seit dem 27. August 2026 wird diese Entscheidung je Anbieter auf Ihrem Gerät gespeichert und ist am Ende dieser Seite widerruflich. Ob Klick und Widerruf den rechtlichen Anforderungen an eine Einwilligung in vollem Umfang genügen, ist anwaltlich noch nicht bestätigt.",
     "Konkrete Speicherfristen sind noch nicht festgelegt.",
   ],
   abschnitte: [
@@ -472,13 +472,19 @@ export const datenschutz: Rechtsdokument = {
         {
           art: "absatz",
           inhalt: [
-            "Ihre Entscheidung gilt für dieses eine Video und wird nicht gespeichert. Rufen Sie die Seite erneut auf, ist wieder nichts geladen. Wir bitten Sie also bei jedem Video erneut, statt eine einmal erteilte Zustimmung fortzuschreiben.",
+            "Ihre Entscheidung gilt für den jeweiligen Anbieter — geben Sie YouTube frei, ist über Vimeo nichts gesagt. Sie wird auf Ihrem Gerät gespeichert, damit wir Sie nicht bei jedem Video erneut fragen müssen; danach werden Videos dieses Anbieters ohne weitere Nachfrage geladen. Gespeichert wird ausschließlich, welche Anbieter Sie freigegeben haben — keine Kennung, kein Zeitpunkt, nichts, woran sich ein Besuch wiedererkennen ließe.",
           ],
         },
         {
           art: "absatz",
           inhalt: [
             "Für den Abruf nach Ihrem Klick verwenden wir die datensparsamste Adresse, die der jeweilige Anbieter anbietet: bei YouTube die Variante „youtube-nocookie.com“, bei Vimeo den Parameter „dnt“ für „Do Not Track“. Was der Anbieter danach tatsächlich speichert, entzieht sich unserer Kenntnis und unserem Einfluss.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Sie können Ihre Freigabe jederzeit zurücknehmen — am Ende dieser Seite, für jeden Anbieter einzeln. Der Widerruf wirkt sofort: das nächste Video dieses Anbieters wird wieder erst auf Ihre Anforderung hin geladen. Ein Konto brauchen Sie dafür nicht. Löschen Sie die Websitedaten in Ihrem Browser, entfällt die Freigabe ebenfalls.",
           ],
         },
       ],

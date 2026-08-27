@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { parseVideoUrl } from "../../lib/feed";
+import { freigeben, useFreigabe } from "../../lib/video-freigabe";
 import { Icon } from "./icons";
 
 const ANBIETER = { youtube: "YouTube", vimeo: "Vimeo" } as const;
@@ -35,21 +36,35 @@ const BREITE = "w-full max-w-2xl";
  * schlichter, als sie sein könnte.
  */
 export function VideoEmbed({ url, title = "Video" }: { url: string; title?: string }) {
-  // Die Freigabe hängt an der URL, NICHT an der Instanz. Der Profil-Editor
-  // schlüsselt seine Zeilen nach Index: hinge sie an der Instanz, lüde eine
-  // geänderte Zeile den neuen Anbieter ohne neue Aktivierung. Gefunden in der
-  // Plan-Review, bevor es Code gab.
-  const [freigegeben, setFreigegeben] = useState<string | null>(null);
+  const video = parseVideoUrl(url);
+
+  // Die Freigabe hängt seit AGE-621 am ANBIETER und liegt auf dem Endgerät —
+  // vorher hing sie an dieser einen URL und starb mit der Instanz. Der Schutz,
+  // um den es beim URL-Bezug ging, bleibt: der Profil-Editor schlüsselt seine
+  // Zeilen nach Index, und eine geänderte Zeile mit einem noch nicht
+  // freigegebenen Anbieter zeigt weiterhin das Tor.
+  const freigegeben = useFreigabe(video?.provider ?? null);
+
+  // Getrennt davon: wurde GENAU DIESE Fläche gerade eben angeklickt? Nur dann
+  // wird abgespielt und der Fokus geholt. Läge beides am Offen-Sein, spielten
+  // beim Seitenaufruf alle Videos einer freigegebenen Seite gleichzeitig los
+  // und der Fokus spränge in einen fremden Rahmen.
+  const [geklickt, setGeklickt] = useState<string | null>(null);
+  const spieltAb = geklickt === url;
+
+  // `|| spieltAb`, nicht nur `freigegeben`: schlägt das Speichern fehl
+  // (abgeschotteter Kontext, volles Kontingent), soll der Klick sein Video
+  // trotzdem öffnen. Verloren ist dann nur das Merken.
+  const offen = freigegeben || spieltAb;
+
   const rahmen = useRef<HTMLIFrameElement>(null);
-  const offen = freigegeben === url;
 
   useEffect(() => {
     // Nach dem Austausch fiele der Tastaturfokus sonst auf `document.body` —
     // wer gerade per Tastatur aktiviert hat, stünde nirgends.
-    if (offen) rahmen.current?.focus();
-  }, [offen]);
+    if (spieltAb) rahmen.current?.focus();
+  }, [spieltAb]);
 
-  const video = parseVideoUrl(url);
   if (!video) {
     return (
       <div
@@ -67,7 +82,10 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
       <div className={`${BREITE} space-y-2`}>
         <button
           type="button"
-          onClick={() => setFreigegeben(url)}
+          onClick={() => {
+            setGeklickt(url);
+            freigeben(video.provider);
+          }}
           className="group flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-[var(--radius-card)] border border-line bg-gradient-to-br from-soft to-chrome transition-colors hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft"
         >
           {/* Ohne Vorschaubild vom Anbieter trägt die Fläche nichts als sich
@@ -82,9 +100,10 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
             ungültiges Markup und eine Tastaturfalle. */}
         <p className="text-xs text-muted">
           Beim Laden wird eine Verbindung zu {anbieter} hergestellt. Dabei wird Ihre IP-Adresse
-          dorthin übertragen.{" "}
+          dorthin übertragen. Ihre Entscheidung wird für {anbieter} gespeichert, bis Sie sie
+          zurücknehmen.{" "}
           <Link to="/datenschutz" className="underline hover:text-ink">
-            Mehr in der Datenschutzerklärung
+            Mehr und Widerruf in der Datenschutzerklärung
           </Link>
         </p>
       </div>
@@ -95,8 +114,12 @@ export function VideoEmbed({ url, title = "Video" }: { url: string; title?: stri
   // Frage dieser Fläche, die kanonische Grenze bleibt davon unberührt. Ohne den
   // Parameter lädt der Player PAUSIERT und verlangt einen zweiten Klick, diesmal
   // im fremden Rahmen — das Tor hätte die Bedienung verschlechtert.
+  //
+  // NUR beim frischen Klick (AGE-621). Ein Video, das bloß wegen einer
+  // gemerkten Freigabe lädt, hat niemand in diesem Moment angefordert; spielte
+  // es ab, liefen beim Seitenaufruf alle Videos der Seite gleichzeitig.
   const src = new URL(video.embedUrl);
-  src.searchParams.set("autoplay", "1");
+  if (spieltAb) src.searchParams.set("autoplay", "1");
 
   return (
     <div
