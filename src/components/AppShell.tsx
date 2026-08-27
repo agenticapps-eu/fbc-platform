@@ -24,6 +24,7 @@ import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { useOverlay } from "./ui/useOverlay";
 import { Icon } from "./ui/icons";
+import { LeistenPill } from "./LeistenPill";
 
 // Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
 // Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
@@ -571,6 +572,7 @@ export default function AppShell() {
           am Rand, nicht schwebend"). Bis AGE-499 hing sie als gerundete Karte in
           einem zentrierten Container und schwebte sichtbar. */}
       <aside
+        id="fbc-navigation"
         className={cn(
           "fbc-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-chrome-border lg:flex",
           SIDEBAR_SURFACE,
@@ -604,24 +606,16 @@ export default function AppShell() {
           <FeedbackButton collapsed={collapsed} />
         </div>
 
-        {/* Einklappen — unten, damit der Schalter nicht mit der Navigation
-            konkurriert. Der Zustand überlebt den Reload. */}
-        <div className="shrink-0 border-t border-chrome-border p-2">
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
-            title={collapsed ? "Ausklappen" : "Einklappen"}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              collapsed && "justify-center px-2",
-            )}
-          >
-            <ChevronLeftIcon flipped={collapsed} />
-            {!collapsed && <span>Einklappen</span>}
-          </button>
-        </div>
+        {/* Der Einklapp-Schalter sass bis AGE-638 hier unten als eigene Zeile,
+            mit Pfeil und dem Wort „Einklappen". Er steht jetzt als Pill am
+            rechten Rand dieser Leiste — dasselbe Bauteil wie an der
+            Nachrichten-Leiste, an derselben Höhe. */}
+        <LeistenPill
+          seite="links"
+          offen={!collapsed}
+          steuert="fbc-navigation"
+          onClick={() => setCollapsed((c) => !c)}
+        />
       </aside>
 
       {/* Nachrichten-Leiste (≥ lg, AGE-627): gespiegelt zur linken — bündig an
@@ -639,31 +633,24 @@ export default function AppShell() {
           weil dort beide Flächen weiss sind. */}
       {chatLeisteSteht && (
         <aside
+          id="fbc-nachrichten"
           className={cn(
             "fbc-chat-rail fixed inset-y-0 right-0 z-40 hidden flex-col border-l xl:flex",
             chatCollapsed ? cn("border-chrome-border", SIDEBAR_SURFACE) : "border-line bg-canvas",
           )}
         >
           {chatCollapsed ? (
-            // Eingeklappt: NUR die Sprechblase mit dem Zähler. Kein Thread wird
-            // dafür geladen — die Zahl führt `useUngelesen` ohnehin getrennt.
+            // Eingeklappt: NUR die Sprechblase mit dem Zähler — seit AGE-638
+            // eine ANZEIGE, kein Knopf. Geschaltet wird über den Pill. Stünden
+            // beide, stünden sie in derselben 4rem-Zeile eines 4,5rem schmalen
+            // Rails: zwei Schalter, keine 40 px auseinander, mit derselben
+            // Wirkung. Kein Thread wird hier geladen — die Zahl führt
+            // `useUngelesen` ohnehin getrennt.
             <div className="flex h-16 shrink-0 items-center justify-center border-b border-chrome-border px-2">
-              <button
-                type="button"
-                onClick={() => setChatCollapsed(false)}
-                aria-expanded={false}
-                aria-label={
-                  ungelesenFehlt
-                    ? "Nachrichten ausklappen — Anzahl konnte nicht geladen werden"
-                    : ungelesen.gesamt > 0
-                      ? `Nachrichten ausklappen, ${ungelesen.gesamt} ungelesen`
-                      : "Nachrichten ausklappen"
-                }
-                className="relative rounded-md p-2 text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
+              <span className="relative p-2 text-on-chrome">
                 <Icon name="messages" className="h-5 w-5" />
                 {(ungelesenFehlt || ungelesen.gesamt > 0) && (
-                  // `aria-hidden`: die Zahl steht schon im Namen des Knopfes.
+                  // `aria-hidden`: die Zahl steht schon im Satz darunter.
                   <span
                     aria-hidden="true"
                     className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-accent px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
@@ -671,23 +658,31 @@ export default function AppShell() {
                     {ungelesenFehlt ? "!" : ungelesen.gesamt}
                   </span>
                 )}
-              </button>
+                {/* Als TEXT, nicht als `aria-label`: ein `aria-label` auf einem
+                    `span` ohne Rolle wird von Vorlesesoftware nicht verlässlich
+                    ausgegeben. Beim Knopf, der hier bis AGE-638 stand, ging das
+                    noch — bei einer Anzeige nicht mehr. */}
+                <span className="sr-only">
+                  {ungelesenFehlt
+                    ? "Ungelesene Nachrichten — Anzahl konnte nicht geladen werden"
+                    : ungelesen.gesamt > 0
+                      ? `${ungelesen.gesamt} ungelesene Nachrichten`
+                      : "Keine ungelesenen Nachrichten"}
+                </span>
+              </span>
             </div>
           ) : (
-            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
+            <div className="flex h-16 shrink-0 items-center border-b border-line px-4">
               <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
-              <button
-                type="button"
-                onClick={() => setChatCollapsed(true)}
-                aria-expanded={true}
-                aria-label="Nachrichten einklappen"
-                title="Einklappen"
-                className="rounded-md p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <ChevronLeftIcon flipped />
-              </button>
             </div>
           )}
+
+          <LeistenPill
+            seite="rechts"
+            offen={!chatCollapsed}
+            steuert="fbc-nachrichten"
+            onClick={() => setChatCollapsed((c) => !c)}
+          />
 
           {/* `istBreit` gehört in die MONTAGE, nicht in einen Schalter am Panel:
               unter `lg` liegt diese Leiste per CSS verborgen, aber montiert —

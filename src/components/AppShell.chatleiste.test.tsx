@@ -29,12 +29,19 @@ if (!Element.prototype.scrollIntoView) {
 type Seite = import("../lib/chat").ChatThreadSeite;
 const fetchThreads = vi.fn<(uid: string, opts?: { offset?: number }) => Promise<Seite>>();
 
+/** Der Ungelesen-Zähler der Attrappe. Veränderlich, weil eine der Zusagen aus
+ *  AGE-638 nur mit einer Zahl > 0 überhaupt messbar ist: erst dann trägt die
+ *  Sprechblase einen eigenen Namen, an dem sich zeigt, ob sie noch ein Knopf
+ *  ist. `vi.hoisted`, weil `vi.mock` nach oben gezogen wird und eine normale
+ *  Konstante dort nicht sähe. */
+const { ungelesen } = vi.hoisted(() => ({ ungelesen: { gesamt: 0 } }));
+
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),
   fetchThreads: (uid: string, opts?: { offset?: number }) => fetchThreads(uid, opts),
   fetchMessages: async () => [],
   fetchUnreadCounts: async () => ({
-    gesamt: 0,
+    gesamt: ungelesen.gesamt,
     jeThread: new Map<string, number>(),
     hatUngelesen: () => false,
   }),
@@ -115,6 +122,7 @@ const oeffner = () => screen.queryByRole("button", { name: "Nachrichten-Leiste �
 
 beforeEach(() => {
   setzeBreit(1440);
+  ungelesen.gesamt = 0;
   fetchThreads.mockReset();
   fetchThreads.mockResolvedValue({ threads: [], nextOffset: null });
   localStorage.clear();
@@ -188,6 +196,96 @@ describe("Die Nachrichten-Leiste steht in der Hülle (AGE-627)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Navigation einklappen" }));
     expect(localStorage.getItem("fbc.sidebarCollapsed")).toBe("1");
     expect(localStorage.getItem("fbc.chatCollapsed")).toBe("0");
+  });
+});
+
+describe("Ein Pill für beide Leisten (AGE-638)", () => {
+  /** Der Pill einer Leiste, egal in welchem Zustand. Über den Namen gesucht,
+   *  weil der die HANDLUNG benennt — genau das, was ein Schalter ansagen muss. */
+  const pill = (leiste: "Navigation" | "Nachrichten") =>
+    screen.queryByRole("button", { name: new RegExp(`^${leiste} (ein|aus)klappen$`) });
+
+  it("trägt an beiden Leisten einen Schalter, der die Handlung benennt", () => {
+    renderApp();
+    // Links offen, rechts eingeklappt — die beiden Startzustände.
+    expect(pill("Navigation")).toHaveAccessibleName("Navigation einklappen");
+    expect(pill("Nachrichten")).toHaveAccessibleName("Nachrichten ausklappen");
+  });
+
+  it("sagt den Zustand über aria-expanded an, nicht nur über den Text", () => {
+    renderApp();
+    expect(pill("Navigation")).toHaveAttribute("aria-expanded", "true");
+    expect(pill("Nachrichten")).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(pill("Navigation")!);
+    expect(pill("Navigation")).toHaveAttribute("aria-expanded", "false");
+    expect(pill("Navigation")).toHaveAccessibleName("Navigation ausklappen");
+  });
+
+  it("zeigt in allen VIER Fällen in die Richtung, in die es geht", () => {
+    // Seite × Zustand. Ein Test nur auf den Namen sähe einen umgedrehten Pfeil
+    // nie — und „gespiegelt" ist genau die Eigenschaft, die hier leicht kippt.
+    renderApp();
+    expect(pill("Navigation")).toHaveAttribute("data-richtung", "links");
+    expect(pill("Nachrichten")).toHaveAttribute("data-richtung", "links");
+
+    fireEvent.click(pill("Navigation")!);
+    fireEvent.click(pill("Nachrichten")!);
+
+    expect(pill("Navigation")).toHaveAttribute("data-richtung", "rechts");
+    expect(pill("Nachrichten")).toHaveAttribute("data-richtung", "rechts");
+  });
+
+  it("ist an beiden Leisten DASSELBE Bauteil", () => {
+    // Die eigentliche Zusage dieses Vorgangs, und die einzige Formulierung,
+    // die sie messbar macht: ein Test auf die NAMEN wäre auch gegen die alten,
+    // getrennt gebauten Schalter grün gewesen — die hiessen ja schon so.
+    renderApp();
+    const pills = document.querySelectorAll("[data-leisten-pill]");
+    expect(pills).toHaveLength(2);
+    expect([...pills].map((p) => p.getAttribute("data-leisten-pill")).sort()).toEqual([
+      "links",
+      "rechts",
+    ]);
+  });
+
+  it("hat links KEINE untere Einklapp-Zeile mehr — und den Feedback-Zugang schon", () => {
+    renderApp();
+    // Der Pill trägt nur ein Zeichen. Das WORT „Einklappen" stand allein in der
+    // unteren Zeile; verschwindet es, ist sie weg. Ein Test auf den
+    // zugänglichen Namen träfe hier nicht, weil der Pill denselben führt.
+    expect(screen.queryByText("Einklappen")).not.toBeInTheDocument();
+    // Positivkontrolle zur Verneinung: ohne sie wäre der Test auch grün, wenn
+    // die ganze Leiste fehlte.
+    expect(screen.getByRole("button", { name: /Feedback/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Navigation einklappen" })).toHaveLength(1);
+  });
+
+  it("hat rechts aufgeklappt KEINEN eigenen Knopf im Kopf mehr", () => {
+    renderApp();
+    fireEvent.click(pill("Nachrichten")!);
+    // Genau einer, und er steckt im Pill — nicht im Kopf der Leiste.
+    const knoepfe = screen.getAllByRole("button", { name: "Nachrichten einklappen" });
+    expect(knoepfe).toHaveLength(1);
+    expect(knoepfe[0]).toHaveAttribute("data-leisten-pill", "rechts");
+  });
+
+  it("macht aus der Sprechblase im Rail eine Anzeige, keinen zweiten Schalter", async () => {
+    // Erst mit einer Zahl > 0 trägt die Sprechblase einen eigenen Namen. Mit 0
+    // hiesse sie schlicht „Nachrichten ausklappen" wie der Pill, und der Test
+    // könnte die beiden gar nicht auseinanderhalten.
+    ungelesen.gesamt = 3;
+    renderApp();
+
+    // Auf den SATZ geprüft, nicht auf die Ziffer: die „3" steht auch am
+    // Glocken-Zähler in der Topbar, und `findByText("3")` träfe beide.
+    expect(await screen.findByText("3 ungelesene Nachrichten")).toBeInTheDocument();
+    // Die Zahl steht da — aber nicht mehr auf einem Knopf.
+    expect(screen.queryByRole("button", { name: /ungelesen/ })).not.toBeInTheDocument();
+    // Und der EINZIGE Weg zum Ausklappen ist der Pill.
+    const wege = screen.getAllByRole("button", { name: /^Nachrichten ausklappen/ });
+    expect(wege).toHaveLength(1);
+    expect(wege[0]).toHaveAttribute("data-leisten-pill", "rechts");
   });
 });
 
