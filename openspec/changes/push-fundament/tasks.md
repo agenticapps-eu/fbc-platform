@@ -1,5 +1,20 @@
 # Aufgaben — Push-Fundament (AGE-641)
 
+> ## Stand 27.08., abends
+>
+> **Die Datenschicht von Phase A ist fertig.** A1, A2, A2b, A3 und A4/A5b
+> stehen in fünf Commits, jeder mit RED davor und Gegenprobe.
+>
+> **A5 ist blockiert und nicht durch Code.** In Infisical `dev` UND `prod`
+> gibt es kein einziges FCM-, APNs-, Firebase- oder Apple-Geheimnis. Die Edge
+> Function lässt sich schreiben, aber gegen keinen echten Anbieter messen.
+> Nötig sind ein Firebase-Projekt (Dienstschlüssel für FCM) und ein
+> APNs-Schlüssel aus einem Apple-Developer-Konto samt Key-ID und Team-ID —
+> Kontoeinrichtungen, keine Codearbeit.
+>
+> Nach der vereinbarten Reihenfolge folgt darum jetzt **AGE-642**; A5 und A6
+> kommen danach, sobald die Zugänge stehen.
+
 Zwei Phasen mit einem ausdrücklichen Halt. **Phase B beginnt erst, wenn
 AGE-642 gemergt ist** — vorher gibt es kein Gerätetoken zu registrieren.
 
