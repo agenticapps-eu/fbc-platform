@@ -109,11 +109,18 @@ have is an entry point into nothing.
   opens the other
 - **THEN** the first drawer closes, and exactly one drawer is open
 
-#### Scenario: A drawer does not survive the jump past its own threshold
+#### Scenario: A drawer does not survive the jump to `lg`
 
-- **WHEN** a member opens a drawer and the viewport then widens past the width
-  at which **that** bar docks
+- **WHEN** a member opens the **navigation** drawer below `lg` and the viewport
+  then widens past `lg`
 - **THEN** that drawer is closed, and the page behind it scrolls normally
+
+#### Scenario: The right bar's drawer closes at its own threshold, not at `lg`
+
+- **WHEN** a member opens the **messages** drawer and the viewport then widens
+  past `xl`
+- **THEN** that drawer is closed, and it was still available throughout the band
+  between `lg` and `xl`
 
 #### Scenario: Each drawer has a way in
 

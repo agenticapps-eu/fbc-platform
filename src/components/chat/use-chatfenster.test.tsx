@@ -252,6 +252,26 @@ describe("useChatfenster — der Speicher gehört einem Konto", () => {
     expect(reihe()).toEqual(["t1"]);
   });
 
+  it("entdoppelt beim Wiederherstellen — zwei Fenster auf einen Verlauf gibt es nicht", () => {
+    // `oeffne` verhindert das aktiv; ein doppelt gespeicherter Eintrag stellte
+    // es über die Hintertür wieder her — samt doppeltem React-`key` und zwei
+    // Sendezeilen auf denselben Verlauf (Diff-Review, opencode, LOW).
+    localStorage.setItem(
+      schluessel(UID),
+      JSON.stringify([
+        { id: "t1", min: false, name: "Alt", avatar: null },
+        { id: "t2", min: false, name: "Chris Mai", avatar: null },
+        { id: "t1", min: true, name: "Neu", avatar: null },
+      ]),
+    );
+    montiere();
+
+    expect(reihe()).toEqual(["t1", "t2"]);
+    // Der letzte Eintrag gewinnt — er ist der jüngere.
+    expect(stand().fenster.find((f) => f.threadId === "t1")!.name).toBe("Neu");
+    expect(minimiert()).toEqual(["t1"]);
+  });
+
   it("überlebt Unsinn im Speicher", () => {
     localStorage.setItem(schluessel(UID), "{kein json");
     montiere();

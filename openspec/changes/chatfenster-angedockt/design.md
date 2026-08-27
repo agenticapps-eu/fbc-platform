@@ -145,6 +145,20 @@ gespeicherte Reihenfolge *ist* die Reihenfolge. Einen Zähler zu speichern hiess
 eine Zahl über Sitzungen hinweg gültig zu halten, die nur innerhalb einer
 Sitzung etwas bedeutet.
 
+**Die Folge, ausgesprochen** (Diff-Review, gemini, LOW — er hat sie als erster
+benannt): nach einem Neuladen entscheidet über die Verdrängung wieder die
+Öffnungs­reihenfolge, nicht die Benutzung von vorher. Wer vor dem Neuladen
+ausgiebig im linkesten Fenster geschrieben hat, verliert genau dieses beim
+nächsten vierten Gespräch.
+
+Das bleibt so, und zwar nicht aus Bequemlichkeit: **nach einem Neuladen hat
+niemand irgendetwas berührt.** Alle drei Fenster stehen gleich da, und einen
+Gleichstand muss irgendetwas brechen. Die Öffnungsreihenfolge ist dafür der
+sichtbare Schlüssel — sie ist genau die Reihenfolge, in der die Fenster auf dem
+Schirm stehen, von links nach rechts. Eine Zahl aus der vorigen Sitzung wäre der
+unsichtbare: das Fenster ganz links bliebe stehen und das in der Mitte wiche,
+aus einem Grund, den man dem Bild nicht ansieht.
+
 **Beim Wiederherstellen wird nichts geprüft.** Ein Thread, den es nicht mehr
 gibt oder der nicht mehr sichtbar ist, liefert beim Laden seiner Nachrichten
 einen Fehler — und dafür gibt es bereits einen Zustand (das Fenster zeigt

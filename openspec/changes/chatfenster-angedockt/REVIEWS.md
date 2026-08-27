@@ -113,3 +113,90 @@ Geändert:
 - **Keine Tab-Synchronisierung.** Als Annahme benannt statt behoben: das Projekt
   hat sie nirgends, und sie hier einzuführen wäre ein Mechanismus für einen
   Vorgang, der ihn nicht braucht.
+
+---
+
+# Diff-Review (Schritt 4) — auf dem CODE, nicht auf dem Plan
+
+Dieselben zwei fremden Anbieter, diesmal auf `git diff origin/main HEAD -- src/`
+plus den vier neuen Dateien im Volltext (ein Diff einer hinzugefügten Datei ist
+leicht falsch zu lesen).
+
+| Reviewer | Modell | Urteil |
+| --- | --- | --- |
+| opencode | `hf:moonshotai/Kimi-K3` | REQUEST-CHANGES |
+| gemini | gemini-3-pro | REQUEST-CHANGES |
+
+## opencode — die Befunde, die etwas geändert haben
+
+- **[HIGH] Doppeltes `markThreadRead` auf `/chat/:id`.** `ChatPage` behielt den
+  Aufruf in seinem `subscribeToThread`-Rückruf, und der neue Hook markiert über
+  den `letzteFremde`-Effect zusätzlich: **zwei Upserts je eingehender
+  Fremdzeile**. Damit hat er zugleich einen Kommentar im Hook widerlegt, der
+  „gleich viele Schreibvorgänge, und das ist gemessen" behauptete — gemessen
+  war der Hook ALLEIN.
+  → Der Aufruf in `ChatPage` ist entfallen. Neuer Test
+  `ChatPage.lesestand.test.tsx`; **gegen den alten Stand rot** (3 Aufrufe statt
+  2), gegengeprüft.
+- **[MEDIUM] `naechste.current++` im `setFenster`-Updater.** Nebeneffekt in
+  einer Funktion, die rein sein muss — im StrictMode doppelt aufgerufen. Folge
+  hier harmlos, aber genau das Muster, das dieselbe Datei an anderer Stelle
+  ablehnt. → Die Nummer wird jetzt aus dem vorherigen Zustand abgeleitet; die
+  Ref entfällt.
+- **[MEDIUM] Zustell-Rennen beim Öffnen.** `prev ? merge : prev` verwarf jede
+  Nachricht, die eintrifft, während ein Fenster seinen Verlauf noch HOLT — und
+  anders als `ChatPage`, das ein eigenes Thread-Abo führt, holte nichts sie
+  nach. → Gefragt wird jetzt der Cache-EINTRAG: mit Daten wird gemergt, ohne
+  Daten neu abgefragt. Neuer Test, **gegen die alte Fassung rot**.
+- **[LOW] `queueMicrotask` für den Fokus** setzte voraus, dass Reacts Commit
+  synchron davor liegt. → Über einen Effect. Zwei neue Tests, **beide gegen die
+  neutralisierte Fassung rot**.
+- **[LOW] Keine Deduplizierung beim Wiederherstellen.** → Nach Kennung
+  entdoppelt, letzter Eintrag gewinnt. Test ergänzt.
+- **[LOW] `aria-expanded` ohne `aria-controls`.** → Ergänzt, wie beim
+  `LeistenPill`.
+- **[LOW] Gestapelter Spy im Test.** → Derselbe Spy, `mockClear()` davor.
+- **[LOW] `new Set(...)` je Anstrich.** → `useMemo`.
+
+## gemini — die Befunde
+
+- **[MEDIUM] Zeigerkontakt auf dem Scrollbalken zählt als „berührt".**
+  → **Nicht geändert, und das ist die Entscheidung:** wer in einem Gespräch
+  scrollt, um zu lesen, benutzt es. Genau davor soll die Regel es schützen. Ein
+  Fenster, das man gerade liest, ist kein Kandidat fürs Räumen.
+- **[LOW] Der LRU-Stand überlebt das Neuladen nicht.** Zutreffend.
+  → **Nicht geändert**, jetzt aber im Design ausgesprochen: nach einem Neuladen
+  hat niemand etwas berührt, und den Gleichstand bricht die sichtbare
+  Reihenfolge auf dem Schirm. Eine Zahl aus der vorigen Sitzung wäre der
+  unsichtbare Schlüssel.
+- **[LOW] `useUngelesenLive` abonniere bei einem Kontowechsel nicht neu.**
+  → **Falsch.** Der Effect hängt seit AGE-583 an `[uid, queryClient]`
+  (`use-ungelesen.ts:159`) und baut sehr wohl neu auf. Der Diff zeigt die Zeile
+  nicht, weil sie unverändert ist — dasselbe Muster wie zwei falsche Befunde in
+  AGE-638. Ein `grep` in zehn Sekunden.
+
+## Sicherheits-Gate (`cso`)
+
+Belegt statt behauptet — der Change fasst nichts Sicherheitsrelevantes an:
+
+- `git diff --name-only origin/main HEAD -- supabase/ .github/` ist **leer**:
+  keine Migration, keine Edge Function, keine Policy, kein Workflow.
+- Im ganzen Diff steht **kein einziger neuer** `supabase.`-, `.rpc(`- oder
+  `.from(`-Aufruf. Die Datenschicht ist unberührt; alles läuft über bestehende,
+  RLS-gedeckte Wege.
+- Neu im Gerätespeicher: `fbc.chatFenster.<uid>` mit Thread-Kennungen, Namen und
+  Avatar-Pfaden der **eigenen** Kontakte — Daten, die dem Mitglied auf demselben
+  Gerät ohnehin angezeigt werden, getrennt je Konto.
+- Der gespeicherte Avatar-Pfad geht durch `bildUrl` in ein `<img src>`. Ein
+  fremdes URI-Schema würde durchgereicht, führt in `<img src>` aber zu keiner
+  Ausführung, und wer den Gerätespeicher beschreiben kann, hat die Seite ohnehin.
+  **Bewertet und angenommen** — kein Riegel für einen Fall, der nicht eintritt.
+
+## Was NICHT im Browser nachgemessen wurde
+
+Die Sichtprobe (siehe `tasks.md`) lief gegen den Stand **vor** diesen
+Korrekturen. Zwei davon ändern Verhalten und sind deshalb stattdessen in Tests
+festgenagelt, jeweils mit Gegenprobe: der entfallene doppelte Lesestand-Aufruf
+und die Fokusversetzung. Der lokale Stack liess sich nicht erneut dafür
+benutzen — eine parallele Sitzung auf diesem Rechner hat ihn dreimal geleert
+(siehe die Notiz zum geteilten Stack).

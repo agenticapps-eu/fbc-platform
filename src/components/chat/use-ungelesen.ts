@@ -104,21 +104,36 @@ export function useUngelesenLive(
     const unsubscribe = subscribeToAllMessages((nachricht) => {
       // Zuerst zustellen, dann erst über das Zählen entscheiden (AGE-639).
       //
-      // `prev ? … : prev` ist die ganze Logik: fortgeschrieben wird NUR ein
-      // Cache-Eintrag, den es schon gibt — und den gibt es genau dann, wenn eine
-      // Fläche diesen Thread gerade lädt oder zeigt. Dieser Rückruf weiss damit
-      // nichts über Fenster, und es entsteht keine zweite Stelle, an der
-      // „welche Gespräche sind offen?" beantwortet werden müsste.
+      // Gefragt wird der Cache-EINTRAG, nicht sein Inhalt. Einen Eintrag gibt es
+      // genau dann, wenn eine Fläche diesen Thread gerade lädt oder zeigt —
+      // dieser Rückruf weiss damit nichts über Fenster, und es entsteht keine
+      // zweite Stelle, an der „welche Gespräche sind offen?" beantwortet werden
+      // müsste. Für einen Thread, den niemand zeigt, passiert nichts.
       //
-      // Auch für ein MINIMIERTES Fenster: es lädt seinen Verlauf, und ohne
-      // diese Zeile fehlten ihm beim Aufziehen genau die Zeilen, die während
-      // des Minimiertseins kamen.
+      // Auch für ein MINIMIERTES Fenster: es lädt seinen Verlauf, und ohne das
+      // fehlten ihm beim Aufziehen genau die Zeilen, die währenddessen kamen.
       //
-      // `ChatPage` hat daneben sein eigenes `subscribeToThread`. Das kostet
-      // nichts: `mergeMessage` ist über die `id` idempotent.
-      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(nachricht.threadId), (prev) =>
-        prev ? mergeMessage(prev, nachricht) : prev,
+      // **Zwei Fälle, nicht einer** (Diff-Review, opencode, MEDIUM). Die erste
+      // Fassung schrieb `prev ? mergeMessage(…) : prev` und verwarf damit jede
+      // Nachricht, die eintrifft, während ein eben geöffnetes Fenster seinen
+      // Verlauf noch HOLT — und anders als bei `ChatPage`, das daneben ein
+      // eigenes Thread-Abo führt, holte sie danach nichts mehr nach. Der
+      // Eintrag existiert in diesem Moment bereits, er hat nur noch keine
+      // Daten; dann ist eine Neuabfrage die richtige Antwort.
+      const eintrag = queryClient.getQueryState<ChatMessage[]>(
+        messagesQueryKey(nachricht.threadId),
       );
+      if (eintrag?.data) {
+        // `mergeMessage` ist über die `id` idempotent — das Thread-Abo von
+        // `ChatPage` darf dieselbe Zeile also ruhig ein zweites Mal einspielen.
+        queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(nachricht.threadId), (prev) =>
+          prev ? mergeMessage(prev, nachricht) : prev,
+        );
+      } else if (eintrag) {
+        void queryClient.invalidateQueries({
+          queryKey: messagesQueryKey(nachricht.threadId),
+        });
+      }
 
       if (pfad.current === `/chat/${nachricht.threadId}`) return;
       // Dieselbe Begründung wie beim Pfad: liegt das Gespräch aufgezogen vor

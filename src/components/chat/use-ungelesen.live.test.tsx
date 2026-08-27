@@ -137,14 +137,35 @@ describe("useUngelesenLive — die angedockten Chatfenster (AGE-639)", () => {
     expect(abonnieren).toHaveBeenCalledTimes(1);
   });
 
+  it("holt neu, wenn der Verlauf noch LÄDT — sonst fiele die Nachricht weg", () => {
+    // Der Fall, den die Diff-Review gefunden hat: ein eben geöffnetes Fenster
+    // hat seinen Cache-Eintrag schon, aber noch keine Daten. Ein blosses
+    // `prev ? merge : prev` verwürfe die Nachricht — und anders als bei
+    // `ChatPage`, das ein eigenes Thread-Abo führt, holte sie danach nichts
+    // mehr nach.
+    const { queryClient, invalidiert } = renderHook();
+    void queryClient.prefetchQuery({
+      queryKey: messagesQueryKey("t1"),
+      queryFn: () => new Promise<ChatMessage[]>(() => {}),
+    });
+    invalidiert.mockClear();
+
+    act(() => beiNachricht!(eingang));
+
+    expect(schluessel(invalidiert)).toContain(JSON.stringify(messagesQueryKey("t1")));
+  });
+
   it("legt für einen Thread, den niemand zeigt, KEINEN Verlauf an", () => {
-    // `prev ? … : prev`. Sonst füllte jede eingehende Nachricht den Cache mit
-    // Verläufen, die keine Fläche je abruft.
-    const { queryClient } = renderHook();
+    // Gefragt wird der EINTRAG, nicht sein Inhalt. Ohne diese Bedingung füllte
+    // jede eingehende Nachricht den Cache mit Verläufen, die keine Fläche je
+    // abruft — und löste dazu eine Abfrage je Nachricht aus.
+    const { queryClient, invalidiert } = renderHook();
+    invalidiert.mockClear();
 
     act(() => beiNachricht!(eingang));
 
     expect(queryClient.getQueryData(messagesQueryKey("t1"))).toBeUndefined();
+    expect(schluessel(invalidiert)).not.toContain(JSON.stringify(messagesQueryKey("t1")));
   });
 
   it("überspringt die Neuzählung für ein AUFGEZOGENES Fenster", () => {
@@ -176,7 +197,7 @@ describe("useUngelesenLive — die angedockten Chatfenster (AGE-639)", () => {
     // Die Menge liegt in einer Ref, nicht in der Abhängigkeitsliste. Stünde sie
     // dort, kostete jedes geöffnete Fenster einen Kanalwechsel — und ein neuer
     // Kanal heisst hier eine Lücke, in der nichts ankommt.
-    const { rerender, queryClient } = renderHook("/mitglieder", KEINE);
+    const { rerender, queryClient, invalidiert } = renderHook("/mitglieder", KEINE);
     rerender(
       <QueryClientProvider client={queryClient}>
         <Huelle pfad="/mitglieder" sichtbar={new Set(["t1"])} />
@@ -187,7 +208,11 @@ describe("useUngelesenLive — die angedockten Chatfenster (AGE-639)", () => {
 
     // Und die neue Menge WIRKT trotzdem — ohne diese Zeile wäre der Test auch
     // grün, wenn die Ref nie nachgeführt würde.
-    const { invalidiert } = { invalidiert: vi.spyOn(queryClient, "invalidateQueries") };
+    //
+    // Derselbe Spy aus `renderHook`, nur zurückgesetzt: ein ZWEITER `spyOn` auf
+    // dieselbe Instanz stapelt sich über den ersten, und was dann gezählt wird,
+    // hängt an der Reihenfolge der Ersetzungen (Diff-Review, opencode, LOW).
+    invalidiert.mockClear();
     act(() => beiNachricht!(eingang));
     act(() => void vi.advanceTimersByTime(500));
     expect(schluessel(invalidiert)).toEqual([]);

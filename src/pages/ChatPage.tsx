@@ -8,12 +8,10 @@ import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import {
-  markThreadRead,
   mergeMessage,
   messagesQueryKey,
   subscribeToThread,
   threadsQueryKey,
-  unreadQueryKey,
   type ChatMessage,
 } from "../lib/chat";
 import { useGespraech } from "../components/chat/use-gespraech";
@@ -75,15 +73,19 @@ export default function ChatPage() {
         mergeMessage(prev ?? [], incoming),
       );
       void queryClient.invalidateQueries({ queryKey: threadsQueryKey(myId) });
-      // Der Lesestand rückt SOFORT nach, weil das Gespräch offen vor einem
-      // liegt. Ohne das stiege die Summe in der Kopfzeile auf 1 und fiele beim
-      // nächsten Abgleich zurück — ein Zucken, das wie ein Fehler aussieht.
-      // Nur für fremde Nachrichten: die eigene zählt ohnehin nie.
-      if (myId && incoming.senderId !== myId) {
-        void markThreadRead(activeId, myId)
-          .then(() => queryClient.invalidateQueries({ queryKey: unreadQueryKey(myId) }))
-          .catch(() => {});
-      }
+      // **Hier wird der Lesestand NICHT mehr vorgerückt** (AGE-639).
+      //
+      // Er wird es trotzdem, und zwar sofort: `useGespraech` hängt seinen
+      // Effect an die letzte FREMDE Nachricht, und die Zeile darüber schreibt
+      // sie gerade in den Cache. Die Zusage aus AGE-583 — die Summe darf nicht
+      // auf 1 springen und zurückfallen — bleibt damit erfüllt.
+      //
+      // Der Aufruf, der hier stand, ist ersatzlos entfallen, weil er neben dem
+      // Hook ein ZWEITES Mal geschrieben hätte: je eingehender Fremdnachricht
+      // zwei Upserts statt einem. Gefunden hat es die Diff-Review (opencode,
+      // HIGH) — und sie hat damit zugleich einen Kommentar im Hook widerlegt,
+      // der „gleich viele Schreibvorgänge" behauptete. Gemessen war das nur am
+      // Hook allein, nicht an dieser Seite mit ihrem eigenen Abo.
     });
     return unsubscribe;
   }, [activeId, myId, queryClient]);

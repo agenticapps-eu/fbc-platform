@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Die offenen Chatfenster (AGE-639) — Zustand, Grenze und Gedächtnis.
@@ -97,12 +97,19 @@ function lies(uid: string): Chatfenster[] {
     if (!roh) return [];
     const daten: unknown = JSON.parse(roh);
     if (!Array.isArray(daten)) return [];
+    const eintraege = daten.filter(
+      (e): e is Gespeichert =>
+        typeof e === "object" && e !== null && typeof (e as Gespeichert).id === "string",
+    );
+    // Nach Kennung entdoppelt, der letzte Eintrag gewinnt (Diff-Review,
+    // opencode, LOW). Nur dieser Hook schreibt hier — aber ein von Hand oder
+    // durch einen Fehler doppelt gespeicherter Eintrag ergäbe zwei Fenster mit
+    // demselben React-`key` und zwei Sendezeilen auf denselben Verlauf: genau
+    // der Zustand, den `oeffne` aktiv verhindert. Ein Speicher, der ihn über
+    // die Hintertür herstellt, wäre die Ausnahme von einer Regel.
+    const jeId = new Map(eintraege.map((e) => [e.id, e]));
     return (
-      daten
-        .filter(
-          (e): e is Gespeichert =>
-            typeof e === "object" && e !== null && typeof (e as Gespeichert).id === "string",
-        )
+      [...jeId.values()]
         // Gekappt, auch wenn nur dieser Hook je schreibt: ein von Hand gefüllter
         // Speicher darf die Reihe nicht sprengen.
         .slice(-MAX_FENSTER)
@@ -125,10 +132,19 @@ function lies(uid: string): Chatfenster[] {
 export function useChatfenster(uid: string | null): ChatfensterStand {
   const [fenster, setFenster] = useState<Chatfenster[]>(() => (uid ? lies(uid) : []));
 
-  // Die Zählnummer läuft in einer Ref, nicht im Zustand: sie ist ein Zähler,
-  // kein Anzeigewert, und ein Zustand dafür löste ein zweites Rendern je
-  // Berührung aus.
-  const naechste = useRef(MAX_FENSTER);
+  // Die nächste Zählnummer wird aus dem VORHERIGEN Zustand abgeleitet, nicht
+  // aus einer Ref hochgezählt.
+  //
+  // Die erste Fassung schrieb `naechste.current++` im Updater von `setFenster`.
+  // Das ist ein Nebeneffekt in einer Funktion, die rein sein muss: React ruft
+  // Updater im StrictMode doppelt auf und darf einen Anstrich verwerfen. Hier
+  // blieb die Folge zwar harmlos (übersprungene Nummern schaden nicht), aber es
+  // war genau das Muster, das dieselbe Datei elf Zeilen weiter unten ablehnt.
+  // Gefunden hat es die Diff-Review (opencode, MEDIUM).
+  //
+  // Aus dem Zustand abgeleitet ist es zugleich weniger: die Ref entfällt.
+  const naechsteNummer = (vorher: Chatfenster[]) =>
+    vorher.reduce((m, f) => Math.max(m, f.beruehrtAm), MAX_FENSTER - 1) + 1;
 
   // Der Kontowechsel innerhalb einer laufenden Sitzung — abmelden, anmelden,
   // ohne Neuladen. Ohne ihn behielte die Hülle die Fenster des vorigen Kontos,
@@ -163,7 +179,7 @@ export function useChatfenster(uid: string | null): ChatfensterStand {
   const oeffne = useCallback((thread: { id: string; partner: FensterPartner }) => {
     const threadId = thread.id;
     setFenster((vorher) => {
-      const nummer = naechste.current++;
+      const nummer = naechsteNummer(vorher);
       const schon = vorher.find((f) => f.threadId === threadId);
       // Ein bereits offenes Gespräch bekommt kein zweites Fenster: es wird
       // aufgezogen und berührt. Zwei Fenster auf denselben Verlauf wären zwei
@@ -195,7 +211,7 @@ export function useChatfenster(uid: string | null): ChatfensterStand {
 
   const setzeMinimiert = useCallback((threadId: string, minimiert: boolean) => {
     setFenster((vorher) => {
-      const nummer = naechste.current++;
+      const nummer = naechsteNummer(vorher);
       return vorher.map((f) =>
         f.threadId === threadId ? { ...f, minimiert, beruehrtAm: nummer } : f,
       );
@@ -224,7 +240,7 @@ export function useChatfenster(uid: string | null): ChatfensterStand {
       const ziel = vorher.find((f) => f.threadId === threadId);
       if (!ziel) return vorher;
       if (vorher.every((f) => f.beruehrtAm <= ziel.beruehrtAm)) return vorher;
-      const nummer = naechste.current++;
+      const nummer = naechsteNummer(vorher);
       return vorher.map((f) => (f === ziel ? { ...f, beruehrtAm: nummer } : f));
     });
   }, []);

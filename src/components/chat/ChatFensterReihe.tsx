@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import { ChatFenster } from "./ChatFenster";
@@ -64,8 +65,6 @@ export function ChatFensterReihe({
   onSchliesse: (threadId: string) => void;
   onBeruehre: (threadId: string) => void;
 }) {
-  if (fenster.length === 0) return null;
-
   /**
    * Beim Schliessen darf der Fokus nicht auf den `body` fallen — wer mit der
    * Tastatur arbeitet, stünde sonst mitten im Nichts (Plan-Review, opencode).
@@ -73,20 +72,36 @@ export function ChatFensterReihe({
    * Geregelt wird genau dieser eine Fall. Die Verdrängung durch ein viertes
    * Gespräch braucht keine Regel: der Klick, der sie auslöst, liegt in der
    * Nachrichten-Leiste, der Fokus also ohnehin dort.
+   *
+   * **Über einen Effect, nicht über `queueMicrotask`** (Diff-Review, opencode,
+   * LOW). Die erste Fassung setzte voraus, dass Reacts Commit bei einem
+   * diskreten Ereignis synchron VOR dem Microtask liegt. Das stimmt heute und
+   * ist doch eine Annahme über die Implementierung, kein Versprechen — sie
+   * fiele unter geändertem Batching still aus, und „still" ist bei einer
+   * Tastaturzusage das Schlimmste. Ein Effect läuft garantiert nach dem
+   * Zeichnen.
    */
+  const fokusZiel = useRef<string | null>(null);
+  useEffect(() => {
+    const ziel = fokusZiel.current;
+    if (ziel === null) return;
+    fokusZiel.current = null;
+    const el = ziel
+      ? document.querySelector<HTMLElement>(
+          `[data-chatfenster="${ziel}"] [data-fenster-schalter="groesse"]`,
+        )
+      : document.querySelector<HTMLElement>('[data-leisten-pill="rechts"]');
+    el?.focus();
+  }, [fenster]);
+
   function schliesseUndVersetzeFokus(threadId: string) {
     const uebrig = fenster.filter((f) => f.threadId !== threadId);
+    // Leerer String heisst „kein Fenster mehr da" — dann der Pill der Leiste.
+    fokusZiel.current = uebrig.length ? uebrig[uebrig.length - 1].threadId : "";
     onSchliesse(threadId);
-    // Nach dem Neuzeichnen, sonst greift die Suche noch ins alte Dokument.
-    queueMicrotask(() => {
-      const ziel = uebrig.length
-        ? document.querySelector<HTMLElement>(
-            `[data-chatfenster="${uebrig[uebrig.length - 1].threadId}"] [data-fenster-schalter="groesse"]`,
-          )
-        : document.querySelector<HTMLElement>('[data-leisten-pill="rechts"]');
-      ziel?.focus();
-    });
   }
+
+  if (fenster.length === 0) return null;
 
   return createPortal(
     <div

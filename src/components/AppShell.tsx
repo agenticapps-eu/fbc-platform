@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
@@ -550,7 +550,8 @@ export default function AppShell() {
   // ausserdem die Zusage „Fenster fügen keinen Realtime-Kanal hinzu" — sie gilt,
   // weil Fenster und `ChatPage` nie gleichzeitig montiert sind.
   const fensterMoeglich = chatLeisteSteht && istBreit;
-  const offeneFenster = fensterMoeglich ? chatfenster.fenster : [];
+  const leer = useMemo<typeof chatfenster.fenster>(() => [], []);
+  const offeneFenster = fensterMoeglich ? chatfenster.fenster : leer;
 
   // Die Breiten beider Leisten — EINE Rechnung, drei Verbraucher: die
   // CSS-Variablen am Wurzel-`div` unten (für Leisten, Kopf, Inhalt und Fuss)
@@ -571,8 +572,14 @@ export default function AppShell() {
   //
   // Ein minimiertes gehört ausdrücklich NICHT dazu: es ist nicht gelesen worden,
   // und sein Zähler soll laufen.
-  const sichtbareThreads = new Set(
-    offeneFenster.filter((f) => !f.minimiert).map((f) => f.threadId),
+  //
+  // `useMemo`, weil die Hülle bei jeder Navigation und jeder Invalidierung neu
+  // rendert: eine frische `Set`-Instanz je Anstrich liesse den Spiegelungs-
+  // Effect in `useUngelesenLive` jedes Mal mitlaufen, für einen Inhalt, der
+  // sich fast nie ändert (Diff-Review, opencode, LOW).
+  const sichtbareThreads = useMemo(
+    () => new Set(offeneFenster.filter((f) => !f.minimiert).map((f) => f.threadId)),
+    [offeneFenster],
   );
   useUngelesenLive(user?.id ?? null, pathname, sichtbareThreads);
 

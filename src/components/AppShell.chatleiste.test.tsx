@@ -555,3 +555,52 @@ describe("Unter xl bleibt es beim Weg über die Adresse (AGE-639)", () => {
     expect(document.querySelectorAll("[data-chatfenster]")).toHaveLength(0);
   });
 });
+
+describe("Fokus beim Schliessen eines Fensters (AGE-639)", () => {
+  const ANNA = {
+    id: "t1",
+    partner: { id: "p1", name: "Anna Becker", avatarUrl: null, company: null, tier: null },
+    lastMessage: null,
+    lastActivityAt: "2026-08-01T09:00:00Z",
+  };
+  const CHRIS = { ...ANNA, id: "t2", partner: { ...ANNA.partner, id: "p2", name: "Chris Mai" } };
+
+  beforeEach(() => {
+    fetchThreads.mockResolvedValue({ threads: [ANNA, CHRIS], nextOffset: null });
+    localStorage.setItem("fbc.chatCollapsed", "0");
+  });
+
+  /** Wie ein Tastaturnutzer: erst fokussieren, dann auslösen. jsdom verschiebt
+   *  den Fokus beim Klick NICHT von selbst — ein Test, der das nicht nachstellt,
+   *  misst hier gar nichts. */
+  function loeseAus(el: HTMLElement) {
+    el.focus();
+    fireEvent.click(el);
+  }
+
+  it("gibt den Fokus an das verbliebene Fenster weiter, nicht an den body", async () => {
+    renderApp("/mitglieder");
+    fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Chris Mai" }));
+
+    loeseAus(screen.getByRole("button", { name: "Gespräch mit Chris Mai schliessen" }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAccessibleName("Gespräch mit Anna Becker minimieren"),
+    );
+  });
+
+  it("gibt ihn an den Pill der Leiste, wenn das letzte Fenster schliesst", async () => {
+    renderApp("/mitglieder");
+    fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
+
+    loeseAus(screen.getByRole("button", { name: "Gespräch mit Anna Becker schliessen" }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-leisten-pill", "rechts"),
+    );
+    // Positivkontrolle zur Verneinung: ohne sie wäre der Test auch grün, wenn
+    // der Fokus einfach nirgends gelandet wäre.
+    expect(document.activeElement).not.toBe(document.body);
+  });
+});

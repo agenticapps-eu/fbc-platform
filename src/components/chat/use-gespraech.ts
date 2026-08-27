@@ -80,9 +80,15 @@ export function useGespraech({
   // ein Effect an `activeId` (Öffnen) und ein zweiter Aufruf im Realtime-Abo
   // (je eingehender fremder Zeile).
   //
-  // Die Zahl der Schreibvorgänge bleibt dieselbe, und das ist gemessen, nicht
-  // behauptet — `use-gespraech.test.tsx` zählt sie: drei Zeilen beim Öffnen
-  // ergeben EINEN Aufruf, eine eigene Nachricht KEINEN, eine fremde genau einen.
+  // Die Zahl der Schreibvorgänge bleibt dieselbe, und `use-gespraech.test.tsx`
+  // zählt sie: drei Zeilen beim Öffnen ergeben EINEN Aufruf, eine eigene
+  // Nachricht KEINEN, eine fremde genau einen.
+  //
+  // **Diese Messung gilt für den Hook allein**, und das war beim ersten Mal zu
+  // wenig: `ChatPage` markierte in seinem eigenen Realtime-Abo weiter mit, also
+  // schrieb dort jede eingehende Fremdzeile ZWEIMAL. Die Diff-Review (opencode,
+  // HIGH) hat es gefunden. Der doppelte Aufruf ist entfallen — der Lesestand
+  // der Vollansicht kommt seitdem ausschliesslich von hier.
   //
   // Eine Abhängigkeit an `messages.length` täte das nicht: sie zählte die eigene
   // Nachricht mit, und beim Öffnen eines Gesprächs mit dreissig Zeilen bliebe es

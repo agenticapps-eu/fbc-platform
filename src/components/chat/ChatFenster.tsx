@@ -56,6 +56,9 @@ export function ChatFenster({
 
   const name = thread.partner.name;
   const zaehler = minimiert && ungelesen > 0 ? `, ${ungelesen} ungelesen` : "";
+  // Aus der Thread-Kennung abgeleitet statt über `useId`: sie ist ohnehin
+  // eindeutig, und so bleibt der Bezug auch über ein Neumontieren derselbe.
+  const inhaltId = `fbc-fenster-inhalt-${thread.id}`;
 
   return (
     <section
@@ -95,6 +98,10 @@ export function ChatFenster({
           onClick={() => (minimiert ? onZiehAuf(thread.id) : onMinimiere(thread.id))}
           aria-label={`Gespräch mit ${name} ${minimiert ? "aufziehen" : "minimieren"}${zaehler}`}
           aria-expanded={!minimiert}
+          // `aria-expanded` ohne `aria-controls` sagt DASS etwas auf- und
+          // zugeht, aber nicht WAS (Diff-Review, opencode, LOW). Derselbe
+          // Grundsatz, dem `LeistenPill` schon folgt.
+          aria-controls={inhaltId}
           data-fenster-schalter="groesse"
           className="shrink-0 rounded p-1 text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
@@ -117,21 +124,20 @@ export function ChatFenster({
           Ein Fehlschlag als „schreibe die erste Nachricht" zu zeigen hiesse, dem
           Mitglied zu sagen, sein Kontakt habe nichts geschrieben, während in
           Wahrheit gar nichts gelesen wurde. */}
-      {!minimiert &&
-        (gespraech.isError ? (
-          <p className="flex-1 px-3 py-6 text-sm text-muted">
-            Das Gespräch konnte nicht geladen werden. Lade die Seite neu.
-          </p>
-        ) : gespraech.isLoading ? (
-          <p className="flex-1 px-3 py-6 text-sm text-muted">Wird geladen…</p>
-        ) : (
-          // `min-h-0 flex-1` ist hier nicht Kosmetik, sondern trägt die
-          // Sendezeile. `Conversation` ist innen `h-full` — also 100 % der
-          // FENSTERhöhe. Ohne diese Hülle stünde sie neben der Titelzeile
-          // statt darunter, und die Sendezeile lag gemessen 32 px UNTER dem
-          // Bildrand. jsdom hat davon nichts gesehen; im Browser fiel es
-          // sofort auf.
-          <div className="min-h-0 flex-1">
+      {/* `min-h-0 flex-1` ist hier nicht Kosmetik, sondern trägt die
+          Sendezeile. `Conversation` ist innen `h-full` — also 100 % der
+          FENSTERhöhe. Ohne diese Hülle stünde sie neben der Titelzeile statt
+          darunter, und die Sendezeile lag gemessen 32 px UNTER dem Bildrand.
+          jsdom hat davon nichts gesehen; im Browser fiel es sofort auf. */}
+      {!minimiert && (
+        <div id={inhaltId} className="flex min-h-0 flex-1 flex-col">
+          {gespraech.isError ? (
+            <p className="flex-1 px-3 py-6 text-sm text-muted">
+              Das Gespräch konnte nicht geladen werden. Lade die Seite neu.
+            </p>
+          ) : gespraech.isLoading ? (
+            <p className="flex-1 px-3 py-6 text-sm text-muted">Wird geladen…</p>
+          ) : (
             <Conversation
               thread={thread}
               messages={gespraech.messages}
@@ -139,8 +145,9 @@ export function ChatFenster({
               onSend={gespraech.sende}
               variante="fenster"
             />
-          </div>
-        ))}
+          )}
+        </div>
+      )}
     </section>
   );
 }
