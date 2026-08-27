@@ -13,8 +13,8 @@ neue Vorgänge angelegt.**
 | Drei Changes archiviert (620/621/622) | ✅ #239 |
 | **AGE-604** Admin-Knopf „direkt aktivieren" | ✅ **überholt** — geschlossen mit Messbeleg |
 | **AGE-623** notify-contact-request auf DEFINER-RPC | ✅ #240 + #241, PROD bespielt |
-| **AGE-625** Rückweg am Kopf der Rechtsseiten | 🔄 #242, CI lief zuletzt |
-| **AGE-626** rechte Feed-Spalte läuft mit | 🔄 #242 (derselbe PR) |
+| **AGE-625** Rückweg am Kopf der Rechtsseiten | ✅ #242 gemergt |
+| **AGE-626** rechte Feed-Spalte läuft mit | ✅ #242 (derselbe PR) |
 | **AGE-627** Chat als rechte Sidebar | 📋 angelegt, **hier weitermachen** |
 | **AGE-628** Feedback-Ausbau | 📋 angelegt, eine Produktfrage offen |
 
@@ -67,13 +67,13 @@ drei direkte Tabellenzugriffe. 21 pgTAP-Zusagen, RED → GRÜN, auch nach
 
 ## Next session: start here
 
-**Erster Griff: `gh pr checks 242` und mergen, falls grün.** Der letzte Lauf war
-bei Sitzungsende noch unterwegs (SHA `26922de`). Die Vorgänger-SHA war an
-`verify` gescheitert — der Icon-Wächter (`icons.test.ts`) verbietet `<svg>`
-ausserhalb des Satzes, mein Inline-Pfeil verstiess dagegen. Behoben mit
-`Icon name="chevronLeft"`; volle Suite danach 1831 grün.
+**Nichts hängt.** #242 ist gemergt (SHA `26922de`, alle vier Pflichtchecks grün
+auf der HEAD-SHA gemessen). Unterwegs war er einmal rot: der Icon-Wächter
+(`icons.test.ts`) verbietet `<svg>` ausserhalb des Satzes, mein Inline-Pfeil
+verstiess dagegen. Behoben mit `Icon name="chevronLeft"`; volle Suite danach
+1831 grün.
 
-**Danach AGE-627 (Chat als rechte Sidebar)** — Donald hat das ausdrücklich für
+**Erster Griff: AGE-627 (Chat als rechte Sidebar)** — Donald hat das für
 eine frische Sitzung vorgesehen. Es ist eine Änderung am Shell-Layout, kein
 Bauteil: **erst ein OpenSpec-Change mit Plan-Review, dann Code.** Vor dem
 Proposal zu klären sind die fünf Punkte, die im Issue stehen — vor allem das
