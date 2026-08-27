@@ -1,104 +1,126 @@
-# Session Handoff — 2026-08-26 (siebenunddreißigste Sitzung: AGE-583 live auf PROD)
+# Session Handoff — 2026-08-27 (neununddreißigste Sitzung)
 
-> Diese Datei liegt im WORKTREE
-> `../fbc-platform.donald-age-583-nachrichten-zaehler`, nicht im Haupt-Checkout
-> — die Sitzung war worktree-isoliert.
+> Liegt im WORKTREE `../fbc-platform.donald-age-583-nachrichten-zaehler`, zuletzt
+> auf Branch `donald/ui-zurueck-und-sticky-sidebar`. Der Verzeichnisname ist
+> veraltet — der Worktree wurde fünfmal umgewidmet.
 
-**Alles gemerged und live.** Drei PRs durch, PROD-Migration angewandt,
-Frontend-Deploy grün und am Bundle verifiziert.
+Angefangen mit „archiviere die changes die schon beendet sind", dann „mache 604,
+623", danach vier UI-Wünsche im Zuruf. **Vier PRs gemergt, einer offen, vier
+neue Vorgänge angelegt.**
 
-| PR | Inhalt | Stand |
-| -- | -- | -- |
-| #233 | AGE-616/541 Gästeflächen | gemerged |
-| #234 | AGE-583 Nachrichten-Zähler | gemerged, live verifiziert |
-| #235 | Sprechblase statt Kuvert | gemerged, live verifiziert |
+| Vorgang | Stand |
+| --- | --- |
+| Drei Changes archiviert (620/621/622) | ✅ #239 |
+| **AGE-604** Admin-Knopf „direkt aktivieren" | ✅ **überholt** — geschlossen mit Messbeleg |
+| **AGE-623** notify-contact-request auf DEFINER-RPC | ✅ #240 + #241, PROD bespielt |
+| **AGE-625** Rückweg am Kopf der Rechtsseiten | ✅ #242 gemergt |
+| **AGE-626** rechte Feed-Spalte läuft mit | ✅ #242 (derselbe PR) |
+| **AGE-627** Chat als rechte Sidebar | 📋 angelegt, **hier weitermachen** |
+| **AGE-628** Feedback-Ausbau | 📋 angelegt, eine Produktfrage offen |
 
-Der GitHub-Actions-Ausfall (15:09–~19:0x) ist vorbei. #233 hing nur daran; nach
-Close/Reopen lief es sofort durch.
+## Accomplished
 
-## Was AGE-583 geworden ist
+**Archivierung (#239).** Drei Changes. Beim dritten brach `openspec archive` an
+zwei umgetauften Szenario-Titeln ab — vom Change absichtlich überholt. Der
+Wächter sitzt im Falt-Schritt und ist auch mit `--no-validate` nicht
+abschaltbar; also die durable Spec von Hand gefaltet, `--skip-specs`, Gegenprobe
+am Diff.
 
-Lesestand in eigener Tabelle `thread_read_positions` (eigentümerprivate RLS),
-Zähler als `SECURITY INVOKER`-Funktion, Einstieg als Sprechblase in der
-Kopfzeile, Kachel auf `/profil`, Markierung je Gespräch. Bei 0 wird nichts
-gezeigt.
+**AGE-604 ist überholt, nicht gefixt.** Reproduktion gegen den lokalen Stack:
+direkt aktiviertes Konto → `issued_reset`, Passwort setzen 200, Anmeldung 200.
+Gegenprobe: nicht aktiviertes Konto → `issued`. Ursache ist **AGE-505**,
+gelandet am 26.08. um 11:37 — eine Stunde nach Anlage des Issues.
 
-**Zwei Befunde haben den Entwurf gedreht, beide aus Reviews:**
+**AGE-623 gebaut und ausgeliefert.** `notify_contact_request_daten()` ersetzt
+drei direkte Tabellenzugriffe. 21 pgTAP-Zusagen, RED → GRÜN, auch nach
+`db reset`. Alle drei PROD-Flächen bespielt und an der Sache verifiziert
+(Katalog für die RPC, Funktionsinhalt für die Edge Function).
 
-1. Der Schemavorschlag des Vorgangs (zwei Spalten auf `message_threads`) hätte
-   dem Gegenüber eine Lesebestätigung geliefert — `threads_select` gibt jedem
-   Teilnehmer die ganze Zeile. Die eigene Tabelle machte den Change **kleiner**:
-   die geplante `SECURITY DEFINER`-Funktion entfiel ersatzlos.
-2. `markThreadRead` schickte die **Client-Uhr** mit, während der Kommentar das
-   Gegenteil behauptete. Behoben per Trigger, der `clock_timestamp()` erzwingt.
+**AGE-625 / AGE-626** im Browser gemessen, beide mit Gegenprobe — siehe unten.
 
-**Drei Messungen fielen gegen die Erwartung aus:** der von beiden Reviewern
-geforderte Index wird nie gewählt (geholfen hat `lateral`: 213 ms → 1,2 ms);
-`bigint` kommt über PostgREST als Zahl; die Kopfzeile hat bei 320 px noch 12 px
-Reserve — **ein drittes Symbol trägt sie nicht mehr.**
+## Decisions
 
-## Neue Arbeitsregel (du, 26.08.)
+- **AGE-604 auf Done statt Canceled**, mit Beleg als Kommentar. Warum: gelöst,
+  nur durch einen anderen Vorgang; „Done" ohne Notiz läse sich als „wir haben
+  es gefixt".
+- **Der Zurück-Knopf trägt zwei Fälle** (`location.key === "default"`). Warum:
+  `history.back()` bricht beim Direktaufruf aus einer Mail, ein fester Link auf
+  `/` kostet jeden seinen Platz, der aus der App kam. Beim Direktaufruf heisst
+  er „Zurück zur Startseite" — ein Knopf, der „Zurück" sagt und zur Startseite
+  springt, sagt die Unwahrheit.
+- **Der flächendeckende `service_role`-Entzug bleibt draußen** (AGE-623 Schritte
+  3+4). Warum: braucht die Inventur aller acht Edge Functions.
+- **Chat klappt seitlich nach rechts ein, nicht nach oben.** Donalds
+  Präzisierung vom 27.08., abweichend vom LinkedIn-Vorbild im Referenzbild.
 
-**Plan- und Diff-Review nur noch bei Migration, Rechten oder Sicherheit.** UI
-und Text gehen direkt durch. Anlass war, dass ich zu lange brauche — ein Teil
-davon war der Ablauf, ein Teil meine Umwege (falscher Port, falsches
-Messwerkzeug, eine falsch gelesene Zeitachse). Als Memory festgehalten.
+## Files modified
+
+- `supabase/migrations/20260827100000_notify_contact_request_daten.sql`, 
+  `supabase/tests/notify_contact_request_daten_test.sql`,
+  `supabase/functions/notify-contact-request/{index.ts,emails.ts}`,
+  `.github/workflows/ci.yml` — AGE-623
+- `src/components/LegalZurueck.tsx` (neu), `src/pages/LegalZurueck.test.tsx`
+  (neu), `src/pages/{LegalRoute,LegalPage,LegalPage.test}.tsx` — AGE-625
+- `src/components/community/CommunityFeed.tsx` — AGE-626
+- `openspec/specs/{access-control,design-system,notifications}/spec.md` gefaltet,
+  vier Changes unter `openspec/changes/archive/2026-08-27-*`
 
 ## Next session: start here
 
-**Change 2: `glocke-und-hinweistypen`** — von dir am 26.08. entschieden. Glocke
-verdrahten (die Anforderung dafür liegt im offenen Change
-`add-lifecycle-notifications`/AGE-299 und ist dort herauszulösen) plus fünf neue
-Typen: neues Mitglied, neuer Beitrag, neues Event, Kommentar und Like auf meinen
-Beitrag. Mit **Fan-out** je aktiviertem Mitglied und **Opt-out** in den
-Einstellungen.
+**Nichts hängt.** #242 ist gemergt (SHA `26922de`, alle vier Pflichtchecks grün
+auf der HEAD-SHA gemessen). Unterwegs war er einmal rot: der Icon-Wächter
+(`icons.test.ts`) verbietet `<svg>` ausserhalb des Satzes, mein Inline-Pfeil
+verstiess dagegen. Behoben mit `Icon name="chevronLeft"`; volle Suite danach
+1831 grün.
 
-`notifications` hat bereits `read_at`, volle CRUD-Grants und die
-`notifications_own`-Policy — die Glocke selbst braucht **keine Migration**, nur
-Frontend. Die fünf Typen brauchen Trigger auf `profiles`, `posts`, `events`,
-`comments` und `post_likes`.
-
-**Meine Sorge, unverändert:** das sind Schreib-Trigger auf fünf Tabellen, Tage
-vor dem Go-Live. Bauen ja — scharfschalten würde ich erst danach.
-
-**Und beim Verdrahten der Glocke die 320-px-Breite messen**, nicht hoffen: mit
-Sprechblase und Glocke sind 12 px übrig.
+**Erster Griff: AGE-627 (Chat als rechte Sidebar)** — Donald hat das für
+eine frische Sitzung vorgesehen. Es ist eine Änderung am Shell-Layout, kein
+Bauteil: **erst ein OpenSpec-Change mit Plan-Review, dann Code.** Vor dem
+Proposal zu klären sind die fünf Punkte, die im Issue stehen — vor allem das
+Verhältnis zur linken Sidebar unterhalb von `lg` und ob `/chat` als Vollseite
+bleibt. Und `fetchThreads` lädt heute **ohne `limit`**; für eine dauerhaft
+offene Liste ist Paging Pflicht, nicht Kür.
 
 ## Open questions
 
-- **`fetchThreads` lädt alle Nachrichten aller Threads** (`chat.ts:155-159`,
-  kein `limit`). Bestehender Mangel, nicht angefasst; zwei Reviewer zeigten
-  unabhängig darauf. Eigener Vorgang.
-- **`database.types.ts` von Hand** — beide Reviewer melden Driftgefahr, zu
-  Recht. Der Fix (Fixtures an den echten Rückgabevertrag) ist ein eigener
-  Vorgang.
-- **Der `codex`-Reviewer prüft nicht selbst**, er startet Unter-Reviewer und
-  liefert deren Antwort unter seinem Namen — einmal sogar `claude`, den eigenen
-  Anbieter. Als Memory festgehalten. `gemini` und `opencode` sind die
-  verlässlichen zwei.
-- **Schreibende PROD-Wege blockt der Klassifikator.** `gh workflow run
-  migrate-prod.yml --ref main` musst du selbst starten (`! `-Präfix im Prompt).
-- Unverändert offen: AGE-610 (Detlev/Anwalt) · Aktivierungsversand 69 von 72 ·
-  Rotation des PROD-DB-Passworts · Verzeichnis-Sichtbarkeit C3 (AGE-598) ·
-  `effbeezee.com` zeigt auf Strato (AGE-256) · Fotografennamen in `CREDITS.md`
-  seit 04.08. · `AppShell.tsx` führt `/login` in `NARROW_ROUTES` (toter Eintrag).
-- **Lokaler Stack trägt Testdaten**: Anna/Bernd aus
-  `scripts/chat-testkonten.ts` plus `dritter@` und `unbestaetigt@` aus dem
-  Realtime-Test. Nur lokal.
-- **Worktrees**: `donald/age-583-nachrichten-zaehler` und
-  `donald/age-583-nachrichten-icon` sind gemerged und können mit `wt remove`
-  weg; `donald/age-616-gaeste-flaechen` ebenfalls.
+- **AGE-628 braucht eine Produktentscheidung von Donald, bevor irgendetwas
+  gebaut wird:** Feedback soll anonym abgegeben werden können (AGE-588), aber
+  aus einem Feedback heraus soll man den Verfasser anchatten können. Beides
+  zugleich geht nicht. Zweitens: darf ein Admin die Kontaktanfrage-Hürde
+  überspringen? Das wäre eine Ausnahme im Zugangsmodell.
+- **Die Instanz-Sorte dreht sich unbemerkt.** AGE-622 maß lokal 0 von 36
+  Tabellen mit `service_role`-Recht, heute 35 von 36 — der Datenträger wurde
+  ausgetauscht. **PROD misst dasselbe (35/36, Ausnahme `staff_roles`).**
+- **`gh pr checks` meldete eine ältere SHA** und behauptete grün, während die
+  HEAD-SHA noch lief. Nur `check-runs` auf der exakten SHA zählt; das Skript
+  dafür liegt im Scratchpad (`wait-ci-sha.sh`).
+- **Ein Teil-Testlauf hat einen Wächter verfehlt.** `vitest run src/pages
+  src/components/community` war grün, `verify` in der CI rot — der Wächter liegt
+  in `src/components/ui`. Vor dem Push die **volle** Suite.
+- **gemini als Diff-Reviewer verlor seine Werkzeuge** (`run_shell_command not
+  found`). codex lief sauber durch und lieferte die härtesten Befunde; opencode
+  brauchte ~8 Minuten, war aber der schärfste Plan-Reviewer.
+- Unverändert offen: AGE-604-Restbefund (aktiviertes Mitglied wird nie
+  informiert) · AGE-610 (Detlev/Anwalt) · AGE-512 (Stripe-/Resend-Secrets
+  ungetrennt) · Aktivierungsversand 69 von 72 · Rotation des PROD-DB-Passworts ·
+  AGE-598 · AGE-256 · AGE-606 (Prettier).
 
 ## Lokal ansehen
 
-`pnpm dev` geht aus einer Agenten-Sitzung nicht (Infisical braucht ein TTY):
+Der lokale Stack läuft, Testkonten sind angelegt (`anna@chattest.invalid` /
+`bernd@chattest.invalid`, Passwort `Testchat2026!`). Die 18 Testbeiträge für die
+Sticky-Messung sind wieder entfernt.
+
+`pnpm dev` geht aus einer Agenten-Sitzung nicht (Infisical braucht ein TTY).
+Fertiges Startskript im Scratchpad, oder von Hand:
 
 ```
 VITE_SUPABASE_URL=http://127.0.0.1:54321 \
 VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
 VITE_ENVIRONMENT=local \
-npx vite --port 5199
+npx vite --port 5201 --strictPort
 ```
 
-Dann `http://localhost:5199` — **nicht** `127.0.0.1:5199`, dort antwortet ein
-fremder Python-Server. Anmelden: `anna@chattest.invalid` / `Testchat2026!`.
+**`--strictPort` ist wichtig:** ohne ihn weicht Vite still auf den nächsten
+freien Port aus, und auf 5199/5200 antworten Zombie-Server aus früheren
+Sitzungen mit einer leeren Seite.
