@@ -1,16 +1,18 @@
 # Session Handoff — 2026-08-27 (einundvierzigste Sitzung)
 
-> Liegt im Worktree `../fbc-platform.age-631-release-notes`, Branch
-> `donald/age-631-release-notes`. Der 627er-Worktree ist **gemergt** (#244) und
-> kann weg; der 583er-Branch `donald/handoff-27-08` ist weiter überholt.
+> **Beide Worktrees dieser Sitzung sind gemergt** (#244, #245) und können weg:
+> `../fbc-platform.donald-age-627-chat-rechte-sidebar` und
+> `../fbc-platform.age-631-release-notes`. Der 583er-Branch
+> `donald/handoff-27-08` ist weiter überholt.
 
-Zwei Vorgänge komplett gebaut, zwei PRs offen bzw. gemergt, ein neuer Vorgang
-angelegt.
+Zwei Vorgänge komplett gebaut und **beide gemergt**, ein neuer Vorgang angelegt.
+**Was jetzt fehlt, ist der `db push` — und daran hängt der nächste
+Frontend-Deploy.**
 
 | Vorgang | Stand |
 | --- | --- |
 | **AGE-627** Chat als rechte Leiste | ✅ **gemergt** (#244), 8 Bänder |
-| **AGE-631** Release-Notes an alle | 🟡 **PR #245 offen**, 6 Bänder fertig |
+| **AGE-631** Release-Notes an alle | ✅ **gemergt** (#245), 6 Bänder |
 
 ## Accomplished
 
@@ -76,17 +78,14 @@ Doppelzustellung, und es gibt **kein Opt-out** — der Ausgleich ist `/neues`.
 
 ## Next session: start here
 
-**1. `gh pr view 245 --json state` prüfen und bei grünem CI mergen.** Die
-Freigabe bei grünen Pflichtchecks steht.
-
-**2. Danach `supabase db push` für BEIDE Migrationen** (`20260827120000` und
+**1. `supabase db push` für BEIDE Migrationen** (`20260827120000` und
 `20260827140000`). Ohne das blockt das drift-gate jeden Frontend-Deploy — still.
 Und die einzige echte Prüfung der Rückfüllung aus AGE-627 gehört dorthin:
 zählen, wieviele Threads MIT Nachricht ein leeres `last_message_at` haben.
 Erwartet null. Lokal ist das nicht messbar, weil die Rückfüllung vor jedem
 Fixture läuft und es keine `seed.sql` gibt.
 
-**3. Dann AGE-629 oder AGE-630** — beide haben noch offene Produktfragen, siehe
+**2. Dann AGE-629 oder AGE-630** — beide haben noch offene Produktfragen, siehe
 unten.
 
 ## Open questions
