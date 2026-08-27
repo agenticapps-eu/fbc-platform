@@ -318,8 +318,18 @@ export default function CommunityFeed() {
         {/* Die Spannweite hängt daran, ob der Composer eine eigene Zeile
             belegt. Fest auf zwei gesetzt entstünde ausgeloggt eine LEERE zweite
             Zeile unter dem Feed — samt ihrem Abstand. */}
+        {/* `sticky` erst ab `lg` (AGE-626): darunter steht die Spalte im Fluss
+            ÜBER dem Feed, dort wäre Mitlaufen sinnlos.
+            `self-start` ist Pflicht und nicht Kosmetik — ein Rasterkind wird
+            sonst auf die volle Zeilenhöhe gedehnt, und an einem Element, das
+            ohnehin so hoch ist wie sein Behälter, hat `sticky` nichts, woran es
+            kleben könnte.
+            `top-20` = 5rem: der Shell-Header ist `sticky top-0` mit `h-16`
+            (4rem), dazu 1rem Luft, sonst klebt die Spalte direkt darunter.
+            `max-h` + `overflow-y-auto`: ist die Spalte höher als das Fenster,
+            liefe ihr unteres Ende sonst nie ins Bild. */}
         <aside
-          className={`lg:col-start-2 lg:row-start-1 ${user ? "lg:row-span-2" : "lg:row-span-1"}`}
+          className={`lg:sticky lg:top-20 lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto ${user ? "lg:row-span-2" : "lg:row-span-1"}`}
         >
           <FeedSidebar
             zaehler={tagZaehler.data ?? []}
