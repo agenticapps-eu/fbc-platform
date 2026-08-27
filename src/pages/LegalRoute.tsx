@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import LegalPage from "./LegalPage";
+import LegalZurueck from "../components/LegalZurueck";
 import { Logo } from "../components/ui/Logo";
 import type { Rechtsseite } from "../content/legal/meta";
 import type { Rechtsdokument } from "../content/legal/types";
@@ -20,7 +21,13 @@ function Rahmen({ titel, children }: { titel: string; children: React.ReactNode 
       <Link to="/" className="inline-flex" aria-label="Zur Startseite">
         <Logo lockup="full" />
       </Link>
-      <h1 className="mt-8 font-display text-3xl font-semibold tracking-tight break-words hyphens-auto text-ink">
+      {/* Auch im LADE-Rahmen, nicht nur am fertigen Dokument (AGE-625): sonst
+          fehlt der Rückweg genau so lange, wie das Nachladen dauert — und bei
+          121k Zeichen AGB ist das die Zeit, in der jemand abbricht. */}
+      <div>
+        <LegalZurueck />
+      </div>
+      <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight break-words hyphens-auto text-ink">
         {titel}
       </h1>
       {children}

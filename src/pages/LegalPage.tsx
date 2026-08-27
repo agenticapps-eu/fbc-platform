@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import LegalZurueck from "../components/LegalZurueck";
 import { VideoFreigabeWiderruf } from "../components/VideoFreigabeWiderruf";
 import { Logo } from "../components/ui/Logo";
 import { rechtsseiten } from "../content/legal/meta";
@@ -132,6 +133,13 @@ export default function LegalPage({ dokument }: { dokument: Rechtsdokument }) {
         <Logo lockup="full" />
       </Link>
 
+      {/* Der Rückweg am Kopf (AGE-625). Der in der Fußzeile bleibt stehen —
+          dieser ist der zweite, nicht sein Ersatz: bei 121k Zeichen AGB ist
+          der untere erst nach dem ganzen Dokument erreichbar. */}
+      <div>
+        <LegalZurueck />
+      </div>
+
       {/* `break-words hyphens-auto`: „Datenschutzerklärung" und
           „Geschäftsbedingungen" passen bei 320 px nicht in eine Zeile und
           brechen von sich aus nicht. Im Browser gemessen — die Überschrift lief
@@ -139,7 +147,10 @@ export default function LegalPage({ dokument }: { dokument: Rechtsdokument }) {
           (323 px Dokumentbreite bei 320 px Fenster). `jsdom` rechnet kein
           Layout und sah davon nichts. Silbentrennung greift, weil
           <html lang="de"> gesetzt ist; `break-words` ist der Notnagel. */}
-      <h1 className="mt-8 font-display text-3xl font-semibold tracking-tight break-words hyphens-auto text-ink">
+      {/* `mt-6` wie im Lade-Rahmen von `LegalRoute` — beide Zustände zeigen
+          denselben Kopf, und ein unterschiedlicher Abstand liesse die
+          Überschrift beim Eintreffen des Textes springen. */}
+      <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight break-words hyphens-auto text-ink">
         {dokument.titel}
       </h1>
       <p className="mt-1 text-sm text-muted">Stand: {dokument.stand}</p>

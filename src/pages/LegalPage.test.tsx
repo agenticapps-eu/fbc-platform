@@ -83,9 +83,14 @@ describe("LegalPage", () => {
       expect(screen.getByRole("link", { name: dok.titel })).toHaveAttribute("href", `/${dok.slug}`);
     }
     // Statischer Link, kein history.back() — das bricht beim Direktaufruf.
-    // Exakter Name: das Logo oben traegt aria-label="Zur Startseite" und
-    // zeigt ebenfalls auf "/".
-    expect(screen.getByRole("link", { name: "Zurück zur Startseite" })).toHaveAttribute(
+    //
+    // Auf die Fußzeilen-NAVIGATION eingeschraenkt, seit der Kopf einen zweiten
+    // Rueckweg traegt (AGE-625): beide heissen beim Direktaufruf gleich, und
+    // ein `getByRole` ueber das ganze Dokument faende zwei. Die Einschraenkung
+    // macht die Zusage praeziser, nicht schwaecher — sie sagt jetzt, WO der
+    // Link steht.
+    const fusszeile = screen.getByRole("navigation", { name: "Weitere Rechtsseiten" });
+    expect(within(fusszeile).getByRole("link", { name: "Zurück zur Startseite" })).toHaveAttribute(
       "href",
       "/",
     );
