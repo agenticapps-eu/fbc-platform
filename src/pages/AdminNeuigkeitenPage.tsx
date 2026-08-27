@@ -6,6 +6,7 @@ import { Card, CardTitle } from "../components/ui/Card";
 import { useToast } from "../components/ui/toast-context";
 import { RELEASE_EINTRAEGE } from "../content/release-entries.generated";
 import {
+  ausLetzterWoche,
   fetchEntwuerfe,
   fetchZugestellte,
   nochNichtAngekuendigt,
@@ -48,25 +49,35 @@ export default function AdminNeuigkeitenPage() {
     queryFn: () => fetchZugestellte(),
   });
 
-  const [gewaehlt, setGewaehlt] = useState<string[]>([]);
+  // `null` heisst „noch nicht angefasst" und ist nicht dasselbe wie „nichts
+  // gewählt": nur solange es null ist, gilt die Vorauswahl. Ein leeres Array
+  // nach dem Zustellen bleibt leer — sonst kämen die Häkchen zurück.
+  //
+  // Abgeleitet statt in den Zustand gelegt: die Liste steht erst, wenn beide
+  // Abfragen da sind. Ein `useState(vorauswahl)` nähme den Wert nie an, weil er
+  // beim Mount noch leer ist — grüner Test, leere Fläche.
+  const [gewaehlt, setGewaehlt] = useState<string[] | null>(null);
   const [titel, setTitel] = useState("");
   const [text, setText] = useState("");
   const [entwurfId, setEntwurfId] = useState<string | null>(null);
 
   const notes = [...(entwuerfe.data ?? []), ...(zugestellte.data ?? [])];
   const offen = nochNichtAngekuendigt(RELEASE_EINTRAEGE, notes);
+  const auswahl = gewaehlt ?? ausLetzterWoche(offen, new Date()).map((e) => e.slug);
 
   /** Ein Eintrag wird an- oder abgehakt. */
   function umschalten(slug: string) {
-    setGewaehlt((bisher) =>
-      bisher.includes(slug) ? bisher.filter((s) => s !== slug) : [...bisher, slug],
+    // Aus `auswahl` gerechnet, nicht aus dem bisherigen Zustand: der ist beim
+    // ersten Klick noch `null` und trüge die Vorauswahl nicht.
+    setGewaehlt(
+      auswahl.includes(slug) ? auswahl.filter((s) => s !== slug) : [...auswahl, slug],
     );
   }
 
   /** Aus der Auswahl wird EIN Vorschlag — überschreibbar, und er soll
    *  überschrieben werden. */
   function vorschlagen() {
-    const entwurf = entwurfAus(offen.filter((e) => gewaehlt.includes(e.slug)));
+    const entwurf = entwurfAus(offen.filter((e) => auswahl.includes(e.slug)));
     setTitel(entwurf.titel);
     setText(entwurf.text);
   }
@@ -77,7 +88,7 @@ export default function AdminNeuigkeitenPage() {
         ...(entwurfId ? { id: entwurfId } : {}),
         title: titel,
         body: text,
-        entrySlugs: gewaehlt,
+        entrySlugs: auswahl,
         createdBy: user?.id ?? null,
       }),
     onSuccess: (note) => {
@@ -136,7 +147,7 @@ export default function AdminNeuigkeitenPage() {
                   <label className="flex cursor-pointer items-start gap-2 text-sm text-ink">
                     <input
                       type="checkbox"
-                      checked={gewaehlt.includes(e.slug)}
+                      checked={auswahl.includes(e.slug)}
                       onChange={() => umschalten(e.slug)}
                       className="mt-1 h-4 w-4 shrink-0 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent"
                     />
@@ -151,8 +162,8 @@ export default function AdminNeuigkeitenPage() {
                 </li>
               ))}
             </ul>
-            <Button variant="secondary" size="sm" onClick={vorschlagen} disabled={!gewaehlt.length}>
-              Aus {gewaehlt.length} Änderungen einen Entwurf machen
+            <Button variant="secondary" size="sm" onClick={vorschlagen} disabled={!auswahl.length}>
+              Aus {auswahl.length} Änderungen einen Entwurf machen
             </Button>
           </>
         )}

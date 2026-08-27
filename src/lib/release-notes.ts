@@ -115,3 +115,32 @@ export async function stelleZu(id: string): Promise<number> {
   if (error) throw error;
   return data ?? 0;
 }
+
+/** Wieviele Tage „letzte Woche" umfasst — die Grenze ist einschliessend. */
+const VORAUSWAHL_TAGE = 7;
+
+/**
+ * Was beim Öffnen der Fläche vorangehakt ist: die Einträge der letzten Woche.
+ *
+ * **Warum eine Vorauswahl und keine Filterung.** Die Liste zeigt weiterhin
+ * alles noch nicht Angekündigte — beim ersten Mal sind das über fünfzig
+ * Einträge aus der ganzen Projektgeschichte. Verkürzte man die Liste auf sieben
+ * Tage, verschwände der Rest lautlos und für immer aus dem Blick: eine kürzere
+ * Liste sieht aus wie eine vollständige. Vorgehakt ist deshalb nur der
+ * Vorschlag; abwählen und dazuwählen bleibt in derselben Liste möglich.
+ *
+ * `heute` wird übergeben, nicht gelesen — sonst wäre die Rechnung nur an dem
+ * Tag prüfbar, an dem der Test geschrieben wurde.
+ *
+ * Verglichen wird `JJJJ-MM-TT` als Zeichenkette. Das geht, weil das Format
+ * lexikographisch in derselben Ordnung steht wie chronologisch, und es umgeht
+ * die Zeitzonenfrage: `datum` ist ein Kalendertag ohne Uhrzeit, kein Zeitpunkt.
+ * Ein Eintrag ohne Datum (`""`) fällt dabei von selbst heraus — er bleibt
+ * sichtbar, nur ungehakt.
+ */
+export function ausLetzterWoche(eintraege: ReleaseEintrag[], heute: Date): ReleaseEintrag[] {
+  const grenze = new Date(heute);
+  grenze.setDate(grenze.getDate() - VORAUSWAHL_TAGE);
+  const tag = grenze.toISOString().slice(0, 10);
+  return eintraege.filter((e) => e.datum >= tag);
+}

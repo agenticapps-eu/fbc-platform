@@ -69,6 +69,7 @@ vi.mock("./supabase", () => ({
 
 import {
   RELEASE_NOTES_SEITE,
+  ausLetzterWoche,
   fetchEntwuerfe,
   fetchZugestellte,
   nochNichtAngekuendigt,
@@ -110,6 +111,48 @@ describe("nochNichtAngekuendigt — was der Admin zu sehen bekommt", () => {
 
   it("gibt ohne Notes alles zurück", () => {
     expect(nochNichtAngekuendigt(alle, [])).toHaveLength(3);
+  });
+});
+
+describe("ausLetzterWoche — was beim Öffnen vorangehakt ist", () => {
+  // `heute` wird übergeben, nicht gelesen. Eine Funktion, die selbst zur Uhr
+  // greift, ist nur an dem einen Tag prüfbar, an dem der Test geschrieben wurde.
+  const heute = new Date("2026-08-27T09:00:00Z");
+
+  it("nimmt den siebten Tag NOCH mit", () => {
+    // Die Grenze ist eine Zusage, kein Zufall: „letzte Woche" schliesst den
+    // Tag vor sieben Tagen ein. Ohne diesen Fall fiele eine Verschiebung um
+    // einen Tag durch jeden Test.
+    expect(ausLetzterWoche([eintrag("2026-08-20-a")], heute).map((e) => e.slug)).toEqual([
+      "2026-08-20-a",
+    ]);
+  });
+
+  it("lässt den achten Tag aus", () => {
+    expect(ausLetzterWoche([eintrag("2026-08-19-a")], heute)).toEqual([]);
+  });
+
+  it("trennt eine gemischte Liste", () => {
+    const alle = [eintrag("2026-08-27-a"), eintrag("2026-08-21-b"), eintrag("2026-07-04-c")];
+    expect(ausLetzterWoche(alle, heute).map((e) => e.slug)).toEqual([
+      "2026-08-27-a",
+      "2026-08-21-b",
+    ]);
+  });
+
+  it("lässt einen Eintrag OHNE Datum aus", () => {
+    // Ein Verzeichnisname ohne `JJJJ-MM-TT` ergibt `datum: ""`. Der leere
+    // String ist lexikographisch kleiner als jede Grenze — er fällt also von
+    // selbst heraus, und das ist die richtige Seite: nicht angehakt, aber
+    // sichtbar in der Liste, wo ein Mensch ihn sieht.
+    const ohne: ReleaseEintrag = {
+      slug: "kein-datum",
+      datum: "",
+      titel: "kein-datum",
+      linear: null,
+      aenderungen: [],
+    };
+    expect(ausLetzterWoche([ohne], heute)).toEqual([]);
   });
 });
 

@@ -14,7 +14,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *  3. Zugestellt wird der **geänderte** Text, nicht der vorgeschlagene.
  *  4. Es gibt **keine Empfängerauswahl** — das ist die Zusage aus
  *     `specs/admin`, die AGE-304 seit je hält.
+ *  5. Beim Öffnen ist die **letzte Woche** vorangehakt, älteres nicht — und
+ *     nach dem Zustellen kommt kein Häkchen von selbst zurück.
+ *
+ * **Die Daten der Attrappe sind relativ zu heute gerechnet, nicht fest.** Mit
+ * `datum: "2026-08-27"` prüfte dieser Test die Vorauswahl an genau dem Tag, an
+ * dem er geschrieben wurde, und ab dem achten Tag danach das Gegenteil —
+ * grün-nach-rot ohne eine Zeile Codeänderung.
  */
+
+const { tagVor } = vi.hoisted(() => ({
+  /** `JJJJ-MM-TT`, n Tage vor heute. Geteilt zwischen Attrappe und Test —
+   *  `vi.mock` wird gehoistet und sähe eine normale Konstante nicht. */
+  tagVor: (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10),
+}));
 
 type Note = import("../lib/release-notes").ReleaseNote;
 
@@ -34,18 +47,25 @@ vi.mock("../lib/release-notes", async (original) => ({
 vi.mock("../content/release-entries.generated", () => ({
   RELEASE_EINTRAEGE: [
     {
-      slug: "2026-08-27-glocke",
-      datum: "2026-08-27",
+      slug: `${tagVor(0)}-glocke`,
+      datum: tagVor(0),
       titel: "Glocke verdrahtet",
       linear: "AGE-620",
       aenderungen: ["Vier Hinweistypen"],
     },
     {
-      slug: "2026-08-26-feed",
-      datum: "2026-08-26",
+      slug: `${tagVor(2)}-feed`,
+      datum: tagVor(2),
       titel: "Feed blättert",
       linear: null,
       aenderungen: ["Seitenweise laden"],
+    },
+    {
+      slug: `${tagVor(40)}-damals`,
+      datum: tagVor(40),
+      titel: "Damals gebaut",
+      linear: null,
+      aenderungen: ["Vor langer Zeit"],
     },
   ],
 }));
@@ -100,7 +120,7 @@ describe("Was zur Auswahl steht", () => {
 
   it("lässt aus, was eine ZUGESTELLTE Note schon abdeckt", async () => {
     fetchZugestellte.mockResolvedValue([
-      note({ id: "n9", status: "sent", entry_slugs: ["2026-08-27-glocke"] }),
+      note({ id: "n9", status: "sent", entry_slugs: [`${tagVor(0)}-glocke`] }),
     ]);
     renderPage();
 
@@ -112,7 +132,7 @@ describe("Was zur Auswahl steht", () => {
     // Sonst verschwände eine Änderung für immer, sobald jemand sie in einen
     // Entwurf gezogen und den Entwurf liegen gelassen hat.
     fetchEntwuerfe.mockResolvedValue([
-      note({ id: "n8", status: "draft", entry_slugs: ["2026-08-27-glocke"] }),
+      note({ id: "n8", status: "draft", entry_slugs: [`${tagVor(0)}-glocke`] }),
     ]);
     renderPage();
 
@@ -120,11 +140,54 @@ describe("Was zur Auswahl steht", () => {
   });
 });
 
+describe("Was beim Öffnen vorangehakt ist", () => {
+  it("hakt die letzte Woche an und älteres nicht", async () => {
+    renderPage();
+    await screen.findByLabelText(/Glocke verdrahtet/);
+
+    expect(screen.getByLabelText(/Glocke verdrahtet/)).toBeChecked();
+    expect(screen.getByLabelText(/Feed blättert/)).toBeChecked();
+    // Die Positivkontrolle zur Verneinung: der alte Eintrag STEHT in der
+    // Liste. Verschwände er, sähe eine verkürzte Liste aus wie eine
+    // vollständige — und niemand kündigte ihn je an.
+    expect(screen.getByLabelText(/Damals gebaut/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Damals gebaut/)).not.toBeChecked();
+    expect(screen.getByRole("button", { name: /Aus 2 Änderungen/ })).toBeInTheDocument();
+  });
+
+  it("lässt sich abwählen", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByLabelText(/Glocke verdrahtet/));
+
+    expect(screen.getByLabelText(/Glocke verdrahtet/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Feed blättert/)).toBeChecked();
+    expect(screen.getByRole("button", { name: /Aus 1 Änderungen/ })).toBeInTheDocument();
+  });
+
+  it("bringt nach dem Zustellen KEIN Häkchen von selbst zurück", async () => {
+    // Die Falle an einer abgeleiteten Vorauswahl: nach dem Zustellen leert die
+    // Fläche die Auswahl. Wäre „leer" von „noch nicht angefasst" nicht zu
+    // unterscheiden, stünden sofort wieder Häkchen da — und der nächste Klick
+    // auf „zustellen" schickte dieselben Änderungen ein zweites Mal los.
+    renderPage();
+    await screen.findByLabelText(/Glocke verdrahtet/);
+    fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+    const knopf = screen.getByRole("button", { name: /zustellen/ });
+    await waitFor(() => expect(knopf).not.toBeDisabled());
+    fireEvent.click(knopf);
+
+    await waitFor(() => expect(stelleZu).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByLabelText(/Glocke verdrahtet/)).not.toBeChecked());
+    expect(screen.getByLabelText(/Feed blättert/)).not.toBeChecked();
+  });
+});
+
 describe("Aus mehreren Änderungen wird EINE Nachricht", () => {
   it("fasst die Auswahl zu einem Entwurf zusammen", async () => {
     renderPage();
-    fireEvent.click(await screen.findByLabelText(/Glocke verdrahtet/));
-    fireEvent.click(screen.getByLabelText(/Feed blättert/));
+    // Die beiden jungen sind vorangehakt — geklickt wird nur, was dazukommt.
+    await screen.findByLabelText(/Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
 
     const feld = screen.getByLabelText(/Text — so, wie ein Mitglied/) as HTMLTextAreaElement;
@@ -136,7 +199,7 @@ describe("Aus mehreren Änderungen wird EINE Nachricht", () => {
 
   it("stellt den GEÄNDERTEN Text zu, nicht den vorgeschlagenen", async () => {
     renderPage();
-    fireEvent.click(await screen.findByLabelText(/Glocke verdrahtet/));
+    await screen.findByLabelText(/Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
 
     fireEvent.change(screen.getByLabelText(/Text — so, wie ein Mitglied/), {
@@ -162,7 +225,7 @@ describe("Zustellen", () => {
     // `findBy`, nicht `getBy`: der Zustell-Knopf steht sofort da, die Liste der
     // Änderungen kommt erst mit der Abfrage. Ein `getBy` misst hier den
     // Ladezustand und nicht die Fläche.
-    fireEvent.click(await screen.findByLabelText(/Glocke verdrahtet/));
+    await screen.findByLabelText(/Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
     fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
 
@@ -179,7 +242,7 @@ describe("Zustellen", () => {
     // Ein Kästchen mit einem Mitgliedsnamen daran wäre genau die Fläche, die
     // AGE-304 verboten hat.
     const kaesten = screen.getAllByRole("checkbox");
-    expect(kaesten).toHaveLength(2);
+    expect(kaesten).toHaveLength(3);
     expect(screen.queryByText(/Empfänger/)).not.toBeInTheDocument();
     // Positivkontrolle: der Kreis wird trotzdem benannt, nur nicht gewählt.
     expect(screen.getByRole("button", { name: /alle aktivierten Mitglieder/ })).toBeInTheDocument();
