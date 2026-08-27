@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +24,19 @@ vi.mock("../lib/release-notes", async (original) => ({
   fetchZugestellte: () => fetchZugestellte(),
 }));
 
+vi.mock("../content/release-bilder", () => ({
+  RELEASE_BILDER: {
+    "2026-08-27-chat": [
+      {
+        src: "/release/chat-leiste.png",
+        alt: "Die Nachrichtenleiste am rechten Rand",
+        width: 1200,
+        height: 750,
+      },
+    ],
+  },
+}));
+
 const { default: NeuesPage } = await import("./NeuesPage");
 
 function note(over: Partial<Note> = {}): Note {
@@ -41,11 +54,11 @@ function note(over: Partial<Note> = {}): Note {
   } as Note;
 }
 
-function renderPage() {
+function renderPage(adresse = "/neues") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[adresse]}>
         <NeuesPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -89,5 +102,80 @@ describe("NeuesPage — drei Zustände", () => {
 
     await screen.findByText("Noch nichts angekündigt");
     expect(fetchZugestellte).toHaveBeenCalled();
+  });
+});
+
+describe("Eine Note öffnet sich mittig (AGE-632)", () => {
+  beforeEach(() => {
+    fetchZugestellte.mockResolvedValue([note()]);
+  });
+
+  it("öffnet auf Klick ein Modal mit dem vollen Text", async () => {
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Nachrichten stehen jetzt im Rahmen/ }),
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Die Unterhaltungsliste steht rechts.")).toBeInTheDocument();
+  });
+
+  it("hängt das Overlay an document.body, NICHT in die Kartenliste", async () => {
+    // Die Falle, die diese Anwendung zweimal stellt: `.fbc-card:hover` trägt
+    // ein `transform`, der Seitenkopf ein `backdrop-filter`. Beide erzeugen
+    // einen Bezugsrahmen, in dem `fixed` nicht mehr am Viewport hängt — das
+    // Overlay säße dann IM Kasten. jsdom sieht davon nichts, also wird hier
+    // der Elternknoten geprüft und nicht die Optik.
+    const { container } = renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Nachrichten stehen jetzt im Rahmen/ }),
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(container.contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
+  });
+
+  it("schliesst mit Escape", async () => {
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Nachrichten stehen jetzt im Rahmen/ }),
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("steht offen, wenn die Adresse die Note nennt — der Weg aus der Glocke", async () => {
+    renderPage("/neues?note=n1");
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("bleibt geschlossen, wenn die Adresse eine unbekannte Note nennt", async () => {
+    // Eine Note kann geloescht sein, waehrend der Hinweis noch in der Glocke
+    // steht. Ein leeres Modal waere schlechter als keines.
+    renderPage("/neues?note=gibtesnicht");
+    await screen.findByText("Nachrichten stehen jetzt im Rahmen");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("zeigt die Bilder der abgedeckten Änderungen, mit Abmessungen", async () => {
+    renderPage("/neues?note=n1");
+    const bild = await within(await screen.findByRole("dialog")).findByRole("img", {
+      name: "Die Nachrichtenleiste am rechten Rand",
+    });
+    // Ohne Abmessungen im Markup rutscht der Text nach unten, sobald das Bild
+    // eintrifft — auf einem langsamen Anschluss genau dann, wenn jemand liest.
+    expect(bild).toHaveAttribute("width", "1200");
+    expect(bild).toHaveAttribute("height", "750");
+  });
+
+  it("zeigt bei einer Note ohne Bilder gar keine Bildfläche", async () => {
+    fetchZugestellte.mockResolvedValue([note({ entry_slugs: ["2026-08-01-ohne-bild"] })]);
+    renderPage("/neues?note=n1");
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("img")).not.toBeInTheDocument();
   });
 });

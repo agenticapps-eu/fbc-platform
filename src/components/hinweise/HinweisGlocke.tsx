@@ -199,7 +199,13 @@ function hinweisText(h: Hinweis): string {
  * Verlinkung soll eine Zeile hier sein und keine Umbauaktion an der Liste.
  */
 function hinweisZiel(h: Hinweis): string | null {
-  return h.type === "release_note" ? "/neues" : null;
+  if (h.type !== "release_note") return null;
+  // Mit Kennung öffnet die Fläche die gemeinte Note (AGE-632). Ohne — eine
+  // alte Nutzlast trägt sie womöglich nicht — bleibt die blosse Liste das
+  // Ziel: `?note=undefined` wäre eine Adresse, die nichts öffnet und trotzdem
+  // aussieht, als sollte sie.
+  const id = text(h.payload?.["release_note_id"]);
+  return id ? `/neues?note=${encodeURIComponent(id)}` : "/neues";
 }
 
 function text(wert: unknown): string | null {
