@@ -1,165 +1,135 @@
-# Session Handoff — 2026-08-27 (dreiundvierzigste Sitzung, abends)
+# Session Handoff — 2026-08-27 (vierundvierzigste Sitzung, nachts)
 
-Zwei Vorgänge gebaut, **beide gemergt**. Ein dritter ist als Befund angelegt,
-aber nicht begonnen.
+Ein Vorgang, vollständig durch die Schleife: **AGE-639, angedockte Chatfenster**.
+PR **#258** offen, CI beim Schreiben noch am Laufen. Der Change ist archiviert,
+die neue Wahrheit steht in `openspec/specs/`.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-636** Archiv der Neuigkeiten-Fläche | ✅ #256 gemergt, `migrate-prod` grün auf `4a9c6b8` |
-| **AGE-638** Ausbuchtung statt zweier Schalter | ✅ #257 gemergt (18:55), CI war komplett grün |
-| **AGE-639** Angedockte Chatfenster unten | 📋 nur Issue, nichts gebaut |
-
-**Nicht geprüft: ob der Deploy von #257 wirklich ausgeliefert hat.** Er trägt
-keine Migration, das drift-gate sollte also nicht blocken — aber gemessen ist
-das nicht. Erster Handgriff der nächsten Sitzung, siehe unten.
+| **AGE-636** / **AGE-638** | ✅ gemergt, Deploy auf der HEAD-SHA von `main` **grün geprüft** (alle 11 check-runs) |
+| **AGE-639** Chatfenster | 🟡 PR #258, archiviert, CI läuft |
 
 ## Accomplished
 
-### AGE-636 — Zugestelltes und „nicht relevant" wandern ins Archiv
+Ein Klick in der stehenden Nachrichten-Leiste öffnet ab `xl` ein **Fenster**
+statt wegzunavigieren. Höchstens drei, jedes einzeln minimierbar und
+schliessbar, sie überleben Seitenwechsel und Neuladen (gerätelokal, **je
+Konto**). Ein aufgezogenes Fenster rückt den Lesestand vor, ein minimiertes
+nicht. **Ein** Realtime-Kanal für alle.
 
-Ein Eintrag steht jetzt in genau einem von zwei Zuständen. Archiviert wird er
-durch **Zustellung** (endgültig) oder durch ein zweites Kästchen je Zeile,
-**„nicht relevant"** (geteilt zwischen allen Admins, rücknehmbar). Das Archiv
-ist ein zugeklapptes `<details>` und nennt zu jedem Eintrag den Grund.
-
-Neue Tabelle `release_entry_skips`: `slug` als Primärschlüssel, `skipped_by` mit
-`default auth.uid()` — und die Insert-Policy verlangt genau das. **DELETE ist
-hier erlaubt**, anders als bei `release_notes`: eine Markierung verschickt
-nichts. 16 pgTAP-Zusagen, Golden-Snapshot mitgepflegt.
-
-### AGE-638 — beide Leisten klappen über dieselbe Ausbuchtung ein
-
-`LeistenPill`, zweimal montiert und gespiegelt, oben am inneren Rand. Die untere
-Einklapp-Zeile links **und** der Knopf im Kopf der rechten Leiste entfallen; die
-Sprechblase im eingeklappten rechten Rail wird zur **Anzeige**.
+Geteilt statt kopiert: `useGespraech` trägt Verlauf, Lesestand und optimistisches
+Senden für Vollansicht **und** Fenster. `ChatPage` benutzt es jetzt, ohne dass
+eine seiner Zusicherungen sich ändern musste.
 
 ## Decisions
 
-- **Die Seitengrenze von 20 fiel in AGE-636 mit.** Sie war als Folgevorgang
-  weggeschoben; beide Plan-Reviewer sagten HIGH. Zu Recht: das Archiv sagt
-  Vollständigkeit zu, ab Note 21 wären zugestellte Einträge wieder offen und
-  würden ein **zweites Mal** angekündigt. Neue, ungeseitete `fetchAngekuendigt()`
-  ohne `body` — **mit eigenem Query-Key**, weil `/neues` unter dem alten
-  Schlüssel `n.body` rendert.
-- **„Zugestellt schlägt nicht relevant"**, und deshalb prüft
-  `send_release_note` die Markierungen NICHT. Ein Riegel dort machte aus einer
-  redaktionellen Vormerkung ein Veto. (codex forderte ihn, abgelehnt.)
-- **`skipped_by` bleibt**, gegen einen Reviewer: `release_notes.created_by` setzt
-  im selben Modul den Präzedenzfall, und bei einer **geteilten** Markierung ist
-  „wer hat das entschieden?" genau die Frage, die zwischen zwei Admins aufkommt.
-- **Der Pill ist eine Ausbuchtung, kein Knopf darauf** (Donald am Bildschirm).
-  Das kehrt einen Reviewer-Befund um, der eigene Farben verlangte — gebaut war
-  das schon, mit gemessenen 5,0:1. Der Reviewer hatte technisch recht und
-  gestalterisch unrecht: „an beiden gleich aussehen" war nie das Ziel, sondern
-  „an beiden dieselbe **Geste**". Abgehoben wird über den **Schatten**; ohne ihn
-  wäre die Wölbung im hellen Theme unsichtbar (Leiste und Kopf sind beide weiss,
-  gemessen).
-- **Kein `role="status"` für den Ungelesen-Zähler.** Ich hatte es eingebaut und
-  mir damit selbst widerlegt: es machte `getByRole("status")` in der ganzen
-  Hülle mehrdeutig und brach zwei bestehende Tests. Die Zahl steht ohnehin schon
-  im Namen des Topbar-Links (`AppShell.tsx:126`).
+- **Fenster sind adresslos** (Donald). `/chat/:id` bleibt Deep-Link und
+  Vollansicht; die Spec-Zusage „eine Adresse = ein Gespräch" wurde umformuliert,
+  nicht gebrochen: die Adresse benennt einen **Ort**, das Fenster ist Werkzeug.
+- **Minimiert bleibt die Titelzeile**, nicht eine Avatar-Blase — sonst wäre bei
+  drei Fenstern nur noch ein Buchstabe übrig.
+- **Höchstens drei; das vierte räumt das am längsten unberührte.** „Berührt"
+  schliesst Senden und Fokus ein, sonst fliegt das Fenster raus, in dem gerade
+  geschrieben wird.
+- **Bei Platznot geben die Fenster in der BREITE nach, keines wird
+  abgeschnitten.** Die Zahl bleibt fest bei drei; Donalds Absage galt der
+  variablen Zahl, nicht der Breite.
+- **Die „never rounded or floating"-Doktrin gilt weiter — für die LEISTEN.** Sie
+  handelt von den Kanten des Rahmens; Overlays, Toasts und Popover schweben seit
+  jeher. Ein Fenster gehört in diese Klasse.
+- **Der falsche Breakpoint wird mitkorrigiert**: `design-system/spec.md` sagte
+  „Below `lg`" für eine Leiste, die an `xl` andockt. Da der `MODIFIED`-Block das
+  Requirement ohnehin vollständig neu ausstellt, wäre Weiterreichen kein Respekt
+  vor fremdem Umfang gewesen.
 
 ## Files modified
 
-**AGE-636** (auf `main`)
-- `supabase/migrations/20260827180000_release_entry_skips.sql` (neu)
-- `supabase/tests/release_entry_skips_test.sql` (neu), `grants_test.sql`, `ci.yml`
-- `src/lib/release-notes.ts` — `teileAuf()` ersetzt `nochNichtAngekuendigt()`,
-  dazu `fetchAngekuendigt`, `fetchUebersprungene`, `markiereUebersprungen`,
-  `holeZurueck`
-- `src/pages/AdminNeuigkeitenPage.tsx`, beide Testdateien, `database.types.ts`
-- `openspec/changes/neuigkeiten-archiv/`
-
-**AGE-638** (Branch `donald/age-638-sidebar-pill`)
-- `src/components/LeistenPill.tsx` (neu)
-- `src/components/AppShell.tsx`, `AppShell.chatleiste.test.tsx`
-- `openspec/changes/sidebar-pill/`
+- `src/components/chat/` — **neu**: `use-gespraech.ts`, `use-chatfenster.ts`,
+  `ChatFenster.tsx`, `ChatFensterReihe.tsx` (+ vier Testdateien)
+- `src/components/chat/` — geändert: `ChatPanel.tsx` (meldet den THREAD, nicht
+  nur die Kennung), `Conversation.tsx` (Variante `fenster`), `use-ungelesen.ts`
+- `src/components/AppShell.tsx` — Zustand, Verzweigung, Reihe, `--fbc-fenster-h`
+- `src/components/ui/Toast.tsx`, `src/components/EnvironmentBanner.tsx` — weichen
+  der Reihe aus
+- `src/pages/ChatPage.tsx` — benutzt `useGespraech`; **doppeltes
+  `markThreadRead` entfernt** · `ChatPage.lesestand.test.tsx` neu
+- `openspec/changes/archive/2026-08-27-chatfenster-angedockt/`,
+  `openspec/specs/{messaging,design-system}/spec.md`,
+  `src/content/release-entries.generated.ts`
 
 ## Next session: start here
 
-**Zuerst nachsehen, ob der Deploy von #257 durchgelaufen ist.** Beide PRs sind
-gemergt; geprüft habe ich nur den Merge, nicht die Auslieferung.
+**Zuerst `gh pr checks 258`.** Grün ⇒ mergen (die Freigabe bei grünem CI ist
+generell erteilt), danach **`gh pr view 258 --json state` prüfen** — ein
+`gh pr merge` kann still fehlschlagen. Der Change trägt **keine Migration**, das
+drift-gate sollte den Deploy also nicht überspringen; das ist trotzdem auf der
+HEAD-SHA von `main` nachzusehen.
 
-```
-gh run list --branch main --limit 5
-```
-
-Der `deploy`-Job muss auf der **HEAD-SHA von main** grün sein — ein grüner Lauf
-auf einer älteren SHA sagt nichts. Bleibt er auf `skipping`, ist es das
-drift-gate, und dann fehlt PROD eine Migration (bei #257 unwahrscheinlich, sie
-trägt keine).
-
-**Danach: die drei Changes archivieren.** `neuigkeiten-archiv`,
-`admin-setzt-stufe` und `release-notes-modal` liegen unarchiviert. Bis dahin
-steht ihre Wahrheit nicht in `openspec/specs/` — und sie fehlen in der
-Neuigkeiten-Liste, weil die aus `openspec/changes/archive/` erzeugt wird. Beim
-Archivieren gilt: Szenario-Titel sind der Schlüssel, und `validate` ist grün,
-auch wenn ein umgetauftes Szenario das alte löscht.
+**Danach: die drei alten Changes archivieren** — `neuigkeiten-archiv`,
+`admin-setzt-stufe`, `release-notes-modal` liegen weiterhin unarchiviert. Bis
+dahin steht ihre Wahrheit nicht in `openspec/specs/`, und sie fehlen in der
+Neuigkeiten-Liste. **Achtung, in dieser Sitzung frisch erlebt:** ein
+*umbenanntes* Szenario in einem `MODIFIED`-Block löscht das alte, `validate`
+bleibt dabei grün, und nur `openspec archive` bricht ab. Auflösung ohne Verlust:
+den alten Titel behalten und das Neue als eigenes Szenario danebenstellen.
 
 ## Open questions
 
-- **Die erste Release-Note ist weiterhin nicht zugestellt.** Das bleibt Donalds
-  bzw. Detlevs Handlung; sie geht genau einmal und an alle aktivierten
-  Mitglieder. Mit AGE-636 lässt sich die Liste vorher aufräumen — 22 Einträge
-  liegen ausserhalb des Vorauswahl-Fensters.
-- **AGE-639 braucht eine Design-Runde vor dem Proposal.** Zwei bestehende
-  Zusagen stehen dagegen: „eine Adresse = ein Gespräch"
-  (`messaging/spec.md:268`) und „never rounded or floating"
-  (`design-system/spec.md:262`). Beide sind zu ändern oder ausdrücklich
-  abzugrenzen.
-- **Unbelegt in AGE-638:** das Auslösen des Pills per Enter/Leertaste (belegt
-  ist nur, dass es ein echtes `<button>` mit Fokus ist) und ein **zweistelliger**
-  Ungelesen-Zähler im Browser. Steht als offener Haken in `tasks.md`.
-- **Unbelegt in AGE-636:** der Query-Key-Konflikt ist auf die Begründung der
-  Reviewer hin behoben, **nicht reproduziert**. Der Browserversuch benutzte ein
-  `<a>`, das einen echten Seitenwechsel auslöst — also einen frischen Cache und
-  damit nicht die Bedingung, die der Befund braucht. Was ihn festnageln würde:
-  ein Test, der beide Seiten unter **einem** `QueryClient` montiert.
+- **Die erste Release-Note ist weiterhin nicht zugestellt.** Donalds bzw.
+  Detlevs Handlung; sie geht genau einmal an alle aktivierten Mitglieder.
+- **Nicht im Browser nachgemessen**: die Korrekturen aus der Diff-Review kamen
+  NACH der Sichtprobe. Die zwei, die Verhalten ändern (entfallener doppelter
+  Lesestand-Aufruf, Fokus beim Schliessen), sind stattdessen in Tests
+  festgenagelt — jeweils mit Gegenprobe rot. Der lokale Stack liess sich dafür
+  nicht erneut benutzen, siehe unten.
+- **Bewusst offen gelassen**: das Wettrennen zwischen erstem Laden und Kanal
+  (wortgleich `ChatPage.tsx:81` seit AGE-248); zwei Tabs überschreiben einander
+  im Gerätespeicher; der LRU-Stand überlebt kein Neuladen (begründet im Design).
+- **Folgevorgang**: die Threadliste markiert offene Gespräche nicht —
+  `ThreadList` trägt genau ein `activeId`, drei Fenster brauchten eine Menge.
 - Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
   des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
-## Umgebung — zwei Stolpersteine für die nächste Sitzung
+## Umgebung — eine neue Stolperfalle
 
-**Dieser Worktree heisst `.neuigkeiten-archiv`, trägt aber den Branch
-`donald/age-638-sidebar-pill`.** Kein Fehler, sondern eine Umgehung: die Sitzung
-ist an ihren Worktree gepinnt, `EnterWorktree` nimmt nur Pfade unter
-`.claude/worktrees/`, und ein `cd` in einen `wt`-Worktree wird zurückgesetzt.
-Der frisch angelegte wurde deshalb mit `wt remove --no-delete-branch` wieder
-entfernt und der Branch hier ausgecheckt. Wer den Namen geradeziehen will,
-macht das ausserhalb der Sitzung.
+**Der lokale Supabase-Stack gehört ALLEN Worktrees auf diesem Rechner.** Eine
+parallele Sitzung hat ihn während der Sichtprobe **dreimal** geleert. Erkennbar
+daran, dass `supabase_migrations.schema_migrations` Namen trägt, die der eigene
+Branch gar nicht hat (hier: `notify_app_umbenennung`, `push_tokens`). Also: Zahlen
+sofort protokollieren, und Seed-Skripte wiederholbar bauen.
 
-**Lokaler Stack:** zurückgesetzt (`supabase db reset`). Ein Konto steht:
-`archiv-admin@test.local` / `Probe-2026-lokal`, `impact`, aktiviert, Adminrolle.
-`release_entry_skips` und `release_notes` sind leer geräumt.
+Der Seed für diese Fläche (sechs Konten, fünf Gespräche à drei Nachrichten) lag
+im Scratchpad und ist damit weg. Neu bauen nach dem Muster von
+`scripts/chat-testkonten.ts` — dieselben GoTrue-Fallen (die vier Token-Spalten
+müssen `''` sein, nicht NULL) und der echte Weg `pending → accepted`, weil erst
+der Übergang die Threads anlegt. Anmeldung war `ich@chattest.invalid` /
+`Testchat2026!`.
 
-Vite lief zuletzt auf **5205**; 5203 und 5204 belegen ältere Server.
-
-```
-VITE_SUPABASE_URL=http://127.0.0.1:54321 \
-VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
-VITE_ENVIRONMENT=local \
-npx vite --port 5205 --strictPort
-```
+Vite lief zuletzt auf **5210**, gestartet mit den Werten aus `supabase status`
+(`VITE_SUPABASE_URL=http://127.0.0.1:54321`, ANON_KEY, `VITE_ENVIRONMENT=local`).
+Er hört auf `localhost`, **nicht** auf `127.0.0.1` — ein `curl` auf die IP hängt.
 
 ## Was in dieser Sitzung schiefging (und wie man es merkt)
 
-**Fünf von sechs neuen Tests waren gegen den ALTEN Code grün.** Sie prüften
-zugängliche Namen — und die gab es schon, weil die alten Schalter genauso
-hiessen. Ein Test, der einen Umbau treiben soll, muss auf das zielen, was sich
-**ändert**: das Verschwinden des Wortes „Einklappen", die Zahl der Treffer eines
-Namens, ein Markierungsattribut. Erst danach fielen fünf.
+**Die Breitenrechnung liess die linke Leiste weg**, und darauf stand die ganze
+Entscheidung „höchstens drei". Behauptet waren 60 rem, gerechnet sind es 44.
+**Beide** Plan-Reviewer haben es unabhängig gefunden — genau der Wert dieses
+Schritts, denn er lief vor der ersten Codezeile.
 
-**Zwei Reviewer-Befunde standen auf einem „falls" und waren falsch.** „Der Pill
-verschwindet unter dem Kopf, **falls** der z-50 ist" — er ist z-30, die Leisten
-sind z-40. „`ChevronLeftIcon` ist tot, **wie der Diff stark nahelegt**" — es hat
-zwei verbliebene Verwender. Ein Diff zeigt, was sich ändert, nicht was bleibt;
-beide Male half ein `grep` in zehn Sekunden.
+**Die Fensterreihe war 77 rem breit statt 44 und lief unter beide Leisten.** Sie
+las `var(--fbc-sidebar-w)`, das am Wurzel-`div` der Hülle steht, während sie per
+Portal am `document.body` hängt — also darüber. `var()` fiel auf `0rem` zurück.
+**Dieselbe Falle, die ich für die Toast-Variable erkannt und hier übersehen
+hatte.** jsdom sieht davon nichts; ein `getBoundingClientRect` sofort.
 
-**codex gibt ohne die Auflage „lies keine Dateien" kein Urteil ab.** Der erste
-Lauf durchsuchte 8027 Zeilen lang das Repository und endete damit, `REVIEWS.md`
-auszugeben. Mit dem Zusatz kam beim zweiten Versuch sofort eine Antwort.
+**Ein Kommentar behauptete „gleich viele Schreibvorgänge, und das ist
+gemessen".** Gemessen war der Hook ALLEIN — auf `/chat/:id` schrieb jede
+eingehende Fremdzeile zweimal, weil `ChatPage` in seinem Abo weiter mitmarkierte.
+Die Diff-Review hat es gefunden. **Wo „gemessen" steht, muss dabeistehen, WORAN.**
 
-**Ein erster Kontrast-Fix wirkte nicht, und nur die Messung zeigte es.**
-`bg-soft` statt `bg-canvas` kam auf **1,05:1**. Im hellen Theme gibt es kein
-neutrales Flächen-Token, das trägt — `canvas` und `chrome` sind dort selbst
-weiss. (Am Ende ist es ohnehin der Schatten geworden, auf Donalds Ansage.)
+**Ein synthetisches `KeyboardEvent` aktiviert einen `<button>` nicht.** Der erste
+Tastatur-Nachweis war wertlos; erst ein echter Tastendruck über CDP belegte
+Enter und Leertaste. (Nebenbei damit auch der offene Haken aus AGE-638 erledigt.)
+
+**Ein Endzustand belegt kein Ausbleiben von Zucken** — Zucken ist per Definition
+ein Zwischenzustand. Erst eine Abtastung alle 25 ms über 3 s belegt es.
