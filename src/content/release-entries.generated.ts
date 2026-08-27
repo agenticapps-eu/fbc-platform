@@ -72,6 +72,22 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-27-chatfenster-angedockt",
+    datum: "2026-08-27",
+    titel: "Angedockte Chatfenster unten: mehrere Gespräche gleichzeitig, minimierbar",
+    linear: "AGE-639",
+    aenderungen: [
+      "**Ein Klick in der stehenden Leiste öffnet ein Fenster** statt zu navigieren — ab `xl`, also genau dort, wo die Leiste angedockt steht. Darunter (Schublade, Telefon) bleibt es beim heutigen Weg: die Adresse.",
+      "**Höchstens drei Fenster**, unten rechts aufgereiht, **zwischen beiden Leisten**. Jedes bis zu 18 rem breit; wird es eng, teilen sich alle drei den Platz, statt dass eines angeschnitten wird. Ein viertes Gespräch schliesst das am längsten unberührte — es ist damit nicht verloren, sondern steht unverändert in der Leiste daneben.",
+      "**Jedes Fenster minimiert und schliesst einzeln.** Minimiert bleibt seine Titelzeile stehen: Avatar, Name, Ungelesen-Zähler, beide Schalter.",
+      "**Die Fenster überleben den Seitenwechsel und das Neuladen.** Offene Threads und ihr Minimiert-Zustand liegen gerätelokal, wie `fbc.sidebarCollapsed` und `fbc.chatCollapsed` es schon tun.",
+      "**Ein aufgezogenes Fenster rückt den Lesestand vor**, genau wie die Vollansicht. Ein minimiertes nicht — es ist nicht gelesen worden.",
+      "**Ein Realtime-Kanal, nicht N.** Das bestehende `subscribeToAllMessages`-Abo in der Hülle bedient die Fenster mit; kein Fenster öffnet einen eigenen Kanal.",
+      "**`/chat` und `/chat/:threadId` bleiben unverändert** — Vollansicht, Deep-Link, und der einzige Weg unterhalb von `xl`. Auf diesen Routen steht die Fensterreihe nicht, aus demselben Grund, aus dem die Leiste dort nicht steht.",
+      "**Die Toasts weichen der Fensterreihe nach oben aus**, über dieselbe geteilte CSS-Variable, mit der der Rahmen schon heute seine Leistenbreite verteilt.",
+    ],
+  },
+  {
     slug: "2026-08-27-chat-rechte-sidebar",
     datum: "2026-08-27",
     titel: "Der Chat wird eine zweite angedockte Leiste an der rechten Viewport-Kante",

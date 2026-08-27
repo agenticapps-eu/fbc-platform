@@ -1,150 +1,135 @@
-# Session Handoff — 2026-08-27 (zweiundvierzigste Sitzung, nachmittags)
+# Session Handoff — 2026-08-27 (vierundvierzigste Sitzung, nachts)
 
-**PROD ist migriert** (beide Migrationen aus der Vormittagssitzung), fünf
-Vorgänge sind gebaut, drei davon live. Der wichtigste offene Punkt steht unter
-„Next session".
+Ein Vorgang, vollständig durch die Schleife: **AGE-639, angedockte Chatfenster**.
+PR **#258** offen, CI beim Schreiben noch am Laufen. Der Change ist archiviert,
+die neue Wahrheit steht in `openspec/specs/`.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-631** Vorauswahl „letzte Woche" | ✅ gemergt (#250) |
-| **AGE-633** Preise nur für Nicht-`impact` | ✅ gemergt (#251) |
-| **AGE-632** Release-Note als Modal + Screenshots | ✅ gemergt (#252) |
-| **AGE-635** Event-Cover in der Aktivitätsliste | ✅ gemergt (#254) |
-| **AGE-634** Admin setzt die Stufe | 🔶 PR #253, rebast, CI läuft — **danach `migrate-prod`** |
+| **AGE-636** / **AGE-638** | ✅ gemergt, Deploy auf der HEAD-SHA von `main` **grün geprüft** (alle 11 check-runs) |
+| **AGE-639** Chatfenster | 🟡 PR #258, archiviert, CI läuft |
 
 ## Accomplished
 
-### PROD-Migration (der Punkt 1 des Vormittags-Handoffs)
+Ein Klick in der stehenden Nachrichten-Leiste öffnet ab `xl` ein **Fenster**
+statt wegzunavigieren. Höchstens drei, jedes einzeln minimierbar und
+schliessbar, sie überleben Seitenwechsel und Neuladen (gerätelokal, **je
+Konto**). Ein aufgezogenes Fenster rückt den Lesestand vor, ein minimiertes
+nicht. **Ein** Realtime-Kanal für alle.
 
-`migrate-prod` dispatcht, `plan` und `apply` grün, danach Drift-Gate **und**
-Objekt-Drift-Scan grün. Damit war der seit drei Läufen blockierte Frontend-Deploy
-wieder frei.
-
-**Nicht gemessen:** die Rückfüll-Kontrolle aus AGE-627 (Threads mit Nachricht und
-leerem `last_message_at`, erwartet null) — das FBC-Projekt hängt nicht an der
-Supabase-MCP-Verbindung (dort ist nur `cparx`), die PROD-DB-URL liegt hinter
-einem TTY. **Bleibt offen.**
-
-### AGE-631 — die letzte Woche ist vorangehakt
-
-`ausLetzterWoche(eintraege, heute)` hakt die Einträge der letzten sieben Tage
-vor; die Liste bleibt vollständig, älteres steht ungehakt darin. Der Zustand ist
-**abgeleitet**: `gewaehlt === null` heisst „noch nicht angefasst", `[]` heisst
-„nichts gewählt" — ohne die Unterscheidung stünden nach dem Zustellen sofort
-wieder Häkchen da.
-
-### AGE-632 — Modal, Bilder, Deep-Link
-
-Portal an `document.body` (`.fbc-card:hover` und der `backdrop-filter` des Kopfes
-fangen `fixed` sonst ein), `useOverlay` aus AGE-529, Offen-Zustand als
-`?note=<id>`. Drei Screenshots unter `public/release/`, gegen den lokalen Stack
-mit erfundenen Konten.
-
-### AGE-634 — `admin_set_tier`
-
-Setzt in **beide** Richtungen (das kann `apply_upgrade` nicht), mit
-Pflichtbegründung und einer `admin_audit`-Zeile, die alte **und** neue Stufe
-trägt. 12 pgTAP-Zusagen in `ci.yml`; `code_as()` gibt den SQLSTATE zurück, weil
-`try_as()` jeden Fehler als `DENIED:` meldet.
+Geteilt statt kopiert: `useGespraech` trägt Verlauf, Lesestand und optimistisches
+Senden für Vollansicht **und** Fenster. `ChatPage` benutzt es jetzt, ohne dass
+eine seiner Zusicherungen sich ändern musste.
 
 ## Decisions
 
-- **Kein YouTube-Standbild in der Aktivitätsliste (AGE-635).** Es käme von
-  `img.youtube.com` — derselbe Aufruf an den Anbieter samt IP, den das
-  Einwilligungstor aus AGE-611/621 verhindert; `VideoEmbed.tsx:34` sagt das
-  ausdrücklich, ein Test hält es fest. Ausgeliefert wurde nur das **Event-Cover**
-  (eigener Bucket). Der saubere Weg für Videos wäre ein Standbild erst nach
-  erteilter Freigabe (`useFreigabe`) — **Donalds Entscheidung, noch offen.**
-- **Bilder hängen am Change, nicht an der Note.** Verworfen: eine Spalte auf
-  `release_notes` mit Upload — sie kostete Migration, Bucket und Policies und
-  bräche die Konstruktion „was im Bündel steht, ist ausgeliefert".
-- **`tier` bleibt draussen aus `admin_update_profile`.** Eine Stufe zu setzen ist
-  kein Pflegen von Stammdaten; eigene RPC, eigene Spur, eigene Begründung.
-- **„Alles Admin-mässige raus" betrifft nur den TEXT der Release-Note**, nicht die
-  Auswahl und nicht die App (Donald, ausdrücklich). Die technischen Changes
-  bleiben angehakt, damit sie als angekündigt verbucht sind.
+- **Fenster sind adresslos** (Donald). `/chat/:id` bleibt Deep-Link und
+  Vollansicht; die Spec-Zusage „eine Adresse = ein Gespräch" wurde umformuliert,
+  nicht gebrochen: die Adresse benennt einen **Ort**, das Fenster ist Werkzeug.
+- **Minimiert bleibt die Titelzeile**, nicht eine Avatar-Blase — sonst wäre bei
+  drei Fenstern nur noch ein Buchstabe übrig.
+- **Höchstens drei; das vierte räumt das am längsten unberührte.** „Berührt"
+  schliesst Senden und Fokus ein, sonst fliegt das Fenster raus, in dem gerade
+  geschrieben wird.
+- **Bei Platznot geben die Fenster in der BREITE nach, keines wird
+  abgeschnitten.** Die Zahl bleibt fest bei drei; Donalds Absage galt der
+  variablen Zahl, nicht der Breite.
+- **Die „never rounded or floating"-Doktrin gilt weiter — für die LEISTEN.** Sie
+  handelt von den Kanten des Rahmens; Overlays, Toasts und Popover schweben seit
+  jeher. Ein Fenster gehört in diese Klasse.
+- **Der falsche Breakpoint wird mitkorrigiert**: `design-system/spec.md` sagte
+  „Below `lg`" für eine Leiste, die an `xl` andockt. Da der `MODIFIED`-Block das
+  Requirement ohnehin vollständig neu ausstellt, wäre Weiterreichen kein Respekt
+  vor fremdem Umfang gewesen.
 
 ## Files modified
 
-- **AGE-631** `src/lib/release-notes.ts` (+`ausLetzterWoche`), `AdminNeuigkeitenPage.tsx`
-- **AGE-633** `MitgliedschaftPage.tsx`, `AppShell.tsx` (Profilmenü)
-- **AGE-632** `src/components/release/ReleaseNoteModal.tsx` (neu),
-  `NeuesPage.tsx`, `HinweisGlocke.tsx`, `src/content/release-bilder.ts` (neu),
-  `src/types/release.ts`, `public/release/*.png` (3 Screenshots)
-- **AGE-635** `src/components/home/MemberDashboard.tsx`
-- **AGE-634** `supabase/migrations/20260827160000_admin_set_tier.sql` (neu),
-  `supabase/tests/admin_set_tier_test.sql` (neu), `ci.yml`, `admin-members.ts`,
-  `admin-profile.ts`, `database.types.ts`, `AdminMitgliedPage.tsx`
-- Changes: `openspec/changes/release-notes-modal/`, `openspec/changes/admin-setzt-stufe/`
+- `src/components/chat/` — **neu**: `use-gespraech.ts`, `use-chatfenster.ts`,
+  `ChatFenster.tsx`, `ChatFensterReihe.tsx` (+ vier Testdateien)
+- `src/components/chat/` — geändert: `ChatPanel.tsx` (meldet den THREAD, nicht
+  nur die Kennung), `Conversation.tsx` (Variante `fenster`), `use-ungelesen.ts`
+- `src/components/AppShell.tsx` — Zustand, Verzweigung, Reihe, `--fbc-fenster-h`
+- `src/components/ui/Toast.tsx`, `src/components/EnvironmentBanner.tsx` — weichen
+  der Reihe aus
+- `src/pages/ChatPage.tsx` — benutzt `useGespraech`; **doppeltes
+  `markThreadRead` entfernt** · `ChatPage.lesestand.test.tsx` neu
+- `openspec/changes/archive/2026-08-27-chatfenster-angedockt/`,
+  `openspec/specs/{messaging,design-system}/spec.md`,
+  `src/content/release-entries.generated.ts`
 
 ## Next session: start here
 
-**1. AGE-634 (#253) landen — und danach `migrate-prod` dispatchen.** Der PR trägt
-`20260827160000_admin_set_tier.sql`; ohne die Migration auf PROD blockt das
-drift-gate den nächsten Frontend-Deploy **still**. Nach dem Merge läuft
-deploy.yml auf main automatisch; er wird ohne die Migration nichts ausliefern.
+**Zuerst `gh pr checks 258`.** Grün ⇒ mergen (die Freigabe bei grünem CI ist
+generell erteilt), danach **`gh pr view 258 --json state` prüfen** — ein
+`gh pr merge` kann still fehlschlagen. Der Change trägt **keine Migration**, das
+drift-gate sollte den Deploy also nicht überspringen; das ist trotzdem auf der
+HEAD-SHA von `main` nachzusehen.
 
-**2. Die erste Release-Note zustellen.** Der Textentwurf steht im Verlauf dieser
-Sitzung; er ist admin- und technikfrei. Zustellen geht **genau einmal** und an
-alle aktivierten Mitglieder — das ist Donalds/Detlevs Handlung, nicht die des
-Agenten.
-
-## Was in dieser Sitzung schiefging (und wie man es merkt)
-
-Ein Re-Run des alten Laufs **33077648634** (Commit `45bbb40`) hat das frische
-Deployment von `3524c2a` **überschrieben** — der `functions`-Job meldete das
-korrekt als „RUECKFALL auf HEAD^ … ist kein Vorfahr von HEAD", aber `deploy` war
-da schon durch. Live stand danach der Stand VOR drei Merges.
-
-**Der erste Beleg dafür, dass alles live sei, war wertlos:** geprüft wurde
-`Aus … Änderungen einen Entwurf machen` — eine Zeichenkette, die es **vor** dem
-Diff schon gab (nur die Variable dahinter wurde umbenannt). Sie kann die
-Versionen nicht unterscheiden.
-
-Brauchbar sind zwei Proben:
-
-* eine Zeichenkette, die **nur** der neue Stand trägt (hier `release-note-titel`),
-* und für eine Datei der **`content-type`**: der SPA-Fallback antwortet auf JEDEN
-  unbekannten Pfad mit `200`, `text/html` und 3487 Bytes. `/release/xyz.png`
-  „existiert" damit immer. Erst `content-type: image/png` plus die echte
-  Dateigrösse belegt etwas.
-
-Eingefangen wurde es durch den Merge von #254, der einen sauberen Deploy auf dem
-aktuellen main auslöste. Danach gemessen: Bundle `index-CodyLEBR.js`,
-`release-note-titel` vorhanden, `nachrichtenleiste.png` mit `image/png` und
-295 523 Bytes.
+**Danach: die drei alten Changes archivieren** — `neuigkeiten-archiv`,
+`admin-setzt-stufe`, `release-notes-modal` liegen weiterhin unarchiviert. Bis
+dahin steht ihre Wahrheit nicht in `openspec/specs/`, und sie fehlen in der
+Neuigkeiten-Liste. **Achtung, in dieser Sitzung frisch erlebt:** ein
+*umbenanntes* Szenario in einem `MODIFIED`-Block löscht das alte, `validate`
+bleibt dabei grün, und nur `openspec archive` bricht ab. Auflösung ohne Verlust:
+den alten Titel behalten und das Neue als eigenes Szenario danebenstellen.
 
 ## Open questions
 
-- **Video-Standbilder nach Freigabe?** Siehe Decisions — eigener Vorgang.
-- **Rückfüll-Kontrolle aus AGE-627** ist weiterhin ungemessen (kein PROD-Zugang
-  ohne TTY).
-- **Plan-Reviews fehlen** für `release-notes-modal` und `admin-setzt-stufe` —
-  die drei Fremd-Reviewer waren am 27.08. alle kaputt.
-- **CI-Flake:** der `migrations`-Job scheiterte einmal an `address already in use`
-  (Port 54324, inbucket) — nicht am Code. Neustart geht hier nur per
-  Close/Reopen des PRs; danach stehen **alte und neue Check-Runs auf derselben
-  SHA**, und eine Abfrage ohne `group_by(.name) | max_by(.started_at)` liest die
-  Karteileiche als Fehlschlag.
-- **`gh pr merge` schlägt still fehl**, wenn der Branch hinter `main` liegt
-  („not up to date"): der Befehl gibt nichts aus, der PR bleibt offen. Immer
-  `gh pr view --json state` nachschieben — hier einmal passiert.
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation des
-  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **Die erste Release-Note ist weiterhin nicht zugestellt.** Donalds bzw.
+  Detlevs Handlung; sie geht genau einmal an alle aktivierten Mitglieder.
+- **Nicht im Browser nachgemessen**: die Korrekturen aus der Diff-Review kamen
+  NACH der Sichtprobe. Die zwei, die Verhalten ändern (entfallener doppelter
+  Lesestand-Aufruf, Fokus beim Schliessen), sind stattdessen in Tests
+  festgenagelt — jeweils mit Gegenprobe rot. Der lokale Stack liess sich dafür
+  nicht erneut benutzen, siehe unten.
+- **Bewusst offen gelassen**: das Wettrennen zwischen erstem Laden und Kanal
+  (wortgleich `ChatPage.tsx:81` seit AGE-248); zwei Tabs überschreiben einander
+  im Gerätespeicher; der LRU-Stand überlebt kein Neuladen (begründet im Design).
+- **Folgevorgang**: die Threadliste markiert offene Gespräche nicht —
+  `ThreadList` trägt genau ein `activeId`, drei Fenster brauchten eine Menge.
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
+  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
-## Lokaler Stack
+## Umgebung — eine neue Stolperfalle
 
-Wurde für die Migration **zurückgesetzt**; die Konten der Vormittagssitzung sind
-weg. Neu angelegt: `st-admin@test.local` (Admin) und `st-ziel@test.local`,
-Passwort `Probe-2026-lokal`, beide `impact` und aktiviert. `st-ziel` steht nach
-der Sichtprobe auf `connect`.
+**Der lokale Supabase-Stack gehört ALLEN Worktrees auf diesem Rechner.** Eine
+parallele Sitzung hat ihn während der Sichtprobe **dreimal** geleert. Erkennbar
+daran, dass `supabase_migrations.schema_migrations` Namen trägt, die der eigene
+Branch gar nicht hat (hier: `notify_app_umbenennung`, `push_tokens`). Also: Zahlen
+sofort protokollieren, und Seed-Skripte wiederholbar bauen.
 
-Vite läuft auf **5203** (5201/5202 belegen noch die Server der beiden gemergten
-Worktrees vom Vormittag):
+Der Seed für diese Fläche (sechs Konten, fünf Gespräche à drei Nachrichten) lag
+im Scratchpad und ist damit weg. Neu bauen nach dem Muster von
+`scripts/chat-testkonten.ts` — dieselben GoTrue-Fallen (die vier Token-Spalten
+müssen `''` sein, nicht NULL) und der echte Weg `pending → accepted`, weil erst
+der Übergang die Threads anlegt. Anmeldung war `ich@chattest.invalid` /
+`Testchat2026!`.
 
-```
-VITE_SUPABASE_URL=http://127.0.0.1:54321 \
-VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
-VITE_ENVIRONMENT=local \
-npx vite --port 5203 --strictPort
-```
+Vite lief zuletzt auf **5210**, gestartet mit den Werten aus `supabase status`
+(`VITE_SUPABASE_URL=http://127.0.0.1:54321`, ANON_KEY, `VITE_ENVIRONMENT=local`).
+Er hört auf `localhost`, **nicht** auf `127.0.0.1` — ein `curl` auf die IP hängt.
+
+## Was in dieser Sitzung schiefging (und wie man es merkt)
+
+**Die Breitenrechnung liess die linke Leiste weg**, und darauf stand die ganze
+Entscheidung „höchstens drei". Behauptet waren 60 rem, gerechnet sind es 44.
+**Beide** Plan-Reviewer haben es unabhängig gefunden — genau der Wert dieses
+Schritts, denn er lief vor der ersten Codezeile.
+
+**Die Fensterreihe war 77 rem breit statt 44 und lief unter beide Leisten.** Sie
+las `var(--fbc-sidebar-w)`, das am Wurzel-`div` der Hülle steht, während sie per
+Portal am `document.body` hängt — also darüber. `var()` fiel auf `0rem` zurück.
+**Dieselbe Falle, die ich für die Toast-Variable erkannt und hier übersehen
+hatte.** jsdom sieht davon nichts; ein `getBoundingClientRect` sofort.
+
+**Ein Kommentar behauptete „gleich viele Schreibvorgänge, und das ist
+gemessen".** Gemessen war der Hook ALLEIN — auf `/chat/:id` schrieb jede
+eingehende Fremdzeile zweimal, weil `ChatPage` in seinem Abo weiter mitmarkierte.
+Die Diff-Review hat es gefunden. **Wo „gemessen" steht, muss dabeistehen, WORAN.**
+
+**Ein synthetisches `KeyboardEvent` aktiviert einen `<button>` nicht.** Der erste
+Tastatur-Nachweis war wertlos; erst ein echter Tastendruck über CDP belegte
+Enter und Leertaste. (Nebenbei damit auch der offene Haken aus AGE-638 erledigt.)
+
+**Ein Endzustand belegt kein Ausbleiben von Zucken** — Zucken ist per Definition
+ein Zwischenzustand. Erst eine Abtastung alle 25 ms über 3 s belegt es.
