@@ -33,6 +33,8 @@ export function ChatFensterReihe({
   fenster,
   myId,
   ungelesenJeThread,
+  leisteLinks,
+  leisteRechts,
   onMinimiere,
   onZiehAuf,
   onSchliesse,
@@ -41,6 +43,22 @@ export function ChatFensterReihe({
   fenster: ChatfensterStand["fenster"];
   myId: string;
   ungelesenJeThread: Map<string, number>;
+  /**
+   * Die Breiten beider Leisten, als WERTE übergeben — nicht über
+   * `var(--fbc-sidebar-w)`.
+   *
+   * **Im Browser gemessen, nicht überlegt:** die erste Fassung las genau diese
+   * CSS-Variablen. Sie sind aber am Wurzel-`div` der Hülle gesetzt, und diese
+   * Reihe hängt per Portal am `document.body` — also OBERHALB davon. `var()`
+   * fiel auf `0rem` zurück, die Reihe wurde 77 rem statt 44 rem breit und lief
+   * unter beide Leisten. jsdom sieht davon nichts; ein `getBoundingClientRect`
+   * im echten Chrome sieht es sofort.
+   *
+   * Es bleibt EINE Quelle: derselbe Ausdruck in der Hülle, der die Variablen
+   * setzt, füllt diese beiden Angaben.
+   */
+  leisteLinks: string;
+  leisteRechts: string;
   onMinimiere: (threadId: string) => void;
   onZiehAuf: (threadId: string) => void;
   onSchliesse: (threadId: string) => void;
@@ -78,11 +96,8 @@ export function ChatFensterReihe({
       // dahinter blockieren.
       className="pointer-events-none fixed bottom-0 z-30 flex items-end justify-end gap-2 overflow-hidden"
       style={{
-        // EINE Quelle für beide Ränder — dieselben Variablen, mit denen der
-        // Rahmen schon heute seinen Inhalt versetzt. Eine zweite Rechnung wäre
-        // die, die jemand vergisst, wenn sich die erste ändert.
-        left: "calc(var(--fbc-sidebar-w, 0rem) + 1rem)",
-        right: "calc(var(--fbc-chat-w, 0rem) + 1rem)",
+        left: `calc(${leisteLinks} + 1rem)`,
+        right: `calc(${leisteRechts} + 1rem)`,
       }}
     >
       {fenster.map((f) => (

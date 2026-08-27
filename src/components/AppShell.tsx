@@ -552,6 +552,18 @@ export default function AppShell() {
   const fensterMoeglich = chatLeisteSteht && istBreit;
   const offeneFenster = fensterMoeglich ? chatfenster.fenster : [];
 
+  // Die Breiten beider Leisten — EINE Rechnung, drei Verbraucher: die
+  // CSS-Variablen am Wurzel-`div` unten (für Leisten, Kopf, Inhalt und Fuss)
+  // und die Ränder der Fensterreihe.
+  //
+  // Die Reihe bekommt sie als WERTE übergeben, nicht über `var(…)`, und das ist
+  // im Browser gemessen: sie hängt per Portal am `document.body` und damit
+  // OBERHALB des `div`, an dem die Variablen stehen. Dort löste `var()` nicht
+  // auf, fiel auf `0rem` zurück, und die Reihe lief unter beide Leisten.
+  const navBreite = collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN;
+  const chatBreite =
+    chatLeisteSteht && istBreit ? (chatCollapsed ? CHAT_W_RAIL : CHAT_W_OPEN) : "0rem";
+
   // Das Live-Abo überspringt die Neuzählung für Gespräche, die dem Mitglied
   // gerade GEGENÜBERLIEGEN — sonst springt die Blase auf 1 und fällt beim
   // nächsten Abgleich zurück. Bis AGE-639 war das genau eines: die offene
@@ -611,14 +623,13 @@ export default function AppShell() {
       className="relative isolate min-h-screen bg-soft text-ink"
       style={
         {
-          "--fbc-sidebar-w": collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN,
+          "--fbc-sidebar-w": navBreite,
           // Steht die Leiste nicht — oder ist der Schirm schmaler als `xl` —,
           // ist der Versatz 0, und die Regel in index.css wirkt wie vor
           // AGE-627. Das erspart eine ZWEITE Media Query im Stylesheet: der
           // Umbruchpunkt der Leiste ist ein anderer als der der Navigation,
           // und zwei Regeln mit zwei Grenzen liefen auseinander.
-          "--fbc-chat-w":
-            chatLeisteSteht && istBreit ? (chatCollapsed ? CHAT_W_RAIL : CHAT_W_OPEN) : "0rem",
+          "--fbc-chat-w": chatBreite,
         } as React.CSSProperties
       }
     >
@@ -911,6 +922,8 @@ export default function AppShell() {
           fenster={chatfenster.fenster}
           myId={user?.id ?? ""}
           ungelesenJeThread={ungelesen.jeThread}
+          leisteLinks={navBreite}
+          leisteRechts={chatBreite}
           onMinimiere={chatfenster.minimiere}
           onZiehAuf={chatfenster.ziehAuf}
           onSchliesse={chatfenster.schliesse}

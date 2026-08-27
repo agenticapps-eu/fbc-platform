@@ -125,13 +125,21 @@ export function ChatFenster({
         ) : gespraech.isLoading ? (
           <p className="flex-1 px-3 py-6 text-sm text-muted">Wird geladen…</p>
         ) : (
-          <Conversation
-            thread={thread}
-            messages={gespraech.messages}
-            myId={myId}
-            onSend={gespraech.sende}
-            variante="fenster"
-          />
+          // `min-h-0 flex-1` ist hier nicht Kosmetik, sondern trägt die
+          // Sendezeile. `Conversation` ist innen `h-full` — also 100 % der
+          // FENSTERhöhe. Ohne diese Hülle stünde sie neben der Titelzeile
+          // statt darunter, und die Sendezeile lag gemessen 32 px UNTER dem
+          // Bildrand. jsdom hat davon nichts gesehen; im Browser fiel es
+          // sofort auf.
+          <div className="min-h-0 flex-1">
+            <Conversation
+              thread={thread}
+              messages={gespraech.messages}
+              myId={myId}
+              onSend={gespraech.sende}
+              variante="fenster"
+            />
+          </div>
         ))}
     </section>
   );

@@ -122,7 +122,12 @@ export function Conversation({
             }
           }}
           rows={1}
-          placeholder="Nachricht schreiben…"
+          // Kürzer im Fenster: bei 14 rem Fensterbreite bleiben der Eingabe
+          // rund 7 rem, und „Nachricht schreiben…" brach dort auf zwei Zeilen
+          // und wurde abgeschnitten (im Browser gesehen). Der ZUGÄNGLICHE Name
+          // bleibt in beiden Varianten derselbe — er beschreibt die Aufgabe,
+          // nicht den verfügbaren Platz.
+          placeholder={imFenster ? "Nachricht…" : "Nachricht schreiben…"}
           aria-label="Nachricht schreiben"
           className={cn(
             "max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-md border border-line bg-canvas py-2.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none",
