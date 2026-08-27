@@ -72,6 +72,7 @@ profile_interests/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_theme_scores/authenticated=DELETE,INSERT,SELECT,UPDATE
 profiles/authenticated=SELECT
 profiles_public/authenticated=SELECT
+release_entry_skips/authenticated=DELETE,INSERT,SELECT
 release_notes/authenticated=INSERT,SELECT,UPDATE
 routing_queue/authenticated=SELECT
 staff_roles/authenticated=SELECT
@@ -100,6 +101,20 @@ thread_read_positions/authenticated=INSERT,SELECT,UPDATE$$,
 -- `release_notes_admin_edit` laesst es nur fuer Admins UND nur auf Zeilen mit
 -- `status = 'draft'` zu, in `using` UND `with check`. Der Wechsel auf `sent`
 -- gehoert allein `send_release_note()`.
+
+-- AGE-636 hat `release_entry_skips` dazugelegt, und die Zeile ist die
+-- SPIEGELUNG der darueber: hier steht ein DELETE und kein UPDATE, dort ein
+-- UPDATE und kein DELETE. Beides folgt aus derselben Frage — was passiert,
+-- wenn die Zeile verschwindet?
+--
+-- Eine zugestellte Mitteilung zu loeschen liesse siebzig Hinweise ohne Bezug
+-- zurueck; deshalb dort kein DELETE. Eine Markierung „nicht relevant" hat
+-- nichts verschickt: ihre Ruecknahme ist der Normalfall, und weil `slug` der
+-- Primaerschluessel ist, ist sie genau dieselbe Zeile. Ein UPDATE braucht es
+-- dafuer nicht — an einer Markierung gibt es nichts zu aendern.
+--
+-- Kein `anon`: was ein Admin fuer nicht mitteilenswert haelt, geht einen
+-- ausgeloggten Besucher nichts an.
 
 -- AGE-582 hat `post_saves` dazugelegt — eine private Merkliste, und die Zeile
 -- sagt vor allem, was NICHT darauf steht: kein UPDATE. An einer Speicherung

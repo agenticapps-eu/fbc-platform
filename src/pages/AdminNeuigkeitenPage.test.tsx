@@ -32,14 +32,20 @@ const { tagVor } = vi.hoisted(() => ({
 type Note = import("../lib/release-notes").ReleaseNote;
 
 const fetchEntwuerfe = vi.fn<() => Promise<Note[]>>();
-const fetchZugestellte = vi.fn<() => Promise<Note[]>>();
+const fetchAngekuendigt = vi.fn<() => Promise<Note[]>>();
+const fetchUebersprungene = vi.fn<() => Promise<string[]>>();
+const markiereUebersprungen = vi.fn<(slug: string) => Promise<void>>();
+const holeZurueck = vi.fn<(slug: string) => Promise<void>>();
 const speichereEntwurf = vi.fn();
 const stelleZu = vi.fn<(id: string) => Promise<number>>();
 
 vi.mock("../lib/release-notes", async (original) => ({
   ...(await original<typeof import("../lib/release-notes")>()),
   fetchEntwuerfe: () => fetchEntwuerfe(),
-  fetchZugestellte: () => fetchZugestellte(),
+  fetchAngekuendigt: () => fetchAngekuendigt(),
+  fetchUebersprungene: () => fetchUebersprungene(),
+  markiereUebersprungen: (slug: string) => markiereUebersprungen(slug),
+  holeZurueck: (slug: string) => holeZurueck(slug),
   speichereEntwurf: (e: unknown) => speichereEntwurf(e),
   stelleZu: (id: string) => stelleZu(id),
 }));
@@ -104,12 +110,35 @@ function renderPage() {
   );
 }
 
+/**
+ * Der Bestand der Attrappe. **Schreiben wirkt hier auf das nächste Lesen** —
+ * sonst prüfte der Test nur, ob die Fläche ihren eigenen Zustand aufräumt, und
+ * bliebe grün, wenn genau dieses Aufräumen die einzige Mechanik wäre. Der echte
+ * Weg ist: schreiben → Abfrage entwerten → neu lesen → neu rechnen.
+ */
+let uebersprungen: string[] = [];
+
 beforeEach(() => {
+  uebersprungen = [];
   fetchEntwuerfe.mockReset().mockResolvedValue([]);
-  fetchZugestellte.mockReset().mockResolvedValue([]);
+  fetchAngekuendigt.mockReset().mockResolvedValue([]);
+  fetchUebersprungene.mockReset().mockImplementation(() => Promise.resolve([...uebersprungen]));
+  markiereUebersprungen.mockReset().mockImplementation((slug) => {
+    uebersprungen.push(slug);
+    return Promise.resolve();
+  });
+  holeZurueck.mockReset().mockImplementation((slug) => {
+    uebersprungen = uebersprungen.filter((s) => s !== slug);
+    return Promise.resolve();
+  });
   speichereEntwurf.mockReset().mockResolvedValue(note({ id: "gespeichert" }));
   stelleZu.mockReset().mockResolvedValue(74);
 });
+
+/** Das Kästchen „nicht relevant" einer Zeile. Eigener Name, damit die Zeile
+ *  zwei unterscheidbare Bedienelemente hat — `/Glocke verdrahtet/` allein wäre
+ *  ab jetzt mehrdeutig. */
+const nichtRelevant = (titel: string) => screen.getByLabelText(`Nicht relevant: ${titel}`);
 
 describe("Was zur Auswahl steht", () => {
   it("listet die noch nicht angekündigten Änderungen", async () => {
@@ -119,13 +148,16 @@ describe("Was zur Auswahl steht", () => {
   });
 
   it("lässt aus, was eine ZUGESTELLTE Note schon abdeckt", async () => {
-    fetchZugestellte.mockResolvedValue([
+    fetchAngekuendigt.mockResolvedValue([
       note({ id: "n9", status: "sent", entry_slugs: [`${tagVor(0)}-glocke`] }),
     ]);
     renderPage();
 
     expect(await screen.findByText("Feed blättert")).toBeInTheDocument();
-    expect(screen.queryByText("Glocke verdrahtet")).not.toBeInTheDocument();
+    // Seit AGE-636 verschwindet es nicht spurlos, sondern wandert ins Archiv.
+    // Die Zusage lautet deshalb auf die AUSWAHL: kein Kästchen mehr.
+    expect(screen.queryByLabelText(/^Glocke verdrahtet/)).not.toBeInTheDocument();
+    expect(screen.getByText("Glocke verdrahtet")).toBeInTheDocument();
   });
 
   it("lässt NICHTS aus, was nur in einem Entwurf steht", async () => {
@@ -143,24 +175,24 @@ describe("Was zur Auswahl steht", () => {
 describe("Was beim Öffnen vorangehakt ist", () => {
   it("hakt die letzte Woche an und älteres nicht", async () => {
     renderPage();
-    await screen.findByLabelText(/Glocke verdrahtet/);
+    await screen.findByLabelText(/^Glocke verdrahtet/);
 
-    expect(screen.getByLabelText(/Glocke verdrahtet/)).toBeChecked();
-    expect(screen.getByLabelText(/Feed blättert/)).toBeChecked();
+    expect(screen.getByLabelText(/^Glocke verdrahtet/)).toBeChecked();
+    expect(screen.getByLabelText(/^Feed blättert/)).toBeChecked();
     // Die Positivkontrolle zur Verneinung: der alte Eintrag STEHT in der
     // Liste. Verschwände er, sähe eine verkürzte Liste aus wie eine
     // vollständige — und niemand kündigte ihn je an.
-    expect(screen.getByLabelText(/Damals gebaut/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Damals gebaut/)).not.toBeChecked();
+    expect(screen.getByLabelText(/^Damals gebaut/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Damals gebaut/)).not.toBeChecked();
     expect(screen.getByRole("button", { name: /Aus 2 Änderungen/ })).toBeInTheDocument();
   });
 
   it("lässt sich abwählen", async () => {
     renderPage();
-    fireEvent.click(await screen.findByLabelText(/Glocke verdrahtet/));
+    fireEvent.click(await screen.findByLabelText(/^Glocke verdrahtet/));
 
-    expect(screen.getByLabelText(/Glocke verdrahtet/)).not.toBeChecked();
-    expect(screen.getByLabelText(/Feed blättert/)).toBeChecked();
+    expect(screen.getByLabelText(/^Glocke verdrahtet/)).not.toBeChecked();
+    expect(screen.getByLabelText(/^Feed blättert/)).toBeChecked();
     expect(screen.getByRole("button", { name: /Aus 1 Änderungen/ })).toBeInTheDocument();
   });
 
@@ -170,7 +202,7 @@ describe("Was beim Öffnen vorangehakt ist", () => {
     // unterscheiden, stünden sofort wieder Häkchen da — und der nächste Klick
     // auf „zustellen" schickte dieselben Änderungen ein zweites Mal los.
     renderPage();
-    await screen.findByLabelText(/Glocke verdrahtet/);
+    await screen.findByLabelText(/^Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
     fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
     const knopf = screen.getByRole("button", { name: /zustellen/ });
@@ -178,8 +210,8 @@ describe("Was beim Öffnen vorangehakt ist", () => {
     fireEvent.click(knopf);
 
     await waitFor(() => expect(stelleZu).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByLabelText(/Glocke verdrahtet/)).not.toBeChecked());
-    expect(screen.getByLabelText(/Feed blättert/)).not.toBeChecked();
+    await waitFor(() => expect(screen.getByLabelText(/^Glocke verdrahtet/)).not.toBeChecked());
+    expect(screen.getByLabelText(/^Feed blättert/)).not.toBeChecked();
   });
 });
 
@@ -187,7 +219,7 @@ describe("Aus mehreren Änderungen wird EINE Nachricht", () => {
   it("fasst die Auswahl zu einem Entwurf zusammen", async () => {
     renderPage();
     // Die beiden jungen sind vorangehakt — geklickt wird nur, was dazukommt.
-    await screen.findByLabelText(/Glocke verdrahtet/);
+    await screen.findByLabelText(/^Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
 
     const feld = screen.getByLabelText(/Text — so, wie ein Mitglied/) as HTMLTextAreaElement;
@@ -199,7 +231,7 @@ describe("Aus mehreren Änderungen wird EINE Nachricht", () => {
 
   it("stellt den GEÄNDERTEN Text zu, nicht den vorgeschlagenen", async () => {
     renderPage();
-    await screen.findByLabelText(/Glocke verdrahtet/);
+    await screen.findByLabelText(/^Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
 
     fireEvent.change(screen.getByLabelText(/Text — so, wie ein Mitglied/), {
@@ -225,7 +257,7 @@ describe("Zustellen", () => {
     // `findBy`, nicht `getBy`: der Zustell-Knopf steht sofort da, die Liste der
     // Änderungen kommt erst mit der Abfrage. Ein `getBy` misst hier den
     // Ladezustand und nicht die Fläche.
-    await screen.findByLabelText(/Glocke verdrahtet/);
+    await screen.findByLabelText(/^Glocke verdrahtet/);
     fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
     fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
 
@@ -238,13 +270,201 @@ describe("Zustellen", () => {
     renderPage();
     await screen.findByText("Glocke verdrahtet");
 
-    // Die einzigen Auswahlkästchen auf dieser Fläche sind die der Änderungen.
-    // Ein Kästchen mit einem Mitgliedsnamen daran wäre genau die Fläche, die
-    // AGE-304 verboten hat.
+    // Die einzigen Auswahlkästchen auf dieser Fläche sind die der Änderungen —
+    // seit AGE-636 zwei je Zeile: aufnehmen und „nicht relevant". Ein Kästchen
+    // mit einem Mitgliedsnamen daran wäre genau die Fläche, die AGE-304
+    // verboten hat.
     const kaesten = screen.getAllByRole("checkbox");
-    expect(kaesten).toHaveLength(3);
+    expect(kaesten).toHaveLength(6);
     expect(screen.queryByText(/Empfänger/)).not.toBeInTheDocument();
     // Positivkontrolle: der Kreis wird trotzdem benannt, nur nicht gewählt.
     expect(screen.getByRole("button", { name: /alle aktivierten Mitglieder/ })).toBeInTheDocument();
+  });
+});
+
+describe("Nicht relevant — das zweite Kästchen (AGE-636)", () => {
+  it("markiert und nimmt den Eintrag zugleich aus der Auswahl", async () => {
+    renderPage();
+    await screen.findByLabelText(/^Glocke verdrahtet/);
+    // Vorangehakt ist er, weil er von heute ist — genau der gefährliche Fall.
+    expect(screen.getByLabelText(/^Glocke verdrahtet/)).toBeChecked();
+
+    fireEvent.click(nichtRelevant("Glocke verdrahtet"));
+
+    await waitFor(() => expect(markiereUebersprungen).toHaveBeenCalledWith(`${tagVor(0)}-glocke`));
+    // Die Zusage ist NICHT „das Kästchen ist leer", sondern „er landet nicht in
+    // der Mitteilung". Gemessen wird deshalb am Entwurf.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Aus 1 Änderungen/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
+    const feld = screen.getByLabelText(/Text — so, wie ein Mitglied/) as HTMLTextAreaElement;
+    expect(feld.value).not.toContain("Glocke verdrahtet");
+    expect(feld.value).toContain("Feed blättert");
+  });
+
+  it("sperrt das Zustellen, wenn nach dem SPEICHERN markiert wurde", async () => {
+    // Der Fund der Fremd-Review (codex, HIGH): `stelleZu(id)` liest die Zeile in
+    // der Datenbank, nicht den Bildschirm. Ohne diese Sperre verschickte
+    // „speichern → markieren → zustellen" genau den Eintrag, den der Admin
+    // gerade aussortiert hat.
+    renderPage();
+    await screen.findByLabelText(/^Glocke verdrahtet/);
+    fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+
+    const knopf = screen.getByRole("button", { name: /zustellen/ });
+    await waitFor(() => expect(knopf).not.toBeDisabled());
+
+    fireEvent.click(nichtRelevant("Glocke verdrahtet"));
+
+    await waitFor(() => expect(knopf).toBeDisabled());
+    fireEvent.click(knopf);
+    expect(stelleZu).not.toHaveBeenCalled();
+  });
+
+  it("sperrt das Zustellen auch, wenn nur der TEXT noch zur alten Auswahl passt", async () => {
+    // Der Weg, den `unveraendert` allein nicht schliesst: Entwurf machen →
+    // markieren → ERNEUT speichern. Danach stimmen die `entry_slugs`, der
+    // Fliesstext nennt die aussortierte Änderung aber weiterhin — und die
+    // Mitglieder läsen von etwas, das ausdrücklich raus sollte.
+    // (Fremd-Review auf dem Diff, opencode, MEDIUM.)
+    renderPage();
+    await screen.findByLabelText(/^Glocke verdrahtet/);
+    fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
+
+    fireEvent.click(nichtRelevant("Glocke verdrahtet"));
+    await waitFor(() =>
+      expect(screen.queryByLabelText(/^Glocke verdrahtet/)).not.toBeInTheDocument(),
+    );
+
+    // Der Text nennt sie noch — und genau das meldet die Fläche.
+    expect(
+      (screen.getByLabelText(/Text — so, wie ein Mitglied/) as HTMLTextAreaElement).value,
+    ).toContain("Glocke verdrahtet");
+    expect(screen.getByText(/stammt noch von einer anderen Auswahl/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+    await waitFor(() => expect(speichereEntwurf).toHaveBeenCalled());
+
+    // Gespeichert ist gespeichert — trotzdem bleibt zugestellt gesperrt.
+    expect(screen.getByRole("button", { name: /zustellen/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /zustellen/ }));
+    expect(stelleZu).not.toHaveBeenCalled();
+  });
+
+  it("schickt beim Speichern den Stand von DAMALS, nicht den vom Antwortzeitpunkt", async () => {
+    // `onSuccess` liest sonst den Bildschirm zum Zeitpunkt der Antwort: wer
+    // während des Speicherns weitertippt, bekäme seinen NEUEN Stand als
+    // „gespeichert" quittiert, während in der Datenbank der alte steht.
+    // (Fremd-Review auf dem Diff, codex, HIGH.)
+    let aufloesen: ((n: unknown) => void) | undefined;
+    speichereEntwurf.mockImplementation(
+      () =>
+        new Promise((r) => {
+          aufloesen = r;
+        }),
+    );
+    renderPage();
+    await screen.findByLabelText(/^Glocke verdrahtet/);
+    fireEvent.click(screen.getByRole("button", { name: /Entwurf machen/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+    // react-query ruft die Mutation erst im nächsten Mikrotask — ohne dieses
+    // Abwarten gäbe es den Auflöser noch gar nicht.
+    await waitFor(() => expect(speichereEntwurf).toHaveBeenCalled());
+
+    // Während die Antwort noch aussteht, wird weitergetippt.
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Nachträglich" } });
+    aufloesen!(note({ id: "gespeichert" }));
+
+    // Der Bildschirm weicht jetzt vom gespeicherten Stand ab — also gesperrt.
+    await waitFor(() => expect(screen.getByRole("button", { name: /zustellen/ })).toBeDisabled());
+    expect(screen.getByText("Erst speichern, dann zustellen.")).toBeInTheDocument();
+  });
+
+  it("lässt den Eintrag stehen, wenn das Markieren fehlschlägt", async () => {
+    // Kein optimistisches Umschalten: eine Zeile, die verschwindet und beim
+    // nächsten Laden wiederkommt, ist schlimmer als eine, die stehen bleibt.
+    markiereUebersprungen.mockRejectedValue(new Error("keine Verbindung"));
+    renderPage();
+    await screen.findByLabelText(/^Glocke verdrahtet/);
+
+    fireEvent.click(nichtRelevant("Glocke verdrahtet"));
+
+    expect(await screen.findByText(/Nicht markiert/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Glocke verdrahtet/)).toBeInTheDocument();
+  });
+});
+
+describe("Das Archiv (AGE-636)", () => {
+  /** Eine zugestellte Note, die „Glocke verdrahtet" abdeckt. */
+  const zugestellteNote = () =>
+    note({
+      id: "n9",
+      status: "sent",
+      title: "Neu in der App",
+      sent_at: "2026-08-20T09:00:00Z",
+      entry_slugs: [`${tagVor(0)}-glocke`],
+    });
+
+  it("beginnt zugeklappt und trägt die Zahl im Kopf", async () => {
+    uebersprungen.push(`${tagVor(40)}-damals`);
+    fetchAngekuendigt.mockResolvedValue([zugestellteNote()]);
+    renderPage();
+
+    const kopf = await screen.findByText(/Archiv \(2\)/);
+    // jsdom hält den Inhalt eines `<details>` auch zugeklappt im Baum — die
+    // Zusage lautet deshalb auf das Attribut, nicht auf die Sichtbarkeit.
+    expect(kopf.closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("nennt bei Zugestelltem die Mitteilung und das Datum — und bietet KEINEN Weg zurück", async () => {
+    fetchAngekuendigt.mockResolvedValue([zugestellteNote()]);
+    renderPage();
+
+    await screen.findByText(/Archiv \(1\)/);
+    // Datum UND Titel in einer Zusage: `2026-08-20` allein steht auch in der
+    // Karte „Bereits zugestellt" und wäre dort schon erfüllt, ohne dass das
+    // Archiv es je nennt.
+    expect(screen.getByText(/zugestellt 2026-08-20 · „Neu in der App"/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zurück in die Liste/ })).not.toBeInTheDocument();
+  });
+
+  it("holt eine als nicht relevant markierte Änderung zurück", async () => {
+    uebersprungen.push(`${tagVor(40)}-damals`);
+    renderPage();
+
+    await screen.findByText(/Archiv \(1\)/);
+    expect(screen.queryByLabelText(/^Damals gebaut/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Zurück in die Liste/ }));
+
+    await waitFor(() => expect(holeZurueck).toHaveBeenCalledWith(`${tagVor(40)}-damals`));
+  });
+
+  it("nennt KEINE Zahl, solange die Grundlage fehlt", async () => {
+    // Sonst wanderte die Lüge nur eine Karte tiefer: „Noch nichts archiviert."
+    // als Tatsachenbehauptung, während gerade die abgeräumten Einträge nicht
+    // geladen werden konnten. (Fremd-Review auf dem Diff, opencode, MEDIUM.)
+    fetchUebersprungene.mockRejectedValue(new Error("keine Verbindung"));
+    renderPage();
+
+    expect(await screen.findByText(/nicht sagen, was archiviert ist/)).toBeInTheDocument();
+    expect(screen.queryByText(/Archiv \(/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Noch nichts archiviert.")).not.toBeInTheDocument();
+  });
+
+  it("bleibt zu, wenn die Markierungen nicht geladen werden können", async () => {
+    // Fail-closed: ein Ausfall, der als „nichts markiert" durchgeht, stellt
+    // gerade die abgeräumten Einträge wieder zur Wahl — die jüngeren davon
+    // vorangehakt.
+    fetchUebersprungene.mockRejectedValue(new Error("keine Verbindung"));
+    renderPage();
+
+    expect(
+      await screen.findByText(/lässt sich nicht sagen, was noch offen ist/),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Glocke verdrahtet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Entwurf machen/ })).not.toBeInTheDocument();
   });
 });

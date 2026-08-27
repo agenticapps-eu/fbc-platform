@@ -23,6 +23,10 @@ interface Aufruf {
   order?: { spalte: string; ascending?: boolean; nullsFirst?: boolean }[];
   range?: [number, number];
   args?: unknown;
+  /** Die Optionen des `upsert` — `ignoreDuplicates` ist der einzige Weg zu
+   *  `on conflict do nothing`, und den prüft ein Test. */
+  optionen?: unknown;
+  geloescht?: boolean;
 }
 
 let aufrufe: Aufruf[] = [];
@@ -50,8 +54,13 @@ vi.mock("./supabase", () => ({
           eintrag.range = [von, bis];
           return kette;
         },
-        upsert: (werte: unknown) => {
+        upsert: (werte: unknown, optionen?: unknown) => {
           eintrag.args = werte;
+          eintrag.optionen = optionen;
+          return kette;
+        },
+        delete: () => {
+          eintrag.geloescht = true;
           return kette;
         },
         single: () => kette,
@@ -71,9 +80,13 @@ import {
   RELEASE_NOTES_SEITE,
   ausLetzterWoche,
   fetchEntwuerfe,
+  fetchAngekuendigt,
+  fetchUebersprungene,
   fetchZugestellte,
-  nochNichtAngekuendigt,
+  holeZurueck,
+  markiereUebersprungen,
   stelleZu,
+  teileAuf,
 } from "./release-notes";
 import type { ReleaseEintrag } from "../types/release";
 
@@ -86,31 +99,95 @@ beforeEach(() => {
   zeilen = [];
 });
 
-describe("nochNichtAngekuendigt — was der Admin zu sehen bekommt", () => {
+/** Eine zugestellte Note, verkürzt auf das, was `teileAuf` braucht. */
+function zugestellt(titel: string, am: string | null, slugs: string[]) {
+  return { status: "sent", title: titel, sent_at: am, entry_slugs: slugs };
+}
+
+describe("teileAuf — was in der Liste steht und was im Archiv", () => {
   const alle = [eintrag("2026-08-27-a"), eintrag("2026-08-26-b"), eintrag("2026-08-25-c")];
 
-  it("zieht die Slugs ZUGESTELLTER Notes ab", () => {
-    const offen = nochNichtAngekuendigt(alle, [{ status: "sent", entry_slugs: ["2026-08-26-b"] }]);
+  it("zieht die Slugs ZUGESTELLTER Notes aus der Liste — und legt sie ins Archiv", () => {
+    const { offen, archiv } = teileAuf(
+      alle,
+      [zugestellt("Neu in der App", "2026-08-26T09:00:00Z", ["2026-08-26-b"])],
+      [],
+    );
     expect(offen.map((e) => e.slug)).toEqual(["2026-08-27-a", "2026-08-25-c"]);
+    expect(archiv).toEqual([
+      {
+        eintrag: alle[1],
+        grund: { art: "zugestellt", titel: "Neu in der App", am: "2026-08-26T09:00:00Z" },
+      },
+    ]);
   });
 
   it("zieht die Slugs eines ENTWURFS NICHT ab", () => {
     // Sonst verschwände ein Change, sobald ihn jemand in einen Entwurf gezogen
     // und den Entwurf liegen gelassen hat — für immer unangekündigt.
-    const offen = nochNichtAngekuendigt(alle, [{ status: "draft", entry_slugs: ["2026-08-26-b"] }]);
+    const { offen, archiv } = teileAuf(
+      alle,
+      [{ status: "draft", title: "Liegengeblieben", sent_at: null, entry_slugs: ["2026-08-26-b"] }],
+      [],
+    );
     expect(offen.map((e) => e.slug)).toEqual(["2026-08-27-a", "2026-08-26-b", "2026-08-25-c"]);
+    expect(archiv).toEqual([]);
   });
 
   it("kommt mit mehreren Notes und Überschneidungen zurecht", () => {
-    const offen = nochNichtAngekuendigt(alle, [
-      { status: "sent", entry_slugs: ["2026-08-26-b", "2026-08-25-c"] },
-      { status: "sent", entry_slugs: ["2026-08-25-c"] },
-    ]);
+    const { offen } = teileAuf(
+      alle,
+      [
+        zugestellt("Erste", "2026-08-25T09:00:00Z", ["2026-08-26-b", "2026-08-25-c"]),
+        zugestellt("Zweite", "2026-08-26T09:00:00Z", ["2026-08-25-c"]),
+      ],
+      [],
+    );
     expect(offen.map((e) => e.slug)).toEqual(["2026-08-27-a"]);
   });
 
-  it("gibt ohne Notes alles zurück", () => {
-    expect(nochNichtAngekuendigt(alle, [])).toHaveLength(3);
+  it("nennt bei zwei Zustellungen die FRÜHERE — unabhängig von der Reihenfolge", () => {
+    // Ohne diese Zusage entschiede ein `find()`, und die Antwort hinge still an
+    // der Sortierung der Abfrage. Deshalb dieselbe Rechnung zweimal, mit
+    // umgedrehter Eingabe.
+    const frueh = zugestellt("Die frühe", "2026-08-25T09:00:00Z", ["2026-08-26-b"]);
+    const spaet = zugestellt("Die späte", "2026-08-27T09:00:00Z", ["2026-08-26-b"]);
+
+    for (const notes of [
+      [frueh, spaet],
+      [spaet, frueh],
+    ]) {
+      const { archiv } = teileAuf(alle, notes, []);
+      expect(archiv[0].grund).toEqual({
+        art: "zugestellt",
+        titel: "Die frühe",
+        am: "2026-08-25T09:00:00Z",
+      });
+    }
+  });
+
+  it("legt Übersprungenes ins Archiv, mit eigenem Grund", () => {
+    const { offen, archiv } = teileAuf(alle, [], ["2026-08-25-c"]);
+    expect(offen.map((e) => e.slug)).toEqual(["2026-08-27-a", "2026-08-26-b"]);
+    expect(archiv).toEqual([{ eintrag: alle[2], grund: { art: "nicht-relevant" } }]);
+  });
+
+  it("lässt ZUGESTELLT gegen NICHT RELEVANT gewinnen", () => {
+    // Ein verschickter Eintrag ist verschickt, egal was vorher jemand angehakt
+    // hat — und nur so bleibt „kein Weg zurück" wahr.
+    const { archiv } = teileAuf(
+      alle,
+      [zugestellt("Neu in der App", "2026-08-26T09:00:00Z", ["2026-08-26-b"])],
+      ["2026-08-26-b"],
+    );
+    expect(archiv).toHaveLength(1);
+    expect(archiv[0].grund.art).toBe("zugestellt");
+  });
+
+  it("gibt ohne Notes und ohne Markierungen alles als offen zurück", () => {
+    const { offen, archiv } = teileAuf(alle, [], []);
+    expect(offen).toHaveLength(3);
+    expect(archiv).toEqual([]);
   });
 });
 
@@ -170,6 +247,40 @@ describe("Die Abfragen", () => {
     expect(a.order).toEqual([{ spalte: "sent_at", ascending: false, nullsFirst: false }]);
     // Eine Grenze gehört in die ERSTE Fassung jeder listenden Fläche.
     expect(a.range).toEqual([0, RELEASE_NOTES_SEITE - 1]);
+  });
+
+  it("holt für die Admin-Fläche ALLE Zugestellten — ohne Seite und ohne body", async () => {
+    // Die Rechnung „was ist archiviert" braucht die vollständige Menge. Eine
+    // Seite wäre von „nicht angekündigt" nicht zu unterscheiden und holte
+    // Einträge stillschweigend zurück in die Liste (Fremd-Review, HIGH).
+    await fetchAngekuendigt();
+    const a = aufrufe.find((x) => x.table === "release_notes")!;
+    expect(a.eq).toContainEqual(["status", "sent"]);
+    expect(a.range).toBeUndefined();
+    expect(a.select).not.toContain("body");
+  });
+
+  it("liest die Markierungen aus der eigenen Tabelle", async () => {
+    await fetchUebersprungene();
+    expect(aufrufe.some((x) => x.table === "release_entry_skips")).toBe(true);
+  });
+
+  it("markiert über upsert mit ignoreDuplicates — und schickt NUR den Slug", async () => {
+    // `insert()` kann `on conflict do nothing` gar nicht ausdrücken; zwei
+    // Admins gleichzeitig bekämen sonst einen 23505 zu sehen, wo nichts
+    // gestört ist. Und `skipped_by` gehört der Datenbank: die Policy verlangt
+    // `= auth.uid()`, ein mitgeschickter Wert würde abgewiesen.
+    await markiereUebersprungen("2026-08-27-a");
+    const a = aufrufe.find((x) => x.table === "release_entry_skips")!;
+    expect(a.args).toEqual({ slug: "2026-08-27-a" });
+    expect(a.optionen).toEqual({ onConflict: "slug", ignoreDuplicates: true });
+  });
+
+  it("holt über DELETE auf den Slug zurück", async () => {
+    await holeZurueck("2026-08-27-a");
+    const a = aufrufe.find((x) => x.table === "release_entry_skips")!;
+    expect(a.geloescht).toBe(true);
+    expect(a.eq).toContainEqual(["slug", "2026-08-27-a"]);
   });
 
   it("stellt über die RPC zu, nicht über ein UPDATE", async () => {
