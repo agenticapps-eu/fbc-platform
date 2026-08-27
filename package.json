@@ -29,6 +29,8 @@
     "demo:reset": "infisical run --env=dev -- env DEMO_SEED_MODE=reset tsx supabase/seed/demo_seed.ts"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
     "@hookform/resolvers": "^5.9.1",
     "@sentry/react": "^10.71.0",
     "@supabase/supabase-js": "^2.112.4",

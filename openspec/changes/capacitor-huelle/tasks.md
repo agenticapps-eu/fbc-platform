@@ -12,25 +12,25 @@ Riskanteste zuerst, solange es noch im Browser prüfbar ist.
 Die einzige Änderung an bestehendem Code, die schiefgehen kann. Sie kommt
 allein und zuerst.
 
-- [ ] `@capacitor/core` und `@capacitor/preferences` als Abhängigkeit. Beide
+- [x] `@capacitor/core` und `@capacitor/preferences` als Abhängigkeit. Beide
       sind reine npm-Pakete; für diesen Schritt ist kein natives SDK nötig.
-- [ ] **RED**: Test — im Web geht `auth.storage` auf `window.localStorage`,
+- [x] **RED**: Test — im Web geht `auth.storage` auf `window.localStorage`,
       **mit demselben `storageKey`** wie bisher. Der Test liest den Schlüssel,
       unter dem eine bestehende Sitzung liegt, und verlangt, dass der Client sie
       danach findet. *Positivkontrolle:* mit einem geänderten Schlüssel muss
       derselbe Test rot werden — sonst prüft er nur, dass irgendetwas liest.
-- [ ] **RED**: Test — nativ liest und schreibt der Adapter über `Preferences`,
+- [x] **RED**: Test — nativ liest und schreibt der Adapter über `Preferences`,
       und `getItem` gibt den Wert zurück, den `setItem` gelegt hat.
-- [ ] **RED**: Test — `removeItem` entfernt den Eintrag **tatsächlich**. Ein
+- [x] **RED**: Test — `removeItem` entfernt den Eintrag **tatsächlich**. Ein
       Adapter, dessen Löschen ins Leere läuft, ergäbe ein Konto, das sich nicht
       abmelden lässt.
-- [ ] **`auth.storageKey` auf den heute geltenden Wert festnageln.** Bisher ist
+- [x] **`auth.storageKey` auf den heute geltenden Wert festnageln.** Bisher ist
       er der Default der Bibliothek; ein Minor-Upgrade von
       `@supabase/supabase-js`, das das Format ändert, meldete alle Web-Mitglieder
       ab. Der Test darf den Schlüssel **nicht gegen sich selbst** prüfen — er
       trägt den erwarteten Wert als Literal, sonst wandern beide Seiten
       gemeinsam.
-- [ ] Weiche in `src/lib/supabase.ts`: `Capacitor.isNativePlatform()` entscheidet.
+- [x] Weiche in `src/lib/supabase.ts`: `Capacitor.isNativePlatform()` entscheidet.
       Im Web-Zweig **kein** Wrapper — `localStorage` unverändert durchreichen.
 - [ ] **Beleg (Browser, nicht jsdom):** vor dem Umbau anmelden, umbauen, Seite
       neu laden, weiterhin angemeldet. Das ist die Abnahme aus dem Issue, und
