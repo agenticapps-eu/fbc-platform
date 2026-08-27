@@ -8,8 +8,11 @@ const invoke = vi.fn();
 vi.mock("../lib/supabase", () => ({
   supabase: { functions: { invoke: (...a: unknown[]) => invoke(...a) } },
 }));
+// Veränderlich, weil eine der Zusagen von der Stufe des Betrachters abhängt:
+// wer schon `impact` trägt, bekommt gar keine Preise zu sehen.
+let auth: { tier: string; levelRank: number } = { tier: "discover", levelRank: 3 };
 vi.mock("../providers/auth-context", () => ({
-  useAuth: () => ({ tier: "discover", levelRank: 3 }),
+  useAuth: () => auth,
 }));
 
 function renderPage() {
@@ -26,6 +29,7 @@ describe("MitgliedschaftPage", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockResolvedValue({ data: { url: "https://stripe.test/x" }, error: null });
+    auth = { tier: "discover", levelRank: 3 };
   });
 
   it("zeigt alle 6 Stufen als Karten", () => {
@@ -105,6 +109,35 @@ describe("MitgliedschaftPage", () => {
       value: originalLocation,
       writable: true,
       configurable: true,
+    });
+  });
+
+  describe("Wer schon impact trägt", () => {
+    // Der WP-Import legt jedes übernommene Mitglied auf `impact` an. Eine
+    // Preistabelle mit vier zahlenden Stufen, von denen keine für es gilt, ist
+    // für diesen Kreis keine Information, sondern eine Aufforderung ins Leere.
+    beforeEach(() => {
+      auth = { tier: "impact", levelRank: 6 };
+    });
+
+    it("sieht keine einzige Preiskarte", () => {
+      renderPage();
+      for (const key of ["basic", "connect", "discover", "exchange", "focus", "impact"])
+        expect(screen.queryByTestId(`level-${key}`)).not.toBeInTheDocument();
+    });
+
+    it("sieht auch den Jahr/Monat-Schalter nicht", () => {
+      // Der Schalter ohne Karten wäre ein Bedienelement ohne Wirkung.
+      renderPage();
+      expect(screen.queryByRole("button", { name: "Jährlich" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Monatlich" })).not.toBeInTheDocument();
+    });
+
+    it("sieht weiterhin die eigene Mitgliedschaft", () => {
+      // Die Positivkontrolle zur Verneinung: die Seite ist nicht leer, sie
+      // beantwortet nur eine andere Frage — „was habe ich?" statt „was kostet was?".
+      renderPage();
+      expect(screen.getByText("Deine Mitgliedschaft")).toBeInTheDocument();
     });
   });
 });
