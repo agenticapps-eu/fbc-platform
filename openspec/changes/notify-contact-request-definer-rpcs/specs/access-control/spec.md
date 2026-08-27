@@ -145,3 +145,27 @@ zur Laufzeit und nur dort, wo niemand hinsieht.
   genau dieser Anfrage gehört
 - **THEN** liefert sie keine Zeile, und weder Zustelladresse noch Anzeigename
   werden preisgegeben
+
+#### Scenario: Die Bindung gilt ungeordnet, die Adresse gehört dem Empfänger
+
+- **WHEN** dieselbe Anfrage einmal als neue Anfrage (Empfänger ist `to_id`) und
+  einmal als Antwort darauf (Empfänger ist `from_id`) gemeldet wird
+- **THEN** trägt die Auskunft **beide** Richtungen, denn Empfänger und Gegenüber
+  tauschen je nach Ereignis die Rollen — ein nach `from_id`/`to_id` **geordnetes**
+  Prädikat verwürfe jede Zusage- und Absage-Mail
+- **AND** die gelieferte Zustelladresse gehört immer der **als Empfänger
+  übergebenen** Kennung, damit ein Vertauschen der beiden Parameter nicht die
+  Adresse des jeweils anderen preisgibt
+
+#### Scenario: Eine fehlende Zustelladresse ist von einer verletzten Bindung unterscheidbar
+
+- **WHEN** die Anfrage existiert und die Bindung stimmt, der Empfänger aber
+  keine Zustelladresse hinterlegt hat
+- **THEN** liefert die Auskunft **eine** Zeile mit leerer Adresse — nicht
+  „keine Zeile"
+- **AND** der Aufrufer behandelt das weiterhin als erledigten Normalfall und
+  nicht als Abweichung, denn beides zu vermengen verwandelte eine fehlende
+  Adresse in einen Wiederholungslauf
+- **AND** dasselbe gilt für einen fehlenden Anzeigenamen des Gegenübers: die
+  Zeile kommt, das Feld ist leer, und die Vorlage fällt auf ihren allgemeinen
+  Wortlaut zurück
