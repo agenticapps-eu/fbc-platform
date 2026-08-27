@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(14);
+select plan(15);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -249,8 +249,15 @@ suchbegriff_zu_tsquery(p_query text)$$,
 -- Ohne sie waere die Liste dort blind, wo eine Rolle das Recht ohnehin nie hielt.
 -- Die Wegwerf-Funktion wird angelegt, ihr Recht entzogen und wieder erteilt; beide
 -- Richtungen werden gemessen. Laeuft in der Testtransaktion und wird zurueckgerollt.
-
-revoke execute on function public.age602_wegwerf() from public;
+--
+-- GEGENPROBE A ENTZOG BIS ZUM 27.08. NUR `from public` — und behauptete damit,
+-- genau die Formulierung wirke, die AGE-602 im Kopf von
+-- 20260826090000_anon_execute_namentlich_entziehen.sql als unzureichend
+-- beschreibt. Auf dem alten lokalen Stack ging das durch, weil `anon` dort kein
+-- eigenes Recht haelt. Auf einer frisch angelegten Instanz — und PROD IST eine
+-- solche — fiel sie (AGE-622). Eine Gegenprobe, die die falsche Form vorfuehrt,
+-- ist schlimmer als keine: sie schreibt den Irrtum fest, den sie aufdecken soll.
+revoke execute on function public.age602_wegwerf() from public, anon;
 select is(
   has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
   false,
@@ -261,6 +268,22 @@ select is(
   has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
   true,
   'Gegenprobe B: ein erteiltes Recht wird gemessen — die Zusage ist nicht blind');
+
+-- GEGENPROBE C — die Lektion selbst, und zwar instanz-UNABHAENGIG.
+-- Oben haelt `anon` nach B ein ROLLEN-EIGENES Recht (ausdruecklich erteilt, nicht
+-- ueber PUBLIC geerbt). Ein `revoke ... from public` laesst es stehen. Diese
+-- Zusage misst auf JEDER Instanz-Sorte etwas, weil der rollen-eigene Grant hier
+-- hergestellt statt vorausgesetzt wird — anders als die uebrigen Zusagen ueber
+-- nicht genannte Rollen, deren Biss am gepinnten CI-Abbild haengt.
+--
+-- Sie faellt, sobald jemand `revoke ... from public` wieder fuer ausreichend
+-- haelt. Zweimal ist das passiert: AGE-602 (elf Funktionen in PROD) und AGE-622
+-- (`resolve_display_name`, zwei Stunden nach der Regel).
+revoke execute on function public.age602_wegwerf() from public;
+select is(
+  has_function_privilege('anon', 'public.age602_wegwerf()', 'execute'),
+  true,
+  'Gegenprobe C: `from public` allein nimmt einen rollen-eigenen Grant NICHT');
 
 -- ── 8. Die Rechte der von AGE-602 angefassten Funktionen, vollstaendig ──────
 -- Die Liste in Abschnitt 6 deckt nur `anon`. Ein rollen-eigener
