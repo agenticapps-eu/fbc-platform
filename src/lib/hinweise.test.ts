@@ -22,16 +22,25 @@ beforeEach(() => {
  *  die Zusage aus — deshalb ist das Ende der Kette ein `then`-fähiges Objekt.
  *
  *  Namentlich aufgezaehlt statt in einer Schleife: nur so behalten die Attrappen
- *  ihren Typ, und nur dann faellt ein `k.update.mock.calls[0][0]` im Typecheck
- *  auf, statt als `unknown` durchzurutschen. */
+ *  ihren Typ. */
 function kette(ergebnis: unknown) {
+  // Die geschriebenen Werte werden MITGESCHRIEBEN statt ueber
+  // `update.mock.calls[0][0]` gelesen. Zwei Gruende: der Zugriff dort waere
+  // `unknown`, und ein nur zur Typisierung dastehender Parameter faellt in
+  // diesem Repo dem Linter zum Opfer — die Unterstrich-Konvention gilt hier
+  // nicht.
+  const geschrieben: Record<string, unknown>[] = [];
   const glied = {
     select: vi.fn(() => glied),
     eq: vi.fn(() => glied),
     is: vi.fn(() => glied),
     order: vi.fn(() => glied),
     limit: vi.fn(() => glied),
-    update: vi.fn((_werte: Record<string, unknown>) => glied),
+    update: vi.fn((werte: Record<string, unknown>) => {
+      geschrieben.push(werte);
+      return glied;
+    }),
+    geschrieben,
     then: (aufloesen: (w: unknown) => unknown) => Promise.resolve(ergebnis).then(aufloesen),
   };
   return glied;
@@ -73,9 +82,8 @@ describe("hinweise — Datenschicht der Glocke (AGE-620)", () => {
     await markiereHinweisGelesen("hinweis-1");
 
     expect(k.update).toHaveBeenCalledTimes(1);
-    const geschrieben = k.update.mock.calls[0][0] as Record<string, unknown>;
     // Die Policy erlaubt mehr, als die Glocke tun darf. Was sie tut, steht hier.
-    expect(Object.keys(geschrieben)).toEqual(["read_at"]);
+    expect(Object.keys(k.geschrieben[0])).toEqual(["read_at"]);
     expect(k.eq).toHaveBeenCalledWith("id", "hinweis-1");
   });
 
@@ -96,7 +104,7 @@ describe("hinweise — Datenschicht der Glocke (AGE-620)", () => {
 
     await markiereHinweisGelesen("hinweis-1");
 
-    const wert = (k.update.mock.calls[0][0] as { read_at: unknown }).read_at;
+    const wert = k.geschrieben[0].read_at;
     // Eine zweite Uhr im selben Vergleich hat in AGE-583 schon einmal einen
     // Lesestand vor die Nachricht gesetzt. `'now'` ist ein Sonderwert von
     // Postgres und ergibt die Zeit der SERVER-Transaktion — kein `new Date()`,
