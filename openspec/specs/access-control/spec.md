@@ -173,9 +173,17 @@ Zusage SHALL das sagen und keinen weitergehenden Grundsatz behaupten, denn ein
 behaupteter Grundsatz erzeugt Vertrauen, das die Messung nicht trägt.
 
 Konkret: `service_role` hält auf `staff_roles` kein Recht. Ob es auf **anderen**
-Tabellen in `public` Rechte hält, ist damit **nicht** gesagt und heute
-nachweislich offen — `notify-contact-request` liest drei Tabellen als
-`service_role`. Ein Vorgang, der diese Frage schließt, ist eigens zu führen.
+Tabellen in `public` Rechte hält, ist damit **nicht** gesagt und bleibt offen,
+bis ein flächendeckender Entzug ausgesprochen ist.
+
+**Eine Edge Function SHALL nicht darauf bauen, dass `service_role` ein
+Tabellenrecht hält.** Sie liest und schreibt in `public` über
+`SECURITY DEFINER`-Funktionen, die ihr namentlich zugestanden sind. Der Grund
+ist nicht Vorliebe, sondern Messbarkeit: ob `service_role` eigene Grants trägt,
+entscheidet die **Instanz**, nicht dieses Repository — keine Migration erteilt
+sie, und welche Default Privileges eine Instanz mitbringt, hängt von ihrem
+Anlagedatum ab. Ein Weg, der auf einer solchen Eigenschaft steht, scheitert erst
+zur Laufzeit und nur dort, wo niemand hinsieht.
 
 #### Scenario: A new table inherits no client privileges
 
@@ -247,6 +255,46 @@ nachweislich offen — `notify-contact-request` liest drei Tabellen als
 - **AND** die Prüfung trägt eine Gegenprobe, die das Recht erteilt, `true` misst,
   es entzieht und `false` misst — ohne sie wäre die Zusage dort grün, wo die Rolle
   das Recht ohnehin nie hielt
+
+#### Scenario: Eine Edge Function liest public nicht als service_role
+
+- **WHEN** eine Edge Function eine Tabelle in `public` liest oder schreibt
+- **THEN** tut sie es über eine `SECURITY DEFINER`-Funktion, die `service_role`
+  namentlich zugestanden ist
+- **AND** ein direkter Tabellenzugriff mit dem Dienstschlüssel gilt als Befund,
+  auch wenn er auf der Produktivinstanz heute gelingt
+
+#### Scenario: Die Mail-Auskunft bindet Empfänger und Gegenüber an die Zeile
+
+- **WHEN** die Auskunftsfunktion für eine Kontaktanfrage mit einer Empfänger-
+  oder Gegenüber-Kennung gerufen wird, die nicht zu den beiden Beteiligten
+  genau dieser Anfrage gehört
+- **THEN** liefert sie keine Zeile, und weder Zustelladresse noch Anzeigename
+  werden preisgegeben
+
+#### Scenario: Die Bindung gilt ungeordnet, die Adresse gehört dem Empfänger
+
+- **WHEN** dieselbe Anfrage einmal als neue Anfrage (Empfänger ist `to_id`) und
+  einmal als Antwort darauf (Empfänger ist `from_id`) gemeldet wird
+- **THEN** trägt die Auskunft **beide** Richtungen, denn Empfänger und Gegenüber
+  tauschen je nach Ereignis die Rollen — ein nach `from_id`/`to_id` **geordnetes**
+  Prädikat verwürfe jede Zusage- und Absage-Mail
+- **AND** die gelieferte Zustelladresse gehört immer der **als Empfänger
+  übergebenen** Kennung, damit ein Vertauschen der beiden Parameter nicht die
+  Adresse des jeweils anderen preisgibt
+
+#### Scenario: Eine fehlende Zustelladresse ist von einer verletzten Bindung unterscheidbar
+
+- **WHEN** die Anfrage existiert und die Bindung stimmt, der Empfänger aber
+  keine Zustelladresse hinterlegt hat
+- **THEN** liefert die Auskunft **eine** Zeile mit leerer Adresse — nicht
+  „keine Zeile"
+- **AND** der Aufrufer behandelt das weiterhin als erledigten Normalfall und
+  nicht als Abweichung, denn beides zu vermengen verwandelte eine fehlende
+  Adresse in einen Wiederholungslauf
+- **AND** dasselbe gilt für einen fehlenden Anzeigenamen des Gegenübers: die
+  Zeile kommt, das Feld ist leer, und die Vorlage fällt auf ihren allgemeinen
+  Wortlaut zurück
 
 ### Requirement: Helper predicates are the single authority for gating
 
