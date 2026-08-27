@@ -3,9 +3,12 @@ import { useEffect, useRef } from "react";
 
 import {
   fetchUnreadCounts,
+  mergeMessage,
+  messagesQueryKey,
   subscribeToAllMessages,
   threadsQueryKey,
   unreadQueryKey,
+  type ChatMessage,
   type UngelesenStand,
 } from "../../lib/chat";
 
@@ -61,7 +64,20 @@ const ENTPRELLUNG_MS = 400;
  * Nachricht dorthin, überspringt dieses Abo die Neuabfrage — `ChatPage` fragt
  * ohnehin neu ab, und zwar NACH seinem Schreibvorgang.
  */
-export function useUngelesenLive(uid: string | null, offenerPfad: string): void {
+export function useUngelesenLive(
+  uid: string | null,
+  offenerPfad: string,
+  /**
+   * Threads, die dem Mitglied gerade in einem AUFGEZOGENEN Chatfenster
+   * gegenüberliegen (AGE-639). Dieselbe Rolle wie `offenerPfad`, nur für die
+   * zweite Art, ein Gespräch vor sich zu haben.
+   *
+   * **Erforderlich, nicht optional.** Ein Vorgabewert hätte den einen Aufrufer
+   * stillschweigend beim alten Verhalten gelassen — und genau solche
+   * Vorgabewerte entfernt später niemand mehr.
+   */
+  sichtbareThreads: ReadonlySet<string>,
+): void {
   const queryClient = useQueryClient();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Über eine Ref, nicht über die Abhängigkeitsliste: sonst würde jeder
@@ -75,10 +91,41 @@ export function useUngelesenLive(uid: string | null, offenerPfad: string): void 
     pfad.current = offenerPfad;
   }, [offenerPfad]);
 
+  // Aus demselben Grund über eine Ref wie der Pfad: die Menge ändert sich mit
+  // jedem geöffneten Fenster, und stünde sie in der Abhängigkeitsliste, baute
+  // jedes Öffnen den Kanal ab und neu auf.
+  const sichtbar = useRef(sichtbareThreads);
+  useEffect(() => {
+    sichtbar.current = sichtbareThreads;
+  }, [sichtbareThreads]);
+
   useEffect(() => {
     if (!uid) return;
     const unsubscribe = subscribeToAllMessages((nachricht) => {
+      // Zuerst zustellen, dann erst über das Zählen entscheiden (AGE-639).
+      //
+      // `prev ? … : prev` ist die ganze Logik: fortgeschrieben wird NUR ein
+      // Cache-Eintrag, den es schon gibt — und den gibt es genau dann, wenn eine
+      // Fläche diesen Thread gerade lädt oder zeigt. Dieser Rückruf weiss damit
+      // nichts über Fenster, und es entsteht keine zweite Stelle, an der
+      // „welche Gespräche sind offen?" beantwortet werden müsste.
+      //
+      // Auch für ein MINIMIERTES Fenster: es lädt seinen Verlauf, und ohne
+      // diese Zeile fehlten ihm beim Aufziehen genau die Zeilen, die während
+      // des Minimiertseins kamen.
+      //
+      // `ChatPage` hat daneben sein eigenes `subscribeToThread`. Das kostet
+      // nichts: `mergeMessage` ist über die `id` idempotent.
+      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(nachricht.threadId), (prev) =>
+        prev ? mergeMessage(prev, nachricht) : prev,
+      );
+
       if (pfad.current === `/chat/${nachricht.threadId}`) return;
+      // Dieselbe Begründung wie beim Pfad: liegt das Gespräch aufgezogen vor
+      // einem, rückt dessen eigener Lesestand ohnehin nach — und zwar NACH
+      // seinem Schreibvorgang. Eine Neuzählung hier käme davor und liesse die
+      // Blase auf 1 springen und zurückfallen.
+      if (sichtbar.current.has(nachricht.threadId)) return;
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
         void queryClient.invalidateQueries({ queryKey: unreadQueryKey(uid) });

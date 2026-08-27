@@ -17,35 +17,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * genau der Fall, den die Ref im Hook abfängt.
  */
 
-let beiNachricht: ((n: { threadId: string; senderId: string }) => void) | null = null;
+type Eingang = { threadId: string; senderId: string; id?: string; body?: string };
+
+let beiNachricht: ((n: Eingang) => void) | null = null;
 const abbestellen = vi.fn();
-const abonnieren = vi.fn((cb: (n: { threadId: string; senderId: string }) => void) => {
+const abonnieren = vi.fn((cb: (n: Eingang) => void) => {
   beiNachricht = cb;
   return abbestellen;
 });
 
 vi.mock("../../lib/chat", async (original) => ({
   ...(await original<typeof import("../../lib/chat")>()),
-  subscribeToAllMessages: (cb: (n: { threadId: string; senderId: string }) => void) =>
-    abonnieren(cb),
+  subscribeToAllMessages: (cb: (n: Eingang) => void) => abonnieren(cb),
 }));
 
 const { useUngelesenLive } = await import("./use-ungelesen");
-const { threadsQueryKey, unreadQueryKey } = await import("../../lib/chat");
+const { messagesQueryKey, threadsQueryKey, unreadQueryKey } = await import("../../lib/chat");
+type ChatMessage = import("../../lib/chat").ChatMessage;
 
 const UID = "test-user";
+const KEINE: ReadonlySet<string> = new Set();
 
-function Huelle({ pfad }: { pfad: string }) {
-  useUngelesenLive(UID, pfad);
+function Huelle({ pfad, sichtbar = KEINE }: { pfad: string; sichtbar?: ReadonlySet<string> }) {
+  useUngelesenLive(UID, pfad, sichtbar);
   return null;
 }
 
-function renderHook(pfad = "/aktivitaet") {
+function renderHook(pfad = "/aktivitaet", sichtbar: ReadonlySet<string> = KEINE) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidiert = vi.spyOn(queryClient, "invalidateQueries");
   const ergebnis = render(
     <QueryClientProvider client={queryClient}>
-      <Huelle pfad={pfad} />
+      <Huelle pfad={pfad} sichtbar={sichtbar} />
     </QueryClientProvider>,
   );
   return { ...ergebnis, invalidiert, queryClient };
@@ -110,5 +113,83 @@ describe("useUngelesenLive — ein Abo, zwei Schlüssel", () => {
     expect(abonnieren).toHaveBeenCalledTimes(1);
     unmount();
     expect(abbestellen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useUngelesenLive — die angedockten Chatfenster (AGE-639)", () => {
+  const eingang: Eingang = {
+    id: "m-neu",
+    threadId: "t1",
+    senderId: "wer-anders",
+    body: "frisch",
+  };
+
+  it("stellt in einen VORHANDENEN Verlauf zu — ohne einen zweiten Kanal", () => {
+    // DIE Zusage des Changes: drei offene Fenster halten dieselbe Zahl von
+    // Abos wie null offene. Ein Abo je Fenster wäre der naheliegende Weg
+    // gewesen, und `chat.ts:207` warnt ausdrücklich davor.
+    const { queryClient } = renderHook();
+    queryClient.setQueryData<ChatMessage[]>(messagesQueryKey("t1"), []);
+
+    act(() => beiNachricht!(eingang));
+
+    expect(queryClient.getQueryData<ChatMessage[]>(messagesQueryKey("t1"))).toHaveLength(1);
+    expect(abonnieren).toHaveBeenCalledTimes(1);
+  });
+
+  it("legt für einen Thread, den niemand zeigt, KEINEN Verlauf an", () => {
+    // `prev ? … : prev`. Sonst füllte jede eingehende Nachricht den Cache mit
+    // Verläufen, die keine Fläche je abruft.
+    const { queryClient } = renderHook();
+
+    act(() => beiNachricht!(eingang));
+
+    expect(queryClient.getQueryData(messagesQueryKey("t1"))).toBeUndefined();
+  });
+
+  it("überspringt die Neuzählung für ein AUFGEZOGENES Fenster", () => {
+    // Sonst springt die Blase auf 1 und fällt beim nächsten Abgleich zurück —
+    // dasselbe Zucken, gegen das die Pfad-Bedingung gebaut ist.
+    const { invalidiert } = renderHook("/mitglieder", new Set(["t1"]));
+
+    act(() => beiNachricht!(eingang));
+    act(() => void vi.advanceTimersByTime(500));
+
+    expect(schluessel(invalidiert)).toEqual([]);
+  });
+
+  it("zählt für ein MINIMIERTES Fenster sehr wohl neu", () => {
+    // Die Positivkontrolle zur Zeile darüber, und zugleich die Zusage selbst:
+    // ein minimiertes Gespräch ist nicht gelesen worden. Es steht nicht in der
+    // Menge — die Hülle nimmt nur die aufgezogenen auf.
+    const { invalidiert } = renderHook("/mitglieder", KEINE);
+
+    act(() => beiNachricht!(eingang));
+    act(() => void vi.advanceTimersByTime(500));
+
+    expect(schluessel(invalidiert)).toEqual(
+      expect.arrayContaining([JSON.stringify(unreadQueryKey(UID))]),
+    );
+  });
+
+  it("baut den Kanal NICHT neu auf, wenn ein Fenster aufgeht", () => {
+    // Die Menge liegt in einer Ref, nicht in der Abhängigkeitsliste. Stünde sie
+    // dort, kostete jedes geöffnete Fenster einen Kanalwechsel — und ein neuer
+    // Kanal heisst hier eine Lücke, in der nichts ankommt.
+    const { rerender, queryClient } = renderHook("/mitglieder", KEINE);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Huelle pfad="/mitglieder" sichtbar={new Set(["t1"])} />
+      </QueryClientProvider>,
+    );
+
+    expect(abonnieren).toHaveBeenCalledTimes(1);
+
+    // Und die neue Menge WIRKT trotzdem — ohne diese Zeile wäre der Test auch
+    // grün, wenn die Ref nie nachgeführt würde.
+    const { invalidiert } = { invalidiert: vi.spyOn(queryClient, "invalidateQueries") };
+    act(() => beiNachricht!(eingang));
+    act(() => void vi.advanceTimersByTime(500));
+    expect(schluessel(invalidiert)).toEqual([]);
   });
 });

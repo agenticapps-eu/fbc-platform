@@ -9,8 +9,11 @@ import {
   fetchIncomingRequests,
   incomingRequestsQueryKey,
 } from "../lib/contact-requests";
+import type { ChatThread } from "../lib/chat";
 import { useAuth } from "../providers/auth-context";
 import { ChatPanel } from "./chat/ChatPanel";
+import { ChatFensterReihe } from "./chat/ChatFensterReihe";
+import { reihenHoehe, useChatfenster } from "./chat/use-chatfenster";
 import { useUngelesen, useUngelesenLive } from "./chat/use-ungelesen";
 import { HinweisGlocke } from "./hinweise/HinweisGlocke";
 import { useHinweise, useHinweiseLive, useHinweisMarkieren } from "./hinweise/use-hinweise";
@@ -432,7 +435,12 @@ export default function AppShell() {
   // Hülle steht auf jeder angemeldeten Seite, und jede weitere Aufrufstelle
   // würde einen zweiten Kanal öffnen.
   const { stand: ungelesen, isError: ungelesenFehlt } = useUngelesen(user?.id ?? null);
-  useUngelesenLive(user?.id ?? null, pathname);
+
+  // Die angedockten Chatfenster (AGE-639). Der Zustand liegt HIER, nicht in
+  // einem Context: die Hülle wird beim Navigieren nicht abgebaut, und genau das
+  // ist die Zusage „das Fenster überlebt den Seitenwechsel" — als Eigenschaft
+  // der Montage statt als Verabredung zwischen Komponenten.
+  const chatfenster = useChatfenster(user?.id ?? null);
 
   // Die Glocke (AGE-620). Sie war seit Juni ein toter Knopf, waehrend drei
   // Typen laengst in `notifications` schrieben.
@@ -537,12 +545,60 @@ export default function AppShell() {
   const mobileNav = useOverlay(mobileNavOpen);
   const chatDrawer = useOverlay(chatDrawerOpen);
 
-  /** Ein Thread wird gewählt: Adresse auf, Schublade zu. Ohne das Schliessen
-   *  stünde sie samt Scroll-Sperre über der neuen Seite — links tut das
-   *  `onNavigate`. */
-  function chatOeffnen(threadId: string) {
+  // Chatfenster gibt es genau dort, wo die Nachrichten-Leiste angedockt steht:
+  // angemeldet, ausserhalb der Chatrouten, ab `xl`. Dieselbe Bedingung trägt
+  // ausserdem die Zusage „Fenster fügen keinen Realtime-Kanal hinzu" — sie gilt,
+  // weil Fenster und `ChatPage` nie gleichzeitig montiert sind.
+  const fensterMoeglich = chatLeisteSteht && istBreit;
+  const offeneFenster = fensterMoeglich ? chatfenster.fenster : [];
+
+  // Das Live-Abo überspringt die Neuzählung für Gespräche, die dem Mitglied
+  // gerade GEGENÜBERLIEGEN — sonst springt die Blase auf 1 und fällt beim
+  // nächsten Abgleich zurück. Bis AGE-639 war das genau eines: die offene
+  // Chatseite. Jetzt kommt jedes AUFGEZOGENE Fenster dazu.
+  //
+  // Ein minimiertes gehört ausdrücklich NICHT dazu: es ist nicht gelesen worden,
+  // und sein Zähler soll laufen.
+  const sichtbareThreads = new Set(
+    offeneFenster.filter((f) => !f.minimiert).map((f) => f.threadId),
+  );
+  useUngelesenLive(user?.id ?? null, pathname, sichtbareThreads);
+
+  // Die Höhe der Fensterreihe, damit die Toasts ihr ausweichen. An
+  // `document.documentElement`, NICHT am Wurzel-`div` unten: der `ToastProvider`
+  // steht in `main.tsx` oberhalb von `App` und sähe eine dort gesetzte Variable
+  // nie. Genau EINE Stelle schreibt sie — und räumt sie wieder ab, sonst
+  // schwebten die Toasts nach dem Abmelden auf `/login` grundlos in der Luft.
+  const fensterHoehe = reihenHoehe(offeneFenster);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--fbc-fenster-h", fensterHoehe);
+    return () => {
+      document.documentElement.style.removeProperty("--fbc-fenster-h");
+    };
+  }, [fensterHoehe]);
+
+  /**
+   * Ein Thread wird gewählt — und seit AGE-639 hängt davon ab, wie breit der
+   * Schirm ist.
+   *
+   * **Angedockt (`xl`): ein Fenster geht auf, die Adresse bleibt stehen.** Das
+   * ist der ganze Vorgang: wer im Verzeichnis liest und jemandem antwortet, hat
+   * sich nicht an einen anderen Ort begeben, und der Rahmen soll ihn nicht
+   * dorthin schieben.
+   *
+   * **Darunter: der Weg über die Adresse, wie bisher**, samt Schliessen der
+   * Schublade — ohne das stünde sie samt Scroll-Sperre über der neuen Seite.
+   * Unterhalb von `xl` steht die Leiste gar nicht angedockt, und ein Fenster,
+   * das aus einer modalen Schublade heraus aufgeht, während diese sich
+   * schliesst, wäre ein zweiter Bewegungsablauf für dasselbe Ziel.
+   */
+  function chatOeffnen(thread: ChatThread) {
+    if (fensterMoeglich) {
+      chatfenster.oeffne(thread);
+      return;
+    }
     setChatDrawerOpen(false);
-    navigate(`/chat/${threadId}`);
+    navigate(`/chat/${thread.id}`);
   }
 
   async function handleSignOut() {
@@ -847,6 +903,20 @@ export default function AppShell() {
       {/* Pflichtlinks (AGE-497). Traegt `fbc-shell-offset` wie <main>, sonst
           laege er ab lg unter der fixierten Sidebar. */}
       <AppFooter />
+
+      {/* Die angedockten Chatfenster (AGE-639). Sie rendert sich selbst per
+          Portal an `document.body` — hier steht nur, WANN es sie gibt. */}
+      {fensterMoeglich && (
+        <ChatFensterReihe
+          fenster={chatfenster.fenster}
+          myId={user?.id ?? ""}
+          ungelesenJeThread={ungelesen.jeThread}
+          onMinimiere={chatfenster.minimiere}
+          onZiehAuf={chatfenster.ziehAuf}
+          onSchliesse={chatfenster.schliesse}
+          onBeruehre={chatfenster.beruehre}
+        />
+      )}
 
       {/* Off-Canvas-Sidebar (< lg). */}
       {mobileNavOpen && (

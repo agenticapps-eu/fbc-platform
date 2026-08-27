@@ -34,7 +34,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex w-full max-w-sm flex-col gap-3">
+      {/* Der Ausgleich für die angedockten Chatfenster (AGE-639). Gemessen:
+          Toasts stehen bei `right-6` und sind bis 24 rem breit, die Fensterreihe
+          beginnt bei 5,5 rem vom rechten Rand — sie überlappen, und zwar genau
+          in der Ecke, in der die SENDEZEILE des rechtesten Fensters sitzt. Der
+          Toast, der als erster dort landen würde, ist ausgerechnet „Nachricht
+          nicht gesendet".
+
+          Die Variable setzt die Hülle an `document.documentElement`, an genau
+          einer Stelle. Der Vorgabewert `0rem` gilt überall, wo es keine Fenster
+          gibt — auf `/login`, unter `xl`, auf den Chatrouten. */}
+      <div
+        style={{ bottom: "calc(1.5rem + var(--fbc-fenster-h, 0rem))" }}
+        className="pointer-events-none fixed right-6 z-50 flex w-full max-w-sm flex-col gap-3"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
