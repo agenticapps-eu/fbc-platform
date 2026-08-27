@@ -5,10 +5,13 @@
  * Vollständig übernommen.
  *
  * Der wichtigste offene Punkt steht bewusst ganz oben in `offenePunkte`: die
- * Richtlinie BESCHREIBT einen Einwilligungsweg, den die Plattform nicht hat,
- * und die Video-Einbettungen laden heute ohne Einwilligung. Ein Hinweiskasten
- * heilt das nicht — er macht es nur sichtbar. Die Behebung ist ein eigener
- * Vorgang.
+ * Richtlinie BESCHREIBT einen allgemeinen Einwilligungsweg, den die Plattform
+ * nicht hat. Ein Hinweiskasten heilt das nicht — er macht es nur sichtbar.
+ *
+ * Für die Video-Einbettungen gilt das seit AGE-611 NICHT mehr: sie laden erst
+ * auf Anforderung, und seit AGE-621 wird die Freigabe je Anbieter gespeichert
+ * und ist widerruflich. Abschnitt 3.1 beschreibt das Verfahren samt dem dafür
+ * gespeicherten Wert.
  *
  * ERZEUGT aus der pandoc-Fassung des .docx und danach von Hand geprüft.
  */
@@ -22,7 +25,7 @@ export const cookies: Rechtsdokument = {
   quelle: "04 FBC Cookie Richtlinie.docx (Stand Juli 2026)",
   provisorisch: true,
   offenePunkte: [
-    "Das hier beschriebene allgemeine Einwilligungs- und Widerrufsverfahren gibt es noch nicht. Es existiert kein Cookie-Dialog, in dem sich eine Einwilligung erteilen oder zurücknehmen ließe. Für eingebettete Videos gibt es seit dem 26. August 2026 ein eigenes Verfahren, das in Abschnitt 3.1 beschrieben ist; der Text weicht insoweit vom Quelldokument ab, das dort ein Banner voraussetzt.",
+    "Das hier beschriebene allgemeine Einwilligungs- und Widerrufsverfahren gibt es noch nicht. Es existiert kein Cookie-Dialog, in dem sich eine Einwilligung erteilen oder zurücknehmen ließe. Für eingebettete Videos gibt es seit dem 26. August 2026 ein eigenes Verfahren, seit dem 27. August 2026 mit gespeicherter Freigabe und eigenem Widerruf; es ist in Abschnitt 3.1 beschrieben. Der Text weicht insoweit vom Quelldokument ab, das dort ein Banner voraussetzt.",
     "Die Aufstellung der tatsächlich gesetzten Cookies und ihrer Speicherdauern stammt aus dem Quelldokument und ist nicht gegen den laufenden Betrieb abgeglichen worden.",
   ],
   abschnitte: [
@@ -606,7 +609,27 @@ export const cookies: Rechtsdokument = {
         {
           art: "absatz",
           inhalt: [
-            "Für eingebettete Videos von YouTube und Vimeo erteilen Sie Ihre Einwilligung stattdessen unmittelbar am Video selbst: An seiner Stelle steht eine Fläche von unserem eigenen Server, und erst Ihr Klick darauf stellt die Verbindung zum Anbieter her. Diese Entscheidung gilt für dieses eine Video und wird nicht gespeichert.",
+            "Für eingebettete Videos von YouTube und Vimeo erteilen Sie Ihre Einwilligung stattdessen unmittelbar am Video selbst: An seiner Stelle steht eine Fläche von unserem eigenen Server, und erst Ihr Klick darauf stellt die Verbindung zum Anbieter her. Diese Entscheidung gilt für den jeweiligen Anbieter und wird auf Ihrem Gerät gespeichert, damit wir Sie nicht bei jedem Video erneut fragen müssen. Widerrufen können Sie sie am Ende der Datenschutzerklärung, für jeden Anbieter einzeln.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Diese Freigabe wird nicht als Cookie abgelegt, sondern im lokalen Speicher Ihres Browsers — rechtlich ist das eine vergleichbare Technologie. Der Vollständigkeit halber benennen wir sie hier:",
+          ],
+        },
+        {
+          art: "liste",
+          punkte: [
+            ["Bezeichnung: „fbc.video-freigabe“"],
+            ["Zweck: sich merken, für welche Videoanbieter Sie das Laden erlaubt haben"],
+            [
+              "Inhalt: ausschließlich die Namen der freigegebenen Anbieter — keine Kennung, kein Zeitpunkt, keine Nutzungsdaten",
+            ],
+            [
+              "Speicherdauer: bis zum Widerruf oder bis Sie die Websitedaten in Ihrem Browser löschen",
+            ],
+            ["Widerruf: am Ende der Datenschutzerklärung, für jeden Anbieter einzeln, ohne Konto"],
           ],
         },
         {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VideoEmbed } from "./VideoEmbed";
 
 /** `VideoEmbed` verlinkt die Datenschutzerklärung und braucht deshalb einen
@@ -10,7 +10,19 @@ function zeige(ui: React.ReactElement) {
 }
 
 const YT = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+const YT2 = "https://www.youtube.com/watch?v=Ks-_Mh1QhMc";
 const VIMEO = "https://vimeo.com/123456789";
+
+// Die Freigabe liegt seit AGE-621 auf dem Endgeraet und ueberlebt damit auch
+// einen Test. Ohne dieses Aufraeumen liesse der erste Klick jeden folgenden
+// Test in einer Welt laufen, in der YouTube bereits freigegeben ist.
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("VideoEmbed — Einwilligungstor (AGE-611)", () => {
   it("lädt beim ersten Rendern keinen Player", () => {
@@ -79,7 +91,9 @@ describe("VideoEmbed — Einwilligungstor (AGE-611)", () => {
     expect(src.searchParams.get("autoplay")).toBe("1");
   });
 
-  it("lädt nicht das zweite Video, wenn das erste aktiviert wird", () => {
+  it("lädt nicht das Video des ANDEREN Anbieters mit", () => {
+    // Eine Freigabe ist spezifisch. Wer YouTube erlaubt, hat über Vimeo nichts
+    // gesagt — das bleibt auch dann wahr, wenn die Freigabe jetzt gemerkt wird.
     zeige(
       <>
         <VideoEmbed url={YT} title="Erstes" />
@@ -94,10 +108,47 @@ describe("VideoEmbed — Einwilligungstor (AGE-611)", () => {
     expect(screen.getByRole("button", { name: /Video von Vimeo laden/i })).toBeInTheDocument();
   });
 
-  it("nimmt die Freigabe zurück, wenn dieselbe Instanz eine andere URL bekommt", () => {
+  it("lädt das zweite Video DESSELBEN Anbieters ohne zweiten Klick mit", () => {
+    // Das ist die Zusage „einmalig" auf genau der Seite, auf der sie zählt.
+    // Vorher blieb hier ein zweites Tor stehen.
+    zeige(
+      <>
+        <VideoEmbed url={YT} title="Erstes" />
+        <VideoEmbed url={YT2} title="Zweites" />
+      </>,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /laden/i })[0]);
+
+    expect(screen.getByTitle("Erstes")).toBeInTheDocument();
+    expect(screen.getByTitle("Zweites")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /laden/i })).toBeNull();
+  });
+
+  it("spielt das mitgeladene Video NICHT ab und lässt ihm den Fokus", () => {
+    // Ohne diese Trennung spielten auf einer Seite mit drei Videos nach einem
+    // Klick alle drei gleichzeitig los.
+    zeige(
+      <>
+        <VideoEmbed url={YT} title="Geklicktes" />
+        <VideoEmbed url={YT2} title="Mitgeladenes" />
+      </>,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /laden/i })[0]);
+
+    const geklickt = screen.getByTitle("Geklicktes") as HTMLIFrameElement;
+    const mit = screen.getByTitle("Mitgeladenes") as HTMLIFrameElement;
+    expect(new URL(geklickt.src).searchParams.get("autoplay")).toBe("1");
+    expect(new URL(mit.src).searchParams.has("autoplay")).toBe(false);
+    expect(document.activeElement).toBe(geklickt);
+  });
+
+  it("verlangt für einen anderen Anbieter in derselben Instanz eine neue Aktivierung", () => {
     // Der Profil-Editor schlüsselt seine Zeilen nach Index. Hinge die Freigabe
-    // an der Instanz statt an der URL, lüde eine geänderte Zeile den neuen
-    // Anbieter ohne neue Aktivierung.
+    // an der Instanz, lüde eine geänderte Zeile den neuen Anbieter ohne neue
+    // Aktivierung. Seit AGE-621 hängt sie am ANBIETER — der Schutz bleibt
+    // derselbe, solange der Anbieter wechselt.
     const { rerender } = zeige(<VideoEmbed url={YT} title="Wechsel" />);
     fireEvent.click(screen.getByRole("button", { name: /laden/i }));
     expect(screen.getByTitle("Wechsel")).toBeInTheDocument();
@@ -112,14 +163,40 @@ describe("VideoEmbed — Einwilligungstor (AGE-611)", () => {
     expect(screen.getByRole("button", { name: /Video von Vimeo laden/i })).toBeInTheDocument();
   });
 
-  it("merkt sich die Freigabe nicht über ein Neumontieren hinaus", () => {
+  it("merkt sich die Freigabe über ein Neumontieren hinaus", () => {
+    // Genau die Zusage des Changes, und die Umkehr des Tests, der vorher hier
+    // stand: „merkt sich die Freigabe NICHT über ein Neumontieren hinaus".
     const { unmount } = zeige(<VideoEmbed url={YT} title="Neu" />);
     fireEvent.click(screen.getByRole("button", { name: /laden/i }));
     expect(screen.getByTitle("Neu")).toBeInTheDocument();
     unmount();
 
     zeige(<VideoEmbed url={YT} title="Neu" />);
-    expect(screen.queryByTitle("Neu")).toBeNull();
+    const rahmen = screen.getByTitle("Neu") as HTMLIFrameElement;
+    // Beim neuen Aufruf spielt nichts von selbst und der Fokus bleibt, wo die
+    // Seite ihn hingelegt hat.
+    expect(new URL(rahmen.src).searchParams.has("autoplay")).toBe(false);
+    expect(document.activeElement).not.toBe(rahmen);
+  });
+
+  it("hält das Tor, wenn der Speicher nicht zur Verfügung steht", () => {
+    // Das Merken fällt aus, das Tor nicht — und die Seite rendert.
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Zugriff verweigert");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Kein Platz");
+    });
+
+    const { unmount } = zeige(<VideoEmbed url={YT} title="Ohne Speicher" />);
+    expect(screen.queryByTitle("Ohne Speicher")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /laden/i }));
+    expect(screen.getByTitle("Ohne Speicher")).toBeInTheDocument();
+    unmount();
+
+    zeige(<VideoEmbed url={YT} title="Ohne Speicher" />);
+    expect(screen.queryByTitle("Ohne Speicher")).toBeNull();
   });
 
   it("zeigt für eine nicht unterstützte URL weiterhin eine klare Absage", () => {
