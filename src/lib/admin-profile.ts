@@ -45,6 +45,14 @@ export interface AdminLegacy {
 export interface AdminProfileData {
   form: ProfileFormValues;
   legacy: AdminLegacy;
+  /**
+   * Die WIRKSAME Stufe (AGE-634) — nicht `legacy.legacy_tier`, das die alte
+   * WordPress-Bezeichnung trägt und nichts entscheidet.
+   *
+   * `admin_get_profile` liefert die Zeile als `to_jsonb(p)` und trug die Spalte
+   * von Anfang an mit; gelesen hat sie hier bis heute niemand.
+   */
+  tier: string;
   loginEmail: string;
   activated: boolean;
   /**
@@ -146,6 +154,7 @@ export async function fetchAdminProfile(id: string): Promise<AdminProfileData> {
       legacy_source_id: text(l.legacy_source_id),
       payment_type: text(l.payment_type),
     },
+    tier: text(p.tier),
     loginEmail: text(paket.login_email),
     activated: p.activated_at != null,
     deaktiviert: p.disabled_at != null,
@@ -193,9 +202,7 @@ export async function saveAdminProfile(
     // Der Editor zeigt die Videos — ohne diese Zeile meldete das Speichern
     // Erfolg und verwarf die Änderung (Review auf dem Diff).
     videos: sanitizeVideos(form.videos),
-    socials: Object.fromEntries(
-      Object.entries(form.socials).filter(([, v]) => v.trim() !== ""),
-    ),
+    socials: Object.fromEntries(Object.entries(form.socials).filter(([, v]) => v.trim() !== "")),
     email: leerZuNull(form.contact.email),
     phone: leerZuNull(form.contact.phone),
     // Die Anschrift (AGE-537). Sie liegt auf derselben Zeile wie E-Mail und

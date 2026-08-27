@@ -43,6 +43,7 @@ vi.mock("./supabase", () => ({
 import {
   activateMember,
   adminMemberCountsQueryKey,
+  setzeStufe,
   adminMembersQueryKey,
   fetchAdminMemberCounts,
   fetchAdminMembers,
@@ -229,5 +230,30 @@ describe("adminMemberCountsQueryKey", () => {
     expect(adminMemberCountsQueryKey).not.toEqual(
       adminMembersQueryKey({ query: "", status: "alle", seite: 0 }),
     );
+  });
+});
+
+describe("setzeStufe (AGE-634)", () => {
+  it("ruft admin_set_tier — nicht admin_update_profile", async () => {
+    // `tier` steht auf der AUSSCHLUSSliste jener Funktion; ein Patch damit
+    // bräche mit 22023 ab. Diese Zusage hält fest, dass die Fläche gar nicht
+    // erst dorthin geht.
+    await setzeStufe("p1", "focus", "Überweisung eingegangen");
+
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("admin_set_tier");
+    expect(rpcCalls[0].args).toEqual({
+      p_profile_id: "p1",
+      p_tier: "focus",
+      p_grund: "Überweisung eingegangen",
+    });
+  });
+
+  it("wirft, wenn die Datenbank ablehnt", async () => {
+    // Der Riegel sitzt im Rumpf der Funktion und meldet sich als Fehler. Ihn zu
+    // verschlucken hiesse, dem Admin Erfolg für etwas zu melden, das nicht
+    // geschehen ist — genau der Fehler, den die Weissliste dort vermeidet.
+    rpcFehler = { message: "nur Admins", code: "42501" };
+    await expect(setzeStufe("p1", "focus", "Grund")).rejects.toMatchObject({ code: "42501" });
   });
 });

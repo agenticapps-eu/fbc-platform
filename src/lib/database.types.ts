@@ -1740,6 +1740,13 @@ export type Database = {
         Args: { target: string; patch: Json };
         Returns: undefined;
       };
+      // Stufe eines Mitglieds setzen (AGE-634), aus
+      // 20260827160000_admin_set_tier.sql. Von Hand gepflegt wie der Rest
+      // dieses Blocks — `supabase gen types` NICHT darueberlaufen lassen.
+      admin_set_tier: {
+        Args: { p_profile_id: string; p_tier: string; p_grund: string };
+        Returns: string;
+      };
       admin_get_profile: { Args: { target: string }; Returns: Json };
       admin_find_profile: { Args: { needle: string }; Returns: Json };
       // Admin-Mitgliederliste (AGE-566), aus 20260817120000_admin_member_list.sql.
