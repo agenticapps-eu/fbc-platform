@@ -26,12 +26,6 @@ export interface ReleaseEintrag {
   aenderungen: string[];
 }
 
-export interface ReleaseEntwurf {
-  titel: string;
-  text: string;
-  slugs: string[];
-}
-
 const DATUM = /^(\d{4}-\d{2}-\d{2})-(.+)$/;
 
 /**
@@ -100,20 +94,4 @@ export function parseArchivEintrag(slug: string, proposal: string): ReleaseEintr
     linear: linearZeile ? linearZeile[1] : null,
     aenderungen: stichpunkte(abschnittWhatChanges(proposal)),
   };
-}
-
-/**
- * Aus mehreren Einträgen wird EIN Entwurf — das ist die Anforderung, nicht eine
- * Nachricht je Eintrag. Der Text ist ein Vorschlag: der Admin überschreibt ihn,
- * und er soll ihn überschreiben. Proposal-Sprache ist für Entwickler.
- */
-export function entwurfAus(eintraege: ReleaseEintrag[]): ReleaseEntwurf {
-  const text = eintraege
-    .map((e) => {
-      const kopf = `## ${e.titel}`;
-      const punkte = e.aenderungen.map((a) => `- ${a}`).join("\n");
-      return punkte ? `${kopf}\n\n${punkte}` : kopf;
-    })
-    .join("\n\n");
-  return { titel: "Neu in der App", text, slugs: eintraege.map((e) => e.slug) };
 }

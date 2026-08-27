@@ -11,6 +11,7 @@ import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
 import AdminFeedbackPage from "./pages/AdminFeedbackPage";
+import AdminNeuigkeitenPage from "./pages/AdminNeuigkeitenPage";
 import AdminMitgliedPage from "./pages/AdminMitgliedPage";
 import AdminMitgliederPage from "./pages/AdminMitgliederPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
@@ -163,6 +164,18 @@ function AppInner() {
           element={
             <RequireAdmin>
               <AdminFeedbackPage />
+            </RequireAdmin>
+          }
+        />
+        {/* Neuigkeiten (AGE-631). Dieselbe Begruendung wie beim QM-Feedback
+            darueber: eager importiert, RequireAdmin ist Komfort, die echte
+            Grenze ist `is_admin()` im Rumpf von `send_release_note` und in den
+            Policies auf `release_notes`. */}
+        <Route
+          path="/admin/neuigkeiten"
+          element={
+            <RequireAdmin>
+              <AdminNeuigkeitenPage />
             </RequireAdmin>
           }
         />

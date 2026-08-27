@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseArchivEintrag, entwurfAus } from "./release-entries.logic";
+import { parseArchivEintrag } from "./release-entries.logic";
 
 /**
  * Der Erzeuger der Release-Einträge (AGE-631, Band 1).
@@ -91,33 +91,5 @@ describe("parseArchivEintrag — was das Archiv wirklich hergibt", () => {
     const e = parseArchivEintrag("2026-08-01-nur-why", "## Why\n\nEtwas.\n");
     expect(e.aenderungen).toEqual([]);
     expect(e.titel).toBe("nur-why");
-  });
-});
-
-describe("entwurfAus — mehrere Changes werden EINE Nachricht", () => {
-  const a = parseArchivEintrag("2026-08-27-glocke-und-hinweistypen", MIT_ALLEM);
-  const b = parseArchivEintrag("2026-08-25-feed-paging", OHNE_TITEL);
-
-  it("fasst mehrere Einträge zu einem Text zusammen, nicht zu mehreren", () => {
-    const entwurf = entwurfAus([a, b]);
-    expect(entwurf.text).toContain("Glocke verdrahten und vier Hinweistypen");
-    expect(entwurf.text).toContain("feed-paging");
-    // EIN Titel für die ganze Nachricht — das ist die Anforderung.
-    expect(entwurf.titel).toBe("Neu in der App");
-  });
-
-  it("führt jeden gewählten Slug im Entwurf mit", () => {
-    // Ohne diese Menge könnte die Fläche später nicht sagen, was schon
-    // angekündigt wurde — und dieselbe Änderung erschiene zweimal.
-    expect(entwurfAus([a, b]).slugs).toEqual([
-      "2026-08-27-glocke-und-hinweistypen",
-      "2026-08-25-feed-paging",
-    ]);
-  });
-
-  it("ergibt aus null Einträgen einen leeren Entwurf, keinen kaputten", () => {
-    const leer = entwurfAus([]);
-    expect(leer.slugs).toEqual([]);
-    expect(leer.text).toBe("");
   });
 });

@@ -58,10 +58,15 @@ function adminLinks(): string[] {
 }
 
 describe("Das Administrationsmenü trägt seine Flächen vollständig (AGE-587)", () => {
-  it("führt Einstellungen, Mitgliederliste und QM-Feedback", () => {
+  it("führt Einstellungen, Mitgliederliste, QM-Feedback und Neuigkeiten", () => {
     renderApp(ADMIN);
 
-    expect(adminLinks()).toEqual(["/admin", "/admin/mitglieder", "/admin/feedback"]);
+    expect(adminLinks()).toEqual([
+      "/admin",
+      "/admin/mitglieder",
+      "/admin/feedback",
+      "/admin/neuigkeiten",
+    ]);
   });
 
   it("nennt das QM-Feedback beim Namen", () => {
@@ -69,6 +74,16 @@ describe("Das Administrationsmenü trägt seine Flächen vollständig (AGE-587)"
 
     const link = screen.getByRole("link", { name: "QM-Feedback" });
     expect(link).toHaveAttribute("href", "/admin/feedback");
+  });
+
+  // AGE-631: dieselbe Zusage für die Release-Notes-Fläche. Diese Liste ist der
+  // Grund, warum die neue Fläche beim ersten Lauf rot war — der Wächter hat
+  // getan, wofür er da ist.
+  it("nennt die Neuigkeiten beim Namen", () => {
+    renderApp(ADMIN);
+
+    const link = screen.getByRole("link", { name: "Neuigkeiten" });
+    expect(link).toHaveAttribute("href", "/admin/neuigkeiten");
   });
 
   /**

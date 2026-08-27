@@ -391,6 +391,11 @@ function SidebarContent({
         // lässt sich ohne ihren Parameter gar nicht öffnen. Sie wird aus der
         // Mitgliederliste erreicht.
         { path: "/admin/feedback", label: "QM-Feedback" },
+        // AGE-631: dasselbe Argument wie zwei Zeilen hoeher. Und die Spec sagt
+        // es ausdruecklich — „Das Administrationsmenue traegt seine Flaechen
+        // vollstaendig": eine Flaeche, die nur ueber die getippte Adresse
+        // erreichbar ist, ist nicht auffindbar.
+        { path: "/admin/neuigkeiten", label: "Neuigkeiten" },
       ],
     });
   }
