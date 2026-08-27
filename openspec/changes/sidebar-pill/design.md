@@ -98,17 +98,40 @@ Test, der nur den Namen prüft, sieht einen umgedrehten Pfeil nicht.
 | links | Pfeil nach **links** (einklappen) | Pfeil nach **rechts** (ausklappen) |
 | rechts | Pfeil nach **rechts** (einklappen) | Pfeil nach **links** (ausklappen) |
 
-### 5c. Die Farben gehören dem Pill, nicht seinem Elternteil
+### 5c. Die Farbe gehört der LEISTE — eine Ausbuchtung, kein Knopf darauf
 
-Die linke Leiste ist Chrome-Fläche (navy im navy-Theme), die rechte **aufgeklappt**
-Inhaltsfläche (`bg-canvas`). Eine gemeinsame Komponente, die ihre Farbe erbt,
-sähe an beiden Leisten verschieden aus — und der Vorgang hätte die
-Farb-Ungleichheit, die er beseitigen soll, in ein Bauteil hineingezogen
-(codex, MEDIUM).
+Hier steht eine Kehrtwende, und sie gehört benannt.
 
-Der Pill setzt seine Flächen-, Rand- und Schriftfarbe deshalb **selbst**, mit
-denselben Tokens an beiden Seiten, und wird in **beiden Themes** auf Kontrast
-geprüft.
+**Der Reviewer verlangte das Gegenteil** (codex, MEDIUM): der Pill solle seine
+Farben selbst setzen, sonst sähe eine gemeinsame Komponente an zwei Eltern
+verschieden aus. Das wurde gebaut — weisse Fläche, `border-muted` als Rand,
+5,0:1 Kontrast, alles gemessen und belegt.
+
+**Donald hat es am Bildschirm gesehen und verworfen** (27.08.):
+
+> „Das ist nicht schön, es soll wie ein Bestandteil der Sidebar hell oder dunkel
+> aussehen, gleiche Farben, kein Rand, einfach eine Ausbuchtung."
+>
+> „Schatten ist es, der Schatten hebt es ab."
+
+Der Reviewer hatte technisch recht und gestalterisch unrecht: „an beiden Leisten
+gleich aussehen" war nie das Ziel. Das Ziel ist **an beiden Leisten dieselbe
+Geste** — und die Geste ist, dass die Leiste sich wölbt. Eine Wölbung hat
+naturgemäss die Farbe dessen, was sich wölbt.
+
+Also: Fläche und Schriftfarbe der **Leiste**, kein Rahmen, und abgehoben wird
+über einen **gerichteten Schatten** nach aussen. Der ist nicht Zierde — im
+hellen Theme ist die Leiste weiss (`rgb(255,255,255)`) und der Kopf, in den der
+Pill oben hineinragt, ebenfalls; ohne Schatten wäre die Wölbung dort unsichtbar.
+Gemessen, nicht vermutet.
+
+Weil die rechte Leiste ihre Fläche beim Aufklappen **wechselt** (Chrome-Rail →
+Inhaltsfläche), bekommt das Bauteil dafür einen Schalter `flaeche`. Eine feste
+Angabe hinterliesse beim Umschalten einen Fleck in der falschen Farbe an ihrer
+Kante.
+
+Gemessen nach dem Umbau: im navy-Theme trägt der Pill `rgb(8,21,39)` — **exakt**
+die Fläche der Leiste.
 
 ### 6. Die Namen sind Anker — und einer davon kollidiert
 

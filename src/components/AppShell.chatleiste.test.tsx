@@ -236,10 +236,15 @@ describe("Ein Pill für beide Leisten (AGE-638)", () => {
     expect(pill("Nachrichten")).toHaveAttribute("data-richtung", "rechts");
   });
 
-  it("ist an beiden Leisten DASSELBE Bauteil", () => {
-    // Die eigentliche Zusage dieses Vorgangs, und die einzige Formulierung,
-    // die sie messbar macht: ein Test auf die NAMEN wäre auch gegen die alten,
-    // getrennt gebauten Schalter grün gewesen — die hiessen ja schon so.
+  it("steht an beiden Leisten, links und rechts", () => {
+    // Was dieser Test misst und was NICHT: dass an beiden Leisten ein Pill
+    // steht — nicht, dass es dasselbe Bauteil ist. Ein Markierungsattribut
+    // liesse sich auch von zwei getrennt gebauten Knöpfen setzen (Fremd-Review
+    // auf dem Diff, codex, LOW). Die Wiederverwendung hält der Quelltext, nicht
+    // diese Zusage.
+    //
+    // Er ist trotzdem nicht wertlos: gegen die alten Schalter war er ROT, und
+    // ein Test auf die NAMEN wäre grün gewesen — die hiessen ja schon so.
     renderApp();
     const pills = document.querySelectorAll("[data-leisten-pill]");
     expect(pills).toHaveLength(2);

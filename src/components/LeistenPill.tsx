@@ -10,15 +10,21 @@ import { cn } from "../lib/cn";
  * sind auseinandergelaufen, weil sie nie dasselbe Bauteil waren; ein gemeinsames
  * Aussehen aus zwei Quelltexten läuft wieder auseinander.
  *
+ * **Er ist eine AUSBUCHTUNG der Leiste, kein Knopf darauf** (Donald, 27.08.).
+ * Er trägt deshalb die Fläche seiner Leiste und deren Schriftfarbe — und
+ * **keinen Rahmen**. Ein Rahmen machte ihn zu einem aufgeklebten Bauteil;
+ * genau das soll er nicht sein.
+ *
+ * **Abheben tut ihn der Schatten** (Donald, 27.08.). Das ist hier nicht nur
+ * Geschmack: im hellen Theme ist die Leiste weiss (`rgb(255,255,255)`) und der
+ * Kopf, in den er oben hineinragt, ebenfalls (`bg-canvas/85`) — gemessen. Ohne
+ * den Schatten wäre die Wölbung dort unsichtbar. Er ist gerichtet, nach aussen,
+ * damit die Leiste die Ausbuchtung wirft und nicht umgekehrt.
+ *
  * **Er hängt an der Leiste, nicht am Rahmen.** `absolute` innerhalb der
  * `<aside>`, um die halbe eigene Breite nach aussen geschoben. Als `fixed`
  * Element am Rahmen müsste er die Leistenbreite ein zweites Mal kennen — und
  * die zweite Rechnung ist die, die jemand vergisst, wenn sich die erste ändert.
- *
- * **Die Farben setzt er selbst.** Links liegt er auf Chrome-Fläche (navy im
- * navy-Theme), rechts aufgeklappt auf Inhaltsfläche. Erbte er, sähe er an
- * beiden Leisten verschieden aus — und der Vorgang hätte die Ungleichheit, die
- * er beseitigen soll, in ein einziges Bauteil hineingezogen.
  *
  * **Die Pfeilrichtung hängt an ZWEI Achsen**, Seite und Zustand, also an vier
  * Fällen. `data-richtung` trägt sie nach aussen, damit ein Test sie prüfen kann:
@@ -26,11 +32,16 @@ import { cn } from "../lib/cn";
  */
 export function LeistenPill({
   seite,
+  flaeche,
   offen,
   steuert,
   onClick,
 }: {
   seite: "links" | "rechts";
+  /** Worauf die Leiste GERADE steht. Die rechte wechselt beim Aufklappen von
+   *  der Chrome- auf die Inhaltsfläche; die Ausbuchtung muss mitwechseln, sonst
+   *  sitzt ein Fleck in der falschen Farbe an ihrer Kante. */
+  flaeche: "leiste" | "inhalt";
   offen: boolean;
   /** `id` der Leiste, die er auf- und zuklappt. */
   steuert: string;
@@ -57,16 +68,25 @@ export function LeistenPill({
       data-leisten-pill={seite}
       data-richtung={richtung}
       className={cn(
-        // Der halbe Pill: gerundet nur zur AUSSENSEITE, und um die halbe eigene
-        // Breite über die Kante geschoben. `top-8` ist die Mitte der 4rem hohen
-        // Kopfzeile — der eine Ort, an dem beide Leisten schon heute dieselbe
-        // Höhe haben.
-        "absolute top-8 z-10 flex h-10 w-5 -translate-y-1/2 items-center justify-center",
-        "border border-line bg-canvas text-ink shadow-soft transition-colors",
-        "hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        // `top-8` ist die Mitte der `h-16`-Kopfzeile (4rem) — der eine Ort, an
+        // dem beide Leisten schon heute dieselbe Höhe haben. **Ändert jemand
+        // die Höhe dieser Zeile, sitzt die Ausbuchtung schief, und kein Test
+        // merkt es** — jsdom kennt keine Geometrie.
+        //
+        // `w-6` sind 24 px, und das ist kein gerundeter Zufall: WCAG 2.2
+        // verlangt für ein Ziel mindestens 24 × 24 px.
+        "absolute top-8 z-10 flex h-10 w-6 -translate-y-1/2 items-center justify-center",
+        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
+        flaeche === "leiste"
+          ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active"
+          : "bg-canvas text-muted hover:text-ink",
+        // Der Schatten ist GERICHTET — nach aussen, weg von der Leiste. Ein
+        // Schatten ringsum sähe aus wie eine schwebende Marke; so sieht es aus,
+        // als würfe die Leiste ihre eigene Wölbung.
         seite === "links"
-          ? "right-0 translate-x-1/2 rounded-r-full border-l-0"
-          : "left-0 -translate-x-1/2 rounded-l-full border-r-0",
+          ? "right-0 translate-x-1/2 rounded-r-full shadow-[3px_0_8px_-2px_rgb(15_29_51_/_0.18)]"
+          : "left-0 -translate-x-1/2 rounded-l-full shadow-[-3px_0_8px_-2px_rgb(15_29_51_/_0.18)]",
       )}
     >
       <Icon

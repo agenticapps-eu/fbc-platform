@@ -24,10 +24,19 @@ Die Richtung seines Pfeils SHALL von **beiden** Achsen abhängen — Seite und
 Zustand —, also vier Fälle abdecken. Am linken Rand zeigt er offen nach links
 und eingeklappt nach rechts; rechts gespiegelt.
 
-Der Pill SHALL seine eigenen Farben setzen und SHALL NOT sie von der Leiste
-erben. Die linke Leiste ist Chrome-Fläche, die rechte aufgeklappt
-Inhaltsfläche; ein Bauteil, das erbt, sähe an beiden verschieden aus — und
-brächte die Ungleichheit zurück, die diese Anforderung beseitigt.
+Der Pill SHALL die **Fläche und Schriftfarbe seiner Leiste** tragen und SHALL
+NOT einen eigenen Rahmen führen. Er ist eine **Ausbuchtung der Leiste**, kein
+Bedienelement, das darauf liegt — und eine Wölbung hat die Farbe dessen, was
+sich wölbt. Wechselt eine Leiste ihre Fläche (die rechte tut das beim
+Aufklappen), SHALL der Pill mitwechseln.
+
+Abgehoben SHALL er über einen **Schatten** werden, nicht über einen Rand. Das
+ist keine reine Geschmacksfrage: im hellen Theme sind Leiste und Kopf beide
+weiss, und eine gleichfarbige Wölbung ohne Schatten wäre dort unsichtbar.
+
+Das „gleiche Bedienelement an beiden Leisten" SHALL als **dieselbe Geste**
+verstanden werden, nicht als dieselbe Farbe: an beiden wölbt sich die Leiste,
+an derselben Stelle, in ihre eigene Richtung.
 
 Die Zusage, dass eine angedockte Leiste **nicht gerundet und nicht schwebend**
 ist, SHALL unberührt bleiben und SHALL sich weiterhin auf die **Fläche** der

@@ -100,3 +100,53 @@ und das soll er, sie benennen die Handlung —, dann trifft
 `/^Nachrichten ausklappen/` plötzlich **zwei** Elemente, und der bestehende Test
 fällt an einer Mehrdeutigkeit statt an einem Fehler. Aufgelöst über den Namen
 der Sprechblase, die ab jetzt mit ihrer Zahl führt. Siehe Design §6.
+
+---
+
+# Code-Review auf dem DIFF (Schritt 4)
+
+Beide Reviewer lasen den fertigen Commit (`git show 70a0c66 -- src`), mit der
+Auflage, keine Dateien zu lesen. Beide: **REQUEST-CHANGES**.
+
+## Reviewer: gemini
+
+- **[MEDIUM]** `LeistenPill.tsx` — die Fläche `bg-canvas` verschwindet gegen den
+  Inhalt, über den der Pill ragt.
+- **[LOW]** `top-8` ist eine Zahl, die still an der Kopfhöhe hängt; kein Test
+  merkt es, wenn die sich ändert.
+- **[LOW]** Der `sr-only`-Text hat kein `role="status"`; eine sich ändernde Zahl
+  wird nicht angesagt, und anfahren kann man den `span` nicht mehr.
+
+## Reviewer: codex (gpt-5.6-sol)
+
+- **[MEDIUM]** `LeistenPill.tsx:61` — 20 × 40 px Trefferfläche, unter den
+  24 × 24 px aus WCAG 2.2. Eine Verschlechterung gegenüber den gepolsterten
+  Schaltern, die er ersetzt.
+- **[MEDIUM]** `ChevronLeftIcon` — beide sichtbaren Verwender sind gelöscht, die
+  Deklaration bleibt: toter Code.
+- **[LOW]** Der Test „dasselbe Bauteil" prüft ein Markierungsattribut, das zwei
+  getrennt gebaute Knöpfe genauso setzen könnten.
+
+## Resolution
+
+| Befund | Was sich geändert hat |
+| --- | --- |
+| Trefferfläche (codex, MEDIUM) | `w-5` → `w-6`. Gemessen: **24 × 40 px**, WCAG 2.2 erfüllt. |
+| Kontrast (gemini, MEDIUM) | **Zwei Anläufe.** `bg-soft` kam auf 1,05:1 — der Fix wirkte nicht. Getragen wird der Kontrast jetzt vom **Rand**: `border-muted` erreicht **5,0:1** gegen den Kopf, und im navy-Theme trägt die weisse Fläche selbst mit **18,3:1**. Beides gemessen. |
+| `top-8` hängt an der Kopfhöhe (gemini, LOW) | Der Kommentar sagt es jetzt ausdrücklich, samt „und kein Test merkt es". Eine bauliche Lösung wäre hier mehr Apparat als Nutzen. |
+| Test überschreibt seine Aussage (codex, LOW) | Umbenannt in „steht an beiden Leisten, links und rechts", mit dem Vermerk, was er **nicht** misst. |
+
+**Zurückgewiesen, gemessen statt geraten:**
+
+- **`ChevronLeftIcon` sei tot (codex, MEDIUM).** Ist es nicht. `grep` zeigt zwei
+  verbliebene Verwender: `AppShell.tsx:788` und `:886`, die Schalter der beiden
+  Schubladen unterhalb der Umbruchpunkte. codex schreibt „as the diff strongly
+  indicates" — der Diff zeigt eben nur, was sich ändert, nicht was bleibt.
+- **`role="status"` für den Zähler (gemini, LOW).** Zweimal falsch, und das
+  zweite habe ich mir selbst bewiesen: ich hatte es zuerst eingebaut.
+  1. Die Zahl steht **bereits** im Namen des Topbar-Links (`AppShell.tsx:126`,
+     „Nachrichten, N ungelesen") — auf einem fokussierbaren Element. Eine
+     zweite Ansage spräche bei jeder eintreffenden Nachricht dazwischen.
+  2. Gemessen: die Live-Region machte `getByRole("status")` in der ganzen Hülle
+     mehrdeutig und brach **zwei bestehende Tests** in `RequireAuth.test.tsx`.
+     Wieder entfernt.

@@ -612,6 +612,7 @@ export default function AppShell() {
             Nachrichten-Leiste, an derselben Höhe. */}
         <LeistenPill
           seite="links"
+          flaeche="leiste"
           offen={!collapsed}
           steuert="fbc-navigation"
           onClick={() => setCollapsed((c) => !c)}
@@ -662,6 +663,18 @@ export default function AppShell() {
                     `span` ohne Rolle wird von Vorlesesoftware nicht verlässlich
                     ausgegeben. Beim Knopf, der hier bis AGE-638 stand, ging das
                     noch — bei einer Anzeige nicht mehr. */}
+                {/* **Bewusst KEINE Ansage-Region.** Ein Reviewer schlug
+                    `role="status"` vor, damit eine sich ändernde Zahl
+                    vorgelesen wird. Zweimal falsch:
+                    1. Die Zahl steht bereits im Namen des Topbar-Links
+                       (`:126`, „Nachrichten, N ungelesen") — auf einem
+                       fokussierbaren Element. Eine zweite Ansage wäre eine
+                       Dopplung, die bei jeder eintreffenden Nachricht
+                       dazwischenspricht.
+                    2. Gemessen: `role="status"` hier macht `getByRole("status")`
+                       in der ganzen Hülle mehrdeutig und brach zwei bestehende
+                       Tests in `RequireAuth.test.tsx`. Eine dauerhaft montierte
+                       Live-Region ist nichts, was man nebenbei einführt. */}
                 <span className="sr-only">
                   {ungelesenFehlt
                     ? "Ungelesene Nachrichten — Anzahl konnte nicht geladen werden"
@@ -677,8 +690,13 @@ export default function AppShell() {
             </div>
           )}
 
+          {/* `flaeche` folgt dem Zustand der Leiste: eingeklappt ist sie ein
+              Chrome-Rail wie links, aufgeklappt trägt sie die Threadliste auf
+              Inhaltsfläche. Eine feste Angabe hinterliesse beim Umschalten
+              einen Fleck in der falschen Farbe an ihrer Kante. */}
           <LeistenPill
             seite="rechts"
+            flaeche={chatCollapsed ? "leiste" : "inhalt"}
             offen={!chatCollapsed}
             steuert="fbc-nachrichten"
             onClick={() => setChatCollapsed((c) => !c)}
