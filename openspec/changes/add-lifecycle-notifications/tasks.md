@@ -1,13 +1,11 @@
 # Tasks
 
-## 1. Bell wiring
+## 1. Bell wiring — HERAUSGELÖST am 27.08.2026
 
-- [ ] 1.1 Wire the bell to the member's unread `notifications` with a live count
-      (realtime subscription or poll)
-- [ ] 1.2 Mark-read sets only `read_at` (server time) via the owner-only policy;
-      confirm grants permit SELECT + a constrained UPDATE
-- [ ] 1.3 Handle the empty state and the RLS-rejection path (marking another
-      member's row)
+Die Verdrahtung der Glocke steht jetzt in `glocke-und-hinweistypen` (AGE-620).
+Sie braucht keine Zutat dieses Changes — kein Resend, kein Sendejournal, keine
+Sperrliste, kein `onboarded_at` — und wäre hier an ein Vorhaben gekettet
+gewesen, das im Nach-Go-Live-Backlog liegt.
 
 ## 2. Send ledger & scheduled sender
 
@@ -34,8 +32,6 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Test: bell reflects unread count; marking read sets `read_at` and
-      decrements; cannot mark another member's row
 - [ ] 5.2 Test: a due lifecycle mail sends once; a re-run does not re-send (ledger idempotency)
 - [ ] 5.3 Test: a failed send is retried without a duplicate confirmed send
 - [ ] 5.4 Test: unsubscribed / no-email / deleted member is skipped

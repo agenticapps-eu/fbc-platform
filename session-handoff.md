@@ -1,128 +1,104 @@
-# Session Handoff — 2026-08-25 (vierundzwanzigste Sitzung: AGE-582 live, AGE-587 geplant)
+# Session Handoff — 2026-08-26 (siebenunddreißigste Sitzung: AGE-583 live auf PROD)
 
-**AGE-582 ist vollständig durch — gebaut, abgenommen, gemergt, auf PROD migriert
-und ausgeliefert.** Vier PRs (#205, #207, #208, #209). Danach ist **AGE-587**
-entstanden und bis zum Gate geplant: Change geschrieben, von zwei fremden
-Vendoren gegengelesen, überarbeitet, committet. **Es existiert noch kein Code.**
+> Diese Datei liegt im WORKTREE
+> `../fbc-platform.donald-age-583-nachrichten-zaehler`, nicht im Haupt-Checkout
+> — die Sitzung war worktree-isoliert.
 
-## Accomplished
+**Alles gemerged und live.** Drei PRs durch, PROD-Migration angewandt,
+Frontend-Deploy grün und am Bundle verifiziert.
 
-### AGE-582 — Abschnitt 7 und der ganze Weg nach PROD
+| PR | Inhalt | Stand |
+| -- | -- | -- |
+| #233 | AGE-616/541 Gästeflächen | gemerged |
+| #234 | AGE-583 Nachrichten-Zähler | gemerged, live verifiziert |
+| #235 | Sprechblase statt Kuvert | gemerged, live verifiziert |
 
-Alle acht Abnahme-Aufgaben. `pnpm lint/typecheck/test/build` grün (**1546/1546**),
-pgTAP **684/684** über neun Dateien, Integrationslauf 17/17.
+Der GitHub-Actions-Ausfall (15:09–~19:0x) ist vorbei. #233 hing nur daran; nach
+Close/Reopen lief es sofort durch.
 
-**Sieben Review-Befunde von codex und gemini, alle behoben, jeder mit einer
-Gegenprobe.** Der schwerste: `post_saves` war ein **Existenz-Orakel** — ein
-`basic`-Mitglied konnte einen Beitrag speichern, den es nicht lesen darf, und am
-Unterschied zwischen „geht durch" und `23503` ablesen, ob es ihn gibt. Die
-Auskunft kam nicht aus der Policy, sondern aus dem **Fremdschlüssel**, dessen
-Prüfung an der RLS vorbeiläuft. Behoben in
-`20260825090000_post_saves_kein_existenz_orakel.sql`.
+## Was AGE-583 geworden ist
 
-**Der Weg nach PROD, in dieser Reihenfolge und je einzeln belegt:**
+Lesestand in eigener Tabelle `thread_read_positions` (eigentümerprivate RLS),
+Zähler als `SECURITY INVOKER`-Funktion, Einstieg als Sprechblase in der
+Kopfzeile, Kachel auf `/profil`, Markierung je Gespräch. Bei 0 wird nichts
+gezeigt.
 
-1. Merge (#205) → `migrate-dev` grün, `drift-gate` **failure**, Deploy `skipped`.
-2. Dry-Run gelesen — nicht im Workflow, sondern vorher gegen PROD: keine
-   Objektkollision, die einzige datenberührende Migration unkritisch (4 Beiträge,
-   0 Reaktionen), und die zwei Rechte-Entzüge gegen den Code gehalten. **Der
-   Like-Pfad wurde gemessen**: `upsert(ignoreDuplicates)` gibt 201/201 mit
-   entzogenem UPDATE-Recht, ist also `DO NOTHING`, nicht `DO UPDATE`.
-3. `Migrate PROD` dispatcht → `plan`/`apply` grün. **Unabhängig nachgemessen:**
-   Historie 86 Zeilen = 86 Dateien, jedes Recht auf PROD wie entworfen.
-4. `gh run rerun --failed` → Deploy grün. Live-Bündel an vier Zeichenketten aus
-   dem Diff geprüft, nicht an der Größe.
+**Zwei Befunde haben den Entwurf gedreht, beide aus Reviews:**
 
-### AGE-587 — geplant, gegengelesen, überarbeitet
+1. Der Schemavorschlag des Vorgangs (zwei Spalten auf `message_threads`) hätte
+   dem Gegenüber eine Lesebestätigung geliefert — `threads_select` gibt jedem
+   Teilnehmer die ganze Zeile. Die eigene Tabelle machte den Change **kleiner**:
+   die geplante `SECURITY DEFINER`-Funktion entfiel ersatzlos.
+2. `markThreadRead` schickte die **Client-Uhr** mit, während der Kommentar das
+   Gegenteil behauptete. Behoben per Trigger, der `clock_timestamp()` erzwingt.
 
-Drei Wünsche Donalds: QM-Feedback als eigene Admin-Seite mit Paging, Zähler an
-den Reitern der Mitgliederliste, Deeplink von der Aktivitäten-Karte auf den
-einzelnen Beitrag. Change `admin-und-profilflaechen`, `validate --all --strict`
-32/32.
+**Drei Messungen fielen gegen die Erwartung aus:** der von beiden Reviewern
+geforderte Index wird nie gewählt (geholfen hat `lateral`: 213 ms → 1,2 ms);
+`bigint` kommt über PostgREST als Zahl; die Kopfzeile hat bei 320 px noch 12 px
+Reserve — **ein drittes Symbol trägt sie nicht mehr.**
 
-**Der Plan-Review hat dreizehn Befunde gebracht — zwölf angenommen, einer
-widerlegt — und zwei davon haben die Bauart geändert:**
+## Neue Arbeitsregel (du, 26.08.)
 
-- **[HIGH, codex]** Die Fünf-Seiten-Grenze widersprach der eigenen Zusage: ein
-  **sichtbarer** Beitrag auf Seite 6 verletzte sie durch korrekten Code. Statt die
-  Zusage aufzuweichen, wird der Beitrag jetzt **direkt geholt** statt gesucht —
-  jeder sichtbare erreichbar, eine Anfrage statt fünf, und die
-  Ununterscheidbarkeit ist gebaut statt argumentiert (beide Fälle: null Zeilen).
-- **[MEDIUM, gemini, geschärft]** Die abgeschriebene Zustandsbedingung ist
-  entfallen; beide Funktionen **teilen** sie jetzt. Die Wächter schützen Signatur
-  und Spaltensatz von `admin_list_members`, **nicht den Rumpf**. Dieses Repo hat
-  die Regel am Vortag selbst aufgeschrieben (Sidebar-Migration, AGE-582).
-- **[MEDIUM, codex]** Und ein Befund hat den Plan *verbessert*: **fünf der sieben
-  alten Zusagen dürfen NICHT umgeschrieben werden.** Weil die Funktion
-  Vorgabewerte bekommt, bleibt der argumentlose Aufruf gültig — die fünf sind
-  damit Wächter über genau diese Vorgabewerte.
-
-**Widerlegt:** geminis HIGH über einen Seitenkanal in der Zahl der Anfragen. Sein
-eigenes Szenario zeigt, dass unsichtbar und nicht vorhanden dieselbe Zahl
-erzeugen; verschieden ist nur der sichtbare Beitrag. Codex bestätigte es
-unabhängig.
-
-## Decisions
-
-- **AGE-582:** das `exists` in der neuen Policy ist keine vierte Abschrift des
-  Prädikats — ein Policy-Ausdruck läuft mit den Rechten des Aufrufers und
-  **wendet** `posts_select_by_visibility` an. Die Zusage lautet „beide Wege enden
-  **zeichengleich**", nicht „unsichtbar wird abgelehnt".
-- **AGE-587, Donalds Entscheidungen (25.08.):** die alte Karte verschwindet ganz ·
-  Umfang ist Liste mit Paging, keine Filter, kein Bearbeitungsstand · **jede Zeile
-  springt zu IHREM Beitrag** (nicht die Karte in den Feed) · Ersatztext **„Beitrag
-  ohne Text"** statt „Beitrag mit Bild", nachdem der Review belegt hat, dass die
-  Bild-Behauptung nicht stimmen muss · Chat später per eigenem Prompt · anonymes
-  Feedback ins Backlog (AGE-588).
-- **`profile_id` verlässt die RPC**, obwohl sie heute keinen Aufrufer hat — die
-  Funktion wird fürs Paging ohnehin abgerissen, später kostete dieselbe Zeile eine
-  zweite Migration.
-- **Die Zähler sind global**, auch bei aktiver Suche. Der Reiter beantwortet „wie
-  viele gibt es", nicht „wie viele meiner Treffer".
-
-## Files modified
-
-**AGE-582** (gemergt): `20260825090000_post_saves_kein_existenz_orakel.sql` (neu) ·
-`feed_sidebar_test.sql` 18 → 26 · `post_saves_test.sql` 24 → 29 ·
-`CommunityFeed.tsx` · drei Testdateien · `feed.auswahl.integration.test.ts`.
-
-**AGE-587** (Branch `donald/age-587-admin-und-profilflaechen`, `f0b59d1`,
-gepusht, **noch kein PR**): `openspec/changes/admin-und-profilflaechen/` —
-proposal, design, REVIEWS.md, vier Spec-Deltas, tasks.md (9 Abschnitte).
+**Plan- und Diff-Review nur noch bei Migration, Rechten oder Sicherheit.** UI
+und Text gehen direkt durch. Anlass war, dass ich zu lange brauche — ein Teil
+davon war der Ablauf, ein Teil meine Umwege (falscher Port, falsches
+Messwerkzeug, eine falsch gelesene Zeitachse). Als Memory festgehalten.
 
 ## Next session: start here
 
-**Erste Handlung: Schritt 3 der Schleife, der Bau von AGE-587** — der Branch ist
-gepusht, das Gate ist offen (`validate --all` 32/32, Change committet). Anfangen
-bei **Aufgabe 1.1** und der Reihe nach.
+**Change 2: `glocke-und-hinweistypen`** — von dir am 26.08. entschieden. Glocke
+verdrahten (die Anforderung dafür liegt im offenen Change
+`add-lifecycle-notifications`/AGE-299 und ist dort herauszulösen) plus fünf neue
+Typen: neues Mitglied, neuer Beitrag, neues Event, Kommentar und Like auf meinen
+Beitrag. Mit **Fan-out** je aktiviertem Mitglied und **Opt-out** in den
+Einstellungen.
 
-Die wichtigste Falle steht in der Aufgabenliste, hier noch einmal: **1.3 ändert
-den Rumpf von `admin_list_members`.** Signatur und Spaltensatz müssen Zeichen für
-Zeichen gleich bleiben; die Abnahme dieses Schritts ist, dass
-`admin_member_list_test.sql` **unverändert** grün bleibt — nicht angepasst,
-unverändert.
+`notifications` hat bereits `read_at`, volle CRUD-Grants und die
+`notifications_own`-Policy — die Glocke selbst braucht **keine Migration**, nur
+Frontend. Die fünf Typen brauchen Trigger auf `profiles`, `posts`, `events`,
+`comments` und `post_likes`.
+
+**Meine Sorge, unverändert:** das sind Schreib-Trigger auf fünf Tabellen, Tage
+vor dem Go-Live. Bauen ja — scharfschalten würde ich erst danach.
+
+**Und beim Verdrahten der Glocke die 320-px-Breite messen**, nicht hoffen: mit
+Sprechblase und Glocke sind 12 px übrig.
 
 ## Open questions
 
-- **Wie viele Feedbacks je Seite?** 25 wie die Mitgliederliste, falls Donald
-  nichts anderes sagt.
-- **`fbc-probe-a4664fb5.pages.dev` ist veraltet** und bleibt es. Belegt: in
-  `.github/workflows/` kommt „probe" **kein einziges Mal** vor, `deploy.yml:686`
-  liefert nur `--project-name=fbc-platform`. Es ist ein zweites, handgepflegtes
-  Pages-Projekt — kein Preview. Nachziehen geht auf Zuruf.
-- **`EnvironmentBanner.tsx:24`** trägt die einzige `dark:`-Regel im ganzen `src/`.
-  Sie hängt an `prefers-color-scheme`, nicht am Theme dieser App: bei dunkler
-  Systemeinstellung **1,05:1 gemessen** gegen 7,63:1 hell. Vorbestehend seit
-  AGE-496, ein Zeichen Arbeit.
-- **`like` in `InteraktionsLeiste`** hat dieselbe Form wie das behobene `save` —
-  `onSuccess` ohne `return`. Vorbestehend.
-- **Die nackte Video-URL** steht als Text in den Aktivitäten-Karten. Vermerkt,
-  nicht Teil von AGE-587.
-- Unverändert offen: RLS-Kosten von `posts_select_by_visibility` (Faktor 195) ·
-  `post_engagement_counts` mit toten `prime`/`legacy`-Zweigen · Aktivierungsversand
-  (69 von 72; Donald: „das ist okay") · `academy.ts` unformatiert · vier gepushte
-  Commit-Messages mit falschem Tag · drei abweichende Anmeldeadressen · ein echter
-  Mitgliedsname in der Git-Historie · Rotation des PROD-DB-Passworts · vier
-  Review-Befunde aus 11.5 · kein Nachsetz-Weg für eine gelöschte Zeile ohne Ban ·
-  `grund` ohne Aufrufer · `admin_audit.actor` ohne `on delete cascade` ·
-  Downgrade (AGE-516) · `admin_list_feedback()` ohne Paging **(löst AGE-587)**.
+- **`fetchThreads` lädt alle Nachrichten aller Threads** (`chat.ts:155-159`,
+  kein `limit`). Bestehender Mangel, nicht angefasst; zwei Reviewer zeigten
+  unabhängig darauf. Eigener Vorgang.
+- **`database.types.ts` von Hand** — beide Reviewer melden Driftgefahr, zu
+  Recht. Der Fix (Fixtures an den echten Rückgabevertrag) ist ein eigener
+  Vorgang.
+- **Der `codex`-Reviewer prüft nicht selbst**, er startet Unter-Reviewer und
+  liefert deren Antwort unter seinem Namen — einmal sogar `claude`, den eigenen
+  Anbieter. Als Memory festgehalten. `gemini` und `opencode` sind die
+  verlässlichen zwei.
+- **Schreibende PROD-Wege blockt der Klassifikator.** `gh workflow run
+  migrate-prod.yml --ref main` musst du selbst starten (`! `-Präfix im Prompt).
+- Unverändert offen: AGE-610 (Detlev/Anwalt) · Aktivierungsversand 69 von 72 ·
+  Rotation des PROD-DB-Passworts · Verzeichnis-Sichtbarkeit C3 (AGE-598) ·
+  `effbeezee.com` zeigt auf Strato (AGE-256) · Fotografennamen in `CREDITS.md`
+  seit 04.08. · `AppShell.tsx` führt `/login` in `NARROW_ROUTES` (toter Eintrag).
+- **Lokaler Stack trägt Testdaten**: Anna/Bernd aus
+  `scripts/chat-testkonten.ts` plus `dritter@` und `unbestaetigt@` aus dem
+  Realtime-Test. Nur lokal.
+- **Worktrees**: `donald/age-583-nachrichten-zaehler` und
+  `donald/age-583-nachrichten-icon` sind gemerged und können mit `wt remove`
+  weg; `donald/age-616-gaeste-flaechen` ebenfalls.
+
+## Lokal ansehen
+
+`pnpm dev` geht aus einer Agenten-Sitzung nicht (Infisical braucht ein TTY):
+
+```
+VITE_SUPABASE_URL=http://127.0.0.1:54321 \
+VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
+VITE_ENVIRONMENT=local \
+npx vite --port 5199
+```
+
+Dann `http://localhost:5199` — **nicht** `127.0.0.1:5199`, dort antwortet ein
+fremder Python-Server. Anmelden: `anna@chattest.invalid` / `Testchat2026!`.

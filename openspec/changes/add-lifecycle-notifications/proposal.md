@@ -3,16 +3,22 @@
 ## Why
 
 Today the `notifications` table, its owner-only RLS, and server-side inserts exist,
-and a single transactional contact-request email is delivered via Resend — but the
-notification-bell UI is not wired to read or mark notifications, and there is no
-lifecycle/nudge mail system. New members can also stall mid-onboarding with nothing
-prompting them to finish. Linear: **AGE-299** (lifecycle mails via Resend + nudge
-system + bell wiring) and **AGE-261** (onboarding full build).
+and a single transactional contact-request email is delivered via Resend — but there
+is no lifecycle/nudge mail system. New members can also stall mid-onboarding with
+nothing prompting them to finish. Linear: **AGE-299** (lifecycle mails via Resend +
+nudge system) and **AGE-261** (onboarding full build).
+
+**Die Verdrahtung der Glocke ist am 27.08.2026 herausgelöst worden** — sie steht
+jetzt in `glocke-und-hinweistypen` (AGE-620) und wird dort zusammen mit fünf neuen
+In-App-Hinweistypen gebaut. Grund: die Glocke braucht keine der Zutaten dieses
+Changes (kein Resend, kein Sendejournal, keine Sperrliste, kein
+`onboarded_at`) — sie liest die Tabelle, die es längst gibt. Sie hier zu lassen
+hätte eine Ein-Tages-Aufgabe an ein Vorhaben gekettet, das im
+Nach-Go-Live-Backlog liegt. Dieser Change behält den **Mail-Teil** und bleibt
+dort.
 
 ## What Changes
 
-- Wire the in-app bell to the member's unread notifications; marking read sets only
-  `read_at` via the existing owner-only policy.
 - Add a **scheduled lifecycle-mail sender** (distinct from the transactional
   contact-request mail) with a **durable send ledger** keyed `(member, mail_type,
 occurrence)` for idempotency and attempted-vs-confirmed retry semantics.

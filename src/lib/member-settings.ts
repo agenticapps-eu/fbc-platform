@@ -13,13 +13,25 @@ export interface MemberSettings {
   notify_email_digest: boolean;
   visible_in_directory: boolean;
   contactable_by_prime: boolean;
+  /* Die vier In-App-Schalter der Glocke (AGE-620). Sie stehen bewusst HIER und
+     nicht auf einem eigenen schmalen Pfad wie `theme` und `onboarded_at`: die
+     beiden bekamen einen, weil sie ANDERSWO umgelegt werden (Design-Umschalter,
+     Onboarding-Strecke) und ein breiter Upsert sie mit einem veralteten
+     Cache-Wert ueberschriebe. Diese vier werden im selben Formular bearbeitet
+     wie die E-Mail-Schalter darueber — derselbe Lesezeitpunkt, derselbe
+     Schreibvorgang, kein Fenster fuer die Kollision. */
+  notify_inapp_post: boolean;
+  notify_inapp_event: boolean;
+  notify_inapp_comment: boolean;
+  notify_inapp_like: boolean;
 }
 
 /** Die Felder, die wirklich in member_settings liegen. */
 type StoredSettings = Omit<MemberSettings, "visible_in_directory">;
 
 const STORED_COLUMNS =
-  "notify_email_requests, notify_email_events, notify_email_digest, contactable_by_prime";
+  "notify_email_requests, notify_email_events, notify_email_digest, contactable_by_prime, " +
+  "notify_inapp_post, notify_inapp_event, notify_inapp_comment, notify_inapp_like";
 
 /** Defaults entsprechen den DB-Defaults der Migrationen — bestehendes Verhalten bleibt unverändert. */
 export const DEFAULT_MEMBER_SETTINGS: MemberSettings = {
@@ -28,6 +40,10 @@ export const DEFAULT_MEMBER_SETTINGS: MemberSettings = {
   notify_email_digest: false,
   visible_in_directory: true,
   contactable_by_prime: true,
+  notify_inapp_post: true,
+  notify_inapp_event: true,
+  notify_inapp_comment: true,
+  notify_inapp_like: true,
 };
 
 export const memberSettingsQueryKey = (uid: string) => ["member-settings", uid] as const;
@@ -154,6 +170,10 @@ export async function fetchMemberSettings(uid: string): Promise<MemberSettings> 
     notify_email_events: DEFAULT_MEMBER_SETTINGS.notify_email_events,
     notify_email_digest: DEFAULT_MEMBER_SETTINGS.notify_email_digest,
     contactable_by_prime: DEFAULT_MEMBER_SETTINGS.contactable_by_prime,
+    notify_inapp_post: DEFAULT_MEMBER_SETTINGS.notify_inapp_post,
+    notify_inapp_event: DEFAULT_MEMBER_SETTINGS.notify_inapp_event,
+    notify_inapp_comment: DEFAULT_MEMBER_SETTINGS.notify_inapp_comment,
+    notify_inapp_like: DEFAULT_MEMBER_SETTINGS.notify_inapp_like,
   };
   return {
     ...s,
