@@ -38,7 +38,7 @@
 --     Fehlermeldung — und mit einer Gegenprobe, die sich bewegt.
 
 begin;
-select plan(16);
+select plan(21);
 
 -- ── Fixtures ───────────────────────────────────────────────────────────────
 -- Zwei Mitglieder mit Adresse, eines ohne Adresszeile, eines ohne Namen.
@@ -197,6 +197,54 @@ select ok(
      'a0000000-0000-4000-8000-000000000003',
      'a0000000-0000-4000-8000-000000000001')),
   'Nachbarfall: derselbe Aufruf liefert den Namen des Gegenuebers sehr wohl');
+
+-- Konto 3 hat KEINEN Namen. Bisher wurde es nur als Empfaenger abgefragt, nie
+-- als Gegenueber — der `other_name is null`-Fall blieb also ungeprueft, obwohl
+-- die Spec ihn zusichert und `index.ts` mit `?? ""` darauf baut. (codex, LOW)
+select ok(
+  (select other_name is null from public.notify_contact_request_daten(
+     'c0000000-0000-4000-8000-000000000002',
+     'a0000000-0000-4000-8000-000000000001',
+     'a0000000-0000-4000-8000-000000000003')),
+  'Gegenueber ohne Namen: das Namensfeld ist leer, die Zeile kommt trotzdem');
+
+select is(
+  (select count(*)::int from public.notify_contact_request_daten(
+     'c0000000-0000-4000-8000-000000000002',
+     'a0000000-0000-4000-8000-000000000001',
+     'a0000000-0000-4000-8000-000000000003')),
+  1,
+  'Gegenueber ohne Namen: es bleibt bei genau einer Zeile');
+
+-- ══ 6. DIE VIER FELDER, DIE DER AUFRUFER VERGLEICHT ════════════════════════
+-- `passtZurDatenbank` prueft `id`, `from_id`, `to_id` und `status`. Projiziert
+-- die RPC eines davon falsch — etwa from/to vertauscht —, blieben alle Zusagen
+-- oben gruen, der Handler antwortete aber 409 und es ginge NIE eine Mail
+-- hinaus. Genau dieser Fall war ungeprueft. (codex, MEDIUM)
+
+select is(
+  (select id from public.notify_contact_request_daten(
+     'c0000000-0000-4000-8000-000000000001',
+     'a0000000-0000-4000-8000-000000000002',
+     'a0000000-0000-4000-8000-000000000001')),
+  'c0000000-0000-4000-8000-000000000001'::uuid,
+  'Die Auskunft liefert die id der Zeile');
+
+select is(
+  (select from_id || '/' || to_id from public.notify_contact_request_daten(
+     'c0000000-0000-4000-8000-000000000001',
+     'a0000000-0000-4000-8000-000000000002',
+     'a0000000-0000-4000-8000-000000000001')),
+  'a0000000-0000-4000-8000-000000000001/a0000000-0000-4000-8000-000000000002',
+  'from_id und to_id kommen in der Reihenfolge der ZEILE, nicht der Parameter');
+
+select is(
+  (select status from public.notify_contact_request_daten(
+     'c0000000-0000-4000-8000-000000000001',
+     'a0000000-0000-4000-8000-000000000002',
+     'a0000000-0000-4000-8000-000000000001')),
+  'pending',
+  'Der Status wird unveraendert durchgereicht');
 
 select * from finish();
 rollback;

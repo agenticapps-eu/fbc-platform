@@ -144,7 +144,12 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Name lookup failure degrades gracefully (templates fall back to generic copy).
+  // Ein FEHLENDER Name degradiert weiterhin sanft — die Vorlagen fallen auf
+  // ihren allgemeinen Wortlaut zurück. Ein FEHLER beim Lesen tut das seit
+  // AGE-623 nicht mehr: früher lag der Name in einer eigenen Abfrage, deren
+  // Fehler ungeprüft blieb und stillschweigend zu einer Mail ohne Namen führte;
+  // jetzt trägt ein Fehler den ganzen Aufruf und endet oben in 502. Das ist
+  // Absicht — der Webhook wiederholt dann, statt eine halbe Mail zu verschicken.
   const otherName = daten?.other_name ?? "";
   let email: RenderedEmail;
   switch (decision.kind) {

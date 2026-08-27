@@ -142,3 +142,74 @@ die Reihenfolge verkehrt herum. Er wird mit dem Folgevorgang geführt.
   Anforderung sind übernommen, zwei neu, … nichts fällt still." Das ist die
   unabhängige Bestätigung gegen die Falle, an der das Archivieren sonst bricht.
 - **502-Semantik** und **Zeilenangabe `101-112` → `91-94`**: beide übernommen.
+
+# Code-Review auf den Diff (Schritt 4)
+
+Zweiter Durchgang, diesmal am **Code** statt am Plan.
+
+| Reviewer | Ergebnis |
+| --- | --- |
+| gemini | eingeschränkt: der Lauf verlor seine Werkzeuge (`run_shell_command not found`) und kam nur zu einem LOW |
+| codex (`GPT-5 Codex`) | vollständig, fünf Befunde |
+
+## gemini — LOW
+
+`status` werde als Enum behandelt, obwohl die RPC `text` liefert. **Bereits im
+Code beantwortet:** `contact_requests` trägt
+`CHECK (status = ANY (ARRAY['pending','accepted','declined']))`, der engere Typ
+ist also von der Datenbank gedeckt, und ein abweichender Wert liefe in
+`passtZurDatenbank` auf einen fehlgeschlagenen Abgleich — fail closed. Der
+Kommentar an `MailAuskunft` sagt genau das.
+
+## codex — MEDIUM: der Namensfehler ist kein sanfter Rückfall mehr
+
+> Die gebündelte RPC macht aus einem früher tolerierten Fehler der Namensabfrage
+> nun einen 502, obwohl Zeile 147 weiterhin Graceful Degradation verspricht.
+
+**Berechtigt — der Kommentar log, nicht der Code.** Früher lag der Name in einer
+eigenen Abfrage, deren Fehler *ungeprüft* blieb: eine kaputte Namensabfrage
+führte still zu einer Mail ohne Namen. Jetzt trägt ein Fehler den ganzen Aufruf
+und endet in 502, der Webhook wiederholt. Das ist die bessere Eigenschaft, aber
+der Kommentar behauptete das Gegenteil. Er benennt jetzt beide Fälle getrennt:
+ein **fehlender** Name degradiert sanft, ein **Fehler** nicht.
+
+## codex — MEDIUM: die vier Vergleichsfelder waren ungeprüft
+
+> Keine der 16 Zusagen prüft `id`, `from_id`, `to_id` oder `status`, sodass
+> vertauschte Vergleichsfelder grün bleiben und der Handler anschließend 409
+> liefert.
+
+**Die härteste Lücke der Runde, geschlossen.** `passtZurDatenbank` vergleicht
+genau diese vier Felder. Eine falsche Projektion — etwa `from`/`to` vertauscht —
+wäre durch alle 16 Zusagen gelaufen, und der Handler hätte jede Mail mit 409
+verworfen. Drei neue Zusagen decken `id`, das Paar `from_id`/`to_id` und
+`status` ab.
+
+**Mit Gegenprobe belegt, nicht behauptet:** mit vertauschter Projektion fällt
+genau Test 20 (`Failed 1/21`), mit der Migrationsfassung sind alle 21 grün. Der
+Test misst also wirklich.
+
+## codex — LOW: der `other_name`-Fallback war ungetestet
+
+**Berechtigt, geschlossen.** Das namenlose Fixture wurde nur als *Empfänger*
+abgefragt, nie als *Gegenüber*. Zwei neue Zusagen prüfen jetzt, dass ein
+Gegenüber ohne Namen ein leeres Feld ergibt und die Zeile trotzdem kommt.
+
+## codex — LOW: die Rechte-Gegenprobe erfülle sich selbst
+
+> Die beiden Gegenproben erfüllen sich durch das unmittelbar vorherige `grant`
+> beziehungsweise `revoke` selbst und messen nicht die Migration.
+
+**Zutreffend beschrieben, aber das ist ihre Aufgabe.** Was die Migration
+ausspricht, messen die Zusagen davor (`anon`/`authenticated` haben kein
+`execute`). Die Gegenprobe daneben beantwortet eine andere Frage: bewegt sich
+die Sonde überhaupt? Ohne sie wären zwei Negativzusagen auch dann grün, wenn die
+Rolle das Recht nie halten könnte. Beide zusammen tragen erst die Aussage; keine
+Änderung.
+
+## codex — LOW: Selbstbezugsfall ohne Zusage
+
+**Anerkannt, nicht aufgenommen.** Für `p_recipient_id = p_other_id` verlangt das
+Prädikat `from_id = to_id` — eine Anfrage an sich selbst. Die Auskunft gäbe dann
+die eigene Adresse zurück, also nichts, was der Aufrufer nicht schon hätte. Eine
+Zusage darüber pinnte einen Zustand, den das Produkt nicht kennt.
