@@ -10,21 +10,44 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
 
 ## 1. Migration: Aktivitätsspalten auf `message_threads`
 
-- [ ] **RED**: pgTAP — `message_threads` hat `last_message_at`,
+- [x] **RED**: pgTAP — `message_threads` hat `last_message_at`,
       `last_message_body`, `last_message_sender_id`; ein Insert in `messages`
       setzt alle drei; ein zweiter Insert überschreibt sie.
-- [ ] Migration mit Entscheidungskopf (signiert, datiert, verworfene
+      → `supabase/tests/thread_aktivitaet_test.sql`, 15/15 rot vor der
+      Migration („column last_message_body does not exist").
+- [x] Migration mit Entscheidungskopf (signiert, datiert, verworfene
       Alternative = DEFINER-RPC): drei Spalten, `security definer`-Trigger auf
       `messages` (after insert), Index auf `(last_message_at desc)`.
-- [ ] **RED**: pgTAP — `authenticated` hat **kein** UPDATE-Recht auf
+      → `20260827120000_thread_aktivitaetsspalten.sql`.
+- [x] **RED**: pgTAP — `authenticated` hat **kein** UPDATE-Recht auf
       `message_threads`, auch kein spaltenweises. Positivkontrolle: der Trigger
-      schreibt trotzdem.
-- [ ] **RED**: pgTAP — ein Dritter sieht die neuen Spalten **nicht**
-      (`threads_select` unverändert wirksam).
-- [ ] Rückfüllung für bestehende Threads im selben Migrationsschritt.
-- [ ] `grants_test.sql` gegenprüfen: Golden-Snapshot muss **unverändert**
+      schreibt trotzdem — gemessen unter der Identität des Absenders.
+- [x] **RED**: pgTAP — ein Dritter sieht die neuen Spalten **nicht**
+      (`threads_select` unverändert wirksam), mit Positivkontrolle am
+      Teilnehmer und der Gegenprobe auf `messages`.
+- [x] Rückfüllung für bestehende Threads im selben Migrationsschritt.
+      **Nicht in `db reset` messbar** — sie läuft vor jedem Fixture, und es gibt
+      keine `seed.sql`. Ein Test dafür müsste die UPDATE-Anweisung abschreiben
+      und prüfte seine eigene Kopie. Der Beleg gehört an den Rollout: siehe
+      Band 8.
+- [x] `grants_test.sql` gegenprüfen: Golden-Snapshot muss **unverändert**
       bleiben. Ändert er sich, ist versehentlich ein Recht entstanden.
-- [ ] **GRÜN**, auch nach `supabase db reset`.
+      → unverändert, `grants_test.sql` grün ohne eine einzige Änderung.
+- [x] **GRÜN**, auch nach `supabase db reset`. 820 + 15 pgTAP-Zusagen grün.
+
+**Zwei Dinge kamen beim Bauen dazu, beide begründet in der Migration:**
+
+- [x] **Zweiter Trigger, `before insert on message_threads`.** Das INSERT-Recht
+      auf der Tabelle **besteht** (`20260715140000:68`, tabellenweit) — ohne
+      Vorkehrung könnte ein Mitglied beim Anlegen des Threads eine **erfundene
+      Vorschauzeile** setzen, die sein Gegenüber zu sehen bekäme. Der Plan sah
+      nur die UPDATE-Tür. Gegenprobe: Trigger entfernt → genau Test 10 fällt.
+- [x] **Der Sortierschlüssel geht nur vorwärts.** `messages.created_at` ist vom
+      Client setzbar; eine rückdatierte Nachricht dürfte den Thread nicht nach
+      unten ziehen. Gegenprobe: Bedingung entfernt → genau Test 8 fällt.
+- [x] `src/lib/database.types.ts` von Hand nachgezogen — die drei Spalten
+      stehen **nur in `Row`**. `supabase gen types` NICHT darüberlaufen lassen.
+- [x] `ci.yml` trägt die neue Testdatei ein.
 
 ## 2. `fetchThreads` liest die neue Form
 
@@ -34,6 +57,9 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
       Ergebnis.
 - [ ] `fetchThreads(uid, { limit, offset })`; `threadsQueryKey` bekommt die
       Seitenparameter.
+- [ ] **`nullsFirst: false` beim `order`.** `desc` ist in Postgres
+      `nulls first` — ein Thread ohne einzige Nachricht stünde sonst GANZ OBEN,
+      und der Index (`… desc nulls last`) käme nicht zum Zug.
 - [ ] Alle Invalidierungen nachziehen — `ChatPage.tsx:88,123` invalidiert heute
       unter dem alten Schlüssel.
 - [ ] `ChatPage` lädt dieselbe Seite wie das Panel. Eine Datenquelle, ein
@@ -119,5 +145,8 @@ Abfrage wäre eine Fläche, die man zurückbauen muss.
 - [ ] `supabase test db` **mit Dateiliste** — ohne sie meldet der Befehl FAIL
       trotz grün.
 - [ ] `openspec validate --all` grün.
+- [ ] **Nach `db push` auf DEV und PROD:** zählen, wieviele Threads MIT
+      Nachricht ein leeres `last_message_at` haben. Erwartet: null. Das ist der
+      einzige echte Beleg für die Rückfüllung aus Band 1.
 - [ ] Diff-Review durch einen fremden Anbieter.
 - [ ] `REVIEWS.md` um die Auflösung der übrigen Befunde ergänzen.

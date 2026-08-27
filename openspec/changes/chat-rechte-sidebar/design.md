@@ -75,6 +75,33 @@ schreibt diese Spalten nie, kann es nicht, und der Golden-Snapshot in
 `grants_test.sql` bleibt unverändert — er listet UPDATE-Spalten-Grants, und wir
 sprechen keinen aus.
 
+### Nachtrag aus der Umsetzung: „kann es nicht" hatte zwei Türen
+
+Beim Bauen von Band 1 fiel auf, dass dieser Absatz nur die UPDATE-Tür kannte.
+Die zweite steht offen: das **INSERT**-Recht auf `message_threads` besteht
+(`20260715140000:68` spricht es tabellenweit aus, `threads_insert` lässt es zu).
+Ohne Vorkehrung könnte ein Mitglied beim Anlegen des Threads eine **erfundene
+Vorschauzeile** setzen — sichtbar für sein Gegenüber, dem Trigger nie begegnet.
+
+Deshalb ein zweiter, gewöhnlicher Trigger `before insert on message_threads`,
+der die drei Werte auf `null` setzt. *Verworfen — den Tabellen-Grant durch
+`grant insert (a_profile_id, b_profile_id)` ersetzen:* schlösse dieselbe Tür,
+entfernte aber die Zeile `message_threads/authenticated=INSERT,SELECT` aus
+`role_table_grants` und bräche den Golden-Snapshot. Ein Snapshot, der sich bei
+jeder Vorkehrung bewegt, hört auf, etwas zu sagen.
+
+Ebenfalls aus der Umsetzung: `messages.created_at` ist vom Client setzbar, also
+geht der Sortierschlüssel **nur vorwärts** — sonst zöge eine rückdatierte
+Nachricht den Thread nach unten und verdrängte die jüngere Vorschauzeile.
+
+### Was das für die Abfrage in Band 2 heißt
+
+`order by … desc` ist in Postgres `nulls first`. Ein Thread **ohne** einzige
+Nachricht stünde damit ganz oben, vor jeder laufenden Unterhaltung. Der Index
+trägt die Ordnung deshalb als `(last_message_at desc nulls last)` — und die
+Abfrage muss `nullsFirst: false` mitgeben, sonst passt sie nicht zum Index und
+sortiert die leeren Threads nach vorn.
+
 ## Paging: Offset oder Cursor
 
 Codex hat zu Recht angemerkt, dass Offset-Paging auf einer live nach Aktivität

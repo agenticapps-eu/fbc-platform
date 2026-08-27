@@ -160,6 +160,7 @@ jobs:
           supabase/tests/thread_read_positions_test.sql
           supabase/tests/hinweistypen_test.sql
           supabase/tests/notify_contact_request_daten_test.sql
+          supabase/tests/thread_aktivitaet_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
