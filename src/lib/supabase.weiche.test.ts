@@ -18,7 +18,11 @@ vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform } }));
 async function clientNeuAufbauen() {
   vi.resetModules();
   await import("./supabase");
-  return createClient.mock.calls.at(-1) as unknown as [string, string, { auth?: Record<string, unknown> }];
+  return createClient.mock.calls.at(-1) as unknown as [
+    string,
+    string,
+    { auth?: Record<string, unknown> },
+  ];
 }
 
 beforeEach(() => {

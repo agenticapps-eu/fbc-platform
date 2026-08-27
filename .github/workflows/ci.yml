@@ -26,6 +26,19 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+      # AGE-642: Keine Seite darf beim ersten Aufruf mitgeladen werden ausser
+      # denen, die der erste Bildschirm braucht. Eine Zahl allein taugt dafuer
+      # nicht — sie driftet mit dem naechsten Feature und sagt beim
+      # Ueberschreiten nicht, wer sie verschoben hat. Der Waechter liest die
+      # Source-Maps der gesamten Erstlast (Eintritt plus jede vorgeladene
+      # Datei) und bricht ab, wenn er dort eine Seite findet, die nicht in
+      # seiner Erlaubnisliste steht.
+      #
+      # Steht hinter `pnpm build`, weil er das Bauergebnis braucht; er bricht
+      # von sich aus ab, wenn dieses Ergebnis unvollstaendig ist.
+      - name: Keine Seite ausser dem ersten Bildschirm in der Erstlast
+        run: pnpm tsx scripts/entry-chunk-guard.ts
+
       # Zwei Zusagen aus AGE-492, die KEIN Typecheck halten kann, weil beide
       # Strings sind: Tailwind-Klassennamen prüft TypeScript nicht, und eine
       # Font-URL ist nur Text. Ohne diesen Schritt schleichen sie sich in C2–C6

@@ -1,19 +1,35 @@
-import type { ComponentType } from "react";
+import { lazy, type ComponentType } from "react";
 import type { MembershipLevel } from "./levels";
-import AcademyPage from "../pages/AcademyPage";
-import AktivitaetPage from "../pages/AktivitaetPage";
-import ChatPage from "../pages/ChatPage";
-import NeuesPage from "../pages/NeuesPage";
-import CompassPage from "../pages/CompassPage";
 import HomeRedirect from "../components/HomeRedirect";
-import EventsPage from "../pages/EventsPage";
-import EinstellungenPage from "../pages/EinstellungenPage";
-import KontaktePage from "../pages/KontaktePage";
-import MeineEventsPage from "../pages/MeineEventsPage";
-import MitgliederPage from "../pages/MitgliederPage";
-import MitgliedschaftPage from "../pages/MitgliedschaftPage";
-import ProfilAnsichtPage from "../pages/ProfilAnsichtPage";
-import ProfilPage from "../pages/ProfilPage";
+
+/**
+ * AGE-642: Die Seiten kommen einzeln nach, nicht mit dem Erststart.
+ *
+ * Vorher hingen alle 14 hier als statische Importe und lagen damit im
+ * Eintrittsbündel — jedes Mitglied lud beim ersten Aufruf jede Seite mit, auch
+ * die, die es nie öffnet. Auf Mobilfunk ist das der Unterschied zwischen einer
+ * App, die startet, und einer, die lädt.
+ *
+ * `HomeRedirect` bleibt bewusst statisch: es ist die Startseite und damit für
+ * ausgeloggte wie eingeloggte Besucher der erste Bildschirm. Ein Ladezustand
+ * davor wäre ein leerer Start.
+ *
+ * Die Sidebar liest `path`, `label` und `section` — sie berührt `Component`
+ * nicht und merkt von dieser Änderung nichts.
+ */
+const AcademyPage = lazy(() => import("../pages/AcademyPage"));
+const AktivitaetPage = lazy(() => import("../pages/AktivitaetPage"));
+const ChatPage = lazy(() => import("../pages/ChatPage"));
+const NeuesPage = lazy(() => import("../pages/NeuesPage"));
+const CompassPage = lazy(() => import("../pages/CompassPage"));
+const EventsPage = lazy(() => import("../pages/EventsPage"));
+const EinstellungenPage = lazy(() => import("../pages/EinstellungenPage"));
+const KontaktePage = lazy(() => import("../pages/KontaktePage"));
+const MeineEventsPage = lazy(() => import("../pages/MeineEventsPage"));
+const MitgliederPage = lazy(() => import("../pages/MitgliederPage"));
+const MitgliedschaftPage = lazy(() => import("../pages/MitgliedschaftPage"));
+const ProfilAnsichtPage = lazy(() => import("../pages/ProfilAnsichtPage"));
+const ProfilPage = lazy(() => import("../pages/ProfilPage"));
 
 /**
  * Sidebar-Abschnitt (AGE-314, Spec §2):

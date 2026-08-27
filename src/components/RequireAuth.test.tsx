@@ -44,22 +44,38 @@ describe("Auth-Gating für /mein-bereich", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Basic-Nutzer Mein Bereich sehen", () => {
+  it("lässt eingeloggte Basic-Nutzer Mein Bereich sehen", async () => {
     renderAt("/mein-bereich", authAsTier("basic"));
 
     // /mein-bereich leitet auf /profil weiter; der Auth-Gate hat durchgelassen
     // und die Profilansicht rendert (Beleg: Lade-Skeleton sichtbar, kein Login).
-    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    //
+    // AGE-642: Die Seite kommt seit dem Route-Splitting asynchron nach, deshalb
+    // `findBy`. Die Verneinung steht bewusst DAHINTER: vor dem Auflösen des
+    // Chunks ist der Baum leer, und "kein Login zu sehen" waere dann wahr,
+    // ohne etwas zu belegen.
+    await screen.findByRole("status");
     expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
   });
 
-  it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", () => {
+  it("blockiert Mein Bereich nicht, während die Stufe noch lädt (nur Session nötig)", async () => {
     renderAt("/mein-bereich", authLoadingTier());
 
     // /mein-bereich → /profil (RequireAuth, kein MembershipGate): bei laufendem
     // tier-Fetch reicht die Session – kein vorzeitiger Redirect auf /login.
+    //
+    // AGE-642: Der Beleg war bis zum Route-Splitting das Lade-Skelett
+    // (`role="status"`). Das war eine verdeckte Annahme über die ERSTE
+    // Renderrunde: die Seite mountete synchron, und die Dashboard-Abfrage war
+    // in diesem Moment noch offen. Jetzt kommt die Seite später, und bis dahin
+    // ist die Abfrage längst gescheitert — das Skelett ist dann vorbei.
+    // Belegt wird deshalb, dass die Profilseite ÜBERHAUPT gemountet hat: ihr
+    // Fehlerzweig gehört ihr allein und steht auf keiner anderen Route.
+    const fehler = "Profil konnte nicht geladen werden. Bitte neu laden.";
+    await screen.findByText(fehler);
+    expect(screen.getByText(fehler)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });
 
@@ -71,12 +87,13 @@ describe("Auth-Gating für /profil", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Basic)", () => {
+  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Basic)", async () => {
     renderAt("/profil/bearbeiten", authAsTier("basic"));
 
     // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; der Editor
     // mountet und lädt seine Daten.
-    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    await screen.findByText("Profil wird geladen…");
     expect(screen.getByText("Profil wird geladen…")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
   });
 });

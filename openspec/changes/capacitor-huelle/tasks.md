@@ -46,37 +46,79 @@ allein und zuerst.
 
 ### A2. Die Routen werden geteilt
 
-- [ ] Grundlinie festhalten: `pnpm build`, Größe des Eintrittsbündels roh und
+- [x] Grundlinie festhalten: `pnpm build`, Größe des Eintrittsbündels roh und
       gzip notieren. Gemessen am 27.08. auf `0dd4b8b`: **1.181,77 kB / 347,78 kB**.
 - [ ] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
       und `section`, und die Sidebar rendert unverändert. Der Umbau berührt
       `Component`; die Zusage ist, dass er sonst nichts berührt.
-- [ ] `Component` in `src/config/nav.ts` auf `lazy()` umstellen; die statischen
+- [x] `Component` in `src/config/nav.ts` auf `lazy()` umstellen; die statischen
       Seitenimporte in `src/App.tsx` ebenso — **außer** `HomeRedirect` und
       `LoginPage`.
-- [ ] Ein `Suspense`-Rahmen um den Routen-Block, Fallback ohne Spinner (nur die
+- [x] Ein `Suspense`-Rahmen um den Routen-Block, Fallback ohne Spinner (nur die
       Höhe des Inhaltsbereichs).
-- [ ] Admin-Seiten mit umstellen. Das kehrt den Kommentar in `App.tsx:155-161`
+- [x] Admin-Seiten mit umstellen. Das kehrt den Kommentar in `App.tsx:155-161`
       um — **der Kommentar wird mitgeändert**, samt Zahl (61,2 kB
       `RELEASE_EINTRAEGE` über `AdminNeuigkeitenPage.tsx:7`). Ein Kommentar, der
       das Gegenteil des Codes behauptet, ist schlimmer als keiner.
-- [ ] Bestehende Routen-Tests auf asynchrones Rendern anpassen, **ohne eine
+- [x] Bestehende Routen-Tests auf asynchrones Rendern anpassen, **ohne eine
       einzige Assertion zu lockern**. Das ist Arbeit, keine Nebenwirkung: nach
       `lazy()` findet ein synchrones `getBy*` nichts, bis der Chunk aufgelöst
       ist, und ein Teil der 174 Testdateien rendert Routen heute synchron. Wer
       hier „läuft unverändert durch" hinschreibt, hat die Aufgabe nicht
       geplant, sondern gehofft. Die Anpassung ist mechanisch (`findBy*` statt
       `getBy*`), die Zusagen der Tests bleiben Wort für Wort dieselben.
-- [ ] **Beleg 1 (Zahl):** dieselbe Messung nach dem Umbau, mit demselben Befehl.
-      Ziel: unter **1.024 kB** roh.
-- [ ] **Beleg 2 (Struktur) — als Skript, nicht als Behauptung.** Die Spec
+- [x] **Beleg 1 (Zahl):** dieselbe Messung nach dem Umbau, mit demselben Befehl.
+      Ziel: unter **1.024 kB** roh. **Erreicht: 600,53 kB** (Eintrittsbündel).
+
+      Die ehrlichere Zahl steht daneben, und sie ist die, die zählt: die
+      **Erstlast** — Eintritt plus alles, was `index.html` daneben vorlädt, plus
+      CSS. Eine eigene Datei ist nicht dasselbe wie „wird nicht geladen".
+
+      | | vorher | nachher |
+      | --- | ---: | ---: |
+      | Eintrittsbündel roh | 1.189,90 kB | **600,53 kB** |
+      | Erstlast roh (mit CSS) | 1.261,69 kB | **927,26 kB** |
+      | Erstlast gzip | 363,08 kB | **269,95 kB** |
+      | Dateien in der Erstlast | 2 | 11 |
+
+      −26 % über die Leitung. Der grösste einzelne Posten, der wanderte, ist
+      `AdminNeuigkeitenPage` mit 70,66 kB (davon 61,2 kB erzeugte
+      Änderungsliste) — die Seite, deren Kommentar behauptete, sie sei „klein".
+
+      **Nicht** gewandert ist der Supabase-Client: 202,89 kB, jetzt in einer
+      eigenen Datei, die trotzdem vorgeladen wird. Wer nur auf die Grösse des
+      Eintrittsbündels sieht, hält das für einen Gewinn. Es ist keiner.
+- [x] **Beleg 2 (Struktur) — als Skript, nicht als Behauptung.** Die Spec
       verspricht „strukturell geprüft"; eine Messung von Hand erfüllt das genau
       einmal und ist bei der nächsten Abhängigkeit wertlos. Also ein Skript, das
       die Source-Map des Eintrittsbündels seinen Quellmodulen zuordnet und
       gegen eine **Erlaubnisliste** prüft: Hülle, Wachen, `HomeRedirect`,
       `HomePage`, `LoginPage`. Alles andere aus `src/pages/` im Eintritt macht
       den Lauf rot. Im CI, neben den übrigen Wächtern.
-- [ ] **Nicht geändert, mit Begründung festgehalten:** `/` zeigt einem
+
+      Gebaut als `scripts/entry-chunk-guard{,.logic,.logic.test}.ts`, im Job
+      `verify` hinter `pnpm build`. **Drei Dinge, die er über die erste Fassung
+      hinaus kann, und jedes davon hat einen Grund:**
+
+      1. Er liest die **ganze Erstlast**, nicht nur das Eintrittsbündel. Die
+         erste Fassung sah allein `index-*.js` — und war damit blind für die
+         neun Dateien, die `index.html` daneben vorlädt. Eine Seite, die dorthin
+         rutscht, wäre unbemerkt zurück im Erststart gewesen.
+      2. Er bricht ab, wenn eine **Source-Map fehlt**. Ohne sie wäre er blind
+         und trotzdem grün.
+      3. Er bricht ab, wenn die Erstlast nicht einmal `src/App.tsx` enthält —
+         ein unvollständiger Bau darf nicht als „alles sauber" durchgehen.
+
+      **Positivkontrolle gefahren:** mit geleerter Erlaubnisliste meldet er
+      genau die drei erlaubten Seiten und endet mit 1. Vor dem Umbau meldete er
+      **28**. Ein Wächter, der nie rot wird, ist von einem, der prüft, nicht zu
+      unterscheiden.
+
+      Er hat sich dabei selbst bewährt: `ActivationScreen.tsx` stand in keiner
+      Planung und liegt trotzdem zu Recht im Erststart — `ActivationGate`
+      umschliesst die ganze Hülle und rendert ihn für jedes unbestätigte Konto.
+      Gefunden hat das der Wächter, nicht ich.
+- [x] **Nicht geändert, mit Begründung festgehalten:** `/` zeigt einem
       angemeldeten Mitglied **nicht** den Feed, sondern `HomePage` —
       `HomeRedirect.tsx:60-67` gibt sie in jedem Zweig zurück, der einzige
       andere Ausgang ist `/willkommen`. Der Feed liegt auf `/aktivitaet` und
