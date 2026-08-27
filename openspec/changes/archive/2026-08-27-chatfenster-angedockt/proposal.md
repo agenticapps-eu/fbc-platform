@@ -59,10 +59,11 @@ umformuliert, nicht umgangen:
 - **Ein Klick in der stehenden Leiste öffnet ein Fenster** statt zu
   navigieren — ab `xl`, also genau dort, wo die Leiste angedockt steht.
   Darunter (Schublade, Telefon) bleibt es beim heutigen Weg: die Adresse.
-- **Höchstens drei Fenster**, unten rechts aufgereiht, links neben der
-  Nachrichten-Leiste. Jedes 19 rem breit. Ein viertes Gespräch schliesst das am
-  längsten unberührte — es ist damit nicht verloren, sondern steht unverändert
-  in der Leiste daneben.
+- **Höchstens drei Fenster**, unten rechts aufgereiht, **zwischen beiden
+  Leisten**. Jedes bis zu 18 rem breit; wird es eng, teilen sich alle drei den
+  Platz, statt dass eines angeschnitten wird. Ein viertes Gespräch schliesst das
+  am längsten unberührte — es ist damit nicht verloren, sondern steht
+  unverändert in der Leiste daneben.
 - **Jedes Fenster minimiert und schliesst einzeln.** Minimiert bleibt seine
   Titelzeile stehen: Avatar, Name, Ungelesen-Zähler, beide Schalter.
 - **Die Fenster überleben den Seitenwechsel und das Neuladen.** Offene Threads
