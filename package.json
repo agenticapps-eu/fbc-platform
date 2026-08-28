@@ -29,14 +29,14 @@
     "demo:reset": "infisical run --env=dev -- env DEMO_SEED_MODE=reset tsx supabase/seed/demo_seed.ts"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.7.1",
-    "@sentry/react": "^10.69.0",
-    "@supabase/supabase-js": "^2.112.1",
-    "@tanstack/react-query": "^5.101.4",
+    "@hookform/resolvers": "^5.9.1",
+    "@sentry/react": "^10.71.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "@tanstack/react-query": "^5.102.2",
     "framer-motion": "^12.42.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-hook-form": "^7.84.0",
+    "react-hook-form": "^7.86.0",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
     "zod": "^4.4.3"
