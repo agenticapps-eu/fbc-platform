@@ -187,8 +187,9 @@ jobs:
       # warnt. Gefunden bei der Diff-Prüfung zu AGE-581.
       #
       # `display_name_test.sql` kam am 28.08. dazu und war derselbe Fall: 14
-      # Zusagen, seit dem 27.08. auf der Platte, nie gelaufen. Die Warnung oben
-      # stand da bereits — sie hat nicht gereicht. Seitdem prüft
+      # Zusagen, seit dem 26.08. auf der Platte, nie gelaufen. Die Warnung oben
+      # steht seit dem 05.08. da — sie hat in beiden Fällen nicht gereicht,
+      # nach 18 bzw. 23 Tagen. Seitdem prüft
       # `scripts/pgtap-dateiliste.test.ts` diese Liste gegen das Verzeichnis,
       # in beide Richtungen, im Job `verify`.
       - name: Verify the grant + RLS rights matrix (pgTAP)
