@@ -1,124 +1,136 @@
-# Session Handoff — 2026-08-28 (Abend, AGE-642 auf einem echten iPhone)
+# Session Handoff — 2026-08-28 (Abend, Push verdrahtet · App-Symbol · PR #277)
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`, Baum **sauber**, alles gepusht (`82797d4`).
-`main` steht auf `2d0b8d8` (die Nachbarsitzung hat AGE-655 gemergt); dieser
-Branch ist **5 Commits davor abgezweigt** und braucht vor dem nächsten PR ein
-`git fetch` + Rebase.
+`donald/age-642-capacitor-huelle`, Baum **sauber**, alles gepusht (`33bb25b`).
+**PR #277 ist offen — als Entwurf, und das mit Absicht.**
 
-**Die App läuft auf einem echten iPhone 17 Pro gegen DEV.** Das ist der Kern
-dieser Sitzung: nicht mehr Simulator, nicht mehr Behauptung.
+**Der Code ist fertig, beide Plattformen sind gebaut, die Abnahme steht aus.**
+Donald hat das iPhone mitgenommen („wir testen, wenn du alles fertig hast").
+Alles, was an AGE-641 Phase B noch offen ist, lässt sich **ausschliesslich am
+Gerät** messen.
 
 ## Accomplished
 
-### Auf `main` gelandet (PR #272, `da5da85`, elf von elf Checks grün)
+### AGE-641 Phase B — die Verdrahtung (`ac8999e`)
 
-Phase A + B1 + B2 von `capacitor-huelle`. iOS und Android bauen beide durch,
-belegt an den **gebauten** Artefakten: `plutil -extract` auf der Info.plist
-*innerhalb* von `App.app`, `aapt2 dump` auf der APK. Dazu der Wächter gegen
-native Geheimnisse (Baum statt Diff, Mutations-Gegenprobe tötet 5 von 6,
-Historienlauf über 1896 Pfade sauber).
+`src/lib/push.ts` stand seit dem 28.08. gebaut und **ohne Aufrufer** da. Jetzt:
 
-### Danach, noch NICHT auf `main` (fünf Commits auf dem Branch)
+- **`pushEinrichten()` beim Öffnen der Nachrichten**, nicht im Kaltstart. iOS
+  zeigt den Systemdialog einmal; wer ihn vor jedem Zusammenhang sieht, lehnt ab,
+  und die Ablehnung ist endgültig.
+- **Beide** Wege hinein zählen: die Schublade **und** die Route `/chat`.
+- **Der Riegel merkt sich das Konto, nicht ein Ja/Nein.** Zuerst war er ein
+  Ja/Nein — das hätte genau den Fall verschluckt, für den `claim_push_token`
+  gebaut wurde. **Gefunden hat es der Test, nicht das Lesen.**
+- **`pushAbmelden()` in `AuthProvider.signOut`**, vor `auth.signOut()` und nicht
+  bei einem der **fünf** Aufrufer.
 
-| Commit | |
-| --- | --- |
-| `db45981` | React Query nur nativ gezähmt (`staleTime` 30 s, kein Refetch bei Fokus) |
-| `a1305a2` | `aps-environment` im signierten Bündel — die Hülle fordert Push an |
-| `a9cf019` | Sichere Ränder (C1) + iOS-Eingabe-Zoom behoben |
-| `df136dc` | Wischgeste von rechts, Schubladen unter der Kopfzeile, Pfeil nach aussen |
-| `82797d4` | **WIP** Push-Token-Registrierung — Modul steht, Verdrahtung fehlt |
+**Fund nebenbei:** `@capacitor/push-notifications` war auf **Android nie
+registriert** — die Abhängigkeit lag seit Phase A im `package.json`, aber ein
+`cap sync android` war nie gelaufen.
 
-### Am Gerät belegt
+### AGE-642 B4 — das App-Symbol (`64b49ea`)
 
-- **Die Sitzung überlebt einen kompletten Neustart der App.** Die Abnahme aus
-  Phase A, die sich nur dort führen lässt. Im Protokoll: `Preferences get` →
-  `null`, dann beim Anmelden **`Preferences set` genau einmal**, danach liest
-  die App die Sitzung nativ zurück (`sub` und `iss` stimmen).
-- Anmelden, Verzeichnis, vier Gespräche mit Ungelesen-Zählern.
-- Signierter Gerätebau mit Team `WQZJ8649TN`, Wildcard zuerst, nach dem
-  Entitlement das Profil `com.effbeezee.app`.
+Eine Quelle (`public/brand/compass-favicon.svg`), fünfzehn Dateien, `pnpm
+app:icons`. Weiss auf Navy `#081527`. Gemessen statt behauptet: die mittlere
+Farbe sprang von `#ebf6fe` auf `#212d3d` — **am gebauten Artefakt**, also
+`AppIcon60x60@2x.png` innerhalb von `App.app` und den PNG aus der entpackten
+APK.
+
+### Code-Review und ihre Auflagen (`954c037`)
+
+opencode über den Diff: **FREIGABE MIT AUFLAGEN**, kein Kernfehler. Drei Punkte,
+alle abgearbeitet: der Riegel fiel auch bei `"fehler"` zu (jetzt Rücknahme, bei
+`"abgelehnt"` ausdrücklich nicht) · das Regex-Parsing brach still an drei
+Stellen (`"15.5.5"` → NaN in alle fünfzehn PNG, erster Treffer gewinnt,
+`transform` ignoriert) · der Reihenfolge-Test hätte auch ein `void` ohne `await`
+bestanden.
+
+### `deno.lock` (`33bb25b`)
+
+Der **erste CI-Lauf dieses Branches** fand es: `edge-functions` rot, sechs
+Capacitor-Pakete fehlten im Lock. Der Deno-Job liest `package.json` mit.
+Nachgezogen, 472 Zeilen. Weggeschrieben als Erinnerung.
 
 ## Decisions
 
-- **App-ID `com.effbeezee.app`** war keine offene Wahl: sie liegt als
-  `APNS_BUNDLE_ID` in den Secrets und ist das `apns-topic`.
-- **Team-ID gehört NICHT ins Repo** (öffentlich, identifiziert das Konto
-  dauerhaft). Sie kommt beim Bau von aussen: `DEVELOPMENT_TEAM=WQZJ8649TN`.
-- **React Query nur nativ zähmen, Web unverändert** (Donald). Umgesetzt über
-  `Capacitor.isNativePlatform()`, dieselbe Weiche wie beim Sitzungsspeicher.
-  `refetchOnReconnect` bleibt bewusst `true`.
-- **Wischgeste nur an der RECHTEN Kante** (Donald). Links liegt die
-  System-Zurück-Geste von iOS.
-- **Der Pfeil in der Kopfzeile bleibt** — Donald hatte ihn erst entfernen
-  wollen, dann nach dem Befund umentschieden: ohne ihn fielen neun Zusagen aus
-  AGE-627 (gemessen: 9 rot) und VoiceOver käme nicht mehr an die Schublade.
-  Verschoben ist er trotzdem, ganz nach aussen.
-- **C1 vorgezogen** vor B3, weil der Anmelden-Knopf unter der Statusleiste lag
-  und die ganze Abnahme blockierte.
-- **AGE-658** (React-Query-Vorgaben) hat die Nachbarsitzung angelegt; ich habe
-  ihn übernommen statt einen zweiten aufzumachen. **AGE-657** (Index auf
-  `messages`) gehört ihr.
+- **Der Erlaubnisdialog beim Öffnen der Nachrichten**, nicht im Kaltstart und
+  nicht „nach der ersten Nachricht" (so stand es in `tasks.md`) — letzteres
+  gibt es als Ereignis gar nicht, wenn noch nie eine kam.
+- **Navy `#081527` mit weisser Marke**, nicht blau auf weiss: die dokumentierte
+  Inversfassung, und iOS verbietet Durchsichtigkeit ohnehin.
+- **Die Quelle ist das Favicon, nicht `CompassMark.tsx`.** Die beiden
+  unterscheiden sich in genau einer Grösse; das Favicon ist die für kleine
+  Grössen gehärtete Fassung, und ein App-Symbol IST der kleine Fall.
+- **PR als Entwurf.** Er ist erst mergefähig, wenn am Gerät gemessen ist.
+- **AGE-642 in Linear zurück auf *In Progress*** — die Automation hatte beim
+  Merge von #272 auf Done geschaltet, die Abnahmeliste ist zur Hälfte offen.
+  Begründung als Kommentar am Vorgang.
+- **Nicht gemacht:** der Startbildschirm bleibt Capacitors weisse Fläche. Sie
+  trägt keine fremde Marke, nur keine eigene — eigener Vorgang.
 
 ## Files modified
 
-- `capacitor.config.ts`, `ios/`, `android/` — die Hülle (auf `main`)
-- `scripts/native-secrets-guard{,.logic,.logic.test,.cli.test}.ts` — B2 (auf `main`)
-- `src/lib/query-defaults.ts` + Test — nativ gezähmte Vorgaben
-- `src/lib/wischgeste.ts` + Test — die Wisch-Entscheidung, sieben Zusagen
-- `src/lib/push.ts` — **neu, ohne Aufrufer**
-- `src/lib/database.types.ts` — `claim_push_token`, Spalten abgelesen
-- `ios/App/App/AppDelegate.swift` — Token-Weitergabe an die Brücke
-- `ios/App/App/App.entitlements` — `aps-environment`
-- `src/components/AppShell.tsx`, `src/index.css`, `index.html` — sichere
-  Ränder, Eingabe-Zoom, Schubladen, Geste
+- `src/components/AppShell.tsx` — der Effect um Zeile 606, plus Import
+- `src/components/AppShell.push.test.tsx` — **neu**, acht Zusagen
+- `src/providers/AuthProvider.tsx` — `pushAbmelden()` vor `auth.signOut()`
+- `src/providers/AuthProvider.push.test.tsx` — **neu**, drei Zusagen
+- `src/lib/push.ts` — `letztesToken`, `pushAbmelden()`
+- `src/lib/database.types.ts` — Tabelle `push_tokens`, von Hand
+- `scripts/app-icons{.logic,.logic.test,}.ts` — **neu**, dreizehn Zusagen
+- `assets/app-icon{,-round,-foreground}.svg` — **neu**, erzeugt und lesbar
+- `android/.../mipmap-*`, `ios/.../AppIcon.appiconset` — die fünfzehn PNG
+- `android/app/capacitor.build.gradle`, `android/capacitor.settings.gradle`
+- `deno.lock`, `package.json` (`app:icons`)
+- `openspec/changes/{push-fundament,capacitor-huelle}/` — Delta + Aufgaben
 
 ## Next session: start here
 
-**Erste Aktion: `git fetch` + Rebase auf `origin/main`** (5 Commits Rückstand),
-dann `pnpm install`. Ohne das misst man gegen einen alten Stand.
+**Erste Aktion: das iPhone anstecken und in dieser Reihenfolge messen.** Ohne
+Schritt 3 belegt der Rest nichts.
 
-**Dann AGE-641 Phase B zu Ende bringen — konkret fehlt nur die Verdrahtung.**
-`src/lib/push.ts` ist gebaut und hat **keinen Aufrufer**. Der Aufruf gehört
-laut Plan NICHT in den Kaltstart (wer beim ersten Start gefragt wird, sagt
-nein, und iOS fragt kein zweites Mal), sondern dorthin, wo die Frage erklärbar
-ist — beim Öffnen der Nachrichten. Danach:
+1. `xcrun devicectl list devices` — die UDID holen (zuletzt
+   `544B9818-1B6A-5B09-827D-BC3C88462D3D`)
+2. `xcrun devicectl device install app --device <UDID> ~/Library/Developer/Xcode/DerivedData/App-fjtekmjleeroiabuhudhvziazqpk/Build/Products/Debug-iphoneos/App.app`
+   — der Bau von heute Abend liegt dort und ist aktuell
+3. **Vorher** `select count(*) from push_tokens` → muss **0** sein. Das ist die
+   Positivkontrolle
+4. App öffnen, anmelden, **Nachrichten öffnen** — hier kommt der Dialog, nicht
+   beim Start. Erlaubnis geben
+5. `select count(*) from push_tokens` → muss **1** sein
+6. Erst dann eine Nachricht einfügen und den Push abwarten
+7. Sichtprobe am Sperrbildschirm: „… hat dir geschrieben", **kein** Text,
+   Bildschirmfoto als Beleg
 
-1. bauen: `infisical run --env=dev --silent -- pnpm build`, `npx cap sync ios`
-2. `xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphoneos \
-   -destination 'generic/platform=iOS' -allowProvisioningUpdates \
-   DEVELOPMENT_TEAM=WQZJ8649TN build`
-3. `xcrun devicectl device install app --device 544B9818-1B6A-5B09-827D-BC3C88462D3D <App.app>`
-4. Erlaubnis am Gerät einmal geben, dann prüfen: `select count(*) from
-   push_tokens` muss **1** sein. Vorher war er 0 — das ist die Positivkontrolle.
-5. Erst dann eine Nachricht einfügen und den Push abwarten.
+⚠️ **Ein Push, der nicht ankommt, sieht aus wie einer, den niemand ausgelöst
+hat.** Wenn Schritt 6 still bleibt, ist die Frage nicht „warum kommt nichts",
+sondern **wo die Kette abreisst**: `notifications`-Zeile da? →
+`net._http_response` neue Zeile? → `send-push`-Antwort `{"skipped":true}` oder
+etwas anderes? Die drei sind getrennt zu prüfen; jede sieht bei Erfolg und bei
+Ausfall gleich aus.
 
-**Donald wartet auf eine Aufnahme**, in der er eine Nachricht schickt, die App
-schliesst, und ein echter Push ankommt. Ohne Schritt 4 ist das nicht möglich.
-
-⚠️ **Die Kette ist sonst vollständig und nachgemessen:**
-`messages INSERT → trg_hinweis_neue_nachricht → notifications INSERT →
-notifications_push_webhook → send-push`. Aus 14 eingefügten Nachrichten sind 16
-Hinweise entstanden. Nur `push_tokens` ist leer, deshalb `{"skipped":true}`.
+**Danach:** PR #277 aus dem Entwurf holen und mergen (CI war vollständig grün:
+`verify`, `edge-functions`, `migrations`, `deploy`, `pr-title` alle `success`).
+Vorher `git fetch` + Rebase — `main` steht auf `7a5f58a`, dieser Branch zweigt
+davor ab.
 
 ## Open questions
 
-- **Das App-Icon ist Capacitors Standard**, nicht die Marke. Eigener Schritt.
-- „**Sieht ein bisschen hart aus**" — Donald zur Schublade. Kanten sind jetzt
-  gerundet; ob er den fehlenden Übergang meinte, ist ungeklärt.
-- **Der DEV-Zugang steht im Sitzungsprotokoll.** `donald@factiv.eu`, Passwort
-  von mir gesetzt (`claim`-Weg über GoTrue-Admin, mit echter Anmeldung
-  gegengeprüft). Nur DEV, PROD unberührt — sollte er ändern wollen, geht das in
-  den Einstellungen.
-- **Auf DEV liegen jetzt 6 Verbindungen, 4 Gespräche, 14 Nachrichten** für
-  Donalds Konto, per Wegwerf-Skript angelegt und **durch die RLS mit seinem
-  eigenen Konto gegengeprüft**. Sie sind erfunden, die Gegenüber sind echte
-  gespiegelte Mitglieder.
-- Unverändert offen: **B3** (Signaturmaterial, eigener nativer Workflow),
-  Phase C2/C3, Phase D (OTA), Phase E. Der Change ist **nicht** archiviert.
+- **Android ist nicht auf einem Gerät gelaufen.** Die APK baut
+  (`BUILD SUCCESSFUL`), mehr ist nicht belegt.
+- **Die Anbieter-Secrets in Infisical `prod` sind bewusst leer.** Mit dem ersten
+  echten Gerätetoken müssen sie stehen.
 - **`CFBundleDevelopmentRegion` steht auf `en`** bei einer deutschen App.
 - **`pnpm build` schmutzt jedes Mal `release-entries.generated.ts`** — vor jedem
   Commit `git checkout --` darauf.
-- Der Kommentar in `session-storage.ts` nennt noch `supabase-js` 2.112.1 und
-  Zeile 626; installiert ist 2.112.4, die Formel ist unverändert, nur der
-  Zeilenverweis veraltet.
+- **Die `.env` in diesem Worktree zeigt auf `https://messung.supabase.co`**,
+  einen Platzhalter aus einer Messsitzung. `pnpm dev` liefe damit ins Leere;
+  gebaut wurde deshalb über `infisical run --env=dev`. Nicht von mir angefasst.
+- **Der Startbildschirm** ist Capacitors weisse Fläche — eigener Vorgang.
+- Aus der Review nicht umgesetzt: der hart verdrahtete `fill="none"` am Ring in
+  `app-icons.logic.ts`. Eigenschaft der Ausgabe, nicht Lesefehler.
+- Unverändert offen: **B3** (Signaturmaterial, eigener nativer Workflow), C2
+  (Android-Zurück), C3 (Kamera), Phase D (OTA), Phase E. Beide Changes sind
+  **nicht** archiviert.
+- **AGE-653** (`deno.json` nach `supabase/functions/`) hat heute konkret weh
+  getan — siehe den `deno.lock`-Commit.
