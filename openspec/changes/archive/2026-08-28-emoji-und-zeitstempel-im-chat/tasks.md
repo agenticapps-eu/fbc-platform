@@ -148,7 +148,7 @@ Vorgang im Design-System.
 - [x] Code-Review auf dem Diff (Stufe 2), nicht auf dem Plan — **die zwei
       Hälften ausdrücklich getrennt beurteilen lassen** (Emoji-Weg und
       Zeitstempel sind unabhängig; sonst kauft das offengelegte Bündeln nichts)
-- [ ] `openspec archive`, dann PR
+- [x] `openspec archive`, dann PR
 
 **Die Diff-Review hat fünf Befunde gebracht, alle behoben** — Einzelheiten in
 `REVIEWS.md` unter „Diff-Review (Stufe 4)". Getrennt beurteilt wie verlangt:
