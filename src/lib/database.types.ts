@@ -1724,6 +1724,25 @@ export type Database = {
         Returns: string;
       };
       current_tier_rank: { Args: never; Returns: number };
+      /** AGE-641 Phase B: nimmt ein Geraetetoken entgegen und ordnet es dem
+       *  aufrufenden Konto zu. `security definer`, weil `push_tokens`
+       *  owner-only-RLS traegt und ein Token, das vorher einem anderen Konto
+       *  gehoerte, den Besitzer wechseln muss statt doppelt zu existieren —
+       *  derselbe Apparat, dasselbe Token, ein anderes Mitglied.
+       *
+       *  Spalten aus der Datenbank abgelesen (28.08., DEV), nicht geraten;
+       *  `gen types` darf ueber diese Datei nicht laufen (AGE-498). */
+      claim_push_token: {
+        Args: { p_token: string; p_plattform: string };
+        Returns: {
+          id: string;
+          profile_id: string;
+          token: string;
+          plattform: string;
+          letzter_kontakt: string;
+          created_at: string;
+        }[];
+      };
       /** AGE-631: stellt eine Release-Note genau EINMAL zu; gibt die Zahl der
        *  wirklich beschriebenen Mitglieder zurueck. Wirft, wenn der Aufrufer
        *  kein Admin ist oder die Note schon zugestellt wurde. */
