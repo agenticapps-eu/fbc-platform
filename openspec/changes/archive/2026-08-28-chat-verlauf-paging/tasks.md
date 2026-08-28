@@ -131,8 +131,10 @@ Geschwistern davor. Beides zusammen deckt den Weg ab; keines der beiden allein.
       nicht gezählt (zwei Wörter auf 1309 Diff-Zeilen). Alle Befunde in
       `REVIEWS.md` aufgelöst — darunter zwei, die eine Korrektur aus der ersten
       Runde wieder umgeworfen haben.
-- [ ] 5.3 `openspec validate --all` grün, danach `openspec archive` +
-      `pnpm release:entries` + prettier auf die erzeugte Datei.
+- [x] 5.3 `openspec validate --all` grün (31/31), danach `openspec archive` +
+      `pnpm release:entries` + prettier auf die erzeugte Datei. Nach dem Merge
+      von #274 und dem vollständig grünen `main`-Lauf (`drift-gate: success`,
+      nicht skipped — nur dann liefert der Deploy wirklich aus).
 
 ## 6. Folgevorgänge, die dieser Change erzeugt
 

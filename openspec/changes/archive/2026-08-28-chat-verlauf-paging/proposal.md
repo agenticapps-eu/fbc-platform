@@ -1,3 +1,7 @@
+# Ältere Nachrichten nachladen statt den ganzen Verlauf auf einmal
+
+Linear: **AGE-655**
+
 ## Why
 
 `fetchMessages` (`src/lib/chat.ts:320`) holt **jede** Nachricht eines Threads —
@@ -16,6 +20,41 @@ Es ist **kein Regress**: die fehlende Grenze steht seit der ersten Fassung auf
 Tagesgruppierung über den ganzen Verlauf lief.
 
 ## What Changes
+
+- Ein langes Gespräch öffnet sich jetzt **sofort**, statt erst den ganzen
+  Verlauf zu laden. Sichtbar sind die letzten 50 Nachrichten — dort, wo man
+  weiterliest.
+- Wer weiter zurück will, findet am oberen Rand den Knopf **„Ältere laden"**.
+  Er holt die nächsten 50 und verschwindet, sobald der Verlauf vollständig ist.
+- **Die Ansicht bleibt dabei stehen**, wo sie war. Nachgeladene Nachrichten
+  treten oben hinzu, ohne dass es ans Ende des Gesprächs springt.
+- Die Tagesmarker rücken mit: lädt man ältere Nachrichten desselben Tages nach,
+  steht der Marker danach über der ersten davon.
+- Gilt in der **Gesprächsansicht und im angedockten Fenster** gleichermassen.
+
+Für Gespräche mit weniger als 50 Nachrichten ändert sich nichts — kein Knopf,
+kein Unterschied.
+
+## Capabilities
+
+### New Capabilities
+
+_Keine._
+
+### Modified Capabilities
+
+- `messaging`: eine **neue** Anforderung, dass der Nachrichtenverlauf eines
+  Threads seitenweise geladen wird und die älteren Nachrichten über ein
+  Bedienelement erreichbar bleiben. Die bestehende Anforderung „The conversation
+  list loads a bounded page, not every message" (`spec.md:394`) bindet
+  ausdrücklich die **Liste** und die Vorschauzeile je Thread — über den Verlauf
+  innerhalb eines Threads sagt sie nichts. Sie wird **nicht** geändert.
+
+## Impact
+
+**Was der Change technisch tut** (stand bis zum Archivieren in
+`## What Changes` und ist von dort in den Neuigkeiten-Eintrag gelaufen —
+den liest ein Mitglied, kein Entwickler):
 
 - `fetchMessages` bekommt eine **Seitengrenze** und lädt die **neuesten**
   Nachrichten statt aller. Die Ordnung kommt vom Server, **vor** der Grenze.
@@ -38,23 +77,6 @@ Tagesgruppierung über den ganzen Verlauf lief.
   Schreiber oben.
 - **Keine** Migration, **keine** neue Tabelle, **kein** Table-Grant — und damit
   auch keine Berührung des Golden-Snapshots in `supabase/tests/grants_test.sql`.
-
-## Capabilities
-
-### New Capabilities
-
-_Keine._
-
-### Modified Capabilities
-
-- `messaging`: eine **neue** Anforderung, dass der Nachrichtenverlauf eines
-  Threads seitenweise geladen wird und die älteren Nachrichten über ein
-  Bedienelement erreichbar bleiben. Die bestehende Anforderung „The conversation
-  list loads a bounded page, not every message" (`spec.md:394`) bindet
-  ausdrücklich die **Liste** und die Vorschauzeile je Thread — über den Verlauf
-  innerhalb eines Threads sagt sie nichts. Sie wird **nicht** geändert.
-
-## Impact
 
 | Fläche | Was |
 | --- | --- |
