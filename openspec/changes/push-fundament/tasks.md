@@ -142,6 +142,13 @@ Issue. Siehe `REVIEWS.md`.
 - [x] Webhook-Auth über gemeinsames Geheimnis wie `notify-contact-request`
       (`verify_jwt=false`). Kein `getUser()`/`getClaims()` — beide scheitern
       unter ES256.
+      **Korrektur vom 28.08.:** dieser Haken war nur halb wahr. Der Kopf von
+      `index.ts` nannte `verify_jwt=false` und verwies auf `config.toml` — dort
+      stand kein Block für `send-push`, also galt die Vorgabe `true`. Das
+      Gateway hätte den Webhook mit **401** abgewiesen, bevor die
+      Geheimnisprüfung im Handler je läuft. Block ergänzt, plus
+      `scripts/functions-config.test.ts` als Wächter: jede Function auf der
+      Platte braucht einen Block, und ein auskommentierter zählt nicht.
 - [x] **(R1)** Die Benachrichtigung wird aus einer **festen Feldliste** gebaut,
       nie aus durchgereichter Nutzlast. Stärker als geplant umgesetzt:
       `baueBenachrichtigung` nimmt drei Felder entgegen (`typ`, `wer`,
