@@ -1,6 +1,6 @@
 # Aufgaben — Push-Fundament (AGE-641)
 
-> ## Stand 28.08., mittags — Phase A ist auf PROD
+> ## Stand 28.08., nachmittags — Phase A ist vollständig
 >
 > **PR #265 ist gemergt (`ebe64da`), `migrate-prod` ist durch, der Frontend-Deploy
 > nachgezogen.** Der Serverweg ist auf DEV **und** PROD gemessen, nicht behauptet:
@@ -12,12 +12,19 @@
 > | Webhook-Paar | ✅ | ✅ |
 > | richtiger Bearer | `200 {"skipped":true}` | `200 {"skipped":true}` |
 > | falscher Bearer | `401 Unauthorized` | `401 Unauthorized` |
+> | `pg_cron`-Wiederholung | ✅ | ✅ |
 >
-> **Was in Phase A noch offen ist: `pg_cron`** (A5b, zwei Punkte). Ohne den
-> Wiederholungslauf kann die Function zwar `{"modus":"faellig"}`, aber niemand
-> ruft es periodisch. Ein verlorener Push bleibt bis dahin liegen, statt nach
-> fünf Minuten erneut versucht zu werden — die Zeile in der Glocke steht
-> trotzdem. **Deshalb ist der Change noch nicht archiviert.**
+> **Der letzte offene Punkt der Phase A ist erledigt: `pg_cron` steht auf beiden
+> Seiten** (A5b). Extension 1.6.4 installiert, `public.push_wiederholung()`
+> angelegt, Job `push-wiederholung` **jede Minute**. Belegt ist beides getrennt,
+> weil `net.http_post` asynchron
+> ist und ein `succeeded` im Job-Protokoll nur heisst, dass das SQL lief: der
+> **Rumpf** über eine neue Zeile in `net._http_response` gegen eine vorher
+> festgehaltene `max(id)`, der **Takt** über einen echten cron-Lauf (auf DEV
+> 11:30:00.086Z Job-Start, 11:30:00.136Z Antwort `200 {"skipped":true}`).
+>
+> **Archiviert wird trotzdem nicht** — der Change trägt auch Phase B, und die
+> beginnt erst mit AGE-642. Offen ist dort alles, hier nichts.
 >
 > **Beide Anbieter sind gegen ihre echten Endpunkte belegt.** APNs Sandbox und
 > Produktion `400 BadDeviceToken`, FCM `400 INVALID_ARGUMENT` — authentifiziert,
@@ -206,7 +213,7 @@ Issue. Siehe `REVIEWS.md`.
       `docs/secrets.md`.
 - [x] Commit.
 
-### A5b · **(R2)** Dauerhafter Zustellzustand
+### A5b · **(R2)** Dauerhafter Zustellzustand ✅
 
 Donald am 27.08.: **bauen**, nicht bestmüht zustellen. Ein verlorener Push wäre
 zwar nicht der verlorene Hinweis — der steht weiter in der Glocke —, aber die
@@ -224,17 +231,45 @@ beides fällt mit derselben Mechanik.
 - [x] Anspruch atomar: `update … set zustand = 'laeuft' where zustand = 'offen'
       … returning`. Kein `select`-dann-`update`; zwei Läufe holten sonst
       dieselbe Zeile.
-- [ ] **Wiederholung über `pg_cron`.** Gemessen: lokal verfügbar (1.6.4), nicht
-      installiert; es gibt **keinen** zeitgesteuerten GitHub-Workflow, in den
-      man das sonst legen müsste — und eine zustellkritische Schleife gehört
-      ohnehin nicht in die CI. Der Drift-Scanner sieht das nicht: er prüft
-      Funktionen, Trigger, Tabellen und Policies in `public`
-      (`db-drift-scan.ts:73-100`), keine Extensions und nichts im
-      `cron`-Schema.
-- [ ] ⚠️ **Zuerst auf DEV messen, dann PROD.** `create extension pg_cron` ist
+- [x] **Wiederholung über `pg_cron`.** Es gibt **keinen** zeitgesteuerten
+      GitHub-Workflow, in den man das sonst legen müsste — und eine
+      zustellkritische Schleife gehört ohnehin nicht in die CI. Der
+      Drift-Scanner sieht davon nur die Hälfte: er prüft Funktionen, Trigger,
+      Tabellen, Views und Policies in `public` (`db-drift-scan.ts:61-90`), keine
+      Extensions und nichts im `cron`-Schema. `push_wiederholung` steht deshalb
+      in `ERWARTET_OHNE_MIGRATION` — die **Zeitplanung bleibt unsichtbar**,
+      dafür gibt es `scripts/probe-age641-pg-cron.ts <dev|prod>`.
+      **Fehlende Anforderung nachgetragen:** der Delta verlangte bis hierher
+      nur, dass ein beanspruchter Auftrag eine Frist trägt, und setzte „den
+      Wiederholungslauf" in einem Szenario voraus — dass ihn jemand
+      *wiederkehrend anstösst*, stand nirgends. Neue SHALL-Klausel plus
+      Szenario „Der Wiederholungslauf braucht keinen neuen Hinweis".
+      **Takt `* * * * *` — und das ist eine Korrektur aus der Code-Review.**
+      Hier stand `*/5` mit der Begründung, das sei „derselbe Wert wie die
+      Anspruchsfrist". Zwei verschiedene Fristen verwechselt: die
+      Anspruchsfrist ist `now() + 5 min` (`20260828100000:110,179`), die
+      **Rückstellung nach Fehlschlag** dagegen `now() + 1 min · 2^versuche`
+      (`20260827240000:312`) — also 1, 2, 4, 8, 16. Der Takt muss sich an der
+      Rückstellung orientieren; `*/5` hätte deren erste zwei Stufen
+      verschluckt und aus 1, 2, 4 faktisch 5, 5, 5 gemacht. Mein Satz „ein
+      engerer Takt fände nichts vor" war schlicht falsch. Preis des
+      Minutentakts: ~1440 Aufrufe je Tag und Projekt, die ohne Zeile in
+      `push_tokens` sofort `{"skipped":true}` antworten.
+- [x] ⚠️ **Zuerst auf DEV messen, dann PROD.** `create extension pg_cron` ist
       ein Eingriff in die Instanz, und der lokale Stack ist darin nicht von
-      PROD unterscheidbar — `postgres` hat hier andere Rechte. Schlägt es auf
-      DEV fehl, ist das die Stelle zum Umplanen, nicht PROD.
+      PROD unterscheidbar — `postgres` hat hier andere Rechte.
+      **Verfügbarkeit gemessen, nicht angenommen:** 1.6.4 auf DEV *und* PROD
+      verfügbar, auf beiden nicht installiert; auf DEV lief `create extension`
+      durch.
+      **Der Beleg ist zweiteilig, weil `net.http_post` asynchron ist** — ein
+      `succeeded` in `job_run_details` sagt nur, dass das SQL lief, nicht dass
+      `send-push` geantwortet hat. (1) Rumpf: `push_wiederholung()` von Hand
+      angestossen → neue Zeile in `net._http_response`, `200 {"skipped":true}`,
+      gemessen gegen eine vorher festgehaltene `max(id)`. Ohne diese Grundlinie
+      hätte die `200`-Zeile der Webhook-Probe vom selben Vormittag als Beleg
+      getaugt, ohne einer zu sein. (2) Takt: ein echter cron-Lauf.
+      Der Wortlaut trägt die Kette: ohne `modus` antwortet `index.ts` **400**,
+      mit falschem Bearer **401**, bei fehlgeschlagener RPC **502**.
 - [x] Zurückgestellte Zeilen aufräumen: was nach N Versuchen nicht zugestellt
       ist, wird beendet und nicht ewig wiederholt. Gilt seit A5c auch für
       Aufträge, die nie quittiert wurden.
@@ -397,3 +432,24 @@ Phase B beginnt erst danach.
 - [ ] **Zustellzustand (R2/M5)** — siehe A5.
 - [ ] Bündelung für `event_created` — eigener Vorgang.
 - [ ] Der tote `member_joined`-Zweig (`HinweisGlocke.tsx:172`) — eigener Vorgang.
+
+### Aus der Code-Review vom 28.08. — eigene Vorgänge, kein Merge-Blocker
+
+Vier Punkte, die der Reviewer als Betriebsrisiken benannt hat. Sie stehen hier,
+damit ein grüner A5b-Haken nicht als Aussage gelesen wird, die er nicht trägt.
+
+- [ ] **Ein `supabase db reset` tilgt den Wiederholungslauf lautlos.** Funktion
+      und cron-Eintrag sind keine Migrationen. Der Objekt-Drift-Scan misst nur
+      PROD und läuft nur von Hand — **DEV hat gar keinen Wächter**. Nach einem
+      Reset ist der Lauf dort still tot. Gleiches gilt seit jeher für das
+      Webhook-Paar; neu ist nur, dass es jetzt drei Objekte sind.
+- [ ] **Ein dauerhafter Zustellausfall ist unsichtbar.** `net.http_post` ist
+      Fire-and-Forget: antwortet `send-push` durchgehend `401` (rotierter
+      Bearer) oder `502`, bleibt der cron-Lauf `succeeded`. Nichts schlägt an.
+- [ ] **`net._http_response` wächst und wird von niemandem aufgeräumt** — beim
+      Minutentakt rund 1440 Zeilen je Tag und Projekt. pg_net räumt nicht
+      selbst auf.
+- [ ] **Das Gesundheitssignal verfällt mit Phase B.** Solange `push_tokens`
+      leer ist, belegt `200 {"skipped":true}`, dass der Weg steht. Mit dem
+      ersten echten Gerätetoken heisst dieselbe Antwort nur noch „nichts
+      zuzustellen" — ein Nachfolge-Beleg fehlt.

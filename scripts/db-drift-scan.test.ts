@@ -117,8 +117,15 @@ describe("findeObjektDrift", () => {
  * Warum es sie gibt: die Webhooks werden von Hand angelegt und stehen darum in
  * keiner Migration. Fehlt ein Name in der Liste, meldet der Scan ihn als
  * „unbekannt"; fehlt umgekehrt das Objekt in PROD, meldet er es als „fehlend".
- * Beides bricht `migrate-prod` ab, und weil `deploy.yml` dann am
- * Migrations-Gate hängen bleibt, fällt der Frontend-Deploy **stumm** aus.
+ * Beides bricht `migrate-prod` ab.
+ *
+ * **Korrigiert am 28.08. (Code-Review):** hier stand, danach bliebe auch
+ * `deploy.yml` am Migrations-Gate hängen und der Frontend-Deploy falle stumm
+ * aus. Das verwechselt zwei Gates. `db-drift-scan.ts` läuft an genau einer
+ * Stelle — `migrate-prod.yml:152`, `workflow_dispatch`, also nur von Hand.
+ * Das Gate in `deploy.yml` ist `migration-drift-gate.ts` und vergleicht die
+ * Migrations*historie*; nur dieses blockiert Deploys. Ein roter Objekt-Scan
+ * kostet den nächsten Handlauf von `migrate-prod`, keinen Deploy.
  */
 describe("ERWARTET_OHNE_MIGRATION", () => {
   /**
@@ -130,6 +137,20 @@ describe("ERWARTET_OHNE_MIGRATION", () => {
    */
   const PUSH_WEBHOOK = ["notify_push_webhook", "notifications_push_webhook"];
 
+  /**
+   * Der Wiederholungslauf (A5b) ist der dritte Name der **Push-Gruppe** (der
+   * fünfte der Liste insgesamt) und kein Webhook: ihn stößt kein Trigger an,
+   * sondern `cron.schedule`. In der Liste
+   * steht er aus demselben Grund wie die zwei darüber — sein Bearer liegt
+   * inline im Funktionsrumpf, und dieses Repo ist öffentlich.
+   *
+   * Der Scan deckt davon nur diese Hälfte ab. `cron.job` liegt im Schema
+   * `cron`, und der Scan fragt `public` ab (`db-drift-scan.ts:61-90`): eine
+   * abbestellte Zeitplanung fällt ihm **nicht** auf, eine verworfene Funktion
+   * schon. Für die andere Hälfte gibt es `scripts/probe-age641-pg-cron.ts`.
+   */
+  const PUSH_VON_HAND = [...PUSH_WEBHOOK, "push_wiederholung"];
+
   it("meldet keinen Drift, wenn jeder erwartete Webhook im Bestand liegt", () => {
     // Welcher Eimer, ist hier gleichgültig: geprüft wird gegen die **flache**
     // Vereinigung (Grenze 3 im Kopf des Logikmoduls). Sie nach Funktion und
@@ -140,7 +161,7 @@ describe("ERWARTET_OHNE_MIGRATION", () => {
     expect(findeObjektDrift(bestand, [], ERWARTET_OHNE_MIGRATION)).toEqual([]);
   });
 
-  it.each(PUSH_WEBHOOK)(
+  it.each(PUSH_VON_HAND)(
     "meldet `%s` als fehlend, wenn er aus der Datenbank verschwindet",
     (name) => {
       const ohne = ERWARTET_OHNE_MIGRATION.filter((n) => n !== name);

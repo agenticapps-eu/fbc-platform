@@ -39,8 +39,11 @@
 
 /**
  * Objekte, die bewusst in keiner Migration stehen und trotzdem da sein
- * MUESSEN. Jeder Eintrag wird von Hand in der Konsole angelegt, weil sein
+ * MUESSEN. Jeder Eintrag wird von Hand per SQL angelegt, weil sein
  * Bearer-Token inline in der Datenbank liegt und dieses Repo oeffentlich ist.
+ * (Frueher stand hier "in der Konsole". Das war schon fuer die Webhooks falsch
+ * — Database Webhooks sind auf diesen Projekten nie aktiviert worden — und
+ * fuer den cron-Eintrag darunter ist es das erst recht.)
  *
  * Die Liste steht in diesem Modul und nicht im Skript daneben, weil
  * `db-drift-scan.ts` schon beim Import eine Datenbankverbindung aufbaut — von
@@ -61,6 +64,18 @@ export const ERWARTET_OHNE_MIGRATION = [
   // dieser Webhook ein `net.http_post`-Trigger von Hand.
   "notify_push_webhook",
   "notifications_push_webhook",
+  // Wiederholungslauf (AGE-641 A5b): dieselbe Sorte Objekt, anderer Ausloeser.
+  // Kein Trigger stoesst es an, sondern `cron.schedule` jede Minute mit
+  // `{"modus":"faellig"}`. Ohne diesen Lauf ist die Anspruchsfrist wirkungslos:
+  // sie sagt, WANN ein Auftrag wieder faellig wird, aber nicht, dass ihn jemand
+  // abholt — ein an einem Anbieter-5xx gescheiterter Push bliebe bis zum
+  // naechsten zufaelligen Hinweis liegen.
+  //
+  // Der Scan deckt nur diese Haelfte ab: die Funktion liegt in `public`, die
+  // Zeitplanung im Schema `cron`, das er nicht abfragt. Eine abbestellte
+  // Zeitplanung faellt ihm also NICHT auf. Dafuer:
+  // `pnpm tsx scripts/probe-age641-pg-cron.ts <dev|prod>`.
+  "push_wiederholung",
 ];
 
 export type Bestand = {

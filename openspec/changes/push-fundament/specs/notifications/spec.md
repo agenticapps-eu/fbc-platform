@@ -157,13 +157,36 @@ derselben Versuchsgrenze aufgegeben werden wie ein quittierter, damit ein
 Auftrag, der den Zustellweg jedes Mal abbrechen lässt, nicht unbegrenzt
 wiederkehrt.
 
+**Diesen Wiederholungslauf SHALL das System von sich aus wiederkehrend
+anstoßen** und SHALL NOT darauf warten, dass ein neuer Hinweis entsteht. Das
+steht nicht im Widerspruch zum Absatz weiter oben, wonach nicht abgefragt
+werden SHALL, ob etwas anliegt: jener regelt den **Erst-Anstoß**, für den die
+Hinweiszeile selbst der Auslöser bleibt. Hier geht es allein um bereits
+angelegte, fehlgeschlagene Zustellaufträge — für die gibt es kein zweites
+Ereignis, auf das sich warten liesse. Ohne
+das ist die Frist aus dem Absatz darüber wirkungslos: sie sagt, wann ein Auftrag
+wieder fällig wird, aber nicht, dass ihn jemand abholt. Ein Push, der an einem
+vorübergehenden Anbieterfehler scheitert, bliebe dann bis zum nächsten
+zufälligen Hinweis liegen — und käme in einer stillen Nacht gar nicht mehr. Der
+Anstoß SHALL innerhalb der Datenbank liegen und SHALL NOT von der CI oder einer
+anderen Fläche abhängen, die für Zustellung nicht einsteht.
+
+#### Scenario: Der Wiederholungslauf braucht keinen neuen Hinweis
+
+- **WHEN** ein Zustellauftrag fällig ist und in der Zwischenzeit **kein**
+  weiterer Hinweis entsteht
+- **THEN** wird er trotzdem erneut versucht
+- **AND** der Anstoß dazu kommt aus der Datenbank selbst
+
 #### Scenario: Ein abgebrochener Lauf lässt keinen Auftrag liegen
+
 - **WHEN** ein Zustellauftrag beansprucht, aber nie quittiert wurde und seine
   Frist verstrichen ist
 - **THEN** sammelt ihn der Wiederholungslauf wieder ein
 - **AND** ein Auftrag, dessen Frist noch läuft, wird dabei nicht angefasst
 
 #### Scenario: Ein unbekannter Anbieterfehler entfernt kein Token
+
 - **WHEN** der Anbieter mit einem Grund antwortet, den das System nicht kennt
 - **THEN** bleibt das Gerätetoken bestehen
 - **AND** die Zustellung wird zurückgestellt statt aufgegeben
