@@ -1,15 +1,19 @@
-# Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung, vormittags)
+# Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung)
 
-Drei Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
-verlangte; **AGE-652** durch die volle Schleife; und die **Worktree-Rückfragen
-dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat.
+Vier Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
+verlangte; **AGE-652** durch die volle Schleife; die **Worktree-Rückfragen
+dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat; und den
+**Dependabot-Stau aufgelöst**, der seit dem 14.08. stand.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-632/634/636/638** archiviert (PR #260) | ✅ `a08d909`, alle 11 check-runs grün |
-| Übergabe vormittags (PR #261) | ✅ `c540f4b` |
-| **AGE-652** Spec-Drift `lg` → `xl` (PR #262) | ✅ `7939f08`, Linear auf Done |
-| **AGE-651** Blase frisst das Kuvert | 🆕 Backlog, Gestaltungsfrage für Donald |
+| **AGE-632/634/636/638** archiviert (#260) | ✅ `a08d909`, alle 11 check-runs grün |
+| **AGE-652** Spec-Drift `lg` → `xl` (#262) | ✅ `7939f08`, Linear auf Done |
+| **Dependabot** #247 · #248 · #185 | ✅ `c671988` · `2d7d2cb` · `d79daa7` |
+| Übergaben #261 · #263 | ✅ `c540f4b` · `76694d0` |
+| **AGE-651** Blase frisst das Kuvert | ⛔ **Canceled** (Donald: Kosmetik) |
+| **AGE-653** Dependabot ⇄ `deno.lock` | 🆕 Backlog, Ursache belegt, Fix offen |
+| **#186** framer-motion 12 → 13 | 🟡 bewusst liegengelassen |
 | Worktree-Erreichbarkeit + stale `main` | ✅ dauerhaft behoben, gemessen |
 
 ## Accomplished
@@ -17,13 +21,14 @@ dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat.
 **`openspec/changes/` ist aufgeräumt.** Es lagen **vier** unarchivierte Changes
 da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen, und
 ausgerechnet der trug den einzigen offenen Haken. Übrig sind nur die fünf
-`add-*`-Vorhaben, zu Recht: sie tragen ausschliesslich offene Aufgaben.
+`add-*`-Vorhaben, zu Recht: sie tragen nur offene Aufgaben.
 
 **Der offene Haken aus AGE-638 ist nachgemessen.** Der Rail wird von einer
 mehrstelligen Zahl **nicht** gesprengt, auch vierstellig nicht: `-right-0.5`
-nagelt die rechte Kante fest, die Blase wächst nach links, die Luft rechts bleibt
-konstant 15,5 px. Gefunden hat die Messung etwas anderes → **AGE-651**: die Blase
-verdeckt das Kuvert, zweistellig zur Hälfte, vierstellig ganz.
+nagelt die rechte Kante fest, die Blase wächst nach links. Gefunden hat die
+Messung etwas anderes — die Blase verdeckt das Kuvert, zweistellig zur Hälfte,
+vierstellig ganz. Als **AGE-651** notiert und von Donald als Kosmetik
+**abgeschlossen**; die Messtabelle bleibt dort stehen.
 
 **AGE-652 ist gebaut, nicht nur behauptet.** Zwei Anforderungen in derselben
 Datei widersprachen einander, beide mit `SHALL`. Abgeglichen wurde **Spec gegen
@@ -33,42 +38,73 @@ Sonst wäre es die Red-Flag-Zeile „a spec delta edited to match the code".
 ## Decisions
 
 - **Spec-only-Korrekturen laufen hier über einen vollen Change**, nicht als
-  Handedit in `openspec/specs/`. Präzedenz ist AGE-579 (`d071ddc`): proposal,
-  REVIEWS.md, Messbeleg, tasks, Delta — für eine Ein-Satz-Korrektur.
+  Handedit in `openspec/specs/`. Präzedenz ist AGE-579 (`d071ddc`).
 - **Ein `MODIFIED`-Block bekräftigt alles, was in ihm steht.** Darum wurden zwei
   *bestehende* Falschaussagen im selben Szenario mitkorrigiert, obwohl
   „Surgical Changes" dagegenspricht: Stehenlassen wäre dort keine Zurückhaltung,
   sondern eine Bekräftigung unter neuem Datum.
-- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert.** Ohne
-  diesen Schritt stünden 889 Zeilen Kosmetik im Diff; mit ihm sind es die
-  tatsächlichen Zeilen. Nie `pnpm format`.
+- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert** — sonst
+  889 Zeilen Kosmetik im Diff. Nie `pnpm format`.
 - **Kein Linear-Statuswechsel von Hand**, obwohl ein Reviewer ihn forderte. Die
   GitHub-Automation schaltet In Progress/Done — bei AGE-652 beobachtet.
-- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl). So
-  bleiben die bestehenden neun Worktrees und die parallel laufenden Sitzungen
-  erreichbar.
+- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl), so
+  bleiben die neun bestehenden erreichbar.
 
 ## Files modified
 
 - `openspec/changes/archive/2026-08-28-{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill,rail-breakpoint-xl}/`
 - `openspec/specs/{admin,notifications,design-system}/spec.md`
 - `src/content/release-entries.generated.ts` — fünf Einträge dazu
+- `package.json` + beide Sperrdateien — 18 Pakete, über drei Dependabot-Merges
 - **Maschinenkonfiguration** (nicht im Repo): `~/.claude/settings.json`
-  (`additionalDirectories`, Sicherung als `.bak-2026-08-28`) und
+  (`additionalDirectories`, Sicherung `.bak-2026-08-28`) und
   `~/.config/worktrunk/config.toml` (`[pre-switch] sync-main`)
+
+## Der Dependabot-Stau, aufgelöst
+
+Vier PRs standen seit dem 14.08. **Keiner scheiterte an seiner Abhängigkeit** —
+alle an `deno test --frozen` (`ci.yml:82`), einem Pflichtcheck: mangels
+`deno.json` faltet Deno 2 die Wurzel-`package.json` samt Versionsbereichen in
+`deno.lock`, und genau die hebt Dependabot. Hausgemacht, Ursache als **AGE-653**
+notiert (nicht gebaut, siehe unten). Freigemacht mit `deno install
+--frozen=false` je Branch, gegengeprüft mit `--frozen` (90 Deno-Tests).
+
+Zwei Fallen, beide eingetreten und als Memory abgelegt: die Branch-Protection
+verlangt zusätzlich **„aktuell zur Basis"** (Pflichtchecks sind `verify`,
+`migrations`, `pr-title`, `edge-functions` — **`deploy` ist keiner**), und die
+PRs gehen **nur nacheinander**, weil beim Nachziehen von `main` die Sperrdateien
+kollidieren. Eine Sperrdatei wird erzeugt, nicht zusammengeschrieben.
+
+## Bewusst nicht getan
+
+**AGE-653 ist angelegt, aber nicht gebaut** — abweichend von Donalds Wahl
+„gleich mitmachen", ausgesprochen statt verschwiegen. Der saubere Fix wäre ein
+`deno.json` in `supabase/functions/`; das ist eine **CI-Änderung**, und die haben
+`main` hier schon zweimal rot gemacht. `--frozen` sichert laut `ci.yml:73`
+ausdrücklich mit ab, dass `deno.lock` zum Code passt. Gehört durch die Schleife
+mit Plan-Review, nicht ans Ende einer Sitzung mit sieben Merges.
+
+**#186 (framer-motion 12 → 13) liegt bewusst.** Ein grünes `verify` trägt bei
+einem Major einer Animationsbibliothek wenig — jsdom sieht davon nichts. Braucht
+eine Sichtprobe im Browser, und die liegt dicht vor dem Go-Live.
 
 ## Next session: start here
 
-**Zuerst die check-runs auf `7939f08` nachsehen.** Beim Schreiben waren `build`,
-`deploy`, `edge-functions`, `migrate-dev` und `report-build-status` grün;
-`verify`, `migrations` und `drift-gate` liefen noch. Kein Migrationsanteil, das
-drift-gate sollte also nicht überspringen.
+**Nichts ist unfertig.** `d79daa7` (HEAD von `main` nach den drei
+Dependabot-Merges) trägt **alle 12 check-runs grün**, beide `deploy`-Jobs und
+`drift-gate` eingeschlossen — nach drei Abhängigkeits-Merges war das die
+eigentliche Prüfung, und sie ist bestanden.
 
-**Danach ist AGE-651 der nächste sinnvolle Schritt** — aber er braucht erst
-Donalds Entscheidung, keine Arbeit: kappen bei `99+`, die Blase nach aussen in
-die 15,5 px Luft setzen, oder das Symbol vergrössern? Ohne diese Antwort ist der
-Vorgang nicht baubar. Danach kämen AGE-645 (Emoji, klein) oder AGE-646
-(Antworten, eine Spalte, keine neue Tabelle).
+**Es hängt an zwei Antworten von Donald, nicht an Arbeit:** **AGE-628**
+(Feedback: Thema, Screenshot, Filter, Chat-Sprung) — der Issue existiert und
+deckt alle Punkte, **ein Change fehlt**. Baubar erst mit der Themenliste und der
+Entscheidung, was beim Chat-Sprung mit **anonymem** Feedback passiert (AGE-588
+steht dafür offen) und ob ein Admin die Kontaktanfrage-Hürde überspringen darf —
+letzteres wäre eine Ausnahme im Zugangsmodell und gehört ausgesprochen. Und
+**AGE-653**: bauen oder liegen lassen.
+
+Ohne diese Antworten sind **AGE-645** (Emoji, klein, keine Migration) oder
+**AGE-646** (Antworten, eine Spalte) die nächsten baubaren Vorgänge.
 
 **Dieser Worktree kann weg.** Er heisst `fbc-platform.neuigkeiten-archiv` nach
 einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt.
@@ -79,54 +115,38 @@ einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt
   sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt fünf
   Einträge mehr — darunter den von AGE-652, der eine interne Spec-Korrektur ist
   und beim Zustellen ein Kandidat für „nicht relevant" wäre.
-- **AGE-651 ist eine Gestaltungsfrage**, keine technische. Was dort entschieden
-  wird, gilt vermutlich für die Topbar mit — sie trägt dieselbe Zahl im selben
-  Muster.
 - Unverändert offen: AGE-645/646/647/648 · AGE-610 · AGE-512 ·
   Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
-  AGE-256 · AGE-606 · AGE-628/629/630 · die Threadliste markiert offene
+  AGE-256 · AGE-606 · AGE-629/630 · die Threadliste markiert offene
   Chatfenster nicht · `community-feed/spec.md:6` verspricht „threaded comments",
   `public.comments` hat kein `parent_id`.
 
 ## Was diese Sitzung gelernt hat
 
-**Die Plan-Review hat sich in AGE-652 bezahlt gemacht, und zwar messbar.** Drei
-Reviewer (gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
-REQUEST-CHANGES) fanden zwei HIGH-Befunde, davon **einen unabhängig
-doppelt** — und der schärfste war einer, den ich nie gefunden hätte: meine
-Messung belegte den Erstbesuch gar nicht, weil `fbc.chatCollapsed` auf `"1"`
-stand. Gemessen war ein gespeicherter Zustand.
+Die dauerhaften Lehren liegen als Memory-Einträge; hier nur das Nötige.
 
-**`resize_page` ist wirkungslos, `emulate` nicht.** Nach `resize_page(1279)`
-meldete die Seite weiter `innerWidth: 1688` — ohne Fehler, ohne Hinweis. Drei
-falsche Messungen wären so entstanden. In jeder Messung `innerWidth`
-mitausgeben und gegen die gewünschte Breite prüfen.
+**Die Plan-Review hat sich in AGE-652 messbar bezahlt gemacht.** Drei Reviewer
+(gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
+REQUEST-CHANGES) fanden zwei HIGH-Befunde, davon **einen unabhängig doppelt** —
+und der schärfste war einer, den ich nie gefunden hätte: meine Messung belegte
+den Erstbesuch gar nicht, weil `fbc.chatCollapsed` auf `"1"` stand.
 
-**Eine Schwelle belegt man an der Kante.** 1100 und 1688 px zeigen zwei
-Zustände, aber nicht, wo der Sprung liegt. Das tun 1279 (Breite 0) und 1280
-(72 px) — plus die gemessene Wurzelschriftgrösse, damit „80rem = 1280 px" nicht
-auf einer Annahme ruht.
-
-**`git checkout <branch> -- <datei>` holt die COMMITTETE Fassung.** Eine frisch
-geschriebene, ungesicherte Datei ist danach weg — hier diese Übergabe, einmal
-komplett. Nach `git checkout -b` ist die Arbeitskopie ohnehin mitgekommen.
-
-**`switch.base` gibt es in der wt-Config nicht.** wt nimmt den Schlüssel
-widerspruchslos an und ignoriert ihn; erkennbar nur am gemessenen Commit des
-entstandenen Worktrees, nicht an einer Fehlermeldung.
+**Drei Messfallen**, alle als Memory abgelegt: `resize_page` ist im
+chrome-devtools-MCP wirkungslos (`innerWidth` blieb stumm bei 1688, ohne
+Fehler); eine Schwelle belegt man an der Kante (1279/1280), nicht an zwei
+entfernten Punkten; und `git checkout <branch> -- <datei>` holt die
+**committete** Fassung und wirft Ungesichertes weg — hier diese Übergabe, einmal
+komplett.
 
 ## Umgebung
 
-**Worktrees sind jetzt dauerhaft erreichbar** — `~/Sourcecode` steht in
-`permissions.additionalDirectories`. Gemessen: ein `cd` in einen fremden
-Worktree bleibt stehen, ohne Neustart. Weiterhin gilt: `wt switch --create …
---no-cd --format=json`, dann `cd` auf den `path` aus der Antwort; `EnterWorktree`
-schlägt bei Geschwister-Worktrees fehl.
-
-**Die lokale `main` zieht sich selbst nach** — `[pre-switch] sync-main` in
-`~/.config/worktrunk/config.toml` fetcht und macht `main` per `--ff-only`
-aktuell, bevor ein Worktree entsteht. Gemessen: Worktree landete auf `c540f4b`
-statt auf dem sechs Commits alten `e4eb9d1`.
+**Worktrees sind dauerhaft erreichbar** — `~/Sourcecode` steht in
+`permissions.additionalDirectories`, und `[pre-switch] sync-main` in
+`~/.config/worktrunk/config.toml` zieht die lokale `main` vor jedem neuen
+Worktree nach. Beides gemessen. Weiterhin gilt: `wt switch --create …
+--no-cd --format=json`, dann `cd` auf den `path`; `EnterWorktree` schlägt bei
+Geschwister-Worktrees fehl. **`switch.base` in der wt-Config gibt es nicht** —
+wt nimmt den Schlüssel an und ignoriert ihn.
 
 Lokaler Stack: `anna@chattest.invalid` / `Testchat2026!` (siehe
 `scripts/chat-testkonten.ts`), ein Gespräch. Die Probennachrichten dieser Sitzung
