@@ -615,8 +615,18 @@ export default function AppShell() {
   const nachrichtenOffen = chatDrawerOpen || aufChatRoute;
   useEffect(() => {
     if (!user || !nachrichtenOffen || pushGefragtFuer.current === user.id) return;
+    // Der Riegel fällt VOR dem Aufruf — sonst liefe ein schnelles Auf/Zu
+    // zweimal hinein, solange die erste Frage noch offen ist.
+    //
+    // Bei "fehler" wird er zurückgenommen (Auflage aus der Code-Review): dann
+    // hat die Brücke geworfen, der Systemdialog war nie zu sehen, und ein
+    // gesetzter Riegel machte einen Fehlschlag für die ganze Sitzung endgültig.
+    // Bei "abgelehnt" NICHT — das ist eine Entscheidung, und iOS stellt sie
+    // ohnehin kein zweites Mal zur Wahl.
     pushGefragtFuer.current = user.id;
-    void pushEinrichten();
+    void pushEinrichten().then((stand) => {
+      if (stand === "fehler") pushGefragtFuer.current = null;
+    });
   }, [user, nachrichtenOffen]);
 
   // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es

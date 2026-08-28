@@ -101,6 +101,31 @@ describe("Abmelden nimmt das Gerätetoken mit (AGE-641 Phase B)", () => {
     expect(reihenfolge).toEqual(["push", "signOut"]);
   });
 
+  it("WARTET auf das Aufräumen, statt es nur anzustoßen", async () => {
+    // AUFLAGE AUS DER CODE-REVIEW. Der Reihenfolge-Test darüber ist schwächer,
+    // als er aussieht: auch ein `void pushAbmelden()` ohne `await` bestünde ihn,
+    // weil die Attrappe „push" schon beim AUFRUF notiert. Gemessen würde dann
+    // die Aufrufreihenfolge, nicht das Abwarten — und genau das Abwarten ist
+    // hier der Punkt: ohne es liefe das `delete` gegen eine Sitzung, die
+    // `auth.signOut()` parallel gerade abräumt.
+    //
+    // Deshalb ein Versprechen, das erst auf Zuruf einlöst. Solange es offen
+    // ist, DARF `auth.signOut()` nicht gelaufen sein.
+    let einloesen: (() => void) | null = null;
+    pushAbmelden.mockImplementation(
+      () => new Promise<string>((res) => (einloesen = () => res("entfernt"))),
+    );
+
+    render(<Umgebung />);
+    fireEvent.click(screen.getByRole("button", { name: "Abmelden" }));
+
+    await waitFor(() => expect(pushAbmelden).toHaveBeenCalledTimes(1));
+    expect(authSignOut).not.toHaveBeenCalled();
+
+    einloesen!();
+    await waitFor(() => expect(authSignOut).toHaveBeenCalledTimes(1));
+  });
+
   it("meldet auch dann ab, wenn das Aufräumen scheitert", async () => {
     pushAbmelden.mockRejectedValue(new Error("kein Netz"));
     render(<Umgebung />);

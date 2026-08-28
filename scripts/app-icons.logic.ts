@@ -74,12 +74,33 @@ export function leseMarke(faviconSvg: string): Marke {
   if (!box) throw new Error("app-icons: keine viewBox im Favicon gefunden");
   if (box[1] !== box[2]) throw new Error(`app-icons: Favicon ist nicht quadratisch (${box[0]})`);
 
+  // Genau EINE Form je Sorte. Ohne diese Zaehlung gewaenne still der erste
+  // Treffer: kaeme im Favicon je ein zweiter Ring oder Pfad dazu, erzeugte
+  // dieses Skript weiter das alte Symbol und meldete fuenfzehn Erfolge.
+  const kreise = faviconSvg.match(/<circle\b/g) ?? [];
+  const pfade = faviconSvg.match(/<path\b/g) ?? [];
+  if (kreise.length !== 1)
+    throw new Error(`app-icons: genau ein <circle> erwartet, gefunden: ${kreise.length}`);
+  if (pfade.length !== 1)
+    throw new Error(`app-icons: genau ein <path> erwartet, gefunden: ${pfade.length}`);
+
+  // Dieses Skript liest KEIN `transform`. Waeren die Formen verschoben statt
+  // absolut angegeben, waere die Ausgabe falsch platziert — und der Vergleich
+  // gegen die Pfaddaten bliebe trotzdem gruen. Also sagen, statt so zu tun.
+  if (/<(?:circle|path)\b[^>]*\stransform=/.test(faviconSvg))
+    throw new Error("app-icons: transform an Ring oder Stern — dieses Skript liest es nicht");
+
   const kreis = /<circle([^>]*)\/>/.exec(faviconSvg);
   if (!kreis) throw new Error("app-icons: kein <circle> (Ring) im Favicon gefunden");
   const attr = (name: string): number => {
-    const m = new RegExp(`${name}="([\\d.]+)"`).exec(kreis[1]);
+    const m = new RegExp(`${name}="([^"]+)"`).exec(kreis[1]);
     if (!m) throw new Error(`app-icons: Ring ohne ${name}`);
-    return Number(m[1]);
+    const zahl = Number(m[1]);
+    // `Number("15.5.5")` ist NaN, und NaN wanderte ohne einen Mucks durch
+    // `runde()` in jede erzeugte Datei — ein Symbol, das nirgends gezeichnet
+    // wird, sieht im Protokoll aus wie fuenfzehn Erfolge.
+    if (!Number.isFinite(zahl)) throw new Error(`app-icons: ${name}="${m[1]}" ist keine Zahl`);
+    return zahl;
   };
 
   const pfad = /<path[^>]*\sd="([^"]+)"/.exec(faviconSvg);

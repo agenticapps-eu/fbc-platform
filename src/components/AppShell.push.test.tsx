@@ -163,6 +163,44 @@ describe("Die Push-Erlaubnis wird beim Öffnen der Nachrichten gefragt (AGE-641 
     await waitFor(() => expect(pushEinrichten).toHaveBeenCalledTimes(2));
   });
 
+  it("versucht es erneut, wenn die Einrichtung gescheitert ist", async () => {
+    // AUFLAGE AUS DER CODE-REVIEW. Der Riegel fällt VOR dem Aufruf — sonst
+    // liefe ein schnelles Auf/Zu zweimal hinein. Damit wäre aber auch ein
+    // Fehlschlag der Brücke endgültig: der Systemdialog war nie zu sehen, und
+    // die App fragte in dieser Sitzung nie wieder. Genau das soll er nicht.
+    //
+    // Nur bei "fehler". Eine Ablehnung ist eine Entscheidung, die iOS ohnehin
+    // kein zweites Mal zur Wahl stellt.
+    pushEinrichten.mockResolvedValueOnce("fehler");
+    renderApp();
+
+    fireEvent.click(oeffner());
+    await waitFor(() => expect(pushEinrichten).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(schliesser());
+    await waitFor(() => expect(oeffner()).toBeInTheDocument());
+    fireEvent.click(oeffner());
+
+    await waitFor(() => expect(pushEinrichten).toHaveBeenCalledTimes(2));
+  });
+
+  it("versucht es nach einer Ablehnung NICHT erneut", async () => {
+    // Die Gegenseite derselben Zusage — ohne sie liesse sich „nur bei fehler"
+    // von „immer" nicht unterscheiden.
+    pushEinrichten.mockResolvedValueOnce("abgelehnt");
+    renderApp();
+
+    fireEvent.click(oeffner());
+    await waitFor(() => expect(pushEinrichten).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(schliesser());
+    await waitFor(() => expect(oeffner()).toBeInTheDocument());
+    fireEvent.click(oeffner());
+
+    await waitFor(() => expect(schliesser()).toBeInTheDocument());
+    expect(pushEinrichten).toHaveBeenCalledTimes(1);
+  });
+
   it("fragt einen Gast nicht", async () => {
     renderApp("/aktivitaet", GAST);
     expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();

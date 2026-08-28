@@ -53,6 +53,31 @@ describe("Die Marke kommt aus dem Favicon und nicht aus einer Kopie", () => {
     expect(marke.ring).toEqual({ cx: 24, cy: 24, r: 15.5, strichbreite: 3.5 });
   });
 
+  it("wirft bei einer Zahl, die keine ist — statt NaN in fünfzehn PNG zu schreiben", () => {
+    // AUFLAGE AUS DER CODE-REVIEW. `[\\d.]+` schluckt „15.5.5"; `Number()` macht
+    // daraus NaN, und NaN wanderte ohne einen Mucks durch `runde()` in jede
+    // erzeugte Datei. Ein Symbol, das nirgends gezeichnet wird, sieht im
+    // Erzeugungsprotokoll aus wie fünfzehn Erfolge.
+    const kaputt = FAVICON.replace('r="15.5"', 'r="15.5.5"');
+    expect(() => leseMarke(kaputt)).toThrow(/keine Zahl/);
+  });
+
+  it("wirft bei einer zweiten Form, statt die erste zu nehmen", () => {
+    // Sonst gewinnt still der erste Treffer: käme im Favicon je ein zweiter
+    // Ring oder Pfad dazu, erzeugte dieses Skript weiter das alte Symbol.
+    const zwei = FAVICON.replace("</svg>", '<circle cx="1" cy="1" r="1" stroke-width="1"/></svg>');
+    expect(() => leseMarke(zwei)).toThrow(/genau ein/);
+  });
+
+  it("wirft bei einem transform, das es nicht liest", () => {
+    // Der ehrlichste stille Fall: würde das Favicon seine Formen verschoben
+    // statt absolut angeben, bliebe der Vergleich oben grün und die Ausgabe
+    // wäre falsch platziert. Dieses Skript liest kein `transform` — also sagt
+    // es das, statt so zu tun.
+    const verschoben = FAVICON.replace("<circle", '<circle transform="translate(2 2)"');
+    expect(() => leseMarke(verschoben)).toThrow(/transform/);
+  });
+
   it("wirft, statt ein halbes Symbol zu erzeugen", () => {
     expect(() => leseMarke("<svg></svg>")).toThrow(/viewBox/);
     expect(() => leseMarke('<svg viewBox="0 0 48 48"></svg>')).toThrow(/circle/);
