@@ -961,7 +961,12 @@ export default function AppShell() {
           />
           <div
             className={cn(
-              "absolute inset-y-0 left-0 w-72 max-w-[80vw] overflow-y-auto px-4 py-6 shadow-soft",
+              // AGE-642 C1: `py-6` ist hier bewusst AUFGELOEST statt um ein
+              // `pt-*` ergaenzt. Beide waeren gleich spezifisch, und welche
+              // gewinnt, entschiede allein die Reihenfolge im erzeugten
+              // Stylesheet — `cn()` loescht keine Gegenklasse.
+              "absolute inset-y-0 left-0 w-72 max-w-[80vw] overflow-y-auto px-4 shadow-soft",
+              "pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
               SIDEBAR_SURFACE,
             )}
           >
@@ -990,7 +995,8 @@ export default function AppShell() {
             className="absolute inset-0 bg-scrim backdrop-blur-sm"
             onClick={() => setChatDrawerOpen(false)}
           />
-          <div className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-canvas shadow-soft">
+          {/* AGE-642 C1: keine Padding-Klasse im Weg, deshalb hier direkt. */}
+          <div className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-canvas pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-soft">
             <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
               <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
               <button

@@ -4,7 +4,12 @@
 <html lang="de" data-variant="hell">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- AGE-642 C1: `viewport-fit=cover` MUSS hier stehen, sonst liefern alle
+         `env(safe-area-inset-*)` in index.css den Wert 0 und jede Regel dort
+         ist wirkungslos. Am 28.08. auf einem iPhone 17 Pro gemessen: ohne das
+         Meta liegt der Kopf der Hülle unter der Statusleiste, und der
+         Anmelden-Knopf ist nicht erreichbar. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/brand/compass-favicon.svg" />
     <link rel="apple-touch-icon" href="/brand/compass-favicon.svg" />
     <meta name="theme-color" content="#ffffff" />
