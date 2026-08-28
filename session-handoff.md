@@ -1,158 +1,132 @@
-# Session Handoff — 2026-08-27 (vierundvierzigste Sitzung, nachts)
+# Session Handoff — 2026-08-28
 
-Ein Vorgang, vollständig durch die Schleife: **AGE-639, angedockte Chatfenster**.
-PR **#258** offen, CI beim Schreiben noch am Laufen. Der Change ist archiviert,
-die neue Wahrheit steht in `openspec/specs/`.
+Ein Vorgang, durch die ganze Schleife bis kurz vor den PR: **AGE-645**, jetzt
+Emoji-Auswahl **plus** Zeitstempel **plus** Tagesmarker. Vier Commits auf
+`donald/age-645-emoji-auswahl`, **kein PR offen**.
 
-| Vorgang | Stand |
-| --- | --- |
-| **AGE-636** / **AGE-638** | ✅ gemergt, Deploy auf der HEAD-SHA von `main` **grün geprüft** (alle 11 check-runs) |
-| **AGE-639** Chatfenster | 🟡 PR #258, archiviert, CI läuft |
+| Vorgang                       | Stand                                                               |
+| ----------------------------- | ------------------------------------------------------------------- |
+| **AGE-639** Chatfenster       | ✅ gemergt, Deploy auf HEAD-SHA von `main` (`b7c33b2`) grün geprüft |
+| **AGE-645**                   | 🟡 gebaut, Sichtprobe durch, offen: Diff-Review · Archivieren · PR  |
+| **AGE-649** Lesebestätigungen | neu angelegt                                                        |
+| **AGE-650** Hauttöne          | neu angelegt                                                        |
 
 ## Accomplished
 
-Ein Klick in der stehenden Nachrichten-Leiste öffnet ab `xl` ein **Fenster**
-statt wegzunavigieren. Höchstens drei, jedes einzeln minimierbar und
-schliessbar, sie überleben Seitenwechsel und Neuladen (gerätelokal, **je
-Konto**). Ein aufgezogenes Fenster rückt den Lesestand vor, ein minimiertes
-nicht. **Ein** Realtime-Kanal für alle.
+Drei Dinge in einer Sendezeile: `:-)` wird **beim Senden** zu 🙂, jede bestätigte
+Nachricht trägt eine Uhrzeit, und ein Auswahlfeld über 1914 deutsch
+durchsuchbare Emoji. Dazu **Tagesmarker** wie in WhatsApp („Heute", „Gestern",
+Wochentag, sonst Datum).
 
-Geteilt statt kopiert: `useGespraech` trägt Verlauf, Lesestand und optimistisches
-Senden für Vollansicht **und** Fenster. `ChatPage` benutzt es jetzt, ohne dass
-eine seiner Zusicherungen sich ändern musste.
+2086 Tests grün, `typecheck` und `lint` sauber, `openspec validate --all` grün.
+
+**Plan-Review vor der ersten Codezeile** (gemini + opencode/Kimi-K3, beide
+REQUEST-CHANGES) — alle HIGH und MEDIUM eingearbeitet, dokumentiert in
+`REVIEWS.md`.
+
+**Sichtprobe im Browser** über chrome-devtools/CDP, gegen den lokalen Stack.
 
 ## Decisions
 
-- **Fenster sind adresslos** (Donald). `/chat/:id` bleibt Deep-Link und
-  Vollansicht; die Spec-Zusage „eine Adresse = ein Gespräch" wurde umformuliert,
-  nicht gebrochen: die Adresse benennt einen **Ort**, das Fenster ist Werkzeug.
-- **Minimiert bleibt die Titelzeile**, nicht eine Avatar-Blase — sonst wäre bei
-  drei Fenstern nur noch ein Buchstabe übrig.
-- **Höchstens drei; das vierte räumt das am längsten unberührte.** „Berührt"
-  schliesst Senden und Fokus ein, sonst fliegt das Fenster raus, in dem gerade
-  geschrieben wird.
-- **Bei Platznot geben die Fenster in der BREITE nach, keines wird
-  abgeschnitten.** Die Zahl bleibt fest bei drei; Donalds Absage galt der
-  variablen Zahl, nicht der Breite.
-- **Die „never rounded or floating"-Doktrin gilt weiter — für die LEISTEN.** Sie
-  handelt von den Kanten des Rahmens; Overlays, Toasts und Popover schweben seit
-  jeher. Ein Fenster gehört in diese Klasse.
-- **Der falsche Breakpoint wird mitkorrigiert**: `design-system/spec.md` sagte
-  „Below `lg`" für eine Leiste, die an `xl` andockt. Da der `MODIFIED`-Block das
-  Requirement ohnehin vollständig neu ausstellt, wäre Weiterreichen kein Respekt
-  vor fremdem Umfang gewesen.
+- **`:-)` wird beim SENDEN ersetzt, nicht beim Anzeigen** (Donald). Endgültig im
+  `body`, nicht rückwirkend, nicht rücknehmbar — benannt und so gewollt.
+- **Die Ersetzung sitzt in `useGespraech.sende()`**, nicht in
+  `Conversation.submit()`. Dort speisen sich optimistische Blase und Insert aus
+  derselben Variablen; die Gleichheit ist strukturell statt per Konvention.
+  `sendMessage` hat genau einen Aufrufer (`use-gespraech.ts:134`).
+- **Deutscher Datensatz, obwohl er der größere ist.** Der englische ist mit
+  16,7 kB gzip kleiner und trotzdem falsch: sein einziges „Herz" ist „Bosnia &
+  Herzegovina". Gewählt: `emojibase-data@17` `de/compact`, abgespeckt 46 kB gzip.
+- **Erzeuger statt Abhängigkeit** (47 MB für zwei Dateien), und er läuft
+  **nicht** in `prebuild` — er braucht Netz, und ein Build, der ohne Netz
+  scheitert, wäre ein Rückschritt.
+- **Hauttöne ausgeschlossen** (AGE-650), ausdrücklich statt stillschweigend.
+  Daten kosten nur +8 kB; die Kosten liegen in der Oberfläche.
+- **Lesebestätigungen: gegenseitig, nicht abschaltbar** (Donald, AGE-649). Preis:
+  niemand kann sich entziehen.
+- **Tagesmarker ERSETZEN das Datum an der Blase.** Das Datum gab es nur, weil es
+  keine Marker geben sollte; mit ihnen wäre es Doppelung.
+- **Uhrzeit auf eigener Blase mit voller Deckkraft** — gemessen, nicht gewählt:
+  `/70` = 3,34:1, `/90` = 4,43, voll = 5,07. Unter 4,5 besteht kein AA.
 
 ## Files modified
 
-- `src/components/chat/` — **neu**: `use-gespraech.ts`, `use-chatfenster.ts`,
-  `ChatFenster.tsx`, `ChatFensterReihe.tsx` (+ vier Testdateien)
-- `src/components/chat/` — geändert: `ChatPanel.tsx` (meldet den THREAD, nicht
-  nur die Kennung), `Conversation.tsx` (Variante `fenster`), `use-ungelesen.ts`
-- `src/components/AppShell.tsx` — Zustand, Verzweigung, Reihe, `--fbc-fenster-h`
-- `src/components/ui/Toast.tsx`, `src/components/EnvironmentBanner.tsx` — weichen
-  der Reihe aus
-- `src/pages/ChatPage.tsx` — benutzt `useGespraech`; **doppeltes
-  `markThreadRead` entfernt** · `ChatPage.lesestand.test.tsx` neu
-- `openspec/changes/archive/2026-08-27-chatfenster-angedockt/`,
-  `openspec/specs/{messaging,design-system}/spec.md`,
-  `src/content/release-entries.generated.ts`
+- `src/lib/emoticons.ts` + Test — **neu**, die Ersetzung samt Wortgrenzen
+- `src/lib/emoji-suche.ts` + Test — **neu**, Filter mit Umlaut-/Schreibungsfaltung
+- `src/lib/tagestrenner.ts` + Test — **neu**, Marker-Beschriftung + Gruppierung
+- `src/components/chat/EmojiAuswahl.tsx` + Test — **neu**, portaliertes Overlay
+- `scripts/generate-emoji.ts`, `src/content/emoji.generated.ts` (+ Test) — **neu**
+- `src/components/chat/Conversation.tsx` — Zeitstempel, Tagesmarker, Schalter im
+  Feld, `pr-8`
+- `src/components/chat/use-gespraech.ts` — `ersetzeEmoticons` in `sende()`
+- `openspec/changes/emoji-und-zeitstempel-im-chat/` — proposal, design, tasks,
+  REVIEWS, Delta `messaging`
 
 ## Next session: start here
 
-**Zuerst `gh pr checks 258`.** Grün ⇒ mergen (die Freigabe bei grünem CI ist
-generell erteilt), danach **`gh pr view 258 --json state` prüfen** — ein
-`gh pr merge` kann still fehlschlagen. Der Change trägt **keine Migration**, das
-drift-gate sollte den Deploy also nicht überspringen; das ist trotzdem auf der
-HEAD-SHA von `main` nachzusehen.
-
-**Danach: die drei alten Changes archivieren** — `neuigkeiten-archiv`,
-`admin-setzt-stufe`, `release-notes-modal` liegen weiterhin unarchiviert. Bis
-dahin steht ihre Wahrheit nicht in `openspec/specs/`, und sie fehlen in der
-Neuigkeiten-Liste. **Achtung, in dieser Sitzung frisch erlebt:** ein
-*umbenanntes* Szenario in einem `MODIFIED`-Block löscht das alte, `validate`
-bleibt dabei grün, und nur `openspec archive` bricht ab. Auflösung ohne Verlust:
-den alten Titel behalten und das Neue als eigenes Szenario danebenstellen.
+**Erst die Diff-Review (Stufe 2), dann archivieren, dann PR.** Die Review muss
+die **zwei Hälften getrennt** beurteilen — Emoji-Weg und Zeitstempel/Marker sind
+unabhängig, sonst kauft das offengelegte Bündeln nichts (steht so in `tasks.md`
+Abschnitt 8). Danach `openspec archive emoji-und-zeitstempel-im-chat`, PR gegen
+`main`, und bei grünem CI mergen (Freigabe ist generell erteilt) — anschließend
+**`gh pr view --json state` prüfen**, ein `gh pr merge` kann still fehlschlagen.
+Der Change trägt **keine Migration**, das drift-gate sollte den Deploy also
+nicht überspringen; trotzdem auf der HEAD-SHA von `main` nachsehen.
 
 ## Open questions
 
-- **Die erste Release-Note ist weiterhin nicht zugestellt.** Donalds bzw.
-  Detlevs Handlung; sie geht genau einmal an alle aktivierten Mitglieder.
-- **Nicht im Browser nachgemessen**: die Korrekturen aus der Diff-Review kamen
-  NACH der Sichtprobe. Die zwei, die Verhalten ändern (entfallener doppelter
-  Lesestand-Aufruf, Fokus beim Schliessen), sind stattdessen in Tests
-  festgenagelt — jeweils mit Gegenprobe rot. Der lokale Stack liess sich dafür
-  nicht erneut benutzen, siehe unten.
-- **Bewusst offen gelassen**: das Wettrennen zwischen erstem Laden und Kanal
-  (wortgleich `ChatPage.tsx:81` seit AGE-248); zwei Tabs überschreiben einander
-  im Gerätespeicher; der LRU-Stand überlebt kein Neuladen (begründet im Design).
-- **Folgevorgang**: die Threadliste markiert offene Gespräche nicht —
-  `ThreadList` trägt genau ein `activeId`, drei Fenster brauchten eine Menge.
+- **Navy-Kontrast, nicht von diesem Change:** die eigene Blase liegt bei
+  **3,61:1** für ihren _Nachrichtentext selbst_ (`bg-accent` + `text-chrome`,
+  unverändert im Diff). Eigener Vorgang im Design-System — Donald gefragt, noch
+  keine Antwort.
+- **`REVIEWS.md` trägt keinen signierten Trailer.** Das Tor merkt es an
+  („trailer-absent"), blockt aber nicht. Die kanonische
+  `~/.agenticapps/bin/run-plan-review.sh` schreibt ihn; ich habe ihn **nicht**
+  von Hand geschrieben — ein selbstgemachter Prüfwert wäre ein falscher Beleg.
+- **`release-entries.generated.ts` hat dasselbe Problem**, das ich in meinem
+  Erzeuger behoben habe: ungeformte `JSON.stringify`-Ausgabe, dauerhaft
+  `format:check`-rot, springt bei jedem Build hin und her. Eigener Vorgang.
+- Unverändert offen: erste Release-Note nicht zugestellt · AGE-610 · AGE-512 ·
+  Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
+  AGE-256 · AGE-606 · AGE-628/629/630 · AGE-646/647/648.
 
-## Vier neue Vorgänge für die Nachrichten (angelegt am 27.08.)
+## Umgebung
 
-Donald fragte, ob Reaktionen, Antworten, Gruppen und Emoji geplant seien.
-Nachgesehen: **nichts davon**, weder in den Specs noch in Linear. Angelegt, in
-dieser Reihenfolge — sie ist nach Kosten sortiert, nicht nach Lust:
+**Der Worktree ist `fbc-platform.donald-age-645-emoji-auswahl`** — die Sitzung
+war aber auf `neuigkeiten-archiv` festgenagelt und brauchte ein
+`/add-dir`, bevor sie hineinschreiben durfte. `wt switch --create --base
+origin/main` war nötig, weil die **lokale** `main` 4 Commits zurückhing.
 
-| | Umfang |
-| --- | --- |
-| **AGE-645** Emoji-Auswahl | **klein.** Emoji funktionieren schon (`body` ist `text`); es fehlt nur der Picker. Keine Migration. Enthält die Ja/Nein-Frage, ob `:-)` gedeutet wird. |
-| **AGE-646** Antworten | **mittel-klein.** `messages.reply_to_id`, eine Spalte, **keine** neue Tabelle — also kein Grant und kein Golden-Snapshot. |
-| **AGE-647** Reaktionen | **mittel.** Neue Tabelle ⇒ Grants, `grants_test.sql`-Snapshot, zwei Policies, und die Publikation `supabase_realtime` samt `DELETE`. |
-| **AGE-648** Gruppen-Chats | **gross, eigene Design-Runde.** Kein fehlendes Feature, sondern eine gebaute Entscheidung: `message_threads_unique_pair` und die Anforderung „One thread per member pair". |
+**Der lokale Stack trägt 6 fremde Migrationen** (Push-Vorgang AGE-641 aus einem
+anderen Worktree, `20260827200000`–`20260828100000`). Für rein frontendseitige
+Arbeit unschädlich, aber vor jeder Messung protokollieren.
 
-**Zwei Dinge daraus, die auch ohne diese Vorgänge gelten:**
+**Testkonten stehen wieder:** `anna@` / `bernd@chattest.invalid`,
+`Testchat2026!`, angelegt mit `pnpm tsx scripts/chat-testkonten.ts`. Thread
+`f8543c25-cc6e-4d33-96a9-67ca4e8bdf58` mit Nachrichten über drei Kalendertage.
 
-- **Threads werden an ZWEI Stellen eingefügt** —
-  `20260614100000_contact_request_flow.sql:69` und
-  `20260614120000_volume_routing_queue.sql:195`. Wer am Thread-Modell arbeitet
-  und nur die erste findet, baut die Hälfte.
-- **Spec-Drift gefunden**: `community-feed/spec.md:6` sagt „threaded comments",
-  aber `public.comments` hat kein `parent_id` — Kommentare sind flach. Steht in
-  AGE-646 vermerkt; eigener Vorgang, falls es geradegezogen werden soll.
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
-  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
-
-## Umgebung — eine neue Stolperfalle
-
-**Der lokale Supabase-Stack gehört ALLEN Worktrees auf diesem Rechner.** Eine
-parallele Sitzung hat ihn während der Sichtprobe **dreimal** geleert. Erkennbar
-daran, dass `supabase_migrations.schema_migrations` Namen trägt, die der eigene
-Branch gar nicht hat (hier: `notify_app_umbenennung`, `push_tokens`). Also: Zahlen
-sofort protokollieren, und Seed-Skripte wiederholbar bauen.
-
-Der Seed für diese Fläche (sechs Konten, fünf Gespräche à drei Nachrichten) lag
-im Scratchpad und ist damit weg. Neu bauen nach dem Muster von
-`scripts/chat-testkonten.ts` — dieselben GoTrue-Fallen (die vier Token-Spalten
-müssen `''` sein, nicht NULL) und der echte Weg `pending → accepted`, weil erst
-der Übergang die Threads anlegt. Anmeldung war `ich@chattest.invalid` /
-`Testchat2026!`.
-
-Vite lief zuletzt auf **5210**, gestartet mit den Werten aus `supabase status`
-(`VITE_SUPABASE_URL=http://127.0.0.1:54321`, ANON_KEY, `VITE_ENVIRONMENT=local`).
-Er hört auf `localhost`, **nicht** auf `127.0.0.1` — ein `curl` auf die IP hängt.
+Vite lief auf **5199**, gestartet an `pnpm dev` vorbei (das will Infisical):
+`VITE_SUPABASE_URL=http://127.0.0.1:54321 … pnpm exec vite --port 5199`.
 
 ## Was in dieser Sitzung schiefging (und wie man es merkt)
 
-**Die Breitenrechnung liess die linke Leiste weg**, und darauf stand die ganze
-Entscheidung „höchstens drei". Behauptet waren 60 rem, gerechnet sind es 44.
-**Beide** Plan-Reviewer haben es unabhängig gefunden — genau der Wert dieses
-Schritts, denn er lief vor der ersten Codezeile.
+**Zwei Gegenproben haben zwei wertlose Tests entlarvt.** Die linke Wortgrenze
+entfernt: nur _ein_ Test fiel — die anderen „lass in Ruhe"-Fälle hielt in
+Wahrheit die rechte Grenze, und mein Kommentar behauptete das Gegenteil. Die
+rechte Grenze entfernt: **alle** Tests blieben grün, sie war reine Behauptung.
+Vier Fälle nachgetragen, darunter `<3000 Euro` → wäre `❤️000 Euro` geworden.
 
-**Die Fensterreihe war 77 rem breit statt 44 und lief unter beide Leisten.** Sie
-las `var(--fbc-sidebar-w)`, das am Wurzel-`div` der Hülle steht, während sie per
-Portal am `document.body` hängt — also darüber. `var()` fiel auf `0rem` zurück.
-**Dieselbe Falle, die ich für die Toast-Variable erkannt und hier übersehen
-hatte.** jsdom sieht davon nichts; ein `getBoundingClientRect` sofort.
+**Ein Test hiess „Reihenfolge" und prüfte keine.** In dieser Liste ist keine Form
+Präfix einer anderen; die Behauptung war durch nichts zu widerlegen.
 
-**Ein Kommentar behauptete „gleich viele Schreibvorgänge, und das ist
-gemessen".** Gemessen war der Hook ALLEIN — auf `/chat/:id` schrieb jede
-eingehende Fremdzeile zweimal, weil `ChatPage` in seinem Abo weiter mitmarkierte.
-Die Diff-Review hat es gefunden. **Wo „gemessen" steht, muss dabeistehen, WORAN.**
+**Die Sichtprobe fand zwei Fehler, die 2086 Tests durchgelassen hatten:** der
+Emoji-Schalter ragte 2 px in den Text, und die Uhrzeit lag unter AA.
 
-**Ein synthetisches `KeyboardEvent` aktiviert einen `<button>` nicht.** Der erste
-Tastatur-Nachweis war wertlos; erst ein echter Tastendruck über CDP belegte
-Enter und Leertaste. (Nebenbei damit auch der offene Haken aus AGE-638 erledigt.)
+**Ein Negativbefund ohne Positivkontrolle:** die Scroll-Nachführung „belegte"
+sich zuerst in einem angedockten Fenster — das `fixed` steht und sich beim
+Scrollen gar nicht bewegt. Erst in der Vollansicht, wo der Schalter um −300 px
+wandert, hatte die Messung überhaupt Aussagekraft.
 
-**Ein Endzustand belegt kein Ausbleiben von Zucken** — Zucken ist per Definition
-ein Zwischenzustand. Erst eine Abtastung alle 25 ms über 3 s belegt es.
+**`ls` ist ein eza-Alias** — die Migrationsliste aus dem Branch kam als
+Langformat und liess 99 von 105 Migrationen als „fremd" erscheinen. Mit `find`
+waren es sechs.
