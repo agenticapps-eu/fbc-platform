@@ -107,7 +107,16 @@ export function EventCoverPicker({
       <span className="text-sm font-medium text-ink">Titelbild</span>
       <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-soft">
         {bildUrl ? (
-          <img src={bildUrl} alt="" className="aspect-[3/1] w-full object-cover" />
+          // `object-contain`, nicht `-cover` (AGE-600): die Vorschau ist der
+          // einzige Ort, an dem sich das Ergebnis VOR dem Speichern beurteilen
+          // lässt — sie muss deshalb dieselbe Regel tragen wie `EventCover`,
+          // sonst widerspricht sie der Kachel daneben. Bei den 1,50:1-Bildern
+          // des Demo-Seeds schnitt sie 50 % der HÖHE weg, während die Kachel
+          // das ganze Bild zeigte — das Feld ist mit 3:1 BREITER als das Bild,
+          // `cover` füllt also die Breite und beschneidet oben und unten. (Die
+          // erste Fassung dieses Kommentars schrieb „Breite"; korrigiert aus
+          // der Diff-Review.)
+          <img src={bildUrl} alt="" className="aspect-[3/1] w-full object-contain" />
         ) : (
           <div className="flex aspect-[3/1] w-full items-center justify-center text-xs text-muted">
             Noch kein Titelbild
