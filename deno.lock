@@ -4,7 +4,7 @@
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/crypto@1": "1.1.0",
     "jsr:@std/internal@^1.0.12": "1.0.14",
-    "npm:@cloudflare/workers-types@^4.20260612.1": "4.20260702.1",
+    "npm:@cloudflare/workers-types@^5.20260825.1": "5.20260828.1",
     "npm:@eslint/js@^10.0.1": "10.0.1_eslint@10.9.1",
     "npm:@hookform/resolvers@^5.9.1": "5.9.1_react-hook-form@7.86.0__react@19.2.8_zod@4.4.3_react@19.2.8",
     "npm:@sentry/react@^10.71.0": "10.71.0_react@19.2.8",
@@ -41,7 +41,7 @@
     "npm:typescript@^6.0.3": "6.0.3",
     "npm:vite@^8.2.2": "8.2.2_@types+node@26.2.0_tsx@4.23.12",
     "npm:vitest@^4.1.11": "4.1.11_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.2__@types+node@26.2.0__tsx@4.23.12",
-    "npm:wrangler@4.125.0": "4.125.0_@cloudflare+workers-types@4.20260702.1",
+    "npm:wrangler@4.125.0": "4.125.0_@cloudflare+workers-types@5.20260828.1",
     "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
@@ -249,8 +249,8 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
-    "@cloudflare/workers-types@4.20260702.1": {
-      "integrity": "sha512-mOhf5TUEB1m2vPrxtqoIGfz0fUC9xyxRDx5gWHy5s+OCo6dcV+g7wI1R7gYCMFohhqF/2y2xeKVwMwCJjfn/WA=="
+    "@cloudflare/workers-types@5.20260828.1": {
+      "integrity": "sha512-Ce0QfghuAK9v821gER8rFPR3rMeC+5puTgTzCu4UrG1Zg967Z5Aa+2uZVciIyfCAdGssyh+sLEC6rMjN/YBQwA=="
     },
     "@cspotcode/source-map-support@0.8.1": {
       "integrity": "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==",
@@ -3069,7 +3069,7 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.125.0_@cloudflare+workers-types@4.20260702.1": {
+    "wrangler@4.125.0_@cloudflare+workers-types@5.20260828.1": {
       "integrity": "sha512-yFpvggu+xk1Hdm/Uxwaqa19bb7GArME4CrCS3Vov68a2TZq2MPO+wLocKbbnIC9K0oLowcdau7/ycxbbNHKCEg==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
@@ -3141,7 +3141,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@cloudflare/workers-types@^4.20260612.1",
+        "npm:@cloudflare/workers-types@^5.20260825.1",
         "npm:@eslint/js@^10.0.1",
         "npm:@hookform/resolvers@^5.9.1",
         "npm:@sentry/react@^10.71.0",
