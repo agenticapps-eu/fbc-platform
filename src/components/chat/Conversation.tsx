@@ -4,34 +4,25 @@ import type { ChatMessage } from "../../lib/chat";
 import { cn } from "../../lib/cn";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
+import { gruppiereNachTag, tagesTrennerLabel } from "../../lib/tagestrenner";
 import { EmojiAuswahl } from "./EmojiAuswahl";
 
 const NUR_UHRZEIT = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
-const MIT_DATUM = new Intl.DateTimeFormat("de-DE", {
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 const VOLLES_DATUM = new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" });
 
-/** `HH:MM` für heute, `TT.MM., HH:MM` für alles Ältere (AGE-645).
+/** In der Blase steht NUR die Uhrzeit — der Tag steht einmal im Trenner
+ *  darüber (AGE-645).
  *
- *  Das Datum ist nicht Zierde. Ohne es stünde eine Nachricht von letztem
- *  Dienstag als blosses „14:03" da — und weil dieser Vorgang Datumstrenner
- *  ausdrücklich ausschliesst, gäbe es nirgends sonst einen Hinweis auf den Tag.
- *  Der Plan-Reviewer hat genau das vorgerechnet.
+ *  Eine Zwischenfassung schrieb hier `TT.MM., HH:MM` für ältere Nachrichten.
+ *  Das war richtig, solange es keine Tagesmarker gab: sonst hätte eine
+ *  Nachricht von letztem Dienstag als blosses „14:03" dagestanden. Mit den
+ *  Markern ist die Wiederholung in jeder Blase nur noch Lärm.
  *
  *  Die Zone ist die des Betrachters, weil `Intl` ohne weitere Angabe so
  *  arbeitet: zwei Mitglieder in verschiedenen Zonen sehen für dieselbe Zeile
  *  verschiedene Uhrzeiten. Gewollt. */
-function zeitLabel(createdAt: string, jetzt: Date): string {
-  const d = new Date(createdAt);
-  const gleicherTag =
-    d.getFullYear() === jetzt.getFullYear() &&
-    d.getMonth() === jetzt.getMonth() &&
-    d.getDate() === jetzt.getDate();
-  return (gleicherTag ? NUR_UHRZEIT : MIT_DATUM).format(d);
+function zeitLabel(createdAt: string): string {
+  return NUR_UHRZEIT.format(new Date(createdAt));
 }
 
 /** Konversationsansicht (§9): Nachrichten-Verlauf + Eingabe mit optimistischem Senden.
@@ -137,43 +128,71 @@ export function Conversation({
             Noch keine Nachrichten — schreibe die erste.
           </p>
         ) : (
-          messages.map((message) => {
-            const mine = message.senderId === myId;
-            return (
-              <div key={message.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
+          gruppiereNachTag(messages).map((gruppe) => (
+            <div key={gruppe.schluessel} className="space-y-2">
+              {/* Der Tagesmarker: mittig, als Pille, einmal je Kalendertag.
+                  Er ist eine Überschrift für die Gruppe darunter, kein
+                  dekorativer Streifen — deshalb `role="separator"` mit Text
+                  statt einer blossen Linie. */}
+              <div className="flex justify-center py-1">
                 <span
-                  className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap",
-                    mine
-                      ? "bg-accent text-chrome rounded-br-sm"
-                      : "border border-line bg-canvas text-ink rounded-bl-sm",
-                    message.pending && "opacity-60",
-                  )}
+                  role="separator"
+                  data-testid="tagestrenner"
+                  className="rounded-full border border-line bg-canvas px-3 py-0.5 text-[0.7rem] font-medium text-muted"
                 >
-                  {message.body}
-                  {/* Die schwebende Blase bekommt KEINE Zeit: sie trägt die Uhr
+                  {tagesTrennerLabel(gruppe.nachrichten[0].createdAt, new Date())}
+                </span>
+              </div>
+
+              {gruppe.nachrichten.map((message) => {
+                const mine = message.senderId === myId;
+                return (
+                  <div
+                    key={message.id}
+                    className={cn("flex", mine ? "justify-end" : "justify-start")}
+                  >
+                    <span
+                      className={cn(
+                        "max-w-[75%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap",
+                        mine
+                          ? "bg-accent text-chrome rounded-br-sm"
+                          : "border border-line bg-canvas text-ink rounded-bl-sm",
+                        message.pending && "opacity-60",
+                      )}
+                    >
+                      {message.body}
+                      {/* Die schwebende Blase bekommt KEINE Zeit: sie trägt die Uhr
                       des Geräts (`use-gespraech.ts`, `new Date()`), die
                       bestätigte Zeile die des Servers. Eine angezeigte Zeit
                       spränge beim Eintreffen des Echos um die Uhrendifferenz. */}
-                  {!message.pending && (
-                    <time
-                      data-testid="nachricht-zeit"
-                      dateTime={message.createdAt}
-                      title={VOLLES_DATUM.format(new Date(message.createdAt))}
-                      className={cn(
-                        "mt-1 block text-right text-[0.65rem] tabular-nums",
-                        // Zwei Gründe, zwei Farben. Eine einzige gedämpfte Farbe
-                        // wäre auf einer der beiden Blasen unlesbar.
-                        mine ? "text-chrome/70" : "text-muted",
+                      {!message.pending && (
+                        <time
+                          data-testid="nachricht-zeit"
+                          dateTime={message.createdAt}
+                          title={VOLLES_DATUM.format(new Date(message.createdAt))}
+                          className={cn(
+                            "mt-1 block text-right text-[0.65rem] tabular-nums",
+                            // Zwei Gründe, zwei Farben. Eine einzige gedämpfte Farbe
+                            // wäre auf einer der beiden Blasen unlesbar.
+                            //
+                            // Auf der EIGENEN Blase VOLLE Deckkraft, und das ist
+                            // gemessen, nicht gewählt: `text-chrome` auf `bg-accent`
+                            // ergibt 5,07:1, mit `/70` nur 3,34:1 — unter dem
+                            // AA-Schwellwert 4,5 für Text dieser Größe. Auch `/90`
+                            // reicht mit 4,43 nicht. Zurückhaltung trägt hier die
+                            // Schriftgröße, nicht die Transparenz.
+                            mine ? "text-chrome" : "text-muted",
+                          )}
+                        >
+                          {zeitLabel(message.createdAt)}
+                        </time>
                       )}
-                    >
-                      {zeitLabel(message.createdAt, new Date())}
-                    </time>
-                  )}
-                </span>
-              </div>
-            );
-          })
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))
         )}
         <div ref={endRef} />
       </div>
@@ -213,8 +232,11 @@ export function Conversation({
               // Flex-Element seine Inhaltsbreite als Minimum durch und schiebt den
               // Senden-Knopf bei 14 rem aus der Zeile.
               imFenster ? "min-w-0 px-2" : "px-3",
-              // Platz für den Emoji-Schalter, der über dem Feld liegt.
-              imFenster ? "pr-7" : "pr-9",
+              // Platz für den Emoji-Schalter, der über dem Feld liegt. `pr-8`
+              // und nicht `pr-7`: im Browser bei 12 rem gemessen (der engste
+              // Fall, `min-w-[12rem]`) ragte der Schalter mit `pr-7` genau 2 px
+              // in den Textbereich.
+              imFenster ? "pr-8" : "pr-9",
             )}
           />
           <EmojiAuswahl

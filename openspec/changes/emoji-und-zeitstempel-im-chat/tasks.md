@@ -23,11 +23,23 @@ kein Haken.
 
 - [x] **RED zuerst:** `Conversation` zeigt an einer bestätigten Nachricht
       `HH:MM`; an einer mit `pending: true` **keine** Zeit
-- [x] **Ältere Nachrichten tragen ein Datum** (aus der Review): heute `HH:MM`,
-      davor `TT.MM., HH:MM`. Test mit einer festen Zeit, nicht mit `Date.now()`
+- [x] ~~Ältere Nachrichten tragen ein Datum an der Blase~~ **ÜBERHOLT.** Donald
+      hat am 28.08. Tagesmarker wie in WhatsApp bestellt (Bild geliefert). Damit
+      steht der Tag EINMAL im Trenner, und die Blase trägt nur `HH:MM` — das
+      Datum an jeder Blase wäre Doppelung. Siehe Abschnitt 2a.
 - [x] `<time dateTime={message.createdAt}>` mit vollem Datum als `title`
-- [x] Zwei Farben für die zwei Blasengründe (`text-chrome/70` eigen,
-      `text-muted` fremd)
+- [x] Zwei Farben für die zwei Blasengründe — **eigene Blase mit VOLLER
+      Deckkraft**, nicht `/70`: im Browser gemessen ergab `/70` nur 3,34:1,
+      `/90` 4,43:1, voll 5,07:1. Unter 4,5 besteht kein AA.
+
+## 2a. Tagesmarker (nachgereicht am 28.08.)
+
+- [x] `src/lib/tagestrenner.ts` — „Heute", „Gestern", Wochentag innerhalb der
+      Woche, sonst Datum; plus `gruppiereNachTag`
+- [x] **RED zuerst**, mit fester Bezugszeit statt `Date.now()`
+- [x] Kalendertage, keine Zeitspannen: 23:30 und 00:30 liegen eine Stunde
+      auseinander und sind verschiedene Tage
+- [x] Mittige Pille über jeder Gruppe, `role="separator"` mit Text
 - [x] Unter dem Text, nicht daneben — bei `max-w-[75%]` im Fenster zwänge
       daneben kurze Nachrichten in einen Umbruch
 
@@ -91,16 +103,42 @@ kommt dort **0-mal** vor, im Emoji-Bündel einmal.
 
 ## 7. Sichtprobe im Browser (was jsdom nicht sieht)
 
-- [ ] Overlay wird nicht eingefangen — `getBoundingClientRect` direkt nach dem
+- [x] Overlay wird nicht eingefangen — `getBoundingClientRect` direkt nach dem
       Öffnen, in einem Fenster (dessen Vorfahre `transform` trägt)
-- [ ] Overlay öffnet **im Fenster** nach oben und bleibt vollständig im
+- [x] Overlay öffnet **im Fenster** nach oben und bleibt vollständig im
       Sichtfenster; beim Scrollen läuft es dem Schalter nach. Der günstige Fall
       auf der Seite beweist das nicht
-- [ ] Sendezeile bricht bei 14 rem nicht um; Eingabe behält ihre Breite
-- [ ] Kontrast der Uhrzeit auf **beiden** Blasen in **beiden** Themes
+- [x] Sendezeile bricht nicht um; Eingabe behält ihre Breite
+- [x] Kontrast der Uhrzeit auf **beiden** Blasen in **beiden** Themes
       (`data-variant`, hell und navy — nicht `prefers-color-scheme`)
-- [ ] Tastaturweg mit **echten** Tastendrücken über CDP, nicht `fireEvent` —
+- [x] Tastaturweg mit **echten** Tastendrücken über CDP, nicht `fireEvent` —
       ein synthetisches `KeyboardEvent` aktiviert keinen `<button>`
+
+**Ergebnisse der Sichtprobe (28.08., lokaler Stack, Chrome über CDP):**
+
+| Prüfung | Messwert |
+| --- | --- |
+| Overlay am `body`, kein `transform`-Vorfahre | bestätigt |
+| Öffnet **im Fenster** nach oben | Dialog endet bei 1188 px, Schalter beginnt bei 1196 — 8 px Abstand, vollständig im Sichtfenster |
+| Läuft beim Scrollen mit | Schalter −300 px, Dialog folgt und kippt die Richtung; danach 8 px unter dem Schalter, exakt rechtsbündig |
+| Sendezeile bei **12 rem** (`min-w-[12rem]`, enger als die 14 rem im Ticket) | Eingabe 83 px, Senden passt, kein Umbruch, kein Überlauf |
+| Tastaturweg | Suchfeld fokussiert → „Herz" getippt → **43 Treffer** → Pfeil runter/rechts → Enter fügt 😍 ein, Fokus zurück, Cursor dahinter |
+| Kontrast hell | fremde Blase 5,08 · eigene 5,07 · Tagesmarker 5,08 |
+| Kontrast navy | fremde Blase 5,08 · eigene **3,61** · Tagesmarker 5,08 |
+| Ende zu Ende, in der Datenbank nachgelesen | `Bis Donnerstag also 🙂. Und Budget <3000 Euro bleibt so.` — Satzzeichen-Fall UND Grenzfall in einer Nachricht |
+
+**Zwei Befunde, die die Sichtprobe erst erzeugt hat:**
+
+1. Mit `pr-7` ragte der Emoji-Schalter bei 12 rem **2 px** in den Textbereich.
+   Behoben mit `pr-8`.
+2. Die Uhrzeit auf der eigenen Blase lag mit `/70` bei **3,34:1**. Behoben durch
+   volle Deckkraft.
+
+**Ein Befund, der NICHT von hier stammt und offen bleibt:** im navy-Theme liegt
+die eigene Blase bei 3,61:1 — und zwar für ihren **Nachrichtentext selbst**, den
+dieser Change nicht anfasst (`bg-accent` + `text-chrome`, unverändert). Die
+Uhrzeit ist damit genau so lesbar wie die Nachricht, zu der sie gehört. Eigener
+Vorgang im Design-System.
 
 ## 8. Abschluss
 

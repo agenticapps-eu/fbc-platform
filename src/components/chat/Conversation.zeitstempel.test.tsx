@@ -64,11 +64,25 @@ describe("Conversation — Zeitstempel", () => {
     expect(zeit).toHaveAttribute("dateTime", "2026-08-28T09:15:00.000Z");
   });
 
-  it("datiert eine Nachricht von einem früheren Tag", () => {
+  // Geändert, nachdem Tagesmarker dazukamen: der Tag steht jetzt EINMAL im
+  // Trenner über der Gruppe, nicht in jeder Blase. Die Zwischenfassung
+  // schrieb `TT.MM., HH:MM` in ältere Blasen — richtig, solange es keine
+  // Marker gab, danach nur noch Doppelung.
+  it("zeigt auch an einer älteren Nachricht NUR die Uhrzeit", () => {
     zeige([nachricht({ createdAt: "2026-08-25T09:15:00.000Z" })]);
     const zeit = screen.getByTestId("nachricht-zeit");
-    // Ohne Datum stünde hier bloss „11:15", und niemand wüsste, von wann.
-    expect(zeit.textContent).toMatch(/^\d{2}\.\d{2}\., \d{2}:\d{2}$/);
+    expect(zeit.textContent).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it("setzt über jeden Kalendertag genau einen Marker", () => {
+    zeige([
+      nachricht({ id: "a", createdAt: "2026-08-25T09:15:00.000Z" }),
+      nachricht({ id: "b", createdAt: "2026-08-25T14:00:00.000Z" }),
+      nachricht({ id: "c", createdAt: "2026-08-27T09:00:00.000Z" }),
+      nachricht({ id: "d", createdAt: "2026-08-28T09:00:00.000Z" }),
+    ]);
+    const marker = screen.getAllByTestId("tagestrenner").map((m) => m.textContent);
+    expect(marker).toEqual(["Dienstag", "Gestern", "Heute"]);
   });
 
   it("zeigt an einer schwebenden Blase KEINE Zeit", () => {

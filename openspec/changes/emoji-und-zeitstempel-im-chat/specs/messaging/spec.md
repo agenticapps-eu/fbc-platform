@@ -5,16 +5,24 @@
 The system SHALL display, on every confirmed message in a conversation, the time
 at which it was sent, derived from the message's stored `created_at`.
 
-The time SHALL be rendered in German locale convention, in a `<time>` element
-whose machine-readable value is the full stored timestamp.
-
-A message sent on the current day SHALL show hours and minutes. A message sent
-before the current day SHALL additionally show its day and month, so that an
-older message is never presented as a bare time of day with nothing to date it.
+The time SHALL be rendered as hours and minutes in German locale convention, in
+a `<time>` element whose machine-readable value is the full stored timestamp.
 
 The displayed time SHALL be expressed in the viewing member's own timezone; two
 members in different timezones will therefore see different times for the same
 message.
+
+The conversation SHALL group consecutive messages by the calendar day on which
+they were sent, in the viewing member's own timezone, and SHALL introduce each
+group with a marker naming that day, so that a message is never presented as a
+bare time of day with nothing to date it.
+
+The marker SHALL name the current day and the one before it in words rather
+than by date, and SHALL name a day within the preceding week by its weekday.
+Older days SHALL be named by their date.
+
+Grouping SHALL be by calendar day, not by elapsed time: two messages half an
+hour apart that fall either side of midnight belong to different days.
 
 A message that has not yet been confirmed by the server SHALL NOT display a
 time. Its optimistic row carries the sending device's clock, while the confirmed
@@ -24,8 +32,8 @@ by the difference between the two clocks at the moment the confirmation arrives.
 The time SHALL be legible against both message backgrounds — the sender's own
 and the counterpart's — in both themes.
 
-The system SHALL NOT group messages under date separators. Only the time of day
-is shown, on the message itself.
+The day SHALL be stated once per group, in the marker, and SHALL NOT be
+repeated on every message.
 
 #### Scenario: A confirmed message shows its send time
 
@@ -34,10 +42,24 @@ is shown, on the message itself.
   and exposes the full timestamp as the machine-readable value of a `<time>`
   element
 
-#### Scenario: A message from an earlier day is dated
+#### Scenario: Each calendar day is introduced once
 
-- **WHEN** a conversation renders a confirmed message sent before the current day
-- **THEN** its day and month are shown alongside the time of day
+- **WHEN** a conversation renders messages spanning several calendar days
+- **THEN** each day's messages are preceded by exactly one marker naming that
+  day, and no message repeats the day itself
+
+#### Scenario: Recent days are named in words
+
+- **WHEN** a day marker names the current day, the day before it, or a day
+  within the preceding week
+- **THEN** it reads as "Heute", "Gestern", or the name of the weekday
+  respectively, rather than as a date
+
+#### Scenario: A day boundary separates messages minutes apart
+
+- **WHEN** two messages are sent half an hour apart, one before and one after
+  midnight
+- **THEN** they fall into different groups, each under its own marker
 
 #### Scenario: An unconfirmed message shows no time
 
