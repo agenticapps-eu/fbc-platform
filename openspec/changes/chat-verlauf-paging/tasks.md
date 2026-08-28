@@ -136,18 +136,21 @@ Geschwistern davor. Beides zusammen deckt den Weg ab; keines der beiden allein.
 
 ## 6. Folgevorgänge, die dieser Change erzeugt
 
-Nicht hier zu erledigen, aber hier entstanden — als Vorgang anlegen, nicht als
-Notiz verlieren:
+Nicht hier zu erledigen, aber hier entstanden — angelegt, nicht als Notiz
+verloren:
 
-- [ ] 6.1 **Index `(thread_id, created_at desc, id desc)` auf `public.messages`.**
-      Der zweite Sortierschlüssel gehört seit dem zusammengesetzten Cursor dazu.
-      Der vorhandene `messages_thread_id_idx` deckt nur `thread_id`
-      (`20260612065636_matching.sql:95`); die Sortierlast je Thread bleibt ohne
-      ihn bestehen (Entscheidung 7). Eine Migration, deshalb eigener Vorgang.
-- [ ] 6.2 **`defaultOptions` für den `QueryClient`.** `src/main.tsx:14` ist ein
-      blankes `new QueryClient()`; `staleTime: 0` und `refetchOnWindowFocus: true`
-      sind in einer WebView eine Produktentscheidung über Datenvolumen. Berührt
-      die Capacitor-Hülle (AGE-642) und gehört Donald vorgelegt.
-- [ ] 6.3 **AGE-646 gegenlesen.** Das Issue nimmt ausdrücklich an, dass
-      `fetchMessages` den ganzen Thread hält. Diese Annahme ist ab hier falsch;
-      der Sprung zum Zitat braucht dort eine eigene Antwort.
+- [x] 6.1 **AGE-657** — Index `(thread_id, created_at desc, id desc)` auf
+      `public.messages`. Der vorhandene `messages_thread_id_idx` deckt nur
+      `thread_id` (`20260612065636_matching.sql:95`), also sortiert Postgres
+      weiterhin alle Zeilen des Threads. Der zweite Sortierschlüssel gehört seit
+      dem zusammengesetzten Cursor dazu. Eine Migration, deshalb eigener Vorgang.
+- [x] 6.2 **AGE-658** — `defaultOptions` für den `QueryClient`.
+      `src/main.tsx:14` ist ein blankes `new QueryClient()`; `staleTime: 0` und
+      `refetchOnWindowFocus: true` sind in einer WebView eine Produktentscheidung
+      über Datenvolumen. Berührt die Capacitor-Hülle (AGE-642) und gehört Donald
+      vorgelegt.
+- [x] 6.3 **AGE-646** — als **Kommentar am Issue** vermerkt, nicht als eigener
+      Vorgang. Es ist eine falsch gewordene Annahme *in* AGE-646, kein zweites
+      Stück Arbeit daneben: das Issue rechnet damit, dass `fetchMessages` den
+      ganzen Thread hält, und leitet daraus ab, dass ein Sprung zum Zitat „geht".
+      Der Kommentar nennt die drei möglichen Antworten und eine Empfehlung.
