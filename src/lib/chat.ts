@@ -184,12 +184,10 @@ export async function fetchUnreadCounts(): Promise<UngelesenStand> {
  * dieser hier schon.
  */
 export async function markThreadRead(threadId: string, uid: string): Promise<void> {
-  const { error } = await supabase
-    .from("thread_read_positions")
-    .upsert(
-      { thread_id: threadId, profile_id: uid, last_read_at: "1970-01-01T00:00:00Z" },
-      { onConflict: "thread_id,profile_id" },
-    );
+  const { error } = await supabase.from("thread_read_positions").upsert(
+    { thread_id: threadId, profile_id: uid, last_read_at: "1970-01-01T00:00:00Z" },
+    { onConflict: "thread_id,profile_id" },
+  );
   if (error) throw error;
 }
 
@@ -299,9 +297,7 @@ export async function fetchThreads(
     // postgrest-js die Spaltentypen nicht mehr ab und das Ergebnis fällt auf
     // `GenericStringError` zurück.
     // prettier-ignore
-    .select(
-      "id, a_profile_id, b_profile_id, created_at, last_message_at, last_message_body, last_message_sender_id",
-    )
+    .select("id, a_profile_id, b_profile_id, created_at, last_message_at, last_message_body, last_message_sender_id")
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
@@ -348,6 +344,16 @@ export async function fetchThreads(
   };
 }
 
+/**
+ * Wo eine Seite endet. **Zwei Spalten, nicht eine** — `created_at` allein ist
+ * keine totale Ordnung, und ein Cursor auf der halben Ordnung überspringt bei
+ * Gleichstand Zeilen, die danach nie wieder erreichbar sind.
+ */
+export interface ChatVerlaufCursor {
+  createdAt: string;
+  id: string;
+}
+
 export interface ChatVerlaufSeite {
   messages: ChatMessage[];
   /** Ob es JENSEITS dieser Seite nichts Älteres mehr gibt. Aus der Antwort gemessen. */
@@ -368,6 +374,29 @@ export interface ChatVerlaufSeite {
  * eintreffenden Nachricht, und die nächste Seite überspränge eine Zeile oder
  * lieferte eine doppelt. `before` ist deshalb ein Keyset auf `created_at`.
  *
+ * **Der Cursor ist ZUSAMMENGESETZT: `(created_at, id)`** — dieselbe Ordnung, die
+ * `vereinigeNachrichten` und `mergeMessage` herstellen. Beide Diff-Reviewer haben
+ * darauf gezeigt, und die erste Korrektur (`lte` statt `lt`) war zu klein.
+ *
+ * `created_at` allein ist keine totale Ordnung. Liegt die Seitengrenze zwischen
+ * zwei Nachrichten mit gleichem Zeitstempel, überspringt ein Cursor auf
+ * `created_at` allein deren Geschwister — und sie kommen **nie wieder**: die
+ * Neuabfrage deckt nur das jüngste Ende ab, die Lücke liegt darunter.
+ *
+ * **Gleichstände sind nicht exotisch**, und die ursprüngliche Abschätzung
+ * („zwei Inserts in derselben Mikrosekunde") war falsch (codex, HOCH):
+ * `now()` ist innerhalb einer Transaktion **stabil**, alle Zeilen eines
+ * Transaktionsblocks tragen denselben Wert. Ein Import oder ein Seed erzeugt
+ * Gleichstände also nicht zufällig, sondern der Bauart nach.
+ *
+ * `lte` allein hätte den Verlust nur in einen Stillstand verschoben — eine ganze
+ * Seite gleicher Zeitstempel, und der Knopf holte immer wieder dieselbe Seite.
+ * Der zusammengesetzte Cursor löst beides.
+ *
+ * Die Sortierung trägt denselben zweiten Schlüssel: ohne `.order("id")` wäre die
+ * Reihenfolge innerhalb eines Zeitstempels dem Planer überlassen, und ein Cursor
+ * ist nur so verlässlich wie die Ordnung, aus der er stammt.
+ *
  * **`limit + 1` ist eine Sonde, keine Nachricht.** Sie beantwortet „gibt es noch
  * ältere", ohne zu raten, und fällt aus dem Ergebnis wieder heraus. Ohne sie
  * wäre „genau `limit` Zeilen übrig" von „noch mehr übrig" nicht zu
@@ -380,15 +409,27 @@ export interface ChatVerlaufSeite {
  */
 export async function fetchMessages(
   threadId: string,
-  { limit = VERLAUF_SEITE, before }: { limit?: number; before?: string } = {},
+  { limit = VERLAUF_SEITE, before }: { limit?: number; before?: ChatVerlaufCursor } = {},
 ): Promise<ChatVerlaufSeite> {
   let abfrage = supabase
     .from("messages")
     .select("id, thread_id, sender_id, body, created_at")
     .eq("thread_id", threadId);
-  if (before !== undefined) abfrage = abfrage.lt("created_at", before);
+  if (before !== undefined) {
+    // Keyset über zwei Spalten: „echt älter" ODER „gleich alt, aber in der
+    // zweiten Ordnung davor". Die Werte stehen in Anführungszeichen, weil ein
+    // Zeitstempel Doppelpunkte und ein Pluszeichen trägt — die sind in der
+    // PostgREST-Filtersprache sonst Trennzeichen.
+    abfrage = abfrage.or(
+      `created_at.lt."${before.createdAt}",` +
+        `and(created_at.eq."${before.createdAt}",id.lt."${before.id}")`,
+    );
+  }
 
-  const { data, error } = await abfrage.order("created_at", { ascending: false }).limit(limit + 1);
+  const { data, error } = await abfrage
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit + 1);
   if (error) throw error;
 
   const absteigend = data ?? [];

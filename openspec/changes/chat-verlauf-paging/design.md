@@ -243,3 +243,89 @@ er ist verschoben.
 | Sortierlast bleibt ohne zusammengesetzten Index | Entscheidung 7; eigener Vorgang |
 | AGE-646 nimmt an, der ganze Thread sei geladen | im Proposal benannt; dieser Change macht die Annahme falsch, bevor sie gebaut wird |
 | Ein Kommentar in `Conversation.tsx:69` behauptet die Unbegrenztheit | wird falsch und gehört korrigiert — ein Waise, den dieser Change selbst erzeugt |
+
+---
+
+## Nachtrag: was die Diff-Review am Entwurf geändert hat
+
+Der Entwurf oben ist der Stand **vor** Schritt 4. Zwei fremde Anbieter haben ihn
+danach an fünf Stellen widerlegt. Die Entscheidungen 1, 3, 3b und 4 gelten in der
+oben beschriebenen Form **nicht mehr**; sie bleiben stehen, weil ein Entwurf, aus
+dem die Irrwege getilgt sind, den nächsten Leser dieselben gehen lässt.
+
+### Der Cursor geht über zwei Spalten, nicht über eine
+
+Entscheidung 1 hielt den Gleichstand auf `created_at` für ein Restrisiko und die
+Auslassung für „theoretisch möglich". Beides war zu milde.
+
+- **Der Verlust ist dauerhaft** (opencode, MEDIUM): die Neuabfrage deckt nur das
+  jüngste Ende ab, eine übersprungene Zeile liegt darunter und kommt nie wieder.
+- **Gleichstände sind nicht exotisch** (codex, HOCH): `now()` ist innerhalb einer
+  Transaktion **stabil**. Alle Zeilen eines Blocks tragen denselben Wert; ein
+  Import erzeugt Gleichstände der Bauart nach, nicht durch Zufall.
+
+Eine Zwischenfassung setzte `lte` statt `lt`. Das verschob den Verlust nur in
+einen Stillstand. Jetzt: `or=(created_at.lt."…",and(created_at.eq."…",id.lt."…"))`
+und `.order("created_at").order("id")` — dieselbe Ordnung, die
+`vereinigeNachrichten` herstellt.
+
+**Gegen echtes PostgREST geprüft**, nicht nur gegen die eigene Attrappe: drei
+Zeilen mit identischem Zeitstempel in EINER Anweisung, Cursor auf der dritten,
+Antwort `HTTP 200` mit genau den zwei Geschwistern davor. Mit `lt` wären es null
+gewesen, mit `lte` alle drei. Eine Attrappe kann eine Filtersprache nicht
+ablehnen — dieser Beleg war nötig und stand in keinem Befund.
+
+### Das Zeitfenster beim Einsetzen schliesst `cancelQueries`, nicht `structuralSharing`
+
+Entscheidung 3 liess die `queryFn` den Cache nach dem Warten lesen und vereinigen.
+codex (HOCH) hat gezeigt, dass zwischen jenem Lesen und dem Einsetzen durch React
+Query ein Fenster bleibt, und `structuralSharing` vorgeschlagen.
+
+**Ausprobiert und wieder verworfen, mit Messung:** React Query wendet
+`structuralSharing` **auch auf `setQueryData` an**. Die Vereinigung ist additiv
+und kann keine Entfernung ausdrücken — das Ersetzen der optimistischen Blase
+durch die echte Zeile und ihre Rücknahme nach einem Fehlschlag waren damit beide
+kaputt, zwei rote Zusagen. Der Befund war richtig, das vorgeschlagene Mittel
+nicht.
+
+Stattdessen bricht `ladeAeltere` vor seinem Schreiben laufende Abfragen ab
+(`cancelQueries`) — das Standardmuster für optimistische Änderungen. Was die
+abgebrochene Abfrage geholt hätte, holt die nächste, und die liest dann den Stand
+mit den älteren Zeilen.
+
+### Die Sperrklinke ist ersatzlos entfallen
+
+Entscheidung 3b begründete sie damit, das `erschoepft` einer Neuabfrage sei nicht
+aussagekräftig. Das war falsch — die `limit + 1`-Sonde macht es unabhängig von
+der Anfragegrösse (opencode, LOW). Die zweite Begründung („Nachrichten werden
+nicht rückdatiert") war es auch:
+`20260827120000_thread_aktivitaetsspalten.sql:60` hält ausdrücklich fest, dass
+`messages.created_at` **vom Client setzbar** ist (codex, HOCH).
+
+Damit hatte die Klinke einen Fehlerfall, der **nicht heilt**: eine rückdatierte
+Nachricht unter dem geladenen Ende sähe die Neuabfrage nicht, die Klinke bliebe
+gesetzt, der Weg dauerhaft zu. Ohne sie ist der schlimmste Fall ein Knopf, der
+einmal zu viel erscheint — und der räumt sich beim ersten Klick selbst auf.
+
+Geblieben ist der geteilte Cache-Eintrag; der war nie das Problem.
+
+### Der Doppelklickschutz hängt am Ref, nicht am Zustand
+
+`laedtAeltere` ist erst nach dem nächsten Anstrich `true`; zwei Klicks davor sähen
+beide `false` (codex, MITTEL). Der Zustand bleibt als **Anzeige** (gesperrter
+Knopf), die **Sperre** ist ein Ref. Der Test misst jetzt die Zahl der Anfragen
+statt nur das entdoppelte Ergebnis — und wird rot, wenn man die Sperre
+zurückdreht.
+
+### Ein Befund, der sich NICHT bestätigt hat
+
+codex (MITTEL) schrieb, React Query v5 setze bei einem fehlgeschlagenen
+Hintergrund-Refetch den Status auf `error`, weshalb ein `hatAeltere` mit
+`query.isSuccess` den Knopf verschwinden liesse. **Nachgemessen: der Status bleibt
+`success`**, solange Daten dastehen; die erste Fassung des Tests ist an dieser
+Zusage rot geworden und hat den Befund widerlegt.
+
+Die Änderung bleibt trotzdem — `hatAeltere` hängt jetzt an dem, worum es geht
+(ist etwas da, ist es erschöpft), nicht am Zustand der letzten Abfrage. Ein
+Zusammenhang, der zufällig gerade richtig herauskommt, kippt beim nächsten
+Bibliotheks-Update.

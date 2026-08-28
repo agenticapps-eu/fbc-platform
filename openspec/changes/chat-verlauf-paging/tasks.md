@@ -33,13 +33,17 @@
       sehen, wenn sie denselben Thread gleichzeitig führen.
 
       **Abweichung vom Plan, bewusst:** geteilt wird nur `erschoepft`
-      (`verlaufErschoepftQueryKey`, ein blanker `boolean`). `laeuft` blieb im
-      Komponentenzustand — es ist Rückmeldung an den Finger, der gerade geklickt
-      hat, und gehört nicht der anderen Fläche. Die Zusage „keine Duplikate"
-      hängt ohnehin nicht daran, sondern an der Vereinigung über die `id`; die
-      Sperre ist Bedienung, nicht Korrektheit. Ein Eintrag `{erschoepft, laeuft}`
-      hätte ein fremdes Fenster den Knopf sperren lassen, ohne dass dort jemand
-      etwas gedrückt hat.
+      (`verlaufErschoepftQueryKey`, ein blanker `boolean`). `laeuft` blieb lokal —
+      es ist Rückmeldung an den Finger, der gerade geklickt hat, und gehört nicht
+      der anderen Fläche. Ein Eintrag `{erschoepft, laeuft}` hätte ein fremdes
+      Fenster den Knopf sperren lassen, ohne dass dort jemand etwas gedrückt hat.
+
+      **Und nach der Diff-Review zweimal nachgeschärft:** `erschoepft` ist
+      **keine Sperrklinke** mehr (beide Begründungen dafür widerlegt, und ihr
+      Fehlerfall heilte nicht), und die Sperre gegen den Doppelklick hängt am
+      **Ref**, nicht am Zustand — ein Zustand ist erst nach dem nächsten Anstrich
+      gesetzt und lässt zwei schnelle Klicks beide durch. Siehe design.md,
+      Nachtrag.
 - [x] 2.3 `useGespraech` gibt `ladeAeltere` und `hatAeltere` mit heraus.
 - [x] 2.4 **RED**: `ladeAeltere` ruft `fetchMessages` mit `before` = `createdAt`
       der ältesten geladenen Nachricht und schreibt das Ergebnis als Vereinigung
@@ -49,12 +53,16 @@
       trifft **danach** ein. Zusage am **Ergebnis**: die nachgeladenen Zeilen
       stehen hinterher noch im Cache. Erst rot messen — mit einer ersetzenden
       `queryFn` muss dieser Test fehlschlagen.
-- [x] 2.6 **RED — Sperrklinke (HIGH 2)**: nach einer erschöpften Antwort ist
-      `hatAeltere` falsch, und eine Neuabfrage, die genau so viele Zeilen
-      zurückgibt wie angefragt, dreht es **nicht** zurück.
+- [x] 2.6 **RED — HIGH 2**: nach einer erschöpften Antwort ist `hatAeltere`
+      falsch, und eine Neuabfrage, die genau so viele Zeilen zurückgibt wie
+      geladen, dreht es **nicht** zurück. Trägt die Sonde (`limit + 1`), nicht
+      mehr eine Sperrklinke — samt Gegenrichtung, damit die Zusage nicht nur
+      „konstant falsch" belegt.
 - [x] 2.7 **RED — Doppelklick (MEDIUM)**: zwei Aufrufe von `ladeAeltere` kurz
-      hintereinander erzeugen keine doppelten Zeilen, und der zweite läuft gar
-      nicht erst los (`laeuft`).
+      hintereinander stellen **genau eine Anfrage**. Die erste Fassung mass nur
+      das entdoppelte Ergebnis und liess die Zusage „der zweite läuft gar nicht
+      erst los" ungeprüft (Diff-Review, codex). Mutations-Gegenprobe: Sperre
+      zurück auf den Zustand ⇒ rot.
 - [x] 2.8 **RED**: ein Wechsel auf einen **anderen** Thread setzt den
       Seitenzustand zurück. Der Eintrag hängt an der `threadId`; ein Reset im
       Effect käme zu spät.
@@ -105,15 +113,24 @@ gelöscht — `messages` steht global wieder bei 0 wie vorher, `profiles` bei 72
 - [x] 4.4 Nach vollständigem Nachladen `visibilitychange` + `focus` ausgelöst
       (so hängt react-query den Fokus ein): **weiterhin 60 geladen, weiterhin
       kein Knopf.** Ohne die Vereinigung wäre hier auf 50 zurückgeschnitten
-      worden, ohne die Sperrklinke stünde der Knopf wieder da — die Sichtprobe
-      zu 2.5 und 2.6 zusammen.
+      worden — die Sichtprobe zu 2.5 und 2.6 zusammen.
+
+**Diese Messungen liegen VOR dem Cursor-Umbau der Diff-Review.** Sie belegen den
+Scroll-Sprung, das Nachladen, den Knopf und das Verhalten beim Fokuswechsel —
+alles Stellen, die der Umbau nicht angefasst hat. Was er anfasst, ist die
+Abfrage, und die ist stattdessen **gegen echtes PostgREST** geprüft: drei Zeilen
+mit identischem Zeitstempel, Cursor auf der dritten, HTTP 200 mit genau den zwei
+Geschwistern davor. Beides zusammen deckt den Weg ab; keines der beiden allein.
 
 ## 5. Abnahme
 
-- [x] 5.1 `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (187 Dateien,
-      2142 Zusagen), `pnpm build` und die drei `grep`-Wächter aus `verify` grün.
-- [ ] 5.2 Diff-Review durch **zwei fremde Anbieter**, Befunde als Korrektur
-      sichtbar gemacht statt still ersetzt.
+- [x] 5.1 `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (192 Dateien,
+      2175 Zusagen), `pnpm build` und die drei `grep`-Wächter aus `verify` grün.
+- [x] 5.2 Diff-Review durch **drei** Anbieter gerufen, **zwei gezählt**:
+      opencode FREIGABE MIT AUFLAGEN (3 Befunde), codex **ABLEHNUNG** (9), gemini
+      nicht gezählt (zwei Wörter auf 1309 Diff-Zeilen). Alle Befunde in
+      `REVIEWS.md` aufgelöst — darunter zwei, die eine Korrektur aus der ersten
+      Runde wieder umgeworfen haben.
 - [ ] 5.3 `openspec validate --all` grün, danach `openspec archive` +
       `pnpm release:entries` + prettier auf die erzeugte Datei.
 
@@ -122,7 +139,8 @@ gelöscht — `messages` steht global wieder bei 0 wie vorher, `profiles` bei 72
 Nicht hier zu erledigen, aber hier entstanden — als Vorgang anlegen, nicht als
 Notiz verlieren:
 
-- [ ] 6.1 **Index `(thread_id, created_at desc)` auf `public.messages`.**
+- [ ] 6.1 **Index `(thread_id, created_at desc, id desc)` auf `public.messages`.**
+      Der zweite Sortierschlüssel gehört seit dem zusammengesetzten Cursor dazu.
       Der vorhandene `messages_thread_id_idx` deckt nur `thread_id`
       (`20260612065636_matching.sql:95`); die Sortierlast je Thread bleibt ohne
       ihn bestehen (Entscheidung 7). Eine Migration, deshalb eigener Vorgang.

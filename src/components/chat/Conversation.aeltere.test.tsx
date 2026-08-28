@@ -147,13 +147,27 @@ describe("Conversation — der Tagesmarker nach dem Nachladen", () => {
       />,
     );
 
-    // Zwei Kalendertage, zwei Marker — und der Marker des 28. steht jetzt über
-    // „a", nicht mehr über „b".
+    // Zwei Kalendertage, zwei Marker.
     const marker = screen.getAllByRole("separator");
     expect(marker).toHaveLength(2);
     // Die Blase trägt seit AGE-645 auch die Uhrzeit, deshalb auf den Anfang
     // prüfen statt auf Gleichheit. Es geht um die REIHENFOLGE.
     const texte = screen.getAllByText(/^Text /).map((el) => el.textContent?.slice(0, 6));
     expect(texte).toEqual(["Text v", "Text a", "Text b"]);
+
+    // **Und die namensgebende Zusage selbst** — die fehlte, und der Test hiess
+    // trotzdem so (Diff-Review, codex, NIEDRIG): der Marker des zweiten Tages
+    // muss jetzt über „a" stehen, nicht mehr über „b". Reihenfolge und Anzahl
+    // allein hätten auch dann gestimmt, wenn er stehengeblieben wäre.
+    //
+    // Gemessen an der Dokumentposition, nicht am DOM-Baum: `compareDocumentPosition`
+    // sagt, was das Mitglied wirklich untereinander sieht.
+    const zweiterMarker = marker[1];
+    const a = screen.getByText(/^Text a/);
+    const b = screen.getByText(/^Text b/);
+    const vor = (x: Element, y: Element) =>
+      Boolean(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(vor(zweiterMarker, a)).toBe(true);
+    expect(vor(a, b)).toBe(true);
   });
 });

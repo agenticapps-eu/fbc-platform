@@ -17,9 +17,29 @@ interface Aufruf {
   table: string;
   select?: string;
   eq: [string, unknown][];
-  lt: [string, unknown][];
+  or: string[];
   order: { spalte: string; ascending?: boolean }[];
   limit?: number;
+}
+
+/**
+ * Wertet den `or`-Ausdruck aus, den `fetchMessages` baut — genau die eine Form,
+ * nicht die ganze PostgREST-Sprache.
+ *
+ * Ohne diese Auswertung wäre die Zusage zum Gleichstand ein Vakuumtest: die
+ * Attrappe gäbe alle Zeilen zurück, und der Test bliebe auch mit einem Cursor
+ * auf `created_at` allein grün. Gemessen — genau daran ist die erste Fassung
+ * dieses Tests aufgefallen.
+ */
+function erfuellt(zeile: Record<string, unknown>, ausdruck: string): boolean {
+  const m = ausdruck.match(
+    /^created_at\.lt\."(.+?)",and\(created_at\.eq\."(.+?)",id\.lt\."(.+?)"\)$/,
+  );
+  if (!m) throw new Error(`unerwarteter or-Ausdruck: ${ausdruck}`);
+  const [, grenzeZeit, gleichZeit, grenzeId] = m;
+  const zeit = String(zeile.created_at);
+  const id = String(zeile.id);
+  return zeit < grenzeZeit || (zeit === gleichZeit && id < grenzeId);
 }
 
 let aufrufe: Aufruf[] = [];
@@ -28,7 +48,7 @@ let zeilen: Record<string, unknown>[] = [];
 vi.mock("./supabase", () => ({
   supabase: {
     from: (table: string) => {
-      const eintrag: Aufruf = { table, eq: [], lt: [], order: [] };
+      const eintrag: Aufruf = { table, eq: [], or: [], order: [] };
       aufrufe.push(eintrag);
       const kette = {
         select: (spalten: string) => {
@@ -39,8 +59,8 @@ vi.mock("./supabase", () => ({
           eintrag.eq.push([spalte, wert]);
           return kette;
         },
-        lt: (spalte: string, wert: unknown) => {
-          eintrag.lt.push([spalte, wert]);
+        or: (ausdruck: string) => {
+          eintrag.or.push(ausdruck);
           return kette;
         },
         order: (spalte: string, opts?: { ascending?: boolean }) => {
@@ -51,8 +71,16 @@ vi.mock("./supabase", () => ({
           eintrag.limit = n;
           return kette;
         },
-        then: (auf: (r: { data: unknown; error: null }) => unknown, ab?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: zeilen, error: null }).then(auf, ab),
+        // Der Cursor wird WIRKLICH angewendet, nicht nur aufgezeichnet. Ohne das
+        // wäre die Zusage zum Gleichstand ein Vakuumtest: sie bliebe mit `lt`
+        // genauso grün, weil die Attrappe alle Zeilen zurückgäbe.
+        then: (
+          auf: (r: { data: unknown; error: null }) => unknown,
+          ab?: (e: unknown) => unknown,
+        ) => {
+          const gefiltert = zeilen.filter((z) => eintrag.or.every((a) => erfuellt(z, a)));
+          return Promise.resolve({ data: gefiltert, error: null }).then(auf, ab);
+        },
       };
       return kette;
     },
@@ -91,8 +119,12 @@ describe("fetchMessages — Seitengrenze", () => {
     const [anfrage] = aufrufe;
     expect(anfrage.table).toBe("messages");
     expect(anfrage.eq).toEqual([["thread_id", THREAD]]);
-    // Absteigend, sonst schnitte die Grenze das ÄLTESTE Ende ab.
-    expect(anfrage.order).toEqual([{ spalte: "created_at", ascending: false }]);
+    // Absteigend, sonst schnitte die Grenze das ÄLTESTE Ende ab. Und mit `id`
+    // als zweitem Schlüssel, weil `created_at` allein keine totale Ordnung ist.
+    expect(anfrage.order).toEqual([
+      { spalte: "created_at", ascending: false },
+      { spalte: "id", ascending: false },
+    ]);
     // Die Sonde: eine Zeile mehr als die Seite, um „gibt es noch ältere" zu
     // beantworten, ohne zu raten.
     expect(anfrage.limit).toBe(VERLAUF_SEITE + 1);
@@ -106,12 +138,31 @@ describe("fetchMessages — Seitengrenze", () => {
     expect(messages.map((m) => m.id)).toEqual(["m001", "m002", "m003"]);
   });
 
-  it("setzt den Cursor auf `created_at` der übergebenen Grenze", async () => {
+  // Der Cursor geht über ZWEI Spalten — Befund aus der Diff-Review (opencode
+  // MEDIUM, codex HOCH). `created_at` allein ist keine totale Ordnung: teilen
+  // sich zwei Nachrichten einen Zeitstempel und liegt die Seitengrenze zwischen
+  // ihnen, überspränge ein Cursor auf `created_at` allein die Geschwister der
+  // Grenzzeile — DAUERHAFT, weil die Neuabfrage nur das jüngste Ende abdeckt.
+  //
+  // Und Gleichstände sind nicht exotisch: `now()` ist innerhalb einer
+  // Transaktion stabil, ein Import erzeugt sie der Bauart nach.
+  it("setzt einen zusammengesetzten Cursor über `(created_at, id)`", async () => {
     zeilen = serverZeilen(1);
 
-    await fetchMessages(THREAD, { before: "2026-08-28T12:00:00.000Z" });
+    await fetchMessages(THREAD, { before: { createdAt: "2026-08-28T12:00:00.000Z", id: "m042" } });
 
-    expect(aufrufe[0].lt).toEqual([["created_at", "2026-08-28T12:00:00.000Z"]]);
+    expect(aufrufe[0].or).toHaveLength(1);
+    const [ausdruck] = aufrufe[0].or;
+    // „echt älter" ODER „gleich alt, aber in der zweiten Ordnung davor".
+    expect(ausdruck).toBe(
+      'created_at.lt."2026-08-28T12:00:00.000Z",and(created_at.eq."2026-08-28T12:00:00.000Z",id.lt."m042")',
+    );
+    // Der zweite Schlüssel muss auch in der ORDNUNG stehen: ein Cursor ist nur
+    // so verlässlich wie die Ordnung, aus der er stammt.
+    expect(aufrufe[0].order).toEqual([
+      { spalte: "created_at", ascending: false },
+      { spalte: "id", ascending: false },
+    ]);
   });
 
   it("fragt ohne Grenze auch nicht nach einem Cursor", async () => {
@@ -119,7 +170,29 @@ describe("fetchMessages — Seitengrenze", () => {
 
     await fetchMessages(THREAD);
 
-    expect(aufrufe[0].lt).toEqual([]);
+    expect(aufrufe[0].or).toEqual([]);
+  });
+
+  it("holt bei gleichem Zeitstempel die Geschwister der Grenzzeile mit", async () => {
+    // Vier Zeilen mit IDENTISCHEM `created_at`. Der Cursor steht auf „m3" —
+    // ein Cursor auf `created_at` allein liefe entweder ins Leere (`lt`) oder
+    // holte auch „m4" zurück, das schon geladen ist (`lte`). Der zusammengesetzte
+    // trifft genau die beiden davor.
+    const gleich = "2026-08-28T12:00:00.000Z";
+    zeilen = ["m4", "m3", "m2", "m1"].map((id) => ({
+      id,
+      thread_id: THREAD,
+      sender_id: SENDER,
+      body: `Gleichstand ${id}`,
+      created_at: gleich,
+    }));
+
+    const { messages } = await fetchMessages(THREAD, {
+      before: { createdAt: gleich, id: "m3" },
+      limit: 10,
+    });
+
+    expect(messages.map((m) => m.id)).toEqual(["m1", "m2"]);
   });
 });
 

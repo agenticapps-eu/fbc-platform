@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   VERLAUF_SEITE,
@@ -75,42 +75,37 @@ export function useGespraech({
 }): Gespraech {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  /** Läuft gerade ein Nachladen? Ein **Ref**, kein Zustand — siehe `ladeAeltere`. */
+  const laeuftRef = useRef(false);
   const [laedtAeltere, setLaedtAeltere] = useState(false);
-
-  /**
-   * Setzt die Sperrklinke — und zwar nur in eine Richtung. Ein `false` aus einer
-   * Neuabfrage darf ein früheres `true` nicht zurücknehmen: hat eine Neuabfrage
-   * `max(VERLAUF_SEITE, geladen)` angefragt und genau so viele bekommen, ist ihr
-   * `erschoepft` schlicht nicht aussagekräftig.
-   */
-  function merkeErschoepft(erschoepft: boolean) {
-    if (!erschoepft) return;
-    queryClient.setQueryData(verlaufErschoepftQueryKey(threadId), true);
-  }
 
   const query = useQuery({
     queryKey: messagesQueryKey(threadId),
     /**
      * Lädt die neueste Seite — mindestens so viele Zeilen, wie schon sichtbar
-     * sind — und gibt sie **vereinigt** mit dem aktuellen Stand zurück, statt
-     * ihn zu ersetzen.
+     * sind — und gibt sie **vereinigt** mit dem aktuellen Stand zurück, statt ihn
+     * zu ersetzen. Eine veraltete Antwort kann so nur bestätigen, nie wegnehmen.
      *
-     * Das Vereinigen ist der Kern und nicht Vorsicht. React Query ersetzt die
-     * Daten, wenn die `queryFn` auflöst. Eine Abfrage, die vor einem „Ältere
-     * laden" losgelaufen ist und danach antwortet, nähme die nachgeladenen
-     * Zeilen wieder weg — und Anlässe dafür gibt es genug: `new QueryClient()`
-     * (`src/main.tsx`) läuft auf `refetchOnWindowFocus: true` und
-     * `staleTime: 0`, `use-ungelesen` invalidiert, StrictMode montiert doppelt.
+     * Anlässe für eine Neuabfrage gibt es genug: `new QueryClient()`
+     * (`src/main.tsx`) läuft auf `refetchOnWindowFocus: true` und `staleTime: 0`,
+     * `use-ungelesen` invalidiert, StrictMode montiert doppelt.
      *
-     * Der Stand wird **nach** dem Warten erneut gelesen, nicht der von vorhin
-     * weiterverwendet: alles, was während des Holens dazukam, gehört dazu.
+     * **Warum nicht `structuralSharing`** — die Diff-Review (codex, HOCH) hat
+     * genau das vorgeschlagen, weil hier ein Restfenster bleibt (siehe
+     * `ladeAeltere`). Ausprobiert und wieder verworfen, mit Messung: React Query
+     * wendet `structuralSharing` **auch auf `setQueryData` an**. Die Vereinigung
+     * ist additiv und kann keine Entfernung ausdrücken — das Ersetzen der
+     * optimistischen Blase durch die echte Zeile und ihre Rücknahme nach einem
+     * Fehlschlag waren damit beide kaputt (zwei rote Zusagen in
+     * `use-gespraech.test.tsx`). Das Fenster schliesst deshalb `cancelQueries`
+     * in `ladeAeltere`, nicht eine Vereinigung im Einsetzpfad.
      */
     queryFn: async () => {
       const vorher = queryClient.getQueryData<ChatMessage[]>(messagesQueryKey(threadId)) ?? [];
       const seite = await fetchMessages(threadId, {
         limit: Math.max(VERLAUF_SEITE, vorher.length),
       });
-      merkeErschoepft(seite.erschoepft);
+      queryClient.setQueryData(verlaufErschoepftQueryKey(threadId), seite.erschoepft);
       const inzwischen = queryClient.getQueryData<ChatMessage[]>(messagesQueryKey(threadId)) ?? [];
       return vereinigeNachrichten(inzwischen, seite.messages);
     },
@@ -118,16 +113,30 @@ export function useGespraech({
   });
 
   /**
-   * Nur gelesen, nie geholt: diesen Eintrag beschreibt ausschliesslich
-   * `setQueryData`. `initialData` **zusammen mit** `staleTime: Infinity` ist
-   * dabei der Punkt, nicht Kosmetik — der Eintrag gilt damit als frisch, und die
-   * `queryFn` läuft gar nicht erst.
+   * „Nichts Älteres mehr da", je Thread — als eigener Cache-Eintrag, damit
+   * Vollansicht und angedocktes Fenster denselben Knopf-Zustand sehen, wenn sie
+   * denselben Thread gleichzeitig führen.
    *
-   * Eine `queryFn`, die `false` zurückgibt, war die erste Fassung, und der Test
-   * „dreht eine gesetzte Sperrklinke nicht zurück" hat sie erlegt: sie löste
-   * **nach** dem `merkeErschoepft(true)` der Nachrichtenabfrage auf und
-   * überschrieb es. Derselbe Wettlauf, den die `queryFn` oben durch Vereinigen
-   * vermeidet, nur eine Ebene tiefer.
+   * **Keine Sperrklinke mehr.** Zwei Fassungen davor stand hier eine, die einmal
+   * gesetzt nie zurückfiel, mit zwei nacheinander widerlegten Begründungen:
+   *
+   *  - „das `erschoepft` einer Neuabfrage sei nicht aussagekräftig" — falsch,
+   *    die `limit + 1`-Sonde macht es unabhängig von der Anfragegrösse
+   *    (opencode, LOW);
+   *  - „Nachrichten werden nicht rückdatiert" — ebenfalls falsch.
+   *    `20260827120000_thread_aktivitaetsspalten.sql:60` hält ausdrücklich fest,
+   *    dass `messages.created_at` vom Client setzbar ist (codex, HOCH).
+   *
+   * Und die Klinke hatte einen Preis, den ein blosser Wert nicht hat: **ihr
+   * Fehlerfall heilt nicht.** Eine rückdatierte Nachricht, die unter das geladene
+   * Ende fällt, sähe die Neuabfrage nicht; die Klinke bliebe gesetzt und der Weg
+   * zu ihr dauerhaft zu. Ohne Klinke kann höchstens der umgekehrte Fall eintreten
+   * — eine veraltete Antwort lässt den Knopf wieder erscheinen —, und der räumt
+   * sich beim ersten Klick selbst auf: die Seite kommt leer zurück, `erschoepft`
+   * wird wahr, der Knopf verschwindet.
+   *
+   * Ein sichtbarer, selbstheilender Fehler ist einem unsichtbaren, dauerhaften
+   * vorzuziehen. Deshalb der einfache Wert.
    */
   const erschoepft = useQuery({
     queryKey: verlaufErschoepftQueryKey(threadId),
@@ -233,18 +242,36 @@ export function useGespraech({
    * andere nicht.
    */
   async function ladeAeltere() {
-    if (!threadId || laedtAeltere || erschoepft) return;
+    // **Die Sperre hängt am Ref, nicht am Zustand** (Diff-Review, codex, MITTEL).
+    // `laedtAeltere` ist erst nach dem nächsten Anstrich `true`; zwei Klicks
+    // davor sähen beide `false` und starteten beide eine Abfrage. Der Ref ist
+    // sofort gesetzt. Der Zustand daneben bleibt — er ist die ANZEIGE (gesperrter
+    // Knopf), nicht die Sperre.
+    if (!threadId || laeuftRef.current || erschoepft) return;
     const aktuell = queryClient.getQueryData<ChatMessage[]>(messagesQueryKey(threadId)) ?? [];
     const aelteste = aktuell[0];
     if (!aelteste) return;
 
+    laeuftRef.current = true;
     setLaedtAeltere(true);
     try {
-      const seite = await fetchMessages(threadId, { before: aelteste.createdAt });
+      const seite = await fetchMessages(threadId, {
+        before: { createdAt: aelteste.createdAt, id: aelteste.id },
+      });
+      // **Erst abbrechen, dann schreiben** (Diff-Review, codex, HOCH). Die
+      // Vereinigung in der `queryFn` liest den Cache nach dem Warten — aber
+      // zwischen jenem Lesen und dem Einsetzen durch React Query bleibt ein
+      // Fenster. Fällt das Schreiben hier hinein, gewinnt danach doch das
+      // Ergebnis ohne die älteren Zeilen.
+      //
+      // `cancelQueries` verwirft eine laufende Abfrage samt ihrem schon
+      // berechneten Ergebnis. Was sie geholt hätte, holt die nächste Neuabfrage —
+      // und die liest dann den Stand MIT den älteren Zeilen.
+      await queryClient.cancelQueries({ queryKey: messagesQueryKey(threadId) });
       queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(threadId), (prev) =>
         vereinigeNachrichten(prev ?? [], seite.messages),
       );
-      merkeErschoepft(seite.erschoepft);
+      queryClient.setQueryData(verlaufErschoepftQueryKey(threadId), seite.erschoepft);
     } catch (error) {
       // Ein fehlgeschlagenes Nachladen darf den sichtbaren Verlauf nicht kosten:
       // es wird nichts weggenommen, der Knopf bleibt stehen, das Mitglied kann
@@ -255,6 +282,7 @@ export function useGespraech({
         variant: "error",
       });
     } finally {
+      laeuftRef.current = false;
       setLaedtAeltere(false);
     }
   }
@@ -264,7 +292,13 @@ export function useGespraech({
     isLoading: query.isLoading,
     isError: query.isError,
     sende,
-    hatAeltere: query.isSuccess && messages.length > 0 && !erschoepft,
+    // **Ohne `query.isSuccess`** (Diff-Review, codex, MITTEL): React Query v5
+    // behält bei einem fehlgeschlagenen Hintergrund-Refetch die Daten, setzt den
+    // Status aber auf `error`. Hinge der Knopf daran, verschwände er nach einem
+    // Netzwackler aus einem Verlauf, in dem sehr wohl noch Ältere liegen — und
+    // käme erst mit der nächsten geglückten Abfrage zurück. Was zählt, ist, ob
+    // etwas da ist und ob es erschöpft ist.
+    hatAeltere: messages.length > 0 && !erschoepft,
     laedtAeltere,
     ladeAeltere,
   };

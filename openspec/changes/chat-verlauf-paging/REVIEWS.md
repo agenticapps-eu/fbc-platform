@@ -107,3 +107,55 @@ Scroll-Fall beim Ersetzen der letzten Zeile als erstes benannt; opencode hat die
 beiden HIGH-Befunde und die Zwei-Instanzen-Annahme geliefert, die den Entwurf
 tatsächlich umgeworfen haben. Ein Anbieter allein hätte hier nicht gereicht —
 gemini hat mit APPROVE geurteilt, wo die zentrale Zusage nicht eingelöst war.
+
+---
+
+# Diff-Review (Schritt 4) — auf dem fertigen Diff
+
+Drei Anbieter gerufen, **zwei gezählt**. Wieder keiner davon der Anbieter, der den
+Code geschrieben hat.
+
+| Arm | Modell | Verdikt | gezählt |
+| --- | --- | --- | --- |
+| opencode | `hf:moonshotai/Kimi-K3` | FREIGABE MIT AUFLAGEN, 3 Befunde | ✅ |
+| codex | (nicht ausgewiesen) | **ABLEHNUNG**, 9 Befunde | ✅ |
+| gemini | (nicht ausgewiesen) | FREIGABE, „keine Befunde" | ❌ |
+
+**gemini zählt nicht.** Für 1309 Diff-Zeilen kamen zwei Wörter. Das ist kein
+Verdikt, das ist eine Abwesenheit — und beide anderen Arme haben in denselben
+Zeilen zwei HIGH-Befunde gefunden, an denen die Kernzusage hing. Ein Arm, der
+nichts findet, hat nicht bewiesen, dass nichts da ist.
+
+**opencode hat gemessen statt gelesen:** die zehn betroffenen Testdateien selbst
+laufen lassen (122/122), `tsc --noEmit` dazu, und die Zeilenverweise im Repo
+nachgeschlagen (`main.tsx:14`, `use-ungelesen.ts:133`, `role="separator"`).
+
+**codex ebenfalls** — sein schärfster Befund zitiert
+`20260827120000_thread_aktivitaetsspalten.sql:60`, eine Migrationszeile, die ich
+selbst nicht gelesen hatte und die eine meiner Begründungen widerlegt.
+
+## Auflösung
+
+| Befund | Auflösung |
+| --- | --- |
+| **Cursor nicht total** (opencode MEDIUM, codex HOCH) | Zusammengesetzter Cursor `(created_at, id)` plus zweiter Sortierschlüssel. Zwischenfassung `lte` verworfen — sie verschob den Verlust nur in einen Stillstand. **Gegen echtes PostgREST geprüft**, HTTP 200 mit genau den erwarteten zwei Zeilen. |
+| **Gleichstand-Risiko falsch beziffert** (codex HOCH) | Korrigiert: `now()` ist transaktionsstabil, Gleichstände entstehen der Bauart nach. Die Formulierung „zwei Inserts in derselben Mikrosekunde" ist raus. |
+| **Vereinigung nicht atomar** (codex HOCH) | `cancelQueries` in `ladeAeltere`. Der vorgeschlagene Weg `structuralSharing` wurde ausprobiert und **gemessen verworfen**: React Query wendet ihn auch auf `setQueryData` an, was das Ersetzen der optimistischen Blase und deren Rücknahme brach. |
+| **Sperrklinke falsch begründet** (opencode LOW, codex HOCH) | Klinke **ersatzlos entfernt**. Beide Begründungen waren widerlegt, und ihr Fehlerfall heilte nicht — anders als der ohne sie. |
+| **Doppelklickschutz nicht synchron** (codex MITTEL) | Sperre auf einen Ref umgestellt; der Test misst jetzt die Zahl der Anfragen. Mutations-Gegenprobe: zurück auf den Zustand ⇒ rot. |
+| **`hatAeltere` hängt an `isSuccess`** (codex MITTEL) | Umgesetzt — aber die **Begründung stimmt nicht**: gemessen bleibt der Status nach einem fehlgeschlagenen Hintergrund-Refetch `success`. Siehe design.md. |
+| **Test 2.5 misst die Anfrage** (opencode MEDIUM) | War schon in der Plan-Review-Runde erledigt. |
+| **`hatAeltere`-Vakuumtest** (codex NIEDRIG) | Positivkontrolle ergänzt — der Kommentar behauptete sie, ohne dass sie dastand. |
+| **Tagesmarker-Test misst die Zusage nicht** (codex NIEDRIG) | Position des Markers per `compareDocumentPosition` geprüft. |
+| **Formatierung ausserhalb des Auftrags** (opencode LOW, codex NIEDRIG) | Beide Hunks zurückgenommen. `chat.ts` war schon auf `main` nicht prettier-sauber — der `--write`-Lauf über die ganze Datei hat die Fremdänderung überhaupt erst erzeugt. |
+
+## Was diese Runde über das Verfahren sagt
+
+Zwei Dinge, die ohne die zweite Runde durchgegangen wären:
+
+1. **Eine Korrektur aus Runde eins war zu klein.** `lte` sah nach einer Lösung
+   aus und war eine Verschiebung. Erst der zweite Arm hat das benannt.
+2. **Ein Befund war richtig, sein Mittel falsch.** `structuralSharing` hätte den
+   Wettlauf geschlossen und dabei zwei andere Zusagen gebrochen. Ein Vorschlag
+   aus einer Review ist ein Hinweis, keine Anweisung — er gehört gemessen wie
+   alles andere.
