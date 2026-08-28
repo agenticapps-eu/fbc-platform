@@ -31,7 +31,16 @@ export default function EnvironmentBanner() {
   if (import.meta.env.VITE_ENVIRONMENT === "prod") return null;
 
   return (
-    <div className="pointer-events-none fixed bottom-3 left-1/2 z-50 -translate-x-1/2 select-none rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-900 backdrop-blur">
+    // Der Ausgleich für die angedockten Chatfenster (AGE-639), dieselbe
+    // Variable wie bei den Toasts. Im Proposal stand, das mittig ausgerichtete
+    // Banner treffe die Fensterreihe nicht — im Browser gemessen ist das
+    // falsch: bei 1280 px mit beiden Leisten beginnt die Reihe bei x ≈ 370,
+    // die Bildmitte liegt bei 640, und das Banner lag auf der Sendezeile des
+    // linkesten Fensters.
+    <div
+      style={{ bottom: "calc(0.75rem + var(--fbc-fenster-h, 0rem))" }}
+      className="pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 select-none rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-900 backdrop-blur"
+    >
       Testumgebung — Daten sind nicht echt
     </div>
   );

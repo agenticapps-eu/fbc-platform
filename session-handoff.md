@@ -1,150 +1,155 @@
-# Session Handoff — 2026-08-27 (zweiundvierzigste Sitzung, nachmittags)
+# Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung)
 
-**PROD ist migriert** (beide Migrationen aus der Vormittagssitzung), fünf
-Vorgänge sind gebaut, drei davon live. Der wichtigste offene Punkt steht unter
-„Next session".
+Vier Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
+verlangte; **AGE-652** durch die volle Schleife; die **Worktree-Rückfragen
+dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat; und den
+**Dependabot-Stau aufgelöst**, der seit dem 14.08. stand.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-631** Vorauswahl „letzte Woche" | ✅ gemergt (#250) |
-| **AGE-633** Preise nur für Nicht-`impact` | ✅ gemergt (#251) |
-| **AGE-632** Release-Note als Modal + Screenshots | ✅ gemergt (#252) |
-| **AGE-635** Event-Cover in der Aktivitätsliste | ✅ gemergt (#254) |
-| **AGE-634** Admin setzt die Stufe | 🔶 PR #253, rebast, CI läuft — **danach `migrate-prod`** |
+| **AGE-632/634/636/638** archiviert (#260) | ✅ `a08d909`, alle 11 check-runs grün |
+| **AGE-652** Spec-Drift `lg` → `xl` (#262) | ✅ `7939f08`, Linear auf Done |
+| **Dependabot** #247 · #248 · #185 | ✅ `c671988` · `2d7d2cb` · `d79daa7` |
+| Übergaben #261 · #263 | ✅ `c540f4b` · `76694d0` |
+| **AGE-651** Blase frisst das Kuvert | ⛔ **Canceled** (Donald: Kosmetik) |
+| **AGE-653** Dependabot ⇄ `deno.lock` | 🆕 Backlog, Ursache belegt, Fix offen |
+| **#186** framer-motion 12 → 13 | 🟡 bewusst liegengelassen |
+| Worktree-Erreichbarkeit + stale `main` | ✅ dauerhaft behoben, gemessen |
 
 ## Accomplished
 
-### PROD-Migration (der Punkt 1 des Vormittags-Handoffs)
+**`openspec/changes/` ist aufgeräumt.** Es lagen **vier** unarchivierte Changes
+da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen, und
+ausgerechnet der trug den einzigen offenen Haken. Übrig sind nur die fünf
+`add-*`-Vorhaben, zu Recht: sie tragen nur offene Aufgaben.
 
-`migrate-prod` dispatcht, `plan` und `apply` grün, danach Drift-Gate **und**
-Objekt-Drift-Scan grün. Damit war der seit drei Läufen blockierte Frontend-Deploy
-wieder frei.
+**Der offene Haken aus AGE-638 ist nachgemessen.** Der Rail wird von einer
+mehrstelligen Zahl **nicht** gesprengt, auch vierstellig nicht: `-right-0.5`
+nagelt die rechte Kante fest, die Blase wächst nach links. Gefunden hat die
+Messung etwas anderes — die Blase verdeckt das Kuvert, zweistellig zur Hälfte,
+vierstellig ganz. Als **AGE-651** notiert und von Donald als Kosmetik
+**abgeschlossen**; die Messtabelle bleibt dort stehen.
 
-**Nicht gemessen:** die Rückfüll-Kontrolle aus AGE-627 (Threads mit Nachricht und
-leerem `last_message_at`, erwartet null) — das FBC-Projekt hängt nicht an der
-Supabase-MCP-Verbindung (dort ist nur `cparx`), die PROD-DB-URL liegt hinter
-einem TTY. **Bleibt offen.**
-
-### AGE-631 — die letzte Woche ist vorangehakt
-
-`ausLetzterWoche(eintraege, heute)` hakt die Einträge der letzten sieben Tage
-vor; die Liste bleibt vollständig, älteres steht ungehakt darin. Der Zustand ist
-**abgeleitet**: `gewaehlt === null` heisst „noch nicht angefasst", `[]` heisst
-„nichts gewählt" — ohne die Unterscheidung stünden nach dem Zustellen sofort
-wieder Häkchen da.
-
-### AGE-632 — Modal, Bilder, Deep-Link
-
-Portal an `document.body` (`.fbc-card:hover` und der `backdrop-filter` des Kopfes
-fangen `fixed` sonst ein), `useOverlay` aus AGE-529, Offen-Zustand als
-`?note=<id>`. Drei Screenshots unter `public/release/`, gegen den lokalen Stack
-mit erfundenen Konten.
-
-### AGE-634 — `admin_set_tier`
-
-Setzt in **beide** Richtungen (das kann `apply_upgrade` nicht), mit
-Pflichtbegründung und einer `admin_audit`-Zeile, die alte **und** neue Stufe
-trägt. 12 pgTAP-Zusagen in `ci.yml`; `code_as()` gibt den SQLSTATE zurück, weil
-`try_as()` jeden Fehler als `DENIED:` meldet.
+**AGE-652 ist gebaut, nicht nur behauptet.** Zwei Anforderungen in derselben
+Datei widersprachen einander, beide mit `SHALL`. Abgeglichen wurde **Spec gegen
+Spec** — die Autorität ist die neuere, begründete Anforderung, nicht der Code.
+Sonst wäre es die Red-Flag-Zeile „a spec delta edited to match the code".
 
 ## Decisions
 
-- **Kein YouTube-Standbild in der Aktivitätsliste (AGE-635).** Es käme von
-  `img.youtube.com` — derselbe Aufruf an den Anbieter samt IP, den das
-  Einwilligungstor aus AGE-611/621 verhindert; `VideoEmbed.tsx:34` sagt das
-  ausdrücklich, ein Test hält es fest. Ausgeliefert wurde nur das **Event-Cover**
-  (eigener Bucket). Der saubere Weg für Videos wäre ein Standbild erst nach
-  erteilter Freigabe (`useFreigabe`) — **Donalds Entscheidung, noch offen.**
-- **Bilder hängen am Change, nicht an der Note.** Verworfen: eine Spalte auf
-  `release_notes` mit Upload — sie kostete Migration, Bucket und Policies und
-  bräche die Konstruktion „was im Bündel steht, ist ausgeliefert".
-- **`tier` bleibt draussen aus `admin_update_profile`.** Eine Stufe zu setzen ist
-  kein Pflegen von Stammdaten; eigene RPC, eigene Spur, eigene Begründung.
-- **„Alles Admin-mässige raus" betrifft nur den TEXT der Release-Note**, nicht die
-  Auswahl und nicht die App (Donald, ausdrücklich). Die technischen Changes
-  bleiben angehakt, damit sie als angekündigt verbucht sind.
+- **Spec-only-Korrekturen laufen hier über einen vollen Change**, nicht als
+  Handedit in `openspec/specs/`. Präzedenz ist AGE-579 (`d071ddc`).
+- **Ein `MODIFIED`-Block bekräftigt alles, was in ihm steht.** Darum wurden zwei
+  *bestehende* Falschaussagen im selben Szenario mitkorrigiert, obwohl
+  „Surgical Changes" dagegenspricht: Stehenlassen wäre dort keine Zurückhaltung,
+  sondern eine Bekräftigung unter neuem Datum.
+- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert** — sonst
+  889 Zeilen Kosmetik im Diff. Nie `pnpm format`.
+- **Kein Linear-Statuswechsel von Hand**, obwohl ein Reviewer ihn forderte. Die
+  GitHub-Automation schaltet In Progress/Done — bei AGE-652 beobachtet.
+- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl), so
+  bleiben die neun bestehenden erreichbar.
 
 ## Files modified
 
-- **AGE-631** `src/lib/release-notes.ts` (+`ausLetzterWoche`), `AdminNeuigkeitenPage.tsx`
-- **AGE-633** `MitgliedschaftPage.tsx`, `AppShell.tsx` (Profilmenü)
-- **AGE-632** `src/components/release/ReleaseNoteModal.tsx` (neu),
-  `NeuesPage.tsx`, `HinweisGlocke.tsx`, `src/content/release-bilder.ts` (neu),
-  `src/types/release.ts`, `public/release/*.png` (3 Screenshots)
-- **AGE-635** `src/components/home/MemberDashboard.tsx`
-- **AGE-634** `supabase/migrations/20260827160000_admin_set_tier.sql` (neu),
-  `supabase/tests/admin_set_tier_test.sql` (neu), `ci.yml`, `admin-members.ts`,
-  `admin-profile.ts`, `database.types.ts`, `AdminMitgliedPage.tsx`
-- Changes: `openspec/changes/release-notes-modal/`, `openspec/changes/admin-setzt-stufe/`
+- `openspec/changes/archive/2026-08-28-{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill,rail-breakpoint-xl}/`
+- `openspec/specs/{admin,notifications,design-system}/spec.md`
+- `src/content/release-entries.generated.ts` — fünf Einträge dazu
+- `package.json` + beide Sperrdateien — 18 Pakete, über drei Dependabot-Merges
+- **Maschinenkonfiguration** (nicht im Repo): `~/.claude/settings.json`
+  (`additionalDirectories`, Sicherung `.bak-2026-08-28`) und
+  `~/.config/worktrunk/config.toml` (`[pre-switch] sync-main`)
+
+## Der Dependabot-Stau, aufgelöst
+
+Vier PRs standen seit dem 14.08. **Keiner scheiterte an seiner Abhängigkeit** —
+alle an `deno test --frozen` (`ci.yml:82`), einem Pflichtcheck: mangels
+`deno.json` faltet Deno 2 die Wurzel-`package.json` samt Versionsbereichen in
+`deno.lock`, und genau die hebt Dependabot. Hausgemacht, Ursache als **AGE-653**
+notiert (nicht gebaut, siehe unten). Freigemacht mit `deno install
+--frozen=false` je Branch, gegengeprüft mit `--frozen` (90 Deno-Tests).
+
+Zwei Fallen, beide eingetreten und als Memory abgelegt: die Branch-Protection
+verlangt zusätzlich **„aktuell zur Basis"** (Pflichtchecks sind `verify`,
+`migrations`, `pr-title`, `edge-functions` — **`deploy` ist keiner**), und die
+PRs gehen **nur nacheinander**, weil beim Nachziehen von `main` die Sperrdateien
+kollidieren. Eine Sperrdatei wird erzeugt, nicht zusammengeschrieben.
+
+## Bewusst nicht getan
+
+**AGE-653 ist angelegt, aber nicht gebaut** — abweichend von Donalds Wahl
+„gleich mitmachen", ausgesprochen statt verschwiegen. Der saubere Fix wäre ein
+`deno.json` in `supabase/functions/`; das ist eine **CI-Änderung**, und die haben
+`main` hier schon zweimal rot gemacht. `--frozen` sichert laut `ci.yml:73`
+ausdrücklich mit ab, dass `deno.lock` zum Code passt. Gehört durch die Schleife
+mit Plan-Review, nicht ans Ende einer Sitzung mit sieben Merges.
+
+**#186 (framer-motion 12 → 13) liegt bewusst.** Ein grünes `verify` trägt bei
+einem Major einer Animationsbibliothek wenig — jsdom sieht davon nichts. Braucht
+eine Sichtprobe im Browser, und die liegt dicht vor dem Go-Live.
 
 ## Next session: start here
 
-**1. AGE-634 (#253) landen — und danach `migrate-prod` dispatchen.** Der PR trägt
-`20260827160000_admin_set_tier.sql`; ohne die Migration auf PROD blockt das
-drift-gate den nächsten Frontend-Deploy **still**. Nach dem Merge läuft
-deploy.yml auf main automatisch; er wird ohne die Migration nichts ausliefern.
+**Nichts ist unfertig.** `d79daa7` (HEAD von `main` nach den drei
+Dependabot-Merges) trägt **alle 12 check-runs grün**, beide `deploy`-Jobs und
+`drift-gate` eingeschlossen — nach drei Abhängigkeits-Merges war das die
+eigentliche Prüfung, und sie ist bestanden.
 
-**2. Die erste Release-Note zustellen.** Der Textentwurf steht im Verlauf dieser
-Sitzung; er ist admin- und technikfrei. Zustellen geht **genau einmal** und an
-alle aktivierten Mitglieder — das ist Donalds/Detlevs Handlung, nicht die des
-Agenten.
+**Es hängt an zwei Antworten von Donald, nicht an Arbeit:** **AGE-628**
+(Feedback: Thema, Screenshot, Filter, Chat-Sprung) — der Issue existiert und
+deckt alle Punkte, **ein Change fehlt**. Baubar erst mit der Themenliste und der
+Entscheidung, was beim Chat-Sprung mit **anonymem** Feedback passiert (AGE-588
+steht dafür offen) und ob ein Admin die Kontaktanfrage-Hürde überspringen darf —
+letzteres wäre eine Ausnahme im Zugangsmodell und gehört ausgesprochen. Und
+**AGE-653**: bauen oder liegen lassen.
 
-## Was in dieser Sitzung schiefging (und wie man es merkt)
+Ohne diese Antworten sind **AGE-645** (Emoji, klein, keine Migration) oder
+**AGE-646** (Antworten, eine Spalte) die nächsten baubaren Vorgänge.
 
-Ein Re-Run des alten Laufs **33077648634** (Commit `45bbb40`) hat das frische
-Deployment von `3524c2a` **überschrieben** — der `functions`-Job meldete das
-korrekt als „RUECKFALL auf HEAD^ … ist kein Vorfahr von HEAD", aber `deploy` war
-da schon durch. Live stand danach der Stand VOR drei Merges.
-
-**Der erste Beleg dafür, dass alles live sei, war wertlos:** geprüft wurde
-`Aus … Änderungen einen Entwurf machen` — eine Zeichenkette, die es **vor** dem
-Diff schon gab (nur die Variable dahinter wurde umbenannt). Sie kann die
-Versionen nicht unterscheiden.
-
-Brauchbar sind zwei Proben:
-
-* eine Zeichenkette, die **nur** der neue Stand trägt (hier `release-note-titel`),
-* und für eine Datei der **`content-type`**: der SPA-Fallback antwortet auf JEDEN
-  unbekannten Pfad mit `200`, `text/html` und 3487 Bytes. `/release/xyz.png`
-  „existiert" damit immer. Erst `content-type: image/png` plus die echte
-  Dateigrösse belegt etwas.
-
-Eingefangen wurde es durch den Merge von #254, der einen sauberen Deploy auf dem
-aktuellen main auslöste. Danach gemessen: Bundle `index-CodyLEBR.js`,
-`release-note-titel` vorhanden, `nachrichtenleiste.png` mit `image/png` und
-295 523 Bytes.
+**Dieser Worktree kann weg.** Er heisst `fbc-platform.neuigkeiten-archiv` nach
+einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt.
 
 ## Open questions
 
-- **Video-Standbilder nach Freigabe?** Siehe Decisions — eigener Vorgang.
-- **Rückfüll-Kontrolle aus AGE-627** ist weiterhin ungemessen (kein PROD-Zugang
-  ohne TTY).
-- **Plan-Reviews fehlen** für `release-notes-modal` und `admin-setzt-stufe` —
-  die drei Fremd-Reviewer waren am 27.08. alle kaputt.
-- **CI-Flake:** der `migrations`-Job scheiterte einmal an `address already in use`
-  (Port 54324, inbucket) — nicht am Code. Neustart geht hier nur per
-  Close/Reopen des PRs; danach stehen **alte und neue Check-Runs auf derselben
-  SHA**, und eine Abfrage ohne `group_by(.name) | max_by(.started_at)` liest die
-  Karteileiche als Fehlschlag.
-- **`gh pr merge` schlägt still fehl**, wenn der Branch hinter `main` liegt
-  („not up to date"): der Befehl gibt nichts aus, der PR bleibt offen. Immer
-  `gh pr view --json state` nachschieben — hier einmal passiert.
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation des
-  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **Die erste Release-Note ist weiterhin nicht zugestellt** (Donald bzw. Detlev;
+  sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt fünf
+  Einträge mehr — darunter den von AGE-652, der eine interne Spec-Korrektur ist
+  und beim Zustellen ein Kandidat für „nicht relevant" wäre.
+- Unverändert offen: AGE-645/646/647/648 · AGE-610 · AGE-512 ·
+  Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
+  AGE-256 · AGE-606 · AGE-629/630 · die Threadliste markiert offene
+  Chatfenster nicht · `community-feed/spec.md:6` verspricht „threaded comments",
+  `public.comments` hat kein `parent_id`.
 
-## Lokaler Stack
+## Was diese Sitzung gelernt hat
 
-Wurde für die Migration **zurückgesetzt**; die Konten der Vormittagssitzung sind
-weg. Neu angelegt: `st-admin@test.local` (Admin) und `st-ziel@test.local`,
-Passwort `Probe-2026-lokal`, beide `impact` und aktiviert. `st-ziel` steht nach
-der Sichtprobe auf `connect`.
+Die dauerhaften Lehren liegen als Memory-Einträge; hier nur das Nötige.
 
-Vite läuft auf **5203** (5201/5202 belegen noch die Server der beiden gemergten
-Worktrees vom Vormittag):
+**Die Plan-Review hat sich in AGE-652 messbar bezahlt gemacht.** Drei Reviewer
+(gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
+REQUEST-CHANGES) fanden zwei HIGH-Befunde, davon **einen unabhängig doppelt** —
+und der schärfste war einer, den ich nie gefunden hätte: meine Messung belegte
+den Erstbesuch gar nicht, weil `fbc.chatCollapsed` auf `"1"` stand.
 
-```
-VITE_SUPABASE_URL=http://127.0.0.1:54321 \
-VITE_SUPABASE_ANON_KEY=<ANON_KEY aus `supabase status`> \
-VITE_ENVIRONMENT=local \
-npx vite --port 5203 --strictPort
-```
+**Drei Messfallen**, alle als Memory abgelegt: `resize_page` ist im
+chrome-devtools-MCP wirkungslos (`innerWidth` blieb stumm bei 1688, ohne
+Fehler); eine Schwelle belegt man an der Kante (1279/1280), nicht an zwei
+entfernten Punkten; und `git checkout <branch> -- <datei>` holt die
+**committete** Fassung und wirft Ungesichertes weg — hier diese Übergabe, einmal
+komplett.
+
+## Umgebung
+
+**Worktrees sind dauerhaft erreichbar** — `~/Sourcecode` steht in
+`permissions.additionalDirectories`, und `[pre-switch] sync-main` in
+`~/.config/worktrunk/config.toml` zieht die lokale `main` vor jedem neuen
+Worktree nach. Beides gemessen. Weiterhin gilt: `wt switch --create …
+--no-cd --format=json`, dann `cd` auf den `path`; `EnterWorktree` schlägt bei
+Geschwister-Worktrees fehl. **`switch.base` in der wt-Config gibt es nicht** —
+wt nimmt den Schlüssel an und ignoriert ihn.
+
+Lokaler Stack: `anna@chattest.invalid` / `Testchat2026!` (siehe
+`scripts/chat-testkonten.ts`), ein Gespräch. Die Probennachrichten dieser Sitzung
+sind wieder weg. Vite lief auf 5310 und 5311, `localhost`, nicht `127.0.0.1`.
+Für Skripte im Scratchpad: `node_modules` dorthin symlinken, sonst findet `tsx`
+kein `pg`; und `.mts` statt `.ts` wegen Top-Level-`await`.

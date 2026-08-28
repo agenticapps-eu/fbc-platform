@@ -5,6 +5,67 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-08-28-sidebar-pill",
+    datum: "2026-08-28",
+    titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",
+    linear: "AGE-638",
+    aenderungen: [
+      "**Ein Bauteil statt zweier.** Ein halber Pill am Innenrand jeder Leiste, der über die Kante hinausragt, gespiegelt an beiden. Er klappt ein und aus.",
+      "**Oben an beiden**, auf Höhe der Kopfzeile (Donalds Entscheidung).",
+      "**Immer sichtbar**, nicht erst beim Darüberfahren.",
+      "**Die untere Einklapp-Zeile links entfällt.** Die Feedback-Zeile darüber bleibt, wo sie ist — sie kam in AGE-566 aus einem eigenen Grund dorthin.",
+      "**Die Sprechblase im eingeklappten rechten Rail bleibt klickbar.** Sie ist zugleich der Ungelesen-Melder, den `design-system/spec.md:1372` verlangt; eine grosse Fläche, die aussieht wie ein Knopf und nicht reagiert, wäre schlechter als eine Redundanz. Der Pill ist das **einheitliche** Bauteil, nicht das einzige.",
+    ],
+  },
+  {
+    slug: "2026-08-28-release-notes-modal",
+    datum: "2026-08-28",
+    titel: "Release-Notes im zentrierten Modal lesen, mit Screenshots",
+    linear: "AGE-632",
+    aenderungen: [
+      "Eine Release-Note auf `/neues` ist anklickbar und öffnet sich **mittig als Modal**, mit Scroll-Sperre und Fokus-Falle.",
+      "Eine Release-Note kann **Bilder** tragen. Sie hängen am archivierten Change, entstehen zur Bauzeit wie die Eintragsliste selbst und werden mit dem Bündel ausgeliefert — kein Upload-Weg, keine Migration, kein Bucket.",
+      "Der Hinweis in der Glocke führt weiterhin auf `/neues`, aber mit **geöffneter** Note statt auf die blosse Liste.",
+      "Die Liste bleibt, was sie ist: alle zugestellten Notes, das Jüngste zuerst.",
+    ],
+  },
+  {
+    slug: "2026-08-28-rail-breakpoint-xl",
+    datum: "2026-08-28",
+    titel: "Die rechte Leiste dockt an `xl` an — auch dort, wo die Spec noch `lg` sagt",
+    linear: "AGE-652",
+    aenderungen: [
+      "Einer bindet die Schwelle an die Anforderung, die sie festlegt.",
+      "Einer trennt die **gespeicherte Vorliebe** von ihrer **angedockten Darstellung**. Nur die zweite ist breitengebunden; Persistenz, Trennung vom Zustand der Navigation und die Toleranz gegenüber fehlendem Speicher gelten bei jeder Breite. Ohne diesen Absatz las sich der erste so, als sei unterhalb von `xl` auch die Vorliebe ausser Kraft — beide Reviewer haben genau das gelesen.",
+    ],
+  },
+  {
+    slug: "2026-08-28-neuigkeiten-archiv",
+    datum: "2026-08-28",
+    titel: 'Neuigkeiten-Fläche: ein Archiv für Zugestelltes und für „nicht relevant"',
+    linear: "AGE-636",
+    aenderungen: [
+      '**Ein Eintrag steht in genau einem von zwei Zuständen: offen oder archiviert.** Archiviert wird er auf zwei Wegen — durch **Zustellung** (endgültig) oder durch die Markierung **„nicht relevant"** (rücknehmbar).',
+      '**Ein zweites Kästchen je Zeile: „nicht relevant".** Es nimmt den Eintrag aus der Liste *und* aus der laufenden Auswahl — ein Eintrag, den man gerade als belanglos markiert, darf nicht angehakt im Entwurf landen.',
+      "**Eine neue Tabelle `release_entry_skips`** hält die markierten Slugs. Ein Slug, ein Admin, ein Zeitpunkt — mehr nicht.",
+      '**Ein aufklappbares Archiv** unter der Liste, zugeklappt beginnend, mit der Zahl im Kopf. Es nennt zu jedem Eintrag den Grund und trägt bei „nicht relevant" den Weg zurück.',
+      '**`teileAuf()` ersetzt `nochNichtAngekuendigt()`**: dieselbe Rechnung, aber sie gibt **beide** Hälften zurück statt nur der einen. Die Zusage „ein Entwurf darf nichts verstecken" bleibt wörtlich erhalten und wird weiter geprüft.',
+    ],
+  },
+  {
+    slug: "2026-08-28-admin-setzt-stufe",
+    datum: "2026-08-28",
+    titel: "Ein Admin setzt die Stufe eines einzelnen Mitglieds",
+    linear: "AGE-634",
+    aenderungen: [
+      "Eine neue `SECURITY DEFINER`-RPC `admin_set_tier(p_profile_id, p_tier, p_grund)`, die `is_admin()` im Rumpf prüft und **in beide Richtungen** setzt.",
+      "Jede Änderung schreibt eine Zeile nach `public.admin_audit` — mit alter Stufe, neuer Stufe und Begründung. Ohne sie ist eine Stufe, die nicht aus Stripe stammt, später nicht erklärbar.",
+      'Eine Begründung ist **Pflicht**. Eine Spur ohne Grund beantwortet „wer und wann", aber nicht „warum" — und genau das ist die Frage, die man drei Monate später stellt.',
+      "Die Fläche sitzt in der Einzelbearbeitung eines Mitglieds und benennt, was Stripe später damit tut.",
+      'Der Kommentar an `apply_upgrade` wird nachgezogen: „der einzige Schreibweg für den Tier" stimmt danach nicht mehr.',
+    ],
+  },
+  {
     slug: "2026-08-27-video-freigabe-merken",
     datum: "2026-08-27",
     titel: "Video-Freigabe merken statt bei jedem Video erneut fragen",
@@ -69,6 +130,22 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
       'Die CLI-Version in `ci.yml` wird auf eine **konkrete Nummer** gepinnt, nicht auf „die letzte neue". Nicht als Behebung, sondern damit die Umgebung nicht wieder über Nacht unter dem Repo wegwandert. Gepinnt wird auf die **neue, strengere** Sorte, damit weitere zu enge Entzüge weiterhin auffallen statt zugedeckt zu werden.',
       "**Die Gegenprobe in `grants_test.sql` wird repariert.** Sie entzog bis heute nur `from public` und behauptete damit, genau die Formulierung wirke, die AGE-602 als unzureichend beschreibt. Auf dem alten lokalen Stack ging das durch; auf der neuen Sorte fällt sie. **Eine Gegenprobe, die die falsche Form vorführt, ist schlimmer als keine — sie schreibt den Irrtum fest, den sie aufdecken soll.** Neu dazu kommt eine dritte Probe, die den rollen-eigenen Grant **selbst herstellt** und dann zeigt, dass `from public` ihn nicht mitnimmt. Die misst auf **jeder** Instanz-Sorte etwas.",
       "**Der Pin ist nicht bloß Hygiene — er ist der Biss.** Zwei der neuen Szenarien können auf dem alten lokalen Stack gar nicht rot werden: dort halten `authenticated` und `service_role` von sich aus nichts, und ein Vergleich zweier Instanz-Sorten ist innerhalb einer Instanz ohnehin nicht führbar. Diese Szenarien messen ausschließlich auf der gepinnten CI-Sorte etwas. Das Delta sagt das aus, statt es implizit zu lassen — eine Zusage, die überall grün ist, hat sonst niemand als solche erkannt.",
+    ],
+  },
+  {
+    slug: "2026-08-27-chatfenster-angedockt",
+    datum: "2026-08-27",
+    titel: "Angedockte Chatfenster unten: mehrere Gespräche gleichzeitig, minimierbar",
+    linear: "AGE-639",
+    aenderungen: [
+      "**Ein Klick in der stehenden Leiste öffnet ein Fenster** statt zu navigieren — ab `xl`, also genau dort, wo die Leiste angedockt steht. Darunter (Schublade, Telefon) bleibt es beim heutigen Weg: die Adresse.",
+      "**Höchstens drei Fenster**, unten rechts aufgereiht, **zwischen beiden Leisten**. Jedes bis zu 18 rem breit; wird es eng, teilen sich alle drei den Platz, statt dass eines angeschnitten wird. Ein viertes Gespräch schliesst das am längsten unberührte — es ist damit nicht verloren, sondern steht unverändert in der Leiste daneben.",
+      "**Jedes Fenster minimiert und schliesst einzeln.** Minimiert bleibt seine Titelzeile stehen: Avatar, Name, Ungelesen-Zähler, beide Schalter.",
+      "**Die Fenster überleben den Seitenwechsel und das Neuladen.** Offene Threads und ihr Minimiert-Zustand liegen gerätelokal, wie `fbc.sidebarCollapsed` und `fbc.chatCollapsed` es schon tun.",
+      "**Ein aufgezogenes Fenster rückt den Lesestand vor**, genau wie die Vollansicht. Ein minimiertes nicht — es ist nicht gelesen worden.",
+      "**Ein Realtime-Kanal, nicht N.** Das bestehende `subscribeToAllMessages`-Abo in der Hülle bedient die Fenster mit; kein Fenster öffnet einen eigenen Kanal.",
+      "**`/chat` und `/chat/:threadId` bleiben unverändert** — Vollansicht, Deep-Link, und der einzige Weg unterhalb von `xl`. Auf diesen Routen steht die Fensterreihe nicht, aus demselben Grund, aus dem die Leiste dort nicht steht.",
+      "**Die Toasts weichen der Fensterreihe nach oben aus**, über dieselbe geteilte CSS-Variable, mit der der Rahmen schon heute seine Leistenbreite verteilt.",
     ],
   },
   {
