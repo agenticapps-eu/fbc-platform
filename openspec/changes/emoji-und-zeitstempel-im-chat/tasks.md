@@ -142,10 +142,50 @@ Vorgang im Design-System.
 
 ## 8. Abschluss
 
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`
       (**nie** `pnpm format` — schreibt ~60 fremde Dateien um)
-- [ ] `openspec validate --all` grün
-- [ ] Code-Review auf dem Diff (Stufe 2), nicht auf dem Plan — **die zwei
+- [x] `openspec validate --all` grün
+- [x] Code-Review auf dem Diff (Stufe 2), nicht auf dem Plan — **die zwei
       Hälften ausdrücklich getrennt beurteilen lassen** (Emoji-Weg und
       Zeitstempel sind unabhängig; sonst kauft das offengelegte Bündeln nichts)
 - [ ] `openspec archive`, dann PR
+
+**Die Diff-Review hat fünf Befunde gebracht, alle behoben** — Einzelheiten in
+`REVIEWS.md` unter „Diff-Review (Stufe 4)". Getrennt beurteilt wie verlangt:
+gemini APPROVE/REQUEST-CHANGES, opencode REQUEST-CHANGES/REQUEST-CHANGES. Der
+schärfste war ein HIGH, das die Fehlalarm-Prüfung dieses Changes in ihrer
+eigenen Disziplin schlug: `<3.000 Euro` wurde zu `❤️.000 Euro`, weil im
+Deutschen der Punkt die Tausender trennt — geprüft war nur `<3000`. Gefunden
+hat es ein Reviewer, der die Funktion **ausgeführt** statt gelesen hat.
+
+**Die vier Prüfungen (28.08., nach dem Nachziehen von `main`, nach den Fixes):** `typecheck`
+sauber · `lint` 0 Fehler (6 Warnungen `react-refresh/only-export-components`,
+alle in Dateien, die dieser Change nicht anfasst) · `test` **185 Dateien,
+2116 Tests** grün (14 davon neu aus der Diff-Review).
+
+`format:check` meldet **275 Dateien** repo-weit und ist damit kein Urteil über
+diesen Change: der CI-Job `verify` fährt `lint`, `typecheck`, `test` — **nicht**
+`format:check` (`ci.yml:24-26`). Einzeln nachgeprüft: alle **Quelldateien**
+dieses Changes sind sauber; durch fallen nur die vier Markdown-Dokumente hier —
+genauso wie `openspec/changes/push-fundament/` und `openspec/specs/messaging/`.
+Die OpenSpec-Dokumente sind von Hand auf ~80 Zeichen umbrochen; Prettier würde
+sie umwerfen. Mitformatiert wird deshalb nichts.
+
+**Die Suchleistung, die die Plan-Review offengelassen hatte** (gemini: „ein
+linearer Durchlauf je Tastendruck ist unmessbar teuer — wenn es sich im Browser
+anders zeigt, ist das ein Befund"), ist jetzt gemessen statt vermutet. 1914
+Einträge, Node auf dem Entwicklungsrechner:
+
+| Tippschritt | Treffer | je Tastendruck |
+| --- | --- | --- |
+| `h` | 1339 | 1,06 ms |
+| `herz` | 43 | 1,52 ms |
+| davon: Neu-Normalisieren **aller Einträge** | | 1,44 ms (95 %) |
+| dasselbe mit einmaliger Vorfaltung | | 0,07 ms (20×) |
+
+Die Zusage hält: 1,5 ms ist billig. Die Messung zeigt aber auch, **woher** die
+Kosten kommen — nicht aus dem Durchlauf, sondern daraus, dass `filtereEmoji`
+Name und Suchbegriffe jedes Eintrags bei jedem Tastendruck neu faltet. Eine
+einmalige Vorfaltung wäre 20× billiger. Bewusst **nicht** gebaut: sie änderte
+die Signatur von `filtereEmoji` samt Tests, und 1,5 ms rechtfertigt das nicht.
+Notiert, damit die Zahl beim nächsten Anlass dasteht.

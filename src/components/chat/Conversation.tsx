@@ -83,10 +83,7 @@ export function Conversation({
     if (schwebend.length === 0) return g;
     const letzte = g[g.length - 1];
     if (!letzte) return gruppiereNachTag(schwebend);
-    return [
-      ...g.slice(0, -1),
-      { ...letzte, nachrichten: [...letzte.nachrichten, ...schwebend] },
-    ];
+    return [...g.slice(0, -1), { ...letzte, nachrichten: [...letzte.nachrichten, ...schwebend] }];
   }, [messages]);
 
   // Fokus und Cursor NACH dem Anstrich setzen: vorher trägt das Feld noch den
