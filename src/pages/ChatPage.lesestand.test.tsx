@@ -43,7 +43,7 @@ vi.mock("../lib/chat", async (importOriginal) => {
       ],
       nextOffset: null,
     }),
-    fetchMessages: async (): Promise<ChatMessage[]> => [],
+    fetchMessages: async () => ({ messages: [] as ChatMessage[], erschoepft: true }),
     fetchUnreadCounts: async () => ({
       gesamt: 0,
       jeThread: new Map<string, number>(),

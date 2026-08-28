@@ -232,8 +232,36 @@ export function subscribeToAllMessages(onInsert: (message: ChatMessage) => void)
 export const threadsQueryKey = (uid: string) => ["chat", "threads", uid] as const;
 export const messagesQueryKey = (threadId: string) => ["chat", "messages", threadId] as const;
 
+/**
+ * Ob es zu diesem Thread nichts Älteres mehr zu laden gibt (AGE-655).
+ *
+ * Steht als **eigener Cache-Eintrag** neben den Nachrichten und nicht im
+ * Zustand einer Komponente, aus zwei Gründen, die beide aus der Plan-Review
+ * kommen:
+ *
+ *  - Die Vollansicht und ein angedocktes Fenster können denselben Thread
+ *    **gleichzeitig** führen. Zwei Hook-Instanzen mit eigenem Zustand über
+ *    einem gemeinsamen Nachrichten-Eintrag liefen auseinander — die eine böte
+ *    einen Weg zu älteren Nachrichten an, den die andere schon ausgeschöpft hat.
+ *  - Der Wert ist eine **Sperrklinke**: einmal wahr, bleibt er wahr. Eine
+ *    Neuabfrage darf ihn nicht zurückdrehen, sonst erschiene der Knopf nach
+ *    jedem Fensterwechsel wieder und lüde eine leere Seite. Nachträglich kann
+ *    nichts Älteres entstehen — Nachrichten werden hier nicht gelöscht und
+ *    nicht rückdatiert.
+ */
+export const verlaufErschoepftQueryKey = (threadId: string) =>
+  ["chat", "verlauf-erschoepft", threadId] as const;
+
 /** Wieviele Threads eine Seite trägt. */
 export const THREADS_SEITE = 20;
+
+/**
+ * Nachrichten je Verlaufsseite (AGE-655). Grösser als `THREADS_SEITE`, weil eine
+ * Nachricht viel weniger kostet als ein Thread mit angereichertem Partner — und
+ * weil ein Verlauf, der beim Öffnen sofort einen „Ältere laden"-Knopf zeigt,
+ * sich falsch anfühlt.
+ */
+export const VERLAUF_SEITE = 50;
 
 /** Eine Seite der Unterhaltungsliste; `nextOffset` ist null, wenn keine folgt. */
 export interface ChatThreadSeite {
@@ -316,15 +344,86 @@ export async function fetchThreads(
   };
 }
 
-/** Lädt die Nachrichten eines Threads, chronologisch (RLS: nur Teilnehmer). */
-export async function fetchMessages(threadId: string): Promise<ChatMessage[]> {
-  const { data, error } = await supabase
+export interface ChatVerlaufSeite {
+  messages: ChatMessage[];
+  /** Ob es JENSEITS dieser Seite nichts Älteres mehr gibt. Aus der Antwort gemessen. */
+  erschoepft: boolean;
+}
+
+/**
+ * Lädt EINE SEITE des Verlaufs, vom **jüngsten Ende** her (RLS: nur Teilnehmer).
+ *
+ * Bis AGE-655 holte diese Funktion jede Nachricht des Threads. Die Kosten
+ * wachsen damit, wie viel Mitglieder SCHREIBEN — sie sind deshalb bei der
+ * Einführung unsichtbar und am grössten, wenn der Chat angenommen wird. Das ist
+ * dieselbe Begründung, aus der `fetchThreads` seit AGE-638 gebunden ist.
+ *
+ * **Cursor statt `offset`**, anders als bei der Threadliste. Dort zählt der
+ * Offset in eine Liste, die sich am gelesenen Ende nicht verändert; hier kommen
+ * am jüngsten Ende laufend Zeilen hinzu. Ein Offset verschöbe sich mit jeder
+ * eintreffenden Nachricht, und die nächste Seite überspränge eine Zeile oder
+ * lieferte eine doppelt. `before` ist deshalb ein Keyset auf `created_at`.
+ *
+ * **`limit + 1` ist eine Sonde, keine Nachricht.** Sie beantwortet „gibt es noch
+ * ältere", ohne zu raten, und fällt aus dem Ergebnis wieder heraus. Ohne sie
+ * wäre „genau `limit` Zeilen übrig" von „noch mehr übrig" nicht zu
+ * unterscheiden, und der Weg zu den älteren stünde einmal zu oft da — für eine
+ * leere Seite.
+ *
+ * Absteigend geordnet und erst im Client umgedreht: aufsteigend schnitte die
+ * Grenze das ALTE Ende ab, und ein Gespräch beginnt für das Mitglied bei der
+ * letzten Nachricht.
+ */
+export async function fetchMessages(
+  threadId: string,
+  { limit = VERLAUF_SEITE, before }: { limit?: number; before?: string } = {},
+): Promise<ChatVerlaufSeite> {
+  let abfrage = supabase
     .from("messages")
     .select("id, thread_id, sender_id, body, created_at")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: true });
+    .eq("thread_id", threadId);
+  if (before !== undefined) abfrage = abfrage.lt("created_at", before);
+
+  const { data, error } = await abfrage
+    .order("created_at", { ascending: false })
+    .limit(limit + 1);
   if (error) throw error;
-  return (data ?? []).map(mapMessageRow);
+
+  const absteigend = data ?? [];
+  const erschoepft = absteigend.length <= limit;
+  // Die Sonde ist die ÄLTESTE Zeile der absteigenden Antwort — sie fällt hinten
+  // weg, bevor umgedreht wird.
+  return {
+    messages: absteigend.slice(0, limit).map(mapMessageRow).reverse(),
+    erschoepft,
+  };
+}
+
+/**
+ * Vereinigt zwei Nachrichtenlisten über die `id`, chronologisch — dieselbe
+ * Ordnung wie `mergeMessage` (`created_at`, dann `id`).
+ *
+ * Sie ersetzt bewusst BEIDE Stellen, an denen sonst „voranstellen" bzw.
+ * „überschreiben" stünde, und zwar aus zwei Gründen, die die Plan-Review
+ * geliefert hat:
+ *
+ *  - **Überschreiben verliert im Wettlauf.** react-query ersetzt die Daten,
+ *    wenn die `queryFn` auflöst. Eine Abfrage, die vor einem Nachladen mit einer
+ *    Seite losläuft und danach antwortet, nähme die inzwischen nachgeladenen
+ *    Zeilen wieder weg. Eine Vereinigung kann nur bestätigen, nie wegnehmen —
+ *    die Auflösungsreihenfolge wird damit gleichgültig.
+ *  - **Voranstellen dupliziert.** Zwei Klicks auf „Ältere laden" kurz
+ *    hintereinander lesen dasselbe `before` und holen dieselbe Seite.
+ *
+ * Bei gleicher `id` gewinnt der NEUE Eintrag: er kommt vom Server, der alte kann
+ * eine schwebende Blase sein.
+ */
+export function vereinigeNachrichten(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
+  const nachId = new Map(a.map((m) => [m.id, m]));
+  for (const m of b) nachId.set(m.id, m);
+  return [...nachId.values()].sort((x, y) =>
+    x.createdAt === y.createdAt ? x.id.localeCompare(y.id) : x.createdAt.localeCompare(y.createdAt),
+  );
 }
 
 // ── Senden ──────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ChatMessage, ChatThread } from "../../lib/chat";
+import type { ChatMessage, ChatThread, ChatVerlaufSeite } from "../../lib/chat";
 
 /**
  * Ein angedocktes Chatfenster (AGE-639).
@@ -19,13 +19,20 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
 
-const fetchMessages = vi.fn<(threadId: string) => Promise<ChatMessage[]>>();
+const fetchMessages =
+  vi.fn<
+    (threadId: string, opts?: { limit?: number; before?: string }) => Promise<ChatVerlaufSeite>
+  >();
+
+/** Eine vollstaendige Seite: alles geladen, nichts Aelteres mehr da (AGE-655). */
+const seite = (messages: ChatMessage[]): ChatVerlaufSeite => ({ messages, erschoepft: true });
 
 vi.mock("../../lib/chat", async (importOriginal) => {
   const echt = await importOriginal<typeof import("../../lib/chat")>();
   return {
     ...echt,
-    fetchMessages: (threadId: string) => fetchMessages(threadId),
+    fetchMessages: (threadId: string, opts?: { limit?: number; before?: string }) =>
+      fetchMessages(threadId, opts),
     markThreadRead: async () => {},
     sendMessage: async () => {
       throw new Error("in diesem Test nicht benutzt");
@@ -76,7 +83,7 @@ function montiere(fenster: Array<{ t: ChatThread; minimiert?: boolean; ungelesen
 
 beforeEach(() => {
   fetchMessages.mockReset();
-  fetchMessages.mockResolvedValue([]);
+  fetchMessages.mockResolvedValue(seite([]));
   Object.values(handler).forEach((h) => h.mockReset());
 });
 
@@ -126,15 +133,17 @@ describe("ChatFenster — mehrere nebeneinander", () => {
 
 describe("ChatFenster — minimiert", () => {
   it("legt Verlauf und Sendezeile weg, behält aber den Namen", async () => {
-    fetchMessages.mockResolvedValue([
-      {
-        id: "m1",
-        threadId: "t1",
-        senderId: "p-t1",
-        body: "Hallo aus dem Verlauf",
-        createdAt: "2026-08-01T10:00:00Z",
-      },
-    ]);
+    fetchMessages.mockResolvedValue(
+      seite([
+        {
+          id: "m1",
+          threadId: "t1",
+          senderId: "p-t1",
+          body: "Hallo aus dem Verlauf",
+          createdAt: "2026-08-01T10:00:00Z",
+        },
+      ]),
+    );
     const { rerender } = montiere([{ t: thread("t1", "Anna Berger") }]);
     expect(await screen.findByText("Hallo aus dem Verlauf")).toBeInTheDocument();
 
@@ -180,7 +189,7 @@ describe("ChatFenster — minimiert", () => {
     // fort, was schon im Cache liegt. Ohne Eintrag fiele jede Nachricht weg, die
     // während des Minimiertseins eintrifft.
     montiere([{ t: thread("t1", "Anna Berger"), minimiert: true }]);
-    await waitFor(() => expect(fetchMessages).toHaveBeenCalledWith("t1"));
+    await waitFor(() => expect(fetchMessages).toHaveBeenCalledWith("t1", expect.anything()));
   });
 });
 

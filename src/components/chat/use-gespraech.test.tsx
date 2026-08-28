@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ChatMessage } from "../../lib/chat";
+import type { ChatMessage, ChatVerlaufSeite } from "../../lib/chat";
 
 /**
  * Ein Gespräch, eine Definition — für die Vollansicht und für ein Fenster
@@ -19,7 +19,13 @@ import type { ChatMessage } from "../../lib/chat";
  * Hook liest und schreibt nur den Cache, den beide bedienen.
  */
 
-const fetchMessages = vi.fn<(threadId: string) => Promise<ChatMessage[]>>();
+const fetchMessages =
+  vi.fn<
+    (threadId: string, opts?: { limit?: number; before?: string }) => Promise<ChatVerlaufSeite>
+  >();
+
+/** Eine vollständige Seite: alles geladen, nichts Älteres mehr da (AGE-655). */
+const seite = (messages: ChatMessage[]): ChatVerlaufSeite => ({ messages, erschoepft: true });
 const markThreadRead = vi.fn<(threadId: string, uid: string) => Promise<void>>();
 const sendMessage =
   vi.fn<(input: { threadId: string; senderId: string; body: string }) => Promise<ChatMessage>>();
@@ -28,7 +34,8 @@ vi.mock("../../lib/chat", async (importOriginal) => {
   const echt = await importOriginal<typeof import("../../lib/chat")>();
   return {
     ...echt,
-    fetchMessages: (threadId: string) => fetchMessages(threadId),
+    fetchMessages: (threadId: string, opts?: { limit?: number; before?: string }) =>
+      fetchMessages(threadId, opts),
     markThreadRead: (threadId: string, uid: string) => markThreadRead(threadId, uid),
     sendMessage: (input: { threadId: string; senderId: string; body: string }) =>
       sendMessage(input),
@@ -37,6 +44,8 @@ vi.mock("../../lib/chat", async (importOriginal) => {
 
 const { useGespraech } = await import("./use-gespraech");
 const { ToastProvider } = await import("../ui/Toast");
+const { VERLAUF_SEITE, messagesQueryKey, verlaufErschoepftQueryKey } =
+  await import("../../lib/chat");
 
 const ICH = "ich";
 
@@ -76,7 +85,7 @@ function montiere(aktiv: boolean, threadId = "t1") {
 
 beforeEach(() => {
   fetchMessages.mockReset();
-  fetchMessages.mockResolvedValue([]);
+  fetchMessages.mockResolvedValue(seite([]));
   markThreadRead.mockReset();
   markThreadRead.mockResolvedValue(undefined);
   sendMessage.mockReset();
@@ -84,11 +93,11 @@ beforeEach(() => {
 
 describe("useGespraech — Verlauf", () => {
   it("lädt den Verlauf des Threads", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(true);
 
     await waitFor(() => expect(stand().messages).toHaveLength(1));
-    expect(fetchMessages).toHaveBeenCalledWith("t1");
+    expect(fetchMessages).toHaveBeenCalledWith("t1", { limit: VERLAUF_SEITE });
   });
 
   it("lädt ihn AUCH, wenn das Gespräch nicht aktiv ist", async () => {
@@ -97,7 +106,7 @@ describe("useGespraech — Verlauf", () => {
     // liegt. Ohne Eintrag fielen alle Nachrichten weg, die während des
     // Minimiertseins eintreffen — und das Aufziehen zeigte einen Verlauf, dem
     // genau die neuen Zeilen fehlen.
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(false);
 
     await waitFor(() => expect(stand().messages).toHaveLength(1));
@@ -121,7 +130,7 @@ describe("useGespraech — Lesestand", () => {
   });
 
   it("rückt ihn NICHT vor, wenn es das nicht ist", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(false);
 
     // Auf den geladenen Verlauf warten, sonst misst die Verneinung nur, dass
@@ -131,7 +140,7 @@ describe("useGespraech — Lesestand", () => {
   });
 
   it("rückt ihn beim Aufziehen nach — ein zweiter Aufruf, kein Neuladen", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     const { rerender } = montiere(false);
     await waitFor(() => expect(stand().messages).toHaveLength(1));
     expect(markThreadRead).not.toHaveBeenCalled();
@@ -149,16 +158,17 @@ describe("useGespraech — Lesestand", () => {
     //
     // Drei Zeilen auf einmal beim Öffnen → EIN Schreibvorgang. Genau wie der
     // Effect an `activeId` es in `ChatPage` bisher tat.
-    fetchMessages.mockResolvedValue([
-      nachricht("a", "wer-anders"),
-      nachricht("bb", ICH),
-      nachricht("ccc", "wer-anders"),
-    ]);
+    fetchMessages.mockResolvedValue(
+      seite([
+        nachricht("a", "wer-anders"),
+        nachricht("bb", ICH),
+        nachricht("ccc", "wer-anders"),
+      ]),
+    );
     const { queryClient } = montiere(true);
     await waitFor(() => expect(markThreadRead).toHaveBeenCalledTimes(1));
 
     // Eine EIGENE Nachricht kommt dazu → kein weiterer Schreibvorgang.
-    const { messagesQueryKey } = await import("../../lib/chat");
     act(() => {
       queryClient.setQueryData<ChatMessage[]>(messagesQueryKey("t1"), (prev) => [
         ...(prev ?? []),
@@ -180,7 +190,7 @@ describe("useGespraech — Lesestand", () => {
 
   it("überlebt einen Fehlschlag beim Markieren", async () => {
     markThreadRead.mockRejectedValue(new Error("42501"));
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(true);
 
     // Das Gespräch darf nicht an seiner Buchführung scheitern.
