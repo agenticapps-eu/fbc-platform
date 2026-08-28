@@ -1,132 +1,180 @@
-# Session Handoff — 2026-08-28
+# Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung)
 
-Ein Vorgang, durch die ganze Schleife bis kurz vor den PR: **AGE-645**, jetzt
-Emoji-Auswahl **plus** Zeitstempel **plus** Tagesmarker. Vier Commits auf
-`donald/age-645-emoji-auswahl`, **kein PR offen**.
+Vier Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
+verlangte; **AGE-652** durch die volle Schleife; die **Worktree-Rückfragen
+dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat; und den
+**Dependabot-Stau aufgelöst**, der seit dem 14.08. stand.
 
-| Vorgang                       | Stand                                                               |
-| ----------------------------- | ------------------------------------------------------------------- |
-| **AGE-639** Chatfenster       | ✅ gemergt, Deploy auf HEAD-SHA von `main` (`b7c33b2`) grün geprüft |
-| **AGE-645**                   | 🟡 gebaut, Sichtprobe durch, offen: Diff-Review · Archivieren · PR  |
-| **AGE-649** Lesebestätigungen | neu angelegt                                                        |
-| **AGE-650** Hauttöne          | neu angelegt                                                        |
+| Vorgang | Stand |
+| --- | --- |
+| **AGE-632/634/636/638** archiviert (#260) | ✅ `a08d909`, alle 11 check-runs grün |
+| **AGE-652** Spec-Drift `lg` → `xl` (#262) | ✅ `7939f08`, Linear auf Done |
+| **Dependabot** #247 · #248 · #185 | ✅ `c671988` · `2d7d2cb` · `d79daa7` |
+| Übergaben #261 · #263 | ✅ `c540f4b` · `76694d0` |
+| **#186** framer-motion 12 → 13 | ✅ `bfdffc2`, im Browser gegen 12 gemessen |
+| **AGE-651** Blase frisst das Kuvert | ⛔ **Canceled** (Donald: Kosmetik) |
+| **AGE-653** Dependabot ⇄ `deno.lock` | 🆕 Backlog, Ursache belegt, Fix offen |
+| Worktree-Erreichbarkeit + stale `main` | ✅ dauerhaft behoben, gemessen |
+| **Deploy auf `main`** | ✅ `ebe64da`, alles grün — zwischenzeitlich blockiert |
 
 ## Accomplished
 
-Drei Dinge in einer Sendezeile: `:-)` wird **beim Senden** zu 🙂, jede bestätigte
-Nachricht trägt eine Uhrzeit, und ein Auswahlfeld über 1914 deutsch
-durchsuchbare Emoji. Dazu **Tagesmarker** wie in WhatsApp („Heute", „Gestern",
-Wochentag, sonst Datum).
+**`openspec/changes/` ist aufgeräumt.** Es lagen **vier** unarchivierte Changes
+da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen, und
+ausgerechnet der trug den einzigen offenen Haken. Übrig sind nur die fünf
+`add-*`-Vorhaben, zu Recht: sie tragen nur offene Aufgaben.
 
-2086 Tests grün, `typecheck` und `lint` sauber, `openspec validate --all` grün.
+**Der offene Haken aus AGE-638 ist nachgemessen.** Der Rail wird von einer
+mehrstelligen Zahl **nicht** gesprengt, auch vierstellig nicht: `-right-0.5`
+nagelt die rechte Kante fest, die Blase wächst nach links. Gefunden hat die
+Messung etwas anderes — die Blase verdeckt das Kuvert, zweistellig zur Hälfte,
+vierstellig ganz. Als **AGE-651** notiert und von Donald als Kosmetik
+**abgeschlossen**; die Messtabelle bleibt dort stehen.
 
-**Plan-Review vor der ersten Codezeile** (gemini + opencode/Kimi-K3, beide
-REQUEST-CHANGES) — alle HIGH und MEDIUM eingearbeitet, dokumentiert in
-`REVIEWS.md`.
+**AGE-652 ist gebaut, nicht nur behauptet.** Zwei Anforderungen in derselben
+Datei widersprachen einander, beide mit `SHALL`. Abgeglichen wurde **Spec gegen
+Spec** — die Autorität ist die neuere, begründete Anforderung, nicht der Code.
+Sonst wäre es die Red-Flag-Zeile „a spec delta edited to match the code".
 
-**Sichtprobe im Browser** über chrome-devtools/CDP, gegen den lokalen Stack.
+**framer-motion 13 ist im Browser gegen 12 gemessen, nicht per Test
+abgenickt** — `src/test/setup.ts` stubbt `IntersectionObserver` und `matchMedia`
+aus, ausdrücklich „ohne dass Animationen geprüft werden". Beide Fassungen alle
+25 ms abgetastet, alle vier erreichbaren Bewegungsstellen deckungsgleich; die
+riskanteste (`layoutId`, 14 Positionen 217,4 → 254) auf die Nachkommastelle.
+Entscheidend war, **Zwischenwerte** zu messen — ein Endzustand belegt keine
+Bewegung. Zahlen im Kommentar an PR #186. Vorher geprüft, **wogegen** gemessen
+wird: zwischen Branch und `main` unterschied sich keine einzige Quelldatei.
 
 ## Decisions
 
-- **`:-)` wird beim SENDEN ersetzt, nicht beim Anzeigen** (Donald). Endgültig im
-  `body`, nicht rückwirkend, nicht rücknehmbar — benannt und so gewollt.
-- **Die Ersetzung sitzt in `useGespraech.sende()`**, nicht in
-  `Conversation.submit()`. Dort speisen sich optimistische Blase und Insert aus
-  derselben Variablen; die Gleichheit ist strukturell statt per Konvention.
-  `sendMessage` hat genau einen Aufrufer (`use-gespraech.ts:134`).
-- **Deutscher Datensatz, obwohl er der größere ist.** Der englische ist mit
-  16,7 kB gzip kleiner und trotzdem falsch: sein einziges „Herz" ist „Bosnia &
-  Herzegovina". Gewählt: `emojibase-data@17` `de/compact`, abgespeckt 46 kB gzip.
-- **Erzeuger statt Abhängigkeit** (47 MB für zwei Dateien), und er läuft
-  **nicht** in `prebuild` — er braucht Netz, und ein Build, der ohne Netz
-  scheitert, wäre ein Rückschritt.
-- **Hauttöne ausgeschlossen** (AGE-650), ausdrücklich statt stillschweigend.
-  Daten kosten nur +8 kB; die Kosten liegen in der Oberfläche.
-- **Lesebestätigungen: gegenseitig, nicht abschaltbar** (Donald, AGE-649). Preis:
-  niemand kann sich entziehen.
-- **Tagesmarker ERSETZEN das Datum an der Blase.** Das Datum gab es nur, weil es
-  keine Marker geben sollte; mit ihnen wäre es Doppelung.
-- **Uhrzeit auf eigener Blase mit voller Deckkraft** — gemessen, nicht gewählt:
-  `/70` = 3,34:1, `/90` = 4,43, voll = 5,07. Unter 4,5 besteht kein AA.
+- **Spec-only-Korrekturen laufen über einen vollen Change**, nicht als Handedit
+  in `openspec/specs/`. Präzedenz: AGE-579 (`d071ddc`).
+- **Ein `MODIFIED`-Block bekräftigt alles, was in ihm steht.** Darum wurden zwei
+  *bestehende* Falschaussagen im selben Szenario mitkorrigiert: Stehenlassen
+  wäre dort keine Zurückhaltung, sondern eine Bekräftigung unter neuem Datum.
+- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert** — sonst
+  889 Zeilen Kosmetik im Diff. Nie `pnpm format`.
+- **Kein Linear-Statuswechsel von Hand**, obwohl ein Reviewer ihn forderte. Die
+  GitHub-Automation schaltet In Progress/Done — bei AGE-652 beobachtet.
+- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl), so
+  bleiben die neun bestehenden erreichbar.
 
 ## Files modified
 
-- `src/lib/emoticons.ts` + Test — **neu**, die Ersetzung samt Wortgrenzen
-- `src/lib/emoji-suche.ts` + Test — **neu**, Filter mit Umlaut-/Schreibungsfaltung
-- `src/lib/tagestrenner.ts` + Test — **neu**, Marker-Beschriftung + Gruppierung
-- `src/components/chat/EmojiAuswahl.tsx` + Test — **neu**, portaliertes Overlay
-- `scripts/generate-emoji.ts`, `src/content/emoji.generated.ts` (+ Test) — **neu**
-- `src/components/chat/Conversation.tsx` — Zeitstempel, Tagesmarker, Schalter im
-  Feld, `pr-8`
-- `src/components/chat/use-gespraech.ts` — `ersetzeEmoticons` in `sende()`
-- `openspec/changes/emoji-und-zeitstempel-im-chat/` — proposal, design, tasks,
-  REVIEWS, Delta `messaging`
+- `openspec/changes/archive/2026-08-28-{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill,rail-breakpoint-xl}/`
+- `openspec/specs/{admin,notifications,design-system}/spec.md`
+- `src/content/release-entries.generated.ts` — fünf Einträge dazu
+- `package.json` + beide Sperrdateien — 18 Pakete, über drei Dependabot-Merges
+- **Maschinenkonfiguration** (nicht im Repo): `~/.claude/settings.json`
+  (`additionalDirectories`, Sicherung `.bak-2026-08-28`) und
+  `~/.config/worktrunk/config.toml` (`[pre-switch] sync-main`)
+
+## Der Dependabot-Stau, aufgelöst
+
+Alle vier PRs standen seit dem 14.08., und **keiner scheiterte an seiner
+Abhängigkeit** — alle an `deno test --frozen` (`ci.yml:82`): mangels `deno.json`
+faltet Deno 2 die Wurzel-`package.json` samt Versionsbereichen in `deno.lock`,
+und genau die hebt Dependabot. Freigemacht mit `deno install --frozen=false` je
+Branch. Ursache als **AGE-653** notiert, nicht gebaut.
+
+Zwei Fallen, als Memory abgelegt: die Branch-Protection verlangt zusätzlich
+**„aktuell zur Basis"** (Pflichtchecks sind `verify`, `migrations`, `pr-title`,
+`edge-functions` — **`deploy` ist keiner**), und Dependency-PRs gehen **nur
+nacheinander**, weil ihre Sperrdateien beim Nachziehen kollidieren.
+
+## Bewusst nicht getan
+
+**AGE-653 ist angelegt, aber nicht gebaut** — abweichend von Donalds Wahl
+„gleich mitmachen", ausgesprochen statt verschwiegen. Der saubere Fix wäre ein
+`deno.json` in `supabase/functions/`; das ist eine **CI-Änderung**, und die haben
+`main` hier schon zweimal rot gemacht. `--frozen` sichert laut `ci.yml:73`
+ausdrücklich mit ab, dass `deno.lock` zum Code passt. Gehört durch die Schleife
+mit Plan-Review, nicht ans Ende einer Sitzung mit sieben Merges.
+
+Und **PROD haben wir nicht angefasst** — weder `migrate-prod` ausgelöst noch
+Secrets oder Webhooks gesetzt, obwohl es den Deploy entriegelt hätte. Der
+Workflow wendet ohne Rückfrage an, und es war die Fläche der AGE-641-Sitzung.
+Sie hat es selbst gemacht, mit der Freigabe ihres Nutzers.
 
 ## Next session: start here
 
-**Erst die Diff-Review (Stufe 2), dann archivieren, dann PR.** Die Review muss
-die **zwei Hälften getrennt** beurteilen — Emoji-Weg und Zeitstempel/Marker sind
-unabhängig, sonst kauft das offengelegte Bündeln nichts (steht so in `tasks.md`
-Abschnitt 8). Danach `openspec archive emoji-und-zeitstempel-im-chat`, PR gegen
-`main`, und bei grünem CI mergen (Freigabe ist generell erteilt) — anschließend
-**`gh pr view --json state` prüfen**, ein `gh pr merge` kann still fehlschlagen.
-Der Change trägt **keine Migration**, das drift-gate sollte den Deploy also
-nicht überspringen; trotzdem auf der HEAD-SHA von `main` nachsehen.
+**`main` ist ausgeliefert, alles ist durch** — `ebe64da` trägt jeden Job grün,
+`drift-gate`, `functions` und beide `deploy` eingeschlossen. `bfdffc2`
+(framer-motion 13) ist damit mit live.
+
+Der Weg dorthin, weil er sich wiederholen wird: die sechs Push-Migrationen aus
+AGE-641 lagen zwischenzeitlich auf `main`, aber nicht in PROD — `drift-gate`
+rot, `functions` und `deploy` übersprungen. Aufgelöst von der AGE-641-Sitzung
+mit `Migrate PROD` (`plan` + `apply` grün) und danach
+`gh run rerun 33164048264 --failed`, **nach** dem SHA-Abgleich
+`origin/main == Lauf-SHA`. Ohne diesen Abgleich liefert ein Re-Run das Frontend
+eines älteren Commits aus und rollt es still zurück.
+
+Davor hatte dieselbe Sitzung am Vormittag den **DEV**-Stau ausgelöst, indem sie
+ihre Migrationen auf die geteilte DEV-Datenbank spielte, bevor ihr Branch auf
+`main` war. Beides steht als Memory-Eintrag.
+
+**Es hängt an zwei Antworten von Donald, nicht an Arbeit:** **AGE-628**
+(Feedback: Thema, Screenshot, Filter, Chat-Sprung) — der Issue existiert und
+deckt alle Punkte, **ein Change fehlt**. Baubar erst mit der Themenliste und der
+Entscheidung, was beim Chat-Sprung mit **anonymem** Feedback passiert (AGE-588
+steht dafür offen) und ob ein Admin die Kontaktanfrage-Hürde überspringen darf —
+letzteres wäre eine Ausnahme im Zugangsmodell und gehört ausgesprochen. Und
+**AGE-653**: bauen oder liegen lassen.
+
+Ohne diese Antworten sind **AGE-645** (Emoji, klein, keine Migration) oder
+**AGE-646** (Antworten, eine Spalte) die nächsten baubaren Vorgänge.
+
+**Dieser Worktree kann weg.** Er heisst `fbc-platform.neuigkeiten-archiv` nach
+einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt.
 
 ## Open questions
 
-- **Navy-Kontrast, nicht von diesem Change:** die eigene Blase liegt bei
-  **3,61:1** für ihren _Nachrichtentext selbst_ (`bg-accent` + `text-chrome`,
-  unverändert im Diff). Eigener Vorgang im Design-System — Donald gefragt, noch
-  keine Antwort.
-- **`REVIEWS.md` trägt keinen signierten Trailer.** Das Tor merkt es an
-  („trailer-absent"), blockt aber nicht. Die kanonische
-  `~/.agenticapps/bin/run-plan-review.sh` schreibt ihn; ich habe ihn **nicht**
-  von Hand geschrieben — ein selbstgemachter Prüfwert wäre ein falscher Beleg.
-- **`release-entries.generated.ts` hat dasselbe Problem**, das ich in meinem
-  Erzeuger behoben habe: ungeformte `JSON.stringify`-Ausgabe, dauerhaft
-  `format:check`-rot, springt bei jedem Build hin und her. Eigener Vorgang.
-- Unverändert offen: erste Release-Note nicht zugestellt · AGE-610 · AGE-512 ·
+- **Die erste Release-Note ist weiterhin nicht zugestellt** (Donald bzw. Detlev;
+  sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt fünf
+  Einträge mehr — darunter den von AGE-652, der eine interne Spec-Korrektur ist
+  und beim Zustellen ein Kandidat für „nicht relevant" wäre.
+- Unverändert offen: AGE-645/646/647/648 · AGE-610 · AGE-512 ·
   Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
-  AGE-256 · AGE-606 · AGE-628/629/630 · AGE-646/647/648.
+  AGE-256 · AGE-606 · AGE-629/630 · die Threadliste markiert offene
+  Chatfenster nicht · `community-feed/spec.md:6` verspricht „threaded comments",
+  `public.comments` hat kein `parent_id`.
+
+## Was diese Sitzung gelernt hat
+
+Die dauerhaften Lehren liegen als Memory-Einträge; hier nur das Nötige.
+
+**Fremde Augen haben zweimal mehr gefunden als eigene.** In AGE-652 fanden drei
+Reviewer (gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
+REQUEST-CHANGES) zwei HIGH-Befunde, davon **einen unabhängig doppelt** — der
+schärfste war, dass meine Messung den Erstbesuch gar nicht belegte, weil
+`fbc.chatCollapsed` auf `"1"` stand. Und die Nachbarsitzung korrigierte gleich
+zwei meiner Aussagen (gestapelte Lint-Kommentare gelten beide der nächsten
+Zeile; ein `deno.lock`-Konflikt entsteht nur bei Branches, die selbst
+`package.json` anfassen).
+
+**Drei Messfallen**, als Memory abgelegt: `resize_page` ist wirkungslos
+(`innerWidth` blieb stumm bei 1688, ohne Fehler); eine Schwelle belegt man an
+der Kante (1279/1280); und `git checkout <branch> -- <datei>` wirft
+Ungesichertes weg.
+
+**Und eine eigene Überwachung kann zu eng gebaut sein.** Meine meldete
+„Entwarnung", weil sie nur `migrate-dev` prüfte — während `drift-gate` rot war
+und der Deploy übersprungen wurde. Die Erfolgsbedingung muss das sein, worauf es
+ankommt, nicht der Job, der zuletzt gestört hat.
 
 ## Umgebung
 
-**Der Worktree ist `fbc-platform.donald-age-645-emoji-auswahl`** — die Sitzung
-war aber auf `neuigkeiten-archiv` festgenagelt und brauchte ein
-`/add-dir`, bevor sie hineinschreiben durfte. `wt switch --create --base
-origin/main` war nötig, weil die **lokale** `main` 4 Commits zurückhing.
+**Worktrees sind dauerhaft erreichbar** — `~/Sourcecode` steht in
+`permissions.additionalDirectories`, und `[pre-switch] sync-main` in
+`~/.config/worktrunk/config.toml` zieht die lokale `main` vor jedem neuen
+Worktree nach. Beides gemessen. Weiterhin gilt: `wt switch --create …
+--no-cd --format=json`, dann `cd` auf den `path`; `EnterWorktree` schlägt bei
+Geschwister-Worktrees fehl. **`switch.base` in der wt-Config gibt es nicht** —
+wt nimmt den Schlüssel an und ignoriert ihn.
 
-**Der lokale Stack trägt 6 fremde Migrationen** (Push-Vorgang AGE-641 aus einem
-anderen Worktree, `20260827200000`–`20260828100000`). Für rein frontendseitige
-Arbeit unschädlich, aber vor jeder Messung protokollieren.
-
-**Testkonten stehen wieder:** `anna@` / `bernd@chattest.invalid`,
-`Testchat2026!`, angelegt mit `pnpm tsx scripts/chat-testkonten.ts`. Thread
-`f8543c25-cc6e-4d33-96a9-67ca4e8bdf58` mit Nachrichten über drei Kalendertage.
-
-Vite lief auf **5199**, gestartet an `pnpm dev` vorbei (das will Infisical):
-`VITE_SUPABASE_URL=http://127.0.0.1:54321 … pnpm exec vite --port 5199`.
-
-## Was in dieser Sitzung schiefging (und wie man es merkt)
-
-**Zwei Gegenproben haben zwei wertlose Tests entlarvt.** Die linke Wortgrenze
-entfernt: nur _ein_ Test fiel — die anderen „lass in Ruhe"-Fälle hielt in
-Wahrheit die rechte Grenze, und mein Kommentar behauptete das Gegenteil. Die
-rechte Grenze entfernt: **alle** Tests blieben grün, sie war reine Behauptung.
-Vier Fälle nachgetragen, darunter `<3000 Euro` → wäre `❤️000 Euro` geworden.
-
-**Ein Test hiess „Reihenfolge" und prüfte keine.** In dieser Liste ist keine Form
-Präfix einer anderen; die Behauptung war durch nichts zu widerlegen.
-
-**Die Sichtprobe fand zwei Fehler, die 2086 Tests durchgelassen hatten:** der
-Emoji-Schalter ragte 2 px in den Text, und die Uhrzeit lag unter AA.
-
-**Ein Negativbefund ohne Positivkontrolle:** die Scroll-Nachführung „belegte"
-sich zuerst in einem angedockten Fenster — das `fixed` steht und sich beim
-Scrollen gar nicht bewegt. Erst in der Vollansicht, wo der Schalter um −300 px
-wandert, hatte die Messung überhaupt Aussagekraft.
-
-**`ls` ist ein eza-Alias** — die Migrationsliste aus dem Branch kam als
-Langformat und liess 99 von 105 Migrationen als „fremd" erscheinen. Mit `find`
-waren es sechs.
+Lokaler Stack: `anna@chattest.invalid` / `Testchat2026!` (siehe
+`scripts/chat-testkonten.ts`), ein Gespräch. Die Probennachrichten dieser Sitzung
+sind wieder weg. Vite lief auf 5310 und 5311, `localhost`, nicht `127.0.0.1`.
+Für Skripte im Scratchpad: `node_modules` dorthin symlinken, sonst findet `tsx`
+kein `pg`; und `.mts` statt `.ts` wegen Top-Level-`await`.

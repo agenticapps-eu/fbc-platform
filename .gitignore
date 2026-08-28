@@ -43,6 +43,19 @@ docs/legacy-planning/design-mocks/
 *.pfx
 *.jks
 *.keystore
+# AGE-641: der APNs-Auth-Key. Apple laesst ihn genau EINMAL herunterladen, er
+# gilt teamweit fuer jede App, und dieses Repo ist oeffentlich — ein Push waere
+# eine Rotation im Apple-Portal, kein `git rm`. Die Nachbarzeilen decken `.pem`
+# und `.key` ab, aber Apple liefert die Endung `.p8`.
+*.p8
+# AGE-641: der Firebase-Dienstschluessel fuer FCM. Er kommt als `.json` und
+# faellt damit durch JEDES Muster darueber — und er traegt einen privaten
+# Schluessel im Klartext. Google benennt ihn
+# `<projekt>-firebase-adminsdk-<hash>-<hash>.json`; das Muster faengt auch die
+# umbenannte Fassung, solange der Mittelteil steht.
+*firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
 id_rsa
 id_rsa.*
 id_ecdsa

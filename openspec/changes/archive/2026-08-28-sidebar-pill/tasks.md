@@ -64,8 +64,41 @@ sollen den Umbau überleben, nicht ihn treiben.
       Browserverhalten, das nur eine echte Tastatureingabe erreicht. Die
       Behauptung „mit Enter auslösbar" stünde hier also unbelegt; belegt ist,
       dass es ein Knopf ist, für den der Browser dieses Verhalten mitbringt.
-- [ ] **Offen: der mehrstellige Ungelesen-Zähler im Browser.** Gemessen wurde
-      er nur im Test (`3`). Ob eine zweistellige Zahl den Rail sprengt, ist im
-      Browser nicht geprüft — der lokale Stack hat keine Nachrichten.
+- [x] **Der mehrstellige Ungelesen-Zähler, im Browser nachgemessen** (28.08.,
+      Chrome über CDP, 1688 px breit, eingeklapptes Rail auf `/profil`, echtes
+      angemeldetes Konto mit echten Zeilen in `public.messages`).
+
+      | Ziffern | Blase breit | Luft zur rechten Kante | Luft zur linken | Kuvert verdeckt |
+      | --- | --- | --- | --- | --- |
+      | 2 (`12`) | 19,52 px | 15,5 px | 36,98 px | 9,52 von 20 px |
+      | 3 (`137`) | 26,00 px | 15,5 px | 30,50 px | 16 von 20 px |
+      | 4 (`1481`) | 31,69 px | 15,5 px | 24,81 px | 20 von 20 px |
+
+      **Der Rail wird nicht gesprengt, auch nicht vierstellig.** Der Grund ist
+      `-right-0.5`: die rechte Kante der Blase ist FESTGENAGELT, sie wächst nach
+      links. Darum ist die Luft rechts über alle drei Messungen konstant 15,5 px.
+      Nach links bleiben bei vier Ziffern noch 24,81 px im 72 px breiten Rail —
+      bei ~6,5 px Zuwachs je Ziffer wären etwa acht Ziffern nötig.
+
+      Höhe bleibt bei allen 18 px: **kein Umbruch**. Und der Inhaltsbedarf
+      (Klon mit `position: static; width: max-content`) ist mit 31,69 px
+      identisch zur Kastenbreite — also kein verstecktes Überlaufen, das ein
+      `scrollWidth` von 0 verschwiegen hätte.
+
+      **Was die Messung stattdessen gefunden hat, und es ist nicht das Gesuchte:
+      die Blase frisst das Kuvert.** Schon zweistellig deckt sie es zur Hälfte
+      ab, dreistellig zu 80 %, vierstellig ganz. Kein Layoutbruch, sondern eine
+      Gestaltungsfrage (Kappen bei `99+`? Blase nach aussen setzen?) — als
+      eigener Vorgang notiert, nicht hier nebenbei entschieden.
+
+      Zwei Fallen auf dem Weg dahin, beide eingetreten:
+      1. **`last_read_at` lässt sich nicht zurückdatieren.** Auf
+         `thread_read_positions` sitzt `thread_read_positions_serveruhr`, ein
+         `before insert or update`-Trigger, der den Wert bedingungslos auf
+         `clock_timestamp()` setzt. Das UPDATE geht durch, meldet eine
+         betroffene Zeile — und bewirkt nichts.
+      2. Der Ausweg ist die **andere Seite des Vergleichs**: `messages.created_at`
+         trägt keinen solchen Trigger. Die Probenzeilen liegen darum zwei Stunden
+         in der Zukunft, dann holt kein späteres Vorrücken sie ein.
 - [x] `pnpm test`, `pnpm lint`, `tsc --noEmit`, `vite build` mit gesetzten
       `VITE_*`-Variablen (ohne sie baut es 236 kB ohne App-Code und meldet 0).

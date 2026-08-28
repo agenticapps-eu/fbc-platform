@@ -136,6 +136,13 @@ must **never** reach the client.
 | `FROM_EMAIL`                | Sender address for transactional email — `FBC <noreply@effbeezee.com>` (see the sender-domain note below; **must not** be `onboarding@resend.dev`) |
 | `CONTACT_WEBHOOK_SECRET`    | Shared secret the contact-request DB webhook sends as `Authorization: Bearer …` |
 | `APP_URL` _(optional)_      | Base URL for the "Zum Chat"/"Anfrage ansehen" link in emails |
+| `PUSH_WEBHOOK_SECRET`       | Shared secret the `notifications` DB webhook sends to `send-push` (AGE-641) |
+| `APNS_KEY_P8`               | Der APNs-Auth-Key als PEM. **Nicht** der gleichnamige App-Store-Connect-Schlüssel — siehe unten |
+| `APNS_KEY_ID`               | Kennung ebendieses Schlüssels (steht in Apples Dateinamen `AuthKey_<KEYID>.p8`) |
+| `APNS_TEAM_ID`              | Apple-Team, fährt als `iss` im Provider-JWT mit |
+| `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
+| `APNS_SANDBOX`              | `1` schickt an Apples Sandbox-Host. In `prod` **nicht setzen** |
+| `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
 
 ## Setting and reading secrets
 
@@ -170,19 +177,42 @@ secrets from the **Supabase Functions secret store**, not from the Vite/Pages
 runtime. Push them from Infisical so the values never live in the repo:
 
 ```bash
-# Push the function secrets from Infisical's dev env into Supabase.
-# (--silent keeps the values off your terminal; --plain emits KEY=value pairs.)
-infisical export --env=dev --format=dotenv --plain \
-  | grep -E '^(RESEND_API_KEY|FROM_EMAIL|CONTACT_WEBHOOK_SECRET|APP_URL)=' \
-  > /tmp/fbc-fn.env
-supabase secrets set --env-file /tmp/fbc-fn.env
-rm -f /tmp/fbc-fn.env
-
-# …or set them one-off, reading each value from Infisical at call time:
-infisical run --env=dev -- sh -c \
-  'supabase secrets set RESEND_API_KEY="$RESEND_API_KEY" FROM_EMAIL="$FROM_EMAIL" \
+# Werte ueber die UMGEBUNG uebergeben, nie ueber eine Datei.
+infisical run --env=dev --silent -- sh -c \
+  'supabase secrets set --project-ref <ref> \
+     RESEND_API_KEY="$RESEND_API_KEY" FROM_EMAIL="$FROM_EMAIL" \
      CONTACT_WEBHOOK_SECRET="$CONTACT_WEBHOOK_SECRET" APP_URL="$APP_URL"'
 ```
+
+> ⚠️ **Der frühere `export | grep > datei`-Weg stand hier bis zum 28.08. und war
+> falsch — an drei Stellen.** Er hat an dem Tag `APNS_KEY_P8` und
+> `FCM_SERVICE_ACCOUNT` beschädigt, und zwar **lautlos**: `supabase secrets set`
+> meldete `count: 2` und Erfolg.
+>
+> 1. **`--plain` gibt es nicht.** `infisical export` (0.43.128) kennt das Flag
+>    nicht.
+> 2. **`grep '^KEY='` schneidet mehrzeilige Werte ab.** Der dotenv-Export ist
+>    mehrzeilig — gemessen: 51 Zeilen bei 33 Schlüsseln, also 18
+>    Fortsetzungszeilen. Von einem PEM oder einem Dienstkonto-JSON bleibt so nur
+>    die **erste Zeile** übrig. Das trifft jedes mehrzeilige Geheimnis und fiel
+>    nur deshalb nie auf, weil die vier Werte hier oben alle einzeilig sind.
+> 3. **Ohne `--project-ref` trifft es das verlinkte Projekt** — und ein
+>    Worktree ist in der Regel mit gar keinem verlinkt.
+
+**Nachweisen, nicht annehmen.** Der `value` in `supabase secrets list` ist das
+**SHA-256 des Werts** (belegt am 28.08. an `APNS_BUNDLE_ID`: der Digest ist
+`sha256("com.effbeezee.app")`, ohne Zeilenumbruch am Ende). Damit lässt sich
+byte-genau vergleichen, ohne ein Geheimnis anzuzeigen:
+
+```bash
+# links: was in Infisical steht — rechts: was Supabase gespeichert hat
+infisical run --env=dev --silent -- sh -c \
+  'for k in APNS_KEY_P8 FCM_SERVICE_ACCOUNT; do eval "v=\$$k"; \
+     printf "%-22s %s\n" "$k" "$(printf %s "$v" | shasum -a 256 | cut -d" " -f1)"; done'
+supabase secrets list --project-ref <ref>
+```
+
+Weichen sie ab, ist der Wert unterwegs verändert worden.
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into every Edge
 Function by the platform — do **not** set them here.
@@ -293,3 +323,227 @@ Plattform-injiziert (nicht setzen): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 Danach: als Basic-Nutzer auf ein gesperrtes Format → Wand → „Upgrade" →
 `/mitgliedschaft` → Testkarte `4242 4242 4242 4242` → der Webhook hebt `profiles.tier`,
 und der zuvor gesperrte Inhalt wird sichtbar.
+
+## Supabase Edge Function secrets (`send-push`, AGE-641)
+
+`send-push` wird von einem Database Webhook auf `public.notifications` (INSERT)
+angestoßen und vom Wiederholungslauf mit `{"modus":"faellig"}`. Secrets kommen
+wie überall aus Infisical (`supabase secrets set`), plattform-injiziert sind
+`SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`.
+
+Welche Werte es gibt, steht oben in der Server-only-Tabelle. Hier steht, was
+man über sie wissen muss.
+
+### Den Webhook eintragen — die Namen sind verbindlich
+
+Es ist **kein** Database Webhook aus der Konsole. Gemessen am 28.08.: auf DEV
+**und** PROD fehlt das Schema `supabase_functions` ganz — die Konsolen-Webhooks
+wurden auf diesen Projekten nie aktiviert, und darum fehlt im Dashboard auch der
+Menüpunkt. `pg_net` ist dagegen auf beiden installiert. Der Push-Webhook ist
+deshalb ein `net.http_post`-Trigger von Hand, genau wie der Mail-Webhook
+darüber, und besteht wie dieser aus **zwei** Objekten in `public`:
+
+| | |
+| --- | --- |
+| Funktion | `notify_push_webhook` |
+| Trigger | `notifications_push_webhook` auf `public.notifications`, **nur Insert** |
+
+Beide Namen stehen in `ERWARTET_OHNE_MIGRATION`
+(`scripts/db-drift-scan.logic.ts`) und müssen in **beiden** Projekten exakt so
+lauten. Weicht ein Name ab oder fehlt das Objekt, bricht der Objekt-Drift-Scan
+in `migrate-prod.yml` ab; weil `deploy.yml` dann am Migrations-Gate hängen
+bleibt, fällt der Frontend-Deploy **stumm** aus. Die Zusagen in
+`db-drift-scan.test.ts` lesen die Liste selbst, keine Kopie.
+
+Anwenden mit eingesetztem Token — nicht committen, das Repo ist öffentlich:
+
+```sql
+create extension if not exists pg_net;
+
+create or replace function public.notify_push_webhook()
+  returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  perform net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'Authorization', 'Bearer <PUSH_WEBHOOK_SECRET>'),  -- nicht in git
+    body    := jsonb_build_object(
+                 'type', tg_op, 'table', tg_table_name, 'schema', tg_table_schema,
+                 'record', to_jsonb(new)));
+  return null;
+end; $$;
+revoke execute on function public.notify_push_webhook() from public, anon, authenticated;
+
+create trigger notifications_push_webhook
+  after insert on public.notifications
+  for each row execute function public.notify_push_webhook();
+```
+
+Nur `insert`: ein Update an einer Hinweiszeile (etwa `read_at`) erzeugt keinen
+neuen Hinweis. `old_record` entfällt deshalb — `send-push` liest ohnehin nur
+`record.id`, alles Übrige holt die RPC selbst.
+
+**Zuerst ausliefern, dann eintragen.** Den Functions-Deploy macht `deploy.yml`
+erst beim Merge auf `main`, und dann nach DEV **und** PROD. Für eine Probe in
+DEV muss `send-push` vorher von Hand dort liegen — und der Deploy gehört **in
+den Worktree des Branches**: im Haupt-Checkout gibt es weder die Function noch
+ihren `config.toml`-Block, und ohne den Block gilt `verify_jwt = true`. Dann
+weist das Gateway den Webhook mit **401** ab, bevor der Handler seine
+Geheimnisprüfung erreicht.
+
+**In PROD genügt dafür `PUSH_WEBHOOK_SECRET`.** Die Anbieter-Secrets dürfen
+leer bleiben, solange es keine Produktions-App gibt: ohne Zeile in
+`push_tokens` legt `push_auftraege_holen` keinen Auftrag an und beansprucht
+keinen, die RPC kommt leer zurück, und `send-push` antwortet `{"skipped":true}`
+ohne APNs oder FCM je anzufassen
+(`20260827240000_push_zustellung.sql`). Fehlt dagegen `PUSH_WEBHOOK_SECRET`,
+antwortet die Function auf **jeden** Hinweis mit `500`.
+
+### Prüfen, ohne die Konsole
+
+Der Statuscode allein belegt nichts — `send-push` antwortet auch `200`, wenn es
+nichts zuzustellen gab. Diese drei Proben zusammen belegen etwas, und sie
+brauchen den Webhook noch gar nicht:
+
+```bash
+# 1. richtiger Bearer, erfundene Kennung  → 200 {"skipped":true}
+# 2. falscher Bearer                      → 401 Unauthorized
+# 3. {"modus":"faellig"}                  → 200 {"skipped":true}
+```
+
+Probe 2 ist die entscheidende: ohne sie belegt die 200 nicht, dass die
+Geheimnisprüfung überhaupt greift. Und der Wortlaut zählt — `Unauthorized`
+stammt aus `index.ts`, das Gateway antwortet anders. Sonst ist ein
+Gateway-401 (`verify_jwt` steht falsch) von einem Geheimnis-401 nicht zu
+unterscheiden.
+
+Steht der Webhook, ist der Beleg eine **Zeile im Function-Log**, nicht die
+Antwort an den Aufrufer: `{"fn":"send-push","event":"nichts_zu_tun",…}`. Solange
+es keine Zeile in `push_tokens` gibt, ist `nichts_zu_tun` das erwartete
+Ergebnis.
+
+### Der APNs-Schlüssel: drei Fallen
+
+**1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den
+**App-Store-Connect-API-Schlüssel** als auch den **APNs-Auth-Key** als
+`AuthKey_<KEYID>.p8` herunter. Beide sind PKCS#8/P-256 und an Datei, Größe oder
+Inhalt **nicht** zu unterscheiden. Der falsche liefert an jedem Topic
+`403 InvalidProviderToken` — eine Meldung, die nach kaputten Zugangsdaten
+aussieht und in Wahrheit die falsche Sorte meint.
+
+Sie entstehen an verschiedenen Stellen im Portal:
+
+| Sorte | Wo sie entsteht |
+| --- | --- |
+| App Store Connect API | Users and Access → Integrations → App Store Connect API |
+| **APNs Auth Key** | Certificates, Identifiers & Profiles → **Keys** → Haken bei *Apple Push Notifications service* |
+
+Das hat am 28.08. eine Stunde gekostet. Wer einen `.p8` archiviert, schreibt die
+**Sorte in den Titel**, nicht bloß die Key-ID.
+
+**2. Apple gibt die Datei genau einmal heraus.** Es gibt keinen zweiten
+Download. Geht sie verloren, bleibt nur Widerrufen und Neuanlegen. Das Archiv
+ist darum **1Password**, nicht Infisical — Infisical ist die Laufzeit und kein
+Backup. `.p8` steht in `.gitignore`, weil dieses Repo öffentlich ist und ein
+versehentlicher Push eine Rotation im Apple-Portal bedeutete, kein `git rm`.
+
+Ein ASC-Schlüssel braucht zusätzlich die **Issuer-ID** (eine UUID). Sie steht
+**nicht** in der `.p8` und ist aus ihr nicht ableitbar — ohne Notiz ist der
+Schlüssel wertlos.
+
+**3. Zwei Einstellungen sind nach dem Speichern unveränderlich.** Gewählt:
+
+- **Environment: Sandbox & Production.** TestFlight und der Store laufen über
+  Produktions-APNs; ein Sandbox-Schlüssel wäre genau dort tot, und man hat je
+  Team nur zwei aktive Schlüssel.
+- **Key Restriction: Team Scoped (All Topics).** `Topic Specific` verlangt eine
+  App-ID, die es zum Anlagezeitpunkt schon gibt — und die Einstellung ließe
+  sich nie wieder korrigieren. Preis: ein abhandengekommener Schlüssel dürfte
+  an jede App des Teams pushen.
+
+### Die Zugangsdaten prüfen — ohne App und ohne Gerät
+
+Man muss auf AGE-642 nicht warten, um zu wissen, ob die Zugangsdaten stimmen.
+Ein Push an ein **erfundenes** Gerätetoken kann niemanden erreichen;
+interessant ist allein, **wie** Apple ablehnt:
+
+| Antwort | Bedeutung |
+| --- | --- |
+| `400 BadDeviceToken` | **Alles richtig.** Apple hat uns authentifiziert und nur das Token verworfen |
+| `403 InvalidProviderToken` | Schlüssel, Key-ID oder Team-ID passen nicht — oder es ist die falsche Sorte |
+| `400 TopicDisallowed` | Die App-ID gibt es nicht oder sie hat kein Push aktiviert |
+
+Das misst den ganzen Zugangsweg: JWT-Signatur, PEM-Einlesung, Kopfzeilen und
+Anfragekörper. **Nicht** gemessen wird damit, ob die App-ID existiert — APNs
+prüft das Gerätetoken **vor** dem Topic, ein erfundenes Token kommt also nie
+bis zur Topic-Prüfung.
+
+Eine zweite Bundle-ID desselben Teams als **Positivkontrolle** mitzuschicken
+lohnt sich: ohne sie ist „Zugangsdaten falsch" nicht von „App-ID fehlt" zu
+trennen.
+
+### DEV und PROD
+
+Derselbe `.p8` gehört in **beide** Umgebungen. Apple kennt keinen
+umgebungsspezifischen Auth-Key — er gilt teamweit, und mit der Einstellung
+*Sandbox & Production* bedient er beide Hosts. Byte-gleich ist hier also kein
+Versäumnis, sondern unvermeidbar (anders als bei Stripe und Resend, siehe die
+Trennungsregel oben).
+
+Unterschiedlich ist genau **ein** Wert: `APNS_SANDBOX=1` in `dev`, in `prod`
+gar nicht gesetzt.
+
+> ⚠️ Zeigt ein Entwicklungs-Build auf **PROD**, schickt PROD ein Sandbox-Token
+> an den Produktions-Host. Apple antwortet `BadDeviceToken`, und `send-push`
+> stuft das korrekt als `dauerhaft` ein — es **löscht das Gerätetoken**. Beim
+> nächsten App-Start heilt sich das über `claim_push_token`, sieht aber wie ein
+> Fehler aus. Dev-Builds gehören auf DEV.
+
+### Der Firebase-Dienstschlüssel: die Organisationsrichtlinie
+
+Firebase braucht es **nur für Android**. iOS spricht direkt mit APNs —
+absichtlich: der übliche Weg, iOS durch FCM zu leiten, hiesse, den APNs-Key bei
+Google zu hinterlegen.
+
+Die Play-Console-Bestätigung blockiert das **nicht**. Sie regelt die Verteilung
+im Store; FCM braucht nur ein Firebase-Projekt, und ein seitlich installiertes
+Debug-APK bekommt Push ohne jede Store-Freigabe.
+
+**Was tatsächlich blockiert, ist Google Cloud.** In Workspace-Organisationen ist
+das Anlegen von Dienstkontoschlüsseln seit ~2024 per Vorgabe gesperrt; die
+Firebase-Konsole meldet dann nur „Das Erstellen von Schlüsseln ist für dieses
+Dienstkonto nicht zulässig". Es sind **zwei** Richtlinien, und beide müssen für
+das Projekt auf *nicht erzwungen*:
+
+| Einschränkung | |
+| --- | --- |
+| `iam.disableServiceAccountKeyCreation` | die klassische |
+| `iam.managed.disableServiceAccountKeyCreation` | die neuere „managed"-Variante |
+
+Nicht zu verwechseln mit `iam.managed.disableServiceAccountApiKeyCreation` —
+die regelt API-Key-Bindungen und ist eine andere Sache.
+
+Nur für **dieses Projekt** überschreiben, nicht organisationsweit abschalten:
+langlebige Dienstkontoschlüssel sind genau die Sorte Geheimnis, gegen die die
+Richtlinie gedacht ist. Das Überschreiben braucht `roles/orgpolicy.policyAdmin`
+auf **Organisationsebene** — Projekt-Inhaber reicht nicht, und
+Workspace-Super-Admin ist nicht dasselbe wie Cloud-Organisationsadministrator.
+Die Änderung propagiert nicht sofort.
+
+Die Probe funktioniert wie bei Apple, mit einem erfundenen Gerätetoken:
+
+| Antwort | Bedeutung |
+| --- | --- |
+| `400 INVALID_ARGUMENT` | **Alles richtig.** Authentifiziert, nur das Token verworfen |
+| `401 UNAUTHENTICATED` | Dienstkonto oder Signatur stimmen nicht |
+| `403` mit „API has not been used in project…" | Die FCM-API ist im Projekt nicht aktiviert |
+
+### Was noch fehlt
+
+- **Die Anbieter-Secrets in `prod`** — bewusst noch leer, solange es keine
+  Produktions-App gibt. **Nicht mehr leer bleiben darf `PUSH_WEBHOOK_SECRET`**,
+  sobald der PROD-Webhook steht: siehe „Den Webhook eintragen".
+- **Die Zustellung an ein echtes Gerät.** Beide Anbieter sind gegen ihre echten
+  Endpunkte belegt; was fehlt, ist ein Gerätetoken, und das setzt AGE-642 B1
+  voraus.

@@ -244,10 +244,16 @@ export default function EinstellungenPage() {
         />
       </Card>
 
-      {/* AGE-620. Eine eigene Karte, nicht vier weitere Zeilen in der obigen:
-          die drei darüber verschicken E-Mail, diese vier bleiben in der
-          Anwendung. Eine Überschrift, die beides zusammenwirft, ließe ein
-          Mitglied glauben, es schalte Post ab. */}
+      {/* AGE-641 (war AGE-620). Eine eigene Karte, nicht sechs weitere Zeilen in
+          der obigen: die drei darüber verschicken E-Mail, diese sechs bleiben in
+          der Anwendung. Eine Überschrift, die beides zusammenwirft, ließe ein
+          Mitglied glauben, es schalte Post ab.
+
+          Titel und Beschreibung sagen heute „nur hier in der Anwendung", und das
+          ist WAHR, solange kein Gerät zustellen kann. Mit Phase B von AGE-641
+          wird es falsch — dann steuern dieselben Schalter auch den Push, und
+          beide Texte müssen mit. Nicht vorher: eine Beschreibung, die eine
+          Zustellung ankündigt, die es noch nicht gibt, ist genauso falsch. */}
       <Card className="flex flex-col gap-2">
         <CardTitle>Hinweise in der Glocke</CardTitle>
         <CardDescription>
@@ -255,26 +261,38 @@ export default function EinstellungenPage() {
         </CardDescription>
         <ToggleRow
           label="Wenn jemand einen Beitrag schreibt"
-          checked={settings.notify_inapp_post}
-          onChange={(v) => toggle("notify_inapp_post", v)}
+          checked={settings.notify_app_post}
+          onChange={(v) => toggle("notify_app_post", v)}
           disabled={save.isPending}
         />
         <ToggleRow
           label="Wenn ein Event angelegt wird"
-          checked={settings.notify_inapp_event}
-          onChange={(v) => toggle("notify_inapp_event", v)}
+          checked={settings.notify_app_event}
+          onChange={(v) => toggle("notify_app_event", v)}
           disabled={save.isPending}
         />
         <ToggleRow
           label="Wenn jemand meinen Beitrag kommentiert"
-          checked={settings.notify_inapp_comment}
-          onChange={(v) => toggle("notify_inapp_comment", v)}
+          checked={settings.notify_app_comment}
+          onChange={(v) => toggle("notify_app_comment", v)}
           disabled={save.isPending}
         />
         <ToggleRow
           label="Wenn jemandem mein Beitrag gefällt"
-          checked={settings.notify_inapp_like}
-          onChange={(v) => toggle("notify_inapp_like", v)}
+          checked={settings.notify_app_like}
+          onChange={(v) => toggle("notify_app_like", v)}
+          disabled={save.isPending}
+        />
+        <ToggleRow
+          label="Wenn mir jemand schreibt"
+          checked={settings.notify_app_message}
+          onChange={(v) => toggle("notify_app_message", v)}
+          disabled={save.isPending}
+        />
+        <ToggleRow
+          label="Kontaktanfragen und Antworten darauf"
+          checked={settings.notify_app_contact}
+          onChange={(v) => toggle("notify_app_contact", v)}
           disabled={save.isPending}
         />
       </Card>

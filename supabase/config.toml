@@ -541,6 +541,20 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# send-push (AGE-641): stellt einen Hinweis als Push zu, angestossen von einem
+# Database Webhook auf public.notifications (INSERT) und vom Wiederholungslauf
+# mit {"modus":"faellig"}. Ein DB-Webhook traegt kein Nutzer-JWT, also ist die
+# Pruefung aus — genau wie bei notify-contact-request und aus demselben Grund;
+# die Function prueft stattdessen ein gemeinsames Geheimnis
+# (Authorization: Bearer $PUSH_WEBHOOK_SECRET) in konstanter Zeit.
+#
+# Ohne diesen Block gilt die Vorgabe verify_jwt = true, und dann weist das
+# Gateway den Webhook mit 401 ab, BEVOR der Handler seine Geheimnispruefung
+# ueberhaupt erreicht. Bewacht von scripts/functions-config.test.ts.
+[functions.send-push]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

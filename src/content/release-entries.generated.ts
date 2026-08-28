@@ -5,6 +5,67 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-08-28-sidebar-pill",
+    datum: "2026-08-28",
+    titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",
+    linear: "AGE-638",
+    aenderungen: [
+      "**Ein Bauteil statt zweier.** Ein halber Pill am Innenrand jeder Leiste, der über die Kante hinausragt, gespiegelt an beiden. Er klappt ein und aus.",
+      "**Oben an beiden**, auf Höhe der Kopfzeile (Donalds Entscheidung).",
+      "**Immer sichtbar**, nicht erst beim Darüberfahren.",
+      "**Die untere Einklapp-Zeile links entfällt.** Die Feedback-Zeile darüber bleibt, wo sie ist — sie kam in AGE-566 aus einem eigenen Grund dorthin.",
+      "**Die Sprechblase im eingeklappten rechten Rail bleibt klickbar.** Sie ist zugleich der Ungelesen-Melder, den `design-system/spec.md:1372` verlangt; eine grosse Fläche, die aussieht wie ein Knopf und nicht reagiert, wäre schlechter als eine Redundanz. Der Pill ist das **einheitliche** Bauteil, nicht das einzige.",
+    ],
+  },
+  {
+    slug: "2026-08-28-release-notes-modal",
+    datum: "2026-08-28",
+    titel: "Release-Notes im zentrierten Modal lesen, mit Screenshots",
+    linear: "AGE-632",
+    aenderungen: [
+      "Eine Release-Note auf `/neues` ist anklickbar und öffnet sich **mittig als Modal**, mit Scroll-Sperre und Fokus-Falle.",
+      "Eine Release-Note kann **Bilder** tragen. Sie hängen am archivierten Change, entstehen zur Bauzeit wie die Eintragsliste selbst und werden mit dem Bündel ausgeliefert — kein Upload-Weg, keine Migration, kein Bucket.",
+      "Der Hinweis in der Glocke führt weiterhin auf `/neues`, aber mit **geöffneter** Note statt auf die blosse Liste.",
+      "Die Liste bleibt, was sie ist: alle zugestellten Notes, das Jüngste zuerst.",
+    ],
+  },
+  {
+    slug: "2026-08-28-rail-breakpoint-xl",
+    datum: "2026-08-28",
+    titel: "Die rechte Leiste dockt an `xl` an — auch dort, wo die Spec noch `lg` sagt",
+    linear: "AGE-652",
+    aenderungen: [
+      "Einer bindet die Schwelle an die Anforderung, die sie festlegt.",
+      "Einer trennt die **gespeicherte Vorliebe** von ihrer **angedockten Darstellung**. Nur die zweite ist breitengebunden; Persistenz, Trennung vom Zustand der Navigation und die Toleranz gegenüber fehlendem Speicher gelten bei jeder Breite. Ohne diesen Absatz las sich der erste so, als sei unterhalb von `xl` auch die Vorliebe ausser Kraft — beide Reviewer haben genau das gelesen.",
+    ],
+  },
+  {
+    slug: "2026-08-28-neuigkeiten-archiv",
+    datum: "2026-08-28",
+    titel: 'Neuigkeiten-Fläche: ein Archiv für Zugestelltes und für „nicht relevant"',
+    linear: "AGE-636",
+    aenderungen: [
+      '**Ein Eintrag steht in genau einem von zwei Zuständen: offen oder archiviert.** Archiviert wird er auf zwei Wegen — durch **Zustellung** (endgültig) oder durch die Markierung **„nicht relevant"** (rücknehmbar).',
+      '**Ein zweites Kästchen je Zeile: „nicht relevant".** Es nimmt den Eintrag aus der Liste *und* aus der laufenden Auswahl — ein Eintrag, den man gerade als belanglos markiert, darf nicht angehakt im Entwurf landen.',
+      "**Eine neue Tabelle `release_entry_skips`** hält die markierten Slugs. Ein Slug, ein Admin, ein Zeitpunkt — mehr nicht.",
+      '**Ein aufklappbares Archiv** unter der Liste, zugeklappt beginnend, mit der Zahl im Kopf. Es nennt zu jedem Eintrag den Grund und trägt bei „nicht relevant" den Weg zurück.',
+      '**`teileAuf()` ersetzt `nochNichtAngekuendigt()`**: dieselbe Rechnung, aber sie gibt **beide** Hälften zurück statt nur der einen. Die Zusage „ein Entwurf darf nichts verstecken" bleibt wörtlich erhalten und wird weiter geprüft.',
+    ],
+  },
+  {
+    slug: "2026-08-28-admin-setzt-stufe",
+    datum: "2026-08-28",
+    titel: "Ein Admin setzt die Stufe eines einzelnen Mitglieds",
+    linear: "AGE-634",
+    aenderungen: [
+      "Eine neue `SECURITY DEFINER`-RPC `admin_set_tier(p_profile_id, p_tier, p_grund)`, die `is_admin()` im Rumpf prüft und **in beide Richtungen** setzt.",
+      "Jede Änderung schreibt eine Zeile nach `public.admin_audit` — mit alter Stufe, neuer Stufe und Begründung. Ohne sie ist eine Stufe, die nicht aus Stripe stammt, später nicht erklärbar.",
+      'Eine Begründung ist **Pflicht**. Eine Spur ohne Grund beantwortet „wer und wann", aber nicht „warum" — und genau das ist die Frage, die man drei Monate später stellt.',
+      "Die Fläche sitzt in der Einzelbearbeitung eines Mitglieds und benennt, was Stripe später damit tut.",
+      'Der Kommentar an `apply_upgrade` wird nachgezogen: „der einzige Schreibweg für den Tier" stimmt danach nicht mehr.',
+    ],
+  },
+  {
     slug: "2026-08-27-video-freigabe-merken",
     datum: "2026-08-27",
     titel: "Video-Freigabe merken statt bei jedem Video erneut fragen",
