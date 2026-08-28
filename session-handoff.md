@@ -1,180 +1,127 @@
-# Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung)
+# Session Handoff — 2026-08-28 (Nachmittag, AGE-641 Phase A abgeschlossen)
 
-Vier Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
-verlangte; **AGE-652** durch die volle Schleife; die **Worktree-Rückfragen
-dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat; und den
-**Dependabot-Stau aufgelöst**, der seit dem 14.08. stand.
-
-| Vorgang | Stand |
-| --- | --- |
-| **AGE-632/634/636/638** archiviert (#260) | ✅ `a08d909`, alle 11 check-runs grün |
-| **AGE-652** Spec-Drift `lg` → `xl` (#262) | ✅ `7939f08`, Linear auf Done |
-| **Dependabot** #247 · #248 · #185 | ✅ `c671988` · `2d7d2cb` · `d79daa7` |
-| Übergaben #261 · #263 | ✅ `c540f4b` · `76694d0` |
-| **#186** framer-motion 12 → 13 | ✅ `bfdffc2`, im Browser gegen 12 gemessen |
-| **AGE-651** Blase frisst das Kuvert | ⛔ **Canceled** (Donald: Kosmetik) |
-| **AGE-653** Dependabot ⇄ `deno.lock` | 🆕 Backlog, Ursache belegt, Fix offen |
-| Worktree-Erreichbarkeit + stale `main` | ✅ dauerhaft behoben, gemessen |
-| **Deploy auf `main`** | ✅ `ebe64da`, alles grün — zwischenzeitlich blockiert |
+**Worktree:** `fbc-platform.donald-age-641-push-fundament`, Branch
+`donald/age-641-push-fundament`. **PR #268 ist offen** (`72ce1d1`), CI lief beim
+Schreiben dieser Zeilen noch. **Phase A von AGE-641 ist vollständig** — der
+letzte offene Punkt (A5b, `pg_cron`) ist gebaut und auf DEV **und** PROD
+gemessen.
 
 ## Accomplished
 
-**`openspec/changes/` ist aufgeräumt.** Es lagen **vier** unarchivierte Changes
-da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen, und
-ausgerechnet der trug den einzigen offenen Haken. Übrig sind nur die fünf
-`add-*`-Vorhaben, zu Recht: sie tragen nur offene Aufgaben.
+**Der Wiederholungslauf stösst sich selbst an.** Von Hand in beiden Datenbanken,
+weil der Bearer nicht ins öffentliche Repo gehört (Vorlage: `docs/secrets.md`):
+`create extension pg_cron` (1.6.4), `public.push_wiederholung()` als
+`security definer` mit leerem `search_path`, `revoke execute` von den
+Client-Rollen, cron-Eintrag `push-wiederholung`.
 
-**Der offene Haken aus AGE-638 ist nachgemessen.** Der Rail wird von einer
-mehrstelligen Zahl **nicht** gesprengt, auch vierstellig nicht: `-right-0.5`
-nagelt die rechte Kante fest, die Blase wächst nach links. Gefunden hat die
-Messung etwas anderes — die Blase verdeckt das Kuvert, zweistellig zur Hälfte,
-vierstellig ganz. Als **AGE-651** notiert und von Donald als Kosmetik
-**abgeschlossen**; die Messtabelle bleibt dort stehen.
+`net.http_post` ist **asynchron** — ein `succeeded` im cron-Protokoll sagt nur,
+dass das SQL lief. Deshalb zwei getrennte Belege je Seite:
 
-**AGE-652 ist gebaut, nicht nur behauptet.** Zwei Anforderungen in derselben
-Datei widersprachen einander, beide mit `SHALL`. Abgeglichen wurde **Spec gegen
-Spec** — die Autorität ist die neuere, begründete Anforderung, nicht der Code.
-Sonst wäre es die Red-Flag-Zeile „a spec delta edited to match the code".
+| | DEV | PROD |
+| --- | --- | --- |
+| Extension, Funktion, `revoke` | ✅ | ✅ |
+| **Rumpf** — neue `net._http_response`-Zeile gegen vorher festgehaltene `max(id)` | 10 > 9 | 36 > 35 |
+| **Takt** — zwei aufeinanderfolgende Minuten | 11:40:00 + 11:41:00 | 11:40:00 + 11:41:00 |
+| Objekt-Drift-Scan | grün | grün |
 
-**framer-motion 13 ist im Browser gegen 12 gemessen, nicht per Test
-abgenickt** — `src/test/setup.ts` stubbt `IntersectionObserver` und `matchMedia`
-aus, ausdrücklich „ohne dass Animationen geprüft werden". Beide Fassungen alle
-25 ms abgetastet, alle vier erreichbaren Bewegungsstellen deckungsgleich; die
-riskanteste (`layoutId`, 14 Positionen 217,4 → 254) auf die Nachkommastelle.
-Entscheidend war, **Zwischenwerte** zu messen — ein Endzustand belegt keine
-Bewegung. Zahlen im Kommentar an PR #186. Vorher geprüft, **wogegen** gemessen
-wird: zwischen Branch und `main` unterschied sich keine einzige Quelldatei.
+Ohne die Grundlinie hätte die `200`-Zeile der Webhook-Probe **vom selben
+Vormittag** als Beleg getaugt, ohne einer zu sein.
+
+**Dem Spec-Delta fehlte die Anforderung.** Er verlangte, dass ein beanspruchter
+Auftrag eine Frist trägt, und setzte „den Wiederholungslauf" in einem Szenario
+*voraus* — dass ihn jemand **wiederkehrend anstösst**, stand nirgends. Genau die
+Lücke, durch die A5b abhakbar gewesen wäre, ohne dass etwas läuft.
+
+**Vier Korrekturen aus der Code-Review** (opencode, FREIGABE MIT AUFLAGEN, kein
+Code-Fehler) — alle als Korrektur sichtbar gemacht, nicht still ersetzt:
+
+1. **Der Takt war falsch begründet und deshalb falsch gewählt.** Zwei Fristen
+   verwechselt: **Rückstellung** nach Fehlschlag ist `now() + 1 min · 2^versuche`
+   (`20260827240000:312`, also 1-2-4-8-16), die **Anspruchsfrist** ist
+   `now() + 5 min` (`20260828100000:110,179`). `*/5` hätte die ersten zwei Stufen
+   verschluckt. Jetzt `* * * * *`.
+2. **„Ein roter Objekt-Drift-Scan lässt den Deploy stumm ausfallen" ist falsch**
+   — und stand schon länger in `db-drift-scan.test.ts`. `db-drift-scan.ts` läuft
+   nur in `migrate-prod.yml` (`workflow_dispatch`); `deploy.yml` fährt
+   `migration-drift-gate.ts`, ein anderes Gate.
+3. Zurückgestellt wird von `push_zustellung_quittieren`, nicht von der Tabelle.
+4. Der Scan prüft auch **Views**; Zeilenverweis `61-90`.
+
+**Sicherheitsbefund für alle drei Funktionen dieser Sorte:** `anon` und
+`authenticated` lesen den Rumpf per `pg_get_functiondef()` samt Bearer —
+`revoke execute` schützt das Ausführen, nicht das Lesen. Über die Client-Fläche
+nicht erreichbar (`404 PGRST202`), Positivkontrolle daneben:
+`POST /rpc/push_wiederholung` → `401 42501 permission denied`.
+
+**Der Worktree wurde mitten in der Sitzung von aussen gelöscht** (Aufräum-Sitzung
+`fbc-platform-f4`, 13:17). Über `wt switch` zurückgeholt; zwei ungesicherte
+Dateien neu geschrieben und gegen die Sicherung der anderen Sitzung gediffed —
+inhaltlich deckungsgleich.
 
 ## Decisions
 
-- **Spec-only-Korrekturen laufen über einen vollen Change**, nicht als Handedit
-  in `openspec/specs/`. Präzedenz: AGE-579 (`d071ddc`).
-- **Ein `MODIFIED`-Block bekräftigt alles, was in ihm steht.** Darum wurden zwei
-  *bestehende* Falschaussagen im selben Szenario mitkorrigiert: Stehenlassen
-  wäre dort keine Zurückhaltung, sondern eine Bekräftigung unter neuem Datum.
-- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert** — sonst
-  889 Zeilen Kosmetik im Diff. Nie `pnpm format`.
-- **Kein Linear-Statuswechsel von Hand**, obwohl ein Reviewer ihn forderte. Die
-  GitHub-Automation schaltet In Progress/Done — bei AGE-652 beobachtet.
-- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl), so
-  bleiben die neun bestehenden erreichbar.
+- **Takt `* * * * *`, von Donald ausdrücklich so entschieden** gegen die zwei
+  Alternativen (Drosseln auf `*/5`, Job abschalten). Grund: die entworfene
+  Staffelung 1-2-4-8-16 soll wirklich greifen. Preis: ~1440 Aufrufe je Tag und
+  Projekt, alle `{"skipped":true}`, solange `push_tokens` leer ist.
+- **`push_wiederholung` als benannte Funktion statt `net.http_post` inline im
+  cron-Kommando.** Spiegelt das Webhook-Paar, hält den Bearer aus `cron.job`
+  heraus und gibt dem Drift-Scan einen Griff auf wenigstens die Funktions-Hälfte.
+- **Nicht als Migration.** `create extension` ist ein Eingriff in die Instanz,
+  den der lokale Stack nicht validieren kann; ein Fehlschlag in einer Migration
+  bräche `migrate-prod`.
+- **Nicht archiviert.** Der Change trägt auch Phase B (AGE-642).
+- **Die Wegwerf-Skripte sind gelöscht** (`wire-`, `mess-`, `reschedule`,
+  `rumpf-lesbar`). Durable ist nur `scripts/probe-age641-pg-cron.ts`; die
+  Wiederherstellungs-Vorlage steht in `docs/secrets.md`, wie beim Webhook.
 
 ## Files modified
 
-- `openspec/changes/archive/2026-08-28-{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill,rail-breakpoint-xl}/`
-- `openspec/specs/{admin,notifications,design-system}/spec.md`
-- `src/content/release-entries.generated.ts` — fünf Einträge dazu
-- `package.json` + beide Sperrdateien — 18 Pakete, über drei Dependabot-Merges
-- **Maschinenkonfiguration** (nicht im Repo): `~/.claude/settings.json`
-  (`additionalDirectories`, Sicherung `.bak-2026-08-28`) und
-  `~/.config/worktrunk/config.toml` (`[pre-switch] sync-main`)
-
-## Der Dependabot-Stau, aufgelöst
-
-Alle vier PRs standen seit dem 14.08., und **keiner scheiterte an seiner
-Abhängigkeit** — alle an `deno test --frozen` (`ci.yml:82`): mangels `deno.json`
-faltet Deno 2 die Wurzel-`package.json` samt Versionsbereichen in `deno.lock`,
-und genau die hebt Dependabot. Freigemacht mit `deno install --frozen=false` je
-Branch. Ursache als **AGE-653** notiert, nicht gebaut.
-
-Zwei Fallen, als Memory abgelegt: die Branch-Protection verlangt zusätzlich
-**„aktuell zur Basis"** (Pflichtchecks sind `verify`, `migrations`, `pr-title`,
-`edge-functions` — **`deploy` ist keiner**), und Dependency-PRs gehen **nur
-nacheinander**, weil ihre Sperrdateien beim Nachziehen kollidieren.
-
-## Bewusst nicht getan
-
-**AGE-653 ist angelegt, aber nicht gebaut** — abweichend von Donalds Wahl
-„gleich mitmachen", ausgesprochen statt verschwiegen. Der saubere Fix wäre ein
-`deno.json` in `supabase/functions/`; das ist eine **CI-Änderung**, und die haben
-`main` hier schon zweimal rot gemacht. `--frozen` sichert laut `ci.yml:73`
-ausdrücklich mit ab, dass `deno.lock` zum Code passt. Gehört durch die Schleife
-mit Plan-Review, nicht ans Ende einer Sitzung mit sieben Merges.
-
-Und **PROD haben wir nicht angefasst** — weder `migrate-prod` ausgelöst noch
-Secrets oder Webhooks gesetzt, obwohl es den Deploy entriegelt hätte. Der
-Workflow wendet ohne Rückfrage an, und es war die Fläche der AGE-641-Sitzung.
-Sie hat es selbst gemacht, mit der Freigabe ihres Nutzers.
+- `scripts/probe-age641-pg-cron.ts` — **neu**, lesende Probe je Seite; sieht die
+  cron-Hälfte, die der Drift-Scan nicht sieht
+- `scripts/db-drift-scan.logic.ts` — `push_wiederholung` in
+  `ERWARTET_OHNE_MIGRATION`; „in der Konsole" → „per SQL" richtiggestellt
+- `scripts/db-drift-scan.test.ts` — Zusage auf den neuen Namen (RED gemessen,
+  Positivkontrolle schlug an); die falsche deploy.yml-Kopplung korrigiert
+- `docs/secrets.md` — Vorlage, zwei-Fristen-Tabelle, Gate-Abgrenzung, der
+  Befund zur Lesbarkeit des Funktionsrumpfs
+- `openspec/changes/push-fundament/specs/notifications/spec.md` — neue
+  SHALL-Klausel + Szenario, samt Abgrenzung gegen „SHALL NOT abfragen"
+- `openspec/changes/push-fundament/tasks.md` — A5b abgeschlossen, Kopf
+  neu gefasst, vier Betriebsrisiken als eigene Vorgänge notiert
 
 ## Next session: start here
 
-**`main` ist ausgeliefert, alles ist durch** — `ebe64da` trägt jeden Job grün,
-`drift-gate`, `functions` und beide `deploy` eingeschlossen. `bfdffc2`
-(framer-motion 13) ist damit mit live.
+**Zuerst PR #268 prüfen.** Beim Schreiben lief CI noch. Grün heisst: die vier
+Pflichtchecks auf der HEAD-SHA `72ce1d1` — über `check-runs` auf der SHA lesen,
+nicht über `gh run list`. Bei Grün mergen (Freigabe steht generell), danach
+`gh pr view --json state` gegenprüfen, ein `gh pr merge` kann still fehlschlagen.
 
-Der Weg dorthin, weil er sich wiederholen wird: die sechs Push-Migrationen aus
-AGE-641 lagen zwischenzeitlich auf `main`, aber nicht in PROD — `drift-gate`
-rot, `functions` und `deploy` übersprungen. Aufgelöst von der AGE-641-Sitzung
-mit `Migrate PROD` (`plan` + `apply` grün) und danach
-`gh run rerun 33164048264 --failed`, **nach** dem SHA-Abgleich
-`origin/main == Lauf-SHA`. Ohne diesen Abgleich liefert ein Re-Run das Frontend
-eines älteren Commits aus und rollt es still zurück.
+**`migrate-prod` ist danach NICHT nötig** — dieser PR trägt keine Migration. Der
+Objekt-Drift-Scan ist gegen beide Seiten schon grün gelaufen.
 
-Davor hatte dieselbe Sitzung am Vormittag den **DEV**-Stau ausgelöst, indem sie
-ihre Migrationen auf die geteilte DEV-Datenbank spielte, bevor ihr Branch auf
-`main` war. Beides steht als Memory-Eintrag.
-
-**Es hängt an zwei Antworten von Donald, nicht an Arbeit:** **AGE-628**
-(Feedback: Thema, Screenshot, Filter, Chat-Sprung) — der Issue existiert und
-deckt alle Punkte, **ein Change fehlt**. Baubar erst mit der Themenliste und der
-Entscheidung, was beim Chat-Sprung mit **anonymem** Feedback passiert (AGE-588
-steht dafür offen) und ob ein Admin die Kontaktanfrage-Hürde überspringen darf —
-letzteres wäre eine Ausnahme im Zugangsmodell und gehört ausgesprochen. Und
-**AGE-653**: bauen oder liegen lassen.
-
-Ohne diese Antworten sind **AGE-645** (Emoji, klein, keine Migration) oder
-**AGE-646** (Antworten, eine Spalte) die nächsten baubaren Vorgänge.
-
-**Dieser Worktree kann weg.** Er heisst `fbc-platform.neuigkeiten-archiv` nach
-einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt.
+**Danach ist Phase B dran, und die gehört AGE-642** (Capacitor-Hülle,
+Worktree `fbc-platform.donald-age-642-capacitor-huelle`). Ohne sie gibt es kein
+Gerätetoken, und ohne Gerätetoken bleibt `push_tokens` leer.
 
 ## Open questions
 
-- **Die erste Release-Note ist weiterhin nicht zugestellt** (Donald bzw. Detlev;
-  sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt fünf
-  Einträge mehr — darunter den von AGE-652, der eine interne Spec-Korrektur ist
-  und beim Zustellen ein Kandidat für „nicht relevant" wäre.
-- Unverändert offen: AGE-645/646/647/648 · AGE-610 · AGE-512 ·
-  Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
-  AGE-256 · AGE-606 · AGE-629/630 · die Threadliste markiert offene
-  Chatfenster nicht · `community-feed/spec.md:6` verspricht „threaded comments",
-  `public.comments` hat kein `parent_id`.
-
-## Was diese Sitzung gelernt hat
-
-Die dauerhaften Lehren liegen als Memory-Einträge; hier nur das Nötige.
-
-**Fremde Augen haben zweimal mehr gefunden als eigene.** In AGE-652 fanden drei
-Reviewer (gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
-REQUEST-CHANGES) zwei HIGH-Befunde, davon **einen unabhängig doppelt** — der
-schärfste war, dass meine Messung den Erstbesuch gar nicht belegte, weil
-`fbc.chatCollapsed` auf `"1"` stand. Und die Nachbarsitzung korrigierte gleich
-zwei meiner Aussagen (gestapelte Lint-Kommentare gelten beide der nächsten
-Zeile; ein `deno.lock`-Konflikt entsteht nur bei Branches, die selbst
-`package.json` anfassen).
-
-**Drei Messfallen**, als Memory abgelegt: `resize_page` ist wirkungslos
-(`innerWidth` blieb stumm bei 1688, ohne Fehler); eine Schwelle belegt man an
-der Kante (1279/1280); und `git checkout <branch> -- <datei>` wirft
-Ungesichertes weg.
-
-**Und eine eigene Überwachung kann zu eng gebaut sein.** Meine meldete
-„Entwarnung", weil sie nur `migrate-dev` prüfte — während `drift-gate` rot war
-und der Deploy übersprungen wurde. Die Erfolgsbedingung muss das sein, worauf es
-ankommt, nicht der Job, der zuletzt gestört hat.
-
-## Umgebung
-
-**Worktrees sind dauerhaft erreichbar** — `~/Sourcecode` steht in
-`permissions.additionalDirectories`, und `[pre-switch] sync-main` in
-`~/.config/worktrunk/config.toml` zieht die lokale `main` vor jedem neuen
-Worktree nach. Beides gemessen. Weiterhin gilt: `wt switch --create …
---no-cd --format=json`, dann `cd` auf den `path`; `EnterWorktree` schlägt bei
-Geschwister-Worktrees fehl. **`switch.base` in der wt-Config gibt es nicht** —
-wt nimmt den Schlüssel an und ignoriert ihn.
-
-Lokaler Stack: `anna@chattest.invalid` / `Testchat2026!` (siehe
-`scripts/chat-testkonten.ts`), ein Gespräch. Die Probennachrichten dieser Sitzung
-sind wieder weg. Vite lief auf 5310 und 5311, `localhost`, nicht `127.0.0.1`.
-Für Skripte im Scratchpad: `node_modules` dorthin symlinken, sonst findet `tsx`
-kein `pg`; und `.mts` statt `.ts` wegen Top-Level-`await`.
+- **Die App-ID `com.effbeezee.app` ist unbestätigt.** APNs prüft das Gerätetoken
+  **vor** dem Topic; zeigt sich erst am echten Gerät (AGE-642 B1).
+- **Die Anbieter-Secrets in `prod` sind bewusst leer.** Mit dem ersten echten
+  Gerätetoken müssen sie stehen.
+- **Vier Betriebsrisiken aus der Review**, in `tasks.md` notiert: ein
+  `db reset` tilgt den Lauf lautlos (DEV hat gar keinen Wächter) · ein
+  dauerhafter 401/502 bleibt unsichtbar, weil cron `succeeded` meldet ·
+  `net._http_response` wächst ungeräumt (~1440 Zeilen/Tag/Projekt) · das
+  Gesundheitssignal `{"skipped":true}` verfällt mit Phase B.
+- **`display_name_test.sql` steht in keiner CI-Dateiliste** (20 auf der Platte,
+  19 in `ci.yml`). Eine Zeile, eigener Vorgang.
+- **Ein Glocken-Hinweis je GESPRÄCH, nicht je Nachricht** — Entscheidung vom
+  27.08., Bestätigung offen.
+- **Abschnitt 4 des Issues ist mit Detlev nicht abgestimmt.**
+- Von der Nachbarsitzung gemeldet: **AGE-655** (`fetchMessages`,
+  `src/lib/chat.ts:320`, lädt ohne `limit`/`range`), **AGE-653**
+  (`deno.json` nach `supabase/functions/`).
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
+  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
