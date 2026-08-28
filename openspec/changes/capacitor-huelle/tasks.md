@@ -235,19 +235,78 @@ allein und zuerst.
 
 ### B2. Der Wächter gegen native Geheimnisse im öffentlichen Repo
 
-- [ ] **RED**: Test — der Wächter meldet eine Keystore-Datei, die im
+- [x] **RED**: Test — der Wächter meldet eine Keystore-Datei, die im
       Arbeitsbaum liegt, und bricht ab. *Negativbefund braucht eine
       Positivkontrolle:* ohne die Datei muss derselbe Lauf grün sein, sonst ist
       ein Wächter, der immer bricht, von einem, der prüft, nicht zu
       unterscheiden.
-- [ ] **RED**: Test — er prüft den **Baum**, nicht den Diff: eine Datei, die
+
+      **RED gemessen, nicht behauptet:** gegen einen Stub, der `[]` zurückgibt,
+      waren **7 von 9** Zusagen in `native-secrets-guard.logic.test.ts` rot —
+      und die **2 grünen waren genau die Positivkontrollen** („meldet nichts,
+      wenn derselbe Baum den Keystore nicht enthält", „verwechselt harmlose
+      Nachbarn nicht"). Nach der Umsetzung 9/9 grün.
+- [x] **RED**: Test — er prüft den **Baum**, nicht den Diff: eine Datei, die
       kein aktueller Commit anfasst, wird trotzdem gemeldet.
-- [ ] Wächter schreiben und in `ci.yml` einhängen.
-- [ ] **Einmaliger Lauf über die Historie** beim Einführen des Wächters. Er
+
+      Das kann die reine Funktion **nicht** halten — sie bekommt eine Liste
+      Pfade und kann gar nicht falsch liegen; woher die Liste kommt, entscheidet
+      allein der Runner. Deshalb `native-secrets-guard.cli.test.ts`: ein echtes
+      Wegwerf-Repository, Commit 1 bringt den Keystore, Commit 2 fasst etwas
+      anderes an. Eine nachgestellte git-Ausgabe hätte nur belegt, dass der Test
+      nachstellt, was er prüfen will.
+
+      **Mutations-Gegenprobe** (Runner auf `git diff --name-only HEAD~1 HEAD`
+      umgebaut, Datei vorher nach ausserhalb des Repos gesichert): **5 von 6**
+      Zusagen wurden rot, überlebt hat **genau** die Positivkontrolle, die grün
+      bleiben muss. Danach zurückgespielt, wieder 6/6.
+- [x] Wächter schreiben und in `ci.yml` einhängen.
+
+      Aufgeteilt nach dem Muster von `entry-chunk-guard`: `*.logic.ts` (reine
+      Regeln), `*.logic.test.ts`, `*.cli.test.ts`, Runner.
+
+      **Der Baum ist zweierlei:** verfolgte Dateien (`git ls-files`) — der
+      eingetretene Schaden — und unverfolgte, aber **nicht ignorierte**
+      (`--others --exclude-standard`) — was ein einziges `git add .` öffentlich
+      machen würde. **Ignorierte bleiben absichtlich aussen vor:** B3 verlangt,
+      dass der Keystore lokal und im Signier-Workflow vorliegt, also unter einer
+      Ignorierzeile; ein Wächter, der darauf anschlägt, wäre auf jedem Rechner
+      rot, und ein immer roter Wächter wird abgeschaltet. Die Gegenprobe dazu
+      steht im Test: dieselbe Datei per `git add -f` verfolgt **wird** gemeldet.
+
+      Wie bei `entry-chunk-guard` eine Selbstprüfung gegen den stillen Leerlauf:
+      enthält der Baum nicht einmal `package.json`, bricht er mit **2** ab
+      statt grün zu sein.
+
+      In `ci.yml` **vor** lint/typecheck/test — ein Fund macht jede weitere
+      Minute Rechenzeit sinnlos. Der flache Klon von `actions/checkout` stört
+      nicht: dort ist der Arbeitsbaum vollständig, nur die Historie nicht.
+
+      **Rot/grün am echten Repo belegt**, nicht nur im Test: eine angelegte
+      `ios/KONTROLLE.mobileprovision` → exit 1 mit Grund und Rotationshinweis,
+      nach dem Löschen wieder exit 0 bei 1292 Dateien.
+- [x] **Einmaliger Lauf über die Historie** beim Einführen des Wächters. Er
       prüft den Baum und sieht damit nicht, was in einem früheren Commit liegt —
       und genau dieser Fall ist am 23.08. schon einmal eingetreten. Findet der
       Lauf etwas, ist das eine Rotation, kein Löschen: ein Geheimnis in der
       Historie eines öffentlichen Repos gilt als offengelegt.
+
+      **Ergebnis: sauber.** `git rev-list --objects --all` → **1896**
+      verschiedene Pfade, durch dieselben Regeln geschickt (kein nachgebautes
+      grep), **kein Treffer**. *Positivkontrolle,* weil ein Negativbefund sonst
+      nichts belegt: derselbe Lauf mit einem eingeschleusten
+      `KONTROLLE/erfunden.keystore` meldet ihn, und die Stichprobe zeigt saubere
+      Pfade (`.codex/skills/…`) — die Zeilenzerlegung liegt also nicht daneben.
+      Das Skript war ein Wegwerf-Stück ausserhalb des Repos, wie beim
+      `pg_cron`-Vorgang in AGE-641.
+- [x] **`.gitignore` nachgezogen: `*.mobileprovision`, `*.provisionprofile`.**
+      Der Wächter hat die Lücke gefunden, nicht das Auge — beide Endungen teilen
+      mit keiner bestehenden Zeile ein Muster. Die zwei Schichten tun
+      Verschiedenes: die Ignorierzeile verhindert das versehentliche
+      Hinzufügen, der Wächter findet, was per `git add -f` oder über eine
+      Musterlücke trotzdem hineingerät. Ohne die Ignorierzeile fiele der Fund
+      erst in CI auf — und da ist der Push in ein **öffentliches** Repo schon
+      geschehen.
 
 ### B3. Signaturmaterial, dann der eigene Workflow
 

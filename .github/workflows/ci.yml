@@ -21,6 +21,23 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # AGE-642: Dieses Repository ist OEFFENTLICH. Ein Signaturgeheimnis, das
+      # einmal gepusht wurde, gilt als offengelegt — die Antwort darauf ist eine
+      # Rotation im Apple- bzw. Google-Portal, kein `git rm`. Am 23.08. ist
+      # genau dieser Fall schon einmal eingetreten.
+      #
+      # Der Waechter prueft den BAUM, nicht den Diff: ein Geheimnis, das seit
+      # drei Wochen liegt, fasst kein aktueller Commit an und waere fuer jede
+      # Diff-Pruefung unsichtbar. Das funktioniert auch mit dem flachen Klon von
+      # `actions/checkout` — der Arbeitsbaum ist dort vollstaendig, nur die
+      # Historie ist es nicht.
+      #
+      # Steht VOR lint/typecheck/test, weil ein Fund jede weitere Minute
+      # Rechenzeit sinnlos macht: dann ist nicht der Build das Problem.
+      - name: Kein natives Geheimnis im Baum
+        run: pnpm tsx scripts/native-secrets-guard.ts
+
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -41,6 +41,13 @@ docs/legacy-planning/design-mocks/
 *.key
 *.p12
 *.pfx
+# AGE-642: iOS-Signierung. Teilt mit keiner Zeile hier eine Endung und fiel
+# deshalb durch alles — gefunden hat es der Waechter aus B2, nicht das Auge.
+# Die zwei Schichten tun Verschiedenes: diese Zeile verhindert das
+# versehentliche Hinzufuegen, der Waechter findet, was per `git add -f` oder
+# ueber eine Musterluecke trotzdem hineingeraet.
+*.mobileprovision
+*.provisionprofile
 *.jks
 *.keystore
 # AGE-641: der APNs-Auth-Key. Apple laesst ihn genau EINMAL herunterladen, er
