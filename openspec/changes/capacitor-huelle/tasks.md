@@ -360,6 +360,124 @@ Der Startbildschirm ist die einzige Fläche, die jemand sieht, BEVOR er die App
       *innerhalb* von `App.app` misst `#212c3d`, und dieselben Symbole aus der
       entpackten `app-debug.apk` messen `#212d3d` in jeder Dichte.
 
+### B5. Die Startfläche
+
+Nach dem Symbol die zweite Fläche, die niemand aufrufen muss: sie steht zwischen
+dem Antippen und dem ersten Bild der Anwendung. Bis hierher war sie Capacitors
+weißes PNG.
+
+**Es sind zwei Flächen.** Erst der native Startbildschirm
+(`LaunchScreen.storyboard`), dann der WebView, bis React zeichnet. Wann die erste
+der zweiten weicht, ist ohne `@capacitor/splash-screen` **nicht steuerbar** —
+die Zusage ist deshalb nicht der gesteuerte Übergang, sondern der gemeinsame
+Grundton, der ihn unsichtbar macht.
+
+Diese Aufgabe ist nach der Plan-Review überarbeitet (`REVIEWS.md`, zwei fremde
+Anbieter, beide REQUEST-CHANGES). Was sich dadurch geändert hat, steht bei den
+betroffenen Punkten.
+
+- [ ] **RED, regionsweise statt als Mittelwert.** Der Mittelwert taugt hier
+      nicht: die Komposition endet absichtlich in demselben Weiß, mit dem die
+      Fläche vorher vollflächig gefüllt war — beide Zustände können denselben
+      Mittelwert haben. *Aus der Review (opencode, HIGH).* Gemessen wird
+      stattdessen: **oberste 20 % ≠ Weiß**, **unterste Zeile = Weiß**,
+      **Markenregion nicht leer**. Vorher-Stand festgehalten: die Vorlage misst
+      `#ffffff`, und die drei Renditions liegen in `Assets.car` mit je
+      14 710 Bytes, SHA1 `73CC0B89…` (Scale 3).
+- [ ] **Es gibt kein `Splash.imageset` INNERHALB von `App.app`.** `actool`
+      backt Image Sets in `Assets.car`; der Beleg am gebauten Artefakt läuft
+      deshalb über `assetutil --info` und die SHA1 der Renditions, nicht über
+      eine Datei im Bündel. *Aus der Review (opencode, HIGH).* Bei B4 ging es
+      nur deshalb anders, weil App-Symbole zusätzlich lose im Bündel liegen.
+- [ ] **Eine Quelle, drei Zutaten, alle schon im Repo:** die Marke aus
+      `public/brand/compass-favicon.svg` (dieselbe wie App-Symbol und Tab), das
+      Bild aus `public/images/hero-mitglieder.webp` (dasselbe wie das
+      Login-Panel) und die Schriften aus `public/fonts/*.woff2`. `pnpm splash`.
+- [ ] **Drei Ebenen, nicht zwei — und das ist der Punkt, an dem der Entwurf
+      umgebaut wurde.** Der Verlauf wird **nicht** ins Foto eingebacken, sondern
+      ist eine eigene, gestreckte Ebene über dem Foto. *Aus der Review (beide,
+      HIGH/MEDIUM):* die App erlaubt Querformat (`UISupportedInterfaceOrientations`)
+      und ist universell gebaut (`TARGETED_DEVICE_FAMILY = "1,2"`). Ein
+      eingebackener Verlauf wird beim formatfüllenden Beschneiden mitbeschnitten
+      — quer läge seine Unterkante mitten im Farbverlauf, und die Kante des
+      Bildes wäre sichtbar. Als eigene Ebene endet er **immer** an der Unterkante
+      seiner Fläche in Weiß.
+- [ ] **Der Verlauf ist der vom Login-Panel** (`LoginPage.tsx:277`): vier Stopps
+      — deckend · 22 % · 32 % bei 70 % · 44 % bei 25 % · 58 % durchsichtig. Zwei
+      Stopps ergaben dort eine sichtbare Kante bei 26 %; diese Rampe läuft lang
+      und flach aus. Sie endet in `--color-canvas` `#ffffff`, **derselben Farbe,
+      die auch die Fläche darunter trägt.**
+- [ ] **Der Grundton wird ausdrücklich gesetzt.** Das Storyboard steht heute auf
+      `systemBackgroundColor` — im Dunkelmodus **schwarz**. Bisher unsichtbar
+      unter dem deckenden weißen PNG; in dieser Komposition wäre es die Fläche
+      unter dem Schriftzug. *Abgeleitet aus einem Review-Befund (gemini), dessen
+      Kern — „die App braucht einen Dunkelmodus-Entwurf" — zurückgewiesen ist:
+      `data-variant` kennt nur `hell` und `navy`, ein dunkles Inhaltsthema gibt
+      es nicht, `--color-canvas` ist immer `#ffffff`.*
+- [ ] **Alle drei Ebenen am Verhältnis aufgehängt, nicht an Punkten:** Foto auf
+      den oberen 62 % der Höhe, Schriftzug bei 58 % Höhe und 25 % hoch. Daraus
+      folgt die Invariante, die den Text von jeder Bildlage trennt:
+      `schriftzugOben ≥ bandAnteil × 0.78` — der Punkt, ab dem die Rampe
+      deckend weiß ist. Sie gilt für jede Bildschirmgröße und jede Orientierung,
+      weil beide Seiten Anteile derselben Höhe sind. **Das ist eine Zusage, die
+      ein Test prüfen kann**, im Gegensatz zu „sieht auf dem SE auch gut aus".
+- [ ] **Das `webp` wird vor dem Rastern nach PNG dekodiert, mit Abbruch.**
+      *Aus der Review (opencode, HIGH):* `rsvg-convert` lädt eingebettete Bilder
+      über gdk-pixbuf und fällt bei fehlendem WebP-Loader **still** aus — genau
+      das Fehlerbild, vor dem der Schrift-Punkt warnt. `sips` dekodiert,
+      der Lauf bricht ab, wenn dabei nichts entsteht.
+- [ ] **Die Schriftbindung wird POSITIV nachgewiesen.** *Aus der Review
+      (opencode, HIGH), und der Befund sitzt:* die erste Fassung führte als
+      „Positivkontrolle", dass `Georgia` auf eine Grotesk zurückfällt — also ein
+      gelungenes stilles Ersetzen, genau das, was die Anforderung verbietet.
+      Jetzt umgekehrt: `fc-match` muss für **Inter** und **Fraunces** auf die
+      entpackte Repo-TTF zeigen, sonst bricht der Lauf ab. Die Gegenprobe
+      (Systemschrift greift nicht durch) steht daneben, nicht an ihrer Stelle.
+- [ ] **`PANGOCAIRO_BACKEND=fc` ist nötig und wird am Verhalten geprüft, nicht
+      am Variablennamen.** `rsvg-convert` nimmt auf macOS über pango sonst den
+      **CoreText**-Pfad und ignoriert jede eigene `fonts.conf` stillschweigend:
+      gemessen kam Fraunces als Grotesk heraus, ohne Fehlermeldung. Ob die
+      Variable in einem anderen pango-Bau wirkt, ist offen — deshalb entscheidet
+      die `fc-match`-Prüfung eine Zeile darüber, nicht die Variable.
+      *Aus der Review (opencode, LOW).*
+- [ ] **`woff2_decompress` als Werkzeug** (`brew install woff2`), wie
+      `rsvg-convert` bei B4. Die entstehenden TTF sind Zwischenergebnisse und
+      werden **nicht** versioniert — die `woff2` im Repo bleiben die einzige
+      Fassung der Schriften.
+- [ ] **GREEN:** Zusagen auf die Erzeugung — die vier Stopps des Verlaufs, die
+      Verhältnis-Invariante oben, der Ausschnitt als **Anteil** des Quellbildes
+      (nicht als feste Pixel, *Review opencode LOW*), und dass die Marke aus dem
+      Favicon gelesen und nicht abgeschrieben ist. Mit Mutations-Gegenprobe:
+      Rampe auf zwei Stopps · Schriftzug über die Invariante geschoben · Marke
+      fest verdrahtet → jeweils rot.
+- [ ] **Boot-Fläche: die Entscheidung fällt im `<head>`, nicht im Anwendungscode.**
+      *Aus der Review (opencode, MEDIUM), und der Befund war richtig:* Inhalt in
+      `#root` steht im ausgelieferten Dokument und wird gezeichnet, **bevor**
+      irgendein Modul lädt — `Capacitor.isNativePlatform()` käme zu spät, und die
+      Boot-Fläche erschiene auch im Browser. Das Inline-Skript im `<head>`, das
+      heute schon vor dem First Paint die Design-Variante setzt, entscheidet es
+      mit. **Erst messen, ob die Lücke überhaupt sichtbar ist** — sie ist heute
+      weiß auf weiß.
+- [ ] **Beleg auf dem Gerät, NACH dem Löschen der App.** *Aus der Review (beide,
+      LOW/MEDIUM):* iOS hält den Startbildschirm in einem Zwischenspeicher; ein
+      Beleg ohne vorheriges Löschen zeigt womöglich die alte Fläche und belegt
+      nichts. Bildschirmfoto im Hoch- **und** im Querformat.
+- [ ] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
+      Ein Optimierer wie `oxipng` kommt bewusst **nicht** dazu: eine weitere
+      Werkzeug-Abhängigkeit für einen Lauf, der ein paarmal im Jahr stattfindet.
+- [ ] **Offen, als eigener Vorgang notiert:** `pnpm splash --check` in der CI,
+      die die Raster neu erzeugt und gegen die committeten diffed. Ohne das ist
+      „eine Änderung an der Quelle erreicht die Startfläche" von Hand gehalten,
+      nicht erzwungen. *Review opencode, MEDIUM.* **Gilt für `pnpm app:icons`
+      (B4) genauso** — deshalb ein Vorgang für beide, nicht einer hier.
+- [ ] **Android bleibt hier bewusst aussen vor, mit Grund.** Seit Android 12
+      zeichnet die SplashScreen-API die Startfläche aus
+      `windowSplashScreenBackground` und einem Symbol; das Bitmap unter
+      `@drawable/splash`, das Capacitor anlegt, wird dort nicht mehr gezeigt.
+      Zehn weitere PNG zu erzeugen hiesse, tote Dateien auszuliefern. Eigener
+      Vorgang mit eigenem Entwurf — und ohnehin erst prüfbar, wenn die App auf
+      einem Android-Gerät läuft (offen seit B1).
+
 ## Phase C — Ränder, Zurück-Taste, Kamera
 
 ### C1. Sichere Ränder
