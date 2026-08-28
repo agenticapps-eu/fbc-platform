@@ -11,9 +11,13 @@
 > `apnsJwt`, die PEM-Einlesung, die Kopfzeilen und `bewerteApns` gegen den
 > echten Anbieter belegt.
 >
-> **Offen bleibt die Android-Hälfte:** es gibt kein Firebase-Projekt, also kein
-> `FCM_SERVICE_ACCOUNT`. Die Play-Console-Bestätigung blockiert das **nicht** —
-> sie regelt die Verteilung, nicht FCM. Kontoeinrichtung, keine Codearbeit.
+> **FCM ist seit dem 28.08. ebenfalls eingerichtet und gemessen.** Firebase-
+> Projekt `effbeezee-f9b48`, Dienstkonto-JSON in Infisical `dev`. Gegen das
+> echte FCM: `400 INVALID_ARGUMENT` — authentifiziert, nur das erfundene
+> Gerätetoken verworfen.
+>
+> **Beide Anbieter sind damit belegt.** Von A5 bleibt allein die Zustellung an
+> ein ECHTES Gerät offen, und die hängt an AGE-642 B1.
 >
 > **Korrektur an dieser Liste:** A4 nannte die RPCs `push_zustellung_daten` und
 > `push_token_entfernen`. Gebaut und gemessen sind
@@ -163,9 +167,18 @@ Issue. Siehe `REVIEWS.md`.
       Kopfzeilen, den Anfragekörper und `bewerteApns` an echten Antworten.
       Falle dokumentiert: App-Store-Connect-Schlüssel heissen genauso
       (`AuthKey_<KEYID>.p8`) und liefern an jedem Topic `403`.
-- [ ] ⛔ **FCM-Secrets und Messung.** Es gibt kein Firebase-Projekt; die
-      Android-Hälfte (`googleZugangstoken`, der FCM-`fetch`) ist ungemessen.
-      **Nicht** von der Play Console blockiert.
+- [x] **FCM-Secret nach Infisical `dev` und gegen den echten Anbieter
+      gemessen.** `FCM_SERVICE_ACCOUNT` (Projekt `effbeezee-f9b48`); die
+      Projekt-ID liest der Code aus dem JSON. Antwort auf ein erfundenes Token:
+      `400 INVALID_ARGUMENT` statt `401 UNAUTHENTICATED` — belegt damit
+      `googleZugangstoken` (RS256-Signatur, PKCS#8-RSA-Einlesung, der
+      OAuth2-Tausch), `fcmEndpunkt`, `fcmKoerper` und `bewerteFcm` an einer
+      echten Antwort. Nebenbei belegt: die FCM-API ist im Projekt aktiviert,
+      sonst käme ein 403.
+      Falle dokumentiert: Google sperrt in Workspace-Organisationen das Anlegen
+      von Dienstkontoschlüsseln per Vorgabe — **zwei** Richtlinien
+      (`iam.disableServiceAccountKeyCreation` und die `iam.managed.`-Variante)
+      müssen projektweit auf „nicht erzwungen".
 - [ ] **`prod`-Umgebung befüllen** — bewusst zurückgestellt, solange es keine
       Produktions-App gibt. Steht in `docs/secrets.md`.
 - [x] Commit.

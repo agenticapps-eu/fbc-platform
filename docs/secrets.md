@@ -142,7 +142,7 @@ must **never** reach the client.
 | `APNS_TEAM_ID`              | Apple-Team, fährt als `iss` im Provider-JWT mit |
 | `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
 | `APNS_SANDBOX`              | `1` schickt an Apples Sandbox-Host. In `prod` **nicht setzen** |
-| `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). **Noch nicht eingerichtet** |
+| `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
 
 ## Setting and reading secrets
 
@@ -388,13 +388,49 @@ gar nicht gesetzt.
 > nächsten App-Start heilt sich das über `claim_push_token`, sieht aber wie ein
 > Fehler aus. Dev-Builds gehören auf DEV.
 
+### Der Firebase-Dienstschlüssel: die Organisationsrichtlinie
+
+Firebase braucht es **nur für Android**. iOS spricht direkt mit APNs —
+absichtlich: der übliche Weg, iOS durch FCM zu leiten, hiesse, den APNs-Key bei
+Google zu hinterlegen.
+
+Die Play-Console-Bestätigung blockiert das **nicht**. Sie regelt die Verteilung
+im Store; FCM braucht nur ein Firebase-Projekt, und ein seitlich installiertes
+Debug-APK bekommt Push ohne jede Store-Freigabe.
+
+**Was tatsächlich blockiert, ist Google Cloud.** In Workspace-Organisationen ist
+das Anlegen von Dienstkontoschlüsseln seit ~2024 per Vorgabe gesperrt; die
+Firebase-Konsole meldet dann nur „Das Erstellen von Schlüsseln ist für dieses
+Dienstkonto nicht zulässig". Es sind **zwei** Richtlinien, und beide müssen für
+das Projekt auf *nicht erzwungen*:
+
+| Einschränkung | |
+| --- | --- |
+| `iam.disableServiceAccountKeyCreation` | die klassische |
+| `iam.managed.disableServiceAccountKeyCreation` | die neuere „managed"-Variante |
+
+Nicht zu verwechseln mit `iam.managed.disableServiceAccountApiKeyCreation` —
+die regelt API-Key-Bindungen und ist eine andere Sache.
+
+Nur für **dieses Projekt** überschreiben, nicht organisationsweit abschalten:
+langlebige Dienstkontoschlüssel sind genau die Sorte Geheimnis, gegen die die
+Richtlinie gedacht ist. Das Überschreiben braucht `roles/orgpolicy.policyAdmin`
+auf **Organisationsebene** — Projekt-Inhaber reicht nicht, und
+Workspace-Super-Admin ist nicht dasselbe wie Cloud-Organisationsadministrator.
+Die Änderung propagiert nicht sofort.
+
+Die Probe funktioniert wie bei Apple, mit einem erfundenen Gerätetoken:
+
+| Antwort | Bedeutung |
+| --- | --- |
+| `400 INVALID_ARGUMENT` | **Alles richtig.** Authentifiziert, nur das Token verworfen |
+| `401 UNAUTHENTICATED` | Dienstkonto oder Signatur stimmen nicht |
+| `403` mit „API has not been used in project…" | Die FCM-API ist im Projekt nicht aktiviert |
+
 ### Was noch fehlt
 
-- **`FCM_SERVICE_ACCOUNT`** — es gibt kein Firebase-Projekt. Wichtig dabei: die
-  Bestätigung in der **Play Console blockiert das nicht**. Sie regelt die
-  Verteilung im Store; FCM braucht nur ein Firebase-Projekt, und ein
-  seitlich installiertes Debug-APK bekommt Push ohne jede Store-Freigabe.
-- **Die App-ID `com.effbeezee.app`** mit aktivierter Push-Berechtigung
-  (Identifiers).
 - **Die `prod`-Umgebung** — bewusst noch leer, solange es keine
   Produktions-App gibt.
+- **Die Zustellung an ein echtes Gerät.** Beide Anbieter sind gegen ihre echten
+  Endpunkte belegt; was fehlt, ist ein Gerätetoken, und das setzt AGE-642 B1
+  voraus.
