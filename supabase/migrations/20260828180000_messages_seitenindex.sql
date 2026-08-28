@@ -1,0 +1,80 @@
+-- AGE-657 — Index für die Seitenabfrage des Nachrichtenverlaufs.
+--
+-- `fetchMessages` (`src/lib/chat.ts`) holt seit AGE-655 seitenweise:
+--
+--   where thread_id = $1
+--     and (created_at < $2 or (created_at = $2 and id < $3))
+--   order by created_at desc, id desc
+--   limit 51
+--
+-- Gedeckt war davon nur die erste Spalte (`messages_thread_id_idx`, aus
+-- `20260612065636_matching.sql:95`). Der Planer fand darüber die Zeilen des
+-- Threads und SORTIERTE sie dann — die Sortierlast wuchs also weiter mit der
+-- Länge des Gesprächs, obwohl die Seitengrenze längst da war.
+--
+-- ══ GEMESSEN, NICHT ANGENOMMEN ═════════════════════════════════════════════
+-- Am 26.08. forderten zwei Plan-Reviewer denselben Index für die ZÄHLABFRAGE,
+-- und gemessen an 20 000 Nachrichten wählte der Planer ihn NIE
+-- (`20260826170000_lesestand_und_ungelesen_zaehler.sql:69-83`). Ein Index, den
+-- niemand wählt, ist nicht neutral: er kostet bei jedem Insert. Deshalb steht
+-- hier keine Begründung ohne Messung.
+--
+-- Lokaler Stack, derselbe Aufbau (20 000 Nachrichten in einem Thread), die
+-- Abfrage als `authenticated` MIT Claims, also unter voller RLS:
+--
+--   Form          | ohne Index                    | mit Index
+--   ------------- | ----------------------------- | ---------------------------
+--   erste Seite   | Seq Scan + Sort (top-N)       | Index Scan, KEIN Sort
+--                 | 20 512 Puffer, 66,2 ms        | 295 Puffer, 0,96 ms
+--   Cursor-Seite  | Seq Scan + Sort (top-N)       | Index Scan, KEIN Sort
+--   (5 000 tief)  | 15 267 Puffer, 51,6 ms        | 426 Puffer, 0,70 ms
+--
+-- Der Sortierschritt verschwindet aus dem Plan; das ist der Unterschied, um
+-- den es hier geht. Die Zeiten sind Beiwerk.
+--
+-- ══ WARUM `id` ZUM INDEX GEHÖRT ════════════════════════════════════════════
+-- Der Cursor ist seit der Diff-Review zu AGE-655 zusammengesetzt, weil
+-- `created_at` allein keine totale Ordnung ist: `now()` ist innerhalb einer
+-- Transaktion stabil, ein Import erzeugt Gleichstände der Bauart nach. Ein
+-- Index nur auf `(thread_id, created_at)` liesse die zweite Hälfte der
+-- Ordnung ungestützt und der Sortierschritt käme zurück.
+--
+-- ══ WAS DER INDEX NICHT LÖST ═══════════════════════════════════════════════
+-- Auf der Cursor-Seite steht das Keyset im `Filter`, nicht in der `Index
+-- Cond` — „Rows Removed by Filter: 5009". Der Planer läuft den Index vom
+-- jüngsten Ende an und verwirft, was vor dem Cursor liegt. Grund ist die
+-- Form der Bedingung: `a < x or (a = x and b < y)` ist keine Indexgrenze, ein
+-- Zeilenvergleich `(a, b) < (x, y)` wäre einer — den kann die
+-- PostgREST-Filtersprache aber nicht ausdrücken. Die Kosten wachsen also
+-- weiterhin damit, WIE TIEF geblättert wird (295 → 426 Puffer bei 5 000
+-- Zeilen Tiefe), nur eben rund vierzigmal flacher als vorher.
+--
+-- ══ WARUM `concurrently` — UND WARUM DAS HIER GEHT ═════════════════════════
+-- `create index` sperrt die Tabelle für Schreibzugriffe. Bei den heute 23
+-- Zeilen in PROD wäre das unmerklich, aber die Sperrdauer wächst mit der
+-- Tabelle und diese Migration läuft nur einmal — auf der Tabelle, die von
+-- allen am schnellsten wächst.
+--
+-- Der Einwand dagegen war, `concurrently` laufe nicht in einer Transaktion und
+-- breche deshalb `migrate-prod`. Gemessen am 28.08. gegen den lokalen Stack
+-- (CLI 2.111.0), mit Gegenprobe:
+--
+--   * Diese Migration über `supabase db push` → angewendet, Index `indisvalid`.
+--   * Dieselbe Anweisung in einem `begin … commit` → `25001 CREATE INDEX
+--     CONCURRENTLY cannot run inside a transaction block`.
+--   * Eine Migration OHNE `concurrently`, deren zweite Anweisung scheitert →
+--     die erste ist zurückgerollt.
+--
+-- Also: der Push fasst eine Migration in eine Transaktion, NUR nicht diese
+-- Sorte. Der Einwand gilt nicht, die Atomarität der übrigen Migrationen aber
+-- auch nicht für diese hier — deshalb steht in dieser Datei genau EINE
+-- Anweisung und sonst nichts.
+--
+-- ══ `messages_thread_id_idx` BLEIBT (vorerst) ══════════════════════════════
+-- Er ist ein echtes Präfix des neuen Index und damit für Nachschlagen
+-- redundant, auch für die FK-Kaskade von `message_threads`. Sein Wegfall
+-- gehört trotzdem nicht in diese Datei: sie läuft ohne Transaktion, ein
+-- `drop` daneben könnte also halb angewendet stehenbleiben. Und zu gewinnen
+-- ist bei 23 Zeilen nichts. Eigener Vorgang.
+create index concurrently if not exists messages_thread_created_id_idx
+  on public.messages (thread_id, created_at desc, id desc);
