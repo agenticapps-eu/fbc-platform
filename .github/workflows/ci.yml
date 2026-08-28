@@ -185,6 +185,13 @@ jobs:
       # zusammen) und liefen KEIN EINZIGES MAL in CI, weil niemand sie in diese
       # Zeile eingetragen hatte. Genau der Fall, vor dem der Absatz darüber
       # warnt. Gefunden bei der Diff-Prüfung zu AGE-581.
+      #
+      # `display_name_test.sql` kam am 28.08. dazu und war derselbe Fall: 14
+      # Zusagen, seit dem 26.08. auf der Platte, nie gelaufen. Die Warnung oben
+      # steht seit dem 05.08. da — sie hat in beiden Fällen nicht gereicht,
+      # nach 18 bzw. 23 Tagen. Seitdem prüft
+      # `scripts/pgtap-dateiliste.test.ts` diese Liste gegen das Verzeichnis,
+      # in beide Richtungen, im Job `verify`.
       - name: Verify the grant + RLS rights matrix (pgTAP)
         run: >
           supabase test db
@@ -207,6 +214,7 @@ jobs:
           supabase/tests/release_entry_skips_test.sql
           supabase/tests/push_tokens_test.sql
           supabase/tests/push_zustellung_test.sql
+          supabase/tests/display_name_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
