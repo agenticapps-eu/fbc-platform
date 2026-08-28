@@ -48,6 +48,13 @@ docs/legacy-planning/design-mocks/
 # eine Rotation im Apple-Portal, kein `git rm`. Die Nachbarzeilen decken `.pem`
 # und `.key` ab, aber Apple liefert die Endung `.p8`.
 *.p8
+# AGE-642: die Gradle-Signierkonfiguration. Sie ist selbst kein Schluessel,
+# nennt aber Pfad UND Passwoerter des Keystores im Klartext — die Endung
+# `.properties` faellt durch jedes Muster darueber. Capacitors mitgelieferte
+# `android/.gitignore` deckt sie nicht ab und laesst `*.jks`/`*.keystore` sogar
+# auskommentiert; die Zeilen oben greifen trotzdem, weil sie in der Wurzel
+# stehen. Diese hier schliesst die letzte Luecke.
+key.properties
 # AGE-641: der Firebase-Dienstschluessel fuer FCM. Er kommt als `.json` und
 # faellt damit durch JEDES Muster darueber — und er traegt einen privaten
 # Schluessel im Klartext. Google benennt ihn

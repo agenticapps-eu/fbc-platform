@@ -148,19 +148,90 @@ allein und zuerst.
 
 ### B1. Capacitor und die beiden Projekte
 
-- [ ] `@capacitor/ios`, `@capacitor/android`, `capacitor.config.ts`.
+- [x] `@capacitor/ios`, `@capacitor/android`, `capacitor.config.ts`.
       `webDir: "dist"`, App-ID und Anzeigename festlegen.
-- [ ] `npx cap add ios` und `npx cap add android`; beide Ordner versionieren.
-- [ ] `.gitignore`: Keystore (`*.keystore`, `*.jks`), `key.properties`,
+
+      **Die App-ID war keine offene Wahl mehr.** `com.effbeezee.app` liegt
+      bereits als `APNS_BUNDLE_ID` in den Supabase-Secrets (am 28.08. per
+      SHA-256 gegen Infisical abgeglichen, `docs/secrets.md`) und ist damit das
+      `apns-topic`, gegen das Apple jedes Gerätetoken prüft. Ein abweichender
+      Wert hier bräche den Push aus AGE-641 — und zwar erst am echten Gerät.
+      Anzeigename `eff.bee.zee`, die Marke aus `index.html` und dem
+      Design-System. `webDir: "dist"` ist Vites Standard; `vite.config.ts`
+      setzt kein `outDir`.
+- [x] `npx cap add ios` und `npx cap add android`; beide Ordner versionieren.
+
+      **Capacitor 8 baut iOS über Swift Package Manager**, nicht über
+      CocoaPods: es entsteht `ios/App/CapApp-SPM/Package.swift`, kein
+      `Podfile`. Die `pod`-Zeile in den Voraussetzungen ist damit gegenstandslos.
+      `cap add android` meldete beim ersten Lauf `Unable to locate a Java
+      Runtime` — das mitgelieferte JBR von Android Studio ist **25**, und
+      Gradle 8.14.3 reicht nur bis Java 24. Gebaut wird deshalb mit
+      `JAVA_HOME=/opt/homebrew/opt/openjdk@21`.
+- [x] `.gitignore`: Keystore (`*.keystore`, `*.jks`), `key.properties`,
       `google-services.json`, `GoogleService-Info.plist`, `*.p8`,
       `ios/App/Pods/`, `android/.gradle/`, `*/build/`, `DerivedData/`.
-- [ ] **`Info.plist`: `NSCameraUsageDescription` und
+
+      **Gemessen statt abgeschrieben:** `git check-ignore -v` über alle
+      dreizehn Pfade zeigte, dass genau **ein** Muster fehlte —
+      `key.properties`. Alles andere deckt entweder die Wurzel-`.gitignore` aus
+      AGE-641 ab (`*.jks`, `*.keystore`, `*.p8`, `google-services.json`,
+      `GoogleService-Info.plist`) oder Capacitors eigene `android/.gitignore`
+      bzw. `ios/.gitignore` (`.gradle/`, `build/`, `local.properties`,
+      `App/Pods`, `DerivedData`, die kopierten Web-Assets). `*/build/` war
+      deshalb nicht nötig. **Falle für später:** Capacitors
+      `android/.gitignore` führt `*.jks`/`*.keystore` **auskommentiert** — die
+      Wurzelzeilen greifen trotzdem, aber wer nur dort nachsieht, liest das
+      Gegenteil.
+- [x] **`Info.plist`: `NSCameraUsageDescription` und
       `NSPhotoLibraryUsageDescription`, deutsch formuliert.** Ohne sie stürzt
       iOS beim ersten Kameraaufruf ab — zur **Laufzeit**, nicht erst in der
       Store-Prüfung. Steht hier und nicht in C3, weil die Schale sie schon beim
       Anlegen mitbekommen soll.
-- [ ] **Android:** Kamera-Berechtigung im `AndroidManifest.xml` deklarieren und
+
+      Formuliert gegen die vier Stellen, an denen die App heute Bilder
+      hochlädt (Profilbild, Titelbild, Feed-Beitrag, Event-Titelbild), und in
+      der Anrede der App (`du`). **Beleg an der gebauten App, nicht an der
+      Quelle:** `xcodebuild … -sdk iphonesimulator` → `BUILD SUCCEEDED`, danach
+      `plutil -extract NSCameraUsageDescription raw` auf der `Info.plist`
+      *innerhalb* von `App.app` — Text mit intakten Umlauten,
+      `CFBundleIdentifier` = `com.effbeezee.app`.
+- [x] **Android:** Kamera-Berechtigung im `AndroidManifest.xml` deklarieren und
       die Laufzeit-Abfrage behandeln. Dieselbe Falle, andere Plattform.
+
+      **Die Laufzeit-Abfrage muss dieser Code nicht selbst führen.**
+      `BridgeWebChromeClient.onShowFileChooser` ruft `permissionLauncher.launch`
+      und bricht den Datei-Dialog sauber ab, wenn abgelehnt wird
+      (`BridgeWebChromeClient.java:285-300`).
+
+      **Aber der Zweig greift heute nie.** Er verlangt `isCaptureEnabled()`
+      **und** exakt `image/*` in `accept` (Zeile 281-284). Die sechs
+      Upload-Felder dieser App führen weder `capture` noch `image/*`, sondern
+      eine Typenliste — sie landen alle im System-Dateiwähler. Die Deklaration
+      ändert also **vorerst nichts am Verhalten**; sie steht hier, damit die
+      Hülle vollständig ist. **C3 muss das aufgreifen**, sonst öffnet die
+      Kamera nie.
+
+      Dazu `<uses-feature android:name="android.hardware.camera"
+      android:required="false" />`: ohne diese Zeile leitet aapt aus der
+      Berechtigung eine **Pflicht**-Kamera ab und Play filtert Geräte ohne
+      Kamera aus der Auslieferung. **Beleg an der gebauten APK:**
+      `aapt2 dump permissions` → `android.permission.CAMERA`,
+      `aapt2 dump badging` → `uses-feature-not-required:
+      android.hardware.camera`, `targetSdkVersion:'36'`,
+      `application-label:'eff.bee.zee'`, `package: com.effbeezee.app`.
+- [x] **Die Gates gegen die neuen Bäume abgedichtet.** `android/` und `ios/`
+      tragen eine Kopie des gebauten Web-Bündels, und beide Werkzeuge lasen sie
+      mit. Gemessen: `pnpm lint` meldete **12048** Fehler, davon **null** aus
+      `src/` — 4076 aus `android/app/build`, 3986 aus `android/app/src`, 3986
+      aus `ios/App/App`. Ab dem ersten `cap sync` wäre das Gate wertlos gewesen.
+      Beide Bäume nach `eslint.config.js` und `.prettierignore`, dieselbe
+      Begründung wie beim schon vorhandenen `supabase/.temp` bzw. `dist`.
+      Danach: Lint 0 Fehler; `format:check` fällt von 611 auf **280** — und
+      280 ist die vorbestehende Grundlinie (`openspec` 197, `src` 50,
+      `scripts` 23, `supabase` 6), also fügt dieser Change der
+      Formatierungsschuld nichts hinzu. CI fährt ohnehin nur `lint` und
+      `typecheck` (`ci.yml:24-25`).
 
 ### B2. Der Wächter gegen native Geheimnisse im öffentlichen Repo
 
