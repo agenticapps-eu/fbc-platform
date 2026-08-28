@@ -168,6 +168,24 @@ describe("EinstellungenPage", () => {
     expect(screen.getByText(/stimmen nicht überein/i)).toBeInTheDocument();
   });
 
+  // AGE-656: Das Formular versprach 8 Zeichen, GoTrue verlangt 10
+  // (`minimum_password_length`, config.toml:230). Wer 8 oder 9 wählte, kam durch
+  // die Feldprüfung, wurde vom Server abgelehnt — und sein Passwort blieb
+  // unverändert. openspec/specs/access-control/spec.md verlangt, dass die
+  // Oberfläche dieselbe Länge fordert wie der Server.
+  it("ruft updatePassword nicht auf, wenn das Passwort neun Zeichen hat (AGE-656)", async () => {
+    const updatePassword = vi.fn().mockResolvedValue({ error: null });
+    renderPage(null, { updatePassword });
+    const pw = await screen.findByLabelText("Neues Passwort");
+    fireEvent.change(pw, { target: { value: "neunZeich" } });
+    fireEvent.change(screen.getByLabelText("Neues Passwort bestätigen"), {
+      target: { value: "neunZeich" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    expect(updatePassword).not.toHaveBeenCalled();
+    expect(screen.getByText(/mindestens 10 Zeichen/i)).toBeInTheDocument();
+  });
+
   // AGE-578: Die QM-Feedback-Card ist nach /admin umgezogen. Vorher standen hier
   // drei Zusagen, die das Rollen-Gating prüften — das gibt es nicht mehr, also
   // prüften sie nichts. Die eine Zusage, die den Umzug wirklich belegt, ist die
