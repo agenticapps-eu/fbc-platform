@@ -36,14 +36,32 @@ function nachricht(over: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 function zeige(messages: ChatMessage[]) {
-  return render(<Conversation thread={THREAD} messages={messages} myId={ICH} onSend={() => {}} />);
+  return render(
+    <Conversation
+      thread={THREAD}
+      messages={messages}
+      myId={ICH}
+      onSend={() => {}}
+      hatAeltere={false}
+      laedtAeltere={false}
+      onLadeAeltere={() => {}}
+    />,
+  );
 }
 
 /** Dieselbe Ansicht mit einer neuen Nachrichtenliste — für Übergänge, die zwei
  *  getrennte Anstriche brauchen. */
 function erneut(ergebnis: ReturnType<typeof zeige>, messages: ChatMessage[]): void {
   ergebnis.rerender(
-    <Conversation thread={THREAD} messages={messages} myId={ICH} onSend={() => {}} />,
+    <Conversation
+      thread={THREAD}
+      messages={messages}
+      myId={ICH}
+      onSend={() => {}}
+      hatAeltere={false}
+      laedtAeltere={false}
+      onLadeAeltere={() => {}}
+    />,
   );
 }
 

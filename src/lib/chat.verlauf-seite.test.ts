@@ -123,7 +123,7 @@ describe("fetchMessages — Seitengrenze", () => {
   });
 });
 
-describe("fetchMessages — die Sonde beantwortet „gibt es noch ältere\"", () => {
+describe('fetchMessages — die Sonde beantwortet „gibt es noch ältere"', () => {
   // Beide Richtungen, sonst belegt die eine nichts: „erschoepft ist true" wäre
   // von „die Funktion gibt immer true zurück" nicht zu unterscheiden.
 

@@ -159,11 +159,7 @@ describe("useGespraech — Lesestand", () => {
     // Drei Zeilen auf einmal beim Öffnen → EIN Schreibvorgang. Genau wie der
     // Effect an `activeId` es in `ChatPage` bisher tat.
     fetchMessages.mockResolvedValue(
-      seite([
-        nachricht("a", "wer-anders"),
-        nachricht("bb", ICH),
-        nachricht("ccc", "wer-anders"),
-      ]),
+      seite([nachricht("a", "wer-anders"), nachricht("bb", ICH), nachricht("ccc", "wer-anders")]),
     );
     const { queryClient } = montiere(true);
     await waitFor(() => expect(markThreadRead).toHaveBeenCalledTimes(1));
@@ -266,5 +262,112 @@ describe("useGespraech — Senden", () => {
 
     act(() => aufloesen!({ ...nachricht("echt", ICH, "Toll 🙂.") }));
     await waitFor(() => expect(stand().messages[0].pending).toBeUndefined());
+  });
+});
+
+/**
+ * AGE-655 — die Seitengrenze. Diese vier Zusagen kommen aus der Plan-Review; die
+ * ersten beiden sind die HIGH-Befunde, an denen der erste Entwurf gescheitert
+ * ist. Sie sind mit einer Mutations-Gegenprobe gemessen: ersetzt man die
+ * Vereinigung durch ein Überschreiben bzw. die Sperrklinke durch eine einfache
+ * Zuweisung, werden sie rot.
+ */
+describe("useGespraech — ältere Nachrichten nachladen", () => {
+  const alt = (id: string) => ({
+    ...nachricht(id, "wer-anders"),
+    createdAt: `2026-07-0${id}T10:00:00Z`,
+  });
+  const neu = { ...nachricht("z", "wer-anders"), createdAt: "2026-08-01T10:00:00Z" };
+
+  it("holt die Seite VOR der ältesten geladenen Nachricht", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: true });
+    await act(async () => await stand().ladeAeltere());
+
+    expect(fetchMessages).toHaveBeenLastCalledWith("t1", { before: neu.createdAt });
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
+  // HIGH 1 aus der Plan-Review. React Query ERSETZT die Daten, wenn die
+  // `queryFn` auflöst. Löst eine Abfrage, die vor dem Nachladen losgelaufen ist,
+  // danach auf, nähme sie die nachgeladenen Zeilen wieder weg — und zwar
+  // bevorzugt beim Eintreffen einer Nachricht, also genau im Fall, den die
+  // Zusage sichern soll. Gemessen wird am ERGEBNIS, nicht an der Anfragegrösse.
+  it("verliert nachgeladene Zeilen nicht an eine Abfrage, die vorher losgelaufen ist", async () => {
+    let ersteAntwort!: (s: ChatVerlaufSeite) => void;
+    fetchMessages.mockReturnValueOnce(
+      new Promise<ChatVerlaufSeite>((res) => {
+        ersteAntwort = res;
+      }),
+    );
+    const { queryClient } = montiere(true);
+
+    // Das Nachladen kommt an, während die erste Abfrage noch offen ist.
+    queryClient.setQueryData(messagesQueryKey("t1"), [neu]);
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: true });
+    await act(async () => await stand().ladeAeltere());
+    expect(stand().messages).toHaveLength(2);
+
+    // …und erst JETZT antwortet sie, mit nur der neuesten Seite.
+    //
+    // Die Antwort trägt eine Zeile, die noch NICHT im Cache steht. Ohne sie wäre
+    // dieser Test ein Vakuumtest: `waitFor` wäre beim ersten Versuch grün — also
+    // bevor die veraltete Antwort überhaupt schreibt — und bliebe auch dann
+    // grün, wenn sie danach alles überschreibt. Gemessen mit der Mutation
+    // „ersetzen statt vereinigen": ohne diese Positivkontrolle bleibt der Test
+    // grün, mit ihr wird er rot.
+    const spaeter = { ...nachricht("y", "wer-anders"), createdAt: "2026-08-02T10:00:00Z" };
+    await act(async () => {
+      ersteAntwort({ messages: [neu, spaeter], erschoepft: false });
+    });
+
+    // Erst warten, bis die veraltete Antwort NACHWEISLICH geschrieben hat …
+    await waitFor(() => expect(stand().messages.map((m) => m.id)).toContain("y"));
+    // … und dann prüfen, dass sie dabei nichts weggenommen hat.
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z", "y"]);
+  });
+
+  // HIGH 2. Ein vollständig geladener Thread fragt bei der Neuabfrage
+  // `max(VERLAUF_SEITE, geladen)` an und bekommt genau so viele Zeilen zurück —
+  // sein `erschoepft` ist dann schlicht nicht aussagekräftig und darf die schon
+  // getroffene Feststellung nicht zurücknehmen.
+  it("dreht eine gesetzte Sperrklinke nicht zurück", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: true });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().hatAeltere).toBe(false));
+
+    await act(async () => {
+      queryClient.setQueryData(messagesQueryKey("t1"), [neu]);
+      fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+      await queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+    });
+
+    expect(queryClient.getQueryData(verlaufErschoepftQueryKey("t1"))).toBe(true);
+    expect(stand().hatAeltere).toBe(false);
+  });
+
+  it("erzeugt beim Doppelklick keine doppelten Zeilen", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: false });
+    await act(async () => {
+      await Promise.all([stand().ladeAeltere(), stand().ladeAeltere()]);
+    });
+
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
+  it("bietet keinen Weg zu älteren an, wenn der Verlauf leer ist", async () => {
+    fetchMessages.mockResolvedValue({ messages: [], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().isLoading).toBe(false));
+
+    // Positivkontrolle daneben: mit Inhalt und unerschöpfter Seite steht er da.
+    expect(stand().hatAeltere).toBe(false);
   });
 });

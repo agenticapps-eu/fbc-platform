@@ -184,10 +184,12 @@ export async function fetchUnreadCounts(): Promise<UngelesenStand> {
  * dieser hier schon.
  */
 export async function markThreadRead(threadId: string, uid: string): Promise<void> {
-  const { error } = await supabase.from("thread_read_positions").upsert(
-    { thread_id: threadId, profile_id: uid, last_read_at: "1970-01-01T00:00:00Z" },
-    { onConflict: "thread_id,profile_id" },
-  );
+  const { error } = await supabase
+    .from("thread_read_positions")
+    .upsert(
+      { thread_id: threadId, profile_id: uid, last_read_at: "1970-01-01T00:00:00Z" },
+      { onConflict: "thread_id,profile_id" },
+    );
   if (error) throw error;
 }
 
@@ -297,7 +299,9 @@ export async function fetchThreads(
     // postgrest-js die Spaltentypen nicht mehr ab und das Ergebnis fällt auf
     // `GenericStringError` zurück.
     // prettier-ignore
-    .select("id, a_profile_id, b_profile_id, created_at, last_message_at, last_message_body, last_message_sender_id")
+    .select(
+      "id, a_profile_id, b_profile_id, created_at, last_message_at, last_message_body, last_message_sender_id",
+    )
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
@@ -384,9 +388,7 @@ export async function fetchMessages(
     .eq("thread_id", threadId);
   if (before !== undefined) abfrage = abfrage.lt("created_at", before);
 
-  const { data, error } = await abfrage
-    .order("created_at", { ascending: false })
-    .limit(limit + 1);
+  const { data, error } = await abfrage.order("created_at", { ascending: false }).limit(limit + 1);
   if (error) throw error;
 
   const absteigend = data ?? [];

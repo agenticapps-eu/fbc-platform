@@ -35,7 +35,15 @@ const THREAD = {
 
 function zeige(onSend: (b: string) => void = () => {}) {
   render(
-    <Conversation thread={THREAD} messages={[] as ChatMessage[]} myId="ich" onSend={onSend} />,
+    <Conversation
+      thread={THREAD}
+      messages={[] as ChatMessage[]}
+      myId="ich"
+      onSend={onSend}
+      hatAeltere={false}
+      laedtAeltere={false}
+      onLadeAeltere={() => {}}
+    />,
   );
   return {
     eingabe: screen.getByLabelText("Nachricht schreiben") as HTMLTextAreaElement,
@@ -184,7 +192,15 @@ describe("EmojiAuswahl", () => {
   // Gefunden von einem fremden Reviewer.
   it("schliesst, wenn das Gespräch wechselt — ohne Klick", async () => {
     const ergebnis = render(
-      <Conversation thread={THREAD} messages={[] as ChatMessage[]} myId="ich" onSend={() => {}} />,
+      <Conversation
+        thread={THREAD}
+        messages={[] as ChatMessage[]}
+        myId="ich"
+        onSend={() => {}}
+        hatAeltere={false}
+        laedtAeltere={false}
+        onLadeAeltere={() => {}}
+      />,
     );
     fireEvent.click(screen.getByLabelText("Emoji auswählen"));
     await screen.findByRole("dialog");
@@ -195,6 +211,9 @@ describe("EmojiAuswahl", () => {
         messages={[] as ChatMessage[]}
         myId="ich"
         onSend={() => {}}
+        hatAeltere={false}
+        laedtAeltere={false}
+        onLadeAeltere={() => {}}
       />,
     );
 

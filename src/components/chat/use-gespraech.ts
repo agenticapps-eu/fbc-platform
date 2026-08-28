@@ -117,16 +117,25 @@ export function useGespraech({
     enabled: Boolean(threadId),
   });
 
-  // Nur gelesen, nie geholt: die `queryFn` ist der Vorgabewert für einen Eintrag,
-  // den ausschliesslich `setQueryData` beschreibt. `staleTime: Infinity` hält sie
-  // davon ab, eine gesetzte Sperrklinke wieder zu überschreiben.
-  const erschoepft =
-    useQuery({
-      queryKey: verlaufErschoepftQueryKey(threadId),
-      queryFn: () => false,
-      enabled: Boolean(threadId),
-      staleTime: Infinity,
-    }).data ?? false;
+  /**
+   * Nur gelesen, nie geholt: diesen Eintrag beschreibt ausschliesslich
+   * `setQueryData`. `initialData` **zusammen mit** `staleTime: Infinity` ist
+   * dabei der Punkt, nicht Kosmetik — der Eintrag gilt damit als frisch, und die
+   * `queryFn` läuft gar nicht erst.
+   *
+   * Eine `queryFn`, die `false` zurückgibt, war die erste Fassung, und der Test
+   * „dreht eine gesetzte Sperrklinke nicht zurück" hat sie erlegt: sie löste
+   * **nach** dem `merkeErschoepft(true)` der Nachrichtenabfrage auf und
+   * überschrieb es. Derselbe Wettlauf, den die `queryFn` oben durch Vereinigen
+   * vermeidet, nur eine Ebene tiefer.
+   */
+  const erschoepft = useQuery({
+    queryKey: verlaufErschoepftQueryKey(threadId),
+    queryFn: () => false,
+    initialData: false,
+    enabled: Boolean(threadId),
+    staleTime: Infinity,
+  }).data;
 
   const messages = query.data ?? [];
 

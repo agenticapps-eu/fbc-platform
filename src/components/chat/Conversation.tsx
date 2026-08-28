@@ -40,6 +40,9 @@ export function Conversation({
   messages,
   myId,
   onSend,
+  hatAeltere,
+  laedtAeltere,
+  onLadeAeltere,
   variante = "seite",
 }: {
   /** Nur, was diese Komponente wirklich braucht — nicht der ganze `ChatThread`.
@@ -53,6 +56,10 @@ export function Conversation({
   messages: ChatMessage[];
   myId: string;
   onSend: (body: string) => void | Promise<void>;
+  /** Ob ein Weg zu älteren Nachrichten angeboten wird (AGE-655). */
+  hatAeltere: boolean;
+  laedtAeltere: boolean;
+  onLadeAeltere: () => void | Promise<void>;
   variante?: "seite" | "fenster";
 }) {
   const imFenster = variante === "fenster";
@@ -65,8 +72,11 @@ export function Conversation({
 
   // Jeder Tastendruck in der Eingabe ändert `draft` und stösst damit ein
   // Rendern an — `messages` bleibt dabei dieselbe Liste. Ohne diesen Merker
-  // liefe die Gruppierung über den GANZEN Verlauf bei jedem Zeichen erneut,
-  // und `fetchMessages` (`lib/chat.ts`) holt ihn ohne Begrenzung.
+  // liefe die Gruppierung bei jedem Zeichen über den ganzen geladenen Verlauf
+  // erneut. Seit AGE-655 ist der gebunden (`VERLAUF_SEITE`), aber er wächst mit
+  // jedem „Ältere laden" weiter — der Merker bleibt also nötig. Hier stand bis
+  // dahin, `fetchMessages` hole den Verlauf „ohne Begrenzung"; das ist der Satz,
+  // den dieser Change falsch gemacht hat.
   //
   // Gruppiert werden NUR die bestätigten Zeilen. Die schwebenden tragen die
   // Uhr des Geräts, und dieselbe Uhr, die weiter unten bewusst nicht als
@@ -108,10 +118,27 @@ export function Conversation({
     cursorRef.current = start + emoji.length;
   }
 
-  // Immer ans Ende scrollen, wenn neue Nachrichten kommen oder der Thread wechselt.
+  // Ans Ende scrollen, wenn UNTEN etwas dazukommt oder der Thread wechselt.
+  //
+  // Die Abhängigkeit ist die Identität der letzten Nachricht, nicht die LÄNGE
+  // der Liste — und das ist seit AGE-655 der Unterschied zwischen einem
+  // brauchbaren und einem unbrauchbaren „Ältere laden". Ältere Nachrichten
+  // davorzusetzen ändert die Länge genauso wie eine neue anzuhängen; an der
+  // Länge hängend risse dieser Effect das Mitglied nach jedem Nachladen ans
+  // untere Ende, also weg von genau der Stelle, für die es den Knopf gedrückt
+  // hat.
+  //
+  // Nebenwirkung, die dabei DAZUKOMMT und deshalb hier steht statt in einer
+  // Fussnote: gleicht `mergeMessage` die optimistische Blase mit der echten
+  // Zeile ab, wechselt deren `id` — die letzte Nachricht ist ja gerade die
+  // eigene. Der Effect feuert dann ein zweites Mal, wo er es vorher nicht tat
+  // (die Länge blieb gleich). Man hat in dem Moment selbst gesendet und steht
+  // ohnehin unten; der zusätzliche Sprung ist folgenlos, aber er ist eine
+  // Verhaltensänderung.
+  const letzteId = messages.at(-1)?.id;
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, thread.id]);
+  }, [letzteId, thread.id]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -146,6 +173,23 @@ export function Conversation({
           imFenster ? "px-3 py-3" : "px-5 py-4",
         )}
       >
+        {/* Der Weg zu den älteren Nachrichten (AGE-655). Er steht oben, weil
+            dort das Ende des Geladenen ist — und er verschwindet, sobald nichts
+            Älteres mehr da ist: ein Knopf, der eine leere Seite lädt, behauptet
+            Inhalt, den es nicht gibt. */}
+        {hatAeltere && (
+          <div className="flex justify-center pb-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={laedtAeltere}
+              onClick={() => void onLadeAeltere()}
+            >
+              {laedtAeltere ? "Wird geladen …" : "Ältere laden"}
+            </Button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted">
             Noch keine Nachrichten — schreibe die erste.
