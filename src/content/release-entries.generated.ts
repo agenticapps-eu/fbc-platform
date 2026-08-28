@@ -66,6 +66,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-28-chat-verlauf-paging",
+    datum: "2026-08-28",
+    titel: "Ältere Nachrichten nachladen statt den ganzen Verlauf auf einmal",
+    linear: "AGE-655",
+    aenderungen: [
+      "Ein langes Gespräch öffnet sich jetzt **sofort**, statt erst den ganzen Verlauf zu laden. Sichtbar sind die letzten 50 Nachrichten — dort, wo man weiterliest.",
+      'Wer weiter zurück will, findet am oberen Rand den Knopf **„Ältere laden"**. Er holt die nächsten 50 und verschwindet, sobald der Verlauf vollständig ist.',
+      "**Die Ansicht bleibt dabei stehen**, wo sie war. Nachgeladene Nachrichten treten oben hinzu, ohne dass es ans Ende des Gesprächs springt.",
+      "Die Tagesmarker rücken mit: lädt man ältere Nachrichten desselben Tages nach, steht der Marker danach über der ersten davon.",
+      "Gilt in der **Gesprächsansicht und im angedockten Fenster** gleichermassen.",
+    ],
+  },
+  {
     slug: "2026-08-28-admin-setzt-stufe",
     datum: "2026-08-28",
     titel: "Ein Admin setzt die Stufe eines einzelnen Mitglieds",
