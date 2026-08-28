@@ -106,6 +106,51 @@ In einem Rutsch, in dieser Reihenfolge — nichts davon braucht das Gerät:
    sofort mit der älteren Zeile wieder auf. Betrifft `use-hinweise.ts:41` und
    die Signatur von `markiere` in `HinweisGlocke.tsx`. Zweiter Haken: die
    50er-Grenze greift **vor** dem Eindampfen.
+
+   ---
+
+   ### ⭐ NEUE MARKE — der grösste Brocken, von Donald am 28.08. um 19:45 gegeben
+
+   **Die Marke ändert ihre FORM.** Vorlagen liegen im Repo unter
+   `docs/marke-neu/` (aus `~/Downloads` gesichert, WhatsApp-Downloads
+   verschwinden): `marke-allein.jpeg` · `lockup-quer.jpeg` ·
+   `lockup-gestapelt.jpeg` · `lockup-quer-claim.jpeg`.
+
+   Was sich ändert, gegenüber dem heutigen `compass-favicon.svg`:
+
+   | | alt | neu |
+   | --- | --- | --- |
+   | Ring | ja, `r=15.5`, `stroke-width=3.5` | **weg** |
+   | Stern | vier Strahlen | **acht** — vier lange Haupt-, vier kurze Nebenstrahlen |
+   | Strahlenform | gerade Rauten | schlank, leicht konkav, spitz auslaufend |
+   | Farbe | Blau `#1F53B0` auf durchsichtig | weiss auf Navy (Invers bleibt) |
+   | Wortmarke | Inter, Akzentpunkte | in den Vorlagen eine Grotesk **ohne** farbige Punkte — **mit Donald klären, ob die Punkte bleiben** |
+
+   `lockup-quer-claim.jpeg` trägt zusätzlich „YOUR NEXT OPPORTUNITY" gesperrt
+   unter der Wortmarke. **Ob dieser Claim übernommen wird, ist offen** — er
+   widerspricht dem deutschen „Gemeinsam erfolgreich" der Startfläche.
+
+   **Die Marke liegt im Repo an DREI Stellen, alle drei müssen mit:**
+
+   1. `public/brand/compass-favicon.svg` — die Quelle für `pnpm app:icons`
+      **und** `pnpm splash`
+   2. `src/components/ui/CompassMark.tsx` — die Web-Fläche
+   3. `docs/design-system.html` — die verbindliche Vorlage
+
+   Danach **beide Generatoren neu fahren**: `pnpm app:icons` (fünfzehn Dateien,
+   App-Symbol — Donald nennt es ausdrücklich) und `pnpm splash` (drei Ebenen).
+   Beide lesen dieselbe Quelle; nachziehen von Hand ist nicht nötig und nicht
+   erlaubt.
+
+   **Achtung, zwei Fallen aus B4/B5, die hier wieder zuschlagen:**
+   - `app-icons.logic.ts` `leseMarke()` erwartet GENAU einen `<circle>` und
+     GENAU einen `<path>` und wirft sonst. Ohne Ring gibt es keinen Kreis mehr
+     — **die Lesefunktion muss mit**, samt ihrer Tests.
+   - Der Beleg gehört ans **gebaute** Artefakt (mittlere Farbe, `Assets.car`),
+     nicht an die Vorlage im Arbeitsbaum.
+
+   ---
+
 3. **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von Donalds altem Token
    aus der deinstallierten App. APNs meldet es noch eine Weile als gültig, es
    kommt also kein `dauerhaft` — von selbst verschwindet es **nie**.
@@ -119,10 +164,24 @@ In einem Rutsch, in dieser Reihenfolge — nichts davon braucht das Gerät:
 
 ## Open questions
 
-- **Die Startfläche ist unbestätigt.** Installiert und frisch, aber Donald sagte
-  „ich sehe keinen Startbildschirm"; danach kam die Push-Arbeit dazwischen. Ob
-  sie erscheint oder nur zu kurz steht, ist offen. Ein Simulator-Bild wurde
-  gebaut, aber nie angesehen — das ist die billigste nächste Messung.
+- **Die Startfläche erscheint NICHT — Donald sagt es zum dritten Mal.** Das ist
+  ein echter Fehler, keine Wahrnehmung. Stand der Messung:
+  - Simulator, eine Sekunde nach dem Start: **weiss**. Nicht beweiskräftig, der
+    Launch Screen steht nur ein paar hundert Millisekunden und der WebView
+    dahinter ist ebenfalls weiss.
+  - Schnellaufnahmen direkt nach dem Kaltstart: die erste ist **schwarz** (Gerät
+    hatte noch nicht gezeichnet), die übrigen wurden nicht mehr angesehen —
+    `/tmp/start-{1..6}.png`, verfallen mit dem Neustart. **Hier wieder ansetzen.**
+  - **Ausgeschlossen:** die Image Sets tragen nur `Scale 1`, aber iOS greift bei
+    fehlenden Auflösungen darauf zurück. `UILaunchStoryboardName` steht auf
+    `LaunchScreen`, ein konkurrierendes `UILaunchScreen` gibt es nicht, und
+    `LaunchScreen.storyboardc` liegt gebaut im Bündel — samt
+    `01J-lp-oVM-view-rootView.nib`.
+  - **Noch nicht geprüft:** ob die von Hand geschriebenen Constraints zur
+    Laufzeit greifen (Verdacht Nummer eins), und ob iOS den alten Launch Screen
+    weiter aus dem Zwischenspeicher zeigt. Wegen der neuen Marke wird die Fläche
+    ohnehin neu erzeugt — **erst die Marke, dann diesen Fehler**, sonst wird
+    zweimal dasselbe gesucht.
 - **Zwei Changes auf einem Branch.** `7a2d923` und `ecef573` sind AGE-641 bzw.
   AGE-587 und sitzen auf dem AGE-642-Branch. Entweder trägt PR #277 alles, oder
   es wird herausgepflückt. **Entscheidung offen.**
