@@ -286,15 +286,23 @@ function ProfileEditor({ uid }: { uid: string }) {
         {/* Hintergrundbild (AGE-498) */}
         <Card className="flex flex-col gap-4">
           <CardTitle className="text-base">Hintergrundbild</CardTitle>
+          {/*
+            `aspect-[3/1]` + `object-contain` — dasselbe wie `ProfileHero`
+            (AGE-600). Vorher stand hier eine feste Höhe (`h-24 sm:h-28`) über
+            die volle Breite: in der rund 703 px breiten Editor-Spalte sind das
+            etwa 6:1, und mit `object-cover` sah das Mitglied direkt nach dem
+            Zuschnitt auf 3:1 einen waagerecht gequetschten Ausschnitt seines
+            EIGENEN Zuschnitts — unter der Beschriftung „Zuschnitt 3:1".
+          */}
           <div
-            className="relative h-24 w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))] sm:h-28"
+            className="relative aspect-[3/1] w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))]"
             data-testid="cover-vorschau"
           >
             {coverAnzeige && (
               <img
                 src={coverAnzeige}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-contain"
               />
             )}
           </div>
