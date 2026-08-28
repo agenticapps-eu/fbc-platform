@@ -82,18 +82,36 @@
 Die jsdom-Zusagen aus 3.3 belegen, dass die Attrappe nicht gerufen wird — nicht,
 dass die gelesene Zeile optisch stehenbleibt. Das ist zweierlei.
 
-- [ ] 4.1 Lokal mit einem Thread von mehr als 50 Nachrichten: „Ältere laden"
-      drücken und belegen, dass die Ansicht **nicht** ans Ende springt.
-- [ ] 4.2 Dasselbe im angedockten Fenster bei 1280 px mit beiden Leisten offen —
-      dort ist die Spalte 14 rem breit (AGE-639).
-- [ ] 4.3 Ist der Verlauf kürzer als eine Seite, steht kein Knopf da.
-- [ ] 4.4 Nach vollständigem Nachladen den Tab wechseln und zurückkommen: der
-      Knopf bleibt weg, und der Verlauf bleibt so lang, wie er war. Das ist die
-      Sichtprobe zu 2.5 und 2.6 zusammen.
+Gemessen am 28.08. gegen DEV, in einem eigens angelegten Wegwerf-Konto mit
+einem Thread von 60 Nachrichten über drei Kalendertage. Alles danach wieder
+gelöscht — `messages` steht global wieder bei 0 wie vorher, `profiles` bei 72.
+
+- [x] 4.1 Erste Seite lädt **50 von 60**, und zwar die neuesten (11–60); Knopf
+      steht; drei Tagesmarker. Nach dem Klick: 60 geladen, Knopf weg,
+      `scrollTop` bleibt **0**, `scrollHeight` wächst 3398 → 3985.
+
+      **Positivkontrolle im Browser**, dieselbe Mutation wie in jsdom: mit der
+      alten Abhängigkeit (`messages.length`) springt `scrollTop` beim Klick von
+      **0 auf 3657** — bei 313 px Sichtfenster und 3985 px Inhalt ist das das
+      untere Ende. Ohne diese Gegenprobe belegte „springt nicht" nichts.
+
+      Nebenbefund: das Prädikat `scrollTop + clientHeight >= scrollHeight - 2`
+      war mit 2 px zu eng und meldete auch im kaputten Fall `false`. Der
+      aussagekräftige Wert ist `scrollTop` selbst.
+- [x] 4.2 Angedocktes Fenster bei 1280 px mit **beiden** Leisten offen: Fenster
+      288 px (18 rem), Knopf 106 px, breiteste Blase 247 px — kein Überlauf.
+      `scrollTop` bleibt auch dort 0, 60 geladen, Knopf weg.
+- [x] 4.3 Zweiter Thread mit 5 Nachrichten: 5 geladen, **kein** Knopf.
+- [x] 4.4 Nach vollständigem Nachladen `visibilitychange` + `focus` ausgelöst
+      (so hängt react-query den Fokus ein): **weiterhin 60 geladen, weiterhin
+      kein Knopf.** Ohne die Vereinigung wäre hier auf 50 zurückgeschnitten
+      worden, ohne die Sperrklinke stünde der Knopf wieder da — die Sichtprobe
+      zu 2.5 und 2.6 zusammen.
 
 ## 5. Abnahme
 
-- [ ] 5.1 `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` grün.
+- [x] 5.1 `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (187 Dateien,
+      2142 Zusagen), `pnpm build` und die drei `grep`-Wächter aus `verify` grün.
 - [ ] 5.2 Diff-Review durch **zwei fremde Anbieter**, Befunde als Korrektur
       sichtbar gemacht statt still ersetzt.
 - [ ] 5.3 `openspec validate --all` grün, danach `openspec archive` +
