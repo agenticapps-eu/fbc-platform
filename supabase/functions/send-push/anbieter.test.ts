@@ -23,8 +23,21 @@ import { baueBenachrichtigung, type Auftrag } from "./nachrichten.ts";
  * Der Umweg ist kein Zierrat — er belegt, dass die Felder die Serialisierung
  * ueberhaupt erreichen, und faengt ein `undefined` ab, das im Objekt noch
  * aussaehe wie ein Wert.
+ *
+ * `any` ist hier Absicht. `fcmKoerper` und `apnsKoerper` geben bewusst
+ * `unknown` zurueck — der Anbieter-Koerper hat ausserhalb dieser Zusagen keine
+ * Form, die jemand anfassen soll —, und dies ist die eine Stelle, die ihn zum
+ * Pruefen aufmacht. Ein Generic `<T>(wert: T): T` genuegt nicht: es reicht
+ * `unknown` durch, und `deno check` faellt dann mit neun Fehlern.
+ *
+ * Die Unterdrueckung gilt ESLint und nicht deno lint, denn nur ESLint laeuft
+ * in CI (`pnpm lint` = `eslint .`, und das liest `supabase/functions/` mit).
+ * Hier stand vorher `deno-lint-ignore` — also die Unterdrueckung fuer den
+ * Linter, der gar nicht prueft, waehrend der pruefende rot wurde. Zwei
+ * Direktiven uebereinander helfen nicht: beide gelten der NAECHSTEN Zeile,
+ * also kann nur eine direkt ueber dem Code stehen.
  */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const durchJson = (wert: unknown): any => JSON.parse(JSON.stringify(wert));
 
 const auftrag: Auftrag = {
