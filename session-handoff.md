@@ -1,10 +1,15 @@
 # Session Handoff — 2026-08-28 (Nachmittag, AGE-641 Phase A abgeschlossen)
 
 **Worktree:** `fbc-platform.donald-age-641-push-fundament`, Branch
-`donald/age-641-push-fundament`. **PR #268 ist offen** (`72ce1d1`), CI lief beim
-Schreiben dieser Zeilen noch. **Phase A von AGE-641 ist vollständig** — der
+`donald/age-641-push-fundament`. **PR #268 ist gemergt** (`c303acf`), der Lauf
+auf `main` ist vollständig grün — `drift-gate`, `deploy` und `functions` alle
+`success`, kein übersprungener Job. **Phase A von AGE-641 ist vollständig**: der
 letzte offene Punkt (A5b, `pg_cron`) ist gebaut und auf DEV **und** PROD
-gemessen.
+gemessen. `migrate-prod` war nicht nötig, dieser PR trug keine Migration.
+
+**Linear korrigiert:** die Automation schob AGE-641 beim Merge auf *Done* —
+zum vierten Mal an diesem Tag und wieder verfrüht, weil das Issue Phase A
+**und** Phase B trägt. Zurück auf *In Progress*, mit Begründung als Kommentar.
 
 ## Accomplished
 
@@ -92,13 +97,41 @@ inhaltlich deckungsgleich.
 
 ## Next session: start here
 
-**Zuerst PR #268 prüfen.** Beim Schreiben lief CI noch. Grün heisst: die vier
-Pflichtchecks auf der HEAD-SHA `72ce1d1` — über `check-runs` auf der SHA lesen,
-nicht über `gh run list`. Bei Grün mergen (Freigabe steht generell), danach
-`gh pr view --json state` gegenprüfen, ein `gh pr merge` kann still fehlschlagen.
+**An AGE-641 ist nichts nachzuholen.** #268 ist gemergt, `main` deployt normal,
+Linear ist korrigiert. Dieser Worktree kann bleiben (der Change ist wegen Phase
+B nicht archiviert) oder abgeräumt werden — er trägt nichts Ungesichertes.
 
-**`migrate-prod` ist danach NICHT nötig** — dieser PR trägt keine Migration. Der
-Objekt-Drift-Scan ist gegen beide Seiten schon grün gelaufen.
+**Der nächste Schritt ist AGE-642, und zwar im Worktree
+`fbc-platform.donald-age-642-capacitor-huelle`.**
+
+⚠️ **„Phase B" heisst in den beiden Changes etwas Verschiedenes** — das ist die
+Verwechslung, die hier am leichtesten passiert:
+
+| | gemeint ist | Stand |
+| --- | --- | --- |
+| `push-fundament` **Phase B** | Token-Registrierung in der App, Sichtprobe am Gerät | **blockiert**, beginnt laut Plan erst *nach dem Merge* von AGE-642 |
+| `capacitor-huelle` **Phase B** | B1 Capacitor + `ios/`/`android/`, B2 Geheimnis-Wächter, B3 Signaturmaterial | das ist der nächste Schritt |
+
+**Stand von AGE-642, gemessen am 28.08. — Linear behauptet etwas anderes:**
+
+- Linear sagt **Backlog**, `startedAt: null`. Falsch: dort liegen **4 Commits**
+  und ein durchgeplanter Change `capacitor-huelle` (proposal, design,
+  `REVIEWS.md`, tasks), **15 von 73 Haken gesetzt**. Der Status steht nur
+  deshalb auf Backlog, weil nie ein PR aufging und die Automation nie feuerte.
+- **Dessen Phase A ist fertig** und war der riskante Teil: der Sitzungsspeicher
+  ist aus dem `localStorage` heraus (`ea79040`, im Browser belegt — eine
+  bestehende Web-Sitzung überlebt den Umbau) und die Routen sind geteilt
+  (`7e7802a`).
+- **`ios/`, `android/` und `capacitor.config.ts` gibt es noch nicht.** B1 ist
+  der nächste Haken — und er **braucht Xcode und Android Studio**, also eine
+  Sitzung an diesem Rechner, nicht nur eine Kommandozeile.
+- **Der Branch ist 39 Commits hinter `main`.** Vor der ersten Messung dort
+  `git fetch` + rebase/merge, sonst misst man gegen einen alten Stand — siehe
+  die Erfahrung aus AGE-641, wo ein frischer Worktree 11 Commits alt war.
+
+**Erste Aktion dort:** `git log --oneline HEAD..origin/main | wc -l` gegen null
+bringen, dann `openspec/changes/capacitor-huelle/tasks.md` ab Abschnitt **B1**
+lesen. Nicht bei null anfangen — der Plan steht und ist zweimal gegengelesen.
 
 **Danach ist Phase B dran, und die gehört AGE-642** (Capacitor-Hülle,
 Worktree `fbc-platform.donald-age-642-capacitor-huelle`). Ohne sie gibt es kein
