@@ -118,7 +118,7 @@ describe("HinweisGlocke (AGE-620)", () => {
     expect(screen.queryByRole("button", { name: /Alle als gelesen/i })).toBeNull();
   });
 
-  it("reicht beim Markieren genau die eine Kennung durch", () => {
+  it("reicht beim Markieren genau den einen Hinweis durch", () => {
     const onMarkiere = vi.fn();
     zeige(
       <HinweisGlocke
@@ -131,7 +131,10 @@ describe("HinweisGlocke (AGE-620)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Benachrichtigungen/i }));
 
     fireEvent.click(screen.getAllByRole("button", { name: /als gelesen markieren/i })[0]);
-    expect(onMarkiere).toHaveBeenCalledWith("abc");
+    // Der ganze Hinweis, nicht nur die Kennung: bei einer Nachricht braucht die
+    // Datenschicht den Faden aus der Nutzlast, um ALLE ungelesenen Zeilen
+    // desselben Gespraechs zu markieren (AGE-641).
+    expect(onMarkiere).toHaveBeenCalledWith(expect.objectContaining({ id: "abc" }));
     expect(onMarkiere).toHaveBeenCalledTimes(1);
   });
 

@@ -27,7 +27,7 @@ export function HinweisGlocke({
 }: {
   hinweise: Hinweis[];
   unbekannt: boolean;
-  onMarkiere: (id: string) => void;
+  onMarkiere: (h: Hinweis) => void;
   onAlle: () => void;
 }) {
   const [offen, setOffen] = useState(false);
@@ -125,7 +125,7 @@ export function HinweisGlocke({
                         der Typecheck, nicht der Test. */}
                     <button
                       type="button"
-                      onClick={() => onMarkiere(h.id)}
+                      onClick={() => onMarkiere(h)}
                       aria-label={`${hinweisText(h)} — als gelesen markieren`}
                       className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     >
