@@ -1,29 +1,39 @@
 # Aufgaben — Push-Fundament (AGE-641)
 
-> ## Stand 28.08., vormittags
+> ## Stand 28.08., mittags — Phase A ist auf PROD
 >
-> **Phase A ist bis auf die Abnahme gebaut.** A1–A4 und A5b stehen seit dem
-> 27.08.; A5 ist am 28.08. dazugekommen, samt einer Reparatur an A5b.
+> **PR #265 ist gemergt (`ebe64da`), `migrate-prod` ist durch, der Frontend-Deploy
+> nachgezogen.** Der Serverweg ist auf DEV **und** PROD gemessen, nicht behauptet:
 >
-> **APNs ist seit dem 28.08. eingerichtet und gemessen.** Der Zugangsweg
-> antwortet an Sandbox **und** Produktion mit `400 BadDeviceToken` — Apple
-> authentifiziert uns, nur das erfundene Gerätetoken wird verworfen. Damit sind
-> `apnsJwt`, die PEM-Einlesung, die Kopfzeilen und `bewerteApns` gegen den
-> echten Anbieter belegt.
+> | | DEV | PROD |
+> | --- | --- | --- |
+> | Migrationen | ✅ | ✅ 6 angewendet |
+> | `send-push` ausgeliefert | ✅ | ✅ gleiche `ezbr_sha256` |
+> | Webhook-Paar | ✅ | ✅ |
+> | richtiger Bearer | `200 {"skipped":true}` | `200 {"skipped":true}` |
+> | falscher Bearer | `401 Unauthorized` | `401 Unauthorized` |
 >
-> **FCM ist seit dem 28.08. ebenfalls eingerichtet und gemessen.** Firebase-
-> Projekt `effbeezee-f9b48`, Dienstkonto-JSON in Infisical `dev`. Gegen das
-> echte FCM: `400 INVALID_ARGUMENT` — authentifiziert, nur das erfundene
-> Gerätetoken verworfen.
+> **Was in Phase A noch offen ist: `pg_cron`** (A5b, zwei Punkte). Ohne den
+> Wiederholungslauf kann die Function zwar `{"modus":"faellig"}`, aber niemand
+> ruft es periodisch. Ein verlorener Push bleibt bis dahin liegen, statt nach
+> fünf Minuten erneut versucht zu werden — die Zeile in der Glocke steht
+> trotzdem. **Deshalb ist der Change noch nicht archiviert.**
 >
-> **Beide Anbieter sind damit belegt.** Von A5 bleibt allein die Zustellung an
-> ein ECHTES Gerät offen, und die hängt an AGE-642 B1.
+> **Beide Anbieter sind gegen ihre echten Endpunkte belegt.** APNs Sandbox und
+> Produktion `400 BadDeviceToken`, FCM `400 INVALID_ARGUMENT` — authentifiziert,
+> nur das erfundene Gerätetoken verworfen. Was fehlt, ist ein echtes
+> Gerätetoken, und das setzt AGE-642 B1 voraus.
 >
 > **Korrektur an dieser Liste:** A4 nannte die RPCs `push_zustellung_daten` und
-> `push_token_entfernen`. Gebaut und gemessen sind
-> `push_auftraege_holen`, `push_auftraege_faellig` und
-> `push_zustellung_quittieren` — die Migration ist die Wahrheit, nicht dieser
-> Text.
+> `push_token_entfernen`. Gebaut und gemessen sind `push_auftraege_holen`,
+> `push_auftraege_faellig` und `push_zustellung_quittieren` — die Migration ist
+> die Wahrheit, nicht dieser Text.
+>
+> **Zweite Korrektur:** bis zum Vormittag stand hier der Webhook als
+> *Konsolen*-Webhook mit **einem** Namen. Falsch — auf DEV und PROD fehlt das
+> Schema `supabase_functions` ganz, Database Webhooks wurden nie aktiviert.
+> Es ist ein `net.http_post`-Trigger von Hand und damit ein **Paar**:
+> `notify_push_webhook` + `notifications_push_webhook`.
 
 Zwei Phasen mit einem ausdrücklichen Halt. **Phase B beginnt erst, wenn
 AGE-642 gemergt ist** — vorher gibt es kein Gerätetoken zu registrieren.
@@ -186,8 +196,14 @@ Issue. Siehe `REVIEWS.md`.
       von Dienstkontoschlüsseln per Vorgabe — **zwei** Richtlinien
       (`iam.disableServiceAccountKeyCreation` und die `iam.managed.`-Variante)
       müssen projektweit auf „nicht erzwungen".
-- [ ] **`prod`-Umgebung befüllen** — bewusst zurückgestellt, solange es keine
-      Produktions-App gibt. Steht in `docs/secrets.md`.
+- [x] **`prod`-Umgebung: das eine Secret, das nicht warten durfte.**
+      `PUSH_WEBHOOK_SECRET` ist gesetzt (byte-gleich mit Infisical `prod`,
+      per Digest belegt) — ohne es antwortet die Function auf jeden Hinweis
+      mit `500`. Die **Anbieter**-Secrets bleiben bewusst leer, solange es
+      keine Produktions-App gibt: ohne Zeile in `push_tokens` legt
+      `push_auftraege_holen` keinen Auftrag an, und `send-push` antwortet
+      `{"skipped":true}`, ohne APNs oder FCM anzufassen. Steht in
+      `docs/secrets.md`.
 - [x] Commit.
 
 ### A5b · **(R2)** Dauerhafter Zustellzustand
@@ -244,7 +260,7 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       Transport".
 - [x] **GREEN**. Commit.
 
-### A6 · Abnahme Phase A
+### A6 · Abnahme Phase A ✅
 
 > ⚠️ **Der PROD-Webhook muss stehen, bevor `migrate-prod` läuft — nicht schon
 > vor dem Merge.** Gemessen am 28.08.: der **Objekt**-Drift-Scan hängt allein in
@@ -283,15 +299,28 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       Wortlaut stammt aus `index.ts`, es ist also der Handler und nicht das
       Gateway) · `{"modus":"faellig"}` → `200`. Damit sind `verify_jwt=false`,
       die Geheimnisprüfung und **beide** RPC-Wege belegt.
-- [ ] **Webhook auf DEV eingetragen und ausgelöst** — im SQL-Editor, nicht in
-      der Konsole: den Menüpunkt gibt es hier nicht. Vorlage (Funktion +
-      Trigger): `docs/secrets.md`, Abschnitt „Den Webhook eintragen".
-      Beleg ist eine Zeile im Function-Log, nicht ein 2xx an den Aufrufer —
-      `send-push` antwortet auch `200`, wenn es nichts zuzustellen gab.
-- [ ] **(R2) Webhook auf PROD** — eigener Punkt, nicht mitgemeint. Dieselben
-      zwei Namen. Spätestens **vor** dem `migrate-prod`-Dispatch, sonst bricht
-      dort der Objekt-Drift-Scan ab. Dazu `PUSH_WEBHOOK_SECRET` in `prod` —
-      die Anbieter-Secrets dürfen leer bleiben.
+- [x] **Webhook auf DEV eingetragen und ausgelöst.** Funktion und Trigger per
+      `pg` angelegt, dann zurückgelesen: beide da, Token wirklich im Rumpf
+      (per Bindeparameter geprüft, nie angezeigt), weder `anon` noch
+      `authenticated` mit `execute`.
+      **Der Beleg ist die Log-Zeile, und sie ist über die Kennung korreliert**,
+      nicht bloß „eine Zeile ist aufgetaucht": Probe-Hinweis eingefügt →
+      `{"fn":"send-push","event":"nichts_zu_tun","hinweisId":"3399360f-…"}`
+      eine Sekunde später. `nichts_zu_tun` ist hier das Richtige — auf DEV gibt
+      es keine Zeile in `push_tokens`. Probezeile wieder entfernt.
+- [x] **(R2) Webhook auf PROD.** Dieselben zwei Namen, vor dem
+      `migrate-prod`-Dispatch. Drei Schritte in dieser Reihenfolge, jeder
+      nachgelesen: (1) `send-push` von Hand nach PROD ausgeliefert — eine NEUE
+      Function, nichts überschrieben, damit entfiel das 404-Fenster bis zum
+      `functions`-Job; (2) `PUSH_WEBHOOK_SECRET` ans Projekt, **vor** dem
+      Trigger, sonst antwortete die Function auf jeden Hinweis mit `500`;
+      Digest gegengeprüft, byte-gleich mit Infisical `prod` (dessen Wert sich
+      von `dev` unterscheidet); (3) Funktion und Trigger angelegt und
+      zurückgelesen, Rechte entzogen.
+      Vor dem Verdrahten gemessen: richtiger Bearer → `502 Lookup failed`
+      (an der Auth vorbei, RPC fehlte noch), falscher → `401 Unauthorized` aus
+      dem Handler. Nach `migrate-prod`: richtiger Bearer → `200 {"skipped":true}`.
+      Die Anbieter-Secrets bleiben in `prod` bewusst leer.
 - [x] **(R2) Drift-Scan nachgezogen.** Der Webhook besteht aus **zwei**
       Objekten: `notify_push_webhook` (Funktion) und
       `notifications_push_webhook` (Trigger). Beide Namen sind festgelegt und
@@ -311,9 +340,25 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       nannte den fehlenden Namen jeweils beim Namen. Dazu die
       Wiederherstellungs-Vorlage in `docs/secrets.md`, auf die die
       Fehlermeldung des Scans verweist — für `send-push` fehlte sie ganz.
-- [ ] PR gegen `main`, vier Pflichtchecks grün, `gh pr view --json state`
-      nachgeschoben.
-- [ ] Nach dem Merge: `migrate-prod`.
+- [x] PR **#265** gegen `main`, vier Pflichtchecks grün **auf der HEAD-SHA**
+      (`8f97c3c`, per `check-runs` geprüft — eine Lauf-Liste hätte auch eine
+      alte SHA grün gezeigt). Gemergt als `ebe64da`, verifiziert per
+      `gh pr view --json state`; ein `gh pr merge` kann still fehlschlagen.
+      Unterwegs zwei Fremdbefunde der parallelen Sitzung eingearbeitet: der
+      rote `verify` (Lint-Unterdrückung für den Linter, der nicht prüft) und
+      `mergeStateStatus: BEHIND`. Der erwartete `deno.lock`-Konflikt kam nicht —
+      dieser Branch fasst keine Abhängigkeit an.
+- [x] Nach dem Merge: `migrate-prod` — grün, `plan` und `apply`. Vorher den
+      Dry-Run **gelesen** (der Workflow hält dafür nicht an): exakt die sechs
+      Migrationen, keine Seeds, keine Rollen. Nachgelesen auf PROD: 6
+      Migrationen, 3 Zustell-RPCs, 3 neue Tabellen, 6 `notify_app_*`-Spalten
+      und **null** alte.
+- [x] **Frontend-Deploy nachgezogen.** `deploy.yml` löst nur auf Push nach
+      `main` aus — ein grüner `migrate-prod` holt nichts nach. Also
+      `gh run rerun --failed`, und davor der Abgleich Lauf-SHA == `origin/main`
+      (ein Re-Run auf älterem Commit rollt das Frontend still zurück).
+      Belegt am Inhalt, nicht am grünen Job: das Live-Bündel enthält
+      `notify_app_` zweimal und `notify_inapp_` **null** mal.
 
 ---
 
