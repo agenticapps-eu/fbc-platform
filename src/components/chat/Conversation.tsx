@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { ChatMessage } from "../../lib/chat";
 import { cn } from "../../lib/cn";
@@ -62,6 +62,12 @@ export function Conversation({
   const eingabeRef = useRef<HTMLTextAreaElement>(null);
   /** Wohin der Cursor nach dem nächsten Anstrich gehört, oder `null`. */
   const cursorRef = useRef<number | null>(null);
+
+  // Jeder Tastendruck in der Eingabe ändert `draft` und stösst damit ein
+  // Rendern an — `messages` bleibt dabei dieselbe Liste. Ohne diesen Merker
+  // liefe die Gruppierung über den GANZEN Verlauf bei jedem Zeichen erneut,
+  // und `fetchMessages` (`lib/chat.ts`) holt ihn ohne Begrenzung.
+  const gruppen = useMemo(() => gruppiereNachTag(messages), [messages]);
 
   // Fokus und Cursor NACH dem Anstrich setzen: vorher trägt das Feld noch den
   // alten Wert, und `setSelectionRange` liefe gegen dessen Länge.
@@ -128,7 +134,7 @@ export function Conversation({
             Noch keine Nachrichten — schreibe die erste.
           </p>
         ) : (
-          gruppiereNachTag(messages).map((gruppe) => (
+          gruppen.map((gruppe) => (
             <div key={gruppe.schluessel} className="space-y-2">
               {/* Der Tagesmarker: mittig, als Pille, einmal je Kalendertag.
                   Er ist eine Überschrift für die Gruppe darunter, kein
