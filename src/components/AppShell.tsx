@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
+import { wischtVonRechts } from "../lib/wischgeste";
 import { navItems, type NavSection } from "../config/nav";
 import {
   ANFRAGEN_STALE_TIME_MS,
@@ -539,6 +540,55 @@ export default function AppShell() {
     return () => mq.removeEventListener("change", auf);
   }, []);
 
+  // AGE-642: Wischen von der RECHTEN Kante öffnet die Nachrichten-Schublade.
+  //
+  // Nur rechts, und das ist der Grund für die ganze Beschränkung: links liegt
+  // auf iOS die System-Zurück-Geste. Wer dort gewinnt, entscheidet das
+  // Betriebssystem, nicht diese App. Der Hamburger bleibt deshalb ein Knopf.
+  //
+  // Nur schmal (`!istBreit`) und nur, wenn die Leiste auf dieser Route
+  // überhaupt steht — sonst öffnete die Geste eine Schublade, die es hier
+  // nicht gibt.
+  //
+  // Die Entscheidung selbst steht in `wischtVonRechts` und ist dort geprüft:
+  // Berührungsereignisse entstehen in jsdom nicht, ein Test, der auf sie
+  // wartet, wäre grün, weil nichts passiert.
+  useEffect(() => {
+    if (istBreit || !chatLeisteSteht) return;
+    let start: { x: number; y: number } | null = null;
+    const anfang = (e: TouchEvent) => {
+      const t = e.touches[0];
+      start = t ? { x: t.clientX, y: t.clientY } : null;
+    };
+    const zug = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!start || !t) return;
+      const treffer = wischtVonRechts({
+        startX: start.x,
+        breite: window.innerWidth,
+        dx: t.clientX - start.x,
+        dy: t.clientY - start.y,
+      });
+      if (!treffer) return;
+      // Erst entwaffnen, dann öffnen: sonst feuert derselbe Zug bei jedem
+      // weiteren `touchmove` noch einmal.
+      start = null;
+      setMobileNavOpen(false);
+      setChatDrawerOpen(true);
+    };
+    const ende = () => {
+      start = null;
+    };
+    window.addEventListener("touchstart", anfang, { passive: true });
+    window.addEventListener("touchmove", zug, { passive: true });
+    window.addEventListener("touchend", ende, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", anfang);
+      window.removeEventListener("touchmove", zug);
+      window.removeEventListener("touchend", ende);
+    };
+  }, [istBreit, chatLeisteSteht]);
+
   // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es
   // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon
   // erscheint. Genau dort zählt die iOS-feste Sperre am meisten.
@@ -857,14 +907,32 @@ export default function AppShell() {
             {user ? (
               <>
                 <NachrichtenEinstieg anzahl={ungelesen.gesamt} unbekannt={ungelesenFehlt} />
-                {/* Eigener Öffner für die Schublade, gespiegelt zum Hamburger
-                    links — und ausdrücklich NICHT die Sprechblase daneben zum
-                    Umschalter gemacht: die führt an einen Ort, und ein Ort
-                    gehört in die Adresszeile und ins Kontextmenü (der Grundsatz
-                    an `NachrichtenEinstieg`). Deshalb auch ein anderes Glyph:
-                    zwei gleiche Sprechblasen nebeneinander wären zwei Namen für
-                    dasselbe. Der Pfeil sagt, was passiert — eine Leiste kommt
-                    von rechts herein. */}
+                <HinweisGlocke
+                  hinweise={hinweise}
+                  unbekannt={hinweiseFehlen}
+                  onMarkiere={markiere}
+                  onAlle={markiereAlle}
+                />
+                <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
+                {/* Eigener Öffner für die Schublade — ausdrücklich NICHT die
+                    Sprechblase weiter links zum Umschalter gemacht: die führt an
+                    einen Ort, und ein Ort gehört in die Adresszeile und ins
+                    Kontextmenü (der Grundsatz an `NachrichtenEinstieg`).
+                    Deshalb auch ein anderes Glyph: zwei gleiche Sprechblasen
+                    nebeneinander wären zwei Namen für dasselbe.
+
+                    AGE-642 (28.08.): Er steht jetzt ganz AUSSEN statt zwischen
+                    Sprechblase und Glocke — als Spiegel zum Hamburger gedacht,
+                    und ein Spiegel, der nicht am Rand sitzt, liest sich als
+                    beliebig eingeschobenes Symbol. Am Gerät gemeldet.
+
+                    Und er BLEIBT, obwohl die Wischgeste von rechts dasselbe
+                    tut. Die Geste ist eine Abkürzung für Geübte, kein Ersatz:
+                    VoiceOver fängt Randgesten selbst ab, und ohne den Knopf
+                    wäre die Schublade dort nicht mehr erreichbar. Neun Zusagen
+                    aus AGE-627 hängen ausserdem an ihm — sie hätten sonst
+                    keinen Einstiegspunkt, denn Berührungsereignisse entstehen
+                    in jsdom nicht. Entscheidung Donald, 28.08. */}
                 {chatLeisteSteht && (
                   <button
                     type="button"
@@ -880,13 +948,6 @@ export default function AppShell() {
                     <ChevronLeftIcon flipped={false} />
                   </button>
                 )}
-                <HinweisGlocke
-                  hinweise={hinweise}
-                  unbekannt={hinweiseFehlen}
-                  onMarkiere={markiere}
-                  onAlle={markiereAlle}
-                />
-                <UserMenu email={user.email ?? "?"} tier={tier} onSignOut={handleSignOut} />
               </>
             ) : (
               // Genau EIN Anmelde-Weg im Rahmen (AGE-499). Der Block über der
@@ -961,12 +1022,14 @@ export default function AppShell() {
           />
           <div
             className={cn(
-              // AGE-642 C1: `py-6` ist hier bewusst AUFGELOEST statt um ein
-              // `pt-*` ergaenzt. Beide waeren gleich spezifisch, und welche
-              // gewinnt, entschiede allein die Reihenfolge im erzeugten
-              // Stylesheet — `cn()` loescht keine Gegenklasse.
-              "absolute inset-y-0 left-0 w-72 max-w-[80vw] overflow-y-auto px-4 shadow-soft",
-              "pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+              // AGE-642 C1: Die FLAECHE wird eingerueckt, nicht nur ihr Inhalt.
+              // Erst hatte sie `inset-y-0` und nur oben mehr Polsterung — dann
+              // liegt die Schublade weiterhin unter der Statusleiste und nur
+              // ihr Text nicht. Am Geraet sah das aus, als ginge sie „ueber die
+              // volle Hoehe". `top`/`bottom` statt `inset-y-0` loest das an der
+              // Wurzel; `py-6` kann deshalb stehen bleiben.
+              "absolute left-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-[env(safe-area-inset-bottom)]",
+              "w-72 max-w-[80vw] overflow-y-auto rounded-r-xl px-4 py-6 shadow-soft",
               SIDEBAR_SURFACE,
             )}
           >
@@ -995,8 +1058,12 @@ export default function AppShell() {
             className="absolute inset-0 bg-scrim backdrop-blur-sm"
             onClick={() => setChatDrawerOpen(false)}
           />
-          {/* AGE-642 C1: keine Padding-Klasse im Weg, deshalb hier direkt. */}
-          <div className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-canvas pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-soft">
+          {/* AGE-642 C1: Die Schublade beginnt UNTER der Kopfzeile, nicht unter
+              der Statusleiste. `4rem` ist die Höhe der Kopfzeile (`h-16`), das
+              `env()` ihr eigener sicherer Rand — die Kopfzeile trägt beides,
+              also muss die Schublade beides überspringen. Vorher lag sie
+              darüber und verdeckte die Navigation, aus der sie kommt. */}
+          <div className="absolute right-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-[env(safe-area-inset-bottom)] flex w-80 max-w-[85vw] flex-col overflow-hidden rounded-l-xl bg-canvas shadow-soft">
             <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
               <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
               <button
