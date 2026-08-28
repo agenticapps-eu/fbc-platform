@@ -6,8 +6,9 @@ import sharp from "sharp";
  *
  * ── WARUM DAS NOETIG IST ────────────────────────────────────────────────────
  * Der Demo-Seed lud die Dateien aus `public/images/` **roh** in den Bucket
- * `event-covers`. Das sind Seiten-Heldenbilder, 1600×1067 bzw. 1600×1200 — sie
- * haben den Zuschneider nie gesehen. Gemessen am 25.08. in den Buckets:
+ * `event-covers`. Das sind Seiten-Heldenbilder, 1600 breit und 1066 bis 1068
+ * bzw. 1200 hoch — sie haben den Zuschneider nie gesehen. Gemessen am 25.08. in
+ * den Buckets:
  *
  *   PROD  1 Objekt, 3,00:1  (durch `EventCoverPicker` gegangen)
  *   DEV   8 Objekte, 1,33:1 und 7 × 1,50:1  (aus dem Seed)
@@ -45,6 +46,10 @@ export async function titelbildZuschnitt(quelle: string | Buffer): Promise<Buffe
       fit: "cover",
       position: "centre",
     })
-    .webp()
+    // `quality: 90`, nicht der sharp-Standard 80: `AvatarCropper` exportiert
+    // mit `toBlob(…, "image/webp", 0.9)`. Ohne diese Zeile stimmte oben nur das
+    // Format, nicht die Qualitätsstufe — und der Satz „genau das, was ein
+    // Mitglied hochlädt" wäre um eine Kleinigkeit zu viel behauptet.
+    .webp({ quality: 90 })
     .toBuffer();
 }

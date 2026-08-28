@@ -694,9 +694,9 @@ async function titelbilder(c: pg.Client): Promise<void> {
         "x-upsert": "false",
       },
       // AGE-599: zugeschnitten statt roh. Die Datei in `public/images/` ist ein
-      // Seitenkopf (1,50:1 bzw. 1,33:1); im 3:1-Feld der Event-Kachel stünde
-      // sie mit rund 25 % freier Fläche je Seite — Material, das das Produkt
-      // selbst nie herstellt.
+      // Seitenkopf; im 3:1-Feld der Event-Kachel stünde sie mit freier Fläche
+      // je Seite — 25,0 % bei den acht 1,50:1-Motiven, 27,8 % bei dem einen
+      // 1,33:1. Material, das das Produkt selbst nie herstellt.
       body: new Uint8Array(await titelbildZuschnitt(join(BILDER, t.bild))),
     });
     if (!r.ok && r.status !== 409) {

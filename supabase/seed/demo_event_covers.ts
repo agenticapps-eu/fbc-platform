@@ -136,6 +136,12 @@ async function main(): Promise<void> {
       // lädt dieselben Heldenbilder in denselben Bucket, und nur eine von
       // beiden zu reparieren hätte den Befund halb behoben und ganz für
       // erledigt erklärt.
+      //
+      // Es sind die zwei Stellen, an denen der SEED schreibt. Daneben schreiben
+      // `src/lib/event-cover.ts` (das Produkt, geht durch den Zuschneider) und
+      // `scripts/sync-dev-ruecklauf.ts` (spiegelt 1:1 aus dem Auszug — dort
+      // gehört ein Zuschnitt ausdrücklich NICHT hin, er verfälschte den
+      // Spiegel).
       const bytes = await titelbildZuschnitt(join(BILDER, zu.datei));
       const stand = await hochladen(basis, key, pfad, bytes);
       await client.query(`update public.events set cover_path = $1 where id = $2`, [pfad, ev.id]);

@@ -90,14 +90,27 @@ describe("Titelbild-Zuschnitt für den Demo-Seed (AGE-599)", () => {
     const { data } = await sharp(await titelbildZuschnitt(probe))
       .raw()
       .toBuffer({ resolveWithObject: true });
-    // Erstes Pixel der zugeschnittenen Fläche: blau, wenn mittig geschnitten.
+
+    // BEIDE Ränder, nicht nur der obere. Das erste Pixel allein unterscheidet
+    // „mittig" nicht von „unten": ein Zuschnitt mit `position: "south"` nähme
+    // y = 500…1000, und dessen erste Zeile liegt mit y = 500 noch IM blauen
+    // Band. Gemessen (Befund MITTEL aus der Diff-Review, opencode):
     //
-    // Nicht auf `[0, 0, 255]` genau: webp ist verlustbehaftet und liefert an
-    // dieser Kante gemessen `[23, 2, 216]`. Zugesichert wird deshalb, welcher
-    // Kanal führt — das unterscheidet Blau von Rot zuverlässig und hängt nicht
-    // an der Kompressionsstufe.
-    const [r, g, b] = [data[0], data[1], data[2]];
-    expect(b, `gemessen r=${r} g=${g} b=${b}`).toBeGreaterThan(150);
-    expect(r, `gemessen r=${r} g=${g} b=${b}`).toBeLessThan(100);
+    //   centre  erstes [23, 2, 216]   letztes [26, 3, 215]   → beide blau
+    //   south   erstes  [2, 0, 255]   letztes [255, 1, 0]    → letztes ROT
+    //   top     erstes [255, 0,   2]                         → erstes ROT
+    //
+    // Erst beide zusammen schliessen alle drei Lagen gegeneinander ab.
+    //
+    // Nicht auf `[0, 0, 255]` genau: webp ist verlustbehaftet. Zugesichert wird
+    // deshalb, welcher Kanal führt — das trennt Blau von Rot mit über 60
+    // Punkten Abstand und hängt nicht an der Kompressionsstufe.
+    function fuehrtBlau(offset: number, wo: string) {
+      const [r, g, b] = [data[offset], data[offset + 1], data[offset + 2]];
+      expect(b, `${wo}: r=${r} g=${g} b=${b}`).toBeGreaterThan(150);
+      expect(r, `${wo}: r=${r} g=${g} b=${b}`).toBeLessThan(100);
+    }
+    fuehrtBlau(0, "erstes Pixel");
+    fuehrtBlau(data.length - 3, "letztes Pixel");
   });
 });
