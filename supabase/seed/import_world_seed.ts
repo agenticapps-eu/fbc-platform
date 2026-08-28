@@ -43,6 +43,8 @@ import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
+import { titelbildZuschnitt } from "./event_cover_zuschnitt";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BILDER = join(HERE, "..", "..", "public", "images");
 
@@ -691,7 +693,11 @@ async function titelbilder(c: pg.Client): Promise<void> {
         "Content-Type": "image/webp",
         "x-upsert": "false",
       },
-      body: new Uint8Array(readFileSync(join(BILDER, t.bild))),
+      // AGE-599: zugeschnitten statt roh. Die Datei in `public/images/` ist ein
+      // Seitenkopf; im 3:1-Feld der Event-Kachel stünde sie mit freier Fläche
+      // je Seite — 25,0 % bei den acht 1,50:1-Motiven, 27,8 % bei dem einen
+      // 1,33:1. Material, das das Produkt selbst nie herstellt.
+      body: new Uint8Array(await titelbildZuschnitt(join(BILDER, t.bild))),
     });
     if (!r.ok && r.status !== 409) {
       const text = await r.text();
