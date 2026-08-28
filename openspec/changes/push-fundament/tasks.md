@@ -239,9 +239,25 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
 
 ### A6 · Abnahme Phase A
 
-- [ ] `openspec validate --all` grün.
-- [ ] Volle pgTAP-Läufe mit expliziter Dateiliste, Ausgabe gelesen.
-- [ ] `pnpm test`, `pnpm typecheck` (**nie** `pnpm format`).
+> ⚠️ **Reihenfolge: der Webhook muss VOR dem Merge in beiden Konsolen stehen.**
+> Seit dem Drift-Scan-Commit erwartet `ERWARTET_OHNE_MIGRATION` den Namen
+> `notifications_push_webhook`. Fehlt der Webhook in PROD, meldet der Scan ihn
+> als **fehlend**, und ein rotes Drift-Gate überspringt den Frontend-Deploy
+> stumm — derselbe Ausfall wie vorher, nur andersherum. Ein Fenster gibt es in
+> beiden Reihenfolgen; nur in dieser liegt es außerhalb von `main`. Also erst
+> die zwei Konsolen, dann der PR.
+
+- [x] `openspec validate --all` grün — 33/33.
+- [x] Volle pgTAP-Läufe mit der Dateiliste aus `ci.yml`, Ausgabe gelesen:
+      **19 Dateien / 923 Zusagen, PASS**. Vorher geprüft, dass der geteilte
+      lokale Stack genau diesen Branch trägt — jede Migration `local` ==
+      `remote`, `20260828100000` eingeschlossen. Ohne diese Probe belegt der
+      Lauf nichts: eine fremde Sitzung kann den Stack mitten in der Messung
+      leeren.
+- [x] `pnpm test` (**174 Dateien / 1968 Zusagen**) und `pnpm typecheck` sauber,
+      dazu `deno test` (**122 Zusagen**) und `deno check` über alle Functions.
+      Formatiert wurde dateiweise mit `prettier --write <pfad>` — **nie**
+      `pnpm format`.
 - [ ] **Webhook in der DEV-Konsole** eingetragen und ausgelöst — Beleg ist eine
       Zeile im Function-Log, nicht ein 2xx an den Aufrufer. `send-push`
       antwortet auch `200`, wenn es nichts zuzustellen gab.
