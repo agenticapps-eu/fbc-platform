@@ -326,6 +326,40 @@ echten Geräten" nicht erreichbar, und das fiele erst ganz am Ende auf.
 - [ ] **Beleg:** ein Pull Request, der nur Web-Dateien ändert, löst ihn **nicht**
       aus, und der Web-Deploy läuft wie bisher.
 
+### B4. Das App-Symbol ✅
+
+Der Startbildschirm ist die einzige Fläche, die jemand sieht, BEVOR er die App
+öffnet — und dort stand bis zum 28.08. das Symbol des Frameworks.
+
+- [x] **RED, und zwar gemessen statt behauptet:** die mittlere Farbe der
+      vorhandenen Symbole, über `sips` auf 1×1 geschrumpft und die Bildpunkte
+      selbst gelesen. `#ebf6fe` (iOS) und `#e6f2fa` / `#e0eff9` (Android) —
+      nahezu weiss, das Standardsymbol. Nachher `#212d3d` auf beiden Seiten.
+- [x] **Eine Quelle:** `scripts/app-icons.logic.ts` liest Ring und Stern aus
+      `public/brand/compass-favicon.svg` — derselben Marke, die der Browser-Tab
+      trägt — und erzeugt daraus alle fünfzehn Dateien beider Plattformen.
+      Keine vierte Kopie der Marke im Repo. `pnpm app:icons`.
+- [x] Genommen ist die **Favicon**-Fassung und nicht die der Komponente: die
+      beiden unterscheiden sich in genau einer Grösse (Ring 3.5 statt 2.5, dafür
+      r=15.5 statt 16.5), und diese ist die für kleine Grössen gehärtete. Ein
+      App-Symbol wird mit 60 pt gezeichnet, in der Einstellungsliste mit 29.
+- [x] Farbe: weiss auf Navy `#081527` — die zweite dokumentierte Markenpaarung
+      (`docs/design-system.html`, „Invers · Weiß auf Navy"). Durchsichtigkeit
+      verbietet iOS ohnehin, und blau auf navy wären 1,9:1.
+- [x] Androids adaptives Symbol: Fläche als **Farbe** (`ic_launcher_background`
+      auf Navy gezogen), Vordergrund nur die Marke, in der inneren
+      Sicherheitszone (66 von 108). Eine mitgezeichnete Fläche im Vordergrund
+      wanderte beim Parallax-Effekt der Startbildschirme sichtbar mit.
+- [x] Zwei tote Vorlagen des Frameworks entfernt (`drawable/ic_launcher_-
+      background.xml`, `drawable-v24/ic_launcher_foreground.xml`) — von keinem
+      `mipmap-anydpi-v26`-Eintrag referenziert, aber im Paket mitgeliefert.
+- [x] **GREEN:** zehn Zusagen auf die Erzeugung, davon drei durch eine
+      Mutations-Gegenprobe belegt (Marke bis an die Kante · Vordergrund aus der
+      Sicherheitszone geschoben · Favicon-Blau stehen gelassen → drei rot).
+- [x] **Beleg am GEBAUTEN Artefakt**, nicht an der Vorlage: `AppIcon60x60@2x.png`
+      *innerhalb* von `App.app` misst `#212c3d`, und dieselben Symbole aus der
+      entpackten `app-debug.apk` messen `#212d3d` in jeder Dichte.
+
 ## Phase C — Ränder, Zurück-Taste, Kamera
 
 ### C1. Sichere Ränder

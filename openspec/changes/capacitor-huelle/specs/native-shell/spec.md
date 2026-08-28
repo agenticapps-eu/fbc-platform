@@ -224,3 +224,38 @@ nicht gegen ein *eigenes, kaputtes*.
   Gerät installiert hat
 - **THEN** erhält dieses Gerät das Bündel nicht
 - **AND** es bleibt auf der Fassung, die zu seiner Schale passt
+
+### Requirement: Die installierte App trägt die Marke, nicht die des Frameworks
+
+Das Symbol der installierten App SHALL die Marke zeigen und SHALL NOT das
+Standardsymbol des Frameworks sein. Das gilt für **beide** Plattformen.
+
+Ein Standardsymbol auf dem Startbildschirm ist kein kosmetischer Rest: es ist
+die einzige Fläche, die ein Mitglied sieht, bevor es die App überhaupt öffnet.
+Es sagt dort, die Anwendung sei ein Gerüst, kein Produkt.
+
+Das Symbol SHALL aus **einer** Quelle im Repository erzeugt werden, aus der
+alle Größen beider Plattformen hervorgehen. Zwei von Hand gepflegte Vorlagen
+SHALL NOT nebeneinanderstehen — sie laufen auseinander, und der Unterschied
+fällt erst auf einem Gerät auf.
+
+Die Quelle SHALL dieselbe Form zeigen wie die Marke der Web-Fläche.
+
+Der Beleg SHALL am **gebauten** Artefakt geführt werden, nicht an der Vorlage im
+Arbeitsbaum: nur dort steht, was auf dem Gerät landet.
+
+#### Scenario: Das gebaute iOS-Bündel trägt die Marke
+
+- **WHEN** das signierte iOS-Bündel gebaut ist
+- **THEN** enthält es ein Symbol in der Markenfarbe und nicht das des Frameworks
+
+#### Scenario: Das gebaute Android-Paket trägt die Marke
+
+- **WHEN** das Android-Paket gebaut ist
+- **THEN** enthält es dasselbe Symbol, in allen Auflösungen des Startbildschirms
+
+#### Scenario: Eine Änderung an der Quelle erreicht beide Plattformen
+
+- **WHEN** die eine Quelle geändert und die Erzeugung erneut gefahren wird
+- **THEN** ändern sich die Symbole beider Plattformen, ohne dass eine Datei von
+  Hand nachgezogen wird
