@@ -243,13 +243,22 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
 - [ ] Volle pgTAP-Läufe mit expliziter Dateiliste, Ausgabe gelesen.
 - [ ] `pnpm test`, `pnpm typecheck` (**nie** `pnpm format`).
 - [ ] **Webhook in der DEV-Konsole** eingetragen und ausgelöst — Beleg ist eine
-      Zeile im Function-Log, nicht ein 2xx an den Aufrufer.
+      Zeile im Function-Log, nicht ein 2xx an den Aufrufer. `send-push`
+      antwortet auch `200`, wenn es nichts zuzustellen gab.
+      Name, Tabelle, Ereignis und Kopfzeile: `docs/secrets.md`, Abschnitt
+      „Den Webhook eintragen".
 - [ ] **(R2) Webhook in der PROD-Konsole** — eigener Punkt, nicht mitgemeint.
-- [ ] **(R2) `scripts/db-drift-scan.ts` nachziehen.** `ERWARTET_OHNE_MIGRATION`
-      (`:27`) führt heute genau zwei Webhook-Namen. Ein per Konsole angelegter
-      `send-push`-Webhook, der dort fehlt, macht den Objekt-Drift-Scan rot — und
-      der läuft bei **jeder** PROD-Migration (`migrate-prod.yml:132`) und blockt
-      den Frontend-Deploy stumm. Der zugehörige Logiktest wird mitgezogen.
+      Derselbe Name, sonst wird der PROD-Drift-Scan rot.
+- [x] **(R2) Drift-Scan nachgezogen.** Der Webhook heißt
+      **`notifications_push_webhook`** — der Name ist damit festgelegt und muss
+      in beiden Konsolen exakt so stehen. `ERWARTET_OHNE_MIGRATION` ist dabei
+      von `db-drift-scan.ts` nach `db-drift-scan.logic.ts` gewandert: das
+      Skript baut schon **beim Import** eine Datenbankverbindung auf, von dort
+      war die Liste nicht prüfbar. Die zwei neuen Zusagen lesen die
+      **ausgelieferte** Liste, keine Kopie — RED gemessen, dann GREEN; die
+      Positivkontrolle nannte den fehlenden Namen beim Namen. Dazu die
+      Wiederherstellungs-Vorlage in `docs/secrets.md`, auf die die
+      Fehlermeldung des Scans verweist — für `send-push` fehlte sie ganz.
 - [ ] PR gegen `main`, vier Pflichtchecks grün, `gh pr view --json state`
       nachgeschoben.
 - [ ] Nach dem Merge: `migrate-prod`.

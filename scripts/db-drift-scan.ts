@@ -15,18 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
-import { findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
-
-/**
- * Objekte, die bewusst in keiner Migration stehen und trotzdem da sein
- * MUESSEN. Der Bearer-Token des Webhooks liegt inline in der Funktion, und
- * dieses Repo ist oeffentlich — deshalb steht das Paar nicht in `migrations/`.
- * Vorlage zum Wiederherstellen: `docs/secrets.md`.
- */
-const ERWARTET_OHNE_MIGRATION = [
-  "notify_contact_request_webhook",
-  "contact_requests_email_webhook",
-];
+import { ERWARTET_OHNE_MIGRATION, findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -141,7 +130,8 @@ if (drift.length > 0) {
       d.art === "unbekannt"
         ? `::error::DRIFT — ${d.typ} "${d.name}" steht in keiner Migration. War jemand am Dashboard?`
         : `::error::DRIFT — "${d.name}" FEHLT. Es steht bewusst in keiner Migration und muss von Hand ` +
-            "wiederhergestellt werden (Vorlage: docs/secrets.md). Ohne es stirbt der Mailversand still.",
+            "wiederhergestellt werden (Vorlage: docs/secrets.md). Ohne ihn stirbt der zugehoerige " +
+            "Versand still — Mail oder Push, je nach Eintrag.",
     );
   }
   rot(`${drift.length} Objekt-Abweichung(en).`);

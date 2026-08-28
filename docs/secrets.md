@@ -311,6 +311,44 @@ wie überall aus Infisical (`supabase secrets set`), plattform-injiziert sind
 Welche Werte es gibt, steht oben in der Server-only-Tabelle. Hier steht, was
 man über sie wissen muss.
 
+### Den Webhook eintragen — der Name ist verbindlich
+
+Er heißt **`notifications_push_webhook`**, in **beiden** Konsolen exakt so.
+Supabase benennt den Trigger nach dem Webhook, und dieser Trigger liegt in
+`public` — er steht damit im Objekt-Drift-Scan
+(`scripts/db-drift-scan.logic.ts`, `ERWARTET_OHNE_MIGRATION`). Ein abweichender
+Name macht den Scan rot; der läuft bei **jeder** PROD-Migration mit
+(`migrate-prod.yml`), und ein rotes Drift-Gate überspringt den Frontend-Deploy
+**stumm**. Wird der Name je geändert, gehört er in derselben Änderung in die
+Liste — die Zusagen in `db-drift-scan.test.ts` lesen sie, nicht eine Kopie.
+
+| | |
+| --- | --- |
+| Name | `notifications_push_webhook` |
+| Tabelle | `public.notifications` |
+| Ereignis | **Insert** (nur; ein Update erzeugt keinen neuen Hinweis) |
+| Typ | HTTP Request → POST |
+| URL | `https://<project-ref>.supabase.co/functions/v1/send-push` |
+| Kopfzeile | `Authorization: Bearer <PUSH_WEBHOOK_SECRET>` |
+
+Anders als bei `notify-contact-request` ist das **kein** von Hand gebauter
+`pg_net`-Trigger, sondern der Database Webhook der Konsole. Er reicht die
+Nutzlast in derselben Form durch (`record.id` ist alles, was `send-push`
+davon liest), und die aufgerufene Funktion `supabase_functions.http_request`
+liegt in einem fremden Schema — deshalb steht hier **ein** Name in der
+Ausnahmeliste, beim Mail-Webhook dagegen zwei.
+
+Der Bearer-Token liegt danach inline in der Trigger-Definition in der
+Datenbank, wie bei jedem Konsolen-Webhook, und ist nur mit DB-Adminzugang
+lesbar. Genau darum steht der Webhook in keiner Migration: dieses Repo ist
+öffentlich.
+
+> **Der Beleg ist eine Zeile im Function-Log, nicht ein 2xx an den Aufrufer.**
+> `send-push` antwortet auch dann `200`, wenn nichts zuzustellen war
+> (`{"skipped":true}`) — Zuordnung, Schalter und Aktivierung entscheidet die
+> RPC, nicht die Function. Wer nur auf den Statuscode schaut, hat den Webhook
+> nicht geprüft.
+
 ### Der APNs-Schlüssel: drei Fallen
 
 **1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den

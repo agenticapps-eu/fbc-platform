@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
+import { ERWARTET_OHNE_MIGRATION, findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
 
 /**
  * Objekt-Drift: was steht in der Datenbank, das in keiner Migration steht —
@@ -10,12 +10,11 @@ import { findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
  *
  *  1. **Unbekanntes melden.** Ein Objekt, das weder in einer Migration noch in
  *     der Ausnahmeliste steht, heißt: jemand war am Dashboard.
- *  2. **Fehlendes melden.** Das Webhook-Paar
- *     (`notify_contact_request_webhook` + `contact_requests_email_webhook`)
- *     steht bewusst in keiner Migration — der Bearer-Token liegt inline und
- *     das Repo ist öffentlich. Verschwindet es, stirbt der Mailversand
- *     **still**: kein Fehler, keine Meldung, nur keine Mails mehr. Genau
- *     dagegen ist dieser Scan gebaut.
+ *  2. **Fehlendes melden.** Die Webhooks in `ERWARTET_OHNE_MIGRATION` stehen
+ *     bewusst in keiner Migration — ihr Bearer-Token liegt inline und das
+ *     Repo ist öffentlich. Verschwindet einer, stirbt sein Versand **still**:
+ *     kein Fehler, keine Meldung, nur nichts mehr. Genau dagegen ist dieser
+ *     Scan gebaut.
  */
 
 const leer: Bestand = { funktionen: [], trigger: [], tabellen: [], views: [], policies: [] };
@@ -104,5 +103,45 @@ describe("findeObjektDrift", () => {
     // Tabellen. Null Objekte heißt: die Abfrage lief ins Leere, nicht dass
     // alles sauber ist. Dieselbe Lehre wie beim Migrations-Gate.
     expect(() => findeObjektDrift(leer, ["is_admin"], [])).toThrow();
+  });
+});
+
+/**
+ * Die Ausnahmeliste selbst — nicht die Funktion, die sie verarbeitet.
+ *
+ * Diese Zusagen prüfen die **ausgelieferte** Liste, nicht eine hier
+ * abgeschriebene Kopie. Eine Kopie belegt nichts: sie ginge weiter durch, wenn
+ * der Name aus `db-drift-scan.logic.ts` verschwände. Darum ist der Bestand aus
+ * `ERWARTET_OHNE_MIGRATION` gebaut und nicht daneben getippt.
+ *
+ * Warum es sie gibt: der `send-push`-Webhook wird von Hand in der Konsole
+ * angelegt und steht darum in keiner Migration. Fehlt sein Name in der Liste,
+ * meldet der Scan ihn als „unbekannt", der PROD-Drift-Scan wird rot — und ein
+ * rotes Drift-Gate überspringt den Frontend-Deploy **stumm**
+ * (`migrate-prod.yml`).
+ */
+describe("ERWARTET_OHNE_MIGRATION", () => {
+  const PUSH_WEBHOOK = "notifications_push_webhook";
+
+  it("meldet keinen Drift, wenn jeder erwartete Webhook im Bestand liegt", () => {
+    // Welcher Eimer, ist hier gleichgültig: geprüft wird gegen die **flache**
+    // Vereinigung (Grenze 3 im Kopf des Logikmoduls). Ein Eintrag ist eine
+    // Funktion, zwei sind Trigger — sie hier aufzuteilen hiesse, die Liste
+    // abzuschreiben, und genau das soll diese Zusage nicht.
+    const bestand: Bestand = { ...leer, trigger: [...ERWARTET_OHNE_MIGRATION] };
+
+    expect(findeObjektDrift(bestand, [], ERWARTET_OHNE_MIGRATION)).toEqual([]);
+  });
+
+  it("meldet den send-push-Webhook als fehlend, wenn er aus der Datenbank verschwindet", () => {
+    const ohnePush = ERWARTET_OHNE_MIGRATION.filter((n) => n !== PUSH_WEBHOOK);
+    // Positivkontrolle: ohne sie wäre die Zusage auch dann grün, wenn der Name
+    // gar nicht in der Liste stünde — dann filterte `filter` nichts weg und der
+    // Bestand wäre vollständig.
+    expect(ohnePush).toHaveLength(ERWARTET_OHNE_MIGRATION.length - 1);
+
+    const drift = findeObjektDrift({ ...leer, trigger: ohnePush }, [], ERWARTET_OHNE_MIGRATION);
+
+    expect(drift).toEqual([{ art: "fehlt", typ: "erwartet", name: PUSH_WEBHOOK }]);
   });
 });
