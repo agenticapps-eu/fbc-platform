@@ -33,43 +33,43 @@ kein Haken.
 
 ## 3. Der Datensatz
 
-- [ ] `scripts/generate-emoji.ts` — holt `de/compact.json` und `de/messages.json`
+- [x] `scripts/generate-emoji.ts` — holt `de/compact.json` und `de/messages.json`
       von `emojibase-data@17`, wirft Gruppe 2 (`component`) weg, schreibt
       `src/content/emoji.generated.ts` als `[emoji, label, tags, group][]`
-- [ ] Kopfkommentar: **läuft NICHT in `prebuild`** (braucht Netz), von Hand
+- [x] Kopfkommentar: **läuft NICHT in `prebuild`** (braucht Netz), von Hand
       anzustossen — anders als `release:entries`
-- [ ] Kopf der **erzeugten** Datei: Quelle, Fassung (`emojibase-data@17.0.0`),
+- [x] Kopf der **erzeugten** Datei: Quelle, Fassung (`emojibase-data@17.0.0`),
       **MIT-Lizenzhinweis**, und „erzeugt — nicht von Hand ändern"
-- [ ] `skins` wird **nicht** mitgenommen (Hauttöne sind ausgeschlossen, siehe
+- [x] `skins` wird **nicht** mitgenommen (Hauttöne sind ausgeschlossen, siehe
       Design 3a) — eine Zeile, falls der Folgevorgang sie will
-- [ ] Erzeugte Datei einchecken
+- [x] Erzeugte Datei einchecken
 
 ## 4. Das Auswahlfeld
 
-- [ ] `src/components/chat/EmojiAuswahl.tsx` — Raster nach Gruppen, Suchfeld über
+- [x] `src/components/chat/EmojiAuswahl.tsx` — Raster nach Gruppen, Suchfeld über
       `label` + `tags`, per `createPortal` an `document.body`
-- [ ] Dynamisches `import()` des Datensatzes beim ersten Öffnen
-- [ ] Position aus `getBoundingClientRect()` des Schalters, **nicht** aus
+- [x] Dynamisches `import()` des Datensatzes beim ersten Öffnen
+- [x] Position aus `getBoundingClientRect()` des Schalters, **nicht** aus
       CSS-Variablen der Hülle (die Falle aus AGE-639)
-- [ ] **Öffnet nach OBEN**, wenn darunter kein Platz ist (im angedockten Fenster
+- [x] **Öffnet nach OBEN**, wenn darunter kein Platz ist (im angedockten Fenster
       immer), waagerecht ans Sichtfenster geklemmt, Neuberechnung bei `scroll`
       und `resize` — aus der Review, MEDIUM
-- [ ] Suche normalisiert: Kleinschreibung **und** Umlautfaltung (`ä→a`, `ß→ss`)
+- [x] Suche normalisiert: Kleinschreibung **und** Umlautfaltung (`ä→a`, `ß→ss`)
       auf beiden Seiten
-- [ ] Tastaturweg: Fokus beim Öffnen ins **Suchfeld**, Pfeiltasten ins Raster,
+- [x] Tastaturweg: Fokus beim Öffnen ins **Suchfeld**, Pfeiltasten ins Raster,
       Enter wählt, Escape schliesst
-- [ ] ARIA: `dialog` mit Namen, `role="grid"`, je Feld der deutsche Name als
+- [x] ARIA: `dialog` mit Namen, `role="grid"`, je Feld der deutsche Name als
       zugänglicher Name, `aria-expanded` am Schalter
-- [ ] Schliessen per Escape und Klick daneben; Fokus zurück in die **Eingabe**
+- [x] Schliessen per Escape und Klick daneben; Fokus zurück in die **Eingabe**
       (nicht auf den Schalter)
-- [ ] **RED zuerst:** Einfügen an der Cursorposition (nicht am Ende), Fokus
+- [x] **RED zuerst:** Einfügen an der Cursorposition (nicht am Ende), Fokus
       kehrt zurück, deutsche Suche findet (Probe: „Herz" → ❤️, „gruen" → 💚)
 
 ## 5. Einbau in die Sendezeile
 
-- [ ] `textarea` in einen `relative` Wrapper, Schalter absolut rechts innen,
+- [x] `textarea` in einen `relative` Wrapper, Schalter absolut rechts innen,
       `pr-9` am Feld
-- [ ] Beide Varianten (`seite`, `fenster`) tragen ihn
+- [x] Beide Varianten (`seite`, `fenster`) tragen ihn
 - [x] `ersetzeEmoticons` in **`useGespraech.sende()`**, nicht in
       `Conversation.submit()` — dort trägt die optimistische Blase denselben
       String wie der Insert, strukturell statt per Konvention (`sendMessage` hat
@@ -79,10 +79,15 @@ kein Haken.
 
 ## 6. Bündel-Zusage prüfen
 
-- [ ] Belegen, dass der Datensatz **nicht** im Startbündel liegt — am erzeugten
+- [x] Belegen, dass der Datensatz **nicht** im Startbündel liegt — am erzeugten
       Bündel gemessen, nicht am Import-Ausdruck
-- [ ] Achtung: ein Build ohne `.env` erzeugt 236 kB ohne App-Code und endet mit
+- [x] Achtung: ein Build ohne `.env` erzeugt 236 kB ohne App-Code und endet mit
       Exit 0. Die Messung braucht echte Werte, sonst misst sie nichts.
+
+**Ergebnis (28.08., echter Build mit 1696 Modulen):** eigenes Bündel
+`dist/assets/emoji.generated-*.js`, 155,14 kB roh / **46,65 kB gzip** — die
+Vorhersage im Proposal war 46 kB. Gegenprobe am Eintragsbündel: „Bierkrug"
+kommt dort **0-mal** vor, im Emoji-Bündel einmal.
 
 ## 7. Sichtprobe im Browser (was jsdom nicht sieht)
 

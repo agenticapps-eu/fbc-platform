@@ -1,20 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
 import type { ChatMessage } from "../../lib/chat";
 import { cn } from "../../lib/cn";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
+import { EmojiAuswahl } from "./EmojiAuswahl";
 
-/** Konversationsansicht (§9): Nachrichten-Verlauf + Eingabe mit optimistischem Senden.
- *
- *  Zwei Varianten, ein Bauteil (AGE-639). Als `seite` trägt sie ihren eigenen
- *  Kopf mit Bild und Namen; als `fenster` nicht — dort IST die Titelzeile des
- *  Fensters der Kopf, samt Minimieren und Schliessen, und ein zweiter Kopf
- *  darunter nennte den Partner ein zweites Mal auf 14 rem Breite.
- *
- *  EINE Angabe statt zweier Schalter („ohne Kopf", „enger"): beides folgt aus
- *  derselben Tatsache — diese Unterhaltung steht in einem angedockten Fenster.
- *  Zwei Schalter liessen sich unabhängig setzen und damit falsch kombinieren. */
 const NUR_UHRZEIT = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 const MIT_DATUM = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
@@ -43,6 +34,16 @@ function zeitLabel(createdAt: string, jetzt: Date): string {
   return (gleicherTag ? NUR_UHRZEIT : MIT_DATUM).format(d);
 }
 
+/** Konversationsansicht (§9): Nachrichten-Verlauf + Eingabe mit optimistischem Senden.
+ *
+ *  Zwei Varianten, ein Bauteil (AGE-639). Als `seite` trägt sie ihren eigenen
+ *  Kopf mit Bild und Namen; als `fenster` nicht — dort IST die Titelzeile des
+ *  Fensters der Kopf, samt Minimieren und Schliessen, und ein zweiter Kopf
+ *  darunter nennte den Partner ein zweites Mal auf 14 rem Breite.
+ *
+ *  EINE Angabe statt zweier Schalter („ohne Kopf", „enger"): beides folgt aus
+ *  derselben Tatsache — diese Unterhaltung steht in einem angedockten Fenster.
+ *  Zwei Schalter liessen sich unabhängig setzen und damit falsch kombinieren. */
 export function Conversation({
   thread,
   messages,
@@ -67,6 +68,31 @@ export function Conversation({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const eingabeRef = useRef<HTMLTextAreaElement>(null);
+  /** Wohin der Cursor nach dem nächsten Anstrich gehört, oder `null`. */
+  const cursorRef = useRef<number | null>(null);
+
+  // Fokus und Cursor NACH dem Anstrich setzen: vorher trägt das Feld noch den
+  // alten Wert, und `setSelectionRange` liefe gegen dessen Länge.
+  useLayoutEffect(() => {
+    if (cursorRef.current === null) return;
+    const el = eingabeRef.current;
+    if (el) {
+      el.focus();
+      el.setSelectionRange(cursorRef.current, cursorRef.current);
+    }
+    cursorRef.current = null;
+  });
+
+  /** Fügt an der Cursorposition ein, nicht am Ende — wer mitten im Satz ein
+   *  Emoji wählt, meint diese Stelle. */
+  function fuegeEmojiEin(emoji: string) {
+    const el = eingabeRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const ende = el?.selectionEnd ?? start;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(ende));
+    cursorRef.current = start + emoji.length;
+  }
 
   // Immer ans Ende scrollen, wenn neue Nachrichten kommen oder der Thread wechselt.
   useEffect(() => {
@@ -159,31 +185,44 @@ export function Conversation({
           imFenster ? "px-3" : "px-5",
         )}
       >
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              submit(event);
-            }
-          }}
-          rows={1}
-          // Kürzer im Fenster: bei 14 rem Fensterbreite bleiben der Eingabe
-          // rund 7 rem, und „Nachricht schreiben…" brach dort auf zwei Zeilen
-          // und wurde abgeschnitten (im Browser gesehen). Der ZUGÄNGLICHE Name
-          // bleibt in beiden Varianten derselbe — er beschreibt die Aufgabe,
-          // nicht den verfügbaren Platz.
-          placeholder={imFenster ? "Nachricht…" : "Nachricht schreiben…"}
-          aria-label="Nachricht schreiben"
-          className={cn(
-            "max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-md border border-line bg-canvas py-2.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none",
-            // `min-w-0` ist im Fenster nicht Kosmetik: ohne es setzt das
-            // Flex-Element seine Inhaltsbreite als Minimum durch und schiebt den
-            // Senden-Knopf bei 14 rem aus der Zeile.
-            imFenster ? "min-w-0 px-2" : "px-3",
-          )}
-        />
+        {/* `relative` Wrapper: der Emoji-Schalter liegt IM Feld, nicht als
+            dritter Partner in der Zeile — bei 14 rem nähme er dort mehr als ein
+            Drittel der verbleibenden Eingabebreite. */}
+        <div className="relative flex-1">
+          <textarea
+            ref={eingabeRef}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit(event);
+              }
+            }}
+            rows={1}
+            // Kürzer im Fenster: bei 14 rem Fensterbreite bleiben der Eingabe
+            // rund 7 rem, und „Nachricht schreiben…" brach dort auf zwei Zeilen
+            // und wurde abgeschnitten (im Browser gesehen). Der ZUGÄNGLICHE Name
+            // bleibt in beiden Varianten derselbe — er beschreibt die Aufgabe,
+            // nicht den verfügbaren Platz.
+            placeholder={imFenster ? "Nachricht…" : "Nachricht schreiben…"}
+            aria-label="Nachricht schreiben"
+            className={cn(
+              "max-h-32 min-h-[2.75rem] w-full resize-none rounded-md border border-line bg-canvas py-2.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none",
+              // `min-w-0` ist im Fenster nicht Kosmetik: ohne es setzt das
+              // Flex-Element seine Inhaltsbreite als Minimum durch und schiebt den
+              // Senden-Knopf bei 14 rem aus der Zeile.
+              imFenster ? "min-w-0 px-2" : "px-3",
+              // Platz für den Emoji-Schalter, der über dem Feld liegt.
+              imFenster ? "pr-7" : "pr-9",
+            )}
+          />
+          <EmojiAuswahl
+            imFenster={imFenster}
+            onWaehle={fuegeEmojiEin}
+            onSchliessen={() => eingabeRef.current?.focus()}
+          />
+        </div>
         <Button type="submit" size={imFenster ? "sm" : "md"} disabled={sending || !draft.trim()}>
           Senden
         </Button>
