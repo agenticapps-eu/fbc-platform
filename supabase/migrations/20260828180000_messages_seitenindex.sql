@@ -13,8 +13,9 @@
 -- Länge des Gesprächs, obwohl die Seitengrenze längst da war.
 --
 -- ══ GEMESSEN, NICHT ANGENOMMEN ═════════════════════════════════════════════
--- Am 26.08. forderten zwei Plan-Reviewer denselben Index für die ZÄHLABFRAGE,
--- und gemessen an 20 000 Nachrichten wählte der Planer ihn NIE
+-- Am 26.08. forderten zwei Plan-Reviewer diesen ANSATZ — einen zusammen-
+-- gesetzten Index ab `(thread_id, created_at)` — für die ZÄHLABFRAGE, und
+-- gemessen an 20 000 Nachrichten wählte der Planer ihn NIE
 -- (`20260826170000_lesestand_und_ungelesen_zaehler.sql:69-83`). Ein Index, den
 -- niemand wählt, ist nicht neutral: er kostet bei jedem Insert. Deshalb steht
 -- hier keine Begründung ohne Messung.
@@ -38,6 +39,12 @@
 -- Transaktion stabil, ein Import erzeugt Gleichstände der Bauart nach. Ein
 -- Index nur auf `(thread_id, created_at)` liesse die zweite Hälfte der
 -- Ordnung ungestützt und der Sortierschritt käme zurück.
+--
+-- Die beiden `desc` sind dagegen NICHT nötig: weil BEIDE Schlüssel absteigend
+-- gelesen werden, liefert ein Index ohne Richtungsangabe dieselbe Ordnung im
+-- Rückwärts-Scan, kostenneutral. Sie stehen trotzdem da, damit der Index wie
+-- die Abfrage aussieht — beide Reviewer haben darauf gezeigt und keiner hat
+-- daraus einen Befund gemacht.
 --
 -- ══ WAS DER INDEX NICHT LÖST ═══════════════════════════════════════════════
 -- Auf der Cursor-Seite steht das Keyset im `Filter`, nicht in der `Index
@@ -69,6 +76,35 @@
 -- Sorte. Der Einwand gilt nicht, die Atomarität der übrigen Migrationen aber
 -- auch nicht für diese hier — deshalb steht in dieser Datei genau EINE
 -- Anweisung und sonst nichts.
+--
+-- ══ WENN DER BAU SCHEITERT: `if not exists` HEILT DAS NICHT ════════════════
+-- Beide Diff-Reviewer haben unabhängig auf dieselbe Lücke gezeigt, und sie ist
+-- gemessen (28.08., lokaler Stack — ein invalider Index lässt sich verlässlich
+-- herstellen, indem ein `create unique index concurrently` an Dubletten
+-- scheitert):
+--
+--   1. Der Bau scheitert (`23505`) → das Objekt bleibt stehen, `indisvalid`
+--      ist `false`.
+--   2. Dieselbe Anweisung mit `if not exists` erneut → sie tut NICHTS. Der
+--      invalide Index bleibt, mit seiner ALTEN Definition.
+--
+-- Er kostet dann bei jedem Insert und wird nie gewählt, und weder das
+-- `migration-drift-gate` noch der Objekt-Drift-Scan sehen ihn: beide prüfen
+-- Versionen und Objektnamen, nicht `indisvalid`.
+--
+-- Der Weg zurück ist deshalb von Hand und heisst NICHT „nochmal pushen":
+--
+--   drop index concurrently if exists public.messages_thread_created_id_idx;
+--
+-- danach die Migrationszeile zurücksetzen und erneut anwenden. Zu prüfen ist
+-- der Zustand mit
+--
+--   select indisvalid from pg_index
+--   where indexrelid = 'public.messages_thread_created_id_idx'::regclass;
+--
+-- Bei 23 Zeilen in PROD ist ein Fehlschlag praktisch ausgeschlossen; die
+-- Anweisung steht hier, weil der Fehlerfall sich SELBST VERSTECKT und der
+-- nächste Versuch ihn stumm überspringt.
 --
 -- ══ `messages_thread_id_idx` BLEIBT (vorerst) ══════════════════════════════
 -- Er ist ein echtes Präfix des neuen Index und damit für Nachschlagen
