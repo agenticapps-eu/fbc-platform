@@ -1,141 +1,135 @@
 # Session Handoff — 2026-08-28 (fünfundvierzigste Sitzung, vormittags)
 
-Kurze Sitzung, ein Ziel: **das Archivieren nachholen**, das die letzte Übergabe
-als nächsten Schritt benannt hatte. Erledigt — und dabei zwei Befunde gefunden.
+Drei Dinge erledigt: das **Archivieren nachgeholt**, das die letzte Übergabe
+verlangte; **AGE-652** durch die volle Schleife; und die **Worktree-Rückfragen
+dauerhaft abgestellt**, nach denen Donald ausdrücklich gefragt hat.
 
 | Vorgang | Stand |
 | --- | --- |
-| **AGE-639** Chatfenster (PR #258) | ✅ war schon gemergt, CI auf `main` grün |
-| **AGE-632 / 634 / 636 / 638** archiviert (PR #260) | ✅ gemergt als `a08d909` |
-| **AGE-651** Blase frisst das Kuvert | 🆕 angelegt, Backlog |
-| **AGE-652** Spec-Drift `lg` statt `xl` | 🆕 angelegt, Backlog |
+| **AGE-632/634/636/638** archiviert (PR #260) | ✅ `a08d909`, alle 11 check-runs grün |
+| Übergabe vormittags (PR #261) | ✅ `c540f4b` |
+| **AGE-652** Spec-Drift `lg` → `xl` (PR #262) | ✅ `7939f08`, Linear auf Done |
+| **AGE-651** Blase frisst das Kuvert | 🆕 Backlog, Gestaltungsfrage für Donald |
+| Worktree-Erreichbarkeit + stale `main` | ✅ dauerhaft behoben, gemessen |
 
 ## Accomplished
 
 **`openspec/changes/` ist aufgeräumt.** Es lagen **vier** unarchivierte Changes
-da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen.
-Alle vier waren seit dem 27.08. auf `main` gebaut; ihre Wahrheit stand trotzdem
-nicht in `openspec/specs/` und sie fehlten in der Neuigkeiten-Liste. Übrig
-bleiben nur die fünf `add-*`-Vorhaben, und die zu Recht: sie tragen
-ausschliesslich offene Aufgaben (12–16 je), sind also gar nicht gebaut.
+da, nicht drei — die letzte Übergabe hat `sidebar-pill` (AGE-638) übersehen, und
+ausgerechnet der trug den einzigen offenen Haken. Übrig sind nur die fünf
+`add-*`-Vorhaben, zu Recht: sie tragen ausschliesslich offene Aufgaben.
 
-**Der letzte offene Haken aus AGE-638 ist nachgemessen, nicht weggeschrieben.**
-Die Frage war, ob eine mehrstellige Ungelesen-Zahl den eingeklappten Rail
-sprengt. Antwort: **nein, auch nicht vierstellig.**
+**Der offene Haken aus AGE-638 ist nachgemessen.** Der Rail wird von einer
+mehrstelligen Zahl **nicht** gesprengt, auch vierstellig nicht: `-right-0.5`
+nagelt die rechte Kante fest, die Blase wächst nach links, die Luft rechts bleibt
+konstant 15,5 px. Gefunden hat die Messung etwas anderes → **AGE-651**: die Blase
+verdeckt das Kuvert, zweistellig zur Hälfte, vierstellig ganz.
 
-| Ziffern | Blase breit | Luft rechts | Luft links | Kuvert verdeckt |
-| --- | --- | --- | --- | --- |
-| 2 (`12`) | 19,52 px | 15,5 px | 36,98 px | 9,52 von 20 px |
-| 3 (`137`) | 26,00 px | 15,5 px | 30,50 px | 16 von 20 px |
-| 4 (`1481`) | 31,69 px | 15,5 px | 24,81 px | 20 von 20 px |
-
-`-right-0.5` nagelt die rechte Kante fest, die Blase wächst nach **links** —
-darum ist die Luft rechts über alle drei Messungen konstant. Kein Umbruch (Höhe
-bleibt 18 px), und der Inhaltsbedarf ist mit der Kastenbreite identisch, also
-auch kein Überlauf, den ein `scrollWidth` von 0 verschwiegen hätte.
+**AGE-652 ist gebaut, nicht nur behauptet.** Zwei Anforderungen in derselben
+Datei widersprachen einander, beide mit `SHALL`. Abgeglichen wurde **Spec gegen
+Spec** — die Autorität ist die neuere, begründete Anforderung, nicht der Code.
+Sonst wäre es die Red-Flag-Zeile „a spec delta edited to match the code".
 
 ## Decisions
 
-- **Vor jedem Archivieren erst gegen `main` prüfen, dass der Code da ist.**
-  Nicht dem Change glauben: `admin_set_tier` als Migration **und** als Aufruf,
-  `ReleaseNoteModal` im Import, `teileAuf()` mit der `release_entry_skips`-
-  Migration. Archivieren schreibt Wahrheit — eine Behauptung darf das nicht.
-- **Die generierte Neuigkeiten-Datei wird nach dem Erzeugen einzeln
-  prettier-formatiert.** `pnpm release:entries` schreibt JSON-Quoting, die
-  eingecheckte Datei ist formatiert. Ohne den Zwischenschritt stünden 889 Zeilen
-  reiner Kosmetik im Diff; mit ihm 51, rein additiv. **`prettier --write` auf
-  GENAU DIESER Datei** — nie `pnpm format`.
-- **Die zwei Befunde wurden Vorgänge, keine Diffs.** Beide liegen ausserhalb
-  dessen, was diese Sitzung erledigen sollte, und einer ist eine
-  Gestaltungsfrage, die Donald gehört.
-- **`sidebar-pill` wurde trotzdem archiviert**, weil sein offener Haken eine
-  *Messung* war, keine Arbeit. Die Messung ist nachgeholt und steht mit allen
-  Zahlen in der archivierten `tasks.md`.
+- **Spec-only-Korrekturen laufen hier über einen vollen Change**, nicht als
+  Handedit in `openspec/specs/`. Präzedenz ist AGE-579 (`d071ddc`): proposal,
+  REVIEWS.md, Messbeleg, tasks, Delta — für eine Ein-Satz-Korrektur.
+- **Ein `MODIFIED`-Block bekräftigt alles, was in ihm steht.** Darum wurden zwei
+  *bestehende* Falschaussagen im selben Szenario mitkorrigiert, obwohl
+  „Surgical Changes" dagegenspricht: Stehenlassen wäre dort keine Zurückhaltung,
+  sondern eine Bekräftigung unter neuem Datum.
+- **Die generierte Neuigkeiten-Datei wird einzeln prettier-formatiert.** Ohne
+  diesen Schritt stünden 889 Zeilen Kosmetik im Diff; mit ihm sind es die
+  tatsächlichen Zeilen. Nie `pnpm format`.
+- **Kein Linear-Statuswechsel von Hand**, obwohl ein Reviewer ihn forderte. Die
+  GitHub-Automation schaltet In Progress/Done — bei AGE-652 beobachtet.
+- **Worktrees: Verzeichnis freigeben statt Layout umlegen** (Donalds Wahl). So
+  bleiben die bestehenden neun Worktrees und die parallel laufenden Sitzungen
+  erreichbar.
 
 ## Files modified
 
-- `openspec/changes/{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill}/`
-  → `openspec/changes/archive/2026-08-28-*/` (verschoben)
-- `openspec/changes/archive/2026-08-28-sidebar-pill/tasks.md` — der offene Haken
-  ist abgehakt, mit der Messtabelle und den zwei Fallen darunter
-- `openspec/specs/{admin,notifications,design-system}/spec.md` — je eine
-  Anforderung dazu (alle vier Delta-Specs waren reine `ADDED`-Blöcke)
-- `src/content/release-entries.generated.ts` — vier Einträge, +51 Zeilen
+- `openspec/changes/archive/2026-08-28-{admin-setzt-stufe,release-notes-modal,neuigkeiten-archiv,sidebar-pill,rail-breakpoint-xl}/`
+- `openspec/specs/{admin,notifications,design-system}/spec.md`
+- `src/content/release-entries.generated.ts` — fünf Einträge dazu
+- **Maschinenkonfiguration** (nicht im Repo): `~/.claude/settings.json`
+  (`additionalDirectories`, Sicherung als `.bak-2026-08-28`) und
+  `~/.config/worktrunk/config.toml` (`[pre-switch] sync-main`)
 
 ## Next session: start here
 
-**Zuerst nachsehen, ob der Deploy auf `a08d909` durchgelaufen ist:**
-`gh api repos/agenticapps-eu/fbc-platform/commits/a08d909/check-runs`. Beim
-Schreiben waren `build`, `deploy`, `drift-gate`, `edge-functions`, `migrate-dev`
-und `report-build-status` grün; `verify`, `migrations` und der zweite `deploy`
-liefen noch. **Das grüne drift-gate ist die gute Nachricht** — der Deploy wird
-also nicht still übersprungen.
+**Zuerst die check-runs auf `7939f08` nachsehen.** Beim Schreiben waren `build`,
+`deploy`, `edge-functions`, `migrate-dev` und `report-build-status` grün;
+`verify`, `migrations` und `drift-gate` liefen noch. Kein Migrationsanteil, das
+drift-gate sollte also nicht überspringen.
 
-**Danach ist AGE-652 der billigste sinnvolle Schritt**: eine Szenario-Bedingung
-in `openspec/specs/design-system/spec.md` von `lg` auf `xl` ziehen. Klein,
-belegt, und er räumt einen Widerspruch weg, der sonst die nächste Änderung an
-den Leisten in die falsche Richtung schickt.
+**Danach ist AGE-651 der nächste sinnvolle Schritt** — aber er braucht erst
+Donalds Entscheidung, keine Arbeit: kappen bei `99+`, die Blase nach aussen in
+die 15,5 px Luft setzen, oder das Symbol vergrössern? Ohne diese Antwort ist der
+Vorgang nicht baubar. Danach kämen AGE-645 (Emoji, klein) oder AGE-646
+(Antworten, eine Spalte, keine neue Tabelle).
 
 **Dieser Worktree kann weg.** Er heisst `fbc-platform.neuigkeiten-archiv` nach
-einem Change, der jetzt archiviert ist; der Branch
-`donald/age-636-changes-archivieren` ist gemergt. `wt remove`, wenn nichts mehr
-daran hängt.
+einem Change, der jetzt archiviert ist. `wt remove`, wenn nichts mehr dranhängt.
 
 ## Open questions
 
 - **Die erste Release-Note ist weiterhin nicht zugestellt** (Donald bzw. Detlev;
-  sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt vier
-  Einträge mehr.
-- **AGE-651 ist eine Gestaltungsfrage**, keine technische: kappen bei `99+`, die
-  Blase nach aussen in die 15,5 px Luft setzen, oder das Symbol vergrössern? Was
-  hier entschieden wird, gilt vermutlich für die Topbar mit.
-- Unverändert offen: AGE-645/646/647/648 (Emoji, Antworten, Reaktionen, Gruppen)
-  · AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation des
-  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630 · die
-  Threadliste markiert offene Chatfenster nicht · `community-feed/spec.md:6`
-  verspricht „threaded comments", `public.comments` hat kein `parent_id`.
+  sie geht genau einmal an alle aktivierten Mitglieder). Sie enthält jetzt fünf
+  Einträge mehr — darunter den von AGE-652, der eine interne Spec-Korrektur ist
+  und beim Zustellen ein Kandidat für „nicht relevant" wäre.
+- **AGE-651 ist eine Gestaltungsfrage**, keine technische. Was dort entschieden
+  wird, gilt vermutlich für die Topbar mit — sie trägt dieselbe Zahl im selben
+  Muster.
+- Unverändert offen: AGE-645/646/647/648 · AGE-610 · AGE-512 ·
+  Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
+  AGE-256 · AGE-606 · AGE-628/629/630 · die Threadliste markiert offene
+  Chatfenster nicht · `community-feed/spec.md:6` verspricht „threaded comments",
+  `public.comments` hat kein `parent_id`.
 
 ## Was diese Sitzung gelernt hat
 
-**`last_read_at` lässt sich nicht zurückdatieren, und es sagt nichts.** Auf
-`thread_read_positions` sitzt `thread_read_positions_serveruhr`, ein `before
-insert or update`-Trigger, der den Wert bedingungslos auf `clock_timestamp()`
-setzt. Ein UPDATE mit einem älteren Zeitpunkt geht durch, meldet eine betroffene
-Zeile — und bewirkt nichts. Der Ausweg ist die **andere Seite des Vergleichs**:
-`messages.created_at` trägt keinen solchen Trigger. Die Probenzeilen liegen
-darum zwei Stunden in der Zukunft, dann holt kein späteres Vorrücken sie ein.
+**Die Plan-Review hat sich in AGE-652 bezahlt gemacht, und zwar messbar.** Drei
+Reviewer (gemini APPROVE, codex/`gpt-5.6-sol` und opencode/`Kimi-K3` beide
+REQUEST-CHANGES) fanden zwei HIGH-Befunde, davon **einen unabhängig
+doppelt** — und der schärfste war einer, den ich nie gefunden hätte: meine
+Messung belegte den Erstbesuch gar nicht, weil `fbc.chatCollapsed` auf `"1"`
+stand. Gemessen war ein gespeicherter Zustand.
 
-**Ein leeres RPC-Ergebnis hat hier immer mehrere Ursachen.**
-`unread_message_counts()` ist `security invoker` und erbt drei Bedingungen:
-`is_activated()`, Teilnahme am Thread, Eigentümerschaft am Lesestand. Alle drei
-sehen von aussen gleich aus (`[]`). Getrennt geprüft — Aktivierung und Stufe
-waren in Ordnung, es war der Lesestand.
+**`resize_page` ist wirkungslos, `emulate` nicht.** Nach `resize_page(1279)`
+meldete die Seite weiter `innerWidth: 1688` — ohne Fehler, ohne Hinweis. Drei
+falsche Messungen wären so entstanden. In jeder Messung `innerWidth`
+mitausgeben und gegen die gewünschte Breite prüfen.
 
-**Der Negativbefund zum Breakpoint brauchte eine Positivkontrolle.** „Bei
-1100 px ist der rechte Rail nicht da" belegt für sich nichts — die Messung hätte
-auch ins Leere laufen können. Erst die linke Leiste mit ihren 256 px in
-derselben Messung macht daraus einen Befund.
-
-**Die Übergabe hat einen Change übersehen, und der trug den einzigen offenen
-Haken.** „Die drei alten Changes" stand da; es waren vier. Gefunden hat es nicht
-das Lesen der Übergabe, sondern ein `ls openspec/changes/`.
+**Eine Schwelle belegt man an der Kante.** 1100 und 1688 px zeigen zwei
+Zustände, aber nicht, wo der Sprung liegt. Das tun 1279 (Breite 0) und 1280
+(72 px) — plus die gemessene Wurzelschriftgrösse, damit „80rem = 1280 px" nicht
+auf einer Annahme ruht.
 
 **`git checkout <branch> -- <datei>` holt die COMMITTETE Fassung.** Eine frisch
-geschriebene, noch ungesicherte Datei ist danach weg — hier genau diese Übergabe,
-einmal komplett. Nach einem `git checkout -b` ist die Arbeitskopie ohnehin schon
-mitgekommen; der zweite Befehl war überflüssig und schädlich.
+geschriebene, ungesicherte Datei ist danach weg — hier diese Übergabe, einmal
+komplett. Nach `git checkout -b` ist die Arbeitskopie ohnehin mitgekommen.
+
+**`switch.base` gibt es in der wt-Config nicht.** wt nimmt den Schlüssel
+widerspruchslos an und ignoriert ihn; erkennbar nur am gemessenen Commit des
+entstandenen Worktrees, nicht an einer Fehlermeldung.
 
 ## Umgebung
 
-Der lokale Stack lief und trug noch **anna@chattest.invalid / bernd@…** aus
-einer früheren Sitzung (Passwort `Testchat2026!`, siehe
-`scripts/chat-testkonten.ts`), ein Gespräch, fünf Nachrichten. Die
-Probennachrichten dieser Sitzung sind wieder weg (das Skript räumt über die
-Marke `[age-638-probe]` im Textanfang auf und ist wiederholbar).
+**Worktrees sind jetzt dauerhaft erreichbar** — `~/Sourcecode` steht in
+`permissions.additionalDirectories`. Gemessen: ein `cd` in einen fremden
+Worktree bleibt stehen, ohne Neustart. Weiterhin gilt: `wt switch --create …
+--no-cd --format=json`, dann `cd` auf den `path` aus der Antwort; `EnterWorktree`
+schlägt bei Geschwister-Worktrees fehl.
 
-Vite lief auf **5310**, gestartet mit den Werten aus `supabase status`. Er hört
-auf `localhost`, nicht auf `127.0.0.1`. Auf dem Rechner standen dabei acht
-weitere Node-Prozesse auf 5173–5210 — alte Server aus anderen Sitzungen.
+**Die lokale `main` zieht sich selbst nach** — `[pre-switch] sync-main` in
+`~/.config/worktrunk/config.toml` fetcht und macht `main` per `--ff-only`
+aktuell, bevor ein Worktree entsteht. Gemessen: Worktree landete auf `c540f4b`
+statt auf dem sechs Commits alten `e4eb9d1`.
 
-Für Skripte im Scratchpad: `node_modules` als Symlink dorthin legen, sonst
-findet `tsx` kein `pg`. Und `.mts` statt `.ts`, sonst bricht Top-Level-`await`.
+Lokaler Stack: `anna@chattest.invalid` / `Testchat2026!` (siehe
+`scripts/chat-testkonten.ts`), ein Gespräch. Die Probennachrichten dieser Sitzung
+sind wieder weg. Vite lief auf 5310 und 5311, `localhost`, nicht `127.0.0.1`.
+Für Skripte im Scratchpad: `node_modules` dorthin symlinken, sonst findet `tsx`
+kein `pg`; und `.mts` statt `.ts` wegen Top-Level-`await`.
