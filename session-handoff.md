@@ -1,5 +1,42 @@
 # Session Handoff — 2026-08-28 (später Abend, fünf kleine Vorgänge)
 
+> ## ⚠ ZUERST LESEN: der Deploy ist wieder grün, **`CI/verify` auf `main` ist rot**
+>
+> **Erledigt — nichts mehr zu tun:** die DEV-Migration `20260828200000` (AGE-641,
+> gehörte `fbc-platform-b7`, lag nur lokal) ist über **PR #285** auf `main`,
+> `migrate-prod` lief um 23:06 (`33211112563`, success), und der Deploy auf
+> `c61a48d` ist **vollständig grün** — `drift-gate`, `migrate-dev`, `deploy`,
+> `functions`. PROD und DEV tragen beide `20260828200000`.
+>
+> **Aber `CI/verify` ist rot, und zwar an einem flackernden Test — AGE-666.**
+> Nicht an der Änderung: #285 trägt nur eine Migration und eine pgTAP-Datei, ihr
+> eigener PR-Lauf war grün.
+>
+> ```
+> FAIL src/pages/PublicProfilePage.test.tsx > lange Biografie
+>      > kürzt auf drei Zeilen und klappt auf Klick auf
+> Unable to find an accessible element with the role "button"
+>   and name /mehr anzeigen/i
+> ```
+>
+> **Gemessen:** Datei allein 12× → 12 grün. Ganze Suite lokal → Lauf 1 **rot**,
+> Lauf 2 grün. CI → rot. Es flackert nur unter Last.
+>
+> **Ursache steht fest:** `Biografie` (`PublicProfilePage.tsx:351`) rendert den
+> Knopf erst, nachdem ein `useEffect` gemessen hat; der Test greift mit
+> **synchronem** `getByRole` direkt nach dem `await findByText` zu (`:194`). Fix
+> ist eine Zeile (`await screen.findByRole`). **Der Nachbartest bei `:213` ist
+> schlimmer** — eine Verneinung ohne Positivkontrolle, die auch bei kaputter
+> Komponente grün wäre.
+>
+> **Abnahme dazu: die GANZE Suite mehrfach laufen lassen**, nicht die Datei
+> allein — isoliert war sie 12 von 12 grün und hätte jede Korrektur bestätigt.
+>
+> **Warnung von b7 für den lokalen Stack:** er trägt die neue Fassung von
+> `hinweis_neue_nachricht()`, aber `schema_migrations` steht dort weiter auf
+> `20260828180000` — per psql eingespielt, nicht per `db push`. Ein `db reset`
+> bringt das gerade.
+
 **Sitzung:** `fbc-platform-f4`, Worktree `fbc-platform.neuigkeiten-archiv` (der
 Name gehört zu einem längst archivierten Change). Parallel lief
 `fbc-platform-b7` an **AGE-642** (PR #277): **mobil dort, alles andere hier**,
@@ -53,26 +90,21 @@ der Profilkopf malt 568 × 426, die Vorschau 284 × 213 — derselbe Ausschnitt.
 
 **#279 wurde gemergt, bevor seine Diff-Review zurück war.** Beide Reviewer
 fanden danach zwei **falsche Datumsangaben** in meinen eigenen Kommentaren
-(`display_name_test.sql` liegt seit dem 26.08. im Repo, nicht 27.08. — die
-mtime war der Checkout; die Warnung in `ci.yml` steht seit dem **05.08.**, nicht
-24.08.). Korrigiert in #281, samt Linear-Titel. Die richtigen Zahlen schärfen
-die Pointe: beide Vorfälle traten *nach* der Warnung ein, nach 18 bzw. 23 Tagen.
-
-**Und bei AGE-600 dieselbe Sorte:** „50 % der **Breite**" war falsch, es ist die
-Höhe — bei einem 3:1-Feld und einem 1,50:1-Bild ist das Feld *breiter* als das
-Bild. Die Zahl stammte aus dem Linear-Issue und war dort schon falsch. **Beide
-Male eine Zahl, die ich abgeschrieben statt gerechnet habe.**
+(`display_name_test.sql` liegt seit dem 26.08. im Repo, nicht 27.08.; die
+`ci.yml`-Warnung seit dem **05.08.**, nicht 24.08.). Korrigiert in #281, samt
+Linear-Titel — und die richtigen Zahlen schärfen die Pointe: beide Vorfälle
+traten *nach* der Warnung ein, nach 18 bzw. 23 Tagen. **Bei AGE-600 dieselbe
+Sorte:** „50 % der Breite" war falsch, es ist die Höhe. Beide Male eine Zahl,
+die ich abgeschrieben statt gerechnet habe.
 
 **Und drei der vier Diff-Reviews hätten gar nicht laufen sollen.** Donald hat am
 26.08. entschieden: Fremdreviewer **nur bei Schema, Rechten oder Sicherheit** —
 reines UI und Textarbeit gehen direkt durch (`reviewer-nur-bei-migration-und-rls`).
-AGE-657 war richtig, AGE-600 ist reines UI, AGE-659 und AGE-599 berühren weder
-Schema noch Rechte. Grund für den Fehlgriff: **die Memory stand in keiner Zeile
-des Index** — und der Index war mit 30,4 KB über seiner Lesegrenze von 24,4 KB,
-also wurde sein Ende ohnehin still abgeschnitten. Beides ist behoben (Index auf
-15,7 KB, alle 140 Einträge, die Regel steht jetzt in Zeile 1). TDD,
-Gegenproben und die Browser-Sichtprobe bleiben — die hat er ausdrücklich nicht
-gestrichen.
+AGE-657 war richtig; AGE-600, AGE-659 und AGE-599 nicht. Grund: **die Memory
+stand in keiner Zeile des Index**, und der Index war über seiner Lesegrenze,
+sein Ende also ohnehin unsichtbar. Beides behoben; die Regel steht jetzt in
+Zeile 1. TDD, Gegenproben und die Browser-Sichtprobe bleiben — die hat er
+ausdrücklich nicht gestrichen.
 
 ## Files modified
 
@@ -88,8 +120,11 @@ gestrichen.
 
 **Alle fünf PRs sind gemergt.** Nachzuholen ist am Code nichts.
 
-**Erste Aktion ist eine Entscheidung, die nur Donald treffen kann** — die
-Abnahme von AGE-599, und sie hat **zwei** Schritte, nicht einen:
+**Erste Aktion steht im Kasten ganz oben** — AGE-666, der flackernde Test, der
+`CI/verify` auf `main` rot hält. Der Deploy ist wieder grün.
+
+**Danach eine Entscheidung, die nur Donald treffen kann** — die Abnahme von
+AGE-599, und sie hat **zwei** Schritte, nicht einen:
 
 1. **Die acht bestehenden Objekte in `event-covers` auf DEV löschen.** Ein
    Seed-Lauf allein ersetzt sie nicht: beide Upload-Stellen schicken
@@ -105,10 +140,12 @@ ausgeführt. Der Zuschnitt selbst ist lokal an den echten Dateien gemessen.
 `x-upsert` wurde bewusst nicht umgestellt — die Einstellung gilt für jeden
 Seed-Upload, nicht nur für Titelbilder.
 
-**PROD und `main` sind sauber:** `migrate-prod` (Lauf `33192980642`) lief mit
-`plan` und `apply` grün, `messages_thread_created_id_idx` steht in PROD mit
-`indisvalid = true`, und der Deploy auf `main` ist danach wieder vollständig
-grün (`drift-gate`, `migrate-dev`, `deploy`, `functions`).
+**PROD ist sauber:** `migrate-prod` (Lauf `33192980642`) lief mit `plan` und
+`apply` grün, `messages_thread_created_id_idx` steht dort mit
+`indisvalid = true`. Später am Abend kam über b7 noch `20260828200000` dazu
+(Lauf `33211112563`); PROD und DEV tragen jetzt beide dieselben vier jüngsten
+Versionen, und der Deploy auf `main` ist vollständig grün. Rot ist nur
+`CI/verify` — siehe den Kasten oben.
 
 **Diese Sitzung hat selbst eine Spec-Drift erzeugt: AGE-665.**
 `design-system/spec.md` ab Zeile 856 nennt die Zuschnitt-Vorschauen
@@ -118,8 +155,10 @@ Code verletzt nichts, die Anforderung beschreibt die Welt nur nicht mehr;
 `validate` sieht das nicht. **Nicht von Hand am durable-truth-Text vorbei
 reparieren.**
 
-Danach sind die nächsten kleinen Vorgänge **AGE-664** (die letzte
-Event-Titelbild-Fläche, die noch beschneidet), **AGE-660** und **AGE-618**.
+Danach sind die nächsten kleinen Vorgänge **AGE-666** (flackernder Test, hält
+`verify` rot — eine Zeile, aber die Abnahme braucht die ganze Suite mehrfach),
+**AGE-664** (die letzte Event-Titelbild-Fläche, die noch beschneidet),
+**AGE-660** und **AGE-618**.
 
 ## Open questions
 
@@ -135,23 +174,14 @@ Event-Titelbild-Fläche, die noch beschneidet), **AGE-660** und **AGE-618**.
 
 ## Was diese Sitzung über das Verfahren gelernt hat
 
-**Drei neue Memories** (`db-push-transaktion-und-concurrently`,
+**Drei neue Memories** — `db-push-transaktion-und-concurrently`,
 `linear-team-spannt-mehrere-repos`, plus ein Abschnitt in
-`reviewer-cli-timeouts`), und **der Index selbst war das Problem**: 30,4 KB bei
-24,4 KB Lesegrenze, sein Ende also unsichtbar. Neu geschrieben auf 15,7 KB, alle
-140 Einträge behalten.
+`reviewer-cli-timeouts` (gemini erfindet Belege, opencode misst). **Und der
+Index selbst war das Problem:** 30,4 KB bei 24,4 KB Lesegrenze, sein Ende also
+unsichtbar. Neu geschrieben auf 15,7 KB, alle 140 Einträge behalten.
 
-**Eine Zahl aus einem Issue ist keine Messung.** Zweimal übernommen, zweimal
-falsch („50 % der Breite", „rund 6:1") — und beide Male stand die richtige
-Rechnung zwei Absätze weiter im eigenen Text.
-
-**Die schärfste Review galt einer Gegenprobe, die zu schwach war.** Mein Test
-zum mittigen Zuschnitt prüfte nur das erste Pixel; ein Zuschnitt
-`position: "south"` wäre dort ebenfalls grün gewesen. Er belegte „nicht von
-oben", nicht „mittig". Eine Gegenprobe, die nur EINE der falschen Lagen
-ausschliesst, sieht genauso grün aus wie eine, die alle ausschliesst.
-
-**gemini war zweimal unzuverlässig** (ein HOCH-Befund mit verkehrter
-Ausfallrichtung, in zwei Reviews erfundene Dateipfade); opencode hat in allen
-vier Reviews selbst gemessen, und jeder seiner Befunde hielt der Nachprüfung
-stand. Steht in `reviewer-cli-timeouts`.
+**Eine Zahl aus einem Issue ist keine Messung** — zweimal übernommen, zweimal
+falsch, und beide Male stand die richtige Rechnung zwei Absätze weiter im
+eigenen Text. **Und eine Gegenprobe, die nur EINE falsche Lage ausschliesst,
+sieht genauso grün aus wie eine, die alle ausschliesst** (mein Zuschnitt-Test
+prüfte nur das erste Pixel; „von unten" wäre dort auch grün gewesen).
