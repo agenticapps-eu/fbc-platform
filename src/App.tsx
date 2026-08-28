@@ -10,21 +10,36 @@ import RequireAdmin from "./components/RequireAdmin";
 import RequireAuth from "./components/RequireAuth";
 import RequireStaff from "./components/RequireStaff";
 import { navItems, type NavItem } from "./config/nav";
-import AdminFeedbackPage from "./pages/AdminFeedbackPage";
-import AdminNeuigkeitenPage from "./pages/AdminNeuigkeitenPage";
-import AdminMitgliedPage from "./pages/AdminMitgliedPage";
-import AdminMitgliederPage from "./pages/AdminMitgliederPage";
-import AdminSettingsPage from "./pages/AdminSettingsPage";
-import ChatPage from "./pages/ChatPage";
-import EventDetailPage from "./pages/EventDetailPage";
-import InternRoutingPage from "./pages/InternRoutingPage";
 import LoginPage from "./pages/LoginPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import WillkommenPage from "./pages/WillkommenPage";
-import ActivationRedeemPage from "./pages/ActivationRedeemPage";
-import PublicProfilePage from "./pages/PublicProfilePage";
-import LegalRoute from "./pages/LegalRoute";
 import { rechtsseiten } from "./content/legal/meta";
+
+/**
+ * AGE-642: Alles außer der Anmeldung kommt einzeln nach.
+ *
+ * `LoginPage` bleibt statisch — sie ist der erste Bildschirm für jeden, der
+ * nicht angemeldet ist, und ein Ladezustand vor der Anmeldemaske wäre ein
+ * leerer Start. Die Startseite hängt an `HomeRedirect` und bleibt aus demselben
+ * Grund in `config/nav.ts` statisch.
+ *
+ * Die Admin-Seiten sind ausdrücklich dabei. Bis AGE-642 stand hier das
+ * Gegenteil, begründet mit „selten besucht, aber klein" — das stimmt für die
+ * Seiten und nicht für ihren Inhalt: `AdminNeuigkeitenPage` zog allein
+ * 61,2 kB erzeugte Änderungsliste (`RELEASE_EINTRAEGE`) in den Erststart jedes
+ * Mitglieds, für eine Fläche, die nur ein Admin je öffnet.
+ */
+const AdminFeedbackPage = lazy(() => import("./pages/AdminFeedbackPage"));
+const AdminNeuigkeitenPage = lazy(() => import("./pages/AdminNeuigkeitenPage"));
+const AdminMitgliedPage = lazy(() => import("./pages/AdminMitgliedPage"));
+const AdminMitgliederPage = lazy(() => import("./pages/AdminMitgliederPage"));
+const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
+const ChatPage = lazy(() => import("./pages/ChatPage"));
+const EventDetailPage = lazy(() => import("./pages/EventDetailPage"));
+const InternRoutingPage = lazy(() => import("./pages/InternRoutingPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const WillkommenPage = lazy(() => import("./pages/WillkommenPage"));
+const ActivationRedeemPage = lazy(() => import("./pages/ActivationRedeemPage"));
+const PublicProfilePage = lazy(() => import("./pages/PublicProfilePage"));
+const LegalRoute = lazy(() => import("./pages/LegalRoute"));
 
 // Dev-only: aus dem Prod-Build heraustree-shaken (DEV ist statisch false).
 const StyleguidePage = import.meta.env.DEV ? lazy(() => import("./pages/StyleguidePage")) : null;
@@ -66,7 +81,16 @@ export default function App() {
 
 function AppInner() {
   return (
-    <Routes>
+    // AGE-642: Der Rahmen für die Routen AUSSERHALB der Hülle (Anmeldung,
+    // Rechtsseiten, Aktivierung, Onboarding, Willkommen). Die Routen INNERHALB
+    // der Hülle haben ihren eigenen, näher gelegenen Rahmen um den `Outlet` in
+    // `AppShell.tsx` — und das ist kein Doppel, sondern der Unterschied
+    // zwischen „der Inhaltsbereich lädt" und „die ganze Anwendung samt
+    // Navigation verschwindet für einen Moment". React nimmt immer die
+    // nächstgelegene Grenze; ohne die innere führe hier jeder Seitenwechsel die
+    // Hülle mit weg.
+    <Suspense fallback={null}>
+      <Routes>
       {/* Aktivierungs-Wand um ALLES, was in der Shell liegt (AGE-495). Ein
           eingeloggtes, noch unbestätigtes Konto sieht ausschließlich den
           Aktivierungsbildschirm — egal welche Route. Bequemlichkeit, nicht die
@@ -273,6 +297,7 @@ function AppInner() {
           }
         />
       )}
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

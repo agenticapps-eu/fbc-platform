@@ -215,25 +215,33 @@ describe("Zweck der Einlöseseite hängt an der Route (AGE-505)", () => {
     );
   }
 
-  it("/passwort-neu spricht vom Passwort, nicht vom Freischalten eines Zugangs", () => {
+  // AGE-642: `ActivationRedeemPage` kommt seit dem Route-Splitting asynchron
+  // nach. Jede der drei Zusagen wartet ihre POSITIVE Hälfte ab; die Verneinung
+  // steht dahinter. Diese Reihenfolge ist hier besonders wichtig, denn die drei
+  // Fälle unterscheiden sich NUR durch das Gegenstück — vor dem Auflösen des
+  // Chunks fehlt beides, und alle drei Verneinungen wären gleichzeitig wahr.
+  it("/passwort-neu spricht vom Passwort, nicht vom Freischalten eines Zugangs", async () => {
     renderRoute("/passwort-neu", "#token=geheim");
 
+    await screen.findByRole("heading", { name: /Neues Passwort setzen/i });
     expect(screen.getByRole("heading", { name: /Neues Passwort setzen/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zugang freischalten/i })).not.toBeInTheDocument();
   });
 
-  it("/aktivierung spricht weiter vom Zugang — sonst wäre der Test nicht unterscheidend", () => {
+  it("/aktivierung spricht weiter vom Zugang — sonst wäre der Test nicht unterscheidend", async () => {
     renderRoute("/aktivierung", "#token=geheim");
 
+    await screen.findByRole("button", { name: /Zugang freischalten/i });
     expect(screen.getByRole("button", { name: /Zugang freischalten/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: /Neues Passwort setzen/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("/passwort-vergessen zeigt das Adressformular in der Reset-Sprache", () => {
+  it("/passwort-vergessen zeigt das Adressformular in der Reset-Sprache", async () => {
     renderRoute("/passwort-vergessen");
 
+    await screen.findByRole("heading", { name: /Passwort vergessen/i });
     expect(screen.getByRole("heading", { name: /Passwort vergessen/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: /Bestätigungslink anfordern/i }),
@@ -277,11 +285,15 @@ describe("/onboarding liegt hinter der Aktivierungswand (AGE-495, Befund F1)", (
     expect(screen.queryByText(/Schritt 1 von/)).not.toBeInTheDocument();
   });
 
-  it("lässt ein bestätigtes Konto weiterhin auf den Kompass-Assistenten", () => {
+  it("lässt ein bestätigtes Konto weiterhin auf den Kompass-Assistenten", async () => {
     renderOnboarding(
       fakeAuthValue({ user: { id: "u1" } as AuthContextValue["user"], isActivated: true }),
     );
 
+    // AGE-642: `OnboardingPage` kommt asynchron nach; die Aktivierungswand
+    // davor nicht. Die Verneinung bleibt deshalb hinter der positiven Zusage —
+    // sonst hiesse „keine Wand" nur „noch nichts geladen".
+    await screen.findByText(/Schritt 1 von/);
     expect(screen.getByText(/Schritt 1 von/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /Noch ein Schritt/i })).not.toBeInTheDocument();
   });

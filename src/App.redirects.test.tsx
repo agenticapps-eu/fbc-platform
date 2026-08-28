@@ -44,33 +44,39 @@ describe("Redirects alter URLs", () => {
     expect(screen.queryByRole("heading", { name: "Deine Chancen-Datenbank" })).toBeNull();
   });
 
-  it("/community → /aktivitaet (jede eingeloggte Stufe)", () => {
+  it("/community → /aktivitaet (jede eingeloggte Stufe)", async () => {
     renderAt("/community", authAsTier("basic"));
 
+    // AGE-642: Ziel der Weiterleitung kommt asynchron nach. Geprüft wird
+    // unverändert, dass die Weiterleitung DORT landet.
+    await screen.findByRole("heading", { name: "Aktivität" });
     expect(screen.getByRole("heading", { name: "Aktivität" })).toBeInTheDocument();
   });
 
-  it("/verzeichnis → /mitglieder (min Discover)", () => {
+  it("/verzeichnis → /mitglieder (min Discover)", async () => {
     renderAt("/verzeichnis", authAsTier("discover"));
 
     // "Verzeichnis" kommt aus MemberDirectory und rendert nur bei echtem
     // Seiteninhalt — die Wand zeigt nur den Hero-Titel ("Mitglieder").
+    await screen.findByRole("heading", { name: "Verzeichnis" });
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
-  it("/angebote-gesuche → /kompass (jede eingeloggte Stufe)", () => {
+  it("/angebote-gesuche → /kompass (jede eingeloggte Stufe)", async () => {
     renderAt("/angebote-gesuche", authAsTier("basic"));
 
     // "Mini-Kompass" ist die Karten-Überschrift des Mini-Kompass-Tabs — eindeutig
     // gegenüber der Wand, die stattdessen "Dieser Bereich ist Mitgliedern
     // vorbehalten" zeigt (siehe MembershipGate.test.tsx).
+    await screen.findByRole("heading", { name: "Mini-Kompass" });
     expect(screen.getByRole("heading", { name: "Mini-Kompass" })).toBeInTheDocument();
   });
 
   // AGE-494: Die Route heißt sichtbar „Kompass"; der alte Pfad bleibt als Brücke.
-  it("/compass → /kompass (alte Links und Lesezeichen)", () => {
+  it("/compass → /kompass (alte Links und Lesezeichen)", async () => {
     renderAt("/compass", authAsTier("basic"));
 
+    await screen.findByRole("heading", { name: "Mini-Kompass" });
     expect(screen.getByRole("heading", { name: "Mini-Kompass" })).toBeInTheDocument();
   });
 });

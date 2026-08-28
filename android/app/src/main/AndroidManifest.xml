@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      AGE-642: Kamera. Das Gegenstueck zu NSCameraUsageDescription auf iOS.
+
+      Die Laufzeit-Abfrage muss dieser Code NICHT selbst fuehren: Capacitors
+      BridgeWebChromeClient.onShowFileChooser ruft `permissionLauncher.launch`
+      und bricht den Datei-Dialog sauber ab, wenn abgelehnt wird
+      (BridgeWebChromeClient.java:285-300).
+
+      Gemessen am 28.08.: dieser Zweig greift nur bei `isCaptureEnabled()` UND
+      genau `image/*` in `accept`. Die sechs Upload-Felder dieser App fuehren
+      beides nicht — sie tragen eine Typenliste und kein `capture` — und landen
+      damit heute alle im System-Dateiwaehler. Die Deklaration aendert also
+      vorerst nichts am Verhalten; sie steht hier, damit die Huelle beim Anlegen
+      vollstaendig ist und C3 (Kamera) sie nicht nachtragen muss.
+
+      `required="false"`, sonst filtert Play Geraete ohne Kamera aus der
+      Auslieferung heraus — die Berechtigung allein macht das Feature sonst zur
+      Voraussetzung.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+</manifest>

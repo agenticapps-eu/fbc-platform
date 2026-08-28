@@ -129,9 +129,11 @@ describe("Der Weg zur Feedback-Fläche steht nur Admins offen (AGE-587, 5.8)", (
     );
   }
 
-  it("zeigt einem Admin die Fläche", () => {
+  it("zeigt einem Admin die Fläche", async () => {
     renderAt("/admin/feedback", ADMIN);
 
+    // AGE-642: Die Admin-Seiten sind jetzt lazy — Begründung in App.tsx.
+    await screen.findByRole("heading", { name: "QM-Feedback" });
     expect(screen.getByRole("heading", { name: "QM-Feedback" })).toBeInTheDocument();
     expect(screen.getByTestId("standort").textContent).toBe("/admin/feedback");
   });

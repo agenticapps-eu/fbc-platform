@@ -1,0 +1,459 @@
+# Tasks — dieselbe Anwendung, in einer nativen Hülle (AGE-642)
+
+Phasiert nach dem, was sie **voraussetzen**. Phase A braucht nichts als dieses
+Repository und läuft sofort. Ab Phase B braucht es Xcode, Android Studio und
+Konten — siehe „Voraussetzungen" im Proposal. Die Reihenfolge ist bewusst: das
+Riskanteste zuerst, solange es noch im Browser prüfbar ist.
+
+## Phase A — im Browser prüfbar, ohne eine Zeile nativen Codes
+
+### A1. Der Sitzungsspeicher zieht um
+
+Die einzige Änderung an bestehendem Code, die schiefgehen kann. Sie kommt
+allein und zuerst.
+
+- [x] `@capacitor/core` und `@capacitor/preferences` als Abhängigkeit. Beide
+      sind reine npm-Pakete; für diesen Schritt ist kein natives SDK nötig.
+- [x] **RED**: Test — im Web geht `auth.storage` auf `window.localStorage`,
+      **mit demselben `storageKey`** wie bisher. Der Test liest den Schlüssel,
+      unter dem eine bestehende Sitzung liegt, und verlangt, dass der Client sie
+      danach findet. *Positivkontrolle:* mit einem geänderten Schlüssel muss
+      derselbe Test rot werden — sonst prüft er nur, dass irgendetwas liest.
+- [x] **RED**: Test — nativ liest und schreibt der Adapter über `Preferences`,
+      und `getItem` gibt den Wert zurück, den `setItem` gelegt hat.
+- [x] **RED**: Test — `removeItem` entfernt den Eintrag **tatsächlich**. Ein
+      Adapter, dessen Löschen ins Leere läuft, ergäbe ein Konto, das sich nicht
+      abmelden lässt.
+- [x] **`auth.storageKey` auf den heute geltenden Wert festnageln.** Bisher ist
+      er der Default der Bibliothek; ein Minor-Upgrade von
+      `@supabase/supabase-js`, das das Format ändert, meldete alle Web-Mitglieder
+      ab. Der Test darf den Schlüssel **nicht gegen sich selbst** prüfen — er
+      trägt den erwarteten Wert als Literal, sonst wandern beide Seiten
+      gemeinsam.
+- [x] Weiche in `src/lib/supabase.ts`: `Capacitor.isNativePlatform()` entscheidet.
+      Im Web-Zweig **kein** Wrapper — `localStorage` unverändert durchreichen.
+- [x] **Beleg (Browser, nicht jsdom):** vor dem Umbau anmelden, umbauen, Seite
+      neu laden, weiterhin angemeldet. Das ist die Abnahme aus dem Issue, und
+      sie lässt sich in jsdom nicht führen.
+
+      **Gefahren am 27.08. gegen den lokalen Stack**, mit dem *echten*
+      Reihenfolgen-Aufbau statt einer nachgestellten Sitzung:
+
+      1. `src/lib/supabase.ts` auf den Stand **vor** A1 zurückgesetzt, Vite
+         gestartet, im Browser über den Client angemeldet. Geschrieben wurde
+         `sb-127-auth-token` — der Schlüssel, den die Bibliothek selbst bildet.
+      2. Die neue Fassung eingespielt, Seite neu geladen.
+      3. Ergebnis: derselbe Schlüssel noch da, `sitzungsprobe@local.test` in der
+         Sitzung, **keine** Umleitung auf `/login`, und der Client stellt
+         REST-Anfragen. Die Aktivierungswand erscheint — richtig so: das Konto
+         ist ein reiner GoTrue-Nutzer ohne `activated_at`, und diese Wand sieht
+         nur, wer **angemeldet** ist. Sie ist damit selbst ein Beleg.
+
+      Nebenbefund, nicht Teil dieses Changes: das Anmeldeformular liess sich
+      über gesetzte Feldwerte **nicht** absenden — es ging keine einzige
+      `/auth/v1/token`-Anfrage raus, ohne dass eine Fehlermeldung erschien. Ob
+      das nur an der Automatisierung liegt oder auch einen Passwortmanager
+      betrifft, ist offen. **Eigene Aufgabe wert, hier bewusst nicht verfolgt.**
+- [ ] **Beleg (Gerät), sobald Phase B steht — nicht erst in Phase E.** Alle drei
+      RED-Tests oben laufen in jsdom gegen eine **Attrappe** von `Preferences`.
+      Ein Adapter, dessen `removeItem` auf dem Gerät ins Leere läuft, wäre dort
+      grün und hier kaputt — genau die Sorte Vakuum-Test, die dieses Repo
+      wiederholt getroffen hat. Sobald eine Schale startet: anmelden, App
+      beenden, neu starten (angemeldet), abmelden, neu starten (Anmeldung).
+      Diese Zeile ist der eigentliche Beweis für A1; die drei jsdom-Tests
+      sichern nur die Verdrahtung.
+
+### A2. Die Routen werden geteilt
+
+- [x] Grundlinie festhalten: `pnpm build`, Größe des Eintrittsbündels roh und
+      gzip notieren. Gemessen am 27.08. auf `0dd4b8b`: **1.181,77 kB / 347,78 kB**.
+- [ ] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
+      und `section`, und die Sidebar rendert unverändert. Der Umbau berührt
+      `Component`; die Zusage ist, dass er sonst nichts berührt.
+- [x] `Component` in `src/config/nav.ts` auf `lazy()` umstellen; die statischen
+      Seitenimporte in `src/App.tsx` ebenso — **außer** `HomeRedirect` und
+      `LoginPage`.
+- [x] Ein `Suspense`-Rahmen um den Routen-Block, Fallback ohne Spinner (nur die
+      Höhe des Inhaltsbereichs).
+- [x] Admin-Seiten mit umstellen. Das kehrt den Kommentar in `App.tsx:155-161`
+      um — **der Kommentar wird mitgeändert**, samt Zahl (61,2 kB
+      `RELEASE_EINTRAEGE` über `AdminNeuigkeitenPage.tsx:7`). Ein Kommentar, der
+      das Gegenteil des Codes behauptet, ist schlimmer als keiner.
+- [x] Bestehende Routen-Tests auf asynchrones Rendern anpassen, **ohne eine
+      einzige Assertion zu lockern**. Das ist Arbeit, keine Nebenwirkung: nach
+      `lazy()` findet ein synchrones `getBy*` nichts, bis der Chunk aufgelöst
+      ist, und ein Teil der 174 Testdateien rendert Routen heute synchron. Wer
+      hier „läuft unverändert durch" hinschreibt, hat die Aufgabe nicht
+      geplant, sondern gehofft. Die Anpassung ist mechanisch (`findBy*` statt
+      `getBy*`), die Zusagen der Tests bleiben Wort für Wort dieselben.
+- [x] **Beleg 1 (Zahl):** dieselbe Messung nach dem Umbau, mit demselben Befehl.
+      Ziel: unter **1.024 kB** roh. **Erreicht: 600,53 kB** (Eintrittsbündel).
+
+      Die ehrlichere Zahl steht daneben, und sie ist die, die zählt: die
+      **Erstlast** — Eintritt plus alles, was `index.html` daneben vorlädt, plus
+      CSS. Eine eigene Datei ist nicht dasselbe wie „wird nicht geladen".
+
+      | | vorher | nachher |
+      | --- | ---: | ---: |
+      | Eintrittsbündel roh | 1.189,90 kB | **600,53 kB** |
+      | Erstlast roh (mit CSS) | 1.261,69 kB | **927,26 kB** |
+      | Erstlast gzip | 363,08 kB | **269,95 kB** |
+      | Dateien in der Erstlast | 2 | 11 |
+
+      −26 % über die Leitung. Der grösste einzelne Posten, der wanderte, ist
+      `AdminNeuigkeitenPage` mit 70,66 kB (davon 61,2 kB erzeugte
+      Änderungsliste) — die Seite, deren Kommentar behauptete, sie sei „klein".
+
+      **Nicht** gewandert ist der Supabase-Client: 202,89 kB, jetzt in einer
+      eigenen Datei, die trotzdem vorgeladen wird. Wer nur auf die Grösse des
+      Eintrittsbündels sieht, hält das für einen Gewinn. Es ist keiner.
+- [x] **Beleg 2 (Struktur) — als Skript, nicht als Behauptung.** Die Spec
+      verspricht „strukturell geprüft"; eine Messung von Hand erfüllt das genau
+      einmal und ist bei der nächsten Abhängigkeit wertlos. Also ein Skript, das
+      die Source-Map des Eintrittsbündels seinen Quellmodulen zuordnet und
+      gegen eine **Erlaubnisliste** prüft: Hülle, Wachen, `HomeRedirect`,
+      `HomePage`, `LoginPage`. Alles andere aus `src/pages/` im Eintritt macht
+      den Lauf rot. Im CI, neben den übrigen Wächtern.
+
+      Gebaut als `scripts/entry-chunk-guard{,.logic,.logic.test}.ts`, im Job
+      `verify` hinter `pnpm build`. **Drei Dinge, die er über die erste Fassung
+      hinaus kann, und jedes davon hat einen Grund:**
+
+      1. Er liest die **ganze Erstlast**, nicht nur das Eintrittsbündel. Die
+         erste Fassung sah allein `index-*.js` — und war damit blind für die
+         neun Dateien, die `index.html` daneben vorlädt. Eine Seite, die dorthin
+         rutscht, wäre unbemerkt zurück im Erststart gewesen.
+      2. Er bricht ab, wenn eine **Source-Map fehlt**. Ohne sie wäre er blind
+         und trotzdem grün.
+      3. Er bricht ab, wenn die Erstlast nicht einmal `src/App.tsx` enthält —
+         ein unvollständiger Bau darf nicht als „alles sauber" durchgehen.
+
+      **Positivkontrolle gefahren:** mit geleerter Erlaubnisliste meldet er
+      genau die drei erlaubten Seiten und endet mit 1. Vor dem Umbau meldete er
+      **28**. Ein Wächter, der nie rot wird, ist von einem, der prüft, nicht zu
+      unterscheiden.
+
+      Er hat sich dabei selbst bewährt: `ActivationScreen.tsx` stand in keiner
+      Planung und liegt trotzdem zu Recht im Erststart — `ActivationGate`
+      umschliesst die ganze Hülle und rendert ihn für jedes unbestätigte Konto.
+      Gefunden hat das der Wächter, nicht ich.
+- [x] **Nicht geändert, mit Begründung festgehalten:** `/` zeigt einem
+      angemeldeten Mitglied **nicht** den Feed, sondern `HomePage` —
+      `HomeRedirect.tsx:60-67` gibt sie in jedem Zweig zurück, der einzige
+      andere Ausgang ist `/willkommen`. Der Feed liegt auf `/aktivitaet` und
+      darf lazy sein. Steht hier, weil die Annahme naheliegt und einmal zu
+      einem Befund geführt hat.
+
+## Phase B — das Grundgerüst · braucht Xcode und Android Studio
+
+### B1. Capacitor und die beiden Projekte
+
+- [x] `@capacitor/ios`, `@capacitor/android`, `capacitor.config.ts`.
+      `webDir: "dist"`, App-ID und Anzeigename festlegen.
+
+      **Die App-ID war keine offene Wahl mehr.** `com.effbeezee.app` liegt
+      bereits als `APNS_BUNDLE_ID` in den Supabase-Secrets (am 28.08. per
+      SHA-256 gegen Infisical abgeglichen, `docs/secrets.md`) und ist damit das
+      `apns-topic`, gegen das Apple jedes Gerätetoken prüft. Ein abweichender
+      Wert hier bräche den Push aus AGE-641 — und zwar erst am echten Gerät.
+      Anzeigename `eff.bee.zee`, die Marke aus `index.html` und dem
+      Design-System. `webDir: "dist"` ist Vites Standard; `vite.config.ts`
+      setzt kein `outDir`.
+- [x] `npx cap add ios` und `npx cap add android`; beide Ordner versionieren.
+
+      **Capacitor 8 baut iOS über Swift Package Manager**, nicht über
+      CocoaPods: es entsteht `ios/App/CapApp-SPM/Package.swift`, kein
+      `Podfile`. Die `pod`-Zeile in den Voraussetzungen ist damit gegenstandslos.
+      `cap add android` meldete beim ersten Lauf `Unable to locate a Java
+      Runtime` — das mitgelieferte JBR von Android Studio ist **25**, und
+      Gradle 8.14.3 reicht nur bis Java 24. Gebaut wird deshalb mit
+      `JAVA_HOME=/opt/homebrew/opt/openjdk@21`.
+- [x] `.gitignore`: Keystore (`*.keystore`, `*.jks`), `key.properties`,
+      `google-services.json`, `GoogleService-Info.plist`, `*.p8`,
+      `ios/App/Pods/`, `android/.gradle/`, `*/build/`, `DerivedData/`.
+
+      **Gemessen statt abgeschrieben:** `git check-ignore -v` über alle
+      dreizehn Pfade zeigte, dass genau **ein** Muster fehlte —
+      `key.properties`. Alles andere deckt entweder die Wurzel-`.gitignore` aus
+      AGE-641 ab (`*.jks`, `*.keystore`, `*.p8`, `google-services.json`,
+      `GoogleService-Info.plist`) oder Capacitors eigene `android/.gitignore`
+      bzw. `ios/.gitignore` (`.gradle/`, `build/`, `local.properties`,
+      `App/Pods`, `DerivedData`, die kopierten Web-Assets). `*/build/` war
+      deshalb nicht nötig. **Falle für später:** Capacitors
+      `android/.gitignore` führt `*.jks`/`*.keystore` **auskommentiert** — die
+      Wurzelzeilen greifen trotzdem, aber wer nur dort nachsieht, liest das
+      Gegenteil.
+- [x] **`Info.plist`: `NSCameraUsageDescription` und
+      `NSPhotoLibraryUsageDescription`, deutsch formuliert.** Ohne sie stürzt
+      iOS beim ersten Kameraaufruf ab — zur **Laufzeit**, nicht erst in der
+      Store-Prüfung. Steht hier und nicht in C3, weil die Schale sie schon beim
+      Anlegen mitbekommen soll.
+
+      Formuliert gegen die vier Stellen, an denen die App heute Bilder
+      hochlädt (Profilbild, Titelbild, Feed-Beitrag, Event-Titelbild), und in
+      der Anrede der App (`du`). **Beleg an der gebauten App, nicht an der
+      Quelle:** `xcodebuild … -sdk iphonesimulator` → `BUILD SUCCEEDED`, danach
+      `plutil -extract NSCameraUsageDescription raw` auf der `Info.plist`
+      *innerhalb* von `App.app` — Text mit intakten Umlauten,
+      `CFBundleIdentifier` = `com.effbeezee.app`.
+- [x] **Android:** Kamera-Berechtigung im `AndroidManifest.xml` deklarieren und
+      die Laufzeit-Abfrage behandeln. Dieselbe Falle, andere Plattform.
+
+      **Die Laufzeit-Abfrage muss dieser Code nicht selbst führen.**
+      `BridgeWebChromeClient.onShowFileChooser` ruft `permissionLauncher.launch`
+      und bricht den Datei-Dialog sauber ab, wenn abgelehnt wird
+      (`BridgeWebChromeClient.java:285-300`).
+
+      **Aber der Zweig greift heute nie.** Er verlangt `isCaptureEnabled()`
+      **und** exakt `image/*` in `accept` (Zeile 281-284). Die sechs
+      Upload-Felder dieser App führen weder `capture` noch `image/*`, sondern
+      eine Typenliste — sie landen alle im System-Dateiwähler. Die Deklaration
+      ändert also **vorerst nichts am Verhalten**; sie steht hier, damit die
+      Hülle vollständig ist. **C3 muss das aufgreifen**, sonst öffnet die
+      Kamera nie.
+
+      Dazu `<uses-feature android:name="android.hardware.camera"
+      android:required="false" />`: ohne diese Zeile leitet aapt aus der
+      Berechtigung eine **Pflicht**-Kamera ab und Play filtert Geräte ohne
+      Kamera aus der Auslieferung. **Beleg an der gebauten APK:**
+      `aapt2 dump permissions` → `android.permission.CAMERA`,
+      `aapt2 dump badging` → `uses-feature-not-required:
+      android.hardware.camera`, `targetSdkVersion:'36'`,
+      `application-label:'eff.bee.zee'`, `package: com.effbeezee.app`.
+- [x] **Die Gates gegen die neuen Bäume abgedichtet.** `android/` und `ios/`
+      tragen eine Kopie des gebauten Web-Bündels, und beide Werkzeuge lasen sie
+      mit. Gemessen: `pnpm lint` meldete **12048** Fehler, davon **null** aus
+      `src/` — 4076 aus `android/app/build`, 3986 aus `android/app/src`, 3986
+      aus `ios/App/App`. Ab dem ersten `cap sync` wäre das Gate wertlos gewesen.
+      Beide Bäume nach `eslint.config.js` und `.prettierignore`, dieselbe
+      Begründung wie beim schon vorhandenen `supabase/.temp` bzw. `dist`.
+      Danach: Lint 0 Fehler; `format:check` fällt von 611 auf **280** — und
+      280 ist die vorbestehende Grundlinie (`openspec` 197, `src` 50,
+      `scripts` 23, `supabase` 6), also fügt dieser Change der
+      Formatierungsschuld nichts hinzu. CI fährt ohnehin nur `lint` und
+      `typecheck` (`ci.yml:24-25`).
+
+### B2. Der Wächter gegen native Geheimnisse im öffentlichen Repo
+
+- [x] **RED**: Test — der Wächter meldet eine Keystore-Datei, die im
+      Arbeitsbaum liegt, und bricht ab. *Negativbefund braucht eine
+      Positivkontrolle:* ohne die Datei muss derselbe Lauf grün sein, sonst ist
+      ein Wächter, der immer bricht, von einem, der prüft, nicht zu
+      unterscheiden.
+
+      **RED gemessen, nicht behauptet:** gegen einen Stub, der `[]` zurückgibt,
+      waren **7 von 9** Zusagen in `native-secrets-guard.logic.test.ts` rot —
+      und die **2 grünen waren genau die Positivkontrollen** („meldet nichts,
+      wenn derselbe Baum den Keystore nicht enthält", „verwechselt harmlose
+      Nachbarn nicht"). Nach der Umsetzung 9/9 grün.
+- [x] **RED**: Test — er prüft den **Baum**, nicht den Diff: eine Datei, die
+      kein aktueller Commit anfasst, wird trotzdem gemeldet.
+
+      Das kann die reine Funktion **nicht** halten — sie bekommt eine Liste
+      Pfade und kann gar nicht falsch liegen; woher die Liste kommt, entscheidet
+      allein der Runner. Deshalb `native-secrets-guard.cli.test.ts`: ein echtes
+      Wegwerf-Repository, Commit 1 bringt den Keystore, Commit 2 fasst etwas
+      anderes an. Eine nachgestellte git-Ausgabe hätte nur belegt, dass der Test
+      nachstellt, was er prüfen will.
+
+      **Mutations-Gegenprobe** (Runner auf `git diff --name-only HEAD~1 HEAD`
+      umgebaut, Datei vorher nach ausserhalb des Repos gesichert): **5 von 6**
+      Zusagen wurden rot, überlebt hat **genau** die Positivkontrolle, die grün
+      bleiben muss. Danach zurückgespielt, wieder 6/6.
+- [x] Wächter schreiben und in `ci.yml` einhängen.
+
+      Aufgeteilt nach dem Muster von `entry-chunk-guard`: `*.logic.ts` (reine
+      Regeln), `*.logic.test.ts`, `*.cli.test.ts`, Runner.
+
+      **Der Baum ist zweierlei:** verfolgte Dateien (`git ls-files`) — der
+      eingetretene Schaden — und unverfolgte, aber **nicht ignorierte**
+      (`--others --exclude-standard`) — was ein einziges `git add .` öffentlich
+      machen würde. **Ignorierte bleiben absichtlich aussen vor:** B3 verlangt,
+      dass der Keystore lokal und im Signier-Workflow vorliegt, also unter einer
+      Ignorierzeile; ein Wächter, der darauf anschlägt, wäre auf jedem Rechner
+      rot, und ein immer roter Wächter wird abgeschaltet. Die Gegenprobe dazu
+      steht im Test: dieselbe Datei per `git add -f` verfolgt **wird** gemeldet.
+
+      Wie bei `entry-chunk-guard` eine Selbstprüfung gegen den stillen Leerlauf:
+      enthält der Baum nicht einmal `package.json`, bricht er mit **2** ab
+      statt grün zu sein.
+
+      In `ci.yml` **vor** lint/typecheck/test — ein Fund macht jede weitere
+      Minute Rechenzeit sinnlos. Der flache Klon von `actions/checkout` stört
+      nicht: dort ist der Arbeitsbaum vollständig, nur die Historie nicht.
+
+      **Rot/grün am echten Repo belegt**, nicht nur im Test: eine angelegte
+      `ios/KONTROLLE.mobileprovision` → exit 1 mit Grund und Rotationshinweis,
+      nach dem Löschen wieder exit 0 bei 1292 Dateien.
+- [x] **Einmaliger Lauf über die Historie** beim Einführen des Wächters. Er
+      prüft den Baum und sieht damit nicht, was in einem früheren Commit liegt —
+      und genau dieser Fall ist am 23.08. schon einmal eingetreten. Findet der
+      Lauf etwas, ist das eine Rotation, kein Löschen: ein Geheimnis in der
+      Historie eines öffentlichen Repos gilt als offengelegt.
+
+      **Ergebnis: sauber.** `git rev-list --objects --all` → **1896**
+      verschiedene Pfade, durch dieselben Regeln geschickt (kein nachgebautes
+      grep), **kein Treffer**. *Positivkontrolle,* weil ein Negativbefund sonst
+      nichts belegt: derselbe Lauf mit einem eingeschleusten
+      `KONTROLLE/erfunden.keystore` meldet ihn, und die Stichprobe zeigt saubere
+      Pfade (`.codex/skills/…`) — die Zeilenzerlegung liegt also nicht daneben.
+      Das Skript war ein Wegwerf-Stück ausserhalb des Repos, wie beim
+      `pg_cron`-Vorgang in AGE-641.
+- [x] **`.gitignore` nachgezogen: `*.mobileprovision`, `*.provisionprofile`.**
+      Der Wächter hat die Lücke gefunden, nicht das Auge — beide Endungen teilen
+      mit keiner bestehenden Zeile ein Muster. Die zwei Schichten tun
+      Verschiedenes: die Ignorierzeile verhindert das versehentliche
+      Hinzufügen, der Wächter findet, was per `git add -f` oder über eine
+      Musterlücke trotzdem hineingerät. Ohne die Ignorierzeile fiele der Fund
+      erst in CI auf — und da ist der Push in ein **öffentliches** Repo schon
+      geschehen.
+
+### B3. Signaturmaterial, dann der eigene Workflow
+
+Die Signierung kommt **vor** dem Workflow und vor Phase E: ein physisches Gerät
+nimmt keine unsignierte App an. Ohne diesen Schritt ist die Abnahme „startet auf
+echten Geräten" nicht erreichbar, und das fiele erst ganz am Ende auf.
+
+- [ ] **iOS:** Entwickler-Zertifikat und Provisioning Profile (oder
+      App-Store-Connect-API-Schlüssel) bereitstellen. Woher sie kommen, gehört
+      in dieselbe Zeile wie ihr Name — nach Infisical, nicht ins Repo.
+- [ ] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
+      `key.properties` aus CI-Secrets erzeugen lassen. Derselbe Keystore, der
+      nirgends im Repo liegen darf, muss dem Workflow zur Laufzeit vorliegen —
+      das ist der Widerspruch, den diese Zeile auflöst.
+- [ ] Neuer Workflow, ausgelöst per `workflow_dispatch` und Tag, der das
+      Material aus den Secrets einspeist.
+- [ ] **Beleg:** ein Pull Request, der nur Web-Dateien ändert, löst ihn **nicht**
+      aus, und der Web-Deploy läuft wie bisher.
+
+## Phase C — Ränder, Zurück-Taste, Kamera
+
+### C1. Sichere Ränder
+
+- [ ] `viewport-fit=cover` in `index.html:7`. **Zuerst** — ohne das Meta sind
+      alle `env(safe-area-inset-*)` null, und jede weitere Zeile wirkungslos.
+- [ ] `env(safe-area-inset-*)` **ergänzend** (nicht ersetzend) an Kopfzeile,
+      beiden angedockten Leisten und Chatfenster.
+- [ ] **Beleg auf dem Gerät**, ausdrücklich nicht in jsdom: dort sind die Insets
+      immer null, und ein Test darüber wäre grün, gleich was die App tut.
+
+### C2. Android-Zurück
+
+- [ ] **RED**: Test — bei offenem Overlay schließt Zurück das Overlay und
+      navigiert **nicht**. Die Reihenfolge ist der Punkt, den man übersieht:
+      mehrere Flächen führen ihren Offen-Zustand über den Verlaufsschlüssel
+      (`HeaderSearch.tsx:80`, `MemberDirectory.tsx:80`, `LegalZurueck.tsx:24`).
+- [ ] **RED**: Test — mit Verlauf geht Zurück eine Seite zurück; ohne Verlauf
+      schließt es die App **nicht**.
+- [ ] Beide Tests prüfen die **Entscheidungsfunktion**, nicht das Ereignis:
+      `backButton` ist ein natives Capacitor-Ereignis, das in jsdom nie feuert.
+      Ein Test, der auf die Ereignisquelle wartet, wäre grün, weil nichts
+      passiert — dieselbe Falle wie bei `env(safe-area-inset-*)`.
+- [ ] **`@capacitor/app` als Abhängigkeit hinzufügen.** Sie fehlt bisher in
+      jeder Phase: A installiert `core` und `preferences`, C3 `camera`, D den
+      Updater. Ohne sie gibt es weder `backButton` noch das Wegschicken in den
+      Hintergrund, und die RED-Tests oben könnten nie grün werden.
+- [ ] Handler auf `@capacitor/app` `backButton` legen.
+- [ ] **Beleg auf einem Android-Gerät:** durch drei Ebenen navigieren, Overlay
+      öffnen, zweimal zurück — Overlay zu, eine Ebene zurück, App noch offen.
+
+### C3. Kamera und Fotoauswahl
+
+- [ ] **RED**: Test — der gemeinsame Aufrufpunkt gibt im Web eine Datei aus dem
+      bestehenden `<input>` zurück; die sechs Aufrufer kennen keine Plattform.
+- [ ] Aufrufpunkt bauen, `@capacitor/camera` im nativen Zweig.
+- [ ] Die sechs Stellen umstellen: `ProfilPage.tsx:278,317`,
+      `CommunityFeed.tsx:943,2042`, `EventCoverPicker.tsx:120`,
+      `WillkommenPage.tsx:603`.
+- [ ] **Beleg:** Zuschnitt und Upload dahinter sind unverändert — dieselben
+      Seitenverhältnisse je Bucket wie bisher.
+- [ ] **Beleg auf beiden Geräten**, wie bei C1 und C2: einmal aus der Kamera,
+      einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
+      Auswahl ist genau der Teil, den kein Test im Browser je berührt.
+
+## Phase D — OTA · selbst gehostet auf Cloudflare
+
+### D1. Der Weg, auf dem ein Bündel entsteht
+
+Ohne diesen Schritt gibt es drei Endpunkte, die Anfragen beantworten, und nichts,
+was das System je befüllt.
+
+- [ ] Veröffentlichungs-Schritt: `dist/` zu einem Zip mit `index.html` an der
+      Wurzel, SHA-256 bilden, mit dem **privaten** Schlüssel signieren, Zip nach
+      R2 laden, Manifest registrieren (Fassung, URL, Prüfsumme,
+      Vertragsnummer der Schale).
+- [ ] **Den Anlass festlegen, nicht nur den Schritt.** `deploy.yml` baut Web,
+      der native Workflow läuft von Hand — dazwischen gibt es heute nichts, das
+      ein Bündel veröffentlichte. Ohne einen benannten Auslöser (Vorschlag: bei
+      jedem Deploy auf `main`) erreichen Web-Änderungen nie ein Gerät, und die
+      zentrale Zusage der Spec wäre **per Konfiguration** unerfüllbar.
+- [ ] **Fassungsschema festlegen:** welcher Commit ergibt welche Bündel-Fassung,
+      und was gilt, wenn ein Store-Bau und ein `main`-Deploy sich überholen.
+- [ ] Signaturschlüsselpaar erzeugen; **privaten Schlüssel nach Infisical**,
+      öffentlichen als `publicKey` in die Konfiguration.
+
+### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
+
+Dreimal dieselbe Zahl, dreimal woanders. Wird das nicht festgelegt, erfindet
+jeder Schritt in D3 seine eigene Auslegung.
+
+- [ ] **Feld** benennen, in dem die Schale ihre Nummer an `updateUrl` meldet.
+- [ ] **Stempelstelle** benennen: wo die Schale sie trägt. **Nicht** die
+      App-Version — zwei Store-Builds derselben Version können verschiedene
+      Plugin-Mengen haben, und genau darum geht es.
+- [ ] **Regel** festhalten: die Nummer steigt in **jedem** PR, der ein Plugin
+      hinzufügt, entfernt oder seine native Fassung hebt. Ein solcher PR geht
+      über den Store.
+
+### D3. Endpunkte und Schutz
+
+- [ ] `@capgo/capacitor-updater`; `updateUrl`, `channelUrl`, `statsUrl` in
+      `capacitor.config.ts` auf eigene Endpunkte.
+- [ ] Drei Cloudflare Pages Functions; Bündel-Zips nach R2.
+- [ ] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
+      mit zu niedriger Vertragsnummer.
+- [ ] **RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen und die
+      installierte Fassung bleibt in Betrieb.
+
+### D4. Der Rückweg — ohne ihn ist OTA eine Einbahnstraße
+
+- [ ] `notifyAppReady()` nach erfolgreichem Start aufrufen und das
+      Rollback-Verhalten konfigurieren.
+- [ ] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
+      Start scheitert, fällt auf die vorige Fassung zurück.
+- [ ] Das Szenario im Spec-Delta ergänzen. Die bisherige Zusage deckt nur das
+      **unsignierte** Bündel ab; ein signiertes, das startet und dann weiß
+      bleibt, bricht ohne diesen Rückweg **jedes** Gerät dauerhaft — bis eine
+      neue Schale durch den Store geht. Das ist der teuerste denkbare Fehler
+      dieses Changes.
+
+### D5. Beleg
+
+- [ ] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
+      einmal vollständig durchgespielt.
+- [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
+      landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
+      ausgelöst hat, ist eine Behauptung.
+
+## Phase E — Abnahme
+
+Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
+
+- [ ] Beide Apps starten auf echten Geräten.
+- [ ] Anmelden, Feed, Chat, Profil bearbeiten, Bild hochladen — je einmal auf
+      iOS und Android.
+- [ ] Die Sitzung überlebt einen Neustart der App auf beiden Plattformen.
+- [ ] Eine bestehende Web-Sitzung ist nach dem Storage-Umbau weiterhin angemeldet.
+- [ ] Kein Inhalt unter Notch oder Home-Indikator.
+- [ ] Android-Zurück navigiert, statt die App zu schließen.
+- [ ] Realtime im Chat funktioniert im Vordergrund.
+- [ ] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
+- [ ] OTA einmal durchgespielt.
+
+## Vor dem Abschluss
+
+- [ ] `openspec validate --all` grün.
+- [ ] `REVIEWS.md`: mindestens zwei Reviewer **fremder** Anbieter, vor der
+      ersten Codezeile.
+- [ ] Code-Review auf den Diff, nicht auf den Plan.
+- [ ] `openspec archive capacitor-huelle`.

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
@@ -913,7 +913,15 @@ export default function AppShell() {
           )}
         >
           <RouteTransition routeKey={pathname}>
-            <Outlet />
+            {/* AGE-642: Die Seiten kommen einzeln nach. Die Grenze steht hier,
+                um den Inhaltsbereich, und nicht weiter oben um die Routen:
+                sonst nähme jeder Seitenwechsel die Kopfzeile und beide Leisten
+                für einen Moment mit weg. Der Platzhalter trägt nur Höhe —
+                ein Spinner, der bei 40 ms Ladezeit aufblitzt, ist Unruhe ohne
+                Information. */}
+            <Suspense fallback={<div className="min-h-[60vh]" />}>
+              <Outlet />
+            </Suspense>
           </RouteTransition>
         </div>
       </main>

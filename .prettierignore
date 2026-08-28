@@ -1,6 +1,12 @@
 dist
 coverage
 node_modules
+# AGE-642: Capacitor erzeugt und ueberschreibt diese beiden Baeume bei jedem
+# `cap sync` — samt einer Kopie des gebauten Web-Buendels. Gemessen am 28.08.:
+# 262 + 69 Dateien, die Prettier sonst dauerhaft anmeckert und `pnpm format`
+# eines Tages umschreiben wuerde. Gleiche Begruendung wie `dist`.
+android
+ios
 pnpm-lock.yaml
 docs
 .planning

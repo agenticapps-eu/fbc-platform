@@ -64,9 +64,11 @@ describe("Staff-Gating für /intern/routing", () => {
     expect(screen.getByRole("link", { name: "Mein Profil" })).toBeInTheDocument();
   });
 
-  it("lässt Staff (matching_manager) die Routing-Queue sehen", () => {
+  it("lässt Staff (matching_manager) die Routing-Queue sehen", async () => {
     renderAt("/intern/routing", authAsStaff());
 
+    // AGE-642: Die Seite kommt seit dem Route-Splitting asynchron nach.
+    await screen.findByRole("heading", { name: "Routing-Queue" });
     expect(screen.getByRole("heading", { name: "Routing-Queue" })).toBeInTheDocument();
   });
 

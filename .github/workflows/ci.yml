@@ -21,10 +21,40 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # AGE-642: Dieses Repository ist OEFFENTLICH. Ein Signaturgeheimnis, das
+      # einmal gepusht wurde, gilt als offengelegt — die Antwort darauf ist eine
+      # Rotation im Apple- bzw. Google-Portal, kein `git rm`. Am 23.08. ist
+      # genau dieser Fall schon einmal eingetreten.
+      #
+      # Der Waechter prueft den BAUM, nicht den Diff: ein Geheimnis, das seit
+      # drei Wochen liegt, fasst kein aktueller Commit an und waere fuer jede
+      # Diff-Pruefung unsichtbar. Das funktioniert auch mit dem flachen Klon von
+      # `actions/checkout` — der Arbeitsbaum ist dort vollstaendig, nur die
+      # Historie ist es nicht.
+      #
+      # Steht VOR lint/typecheck/test, weil ein Fund jede weitere Minute
+      # Rechenzeit sinnlos macht: dann ist nicht der Build das Problem.
+      - name: Kein natives Geheimnis im Baum
+        run: pnpm tsx scripts/native-secrets-guard.ts
+
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+      # AGE-642: Keine Seite darf beim ersten Aufruf mitgeladen werden ausser
+      # denen, die der erste Bildschirm braucht. Eine Zahl allein taugt dafuer
+      # nicht — sie driftet mit dem naechsten Feature und sagt beim
+      # Ueberschreiten nicht, wer sie verschoben hat. Der Waechter liest die
+      # Source-Maps der gesamten Erstlast (Eintritt plus jede vorgeladene
+      # Datei) und bricht ab, wenn er dort eine Seite findet, die nicht in
+      # seiner Erlaubnisliste steht.
+      #
+      # Steht hinter `pnpm build`, weil er das Bauergebnis braucht; er bricht
+      # von sich aus ab, wenn dieses Ergebnis unvollstaendig ist.
+      - name: Keine Seite ausser dem ersten Bildschirm in der Erstlast
+        run: pnpm tsx scripts/entry-chunk-guard.ts
 
       # Zwei Zusagen aus AGE-492, die KEIN Typecheck halten kann, weil beide
       # Strings sind: Tailwind-Klassennamen prüft TypeScript nicht, und eine

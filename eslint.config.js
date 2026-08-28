@@ -10,7 +10,24 @@ export default tseslint.config(
   // Platte) und enthält gebündeltes Edge-Runtime-JS. Ohne diesen Eintrag meldet
   // `pnpm lint` lokal ~190 Fehler aus einer Datei, die niemand geschrieben hat —
   // und ist damit als Gate wertlos, sobald jemand den lokalen Stack laufen lässt.
-  { ignores: ["dist", "coverage", "node_modules", "docs", "public", "supabase/.temp"] },
+  // AGE-642: `android/` und `ios/` sind dieselbe Sorte wie `supabase/.temp` —
+  // Capacitor kopiert das gebaute Web-Bündel nach
+  // `android/app/src/main/assets/public` und `ios/App/App/public`, und Gradle
+  // legt in `android/app/build` noch einmal nach. Gemessen am 28.08.: ohne
+  // diese zwei Einträge meldet `pnpm lint` 12048 Fehler, davon **null** aus
+  // `src/` — das Gate wäre ab dem ersten `cap sync` wertlos.
+  {
+    ignores: [
+      "dist",
+      "coverage",
+      "node_modules",
+      "docs",
+      "public",
+      "supabase/.temp",
+      "android",
+      "ios",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

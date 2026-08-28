@@ -55,9 +55,13 @@ describe("MembershipGate für Entdecken-Routen", () => {
     expect(screen.queryByText("Mit dem „Warum“ beginnen")).not.toBeInTheDocument();
   });
 
-  it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", () => {
+  it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", async () => {
     renderAt("/academy", authAsTier("basic"));
 
+    // AGE-642: Die Seite kommt asynchron nach. Die Verneinung bleibt hinter der
+    // positiven Zusage — vor dem Auflösen des Chunks fehlt die Wand ohnehin,
+    // und das belegte nichts.
+    await screen.findByText("Mit dem „Warum“ beginnen");
     expect(screen.getByText("Mit dem „Warum“ beginnen")).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
@@ -81,12 +85,15 @@ describe("MembershipGate für Entdecken-Routen", () => {
     expect(screen.getByRole("button", { name: "Zur Startseite" })).toBeInTheDocument();
   });
 
-  it("bietet eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu /mitgliedschaft", () => {
+  it("bietet eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu /mitgliedschaft", async () => {
     renderAt("/mitglieder", authAsTier("basic"));
 
     const upgradeBtn = screen.getByRole("button", { name: "Upgrade" });
     fireEvent.click(upgradeBtn);
 
+    // AGE-642: `/mitgliedschaft` kommt asynchron nach. Der Klick bleibt
+    // synchron — geprüft wird weiterhin, dass er dorthin führt.
+    await screen.findByRole("heading", { name: "Mitgliedschaft" });
     expect(screen.getByRole("heading", { name: "Mitgliedschaft" })).toBeInTheDocument();
   });
 });
@@ -106,15 +113,18 @@ describe("Stufen-Gating für /mitglieder (min Discover)", () => {
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 
-  it("lässt Discover das Verzeichnis sehen", () => {
+  it("lässt Discover das Verzeichnis sehen", async () => {
     renderAt("/mitglieder", authAsTier("discover"));
 
+    // AGE-642: Seite kommt asynchron nach.
+    await screen.findByRole("heading", { name: "Verzeichnis" });
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
-  it("lässt Impact (höhere Stufe) das Verzeichnis sehen", () => {
+  it("lässt Impact (höhere Stufe) das Verzeichnis sehen", async () => {
     renderAt("/mitglieder", authAsTier("impact"));
 
+    await screen.findByRole("heading", { name: "Verzeichnis" });
     expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
