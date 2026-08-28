@@ -29,6 +29,14 @@ time. Its optimistic row carries the sending device's clock, while the confirmed
 row carries the server's; showing the first would make the displayed time jump
 by the difference between the two clocks at the moment the confirmation arrives.
 
+The same clock SHALL NOT open a day group either. An unconfirmed message SHALL
+join the last confirmed group rather than start one of its own — otherwise a
+message sent at 23:59 by the device's clock and recorded after midnight by the
+server would move between groups when the confirmation arrives, marker and all.
+Suppressing the time while letting the same value decide the day would honour
+the rule only halfway. Where there is no confirmed message to join, the device's
+clock remains the only source and SHALL be used.
+
 The time SHALL be legible against both message backgrounds — the sender's own
 and the counterpart's — in both themes.
 
@@ -67,6 +75,13 @@ repeated on every message.
 - **THEN** no time is displayed on it
 - **AND WHEN** the server's confirmation replaces it
 - **THEN** the time appears, taken from the server's `created_at`
+
+#### Scenario: An unconfirmed message opens no day group of its own
+
+- **GIVEN** a conversation that already shows at least one confirmed message
+- **WHEN** a message is sent optimistically and not yet confirmed
+- **THEN** it appears under the last existing day marker, and no further marker
+  is added for it
 
 #### Scenario: The time does not depend on the sending device's clock
 
@@ -192,6 +207,21 @@ Following punctuation SHALL NOT prevent the replacement. A message ending in a
 smiley followed by a full stop or exclamation mark is the ordinary case, and a
 rule that excluded it would suppress the feature exactly where it is most used.
 
+A following full stop or comma SHALL count as a boundary only where no digit
+follows it. In German a full stop separates thousands and a comma separates
+decimals, so `<3.000 Euro` and `<3,50 Euro` are numbers, not hearts — and the
+rule that admits `Toll :-).` is the same rule that would corrupt them.
+
+The one emoticon that is also an operator SHALL be bounded more narrowly than
+the rest: for `<3`, a following closing bracket or semicolon SHALL NOT count as
+a boundary, so that `if (x <3)`, `a[i <3]` and `solange x <3;` are left intact.
+Heart and comparison are not distinguishable from the left — `hab dich <3)` and
+`if (x <3)` are both a word followed by a space — so the rule is decided by
+cost, not by likelihood: a wrong replacement is written permanently into the
+stored body and cannot be undone, while a missed one costs two characters that
+the picker offers anyway. The price SHALL be stated rather than hidden:
+`(hab dich <3)` is not replaced.
+
 Emoticons whose form contains letters SHALL be recognised regardless of letter
 case.
 
@@ -213,9 +243,23 @@ is written, not what is read back.
 #### Scenario: A sentence-final emoticon is replaced
 
 - **WHEN** a member sends a message whose text ends in a recognised emoticon
-  followed by a full stop, exclamation mark or closing bracket
+  followed by a full stop or an exclamation mark
 - **THEN** the stored body contains the corresponding emoji, and the punctuation
   is preserved
+
+#### Scenario: A number is not turned into a heart
+
+- **WHEN** a member sends a message containing an amount written as `<3.000` or
+  `<3,50`
+- **THEN** the stored body contains those characters unchanged, because a digit
+  follows the punctuation
+
+#### Scenario: A comparison is not turned into a heart
+
+- **WHEN** a member sends a message containing `<3` immediately followed by a
+  closing bracket or a semicolon, as in a code fragment
+- **THEN** the stored body contains those characters unchanged — and the same
+  rule means a heart written inside brackets is left as typed
 
 #### Scenario: Letter case does not matter
 
