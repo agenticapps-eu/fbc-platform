@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-08-28-sidebar-pill",
+    datum: "2026-08-28",
+    titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",
+    linear: "AGE-638",
+    aenderungen: [
+      "**Ein Bauteil statt zweier.** Ein halber Pill am Innenrand jeder Leiste, der über die Kante hinausragt, gespiegelt an beiden. Er klappt ein und aus.",
+      "**Oben an beiden**, auf Höhe der Kopfzeile (Donalds Entscheidung).",
+      "**Immer sichtbar**, nicht erst beim Darüberfahren.",
+      "**Die untere Einklapp-Zeile links entfällt.** Die Feedback-Zeile darüber bleibt, wo sie ist — sie kam in AGE-566 aus einem eigenen Grund dorthin.",
+      "**Die Sprechblase im eingeklappten rechten Rail bleibt klickbar.** Sie ist zugleich der Ungelesen-Melder, den `design-system/spec.md:1372` verlangt; eine grosse Fläche, die aussieht wie ein Knopf und nicht reagiert, wäre schlechter als eine Redundanz. Der Pill ist das **einheitliche** Bauteil, nicht das einzige.",
+    ],
+  },
+  {
     slug: "2026-08-28-release-notes-modal",
     datum: "2026-08-28",
     titel: "Release-Notes im zentrierten Modal lesen, mit Screenshots",
