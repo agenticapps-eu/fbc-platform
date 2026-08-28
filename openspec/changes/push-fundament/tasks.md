@@ -411,13 +411,46 @@ Phase B beginnt erst danach.
 
 ## Phase B — Clientseite (nach AGE-642)
 
-- [ ] `@capacitor/push-notifications`; Registrierung über `claim_push_token`,
-      `letzter_kontakt` bei jedem Start.
-- [ ] Erlaubnis-Dialog **nicht beim ersten Start**, sondern wenn er erklärbar
-      ist — nach der ersten Nachricht. Wer beim Kaltstart gefragt wird, sagt
+> **Stand 28.08., abends.** Die Verdrahtung steht, gebaut ist beides. Was noch
+> offen ist, ist **ausnahmslos am Gerät zu messen** — und das Telefon war beim
+> Bauen nicht da. Der Reihe nach, wenn es zurück ist:
+>
+> 1. `xcrun devicectl device install app --device <UDID> <App.app>`
+> 2. Nachrichten öffnen, Erlaubnis geben (der Dialog kommt genau **hier**, nicht
+>    beim Start)
+> 3. `select count(*) from push_tokens` muss **1** sein. Vorher ist er 0 — das
+>    ist die Positivkontrolle, ohne die der Rest nichts belegt.
+> 4. Erst dann eine Nachricht einfügen und den Push abwarten.
+
+- [x] `@capacitor/push-notifications`; Registrierung über `claim_push_token`,
+      `letzter_kontakt` bei jedem Start. Der Android-Teil fehlte bis hierher
+      still: die Abhängigkeit lag seit Phase A im `package.json`, aber
+      `capacitor.build.gradle` und `capacitor.settings.gradle` kannten das
+      Plugin nicht — ein `cap sync android` war nach dem Hinzufügen nie
+      gelaufen. Auf iOS wäre es nicht aufgefallen (SPM erzeugt `Package.swift`
+      bei jedem Sync neu), auf Android hätte die Registrierung zur Laufzeit
+      nichts gefunden.
+- [x] Erlaubnis-Dialog **nicht beim ersten Start**, sondern wenn er erklärbar
+      ist — beim Öffnen der Nachrichten. Wer beim Kaltstart gefragt wird, sagt
       nein, und iOS fragt kein zweites Mal.
-- [ ] Abmelden entfernt das Token des Geräts. **(R2)** Und der Fall, dass genau
-      das fehlschlägt, ist getestet: das nächste Konto übernimmt das Token.
+
+      **Beide** Wege hinein zählen, die Schublade und die Route `/chat`: der
+      Einstieg in der Kopfzeile führt auf die Route, und nur die Schublade zu
+      nehmen hiesse, wer ihn antippt, wird nie gefragt.
+
+      **Höchstens einmal je App-Lauf UND Konto.** Der Riegel merkt sich die
+      Kennung des Kontos, nicht ein Ja/Nein — ein bloßes Ja hätte genau den
+      Fall verschluckt, für den `claim_push_token` gebaut wurde. Beim Schreiben
+      war er zuerst ein Ja/Nein; gefunden hat es der Test, nicht das Lesen.
+- [x] Abmelden entfernt das Token des Geräts. **(R2)** Und der Fall, dass genau
+      das fehlschlägt, ist getestet: das nächste Konto übernimmt das Token
+      (`push_tokens_test.sql:169-187`, pgTAP, seit Phase A grün).
+
+      Das Aufräumen liegt in `AuthProvider.signOut` und nicht bei einem der
+      **fünf** Aufrufer — sonst hätten die anderen vier die Lücke, still. Die
+      Reihenfolge ist die eigentliche Zusage: **vor** `auth.signOut()`, weil
+      danach kein Konto mehr da ist, dem die Zeile gehört, und das `delete`
+      null Zeilen träfe, ohne einen Fehler zu melden.
 - [ ] Zustellung auf **echtem** Android- und **echtem** iOS-Gerät gemessen, im
       Vordergrund, Hintergrund und bei geschlossener App.
 - [ ] **Sichtprobe am Sperrbildschirm**: „… hat dir geschrieben", kein Text.

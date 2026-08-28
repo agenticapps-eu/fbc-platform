@@ -240,6 +240,67 @@ anderen Fläche abhängen, die für Zustellung nicht einsteht.
 - **THEN** wirkt die Änderung, ohne dass Trigger oder Function neu ausgeliefert
   werden
 
+### Requirement: Die Erlaubnis für Push wird gefragt, wenn sie erklärbar ist
+
+Die App SHALL die Erlaubnis für Push-Benachrichtigungen erst dann anfordern,
+wenn ein Mitglied die **Nachrichten öffnet**, und SHALL NOT sie beim Start
+anfordern.
+
+Der Grund ist keine Geschmacksfrage: iOS zeigt den Systemdialog **einmal**. Wer
+ihn beim Kaltstart sieht — vor jedem Kontext, in dem eine Benachrichtigung einen
+Sinn ergäbe —, lehnt ab, und die Ablehnung ist endgültig. Ein zweiter Anlauf ist
+danach nur noch über die Systemeinstellungen möglich, also praktisch nicht.
+
+Die Anfrage SHALL **höchstens einmal je App-Lauf und Konto** ausgelöst werden,
+gleich wie oft die Nachrichten geöffnet und wieder geschlossen werden.
+
+Wechselt in derselben Sitzung das Konto, SHALL erneut registriert werden. Ein
+Gerät und zwei Konten ist der Normalfall, nicht der Randfall; ohne die erneute
+Registrierung bliebe das Gerätetoken beim vorigen Konto, und dessen Zustellungen
+gingen an ein Telefon, das jemand anderes in der Hand hält.
+
+Die Anfrage SHALL ein angemeldetes Mitglied voraussetzen. Ohne Anmeldung gibt es
+kein Profil, dem ein Gerätetoken gehören könnte.
+
+Auf der Web-Fläche SHALL nichts geschehen: kein Dialog, keine Registrierung.
+
+Das erhaltene Gerätetoken SHALL über `claim_push_token` abgelegt werden, samt
+Plattform. Scheitert das Ablegen, SHALL das die Nachrichten NOT blockieren.
+
+#### Scenario: Der Start fragt nicht
+
+- **WHEN** die App startet und ein angemeldetes Mitglied irgendeine andere
+  Fläche als die Nachrichten sieht
+- **THEN** wird keine Erlaubnis angefordert
+
+#### Scenario: Das Öffnen der Nachrichten fragt
+
+- **WHEN** ein angemeldetes Mitglied die Nachrichten öffnet
+- **THEN** wird die Erlaubnis angefordert und bei Zustimmung das Gerätetoken
+  abgelegt
+
+#### Scenario: Zweimal öffnen fragt nicht zweimal
+
+- **WHEN** ein Mitglied die Nachrichten schließt und erneut öffnet
+- **THEN** bleibt es bei genau einer Anforderung in diesem App-Lauf
+
+#### Scenario: Ein Kontowechsel registriert erneut
+
+- **WHEN** sich in derselben Sitzung ein anderes Mitglied anmeldet und die
+  Nachrichten öffnet
+- **THEN** wird erneut registriert, und das Gerätetoken gehört danach dem neuen
+  Konto
+
+#### Scenario: Ohne Anmeldung wird nicht gefragt
+
+- **WHEN** ein Gast dieselbe Fläche erreicht
+- **THEN** wird keine Erlaubnis angefordert
+
+#### Scenario: Die Web-Fläche bleibt unberührt
+
+- **WHEN** die Nachrichten im Browser geöffnet werden
+- **THEN** wird weder ein Dialog gezeigt noch ein Token registriert
+
 ## MODIFIED Requirements
 
 ### Requirement: Each member can switch off any notification type

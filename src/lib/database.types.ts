@@ -1564,6 +1564,45 @@ export type Database = {
           },
         ];
       };
+      // Von Hand gepflegt (AGE-641). Spiegelt push_tokens aus
+      // 20260827210000_push_tokens.sql. Nur `delete` wird vom Client gefahren
+      // (Abmelden); geschrieben wird ueber claim_push_token(), weil owner-only
+      // RLS die fremde Zeile beim Kontowechsel sonst unsichtbar macht.
+      push_tokens: {
+        Row: {
+          created_at: string;
+          id: string;
+          letzter_kontakt: string;
+          plattform: string;
+          profile_id: string;
+          token: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          letzter_kontakt?: string;
+          plattform: string;
+          profile_id: string;
+          token: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          letzter_kontakt?: string;
+          plattform?: string;
+          profile_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
       // routing_queue table from 20260614120000_volume_routing_queue.sql (§8 manager
       // queue; rows inserted only by the lifecycle trigger, manager-only RLS).

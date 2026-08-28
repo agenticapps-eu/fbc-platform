@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
+import { pushEinrichten } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
   ANFRAGEN_STALE_TIME_MS,
@@ -588,6 +589,35 @@ export default function AppShell() {
       window.removeEventListener("touchend", ende);
     };
   }, [istBreit, chatLeisteSteht]);
+
+  // AGE-641 Phase B: HIER wird nach der Push-Erlaubnis gefragt — beim Öffnen
+  // der Nachrichten, und nirgends sonst.
+  //
+  // Nicht im Kaltstart, und das ist keine Feinheit: iOS zeigt den Systemdialog
+  // EINMAL. Wer ihn beim ersten Start sieht — vor jedem Zusammenhang, in dem
+  // eine Benachrichtigung einen Sinn ergäbe —, lehnt ab, und die Ablehnung ist
+  // endgültig; ein zweiter Anlauf führt nur noch über die Systemeinstellungen.
+  //
+  // Beide Wege in die Nachrichten zählen: die Schublade (Knopf oder Wischgeste)
+  // UND die Route `/chat`, auf die der Einstieg in der Kopfzeile führt. Nur die
+  // Schublade zu nehmen hiesse, wer den Einstieg antippt, wird nie gefragt.
+  //
+  // Der Riegel steht in einem Ref, nicht im Zustand: er soll NICHT neu
+  // anstreichen. `pushEinrichten` selbst gibt im Web sofort "web" zurück — die
+  // Weiche steht dort, nicht hier.
+  //
+  // Er merkt sich das KONTO und nicht bloß ein Ja/Nein. Ein bloßes Ja hätte
+  // genau den Fall verschluckt, für den `claim_push_token` gebaut wurde: ein
+  // Gerät, zwei Konten. Nach einem Abmelden und Anmelden in derselben Sitzung
+  // bliebe das Gerätetoken sonst beim vorigen Konto hängen, und dessen nächste
+  // Nachricht ginge auf ein Telefon, das jemand anderes in der Hand hält.
+  const pushGefragtFuer = useRef<string | null>(null);
+  const nachrichtenOffen = chatDrawerOpen || aufChatRoute;
+  useEffect(() => {
+    if (!user || !nachrichtenOffen || pushGefragtFuer.current === user.id) return;
+    pushGefragtFuer.current = user.id;
+    void pushEinrichten();
+  }, [user, nachrichtenOffen]);
 
   // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es
   // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon

@@ -29,6 +29,12 @@ export function pushPlattform(nativ: boolean, plattform: string): PushPlattform 
 
 export type PushStand = "web" | "abgelehnt" | "registriert" | "fehler";
 
+// Das zuletzt erhaltene Gerätetoken. Es wird hier gemerkt, weil die Brücke es
+// nicht wieder herausgibt — und weil beim Abmelden GENAU diese eine Zeile weg
+// muss und nicht alle Token des Kontos: sonst verstummten Tablet und Zweitgerät
+// desselben Menschen mit.
+let letztesToken: string | null = null;
+
 // Die Zuhörer dürfen nur EINMAL angemeldet werden. `addListener` haengt bei
 // jedem Aufruf einen weiteren an; beim zweiten Öffnen der Nachrichten schriebe
 // die App ihr Token sonst doppelt, beim dritten dreifach.
@@ -59,6 +65,7 @@ export async function pushEinrichten(): Promise<PushStand> {
     if (!zuhoererStehen) {
       zuhoererStehen = true;
       await PushNotifications.addListener("registration", async (token) => {
+        letztesToken = token.value;
         const { error } = await supabase.rpc("claim_push_token", {
           p_token: token.value,
           p_plattform: ziel,
@@ -79,4 +86,31 @@ export async function pushEinrichten(): Promise<PushStand> {
     console.error("[push] unerwartet:", (e as Error).message);
     return "fehler";
   }
+}
+
+/**
+ * Nimmt das Gerätetoken beim Abmelden mit — bester Versuch, keine Garantie.
+ *
+ * **Vor** `auth.signOut()` zu rufen ist Pflicht: die Zeile gehört dem
+ * angemeldeten Konto, und owner-only RLS lässt sie nur ihm löschen. Danach
+ * träfe das `delete` null Zeilen und meldete trotzdem keinen Fehler — ein
+ * Aufräumen, das aussieht wie eines und keines ist.
+ *
+ * Scheitert es doch (kein Netz, App abgestürzt, Konto direkt gewechselt), ist
+ * das kein stiller Fehlzustand: `claim_push_token` schreibt dasselbe Token beim
+ * nächsten Konto auf demselben Gerät um. Die Garantie liegt auf dem Server, hier
+ * liegt nur die Höflichkeit — und deshalb darf ein Fehler hier das Abmelden
+ * niemals verhindern.
+ */
+export async function pushAbmelden(): Promise<"nichts" | "entfernt" | "fehler"> {
+  const token = letztesToken;
+  letztesToken = null;
+  if (!token) return "nichts";
+
+  const { error } = await supabase.from("push_tokens").delete().eq("token", token);
+  if (error) {
+    console.error("[push] Token beim Abmelden nicht entfernt:", error.message);
+    return "fehler";
+  }
+  return "entfernt";
 }
