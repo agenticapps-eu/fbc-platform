@@ -1,42 +1,41 @@
 # Session Handoff — 2026-08-28 (später Abend, fünf kleine Vorgänge)
 
-> ## ⚠ ZUERST LESEN: `main` deployt nicht — und **ein Merge allein reicht nicht**
+> ## ⚠ ZUERST LESEN: der Deploy ist wieder grün, **`CI/verify` auf `main` ist rot**
 >
-> **Geklärt, gehört `fbc-platform-b7`, nicht selbst anfassen.** DEV trug ab
-> ~17:30 die Migration **`20260828200000`**, die es auf `main` nicht gab —
-> `migrate-dev` fiel, `drift-gate`/`deploy`/`functions` wurden übersprungen. Sie
-> ist echt (AGE-641, „jede Nachricht löst einen Push aus"), lag nur lokal, und
-> **PR #285** bringt sie nach main.
+> **Erledigt — nichts mehr zu tun:** die DEV-Migration `20260828200000` (AGE-641,
+> gehörte `fbc-platform-b7`, lag nur lokal) ist über **PR #285** auf `main`,
+> `migrate-prod` lief um 23:06 (`33211112563`, success), und der Deploy auf
+> `c61a48d` ist **vollständig grün** — `drift-gate`, `migrate-dev`, `deploy`,
+> `functions`. PROD und DEV tragen beide `20260828200000`.
 >
-> **Der Deploy ist damit aber noch nicht wieder grün, und das ist der Punkt:**
-> `drift-gate` misst gegen **PROD**, nicht gegen DEV. Gelesen am 28.08., 23:02:
+> **Aber `CI/verify` ist rot, und zwar an einem flackernden Test — AGE-666.**
+> Nicht an der Änderung: #285 trägt nur eine Migration und eine pgTAP-Datei, ihr
+> eigener PR-Lauf war grün.
 >
-> | | jüngste Versionen |
-> | --- | --- |
-> | DEV | **20260828200000**, 20260828180000, 20260828100000 |
-> | PROD | 20260828180000, 20260828100000, 20260827240000 |
+> ```
+> FAIL src/pages/PublicProfilePage.test.tsx > lange Biografie
+>      > kürzt auf drei Zeilen und klappt auf Klick auf
+> Unable to find an accessible element with the role "button"
+>   and name /mehr anzeigen/i
+> ```
 >
-> Nach dem Merge von #285 passt `migrate-dev` wieder — dann liegt
-> `20260828200000` aber auf main und fehlt PROD, und **genau das macht
-> `drift-gate` rot**, mit `deploy`/`functions` erneut übersprungen. Es braucht
-> danach `migrate-prod` und ein `gh run rerun --failed`. Belegt am selben Muster
-> von heute Nachmittag (Lauf `33191485012` für meine `20260828180000`).
+> **Gemessen:** Datei allein 12× → 12 grün. Ganze Suite lokal → Lauf 1 **rot**,
+> Lauf 2 grün. CI → rot. Es flackert nur unter Last.
 >
-> **`migrate-prod` ist Donalds Freigabe**, je Fall, nicht generell — b7 dispatcht
-> ihn richtigerweise nicht ungefragt, und ich habe es für deren Version auch
-> nicht getan.
+> **Ursache steht fest:** `Biografie` (`PublicProfilePage.tsx:351`) rendert den
+> Knopf erst, nachdem ein `useEffect` gemessen hat; der Test greift mit
+> **synchronem** `getByRole` direkt nach dem `await findByText` zu (`:194`). Fix
+> ist eine Zeile (`await screen.findByRole`). **Der Nachbartest bei `:213` ist
+> schlimmer** — eine Verneinung ohne Positivkontrolle, die auch bei kaputter
+> Komponente grün wäre.
 >
-> **Reihenfolge also:** #285 mergen → `migrate-prod` freigeben lassen →
-> `gh run rerun --failed` auf dem jüngsten Deploy.
->
-> **Was praktisch fehlt, ist wenig:** der letzte grüne Deploy war 17:20
-> (`116d3db`, AGE-600) — die Frontend-Änderung ist **live**. Ausstehend sind nur
-> AGE-599 (reine Seed-Skripte) und die Übergabe.
+> **Abnahme dazu: die GANZE Suite mehrfach laufen lassen**, nicht die Datei
+> allein — isoliert war sie 12 von 12 grün und hätte jede Korrektur bestätigt.
 >
 > **Warnung von b7 für den lokalen Stack:** er trägt die neue Fassung von
 > `hinweis_neue_nachricht()`, aber `schema_migrations` steht dort weiter auf
-> `20260828180000` — die Datei wurde per psql eingespielt, nicht per `db push`.
-> Ein `db reset` bringt das gerade.
+> `20260828180000` — per psql eingespielt, nicht per `db push`. Ein `db reset`
+> bringt das gerade.
 
 **Sitzung:** `fbc-platform-f4`, Worktree `fbc-platform.neuigkeiten-archiv` (der
 Name gehört zu einem längst archivierten Change). Parallel lief
@@ -121,8 +120,8 @@ ausdrücklich nicht gestrichen.
 
 **Alle fünf PRs sind gemergt.** Nachzuholen ist am Code nichts.
 
-**Erste Aktion steht im Kasten ganz oben** — der Deploy auf `main` hängt, und
-ein Merge von #285 allein reicht nicht.
+**Erste Aktion steht im Kasten ganz oben** — AGE-666, der flackernde Test, der
+`CI/verify` auf `main` rot hält. Der Deploy ist wieder grün.
 
 **Danach eine Entscheidung, die nur Donald treffen kann** — die Abnahme von
 AGE-599, und sie hat **zwei** Schritte, nicht einen:
@@ -143,9 +142,10 @@ Seed-Upload, nicht nur für Titelbilder.
 
 **PROD ist sauber:** `migrate-prod` (Lauf `33192980642`) lief mit `plan` und
 `apply` grün, `messages_thread_created_id_idx` steht dort mit
-`indisvalid = true`. Der Deploy auf `main` war danach zweimal vollständig grün
-(17:01 und 17:20) — **erst der Lauf um 17:40 fiel**, und zwar an der fremden
-DEV-Migration, nicht an einer dieser Änderungen. Siehe den Kasten oben.
+`indisvalid = true`. Später am Abend kam über b7 noch `20260828200000` dazu
+(Lauf `33211112563`); PROD und DEV tragen jetzt beide dieselben vier jüngsten
+Versionen, und der Deploy auf `main` ist vollständig grün. Rot ist nur
+`CI/verify` — siehe den Kasten oben.
 
 **Diese Sitzung hat selbst eine Spec-Drift erzeugt: AGE-665.**
 `design-system/spec.md` ab Zeile 856 nennt die Zuschnitt-Vorschauen
@@ -155,8 +155,10 @@ Code verletzt nichts, die Anforderung beschreibt die Welt nur nicht mehr;
 `validate` sieht das nicht. **Nicht von Hand am durable-truth-Text vorbei
 reparieren.**
 
-Danach sind die nächsten kleinen Vorgänge **AGE-664** (die letzte
-Event-Titelbild-Fläche, die noch beschneidet), **AGE-660** und **AGE-618**.
+Danach sind die nächsten kleinen Vorgänge **AGE-666** (flackernder Test, hält
+`verify` rot — eine Zeile, aber die Abnahme braucht die ganze Suite mehrfach),
+**AGE-664** (die letzte Event-Titelbild-Fläche, die noch beschneidet),
+**AGE-660** und **AGE-618**.
 
 ## Open questions
 
