@@ -39,7 +39,7 @@ const { ungelesen } = vi.hoisted(() => ({ ungelesen: { gesamt: 0 } }));
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),
   fetchThreads: (uid: string, opts?: { offset?: number }) => fetchThreads(uid, opts),
-  fetchMessages: async () => [],
+  fetchMessages: async () => ({ messages: [], erschoepft: true }),
   fetchUnreadCounts: async () => ({
     gesamt: ungelesen.gesamt,
     jeThread: new Map<string, number>(),

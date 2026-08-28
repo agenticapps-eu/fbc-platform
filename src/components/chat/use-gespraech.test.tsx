@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ChatMessage } from "../../lib/chat";
+import type { ChatMessage, ChatVerlaufCursor, ChatVerlaufSeite } from "../../lib/chat";
 
 /**
  * Ein Gespräch, eine Definition — für die Vollansicht und für ein Fenster
@@ -19,7 +19,16 @@ import type { ChatMessage } from "../../lib/chat";
  * Hook liest und schreibt nur den Cache, den beide bedienen.
  */
 
-const fetchMessages = vi.fn<(threadId: string) => Promise<ChatMessage[]>>();
+const fetchMessages =
+  vi.fn<
+    (
+      threadId: string,
+      opts?: { limit?: number; before?: ChatVerlaufCursor },
+    ) => Promise<ChatVerlaufSeite>
+  >();
+
+/** Eine vollständige Seite: alles geladen, nichts Älteres mehr da (AGE-655). */
+const seite = (messages: ChatMessage[]): ChatVerlaufSeite => ({ messages, erschoepft: true });
 const markThreadRead = vi.fn<(threadId: string, uid: string) => Promise<void>>();
 const sendMessage =
   vi.fn<(input: { threadId: string; senderId: string; body: string }) => Promise<ChatMessage>>();
@@ -28,7 +37,8 @@ vi.mock("../../lib/chat", async (importOriginal) => {
   const echt = await importOriginal<typeof import("../../lib/chat")>();
   return {
     ...echt,
-    fetchMessages: (threadId: string) => fetchMessages(threadId),
+    fetchMessages: (threadId: string, opts?: { limit?: number; before?: ChatVerlaufCursor }) =>
+      fetchMessages(threadId, opts),
     markThreadRead: (threadId: string, uid: string) => markThreadRead(threadId, uid),
     sendMessage: (input: { threadId: string; senderId: string; body: string }) =>
       sendMessage(input),
@@ -37,6 +47,7 @@ vi.mock("../../lib/chat", async (importOriginal) => {
 
 const { useGespraech } = await import("./use-gespraech");
 const { ToastProvider } = await import("../ui/Toast");
+const { VERLAUF_SEITE, messagesQueryKey } = await import("../../lib/chat");
 
 const ICH = "ich";
 
@@ -76,7 +87,7 @@ function montiere(aktiv: boolean, threadId = "t1") {
 
 beforeEach(() => {
   fetchMessages.mockReset();
-  fetchMessages.mockResolvedValue([]);
+  fetchMessages.mockResolvedValue(seite([]));
   markThreadRead.mockReset();
   markThreadRead.mockResolvedValue(undefined);
   sendMessage.mockReset();
@@ -84,11 +95,11 @@ beforeEach(() => {
 
 describe("useGespraech — Verlauf", () => {
   it("lädt den Verlauf des Threads", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(true);
 
     await waitFor(() => expect(stand().messages).toHaveLength(1));
-    expect(fetchMessages).toHaveBeenCalledWith("t1");
+    expect(fetchMessages).toHaveBeenCalledWith("t1", { limit: VERLAUF_SEITE });
   });
 
   it("lädt ihn AUCH, wenn das Gespräch nicht aktiv ist", async () => {
@@ -97,7 +108,7 @@ describe("useGespraech — Verlauf", () => {
     // liegt. Ohne Eintrag fielen alle Nachrichten weg, die während des
     // Minimiertseins eintreffen — und das Aufziehen zeigte einen Verlauf, dem
     // genau die neuen Zeilen fehlen.
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(false);
 
     await waitFor(() => expect(stand().messages).toHaveLength(1));
@@ -121,7 +132,7 @@ describe("useGespraech — Lesestand", () => {
   });
 
   it("rückt ihn NICHT vor, wenn es das nicht ist", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(false);
 
     // Auf den geladenen Verlauf warten, sonst misst die Verneinung nur, dass
@@ -131,7 +142,7 @@ describe("useGespraech — Lesestand", () => {
   });
 
   it("rückt ihn beim Aufziehen nach — ein zweiter Aufruf, kein Neuladen", async () => {
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     const { rerender } = montiere(false);
     await waitFor(() => expect(stand().messages).toHaveLength(1));
     expect(markThreadRead).not.toHaveBeenCalled();
@@ -149,16 +160,13 @@ describe("useGespraech — Lesestand", () => {
     //
     // Drei Zeilen auf einmal beim Öffnen → EIN Schreibvorgang. Genau wie der
     // Effect an `activeId` es in `ChatPage` bisher tat.
-    fetchMessages.mockResolvedValue([
-      nachricht("a", "wer-anders"),
-      nachricht("bb", ICH),
-      nachricht("ccc", "wer-anders"),
-    ]);
+    fetchMessages.mockResolvedValue(
+      seite([nachricht("a", "wer-anders"), nachricht("bb", ICH), nachricht("ccc", "wer-anders")]),
+    );
     const { queryClient } = montiere(true);
     await waitFor(() => expect(markThreadRead).toHaveBeenCalledTimes(1));
 
     // Eine EIGENE Nachricht kommt dazu → kein weiterer Schreibvorgang.
-    const { messagesQueryKey } = await import("../../lib/chat");
     act(() => {
       queryClient.setQueryData<ChatMessage[]>(messagesQueryKey("t1"), (prev) => [
         ...(prev ?? []),
@@ -180,7 +188,7 @@ describe("useGespraech — Lesestand", () => {
 
   it("überlebt einen Fehlschlag beim Markieren", async () => {
     markThreadRead.mockRejectedValue(new Error("42501"));
-    fetchMessages.mockResolvedValue([nachricht("a", "wer-anders")]);
+    fetchMessages.mockResolvedValue(seite([nachricht("a", "wer-anders")]));
     montiere(true);
 
     // Das Gespräch darf nicht an seiner Buchführung scheitern.
@@ -256,5 +264,217 @@ describe("useGespraech — Senden", () => {
 
     act(() => aufloesen!({ ...nachricht("echt", ICH, "Toll 🙂.") }));
     await waitFor(() => expect(stand().messages[0].pending).toBeUndefined());
+  });
+});
+
+/**
+ * AGE-655 — die Seitengrenze. Diese vier Zusagen kommen aus der Plan-Review; die
+ * ersten beiden sind die HIGH-Befunde, an denen der erste Entwurf gescheitert
+ * ist. Sie sind mit einer Mutations-Gegenprobe gemessen: ersetzt man die
+ * Vereinigung durch ein Überschreiben bzw. die Sperrklinke durch eine einfache
+ * Zuweisung, werden sie rot.
+ */
+describe("useGespraech — ältere Nachrichten nachladen", () => {
+  const alt = (id: string) => ({
+    ...nachricht(id, "wer-anders"),
+    createdAt: `2026-07-0${id}T10:00:00Z`,
+  });
+  const neu = { ...nachricht("z", "wer-anders"), createdAt: "2026-08-01T10:00:00Z" };
+
+  it("holt die Seite VOR der ältesten geladenen Nachricht", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: true });
+    await act(async () => await stand().ladeAeltere());
+
+    // Der Cursor geht über ZWEI Spalten — `created_at` allein ist keine totale
+    // Ordnung, und ein Cursor auf der halben Ordnung überspringt bei Gleichstand
+    // Zeilen, die danach nie wieder erreichbar sind (Diff-Review).
+    expect(fetchMessages).toHaveBeenLastCalledWith("t1", {
+      before: { createdAt: neu.createdAt, id: neu.id },
+    });
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
+  // HIGH 1 aus der Plan-Review. React Query ERSETZT die Daten, wenn die
+  // `queryFn` auflöst. Löst eine Abfrage, die vor dem Nachladen losgelaufen ist,
+  // danach auf, nähme sie die nachgeladenen Zeilen wieder weg — und zwar
+  // bevorzugt beim Eintreffen einer Nachricht, also genau im Fall, den die
+  // Zusage sichern soll. Gemessen wird am ERGEBNIS, nicht an der Anfragegrösse.
+  it("verliert nachgeladene Zeilen nicht an eine Abfrage, die vorher losgelaufen ist", async () => {
+    let ersteAntwort!: (s: ChatVerlaufSeite) => void;
+    fetchMessages.mockReturnValueOnce(
+      new Promise<ChatVerlaufSeite>((res) => {
+        ersteAntwort = res;
+      }),
+    );
+    const { queryClient } = montiere(true);
+
+    // Das Nachladen kommt an, während die erste Abfrage noch offen ist.
+    queryClient.setQueryData(messagesQueryKey("t1"), [neu]);
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: true });
+    await act(async () => await stand().ladeAeltere());
+    expect(stand().messages).toHaveLength(2);
+
+    // …und erst JETZT antwortet sie, mit nur der neuesten Seite.
+    await act(async () => {
+      ersteAntwort({ messages: [neu], erschoepft: false });
+    });
+
+    // Sie nimmt die nachgeladene Zeile nicht weg.
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+    // Beide Wege sind wirklich gelaufen — sonst prüfte die Zusage oben einen
+    // Zustand, den niemand angetastet hat.
+    expect(fetchMessages).toHaveBeenCalledTimes(2);
+  });
+
+  // Was von HIGH 2 der Plan-Review geblieben ist — und was NICHT.
+  //
+  // Der Befund war: eine Neuabfrage darf die Feststellung „nichts Älteres mehr"
+  // nicht versehentlich zurücknehmen. Die Antwort darauf war zwei Fassungen lang
+  // eine Sperrklinke, die einmal gesetzt nie zurückfiel. Beide Begründungen
+  // dafür haben die Diff-Reviewer widerlegt (siehe `use-gespraech.ts`), und die
+  // Klinke hatte einen Fehlerfall, der NICHT heilt.
+  //
+  // Geblieben ist der einfache Wert — und die Zusage, die wirklich zählt: die
+  // `limit + 1`-Sonde macht `erschoepft` unabhängig davon, wie gross die
+  // Neuabfrage angefragt hat. Genau das misst dieser Test, und zwar in der
+  // Konstellation aus dem Befund: alles geladen, Neuabfrage fragt
+  // `max(VERLAUF_SEITE, geladen)` an.
+  it("bleibt erschöpft, wenn eine Neuabfrage genau so viele Zeilen zurückgibt wie geladen", async () => {
+    fetchMessages.mockResolvedValue({ messages: [alt("1"), neu], erschoepft: true });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(2));
+    expect(stand().hatAeltere).toBe(false);
+
+    // Die Neuabfrage sieht dieselben zwei Zeilen. Die Sonde hat nichts
+    // Überzähliges gefunden, also bleibt `erschoepft` wahr — ohne Klinke.
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+    });
+
+    expect(fetchMessages).toHaveBeenLastCalledWith("t1", { limit: VERLAUF_SEITE });
+    expect(stand().hatAeltere).toBe(false);
+  });
+
+  // Die Gegenrichtung, sonst belegt die Zusage oben nur, dass `hatAeltere`
+  // konstant falsch ist — genau der Vakuumtest, den codex an anderer Stelle
+  // gefunden hat.
+  it("bietet den Weg wieder an, wenn eine Neuabfrage Älteres meldet", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: true });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().hatAeltere).toBe(false));
+
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+    });
+
+    expect(stand().hatAeltere).toBe(true);
+  });
+
+  // Doppelklick. Der Test prüfte zuerst nur das deduplizierte ERGEBNIS — codex
+  // hat zu Recht bemängelt, dass die Zusage „der zweite läuft gar nicht erst
+  // los" damit ungemessen blieb. Sie hing an `laedtAeltere`, und das ist ein
+  // Zustand: zwei Aufrufe vor dem nächsten Anstrich sähen beide `false`.
+  // Gemessen wird jetzt die ANZAHL DER ANFRAGEN.
+  it("stellt beim Doppelklick genau EINE Anfrage", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    fetchMessages.mockClear();
+    fetchMessages.mockResolvedValue({ messages: [alt("1")], erschoepft: false });
+    await act(async () => {
+      await Promise.all([stand().ladeAeltere(), stand().ladeAeltere()]);
+    });
+
+    expect(fetchMessages).toHaveBeenCalledTimes(1);
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
+  // Reproduktionsversuch zu codex HOCH 1: die Neuabfrage hat ihr Ergebnis SCHON
+  // berechnet — also den Cache gelesen, als die älteren Zeilen noch nicht drin
+  // waren — und erst DANACH schreibt `ladeAeltere`. Setzt React Query danach
+  // noch ein, verschwinden die älteren wieder.
+  it("verliert nachgeladene Zeilen auch dann nicht, wenn die Neuabfrage zuerst auflöst", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    let neuabfrageAntwort!: (s: ChatVerlaufSeite) => void;
+    let aeltereAntwort!: (s: ChatVerlaufSeite) => void;
+    fetchMessages
+      .mockImplementationOnce(
+        () => new Promise<ChatVerlaufSeite>((res) => (neuabfrageAntwort = res)),
+      )
+      .mockImplementationOnce(() => new Promise<ChatVerlaufSeite>((res) => (aeltereAntwort = res)));
+
+    let neuabfrage!: Promise<unknown>;
+    let nachladen!: Promise<void>;
+    await act(async () => {
+      neuabfrage = queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+      await Promise.resolve();
+      nachladen = stand().ladeAeltere();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      // Die Reihenfolge IST der Befund: erst die Neuabfrage, dann das Nachladen.
+      neuabfrageAntwort({ messages: [neu], erschoepft: false });
+      aeltereAntwort({ messages: [alt("1")], erschoepft: true });
+      await neuabfrage;
+      await nachladen;
+    });
+
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
+  it("bietet keinen Weg zu älteren an, wenn der Verlauf leer ist", async () => {
+    fetchMessages.mockResolvedValue({ messages: [], erschoepft: false });
+    montiere(true);
+    await waitFor(() => expect(stand().isLoading).toBe(false));
+
+    expect(stand().hatAeltere).toBe(false);
+  });
+
+  // Die Positivkontrolle dazu — sie fehlte, und der Test darüber war damit ein
+  // Vakuumtest: eine Umsetzung mit konstant `hatAeltere: false` hätte ihn
+  // bestanden (codex, NIEDRIG). Der Kommentar behauptete sie sogar, ohne dass
+  // sie dastand.
+  it("bietet ihn an, sobald Inhalt da und die Seite nicht erschöpft ist", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    montiere(true);
+
+    await waitFor(() => expect(stand().hatAeltere).toBe(true));
+  });
+
+  // Ein fehlgeschlagener HINTERGRUND-Refetch darf den Weg zu älteren Nachrichten
+  // nicht kosten.
+  //
+  // **Anlass war ein Befund, der so nicht stimmt** (codex, MITTEL): React Query v5
+  // setze dabei den Status auf `error`, weshalb ein `hatAeltere` mit
+  // `query.isSuccess` den Knopf verschwinden liesse. Nachgemessen — der Status
+  // bleibt `success`, solange Daten dastehen; die erste Fassung dieses Tests ist
+  // an genau dieser Zusage rot geworden und hat den Befund widerlegt.
+  //
+  // Die Änderung bleibt trotzdem: `hatAeltere` hängt jetzt an dem, worum es geht
+  // (ist etwas da, ist es erschöpft), und nicht am Zustand der letzten Abfrage.
+  // Ein Zusammenhang, der zufällig gerade richtig herauskommt, ist einer, der
+  // beim nächsten Bibliotheks-Update kippt.
+  it("behält den Weg zu älteren, wenn eine Neuabfrage scheitert", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().hatAeltere).toBe(true));
+
+    fetchMessages.mockRejectedValue(new Error("offline"));
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+    });
+
+    expect(stand().messages).toHaveLength(1);
+    expect(stand().hatAeltere).toBe(true);
   });
 });

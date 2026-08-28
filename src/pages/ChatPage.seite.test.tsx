@@ -27,7 +27,7 @@ vi.mock("../lib/chat", async (importOriginal) => {
   return {
     ...echt,
     fetchThreads: (uid: string, opts?: { offset?: number }) => fetchThreads(uid, opts),
-    fetchMessages: async () => [],
+    fetchMessages: async () => ({ messages: [], erschoepft: true }),
     fetchUnreadCounts: async () => ({
       gesamt: 0,
       jeThread: new Map<string, number>(),

@@ -5,6 +5,7 @@ import {
   mapMessageRow,
   mapThreadRow,
   mergeMessage,
+  vereinigeNachrichten,
   type ChatMessage,
 } from "./chat";
 
@@ -217,5 +218,54 @@ describe("fasseUngelesenZusammen (AGE-583)", () => {
     ]);
     expect(z.gesamt).toBe(5);
     expect(typeof z.gesamt).toBe("number");
+  });
+});
+
+describe("vereinigeNachrichten (AGE-655 — Seitengrenze)", () => {
+  const n = (id: string, createdAt: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
+    id,
+    threadId: "t1",
+    senderId: partnerId,
+    body: id,
+    createdAt,
+    ...over,
+  });
+
+  const alt = n("m1", "2026-08-28T10:00:00.000Z");
+  const mitte = n("m2", "2026-08-28T11:00:00.000Z");
+  const neu = n("m3", "2026-08-28T12:00:00.000Z");
+
+  it("setzt eine ältere Seite vor die bestehende, chronologisch", () => {
+    expect(vereinigeNachrichten([mitte, neu], [alt]).map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  // Der Doppelklick-Befund aus der Plan-Review: zwei Aufrufe lesen dasselbe
+  // `before` und holen dieselbe Seite. Ein Voranstellen ergäbe sie zweimal —
+  // gleiche `id`, gleiche React-Keys.
+  it("ergibt dieselbe Seite zweimal vereinigt die Seite, nicht das Doppelte", () => {
+    const einmal = vereinigeNachrichten([neu], [alt, mitte]);
+    expect(vereinigeNachrichten(einmal, [alt, mitte]).map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  // Der Wettlauf-Befund: eine veraltete Antwort darf nur bestätigen, nie
+  // wegnehmen. Genau das unterscheidet die Vereinigung vom Ersetzen.
+  it("nimmt nichts weg, wenn die zweite Liste weniger enthält als die erste", () => {
+    expect(vereinigeNachrichten([alt, mitte, neu], [neu]).map((m) => m.id)).toEqual([
+      "m1",
+      "m2",
+      "m3",
+    ]);
+  });
+
+  it("lässt bei gleicher id die neue Fassung gewinnen — die schwebende Blase weicht der echten", () => {
+    const schwebend = n("m3", "2026-08-28T12:00:00.000Z", { pending: true });
+    const [letzte] = vereinigeNachrichten([alt, schwebend], [neu]).slice(-1);
+    expect(letzte.pending).toBeUndefined();
+  });
+
+  it("ordnet bei gleichem Zeitstempel nach id — dieselbe Ordnung wie mergeMessage", () => {
+    const b = n("mb", "2026-08-28T12:00:00.000Z");
+    const a = n("ma", "2026-08-28T12:00:00.000Z");
+    expect(vereinigeNachrichten([b], [a]).map((m) => m.id)).toEqual(["ma", "mb"]);
   });
 });

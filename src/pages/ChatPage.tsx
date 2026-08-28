@@ -158,6 +158,9 @@ export default function ChatPage() {
                 messages={gespraech.messages}
                 myId={myId}
                 onSend={gespraech.sende}
+                hatAeltere={gespraech.hatAeltere}
+                laedtAeltere={gespraech.laedtAeltere}
+                onLadeAeltere={gespraech.ladeAeltere}
               />
             ) : (
               <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">

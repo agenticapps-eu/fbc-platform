@@ -143,6 +143,9 @@ export function ChatFenster({
               messages={gespraech.messages}
               myId={myId}
               onSend={gespraech.sende}
+              hatAeltere={gespraech.hatAeltere}
+              laedtAeltere={gespraech.laedtAeltere}
+              onLadeAeltere={gespraech.ladeAeltere}
               variante="fenster"
             />
           )}
