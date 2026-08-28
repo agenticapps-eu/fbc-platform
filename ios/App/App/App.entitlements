@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- AGE-641/AGE-642: Ohne diesen Eintrag fordert die App keine Faehigkeit
+	     an, die automatische Signierung greift zum Wildcard-Profil
+	     (`WQZJ8649TN.*`), und ein Wildcard-Profil KANN `aps-environment` nicht
+	     tragen. Ergebnis waere eine App, die nie ein Geraetetoken bekommt —
+	     bei fertiger Serverseite und gueltigem APNs-Auth-Key.
+
+	     `development` ist der Wert fuer Entwicklungsbauten. Fuer die
+	     Store-Auslieferung setzt Apple beim Signieren mit einem
+	     Distributions-Profil `production`; das gehoert nach B3, nicht hierher. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
