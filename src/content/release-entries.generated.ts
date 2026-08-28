@@ -30,6 +30,16 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-28-rail-breakpoint-xl",
+    datum: "2026-08-28",
+    titel: "Die rechte Leiste dockt an `xl` an — auch dort, wo die Spec noch `lg` sagt",
+    linear: "AGE-652",
+    aenderungen: [
+      "Einer bindet die Schwelle an die Anforderung, die sie festlegt.",
+      "Einer trennt die **gespeicherte Vorliebe** von ihrer **angedockten Darstellung**. Nur die zweite ist breitengebunden; Persistenz, Trennung vom Zustand der Navigation und die Toleranz gegenüber fehlendem Speicher gelten bei jeder Breite. Ohne diesen Absatz las sich der erste so, als sei unterhalb von `xl` auch die Vorliebe ausser Kraft — beide Reviewer haben genau das gelesen.",
+    ],
+  },
+  {
     slug: "2026-08-28-neuigkeiten-archiv",
     datum: "2026-08-28",
     titel: 'Neuigkeiten-Fläche: ein Archiv für Zugestelltes und für „nicht relevant"',

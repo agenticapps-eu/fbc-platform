@@ -1403,10 +1403,24 @@ A failure to read or write that stored state SHALL leave the bar working and
 merely forgetful. Storage is unavailable in some browsing modes, and a frame
 that throws there would take the whole application with it.
 
+**The initial default and the rail it produces are claims about `xl` and wider,
+and only there.** The right bar docks at `xl`, not at `lg` — a threshold the
+requirement "The application shell docks the navigation to the viewport edge"
+establishes, together with the measurement that produced it. Between `lg` and
+`xl` the bar is a drawer and there is no rail to start collapsed, so a promise
+made from `lg` upward would be unkeepable across that whole band.
+
+**The stored preference is untouched by this.** It is a single device-local
+value that SHALL survive every width, including widths below `xl` where it has
+nothing to render, and SHALL apply again unchanged when the viewport widens past
+the threshold. Only the docked presentation is width-bound; persistence,
+separation from the navigation's own state, and the tolerance for unavailable
+storage all hold at every width.
+
 #### Scenario: The first visit does not spend content width
 
-- **WHEN** a member who has never touched the right bar opens any page at `lg`
-  or wider
+- **WHEN** a member with no stored right-bar preference opens a page that
+  carries the right bar, at `xl` or wider
 - **THEN** the bar is collapsed to its rail, and the content keeps the width the
   rail does not occupy
 
