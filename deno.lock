@@ -24,7 +24,7 @@
     "npm:eslint-plugin-react-hooks@^7.1.1": "7.1.1_eslint@10.9.1",
     "npm:eslint-plugin-react-refresh@~0.5.4": "0.5.5_eslint@10.9.1",
     "npm:eslint@^10.9.0": "10.9.1",
-    "npm:framer-motion@^12.42.0": "12.43.0_react@19.2.8_react-dom@19.2.8__react@19.2.8",
+    "npm:framer-motion@^13.1.1": "13.1.1_react@19.2.8_react-dom@19.2.8__react@19.2.8",
     "npm:globals@^17.11.0": "17.11.0",
     "npm:jsdom@^30.0.1": "30.0.1",
     "npm:pg@^8.23.0": "8.23.0",
@@ -2015,8 +2015,8 @@
     "flatted@3.4.4": {
       "integrity": "sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q=="
     },
-    "framer-motion@12.43.0_react@19.2.8_react-dom@19.2.8__react@19.2.8": {
-      "integrity": "sha512-1eaL3RvR/kAlbG7UYcpMptEyzPoENO0c6w7ZnB3/hh2vSAz/6uGAFn6fdoqTBguNstf3MsFhJHsD/0DHiclG+g==",
+    "framer-motion@13.1.1_react@19.2.8_react-dom@19.2.8__react@19.2.8": {
+      "integrity": "sha512-B/xn2TPS4f61cEBLFjiYlQFnBZUW1YVj/LM+C+N4OP8Rs95VLEI2ot/RlfBg111la/EiyECFaJJi/A3FWA8MUA==",
       "dependencies": [
         "motion-dom",
         "motion-utils",
@@ -2380,14 +2380,14 @@
     "minipass@7.1.3": {
       "integrity": "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
     },
-    "motion-dom@12.43.0": {
-      "integrity": "sha512-azKON4d9S65PEoFUiQTMTgPheEmzf2QngdRc50AKfJp9Q9mmcBVw22c8eMq9k8kxOFHdL7+WZY7N/5F/lwiDag==",
+    "motion-dom@13.1.1": {
+      "integrity": "sha512-XSf8VYWSB6G/0IY3rWVbyLcxWXtAVHkN1PQE2agTaCv3u8RGvbwu56TyyR/MNzBqqNavEBTZzErcxI1TxBrjcA==",
       "dependencies": [
         "motion-utils"
       ]
     },
-    "motion-utils@12.39.0": {
-      "integrity": "sha512-8nadJAJjTtqRkmRF36FoJTrywK9nnFmnPwnSMyxaOCU7GDjN9RTMJIxx9De8ErM+vpPhMccr/6fo5WciyQLnMQ=="
+    "motion-utils@13.0.0": {
+      "integrity": "sha512-7DnN7TmbLcYXcG4RVadXIihWlyuM9afoUww8Y5Agg431kGKiuL2/OMyP4mJ5wLz+pvN3t5ySClLOaVXJ+wekRQ=="
     },
     "ms@2.1.3": {
       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
@@ -3161,7 +3161,7 @@
         "npm:eslint-plugin-react-hooks@^7.1.1",
         "npm:eslint-plugin-react-refresh@~0.5.4",
         "npm:eslint@^10.9.0",
-        "npm:framer-motion@^12.42.0",
+        "npm:framer-motion@^13.1.1",
         "npm:globals@^17.11.0",
         "npm:jsdom@^30.0.1",
         "npm:pg@^8.23.0",
