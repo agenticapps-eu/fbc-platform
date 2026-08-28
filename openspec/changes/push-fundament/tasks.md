@@ -267,6 +267,22 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       dazu `deno test` (**122 Zusagen**) und `deno check` über alle Functions.
       Formatiert wurde dateiweise mit `prettier --write <pfad>` — **nie**
       `pnpm format`.
+- [x] **DEV vorbereitet — drei Schritte, die in dieser Liste fehlten.** Ohne
+      sie zeigt der Webhook ins Leere. (1) Die sechs Migrationen dieses
+      Branches nach DEV (`pnpm db:push`; DEV stand auf `20260827180000`).
+      (2) Die sieben Function-Secrets ans DEV-Projekt — dabei kamen
+      `APNS_KEY_P8` und `FCM_SERVICE_ACCOUNT` **beschädigt** an, weil das
+      damalige Rezept mehrzeilige Werte auf ihre erste Zeile schnitt; Ursache,
+      Reparatur und Digest-Nachweis stehen in `docs/secrets.md`.
+      (3) `supabase functions deploy send-push --project-ref …`, und zwar
+      **aus dem Worktree**: der Haupt-Checkout hat weder die Function noch den
+      `config.toml`-Block, und von dort ausgeliefert wäre `verify_jwt` wieder
+      `true` gewesen.
+      Gegen die ausgelieferte Function gemessen: richtiger Bearer →
+      `200 {"skipped":true}` · falscher Bearer → `401 Unauthorized` (der
+      Wortlaut stammt aus `index.ts`, es ist also der Handler und nicht das
+      Gateway) · `{"modus":"faellig"}` → `200`. Damit sind `verify_jwt=false`,
+      die Geheimnisprüfung und **beide** RPC-Wege belegt.
 - [ ] **Webhook in der DEV-Konsole** eingetragen und ausgelöst — Beleg ist eine
       Zeile im Function-Log, nicht ein 2xx an den Aufrufer. `send-push`
       antwortet auch `200`, wenn es nichts zuzustellen gab.
