@@ -1,13 +1,42 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { ToastProvider } from "../components/ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
 import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
 
 afterEach(() => localStorage.clear());
+
+// Diese Datei prüft das AUTH-GATE, nicht Supabase. Ohne diese Attrappe hing sie
+// aber am Netzwerk: `vite.config.ts` gibt den Tests
+// `VITE_SUPABASE_URL=http://localhost:54321` — ob dort jemand antwortet,
+// entscheidet der Rechner, nicht der Test.
+//
+// Genau daran ist sie am 28.08. ZWEIMAL in CI gescheitert (Läufe 33173596193
+// und 33174921117) und lokal NIE: hier läuft ein lokaler Supabase-Stack und
+// antwortet in 50 ms, in CI hört auf 54321 niemand. Die geteilte
+// Dashboard-Abfrage — die Kopfzeile startet sie unter demselben Schlüssel,
+// bevor die Seite überhaupt nachgeladen ist — erreichte lokal den Fehlerzweig
+// und in CI gar keinen Zustand.
+//
+// Eine grössere Wartezeit war die falsche Antwort und ist wieder draussen: es
+// ist keine Frage der Dauer, sondern des Zustands. Mit 4000 ms statt 1000 blieb
+// der Lauf rot, nur langsamer.
+//
+// Ein nie auflösendes Promise hält die Seite deterministisch im Ladezustand,
+// auf beiden Seiten gleich und ohne einen einzigen Netzaufruf. Nur
+// `fetchDashboard` wird ersetzt; `dashboardQueryKey` bleibt echt, sonst prüfte
+// der Test den Schlüssel gegen sich selbst.
+const { dashboardAbfrage } = vi.hoisted(() => ({
+  dashboardAbfrage: vi.fn(() => new Promise(() => {})),
+}));
+
+vi.mock("../lib/dashboard", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/dashboard")>()),
+  fetchDashboard: dashboardAbfrage,
+}));
 
 /** Eingeloggt, aber tier/level_rank werden noch geladen (Profil-Fetch offen). */
 function authLoadingTier(): AuthContextValue {
@@ -65,31 +94,22 @@ describe("Auth-Gating für /mein-bereich", () => {
     // /mein-bereich → /profil (RequireAuth, kein MembershipGate): bei laufendem
     // tier-Fetch reicht die Session – kein vorzeitiger Redirect auf /login.
     //
-    // AGE-642: Der Beleg war bis zum Route-Splitting das Lade-Skelett
-    // (`role="status"`). Das war eine verdeckte Annahme über die ERSTE
-    // Renderrunde: die Seite mountete synchron, und die Dashboard-Abfrage war
-    // in diesem Moment noch offen. Jetzt kommt die Seite später, und bis dahin
-    // ist die Abfrage längst gescheitert — das Skelett ist dann vorbei.
-    // Belegt wird deshalb, dass die Profilseite ÜBERHAUPT gemountet hat: ihr
-    // Fehlerzweig gehört ihr allein und steht auf keiner anderen Route.
-    const fehler = "Profil konnte nicht geladen werden. Bitte neu laden.";
-    // Die Vorgabe von `findBy` sind 1000 ms, und genau daran ist dieser Test in
-    // CI gescheitert (28.08., Lauf 33173596193: 1086 ms — die Grenze plus
-    // Aufschlag). Lokal ist er nicht zu reproduzieren: auch mit geleertem
-    // `node_modules/.vite` liegt die ganze Datei bei 542 ms, und sogar eine
-    // Grenze von 60 ms hält. Der Unterschied ist der Läufer, nicht die Logik —
-    // seit dem Route-Splitting muss vitest die Profilseite erst nachladen und
-    // kalt transformieren, und das kostet auf zwei CI-Kernen ein Vielfaches.
-    // Deshalb hier ausdrücklich Luft, statt die Grenze global zu heben: global
-    // würde jeder ECHTE Fehlschlag in 190 Dateien vier Sekunden länger
-    // brauchen, um rot zu werden.
-    // `timeout` gehört in den DRITTEN Parameter (`waitForOptions`) — im zweiten
-    // steht `SelectorMatcherOptions`, und dort ist es kein bekanntes Feld. Ohne
-    // `pnpm typecheck` wäre das stillschweigend wirkungslos geblieben: der Test
-    // liefe weiter mit 1000 ms und wäre in CI erneut rot geworden.
-    await screen.findByText(fehler, undefined, { timeout: 4000 });
-    expect(screen.getByText(fehler)).toBeInTheDocument();
+    // AGE-642: Seit dem Route-Splitting kommt die Seite asynchron nach, deshalb
+    // `findBy`. Belegt wird das Lade-Skelett — mit der stillgelegten
+    // Dashboard-Abfrage (siehe `vi.mock` oben) ist das der Zustand, in dem die
+    // Seite bleibt, und zwar auf jedem Rechner gleich.
+    //
+    // Die Verneinung steht bewusst DAHINTER: vor dem Auflösen des Chunks ist
+    // der Baum leer, und „kein Login zu sehen" wäre dann wahr, ohne etwas zu
+    // belegen.
+    await screen.findByRole("status");
+    expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    // Wächter gegen den stillen Rückfall: greift `vi.mock` nach einem Umbau
+    // nicht mehr (umbenanntes Modul, verschobener Pfad), hinge dieser Test
+    // wieder am lokalen Stack — und wäre hier grün, in CI rot. Genau so ist er
+    // heute zweimal durchgerutscht.
+    expect(dashboardAbfrage).toHaveBeenCalled();
   });
 });
 
