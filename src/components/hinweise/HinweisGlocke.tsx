@@ -95,13 +95,15 @@ export function HinweisGlocke({
               <ul className="max-h-80 divide-y divide-line overflow-y-auto">
                 {hinweise.map((h) => (
                   <li key={h.id} className="flex items-start gap-2 px-4 py-3">
-                    {/* Ein Ziel gibt es bisher NUR fuer `release_note`
-                        (AGE-631), und das ist Absicht: die uebrigen sieben
-                        Typen haben seit AGE-620 keines, und ihnen hier eines
-                        anzudichten waere eine Aenderung an sieben Flaechen in
-                        einem Change, der von einer handelt. Wer die anderen
-                        verlinken will, tut das dort, wo er sie auch pruefen
-                        kann. */}
+                    {/* Ein Ziel haben ZWEI Typen: `release_note` (AGE-631) und
+                        seit AGE-641 `message`. Beim zweiten ist es keine
+                        Zugabe, sondern Teil des Hinweises — „jemand hat Ihnen
+                        geschrieben" ohne den Weg ins Gespraech laesst einen
+                        selbst suchen. Die uebrigen sechs haben weiterhin
+                        keines, und ihnen hier eines anzudichten waere eine
+                        Aenderung an sechs Flaechen in einem Change, der von
+                        einer handelt. Wer sie verlinken will, tut das dort, wo
+                        er sie auch pruefen kann. */}
                     {hinweisZiel(h) ? (
                       <Link
                         to={hinweisZiel(h)!}
@@ -157,7 +159,13 @@ export function HinweisGlocke({
  */
 function hinweisText(h: Hinweis): string {
   const p = h.payload ?? {};
-  const wer = text(p.from_name) ?? text(p.to_name) ?? text(p.autor_name) ?? "Ein Mitglied";
+  const wer =
+    text(p.from_name) ??
+    text(p.to_name) ??
+    text(p.autor_name) ??
+    // AGE-641: der Nachrichten-Hinweis nennt den Absender unter eigenem Namen.
+    text(p.sender_name) ??
+    "Ein Mitglied";
   // `titel` schreibt AGE-620, `title` schreibt AGE-631 — beide lesen, statt
   // eine der beiden Nutzlasten nachtraeglich umzubenennen.
   const titel = text(p.titel) ?? text(p.title);
@@ -179,6 +187,12 @@ function hinweisText(h: Hinweis): string {
       return `${wer} hat Ihren Beitrag kommentiert.`;
     case "like_on_post":
       return `${wer} gefällt Ihr Beitrag.`;
+    // AGE-641: Wer, nicht was. Der Nachrichtentext steht schon in der Nutzlast
+    // nicht drin — und selbst wenn er eines Tages dort ankäme, gehört er nicht
+    // in diesen Satz: die Glocke steht offen auf einem Bildschirm, der auf
+    // einem Besprechungstisch liegt.
+    case "message":
+      return `${wer} hat Ihnen geschrieben.`;
     case "release_note":
       // Der Titel steht in der Nutzlast, weil die Note selbst geloescht sein
       // koennte — und weil ein Hinweis, der erst eine zweite Abfrage braucht,
@@ -199,6 +213,18 @@ function hinweisText(h: Hinweis): string {
  * Verlinkung soll eine Zeile hier sein und keine Umbauaktion an der Liste.
  */
 function hinweisZiel(h: Hinweis): string | null {
+  // AGE-641: der Nachrichten-Hinweis führt in sein Gespräch. Ohne Ziel wäre er
+  // der schlechteste von allen — er sagt „jemand hat Ihnen geschrieben" und
+  // liesse einen dann selbst suchen, in welchem Gespräch. Für die übrigen
+  // sieben Typen bleibt es bei „kein Ziel": ihnen hier eines anzudichten wäre
+  // eine Änderung an sieben Flächen in einem Change, der von einer handelt.
+  if (h.type === "message") {
+    const thread = text(h.payload?.["thread_id"]);
+    // Dieselbe Regel wie unten: `/chat/undefined` wäre eine Adresse, die nichts
+    // öffnet und trotzdem aussieht, als sollte sie.
+    return thread ? `/chat/${encodeURIComponent(thread)}` : "/chat";
+  }
+
   if (h.type !== "release_note") return null;
   // Mit Kennung öffnet die Fläche die gemeinte Note (AGE-632). Ohne — eine
   // alte Nutzlast trägt sie womöglich nicht — bleibt die blosse Liste das

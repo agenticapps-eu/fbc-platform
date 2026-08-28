@@ -6,8 +6,10 @@
  *  1. Steht in der Datenbank etwas, das in keiner Migration steht? → jemand war
  *     am Dashboard.
  *  2. Fehlt in der Datenbank etwas, das dort stehen muss, obwohl es
- *     absichtlich in keiner Migration steht? → das Webhook-Paar. Verschwindet
- *     es, stirbt der Mailversand **still**.
+ *     absichtlich in keiner Migration steht? → die Webhooks, die von Hand in
+ *     der Konsole angelegt werden. Verschwindet einer, stirbt sein Versand
+ *     **still** — bei `notify-contact-request` die Mail, bei `send-push` der
+ *     Push.
  *
  * Wie beim Migrations-Gate gilt: ein leeres Messergebnis ist ein Fehler, keine
  * Feststellung.
@@ -34,6 +36,32 @@
  *  5. **Geänderte Funktionsrümpfe.** Verglichen wird der Name, nicht `prosrc`.
  * ────────────────────────────────────────────────────────────────────────────
  */
+
+/**
+ * Objekte, die bewusst in keiner Migration stehen und trotzdem da sein
+ * MUESSEN. Jeder Eintrag wird von Hand in der Konsole angelegt, weil sein
+ * Bearer-Token inline in der Datenbank liegt und dieses Repo oeffentlich ist.
+ *
+ * Die Liste steht in diesem Modul und nicht im Skript daneben, weil
+ * `db-drift-scan.ts` schon beim Import eine Datenbankverbindung aufbaut — von
+ * dort ist sie nicht pruefbar.
+ *
+ * Vorlage zum Wiederherstellen: `docs/secrets.md`.
+ */
+export const ERWARTET_OHNE_MIGRATION = [
+  // Kontaktanfrage → `notify-contact-request`: Funktion und Trigger.
+  "notify_contact_request_webhook",
+  "contact_requests_email_webhook",
+  // Hinweis → `send-push` (AGE-641): Funktion und Trigger, wie oben.
+  //
+  // Ein Konsolen-Webhook waere nur EIN Trigger gewesen. Den gibt es hier
+  // nicht: gemessen am 28.08. fehlt auf DEV UND PROD das Schema
+  // `supabase_functions` ganz, Database Webhooks wurden auf diesen Projekten
+  // also nie aktiviert. `pg_net` ist dagegen installiert — darum ist auch
+  // dieser Webhook ein `net.http_post`-Trigger von Hand.
+  "notify_push_webhook",
+  "notifications_push_webhook",
+];
 
 export type Bestand = {
   funktionen: string[];

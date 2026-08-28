@@ -53,8 +53,8 @@ values ('8a000000-0000-0000-0000-0000000000ad', 'admin');
 
 -- B hat ALLE VIER In-App-Schalter abgeschaltet. Er ist die Zusage, dass das
 -- Opt-out aus AGE-620 auf diesen Typ nicht wirkt.
-insert into public.member_settings (profile_id, notify_inapp_post, notify_inapp_event,
-                                    notify_inapp_comment, notify_inapp_like)
+insert into public.member_settings (profile_id, notify_app_post, notify_app_event,
+                                    notify_app_comment, notify_app_like)
 values ('8a000000-0000-0000-0000-00000000000b', false, false, false, false);
 
 insert into public.release_notes (id, title, body, entry_slugs, status) values

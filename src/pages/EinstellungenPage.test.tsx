@@ -180,4 +180,64 @@ describe("EinstellungenPage", () => {
     // lädt und dann nichts zeigt, wäre kein Umzug.
     expect(mockedAdminFeedback).not.toHaveBeenCalled();
   });
+
+  // AGE-641 — die zwei Schalter, die mit der Umbenennung dazukamen. Chat und
+  // Kontaktanfragen waren die einzigen Hinweistypen ohne eigenen Schalter:
+  // Nachrichten gab es als Typ noch gar nicht, und die drei
+  // contact_request*-Typen fielen in `hinweis_erwuenscht` durch das `case`
+  // hindurch auf „immer an".
+  //
+  // Geprüft wird über den ZUGESTELLTEN Wert, nicht über die Anwesenheit im
+  // Markup: dass ein Schalter dasteht, sagt nicht, dass er den richtigen
+  // Schlüssel schreibt — ein auf `notify_app_like` verdrahteter Schalter mit der
+  // Aufschrift „Wenn mir jemand schreibt" bestünde eine reine Sichtprüfung.
+  it("schreibt den Nachrichten-Schalter unter seinem eigenen Schlüssel (AGE-641)", async () => {
+    renderPage();
+    const toggle = await screen.findByRole("switch", { name: /Wenn mir jemand schreibt/ });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(mockedSave).toHaveBeenCalledWith("u1", {
+        ...DEFAULT_MEMBER_SETTINGS,
+        notify_app_message: false,
+      }),
+    );
+  });
+
+  it("schreibt den Kontaktanfragen-Schalter unter seinem eigenen Schlüssel (AGE-641)", async () => {
+    renderPage();
+    const toggle = await screen.findByRole("switch", {
+      name: /Kontaktanfragen und Antworten darauf/,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(mockedSave).toHaveBeenCalledWith("u1", {
+        ...DEFAULT_MEMBER_SETTINGS,
+        notify_app_contact: false,
+      }),
+    );
+  });
+
+  // Die Karte trägt jetzt SECHS Zeilen. Die Zahl steht hier, damit ein
+  // stillschweigend verschwundener Schalter auffällt — der häufigere Fehler ist
+  // nicht der falsche Schalter, sondern der, den ein Merge wegräumt.
+  it("führt alle sechs App-Schalter in der Glocken-Karte (AGE-641)", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Einstellungen" });
+    for (const name of [
+      /Wenn jemand einen Beitrag schreibt/,
+      /Wenn ein Event angelegt wird/,
+      /Wenn jemand meinen Beitrag kommentiert/,
+      /Wenn jemandem mein Beitrag gefällt/,
+      /Wenn mir jemand schreibt/,
+      /Kontaktanfragen und Antworten darauf/,
+    ]) {
+      expect(screen.getByRole("switch", { name })).toBeInTheDocument();
+    }
+  });
 });

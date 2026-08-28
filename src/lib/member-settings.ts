@@ -13,17 +13,25 @@ export interface MemberSettings {
   notify_email_digest: boolean;
   visible_in_directory: boolean;
   contactable_by_prime: boolean;
-  /* Die vier In-App-Schalter der Glocke (AGE-620). Sie stehen bewusst HIER und
+  /* Die sechs App-Schalter (AGE-641, war AGE-620). Ein Schalter je EREIGNIS,
+     nicht je Transport: er steuert die Glocke und die Zustellung aufs Geraet
+     gemeinsam. Zwei Schalter fuer dasselbe Ereignis waeren eine Falle — wer die
+     Glocke stummschaltet und trotzdem vom Telefon geweckt wird, hat den
+     Schalter nicht missverstanden, sondern benutzt.
+
+     Sie stehen bewusst HIER und
      nicht auf einem eigenen schmalen Pfad wie `theme` und `onboarded_at`: die
      beiden bekamen einen, weil sie ANDERSWO umgelegt werden (Design-Umschalter,
      Onboarding-Strecke) und ein breiter Upsert sie mit einem veralteten
      Cache-Wert ueberschriebe. Diese vier werden im selben Formular bearbeitet
      wie die E-Mail-Schalter darueber — derselbe Lesezeitpunkt, derselbe
      Schreibvorgang, kein Fenster fuer die Kollision. */
-  notify_inapp_post: boolean;
-  notify_inapp_event: boolean;
-  notify_inapp_comment: boolean;
-  notify_inapp_like: boolean;
+  notify_app_post: boolean;
+  notify_app_event: boolean;
+  notify_app_comment: boolean;
+  notify_app_like: boolean;
+  notify_app_message: boolean;
+  notify_app_contact: boolean;
 }
 
 /** Die Felder, die wirklich in member_settings liegen. */
@@ -31,7 +39,8 @@ type StoredSettings = Omit<MemberSettings, "visible_in_directory">;
 
 const STORED_COLUMNS =
   "notify_email_requests, notify_email_events, notify_email_digest, contactable_by_prime, " +
-  "notify_inapp_post, notify_inapp_event, notify_inapp_comment, notify_inapp_like";
+  "notify_app_post, notify_app_event, notify_app_comment, notify_app_like, " +
+  "notify_app_message, notify_app_contact";
 
 /** Defaults entsprechen den DB-Defaults der Migrationen — bestehendes Verhalten bleibt unverändert. */
 export const DEFAULT_MEMBER_SETTINGS: MemberSettings = {
@@ -40,10 +49,12 @@ export const DEFAULT_MEMBER_SETTINGS: MemberSettings = {
   notify_email_digest: false,
   visible_in_directory: true,
   contactable_by_prime: true,
-  notify_inapp_post: true,
-  notify_inapp_event: true,
-  notify_inapp_comment: true,
-  notify_inapp_like: true,
+  notify_app_post: true,
+  notify_app_event: true,
+  notify_app_comment: true,
+  notify_app_like: true,
+  notify_app_message: true,
+  notify_app_contact: true,
 };
 
 export const memberSettingsQueryKey = (uid: string) => ["member-settings", uid] as const;
@@ -170,10 +181,12 @@ export async function fetchMemberSettings(uid: string): Promise<MemberSettings> 
     notify_email_events: DEFAULT_MEMBER_SETTINGS.notify_email_events,
     notify_email_digest: DEFAULT_MEMBER_SETTINGS.notify_email_digest,
     contactable_by_prime: DEFAULT_MEMBER_SETTINGS.contactable_by_prime,
-    notify_inapp_post: DEFAULT_MEMBER_SETTINGS.notify_inapp_post,
-    notify_inapp_event: DEFAULT_MEMBER_SETTINGS.notify_inapp_event,
-    notify_inapp_comment: DEFAULT_MEMBER_SETTINGS.notify_inapp_comment,
-    notify_inapp_like: DEFAULT_MEMBER_SETTINGS.notify_inapp_like,
+    notify_app_post: DEFAULT_MEMBER_SETTINGS.notify_app_post,
+    notify_app_event: DEFAULT_MEMBER_SETTINGS.notify_app_event,
+    notify_app_comment: DEFAULT_MEMBER_SETTINGS.notify_app_comment,
+    notify_app_like: DEFAULT_MEMBER_SETTINGS.notify_app_like,
+    notify_app_message: DEFAULT_MEMBER_SETTINGS.notify_app_message,
+    notify_app_contact: DEFAULT_MEMBER_SETTINGS.notify_app_contact,
   };
   return {
     ...s,
