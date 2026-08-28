@@ -177,19 +177,42 @@ secrets from the **Supabase Functions secret store**, not from the Vite/Pages
 runtime. Push them from Infisical so the values never live in the repo:
 
 ```bash
-# Push the function secrets from Infisical's dev env into Supabase.
-# (--silent keeps the values off your terminal; --plain emits KEY=value pairs.)
-infisical export --env=dev --format=dotenv --plain \
-  | grep -E '^(RESEND_API_KEY|FROM_EMAIL|CONTACT_WEBHOOK_SECRET|APP_URL)=' \
-  > /tmp/fbc-fn.env
-supabase secrets set --env-file /tmp/fbc-fn.env
-rm -f /tmp/fbc-fn.env
-
-# …or set them one-off, reading each value from Infisical at call time:
-infisical run --env=dev -- sh -c \
-  'supabase secrets set RESEND_API_KEY="$RESEND_API_KEY" FROM_EMAIL="$FROM_EMAIL" \
+# Werte ueber die UMGEBUNG uebergeben, nie ueber eine Datei.
+infisical run --env=dev --silent -- sh -c \
+  'supabase secrets set --project-ref <ref> \
+     RESEND_API_KEY="$RESEND_API_KEY" FROM_EMAIL="$FROM_EMAIL" \
      CONTACT_WEBHOOK_SECRET="$CONTACT_WEBHOOK_SECRET" APP_URL="$APP_URL"'
 ```
+
+> ⚠️ **Der frühere `export | grep > datei`-Weg stand hier bis zum 28.08. und war
+> falsch — an drei Stellen.** Er hat an dem Tag `APNS_KEY_P8` und
+> `FCM_SERVICE_ACCOUNT` beschädigt, und zwar **lautlos**: `supabase secrets set`
+> meldete `count: 2` und Erfolg.
+>
+> 1. **`--plain` gibt es nicht.** `infisical export` (0.43.128) kennt das Flag
+>    nicht.
+> 2. **`grep '^KEY='` schneidet mehrzeilige Werte ab.** Der dotenv-Export ist
+>    mehrzeilig — gemessen: 51 Zeilen bei 33 Schlüsseln, also 18
+>    Fortsetzungszeilen. Von einem PEM oder einem Dienstkonto-JSON bleibt so nur
+>    die **erste Zeile** übrig. Das trifft jedes mehrzeilige Geheimnis und fiel
+>    nur deshalb nie auf, weil die vier Werte hier oben alle einzeilig sind.
+> 3. **Ohne `--project-ref` trifft es das verlinkte Projekt** — und ein
+>    Worktree ist in der Regel mit gar keinem verlinkt.
+
+**Nachweisen, nicht annehmen.** Der `value` in `supabase secrets list` ist das
+**SHA-256 des Werts** (belegt am 28.08. an `APNS_BUNDLE_ID`: der Digest ist
+`sha256("com.effbeezee.app")`, ohne Zeilenumbruch am Ende). Damit lässt sich
+byte-genau vergleichen, ohne ein Geheimnis anzuzeigen:
+
+```bash
+# links: was in Infisical steht — rechts: was Supabase gespeichert hat
+infisical run --env=dev --silent -- sh -c \
+  'for k in APNS_KEY_P8 FCM_SERVICE_ACCOUNT; do eval "v=\$$k"; \
+     printf "%-22s %s\n" "$k" "$(printf %s "$v" | shasum -a 256 | cut -d" " -f1)"; done'
+supabase secrets list --project-ref <ref>
+```
+
+Weichen sie ab, ist der Wert unterwegs verändert worden.
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into every Edge
 Function by the platform — do **not** set them here.
