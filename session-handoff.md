@@ -158,3 +158,95 @@ Gerätetoken, und ohne Gerätetoken bleibt `push_tokens` leer.
   (`deno.json` nach `supabase/functions/`).
 - Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
   des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+
+---
+
+# Zweite Sitzung desselben Tages — AGE-645 ist live
+
+Parallel zur Sitzung oben lief `fbc-platform-f4` an AGE-645. Beide Übergaben
+stehen hier, weil beide am selben Tag gemergt wurden; oben AGE-641/642, hier
+AGE-645. Die Abschnitte sind unabhängig.
+
+**AGE-645 ist ausgeliefert** — PR #269, `4bf3524`, **alle elf Läufe grün**
+(`deploy`, `drift-gate`, `functions`, `migrations` eingeschlossen). Emoji-Auswahl
+in der Sendezeile, Uhrzeit an der Blase, Tagesmarker, und getippte Emoticons
+werden beim Senden ersetzt. Der Change ist archiviert; drei Anforderungen stehen
+jetzt in `openspec/specs/messaging/spec.md`.
+
+## Die Diff-Review brachte fünf Befunde, alle behoben
+
+Zwei fremde Anbieter, beide Hälften **getrennt** beurteilt (gemini
+APPROVE/REQUEST-CHANGES, opencode zweimal REQUEST-CHANGES). Jeder Fix vorher als
+roter Test.
+
+Der schärfste kam von dem Reviewer, der die Funktion **ausgeführt** statt gelesen
+hat: `Budget <3.000 Euro` wurde zu `Budget ❤️.000 Euro`. Der vorhandene Test
+deckte `<3000` ab — und der Kommentar daneben behauptete, so schreibe man das im
+Deutschen. Man schreibt `<3.000`. Die Fehlalarm-Prüfung dieses Changes hat sich
+in ihrer eigenen Disziplin selbst geschlagen. Ebenso `if (x <3)`.
+
+`<3` hat deshalb jetzt eine engere rechte Grenze als die übrigen Emoticons.
+Entschieden über die **Kosten**, nicht die Häufigkeit: eine falsche Ersetzung
+steht dauerhaft in `messages.body`, eine ausgebliebene kostet zwei Zeichen. Der
+Preis ist ausgesprochen und getestet — `(hab dich <3)` bleibt stehen.
+
+Die übrigen vier: Fokus konnte den Dialog per Tab verlassen und Escape ihn
+danach nicht erreichen (behoben mit `tabIndex={-1}` und einem Escape-Lauscher am
+`document` **in der Capture-Phase** — `AppShell` schliesst die Chat-Schublade
+ihrerseits bei Escape, sonst schlösse ein Tastendruck beides) · der offene Picker
+überlebte einen Gesprächswechsel ohne Klick · die schwebende Blase bestimmte
+ihren Tagesmarker über die Geräte-Uhr, also genau die Uhr, die bewusst nicht als
+Uhrzeit erscheint · ein Test behauptete einen Übergang, den er nie auslöste.
+
+## Zwei neue Vorgänge
+
+**AGE-656 (High) — eine Passwortänderung mit 8 oder 9 Zeichen persistiert
+nicht.** `EinstellungenPage.tsx:40` prüft `pw.length < 8`; PROD verlangt
+`password_min_length: 10`. Vier Stellen sagen 10: `config.toml:230`, die
+`redeem-activation`-Function, `ActivationRedeemPage.tsx:18` und die live
+gelesene PROD-Konfiguration. Wer 8–9 Zeichen wählt, kommt durch das Formular,
+wird vom Server abgelehnt und sein Passwort ist **unverändert**; die Erklärung
+kommt auf Englisch. Aufgefallen bei der Prüfung von Detlevs Anmeldeproblem —
+das selbst keins war (falsches Passwort). Belegt aus der gelesenen
+Konfiguration, **keine** Änderung gegen PROD ausgeführt.
+
+**AGE-655 (Medium)** — `fetchMessages` (`src/lib/chat.ts:320`) lädt den
+Nachrichtenverlauf ohne `limit`/`range`, anders als die Threadliste daneben.
+Kein Regress.
+
+## Was schiefging
+
+Beim Worktree-Aufräumen wurde `age-641` entfernt, **während die Sitzung oben
+darin arbeitete**. Die drei Belege waren einzeln wahr und zusammen wertlos: die
+PRs waren gemergt · der Branch stand exakt auf `origin/main` (**weil dort zehn
+Minuten zuvor synchronisiert worden war** — frisch synchronisiert sieht am
+fertigsten aus) · der Arbeitsbaum war sauber (eine Momentaufnahme). Und als
+`wt remove` deshalb abbrach, wurde `--force` genommen; das `?? datei` in der
+Meldung war ein Lebenszeichen, kein Hindernis.
+
+**Regel daraus:** vor jedem `wt remove` an einem fremden Worktree erst
+`ListAgents`, dann offene Haken in `openspec/changes/`, dann die Nachbarsitzung
+fragen. Liegt als Memory.
+
+## Zwei Fallen, die diese Sitzung neu gefunden hat
+
+**`verify` fährt drei `grep`-Wächter, die kein pnpm-Skript auslöst.** Der
+`gold`-Wächter sucht als einziger das **bloße Wort** und traf sechs deutsche
+Emoji-Namen („Goldmedaille", „golden gate"). Lokal grün heisst dort nichts — und
+ein Branch ohne PR sammelt solche Überraschungen, weil CI seine Dateien nie
+gesehen hat. Behoben mit `--exclude='*.generated.ts'`, beide Richtungen gemessen
+inklusive Positivkontrolle.
+
+**Nach `openspec archive` gehört `pnpm release:entries` + einzeln prettier.**
+Sonst wird `pnpm test` rot. Und ohne `## What Changes` im Proposal entsteht ein
+Neuigkeiten-Eintrag mit Titel und **leerem Rumpf** — 10 der 59 Einträge sind so.
+
+## Nächster Schritt aus dieser Hälfte
+
+**AGE-656** ist der naheliegende: klein, High, trifft Mitglieder direkt beim
+Zugang. Die Frage dahinter ist, wo die gemeinsame Konstante liegen soll — heute
+steht sie in einer Seitenkomponente. Danach **AGE-646** oder **AGE-655**.
+
+**Dieser Worktree** (`fbc-platform.neuigkeiten-archiv`) heisst nach einem längst
+archivierten Change und trägt nichts Ungesichertes mehr. `wt remove` — aber
+vorher `ListAgents`, siehe oben.
