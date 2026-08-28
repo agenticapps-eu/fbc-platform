@@ -25,11 +25,13 @@ import ProfilPage from "./ProfilPage";
  *
  * AGE-596 hat die drei ANZEIGEflächen auf `aspect-[3/1]` + `object-contain`
  * gebracht und die Vorschauen ausdrücklich ausgenommen. Die Folge war, dass die
- * Vorschau etwas anderes zeigte als das Ergebnis daneben — und zwar in einer
- * ~703 px breiten Editor-Spalte bei fester Höhe `h-24` rund **6:1** statt 3:1,
- * dazu `object-cover`. Direkt nach einem Zuschnitt auf 3:1 sah das Mitglied
- * einen waagerecht gequetschten Ausschnitt seines eigenen Zuschnitts, unter der
- * Beschriftung „Zuschnitt 3:1".
+ * Vorschau etwas anderes zeigte als das Ergebnis daneben: eine feste Höhe über
+ * die volle Breite ergab je nach Breakpoint und Fenster ein Feld zwischen etwa
+ * **5,8:1 und 7,3:1** statt 3:1 (`h-24` = 96 px, `sm:h-28` = 112 px), dazu
+ * `object-cover`. Im Browser gemessen: 646 × 112 = 5,77:1, davon fielen
+ * **77,2 % der Bildhöhe** heraus. Direkt nach einem Zuschnitt auf 3:1 sah das
+ * Mitglied also ein mittiges Band seines eigenen Zuschnitts, unter der
+ * Beschriftung „Zuschnitt 3:1" — ein senkrechter Beschnitt, keine Verzerrung.
  *
  * Warum das als Klassenzusage taugt und nicht als Vakuumtest: **jsdom misst
  * keine Breiten** und lädt kein Bild, die tatsächliche Darstellung ist hier

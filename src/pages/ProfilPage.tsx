@@ -288,11 +288,17 @@ function ProfileEditor({ uid }: { uid: string }) {
           <CardTitle className="text-base">Hintergrundbild</CardTitle>
           {/*
             `aspect-[3/1]` + `object-contain` — dasselbe wie `ProfileHero`
-            (AGE-600). Vorher stand hier eine feste Höhe (`h-24 sm:h-28`) über
-            die volle Breite: in der rund 703 px breiten Editor-Spalte sind das
-            etwa 6:1, und mit `object-cover` sah das Mitglied direkt nach dem
-            Zuschnitt auf 3:1 einen waagerecht gequetschten Ausschnitt seines
-            EIGENEN Zuschnitts — unter der Beschriftung „Zuschnitt 3:1".
+            (AGE-600). Vorher stand hier eine feste Höhe über die volle Breite,
+            und die ergab je nach Breakpoint und Fensterbreite ein Feld
+            zwischen etwa 5,8:1 und 7,3:1 (`h-24` = 96 px, `sm:h-28` = 112 px;
+            im Browser gemessen: 646 × 112 = 5,77:1). Mit `object-cover` fielen
+            davon **77,2 % der Bildhöhe** heraus — das Mitglied sah direkt nach
+            dem Zuschnitt auf 3:1 ein mittiges Band seines EIGENEN Zuschnitts,
+            unter der Beschriftung „Zuschnitt 3:1". Es ist ein senkrechter
+            Beschnitt, keine Verzerrung.
+
+            Nebenfolge, gewollt: das leere Verlaufsband ist jetzt auch OHNE
+            Bild rund 215 px hoch statt 96/112 — genau wie `ProfileHero`.
           */}
           <div
             className="relative aspect-[3/1] w-full overflow-hidden rounded-[var(--radius-card)] border border-line bg-[linear-gradient(120deg,var(--color-accent-soft),var(--color-canvas)_55%,color-mix(in_srgb,var(--color-accent)_20%,var(--color-canvas)))]"

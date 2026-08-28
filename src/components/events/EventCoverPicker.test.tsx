@@ -19,8 +19,10 @@ import { EventCoverPicker } from "./EventCoverPicker";
  * AGE-596 hat `EventCover` auf `object-contain` gebracht und die Vorschau hier
  * ausdrücklich ausgenommen. Danach widersprachen sich die beiden: die Kachel
  * passte ein, die Vorschau daneben schnitt weiter ab. Bei den 1,50:1-Bildern
- * des Demo-Seeds (AGE-599) schnitt sie 50 % der Breite weg, während die Kachel
- * das ganze Bild zeigte.
+ * des Demo-Seeds (AGE-599) schnitt sie 50 % der **Höhe** weg, während die
+ * Kachel das ganze Bild zeigte: das Feld ist mit 3:1 BREITER als das Bild,
+ * `cover` füllt also die Breite und nimmt oben und unten weg. (Die erste
+ * Fassung schrieb „Breite" — falsch, korrigiert aus der Diff-Review.)
  *
  * ── WAS DIESER TEST BELEGT UND WAS NICHT ────────────────────────────────────
  * Er ist strukturell, aus demselben Grund wie `EventCover.test.tsx`: unter
