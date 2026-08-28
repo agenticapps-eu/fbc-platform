@@ -349,6 +349,19 @@ lesbar. Genau darum steht der Webhook in keiner Migration: dieses Repo ist
 > RPC, nicht die Function. Wer nur auf den Statuscode schaut, hat den Webhook
 > nicht geprüft.
 
+**Zuerst ausliefern, dann eintragen.** Den Functions-Deploy macht `deploy.yml`
+erst beim Merge auf `main` — und dann nach DEV **und** PROD. Für die Probe in
+der DEV-Konsole muss `send-push` vorher von Hand dort liegen, sonst zeigt der
+Webhook auf eine Function, die es noch nicht gibt.
+
+**In PROD genügt dafür `PUSH_WEBHOOK_SECRET`.** Die Anbieter-Secrets dürfen
+leer bleiben, solange es keine Produktions-App gibt: ohne Zeile in
+`push_tokens` legt `push_auftraege_holen` keinen Auftrag an und beansprucht
+keinen, die RPC kommt leer zurück, und `send-push` antwortet `{"skipped":true}`
+ohne APNs oder FCM je anzufassen
+(`20260827240000_push_zustellung.sql`). Fehlt dagegen `PUSH_WEBHOOK_SECRET`,
+antwortet die Function auf **jeden** Hinweis mit `500`.
+
 ### Der APNs-Schlüssel: drei Fallen
 
 **1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den
@@ -467,8 +480,9 @@ Die Probe funktioniert wie bei Apple, mit einem erfundenen Gerätetoken:
 
 ### Was noch fehlt
 
-- **Die `prod`-Umgebung** — bewusst noch leer, solange es keine
-  Produktions-App gibt.
+- **Die Anbieter-Secrets in `prod`** — bewusst noch leer, solange es keine
+  Produktions-App gibt. **Nicht mehr leer bleiben darf `PUSH_WEBHOOK_SECRET`**,
+  sobald der PROD-Webhook steht: siehe „Den Webhook eintragen".
 - **Die Zustellung an ein echtes Gerät.** Beide Anbieter sind gegen ihre echten
   Endpunkte belegt; was fehlt, ist ein Gerätetoken, und das setzt AGE-642 B1
   voraus.
