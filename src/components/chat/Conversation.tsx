@@ -15,6 +15,34 @@ import { Button } from "../ui/Button";
  *  EINE Angabe statt zweier Schalter („ohne Kopf", „enger"): beides folgt aus
  *  derselben Tatsache — diese Unterhaltung steht in einem angedockten Fenster.
  *  Zwei Schalter liessen sich unabhängig setzen und damit falsch kombinieren. */
+const NUR_UHRZEIT = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const MIT_DATUM = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const VOLLES_DATUM = new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" });
+
+/** `HH:MM` für heute, `TT.MM., HH:MM` für alles Ältere (AGE-645).
+ *
+ *  Das Datum ist nicht Zierde. Ohne es stünde eine Nachricht von letztem
+ *  Dienstag als blosses „14:03" da — und weil dieser Vorgang Datumstrenner
+ *  ausdrücklich ausschliesst, gäbe es nirgends sonst einen Hinweis auf den Tag.
+ *  Der Plan-Reviewer hat genau das vorgerechnet.
+ *
+ *  Die Zone ist die des Betrachters, weil `Intl` ohne weitere Angabe so
+ *  arbeitet: zwei Mitglieder in verschiedenen Zonen sehen für dieselbe Zeile
+ *  verschiedene Uhrzeiten. Gewollt. */
+function zeitLabel(createdAt: string, jetzt: Date): string {
+  const d = new Date(createdAt);
+  const gleicherTag =
+    d.getFullYear() === jetzt.getFullYear() &&
+    d.getMonth() === jetzt.getMonth() &&
+    d.getDate() === jetzt.getDate();
+  return (gleicherTag ? NUR_UHRZEIT : MIT_DATUM).format(d);
+}
+
 export function Conversation({
   thread,
   messages,
@@ -97,6 +125,25 @@ export function Conversation({
                   )}
                 >
                   {message.body}
+                  {/* Die schwebende Blase bekommt KEINE Zeit: sie trägt die Uhr
+                      des Geräts (`use-gespraech.ts`, `new Date()`), die
+                      bestätigte Zeile die des Servers. Eine angezeigte Zeit
+                      spränge beim Eintreffen des Echos um die Uhrendifferenz. */}
+                  {!message.pending && (
+                    <time
+                      data-testid="nachricht-zeit"
+                      dateTime={message.createdAt}
+                      title={VOLLES_DATUM.format(new Date(message.createdAt))}
+                      className={cn(
+                        "mt-1 block text-right text-[0.65rem] tabular-nums",
+                        // Zwei Gründe, zwei Farben. Eine einzige gedämpfte Farbe
+                        // wäre auf einer der beiden Blasen unlesbar.
+                        mine ? "text-chrome/70" : "text-muted",
+                      )}
+                    >
+                      {zeitLabel(message.createdAt, new Date())}
+                    </time>
+                  )}
                 </span>
               </div>
             );

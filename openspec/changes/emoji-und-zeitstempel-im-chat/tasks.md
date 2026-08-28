@@ -6,29 +6,29 @@ kein Haken.
 
 ## 1. Die Ersetzung (reine Funktion, kein React)
 
-- [ ] `src/lib/emoticons.ts` mit `ersetzeEmoticons(text: string): string`
-- [ ] **RED zuerst:** Treffer (`:-)` → 🙂, `<3` → ❤️, mehrere in einem Text)
+- [x] `src/lib/emoticons.ts` mit `ersetzeEmoticons(text: string): string`
+- [x] **RED zuerst:** Treffer (`:-)` → 🙂, `<3` → ❤️, mehrere in einem Text)
       **und** Nicht-Treffer (`http://x.de/a:-)b`, `http://x.de/a:-).`,
       `foo:)bar`). Gegenprobe: die Nicht-Treffer müssen fehlschlagen, wenn die
       linke Grenze entfernt wird — sonst prüft der Test die Grenze nicht.
-- [ ] **Satzzeichen rechts sind ein Treffer, kein Ausschluss** (aus der Review,
+- [x] **Satzzeichen rechts sind ein Treffer, kein Ausschluss** (aus der Review,
       HIGH): `Toll :-).`, `Schön :)!`, `(danke :-))` werden ersetzt, das
       Satzzeichen bleibt stehen
-- [ ] **Ohne Rücksicht auf Schreibweise** bei den alphabetischen Formen: `:p`
+- [x] **Ohne Rücksicht auf Schreibweise** bei den alphabetischen Formen: `:p`
       wie `:P`, `:d` wie `:D`
-- [ ] Längere Form vor kürzerer (`:-)` vor `:)`); Test, der die falsche
+- [x] Längere Form vor kürzerer (`:-)` vor `:)`); Test, der die falsche
       Reihenfolge auffliegen lässt
 
 ## 2. Der Zeitstempel in der Blase
 
-- [ ] **RED zuerst:** `Conversation` zeigt an einer bestätigten Nachricht
+- [x] **RED zuerst:** `Conversation` zeigt an einer bestätigten Nachricht
       `HH:MM`; an einer mit `pending: true` **keine** Zeit
-- [ ] **Ältere Nachrichten tragen ein Datum** (aus der Review): heute `HH:MM`,
+- [x] **Ältere Nachrichten tragen ein Datum** (aus der Review): heute `HH:MM`,
       davor `TT.MM., HH:MM`. Test mit einer festen Zeit, nicht mit `Date.now()`
-- [ ] `<time dateTime={message.createdAt}>` mit vollem Datum als `title`
-- [ ] Zwei Farben für die zwei Blasengründe (`text-chrome/70` eigen,
+- [x] `<time dateTime={message.createdAt}>` mit vollem Datum als `title`
+- [x] Zwei Farben für die zwei Blasengründe (`text-chrome/70` eigen,
       `text-muted` fremd)
-- [ ] Unter dem Text, nicht daneben — bei `max-w-[75%]` im Fenster zwänge
+- [x] Unter dem Text, nicht daneben — bei `max-w-[75%]` im Fenster zwänge
       daneben kurze Nachrichten in einen Umbruch
 
 ## 3. Der Datensatz
@@ -70,11 +70,11 @@ kein Haken.
 - [ ] `textarea` in einen `relative` Wrapper, Schalter absolut rechts innen,
       `pr-9` am Feld
 - [ ] Beide Varianten (`seite`, `fenster`) tragen ihn
-- [ ] `ersetzeEmoticons` in **`useGespraech.sende()`**, nicht in
+- [x] `ersetzeEmoticons` in **`useGespraech.sende()`**, nicht in
       `Conversation.submit()` — dort trägt die optimistische Blase denselben
       String wie der Insert, strukturell statt per Konvention (`sendMessage` hat
       genau einen Aufrufer, `use-gespraech.ts:134`)
-- [ ] **RED zuerst:** die optimistische Blase trägt denselben Text wie der
+- [x] **RED zuerst:** die optimistische Blase trägt denselben Text wie der
       Aufruf an `sendMessage` — beide 🙂, nicht `:-)`
 
 ## 6. Bündel-Zusage prüfen

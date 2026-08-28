@@ -230,4 +230,31 @@ describe("useGespraech — Senden", () => {
     });
     expect(sendMessage).not.toHaveBeenCalled();
   });
+
+  // AGE-645. Die Ersetzung sitzt HIER und nicht in `Conversation.submit()`,
+  // damit optimistische Blase und Datenbankzeile denselben String tragen —
+  // strukturell, nicht per Konvention. Der Test prüft beide Seiten in EINEM
+  // Lauf; genau das war der Befund aus der Plan-Review.
+  it("ersetzt Emoticons, und zwar in der Blase UND im Insert", async () => {
+    let aufloesen: ((m: ChatMessage) => void) | null = null;
+    sendMessage.mockImplementation(
+      () =>
+        new Promise<ChatMessage>((res) => {
+          aufloesen = res;
+        }),
+    );
+    montiere(true);
+    await waitFor(() => expect(stand().messages).toEqual([]));
+
+    act(() => void stand().sende("Toll :-)."));
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    // Die Blase, die das Mitglied sofort sieht.
+    expect(stand().messages[0].body).toBe("Toll 🙂.");
+    // Und der Text, der wirklich gespeichert wird.
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ body: "Toll 🙂." }));
+
+    act(() => aufloesen!({ ...nachricht("echt", ICH, "Toll 🙂.") }));
+    await waitFor(() => expect(stand().messages[0].pending).toBeUndefined());
+  });
 });
