@@ -142,6 +142,32 @@ vorübergehender Fehler SHALL NOT zum Entfernen führen. Auch das Entfernen SHAL
 über denselben Weg mit definierten Rechten laufen: es steht sonst auf derselben
 Eigenschaft der Instanz, die für das Lesen ausdrücklich verworfen wurde.
 
+Eine Anbieter-Antwort, die das System **nicht kennt**, SHALL als vorübergehend
+gelten und SHALL NOT zum Entfernen führen. Ein Fehler an den eigenen
+Zugangsdaten — abgelaufener Schlüssel, falsches Projekt — SHALL ebenfalls als
+vorübergehend gelten: er sagt nichts über das Gerät, und ihn als dauerhaft zu
+lesen leerte in einem einzigen Lauf den ganzen Bestand.
+
+**Ein beanspruchter Zustellauftrag SHALL eine Frist tragen**, nach deren Ablauf
+er wieder eingesammelt wird. Ein Lauf, der zwischen Anspruch und Quittung
+abbricht, SHALL NOT einen Auftrag dauerhaft liegen lassen — der Zustellzustand
+überlebt sonst zwar, aber niemand holt ihn mehr ab, und der Push ist endgültiger
+verloren als ohne ihn. Ein wiederholt zurückgeholter Auftrag SHALL nach
+derselben Versuchsgrenze aufgegeben werden wie ein quittierter, damit ein
+Auftrag, der den Zustellweg jedes Mal abbrechen lässt, nicht unbegrenzt
+wiederkehrt.
+
+#### Scenario: Ein abgebrochener Lauf lässt keinen Auftrag liegen
+- **WHEN** ein Zustellauftrag beansprucht, aber nie quittiert wurde und seine
+  Frist verstrichen ist
+- **THEN** sammelt ihn der Wiederholungslauf wieder ein
+- **AND** ein Auftrag, dessen Frist noch läuft, wird dabei nicht angefasst
+
+#### Scenario: Ein unbekannter Anbieterfehler entfernt kein Token
+- **WHEN** der Anbieter mit einem Grund antwortet, den das System nicht kennt
+- **THEN** bleibt das Gerätetoken bestehen
+- **AND** die Zustellung wird zurückgestellt statt aufgegeben
+
 #### Scenario: Ein Typ, der nicht gepusht wird, erzeugt keine Zustellung
 
 - **WHEN** ein Hinweis eines Typs entsteht, der in der Zuordnung auf „nicht

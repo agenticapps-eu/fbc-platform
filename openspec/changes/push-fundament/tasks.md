@@ -1,19 +1,23 @@
 # Aufgaben — Push-Fundament (AGE-641)
 
-> ## Stand 27.08., abends
+> ## Stand 28.08., vormittags
 >
-> **Die Datenschicht von Phase A ist fertig.** A1, A2, A2b, A3 und A4/A5b
-> stehen in fünf Commits, jeder mit RED davor und Gegenprobe.
+> **Phase A ist bis auf die Abnahme gebaut.** A1–A4 und A5b stehen seit dem
+> 27.08.; A5 ist am 28.08. dazugekommen, samt einer Reparatur an A5b.
 >
-> **A5 ist blockiert und nicht durch Code.** In Infisical `dev` UND `prod`
-> gibt es kein einziges FCM-, APNs-, Firebase- oder Apple-Geheimnis. Die Edge
-> Function lässt sich schreiben, aber gegen keinen echten Anbieter messen.
-> Nötig sind ein Firebase-Projekt (Dienstschlüssel für FCM) und ein
-> APNs-Schlüssel aus einem Apple-Developer-Konto samt Key-ID und Team-ID —
-> Kontoeinrichtungen, keine Codearbeit.
+> **Was an A5 offen bleibt, ist keine Codearbeit:** in Infisical `dev` UND
+> `prod` gibt es kein einziges FCM-, APNs-, Firebase- oder Apple-Geheimnis. Die
+> Function ist geschrieben und gegen Attrappen gemessen — die fünf Zusagen aus
+> A5 sind anbieterunabhängig —, aber gegen einen echten Anbieter ist sie nie
+> gelaufen. Nötig sind ein Firebase-Projekt (Dienstschlüssel für FCM) und ein
+> APNs-Schlüssel aus einem Apple-Developer-Konto samt Key-ID und Team-ID.
+> **Kontoeinrichtungen, keine Codearbeit.**
 >
-> Nach der vereinbarten Reihenfolge folgt darum jetzt **AGE-642**; A5 und A6
-> kommen danach, sobald die Zugänge stehen.
+> **Korrektur an dieser Liste:** A4 nannte die RPCs `push_zustellung_daten` und
+> `push_token_entfernen`. Gebaut und gemessen sind
+> `push_auftraege_holen`, `push_auftraege_faellig` und
+> `push_zustellung_quittieren` — die Migration ist die Wahrheit, nicht dieser
+> Text.
 
 Zwei Phasen mit einem ausdrücklichen Halt. **Phase B beginnt erst, wenn
 AGE-642 gemergt ist** — vorher gibt es kein Gerätetoken zu registrieren.
@@ -51,97 +55,110 @@ Issue. Siehe `REVIEWS.md`.
 - [x] **GREEN**: 17 pgTAP-Dateien / 877 Zusagen, 173 Testdateien / 1961 Zusagen,
       `typecheck` sauber. Gegenprobe für beide Hälften mit `cp`-Sicherung.
 
-### A2 · `push_tokens`
+### A2 · `push_tokens` ✅
 
-- [ ] **RED**: `push_tokens_test.sql`. Zusagen: eigene Token lesbar · fremde
+- [x] **RED**: `push_tokens_test.sql`. Zusagen: eigene Token lesbar · fremde
       **nicht** · fremde nicht änderbar · fremde nicht löschbar · ein Token mit
       fremder `profile_id` lässt sich nicht anlegen (`with check`) · zwei Geräte
       je Mitglied möglich · `token` bleibt eindeutig · `on delete cascade`.
       `alike()` statt `like()`; ein fremdes UPDATE ergibt **null Zeilen**, nicht
       `42501`.
-- [ ] Migration: Tabelle mit `plattform` (`check in ('ios','android')`) und
+- [x] Migration: Tabelle mit `plattform` (`check in ('ios','android')`) und
       `letzter_kontakt` — **(R2)** beide standen bisher nur in den Aufgaben und
       in keiner Anforderung. RLS owner-only für alle vier Verben, **Grants
       ausdrücklich ausgesprochen** (AGE-312).
-- [ ] **(R2)** `claim_push_token(token, plattform)` als DEFINER-RPC statt eines
+- [x] **(R2)** `claim_push_token(token, plattform)` als DEFINER-RPC statt eines
       gewöhnlichen Inserts. Sonst strandet ein Token beim Kontowechsel: schlägt
       die Abmelde-Aufräumung fehl, kann Konto B die Zeile von A wegen der
       globalen Eindeutigkeit nicht anlegen und wegen owner-only nicht
       übernehmen — und A's Hinweise gingen an ein Gerät, das B benutzt.
       Zusage: nach fehlgeschlagener Aufräumung und Anmeldung als B gehört das
       Token B.
-- [ ] `grants_test.sql`: Golden-String **und** Spalten-Grants-Zusage nachziehen.
+- [x] `grants_test.sql`: Golden-String **und** Spalten-Grants-Zusage nachziehen.
       Die Zeile landet alphabetisch zwischen `profiles_public` und
       `release_entry_skips` — genau dort, wo der Web-Strang gerade geschrieben
       hat. Konflikt erwarten.
-- [ ] `ci.yml`: die neue pgTAP-Datei in die Dateiliste. Ohne Liste **lügt**
+- [x] `ci.yml`: die neue pgTAP-Datei in die Dateiliste. Ohne Liste **lügt**
       `supabase test db`.
-- [ ] Commit.
+- [x] Commit.
 
-### A2b · **(R2)** Den ungenutzten Schreib-Grant entziehen
+### A2b · **(R2)** Den ungenutzten Schreib-Grant entziehen ✅
 
-- [ ] **RED**: Zusage, dass `authenticated` auf `notifications` **kein**
+- [x] **RED**: Zusage, dass `authenticated` auf `notifications` **kein**
       `insert` und **kein** `delete` mehr hält.
-- [ ] `revoke insert, delete on public.notifications from authenticated`.
+- [x] `revoke insert, delete on public.notifications from authenticated`.
       Gemessen: `grep 'from("notifications")' src/` findet **keinen** Insert —
       der Grant ist ungenutzt. Ohne den Entzug kann jedes aktivierte Mitglied
       sich selbst beliebig viele Zeilen schreiben und ab Phase B damit beliebig
       viel Push-Arbeit erzeugen (Kontingent bei FCM/APNs).
-- [ ] `grants_test.sql` nachziehen — **zweite** Berührung des Golden-Snapshots.
-- [ ] Commit.
+- [x] `grants_test.sql` nachziehen — **zweite** Berührung des Golden-Snapshots.
+- [x] Commit.
 
-### A3 · Fünfter Typ `message`
+### A3 · Fünfter Typ `message` ✅
 
-- [ ] **RED**: eine neue Nachricht schreibt dem **Gegenüber** eine Zeile, dem
+- [x] **RED**: eine neue Nachricht schreibt dem **Gegenüber** eine Zeile, dem
       Absender **keine**; die Zeile trägt Absendername und Gesprächs-Kennung und
       **keinen Nachrichtentext**; abgeschaltetes `notify_app_message` schreibt
       nichts; ein nicht aktiviertes Konto bekommt nichts.
-- [ ] Migration: Trigger `trg_hinweis_nachricht` auf `messages` (after insert).
+- [x] Migration: Trigger `trg_hinweis_nachricht` auf `messages` (after insert).
       Gespräche sind eins-zu-eins (`specs/messaging/spec.md:3`) — ein Gegenüber
       je Nachricht ist richtig.
-- [ ] `HinweisGlocke.tsx`: Renderer für `message`, **(R2)** samt Ziel auf den
+- [x] `HinweisGlocke.tsx`: Renderer für `message`, **(R2)** samt Ziel auf den
       Gesprächsfaden. Ein Hinweis, der sich nicht öffnen lässt, ist eine
       Sackgasse. Kein Rohtyp in der Anzeige.
-- [ ] **GREEN**. Commit.
+- [x] **GREEN**. Commit.
 
-### A4 · `push_routing` und die Zustell-RPCs
+### A4 · `push_routing` und die Zustell-RPCs ✅
 
-- [ ] **RED**: keine Client-Rolle hält `execute`; keine Client-Rolle liest
+- [x] **RED**: keine Client-Rolle hält `execute`; keine Client-Rolle liest
       `push_routing`; ein deaktiviertes Konto liefert **null** Token, auch mit
       Token in der Tabelle; ein Typ **ohne** Zeile in `push_routing` liefert
       nichts.
-- [ ] `push_routing (type text primary key, push boolean not null)`. Gesetzt:
+- [x] `push_routing (type text primary key, push boolean not null)`. Gesetzt:
       `message` und die drei `contact_request*` auf `true`; `post_created`,
       `comment_on_post`, `like_on_post`, `event_created` und **`release_note`**
       auf `false`. `event_created` wegen der vertagten Bündelung,
       `release_note` weil der eine Typ ohne Abschalter niemandem aufs Gerät
       gehört.
-- [ ] `push_zustellung_daten(notification_id)` und
+- [x] `push_zustellung_daten(notification_id)` und
       `push_token_entfernen(token)`, beide SECURITY DEFINER,
       **(R2)** `set search_path = ''`, **(R1)** `revoke` von den Client-Rollen
       **und** `grant execute to service_role` — das Vorbild steht in
       `20260827100000:124-127`. Ohne den Grant scheitert die Function zur
       Laufzeit.
-- [ ] **(R1)** Auch das Löschen toter Token läuft über die RPC. Es stünde sonst
+- [x] **(R1)** Auch das Löschen toter Token läuft über die RPC. Es stünde sonst
       auf derselben `service_role`-Tabellenrechte-Eigenschaft, die für das Lesen
       ausdrücklich verworfen wurde.
-- [ ] **GREEN**. Commit.
+- [x] **GREEN**. Commit.
 
-### A5 · Edge Function `send-push`
+### A5 · Edge Function `send-push` ⚠️ gebaut, gegen keinen echten Anbieter gemessen
 
-- [ ] Webhook-Auth über gemeinsames Geheimnis wie `notify-contact-request`
+- [x] Webhook-Auth über gemeinsames Geheimnis wie `notify-contact-request`
       (`verify_jwt=false`). Kein `getUser()`/`getClaims()` — beide scheitern
       unter ES256.
-- [ ] **(R1)** Die Benachrichtigung wird aus einer **festen Feldliste** gebaut,
-      nie aus durchgereichter Nutzlast. Die seit Juni bestehenden Zeilen tragen
-      den Freitext weiter; nur dieser Filter schützt sie. Zusage dazu: eine alte
-      Zeile mit `message` in der Nutzlast liefert ihn nicht aus.
-- [ ] FCM und APNs; dauerhaft abgelehnte Token weg, vorübergehende Fehler nicht.
-- [ ] Tests: `push = false` schickt nichts · unverzeichneter Typ schickt nichts ·
-      abgeschalteter Schalter schickt nichts · deaktiviertes Konto bekommt
-      nichts · keine Nutzlast im Text.
-- [ ] Secrets nach Infisical, **getrennt für DEV und PROD**.
-- [ ] Commit.
+- [x] **(R1)** Die Benachrichtigung wird aus einer **festen Feldliste** gebaut,
+      nie aus durchgereichter Nutzlast. Stärker als geplant umgesetzt:
+      `baueBenachrichtigung` nimmt drei Felder entgegen (`typ`, `wer`,
+      `ziel_id`) und hat gar kein Feld, aus dem sich Freitext ziehen liesse.
+      Die Zusage steht trotzdem als Test — auch untergeschobener Freitext
+      erreicht keinen der drei Ausgänge.
+- [x] FCM und APNs; dauerhaft abgelehnte Token weg, vorübergehende Fehler nicht.
+      **Schärfer als geplant:** alles Unbekannte gilt als vorübergehend, und
+      401/403 ausdrücklich auch — ein abgelaufener Schlüssel darf nicht in
+      einem Lauf den ganzen Tokenbestand löschen.
+- [x] Tests: die fünf Zusagen sind anbieterunabhängig. Drei davon (`push=false`,
+      unverzeichneter Typ, abgeschalteter Schalter, deaktiviertes Konto) liegen
+      in `push_zustellung_test.sql` — sie sind Eigenschaften der RPC, nicht des
+      Transports. „Keine Nutzlast im Text" steht zusätzlich in
+      `nachrichten.test.ts`. **32 Deno-Zusagen**, jede mit Gegenprobe belegt.
+- [ ] ⛔ **Secrets nach Infisical, getrennt für DEV und PROD.** Blockiert:
+      es gibt kein Firebase-Projekt und kein Apple-Developer-Konto. Donalds
+      Handlung, mit Vorlauf.
+- [ ] ⛔ **Gegen einen echten Anbieter messen.** Hängt am selben Blocker. Bis
+      dahin ist die Anbieter-Schicht (`googleZugangstoken`, die beiden
+      `fetch`-Aufrufe) ungemessen; gemessen sind Textbau, Anfragekörper,
+      Antwortbewertung und die ES256-Signatur.
+- [x] Commit.
 
 ### A5b · **(R2)** Dauerhafter Zustellzustand
 
@@ -150,15 +167,15 @@ zwar nicht der verlorene Hinweis — der steht weiter in der Glocke —, aber di
 Doppelzustellung bei einem Betriebs-Replay ist die peinlichere Hälfte, und
 beides fällt mit derselben Mechanik.
 
-- [ ] **RED**: ein Anbieter-5xx lässt die Zeile auf „offen" mit erhöhtem
+- [x] **RED**: ein Anbieter-5xx lässt die Zeile auf „offen" mit erhöhtem
       Zähler stehen · ein zweiter Lauf über dieselbe `(notification_id,
       token_id)` stellt **nicht** zweimal zu · zwei gleichzeitige Läufe greifen
       sich dieselbe Zeile nicht doppelt · ein dauerhaft abgelehntes Token
       beendet den Vorgang, statt ihn zu wiederholen.
-- [ ] Tabelle `push_zustellungen`, Primärschlüssel `(notification_id, token_id)`
+- [x] Tabelle `push_zustellungen`, Primärschlüssel `(notification_id, token_id)`
       — der Schlüssel **ist** die Idempotenz. Zustand, Versuchszähler,
       nächster Versuch.
-- [ ] Anspruch atomar: `update … set zustand = 'laeuft' where zustand = 'offen'
+- [x] Anspruch atomar: `update … set zustand = 'laeuft' where zustand = 'offen'
       … returning`. Kein `select`-dann-`update`; zwei Läufe holten sonst
       dieselbe Zeile.
 - [ ] **Wiederholung über `pg_cron`.** Gemessen: lokal verfügbar (1.6.4), nicht
@@ -172,9 +189,30 @@ beides fällt mit derselben Mechanik.
       ein Eingriff in die Instanz, und der lokale Stack ist darin nicht von
       PROD unterscheidbar — `postgres` hat hier andere Rechte. Schlägt es auf
       DEV fehl, ist das die Stelle zum Umplanen, nicht PROD.
-- [ ] Zurückgestellte Zeilen aufräumen: was nach N Versuchen nicht zugestellt
-      ist, wird beendet und nicht ewig wiederholt.
-- [ ] Commit.
+- [x] Zurückgestellte Zeilen aufräumen: was nach N Versuchen nicht zugestellt
+      ist, wird beendet und nicht ewig wiederholt. Gilt seit A5c auch für
+      Aufträge, die nie quittiert wurden.
+- [x] Commit.
+
+### A5c · Der Anspruch bekommt eine Frist — Reparatur an A5b ✅
+
+Beim Verdrahten von A5 aufgefallen, nicht von einer Review gemeldet: `holen`
+setzt die Zeile auf `laeuft`, nur die Quittung holt sie da heraus, und
+`faellig` suchte ausschliesslich nach `offen`. Ein Lauf, der dazwischen
+abbricht — Zeitlimit, Deploy mitten im Lauf —, liess den Auftrag **für immer**
+liegen. Damit war der Push endgültiger verloren als ganz ohne Zustellzustand:
+dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
+
+- [x] **RED**: ein beanspruchter, nie quittierter Auftrag mit abgelaufener
+      Frist wird wieder eingesammelt. Gemessen rot (Zusage 20), mit
+      Positivkontrolle daneben.
+- [x] Migration `20260828100000`: `naechster_versuch` wird beim Beanspruchen
+      auf `now() + 5 min` gestellt; `faellig` liest `zustand in ('offen',
+      'laeuft')`; ein zurückgeholter Anspruch zählt als Versuch und fällt unter
+      dieselbe Fünfergrenze; der Teilindex deckt beide Zustände.
+- [x] Delta-Spec: Klausel und zwei Szenarien in „Push ist ein zweiter
+      Transport".
+- [x] **GREEN**. Commit.
 
 ### A6 · Abnahme Phase A
 

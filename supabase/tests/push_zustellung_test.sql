@@ -22,7 +22,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
-select plan(18);
+select plan(20);
 
 create function pg_temp.try_as(uid uuid, q text) returns text language plpgsql as $$
 begin
@@ -224,6 +224,44 @@ select is(
   (select count(*)::int from public.push_zustellungen
     where notification_id = 'f0000000-0000-0000-0000-000000000001'),
   1, 'und seine Zustellzeile verschwindet mit ihm');
+
+-- ── 6. Ein abgestuerzter Lauf laesst nichts liegen ──────────────────────────
+-- `push_auftraege_holen` setzt die Zeile beim Holen auf `laeuft`, und nur die
+-- Quittung holt sie da wieder heraus. Bricht die Edge Function zwischen beidem
+-- weg — Zeitlimit, Deploy mitten im Lauf —, dann steht die Zeile auf `laeuft`,
+-- und ein Wiederholungslauf, der nur `offen` sucht, findet sie nie wieder.
+--
+-- Das waere genau der Verlust, gegen den `push_zustellungen` gebaut wurde: der
+-- Zustand ueberlebt, aber niemand holt ihn ab. Der Anspruch bekommt darum eine
+-- FRIST — `naechster_versuch` wird beim Holen vorgestellt —, und der
+-- Wiederholungslauf sammelt ein, was seine Frist ueberschritten hat.
+-- Abschnitt 4 hat Bodos Schalter ABGESCHALTET, um zu belegen, dass er haelt.
+-- Er ist es immer noch — ohne dieses Zurueckschalten misst der Abschnitt hier
+-- den Schalter statt der Frist, und die Positivkontrolle darunter faellt
+-- zusammen mit der eigentlichen Zusage. (Genau so ist es beim ersten Lauf
+-- passiert.)
+update public.member_settings set notify_app_message = true
+ where profile_id = 'e0000000-0000-0000-0000-00000000000b';
+
+insert into public.notifications (id, profile_id, type, payload) values
+  ('f0000000-0000-0000-0000-000000000009',
+   'e0000000-0000-0000-0000-00000000000b', 'message',
+   jsonb_build_object('thread_id', 't-9', 'sender_name', 'PZ Anna'));
+
+select is(
+  (select count(*)::int from public.push_auftraege_holen(
+     'f0000000-0000-0000-0000-000000000009')),
+  1, 'Positivkontrolle: der Auftrag wurde geholt und steht auf laeuft');
+
+-- Der Absturz: quittiert wird nicht. Die Frist laeuft ab.
+update public.push_zustellungen
+   set naechster_versuch = now() - interval '1 minute'
+ where notification_id = 'f0000000-0000-0000-0000-000000000009';
+
+select is(
+  (select count(*)::int from public.push_auftraege_faellig()
+    where notification_id = 'f0000000-0000-0000-0000-000000000009'),
+  1, 'ein Auftrag mit abgelaufener Frist wird wieder eingesammelt');
 
 select * from finish();
 rollback;
