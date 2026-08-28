@@ -48,13 +48,27 @@ describe("Der Release-Hinweis in der Glocke", () => {
     expect(screen.queryByText("Es gibt etwas Neues.")).not.toBeInTheDocument();
   });
 
-  it("führt auf /neues", async () => {
+  it("führt auf die GEMEINTE Note, nicht nur auf die Fläche (AGE-632)", async () => {
+    // Der Hinweis nennt die Note; die Fläche kann sie öffnen. Ein Ziel ohne
+    // Kennung liesse den Leser die angekündigte Mitteilung unter den anderen
+    // suchen — bei der ersten ist das leicht, bei der zwanzigsten nicht.
     const { getByRole } = renderGlocke([hinweis()]);
     getByRole("button", { name: /Benachrichtigungen/ }).click();
 
     const link = await screen.findByRole("link", {
       name: "Neu in der App: Nachrichten stehen jetzt im Rahmen",
     });
+    expect(link).toHaveAttribute("href", "/neues?note=n1");
+  });
+
+  it("führt ohne Kennung in der Nutzlast auf die blosse Fläche", async () => {
+    // Eine alte Nutzlast trägt sie womöglich nicht. Dann ist die Liste das
+    // richtige Ziel — `/neues?note=undefined` wäre ein Ziel, das nichts öffnet
+    // und trotzdem so aussieht, als sollte es.
+    const { getByRole } = renderGlocke([hinweis({ payload: { title: "Ohne Kennung" } })]);
+    getByRole("button", { name: /Benachrichtigungen/ }).click();
+
+    const link = await screen.findByRole("link", { name: "Neu in der App: Ohne Kennung" });
     expect(link).toHaveAttribute("href", "/neues");
   });
 

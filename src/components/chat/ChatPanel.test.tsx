@@ -88,12 +88,22 @@ describe("ChatPanel — drei Zustände", () => {
 });
 
 describe("ChatPanel — die Liste", () => {
-  it("meldet die Wahl eines Gesprächs an die Hülle weiter", async () => {
+  it("meldet den GESPRÄCHSPARTNER mit, nicht nur die Kennung", async () => {
+    // Seit AGE-639 öffnet ein Klick oberhalb von `xl` ein angedocktes Fenster.
+    // Dessen Titelzeile braucht Namen und Bild — und die stehen hier bereits in
+    // der Hand. Sie später nachzuschlagen hiesse, für einen Datensatz erneut
+    // abzufragen, den dieser Klick gerade in der Liste hatte, und nach einem
+    // Neuladen liegt der Thread womöglich gar nicht in der geladenen Seite.
     fetchThreads.mockResolvedValue({ threads: [thread("t1", "Anna Becker")], nextOffset: null });
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
-    expect(gewaehlt).toHaveBeenCalledWith("t1");
+    expect(gewaehlt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "t1",
+        partner: expect.objectContaining({ name: "Anna Becker" }),
+      }),
+    );
   });
 
   it("rendert die Null NICHT — ein Marker steht nur, wo etwas ungelesen ist", async () => {

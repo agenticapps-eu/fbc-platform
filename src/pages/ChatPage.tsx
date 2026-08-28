@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -7,18 +7,14 @@ import { ThreadList } from "../components/chat/ThreadList";
 import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
-import { useToast } from "../components/ui/toast-context";
 import {
-  fetchMessages,
-  markThreadRead,
   mergeMessage,
   messagesQueryKey,
-  sendMessage,
   subscribeToThread,
   threadsQueryKey,
-  unreadQueryKey,
   type ChatMessage,
 } from "../lib/chat";
+import { useGespraech } from "../components/chat/use-gespraech";
 import { useUngelesen } from "../components/chat/use-ungelesen";
 import { useThreadsSeite } from "../components/chat/use-threads-seite";
 import { cn } from "../lib/cn";
@@ -43,7 +39,6 @@ export default function ChatPage() {
   const { threadId } = useParams<{ threadId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   // DERSELBE Hook wie die stehende Leiste — eine Datenquelle, ein Umfang, und
   // zwar als Eigenschaft des Caches statt als Verabredung zwischen zwei
@@ -59,23 +54,14 @@ export default function ChatPage() {
   const threads = threadsQuery.data?.pages.flatMap((seite) => seite.threads) ?? [];
   const activeThread = threads.find((t) => t.id === activeId) ?? null;
 
-  const messagesQuery = useQuery({
-    queryKey: messagesQueryKey(activeId ?? ""),
-    queryFn: () => fetchMessages(activeId!),
-    enabled: Boolean(activeId),
-  });
-
-  // Gelesen-Markierung (AGE-583). Hängt an `activeId`, NICHT an den Nachrichten:
-  // ein Effect über `messages` schriebe je eingegangener Zeile erneut, und das
-  // Öffnen eines Gesprächs soll EIN Schreibvorgang sein.
-  useEffect(() => {
-    if (!activeId || !myId) return;
-    void markThreadRead(activeId, myId)
-      .then(() => queryClient.invalidateQueries({ queryKey: unreadQueryKey(myId) }))
-      // Ein fehlgeschlagenes Markieren darf das Gespräch nicht kosten. Es bleibt
-      // ungelesen, der Zähler zeigt weiter darauf — der sichere Ausgang.
-      .catch(() => {});
-  }, [activeId, myId, queryClient]);
+  // Verlauf, Lesestand und optimistisches Senden kommen seit AGE-639 aus EINER
+  // Definition — dieselbe, aus der ein angedocktes Chatfenster sein Gespräch
+  // bezieht. Die drei Blöcke, die hier standen, waren die Vorlage dafür.
+  //
+  // `aktiv` ist hier `Boolean(activeId)`: die Vollansicht liegt dem Mitglied
+  // immer gegenüber, wenn überhaupt ein Gespräch gewählt ist. Ein Fenster
+  // übergibt an derselben Stelle `!minimiert`.
+  const gespraech = useGespraech({ threadId: activeId ?? "", myId, aktiv: Boolean(activeId) });
 
   // Realtime: neue Nachrichten des OFFENEN Threads live einspielen (§9).
   // Bekannte Phase-1-Lücke: zwischen initialem fetchMessages und aktivem Channel
@@ -87,53 +73,22 @@ export default function ChatPage() {
         mergeMessage(prev ?? [], incoming),
       );
       void queryClient.invalidateQueries({ queryKey: threadsQueryKey(myId) });
-      // Der Lesestand rückt SOFORT nach, weil das Gespräch offen vor einem
-      // liegt. Ohne das stiege die Summe in der Kopfzeile auf 1 und fiele beim
-      // nächsten Abgleich zurück — ein Zucken, das wie ein Fehler aussieht.
-      // Nur für fremde Nachrichten: die eigene zählt ohnehin nie.
-      if (myId && incoming.senderId !== myId) {
-        void markThreadRead(activeId, myId)
-          .then(() => queryClient.invalidateQueries({ queryKey: unreadQueryKey(myId) }))
-          .catch(() => {});
-      }
+      // **Hier wird der Lesestand NICHT mehr vorgerückt** (AGE-639).
+      //
+      // Er wird es trotzdem, und zwar sofort: `useGespraech` hängt seinen
+      // Effect an die letzte FREMDE Nachricht, und die Zeile darüber schreibt
+      // sie gerade in den Cache. Die Zusage aus AGE-583 — die Summe darf nicht
+      // auf 1 springen und zurückfallen — bleibt damit erfüllt.
+      //
+      // Der Aufruf, der hier stand, ist ersatzlos entfallen, weil er neben dem
+      // Hook ein ZWEITES Mal geschrieben hätte: je eingehender Fremdnachricht
+      // zwei Upserts statt einem. Gefunden hat es die Diff-Review (opencode,
+      // HIGH) — und sie hat damit zugleich einen Kommentar im Hook widerlegt,
+      // der „gleich viele Schreibvorgänge" behauptete. Gemessen war das nur am
+      // Hook allein, nicht an dieser Seite mit ihrem eigenen Abo.
     });
     return unsubscribe;
   }, [activeId, myId, queryClient]);
-
-  async function handleSend(body: string) {
-    if (!activeId || !myId) return;
-    const optimistic: ChatMessage = {
-      id: `optimistic-${crypto.randomUUID()}`,
-      threadId: activeId,
-      senderId: myId,
-      body,
-      createdAt: new Date().toISOString(),
-      pending: true,
-    };
-    queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(activeId), (prev) => [
-      ...(prev ?? []),
-      optimistic,
-    ]);
-
-    try {
-      const real = await sendMessage({ threadId: activeId, senderId: myId, body });
-      // Echte Zeile gleicht die optimistische Blase ab (Realtime-Echo bleibt idempotent).
-      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(activeId), (prev) =>
-        mergeMessage(prev ?? [], real),
-      );
-      void queryClient.invalidateQueries({ queryKey: threadsQueryKey(myId) });
-    } catch (error) {
-      // Rollback: optimistische Blase entfernen, Nutzer informieren.
-      queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(activeId), (prev) =>
-        (prev ?? []).filter((m) => m.id !== optimistic.id),
-      );
-      toast({
-        title: "Nachricht nicht gesendet",
-        description: errorMessage(error),
-        variant: "error",
-      });
-    }
-  }
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -200,9 +155,9 @@ export default function ChatPage() {
             {activeThread ? (
               <Conversation
                 thread={activeThread}
-                messages={messagesQuery.data ?? []}
+                messages={gespraech.messages}
                 myId={myId}
-                onSend={handleSend}
+                onSend={gespraech.sende}
               />
             ) : (
               <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">

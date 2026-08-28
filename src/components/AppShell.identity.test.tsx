@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
@@ -81,5 +81,34 @@ describe("Identität im Rahmen (AGE-494)", () => {
     const sidebar = document.querySelector("aside") as HTMLElement;
     expect(within(sidebar).getByRole("link", { name: "Aktivität" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Profilmenü" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der Weg zu den Preisen steht nur denen offen, für die sie gelten (AGE-633).
+   *
+   * Der Menüeintrag in der Sidebar ist seit AGE-494 fort; im Profilmenü stand
+   * der Link weiter. Für den Import-Kreis — jedes übernommene Mitglied liegt
+   * auf `impact` — führt er zu vier zahlenden Stufen, von denen keine gilt.
+   */
+  it("zeigt „Mitgliedschaft\" im Profilmenü NICHT, wer schon impact trägt", () => {
+    renderApp(MIT_EMAIL);
+    fireEvent.click(screen.getByRole("button", { name: "Profilmenü" }));
+
+    expect(screen.queryByRole("menuitem", { name: "Mitgliedschaft" })).not.toBeInTheDocument();
+    // Positivkontrolle: das Menü ist offen und trägt seine übrigen Einträge.
+    expect(screen.getByRole("menuitem", { name: "Profil" })).toBeInTheDocument();
+  });
+
+  it("zeigt ihn einer niedrigeren Stufe weiterhin", () => {
+    renderApp(
+      fakeAuthValue({
+        user: { id: "test-user", email: "bea@demo.local" } as AuthContextValue["user"],
+        tier: "discover",
+        levelRank: LEVEL_RANK.discover,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Profilmenü" }));
+
+    expect(screen.getByRole("menuitem", { name: "Mitgliedschaft" })).toBeInTheDocument();
   });
 });

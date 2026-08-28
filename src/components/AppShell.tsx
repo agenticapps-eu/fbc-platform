@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
@@ -9,8 +9,11 @@ import {
   fetchIncomingRequests,
   incomingRequestsQueryKey,
 } from "../lib/contact-requests";
+import type { ChatThread } from "../lib/chat";
 import { useAuth } from "../providers/auth-context";
 import { ChatPanel } from "./chat/ChatPanel";
+import { ChatFensterReihe } from "./chat/ChatFensterReihe";
+import { reihenHoehe, useChatfenster } from "./chat/use-chatfenster";
 import { useUngelesen, useUngelesenLive } from "./chat/use-ungelesen";
 import { HinweisGlocke } from "./hinweise/HinweisGlocke";
 import { useHinweise, useHinweiseLive, useHinweisMarkieren } from "./hinweise/use-hinweise";
@@ -24,6 +27,7 @@ import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
 import { useOverlay } from "./ui/useOverlay";
 import { Icon } from "./ui/icons";
+import { LeistenPill } from "./LeistenPill";
 
 // Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
 // Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
@@ -226,14 +230,21 @@ function UserMenu({
           >
             Profil
           </Link>
-          <Link
-            to="/mitgliedschaft"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
-          >
-            Mitgliedschaft
-          </Link>
+          {/* Nur, wem Preise etwas sagen (AGE-633). Jedes aus WordPress
+              übernommene Mitglied liegt auf `impact` und hat damit die höchste
+              Stufe bereits — für diesen Kreis führte der Eintrag zu vier
+              zahlenden Stufen, von denen keine gilt. Die Seite selbst bleibt
+              erreichbar; sie zeigt dort nur die eigene Mitgliedschaft. */}
+          {tier !== "impact" && (
+            <Link
+              to="/mitgliedschaft"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
+            >
+              Mitgliedschaft
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -424,7 +435,12 @@ export default function AppShell() {
   // Hülle steht auf jeder angemeldeten Seite, und jede weitere Aufrufstelle
   // würde einen zweiten Kanal öffnen.
   const { stand: ungelesen, isError: ungelesenFehlt } = useUngelesen(user?.id ?? null);
-  useUngelesenLive(user?.id ?? null, pathname);
+
+  // Die angedockten Chatfenster (AGE-639). Der Zustand liegt HIER, nicht in
+  // einem Context: die Hülle wird beim Navigieren nicht abgebaut, und genau das
+  // ist die Zusage „das Fenster überlebt den Seitenwechsel" — als Eigenschaft
+  // der Montage statt als Verabredung zwischen Komponenten.
+  const chatfenster = useChatfenster(user?.id ?? null);
 
   // Die Glocke (AGE-620). Sie war seit Juni ein toter Knopf, waehrend drei
   // Typen laengst in `notifications` schrieben.
@@ -529,12 +545,79 @@ export default function AppShell() {
   const mobileNav = useOverlay(mobileNavOpen);
   const chatDrawer = useOverlay(chatDrawerOpen);
 
-  /** Ein Thread wird gewählt: Adresse auf, Schublade zu. Ohne das Schliessen
-   *  stünde sie samt Scroll-Sperre über der neuen Seite — links tut das
-   *  `onNavigate`. */
-  function chatOeffnen(threadId: string) {
+  // Chatfenster gibt es genau dort, wo die Nachrichten-Leiste angedockt steht:
+  // angemeldet, ausserhalb der Chatrouten, ab `xl`. Dieselbe Bedingung trägt
+  // ausserdem die Zusage „Fenster fügen keinen Realtime-Kanal hinzu" — sie gilt,
+  // weil Fenster und `ChatPage` nie gleichzeitig montiert sind.
+  const fensterMoeglich = chatLeisteSteht && istBreit;
+  const leer = useMemo<typeof chatfenster.fenster>(() => [], []);
+  const offeneFenster = fensterMoeglich ? chatfenster.fenster : leer;
+
+  // Die Breiten beider Leisten — EINE Rechnung, drei Verbraucher: die
+  // CSS-Variablen am Wurzel-`div` unten (für Leisten, Kopf, Inhalt und Fuss)
+  // und die Ränder der Fensterreihe.
+  //
+  // Die Reihe bekommt sie als WERTE übergeben, nicht über `var(…)`, und das ist
+  // im Browser gemessen: sie hängt per Portal am `document.body` und damit
+  // OBERHALB des `div`, an dem die Variablen stehen. Dort löste `var()` nicht
+  // auf, fiel auf `0rem` zurück, und die Reihe lief unter beide Leisten.
+  const navBreite = collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN;
+  const chatBreite =
+    chatLeisteSteht && istBreit ? (chatCollapsed ? CHAT_W_RAIL : CHAT_W_OPEN) : "0rem";
+
+  // Das Live-Abo überspringt die Neuzählung für Gespräche, die dem Mitglied
+  // gerade GEGENÜBERLIEGEN — sonst springt die Blase auf 1 und fällt beim
+  // nächsten Abgleich zurück. Bis AGE-639 war das genau eines: die offene
+  // Chatseite. Jetzt kommt jedes AUFGEZOGENE Fenster dazu.
+  //
+  // Ein minimiertes gehört ausdrücklich NICHT dazu: es ist nicht gelesen worden,
+  // und sein Zähler soll laufen.
+  //
+  // `useMemo`, weil die Hülle bei jeder Navigation und jeder Invalidierung neu
+  // rendert: eine frische `Set`-Instanz je Anstrich liesse den Spiegelungs-
+  // Effect in `useUngelesenLive` jedes Mal mitlaufen, für einen Inhalt, der
+  // sich fast nie ändert (Diff-Review, opencode, LOW).
+  const sichtbareThreads = useMemo(
+    () => new Set(offeneFenster.filter((f) => !f.minimiert).map((f) => f.threadId)),
+    [offeneFenster],
+  );
+  useUngelesenLive(user?.id ?? null, pathname, sichtbareThreads);
+
+  // Die Höhe der Fensterreihe, damit die Toasts ihr ausweichen. An
+  // `document.documentElement`, NICHT am Wurzel-`div` unten: der `ToastProvider`
+  // steht in `main.tsx` oberhalb von `App` und sähe eine dort gesetzte Variable
+  // nie. Genau EINE Stelle schreibt sie — und räumt sie wieder ab, sonst
+  // schwebten die Toasts nach dem Abmelden auf `/login` grundlos in der Luft.
+  const fensterHoehe = reihenHoehe(offeneFenster);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--fbc-fenster-h", fensterHoehe);
+    return () => {
+      document.documentElement.style.removeProperty("--fbc-fenster-h");
+    };
+  }, [fensterHoehe]);
+
+  /**
+   * Ein Thread wird gewählt — und seit AGE-639 hängt davon ab, wie breit der
+   * Schirm ist.
+   *
+   * **Angedockt (`xl`): ein Fenster geht auf, die Adresse bleibt stehen.** Das
+   * ist der ganze Vorgang: wer im Verzeichnis liest und jemandem antwortet, hat
+   * sich nicht an einen anderen Ort begeben, und der Rahmen soll ihn nicht
+   * dorthin schieben.
+   *
+   * **Darunter: der Weg über die Adresse, wie bisher**, samt Schliessen der
+   * Schublade — ohne das stünde sie samt Scroll-Sperre über der neuen Seite.
+   * Unterhalb von `xl` steht die Leiste gar nicht angedockt, und ein Fenster,
+   * das aus einer modalen Schublade heraus aufgeht, während diese sich
+   * schliesst, wäre ein zweiter Bewegungsablauf für dasselbe Ziel.
+   */
+  function chatOeffnen(thread: ChatThread) {
+    if (fensterMoeglich) {
+      chatfenster.oeffne(thread);
+      return;
+    }
     setChatDrawerOpen(false);
-    navigate(`/chat/${threadId}`);
+    navigate(`/chat/${thread.id}`);
   }
 
   async function handleSignOut() {
@@ -547,14 +630,13 @@ export default function AppShell() {
       className="relative isolate min-h-screen bg-soft text-ink"
       style={
         {
-          "--fbc-sidebar-w": collapsed ? SIDEBAR_W_RAIL : SIDEBAR_W_OPEN,
+          "--fbc-sidebar-w": navBreite,
           // Steht die Leiste nicht — oder ist der Schirm schmaler als `xl` —,
           // ist der Versatz 0, und die Regel in index.css wirkt wie vor
           // AGE-627. Das erspart eine ZWEITE Media Query im Stylesheet: der
           // Umbruchpunkt der Leiste ist ein anderer als der der Navigation,
           // und zwei Regeln mit zwei Grenzen liefen auseinander.
-          "--fbc-chat-w":
-            chatLeisteSteht && istBreit ? (chatCollapsed ? CHAT_W_RAIL : CHAT_W_OPEN) : "0rem",
+          "--fbc-chat-w": chatBreite,
         } as React.CSSProperties
       }
     >
@@ -564,6 +646,7 @@ export default function AppShell() {
           am Rand, nicht schwebend"). Bis AGE-499 hing sie als gerundete Karte in
           einem zentrierten Container und schwebte sichtbar. */}
       <aside
+        id="fbc-navigation"
         className={cn(
           "fbc-sidebar fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-chrome-border lg:flex",
           SIDEBAR_SURFACE,
@@ -597,24 +680,17 @@ export default function AppShell() {
           <FeedbackButton collapsed={collapsed} />
         </div>
 
-        {/* Einklappen — unten, damit der Schalter nicht mit der Navigation
-            konkurriert. Der Zustand überlebt den Reload. */}
-        <div className="shrink-0 border-t border-chrome-border p-2">
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
-            title={collapsed ? "Ausklappen" : "Einklappen"}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              collapsed && "justify-center px-2",
-            )}
-          >
-            <ChevronLeftIcon flipped={collapsed} />
-            {!collapsed && <span>Einklappen</span>}
-          </button>
-        </div>
+        {/* Der Einklapp-Schalter sass bis AGE-638 hier unten als eigene Zeile,
+            mit Pfeil und dem Wort „Einklappen". Er steht jetzt als Pill am
+            rechten Rand dieser Leiste — dasselbe Bauteil wie an der
+            Nachrichten-Leiste, an derselben Höhe. */}
+        <LeistenPill
+          seite="links"
+          flaeche="leiste"
+          offen={!collapsed}
+          steuert="fbc-navigation"
+          onClick={() => setCollapsed((c) => !c)}
+        />
       </aside>
 
       {/* Nachrichten-Leiste (≥ lg, AGE-627): gespiegelt zur linken — bündig an
@@ -632,31 +708,24 @@ export default function AppShell() {
           weil dort beide Flächen weiss sind. */}
       {chatLeisteSteht && (
         <aside
+          id="fbc-nachrichten"
           className={cn(
             "fbc-chat-rail fixed inset-y-0 right-0 z-40 hidden flex-col border-l xl:flex",
             chatCollapsed ? cn("border-chrome-border", SIDEBAR_SURFACE) : "border-line bg-canvas",
           )}
         >
           {chatCollapsed ? (
-            // Eingeklappt: NUR die Sprechblase mit dem Zähler. Kein Thread wird
-            // dafür geladen — die Zahl führt `useUngelesen` ohnehin getrennt.
+            // Eingeklappt: NUR die Sprechblase mit dem Zähler — seit AGE-638
+            // eine ANZEIGE, kein Knopf. Geschaltet wird über den Pill. Stünden
+            // beide, stünden sie in derselben 4rem-Zeile eines 4,5rem schmalen
+            // Rails: zwei Schalter, keine 40 px auseinander, mit derselben
+            // Wirkung. Kein Thread wird hier geladen — die Zahl führt
+            // `useUngelesen` ohnehin getrennt.
             <div className="flex h-16 shrink-0 items-center justify-center border-b border-chrome-border px-2">
-              <button
-                type="button"
-                onClick={() => setChatCollapsed(false)}
-                aria-expanded={false}
-                aria-label={
-                  ungelesenFehlt
-                    ? "Nachrichten ausklappen — Anzahl konnte nicht geladen werden"
-                    : ungelesen.gesamt > 0
-                      ? `Nachrichten ausklappen, ${ungelesen.gesamt} ungelesen`
-                      : "Nachrichten ausklappen"
-                }
-                className="relative rounded-md p-2 text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
+              <span className="relative p-2 text-on-chrome">
                 <Icon name="messages" className="h-5 w-5" />
                 {(ungelesenFehlt || ungelesen.gesamt > 0) && (
-                  // `aria-hidden`: die Zahl steht schon im Namen des Knopfes.
+                  // `aria-hidden`: die Zahl steht schon im Satz darunter.
                   <span
                     aria-hidden="true"
                     className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-accent px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
@@ -664,23 +733,48 @@ export default function AppShell() {
                     {ungelesenFehlt ? "!" : ungelesen.gesamt}
                   </span>
                 )}
-              </button>
+                {/* Als TEXT, nicht als `aria-label`: ein `aria-label` auf einem
+                    `span` ohne Rolle wird von Vorlesesoftware nicht verlässlich
+                    ausgegeben. Beim Knopf, der hier bis AGE-638 stand, ging das
+                    noch — bei einer Anzeige nicht mehr. */}
+                {/* **Bewusst KEINE Ansage-Region.** Ein Reviewer schlug
+                    `role="status"` vor, damit eine sich ändernde Zahl
+                    vorgelesen wird. Zweimal falsch:
+                    1. Die Zahl steht bereits im Namen des Topbar-Links
+                       (`:126`, „Nachrichten, N ungelesen") — auf einem
+                       fokussierbaren Element. Eine zweite Ansage wäre eine
+                       Dopplung, die bei jeder eintreffenden Nachricht
+                       dazwischenspricht.
+                    2. Gemessen: `role="status"` hier macht `getByRole("status")`
+                       in der ganzen Hülle mehrdeutig und brach zwei bestehende
+                       Tests in `RequireAuth.test.tsx`. Eine dauerhaft montierte
+                       Live-Region ist nichts, was man nebenbei einführt. */}
+                <span className="sr-only">
+                  {ungelesenFehlt
+                    ? "Ungelesene Nachrichten — Anzahl konnte nicht geladen werden"
+                    : ungelesen.gesamt > 0
+                      ? `${ungelesen.gesamt} ungelesene Nachrichten`
+                      : "Keine ungelesenen Nachrichten"}
+                </span>
+              </span>
             </div>
           ) : (
-            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
+            <div className="flex h-16 shrink-0 items-center border-b border-line px-4">
               <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
-              <button
-                type="button"
-                onClick={() => setChatCollapsed(true)}
-                aria-expanded={true}
-                aria-label="Nachrichten einklappen"
-                title="Einklappen"
-                className="rounded-md p-2 text-muted transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <ChevronLeftIcon flipped />
-              </button>
             </div>
           )}
+
+          {/* `flaeche` folgt dem Zustand der Leiste: eingeklappt ist sie ein
+              Chrome-Rail wie links, aufgeklappt trägt sie die Threadliste auf
+              Inhaltsfläche. Eine feste Angabe hinterliesse beim Umschalten
+              einen Fleck in der falschen Farbe an ihrer Kante. */}
+          <LeistenPill
+            seite="rechts"
+            flaeche={chatCollapsed ? "leiste" : "inhalt"}
+            offen={!chatCollapsed}
+            steuert="fbc-nachrichten"
+            onClick={() => setChatCollapsed((c) => !c)}
+          />
 
           {/* `istBreit` gehört in die MONTAGE, nicht in einen Schalter am Panel:
               unter `lg` liegt diese Leiste per CSS verborgen, aber montiert —
@@ -827,6 +921,22 @@ export default function AppShell() {
       {/* Pflichtlinks (AGE-497). Traegt `fbc-shell-offset` wie <main>, sonst
           laege er ab lg unter der fixierten Sidebar. */}
       <AppFooter />
+
+      {/* Die angedockten Chatfenster (AGE-639). Sie rendert sich selbst per
+          Portal an `document.body` — hier steht nur, WANN es sie gibt. */}
+      {fensterMoeglich && (
+        <ChatFensterReihe
+          fenster={chatfenster.fenster}
+          myId={user?.id ?? ""}
+          ungelesenJeThread={ungelesen.jeThread}
+          leisteLinks={navBreite}
+          leisteRechts={chatBreite}
+          onMinimiere={chatfenster.minimiere}
+          onZiehAuf={chatfenster.ziehAuf}
+          onSchliesse={chatfenster.schliesse}
+          onBeruehre={chatfenster.beruehre}
+        />
+      )}
 
       {/* Off-Canvas-Sidebar (< lg). */}
       {mobileNavOpen && (

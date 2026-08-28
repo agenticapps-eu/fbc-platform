@@ -18,3 +18,19 @@ export interface ReleaseEintrag {
   /** Die Stichpunkte der obersten Ebene aus „What Changes". */
   aenderungen: string[];
 }
+
+/**
+ * Ein Bild zu einem archivierten Change (AGE-632).
+ *
+ * `width`/`height` sind Pflicht, nicht Zierde: ohne sie kennt der Browser das
+ * Seitenverhältnis erst, wenn das Bild da ist, und schiebt den Text darunter
+ * genau in dem Moment nach unten, in dem jemand ihn liest.
+ */
+export interface ReleaseBild {
+  /** Pfad im ausgelieferten Bündel, z. B. `/release/chat-leiste.png`. */
+  src: string;
+  /** Was zu sehen ist — für Vorlesesoftware und für den Fall, dass es fehlt. */
+  alt: string;
+  width: number;
+  height: number;
+}

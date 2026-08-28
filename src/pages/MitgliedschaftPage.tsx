@@ -20,6 +20,16 @@ export default function MitgliedschaftPage() {
   const [busy, setBusy] = useState<MembershipLevel | null>(null);
   const currentRank = levelRank ?? 0;
 
+  // Der WordPress-Import legt jedes übernommene Mitglied auf `impact` an; nur
+  // wer sich selbst registriert, beginnt auf `basic`. Für den Import-Kreis ist
+  // eine Preistabelle mit vier zahlenden Stufen keine Information — er hat die
+  // höchste bereits. Preise sehen deshalb nur die, für die sie gelten.
+  //
+  // Kein Redirect und kein 404: wer den Link von woanders hat, landet sonst
+  // unerklärt auf einer fremden Seite. Die Seite beantwortet für ihn eine
+  // andere Frage — „was habe ich?" statt „was kostet was?".
+  const zeigtPreise = tier !== "impact";
+
   async function startUpgrade(level: MembershipLevel) {
     setBusy(level);
     const { data, error } = await supabase.functions.invoke("create-checkout-session", {
@@ -41,46 +51,50 @@ export default function MitgliedschaftPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <FormatHero meta={FORMAT_HERO["/mitgliedschaft"]} className="" />
-        <div className="flex gap-1 rounded-full border border-line p-1">
-          <button
-            type="button"
-            onClick={() => setInterval("year")}
-            className={cn(
-              "rounded-full px-3 py-1 text-sm",
-              interval === "year" && "bg-accent-strong text-canvas",
-            )}
-          >
-            Jährlich
-          </button>
-          <button
-            type="button"
-            onClick={() => setInterval("month")}
-            className={cn(
-              "rounded-full px-3 py-1 text-sm",
-              interval === "month" && "bg-accent-strong text-canvas",
-            )}
-          >
-            Monatlich
-          </button>
-        </div>
+        {zeigtPreise && (
+          <div className="flex gap-1 rounded-full border border-line p-1">
+            <button
+              type="button"
+              onClick={() => setInterval("year")}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm",
+                interval === "year" && "bg-accent-strong text-canvas",
+              )}
+            >
+              Jährlich
+            </button>
+            <button
+              type="button"
+              onClick={() => setInterval("month")}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm",
+                interval === "month" && "bg-accent-strong text-canvas",
+              )}
+            >
+              Monatlich
+            </button>
+          </div>
+        )}
       </div>
 
       <MembershipSummary current={tier} />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {LEVEL_ORDER.map((key) => (
-          <PricingCard
-            key={key}
-            level={LEVELS[key]}
-            interval={interval}
-            isCurrent={tier === key}
-            canUpgrade={PAID.includes(key) && LEVEL_RANK[key] > currentRank}
-            recommended={key === RECOMMENDED}
-            busy={busy === key}
-            onUpgrade={startUpgrade}
-          />
-        ))}
-      </div>
+      {zeigtPreise && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {LEVEL_ORDER.map((key) => (
+            <PricingCard
+              key={key}
+              level={LEVELS[key]}
+              interval={interval}
+              isCurrent={tier === key}
+              canUpgrade={PAID.includes(key) && LEVEL_RANK[key] > currentRank}
+              recommended={key === RECOMMENDED}
+              busy={busy === key}
+              onUpgrade={startUpgrade}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

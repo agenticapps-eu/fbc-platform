@@ -21,6 +21,13 @@ import {
   type AdminProfileData,
 } from "../lib/admin-profile";
 
+// Nur `setzeStufe` wird ersetzt; `ZAHLUNGSARTEN` und der Rest bleiben echt.
+vi.mock("../lib/admin-members", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/admin-members")>()),
+  setzeStufe: vi.fn(),
+}));
+import { setzeStufe } from "../lib/admin-members";
+
 import AdminMitgliedPage from "./AdminMitgliedPage";
 
 const ZIEL = "c6c6c6c6-0000-0000-0000-0000000000b1";
@@ -63,6 +70,7 @@ const DATEN: AdminProfileData = {
     legacy_source_id: "wp-4711",
     payment_type: "copecart",
   },
+  tier: "impact",
   loginEmail: "login@alt.de",
   activated: false,
   deaktiviert: false,
@@ -73,6 +81,7 @@ beforeEach(() => {
   vi.mocked(fetchAdminProfile).mockReset().mockResolvedValue(DATEN);
   vi.mocked(saveAdminProfile).mockReset().mockResolvedValue(undefined);
   vi.mocked(changeLoginEmail).mockReset().mockResolvedValue({ status: "ok" });
+  vi.mocked(setzeStufe).mockReset().mockResolvedValue(undefined);
 });
 
 function renderPage() {
@@ -255,5 +264,44 @@ describe("Die Kopfzeile nennt den Lebenszyklus (Sichtprobe 11.6)", () => {
     vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, activated: false });
     renderPage();
     expect(await screen.findByText(/nicht bestätigt —/)).toBeInTheDocument();
+  });
+});
+
+describe("Die Stufe von Hand setzen (AGE-634)", () => {
+  it("zeigt die Stufe, auf der das Mitglied gerade steht", async () => {
+    renderPage();
+    const auswahl = (await screen.findByLabelText("Stufe")) as HTMLSelectElement;
+    expect(auswahl.value).toBe("impact");
+  });
+
+  it("lässt ohne Begründung nicht auslösen", async () => {
+    // Eine Spur ohne Grund beantwortet „wer" und „wann", nicht „warum". Die
+    // Datenbank weist eine leere Begründung ab; die Fläche soll es gar nicht
+    // erst versuchen.
+    renderPage();
+    await screen.findByLabelText("Stufe");
+    expect(screen.getByRole("button", { name: /Stufe setzen/ })).toBeDisabled();
+  });
+
+  it("schickt Stufe und Begründung an admin_set_tier", async () => {
+    renderPage();
+    const auswahl = await screen.findByLabelText("Stufe");
+    fireEvent.change(auswahl, { target: { value: "connect" } });
+    fireEvent.change(screen.getByLabelText("Begründung"), {
+      target: { value: "Importfehler korrigiert" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Stufe setzen/ }));
+
+    await waitFor(() =>
+      expect(setzeStufe).toHaveBeenCalledWith(ZIEL, "connect", "Importfehler korrigiert"),
+    );
+  });
+
+  it("sagt, was ein späterer Stripe-Kauf damit tut", async () => {
+    // `apply_upgrade` hebt nur an. Wer das nicht weiss, hält eine Senkung für
+    // dauerhaft — sie ist es nur, solange niemand eine höhere Stufe kauft.
+    renderPage();
+    await screen.findByLabelText("Stufe");
+    expect(screen.getByText(/höhere Stufe/)).toBeInTheDocument();
   });
 });
