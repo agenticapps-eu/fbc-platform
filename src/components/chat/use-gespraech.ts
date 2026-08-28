@@ -267,6 +267,10 @@ export function useGespraech({
       // `cancelQueries` verwirft eine laufende Abfrage samt ihrem schon
       // berechneten Ergebnis. Was sie geholt hätte, holt die nächste Neuabfrage —
       // und die liest dann den Stand MIT den älteren Zeilen.
+      //
+      // **Beides gemessen**, nicht angenommen: der Test „…wenn die Neuabfrage
+      // zuerst auflöst" stellt genau diese Reihenfolge her, und ohne diese Zeile
+      // wird er rot. Das Fenster ist also real — und diese Zeile schliesst es.
       await queryClient.cancelQueries({ queryKey: messagesQueryKey(threadId) });
       queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(threadId), (prev) =>
         vereinigeNachrichten(prev ?? [], seite.messages),

@@ -395,6 +395,43 @@ describe("useGespraech — ältere Nachrichten nachladen", () => {
     expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
   });
 
+  // Reproduktionsversuch zu codex HOCH 1: die Neuabfrage hat ihr Ergebnis SCHON
+  // berechnet — also den Cache gelesen, als die älteren Zeilen noch nicht drin
+  // waren — und erst DANACH schreibt `ladeAeltere`. Setzt React Query danach
+  // noch ein, verschwinden die älteren wieder.
+  it("verliert nachgeladene Zeilen auch dann nicht, wenn die Neuabfrage zuerst auflöst", async () => {
+    fetchMessages.mockResolvedValue({ messages: [neu], erschoepft: false });
+    const { queryClient } = montiere(true);
+    await waitFor(() => expect(stand().messages).toHaveLength(1));
+
+    let neuabfrageAntwort!: (s: ChatVerlaufSeite) => void;
+    let aeltereAntwort!: (s: ChatVerlaufSeite) => void;
+    fetchMessages
+      .mockImplementationOnce(
+        () => new Promise<ChatVerlaufSeite>((res) => (neuabfrageAntwort = res)),
+      )
+      .mockImplementationOnce(() => new Promise<ChatVerlaufSeite>((res) => (aeltereAntwort = res)));
+
+    let neuabfrage!: Promise<unknown>;
+    let nachladen!: Promise<void>;
+    await act(async () => {
+      neuabfrage = queryClient.refetchQueries({ queryKey: messagesQueryKey("t1") });
+      await Promise.resolve();
+      nachladen = stand().ladeAeltere();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      // Die Reihenfolge IST der Befund: erst die Neuabfrage, dann das Nachladen.
+      neuabfrageAntwort({ messages: [neu], erschoepft: false });
+      aeltereAntwort({ messages: [alt("1")], erschoepft: true });
+      await neuabfrage;
+      await nachladen;
+    });
+
+    expect(stand().messages.map((m) => m.id)).toEqual(["1", "z"]);
+  });
+
   it("bietet keinen Weg zu älteren an, wenn der Verlauf leer ist", async () => {
     fetchMessages.mockResolvedValue({ messages: [], erschoepft: false });
     montiere(true);
