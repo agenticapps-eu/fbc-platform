@@ -246,13 +246,15 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
 
 ### A6 · Abnahme Phase A
 
-> ⚠️ **Reihenfolge: der Webhook muss VOR dem Merge in beiden Konsolen stehen.**
-> Seit dem Drift-Scan-Commit erwartet `ERWARTET_OHNE_MIGRATION` den Namen
-> `notifications_push_webhook`. Fehlt der Webhook in PROD, meldet der Scan ihn
-> als **fehlend**, und ein rotes Drift-Gate überspringt den Frontend-Deploy
-> stumm — derselbe Ausfall wie vorher, nur andersherum. Ein Fenster gibt es in
-> beiden Reihenfolgen; nur in dieser liegt es außerhalb von `main`. Also erst
-> die zwei Konsolen, dann der PR.
+> ⚠️ **Der PROD-Webhook muss stehen, bevor `migrate-prod` läuft — nicht schon
+> vor dem Merge.** Gemessen am 28.08.: der **Objekt**-Drift-Scan hängt allein in
+> `migrate-prod.yml`; `deploy.yml` führt nur das **Migrations**-Drift-Gate. Der
+> Merge ist also gefahrlos. Danach aber gilt: seit dem Drift-Scan-Commit
+> erwartet `ERWARTET_OHNE_MIGRATION` den Namen `notifications_push_webhook`,
+> und fehlt der Webhook in PROD, bricht `migrate-prod` ab. Weil `deploy.yml`
+> bis dahin ohnehin am Migrations-Gate hängt, bleibt der Frontend-Deploy dann
+> **stumm** aus. Die Liste wirkt in beide Richtungen: vorher war ein
+> vorhandener, unbekannter Webhook rot, jetzt ein fehlender, erwarteter.
 
 - [x] `openspec validate --all` grün — 33/33.
 - [x] Volle pgTAP-Läufe mit der Dateiliste aus `ci.yml`, Ausgabe gelesen:
@@ -261,7 +263,7 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       `remote`, `20260828100000` eingeschlossen. Ohne diese Probe belegt der
       Lauf nichts: eine fremde Sitzung kann den Stack mitten in der Messung
       leeren.
-- [x] `pnpm test` (**174 Dateien / 1968 Zusagen**) und `pnpm typecheck` sauber,
+- [x] `pnpm test` (**175 Dateien / 1971 Zusagen**) und `pnpm typecheck` sauber,
       dazu `deno test` (**122 Zusagen**) und `deno check` über alle Functions.
       Formatiert wurde dateiweise mit `prettier --write <pfad>` — **nie**
       `pnpm format`.
@@ -271,7 +273,9 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       Name, Tabelle, Ereignis und Kopfzeile: `docs/secrets.md`, Abschnitt
       „Den Webhook eintragen".
 - [ ] **(R2) Webhook in der PROD-Konsole** — eigener Punkt, nicht mitgemeint.
-      Derselbe Name, sonst wird der PROD-Drift-Scan rot.
+      Derselbe Name. Spätestens **vor** dem `migrate-prod`-Dispatch, sonst
+      bricht dort der Objekt-Drift-Scan ab. Dazu `PUSH_WEBHOOK_SECRET` in
+      `prod` — die Anbieter-Secrets dürfen leer bleiben.
 - [x] **(R2) Drift-Scan nachgezogen.** Der Webhook heißt
       **`notifications_push_webhook`** — der Name ist damit festgelegt und muss
       in beiden Konsolen exakt so stehen. `ERWARTET_OHNE_MIGRATION` ist dabei
