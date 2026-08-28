@@ -3141,6 +3141,11 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@capacitor/android@8",
+        "npm:@capacitor/cli@8",
+        "npm:@capacitor/core@^8.5.0",
+        "npm:@capacitor/ios@8",
+        "npm:@capacitor/preferences@^8.0.1",
         "npm:@cloudflare/workers-types@^5.20260825.1",
         "npm:@eslint/js@^10.0.1",
         "npm:@hookform/resolvers@^5.9.1",

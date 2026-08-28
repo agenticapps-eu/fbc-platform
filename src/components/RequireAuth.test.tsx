@@ -73,7 +73,21 @@ describe("Auth-Gating für /mein-bereich", () => {
     // Belegt wird deshalb, dass die Profilseite ÜBERHAUPT gemountet hat: ihr
     // Fehlerzweig gehört ihr allein und steht auf keiner anderen Route.
     const fehler = "Profil konnte nicht geladen werden. Bitte neu laden.";
-    await screen.findByText(fehler);
+    // Die Vorgabe von `findBy` sind 1000 ms, und genau daran ist dieser Test in
+    // CI gescheitert (28.08., Lauf 33173596193: 1086 ms — die Grenze plus
+    // Aufschlag). Lokal ist er nicht zu reproduzieren: auch mit geleertem
+    // `node_modules/.vite` liegt die ganze Datei bei 542 ms, und sogar eine
+    // Grenze von 60 ms hält. Der Unterschied ist der Läufer, nicht die Logik —
+    // seit dem Route-Splitting muss vitest die Profilseite erst nachladen und
+    // kalt transformieren, und das kostet auf zwei CI-Kernen ein Vielfaches.
+    // Deshalb hier ausdrücklich Luft, statt die Grenze global zu heben: global
+    // würde jeder ECHTE Fehlschlag in 190 Dateien vier Sekunden länger
+    // brauchen, um rot zu werden.
+    // `timeout` gehört in den DRITTEN Parameter (`waitForOptions`) — im zweiten
+    // steht `SelectorMatcherOptions`, und dort ist es kein bekanntes Feld. Ohne
+    // `pnpm typecheck` wäre das stillschweigend wirkungslos geblieben: der Test
+    // liefe weiter mit 1000 ms und wäre in CI erneut rot geworden.
+    await screen.findByText(fehler, undefined, { timeout: 4000 });
     expect(screen.getByText(fehler)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
   });
