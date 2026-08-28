@@ -8,14 +8,12 @@ import {
   requestActivationLink,
   type RedeemStatus,
 } from "../lib/activation";
+import { MIN_PASSWORT_LAENGE } from "../config/auth";
 import { useAuth } from "../providers/auth-context";
 
-/** Muss zu `minimum_password_length` (config.toml) und `MIN_PASSWORT` der Function passen. */
 /** Frist bis zur Weiterleitung auf den Login. Lang genug für einen Satz, kurz
  *  genug, dass niemand auf einem Erfolgsschirm strandet (AGE-527). */
 const WEITERLEITUNG_SEK = 10;
-
-const MIN_PASSWORT = 10;
 
 export type Zweck = "aktivierung" | "reset";
 
@@ -55,7 +53,7 @@ const TEXTE: Record<
 > = {
   aktivierung: {
     titelToken: "Passwort festlegen",
-    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT} Zeichen. Danach ist dein Zugang fertig.`,
+    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT_LAENGE} Zeichen. Danach ist dein Zugang fertig.`,
     knopf: "Zugang freischalten",
     titelAnfordern: "Bestätigungslink anfordern",
     hinweisAnfordern:
@@ -71,7 +69,7 @@ const TEXTE: Record<
     // Die Abmeldung steht hier, BEVOR sie passiert: `revoke_sessions` läuft
     // beim Einlösen mit, und wer auf dem Telefon angemeldet war, hielte den
     // Reset sonst für kaputt.
-    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT} Zeichen. Danach wirst du auf allen Geräten abgemeldet und meldest dich einmal neu an.`,
+    hinweisToken: `Wähle ein eigenes Passwort mit mindestens ${MIN_PASSWORT_LAENGE} Zeichen. Danach wirst du auf allen Geräten abgemeldet und meldest dich einmal neu an.`,
     knopf: "Neues Passwort setzen",
     titelAnfordern: "Passwort vergessen",
     hinweisAnfordern:
@@ -141,7 +139,7 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
   async function einlösen(e: React.FormEvent) {
     e.preventDefault();
     if (!token || läuft) return;
-    if (passwort.length < MIN_PASSWORT) {
+    if (passwort.length < MIN_PASSWORT_LAENGE) {
       setStatus("weak_password");
       return;
     }
@@ -275,7 +273,7 @@ export default function ActivationRedeemPage({ zweck = "aktivierung" }: { zweck?
               />
               {status === "weak_password" && (
                 <p className="text-sm text-danger">
-                  Das Passwort braucht mindestens {MIN_PASSWORT} Zeichen.
+                  Das Passwort braucht mindestens {MIN_PASSWORT_LAENGE} Zeichen.
                 </p>
               )}
             </div>

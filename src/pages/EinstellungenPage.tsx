@@ -18,14 +18,17 @@ import {
   saveMemberTheme,
   type MemberSettings,
 } from "../lib/member-settings";
+import { MIN_PASSWORT_LAENGE } from "../config/auth";
 import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 import { useDesignVariant } from "../providers/design-variant-context";
 
 /**
  * Passwort ändern (AGE-450). Setzt eine aktive Session voraus (auth.updateUser) —
- * kein Re-Auth mit dem alten Passwort. Mindestlänge 8, Bestätigung muss passen;
- * beides wird clientseitig geprüft, bevor der Aufruf rausgeht.
+ * kein Re-Auth mit dem alten Passwort. Mindestlänge `MIN_PASSWORT_LAENGE`,
+ * Bestätigung muss passen; beides wird clientseitig geprüft, bevor der Aufruf
+ * rausgeht. Hier stand bis AGE-656 ein eigenes Literal `8` — der Server verlangt
+ * 10, also nahm das Formular an, was GoTrue danach ablehnte.
  */
 function PasswordCard() {
   const { updatePassword } = useAuth();
@@ -37,8 +40,8 @@ function PasswordCard() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (pw.length < 8) {
-      setError("Das Passwort muss mindestens 8 Zeichen haben.");
+    if (pw.length < MIN_PASSWORT_LAENGE) {
+      setError(`Das Passwort muss mindestens ${MIN_PASSWORT_LAENGE} Zeichen haben.`);
       return;
     }
     if (pw !== confirm) {
