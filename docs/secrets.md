@@ -423,6 +423,130 @@ Antwort an den Aufrufer: `{"fn":"send-push","event":"nichts_zu_tun",…}`. Solan
 es keine Zeile in `push_tokens` gibt, ist `nichts_zu_tun` das erwartete
 Ergebnis.
 
+### Den Wiederholungslauf eintragen — `pg_cron` (A5b)
+
+Der Webhook oben deckt nur den **ersten** Versuch ab: er feuert, wenn eine
+Hinweiszeile entsteht. Scheitert die Zustellung an einem vorübergehenden
+Anbieterfehler, stellt `push_zustellung_quittieren`
+(`20260827240000:309-312`) die Zeile mit wachsendem Abstand zurück — und dann
+muss jemand wiederkommen. Ohne diesen Lauf ist jede Frist wirkungslos: sie
+sagt, *wann* ein Auftrag wieder fällig wird, aber nicht, dass ihn jemand
+abholt. Ein gescheiterter Push bliebe bis zum nächsten zufälligen Hinweis
+liegen, in einer stillen Nacht also gar nicht.
+
+Gemessen am 28.08.: `pg_cron` ist auf DEV **und** PROD verfügbar (1.6.4) und war
+auf beiden nicht installiert. Es ist ein Eingriff in die Instanz — der lokale
+Stack ist darin von PROD **nicht** unterscheidbar, dort hat `postgres` andere
+Rechte. Deshalb zuerst DEV, dann PROD, und beides von Hand.
+
+| | |
+| --- | --- |
+| Funktion | `push_wiederholung` (in `ERWARTET_OHNE_MIGRATION`) |
+| cron-Job | `push-wiederholung`, `* * * * *` |
+
+**Warum jede Minute und nicht seltener.** Es sind zwei verschiedene Fristen im
+Spiel, und sie zu verwechseln kostet die Hälfte der Staffelung:
+
+| | wo | Wert |
+| --- | --- | --- |
+| **Rückstellung** nach Fehlschlag | `20260827240000:312` | `now() + 1 min · 2^versuche` → 1, 2, 4, 8, 16 min |
+| **Anspruchsfrist** (Lease) | `20260828100000:110,179` | `now() + 5 min` |
+
+Der Takt muss sich an der **Rückstellung** orientieren, nicht an der
+Anspruchsfrist: pg_cron kann nicht feiner als eine Minute, und die erste
+Wiederholungsstufe ist genau eine Minute. Ein `*/5`-Takt — so stand es hier bis
+zur Code-Review vom 28.08. — verschlucke die ersten beiden Stufen und machte
+aus 1, 2, 4 faktisch 5, 5, 5. Preis des Minutentakts: rund 1440 Aufrufe je Tag
+und Projekt, die ohne Zeile in `push_tokens` sofort `{"skipped":true}`
+antworten.
+
+```sql
+create extension if not exists pg_cron;
+
+create or replace function public.push_wiederholung()
+  returns void language plpgsql security definer set search_path = '' as $$
+begin
+  perform net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'Authorization', 'Bearer <PUSH_WEBHOOK_SECRET>'),  -- nicht in git
+    body    := jsonb_build_object('modus', 'faellig'));
+end; $$;
+revoke execute on function public.push_wiederholung() from public, anon, authenticated;
+
+select cron.schedule('push-wiederholung', '* * * * *',
+                     'select public.push_wiederholung()');
+```
+
+**Der Name `push_wiederholung` ist verbindlich**, aus demselben Grund wie die
+zwei Webhook-Namen: er steht in `ERWARTET_OHNE_MIGRATION`
+(`scripts/db-drift-scan.logic.ts`). Fehlt die Funktion in PROD, bricht der
+Objekt-Drift-Scan ab — und die Liste wirkt in **beide** Richtungen: ein Objekt
+ohne Namen ist „unbekannt", ein Name ohne Objekt ist „fehlt". Beides rot.
+
+> ⚠️ **Nicht verwechseln — hier standen bis zur Code-Review vom 28.08. zwei
+> Gates durcheinander.** Der **Objekt**-Drift-Scan (`db-drift-scan.ts`) läuft an
+> **genau einer** Stelle: `migrate-prod.yml:152`, und dieser Workflow ist
+> `workflow_dispatch` — er läuft nur von Hand, und der Scan erst *nach* dem
+> Anwenden der Migrationen. Das **Migrations**-Drift-Gate in `deploy.yml`
+> (`migration-drift-gate.ts`, Zeile 228) ist etwas anderes: es vergleicht die
+> Migrations*historie* und blockiert tatsächlich den Deploy. Nur dieses zweite
+> fällt beim Merge stumm aus.
+>
+> Für den Objekt-Scan heisst das: ein Merge blockiert nichts, ein roter Scan
+> meldet sich erst beim nächsten Handlauf von `migrate-prod`. Die Reihenfolge
+> **erst in PROD anlegen, dann den Namen mergen** bleibt trotzdem richtig — nur
+> ist ihr Preis ein abgebrochener Migrationslauf, kein stiller Deploy-Ausfall.
+
+Der Scan deckt davon allerdings nur die Hälfte ab. Die Funktion liegt in
+`public`, die Zeitplanung im Schema `cron` — und der Scan fragt ausschliesslich
+`public` ab (`db-drift-scan.ts:61-90`). Eine **abbestellte Zeitplanung fällt
+ihm nicht auf**: `push_wiederholung` stünde weiter da und würde nie gerufen.
+Dafür gibt es `scripts/probe-age641-pg-cron.ts <dev|prod>`.
+
+#### Prüfen — zwei getrennte Belege, keiner genügt allein
+
+`net.http_post` ist **asynchron**. Ein `succeeded` in `cron.job_run_details`
+belegt darum nur, dass das SQL lief, *nicht* dass `send-push` geantwortet hat.
+Die Antwort steht in `net._http_response`.
+
+1. **Der Rumpf** (URL, Bearer, Nutzlast): `select public.push_wiederholung()`,
+   acht Sekunden warten, dann `net._http_response` lesen — aber **nur Zeilen
+   neuer als eine vorher festgehaltene `max(id)`**. Ohne diese Grundlinie
+   beweist eine `200`-Zeile nichts: auf DEV lag schon eine aus der
+   Webhook-Probe desselben Vormittags.
+2. **Der Takt**: warten, bis `cron.job_run_details` für den Job eine Zeile
+   **mehr** trägt als vorher.
+
+Erwartet ist beide Male `200 {"skipped":true}`, und dieser Wortlaut trägt die
+ganze Kette: ohne `modus` antwortete `index.ts` mit **400**, mit falschem
+Bearer mit **401**, bei fehlgeschlagener RPC mit **502**. `skipped` heisst
+also: Auth durch, `faellig`-Zweig gelaufen, `push_auftraege_faellig` leer —
+solange `push_tokens` leer ist, das richtige Ergebnis.
+
+#### Was „der Bearer liegt inline in der Datenbank" wirklich bedeutet
+
+Gilt für **alle drei** Funktionen dieser Sorte — `notify_contact_request_webhook`
+(seit Juni), `notify_push_webhook` und `push_wiederholung`. Gemessen am 28.08.
+auf DEV, weil es nirgends stand:
+
+- **Ein Funktionsrumpf ist nicht geheim.** Als `anon` **und** als
+  `authenticated` liefert `pg_get_functiondef()` den vollen Text samt Bearer.
+  `revoke execute` schützt das Ausführen, nicht das Lesen — das sind zwei
+  verschiedene Rechte, und nur das erste ist entzogen.
+- **Über die Client-Fläche ist das nicht erreichbar.** PostgREST legt nur
+  `public` offen; `pg_get_functiondef` liegt in `pg_catalog` und antwortet mit
+  einem Anon-Schlüssel `404 PGRST202` („not found in the schema cache").
+  Positivkontrolle daneben, sonst belegt die 404 nichts: `POST /rpc/push_wiederholung`
+  mit demselben Schlüssel antwortet **`401 42501 permission denied for
+  function`** — die Funktion ist der Fläche also durchaus bekannt, nur das
+  Ausführen ist entzogen.
+- **Wer den Bearer lesen kann, ist damit genau, wer eine direkte
+  Postgres-Verbindung hat** — und dafür braucht es Zugangsdaten, gegen die
+  dieser Bearer ohnehin keine zusätzliche Hürde wäre. Ein Grund mehr, das
+  DB-Passwort zu rotieren, kein Grund, das Muster zu ändern.
+
 ### Der APNs-Schlüssel: drei Fallen
 
 **1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den
