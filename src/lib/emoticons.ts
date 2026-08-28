@@ -55,8 +55,15 @@ const LINKS = `(^|[\\s([{"'])`;
  *
  *  Woran sie wirklich hängt, zeigt die Gegenprobe: ohne sie wird aus
  *  `<3000 Euro` ein `❤️000 Euro`, und aus `:-)x` ein `🙂x`. Die linke Grenze
- *  fängt diese Fälle NICHT — bei beiden steht links der Textanfang. */
-const RECHTS = `(?=$|[\\s.,!?;)\\]}"'])`;
+ *  fängt diese Fälle NICHT — bei beiden steht links der Textanfang.
+ *
+ *  `.` und `,` zählen nur, wenn KEINE Ziffer folgt. Das ist nachgetragen: die
+ *  erste Fassung liess beide bedingungslos zu und machte damit aus
+ *  `Budget <3.000 Euro` ein `Budget ❤️.000 Euro` — im Deutschen trennt der
+ *  Punkt die Tausender und das Komma die Nachkommastellen, also kam
+ *  ausgerechnet die Zahlenschreibweise durch dieselbe Tür, die `Toll :-).`
+ *  offenhalten sollte. `<3000` war geprüft und geschützt, `<3.000` nicht. */
+const RECHTS = `(?=$|[\\s!?;)\\]}"']|[.,](?![0-9]))`;
 
 const MUSTER = new RegExp(
   LINKS +

@@ -89,6 +89,20 @@ describe("ersetzeEmoticons", () => {
     it("dasselbe mitten im Satz", () => {
       expect(ersetzeEmoticons("Budget <3000 Euro")).toBe("Budget <3000 Euro");
     });
+
+    // Und die Schreibweise, die im Deutschen die ÜBLICHERE ist: der Punkt
+    // trennt die Tausender, das Komma die Nachkommastellen. Beide stehen in der
+    // rechten Grenze, weil „Toll :-)." der häufigste echte Fall ist — womit
+    // ausgerechnet die Zahlenschreibweise durch dieselbe Tür kam, die der Test
+    // darüber schliessen sollte. Gefunden von einem fremden Reviewer, der die
+    // Funktion ausgeführt statt gelesen hat.
+    it("eine Zahl mit Tausenderpunkt", () => {
+      expect(ersetzeEmoticons("Budget <3.000 Euro")).toBe("Budget <3.000 Euro");
+    });
+
+    it("eine Zahl mit Dezimalkomma", () => {
+      expect(ersetzeEmoticons("Budget <3,50 Euro")).toBe("Budget <3,50 Euro");
+    });
   });
 
   describe("ohne Rücksicht auf Schreibweise", () => {
