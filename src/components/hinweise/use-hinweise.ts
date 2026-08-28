@@ -42,7 +42,9 @@ export function useHinweisMarkieren(uid: string | null) {
   const alle = useMutation({ mutationFn: markiereAlleGelesen, onSuccess: invalidieren });
 
   return {
-    markiere: (id: string) => einzeln.mutate(id),
+    // Der ganze Hinweis, nicht seine Kennung: bei einer Nachricht steht der
+    // Eintrag fuer alle ungelesenen Zeilen seines Fadens (AGE-641).
+    markiere: (h: Hinweis) => einzeln.mutate(h),
     markiereAlle: () => alle.mutate(),
   };
 }
