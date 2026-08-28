@@ -53,6 +53,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-28-emoji-und-zeitstempel-im-chat",
+    datum: "2026-08-28",
+    titel: "Emoji-Auswahl und Zeitstempel in der Nachricht",
+    linear: "AGE-645",
+    aenderungen: [
+      '**Emoji-Auswahl in der Sendezeile.** Ein Schalter im Eingabefeld öffnet ein Feld mit rund 1900 Emoji, nach Gruppen sortiert und **auf Deutsch durchsuchbar** — „Herz", „grün", auch „gruen". Vollständig mit der Tastatur bedienbar. Der Datensatz wird erst beim ersten Öffnen geladen und belastet den Seitenaufbau nicht.',
+      "**Jede Nachricht trägt ihre Uhrzeit**, in der Zeitzone des Betrachters. Der volle Zeitpunkt steht im Tooltip.",
+      '**Tagesmarker zwischen den Tagen** — „Heute", „Gestern", sonst Wochentag oder Datum. Der Tag steht einmal über der Gruppe statt an jeder Blase.',
+      "**Getippte Emoticons werden beim Senden zu Emoji**: `:-)` wird 🙂, `<3` wird ❤️. Bewusst nur eine kleine Liste, und mit Wortgrenzen — Adressen, Hausnummern und Beträge wie `<3.000 Euro` bleiben unangetastet.",
+      "Ältere Nachrichten werden **nicht** nachträglich verändert. Die Ersetzung wirkt auf das, was neu geschrieben wird.",
+    ],
+  },
+  {
     slug: "2026-08-28-admin-setzt-stufe",
     datum: "2026-08-28",
     titel: "Ein Admin setzt die Stufe eines einzelnen Mitglieds",

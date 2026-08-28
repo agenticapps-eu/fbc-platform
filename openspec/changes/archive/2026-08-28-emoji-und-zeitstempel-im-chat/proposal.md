@@ -100,5 +100,30 @@ Nasenvarianten, angewandt **nur an Wortgrenzen**, **vor dem Insert**.
   bleibt.
 * **Kein eigener Emoji-Vorrat.** Was das Betriebssystem hat, wird angezeigt; es
   werden keine Bilder ausgeliefert.
-* **Keine Datumsgruppierung** („Heute", „Gestern") über der Blasenfolge. Der
-  Zeitstempel steht an der Blase; Tagestrenner sind eine eigene Entscheidung.
+* ~~**Keine Datumsgruppierung** („Heute", „Gestern") über der Blasenfolge.~~
+  **ÜBERHOLT am 28.08.** Donald hat Tagesmarker wie in gängigen Messengern
+  nachbestellt (mit Bild). Sie sind gebaut — siehe Aufgaben 2a. Die Folge für
+  die Blase steht dort ebenfalls: der Tag steht seither EINMAL im Marker, und
+  die Blase trägt nur noch `HH:MM` statt `TT.MM., HH:MM`.
+
+## What Changes
+
+Nachgetragen beim Archivieren: ohne diesen Abschnitt erzeugt
+`scripts/generate-release-entries.ts` einen Neuigkeiten-Eintrag mit Titel und
+leerem Rumpf. Die Stichpunkte der obersten Ebene sind genau das, was dort
+landet.
+
+* **Emoji-Auswahl in der Sendezeile.** Ein Schalter im Eingabefeld öffnet ein
+  Feld mit rund 1900 Emoji, nach Gruppen sortiert und **auf Deutsch
+  durchsuchbar** — „Herz", „grün", auch „gruen". Vollständig mit der Tastatur
+  bedienbar. Der Datensatz wird erst beim ersten Öffnen geladen und belastet den
+  Seitenaufbau nicht.
+* **Jede Nachricht trägt ihre Uhrzeit**, in der Zeitzone des Betrachters. Der
+  volle Zeitpunkt steht im Tooltip.
+* **Tagesmarker zwischen den Tagen** — „Heute", „Gestern", sonst Wochentag oder
+  Datum. Der Tag steht einmal über der Gruppe statt an jeder Blase.
+* **Getippte Emoticons werden beim Senden zu Emoji**: `:-)` wird 🙂, `<3` wird
+  ❤️. Bewusst nur eine kleine Liste, und mit Wortgrenzen — Adressen,
+  Hausnummern und Beträge wie `<3.000 Euro` bleiben unangetastet.
+* Ältere Nachrichten werden **nicht** nachträglich verändert. Die Ersetzung
+  wirkt auf das, was neu geschrieben wird.
