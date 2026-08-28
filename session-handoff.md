@@ -1,126 +1,157 @@
-# Session Handoff — 2026-08-28 (Abend, AGE-656 und AGE-655 ausgeliefert)
+# Session Handoff — 2026-08-28 (später Abend, fünf kleine Vorgänge)
 
-**Sitzung:** `fbc-platform-f4`, Worktree
-`fbc-platform.donald-age-655-chat-verlauf-paging`, Branch
-`donald/age-655-archiv`. Parallel lief `fbc-platform-b7` an der mobilen Hülle
-(AGE-642); die Arbeitsteilung war **mobil dort, alles andere hier** und hat
-zweimal verhindert, dass wir uns überschreiben.
-
-**Vier PRs gemergt:** #271 (Übergabe), #273 (AGE-656), #274 (AGE-655 Code),
-#275 (AGE-655 Archivierung). Alle `main`-Läufe vollständig grün — inklusive
-`drift-gate: success`, nicht `skipped`.
+**Sitzung:** `fbc-platform-f4`, Worktree `fbc-platform.neuigkeiten-archiv` (der
+Name gehört zu einem längst archivierten Change). Parallel lief
+`fbc-platform-b7` an **AGE-642** (PR #277): **mobil dort, alles andere hier**,
+ohne Berührung mit deren Dateien. **PROD wurde migriert**, von Donald
+ausdrücklich freigegeben.
 
 ## Accomplished
 
-**AGE-656 — Passwort-Mindestlänge (High, klein).** `EinstellungenPage.tsx` prüfte
-`pw.length < 8`, während GoTrue, `config.toml:230`, die `redeem-activation`-Function
-und die Aktivierungsseite alle 10 verlangen. Wer 8–9 Zeichen wählte, kam durch
-die Feldprüfung, wurde vom Server abgelehnt — und sein Passwort blieb unverändert.
-Die Zahl liegt jetzt in `src/config/auth.ts`. **Kein OpenSpec-Change:**
-`access-control/spec.md:864` verlangt das schon; die Spec war wahr, der Code nicht.
+| PR | Vorgang | Stand |
+| --- | --- | --- |
+| #278 | **AGE-657** — Seitenindex auf `messages` | gemergt, auf PROD angewendet und nachgelesen |
+| #279 + #281 | **AGE-659** (neu angelegt) — pgTAP-Dateiliste bewacht | gemergt |
+| #280 | **AGE-600** — Zuschnitt-Vorschauen passen ein | gemergt |
+| #282 | **AGE-599** — Demo-Seed schneidet Titelbilder zu | gemergt, Abnahme offen (siehe unten) |
 
-**AGE-655 — Seitengrenze im Nachrichtenverlauf (Medium, voller Loop).**
-`fetchMessages` lädt eine Seite von 50 vom jüngsten Ende, ein Knopf „Ältere laden"
-holt nach. Die Anforderung steht mit acht Szenarien in
-`openspec/specs/messaging/spec.md`.
+Jeder PR mit zwei fremden Diff-Reviewern — bei dreien davon zu Unrecht, siehe
+„Was schiefging".
 
-**Zwei Funde, die den Change tragen und in keinem Issue standen:**
+**AGE-657 wurde gemessen, nicht begründet** — das Repo trägt ein Gegenbeispiel,
+in dem derselbe Ansatz gefordert und vom Planer nie gewählt wurde
+(`20260826170000_…:69-83`). Also derselbe Aufbau: 20 000 Nachrichten lokal, als
+`authenticated` **mit Claims**, unter voller RLS. Erste Seite vorher Seq Scan +
+Sort, 20 512 Puffer, 66,2 ms → nachher Index Scan **ohne Sort**, 295 Puffer,
+0,96 ms; Cursor-Seite 15 267 → 426 Puffer.
 
-1. `Conversation.tsx` scrollte bei jeder **Längenänderung** ans Ende — Ältere
-   davorzusetzen ändert die Länge genauso wie Anhängen. Jedes „Ältere laden"
-   hätte das Mitglied weggerissen.
-2. `new QueryClient()` (`main.tsx:14`) läuft auf den Vorgaben
-   (`refetchOnWindowFocus: true`, `staleTime: 0`).
-
-**Beide Review-Runden haben den Entwurf umgeworfen.** Plan-Review: opencode
-REQUEST-CHANGES mit zwei HIGH (react-query **ersetzt** beim Auflösen; `erschoepft`
-sprang zurück) — gemini APPROVE auf denselben Artefakten. Diff-Review: codex
-**ABLEHNUNG** mit neun Befunden, opencode drei. Zwei davon kassierten eine
-Korrektur aus Runde eins.
+**AGE-600 wurde im Browser gemessen**, nicht nur im Test: 4:3-Prüfbild auf dem
+lokalen Chat-Testkonto, beide Zustände auf **derselben Seite**. Vorher Feld
+646 × 112 = **5,77:1** mit `object-cover`, davon fielen **77,2 % der Bildhöhe**
+heraus; nachher 646 × 215 = **3,00:1** mit `object-contain`, 0 %. Gegenprobe:
+der Profilkopf malt 568 × 426, die Vorschau 284 × 213 — derselbe Ausschnitt.
 
 ## Decisions
 
-- **Knopf „Ältere laden" statt Nachladen beim Hochscrollen** — Donalds
-  Entscheidung. Kein Scroll-Anker-Gefummel, in jsdom messbar.
-- **Cursor `(created_at, id)`, nicht `offset` und nicht `created_at` allein.**
-  Das Issue schlug `offset` vor; am geladenen Ende kommen laufend Zeilen hinzu.
-  Und `created_at` allein ist keine totale Ordnung: `now()` ist **innerhalb einer
-  Transaktion stabil**, ein Import erzeugt Gleichstände der Bauart nach. Eine
-  Zwischenfassung mit `lte` war zu klein — sie verschob den stillen Verlust nur
-  in einen Stillstand.
-- **`cancelQueries`, nicht `structuralSharing`.** codex' Befund war richtig, das
-  Mittel nicht: React Query wendet `structuralSharing` **auch auf `setQueryData`**
-  an, und eine additive Vereinigung kann keine Entfernung ausdrücken — das
-  Ersetzen der optimistischen Blase und ihre Rücknahme waren damit kaputt.
-- **Sperrklinke ersatzlos entfernt.** Beide Begründungen widerlegt; ihr
-  Fehlerfall heilte nicht, der ohne sie schon.
-- **`src/main.tsx` nicht angefasst.** Die Absicherung liegt im Cache, damit die
-  Produktentscheidung über die Vorgaben unbelastet bleibt (AGE-658, bei b7).
+- **`concurrently` bleibt in der Migration.** Der Einwand aus dem Issue
+  („bricht `migrate-prod`") ist **gemessen falsch**: `db push` (CLI 2.111.0)
+  fasst eine Migration in eine Transaktion, **nur nicht eine mit CONCURRENTLY**
+  (zwei Gegenproben). Preis: diese Datei ist nicht atomar — deshalb steht genau
+  **eine** Anweisung darin.
+- **`messages_thread_id_idx` bleibt vorerst** (jetzt **AGE-660**). Echtes
+  Präfix, also redundant — aber ein `drop` in derselben transaktionslosen Datei
+  könnte halb angewendet stehenbleiben, und bei 23 Zeilen ist nichts zu gewinnen.
+- **Der pgTAP-Wächter bricht an einem Kommentar ab, statt ihn zu überspringen.**
+  Eine zu kurze Liste macht den Vergleich rot, eine zu lange löge grün.
+- **AGE-599 fasst ZWEI Aufrufstellen an**, obwohl das Issue nur eine nennt —
+  nur eine zu reparieren hätte den Befund halb behoben und ganz für erledigt
+  erklärt.
+- **AGE-658 nicht angefasst** (liegt in PR #277 bei b7 und ist dort erledigt);
+  **AGE-640 gehört zu cPARX**, nicht hierher.
+
+## Was schiefging
+
+**#279 wurde gemergt, bevor seine Diff-Review zurück war.** Beide Reviewer
+fanden danach zwei **falsche Datumsangaben** in meinen eigenen Kommentaren
+(`display_name_test.sql` liegt seit dem 26.08. im Repo, nicht 27.08. — die
+mtime war der Checkout; die Warnung in `ci.yml` steht seit dem **05.08.**, nicht
+24.08.). Korrigiert in #281, samt Linear-Titel. Die richtigen Zahlen schärfen
+die Pointe: beide Vorfälle traten *nach* der Warnung ein, nach 18 bzw. 23 Tagen.
+
+**Und bei AGE-600 dieselbe Sorte:** „50 % der **Breite**" war falsch, es ist die
+Höhe — bei einem 3:1-Feld und einem 1,50:1-Bild ist das Feld *breiter* als das
+Bild. Die Zahl stammte aus dem Linear-Issue und war dort schon falsch. **Beide
+Male eine Zahl, die ich abgeschrieben statt gerechnet habe.**
+
+**Und drei der vier Diff-Reviews hätten gar nicht laufen sollen.** Donald hat am
+26.08. entschieden: Fremdreviewer **nur bei Schema, Rechten oder Sicherheit** —
+reines UI und Textarbeit gehen direkt durch (`reviewer-nur-bei-migration-und-rls`).
+AGE-657 war richtig, AGE-600 ist reines UI, AGE-659 und AGE-599 berühren weder
+Schema noch Rechte. Grund für den Fehlgriff: **die Memory stand in keiner Zeile
+des Index** — und der Index war mit 30,4 KB über seiner Lesegrenze von 24,4 KB,
+also wurde sein Ende ohnehin still abgeschnitten. Beides ist behoben (Index auf
+15,7 KB, alle 140 Einträge, die Regel steht jetzt in Zeile 1). TDD,
+Gegenproben und die Browser-Sichtprobe bleiben — die hat er ausdrücklich nicht
+gestrichen.
 
 ## Files modified
 
-- `src/config/auth.ts` — **neu**, `MIN_PASSWORT_LAENGE = 10` (AGE-656)
-- `src/pages/EinstellungenPage.tsx`, `src/pages/ActivationRedeemPage.tsx` — lesen
-  die geteilte Konstante
-- `src/lib/chat.ts` — `VERLAUF_SEITE`, `ChatVerlaufCursor`, `fetchMessages` mit
-  `limit + 1`-Sonde und zusammengesetztem Cursor, `vereinigeNachrichten`,
-  `verlaufErschoepftQueryKey`
-- `src/components/chat/use-gespraech.ts` — vereinigende `queryFn`,
-  `ladeAeltere` mit `cancelQueries` und Ref-Sperre, `hatAeltere` ohne `isSuccess`
-- `src/components/chat/Conversation.tsx` — Knopf, Scroll-Effect an `letzteId`
-- `src/components/chat/ChatFenster.tsx`, `src/pages/ChatPage.tsx` — verdrahtet
-- Tests: `chat.verlauf-seite.test.ts` und `Conversation.aeltere.test.tsx` neu,
-  fünf weitere nachgezogen
-- `openspec/specs/messaging/spec.md` — die gefolgte Anforderung
-- `openspec/changes/archive/2026-08-28-chat-verlauf-paging/`
+- `supabase/migrations/20260828180000_messages_seitenindex.sql` — **neu**, eine
+  Anweisung, Kopf mit Messung, Grenze und Rückweg für den invaliden Index
+- `scripts/pgtap-dateiliste.test.ts` (**neu**) + `.github/workflows/ci.yml`
+- `src/pages/ProfilPage.tsx` + `ProfilPage.cover.test.tsx` (**neu**);
+  `src/components/events/EventCoverPicker.tsx` + `.test.tsx` (**neu**)
+- `supabase/seed/event_cover_zuschnitt.ts` + `.test.ts` (**neu**),
+  `import_world_seed.ts`, `demo_event_covers.ts`
 
 ## Next session: start here
 
-**Nichts an AGE-655 oder AGE-656 nachzuholen.** Beide sind live, Linear korrekt
-auf *Done*, DEV rückstandsfrei (belegt, siehe unten).
+**Alle fünf PRs sind gemergt.** Nachzuholen ist am Code nichts.
 
-**`main` gehört gerade `fbc-platform-b7`.** Die haben zwei ungepushte Commits im
-Worktree `fbc-platform.donald-age-642-capacitor-huelle` (Push-Verdrahtung
-AGE-641 Phase B, App-Symbole) und ändern `src/components/AppShell.tsx`. **Vor
-eigener Arbeit dort abstimmen.**
+**Erste Aktion ist eine Entscheidung, die nur Donald treffen kann** — die
+Abnahme von AGE-599, und sie hat **zwei** Schritte, nicht einen:
 
-**Der naheliegende nächste Schritt ist AGE-657** — Index
-`(thread_id, created_at desc, id desc)` auf `public.messages`. Klein, eine
-Migration, aus AGE-655 entstanden: ohne ihn sortiert Postgres weiterhin alle
-Zeilen des Threads. `create index concurrently` läuft **nicht** in einer
-Transaktion — sonst bricht `migrate-prod`. Danach **AGE-646** (Zitat-Antwort);
-dort steht ein Kommentar von mir, dessen Annahme dieser Change falsch gemacht hat.
+1. **Die acht bestehenden Objekte in `event-covers` auf DEV löschen.** Ein
+   Seed-Lauf allein ersetzt sie nicht: beide Upload-Stellen schicken
+   `x-upsert: false`, und das ist Absicht mit gemessener Begründung
+   (`demo_event_covers.ts:92-96` — in privaten Buckets scheitert ein Upsert an
+   der SELECT-Policy). Ein zweiter Lauf meldet „vorhanden" und lässt das alte
+   Bild liegen; die Pfade ändert der PR nicht.
+2. **Dann den Seed laufen lassen und messen** (3,00:1 ± 0,01 für alle acht,
+   danach `/events` im Browser).
+
+Beides schreibt in eine geteilte Umgebung und wurde deshalb **nicht**
+ausgeführt. Der Zuschnitt selbst ist lokal an den echten Dateien gemessen.
+`x-upsert` wurde bewusst nicht umgestellt — die Einstellung gilt für jeden
+Seed-Upload, nicht nur für Titelbilder.
+
+**PROD und `main` sind sauber:** `migrate-prod` (Lauf `33192980642`) lief mit
+`plan` und `apply` grün, `messages_thread_created_id_idx` steht in PROD mit
+`indisvalid = true`, und der Deploy auf `main` ist danach wieder vollständig
+grün (`drift-gate`, `migrate-dev`, `deploy`, `functions`).
+
+**Diese Sitzung hat selbst eine Spec-Drift erzeugt: AGE-665.**
+`design-system/spec.md` ab Zeile 856 nennt die Zuschnitt-Vorschauen
+„ausdrücklich nicht erfasst" (AGE-600 hat sie nachgezogen) und den Demo-Seed
+„die benannte Ausnahme, nachzuziehen ist der Seed" (AGE-599 tut genau das). Der
+Code verletzt nichts, die Anforderung beschreibt die Welt nur nicht mehr;
+`validate` sieht das nicht. **Nicht von Hand am durable-truth-Text vorbei
+reparieren.**
+
+Danach sind die nächsten kleinen Vorgänge **AGE-664** (die letzte
+Event-Titelbild-Fläche, die noch beschneidet), **AGE-660** und **AGE-618**.
 
 ## Open questions
 
-- **AGE-658 liegt bei b7**, nicht bei mir. Ich hatte ihn angelegt, obwohl b7 ihn
-  angekündigt hatte — Donald hat es gemerkt. Die Entscheidung ist inzwischen
-  gefallen und gebaut (nur nativ zähmen, Web unverändert).
-- **AGE-657 und AGE-646** offen, siehe oben.
-- **Unverändert offen** aus früheren Sitzungen: AGE-610 · AGE-512 ·
-  Aktivierungsversand 69/72 · Rotation des PROD-DB-Passworts · AGE-598 ·
-  AGE-256 · AGE-606 · AGE-628/629/630.
+- **AGE-658 ist erledigt, nicht offen** — gebaut in PR #277 („nur nativ zähmen,
+  Web unverändert"). Steht hier, weil ich beim Sichten das Gegenteil annahm.
+- **Die Event-Vorschau aus AGE-600 wurde nicht im Browser nachgemessen** — sie
+  braucht ein Event mit Titelbild und eine Rolle, die es bearbeiten darf.
+- **AGE-664 kippt eine ausgesprochene Entscheidung** (AGE-596 hat Feed,
+  Vorschauen und Verzeichnis-Karte ausgeschlossen, `REVIEWS.md:82`). Zwei der
+  drei Ausnahmen sind eingeholt; ob die dritte fällt, ist eine Entscheidung.
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
+  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
 ## Was diese Sitzung über das Verfahren gelernt hat
 
-Fünf Fälle, alle derselben Sorte: **eine Prüfung, die grün ist, weil sie am
-falschen Ort sucht.**
+**Drei neue Memories** (`db-push-transaktion-und-concurrently`,
+`linear-team-spannt-mehrere-repos`, plus ein Abschnitt in
+`reviewer-cli-timeouts`), und **der Index selbst war das Problem**: 30,4 KB bei
+24,4 KB Lesegrenze, sein Ende also unsichtbar. Neu geschrieben auf 15,7 KB, alle
+140 Einträge behalten.
 
-1. **Mein Wettlauf-Test war ein Vakuumtest.** `waitFor` war grün, *bevor* die
-   veraltete Antwort schrieb. Erst eine zusätzliche Zeile, auf deren Erscheinen
-   der Test wartet, machte ihn scharf.
-2. **Mein Scroll-Prädikat war 2 px zu eng** und meldete auch im kaputten Fall
-   `false`. Der aussagekräftige Wert war `scrollTop` selbst (0 gegen 3657).
-3. **`cancelQueries` hatte ich als behoben geführt, ohne zu messen.** Donalds
-   Frage „alles behoben?" hat es aufgedeckt; die Reproduktion steht jetzt als
-   Test und wird ohne die Zeile rot.
-4. **Der `or=`-Ausdruck lief nur gegen meine eigene Attrappe** — die kann eine
-   Filtersprache nicht ablehnen. Gegen echtes PostgREST geprüft: HTTP 200 mit
-   genau den zwei erwarteten Zeilen.
-5. **„DEV rückstandsfrei" war falsch.** Zwei `notifications` überlebten, weil der
-   Fremdschlüssel am **Empfänger** hängt und der eine echte Persona war. Meine
-   Gegenprobe auf *verwaiste* Zeilen hätte sie nie gefunden.
+**Eine Zahl aus einem Issue ist keine Messung.** Zweimal übernommen, zweimal
+falsch („50 % der Breite", „rund 6:1") — und beide Male stand die richtige
+Rechnung zwei Absätze weiter im eigenen Text.
 
-Sechs Mutations-Gegenproben insgesamt. Vier neue Memories: Doku-PR-Titel
-schliessen Vorgänge · fremde Vorgänge nicht anfassen · Aufräumen folgt nicht den
-Fremdschlüsseln · `pg_trigger` statt `information_schema`.
+**Die schärfste Review galt einer Gegenprobe, die zu schwach war.** Mein Test
+zum mittigen Zuschnitt prüfte nur das erste Pixel; ein Zuschnitt
+`position: "south"` wäre dort ebenfalls grün gewesen. Er belegte „nicht von
+oben", nicht „mittig". Eine Gegenprobe, die nur EINE der falschen Lagen
+ausschliesst, sieht genauso grün aus wie eine, die alle ausschliesst.
+
+**gemini war zweimal unzuverlässig** (ein HOCH-Befund mit verkehrter
+Ausfallrichtung, in zwei Reviews erfundene Dateipfade); opencode hat in allen
+vier Reviews selbst gemessen, und jeder seiner Befunde hielt der Nachprüfung
+stand. Steht in `reviewer-cli-timeouts`.
