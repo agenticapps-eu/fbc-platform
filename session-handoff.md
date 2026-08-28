@@ -1,29 +1,42 @@
 # Session Handoff — 2026-08-28 (später Abend, fünf kleine Vorgänge)
 
-> ## ⚠ ZUERST LESEN: `main` deployt seit 17:40 nicht mehr
+> ## ⚠ ZUERST LESEN: `main` deployt nicht — und **ein Merge allein reicht nicht**
 >
-> **Nicht meine Arbeit, nicht selbst reparieren.** DEV trägt die Migration
-> **`20260828200000`**, das Repo kennt sie nicht — weder auf `origin/main` noch
-> auf `origin/donald/age-642-capacitor-huelle`. `migrate-dev` fällt, und
-> `drift-gate`, `deploy`, `functions` werden **alle übersprungen**:
-> `Remote migration versions not found in local migrations directory.`
+> **Geklärt, gehört `fbc-platform-b7`, nicht selbst anfassen.** DEV trug ab
+> ~17:30 die Migration **`20260828200000`**, die es auf `main` nicht gab —
+> `migrate-dev` fiel, `drift-gate`/`deploy`/`functions` wurden übersprungen. Sie
+> ist echt (AGE-641, „jede Nachricht löst einen Push aus"), lag nur lokal, und
+> **PR #285** bringt sie nach main.
 >
-> Deploy-Läufe auf `main`: 17:20 `116d3db` (AGE-600) **success** ← letzter
-> grüner · 17:40 `587964a` (AGE-599) failure · 17:48 `aa8eb5e` (Übergabe)
-> failure, beide an derselben Version.
+> **Der Deploy ist damit aber noch nicht wieder grün, und das ist der Punkt:**
+> `drift-gate` misst gegen **PROD**, nicht gegen DEV. Gelesen am 28.08., 23:02:
 >
-> **Praktisch heißt das:** die Frontend-Änderung aus AGE-600 ist um 17:20 **live
-> gegangen**. Ausstehend sind nur AGE-599 (nur Seed-Skripte, für Nutzer
-> unsichtbar) und die Übergabe (nur Doku). Der Rückstand ist klein — rot bleibt
-> der Lauf trotzdem.
+> | | jüngste Versionen |
+> | --- | --- |
+> | DEV | **20260828200000**, 20260828180000, 20260828100000 |
+> | PROD | 20260828180000, 20260828100000, 20260827240000 |
 >
-> **Erste Aktion:** prüfen, ob `20260828200000` inzwischen auf `main` liegt
-> (`git ls-tree origin/main supabase/migrations/`). Wenn ja: `gh run rerun
-> --failed` auf dem jüngsten Deploy. Wenn nein: **nicht** selbst reparieren
-> (`dev-db-ist-geteilt-blockt-jeden-deploy`). `fbc-platform-b7` ist am 28.08.
-> um 17:52 per `SendMessage` informiert — mit Lauf-ID, Version und beiden Wegen
-> (pushen bzw. `migration repair --status reverted`). **PROD ist nicht
-> betroffen.**
+> Nach dem Merge von #285 passt `migrate-dev` wieder — dann liegt
+> `20260828200000` aber auf main und fehlt PROD, und **genau das macht
+> `drift-gate` rot**, mit `deploy`/`functions` erneut übersprungen. Es braucht
+> danach `migrate-prod` und ein `gh run rerun --failed`. Belegt am selben Muster
+> von heute Nachmittag (Lauf `33191485012` für meine `20260828180000`).
+>
+> **`migrate-prod` ist Donalds Freigabe**, je Fall, nicht generell — b7 dispatcht
+> ihn richtigerweise nicht ungefragt, und ich habe es für deren Version auch
+> nicht getan.
+>
+> **Reihenfolge also:** #285 mergen → `migrate-prod` freigeben lassen →
+> `gh run rerun --failed` auf dem jüngsten Deploy.
+>
+> **Was praktisch fehlt, ist wenig:** der letzte grüne Deploy war 17:20
+> (`116d3db`, AGE-600) — die Frontend-Änderung ist **live**. Ausstehend sind nur
+> AGE-599 (reine Seed-Skripte) und die Übergabe.
+>
+> **Warnung von b7 für den lokalen Stack:** er trägt die neue Fassung von
+> `hinweis_neue_nachricht()`, aber `schema_migrations` steht dort weiter auf
+> `20260828180000` — die Datei wurde per psql eingespielt, nicht per `db push`.
+> Ein `db reset` bringt das gerade.
 
 **Sitzung:** `fbc-platform-f4`, Worktree `fbc-platform.neuigkeiten-archiv` (der
 Name gehört zu einem längst archivierten Change). Parallel lief
@@ -108,8 +121,8 @@ ausdrücklich nicht gestrichen.
 
 **Alle fünf PRs sind gemergt.** Nachzuholen ist am Code nichts.
 
-**Erste Aktion steht im Kasten ganz oben** — der Deploy auf `main` ist durch
-eine fremde DEV-Migration blockiert.
+**Erste Aktion steht im Kasten ganz oben** — der Deploy auf `main` hängt, und
+ein Merge von #285 allein reicht nicht.
 
 **Danach eine Entscheidung, die nur Donald treffen kann** — die Abnahme von
 AGE-599, und sie hat **zwei** Schritte, nicht einen:
