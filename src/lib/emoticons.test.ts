@@ -105,6 +105,50 @@ describe("ersetzeEmoticons", () => {
     });
   });
 
+  // `<3` ist der einzige Eintrag, der auch ein Vergleich sein kann. Von links
+  // ist das nicht zu entscheiden: vor `hab dich <3)` und vor `if (x <3)` steht
+  // beide Male Wort-plus-Leerzeichen. Entschieden wird deshalb über die
+  // KOSTEN — eine falsche Ersetzung steht dauerhaft in `messages.body`, eine
+  // ausgebliebene kostet zwei Zeichen, die im Auswahlfeld danebenliegen.
+  // Darum hat `<3` eine engere rechte Grenze als der Rest.
+  describe("beim Herz strenger, weil es auch ein Vergleich sein kann", () => {
+    it("ein Vergleich in Klammern", () => {
+      expect(ersetzeEmoticons("if (x <3) { }")).toBe("if (x <3) { }");
+    });
+
+    it("ein Vergleich mit Semikolon", () => {
+      expect(ersetzeEmoticons("solange x <3;")).toBe("solange x <3;");
+    });
+
+    it("ein Vergleich in eckigen Klammern", () => {
+      expect(ersetzeEmoticons("a[i <3]")).toBe("a[i <3]");
+    });
+
+    // Der bewusst gezahlte Preis: in Klammern wird das Herz NICHT ersetzt.
+    it("das Herz in Klammern bleibt stehen — der Preis dieser Strenge", () => {
+      expect(ersetzeEmoticons("(hab dich <3)")).toBe("(hab dich <3)");
+    });
+
+    // Was weiter funktionieren MUSS — sonst ist die Strenge zu teuer.
+    it("das Herz am Satzende, mit Punkt", () => {
+      expect(ersetzeEmoticons("Hab dich <3.")).toBe("Hab dich ❤️.");
+    });
+
+    it("das Herz mit Komma mitten im Satz", () => {
+      expect(ersetzeEmoticons("Ich mag dich <3, sehr.")).toBe("Ich mag dich ❤️, sehr.");
+    });
+
+    it("das Herz allein und mit Ausrufezeichen", () => {
+      expect(ersetzeEmoticons("<3")).toBe("❤️");
+      expect(ersetzeEmoticons("<3!")).toBe("❤️!");
+    });
+
+    // Die anderen Emoticons behalten die weite Grenze: `:-)` ist kein Operator.
+    it("die Klammergrenze gilt für die übrigen weiter", () => {
+      expect(ersetzeEmoticons("(so ist das :-))")).toBe("(so ist das 🙂)");
+    });
+  });
+
   describe("ohne Rücksicht auf Schreibweise", () => {
     it("kleines p wie grosses", () => {
       expect(ersetzeEmoticons(":p")).toBe(ersetzeEmoticons(":P"));

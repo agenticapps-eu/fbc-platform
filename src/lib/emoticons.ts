@@ -65,18 +65,40 @@ const LINKS = `(^|[\\s([{"'])`;
  *  offenhalten sollte. `<3000` war geprüft und geschützt, `<3.000` nicht. */
 const RECHTS = `(?=$|[\\s!?;)\\]}"']|[.,](?![0-9]))`;
 
+/** Rechts, aber enger — nur für `<3`.
+ *
+ *  `<3` ist der einzige Eintrag der Liste, der auch ein VERGLEICH sein kann.
+ *  Von links ist das nicht zu entscheiden: vor `hab dich <3)` und vor
+ *  `if (x <3)` steht beide Male Wort-plus-Leerzeichen. Die schliessenden
+ *  Zeichen `)`, `]`, `}` und `;` fallen deshalb für `<3` weg.
+ *
+ *  Entschieden wurde das über die KOSTEN, nicht über die Häufigkeit: eine
+ *  falsche Ersetzung steht dauerhaft in `messages.body` und ist nicht
+ *  rücknehmbar — eine ausgebliebene kostet zwei Zeichen, die im Auswahlfeld
+ *  danebenliegen. Der Preis ist ausgesprochen und getestet: `(hab dich <3)`
+ *  bleibt stehen. */
+const RECHTS_HERZ = `(?=$|[\\s!?"']|[.,](?![0-9]))`;
+
+const HERZ = "<3";
+const UEBRIGE = EMOTICONS.filter(([form]) => form !== HERZ);
+
 const MUSTER = new RegExp(
   LINKS +
-    "(" +
+    "(?:(" +
     // Längste zuerst. In dieser Liste gibt es keine Form, die Präfix einer
     // anderen wäre (`:)` steckt nicht in `:-)`), die Sortierung ist also
     // Vorsorge für spätere Einträge, nicht Bedingung für die heutigen.
-    [...EMOTICONS]
+    [...UEBRIGE]
       .sort((a, b) => b[0].length - a[0].length)
       .map(([form]) => escapeRegExp(form))
       .join("|") +
     ")" +
-    RECHTS,
+    RECHTS +
+    "|(" +
+    escapeRegExp(HERZ) +
+    ")" +
+    RECHTS_HERZ +
+    ")",
   // `i`, weil `:p` häufiger getippt wird als `:P`. Ohne das würde die Hälfte
   // der Eingaben umgewandelt und die andere nicht, ohne sichtbare Regel.
   "gi",
@@ -85,8 +107,11 @@ const MUSTER = new RegExp(
 const NACH_FORM = new Map(EMOTICONS.map(([form, emoji]) => [form.toUpperCase(), emoji]));
 
 export function ersetzeEmoticons(text: string): string {
-  return text.replace(MUSTER, (_treffer, davor: string, form: string) => {
-    const emoji = NACH_FORM.get(form.toUpperCase());
-    return emoji ? davor + emoji : _treffer;
+  // Zwei Fanggruppen, weil zwei Zweige: genau einer trifft, der andere ist
+  // `undefined`.
+  return text.replace(MUSTER, (treffer, davor: string, uebrige?: string, herz?: string) => {
+    const form = uebrige ?? herz;
+    const emoji = form ? NACH_FORM.get(form.toUpperCase()) : undefined;
+    return emoji ? davor + emoji : treffer;
   });
 }
