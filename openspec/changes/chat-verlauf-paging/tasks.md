@@ -5,68 +5,76 @@
 
 ## 1. Datenschnittstelle
 
-- [ ] 1.1 **RED**: Zusage in `src/lib/chat.test.ts`, dass `fetchMessages` eine
+- [x] 1.1 **RED**: Zusage in `src/lib/chat.test.ts`, dass `fetchMessages` eine
       Grenze auf die Abfrage setzt und absteigend ordnet — gemessen an der
       Supabase-Attrappe (`limit`/`order`/`lt` werden gerufen), nicht am
       Rückgabewert allein.
-- [ ] 1.2 `VERLAUF_SEITE = 50` neben `THREADS_SEITE` (`chat.ts:236`).
-- [ ] 1.3 `fetchMessages(threadId, { limit, before }?)` →
+- [x] 1.2 `VERLAUF_SEITE = 50` neben `THREADS_SEITE` (`chat.ts:236`).
+- [x] 1.3 `fetchMessages(threadId, { limit, before }?)` →
       `{ messages, erschoepft }`. Abfrage absteigend mit `.limit(limit + 1)`,
       höchstens `limit` zurückgeben, Ergebnis im Client umdrehen.
-- [ ] 1.4 **Gegenprobe zur Sonde**: `limit + 1` gelieferte Zeilen ergeben
+- [x] 1.4 **Gegenprobe zur Sonde**: `limit + 1` gelieferte Zeilen ergeben
       `erschoepft: false` und **genau `limit`** zurückgegebene Nachrichten;
       `limit` gelieferte ergeben `erschoepft: true`. Ohne den zweiten Fall
       belegt der erste nichts.
-- [ ] 1.5 Der Doc-Kommentar über `fetchMessages` sagt, dass vom **jüngsten Ende**
+- [x] 1.5 Der Doc-Kommentar über `fetchMessages` sagt, dass vom **jüngsten Ende**
       geladen wird und warum der Cursor kein `offset` ist (Entscheidung 1).
-- [ ] 1.6 **Vereinigung als eigene Funktion** (`vereinigeNachrichten`), über die
+- [x] 1.6 **Vereinigung als eigene Funktion** (`vereinigeNachrichten`), über die
       `id`, chronologisch sortiert — dieselbe Ordnung wie `mergeMessage`
       (`created_at`, dann `id`). **RED**: zweimal dieselbe Seite vereinigt ergibt
       die Seite, nicht das Doppelte.
 
 ## 2. Der Hook
 
-- [ ] 2.1 **RED**: `use-gespraech.test.tsx` — beim Öffnen wird mit
+- [x] 2.1 **RED**: `use-gespraech.test.tsx` — beim Öffnen wird mit
       `{ limit: VERLAUF_SEITE }` geladen, nicht ohne Argument.
-- [ ] 2.2 Seitenzustand als **eigener Cache-Eintrag**
-      `verlaufSeitenQueryKey(threadId)` → `{ erschoepft, laeuft }`, nicht als
-      Komponentenzustand. **RED**: zwei gleichzeitig montierte `useGespraech` auf
-      denselben Thread (Seite **und** Fenster) zeigen denselben Knopf-Zustand.
-- [ ] 2.3 `useGespraech` gibt `ladeAeltere` und `hatAeltere` mit heraus.
-- [ ] 2.4 **RED**: `ladeAeltere` ruft `fetchMessages` mit `before` = `createdAt`
+- [x] 2.2 Seitenzustand als **eigener Cache-Eintrag**, nicht als
+      Komponentenzustand — damit Vollansicht und Fenster denselben Knopf-Zustand
+      sehen, wenn sie denselben Thread gleichzeitig führen.
+
+      **Abweichung vom Plan, bewusst:** geteilt wird nur `erschoepft`
+      (`verlaufErschoepftQueryKey`, ein blanker `boolean`). `laeuft` blieb im
+      Komponentenzustand — es ist Rückmeldung an den Finger, der gerade geklickt
+      hat, und gehört nicht der anderen Fläche. Die Zusage „keine Duplikate"
+      hängt ohnehin nicht daran, sondern an der Vereinigung über die `id`; die
+      Sperre ist Bedienung, nicht Korrektheit. Ein Eintrag `{erschoepft, laeuft}`
+      hätte ein fremdes Fenster den Knopf sperren lassen, ohne dass dort jemand
+      etwas gedrückt hat.
+- [x] 2.3 `useGespraech` gibt `ladeAeltere` und `hatAeltere` mit heraus.
+- [x] 2.4 **RED**: `ladeAeltere` ruft `fetchMessages` mit `before` = `createdAt`
       der ältesten geladenen Nachricht und schreibt das Ergebnis als Vereinigung
       in **denselben** Eintrag.
-- [ ] 2.5 **RED — Wettlauf (HIGH 1)**: eine Neuabfrage ist unterwegs, das
+- [x] 2.5 **RED — Wettlauf (HIGH 1)**: eine Neuabfrage ist unterwegs, das
       Mitglied lädt währenddessen ältere Nachrichten nach, die alte Antwort
       trifft **danach** ein. Zusage am **Ergebnis**: die nachgeladenen Zeilen
       stehen hinterher noch im Cache. Erst rot messen — mit einer ersetzenden
       `queryFn` muss dieser Test fehlschlagen.
-- [ ] 2.6 **RED — Sperrklinke (HIGH 2)**: nach einer erschöpften Antwort ist
+- [x] 2.6 **RED — Sperrklinke (HIGH 2)**: nach einer erschöpften Antwort ist
       `hatAeltere` falsch, und eine Neuabfrage, die genau so viele Zeilen
       zurückgibt wie angefragt, dreht es **nicht** zurück.
-- [ ] 2.7 **RED — Doppelklick (MEDIUM)**: zwei Aufrufe von `ladeAeltere` kurz
+- [x] 2.7 **RED — Doppelklick (MEDIUM)**: zwei Aufrufe von `ladeAeltere` kurz
       hintereinander erzeugen keine doppelten Zeilen, und der zweite läuft gar
       nicht erst los (`laeuft`).
-- [ ] 2.8 **RED**: ein Wechsel auf einen **anderen** Thread setzt den
+- [x] 2.8 **RED**: ein Wechsel auf einen **anderen** Thread setzt den
       Seitenzustand zurück. Der Eintrag hängt an der `threadId`; ein Reset im
       Effect käme zu spät.
 
 ## 3. Die Anzeige
 
-- [ ] 3.1 **RED**: `Conversation` zeigt den Knopf „Ältere laden" nur, wenn
+- [x] 3.1 **RED**: `Conversation` zeigt den Knopf „Ältere laden" nur, wenn
       `hatAeltere` gilt — und **nicht**, wenn der Verlauf vollständig ist.
-- [ ] 3.2 Knopf am oberen Rand des Verlaufs, in **beiden** Varianten
+- [x] 3.2 Knopf am oberen Rand des Verlaufs, in **beiden** Varianten
       (`seite` und `fenster`).
-- [ ] 3.3 **RED — der Kern**: `scrollIntoView` wird beim **Vorsetzen** älterer
+- [x] 3.3 **RED — der Kern**: `scrollIntoView` wird beim **Vorsetzen** älterer
       Nachrichten NICHT gerufen, beim **Anhängen** einer neuen schon. Erst rot
       messen (heute hängt der Effect an `messages.length` und feuert bei beidem).
-- [ ] 3.4 Abhängigkeit des Scroll-Effects von `messages.length` auf
+- [x] 3.4 Abhängigkeit des Scroll-Effects von `messages.length` auf
       `messages.at(-1)?.id` umstellen (`Conversation.tsx:112`).
-- [ ] 3.5 Den Kommentar `Conversation.tsx:69` korrigieren — er behauptet, der
+- [x] 3.5 Den Kommentar `Conversation.tsx:69` korrigieren — er behauptet, der
       Verlauf werde ohne Begrenzung geholt. Das ist ab hier falsch.
-- [ ] 3.6 **RED**: nach dem Vorsetzen älterer Nachrichten desselben Kalendertages
+- [x] 3.6 **RED**: nach dem Vorsetzen älterer Nachrichten desselben Kalendertages
       steht der Tagesmarker über der neuen ältesten Zeile dieses Tages.
-- [ ] 3.7 Der Knopf ist gesperrt, solange `laeuft` gilt, und sagt das auch
+- [x] 3.7 Der Knopf ist gesperrt, solange `laeuft` gilt, und sagt das auch
       (kein stiller toter Knopf).
 
 ## 4. Sichtprobe im Browser
