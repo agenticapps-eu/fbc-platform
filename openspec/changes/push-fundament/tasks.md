@@ -451,12 +451,38 @@ Phase B beginnt erst danach.
       Reihenfolge ist die eigentliche Zusage: **vor** `auth.signOut()`, weil
       danach kein Konto mehr da ist, dem die Zeile gehört, und das `delete`
       null Zeilen träfe, ohne einen Fehler zu melden.
-- [ ] Zustellung auf **echtem** Android- und **echtem** iOS-Gerät gemessen, im
-      Vordergrund, Hintergrund und bei geschlossener App.
-- [ ] **Sichtprobe am Sperrbildschirm**: „… hat dir geschrieben", kein Text.
-      Bildschirmfoto als Beleg — die Zusage ist sonst unbelegt.
+- [x] Zustellung auf **echtem iOS-Gerät** gemessen, bei gesperrtem Telefon
+      (28.08., mit Grundlinie davor): `push_tokens` 0 → 1 nach dem Dialog,
+      `ios`, **64 Zeichen** = APNs-Länge · dann `notifications` +1 ·
+      `net._http_response` #372 `200` · Antwort `{"zugestellt":2,…}`.
+
+      Damit sind **beide** Hälften der App-ID-Frage beantwortet: APNs gab ein
+      Token aus **und** nahm die Zustellung an — `com.effbeezee.app` stimmt.
+- [ ] Dasselbe auf **echtem Android-Gerät**, und auf iOS zusätzlich im
+      Vordergrund und im Hintergrund. Offen: gemessen ist der Fall, der zählt
+      (gesperrt), nicht die anderen drei.
+- [x] **Sichtprobe am Sperrbildschirm**: „… hat dir geschrieben", kein Text —
+      von Donald am 28.08. gesehen und aufgenommen.
 - [ ] Opt-out je Typ am Gerät nachgewiesen.
 - [ ] Ungültiges Token wird nach Ablehnung entfernt.
+- [ ] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
+      deinstallierten App. APNs meldet es noch eine Weile als gültig, also
+      kommt kein `dauerhaft` — von selbst verschwindet es **nie**.
+
+### B-Anzeige · Die Glocke fasst je Gespräch zusammen ✅
+
+- [x] `fetchHinweise` dampft `message`-Zeilen je `thread_id` auf die neueste
+      ein; `markiereHinweisGelesen` markiert daraufhin **alle** ungelesenen
+      Zeilen des Fadens. Ohne das zweite taucht der Eintrag sofort wieder auf.
+- [x] **Zwei Abfragen, nicht eine** — die Grenze greift VOR dem Eindampfen. Ein
+      Faden mit fünfzig ungelesenen Nachrichten hätte sonst eine Kontaktanfrage
+      von gestern aus der Liste gedrängt. Übrige Typen bis 50, Nachrichten bis
+      200. `or("type.neq.message,type.is.null")`, weil die Spalte nullable ist
+      und `null <> 'message'` in SQL nicht wahr ist.
+- [x] Gemessen: RED 6/11, dann 11/11 in der Datenschicht, 33/33 mit der Glocke,
+      2247 Tests in 202 Dateien grün. PR #286 gegen `main`.
+- [ ] **Eine Anzahl am Eintrag** („3 neue Nachrichten von Anna"). Braucht ein
+      Feld am Hinweis und berührt `hinweisText` — eigener Vorgang.
 
 ## Offen, gehört Donald und Detlev
 

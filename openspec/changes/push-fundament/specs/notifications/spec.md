@@ -79,6 +79,51 @@ in einer Besprechung offen herum.
 - **WHEN** eine Nachricht an ein Konto geht, das nicht aktiviert ist
 - **THEN** es wird kein Hinweis geschrieben
 
+### Requirement: Jede Nachricht erhebt ihren eigenen Hinweis, die Glocke fasst zusammen
+
+Das System SHALL für **jede** Chat-Nachricht einen eigenen Hinweis schreiben,
+auch dann, wenn für dasselbe Gespräch bereits ein ungelesener Hinweis liegt.
+
+Diese Anforderung nennt ausdrücklich, an welcher Stelle NICHT zusammengefasst
+werden darf: am Ereignis hängt der Push. Unterbleibt die Zeile, unterbleibt die
+Zustellung — und zwar nicht für die zweite Nachricht, sondern für **jede
+weitere**, solange irgendein ungelesener Hinweis des Fadens liegen bleibt. Ein
+Gespräch wäre dann dauerhaft stumm.
+
+Die Zusammenfassung je Gespräch SHALL stattdessen in der **Anzeige** liegen: die
+Glocke SHALL die ungelesenen Nachrichten-Hinweise eines Gesprächs zu einem
+Eintrag zusammenfassen und den jüngsten davon zeigen.
+
+Wird ein solcher Eintrag als gelesen markiert, SHALL das **alle** ungelesenen
+Nachrichten-Hinweise desselben Gesprächs markieren. Andernfalls erschiene der
+Eintrag sofort wieder, mit der nächstälteren Zeile.
+
+Die Mengenbegrenzung der Glocke SHALL NOT dazu führen, dass ein einzelnes
+vielbeschriebenes Gespräch Hinweise anderer Typen aus der Liste verdrängt.
+
+#### Scenario: Die zweite Nachricht erzeugt eine zweite Zeile
+
+- **WHEN** eine Nachricht eingeht, während für dasselbe Gespräch ein ungelesener
+  Hinweis liegt
+- **THEN** wird ein weiterer Hinweis geschrieben, und der Push wird angestoßen
+
+#### Scenario: Die Glocke zeigt ein Gespräch einmal
+
+- **WHEN** ein Gespräch mehrere ungelesene Nachrichten-Hinweise trägt
+- **THEN** zeigt die Glocke dafür genau einen Eintrag, und zwar den jüngsten
+
+#### Scenario: Gelesen heißt das ganze Gespräch
+
+- **WHEN** ein Mitglied den zusammengefassten Eintrag als gelesen markiert
+- **THEN** gilt kein Nachrichten-Hinweis dieses Gesprächs mehr als ungelesen
+
+#### Scenario: Ein lautes Gespräch verdrängt keine Kontaktanfrage
+
+- **WHEN** ein Gespräch mehr ungelesene Nachrichten-Hinweise trägt, als die
+  Glocke insgesamt zeigt, und daneben ein älterer Hinweis eines anderen Typs
+  ungelesen ist
+- **THEN** erscheint dieser andere Hinweis weiterhin in der Glocke
+
 ### Requirement: Ein Hinweis zu einer Kontaktanfrage trägt deren Freitext nicht
 
 Eine Kontaktanfrage führt eine **von einem Mitglied geschriebene Nachricht** mit
