@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import type { ChatThread } from "../../lib/chat";
 import { Button } from "../ui/Button";
 import { ThreadList } from "./ThreadList";
 import { useThreadsSeite } from "./use-threads-seite";
@@ -31,7 +32,12 @@ export function ChatPanel({
 }: {
   uid: string | null;
   activeId: string | null;
-  onSelect: (threadId: string) => void;
+  /** Bekommt den THREAD, nicht nur seine Kennung (AGE-639). Ein angedocktes
+   *  Chatfenster braucht Namen und Bild für seine Titelzeile, und die stehen
+   *  hier bereits in der Hand — sie später nachzuschlagen hiesse, für einen
+   *  Datensatz erneut abzufragen, den dieser Klick gerade in der Liste hatte.
+   *  `ThreadList` bleibt unangetastet und meldet weiter nur die Kennung. */
+  onSelect: (thread: ChatThread) => void;
   ungelesenJeThread: Map<string, number>;
 }) {
   const seite = useThreadsSeite(uid);
@@ -69,7 +75,12 @@ export function ChatPanel({
       <ThreadList
         threads={threads}
         activeId={activeId}
-        onSelect={onSelect}
+        // Die Kennung wird hier zum Thread aufgelöst — an der einen Stelle, die
+        // die Liste ohnehin in der Hand hält.
+        onSelect={(id) => {
+          const thread = threads.find((t) => t.id === id);
+          if (thread) onSelect(thread);
+        }}
         ungelesenJeThread={ungelesenJeThread}
       />
       {/* Ohne diesen Knopf wäre alles jenseits der ersten Seite dauerhaft

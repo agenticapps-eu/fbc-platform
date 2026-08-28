@@ -1441,6 +1441,34 @@ export type Database = {
           },
         ];
       };
+      release_entry_skips: {
+        // `skipped_by` und `skipped_at` stehen NUR in Row: beide füllt die
+        // Datenbank (`default auth.uid()` bzw. `default now()`), und die
+        // Insert-Policy verlangt `skipped_by = auth.uid()`. Ein Client, der sie
+        // mitschickt, wird abgewiesen — der Typ sagt es ihm vorher.
+        //
+        // Kein `Update`: die Tabelle trägt kein UPDATE-Recht. Zurückgenommen
+        // wird per DELETE, und das ist dieselbe Zeile, weil `slug` der
+        // Primärschlüssel ist.
+        Row: {
+          skipped_at: string;
+          skipped_by: string | null;
+          slug: string;
+        };
+        Insert: {
+          slug: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [
+          {
+            foreignKeyName: "release_entry_skips_skipped_by_fkey";
+            columns: ["skipped_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       release_notes: {
         // `status` steht bewusst in Insert UND Update — der Client DARF ihn
         // schreiben, aber nur als 'draft'; das hält die Policy
@@ -1739,6 +1767,13 @@ export type Database = {
       admin_update_profile: {
         Args: { target: string; patch: Json };
         Returns: undefined;
+      };
+      // Stufe eines Mitglieds setzen (AGE-634), aus
+      // 20260827160000_admin_set_tier.sql. Von Hand gepflegt wie der Rest
+      // dieses Blocks — `supabase gen types` NICHT darueberlaufen lassen.
+      admin_set_tier: {
+        Args: { p_profile_id: string; p_tier: string; p_grund: string };
+        Returns: string;
       };
       admin_get_profile: { Args: { target: string }; Returns: Json };
       admin_find_profile: { Args: { needle: string }; Returns: Json };

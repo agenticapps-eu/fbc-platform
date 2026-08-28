@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -29,12 +29,19 @@ if (!Element.prototype.scrollIntoView) {
 type Seite = import("../lib/chat").ChatThreadSeite;
 const fetchThreads = vi.fn<(uid: string, opts?: { offset?: number }) => Promise<Seite>>();
 
+/** Der Ungelesen-Zähler der Attrappe. Veränderlich, weil eine der Zusagen aus
+ *  AGE-638 nur mit einer Zahl > 0 überhaupt messbar ist: erst dann trägt die
+ *  Sprechblase einen eigenen Namen, an dem sich zeigt, ob sie noch ein Knopf
+ *  ist. `vi.hoisted`, weil `vi.mock` nach oben gezogen wird und eine normale
+ *  Konstante dort nicht sähe. */
+const { ungelesen } = vi.hoisted(() => ({ ungelesen: { gesamt: 0 } }));
+
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),
   fetchThreads: (uid: string, opts?: { offset?: number }) => fetchThreads(uid, opts),
   fetchMessages: async () => [],
   fetchUnreadCounts: async () => ({
-    gesamt: 0,
+    gesamt: ungelesen.gesamt,
     jeThread: new Map<string, number>(),
     hatUngelesen: () => false,
   }),
@@ -94,6 +101,14 @@ function wechsleAuf(px: number) {
   zuhoerer.forEach((cb) => cb());
 }
 
+/** Zeigt die aktuelle Adresse an. Ohne sie liesse sich die Kernzusage von
+ *  AGE-639 — „der Klick navigiert NICHT mehr" — gar nicht messen. */
+function Adresse() {
+  const { pathname } = useLocation();
+  return <div data-adresse={pathname} />;
+}
+const adresse = () => document.querySelector("[data-adresse]")!.getAttribute("data-adresse");
+
 function renderApp(pfad = "/aktivitaet", value: AuthContextValue = MITGLIED) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -101,6 +116,7 @@ function renderApp(pfad = "/aktivitaet", value: AuthContextValue = MITGLIED) {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <MemoryRouter initialEntries={[pfad]}>
+            <Adresse />
             <App />
           </MemoryRouter>
         </ToastProvider>
@@ -115,6 +131,7 @@ const oeffner = () => screen.queryByRole("button", { name: "Nachrichten-Leiste �
 
 beforeEach(() => {
   setzeBreit(1440);
+  ungelesen.gesamt = 0;
   fetchThreads.mockReset();
   fetchThreads.mockResolvedValue({ threads: [], nextOffset: null });
   localStorage.clear();
@@ -188,6 +205,101 @@ describe("Die Nachrichten-Leiste steht in der Hülle (AGE-627)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Navigation einklappen" }));
     expect(localStorage.getItem("fbc.sidebarCollapsed")).toBe("1");
     expect(localStorage.getItem("fbc.chatCollapsed")).toBe("0");
+  });
+});
+
+describe("Ein Pill für beide Leisten (AGE-638)", () => {
+  /** Der Pill einer Leiste, egal in welchem Zustand. Über den Namen gesucht,
+   *  weil der die HANDLUNG benennt — genau das, was ein Schalter ansagen muss. */
+  const pill = (leiste: "Navigation" | "Nachrichten") =>
+    screen.queryByRole("button", { name: new RegExp(`^${leiste} (ein|aus)klappen$`) });
+
+  it("trägt an beiden Leisten einen Schalter, der die Handlung benennt", () => {
+    renderApp();
+    // Links offen, rechts eingeklappt — die beiden Startzustände.
+    expect(pill("Navigation")).toHaveAccessibleName("Navigation einklappen");
+    expect(pill("Nachrichten")).toHaveAccessibleName("Nachrichten ausklappen");
+  });
+
+  it("sagt den Zustand über aria-expanded an, nicht nur über den Text", () => {
+    renderApp();
+    expect(pill("Navigation")).toHaveAttribute("aria-expanded", "true");
+    expect(pill("Nachrichten")).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(pill("Navigation")!);
+    expect(pill("Navigation")).toHaveAttribute("aria-expanded", "false");
+    expect(pill("Navigation")).toHaveAccessibleName("Navigation ausklappen");
+  });
+
+  it("zeigt in allen VIER Fällen in die Richtung, in die es geht", () => {
+    // Seite × Zustand. Ein Test nur auf den Namen sähe einen umgedrehten Pfeil
+    // nie — und „gespiegelt" ist genau die Eigenschaft, die hier leicht kippt.
+    renderApp();
+    expect(pill("Navigation")).toHaveAttribute("data-richtung", "links");
+    expect(pill("Nachrichten")).toHaveAttribute("data-richtung", "links");
+
+    fireEvent.click(pill("Navigation")!);
+    fireEvent.click(pill("Nachrichten")!);
+
+    expect(pill("Navigation")).toHaveAttribute("data-richtung", "rechts");
+    expect(pill("Nachrichten")).toHaveAttribute("data-richtung", "rechts");
+  });
+
+  it("steht an beiden Leisten, links und rechts", () => {
+    // Was dieser Test misst und was NICHT: dass an beiden Leisten ein Pill
+    // steht — nicht, dass es dasselbe Bauteil ist. Ein Markierungsattribut
+    // liesse sich auch von zwei getrennt gebauten Knöpfen setzen (Fremd-Review
+    // auf dem Diff, codex, LOW). Die Wiederverwendung hält der Quelltext, nicht
+    // diese Zusage.
+    //
+    // Er ist trotzdem nicht wertlos: gegen die alten Schalter war er ROT, und
+    // ein Test auf die NAMEN wäre grün gewesen — die hiessen ja schon so.
+    renderApp();
+    const pills = document.querySelectorAll("[data-leisten-pill]");
+    expect(pills).toHaveLength(2);
+    expect([...pills].map((p) => p.getAttribute("data-leisten-pill")).sort()).toEqual([
+      "links",
+      "rechts",
+    ]);
+  });
+
+  it("hat links KEINE untere Einklapp-Zeile mehr — und den Feedback-Zugang schon", () => {
+    renderApp();
+    // Der Pill trägt nur ein Zeichen. Das WORT „Einklappen" stand allein in der
+    // unteren Zeile; verschwindet es, ist sie weg. Ein Test auf den
+    // zugänglichen Namen träfe hier nicht, weil der Pill denselben führt.
+    expect(screen.queryByText("Einklappen")).not.toBeInTheDocument();
+    // Positivkontrolle zur Verneinung: ohne sie wäre der Test auch grün, wenn
+    // die ganze Leiste fehlte.
+    expect(screen.getByRole("button", { name: /Feedback/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Navigation einklappen" })).toHaveLength(1);
+  });
+
+  it("hat rechts aufgeklappt KEINEN eigenen Knopf im Kopf mehr", () => {
+    renderApp();
+    fireEvent.click(pill("Nachrichten")!);
+    // Genau einer, und er steckt im Pill — nicht im Kopf der Leiste.
+    const knoepfe = screen.getAllByRole("button", { name: "Nachrichten einklappen" });
+    expect(knoepfe).toHaveLength(1);
+    expect(knoepfe[0]).toHaveAttribute("data-leisten-pill", "rechts");
+  });
+
+  it("macht aus der Sprechblase im Rail eine Anzeige, keinen zweiten Schalter", async () => {
+    // Erst mit einer Zahl > 0 trägt die Sprechblase einen eigenen Namen. Mit 0
+    // hiesse sie schlicht „Nachrichten ausklappen" wie der Pill, und der Test
+    // könnte die beiden gar nicht auseinanderhalten.
+    ungelesen.gesamt = 3;
+    renderApp();
+
+    // Auf den SATZ geprüft, nicht auf die Ziffer: die „3" steht auch am
+    // Glocken-Zähler in der Topbar, und `findByText("3")` träfe beide.
+    expect(await screen.findByText("3 ungelesene Nachrichten")).toBeInTheDocument();
+    // Die Zahl steht da — aber nicht mehr auf einem Knopf.
+    expect(screen.queryByRole("button", { name: /ungelesen/ })).not.toBeInTheDocument();
+    // Und der EINZIGE Weg zum Ausklappen ist der Pill.
+    const wege = screen.getAllByRole("button", { name: /^Nachrichten ausklappen/ });
+    expect(wege).toHaveLength(1);
+    expect(wege[0]).toHaveAttribute("data-leisten-pill", "rechts");
   });
 });
 
@@ -288,5 +400,207 @@ describe("Unter xl: die Schublade von rechts (AGE-627)", () => {
     const dialog = screen.getByRole("dialog", { name: "Nachrichten" });
     fireEvent.click(dialog.firstElementChild!);
     expect(screen.queryByRole("dialog", { name: "Nachrichten" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Angedockte Chatfenster (AGE-639)", () => {
+  const ANNA = {
+    id: "t1",
+    partner: { id: "p1", name: "Anna Becker", avatarUrl: null, company: null, tier: null },
+    lastMessage: null,
+    lastActivityAt: "2026-08-01T09:00:00Z",
+  };
+  const CHRIS = { ...ANNA, id: "t2", partner: { ...ANNA.partner, id: "p2", name: "Chris Mai" } };
+  const DORO = { ...ANNA, id: "t3", partner: { ...ANNA.partner, id: "p3", name: "Doro Klein" } };
+  const EVA = { ...ANNA, id: "t4", partner: { ...ANNA.partner, id: "p4", name: "Eva Lang" } };
+
+  const fenster = () => document.querySelectorAll("[data-chatfenster]");
+  const fensterFuer = (name: string) =>
+    screen.queryByRole("region", { name: `Gespräch mit ${name}` });
+
+  /** Wählt ein Gespräch in der aufgeklappten Leiste. */
+  async function waehle(name: string) {
+    fireEvent.click(await screen.findByRole("button", { name }));
+  }
+
+  beforeEach(() => {
+    fetchThreads.mockResolvedValue({ threads: [ANNA, CHRIS, DORO, EVA], nextOffset: null });
+    // Aufgeklappt starten — sonst montiert die Hülle die Liste gar nicht.
+    localStorage.setItem("fbc.chatCollapsed", "0");
+  });
+
+  it("öffnet ein Fenster, statt wegzunavigieren — die Adresse bleibt stehen", async () => {
+    // DIE Zusage dieses Changes. Vorher rief `chatOeffnen` unbedingt
+    // `navigate('/chat/:id')`; der Klick verliess die Seite.
+    renderApp("/mitglieder");
+    expect(adresse()).toBe("/mitglieder");
+
+    await waehle("Anna Becker");
+
+    expect(adresse()).toBe("/mitglieder");
+    expect(fensterFuer("Anna Becker")).toBeInTheDocument();
+  });
+
+  it("hängt die Reihe per PORTAL an den body, nicht in den Baum der Hülle", async () => {
+    // Ein Vorfahre mit `transform` oder `backdrop-filter` wird zum Containing
+    // Block für `position: fixed` — in diesem Repo schon zweimal passiert.
+    const { container } = renderApp("/mitglieder");
+    await waehle("Anna Becker");
+
+    const reihe = document.querySelector("[data-chatfenster-reihe]")!;
+    expect(reihe).toBeInTheDocument();
+    expect(container.contains(reihe)).toBe(false);
+    expect(reihe.parentElement).toBe(document.body);
+  });
+
+  it("öffnet für dasselbe Gespräch kein zweites Fenster", async () => {
+    renderApp("/mitglieder");
+    await waehle("Anna Becker");
+    await waehle("Anna Becker");
+
+    expect(fenster()).toHaveLength(1);
+  });
+
+  it("hält höchstens drei und räumt beim vierten das am längsten unberührte", async () => {
+    renderApp("/mitglieder");
+    await waehle("Anna Becker");
+    await waehle("Chris Mai");
+    await waehle("Doro Klein");
+    expect(fenster()).toHaveLength(3);
+
+    await waehle("Eva Lang");
+
+    expect(fenster()).toHaveLength(3);
+    expect(fensterFuer("Anna Becker")).not.toBeInTheDocument();
+    expect(fensterFuer("Eva Lang")).toBeInTheDocument();
+  });
+
+  it("nimmt die Fenster über den Seitenwechsel mit", async () => {
+    renderApp("/aktivitaet");
+    await waehle("Anna Becker");
+
+    // Über einen echten Link im Rahmen, nicht über einen erfundenen Aufruf.
+    fireEvent.click(screen.getAllByRole("link", { name: "Mitglieder" })[0]);
+
+    await waitFor(() => expect(adresse()).toBe("/mitglieder"));
+    expect(fensterFuer("Anna Becker")).toBeInTheDocument();
+  });
+
+  it("blendet sie auf den Chatrouten aus — dort ist das Gespräch schon die Seite", async () => {
+    renderApp("/mitglieder");
+    await waehle("Anna Becker");
+    expect(fenster()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("link", { name: /Nachrichten/ }));
+
+    await waitFor(() => expect(adresse()).toBe("/chat"));
+    expect(fenster()).toHaveLength(0);
+  });
+
+  it("merkt sich die Fenster JE KONTO", async () => {
+    renderApp("/mitglieder");
+    await waehle("Anna Becker");
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("fbc.chatFenster.test-user")!)).toEqual([
+        { id: "t1", min: false, name: "Anna Becker", avatar: null },
+      ]),
+    );
+    // Und NICHT unter einem gemeinsamen Schlüssel, den ein zweites Konto erbte.
+    expect(localStorage.getItem("fbc.chatFenster")).toBeNull();
+  });
+
+  it("gibt den Toasts die Höhe der Reihe bekannt — und nimmt sie zurück", async () => {
+    const hoehe = () => document.documentElement.style.getPropertyValue("--fbc-fenster-h");
+    renderApp("/mitglieder");
+    // Ohne Fenster ist die Reihe 0 hoch. Ohne diese Zusage schwebten die Toasts
+    // auf jeder Seite ohne Fenster grundlos in der Luft.
+    expect(hoehe()).toBe("0rem");
+
+    await waehle("Anna Becker");
+    expect(hoehe()).toBe("26rem");
+
+    fireEvent.click(screen.getByRole("button", { name: "Gespräch mit Anna Becker minimieren" }));
+    expect(hoehe()).toBe("2.75rem");
+
+    // Auf der Chatroute steht die Reihe nicht — der Ausgleich muss mit weg.
+    fireEvent.click(screen.getByRole("link", { name: /Nachrichten/ }));
+    await waitFor(() => expect(hoehe()).toBe("0rem"));
+  });
+});
+
+describe("Unter xl bleibt es beim Weg über die Adresse (AGE-639)", () => {
+  it("navigiert aus der Schublade heraus wie bisher", async () => {
+    // Unterhalb von `xl` steht die Leiste nicht angedockt, sondern als modale
+    // Schublade. Ein Fenster, das daraus aufgeht, während sie sich schliesst,
+    // wäre ein zweiter Bewegungsablauf für dasselbe Ziel.
+    setzeBreit(390);
+    fetchThreads.mockResolvedValue({
+      threads: [
+        {
+          id: "t1",
+          partner: { id: "p1", name: "Anna Becker", avatarUrl: null, company: null, tier: null },
+          lastMessage: null,
+          lastActivityAt: "2026-08-01T09:00:00Z",
+        },
+      ],
+      nextOffset: null,
+    });
+    renderApp("/mitglieder");
+    fireEvent.click(oeffner()!);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
+
+    await waitFor(() => expect(adresse()).toBe("/chat/t1"));
+    expect(document.querySelectorAll("[data-chatfenster]")).toHaveLength(0);
+  });
+});
+
+describe("Fokus beim Schliessen eines Fensters (AGE-639)", () => {
+  const ANNA = {
+    id: "t1",
+    partner: { id: "p1", name: "Anna Becker", avatarUrl: null, company: null, tier: null },
+    lastMessage: null,
+    lastActivityAt: "2026-08-01T09:00:00Z",
+  };
+  const CHRIS = { ...ANNA, id: "t2", partner: { ...ANNA.partner, id: "p2", name: "Chris Mai" } };
+
+  beforeEach(() => {
+    fetchThreads.mockResolvedValue({ threads: [ANNA, CHRIS], nextOffset: null });
+    localStorage.setItem("fbc.chatCollapsed", "0");
+  });
+
+  /** Wie ein Tastaturnutzer: erst fokussieren, dann auslösen. jsdom verschiebt
+   *  den Fokus beim Klick NICHT von selbst — ein Test, der das nicht nachstellt,
+   *  misst hier gar nichts. */
+  function loeseAus(el: HTMLElement) {
+    el.focus();
+    fireEvent.click(el);
+  }
+
+  it("gibt den Fokus an das verbliebene Fenster weiter, nicht an den body", async () => {
+    renderApp("/mitglieder");
+    fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Chris Mai" }));
+
+    loeseAus(screen.getByRole("button", { name: "Gespräch mit Chris Mai schliessen" }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAccessibleName("Gespräch mit Anna Becker minimieren"),
+    );
+  });
+
+  it("gibt ihn an den Pill der Leiste, wenn das letzte Fenster schliesst", async () => {
+    renderApp("/mitglieder");
+    fireEvent.click(await screen.findByRole("button", { name: "Anna Becker" }));
+
+    loeseAus(screen.getByRole("button", { name: "Gespräch mit Anna Becker schliessen" }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-leisten-pill", "rechts"),
+    );
+    // Positivkontrolle zur Verneinung: ohne sie wäre der Test auch grün, wenn
+    // der Fokus einfach nirgends gelandet wäre.
+    expect(document.activeElement).not.toBe(document.body);
   });
 });

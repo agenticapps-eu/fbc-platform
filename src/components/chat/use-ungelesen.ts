@@ -3,9 +3,12 @@ import { useEffect, useRef } from "react";
 
 import {
   fetchUnreadCounts,
+  mergeMessage,
+  messagesQueryKey,
   subscribeToAllMessages,
   threadsQueryKey,
   unreadQueryKey,
+  type ChatMessage,
   type UngelesenStand,
 } from "../../lib/chat";
 
@@ -61,7 +64,20 @@ const ENTPRELLUNG_MS = 400;
  * Nachricht dorthin, überspringt dieses Abo die Neuabfrage — `ChatPage` fragt
  * ohnehin neu ab, und zwar NACH seinem Schreibvorgang.
  */
-export function useUngelesenLive(uid: string | null, offenerPfad: string): void {
+export function useUngelesenLive(
+  uid: string | null,
+  offenerPfad: string,
+  /**
+   * Threads, die dem Mitglied gerade in einem AUFGEZOGENEN Chatfenster
+   * gegenüberliegen (AGE-639). Dieselbe Rolle wie `offenerPfad`, nur für die
+   * zweite Art, ein Gespräch vor sich zu haben.
+   *
+   * **Erforderlich, nicht optional.** Ein Vorgabewert hätte den einen Aufrufer
+   * stillschweigend beim alten Verhalten gelassen — und genau solche
+   * Vorgabewerte entfernt später niemand mehr.
+   */
+  sichtbareThreads: ReadonlySet<string>,
+): void {
   const queryClient = useQueryClient();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Über eine Ref, nicht über die Abhängigkeitsliste: sonst würde jeder
@@ -75,10 +91,56 @@ export function useUngelesenLive(uid: string | null, offenerPfad: string): void 
     pfad.current = offenerPfad;
   }, [offenerPfad]);
 
+  // Aus demselben Grund über eine Ref wie der Pfad: die Menge ändert sich mit
+  // jedem geöffneten Fenster, und stünde sie in der Abhängigkeitsliste, baute
+  // jedes Öffnen den Kanal ab und neu auf.
+  const sichtbar = useRef(sichtbareThreads);
+  useEffect(() => {
+    sichtbar.current = sichtbareThreads;
+  }, [sichtbareThreads]);
+
   useEffect(() => {
     if (!uid) return;
     const unsubscribe = subscribeToAllMessages((nachricht) => {
+      // Zuerst zustellen, dann erst über das Zählen entscheiden (AGE-639).
+      //
+      // Gefragt wird der Cache-EINTRAG, nicht sein Inhalt. Einen Eintrag gibt es
+      // genau dann, wenn eine Fläche diesen Thread gerade lädt oder zeigt —
+      // dieser Rückruf weiss damit nichts über Fenster, und es entsteht keine
+      // zweite Stelle, an der „welche Gespräche sind offen?" beantwortet werden
+      // müsste. Für einen Thread, den niemand zeigt, passiert nichts.
+      //
+      // Auch für ein MINIMIERTES Fenster: es lädt seinen Verlauf, und ohne das
+      // fehlten ihm beim Aufziehen genau die Zeilen, die währenddessen kamen.
+      //
+      // **Zwei Fälle, nicht einer** (Diff-Review, opencode, MEDIUM). Die erste
+      // Fassung schrieb `prev ? mergeMessage(…) : prev` und verwarf damit jede
+      // Nachricht, die eintrifft, während ein eben geöffnetes Fenster seinen
+      // Verlauf noch HOLT — und anders als bei `ChatPage`, das daneben ein
+      // eigenes Thread-Abo führt, holte sie danach nichts mehr nach. Der
+      // Eintrag existiert in diesem Moment bereits, er hat nur noch keine
+      // Daten; dann ist eine Neuabfrage die richtige Antwort.
+      const eintrag = queryClient.getQueryState<ChatMessage[]>(
+        messagesQueryKey(nachricht.threadId),
+      );
+      if (eintrag?.data) {
+        // `mergeMessage` ist über die `id` idempotent — das Thread-Abo von
+        // `ChatPage` darf dieselbe Zeile also ruhig ein zweites Mal einspielen.
+        queryClient.setQueryData<ChatMessage[]>(messagesQueryKey(nachricht.threadId), (prev) =>
+          prev ? mergeMessage(prev, nachricht) : prev,
+        );
+      } else if (eintrag) {
+        void queryClient.invalidateQueries({
+          queryKey: messagesQueryKey(nachricht.threadId),
+        });
+      }
+
       if (pfad.current === `/chat/${nachricht.threadId}`) return;
+      // Dieselbe Begründung wie beim Pfad: liegt das Gespräch aufgezogen vor
+      // einem, rückt dessen eigener Lesestand ohnehin nach — und zwar NACH
+      // seinem Schreibvorgang. Eine Neuzählung hier käme davor und liesse die
+      // Blase auf 1 springen und zurückfallen.
+      if (sichtbar.current.has(nachricht.threadId)) return;
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
         void queryClient.invalidateQueries({ queryKey: unreadQueryKey(uid) });

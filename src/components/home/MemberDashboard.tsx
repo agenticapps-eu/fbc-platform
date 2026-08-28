@@ -13,6 +13,7 @@ import { displayAuthor } from "../../lib/displayAuthor";
 import { eventsListKey, fetchEvents, formatEventDate, partitionEvents } from "../../lib/events";
 import { feedQueryKey, fetchFeed, type FeedPost } from "../../lib/feed";
 import { signaturQueryKey, signPostMedia, SIGNATUR_STALE_MS } from "../../lib/post-media";
+import { coverSignaturKey, signEventCovers } from "../../lib/event-cover";
 import { BEREICHE, type Bereich } from "../../config/bereiche";
 import { Icon } from "../ui/icons";
 import { cn } from "../../lib/cn";
@@ -92,6 +93,20 @@ export function MemberDashboard({ uid }: { uid: string }) {
     queryKey: signaturQueryKey(vorschauPfade),
     queryFn: () => signPostMedia(vorschauPfade),
     enabled: vorschauPfade.length > 0,
+    staleTime: SIGNATUR_STALE_MS,
+  });
+
+  // Event-Beiträge tragen ihr Bild in einem ANDEREN privaten Bucket
+  // (`event-covers`) und brauchen deshalb eine eigene Signatur-Abfrage — eine
+  // gemeinsame Liste beider Pfade ginge an den falschen Bucket (AGE-635).
+  const coverPfade = (feedQuery.data?.posts ?? [])
+    .slice(0, 3)
+    .map((p) => p.event?.coverPath)
+    .filter((p): p is string => !!p);
+  const coverSignaturen = useQuery({
+    queryKey: coverSignaturKey(uid, coverPfade),
+    queryFn: () => signEventCovers(coverPfade),
+    enabled: coverPfade.length > 0,
     staleTime: SIGNATUR_STALE_MS,
   });
 
@@ -184,104 +199,122 @@ export function MemberDashboard({ uid }: { uid: string }) {
           dabei unter die Leseinhalte — sie ist Beiwerk, nicht der Anfang. */}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]">
         <div className="space-y-8">
-        <section className="space-y-4">
-          <SectionHeader
-            title="Neu in der Aktivität"
-            to="/aktivitaet"
-            cta="Zur Aktivität"
-            bereich="aktivitaet"
-          />
-          {feedQuery.isLoading ? (
-            <p className="text-sm text-muted">Beiträge werden geladen…</p>
-          ) : posts.length === 0 ? (
-            <p className="text-sm text-muted">Noch keine Beiträge.</p>
-          ) : (
-            <ul className="space-y-4">
-              {posts.map((post) => {
-                const author = displayAuthor(post.author, true);
-                const bildPfad = post.media[0]?.storagePath;
-                const bildUrl = bildPfad ? bildSignaturen.data?.[bildPfad] : undefined;
-                return (
-                  <li key={post.id}>
-                    {/* KOMPAKT: eine Zeile je Beitrag statt Kopf und Absatz
+          <section className="space-y-4">
+            <SectionHeader
+              title="Neu in der Aktivität"
+              to="/aktivitaet"
+              cta="Zur Aktivität"
+              bereich="aktivitaet"
+            />
+            {feedQuery.isLoading ? (
+              <p className="text-sm text-muted">Beiträge werden geladen…</p>
+            ) : posts.length === 0 ? (
+              <p className="text-sm text-muted">Noch keine Beiträge.</p>
+            ) : (
+              <ul className="space-y-4">
+                {posts.map((post) => {
+                  const author = displayAuthor(post.author, true);
+                  const bildPfad = post.media[0]?.storagePath;
+                  // Zwei Quellen, in dieser Reihenfolge: das eigene Bild des
+                  // Beitrags, sonst das Cover des bezogenen Events. Ein Video
+                  // liefert KEINES — das Standbild käme von `img.youtube.com`,
+                  // und das ist derselbe Aufruf an den Anbieter, den das
+                  // Einwilligungstor aus AGE-611/621 gerade verhindert.
+                  const vorschau = bildPfad
+                    ? { url: bildSignaturen.data?.[bildPfad], alt: "" }
+                    : post.event?.coverPath
+                      ? {
+                          url: coverSignaturen.data?.[post.event.coverPath],
+                          alt: post.event.title,
+                        }
+                      : null;
+                  return (
+                    <li key={post.id}>
+                      {/* KOMPAKT: eine Zeile je Beitrag statt Kopf und Absatz
                         untereinander. Die Startseite ist die Übersicht, nicht
                         der Feed — wer mehr will, geht auf „Zur Aktivität". */}
-                    <Card className="flex items-center gap-3">
-                      <Avatar
-                        name={author.name}
-                        src={author.avatarUrl}
-                        masked={author.masked}
-                        size="sm"
-                        className="shrink-0 ring-1 ring-accent/40"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2">
-                          <span className="font-display text-sm font-semibold text-ink">
-                            {author.name}
-                          </span>
-                          {post.author.tier && <TierBadge tier={post.author.tier} />}
-                        </div>
-                        <p className="line-clamp-1 text-sm text-muted">{vorschauZeile(post)}</p>
-                      </div>
-                      {bildUrl && (
-                        <img
-                          src={bildUrl}
-                          alt=""
-                          className="h-12 w-12 shrink-0 rounded-[var(--radius-card)] object-cover"
+                      <Card className="flex items-center gap-3">
+                        <Avatar
+                          name={author.name}
+                          src={author.avatarUrl}
+                          masked={author.masked}
+                          size="sm"
+                          className="shrink-0 ring-1 ring-accent/40"
                         />
-                      )}
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2">
+                            <span className="font-display text-sm font-semibold text-ink">
+                              {author.name}
+                            </span>
+                            {post.author.tier && <TierBadge tier={post.author.tier} />}
+                          </div>
+                          <p className="line-clamp-1 text-sm text-muted">{vorschauZeile(post)}</p>
+                        </div>
+                        {/* Kein Platzhalterkasten, wenn nichts da ist: eine
+                          leere Fläche sieht aus wie ein Bild, das nicht geladen
+                          hat. Die Abmessungen stehen fest, damit die Zeile beim
+                          Eintreffen des Bildes nicht springt. */}
+                        {vorschau?.url && (
+                          <img
+                            src={vorschau.url}
+                            alt={vorschau.alt}
+                            width={48}
+                            height={48}
+                            className="h-12 w-12 shrink-0 rounded-[var(--radius-card)] object-cover"
+                          />
+                        )}
+                      </Card>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
-        <section className="space-y-4">
-          <SectionHeader
-            title="Neue Mitglieder für dich"
-            to="/mitglieder"
-            cta="Alle Mitglieder"
-            bereich="mitglieder"
-          />
-          {membersQuery.isLoading ? (
-            <p className="text-sm text-muted">Mitglieder werden geladen…</p>
-          ) : members.length === 0 ? (
-            <p className="text-sm text-muted">
-              Sobald mehr Mitglieder für dich sichtbar sind, erscheinen hier Empfehlungen.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {members.map((m) => (
-                <li key={m.id}>
-                  <Link
-                    to={`/p/${m.id}`}
-                    className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition-colors hover:border-accent/50"
-                  >
-                    <Avatar
-                      name={m.name ?? "Mitglied"}
-                      src={m.avatar_url}
-                      size="sm"
-                      className="ring-1 ring-accent/40"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-display text-sm font-semibold text-ink">
-                        {m.name ?? "Mitglied"}
+          <section className="space-y-4">
+            <SectionHeader
+              title="Neue Mitglieder für dich"
+              to="/mitglieder"
+              cta="Alle Mitglieder"
+              bereich="mitglieder"
+            />
+            {membersQuery.isLoading ? (
+              <p className="text-sm text-muted">Mitglieder werden geladen…</p>
+            ) : members.length === 0 ? (
+              <p className="text-sm text-muted">
+                Sobald mehr Mitglieder für dich sichtbar sind, erscheinen hier Empfehlungen.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {members.map((m) => (
+                  <li key={m.id}>
+                    <Link
+                      to={`/p/${m.id}`}
+                      className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition-colors hover:border-accent/50"
+                    >
+                      <Avatar
+                        name={m.name ?? "Mitglied"}
+                        src={m.avatar_url}
+                        size="sm"
+                        className="ring-1 ring-accent/40"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-sm font-semibold text-ink">
+                          {m.name ?? "Mitglied"}
+                        </span>
+                        <span className="block truncate text-xs text-muted">
+                          {[m.region, m.company].filter(Boolean).join(" · ") || levelLabel(m.tier)}
+                        </span>
                       </span>
-                      <span className="block truncate text-xs text-muted">
-                        {[m.region, m.company].filter(Boolean).join(" · ") || levelLabel(m.tier)}
+                      <span aria-hidden="true" className="text-accent-strong">
+                        →
                       </span>
-                    </span>
-                    <span aria-hidden="true" className="text-accent-strong">
-                      →
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
 
         {/* Die Schiene. `space-y-8` wie links, damit ein zweiter Block hier
