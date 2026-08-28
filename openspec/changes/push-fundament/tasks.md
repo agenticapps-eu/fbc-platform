@@ -5,13 +5,15 @@
 > **Phase A ist bis auf die Abnahme gebaut.** A1–A4 und A5b stehen seit dem
 > 27.08.; A5 ist am 28.08. dazugekommen, samt einer Reparatur an A5b.
 >
-> **Was an A5 offen bleibt, ist keine Codearbeit:** in Infisical `dev` UND
-> `prod` gibt es kein einziges FCM-, APNs-, Firebase- oder Apple-Geheimnis. Die
-> Function ist geschrieben und gegen Attrappen gemessen — die fünf Zusagen aus
-> A5 sind anbieterunabhängig —, aber gegen einen echten Anbieter ist sie nie
-> gelaufen. Nötig sind ein Firebase-Projekt (Dienstschlüssel für FCM) und ein
-> APNs-Schlüssel aus einem Apple-Developer-Konto samt Key-ID und Team-ID.
-> **Kontoeinrichtungen, keine Codearbeit.**
+> **APNs ist seit dem 28.08. eingerichtet und gemessen.** Der Zugangsweg
+> antwortet an Sandbox **und** Produktion mit `400 BadDeviceToken` — Apple
+> authentifiziert uns, nur das erfundene Gerätetoken wird verworfen. Damit sind
+> `apnsJwt`, die PEM-Einlesung, die Kopfzeilen und `bewerteApns` gegen den
+> echten Anbieter belegt.
+>
+> **Offen bleibt die Android-Hälfte:** es gibt kein Firebase-Projekt, also kein
+> `FCM_SERVICE_ACCOUNT`. Die Play-Console-Bestätigung blockiert das **nicht** —
+> sie regelt die Verteilung, nicht FCM. Kontoeinrichtung, keine Codearbeit.
 >
 > **Korrektur an dieser Liste:** A4 nannte die RPCs `push_zustellung_daten` und
 > `push_token_entfernen`. Gebaut und gemessen sind
@@ -151,13 +153,21 @@ Issue. Siehe `REVIEWS.md`.
       in `push_zustellung_test.sql` — sie sind Eigenschaften der RPC, nicht des
       Transports. „Keine Nutzlast im Text" steht zusätzlich in
       `nachrichten.test.ts`. **32 Deno-Zusagen**, jede mit Gegenprobe belegt.
-- [ ] ⛔ **Secrets nach Infisical, getrennt für DEV und PROD.** Blockiert:
-      es gibt kein Firebase-Projekt und kein Apple-Developer-Konto. Donalds
-      Handlung, mit Vorlauf.
-- [ ] ⛔ **Gegen einen echten Anbieter messen.** Hängt am selben Blocker. Bis
-      dahin ist die Anbieter-Schicht (`googleZugangstoken`, die beiden
-      `fetch`-Aufrufe) ungemessen; gemessen sind Textbau, Anfragekörper,
-      Antwortbewertung und die ES256-Signatur.
+- [x] **APNs-Secrets nach Infisical `dev`.** `APNS_KEY_P8`, `APNS_KEY_ID`,
+      `APNS_TEAM_ID`, `APNS_BUNDLE_ID` (`com.effbeezee.app`), `APNS_SANDBOX=1`.
+      Derselbe `.p8` gehört später byte-gleich nach `prod` — Apple kennt keinen
+      umgebungsspezifischen Auth-Key —, dort aber **ohne** `APNS_SANDBOX`.
+- [x] **APNs gegen den echten Anbieter gemessen.** Sandbox und Produktion
+      antworten `400 BadDeviceToken` auf ein erfundenes Token: authentifiziert,
+      nur das Token verworfen. Belegt damit `apnsJwt`, `importierePkcs8`, die
+      Kopfzeilen, den Anfragekörper und `bewerteApns` an echten Antworten.
+      Falle dokumentiert: App-Store-Connect-Schlüssel heissen genauso
+      (`AuthKey_<KEYID>.p8`) und liefern an jedem Topic `403`.
+- [ ] ⛔ **FCM-Secrets und Messung.** Es gibt kein Firebase-Projekt; die
+      Android-Hälfte (`googleZugangstoken`, der FCM-`fetch`) ist ungemessen.
+      **Nicht** von der Play Console blockiert.
+- [ ] **`prod`-Umgebung befüllen** — bewusst zurückgestellt, solange es keine
+      Produktions-App gibt. Steht in `docs/secrets.md`.
 - [x] Commit.
 
 ### A5b · **(R2)** Dauerhafter Zustellzustand

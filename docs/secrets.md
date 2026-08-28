@@ -136,6 +136,13 @@ must **never** reach the client.
 | `FROM_EMAIL`                | Sender address for transactional email — `FBC <noreply@effbeezee.com>` (see the sender-domain note below; **must not** be `onboarding@resend.dev`) |
 | `CONTACT_WEBHOOK_SECRET`    | Shared secret the contact-request DB webhook sends as `Authorization: Bearer …` |
 | `APP_URL` _(optional)_      | Base URL for the "Zum Chat"/"Anfrage ansehen" link in emails |
+| `PUSH_WEBHOOK_SECRET`       | Shared secret the `notifications` DB webhook sends to `send-push` (AGE-641) |
+| `APNS_KEY_P8`               | Der APNs-Auth-Key als PEM. **Nicht** der gleichnamige App-Store-Connect-Schlüssel — siehe unten |
+| `APNS_KEY_ID`               | Kennung ebendieses Schlüssels (steht in Apples Dateinamen `AuthKey_<KEYID>.p8`) |
+| `APNS_TEAM_ID`              | Apple-Team, fährt als `iss` im Provider-JWT mit |
+| `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
+| `APNS_SANDBOX`              | `1` schickt an Apples Sandbox-Host. In `prod` **nicht setzen** |
+| `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). **Noch nicht eingerichtet** |
 
 ## Setting and reading secrets
 
@@ -293,3 +300,101 @@ Plattform-injiziert (nicht setzen): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 Danach: als Basic-Nutzer auf ein gesperrtes Format → Wand → „Upgrade" →
 `/mitgliedschaft` → Testkarte `4242 4242 4242 4242` → der Webhook hebt `profiles.tier`,
 und der zuvor gesperrte Inhalt wird sichtbar.
+
+## Supabase Edge Function secrets (`send-push`, AGE-641)
+
+`send-push` wird von einem Database Webhook auf `public.notifications` (INSERT)
+angestoßen und vom Wiederholungslauf mit `{"modus":"faellig"}`. Secrets kommen
+wie überall aus Infisical (`supabase secrets set`), plattform-injiziert sind
+`SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`.
+
+Welche Werte es gibt, steht oben in der Server-only-Tabelle. Hier steht, was
+man über sie wissen muss.
+
+### Der APNs-Schlüssel: drei Fallen
+
+**1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den
+**App-Store-Connect-API-Schlüssel** als auch den **APNs-Auth-Key** als
+`AuthKey_<KEYID>.p8` herunter. Beide sind PKCS#8/P-256 und an Datei, Größe oder
+Inhalt **nicht** zu unterscheiden. Der falsche liefert an jedem Topic
+`403 InvalidProviderToken` — eine Meldung, die nach kaputten Zugangsdaten
+aussieht und in Wahrheit die falsche Sorte meint.
+
+Sie entstehen an verschiedenen Stellen im Portal:
+
+| Sorte | Wo sie entsteht |
+| --- | --- |
+| App Store Connect API | Users and Access → Integrations → App Store Connect API |
+| **APNs Auth Key** | Certificates, Identifiers & Profiles → **Keys** → Haken bei *Apple Push Notifications service* |
+
+Das hat am 28.08. eine Stunde gekostet. Wer einen `.p8` archiviert, schreibt die
+**Sorte in den Titel**, nicht bloß die Key-ID.
+
+**2. Apple gibt die Datei genau einmal heraus.** Es gibt keinen zweiten
+Download. Geht sie verloren, bleibt nur Widerrufen und Neuanlegen. Das Archiv
+ist darum **1Password**, nicht Infisical — Infisical ist die Laufzeit und kein
+Backup. `.p8` steht in `.gitignore`, weil dieses Repo öffentlich ist und ein
+versehentlicher Push eine Rotation im Apple-Portal bedeutete, kein `git rm`.
+
+Ein ASC-Schlüssel braucht zusätzlich die **Issuer-ID** (eine UUID). Sie steht
+**nicht** in der `.p8` und ist aus ihr nicht ableitbar — ohne Notiz ist der
+Schlüssel wertlos.
+
+**3. Zwei Einstellungen sind nach dem Speichern unveränderlich.** Gewählt:
+
+- **Environment: Sandbox & Production.** TestFlight und der Store laufen über
+  Produktions-APNs; ein Sandbox-Schlüssel wäre genau dort tot, und man hat je
+  Team nur zwei aktive Schlüssel.
+- **Key Restriction: Team Scoped (All Topics).** `Topic Specific` verlangt eine
+  App-ID, die es zum Anlagezeitpunkt schon gibt — und die Einstellung ließe
+  sich nie wieder korrigieren. Preis: ein abhandengekommener Schlüssel dürfte
+  an jede App des Teams pushen.
+
+### Die Zugangsdaten prüfen — ohne App und ohne Gerät
+
+Man muss auf AGE-642 nicht warten, um zu wissen, ob die Zugangsdaten stimmen.
+Ein Push an ein **erfundenes** Gerätetoken kann niemanden erreichen;
+interessant ist allein, **wie** Apple ablehnt:
+
+| Antwort | Bedeutung |
+| --- | --- |
+| `400 BadDeviceToken` | **Alles richtig.** Apple hat uns authentifiziert und nur das Token verworfen |
+| `403 InvalidProviderToken` | Schlüssel, Key-ID oder Team-ID passen nicht — oder es ist die falsche Sorte |
+| `400 TopicDisallowed` | Die App-ID gibt es nicht oder sie hat kein Push aktiviert |
+
+Das misst den ganzen Zugangsweg: JWT-Signatur, PEM-Einlesung, Kopfzeilen und
+Anfragekörper. **Nicht** gemessen wird damit, ob die App-ID existiert — APNs
+prüft das Gerätetoken **vor** dem Topic, ein erfundenes Token kommt also nie
+bis zur Topic-Prüfung.
+
+Eine zweite Bundle-ID desselben Teams als **Positivkontrolle** mitzuschicken
+lohnt sich: ohne sie ist „Zugangsdaten falsch" nicht von „App-ID fehlt" zu
+trennen.
+
+### DEV und PROD
+
+Derselbe `.p8` gehört in **beide** Umgebungen. Apple kennt keinen
+umgebungsspezifischen Auth-Key — er gilt teamweit, und mit der Einstellung
+*Sandbox & Production* bedient er beide Hosts. Byte-gleich ist hier also kein
+Versäumnis, sondern unvermeidbar (anders als bei Stripe und Resend, siehe die
+Trennungsregel oben).
+
+Unterschiedlich ist genau **ein** Wert: `APNS_SANDBOX=1` in `dev`, in `prod`
+gar nicht gesetzt.
+
+> ⚠️ Zeigt ein Entwicklungs-Build auf **PROD**, schickt PROD ein Sandbox-Token
+> an den Produktions-Host. Apple antwortet `BadDeviceToken`, und `send-push`
+> stuft das korrekt als `dauerhaft` ein — es **löscht das Gerätetoken**. Beim
+> nächsten App-Start heilt sich das über `claim_push_token`, sieht aber wie ein
+> Fehler aus. Dev-Builds gehören auf DEV.
+
+### Was noch fehlt
+
+- **`FCM_SERVICE_ACCOUNT`** — es gibt kein Firebase-Projekt. Wichtig dabei: die
+  Bestätigung in der **Play Console blockiert das nicht**. Sie regelt die
+  Verteilung im Store; FCM braucht nur ein Firebase-Projekt, und ein
+  seitlich installiertes Debug-APK bekommt Push ohne jede Store-Freigabe.
+- **Die App-ID `com.effbeezee.app`** mit aktivierter Push-Berechtigung
+  (Identifiers).
+- **Die `prod`-Umgebung** — bewusst noch leer, solange es keine
+  Produktions-App gibt.
