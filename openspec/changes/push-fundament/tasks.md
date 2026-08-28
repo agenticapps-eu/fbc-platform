@@ -283,23 +283,32 @@ dort hätte ein erneuter Webhook-Aufruf ihn wenigstens noch einmal versucht.
       Wortlaut stammt aus `index.ts`, es ist also der Handler und nicht das
       Gateway) · `{"modus":"faellig"}` → `200`. Damit sind `verify_jwt=false`,
       die Geheimnisprüfung und **beide** RPC-Wege belegt.
-- [ ] **Webhook in der DEV-Konsole** eingetragen und ausgelöst — Beleg ist eine
-      Zeile im Function-Log, nicht ein 2xx an den Aufrufer. `send-push`
-      antwortet auch `200`, wenn es nichts zuzustellen gab.
-      Name, Tabelle, Ereignis und Kopfzeile: `docs/secrets.md`, Abschnitt
-      „Den Webhook eintragen".
-- [ ] **(R2) Webhook in der PROD-Konsole** — eigener Punkt, nicht mitgemeint.
-      Derselbe Name. Spätestens **vor** dem `migrate-prod`-Dispatch, sonst
-      bricht dort der Objekt-Drift-Scan ab. Dazu `PUSH_WEBHOOK_SECRET` in
-      `prod` — die Anbieter-Secrets dürfen leer bleiben.
-- [x] **(R2) Drift-Scan nachgezogen.** Der Webhook heißt
-      **`notifications_push_webhook`** — der Name ist damit festgelegt und muss
-      in beiden Konsolen exakt so stehen. `ERWARTET_OHNE_MIGRATION` ist dabei
-      von `db-drift-scan.ts` nach `db-drift-scan.logic.ts` gewandert: das
+- [ ] **Webhook auf DEV eingetragen und ausgelöst** — im SQL-Editor, nicht in
+      der Konsole: den Menüpunkt gibt es hier nicht. Vorlage (Funktion +
+      Trigger): `docs/secrets.md`, Abschnitt „Den Webhook eintragen".
+      Beleg ist eine Zeile im Function-Log, nicht ein 2xx an den Aufrufer —
+      `send-push` antwortet auch `200`, wenn es nichts zuzustellen gab.
+- [ ] **(R2) Webhook auf PROD** — eigener Punkt, nicht mitgemeint. Dieselben
+      zwei Namen. Spätestens **vor** dem `migrate-prod`-Dispatch, sonst bricht
+      dort der Objekt-Drift-Scan ab. Dazu `PUSH_WEBHOOK_SECRET` in `prod` —
+      die Anbieter-Secrets dürfen leer bleiben.
+- [x] **(R2) Drift-Scan nachgezogen.** Der Webhook besteht aus **zwei**
+      Objekten: `notify_push_webhook` (Funktion) und
+      `notifications_push_webhook` (Trigger). Beide Namen sind festgelegt und
+      müssen in beiden Projekten exakt so lauten.
+      **Korrektur vom 28.08.:** zuerst stand hier nur der Trigger, weil ich
+      einen Konsolen-Webhook angesetzt hatte. Den gibt es nicht — auf DEV
+      **und** PROD fehlt das Schema `supabase_functions` ganz, Database
+      Webhooks wurden auf diesen Projekten nie aktiviert; `pg_net` ist dagegen
+      installiert. Der Webhook ist darum ein `net.http_post`-Trigger von Hand
+      wie der Mail-Webhook, also ein Paar und kein Einzelname.
+      `ERWARTET_OHNE_MIGRATION` ist dabei von `db-drift-scan.ts` nach
+      `db-drift-scan.logic.ts` gewandert: das
       Skript baut schon **beim Import** eine Datenbankverbindung auf, von dort
-      war die Liste nicht prüfbar. Die zwei neuen Zusagen lesen die
-      **ausgelieferte** Liste, keine Kopie — RED gemessen, dann GREEN; die
-      Positivkontrolle nannte den fehlenden Namen beim Namen. Dazu die
+      war die Liste nicht prüfbar. Die drei neuen Zusagen lesen die
+      **ausgelieferte** Liste, keine Kopie — zweimal RED gemessen (einmal für
+      den Trigger, einmal für die Funktion), dann GREEN; die Positivkontrolle
+      nannte den fehlenden Namen jeweils beim Namen. Dazu die
       Wiederherstellungs-Vorlage in `docs/secrets.md`, auf die die
       Fehlermeldung des Scans verweist — für `send-push` fehlte sie ganz.
 - [ ] PR gegen `main`, vier Pflichtchecks grün, `gh pr view --json state`

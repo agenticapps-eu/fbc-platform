@@ -111,37 +111,47 @@ describe("findeObjektDrift", () => {
  *
  * Diese Zusagen prüfen die **ausgelieferte** Liste, nicht eine hier
  * abgeschriebene Kopie. Eine Kopie belegt nichts: sie ginge weiter durch, wenn
- * der Name aus `db-drift-scan.logic.ts` verschwände. Darum ist der Bestand aus
+ * ein Name aus `db-drift-scan.logic.ts` verschwände. Darum ist der Bestand aus
  * `ERWARTET_OHNE_MIGRATION` gebaut und nicht daneben getippt.
  *
- * Warum es sie gibt: der `send-push`-Webhook wird von Hand in der Konsole
- * angelegt und steht darum in keiner Migration. Fehlt sein Name in der Liste,
- * meldet der Scan ihn als „unbekannt", der PROD-Drift-Scan wird rot — und ein
- * rotes Drift-Gate überspringt den Frontend-Deploy **stumm**
- * (`migrate-prod.yml`).
+ * Warum es sie gibt: die Webhooks werden von Hand angelegt und stehen darum in
+ * keiner Migration. Fehlt ein Name in der Liste, meldet der Scan ihn als
+ * „unbekannt"; fehlt umgekehrt das Objekt in PROD, meldet er es als „fehlend".
+ * Beides bricht `migrate-prod` ab, und weil `deploy.yml` dann am
+ * Migrations-Gate hängen bleibt, fällt der Frontend-Deploy **stumm** aus.
  */
 describe("ERWARTET_OHNE_MIGRATION", () => {
-  const PUSH_WEBHOOK = "notifications_push_webhook";
+  /**
+   * `send-push` steht mit **zwei** Namen in der Liste, Funktion und Trigger —
+   * genau wie das Mail-Paar. Ein Konsolen-Webhook wäre nur ein Trigger, aber
+   * die gibt es auf diesen Projekten nicht: gemessen am 28.08. fehlt auf DEV
+   * **und** PROD das Schema `supabase_functions` ganz, `pg_net` ist dagegen
+   * installiert. Der Webhook ist deshalb ein `net.http_post`-Trigger von Hand.
+   */
+  const PUSH_WEBHOOK = ["notify_push_webhook", "notifications_push_webhook"];
 
   it("meldet keinen Drift, wenn jeder erwartete Webhook im Bestand liegt", () => {
     // Welcher Eimer, ist hier gleichgültig: geprüft wird gegen die **flache**
-    // Vereinigung (Grenze 3 im Kopf des Logikmoduls). Ein Eintrag ist eine
-    // Funktion, zwei sind Trigger — sie hier aufzuteilen hiesse, die Liste
-    // abzuschreiben, und genau das soll diese Zusage nicht.
+    // Vereinigung (Grenze 3 im Kopf des Logikmoduls). Sie nach Funktion und
+    // Trigger aufzuteilen hiesse, die Liste abzuschreiben — genau das soll
+    // diese Zusage nicht.
     const bestand: Bestand = { ...leer, trigger: [...ERWARTET_OHNE_MIGRATION] };
 
     expect(findeObjektDrift(bestand, [], ERWARTET_OHNE_MIGRATION)).toEqual([]);
   });
 
-  it("meldet den send-push-Webhook als fehlend, wenn er aus der Datenbank verschwindet", () => {
-    const ohnePush = ERWARTET_OHNE_MIGRATION.filter((n) => n !== PUSH_WEBHOOK);
-    // Positivkontrolle: ohne sie wäre die Zusage auch dann grün, wenn der Name
-    // gar nicht in der Liste stünde — dann filterte `filter` nichts weg und der
-    // Bestand wäre vollständig.
-    expect(ohnePush).toHaveLength(ERWARTET_OHNE_MIGRATION.length - 1);
+  it.each(PUSH_WEBHOOK)(
+    "meldet `%s` als fehlend, wenn er aus der Datenbank verschwindet",
+    (name) => {
+      const ohne = ERWARTET_OHNE_MIGRATION.filter((n) => n !== name);
+      // Positivkontrolle: ohne sie wäre die Zusage auch dann grün, wenn der
+      // Name gar nicht in der Liste stünde — dann filterte `filter` nichts weg
+      // und der Bestand wäre vollständig.
+      expect(ohne).toHaveLength(ERWARTET_OHNE_MIGRATION.length - 1);
 
-    const drift = findeObjektDrift({ ...leer, trigger: ohnePush }, [], ERWARTET_OHNE_MIGRATION);
+      const drift = findeObjektDrift({ ...leer, trigger: ohne }, [], ERWARTET_OHNE_MIGRATION);
 
-    expect(drift).toEqual([{ art: "fehlt", typ: "erwartet", name: PUSH_WEBHOOK }]);
-  });
+      expect(drift).toEqual([{ art: "fehlt", typ: "erwartet", name }]);
+    },
+  );
 });

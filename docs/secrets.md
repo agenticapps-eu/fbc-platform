@@ -334,48 +334,63 @@ wie überall aus Infisical (`supabase secrets set`), plattform-injiziert sind
 Welche Werte es gibt, steht oben in der Server-only-Tabelle. Hier steht, was
 man über sie wissen muss.
 
-### Den Webhook eintragen — der Name ist verbindlich
+### Den Webhook eintragen — die Namen sind verbindlich
 
-Er heißt **`notifications_push_webhook`**, in **beiden** Konsolen exakt so.
-Supabase benennt den Trigger nach dem Webhook, und dieser Trigger liegt in
-`public` — er steht damit im Objekt-Drift-Scan
-(`scripts/db-drift-scan.logic.ts`, `ERWARTET_OHNE_MIGRATION`). Ein abweichender
-Name macht den Scan rot; der läuft bei **jeder** PROD-Migration mit
-(`migrate-prod.yml`), und ein rotes Drift-Gate überspringt den Frontend-Deploy
-**stumm**. Wird der Name je geändert, gehört er in derselben Änderung in die
-Liste — die Zusagen in `db-drift-scan.test.ts` lesen sie, nicht eine Kopie.
+Es ist **kein** Database Webhook aus der Konsole. Gemessen am 28.08.: auf DEV
+**und** PROD fehlt das Schema `supabase_functions` ganz — die Konsolen-Webhooks
+wurden auf diesen Projekten nie aktiviert, und darum fehlt im Dashboard auch der
+Menüpunkt. `pg_net` ist dagegen auf beiden installiert. Der Push-Webhook ist
+deshalb ein `net.http_post`-Trigger von Hand, genau wie der Mail-Webhook
+darüber, und besteht wie dieser aus **zwei** Objekten in `public`:
 
 | | |
 | --- | --- |
-| Name | `notifications_push_webhook` |
-| Tabelle | `public.notifications` |
-| Ereignis | **Insert** (nur; ein Update erzeugt keinen neuen Hinweis) |
-| Typ | HTTP Request → POST |
-| URL | `https://<project-ref>.supabase.co/functions/v1/send-push` |
-| Kopfzeile | `Authorization: Bearer <PUSH_WEBHOOK_SECRET>` |
+| Funktion | `notify_push_webhook` |
+| Trigger | `notifications_push_webhook` auf `public.notifications`, **nur Insert** |
 
-Anders als bei `notify-contact-request` ist das **kein** von Hand gebauter
-`pg_net`-Trigger, sondern der Database Webhook der Konsole. Er reicht die
-Nutzlast in derselben Form durch (`record.id` ist alles, was `send-push`
-davon liest), und die aufgerufene Funktion `supabase_functions.http_request`
-liegt in einem fremden Schema — deshalb steht hier **ein** Name in der
-Ausnahmeliste, beim Mail-Webhook dagegen zwei.
+Beide Namen stehen in `ERWARTET_OHNE_MIGRATION`
+(`scripts/db-drift-scan.logic.ts`) und müssen in **beiden** Projekten exakt so
+lauten. Weicht ein Name ab oder fehlt das Objekt, bricht der Objekt-Drift-Scan
+in `migrate-prod.yml` ab; weil `deploy.yml` dann am Migrations-Gate hängen
+bleibt, fällt der Frontend-Deploy **stumm** aus. Die Zusagen in
+`db-drift-scan.test.ts` lesen die Liste selbst, keine Kopie.
 
-Der Bearer-Token liegt danach inline in der Trigger-Definition in der
-Datenbank, wie bei jedem Konsolen-Webhook, und ist nur mit DB-Adminzugang
-lesbar. Genau darum steht der Webhook in keiner Migration: dieses Repo ist
-öffentlich.
+Anwenden mit eingesetztem Token — nicht committen, das Repo ist öffentlich:
 
-> **Der Beleg ist eine Zeile im Function-Log, nicht ein 2xx an den Aufrufer.**
-> `send-push` antwortet auch dann `200`, wenn nichts zuzustellen war
-> (`{"skipped":true}`) — Zuordnung, Schalter und Aktivierung entscheidet die
-> RPC, nicht die Function. Wer nur auf den Statuscode schaut, hat den Webhook
-> nicht geprüft.
+```sql
+create extension if not exists pg_net;
+
+create or replace function public.notify_push_webhook()
+  returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  perform net.http_post(
+    url     := 'https://<project-ref>.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'Authorization', 'Bearer <PUSH_WEBHOOK_SECRET>'),  -- nicht in git
+    body    := jsonb_build_object(
+                 'type', tg_op, 'table', tg_table_name, 'schema', tg_table_schema,
+                 'record', to_jsonb(new)));
+  return null;
+end; $$;
+revoke execute on function public.notify_push_webhook() from public, anon, authenticated;
+
+create trigger notifications_push_webhook
+  after insert on public.notifications
+  for each row execute function public.notify_push_webhook();
+```
+
+Nur `insert`: ein Update an einer Hinweiszeile (etwa `read_at`) erzeugt keinen
+neuen Hinweis. `old_record` entfällt deshalb — `send-push` liest ohnehin nur
+`record.id`, alles Übrige holt die RPC selbst.
 
 **Zuerst ausliefern, dann eintragen.** Den Functions-Deploy macht `deploy.yml`
-erst beim Merge auf `main` — und dann nach DEV **und** PROD. Für die Probe in
-der DEV-Konsole muss `send-push` vorher von Hand dort liegen, sonst zeigt der
-Webhook auf eine Function, die es noch nicht gibt.
+erst beim Merge auf `main`, und dann nach DEV **und** PROD. Für eine Probe in
+DEV muss `send-push` vorher von Hand dort liegen — und der Deploy gehört **in
+den Worktree des Branches**: im Haupt-Checkout gibt es weder die Function noch
+ihren `config.toml`-Block, und ohne den Block gilt `verify_jwt = true`. Dann
+weist das Gateway den Webhook mit **401** ab, bevor der Handler seine
+Geheimnisprüfung erreicht.
 
 **In PROD genügt dafür `PUSH_WEBHOOK_SECRET`.** Die Anbieter-Secrets dürfen
 leer bleiben, solange es keine Produktions-App gibt: ohne Zeile in
@@ -384,6 +399,29 @@ keinen, die RPC kommt leer zurück, und `send-push` antwortet `{"skipped":true}`
 ohne APNs oder FCM je anzufassen
 (`20260827240000_push_zustellung.sql`). Fehlt dagegen `PUSH_WEBHOOK_SECRET`,
 antwortet die Function auf **jeden** Hinweis mit `500`.
+
+### Prüfen, ohne die Konsole
+
+Der Statuscode allein belegt nichts — `send-push` antwortet auch `200`, wenn es
+nichts zuzustellen gab. Diese drei Proben zusammen belegen etwas, und sie
+brauchen den Webhook noch gar nicht:
+
+```bash
+# 1. richtiger Bearer, erfundene Kennung  → 200 {"skipped":true}
+# 2. falscher Bearer                      → 401 Unauthorized
+# 3. {"modus":"faellig"}                  → 200 {"skipped":true}
+```
+
+Probe 2 ist die entscheidende: ohne sie belegt die 200 nicht, dass die
+Geheimnisprüfung überhaupt greift. Und der Wortlaut zählt — `Unauthorized`
+stammt aus `index.ts`, das Gateway antwortet anders. Sonst ist ein
+Gateway-401 (`verify_jwt` steht falsch) von einem Geheimnis-401 nicht zu
+unterscheiden.
+
+Steht der Webhook, ist der Beleg eine **Zeile im Function-Log**, nicht die
+Antwort an den Aufrufer: `{"fn":"send-push","event":"nichts_zu_tun",…}`. Solange
+es keine Zeile in `push_tokens` gibt, ist `nichts_zu_tun` das erwartete
+Ergebnis.
 
 ### Der APNs-Schlüssel: drei Fallen
 

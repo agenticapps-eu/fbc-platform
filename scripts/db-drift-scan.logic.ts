@@ -52,9 +52,14 @@ export const ERWARTET_OHNE_MIGRATION = [
   // Kontaktanfrage → `notify-contact-request`: Funktion und Trigger.
   "notify_contact_request_webhook",
   "contact_requests_email_webhook",
-  // Hinweis → `send-push` (AGE-641): ein Database Webhook der Konsole, also
-  // NUR ein Trigger in `public` — `supabase_functions.http_request` liegt in
-  // einem fremden Schema und faellt gar nicht unter diesen Scan.
+  // Hinweis → `send-push` (AGE-641): Funktion und Trigger, wie oben.
+  //
+  // Ein Konsolen-Webhook waere nur EIN Trigger gewesen. Den gibt es hier
+  // nicht: gemessen am 28.08. fehlt auf DEV UND PROD das Schema
+  // `supabase_functions` ganz, Database Webhooks wurden auf diesen Projekten
+  // also nie aktiviert. `pg_net` ist dagegen installiert — darum ist auch
+  // dieser Webhook ein `net.http_post`-Trigger von Hand.
+  "notify_push_webhook",
   "notifications_push_webhook",
 ];
 
