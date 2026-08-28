@@ -11,6 +11,7 @@ import {
   unreadQueryKey,
   type ChatMessage,
 } from "../../lib/chat";
+import { ersetzeEmoticons } from "../../lib/emoticons";
 import { useToast } from "../ui/toast-context";
 
 /**
@@ -115,8 +116,16 @@ export function useGespraech({
       .catch(() => {});
   }, [threadId, myId, aktiv, letzteFremde, query.isSuccess, queryClient]);
 
-  async function sende(body: string) {
+  async function sende(roherText: string) {
     if (!threadId || !myId) return;
+    // Emoticons werden HIER ersetzt, nicht in der Sendezeile (AGE-645). Der
+    // Grund ist nicht Bequemlichkeit: unten speisen sich die optimistische
+    // Blase und der Insert aus DERSELBEN Variablen, die Gleichheit von
+    // Angezeigtem und Gespeichertem ist damit strukturell. In
+    // `Conversation.submit()` platziert, hinge sie daran, dass jeder Aufrufer
+    // daran denkt — und `useGespraech` hat bereits zwei (`ChatPage`,
+    // `ChatFenster`).
+    const body = ersetzeEmoticons(roherText);
     const optimistic: ChatMessage = {
       id: `optimistic-${crypto.randomUUID()}`,
       threadId,

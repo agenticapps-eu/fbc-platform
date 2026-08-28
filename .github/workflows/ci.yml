@@ -38,7 +38,18 @@ jobs:
           # `gold` als Token/Utility. src/vision/ ist ausgenommen: der eingefrorene
           # eff.bee.zee-Vision-Dummy (AGE-492 §3) hat einen eigenen --ebz-gold-
           # Namensraum, wird von nirgends importiert und landet in keinem Bundle.
-          if grep -rniI "gold" src/ --exclude-dir=vision; then
+          #
+          # `*.generated.ts` ebenfalls, seit AGE-645: das sind INHALTSDATEN, keine
+          # Auszeichnung. Der deutsche Emoji-Datensatz enthält „Goldmedaille",
+          # „golden gate" und „Goldesel" als Suchbegriffe — sechs Treffer, die mit
+          # Design-Tokens nichts zu tun haben und aus denen nie ein Klassenname
+          # wird. Diese Prüfung sucht als einzige das BLOSSE WORT statt der
+          # Token-Form (siehe die Begründung im nächsten Block, die genau davor
+          # warnt); solange das so ist, wird sie an jedem deutschen Inhalt mit
+          # „Gold…" hängenbleiben. Erzeugte Dateien auszunehmen behebt die Klasse
+          # für Inhaltsdaten, ohne die Schärfe für handgeschriebenen Code zu
+          # verlieren — gemessen: ausserhalb der erzeugten Dateien null Treffer.
+          if grep -rniI "gold" src/ --exclude-dir=vision --exclude='*.generated.ts'; then
             echo "::error::'gold' ist seit AGE-492 kein Token mehr — bitte 'accent' verwenden."
             fail=1
           fi
