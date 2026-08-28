@@ -232,38 +232,52 @@ export function MemberDashboard({ uid }: { uid: string }) {
                     <li key={post.id}>
                       {/* KOMPAKT: eine Zeile je Beitrag statt Kopf und Absatz
                         untereinander. Die Startseite ist die Übersicht, nicht
-                        der Feed — wer mehr will, geht auf „Zur Aktivität". */}
-                      <Card className="flex items-center gap-3">
-                        <Avatar
-                          name={author.name}
-                          src={author.avatarUrl}
-                          masked={author.masked}
-                          size="sm"
-                          className="shrink-0 ring-1 ring-accent/40"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-2">
-                            <span className="font-display text-sm font-semibold text-ink">
-                              {author.name}
-                            </span>
-                            {post.author.tier && <TierBadge tier={post.author.tier} />}
+                        der Feed — wer mehr will, geht auf „Zur Aktivität".
+
+                        JEDE ZEILE FÜHRT IN IHREN Beitrag (AGE-587). Bis zum
+                        28.08. war das hier eine Karte ohne Link: sie sah
+                        anklickbar aus und tat nichts. Den Deeplink `?post=<id>`
+                        gab es da längst — gebaut haben ihn nur die beiden
+                        Profilflächen (`profil-widgets.tsx:271`,
+                        `PublicProfilePage.tsx:266`), und der Feed HOLT den
+                        Beitrag darüber gezielt statt ihn zu suchen, erreicht
+                        ihn also auch auf Seite 6. */}
+                      <Link
+                        to={`/aktivitaet?post=${post.id}`}
+                        className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        <Card className="flex items-center gap-3">
+                          <Avatar
+                            name={author.name}
+                            src={author.avatarUrl}
+                            masked={author.masked}
+                            size="sm"
+                            className="shrink-0 ring-1 ring-accent/40"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2">
+                              <span className="font-display text-sm font-semibold text-ink">
+                                {author.name}
+                              </span>
+                              {post.author.tier && <TierBadge tier={post.author.tier} />}
+                            </div>
+                            <p className="line-clamp-1 text-sm text-muted">{vorschauZeile(post)}</p>
                           </div>
-                          <p className="line-clamp-1 text-sm text-muted">{vorschauZeile(post)}</p>
-                        </div>
-                        {/* Kein Platzhalterkasten, wenn nichts da ist: eine
+                          {/* Kein Platzhalterkasten, wenn nichts da ist: eine
                           leere Fläche sieht aus wie ein Bild, das nicht geladen
                           hat. Die Abmessungen stehen fest, damit die Zeile beim
                           Eintreffen des Bildes nicht springt. */}
-                        {vorschau?.url && (
-                          <img
-                            src={vorschau.url}
-                            alt={vorschau.alt}
-                            width={48}
-                            height={48}
-                            className="h-12 w-12 shrink-0 rounded-[var(--radius-card)] object-cover"
-                          />
-                        )}
-                      </Card>
+                          {vorschau?.url && (
+                            <img
+                              src={vorschau.url}
+                              alt={vorschau.alt}
+                              width={48}
+                              height={48}
+                              className="h-12 w-12 shrink-0 rounded-[var(--radius-card)] object-cover"
+                            />
+                          )}
+                        </Card>
+                      </Link>
                     </li>
                   );
                 })}

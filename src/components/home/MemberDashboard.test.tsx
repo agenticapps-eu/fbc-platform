@@ -197,3 +197,30 @@ describe("Vorschaubilder in der Aktivitätsliste (AGE-635)", () => {
     expect(liste.querySelector("img")).toBeNull();
   });
 });
+
+describe("Die Aktivitätskarte führt in ihren Beitrag (AGE-587)", () => {
+  it("verlinkt jede Zeile auf den Deeplink ihres eigenen Beitrags", async () => {
+    // Den Deeplink `?post=<id>` gibt es seit AGE-587, und der Feed HOLT den
+    // Beitrag darüber gezielt — er ist also auch erreichbar, wenn er längst auf
+    // Seite 6 liegt. Gebaut haben ihn bis zum 28.08. nur die beiden
+    // Profilflächen; die Karte auf der Startseite war eine Karte ohne Link, und
+    // ein Klick darauf tat sichtbar nichts.
+    vi.mocked(fetchFeed).mockResolvedValue({
+      posts: [
+        beitrag({ id: "p-eins", body: "Erster Beitrag." }),
+        beitrag({ id: "p-zwei", body: "Zweiter Beitrag." }),
+      ],
+      nextCursor: null,
+    });
+
+    renderDash();
+
+    // Je Zeile IHR eigener Beitrag, nicht zweimal derselbe. Ein Link, der auf
+    // allen Zeilen dasselbe Ziel trägt, sähe bei nur einer geprüften Zeile
+    // genauso aus wie einer, der stimmt.
+    const erste = (await screen.findByText("Erster Beitrag.")).closest("a");
+    const zweite = screen.getByText("Zweiter Beitrag.").closest("a");
+    expect(erste).toHaveAttribute("href", "/aktivitaet?post=p-eins");
+    expect(zweite).toHaveAttribute("href", "/aktivitaet?post=p-zwei");
+  });
+});
