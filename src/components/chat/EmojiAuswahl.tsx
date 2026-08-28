@@ -128,6 +128,30 @@ export function EmojiAuswahl({
     }
   }, [offen, pos]);
 
+  // Escape schliesst — dokumentweit und in der CAPTURE-Phase, nicht am Dialog.
+  //
+  // Am Dialog griff es nur, solange der Fokus drinnen lag. Er kann aber hinaus:
+  // die Rasterfelder tragen zwar `tabIndex={-1}`, das Suchfeld ist aber ein
+  // regulärer Tabstopp, und hinter ihm führt Tab aus dem portalierten Overlay
+  // heraus. Danach lief das Escape am Hintergrundelement los und erreichte den
+  // Handler hier nie — offenes Overlay ohne Tastaturweg hinaus.
+  //
+  // CAPTURE und `stopPropagation`, weil `AppShell` die Chat-Schublade
+  // ihrerseits bei Escape über einen `document`-Lauscher schliesst
+  // (`AppShell.tsx`, `chatDrawerOpen`). In der Blasenphase schlösse ein
+  // Tastendruck beides auf einmal. So schliesst das erste Escape den Picker,
+  // das zweite die Schublade.
+  useEffect(() => {
+    if (!offen) return;
+    function aufTaste(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      schliesse();
+    }
+    document.addEventListener("keydown", aufTaste, true);
+    return () => document.removeEventListener("keydown", aufTaste, true);
+  });
+
   // Klick daneben schliesst. `mousedown` und nicht `click`, damit ein Klick ins
   // Eingabefeld dort auch den Cursor setzt.
   useEffect(() => {
@@ -218,12 +242,6 @@ export function EmojiAuswahl({
               height: HOEHE,
             }}
             className="z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-canvas shadow-lg"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                schliesse();
-              }
-            }}
           >
             <input
               ref={sucheRef}
@@ -325,6 +343,11 @@ function Feld({
     <button
       ref={refCb}
       type="button"
+      // Aus der Tab-Reihenfolge genommen: 1900 Tabstopps sind keine Bedienung,
+      // und wer per Tab hindurchläuft, verlässt am Ende den portalierten
+      // Dialog. Erreichbar bleiben die Felder über die Pfeiltasten, die sie
+      // ohnehin programmatisch fokussieren — `.focus()` wirkt auch bei -1.
+      tabIndex={-1}
       aria-label={name}
       onClick={onWaehle}
       onKeyDown={onTaste}

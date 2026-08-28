@@ -36,7 +36,20 @@ function nachricht(over: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 function zeige(messages: ChatMessage[]) {
-  render(<Conversation thread={THREAD} messages={messages} myId={ICH} onSend={() => {}} />);
+  return render(
+    <Conversation thread={THREAD} messages={messages} myId={ICH} onSend={() => {}} />,
+  );
+}
+
+/** Dieselbe Ansicht mit einer neuen Nachrichtenliste — für Übergänge, die zwei
+ *  getrennte Anstriche brauchen. */
+function erneut(
+  ergebnis: ReturnType<typeof zeige>,
+  messages: ChatMessage[],
+): void {
+  ergebnis.rerender(
+    <Conversation thread={THREAD} messages={messages} myId={ICH} onSend={() => {}} />,
+  );
 }
 
 describe("Conversation — Zeitstempel", () => {
@@ -93,8 +106,39 @@ describe("Conversation — Zeitstempel", () => {
     expect(screen.queryByTestId("nachricht-zeit")).toBeNull();
   });
 
+  // Dieselbe Geräte-Uhr, die aus gutem Grund NICHT als Uhrzeit erscheint, legte
+  // vorher trotzdem die Tagesgruppe fest: eine schwebende Blase konnte einen
+  // eigenen Tagesmarker aufmachen. Um 23:59 gesendet, vom Server nach
+  // Mitternacht gebucht — die Blase sprang nach der Bestätigung samt Marker.
+  // Das Argument gegen die Geräte-Uhr galt also nur zur Hälfte. Gefunden von
+  // einem fremden Reviewer.
+  it("macht für eine schwebende Blase KEINEN eigenen Tagesmarker auf", () => {
+    zeige([
+      nachricht({ id: "m1", createdAt: "2026-08-27T21:00:00.000Z" }),
+      nachricht({ id: "m2", createdAt: "2026-08-28T22:05:00.000Z", pending: true }),
+    ]);
+    // Ein Marker, nicht zwei: die schwebende Zeile hängt sich an die letzte
+    // bestätigte Gruppe, statt eine aus der Geräte-Uhr zu erfinden.
+    expect(screen.getAllByTestId("tagestrenner")).toHaveLength(1);
+  });
+
+  it("bekommt einen Marker, wenn sie die allererste Nachricht ist", () => {
+    // Der unvermeidbare Rest: ohne bestätigte Zeile gibt es nichts, woran sie
+    // sich hängen könnte. Dann ist die Geräte-Uhr die einzige Quelle.
+    zeige([nachricht({ id: "m1", createdAt: "2026-08-28T09:15:00.000Z", pending: true })]);
+    expect(screen.getAllByTestId("tagestrenner")).toHaveLength(1);
+  });
+
+  // Die erste Fassung dieses Tests rief `zeige([pending, { id: "m2" }])` und
+  // erwartete GENAU EINE Zeit. Das prüfte nur, dass eine zweite, bereits
+  // bestätigte Nachricht eine Zeit trägt — der Übergang DERSELBEN Nachricht
+  // wurde nie ausgelöst, und der Test wäre auch dann grün geblieben, wenn er
+  // nie funktioniert hätte. Ein fremder Reviewer hat das gefunden.
   it("zeigt die Zeit, sobald dieselbe Nachricht bestätigt ist", () => {
-    zeige([nachricht({ pending: true }), nachricht({ id: "m2" })]);
+    const ergebnis = zeige([nachricht({ id: "m1", pending: true })]);
+    expect(screen.queryAllByTestId("nachricht-zeit")).toHaveLength(0);
+
+    erneut(ergebnis, [nachricht({ id: "m1" })]);
     expect(screen.getAllByTestId("nachricht-zeit")).toHaveLength(1);
   });
 });

@@ -67,7 +67,27 @@ export function Conversation({
   // Rendern an — `messages` bleibt dabei dieselbe Liste. Ohne diesen Merker
   // liefe die Gruppierung über den GANZEN Verlauf bei jedem Zeichen erneut,
   // und `fetchMessages` (`lib/chat.ts`) holt ihn ohne Begrenzung.
-  const gruppen = useMemo(() => gruppiereNachTag(messages), [messages]);
+  //
+  // Gruppiert werden NUR die bestätigten Zeilen. Die schwebenden tragen die
+  // Uhr des Geräts, und dieselbe Uhr, die weiter unten bewusst nicht als
+  // Uhrzeit erscheint, darf auch keinen Tagesmarker aufmachen: um 23:59
+  // gesendet und vom Server nach Mitternacht gebucht, sprang die Blase sonst
+  // nach der Bestätigung samt Marker in eine andere Gruppe. Sie hängen sich
+  // deshalb an die letzte bestätigte Gruppe — chronologisch stehen sie ohnehin
+  // am Ende. Nur wenn es gar keine bestätigte Zeile gibt, bleibt die Geräte-Uhr
+  // die einzige Quelle; dieser Rest ist unvermeidbar.
+  const gruppen = useMemo(() => {
+    const bestaetigt = messages.filter((m) => !m.pending);
+    const schwebend = messages.filter((m) => m.pending);
+    const g = gruppiereNachTag(bestaetigt);
+    if (schwebend.length === 0) return g;
+    const letzte = g[g.length - 1];
+    if (!letzte) return gruppiereNachTag(schwebend);
+    return [
+      ...g.slice(0, -1),
+      { ...letzte, nachrichten: [...letzte.nachrichten, ...schwebend] },
+    ];
+  }, [messages]);
 
   // Fokus und Cursor NACH dem Anstrich setzen: vorher trägt das Feld noch den
   // alten Wert, und `setSelectionRange` liefe gegen dessen Länge.
@@ -245,7 +265,18 @@ export function Conversation({
               imFenster ? "pr-8" : "pr-9",
             )}
           />
+          {/* Der Schlüssel wirft Offen-Zustand, Suchbegriff und Position beim
+              Gesprächswechsel weg. Nötig, weil `ChatPage` dieselbe
+              `Conversation` weiterrendert — dort steht kein `key`. Ein Klick
+              in die Threadliste schliesst den Picker über `mousedown`, ein
+              Wechsel per Zurück/Vorwärts oder über die Tastatur aber nicht;
+              die nächste Wahl landete dann im Entwurf des ANDEREN Gesprächs.
+
+              Bewusst hier und nicht an der Aufrufstelle: ein `key` an der
+              `Conversation` selbst würfe auch den Entwurf weg, und dessen
+              Verhalten stammt nicht aus diesem Vorgang. */}
           <EmojiAuswahl
+            key={thread.id}
             imFenster={imFenster}
             onWaehle={fuegeEmojiEin}
             onSchliessen={() => eingabeRef.current?.focus()}

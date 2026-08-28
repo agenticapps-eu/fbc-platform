@@ -129,4 +129,75 @@ describe("EmojiAuswahl", () => {
     expect(dialog.closest("form")).toBeNull();
     expect(schalter.closest("form")).not.toBeNull();
   });
+
+  // Die 1900 Rasterfelder waren normale Tabstopps. Wer per Tastatur öffnete,
+  // ins Raster wechselte und dann Tab drückte, verliess den portalierten
+  // Dialog — das Overlay blieb offen, und das nächste Escape wurde am
+  // fokussierten Hintergrundelement ausgelöst und erreichte den Handler am
+  // Dialog nicht mehr. Ein offenes Overlay ohne Tastaturweg hinaus.
+  // Gefunden von einem fremden Reviewer.
+  it("nimmt die Rasterfelder aus der Tab-Reihenfolge", async () => {
+    await oeffne();
+    fireEvent.change(screen.getByLabelText("Emoji suchen"), { target: { value: "Herz" } });
+    const feld = await screen.findByRole("button", { name: "rotes Herz" });
+    // Erreichbar bleibt es über die Pfeiltasten, nicht über Tab.
+    expect(feld).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("schliesst mit Escape auch, wenn der Fokus den Dialog verlassen hat", async () => {
+    const { eingabe } = await oeffne();
+    // Fokus ausserhalb des Overlays — der Zustand, in dem der Handler am
+    // Dialog nicht mehr greift.
+    eingabe.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  // Der Preis eines dokumentweiten Lauschers: `AppShell` schliesst die
+  // Chat-Schublade ihrerseits bei Escape über einen `document`-Lauscher in der
+  // BLASENphase (`AppShell.tsx`, `chatDrawerOpen`). Liefe unserer ebenfalls
+  // dort, schlösse ein Tastendruck den Picker UND die Schublade — der Picker
+  // sässe ja gerade in ihr. Deshalb Capture plus `stopPropagation`; hier wird
+  // genau das nachgestellt, statt es zu behaupten.
+  it("lässt das erste Escape nicht bis zu einem Blasen-Lauscher durch", async () => {
+    await oeffne();
+    const fremd = vi.fn();
+    document.addEventListener("keydown", fremd);
+    try {
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(fremd).not.toHaveBeenCalled();
+
+      // Und danach kommt er wieder durch — sonst wäre die Schublade taub.
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(fremd).toHaveBeenCalledTimes(1);
+    } finally {
+      document.removeEventListener("keydown", fremd);
+    }
+  });
+
+  // `ChatPage` rendert beim Wechsel des Gesprächs DIESELBE `Conversation`
+  // weiter — es gibt dort kein `key`. Ein Klick in die Threadliste schliesst
+  // den Picker über `mousedown`; ein Wechsel per Zurück/Vorwärts oder über die
+  // Tastatur tut das NICHT. Ohne eigenen Schlüssel stünde er danach offen über
+  // dem anderen Gespräch, und die nächste Wahl landete in dessen Entwurf.
+  // Gefunden von einem fremden Reviewer.
+  it("schliesst, wenn das Gespräch wechselt — ohne Klick", async () => {
+    const ergebnis = render(
+      <Conversation thread={THREAD} messages={[] as ChatMessage[]} myId="ich" onSend={() => {}} />,
+    );
+    fireEvent.click(screen.getByLabelText("Emoji auswählen"));
+    await screen.findByRole("dialog");
+
+    ergebnis.rerender(
+      <Conversation
+        thread={{ ...THREAD, id: "t2", partner: { ...THREAD.partner, name: "Anna Berger" } }}
+        messages={[] as ChatMessage[]}
+        myId="ich"
+        onSend={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
