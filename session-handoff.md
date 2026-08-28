@@ -1,127 +1,157 @@
-# Session Handoff — 2026-08-28 (Nachmittag, AGE-641 Phase A abgeschlossen)
+# Session Handoff — 2026-08-28 (sechsundvierzigste Sitzung)
 
-**Worktree:** `fbc-platform.donald-age-641-push-fundament`, Branch
-`donald/age-641-push-fundament`. **PR #268 ist offen** (`72ce1d1`), CI lief beim
-Schreiben dieser Zeilen noch. **Phase A von AGE-641 ist vollständig** — der
-letzte offene Punkt (A5b, `pg_cron`) ist gebaut und auf DEV **und** PROD
-gemessen.
+Drei Dinge: **AGE-645 durch die volle Schleife und live**, ein **Passwort-Befund
+aus Detlevs Anmeldeproblem**, und ein **Worktree-Aufräumen, das schiefging** und
+dessen Lehre dieser Sitzung teuer war.
+
+| Vorgang | Stand |
+| --- | --- |
+| **AGE-645** Emoji, Zeitstempel, Tagesmarker (#269) | ✅ `4bf3524`, Deploy grün, Linear auf Done |
+| **AGE-656** Passwort ändern: 8 vs. 10 Zeichen | 🆕 **High**, Ursache belegt, Fix offen |
+| **AGE-655** `fetchMessages` ohne Begrenzung | 🆕 Medium, kein Regress |
+| Detlev kommt nicht rein | ✅ falsches Passwort, kein Vorfall |
+| Worktree-Aufräumen | ⚠️ 5 entfernt, **einer davon fremd belegt** — siehe unten |
+| Vier Worktrees übrig | `main`, dieser, `age-641`, `age-642` |
 
 ## Accomplished
 
-**Der Wiederholungslauf stösst sich selbst an.** Von Hand in beiden Datenbanken,
-weil der Bearer nicht ins öffentliche Repo gehört (Vorlage: `docs/secrets.md`):
-`create extension pg_cron` (1.6.4), `public.push_wiederholung()` als
-`security definer` mit leerem `search_path`, `revoke execute` von den
-Client-Rollen, cron-Eintrag `push-wiederholung`.
+**AGE-645 ist gelandet, nicht bloss gebaut.** Der Branch lag seit dem Vormittag
+fertig-aussehend da (5 Commits, kein PR). Offen war Abschnitt 8: die vier
+Prüfungen, `openspec validate`, die **Diff-Review** und das Archivieren.
 
-`net.http_post` ist **asynchron** — ein `succeeded` im cron-Protokoll sagt nur,
-dass das SQL lief. Deshalb zwei getrennte Belege je Seite:
+Die Diff-Review (Stufe 4, zwei fremde Anbieter, beide Hälften getrennt
+beurteilt) brachte **fünf Befunde, alle behoben**, jeder vorher als roter Test:
 
-| | DEV | PROD |
-| --- | --- | --- |
-| Extension, Funktion, `revoke` | ✅ | ✅ |
-| **Rumpf** — neue `net._http_response`-Zeile gegen vorher festgehaltene `max(id)` | 10 > 9 | 36 > 35 |
-| **Takt** — zwei aufeinanderfolgende Minuten | 11:40:00 + 11:41:00 | 11:40:00 + 11:41:00 |
-| Objekt-Drift-Scan | grün | grün |
+1. **[HIGH]** `Budget <3.000 Euro` → `Budget ❤️.000 Euro`. Der Test deckte
+   `<3000` ab — im Deutschen ist `<3.000` die übliche Schreibweise. Ebenso
+   `if (x <3)`. `<3` hat jetzt eine engere rechte Grenze als der Rest.
+2. **[MEDIUM]** Fokus konnte den Dialog per Tab verlassen, Escape ihn danach
+   nicht mehr erreichen.
+3. **[MEDIUM]** Der offene Picker überlebte einen Gesprächswechsel ohne Klick.
+4. **[MEDIUM]** Die schwebende Blase bestimmte ihren Tagesmarker über die
+   Geräte-Uhr — genau die Uhr, die bewusst nicht als Uhrzeit erscheint.
+5. **[LOW]** Ein Test behauptete einen Übergang, den er nie auslöste.
 
-Ohne die Grundlinie hätte die `200`-Zeile der Webhook-Probe **vom selben
-Vormittag** als Beleg getaugt, ohne einer zu sein.
-
-**Dem Spec-Delta fehlte die Anforderung.** Er verlangte, dass ein beanspruchter
-Auftrag eine Frist trägt, und setzte „den Wiederholungslauf" in einem Szenario
-*voraus* — dass ihn jemand **wiederkehrend anstösst**, stand nirgends. Genau die
-Lücke, durch die A5b abhakbar gewesen wäre, ohne dass etwas läuft.
-
-**Vier Korrekturen aus der Code-Review** (opencode, FREIGABE MIT AUFLAGEN, kein
-Code-Fehler) — alle als Korrektur sichtbar gemacht, nicht still ersetzt:
-
-1. **Der Takt war falsch begründet und deshalb falsch gewählt.** Zwei Fristen
-   verwechselt: **Rückstellung** nach Fehlschlag ist `now() + 1 min · 2^versuche`
-   (`20260827240000:312`, also 1-2-4-8-16), die **Anspruchsfrist** ist
-   `now() + 5 min` (`20260828100000:110,179`). `*/5` hätte die ersten zwei Stufen
-   verschluckt. Jetzt `* * * * *`.
-2. **„Ein roter Objekt-Drift-Scan lässt den Deploy stumm ausfallen" ist falsch**
-   — und stand schon länger in `db-drift-scan.test.ts`. `db-drift-scan.ts` läuft
-   nur in `migrate-prod.yml` (`workflow_dispatch`); `deploy.yml` fährt
-   `migration-drift-gate.ts`, ein anderes Gate.
-3. Zurückgestellt wird von `push_zustellung_quittieren`, nicht von der Tabelle.
-4. Der Scan prüft auch **Views**; Zeilenverweis `61-90`.
-
-**Sicherheitsbefund für alle drei Funktionen dieser Sorte:** `anon` und
-`authenticated` lesen den Rumpf per `pg_get_functiondef()` samt Bearer —
-`revoke execute` schützt das Ausführen, nicht das Lesen. Über die Client-Fläche
-nicht erreichbar (`404 PGRST202`), Positivkontrolle daneben:
-`POST /rpc/push_wiederholung` → `401 42501 permission denied`.
-
-**Der Worktree wurde mitten in der Sitzung von aussen gelöscht** (Aufräum-Sitzung
-`fbc-platform-f4`, 13:17). Über `wt switch` zurückgeholt; zwei ungesicherte
-Dateien neu geschrieben und gegen die Sicherung der anderen Sitzung gediffed —
-inhaltlich deckungsgleich.
+**Detlevs Anmeldeproblem war keins** — falsches Passwort. Die Prüfung hat aber
+etwas anderes freigelegt (AGE-656, siehe unten). Belegt wurde nur lesend gegen
+PROD; **keine** Änderung ausgeführt.
 
 ## Decisions
 
-- **Takt `* * * * *`, von Donald ausdrücklich so entschieden** gegen die zwei
-  Alternativen (Drosseln auf `*/5`, Job abschalten). Grund: die entworfene
-  Staffelung 1-2-4-8-16 soll wirklich greifen. Preis: ~1440 Aufrufe je Tag und
-  Projekt, alle `{"skipped":true}`, solange `push_tokens` leer ist.
-- **`push_wiederholung` als benannte Funktion statt `net.http_post` inline im
-  cron-Kommando.** Spiegelt das Webhook-Paar, hält den Bearer aus `cron.job`
-  heraus und gibt dem Drift-Scan einen Griff auf wenigstens die Funktions-Hälfte.
-- **Nicht als Migration.** `create extension` ist ein Eingriff in die Instanz,
-  den der lokale Stack nicht validieren kann; ein Fehlschlag in einer Migration
-  bräche `migrate-prod`.
-- **Nicht archiviert.** Der Change trägt auch Phase B (AGE-642).
-- **Die Wegwerf-Skripte sind gelöscht** (`wire-`, `mess-`, `reschedule`,
-  `rumpf-lesbar`). Durable ist nur `scripts/probe-age641-pg-cron.ts`; die
-  Wiederherstellungs-Vorlage steht in `docs/secrets.md`, wie beim Webhook.
+- **`<3` bekommt eine engere Grenze als die übrigen Emoticons.** Von links sind
+  `hab dich <3)` und `if (x <3)` nicht unterscheidbar. Entschieden über die
+  **Kosten**: eine falsche Ersetzung steht dauerhaft in `messages.body`, eine
+  ausgebliebene kostet zwei Zeichen. Der Preis ist getestet: `(hab dich <3)`
+  bleibt stehen.
+- **Kein Schliessen bei `focusout`**, obwohl der Reviewer es empfahl — in jsdom
+  grün, im Browser womöglich kaputt. Stattdessen Escape dokumentweit, **in der
+  Capture-Phase**: `AppShell` schliesst die Chat-Schublade ihrerseits bei
+  Escape, sonst schlösse ein Tastendruck beides.
+- **Das Spec-Delta wurde an die Fixes angepasst.** Das ist hier keine
+  Anpassung-an-den-Code: die alte Zusage verlangte wörtlich, `<3.000 Euro` zu
+  zerstören.
+- **Die Suchleistung nicht optimiert**, obwohl 20× drin wären — die Messung
+  (1,5 ms je Tastendruck) widerlegt die Dringlichkeit. Zahl steht in `tasks.md`.
 
 ## Files modified
 
-- `scripts/probe-age641-pg-cron.ts` — **neu**, lesende Probe je Seite; sieht die
-  cron-Hälfte, die der Drift-Scan nicht sieht
-- `scripts/db-drift-scan.logic.ts` — `push_wiederholung` in
-  `ERWARTET_OHNE_MIGRATION`; „in der Konsole" → „per SQL" richtiggestellt
-- `scripts/db-drift-scan.test.ts` — Zusage auf den neuen Namen (RED gemessen,
-  Positivkontrolle schlug an); die falsche deploy.yml-Kopplung korrigiert
-- `docs/secrets.md` — Vorlage, zwei-Fristen-Tabelle, Gate-Abgrenzung, der
-  Befund zur Lesbarkeit des Funktionsrumpfs
-- `openspec/changes/push-fundament/specs/notifications/spec.md` — neue
-  SHALL-Klausel + Szenario, samt Abgrenzung gegen „SHALL NOT abfragen"
-- `openspec/changes/push-fundament/tasks.md` — A5b abgeschlossen, Kopf
-  neu gefasst, vier Betriebsrisiken als eigene Vorgänge notiert
+- `src/lib/emoticons.ts` + Test — eigener Musterzweig für `<3`
+- `src/components/chat/{Conversation,EmojiAuswahl}.tsx` + drei Testdateien
+- `openspec/changes/archive/2026-08-28-emoji-und-zeitstempel-im-chat/` — archiviert,
+  `REVIEWS.md` um die Diff-Review erweitert, `## What Changes` nachgetragen
+- `openspec/specs/messaging/spec.md` — drei Anforderungen sind jetzt geltende Wahrheit
+- `src/content/release-entries.generated.ts` — neuer Eintrag
+- `.github/workflows/ci.yml` — der `gold`-Wächter nimmt `*.generated.ts` aus
+
+## Das Worktree-Aufräumen, und was dabei schiefging
+
+Donald bat um Aufräumen. Fünf gelandete Worktrees sind gefallen — vier zu Recht.
+Der fünfte, `age-641`, war **von einer laufenden Nachbarsitzung belegt**, und ich
+habe sie ihr weggezogen.
+
+Meine drei Belege waren einzeln wahr und zusammen wertlos: die PRs waren
+gemergt; der Branch stand exakt auf `origin/main` (**weil die Sitzung zehn
+Minuten vorher selbst synchronisiert hatte** — frisch synchronisiert sieht am
+fertigsten aus); der Arbeitsbaum war sauber (**eine Momentaufnahme**). Und als
+`wt remove` deshalb abbrach, habe ich `--force` genommen — das `?? datei` in der
+Meldung war ein Lebenszeichen.
+
+Verloren: eine untracked Probe (vorher gesichert, zurückgespielt, die
+Nachbarsitzung hat beide Fassungen gegeneinander gediffed) und eine Änderung an
+einer **getrackten** Datei (weg — unstaged heisst kein Blob; eine Suche über 958
+unerreichbare Blobs fand sie folgerichtig nicht). Die Nachbarsitzung hat sie neu
+geschrieben. Kein bleibender Schaden, aber vermeidbar.
+
+**Als Memory abgelegt:** erst `ListAgents`, dann offene Haken in
+`openspec/changes/`, dann die Nachbarsitzung fragen — und erst dann `wt remove`.
 
 ## Next session: start here
 
-**Zuerst PR #268 prüfen.** Beim Schreiben lief CI noch. Grün heisst: die vier
-Pflichtchecks auf der HEAD-SHA `72ce1d1` — über `check-runs` auf der SHA lesen,
-nicht über `gh run list`. Bei Grün mergen (Freigabe steht generell), danach
-`gh pr view --json state` gegenprüfen, ein `gh pr merge` kann still fehlschlagen.
+**`main` ist ausgeliefert** — `4bf3524`, `deploy`, `drift-gate`, `functions` und
+`migrations` grün. AGE-645 ist live.
 
-**`migrate-prod` ist danach NICHT nötig** — dieser PR trägt keine Migration. Der
-Objekt-Drift-Scan ist gegen beide Seiten schon grün gelaufen.
+Der naheliegende nächste Vorgang ist **AGE-656** (High): `EinstellungenPage.tsx:40`
+prüft `pw.length < 8`, PROD verlangt `password_min_length: 10`. Vier andere
+Stellen sagen 10 — `config.toml:230`, die `redeem-activation`-Function,
+`ActivationRedeemPage.tsx:18` und die live gelesene PROD-Konfiguration. Wer 8–9
+Zeichen wählt, kommt durch das Formular, wird vom Server abgelehnt und **sein
+Passwort ist unverändert**; die Erklärung kommt auf Englisch. Der Fix ist klein
+(gemeinsame Konstante), die Frage dahinter ist, wo sie liegen soll — heute steht
+sie in einer Seitenkomponente.
 
-**Danach ist Phase B dran, und die gehört AGE-642** (Capacitor-Hülle,
-Worktree `fbc-platform.donald-age-642-capacitor-huelle`). Ohne sie gibt es kein
-Gerätetoken, und ohne Gerätetoken bleibt `push_tokens` leer.
+Danach: **AGE-646** (Antworten, eine Spalte) oder **AGE-655** (Paging im
+Nachrichtenverlauf). **AGE-628** hängt weiter an Donalds Antworten.
+
+**Dieser Worktree** heisst nach einem längst archivierten Change und trägt jetzt
+den gemergten `donald/age-645-emoji-auswahl`. `wt remove`, wenn nichts mehr
+dranhängt — aber **vorher `ListAgents`**, siehe oben.
 
 ## Open questions
 
-- **Die App-ID `com.effbeezee.app` ist unbestätigt.** APNs prüft das Gerätetoken
-  **vor** dem Topic; zeigt sich erst am echten Gerät (AGE-642 B1).
-- **Die Anbieter-Secrets in `prod` sind bewusst leer.** Mit dem ersten echten
-  Gerätetoken müssen sie stehen.
-- **Vier Betriebsrisiken aus der Review**, in `tasks.md` notiert: ein
-  `db reset` tilgt den Lauf lautlos (DEV hat gar keinen Wächter) · ein
-  dauerhafter 401/502 bleibt unsichtbar, weil cron `succeeded` meldet ·
-  `net._http_response` wächst ungeräumt (~1440 Zeilen/Tag/Projekt) · das
-  Gesundheitssignal `{"skipped":true}` verfällt mit Phase B.
-- **`display_name_test.sql` steht in keiner CI-Dateiliste** (20 auf der Platte,
-  19 in `ci.yml`). Eine Zeile, eigener Vorgang.
-- **Ein Glocken-Hinweis je GESPRÄCH, nicht je Nachricht** — Entscheidung vom
-  27.08., Bestätigung offen.
-- **Abschnitt 4 des Issues ist mit Detlev nicht abgestimmt.**
-- Von der Nachbarsitzung gemeldet: **AGE-655** (`fetchMessages`,
-  `src/lib/chat.ts:320`, lädt ohne `limit`/`range`), **AGE-653**
-  (`deno.json` nach `supabase/functions/`).
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
-  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **Die erste Release-Note ist weiterhin nicht zugestellt** (Donald/Detlev; sie
+  geht genau einmal an alle aktivierten Mitglieder). Sie trägt jetzt AGE-645.
+  **10 von 59 Einträgen haben einen leeren Rumpf**, weil ihrem Proposal
+  `## What Changes` fehlt — beim Zustellen sichtbar.
+- **57 von 74 Profilen sind nicht aktiviert** (gemessen 28.08. auf PROD). Passt
+  zum offenen Punkt „Aktivierungsversand 69/72".
+- Unverändert offen: AGE-646/647/648 · AGE-610 · AGE-512 · Rotation des
+  PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-629/630 · AGE-653 ·
+  die Threadliste markiert offene Chatfenster nicht · `community-feed/spec.md:6`
+  verspricht „threaded comments", `public.comments` hat kein `parent_id`.
+
+## Was diese Sitzung gelernt hat
+
+Die dauerhaften Lehren liegen als Memory-Einträge; hier nur das Nötige.
+
+**Ein Reviewer, der den Code AUSFÜHRT, findet, was Leser übersehen.** `opencode`
+hat `ersetzeEmoticons` mit echten Zeichenketten aufgerufen und damit den
+HIGH-Befund erzeugt. `gemini` las und fand einen `useMemo`. Beide Verdikte
+zählten, aber nur eines fand einen Datenverlust.
+
+**Und die eigene Fehlalarm-Prüfung schlug sich selbst:** der Test deckte
+`<3000` ab und der Kommentar behauptete, so schreibe man das im Deutschen. Man
+schreibt `<3.000`.
+
+**`verify` fährt drei grep-Wächter, die kein pnpm-Skript auslöst.** Der
+`gold`-Wächter sucht als einziger das bloße Wort und traf sechs deutsche
+Emoji-Namen. Lokal grün heisst dort nichts — und ein Branch ohne PR sammelt
+solche Überraschungen, weil CI seine Dateien nie gesehen hat.
+
+**`gh pr merge` schlug im Worktree fehl, NACHDEM der Merge durch war**
+(`'main' is already used by worktree`). Diesmal täuschte ein Fehler einen
+Misserfolg vor — früher täuschte leerer Output einen Erfolg vor. In beide
+Richtungen entscheidet nur `gh pr view --json state`.
+
+## Umgebung
+
+`infisical run --env=prod` liest PROD (20 Secrets); für Skripte im Scratchpad
+`node_modules` dorthin symlinken, sonst findet `tsx` kein `pg`, und `.mts` statt
+`.ts`. Die Management-API braucht `SUPABASE_ACCESS_TOKEN` aus Infisical **dev**;
+`GET /v1/projects/<ref>/config/auth` liefert die GoTrue-Konfiguration.
+PROD-Projekt: `viwntbodrtqxgmqyxluh`.
+
+Reviewer: `gemini -p` (stdin wird angehängt; `--approval-mode plan` ist **nicht**
+freigeschaltet und endet mit Exit 0 bei LEERER Ausgabe) und `opencode run`
+(stdin, ~9 Minuten für 2500 Diff-Zeilen, liest dabei selbst im Repo nach).
+`gemini` wies sich als `gemini-1.5-pro-reviewer-de` aus — keine echte
+Modellkennung, als Selbstauskunft ohne Deckung behandelt.
