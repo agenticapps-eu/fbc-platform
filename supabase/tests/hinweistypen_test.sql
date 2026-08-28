@@ -464,11 +464,16 @@ select isnt(
     where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
   null, 'die Nutzlast nennt das Gespraech, damit der Hinweis sich oeffnen laesst');
 
--- ── 9b. Eine Zeile je GESPRAECH, nicht je Nachricht ─────────────────────────
--- Zwanzig Nachrichten am Stueck sind ein Gespraech, kein zwanzigfacher Anlass.
--- Solange der Hinweis ungelesen ist, kommt keiner dazu — sonst wuerde die
--- Glocke bei jedem Chat volllaufen und das Telefon zwanzigmal wecken. Genau
--- der Laerm, der dazu fuehrt, dass jemand Push GANZ abschaltet.
+-- ── 9b. Eine Zeile JE NACHRICHT, auch bei ungelesenem Hinweis ───────────────
+-- Bis zum 28.08. stand hier das Gegenteil: eine Zeile je GESPRAECH, solange
+-- der Hinweis ungelesen ist. Am selben INSERT haengt aber der Push
+-- (`notifications_push_webhook`, AFTER INSERT) — die unterdrueckte Zeile
+-- machte das Telefon fuer den Faden DAUERHAFT stumm, auch fuer die Nachricht
+-- von morgen. Am echten Geraet gemessen, siehe `20260828200000`.
+--
+-- Der Preis ist ausdruecklich in Kauf genommen: zwanzig Nachrichten wecken
+-- zwanzigmal. Die Zusammenfassung gehoert in die ANZEIGE (die Glocke fasst
+-- `message`-Zeilen je Faden zusammen), nicht ins Ereignis.
 
 insert into public.messages (thread_id, sender_id, body)
 select t.id, 'c0000000-0000-0000-0000-00000000000a', 'Noch ein Satz'
@@ -481,11 +486,11 @@ select t.id, 'c0000000-0000-0000-0000-00000000000a', 'Noch ein Satz'
 select is(
   (select count(*)::int from public.notifications
     where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'),
-  1, 'die zweite Nachricht erzeugt keine zweite ungelesene Zeile');
+  2, 'die zweite Nachricht erzeugt eine zweite Zeile, trotz ungelesener erster');
 
--- Und die Gegenprobe: nach dem Lesen meldet sich das Gespraech wieder. Ohne
--- sie waere „keine zweite Zeile" auch von einem Trigger erfuellt, der nach der
--- ersten Nachricht nie wieder etwas tut.
+-- Und die Gegenprobe: die neue Zeile ist auch wirklich neu und ungelesen. Ohne
+-- sie waere „zwei Zeilen" auch von einem Trigger erfuellt, der die bestehende
+-- Zeile umschreibt statt einzufuegen — und genau daran haengt der Push.
 update public.notifications set read_at = now()
  where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b';
 
@@ -501,7 +506,7 @@ select is(
   (select count(*)::int from public.notifications
     where type = 'message' and profile_id = 'c0000000-0000-0000-0000-00000000000b'
       and read_at is null),
-  1, 'nach dem Lesen meldet sich das Gespraech wieder');
+  1, 'nach dem Lesen ist die naechste Zeile wieder ungelesen');
 
 -- ── 9c. Schalter und Aktivierung ────────────────────────────────────────────
 
