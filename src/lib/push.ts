@@ -114,3 +114,53 @@ export async function pushAbmelden(): Promise<"nichts" | "entfernt" | "fehler"> 
   }
   return "entfernt";
 }
+
+/**
+ * Das Sprungziel aus der Nutzlast einer Mitteilung — oder `null`.
+ *
+ * Die Serverseite legt es längst bei (`send-push/nachrichten.ts`): für eine
+ * Nachricht `/chat/<thread_id>`, für die drei Kontaktanfrage-Typen bewusst
+ * nichts. Gelesen wurde es auf dem Gerät bis zum 28.08. nicht, und ein Tipp
+ * öffnete deshalb nur die App — bei einem Hinweis, der „jemand hat Ihnen
+ * geschrieben" sagt, ist das der schlechteste aller Ausgänge: er nennt einen
+ * Anlass und lässt einen dann suchen.
+ *
+ * **Warum hier geprüft wird, obwohl der Wert vom eigenen Server kommt.** Er
+ * kommt über einen FREMDEN Zustelldienst auf das Gerät und wird ungeprüft in
+ * eine Navigation gegeben. Genau daraus wird aus einem Push ein Umleiter auf
+ * eine fremde Seite. Erlaubt ist deshalb nur ein absoluter Pfad innerhalb
+ * dieser Anwendung — und ausdrücklich NICHT `//host`, das wie ein interner
+ * Pfad aussieht und protokollrelativ auf einen fremden Host führt.
+ */
+export function pushZiel(daten: unknown): string | null {
+  const ziel = (daten as { ziel?: unknown } | undefined)?.ziel;
+  if (typeof ziel !== "string") return null;
+  if (!ziel.startsWith("/") || ziel.startsWith("//")) return null;
+  return ziel;
+}
+
+// Auch dieser Zuhörer darf nur EINMAL hängen — `addListener` haengt sonst bei
+// jedem Aufruf einen weiteren an, und ein Tipp navigierte doppelt.
+let zielZuhoererSteht = false;
+
+/**
+ * Lässt einen Tipp auf die Mitteilung in ihr Gespräch führen.
+ *
+ * **Getrennt von `pushEinrichten` und früher als sie.** Die Erlaubnisfrage
+ * gehört ans Öffnen der Nachrichten; dieser Zuhörer muss stehen, sobald die
+ * Hülle steht — sonst kommt ein Kaltstart AUS der Mitteilung heraus an, bevor
+ * jemand zuhört, und der Sprung fällt genau dann aus, wenn er am meisten
+ * bedeutet.
+ */
+export async function pushZielZuhoerer(navigiere: (ziel: string) => void): Promise<void> {
+  if (!pushPlattform(Capacitor.isNativePlatform(), Capacitor.getPlatform())) return;
+  if (zielZuhoererSteht) return;
+  zielZuhoererSteht = true;
+
+  await PushNotifications.addListener("pushNotificationActionPerformed", (ereignis) => {
+    const ziel = pushZiel(ereignis.notification.data);
+    // Ohne Ziel bleibt die App dort, wo sie ist. Ein Sprung auf gut Glück wäre
+    // schlechter als keiner.
+    if (ziel) navigiere(ziel);
+  });
+}

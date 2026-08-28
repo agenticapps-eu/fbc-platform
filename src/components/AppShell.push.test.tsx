@@ -22,8 +22,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `env(safe-area-inset-*)` und beim `backButton`. Die Grenze ist deshalb
  * bewusst das Modul: DASS es gerufen wird, wann, und wie oft.
  */
-const { pushEinrichten } = vi.hoisted(() => ({ pushEinrichten: vi.fn(async () => "web") }));
-vi.mock("../lib/push", () => ({ pushEinrichten }));
+const { pushEinrichten, pushZielZuhoerer } = vi.hoisted(() => ({
+  pushEinrichten: vi.fn(async () => "web"),
+  // Der Ziel-Zuhoerer haengt seit AGE-641 Phase B am Montieren der Huelle.
+  // Ohne Attrappe liefe der echte in jsdom — und ein fehlendes Feld hier machte
+  // JEDE Zusage dieser Datei rot, nicht nur die zum Sprungziel.
+  pushZielZuhoerer: vi.fn(async () => {}),
+}));
+vi.mock("../lib/push", () => ({ pushEinrichten, pushZielZuhoerer }));
 
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),

@@ -4,7 +4,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
-import { pushEinrichten } from "../lib/push";
+import { pushEinrichten, pushZielZuhoerer } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
   ANFRAGEN_STALE_TIME_MS,
@@ -628,6 +628,21 @@ export default function AppShell() {
       if (stand === "fehler") pushGefragtFuer.current = null;
     });
   }, [user, nachrichtenOffen]);
+
+  // Ein Tipp auf die Mitteilung führt in ihr Gespräch (AGE-641 Phase B).
+  //
+  // BEIM MONTIEREN, nicht beim Öffnen der Nachrichten — und das ist der ganze
+  // Punkt dieses zweiten Effects. Der wichtigste Tipp ist der auf ein
+  // GESPERRTES Telefon: dabei startet die App kalt und kommt AUS der Mitteilung
+  // heraus. Hinge der Zuhörer an derselben Bedingung wie die Erlaubnisfrage,
+  // stünde er in genau diesem Fall noch nicht, und der Sprung fiele aus, wenn
+  // er am meisten bedeutet.
+  //
+  // Keine Abhängigkeit ausser `navigate`: `pushZielZuhoerer` meldet sich selbst
+  // nur einmal an und gibt im Web sofort zurück.
+  useEffect(() => {
+    void pushZielZuhoerer((ziel) => navigate(ziel));
+  }, [navigate]);
 
   // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es
   // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon

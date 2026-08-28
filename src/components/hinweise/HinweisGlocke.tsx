@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Hinweis } from "../../lib/hinweise";
 import { Icon } from "../ui/icons";
@@ -32,6 +32,37 @@ export function HinweisGlocke({
 }) {
   const [offen, setOffen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  /**
+   * Wie breit das Panel höchstens werden darf (AGE-641, am Gerät gefunden).
+   *
+   * Es hängt mit `right-0` am KNOPF, nicht am Fensterrand — rechts vom Knopf
+   * stehen Avatar und Zurück-Pfeil. Auf einem iPhone lief es deshalb links aus
+   * dem Bild, und die erste Spalte der Namen war abgeschnitten.
+   *
+   * `max-w-[calc(100vw-2rem)]` stand schon da und half nicht: es begrenzt auf
+   * die FENSTERBREITE, während die eigentliche Schranke der Platz LINKS vom
+   * Knopf ist. Der ist in CSS nicht ausdrückbar, weil er davon abhängt, was
+   * rechts daneben steht — und das wechselt mit Anmeldezustand und Route.
+   *
+   * Deshalb gemessen statt geraten: die rechte Kante des Containers IST der
+   * verfügbare Platz. `useLayoutEffect` und nicht `useEffect`, damit der Wert
+   * vor dem ersten Anstrich steht und das Panel nicht sichtbar springt.
+   */
+  const [maxBreite, setzeMaxBreite] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!offen) return;
+    const messen = () => {
+      const rechts = ref.current?.getBoundingClientRect().right;
+      // 8 px Luft zum Rand, dieselbe wie die Kopfzeile links hält.
+      setzeMaxBreite(rechts ? Math.max(0, rechts - 8) : undefined);
+    };
+    messen();
+    // Drehen des Geräts ändert beides: die Fensterbreite und die Lage des
+    // Knopfes darin.
+    window.addEventListener("resize", messen);
+    return () => window.removeEventListener("resize", messen);
+  }, [offen]);
 
   useEffect(() => {
     if (!offen) return;
@@ -84,6 +115,7 @@ export function HinweisGlocke({
         <div
           role="dialog"
           aria-label="Benachrichtigungen"
+          style={{ maxWidth: maxBreite }}
           className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas shadow-soft"
         >
           {anzahl === 0 ? (
