@@ -21,6 +21,9 @@
  * kommerzielle Nutzung erlaubt). Bewusst KEIN neuer Fremdabruf: ein Demo-Bild
  * ohne geklärte Herkunft ist genau das Problem, das jene Datei gelöst hat. Sie
  * sind ausserdem schon `image/webp` — der einzige Typ, den der Bucket annimmt.
+ * Seit AGE-599 gehen sie trotzdem nicht roh hinein, sondern durch
+ * `titelbildZuschnitt`: als Seitenkoepfe sind sie 1,50:1 bzw. 1,33:1, und das
+ * Feld der Event-Kachel ist seit AGE-596 3:1.
  *
  * DIE PFADREGEL IST NICHT VERHANDELBAR:
  * `event_cover_lesbar` verlangt, dass das erste Pfadsegment die `host_id` des
@@ -28,13 +31,13 @@
  * nicht signieren und bliebe für JEDEN Betrachter ein grauer Kasten — ohne
  * Fehlermeldung. Der Pfad wird deshalb aus der Datenbank gelesen, nicht geraten.
  */
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
 import { assertOptIn, resolveDatabaseUrl } from "./demo_seed.lib";
+import { titelbildZuschnitt } from "./event_cover_zuschnitt";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BILDER = join(HERE, "..", "..", "public", "images");
@@ -128,7 +131,12 @@ async function main(): Promise<void> {
       }
       // Erstes Segment = host_id. Siehe die Pfadregel im Kopf dieser Datei.
       const pfad = `${ev.host_id}/demo-${zu.datei}`;
-      const bytes = readFileSync(join(BILDER, zu.datei));
+      // AGE-599: zugeschnitten statt roh — dieselbe Begründung wie in
+      // `import_world_seed.ts`. Diese zweite Stelle stand in keinem Issue; sie
+      // lädt dieselben Heldenbilder in denselben Bucket, und nur eine von
+      // beiden zu reparieren hätte den Befund halb behoben und ganz für
+      // erledigt erklärt.
+      const bytes = await titelbildZuschnitt(join(BILDER, zu.datei));
       const stand = await hochladen(basis, key, pfad, bytes);
       await client.query(`update public.events set cover_path = $1 where id = $2`, [pfad, ev.id]);
       console.log(`  ✓ ${ev.title.padEnd(42)} ← ${zu.datei} (${stand})`);
