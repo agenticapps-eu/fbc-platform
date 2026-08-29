@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- eff.bee.zee Kompassmarke (AGE-492). Ring auf 3.5 statt 2.5 verstärkt:
-       bei 16 px Favicon-Größe verschwindet die dünnere Linie sonst. -->
-  <!-- AGE-499: Die Zacken brechen aus dem Ring aus, wie in der Marke selbst
-       (CompassMark.tsx). Ring dafür von 20.5 auf 15.5 eingerückt — beide Dateien
-       müssen dieselbe Form zeigen, sonst trägt der Tab ein anderes Logo als die App. -->
-  <circle cx="24" cy="24" r="15.5" fill="none" stroke="#1F53B0" stroke-width="3.5" />
-  <path d="M24 2 L27.4 20.6 L46 24 L27.4 27.4 L24 46 L20.6 27.4 L2 24 L20.6 20.6 Z" fill="#1F53B0" />
+  <!-- eff.bee.zee Kompassmarke (AGE-492), neue Fassung vom 29.08.: kein Ring
+       mehr, dafür vier Nebenstrahlen auf den Diagonalen. Form vermessen an
+       docs/marke-neu/marke-allein.jpeg — die Zahlen und die Methode stehen in
+       docs/marke-neu/entwurf-messung.md. Alle drei Stellen (diese Datei,
+       CompassMark.tsx, docs/design-system.html) müssen dieselbe Form zeigen,
+       sonst trägt der Tab ein anderes Logo als die App.
+       Ein einziger Pfad mit fünf Teilzügen, kein zweites Element: das Skript
+       scripts/app-icons.logic.ts liest genau diesen Pfad und erzeugt daraus
+       App-Symbol und Startfläche. Eine Form mehr in dieser Datei zeichnete es
+       nicht mit — deshalb zählt es sie und bricht ab. -->
+  <path d="M24 2 L27.15 20.85 L46 24 L27.15 27.15 L24 46 L20.85 27.15 L2 24 L20.85 20.85 Z M27.89 20.11 L29.64 19.9 L34.58 13.42 L28.1 18.36 Z M27.89 27.89 L28.1 29.64 L34.58 34.58 L29.64 28.1 Z M20.11 27.89 L18.36 28.1 L13.42 34.58 L19.9 29.64 Z M20.11 20.11 L19.9 18.36 L13.42 13.42 L18.36 19.9 Z" fill="#1F53B0" />
 </svg>

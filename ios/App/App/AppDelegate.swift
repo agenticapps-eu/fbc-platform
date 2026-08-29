@@ -33,6 +33,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    // AGE-641 Phase B: Das Geraetetoken von APNs an die Capacitor-Bruecke
+    // weiterreichen.
+    //
+    // Capacitor erzeugt diese Datei OHNE die beiden Methoden. Fehlen sie,
+    // laeuft `PushNotifications.register()` fehlerfrei durch und das
+    // `registration`-Ereignis feuert einfach NIE — kein Fehler, keine Warnung,
+    // nur kein Token. Der Rest der Kette (`claim_push_token`, `send-push`,
+    // Wiederholungslauf) waere fertig und `push_tokens` bliebe trotzdem leer,
+    // und man suchte den Fehler auf der Serverseite.
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications,
+                                        object: deviceToken)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications,
+                                        object: error)
+    }
+
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {

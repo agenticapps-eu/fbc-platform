@@ -79,6 +79,51 @@ in einer Besprechung offen herum.
 - **WHEN** eine Nachricht an ein Konto geht, das nicht aktiviert ist
 - **THEN** es wird kein Hinweis geschrieben
 
+### Requirement: Jede Nachricht erhebt ihren eigenen Hinweis, die Glocke fasst zusammen
+
+Das System SHALL für **jede** Chat-Nachricht einen eigenen Hinweis schreiben,
+auch dann, wenn für dasselbe Gespräch bereits ein ungelesener Hinweis liegt.
+
+Diese Anforderung nennt ausdrücklich, an welcher Stelle NICHT zusammengefasst
+werden darf: am Ereignis hängt der Push. Unterbleibt die Zeile, unterbleibt die
+Zustellung — und zwar nicht für die zweite Nachricht, sondern für **jede
+weitere**, solange irgendein ungelesener Hinweis des Fadens liegen bleibt. Ein
+Gespräch wäre dann dauerhaft stumm.
+
+Die Zusammenfassung je Gespräch SHALL stattdessen in der **Anzeige** liegen: die
+Glocke SHALL die ungelesenen Nachrichten-Hinweise eines Gesprächs zu einem
+Eintrag zusammenfassen und den jüngsten davon zeigen.
+
+Wird ein solcher Eintrag als gelesen markiert, SHALL das **alle** ungelesenen
+Nachrichten-Hinweise desselben Gesprächs markieren. Andernfalls erschiene der
+Eintrag sofort wieder, mit der nächstälteren Zeile.
+
+Die Mengenbegrenzung der Glocke SHALL NOT dazu führen, dass ein einzelnes
+vielbeschriebenes Gespräch Hinweise anderer Typen aus der Liste verdrängt.
+
+#### Scenario: Die zweite Nachricht erzeugt eine zweite Zeile
+
+- **WHEN** eine Nachricht eingeht, während für dasselbe Gespräch ein ungelesener
+  Hinweis liegt
+- **THEN** wird ein weiterer Hinweis geschrieben, und der Push wird angestoßen
+
+#### Scenario: Die Glocke zeigt ein Gespräch einmal
+
+- **WHEN** ein Gespräch mehrere ungelesene Nachrichten-Hinweise trägt
+- **THEN** zeigt die Glocke dafür genau einen Eintrag, und zwar den jüngsten
+
+#### Scenario: Gelesen heißt das ganze Gespräch
+
+- **WHEN** ein Mitglied den zusammengefassten Eintrag als gelesen markiert
+- **THEN** gilt kein Nachrichten-Hinweis dieses Gesprächs mehr als ungelesen
+
+#### Scenario: Ein lautes Gespräch verdrängt keine Kontaktanfrage
+
+- **WHEN** ein Gespräch mehr ungelesene Nachrichten-Hinweise trägt, als die
+  Glocke insgesamt zeigt, und daneben ein älterer Hinweis eines anderen Typs
+  ungelesen ist
+- **THEN** erscheint dieser andere Hinweis weiterhin in der Glocke
+
 ### Requirement: Ein Hinweis zu einer Kontaktanfrage trägt deren Freitext nicht
 
 Eine Kontaktanfrage führt eine **von einem Mitglied geschriebene Nachricht** mit
@@ -239,6 +284,67 @@ anderen Fläche abhängen, die für Zustellung nicht einsteht.
 - **WHEN** die Entscheidung, ob ein Typ gepusht wird, geändert wird
 - **THEN** wirkt die Änderung, ohne dass Trigger oder Function neu ausgeliefert
   werden
+
+### Requirement: Die Erlaubnis für Push wird gefragt, wenn sie erklärbar ist
+
+Die App SHALL die Erlaubnis für Push-Benachrichtigungen erst dann anfordern,
+wenn ein Mitglied die **Nachrichten öffnet**, und SHALL NOT sie beim Start
+anfordern.
+
+Der Grund ist keine Geschmacksfrage: iOS zeigt den Systemdialog **einmal**. Wer
+ihn beim Kaltstart sieht — vor jedem Kontext, in dem eine Benachrichtigung einen
+Sinn ergäbe —, lehnt ab, und die Ablehnung ist endgültig. Ein zweiter Anlauf ist
+danach nur noch über die Systemeinstellungen möglich, also praktisch nicht.
+
+Die Anfrage SHALL **höchstens einmal je App-Lauf und Konto** ausgelöst werden,
+gleich wie oft die Nachrichten geöffnet und wieder geschlossen werden.
+
+Wechselt in derselben Sitzung das Konto, SHALL erneut registriert werden. Ein
+Gerät und zwei Konten ist der Normalfall, nicht der Randfall; ohne die erneute
+Registrierung bliebe das Gerätetoken beim vorigen Konto, und dessen Zustellungen
+gingen an ein Telefon, das jemand anderes in der Hand hält.
+
+Die Anfrage SHALL ein angemeldetes Mitglied voraussetzen. Ohne Anmeldung gibt es
+kein Profil, dem ein Gerätetoken gehören könnte.
+
+Auf der Web-Fläche SHALL nichts geschehen: kein Dialog, keine Registrierung.
+
+Das erhaltene Gerätetoken SHALL über `claim_push_token` abgelegt werden, samt
+Plattform. Scheitert das Ablegen, SHALL das die Nachrichten NOT blockieren.
+
+#### Scenario: Der Start fragt nicht
+
+- **WHEN** die App startet und ein angemeldetes Mitglied irgendeine andere
+  Fläche als die Nachrichten sieht
+- **THEN** wird keine Erlaubnis angefordert
+
+#### Scenario: Das Öffnen der Nachrichten fragt
+
+- **WHEN** ein angemeldetes Mitglied die Nachrichten öffnet
+- **THEN** wird die Erlaubnis angefordert und bei Zustimmung das Gerätetoken
+  abgelegt
+
+#### Scenario: Zweimal öffnen fragt nicht zweimal
+
+- **WHEN** ein Mitglied die Nachrichten schließt und erneut öffnet
+- **THEN** bleibt es bei genau einer Anforderung in diesem App-Lauf
+
+#### Scenario: Ein Kontowechsel registriert erneut
+
+- **WHEN** sich in derselben Sitzung ein anderes Mitglied anmeldet und die
+  Nachrichten öffnet
+- **THEN** wird erneut registriert, und das Gerätetoken gehört danach dem neuen
+  Konto
+
+#### Scenario: Ohne Anmeldung wird nicht gefragt
+
+- **WHEN** ein Gast dieselbe Fläche erreicht
+- **THEN** wird keine Erlaubnis angefordert
+
+#### Scenario: Die Web-Fläche bleibt unberührt
+
+- **WHEN** die Nachrichten im Browser geöffnet werden
+- **THEN** wird weder ein Dialog gezeigt noch ein Token registriert
 
 ## MODIFIED Requirements
 

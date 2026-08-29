@@ -411,19 +411,78 @@ Phase B beginnt erst danach.
 
 ## Phase B — Clientseite (nach AGE-642)
 
-- [ ] `@capacitor/push-notifications`; Registrierung über `claim_push_token`,
-      `letzter_kontakt` bei jedem Start.
-- [ ] Erlaubnis-Dialog **nicht beim ersten Start**, sondern wenn er erklärbar
-      ist — nach der ersten Nachricht. Wer beim Kaltstart gefragt wird, sagt
+> **Stand 28.08., abends.** Die Verdrahtung steht, gebaut ist beides. Was noch
+> offen ist, ist **ausnahmslos am Gerät zu messen** — und das Telefon war beim
+> Bauen nicht da. Der Reihe nach, wenn es zurück ist:
+>
+> 1. `xcrun devicectl device install app --device <UDID> <App.app>`
+> 2. Nachrichten öffnen, Erlaubnis geben (der Dialog kommt genau **hier**, nicht
+>    beim Start)
+> 3. `select count(*) from push_tokens` muss **1** sein. Vorher ist er 0 — das
+>    ist die Positivkontrolle, ohne die der Rest nichts belegt.
+> 4. Erst dann eine Nachricht einfügen und den Push abwarten.
+
+- [x] `@capacitor/push-notifications`; Registrierung über `claim_push_token`,
+      `letzter_kontakt` bei jedem Start. Der Android-Teil fehlte bis hierher
+      still: die Abhängigkeit lag seit Phase A im `package.json`, aber
+      `capacitor.build.gradle` und `capacitor.settings.gradle` kannten das
+      Plugin nicht — ein `cap sync android` war nach dem Hinzufügen nie
+      gelaufen. Auf iOS wäre es nicht aufgefallen (SPM erzeugt `Package.swift`
+      bei jedem Sync neu), auf Android hätte die Registrierung zur Laufzeit
+      nichts gefunden.
+- [x] Erlaubnis-Dialog **nicht beim ersten Start**, sondern wenn er erklärbar
+      ist — beim Öffnen der Nachrichten. Wer beim Kaltstart gefragt wird, sagt
       nein, und iOS fragt kein zweites Mal.
-- [ ] Abmelden entfernt das Token des Geräts. **(R2)** Und der Fall, dass genau
-      das fehlschlägt, ist getestet: das nächste Konto übernimmt das Token.
-- [ ] Zustellung auf **echtem** Android- und **echtem** iOS-Gerät gemessen, im
-      Vordergrund, Hintergrund und bei geschlossener App.
-- [ ] **Sichtprobe am Sperrbildschirm**: „… hat dir geschrieben", kein Text.
-      Bildschirmfoto als Beleg — die Zusage ist sonst unbelegt.
+
+      **Beide** Wege hinein zählen, die Schublade und die Route `/chat`: der
+      Einstieg in der Kopfzeile führt auf die Route, und nur die Schublade zu
+      nehmen hiesse, wer ihn antippt, wird nie gefragt.
+
+      **Höchstens einmal je App-Lauf UND Konto.** Der Riegel merkt sich die
+      Kennung des Kontos, nicht ein Ja/Nein — ein bloßes Ja hätte genau den
+      Fall verschluckt, für den `claim_push_token` gebaut wurde. Beim Schreiben
+      war er zuerst ein Ja/Nein; gefunden hat es der Test, nicht das Lesen.
+- [x] Abmelden entfernt das Token des Geräts. **(R2)** Und der Fall, dass genau
+      das fehlschlägt, ist getestet: das nächste Konto übernimmt das Token
+      (`push_tokens_test.sql:169-187`, pgTAP, seit Phase A grün).
+
+      Das Aufräumen liegt in `AuthProvider.signOut` und nicht bei einem der
+      **fünf** Aufrufer — sonst hätten die anderen vier die Lücke, still. Die
+      Reihenfolge ist die eigentliche Zusage: **vor** `auth.signOut()`, weil
+      danach kein Konto mehr da ist, dem die Zeile gehört, und das `delete`
+      null Zeilen träfe, ohne einen Fehler zu melden.
+- [x] Zustellung auf **echtem iOS-Gerät** gemessen, bei gesperrtem Telefon
+      (28.08., mit Grundlinie davor): `push_tokens` 0 → 1 nach dem Dialog,
+      `ios`, **64 Zeichen** = APNs-Länge · dann `notifications` +1 ·
+      `net._http_response` #372 `200` · Antwort `{"zugestellt":2,…}`.
+
+      Damit sind **beide** Hälften der App-ID-Frage beantwortet: APNs gab ein
+      Token aus **und** nahm die Zustellung an — `com.effbeezee.app` stimmt.
+- [ ] Dasselbe auf **echtem Android-Gerät**, und auf iOS zusätzlich im
+      Vordergrund und im Hintergrund. Offen: gemessen ist der Fall, der zählt
+      (gesperrt), nicht die anderen drei.
+- [x] **Sichtprobe am Sperrbildschirm**: „… hat dir geschrieben", kein Text —
+      von Donald am 28.08. gesehen und aufgenommen.
 - [ ] Opt-out je Typ am Gerät nachgewiesen.
 - [ ] Ungültiges Token wird nach Ablehnung entfernt.
+- [ ] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
+      deinstallierten App. APNs meldet es noch eine Weile als gültig, also
+      kommt kein `dauerhaft` — von selbst verschwindet es **nie**.
+
+### B-Anzeige · Die Glocke fasst je Gespräch zusammen ✅
+
+- [x] `fetchHinweise` dampft `message`-Zeilen je `thread_id` auf die neueste
+      ein; `markiereHinweisGelesen` markiert daraufhin **alle** ungelesenen
+      Zeilen des Fadens. Ohne das zweite taucht der Eintrag sofort wieder auf.
+- [x] **Zwei Abfragen, nicht eine** — die Grenze greift VOR dem Eindampfen. Ein
+      Faden mit fünfzig ungelesenen Nachrichten hätte sonst eine Kontaktanfrage
+      von gestern aus der Liste gedrängt. Übrige Typen bis 50, Nachrichten bis
+      200. `or("type.neq.message,type.is.null")`, weil die Spalte nullable ist
+      und `null <> 'message'` in SQL nicht wahr ist.
+- [x] Gemessen: RED 6/11, dann 11/11 in der Datenschicht, 33/33 mit der Glocke,
+      2247 Tests in 202 Dateien grün. PR #286 gegen `main`.
+- [ ] **Eine Anzahl am Eintrag** („3 neue Nachrichten von Anna"). Braucht ein
+      Feld am Hinweis und berührt `hinweisText` — eigener Vorgang.
 
 ## Offen, gehört Donald und Detlev
 

@@ -111,3 +111,98 @@ falsch — sie zählte `<Route`-Vorkommen und übersah die aus `navItems` und
 `rechtsseiten` gemappten. Es sind **43** (24 literale, 14 aus `navItems`, 5
 Rechtsseiten), davon 8 reine Weiterleitungen. `AppShell.tsx` trägt keine Route;
 der dortige Treffer war `<RouteTransition>`.
+
+---
+
+# Runde 2 — Delta „Startfläche" (B5), 28.08.2026
+
+Geprüft wurde **nur** das neu hinzugekommene Delta: die Anforderung
+„Die Startfläche trägt die Marke" und die Aufgabe B5. Nicht der ganze Change —
+der ist in Runde 1 geprüft.
+
+`reviewed_artifacts_sha` (SHA-256 des vorgelegten Textes):
+`b5d669af6fc1e335814f581688c62d5bf842281040ada264af7126eddc87154c`
+
+Zwei zählende Stimmen fremder Anbieter, beide **vor der ersten Codezeile**.
+Der eigene Anbieter (`claude`) hat nicht geprüft. `codex` wurde nicht gefragt:
+er delegiert die Review weiter und liefert eine fremde `MODEL:`-Zeile unter
+eigenem Namen.
+
+## Reviewer: gemini (Modell selbst ausgewiesen als „Gemini 1.5 Pro")
+VERDICT: REQUEST-CHANGES
+
+- [HIGH] Dunkelmodus fehlt vollständig; die Fläche ist auf `#ffffff` festgelegt.
+  → **ZURÜCKGEWIESEN, mit Beleg.** Diese Anwendung hat kein dunkles
+  Inhaltsthema: `data-variant` kennt `hell` und `navy`, und `navy` färbt laut
+  `docs/design-system.html` nur Sidebar und Topbar — `--color-canvas` ist in
+  beiden `#ffffff`. Ein dunkler Entwurf hätte kein Ziel.
+  → **Der abgeleitete Punkt gilt aber und ist übernommen:** das Storyboard stand
+  auf `systemBackgroundColor`, das im Dunkelmodus schwarz wird. Unter dem alten
+  deckenden PNG unsichtbar, in dieser Komposition die Fläche unter dem
+  Schriftzug. Grundton wird jetzt ausdrücklich gesetzt.
+- [HIGH] Komposition nur für Hochformat ausgelegt; bricht quer.
+  → **ÜBERNOMMEN**, und nachgemessen statt geglaubt: `UISupportedInterfaceOrientations`
+  erlaubt Landscape auf iPhone, `TARGETED_DEVICE_FAMILY = "1,2"` schliesst iPad
+  ein. Der Entwurf ist auf **drei** Ebenen umgebaut; der Verlauf wird nicht mehr
+  ins Foto gebacken.
+- [MEDIUM] Text auf dem Startbildschirm widerspricht Apples HIG.
+  → **ÜBERNOMMEN als bewusste Abweichung**, in der Anforderung benannt. Der
+  Grund der HIG-Empfehlung ist Lokalisierbarkeit; die App ist einsprachig
+  deutsch. Die Stelle, die beim Mehrsprachigwerden nachzieht, ist notiert.
+- [MEDIUM] Der RED-Test über die mittlere Farbe ist nur ein Rauchtest.
+  → **ÜBERNOMMEN**, zusammen mit dem schärferen Befund von opencode: gemessen
+  wird regionsweise.
+- [LOW] iOS hält den Startbildschirm im Zwischenspeicher; der Geräte-Beleg ist
+  ohne frische Installation unzuverlässig.
+  → **ÜBERNOMMEN**, in Anforderung und Aufgabe.
+- [LOW] Bündelgrösse; `oxipng` einbauen.
+  → **Halb übernommen:** der Zuwachs wird gemessen und genannt, der Optimierer
+  kommt nicht dazu (eine Werkzeug-Abhängigkeit mehr für einen Lauf, der ein
+  paarmal im Jahr stattfindet).
+- [LOW] Boot-Fläche vorsorglich statt nach Messung.
+  → **Nicht übernommen.** Die Lücke ist heute weiß auf weiß; erst messen, dann
+  zudecken. Was übernommen ist, ist der Zeitpunkt der Entscheidung — siehe
+  opencode.
+
+## Reviewer: opencode (hf:moonshotai/Kimi-K3)
+VERDICT: REQUEST-CHANGES
+
+Hat die prüfbaren Behauptungen vor dem Urteil im Repo nachgemessen.
+
+- [HIGH] Es gibt kein `Splash.imageset` **innerhalb** von `App.app`; `actool`
+  backt Image Sets in `Assets.car`. Und der Mittelwert kann Vorher und Nachher
+  nicht unterscheiden, weil beide in Weiss enden.
+  → **ÜBERNOMMEN, beides.** Beleg läuft über `assetutil --info` und die SHA1 der
+  Renditions; gemessen wird regionsweise.
+- [HIGH] Die „Positivkontrolle" prüfte das Falsche — dass `Georgia` still
+  ersetzt wird, ist genau der Fail-open-Fall, den die Anforderung verbietet.
+  → **ÜBERNOMMEN, und das ist der beste Befund der Runde.** Die Kontrolle ist
+  umgedreht: `fc-match` muss für Inter und Fraunces auf die Repo-TTF zeigen,
+  sonst Abbruch. Die Gegenprobe steht daneben, nicht an ihrer Stelle.
+- [HIGH] Das Szenario „kein Sprung" hat keine Implementierung: ohne
+  `@capacitor/splash-screen` entscheidet das System, wann der Startbildschirm
+  weicht.
+  → **ÜBERNOMMEN.** Die Anforderung sagt jetzt nicht mehr, der Übergang werde
+  gesteuert, sondern er sei unsichtbar, weil beide Flächen denselben Grundton
+  tragen. Kein Plugin.
+- [HIGH] `rsvg-convert` lädt eingebettete Bilder über gdk-pixbuf und fällt bei
+  fehlendem WebP-Loader **still** aus.
+  → **ÜBERNOMMEN.** `sips` dekodiert vorher nach PNG, mit Abbruch.
+- [MEDIUM] HIG/Lokalisierung, Launch-Screen-Cache. → wie bei gemini, übernommen.
+- [MEDIUM] iPad und Querformat fehlen. → wie bei gemini, übernommen.
+- [MEDIUM] Die Boot-Fläche kann nicht an `isNativePlatform()` entscheiden — der
+  Inhalt des Wurzelelements wird gezeichnet, bevor JS läuft.
+  → **ÜBERNOMMEN.** Die Entscheidung fällt im `<head>`-Inline-Skript, das heute
+  schon vor dem First Paint die Design-Variante setzt.
+- [MEDIUM] Ohne CI-Drift-Prüfung ist „eine Änderung erreicht die Startfläche"
+  nicht erzwungen.
+  → **ANERKANNT, nicht in diesem Change gebaut.** Als eigener Vorgang notiert —
+  und er gilt für `pnpm app:icons` (B4) genauso, also einer für beide statt
+  einer hier.
+- [LOW] Feste Pixelkoordinaten des Ausschnitts roten unbemerkt beim Bildtausch.
+  → **ÜBERNOMMEN**, der Ausschnitt steht als Anteil des Quellbildes.
+- [LOW] `PANGOCAIRO_BACKEND=fc` kann in anderen pango-Bauten wirkungslos sein.
+  → **ÜBERNOMMEN.** Entschieden wird am Verhalten (`fc-match`), nicht am
+  Variablennamen.
+- [LOW] Fail-closed war nur für Schriften gefordert, nicht für Marke und Bild.
+  → **ÜBERNOMMEN**, gilt jetzt für alle drei Quellen.

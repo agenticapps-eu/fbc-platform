@@ -109,7 +109,10 @@ export function ChatFensterReihe({
       // `pointer-events-none` am Behälter, `auto` an jedem Fenster: die Abstände
       // dazwischen und der Streifen über der Reihe dürfen nicht die Seite
       // dahinter blockieren.
-      className="pointer-events-none fixed bottom-0 z-30 flex items-end justify-end gap-2 overflow-hidden"
+      // AGE-642 C1: Die Reihe klebt am unteren Rand — genau dort, wo auf einem
+      // Gerät ohne Home-Knopf der Streifen zum Wischen liegt. Keine
+      // Padding-Klasse im Weg, deshalb direkt hier.
+      className="pointer-events-none fixed bottom-0 z-30 flex items-end justify-end gap-2 overflow-hidden pb-[env(safe-area-inset-bottom)]"
       style={{
         left: `calc(${leisteLinks} + 1rem)`,
         right: `calc(${leisteRechts} + 1rem)`,

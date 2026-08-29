@@ -37,3 +37,39 @@ Insets null, und eine Zusage darüber wäre grün, gleich was die Anwendung tut.
 - **WHEN** dieselbe Fläche auf einem Gerät ohne sichere Bereiche dargestellt
   wird
 - **THEN** trägt sie weiterhin den gestalteten Abstand zum Rand
+
+## MODIFIED Requirements
+
+### Requirement: The brand mark is a single theme-adaptive vector
+
+The system SHALL render the brand mark as an inline SVG compass star that takes its
+colour from `currentColor`, so that one asset serves both themes. The system SHALL
+NOT keep a raster lockup, nor a second asset selected by theme.
+
+The star SHALL stand free, with **no surrounding ring**, and SHALL carry eight
+points: four long ones on the axes and four slender ones on the diagonals. The ring
+was removed on 2026-08-29 (AGE-642) after the mark was measured against the brand
+template — the numbers, the method and the coverage check are in
+`docs/marke-neu/entwurf-messung.md`. This supersedes the AGE-499 clause that the
+star's points SHALL break out of the surrounding ring: there is no longer a ring
+for them to break out of, and that clause SHALL NOT be read as still binding.
+
+The favicon SHALL carry the same silhouette, so the browser tab and the application
+do not show two different marks. With the ring gone the two are now shape-identical:
+the favicon's former thickening of the ring for 16 px applied to exactly the line
+that no longer exists, and SHALL NOT be reintroduced as a difference between them.
+
+The wordmark is `eff.bee.zee`, lowercase throughout, with the separating dots in
+the accent colour. On the chrome the mark SHALL use the chrome's foreground and
+accent tokens. Accessible names for the mark SHALL read `eff.bee.zee`.
+
+#### Scenario: One asset serves both themes
+
+- **WHEN** the brand mark is rendered on a light surface and on a dark surface
+- **THEN** the same component is used in both, inheriting the surrounding colour
+
+#### Scenario: The mark and the favicon show the same shape
+
+- **WHEN** the inline mark and `compass-favicon.svg` are compared
+- **THEN** both show the same free-standing star — four long points on the axes,
+  four slender points on the diagonals, and no ring around either
