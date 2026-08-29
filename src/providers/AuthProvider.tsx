@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { fetchActivationState, resendActivationLink, type ResendStatus } from "../lib/activation";
 import { logEvent } from "../lib/log";
 import { vertagungZuruecksetzen } from "../lib/member-settings";
+import { pushAbmelden } from "../lib/push";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
@@ -322,6 +323,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       },
       signOut: async () => {
+        // AGE-641 Phase B: ZUERST das Gerätetoken, dann die Sitzung. Umgekehrt
+        // träfe das `delete` null Zeilen — die owner-only RLS kennt nach dem
+        // Abmelden kein Konto mehr, dem die Zeile gehörte —, und es sähe
+        // trotzdem nach Erfolg aus.
+        //
+        // Der `catch` ist Pflicht und keine Vorsicht: das Abmelden darf an
+        // einem fehlenden Netz nicht scheitern. Den Rest fängt der Server ab,
+        // `claim_push_token` schreibt das Token beim nächsten Konto um.
+        await pushAbmelden().catch(() => {});
         await supabase.auth.signOut();
       },
       updatePassword: async (password) => {

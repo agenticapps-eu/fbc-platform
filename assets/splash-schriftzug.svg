@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1000"
+     viewBox="0 0 1200 1000">
+  <g transform="scale(4.583)">
+    <path d="M24 2 L27.15 20.85 L46 24 L27.15 27.15 L24 46 L20.85 27.15 L2 24 L20.85 20.85 Z M27.89 20.11 L29.64 19.9 L34.58 13.42 L28.1 18.36 Z M27.89 27.89 L28.1 29.64 L34.58 34.58 L29.64 28.1 Z M20.11 27.89 L18.36 28.1 L13.42 34.58 L19.9 29.64 Z M20.11 20.11 L19.9 18.36 L13.42 13.42 L18.36 19.9 Z" fill="#1e2a3a"/>
+  </g>
+  <text x="270" y="155" font-family="Inter" font-weight="600"
+        font-size="126" letter-spacing="-3.15"
+        fill="#1e2a3a">eff<tspan fill="#2f6bd1">.</tspan>bee<tspan fill="#2f6bd1">.</tspan>zee</text>
+  <text x="0" y="520" font-family="Fraunces" font-weight="600"
+        font-size="152" letter-spacing="-3.8"
+        fill="#1e2a3a">Gemeinsam</text>
+  <text x="0" y="695" font-family="Fraunces" font-weight="600"
+        font-size="152" letter-spacing="-3.8"
+        fill="#1e2a3a">erfolgreich</text>
+  <text x="0" y="900" font-family="Inter" font-weight="400"
+        font-size="70" fill="#626f85">verbinden, wachsen, vertrauen</text>
+</svg>

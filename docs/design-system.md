@@ -106,9 +106,11 @@ Deutschland ein Abmahnthema. Ein CI-Schritt hält das offen (siehe §7).
 
 ## 4. Marke
 
-`CompassMark.tsx` — vierstrahliger Kompassstern, dessen Zacken an allen vier
-Spitzen **aus dem Ring ausbrechen** (AGE-499; vorher lag der Stern innen und die
-Marke las wie ein gefüllter Kreis mit Muster). `fill="currentColor"`: **ein**
+`CompassMark.tsx` — achtstrahliger Kompassstern: vier lange Hauptstrahlen auf
+den Achsen, vier schlanke Nebenstrahlen auf den Diagonalen. **Der Ring ist am
+29.08.2026 ersatzlos entfallen** (AGE-642, vermessen in
+`docs/marke-neu/entwurf-messung.md`); damit ist auch die Frage von AGE-499
+erledigt, ob die Zacken aus ihm ausbrechen. `fill="currentColor"`: **ein**
 Asset trägt beide Themes, weil es die Farbe seiner Umgebung erbt; die Krone
 brauchte dafür ein zweites, das dauerhaft fehlte.
 
@@ -119,9 +121,13 @@ brauchte dafür ein zweites, das dauerhaft fehlte.
   Fläche.
 - Wortmarke `eff.bee.zee`, durchgehend klein, die Punkte in `--color-accent` —
   laut Vorlage das einzige Farbdetail
-- Favicon: `public/brand/compass-favicon.svg`, Ring auf 3.5 verstärkt (`r=15.5`
-  statt `16.5`). **Beide Dateien zusammen ändern** — sonst trägt der Tab eine
-  andere Marke als die App.
+- Favicon: `public/brand/compass-favicon.svg` — seit dem Wegfall des Rings
+  **zeichengleich** mit der Komponente; die frühere Verstärkung auf 3.5
+  (`r=15.5` statt `16.5`) galt genau der Linie, die es nicht mehr gibt.
+  **Alle drei Stellen zusammen ändern** — Komponente, Favicon und
+  `docs/design-system.html` —, sonst trägt der Tab eine andere Marke als die
+  App. Aus dem Favicon erzeugt `pnpm app:icons` zusätzlich das App-Symbol und
+  `pnpm splash` die Startfläche.
 - Regeln (Vorlage §01): transparenter Hintergrund, Mindestabstand = halbe
   Markenhöhe, nie unter 24 px, nie in Versalien
 

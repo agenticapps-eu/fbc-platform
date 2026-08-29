@@ -270,13 +270,76 @@ html[data-variant="navy"] {
   width: var(--fbc-chat-w, 0rem);
   transition: width 180ms ease;
 }
+/* ── Sichere Raender (AGE-642 C1) ──────────────────────────────────────────
+   Erst mit `viewport-fit=cover` in index.html liefern diese `env()` ueberhaupt
+   Werte; ohne das Meta sind sie alle 0 und alles hier ist wirkungslos.
+   Deshalb steht das Meta dort und nicht hier zur Debatte.
+
+   Gemessen am 28.08. auf einem iPhone 17 Pro: ohne diese Regeln liegt der Kopf
+   der Huelle UNTER der Statusleiste, und der Anmelden-Knopf ist nicht
+   erreichbar — die App war damit nicht bedienbar, nicht nur unschoen.
+
+   Die Werte sind ERGAENZEND, nie ersetzend. Wo schon ein Versatz steht (die
+   beiden angedockten Leisten ab 1024 px), wird er per `calc` addiert; stuende
+   hier ein eigener Wert, verschwaende die Leiste ihren Platz.
+
+   Kein Gegenstueck in Tailwind: keines der betroffenen Elemente traegt eine
+   Padding-Klasse. Das ist Absicht — `cn()` loescht keine Gegenklasse, und
+   welche gewinnt, entschiede allein die Reihenfolge im Stylesheet. */
+header.fbc-shell-offset {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+footer.fbc-shell-offset {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Quer gehalten liegt die Notch seitlich. Steht vor der Regel fuer grosse
+   Breiten, damit die dortigen Versaetze diese hier ueberschreiben duerfen —
+   sie tragen die Insets per `calc` selbst. */
+.fbc-shell-offset {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.fbc-sidebar,
+.fbc-chat-rail {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── iOS-Eingabe-Zoom (AGE-642 C1) ─────────────────────────────────────────
+   WebKit zoomt beim Fokussieren eines Eingabefeldes hinein, wenn dessen
+   Schriftgroesse UNTER 16px liegt — und bleibt danach hineingezoomt.
+
+   Am 28.08. auf einem iPhone 17 Pro gemessen: direkt nach dem Anmelden stand
+   die Seite vergroessert und liess sich seitlich schieben. Das sah aus wie ein
+   Layoutfehler und war der Zoom; nach einem Neustart der App war es weg. Ohne
+   den Vergleich zweier Aufnahmen waere die falsche Stelle repariert worden.
+
+   `pointer: coarse` statt einer Breitenabfrage: der Zoom haengt am GERAET,
+   nicht an der Fensterbreite. Ein schmales Desktop-Fenster hat ihn nicht.
+
+   Global statt in `Input.tsx`, und das ist der Punkt: Formularfelder stehen in
+   20 Dateien, viele ohne die Komponente. Ein uebersehenes Feld brachte den
+   Zoom lautlos zurueck.
+
+   `!important` ist hier kein Schlendrian: die Felder tragen `text-sm` als
+   KLASSE, und eine Klasse schlaegt jeden Elementselektor. Ohne das waere die
+   Regel wirkungslos — sichtbar geworden waere das erst wieder am Geraet.
+
+   16px ist keine Wahl, sondern die Schwelle: alles darunter loest aus. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
 @media (min-width: 1024px) {
   /* Beide Versaetze in DERSELBEN Regel, beide mit Uebergang. Stuenden sie in
      zwei Regeln, ueberblendete nur einer von beiden — bis AGE-627 gab es hier
      nur `padding-left`. */
   .fbc-shell-offset {
-    padding-left: var(--fbc-sidebar-w, 16rem);
-    padding-right: var(--fbc-chat-w, 0rem);
+    padding-left: calc(var(--fbc-sidebar-w, 16rem) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--fbc-chat-w, 0rem) + env(safe-area-inset-right, 0px));
     transition:
       padding-left 180ms ease,
       padding-right 180ms ease;

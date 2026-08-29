@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "infisical run --env=dev -- vite",
     "release:entries": "tsx scripts/generate-release-entries.ts",
+    "app:icons": "tsx scripts/app-icons.ts",
+    "splash": "tsx scripts/splash.ts",
     "prebuild": "tsx scripts/generate-release-entries.ts",
     "build": "tsc --noEmit && vite build",
     "build:prod": "tsc --noEmit && infisical run --env=prod -- sh -c 'VITE_SENTRY_RELEASE=$(git rev-parse HEAD) vite build'",
@@ -33,6 +35,7 @@
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8",
     "@capacitor/preferences": "^8.0.1",
+    "@capacitor/push-notifications": "^8",
     "@hookform/resolvers": "^5.9.1",
     "@sentry/react": "^10.71.0",
     "@supabase/supabase-js": "^2.112.4",
