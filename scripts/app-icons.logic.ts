@@ -14,14 +14,12 @@
  * hiesse, dass ein Nachziehen der Marke drei Dateien trifft und die vierte
  * still zurückbleibt — und der Unterschied fiele erst auf einem Gerät auf.
  *
- * Gelesen wird deshalb das Favicon, und zwar seine Formen selbst, nicht ihre
- * Zahlen abgeschrieben. Dass es das Favicon ist und nicht die Komponente, ist
- * eine Entscheidung und kein Zufall: die beiden unterscheiden sich in genau
- * einer Grösse — das Favicon verstärkt den Ring von 2.5 auf 3.5 und rückt ihn
- * dafür von r=16.5 auf r=15.5 ein, weil die dünnere Linie bei 16 px
- * verschwindet. Ein App-Symbol wird auf dem Startbildschirm mit 60 pt
- * gezeichnet, in der Einstellungsliste mit 29 pt. Das ist der kleine Fall, also
- * ist die für ihn gehärtete Fassung die richtige.
+ * Gelesen wird deshalb das Favicon, und zwar seine Form selbst, nicht ihre
+ * Zahlen abgeschrieben. Bis zum 29.08. war das ausserdem eine Wahl zwischen
+ * zwei Fassungen — das Favicon verstärkte den Ring für 16 px. Mit dem Wegfall
+ * des Rings (AGE-642) ist dieser Unterschied entfallen: Favicon und
+ * Komponente zeigen jetzt dieselbe Form. Das Favicon bleibt trotzdem die Quelle, weil es eine
+ * reine SVG-Datei ist und ohne JSX-Zerlegung gelesen werden kann.
  *
  * ══ WARUM DIE FARBEN GETAUSCHT WERDEN ══════════════════════════════════════
  * Das Favicon ist blau auf durchsichtig — richtig für einen Browser-Tab, dem
@@ -54,19 +52,18 @@ export const ADAPTIV_KANTE = 108;
 export const ADAPTIV_SICHER = 66;
 
 export type Marke = {
-  /** Der Ring, als Attribute — `cx`, `cy`, `r`, `stroke-width`. */
-  ring: { cx: number; cy: number; r: number; strichbreite: number };
-  /** Der vierstrahlige Stern, als Pfaddaten. */
+  /** Der Stern mit seinen vier Nebenstrahlen, als Pfaddaten — ein `<path>` mit
+   *  fünf Teilzügen. */
   stern: string;
-  /** Kantenlänge des Koordinatensystems, aus dem beides stammt. */
+  /** Kantenlänge des Koordinatensystems, aus dem er stammt. */
   kante: number;
 };
 
 /**
- * Liest Ring und Stern aus dem Favicon.
+ * Liest den Stern aus dem Favicon.
  *
- * Bewusst streng: fehlt eine der Formen oder die `viewBox`, wird geworfen statt
- * ein halbes Symbol erzeugt. Ein Generator, der bei kaputter Eingabe etwas
+ * Bewusst streng: fehlt die Form oder die `viewBox`, wird geworfen statt ein
+ * halbes Symbol erzeugt. Ein Generator, der bei kaputter Eingabe etwas
  * Plausibles ausgibt, schreibt den Fehler in fünfzehn PNG-Dateien.
  */
 export function leseMarke(faviconSvg: string): Marke {
@@ -74,53 +71,28 @@ export function leseMarke(faviconSvg: string): Marke {
   if (!box) throw new Error("app-icons: keine viewBox im Favicon gefunden");
   if (box[1] !== box[2]) throw new Error(`app-icons: Favicon ist nicht quadratisch (${box[0]})`);
 
-  // Genau EINE Form je Sorte. Ohne diese Zaehlung gewaenne still der erste
-  // Treffer: kaeme im Favicon je ein zweiter Ring oder Pfad dazu, erzeugte
-  // dieses Skript weiter das alte Symbol und meldete fuenfzehn Erfolge.
+  // Die Marke ist GENAU EIN Pfad und sonst nichts. Ohne diese Zaehlung gewaenne
+  // still der erste Treffer: kaeme im Favicon eine zweite Form dazu, erzeugte
+  // dieses Skript weiter das alte Symbol und meldete fuenfzehn Erfolge. Der Ring
+  // ist am 29.08. entfallen (AGE-642) — ein <circle> wuerde hier also nicht mehr
+  // gezeichnet, und genau deshalb wird er verboten statt uebergangen.
   const kreise = faviconSvg.match(/<circle\b/g) ?? [];
   const pfade = faviconSvg.match(/<path\b/g) ?? [];
-  if (kreise.length !== 1)
-    throw new Error(`app-icons: genau ein <circle> erwartet, gefunden: ${kreise.length}`);
+  if (kreise.length !== 0)
+    throw new Error(`app-icons: kein <circle> erwartet, gefunden: ${kreise.length}`);
   if (pfade.length !== 1)
     throw new Error(`app-icons: genau ein <path> erwartet, gefunden: ${pfade.length}`);
 
-  // Dieses Skript liest KEIN `transform`. Waeren die Formen verschoben statt
+  // Dieses Skript liest KEIN `transform`. Waere der Stern verschoben statt
   // absolut angegeben, waere die Ausgabe falsch platziert — und der Vergleich
   // gegen die Pfaddaten bliebe trotzdem gruen. Also sagen, statt so zu tun.
-  if (/<(?:circle|path)\b[^>]*\stransform=/.test(faviconSvg))
-    throw new Error("app-icons: transform an Ring oder Stern — dieses Skript liest es nicht");
-
-  const kreis = /<circle([^>]*)\/>/.exec(faviconSvg);
-  if (!kreis) throw new Error("app-icons: kein <circle> (Ring) im Favicon gefunden");
-  const attr = (name: string): number => {
-    const m = new RegExp(`${name}="([^"]+)"`).exec(kreis[1]);
-    if (!m) throw new Error(`app-icons: Ring ohne ${name}`);
-    const zahl = Number(m[1]);
-    // `Number("15.5.5")` ist NaN, und NaN wanderte ohne einen Mucks durch
-    // `runde()` in jede erzeugte Datei — ein Symbol, das nirgends gezeichnet
-    // wird, sieht im Protokoll aus wie fuenfzehn Erfolge.
-    if (!Number.isFinite(zahl)) throw new Error(`app-icons: ${name}="${m[1]}" ist keine Zahl`);
-    return zahl;
-  };
+  if (/<path\b[^>]*\stransform=/.test(faviconSvg))
+    throw new Error("app-icons: transform am Stern — dieses Skript liest es nicht");
 
   const pfad = /<path[^>]*\sd="([^"]+)"/.exec(faviconSvg);
   if (!pfad) throw new Error("app-icons: kein <path> (Stern) im Favicon gefunden");
 
-  return {
-    ring: { cx: attr("cx"), cy: attr("cy"), r: attr("r"), strichbreite: attr("stroke-width") },
-    stern: pfad[1],
-    kante: Number(box[1]),
-  };
-}
-
-/** Ring und Stern in der Zielfarbe, unverschoben im eigenen Koordinatensystem. */
-function formen(marke: Marke, farbe: string): string {
-  const { cx, cy, r, strichbreite } = marke.ring;
-  return (
-    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" ` +
-    `stroke="${farbe}" stroke-width="${strichbreite}"/>` +
-    `<path d="${marke.stern}" fill="${farbe}"/>`
-  );
+  return { stern: pfad[1], kante: Number(box[1]) };
 }
 
 /** Setzt die Marke mittig auf eine Fläche der Breite `flaeche`, skaliert auf
@@ -130,7 +102,7 @@ function mittig(marke: Marke, flaeche: number, zielbreite: number, farbe: string
   const versatz = (flaeche - zielbreite) / 2;
   return (
     `<g transform="translate(${runde(versatz)} ${runde(versatz)}) scale(${runde(faktor)})">` +
-    formen(marke, farbe) +
+    `<path d="${marke.stern}" fill="${farbe}"/>` +
     `</g>`
   );
 }

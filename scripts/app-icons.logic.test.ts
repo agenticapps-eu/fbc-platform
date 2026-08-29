@@ -42,48 +42,46 @@ describe("Die Marke kommt aus dem Favicon und nicht aus einer Kopie", () => {
   it("liest den Stern wörtlich, so wie er im Favicon steht", () => {
     const imFavicon = /<path[^>]*\sd="([^"]+)"/.exec(FAVICON)![1];
     expect(marke.stern).toBe(imFavicon);
-    // Positivkontrolle zur Regex: der Stern ist ein geschlossener Pfad mit
-    // acht Punkten, keine leere Zeichenkette, die alles bestehen liesse.
-    expect(marke.stern).toMatch(/^M[\d.]+ [\d.]+( L[\d.]+ [\d.]+){7} Z$/);
+    // Positivkontrolle zur Regex: EIN geschlossener Pfad aus fünf Teilzügen —
+    // der achtpunktige Hauptstern und vier Nebenstrahlen mit je vier Punkten
+    // (AGE-642). Keine leere Zeichenkette, die alles bestehen liesse.
+    expect(marke.stern).toMatch(
+      /^M[\d.]+ [\d.]+( L[\d.]+ [\d.]+){7} Z( M[\d.]+ [\d.]+( L[\d.]+ [\d.]+){3} Z){4}$/,
+    );
   });
 
-  it("liest den Ring mit seiner verstärkten Strichbreite", () => {
-    // Genau die Grösse, in der Favicon und Komponente sich unterscheiden. Sie
-    // hier zu prüfen hält fest, welche der beiden Fassungen gemeint war.
-    expect(marke.ring).toEqual({ cx: 24, cy: 24, r: 15.5, strichbreite: 3.5 });
+  it("hat keinen Ring mehr, und das Skript zeichnete einen auch nicht mehr mit", () => {
+    // Der Ring ist am 29.08. ersatzlos entfallen (AGE-642). Ein <circle>, der
+    // sich wieder ins Favicon verirrte, würde von diesem Generator STILL
+    // übergangen — das Symbol trüge dann eine andere Marke als der Tab. Also
+    // wird er verboten, statt ihn zu ignorieren.
+    expect(FAVICON).not.toContain("<circle");
+    const mitRing = FAVICON.replace(
+      "</svg>",
+      '<circle cx="24" cy="24" r="15.5" stroke-width="3.5"/></svg>',
+    );
+    expect(() => leseMarke(mitRing)).toThrow(/kein <circle> erwartet/);
   });
 
-  it("wirft bei einer Zahl, die keine ist — statt NaN in fünfzehn PNG zu schreiben", () => {
-    // AUFLAGE AUS DER CODE-REVIEW. `[\\d.]+` schluckt „15.5.5"; `Number()` macht
-    // daraus NaN, und NaN wanderte ohne einen Mucks durch `runde()` in jede
-    // erzeugte Datei. Ein Symbol, das nirgends gezeichnet wird, sieht im
-    // Erzeugungsprotokoll aus wie fünfzehn Erfolge.
-    const kaputt = FAVICON.replace('r="15.5"', 'r="15.5.5"');
-    expect(() => leseMarke(kaputt)).toThrow(/keine Zahl/);
-  });
-
-  it("wirft bei einer zweiten Form, statt die erste zu nehmen", () => {
-    // Sonst gewinnt still der erste Treffer: käme im Favicon je ein zweiter
-    // Ring oder Pfad dazu, erzeugte dieses Skript weiter das alte Symbol.
-    const zwei = FAVICON.replace("</svg>", '<circle cx="1" cy="1" r="1" stroke-width="1"/></svg>');
-    expect(() => leseMarke(zwei)).toThrow(/genau ein/);
+  it("wirft bei einem zweiten Pfad, statt den ersten zu nehmen", () => {
+    // Sonst gewinnt still der erste Treffer: käme im Favicon ein zweiter Pfad
+    // dazu, erzeugte dieses Skript weiter das alte Symbol.
+    const zwei = FAVICON.replace("</svg>", '<path d="M1 1 L2 2 Z"/></svg>');
+    expect(() => leseMarke(zwei)).toThrow(/genau ein <path>/);
   });
 
   it("wirft bei einem transform, das es nicht liest", () => {
-    // Der ehrlichste stille Fall: würde das Favicon seine Formen verschoben
-    // statt absolut angeben, bliebe der Vergleich oben grün und die Ausgabe
-    // wäre falsch platziert. Dieses Skript liest kein `transform` — also sagt
-    // es das, statt so zu tun.
-    const verschoben = FAVICON.replace("<circle", '<circle transform="translate(2 2)"');
+    // Der ehrlichste stille Fall: würde das Favicon seine Form verschoben statt
+    // absolut angeben, bliebe der Vergleich oben grün und die Ausgabe wäre
+    // falsch platziert. Dieses Skript liest kein `transform` — also sagt es
+    // das, statt so zu tun.
+    const verschoben = FAVICON.replace("<path", '<path transform="translate(2 2)"');
     expect(() => leseMarke(verschoben)).toThrow(/transform/);
   });
 
   it("wirft, statt ein halbes Symbol zu erzeugen", () => {
     expect(() => leseMarke("<svg></svg>")).toThrow(/viewBox/);
-    expect(() => leseMarke('<svg viewBox="0 0 48 48"></svg>')).toThrow(/circle/);
-    expect(() =>
-      leseMarke('<svg viewBox="0 0 48 48"><circle cx="1" cy="1" r="1" stroke-width="1"/></svg>'),
-    ).toThrow(/path/);
+    expect(() => leseMarke('<svg viewBox="0 0 48 48"></svg>')).toThrow(/path/);
     expect(() => leseMarke('<svg viewBox="0 0 48 60"></svg>')).toThrow(/quadratisch/);
   });
 });
@@ -93,8 +91,10 @@ describe("Das vollflächige Symbol", () => {
 
   it("trägt Navy bis an die Kante und die Marke in Weiss", () => {
     expect(svg).toContain(`<rect width="${KANTE}" height="${KANTE}" fill="${HINTERGRUND}"/>`);
-    expect(svg).toContain(`fill="${VORDERGRUND}"`);
-    expect(svg).toContain(`stroke="${VORDERGRUND}"`);
+    expect(svg).toContain(`<path d="${marke.stern}" fill="${VORDERGRUND}"/>`);
+    // Seit dem Wegfall des Rings ist die Marke eine reine Füllung. Ein
+    // stehengebliebenes `stroke` zöge eine Kontur, die die Vorlage nicht hat.
+    expect(svg).not.toContain("stroke");
   });
 
   it("trägt das Blau des Favicons nirgends mehr", () => {

@@ -336,13 +336,16 @@ Der Startbildschirm ist die einzige Fläche, die jemand sieht, BEVOR er die App
       selbst gelesen. `#ebf6fe` (iOS) und `#e6f2fa` / `#e0eff9` (Android) —
       nahezu weiss, das Standardsymbol. Nachher `#212d3d` auf beiden Seiten.
 - [x] **Eine Quelle:** `scripts/app-icons.logic.ts` liest Ring und Stern aus
-      `public/brand/compass-favicon.svg` — derselben Marke, die der Browser-Tab
+      `public/brand/compass-favicon.svg` (seit B6 nur noch den Stern) — derselben Marke, die der Browser-Tab
       trägt — und erzeugt daraus alle fünfzehn Dateien beider Plattformen.
       Keine vierte Kopie der Marke im Repo. `pnpm app:icons`.
 - [x] Genommen ist die **Favicon**-Fassung und nicht die der Komponente: die
       beiden unterscheiden sich in genau einer Grösse (Ring 3.5 statt 2.5, dafür
       r=15.5 statt 16.5), und diese ist die für kleine Grössen gehärtete. Ein
       App-Symbol wird mit 60 pt gezeichnet, in der Einstellungsliste mit 29.
+      **ÜBERHOLT seit B6 (29.08.):** mit dem Ring ist dieser Unterschied
+      entfallen — Favicon und Komponente sind jetzt formgleich. Das Favicon
+      bleibt die Quelle, aber aus einem anderen Grund (siehe B6).
 - [x] Farbe: weiss auf Navy `#081527` — die zweite dokumentierte Markenpaarung
       (`docs/design-system.html`, „Invers · Weiß auf Navy"). Durchsichtigkeit
       verbietet iOS ohnehin, und blau auf navy wären 1,9:1.
@@ -477,6 +480,42 @@ betroffenen Punkten.
       Zehn weitere PNG zu erzeugen hiesse, tote Dateien auszuliefern. Eigener
       Vorgang mit eigenem Entwurf — und ohnehin erst prüfbar, wenn die App auf
       einem Android-Gerät läuft (offen seit B1).
+
+### B6. Die neue Marke ✅
+
+Der Ring fällt ersatzlos, dafür kommen vier Nebenstrahlen auf die Diagonalen.
+Vermessen, entschieden und freigegeben am 29.08.; die Zahlen, die Methode und
+die Deckungsprobe stehen in `docs/marke-neu/entwurf-messung.md` und werden hier
+nicht wiederholt.
+
+- [x] **Eingesetzt an den drei handgepflegten Stellen, keine vierte Kopie:**
+      `public/brand/compass-favicon.svg`, `src/components/ui/CompassMark.tsx`,
+      `docs/design-system.html` (dort **sieben** Vorkommen, nicht eines — zwei
+      davon trugen die Favicon-Fassung mit dem verstärkten Ring). Nachgemessen:
+      elf Vorkommen des Pfades im Repo, davon zwei in erzeugten Dateien, und
+      **genau ein** verschiedener Pfad darunter.
+- [x] `leseMarke()` in `scripts/app-icons.logic.ts`: `Marke.ring` entfällt samt
+      Zeichnen des Rings. Ein `<circle>` wird jetzt **verboten** statt
+      übergangen — sonst zeichnete der Generator ihn still nicht mit und das
+      Symbol trüge eine andere Marke als der Tab.
+- [x] Mitgezogen, weil es dieselbe `Marke` verbraucht: `schriftzugSvg()` in
+      `scripts/splash.logic.ts`. Ohne diesen Schritt hätte der Typ nicht mehr
+      gepasst.
+- [x] **GREEN:** 29 Zusagen in `app-icons.logic.test.ts` und
+      `splash.logic.test.ts`, angepasst statt gelöscht — die Ring-Zusagen sind
+      durch Stern-Zusagen ersetzt (fünf Teilzüge als Positivkontrolle zur Regex;
+      „folgt einem geänderten Stern" als Gegenprobe zum Abschreiben). Die
+      NaN-Wache entfällt mit dem Ring: es wird keine Zahl mehr aus einer Form
+      gelesen. Ganze Reihe: 2246 Tests grün.
+- [x] **Beleg am erzeugten Artefakt, nicht an der Datei im Arbeitsbaum:**
+      `pnpm app:icons` und `pnpm splash` neu gefahren, 21 Dateien geändert.
+      Mittlere Farbe des iOS-Symbols `#212c3c` → `#152132`, Weissanteil
+      10,03 % → 5,24 % — der Ring war der Unterschied.
+- [x] **Deckungsprobe gegen die Vorlage, aus dem Repo heraus gerendert:**
+      90,9 % (Schnittmenge durch Vereinigung, 600², Mitte und R **gemessen**
+      statt angenommen: 626,4/625,7 und R=176, beides reproduziert). Als
+      Positivkontrolle derselbe Test gegen den alten Stand aus `HEAD`: 42,2 %.
+      Umriss über der Vorlage sichtgeprüft.
 
 ## Phase C — Ränder, Zurück-Taste, Kamera
 

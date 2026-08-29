@@ -207,14 +207,12 @@ const ENG = -0.025;
  */
 export function schriftzugSvg(marke: Marke): string {
   const faktor = rund(MARKE_GROESSE / marke.kante);
-  const { cx, cy, r, strichbreite } = marke.ring;
   const punkt = (t: string) => `<tspan fill="${AKZENT}">${t}</tspan>`;
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${SCHRIFTZUG_BILD.breite}" height="${SCHRIFTZUG_BILD.hoehe}"`,
     `     viewBox="0 0 ${SCHRIFTZUG_BILD.breite} ${SCHRIFTZUG_BILD.hoehe}">`,
     `  <g transform="scale(${faktor})">`,
-    `    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${INK}" stroke-width="${strichbreite}"/>`,
     `    <path d="${marke.stern}" fill="${INK}"/>`,
     `  </g>`,
     `  <text x="${WORTMARKE.x}" y="${WORTMARKE.basis}" font-family="Inter" font-weight="600"`,

@@ -142,14 +142,15 @@ describe("Die Marke kommt aus dem Favicon, nicht aus einer Kopie", () => {
     expect(svg).toContain(marke.stern);
   });
 
-  it("folgt einem geänderten Ring, statt ihn abgeschrieben zu haben", () => {
-    const anders = leseMarke(
-      FAVICON.replace('r="15.5"', 'r="11.25"').replace('stroke-width="3.5"', 'stroke-width="6"'),
-    );
+  it("folgt einem geänderten Stern, statt ihn abgeschrieben zu haben", () => {
+    // Die Gegenprobe zum Test darüber: dort könnte auch eine zweite Kopie im
+    // Skript zufällig dasselbe sagen. Hier wird das Favicon verändert — nur
+    // wer es wirklich liest, zieht mit.
+    const anders = leseMarke(FAVICON.replace(marke.stern, "M1 1 L9 9 Z"));
     const svg = schriftzugSvg(anders);
-    expect(anders.ring.r).toBe(11.25);
-    expect(svg).toContain('r="11.25"');
-    expect(svg).not.toContain('r="15.5"');
+    expect(anders.stern).toBe("M1 1 L9 9 Z");
+    expect(svg).toContain('d="M1 1 L9 9 Z"');
+    expect(svg).not.toContain(marke.stern);
   });
 
   it("zeichnet die Marke in Ink und nicht im Blau des Favicons", () => {
