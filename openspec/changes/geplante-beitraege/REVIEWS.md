@@ -146,8 +146,18 @@ undefined"), und grün mit der Korrektur.
   RPC weiter mit sechs Argumenten (`probe-rpc-create-post.ts`,
   `probe-9-3-sichtbarkeit.ts`); PostgREST fände die Funktion nicht mehr
   (PGRST202). Kein CI-Bruch — die Sonden laufen in keinem Workflow —, aber
-  beide Messwerkzeuge für den Schreibweg wären still kaputt gewesen. Der Haken
-  stand, weil `tsc` `scripts/` nicht mitprüft. Umgestellt.
+  beide Messwerkzeuge für den Schreibweg wären still kaputt gewesen.
+  Umgestellt.
+
+  **Warum der grüne Typlauf das nicht gefangen hat — und es ist NICHT der
+  naheliegende Grund.** `tsconfig.json` schliesst `scripts` ein
+  (`"include": ["src", "scripts", "vite.config.ts"]`); `tsc` sieht die Dateien.
+  Es kann die Aufrufe nur nicht prüfen: die Sonden bauen ihren Client mit
+  `createClient(API_URL, KEY)` **ohne das `Database`-Generic**, damit ist
+  `rpc()` dort auf `string` und `any` abgebildet, und ein siebter
+  Pflichtparameter fällt nirgends auf. (Hier stand zuerst „`tsc` prüft
+  `scripts/` nicht mit" — eine Ursache, die ich vermutet und nicht gemessen
+  hatte. Sie ist falsch.)
 - **`probe-feed-cursor.ts` mass weiter über `created_at`** — eine Sonde, deren
   Kommentar „exakt die Abfrage aus src/lib/feed.ts" behauptet, über eine Spalte,
   deren Index in derselben Migration gefallen ist. Falsch beruhigende Zahlen.

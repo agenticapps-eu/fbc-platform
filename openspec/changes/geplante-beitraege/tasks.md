@@ -201,8 +201,14 @@ danach keinen Leser mehr und sind gefallen. Zahlen im Kopf der Migration.
 
 **C5 stand abgehakt, ohne erledigt zu sein.** Drei Sonden riefen die RPC weiter
 mit sechs Argumenten, eine vierte mass den Cursor über die gefallene Spalte.
-`tsc` prüft `scripts/` nicht mit — der Haken kam von einem grünen Typlauf, der
-diese Dateien gar nicht ansieht. Alle vier umgestellt.
+
+**Und der Grund ist nicht der naheliegende.** `tsconfig.json` schliesst
+`scripts` ausdrücklich ein (`"include": ["src", "scripts", "vite.config.ts"]`) —
+der Typlauf sieht diese Dateien sehr wohl. Er kann die Aufrufe nur nicht prüfen:
+die Sonden bauen ihren Client mit `createClient(API_URL, KEY)` **ohne das
+`Database`-Generic**, und damit ist `rpc()` dort auf `string` und `any`
+abgebildet. Ein siebter Pflichtparameter fällt so nirgends auf. Alle vier
+umgestellt.
 
 **Die Sichtprobe (D4) hat einen Fehler gefunden, den kein Test sah:** sobald
 ein Zeitpunkt gewählt war, schob der „sofort"-Knopf die Gruppe im Composer über
