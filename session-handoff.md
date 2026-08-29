@@ -1,9 +1,16 @@
 # Session Handoff — 2026-08-29 (früh, die neue Marke ist vermessen und freigegeben)
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`, **5 Commits hinter `origin/main`**.
-Drei Dateien liegen **uncommitted** im Baum (siehe *Files modified*) — sie sind
-das Ergebnis dieser Sitzung und gehören in den nächsten Commit.
+`donald/age-642-capacitor-huelle`. **Nachtrag 29.08.:** die Marke ist
+eingesetzt, alles committet, und der Branch ist auf `origin/main` rebased —
+**0 dahinter, 20 davor**. Der Arbeitsbaum ist sauber; die unten unter *Files
+modified* genannten drei Dateien sind drin.
+
+Das Rebase hat **zwei** Commits als bereits auf `main` fallen lassen (Glocke
+und pgTAP-Wächter, beide über PR #286 gequetscht) und den Merge-Commit
+eingeebnet. Damit liegt die lokale Historie **anders als die von PR #277** —
+der Branch braucht einen `--force-with-lease`-Push, und der ist noch nicht
+gemacht.
 
 Die Sitzung davor lief im Worktree `age-641` und konnte von dort keine
 git-Operationen auf diesen Baum ausführen; deshalb nur Dateien, kein Commit.
@@ -122,6 +129,20 @@ nicht solange dort eine Sitzung läuft.
   verschwinden nie von selbst.
 - **Die App-ID `com.effbeezee.app` ist unbestätigt**; APNs prüft das Gerätetoken
   vor dem Topic, zeigt sich erst am echten Gerät.
+- **Aus der Übergabe vom 28.08. spätabends zurückgeholt** (sie stand auf `main`
+  und wurde beim Rebase von dieser Fassung überschrieben — die drei Punkte
+  waren hier nie eingearbeitet und wären sonst still verschwunden):
+  - **Die Event-Vorschau aus AGE-600 ist nicht im Browser nachgemessen.** Sie
+    braucht ein Event mit Titelbild und eine Rolle, die es bearbeiten darf.
+  - **AGE-664 kippt eine ausgesprochene Entscheidung** — AGE-596 hat Feed,
+    Vorschauen und Verzeichnis-Karte ausgeschlossen (`REVIEWS.md:82`). Zwei der
+    drei Ausnahmen sind eingeholt; ob die dritte fällt, ist eine Entscheidung
+    und keine Aufgabe.
+  - **AGE-658 ist erledigt, nicht offen** — gebaut in PR #277 („nur nativ
+    zähmen, Web unverändert"). Steht hier, weil beim Sichten das Gegenteil
+    angenommen wurde.
+  - Ebenfalls von dort: Aktivierungsversand 69/72 · Rotation des
+    PROD-DB-Passworts.
 - Unverändert: B3 (Signaturmaterial), C2, C3, Phase D, E · Bearer im
   Funktionsrumpf per `pg_get_functiondef()` lesbar · Abschnitt 4 mit Detlev ·
   AGE-655 · AGE-653 · AGE-610 · AGE-512 · AGE-598 · AGE-256 · AGE-606 ·
