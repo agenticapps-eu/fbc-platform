@@ -215,6 +215,7 @@ jobs:
           supabase/tests/push_tokens_test.sql
           supabase/tests/push_zustellung_test.sql
           supabase/tests/display_name_test.sql
+          supabase/tests/geplante_beitraege_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #

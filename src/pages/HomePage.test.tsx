@@ -19,6 +19,7 @@ function makePost(body: string): FeedPost {
     hashtags: [],
     visibility: "public",
     createdAt: new Date("2026-07-23T08:00:00Z").toISOString(),
+    veroeffentlichtAb: new Date("2026-07-23T08:00:00Z").toISOString(),
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,

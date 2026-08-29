@@ -78,9 +78,7 @@ const GEFUELLT: DashboardData = {
   ],
   interests: [{ theme: "tun", label: "Impact Investing" }],
   goals: [{ category: "unternehmerisch", title: "Zwei neue Partner", progress: 30 }],
-  badges: [
-    { key: "gruender", label: "Gründungsmitglied", icon: null, awarded_at: "2019-03-04" },
-  ],
+  badges: [{ key: "gruender", label: "Gründungsmitglied", icon: null, awarded_at: "2019-03-04" }],
   matchStats: { active: 3, successful: 4, avgScore: 71 },
   posts: [
     {
@@ -88,6 +86,7 @@ const GEFUELLT: DashboardData = {
       body: "Kurzer echter Beitrag von mir.",
       hashtags: [],
       created_at: "2026-08-01T09:00:00Z",
+      veroeffentlicht_ab: "2026-08-01T09:00:00Z",
       visibility: "members",
     },
   ],
@@ -208,9 +207,7 @@ describe("ProfilAnsichtPage — vertagte Oberflächen bleiben auch MIT Daten for
 describe("ProfilAnsichtPage — keine erfundenen Beiträge", () => {
   it("zeigt keinen Demo-Beitragstitel", async () => {
     await renderUndWarten();
-    expect(
-      screen.queryByText("Warum Ökosysteme die Zukunft des Mittelstands sind"),
-    ).toBeNull();
+    expect(screen.queryByText("Warum Ökosysteme die Zukunft des Mittelstands sind")).toBeNull();
     expect(screen.queryByText("Deal-Keeping im Family Office (Podcast)")).toBeNull();
   });
 
@@ -373,6 +370,7 @@ describe("Meine Beiträge: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => 
           body: "Erster Gedanke",
           hashtags: [],
           created_at: "2026-08-01T09:00:00Z",
+          veroeffentlicht_ab: "2026-08-01T09:00:00Z",
           visibility: "members",
         },
         {
@@ -380,6 +378,7 @@ describe("Meine Beiträge: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => 
           body: "Zweiter Gedanke",
           hashtags: [],
           created_at: "2026-08-02T09:00:00Z",
+          veroeffentlicht_ab: "2026-08-02T09:00:00Z",
           visibility: "members",
         },
       ]),
@@ -405,6 +404,7 @@ describe("Meine Beiträge: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => 
           body: "Ein Gedanke",
           hashtags: [],
           created_at: "2026-08-01T09:00:00Z",
+          veroeffentlicht_ab: "2026-08-01T09:00:00Z",
           visibility: "members",
         },
       ]),
@@ -424,6 +424,7 @@ describe("Meine Beiträge: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => 
           body: "",
           hashtags: [],
           created_at: "2026-08-01T09:00:00Z",
+          veroeffentlicht_ab: "2026-08-01T09:00:00Z",
           visibility: "members",
         },
       ]),

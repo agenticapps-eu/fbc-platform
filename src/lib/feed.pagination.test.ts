@@ -51,10 +51,8 @@ vi.mock("./supabase", () => ({
           eintrag.in = [spalte, werte];
           return kette;
         },
-        then: (
-          auf: (r: { data: unknown; error: null }) => unknown,
-          ab?: (e: unknown) => unknown,
-        ) => Promise.resolve({ data: daten(), error: null }).then(auf, ab),
+        then: (auf: (r: { data: unknown; error: null }) => unknown, ab?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: daten(), error: null }).then(auf, ab),
       };
       return kette;
     },
@@ -66,14 +64,19 @@ import { FEED_SEITE, fetchFeed } from "./feed";
 
 const AUTOR = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 
-function zeile(id: string, createdAt: string) {
+function zeile(id: string, zeitpunkt: string) {
   return {
     id,
     author_id: AUTOR,
     body: "Text",
     hashtags: [],
     visibility: "public",
-    created_at: createdAt,
+    created_at: zeitpunkt,
+    // Seit AGE-667 ist `veroeffentlicht_ab` die Ordnung des Feeds und das
+    // führende Feld des Cursors. Beide Spalten tragen hier denselben Moment:
+    // diese Datei misst die SEITENGRENZE, nicht die Planung, und ein
+    // Unterschied zwischen beiden hätte hier keine Bedeutung.
+    veroeffentlicht_ab: zeitpunkt,
   };
 }
 
@@ -86,7 +89,7 @@ beforeEach(() => {
 });
 
 describe("fetchFeed — Seiten", () => {
-  it("holt 20 Beiträge, absteigend über created_at UND id", async () => {
+  it("holt 20 Beiträge, absteigend über veroeffentlicht_ab UND id", async () => {
     postZeilen = [zeile("p1", "2026-08-01T10:00:00Z")];
 
     await fetchFeed({ uid: null });
@@ -95,8 +98,12 @@ describe("fetchFeed — Seiten", () => {
     expect(postsAufruf().limit).toBe(FEED_SEITE + 1);
     // Beide Spalten in der Sortierung, sonst ist der Cursor unten wirkungslos:
     // ein Stichentscheid im `where` ohne denselben im `order by` ordnet nichts.
+    // AGE-667: die führende Spalte ist `veroeffentlicht_ab`, nicht
+    // `created_at`. Sie MUSS dieselbe sein wie im Cursor unten — eine Grenze
+    // über eine andere Spalte als die Ordnung überspringt Zeilen oder liefert
+    // sie doppelt.
     expect(postsAufruf().order).toEqual([
-      { spalte: "created_at", ascending: false },
+      { spalte: "veroeffentlicht_ab", ascending: false },
       { spalte: "id", ascending: false },
     ]);
     expect(postsAufruf().or).toBeUndefined();
@@ -122,7 +129,7 @@ describe("fetchFeed — Seiten", () => {
 
     expect(seite.posts).toHaveLength(20);
     expect(seite.posts.at(-1)?.id).toBe("p19");
-    expect(seite.nextCursor).toEqual({ createdAt: "2026-08-01T10:00:19Z", id: "p19" });
+    expect(seite.nextCursor).toEqual({ veroeffentlichtAb: "2026-08-01T10:00:19Z", id: "p19" });
   });
 
   it("genau 20 sichtbare Beiträge versprechen KEINE weitere Seite", async () => {
@@ -147,19 +154,19 @@ describe("fetchFeed — Seiten", () => {
 
   it("der Cursor trägt den id-Stichentscheid, sonst verschwinden gleiche Zeitstempel", async () => {
     // Der Fall, der beim Import der ~70 Konten wahrscheinlich wird: zwei
-    // Beiträge mit identischem `created_at`. Ein Cursor nur über die Zeit
-    // (`created_at.lt.X`) überspränge den zweiten still — er ist weder auf
-    // Seite 1 noch auf Seite 2.
+    // Beiträge mit identischem `veroeffentlicht_ab`. Ein Cursor nur über die
+    // Zeit (`veroeffentlicht_ab.lt.X`) überspränge den zweiten still — er ist
+    // weder auf Seite 1 noch auf Seite 2.
     postZeilen = [zeile("p21", "2026-08-01T09:00:00Z")];
 
     await fetchFeed({
       uid: null,
-      cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20" },
+      cursor: { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p20" },
     });
 
     expect(postsAufruf().or).toBe(
-      "created_at.lt.2026-08-01T10:00:00Z," +
-        "and(created_at.eq.2026-08-01T10:00:00Z,id.lt.p20)",
+      "veroeffentlicht_ab.lt.2026-08-01T10:00:00Z," +
+        "and(veroeffentlicht_ab.eq.2026-08-01T10:00:00Z,id.lt.p20)",
     );
   });
 });

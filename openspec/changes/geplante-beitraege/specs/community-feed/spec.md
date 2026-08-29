@@ -95,6 +95,19 @@ Für Aufrufer **ohne Session** SHALL das Prädikat allein `veroeffentlicht_ab <=
 now()` lauten; die Autoren-Ausnahme SHALL dort entfallen, weil es keinen Autor
 gibt.
 
+Das SHALL auch für Werte gelten, die die **Existenz** eines Beitrags verraten,
+ohne ihn selbst zu zeigen: `recompute_potential_score` zählt die eigenen
+Beiträge in die „Aktivität", und der Score steht Fremden über `profiles_public`
+als Marke auf der Profilseite. Ein geplanter Beitrag SHALL NOT in diese Zahl
+eingehen — sonst sieht ein Beobachter sie springen, bevor es den Beitrag gibt.
+
+#### Scenario: Der Score verrät den geplanten Beitrag nicht
+
+- **WHEN** ein Mitglied einen Beitrag für die Zukunft plant und sein
+  Potential-Score neu berechnet wird
+- **THEN** ist die Zahl unverändert, und sie ändert sich erst, wenn der Beitrag
+  veröffentlicht ist
+
 `event_feed_post_sync()` SHALL unberührt bleiben: sie schreibt Spiegelzeilen
 für Events und entscheidet über keine Sichtbarkeit.
 
@@ -125,6 +138,25 @@ hier vertretbar und für die Sichtbarkeit nicht.
 Jeder Beitrag SHALL **genau einmal** angekündigt werden. Das System SHALL dafür
 am Beitrag festhalten, dass er angekündigt wurde, und SHALL NOT die
 Hinweiszeilen danach durchsuchen — dort steht je Empfänger eine Zeile.
+
+Der Bestand SHALL bei der Migration als **bereits angekündigt** markiert
+werden. Ohne das wäre die Migration ein Massenversand: jeder vorhandene Beitrag
+trägt einen erreichten Zeitpunkt, und der erste Lauf kündigte den gesamten
+Bestand an jedes Mitglied an, in der Glocke und als Push.
+
+Die **Funktion** des Laufs SHALL in einer Migration entstehen, seine
+**Zeitplanung** SHALL von Hand auf DEV und PROD gesetzt und dokumentiert
+werden. Der Grund SHALL festgehalten sein, und er ist gemessen: `pg_cron` ist
+im lokalen Stack und in der frischen CI-Abbildung nicht installiert, ein
+`cron.schedule` in einer Migration bräche also den CI-Job `migrations`. Der
+Schnitt zwischen beiden SHALL so liegen, dass die Funktion in pgTAP direkt
+aufrufbar und damit messbar bleibt.
+
+#### Scenario: Die Migration kündigt den Bestand nicht an
+
+- **WHEN** die Migration auf eine Umgebung mit vorhandenen Beiträgen angewendet
+  wird und der Lauf danach zum ersten Mal geht
+- **THEN** entsteht für keinen der vorhandenen Beiträge eine Hinweiszeile
 
 #### Scenario: Nach dem Zeitpunkt wird angekündigt
 
@@ -178,9 +210,39 @@ Der Zeitpunkt SHALL Datum **und** Uhrzeit tragen und SHALL vorbelegt „sofort"
 bedeuten. Der Verfasser SHALL ihn bis zum Erreichen ändern und zurücknehmen
 können; ein zurückgenommener Zeitpunkt SHALL den Beitrag sofort veröffentlichen.
 
+Das Bearbeiten eines **bereits veröffentlichten** Beitrags SHALL den Zeitpunkt
+UNBERÜHRT lassen. Der Grund SHALL festgehalten sein: „am Zeitpunkt nichts
+geändert" und „jetzt sichtbar machen" sind zwei verschiedene Absichten und
+brauchen zwei verschiedene Werte. Fallen sie zusammen, datiert jede
+Textkorrektur einen alten Beitrag auf jetzt um, schiebt ihn im Feed nach oben
+und bewegt seine Zeile mitten in der Keyset-Ordnung, wo fremdes Blättern
+Beiträge überspringt oder doppelt.
+
+#### Scenario: Eine Textkorrektur verschiebt den Beitrag nicht
+
+- **WHEN** der Verfasser den Text eines längst veröffentlichten Beitrags ändert
+  und speichert, ohne den Zeitpunkt anzufassen
+- **THEN** behält der Beitrag seinen Veröffentlichungszeitpunkt und seine
+  Stelle im Feed
+
 Ein geplanter Beitrag SHALL dem Verfasser mit dem Zeitpunkt gekennzeichnet
 erscheinen, für den er geplant ist, damit er nicht für veröffentlicht gehalten
 wird.
+
+Das SHALL auf **jeder** Fläche gelten, die dem Verfasser seine eigenen Beiträge
+zeigt — nicht nur im Feed, sondern auch im Regal „selbst geteilt" auf der
+Profilseite und in den eigenen Beiträgen im Dashboard. Diese Flächen SHALL
+ausserdem nach `veroeffentlicht_ab` ordnen. Der Grund SHALL festgehalten sein:
+sie sind die einzigen ausser dem Feed, die einen geplanten Beitrag überhaupt
+zeigen, und zwei verschiedene Antworten auf „welcher ist der neueste" wären ein
+Fehler, den niemand als solchen läse.
+
+#### Scenario: Auch die Profilseite und das Dashboard markieren ihn
+
+- **WHEN** der Verfasser sein eigenes Profil oder sein Dashboard aufruft und
+  dort ein geplanter Beitrag steht
+- **THEN** trägt dessen Zeile den geplanten Zeitpunkt und nicht sein
+  Schreibdatum
 
 Videos SHALL verlinkt und NOT hochgeladen werden. Es SHALL nur eingebettet
 werden, was als YouTube- oder Vimeo-Link mit valider Video-ID erkannt wird. Der

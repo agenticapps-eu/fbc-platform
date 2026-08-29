@@ -45,7 +45,7 @@ type MatchingRow = {
 };
 type PostRow = Pick<
   Database["public"]["Tables"]["posts"]["Row"],
-  "id" | "body" | "hashtags" | "created_at" | "visibility"
+  "id" | "body" | "hashtags" | "created_at" | "visibility" | "veroeffentlicht_ab"
 >;
 
 export interface DashboardProfile {
@@ -258,13 +258,15 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
       .eq("profile_id", uid),
     supabase
       .from("posts")
-      .select("id, body, hashtags, created_at, visibility")
+      .select("id, body, hashtags, created_at, visibility, veroeffentlicht_ab")
       .eq("author_id", uid)
       // Nur Mitgliedsbeitraege (AGE-533): ein Event-Beitrag traegt einen leeren
       // Body und erschiene hier als leere Karte — und wuerde bei `limit(4)`
       // einen echten Beitrag verdraengen.
       .eq("kind", "member")
-      .order("created_at", { ascending: false })
+      // AGE-667: dieselbe Ordnung wie im Feed — sonst gaebe es zwei Antworten
+      // auf die Frage, welcher der neueste eigene Beitrag ist.
+      .order("veroeffentlicht_ab", { ascending: false })
       .limit(4),
     supabase
       .from("events")

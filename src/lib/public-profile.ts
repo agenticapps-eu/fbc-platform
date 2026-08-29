@@ -45,6 +45,14 @@ export interface ProfileActivity {
   id: string;
   body: string;
   created_at: string;
+  /**
+   * Ab wann der Beitrag sichtbar ist (AGE-667). Für einen FREMDEN Betrachter
+   * ist das nie ein zukünftiger Wert — die RLS liefert einen geplanten Beitrag
+   * gar nicht erst aus. Auf dem EIGENEN Profil steht er aber, und dann muss das
+   * Regal ihn markieren: sonst sähe der Verfasser dort einen Beitrag, den ausser
+   * ihm niemand hat, und hielte ihn für veröffentlicht.
+   */
+  veroeffentlicht_ab: string;
 }
 
 export interface ExtendedProfile {
@@ -84,8 +92,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
   // `profile_theme_scores` wird NICHT mehr gelesen (AGE-597): der Erfolgsradar ist
   // aus dieser Ansicht entfallen, und ein Rundlauf ohne Leser ist kein „Erhalten".
   // Tabelle und `recompute_potential_score` bleiben bestehen.
-  const [publicRes, baseRes, interestsRes, offersRes, needsRes, postsRes] =
-    await Promise.all([
+  const [publicRes, baseRes, interestsRes, offersRes, needsRes, postsRes] = await Promise.all([
     supabase
       .from("profiles_public")
       .select("id, name, avatar_url, cover_url, region, company, short_bio, tier, roles")
@@ -109,13 +116,17 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
       .order("created_at"),
     supabase
       .from("posts")
-      .select("id, body, created_at")
+      .select("id, body, created_at, veroeffentlicht_ab")
       .eq("author_id", id)
       // Nur Mitgliedsbeitraege (AGE-533): ein Event-Beitrag traegt einen leeren
       // Body und erschiene hier als leere Karte — und wuerde bei `limit(5)`
       // einen echten Beitrag verdraengen.
       .eq("kind", "member")
-      .order("created_at", { ascending: false })
+      // AGE-667: dieselbe Ordnung wie im Feed. Bliebe hier `created_at`, stünde
+      // ein fuer Freitag geplanter Beitrag im Feed oben und in diesem Regal an
+      // der Stelle seines Schreibdatums — zwei Antworten auf „welcher ist der
+      // neueste".
+      .order("veroeffentlicht_ab", { ascending: false })
       .limit(5),
   ]);
 

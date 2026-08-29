@@ -112,6 +112,11 @@ function zeile(id: string, extra: Record<string, unknown> = {}) {
     hashtags: [],
     visibility: "public",
     created_at: "2026-08-01T10:00:00Z",
+    // Seit AGE-667 ordnet der Feed nach `veroeffentlicht_ab`, nicht nach
+    // `created_at`. Der Vorgabewert ist derselbe Moment — so bleibt jeder
+    // bestehende Fall unverändert, und die Fälle, die den Unterschied MEINEN,
+    // setzen ihn über `extra`.
+    veroeffentlicht_ab: "2026-08-01T10:00:00Z",
     like_count: 0,
     ...extra,
   };
@@ -181,10 +186,10 @@ describe("5.3 — mehrere Tags wirken als ODER", () => {
 });
 
 describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
-  it("Neueste zuerst: created_at, id — beide absteigend", async () => {
+  it("Neueste zuerst: veroeffentlicht_ab, id — beide absteigend", async () => {
     await fetchFeed({ uid: ICH, ordnung: "neueste" });
     expect(postsAufruf().order).toEqual([
-      { spalte: "created_at", ascending: false },
+      { spalte: "veroeffentlicht_ab", ascending: false },
       { spalte: "id", ascending: false },
     ]);
   });
@@ -193,22 +198,22 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
     await fetchFeed({
       uid: ICH,
       ordnung: "aelteste",
-      cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20" },
+      cursor: { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p20" },
     });
     expect(postsAufruf().order).toEqual([
-      { spalte: "created_at", ascending: true },
+      { spalte: "veroeffentlicht_ab", ascending: true },
       { spalte: "id", ascending: true },
     ]);
     expect(postsAufruf().or).toEqual([
-      "created_at.gt.2026-08-01T10:00:00Z,and(created_at.eq.2026-08-01T10:00:00Z,id.gt.p20)",
+      "veroeffentlicht_ab.gt.2026-08-01T10:00:00Z,and(veroeffentlicht_ab.eq.2026-08-01T10:00:00Z,id.gt.p20)",
     ]);
   });
 
-  it("Beliebteste: like_count führt, created_at und id entscheiden den Gleichstand", async () => {
+  it("Beliebteste: like_count führt, veroeffentlicht_ab und id entscheiden den Gleichstand", async () => {
     await fetchFeed({ uid: ICH, ordnung: "beliebteste" });
     expect(postsAufruf().order).toEqual([
       { spalte: "like_count", ascending: false },
-      { spalte: "created_at", ascending: false },
+      { spalte: "veroeffentlicht_ab", ascending: false },
       { spalte: "id", ascending: false },
     ]);
   });
@@ -220,12 +225,12 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
     await fetchFeed({
       uid: ICH,
       ordnung: "beliebteste",
-      cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20", likeCount: 7 },
+      cursor: { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p20", likeCount: 7 },
     });
     expect(postsAufruf().or).toEqual([
       "like_count.lt.7," +
-        "and(like_count.eq.7,created_at.lt.2026-08-01T10:00:00Z)," +
-        "and(like_count.eq.7,created_at.eq.2026-08-01T10:00:00Z,id.lt.p20)",
+        "and(like_count.eq.7,veroeffentlicht_ab.lt.2026-08-01T10:00:00Z)," +
+        "and(like_count.eq.7,veroeffentlicht_ab.eq.2026-08-01T10:00:00Z,id.lt.p20)",
     ]);
   });
 
@@ -236,7 +241,7 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
       fetchFeed({
         uid: ICH,
         ordnung: "beliebteste",
-        cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20" },
+        cursor: { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p20" },
       }),
     ).rejects.toThrow(/likeCount/);
   });
@@ -246,19 +251,20 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
       zeile(`p${i}`, {
         like_count: 5,
         created_at: `2026-08-01T10:00:${String(i).padStart(2, "0")}Z`,
+        veroeffentlicht_ab: `2026-08-01T10:00:${String(i).padStart(2, "0")}Z`,
       }),
     );
 
     const beliebt = await fetchFeed({ uid: ICH, ordnung: "beliebteste" });
     expect(beliebt.nextCursor).toEqual({
-      createdAt: "2026-08-01T10:00:19Z",
+      veroeffentlichtAb: "2026-08-01T10:00:19Z",
       id: "p19",
       likeCount: 5,
     });
 
     aufrufe = [];
     const neueste = await fetchFeed({ uid: ICH, ordnung: "neueste" });
-    expect(neueste.nextCursor).toEqual({ createdAt: "2026-08-01T10:00:19Z", id: "p19" });
+    expect(neueste.nextCursor).toEqual({ veroeffentlichtAb: "2026-08-01T10:00:19Z", id: "p19" });
   });
 });
 
@@ -320,11 +326,11 @@ describe("5.12 / AGE-590 — die Typen stehen in der Anfrage, nicht in einer Nac
     await fetchFeed({
       uid: ICH,
       typen: ["video", "bild"],
-      cursor: { createdAt: "2026-08-01T10:00:00Z", id: "p20" },
+      cursor: { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p20" },
     });
     expect(postsAufruf().or).toEqual([
       "post_media.not.is.null,video_url.not.is.null",
-      "created_at.lt.2026-08-01T10:00:00Z,and(created_at.eq.2026-08-01T10:00:00Z,id.lt.p20)",
+      "veroeffentlicht_ab.lt.2026-08-01T10:00:00Z,and(veroeffentlicht_ab.eq.2026-08-01T10:00:00Z,id.lt.p20)",
     ]);
   });
 

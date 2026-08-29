@@ -39,6 +39,7 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     hashtags: ["netzwerken", "leadership"],
     visibility: "members",
     createdAt: new Date("2026-08-17T10:00:00Z").toISOString(),
+    veroeffentlichtAb: new Date("2026-08-17T10:00:00Z").toISOString(),
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,

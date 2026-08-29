@@ -96,3 +96,100 @@ rekonstruiert. Die Behauptung „gemessen aus dem lebenden Katalog" bleibt damit
 von ihm unbestätigt; die Rekonstruktion deckte sich vollständig. Der Abgleich
 gegen den echten Katalog ist hier von Hand nachgeholt worden — er hat geminis
 Befunde widerlegt und opencodes HOCH-Befund bestätigt.
+
+---
+
+# Diff-Review (Schritt 4) — 29.08., nach dem Bauen
+
+Zwei fremde Anbieter, direkt per Bash auf den fertigen Diff (3001 Zeilen,
+neue Dateien per `git add -N` sichtbar gemacht — sonst prüft der Reviewer die
+Hälfte).
+
+| Anbieter | Verdikt |
+| --- | --- |
+| **opencode** | `AENDERUNG NOETIG` — 2× MITTEL, 2× NIEDRIG, **alle vier berechtigt** |
+| **gemini** | `AENDERUNG NOETIG` — 1× HOCH (widerlegt), 1× MITTEL, 2× NIEDRIG |
+
+## Die zwei teuersten Funde — beide von opencode, beide von mir eingebaut
+
+**1. Das ACHTE Tor, MITTEL.** `recompute_potential_score`
+(`20260807090000:96`) zählt `count(*) from public.posts where author_id = …`
+ohne Zeitfilter. Gewicht 20 %, Sättigung 10 — ein einziger geplanter Beitrag
+hebt den Score um rund zwei Punkte, und der Score steht Fremden über
+`profiles_public` als Impact-Marke auf der Profilseite. **Ein Beobachter sieht
+die Zahl springen, bevor es den Beitrag gibt.**
+
+Der Entwurf hatte diese Funktion als „bekannten Rest" geführt und die
+Entscheidung auf den nächsten Vorgang verschoben, der den Score ohnehin
+anfasst. Das trägt nicht: es ist exakt die Fehlerklasse, die Tor 4 für
+`post_engagement_counts` schliesst („eine Zahl für eine unsichtbare Zeile
+verrät, DASS es die Zeile gibt"). **Geschlossen**, samt Zusage mit
+Positivkontrolle.
+
+**2. Jede Textkorrektur datierte einen alten Beitrag auf jetzt um, MITTEL.**
+Bei einem veröffentlichten Beitrag ist das Zeitfeld im Editor leer, der Editor
+schickte `null` (= „sofort"), und `updatePost` schrieb `new Date()`. „Ich habe
+am Zeitpunkt nichts geändert" war von „mach ihn jetzt sichtbar" nicht zu
+unterscheiden. Ein drei Monate alter, redigierter Beitrag wäre im Feed nach
+oben gesprungen, hätte „vor wenigen Sekunden" getragen — und die Zeile mitten
+in der Keyset-Ordnung bewegt, wo fremdes Blättern Zeilen überspringt oder
+doppelt.
+
+**Behoben mit drei Zuständen statt zwei** (`undefined` = nicht anfassen,
+`null` = sofort, Wert = dieser Zeitpunkt). **Gegenprobe gemessen:** der neue
+Test ist rot, sobald man auf zwei Zustände zurückstellt („expected null to be
+undefined"), und grün mit der Korrektur.
+
+## Angenommen, NIEDRIG
+
+- **`tasks.md` C5 war abgehakt, ohne erledigt zu sein.** Drei Sonden riefen die
+  RPC weiter mit sechs Argumenten (`probe-rpc-create-post.ts`,
+  `probe-9-3-sichtbarkeit.ts`); PostgREST fände die Funktion nicht mehr
+  (PGRST202). Kein CI-Bruch — die Sonden laufen in keinem Workflow —, aber
+  beide Messwerkzeuge für den Schreibweg wären still kaputt gewesen. Der Haken
+  stand, weil `tsc` `scripts/` nicht mitprüft. Umgestellt.
+- **`probe-feed-cursor.ts` mass weiter über `created_at`** — eine Sonde, deren
+  Kommentar „exakt die Abfrage aus src/lib/feed.ts" behauptet, über eine Spalte,
+  deren Index in derselben Migration gefallen ist. Falsch beruhigende Zahlen.
+  Umgestellt.
+- **Keine Zusage fürs De-Publizieren** (gemini). Entscheidung 7 verlangt sie
+  ausdrücklich („damit niemand später annimmt, es sei unmöglich") — sie fehlte.
+  Vier Zusagen ergänzt, samt Nachlese des Werts: ein `OK` von `try_as` allein
+  belegt nichts, weil ein von der RLS gefiltertes UPDATE null Zeilen ergibt.
+- **Kein Hinweis auf Überwachung des Laufs** in `docs/secrets.md` (gemini).
+  Ergänzt.
+
+## NICHT übernommen — und warum
+
+**geminis HOCH-Befund ist falsch.** Er meldete, `drop function` ohne
+vorheriges `revoke execute` hinterlasse eine „verwaiste Berechtigung". Postgres
+löscht die ACL **mit** dem Objekt; es gibt nichts, was verwaisen könnte. Die
+neue Signatur bekommt ihre Rechte ohnehin ausgesprochen.
+
+**Und gemini hat den Diff gar nicht gelesen.** `.gstack/` ist gitignoriert, und
+seine Ignore-Regeln verweigerten die Datei („File path … is ignored by
+configured ignore patterns"), `run_shell_command` gibt es bei ihm nicht mehr.
+Er hat stattdessen die Dateien im Repo gelesen. Das ist die dritte Sitzung in
+Folge, in der geminis *Verdikt* brauchbar ist und seine *Belege* nicht —
+diesmal immerhin ohne erfundene Pfade.
+
+**Für den nächsten Lauf:** den Diff NICHT nach `.gstack/` legen, sondern in den
+Scratchpad unter `/private/tmp/claude-501/…` (dort liest opencode über
+`reviewer-cli.sh` mit, und geminis Ignore-Regeln greifen nicht).
+
+## Was opencode ausdrücklich geprüft und NICHT beanstandet hat
+
+Alle `security definer`-Migrationen auf `public.posts`-Leser durchsucht; keine
+Views über `posts`; die Storage-Select-Policy delegiert an `post_media_lesbar`;
+`post_media`/`comments`/`post_likes`/`post_saves` erben über
+`exists`-Unterabfragen; `feed_tag_counts`/`feed_top_authors` sind
+`security invoker`; `hinweis_auf_meinem_beitrag` ist ungefährlich (nur der
+Autor kann seinen geplanten Beitrag kommentieren, und dann greift `v_owner =
+v_actor`); Edge Functions lesen keine `posts`; `posts` steht nicht in
+`supabase_realtime`. Cursor und `order by` tragen in allen drei Ordnungen
+dieselbe Spalte; `AcademyCursor` ist sauber getrennt. Doppelankündigung durch
+`for update … skip locked` plus Stempel in einer Transaktion ausgeschlossen.
+
+**Eine Randnotiz ohne Befund, die trotzdem gehört gesagt:** Re-Publizieren nach
+De-Publizieren kündigt NICHT erneut an — der Stempel bleibt. Das ist
+konsistent, steht aber weder in der Spec noch in der Oberfläche.

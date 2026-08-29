@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { FEED_SEITE, fetchAuthors, type FeedCursor, type FeedPost } from "./feed";
+import { FEED_SEITE, fetchAuthors, type FeedPost } from "./feed";
 
 /**
  * Academy-lite (AGE-533, C9) — das eine Stück, das der Feed nicht schon kann.
@@ -26,16 +26,35 @@ import { FEED_SEITE, fetchAuthors, type FeedCursor, type FeedPost } from "./feed
  * lautlos: ein Like ist eine Markierung, kein Zugriffsrecht.
  */
 
+/**
+ * Der Cursor dieses Regals — und ein EIGENER Typ, nicht der `FeedCursor`.
+ *
+ * Bis AGE-667 teilten sich beide einen Typ, weil beide führenden Felder
+ * `created_at` hiessen. Sie meinten aber nie dasselbe: der Feed ordnet nach dem
+ * Beitrag, dieses Regal nach dem ZEITPUNKT DES LIKES. Seit der Feed auf
+ * `veroeffentlicht_ab` umgestellt ist, wäre ein geteilter Typ eine Einladung,
+ * einen Cursor aus der einen Ordnung in die andere zu reichen — genau der
+ * Fehler, vor dem `cursorAusdruck` in `feed.ts` warnt. Zwei Ordnungen, zwei
+ * Typen.
+ */
+export interface AcademyCursor {
+  /** Wann der Betrachter den Beitrag markiert hat (`post_likes.created_at`). */
+  gelikedAm: string;
+  /** `post_likes.post_id` — bricht den Gleichstand. */
+  id: string;
+}
+
 export interface AcademySeite {
   posts: FeedPost[];
   /** `null` heißt: es gibt nichts mehr nachzuladen. */
-  nextCursor: FeedCursor | null;
+  nextCursor: AcademyCursor | null;
 }
 
 export const gelikteVideosKey = (uid: string | null) => ["academy", "geliked", uid] as const;
 
 /** Die Spalten des eingebetteten Beitrags — dieselben wie im Feed. */
-const POST_SPALTEN = "id, author_id, body, hashtags, visibility, created_at, video_url";
+const POST_SPALTEN =
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url";
 
 interface LikeZeile {
   post_id: string;
@@ -47,6 +66,7 @@ interface LikeZeile {
     hashtags: string[] | null;
     visibility: string;
     created_at: string;
+    veroeffentlicht_ab: string;
     video_url: string | null;
   } | null;
 }
@@ -55,7 +75,7 @@ export interface FetchGelikteArgs {
   /** Eigene Profil-ID; null = ausgeloggt. */
   uid: string | null;
   /** Weiterlesen ab hier — Cursor über (Like-Zeitpunkt, post_id). */
-  cursor?: FeedCursor | null;
+  cursor?: AcademyCursor | null;
 }
 
 /**
@@ -65,10 +85,7 @@ export interface FetchGelikteArgs {
  * `post_likes` trägt für `anon` kein Leserecht, die Abfrage käme als `42501`
  * zurück. Das ist KEINE Sicherheitsgrenze — die bleibt das fehlende Recht.
  */
-export async function fetchGelikteVideos({
-  uid,
-  cursor,
-}: FetchGelikteArgs): Promise<AcademySeite> {
+export async function fetchGelikteVideos({ uid, cursor }: FetchGelikteArgs): Promise<AcademySeite> {
   if (!uid) return { posts: [], nextCursor: null };
 
   let query = supabase
@@ -96,8 +113,8 @@ export async function fetchGelikteVideos({
 
   if (cursor) {
     query = query.or(
-      `created_at.lt.${cursor.createdAt},` +
-        `and(created_at.eq.${cursor.createdAt},post_id.lt.${cursor.id})`,
+      `created_at.lt.${cursor.gelikedAm},` +
+        `and(created_at.eq.${cursor.gelikedAm},post_id.lt.${cursor.id})`,
     );
   }
 
@@ -140,6 +157,12 @@ export async function fetchGelikteVideos({
       hashtags: p.hashtags ?? [],
       visibility: p.visibility,
       createdAt: p.created_at,
+      // Ein geplanter Beitrag kann hier nicht stehen: er ist für niemanden
+      // ausser seinem Verfasser sichtbar, also kann ihn auch niemand markiert
+      // haben. Der Wert wird trotzdem GELESEN und nicht aus `created_at`
+      // abgeschrieben — sonst zeigte die Karte in diesem Regal einen anderen
+      // Zeitpunkt als dieselbe Karte im Feed.
+      veroeffentlichtAb: p.veroeffentlicht_ab,
       likeCount: 0,
       commentCount: 0,
       // Es ist die eigene Like-Liste — jede Zeile hier ist geliked.
@@ -163,6 +186,6 @@ export async function fetchGelikteVideos({
     posts,
     // Der Cursor läuft über den LIKE-Zeitpunkt, nicht über den des Beitrags:
     // danach ist auch sortiert.
-    nextCursor: gibtMehr ? { createdAt: letzte.created_at, id: letzte.post_id } : null,
+    nextCursor: gibtMehr ? { gelikedAm: letzte.created_at, id: letzte.post_id } : null,
   };
 }

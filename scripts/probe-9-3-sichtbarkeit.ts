@@ -200,6 +200,7 @@ try {
       p_hashtags: [],
       p_tags: [],
       p_media: [{ storage_path: pfad, sort: 0, width: 1, height: 1 }],
+      p_veroeffentlicht_ab: null,
     });
     if (rpc.error) throw new Error(`RPC (${sicht}): ${rpc.error.message}`);
     pfade[sicht] = pfad;
