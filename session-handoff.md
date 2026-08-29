@@ -2,9 +2,16 @@
 
 > ## ⚠ ZUERST LESEN
 >
-> **PR #289 ist offen**, CI lief beim Schreiben dieser Zeilen noch. Branch
-> `donald/age-667-geplante-beitraege`, Worktree
-> `../fbc-platform.donald-age-667-geplante-beitraege`, HEAD `9173960`.
+> **PR #289 ist offen.** Branch `donald/age-667-geplante-beitraege`, Worktree
+> `../fbc-platform.donald-age-667-geplante-beitraege`, HEAD `995665f` (enthält
+> einen Merge von `origin/main` — PR #277 war dazwischengekommen).
+>
+> **Und eine Falle, die vierzig Minuten gekostet hat:** der PR stand auf
+> `mergeable: CONFLICTING`, und dann legt GitHub für `on: pull_request`
+> **überhaupt keinen Lauf** an — `check-runs` meldet `total_count: 0`, was
+> aussieht wie ein Actions-Ausfall und keiner ist. Nach dem Merge standen binnen
+> Sekunden acht Check-Runs. Festgehalten in
+> `actions-ausfall-liefert-nicht-nach`.
 >
 > **Nach dem Merge sind es ZWEI Schritte, nicht einer** — und der zweite ist der
 > gefährliche:
