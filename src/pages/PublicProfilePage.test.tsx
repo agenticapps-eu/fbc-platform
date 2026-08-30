@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
@@ -168,22 +168,33 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
         scroll: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight"),
         client: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight"),
       };
+      // Mitgezählt wird, WIE OFT `scrollHeight` gelesen wurde. Der Negativtest
+      // unten braucht diesen Beleg: ohne ihn ist er auch dann grün, wenn die
+      // Komponente gar nicht misst — gemessen an einer Sonde, die `setGekuerzt`
+      // stilllegt, blieb er es (AGE-666).
+      let messungen = 0;
       Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
         configurable: true,
-        get: () => scrollHeight,
+        get: () => {
+          messungen += 1;
+          return scrollHeight;
+        },
       });
       Object.defineProperty(HTMLElement.prototype, "clientHeight", {
         configurable: true,
         get: () => clientHeight,
       });
-      return () => {
-        if (alt.scroll) Object.defineProperty(HTMLElement.prototype, "scrollHeight", alt.scroll);
-        if (alt.client) Object.defineProperty(HTMLElement.prototype, "clientHeight", alt.client);
+      return {
+        zurueck: () => {
+          if (alt.scroll) Object.defineProperty(HTMLElement.prototype, "scrollHeight", alt.scroll);
+          if (alt.client) Object.defineProperty(HTMLElement.prototype, "clientHeight", alt.client);
+        },
+        messungen: () => messungen,
       };
     }
 
     it("kürzt auf drei Zeilen und klappt auf Klick auf", async () => {
-      const zurueck = stelleLayout(600, 60);
+      const { zurueck } = stelleLayout(600, 60);
       try {
         mockedFetch.mockResolvedValue(fullView);
         renderPage(authAsTier("discover"));
@@ -191,7 +202,10 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
         const bio = await screen.findByText(publicProfile.short_bio);
         expect(bio.className).toContain("line-clamp-3");
 
-        const mehr = screen.getByRole("button", { name: /mehr anzeigen/i });
+        // `findByRole`, nicht `getByRole`: den Knopf erzeugt erst der Effect, der
+        // misst — zwischen Text und Knopf liegt ein Durchlauf. Synchron gegriffen
+        // gewann der Zugriff das Rennen isoliert immer und unter Last nicht (AGE-666).
+        const mehr = await screen.findByRole("button", { name: /mehr anzeigen/i });
         fireEvent.click(mehr);
 
         expect(screen.getByText(publicProfile.short_bio).className).not.toContain("line-clamp-3");
@@ -204,12 +218,16 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     it("zeigt bei einer kurzen Biografie keinen Aufklapp-Weg", async () => {
       // Sonst stünde unter einem Zweizeiler ein „Mehr anzeigen", das nichts
       // aufklappt — der Grund, warum überhaupt gemessen wird.
-      const zurueck = stelleLayout(60, 60);
+      const { zurueck, messungen } = stelleLayout(60, 60);
       try {
         mockedFetch.mockResolvedValue(fullView);
         renderPage(authAsTier("discover"));
 
         await screen.findByText(publicProfile.short_bio);
+        // Erst der Beleg, DASS gemessen wurde. Ohne ihn prüft die Verneinung
+        // darunter nichts: sie ist auch grün, solange der Effect noch nicht
+        // gelaufen ist, und damit selbst bei einer Komponente, die nie misst.
+        await waitFor(() => expect(messungen()).toBeGreaterThan(0));
         expect(screen.queryByRole("button", { name: /mehr anzeigen/i })).not.toBeInTheDocument();
       } finally {
         zurueck();
