@@ -1,9 +1,12 @@
+import { App as NativeApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { useQuery } from "@tanstack/react-query";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
+import { entscheideZurueck, hatVerlauf } from "../lib/zurueck";
 import { pushEinrichten, pushZielZuhoerer } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
@@ -27,7 +30,7 @@ import { RouteTransition } from "./ui/Motion";
 import { Logo } from "./ui/Logo";
 import { SidebarNav, type SidebarNavSection } from "./ui/SidebarNav";
 import { TierBadge } from "./ui/TierBadge";
-import { useOverlay } from "./ui/useOverlay";
+import { istOverlayOffen, schliesseOberstesOverlay, useOverlay } from "./ui/useOverlay";
 import { Icon } from "./ui/icons";
 import { LeistenPill } from "./LeistenPill";
 
@@ -644,11 +647,59 @@ export default function AppShell() {
     void pushZielZuhoerer((ziel) => navigate(ziel));
   }, [navigate]);
 
+  // Die Android-Zurück-Taste (AGE-642 C2).
+  //
+  // Die Entscheidung steht in `entscheideZurueck` und ist dort geprüft — mit
+  // Mutations-Gegenprobe. Hier steht nur das Ausführen, denn `backButton` ist
+  // ein natives Ereignis, das in jsdom nie feuert: ein Test, der auf die
+  // Ereignisquelle wartet, wäre grün, weil nichts passiert.
+  //
+  // Beide Eingaben werden im Moment des Drucks GELESEN, nicht beim Anmelden
+  // festgehalten: der Zuhörer wird einmal angemeldet und überlebt jede
+  // Navigation. Ein festgehaltener Wert meldete für immer den Stand des
+  // ersten Aufbaus — sichtbar erst am Gerät, nach der dritten Seite.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let abgeraeumt = false;
+    let entfernen: (() => void) | undefined;
+
+    void NativeApp.addListener("backButton", () => {
+      switch (
+        entscheideZurueck({
+          overlayOffen: istOverlayOffen(),
+          hatVerlauf: hatVerlauf(window.history.state),
+        })
+      ) {
+        case "overlay-schliessen":
+          schliesseOberstesOverlay();
+          return;
+        case "seite-zurueck":
+          navigate(-1);
+          return;
+        // `minimizeApp` gibt es nur auf Android — dort feuert `backButton`
+        // auch allein. Beenden wäre die Voreinstellung der Plattform und
+        // ausdrücklich verboten: sie verlöre jeden halb ausgefüllten Entwurf.
+        case "hintergrund":
+          void NativeApp.minimizeApp();
+      }
+    }).then((h) => {
+      // Löst sich das Abräumen VOR dem Anmelden ein, bliebe der Zuhörer sonst
+      // stehen, ohne dass ihn noch jemand entfernen könnte.
+      if (abgeraeumt) void h.remove();
+      else entfernen = () => void h.remove();
+    });
+
+    return () => {
+      abgeraeumt = true;
+      entfernen?.();
+    };
+  }, [navigate]);
+
   // Off-Canvas-Navigation: das vierte Overlay — im Issue-Tisch fehlte es, und es
   // ist das einzige, das auf JEDER Seite montiert ist und nur auf dem Telefon
   // erscheint. Genau dort zählt die iOS-feste Sperre am meisten.
-  const mobileNav = useOverlay(mobileNavOpen);
-  const chatDrawer = useOverlay(chatDrawerOpen);
+  const mobileNav = useOverlay(mobileNavOpen, () => setMobileNavOpen(false));
+  const chatDrawer = useOverlay(chatDrawerOpen, () => setChatDrawerOpen(false));
 
   // Chatfenster gibt es genau dort, wo die Nachrichten-Leiste angedockt steht:
   // angemeldet, ausserhalb der Chatrouten, ab `xl`. Dieselbe Bedingung trägt

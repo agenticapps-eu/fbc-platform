@@ -5,6 +5,7 @@
     "jsr:@std/crypto@1": "1.1.0",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "npm:@capacitor/android@8": "8.5.0_@capacitor+core@8.5.0",
+    "npm:@capacitor/app@^8.1.1": "8.1.1_@capacitor+core@8.5.0",
     "npm:@capacitor/cli@8": "8.5.0",
     "npm:@capacitor/core@^8.5.0": "8.5.0",
     "npm:@capacitor/ios@8": "8.5.0_@capacitor+core@8.5.0",
@@ -219,6 +220,12 @@
     },
     "@capacitor/android@8.5.0_@capacitor+core@8.5.0": {
       "integrity": "sha512-Rb3prJeQiTp0pQhSSOReJuG9VgibOGMG4ECs+UhMwr6TCCHZ3NCZO811bDA0HxD0xrT/gCrJAsY5yfEATu84JQ==",
+      "dependencies": [
+        "@capacitor/core"
+      ]
+    },
+    "@capacitor/app@8.1.1_@capacitor+core@8.5.0": {
+      "integrity": "sha512-xM2ZTX5jK60tFtmjsmJv+Cdj1Qsb6NcavkqmdEnCPQBeya9oKhamZJxYOnQNj1ZvcJM7sWfG6BEtSLx42pisbA==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -3610,6 +3617,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@capacitor/android@8",
+        "npm:@capacitor/app@^8.1.1",
         "npm:@capacitor/cli@8",
         "npm:@capacitor/core@^8.5.0",
         "npm:@capacitor/ios@8",

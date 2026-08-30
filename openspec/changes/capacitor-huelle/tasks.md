@@ -379,7 +379,7 @@ Diese Aufgabe ist nach der Plan-Review überarbeitet (`REVIEWS.md`, zwei fremde
 Anbieter, beide REQUEST-CHANGES). Was sich dadurch geändert hat, steht bei den
 betroffenen Punkten.
 
-- [ ] **RED, regionsweise statt als Mittelwert.** Der Mittelwert taugt hier
+- [x] **RED, regionsweise statt als Mittelwert.** Der Mittelwert taugt hier
       nicht: die Komposition endet absichtlich in demselben Weiß, mit dem die
       Fläche vorher vollflächig gefüllt war — beide Zustände können denselben
       Mittelwert haben. *Aus der Review (opencode, HIGH).* Gemessen wird
@@ -387,16 +387,21 @@ betroffenen Punkten.
       **Markenregion nicht leer**. Vorher-Stand festgehalten: die Vorlage misst
       `#ffffff`, und die drei Renditions liegen in `Assets.car` mit je
       14 710 Bytes, SHA1 `73CC0B89…` (Scale 3).
-- [ ] **Es gibt kein `Splash.imageset` INNERHALB von `App.app`.** `actool`
+- [x] **Es gibt kein `Splash.imageset` INNERHALB von `App.app`.** `actool`
       backt Image Sets in `Assets.car`; der Beleg am gebauten Artefakt läuft
       deshalb über `assetutil --info` und die SHA1 der Renditions, nicht über
       eine Datei im Bündel. *Aus der Review (opencode, HIGH).* Bei B4 ging es
       nur deshalb anders, weil App-Symbole zusätzlich lose im Bündel liegen.
-- [ ] **Eine Quelle, drei Zutaten, alle schon im Repo:** die Marke aus
+      **Angewandt am 30.08.:** `Splash`, `SplashSchriftzug` und `SplashVerlauf`
+      liegen im gebauten `Assets.car`. Damit ist auch die Lesart widerrufen, die
+      Startfläche fehle, *weil* kein `Splash.imageset` im Bündel liege — sie
+      liegt dort erwartungsgemäss nicht und ist trotzdem da. Ob die Fläche beim
+      Start erscheint, ist damit **nicht** belegt; das kann nur das Gerät.
+- [x] **Eine Quelle, drei Zutaten, alle schon im Repo:** die Marke aus
       `public/brand/compass-favicon.svg` (dieselbe wie App-Symbol und Tab), das
       Bild aus `public/images/hero-mitglieder.webp` (dasselbe wie das
       Login-Panel) und die Schriften aus `public/fonts/*.woff2`. `pnpm splash`.
-- [ ] **Drei Ebenen, nicht zwei — und das ist der Punkt, an dem der Entwurf
+- [x] **Drei Ebenen, nicht zwei — und das ist der Punkt, an dem der Entwurf
       umgebaut wurde.** Der Verlauf wird **nicht** ins Foto eingebacken, sondern
       ist eine eigene, gestreckte Ebene über dem Foto. *Aus der Review (beide,
       HIGH/MEDIUM):* die App erlaubt Querformat (`UISupportedInterfaceOrientations`)
@@ -405,49 +410,49 @@ betroffenen Punkten.
       — quer läge seine Unterkante mitten im Farbverlauf, und die Kante des
       Bildes wäre sichtbar. Als eigene Ebene endet er **immer** an der Unterkante
       seiner Fläche in Weiß.
-- [ ] **Der Verlauf ist der vom Login-Panel** (`LoginPage.tsx:277`): vier Stopps
+- [x] **Der Verlauf ist der vom Login-Panel** (`LoginPage.tsx:277`): vier Stopps
       — deckend · 22 % · 32 % bei 70 % · 44 % bei 25 % · 58 % durchsichtig. Zwei
       Stopps ergaben dort eine sichtbare Kante bei 26 %; diese Rampe läuft lang
       und flach aus. Sie endet in `--color-canvas` `#ffffff`, **derselben Farbe,
       die auch die Fläche darunter trägt.**
-- [ ] **Der Grundton wird ausdrücklich gesetzt.** Das Storyboard steht heute auf
+- [x] **Der Grundton wird ausdrücklich gesetzt.** Das Storyboard steht heute auf
       `systemBackgroundColor` — im Dunkelmodus **schwarz**. Bisher unsichtbar
       unter dem deckenden weißen PNG; in dieser Komposition wäre es die Fläche
       unter dem Schriftzug. *Abgeleitet aus einem Review-Befund (gemini), dessen
       Kern — „die App braucht einen Dunkelmodus-Entwurf" — zurückgewiesen ist:
       `data-variant` kennt nur `hell` und `navy`, ein dunkles Inhaltsthema gibt
       es nicht, `--color-canvas` ist immer `#ffffff`.*
-- [ ] **Alle drei Ebenen am Verhältnis aufgehängt, nicht an Punkten:** Foto auf
+- [x] **Alle drei Ebenen am Verhältnis aufgehängt, nicht an Punkten:** Foto auf
       den oberen 62 % der Höhe, Schriftzug bei 58 % Höhe und 25 % hoch. Daraus
       folgt die Invariante, die den Text von jeder Bildlage trennt:
       `schriftzugOben ≥ bandAnteil × 0.78` — der Punkt, ab dem die Rampe
       deckend weiß ist. Sie gilt für jede Bildschirmgröße und jede Orientierung,
       weil beide Seiten Anteile derselben Höhe sind. **Das ist eine Zusage, die
       ein Test prüfen kann**, im Gegensatz zu „sieht auf dem SE auch gut aus".
-- [ ] **Das `webp` wird vor dem Rastern nach PNG dekodiert, mit Abbruch.**
+- [x] **Das `webp` wird vor dem Rastern nach PNG dekodiert, mit Abbruch.**
       *Aus der Review (opencode, HIGH):* `rsvg-convert` lädt eingebettete Bilder
       über gdk-pixbuf und fällt bei fehlendem WebP-Loader **still** aus — genau
       das Fehlerbild, vor dem der Schrift-Punkt warnt. `sips` dekodiert,
       der Lauf bricht ab, wenn dabei nichts entsteht.
-- [ ] **Die Schriftbindung wird POSITIV nachgewiesen.** *Aus der Review
+- [x] **Die Schriftbindung wird POSITIV nachgewiesen.** *Aus der Review
       (opencode, HIGH), und der Befund sitzt:* die erste Fassung führte als
       „Positivkontrolle", dass `Georgia` auf eine Grotesk zurückfällt — also ein
       gelungenes stilles Ersetzen, genau das, was die Anforderung verbietet.
       Jetzt umgekehrt: `fc-match` muss für **Inter** und **Fraunces** auf die
       entpackte Repo-TTF zeigen, sonst bricht der Lauf ab. Die Gegenprobe
       (Systemschrift greift nicht durch) steht daneben, nicht an ihrer Stelle.
-- [ ] **`PANGOCAIRO_BACKEND=fc` ist nötig und wird am Verhalten geprüft, nicht
+- [x] **`PANGOCAIRO_BACKEND=fc` ist nötig und wird am Verhalten geprüft, nicht
       am Variablennamen.** `rsvg-convert` nimmt auf macOS über pango sonst den
       **CoreText**-Pfad und ignoriert jede eigene `fonts.conf` stillschweigend:
       gemessen kam Fraunces als Grotesk heraus, ohne Fehlermeldung. Ob die
       Variable in einem anderen pango-Bau wirkt, ist offen — deshalb entscheidet
       die `fc-match`-Prüfung eine Zeile darüber, nicht die Variable.
       *Aus der Review (opencode, LOW).*
-- [ ] **`woff2_decompress` als Werkzeug** (`brew install woff2`), wie
+- [x] **`woff2_decompress` als Werkzeug** (`brew install woff2`), wie
       `rsvg-convert` bei B4. Die entstehenden TTF sind Zwischenergebnisse und
       werden **nicht** versioniert — die `woff2` im Repo bleiben die einzige
       Fassung der Schriften.
-- [ ] **GREEN:** Zusagen auf die Erzeugung — die vier Stopps des Verlaufs, die
+- [x] **GREEN:** Zusagen auf die Erzeugung — die vier Stopps des Verlaufs, die
       Verhältnis-Invariante oben, der Ausschnitt als **Anteil** des Quellbildes
       (nicht als feste Pixel, *Review opencode LOW*), und dass die Marke aus dem
       Favicon gelesen und nicht abgeschrieben ist. Mit Mutations-Gegenprobe:
@@ -521,30 +526,57 @@ nicht wiederholt.
 
 ### C1. Sichere Ränder
 
-- [ ] `viewport-fit=cover` in `index.html:7`. **Zuerst** — ohne das Meta sind
+- [x] `viewport-fit=cover` in `index.html:12`. **Zuerst** — ohne das Meta sind
       alle `env(safe-area-inset-*)` null, und jede weitere Zeile wirkungslos.
-- [ ] `env(safe-area-inset-*)` **ergänzend** (nicht ersetzend) an Kopfzeile,
+- [x] `env(safe-area-inset-*)` **ergänzend** (nicht ersetzend) an Kopfzeile,
       beiden angedockten Leisten und Chatfenster.
 - [ ] **Beleg auf dem Gerät**, ausdrücklich nicht in jsdom: dort sind die Insets
       immer null, und ein Test darüber wäre grün, gleich was die App tut.
 
 ### C2. Android-Zurück
 
-- [ ] **RED**: Test — bei offenem Overlay schließt Zurück das Overlay und
+- [x] **RED**: Test — bei offenem Overlay schließt Zurück das Overlay und
       navigiert **nicht**. Die Reihenfolge ist der Punkt, den man übersieht:
       mehrere Flächen führen ihren Offen-Zustand über den Verlaufsschlüssel
       (`HeaderSearch.tsx:80`, `MemberDirectory.tsx:80`, `LegalZurueck.tsx:24`).
-- [ ] **RED**: Test — mit Verlauf geht Zurück eine Seite zurück; ohne Verlauf
+- [x] **RED**: Test — mit Verlauf geht Zurück eine Seite zurück; ohne Verlauf
       schließt es die App **nicht**.
-- [ ] Beide Tests prüfen die **Entscheidungsfunktion**, nicht das Ereignis:
+- [x] Beide Tests prüfen die **Entscheidungsfunktion**, nicht das Ereignis:
       `backButton` ist ein natives Capacitor-Ereignis, das in jsdom nie feuert.
       Ein Test, der auf die Ereignisquelle wartet, wäre grün, weil nichts
       passiert — dieselbe Falle wie bei `env(safe-area-inset-*)`.
-- [ ] **`@capacitor/app` als Abhängigkeit hinzufügen.** Sie fehlt bisher in
+- [x] **`@capacitor/app` als Abhängigkeit hinzufügen.** Sie fehlt bisher in
       jeder Phase: A installiert `core` und `preferences`, C3 `camera`, D den
       Updater. Ohne sie gibt es weder `backButton` noch das Wegschicken in den
       Hintergrund, und die RED-Tests oben könnten nie grün werden.
-- [ ] Handler auf `@capacitor/app` `backButton` legen.
+- [x] Handler auf `@capacitor/app` `backButton` legen. Er steht in
+      `AppShell.tsx`, nicht in `src/lib/`: er braucht Navigation UND den
+      Overlay-Stapel, und `src/lib` importiert nirgends aus `src/components` —
+      diese Schichtung ist nicht umgekehrt worden.
+- [x] **Beim Bauen entschieden, weil die Anforderung es erzwingt:** „Overlay
+      schliessen, ohne zu navigieren" braucht einen Weg, das oberste Overlay zu
+      schliessen. `useOverlay` führte den Stapel bereits (für die Tab-Falle),
+      hatte aber keinen Ausgang. Er bekommt zwei — `istOverlayOffen()` und
+      `schliesseOberstesOverlay()` — und eine **Pflicht**-Schliessfunktion als
+      zweites Argument. Pflicht, nicht optional, aus demselben Grund, aus dem
+      der Hook überhaupt entstand (AGE-529): der Mangel wäre nicht die eine
+      Fläche, die Zurück nicht bedient, sondern die fehlende Regel. Der Typ
+      erzwingt sie an allen acht Anschlussstellen, heute und beim nächsten
+      Overlay. **Kein synthetisches Escape ins Dokument** — das träfe jeden
+      `document`-Lauscher auf einmal, ein Fehlerbild, das `EmojiAuswahl.tsx`
+      bereits beschreibt.
+- [x] **`hatVerlauf` liest `window.history.state.idx`, NICHT
+      `location.key !== "default"`.** Der erste Entwurf nahm die Regel aus
+      `LegalZurueck.tsx`, um keinen zweiten Begriff von „es gibt ein Zurück"
+      zu schaffen. **Das trägt hier nicht, und es fiel erst bei der Durchsicht
+      auf:** `RequireAuth` und `HomeRedirect` ersetzen beim Kaltstart den
+      ersten Eintrag (`<Navigate replace />`). Der Schlüssel wäre dann nicht
+      mehr `"default"`, ein Eintrag dahinter gäbe es trotzdem nicht — Zurück
+      liefe ins Leere, statt zu minimieren. In `react-router@7.18.2` gemessen,
+      nicht angenommen: erster Eintrag `index = 0` · `push`
+      `index = getIndex() + 1` · **`replace` `index = getIndex()`**. Für
+      `LegalZurueck` bleibt die alte Regel richtig — dort entscheidet sie eine
+      Aufschrift nach einer Navigation, die stattgefunden hat.
 - [ ] **Beleg auf einem Android-Gerät:** durch drei Ebenen navigieren, Overlay
       öffnen, zweimal zurück — Overlay zu, eine Ebene zurück, App noch offen.
 

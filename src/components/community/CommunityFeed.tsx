@@ -1637,7 +1637,7 @@ function Lightbox({
   // Die Lightbox ist nur montiert, solange sie offen ist — daher fest `true`
   // (AGE-529). Sperrt die Seite dahinter und hält den Fokus im Overlay; den
   // ERSTEN Fokus setzt weiterhin der Effekt unten, aus dem Grund, der dort steht.
-  const overlay = useOverlay(true);
+  const overlay = useOverlay(true, onSchliessen);
 
   const weiter = (schritt: number) => onIndex((index + schritt + media.length) % media.length);
 
