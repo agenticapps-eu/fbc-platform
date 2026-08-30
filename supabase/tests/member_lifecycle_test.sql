@@ -525,7 +525,14 @@ select is(
   -- Waechter hat beim Umstellen gebrochen und damit genau das geleistet, wofuer
   -- er da ist — die Kopie in `former_member_entries` wurde in derselben
   -- Migration nachgezogen (20260826100000).
+  --
+  -- AGE-667: UND ZUM ZWEITEN MAL. Der Veroeffentlichungszeitpunkt kam in die
+  -- Policy, dieser Waechter wurde rot, und die Kopie in
+  -- `former_member_entries` ist in derselben Migration (20260829090000)
+  -- nachgezogen worden — samt eigener Zusage in
+  -- `supabase/tests/geplante_beitraege_test.sql`, die vorher rot war.
   '(is_activated() AND ((visibility = ''public''::text) OR (visibility = ''members''::text) '
+  'OR (author_id = ( SELECT auth.uid() AS uid))) AND ((veroeffentlicht_ab <= now()) '
   'OR (author_id = ( SELECT auth.uid() AS uid))))',
   'posts_select_by_visibility unveraendert — sonst ist die Kopie in former_member_entries nachzuziehen');
 

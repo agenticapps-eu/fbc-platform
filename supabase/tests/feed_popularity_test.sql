@@ -40,7 +40,7 @@
 --     Fixture-IDs eingeschränkt und nie `count(*)` der ganzen Tabelle.
 
 begin;
-select plan(23);
+select plan(24);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -186,13 +186,26 @@ select is(
 -- Richtung, nicht nur auf den Namen: ein Index ueber dieselben drei Spalten in
 -- anderer Reihenfolge spart den Sortierschritt nicht und waere fuer den
 -- Keyset-Cursor wertlos.
+-- AGE-667: der Stichentscheid wandert von `created_at` auf
+-- `veroeffentlicht_ab`, weil die Ordnung des Feeds es tut. Bliebe er hier
+-- stehen, hätte der Feed zwei verschiedene Begriffe von „neuer" — die
+-- Zeit-Ordnungen einen, der Gleichstand der dritten einen anderen. Der alte
+-- Index ist in derselben Migration gefallen; er hatte keinen Leser mehr.
 select is(
   (select indexdef from pg_indexes
-    where schemaname = 'public' and indexname = 'posts_like_count_created_at_id_idx'),
-  'CREATE INDEX posts_like_count_created_at_id_idx ON public.posts '
-  'USING btree (like_count DESC, created_at DESC, id DESC)',
-  'Der Index trägt (like_count desc, created_at desc, id desc) — total geordnet, '
+    where schemaname = 'public' and indexname = 'posts_like_count_veroeffentlicht_ab_id_idx'),
+  'CREATE INDEX posts_like_count_veroeffentlicht_ab_id_idx ON public.posts '
+  'USING btree (like_count DESC, veroeffentlicht_ab DESC, id DESC)',
+  'Der Index trägt (like_count desc, veroeffentlicht_ab desc, id desc) — total geordnet, '
   'wie der Keyset-Cursor es braucht');
+
+-- Und der alte ist WIRKLICH weg, nicht bloss danebengelegt. Ohne diese Zeile
+-- wäre die Zusage darüber auch grün, wenn zwei Indizes über dieselben Spalten
+-- lägen — einer gelesen, einer nur Schreiblast.
+select is(
+  (select count(*)::int from pg_indexes
+    where schemaname = 'public' and indexname = 'posts_like_count_created_at_id_idx'),
+  0, 'Der alte Index über created_at ist gefallen, nicht danebengeblieben');
 
 -- ── 3. Die Triggerfunktion ist gehärtet ─────────────────────────────────────
 -- Sie schreibt `posts` unter fremdem Recht. Als INVOKER liefe das UPDATE unter
@@ -232,8 +245,8 @@ select is(
      from information_schema.role_column_grants
     where table_schema = 'public' and table_name = 'posts'
       and grantee = 'authenticated' and privilege_type = 'UPDATE'),
-  'body,hashtags,visibility',
-  'Schreibbar sind genau die drei Spalten, die updatePost setzt');
+  'body,hashtags,veroeffentlicht_ab,visibility',
+  'Schreibbar sind genau die vier Spalten, die updatePost setzt');
 
 select alike(
   pg_temp.try_as('c1000000-0000-0000-0000-000000000002',
@@ -270,7 +283,7 @@ select is(
     $$select public.create_post_with_media(
         'c2000000-0000-0000-0000-00000000000c'::uuid,
         'Ueber die RPC entstanden', 'public',
-        array['beleg'], '{}'::text[], '[]'::jsonb)$$),
+        array['beleg'], '{}'::text[], '[]'::jsonb, null)$$),
   'OK',
   'Ein Beitrag entsteht über create_post_with_media auch OHNE INSERT-Recht auf '
   'posts — die Funktion ist security definer');

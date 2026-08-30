@@ -30,6 +30,7 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     hashtags: ["netzwerken"],
     visibility: "public",
     createdAt: new Date("2026-08-01T10:00:00Z").toISOString(),
+    veroeffentlichtAb: new Date("2026-08-01T10:00:00Z").toISOString(),
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
@@ -109,7 +110,7 @@ describe("CommunityFeed — jeder Tag erscheint genau einmal", () => {
 });
 
 describe("CommunityFeed — ältere Beiträge sind erreichbar", () => {
-  const CURSOR = { createdAt: "2026-08-01T10:00:00Z", id: "p1" };
+  const CURSOR = { veroeffentlichtAb: "2026-08-01T10:00:00Z", id: "p1" };
 
   function seite(over: Partial<FeedSeite> & { posts: FeedPost[] }): FeedSeite {
     return { nextCursor: null, ...over };

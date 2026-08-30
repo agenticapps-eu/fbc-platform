@@ -131,8 +131,8 @@ beforeAll(async () => {
   // über das führende Feld allein Beiträge verschluckt (5.5).
   for (let i = 0; i < 25; i++) {
     await pg.query(
-      `insert into public.posts (id, author_id, body, hashtags, visibility, created_at, like_count)
-       values (gen_random_uuid(), $1, $2, $3, 'public', $4, 3)`,
+      `insert into public.posts (id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, like_count)
+       values (gen_random_uuid(), $1, $2, $3, 'public', $4, $4, 3)`,
       [i % 2 === 0 ? ich : anderer, `Text ${i}`, [MARKE], zeit(i)],
     );
   }
@@ -140,29 +140,29 @@ beforeAll(async () => {
   // Vereinigung gegen Durchschnitt (5.3).
   for (let i = 0; i < 2; i++) {
     await pg.query(
-      `insert into public.posts (author_id, body, hashtags, visibility, created_at, like_count)
-       values ($1, $2, $3, 'public', $4, 1)`,
+      `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, like_count)
+       values ($1, $2, $3, 'public', $4, $4, 1)`,
       [anderer, `Nur zweite Marke ${i}`, [ZWEITE_MARKE], zeit(100 + i)],
     );
   }
   // Ein oeffentlicher Beitrag unter dem KURATIERTEN Tag. Er ist die Zeile, die
   // `feed_tag_counts` garantiert liefert.
   await pg.query(
-    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
-     values ($1, 'Unter einer kuratierten Marke', $2, 'public', $3)`,
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab)
+     values ($1, 'Unter einer kuratierten Marke', $2, 'public', $3, $3)`,
     [ich, [KURIERTE_MARKE], zeit(300)],
   );
   // Ein Beitrag mit Video (der Trigger leitet `video_url` aus dem Body ab —
   // die Spalte von Hand zu setzen prüfte den Bestand, nicht den Weg).
   await pg.query(
-    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
-     values ($1, 'Schau mal https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3)`,
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab)
+     values ($1, 'Schau mal https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3, $3)`,
     [ich, [MARKE], zeit(200)],
   );
   // Ein Beitrag mit Bild.
   const mitBild = await pg.query<{ id: string }>(
-    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
-     values ($1, 'Mit Bild', $2, 'public', $3) returning id`,
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab)
+     values ($1, 'Mit Bild', $2, 'public', $3, $3) returning id`,
     [ich, [MARKE], zeit(201)],
   );
   await pg.query(
@@ -175,8 +175,8 @@ beforeAll(async () => {
   // liefert. `or` ist ein Praedikat auf einer Zeile und kein Join — aber das
   // gehoert zugesagt, nicht angenommen.
   const beides = await pg.query<{ id: string }>(
-    `insert into public.posts (author_id, body, hashtags, visibility, created_at)
-     values ($1, 'Beides https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3) returning id`,
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab)
+     values ($1, 'Beides https://www.youtube.com/watch?v=dQw4w9WgXcQ', $2, 'public', $3, $3) returning id`,
     [ich, [MARKE], zeit(203)],
   );
   await pg.query(
@@ -190,8 +190,8 @@ beforeAll(async () => {
      values ('AGE-582 Testtermin', now() + interval '7 days', 'public') returning id`,
   );
   await pg.query(
-    `insert into public.posts (author_id, body, hashtags, visibility, created_at, kind, ref_id)
-     values ($1, '', $2, 'public', $3, 'event', $4)`,
+    `insert into public.posts (author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, kind, ref_id)
+     values ($1, '', $2, 'public', $3, $3, 'event', $4)`,
     [ich, [MARKE], zeit(202), event.rows[0].id],
   );
 
@@ -295,7 +295,7 @@ describe("5.12 / AGE-590 — der Typ-Filter läuft in der Datenbank", () => {
     const r = await pg.query<{ id: string }>(
       `select p.id from public.posts p
         where p.hashtags && $1 ${wo}
-        order by p.created_at desc, p.id desc`,
+        order by p.veroeffentlicht_ab desc, p.id desc`,
       [[MARKE]],
     );
     return r.rows.map((x) => x.id);

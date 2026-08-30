@@ -114,7 +114,24 @@ export interface FeedPost {
   body: string;
   hashtags: string[];
   visibility: string;
+  /**
+   * Wann der Beitrag GESCHRIEBEN wurde. Seit AGE-667 ist das nicht mehr
+   * dasselbe wie „sichtbar seit" — dafür steht `veroeffentlichtAb`. Der Wert
+   * bleibt, weil er für Admin und Fehlersuche das ehrlichere Feld ist: er sagt,
+   * wann jemand getippt hat.
+   */
   createdAt: string;
+  /**
+   * Ab wann der Beitrag für andere sichtbar ist (AGE-667). Die KARTE zeigt
+   * diesen Wert, nicht `createdAt`: für einen Leser heisst „vor drei Stunden"
+   * der Moment, seit dem der Beitrag da ist, nicht der, in dem sein Verfasser
+   * ihn getippt hat.
+   *
+   * Liegt er in der Zukunft, ist der Beitrag GEPLANT — und dann sieht ihn nur
+   * sein Verfasser. Das ist keine Zusage der Oberfläche, sondern die der RLS
+   * und der fünf weiteren Tore; die Karte MARKIERT den Zustand nur.
+   */
+  veroeffentlichtAb: string;
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
@@ -469,19 +486,42 @@ export async function fetchAuthors(
 export const FEED_SEITE = 20;
 
 /**
- * Der Cursor läuft über **(created_at, id)**, nicht über `created_at` allein.
- * Bei gleichen Zeitstempeln — beim Import der ~70 Konten der wahrscheinliche
- * Fall — überspränge eine reine Zeitgrenze den zweiten Beitrag still: er stünde
- * weder auf der einen noch auf der nächsten Seite.
+ * Ist der Beitrag noch nicht veröffentlicht? (AGE-667)
+ *
+ * KOMFORT, KEINE GRENZE. Wer einen geplanten Beitrag nicht sehen darf, bekommt
+ * ihn gar nicht erst geliefert — das entscheiden die RLS und die fünf weiteren
+ * Tore in der Datenbank. Diese Funktion beantwortet nur die Frage, ob die
+ * Karte des VERFASSERS eine Markierung tragen soll.
+ *
+ * `jetzt` ist ein Parameter und kein `new Date()` im Rumpf, damit ein Test die
+ * Grenze an beiden Seiten messen kann statt auf die Wanduhr zu warten.
+ */
+export function istGeplant(veroeffentlichtAb: string, jetzt: Date = new Date()): boolean {
+  return new Date(veroeffentlichtAb).getTime() > jetzt.getTime();
+}
+
+/**
+ * Der Cursor läuft über **(veroeffentlicht_ab, id)**, nicht über
+ * `veroeffentlicht_ab` allein. Bei gleichen Zeitstempeln — beim Import der ~70
+ * Konten der wahrscheinliche Fall — überspränge eine reine Zeitgrenze den
+ * zweiten Beitrag still: er stünde weder auf der einen noch auf der nächsten
+ * Seite.
+ *
+ * SEIT AGE-667 IST DAS FÜHRENDE FELD `veroeffentlicht_ab`, NICHT `created_at`,
+ * und zwar in allen drei Ordnungen. Cursor und `order by` müssen dieselbe
+ * Spalte tragen: eine Grenze über eine ANDERE Spalte als die Ordnung
+ * überspringt Zeilen oder liefert sie doppelt — dieselbe Klasse wie der
+ * zusammengesetzte Cursor aus AGE-655, nur eine Ebene höher.
  */
 export interface FeedCursor {
-  createdAt: string;
+  veroeffentlichtAb: string;
   id: string;
   /**
    * Nur in der Ordnung „Beliebteste" belegt — dort führt `like_count`, und eine
-   * Grenze über `created_at` allein überspränge bei gleicher Reaktionszahl
-   * still Beiträge. In den beiden Zeit-Ordnungen fehlt das Feld absichtlich:
-   * ein Cursor, der Felder einer FREMDEN Ordnung trägt, sähe gültig aus.
+   * Grenze über `veroeffentlicht_ab` allein überspränge bei gleicher
+   * Reaktionszahl still Beiträge. In den beiden Zeit-Ordnungen fehlt das Feld
+   * absichtlich: ein Cursor, der Felder einer FREMDEN Ordnung trägt, sähe
+   * gültig aus.
    */
   likeCount?: number;
 }
@@ -565,7 +605,7 @@ const TYP_AUSDRUCK: Record<FeedTyp, string> = {
  * daran (`post_media=not.is.null` bzw. `=is.null`).
  */
 const FEED_SPALTEN =
-  "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
 
 /**
  * Dasselbe mit dem Pflicht-Join auf die EIGENEN Speicherungen — der Reiter
@@ -584,7 +624,7 @@ const FEED_SPALTEN =
  * ist der Weg dorthin und keine Nachkorrektur im Client.
  */
 const FEED_SPALTEN_GESPEICHERT =
-  "id, author_id, body, hashtags, visibility, created_at, video_url, kind, ref_id, like_count, post_media(post_id), post_saves!inner(profile_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, like_count, post_media(post_id), post_saves!inner(profile_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
 
 /**
  * Der Keyset-Ausdruck der jeweiligen Ordnung.
@@ -603,12 +643,12 @@ function cursorAusdruck(ordnung: FeedOrdnung, c: FeedCursor): string {
     }
     return (
       `like_count.lt.${c.likeCount},` +
-      `and(like_count.eq.${c.likeCount},created_at.lt.${c.createdAt}),` +
-      `and(like_count.eq.${c.likeCount},created_at.eq.${c.createdAt},id.lt.${c.id})`
+      `and(like_count.eq.${c.likeCount},veroeffentlicht_ab.lt.${c.veroeffentlichtAb}),` +
+      `and(like_count.eq.${c.likeCount},veroeffentlicht_ab.eq.${c.veroeffentlichtAb},id.lt.${c.id})`
     );
   }
   const op = ordnung === "aelteste" ? "gt" : "lt";
-  return `created_at.${op}.${c.createdAt},and(created_at.eq.${c.createdAt},id.${op}.${c.id})`;
+  return `veroeffentlicht_ab.${op}.${c.veroeffentlichtAb},and(veroeffentlicht_ab.eq.${c.veroeffentlichtAb},id.${op}.${c.id})`;
 }
 
 /**
@@ -675,12 +715,19 @@ export async function fetchFeed({
     .limit(FEED_SEITE + 1);
 
   // Die Ordnung, je einen eigenen Pfad. `like_count` führt nur in
-  // „Beliebteste"; `created_at` und `id` entscheiden dort den Gleichstand und
-  // sind in den beiden Zeit-Ordnungen selbst die Ordnung.
+  // „Beliebteste"; `veroeffentlicht_ab` und `id` entscheiden dort den
+  // Gleichstand und sind in den beiden Zeit-Ordnungen selbst die Ordnung.
+  //
+  // AGE-667: der Gleichstand in „Beliebteste" WANDERT MIT auf
+  // `veroeffentlicht_ab`. Bliebe er auf `created_at`, hätte der Feed zwei
+  // verschiedene Begriffe von „neuer" — die Zeit-Ordnungen einen, der
+  // Stichentscheid der dritten einen anderen. Ein für Freitag geplanter Beitrag
+  // stünde dann in „Neueste" oben und in „Beliebteste" an der Stelle seines
+  // Schreibdatums.
   if (ordnung === "beliebteste") query = query.order("like_count", { ascending: false });
   const aufsteigend = ordnung === "aelteste";
   query = query
-    .order("created_at", { ascending: aufsteigend })
+    .order("veroeffentlicht_ab", { ascending: aufsteigend })
     .order("id", { ascending: aufsteigend });
 
   // Der Ein-Tag-Filter läuft über denselben Weg wie die Mehrfachauswahl, statt
@@ -793,6 +840,7 @@ export async function fetchFeed({
       hashtags: r.hashtags ?? [],
       visibility: r.visibility,
       createdAt: r.created_at,
+      veroeffentlichtAb: r.veroeffentlicht_ab,
       likeCount: counts.get(r.id)?.like_count ?? 0,
       commentCount: counts.get(r.id)?.comment_count ?? 0,
       likedByMe: myLikes.has(r.id),
@@ -814,8 +862,12 @@ export async function fetchFeed({
     // sie ein Feld, das gültig aussieht und nichts bedeutet.
     nextCursor: gibtMehr
       ? ordnung === "beliebteste"
-        ? { createdAt: letzte.created_at, id: letzte.id, likeCount: letzte.like_count }
-        : { createdAt: letzte.created_at, id: letzte.id }
+        ? {
+            veroeffentlichtAb: letzte.veroeffentlicht_ab,
+            id: letzte.id,
+            likeCount: letzte.like_count,
+          }
+        : { veroeffentlichtAb: letzte.veroeffentlicht_ab, id: letzte.id }
       : null,
   };
 }
@@ -896,6 +948,16 @@ export async function createPostWithMedia(input: {
   visibility: PostVisibility;
   tags: string[];
   media: PostMediaEingabe[];
+  /**
+   * Ab wann der Beitrag sichtbar sein soll (AGE-667), als absoluter Zeitpunkt
+   * (ISO). `null` heisst „sofort".
+   *
+   * Der Parameter der RPC trägt bewusst KEINEN Vorgabewert — ein Vorgabewert
+   * erzeugte in Postgres eine Überladung statt einer Ersetzung, und der alte,
+   * sechsstellige Schreibweg bliebe daneben offen. Deshalb wird hier immer ein
+   * Wert übergeben, notfalls `null`.
+   */
+  veroeffentlichtAb: string | null;
 }): Promise<void> {
   const { error } = await supabase.rpc("create_post_with_media", {
     p_post_id: input.postId,
@@ -903,6 +965,7 @@ export async function createPostWithMedia(input: {
     p_visibility: input.visibility,
     p_hashtags: parseHashtags(input.body),
     p_tags: input.tags,
+    p_veroeffentlicht_ab: input.veroeffentlichtAb,
     // `p_media` ist in Postgres `jsonb`, und der Typgenerator schreibt dafür
     // `Json` — eine Struktur mit festen Feldern passt da nicht ohne Weiteres
     // hinein. Die Form prüft die RPC beim Auspacken (`m->>'storage_path'` …),
@@ -1027,6 +1090,38 @@ export async function updatePost(input: {
   alteHashtags: string[];
   body: string;
   visibility: PostVisibility;
+  /**
+   * Der neue Veröffentlichungszeitpunkt (AGE-667), absolut (ISO).
+   *
+   * DREI Zustände, und die Unterscheidung ist der ganze Punkt:
+   *
+   *   `undefined` — den Zeitpunkt NICHT anfassen. Der Normalfall: jemand
+   *                 redigiert den Text eines längst veröffentlichten Beitrags.
+   *   `null`      — „ab sofort sichtbar". So nimmt der Verfasser eine Planung
+   *                 zurück.
+   *   ein ISO-Wert — genau dieser Zeitpunkt.
+   *
+   * ZWEI ZUSTÄNDE REICHTEN NICHT, und das hat der Diff-Review gefunden: mit
+   * `null` als „sofort" ist „ich habe am Zeitpunkt nichts geändert" von „mach
+   * ihn jetzt sichtbar" nicht zu unterscheiden. Jede Textkorrektur an einem
+   * drei Monate alten Beitrag hätte ihn auf `now()` umdatiert, im Feed nach
+   * oben katapultiert, die Zeitangabe auf „vor wenigen Sekunden" gestellt —
+   * und die Zeile mitten in der Keyset-Ordnung bewegt, wo sie fremdes Blättern
+   * Zeilen überspringen oder doppeln lässt.
+   *
+   * ANDERS ALS BEIM ANLEGEN wird ein Wert in der Vergangenheit hier NICHT auf
+   * `now()` gehoben. Das ist Absicht: die Anhebung sitzt in der RPC, und dieser
+   * Weg läuft an ihr vorbei — über das Spalten-UPDATE-Recht direkt auf die
+   * Tabelle. Eine Invariante zu behaupten, die der zweite Schreibweg nicht
+   * hält, wäre schlimmer als keine.
+   *
+   * Damit ist auch das DE-PUBLIZIEREN möglich: ein Zeitpunkt in der Zukunft an
+   * einem bereits sichtbaren Beitrag nimmt ihn wieder aus der Sicht.
+   * Entschieden und zugelassen — das ist dasselbe wie Löschen, nur reversibel.
+   * Likes und Kommentare bleiben liegen und werden wieder sichtbar, wenn er es
+   * wird.
+   */
+  veroeffentlichtAb?: string | null;
 }): Promise<void> {
   const { error } = await supabase
     .from("posts")
@@ -1034,6 +1129,13 @@ export async function updatePost(input: {
       body: input.body,
       hashtags: hashtagsNachBearbeitung(input.alterText, input.alteHashtags, input.body),
       visibility: input.visibility,
+      // Die Spalte steht NUR dann im Update, wenn sie gemeint ist. `null` heisst
+      // „sofort" und wird zur Uhrzeit des Clients — das ist hier vertretbar,
+      // weil derselbe Client auch jeden geplanten Zeitpunkt aus seiner eigenen
+      // Wanduhr errechnet; die Uhr ist für diese Spalte ohnehin massgeblich.
+      ...(input.veroeffentlichtAb === undefined
+        ? {}
+        : { veroeffentlicht_ab: input.veroeffentlichtAb ?? new Date().toISOString() }),
     })
     .eq("id", input.postId);
   if (error) throw error;

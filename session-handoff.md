@@ -1,149 +1,154 @@
-# Session Handoff — 2026-08-29 (früh, die neue Marke ist vermessen und freigegeben)
+# Session Handoff — 2026-08-29 (AGE-667, geplante Beiträge)
 
-**Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`. **Nachtrag 29.08.:** die Marke ist
-eingesetzt, alles committet, und der Branch ist auf `origin/main` rebased —
-**0 dahinter, 20 davor**. Der Arbeitsbaum ist sauber; die unten unter *Files
-modified* genannten drei Dateien sind drin.
+> ## ⚠ ZUERST LESEN
+>
+> **PR #289 ist offen.** Branch `donald/age-667-geplante-beitraege`, Worktree
+> `../fbc-platform.donald-age-667-geplante-beitraege`, HEAD `995665f` (enthält
+> einen Merge von `origin/main` — PR #277 war dazwischengekommen).
+>
+> **Und eine Falle, die vierzig Minuten gekostet hat:** der PR stand auf
+> `mergeable: CONFLICTING`, und dann legt GitHub für `on: pull_request`
+> **überhaupt keinen Lauf** an — `check-runs` meldet `total_count: 0`, was
+> aussieht wie ein Actions-Ausfall und keiner ist. Nach dem Merge standen binnen
+> Sekunden acht Check-Runs. Festgehalten in
+> `actions-ausfall-liefert-nicht-nach`.
+>
+> **Nach dem Merge sind es ZWEI Schritte, nicht einer** — und der zweite ist der
+> gefährliche:
+>
+> 1. `migrate-prod` von Hand, mit Donalds Freigabe.
+> 2. **Danach** die pg_cron-Zeitplanung setzen, erst DEV, dann PROD
+>    (`docs/secrets.md`, Abschnitt „Den Ankündigungslauf … eintragen").
+>    **Nicht vorher.** Die Migration markiert den Bestand als angekündigt; läuft
+>    der Job vor ihr, kündigt er JEDEN vorhandenen Beitrag an JEDES Mitglied an,
+>    per Glocke und Push.
+> 3. Den Rückfüllschritt auf DEV/PROD nachlesen — lokal ist er grundsätzlich
+>    nicht messbar (Migrationen laufen vor dem Seed):
+>    `count(*) where veroeffentlicht_ab <> created_at` = 0 und
+>    `count(*) where angekuendigt_am is null` = 0.
+>
+> **Der lokale Stack wurde zweimal zurückgesetzt** (`supabase db reset`). Er
+> trägt jetzt alle Migrationen dieses Branches inklusive `20260828200000`, das
+> vorher nur von Hand eingespielt war — die Warnung aus der letzten Übergabe ist
+> damit erledigt.
 
-Das Rebase hat **zwei** Commits als bereits auf `main` fallen lassen (Glocke
-und pgTAP-Wächter, beide über PR #286 gequetscht) und den Merge-Commit
-eingeebnet. Damit liegt die lokale Historie **anders als die von PR #277** —
-der Branch braucht einen `--force-with-lease`-Push, und der ist noch nicht
-gemacht.
-
-Die Sitzung davor lief im Worktree `age-641` und konnte von dort keine
-git-Operationen auf diesen Baum ausführen; deshalb nur Dateien, kein Commit.
+**Sitzung:** `fbc-platform-f4`. Parallel lief `fbc-platform-donald-age-642-…`
+an AGE-642 (mobil) — keine Berührung.
 
 ## Accomplished
 
-### Die neue Marke ist vermessen, entworfen und von Donald freigegeben
+**AGE-667 vollständig gebaut**, von Schritt 3 bis Schritt 7 der Schleife. Der
+Change war beim Einstieg schon vorgeschlagen, validiert und plan-reviewed
+(Commit `5f6ba4b`); begonnen habe ich beim Bauen.
 
-Der fertige SVG-Pfad, alle Messwerte, die Deckungstabelle und die verbleibenden
-Schritte stehen in **`docs/marke-neu/entwurf-messung.md`**. Bildbeleg daneben:
-`docs/marke-neu/entwurf-gegen-vorlage.jpeg` (Vorlage · Entwurf · Entwurf als
-roter Umriss über der Vorlage).
+Ein Mitglied kann einen Beitrag jetzt schreiben und zu einem gewählten Zeitpunkt
+sichtbar machen. Sichtbarkeit wird **gerechnet** (`veroeffentlicht_ab <= now()
+or author_id = auth.uid()`), nicht geschaltet.
 
-**Zwei Zahlen der Nacht-Übergabe waren falsch, beide aus derselben Ursache:**
-die Mitte des Vorlagenbildes war mit (626, 626) *angenommen* statt gemessen —
-der Schwerpunkt der hellen Bildpunkte liegt bei (626,4 / 625,7). Vier
-Bildpunkte reichen, damit eine Sonde entlang der 45°-Achse den schlanken
-Nebenstrahl **seitlich** verlässt; die Zahl, die dabei herauskommt, sieht aus
-wie sein Ende.
-
-| | Übergabe nachts | nachgemessen |
-| --- | --- | --- |
-| Nebenstrahl, äussere Spitze | 0,568 R | **0,680 R** |
-| Nabe des Hauptsterns | 0,159 R → „ändert sich praktisch nicht" | **0,140 R**, also 3,4 → **3,15** |
-
-„Gerade Flanken" hält. Der Nebenstrahl ist eine **beidseitig spitze Raute**:
-innere Spitze 0,250 R, breiteste Stelle 0,313 R mit halber Breite 0,0497 R,
-äussere Spitze 0,680 R.
-
-**Gefangen hat es das Bild, nicht die Zahl.** Der erste Entwurf nach den alten
-Zahlen sah in der Tabelle plausibel aus und fiel erst im Umriss über der
-Vorlage durch. Genau dafür steht Schritt „rendern und zeigen" vor allem
-anderen.
-
-**Deckungsprobe** (Schnittmenge durch Vereinigung der Schwellenmasken, 600²):
-
-| | Deckung |
+| Abschnitt | Stand |
 | --- | --- |
-| heute im Repo (Ring + Stern) — Positivkontrolle | 41,9 % |
-| Nabe 3,4 (Hauptstern unverändert) | 85,8 % |
-| **Nabe 3,15 — von Donald gewählt** | **87,1 %** |
+| A · Spalte, Rückfüllung, Spalten-Grant | fertig |
+| B · die sechs lesenden Tore | fertig, jedes mit eigener Zusage |
+| B′ · das schreibende Tor + Ankündigungslauf | fertig |
+| C · Schreibweg, Cursor, Typen, alle Aufrufer | fertig |
+| D · Composer, Markierung, Rückweg, 2 weitere Flächen | fertig |
+| E · pgTAP (31 Zusagen), CI-Dateiliste | fertig |
+| F1 · zwei fremde Diff-Reviewer | fertig, Befunde eingearbeitet |
+| F3 · `migrate-prod` | **offen, Donalds Freigabe** |
 
-Das Optimum ist flach (3,1 bis 3,2 innerhalb von 0,2 Punkten), 3,4 fällt
-heraus. Weiter zu optimieren hiesse JPEG-Unschärfe nachbauen.
-
-### Der Worktree `age-641` ist abräumbar
-
-Nachgemessen: Arbeitsbaum sauber auch mit `--untracked-files=all`, **0 Commits
-ahead**, `git branch --contains HEAD -r` nennt `origin/main`. Ignoriert liegen
-dort nur `node_modules/`, `.opencode/` und `ci-watch.local` — ein totes
-19-Zeilen-Pollskript auf einen längst durchgelaufenen CI-Lauf.
+**Belege:** 969 pgTAP-Zusagen über 21 Dateien grün · 2203 Unit-Tests grün · 24
+Integrationstests gegen den laufenden Stack grün · `tsc`, `lint`, `build` grün.
 
 ## Decisions
 
-- **Nabe 3,15 statt 3,4** (Donald, 29.08.), gegen die Alternative „Hauptstern
-  Zeichen für Zeichen unverändert lassen". Grund: die Vorlage ist am Ansatz
-  rund 8 % schlanker, und die Deckungsprobe zeigt es ausgeglichen statt zu fett.
-  Das widerspricht der Nacht-Notiz „die Hauptstrahlen ändern sich praktisch
-  nicht" — die stützte sich auf die fehlerhafte Mitte.
-- **Ein `<path>` mit fünf Teilzügen**, kein `<circle>` mehr. Dann bleibt
-  `pfade.length === 1`, und an `leseMarke()` fällt nur die Ring-Erwartung.
-- **Die falschen Zahlen wurden als Korrektur sichtbar gemacht**, nicht still
-  ersetzt — in diesem Handoff und im vorigen. Wer die alte Tabelle wiederfindet,
-  soll sehen, dass sie widerrufen ist.
-- **Der 642-Worktree wurde NICHT hierher geholt.** `wt remove --no-delete-branch`
-  hätte `.env` und den gesamten nativen Bauzustand (`ios/`, `android/`, Pods,
-  Assets) mitgenommen. Stattdessen: neue Sitzung in diesem Worktree.
+- **Acht Tore, nicht sechs.** Der Entwurf zählte fünf lesende. Die Plan-Review
+  fand das **schreibende** (`trg_hinweis_neuer_beitrag` hätte im Moment des
+  PLANENS jedes Telefon erreicht), die Diff-Review das **achte**
+  (`recompute_potential_score` zählte geplante Beiträge in einen Score, der
+  Fremden als Impact-Marke auf der Profilseite steht — die Zahl wäre gesprungen,
+  bevor es den Beitrag gibt). Der Entwurf führte letzteres als „bekannten Rest"
+  und wollte es verschieben; das trägt nicht, es ist dieselbe Fehlerklasse wie
+  Tor 4.
+- **Die Ankündigung bekommt einen Lauf, die Sichtbarkeit nicht.** Fällt der Lauf
+  aus, erscheint der Beitrag trotzdem, nur unangekündigt — er verbirgt keinen
+  Inhalt. Genau deshalb ist er hier vertretbar.
+- **B′5 gemessen und anders entschieden als angeboten.** `pg_cron` fehlt im
+  lokalen Stack. Gewählt ist ein dritter Weg: die **Funktion** in der Migration
+  (kein Geheimnis, in pgTAP direkt messbar), nur die **Zeitplanung** von Hand.
+  Sie gehört deshalb NICHT in `ERWARTET_OHNE_MIGRATION`.
+- **Der Stichentscheid in „Beliebteste" wandert mit** (C7). Sonst hätte der Feed
+  zwei Begriffe von „neuer".
+- **Drei Indizes über `created_at` sind gefallen**, drei neue entstanden —
+  gemessen an 20 000 Beiträgen unter voller RLS: Seq Scan + Sort (20 692 Puffer,
+  58,5 ms) → Index Scan **ohne Sort** (43 Puffer, 0,17 ms).
+  `posts_visibility_created_at_idx` bleibt: nicht gemessen, also nicht angefasst.
+- **De-Publizieren ist zugelassen** und jetzt auch zugesagt (Entscheidung 7
+  verlangte das, die Zusagen fehlten).
 
 ## Files modified
 
-Alle drei **uncommitted**:
+39 Dateien in `244cfe2`, zwei in `9173960`. Die tragenden:
 
-- `docs/marke-neu/entwurf-messung.md` — **neu**. Die fertige SVG-Datei zum
-  Übernehmen, die Messwerte samt Methode, die Deckungstabelle, die
-  verbleibenden vier Schritte.
-- `docs/marke-neu/entwurf-gegen-vorlage.jpeg` — **neu**, 81 kB. Vorlage,
-  Entwurf, Umriss über der Vorlage.
-- `session-handoff.md` — diese Datei; die Vorgängerfassung trug die zwei
-  falschen Zahlen.
+- `supabase/migrations/20260829090000_geplante_beitraege.sql` (**neu**, 741
+  Zeilen) — Spalte, Rückfüllung, Grant, acht Tore, Trigger, Lauf, neue
+  RPC-Signatur, Indizes. Jede Entscheidung im Kopf, mit Messung.
+- `supabase/tests/geplante_beitraege_test.sql` (**neu**) — 31 Zusagen, jede
+  Verneinung mit Positivkontrolle.
+- `src/components/community/CommunityFeed.geplant.test.tsx` (**neu**) — 9 Zusagen.
+- `src/lib/feed.ts` · `academy.ts` (eigener Cursor-Typ) · `dashboard.ts` ·
+  `public-profile.ts` · `database.types.ts` (von Hand)
+- `CommunityFeed.tsx` · `profil-widgets.tsx` · `PublicProfilePage.tsx` ·
+  `AcademyPage.tsx`
+- `rls_test.sql` · `member_lifecycle_test.sql` · `feed_popularity_test.sql` —
+  drei bestehende Wächter, die zu Recht angeschlagen haben
+- `docs/secrets.md` · `.github/workflows/ci.yml` · die drei `scripts/probe-*.ts`
 
 ## Next session: start here
 
-1. `git fetch && git rebase origin/main` — 5 Commits hinter `main`. Erst danach
-   messen, sonst misst man gegen einen alten Stand.
-2. **`docs/marke-neu/entwurf-messung.md` lesen.** Nicht neu messen, nicht neu
-   entwerfen — der Pfad ist freigegeben.
-3. Den Pfad an **drei** Stellen einsetzen: `public/brand/compass-favicon.svg`,
-   `src/components/ui/CompassMark.tsx`, `docs/design-system.html`. Keine vierte
-   Kopie. Geändert wird ausschliesslich die **Form**, nicht die Farbe.
-4. `leseMarke()` in `scripts/app-icons.logic.ts:72` samt Tests: die
-   `<circle>`-Erwartung fällt, das Zeichnen des Rings auch. **Ohne diesen
-   Schritt scheitert `pnpm app:icons`** an einer Vorlage ohne Kreis.
-5. `pnpm app:icons` **und** `pnpm splash`. Beleg ans **gebaute** Artefakt
-   (mittlere Farbe, `Assets.car`), nicht an die Datei im Arbeitsbaum.
-6. **Erst danach** der Startbildschirm-Fehler — die Fläche wird ohnehin neu
-   erzeugt, sonst wird zweimal dasselbe gesucht.
+**Zuerst `gh pr checks 289` lesen** — beim Schreiben lief CI noch. Ist sie grün,
+mergen; dann die beiden Schritte aus dem Kasten oben, in dieser Reihenfolge.
 
-Wenn der Worktree `age-641` nicht mehr gebraucht wird: dort `wt remove` (der
-Branch ist gemergt, `wt` nimmt ihn mit — hier richtig). Nicht von hier aus, und
-nicht solange dort eine Sitzung läuft.
+Danach sind die nächsten kleinen Vorgänge **AGE-666** (flackernder Test in
+`PublicProfilePage.test.tsx`, hält `verify` auf `main` rot — eine Zeile
+`await screen.findByRole`, aber die Abnahme braucht die GANZE Suite mehrfach),
+**AGE-664**, **AGE-660**, **AGE-618**.
 
 ## Open questions
 
-- **Der lokale Stack ist verstellt.** `hinweis_neue_nachricht()` trägt dort die
-  neue Fassung, `schema_migrations` steht aber auf `20260828180000` — per psql
-  eingespielt, nicht per `db push`. Ein `db reset` bringt es gerade.
-- **CI ist flaky.** `PublicProfilePage.test.tsx` und `use-gespraech.test.tsx`,
-  beide im Nachlauf grün. Signatur von `lokal-gruen-ci-rot-zwei-ursachen`,
-  Ursache 1. Noch kein eigener Vorgang.
-- **Zwei Changes auf einem Branch** (#277) — unverändert offen, jetzt kleiner:
-  Migration, pgTAP und Glocke sind heraus und auf `main`.
-- **Startbildschirm erscheint nicht** — Verdacht eins bleiben die von Hand
-  geschriebenen Constraints, Zwischenspeicher des Launch Screens die zweite
-  Spur. Erst die Marke.
-- **Tote Gerätetokens** (`zugestellt: 2` aus der deinstallierten App) —
-  verschwinden nie von selbst.
-- **Die App-ID `com.effbeezee.app` ist unbestätigt**; APNs prüft das Gerätetoken
-  vor dem Topic, zeigt sich erst am echten Gerät.
-- **Aus der Übergabe vom 28.08. spätabends zurückgeholt** (sie stand auf `main`
-  und wurde beim Rebase von dieser Fassung überschrieben — die drei Punkte
-  waren hier nie eingearbeitet und wären sonst still verschwunden):
-  - **Die Event-Vorschau aus AGE-600 ist nicht im Browser nachgemessen.** Sie
-    braucht ein Event mit Titelbild und eine Rolle, die es bearbeiten darf.
-  - **AGE-664 kippt eine ausgesprochene Entscheidung** — AGE-596 hat Feed,
-    Vorschauen und Verzeichnis-Karte ausgeschlossen (`REVIEWS.md:82`). Zwei der
-    drei Ausnahmen sind eingeholt; ob die dritte fällt, ist eine Entscheidung
-    und keine Aufgabe.
-  - **AGE-658 ist erledigt, nicht offen** — gebaut in PR #277 („nur nativ
-    zähmen, Web unverändert"). Steht hier, weil beim Sichten das Gegenteil
-    angenommen wurde.
-  - Ebenfalls von dort: Aktivierungsversand 69/72 · Rotation des
-    PROD-DB-Passworts.
-- Unverändert: B3 (Signaturmaterial), C2, C3, Phase D, E · Bearer im
-  Funktionsrumpf per `pg_get_functiondef()` lesbar · Abschnitt 4 mit Detlev ·
-  AGE-655 · AGE-653 · AGE-610 · AGE-512 · AGE-598 · AGE-256 · AGE-606 ·
-  AGE-628/629/630.
+- **Re-Publizieren nach De-Publizieren kündigt NICHT erneut an** — der Stempel
+  bleibt. Konsistent, steht aber weder in der Spec noch in der Oberfläche.
+  Randnotiz von opencode, kein Befund.
+- **Das Bearbeiten-Formular überläuft auf 375 px um 18 px.** Gemessen, dass es
+  NICHT von hier kommt (das Entfernen des Planungsfeldes ändert nichts);
+  Treiber ist der native `<input type="file">` mit 301 px. Bestand aus AGE-566,
+  bewusst nicht mitrepariert.
+- **`updatePost` schreibt für „sofort" die Uhrzeit des Clients**, die RPC beim
+  Anlegen die des Servers. Vertretbar, weil derselbe Client jeden geplanten
+  Zeitpunkt aus seiner eigenen Wanduhr errechnet — aber benannt, nicht
+  übersehen.
+- Unverändert offen: AGE-599-Abnahme (zwei Schritte, siehe Übergabe vom 28.08.),
+  AGE-665 (Spec-Drift), AGE-610 · AGE-512 · Aktivierungsversand 69/72 ·
+  Rotation des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+
+## Was diese Sitzung über das Verfahren gelernt hat
+
+**Zwei neue Memories** — `sonden-client-ohne-database-generic` (ein grüner
+`typecheck` belegt NICHT, dass die Sonden in `scripts/` noch passen: sie bauen
+`createClient()` ohne `Database`-Generic) und
+`pgtap-zusage-ueber-die-ganze-tabelle` (in CI vakuum-grün, lokal flackernd).
+Dazu ein Abschnitt in `reviewer-cli-timeouts`: gemini konnte den Diff aus
+`.gstack/` gar nicht lesen und hat trotzdem ein vollständiges Verdikt geliefert.
+
+**Und zweimal habe ich eine Ursache aufgeschrieben, die ich nicht gemessen
+hatte.** Erst „`tsc` prüft `scripts/` nicht mit" (falsch — `scripts` steht in
+`tsconfig.json`), dann eine Score-Zusage, die `recompute_potential_score` mit
+einer Spalte verglich, die genau diese Funktion selbst schreibt. Beide korrigiert
+— die erste in einem eigenen Commit, weil sie schon gepusht war. Dieselbe Sorte
+wie die falschen Zahlen der Vorsitzung: was zwei Absätze weiter nachprüfbar ist,
+schreibe ich trotzdem aus dem Gedächtnis.
+
+**Die Browser-Sichtprobe hat einen Fehler gefunden, den 2203 Tests nicht sahen**
+— 35 px waagerechter Überlauf, sobald ein Zeitpunkt gewählt war. Und die
+Messung dazu hatte selbst einen Fehler: `top` unterscheidet sich bei
+`items-center` zwischen verschieden hohen Kindern auf DERSELBEN Zeile. Gemessen
+werden müssen die Mitten.

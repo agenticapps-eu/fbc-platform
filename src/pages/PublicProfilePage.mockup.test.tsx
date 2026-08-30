@@ -43,14 +43,35 @@ const VOLL: PublicProfileData = {
     // die Fixture trug bis dahin `vertrieb`, das dort gar nicht steht. Der Fall
     // „unbekannter Schlüssel" hat jetzt einen eigenen Test.
     offers: [
-      { id: "o1", category: "kapital", theme: null, title: "Kapital", description: null, source: "chip" },
+      {
+        id: "o1",
+        category: "kapital",
+        theme: null,
+        title: "Kapital",
+        description: null,
+        source: "chip",
+      },
     ],
     needs: [
-      { id: "n1", category: "partner", theme: null, title: "Partner", description: null, source: "chip" },
+      {
+        id: "n1",
+        category: "partner",
+        theme: null,
+        title: "Partner",
+        description: null,
+        source: "chip",
+      },
     ],
     branche: "Immobilien",
     member_since: "2019-04-01",
-    posts: [{ id: "p1", body: "Mein Beitrag", created_at: "2026-07-01T10:00:00Z" }],
+    posts: [
+      {
+        id: "p1",
+        body: "Mein Beitrag",
+        created_at: "2026-07-01T10:00:00Z",
+        veroeffentlicht_ab: "2026-07-01T10:00:00Z",
+      },
+    ],
   },
 };
 
@@ -79,7 +100,15 @@ function renderPage(daten: PublicProfileData = VOLL) {
 
 /** Reihenfolge der Überschriften im Dokument, gefiltert auf die des Mockups. */
 function abschnitte(): string[] {
-  const gesucht = ["Über mich", "Beruf", "Hobbys", "Ich biete", "Ich suche", "Aktivitäten", "Eckdaten"];
+  const gesucht = [
+    "Über mich",
+    "Beruf",
+    "Hobbys",
+    "Ich biete",
+    "Ich suche",
+    "Aktivitäten",
+    "Eckdaten",
+  ];
   return screen
     .getAllByRole("heading")
     .map((h) => h.textContent?.trim() ?? "")

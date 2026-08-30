@@ -10,7 +10,7 @@ import { Tabs } from "../components/ui/Tabs";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { FORMAT_HERO } from "../config/formatHero";
 import { displayAuthor } from "../lib/displayAuthor";
-import { fetchGelikteVideos, gelikteVideosKey } from "../lib/academy";
+import { fetchGelikteVideos, gelikteVideosKey, type AcademyCursor } from "../lib/academy";
 import { fetchFeed, type FeedCursor, type FeedPost } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
 
@@ -129,8 +129,7 @@ function GeteilteVideos({
 }) {
   const liste = useInfiniteQuery({
     queryKey: academyKey(uid, autorId),
-    queryFn: ({ pageParam }) =>
-      fetchFeed({ uid, nurVideos: true, autorId, cursor: pageParam }),
+    queryFn: ({ pageParam }) => fetchFeed({ uid, nurVideos: true, autorId, cursor: pageParam }),
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzte) => letzte.nextCursor,
   });
@@ -183,9 +182,7 @@ function MeineAcademy({ uid }: { uid: string | null }) {
       </section>
 
       <section className="space-y-4">
-        <h3 className="font-display text-lg font-semibold tracking-tight text-ink">
-          Gefällt mir
-        </h3>
+        <h3 className="font-display text-lg font-semibold tracking-tight text-ink">Gefällt mir</h3>
         {/* Die Beschriftung sagt, was es ist. „Gemerkt" oder „Gespeichert"
             verspräche Privatheit, die es nicht gibt: `post_engagement_counts`
             gibt den Like-Zähler an jeden aus, der den Beitrag sehen darf —
@@ -203,7 +200,7 @@ function GelikteVideos({ uid }: { uid: string | null }) {
   const liste = useInfiniteQuery({
     queryKey: gelikteVideosKey(uid),
     queryFn: ({ pageParam }) => fetchGelikteVideos({ uid, cursor: pageParam }),
-    initialPageParam: null as FeedCursor | null,
+    initialPageParam: null as AcademyCursor | null,
     getNextPageParam: (letzte) => letzte.nextCursor,
   });
 
@@ -220,8 +217,7 @@ function GelikteVideos({ uid }: { uid: string | null }) {
       isLoggedIn={uid !== null}
       leer={{
         title: "Noch nichts markiert",
-        description:
-          "Was dir in der Aktivität oder unter „Alle“ gefällt, sammelt sich hier.",
+        description: "Was dir in der Aktivität oder unter „Alle“ gefällt, sammelt sich hier.",
       }}
     />
   );
@@ -306,10 +302,7 @@ function VideoKarte({ post, isLoggedIn }: { post: FeedPost; isLoggedIn: boolean 
         {author.masked ? (
           <span className="text-sm text-muted">{author.name}</span>
         ) : (
-          <Link
-            to={`/p/${post.author.id}`}
-            className="text-sm text-muted hover:text-accent-strong"
-          >
+          <Link to={`/p/${post.author.id}`} className="text-sm text-muted hover:text-accent-strong">
             {author.name}
           </Link>
         )}

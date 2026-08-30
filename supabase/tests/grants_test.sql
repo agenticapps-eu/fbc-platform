@@ -163,7 +163,7 @@ select is(
          group by 1) t),
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
-posts.UPDATE=body,hashtags,visibility
+posts.UPDATE=body,hashtags,veroeffentlicht_ab,visibility
 profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status
 thread_read_positions.UPDATE=last_read_at,profile_id,thread_id$$,

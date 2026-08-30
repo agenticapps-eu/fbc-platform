@@ -1083,6 +1083,7 @@ export type Database = {
       };
       posts: {
         Row: {
+          angekuendigt_am: string | null;
           author_id: string;
           body: string;
           created_at: string;
@@ -1091,10 +1092,12 @@ export type Database = {
           kind: string;
           like_count: number;
           ref_id: string | null;
+          veroeffentlicht_ab: string;
           video_url: string | null;
           visibility: string;
         };
         Insert: {
+          angekuendigt_am?: string | null;
           author_id: string;
           body: string;
           created_at?: string;
@@ -1103,10 +1106,12 @@ export type Database = {
           kind?: string;
           like_count?: number;
           ref_id?: string | null;
+          veroeffentlicht_ab?: string;
           video_url?: string | null;
           visibility?: string;
         };
         Update: {
+          angekuendigt_am?: string | null;
           author_id?: string;
           body?: string;
           created_at?: string;
@@ -1115,6 +1120,7 @@ export type Database = {
           kind?: string;
           like_count?: number;
           ref_id?: string | null;
+          veroeffentlicht_ab?: string;
           video_url?: string | null;
           visibility?: string;
         };
@@ -1759,6 +1765,11 @@ export type Database = {
           p_hashtags: string[];
           p_tags: string[];
           p_media: Json;
+          /** AGE-667: OHNE Fragezeichen. Der Parameter traegt in Postgres
+           *  bewusst keinen Vorgabewert — der erzeugte eine Ueberladung statt
+           *  einer Ersetzung, und der alte sechsstellige Schreibweg bliebe
+           *  daneben offen. `null` heisst „sofort". */
+          p_veroeffentlicht_ab: string | null;
         };
         Returns: string;
       };

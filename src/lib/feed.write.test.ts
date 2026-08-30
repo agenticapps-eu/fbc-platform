@@ -37,6 +37,7 @@ describe("createPostWithMedia", () => {
       visibility: "members",
       tags: ["netzwerken", "erlebnistag"],
       media: [],
+      veroeffentlichtAb: null,
     });
 
     expect(rpcAufrufe).toHaveLength(1);
@@ -52,6 +53,11 @@ describe("createPostWithMedia", () => {
       // zu führen.
       p_tags: ["netzwerken", "erlebnistag"],
       p_media: [],
+      // AGE-667: WIRD ÜBERGEBEN, auch für „sofort". Der Parameter trägt in
+      // Postgres bewusst keinen Vorgabewert — ein Aufruf mit sechs Argumenten
+      // fände die Funktion nicht mehr, statt still die alte Überladung zu
+      // treffen. Diese Zeile ist der Beleg, dass der Client ihn immer sendet.
+      p_veroeffentlicht_ab: null,
     });
   });
 
@@ -65,6 +71,7 @@ describe("createPostWithMedia", () => {
         { storage_path: "u/p/0-1.webp", sort: 0, width: 1600, height: 1200 },
         { storage_path: "u/p/1-2.webp", sort: 1, width: 800, height: 800 },
       ],
+      veroeffentlichtAb: null,
     });
 
     expect(rpcAufrufe[0].args.p_media).toEqual([
@@ -83,6 +90,7 @@ describe("createPostWithMedia", () => {
         visibility: "members",
         tags: [],
         media: [],
+        veroeffentlichtAb: null,
       }),
     ).rejects.toMatchObject({ message: "Kein bestätigter Zugang" });
   });

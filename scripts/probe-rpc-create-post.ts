@@ -101,6 +101,7 @@ try {
     p_hashtags: ["netzwerken"],
     p_tags: ["netzwerken", "erlebnistag"],
     p_media: [bild(autor.uid, postId, 0), bild(autor.uid, postId, 1)],
+    p_veroeffentlicht_ab: null,
   });
   pruefe(
     "A PostgREST findet die Funktion und nimmt sie an",
@@ -133,6 +134,7 @@ try {
     p_hashtags: [],
     p_tags: [],
     p_media: Array.from({ length: 7 }, (_, i) => bild(autor.uid, zuviel, i)),
+    p_veroeffentlicht_ab: null,
   });
   const uebrig = await db.query("select 1 from public.posts where id = $1", [zuviel]);
   pruefe(
@@ -150,6 +152,7 @@ try {
     p_hashtags: [],
     p_tags: [],
     p_media: [],
+    p_veroeffentlicht_ab: null,
   });
   pruefe(
     "C unbestaetigtes Konto wird abgewiesen",
@@ -166,6 +169,7 @@ try {
     p_hashtags: [],
     p_tags: [],
     p_media: [],
+    p_veroeffentlicht_ab: null,
   });
   pruefe(
     "D ohne Session fehlt schon das Ausfuehrungsrecht",

@@ -27,6 +27,7 @@ import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform
 import { kompassAnzeige, type KompassAnzeige } from "../lib/kompass-anzeige";
 import { LEVELS, LEVEL_RANK } from "../config/levels";
 import { cn } from "../lib/cn";
+import { istGeplant } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
 
 // Themen-Reihenfolge & Labels der Interessen (Sein·Tun·Haben·Wirken). Der
@@ -107,9 +108,8 @@ export default function PublicProfilePage() {
             {/* „Erfolgsradar" stand hier bis AGE-597 an erster Stelle. Eine Fähigkeit
                 zu bewerben, die es nicht mehr gibt, ist ein falsches Versprechen —
                 und es stünde ausgerechnet vor denen, die kaufen sollen. */}
-            Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der
-            Mitgliedsstufe <span className="font-medium text-ink">{LEVELS.discover.label}</span>{" "}
-            sichtbar.
+            Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der Mitgliedsstufe{" "}
+            <span className="font-medium text-ink">{LEVELS.discover.label}</span> sichtbar.
           </p>
         </Card>
       )}
@@ -269,8 +269,20 @@ function ExtendedSections({
                   <p className="text-sm text-ink/80 hover:text-ink">
                     {post.body.trim() === "" ? "Beitrag ohne Text" : post.body}
                   </p>
+                  {/* AGE-667: Sichtbar-seit statt Schreibdatum, und eine
+                      Markierung für den geplanten Fall. Auf einem FREMDEN
+                      Profil kann der zweite Zweig nie eintreten — die RLS
+                      liefert einen geplanten Beitrag nicht aus. Auf dem eigenen
+                      schon, und dort ist er die Antwort auf „warum sieht den
+                      niemand". */}
                   <p className="mt-1 text-xs text-muted">
-                    {new Date(post.created_at).toLocaleDateString("de-DE")}
+                    {istGeplant(post.veroeffentlicht_ab) ? (
+                      <span className="font-medium text-accent-strong">
+                        Geplant für {new Date(post.veroeffentlicht_ab).toLocaleDateString("de-DE")}
+                      </span>
+                    ) : (
+                      new Date(post.veroeffentlicht_ab).toLocaleDateString("de-DE")
+                    )}
                   </p>
                 </Link>
               </li>

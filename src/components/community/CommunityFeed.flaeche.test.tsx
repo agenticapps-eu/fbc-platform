@@ -49,6 +49,7 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     hashtags: [],
     visibility: "public",
     createdAt: new Date("2026-08-01T10:00:00Z").toISOString(),
+    veroeffentlichtAb: new Date("2026-08-01T10:00:00Z").toISOString(),
     likeCount: 0,
     commentCount: 0,
     likedByMe: false,
@@ -183,7 +184,7 @@ describe("Die drei Reiter (6.4)", () => {
   it("verwirft beim Reiterwechsel den Cursor", async () => {
     vi.mocked(fetchFeed).mockResolvedValue({
       posts: [post()],
-      nextCursor: { createdAt: "2026-08-01T09:00:00Z", id: "p0" },
+      nextCursor: { veroeffentlichtAb: "2026-08-01T09:00:00Z", id: "p0" },
     });
     renderFeed();
     await screen.findByText(/viel gelernt/);
@@ -211,7 +212,7 @@ describe("Der Ordnungs-Umschalter (6.5)", () => {
   it("stellt die Ordnung um und beginnt dabei von vorn", async () => {
     vi.mocked(fetchFeed).mockResolvedValue({
       posts: [post()],
-      nextCursor: { createdAt: "2026-08-01T09:00:00Z", id: "p0" },
+      nextCursor: { veroeffentlichtAb: "2026-08-01T09:00:00Z", id: "p0" },
     });
     renderFeed();
     await screen.findByText(/viel gelernt/);

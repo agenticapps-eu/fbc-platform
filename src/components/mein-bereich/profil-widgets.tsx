@@ -11,6 +11,7 @@ import {
   type DashboardProfile,
   type ScoreBreakdown,
 } from "../../lib/dashboard";
+import { istGeplant } from "../../lib/feed";
 import { GOAL_CATEGORIES } from "../../lib/profile";
 import {
   CardLink,
@@ -250,8 +251,8 @@ export function BeitraegeWidget({ data }: { data: DashboardData }) {
         <div>
           <p className="text-sm text-ink">Von dir war hier noch nichts zu lesen.</p>
           <p className="mt-1 text-sm text-muted">
-            Was dich gerade beschäftigt, ist für die anderen der schnellste Weg, dich
-            einzuordnen — ein paar Sätze genügen.
+            Was dich gerade beschäftigt, ist für die anderen der schnellste Weg, dich einzuordnen —
+            ein paar Sätze genügen.
           </p>
           <Link to="/aktivitaet" className="mt-3 inline-block">
             <Button variant="primary" size="sm">
@@ -274,7 +275,20 @@ export function BeitraegeWidget({ data }: { data: DashboardData }) {
                 <p className="line-clamp-2 text-sm font-medium text-ink hover:text-accent-strong">
                   {post.body.trim() === "" ? "Beitrag ohne Text" : post.body}
                 </p>
-                <p className="text-xs text-muted">{formatDate(post.created_at, dateFmt)}</p>
+                {/* AGE-667: der Zeitpunkt, seit dem der Beitrag DA ist, und
+                    eine Markierung, solange er es nicht ist. Ohne sie stünde
+                    ein geplanter Beitrag hier ununterscheidbar neben den
+                    veröffentlichten — auf der einen Fläche, die ihn ausser dem
+                    Feed überhaupt zeigt. */}
+                <p className="text-xs text-muted">
+                  {istGeplant(post.veroeffentlicht_ab) ? (
+                    <span className="font-medium text-accent-strong">
+                      Geplant für {formatDate(post.veroeffentlicht_ab, dateFmt)}
+                    </span>
+                  ) : (
+                    formatDate(post.veroeffentlicht_ab, dateFmt)
+                  )}
+                </p>
               </Link>
             </li>
           ))}

@@ -60,19 +60,24 @@ function pruefe(name: string, ok: boolean, gemessen: string) {
   console.log(`${ok ? "  OK  " : " FEHL "} ${name}: ${gemessen}`);
 }
 
-/** Eine Seite lesen — exakt die Abfrage aus src/lib/feed.ts. */
-async function seite(groesse: number, cursor: { createdAt: string; id: string } | null) {
+/** Eine Seite lesen — exakt die Abfrage aus src/lib/feed.ts.
+ *
+ *  AGE-667: die Ordnung ist `veroeffentlicht_ab`, nicht mehr `created_at`. Ein
+ *  Cursor-Messskript, das eine ANDERE Spalte misst als die, die der Feed
+ *  ordnet, liefert falsch beruhigende Zahlen — und der Index auf `created_at`
+ *  ist mit demselben Change gefallen. */
+async function seite(groesse: number, cursor: { veroeffentlichtAb: string; id: string } | null) {
   let q = anon
     .from("posts")
-    .select("id, created_at")
+    .select("id, veroeffentlicht_ab")
     .in("id", ids)
-    .order("created_at", { ascending: false })
+    .order("veroeffentlicht_ab", { ascending: false })
     .order("id", { ascending: false })
     .limit(groesse);
   if (cursor) {
     q = q.or(
-      `created_at.lt.${cursor.createdAt},` +
-        `and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+      `veroeffentlicht_ab.lt.${cursor.veroeffentlichtAb},` +
+        `and(veroeffentlicht_ab.eq.${cursor.veroeffentlichtAb},id.lt.${cursor.id})`,
     );
   }
   const { data, error } = await q;
@@ -81,15 +86,15 @@ async function seite(groesse: number, cursor: { createdAt: string; id: string } 
 }
 
 /** Die naive Fassung, gegen die gemessen wird: Cursor nur ueber die Zeit. */
-async function seiteNaiv(groesse: number, cursor: { createdAt: string } | null) {
+async function seiteNaiv(groesse: number, cursor: { veroeffentlichtAb: string } | null) {
   let q = anon
     .from("posts")
-    .select("id, created_at")
+    .select("id, veroeffentlicht_ab")
     .in("id", ids)
-    .order("created_at", { ascending: false })
+    .order("veroeffentlicht_ab", { ascending: false })
     .order("id", { ascending: false })
     .limit(groesse);
-  if (cursor) q = q.lt("created_at", cursor.createdAt);
+  if (cursor) q = q.lt("veroeffentlicht_ab", cursor.veroeffentlichtAb);
   const { data, error } = await q;
   if (error) throw new Error(`PostgREST: ${error.message}`);
   return data ?? [];
@@ -98,17 +103,17 @@ async function seiteNaiv(groesse: number, cursor: { createdAt: string } | null) 
 async function alleSeiten(
   lies: (
     groesse: number,
-    cursor: { createdAt: string; id: string } | null,
-  ) => Promise<{ id: string; created_at: string }[]>,
+    cursor: { veroeffentlichtAb: string; id: string } | null,
+  ) => Promise<{ id: string; veroeffentlicht_ab: string }[]>,
 ) {
   const gesehen: string[] = [];
-  let cursor: { createdAt: string; id: string } | null = null;
+  let cursor: { veroeffentlichtAb: string; id: string } | null = null;
   for (let runde = 0; runde < 5; runde++) {
     const zeilen = await lies(SEITE, cursor);
     gesehen.push(...zeilen.map((z) => z.id));
     if (zeilen.length < SEITE) break;
     const letzte = zeilen[zeilen.length - 1];
-    cursor = { createdAt: letzte.created_at, id: letzte.id };
+    cursor = { veroeffentlichtAb: letzte.veroeffentlicht_ab, id: letzte.id };
   }
   return gesehen;
 }
@@ -138,10 +143,13 @@ try {
     [uid],
   );
   await db.query(
-    `insert into public.posts (id, author_id, body, visibility, created_at) values
-       ($1, $4, 'A (gleicher Zeitstempel)', 'public', $5),
-       ($2, $4, 'B (gleicher Zeitstempel)', 'public', $5),
-       ($3, $4, 'C (aelter)',               'public', $6)`,
+    // AGE-667: beide Spalten tragen denselben Moment. Der FALL, den diese Sonde
+    // misst, ist der GLEICHSTAND im fuehrenden Feld — und fuehrend ist seit
+    // diesem Change `veroeffentlicht_ab`.
+    `insert into public.posts (id, author_id, body, visibility, created_at, veroeffentlicht_ab) values
+       ($1, $4, 'A (gleicher Zeitstempel)', 'public', $5, $5),
+       ($2, $4, 'B (gleicher Zeitstempel)', 'public', $5, $5),
+       ($3, $4, 'C (aelter)',               'public', $6, $6)`,
     [ids[0], ids[1], ids[2], uid, GLEICH, AELTER],
   );
 

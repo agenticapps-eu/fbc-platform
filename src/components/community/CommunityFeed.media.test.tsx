@@ -88,6 +88,9 @@ function post(id: string, over: Record<string, unknown> = {}) {
     hashtags: ["netzwerken", "allgäu"],
     visibility: "members",
     created_at: "2026-08-12T10:00:00Z",
+    // AGE-667: die Karte zeigt `veroeffentlicht_ab`, nicht `created_at`.
+    // Derselbe Moment — diese Datei misst Bilder und Chips, nicht die Planung.
+    veroeffentlicht_ab: "2026-08-12T10:00:00Z",
     ...over,
   };
 }
@@ -315,6 +318,7 @@ describe("Der Feed teilt seinen Cache-Eintrag mit niemandem", () => {
             hashtags: [],
             visibility: "public",
             createdAt: "2026-08-12T10:00:00Z",
+            veroeffentlichtAb: "2026-08-12T10:00:00Z",
             likeCount: 0,
             commentCount: 0,
             likedByMe: false,

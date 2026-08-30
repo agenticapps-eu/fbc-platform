@@ -547,6 +547,68 @@ auf DEV, weil es nirgends stand:
   dieser Bearer ohnehin keine zusätzliche Hürde wäre. Ein Grund mehr, das
   DB-Passwort zu rotieren, kein Grund, das Muster zu ändern.
 
+### Den Ankündigungslauf für geplante Beiträge eintragen — `pg_cron` (AGE-667)
+
+Ein Beitrag mit `veroeffentlicht_ab` in der Zukunft ist **sichtbar, sobald der
+Zeitpunkt erreicht ist** — das rechnet die Regel, dafür läuft nichts. Was einen
+Lauf braucht, ist allein die **Ankündigung**: `trg_hinweis_neuer_beitrag`
+schweigt beim Planen (sonst hätte das Planen selbst alle Telefone erreicht), und
+`public.beitrag_ankuendigen()` holt den Beitrag nach, sobald er live ist.
+
+**Der Unterschied zu `push_wiederholung` oben, und er ist der ganze Punkt:**
+fällt dieser Lauf aus, **erscheint der Beitrag trotzdem** und ist nur
+unangekündigt. Er verbirgt keinen Inhalt. Genau deshalb ist er hier vertretbar
+und für die Sichtbarkeit nicht.
+
+| | |
+| --- | --- |
+| Funktion | `beitrag_ankuendigen` — **in der Migration** `20260829090000` |
+| cron-Job | `beitrag-ankuendigen`, `* * * * *` |
+
+**Die Funktion steht in der Migration, die Zeitplanung nicht.** Gemessen am
+29.08.: `pg_cron` ist im lokalen Stack **nicht installiert** (`pg_net,
+pg_stat_statements, pgcrypto, plpgsql, supabase_vault, uuid-ossp`) und in der
+frischen CI-Abbildung ebenso wenig — ein `cron.schedule` in einer Migration
+bräche den CI-Job `migrations`. Der Schnitt liegt deshalb anders als bei
+`push_wiederholung`: dort musste die ganze Funktion von Hand entstehen, weil sie
+einen Bearer inline trägt. `beitrag_ankuendigen` trägt kein Geheimnis und ruft
+kein `net.http_post` — sie ist reines SQL und damit in pgTAP **direkt aufrufbar
+und messbar** (`supabase/tests/geplante_beitraege_test.sql`).
+
+**Sie gehört deshalb NICHT in `ERWARTET_OHNE_MIGRATION`.** Die Liste wirkt in
+beide Richtungen: ein Name ohne Migration gehört hinein, ein Name **mit**
+Migration wäre dort falsch und machte den Objekt-Drift-Scan rot.
+
+Von Hand, auf **DEV zuerst, dann PROD**:
+
+```sql
+create extension if not exists pg_cron;
+
+select cron.schedule('beitrag-ankuendigen', '* * * * *',
+                     'select public.beitrag_ankuendigen()');
+```
+
+**Warum jede Minute.** Feiner kann `pg_cron` nicht, und gröber verschöbe es den
+gewählten Zeitpunkt sichtbar: wer „Freitag 18:00" wählt, nimmt eine Minute
+Verzug hin, aber keine fünf.
+
+**Prüfen.** Anders als beim Wiederholungslauf ist hier nichts asynchron — der
+Rückgabewert ist die Zahl der angekündigten Beiträge:
+
+1. `select public.beitrag_ankuendigen();` → erwartet `0`, solange nichts fällig
+   ist. Das ist die **Positivkontrolle für die Erreichbarkeit**, nicht für die
+   Wirkung.
+2. Der Takt: warten, bis `cron.job_run_details` für den Job eine Zeile **mehr**
+   trägt als vorher. Eine abbestellte Zeitplanung fällt dem Objekt-Drift-Scan
+   **nicht** auf — er fragt nur `public` ab, die Zeitplanung liegt in `cron`.
+
+> ⚠️ **Vor dem ersten Lauf auf einer bestehenden Umgebung:** die Migration
+> markiert den gesamten Bestand als bereits angekündigt (`angekuendigt_am =
+> created_at`). Ohne diese Zeile wäre der erste Lauf ein Massenversand — jeder
+> vorhandene Beitrag trägt einen erreichten Zeitpunkt. Die Zeile steht in
+> `20260829090000`; die Zeitplanung darf erst **nach** angewendeter Migration
+> gesetzt werden.
+
 ### Der APNs-Schlüssel: drei Fallen
 
 **1. Zwei Schlüsselsorten, ein Dateiname.** Apple lädt sowohl den
@@ -671,3 +733,18 @@ Die Probe funktioniert wie bei Apple, mit einem erfundenen Gerätetoken:
 - **Die Zustellung an ein echtes Gerät.** Beide Anbieter sind gegen ihre echten
   Endpunkte belegt; was fehlt, ist ein Gerätetoken, und das setzt AGE-642 B1
   voraus.
+
+**Überwachen.** Der Lauf hat keinen Empfänger, der sich beschwert: fällt er aus,
+erscheinen die Beiträge trotzdem, nur unangekündigt — es gibt also kein Signal
+ausser der Zahl selbst. Zwei Abfragen, beide gegen die Zieldatenbank:
+
+```sql
+-- Fällige, die niemand abgeholt hat. Erwartet: 0 (bzw. < 200 kurz nach einer
+-- Welle). Eine Zahl, die WÄCHST, ist der Befund.
+select count(*) from public.posts
+ where kind = 'member' and veroeffentlicht_ab <= now() and angekuendigt_am is null;
+
+-- Und ob der Job überhaupt noch läuft — der Objekt-Drift-Scan sieht das Schema
+-- `cron` nicht, eine abbestellte Zeitplanung fällt ihm also NICHT auf.
+select jobname, active, schedule from cron.job where jobname = 'beitrag-ankuendigen';
+```

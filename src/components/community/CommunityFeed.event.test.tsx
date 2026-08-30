@@ -44,6 +44,7 @@ function eventPost(overrides: Partial<FeedPost> = {}): FeedPost {
     hashtags: [],
     visibility: "public",
     createdAt: new Date("2026-08-13T10:00:00Z").toISOString(),
+    veroeffentlichtAb: new Date("2026-08-13T10:00:00Z").toISOString(),
     likeCount: 2,
     commentCount: 0,
     likedByMe: false,

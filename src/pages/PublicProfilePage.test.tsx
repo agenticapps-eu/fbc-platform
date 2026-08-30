@@ -344,9 +344,15 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
  * codex). Wer eine der beiden Zusagen ändert, soll die andere finden.
  */
 describe("Aktivitäten-Karte: jede Zeile führt zu ihrem Beitrag (AGE-587)", () => {
+  // AGE-667: `veroeffentlicht_ab` ergänzt der Helfer, statt es in jeden Aufruf
+  // zu schreiben. Es trägt denselben Moment wie `created_at` — diese Datei misst
+  // die Deeplinks der Aktivitäten-Karte, nicht die Planung.
   const mitBeitraegen = (posts: { id: string; body: string; created_at: string }[]) => ({
     ...fullView,
-    extended: { ...fullView.extended!, posts },
+    extended: {
+      ...fullView.extended!,
+      posts: posts.map((p) => ({ ...p, veroeffentlicht_ab: p.created_at })),
+    },
   });
 
   it("macht jede Zeile zu einem Link auf IHREN Beitrag", async () => {

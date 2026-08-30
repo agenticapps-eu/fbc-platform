@@ -51,6 +51,7 @@ import {
   feedListKey,
   feedSeitenKey,
   fetchPostById,
+  istGeplant,
   postDeeplinkQueryKey,
   type FeedAuswahl,
   type FeedOrdnung,
@@ -676,6 +677,17 @@ function PostComposer({ authorId }: { authorId: string }) {
    *  sobald etwas darin steht. */
   const [videoOffen, setVideoOffen] = useState(false);
   const [visibility, setVisibility] = useState<PostVisibility>("members");
+  /**
+   * Der gewählte Veröffentlichungszeitpunkt als `datetime-local`-Wert, also
+   * WANDUHRZEIT in der Zone des Mitglieds — leer heisst „sofort" (AGE-667).
+   *
+   * Gespeichert wird daraus ein absoluter Moment (`toISOString()`), nicht die
+   * Wanduhr: „nächster Freitag 18 Uhr" ist ein Zeitpunkt, kein wiederkehrender
+   * Termin. Die Umrechnung macht der Browser, und deshalb gibt es hier kein
+   * Sommerzeitproblem — anders als bei den Terminreihen (AGE-630), wo eine
+   * wiederkehrende Wanduhrzeit gemeint ist.
+   */
+  const [geplantAm, setGeplantAm] = useState("");
   const [bilder, setBilder] = useState<GewaehltesBild[]>([]);
   const [bildFehler, setBildFehler] = useState<string | null>(null);
   const [gewaehlteTags, setGewaehlteTags] = useState<string[]>([]);
@@ -740,6 +752,11 @@ function PostComposer({ authorId }: { authorId: string }) {
         visibility,
         tags: gewaehlteTags,
         media,
+        // Leer heisst „sofort". Ein Zeitpunkt in der VERGANGENHEIT wird hier
+        // NICHT abgefangen: die RPC hebt ihn auf `now()`, und die Regel gehört
+        // an EINE Stelle. Ein zweiter Wächter hier könnte mit ihr auseinander-
+        // laufen, ohne dass es jemandem auffiele.
+        veroeffentlichtAb: geplantAm ? new Date(geplantAm).toISOString() : null,
       });
     },
     onSuccess: () => {
@@ -747,12 +764,20 @@ function PostComposer({ authorId }: { authorId: string }) {
       setVideoUrl("");
       setVideoOffen(false);
       setVisibility("members");
+      setGeplantAm("");
       for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
       setBilder([]);
       setBildFehler(null);
       setGewaehlteTags([]);
       setOffen(false);
-      toast({ variant: "success", title: "Beitrag veröffentlicht" });
+      // Zwei Meldungen, weil zwei Dinge geschehen sind. „Veröffentlicht" für
+      // etwas, das erst am Freitag erscheint, wäre schlicht falsch — und es ist
+      // die eine Stelle, an der das Mitglied merkt, ob seine Planung angekommen
+      // ist.
+      toast({
+        variant: "success",
+        title: geplantAm ? "Beitrag geplant" : "Beitrag veröffentlicht",
+      });
       // Präfix-Invalidierung: alle Feed-Ansichten dieses Betrachters (jeder
       // Hashtag-Filter), damit ein mehrfach getaggter Beitrag nirgends veraltet.
       //
@@ -915,6 +940,33 @@ function PostComposer({ authorId }: { authorId: string }) {
               </option>
             ))}
           </Select>
+        </label>
+        {/* Der Planungsweg (AGE-667). Er steht NEBEN der Sichtbarkeit, weil er
+            dieselbe Frage in der anderen Achse beantwortet: „wer" und „ab
+            wann". Und er ist ein gewöhnliches Feld statt eines Schalters mit
+            aufklappendem Feld — leer heisst „sofort", und damit ist der Normal-
+            fall genau ein Blick und null Klicks. */}
+        <label className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className="whitespace-nowrap">Sichtbar ab</span>
+          <input
+            type="datetime-local"
+            value={geplantAm}
+            onChange={(e) => setGeplantAm(e.target.value)}
+            className="h-9 w-auto rounded-md border border-line bg-surface px-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label="Sichtbar ab (leer = sofort)"
+          />
+          {geplantAm && (
+            /* Ein Weg ZURÜCK auf „sofort". Ohne ihn müsste das Mitglied ein
+               `datetime-local`-Feld von Hand leeren, und das ist je nach
+               Browser gar nicht möglich. */
+            <button
+              type="button"
+              onClick={() => setGeplantAm("")}
+              className="rounded-md px-2 py-1 text-xs text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              sofort
+            </button>
+          )}
         </label>
         {/* `ml-auto` und nicht nur `justify-between`: bricht die Zeile auf dem
             Telefon um, landet ein einzelnes Element sonst am ZEILENANFANG —
@@ -1151,8 +1203,23 @@ function PostCard({
               </>
             )}
           </div>
+          {/* Die Zeitangabe nennt `veroeffentlichtAb`, nicht `createdAt`: für
+              einen Leser heisst „vor drei Stunden" der Moment, seit dem der
+              Beitrag da ist, nicht der, in dem sein Verfasser ihn getippt hat.
+              Für jeden Beitrag ohne Planung sind beide gleich.
+
+              Ist der Zeitpunkt noch nicht erreicht, sieht diese Karte OHNEHIN
+              nur ihr Verfasser — das entscheidet die RLS, nicht diese Zeile.
+              Sie MARKIERT den Zustand nur, damit er nicht wie ein
+              veröffentlichter Beitrag aussieht. */}
           <p className="text-xs text-muted">
-            {timeAgo(post.createdAt)}
+            {istGeplant(post.veroeffentlichtAb) ? (
+              <span className="font-medium text-accent-strong">
+                Geplant für {geplantFuer(post.veroeffentlichtAb)}
+              </span>
+            ) : (
+              timeAgo(post.veroeffentlichtAb)
+            )}
             {" · "}
             {post.visibility === "members" ? "Nur für Mitglieder" : "Öffentlich"}
           </p>
@@ -1880,6 +1947,43 @@ function timeAgo(iso: string): string {
   return absFmt.format(new Date(iso));
 }
 
+/**
+ * Der geplante Zeitpunkt, MIT Uhrzeit (AGE-667).
+ *
+ * Bewusst nicht `timeAgo`: „in 4 Tagen" beantwortet die Frage nicht, die
+ * jemand an seinen eigenen geplanten Beitrag hat. Er hat einen Zeitpunkt
+ * gewählt und will ihn wiedererkennen — sonst ist die einzige Stelle, an der
+ * er ihn prüfen könnte, das Bearbeiten-Formular.
+ */
+const geplantFmt = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function geplantFuer(iso: string): string {
+  return `${geplantFmt.format(new Date(iso))} Uhr`;
+}
+
+/**
+ * Ein absoluter Zeitpunkt als Wert für `<input type="datetime-local">`.
+ *
+ * ÖRTLICHE Zeitanteile, nicht `toISOString()`. Letzteres liefert UTC, und das
+ * Feld liest seinen Wert als WANDUHRZEIT — in Deutschland wäre ein geplanter
+ * Beitrag beim Öffnen des Formulars also um ein bis zwei Stunden verstellt und
+ * würde beim nächsten „Speichern" genau so falsch zurückgeschrieben.
+ */
+function fuerDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const zwei = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}` +
+    `T${zwei(d.getHours())}:${zwei(d.getMinutes())}`
+  );
+}
+
 function HeartIcon({ filled }: { filled: boolean }) {
   return <Icon name="heart" variant={filled ? "solid" : "line"} className="h-4 w-4" />;
 }
@@ -1925,6 +2029,17 @@ function PostEditor({
   const [sichtbarkeit, setSichtbarkeit] = useState<PostVisibility>(
     post.visibility as PostVisibility,
   );
+  /**
+   * Der Zeitpunkt als `datetime-local`-Wert (AGE-667). Vorbelegt ist er NUR
+   * bei einem noch geplanten Beitrag; ein bereits veröffentlichter startet
+   * leer, damit ein Klick auf „Speichern" ihn nicht versehentlich rückdatiert.
+   *
+   * Leer heisst hier „ab jetzt sichtbar" — und genau das ist der Weg, eine
+   * Planung ZURÜCKZUNEHMEN.
+   */
+  const [geplantAm, setGeplantAm] = useState(
+    istGeplant(post.veroeffentlichtAb) ? fuerDatetimeLocal(post.veroeffentlichtAb) : "",
+  );
   const [laedt, setLaedt] = useState(false);
 
   function neuLaden() {
@@ -1939,6 +2054,18 @@ function PostEditor({
         alteHashtags: post.hashtags,
         body: text,
         visibility: sichtbarkeit,
+        // Drei Fälle, nicht zwei (Befund aus dem Diff-Review):
+        //   ein Wert im Feld            → genau dieser Zeitpunkt
+        //   Feld leer, Beitrag WAR geplant → der Verfasser nimmt die Planung
+        //                                    zurück, also ab sofort sichtbar
+        //   Feld leer, Beitrag war es NICHT → gar nicht anfassen
+        // Ohne den dritten Fall datierte jede Textkorrektur einen alten Beitrag
+        // auf jetzt um und schöbe ihn im Feed nach oben.
+        veroeffentlichtAb: geplantAm
+          ? new Date(geplantAm).toISOString()
+          : istGeplant(post.veroeffentlichtAb)
+            ? null
+            : undefined,
       }),
     onSuccess: () => {
       neuLaden();
@@ -2063,11 +2190,33 @@ function PostEditor({
             </option>
           ))}
         </Select>
+        {/* Planung ändern oder aufheben (AGE-667). Der Knopf daneben ist der
+            Rückweg auf „sofort" — ein `datetime-local`-Feld lässt sich je nach
+            Browser gar nicht von Hand leeren. */}
+        <label className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className="whitespace-nowrap">Sichtbar ab</span>
+          <input
+            type="datetime-local"
+            value={geplantAm}
+            onChange={(e) => setGeplantAm(e.target.value)}
+            className="h-9 w-auto rounded-md border border-line bg-surface px-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label="Sichtbar ab (leer = sofort)"
+          />
+          {geplantAm && (
+            <button
+              type="button"
+              onClick={() => setGeplantAm("")}
+              className="rounded-md px-2 py-1 text-xs text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              sofort
+            </button>
+          )}
+        </label>
       </div>
 
       {/* Sagt, was sofort gilt — siehe die Notiz über dieser Komponente. */}
       <p className="text-xs text-muted">
-        Bildänderungen wirken sofort. Text und Sichtbarkeit erst mit „Speichern".
+        Bildänderungen wirken sofort. Text, Sichtbarkeit und Zeitpunkt erst mit „Speichern".
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -2236,7 +2236,8 @@ select is(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
       'Beitrag mit zwei Bildern', 'members',
       array['netzwerken', 'allgäu'], array['ki', 'netzwerken'],
       '[{"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a1/c7000005-0000-4000-8000-000000000005/0.webp","sort":0,"width":1600,"height":1200},
-        {"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a1/c7000005-0000-4000-8000-000000000005/1.webp","sort":1,"width":800,"height":600}]'::jsonb)$$),
+        {"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a1/c7000005-0000-4000-8000-000000000005/1.webp","sort":1,"width":800,"height":600}]'::jsonb,
+      null)$$),
   'OK', 'create_post_with_media: der Autor legt Beitrag und Bilder in einem Zug an');
 
 select is(
@@ -2257,7 +2258,8 @@ select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
       (select jsonb_agg(jsonb_build_object(
           'storage_path', 'c7c7c7c7-0000-0000-0000-0000000000a1/c7000006-0000-4000-8000-000000000006/' || i || '.webp',
           'sort', i, 'width', 1600, 'height', 1200))
-         from generate_series(0, 6) i))$$),
+         from generate_series(0, 6) i),
+      null)$$),
   'DENIED:%',
   'create_post_with_media: sieben Bilder werden abgelehnt');
 
@@ -2272,12 +2274,12 @@ select is(
 select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a3',
   $$select public.create_post_with_media(
       'c7000007-0000-4000-8000-000000000007', 'Unbestätigt', 'members',
-      array[]::text[], array[]::text[], '[]'::jsonb)$$),
+      array[]::text[], array[]::text[], '[]'::jsonb, null)$$),
   'DENIED:%',
   'create_post_with_media: ein nicht bestätigtes Konto veröffentlicht nicht');
 
 select is(has_function_privilege('anon',
-  'public.create_post_with_media(uuid,text,text,text[],text[],jsonb)', 'execute'),
+  'public.create_post_with_media(uuid,text,text,text[],text[],jsonb,timestamptz)', 'execute'),
   false, 'create_post_with_media: ohne Session gibt es keinen Schreibweg');
 
 -- 19.7a Der Pfad muss dem Aufrufer gehören. Aus dem Diff-Review, und es ist die
@@ -2297,7 +2299,8 @@ select alike(pg_temp.try_as('c7c7c7c7-0000-0000-0000-0000000000a1',
   $$select public.create_post_with_media(
       'c7000008-0000-4000-8000-000000000008',
       'Fremder Pfad', 'public', array[]::text[], array[]::text[],
-      '[{"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a2/beliebig/0.webp","sort":0,"width":16,"height":16}]'::jsonb)$$),
+      '[{"storage_path":"c7c7c7c7-0000-0000-0000-0000000000a2/beliebig/0.webp","sort":0,"width":16,"height":16}]'::jsonb,
+      null)$$),
   'DENIED:%',
   'create_post_with_media: ein Pfad unter fremdem Präfix wird abgelehnt');
 
@@ -2725,20 +2728,25 @@ update public.profiles set tier = 'impact', activated_at = now()
  where id = 'c9c9c9c9-0000-0000-0000-0000000000a1';
 
 -- 21.1/21.2 Spalte und Index. Der Index ist PARTIELL und über
--- (created_at desc, id desc) — er trägt Filter und Sortierung in einem; ein
--- Index auf `video_url` allein trüge die Sortierung nicht.
+-- (veroeffentlicht_ab desc, id desc) — er trägt Filter und Sortierung in
+-- einem; ein Index auf `video_url` allein trüge die Sortierung nicht.
+--
+-- AGE-667 hat die Sortierspalte gewechselt und den Index dabei UMBENANNT
+-- (`posts_video_url_idx` → `posts_video_veroeffentlicht_ab_idx`). Der Name
+-- steht hier, nicht nur die Form: eine Zusage über „irgendeinen partiellen
+-- Index" wäre auch dann grün, wenn zwei nebeneinander lägen.
 select has_column('public', 'posts', 'video_url',
   'posts trägt video_url');
 
 select is(
   (select count(*)::int from pg_indexes
-    where schemaname = 'public' and indexname = 'posts_video_url_idx'
+    where schemaname = 'public' and indexname = 'posts_video_veroeffentlicht_ab_idx'
       -- `indexdef` gibt Schlüsselwörter GROSS zurück, und `like` ist
       -- case-sensitiv. Beides zusammen hat diese Behauptung erst rot gemeldet,
       -- obwohl der Index richtig stand.
       and indexdef like '%WHERE (video_url IS NOT NULL)%'
-      and indexdef like '%(created_at DESC, id DESC)%'),
-  1, 'posts_video_url_idx besteht, ist partiell und trägt die Sortierung');
+      and indexdef like '%(veroeffentlicht_ab DESC, id DESC)%'),
+  1, 'posts_video_veroeffentlicht_ab_idx besteht, ist partiell und trägt die Sortierung');
 
 -- 21.3–21.6 Die akzeptierten Formen, je eine Familie.
 select is(
