@@ -41,7 +41,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@sentry/react": "^10.71.0",
     "@supabase/supabase-js": "^2.112.4",
-    "@tanstack/react-query": "^5.102.2",
+    "@tanstack/react-query": "^5.102.8",
     "framer-motion": "^13.1.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
