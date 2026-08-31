@@ -15,7 +15,7 @@
 
 **PR #299 ist gemerged** (Squash, `e8a2abc` auf `main`, 31.08. 13:33).
 Worktree `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle` — **noch nicht auf den Squash rebasiert.**
+`donald/age-642-capacitor-huelle` — auf den Squash nachgezogen, sauber.
 
 Change `capacitor-huelle`: **31 offen, 87 erledigt.** Linear steht auf
 *In Progress* (die Automation hatte beim Merge auf *Done* gekippt,
