@@ -1,167 +1,150 @@
-# Session Handoff — 2026-08-31
+# Session Handoff — 2026-08-31 (AGE-642 mobil: C2 und C3 gebaut)
 
-> ## ⚠ ZUERST LESEN: `main` ist vollständig grün, zwei Vorgänge sind ausgerollt
+> ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
-> **AGE-666** (PR #291) und **AGE-665** (PR #292) sind gemergt, beide Läufe auf
-> `main` grün — `CI` und `Deploy`. Nachzuholen ist am Code **nichts**.
+> Donald hat am 31.08. abgegrenzt: **AGE-642 (Capacitor-Hülle) gehört hierher,
+> alles andere nicht.** Frühere Fassungen dieser Datei schleppten fremde Punkte
+> mit — das war der Grund für drei Rebase-Konflikte auf `session-handoff.md` in
+> zwei Tagen. Wer den Stand ausserhalb AGE-642 braucht, fragt die Sitzung
+> **`fbc-platform-f4`** oder liest ihre Übergabe — sie stand zuletzt auf `main`
+> in **#294 (`a25ed92`)**, bis diese Datei sie ersetzte. Abgestimmt am 31.08.
 >
-> **⛔ AGE-599 ist ERLEDIGT — und die frühere Anweisung dazu war FALSCH.**
-> Eine ältere Fassung dieses Dokuments verlangte, „die acht Objekte in
-> `event-covers` auf DEV zu löschen und dann zu seeden". **Das hätte DEV
-> kaputtgemacht.** Am 31.08. dort gemessen (nur lesend): die acht Objekte
-> tragen Pfade `<host_id>/vorschau-<bild>.webp` und stammen aus dem **Spiegel
-> DEV ← PROD (AGE-576)**, nicht aus einem Seed-Lauf. **0 von 8** Event-IDs aus
-> `demo_event_covers.ts` existieren auf DEV, und `import_world_seed.ts` zielt
-> auf PROD. Nach dem Löschen zeigten acht Events auf Pfade ohne Objekt —
-> graue Kästen ohne Fehlermeldung —, und **keines der beiden Skripte** stellte
-> sie wieder her.
+> ### ⛔ Eine Anweisung aus ÄLTEREN Übergaben ist WIDERLEGT
 >
-> **Entschieden (Donald, 31.08.): DEV bleibt so — zum Testen brauchbar —,
-> PROD wird NICHT angefasst.** Ein vollständiger Seed ist vielleicht später ein
-> eigener Vorgang. Nachgezogen in `design-system/spec.md` samt einem SHALL NOT
-> gegen das Löschen als Seed-Vorbereitung.
->
-> **Der Neuigkeiten-Eintrag ist kein offener Punkt** — Donald macht das
-> generell selbst.
+> Im Verlauf dieser Datei steht für **AGE-599** „erst die acht Objekte in
+> `event-covers` auf DEV löschen, dann seeden". **Nicht tun — das macht DEV
+> kaputt.** Die Objekte stammen aus dem Spiegel DEV ← PROD (AGE-576), nicht aus
+> einem Seed-Lauf, und keines der Skripte stellt sie wieder her. Gemessen und
+> ausgeschrieben in `openspec/specs/design-system/spec.md` (#294), samt einem
+> SHALL NOT. **Donald, 31.08.:** DEV bleibt, PROD wird nicht angefasst. Der
+> wartende Neuigkeiten-Eintrag ist ebenfalls kein offener Punkt mehr.
 
-**Sitzung:** Worktree `fbc-platform.neuigkeiten-archiv` (der Name gehört zu
-einem längst archivierten Change). Gearbeitet wurde auf Branches, die direkt von
-`origin/main` abzweigen — die **lokale** `main` hängt zurück (`359f349` gegen
-`cfae118`) und liegt im Haupt-Worktree, `wt switch --create` hätte also von
-einem veralteten Stand abgezweigt.
+**Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
+`donald/age-642-capacitor-huelle` — auf `origin/main` rebased, **4 Commits
+davor**, Arbeitsbaum sauber. **Noch nicht gepusht:** der Remote-Branch trägt die
+Vor-Squash-Historie von PR #277 und bräuchte `--force-with-lease`.
+Change `capacitor-huelle`: **43 offen, 69 erledigt** (Einstieg 30.08.: 66/40).
 
 ## Accomplished
 
-| PR | Vorgang | Stand |
-| --- | --- | --- |
-| #291 | **AGE-666** — flackernder Test, hielt `verify` rot | gemergt, `main` grün |
-| #292 | **AGE-665** — Spec-Drift im Titelbild-Abschnitt | gemergt, Delta gefaltet |
-| #294 | **AGE-599** — Bestand auf DEV: warum ein Seed-Lauf ihn nicht heilt | gemergt, Delta gefaltet |
+**C2 „Android-Zurück"** — drei Zweige: offenes Overlay schliessen · sonst eine
+Seite zurück · sonst in den Hintergrund. Nie beenden.
 
-**AGE-666 ließ sich nicht statistisch abnehmen — und das war der Befund.** Acht
-volle Suite-Läufe auf dem ungepatchten Stand: **8 von 8 grün**. Die Flakiness
-reproduziert sich auf dieser Maschine nicht, also hätte die im Issue
-vorgeschriebene Abnahme („Suite mehrfach laufen lassen") **jede** Korrektur
-bestätigt. Belegt wurde stattdessen deterministisch, über zwei Sonden an der
-Komponente (beide zurückgenommen, Prüfsumme verglichen):
+**C3 „Bild über einen Aufrufpunkt"** — sechs Flächen (Profilbild, Titelbild,
+Event-Cover, Willkommen, Feed ×2) laufen über `useBildauswahl`. Keine weiss, auf
+welcher Plattform sie läuft: sie ruft `oeffnen` und bekommt ihre Dateien in
+DERSELBEN Senke wie das `onChange` des Dateifeldes.
 
-- **Sonde A** — `setGekuerzt` um einen Makrotask verzögert: vorher **rot, mit
-  der CI-Fehlermeldung Wort für Wort**, nachher grün.
-- **Sonde B** — `setGekuerzt` stillgelegt: der Negativtest daneben war **grün**
-  bei einer Komponente, die nie misst; mit der neuen Positivkontrolle rot
-  (`expected 0 to be greater than 0`).
+| | |
+| --- | --- |
+| Tests | **2291 grün** (207 Dateien), `tsc`, `eslint` 0 Fehler, `build`, openspec 31/31 |
+| Neu | `src/lib/zurueck.ts`, `src/lib/bildauswahl.ts`, `useBildauswahl.tsx`, je mit Test |
+| Gegenproben | 3 Mutationen bei C2, 6 bei C3 — jede von der gemeinten Zusage gefangen |
 
-**AGE-665 war größer als das Issue.** Es nannte zwei überholte Aussagen; beim
-klauselweisen Lesen für den `MODIFIED`-Block waren es **drei plus eine falsche
-Begründung**:
-
-- **Die Verzeichnis-Karte** stand in der Ausschlussliste und ist seit AGE-595
-  längst konform. Zeitachse: die Fassung, die sie ausschloss, landete am 25.08.
-  um **20:18**, die Karte wurde um **22:38** konform — 2 h 20 später.
-- **„tragen anderes Bildmaterial"** ist für **beide** Ausschlussflächen falsch:
-  die Karte zieht aus `covers` wie der Profilkopf, der Feed über
-  `signEventCovers` aus `event-covers` wie Kachel und Kopf.
-
-**AGE-599 wurde abgenommen — und die Abnahme hat den Plan widerlegt.** Die
-Vorher-Messung gegen DEV (nur lesend, Ziel vorher belegt) ergab 8 Objekte,
-**0 davon 3:1**. Entscheidend war aber nicht diese Zahl, sondern zwei andere:
-die Pfadform `<host_id>/vorschau-<bild>.webp` gehört zu `import_world_seed.ts`
-(das auf **PROD** zielt), und **0 von 8** Event-IDs aus `demo_event_covers.ts`
-existieren auf DEV. Der Bestand stammt also aus dem **Spiegel AGE-576**, und
-Löschen hätte acht Events auf leere Pfade zeigen lassen, ohne Weg zurück.
-**Es wurde nichts gelöscht.**
+Dazu **14 Aufgaben allein durch Messen geschlossen** (C1 und der Grossteil von
+B5), ohne eine Zeile Code.
 
 ## Decisions
 
-- **Vorschauen bekommen eine eigene Klausel**, keinen fünften Aufzählungspunkt
-  („Eine Vorschau SHALL dieselbe Regel tragen wie die Fläche, die sie
-  vorwegnimmt"). Sagt den Grund mit und deckt künftige Vorschauen ab — sonst
-  wäre die Liste im selben Zug auf sechs Einträge gewachsen.
-- **Der Seed-Absatz geht in die Vergangenheitsform, nicht weg.** Er trägt eine
-  gemessene Zahl (25 % freie Fläche je Seite; beim 1,33:1-Motiv 27,8 %), die als
-  Beleg wertvoll bleibt.
-- **Die Bucket-Zahlen wurden datiert, nicht nachgemessen.** Über den hier
-  erreichbaren Supabase-Zugang ist nur `cparx` sichtbar, Infisical braucht ein
-  TTY. Ein `MODIFIED`-Block bekräftigt jede Klausel unter neuem Datum — sie
-  ungeprüft stehenzulassen hieße, sie neu zu behaupten.
-- **Der Feed bleibt ausgeschlossen, aber mit dem richtigen Grund.** Der
-  Ausschluss ruht jetzt sichtbar auf AGE-664 statt auf einer falschen
-  Materialbehauptung.
-- **Kein Fremdreviewer bei allen drei Vorgängen** — weder Schema noch Rechte
-  noch Sicherheit (`reviewer-nur-bei-migration-und-rls`).
-- **DEV bleibt, PROD wird nicht angefasst** (Donald, 31.08.). Der Bestand ist
-  zum Testen brauchbar; ein vollständiger Neuaufbau ist ein eigener Vorgang.
-
-## Files modified
-
-- `src/pages/PublicProfilePage.test.tsx` — `findByRole` statt `getByRole`;
-  `stelleLayout` zählt die `scrollHeight`-Zugriffe mit und liefert
-  `{ zurueck, messungen }`; der Negativtest wartet erst auf den Messbeleg
-- `openspec/specs/design-system/spec.md` — die Titelbild-Anforderung ganz neu
-  ausgestellt; **vier** Bauteile, Vorschau-Klausel, Feed als einzige Ausnahme,
-  alle **neun** Szenarien zeichengleich erhalten
-- `openspec/changes/archive/2026-08-31-titelbild-anforderung-nachziehen/` — neu
-- `openspec/changes/archive/2026-08-31-titelbild-bestand-auf-dev/` — neu; der
-  Bestandsabsatz nennt jetzt die Herkunft (Spiegel) und spricht ein SHALL NOT
-  gegen das Löschen als Seed-Vorbereitung aus
-- `src/content/release-entries.generated.ts` — nach `pnpm release:entries`
-  + einzelnem prettier
-
-## Next session: start here
-
-**Es liegt nichts Blockierendes an.** AGE-599 ist erledigt und entschieden
-(siehe Kasten oben); es wartet keine Freigabe mehr.
-
-Die nächsten Vorgänge, frei wählbar: **AGE-664** (der Feed, die letzte Fläche,
-die noch beschneidet — kippt eine ausgesprochene Entscheidung, siehe unten),
-**AGE-660** und **AGE-618**.
-
-**Parallel läuft eine zweite Sitzung an AGE-642** (mobile Hülle), Branch
-`donald/age-642-capacitor-huelle`, zum Stand dieser Übergabe noch nicht
-gepusht (braucht `--force-with-lease` wegen des Squash von #277). Sie fasst
-`useOverlay` (zweites Pflichtargument) und sechs Dateifelder in
-`CommunityFeed`, `ProfilPage`, `WillkommenPage`, `EventCoverPicker` an.
-**Berührungspunkt mit dieser Sitzung: nur `session-handoff.md`.** Wer eine
-dieser Flächen anfasst, sagt dort bitte kurz Bescheid.
-
-## Open questions
-
-- **AGE-664 kippt eine ausgesprochene Entscheidung** (AGE-596 hat Feed,
-  Vorschauen und Verzeichnis-Karte ausgeschlossen, `REVIEWS.md:82`). Von den
-  drei Ausnahmen sind jetzt **alle bis auf den Feed** eingeholt — die Vorschauen
-  über AGE-600, die Karte über AGE-595. Ob die letzte fällt, ist Donalds
-  Entscheidung; die Spec hält sie seit AGE-665 sauber offen.
-- **AGE-660** (`drop index concurrently` auf `messages_thread_id_idx`) verlangt
-  laut Issue **erst eine Messung**: `pg_stat_user_indexes.idx_scan` für beide
-  Indizes auf DEV **und** PROD. Steht auf dem alten Index eine Zahl, die der neue
-  nicht erklärt, ist die Präfix-Argumentation unvollständig. Braucht außerdem
-  einen Fremdreviewer (Schema) und für PROD eine getrennte Freigabe.
-- **Ein Doku-Branch der Vorsitzung liegt ohne PR herum:**
-  `donald/uebergabe-dev-migration-blockiert` (Commit `36c595e`, die Übergabe vom
-  28.08.). Er ist nicht auf `main`. Entweder nachträglich einbringen oder
-  löschen — hängengeblieben ist er, weil Übergaben zwar committet, aber nicht
-  immer gemergt wurden.
-- **Die Bucket-Zahlen in der Spec sind auf den 25.08. datiert** und nicht
-  nachgemessen. Wer PROD-Zugang hat, kann sie bestätigen oder korrigieren.
-- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
-  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **C3: die Rückfrage „Aufnehmen oder aus der Mediathek?" stellt die App
+  selbst** (Donald, 31.08.). `@capacitor/camera` 8.2.3 führt `getPhoto` samt
+  eingebauter Quellen-Rückfrage als **veraltet** und verweist dafür auf eine
+  eigene Oberfläche. Ersatz sind `takePhoto` und `chooseFromGallery`; nur der
+  zweite kann Mehrfachauswahl — deshalb behält der Feed sie. Die Anforderung in
+  `specs/native-shell/spec.md` ist nachgezogen, sie sprach vom „nativen Ablauf
+  mit der Wahl".
+- **`limit` ist der REST, nicht das Maximum.** Im Web hält der Dateidialog
+  nichts, nativ hielte es niemand, und `waehleBilder` verwürfe den Überschuss
+  stumm.
+- **`EncodingType.JPEG` bei der Kamera** — die Lehre vom 17.08.: ein HEIC vom
+  iPhone zeigte im Zuschnitt eine leere Fläche und einen toten Knopf.
+  `chooseFromGallery` kennt die Option nicht; dort trägt der Zweig, den
+  `AvatarCropper` dafür schon hat.
+- **`useOverlay` bekam eine PFLICHT-Schliessfunktion** (C2), dazu
+  `istOverlayOffen()` und `schliesseOberstesOverlay()`. Pflicht aus dem Grund,
+  aus dem der Hook entstand (AGE-529): der Mangel wäre nicht die eine Fläche,
+  sondern die fehlende Regel — der Typ erzwingt sie an acht Anschlussstellen.
+- **`hatVerlauf` liest `window.history.state.idx`**, nicht
+  `location.key !== "default"`: `RequireAuth` und `HomeRedirect` **ersetzen**
+  beim Kaltstart den ersten Eintrag. In `react-router@7.18.2` gemessen —
+  `push` erhöht den Index, **`replace` nicht**.
 
 ## Was diese Sitzung über das Verfahren gelernt hat
 
-**Eine neue Memory** — `flake-ohne-reproduktion-deterministisch-sondieren`:
-reproduziert ein Flake sich nicht, ist die statistische Abnahme wertlos, und der
-Ausweg ist keine höhere Wiederholungszahl, sondern eine Sonde, die das Rennen
-deterministisch macht.
+Vier Memories: `catch-durch-den-aufrufer-nicht-belegbar` ·
+`neue-node-abhaengigkeit-macht-deno-job-rot` (nach `deno install --frozen=false`
+**zwingend** `pnpm install`) · `archivieren-zieht-neuigkeiten-nach` (jeder
+`pnpm build` schreibt `release-entries.generated.ts` unformatiert um) ·
+`handoff-ist-geteilt-scope-abgrenzen`. Dazu ohne Memory: dieser Branch liess
+sich **nicht normal rebasen** — die 21 Vor-Squash-Commits von #277 kollidieren
+mit dem eigenen, gemergten Inhalt; Weg war `rebase --onto`.
 
-**Drei ergänzt:** `modified-block-bekraeftigt-alles` (zweiter Fall — und diesmal
-ohne Reviewer gefunden, das klauselweise Nachmessen war der einzige Schritt, der
-blieb), `archivieren-zieht-neuigkeiten-nach` (ein Spec-Drift-Change erzeugt einen
-Eintrag, der zum Überspringen gedacht ist) und `merge-erfolg-verifizieren` (im
-Worktree `--delete-branch` von vornherein weglassen — ich bin am selben Fehler
-ein zweites Mal hängengeblieben).
+## Files modified
 
-**Und eine Falle beim Messen:** ein Worktree mit veralteten `node_modules` lässt
-die Suite mit `exit=1` und **16 nicht ladbaren Dateien** abbrechen, ohne dass ein
-benannter Test fehlschlägt — das sah aus wie der gesuchte Flake und war eine
-fehlende Abhängigkeit (`@capacitor/push-notifications` aus #277). Vor jeder
-Baseline-Messung `pnpm install --frozen-lockfile`.
+Commits `106504d` (C2) und `aff6954` (C3):
+
+- **neu**: `src/lib/zurueck.ts`, `src/lib/bildauswahl.ts`,
+  `src/components/ui/useBildauswahl.tsx` — je mit Testdatei
+- `useOverlay.ts` + Test (Stapel-Ausgänge, Pflichtargument), `AppShell.tsx`
+  (`backButton`-Zuhörer), die sieben weiteren `useOverlay`-Stellen, die sechs
+  Bildstellen samt `CommunityFeed.composer.test.tsx`
+- `package.json`, `pnpm-lock.yaml`, `deno.lock` — `@capacitor/app@8.1.1`,
+  `@capacitor/camera@8.2.3`; dazu `cap update` in drei nativen Dateien
+- `openspec/changes/capacitor-huelle/` — `tasks.md` und die
+  `native-shell`-Anforderung; überholte Lesarten **sichtbar widerrufen**
+
+## Next session: start here
+
+**Zuerst entscheiden, ob der Branch gepusht wird** (`--force-with-lease`, weil
+#277 gequetscht gemergt wurde). Damit ist alles an C1–C3 erledigt, was ohne
+Geräte geht.
+
+Danach bleibt in diesem Change nur noch **Phase D (OTA)** — 29 offene Punkte
+über D1–D5, plus **B3 Signaturmaterial** (4 offen). Der Grundsatz ist gefallen
+(selbst gehostet auf Cloudflare, Donald 27.08.); offen sind Anlass,
+Fassungsschema und das Signaturschlüsselpaar. D1 ist der Einstieg: der Weg, auf
+dem ein Bündel entsteht.
+
+## Zwei flackernde Tests — erst neu laufen lassen, dann suchen
+
+Von `fbc-platform-f4` am 31.08. **auf einem Diff ohne eine einzige Quelldatei**
+gemessen, also beides Bestand: `use-gespraech.test.tsx` → „bietet den Weg wieder
+an, wenn eine Neuabfrage Älteres meldet" (1 von 2259, Rerun grün) · ein
+`ReferenceError: window is not defined` aus `AdminMitgliederPage.test.tsx`.
+
+**Der zweite zeigt scheinbar hierher** — `AdminMitgliederPage.tsx` ist eine der
+acht `useOverlay`-Stellen —, wurde aber gesehen, **bevor dieser Code irgendwo
+lag**. Bei rotem `verify` also erst `gh run rerun --failed`. Roter Beleg bei f4
+gesichert: Lauf `33371323105`, Job `99422887270`, Commit `7e8184b`.
+
+## Open questions — alle innerhalb AGE-642
+
+- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen (Kamera und
+  Mediathek, Bild danach sichtbar) · C2 auf Android · C1 auf iOS · B5 der
+  Startbildschirm. **Für B5 muss die App gelöscht werden**
+  (Launch-Screen-Zwischenspeicher), **und das kostet Donald die Anmeldung** —
+  vorher ansagen.
+- **C3 ändert an zwei Stellen die Optik**, unvermeidbar: `WillkommenPage` und
+  das Bearbeiten-Formular im Feed trugen ein *sichtbares* Dateifeld, das
+  zugleich der Auslöser war. Ein `<label>` löst sein Feld unabweisbar selbst
+  aus — es gäbe keine Stelle für die Rückfrage. Beide liegen jetzt hinter einem
+  Knopf. **Im Browser ansehen, bevor das gemergt wird.**
+- **`useBildauswahl.tsx` trägt eine Fast-Refresh-Warnung** — dieselbe, die vier
+  bestehende Dateien schon tragen. Eine eigene Datei dafür wäre eine
+  Abstraktion für einen einzigen Aufrufer.
+- **`.env` hier war eine ATTRAPPE** (`.env.ATTRAPPE-MESSUNG.bak`) — ein blankes
+  `pnpm build` erzeugt kein lauffähiges Gerätebündel. Android zusätzlich:
+  `.../assets/public` ist veraltete `cap sync`-Ausgabe; `pnpm build:prod` →
+  `npx cap sync android`.
+- **`push-fundament` (13 offen)** hängt am selben Gerät, darunter drei Punkte,
+  die von selbst nie auffallen: ein `supabase db reset` tilgt den
+  Wiederholungslauf lautlos · ein dauerhafter Zustellausfall ist unsichtbar ·
+  `net._http_response` wächst unaufgeräumt. Dazu tote Gerätetokens.
+- **AGE-641 steht auf Done**, hat aber 13 offene Aufgaben — Donalds
+  Entscheidung. **AGE-642 springt beim Merge selbst auf Done**; vorbeugen geht
+  nicht, nur nachsehen.
+
+*Alles ausserhalb AGE-642 — AGE-664/660/618, die Bucket-Zahlen, der Doku-Branch
+`donald/uebergabe-dev-migration-blockiert` — steht bewusst NICHT mehr hier.
+AGE-599 und der Neuigkeiten-Eintrag sind erledigt bzw. entschieden; siehe den
+Kasten oben, der auch sagt, warum die alte AGE-599-Anweisung gefährlich ist.*
