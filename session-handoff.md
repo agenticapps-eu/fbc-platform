@@ -1,4 +1,4 @@
-# Session Handoff — 2026-08-31 (AGE-642: D3 ist fertig, D4 ist dran)
+# Session Handoff — 2026-08-31 (AGE-642: D3+D4 sind draussen, PR #299 offen)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -14,128 +14,114 @@
 > `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`. **Kein PR offen, nichts gepusht.**
+`donald/age-642-capacitor-huelle`, rebasiert auf `origin/main` (`63f3237`).
+**PR #299 ist offen** — https://github.com/agenticapps-eu/fbc-platform/pull/299
 
-> ### Der Plan, festgelegt von Donald am 31.08.
->
-> **D4 in einer frischen Sitzung, gepusht wird ERST DANACH.** Also: nicht am
-> Anfang der nächsten Sitzung pushen, und keinen PR öffnen, um D3 „schon mal
-> unterzubringen". D3 und D4 gehen zusammen hinaus.
->
-> Der Grund steht in D4 selbst: ohne `notifyAppReady()` ist OTA eine
-> Einbahnstrasse. D3 allein auf `main` hiesse, dass der erste Deploy den
-> Auslieferungsweg scharf schaltet, bevor es einen Rückweg gibt — und dann ist
-> ein kaputtes Bündel ein bis drei Tage lang nicht zurückzunehmen.
+Change `capacitor-huelle`: **31 offen, 87 erledigt.**
 
-**Rückstand selbst messen:**
-`git fetch origin main && git rev-list --left-right --count origin/main...HEAD`.
-Beim Schreiben: 2 hinter, 17 voraus.
+## Accomplished — D4 steht, D3+D4 sind gemeinsam hinausgegangen
 
-Change `capacitor-huelle`: **33 offen, 84 erledigt.**
+Zwei Commits auf dem rebasierten Stand, alles grün: **2323 vitest (210 Dateien)
+· 133 Deno · `deno check` · typecheck · `pnpm lint` 0 Fehler · `openspec
+validate --all` 30/30.**
 
-## Accomplished — Phase D3 steht
+- `0978348` — `fix:` fehlender `cause` in `scripts/ota-buendel.logic.ts`.
+- `aca10bf` — `feat:` der Rückweg (D4).
 
-Zwei Commits, beide grün: 41 pgTAP · 133 Deno · 2318 vitest · typecheck ·
-`deno check` · `openspec validate --all`.
+### Der Befund, der D4 grösser gemacht hat als „Aufruf einbauen"
 
-- `dd5fb64` — der Leseweg als DEFINER-Funktion
-  (`20260831160000_ota_buendel_neuestes.sql`), drei Edge Functions
-  (`ota-update`, `ota-channel`, `ota-stats`) mit je einem `config.toml`-Block,
-  die drei Endpunkt-URLs und der `publicKey` in `capacitor.config.ts`,
-  `@capgo/capacitor-updater` **exakt** auf `8.51.15`.
-- `ee84109` — die sechs übernommenen Befunde aus Review-Runde 5.
+**`autoDeleteFailed` steht per Vorgabe auf `true`, und das macht aus dem
+Rückfall eine ENDLOSSCHLEIFE.** Am 31.08. an 8.51.15 auf beiden Plattformen an
+der Quelle gemessen:
 
-**Zwei Entscheidungen, die man der Datei nicht ansieht:**
+1. `checkRevert()` setzt das kaputte Bündel auf `ERROR` und rollt zurück
+   (`CapacitorUpdaterPlugin.swift:3353-3399`, `.java:5140` ff.).
+2. Danach löscht `autoDeleteFailed` es mit `removeInfo: false` — und dieser
+   Zweig **überschreibt das eben gesetzte `ERROR` mit `DELETED`**
+   (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
+3. Beim nächsten Start würde `isErrorStatus()` abbrechen (`.swift:4391`,
+   `.java:4915`) — aber der Status ist `DELETED`, und der Zweig darüber wirft
+   die Registrierung weg und **lädt dasselbe Bündel erneut**
+   (`.swift:4364-4379`, `.java:4999`).
 
-- **Der Projekt-Host steht NICHT in `capacitor.config.ts`**, sondern kommt aus
-  `process.env.VITE_SUPABASE_URL`. Fehlt sie, **wirft** `cap sync`. Eine leere
-  URL schaltet den Weg nämlich nicht ab, sondern legt ihn auf
-  `plugin.capgo.app` — samt `device_id` jedes Geräts.
-- **`ota-channel` und `ota-stats` speichern nichts.** Sie existieren nur, damit
-  diese zwei Wege nicht bei capgo landen.
+Der Abbruch-Zweig ist mit der Vorgabe toter Code. **Der D3-Endpunkt kann das
+nicht auffangen:** `ota_buendel_neuestes` liefert, was streng später eingetragen
+wurde als das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
+kaputte Bündel ist also weiterhin „später". Nur das Gerät bricht die Schleife:
+`autoDeleteFailed: false`.
 
-## Review-Runde 5 — der Befund, der etwas verschob
+## Decisions
 
-codex fand sieben Befunde, vier HIGH; sechs übernommen, einer abgelehnt (alles
-mit Begründung in `REVIEWS.md`). Der schwerste traf eine Zeile, die zwei Runden
-lang als der Kern der Phase galt:
-
-**`order by created_at desc` liefert die neueste Zeile im MANIFEST — das ist
-nicht dasselbe wie „neuer als das, was auf dem Gerät läuft."** Steht ein Gerät
-weiter vorn, bekäme es ein älteres Bündel und installierte es kommentarlos.
-`ota_buendel_neuestes` nimmt jetzt **beide** Angaben des Geräts und nur, was
-STRENG später eingetragen wurde. Kein neues Feld nötig — `created_at` war schon
-die Ordnung, es fehlte die Untergrenze.
-
-Dabei fiel `if (buendel.version === laeuft)` ersatzlos weg: der Zweig kann nicht
-mehr laufen.
-
-`opencode` ist zweimal am Anbieter gescheitert (`UnknownError`), `gemini` ist
-eingesprungen und fand nichts — auch nicht den Rückschritt. Zweitmeinung, kein
-Beleg.
+- **`src/lib/ota.ts` ist ein Nebenwirkungs-Modul ohne Export**, in `main.tsx`
+  als zweiter Import direkt hinter `./instrument`. Der Import IST der Aufruf —
+  damit gibt es keine Funktion, die jemand zu rufen vergessen kann, und
+  „vergessen" bräche hier JEDES Gerät bis zur nächsten Store-Einreichung.
+- **Ohne Plattform-Bedingung.** Die Web-Umsetzung ist ein
+  `return { bundle: BUNDLE_BUILTIN }` (`dist/esm/web.js:172`) — sie kostet
+  nichts und kann nicht scheitern. Ein `if (nativ)` spart nichts und fügt eine
+  Stelle hinzu, an der die Bestätigung ausbleiben kann.
+- **Ohne `await`.** Ein top-level `await` machte aus einer hakenden Brücke einen
+  Startfehler — genau den Zustand, gegen den das Modul steht.
+- **Der Lint-Fix ist ein eigener Commit**, weil er eine Reparatur an D3 ist und
+  nicht zum Rückweg gehört. `pnpm lint` lief auf diesem Branch **rot**, und CI
+  fährt es (`ci.yml:41`); typecheck und die Testläufe sehen die Regel nicht.
+- **Push per `--force-with-lease` war korrekt und verlustfrei:** der Remote-Tip
+  (`a36b64d`) war der Vor-Squash-Stand von PR #295, dessen Inhalt längst als
+  `59390b3` in `main` liegt.
 
 ## Files modified
 
-`supabase/migrations/20260831160000_ota_buendel_neuestes.sql` (neu) ·
-`supabase/functions/ota-{update,channel,stats}/` (neu) ·
-`supabase/config.toml` (drei Blöcke) · `supabase/tests/ota_buendel_test.sql`
-(27 → 41 Zusagen) · `capacitor.config.ts` (URLs, publicKey) ·
-`scripts/capacitor-config.test.ts` (neu) · `scripts/functions-config.test.ts` ·
-`scripts/ota-buendel{,.logic,.logic.test}.ts` (`pruefeSchluesselpaar`) ·
-`package.json` + `pnpm-lock.yaml` + `deno.lock` (capgo) · `tasks.md` ·
-`REVIEWS.md` (Runde 5, **mit** verifiziertem Trailer).
+`src/lib/ota.ts` (neu) · `src/lib/ota.test.ts` (neu, 3 Zusagen) ·
+`src/main.tsx` (ein Import, Zeile 2) · `capacitor.config.ts`
+(`autoDeleteFailed: false`, ausführlich begründet) ·
+`scripts/capacitor-config.test.ts` (+1 Zusage) ·
+`scripts/ota-buendel.logic.ts` (`cause`) ·
+`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage +
+Szenario „Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert") ·
+`openspec/changes/capacitor-huelle/tasks.md` (D4 abgehakt).
 
 ## Next session: start here
 
-**D4 — der Rückweg.** Erster Handgriff: `### D4.` in
-`openspec/changes/capacitor-huelle/tasks.md` lesen. Ohne `notifyAppReady()` ist
-OTA eine Einbahnstrasse: ein gültig signiertes Bündel, das startet und dann weiss
-bleibt, bricht jedes Gerät dauerhaft bis eine neue Schale durch den Store geht —
-und zwar für genau die Menschen, die am wenigsten davon verstehen.
+**Erster Handgriff: `gh pr checks 299` — und dann den Merge begleiten.**
+Danach, in dieser Reihenfolge:
 
-**Nicht als erstes pushen.** Siehe den Kasten oben: erst D4 bauen, dann D3+D4
-gemeinsam hinaus.
+1. **`migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
+   Frontend-Deploy. Es sind **drei** Migrationen (…100000, …140000, …160000).
+   **Vor** dem ersten Deploy auf `main`, sonst scheitert der OTA-Schritt am
+   fehlenden Bucket.
+2. **Linear-Status von AGE-642 nachsehen.** Die Automation kippt ihn beim Merge
+   auf *Done*, und der Vorgang ist NICHT fertig (31 offene Aufgaben, Phase E
+   unangetastet). Vorbeugen geht nicht — der Branchname trägt das Kürzel.
+   Nachsehen und zurücksetzen ist die einzige gemessene Abhilfe.
+3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
+   live geschalteten Luftweg braucht.
 
-**Fünf Dinge, die vorher gelesen gehören:**
+**Zwei Dinge, die vorher gelesen gehören:**
 
-1. **D4 fasst mit ziemlicher Sicherheit die Web-Schicht an** — `notifyAppReady()`
-   will beim ersten erfolgreichen Start gerufen werden, also aus `src/`. Das ist
-   die erste Stelle dieser Phase, an der wir nicht mehr nur `supabase/` und
-   Konfiguration anfassen. **Vorher mit `fbc-platform-f4` abstimmen**, so wie es
-   bei den Sperrdateien nötig war: f4 arbeitet an `src/` (AGE-629, AGE-670).
-2. **Die Vertragsnummer muss steigen, wenn D4 ein Plugin anfasst.**
-   `plugins.CapacitorUpdater.version` in `capacitor.config.ts`, heute `1.0.0`.
-   Ein PR, der ein Capacitor-Plugin hinzufügt, hebt sie auf `2.0.0` und geht
-   über den Store. Das ist Buchführung, kein Mechanismus — der Entwurf sagt das
-   ausdrücklich, und codex hat genau daran Anstoss genommen (abgelehnt, §8).
-3. **Nach dem Merge `migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
-   Frontend-Deploy. Es sind jetzt **drei** Migrationen (…100000, …140000,
-   …160000). **Vor** dem ersten Deploy auf `main`, sonst scheitert der
-   OTA-Schritt am fehlenden Bucket.
-4. **Nach JEDEM `pnpm build`, vor jedem `git add`:**
-   `git checkout -- src/content/release-entries.generated.ts`.
-5. **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand.** Ich habe
-   sie per `psql` eingespielt, weil der Stack geteilt ist und ein
-   `supabase db reset` f4s Stand geräumt hätte. Ein Reset stellt sie korrekt her.
+- **Das Spec-Delta ist NACH Review-Runde 5 gewachsen** (die neue
+  Rückweg-Zusage). Der §18-Gate meldet das bei jedem Commit: „was reviewed, but
+  the artifacts changed since". Nicht blockend, aber vor dem Archivieren ist zu
+  entscheiden, ob eine Runde 6 über das geänderte Delta läuft. Im PR-Rumpf steht
+  ein Hinweis für die Review.
+- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
+  `git checkout -- src/content/release-entries.generated.ts`.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf, und jetzt auch
-  die drei Endpunkte selbst. Alles davor ist belegt; sichtbar wird es erst beim
-  ersten Deploy auf `main`.
-- **Die zweite RED-Zusage aus D3 ist halb offen und absichtlich so markiert.**
-  „Ein Bündel ohne passende Prüfsumme wird abgewiesen **und die installierte
-  Fassung bleibt in Betrieb**" — die erste Hälfte liegt bei uns und ist belegt,
-  die zweite ist Verhalten des Plugins und hängt an D4.
+- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
+  Endpunkte. Sichtbar wird er erst beim ersten Deploy auf `main`.
+- **Der Rückfall selbst ist unbelegt und absichtlich so markiert.** Er hängt an
+  einem Zeitgeber im nativen Teil und ist in jsdom nicht herstellbar. Belegt ist
+  unsere Hälfte: vier Zusagen, alle vier gegengeprüft (Plattform-Bedingung
+  lässt zwei umfallen, top-level `await` die dritte, `autoDeleteFailed: true`
+  die vierte).
 - **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
   C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
   **und das kostet Donald die Anmeldung** — vorher ansagen.
 - **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
-  Donalds Hand. Das OTA-Schlüsselpaar ist **erledigt** und seit Runde 5 auch im
-  Deploy gegengeprüft.
+  Donalds Hand. Das OTA-Schlüsselpaar ist erledigt und im Deploy gegengeprüft.
+- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand** (per `psql`
+  eingespielt, weil der Stack geteilt ist). Ein `supabase db reset` stellt sie
+  korrekt her.
 - **Nicht angefasst, ausserhalb AGE-642:** `scripts/sync-dev-auszug.test.ts` ist
-  per Bauart flakig (vergleicht `git status --ignored` über den ganzen
-  Arbeitsbaum). f4 hat es diagnostiziert und stehen lassen — es ist niemandes
-  Vorgang. Merkzettel liegt in der Projekt-Memory.
-- **Nebenbefund, weiterhin nicht angefasst:** `ADR-0037` wird dreimal zitiert,
-  existiert aber nicht (`docs/decisions/` führt 0001–0005).
+  per Bauart flakig. `ADR-0037` wird dreimal zitiert, existiert aber nicht.
