@@ -32,6 +32,17 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-31-composer-abbruch",
+    datum: "2026-08-31",
+    titel: "Ein begonnener Beitrag lässt sich wieder verwerfen",
+    linear: "AGE-670",
+    aenderungen: [
+      '**Der Composer bekommt einen Weg zurück.** Neben „Posten" steht künftig „Abbrechen": der Entwurf wird verworfen und der Composer klappt zu.',
+      '**Verworfen wird alles auf einmal** — Text, Video-Link samt aufgeklapptem Feld, Sichtbarkeit zurück auf „Mitglieder", der Veröffentlichungszeitpunkt zurück auf „sofort", die gewählten Bilder, eine stehende Bildfehlermeldung und die gewählten Themen.',
+      "**Ein erneutes Aufklappen beginnt leer**, nicht beim alten Entwurf.",
+    ],
+  },
+  {
     slug: "2026-08-30-geplante-beitraege",
     datum: "2026-08-30",
     titel: "Einen Beitrag jetzt schreiben und später live schalten",
