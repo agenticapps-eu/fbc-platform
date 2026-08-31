@@ -134,19 +134,35 @@ function EventsBody({
  * Drei Kacheln je Reihe (Entscheidung Meeting 03.08., AGE-531). Vorher standen
  * hier zwei — das Mockup zeigt vier, entschieden wurden drei; der Schritt ist
  * also 2 → 3 und nicht, wie im Issue formuliert, 4 → 3.
+ *
+ * Die DREI bleibt; seit AGE-629 wechselt nur ihr Auslöser. Vorher hing sie am
+ * Fenster, jetzt an der Breite dieser Liste — mit der Filterspalte daneben
+ * verengt sich die Liste, das Fenster aber nicht, und ein Viewport-Breakpoint
+ * quetschte drei Kacheln in eine Fläche, die eine trägt: gemessen 115 px je
+ * Kachel bei 1280 px Fenster.
+ *
+ * Der Behälter ist ein eigenes `div` und nicht die `<ul>` selbst: ein Element
+ * kann seinen EIGENEN Container nicht abfragen, `@[41rem]:` an der Liste
+ * fragte sonst einen Vorfahren — oder gar nichts — und wäre lautlos wirkungslos.
+ *
+ * 41rem = 3 × 208 px + 2 × 16 px Abstand, 27rem = 2 × 208 px + 16 px. Die
+ * 208 px sind keine Wahl: es ist die schmalste Kachel, die die Anwendung
+ * heute schon ausliefert (1280 px mit angedockter Nachrichten-Leiste, AGE-627).
  */
 function CardGrid({ events, empty }: { events: EventListItem[]; empty: string }) {
   // Ein Signieraufruf für die ganze Reiterseite, nicht einer je Kachel.
   const covers = useEventCovers(events);
   if (events.length === 0) return <p className="text-sm text-muted">{empty}</p>;
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {events.map((e) => (
-        <li key={e.id}>
-          <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
-        </li>
-      ))}
-    </ul>
+    <div className="@container">
+      <ul className="grid grid-cols-1 gap-4 @[27rem]:grid-cols-2 @[41rem]:grid-cols-3">
+        {events.map((e) => (
+          <li key={e.id}>
+            <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

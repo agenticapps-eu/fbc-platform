@@ -213,18 +213,29 @@ export default function MemberDirectory() {
         </p>
       </header>
 
-      <div className="grid gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-4 shadow-soft sm:grid-cols-2 lg:grid-cols-3">
-        <div className="sm:col-span-2 lg:col-span-3">
-          <Input
-            type="search"
-            value={queryInput}
-            onChange={(e) => setQueryInput(e.target.value)}
-            placeholder="Suche nach Name, Firma, Kompetenz …"
-            aria-label="Volltextsuche im Verzeichnis"
-          />
-        </div>
+      {/* Der Filterblock trägt dieselbe Krankheit wie die Kartenraster und
+          bekommt dieselbe Kur (AGE-629) — hier sogar dringender: er zieht in
+          die 16rem breite rechte Spalte, und `lg:grid-cols-3` ergäbe dort drei
+          Felder zu je 74 px. Ein Viewport-Breakpoint kann nicht wissen, dass
+          er in einer schmalen Spalte steht; der Behälter weiss es.
 
-        {/* Der Standard ist EINE Zeile. Fünf Auswahlfelder und zwölf Chips
+          EIN Behälter für den ganzen Block: die verschachtelte Chip-Gruppe
+          weiter unten fragt denselben ab, denn Containerabfragen zielen auf den
+          nächsten Vorfahren. Ein zweiter Behälter dort wäre nicht falsch, aber
+          eine zweite Zahl, die man synchron halten müsste. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-3 rounded-[var(--radius-card)] border border-line bg-canvas p-4 shadow-soft @[27rem]:grid-cols-2 @[41rem]:grid-cols-3">
+          <div className="@[27rem]:col-span-2 @[41rem]:col-span-3">
+            <Input
+              type="search"
+              value={queryInput}
+              onChange={(e) => setQueryInput(e.target.value)}
+              placeholder="Suche nach Name, Firma, Kompetenz …"
+              aria-label="Volltextsuche im Verzeichnis"
+            />
+          </div>
+
+          {/* Der Standard ist EINE Zeile. Fünf Auswahlfelder und zwölf Chips
             beim ersten Blick sind ein Formular, keine Suche — und die
             allermeisten Wege gehen über den Namen (AGE-566).
 
@@ -233,86 +244,87 @@ export default function MemberDirectory() {
             Filter erklärt sonst eine kurze Trefferliste nicht — und das ist
             genau die Verwechslung, die „keine Treffer" hier schon einmal
             erzeugt hat. */}
-        <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            onClick={() => setErweitert((v) => !v)}
-            aria-expanded={erweitert}
-            className="rounded-md text-sm font-medium text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            {erweitert ? "Erweiterte Suche schließen" : "Erweiterte Suche"}
-          </button>
-          {!erweitert && hasAdvancedFilters(filters) && (
-            <span className="text-sm text-muted">Erweiterte Filter sind aktiv.</span>
-          )}
-        </div>
+          <div className="@[27rem]:col-span-2 @[41rem]:col-span-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button
+              type="button"
+              onClick={() => setErweitert((v) => !v)}
+              aria-expanded={erweitert}
+              className="rounded-md text-sm font-medium text-accent-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {erweitert ? "Erweiterte Suche schließen" : "Erweiterte Suche"}
+            </button>
+            {!erweitert && hasAdvancedFilters(filters) && (
+              <span className="text-sm text-muted">Erweiterte Filter sind aktiv.</span>
+            )}
+          </div>
 
-        {erweitert && (
-          <>
-            <FilterSelect
-              label="Thema"
-              value={filters.theme}
-              onChange={(v) => setFilter("theme", v)}
-              allLabel="Alle Themen"
-              options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
-            />
-            <FilterSelect
-              label="Branche"
-              value={filters.branche}
-              onChange={(v) => setFilter("branche", v)}
-              allLabel="Alle Branchen"
-              options={facets.branchen.map((b) => ({ value: b, label: b }))}
-            />
-            <FilterSelect
-              label="Region"
-              value={filters.region}
-              onChange={(v) => setFilter("region", v)}
-              allLabel="Alle Regionen"
-              options={facets.regionen.map((r) => ({ value: r, label: r }))}
-            />
-            <FilterSelect
-              label="Kompetenz"
-              value={filters.competency}
-              onChange={(v) => setFilter("competency", v)}
-              allLabel="Alle Kompetenzen"
-              options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
-            />
-            <FilterSelect
-              label="Sucht / bietet"
-              value={filters.offering}
-              onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
-              allLabel="Egal"
-              options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            />
+          {erweitert && (
+            <>
+              <FilterSelect
+                label="Thema"
+                value={filters.theme}
+                onChange={(v) => setFilter("theme", v)}
+                allLabel="Alle Themen"
+                options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+              />
+              <FilterSelect
+                label="Branche"
+                value={filters.branche}
+                onChange={(v) => setFilter("branche", v)}
+                allLabel="Alle Branchen"
+                options={facets.branchen.map((b) => ({ value: b, label: b }))}
+              />
+              <FilterSelect
+                label="Region"
+                value={filters.region}
+                onChange={(v) => setFilter("region", v)}
+                allLabel="Alle Regionen"
+                options={facets.regionen.map((r) => ({ value: r, label: r }))}
+              />
+              <FilterSelect
+                label="Kompetenz"
+                value={filters.competency}
+                onChange={(v) => setFilter("competency", v)}
+                allLabel="Alle Kompetenzen"
+                options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
+              />
+              <FilterSelect
+                label="Sucht / bietet"
+                value={filters.offering}
+                onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
+                allLabel="Egal"
+                options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              />
 
-            {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
+              {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
             Gruppen, Mehrfachauswahl: ODER innerhalb einer Gruppe, UND zwischen
             beiden. Sechs Optionen je Seite, nicht elf: die Elf aus dem Issue ist
             die Vereinigung, `immobilien` steht in beiden. */}
-            <div className="sm:col-span-2 lg:col-span-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
-              <ChipFilterGroup
-                label="Bietet"
-                options={OFFER_CATEGORY_OPTIONS}
-                selected={filters.offers}
-                onToggle={(v) => toggleCategory("offers", v)}
-              />
-              <ChipFilterGroup
-                label="Sucht"
-                options={NEED_CATEGORY_OPTIONS}
-                selected={filters.needs}
-                onToggle={(v) => toggleCategory("needs", v)}
-              />
-            </div>
-          </>
-        )}
+              <div className="@[27rem]:col-span-2 @[41rem]:col-span-3 grid grid-cols-1 gap-3 border-t border-line pt-3 @[27rem]:grid-cols-2">
+                <ChipFilterGroup
+                  label="Bietet"
+                  options={OFFER_CATEGORY_OPTIONS}
+                  selected={filters.offers}
+                  onToggle={(v) => toggleCategory("offers", v)}
+                />
+                <ChipFilterGroup
+                  label="Sucht"
+                  options={NEED_CATEGORY_OPTIONS}
+                  selected={filters.needs}
+                  onToggle={(v) => toggleCategory("needs", v)}
+                />
+              </div>
+            </>
+          )}
 
-        {active && (
-          <div className="flex items-end">
-            <Button variant="ghost" size="sm" onClick={reset}>
-              Filter zurücksetzen
-            </Button>
-          </div>
-        )}
+          {active && (
+            <div className="flex items-end">
+              <Button variant="ghost" size="sm" onClick={reset}>
+                Filter zurücksetzen
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-line">
@@ -551,13 +563,15 @@ function KontakteResults({
         <p className="text-sm text-muted">
           {members.length} {members.length === 1 ? "Kontakt" : "Kontakte"}
         </p>
-        <Stagger className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {members.map((m) => (
-            <StaggerItem key={m.id} className="h-full">
-              <MemberCard member={m} />
-            </StaggerItem>
-          ))}
-        </Stagger>
+        <div className="@container mt-4">
+          <Stagger className="grid grid-cols-1 gap-4 @[27rem]:grid-cols-2 @[41rem]:grid-cols-3">
+            {members.map((m) => (
+              <StaggerItem key={m.id} className="h-full">
+                <MemberCard member={m} />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </div>
       </>
     );
   }
@@ -586,7 +600,9 @@ function KontakteResults({
     return (
       <EmptyState
         title="Dazu passt keiner deiner Kontakte"
-        description={'Diese Kombination aus Suche und Filtern trifft auf keinen deiner Kontakte. Nimm einen Filter weg \u2014 oder wechsle zu \u201eAlle Mitglieder\u201c.'}
+        description={
+          "Diese Kombination aus Suche und Filtern trifft auf keinen deiner Kontakte. Nimm einen Filter weg \u2014 oder wechsle zu \u201eAlle Mitglieder\u201c."
+        }
         action={
           <Button variant="secondary" size="sm" onClick={onReset}>
             Filter zurücksetzen
@@ -655,13 +671,22 @@ function DirectoryResults({
       <p className="text-sm text-muted">
         {members.length} {members.length === 1 ? "Mitglied" : "Mitglieder"}
       </p>
-      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {members.map((m) => (
-          <StaggerItem key={m.id} className="h-full">
-            <MemberCard member={m} />
-          </StaggerItem>
-        ))}
-      </Stagger>
+      {/* Behälter statt Fenster (AGE-629). Die Schwellen sind gerechnet:
+          41rem = 3 × 208 px + 2 × 16 px Abstand, 27rem = 2 × 208 px + 16 px.
+          208 px ist die schmalste Karte, die heute schon ausgeliefert wird
+          (1280 px mit angedockter Nachrichten-Leiste, AGE-627) — mit der
+          Filterspalte daneben fiel sie ohne diese Umstellung auf 115 px.
+          Der Behälter ist ein eigenes `div`: ein Element kann seinen EIGENEN
+          Container nicht abfragen. */}
+      <div className="@container">
+        <Stagger className="grid grid-cols-1 gap-4 @[27rem]:grid-cols-2 @[41rem]:grid-cols-3">
+          {members.map((m) => (
+            <StaggerItem key={m.id} className="h-full">
+              <MemberCard member={m} />
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </div>
     </>
   );
 }
@@ -695,13 +720,16 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
       to={to ?? `/p/${member.id}`}
       className="block h-full rounded-[var(--radius-card)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
     >
-{/* `padded={false}` und NICHT `p-0` in der className: `cn()` ist ein reiner
+      {/* `padded={false}` und NICHT `p-0` in der className: `cn()` ist ein reiner
           Join ohne tailwind-merge, ein `p-0` löscht das `p-6` also nicht,
           sondern stellt sich daneben — und bei gleicher Spezifität entscheidet
           die Reihenfolge im Stylesheet. Das Cover sass dadurch 25 px eingerückt
           statt randlos, und die Sichtprobe hat es nicht gesehen, weil Höhe und
           Verhältnis trotzdem stimmten. */}
-      <Card padded={false} className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]">
+      <Card
+        padded={false}
+        className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-[0_1px_2px_rgba(20,21,26,0.06),0_20px_48px_-24px_rgba(20,21,26,0.35)]"
+      >
         {/* AGE-595: das Hintergrundbild des Profils, randlos über der Karte.
             Gebaut wie `EventCover` und aus demselben Grund:
 
@@ -725,28 +753,33 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
         </div>
 
         <div className="flex flex-1 flex-col gap-4 p-5">
-        {/* AGE-450: Das Tier-Label stand rechts in der Namenszeile und schnitt lange
+          {/* AGE-450: Das Tier-Label stand rechts in der Namenszeile und schnitt lange
             Namen ab (Screenshot Detlev). Jetzt unter dem Namen — der bekommt die
             volle Breite und truncatet erst am Kartenrand. */}
-        <div className="flex items-start gap-3">
-          <Avatar name={name} src={member.avatar_url} size="lg" className="ring-1 ring-accent/40" />
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-display text-lg font-semibold text-ink">{name}</h3>
-            {subtitle && <p className="truncate text-sm text-accent-strong">{subtitle}</p>}
-            {meta && <p className="mt-0.5 truncate text-xs text-muted">{meta}</p>}
-            {member.tier && (
-              <span className="mt-1.5 inline-flex items-center rounded-full border border-accent/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-strong uppercase">
-                {levelLabel(member.tier)}
-              </span>
-            )}
+          <div className="flex items-start gap-3">
+            <Avatar
+              name={name}
+              src={member.avatar_url}
+              size="lg"
+              className="ring-1 ring-accent/40"
+            />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-display text-lg font-semibold text-ink">{name}</h3>
+              {subtitle && <p className="truncate text-sm text-accent-strong">{subtitle}</p>}
+              {meta && <p className="mt-0.5 truncate text-xs text-muted">{meta}</p>}
+              {member.tier && (
+                <span className="mt-1.5 inline-flex items-center rounded-full border border-accent/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-strong uppercase">
+                  {levelLabel(member.tier)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {member.short_bio && (
-          <p className="line-clamp-3 text-sm leading-relaxed text-muted">{member.short_bio}</p>
-        )}
+          {member.short_bio && (
+            <p className="line-clamp-3 text-sm leading-relaxed text-muted">{member.short_bio}</p>
+          )}
 
-        {/* AGE-595: die vier Kompass-Zweige sind hier weg — beide `map`-Läufe
+          {/* AGE-595: die vier Kompass-Zweige sind hier weg — beide `map`-Läufe
             über die Kategorien und beide pauschalen Marken. Übrig bleibt die
             Branche, die einordnet statt aufzuzählen.
 
@@ -755,11 +788,11 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
             eine Änderung an der Darstellung darf keine Datenschicht mitreißen,
             und ihre Entfernung wäre eine dritte Signaturänderung an derselben
             Funktion für einen Nutzen, den niemand hat. */}
-        {member.branche && (
-          <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-            <Badge variant="neutral">{member.branche}</Badge>
-          </div>
-        )}
+          {member.branche && (
+            <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
+              <Badge variant="neutral">{member.branche}</Badge>
+            </div>
+          )}
         </div>
       </Card>
     </Link>

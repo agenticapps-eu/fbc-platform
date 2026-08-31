@@ -1,17 +1,54 @@
 ## 1. Das Raster folgt seinem Behälter
 
-- [ ] 1.1 RED: Test, der die Spaltenzahl an **Behälterbreiten** prüft, nicht an
+- [x] 1.1 RED: Test, der die Spaltenzahl an **Behälterbreiten** prüft, nicht an
       Fensterbreiten — bei 409 px eine Spalte, bei 657 px und 873 px drei, bei
       1376 px weiterhin drei. Muss vor der Umstellung fehlschlagen.
-- [ ] 1.2 `MemberDirectory.tsx:554` und `:658` — Behälter auf `@container`,
+- [x] 1.2 `MemberDirectory.tsx:554` und `:658` — Behälter auf `@container`,
       Raster auf `grid-cols-1 @[27rem]:grid-cols-2 @[41rem]:grid-cols-3`.
-- [ ] 1.3 `EventsList.tsx:143` — dasselbe. Den Kommentarkopf von `CardGrid`
+- [x] 1.3 `EventsList.tsx:143` — dasselbe. Den Kommentarkopf von `CardGrid`
       nachziehen: die Meeting-Entscheidung „drei Kacheln" bleibt, nur ihr
       Auslöser wechselt.
-- [ ] 1.4 `AcademyPage.tsx:72` und `:273` — `grid-cols-1 @[35rem]:grid-cols-2`,
+- [x] 1.4 `AcademyPage.tsx:72` und `:273` — `grid-cols-1 @[35rem]:grid-cols-2`,
       Deckel 2.
-- [ ] 1.5 GREEN, und `pnpm vitest run src/components/ui/schmale-geraete.test.ts`
+- [x] 1.5 GREEN, und `pnpm vitest run src/components/ui/schmale-geraete.test.ts`
       bleibt grün (der Wächter gegen feste Spaltenbreiten).
+- [x] 1.6 **Nicht geplant, beim Umbau gefunden:** der Filterblock
+      (`MemberDirectory:216` und die verschachtelte Chip-Gruppe `:292`) trug
+      dieselben Viewport-Schwellen — und genau er zieht in die 16rem-Spalte,
+      wo `lg:grid-cols-3` drei Felder zu je 74 px ergäbe. Mit umgestellt, samt
+      der drei `col-span`-Spannweiten, die sonst über Spalten spannten, die es
+      nicht mehr gibt.
+
+### Gemessen nach dem Umbau (31.08., Browser, `/events` und `/academy`)
+
+**Kein heutiger Zustand hat sich geändert:**
+
+| Fenster | Inhalt | `/events` vorher → nachher |
+| --- | --- | --- |
+| 1009 | 689 | 3 × 219 → 3 × 219 |
+| 1265, Chat eingekl. | 873 | 3 × 280 → 3 × 280 |
+| 1265, Chat offen | 657 | 3 × 208 → 3 × 208 |
+| 1905, Chat eingekl. | 1376 | 3 × 448 → 3 × 448 |
+| 1905, Chat offen | 1297 | 3 × 422 → 3 × 422 |
+
+**Die verengten Fälle sind repariert:**
+
+| Fenster + Suchspalte | Inhalt | vorher → nachher |
+| --- | --- | --- |
+| 1009 | 409 | 3 × 126 → **1 × 409** |
+| 1265, Chat eingekl. | 593 | 3 × 187 → **2 × 289** |
+| 1265, Chat offen | 377 | 3 × 115 → **1 × 377** |
+
+`/academy`, Deckel 2, beide Regale gleich: 873 → 2 × 425, 657 → 2 × 317,
+1024 → 2 × 333 (unverändert), mit Spalte 377 → 1 × 377. Überlauf überall 0.
+
+**Deckel-Probe bestanden:** 1376 px Behälter → drei Kacheln, nicht sechs. Genau
+dafür wurde `auto-fill` verworfen.
+
+**Korrektur an der Ausgangsmessung:** die Randbemerkung, `xl` greife bei 1280 px
+mit Scrollbar nicht, war falsch. `matchMedia` misst `window.innerWidth` (1280),
+das Layout `clientWidth` (1265) — die Leiste dockt an. Die Breitenzahlen bleiben
+richtig, die Aussage über die Kante nicht.
 
 ## 2. Die Spalte auf `/mitglieder`
 

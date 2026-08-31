@@ -69,16 +69,25 @@ export default function AcademyPage() {
         <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
           Aus der Redaktion
         </h2>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {ACADEMY_LESSONS.map((lesson) => (
-            <Card key={lesson.url} className="flex flex-col gap-3">
-              <VideoEmbed url={lesson.url} title={lesson.title} />
-              <div>
-                <CardTitle className="text-base">{lesson.title}</CardTitle>
-                <CardDescription>{lesson.description}</CardDescription>
-              </div>
-            </Card>
-          ))}
+        {/* Behälter statt Fenster (AGE-629): mit der Filterspalte daneben
+            verengt sich diese Fläche, das Fenster nicht. 35rem und nicht
+            41rem wie bei den Karten der anderen Flächen — eine Lektion trägt
+            einen Videorahmen und wird darunter unbrauchbar; gemessen liefert
+            die Academy heute bei 1024 px zwei Kacheln zu 332 px. Der Deckel
+            bleibt bei ZWEI, damit ein breiter Schirm die Fläche nicht dichter
+            macht, als sie heute ist. */}
+        <div className="@container">
+          <div className="grid grid-cols-1 gap-6 @[35rem]:grid-cols-2">
+            {ACADEMY_LESSONS.map((lesson) => (
+              <Card key={lesson.url} className="flex flex-col gap-3">
+                <VideoEmbed url={lesson.url} title={lesson.title} />
+                <div>
+                  <CardTitle className="text-base">{lesson.title}</CardTitle>
+                  <CardDescription>{lesson.description}</CardDescription>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -270,10 +279,14 @@ function VideoRaster({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2">
-        {posts.map((post) => (
-          <VideoKarte key={post.id} post={post} isLoggedIn={isLoggedIn} />
-        ))}
+      {/* Dieselbe Schwelle wie beim Redaktionsregal — es sind dieselben
+          Kacheln mit demselben Videorahmen. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-6 @[35rem]:grid-cols-2">
+          {posts.map((post) => (
+            <VideoKarte key={post.id} post={post} isLoggedIn={isLoggedIn} />
+          ))}
+        </div>
       </div>
       {hasNextPage && (
         <div className="flex justify-center">
