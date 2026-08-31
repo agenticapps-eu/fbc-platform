@@ -14,8 +14,18 @@
 > `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`. **Kein PR offen, nichts gepusht** — Donald
-hat weder Push noch PR verlangt.
+`donald/age-642-capacitor-huelle`. **Kein PR offen, nichts gepusht.**
+
+> ### Der Plan, festgelegt von Donald am 31.08.
+>
+> **D4 in einer frischen Sitzung, gepusht wird ERST DANACH.** Also: nicht am
+> Anfang der nächsten Sitzung pushen, und keinen PR öffnen, um D3 „schon mal
+> unterzubringen". D3 und D4 gehen zusammen hinaus.
+>
+> Der Grund steht in D4 selbst: ohne `notifyAppReady()` ist OTA eine
+> Einbahnstrasse. D3 allein auf `main` hiesse, dass der erste Deploy den
+> Auslieferungsweg scharf schaltet, bevor es einen Rückweg gibt — und dann ist
+> ein kaputtes Bündel ein bis drei Tage lang nicht zurückzunehmen.
 
 **Rückstand selbst messen:**
 `git fetch origin main && git rev-list --left-right --count origin/main...HEAD`.
@@ -80,22 +90,31 @@ Beleg.
 **D4 — der Rückweg.** Erster Handgriff: `### D4.` in
 `openspec/changes/capacitor-huelle/tasks.md` lesen. Ohne `notifyAppReady()` ist
 OTA eine Einbahnstrasse: ein gültig signiertes Bündel, das startet und dann weiss
-bleibt, bricht jedes Gerät dauerhaft bis eine neue Schale durch den Store geht.
+bleibt, bricht jedes Gerät dauerhaft bis eine neue Schale durch den Store geht —
+und zwar für genau die Menschen, die am wenigsten davon verstehen.
 
-**Vier Dinge, die vorher gelesen gehören:**
+**Nicht als erstes pushen.** Siehe den Kasten oben: erst D4 bauen, dann D3+D4
+gemeinsam hinaus.
 
-1. **Die Vertragsnummer muss steigen, wenn D4 ein Plugin anfasst.**
+**Fünf Dinge, die vorher gelesen gehören:**
+
+1. **D4 fasst mit ziemlicher Sicherheit die Web-Schicht an** — `notifyAppReady()`
+   will beim ersten erfolgreichen Start gerufen werden, also aus `src/`. Das ist
+   die erste Stelle dieser Phase, an der wir nicht mehr nur `supabase/` und
+   Konfiguration anfassen. **Vorher mit `fbc-platform-f4` abstimmen**, so wie es
+   bei den Sperrdateien nötig war: f4 arbeitet an `src/` (AGE-629, AGE-670).
+2. **Die Vertragsnummer muss steigen, wenn D4 ein Plugin anfasst.**
    `plugins.CapacitorUpdater.version` in `capacitor.config.ts`, heute `1.0.0`.
    Ein PR, der ein Capacitor-Plugin hinzufügt, hebt sie auf `2.0.0` und geht
    über den Store. Das ist Buchführung, kein Mechanismus — der Entwurf sagt das
    ausdrücklich, und codex hat genau daran Anstoss genommen (abgelehnt, §8).
-2. **Nach dem Merge `migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
+3. **Nach dem Merge `migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
    Frontend-Deploy. Es sind jetzt **drei** Migrationen (…100000, …140000,
    …160000). **Vor** dem ersten Deploy auf `main`, sonst scheitert der
    OTA-Schritt am fehlenden Bucket.
-3. **Nach JEDEM `pnpm build`, vor jedem `git add`:**
+4. **Nach JEDEM `pnpm build`, vor jedem `git add`:**
    `git checkout -- src/content/release-entries.generated.ts`.
-4. **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand.** Ich habe
+5. **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand.** Ich habe
    sie per `psql` eingespielt, weil der Stack geteilt ist und ein
    `supabase db reset` f4s Stand geräumt hätte. Ein Reset stellt sie korrekt her.
 
