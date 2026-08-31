@@ -734,8 +734,25 @@ was das System je befüllt.
       package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49bdeadb`. Beantwortet zugleich,
       was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
       SHAs, also verschiedene Fassungen.
-- [ ] **RSA-Schlüsselpaar NEU erzeugen — 2048 Bit.** Donalds Hand (Infisical
-      `prod` braucht ein echtes Terminal).
+- [x] **RSA-Schlüsselpaar neu erzeugt — 2048 Bit** (Donald, 31.08. nachmittags,
+      nach dem Befund unten).
+
+      **Gemessen an `~/Documents/capgo_privat.pem`, fünf Punkte:** 2048 Bit ·
+      PKCS#1 in beiden Dateien (`BEGIN RSA PRIVATE KEY` / `BEGIN RSA PUBLIC
+      KEY`) · Chiffrat **256 Byte**, also genau was das Plugin verlangt ·
+      Rundlauf *privat verschlüsselt → öffentlich geöffnet* byte-gleich über 32
+      Bytes · Base64 **344** und Hex **512** Zeichen, also genau die Längen, die
+      `ota_buendel` als Bedingung führt.
+
+      **Diesmal ist die GRÖSSE ausdrücklich geprüft** — das ist der Unterschied
+      zu den drei Belegen vom Vormittag, die Format, Übertragung und Rundlauf
+      prüften und die Länge gerade nicht.
+
+      **Nicht selbst nachgemessen:** dass der Wert in Infisical `prod` derselbe
+      ist wie die Datei auf der Platte. Das braucht ein echtes Terminal; Donald
+      hat es abgelegt und gesagt. Der erste Deploy auf `main` ist die Stelle, an
+      der es sich zeigt — und er scheitert dann laut, nicht still, weil
+      `bildeBuendel` die Längen prüft, bevor irgendetwas hochgeladen wird.
 
       **Korrektur vom 31.08., nachmittags.** Am Vormittag desselben Tages galt
       diese Aufgabe als erledigt und dreifach belegt: 4096 Bit, PKCS#1, in

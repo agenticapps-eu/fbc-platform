@@ -15,22 +15,28 @@
 > `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`. Heute auf `origin/main` rebased (sauber),
-danach **10 Commits voraus** — davon zwei mit Code.
+`donald/age-642-capacitor-huelle`. **Kein PR offen.** Zwei Commits tragen Code,
+der Rest ist Doku.
 
-Den Rückstand selbst messen, nicht hier ablesen:
-`git fetch origin main && git rev-list --left-right --count origin/main...HEAD`.
+**Rückstand selbst messen, nicht hier ablesen** — `main` bewegt sich mehrmals
+täglich: `git fetch origin main && git rev-list --left-right --count
+origin/main...HEAD`. Beim Schreiben dieser Zeile: 2 hinter, 13 voraus. Der
+letzte Rebase lief sauber; wir fassen nur `openspec/changes/capacitor-huelle/`,
+`docs/decisions/`, `scripts/ota-buendel*`, `supabase/`, `capacitor.config.ts`
+und die zwei Workflows an.
 
-Change `capacitor-huelle`: **D1 ist abgeschlossen.**
+Change `capacitor-huelle`: **37 offen, 80 erledigt.**
 
 ## Accomplished
 
-**Phase D1 steht vollständig** — Speicher, Schreibweg und
-Veröffentlichungs-Schritt.
+**Phase D1 steht vollständig** — Speicher, Schreibweg, Veröffentlichungs-Schritt
+und Schlüssel. Der einzige noch offene D1-Punkt ist `publicKey` in
+`capacitor.config.ts`, und der gehört absichtlich zu D3: vorher wäre er tote
+Konfiguration.
 
-* `eaedcdd` — Bucket `ota-buendel` und Manifest-Tabelle `public.ota_buendel`,
+- `eaedcdd` — Bucket `ota-buendel` und Manifest-Tabelle `public.ota_buendel`,
   per Migration. RLS an, keine Policy, kein Grant (Muster `activation_tokens`).
-* `f765036` — `scripts/ota-buendel.logic.ts` (zippen und rechnen),
+- `f765036` — `scripts/ota-buendel.logic.ts` (zippen und rechnen),
   `scripts/ota-buendel.ts` (hochladen und eintragen), die
   SECURITY-DEFINER-Funktion `ota_buendel_veroeffentlichen`, die Vertragsnummer
   `1.0.0` in `capacitor.config.ts` und ein Schritt in `deploy.yml`.
@@ -42,48 +48,54 @@ Prüfsumme vergleichen. Zusätzlich einmal gegen den **echten** Schlüssel und d
 **echte** 2,75-MB-Bündel gefahren — `index.html` an der Wurzel, 0 von 64
 Sourcemaps drin.
 
-## Der Schlüssel ist getauscht und gemessen
+## Der Schlüssel: erst falsch, dann getauscht und gemessen
 
-Donald hat am 31.08. einen 2048-Bit-Schlüssel erzeugt und in Infisical `prod`
-abgelegt. Fünf Messungen an `~/Documents/capgo_privat.pem`: 2048 Bit · PKCS#1
-in beiden Dateien · Chiffrat **256 Byte** · Rundlauf byte-gleich · Base64 344
-und Hex 512 Zeichen, also genau die Längen, die die Tabelle verlangt.
+Der am Vormittag hinterlegte Schlüssel hatte **4096 Bit** und war unbrauchbar:
+das Plugin bricht ab, wenn das Chiffrat der Prüfsumme nicht **genau 256 Byte**
+misst (`CryptoCipher.java:254`, `.swift:74`). Gescheitert wäre es still auf dem
+Gerät, entdeckt frühestens beim Gerätetest.
 
-**Nicht selbst nachgemessen:** dass der Wert in Infisical derselbe ist wie die
-Datei. Das braucht ein echtes Terminal. Donald hat es abgelegt und gesagt.
+Er galt als „dreifach belegt" — die drei Belege prüften Format, Übertragung und
+Rundlauf. **Ein Rundlauf gelingt mit jeder Schlüssellänge.** Wer
+Schlüsselmaterial belegt, muss die Grösse als eigene Frage stellen.
+
+Donald hat neu erzeugt. Fünf Messungen an `~/Documents/capgo_privat.pem`: 2048
+Bit · PKCS#1 in beiden Dateien · Chiffrat 256 Byte · Rundlauf byte-gleich ·
+Base64 344 und Hex 512 Zeichen. **Nicht selbst nachgemessen:** dass der Wert in
+Infisical `prod` derselbe ist wie die Datei — das braucht ein echtes Terminal.
 
 ## Decisions
 
 - **Der Objektname trägt den INHALT**, nicht nur die Fassung:
-  `<version>-<sha256(chiffrat)[0..16]>.bin`. Das kam aus dem Fremd-Review und
+  `<version>-<sha256(chiffrat)[0..16]>.bin`. Kam aus dem Fremd-Review und
   erledigt drei HIGH-Befunde auf einmal — ein Re-Run desselben Commits
   überschreibt keine liegende Datei mehr, und es gibt kein Zeitfenster, in dem
   die Manifest-Zeile auf veränderte Bytes mit alten Kryptowerten zeigt.
-  `deploy.yml` trägt `cancel-in-progress: true`, dieses Fenster war real.
-- **Zwölf Stellen des SHA** in der Fassung, nicht sieben (28 Bit sind bei
-  tausend Auslieferungen rund 0,2 % Kollisionsgefahr).
+  `deploy.yml` trägt `cancel-in-progress: true`; dieses Fenster war real.
+- **Zwölf Stellen des SHA** in der Fassung, nicht sieben.
 - **AES-128**, weil das Plugin diese Länge durchgängig benennt und die
   Verschlüsselung Echtheit trägt, nicht Vertraulichkeit.
 - **Der Schreibweg ist eine DEFINER-Funktion**, kein Tabellen-Grant für
   `service_role`. Das Repo macht es nirgends anders.
 - **Kein npm-Modul fürs Zippen.** `zip` liegt auf `ubuntu-latest`; eine neue
-  Abhängigkeit führe in jedes `pnpm install` und berührte die Sperrdateien, die
-  f4s Dependabot-PRs anfassen.
+  Abhängigkeit berührte die Sperrdateien, die f4s Dependabot-PRs anfassen.
 
 ## Files modified
 
 `eaedcdd` + `f765036`: `supabase/migrations/20260831100000_ota_buendel.sql` ·
 `…140000_ota_buendel_veroeffentlichen.sql` · `supabase/tests/ota_buendel_test.sql`
-(27 Zusagen) · `scripts/ota-buendel.logic.ts` · `…logic.test.ts` · `…ota-buendel.ts`
-· `capacitor.config.ts` · `.github/workflows/{ci,deploy}.yml` · `tasks.md` ·
+· `scripts/ota-buendel.logic.ts` · `…logic.test.ts` · `…ota-buendel.ts` ·
+`capacitor.config.ts` · `.github/workflows/{ci,deploy}.yml` · `tasks.md` ·
 `design.md` · `REVIEWS.md` (Runden 3 und 4) · `docs/decisions/0005-…md`.
 
 ## Next session: start here
 
-**D3 — die drei Endpunkte als Edge Functions.** Das ist der nächste Block, und
-er bringt auch das Plugin selbst mit.
+**D3 — die drei Endpunkte als Edge Functions**, und dort kommt auch das Plugin
+selbst dazu. Erster Handgriff: in `openspec/changes/capacitor-huelle/tasks.md`
+den Abschnitt `### D3.` lesen — er trägt oben einen Kasten mit der einen
+Anforderung, die dort nicht verhandelbar ist.
 
-**Zwei Dinge sind für D3 schon entschieden und gemessen:**
+**Vier Dinge, die vorher gelesen gehören:**
 
 1. **Der `updateUrl`-Endpunkt trägt die Ordnung allein.** Das Gerät vergleicht
    Fassungen auf **Ungleichheit**, nicht auf Grösse
@@ -92,34 +104,32 @@ er bringt auch das Plugin selbst mit.
    `order by created_at desc` und das erste Bündel nehmen, dessen
    `benoetigte_schale` das Gerät erfüllt.
 2. **Fehlt der `config.toml`-Block zu einer Function, gilt `verify_jwt = true`**
-   — das Gateway antwortet dann mit 401, bevor der Handler läuft, und kein Log
-   der Function erklärt es. Alle drei brauchen je einen Block.
-
-**Und der Lesepfad braucht wieder eine DEFINER-Funktion.** `service_role` hält
-auf `ota_buendel` kein Recht; ein `.from("ota_buendel").select(...)` in einer
-Edge Function läuft durch Typecheck und Tests und scheitert erst zur Laufzeit.
-
-**Beim Hinzufügen von capgo — die Reihenfolge:** `pnpm add` →
-`deno install --frozen=false` → **zwingend** `pnpm install`. Das macht
-`edge-functions` rot, obwohl die Functions capgo nie importieren; der Fix sind
-zwei Zeilen im selben Commit. **Vorher mit f4 abstimmen** — das ist der einzige
-Punkt, an dem wir dieselben Sperrdateien anfassen wie ihre Dependabot-PRs.
-Fassung `8.51.15`, **nicht** `9.x`/`10.x`.
+   — 401 vor dem Handler, und kein Log der Function erklärt es. Alle drei
+   brauchen je einen Block.
+3. **Auch der Lesepfad braucht eine DEFINER-Funktion.** `service_role` hält auf
+   `ota_buendel` kein Recht; ein `.from("ota_buendel").select(...)` läuft durch
+   Typecheck und Tests und scheitert erst zur Laufzeit.
+4. **capgo hinzufügen — die Reihenfolge:** `pnpm add` →
+   `deno install --frozen=false` → **zwingend** `pnpm install`. Das macht
+   `edge-functions` rot, obwohl die Functions capgo nie importieren; der Fix
+   sind zwei Zeilen im selben Commit. Fassung **`8.51.15`**, nicht `9.x`/`10.x`
+   (höhere Zahl, ältere peer-Zusage). **Vorher mit f4 abstimmen** — einzige
+   Stelle, an der wir dieselben Sperrdateien anfassen wie ihre Dependabot-PRs.
 
 **Weiter zu beachten:**
 
-1. **Postgres-Regex: `{n}` höchstens 255.** `{512}` läuft beim Anlegen durch und
-   fällt erst beim ersten INSERT mit `2201B`. Als `length(…) = n` schreiben.
-2. **Der Drift-Gate blockt den Frontend-Deploy**, solange die zwei Migrationen
-   nicht auf PROD/DEV angewendet sind. Nach dem Merge `migrate-prod`
-   dispatchen — das wendet ohne Rückfrage an. **Vor** dem ersten Deploy auf
-   `main`, sonst scheitert der OTA-Schritt am fehlenden Bucket.
-3. **Nach JEDEM `pnpm build`, vor jedem `git add`:**
-   `git checkout -- src/content/release-entries.generated.ts`.
-
-**Migration + RLS heisst Fremdreviewer.** Für D1 liefen zwei Runden, beide in
-`REVIEWS.md`. **codex braucht mehr als zehn Minuten** — im Hintergrund starten,
-ein Bash-Aufruf schneidet ihn ab.
+- **Postgres-Regex: `{n}` höchstens 255.** `{512}` läuft beim Anlegen durch und
+  fällt erst beim ersten INSERT mit `2201B`. Als `length(…) = n` schreiben.
+- **Der Drift-Gate blockt den Frontend-Deploy**, solange die zwei Migrationen
+  nicht auf PROD/DEV angewendet sind. Nach dem Merge `migrate-prod` dispatchen —
+  das wendet ohne Rückfrage an. **Vor** dem ersten Deploy auf `main`, sonst
+  scheitert der OTA-Schritt am fehlenden Bucket.
+- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
+  `git checkout -- src/content/release-entries.generated.ts`.
+- **Migration + RLS heisst Fremdreviewer** (Donald, 26.08.). Für D1 liefen zwei
+  Runden, beide in `REVIEWS.md`. **codex braucht mehr als zehn Minuten** — im
+  Hintergrund starten, ein Bash-Aufruf schneidet ihn ab. Ein Lauf ohne Befunde
+  ist keine Freigabe.
 
 ## Open questions — alle innerhalb AGE-642
 
@@ -132,13 +142,7 @@ ein Bash-Aufruf schneidet ihn ab.
   (Launch-Screen-Zwischenspeicher), **und das kostet Donald die Anmeldung** —
   vorher ansagen.
 - **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
-  Donalds Hand. Vom OTA-Schlüsselpaar unabhängig.
-- **`publicKey` in `capacitor.config.ts`** gehört zu D3, wo das Plugin dazukommt.
-- **capgo-Version `8.51.15`, nicht `9.x`/`10.x`.** Reihenfolge beim Hinzufügen:
-  `pnpm add` → `deno install --frozen=false` → **zwingend** `pnpm install`. Das
-  macht `edge-functions` rot, obwohl die Functions capgo nie importieren.
-  **Vorher mit f4 abstimmen** — einzige Stelle, an der wir dieselben Sperrdateien
-  anfassen wie ihre Dependabot-PRs.
+  Donalds Hand. Vom OTA-Schlüsselpaar unabhängig, das ist **erledigt**.
 - **C3 ändert an zwei Stellen die Optik** (`WillkommenPage`, Bearbeiten-Formular
   im Feed) — gemergt, aber nie im Browser angesehen.
 - **AGE-642 springt beim Merge selbst auf Done**, und die Automation geht auch
