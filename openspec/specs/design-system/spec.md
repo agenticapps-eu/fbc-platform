@@ -862,18 +862,40 @@ Verhältnis von dem der gespeicherten Bilder abweicht, erzwingt eine Wahl
 zwischen Beschnitt und leerer Fläche; die Abweichung selbst ist die Ursache,
 nicht die gewählte `object-fit`-Regel.
 
-Diese Anforderung gilt für genau drei Bauteile und SHALL NOT als allgemeine
+Diese Anforderung gilt für genau vier Bauteile und SHALL NOT als allgemeine
 Regel für jedes Bild der Anwendung gelesen werden:
 
 - den Profilkopf (`ProfileHero`),
 - das Bildfeld der Event-Kachel,
-- das Bildfeld des Event-Kopfes.
+- das Bildfeld des Event-Kopfes,
+- die Karte des Mitgliederverzeichnisses (`MemberDirectory`).
 
-Ausdrücklich **nicht** erfasst sind die Zuschnitt-Vorschauen in `ProfilPage`
-und `EventCoverPicker`, die Bilder im Feed und die Karte des
-Mitgliederverzeichnisses. Sie sind entweder Werkzeug-Oberfläche oder tragen
-anderes Bildmaterial; eine Regel, die sie stillschweigend mitbindet, wäre beim
-Archivieren sofort verletzt.
+Die **Verzeichnis-Karte** stand bis zu dieser Fassung in der Ausschlussliste,
+mit der Begründung, sie trage anderes Bildmaterial. Das trifft nicht zu: sie
+zieht ihr Bild über `bildUrl("covers", …)` aus **demselben** Bucket wie der
+Profilkopf und führt seit AGE-595 bereits `aspect-[3/1]` mit `object-contain`.
+Der Ausschluss war beim Schreiben richtig und am selben Abend nicht mehr —
+die Fassung, die ihn aussprach, landete am 25.08. um 20:18, die Karte wurde um
+22:38 konform. Aufgenommen wird sie deshalb als beschreibende Nachführung einer
+Fläche, die die Regel längst hält, nicht als neue Vorgabe.
+
+Eine **Vorschau** auf den Zuschnitt SHALL dieselbe Regel tragen wie die Fläche,
+die sie vorwegnimmt. Heute sind das die Zuschnitt-Vorschauen in `ProfilPage`
+und `EventCoverPicker`; die Klausel ist bewusst über diese Eigenschaft
+formuliert und nicht über die zwei Namen, damit eine künftige Vorschau nicht
+erneut einzeln nachgetragen werden muss. Der Grund steht mit darin: eine
+Vorschau mit abweichendem Verhältnis zeigt etwas anderes als das Ergebnis
+daneben — im Browser gemessen war die Profil-Vorschau 646 × 112 px (5,77:1)
+mit `object-cover` und schnitt 77,2 % der Bildhöhe weg, unmittelbar nach einem
+Zuschnitt auf 3:1 (AGE-600).
+
+Ausdrücklich **nicht** erfasst sind allein die **Bilder im Feed**. Sie führen
+zwar `aspect-[3/1]`, aber `object-cover`, und beschneiden damit als einzige
+Fläche noch. Die frühere Begründung — sie trügen anderes Bildmaterial — SHALL
+NOT weitergeführt werden: der Feed signiert über `signEventCovers` und zeigt
+damit dasselbe `event-covers`-Material wie Kachel und Kopf. Der Ausschluss
+ruht also allein auf einer offenen Entscheidung, die als AGE-664 vorliegt, und
+diese Anforderung hält ihn offen, statt ihn mit einem falschen Grund zu decken.
 
 Der Profilkopf SHALL dabei **keinen Höhendeckel** mehr führen. Das nimmt die
 Deckelung aus AGE-566 zurück. Ihre Begründung — eine mitwachsende Bahn schiebt
@@ -889,8 +911,11 @@ Das Bild SHALL innerhalb seines Feldes **vollständig** sichtbar sein. Wo das
 gespeicherte Bild nicht genau 3:1 ist, SHALL es eingepasst und nicht
 beschnitten werden.
 
-Die Bestände hinter den drei Feldern sind **zwei verschiedene Buckets**, und sie
-sind getrennt gemessen — eine Zahl aus dem einen belegt für das andere nichts:
+Die Bestände hinter diesen Feldern sind **zwei verschiedene Buckets**, und sie
+sind getrennt gemessen — eine Zahl aus dem einen belegt für das andere nichts.
+Die folgenden Zahlen sind der **Stand vom 25.08.2026** und SHALL als datierter
+Beleg gelesen werden, nicht als fortlaufende Zusage: ein Bestand wächst mit
+jedem Upload, und diese Fassung hat ihn nicht neu gezählt.
 
 - `covers` (Profilbanner), alle 55 Objekte: Median 2,70:1, Minimum 1,33:1,
   Maximum 3,00:1, keines breiter als 3:1. Für die 49 Bilder zwischen 2,2:1 und
@@ -899,12 +924,21 @@ sind getrennt gemessen — eine Zahl aus dem einen belegt für das andere nichts
   3,00:1 — es kam durch `EventCoverPicker`. Alles, was über das Produkt
   hochgeladen wird, ist 3:1 und sitzt randlos.
 
-Der **Demo-Seed** ist die benannte Ausnahme und SHALL NOT als Gegenbeispiel
-gegen diese Anforderung gelten: seine acht Event-Bilder (1,50:1, eines 1,33:1)
-sind Seiten-Heldenbilder, die am Zuschneider vorbei hochgeladen werden. Sie
-stehen unter dieser Regel mit rund 25 % freier Fläche je Seite in der Kachel.
-Das ist ein Mangel des Seeds, der Material erzeugt, das das Produkt so nie
-herstellt — nachzuziehen ist der Seed, nicht das Feld.
+Der **Demo-Seed** war bis zum 28.08. die benannte Ausnahme: seine acht
+Event-Bilder (1,50:1, eines 1,33:1) sind Seiten-Heldenbilder, die am
+Zuschneider vorbei hochgeladen wurden und unter dieser Regel mit rund 25 %
+freier Fläche je Seite in der Kachel standen — bei dem einen 1,33:1-Motiv sind
+es 27,8 %. Nachzuziehen war der Seed, nicht das Feld, und das ist geschehen:
+beide Upload-Stellen (`import_world_seed.ts`, `demo_event_covers.ts`)
+schneiden über `titelbildZuschnitt` auf 1500 × 500 zu (AGE-599).
+
+Der **Bestand** ist davon noch nicht eingeholt, und das SHALL NOT als
+Gegenbeispiel gegen diese Anforderung gelten. Bereits liegende Objekte werden
+von einem weiteren Seed-Lauf NICHT ersetzt: beide Stellen schicken
+`x-upsert: false`, weil ein Upsert in einem privaten Bucket an der
+SELECT-Policy scheitert. Solange die alten Objekte nicht gelöscht und neu
+erzeugt sind, traegt der Bestand weiter Material, das der Seed heute so nicht
+mehr herstellt.
 
 Geschützt ist das **gespeicherte** Bild, nicht das Original vor dem Zuschnitt.
 Beide Upload-Wege schneiden zu, bevor gespeichert wird; eine Zusage über das

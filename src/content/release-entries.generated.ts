@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-08-31-titelbild-anforderung-nachziehen",
+    datum: "2026-08-31",
+    titel: "Die Titelbild-Anforderung sagt wieder, was gebaut ist",
+    linear: "AGE-665",
+    aenderungen: [
+      "**Die Verzeichnis-Karte kommt in die Aufzählung** — aus drei Bauteilen werden vier. Sie hält die Regel längst; die Anforderung führt das nach, sie verlangt nichts Neues.",
+      '**Die Vorschauen bekommen eine eigene Klausel**, nicht einen fünften Aufzählungspunkt: „Eine Vorschau SHALL dieselbe Regel tragen wie die Fläche, die sie vorwegnimmt." Über die Eigenschaft formuliert, nicht über die zwei Namen — sonst ist die nächste Vorschau wieder ein eigener Vorgang.',
+      '**Der Feed bleibt ausgeschlossen, aber mit dem richtigen Grund.** Er ist die einzige Fläche, die noch beschneidet (`aspect-[3/1]` **mit** `object-cover`). Der Ausschluss ruht damit auf einer offenen Entscheidung — AGE-664 — und nicht mehr auf „anderes Bildmaterial".',
+      "**Der Seed-Absatz geht in die Vergangenheitsform** und behält seine gemessene Zahl. Ergänzt um den Zustand, der wirklich noch offen ist: der **Bestand**.",
+      "**Die Bucket-Zahlen werden als datierter Beleg gekennzeichnet** (Stand 25.08.), nicht als fortlaufende Zusage.",
+    ],
+  },
+  {
     slug: "2026-08-28-sidebar-pill",
     datum: "2026-08-28",
     titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",
