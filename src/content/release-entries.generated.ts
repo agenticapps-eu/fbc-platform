@@ -32,6 +32,30 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-31-composer-abbruch",
+    datum: "2026-08-31",
+    titel: "Ein begonnener Beitrag lässt sich wieder verwerfen",
+    linear: "AGE-670",
+    aenderungen: [
+      '**Der Composer bekommt einen Weg zurück.** Neben „Posten" steht künftig „Abbrechen": der Entwurf wird verworfen und der Composer klappt zu.',
+      '**Verworfen wird alles auf einmal** — Text, Video-Link samt aufgeklapptem Feld, Sichtbarkeit zurück auf „Mitglieder", der Veröffentlichungszeitpunkt zurück auf „sofort", die gewählten Bilder, eine stehende Bildfehlermeldung und die gewählten Themen.',
+      "**Ein erneutes Aufklappen beginnt leer**, nicht beim alten Entwurf.",
+    ],
+  },
+  {
+    slug: "2026-08-30-geplante-beitraege",
+    datum: "2026-08-30",
+    titel: "Einen Beitrag jetzt schreiben und später live schalten",
+    linear: "AGE-667",
+    aenderungen: [
+      'Im Composer steht neben „Veröffentlichen" ein Weg, den Beitrag **für einen Zeitpunkt zu planen** — Datum **und** Uhrzeit.',
+      'Bis dahin sieht ihn **nur der Verfasser**, mit der Markierung „geplant für …". Niemand sonst — keine Admin-Einsicht, keine Freigabe durch andere.',
+      'Der Verfasser kann bis zum Zeitpunkt **ändern, den Zeitpunkt verschieben oder ganz zurücknehmen** (auf „sofort" stellen oder löschen).',
+      "Ist der Zeitpunkt erreicht, erscheint der Beitrag im Feed, als wäre er in diesem Moment geschrieben worden — **oben**, nicht an der Stelle seines Schreibdatums.",
+      "Für alles Bestehende ändert sich **nichts**: ein Beitrag ohne Planung verhält sich wie heute.",
+    ],
+  },
+  {
     slug: "2026-08-28-sidebar-pill",
     datum: "2026-08-28",
     titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",

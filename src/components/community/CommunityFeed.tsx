@@ -743,6 +743,36 @@ function PostComposer({ authorId }: { authorId: string }) {
     }
   }
 
+  /**
+   * Den Entwurf verwerfen und den Composer zuklappen (AGE-670).
+   *
+   * Zwei Aufrufer, und das ist der ganze Grund für diese Funktion: das
+   * `onSuccess` der Mutation und „Abbrechen". Bis AGE-670 stand dieser Block
+   * im `onSuccess` und war damit NUR über einen erfolgreichen Schreibvorgang
+   * erreichbar — der Composer hatte genau einen Ausgang, und der führte durch
+   * das Veröffentlichen.
+   *
+   * `URL.revokeObjectURL` steht in dieser Datei an ZWEI Stellen. Hierher gehört
+   * nur diese; die zweite hängt am „×" der einzelnen Bildkachel und darf nicht
+   * mitwandern, sonst gäbe das Entfernen eines Bildes den ganzen Entwurf frei.
+   *
+   * `verarbeitet` wird NICHT zurückgesetzt: der Zähler gehört den laufenden
+   * Bildverarbeitungen, und sein `finally` zählt gleich wieder herunter. Auf
+   * null gesetzt liefe er ins Negative.
+   */
+  function zuruecksetzen() {
+    setBody("");
+    setVideoUrl("");
+    setVideoOffen(false);
+    setVisibility("members");
+    setGeplantAm("");
+    for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
+    setBilder([]);
+    setBildFehler(null);
+    setGewaehlteTags([]);
+    setOffen(false);
+  }
+
   const create = useMutation({
     mutationFn: async () => {
       // Video-URL (falls valide) wird an den Body gehängt — kein neues Schema; die
@@ -767,16 +797,7 @@ function PostComposer({ authorId }: { authorId: string }) {
       });
     },
     onSuccess: () => {
-      setBody("");
-      setVideoUrl("");
-      setVideoOffen(false);
-      setVisibility("members");
-      setGeplantAm("");
-      for (const bild of bilder) URL.revokeObjectURL(bild.vorschau);
-      setBilder([]);
-      setBildFehler(null);
-      setGewaehlteTags([]);
-      setOffen(false);
+      zuruecksetzen();
       // Zwei Meldungen, weil zwei Dinge geschehen sind. „Veröffentlicht" für
       // etwas, das erst am Freitag erscheint, wäre schlicht falsch — und es ist
       // die eine Stelle, an der das Mitglied merkt, ob seine Planung angekommen
@@ -977,8 +998,17 @@ function PostComposer({ authorId }: { authorId: string }) {
         </label>
         {/* `ml-auto` und nicht nur `justify-between`: bricht die Zeile auf dem
             Telefon um, landet ein einzelnes Element sonst am ZEILENANFANG —
-            die Gruppe stünde dort links. Gemessen auf 375 px. */}
-        <div className="ml-auto flex items-center gap-2">
+            die Gruppe stünde dort links. Gemessen auf 375 px.
+
+            `flex-wrap` und `justify-end` sind mit AGE-670 dazugekommen, und
+            zwar gemessen, nicht vorsorglich: die Gruppe selbst konnte bis dahin
+            NICHT umbrechen. Mit dem dritten Knopf brauchte sie 353 px, hatte
+            aber 293 px Innenmaß der Karte — sie weitete die Karte von 341 auf
+            401 px und erzeugte 44 px waagerechten Überlauf im ganzen Dokument
+            (Chrome, 375 × 812). Mit `flex-wrap` sind es wieder 0.
+            `justify-end` hält dabei die Begründung eine Zeile weiter oben
+            aufrecht: die umgebrochene Zeile bleibt rechts. */}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {/* Die Medientyp-Zeile (6.3): sie benennt, was dieser Composer
               annimmt — Bild und Video, sonst nichts. KEIN „Event"-Knopf (Events
               entstehen in `/events` und erscheinen hier als eigene Karte) und
@@ -1037,6 +1067,19 @@ function PostComposer({ authorId }: { authorId: string }) {
               Video
             </button>
           </span>
+          {/* Der Rückweg (AGE-670). Er steht neben „Posten", weil er dieselbe
+              Frage beantwortet — „und jetzt?" —, und trägt bewusst KEINE
+              Rückfrage: ein Klick, unmittelbar neben dem Hauptweg, ohne
+              zerstörerisches Gewicht. `ghost`, damit „Posten" der einzige
+              betonte Knopf der Zeile bleibt.
+
+              Gesperrt, solange geschrieben wird: ein Verwerfen mitten in der
+              laufenden Mutation leerte den Entwurf, den ihr `onSuccess` gleich
+              selbst leert — und bei einem Fehlschlag stünde das Mitglied ohne
+              seinen Text da. */}
+          <Button variant="ghost" size="sm" disabled={create.isPending} onClick={zuruecksetzen}>
+            Abbrechen
+          </Button>
           <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
             {create.isPending ? "Wird veröffentlicht…" : "Posten"}
           </Button>

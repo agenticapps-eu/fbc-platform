@@ -140,7 +140,7 @@ erreichte ein geplanter Beitrag im Moment des *Planens* alle Telefone.
       Schema **und** RLS anfasst — genau der Fall, für den die Fremdreviewer am
       26.08. behalten wurden.
 - [x] **F2** `openspec validate --all` grün.
-- [ ] **F3** Nach dem Merge: `migrate-prod` ist ein **eigener** Schritt und
+- [x] **F3** Nach dem Merge: `migrate-prod` ist ein **eigener** Schritt und
       braucht Donalds Freigabe. Ohne ihn blockt `drift-gate` den Deploy.
 
 ## Was beim Bauen dazukam — gemessen, nicht geplant
@@ -237,3 +237,38 @@ vakuum-grün, auf einem benutzten Stack flackernd. Aufgefallen an zwei Zeilen
 aus der eigenen Sichtprobe. Ersetzt durch das, was wirklich messbar ist — die
 Vorgabe der Spalte plus der Beleg, dass sie greift. Der Rückfüllschritt selbst
 ist lokal nicht messbar (Migrationen laufen vor dem Seed) und gehört nach F3.
+
+## F3 — ausgerollt am 30.08., gemessen statt geglaubt
+
+| Schritt | Beleg |
+| --- | --- |
+| PR #289 gemergt | Squash `746f5f7`, `state=MERGED` nachgeprüft |
+| `drift-gate` auf main | **rot**, wie erwartet — `deploy`/`functions` übersprungen |
+| Trockenlauf VOR dem Anwenden | genau **eine** fehlende Version: `20260829090000`, keine fremde fährt mit |
+| `migrate-prod` | Lauf `33323498302`, `plan` + `apply` grün |
+| `gh run rerun --failed` | `drift-gate` grün, `deploy` und `functions` grün |
+
+**Die Rückfüllung ist auf beiden Seiten nachgelesen** — der Schritt, der lokal
+grundsätzlich nicht messbar ist (Migrationen laufen vor dem Seed):
+
+| | Bestand | `veroeffentlicht_ab <> created_at` | fällig & unangekündigt |
+| --- | --- | --- | --- |
+| PROD | 7 | **0** | **0** |
+| DEV | 29 | **0** | **0** |
+
+Dazu auf beiden: beide Policies und alle fünf Funktionen tragen den Zeitpunkt,
+`create_post_with_media` hat **genau eine** Signatur, `beitrag_ankuendigen()`
+existiert. Sonde: `scripts/mess-age667-prod.ts` (nur lesend,
+`default_transaction_read_only`, Ziel gegen die Ref geprüft) — sie war nur für
+diese Abnahme da und ist mit dem Archivieren wieder entfernt worden.
+
+**Die Zeitplanung steht auf DEV und PROD** (`beitrag-ankuendigen`, `* * * * *`,
+`active=t`) — gesetzt **nach** der Messung, nie davor. Der erste Lauf auf PROD
+ist gefeuert und hat **geschwiegen**: `status=succeeded`, `post_created` blieb
+bei 16, `faellig_offen=0`. Genau das war die Zusage.
+
+**Live nachgeprüft am Inhalt, nicht an der Grösse:** Deploy-URL und Apex liefern
+denselben Bundle-Hash (`index-DKgt4Zdc.js`), und der Chunk
+`AktivitaetPage-DcCP3mSz.js` trägt alle vier Zeichenketten aus dem Diff
+(`Sichtbar ab (leer = sofort)`, `Geplant für`, `Beitrag geplant`,
+`datetime-local`).
