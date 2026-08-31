@@ -1031,6 +1031,13 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
 
 ### D5. Beleg
 
+**Runbook: `geraetesitzung-d5.md`** (31.08.). Die drei Proben tragen sprechende
+Fassungen — `0.0.0+600df00d` heil, `0.0.0+defec7ed` defekt, `0.0.0+c1ea4ed0`
+das Aufräumen —, die Griffe sind am gebauten `dist/` gemessen und fassen
+**keine Quelldatei** an. Die Falle, die dort ganz oben steht: eine Probe unter
+einer BEREITS eingetragenen Fassung ist ein Upsert und überschreibt das gute
+Bündel.
+
 - [ ] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
       einmal vollständig durchgespielt.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
