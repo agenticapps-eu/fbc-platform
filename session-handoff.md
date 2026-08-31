@@ -19,13 +19,15 @@
 > SHALL NOT in `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`. **5 Commits über `origin/main`, 1 dahinter.**
-Alle fünf sind reine Doku, **kein Code liegt an.**
+`donald/age-642-capacitor-huelle`. **7 Commits über `origin/main`**, alle reine
+Doku — **kein Code liegt an.**
 
-Der eine Rückstand ist f4s `eab8368` (#290, AGE-667). **Gemessen: kein
-Berührungspunkt** — es fasst `openspec/changes/archive/…`,
-`openspec/specs/community-feed/spec.md` und `release-entries.generated.ts` an,
-wir keines davon. Der Rebase ist sauber.
+**Den Rückstand selbst messen, nicht hier ablesen:** `main` bewegte sich am
+31.08. mehrfach (f4 merget #297 und danach die zwei Dependabot-PRs #287/#296).
+Also `git fetch origin main && git rev-list --left-right --count origin/main...HEAD`.
+Der Rebase ist trotzdem sauber: unsere sieben Commits fassen nur
+`openspec/changes/capacitor-huelle/`, `docs/decisions/` und diese Datei an, f4
+nichts davon — gemessen, und von beiden Seiten bestätigt.
 
 Change `capacitor-huelle`: **40 offen, 76 erledigt** (Einstieg heute: 43/69).
 
@@ -57,24 +59,20 @@ Zwei Lücken hingen daran: das Manifest braucht **`sessionKey`**
 - **Anlass: jeder Deploy auf `main`**, im bestehenden `deploy.yml`-Job.
 - **Fassung: `<Semver>+<kurzer SHA>`**, z. B. `1.4.0+8fbc49b`. Beantwortet auch,
   was gilt, wenn Store-Bau und `main`-Deploy sich überholen.
-- **Vertragsnummer fährt in `version_build`** — am Plugin gemessen, nicht
-  geraten. Einziges Feld, das auf beiden Plattformen aus
-  `plugins.CapacitorUpdater.version` kommt. Beleg: `capacitor.config.json` liegt
-  **neben** `public/`, nicht darin.
-- **Das Spec-Delta blieb unberührt** (es nennt keinen Anbieter) — deshalb wurde
-  **2b nicht neu fällig**.
+- **Vertragsnummer fährt in `version_build`** — am Plugin gemessen. Einziges
+  Feld, das auf beiden Plattformen aus `plugins.CapacitorUpdater.version` kommt;
+  Beleg: `capacitor.config.json` liegt **neben** `public/`, nicht darin.
+- **Das Spec-Delta blieb unberührt** (es nennt keinen Anbieter) — **2b wurde
+  nicht neu fällig**.
 
 ## Der Schlüssel steht — und ist belegt
 
 `CAPGO_PRIVATE_KEY` liegt in Infisical `prod`, 4096 Bit, **PKCS#1**. Dreifach
-geprüft: Kopfzeilen tragen `BEGIN RSA PRIVATE/PUBLIC KEY` · der SHA-256 des
-hinterlegten Werts ist gleich dem der Datei ohne Schluss-Zeilenumbruch · ein
-Rundlauf *privat verschlüsselt → öffentlich entschlüsselt* gibt 32 zufällige
-Bytes byte-gleich zurück, während ein fremder Schlüssel auf demselben Befehlsweg
-abgewiesen wird. Dateien in `~/Documents`, `0600`, nicht iCloud-synchronisiert,
-nichts davon im Repo.
-
-**Ein Infisical-Login steht NICHT aus** — die Anmeldung trägt.
+geprüft: Kopfzeilen · SHA-256 des hinterlegten Werts gleich dem der Datei ohne
+Schluss-Zeilenumbruch · Rundlauf *privat verschlüsselt → öffentlich
+entschlüsselt* byte-gleich, während ein fremder Schlüssel auf demselben
+Befehlsweg abgewiesen wird. Dateien in `~/Documents`, `0600`, nicht
+iCloud-synchronisiert, nichts im Repo. **Ein Infisical-Login steht NICHT aus.**
 
 ## Files modified
 
@@ -118,11 +116,10 @@ benannten Fehlschlag sieht aus wie ein Flake und ist eine fehlende Abhängigkeit
 git checkout -- src/content/release-entries.generated.ts
 ```
 
-Jeder Build schreibt diese Datei unformatiert neu; sie steht danach als `M` im
-Status, ohne dass jemand sie bearbeitet hat. Wer dann committet, nimmt ein paar
-hundert fremde Zeilen mit. Sie war der einzige Konflikt beim Rebase von #290
-(f4, 31.08.). **Ausnahme:** wirklich archiviert — dann gehört sie in den Commit.
-Bis jetzt ist sie in diesem Branch unberührt, und das soll so bleiben.
+Jeder Build schreibt sie unformatiert neu; sie steht danach als `M` im Status,
+ohne dass jemand sie bearbeitet hat, und wer committet, nimmt ein paar hundert
+fremde Zeilen mit. Sie war der einzige Konflikt beim Rebase von #290.
+**Ausnahme:** wirklich archiviert. Bislang in diesem Branch unberührt.
 
 ## Open questions — alle innerhalb AGE-642
 
@@ -135,8 +132,13 @@ Bis jetzt ist sie in diesem Branch unberührt, und das soll so bleiben.
 - **`publicKey` in `capacitor.config.ts`** gehört zu D3, wo das Plugin dazukommt
   — vorher wäre es tote Konfiguration. Datei liegt bereit.
 - **capgo-Version:** `8.51.15`. **Nicht `9.x`/`10.x`** — höhere Zahl, aber peer
-  `@capacitor/core: ^5.0.0`. Nach dem Hinzufügen `deno install --frozen=false`,
-  danach **zwingend** `pnpm install`.
+  `@capacitor/core: ^5.0.0`. Reihenfolge beim Hinzufügen: `pnpm add` →
+  `deno install --frozen=false` → **zwingend** `pnpm install`. Das macht
+  `edge-functions` rot, **obwohl die Edge Functions capgo nie importieren** —
+  `deno.lock` hält den Versions**bereich** aus `package.json` fest (f4 hat es am
+  31.08. an #287 zeilengenau belegt). Der Fix sind zwei Zeilen im selben Commit.
+  **Vorher mit f4 abstimmen:** das ist der einzige Punkt, an dem wir dieselben
+  Sperrdateien anfassen wie ihre Dependabot-PRs.
 - **C3 ändert an zwei Stellen die Optik** (`WillkommenPage`, Bearbeiten-Formular
   im Feed) — gemergt, aber nie im Browser angesehen.
 - **AGE-642 springt beim Merge selbst auf Done.** Vorbeugen geht nicht, nur
@@ -145,5 +147,5 @@ Bis jetzt ist sie in diesem Branch unberührt, und das soll so bleiben.
   Handgriff. Und die Automation geht auch **zurück**: beim Öffnen eines zweiten
   PR fiel der Vorgang von Done wieder auf In Progress. Ein Status sagt hier also
   weder „fertig" noch „unfertig" verlässlich.
-- **Nebenbefund, nicht angefasst:** `ADR-0037` wird an drei Stellen zitiert,
-  existiert aber nicht — `docs/decisions/` führt nur 0001–0005.
+- **Nebenbefund, nicht angefasst:** `ADR-0037` wird dreimal zitiert, existiert
+  aber nicht (`docs/decisions/` führt 0001–0005).
