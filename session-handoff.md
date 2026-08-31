@@ -1,4 +1,4 @@
-# Session Handoff — 2026-08-31 (AGE-642: der Luftweg ist auf PROD live, D5 ist dran)
+# Session Handoff — 2026-08-31 (AGE-642: D5 ist vorbereitet, das Gerät fehlt)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -13,124 +13,110 @@
 > (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
 > `openspec/specs/design-system/spec.md`.
 
-**PR #299 ist gemerged** (Squash, `e8a2abc` auf `main`, 31.08. 13:33). Worktree
-`fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle` — auf den Squash nachgezogen, Arbeitsbaum
-sauber, alles gepusht. Change `capacitor-huelle`: **31 offen, 87 erledigt.**
-Linear steht auf *In Progress* (die Automation hatte beim Merge auf *Done*
-gekippt, zurückgesetzt um 13:33 — sie tut das bei JEDEM Merge, der das Kürzel
-im Branchnamen trägt).
+Branch `donald/age-642-capacitor-huelle`, sauber, gepusht, **7 Commits vor
+`origin/main`** (vier Handoffs, zwei aus dieser Sitzung, einer der Feature-Merge
+davor). Change `capacitor-huelle`: **29 offen, 89 erledigt** (war 31/87).
+`openspec validate --all` 30/30. Linear steht auf *In Progress*.
+
+**Kein Code angefasst.** Diese Sitzung hat gemessen und vorbereitet.
 
 ## Accomplished
 
-### 1 · Review-Runde 6 — und der schwerste Befund der ganzen Phase D
+### 1 · Der Krypto-Weg, am LEBENDEN Bündel nachgestellt
 
-Zwei fremde Arme direkt per Bash, beide haben geliefert und beide haben selbst
-gemessen: **opencode** 7 Befunde, **codex** 12. Jeder Beleg an der Plugin-Quelle
-nachgeschlagen. **Elf übernommen, einer abgelehnt.** Steht als Runde 6 in
-`REVIEWS.md`, mit gültigem Trailer (das Gate verifiziert ihn jetzt).
+`pruefeSchluesselpaar` läuft im Deploy und vergleicht zwei Schlüssel
+miteinander — **es fasst das ausgelieferte Bündel nie an.** Nichts belegte, dass
+die Kette am fertigen Artefakt aufgeht. Jetzt schon, gegen PROD
+(`viwntbodrtqxgmqyxluh`), Manifest `0.0.0+e8a2abcdcb21`, mit dem Schlüssel **aus
+`capacitor.config.ts` gelesen** statt abgeschrieben:
 
-**codex, HOCH: der Rückweg deckte sein eigenes Motivszenario nicht ab.**
-`notifyAppReady()` stand blank im Modulrumpf und ging bei der Modulauswertung
-ab — vor dem ersten Rendern, vor `AuthProvider`, vor `src/lib/supabase.ts:10`,
-das bei fehlender Konfiguration wirft. Ein Bündel, das lädt und dann **weiss
-bleibt**, war damit bereits als erfolgreich gestempelt und fiel nie zurück.
+1. `sessionKey` RSA-geöffnet (PKCS#1) → AES-128-CBC-Schlüssel und IV.
+2. Chiffrat 2.997.808 B entschlüsselt → 2.997.792 B, beginnend mit `PK`.
+3. SHA-256 des Klartext-Zips == RSA-geöffnete `checksum`, **byte-gleich**
+   (`ec0737e811bd8ed2…`).
 
-Jetzt wartet die Bestätigung auf den ersten Element-Knoten unter `#root` —
-Reacts erster Commit. Bleibt er aus, bleibt sie aus. Die Frist trägt das: 10 s
-auf iOS, **mindestens 30 s auf Android**
-(`PENDING_BUNDLE_APP_READY_MIN_TIMEOUT_MS`, `.java:134`), und `AuthProvider`
-hält das erste Bild nicht auf (`AuthProvider.tsx:358`).
+**Mit Positivkontrolle:** ein gekipptes Byte → `8d75277684dff5db…`, die Probe
+rötet. Genau der Fehlschlag, der auf dem Gerät still bliebe. Steht als eigener
+Punkt unter D3 in `tasks.md`.
 
-Zwei weitere HOCH-Befunde waren **fehlende Zusagen**: `if (!nativ)` wäre grün
-gewesen und hätte auf JEDEM Gerät nie bestätigt (jsdom ist immer Web), und keine
-Zusage belegte, dass `main.tsx` das Modul überhaupt einbindet — die Zeile zu
-entfernen liess alles grün.
+### 2 · Zwei stehengebliebene Kästchen, beide Messungen
 
-Aus 3 Zusagen sind 7 geworden, **jede einzeln durch eine Mutation
-gegengeprüft**: alte Bauart · `if (!nativ)` · top-level `await` · Beobachter
-entfernt · Import aus `main.tsx` entfernt · `autoDeleteFailed: true` · Zeile
-gelöscht. Jede Mutation rötet genau die zugehörige Zusage, keine andere.
+- **B5 Grössenzuwachs** — mit `actool` (Xcode 26.6) am **kompilierten**
+  `Assets.car` gemessen: **+329.936 B**, iOS allein. Die Quelldateien hätten
+  +277.162 B gesagt, **~53 KB zu niedrig**: die Capacitor-Vorgabe brachte drei
+  byte-identische PNG mit (Blob `33ea6c9`), die `actool` einmal ablegt.
+- **D3 `publicKey`** — stand als offen, war es seit D3 nicht mehr
+  (`capacitor.config.ts:105`, testbewacht).
 
-`17fd491`, danach alles grün: **2327 vitest (210 Dateien) · typecheck exit 0 ·
-`pnpm lint` exit 0 · `openspec validate --all` 30/30 · CI 5/5.**
+### 3 · Das Runbook für die Gerätesitzung
 
-### 2 · Der Luftweg steht auf PROD — am lebenden Endpunkt belegt
+`openspec/changes/capacitor-huelle/geraetesitzung-d5.md`. Donald hat es dieser
+Sitzung ausdrücklich vorgezogen, statt D5 sofort zu fahren.
 
-`migrate-prod` gelaufen (Lauf `33421851095`, `plan` und `apply` grün, auf
-`e8a2abc`), danach den Deploy neu gefahren (`33397608024`): **drift-gate,
-migrate-dev, functions, deploy — alle vier grün.**
+**Der teuerste Fehler liegt VOR der Sitzung:**
+`ota_buendel_veroeffentlichen` ist ein **Upsert auf `version`**. Das defekte
+Bündel unter der Fassung des guten veröffentlicht, überschreibt dessen `url`,
+`checksum` und `session_key`, während `created_at` stehen bleibt — danach gibt
+es im Manifest nichts mehr, worauf zurückgerollt werden könnte. Und derselbe
+Mechanismus macht einen Aufräum-Lauf unter bekannter Fassung wirkungslos.
 
-Sichtprobe gegen `viwntbodrtqxgmqyxluh` (PROD), 31.08.:
+Deshalb drei eigene Fassungen über `GITHUB_SHA`, **ohne einen einzigen Commit**:
+`0.0.0+600df00d` (heil, sichtbare Marke) · `0.0.0+defec7ed` (defekt) ·
+`0.0.0+c1ea4ed0` (Aufräumen). Sprechendes Hex, im Manifest ohne Nachschlagen
+erkennbar.
 
-| Endpunkt | Antwort |
-|---|---|
-| `ota-update` | **HTTP 200**, bietet `0.0.0+e8a2abcdcb21` an — der Merge-Commit — mit `url` und `checksum` |
-| `ota-channel` | HTTP 400 `channel_not_supported`, wie vorgesehen |
-| `ota-stats` | HTTP 200 `{"status":"ok"}` |
-| das Bündel selbst | HTTP 200, **2 997 808 B**, öffentlich abrufbar |
-
-**Damit ist „der Weg über das Netz bleibt ungeprüft" erledigt** — Upload,
-RPC-Aufruf, Manifest, Endpunkt-Entscheidung und Auslieferung greifen
-ineinander. Ungeprüft ist nur noch das Gerät.
+**Beide Griffe fassen keine Quelldatei an**, sondern das gebaute `dist/` — es
+gibt nichts, das jemand zurückzunehmen vergessen kann.
 
 ## Decisions
 
-- **Runde 6 war fällig, weil das Spec-Delta nach Runde 5 gewachsen war.** Sie
-  hat den schwersten Befund der Phase gebracht. Die Regel „Delta gewachsen ⇒
-  neue Runde" hat sich an genau diesem Tag bezahlt gemacht.
-- **Donald am 31.08.: sofort reparieren, nicht als Folgeaufgabe.** Die
-  Alternative wäre gewesen, die SHALL-Zusage ehrlich zu verengen und den weissen
-  Bildschirm ungeschützt zu lassen.
-- **Nicht übernommen (1 von 12):** codex' NIEDRIG-Befund, `instrument.ts` könne
-  vor `ota` schon senden. Sachlich richtig, aber Sentry MUSS der erste Import
-  bleiben — sonst fehlen genau die Fehler des Starts.
-- **`autoDeleteFailed: false` trägt keine ABSOLUTE Zusage:** `resetWhenUpdate`
-  räumt bei einer neuen Schale aus dem Store alles ab, ERROR eingeschlossen.
-  Das Delta sagt das jetzt selbst — und begründet, warum das richtig ist: die
-  neue Schale ist der Weg, auf dem ein Fehler behoben wird.
-- **Der `migrate-prod`-Dispatch ging über Donalds Hand.** Der
-  Auto-Mode-Klassifikator blockt `gh workflow run` als Schreibweg auf PROD (und
-  auch `gh run view --log` auf diesen Lauf). Wer das der Sitzung überlassen
-  will, braucht eine Bash-Regel in den Einstellungen.
+- **Der Griff für das defekte Bündel ist `#root` entfernen**, nicht ein `throw`
+  in `src/`. `ota.ts` beschreibt den Fall unten selbst: ohne `#root` richtet das
+  Modul planmässig nichts ein, `main.tsx` wirft, der Bildschirm bleibt leer.
+  Preis, ehrlich benannt: **der Beobachter aus Runde 6 wird dabei umgangen.**
+  Belegt wird die Plugin-Hälfte (Frist, `checkRevert`, ERROR bleibt liegen); die
+  andere trägt `ota.test.ts` mit sieben gegengeprüften Zusagen.
+- **Gemessen statt vermutet:** `<div id="root"></div>` und `</body>` stehen im
+  gebauten HTML wörtlich und je genau einmal; `createRoot(null)` wirft in jsdom
+  gegen das echte react-dom, mit `#root` nicht (Positivkontrolle).
+- **Kein Skript ins Repo.** Die Griffe sind je vier Zeilen im Runbook. Ein
+  Werkzeug für einen Lauf, der einmal stattfindet, wäre mehr Rahmen als Inhalt.
 
 ## Files modified
 
-`src/lib/ota.ts` (wartet auf `#root`, `instanceof`-Fehlerzweig, vier
-Quellenangaben korrigiert) · `src/lib/ota.test.ts` (7 Zusagen statt 3) ·
-`capacitor.config.ts` (Kommentar: Reihenfolge entzerrt, Wachstumspreis,
-`download()`-Zaun) · `scripts/capacitor-config.test.ts` (Testname ehrlich
-gemacht) · `openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue
-Zusage „erst wenn ein Bild steht" + Szenario; `resetWhenUpdate`-Einschränkung) ·
-`openspec/changes/capacitor-huelle/REVIEWS.md` (Runde 6, neuer Trailer).
+`openspec/changes/capacitor-huelle/tasks.md` (Krypto-Beleg unter D3;
+Grössenzuwachs gemessen; `publicKey` nachgeführt; D5 zeigt aufs Runbook) ·
+`openspec/changes/capacitor-huelle/geraetesitzung-d5.md` (**neu**) ·
+`session-handoff.md`.
 
 ## Next session: start here
 
-**Erster Handgriff: D5, der Gerätebeleg** (`tasks.md:983`). Die Voraussetzung —
-ein live geschalteter Luftweg — ist seit dem 31.08. erfüllt und oben belegt.
-Zwei Kästchen, und das zweite ist das wichtigere:
+**Das Runbook fahren — `geraetesitzung-d5.md`, §0 zuerst.** Die Vorbedingung
+ist die, die am leichtesten übersehen wird: die App auf dem Gerät **muss aus
+`ddbd8ad` oder neuer gebaut sein**. Eine ältere Schale bestätigt ihren Start
+blank im Modulrumpf, rollt nie zurück — und Probe 2 belegte dann nichts.
 
-1. Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung. Das Gerät
-   soll `0.0.0+e8a2abcdcb21` ziehen, öffnen und in Betrieb nehmen.
-2. **Und einmal der Rückweg**: ein absichtlich defektes Bündel ausliefern, Gerät
-   landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand ausgelöst
-   hat, ist eine Behauptung — und genau diese Hälfte hat Runde 6 umgebaut.
+Danach §2, §3, §4 der Reihe nach. **§4 ist nicht optional:** `defec7ed` bleibt
+sonst das neueste Bündel im Manifest, und jede Neuinstallation zieht es.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Kein einziger Beleg stammt von einem Gerät.** Belegt ist unsere Hälfte:
-  sieben Zusagen, jede gegengeprüft. Was ein echtes Gerät mit dem Bündel macht,
-  hängt an nativen Zeitgebern und ist in jsdom nicht herstellbar.
-- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
-  C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
-  **und das kostet Donald die Anmeldung** — vorher ansagen.
-- **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
-  Donalds Hand. Das OTA-Schlüsselpaar ist erledigt und im Deploy gegengeprüft.
-- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand** (per `psql`
-  eingespielt, weil der Stack geteilt ist). Ein `supabase db reset` stellt sie
-  korrekt her.
+- **Kein einziger Beleg stammt von einem Gerät.** Neu belegt ist die
+  Krypto-Hälfte am ausgelieferten Artefakt; alles danach — installieren, neu
+  starten, `notifyAppReady`, Rückfall — bleibt Gerätebeleg.
+- **Vier weitere Gerätebelege**, in §6 des Runbooks gesammelt: C3 auf beiden
+  Plattformen · C2 auf Android · C1 auf iOS · B5 der Startbildschirm.
+  **B5 verlangt, die App zu löschen, und das kostet die Anmeldung** — deshalb
+  zuletzt.
+- **B3 Signaturmaterial (3 offen):** Zertifikat, Provisioning Profile, Keystore,
+  plus der Workflow, der sie einspeist. Donalds Hand. **Für D5 nicht nötig** —
+  ein Xcode-Lauf aufs eigene Gerät genügt (`DEVELOPMENT_TEAM` von Hand).
+- **A2, Kästchen Z. 70** (`navItems`-RED-Zusage) steht offen, ist aber womöglich
+  längst von `nav.test.ts` und den zwei `SidebarNav`-Tests gedeckt. Ungemessen —
+  eine der vier Optionen, die Donald diese Sitzung nicht gewählt hat.
+- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand.** Ein
+  `supabase db reset` stellt sie korrekt her.
 - **Nicht angefasst, ausserhalb AGE-642:** `docs/prod-neuaufbau-plan.md:31-32`
-  beschreibt noch den Stand vor der Umschaltung vom 24.08. und nennt
-  `foelowldexkcqzewvrcf` als Projekt der Live-Fläche — stimmt seitdem nicht
-  mehr. `scripts/sync-dev-auszug.test.ts` ist per Bauart flakig. `ADR-0037`
-  wird dreimal zitiert, existiert aber nicht.
+  nennt noch `foelowldexkcqzewvrcf` als Live-Fläche (falsch seit 24.08.) ·
+  `scripts/sync-dev-auszug.test.ts` ist per Bauart flakig · `ADR-0037` wird
+  dreimal zitiert, existiert aber nicht.

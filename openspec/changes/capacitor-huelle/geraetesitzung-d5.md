@@ -167,6 +167,12 @@ Die Antwort **muss** `0.0.0+c1ea4ed0` nennen. Steht dort noch `defec7ed`, ist
 das Aufräumen nicht durch — dann stimmt die Fassung nicht (siehe die Falle in
 §1).
 
+Und am Gerät gibt es dafür ein Zeichen, das man nicht übersehen kann: Probe 3
+trägt **keine Marke**. Zweimal schliessen und öffnen, und der rote Balken unten
+links ist weg. Damit ist zugleich belegt, dass das Gerät nach dem Rückfall
+wieder ganz normal Aktualisierungen annimmt — es hat nur `defec7ed` liegen
+lassen, nicht den Luftweg.
+
 ## 5 · Was diese Sitzung nicht belegt
 
 Der Beobachter aus Runde 6 — Bestätigung erst beim ersten Element-Knoten unter
