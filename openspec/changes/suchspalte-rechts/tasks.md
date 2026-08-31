@@ -91,12 +91,12 @@ Zahlen werden hier eingetragen** — nicht „sieht gut aus".
 
 - [x] 5.1 `/mitglieder`, `/events`, `/academy` bei 1024 · 1280 · 1440 · 1920 px,
       je mit Chat-Leiste eingeklappt und offen.
-- [ ] 5.2 Gegenprobe, dass **kein heutiger Zustand** sich geändert hat:
+- [x] 5.2 Gegenprobe, dass **kein heutiger Zustand** sich geändert hat:
       1009→3×219, 1265 eingekl.→3×280, 1265 offen→3×208, 1425→3×334,
       1905→3×448.
 - [x] 5.3 Kein waagerechter Überlauf auf 375 px (`scrollWidth` allein genügt
       nicht — im Bild ansehen).
-- [ ] 5.4 Gemessene Werte in diesen Abschnitt eintragen.
+- [x] 5.4 Gemessene Werte in diesen Abschnitt eintragen.
 
 ### Sichtprobe an den echten Spalten (31.08.)
 
@@ -123,6 +123,36 @@ Bestehendes Verhalten der `Tabs`.
 Academy (dort gibt es Hashtags), auf der Datenlage der Produktion nicht — der
 leere Fall ist als Unit-Test belegt, der volle im Bild. Ein Negativbefund allein
 haette nicht unterschieden, ob die Karte fehlt oder die Facette kaputt ist.
+
+### `/mitglieder` — nachgeholt, nachdem das QA-Konto auf `discover` steht
+
+Die Flaeche fehlte in der ersten Abnahme: das QA-Konto stand auf `basic`, und
+das Verzeichnis ist ab `discover` freigegeben. Auf Donalds Ansage am 31.08.
+selbst gesetzt (DEV, genau eine Zeile, `profiles.tier`).
+
+**Nicht** ueber `apply_migration`: eine Datenaenderung in der
+Migrationshistorie verfaelscht den Drift-Vergleich DEV↔PROD. Und der
+Supabase-MCP `execute_sql` ist read-only. Also ein `pg`-Skript aus dem
+Scratchpad, mit dem Wurzelzertifikat aus dem Repo statt abgeschalteter
+TLS-Pruefung. Sein Ziel-Waechter hat beim ersten Lauf angehalten — er pruefte
+den HOST, und der Pooler-Host ist fuer alle Projekte derselbe; die
+Projektkennung steht im Benutzernamen (`postgres.<ref>`).
+
+Gemessen bei 1265 px:
+
+| Zustand | Listenspalte | Karten |
+| --- | --- | --- |
+| Chat eingeklappt | 593 | 2 × 289 |
+| Chat offen | **377** | **1 × 377** |
+
+Ohne die Container-Umstellung waeren das 3 × 115 gewesen. Ueberlauf 0.
+
+Bei 375 px: Spalte zugeklappt (`aria-expanded=false`, Flaeche `display: none`),
+Karten 1 × 343, Ueberlauf 0, keine echten Ueberlaeufer.
+
+Die Sticky-Bedingungen greifen auch hier: `sticky`, `top: 80px`,
+`align-self: flex-start`, `overflow-y: auto`. Die erweiterten Filter stehen ab
+`lg` offen — im Bild bestaetigt, alle fuenf.
 
 ## 6. Vor dem Archivieren
 
