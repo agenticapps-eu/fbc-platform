@@ -21,6 +21,7 @@ import { AuthFixture, authAsTier } from "../../test/auth-fixtures";
 const uploads: { path: string; contentType?: string }[] = [];
 let rpcAufrufe: { name: string; args: Record<string, unknown> }[] = [];
 let uploadFehler: { message: string } | null = null;
+let freigegeben: ReturnType<typeof vi.fn>;
 
 const TAGS = [
   { key: "netzwerken", label: "Netzwerken", sort: 10 },
@@ -109,10 +110,14 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((rueckruf) => {
     rueckruf(new Blob(["webp"], { type: "image/webp" }));
   });
+  // Beobachtbar, nicht bloss stumm: das Verwerfen eines Entwurfs MUSS die
+  // Vorschau-URLs freigeben (AGE-670), und ein leerer Rumpf koennte das nicht
+  // belegen. Als No-op verhaelt sich die Attrappe genau wie vorher.
+  freigegeben = vi.fn();
   vi.stubGlobal("URL", {
     ...URL,
     createObjectURL: () => "blob:vorschau",
-    revokeObjectURL: () => {},
+    revokeObjectURL: freigegeben,
   });
 });
 
@@ -321,5 +326,128 @@ describe("Composer — die Medientyp-Zeile", () => {
     fireEvent.change(feld, { target: { value: "https://www.youtube.com/watch?v=abc12345678" } });
     fireEvent.click(screen.getByRole("button", { name: /^video$/i }));
     expect(screen.getByLabelText(/video-link/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Rückweg aus dem Composer (AGE-670).
+ *
+ * Bis hierher hatte er genau EINEN Ausgang, und der führte durch das
+ * Veröffentlichen: `setOffen(false)` stand allein im `onSuccess` der Mutation.
+ * Wer aufklappte und es sich anders überlegte, blieb für die Lebensdauer der
+ * Seite in seinem Entwurf.
+ *
+ * Geprüft wird deshalb nicht nur, DASS der Composer zugeht, sondern dass er
+ * beim nächsten Aufklappen LEER ist — ein halb zurückgesetzter Entwurf wäre
+ * schlechter als gar kein Rückweg, weil sein Verfasser ihn für leer hielte.
+ */
+describe("Composer — den Entwurf verwerfen", () => {
+  it("klappt zu, ohne einen Beitrag anzulegen", () => {
+    renderFeed();
+    oeffneComposer();
+
+    fireEvent.change(screen.getByLabelText("Neuer Beitrag"), {
+      target: { value: "Doch nicht." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /abbrechen/i }));
+
+    // Zu: die ruhige Zeile steht wieder da, das Textfeld nicht mehr.
+    expect(
+      screen.getByRole("button", { name: /was möchtest du mit der community teilen/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Neuer Beitrag")).toBeNull();
+
+    // Und NICHTS geschrieben. Ohne diese Zusage wäre der Test auch grün, wenn
+    // „Abbrechen" den Beitrag stillschweigend veröffentlichte.
+    //
+    // Nur DIESE RPC zählen, wie oben bei 6.6: die zwei Sidebar-Zähler laufen
+    // ebenfalls über `rpc`, und ein Zähler über alle Aufrufe misst Nachbarn
+    // statt der Zusage.
+    expect(rpcAufrufe.filter((r) => r.name === "create_post_with_media")).toEqual([]);
+  });
+
+  it("beginnt beim nächsten Aufklappen leer — in jedem Feld", async () => {
+    renderFeed();
+    oeffneComposer();
+
+    fireEvent.change(screen.getByLabelText("Neuer Beitrag"), {
+      target: { value: "Ein Entwurf mit allem Drum und Dran" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^video$/i }));
+    fireEvent.change(screen.getByLabelText(/video-link/i), {
+      target: { value: "https://www.youtube.com/watch?v=abc12345678" },
+    });
+    fireEvent.change(screen.getByLabelText("Sichtbarkeit"), { target: { value: "public" } });
+    fireEvent.change(screen.getByLabelText(/sichtbar ab/i), {
+      target: { value: "2026-09-04T18:00" },
+    });
+    // Über die GRUPPE, nicht global: dieselben Tags stehen seit Block 8 auch in
+    // der Filterleiste, und ein unqualifiziertes `getByRole` fände beide.
+    const tagAuswahl = await screen.findByRole("group", { name: /tags für diesen beitrag/i });
+    fireEvent.click(within(tagAuswahl).getByRole("button", { name: "Netzwerken" }));
+
+    // Vorbedingung, nicht Zierde: ohne sie wäre die Prüfung unten auch dann
+    // grün, wenn die Auswahl gar nicht erst angekommen ist.
+    expect(within(tagAuswahl).getByRole("button", { name: "Netzwerken" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /abbrechen/i }));
+    oeffneComposer();
+
+    expect(screen.getByLabelText("Neuer Beitrag")).toHaveValue("");
+    expect(screen.getByLabelText("Sichtbarkeit")).toHaveValue("members");
+    expect(screen.getByLabelText(/sichtbar ab/i)).toHaveValue("");
+    // Frisch geholt, nicht die Referenz von oben: die alte Gruppe ist beim
+    // Zuklappen aus dem Baum genommen worden.
+    const tagsDanach = screen.getByRole("group", { name: /tags für diesen beitrag/i });
+    expect(within(tagsDanach).getByRole("button", { name: "Netzwerken" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    // Das Videofeld hält sich offen, sobald etwas darin steht (6.3). Ist der
+    // Link fort, muss es wieder verschwunden sein — steht es noch da, ist
+    // `videoUrl` nicht geleert.
+    expect(screen.queryByLabelText(/video-link/i)).toBeNull();
+  });
+
+  /**
+   * Der Überlauf, den jsdom nicht sehen kann — deshalb hier als STRUKTUR.
+   *
+   * Im Browser gemessen (Chrome, 375 × 812, die echte Feed-Karte): der dritte
+   * Knopf treibt die Aktionsgruppe auf 353 px, während die Karte 293 px
+   * Innenmaß hat. Ohne `flex-wrap` kann die Gruppe nicht umbrechen, weitet die
+   * Karte von 341 auf 401 px und erzeugt 44 px waagerechten Überlauf im ganzen
+   * Dokument. Mit `flex-wrap` sind es 0.
+   *
+   * Die Zahl ist hier nicht nachmessbar. Die Klasse, an der sie hängt, schon —
+   * und ohne diese Zusage nimmt der nächste Aufräumer sie kommentarlos wieder
+   * heraus.
+   */
+  it("lässt die Aktionsgruppe umbrechen, statt die Karte aufzuweiten", () => {
+    renderFeed();
+    oeffneComposer();
+
+    const gruppe = screen.getByRole("button", { name: /abbrechen/i }).parentElement;
+    expect(gruppe).not.toBeNull();
+    // Dieselbe Gruppe trägt „Posten" — sonst misst die Zusage einen Nachbarn.
+    expect(gruppe!.contains(screen.getByRole("button", { name: /posten/i }))).toBe(true);
+    expect(gruppe!.className).toContain("flex-wrap");
+  });
+
+  it("gibt die Vorschau des gewählten Bildes frei", async () => {
+    renderFeed();
+    oeffneComposer();
+
+    waehleBilder(foto("a.jpg"));
+    await screen.findByRole("button", { name: /bild 1 entfernen/i });
+    // Bis hierher wurde nichts freigegeben — sonst belegte die Zusage unten
+    // den Aufruf des „×"-Knopfes statt den des Verwerfens.
+    expect(freigegeben).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /abbrechen/i }));
+
+    expect(freigegeben).toHaveBeenCalledWith("blob:vorschau");
   });
 });
