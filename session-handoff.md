@@ -52,12 +52,10 @@ Sourcemaps drin.
 
 Der am Vormittag hinterlegte Schlüssel hatte **4096 Bit** und war unbrauchbar:
 das Plugin bricht ab, wenn das Chiffrat der Prüfsumme nicht **genau 256 Byte**
-misst (`CryptoCipher.java:254`, `.swift:74`). Gescheitert wäre es still auf dem
-Gerät, entdeckt frühestens beim Gerätetest.
-
-Er galt als „dreifach belegt" — die drei Belege prüften Format, Übertragung und
-Rundlauf. **Ein Rundlauf gelingt mit jeder Schlüssellänge.** Wer
-Schlüsselmaterial belegt, muss die Grösse als eigene Frage stellen.
+misst (`CryptoCipher.java:254`, `.swift:74`) — still, auf dem Gerät. Er galt als
+„dreifach belegt"; die drei Belege prüften Format, Übertragung und Rundlauf.
+**Ein Rundlauf gelingt mit jeder Schlüssellänge.** Wer Schlüsselmaterial belegt,
+muss die Grösse als eigene Frage stellen.
 
 Donald hat neu erzeugt. Fünf Messungen an `~/Documents/capgo_privat.pem`: 2048
 Bit · PKCS#1 in beiden Dateien · Chiffrat 256 Byte · Rundlauf byte-gleich ·
@@ -82,11 +80,11 @@ Infisical `prod` derselbe ist wie die Datei — das braucht ein echtes Terminal.
 
 ## Files modified
 
-`eaedcdd` + `f765036`: `supabase/migrations/20260831100000_ota_buendel.sql` ·
+`eaedcdd` + `f765036`: die zwei Migrationen `20260831100000_ota_buendel.sql` und
 `…140000_ota_buendel_veroeffentlichen.sql` · `supabase/tests/ota_buendel_test.sql`
-· `scripts/ota-buendel.logic.ts` · `…logic.test.ts` · `…ota-buendel.ts` ·
-`capacitor.config.ts` · `.github/workflows/{ci,deploy}.yml` · `tasks.md` ·
-`design.md` · `REVIEWS.md` (Runden 3 und 4) · `docs/decisions/0005-…md`.
+· `scripts/ota-buendel{,.logic,.logic.test}.ts` · `capacitor.config.ts` ·
+`.github/workflows/{ci,deploy}.yml` · `tasks.md` · `design.md` · `REVIEWS.md`
+(Runden 3 und 4) · `docs/decisions/0005-…md`.
 
 ## Next session: start here
 
