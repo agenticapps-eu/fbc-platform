@@ -29,11 +29,40 @@ import { useEffect, useRef, type RefObject } from "react";
  * diese Regel behandelten zwei aktive Fallen denselben Tastendruck und rissen
  * den Fokus gegeneinander.
  */
-const stapel: object[] = [];
+const stapel: { schliessen: () => void }[] = [];
+
+/**
+ * Ob mindestens ein modales Overlay offen ist (AGE-642 C2).
+ *
+ * Die Android-Zurueck-Taste braucht das, BEVOR sie navigiert: mehrere Flaechen
+ * fuehren ihren Offen-Zustand ueber den Verlaufsschluessel und schliessen sich
+ * bei jeder Navigation selbst. Wer bei offenem Overlay zuruecknavigiert, sieht
+ * das Overlay zugehen und traegt die Seite darunter mit fort.
+ */
+export function istOverlayOffen(): boolean {
+  return stapel.length > 0;
+}
+
+/**
+ * Schliesst das OBERSTE Overlay, ohne zu navigieren (AGE-642 C2).
+ *
+ * Am obersten, wie die Tab-Falle: liegen zwei uebereinander, gehoert der
+ * Tastendruck dem sichtbaren. Kein synthetisches Escape ins Dokument — das
+ * traefe jeden `document`-Lauscher auf einmal, und genau dieses Fehlerbild
+ * beschreibt `EmojiAuswahl.tsx` bereits.
+ *
+ * Still folgenlos, wenn nichts offen ist: der Aufrufer hat vorher
+ * `istOverlayOffen()` gefragt, und zwischen Frage und Antwort kann ein Overlay
+ * von selbst zugegangen sein.
+ */
+export function schliesseOberstesOverlay(): void {
+  stapel[stapel.length - 1]?.schliessen();
+}
 
 /** Gehört dem ERSTEN Sperrer: seine Scroll-Position und die Inline-Stile, die
  *  er am `body` vorgefunden hat. */
-let gemerkt: { y: number; position: string; top: string; left: string; right: string } | null = null;
+let gemerkt: { y: number; position: string; top: string; left: string; right: string } | null =
+  null;
 
 function sperren() {
   const s = document.body.style;
@@ -88,18 +117,40 @@ function fokussierbare(container: HTMLElement): HTMLElement[] {
  * Generisch typisiert, weil `RefObject<HTMLElement | null>` unter React 19
  * nicht an das `ref` eines `<div>` zuweisbar ist (`current` ist invariant).
  *
+ * `schliessen` ist PFLICHT und nicht optional, und das ist dieselbe Regel wie
+ * bei der Sperre selbst: der Mangel waere nicht die eine Flaeche, die die
+ * Zurueck-Taste nicht bedient, sondern die fehlende Regel — das naechste
+ * Overlay entstuende wieder ohne, und niemand saehe es. Als Pflichtfeld
+ * erzwingt der Typ es an jeder Anschlussstelle, heute und spaeter.
+ *
  * @param aktiv ob das Overlay gerade offen ist
+ * @param schliessen wie dieses Overlay zugeht — fuer die Android-Zurueck-Taste
  * @returns Ref für den Overlay-Container; daran hängt die Falle
  */
 export function useOverlay<T extends HTMLElement = HTMLDivElement>(
   aktiv: boolean,
+  schliessen: () => void,
 ): RefObject<T | null> {
   const ref = useRef<T | null>(null);
+
+  // Der Eintrag haelt die Funktion NICHT woertlich, sondern liest sie beim
+  // Aufruf aus diesem Ref. Der Effekt haengt allein an `aktiv`; haenge er auch
+  // an `schliessen`, loeste jede neue Pfeilfunktion des Aufrufers ein Abraeumen
+  // und Neuanlegen aus — also ein Freigeben und Neusperren, das die
+  // Scroll-Position verloere. Woertlich gehalten wiederum riefe Zurueck spaeter
+  // eine veraltete Fassung.
+  // Nachgefuehrt im Effekt, nicht im Rumpf: eine Ref waehrend des Renderns zu
+  // beschreiben ist unter React 19 ein Fehler (`react-hooks/refs`). Ohne
+  // Abhaengigkeitsliste, damit sie nach JEDEM Render stimmt.
+  const schliessenRef = useRef(schliessen);
+  useEffect(() => {
+    schliessenRef.current = schliessen;
+  });
 
   useEffect(() => {
     if (!aktiv) return;
 
-    const eintrag = {};
+    const eintrag = { schliessen: () => schliessenRef.current() };
     stapel.push(eintrag);
     if (stapel.length === 1) sperren();
 

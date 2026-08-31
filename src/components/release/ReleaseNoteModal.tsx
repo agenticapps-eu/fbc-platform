@@ -24,7 +24,7 @@ import { useOverlay } from "../ui/useOverlay";
  * braucht.
  */
 export function ReleaseNoteModal({ note, onClose }: { note: ReleaseNote; onClose: () => void }) {
-  const overlay = useOverlay<HTMLDivElement>(true);
+  const overlay = useOverlay<HTMLDivElement>(true, onClose);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

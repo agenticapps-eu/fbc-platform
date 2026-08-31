@@ -92,7 +92,7 @@ export default function HeaderSearch() {
   // Sperre und Tab-Falle kommen aus dem gemeinsamen Hook (AGE-529). Was er
   // NICHT mitbringt — Anfangsfokus und Escape — steht weiter unten; das war ein
   // Befund des Plan-Reviews und keine Vermutung.
-  const overlay = useOverlay<HTMLDivElement>(mobilOffen);
+  const overlay = useOverlay<HTMLDivElement>(mobilOffen, () => setMobilOffen(false));
 
   const begriff = roh.trim();
   const langGenug = begriff.length >= HEADER_SEARCH_MIN_CHARS;

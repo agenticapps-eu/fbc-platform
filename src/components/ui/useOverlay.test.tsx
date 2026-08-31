@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useOverlay } from "./useOverlay";
+import { istOverlayOffen, schliesseOberstesOverlay, useOverlay } from "./useOverlay";
 
 /**
  * Sperre und Fokus-Falle für alle modalen Overlays (AGE-529).
@@ -29,8 +29,16 @@ function setScrollY(y: number) {
 }
 
 /** Ein Overlay mit drei fokussierbaren Knoten — erster, mittlerer, letzter. */
-function Overlay({ aktiv, prefix = "o" }: { aktiv: boolean; prefix?: string }) {
-  const ref = useOverlay(aktiv);
+function Overlay({
+  aktiv,
+  prefix = "o",
+  schliessen = () => {},
+}: {
+  aktiv: boolean;
+  prefix?: string;
+  schliessen?: () => void;
+}) {
+  const ref = useOverlay(aktiv, schliessen);
   if (!aktiv) return null;
   return (
     <div ref={ref} role="dialog" aria-modal="true" aria-label={prefix}>
@@ -276,7 +284,7 @@ describe("useOverlay — die Fokus-Rückgabe", () => {
 describe("useOverlay — Randfälle", () => {
   it("bricht nicht an einem Overlay ohne fokussierbaren Inhalt", () => {
     function Leer() {
-      const ref = useOverlay(true);
+      const ref = useOverlay(true, () => {});
       return (
         <div ref={ref} role="dialog" aria-modal="true">
           <p>nur Text</p>
@@ -291,7 +299,7 @@ describe("useOverlay — Randfälle", () => {
 
   it("übergeht deaktivierte und ausgeblendete Knoten", () => {
     function MitLeichen() {
-      const ref = useOverlay(true);
+      const ref = useOverlay(true, () => {});
       return (
         <div ref={ref} role="dialog">
           <button type="button">echt-erster</button>
@@ -312,5 +320,91 @@ describe("useOverlay — Randfälle", () => {
     fireEvent.keyDown(document, { key: "Tab" });
 
     expect(document.activeElement).toBe(screen.getByText("echt-erster"));
+  });
+});
+
+/**
+ * Der Stapel als Auskunft nach aussen (AGE-642 C2).
+ *
+ * Die Android-Zurueck-Taste muss wissen, OB ein Overlay offen ist, und das
+ * OBERSTE schliessen koennen, ohne zu navigieren. Beides weiss allein dieser
+ * Stapel; die Alternative — ein synthetisches Escape ins Dokument — traefe
+ * jeden `document`-Lauscher auf einmal, was `EmojiAuswahl.tsx` bereits
+ * ausdruecklich als Fehlerbild beschreibt.
+ */
+describe("useOverlay — der Stapel nach aussen", () => {
+  it("meldet keine offenen Overlays, solange keines gemountet ist", () => {
+    expect(istOverlayOffen()).toBe(false);
+  });
+
+  // Positivkontrolle zur Verneinung darueber: ohne sie waere eine Funktion,
+  // die IMMER false sagt, von einer, die zaehlt, nicht zu unterscheiden.
+  it("meldet ein offenes Overlay, sobald eines gemountet ist", () => {
+    const { unmount } = render(<Overlay aktiv />);
+    expect(istOverlayOffen()).toBe(true);
+    unmount();
+    expect(istOverlayOffen()).toBe(false);
+  });
+
+  it("schliesst das OBERSTE Overlay und laesst das untere stehen", () => {
+    const unten = vi.fn();
+    const oben = vi.fn();
+    render(
+      <>
+        <Overlay aktiv prefix="unten" schliessen={unten} />
+        <Overlay aktiv prefix="oben" schliessen={oben} />
+      </>,
+    );
+
+    schliesseOberstesOverlay();
+
+    expect(oben).toHaveBeenCalledTimes(1);
+    expect(unten).not.toHaveBeenCalled();
+  });
+
+  it("nimmt nach dem obersten das naechste, nicht wieder dasselbe", () => {
+    const unten = vi.fn();
+    const oben = vi.fn();
+    const { rerender } = render(
+      <>
+        <Overlay aktiv prefix="unten" schliessen={unten} />
+        <Overlay aktiv prefix="oben" schliessen={oben} />
+      </>,
+    );
+
+    schliesseOberstesOverlay();
+    // Das echte Overlay geht durch seinen eigenen Zustand zu; hier von Hand.
+    rerender(
+      <>
+        <Overlay aktiv prefix="unten" schliessen={unten} />
+        <Overlay aktiv={false} prefix="oben" schliessen={oben} />
+      </>,
+    );
+
+    schliesseOberstesOverlay();
+
+    expect(unten).toHaveBeenCalledTimes(1);
+    expect(oben).toHaveBeenCalledTimes(1);
+  });
+
+  // Der Grund, warum der Eintrag die Funktion NICHT woertlich haelt: der Effekt
+  // haengt allein an `aktiv`. Haenge er auch an `schliessen`, loeste jede neue
+  // Pfeilfunktion des Aufrufers ein Abraeumen und Neuanlegen aus — und damit
+  // ein Freigeben und Neusperren, das die Scroll-Position verloere. Haelt er
+  // sie woertlich, ruft Zurueck spaeter eine veraltete Fassung.
+  it("ruft die AKTUELLE Schliessfunktion, nicht die beim Oeffnen uebergebene", () => {
+    const alt = vi.fn();
+    const neu = vi.fn();
+    const { rerender } = render(<Overlay aktiv schliessen={alt} />);
+
+    rerender(<Overlay aktiv schliessen={neu} />);
+    schliesseOberstesOverlay();
+
+    expect(neu).toHaveBeenCalledTimes(1);
+    expect(alt).not.toHaveBeenCalled();
+  });
+
+  it("bricht nicht, wenn gar kein Overlay offen ist", () => {
+    expect(() => schliesseOberstesOverlay()).not.toThrow();
   });
 });

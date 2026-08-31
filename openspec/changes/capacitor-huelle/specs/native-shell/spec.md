@@ -149,9 +149,19 @@ ließe Overlay-Zustand und Verlauf auseinanderlaufen.
 ### Requirement: Ein Bild kommt über einen Aufrufpunkt, der die Plattform kennt
 
 Die Auswahl eines Bildes — Profilbild, Titelbild, Beitragsbild — SHALL über
-**einen** gemeinsamen Aufrufpunkt laufen, der eine Datei zurückgibt. Nativ SHALL
-er den Systemablauf für Kamera und Galerie anbieten, im Web SHALL er das
-bestehende Dateifeld verwenden.
+**einen** gemeinsamen Aufrufpunkt laufen, der Dateien zurückgibt. Nativ SHALL er
+die Wahl zwischen Kamera und Mediathek anbieten und danach den jeweiligen
+Systemablauf öffnen; im Web SHALL er das bestehende Dateifeld verwenden.
+
+**Die Wahl stellt die Anwendung, nicht das System** — gemessen an
+`@capacitor/camera` 8.2.3: `getPhoto` samt eingebauter Quellen-Rückfrage ist
+dort als veraltet markiert und wird entfernt; die Doku verweist ausdrücklich auf
+eine eigene Oberfläche. Der Ersatz sind zwei getrennte Aufrufe, `takePhoto` und
+`chooseFromGallery`, und nur der zweite kann Mehrfachauswahl.
+
+Wo eine Fläche mehrere Bilder annimmt, SHALL der Aufrufpunkt den verbleibenden
+**Rest** als Obergrenze durchreichen, nicht die Gesamtzahl. Im Web hält der
+Dateidialog nichts; nativ verwürfe die Fläche den Überschuss stumm.
 
 Die aufrufenden Flächen SHALL NOT wissen, auf welcher Plattform sie laufen. Was
 nach der Auswahl geschieht — Zuschnitt, Upload, Seitenverhältnis — SHALL
@@ -160,10 +170,23 @@ unverändert bleiben.
 #### Scenario: Dieselbe Fläche, zwei Plattformen
 
 - **WHEN** ein Mitglied auf iOS oder Android ein Profilbild wählt
-- **THEN** öffnet sich der native Ablauf mit der Wahl zwischen Kamera und
-  Galerie
+- **THEN** fragt die Anwendung zuerst, ob aufgenommen oder aus der Mediathek
+  gewählt wird
+- **AND** danach öffnet sich der Systemablauf der gewählten Quelle
 - **AND** dieselbe Fläche im Browser öffnet weiterhin den Dateidialog
 - **AND** das hochgeladene Bild durchläuft in beiden Fällen denselben Zuschnitt
+
+#### Scenario: Ein Abbruch ist kein Fehler
+
+- **WHEN** ein Mitglied die Kamera oder die Mediathek ohne Auswahl verlässt
+- **THEN** bleibt die Fläche unverändert stehen
+- **AND** es erscheint keine Fehlermeldung
+
+#### Scenario: Der Rest, nicht das Maximum
+
+- **WHEN** ein Beitrag schon vier von sechs Bildern trägt und ein Mitglied
+  nativ weitere aus der Mediathek wählt
+- **THEN** lässt die Auswahl höchstens zwei weitere zu
 
 ### Requirement: Web-Änderungen erreichen Geräte ohne Store-Einreichung
 

@@ -18,6 +18,7 @@ import { Select } from "../ui/Select";
 import { Textarea } from "../ui/Textarea";
 import { TierBadge } from "../ui/TierBadge";
 import { VideoEmbed } from "../ui/VideoEmbed";
+import { useBildauswahl } from "../ui/useBildauswahl";
 import { useOverlay } from "../ui/useOverlay";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
@@ -707,6 +708,12 @@ function PostComposer({ authorId }: { authorId: string }) {
    * unlesbares Bild soll sofort und benennbar auffallen, statt den Nutzer
    * später in einen nichtssagenden Serverfehler am 1-MiB-Limit laufen zu lassen.
    */
+  // Der gemeinsame Aufrufpunkt (AGE-642 C3). `frei` ist der REST, nicht das
+  // Maximum: im Web hält der Dateidialog nichts, aber `waehleBilder` unten
+  // meldet den Überschuss; nativ verwürfe er ihn stumm, wenn `limit` fehlte.
+  const bildFeldRef = useRef<HTMLInputElement>(null);
+  const bildWahl = useBildauswahl((dateien) => void waehleBilder(dateien));
+
   async function waehleBilder(dateien: File[]) {
     const frei = MAX_BILDER - bilder.length;
     setBildFehler(
@@ -983,27 +990,43 @@ function PostComposer({ authorId }: { authorId: string }) {
               Aktionsgruppe, damit Donalds Anordnung vom 12.08. bestehen bleibt
               — Handelndes zusammen und nach rechts. */}
           <span role="group" aria-label="Medien" className="inline-flex items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center text-sm text-muted">
-              {/* Beschriftung bleibt „Bild", bis auch Dateien gehen (AGE-532).
-                  Ein Knopf, der „Datei anhängen" verspricht und nur Bilder
-                  annimmt, ist schlechter als der genaue Name. */}
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 transition-colors hover:text-ink">
-                <Icon name="image" className="h-4 w-4" />
-                Bild
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple
-                aria-label="Bilder auswählen"
-                className="sr-only"
-                onChange={(e) => {
-                  const dateien = [...(e.target.files ?? [])];
-                  e.target.value = "";
-                  void waehleBilder(dateien);
-                }}
-              />
-            </label>
+            {/* Beschriftung bleibt „Bild", bis auch Dateien gehen (AGE-532).
+                Ein Knopf, der „Datei anhängen" verspricht und nur Bilder
+                annimmt, ist schlechter als der genaue Name.
+
+                AGE-642 C3: aus `<label>` + `<span>` wurde ein echter `<button>`
+                — ein Label löst sein Feld unabweisbar selbst aus, und damit
+                gäbe es keine Stelle, an der die native Rückfrage aufgehen
+                könnte. Die Klassen sind wörtlich dieselben; sichtbar ändert
+                sich nichts. Der Fokusring kommt vom Nachbarknopf, der ihn
+                schon trägt — vorher lag der Fokus auf dem `sr-only`-Feld. */}
+            <button
+              type="button"
+              onClick={() =>
+                bildWahl.oeffnen(bildFeldRef.current, {
+                  mehrere: true,
+                  frei: MAX_BILDER - bilder.length,
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <Icon name="image" className="h-4 w-4" />
+              Bild
+            </button>
+            <input
+              ref={bildFeldRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              aria-label="Bilder auswählen"
+              className="sr-only"
+              onChange={(e) => {
+                const dateien = [...(e.target.files ?? [])];
+                e.target.value = "";
+                void waehleBilder(dateien);
+              }}
+            />
+            {bildWahl.rueckfrage}
             <button
               type="button"
               onClick={() => setVideoOffen((v) => !v)}
@@ -1637,7 +1660,7 @@ function Lightbox({
   // Die Lightbox ist nur montiert, solange sie offen ist — daher fest `true`
   // (AGE-529). Sperrt die Seite dahinter und hält den Fokus im Overlay; den
   // ERSTEN Fokus setzt weiterhin der Effekt unten, aus dem Grund, der dort steht.
-  const overlay = useOverlay(true);
+  const overlay = useOverlay(true, onSchliessen);
 
   const weiter = (schritt: number) => onIndex((index + schritt + media.length) % media.length);
 
@@ -2095,6 +2118,9 @@ function PostEditor({
     onError: (e) => toast({ variant: "error", title: "Bild bleibt", description: errorMessage(e) }),
   });
 
+  const bearbeitenFeldRef = useRef<HTMLInputElement>(null);
+  const bearbeitenBildWahl = useBildauswahl((dateien) => void bilderWaehlen(dateien));
+
   async function bilderWaehlen(dateien: File[]) {
     const frei = MAX_BILDER - post.media.length;
     if (frei <= 0) {
@@ -2163,21 +2189,40 @@ function PostEditor({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-muted">
-          <span className="sr-only">Bilder hinzufügen</span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            multiple
-            disabled={beschaeftigt || post.media.length >= MAX_BILDER}
-            onChange={(e) => {
-              const dateien = Array.from(e.target.files ?? []);
-              e.target.value = "";
-              if (dateien.length > 0) void bilderWaehlen(dateien);
-            }}
-            className="text-sm text-muted"
-          />
-        </label>
+        {/* AGE-642 C3: Das Feld war hier SICHTBAR und war zugleich der
+            Auslöser — damit gab es keine Stelle, an der die native Rückfrage
+            aufgehen könnte. Es liegt jetzt versteckt hinter einem Knopf, wie
+            an den fünf anderen Bildstellen. Im Browser öffnet der Knopf
+            weiterhin denselben Dateidialog; was sich ändert, ist die Optik
+            des Auslösers. Die Sperre bei sechs Bildern wandert mit. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={beschaeftigt || post.media.length >= MAX_BILDER}
+          onClick={() =>
+            bearbeitenBildWahl.oeffnen(bearbeitenFeldRef.current, {
+              mehrere: true,
+              frei: MAX_BILDER - post.media.length,
+            })
+          }
+        >
+          Bilder hinzufügen
+        </Button>
+        {bearbeitenBildWahl.rueckfrage}
+        <input
+          ref={bearbeitenFeldRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          aria-label="Bilder hinzufügen"
+          disabled={beschaeftigt || post.media.length >= MAX_BILDER}
+          onChange={(e) => {
+            const dateien = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (dateien.length > 0) void bilderWaehlen(dateien);
+          }}
+          className="sr-only"
+        />
         <Select
           value={sichtbarkeit}
           onChange={(e) => setSichtbarkeit(e.target.value as PostVisibility)}

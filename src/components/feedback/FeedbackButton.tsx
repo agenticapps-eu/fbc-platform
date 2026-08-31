@@ -56,7 +56,7 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   // verletzte jeder Wechsel des Anmeldezustands die Hook-Regeln. `Boolean(user)`
   // in der Bedingung sorgt außerdem dafür, dass ein Sitzungsverlust bei offenem
   // Panel keine Sperre ohne sichtbares Overlay zurücklässt.
-  const overlay = useOverlay(Boolean(user) && open);
+  const overlay = useOverlay(Boolean(user) && open, () => setOpen(false));
 
   // Ohne Konto ist Feedback nicht speicherbar: feedback.profile_id ist `not null`
   // und feedback_own verlangt profile_id = auth.uid(). Einen Button zu zeigen, der

@@ -1166,7 +1166,7 @@ function Rueckfrage({
   onAbbrechen: () => void;
   onBestaetigen: () => void;
 }) {
-  const overlay = useOverlay(true);
+  const overlay = useOverlay(true, onAbbrechen);
   const text = RUECKFRAGEN[art];
   const name = member.name ?? "Dieses Mitglied";
 

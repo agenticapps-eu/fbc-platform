@@ -87,7 +87,7 @@ export function AvatarCropper({
 }: AvatarCropperProps) {
   // Nur montiert, solange zugeschnitten wird — daher fest `true` (AGE-529).
   // Hier stört das Hintergrund-Scrollen am meisten: man ZIEHT in diesem Overlay.
-  const overlay = useOverlay(true);
+  const overlay = useOverlay(true, onCancel);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);

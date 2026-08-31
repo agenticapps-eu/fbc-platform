@@ -12,6 +12,7 @@ import {
   type CategorySelection,
 } from "../lib/profile-categories";
 import { AvatarCropper } from "../components/profile/AvatarCropper";
+import { useBildauswahl } from "../components/ui/useBildauswahl";
 import {
   ProfileBasicsFieldset,
   ProfileContactFieldset,
@@ -170,6 +171,13 @@ function ProfileEditor({ uid }: { uid: string }) {
     },
   });
 
+  // Der gemeinsame Aufrufpunkt (AGE-642 C3). Zwei Hooks statt eines mit
+  // Fallunterscheidung: jeder hat seine eigene Senke, und beide enden in
+  // DERSELBEN, die auch `onFileChange` bedient — im Web ueber das Dateifeld,
+  // nativ aus Kamera oder Mediathek.
+  const avatarWahl = useBildauswahl(([datei]) => setPending({ file: datei, kind: "avatar" }));
+  const coverWahl = useBildauswahl(([datei]) => setPending({ file: datei, kind: "cover" }));
+
   function onFileChange(kind: "avatar" | "cover") {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -268,7 +276,11 @@ function ProfileEditor({ uid }: { uid: string }) {
           <div className="flex items-center gap-5">
             <Avatar name={values.name || "?"} src={preview ?? values.avatar_url} size="lg" />
             <div className="flex flex-col gap-2">
-              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => avatarWahl.oeffnen(fileInputRef.current)}
+              >
                 {values.avatar_url || preview ? "Bild ändern" : "Bild hochladen"}
               </Button>
               <p className="text-xs text-muted">JPG, PNG oder WebP. Quadratischer Zuschnitt.</p>
@@ -313,7 +325,11 @@ function ProfileEditor({ uid }: { uid: string }) {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => coverInputRef.current?.click()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => coverWahl.oeffnen(coverInputRef.current)}
+            >
               {values.cover_url || coverPreview ? "Bild ändern" : "Bild hochladen"}
             </Button>
             {(values.cover_url || coverPreview) && (
@@ -458,6 +474,9 @@ function ProfileEditor({ uid }: { uid: string }) {
             {mutation.isPending ? "Speichern…" : "Speichern"}
           </Button>
         </div>
+
+        {avatarWahl.rueckfrage}
+        {coverWahl.rueckfrage}
 
         {pending && (
           <AvatarCropper

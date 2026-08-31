@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../ui/Button";
 import { AvatarCropper } from "../profile/AvatarCropper";
+import { useBildauswahl } from "../ui/useBildauswahl";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import {
@@ -48,6 +49,9 @@ export function EventCoverPicker({
   const { toast } = useToast();
   const dateiRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<File | null>(null);
+  // Der gemeinsame Aufrufpunkt (AGE-642 C3): dieselbe Senke wie das `onChange`
+  // des Dateifeldes darunter.
+  const bildWahl = useBildauswahl(([datei]) => setPending(datei));
   const [vorschau, setVorschau] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
 
@@ -123,6 +127,7 @@ export function EventCoverPicker({
           </div>
         )}
       </div>
+      {bildWahl.rueckfrage}
       <div className="flex items-center gap-2">
         <input
           ref={dateiRef}
@@ -139,7 +144,7 @@ export function EventCoverPicker({
           variant="ghost"
           size="sm"
           disabled={laedt}
-          onClick={() => dateiRef.current?.click()}
+          onClick={() => bildWahl.oeffnen(dateiRef.current)}
         >
           {laedt ? "Wird hochgeladen…" : pfad ? "Titelbild ersetzen" : "Titelbild wählen"}
         </Button>
