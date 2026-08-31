@@ -231,13 +231,18 @@ function GeteilteVideos({
             <label htmlFor="academy-suche" className="font-display text-sm font-semibold text-ink">
               Suche
             </label>
+            {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
+                `<label for>`, und ein `aria-label` ERSETZT dessen Text als
+                zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
+                „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
+                Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
+                kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
             <Input
               id="academy-suche"
               type="search"
               value={eingabe}
               onChange={(e) => setEingabe(e.target.value)}
               placeholder="Wonach suchst du?"
-              aria-label="Volltextsuche in der Academy"
             />
           </Card>
 
@@ -256,7 +261,6 @@ function GeteilteVideos({
               id="academy-ordnung"
               value={ordnung}
               onChange={(e) => setOrdnung(e.target.value as FeedOrdnung)}
-              aria-label="Sortierung der Academy"
             >
               <option value="neueste">Neueste zuerst</option>
               <option value="beliebteste">Beliebteste zuerst</option>

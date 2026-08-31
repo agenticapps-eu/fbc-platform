@@ -156,12 +156,56 @@ Die Sticky-Bedingungen greifen auch hier: `sticky`, `top: 80px`,
 
 ## 6. Vor dem Archivieren
 
-- [ ] 6.1 Jede Klausel der beiden `MODIFIED`-Blöcke erneut am Code nachlesen —
+- [x] 6.1 Jede Klausel der beiden `MODIFIED`-Blöcke erneut am Code nachlesen —
       ein `MODIFIED` bekräftigt alle Klauseln unter neuem Datum, nicht nur die
-      geänderte.
-- [ ] 6.2 `openspec validate --all` grün.
-- [ ] 6.3 Code-Review auf dem **Diff** (nicht auf dem Plan).
-- [ ] 6.4 `pnpm vitest run` vollständig grün, Zahl notieren.
+      geänderte. **Zweite Prüfung am 31.08., keine Abweichung.**
+      `directory-search`, acht Klauseln: Kartenfelder vollständig
+      (`MemberDirectory.tsx:710–795`); keine Kompass-Marke auf der Karte, die
+      beiden `map`-Läufe sind weg; `aspect-[3/1]` + `object-contain`; das
+      Coverfeld steht auch ohne Bild, deshalb gleiche Höhe;
+      `bildUrl("covers", member.cover_url ?? null)`; Fixture `COVER_PFAD` ist
+      ein **Pfad**, kein `https://…` (`MemberDirectory.test.tsx:299`);
+      `offer_categories`/`need_categories` weiter im RPC-Typ
+      (`database.types.ts:1900–1901, 2122–2123`); die Kategorien stehen an
+      beiden zugesagten Stellen — Filterspalte (`MemberDirectory.tsx:299–316`)
+      und Profil (`PublicProfilePage.tsx:234`, von diesem Change nicht
+      angefasst).
+      `events`, fünf Klauseln: `@container` + `@[27rem]`/`@[41rem]`
+      (`EventsList.tsx:287–288`) — Behälterbreite, nicht Viewport, Maximum
+      drei; 409 px liegen unter 27rem, also eine Kachel ≥ 208 px;
+      Kachelinhalt und Detail-Link in `EventCard.tsx`; Datumsmarke und
+      höhengleicher Platzhalter in `EventCover.tsx:45`; die Zahl kommt aus
+      `event_registration_counts` (`events.ts:398`), `event_attendees` nur auf
+      der Detailseite (`events.ts:507`).
+- [x] 6.2 `openspec validate --all` grün — 31 passed, 0 failed.
+- [x] 6.3 Code-Review auf dem **Diff** (nicht auf dem Plan). Ein Befund,
+      behoben; eine Beobachtung, offen.
+      **Behoben — das `aria-label` überschrieb den sichtbaren Namen.** Auf den
+      beiden NEU gebauten Spalten trugen drei Bedienelemente sowohl ein
+      sichtbares `<label for>` als auch ein `aria-label`
+      (`EventsList.tsx` Suche, `AcademyPage.tsx` Suche und Sortierung). Ein
+      `aria-label` ERSETZT den Text des Labels als zugänglichen Namen, statt
+      ihn zu ergänzen: „Suche" war nicht mehr der Name des Feldes (WCAG 2.5.3,
+      Sprachbedienung trifft es nicht mehr). Auf `/mitglieder` ist das
+      `aria-label` richtig — dort gibt es kein sichtbares Label; beim
+      Übernehmen kam hier eines dazu. Die drei `aria-label` sind entfernt.
+      **Gemessen, nicht vermutet:** die erste Sonde über
+      `getByLabelText("Suche")` war in BEIDE Richtungen grün — die Abfrage
+      prüft die Label-Zuordnung, nicht den berechneten Namen, und hätte nichts
+      belegt. Erst `getByRole("searchbox", { name: "Suche" })` wurde rot
+      (5 von 11), nach der Reparatur grün (11 von 11).
+      **Offen, unvermessen — `*` bleibt in `feed.ts` unmaskiert.** Die
+      Volltextsuche maskiert `%`, `_` und `\` (`feed.ts:756`). PostgREST
+      deutet für `like`/`ilike` zusätzlich `*` als `%`; der Client reicht das
+      Muster wörtlich durch (`ilike.${pattern}`), die Umdeutung geschähe also
+      serverseitig. Wer `*` tippt, träfe dann alles statt eines Sternchens.
+      **Gegen diese Auslieferung nicht nachgemessen**, und deshalb bewusst
+      nicht blind repariert: ob `\*` richtig wirkt, hängt an der Reihenfolge
+      von Maskierung und Umdeutung. Geringe Tragweite — ein Sternchen in einem
+      Suchfeld.
+- [x] 6.4 `pnpm vitest run` vollständig grün: **2315 Tests in 211 Dateien**,
+      Exit 0. Dazu `pnpm typecheck` Exit 0 und `pnpm lint` Exit 0 (7
+      Warnungen, alle in Dateien, die dieser Change nicht anfasst).
 
 ## Nicht in diesem Change
 

@@ -76,9 +76,9 @@ beforeEach(() => {
 describe("Academy: Suche, Hashtags und Sortierung in der Spalte", () => {
   it("schickt den Suchbegriff an die Anfrage, nicht in eine Nachfilterung", async () => {
     renderAcademy([video({ id: "1", body: "Über Führung" })]);
-    await screen.findByLabelText(/Volltextsuche/i);
+    await screen.findByRole("searchbox", { name: "Suche" });
 
-    fireEvent.change(screen.getByLabelText(/Volltextsuche/i), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Suche" }), {
       target: { value: "führung" },
     });
 
@@ -90,9 +90,9 @@ describe("Academy: Suche, Hashtags und Sortierung in der Spalte", () => {
 
   it("nutzt die vorhandene Ordnung „beliebteste“, statt eine eigene zu bauen", async () => {
     renderAcademy([video({ id: "1", body: "Über Führung" })]);
-    await screen.findByLabelText(/Sortierung/i);
+    await screen.findByRole("combobox", { name: "Sortierung" });
 
-    fireEvent.change(screen.getByLabelText(/Sortierung/i), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Sortierung" }), {
       target: { value: "beliebteste" },
     });
 
@@ -111,12 +111,12 @@ describe("Academy: Suche, Hashtags und Sortierung in der Spalte", () => {
 
   it("trägt auch ohne ein einziges Hashtag — der Zustand der Produktion", async () => {
     renderAcademy([video({ id: "1", body: "Über Führung" })]);
-    await screen.findByLabelText(/Volltextsuche/i);
+    await screen.findByRole("searchbox", { name: "Suche" });
 
     // Keine leere Hülle …
     expect(screen.queryByText("Hashtags")).toBeNull();
     // … aber die Spalte steht trotzdem.
-    expect(screen.getByLabelText(/Volltextsuche/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Sortierung/i)).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Suche" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Sortierung" })).toBeInTheDocument();
   });
 });

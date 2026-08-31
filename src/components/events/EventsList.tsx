@@ -173,13 +173,18 @@ function EventsBody({
             <label htmlFor="events-suche" className="font-display text-sm font-semibold text-ink">
               Suche
             </label>
+            {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
+                `<label for>`, und ein `aria-label` ERSETZT dessen Text als
+                zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
+                „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
+                Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
+                kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
             <Input
               id="events-suche"
               type="search"
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Titel, Beschreibung, Ort …"
-              aria-label="Volltextsuche in den Events"
             />
           </Card>
 

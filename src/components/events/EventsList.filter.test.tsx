@@ -77,7 +77,7 @@ describe("Eventliste: Suche und Facetten in der rechten Spalte", () => {
     ]);
     await screen.findByText("Kaminabend");
 
-    fireEvent.change(screen.getByLabelText(/Volltextsuche/i), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Suche" }), {
       target: { value: "esslingen" },
     });
 
@@ -131,7 +131,7 @@ describe("Eventliste: Suche und Facetten in der rechten Spalte", () => {
     expect(screen.queryByText("Themen")).toBeNull();
     // Suchfeld und Art-Facette stehen trotzdem — die Spalte trägt auf jeder
     // Datenlage.
-    expect(screen.getByLabelText(/Volltextsuche/i)).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Suche" })).toBeInTheDocument();
     expect(screen.getByText("Art")).toBeInTheDocument();
   });
 
