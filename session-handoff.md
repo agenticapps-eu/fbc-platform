@@ -18,12 +18,12 @@
 `donald/age-642-capacitor-huelle`. **Kein PR offen.** Zwei Commits tragen Code,
 der Rest ist Doku.
 
-**Rückstand selbst messen, nicht hier ablesen** — `main` bewegt sich mehrmals
-täglich: `git fetch origin main && git rev-list --left-right --count
-origin/main...HEAD`. Beim Schreiben dieser Zeile: 2 hinter, 13 voraus. Der
-letzte Rebase lief sauber; wir fassen nur `openspec/changes/capacitor-huelle/`,
-`docs/decisions/`, `scripts/ota-buendel*`, `supabase/`, `capacitor.config.ts`
-und die zwei Workflows an.
+**Rückstand selbst messen** (`main` bewegt sich mehrmals täglich):
+`git fetch origin main && git rev-list --left-right --count origin/main...HEAD`.
+Beim Schreiben: 2 hinter, 14 voraus. Der letzte Rebase lief sauber — wir fassen
+nur `openspec/changes/capacitor-huelle/`, `docs/decisions/`,
+`scripts/ota-buendel*`, `supabase/`, `capacitor.config.ts` und die zwei
+Workflows an.
 
 Change `capacitor-huelle`: **37 offen, 80 erledigt.**
 
