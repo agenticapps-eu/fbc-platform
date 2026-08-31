@@ -932,13 +932,34 @@ es 27,8 %. Nachzuziehen war der Seed, nicht das Feld, und das ist geschehen:
 beide Upload-Stellen (`import_world_seed.ts`, `demo_event_covers.ts`)
 schneiden über `titelbildZuschnitt` auf 1500 × 500 zu (AGE-599).
 
-Der **Bestand** ist davon noch nicht eingeholt, und das SHALL NOT als
-Gegenbeispiel gegen diese Anforderung gelten. Bereits liegende Objekte werden
-von einem weiteren Seed-Lauf NICHT ersetzt: beide Stellen schicken
+Der **Bestand auf DEV** ist davon nicht eingeholt, und das SHALL NOT als
+Gegenbeispiel gegen diese Anforderung gelten. Am 31.08. dort gemessen: acht
+Objekte in `event-covers`, **null davon 3:1** (1600 × 1067 bis 1600 × 1200,
+also 1,333:1 bis 1,501:1).
+
+**Warum ein Seed-Lauf das nicht heilt, SHALL festgehalten sein** — die
+naheliegende Annahme ist falsch und führt zu Datenverlust. Die Objekte tragen
+Pfade der Form `<host_id>/vorschau-<bild>.webp` und stammen aus dem **Spiegel
+DEV ← PROD** (AGE-576), nicht aus einem Seed-Lauf gegen DEV. Der Spiegel
+kopiert absichtlich 1:1 und schneidet nicht zu. Daraus folgt:
+
+- `demo_event_covers.ts` zielt zwar auf DEV, spricht aber die synthetischen
+  Demo-Events an. Am 31.08. gemessen: **null von acht** dieser IDs existieren
+  dort. Ein Lauf fände nichts und lüde nichts hoch.
+- `import_world_seed.ts` schreibt die passende Pfadform, zielt aber auf PROD
+  (`ZIEL_PROJEKT`, von `zielPruefen()` erzwungen).
+
+Die acht Objekte auf DEV zu löschen SHALL NOT als Vorbereitung eines
+Seed-Laufs geschehen: danach zeigten acht Events auf Pfade ohne Objekt — graue
+Kästen ohne Fehlermeldung —, und keines der beiden Skripte stellte sie wieder
+her.
+
+**Entschieden am 31.08. (Donald): DEV bleibt so, PROD wird nicht angefasst.**
+Für Testzwecke ist der Bestand brauchbar; ein vollständiger Neuaufbau bleibt
+möglich, ist aber ein eigener Vorgang. Der Zuschnitt selbst ist davon
+unberührt: beide Seed-Stellen schneiden zu, und beide schicken
 `x-upsert: false`, weil ein Upsert in einem privaten Bucket an der
-SELECT-Policy scheitert. Solange die alten Objekte nicht gelöscht und neu
-erzeugt sind, traegt der Bestand weiter Material, das der Seed heute so nicht
-mehr herstellt.
+SELECT-Policy scheitert.
 
 Geschützt ist das **gespeicherte** Bild, nicht das Original vor dem Zuschnitt.
 Beide Upload-Wege schneiden zu, bevor gespeichert wird; eine Zusage über das

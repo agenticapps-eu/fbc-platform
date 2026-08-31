@@ -5,14 +5,24 @@
 > **AGE-666** (PR #291) und **AGE-665** (PR #292) sind gemergt, beide Läufe auf
 > `main` grün — `CI` und `Deploy`. Nachzuholen ist am Code **nichts**.
 >
-> **Die erste Aktion der nächsten Sitzung ist eine Entscheidung, die nur Donald
-> treffen kann: die Abnahme von AGE-599.** Sie steht seit dem 28.08. und hat
-> zwei Schritte, nicht einen — unverändert gültig, siehe unten.
+> **⛔ AGE-599 ist ERLEDIGT — und die frühere Anweisung dazu war FALSCH.**
+> Eine ältere Fassung dieses Dokuments verlangte, „die acht Objekte in
+> `event-covers` auf DEV zu löschen und dann zu seeden". **Das hätte DEV
+> kaputtgemacht.** Am 31.08. dort gemessen (nur lesend): die acht Objekte
+> tragen Pfade `<host_id>/vorschau-<bild>.webp` und stammen aus dem **Spiegel
+> DEV ← PROD (AGE-576)**, nicht aus einem Seed-Lauf. **0 von 8** Event-IDs aus
+> `demo_event_covers.ts` existieren auf DEV, und `import_world_seed.ts` zielt
+> auf PROD. Nach dem Löschen zeigten acht Events auf Pfade ohne Objekt —
+> graue Kästen ohne Fehlermeldung —, und **keines der beiden Skripte** stellte
+> sie wieder her.
 >
-> **Ein Eintrag wartet in der Admin-Ansicht.** Das Archivieren von AGE-665 hat
-> automatisch einen Neuigkeiten-Eintrag erzeugt („Die Titelbild-Anforderung sagt
-> wieder, was gebaut ist"). Er trägt Spec-Innensicht und richtet sich nicht an
-> Mitglieder — in `AdminNeuigkeitenPage` auf **übersprungen** setzen.
+> **Entschieden (Donald, 31.08.): DEV bleibt so — zum Testen brauchbar —,
+> PROD wird NICHT angefasst.** Ein vollständiger Seed ist vielleicht später ein
+> eigener Vorgang. Nachgezogen in `design-system/spec.md` samt einem SHALL NOT
+> gegen das Löschen als Seed-Vorbereitung.
+>
+> **Der Neuigkeiten-Eintrag ist kein offener Punkt** — Donald macht das
+> generell selbst.
 
 **Sitzung:** Worktree `fbc-platform.neuigkeiten-archiv` (der Name gehört zu
 einem längst archivierten Change). Gearbeitet wurde auf Branches, die direkt von
@@ -26,6 +36,7 @@ einem veralteten Stand abgezweigt.
 | --- | --- | --- |
 | #291 | **AGE-666** — flackernder Test, hielt `verify` rot | gemergt, `main` grün |
 | #292 | **AGE-665** — Spec-Drift im Titelbild-Abschnitt | gemergt, Delta gefaltet |
+| #294 | **AGE-599** — Bestand auf DEV: warum ein Seed-Lauf ihn nicht heilt | gemergt, Delta gefaltet |
 
 **AGE-666 ließ sich nicht statistisch abnehmen — und das war der Befund.** Acht
 volle Suite-Läufe auf dem ungepatchten Stand: **8 von 8 grün**. Die Flakiness
@@ -51,6 +62,15 @@ Begründung**:
   die Karte zieht aus `covers` wie der Profilkopf, der Feed über
   `signEventCovers` aus `event-covers` wie Kachel und Kopf.
 
+**AGE-599 wurde abgenommen — und die Abnahme hat den Plan widerlegt.** Die
+Vorher-Messung gegen DEV (nur lesend, Ziel vorher belegt) ergab 8 Objekte,
+**0 davon 3:1**. Entscheidend war aber nicht diese Zahl, sondern zwei andere:
+die Pfadform `<host_id>/vorschau-<bild>.webp` gehört zu `import_world_seed.ts`
+(das auf **PROD** zielt), und **0 von 8** Event-IDs aus `demo_event_covers.ts`
+existieren auf DEV. Der Bestand stammt also aus dem **Spiegel AGE-576**, und
+Löschen hätte acht Events auf leere Pfade zeigen lassen, ohne Weg zurück.
+**Es wurde nichts gelöscht.**
+
 ## Decisions
 
 - **Vorschauen bekommen eine eigene Klausel**, keinen fünften Aufzählungspunkt
@@ -67,8 +87,10 @@ Begründung**:
 - **Der Feed bleibt ausgeschlossen, aber mit dem richtigen Grund.** Der
   Ausschluss ruht jetzt sichtbar auf AGE-664 statt auf einer falschen
   Materialbehauptung.
-- **Kein Fremdreviewer bei beiden Vorgängen** — weder Schema noch Rechte noch
-  Sicherheit (`reviewer-nur-bei-migration-und-rls`).
+- **Kein Fremdreviewer bei allen drei Vorgängen** — weder Schema noch Rechte
+  noch Sicherheit (`reviewer-nur-bei-migration-und-rls`).
+- **DEV bleibt, PROD wird nicht angefasst** (Donald, 31.08.). Der Bestand ist
+  zum Testen brauchbar; ein vollständiger Neuaufbau ist ein eigener Vorgang.
 
 ## Files modified
 
@@ -79,25 +101,28 @@ Begründung**:
   ausgestellt; **vier** Bauteile, Vorschau-Klausel, Feed als einzige Ausnahme,
   alle **neun** Szenarien zeichengleich erhalten
 - `openspec/changes/archive/2026-08-31-titelbild-anforderung-nachziehen/` — neu
-- `src/content/release-entries.generated.ts` — 13 Zeilen, nach `pnpm
-  release:entries` + einzelnem prettier
+- `openspec/changes/archive/2026-08-31-titelbild-bestand-auf-dev/` — neu; der
+  Bestandsabsatz nennt jetzt die Herkunft (Spiegel) und spricht ein SHALL NOT
+  gegen das Löschen als Seed-Vorbereitung aus
+- `src/content/release-entries.generated.ts` — nach `pnpm release:entries`
+  + einzelnem prettier
 
 ## Next session: start here
 
-**Erste Aktion: die Abnahme von AGE-599 — sie braucht Donalds Freigabe**, weil
-sie in eine geteilte Umgebung schreibt. Zwei Schritte, nicht einer:
+**Es liegt nichts Blockierendes an.** AGE-599 ist erledigt und entschieden
+(siehe Kasten oben); es wartet keine Freigabe mehr.
 
-1. **Die acht bestehenden Objekte in `event-covers` auf DEV löschen.** Ein
-   Seed-Lauf allein ersetzt sie nicht: beide Upload-Stellen schicken
-   `x-upsert: false` (`demo_event_covers.ts:97`, `import_world_seed.ts:694`),
-   und das ist Absicht mit gemessener Begründung — in privaten Buckets scheitert
-   ein Upsert an der SELECT-Policy. Die Pfade ändert der PR nicht.
-2. **Dann den Seed laufen lassen und messen** (3,00:1 ± 0,01 für alle acht,
-   danach `/events` im Browser).
-
-Danach sind die nächsten Vorgänge **AGE-664** (der Feed, die letzte Fläche, die
-noch beschneidet — kippt eine ausgesprochene Entscheidung, siehe unten),
+Die nächsten Vorgänge, frei wählbar: **AGE-664** (der Feed, die letzte Fläche,
+die noch beschneidet — kippt eine ausgesprochene Entscheidung, siehe unten),
 **AGE-660** und **AGE-618**.
+
+**Parallel läuft eine zweite Sitzung an AGE-642** (mobile Hülle), Branch
+`donald/age-642-capacitor-huelle`, zum Stand dieser Übergabe noch nicht
+gepusht (braucht `--force-with-lease` wegen des Squash von #277). Sie fasst
+`useOverlay` (zweites Pflichtargument) und sechs Dateifelder in
+`CommunityFeed`, `ProfilPage`, `WillkommenPage`, `EventCoverPicker` an.
+**Berührungspunkt mit dieser Sitzung: nur `session-handoff.md`.** Wer eine
+dieser Flächen anfasst, sagt dort bitte kurz Bescheid.
 
 ## Open questions
 
