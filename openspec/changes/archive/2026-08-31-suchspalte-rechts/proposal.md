@@ -1,3 +1,7 @@
+# Suche und Filter stehen jetzt rechts und laufen beim Blättern mit
+
+Linear: **AGE-629**
+
 ## Why
 
 AGE-629. Suche und Filter stehen heute über der Liste und nehmen dem Inhalt
