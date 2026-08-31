@@ -8,10 +8,10 @@ import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { FilterSpalte } from "../ui/FilterSpalte";
 import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
-import { Icon } from "../ui/icons";
 import { cn } from "../../lib/cn";
 import { levelLabel } from "../../config/levels";
 import {
@@ -135,22 +135,18 @@ export default function MemberDirectory() {
   }, [uid, queryClient]);
 
   const active = hasActiveFilters(filters);
-  /**
-   * Die Filterspalte ist auf schmalen Schirmen zugeklappt (AGE-629).
-   *
-   * Vorher gab es hier ZWEI Aufklapper: einen für die erweiterten Felder
-   * (AGE-566, weil über der Liste die Höhe fehlte) und keinen für die Spalte,
-   * die es noch nicht gab. Jetzt gibt es einen. Ab `lg` steht die Spalte
-   * ohnehin, und mit ihr stehen die erweiterten Felder offen — der Mangel, den
-   * das Einklappen beantwortete, existiert in einer eigenen Spalte nicht.
-   *
-   * Anfangswert aus `hasAdvancedFilters` und nicht `false`: käme man über einen
-   * Link mit gesetzten Filtern hierher, stünde sonst eine gefilterte Liste ohne
-   * ein einziges sichtbares Filterfeld da. Heute kann das nicht eintreten — die
-   * Adresszeile trägt nur `q`, und das ist ausdrücklich KEIN erweiterter Filter
-   * —, aber die Bedingung sagt, was gelten soll, wenn sie es einmal trägt.
-   */
-  const [offen, setOffen] = useState(() => hasAdvancedFilters(filters));
+  /* Zur Filterspalte (AGE-629): vorher gab es hier ZWEI Aufklapper — einen für
+     die erweiterten Felder (AGE-566, weil über der Liste die Höhe fehlte) und
+     keinen für die Spalte, die es noch nicht gab. Jetzt gibt es einen, und er
+     steht in `FilterSpalte`. Ab `lg` steht die Spalte ohnehin, und mit ihr
+     stehen die erweiterten Felder offen — der Mangel, den das Einklappen
+     beantwortete, existiert in einer eigenen Spalte nicht.
+
+     `anfangsOffen` aus `hasAdvancedFilters`: käme man über einen Link mit
+     gesetzten Filtern hierher, stünde sonst eine gefilterte Liste ohne ein
+     einziges sichtbares Filterfeld da. Heute kann das nicht eintreten — die
+     Adresszeile trägt nur `q`, und das ist ausdrücklich KEIN erweiterter
+     Filter —, aber die Bedingung sagt, was gelten soll, wenn sie es tut. */
   // `useMemo` und nicht `results.data ?? []`: der Kurzschluss erzeugt bei jedem
   // Rendern ein NEUES leeres Array, und die beiden Schnitte darunter liefen
   // dann jedes Mal neu. Kein Fehler, aber eine unnötige Runde je Tastendruck.
@@ -222,36 +218,17 @@ export default function MemberDirectory() {
         </p>
       </header>
 
-      {/* Zwei Spalten ab `lg` (AGE-629). Das Muster ist von der Aktivität
-          abgeschrieben (`CommunityFeed.tsx:313/334/561`) und nicht neu
-          erfunden: dieselben 16rem, derselbe `gap-6`, dieselben Sticky-Klassen.
-          `lg:row-start-1`, damit die Spalte oben neben den Reitern beginnt und
-          nicht erst neben der Trefferliste. */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto">
-          {/* Der eine Schalter, der die ganze Spalte zuklappt — nur unterhalb
-              von `lg`, darüber steht sie ohnehin. Trägt zusätzlich den Hinweis
-              auf verborgene aktive Filter: ein aktiver, aber unsichtbarer
-              Filter erklärt sonst eine kurze Trefferliste nicht, und genau
-              diese Verwechslung hat „keine Treffer" hier schon einmal
-              erzeugt. */}
-          <div className="mb-3 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setOffen((v) => !v)}
-              aria-expanded={offen}
-              aria-controls="verzeichnis-filter"
-              className="inline-flex w-full items-center justify-between rounded-md border border-line px-3 py-2 text-sm text-muted transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-            >
-              Filter
-              <Icon name="chevronDown" className={`h-4 w-4 ${offen ? "rotate-180" : ""}`} />
-            </button>
-            {!offen && hasAdvancedFilters(filters) && (
-              <p className="mt-2 text-sm text-muted">Erweiterte Filter sind aktiv.</p>
-            )}
-          </div>
-
-          <div id="verzeichnis-filter" className={`${offen ? "" : "hidden"} lg:block`}>
+      {/* Der Rahmen — Raster, Sticky-Spalte, Aufklapper — steht in
+          `FilterSpalte` und nicht dreimal im Haus. Der Hinweis auf verborgene
+          aktive Filter gehört an den Schalter: ein aktiver, aber unsichtbarer
+          Filter erklärt eine kurze Trefferliste nicht, und genau diese
+          Verwechslung hat „keine Treffer" hier schon einmal erzeugt. */}
+      <FilterSpalte
+        id="verzeichnis-filter"
+        anfangsOffen={hasAdvancedFilters(filters)}
+        hinweisWennZu={hasAdvancedFilters(filters) ? "Erweiterte Filter sind aktiv." : undefined}
+        filter={
+          <>
             {/* Der Filterblock trägt dieselbe Krankheit wie die Kartenraster und
           bekommt dieselbe Kur (AGE-629) — hier sogar dringender: er zieht in
           die 16rem breite rechte Spalte, und `lg:grid-cols-3` ergäbe dort drei
@@ -347,92 +324,90 @@ export default function MemberDirectory() {
                 )}
               </div>
             </div>
-          </div>
-        </aside>
-
-        <div className="space-y-6 lg:col-start-1 lg:row-start-1">
-          <div className="border-b border-line">
-            <div role="tablist" aria-label="Verzeichnis" className="flex gap-6 overflow-x-auto">
-              {(
-                [
-                  { id: "alle", label: "Alle Mitglieder", zahl: zahlAlle },
-                  { id: "kontakte", label: "Meine Kontakte", zahl: zahlKontakte },
-                ] as const
-              ).map((r) => {
-                const gewaehlt = r.id === reiter;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    role="tab"
-                    id={`verzeichnis-reiter-${r.id}`}
-                    aria-selected={gewaehlt}
-                    aria-controls="verzeichnis-tafel"
-                    onClick={() => setReiter(r.id)}
-                    className={
-                      "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
-                      (gewaehlt
-                        ? "border-accent text-accent-strong"
-                        : "border-transparent text-muted hover:text-ink")
-                    }
-                  >
-                    {r.label}
-                    {/* `aria-hidden`, und das ist der Punkt: der zugängliche NAME des
+          </>
+        }
+      >
+        <div className="border-b border-line">
+          <div role="tablist" aria-label="Verzeichnis" className="flex gap-6 overflow-x-auto">
+            {(
+              [
+                { id: "alle", label: "Alle Mitglieder", zahl: zahlAlle },
+                { id: "kontakte", label: "Meine Kontakte", zahl: zahlKontakte },
+              ] as const
+            ).map((r) => {
+              const gewaehlt = r.id === reiter;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="tab"
+                  id={`verzeichnis-reiter-${r.id}`}
+                  aria-selected={gewaehlt}
+                  aria-controls="verzeichnis-tafel"
+                  onClick={() => setReiter(r.id)}
+                  className={
+                    "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
+                    (gewaehlt
+                      ? "border-accent text-accent-strong"
+                      : "border-transparent text-muted hover:text-ink")
+                  }
+                >
+                  {r.label}
+                  {/* `aria-hidden`, und das ist der Punkt: der zugängliche NAME des
                     Reiters bleibt seine Beschriftung. Stünde die Zahl darin,
                     läse eine Vorleseausgabe „Meine Kontakte 2" als Bezeichnung
                     eines Bedienelements vor — und der Name änderte sich bei
                     jeder angenommenen Anfrage. Dasselbe Muster wie in der
                     Admin-Mitgliederliste. */}
-                    {r.zahl !== null && (
-                      <span
-                        aria-hidden="true"
-                        className={
-                          "ml-1.5 text-xs tabular-nums " +
-                          (gewaehlt ? "text-accent-strong" : "text-muted")
-                        }
-                      >
-                        {r.zahl}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                  {r.zahl !== null && (
+                    <span
+                      aria-hidden="true"
+                      className={
+                        "ml-1.5 text-xs tabular-nums " +
+                        (gewaehlt ? "text-accent-strong" : "text-muted")
+                      }
+                    >
+                      {r.zahl}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {/* `aria-labelledby` und `aria-controls` gehören zusammen: ohne sie hört
+        {/* `aria-labelledby` und `aria-controls` gehören zusammen: ohne sie hört
           jemand mit einer Vorleseausgabe eine unbeschriftete Tafel und erfährt
           nicht, zu welchem der beiden Reiter sie gehört. `tabIndex={0}`, damit
           die Tafel selbst anfahrbar ist. Dieselbe Verdrahtung wie in der
           Admin-Mitgliederliste. */}
-          <div
-            role="tabpanel"
-            id="verzeichnis-tafel"
-            aria-labelledby={`verzeichnis-reiter-${reiter}`}
-            tabIndex={0}
-          >
-            {reiter === "alle" ? (
-              <DirectoryResults
-                isLoading={results.isLoading}
-                isError={results.isError}
-                members={members}
-                active={active}
-                onReset={reset}
-              />
-            ) : (
-              <KontakteResults
-                isLoading={results.isLoading || contacts.isLoading || facetsQuery.isLoading}
-                isError={results.isError}
-                kontaktabfrageGescheitert={contacts.isError}
-                hatKontakte={contactIds.size > 0}
-                hatSichtbareKontakte={sichtbareKontakteUngefiltert.length > 0}
-                members={kontakte}
-                onReset={reset}
-              />
-            )}
-          </div>
+        <div
+          role="tabpanel"
+          id="verzeichnis-tafel"
+          aria-labelledby={`verzeichnis-reiter-${reiter}`}
+          tabIndex={0}
+        >
+          {reiter === "alle" ? (
+            <DirectoryResults
+              isLoading={results.isLoading}
+              isError={results.isError}
+              members={members}
+              active={active}
+              onReset={reset}
+            />
+          ) : (
+            <KontakteResults
+              isLoading={results.isLoading || contacts.isLoading || facetsQuery.isLoading}
+              isError={results.isError}
+              kontaktabfrageGescheitert={contacts.isError}
+              hatKontakte={contactIds.size > 0}
+              hatSichtbareKontakte={sichtbareKontakteUngefiltert.length > 0}
+              members={kontakte}
+              onReset={reset}
+            />
+          )}
         </div>
-      </div>
+      </FilterSpalte>
     </section>
   );
 }

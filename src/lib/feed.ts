@@ -575,6 +575,13 @@ export interface FetchFeedArgs {
   tags?: string[];
   /** Gewählte Beitragstypen als ODER; die leere Menge heißt „alle Typen". */
   typen?: FeedTyp[];
+  /**
+   * Volltext über den Beitragstext (AGE-629). Leer oder nur Leerzeichen heißt
+   * „nicht suchen" — ein leerer Begriff, der als `ilike '%%'` durchginge, wäre
+   * kein Filter, aber er stünde im Abfrageschlüssel und teilte den
+   * Zwischenspeicher unnötig.
+   */
+  suche?: string;
 }
 
 /**
@@ -685,6 +692,7 @@ export async function fetchFeed({
   ordnung = "neueste",
   tags,
   typen = [],
+  suche,
 }: FetchFeedArgs): Promise<FeedSeite> {
   // DER STILLE FALL, und der Wächter steht VOR der ersten Zeile Anfrage.
   // Ein fehlender Autorenfilter ist kein leerer Filter: `if (uid) query =
@@ -737,6 +745,15 @@ export async function fetchFeed({
   // Hinter Auswahlkästchen, die Mehrfachauswahl versprechen, wäre das eine
   // Lüge an der Oberfläche — und bei zwei Haken fast immer eine leere Liste.
   if (gewaehlteTags.length > 0) query = query.overlaps("hashtags", gewaehlteTags);
+  // Volltext über den Beitragstext (AGE-629, für die Academy-Spalte). Aus
+  // demselben Grund in der Anfrage wie alles darunter.
+  //
+  // `%` und `_` sind LIKE-Platzhalter: ungeschützt fände die Eingabe „100_%"
+  // etwas ganz anderes als das Getippte, und ein einzelnes `%` alles. Sie
+  // werden deshalb maskiert, nicht entfernt — wer sie tippt, meint sie
+  // wörtlich.
+  const begriff = suche?.trim() ?? "";
+  if (begriff) query = query.ilike("body", `%${begriff.replace(/[%_\\]/g, "\\$&")}%`);
   // Der Filter sitzt in der ANFRAGE, nicht hinterher im Client: sonst trüge
   // eine Seite von 20 gelesenen Zeilen nur die paar passenden, und „Ältere
   // Beiträge" liefe durch den ganzen Bestand, um eine Seite zu füllen. Das

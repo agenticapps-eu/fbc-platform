@@ -52,36 +52,36 @@ richtig, die Aussage über die Kante nicht.
 
 ## 2. Die Spalte auf `/mitglieder`
 
-- [ ] 2.1 RED: Test, dass Suchfeld und Facetten ab `lg` in der rechten Spalte
+- [x] 2.1 RED: Test, dass Suchfeld und Facetten ab `lg` in der rechten Spalte
       stehen und die erweiterten Filter offen sind.
-- [ ] 2.2 Raster `lg:grid-cols-[minmax(0,1fr)_16rem]` mit `gap-6`, Spalte mit
+- [x] 2.2 Raster `lg:grid-cols-[minmax(0,1fr)_16rem]` mit `gap-6`, Spalte mit
       den Sticky-Klassen aus `CommunityFeed.tsx:334`, Aufklapper aus `:561`.
-- [ ] 2.3 Erweiterte Filter dauerhaft offen; das bisherige Zuklappen entfällt
+- [x] 2.3 Erweiterte Filter dauerhaft offen; das bisherige Zuklappen entfällt
       nur ab `lg`.
-- [ ] 2.4 GREEN.
+- [x] 2.4 GREEN.
 
 ## 3. Die Spalte auf `/events`
 
-- [ ] 3.1 RED: Test, dass die Art-Facette genau die Werte aus
+- [x] 3.1 RED: Test, dass die Art-Facette genau die Werte aus
       `events_type_check` anbietet. Der Test SHALL den Constraint lesen
       (Migration oder Katalog), nicht die Liste gegen sich selbst prüfen.
-- [ ] 3.2 Feste Art-Liste aus dem Constraint, Themen-Facette aus dem Bestand,
+- [x] 3.2 Feste Art-Liste aus dem Constraint, Themen-Facette aus dem Bestand,
       Volltext über Titel · Beschreibung · Ort.
-- [ ] 3.3 Spalte wie 2.2. Suche und Facetten wirken **innerhalb** des gewählten
+- [x] 3.3 Spalte wie 2.2. Suche und Facetten wirken **innerhalb** des gewählten
       Reiters.
-- [ ] 3.4 RED→GREEN: eine Facette ohne Werte rendert nicht, Volltextfeld steht
+- [x] 3.4 RED→GREEN: eine Facette ohne Werte rendert nicht, Volltextfeld steht
       trotzdem.
 
 ## 4. Die Spalte auf `/academy`
 
-- [ ] 4.1 RED: Test, dass ohne Hashtags im Bestand keine Hashtag-Karte
+- [x] 4.1 RED: Test, dass ohne Hashtags im Bestand keine Hashtag-Karte
       erscheint, Volltextfeld und Sortierung aber stehen.
-- [ ] 4.2 Volltext über den Beitragstext, Hashtag-Facette aus dem Bestand.
-- [ ] 4.3 Sortierung über die **vorhandenen** Ordnungen von `fetchFeed`
+- [x] 4.2 Volltext über den Beitragstext, Hashtag-Facette aus dem Bestand.
+- [x] 4.3 Sortierung über die **vorhandenen** Ordnungen von `fetchFeed`
       („Neueste", „Beliebteste"). Keine eigene Ordnung, kein zweiter
       Cursorvertrag.
-- [ ] 4.4 Die drei kuratierten Lektionen bleiben oberhalb der geteilten Videos.
-- [ ] 4.5 GREEN.
+- [x] 4.4 Die drei kuratierten Lektionen bleiben oberhalb der geteilten Videos.
+- [x] 4.5 GREEN.
 
 ## 5. Abnahme im Browser (qa-Gate)
 
@@ -89,14 +89,40 @@ Die Spaltenzahlen sind CSS; jsdom kann sie nicht messen. Abgenommen wird an
 denselben Breiten wie die Ausgangsmessung, je Fläche, und die **gemessenen
 Zahlen werden hier eingetragen** — nicht „sieht gut aus".
 
-- [ ] 5.1 `/mitglieder`, `/events`, `/academy` bei 1024 · 1280 · 1440 · 1920 px,
+- [x] 5.1 `/mitglieder`, `/events`, `/academy` bei 1024 · 1280 · 1440 · 1920 px,
       je mit Chat-Leiste eingeklappt und offen.
 - [ ] 5.2 Gegenprobe, dass **kein heutiger Zustand** sich geändert hat:
       1009→3×219, 1265 eingekl.→3×280, 1265 offen→3×208, 1425→3×334,
       1905→3×448.
-- [ ] 5.3 Kein waagerechter Überlauf auf 375 px (`scrollWidth` allein genügt
+- [x] 5.3 Kein waagerechter Überlauf auf 375 px (`scrollWidth` allein genügt
       nicht — im Bild ansehen).
 - [ ] 5.4 Gemessene Werte in diesen Abschnitt eintragen.
+
+### Sichtprobe an den echten Spalten (31.08.)
+
+`/events` bei 1265 px: Spalte 256 px, Listenspalte **593 px**, Karten **2 × 289**,
+Ueberlauf 0. Die vier Sticky-Bedingungen greifen alle — `position: sticky`,
+`top: 80px`, `align-self: flex-start`, `max-height` + `overflow-y: auto`. Der
+Aufklapper ist ab `lg` ausgeblendet, die Filterflaeche sichtbar.
+
+`/events` und `/academy` bei 375 px: Spalte im Fluss, zugeklappt, Karten
+1 × 343, Ueberlauf **0**.
+
+**Dabei einen echten Fehler gefunden — im Bild, nicht im Test.** Bei 375 px lief
+das Dokument um **31 px** zur Seite: das Raster der `FilterSpalte` hatte
+unterhalb von `lg` nur eine implizite `auto`-Spalte, und die waechst auf
+`max-content`; beide Kinder wurden 389 px breit in einem 343-px-Behaelter.
+Behoben mit `grid-cols-1` als Grundfall (Tailwind setzt das als
+`minmax(0, 1fr)`). 2315 gruene Tests sahen das nicht.
+
+Ein zweiter Kandidat war keiner: der dritte Reiter steht rechts heraus, sitzt
+aber in einer Leiste mit `overflow-x: auto` und schiebt das Dokument nicht.
+Bestehendes Verhalten der `Tabs`.
+
+**Positivkontrolle zur Facettenregel:** auf DEV rendert die Hashtag-Karte der
+Academy (dort gibt es Hashtags), auf der Datenlage der Produktion nicht — der
+leere Fall ist als Unit-Test belegt, der volle im Bild. Ein Negativbefund allein
+haette nicht unterschieden, ob die Karte fehlt oder die Facette kaputt ist.
 
 ## 6. Vor dem Archivieren
 
