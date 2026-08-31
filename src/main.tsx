@@ -1,4 +1,5 @@
 import "./instrument"; // ← MUSS der erste Import bleiben (Sentry vor allem anderen).
+import "./lib/ota"; // ← und dieser der zweite: die Startbestätigung des Luftwegs.
 
 import { Capacitor } from "@capacitor/core";
 import * as Sentry from "@sentry/react";

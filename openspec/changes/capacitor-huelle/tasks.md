@@ -930,10 +930,41 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
 
 ### D4. Der Rückweg — ohne ihn ist OTA eine Einbahnstraße
 
-- [ ] `notifyAppReady()` nach erfolgreichem Start aufrufen und das
-      Rollback-Verhalten konfigurieren.
-- [ ] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
-      Start scheitert, fällt auf die vorige Fassung zurück.
+- [x] `notifyAppReady()` nach erfolgreichem Start aufrufen und das
+      Rollback-Verhalten konfigurieren. **Erledigt** — `src/lib/ota.ts` ist ein
+      Nebenwirkungs-Modul ohne Export, in `main.tsx` als **zweiter** Import
+      direkt hinter `./instrument`. Der Import IST der Aufruf; damit gibt es
+      keine Funktion, die jemand zu rufen vergessen kann. Ohne Bedingung (die
+      Web-Umsetzung ist ein `return { bundle: BUNDLE_BUILTIN }`,
+      `dist/esm/web.js:172`) und ohne `await` (ein top-level `await` machte aus
+      einer hakenden Brücke einen Startfehler).
+- [x] **Das Rollback-Verhalten war die eigentliche Arbeit:**
+      `autoDeleteFailed: false` in `capacitor.config.ts`. Die Vorgabe ist
+      `true` und macht aus dem Rückfall eine **Endlosschleife** — am 31.08. an
+      8.51.15 auf beiden Plattformen gemessen: `checkRevert()` setzt das
+      kaputte Bündel auf ERROR und rollt zurück (`.swift:3353`, `.java:5140`),
+      das anschliessende Löschen mit `removeInfo: false` **überschreibt dieses
+      ERROR mit DELETED** (`CapgoUpdater.swift:2325`, `.java:1632`), und DELETED
+      ist genau der Zweig, der beim nächsten Start dasselbe Bündel **erneut
+      lädt** (`.swift:4364-4379`, `.java:4999`) statt abzubrechen, wie ERROR es
+      täte (`.swift:4391`, `.java:4915`). Der Abbruch-Zweig ist mit der Vorgabe
+      toter Code. **Der Endpunkt aus D3 kann das nicht auffangen:**
+      `ota_buendel_neuestes` liefert, was streng später eingetragen wurde als
+      das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
+      kaputte Bündel ist also weiterhin „später". Die Schleife ist nur auf dem
+      Gerät zu brechen.
+- [x] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
+      Start scheitert, fällt auf die vorige Fassung zurück. **Zur Hälfte
+      belegt, und die Hälfte ist benannt** — wie schon bei der zweiten
+      RED-Zusage aus D3. Belegt ist unsere Hälfte, mit drei Zusagen in
+      `src/lib/ota.test.ts` und einer in `scripts/capacitor-config.test.ts`,
+      alle vier gegengeprüft: eine Plattform-Bedingung im Modul lässt zwei
+      Zusagen umfallen, ein top-level `await` die dritte, `autoDeleteFailed:
+      true` die vierte. Der Rückfall selbst ist Verhalten des Plugins und in
+      jsdom nicht herstellbar — er hängt an einem Zeitgeber im nativen Teil.
+      Er gehört damit zu den Gerätebelegen, nicht in den vitest-Lauf; ein Test,
+      der ihn hier behauptete, wäre grün, weil nichts passiert (dieselbe Falle
+      wie bei `env(safe-area-inset-*)` und dem `backButton`).
 - [x] Das Szenario im Spec-Delta ergänzen. **Erledigt** — gemessen am 31.08.:
       der `ADDED`-Block in `specs/native-shell/spec.md` trägt die Rückweg-Zusage
       (Z. 214–221) **und** das Szenario „Ein signiertes, aber defektes Bündel
@@ -942,6 +973,12 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       bleibt, bricht ohne diesen Rückweg **jedes** Gerät dauerhaft — bis eine
       neue Schale durch den Store geht. Das ist der teuerste denkbare Fehler
       dieses Changes.
+      **Nachgetragen am 31.08. beim Bauen:** eine zweite Zusage und ein zweites
+      Szenario, „Ein zurückgerolltes Bündel wird nicht ein zweites Mal
+      installiert". Ohne sie ist der Rückfall nur EINEN Start lang wahr — siehe
+      den `autoDeleteFailed`-Befund oben. Das Szenario beschreibt bewusst das
+      Gerät und nicht die Konfiguration: die Zusage muss auch dann noch gelten,
+      wenn das Plugin einmal ausgetauscht wird.
 
 ### D5. Beleg
 

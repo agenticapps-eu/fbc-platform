@@ -221,6 +221,18 @@ trotzdem nicht startet, jedes Gerät dauerhaft zum Stillstand — bis eine neue
 Schale durch den Store geht. Die Prüfsumme schützt gegen ein *fremdes* Bündel,
 nicht gegen ein *eigenes, kaputtes*.
 
+Ein Bündel, das einmal beim Start gescheitert ist, SHALL auf demselben Gerät
+nicht erneut installiert werden. Das Gerät SHALL sich merken, dass es
+gescheitert ist, und SHALL auf der vorigen Fassung bleiben, bis eine **andere**
+Fassung angeboten wird.
+
+Ohne dieses Gedächtnis ist der Rückfall nur einen Start lang wahr: der Dienst
+bietet dieselbe Fassung wieder an — sie ist ja weiterhin neuer als die, die nach
+dem Rückfall läuft —, das Gerät installiert sie, scheitert, rollt zurück, und
+beginnt von vorn. Aus einem einmaligen Fehlschlag würde eine Schleife bei jedem
+Start, und die wäre von aussen von einem dauerhaft defekten Gerät nicht zu
+unterscheiden.
+
 #### Scenario: Eine Web-Änderung erreicht das Gerät ohne Store
 
 - **WHEN** eine Änderung ausgeliefert wird, die nur Web-Assets betrifft
@@ -240,6 +252,14 @@ nicht gegen ein *eigenes, kaputtes*.
   nicht bis zur Startbestätigung kommt
 - **THEN** läuft beim nächsten Start wieder die zuvor installierte Fassung
 - **AND** das Gerät braucht dafür keine Store-Einreichung
+
+#### Scenario: Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert
+
+- **WHEN** der Aktualisierungsdienst nach einem Rückfall dieselbe Fassung erneut
+  anbietet
+- **THEN** installiert das Gerät sie nicht noch einmal
+- **AND** es bleibt auf der zuvor installierten Fassung, bis eine andere Fassung
+  angeboten wird
 
 #### Scenario: Ein Bündel für eine neuere Schale erreicht eine ältere nicht
 

@@ -103,6 +103,38 @@ const config: CapacitorConfig = {
       // Manifest-Tabelle erzwingt sie als `not null` — die beiden Zeilen
       // gehoeren zusammen.
       publicKey: OTA_PUBLIC_KEY,
+
+      // ══ DER RÜCKWEG BRAUCHT EIN GEDÄCHTNIS (AGE-642, Phase D4) ══════════
+      // Die Vorgabe ist `true`, und sie macht aus dem Rueckfall eine
+      // ENDLOSSCHLEIFE. Am 31.08. an 8.51.15 auf beiden Plattformen gemessen:
+      //
+      // 1. `checkRevert()` setzt das kaputte Buendel auf ERROR und rollt
+      //    zurueck (`.swift:3353-3399`, `.java:5140` ff.).
+      // 2. Danach loescht `autoDeleteFailed` es mit `removeInfo: false` — und
+      //    genau dieser Zweig UEBERSCHREIBT das eben gesetzte ERROR mit
+      //    DELETED (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
+      // 3. Beim naechsten Start fragt das Plugin den Endpunkt, findet die
+      //    Fassung im Verzeichnis wieder und prueft in dieser Reihenfolge:
+      //    `isErrorStatus()` wuerde ABBRECHEN (`.swift:4391`, `.java:4915`),
+      //    aber der Status ist DELETED — und der Zweig darueber wirft die
+      //    Registrierung weg und LAEDT DASSELBE BUENDEL ERNEUT
+      //    (`.swift:4364-4379`, `.java:4999`).
+      //
+      // Das laeuft bei jedem Start weiter, unbegrenzt: installieren,
+      // scheitern, zurueckrollen, neu laden. Der Abbruch-Zweig aus (3) ist
+      // mit der Vorgabe toter Code — er greift nur, wenn das Buendel mit
+      // seinem ERROR liegen bleiben darf.
+      //
+      // **Und der Endpunkt aus D3 kann das nicht auffangen.**
+      // `ota_buendel_neuestes` liefert, was STRENG spaeter eingetragen wurde
+      // als das, was laeuft. Nach dem Rueckfall laeuft wieder die aeltere
+      // Fassung — das kaputte Buendel ist damit weiterhin „spaeter" und wird
+      // wieder angeboten. Die Schleife ist nur auf dem Geraet zu brechen.
+      //
+      // Der Preis ist ein Buendel-Ordner, der liegen bleibt. Der Gegenwert
+      // ist, dass „faellt auf die vorige Fassung zurueck" auch beim ZWEITEN
+      // Start noch gilt. Bewacht von `scripts/capacitor-config.test.ts`.
+      autoDeleteFailed: false,
     },
   },
 };

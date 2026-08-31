@@ -78,6 +78,21 @@ describe("capacitor.config.ts", () => {
     expect(geparst.asymmetricKeyDetails?.modulusLength).toBe(2048);
   });
 
+  it("laesst das gescheiterte Buendel mit seinem ERROR liegen", async () => {
+    // Die Vorgabe ist `true` und macht aus dem Rueckfall eine Endlosschleife:
+    // das Loeschen mit `removeInfo: false` ueberschreibt den eben gesetzten
+    // Status ERROR mit DELETED (`CapgoUpdater.swift:2325`,
+    // `CapgoUpdater.java:1632`), und DELETED ist genau der Zweig, der beim
+    // naechsten Start dasselbe Buendel erneut laedt (`.swift:4364-4379`,
+    // `.java:4999`) — statt abzubrechen, wie ERROR es taete (`.swift:4391`,
+    // `.java:4915`).
+    //
+    // `undefined` ist hier deshalb KEIN bestandener Test, sondern der
+    // Fehlerfall: das Plugin liest dann seine eigene Vorgabe. Darum
+    // `toBe(false)` und nicht `toBeFalsy()`.
+    expect((await ladeConfig()).plugins?.CapacitorUpdater?.autoDeleteFailed).toBe(false);
+  });
+
   it("stempelt eine semver-foermige Vertragsnummer", async () => {
     // Eine blanke Zahl liesse `currentVersionNative` auf iOS still auf `0.0.0`
     // stehen (`CapacitorUpdaterPlugin.swift:262`).
