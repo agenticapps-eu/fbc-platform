@@ -216,15 +216,26 @@ laufende Fassung zurückfallen. Die Anwendung SHALL dem Aktualisierungsdienst
 ihren erfolgreichen Start ausdrücklich bestätigen; bleibt die Bestätigung aus,
 SHALL die vorige Fassung wieder in Betrieb gehen.
 
+Die Bestätigung SHALL erst abgehen, wenn tatsächlich ein Bild auf dem Schirm
+steht — nicht schon, wenn der Code des Bündels zu laufen beginnt. Sonst deckt
+der Rückweg genau den Fall nicht ab, für den es ihn gibt: ein Bündel, das lädt
+und dann weiss bleibt, wäre bereits bestätigt, bevor das Weissbleiben überhaupt
+eintreten kann.
+
 Ohne diesen Rückweg brächte ein Bündel, das **gültig signiert** ist und
 trotzdem nicht startet, jedes Gerät dauerhaft zum Stillstand — bis eine neue
 Schale durch den Store geht. Die Prüfsumme schützt gegen ein *fremdes* Bündel,
 nicht gegen ein *eigenes, kaputtes*.
 
 Ein Bündel, das einmal beim Start gescheitert ist, SHALL auf demselben Gerät
-nicht erneut installiert werden. Das Gerät SHALL sich merken, dass es
-gescheitert ist, und SHALL auf der vorigen Fassung bleiben, bis eine **andere**
-Fassung angeboten wird.
+nicht erneut installiert werden, solange dieselbe Schale läuft. Das Gerät SHALL
+sich merken, dass es gescheitert ist, und SHALL auf der vorigen Fassung bleiben,
+bis eine **andere** Fassung angeboten wird.
+
+Das Gedächtnis überdauert die Schale nicht: eine neue Fassung aus dem Store
+räumt sämtliche Bündel ab, das gescheiterte eingeschlossen. Danach darf dieselbe
+Fassung erneut angeboten und installiert werden — und das ist beabsichtigt, denn
+die neue Schale ist genau der Weg, auf dem ein Fehler behoben wird.
 
 Ohne dieses Gedächtnis ist der Rückfall nur einen Start lang wahr: der Dienst
 bietet dieselbe Fassung wieder an — sie ist ja weiterhin neuer als die, die nach
@@ -260,6 +271,13 @@ unterscheiden.
 - **THEN** installiert das Gerät sie nicht noch einmal
 - **AND** es bleibt auf der zuvor installierten Fassung, bis eine andere Fassung
   angeboten wird
+
+#### Scenario: Ein Bündel, das lädt und dann weiss bleibt, rollt zurück
+
+- **WHEN** ein installiertes Bündel zwar zu laufen beginnt, aber kein Bild auf
+  den Schirm bringt
+- **THEN** bleibt die Startbestätigung aus
+- **AND** beim nächsten Start läuft wieder die zuvor installierte Fassung
 
 #### Scenario: Ein Bündel für eine neuere Schale erreicht eine ältere nicht
 

@@ -489,9 +489,159 @@ Schale die drei URLs wirklich ruft, dass sie das Bündel öffnet, und dass sie b
 falscher Prüfsumme auf der laufenden Fassung bleibt. Das Letzte hängt zudem an
 D4 (`notifyAppReady`) — ohne den Rückweg gibt es kein „bleibt in Betrieb".
 
+---
+
+# Runde 6 — Diff-Review D4, der Rückweg, 31.08.2026
+
+Gegenstand: `16439c2..aca10bf` ohne `session-handoff.md` und `tasks.md` — also
+`src/lib/ota.ts`, `src/lib/ota.test.ts`, `src/main.tsx`, `capacitor.config.ts`,
+`scripts/capacitor-config.test.ts`, der `cause`-Fix in
+`scripts/ota-buendel.logic.ts` und das gewachsene Spec-Delta. Beide Arme direkt
+per Bash, Prompt 15 kB mit dem Diff im Rumpf und der ausdrücklichen Erlaubnis,
+im Arbeitsverzeichnis nachzumessen (die Plugin-Quelle liegt unter
+`node_modules/@capgo/capacitor-updater/` im Klartext).
+
+**Die Runde war fällig, weil das Delta nach Runde 5 gewachsen ist** — die neue
+Rückweg-Zusage stand in keiner Review. Sie hat sich gelohnt: der schwerste
+Befund der ganzen Phase D kam hier.
+
+## Reviewer: opencode
+
+VERDICT: REQUEST-CHANGES
+
+Sieben Befunde, alle mit eigener Messung an der Plugin-Quelle. Zwei MITTEL,
+fünf NIEDRIG. **Übernommen: alle sieben.**
+
+- **MITTEL — Test 3 belegt die Zusage „kein top-level await" nicht.** Ein
+  `await CapacitorUpdater.notifyAppReady().catch(…)` liefe durch alle drei
+  Tests: der Mock ist sofort settled, und ein TLA mit `catch` löst das Modul
+  weiterhin auf. Unabhängig davon in dieser Sitzung nachgemessen, bevor der
+  Befund vorlag: Mutation eingespielt, 3/3 grün. Rot wird sie erst an einer
+  Brücke, die weder auflöst noch ablehnt. Behoben durch die neue Zusage „lässt
+  eine hakende Brücke den Start nicht aufhalten"; Gegenprobe: TLA → genau
+  dieser Test rot nach 4 s, die übrigen grün.
+- **MITTEL — Umgehungspfad am Gedächtnis vorbei.** Der öffentliche manuelle
+  `CapacitorUpdater.download()` löscht ein ERROR-Bündel ausdrücklich vor dem
+  neuen Versuch (`CapgoUpdater.java:1433` und `:1488`). Heute ohne Aufrufer —
+  `grep -rn "CapacitorUpdater\." src/` findet nur `ota.ts` —, die Zusage gilt
+  also. Als Zaun in den Kommentar von `capacitor.config.ts` aufgenommen.
+- **NIEDRIG — `.java:5140` liegt daneben:** `private void checkRevert()` steht
+  auf **5141**, 5140 ist leer. Nachgemessen und in beiden Dateien korrigiert.
+  Alle übrigen Verweise hat opencode einzeln bestätigt.
+- **NIEDRIG — „der Zweig darueber" stimmt nur für Swift.** In Swift liegt der
+  DELETED-Zweig (4364) über dem ERROR-Abbruch (4391), in Java umgekehrt (4999
+  gegen 4915). Ergebnis identisch, Reihenfolgebehauptung nicht. Umformuliert.
+  Dazu die Nebenpräzision: das erste Überschreiben des ERROR ist bereits
+  *synchron* das Setzen auf DELETING (`.swift:3382`, `.java:5171`).
+- **NIEDRIG — Test 2 war strikt schwächer als Test 1.** Jede Mutation, die ihn
+  rötet, rötet auch Test 1; seine Zusage war zudem die schwächere. Zusammen­
+  gelegt.
+- **NIEDRIG — `(e as Error).message`** protokolliert `undefined`, wenn die
+  Ablehnung kein `Error` ist. Auf das Hausmuster umgestellt.
+- **NIEDRIG — „der Preis ist ein Buendel-Ordner" untertreibt.** Nachgemessen:
+  `autoDeletePrevious` trifft nur das vorige *erfolgreiche* Bündel
+  (`CapgoUpdater.swift:2748` ff.), für ERROR-Bündel gibt es keine Obergrenze.
+  Kommentar korrigiert; die Entscheidung selbst bleibt.
+
+Ohne Befund verifiziert: die Schleifenmechanik Schritt für Schritt, die vierte
+Zusage in `scripts/capacitor-config.test.ts` (drei Mutationen, alle rot), die
+Importreihenfolge, und `{ cause: … }` gegen `lib: ES2023`.
+
+## Reviewer: codex
+
+VERDICT: REQUEST-CHANGES
+
+Zwölf Befunde, drei HOCH. **Übernommen: elf.**
+
+### HOCH 1 — der Rückweg deckte sein eigenes Motivszenario nicht ab
+
+Der schwerste Befund der Phase. `CapacitorUpdater.notifyAppReady()` stand blank
+im Modulrumpf und ging damit **bei der Modulauswertung** ab — vor dem ersten
+Rendern, vor `AuthProvider`, und vor `src/lib/supabase.ts:10`, das bei fehlender
+Konfiguration wirft. Ein Bündel, das lädt und dann **weiss bleibt**, war so
+bereits als erfolgreich gestempelt und fiel nie zurück. Genau das Szenario, mit
+dem der Kopf von `ota.ts` das ganze Modul begründet.
+
+Am Repo nachgemessen: `main.tsx:2` liegt vor `main.tsx:14` (`AuthProvider`),
+`supabase.ts:10-15` wirft wirklich, und `setSuccess()` hängt am Aufruf
+(`CapacitorUpdaterPlugin.swift:3265`).
+
+**Donalds Entscheidung am 31.08.: jetzt reparieren, nicht als Folgeaufgabe.**
+Die Bestätigung wartet nun auf das einzige Zeichen, das „die Oberfläche steht"
+bedeutet, ohne etwas über sie zu wissen: den ersten Element-Knoten unter
+`#root`, aus Reacts erstem Commit. Bleibt er aus, bleibt die Bestätigung aus —
+und das ist die gewünschte Antwort. Die Frist trägt das: 10 s auf iOS, auf
+Android mindestens 30 s, und `AuthProvider` hält das erste Bild nicht auf
+(`AuthProvider.tsx:358` reicht die Kinder unverzüglich durch).
+
+Ausdrücklich nicht abgedeckt und so im Kopf von `ota.ts` vermerkt: greift die
+oberste `ErrorBoundary`, steht mit `ErrorFallback` ebenfalls ein Bild — das
+zählt als „gestartet". Ein Rückfall auf jeden abgefangenen Renderfehler wäre zu
+grob.
+
+### HOCH 2 — beide Aufruf-Zusagen liefen nur im Web-Modus
+
+`if (!Capacitor.isNativePlatform())` wäre vollständig grün gewesen und hätte auf
+**jedem** Gerät nie bestätigt — die katastrophale Richtung, und die Tests sahen
+sie nicht, weil jsdom immer Web ist. Neue Zusage „bestätigt auch, wenn die
+Plattform sich als nativ meldet" (`vi.doMock` auf `@capacitor/core`). Gegenprobe:
+`if (!nativ)` → genau diese Zusage rot, die Web-Zusage bleibt grün. Beide
+Richtungen sind jetzt zu.
+
+### HOCH 3 — keine Zusage belegte, dass `main.tsx` das Modul überhaupt einbindet
+
+Alle Zusagen importierten `./ota` selbst. Die Zeile aus `main.tsx` zu entfernen
+oder nach hinten zu schieben liess sie sämtlich grün — bei einem Modul, dessen
+ganze Bauart darauf beruht, dass „der Import IST der Aufruf". Neue Zusage „wird
+von `main.tsx` als zweiter Import eingebunden", die die Datei liest. Gegenprobe:
+Zeile entfernt → genau diese Zusage rot.
+
+### MITTEL — `autoDeleteFailed: false` reicht für eine ABSOLUTE Zusage nicht
+
+`resetWhenUpdate` (Vorgabe an) räumt bei einer neuen nativen Fassung sämtliche
+registrierten Bündel ab, ERROR eingeschlossen (`.swift:1090-1108`,
+`.java:2418-2440`, beide nachgeschlagen). Danach darf dieselbe Fassung wieder
+angeboten werden. Das Delta sagt das jetzt selbst — und begründet es: die neue
+Schale ist genau der Weg, auf dem ein Fehler behoben wird.
+
+### MITTEL — „10 Sekunden" stimmt auf Android nicht
+
+`resolveAppReadyCheckTimeoutMs()` hebt die Frist für ein noch nicht bestätigtes
+Bündel auf mindestens 30 000 ms (`PENDING_BUNDLE_APP_READY_MIN_TIMEOUT_MS`,
+`.java:134`, angewandt `.java:1043-1055`). Nachgeschlagen, Kommentar ergänzt.
+
+### MITTEL — der Testname beanspruchte mehr, als er misst
+
+„laesst das gescheiterte Buendel mit seinem ERROR liegen" prüft in Wahrheit
+einen Konfigurationswert. Umbenannt in „haelt `autoDeleteFailed` auf `false`";
+was daran hängt, steht im Rumpf.
+
+Die übrigen vier — top-level `await`, Test-2-Dopplung, `(e as Error)`, der
+Wachstumspreis — decken sich mit opencode und sind dort abgehandelt. Der
+Zeilenversatz `web.js:172` gegen `:173` ist als `172-173` aufgelöst.
+
+### NIEDRIG — NICHT übernommen: Sentry vor der Bestätigung
+
+codex merkt an, `instrument.ts` werde vor `ota` ausgewertet und könne bei
+verborgenem Dokument synchron `captureSession()` senden — der Aufruf liege also
+nicht *strikt* vor jeder Netzaktivität. Sachlich richtig und bewusst so: Sentry
+MUSS der erste Import bleiben, sonst fehlen genau die Fehler des Starts. codex
+schätzt das Risiko selbst als gering ein. Kein Diff.
+
+## Was die Reviewer NICHT geprüft haben
+
+Dasselbe wie in Runde 5, und es wiegt hier schwerer: **kein einziger Beleg
+stammt von einem Gerät.** Dass die Schale die drei URLs ruft, dass sie ein
+Bündel öffnet, dass `checkRevert` nach ausbleibender Bestätigung wirklich
+zurückrollt — all das hängt an nativen Zeitgebern und ist in jsdom nicht
+herstellbar. Belegt ist unsere Hälfte: sieben Zusagen, jede einzeln durch eine
+Mutation gegengeprüft (alte Bauart, `if (!nativ)`, top-level `await`,
+Beobachter entfernt, Import aus `main.tsx` entfernt, `autoDeleteFailed: true`,
+Zeile gelöscht). Der Gerätebeleg ist D5.
+
 <!-- openspec-review-trailer v1
 implementing-host: claude
-digest: sha256:a52804a6898904ea88d686db21152f69649db890138fddbc8f50842e6c28e699
+digest: sha256:efc290a88c027faa7859aa66e6c9b3100981d5ae2899f95ee9ffe045c0d40212
 producer-version: 1.2.0
-tasks-digest: sha256:61dbe4c2d8249ac7afe5e9a6281b96ae2c6c6107f33aee95a20f91760753ea10
+tasks-digest: sha256:c77d9dee4f45358bd47508806404d61087405549f010d94280a6ed6988353ee3
 -->

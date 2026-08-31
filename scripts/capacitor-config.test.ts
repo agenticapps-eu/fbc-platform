@@ -78,7 +78,7 @@ describe("capacitor.config.ts", () => {
     expect(geparst.asymmetricKeyDetails?.modulusLength).toBe(2048);
   });
 
-  it("laesst das gescheiterte Buendel mit seinem ERROR liegen", async () => {
+  it("haelt `autoDeleteFailed` auf `false`", async () => {
     // Die Vorgabe ist `true` und macht aus dem Rueckfall eine Endlosschleife:
     // das Loeschen mit `removeInfo: false` ueberschreibt den eben gesetzten
     // Status ERROR mit DELETED (`CapgoUpdater.swift:2325`,

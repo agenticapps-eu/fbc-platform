@@ -109,16 +109,19 @@ const config: CapacitorConfig = {
       // ENDLOSSCHLEIFE. Am 31.08. an 8.51.15 auf beiden Plattformen gemessen:
       //
       // 1. `checkRevert()` setzt das kaputte Buendel auf ERROR und rollt
-      //    zurueck (`.swift:3353-3399`, `.java:5140` ff.).
-      // 2. Danach loescht `autoDeleteFailed` es mit `removeInfo: false` — und
-      //    genau dieser Zweig UEBERSCHREIBT das eben gesetzte ERROR mit
+      //    zurueck (`.swift:3353` ff., `.java:5141` ff.).
+      // 2. Danach nimmt `autoDeleteFailed` dieses ERROR wieder zurueck, in
+      //    zwei Schritten: erst synchron auf DELETING (`.swift:3382`,
+      //    `.java:5171`), dann beim Loeschen mit `removeInfo: false` auf
       //    DELETED (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
-      // 3. Beim naechsten Start fragt das Plugin den Endpunkt, findet die
-      //    Fassung im Verzeichnis wieder und prueft in dieser Reihenfolge:
-      //    `isErrorStatus()` wuerde ABBRECHEN (`.swift:4391`, `.java:4915`),
-      //    aber der Status ist DELETED — und der Zweig darueber wirft die
-      //    Registrierung weg und LAEDT DASSELBE BUENDEL ERNEUT
-      //    (`.swift:4364-4379`, `.java:4999`).
+      //    Nach beiden Schritten ist der Status alles, nur nicht ERROR.
+      // 3. Beim naechsten Start fragt das Plugin den Endpunkt und findet die
+      //    Fassung im Verzeichnis wieder. Beide Plattformen kennen zwei
+      //    Zweige — nur in verschiedener Reihenfolge: `isErrorStatus()` wuerde
+      //    ABBRECHEN (`.swift:4391`, `.java:4915`), der DELETED-Zweig wirft
+      //    die Registrierung weg und LAEDT DASSELBE BUENDEL ERNEUT
+      //    (`.swift:4364-4379`, `.java:4999`). Der Status ist DELETED, also
+      //    greift auf beiden der zweite.
       //
       // Das laeuft bei jedem Start weiter, unbegrenzt: installieren,
       // scheitern, zurueckrollen, neu laden. Der Abbruch-Zweig aus (3) ist
@@ -131,9 +134,19 @@ const config: CapacitorConfig = {
       // Fassung — das kaputte Buendel ist damit weiterhin „spaeter" und wird
       // wieder angeboten. Die Schleife ist nur auf dem Geraet zu brechen.
       //
-      // Der Preis ist ein Buendel-Ordner, der liegen bleibt. Der Gegenwert
+      // Der Preis: je gescheiterter Fassung bleiben Ordner und Registrierung
+      // liegen, und das Plugin raeumt sie NIE ab — `autoDeletePrevious` trifft
+      // nur das vorige erfolgreiche Buendel (`CapgoUpdater.swift:2748` ff.),
+      // eine Obergrenze fuer ERROR-Buendel gibt es nicht. Begrenzt ist das
+      // also allein durch die Zahl kaputter Veroeffentlichungen. Der Gegenwert
       // ist, dass „faellt auf die vorige Fassung zurueck" auch beim ZWEITEN
       // Start noch gilt. Bewacht von `scripts/capacitor-config.test.ts`.
+      //
+      // **Was das Gedaechtnis umgeht:** der manuelle `CapacitorUpdater
+      // .download()` loescht ein ERROR-Buendel ausdruecklich vor dem neuen
+      // Versuch (`CapgoUpdater.java:1433` und `:1488`). Heute ruft ihn niemand — `src/`
+      // kennt nur `notifyAppReady()` in `src/lib/ota.ts`. Wer ihn einbaut,
+      // hebt diese Zusage auf.
       autoDeleteFailed: false,
     },
   },
