@@ -44,7 +44,7 @@ R2? Ist das Storage? Wir haben bisher Supabase Storage genutzt."
 | `updateUrl`, `channelUrl`, `statsUrl` | drei Edge Functions mit `verify_jwt = false` |
 | privater RSA-Schlüssel (**2048 Bit**, PKCS#1) | Infisical — mehrzeiliges PEM, nur über die Umgebung setzen |
 | Veröffentlichungs-Anlass | jeder Deploy auf `main`, im bestehenden `deploy.yml`-Job |
-| Fassungsschema | `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b` |
+| Fassungsschema | `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49bdeadb` |
 
 Die Entscheidung vom 27.08. bleibt unberührt: **„selbst gehostet"** war die Wahl
 gegen den bezahlten Ionic-Dienst, nicht die Wahl eines Anbieters. Supabase ist

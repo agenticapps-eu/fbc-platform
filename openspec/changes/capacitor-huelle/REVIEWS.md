@@ -259,3 +259,71 @@ Der Auftrag nannte ihm vier gemessene Tatsachen als gegeben (Rechte von
 `service_role`, der Golden-Master über die Tabellenrechte, die Anforderungen des
 Clients). Wären die falsch, fiele es hier nicht auf. Sie sind am laufenden Stack
 bzw. am Quelltext des Plugins gemessen, nicht angenommen.
+
+---
+
+# Runde 4 — Diff-Review D1, Veröffentlichungs-Schritt, 31.08.2026
+
+Zweiter **Diff-Review** derselben Phase, über den Code, der ein Bündel erzeugt:
+`ota-buendel.logic.ts` (+ Test), `ota-buendel.ts`,
+`20260831140000_ota_buendel_veroeffentlichen.sql`, ein Schritt in `deploy.yml`
+und die Vertragsnummer in `capacitor.config.ts`. Wieder Donalds Regel vom 26.08.
+
+**Zwei Anbieter**, weil ein Reviewer ohne Befunde keine Freigabe ist.
+
+## Reviewer: gemini
+
+Keine Befunde. Ging alle fünf angefragten Bereiche einzeln durch und begründete
+je, warum sie tragen. Zählt als Zweitmeinung, nicht als Beleg — die Arbeit hat
+codex gemacht.
+
+## Reviewer: codex
+
+Kopf gegen das Abschweifen, `REVIEWER_TIMEOUT=1800`. Der Lauf brauchte über
+zehn Minuten und musste im Hintergrund laufen; ein Aufruf mit zehn Minuten
+Grenze wurde vorher abgeschnitten. **Zehn Befunde, drei davon HIGH — und die
+drei hatten dieselbe Wurzel.**
+
+### Die Wurzel: ein Objektname, der nur die Fassung trug
+
+Alle drei HIGH-Befunde beschrieben denselben Fehler von drei Seiten. Beim
+**erneuten Lauf desselben Commits** — häufig, denn `deploy.yml` trägt
+`cancel-in-progress: true` — entsteht ein ANDERES Chiffrat, weil der
+AES-Schlüssel je Lauf zufällig ist. Mit `<version>.bin` als Namen hiess das:
+
+1. Der Upload überschreibt die Datei, die Manifest-Zeile trägt noch die alte
+   `checksum` und den alten `sessionKey`. Bricht der Lauf dazwischen ab, bleibt
+   dieser Zustand **dauerhaft** stehen, und kein Gerät kann das Bündel öffnen.
+2. Zwei Läufe könnten Upload und Manifest-Zeile verschränken.
+3. Ein Zwischenspeicher lieferte unter derselben URL das alte Chiffrat zu den
+   neuen Kryptowerten.
+
+**Ein Fix für alle drei:** der Objektname trägt jetzt die ersten 16 Stellen der
+SHA-256 des Chiffrats (`<version>-<inhalt>.bin`). Jeder Lauf schreibt eine
+eigene Datei; die Manifest-Zeile wechselt in EINEM Schritt. Beide Zustände sind
+in sich stimmig, egal wann ein Lauf endet. Preis: ein abgebrochener Lauf
+hinterlässt eine verwaiste, für niemanden erreichbare Datei — benannt und
+akzeptiert.
+
+### Die übrigen sieben
+
+| Schwere | Befund | Was daraus wurde |
+| --- | --- | --- |
+| MEDIUM | `github.ref == 'refs/heads/main'` schützt nicht gegen `pull_request_target` | Gemessen: der Workflow hört auf `pull_request`, heute greift die Bedingung also richtig. `github.event_name == 'push'` steht trotzdem dazu — sie kostet nichts und macht die Zusage unabhängig von späteren Auslösern |
+| MEDIUM | Der „Geräte-Rundlauf" benutzte **kein echtes Zip** | Der Test baut jetzt ein `dist/` im Kleinen, zippt es wirklich, und macht das ENTSCHLÜSSELTE Archiv auf: `index.html` an der Wurzel, 0 Sourcemaps, `assets/app.js` da. `zippeVerzeichnis` ist dafür aus dem Läufer ins Logik-Modul gezogen |
+| MEDIUM | Der Upsert-Test prüfte `checksum` und `session_key` nicht mit | Prüft jetzt alle vier veränderlichen Felder — die beiden Kryptowerte sind die, auf die es ankommt |
+| MEDIUM | Pages ist veröffentlicht, bevor der OTA-Schritt läuft | **Nicht übernommen.** Das ist die Bauart, nicht ein Fehler: die App holt ohnehin asynchron nach, und Pages zurückzurollen, weil OTA scheiterte, wäre schlechter als der Verzug. Der rote Job macht es sichtbar |
+| LOW | Der Zufallstest belegte nicht, dass Schlüssel **und** IV erneuert werden | Beide Hälften einzeln verglichen. Trägt, weil PKCS#1 Typ 1 deterministisch ist — verschiedene Chiffrate heissen verschiedene Schlüssel. Steht als Begründung im Test |
+| LOW | Nur EINE CHECK-Verletzung wurde über die DEFINER-Funktion geprüft | Eine zweite ergänzt (URL auf fremdem Host) |
+| LOW | Sieben SHA-Stellen sind 28 Bit — Kollisionsgefahr | Auf **zwölf** erhöht (48 Bit). Rechnung: bei tausend Auslieferungen rund 0,2 % mit sieben Stellen. Beispiel in vier Dokumenten mitgezogen |
+
+## Was die Reviewer NICHT geprüft haben
+
+Beide bekamen die gemessenen Tatsachen als gegeben vorgesetzt (Rechte von
+`service_role`, die Bedingungen der Tabelle, die Anforderungen des Plugins).
+Wären die falsch, fiele es hier nicht auf — sie sind am laufenden Stack und am
+Quelltext des Plugins gemessen.
+
+**Und ungeprüft bleibt der Weg über das Netz:** Upload in den Bucket und
+RPC-Aufruf. Beide brauchen ein laufendes Projekt mit angewandten Migrationen
+und werden erst beim ersten Deploy auf `main` sichtbar.

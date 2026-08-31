@@ -27,7 +27,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
-select plan(20);
+select plan(27);
 
 -- Impersonierung. Eigene Kopie: jede Testdatei laeuft in ihrer eigenen Sitzung.
 -- ACHTUNG: `try_as` meldet JEDEN Fehler als `DENIED:`, auch einen Tippfehler.
@@ -226,6 +226,90 @@ select cmp_ok(
       and grantee in ('anon', 'authenticated')),
   '>', 0,
   'Gegenprobe: dieselbe Abfrage zaehlt auf profiles sehr wohl Rechte');
+
+-- ── 21–26. Der Schreibweg (20260831140000) ──────────────────────────────────
+-- Die Tabelle traegt keinen Grant; geschrieben wird ueber genau eine
+-- SECURITY-DEFINER-Funktion, die nur service_role ausfuehren darf. Diese sechs
+-- Zusagen sind zusammen die Aussage „genau eine Tuer, und sie ist eng".
+--
+-- §26 ist die wichtigste: eine DEFINER-Funktion umgeht die RLS — sie umgeht
+-- aber KEINE CHECK-Bedingung. Ohne diese Zusage waere nicht belegt, dass der
+-- Weg, den deploy.yml wirklich nimmt, denselben Pruefungen unterliegt wie ein
+-- direkter INSERT.
+
+select is(
+  (select p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_veroeffentlichen'),
+  true,
+  'ota_buendel_veroeffentlichen ist security definer — nur so kommt sie an eine '
+  'Tabelle, auf der service_role kein Recht haelt');
+
+select is(
+  (select has_function_privilege('anon', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_veroeffentlichen'),
+  false,
+  'anon darf den Schreibweg NICHT ausfuehren — eine neue Funktion erbt EXECUTE '
+  'ueber PUBLIC, der Entzug muss also jede Rolle nennen (AGE-622)');
+
+select is(
+  (select has_function_privilege('authenticated', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_veroeffentlichen'),
+  false,
+  'authenticated darf den Schreibweg NICHT ausfuehren');
+
+select is(
+  (select has_function_privilege('service_role', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_veroeffentlichen'),
+  true,
+  'service_role darf ihn ausfuehren — sonst scheitert deploy.yml erst zur '
+  'Laufzeit, und zwar nach dem Upload');
+
+-- Wirkung, nicht nur Recht: die Zeile muss danach dastehen, und ein zweiter
+-- Aufruf mit derselben Fassung muss sie ERSETZEN statt fehlzuschlagen. Sonst
+-- macht ein Re-Run desselben Commits den Deploy rot.
+-- Zwei EIGENSTAENDIGE Anweisungen, nicht zwei CTE im selben Statement. Das ist
+-- kein Stil: in einem Statement laufen beide gegen denselben Snapshot, und die
+-- abschliessende Abfrage sieht KEINE der beiden Zeilen — gemessen, `have: NULL`.
+select public.ota_buendel_veroeffentlichen(
+  '0.0.0+1111111', pg_temp.url('1'), repeat('a', 512),
+  pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0');
+select public.ota_buendel_veroeffentlichen(
+  '0.0.0+1111111', pg_temp.url('2'), repeat('b', 512),
+  pg_temp.iv() || ':' || pg_temp.skey(), '2.0.0');
+
+-- Geprueft werden ALLE vier veraenderlichen Felder, nicht nur url und Schale.
+-- checksum und session_key sind die, auf die es ankommt: sie gehoeren zum neu
+-- hochgeladenen Chiffrat, und blieben sie stehen, koennte kein Geraet das
+-- angebotene Buendel oeffnen (Befund Fremd-Review, MEDIUM).
+select is(
+  (select count(*)::int || '/' || max(url) || '/' || max(benoetigte_schale)
+          || '/' || left(max(checksum), 3) || '/' || left(max(session_key), 24)
+     from public.ota_buendel
+    where version = '0.0.0+1111111'),
+  '1/' || pg_temp.url('2') || '/2.0.0/bbb/' || pg_temp.iv(),
+  'zweimal dieselbe Fassung ergibt EINE Zeile, und ALLE vier Felder wandern '
+  'mit — auch checksum und session_key, die zum neuen Chiffrat gehoeren');
+
+select throws_ok($$
+  select public.ota_buendel_veroeffentlichen(
+    '0.0.0+2222222', 'https://abc.supabase.co/storage/v1/object/public/ota-buendel/x.bin',
+    repeat('a', 1024), 'AAAAAAAAAAAAAAAAAAAAAA==:' || repeat('A', 342) || '==', '1.0.0')
+$$, '23514', null,
+  'die CHECK-Bedingungen greifen AUCH auf dem DEFINER-Weg — eine Funktion '
+  'umgeht die RLS, nicht die Bedingungen an den Spalten');
+
+-- Eine zweite, andere Verletzung auf demselben Weg. Mit nur einer waere die
+-- Zusage darueber auch dann gruen, wenn ALLE anderen Bedingungen fehlten
+-- (Befund Fremd-Review, LOW).
+select throws_ok($$
+  select public.ota_buendel_veroeffentlichen(
+    '0.0.0+3333333', 'https://beliebiger-fremder-host.test/buendel.bin',
+    repeat('a', 512), 'AAAAAAAAAAAAAAAAAAAAAA==:' || repeat('A', 342) || '==', '1.0.0')
+$$, '23514', null,
+  'auch die URL-Bindung an den eigenen Bucket greift auf dem DEFINER-Weg');
 
 select * from finish();
 rollback;

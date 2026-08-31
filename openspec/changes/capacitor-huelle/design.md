@@ -385,6 +385,33 @@ Feld nicht mehr die Marketing-Version. Sie bleibt über `version_code` sichtbar,
 das die Store-Build-Nummer führt — verloren geht nichts, aber wer die Statistik
 liest, muss die Umwidmung kennen.
 
+### Das Gerät entscheidet NICHT, was neuer ist — gemessen am 31.08.
+
+Die Stelle, an der ein Gerät „aktualisieren oder nicht" entscheidet, ist auf
+beiden Plattformen ein **Zeichenketten-Vergleich auf Ungleichheit**:
+
+```java
+// CapacitorUpdaterPlugin.java:4909
+!current.getVersionName().equals(latestVersionName)
+```
+```swift
+// CapacitorUpdaterPlugin.swift:4360
+current.getVersionName() != latestVersionName
+```
+
+Kein Semver, keine Ordnung, kein „grösser als". Zwei Folgen, und die zweite ist
+eine Anforderung an D3:
+
+1. **Unser Fassungsschema funktioniert.** `package.json` steht auf `0.0.0`, jede
+   Fassung heisst also `0.0.0+<SHA>`. Eine Semver-Ordnung könnte die nicht
+   unterscheiden — ein Ungleichheits-Vergleich schon.
+2. **Der Endpunkt trägt die ganze Verantwortung dafür, welches Bündel das
+   richtige ist.** Liefert er ein älteres, installiert das Gerät es, ohne zu
+   fragen. Ein Rückschritt ist damit kein Fehlerfall, gegen den sich ein Gerät
+   wehrt, sondern eine ganz normale Antwort. Die Abfrage in D3 muss also
+   ausdrücklich nach `created_at` ordnen; „die Zeile, die zuletzt kam" ist keine
+   Eigenschaft, die eine Tabelle von sich aus hat.
+
 ### Und der Rückweg
 
 Die Prüfsumme schützt gegen ein **fremdes** Bündel. Gegen ein **eigenes,
@@ -412,7 +439,11 @@ denselben Job. Jeder andere Anlass hieße, dass ein vergessener Auslöser Gerät
 still zurücklässt — und „still" ist hier das Problem, nicht „zurück".
 
 **Fassungsschema, festgelegt am 31.08.:** `<Semver aus package.json>+<kurzer
-SHA>`, etwa `1.4.0+8fbc49b`. Jede Fassung ist damit eindeutig und auf genau einen
+SHA>`, etwa `1.4.0+8fbc49bdeadb`. **Zwölf** Stellen des SHA, nicht die sieben von
+`git rev-parse --short`: sieben sind 28 Bit, und bei tausend Auslieferungen
+liegt die Kollisionswahrscheinlichkeit schon bei rund 0,2 % — eine Kollision
+hiesse, dass zwei verschiedene Commits dieselbe Manifest-Zeile überschreiben
+(Befund Fremd-Review, 31.08.). Jede Fassung ist damit eindeutig und auf genau einen
 Commit rückführbar, und zwei Deploys derselben Semver kollidieren nicht. Das
 beantwortet zugleich die offene Frage, was gilt, wenn ein Store-Bau und ein
 `main`-Deploy sich überholen: sie tragen verschiedene SHAs, also verschiedene

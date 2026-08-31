@@ -664,7 +664,36 @@ was das System je befüllt.
       Base64 — am Plugin gemessen, `CapacitorUpdaterPlugin.java:4173`). Mit RLS,
       die dem Endpunkt das Lesen erlaubt und das Schreiben niemandem außer dem
       Veröffentlichungs-Schritt.
-- [ ] Veröffentlichungs-Schritt in `deploy.yml`: `dist/` zu einem Zip mit
+- [x] **Veröffentlichungs-Schritt gebaut** (31.08.): `scripts/ota-buendel.logic.ts`
+      (das Rechnen, mit Test), `scripts/ota-buendel.ts` (zippen, hochladen,
+      eintragen), `20260831140000_ota_buendel_veroeffentlichen.sql` (der
+      Schreibweg als SECURITY-DEFINER-Funktion, nur `service_role`) und ein
+      Schritt in `deploy.yml`, der **nur auf `main`** läuft.
+
+      **Belegt, nicht behauptet:**
+      * Der **Rundlauf des Geräts**, mit dem **echten** Schlüssel und dem
+        **echten** 2,75-MB-Bündel: sessionKey RSA-geöffnet → AES entschlüsselt →
+        byte-gleich zum Zip → Prüfsumme passt zum Klartext. 10 Zusagen in
+        `ota-buendel.logic.test.ts`, dazu die Abweisung eines 4096-Bit-Schlüssels.
+      * Das **Zip**, an einem echten `dist/` gemessen: `index.html` an der
+        Wurzel, **0** von 64 Sourcemaps darin, 2,75 MB.
+      * Der **Schreibweg** in `ota_buendel_test.sql` §21–26: `security definer`,
+        `anon` und `authenticated` dürfen ihn NICHT ausführen, `service_role`
+        schon, ein zweiter Aufruf ersetzt statt zu scheitern, und die
+        CHECK-Bedingungen greifen auch auf diesem Weg.
+
+      **NICHT belegt** und erst beim ersten Deploy auf `main` sichtbar: der
+      Upload in den Bucket und der RPC-Aufruf über das Netz. Beide brauchen ein
+      laufendes Projekt mit angewandten Migrationen.
+
+      **Ein Fund am Rande, der die Wahl der Krypto-Bibliothek festnagelt:**
+      `RSA.swift:253` trägt wörtlich den Kommentar „For PKCS1 padding from
+      Node.js privateEncrypt" und prüft auf genau dieses Blockformat. Node ist
+      hier die Referenz, gegen die die iOS-Seite geschrieben wurde — nicht eine
+      von mehreren Möglichkeiten. Dieselbe Datei polstert zwei Zeilen darüber
+      hart auf 256 Byte: RSA-2048, ein zweites Mal und an ganz anderer Stelle.
+
+      Ursprünglich gefordert war: `dist/` zu einem Zip mit
       `index.html` an der Wurzel und **ohne `.map`-Dateien**; SHA-256 bilden;
       das Zip mit einem zufälligen **AES**-Schlüssel verschlüsseln; diesen
       Sitzungsschlüssel **und** die Prüfsumme mit dem **privaten** RSA-Schlüssel
@@ -702,7 +731,7 @@ was das System je befüllt.
       Job, der `dist/` schon baut und zu Pages lädt. Jeder andere Anlass hieße,
       dass ein vergessener Auslöser Geräte **still** zurücklässt.
 - [x] **Fassungsschema festgelegt** (Donald, 31.08.): `<Semver aus
-      package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`. Beantwortet zugleich,
+      package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49bdeadb`. Beantwortet zugleich,
       was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
       SHAs, also verschiedene Fassungen.
 - [ ] **RSA-Schlüsselpaar NEU erzeugen — 2048 Bit.** Donalds Hand (Infisical
@@ -764,7 +793,10 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       `custom_id` scheidet aus: aus **JavaScript** gesetzt (`setCustomId`), die
       Web-Schicht erklärte damit ihren eigenen Vertrag.
 - [x] **Stempelstelle: `plugins.CapacitorUpdater.version` in
-      `capacitor.config.ts`.** Beleg: `capacitor.config.json` liegt in
+      `capacitor.config.ts`** — am 31.08. auch wirklich **eingetragen**, Wert
+      `1.0.0`. Sie ist keine tote Konfiguration, obwohl das Plugin erst mit D3
+      dazukommt: `scripts/ota-buendel.ts` liest sie heute schon und stempelt
+      jedes Bündel damit. Beleg: `capacitor.config.json` liegt in
       `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`,
       nicht darin. OTA tauscht `public/`; die Nummer bleibt der Schale und ist
       nur über den Store änderbar. Ausdrücklich **nicht** die App-Version.
@@ -773,6 +805,15 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       solcher PR geht über den Store.
 
 ### D3. Endpunkte und Schutz
+
+> **Vorab, gemessen am 31.08. und bindend für den `updateUrl`-Endpunkt:** das
+> Gerät vergleicht die angebotene Fassung mit der eigenen **auf Ungleichheit,
+> nicht auf Grösse** (`CapacitorUpdaterPlugin.java:4909`, `.swift:4360`).
+> Liefert der Endpunkt ein älteres Bündel, installiert das Gerät es
+> kommentarlos. Die Abfrage MUSS deshalb ausdrücklich nach `created_at`
+> absteigend ordnen und das erste Bündel nehmen, dessen `benoetigte_schale` das
+> Gerät erfüllt. Ein `select … limit 1` ohne `order by` wäre ein Rückschritt,
+> der wie ein Zufall aussieht.
 
 - [ ] `@capgo/capacitor-updater@8.51.15` hinzufügen. **Nicht `9.x` oder `10.x`**
       — die tragen die höhere Zahl, fordern aber `@capacitor/core: ^5.0.0`;

@@ -107,7 +107,7 @@ on conflict (id) do update
 -- die Zeile eins zu eins ab, und jede Umbenennung hier wäre eine
 -- Übersetzungsschicht, die jemand pflegen muss.
 create table public.ota_buendel (
-  -- `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`
+  -- `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49bdeadb`
   -- (Entscheidung Donald, 31.08.). Der Primärschlüssel ist die Fassung selbst:
   -- zwei Bündel derselben Fassung gäbe es nur, wenn derselbe Commit zweimal
   -- ausgeliefert würde, und das ist ein Überschreiben, kein zweiter Eintrag.
@@ -199,7 +199,7 @@ comment on table public.ota_buendel is
   'nachreicht, macht den Auslieferungsweg für Clients beschreibbar.';
 
 comment on column public.ota_buendel.version is
-  '<Semver aus package.json>+<kurzer SHA>, z. B. 1.4.0+8fbc49b. Eindeutig und '
+  '<Semver aus package.json>+<kurzer SHA>, z. B. 1.4.0+8fbc49bdeadb. Eindeutig und '
   'auf genau einen Commit rückführbar.';
 comment on column public.ota_buendel.url is
   'Öffentliche URL des AES-Chiffrats im Bucket ota-buendel.';
