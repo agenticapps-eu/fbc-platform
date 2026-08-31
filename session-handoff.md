@@ -1,4 +1,4 @@
-# Session Handoff — 2026-08-31 (AGE-642: D3+D4 sind draussen, PR #299 offen)
+# Session Handoff — 2026-08-31 (AGE-642: PR #299 ist gemerged, PROD wartet auf migrate-prod)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -13,108 +13,99 @@
 > (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
 > `openspec/specs/design-system/spec.md`.
 
-**Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`, rebasiert auf `origin/main` (`63f3237`).
-**PR #299 ist offen** — https://github.com/agenticapps-eu/fbc-platform/pull/299
+**PR #299 ist gemerged** (Squash, `e8a2abc` auf `main`, 31.08. 13:33).
+Worktree `fbc-platform.donald-age-642-capacitor-huelle`, Branch
+`donald/age-642-capacitor-huelle` — **noch nicht auf den Squash rebasiert.**
 
-Change `capacitor-huelle`: **31 offen, 87 erledigt.**
+Change `capacitor-huelle`: **31 offen, 87 erledigt.** Linear steht auf
+*In Progress* (die Automation hatte beim Merge auf *Done* gekippt,
+zurückgesetzt um 13:33).
 
-## Accomplished — D4 steht, D3+D4 sind gemeinsam hinausgegangen
+## 🔴 ERSTER HANDGRIFF: `migrate-prod` dispatchen
 
-Zwei Commits auf dem rebasierten Stand, alles grün: **2323 vitest (210 Dateien)
-· 133 Deno · `deno check` · typecheck · `pnpm lint` 0 Fehler · `openspec
-validate --all` 30/30.**
+**Der Deploy auf `main` ist rot** (Lauf `33397608024`), und zwar genau am
+vorhergesagten Punkt. `drift-gate` meldet wörtlich:
 
-- `0978348` — `fix:` fehlender `cause` in `scripts/ota-buendel.logic.ts`.
-- `aca10bf` — `feat:` der Rückweg (D4).
+```
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831100000
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831140000
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831160000
+```
 
-### Der Befund, der D4 grösser gemacht hat als „Aufruf einbauen"
+`functions` und `deploy` sind übersprungen. **Die Web-Fläche steht damit auf dem
+Stand vor dem Merge** — nichts ist kaputt, aber nichts ist auch live. Erst
+`migrate-prod`, dann den Deploy erneut fahren.
 
-**`autoDeleteFailed` steht per Vorgabe auf `true`, und das macht aus dem
-Rückfall eine ENDLOSSCHLEIFE.** Am 31.08. an 8.51.15 auf beiden Plattformen an
-der Quelle gemessen:
+**Dispatchen heisst anwenden** — `migrate-prod` fragt nicht nach. Ein Deploy
+auf altem Commit rollt zurück; also den Lauf auf `e8a2abc` neu starten, keinen
+alten Re-Run.
 
-1. `checkRevert()` setzt das kaputte Bündel auf `ERROR` und rollt zurück
-   (`CapacitorUpdaterPlugin.swift:3353-3399`, `.java:5140` ff.).
-2. Danach löscht `autoDeleteFailed` es mit `removeInfo: false` — und dieser
-   Zweig **überschreibt das eben gesetzte `ERROR` mit `DELETED`**
-   (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
-3. Beim nächsten Start würde `isErrorStatus()` abbrechen (`.swift:4391`,
-   `.java:4915`) — aber der Status ist `DELETED`, und der Zweig darüber wirft
-   die Registrierung weg und **lädt dasselbe Bündel erneut**
-   (`.swift:4364-4379`, `.java:4999`).
+## Accomplished — Review-Runde 6 und der Merge
 
-Der Abbruch-Zweig ist mit der Vorgabe toter Code. **Der D3-Endpunkt kann das
-nicht auffangen:** `ota_buendel_neuestes` liefert, was streng später eingetragen
-wurde als das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
-kaputte Bündel ist also weiterhin „später". Nur das Gerät bricht die Schleife:
-`autoDeleteFailed: false`.
+`17fd491` — `fix:` die Bestätigung wartet auf das erste Bild. Danach alles grün:
+**2327 vitest (210 Dateien) · typecheck exit 0 · `pnpm lint` exit 0 ·
+`openspec validate --all` 30/30 · CI 5/5 pass.**
+
+### Der Befund, der D4 umgebaut hat
+
+**codex, HOCH: der Rückweg deckte sein eigenes Motivszenario nicht ab.**
+`notifyAppReady()` stand blank im Modulrumpf und ging bei der Modulauswertung ab
+— vor dem ersten Rendern, vor `AuthProvider`, vor `src/lib/supabase.ts:10`, das
+bei fehlender Konfiguration wirft. Ein Bündel, das lädt und dann **weiss
+bleibt**, war damit bereits als erfolgreich gestempelt und fiel nie zurück.
+
+Jetzt wartet die Bestätigung auf den ersten Element-Knoten unter `#root` —
+Reacts erster Commit. Bleibt er aus, bleibt sie aus. Die Frist trägt das: 10 s
+auf iOS, **mindestens 30 s auf Android** (`PENDING_BUNDLE_APP_READY_MIN_TIMEOUT_MS`,
+`.java:134`), und `AuthProvider` hält das erste Bild nicht auf
+(`AuthProvider.tsx:358`).
+
+Zwei weitere HOCH-Befunde waren **fehlende Zusagen**: `if (!nativ)` wäre grün
+gewesen und hätte auf JEDEM Gerät nie bestätigt (jsdom ist immer Web), und keine
+Zusage belegte, dass `main.tsx` das Modul überhaupt einbindet.
 
 ## Decisions
 
-- **`src/lib/ota.ts` ist ein Nebenwirkungs-Modul ohne Export**, in `main.tsx`
-  als zweiter Import direkt hinter `./instrument`. Der Import IST der Aufruf —
-  damit gibt es keine Funktion, die jemand zu rufen vergessen kann, und
-  „vergessen" bräche hier JEDES Gerät bis zur nächsten Store-Einreichung.
-- **Ohne Plattform-Bedingung.** Die Web-Umsetzung ist ein
-  `return { bundle: BUNDLE_BUILTIN }` (`dist/esm/web.js:172`) — sie kostet
-  nichts und kann nicht scheitern. Ein `if (nativ)` spart nichts und fügt eine
-  Stelle hinzu, an der die Bestätigung ausbleiben kann.
-- **Ohne `await`.** Ein top-level `await` machte aus einer hakenden Brücke einen
-  Startfehler — genau den Zustand, gegen den das Modul steht.
-- **Der Lint-Fix ist ein eigener Commit**, weil er eine Reparatur an D3 ist und
-  nicht zum Rückweg gehört. `pnpm lint` lief auf diesem Branch **rot**, und CI
-  fährt es (`ci.yml:41`); typecheck und die Testläufe sehen die Regel nicht.
-- **Push per `--force-with-lease` war korrekt und verlustfrei:** der Remote-Tip
-  (`a36b64d`) war der Vor-Squash-Stand von PR #295, dessen Inhalt längst als
-  `59390b3` in `main` liegt.
+- **Runde 6 war fällig**, weil das Spec-Delta nach Runde 5 gewachsen war. Sie
+  hat den schwersten Befund der ganzen Phase D gebracht — die Regel „Delta
+  gewachsen ⇒ neue Runde" hat sich bezahlt gemacht.
+- **Donald am 31.08.: sofort reparieren, nicht als Folgeaufgabe.** Die
+  Alternative wäre gewesen, die SHALL-Zusage ehrlich zu verengen und den weissen
+  Bildschirm ungeschützt zu lassen.
+- **Nicht übernommen (1 von 12):** codex' NIEDRIG-Befund, `instrument.ts` könne
+  vor `ota` schon senden. Sachlich richtig, aber Sentry MUSS der erste Import
+  bleiben — sonst fehlen genau die Fehler des Starts.
+- **`autoDeleteFailed: false` trägt keine ABSOLUTE Zusage:** `resetWhenUpdate`
+  räumt bei einer neuen Schale aus dem Store alles ab, ERROR eingeschlossen. Das
+  Delta sagt das jetzt selbst und begründet, warum das richtig ist.
 
 ## Files modified
 
-`src/lib/ota.ts` (neu) · `src/lib/ota.test.ts` (neu, 3 Zusagen) ·
-`src/main.tsx` (ein Import, Zeile 2) · `capacitor.config.ts`
-(`autoDeleteFailed: false`, ausführlich begründet) ·
-`scripts/capacitor-config.test.ts` (+1 Zusage) ·
-`scripts/ota-buendel.logic.ts` (`cause`) ·
-`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage +
-Szenario „Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert") ·
-`openspec/changes/capacitor-huelle/tasks.md` (D4 abgehakt).
+`src/lib/ota.ts` (wartet auf `#root`, `instanceof`-Fehlerzweig, vier
+Quellenangaben korrigiert) · `src/lib/ota.test.ts` (7 Zusagen statt 3) ·
+`capacitor.config.ts` (Kommentar: Reihenfolge entzerrt, Wachstumspreis,
+`download()`-Zaun) · `scripts/capacitor-config.test.ts` (Testname) ·
+`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage
+„erst wenn ein Bild steht" + Szenario; `resetWhenUpdate`-Einschränkung) ·
+`openspec/changes/capacitor-huelle/REVIEWS.md` (Runde 6, neuer Trailer).
 
 ## Next session: start here
 
-**Erster Handgriff: `gh pr checks 299` — und dann den Merge begleiten.**
-Danach, in dieser Reihenfolge:
-
-1. **`migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
-   Frontend-Deploy. Es sind **drei** Migrationen (…100000, …140000, …160000).
-   **Vor** dem ersten Deploy auf `main`, sonst scheitert der OTA-Schritt am
-   fehlenden Bucket.
-2. **Linear-Status von AGE-642 nachsehen.** Die Automation kippt ihn beim Merge
-   auf *Done*, und der Vorgang ist NICHT fertig (31 offene Aufgaben, Phase E
-   unangetastet). Vorbeugen geht nicht — der Branchname trägt das Kürzel.
-   Nachsehen und zurücksetzen ist die einzige gemessene Abhilfe.
+1. **`migrate-prod` dispatchen** (siehe oben), dann den Deploy auf `e8a2abc`
+   neu fahren und `drift-gate` grün sehen.
+2. **Branch nachziehen:** `main` trägt den Squash, der lokale Branch die 24
+   Einzelcommits. Vor der nächsten Zeile Code rebasieren.
 3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
    live geschalteten Luftweg braucht.
-
-**Zwei Dinge, die vorher gelesen gehören:**
-
-- **Das Spec-Delta ist NACH Review-Runde 5 gewachsen** (die neue
-  Rückweg-Zusage). Der §18-Gate meldet das bei jedem Commit: „was reviewed, but
-  the artifacts changed since". Nicht blockend, aber vor dem Archivieren ist zu
-  entscheiden, ob eine Runde 6 über das geänderte Delta läuft. Im PR-Rumpf steht
-  ein Hinweis für die Review.
-- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
-  `git checkout -- src/content/release-entries.generated.ts`.
 
 ## Open questions — alle innerhalb AGE-642
 
 - **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
-  Endpunkte. Sichtbar wird er erst beim ersten Deploy auf `main`.
-- **Der Rückfall selbst ist unbelegt und absichtlich so markiert.** Er hängt an
-  einem Zeitgeber im nativen Teil und ist in jsdom nicht herstellbar. Belegt ist
-  unsere Hälfte: vier Zusagen, alle vier gegengeprüft (Plattform-Bedingung
-  lässt zwei umfallen, top-level `await` die dritte, `autoDeleteFailed: true`
-  die vierte).
+  Endpunkte. Sichtbar wird er erst mit dem Deploy auf `main`.
+- **Kein einziger Beleg stammt von einem Gerät.** Belegt ist unsere Hälfte:
+  sieben Zusagen, jede einzeln durch eine Mutation gegengeprüft (alte Bauart,
+  `if (!nativ)`, top-level `await`, Beobachter entfernt, Import aus `main.tsx`
+  entfernt, `autoDeleteFailed: true`, Zeile gelöscht).
 - **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
   C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
   **und das kostet Donald die Anmeldung** — vorher ansagen.
