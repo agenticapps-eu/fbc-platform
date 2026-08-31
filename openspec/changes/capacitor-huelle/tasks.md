@@ -620,61 +620,365 @@ nicht wiederholt.
       einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
       Auswahl ist genau der Teil, den kein Test im Browser je berührt.
 
-## Phase D — OTA · selbst gehostet auf Cloudflare
+## Phase D — OTA · selbst gehostet auf Supabase
+
+> **Korrigiert am 31.08.** Diese Phase stand bis dahin auf Cloudflare Pages
+> Functions plus R2. Sie liegt jetzt auf **Supabase** — Begründung in
+> `design.md` §8, kurz: die einzige Begründung für R2 lautete „steht bereits"
+> und war gemessen falsch. R2 stand nie; Supabase Storage steht mit vier
+> Buckets. Wer eine ältere Fassung dieser Datei gelesen hat, hat einen
+> R2-Bucket erwartet, den es nicht gibt.
 
 ### D1. Der Weg, auf dem ein Bündel entsteht
 
 Ohne diesen Schritt gibt es drei Endpunkte, die Anfragen beantworten, und nichts,
 was das System je befüllt.
 
-- [ ] Veröffentlichungs-Schritt: `dist/` zu einem Zip mit `index.html` an der
-      Wurzel, SHA-256 bilden, mit dem **privaten** Schlüssel signieren, Zip nach
-      R2 laden, Manifest registrieren (Fassung, URL, Prüfsumme,
-      Vertragsnummer der Schale).
-- [ ] **Den Anlass festlegen, nicht nur den Schritt.** `deploy.yml` baut Web,
-      der native Workflow läuft von Hand — dazwischen gibt es heute nichts, das
-      ein Bündel veröffentlichte. Ohne einen benannten Auslöser (Vorschlag: bei
-      jedem Deploy auf `main`) erreichen Web-Änderungen nie ein Gerät, und die
-      zentrale Zusage der Spec wäre **per Konfiguration** unerfüllbar.
-- [ ] **Fassungsschema festlegen:** welcher Commit ergibt welche Bündel-Fassung,
-      und was gilt, wenn ein Store-Bau und ein `main`-Deploy sich überholen.
-- [ ] Signaturschlüsselpaar erzeugen; **privaten Schlüssel nach Infisical**,
-      öffentlichen als `publicKey` in die Konfiguration.
+- [x] Bucket **per Migration** anlegen (31.08., `20260831100000_ota_buendel.sql`):
+      `ota-buendel`, `public = true`, **8 MiB**, **`application/octet-stream`**
+      (kein `application/zip` — es liegt ein AES-Chiffrat darin; der Downloader
+      des Plugins prüft den Content-Type gar nicht). **Keine Policy**, und das
+      ist gemessen richtig: `service_role` trägt `rolbypassrls = true` und alle
+      sieben Rechte auf `storage.objects`. Die 8 MiB sind das Fangnetz gegen
+      einen entgleisten Upload, **nicht** gegen mitgelieferte Sourcemaps (die
+      wögen 4,43 MB und kämen durch) — deren Ausschluss gehört in den
+      Veröffentlichungs-Schritt, wo er prüfbar ist.
+      Nach dem Muster der vier bestehenden:
+      `public = true`, `file_size_limit`, `allowed_mime_types`. Gemessene Größe
+      je Bündel: **2,71 MB** ohne Sourcemaps (4,43 MB mit). Öffentlich ist hier
+      kein Zugeständnis: mit gesetztem `publicKey` liegt im Bucket **Chiffrat**,
+      kein lesbares `dist/` — die Datei ist nur mit dem öffentlichen Schlüssel
+      lesbar. **Mime-Typ erst festlegen, wenn die Verschlüsselung steht**; ein
+      AES-Chiffrat ist kein `application/zip` mehr.
+- [x] Manifest **per Migration** als Tabelle (31.08., dieselbe Datei):
+      `public.ota_buendel` mit `version` (PK), `url`, `checksum`, `session_key`,
+      `benoetigte_schale`, `created_at`. RLS an, **keine Policy, kein Grant** —
+      Muster `activation_tokens`; gelesen und geschrieben wird allein mit der
+      Service-Rolle über SECURITY-DEFINER-Funktionen, die mit D3 dazukommen.
+      Vier Bedingungen an den Spalten halten je eine Messung am Plugin fest;
+      `supabase/tests/ota_buendel_test.sql` belegt sie mit je einer
+      Positivkontrolle (13 Zusagen, lokal grün). Die Spaltennamen sind die
+      Feldnamen der Antwort an `updateUrl` — der Endpunkt bildet eins zu eins ab.
+      Ursprünglich gefordert war:
+      Vertragsnummer der Schale **und `sessionKey`** (Form `iv:sessionKey`, beides
+      Base64 — am Plugin gemessen, `CapacitorUpdaterPlugin.java:4173`). Mit RLS,
+      die dem Endpunkt das Lesen erlaubt und das Schreiben niemandem außer dem
+      Veröffentlichungs-Schritt.
+- [x] **Veröffentlichungs-Schritt gebaut** (31.08.): `scripts/ota-buendel.logic.ts`
+      (das Rechnen, mit Test), `scripts/ota-buendel.ts` (zippen, hochladen,
+      eintragen), `20260831140000_ota_buendel_veroeffentlichen.sql` (der
+      Schreibweg als SECURITY-DEFINER-Funktion, nur `service_role`) und ein
+      Schritt in `deploy.yml`, der **nur auf `main`** läuft.
+
+      **Belegt, nicht behauptet:**
+      * Der **Rundlauf des Geräts**, mit dem **echten** Schlüssel und dem
+        **echten** 2,75-MB-Bündel: sessionKey RSA-geöffnet → AES entschlüsselt →
+        byte-gleich zum Zip → Prüfsumme passt zum Klartext. 10 Zusagen in
+        `ota-buendel.logic.test.ts`, dazu die Abweisung eines 4096-Bit-Schlüssels.
+      * Das **Zip**, an einem echten `dist/` gemessen: `index.html` an der
+        Wurzel, **0** von 64 Sourcemaps darin, 2,75 MB.
+      * Der **Schreibweg** in `ota_buendel_test.sql` §21–26: `security definer`,
+        `anon` und `authenticated` dürfen ihn NICHT ausführen, `service_role`
+        schon, ein zweiter Aufruf ersetzt statt zu scheitern, und die
+        CHECK-Bedingungen greifen auch auf diesem Weg.
+
+      **NICHT belegt** und erst beim ersten Deploy auf `main` sichtbar: der
+      Upload in den Bucket und der RPC-Aufruf über das Netz. Beide brauchen ein
+      laufendes Projekt mit angewandten Migrationen.
+
+      **Ein Fund am Rande, der die Wahl der Krypto-Bibliothek festnagelt:**
+      `RSA.swift:253` trägt wörtlich den Kommentar „For PKCS1 padding from
+      Node.js privateEncrypt" und prüft auf genau dieses Blockformat. Node ist
+      hier die Referenz, gegen die die iOS-Seite geschrieben wurde — nicht eine
+      von mehreren Möglichkeiten. Dieselbe Datei polstert zwei Zeilen darüber
+      hart auf 256 Byte: RSA-2048, ein zweites Mal und an ganz anderer Stelle.
+
+      Ursprünglich gefordert war: `dist/` zu einem Zip mit
+      `index.html` an der Wurzel und **ohne `.map`-Dateien**; SHA-256 bilden;
+      das Zip mit einem zufälligen **AES**-Schlüssel verschlüsseln; diesen
+      Sitzungsschlüssel **und** die Prüfsumme mit dem **privaten** RSA-Schlüssel
+      verschlüsseln; Chiffrat in den Bucket laden; Manifest-Zeile mit `version`,
+      `url`, `checksum` und `sessionKey` schreiben. Das ist capgos „end to end
+      encryption v2", nicht eine losgelöste Signatur — siehe `design.md` §8.
+      Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus Infisical — der Job fährt
+      ohnehin über `infisical run`.
+
+      **Vier Einzelheiten, am 31.08. am Quelltext gemessen; jede einzelne würde
+      sonst erst auf dem Gerät auffallen, und dort still:**
+
+      1. **Die Prüfsumme gehört zum KLARTEXT-Zip, nicht zum Chiffrat.** Das
+         Plugin entschlüsselt zuerst und rechnet dann
+         (`CapgoUpdater.java:851-856`). Wer die SHA-256 über die hochgeladene
+         Datei bildet, liefert die falsche.
+      2. **Verschlüsselt werden die 32 ROHEN Digest-Bytes**, nicht die 64
+         Hex-Zeichen. Das Gerät hext das Ergebnis selbst auf und vergleicht mit
+         `calcChecksum`, das Kleinbuchstaben-Hex liefert (`CryptoCipher.java:266`).
+      3. **Das Feld `checksum` trägt Hex**, nicht Base64 — beides wird
+         angenommen, Hex ist das neue Format. Bei RSA-2048 also genau 512
+         Zeichen; die Bedingung an der Spalte erzwingt es.
+      4. **`sessionKey` ist `<iv>:<sessionKey>`**, beides Base64, der IV
+         **unverschlüsselt** (`CryptoCipher.java:151-152`). Fehlt der
+         Doppelpunkt, hält das Plugin die Verschlüsselung für abgeschaltet und
+         versucht, Chiffrat zu entpacken — ohne Fehlermeldung, die das erklärt.
+
+      **Nicht die Tabelle direkt beschreiben.** `service_role` hält in `public`
+      keine Tabellenrechte (AGE-312); ein `.from("ota_buendel").insert(…)`
+      scheitert erst zur Laufzeit. Der Schreibweg ist eine
+      SECURITY-DEFINER-Funktion mit `grant execute … to service_role`, Muster
+      `issue_activation_token`. Für den **Bucket** gilt das nicht: dort trägt
+      `service_role` alle Rechte und umgeht die RLS — gemessen.
+- [x] **Anlass festgelegt** (Donald, 31.08.): jeder Deploy auf `main`. Derselbe
+      Job, der `dist/` schon baut und zu Pages lädt. Jeder andere Anlass hieße,
+      dass ein vergessener Auslöser Geräte **still** zurücklässt.
+- [x] **Fassungsschema festgelegt** (Donald, 31.08.): `<Semver aus
+      package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49bdeadb`. Beantwortet zugleich,
+      was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
+      SHAs, also verschiedene Fassungen.
+- [x] **RSA-Schlüsselpaar neu erzeugt — 2048 Bit** (Donald, 31.08. nachmittags,
+      nach dem Befund unten).
+
+      **Gemessen an `~/Documents/capgo_privat.pem`, fünf Punkte:** 2048 Bit ·
+      PKCS#1 in beiden Dateien (`BEGIN RSA PRIVATE KEY` / `BEGIN RSA PUBLIC
+      KEY`) · Chiffrat **256 Byte**, also genau was das Plugin verlangt ·
+      Rundlauf *privat verschlüsselt → öffentlich geöffnet* byte-gleich über 32
+      Bytes · Base64 **344** und Hex **512** Zeichen, also genau die Längen, die
+      `ota_buendel` als Bedingung führt.
+
+      **Diesmal ist die GRÖSSE ausdrücklich geprüft** — das ist der Unterschied
+      zu den drei Belegen vom Vormittag, die Format, Übertragung und Rundlauf
+      prüften und die Länge gerade nicht.
+
+      **Nicht selbst nachgemessen:** dass der Wert in Infisical `prod` derselbe
+      ist wie die Datei auf der Platte. Das braucht ein echtes Terminal; Donald
+      hat es abgelegt und gesagt. Der erste Deploy auf `main` ist die Stelle, an
+      der es sich zeigt — und er scheitert dann laut, nicht still, weil
+      `bildeBuendel` die Längen prüft, bevor irgendetwas hochgeladen wird.
+
+      **Korrektur vom 31.08., nachmittags.** Am Vormittag desselben Tages galt
+      diese Aufgabe als erledigt und dreifach belegt: 4096 Bit, PKCS#1, in
+      Infisical `prod`. **Die Schlüssellänge ist falsch, und die drei Belege
+      haben sie nicht geprüft** — sie prüften Format, Übertragung und Rundlauf,
+      also drei Fragen, unter denen die Größe nicht vorkam. Ein Rundlauf
+      gelingt mit jeder Schlüssellänge.
+
+      Gemessen am Quelltext von `@capgo/capacitor-updater@8.51.15`:
+      `decryptChecksum` bricht ab, wenn das Chiffrat der Prüfsumme **nicht
+      genau 256 Byte** lang ist — auf beiden Plattformen, hart, mit
+      „Checksum is not RSA encrypted" (`CryptoCipher.java:254`,
+      `CryptoCipher.swift:74`). 256 Byte heißt **RSA-2048**. Der hinterlegte
+      4096-Bit-Schlüssel liefert gemessen **512 Byte**; Gegenprobe mit einem
+      frischen 2048-Bit-Schlüssel: 256 Byte, und der Rundlauf gibt die 32
+      Digest-Bytes byte-gleich zurück.
+
+      **Der Fehlschlag wäre still gewesen:** die Prüfsumme ist Pflicht, sobald
+      ein `publicKey` gesetzt ist. Das Bündel lädt, die Prüfung scheitert, das
+      Gerät bleibt auf der alten Fassung — und kein Log auf unserer Seite sagt
+      warum. Aufgefallen wäre es frühestens beim ersten Gerätetest.
+
+      **Was aus der alten Fassung weiter gilt** (geprüft, Klausel für Klausel):
+      **PKCS#1** ist richtig und wird von beiden Plattformen ausdrücklich
+      verlangt (`CryptoCipher.java:145`, `CryptoCipher.swift:241`);
+      `openssl rsa -pubout` liefert das falsche Format, `-RSAPublicKey_out` das
+      richtige. Die Ablage in Infisical `prod` als `CAPGO_PRIVATE_KEY` ist der
+      richtige Ort, und der mehrzeilige PEM-Wert ist dort ungekürzt angekommen —
+      das war die Lehre aus `APNS_KEY_P8` vom 28.08. und sie trägt weiter.
+      **Nur die Länge ändert sich.**
+
+      Erzeugung: `openssl genrsa -traditional -out capgo_privat.pem 2048`,
+      dann `openssl rsa -in capgo_privat.pem -RSAPublicKey_out`. Danach
+      `CAPGO_PRIVATE_KEY` in Infisical `prod` ersetzen. Die alten
+      4096-Bit-Dateien in `~/Documents` gehören gelöscht, damit nicht später
+      die falsche gegriffen wird.
+- [x] **Die Länge ist in der Datenbank festgehalten** (31.08.). Die Bedingung
+      `ota_buendel_checksum_rsa2048_hex` verlangt 512 Hex-Zeichen = 256 Byte.
+      Ein mit dem 4096-Bit-Schlüssel gebildetes Chiffrat (1024 Zeichen) wird
+      beim Schreiben abgewiesen, statt dass jedes Gerät das Bündel schweigend
+      verweigert. `ota_buendel_test.sql` belegt beide Richtungen.
+- [ ] Öffentlichen Schlüssel als `publicKey` in `capacitor.config.ts` eintragen.
+      Steht erst mit D3 an, wo das Plugin dazukommt — vorher wäre es tote
+      Konfiguration. Die Datei liegt bereit.
 
 ### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
 
 Dreimal dieselbe Zahl, dreimal woanders. Wird das nicht festgelegt, erfindet
-jeder Schritt in D3 seine eigene Auslegung.
+jeder Schritt in D3 seine eigene Auslegung. Alle drei sind am 31.08. **am
+Quelltext des Plugins gemessen** worden, nicht geraten.
 
-- [ ] **Feld** benennen, in dem die Schale ihre Nummer an `updateUrl` meldet.
-- [ ] **Stempelstelle** benennen: wo die Schale sie trägt. **Nicht** die
-      App-Version — zwei Store-Builds derselben Version können verschiedene
-      Plugin-Mengen haben, und genau darum geht es.
-- [ ] **Regel** festhalten: die Nummer steigt in **jedem** PR, der ein Plugin
-      hinzufügt, entfernt oder seine native Fassung hebt. Ein solcher PR geht
-      über den Store.
+- [x] **Feld: `version_build`.** Das einzige Feld im POST an `updateUrl`, das auf
+      **beiden** Plattformen aus `plugins.CapacitorUpdater.version` kommt
+      (`CapacitorUpdaterPlugin.java:725`, `CapacitorUpdaterPlugin.swift:268`).
+      `custom_id` scheidet aus: aus **JavaScript** gesetzt (`setCustomId`), die
+      Web-Schicht erklärte damit ihren eigenen Vertrag.
+- [x] **Stempelstelle: `plugins.CapacitorUpdater.version` in
+      `capacitor.config.ts`** — am 31.08. auch wirklich **eingetragen**, Wert
+      `1.0.0`. Sie ist keine tote Konfiguration, obwohl das Plugin erst mit D3
+      dazukommt: `scripts/ota-buendel.ts` liest sie heute schon und stempelt
+      jedes Bündel damit. Beleg: `capacitor.config.json` liegt in
+      `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`,
+      nicht darin. OTA tauscht `public/`; die Nummer bleibt der Schale und ist
+      nur über den Store änderbar. Ausdrücklich **nicht** die App-Version.
+- [x] **Regel** festgehalten (`design.md` §8): die Nummer steigt in **jedem** PR,
+      der ein Plugin hinzufügt, entfernt oder seine native Fassung hebt. Ein
+      solcher PR geht über den Store.
 
 ### D3. Endpunkte und Schutz
 
-- [ ] `@capgo/capacitor-updater`; `updateUrl`, `channelUrl`, `statsUrl` in
-      `capacitor.config.ts` auf eigene Endpunkte.
-- [ ] Drei Cloudflare Pages Functions; Bündel-Zips nach R2.
-- [ ] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
+> **Vorab, gemessen am 31.08. und bindend für den `updateUrl`-Endpunkt:** das
+> Gerät vergleicht die angebotene Fassung mit der eigenen **auf Ungleichheit,
+> nicht auf Grösse** (`CapacitorUpdaterPlugin.java:4909`, `.swift:4360`).
+> Liefert der Endpunkt ein älteres Bündel, installiert das Gerät es
+> kommentarlos. Die Abfrage MUSS deshalb ausdrücklich nach `created_at`
+> absteigend ordnen und das erste Bündel nehmen, dessen `benoetigte_schale` das
+> Gerät erfüllt. Ein `select … limit 1` ohne `order by` wäre ein Rückschritt,
+> der wie ein Zufall aussieht.
+
+- [x] `@capgo/capacitor-updater@8.51.15` hinzufügen. **Nicht `9.x` oder `10.x`**
+      — die tragen die höhere Zahl, fordern aber `@capacitor/core: ^5.0.0`;
+      `latest` ist bewusst `8.51.15`. Nach dem Hinzufügen: `deno install
+      --frozen=false`, danach **zwingend** `pnpm install`, sonst wird der
+      Deno-Job rot.
+      **Erledigt 31.08.**, in dieser Reihenfolge und mit `fbc-platform-f4`
+      abgestimmt (null offene PRs, keine ungesicherte Sperrdatei). In
+      `package.json` steht die Fassung **exakt**, ohne `^`: ein Caret liesse
+      `pnpm update` auf `8.x` wandern, und die Fassungswahl hier ist eine
+      Messung, keine Untergrenze. Keine unerfüllte peer-Zusage.
+- [x] `updateUrl`, `channelUrl`, `statsUrl` in `capacitor.config.ts` auf die
+      eigenen Endpunkte; dazu `plugins.CapacitorUpdater.version` als
+      Vertragsnummer (D2) und der `publicKey`.
+      **Erledigt 31.08.** Zwei Entscheidungen, die dort nicht offensichtlich
+      sind:
+      * **Der Projekt-Host steht nicht als Zeichenkette in der Datei**, sondern
+        kommt aus `process.env.VITE_SUPABASE_URL` — dieselbe Quelle wie in
+        `scripts/ota-buendel.ts`, und das Repo ist öffentlich. Fehlt die
+        Variable, **wirft** `cap sync`, statt eine Vorgabe einzusetzen: eine
+        leere URL schaltet den Weg nicht ab, sondern legt ihn auf
+        `plugin.capgo.app` (`CapacitorUpdaterPlugin.java:98-100`,
+        `.swift:101-103`) — samt `device_id` und `app_id` jedes Geräts, aus
+        einer Abwesenheit heraus, die in keinem Diff steht.
+      * **Der öffentliche Schlüssel steht im Repo**, PKCS#1, acht Zeilen. Er
+        gehört dorthin: er steckt ohnehin in jeder ausgelieferten App. Gemessen
+        am 31.08.: 2048 Bit, und Modulus identisch mit dem privaten Teil in
+        `~/Documents/capgo_privat.pem`. Bewacht von
+        `scripts/capacitor-config.test.ts` (4 Zusagen) — die Kopfzeile prüft
+        `decryptFile` wörtlich und kehrt sonst **ohne Ausnahme** zurück
+        (`CryptoCipher.java:145`).
+- [x] Drei Supabase Edge Functions. **Für jede ein `config.toml`-Block mit
+      `verify_jwt = false`** — fehlt der Block, gilt `true`, und das Gateway
+      antwortet mit 401 **vor** dem Handler. Ein Gerät hat kein JWT, und der
+      Fehler stünde in keinem Log der Function.
+      **Erledigt 31.08.**: `ota-update`, `ota-channel`, `ota-stats`, alle drei
+      mit Block. `scripts/functions-config.test.ts` sagt es je Function
+      einzeln zu; sein bestehender Vergleich Verzeichnis ⇄ Deklaration deckt
+      die Vollzähligkeit.
+      * **Der Leseweg brauchte eine eigene Migration**
+        (`20260831160000_ota_buendel_neuestes.sql`, SECURITY DEFINER, nur
+        `service_role`). `service_role` hält auf `ota_buendel` kein SELECT, und
+        `rolbypassrls` umgeht die RLS, nicht ein fehlendes Recht — ein
+        `.from(...)` wäre durch Typecheck und Tests gelaufen.
+      * **Sie nimmt ZWEI Argumente, und das kam aus dem Fremd-Review** (Runde 5,
+        HIGH): die Vertragsnummer sagt, was ein Gerät tragen KANN, die laufende
+        Fassung, ab wo es überhaupt noch vorwärts geht. `order by created_at
+        desc` allein liefert die neueste Zeile im MANIFEST — das ist nicht
+        dasselbe wie „neuer als das, was läuft". Steht ein Gerät weiter vorn,
+        bekäme es sonst ein älteres Bündel und installierte es kommentarlos.
+      * **Die Verdrahtung zur Datenbank ist eine eigene Funktion**
+        (`manifestZugriff`), weil sie sonst zwischen Attrappe und pgTAP
+        hindurchfiele — ein Tippfehler im RPC-Namen wäre durch beide Suiten
+        gegangen (Fremd-Review, HIGH).
+      * **`ota-channel` und `ota-stats` speichern nichts.** Sie existieren
+        allein, damit die zwei Wege nicht bei capgo landen. `ota-stats`
+        protokolliert `action` und ausdrücklich **nicht** `device_id`.
+      * `.rpc()` gibt einen `PostgrestFilterBuilder` zurück, kein Promise — die
+        Zusicherung fiel in `deno check` auf, genau wie beim Herauslösen von
+        `redeem.ts`.
+- [x] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
       mit zu niedriger Vertragsnummer.
+      **Erledigt 31.08., auf beiden Seiten der Grenze**, weil ein Mock, der
+      beides behauptet, nur sich selbst prüft:
+      * `supabase/tests/ota_buendel_test.sql` §32 — die Auswahl selbst, gegen
+        vier Zeilen mit ausdrücklich gesetztem `created_at` (`now()` ist die
+        Zeit der **Transaktion**; aus dem Default wären alle vier gleich und die
+        Ordnung fiele still auf den Tiebreaker). §33 ist die Positivkontrolle,
+        §34 hält fest, dass nach Zeit geordnet wird und nicht nach der höchsten
+        erfüllbaren Nummer, §35 dass der Vergleich zahlenweise ist.
+      * `supabase/functions/ota-update/antwort.test.ts` — dass der Endpunkt die
+        Vertragsnummer überhaupt weiterreicht und nicht selbst filtert.
+      * **Mutationsprobe am laufenden Stack** (31.08.): `order by version desc`
+        statt `created_at` → 5 von 41 rot; Zeichenkettenvergleich statt `int[]`
+        → 1 rot; `is null` aus dem Wächter entfernt → 1 rot; Untergrenze der
+        laufenden Fassung entfernt → 1 rot; `>=` statt `>` → 1 rot. Original
+        jedes Mal wieder grün.
 - [ ] **RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen und die
       installierte Fassung bleibt in Betrieb.
+      **Halb erledigt 31.08., und die Teilung ist keine Bequemlichkeit.** Die
+      Zusage hat zwei Hälften, und nur eine liegt in unserem Code:
+      * **Unsere Hälfte, belegt:** ein Angebot ist vollständig oder es ist
+        keines (`antwort.test.ts`). Fehlte `checksum`, lehnte das Gerät mit
+        `checksum_required` ab; fehlte `sessionKey`, gälte die Verschlüsselung
+        als nicht gesetzt (`CryptoCipher.java:141`), das Gerät entpackte
+        Chiffrat und scheiterte **ohne Hinweis auf die Ursache**. Dazu §38 der
+        pgTAP-Datei: die vier Spalten kommen der richtigen Zuordnung zurück.
+        Und seit dem Fremd-Review (Runde 5, HIGH): `pruefeSchluesselpaar` im
+        Veröffentlichungs-Schritt — der `publicKey` der Schale muss zum
+        privaten Schlüssel des Deploys gehören, sonst fällt der Job. Vorher
+        belegte nichts mehr als „irgendein 2048-Bit-Schlüssel".
+      * **Offen, und zwar als Gerätebeleg:** dass das Gerät ein Bündel mit
+        falscher Prüfsumme verwirft **und auf der laufenden Fassung bleibt**,
+        ist Verhalten des Plugins. Ein Mock könnte es nur behaupten. Der zweite
+        Teil des Satzes hängt zudem an **D4** (`notifyAppReady`) — ohne den
+        Rückweg gibt es kein „bleibt in Betrieb", nur ein „installiert nicht".
 
 ### D4. Der Rückweg — ohne ihn ist OTA eine Einbahnstraße
 
-- [ ] `notifyAppReady()` nach erfolgreichem Start aufrufen und das
-      Rollback-Verhalten konfigurieren.
-- [ ] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
-      Start scheitert, fällt auf die vorige Fassung zurück.
-- [ ] Das Szenario im Spec-Delta ergänzen. Die bisherige Zusage deckt nur das
+- [x] `notifyAppReady()` nach erfolgreichem Start aufrufen und das
+      Rollback-Verhalten konfigurieren. **Erledigt** — `src/lib/ota.ts` ist ein
+      Nebenwirkungs-Modul ohne Export, in `main.tsx` als **zweiter** Import
+      direkt hinter `./instrument`. Der Import IST der Aufruf; damit gibt es
+      keine Funktion, die jemand zu rufen vergessen kann. Ohne Bedingung (die
+      Web-Umsetzung ist ein `return { bundle: BUNDLE_BUILTIN }`,
+      `dist/esm/web.js:172`) und ohne `await` (ein top-level `await` machte aus
+      einer hakenden Brücke einen Startfehler).
+- [x] **Das Rollback-Verhalten war die eigentliche Arbeit:**
+      `autoDeleteFailed: false` in `capacitor.config.ts`. Die Vorgabe ist
+      `true` und macht aus dem Rückfall eine **Endlosschleife** — am 31.08. an
+      8.51.15 auf beiden Plattformen gemessen: `checkRevert()` setzt das
+      kaputte Bündel auf ERROR und rollt zurück (`.swift:3353`, `.java:5140`),
+      das anschliessende Löschen mit `removeInfo: false` **überschreibt dieses
+      ERROR mit DELETED** (`CapgoUpdater.swift:2325`, `.java:1632`), und DELETED
+      ist genau der Zweig, der beim nächsten Start dasselbe Bündel **erneut
+      lädt** (`.swift:4364-4379`, `.java:4999`) statt abzubrechen, wie ERROR es
+      täte (`.swift:4391`, `.java:4915`). Der Abbruch-Zweig ist mit der Vorgabe
+      toter Code. **Der Endpunkt aus D3 kann das nicht auffangen:**
+      `ota_buendel_neuestes` liefert, was streng später eingetragen wurde als
+      das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
+      kaputte Bündel ist also weiterhin „später". Die Schleife ist nur auf dem
+      Gerät zu brechen.
+- [x] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
+      Start scheitert, fällt auf die vorige Fassung zurück. **Zur Hälfte
+      belegt, und die Hälfte ist benannt** — wie schon bei der zweiten
+      RED-Zusage aus D3. Belegt ist unsere Hälfte, mit drei Zusagen in
+      `src/lib/ota.test.ts` und einer in `scripts/capacitor-config.test.ts`,
+      alle vier gegengeprüft: eine Plattform-Bedingung im Modul lässt zwei
+      Zusagen umfallen, ein top-level `await` die dritte, `autoDeleteFailed:
+      true` die vierte. Der Rückfall selbst ist Verhalten des Plugins und in
+      jsdom nicht herstellbar — er hängt an einem Zeitgeber im nativen Teil.
+      Er gehört damit zu den Gerätebelegen, nicht in den vitest-Lauf; ein Test,
+      der ihn hier behauptete, wäre grün, weil nichts passiert (dieselbe Falle
+      wie bei `env(safe-area-inset-*)` und dem `backButton`).
+- [x] Das Szenario im Spec-Delta ergänzen. **Erledigt** — gemessen am 31.08.:
+      der `ADDED`-Block in `specs/native-shell/spec.md` trägt die Rückweg-Zusage
+      (Z. 214–221) **und** das Szenario „Ein signiertes, aber defektes Bündel
+      rollt zurück" (Z. 237–242). Die bisherige Zusage deckte nur das
       **unsignierte** Bündel ab; ein signiertes, das startet und dann weiß
       bleibt, bricht ohne diesen Rückweg **jedes** Gerät dauerhaft — bis eine
       neue Schale durch den Store geht. Das ist der teuerste denkbare Fehler
       dieses Changes.
+      **Nachgetragen am 31.08. beim Bauen:** eine zweite Zusage und ein zweites
+      Szenario, „Ein zurückgerolltes Bündel wird nicht ein zweites Mal
+      installiert". Ohne sie ist der Rückfall nur EINEN Start lang wahr — siehe
+      den `autoDeleteFailed`-Befund oben. Das Szenario beschreibt bewusst das
+      Gerät und nicht die Konfiguration: die Zusage muss auch dann noch gelten,
+      wenn das Plugin einmal ausgetauscht wird.
 
 ### D5. Beleg
 

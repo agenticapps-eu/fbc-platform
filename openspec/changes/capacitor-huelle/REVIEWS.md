@@ -206,3 +206,442 @@ Hat die prüfbaren Behauptungen vor dem Urteil im Repo nachgemessen.
   Variablennamen.
 - [LOW] Fail-closed war nur für Schriften gefordert, nicht für Marke und Bild.
   → **ÜBERNOMMEN**, gilt jetzt für alle drei Quellen.
+
+---
+
+# Runde 3 — Diff-Review D1 (Speicher des Luftwegs), 31.08.2026
+
+Kein Plan-Review nach Schritt 2b, sondern ein **Diff-Review** über den ersten
+Code der Phase D: `20260831100000_ota_buendel.sql`, `ota_buendel_test.sql` und
+die Zeile in `ci.yml`. Anlass ist Donalds Regel vom 26.08. — Migration und RLS
+gehen nie ohne Fremdreviewer. Kein Gate-Trailer, weil dieser Lauf nicht über
+`run-plan-review.sh` lief; er bindet sich an den Diff, nicht an die Artefakte.
+
+## Reviewer: codex
+
+Auftrag mit dem Kopf aus [[reviewer-cli-timeouts]] („Ignoriere sämtliche
+Skills … Antworte nur mit der Befundliste"), `REVIEWER_TIMEOUT=900`, exit 0,
+zehn Befunde. Kein Abschweifen.
+
+**Übernommen (7):**
+
+| Schwere | Befund | Was daraus wurde |
+| --- | --- | --- |
+| MEDIUM | Der Bucket ist öffentlich lesbar; die Verschlüsselung schafft **keine** Vertraulichkeit, weil öffentlicher Schlüssel und `sessionKey` beide öffentlich erreichbar sind | **Der teuerste Befund.** Die Begründung für `public = true` war falsch — in der Migration, in `design.md` §8 (zweimal) und in ADR-0005. Alle vier Stellen korrigiert: die Verschlüsselung trägt Echtheit, öffentlich ist unbedenklich, weil im Bündel steht, was Pages ohnehin ausliefert |
+| MEDIUM | `session_key` prüfte keine Längen; `A:A` kam durch | Feste Längen erzwungen: IV 24, Sitzungsschlüssel 344 Base64-Zeichen (16 bzw. 256 Byte) |
+| MEDIUM | Die Positivkontrolle im Test benutzte genau solche laufzeituntauglichen Werte | Test auf die echten Längen umgestellt; zusätzliche Verneinung für „Form richtig, Länge falsch" |
+| MEDIUM | `url ~ '^https://'` liess jeden fremden Host durch | An den Pfad **unseres** Buckets gebunden; Verneinung ergänzt |
+| MEDIUM | `benoetigte_schale` liess `999999999999.0.0` zu — Überlauf beim Vergleich nach `int[]` | Auf vier Stellen je Zahl begrenzt, führende Nullen ausgeschlossen |
+| MEDIUM | Der Test prüfte nur `rolbypassrls`; ein RLS-Bypass verleiht **keine** Tabellenrechte | Zweite Zusage über die vier Rechte auf `storage.objects` ergänzt |
+| MEDIUM | Schreibzugriffe von Clients auf den Bucket wurden gar nicht geprüft — Policies gelten der geteilten Tabelle `storage.objects`, nicht einem Bucket | Verhaltensprobe ergänzt, mit Kontrolle: dieselbe Anweisung ohne RLS geht durch, als `authenticated` wird sie abgewiesen |
+
+**Teilweise übernommen (2):**
+
+- **`version` akzeptiert führende Nullen, weist Vorabfassungen ab.** Die erste
+  Hälfte stimmt und ist behoben. Die zweite ist eine **bewusste Grenze**:
+  `package.json` steht auf `0.0.0`, das Projekt kennt keine Vorabfassungen, und
+  entstünde je eine, fiele der Veröffentlichungs-Schritt **laut** aus (rote CI)
+  statt still. Steht als Kommentar an der Bedingung.
+- **`count(*) = 0` ist vakuum-grün bei einem Tippfehler im Tabellennamen.**
+  Behoben mit `has_table` davor. Die Gegenprobe über `profiles` bleibt, sie
+  beantwortet die andere Frage (misst die Abfrage überhaupt etwas).
+
+**Nicht übernommen (1):**
+
+- **`HTTPS://` in Großbuchstaben wird abgewiesen.** Zutreffend, aber ohne Folge:
+  die URL wird vom Veröffentlichungs-Schritt selbst gebildet, nicht eingegeben.
+  Eine Bedingung auf `lower(url)` wäre Nachsicht gegenüber einem Aufrufer, den
+  es nicht gibt.
+
+## Was der Review NICHT geprüft hat
+
+Der Auftrag nannte ihm vier gemessene Tatsachen als gegeben (Rechte von
+`service_role`, der Golden-Master über die Tabellenrechte, die Anforderungen des
+Clients). Wären die falsch, fiele es hier nicht auf. Sie sind am laufenden Stack
+bzw. am Quelltext des Plugins gemessen, nicht angenommen.
+
+---
+
+# Runde 4 — Diff-Review D1, Veröffentlichungs-Schritt, 31.08.2026
+
+Zweiter **Diff-Review** derselben Phase, über den Code, der ein Bündel erzeugt:
+`ota-buendel.logic.ts` (+ Test), `ota-buendel.ts`,
+`20260831140000_ota_buendel_veroeffentlichen.sql`, ein Schritt in `deploy.yml`
+und die Vertragsnummer in `capacitor.config.ts`. Wieder Donalds Regel vom 26.08.
+
+**Zwei Anbieter**, weil ein Reviewer ohne Befunde keine Freigabe ist.
+
+## Reviewer: gemini
+
+Keine Befunde. Ging alle fünf angefragten Bereiche einzeln durch und begründete
+je, warum sie tragen. Zählt als Zweitmeinung, nicht als Beleg — die Arbeit hat
+codex gemacht.
+
+## Reviewer: codex
+
+Kopf gegen das Abschweifen, `REVIEWER_TIMEOUT=1800`. Der Lauf brauchte über
+zehn Minuten und musste im Hintergrund laufen; ein Aufruf mit zehn Minuten
+Grenze wurde vorher abgeschnitten. **Zehn Befunde, drei davon HIGH — und die
+drei hatten dieselbe Wurzel.**
+
+### Die Wurzel: ein Objektname, der nur die Fassung trug
+
+Alle drei HIGH-Befunde beschrieben denselben Fehler von drei Seiten. Beim
+**erneuten Lauf desselben Commits** — häufig, denn `deploy.yml` trägt
+`cancel-in-progress: true` — entsteht ein ANDERES Chiffrat, weil der
+AES-Schlüssel je Lauf zufällig ist. Mit `<version>.bin` als Namen hiess das:
+
+1. Der Upload überschreibt die Datei, die Manifest-Zeile trägt noch die alte
+   `checksum` und den alten `sessionKey`. Bricht der Lauf dazwischen ab, bleibt
+   dieser Zustand **dauerhaft** stehen, und kein Gerät kann das Bündel öffnen.
+2. Zwei Läufe könnten Upload und Manifest-Zeile verschränken.
+3. Ein Zwischenspeicher lieferte unter derselben URL das alte Chiffrat zu den
+   neuen Kryptowerten.
+
+**Ein Fix für alle drei:** der Objektname trägt jetzt die ersten 16 Stellen der
+SHA-256 des Chiffrats (`<version>-<inhalt>.bin`). Jeder Lauf schreibt eine
+eigene Datei; die Manifest-Zeile wechselt in EINEM Schritt. Beide Zustände sind
+in sich stimmig, egal wann ein Lauf endet. Preis: ein abgebrochener Lauf
+hinterlässt eine verwaiste, für niemanden erreichbare Datei — benannt und
+akzeptiert.
+
+### Die übrigen sieben
+
+| Schwere | Befund | Was daraus wurde |
+| --- | --- | --- |
+| MEDIUM | `github.ref == 'refs/heads/main'` schützt nicht gegen `pull_request_target` | Gemessen: der Workflow hört auf `pull_request`, heute greift die Bedingung also richtig. `github.event_name == 'push'` steht trotzdem dazu — sie kostet nichts und macht die Zusage unabhängig von späteren Auslösern |
+| MEDIUM | Der „Geräte-Rundlauf" benutzte **kein echtes Zip** | Der Test baut jetzt ein `dist/` im Kleinen, zippt es wirklich, und macht das ENTSCHLÜSSELTE Archiv auf: `index.html` an der Wurzel, 0 Sourcemaps, `assets/app.js` da. `zippeVerzeichnis` ist dafür aus dem Läufer ins Logik-Modul gezogen |
+| MEDIUM | Der Upsert-Test prüfte `checksum` und `session_key` nicht mit | Prüft jetzt alle vier veränderlichen Felder — die beiden Kryptowerte sind die, auf die es ankommt |
+| MEDIUM | Pages ist veröffentlicht, bevor der OTA-Schritt läuft | **Nicht übernommen.** Das ist die Bauart, nicht ein Fehler: die App holt ohnehin asynchron nach, und Pages zurückzurollen, weil OTA scheiterte, wäre schlechter als der Verzug. Der rote Job macht es sichtbar |
+| LOW | Der Zufallstest belegte nicht, dass Schlüssel **und** IV erneuert werden | Beide Hälften einzeln verglichen. Trägt, weil PKCS#1 Typ 1 deterministisch ist — verschiedene Chiffrate heissen verschiedene Schlüssel. Steht als Begründung im Test |
+| LOW | Nur EINE CHECK-Verletzung wurde über die DEFINER-Funktion geprüft | Eine zweite ergänzt (URL auf fremdem Host) |
+| LOW | Sieben SHA-Stellen sind 28 Bit — Kollisionsgefahr | Auf **zwölf** erhöht (48 Bit). Rechnung: bei tausend Auslieferungen rund 0,2 % mit sieben Stellen. Beispiel in vier Dokumenten mitgezogen |
+
+## Was die Reviewer NICHT geprüft haben
+
+Beide bekamen die gemessenen Tatsachen als gegeben vorgesetzt (Rechte von
+`service_role`, die Bedingungen der Tabelle, die Anforderungen des Plugins).
+Wären die falsch, fiele es hier nicht auf — sie sind am laufenden Stack und am
+Quelltext des Plugins gemessen.
+
+**Und ungeprüft bleibt der Weg über das Netz:** Upload in den Bucket und
+RPC-Aufruf. Beide brauchen ein laufendes Projekt mit angewandten Migrationen
+und werden erst beim ersten Deploy auf `main` sichtbar.
+
+---
+
+# Runde 5 — Diff-Review D3, die drei Endpunkte, 31.08.2026
+
+Dritter **Diff-Review** dieser Phase, über den Code, der ein Bündel AUSLIEFERT:
+`20260831160000_ota_buendel_neuestes.sql`, die drei Edge Functions, die drei
+`config.toml`-Blöcke, `capacitor.config.ts` und die Tests dazu. Donalds Regel
+vom 26.08.
+
+**Zwei Anbieter** — und der eine hat die Arbeit gemacht.
+
+## Reviewer: codex
+
+VERDICT: REQUEST-CHANGES
+
+`REVIEWER_TIMEOUT=1800`, im Hintergrund. **Sieben Befunde, vier davon HIGH.**
+Fünf übernommen, einer teilweise, einer abgelehnt.
+
+### HIGH 1 — die neueste Zeile im Manifest ist nicht „neuer als das, was läuft"
+
+Der wichtigste Befund der Runde, und er trifft eine Zeile, die zwei Runden lang
+als der Kern der Phase galt. `order by created_at desc` liefert die neueste
+Zeile, die eine Schale tragen KANN — daraus folgt nicht, dass sie neuer ist als
+die Fassung, die auf dem Gerät läuft. Steht ein Gerät weiter vorn als das
+Manifest, bekommt es ein älteres Bündel und installiert es kommentarlos, weil es
+selbst keine Ordnung kennt.
+
+Das war der eigene blinde Fleck: der Entwurf hält seit dem 31.08. fest, dass der
+Endpunkt „die ganze Verantwortung dafür trägt, welches Bündel das richtige ist",
+und die Umsetzung hat daraus nur die halbe Frage gemacht.
+
+**Übernommen, aber nicht wie vorgeschlagen.** codex wollte eine monotone
+Release-Sequenz als neue Spalte. Nicht nötig: `created_at` IST die Ordnung,
+es fehlte nur die Untergrenze. `ota_buendel_neuestes` nimmt jetzt zwei
+Argumente — die Vertragsnummer **und** die laufende Fassung — und nimmt nur
+Zeilen, die STRENG später eingetragen wurden. Ist die laufende Fassung die
+jüngste, fällt sie selbst heraus; „nichts Neues" ist damit eine leere Antwort
+und kein Sonderfall.
+
+Zwei Folgen, die es zu benennen lohnt:
+
+1. **Ein Zweig ist ersatzlos verschwunden.** `if (buendel.version === laeuft)`
+   in `antwort.ts` kann nicht mehr laufen — die Abfrage kann die laufende
+   Fassung nicht mehr zurückgeben. Ein Zweig, der nicht mehr laufen kann, ist
+   keine zweite Sicherung, sondern eine Behauptung, die niemand prüfen kann. Die
+   Zusage steht jetzt dort, wo die Entscheidung fällt (§36 der pgTAP-Datei).
+2. **Die Restlücke steht ausdrücklich in der Migration und als §41.** Ist die
+   laufende Fassung dem Manifest UNBEKANNT — `builtin` bei frischer
+   Installation — gibt es keine Untergrenze, und es kommt die jüngste
+   erfüllbare Zeile. Für `builtin` ist genau das gewollt. Für eine später
+   einmal geräumte Zeile wäre es ein Rückschritt; ein Aufräumen auf dieser
+   Tabelle gibt es heute nicht, und wer eines baut, muss §41 lesen.
+
+Mutationsprobe am laufenden Stack: Untergrenze entfernt → 1 von 41 rot;
+`>=` statt `>` → 1 rot.
+
+### HIGH 2 — die Naht zwischen Handler und SQL prüfte nichts
+
+Richtig, und die Sorte Lücke, die dieses Repo schon kennt. Die Deno-Tests
+ersetzen `neuestesBuendel` vollständig durch eine Attrappe, pgTAP ruft die
+SQL-Funktion direkt — dazwischen lag nichts. Ein Tippfehler im Funktionsnamen
+oder ein fest verdrahtetes `p_schale: "9999.0.0"` wäre durch BEIDE Suiten
+hindurchgegangen und hätte alten Schalen Bündel geliefert, die ihre native
+Hülle nicht trägt.
+
+**Übernommen.** Die Verdrahtung ist als `manifestZugriff(client)` aus dem Rumpf
+von `index.ts` herausgezogen und wird gegen eine Attrappe geprüft, die
+Funktionsnamen und beide Parameter mitschreibt.
+
+### HIGH 4 — der Schlüsseltest belegte nicht, dass die Hälften zusammengehören
+
+Ebenfalls richtig, und im Rückblick offensichtlich: `modulusLength === 2048`
+erfüllt **jeder beliebige** andere PKCS#1-Schlüssel. Würde eine Hälfte erneuert
+und die andere nicht, verschlüsselte der Deploy weiter mit dem alten privaten
+Schlüssel — und JEDE Installation auf JEDEM Gerät scheiterte, still.
+
+Das ist derselbe Fehlerkopf wie am Vormittag beim 4096-Bit-Schlüssel: eine
+Eigenschaft wurde für den Schlüssel selbst gehalten.
+
+**Übernommen.** `pruefeSchluesselpaar` vergleicht die **DER**-Kodierung (nicht
+den PEM-Text — Zeilenenden sind Darstellung) und läuft in
+`scripts/ota-buendel.ts` **vor jedem Seiteneffekt**. Die Prüfung gehört dorthin
+und nicht in einen Unit-Test: nur der Deploy hat beide Hälften. Vier Zusagen in
+`ota-buendel.logic.test.ts`, darunter die Positivkontrolle und ein fremdes Paar.
+Einmal gegen den echten Schlüssel gefahren: der `publicKey` in
+`capacitor.config.ts` gehört zu `~/Documents/capgo_privat.pem`.
+
+### MEDIUM 5 — ein offener Endpunkt ist eine offene Senke
+
+`ota-stats` las `action` aus dem Rumpf und schrieb es UNBESCHNITTEN ins Log. Bei
+`verify_jwt = false` heisst das: jeder kann beliebig viel Text in unsere Logs
+schreiben, so oft er mag.
+
+**Übernommen, in dem Teil, der hierher gehört:** Rumpf höchstens 8 KiB (sonst
+413), `action` höchstens 64 Zeichen im Log; `ota-channel` liest den Rumpf gar
+nicht mehr und protokolliert nur die Methode. **Ratenbegrenzung nicht
+übernommen** — die gehört ans Gateway und nicht in den Handler, und sie steht
+als solche im Kopf der Datei.
+
+### LOW 6 — interne Datenbankfehler gingen nach aussen
+
+`message: error.message` reichte die Postgres-Meldung an einen Aufrufer ohne
+JWT durch — Funktions-, Spalten- und bei Rechtefehlern Rollennamen.
+**Übernommen:** nach aussen ein konstanter Satz, die Meldung ins Log.
+
+### LOW 7 — `{"status":"ok"}` auf einen unlesbaren Rumpf
+
+Machte Zustellung und Verlust ununterscheidbar. **Halb übernommen:** die Antwort
+sagt jetzt `discarded` und die Function protokolliert `rumpf_unlesbar`. Der
+Status bleibt 200 — ein 4xx löste beim Gerät nur eine Wiederholung aus, die
+nichts besser machte.
+
+### HIGH 3 — ABGELEHNT: „der Wächter prüft nur die Form der Vertragsnummer"
+
+Der einzige Befund, der nicht trägt. codex bemängelt, `version: "1.0.0"` liesse
+sich zu `"9999.0.0"` mutieren, ohne dass `toMatch(...)` rot würde, und fordert
+eine an die nativen Fähigkeiten gekoppelte Quelle.
+
+Der zweite Teil ist bereits entschieden und steht seit dem 31.08. im Entwurf §8
+als benannte Abwägung: **die Vertragsnummer ist eine Richtlinie, kein
+Mechanismus.** Es gibt keinen technischen Weg, aus einem gebauten Paket
+abzuleiten, welche nativen Fähigkeiten es trägt; die Regel „die Nummer steigt in
+jedem PR, der ein Plugin anfasst" ist Buchführung, und der Entwurf sagt das
+ausdrücklich, damit es nicht später als selbstverständlich unterstellt wird.
+
+Der erste Teil beschreibt kein Leck, sondern die Absicht: die Zahl SOLL sich
+ändern. Ein Test, der den konkreten Wert festschreibt, wäre eine zweite Kopie
+derselben Zeile, die im selben PR mitgeändert würde — er verschöbe die Frage,
+statt sie zu beantworten.
+
+## Reviewer: gemini
+
+VERDICT: APPROVE
+
+Keine Befunde. Ging alle sechs angefragten Bereiche einzeln durch — Erfüllung
+der Vertragsnummer, Rückschritt, Rechte des Lesewegs, Folgen von
+`verify_jwt = false`, Vakuum-Grün, Fehlerpfade — und begründete je, warum sie
+tragen. **Zählt als Zweitmeinung, nicht als Beleg:** zum Rückschritt schrieb es
+ausdrücklich „Nichts gefunden", und genau dort lag der schwerste Befund der
+Runde. Die Arbeit hat codex gemacht.
+
+## Nicht gezählt
+
+`opencode` (`hf:moonshotai/Kimi-K3`) sollte die zweite Stimme sein und ist
+zweimal am Anbieter gescheitert — `UnknownError: Unexpected server error`,
+Kennungen `err_66bd21df` und `err_1be8fe66`. Kein Lauf, keine Stimme. `gemini`
+ist an seine Stelle gerückt.
+
+## Was die Reviewer NICHT geprüft haben
+
+Beide bekamen die gemessenen Tatsachen als gegeben vorgesetzt: die Rechte von
+`service_role`, das Verhalten des Plugins bei Fassungsvergleich und leerer URL,
+die Wirkung eines fehlenden `config.toml`-Blocks. Sie sind am Quelltext von
+`@capgo/capacitor-updater@8.51.15` und am laufenden Stack gemessen — wären sie
+falsch, fiele es hier nicht auf.
+
+**Und ungeprüft bleibt weiterhin alles, was ein echtes Gerät braucht:** dass die
+Schale die drei URLs wirklich ruft, dass sie das Bündel öffnet, und dass sie bei
+falscher Prüfsumme auf der laufenden Fassung bleibt. Das Letzte hängt zudem an
+D4 (`notifyAppReady`) — ohne den Rückweg gibt es kein „bleibt in Betrieb".
+
+---
+
+# Runde 6 — Diff-Review D4, der Rückweg, 31.08.2026
+
+Gegenstand: `16439c2..aca10bf` ohne `session-handoff.md` und `tasks.md` — also
+`src/lib/ota.ts`, `src/lib/ota.test.ts`, `src/main.tsx`, `capacitor.config.ts`,
+`scripts/capacitor-config.test.ts`, der `cause`-Fix in
+`scripts/ota-buendel.logic.ts` und das gewachsene Spec-Delta. Beide Arme direkt
+per Bash, Prompt 15 kB mit dem Diff im Rumpf und der ausdrücklichen Erlaubnis,
+im Arbeitsverzeichnis nachzumessen (die Plugin-Quelle liegt unter
+`node_modules/@capgo/capacitor-updater/` im Klartext).
+
+**Die Runde war fällig, weil das Delta nach Runde 5 gewachsen ist** — die neue
+Rückweg-Zusage stand in keiner Review. Sie hat sich gelohnt: der schwerste
+Befund der ganzen Phase D kam hier.
+
+## Reviewer: opencode
+
+VERDICT: REQUEST-CHANGES
+
+Sieben Befunde, alle mit eigener Messung an der Plugin-Quelle. Zwei MITTEL,
+fünf NIEDRIG. **Übernommen: alle sieben.**
+
+- **MITTEL — Test 3 belegt die Zusage „kein top-level await" nicht.** Ein
+  `await CapacitorUpdater.notifyAppReady().catch(…)` liefe durch alle drei
+  Tests: der Mock ist sofort settled, und ein TLA mit `catch` löst das Modul
+  weiterhin auf. Unabhängig davon in dieser Sitzung nachgemessen, bevor der
+  Befund vorlag: Mutation eingespielt, 3/3 grün. Rot wird sie erst an einer
+  Brücke, die weder auflöst noch ablehnt. Behoben durch die neue Zusage „lässt
+  eine hakende Brücke den Start nicht aufhalten"; Gegenprobe: TLA → genau
+  dieser Test rot nach 4 s, die übrigen grün.
+- **MITTEL — Umgehungspfad am Gedächtnis vorbei.** Der öffentliche manuelle
+  `CapacitorUpdater.download()` löscht ein ERROR-Bündel ausdrücklich vor dem
+  neuen Versuch (`CapgoUpdater.java:1433` und `:1488`). Heute ohne Aufrufer —
+  `grep -rn "CapacitorUpdater\." src/` findet nur `ota.ts` —, die Zusage gilt
+  also. Als Zaun in den Kommentar von `capacitor.config.ts` aufgenommen.
+- **NIEDRIG — `.java:5140` liegt daneben:** `private void checkRevert()` steht
+  auf **5141**, 5140 ist leer. Nachgemessen und in beiden Dateien korrigiert.
+  Alle übrigen Verweise hat opencode einzeln bestätigt.
+- **NIEDRIG — „der Zweig darueber" stimmt nur für Swift.** In Swift liegt der
+  DELETED-Zweig (4364) über dem ERROR-Abbruch (4391), in Java umgekehrt (4999
+  gegen 4915). Ergebnis identisch, Reihenfolgebehauptung nicht. Umformuliert.
+  Dazu die Nebenpräzision: das erste Überschreiben des ERROR ist bereits
+  *synchron* das Setzen auf DELETING (`.swift:3382`, `.java:5171`).
+- **NIEDRIG — Test 2 war strikt schwächer als Test 1.** Jede Mutation, die ihn
+  rötet, rötet auch Test 1; seine Zusage war zudem die schwächere. Zusammen­
+  gelegt.
+- **NIEDRIG — `(e as Error).message`** protokolliert `undefined`, wenn die
+  Ablehnung kein `Error` ist. Auf das Hausmuster umgestellt.
+- **NIEDRIG — „der Preis ist ein Buendel-Ordner" untertreibt.** Nachgemessen:
+  `autoDeletePrevious` trifft nur das vorige *erfolgreiche* Bündel
+  (`CapgoUpdater.swift:2748` ff.), für ERROR-Bündel gibt es keine Obergrenze.
+  Kommentar korrigiert; die Entscheidung selbst bleibt.
+
+Ohne Befund verifiziert: die Schleifenmechanik Schritt für Schritt, die vierte
+Zusage in `scripts/capacitor-config.test.ts` (drei Mutationen, alle rot), die
+Importreihenfolge, und `{ cause: … }` gegen `lib: ES2023`.
+
+## Reviewer: codex
+
+VERDICT: REQUEST-CHANGES
+
+Zwölf Befunde, drei HOCH. **Übernommen: elf.**
+
+### HOCH 1 — der Rückweg deckte sein eigenes Motivszenario nicht ab
+
+Der schwerste Befund der Phase. `CapacitorUpdater.notifyAppReady()` stand blank
+im Modulrumpf und ging damit **bei der Modulauswertung** ab — vor dem ersten
+Rendern, vor `AuthProvider`, und vor `src/lib/supabase.ts:10`, das bei fehlender
+Konfiguration wirft. Ein Bündel, das lädt und dann **weiss bleibt**, war so
+bereits als erfolgreich gestempelt und fiel nie zurück. Genau das Szenario, mit
+dem der Kopf von `ota.ts` das ganze Modul begründet.
+
+Am Repo nachgemessen: `main.tsx:2` liegt vor `main.tsx:14` (`AuthProvider`),
+`supabase.ts:10-15` wirft wirklich, und `setSuccess()` hängt am Aufruf
+(`CapacitorUpdaterPlugin.swift:3265`).
+
+**Donalds Entscheidung am 31.08.: jetzt reparieren, nicht als Folgeaufgabe.**
+Die Bestätigung wartet nun auf das einzige Zeichen, das „die Oberfläche steht"
+bedeutet, ohne etwas über sie zu wissen: den ersten Element-Knoten unter
+`#root`, aus Reacts erstem Commit. Bleibt er aus, bleibt die Bestätigung aus —
+und das ist die gewünschte Antwort. Die Frist trägt das: 10 s auf iOS, auf
+Android mindestens 30 s, und `AuthProvider` hält das erste Bild nicht auf
+(`AuthProvider.tsx:358` reicht die Kinder unverzüglich durch).
+
+Ausdrücklich nicht abgedeckt und so im Kopf von `ota.ts` vermerkt: greift die
+oberste `ErrorBoundary`, steht mit `ErrorFallback` ebenfalls ein Bild — das
+zählt als „gestartet". Ein Rückfall auf jeden abgefangenen Renderfehler wäre zu
+grob.
+
+### HOCH 2 — beide Aufruf-Zusagen liefen nur im Web-Modus
+
+`if (!Capacitor.isNativePlatform())` wäre vollständig grün gewesen und hätte auf
+**jedem** Gerät nie bestätigt — die katastrophale Richtung, und die Tests sahen
+sie nicht, weil jsdom immer Web ist. Neue Zusage „bestätigt auch, wenn die
+Plattform sich als nativ meldet" (`vi.doMock` auf `@capacitor/core`). Gegenprobe:
+`if (!nativ)` → genau diese Zusage rot, die Web-Zusage bleibt grün. Beide
+Richtungen sind jetzt zu.
+
+### HOCH 3 — keine Zusage belegte, dass `main.tsx` das Modul überhaupt einbindet
+
+Alle Zusagen importierten `./ota` selbst. Die Zeile aus `main.tsx` zu entfernen
+oder nach hinten zu schieben liess sie sämtlich grün — bei einem Modul, dessen
+ganze Bauart darauf beruht, dass „der Import IST der Aufruf". Neue Zusage „wird
+von `main.tsx` als zweiter Import eingebunden", die die Datei liest. Gegenprobe:
+Zeile entfernt → genau diese Zusage rot.
+
+### MITTEL — `autoDeleteFailed: false` reicht für eine ABSOLUTE Zusage nicht
+
+`resetWhenUpdate` (Vorgabe an) räumt bei einer neuen nativen Fassung sämtliche
+registrierten Bündel ab, ERROR eingeschlossen (`.swift:1090-1108`,
+`.java:2418-2440`, beide nachgeschlagen). Danach darf dieselbe Fassung wieder
+angeboten werden. Das Delta sagt das jetzt selbst — und begründet es: die neue
+Schale ist genau der Weg, auf dem ein Fehler behoben wird.
+
+### MITTEL — „10 Sekunden" stimmt auf Android nicht
+
+`resolveAppReadyCheckTimeoutMs()` hebt die Frist für ein noch nicht bestätigtes
+Bündel auf mindestens 30 000 ms (`PENDING_BUNDLE_APP_READY_MIN_TIMEOUT_MS`,
+`.java:134`, angewandt `.java:1043-1055`). Nachgeschlagen, Kommentar ergänzt.
+
+### MITTEL — der Testname beanspruchte mehr, als er misst
+
+„laesst das gescheiterte Buendel mit seinem ERROR liegen" prüft in Wahrheit
+einen Konfigurationswert. Umbenannt in „haelt `autoDeleteFailed` auf `false`";
+was daran hängt, steht im Rumpf.
+
+Die übrigen vier — top-level `await`, Test-2-Dopplung, `(e as Error)`, der
+Wachstumspreis — decken sich mit opencode und sind dort abgehandelt. Der
+Zeilenversatz `web.js:172` gegen `:173` ist als `172-173` aufgelöst.
+
+### NIEDRIG — NICHT übernommen: Sentry vor der Bestätigung
+
+codex merkt an, `instrument.ts` werde vor `ota` ausgewertet und könne bei
+verborgenem Dokument synchron `captureSession()` senden — der Aufruf liege also
+nicht *strikt* vor jeder Netzaktivität. Sachlich richtig und bewusst so: Sentry
+MUSS der erste Import bleiben, sonst fehlen genau die Fehler des Starts. codex
+schätzt das Risiko selbst als gering ein. Kein Diff.
+
+## Was die Reviewer NICHT geprüft haben
+
+Dasselbe wie in Runde 5, und es wiegt hier schwerer: **kein einziger Beleg
+stammt von einem Gerät.** Dass die Schale die drei URLs ruft, dass sie ein
+Bündel öffnet, dass `checkRevert` nach ausbleibender Bestätigung wirklich
+zurückrollt — all das hängt an nativen Zeitgebern und ist in jsdom nicht
+herstellbar. Belegt ist unsere Hälfte: sieben Zusagen, jede einzeln durch eine
+Mutation gegengeprüft (alte Bauart, `if (!nativ)`, top-level `await`,
+Beobachter entfernt, Import aus `main.tsx` entfernt, `autoDeleteFailed: true`,
+Zeile gelöscht). Der Gerätebeleg ist D5.
+
+<!-- openspec-review-trailer v1
+implementing-host: claude
+digest: sha256:efc290a88c027faa7859aa66e6c9b3100981d5ae2899f95ee9ffe045c0d40212
+producer-version: 1.2.0
+tasks-digest: sha256:c77d9dee4f45358bd47508806404d61087405549f010d94280a6ed6988353ee3
+-->

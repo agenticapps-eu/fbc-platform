@@ -12,6 +12,7 @@
     "npm:@capacitor/ios@8": "8.5.0_@capacitor+core@8.5.0",
     "npm:@capacitor/preferences@^8.0.1": "8.0.1_@capacitor+core@8.5.0",
     "npm:@capacitor/push-notifications@8": "8.1.2_@capacitor+core@8.5.0",
+    "npm:@capgo/capacitor-updater@8.51.15": "8.51.15_@capacitor+core@8.5.0",
     "npm:@cloudflare/workers-types@^5.20260825.1": "5.20260828.1",
     "npm:@eslint/js@^10.0.1": "10.0.1_eslint@10.9.1",
     "npm:@hookform/resolvers@^5.9.1": "5.9.1_react-hook-form@7.86.0__react@19.2.8_zod@4.4.3_react@19.2.8",
@@ -281,6 +282,12 @@
     },
     "@capacitor/push-notifications@8.1.2_@capacitor+core@8.5.0": {
       "integrity": "sha512-TQl4XxqJfNF+KbSYBFMXYYT5WXUaleVKXlByhh/8+KySMVNjp+l5OqAUoGe/sY1IAnGXEuUeCjA/WLZEVvGwrA==",
+      "dependencies": [
+        "@capacitor/core"
+      ]
+    },
+    "@capgo/capacitor-updater@8.51.15_@capacitor+core@8.5.0": {
+      "integrity": "sha512-eJxQrwMYjlaRY79r+1jJWzetgqeyVdXkkHTngVLVQq3/1BK6itOkO45wRzyFrrB9WZD84fY1ziGp8ItGCN3hWA==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -3631,6 +3638,7 @@
         "npm:@capacitor/ios@8",
         "npm:@capacitor/preferences@^8.0.1",
         "npm:@capacitor/push-notifications@8",
+        "npm:@capgo/capacitor-updater@8.51.15",
         "npm:@cloudflare/workers-types@^5.20260825.1",
         "npm:@eslint/js@^10.0.1",
         "npm:@hookform/resolvers@^5.9.1",
