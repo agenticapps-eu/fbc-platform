@@ -32,6 +32,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-30-geplante-beitraege",
+    datum: "2026-08-30",
+    titel: "Einen Beitrag jetzt schreiben und später live schalten",
+    linear: "AGE-667",
+    aenderungen: [
+      'Im Composer steht neben „Veröffentlichen" ein Weg, den Beitrag **für einen Zeitpunkt zu planen** — Datum **und** Uhrzeit.',
+      'Bis dahin sieht ihn **nur der Verfasser**, mit der Markierung „geplant für …". Niemand sonst — keine Admin-Einsicht, keine Freigabe durch andere.',
+      'Der Verfasser kann bis zum Zeitpunkt **ändern, den Zeitpunkt verschieben oder ganz zurücknehmen** (auf „sofort" stellen oder löschen).',
+      "Ist der Zeitpunkt erreicht, erscheint der Beitrag im Feed, als wäre er in diesem Moment geschrieben worden — **oben**, nicht an der Stelle seines Schreibdatums.",
+      "Für alles Bestehende ändert sich **nichts**: ein Beitrag ohne Planung verhält sich wie heute.",
+    ],
+  },
+  {
     slug: "2026-08-28-sidebar-pill",
     datum: "2026-08-28",
     titel: "Beide Leisten klappen über denselben halben Pill am Rand ein",
