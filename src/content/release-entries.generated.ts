@@ -32,6 +32,16 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-31-composer-aktionen-zusammen",
+    datum: "2026-08-31",
+    titel: 'Der Umbruch trennt „Abbrechen" nicht mehr von „Posten"',
+    linear: "AGE-674",
+    aenderungen: [
+      '**„Abbrechen" und „Posten" brechen gemeinsam um.** Sie liegen in einer eigenen Hülle, die selbst nicht umbricht; umgebrochen wird künftig die Medien-Zeile **über** die Aktionen, statt die Aktionen auseinanderzureissen.',
+      "Sichtbar ändert sich sonst nichts: dieselben Knöpfe, dieselbe Reihenfolge, dieselbe Ausrichtung nach rechts.",
+    ],
+  },
+  {
     slug: "2026-08-31-composer-abbruch",
     datum: "2026-08-31",
     titel: "Ein begonnener Beitrag lässt sich wieder verwerfen",

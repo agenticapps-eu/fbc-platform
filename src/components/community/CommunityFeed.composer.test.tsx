@@ -429,11 +429,41 @@ describe("Composer — den Entwurf verwerfen", () => {
     renderFeed();
     oeffneComposer();
 
-    const gruppe = screen.getByRole("button", { name: /abbrechen/i }).parentElement;
+    // Über die Medien-Zeile geholt, nicht über „Abbrechen": seit AGE-674 liegen
+    // die zwei Aktionsknöpfe in einer eigenen Hülle, und `parentElement` von
+    // „Abbrechen" wäre dann diese Hülle statt der umbrechenden Gruppe.
+    const gruppe = screen.getByRole("group", { name: /medien/i }).parentElement;
     expect(gruppe).not.toBeNull();
     // Dieselbe Gruppe trägt „Posten" — sonst misst die Zusage einen Nachbarn.
     expect(gruppe!.contains(screen.getByRole("button", { name: /posten/i }))).toBe(true);
     expect(gruppe!.className).toContain("flex-wrap");
+  });
+
+  /**
+   * Der Umbruch aus AGE-670 hatte einen Preis, den erst die angemeldete
+   * Sichtprobe am echten Composer zeigte (AGE-674).
+   *
+   * Auf 375 × 812 brach die Zeile als `[Bild] [Video] [Abbrechen]` / `[Posten]`
+   * um — gemessen an den `top`-Werten 388 gegen 432. „Abbrechen" stand damit
+   * bei den Knöpfen, die etwas HINZUFÜGEN, und „Posten" allein darunter. Kein
+   * Überlauf, aber eine Gruppierung, die die falsche Geschichte erzählt.
+   *
+   * Die Höhe ist in jsdom nicht messbar. Die Struktur, an der sie hängt, schon:
+   * beide Aktionsknöpfe teilen sich eine Hülle, die NICHT umbricht, und die
+   * liegt in der Gruppe, die es tut.
+   */
+  it('hält „Abbrechen" und „Posten" in einer gemeinsamen, nicht umbrechenden Hülle', () => {
+    renderFeed();
+    oeffneComposer();
+
+    const huelle = screen.getByRole("button", { name: /abbrechen/i }).parentElement;
+    expect(huelle).not.toBeNull();
+    expect(huelle!.contains(screen.getByRole("button", { name: /posten/i }))).toBe(true);
+    // Sie darf nicht umbrechen — sonst trennt sie genau die zwei Knöpfe wieder.
+    expect(huelle!.className).not.toContain("flex-wrap");
+    // Und sie liegt IN der umbrechenden Gruppe, sonst wäre der Umbruch von
+    // AGE-670 verloren und die Karte würde wieder aufgeweitet.
+    expect(huelle!.parentElement!.className).toContain("flex-wrap");
   });
 
   it("gibt die Vorschau des gewählten Bildes frei", async () => {
