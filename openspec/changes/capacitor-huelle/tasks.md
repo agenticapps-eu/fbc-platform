@@ -662,14 +662,20 @@ was das System je befüllt.
       package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`. Beantwortet zugleich,
       was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
       SHAs, also verschiedene Fassungen.
-- [ ] RSA-Schlüsselpaar erzeugen, **PKCS#1** (`-----BEGIN RSA PUBLIC KEY-----`).
-      Beide Plattformen prüfen das Format ausdrücklich und weisen PKCS#8 ab
-      (`CryptoCipher.java:145`, `CryptoCipher.swift:241`) — `openssl rsa -pubout`
-      liefert standardmäßig das **falsche**; `-RSAPublicKey_out` das richtige.
-      Privaten Schlüssel nach Infisical, öffentlichen als `publicKey` in die
-      Konfiguration. **Ein PEM ist mehrzeilig** — nur über die Umgebung setzen,
-      nie über eine Datei, und hinterher per SHA-256 gegenprüfen (siehe die
-      Havarie an `APNS_KEY_P8` vom 28.08.).
+- [x] **RSA-Schlüsselpaar erzeugt und hinterlegt** (Donald, 31.08.). 4096 Bit,
+      **PKCS#1** — beide Plattformen prüfen das Format ausdrücklich und weisen
+      PKCS#8 ab (`CryptoCipher.java:145`, `CryptoCipher.swift:241`);
+      `openssl rsa -pubout` liefert das **falsche**, `-RSAPublicKey_out` das
+      richtige. Privater Teil liegt als `CAPGO_PRIVATE_KEY` in Infisical `prod`.
+      **Dreifach belegt:** Kopfzeilen beider Dateien tragen PKCS#1 · der
+      SHA-256 des hinterlegten Werts ist gleich dem der Datei ohne
+      Schluss-Zeilenumbruch (das PEM ist mehrzeilig und wurde **nicht** gekürzt,
+      anders als `APNS_KEY_P8` am 28.08.) · ein Rundlauf `privat verschlüsselt →
+      öffentlich entschlüsselt` gibt 32 zufällige Bytes byte-gleich zurück,
+      während ein fremder Schlüssel auf demselben Befehlsweg abgewiesen wird.
+- [ ] Öffentlichen Schlüssel als `publicKey` in `capacitor.config.ts` eintragen.
+      Steht erst mit D3 an, wo das Plugin dazukommt — vorher wäre es tote
+      Konfiguration. Die Datei liegt bereit.
 
 ### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
 
