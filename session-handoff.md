@@ -1,154 +1,142 @@
-# Session Handoff — 2026-08-29 (AGE-667, geplante Beiträge)
+# Session Handoff — 2026-08-31
 
-> ## ⚠ ZUERST LESEN
+> ## ⚠ ZUERST LESEN: `main` ist vollständig grün, zwei Vorgänge sind ausgerollt
 >
-> **PR #289 ist offen.** Branch `donald/age-667-geplante-beitraege`, Worktree
-> `../fbc-platform.donald-age-667-geplante-beitraege`, HEAD `995665f` (enthält
-> einen Merge von `origin/main` — PR #277 war dazwischengekommen).
+> **AGE-666** (PR #291) und **AGE-665** (PR #292) sind gemergt, beide Läufe auf
+> `main` grün — `CI` und `Deploy`. Nachzuholen ist am Code **nichts**.
 >
-> **Und eine Falle, die vierzig Minuten gekostet hat:** der PR stand auf
-> `mergeable: CONFLICTING`, und dann legt GitHub für `on: pull_request`
-> **überhaupt keinen Lauf** an — `check-runs` meldet `total_count: 0`, was
-> aussieht wie ein Actions-Ausfall und keiner ist. Nach dem Merge standen binnen
-> Sekunden acht Check-Runs. Festgehalten in
-> `actions-ausfall-liefert-nicht-nach`.
+> **Die erste Aktion der nächsten Sitzung ist eine Entscheidung, die nur Donald
+> treffen kann: die Abnahme von AGE-599.** Sie steht seit dem 28.08. und hat
+> zwei Schritte, nicht einen — unverändert gültig, siehe unten.
 >
-> **Nach dem Merge sind es ZWEI Schritte, nicht einer** — und der zweite ist der
-> gefährliche:
->
-> 1. `migrate-prod` von Hand, mit Donalds Freigabe.
-> 2. **Danach** die pg_cron-Zeitplanung setzen, erst DEV, dann PROD
->    (`docs/secrets.md`, Abschnitt „Den Ankündigungslauf … eintragen").
->    **Nicht vorher.** Die Migration markiert den Bestand als angekündigt; läuft
->    der Job vor ihr, kündigt er JEDEN vorhandenen Beitrag an JEDES Mitglied an,
->    per Glocke und Push.
-> 3. Den Rückfüllschritt auf DEV/PROD nachlesen — lokal ist er grundsätzlich
->    nicht messbar (Migrationen laufen vor dem Seed):
->    `count(*) where veroeffentlicht_ab <> created_at` = 0 und
->    `count(*) where angekuendigt_am is null` = 0.
->
-> **Der lokale Stack wurde zweimal zurückgesetzt** (`supabase db reset`). Er
-> trägt jetzt alle Migrationen dieses Branches inklusive `20260828200000`, das
-> vorher nur von Hand eingespielt war — die Warnung aus der letzten Übergabe ist
-> damit erledigt.
+> **Ein Eintrag wartet in der Admin-Ansicht.** Das Archivieren von AGE-665 hat
+> automatisch einen Neuigkeiten-Eintrag erzeugt („Die Titelbild-Anforderung sagt
+> wieder, was gebaut ist"). Er trägt Spec-Innensicht und richtet sich nicht an
+> Mitglieder — in `AdminNeuigkeitenPage` auf **übersprungen** setzen.
 
-**Sitzung:** `fbc-platform-f4`. Parallel lief `fbc-platform-donald-age-642-…`
-an AGE-642 (mobil) — keine Berührung.
+**Sitzung:** Worktree `fbc-platform.neuigkeiten-archiv` (der Name gehört zu
+einem längst archivierten Change). Gearbeitet wurde auf Branches, die direkt von
+`origin/main` abzweigen — die **lokale** `main` hängt zurück (`359f349` gegen
+`cfae118`) und liegt im Haupt-Worktree, `wt switch --create` hätte also von
+einem veralteten Stand abgezweigt.
 
 ## Accomplished
 
-**AGE-667 vollständig gebaut**, von Schritt 3 bis Schritt 7 der Schleife. Der
-Change war beim Einstieg schon vorgeschlagen, validiert und plan-reviewed
-(Commit `5f6ba4b`); begonnen habe ich beim Bauen.
+| PR | Vorgang | Stand |
+| --- | --- | --- |
+| #291 | **AGE-666** — flackernder Test, hielt `verify` rot | gemergt, `main` grün |
+| #292 | **AGE-665** — Spec-Drift im Titelbild-Abschnitt | gemergt, Delta gefaltet |
 
-Ein Mitglied kann einen Beitrag jetzt schreiben und zu einem gewählten Zeitpunkt
-sichtbar machen. Sichtbarkeit wird **gerechnet** (`veroeffentlicht_ab <= now()
-or author_id = auth.uid()`), nicht geschaltet.
+**AGE-666 ließ sich nicht statistisch abnehmen — und das war der Befund.** Acht
+volle Suite-Läufe auf dem ungepatchten Stand: **8 von 8 grün**. Die Flakiness
+reproduziert sich auf dieser Maschine nicht, also hätte die im Issue
+vorgeschriebene Abnahme („Suite mehrfach laufen lassen") **jede** Korrektur
+bestätigt. Belegt wurde stattdessen deterministisch, über zwei Sonden an der
+Komponente (beide zurückgenommen, Prüfsumme verglichen):
 
-| Abschnitt | Stand |
-| --- | --- |
-| A · Spalte, Rückfüllung, Spalten-Grant | fertig |
-| B · die sechs lesenden Tore | fertig, jedes mit eigener Zusage |
-| B′ · das schreibende Tor + Ankündigungslauf | fertig |
-| C · Schreibweg, Cursor, Typen, alle Aufrufer | fertig |
-| D · Composer, Markierung, Rückweg, 2 weitere Flächen | fertig |
-| E · pgTAP (31 Zusagen), CI-Dateiliste | fertig |
-| F1 · zwei fremde Diff-Reviewer | fertig, Befunde eingearbeitet |
-| F3 · `migrate-prod` | **offen, Donalds Freigabe** |
+- **Sonde A** — `setGekuerzt` um einen Makrotask verzögert: vorher **rot, mit
+  der CI-Fehlermeldung Wort für Wort**, nachher grün.
+- **Sonde B** — `setGekuerzt` stillgelegt: der Negativtest daneben war **grün**
+  bei einer Komponente, die nie misst; mit der neuen Positivkontrolle rot
+  (`expected 0 to be greater than 0`).
 
-**Belege:** 969 pgTAP-Zusagen über 21 Dateien grün · 2203 Unit-Tests grün · 24
-Integrationstests gegen den laufenden Stack grün · `tsc`, `lint`, `build` grün.
+**AGE-665 war größer als das Issue.** Es nannte zwei überholte Aussagen; beim
+klauselweisen Lesen für den `MODIFIED`-Block waren es **drei plus eine falsche
+Begründung**:
+
+- **Die Verzeichnis-Karte** stand in der Ausschlussliste und ist seit AGE-595
+  längst konform. Zeitachse: die Fassung, die sie ausschloss, landete am 25.08.
+  um **20:18**, die Karte wurde um **22:38** konform — 2 h 20 später.
+- **„tragen anderes Bildmaterial"** ist für **beide** Ausschlussflächen falsch:
+  die Karte zieht aus `covers` wie der Profilkopf, der Feed über
+  `signEventCovers` aus `event-covers` wie Kachel und Kopf.
 
 ## Decisions
 
-- **Acht Tore, nicht sechs.** Der Entwurf zählte fünf lesende. Die Plan-Review
-  fand das **schreibende** (`trg_hinweis_neuer_beitrag` hätte im Moment des
-  PLANENS jedes Telefon erreicht), die Diff-Review das **achte**
-  (`recompute_potential_score` zählte geplante Beiträge in einen Score, der
-  Fremden als Impact-Marke auf der Profilseite steht — die Zahl wäre gesprungen,
-  bevor es den Beitrag gibt). Der Entwurf führte letzteres als „bekannten Rest"
-  und wollte es verschieben; das trägt nicht, es ist dieselbe Fehlerklasse wie
-  Tor 4.
-- **Die Ankündigung bekommt einen Lauf, die Sichtbarkeit nicht.** Fällt der Lauf
-  aus, erscheint der Beitrag trotzdem, nur unangekündigt — er verbirgt keinen
-  Inhalt. Genau deshalb ist er hier vertretbar.
-- **B′5 gemessen und anders entschieden als angeboten.** `pg_cron` fehlt im
-  lokalen Stack. Gewählt ist ein dritter Weg: die **Funktion** in der Migration
-  (kein Geheimnis, in pgTAP direkt messbar), nur die **Zeitplanung** von Hand.
-  Sie gehört deshalb NICHT in `ERWARTET_OHNE_MIGRATION`.
-- **Der Stichentscheid in „Beliebteste" wandert mit** (C7). Sonst hätte der Feed
-  zwei Begriffe von „neuer".
-- **Drei Indizes über `created_at` sind gefallen**, drei neue entstanden —
-  gemessen an 20 000 Beiträgen unter voller RLS: Seq Scan + Sort (20 692 Puffer,
-  58,5 ms) → Index Scan **ohne Sort** (43 Puffer, 0,17 ms).
-  `posts_visibility_created_at_idx` bleibt: nicht gemessen, also nicht angefasst.
-- **De-Publizieren ist zugelassen** und jetzt auch zugesagt (Entscheidung 7
-  verlangte das, die Zusagen fehlten).
+- **Vorschauen bekommen eine eigene Klausel**, keinen fünften Aufzählungspunkt
+  („Eine Vorschau SHALL dieselbe Regel tragen wie die Fläche, die sie
+  vorwegnimmt"). Sagt den Grund mit und deckt künftige Vorschauen ab — sonst
+  wäre die Liste im selben Zug auf sechs Einträge gewachsen.
+- **Der Seed-Absatz geht in die Vergangenheitsform, nicht weg.** Er trägt eine
+  gemessene Zahl (25 % freie Fläche je Seite; beim 1,33:1-Motiv 27,8 %), die als
+  Beleg wertvoll bleibt.
+- **Die Bucket-Zahlen wurden datiert, nicht nachgemessen.** Über den hier
+  erreichbaren Supabase-Zugang ist nur `cparx` sichtbar, Infisical braucht ein
+  TTY. Ein `MODIFIED`-Block bekräftigt jede Klausel unter neuem Datum — sie
+  ungeprüft stehenzulassen hieße, sie neu zu behaupten.
+- **Der Feed bleibt ausgeschlossen, aber mit dem richtigen Grund.** Der
+  Ausschluss ruht jetzt sichtbar auf AGE-664 statt auf einer falschen
+  Materialbehauptung.
+- **Kein Fremdreviewer bei beiden Vorgängen** — weder Schema noch Rechte noch
+  Sicherheit (`reviewer-nur-bei-migration-und-rls`).
 
 ## Files modified
 
-39 Dateien in `244cfe2`, zwei in `9173960`. Die tragenden:
-
-- `supabase/migrations/20260829090000_geplante_beitraege.sql` (**neu**, 741
-  Zeilen) — Spalte, Rückfüllung, Grant, acht Tore, Trigger, Lauf, neue
-  RPC-Signatur, Indizes. Jede Entscheidung im Kopf, mit Messung.
-- `supabase/tests/geplante_beitraege_test.sql` (**neu**) — 31 Zusagen, jede
-  Verneinung mit Positivkontrolle.
-- `src/components/community/CommunityFeed.geplant.test.tsx` (**neu**) — 9 Zusagen.
-- `src/lib/feed.ts` · `academy.ts` (eigener Cursor-Typ) · `dashboard.ts` ·
-  `public-profile.ts` · `database.types.ts` (von Hand)
-- `CommunityFeed.tsx` · `profil-widgets.tsx` · `PublicProfilePage.tsx` ·
-  `AcademyPage.tsx`
-- `rls_test.sql` · `member_lifecycle_test.sql` · `feed_popularity_test.sql` —
-  drei bestehende Wächter, die zu Recht angeschlagen haben
-- `docs/secrets.md` · `.github/workflows/ci.yml` · die drei `scripts/probe-*.ts`
+- `src/pages/PublicProfilePage.test.tsx` — `findByRole` statt `getByRole`;
+  `stelleLayout` zählt die `scrollHeight`-Zugriffe mit und liefert
+  `{ zurueck, messungen }`; der Negativtest wartet erst auf den Messbeleg
+- `openspec/specs/design-system/spec.md` — die Titelbild-Anforderung ganz neu
+  ausgestellt; **vier** Bauteile, Vorschau-Klausel, Feed als einzige Ausnahme,
+  alle **neun** Szenarien zeichengleich erhalten
+- `openspec/changes/archive/2026-08-31-titelbild-anforderung-nachziehen/` — neu
+- `src/content/release-entries.generated.ts` — 13 Zeilen, nach `pnpm
+  release:entries` + einzelnem prettier
 
 ## Next session: start here
 
-**Zuerst `gh pr checks 289` lesen** — beim Schreiben lief CI noch. Ist sie grün,
-mergen; dann die beiden Schritte aus dem Kasten oben, in dieser Reihenfolge.
+**Erste Aktion: die Abnahme von AGE-599 — sie braucht Donalds Freigabe**, weil
+sie in eine geteilte Umgebung schreibt. Zwei Schritte, nicht einer:
 
-Danach sind die nächsten kleinen Vorgänge **AGE-666** (flackernder Test in
-`PublicProfilePage.test.tsx`, hält `verify` auf `main` rot — eine Zeile
-`await screen.findByRole`, aber die Abnahme braucht die GANZE Suite mehrfach),
-**AGE-664**, **AGE-660**, **AGE-618**.
+1. **Die acht bestehenden Objekte in `event-covers` auf DEV löschen.** Ein
+   Seed-Lauf allein ersetzt sie nicht: beide Upload-Stellen schicken
+   `x-upsert: false` (`demo_event_covers.ts:97`, `import_world_seed.ts:694`),
+   und das ist Absicht mit gemessener Begründung — in privaten Buckets scheitert
+   ein Upsert an der SELECT-Policy. Die Pfade ändert der PR nicht.
+2. **Dann den Seed laufen lassen und messen** (3,00:1 ± 0,01 für alle acht,
+   danach `/events` im Browser).
+
+Danach sind die nächsten Vorgänge **AGE-664** (der Feed, die letzte Fläche, die
+noch beschneidet — kippt eine ausgesprochene Entscheidung, siehe unten),
+**AGE-660** und **AGE-618**.
 
 ## Open questions
 
-- **Re-Publizieren nach De-Publizieren kündigt NICHT erneut an** — der Stempel
-  bleibt. Konsistent, steht aber weder in der Spec noch in der Oberfläche.
-  Randnotiz von opencode, kein Befund.
-- **Das Bearbeiten-Formular überläuft auf 375 px um 18 px.** Gemessen, dass es
-  NICHT von hier kommt (das Entfernen des Planungsfeldes ändert nichts);
-  Treiber ist der native `<input type="file">` mit 301 px. Bestand aus AGE-566,
-  bewusst nicht mitrepariert.
-- **`updatePost` schreibt für „sofort" die Uhrzeit des Clients**, die RPC beim
-  Anlegen die des Servers. Vertretbar, weil derselbe Client jeden geplanten
-  Zeitpunkt aus seiner eigenen Wanduhr errechnet — aber benannt, nicht
-  übersehen.
-- Unverändert offen: AGE-599-Abnahme (zwei Schritte, siehe Übergabe vom 28.08.),
-  AGE-665 (Spec-Drift), AGE-610 · AGE-512 · Aktivierungsversand 69/72 ·
-  Rotation des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
+- **AGE-664 kippt eine ausgesprochene Entscheidung** (AGE-596 hat Feed,
+  Vorschauen und Verzeichnis-Karte ausgeschlossen, `REVIEWS.md:82`). Von den
+  drei Ausnahmen sind jetzt **alle bis auf den Feed** eingeholt — die Vorschauen
+  über AGE-600, die Karte über AGE-595. Ob die letzte fällt, ist Donalds
+  Entscheidung; die Spec hält sie seit AGE-665 sauber offen.
+- **AGE-660** (`drop index concurrently` auf `messages_thread_id_idx`) verlangt
+  laut Issue **erst eine Messung**: `pg_stat_user_indexes.idx_scan` für beide
+  Indizes auf DEV **und** PROD. Steht auf dem alten Index eine Zahl, die der neue
+  nicht erklärt, ist die Präfix-Argumentation unvollständig. Braucht außerdem
+  einen Fremdreviewer (Schema) und für PROD eine getrennte Freigabe.
+- **Ein Doku-Branch der Vorsitzung liegt ohne PR herum:**
+  `donald/uebergabe-dev-migration-blockiert` (Commit `36c595e`, die Übergabe vom
+  28.08.). Er ist nicht auf `main`. Entweder nachträglich einbringen oder
+  löschen — hängengeblieben ist er, weil Übergaben zwar committet, aber nicht
+  immer gemergt wurden.
+- **Die Bucket-Zahlen in der Spec sind auf den 25.08. datiert** und nicht
+  nachgemessen. Wer PROD-Zugang hat, kann sie bestätigen oder korrigieren.
+- Unverändert offen: AGE-610 · AGE-512 · Aktivierungsversand 69/72 · Rotation
+  des PROD-DB-Passworts · AGE-598 · AGE-256 · AGE-606 · AGE-628/629/630.
 
 ## Was diese Sitzung über das Verfahren gelernt hat
 
-**Zwei neue Memories** — `sonden-client-ohne-database-generic` (ein grüner
-`typecheck` belegt NICHT, dass die Sonden in `scripts/` noch passen: sie bauen
-`createClient()` ohne `Database`-Generic) und
-`pgtap-zusage-ueber-die-ganze-tabelle` (in CI vakuum-grün, lokal flackernd).
-Dazu ein Abschnitt in `reviewer-cli-timeouts`: gemini konnte den Diff aus
-`.gstack/` gar nicht lesen und hat trotzdem ein vollständiges Verdikt geliefert.
+**Eine neue Memory** — `flake-ohne-reproduktion-deterministisch-sondieren`:
+reproduziert ein Flake sich nicht, ist die statistische Abnahme wertlos, und der
+Ausweg ist keine höhere Wiederholungszahl, sondern eine Sonde, die das Rennen
+deterministisch macht.
 
-**Und zweimal habe ich eine Ursache aufgeschrieben, die ich nicht gemessen
-hatte.** Erst „`tsc` prüft `scripts/` nicht mit" (falsch — `scripts` steht in
-`tsconfig.json`), dann eine Score-Zusage, die `recompute_potential_score` mit
-einer Spalte verglich, die genau diese Funktion selbst schreibt. Beide korrigiert
-— die erste in einem eigenen Commit, weil sie schon gepusht war. Dieselbe Sorte
-wie die falschen Zahlen der Vorsitzung: was zwei Absätze weiter nachprüfbar ist,
-schreibe ich trotzdem aus dem Gedächtnis.
+**Drei ergänzt:** `modified-block-bekraeftigt-alles` (zweiter Fall — und diesmal
+ohne Reviewer gefunden, das klauselweise Nachmessen war der einzige Schritt, der
+blieb), `archivieren-zieht-neuigkeiten-nach` (ein Spec-Drift-Change erzeugt einen
+Eintrag, der zum Überspringen gedacht ist) und `merge-erfolg-verifizieren` (im
+Worktree `--delete-branch` von vornherein weglassen — ich bin am selben Fehler
+ein zweites Mal hängengeblieben).
 
-**Die Browser-Sichtprobe hat einen Fehler gefunden, den 2203 Tests nicht sahen**
-— 35 px waagerechter Überlauf, sobald ein Zeitpunkt gewählt war. Und die
-Messung dazu hatte selbst einen Fehler: `top` unterscheidet sich bei
-`items-center` zwischen verschieden hohen Kindern auf DERSELBEN Zeile. Gemessen
-werden müssen die Mitten.
+**Und eine Falle beim Messen:** ein Worktree mit veralteten `node_modules` lässt
+die Suite mit `exit=1` und **16 nicht ladbaren Dateien** abbrechen, ohne dass ein
+benannter Test fehlschlägt — das sah aus wie der gesuchte Flake und war eine
+fehlende Abhängigkeit (`@capacitor/push-notifications` aus #277). Vor jeder
+Baseline-Messung `pnpm install --frozen-lockfile`.
