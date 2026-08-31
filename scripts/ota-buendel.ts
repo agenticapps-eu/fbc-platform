@@ -37,6 +37,7 @@ import {
   buendelUrl,
   fassung,
   objektname,
+  pruefeSchluesselpaar,
   zippeVerzeichnis,
 } from "./ota-buendel.logic";
 
@@ -48,6 +49,24 @@ function ausUmgebung(name: string, herkunft: string): string {
   const wert = process.env[name];
   if (wert === undefined || wert.trim() === "") {
     throw new Error(`${name} fehlt. Herkunft: ${herkunft}.`);
+  }
+  return wert;
+}
+
+/**
+ * Der oeffentliche Schluessel, den die ausgelieferte Schale traegt.
+ *
+ * Dieselbe Stempelstelle-Logik wie bei der Vertragsnummer: `capacitor.config.ts`
+ * liegt NEBEN `public/`, der Luftweg kann sie nicht anfassen. Was hier steht,
+ * ist also genau das, womit ein Geraet zu oeffnen versucht.
+ */
+function oeffentlicherSchluessel(): string {
+  const wert = capacitorConfig.plugins?.CapacitorUpdater?.publicKey;
+  if (typeof wert !== "string" || wert === "") {
+    throw new Error(
+      "plugins.CapacitorUpdater.publicKey fehlt in capacitor.config.ts. Ohne " +
+        "ihn faende auf dem Geraet keine Echtheitspruefung statt.",
+    );
   }
   return wert;
 }
@@ -85,6 +104,13 @@ async function main(): Promise<void> {
 
   const version = fassung(semver, sha);
   const schale = benoetigteSchale();
+
+  // VOR jedem Seiteneffekt und vor dem Zippen: gehoeren die beiden Haelften des
+  // Schluesselpaars zusammen? Der Deploy ist die einzige Stelle, die beide
+  // sieht — der private Teil kommt aus Infisical, der oeffentliche aus der
+  // Schale. Passen sie nicht, scheitert JEDE Installation auf JEDEM Geraet, und
+  // zwar still (Befund Fremd-Review D3, HIGH). Hier faellt stattdessen der Job.
+  pruefeSchluesselpaar(privatschluessel, oeffentlicherSchluessel());
 
   const zip = zippeVerzeichnis(DIST);
   console.log(`Buendel  ${version}  (Schale ${schale})`);

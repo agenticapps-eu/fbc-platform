@@ -18,7 +18,7 @@
 // Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (plattform-injiziert).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { type Buendel, ermittleAntwort } from "./antwort.ts";
+import { ermittleAntwort, manifestZugriff, type RpcClient } from "./antwort.ts";
 
 function log(
   level: "info" | "warn" | "error",
@@ -47,21 +47,12 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Der Funktionsname und die zwei Parameter, die hinausgehen, stehen in
+  // `manifestZugriff` und werden dort geprueft — dieser Rumpf baut nur noch die
+  // Abhaengigkeiten. Die Zusicherung auf `RpcClient` verengt den Client auf den
+  // einen Aufruf, den dieser Weg braucht.
   const ergebnis = await ermittleAntwort(rumpf, {
-    // `.rpc(...)` und NICHT `.from("ota_buendel").select(...)`: service_role
-    // hält in `public` auf keiner Tabelle ein Recht (AGE-312), und
-    // `rolbypassrls` umgeht die RLS, nicht ein fehlendes SELECT. Der direkte
-    // Weg liefe durch Typecheck und Tests und scheiterte erst hier.
-    //
-    // Und `await` statt einer Typzusicherung auf den Rueckgabewert: `.rpc()`
-    // gibt einen PostgrestFilterBuilder zurueck, kein Promise. Ein `as
-    // Promise<...>` liefe durch `deno test` hindurch und faellt erst in `deno
-    // check` auf (ci.yml, Job edge-functions) — dieselbe Stelle, an der es beim
-    // Herausloesen von redeem.ts schon einmal auffiel.
-    neuestesBuendel: async (schale) => {
-      const { data, error } = await supabase.rpc("ota_buendel_neuestes", { p_schale: schale });
-      return { data: data as Buendel[] | null, error };
-    },
+    neuestesBuendel: manifestZugriff(supabase as unknown as RpcClient),
     log,
   });
 

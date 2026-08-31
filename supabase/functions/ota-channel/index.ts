@@ -38,6 +38,10 @@ Deno.serve((req) => {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
+  // Kein Feld aus der Anfrage im Log — nur die Methode, und die ist eines von
+  // drei Wörtern. Der Rumpf wird gar nicht erst gelesen: für die Antwort ist er
+  // ohne Belang, und ein offener Endpunkt, der Fremdes protokolliert, ist eine
+  // Senke, die jeder befüllen kann (Befund Fremd-Review, MEDIUM).
   console.log(JSON.stringify({ fn: "ota-channel", event: "kanal_abgelehnt", methode: req.method }));
 
   // `error` und `message` sind die Felder, die die Kanal-Pfade des Plugins

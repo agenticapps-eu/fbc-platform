@@ -14,6 +14,35 @@
 -- hier nicht im Deploy auffiele, sondern auf jedem Geraet, das nach einer
 -- Aktualisierung fragt.
 --
+-- ══ ZWEI FRAGEN, NICHT EINE ════════════════════════════════════════════════
+-- Die Funktion nimmt BEIDE Angaben des Geraets, die etwas entscheiden:
+--
+--   `p_schale`   — die Vertragsnummer der nativen Huelle (`version_build`).
+--                  Sie sagt, welche Buendel das Geraet ueberhaupt tragen KANN.
+--   `p_laufende` — die Fassung, die gerade installiert ist (`version_name`).
+--                  Sie sagt, ab wo es ueberhaupt noch vorwaerts geht.
+--
+-- Die zweite kam aus dem Fremd-Review zu diesem Diff (HIGH, 31.08.), und der
+-- Befund traf. Die erste Fassung ordnete nur nach `created_at` und nahm die
+-- neueste erfuellbare Zeile — das ist die neueste im MANIFEST und beweist
+-- nicht, dass sie neuer ist als die, die auf dem Geraet laeuft. Ein Geraet, das
+-- weiter vorn steht als das Manifest, bekaeme ein aelteres Buendel und
+-- installierte es kommentarlos, weil es selbst keine Ordnung kennt.
+--
+-- Deshalb: ist `p_laufende` im Manifest bekannt, kommt nur in Frage, was
+-- STRENG spaeter eingetragen wurde. Ist die laufende Fassung dieselbe wie die
+-- neueste, faellt sie damit selbst aus der Menge — „nichts Neues" ist hier eine
+-- leere Antwort und kein Sonderfall.
+--
+-- **Die verbleibende Luecke steht hier ausdruecklich:** ist `p_laufende` dem
+-- Manifest UNBEKANNT — `builtin` bei einer frischen Installation, oder eine
+-- Zeile, die spaeter einmal geraeumt wird —, gibt es nichts, wogegen sich
+-- ordnen liesse, und die Funktion liefert die neueste erfuellbare Zeile. Fuer
+-- `builtin` ist genau das gewollt: eine frische Installation SOLL den aktuellen
+-- Web-Stand holen. Fuer eine geraeumte Zeile waere es ein Rueckschritt — es
+-- gibt heute kein Aufraeumen auf dieser Tabelle, und wer eines baut, muss diese
+-- Zeile lesen.
+--
 -- ══ DIE ORDNUNG IST DER GANZE INHALT DIESER FUNKTION ════════════════════════
 -- Gemessen am 31.08. an @capgo/capacitor-updater@8.51.15: das Geraet vergleicht
 -- die angebotene Fassung mit der eigenen auf UNGLEICHHEIT, nicht auf Groesse
@@ -46,12 +75,17 @@
 --
 -- Forward-only.
 
-create or replace function public.ota_buendel_neuestes(p_schale text)
+create or replace function public.ota_buendel_neuestes(
+  p_schale    text,
+  p_laufende  text
+)
   returns table (version text, url text, checksum text, session_key text)
   language plpgsql
   security definer
   set search_path = ''
 as $$
+declare
+  v_laufende_zeit timestamptz;
 begin
   -- Der Waechter ist keine Vorsicht auf Vorrat, sondern die Bedingung dafuer,
   -- dass die Zeile darunter ueberhaupt sicher ist: `::int[]` auf einer
@@ -70,19 +104,30 @@ begin
       using errcode = '22023';
   end if;
 
+  -- KEIN Waechter auf `p_laufende`: jede Zeichenkette ist hier zulaessig. Ein
+  -- Geraet meldet `builtin`, wenn es auf dem Stand aus dem Store laeuft, und
+  -- nach einer Neuinstallation kann der Wert alles sein. Unbekannt heisst
+  -- schlicht „keine Untergrenze", nicht „Fehler".
+  select b.created_at into v_laufende_zeit
+    from public.ota_buendel b
+   where b.version = p_laufende;
+
   return query
     select b.version, b.url, b.checksum, b.session_key
       from public.ota_buendel b
      where string_to_array(b.benoetigte_schale, '.')::int[]
         <= string_to_array(p_schale, '.')::int[]
+       -- STRENG groesser: die laufende Fassung selbst faellt damit heraus.
+       and (v_laufende_zeit is null or b.created_at > v_laufende_zeit)
      order by b.created_at desc, b.version desc
      limit 1;
 end;
 $$;
 
-comment on function public.ota_buendel_neuestes(text) is
-  'Liefert das NEUESTE Buendel, dessen benoetigte_schale die anfragende Schale '
-  'erfuellt (AGE-642). Einziger Leseweg auf public.ota_buendel; die Tabelle '
+comment on function public.ota_buendel_neuestes(text, text) is
+  'Liefert das NEUESTE Buendel, das die anfragende Schale erfuellt UND spaeter '
+  'eingetragen wurde als die dort laufende Fassung (AGE-642). Einziger Leseweg '
+  'auf public.ota_buendel; die Tabelle '
   'traegt selbst keinen Grant. Nur fuer service_role, aufgerufen aus der Edge '
   'Function ota-update. Die Ordnung nach created_at ist Pflicht und keine '
   'Kosmetik: das Geraet vergleicht Fassungen auf Ungleichheit und installiert '
@@ -99,7 +144,7 @@ comment on function public.ota_buendel_neuestes(text) is
 -- dem oeffentlichen Schluessel jedes Buendel — kein Geheimnis (die
 -- Verschluesselung traegt Echtheit, nicht Vertraulichkeit, Entwurf §8), aber
 -- auch nichts, das ein Browser-Client von uns bekommen muesste.
-revoke execute on function public.ota_buendel_neuestes(text)
+revoke execute on function public.ota_buendel_neuestes(text, text)
   from public, anon, authenticated, service_role;
-grant  execute on function public.ota_buendel_neuestes(text)
+grant  execute on function public.ota_buendel_neuestes(text, text)
   to service_role;

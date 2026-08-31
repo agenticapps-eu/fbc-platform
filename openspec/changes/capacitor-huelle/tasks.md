@@ -875,6 +875,16 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
         `service_role`). `service_role` hält auf `ota_buendel` kein SELECT, und
         `rolbypassrls` umgeht die RLS, nicht ein fehlendes Recht — ein
         `.from(...)` wäre durch Typecheck und Tests gelaufen.
+      * **Sie nimmt ZWEI Argumente, und das kam aus dem Fremd-Review** (Runde 5,
+        HIGH): die Vertragsnummer sagt, was ein Gerät tragen KANN, die laufende
+        Fassung, ab wo es überhaupt noch vorwärts geht. `order by created_at
+        desc` allein liefert die neueste Zeile im MANIFEST — das ist nicht
+        dasselbe wie „neuer als das, was läuft". Steht ein Gerät weiter vorn,
+        bekäme es sonst ein älteres Bündel und installierte es kommentarlos.
+      * **Die Verdrahtung zur Datenbank ist eine eigene Funktion**
+        (`manifestZugriff`), weil sie sonst zwischen Attrappe und pgTAP
+        hindurchfiele — ein Tippfehler im RPC-Namen wäre durch beide Suiten
+        gegangen (Fremd-Review, HIGH).
       * **`ota-channel` und `ota-stats` speichern nichts.** Sie existieren
         allein, damit die zwei Wege nicht bei capgo landen. `ota-stats`
         protokolliert `action` und ausdrücklich **nicht** `device_id`.
@@ -894,9 +904,10 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       * `supabase/functions/ota-update/antwort.test.ts` — dass der Endpunkt die
         Vertragsnummer überhaupt weiterreicht und nicht selbst filtert.
       * **Mutationsprobe am laufenden Stack** (31.08.): `order by version desc`
-        statt `created_at` → 5 von 38 rot; Zeichenkettenvergleich statt `int[]`
-        → 1 rot; `is null` aus dem Wächter entfernt → 1 rot. Original wieder
-        grün.
+        statt `created_at` → 5 von 41 rot; Zeichenkettenvergleich statt `int[]`
+        → 1 rot; `is null` aus dem Wächter entfernt → 1 rot; Untergrenze der
+        laufenden Fassung entfernt → 1 rot; `>=` statt `>` → 1 rot. Original
+        jedes Mal wieder grün.
 - [ ] **RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen und die
       installierte Fassung bleibt in Betrieb.
       **Halb erledigt 31.08., und die Teilung ist keine Bequemlichkeit.** Die
@@ -907,6 +918,10 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
         als nicht gesetzt (`CryptoCipher.java:141`), das Gerät entpackte
         Chiffrat und scheiterte **ohne Hinweis auf die Ursache**. Dazu §38 der
         pgTAP-Datei: die vier Spalten kommen der richtigen Zuordnung zurück.
+        Und seit dem Fremd-Review (Runde 5, HIGH): `pruefeSchluesselpaar` im
+        Veröffentlichungs-Schritt — der `publicKey` der Schale muss zum
+        privaten Schlüssel des Deploys gehören, sonst fällt der Job. Vorher
+        belegte nichts mehr als „irgendein 2048-Bit-Schlüssel".
       * **Offen, und zwar als Gerätebeleg:** dass das Gerät ein Bündel mit
         falscher Prüfsumme verwirft **und auf der laufenden Fassung bleibt**,
         ist Verhalten des Plugins. Ein Mock könnte es nur behaupten. Der zweite

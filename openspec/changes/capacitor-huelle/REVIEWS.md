@@ -327,3 +327,171 @@ Quelltext des Plugins gemessen.
 **Und ungeprüft bleibt der Weg über das Netz:** Upload in den Bucket und
 RPC-Aufruf. Beide brauchen ein laufendes Projekt mit angewandten Migrationen
 und werden erst beim ersten Deploy auf `main` sichtbar.
+
+---
+
+# Runde 5 — Diff-Review D3, die drei Endpunkte, 31.08.2026
+
+Dritter **Diff-Review** dieser Phase, über den Code, der ein Bündel AUSLIEFERT:
+`20260831160000_ota_buendel_neuestes.sql`, die drei Edge Functions, die drei
+`config.toml`-Blöcke, `capacitor.config.ts` und die Tests dazu. Donalds Regel
+vom 26.08.
+
+**Zwei Anbieter** — und der eine hat die Arbeit gemacht.
+
+## Reviewer: codex
+
+VERDICT: REQUEST-CHANGES
+
+`REVIEWER_TIMEOUT=1800`, im Hintergrund. **Sieben Befunde, vier davon HIGH.**
+Fünf übernommen, einer teilweise, einer abgelehnt.
+
+### HIGH 1 — die neueste Zeile im Manifest ist nicht „neuer als das, was läuft"
+
+Der wichtigste Befund der Runde, und er trifft eine Zeile, die zwei Runden lang
+als der Kern der Phase galt. `order by created_at desc` liefert die neueste
+Zeile, die eine Schale tragen KANN — daraus folgt nicht, dass sie neuer ist als
+die Fassung, die auf dem Gerät läuft. Steht ein Gerät weiter vorn als das
+Manifest, bekommt es ein älteres Bündel und installiert es kommentarlos, weil es
+selbst keine Ordnung kennt.
+
+Das war der eigene blinde Fleck: der Entwurf hält seit dem 31.08. fest, dass der
+Endpunkt „die ganze Verantwortung dafür trägt, welches Bündel das richtige ist",
+und die Umsetzung hat daraus nur die halbe Frage gemacht.
+
+**Übernommen, aber nicht wie vorgeschlagen.** codex wollte eine monotone
+Release-Sequenz als neue Spalte. Nicht nötig: `created_at` IST die Ordnung,
+es fehlte nur die Untergrenze. `ota_buendel_neuestes` nimmt jetzt zwei
+Argumente — die Vertragsnummer **und** die laufende Fassung — und nimmt nur
+Zeilen, die STRENG später eingetragen wurden. Ist die laufende Fassung die
+jüngste, fällt sie selbst heraus; „nichts Neues" ist damit eine leere Antwort
+und kein Sonderfall.
+
+Zwei Folgen, die es zu benennen lohnt:
+
+1. **Ein Zweig ist ersatzlos verschwunden.** `if (buendel.version === laeuft)`
+   in `antwort.ts` kann nicht mehr laufen — die Abfrage kann die laufende
+   Fassung nicht mehr zurückgeben. Ein Zweig, der nicht mehr laufen kann, ist
+   keine zweite Sicherung, sondern eine Behauptung, die niemand prüfen kann. Die
+   Zusage steht jetzt dort, wo die Entscheidung fällt (§36 der pgTAP-Datei).
+2. **Die Restlücke steht ausdrücklich in der Migration und als §41.** Ist die
+   laufende Fassung dem Manifest UNBEKANNT — `builtin` bei frischer
+   Installation — gibt es keine Untergrenze, und es kommt die jüngste
+   erfüllbare Zeile. Für `builtin` ist genau das gewollt. Für eine später
+   einmal geräumte Zeile wäre es ein Rückschritt; ein Aufräumen auf dieser
+   Tabelle gibt es heute nicht, und wer eines baut, muss §41 lesen.
+
+Mutationsprobe am laufenden Stack: Untergrenze entfernt → 1 von 41 rot;
+`>=` statt `>` → 1 rot.
+
+### HIGH 2 — die Naht zwischen Handler und SQL prüfte nichts
+
+Richtig, und die Sorte Lücke, die dieses Repo schon kennt. Die Deno-Tests
+ersetzen `neuestesBuendel` vollständig durch eine Attrappe, pgTAP ruft die
+SQL-Funktion direkt — dazwischen lag nichts. Ein Tippfehler im Funktionsnamen
+oder ein fest verdrahtetes `p_schale: "9999.0.0"` wäre durch BEIDE Suiten
+hindurchgegangen und hätte alten Schalen Bündel geliefert, die ihre native
+Hülle nicht trägt.
+
+**Übernommen.** Die Verdrahtung ist als `manifestZugriff(client)` aus dem Rumpf
+von `index.ts` herausgezogen und wird gegen eine Attrappe geprüft, die
+Funktionsnamen und beide Parameter mitschreibt.
+
+### HIGH 4 — der Schlüsseltest belegte nicht, dass die Hälften zusammengehören
+
+Ebenfalls richtig, und im Rückblick offensichtlich: `modulusLength === 2048`
+erfüllt **jeder beliebige** andere PKCS#1-Schlüssel. Würde eine Hälfte erneuert
+und die andere nicht, verschlüsselte der Deploy weiter mit dem alten privaten
+Schlüssel — und JEDE Installation auf JEDEM Gerät scheiterte, still.
+
+Das ist derselbe Fehlerkopf wie am Vormittag beim 4096-Bit-Schlüssel: eine
+Eigenschaft wurde für den Schlüssel selbst gehalten.
+
+**Übernommen.** `pruefeSchluesselpaar` vergleicht die **DER**-Kodierung (nicht
+den PEM-Text — Zeilenenden sind Darstellung) und läuft in
+`scripts/ota-buendel.ts` **vor jedem Seiteneffekt**. Die Prüfung gehört dorthin
+und nicht in einen Unit-Test: nur der Deploy hat beide Hälften. Vier Zusagen in
+`ota-buendel.logic.test.ts`, darunter die Positivkontrolle und ein fremdes Paar.
+Einmal gegen den echten Schlüssel gefahren: der `publicKey` in
+`capacitor.config.ts` gehört zu `~/Documents/capgo_privat.pem`.
+
+### MEDIUM 5 — ein offener Endpunkt ist eine offene Senke
+
+`ota-stats` las `action` aus dem Rumpf und schrieb es UNBESCHNITTEN ins Log. Bei
+`verify_jwt = false` heisst das: jeder kann beliebig viel Text in unsere Logs
+schreiben, so oft er mag.
+
+**Übernommen, in dem Teil, der hierher gehört:** Rumpf höchstens 8 KiB (sonst
+413), `action` höchstens 64 Zeichen im Log; `ota-channel` liest den Rumpf gar
+nicht mehr und protokolliert nur die Methode. **Ratenbegrenzung nicht
+übernommen** — die gehört ans Gateway und nicht in den Handler, und sie steht
+als solche im Kopf der Datei.
+
+### LOW 6 — interne Datenbankfehler gingen nach aussen
+
+`message: error.message` reichte die Postgres-Meldung an einen Aufrufer ohne
+JWT durch — Funktions-, Spalten- und bei Rechtefehlern Rollennamen.
+**Übernommen:** nach aussen ein konstanter Satz, die Meldung ins Log.
+
+### LOW 7 — `{"status":"ok"}` auf einen unlesbaren Rumpf
+
+Machte Zustellung und Verlust ununterscheidbar. **Halb übernommen:** die Antwort
+sagt jetzt `discarded` und die Function protokolliert `rumpf_unlesbar`. Der
+Status bleibt 200 — ein 4xx löste beim Gerät nur eine Wiederholung aus, die
+nichts besser machte.
+
+### HIGH 3 — ABGELEHNT: „der Wächter prüft nur die Form der Vertragsnummer"
+
+Der einzige Befund, der nicht trägt. codex bemängelt, `version: "1.0.0"` liesse
+sich zu `"9999.0.0"` mutieren, ohne dass `toMatch(...)` rot würde, und fordert
+eine an die nativen Fähigkeiten gekoppelte Quelle.
+
+Der zweite Teil ist bereits entschieden und steht seit dem 31.08. im Entwurf §8
+als benannte Abwägung: **die Vertragsnummer ist eine Richtlinie, kein
+Mechanismus.** Es gibt keinen technischen Weg, aus einem gebauten Paket
+abzuleiten, welche nativen Fähigkeiten es trägt; die Regel „die Nummer steigt in
+jedem PR, der ein Plugin anfasst" ist Buchführung, und der Entwurf sagt das
+ausdrücklich, damit es nicht später als selbstverständlich unterstellt wird.
+
+Der erste Teil beschreibt kein Leck, sondern die Absicht: die Zahl SOLL sich
+ändern. Ein Test, der den konkreten Wert festschreibt, wäre eine zweite Kopie
+derselben Zeile, die im selben PR mitgeändert würde — er verschöbe die Frage,
+statt sie zu beantworten.
+
+## Reviewer: gemini
+
+VERDICT: APPROVE
+
+Keine Befunde. Ging alle sechs angefragten Bereiche einzeln durch — Erfüllung
+der Vertragsnummer, Rückschritt, Rechte des Lesewegs, Folgen von
+`verify_jwt = false`, Vakuum-Grün, Fehlerpfade — und begründete je, warum sie
+tragen. **Zählt als Zweitmeinung, nicht als Beleg:** zum Rückschritt schrieb es
+ausdrücklich „Nichts gefunden", und genau dort lag der schwerste Befund der
+Runde. Die Arbeit hat codex gemacht.
+
+## Nicht gezählt
+
+`opencode` (`hf:moonshotai/Kimi-K3`) sollte die zweite Stimme sein und ist
+zweimal am Anbieter gescheitert — `UnknownError: Unexpected server error`,
+Kennungen `err_66bd21df` und `err_1be8fe66`. Kein Lauf, keine Stimme. `gemini`
+ist an seine Stelle gerückt.
+
+## Was die Reviewer NICHT geprüft haben
+
+Beide bekamen die gemessenen Tatsachen als gegeben vorgesetzt: die Rechte von
+`service_role`, das Verhalten des Plugins bei Fassungsvergleich und leerer URL,
+die Wirkung eines fehlenden `config.toml`-Blocks. Sie sind am Quelltext von
+`@capgo/capacitor-updater@8.51.15` und am laufenden Stack gemessen — wären sie
+falsch, fiele es hier nicht auf.
+
+**Und ungeprüft bleibt weiterhin alles, was ein echtes Gerät braucht:** dass die
+Schale die drei URLs wirklich ruft, dass sie das Bündel öffnet, und dass sie bei
+falscher Prüfsumme auf der laufenden Fassung bleibt. Das Letzte hängt zudem an
+D4 (`notifyAppReady`) — ohne den Rückweg gibt es kein „bleibt in Betrieb".
+
+<!-- openspec-review-trailer v1
+implementing-host: claude
+digest: sha256:a52804a6898904ea88d686db21152f69649db890138fddbc8f50842e6c28e699
+producer-version: 1.2.0
+tasks-digest: sha256:61dbe4c2d8249ac7afe5e9a6281b96ae2c6c6107f33aee95a20f91760753ea10
+-->

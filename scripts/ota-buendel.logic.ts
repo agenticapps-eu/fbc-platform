@@ -45,7 +45,14 @@
  * an einer ganz anderen Stelle als `CryptoCipher.swift:74`.
  */
 import { execFileSync } from "node:child_process";
-import { constants, createCipheriv, createHash, privateEncrypt, randomBytes } from "node:crypto";
+import {
+  constants,
+  createCipheriv,
+  createHash,
+  createPublicKey,
+  privateEncrypt,
+  randomBytes,
+} from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -184,10 +191,7 @@ export function bildeBuendel(zip: Buffer, privatschluesselPem: string): Buendel 
   const chiffrat = Buffer.concat([cipher.update(zip), cipher.final()]);
 
   const rsa = (klartext: Buffer): Buffer =>
-    privateEncrypt(
-      { key: privatschluesselPem, padding: constants.RSA_PKCS1_PADDING },
-      klartext,
-    );
+    privateEncrypt({ key: privatschluesselPem, padding: constants.RSA_PKCS1_PADDING }, klartext);
 
   const checksum = rsa(digest).toString("hex");
   const sessionKey = `${iv.toString("base64")}:${rsa(aesKey).toString("base64")}`;
@@ -217,4 +221,52 @@ export function bildeBuendel(zip: Buffer, privatschluesselPem: string): Buendel 
   }
 
   return { chiffrat, sessionKey, checksum };
+}
+
+/**
+ * Prüft, dass der `publicKey` der Schale zum privaten Schlüssel des Deploys
+ * gehört. Wirft, wenn nicht.
+ *
+ * ══ WARUM DAS EINE EIGENE PRÜFUNG BRAUCHT ═══════════════════════════════════
+ * Aus dem Fremd-Review zu Phase D3 (HIGH, 31.08.), und der Befund war richtig:
+ * `scripts/capacitor-config.test.ts` belegt, dass der öffentliche Schlüssel
+ * PKCS#1 ist und 2048 Bit hat — **jeder beliebige andere** Schlüssel derselben
+ * Bauart erfüllt das genauso. Wird der eine Teil je erneuert und der andere
+ * nicht, verschlüsselt der Deploy weiter mit dem alten privaten Schlüssel, und
+ * JEDE Installation auf JEDEM Gerät scheitert. Still: `decryptRSA` liefert
+ * Unsinn, die Prüfsumme stimmt nicht, das Gerät bleibt auf seinem Stand.
+ *
+ * Die Prüfung gehört hierher und nicht in einen Unit-Test: nur der Deploy hat
+ * beide Hälften. Der Test hat den privaten Teil nicht — er liegt in Infisical.
+ *
+ * Verglichen wird die **DER-Kodierung**, nicht der PEM-Text: Zeilenumbrüche,
+ * Kopfzeilen und ein fehlender Zeilenabschluss sind Darstellungsfragen und
+ * dürfen die Antwort nicht ändern.
+ */
+export function pruefeSchluesselpaar(privatschluesselPem: string, oeffentlichPem: string): void {
+  const der = (pem: string): string =>
+    createPublicKey(pem).export({ type: "pkcs1", format: "der" }).toString("hex");
+
+  const ausPrivat = der(
+    createPublicKey(privatschluesselPem).export({ type: "pkcs1", format: "pem" }).toString(),
+  );
+  let ausConfig: string;
+  try {
+    ausConfig = der(oeffentlichPem);
+  } catch (fehler) {
+    throw new Error(
+      `publicKey aus capacitor.config.ts ist kein lesbarer RSA-Schluessel: ` +
+        `${fehler instanceof Error ? fehler.message : String(fehler)}`,
+    );
+  }
+
+  if (ausPrivat !== ausConfig) {
+    throw new Error(
+      "Der publicKey in capacitor.config.ts gehoert NICHT zu CAPGO_PRIVATE_KEY. " +
+        "Jede OTA-Installation wuerde scheitern, und zwar still: das Geraet " +
+        "entschluesselt Unsinn, die Pruefsumme stimmt nicht, es bleibt auf " +
+        "seinem Stand. Erneuere beide Haelften gemeinsam — die eine in " +
+        "Infisical prod, die andere in capacitor.config.ts.",
+    );
+  }
 }

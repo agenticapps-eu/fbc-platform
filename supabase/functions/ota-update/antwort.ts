@@ -51,9 +51,18 @@ export interface Ergebnis {
 }
 
 export interface Deps {
-  /** `ota_buendel_neuestes` — der einzige Leseweg auf das Manifest. */
+  /**
+   * `ota_buendel_neuestes` — der einzige Leseweg auf das Manifest.
+   *
+   * BEIDE Angaben gehen hinein. `laufende` ist keine Bequemlichkeit, sondern
+   * die Untergrenze: ohne sie liefert die Abfrage die neueste Zeile im
+   * MANIFEST, und das ist nicht dasselbe wie „neuer als das, was laeuft"
+   * (Befund Fremd-Review, HIGH). Die Auswahl selbst steht in SQL, weil sie dort
+   * gegen echte Zeilen geprueft werden kann.
+   */
   neuestesBuendel: (
     schale: string,
+    laufende: string,
   ) => Promise<{ data: Buendel[] | null; error: { message: string } | null }>;
   log: (level: "info" | "warn" | "error", event: string, fields?: Record<string, unknown>) => void;
 }
@@ -100,11 +109,20 @@ export async function ermittleAntwort(rumpf: unknown, deps: Deps): Promise<Ergeb
     };
   }
 
-  const { data, error } = await deps.neuestesBuendel(schale);
+  const { data, error } = await deps.neuestesBuendel(schale, laeuft);
   if (error) {
+    // Die Meldung geht ins LOG, nicht in die Antwort (Befund Fremd-Review,
+    // LOW). Der Endpunkt hat kein JWT vor sich: eine durchgereichte
+    // Postgres-Meldung nennt Funktions- und Spaltennamen und bei einem
+    // Rechtefehler auch Rollennamen — an jeden, der fragt. Nach aussen genau
+    // ein Satz, und der sagt nichts, was nicht ohnehin bekannt ist.
     deps.log("error", "manifest_unlesbar", { schale, meldung: error.message });
     return {
-      body: { kind: "failed", error: "manifest_unavailable", message: error.message },
+      body: {
+        kind: "failed",
+        error: "manifest_unavailable",
+        message: "Das Manifest ist derzeit nicht lesbar.",
+      },
       status: 500,
     };
   }
@@ -115,13 +133,13 @@ export async function ermittleAntwort(rumpf: unknown, deps: Deps): Promise<Ergeb
     return aktuell("Kein Buendel fuer diese Schale");
   }
 
-  // Das Gerät verglüche selbst — aber es liefe dafür den Download an. Der
-  // Vergleich hier spart ihn und macht aus dem Normalfall eine Zeile im Log,
-  // die „alles aktuell" sagt statt „Download begonnen und verworfen".
-  if (buendel.version === laeuft) {
-    deps.log("info", "schon_aktuell", { schale, version: buendel.version });
-    return aktuell("Bereits die neueste Fassung");
-  }
+  // Hier stand bis zum Fremd-Review ein `if (buendel.version === laeuft)`. Er
+  // ist ERSATZLOS weg, und zwar weil er unerreichbar geworden ist: die Abfrage
+  // nimmt nur noch Zeilen, die STRENG spaeter eingetragen wurden als die
+  // laufende Fassung, also kann sie die laufende nicht mehr zurueckgeben. Ein
+  // Zweig, der nicht mehr laufen kann, ist keine zweite Sicherung — er ist eine
+  // Behauptung, die niemand mehr pruefen kann. Die Zusage dazu steht jetzt
+  // dort, wo die Entscheidung faellt: `ota_buendel_test.sql` §36.
 
   deps.log("info", "buendel_angeboten", { schale, version: buendel.version });
   return {
@@ -132,5 +150,40 @@ export async function ermittleAntwort(rumpf: unknown, deps: Deps): Promise<Ergeb
       sessionKey: buendel.session_key,
     },
     status: 200,
+  };
+}
+
+/** Der schmale Ausschnitt des Supabase-Clients, den dieser Weg wirklich braucht. */
+export interface RpcClient {
+  rpc(
+    fn: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+}
+
+/**
+ * Die Verdrahtung zur Datenbank — als eigene Funktion, damit sie geprüft werden
+ * KANN.
+ *
+ * Vorher stand sie als Objektliteral im Rumpf von `index.ts`, und der
+ * Fremd-Review hat die Lücke benannt (HIGH, 31.08.): die Tests ersetzen
+ * `neuestesBuendel` vollständig durch eine Attrappe, pgTAP ruft die SQL-Funktion
+ * direkt — dazwischen prüfte nichts. Ein falsch geschriebener Funktionsname oder
+ * ein fest verdrahtetes `p_schale: "9999.0.0"` wäre durch beide Suiten
+ * hindurchgegangen und hätte alten Schalen Bündel geliefert, die ihre native
+ * Hülle nicht trägt.
+ *
+ * `.rpc(...)` und NICHT `.from("ota_buendel").select(...)`: `service_role` hält
+ * in `public` auf keiner Tabelle ein Recht (AGE-312), und `rolbypassrls` umgeht
+ * die RLS, nicht ein fehlendes SELECT. Der direkte Weg liefe durch Typecheck und
+ * Tests und scheiterte erst zur Laufzeit.
+ */
+export function manifestZugriff(client: RpcClient): Deps["neuestesBuendel"] {
+  return async (schale, laufende) => {
+    const { data, error } = await client.rpc("ota_buendel_neuestes", {
+      p_schale: schale,
+      p_laufende: laufende,
+    });
+    return { data: data as Buendel[] | null, error };
   };
 }

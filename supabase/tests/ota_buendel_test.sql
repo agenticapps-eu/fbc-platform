@@ -25,15 +25,17 @@
 -- abweist, waere gruen und wertlos. §6/§7 sind ein solches Paar, §20 ist die
 -- Kontrolle zu §19, und §33 ist die zu §32.
 --
--- §28–§38 gelten dem LESEWEG (Phase D3, Migration …160000). Die schaerfsten
--- dort sind §32 und §35: die erste haelt fest, dass ein Buendel eine Schale mit
+-- §28–§41 gelten dem LESEWEG (Phase D3, Migration …160000). Die schaerfsten
+-- dort sind §32, §35 und §39: die erste haelt fest, dass ein Buendel eine Schale mit
 -- zu niedriger Vertragsnummer NICHT erreicht, die zweite, dass der Vergleich
 -- zahlenweise ist — als Zeichenkette stuende `10.0.0` vor `9.0.0`, und ein
--- Geraet mit Schale 10.0.0 bekaeme nie ein Buendel, das 9.0.0 verlangt.
+-- Geraet mit Schale 10.0.0 bekaeme nie ein Buendel, das 9.0.0 verlangt. §39
+-- haelt fest, dass die LAUFENDE Fassung die Untergrenze ist — ohne sie waere
+-- „das neueste im Manifest" mit „neuer als das, was laeuft" verwechselt.
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
-select plan(38);
+select plan(41);
 
 -- Impersonierung. Eigene Kopie: jede Testdatei laeuft in ihrer eigenen Sitzung.
 -- ACHTUNG: `try_as` meldet JEDEN Fehler als `DENIED:`, auch einen Tippfehler.
@@ -383,11 +385,16 @@ values
   ('0.0.0+aaaaaaa', pg_temp.url('a'), repeat('a', 512),
    pg_temp.iv() || ':' || pg_temp.skey(), '9.0.0', '2026-08-04T00:00:00Z');
 
+-- `'builtin'` als zweites Argument in §32–§38: so meldet sich ein Geraet, das
+-- auf dem Stand aus dem Store laeuft. Der Wert steht im Manifest nicht, es gibt
+-- also keine Untergrenze, und die Zusagen unten messen allein die Vertragsnummer
+-- und die Ordnung. Die Untergrenze selbst ist §39–§41.
+
 -- §32 — DIE Zusage der Phase. Eine Schale 1.0.0 sieht `+aaaaaaa` (9.0.0, die
 -- neueste Zeile ueberhaupt) und `+ccccccc` (2.0.0) NICHT. Was sie bekommt, ist
 -- die neueste Zeile, die sie erfuellt.
 select is(
-  (select version from public.ota_buendel_neuestes('1.0.0')),
+  (select version from public.ota_buendel_neuestes('1.0.0', 'builtin')),
   '0.0.0+bbbbbbb',
   'eine Schale 1.0.0 bekommt KEIN Buendel, das eine hoehere Vertragsnummer '
   'verlangt — sonst ruft ausgeliefertes JavaScript eine native Faehigkeit auf, '
@@ -397,7 +404,7 @@ select is(
 -- andere Antwort: die Ausschluesse oben kommen von der Vertragsnummer und nicht
 -- daher, dass die Funktion die Zeilen gar nicht saehe.
 select is(
-  (select version from public.ota_buendel_neuestes('9.0.0')),
+  (select version from public.ota_buendel_neuestes('9.0.0', 'builtin')),
   '0.0.0+aaaaaaa',
   'Gegenprobe: eine Schale 9.0.0 bekommt genau die Zeile, die §32 ausschliesst');
 
@@ -405,7 +412,7 @@ select is(
 -- Vertragsnummer. Eine Schale 2.0.0 koennte `+ccccccc` (2.0.0) nehmen; richtig
 -- ist `+bbbbbbb`, weil es neuer ist.
 select is(
-  (select version from public.ota_buendel_neuestes('2.0.0')),
+  (select version from public.ota_buendel_neuestes('2.0.0', 'builtin')),
   '0.0.0+bbbbbbb',
   'geordnet wird nach created_at, nicht nach der hoechsten erfuellbaren '
   'Vertragsnummer — und nicht nach der Fassung, die hier `+ddddddd` waere');
@@ -414,7 +421,7 @@ select is(
 -- die Zeile `+aaaaaaa` fiele also aus der Menge und die Antwort waere
 -- `+bbbbbbb`. Genau dieser Fehler bliebe bis zur zehnten Schale unsichtbar.
 select is(
-  (select version from public.ota_buendel_neuestes('10.0.0')),
+  (select version from public.ota_buendel_neuestes('10.0.0', 'builtin')),
   '0.0.0+aaaaaaa',
   'eine Schale 10.0.0 erfuellt 9.0.0 — der Vergleich laeuft ueber int[], ein '
   'Zeichenkettenvergleich stellte 10.0.0 vor 9.0.0');
@@ -423,7 +430,7 @@ select is(
 -- hiesse fuer das Geraet „alles aktuell" und liesse jede Schale mit
 -- missgebildeter Vertragsnummer still auf ihrem Stand stehen.
 select throws_ok($$
-  select * from public.ota_buendel_neuestes('1.0')
+  select * from public.ota_buendel_neuestes('1.0', 'builtin')
 $$, '22023', null,
   'eine missgebildete Vertragsnummer wird abgewiesen, nicht als "nichts '
   'gefunden" beantwortet');
@@ -432,7 +439,7 @@ $$, '22023', null,
 -- ist NULL und nicht TRUE. Ohne die ausdrueckliche `is null`-Klausel im
 -- Waechter liefe dieser Aufruf STILL durch und lieferte null Zeilen.
 select throws_ok($$
-  select * from public.ota_buendel_neuestes(null)
+  select * from public.ota_buendel_neuestes(null, 'builtin')
 $$, '22023', null,
   'auch NULL wird abgewiesen — ein `!~` allein faengt es nicht');
 
@@ -442,10 +449,49 @@ $$, '22023', null,
 -- lesen nur `version`.
 select is(
   (select url || '|' || left(checksum, 3) || '|' || left(session_key, 24)
-     from public.ota_buendel_neuestes('1.0.0')),
+     from public.ota_buendel_neuestes('1.0.0', 'builtin')),
   pg_temp.url('b') || '|bbb|' || pg_temp.iv(),
   'url, checksum und session_key kommen der richtigen Spalte zugeordnet '
   'zurueck — vertauscht liesse kein Geraet das Buendel oeffnen');
+
+-- ── 39–41. Die laufende Fassung ist die Untergrenze ─────────────────────────
+-- Aus dem Fremd-Review zu diesem Diff (HIGH, 31.08.). §32–§35 belegen, dass die
+-- Funktion die neueste erfuellbare Zeile im MANIFEST liefert — und das ist
+-- nicht dasselbe wie „neuer als das, was auf dem Geraet laeuft". Steht das
+-- Geraet weiter vorn als das Manifest, bekaeme es ein aelteres Buendel und
+-- installierte es kommentarlos: es vergleicht auf Ungleichheit, nicht auf
+-- Groesse.
+--
+-- Der Bestand ist unveraendert der aus §32: `+ddddddd` (08-01), `+ccccccc`
+-- (08-02), `+bbbbbbb` (08-03), `+aaaaaaa` (08-04).
+
+-- §39 — kein Rueckschritt. Die Schale erfuellt 9.0.0, koennte also jede Zeile
+-- tragen; sie laeuft aber schon auf `+aaaaaaa`, der juengsten. Es bleibt nichts.
+select is(
+  (select count(*)::int from public.ota_buendel_neuestes('9.0.0', '0.0.0+aaaaaaa')),
+  0,
+  'die laufende Fassung ist die Untergrenze — auf der juengsten Zeile bleibt '
+  'nichts uebrig, und „nichts Neues" ist eine leere Antwort, kein Sonderfall');
+
+-- §40 — die Positivkontrolle zu §39. Dieselbe Schale, eine AELTERE laufende
+-- Fassung: jetzt kommt sehr wohl etwas. Ohne sie waere §39 auch dann gruen,
+-- wenn die Funktion mit einer bekannten laufenden Fassung NIE etwas lieferte.
+select is(
+  (select version from public.ota_buendel_neuestes('9.0.0', '0.0.0+ccccccc')),
+  '0.0.0+aaaaaaa',
+  'Gegenprobe: von einer aelteren laufenden Fassung aus kommt die juengste '
+  'erfuellbare Zeile');
+
+-- §41 — die benannte Luecke, als Zusage statt als Hoffnung. Eine dem Manifest
+-- UNBEKANNTE laufende Fassung — `builtin` bei frischer Installation — hat keine
+-- Untergrenze und bekommt die juengste erfuellbare Zeile. Genau so gewollt: eine
+-- frische Installation SOLL den aktuellen Web-Stand holen.
+select is(
+  (select version from public.ota_buendel_neuestes('9.0.0', 'gibt-es-nicht')),
+  '0.0.0+aaaaaaa',
+  'eine unbekannte laufende Fassung setzt keine Untergrenze — fuer `builtin` '
+  'ist das gewollt; wer je ein Aufraeumen auf ota_buendel baut, muss diese '
+  'Zusage lesen');
 
 select * from finish();
 rollback;

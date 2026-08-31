@@ -26,6 +26,7 @@ import {
   buendelUrl,
   fassung,
   objektname,
+  pruefeSchluesselpaar,
   zippeVerzeichnis,
 } from "./ota-buendel.logic";
 
@@ -77,10 +78,7 @@ function eintraegeVon(zip: Buffer): string[] {
 }
 
 function oeffne(chiffrat: Buffer): Buffer {
-  return publicDecrypt(
-    { key: PAAR.oeffentlich, padding: constants.RSA_PKCS1_PADDING },
-    chiffrat,
-  );
+  return publicDecrypt({ key: PAAR.oeffentlich, padding: constants.RSA_PKCS1_PADDING }, chiffrat);
 }
 
 describe("bildeBuendel — der Rundlauf, den das Gerät geht", () => {
@@ -158,6 +156,45 @@ describe("bildeBuendel — der Rundlauf, den das Gerät geht", () => {
   });
 });
 
+describe("pruefeSchluesselpaar — die Haelften gehoeren zusammen", () => {
+  // Aus dem Fremd-Review zu Phase D3 (HIGH, 31.08.). `capacitor-config.test.ts`
+  // belegt Format und Groesse des oeffentlichen Schluessels — jeder BELIEBIGE
+  // andere Schluessel derselben Bauart erfuellt das genauso. Wuerde eine Haelfte
+  // erneuert und die andere nicht, scheiterte jede Installation auf jedem Geraet,
+  // und zwar still.
+  const fremd = schluesselpaar(2048);
+
+  it("laesst das eigene Paar durch", () => {
+    // Die Positivkontrolle. Ohne sie waere die Zusage darunter auch dann gruen,
+    // wenn die Pruefung ALLES abwiese.
+    expect(() => pruefeSchluesselpaar(PAAR.privat, PAAR.oeffentlich)).not.toThrow();
+  });
+
+  it("RED: weist ein FREMDES Paar ab", () => {
+    expect(() => pruefeSchluesselpaar(PAAR.privat, fremd.oeffentlich)).toThrow(
+      /gehoert NICHT zu CAPGO_PRIVATE_KEY/,
+    );
+  });
+
+  it("stoert sich nicht an Darstellungsfragen", () => {
+    // Verglichen wird DER, nicht PEM-Text: ein fehlender Zeilenabschluss oder
+    // andere Zeilenenden sind Darstellung und duerfen die Antwort nicht aendern.
+    // Ohne diese Zusage waere ein Zeichenkettenvergleich hier gruen — und in CI
+    // rot, sobald irgendwo ein \r\n entstuende.
+    const mitCrLf = PAAR.oeffentlich.trimEnd().replace(/\n/g, "\r\n");
+    expect(() => pruefeSchluesselpaar(PAAR.privat, mitCrLf)).not.toThrow();
+  });
+
+  it("nennt die Ursache, wenn der oeffentliche Teil gar kein Schluessel ist", () => {
+    expect(() =>
+      pruefeSchluesselpaar(
+        PAAR.privat,
+        "-----BEGIN RSA PUBLIC KEY-----\nQUJD\n-----END RSA PUBLIC KEY-----",
+      ),
+    ).toThrow(/kein lesbarer RSA-Schluessel/);
+  });
+});
+
 describe("Fassung, Objektname und URL", () => {
   it("hängt zwölf Stellen des SHA an die Semver", () => {
     expect(fassung("1.4.0", "8fbc49bdeadbeefcafe")).toBe("1.4.0+8fbc49bdeadb");
@@ -200,9 +237,7 @@ describe("zippeVerzeichnis", () => {
     // Ueber eine Datei, nicht ueber stdin: `unzip -Z1 -` kennt kein stdin und
     // gibt statt eines Fehlers seine Hilfe aus — der Test waere dann gruen oder
     // rot aus dem falschen Grund.
-    expect(eintraegeVon(ZIP)).toEqual(
-      expect.arrayContaining(["index.html", "assets/app.js"]),
-    );
+    expect(eintraegeVon(ZIP)).toEqual(expect.arrayContaining(["index.html", "assets/app.js"]));
     expect(eintraegeVon(ZIP).filter((z) => z.endsWith(".map"))).toHaveLength(0);
   });
 });
