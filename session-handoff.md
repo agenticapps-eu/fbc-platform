@@ -20,10 +20,22 @@
 > wartende Neuigkeiten-Eintrag ist ebenfalls kein offener Punkt mehr.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle` — auf `origin/main` rebased, **4 Commits
-davor**, Arbeitsbaum sauber. **Noch nicht gepusht:** der Remote-Branch trägt die
-Vor-Squash-Historie von PR #277 und bräuchte `--force-with-lease`.
+`donald/age-642-capacitor-huelle` — **gemergt** (PR #295, Squash `59390b3`).
+Der Branch sitzt jetzt **exakt auf `origin/main`** (0/0, sauber); das ist
+Absicht und nimmt der nächsten Sitzung das Rebase-Problem ab, an dem diese
+hier hing.
 Change `capacitor-huelle`: **43 offen, 69 erledigt** (Einstieg 30.08.: 66/40).
+
+**Drei CI-Läufe grün:** zweimal auf dem PR (je 8/8, vor und nach dem Rebase auf
+`a25ed92`), dann **`main` selbst mit 13/13** — inklusive `drift-gate`,
+`functions` und beider `deploy`, die im PR übersprungen waren. Kein Flake
+getroffen. **AGE-642 sprang beim Merge zum vierten Mal auf Done** (08:25:09,
+exakt zur Merge-Zeit) und ist von Hand auf *In Progress* zurück.
+
+**Diese Datei ist committet, aber nicht gemergt** — sie liegt als einziger
+Commit auf dem Branch über `main`. Sie geht mit dem nächsten PR mit; wer den
+Worktree vorher entfernt, verliert sie. (Genau so ist
+`donald/uebergabe-dev-migration-blockiert` hängengeblieben.)
 
 ## Accomplished
 
@@ -95,11 +107,10 @@ Commits `106504d` (C2) und `aff6954` (C3):
 
 ## Next session: start here
 
-**Zuerst entscheiden, ob der Branch gepusht wird** (`--force-with-lease`, weil
-#277 gequetscht gemergt wurde). Damit ist alles an C1–C3 erledigt, was ohne
-Geräte geht.
+C1–C3 sind gemergt; damit ist alles erledigt, was ohne Geräte geht. Der Branch
+ist sauber und liegt auf `main` — einfach weiterarbeiten, kein Aufräumen nötig.
 
-Danach bleibt in diesem Change nur noch **Phase D (OTA)** — 29 offene Punkte
+Es bleibt in diesem Change nur noch **Phase D (OTA)** — 29 offene Punkte
 über D1–D5, plus **B3 Signaturmaterial** (4 offen). Der Grundsatz ist gefallen
 (selbst gehostet auf Cloudflare, Donald 27.08.); offen sind Anlass,
 Fassungsschema und das Signaturschlüsselpaar. D1 ist der Einstieg: der Weg, auf
