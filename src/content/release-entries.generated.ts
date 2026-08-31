@@ -5,6 +5,20 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-08-31-titelbild-bestand-auf-dev",
+    datum: "2026-08-31",
+    titel: "Der Bestand auf DEV: warum ein Seed-Lauf ihn nicht heilt",
+    linear: "AGE-599",
+    aenderungen: [
+      "Der Bestandsabsatz nennt die **gemessenen Zahlen vom 31.08.** statt einer allgemeinen Aussage.",
+      "Er nennt die **Herkunft**: Spiegel (AGE-576), nicht Seed-Lauf.",
+      "Er sagt für beide Skripte einzeln, **warum sie nicht greifen**.",
+      "Er spricht ein **SHALL NOT** gegen das Löschen als Seed-Vorbereitung aus — die Stelle, an der diese Änderung tatsächlich schützt.",
+      "Er hält die **Entscheidung vom 31.08.** fest: DEV bleibt, PROD wird nicht angefasst, ein vollständiger Neuaufbau ist ein eigener Vorgang.",
+      "Nebenbei: `traegt` → `trägt` (in AGE-665 durchgerutscht).",
+    ],
+  },
+  {
     slug: "2026-08-31-titelbild-anforderung-nachziehen",
     datum: "2026-08-31",
     titel: "Die Titelbild-Anforderung sagt wieder, was gebaut ist",
