@@ -635,19 +635,26 @@ Ohne diesen Schritt gibt es drei Endpunkte, die Anfragen beantworten, und nichts
 was das System je befüllt.
 
 - [ ] Bucket **per Migration** anlegen, nach dem Muster der vier bestehenden:
-      `public = true`, `file_size_limit`, `allowed_mime_types`
-      `application/zip`. Gemessene Größe je Bündel: **2,71 MB** ohne Sourcemaps
-      (4,43 MB mit). Öffentlich ist hier kein Zugeständnis — es ist dasselbe
-      `dist/`, das Pages ohnehin dem ganzen Internet ausliefert; der Schutz
-      kommt aus der Signatur, nicht aus der Zugriffskontrolle.
+      `public = true`, `file_size_limit`, `allowed_mime_types`. Gemessene Größe
+      je Bündel: **2,71 MB** ohne Sourcemaps (4,43 MB mit). Öffentlich ist hier
+      kein Zugeständnis: mit gesetztem `publicKey` liegt im Bucket **Chiffrat**,
+      kein lesbares `dist/` — die Datei ist nur mit dem öffentlichen Schlüssel
+      lesbar. **Mime-Typ erst festlegen, wenn die Verschlüsselung steht**; ein
+      AES-Chiffrat ist kein `application/zip` mehr.
 - [ ] Manifest **per Migration** als Tabelle: Fassung, URL, Prüfsumme,
-      Vertragsnummer der Schale. Mit RLS, die dem Endpunkt das Lesen erlaubt und
-      das Schreiben niemandem außer dem Veröffentlichungs-Schritt.
+      Vertragsnummer der Schale **und `sessionKey`** (Form `iv:sessionKey`, beides
+      Base64 — am Plugin gemessen, `CapacitorUpdaterPlugin.java:4173`). Mit RLS,
+      die dem Endpunkt das Lesen erlaubt und das Schreiben niemandem außer dem
+      Veröffentlichungs-Schritt.
 - [ ] Veröffentlichungs-Schritt in `deploy.yml`: `dist/` zu einem Zip mit
-      `index.html` an der Wurzel und **ohne `.map`-Dateien**, SHA-256 bilden,
-      mit dem **privaten** Schlüssel signieren, in den Bucket laden,
-      Manifest-Zeile schreiben. Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus
-      Infisical — der Job fährt ohnehin über `infisical run`.
+      `index.html` an der Wurzel und **ohne `.map`-Dateien**; SHA-256 bilden;
+      das Zip mit einem zufälligen **AES**-Schlüssel verschlüsseln; diesen
+      Sitzungsschlüssel **und** die Prüfsumme mit dem **privaten** RSA-Schlüssel
+      verschlüsseln; Chiffrat in den Bucket laden; Manifest-Zeile mit `version`,
+      `url`, `checksum` und `sessionKey` schreiben. Das ist capgos „end to end
+      encryption v2", nicht eine losgelöste Signatur — siehe `design.md` §8.
+      Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus Infisical — der Job fährt
+      ohnehin über `infisical run`.
 - [x] **Anlass festgelegt** (Donald, 31.08.): jeder Deploy auf `main`. Derselbe
       Job, der `dist/` schon baut und zu Pages lädt. Jeder andere Anlass hieße,
       dass ein vergessener Auslöser Geräte **still** zurücklässt.
@@ -655,10 +662,14 @@ was das System je befüllt.
       package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`. Beantwortet zugleich,
       was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
       SHAs, also verschiedene Fassungen.
-- [ ] Signaturschlüsselpaar erzeugen; **privaten Schlüssel nach Infisical**,
-      öffentlichen als `publicKey` in die Konfiguration. Der Infisical-Login
-      braucht ein echtes Terminal — dieser Schritt geht nicht aus einer Sitzung
-      heraus.
+- [ ] RSA-Schlüsselpaar erzeugen, **PKCS#1** (`-----BEGIN RSA PUBLIC KEY-----`).
+      Beide Plattformen prüfen das Format ausdrücklich und weisen PKCS#8 ab
+      (`CryptoCipher.java:145`, `CryptoCipher.swift:241`) — `openssl rsa -pubout`
+      liefert standardmäßig das **falsche**; `-RSAPublicKey_out` das richtige.
+      Privaten Schlüssel nach Infisical, öffentlichen als `publicKey` in die
+      Konfiguration. **Ein PEM ist mehrzeilig** — nur über die Umgebung setzen,
+      nie über eine Datei, und hinterher per SHA-256 gegenprüfen (siehe die
+      Havarie an `APNS_KEY_P8` vom 28.08.).
 
 ### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
 

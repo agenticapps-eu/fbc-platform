@@ -39,10 +39,10 @@ R2? Ist das Storage? Wir haben bisher Supabase Storage genutzt."
 
 | Teil | Wo |
 | --- | --- |
-| Bündel-Zips | Storage-Bucket, per Migration angelegt, `application/zip` |
+| Bündel | Storage-Bucket, per Migration angelegt. **Chiffrat, kein lesbares Zip** — Mime-Typ erst festlegen, wenn die Verschlüsselung steht |
 | Manifest (Fassung, URL, Prüfsumme, Vertragsnummer) | Tabelle, per Migration, mit RLS |
 | `updateUrl`, `channelUrl`, `statsUrl` | drei Edge Functions mit `verify_jwt = false` |
-| privater Signaturschlüssel | Infisical |
+| privater RSA-Schlüssel (PKCS#1) | Infisical — mehrzeiliges PEM, nur über die Umgebung setzen |
 | Veröffentlichungs-Anlass | jeder Deploy auf `main`, im bestehenden `deploy.yml`-Job |
 | Fassungsschema | `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b` |
 
@@ -60,10 +60,20 @@ Gründe über „steht schon" hinaus:
    tragen bereits `stripe-webhook`, `send-activation` und
    `notify-contact-request`, jeweils mit ausgeschriebener Begründung in
    `supabase/config.toml`. Ein Gerät hat kein JWT.
-3. **Öffentlich ist kein Zugeständnis.** Das Bündel ist byte-gleich mit dem
-   `dist/`, das Cloudflare Pages ohnehin dem ganzen Internet ausliefert. Der
-   Schutz gegen ein fremdes Bündel kommt aus der **Signatur** (`publicKey` plus
-   Prüfsumme), nicht aus der Zugriffskontrolle des Speichers.
+3. **Öffentlich ist kein Zugeständnis.** Im Bucket liegt **Chiffrat**. capgos
+   `publicKey` ist „end to end live update encryption Version 2": das Zip wird
+   mit einem AES-Sitzungsschlüssel verschlüsselt, dieser mit dem **privaten**
+   RSA-Schlüssel, und nur der öffentliche Schlüssel in der Schale öffnet beides.
+   Die Zugriffskontrolle des Speichers trägt hier also gar nichts bei — sie
+   müsste es auch nicht.
+
+   > **Korrigiert am 31.08., noch am selben Tag.** Die erste Fassung dieses
+   > Punktes begründete ihn damit, das Bündel sei „byte-gleich mit dem `dist/`,
+   > das Cloudflare Pages ohnehin ausliefert". Das war falsch und stammte aus der
+   > Annahme, `publicKey` prüfe bloss eine Signatur. Nachgemessen an
+   > `CryptoCipher.java`/`.swift`: es verschlüsselt. Die Schlussfolgerung hält,
+   > die Begründung nicht — und eine falsche Begründung hätte den
+   > Veröffentlichungs-Schritt ein unverschlüsseltes Zip hochladen lassen.
 4. **Die Größe ist unerheblich.** Gemessen am 31.08.: `dist/` gezippt sind
    **2,71 MB** ohne Sourcemaps, 4,43 MB mit. Die Maps gehen zu Sentry, nicht
    aufs Gerät. Der eine echte Vorteil von R2 — kostenloser Egress — trägt bei
@@ -80,11 +90,26 @@ erklärt. Jede der drei Functions braucht ihren Block ausgeschrieben.
 ausgeliefert; `functions/api/log.ts` bleibt unberührt. Diese Entscheidung
 verschiebt nur den OTA-Dienst, nicht das Hosting.
 
-**Ein Handgriff entfällt.** Der Entwurf führte „Ein Cloudflare-R2-Bucket" unter
-dem, was Donald von Hand bereitstellen muss. Der Bucket entsteht jetzt wie die
-vier bestehenden per Migration. Bereitzustellen bleibt allein das
-Signaturschlüsselpaar — der private Teil nach Infisical, und dessen Login
-braucht ein echtes Terminal.
+**Ein Handgriff entfällt, und der verbleibende ist kleiner als gedacht.** Der
+Entwurf führte „Ein Cloudflare-R2-Bucket" unter dem, was Donald von Hand
+bereitstellen muss. Der Bucket entsteht jetzt wie die vier bestehenden per
+Migration. Bereitzustellen bleibt allein das **RSA-Schlüsselpaar in PKCS#1**.
+
+Ein **Infisical-Login ist dafür nicht nötig** — am 31.08. gemessen: die Sitzung
+ist angemeldet, ein Lesezugriff auf `--env=prod` ging durch. Die ältere Notiz
+„der Login braucht ein echtes Terminal" gilt weiterhin für den Fall, dass die
+Anmeldung abläuft, ist hier aber **kein offener Schritt**. Zu tun bleibt: Paar
+erzeugen, privaten Teil setzen, Digest gegenprüfen.
+
+**Zwei Fallen dabei**, beide anderswo schon einmal eingetreten:
+
+1. **PKCS#1, nicht PKCS#8.** `openssl rsa -pubout` liefert standardmäßig
+   `-----BEGIN PUBLIC KEY-----`; beide Plattformen weisen das ab und verlangen
+   `-----BEGIN RSA PUBLIC KEY-----` (`-RSAPublicKey_out`).
+2. **Das PEM ist mehrzeilig.** Genau daran wurden am 28.08. `APNS_KEY_P8` und
+   `FCM_SERVICE_ACCOUNT` still auf ihre erste Zeile gekürzt — mit
+   Erfolgsmeldung. Wert nur über die Umgebung übergeben, nie über eine Datei,
+   und hinterher per SHA-256 vergleichen.
 
 **Nachgezogen wurden** `openspec/changes/capacitor-huelle/design.md` §8,
 `proposal.md` (§8 und die Liste des von Hand Bereitzustellenden) und `tasks.md`

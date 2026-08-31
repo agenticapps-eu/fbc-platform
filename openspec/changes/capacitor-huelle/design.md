@@ -245,9 +245,12 @@ Was dafür spricht, über „steht schon" hinaus:
   `stripe-webhook`, `send-activation` und `notify-contact-request`, jeweils mit
   ausgeschriebener Begründung. Ein Gerät hat kein JWT; der Endpunkt muss ohne
   auskommen.
-- **Öffentlich ist kein Zugeständnis.** Das Bündel ist dasselbe `dist/`, das
-  Pages ohnehin dem ganzen Internet ausliefert. Der Schutz kommt aus der
-  Signatur, nicht aus der Zugriffskontrolle.
+- **Öffentlich ist kein Zugeständnis** — aber aus einem anderen Grund, als hier
+  zunächst stand. Die erste Fassung dieses Absatzes behauptete, das Bündel sei
+  „dasselbe `dist/`, das Pages ohnehin ausliefert". **Das ist falsch:** mit
+  gesetztem `publicKey` liegt im Bucket **Chiffrat**, kein lesbares `dist/`
+  (siehe oben). Der Schutz kommt also nicht nur aus der Echtheitsprüfung,
+  sondern die Datei ist überhaupt nur mit dem öffentlichen Schlüssel lesbar.
 
 **Die Falle dabei, und sie ist still:** fehlt der `config.toml`-Block zu einer
 Function, gilt `verify_jwt = true`. Das Gateway antwortet dann mit 401, **bevor**
@@ -267,6 +270,31 @@ Aus dem Android-Quelltext des Plugins (`CapgoUpdater.java`), nachgelesen:
   Downloads verglichen.
 - Ist ein `publicKey` gesetzt, aber keine `checksum` geliefert, wird die
   Installation mit `checksum_required` **abgelehnt**.
+
+### Was `publicKey` wirklich tut — nachgemessen am 31.08.
+
+Der Name führt in die Irre. `publicKey` ist laut `definitions.d.ts` „**end to end
+live update encryption Version 2**" (seit 6.2.0), nicht eine losgelöste Signatur.
+Der Mechanismus, aus `CryptoCipher.java` und `CryptoCipher.swift`:
+
+- Das Bündel wird beim Veröffentlichen mit einem zufälligen **AES**-Schlüssel
+  verschlüsselt (`AES/CBC/PKCS5Padding`).
+- Dieser Sitzungsschlüssel wird mit dem **privaten** RSA-Schlüssel verschlüsselt
+  und als Feld **`sessionKey`** in der Form `iv:sessionKey` (beides Base64,
+  durch Doppelpunkt getrennt) mitgeliefert.
+- Auf dem Gerät entschlüsselt `decryptRSA(sessionKey, publicKey)` mit dem
+  **öffentlichen** Schlüssel den AES-Schlüssel und damit die Datei. Auch die
+  **Prüfsumme** wird so entschlüsselt (`decryptChecksum`).
+
+RSA rückwärts also: was der private Schlüssel verschlossen hat, öffnet nur der
+passende öffentliche. Das ergibt Echtheit **und** Vertraulichkeit — aber es
+heisst auch, dass **im Bucket kein lesbares `dist/` liegt, sondern Chiffrat.**
+
+**Formatfalle:** beide Plattformen prüfen ausdrücklich auf
+`-----BEGIN RSA PUBLIC KEY-----`, also **PKCS#1** (`CryptoCipher.java:145`,
+`CryptoCipher.swift:241`). Der Normalfall von `openssl rsa -pubout` ist PKCS#8
+(`-----BEGIN PUBLIC KEY-----`) und wird mit „The public key is not a valid RSA
+Public key" abgewiesen.
 
 **Der Unterschied, auf den es ankommt, ist Integrität gegen Echtheit.** Eine
 blanke Prüfsumme belegt, dass das Zip unterwegs nicht beschädigt wurde. Sie
