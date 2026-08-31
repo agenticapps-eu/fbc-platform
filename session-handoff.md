@@ -32,25 +32,21 @@ Change `capacitor-huelle`: **40 offen, 76 erledigt** (Einstieg heute: 43/69).
 ## Accomplished
 
 Keine Zeile Code. Phase D ist von „vier offenen Entscheidungen" auf „baubar"
-gebracht worden, und dabei fielen zwei Irrtümer auf — einer im Entwurf, einer in
-meiner eigenen Korrektur davon.
+gebracht worden; dabei fielen zwei Irrtümer auf.
 
-**1 · R2 stand nie.** `design.md` §8 legte den OTA-Dienst auf Cloudflare Pages
-Functions plus R2, begründet mit einem Satz: „Beides steht bereits." Pages steht.
-R2 nicht — kein `wrangler.toml`, keine Bindung, kein Treffer; die scheinbaren
-R2-Fundstellen sind eine **Risiko-Kennung `R2`** in `docs/w2-acceptance.md`.
-Damit trug die Wahl kein Argument mehr.
+**1 · R2 stand nie.** `design.md` §8 begründete Cloudflare Pages plus R2 mit
+einem Satz: „Beides steht bereits." Pages steht. R2 nicht — kein
+`wrangler.toml`, keine Bindung, kein Treffer; die scheinbaren R2-Fundstellen
+sind eine **Risiko-Kennung `R2`** in `docs/w2-acceptance.md`.
 
-**2 · `publicKey` verschlüsselt, er signiert nicht.** Laut `definitions.d.ts` ist
-er „end to end live update encryption Version 2". Das Zip wird mit einem AES-
-Schlüssel verschlüsselt, dieser mit dem **privaten** RSA-Schlüssel; nur der
-öffentliche in der Schale öffnet beides (`CryptoCipher.java`/`.swift`).
-**Im Speicher liegt Chiffrat, kein lesbares `dist/`.** Das widerlegte eine
-Begründung, die ich am selben Vormittag selbst geschrieben hatte — und hätte sie
-gestanden, hätte der Veröffentlichungs-Schritt ein unverschlüsseltes Zip
-hochgeladen. Daran hingen zwei Lücken: das Manifest braucht ein Feld
-**`sessionKey`** (`iv:sessionKey`), und der Veröffentlichungs-Schritt muss
-verschlüsseln.
+**2 · `publicKey` verschlüsselt, er signiert nicht** („end to end live update
+encryption Version 2"). Das Zip wird mit einem AES-Schlüssel verschlüsselt,
+dieser mit dem **privaten** RSA-Schlüssel; nur der öffentliche in der Schale
+öffnet beides. **Im Speicher liegt Chiffrat, kein lesbares `dist/`.** Das
+widerlegte eine Begründung, die ich am selben Vormittag selbst geschrieben
+hatte — hätte sie gestanden, wäre ein unverschlüsseltes Zip hochgeladen worden.
+Zwei Lücken hingen daran: das Manifest braucht **`sessionKey`**
+(`iv:sessionKey`), und der Veröffentlichungs-Schritt muss verschlüsseln.
 
 ## Decisions (alle Donald, 31.08.)
 
@@ -82,12 +78,10 @@ nichts davon im Repo.
 
 ## Files modified
 
-`9fd3a00` · `9e59b52` · `c70524a` (plus die zwei Übergabe-Commits):
-
-- `openspec/changes/capacitor-huelle/design.md` — §8 neu; Vertragsnummer-Tabelle
-  beantwortet; Anlass, Fassungsschema, Verschlüsselungs-Mechanik, Formatfalle
-- `openspec/changes/capacitor-huelle/proposal.md` · `tasks.md` — Phase D neu
-- `docs/decisions/0005-ota-auf-supabase-statt-cloudflare-r2.md` — **neu**
+`9fd3a00` · `9e59b52` · `c70524a`: `design.md` §8 neu (Vertragsnummer beantwortet,
+Anlass, Fassungsschema, Verschlüsselung, Formatfalle) · `proposal.md` und
+`tasks.md` Phase D neu · `docs/decisions/0005-ota-auf-supabase-statt-cloudflare-r2.md`
+**neu**.
 
 ## Next session: start here
 
@@ -118,6 +112,18 @@ darf direkt gebaut werden, das hier nicht.
 Erster Befehl der Sitzung: `pnpm install --frozen-lockfile`. Ein `exit=1` ohne
 benannten Fehlschlag sieht aus wie ein Flake und ist eine fehlende Abhängigkeit.
 
+**Nach JEDEM `pnpm build`, vor jedem `git add`:**
+
+```
+git checkout -- src/content/release-entries.generated.ts
+```
+
+Jeder Build schreibt diese Datei unformatiert neu; sie steht danach als `M` im
+Status, ohne dass jemand sie bearbeitet hat. Wer dann committet, nimmt ein paar
+hundert fremde Zeilen mit. Sie war der einzige Konflikt beim Rebase von #290
+(f4, 31.08.). **Ausnahme:** wirklich archiviert — dann gehört sie in den Commit.
+Bis jetzt ist sie in diesem Branch unberührt, und das soll so bleiben.
+
 ## Open questions — alle innerhalb AGE-642
 
 - **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
@@ -134,6 +140,10 @@ benannten Fehlschlag sieht aus wie ein Flake und ist eine fehlende Abhängigkeit
 - **C3 ändert an zwei Stellen die Optik** (`WillkommenPage`, Bearbeiten-Formular
   im Feed) — gemergt, aber nie im Browser angesehen.
 - **AGE-642 springt beim Merge selbst auf Done.** Vorbeugen geht nicht, nur
-  nachsehen. Zuletzt viermal passiert.
+  nachsehen. Zuletzt viermal passiert. f4 hat es am 31.08. an AGE-667 hart
+  belegt: `completedAt` 08:52:03Z, Merge 08:52:00Z — **drei Sekunden**, kein
+  Handgriff. Und die Automation geht auch **zurück**: beim Öffnen eines zweiten
+  PR fiel der Vorgang von Done wieder auf In Progress. Ein Status sagt hier also
+  weder „fertig" noch „unfertig" verlässlich.
 - **Nebenbefund, nicht angefasst:** `ADR-0037` wird an drei Stellen zitiert,
   existiert aber nicht — `docs/decisions/` führt nur 0001–0005.
