@@ -1,139 +1,139 @@
-# Session Handoff — 2026-08-31 (AGE-642: Phase D entschieden, OTA zieht nach Supabase)
+# Session Handoff — 2026-08-31 (AGE-642: Phase D entschieden, Schlüssel steht, D1 ist dran)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
-> Donald hat am 31.08. abgegrenzt: **AGE-642 (Capacitor-Hülle) gehört hierher,
-> alles andere nicht.** Frühere Fassungen dieser Datei schleppten fremde Punkte
-> mit — das war der Grund für drei Rebase-Konflikte auf `session-handoff.md` in
-> zwei Tagen.
+> **AGE-642 (Capacitor-Hülle) gehört hierher, alles andere nicht** (Donald,
+> 31.08.). Frühere Fassungen schleppten fremde Punkte mit — das war der Grund
+> für drei Rebase-Konflikte auf dieser Datei in zwei Tagen.
 >
-> **Neu am 31.08.:** die Sitzung **`fbc-platform-f4`** schreibt ihre Übergabe
-> bewusst **nicht mehr ins Repo**. Sie liegt als reine Arbeitsbaum-Änderung in
-> `fbc-platform.neuigkeiten-archiv`. Wer den Stand ausserhalb AGE-642 braucht,
-> **fragt jene Sitzung** — in der Historie steht er nicht mehr. Damit ist der
-> Rebase-Konflikt auf dieser Datei strukturell erledigt.
+> Die Sitzung **`fbc-platform-f4`** schreibt ihre Übergabe **nicht mehr ins
+> Repo**; sie liegt als Arbeitsbaum-Änderung in `fbc-platform.neuigkeiten-archiv`.
+> Wer den Stand ausserhalb AGE-642 braucht, **fragt jene Sitzung** — in der
+> Historie steht er nicht.
 >
-> ### ⛔ Eine Anweisung aus ÄLTEREN Übergaben ist WIDERLEGT
+> ### ⛔ Für AGE-599 gilt weiterhin: NICHT löschen
 >
-> Für **AGE-599** stand dort „erst die acht Objekte in `event-covers` auf DEV
-> löschen, dann seeden". **Nicht tun — das macht DEV kaputt.** Die Objekte
-> stammen aus dem Spiegel DEV ← PROD (AGE-576), kein Skript stellt sie wieder
-> her. Ausgeschrieben in `openspec/specs/design-system/spec.md` (#294), samt
-> SHALL NOT. DEV bleibt, PROD wird nicht angefasst.
+> Ältere Übergaben sagten „erst die acht Objekte in `event-covers` auf DEV
+> löschen, dann seeden". **Das macht DEV kaputt.** Die Objekte stammen aus dem
+> Spiegel DEV ← PROD (AGE-576), kein Skript stellt sie wieder her. Steht als
+> SHALL NOT in `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle` — **2 Commits über `origin/main`**, sauber:
-`8fbc49b` (Übergabe der Vorsitzung) und `9fd3a00` (diese Sitzung). Beide sind
-reine Doku; **kein Code liegt an.** Sie gehen mit dem nächsten PR mit; wer den
-Worktree vorher entfernt, verliert sie.
+`donald/age-642-capacitor-huelle`. **5 Commits über `origin/main`, 1 dahinter.**
+Alle fünf sind reine Doku, **kein Code liegt an.**
 
-Change `capacitor-huelle`: **40 offen, 75 erledigt** (Einstieg: 43/69).
+Der eine Rückstand ist f4s `eab8368` (#290, AGE-667). **Gemessen: kein
+Berührungspunkt** — es fasst `openspec/changes/archive/…`,
+`openspec/specs/community-feed/spec.md` und `release-entries.generated.ts` an,
+wir keines davon. Der Rebase ist sauber.
+
+Change `capacitor-huelle`: **40 offen, 76 erledigt** (Einstieg heute: 43/69).
 
 ## Accomplished
 
-Diese Sitzung hat **keine Zeile Code** geschrieben — sie hat Phase D
-entscheidungsreif gemacht und dabei den Entwurf an einer Stelle widerlegt.
+Keine Zeile Code. Phase D ist von „vier offenen Entscheidungen" auf „baubar"
+gebracht worden, und dabei fielen zwei Irrtümer auf — einer im Entwurf, einer in
+meiner eigenen Korrektur davon.
 
-**Der Kernbefund: R2 stand nie.** `design.md` §8 legte den OTA-Dienst auf
-Cloudflare Pages Functions plus R2 und begründete das mit einem Satz — „Beides
-steht bereits." Nachgemessen stimmt er zur Hälfte. **Pages steht** (`wrangler
-pages deploy ./dist`, Token über Infisical, `functions/` fährt mit). **R2 nicht:**
-kein `wrangler.toml`, keine Bucket-Bindung, kein Treffer. Die scheinbaren
-R2-Fundstellen sind eine **Risiko-Kennung `R2`** in `docs/w2-acceptance.md` —
-Namensgleichheit. Damit trug die Wahl kein Argument mehr.
+**1 · R2 stand nie.** `design.md` §8 legte den OTA-Dienst auf Cloudflare Pages
+Functions plus R2, begründet mit einem Satz: „Beides steht bereits." Pages steht.
+R2 nicht — kein `wrangler.toml`, keine Bindung, kein Treffer; die scheinbaren
+R2-Fundstellen sind eine **Risiko-Kennung `R2`** in `docs/w2-acceptance.md`.
+Damit trug die Wahl kein Argument mehr.
 
-Ausgelöst hat das Donalds Rückfrage: „Wofür brauchen wir R2? Ist das Storage?
-Wir haben bisher Supabase Storage genutzt."
+**2 · `publicKey` verschlüsselt, er signiert nicht.** Laut `definitions.d.ts` ist
+er „end to end live update encryption Version 2". Das Zip wird mit einem AES-
+Schlüssel verschlüsselt, dieser mit dem **privaten** RSA-Schlüssel; nur der
+öffentliche in der Schale öffnet beides (`CryptoCipher.java`/`.swift`).
+**Im Speicher liegt Chiffrat, kein lesbares `dist/`.** Das widerlegte eine
+Begründung, die ich am selben Vormittag selbst geschrieben hatte — und hätte sie
+gestanden, hätte der Veröffentlichungs-Schritt ein unverschlüsseltes Zip
+hochgeladen. Daran hingen zwei Lücken: das Manifest braucht ein Feld
+**`sessionKey`** (`iv:sessionKey`), und der Veröffentlichungs-Schritt muss
+verschlüsseln.
 
-| | |
-| --- | --- |
-| Geprüft | `openspec validate --all` 31/31 · Zählung 43→40 offen, 69→75 erledigt |
-| Neu | `docs/decisions/0005-ota-auf-supabase-statt-cloudflare-r2.md` |
-| Gemessen | Bündelgrösse **2,71 MB** (ohne Sourcemaps; 4,43 MB mit) |
+## Decisions (alle Donald, 31.08.)
 
-## Decisions
+- **Heimat: alles auf Supabase.** Bündel im Storage-Bucket, Manifest als Tabelle,
+  drei Edge Functions mit `verify_jwt = false`. Die Entscheidung vom 27.08.
+  bleibt unberührt — **„selbst gehostet" war die Wahl gegen den bezahlten
+  Ionic-Dienst, nicht für einen Anbieter.** ADR-0005.
+- **Anlass: jeder Deploy auf `main`**, im bestehenden `deploy.yml`-Job.
+- **Fassung: `<Semver>+<kurzer SHA>`**, z. B. `1.4.0+8fbc49b`. Beantwortet auch,
+  was gilt, wenn Store-Bau und `main`-Deploy sich überholen.
+- **Vertragsnummer fährt in `version_build`** — am Plugin gemessen, nicht
+  geraten. Einziges Feld, das auf beiden Plattformen aus
+  `plugins.CapacitorUpdater.version` kommt. Beleg: `capacitor.config.json` liegt
+  **neben** `public/`, nicht darin.
+- **Das Spec-Delta blieb unberührt** (es nennt keinen Anbieter) — deshalb wurde
+  **2b nicht neu fällig**.
 
-- **Heimat: alles auf Supabase** (Donald, 31.08.). Bündel im Storage-Bucket,
-  Manifest als Tabelle, drei Edge Functions mit `verify_jwt = false`. Die
-  Entscheidung vom 27.08. bleibt unberührt — **„selbst gehostet" war die Wahl
-  gegen den bezahlten Ionic-Dienst, nicht für einen Anbieter.**
-- **Anlass: jeder Deploy auf `main`** (Donald, 31.08.), im bestehenden
-  `deploy.yml`-Job, der `dist/` ohnehin baut.
-- **Fassungsschema: `<Semver>+<kurzer SHA>`**, z. B. `1.4.0+8fbc49b` (Donald,
-  31.08.). Beantwortet zugleich, was gilt, wenn Store-Bau und `main`-Deploy sich
-  überholen: verschiedene SHAs.
-- **D2 gemessen statt geraten.** Die Vertragsnummer fährt in **`version_build`** —
-  das einzige Feld im POST an `updateUrl`, das auf beiden Plattformen aus
-  `plugins.CapacitorUpdater.version` kommt (`…Plugin.java:725`,
-  `…Plugin.swift:268`). Der Beleg: **`capacitor.config.json` liegt NEBEN
-  `public/`, nicht darin** — OTA tauscht `public/`, die Nummer bleibt der Schale.
-  `custom_id` scheidet aus: aus JavaScript gesetzt.
-- **Das Spec-Delta blieb unberührt** — es sagt „selbst gehostet" und nennt keinen
-  Anbieter. Dass die Korrektur keine Zeile Spec kostete, belegt die richtige
-  Flughöhe. Deshalb wurde **2b nicht neu fällig**.
+## Der Schlüssel steht — und ist belegt
 
-## Zwei Fallen, festgehalten
+`CAPGO_PRIVATE_KEY` liegt in Infisical `prod`, 4096 Bit, **PKCS#1**. Dreifach
+geprüft: Kopfzeilen tragen `BEGIN RSA PRIVATE/PUBLIC KEY` · der SHA-256 des
+hinterlegten Werts ist gleich dem der Datei ohne Schluss-Zeilenumbruch · ein
+Rundlauf *privat verschlüsselt → öffentlich entschlüsselt* gibt 32 zufällige
+Bytes byte-gleich zurück, während ein fremder Schlüssel auf demselben Befehlsweg
+abgewiesen wird. Dateien in `~/Documents`, `0600`, nicht iCloud-synchronisiert,
+nichts davon im Repo.
 
-- **capgo `9.0.0` und `10.0.0` sind Fallen**: höhere Zahl, aber peer
-  `@capacitor/core: ^5.0.0`. `latest` ist bewusst **`8.51.15`**.
-- **Fehlt der `config.toml`-Block, gilt `verify_jwt = true`** — 401 **vor** dem
-  Handler, ohne Spur im Log der Function. Ein Gerät hat kein JWT.
-
-Neue Memory: `capgo-version-build-ist-das-einzige-schalen-feld`. Aktualisiert:
-`format-statt-format-check` (139 → **286** unformatierte Bestandsdateien).
+**Ein Infisical-Login steht NICHT aus** — die Anmeldung trägt.
 
 ## Files modified
 
-Alles in Commit `9fd3a00`:
+`9fd3a00` · `9e59b52` · `c70524a` (plus die zwei Übergabe-Commits):
 
-- `openspec/changes/capacitor-huelle/design.md` — §8 neu: der widerlegte Satz
-  sichtbar widerrufen, Vertragsnummer-Tabelle beantwortet, Anlass und
-  Fassungsschema, Fassungsfalle; neue Zeile in „Verworfene Alternativen"
-- `openspec/changes/capacitor-huelle/proposal.md` — §8 und die Liste des von Hand
-  Bereitzustellenden (der R2-Bucket entfällt, das Schlüsselpaar bleibt)
-- `openspec/changes/capacitor-huelle/tasks.md` — Phase D neu (D1–D3), sechs
-  Aufgaben abgehakt
+- `openspec/changes/capacitor-huelle/design.md` — §8 neu; Vertragsnummer-Tabelle
+  beantwortet; Anlass, Fassungsschema, Verschlüsselungs-Mechanik, Formatfalle
+- `openspec/changes/capacitor-huelle/proposal.md` · `tasks.md` — Phase D neu
 - `docs/decisions/0005-ota-auf-supabase-statt-cloudflare-r2.md` — **neu**
 
 ## Next session: start here
 
-**Der erste Schritt ist Donalds, nicht der Sitzung:** das
-**Signaturschlüsselpaar** erzeugen, den privaten Teil nach Infisical. Der
-Infisical-Login braucht ein echtes Terminal und geht nicht aus Claude Code
-heraus. Ohne den `publicKey` ist D3 nicht abschliessbar — und ohne Signatur wäre
-der Endpunkt ein Weg, beliebigen Code auf jedes Gerät zu bringen.
+**D1, erste zwei Aufgaben: Bucket und Manifest-Tabelle, beide per Migration.**
+Das ist der erste Code der Phase. Vorlagen sind die vier bestehenden
+Bucket-Migrationen, am nächsten `supabase/migrations/20260812100200_event_covers_storage.sql`.
 
-**Parallel dazu baubar, ohne Schlüssel und ohne Gerät:** D1s erste beiden
-Aufgaben — Bucket und Manifest-Tabelle, beide **per Migration**, nach dem Muster
-der vier bestehenden Buckets. Das ist der erste Code dieser Phase. **Achtung:
-Migration + RLS heisst Fremdreviewer** (Donalds Regel vom 26.08.).
+**Vorher lesen, sonst wird CI rot oder die Tabelle ist zur Laufzeit tot:**
 
-Danach der Veröffentlichungs-Schritt in `deploy.yml`, dann D3.
+1. **`grants_test.sql` ist ein Golden-Master über ALLE public-Tabellen.** Eine
+   neue Tabelle mit `grant select … to authenticated` kippt den
+   `migrations`-Job, **obwohl sie im Test nirgends namentlich vorkommt**. Der
+   erwartete String muss an alphabetisch richtiger Stelle ergänzt werden.
+2. **Grants werden nicht geerbt.** Unsere Migrationen sprechen sie meist nicht
+   aus; der Ist-Zustand kam aus Supabases `alter default privileges`, und der
+   unterscheidet sich zwischen Prod und frischem CLI-Image. Also **ausdrücklich
+   granten**.
+3. **`service_role` hält keine Tabellenrechte** — separat aussprechen, sonst
+   scheitert der Veröffentlichungs-Schritt erst zur Laufzeit.
+4. **Der Mime-Typ ist NICHT `application/zip`** — es liegt Chiffrat im Bucket.
+   Erst festlegen, wenn die Verschlüsselung steht.
+5. **Die Manifest-Tabelle braucht `sessionKey`** neben Fassung, URL, Prüfsumme
+   und Vertragsnummer.
+
+**Migration + RLS heisst Fremdreviewer** (Donalds Regel vom 26.08.) — reines UI
+darf direkt gebaut werden, das hier nicht.
+
+Erster Befehl der Sitzung: `pnpm install --frozen-lockfile`. Ein `exit=1` ohne
+benannten Fehlschlag sieht aus wie ein Flake und ist eine fehlende Abhängigkeit.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Vier Gerätebelege stehen weiter aus:** C3 auf beiden Plattformen · C2 auf
-  Android · C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht
-  werden** (Launch-Screen-Zwischenspeicher), **und das kostet Donald die
-  Anmeldung** — vorher ansagen.
-- **B3 Signaturmaterial (4 offen)** hängt an Zertifikat, Provisioning Profile und
-  Keystore — ebenfalls Donalds Hand, ebenfalls nach Infisical.
+- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
+  C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**
+  (Launch-Screen-Zwischenspeicher), **und das kostet Donald die Anmeldung** —
+  vorher ansagen.
+- **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
+  Donalds Hand. Das OTA-Schlüsselpaar ist davon unabhängig und **erledigt**.
+- **`publicKey` in `capacitor.config.ts`** gehört zu D3, wo das Plugin dazukommt
+  — vorher wäre es tote Konfiguration. Datei liegt bereit.
+- **capgo-Version:** `8.51.15`. **Nicht `9.x`/`10.x`** — höhere Zahl, aber peer
+  `@capacitor/core: ^5.0.0`. Nach dem Hinzufügen `deno install --frozen=false`,
+  danach **zwingend** `pnpm install`.
 - **C3 ändert an zwei Stellen die Optik** (`WillkommenPage`, Bearbeiten-Formular
-  im Feed): das sichtbare Dateifeld liegt jetzt hinter einem Knopf. Ist gemergt,
-  aber noch nie im Browser angesehen worden.
-- **`push-fundament` (13 offen)** hängt am selben Gerät.
-- **AGE-642 springt beim Merge selbst auf Done** — vorbeugen geht nicht, nur
-  nachsehen. Beim letzten Merge zum vierten Mal passiert.
-- **Nebenbefund, ausserhalb des Scopes, nicht angefasst:** `ADR-0037` wird an
-  drei Stellen zitiert (`.env.example:23`, `docs/foundation-acceptance.md`),
+  im Feed) — gemergt, aber nie im Browser angesehen.
+- **AGE-642 springt beim Merge selbst auf Done.** Vorbeugen geht nicht, nur
+  nachsehen. Zuletzt viermal passiert.
+- **Nebenbefund, nicht angefasst:** `ADR-0037` wird an drei Stellen zitiert,
   existiert aber nicht — `docs/decisions/` führt nur 0001–0005.
-
-## Berührungspunkt mit `fbc-platform-f4` — geklärt
-
-f4 nimmt sich `CommunityFeed.tsx` vor (Composer bekommt „Abbrechen"). **Wir haben
-dort nichts Offenes.** Ihre Zeilennummern stammten aus einem Worktree ohne #295;
-gegen `main` gemessen: `setOffen(false)` in **779**, `URL.revokeObjectURL` in
-**775 und 860** (die 860 ist der „×"-Knopf an der Bildkachel und gehört **nicht**
-in ihr `zuruecksetzen()`), `useBildauswahl` in 715. Ihre Quellen-Rückfrage
-rendert **innerhalb** des Composers (1029) — steht bei ihnen als Browser-Prüfschritt.
-Beides gegenseitig bestätigt.
