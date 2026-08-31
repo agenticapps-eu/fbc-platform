@@ -1880,11 +1880,33 @@ bei **293 px** Innenmaß — sie weitete die Karte von 341 auf 401 px und erzeug
 **44 px** waagerechten Überlauf im ganzen Dokument. Ein Composer, der die Seite
 seitlich verschiebt, ist ein schlechterer Tausch als ein fehlender Rückweg.
 
+**Der Umbruch SHALL die zwei Aktionsknöpfe nicht trennen.** „Abbrechen" und
+„Posten" SHALL gemeinsam umbrechen; umbrechen SHALL die Medien-Zeile über sie,
+nicht die Aktionszeile zwischen ihnen.
+
+Der Grund SHALL mit der Messung festgehalten sein, und er ist eine Folge der
+Klausel darüber: mit dem blossen Umbruch brach die Zeile auf 375 × 812 als
+`[Bild] [Video] [Abbrechen]` über `[Posten]` — die beiden Aktionsknöpfe lagen
+auf `top` **388** und **432**, also in verschiedenen Zeilen. „Abbrechen" stand
+damit bei den Knöpfen, die etwas **hinzufügen**, statt bei dem, der abschliesst.
+Kein Überlauf, kein abgeschnittener Inhalt — eine Gruppierung, die die falsche
+Geschichte erzählt. Gemeinsam gefasst sind es **430/430**, die Hülle misst
+**178 px** in 293 px Innenmaß, und der Überlauf bleibt **0**.
+
+Diese Klausel SHALL NOT als Vorgabe für die Reihenfolge gelesen werden. Sie
+sagt, dass die beiden zusammenbleiben, nicht welcher links steht.
+
 #### Scenario: Der dritte Knopf erzeugt keinen waagerechten Überlauf
 
 - **WHEN** der Composer auf einem 375 px breiten Schirm aufgeklappt ist
 - **THEN** bleibt die Aktionszeile innerhalb der Karte, und das Dokument
   scrollt nicht seitlich
+
+#### Scenario: Der Umbruch trennt „Abbrechen" nicht von „Posten"
+
+- **WHEN** der Composer auf einem 375 px breiten Schirm aufgeklappt ist und die
+  Aktionszeile umbricht
+- **THEN** stehen „Abbrechen" und „Posten" weiterhin in derselben Zeile
 
 #### Scenario: Verwerfen schliesst den Composer, ohne zu veröffentlichen
 

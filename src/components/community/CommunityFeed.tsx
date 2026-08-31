@@ -1067,9 +1067,18 @@ function PostComposer({ authorId }: { authorId: string }) {
               Video
             </button>
           </span>
-          {/* Der Rückweg (AGE-670). Er steht neben „Posten", weil er dieselbe
-              Frage beantwortet — „und jetzt?" —, und trägt bewusst KEINE
-              Rückfrage: ein Klick, unmittelbar neben dem Hauptweg, ohne
+          {/* Die zwei Aktionsknöpfe in EINER Hülle, die nicht umbricht
+              (AGE-674). Ohne sie brach die Zeile auf 375 px zwischen ihnen:
+              `[Bild] [Video] [Abbrechen]` über `[Posten]`, gemessen an den
+              `top`-Werten 388 gegen 432. „Abbrechen" stand damit bei den
+              Knöpfen, die etwas HINZUFÜGEN, statt bei dem, der abschliesst.
+              Mit Hülle sind es 430/430 — die Medien-Zeile bricht jetzt ÜBER
+              die Aktionen, statt sie aufzuspalten. 178 px in 293 px Innenmass,
+              Überlauf bleibt 0.
+
+              Der Rückweg selbst (AGE-670) steht neben „Posten", weil er
+              dieselbe Frage beantwortet — „und jetzt?" —, und trägt bewusst
+              KEINE Rückfrage: ein Klick, unmittelbar neben dem Hauptweg, ohne
               zerstörerisches Gewicht. `ghost`, damit „Posten" der einzige
               betonte Knopf der Zeile bleibt.
 
@@ -1077,12 +1086,14 @@ function PostComposer({ authorId }: { authorId: string }) {
               laufenden Mutation leerte den Entwurf, den ihr `onSuccess` gleich
               selbst leert — und bei einem Fehlschlag stünde das Mitglied ohne
               seinen Text da. */}
-          <Button variant="ghost" size="sm" disabled={create.isPending} onClick={zuruecksetzen}>
-            Abbrechen
-          </Button>
-          <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
-            {create.isPending ? "Wird veröffentlicht…" : "Posten"}
-          </Button>
+          <span className="inline-flex items-center gap-2">
+            <Button variant="ghost" size="sm" disabled={create.isPending} onClick={zuruecksetzen}>
+              Abbrechen
+            </Button>
+            <Button size="sm" disabled={!canSubmit} onClick={() => create.mutate()}>
+              {create.isPending ? "Wird veröffentlicht…" : "Posten"}
+            </Button>
+          </span>
         </div>
       </div>
     </Card>
