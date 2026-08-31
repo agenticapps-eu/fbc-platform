@@ -6,6 +6,7 @@
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "npm:@capacitor/android@8": "8.5.0_@capacitor+core@8.5.0",
     "npm:@capacitor/app@^8.1.1": "8.1.1_@capacitor+core@8.5.0",
+    "npm:@capacitor/camera@^8.2.3": "8.2.3_@capacitor+core@8.5.0",
     "npm:@capacitor/cli@8": "8.5.0",
     "npm:@capacitor/core@^8.5.0": "8.5.0",
     "npm:@capacitor/ios@8": "8.5.0_@capacitor+core@8.5.0",
@@ -226,6 +227,12 @@
     },
     "@capacitor/app@8.1.1_@capacitor+core@8.5.0": {
       "integrity": "sha512-xM2ZTX5jK60tFtmjsmJv+Cdj1Qsb6NcavkqmdEnCPQBeya9oKhamZJxYOnQNj1ZvcJM7sWfG6BEtSLx42pisbA==",
+      "dependencies": [
+        "@capacitor/core"
+      ]
+    },
+    "@capacitor/camera@8.2.3_@capacitor+core@8.5.0": {
+      "integrity": "sha512-x9Pl5UgvrZyU5Hl53Fly9f6u019hhgN+gSdDgi+WygxK9DUVuYKjigplOXz3VJQ9m8ttUSjqN/rAC3JVnyEzcA==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -3618,6 +3625,7 @@
       "dependencies": [
         "npm:@capacitor/android@8",
         "npm:@capacitor/app@^8.1.1",
+        "npm:@capacitor/camera@^8.2.3",
         "npm:@capacitor/cli@8",
         "npm:@capacitor/core@^8.5.0",
         "npm:@capacitor/ios@8",

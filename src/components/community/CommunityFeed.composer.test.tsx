@@ -281,12 +281,18 @@ describe("Composer — die Medientyp-Zeile", () => {
     oeffneComposer();
 
     const zeile = screen.getByRole("group", { name: /medien/i });
-    const bild = within(zeile).getByText("Bild");
+    // Beide als KNOPF geholt, symmetrisch. Bis AGE-642 C3 war „Bild" ein
+    // `<label>` um ein `sr-only`-Feld, und die Zusage lief ueber
+    // `closest("label")`. Ein Label loest sein Feld unabweisbar selbst aus —
+    // damit gaebe es nativ keine Stelle fuer die Kamera/Mediathek-Rueckfrage.
+    // Die Zusage ist dieselbe geblieben, nur der Weg zum Element ist jetzt
+    // derselbe wie bei „Video".
+    const bild = within(zeile).getByRole("button", { name: /^bild$/i });
     const video = within(zeile).getByRole("button", { name: /^video$/i });
 
     // Das Symbol ist Teil der Zusage, nicht Zierde: 6.3 verlangt Icons aus dem
     // Satz. Geprüft wird am gezeichneten `<svg>`, nicht an einem Klassennamen.
-    expect(bild.closest("label")!.querySelector("svg")).not.toBeNull();
+    expect(bild.querySelector("svg")).not.toBeNull();
     expect(video.querySelector("svg")).not.toBeNull();
   });
 

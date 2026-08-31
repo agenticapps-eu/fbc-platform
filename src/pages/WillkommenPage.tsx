@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AvatarCropper } from "../components/profile/AvatarCropper";
 import { Button } from "../components/ui/Button";
+import { useBildauswahl } from "../components/ui/useBildauswahl";
 import { Input } from "../components/ui/Input";
 import { Logo } from "../components/ui/Logo";
 import { cn } from "../lib/cn";
@@ -586,6 +587,14 @@ function ProfilSchritt({
   onRegion: (v: string) => void;
   onDatei: (f: File) => void;
 }) {
+  // AGE-642 C3: Das Feld war hier SICHTBAR und war zugleich der Knopf — damit
+  // gab es keine Stelle, an der die native Rueckfrage haette aufgehen koennen.
+  // Es liegt jetzt versteckt hinter einem Knopf, wie an den drei anderen
+  // Bildstellen auch. Im Browser oeffnet der Knopf weiterhin denselben
+  // Dateidialog; was sich aendert, ist die Optik des Ausloesers.
+  const feldRef = useRef<HTMLInputElement>(null);
+  const bildWahl = useBildauswahl(([datei]) => onDatei(datei));
+
   return (
     <div className="flex flex-col gap-8">
       <h2 className="font-display text-2xl font-semibold text-on-chrome">Fast geschafft</h2>
@@ -599,7 +608,12 @@ function ProfilSchritt({
             {vorschau && (
               <img src={vorschau} alt="" className="h-16 w-16 rounded-full object-cover" />
             )}
+            <Button variant="secondary" size="sm" onClick={() => bildWahl.oeffnen(feldRef.current)}>
+              Profilbild wählen
+            </Button>
+            {bildWahl.rueckfrage}
             <input
+              ref={feldRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               aria-label="Profilbild auswählen"
@@ -613,7 +627,7 @@ function ProfilSchritt({
                 e.target.value = "";
                 if (datei) onDatei(datei);
               }}
-              className="text-sm text-on-chrome-muted"
+              className="hidden"
             />
           </div>
         </div>

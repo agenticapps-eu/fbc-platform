@@ -582,13 +582,39 @@ nicht wiederholt.
 
 ### C3. Kamera und Fotoauswahl
 
-- [ ] **RED**: Test — der gemeinsame Aufrufpunkt gibt im Web eine Datei aus dem
+- [x] **RED**: Test — der gemeinsame Aufrufpunkt gibt im Web eine Datei aus dem
       bestehenden `<input>` zurück; die sechs Aufrufer kennen keine Plattform.
-- [ ] Aufrufpunkt bauen, `@capacitor/camera` im nativen Zweig.
-- [ ] Die sechs Stellen umstellen: `ProfilPage.tsx:278,317`,
-      `CommunityFeed.tsx:943,2042`, `EventCoverPicker.tsx:120`,
-      `WillkommenPage.tsx:603`.
-- [ ] **Beleg:** Zuschnitt und Upload dahinter sind unverändert — dieselben
+- [x] Aufrufpunkt bauen, `@capacitor/camera` im nativen Zweig.
+- [x] Die sechs Stellen umstellen. Nachgemessen, die Zeilen waren gewandert:
+      `ProfilPage.tsx:278,331` · `CommunityFeed.tsx:995,2169` ·
+      `EventCoverPicker.tsx:129` · `WillkommenPage.tsx:603`.
+- [x] **Beim Bauen entschieden, weil die API sich unter der Aufgabe bewegt
+      hat:** `@capacitor/camera` 8.2.3 führt `getPhoto` samt eingebauter
+      „Kamera oder Galerie?"-Rückfrage als **veraltet** und verweist für die
+      Rückfrage auf eine eigene Oberfläche. Gewählt (Donald, 31.08.): die
+      aktuelle API — `takePhoto` und `chooseFromGallery` — mit **eigener**
+      Rückfrage in den vorhandenen Overlay-Bausteinen. Der Nebengewinn ist der
+      Grund, warum es die bessere Wahl war: nur `chooseFromGallery` kann
+      `allowMultipleSelection`, der Feed behält damit seine Mehrfachauswahl.
+      Die Anforderung in `specs/native-shell/spec.md` ist nachgezogen; sie
+      sprach vom „nativen Ablauf mit der Wahl".
+- [x] **`limit` ist der REST, nicht das Maximum** — mit eigener Zusage und
+      Mutations-Gegenprobe. Im Web hält der Dateidialog nichts, nativ hielte es
+      niemand, und `waehleBilder` verwürfe den Überschuss stumm.
+- [x] **`EncodingType.JPEG` bei der Kamera**, mit eigener Zusage. Das ist die
+      Lehre vom 17.08.: ein HEIC vom iPhone zeigte im Zuschnitt eine leere
+      Fläche und einen toten Knopf, ohne ein Wort. `chooseFromGallery` kennt
+      die Option nicht — dort trägt der Zweig, den `AvatarCropper` dafür hat.
+- [x] **Zwei Stellen mussten umgebaut werden, und das ist sichtbar:**
+      `WillkommenPage:603` und `CommunityFeed:2169` trugen ein **sichtbares**
+      Dateifeld, das zugleich der Auslöser war — ein `<label>` löst sein Feld
+      unabweisbar selbst aus, es gäbe also keine Stelle, an der die Rückfrage
+      aufgehen könnte. Beide liegen jetzt versteckt hinter einem Knopf, wie die
+      vier anderen. Der Dateidialog im Browser ist derselbe; **was sich ändert,
+      ist die Optik des Auslösers.** Bei `CommunityFeed:995` ändert sich nichts
+      — dort trugen die Klassen schon ein Knopf-Aussehen und wandern wörtlich
+      mit.
+- [x] **Beleg:** Zuschnitt und Upload dahinter sind unverändert — dieselben
       Seitenverhältnisse je Bucket wie bisher.
 - [ ] **Beleg auf beiden Geräten**, wie bei C1 und C2: einmal aus der Kamera,
       einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
