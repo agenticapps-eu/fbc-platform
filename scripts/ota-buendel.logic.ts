@@ -257,6 +257,7 @@ export function pruefeSchluesselpaar(privatschluesselPem: string, oeffentlichPem
     throw new Error(
       `publicKey aus capacitor.config.ts ist kein lesbarer RSA-Schluessel: ` +
         `${fehler instanceof Error ? fehler.message : String(fehler)}`,
+      { cause: fehler },
     );
   }
 
