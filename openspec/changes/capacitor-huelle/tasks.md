@@ -832,22 +832,86 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
 > Gerät erfüllt. Ein `select … limit 1` ohne `order by` wäre ein Rückschritt,
 > der wie ein Zufall aussieht.
 
-- [ ] `@capgo/capacitor-updater@8.51.15` hinzufügen. **Nicht `9.x` oder `10.x`**
+- [x] `@capgo/capacitor-updater@8.51.15` hinzufügen. **Nicht `9.x` oder `10.x`**
       — die tragen die höhere Zahl, fordern aber `@capacitor/core: ^5.0.0`;
       `latest` ist bewusst `8.51.15`. Nach dem Hinzufügen: `deno install
       --frozen=false`, danach **zwingend** `pnpm install`, sonst wird der
       Deno-Job rot.
-- [ ] `updateUrl`, `channelUrl`, `statsUrl` in `capacitor.config.ts` auf die
+      **Erledigt 31.08.**, in dieser Reihenfolge und mit `fbc-platform-f4`
+      abgestimmt (null offene PRs, keine ungesicherte Sperrdatei). In
+      `package.json` steht die Fassung **exakt**, ohne `^`: ein Caret liesse
+      `pnpm update` auf `8.x` wandern, und die Fassungswahl hier ist eine
+      Messung, keine Untergrenze. Keine unerfüllte peer-Zusage.
+- [x] `updateUrl`, `channelUrl`, `statsUrl` in `capacitor.config.ts` auf die
       eigenen Endpunkte; dazu `plugins.CapacitorUpdater.version` als
       Vertragsnummer (D2) und der `publicKey`.
-- [ ] Drei Supabase Edge Functions. **Für jede ein `config.toml`-Block mit
+      **Erledigt 31.08.** Zwei Entscheidungen, die dort nicht offensichtlich
+      sind:
+      * **Der Projekt-Host steht nicht als Zeichenkette in der Datei**, sondern
+        kommt aus `process.env.VITE_SUPABASE_URL` — dieselbe Quelle wie in
+        `scripts/ota-buendel.ts`, und das Repo ist öffentlich. Fehlt die
+        Variable, **wirft** `cap sync`, statt eine Vorgabe einzusetzen: eine
+        leere URL schaltet den Weg nicht ab, sondern legt ihn auf
+        `plugin.capgo.app` (`CapacitorUpdaterPlugin.java:98-100`,
+        `.swift:101-103`) — samt `device_id` und `app_id` jedes Geräts, aus
+        einer Abwesenheit heraus, die in keinem Diff steht.
+      * **Der öffentliche Schlüssel steht im Repo**, PKCS#1, acht Zeilen. Er
+        gehört dorthin: er steckt ohnehin in jeder ausgelieferten App. Gemessen
+        am 31.08.: 2048 Bit, und Modulus identisch mit dem privaten Teil in
+        `~/Documents/capgo_privat.pem`. Bewacht von
+        `scripts/capacitor-config.test.ts` (4 Zusagen) — die Kopfzeile prüft
+        `decryptFile` wörtlich und kehrt sonst **ohne Ausnahme** zurück
+        (`CryptoCipher.java:145`).
+- [x] Drei Supabase Edge Functions. **Für jede ein `config.toml`-Block mit
       `verify_jwt = false`** — fehlt der Block, gilt `true`, und das Gateway
       antwortet mit 401 **vor** dem Handler. Ein Gerät hat kein JWT, und der
       Fehler stünde in keinem Log der Function.
-- [ ] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
+      **Erledigt 31.08.**: `ota-update`, `ota-channel`, `ota-stats`, alle drei
+      mit Block. `scripts/functions-config.test.ts` sagt es je Function
+      einzeln zu; sein bestehender Vergleich Verzeichnis ⇄ Deklaration deckt
+      die Vollzähligkeit.
+      * **Der Leseweg brauchte eine eigene Migration**
+        (`20260831160000_ota_buendel_neuestes.sql`, SECURITY DEFINER, nur
+        `service_role`). `service_role` hält auf `ota_buendel` kein SELECT, und
+        `rolbypassrls` umgeht die RLS, nicht ein fehlendes Recht — ein
+        `.from(...)` wäre durch Typecheck und Tests gelaufen.
+      * **`ota-channel` und `ota-stats` speichern nichts.** Sie existieren
+        allein, damit die zwei Wege nicht bei capgo landen. `ota-stats`
+        protokolliert `action` und ausdrücklich **nicht** `device_id`.
+      * `.rpc()` gibt einen `PostgrestFilterBuilder` zurück, kein Promise — die
+        Zusicherung fiel in `deno check` auf, genau wie beim Herauslösen von
+        `redeem.ts`.
+- [x] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
       mit zu niedriger Vertragsnummer.
+      **Erledigt 31.08., auf beiden Seiten der Grenze**, weil ein Mock, der
+      beides behauptet, nur sich selbst prüft:
+      * `supabase/tests/ota_buendel_test.sql` §32 — die Auswahl selbst, gegen
+        vier Zeilen mit ausdrücklich gesetztem `created_at` (`now()` ist die
+        Zeit der **Transaktion**; aus dem Default wären alle vier gleich und die
+        Ordnung fiele still auf den Tiebreaker). §33 ist die Positivkontrolle,
+        §34 hält fest, dass nach Zeit geordnet wird und nicht nach der höchsten
+        erfüllbaren Nummer, §35 dass der Vergleich zahlenweise ist.
+      * `supabase/functions/ota-update/antwort.test.ts` — dass der Endpunkt die
+        Vertragsnummer überhaupt weiterreicht und nicht selbst filtert.
+      * **Mutationsprobe am laufenden Stack** (31.08.): `order by version desc`
+        statt `created_at` → 5 von 38 rot; Zeichenkettenvergleich statt `int[]`
+        → 1 rot; `is null` aus dem Wächter entfernt → 1 rot. Original wieder
+        grün.
 - [ ] **RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen und die
       installierte Fassung bleibt in Betrieb.
+      **Halb erledigt 31.08., und die Teilung ist keine Bequemlichkeit.** Die
+      Zusage hat zwei Hälften, und nur eine liegt in unserem Code:
+      * **Unsere Hälfte, belegt:** ein Angebot ist vollständig oder es ist
+        keines (`antwort.test.ts`). Fehlte `checksum`, lehnte das Gerät mit
+        `checksum_required` ab; fehlte `sessionKey`, gälte die Verschlüsselung
+        als nicht gesetzt (`CryptoCipher.java:141`), das Gerät entpackte
+        Chiffrat und scheiterte **ohne Hinweis auf die Ursache**. Dazu §38 der
+        pgTAP-Datei: die vier Spalten kommen der richtigen Zuordnung zurück.
+      * **Offen, und zwar als Gerätebeleg:** dass das Gerät ein Bündel mit
+        falscher Prüfsumme verwirft **und auf der laufenden Fassung bleibt**,
+        ist Verhalten des Plugins. Ein Mock könnte es nur behaupten. Der zweite
+        Teil des Satzes hängt zudem an **D4** (`notifyAppReady`) — ohne den
+        Rückweg gibt es kein „bleibt in Betrieb", nur ein „installiert nicht".
 
 ### D4. Der Rückweg — ohne ihn ist OTA eine Einbahnstraße
 

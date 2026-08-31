@@ -22,12 +22,18 @@
 -- Geraetetest unentdeckt geblieben.
 --
 -- Jede Verneinung hier hat ihre Positivkontrolle: eine Bedingung, die ALLES
--- abweist, waere gruen und wertlos. §6/§7 sind ein solches Paar, und §20 ist
--- die Kontrolle zu §19.
+-- abweist, waere gruen und wertlos. §6/§7 sind ein solches Paar, §20 ist die
+-- Kontrolle zu §19, und §33 ist die zu §32.
+--
+-- §28–§38 gelten dem LESEWEG (Phase D3, Migration …160000). Die schaerfsten
+-- dort sind §32 und §35: die erste haelt fest, dass ein Buendel eine Schale mit
+-- zu niedriger Vertragsnummer NICHT erreicht, die zweite, dass der Vergleich
+-- zahlenweise ist — als Zeichenkette stuende `10.0.0` vor `9.0.0`, und ein
+-- Geraet mit Schale 10.0.0 bekaeme nie ein Buendel, das 9.0.0 verlangt.
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
-select plan(27);
+select plan(38);
 
 -- Impersonierung. Eigene Kopie: jede Testdatei laeuft in ihrer eigenen Sitzung.
 -- ACHTUNG: `try_as` meldet JEDEN Fehler als `DENIED:`, auch einen Tippfehler.
@@ -310,6 +316,136 @@ select throws_ok($$
     repeat('a', 512), 'AAAAAAAAAAAAAAAAAAAAAA==:' || repeat('A', 342) || '==', '1.0.0')
 $$, '23514', null,
   'auch die URL-Bindung an den eigenen Bucket greift auf dem DEFINER-Weg');
+
+-- ── 28–38. Der Leseweg (20260831160000) ─────────────────────────────────────
+-- Vier Zusagen ueber das RECHT (§28–§31, dieselbe Form wie §21–§24 fuer den
+-- Schreibweg) und sieben ueber die WIRKUNG. Die Wirkung ist hier das Eigentliche:
+-- diese Funktion ist die einzige Stelle im ganzen Weg, die entscheidet, WELCHES
+-- Buendel ein Geraet bekommt. Auf dem Geraet gibt es keine Ordnung, gegen die
+-- eine falsche Antwort auffiele — der Vergleich dort ist ein
+-- Ungleichheits-Vergleich (`CapacitorUpdaterPlugin.java:4909`, `.swift:4360`),
+-- und ein aelteres Buendel wird kommentarlos installiert.
+
+select is(
+  (select p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_neuestes'),
+  true,
+  'ota_buendel_neuestes ist security definer — service_role haelt auf '
+  'ota_buendel kein SELECT, und rolbypassrls umgeht die RLS, nicht ein '
+  'fehlendes Recht');
+
+select is(
+  (select has_function_privilege('anon', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_neuestes'),
+  false,
+  'anon darf den Leseweg NICHT ausfuehren — er gibt session_key heraus, und '
+  'eine neue Funktion erbt EXECUTE ueber PUBLIC (AGE-622)');
+
+select is(
+  (select has_function_privilege('authenticated', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_neuestes'),
+  false,
+  'authenticated darf den Leseweg NICHT ausfuehren');
+
+select is(
+  (select has_function_privilege('service_role', p.oid, 'execute')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'ota_buendel_neuestes'),
+  true,
+  'service_role darf ihn ausfuehren — sonst antwortet ota-update jedem Geraet '
+  'mit einem Fehler, und zwar erst zur Laufzeit');
+
+-- Der Bestand aus §25 wird geraeumt: die Wirkungs-Zusagen unten sind Aussagen
+-- ueber eine BESTIMMTE Menge, und eine mitgeschleppte Zeile aus dem
+-- Schreibweg-Abschnitt machte sie von der Reihenfolge der Abschnitte abhaengig.
+delete from public.ota_buendel;
+
+-- `created_at` steht hier AUSDRUECKLICH und kommt nicht aus dem Default.
+-- `now()` ist die Zeit der TRANSAKTION, nicht der Anweisung: alle vier Zeilen
+-- traegen sonst denselben Zeitstempel, die Ordnung fiele still auf den
+-- Tiebreaker zurueck, und §32/§34 waeren gruen, ohne je etwas ueber
+-- `order by created_at desc` gesagt zu haben.
+--
+-- Die Fassungen sind so gewaehlt, dass die alphabetische Ordnung der ZEITLICHEN
+-- ENTGEGENLAEUFT: `+ddddddd` ist die aelteste Zeile und die alphabetisch
+-- groesste. Eine Umsetzung, die nach `version` statt nach `created_at` ordnet,
+-- faellt damit auf — mit gleichlaufenden Fassungen waere sie gruen.
+insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale, created_at)
+values
+  ('0.0.0+ddddddd', pg_temp.url('d'), repeat('d', 512),
+   pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0', '2026-08-01T00:00:00Z'),
+  ('0.0.0+ccccccc', pg_temp.url('c'), repeat('c', 512),
+   pg_temp.iv() || ':' || pg_temp.skey(), '2.0.0', '2026-08-02T00:00:00Z'),
+  ('0.0.0+bbbbbbb', pg_temp.url('b'), repeat('b', 512),
+   pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0', '2026-08-03T00:00:00Z'),
+  ('0.0.0+aaaaaaa', pg_temp.url('a'), repeat('a', 512),
+   pg_temp.iv() || ':' || pg_temp.skey(), '9.0.0', '2026-08-04T00:00:00Z');
+
+-- §32 — DIE Zusage der Phase. Eine Schale 1.0.0 sieht `+aaaaaaa` (9.0.0, die
+-- neueste Zeile ueberhaupt) und `+ccccccc` (2.0.0) NICHT. Was sie bekommt, ist
+-- die neueste Zeile, die sie erfuellt.
+select is(
+  (select version from public.ota_buendel_neuestes('1.0.0')),
+  '0.0.0+bbbbbbb',
+  'eine Schale 1.0.0 bekommt KEIN Buendel, das eine hoehere Vertragsnummer '
+  'verlangt — sonst ruft ausgeliefertes JavaScript eine native Faehigkeit auf, '
+  'die auf dem Geraet nicht existiert, und zwar erst beim Aufruf');
+
+-- §33 — die Positivkontrolle zu §32. Dieselben vier Zeilen, hoehere Schale,
+-- andere Antwort: die Ausschluesse oben kommen von der Vertragsnummer und nicht
+-- daher, dass die Funktion die Zeilen gar nicht saehe.
+select is(
+  (select version from public.ota_buendel_neuestes('9.0.0')),
+  '0.0.0+aaaaaaa',
+  'Gegenprobe: eine Schale 9.0.0 bekommt genau die Zeile, die §32 ausschliesst');
+
+-- §34 — geordnet wird nach ZEIT, nicht nach der hoechsten erfuellbaren
+-- Vertragsnummer. Eine Schale 2.0.0 koennte `+ccccccc` (2.0.0) nehmen; richtig
+-- ist `+bbbbbbb`, weil es neuer ist.
+select is(
+  (select version from public.ota_buendel_neuestes('2.0.0')),
+  '0.0.0+bbbbbbb',
+  'geordnet wird nach created_at, nicht nach der hoechsten erfuellbaren '
+  'Vertragsnummer — und nicht nach der Fassung, die hier `+ddddddd` waere');
+
+-- §35 — der Vergleich ist zahlenweise. Als Zeichenkette ist '9.0.0' > '10.0.0',
+-- die Zeile `+aaaaaaa` fiele also aus der Menge und die Antwort waere
+-- `+bbbbbbb`. Genau dieser Fehler bliebe bis zur zehnten Schale unsichtbar.
+select is(
+  (select version from public.ota_buendel_neuestes('10.0.0')),
+  '0.0.0+aaaaaaa',
+  'eine Schale 10.0.0 erfuellt 9.0.0 — der Vergleich laeuft ueber int[], ein '
+  'Zeichenkettenvergleich stellte 10.0.0 vor 9.0.0');
+
+-- §36/§37 — der Waechter am Eingang. LAUT und nicht leer: eine leere Antwort
+-- hiesse fuer das Geraet „alles aktuell" und liesse jede Schale mit
+-- missgebildeter Vertragsnummer still auf ihrem Stand stehen.
+select throws_ok($$
+  select * from public.ota_buendel_neuestes('1.0')
+$$, '22023', null,
+  'eine missgebildete Vertragsnummer wird abgewiesen, nicht als "nichts '
+  'gefunden" beantwortet');
+
+-- Die eigene Zusage fuer NULL, und sie misst etwas anderes als §36: `null !~ '…'`
+-- ist NULL und nicht TRUE. Ohne die ausdrueckliche `is null`-Klausel im
+-- Waechter liefe dieser Aufruf STILL durch und lieferte null Zeilen.
+select throws_ok($$
+  select * from public.ota_buendel_neuestes(null)
+$$, '22023', null,
+  'auch NULL wird abgewiesen — ein `!~` allein faengt es nicht');
+
+-- §38 — die Abbildung der Spalten. `returns table` benennt vier Spalten, und
+-- die Edge Function bildet sie eins zu eins auf die Antwortfelder ab. Eine
+-- Vertauschung im `select` liefe durch jede Zusage oben hindurch: sie alle
+-- lesen nur `version`.
+select is(
+  (select url || '|' || left(checksum, 3) || '|' || left(session_key, 24)
+     from public.ota_buendel_neuestes('1.0.0')),
+  pg_temp.url('b') || '|bbb|' || pg_temp.iv(),
+  'url, checksum und session_key kommen der richtigen Spalte zugeordnet '
+  'zurueck — vertauscht liesse kein Geraet das Buendel oeffnen');
 
 select * from finish();
 rollback;
