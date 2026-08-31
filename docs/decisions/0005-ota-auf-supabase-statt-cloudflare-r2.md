@@ -39,10 +39,10 @@ R2? Ist das Storage? Wir haben bisher Supabase Storage genutzt."
 
 | Teil | Wo |
 | --- | --- |
-| Bündel | Storage-Bucket, per Migration angelegt. **Chiffrat, kein lesbares Zip** — Mime-Typ erst festlegen, wenn die Verschlüsselung steht |
+| Bündel | Storage-Bucket `ota-buendel`, per Migration angelegt, öffentlich, 8 MiB, `application/octet-stream`. Es liegt Chiffrat darin — das trägt aber **Echtheit, nicht Vertraulichkeit**: öffentlicher Schlüssel und `sessionKey` sind beide öffentlich erreichbar. Öffentlich ist unbedenklich, weil im Bündel derselbe Inhalt steht, den Pages ohnehin ausliefert |
 | Manifest (Fassung, URL, Prüfsumme, Vertragsnummer) | Tabelle, per Migration, mit RLS |
 | `updateUrl`, `channelUrl`, `statsUrl` | drei Edge Functions mit `verify_jwt = false` |
-| privater RSA-Schlüssel (PKCS#1) | Infisical — mehrzeiliges PEM, nur über die Umgebung setzen |
+| privater RSA-Schlüssel (**2048 Bit**, PKCS#1) | Infisical — mehrzeiliges PEM, nur über die Umgebung setzen |
 | Veröffentlichungs-Anlass | jeder Deploy auf `main`, im bestehenden `deploy.yml`-Job |
 | Fassungsschema | `<Semver aus package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b` |
 
@@ -110,6 +110,13 @@ erzeugen, privaten Teil setzen, Digest gegenprüfen.
    `FCM_SERVICE_ACCOUNT` still auf ihre erste Zeile gekürzt — mit
    Erfolgsmeldung. Wert nur über die Umgebung übergeben, nie über eine Datei,
    und hinterher per SHA-256 vergleichen.
+3. **2048 Bit, nicht mehr** — nachgetragen am 31.08., nachdem ein bereits
+   hinterlegter 4096-Bit-Schlüssel als unbrauchbar gemessen wurde. Das Plugin
+   verlangt für das Chiffrat der Prüfsumme **genau 256 Byte**
+   (`CryptoCipher.java:254`, `CryptoCipher.swift:74`); 4096 Bit liefern 512 und
+   werden abgewiesen. Eine größere Zahl ist hier keine höhere Sicherheit,
+   sondern ein Bündel, das kein Gerät installiert — und zwar ohne
+   Fehlermeldung auf unserer Seite.
 
 **Nachgezogen wurden** `openspec/changes/capacitor-huelle/design.md` §8,
 `proposal.md` (§8 und die Liste des von Hand Bereitzustellenden) und `tasks.md`

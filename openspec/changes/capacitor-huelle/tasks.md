@@ -634,14 +634,32 @@ nicht wiederholt.
 Ohne diesen Schritt gibt es drei Endpunkte, die Anfragen beantworten, und nichts,
 was das System je befüllt.
 
-- [ ] Bucket **per Migration** anlegen, nach dem Muster der vier bestehenden:
+- [x] Bucket **per Migration** anlegen (31.08., `20260831100000_ota_buendel.sql`):
+      `ota-buendel`, `public = true`, **8 MiB**, **`application/octet-stream`**
+      (kein `application/zip` — es liegt ein AES-Chiffrat darin; der Downloader
+      des Plugins prüft den Content-Type gar nicht). **Keine Policy**, und das
+      ist gemessen richtig: `service_role` trägt `rolbypassrls = true` und alle
+      sieben Rechte auf `storage.objects`. Die 8 MiB sind das Fangnetz gegen
+      einen entgleisten Upload, **nicht** gegen mitgelieferte Sourcemaps (die
+      wögen 4,43 MB und kämen durch) — deren Ausschluss gehört in den
+      Veröffentlichungs-Schritt, wo er prüfbar ist.
+      Nach dem Muster der vier bestehenden:
       `public = true`, `file_size_limit`, `allowed_mime_types`. Gemessene Größe
       je Bündel: **2,71 MB** ohne Sourcemaps (4,43 MB mit). Öffentlich ist hier
       kein Zugeständnis: mit gesetztem `publicKey` liegt im Bucket **Chiffrat**,
       kein lesbares `dist/` — die Datei ist nur mit dem öffentlichen Schlüssel
       lesbar. **Mime-Typ erst festlegen, wenn die Verschlüsselung steht**; ein
       AES-Chiffrat ist kein `application/zip` mehr.
-- [ ] Manifest **per Migration** als Tabelle: Fassung, URL, Prüfsumme,
+- [x] Manifest **per Migration** als Tabelle (31.08., dieselbe Datei):
+      `public.ota_buendel` mit `version` (PK), `url`, `checksum`, `session_key`,
+      `benoetigte_schale`, `created_at`. RLS an, **keine Policy, kein Grant** —
+      Muster `activation_tokens`; gelesen und geschrieben wird allein mit der
+      Service-Rolle über SECURITY-DEFINER-Funktionen, die mit D3 dazukommen.
+      Vier Bedingungen an den Spalten halten je eine Messung am Plugin fest;
+      `supabase/tests/ota_buendel_test.sql` belegt sie mit je einer
+      Positivkontrolle (13 Zusagen, lokal grün). Die Spaltennamen sind die
+      Feldnamen der Antwort an `updateUrl` — der Endpunkt bildet eins zu eins ab.
+      Ursprünglich gefordert war:
       Vertragsnummer der Schale **und `sessionKey`** (Form `iv:sessionKey`, beides
       Base64 — am Plugin gemessen, `CapacitorUpdaterPlugin.java:4173`). Mit RLS,
       die dem Endpunkt das Lesen erlaubt und das Schreiben niemandem außer dem
@@ -655,6 +673,31 @@ was das System je befüllt.
       encryption v2", nicht eine losgelöste Signatur — siehe `design.md` §8.
       Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus Infisical — der Job fährt
       ohnehin über `infisical run`.
+
+      **Vier Einzelheiten, am 31.08. am Quelltext gemessen; jede einzelne würde
+      sonst erst auf dem Gerät auffallen, und dort still:**
+
+      1. **Die Prüfsumme gehört zum KLARTEXT-Zip, nicht zum Chiffrat.** Das
+         Plugin entschlüsselt zuerst und rechnet dann
+         (`CapgoUpdater.java:851-856`). Wer die SHA-256 über die hochgeladene
+         Datei bildet, liefert die falsche.
+      2. **Verschlüsselt werden die 32 ROHEN Digest-Bytes**, nicht die 64
+         Hex-Zeichen. Das Gerät hext das Ergebnis selbst auf und vergleicht mit
+         `calcChecksum`, das Kleinbuchstaben-Hex liefert (`CryptoCipher.java:266`).
+      3. **Das Feld `checksum` trägt Hex**, nicht Base64 — beides wird
+         angenommen, Hex ist das neue Format. Bei RSA-2048 also genau 512
+         Zeichen; die Bedingung an der Spalte erzwingt es.
+      4. **`sessionKey` ist `<iv>:<sessionKey>`**, beides Base64, der IV
+         **unverschlüsselt** (`CryptoCipher.java:151-152`). Fehlt der
+         Doppelpunkt, hält das Plugin die Verschlüsselung für abgeschaltet und
+         versucht, Chiffrat zu entpacken — ohne Fehlermeldung, die das erklärt.
+
+      **Nicht die Tabelle direkt beschreiben.** `service_role` hält in `public`
+      keine Tabellenrechte (AGE-312); ein `.from("ota_buendel").insert(…)`
+      scheitert erst zur Laufzeit. Der Schreibweg ist eine
+      SECURITY-DEFINER-Funktion mit `grant execute … to service_role`, Muster
+      `issue_activation_token`. Für den **Bucket** gilt das nicht: dort trägt
+      `service_role` alle Rechte und umgeht die RLS — gemessen.
 - [x] **Anlass festgelegt** (Donald, 31.08.): jeder Deploy auf `main`. Derselbe
       Job, der `dist/` schon baut und zu Pages lädt. Jeder andere Anlass hieße,
       dass ein vergessener Auslöser Geräte **still** zurücklässt.
@@ -662,17 +705,49 @@ was das System je befüllt.
       package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`. Beantwortet zugleich,
       was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
       SHAs, also verschiedene Fassungen.
-- [x] **RSA-Schlüsselpaar erzeugt und hinterlegt** (Donald, 31.08.). 4096 Bit,
-      **PKCS#1** — beide Plattformen prüfen das Format ausdrücklich und weisen
-      PKCS#8 ab (`CryptoCipher.java:145`, `CryptoCipher.swift:241`);
-      `openssl rsa -pubout` liefert das **falsche**, `-RSAPublicKey_out` das
-      richtige. Privater Teil liegt als `CAPGO_PRIVATE_KEY` in Infisical `prod`.
-      **Dreifach belegt:** Kopfzeilen beider Dateien tragen PKCS#1 · der
-      SHA-256 des hinterlegten Werts ist gleich dem der Datei ohne
-      Schluss-Zeilenumbruch (das PEM ist mehrzeilig und wurde **nicht** gekürzt,
-      anders als `APNS_KEY_P8` am 28.08.) · ein Rundlauf `privat verschlüsselt →
-      öffentlich entschlüsselt` gibt 32 zufällige Bytes byte-gleich zurück,
-      während ein fremder Schlüssel auf demselben Befehlsweg abgewiesen wird.
+- [ ] **RSA-Schlüsselpaar NEU erzeugen — 2048 Bit.** Donalds Hand (Infisical
+      `prod` braucht ein echtes Terminal).
+
+      **Korrektur vom 31.08., nachmittags.** Am Vormittag desselben Tages galt
+      diese Aufgabe als erledigt und dreifach belegt: 4096 Bit, PKCS#1, in
+      Infisical `prod`. **Die Schlüssellänge ist falsch, und die drei Belege
+      haben sie nicht geprüft** — sie prüften Format, Übertragung und Rundlauf,
+      also drei Fragen, unter denen die Größe nicht vorkam. Ein Rundlauf
+      gelingt mit jeder Schlüssellänge.
+
+      Gemessen am Quelltext von `@capgo/capacitor-updater@8.51.15`:
+      `decryptChecksum` bricht ab, wenn das Chiffrat der Prüfsumme **nicht
+      genau 256 Byte** lang ist — auf beiden Plattformen, hart, mit
+      „Checksum is not RSA encrypted" (`CryptoCipher.java:254`,
+      `CryptoCipher.swift:74`). 256 Byte heißt **RSA-2048**. Der hinterlegte
+      4096-Bit-Schlüssel liefert gemessen **512 Byte**; Gegenprobe mit einem
+      frischen 2048-Bit-Schlüssel: 256 Byte, und der Rundlauf gibt die 32
+      Digest-Bytes byte-gleich zurück.
+
+      **Der Fehlschlag wäre still gewesen:** die Prüfsumme ist Pflicht, sobald
+      ein `publicKey` gesetzt ist. Das Bündel lädt, die Prüfung scheitert, das
+      Gerät bleibt auf der alten Fassung — und kein Log auf unserer Seite sagt
+      warum. Aufgefallen wäre es frühestens beim ersten Gerätetest.
+
+      **Was aus der alten Fassung weiter gilt** (geprüft, Klausel für Klausel):
+      **PKCS#1** ist richtig und wird von beiden Plattformen ausdrücklich
+      verlangt (`CryptoCipher.java:145`, `CryptoCipher.swift:241`);
+      `openssl rsa -pubout` liefert das falsche Format, `-RSAPublicKey_out` das
+      richtige. Die Ablage in Infisical `prod` als `CAPGO_PRIVATE_KEY` ist der
+      richtige Ort, und der mehrzeilige PEM-Wert ist dort ungekürzt angekommen —
+      das war die Lehre aus `APNS_KEY_P8` vom 28.08. und sie trägt weiter.
+      **Nur die Länge ändert sich.**
+
+      Erzeugung: `openssl genrsa -traditional -out capgo_privat.pem 2048`,
+      dann `openssl rsa -in capgo_privat.pem -RSAPublicKey_out`. Danach
+      `CAPGO_PRIVATE_KEY` in Infisical `prod` ersetzen. Die alten
+      4096-Bit-Dateien in `~/Documents` gehören gelöscht, damit nicht später
+      die falsche gegriffen wird.
+- [x] **Die Länge ist in der Datenbank festgehalten** (31.08.). Die Bedingung
+      `ota_buendel_checksum_rsa2048_hex` verlangt 512 Hex-Zeichen = 256 Byte.
+      Ein mit dem 4096-Bit-Schlüssel gebildetes Chiffrat (1024 Zeichen) wird
+      beim Schreiben abgewiesen, statt dass jedes Gerät das Bündel schweigend
+      verweigert. `ota_buendel_test.sql` belegt beide Richtungen.
 - [ ] Öffentlichen Schlüssel als `publicKey` in `capacitor.config.ts` eintragen.
       Steht erst mit D3 an, wo das Plugin dazukommt — vorher wäre es tote
       Konfiguration. Die Datei liegt bereit.

@@ -1,0 +1,231 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- AGE-642 — `ota-buendel` und `ota_buendel`: der Speicher des Luftwegs
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- Change: openspec/changes/capacitor-huelle/, Phase D1.
+-- Migration: supabase/migrations/20260831100000_ota_buendel.sql
+--
+-- Echtes pgTAP mit plan()/finish(). Diese Datei muss in `ci.yml` eingetragen
+-- sein — `supabase test db` ohne Dateiliste laeuft sie nie.
+--
+-- ══ WAS DIESE DATEI WIRKLICH ABSICHERT ══════════════════════════════════════
+-- Nicht „die Tabelle existiert". Die Bedingungen an den Spalten sind Messungen
+-- am Quelltext von @capgo/capacitor-updater@8.51.15, und jede von ihnen faengt
+-- einen Fehler ab, der SONST ERST AUF DEM GERAET auftraete — und dort still:
+-- das Buendel laedt, die Pruefung scheitert, das Geraet bleibt auf der alten
+-- Fassung, und kein Log auf unserer Seite sagt warum.
+--
+-- Die schaerfste ist §10: ein mit einem 4096-Bit-Schluessel gebildetes Chiffrat
+-- ist 1024 Hex-Zeichen lang, und das Plugin verlangt 256 Byte = 512 Zeichen
+-- (`CryptoCipher.java:254`, `CryptoCipher.swift:74`). Genau dieser Schluessel
+-- lag am 31.08. in Infisical. Ohne diese Zusage waere er bis zum ersten
+-- Geraetetest unentdeckt geblieben.
+--
+-- Jede Verneinung hier hat ihre Positivkontrolle: eine Bedingung, die ALLES
+-- abweist, waere gruen und wertlos. §6/§7 sind ein solches Paar, und §20 ist
+-- die Kontrolle zu §19.
+-- ════════════════════════════════════════════════════════════════════════════
+
+begin;
+select plan(20);
+
+-- Impersonierung. Eigene Kopie: jede Testdatei laeuft in ihrer eigenen Sitzung.
+-- ACHTUNG: `try_as` meldet JEDEN Fehler als `DENIED:`, auch einen Tippfehler.
+-- Deshalb steht neben jeder Anwendung eine Kontrolle, die dieselbe Anweisung
+-- ohne RLS ausfuehrt.
+create function pg_temp.try_as(uid uuid, q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    perform set_config('request.jwt.claims', '', true);
+    return 'DENIED:' || SQLERRM;
+  end;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return 'OK';
+end $$;
+
+-- Ein wohlgeformter Satz Werte. Jede Probe unten verbiegt genau einen davon.
+-- Die Laengen sind nicht gegriffen: 512 Hex-Zeichen = 256 Byte RSA-2048-Chiffrat,
+-- 24 Base64-Zeichen = 16 Byte AES/CBC-IV, 344 = dieselben 256 Byte.
+create function pg_temp.iv() returns text language sql immutable as
+  $$ select repeat('A', 22) || '==' $$;
+create function pg_temp.skey() returns text language sql immutable as
+  $$ select repeat('A', 342) || '==' $$;
+create function pg_temp.url(v text) returns text language sql immutable as
+  $$ select 'https://abcdefghijklmnop.supabase.co/storage/v1/object/public/ota-buendel/' || v || '.bin' $$;
+
+-- ── 1–3. Der Bucket ─────────────────────────────────────────────────────────
+
+select is(
+  (select public from storage.buckets where id = 'ota-buendel'),
+  true,
+  'Bucket ota-buendel ist oeffentlich — im Buendel steht dasselbe dist/, das '
+  'Pages ohnehin an jeden ausliefert');
+
+select is(
+  (select file_size_limit from storage.buckets where id = 'ota-buendel'),
+  8388608::bigint,
+  'Bucket ota-buendel begrenzt auf 8 MiB — Fangnetz gegen einen entgleisten '
+  'Upload, nicht gegen mitgelieferte Sourcemaps');
+
+select is(
+  (select allowed_mime_types from storage.buckets where id = 'ota-buendel'),
+  array['application/octet-stream'],
+  'Bucket ota-buendel nimmt nur application/octet-stream — es liegt ein '
+  'AES-Chiffrat darin, kein Zip');
+
+-- ── 4–5. Warum der Bucket ohne Policy auskommt ──────────────────────────────
+-- Die Migration legt bewusst KEINE Policy an. Das ist nur dann richtig, wenn
+-- der Veroeffentlichungs-Schritt sowohl die RLS umgeht ALS AUCH die Rechte auf
+-- der Tabelle haelt. Beides einzeln — ein RLS-Bypass allein verleiht keine
+-- Rechte, und die Zusage waere gruen, waehrend der Upload zur Laufzeit an
+-- „permission denied" scheitert (Befund Fremd-Review, MEDIUM).
+
+select is(
+  (select rolbypassrls from pg_roles where rolname = 'service_role'),
+  true,
+  'service_role umgeht RLS — die eine Haelfte der Begruendung, warum '
+  'ota-buendel keine Schreib-Policy braucht');
+
+select is(
+  (select string_agg(distinct privilege_type, ',' order by privilege_type)
+     from information_schema.role_table_grants
+    where table_schema = 'storage' and table_name = 'objects'
+      and grantee = 'service_role'
+      and privilege_type in ('INSERT', 'SELECT', 'UPDATE', 'DELETE')),
+  'DELETE,INSERT,SELECT,UPDATE',
+  'service_role haelt alle vier Schreib-/Leserechte auf storage.objects — die '
+  'andere Haelfte; ohne sie scheitert der Upload erst zur Laufzeit');
+
+-- ── 6–7. Kein Client kann in den Bucket schreiben ───────────────────────────
+-- Policies gelten der GEMEINSAMEN Tabelle storage.objects, nicht einem Bucket.
+-- Dass diese Migration keine Policy anlegt, heisst also NICHT, dass keine
+-- greift — eine bestehende, nicht bucket-gebundene Policy taete es (Befund
+-- Fremd-Review, MEDIUM). Deshalb wird es gemessen und nicht gefolgert.
+--
+-- §6 ist die Kontrolle zu §7: dieselbe Anweisung ohne RLS. Ohne sie waere ein
+-- Tippfehler von einer Abweisung nicht zu unterscheiden.
+
+select lives_ok($$
+  insert into storage.objects (bucket_id, name) values ('ota-buendel', 'kontrolle.bin')
+$$, 'Kontrolle: die Anweisung selbst ist wohlgeformt — ohne RLS geht sie durch');
+
+select alike(
+  pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d'::uuid,
+    $$insert into storage.objects (bucket_id, name)
+      values ('ota-buendel', 'fremd.bin')$$),
+  'DENIED:%',
+  'ein angemeldeter Client kann NICHT in ota-buendel schreiben — keine Policy '
+  'des Bestands greift auf diesen Bucket');
+
+-- ── 8–16. Die Tabelle und die Bedingungen an ihren Spalten ──────────────────
+
+select has_table('public', 'ota_buendel',
+  'ota_buendel existiert — ohne diese Zusage waeren die Nullen in §18/§19 auch '
+  'bei einem Tippfehler im Tabellennamen gruen');
+
+select lives_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+8fbc49b', pg_temp.url('0.0.0+8fbc49b'),
+          repeat('a', 512), pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0')
+$$, 'Positivkontrolle: ein wohlgeformtes Buendel wird angenommen — mit den '
+    'Laengen, die das Plugin wirklich verlangt');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+aaaaaaa', pg_temp.url('a'), repeat('a', 1024),
+          pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0')
+$$, '23514', null,
+  'ein Chiffrat aus einem 4096-Bit-Schluessel (1024 Hex-Zeichen) wird '
+  'abgewiesen — das Plugin verlangt 256 Byte, also RSA-2048');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+bbbbbbb', pg_temp.url('b'), repeat('a', 512),
+          pg_temp.skey(), '1.0.0')
+$$, '23514', null,
+  'ein sessionKey ohne Doppelpunkt wird abgewiesen — ohne IV haelt das Plugin '
+  'die Verschluesselung fuer abgeschaltet und entpackt Chiffrat');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+ccccccc', pg_temp.url('c'), repeat('a', 512),
+          'aXY=:c2Vzc2lvbktleQ==', '1.0.0')
+$$, '23514', null,
+  'ein sessionKey der FORM nach richtig, aber mit falschen Laengen wird '
+  'abgewiesen — 2-Byte-IV und 10-Byte-Schluessel sind auf dem Geraet unbrauchbar');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0', pg_temp.url('d'), repeat('a', 512),
+          pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0')
+$$, '23514', null,
+  'eine Fassung ohne +<SHA> wird abgewiesen — zwei Deploys derselben Semver '
+  'kollidierten sonst am Primaerschluessel');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('01.4.0+eeeeeee', pg_temp.url('e'), repeat('a', 512),
+          pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0')
+$$, '23514', null,
+  'eine fuehrende Null in der Fassung wird abgewiesen — `01.4.0` ist kein '
+  'gueltiges Semver');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+fffffff', 'https://beliebiger-fremder-host.test/buendel.bin',
+          repeat('a', 512), pg_temp.iv() || ':' || pg_temp.skey(), '1.0.0')
+$$, '23514', null,
+  'eine URL auf einen fremden Host wird abgewiesen — eine Manifest-Zeile darf '
+  'Geraete nicht anderswohin schicken');
+
+select throws_ok($$
+  insert into public.ota_buendel (version, url, checksum, session_key, benoetigte_schale)
+  values ('0.0.0+9999999', pg_temp.url('g'), repeat('a', 512),
+          pg_temp.iv() || ':' || pg_temp.skey(), '2')
+$$, '23514', null,
+  'eine ganzzahlige Vertragsnummer wird abgewiesen — derselbe Wert wird auf '
+  'dem Geraet als Semver geparst, und `2` liesse currentVersionNative auf 0.0.0');
+
+-- ── 17–20. Die Tabelle ist fuer Clients unerreichbar ────────────────────────
+-- Dieselbe Aussage wie grants_test.sql §4 fuer activation_tokens, und aus
+-- demselben Grund ausgeschrieben: eine Abwesenheit ist von einem vergessenen
+-- Eintrag nicht zu unterscheiden.
+
+select is(
+  (select relrowsecurity from pg_class where oid = 'public.ota_buendel'::regclass),
+  true,
+  'ota_buendel hat RLS an');
+
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'public' and tablename = 'ota_buendel'),
+  0,
+  'ota_buendel hat bewusst KEINE Policy — deny-by-default ist hier das Feature');
+
+select is(
+  (select count(*)::int from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'ota_buendel'
+      and grantee in ('anon', 'authenticated')),
+  0,
+  'ota_buendel traegt fuer anon/authenticated KEIN einziges Recht — der '
+  'Auslieferungsweg ist fuer Clients nicht beschreibbar');
+
+-- Gegenprobe zur Zeile darueber: misst die Abfrage ueberhaupt etwas? Ohne sie
+-- waere die Null auch dann gruen, wenn `role_table_grants` hier gar nichts
+-- zurueckgibt. `profiles` traegt gemessen SELECT fuer authenticated.
+select cmp_ok(
+  (select count(*)::int from information_schema.role_table_grants
+    where table_schema = 'public' and table_name = 'profiles'
+      and grantee in ('anon', 'authenticated')),
+  '>', 0,
+  'Gegenprobe: dieselbe Abfrage zaehlt auf profiles sehr wohl Rechte');
+
+select * from finish();
+rollback;

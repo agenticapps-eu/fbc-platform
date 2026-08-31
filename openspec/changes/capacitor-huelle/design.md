@@ -245,12 +245,20 @@ Was dafür spricht, über „steht schon" hinaus:
   `stripe-webhook`, `send-activation` und `notify-contact-request`, jeweils mit
   ausgeschriebener Begründung. Ein Gerät hat kein JWT; der Endpunkt muss ohne
   auskommen.
-- **Öffentlich ist kein Zugeständnis** — aber aus einem anderen Grund, als hier
-  zunächst stand. Die erste Fassung dieses Absatzes behauptete, das Bündel sei
-  „dasselbe `dist/`, das Pages ohnehin ausliefert". **Das ist falsch:** mit
-  gesetztem `publicKey` liegt im Bucket **Chiffrat**, kein lesbares `dist/`
-  (siehe oben). Der Schutz kommt also nicht nur aus der Echtheitsprüfung,
-  sondern die Datei ist überhaupt nur mit dem öffentlichen Schlüssel lesbar.
+- **Öffentlich ist kein Zugeständnis** — und dieser Absatz hat die Begründung
+  dafür am 31.08. **zweimal** gewechselt. Die erste Fassung sagte „dasselbe
+  `dist/`, das Pages ohnehin ausliefert"; die zweite verwarf das und setzte auf
+  die Verschlüsselung, weil im Bucket Chiffrat liegt. **Die zweite war die
+  schlechtere.** Ein Fremd-Review am Diff hat sie widerlegt: der öffentliche
+  Schlüssel steckt in jeder ausgelieferten App, und der `sessionKey` kommt vom
+  Aktualisierungs-Endpunkt, der ohne JWT antwortet. Wer beides holt,
+  entschlüsselt das Bündel. **Die Verschlüsselung trägt Echtheit, nicht
+  Vertraulichkeit.**
+
+  Es gilt also wieder die erste Fassung, und sie war nie falsch, nur unbelegt:
+  im Bündel steht der Inhalt, den Pages ohnehin an jeden ausliefert. Es gibt
+  hier nichts zu verbergen. Zu schützen ist allein, dass niemand ANDEREN Code
+  unterschiebt — und das leistet die Signatur, nicht der Bucket.
 
 **Die Falle dabei, und sie ist still:** fehlt der `config.toml`-Block zu einer
 Function, gilt `verify_jwt = true`. Das Gateway antwortet dann mit 401, **bevor**
@@ -287,7 +295,9 @@ Der Mechanismus, aus `CryptoCipher.java` und `CryptoCipher.swift`:
   **Prüfsumme** wird so entschlüsselt (`decryptChecksum`).
 
 RSA rückwärts also: was der private Schlüssel verschlossen hat, öffnet nur der
-passende öffentliche. Das ergibt Echtheit **und** Vertraulichkeit — aber es
+passende öffentliche. Das ergibt **Echtheit**. Vertraulichkeit ergibt es
+**nicht**: der öffentliche Schlüssel ist öffentlich, und der `sessionKey` kommt
+über einen Endpunkt ohne JWT — wer beides hat, liest mit. Aber es
 heisst auch, dass **im Bucket kein lesbares `dist/` liegt, sondern Chiffrat.**
 
 **Formatfalle:** beide Plattformen prüfen ausdrücklich auf
@@ -295,6 +305,24 @@ heisst auch, dass **im Bucket kein lesbares `dist/` liegt, sondern Chiffrat.**
 `CryptoCipher.swift:241`). Der Normalfall von `openssl rsa -pubout` ist PKCS#8
 (`-----BEGIN PUBLIC KEY-----`) und wird mit „The public key is not a valid RSA
 Public key" abgewiesen.
+
+**Längenfalle — gemessen am 31.08., nachmittags.** Die Schlüssellänge ist
+nicht frei: `decryptChecksum` bricht ab, wenn das Chiffrat der Prüfsumme
+**nicht genau 256 Byte** lang ist (`CryptoCipher.java:254`,
+`CryptoCipher.swift:74`, beide mit derselben Meldung „Checksum is not RSA
+encrypted"). 256 Byte heißt **RSA-2048**, und nichts anderes ist zulässig. Ein
+4096-Bit-Schlüssel liefert 512 Byte und macht jedes Bündel unbrauchbar — still,
+denn die Prüfsumme ist Pflicht, sobald ein `publicKey` gesetzt ist: das Bündel
+lädt, die Prüfung scheitert, das Gerät bleibt auf der alten Fassung. Genau ein
+solcher Schlüssel lag am Vormittag desselben Tages in Infisical, dreifach
+belegt — die drei Belege prüften Format, Übertragung und Rundlauf, und ein
+Rundlauf gelingt mit jeder Länge.
+
+**Und die Prüfsumme meint das Klartext-Zip.** Das Plugin entschlüsselt zuerst
+und rechnet dann (`CapgoUpdater.java:851-856`). Verschlüsselt und übertragen
+werden die **32 rohen Digest-Bytes**; das Gerät hext sie selbst auf und
+vergleicht mit `calcChecksum`, das Kleinbuchstaben-Hex liefert. Wer die SHA-256
+über die hochgeladene Datei bildet, liefert die falsche Zahl.
 
 **Der Unterschied, auf den es ankommt, ist Integrität gegen Echtheit.** Eine
 blanke Prüfsumme belegt, dass das Zip unterwegs nicht beschädigt wurde. Sie
@@ -350,6 +378,7 @@ Rumpf, den die Schale an `updateUrl` schickt, steht in `CapgoUpdater.java`
 | **Feld** | **`version_build`.** Es kommt auf **beiden** Plattformen aus `plugins.CapacitorUpdater.version` — Android `CapacitorUpdaterPlugin.java:725`, iOS `CapacitorUpdaterPlugin.swift:268` — und fällt sonst auf die Marketing-Version zurück. `custom_id` scheidet aus: es wird aus **JavaScript** gesetzt (`setCustomId`) und in Preferences gehalten, die Web-Schicht erklärte also ihren eigenen Vertrag. `version_code` ist die Store-Build-Nummer, `plugin_version` capgos eigene. |
 | **Stempelstelle** | **`plugins.CapacitorUpdater.version` in `capacitor.config.ts`.** Der Beleg, auf den es ankommt: `capacitor.config.json` liegt in `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`, nicht darin. OTA tauscht `public/`; die Nummer ist damit unabweisbar Sache der Schale und nur über den Store änderbar. Und sie ist **nicht** die App-Version: zwei Store-Builds derselben Version können verschiedene Plugin-Mengen haben, und genau dieser Fall ist der Anlass. |
 | **Regel** | die Nummer steigt in **jedem** Pull Request, der ein Plugin hinzufügt, entfernt oder seine native Fassung hebt — und ein solcher Pull Request geht über den Store. |
+| **Form** | **semver-förmig**, also `1.0.0` → `2.0.0`, nicht `1` → `2`. Gemessen am 31.08.: `version_build` wird zwar unvalidiert durchgereicht, aber **derselbe** Config-Wert wird eine Zeile später als Semver geparst (`CapacitorUpdaterPlugin.java:730`, `.swift:262`). Eine blanke Zahl liesse `currentVersionNative` auf iOS still auf `0.0.0` stehen, und die Verzögerungslogik rechnete mit dem falschen Wert. Der Vergleich im Endpunkt ist deshalb zahlenweise über `string_to_array(…, '.')::int[]` — ein Zeichenkettenvergleich stellte `10.0.0` vor `9.0.0`. |
 
 **Der Preis, benannt:** belegt die Vertragsnummer `version_build`, trägt dieses
 Feld nicht mehr die Marketing-Version. Sie bleibt über `version_code` sichtbar,

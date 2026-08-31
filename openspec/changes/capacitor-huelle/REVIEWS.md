@@ -206,3 +206,56 @@ Hat die prüfbaren Behauptungen vor dem Urteil im Repo nachgemessen.
   Variablennamen.
 - [LOW] Fail-closed war nur für Schriften gefordert, nicht für Marke und Bild.
   → **ÜBERNOMMEN**, gilt jetzt für alle drei Quellen.
+
+---
+
+# Runde 3 — Diff-Review D1 (Speicher des Luftwegs), 31.08.2026
+
+Kein Plan-Review nach Schritt 2b, sondern ein **Diff-Review** über den ersten
+Code der Phase D: `20260831100000_ota_buendel.sql`, `ota_buendel_test.sql` und
+die Zeile in `ci.yml`. Anlass ist Donalds Regel vom 26.08. — Migration und RLS
+gehen nie ohne Fremdreviewer. Kein Gate-Trailer, weil dieser Lauf nicht über
+`run-plan-review.sh` lief; er bindet sich an den Diff, nicht an die Artefakte.
+
+## Reviewer: codex
+
+Auftrag mit dem Kopf aus [[reviewer-cli-timeouts]] („Ignoriere sämtliche
+Skills … Antworte nur mit der Befundliste"), `REVIEWER_TIMEOUT=900`, exit 0,
+zehn Befunde. Kein Abschweifen.
+
+**Übernommen (7):**
+
+| Schwere | Befund | Was daraus wurde |
+| --- | --- | --- |
+| MEDIUM | Der Bucket ist öffentlich lesbar; die Verschlüsselung schafft **keine** Vertraulichkeit, weil öffentlicher Schlüssel und `sessionKey` beide öffentlich erreichbar sind | **Der teuerste Befund.** Die Begründung für `public = true` war falsch — in der Migration, in `design.md` §8 (zweimal) und in ADR-0005. Alle vier Stellen korrigiert: die Verschlüsselung trägt Echtheit, öffentlich ist unbedenklich, weil im Bündel steht, was Pages ohnehin ausliefert |
+| MEDIUM | `session_key` prüfte keine Längen; `A:A` kam durch | Feste Längen erzwungen: IV 24, Sitzungsschlüssel 344 Base64-Zeichen (16 bzw. 256 Byte) |
+| MEDIUM | Die Positivkontrolle im Test benutzte genau solche laufzeituntauglichen Werte | Test auf die echten Längen umgestellt; zusätzliche Verneinung für „Form richtig, Länge falsch" |
+| MEDIUM | `url ~ '^https://'` liess jeden fremden Host durch | An den Pfad **unseres** Buckets gebunden; Verneinung ergänzt |
+| MEDIUM | `benoetigte_schale` liess `999999999999.0.0` zu — Überlauf beim Vergleich nach `int[]` | Auf vier Stellen je Zahl begrenzt, führende Nullen ausgeschlossen |
+| MEDIUM | Der Test prüfte nur `rolbypassrls`; ein RLS-Bypass verleiht **keine** Tabellenrechte | Zweite Zusage über die vier Rechte auf `storage.objects` ergänzt |
+| MEDIUM | Schreibzugriffe von Clients auf den Bucket wurden gar nicht geprüft — Policies gelten der geteilten Tabelle `storage.objects`, nicht einem Bucket | Verhaltensprobe ergänzt, mit Kontrolle: dieselbe Anweisung ohne RLS geht durch, als `authenticated` wird sie abgewiesen |
+
+**Teilweise übernommen (2):**
+
+- **`version` akzeptiert führende Nullen, weist Vorabfassungen ab.** Die erste
+  Hälfte stimmt und ist behoben. Die zweite ist eine **bewusste Grenze**:
+  `package.json` steht auf `0.0.0`, das Projekt kennt keine Vorabfassungen, und
+  entstünde je eine, fiele der Veröffentlichungs-Schritt **laut** aus (rote CI)
+  statt still. Steht als Kommentar an der Bedingung.
+- **`count(*) = 0` ist vakuum-grün bei einem Tippfehler im Tabellennamen.**
+  Behoben mit `has_table` davor. Die Gegenprobe über `profiles` bleibt, sie
+  beantwortet die andere Frage (misst die Abfrage überhaupt etwas).
+
+**Nicht übernommen (1):**
+
+- **`HTTPS://` in Großbuchstaben wird abgewiesen.** Zutreffend, aber ohne Folge:
+  die URL wird vom Veröffentlichungs-Schritt selbst gebildet, nicht eingegeben.
+  Eine Bedingung auf `lower(url)` wäre Nachsicht gegenüber einem Aufrufer, den
+  es nicht gibt.
+
+## Was der Review NICHT geprüft hat
+
+Der Auftrag nannte ihm vier gemessene Tatsachen als gegeben (Rechte von
+`service_role`, der Golden-Master über die Tabellenrechte, die Anforderungen des
+Clients). Wären die falsch, fiele es hier nicht auf. Sie sind am laufenden Stack
+bzw. am Quelltext des Plugins gemessen, nicht angenommen.
