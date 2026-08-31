@@ -1,4 +1,4 @@
-# Session Handoff — 2026-08-31 (AGE-642: PR #299 ist gemerged, PROD wartet auf migrate-prod)
+# Session Handoff — 2026-08-31 (AGE-642: der Luftweg ist auf PROD live, D5 ist dran)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -21,24 +21,29 @@ Change `capacitor-huelle`: **31 offen, 87 erledigt.** Linear steht auf
 *In Progress* (die Automation hatte beim Merge auf *Done* gekippt,
 zurückgesetzt um 13:33).
 
-## 🔴 ERSTER HANDGRIFF: `migrate-prod` dispatchen
+## ✅ Der Luftweg steht auf PROD — am lebenden Endpunkt belegt
 
-**Der Deploy auf `main` ist rot** (Lauf `33397608024`), und zwar genau am
-vorhergesagten Punkt. `drift-gate` meldet wörtlich:
+`migrate-prod` ist gelaufen (Lauf `33421851095`, `plan` und `apply` grün, auf
+`e8a2abc`), danach der Deploy neu gefahren (`33397608024`): **drift-gate,
+migrate-dev, functions, deploy — alle vier grün.** Der Dispatch ging über
+Donalds Hand; der Auto-Mode-Klassifikator blockt Schreibwege auf PROD.
 
-```
-DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831100000
-DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831140000
-DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260831160000
-```
+**Sichtprobe am 31.08. gegen `viwntbodrtqxgmqyxluh` (PROD):**
 
-`functions` und `deploy` sind übersprungen. **Die Web-Fläche steht damit auf dem
-Stand vor dem Merge** — nichts ist kaputt, aber nichts ist auch live. Erst
-`migrate-prod`, dann den Deploy erneut fahren.
+| Endpunkt | Antwort |
+|---|---|
+| `ota-update` | **HTTP 200**, bietet `0.0.0+e8a2abcdcb21` an — der Merge-Commit — mit `url` und `checksum` |
+| `ota-channel` | HTTP 400 `channel_not_supported`, wie vorgesehen |
+| `ota-stats` | HTTP 200 `{"status":"ok"}` |
+| das Bündel selbst | HTTP 200, **2 997 808 B**, öffentlich abrufbar |
 
-**Dispatchen heisst anwenden** — `migrate-prod` fragt nicht nach. Ein Deploy
-auf altem Commit rollt zurück; also den Lauf auf `e8a2abc` neu starten, keinen
-alten Re-Run.
+Damit ist die offene Frage „der Weg über das Netz bleibt ungeprüft" **erledigt**
+— Upload, RPC-Aufruf, Manifest und alle drei Endpunkte tragen. Ungeprüft ist
+nur noch, was ein echtes Gerät damit macht.
+
+**Randnotiz ausserhalb AGE-642:** `docs/prod-neuaufbau-plan.md:31-32` beschreibt
+noch den Stand vor der Umschaltung vom 24.08. und nennt `foelowldexkcqzewvrcf`
+als das Projekt der Live-Fläche. Das stimmt seitdem nicht mehr.
 
 ## Accomplished — Review-Runde 6 und der Merge
 
@@ -91,17 +96,16 @@ Quellenangaben korrigiert) · `src/lib/ota.test.ts` (7 Zusagen statt 3) ·
 
 ## Next session: start here
 
-1. **`migrate-prod` dispatchen** (siehe oben), dann den Deploy auf `e8a2abc`
-   neu fahren und `drift-gate` grün sehen.
-2. **Branch nachziehen:** `main` trägt den Squash, der lokale Branch die 24
-   Einzelcommits. Vor der nächsten Zeile Code rebasieren.
-3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
-   live geschalteten Luftweg braucht.
+**Erster Handgriff: D5, der Gerätebeleg.** Die Voraussetzung dafür — ein live
+geschalteter Luftweg — ist seit dem 31.08. erfüllt und oben belegt. Das Gerät
+soll `0.0.0+e8a2abcdcb21` ziehen, öffnen und in Betrieb nehmen; und bei
+falscher Prüfsumme auf der laufenden Fassung bleiben.
+
+Der Branch ist bereits auf den Squash nachgezogen (`git reset origin/main`,
+Inhalt war deckungsgleich) — es liegt nichts Ungesichertes herum.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
-  Endpunkte. Sichtbar wird er erst mit dem Deploy auf `main`.
 - **Kein einziger Beleg stammt von einem Gerät.** Belegt ist unsere Hälfte:
   sieben Zusagen, jede einzeln durch eine Mutation gegengeprüft (alte Bauart,
   `if (!nativ)`, top-level `await`, Beobachter entfernt, Import aus `main.tsx`
