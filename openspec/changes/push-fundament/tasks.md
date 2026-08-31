@@ -185,6 +185,43 @@ Issue. Siehe `REVIEWS.md`.
       `APNS_TEAM_ID`, `APNS_BUNDLE_ID` (`com.effbeezee.app`), `APNS_SANDBOX=1`.
       Derselbe `.p8` gehört später byte-gleich nach `prod` — Apple kennt keinen
       umgebungsspezifischen Auth-Key —, dort aber **ohne** `APNS_SANDBOX`.
+      **Nachtrag 31.08.: der letzte Halbsatz war eine Fehlplanung**, und was
+      daraus folgte, steht zwei Zeilen tiefer.
+- [x] **PROD scharf geschaltet** (31.08.). Alle sechs Werte im
+      Function-Secret-Store von `viwntbodrtqxgmqyxluh`, per SHA-256 gegen DEV
+      geprüft: byte-gleich. Beleg: eine zurückgesetzte Zustellung ging
+      `zugestellt` durch, **0 Versuche**. Vorher standen dort drei Zeilen
+      `aufgegeben` mit `apns_nicht_konfiguriert` — Push hatte auf PROD nie
+      funktioniert. Ein Redeploy war nicht nötig.
+- [x] **Der Host wird am Anbieter erkannt, nicht an der Konfiguration**
+      (Entscheidung Donald, 31.08.: *„das muss das System, basierend auf dem
+      Input"*). `apnsMitHostErkennung` in `anbieter.ts`: antwortet der zuerst
+      gefragte Host `BadDeviceToken`, wird derselbe Versand am anderen Host
+      wiederholt, und dessen Ergebnis gilt.
+      **Warum der Plan oben nicht trug:** `APNS_SANDBOX` hat einen Wert, und
+      sobald Entwicklungs- und Store-Builds nebeneinander laufen, gibt es zwei
+      Wahrheiten. Der Preis eines Irrtums ist nicht eine ausgefallene
+      Zustellung, sondern ein **gelöschtes Gerätetoken** — `BadDeviceToken`
+      gilt als dauerhaft. Das Mitglied wäre still von allen Hinweisen
+      abgemeldet und hätte sich beim nächsten App-Start wieder geheilt: ein
+      Fehlerbild, das wie Sporadik aussieht und keines ist.
+      **`APNS_SANDBOX` bleibt, bedeutet aber etwas anderes:** nur noch die
+      Vermutung, welcher Host häufiger stimmt. Sie spart einen Weg und
+      entscheidet nichts.
+      **7 Deno-Zusagen, jede einzeln durch eine Mutation gegengeprüft** —
+      Ausweichen entfernt · Bedingung entfernt · erstes statt zweites Ergebnis ·
+      zweimal derselbe Host · `index.ts` ruft die Erkennung nicht auf ·
+      `index.ts` ignoriert den erkannten Host · weicht immer aus. Die letzte
+      war nötig, weil die Erfolgs-Zusage sonst von keiner Mutation gerötet
+      wurde und damit nichts belegt hätte.
+      **Und eine Zusage war zuerst falsch:** die Verdrahtungsprüfung suchte den
+      blossen Namen `apnsMitHostErkennung` und blieb grün, als die Mutation den
+      Aufruf entfernte — der Name stand ja noch im Import. Sie prüft jetzt den
+      Aufruf (`apnsMitHostErkennung(ersterHost,`) und dass der erkannte Host
+      auch benutzt wird (`apnsEndpunkt(host,`).
+- [ ] **`APNS_SANDBOX` von PROD nehmen, sobald ein Store-Build läuft.** Heute
+      steht es dort auf `1`, weil das einzige Gerät ein Xcode-Build ist — die
+      Erkennung fängt den Irrtum ohnehin ab, aber die Vermutung soll stimmen.
 - [x] **APNs gegen den echten Anbieter gemessen.** Sandbox und Produktion
       antworten `400 BadDeviceToken` auf ein erfundenes Token: authentifiziert,
       nur das Token verworfen. Belegt damit `apnsJwt`, `importierePkcs8`, die

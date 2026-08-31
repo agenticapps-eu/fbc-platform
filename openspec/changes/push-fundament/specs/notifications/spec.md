@@ -236,6 +236,46 @@ anderen Fläche abhängen, die für Zustellung nicht einsteht.
 - **THEN** bleibt das Gerätetoken bestehen
 - **AND** die Zustellung wird zurückgestellt statt aufgegeben
 
+### Requirement: Zu welcher APNs-Umgebung ein Gerätetoken gehört, entscheidet der Anbieter
+
+Ein Gerätetoken stammt entweder aus Apples Sandbox (Entwicklungsbuild) oder aus
+der Produktion (TestFlight, App Store), und **dem Token sieht man das nicht an**
+— beide sind 64 Hex-Zeichen. Das System SHALL den Host deshalb an der Antwort
+erkennen und nicht an seiner Konfiguration festlegen.
+
+Eine feste Zuordnung kann das nicht leisten, sobald beide Buildsorten
+gleichzeitig unterwegs sind: sie hat einen Wert, und es gibt zwei Wahrheiten.
+Der Preis eines Irrtums ist zudem nicht bloß eine ausgefallene Zustellung —
+`BadDeviceToken` gilt als dauerhaft und **entfernt das Gerätetoken**, meldet das
+Mitglied also still von allen Hinweisen ab.
+
+#### Scenario: Ein Token der anderen Umgebung wird trotzdem zugestellt
+
+- **WHEN** der zuerst gefragte APNs-Host das Gerätetoken mit `BadDeviceToken`
+  ablehnt
+- **THEN** wird dieselbe Nachricht ein zweites Mal versucht, am jeweils anderen
+  Host
+- **AND** dessen Ergebnis gilt — gelingt es, ist die Zustellung erfolgreich und
+  das Gerätetoken bleibt bestehen
+
+#### Scenario: Ein wirklich unbekanntes Token wird weiterhin entfernt
+
+- **WHEN** beide APNs-Hosts das Gerätetoken mit `BadDeviceToken` ablehnen
+- **THEN** gilt die Zustellung als dauerhaft gescheitert
+- **AND** das Gerätetoken wird entfernt
+
+#### Scenario: Nur `BadDeviceToken` löst einen zweiten Host aus
+
+- **WHEN** der Anbieter mit einem anderen Grund antwortet — sei er dauerhaft
+  (`Unregistered`, `DeviceTokenNotForTopic`) oder vorläufig (Ausfall, Drosselung)
+- **THEN** wird kein zweiter Host gefragt
+- **AND** die Einstufung dieses einen Versuchs gilt unverändert
+
+#### Scenario: Gelingt der erste Versuch, gibt es keinen zweiten
+
+- **WHEN** der zuerst gefragte Host die Nachricht annimmt
+- **THEN** wird genau eine Anfrage an Apple gestellt
+
 #### Scenario: Ein Typ, der nicht gepusht wird, erzeugt keine Zustellung
 
 - **WHEN** ein Hinweis eines Typs entsteht, der in der Zuordnung auf „nicht
