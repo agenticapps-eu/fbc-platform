@@ -620,45 +620,80 @@ nicht wiederholt.
       einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
       Auswahl ist genau der Teil, den kein Test im Browser je berührt.
 
-## Phase D — OTA · selbst gehostet auf Cloudflare
+## Phase D — OTA · selbst gehostet auf Supabase
+
+> **Korrigiert am 31.08.** Diese Phase stand bis dahin auf Cloudflare Pages
+> Functions plus R2. Sie liegt jetzt auf **Supabase** — Begründung in
+> `design.md` §8, kurz: die einzige Begründung für R2 lautete „steht bereits"
+> und war gemessen falsch. R2 stand nie; Supabase Storage steht mit vier
+> Buckets. Wer eine ältere Fassung dieser Datei gelesen hat, hat einen
+> R2-Bucket erwartet, den es nicht gibt.
 
 ### D1. Der Weg, auf dem ein Bündel entsteht
 
 Ohne diesen Schritt gibt es drei Endpunkte, die Anfragen beantworten, und nichts,
 was das System je befüllt.
 
-- [ ] Veröffentlichungs-Schritt: `dist/` zu einem Zip mit `index.html` an der
-      Wurzel, SHA-256 bilden, mit dem **privaten** Schlüssel signieren, Zip nach
-      R2 laden, Manifest registrieren (Fassung, URL, Prüfsumme,
-      Vertragsnummer der Schale).
-- [ ] **Den Anlass festlegen, nicht nur den Schritt.** `deploy.yml` baut Web,
-      der native Workflow läuft von Hand — dazwischen gibt es heute nichts, das
-      ein Bündel veröffentlichte. Ohne einen benannten Auslöser (Vorschlag: bei
-      jedem Deploy auf `main`) erreichen Web-Änderungen nie ein Gerät, und die
-      zentrale Zusage der Spec wäre **per Konfiguration** unerfüllbar.
-- [ ] **Fassungsschema festlegen:** welcher Commit ergibt welche Bündel-Fassung,
-      und was gilt, wenn ein Store-Bau und ein `main`-Deploy sich überholen.
+- [ ] Bucket **per Migration** anlegen, nach dem Muster der vier bestehenden:
+      `public = true`, `file_size_limit`, `allowed_mime_types`
+      `application/zip`. Gemessene Größe je Bündel: **2,71 MB** ohne Sourcemaps
+      (4,43 MB mit). Öffentlich ist hier kein Zugeständnis — es ist dasselbe
+      `dist/`, das Pages ohnehin dem ganzen Internet ausliefert; der Schutz
+      kommt aus der Signatur, nicht aus der Zugriffskontrolle.
+- [ ] Manifest **per Migration** als Tabelle: Fassung, URL, Prüfsumme,
+      Vertragsnummer der Schale. Mit RLS, die dem Endpunkt das Lesen erlaubt und
+      das Schreiben niemandem außer dem Veröffentlichungs-Schritt.
+- [ ] Veröffentlichungs-Schritt in `deploy.yml`: `dist/` zu einem Zip mit
+      `index.html` an der Wurzel und **ohne `.map`-Dateien**, SHA-256 bilden,
+      mit dem **privaten** Schlüssel signieren, in den Bucket laden,
+      Manifest-Zeile schreiben. Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus
+      Infisical — der Job fährt ohnehin über `infisical run`.
+- [x] **Anlass festgelegt** (Donald, 31.08.): jeder Deploy auf `main`. Derselbe
+      Job, der `dist/` schon baut und zu Pages lädt. Jeder andere Anlass hieße,
+      dass ein vergessener Auslöser Geräte **still** zurücklässt.
+- [x] **Fassungsschema festgelegt** (Donald, 31.08.): `<Semver aus
+      package.json>+<kurzer SHA>`, z. B. `1.4.0+8fbc49b`. Beantwortet zugleich,
+      was gilt, wenn Store-Bau und `main`-Deploy sich überholen: verschiedene
+      SHAs, also verschiedene Fassungen.
 - [ ] Signaturschlüsselpaar erzeugen; **privaten Schlüssel nach Infisical**,
-      öffentlichen als `publicKey` in die Konfiguration.
+      öffentlichen als `publicKey` in die Konfiguration. Der Infisical-Login
+      braucht ein echtes Terminal — dieser Schritt geht nicht aus einer Sitzung
+      heraus.
 
 ### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
 
 Dreimal dieselbe Zahl, dreimal woanders. Wird das nicht festgelegt, erfindet
-jeder Schritt in D3 seine eigene Auslegung.
+jeder Schritt in D3 seine eigene Auslegung. Alle drei sind am 31.08. **am
+Quelltext des Plugins gemessen** worden, nicht geraten.
 
-- [ ] **Feld** benennen, in dem die Schale ihre Nummer an `updateUrl` meldet.
-- [ ] **Stempelstelle** benennen: wo die Schale sie trägt. **Nicht** die
-      App-Version — zwei Store-Builds derselben Version können verschiedene
-      Plugin-Mengen haben, und genau darum geht es.
-- [ ] **Regel** festhalten: die Nummer steigt in **jedem** PR, der ein Plugin
-      hinzufügt, entfernt oder seine native Fassung hebt. Ein solcher PR geht
-      über den Store.
+- [x] **Feld: `version_build`.** Das einzige Feld im POST an `updateUrl`, das auf
+      **beiden** Plattformen aus `plugins.CapacitorUpdater.version` kommt
+      (`CapacitorUpdaterPlugin.java:725`, `CapacitorUpdaterPlugin.swift:268`).
+      `custom_id` scheidet aus: aus **JavaScript** gesetzt (`setCustomId`), die
+      Web-Schicht erklärte damit ihren eigenen Vertrag.
+- [x] **Stempelstelle: `plugins.CapacitorUpdater.version` in
+      `capacitor.config.ts`.** Beleg: `capacitor.config.json` liegt in
+      `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`,
+      nicht darin. OTA tauscht `public/`; die Nummer bleibt der Schale und ist
+      nur über den Store änderbar. Ausdrücklich **nicht** die App-Version.
+- [x] **Regel** festgehalten (`design.md` §8): die Nummer steigt in **jedem** PR,
+      der ein Plugin hinzufügt, entfernt oder seine native Fassung hebt. Ein
+      solcher PR geht über den Store.
 
 ### D3. Endpunkte und Schutz
 
-- [ ] `@capgo/capacitor-updater`; `updateUrl`, `channelUrl`, `statsUrl` in
-      `capacitor.config.ts` auf eigene Endpunkte.
-- [ ] Drei Cloudflare Pages Functions; Bündel-Zips nach R2.
+- [ ] `@capgo/capacitor-updater@8.51.15` hinzufügen. **Nicht `9.x` oder `10.x`**
+      — die tragen die höhere Zahl, fordern aber `@capacitor/core: ^5.0.0`;
+      `latest` ist bewusst `8.51.15`. Nach dem Hinzufügen: `deno install
+      --frozen=false`, danach **zwingend** `pnpm install`, sonst wird der
+      Deno-Job rot.
+- [ ] `updateUrl`, `channelUrl`, `statsUrl` in `capacitor.config.ts` auf die
+      eigenen Endpunkte; dazu `plugins.CapacitorUpdater.version` als
+      Vertragsnummer (D2) und der `publicKey`.
+- [ ] Drei Supabase Edge Functions. **Für jede ein `config.toml`-Block mit
+      `verify_jwt = false`** — fehlt der Block, gilt `true`, und das Gateway
+      antwortet mit 401 **vor** dem Handler. Ein Gerät hat kein JWT, und der
+      Fehler stünde in keinem Log der Function.
 - [ ] **RED**: Test — der Endpunkt liefert ein Bündel **nicht** an eine Schale
       mit zu niedriger Vertragsnummer.
 - [ ] **RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen und die
@@ -670,7 +705,10 @@ jeder Schritt in D3 seine eigene Auslegung.
       Rollback-Verhalten konfigurieren.
 - [ ] **RED**: Test — ein Bündel, das **signiert und gültig** ist, aber beim
       Start scheitert, fällt auf die vorige Fassung zurück.
-- [ ] Das Szenario im Spec-Delta ergänzen. Die bisherige Zusage deckt nur das
+- [x] Das Szenario im Spec-Delta ergänzen. **Erledigt** — gemessen am 31.08.:
+      der `ADDED`-Block in `specs/native-shell/spec.md` trägt die Rückweg-Zusage
+      (Z. 214–221) **und** das Szenario „Ein signiertes, aber defektes Bündel
+      rollt zurück" (Z. 237–242). Die bisherige Zusage deckte nur das
       **unsignierte** Bündel ab; ein signiertes, das startet und dann weiß
       bleibt, bricht ohne diesen Rückweg **jedes** Gerät dauerhaft — bis eine
       neue Schale durch den Store geht. Das ist der teuerste denkbare Fehler

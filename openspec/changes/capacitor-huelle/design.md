@@ -210,8 +210,52 @@ legen. Der `updateUrl` bekommt ein POST mit Geräteangaben und antwortet mit
 `{ version, url, checksum, … }`; unter `url` liegt ein Zip mit `index.html` an
 der Wurzel.
 
-Damit ergibt sich: **Cloudflare Pages Functions** für die drei Endpunkte,
-**R2** für die Bündel-Zips. Beides steht bereits.
+**Fassungsfalle:** `latest` ist `8.51.15` und passt zu Capacitor 8. Es gibt auch
+`9.0.0` und `10.0.0` — die fordern aber `@capacitor/core: ^5.0.0`. Höhere Zahl,
+ältere Zusage; nicht darauf greifen.
+
+### Wo der Dienst wohnt — korrigiert am 31.08.
+
+Bis zum 31.08. stand hier **Cloudflare Pages Functions plus R2**, begründet mit
+einem einzigen Satz: „Beides steht bereits." **Der Satz war falsch.** Gemessen:
+Pages steht (`wrangler pages deploy ./dist --project-name=fbc-platform` in
+`deploy.yml`; `functions/` fährt automatisch mit). **R2 steht nicht** — kein
+`wrangler.toml`, keine Bucket-Bindung, kein Treffer im Repo. Die „R2"-Fundstellen
+sind eine Risiko-Kennung `R2` in `docs/w2-acceptance.md`, also Namensgleichheit.
+
+Supabase Storage steht dagegen wirklich: vier Buckets, **per Migration** angelegt
+mit `public`, `file_size_limit` und `allowed_mime_types`; `avatars` und `covers`
+sind bereits öffentlich. Das Kriterium, mit dem der Entwurf R2 wählte, spricht
+damit gegen R2.
+
+**Entscheidung Donald, 31.08.: alles auf Supabase.** Bündel im Storage-Bucket,
+Manifest als Tabelle, die drei Endpunkte als Edge Functions mit
+`verify_jwt = false`. Das berührt die Entscheidung vom 27.08. nicht — „selbst
+gehostet" war die Wahl **gegen** den bezahlten Ionic-Dienst, nicht für einen
+Anbieter. Supabase ist genauso selbst gehostet wie Cloudflare.
+
+Was dafür spricht, über „steht schon" hinaus:
+
+- **Ein Schlüssel weniger.** `SUPABASE_SERVICE_ROLE_KEY` liegt in Infisical
+  (`docs/secrets.md:132`), und `deploy.yml` fährt ohnehin alles über
+  `infisical run`. Eine Pages Function müsste das Manifest aus Supabase lesen und
+  bräuchte dafür einen Schlüssel in einer zweiten Umgebung — genau die Reibung,
+  die dieser Weg vermeidet.
+- **Der öffentliche Endpunkt ist hier eingespielt.** `verify_jwt = false` tragen
+  `stripe-webhook`, `send-activation` und `notify-contact-request`, jeweils mit
+  ausgeschriebener Begründung. Ein Gerät hat kein JWT; der Endpunkt muss ohne
+  auskommen.
+- **Öffentlich ist kein Zugeständnis.** Das Bündel ist dasselbe `dist/`, das
+  Pages ohnehin dem ganzen Internet ausliefert. Der Schutz kommt aus der
+  Signatur, nicht aus der Zugriffskontrolle.
+
+**Die Falle dabei, und sie ist still:** fehlt der `config.toml`-Block zu einer
+Function, gilt `verify_jwt = true`. Das Gateway antwortet dann mit 401, **bevor**
+der Handler läuft — die Schale sähe einen Fehler, den kein Log der Function
+erklärt.
+
+**Größe, gemessen am 31.08.:** `dist/` gezippt sind **2,71 MB** ohne Sourcemaps
+(4,43 MB mit; die Maps gehen zu Sentry, nicht aufs Gerät).
 
 ### Signieren ist keine Kür
 
@@ -269,11 +313,20 @@ Bündel.
 Eine Nummer, die man nur benennt, ist keine. Festzulegen sind drei Dinge, und
 zwar **vor** der ersten Zeile in Phase D:
 
-| | |
+Alle drei sind am 31.08. **am Quelltext des Plugins gemessen** festgelegt. Der
+Rumpf, den die Schale an `updateUrl` schickt, steht in `CapgoUpdater.java`
+(Z. 1994–2010); genau ein Feld darin taugt.
+
+| | Festgelegt 31.08. |
 | --- | --- |
-| **Feld** | worin die Schale ihre Nummer an `updateUrl` meldet. Das Plugin sendet Geräte- und Fassungsangaben mit; welches Feld diese Nummer trägt, ist eine Festlegung, keine Vorgabe des Plugins. |
-| **Stempelstelle** | wo die Schale die Nummer trägt. **Nicht** die App-Version: zwei Store-Builds derselben Version können verschiedene Plugin-Mengen haben, und genau dieser Fall ist der Anlass. |
+| **Feld** | **`version_build`.** Es kommt auf **beiden** Plattformen aus `plugins.CapacitorUpdater.version` — Android `CapacitorUpdaterPlugin.java:725`, iOS `CapacitorUpdaterPlugin.swift:268` — und fällt sonst auf die Marketing-Version zurück. `custom_id` scheidet aus: es wird aus **JavaScript** gesetzt (`setCustomId`) und in Preferences gehalten, die Web-Schicht erklärte also ihren eigenen Vertrag. `version_code` ist die Store-Build-Nummer, `plugin_version` capgos eigene. |
+| **Stempelstelle** | **`plugins.CapacitorUpdater.version` in `capacitor.config.ts`.** Der Beleg, auf den es ankommt: `capacitor.config.json` liegt in `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`, nicht darin. OTA tauscht `public/`; die Nummer ist damit unabweisbar Sache der Schale und nur über den Store änderbar. Und sie ist **nicht** die App-Version: zwei Store-Builds derselben Version können verschiedene Plugin-Mengen haben, und genau dieser Fall ist der Anlass. |
 | **Regel** | die Nummer steigt in **jedem** Pull Request, der ein Plugin hinzufügt, entfernt oder seine native Fassung hebt — und ein solcher Pull Request geht über den Store. |
+
+**Der Preis, benannt:** belegt die Vertragsnummer `version_build`, trägt dieses
+Feld nicht mehr die Marketing-Version. Sie bleibt über `version_code` sichtbar,
+das die Store-Build-Nummer führt — verloren geht nichts, aber wer die Statistik
+liest, muss die Umwidmung kennen.
 
 ### Und der Rückweg
 
@@ -293,15 +346,29 @@ OTA überhaupt verantwortbar ist.
 Drei Endpunkte beantworten Anfragen; sie erzeugen nichts. Der
 Veröffentlichungs-Schritt gehört ausdrücklich dazu: `dist/` zu einem Zip mit
 `index.html` an der Wurzel, SHA-256 bilden, mit dem privaten Schlüssel
-signieren, nach R2 laden, Manifest registrieren. Ohne ihn steht ein
+signieren, in den Storage-Bucket laden, Manifest registrieren. Ohne ihn steht ein
 Aktualisierungsdienst, den nichts je befüllt.
+
+**Anlass, festgelegt am 31.08.:** jeder Deploy auf `main`. `deploy.yml` baut dort
+ohnehin `dist/` und lädt es zu Pages; der Veröffentlichungs-Schritt hängt sich an
+denselben Job. Jeder andere Anlass hieße, dass ein vergessener Auslöser Geräte
+still zurücklässt — und „still" ist hier das Problem, nicht „zurück".
+
+**Fassungsschema, festgelegt am 31.08.:** `<Semver aus package.json>+<kurzer
+SHA>`, etwa `1.4.0+8fbc49b`. Jede Fassung ist damit eindeutig und auf genau einen
+Commit rückführbar, und zwei Deploys derselben Semver kollidieren nicht. Das
+beantwortet zugleich die offene Frage, was gilt, wenn ein Store-Bau und ein
+`main`-Deploy sich überholen: sie tragen verschiedene SHAs, also verschiedene
+Fassungen, und die Vertragsnummer entscheidet getrennt davon, wer welches Bündel
+bekommt.
 
 ## Verworfene Alternativen
 
 | Verworfen | Warum |
 | --- | --- |
 | Eigenes Repository für die Hülle | Der Web-Build müsste als Artefakt veröffentlicht und drüben eingesammelt werden. Eine Bau-Pipeline ohne Gewinn (Issue, Entscheidung Donald). |
-| Capacitor Live Updates (Ionic, bezahlt) | Entscheidung Donald, 27.08.: selbst gehostet auf Cloudflare. Die Endpunkte sind drei Funktionen; die Infrastruktur steht schon. |
+| Capacitor Live Updates (Ionic, bezahlt) | Entscheidung Donald, 27.08.: selbst gehostet. Die Endpunkte sind drei Funktionen; sie liegen seit dem 31.08. auf Supabase (§8). |
+| Cloudflare Pages Functions + R2 für OTA | Bis 31.08. der Plan. Verworfen, weil seine einzige Begründung — „beides steht bereits" — gemessen falsch war: R2 stand nicht, Supabase Storage steht. Siehe §8. |
 | Vendor-Chunks statt Route-Splitting | Verschiebt Bytes, entfernt keine (siehe §2). |
 | Den Erfolgsradar löschen, um das Bündel zu senken | Er wiegt am Erststart **null**. Die Behauptung des Issues ist widerlegt, nicht umgesetzt. |
 | `framer-motion` aus der Shell lösen (127,2 kB) | Der zweitgrößte Posten, aber er hängt am Aussehen der Navigation. Design-Entscheidung, eigener Change. |
