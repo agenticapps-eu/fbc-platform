@@ -552,7 +552,7 @@ Management-API** — links steht, was in `config.toml` gehört:
 | `site_url` | `https://app.effbeezee.com` | `site_url` | kanonische Domain seit 2026-09-01 (AGE-256) |
 | `additional_redirect_urls` | `app.effbeezee.com`, `…/**`, `fbc-platform.pages.dev/**` | `uri_allow_list` | **kein localhost, kein Preview-Wildcard**; Stand 2026-09-01 (AGE-256) |
 | `minimum_password_length` | `10` | `password_min_length` | echte Mitgliederkonten |
-| `[auth.rate_limit] email_sent` | `30` | `rate_limit_email_sent` | bei `2` blockieren zwei gleichzeitige Zurücksetzungen den Versand für alle |
+| `[auth.rate_limit] email_sent` | `2` | `rate_limit_email_sent` | **nicht anhebbar**, solange Supabase Auth keinen eigenen SMTP kennt — gemessen 2026-08-05: `HTTP 401 Custom SMTP required`. Ziel bleibt `30`; Bedingung und Weg stehen in AGE-684 |
 | `[auth.email] enable_confirmations` | `false` | `mailer_autoconfirm` (invertiert) | **Entscheidung, kein Versehen** — C3 baut den Aktivierungsweg über Resend |
 
 > ⚠️ **Offen, bis gemessen:** ob `config push` Felder, die die Datei nicht
