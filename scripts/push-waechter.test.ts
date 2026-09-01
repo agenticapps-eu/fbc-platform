@@ -189,15 +189,21 @@ describe("bewerteMessung — Stummheit (der Takt läuft, es kommt nichts zurück
     expect(bewerteMessung(m, schwellen)).toEqual([]);
   });
 
-  it("meldet keine Stummheit, wenn gar kein Takt laeuft — das ist Stillstand", () => {
-    // Zwei verschiedene Ursachen, zwei verschiedene erste Handgriffe. Ohne
-    // Takt gibt es nichts, was antworten koennte; „stumm" waere dort eine
+  it("meldet keine Stummheit, wenn der Takt selbst schon stottert", () => {
+    // Zwei verschiedene Ursachen, zwei verschiedene erste Handgriffe. Steht
+    // der Takt, gibt es nichts, was antworten koennte; „stumm" waere dort eine
     // Folgemeldung ohne eigenen Wert.
+    //
+    // Die Zahlen sind mit Bedacht gewaehlt: 10 Laeufe bei 120 erwarteten sind
+    // Stillstand, und null Antworten waeren fuer sich genommen Stummheit
+    // (0 < 5). Nur der Waechter davor verhindert die zweite Meldung. Mit
+    // `laeufeImFenster: 0` haette diese Zusage NICHTS belegt — dort greift
+    // schon die Arithmetik (`0 < 0`), und die Mutationsprobe hat es gezeigt.
     const m: Messung = {
       ...gesund,
       antworten: [],
       juengsterLaufAlterSekunden: null,
-      laeufeImFenster: 0,
+      laeufeImFenster: 10,
     };
 
     expect(arten(m)).toEqual(["stillstand"]);

@@ -64,6 +64,26 @@ Projekt-Ref-Dateien gepflegt bleiben. Alle vier stehen im Entwurf.
 | Vakuum-grüne Datenschutz-Zusage (MEDIUM) | Zusätzliche Zusage je Abfrage gegen eine Stern-Auswahl (`select *`, `r.*`, `, *`) — `count(*)` und die Multiplikation bleiben erlaubt. `token_id` in der Verbotsliste durch `token` ersetzt (fängt beides). Die vakuum-grüne Zeile ist **entfernt**, mit Begründung an Ort und Stelle | — |
 | TLS-Ausnahme (MEDIUM) | Entscheidung am `URL.hostname` statt an der ganzen Zeichenkette | — |
 
+### Die Gegenprobe zu den neuen Zusagen — und was sie wieder gefunden hat
+
+Sieben weitere Mutationen (M19–M25), je eine je neuer Zusage. Und wie beim
+ersten Mal war **die Probe selbst zuerst stumpf**:
+
+- **M21** rötete zunächst die falsche Zusage. „Keine Stummheit ohne Takt" stand
+  auf `laeufeImFenster: 0` — dort greift schon die Arithmetik (`0 < 0`), nicht
+  der Wächter davor. Die Zusage hätte auch bei entferntem Wächter gehalten.
+  Sie steht jetzt auf `laeufeImFenster: 10` bei 120 erwarteten: Stillstand ja,
+  Stummheit wäre für sich genommen ebenfalls wahr — nur der Wächter verhindert
+  die zweite Meldung.
+- **M23** modellierte den behobenen Fehler falsch. Der alte Vergleich war
+  `includes("public.push_wiederholung(")`, also `command.slice(7, -1)`. Mit
+  einem beliebigen anderen Teilstück rötete die Mutation *alles* und belegte
+  damit nichts Bestimmtes. Mit dem richtigen rötet sie **genau** die
+  Kommentar-Zusage.
+
+Ergebnis: jede der sieben neuen Zusagen wird von einer Mutation gerötet, und
+jede Mutation rötet, was sie treffen soll.
+
 Nebenbefund aus dem Bauen: die erste Fassung der Stern-Zusage war **selbst
 falsch** — sie schlug an `$1 * interval '1 minute'` an, also an einer
 Multiplikation. Ein Zusagefehler, kein Codefehler; die Zusage prüft jetzt den

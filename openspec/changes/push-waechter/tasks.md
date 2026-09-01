@@ -38,6 +38,15 @@ Beleg an der laufenden Anlage.
       | M10 nur den ersten Befund melden | 1 |
       | M11–M17 je eine verbotene Spalte je Abfrage, Verbotsliste aushöhlen | je 1 |
       | M13 einen Befund erfinden | 8 (alle Grünfälle) |
+      | M18 `>=` zurück auf `>` (flakiger Abnahmebeleg) | 1 |
+      | M19–M22 Stummheit, ihre Schwelle, ihr Wächter, die Stern-Auswahl | je 1–2 |
+      | M23–M25 Teilstring statt Volltext, Normalisierung, unbekannte Jobs | je 1 |
+
+      **Und die Probe war beim zweiten Mal wieder zuerst stumpf.** M21 rötete
+      die falsche Zusage (die geprüfte Lage hing an der Arithmetik, nicht am
+      Wächter), M23 modellierte den behobenen Fehler ungenau und rötete
+      deshalb *alles*. Beides ist geschärft — Einzelheiten in
+      `REVIEWS-DIFF.md`.
 
       **M13 ist der Grund, warum die Grünfälle etwas belegen.** Ohne eine
       Mutation, die einen Befund *hinzufügt*, wäre „meldet nichts" von „prüft
