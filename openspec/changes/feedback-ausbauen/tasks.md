@@ -35,12 +35,23 @@
 
 ## 1. Themen: Tabelle, Spalte, Bestand
 
-- [ ] 1.1 **RED:** pgTAP, das `feedback_themes` liest — schlägt fehl, weil es
-      die Tabelle nicht gibt.
+- [x] 1.1 **RED steht.** `supabase/tests/feedback_themes_test.sql`, 16 Zusagen,
+      alle rot mit `relation "public.feedback_themes" does not exist`. Die
+      Datei **bricht dabei nicht ab**: die drei Lesezusagen laufen über
+      `pg_temp.lies_als()`, das den Fehler fängt und als Text zurückgibt — so
+      scheitert RED als Zusage und nicht als Abbruch, und die Fassung nach 1.2
+      misst mit denselben 16. In `ci.yml` eingetragen (jetzt 24 Dateien).
+      Gesamtlauf: 1044 Zusagen, genau 16 rot, alle in dieser Datei.
 - [ ] 1.2 Migration: Tabelle `feedback_themes` mit `key` (Primärschlüssel),
       `label` und `sort`, alle `not null`; RLS an, Lese-Policy für
       `authenticated`, `select` ausdrücklich gegrantet. Neue Tabellen erben hier
       nichts, und RLS ohne Policy sieht aus wie „es gibt keine Themen".
+      **Hier zu entscheiden, nicht nebenbei:** ob `anon` lesen darf. Das
+      Vorbild `membership_tiers` grantet `select` an anon **und**
+      authenticated (Policy `tiers_read_all`); `design.md` nennt nur
+      `authenticated`, weil Feedback hinter der Anmeldung liegt. Der Test aus
+      1.1 behauptet über `anon` bewusst nichts — festgelegt wird es vom
+      Golden-Snapshot in 1.4.
 - [ ] 1.3 Die fünf Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
       etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit", `inhalte`
       „Inhalte / Texte", `idee` „Idee / Wunsch".
