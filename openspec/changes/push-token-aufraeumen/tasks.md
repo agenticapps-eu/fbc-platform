@@ -100,7 +100,8 @@ darf der Aufräumer nicht existieren.
       abgelehnt. Auflösung in `REVIEWS-DIFF.md`. Der schwerste Befund war
       berechtigt: der Frontend-Test belegte `claim_push_token` nicht — jetzt
       per Mutation E gerötet.
-- [ ] Im PR-Text: solange `push_tokens` fast leer ist, belegt der grüne Lauf die
+- [x] Im PR-Text (#307, Abschnitt „Was dieser PR NICHT belegt"): solange
+      `push_tokens` fast leer ist, belegt der grüne Lauf die
       Funktion, nicht den Betrieb. Der Betriebsbeleg kommt mit den echten
       Geräten aus AGE-642. Und: das Löschen eines gültigen Tokens ist eine
       **zustellungsbrechende** Änderung, deren Rückweg der nächste App-Start

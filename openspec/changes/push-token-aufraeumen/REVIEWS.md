@@ -154,5 +154,5 @@ und die liest, was tatsächlich gebaut wurde, nicht was geplant war.
 implementing-host: claude
 digest: sha256:e2ee0c53753b0a40fba45c839dd0c9ededce6ec50e6a0cd486ab84238fdc0e7d
 producer-version: 1.2.0
-tasks-digest: sha256:717b7903ca95dfbe6783ca861f307ebf641a0998c4eead1f3ddf932c453bd4dd
+tasks-digest: sha256:8f227e9e06cc80b5f2a85e4cda0a08571f0010e0600814cd34dc5d433de57eab
 -->
