@@ -149,13 +149,34 @@ Beleg an der laufenden Anlage.
       weiterhin keinen Lauf, und die geänderte Anforderung „regelmäßig gegen
       beide Projekte" hätte keine umsetzende Aufgabe. Beide Reviewer haben die
       Lücke gefunden.
-- [ ] **4.3 Der Meldeweg wird ausgelöst — und der Beleg wird nicht überdehnt.**
-      Ein `workflow_dispatch` mit Höchstpause `0` macht den Lauf **echt rot**;
-      Lauf-ID festhalten. Das belegt, dass der Wächter rot wird. Es belegt
-      **nicht**, dass die stündliche Mail ankommt: ein Dispatch-Fehlschlag mailt
-      an den Auslöser, ein `schedule`-Fehlschlag folgt den
-      Benachrichtigungseinstellungen des Repositories. Beides getrennt festhalten.
-- [ ] **4.4** Danach ein regulärer Lauf, der grün ist — die Gegenprobe zu 4.3.
+- [x] **4.3 Der Meldeweg ist ausgelöst — und die Mail ist angekommen.**
+
+      | Lauf | Eingabe | Ergebnis |
+      | --- | --- | --- |
+      | [33515225084](https://github.com/agenticapps-eu/fbc-platform/actions/runs/33515225084) | `hoechstpause=0` | **rot**, `[stillstand]` auf DEV **und** PROD, aus dem echten Codeweg — nicht an einem Fehler des Läufers. **Keine Mail.** |
+      | [33518894198](https://github.com/agenticapps-eu/fbc-platform/actions/runs/33518894198) | `hoechstpause=0` | **rot**, gleiches Bild. **Mail angekommen.** |
+
+      **Der Unterschied zwischen den beiden Läufen ist der eigentliche Fund.**
+      Der erste ging um 15:44 raus und blieb stumm; zwischen beiden hat Donald
+      die Kontoeinstellung *Notifications → System → Actions* auf „Email
+      (Failed workflows only)" gesetzt, und der zweite Lauf um 16:20 hat
+      gemailt.
+
+      Der Meldeweg hängt also an einer **Einstellung, die in keinem Repo
+      steht** und die kein Test erreicht. Wäre der erste Lauf der einzige
+      Beleg gewesen, hätte der Change mit einem Wächter geschlossen, der
+      zuverlässig rot wird und den niemand sieht — genau der Fehler vom
+      28.–31.08., eine Ebene höher. Steht jetzt als Voraussetzung im Runbook.
+
+      Nebenbei belegt: `if: always()` trägt. Der Drift-Scan lief in beiden
+      roten Läufen und meldete `OK` auf beiden Seiten — ein roter Wächter
+      verdeckt den Drift-Befund nicht. Und die Secrets sind im Protokoll
+      maskiert (`SUPABASE_DB_URL_PROD: ***`).
+- [x] **4.4 Gegenprobe grün:**
+      [33515369653](https://github.com/agenticapps-eu/fbc-platform/actions/runs/33515369653),
+      Vorgabewerte, beide Seiten `success`. Ohne sie belegte der rote Lauf nur,
+      dass der Wächter rot werden *kann* — nicht, dass er zwischen den beiden
+      Zuständen unterscheidet.
 - [x] **4.5 Die bestehenden Wächter greifen — geprüft, nicht angenommen.**
       `tsconfig.json:22` schließt `scripts` ein, `lint` ist `eslint .`. Und der
       Beleg dafür ist kein Vakuum: `typecheck` hat beim Bauen des Läufers
@@ -163,16 +184,30 @@ Beleg an der laufenden Anlage.
       nicht in die Closure hinein). Für Workflow-Dateien gibt es **keinen**
       Wächter im Repo — kein actionlint, kein YAML-Schema; die Datei ist von
       Hand gegengelesen und geparst.
-- [ ] **4.6 Den ersten geplanten Lauf abwarten und nachsehen**, ob er zur
-      erwarteten Zeit kam und wie spät er war. Die Verspätung ist die Größe, an
-      der das 120-Minuten-Fenster hängt; sie steht bisher als Annahme da.
+- [ ] **4.6 Den ersten geplanten Lauf abwarten und seine Verspätung messen.**
+      Die Verspätung ist die Größe, an der das 120-Minuten-Fenster hängt; sie
+      steht bisher als Annahme da.
 
-> **4.3, 4.4 und 4.6 gehen erst nach dem Merge.** GitHub führt `schedule:` nur
-> auf dem Vorgabe-Branch aus, und ein `workflow_dispatch` verlangt, dass der
-> Workflow dort liegt. Auf diesem Branch ist der Wächter also weder auslösbar
-> noch geplant. Das ist keine Nachlässigkeit, sondern die Reihenfolge, die
-> GitHub vorgibt — und es heißt, dass der Change **mit drei offenen
-> Abnahmepunkten gemergt wird**, die unmittelbar danach abzuarbeiten sind.
+      **Stand 16:22:** noch kein `schedule`-Lauf. Der Workflow liegt seit
+      15:44 auf `main`, der Eintrag steht auf `17 * * * *`, und `16:17` ist
+      vorbei. Das ist noch kein Befund — GitHub lässt neue Zeitpläne
+      erfahrungsgemäß verzögert anlaufen, und Verspätung ist genau das, was
+      hier gemessen werden soll. Zu prüfen ist `gh run list
+      --workflow=push-waechter.yml`, sobald ein Lauf mit `event=schedule`
+      auftaucht: `createdAt` gegen die volle Stunde plus 17 Minuten halten.
+
+      **Bleibt er über mehrere Stunden aus, ist das der Befund** — dann trägt
+      der Entwurf eine Annahme, die nicht hält, und das Fenster ist nicht das
+      Problem, sondern der Takt.
+
+> **Der Change ist mit diesem einen offenen Punkt gemergt worden**, und das war
+> keine Nachlässigkeit: GitHub führt `schedule:` nur auf dem Vorgabe-Branch
+> aus, und ein `workflow_dispatch` verlangt, dass der Workflow dort liegt. Vor
+> dem Merge war der Wächter also weder auslösbar noch geplant. 4.3 und 4.4 sind
+> unmittelbar danach erledigt worden; 4.6 braucht Wartezeit, keine Arbeit.
+>
+> **Archiviert wird erst, wenn 4.6 einen Messwert hat.** Ein Archiv mit einem
+> offenen Punkt behauptete, die Zusage sei eingelöst.
 
 ## 5 · Die Dokumentation sagt die Wahrheit
 
