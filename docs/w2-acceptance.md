@@ -11,6 +11,15 @@
 > der Datenbank per RLS** erzwungen, nicht nur im Frontend. RLS-/RPC-Checks unten
 > liefen mit **echten User-JWTs** (GoTrue-Login) gegen die produktive PostgREST-API.
 
+> **Nachtrag 2026-09-01 (AGE-256):** Zwei Angaben unten sind ueberholt.
+> **Die Custom Domain steht** — sie heisst `app.effbeezee.com`, nicht
+> `app.fairbusinessclub.de`; letztere wurde nie gebaut. Und **der Seitentitel
+> lautet inzwischen `eff.bee.zee — Business-Netzwerk auf Werten`**. Die
+> `<title>Fair Business Club</title>`-Zeilen unten bleiben trotzdem stehen: sie
+> sind das Protokoll dessen, was am Messtag ausgeliefert wurde, nicht eine
+> Aussage ueber heute. `fbc-platform.pages.dev` antwortet weiter und bleibt
+> Zweitweg, damit schon verschickte Links gueltig bleiben.
+
 ---
 
 ## ⚠️ Befund während der Abnahme: Migrations-Deploy-Lücke (behoben)
@@ -54,7 +63,7 @@ Alle Checks unten wurden **nach** der Remediation erhoben und sind grün.
 | Potenzial-/Impact-Score (0–100, regelbasiert) + Erfolgsradar (0–10) plausibel | AGE-242 | ✅ |
 | Mini-Compass schreibt ins Profil (`compass_responses`, own-only RLS) | AGE-243 | ✅ |
 | Live-Deploy `pages.dev` erreichbar, SPA-Deep-Routes | — | ✅ |
-| **Custom Domain `app.fairbusinessclub.de`** | AGE-256 | ⏳ offen (W4, Domain-Zugang blockiert) |
+| **Custom Domain `app.effbeezee.com`** | AGE-256 | ✅ seit 2026-09-01 (`app.fairbusinessclub.de` wurde nie gebaut) |
 
 ---
 

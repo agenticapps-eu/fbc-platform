@@ -188,7 +188,7 @@ EU-Infrastruktur. Die acht Akzeptanzkriterien sind 8/8 grün.
 
 | Thema | Inhalt | Tracking |
 | --- | --- | --- |
-| **Custom Domain** | `app.fairbusinessclub.de` an Cloudflare Pages anbinden (DNS-Delegation nötig) | AGE-256 (blockiert) |
+| **Custom Domain** | ✅ erledigt 2026-09-01: `app.effbeezee.com` per CNAME an Cloudflare Pages; keine DNS-Delegation nötig | AGE-256 |
 | **Migrations-Deploy** | Prod-Migrationen automatisieren + Repo↔prod-Drift via `supabase migration repair` angleichen | AGE-257 |
 | **Stripe / Bezahlung** | Mitgliedsstufen-Upgrade & Abrechnung; heute werden Stufen nur per Admin/SQL gesetzt | Phase 2 (neu) |
 | **Onboarding-Vollausbau** | Compass-Onboarding über „Überspringen" hinaus verbindlich machen, an Profil/Score koppeln | Phase 2 (neu) |
