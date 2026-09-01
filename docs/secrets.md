@@ -141,7 +141,7 @@ must **never** reach the client.
 | `APNS_KEY_ID`               | Kennung ebendieses Schlüssels (steht in Apples Dateinamen `AuthKey_<KEYID>.p8`) |
 | `APNS_TEAM_ID`              | Apple-Team, fährt als `iss` im Provider-JWT mit |
 | `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
-| `APNS_SANDBOX`              | `1` schickt an Apples Sandbox-Host. In `prod` **nicht setzen** |
+| `APNS_SANDBOX`              | `1` fragt Apples Sandbox-Host **zuerst**. Nur eine Vermutung — den Host erkennt `send-push` an der Antwort (siehe unten) |
 | `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
 
 ## Setting and reading secrets
@@ -677,14 +677,29 @@ umgebungsspezifischen Auth-Key — er gilt teamweit, und mit der Einstellung
 Versäumnis, sondern unvermeidbar (anders als bei Stripe und Resend, siehe die
 Trennungsregel oben).
 
-Unterschiedlich ist genau **ein** Wert: `APNS_SANDBOX=1` in `dev`, in `prod`
-gar nicht gesetzt.
+`APNS_SANDBOX` steht in `dev` auf `1` und seit dem 31.08. auch in `prod` — dort,
+solange das einzige Gerät ein Xcode-Build ist.
 
-> ⚠️ Zeigt ein Entwicklungs-Build auf **PROD**, schickt PROD ein Sandbox-Token
-> an den Produktions-Host. Apple antwortet `BadDeviceToken`, und `send-push`
-> stuft das korrekt als `dauerhaft` ein — es **löscht das Gerätetoken**. Beim
-> nächsten App-Start heilt sich das über `claim_push_token`, sieht aber wie ein
-> Fehler aus. Dev-Builds gehören auf DEV.
+> **Seit dem 31.08. entscheidet dieser Wert nichts mehr.** Er sagt nur noch,
+> welcher Host **zuerst** gefragt wird.
+>
+> Bis dahin stand hier die Regel „in `prod` gar nicht setzen" und die Warnung
+> „Dev-Builds gehören auf DEV". Beides ist überholt, und die Regel war von
+> Anfang an nicht haltbar: ein Wert kann nicht zwei Wahrheiten tragen, sobald
+> Entwicklungs- und Store-Builds nebeneinander laufen. Der Preis eines Irrtums
+> war auch keine ausgefallene Zustellung, sondern ein **gelöschtes
+> Gerätetoken** — `BadDeviceToken` gilt als dauerhaft, das Mitglied war still
+> von allen Hinweisen abgemeldet und heilte sich beim nächsten App-Start
+> wieder: ein Fehlerbild, das wie Sporadik aussieht und keines ist.
+>
+> `apnsMitHostErkennung` (`supabase/functions/send-push/anbieter.ts`) fängt das
+> ab: auf `BadDeviceToken` wird derselbe Versand am anderen Host wiederholt,
+> und dessen Ergebnis gilt. Lehnen **beide** ab, ist das Token wirklich tot und
+> wird entfernt. Ein Dev-Build darf damit auf PROD zeigen.
+>
+> Sobald ein Store-Build läuft, gehört `APNS_SANDBOX` aus `prod` heraus — nicht
+> weil es sonst bräche, sondern damit die Vermutung stimmt und der zweite Weg
+> die Ausnahme bleibt.
 
 ### Der Firebase-Dienstschlüssel: die Organisationsrichtlinie
 

@@ -6,10 +6,13 @@
 // falsche Einstufung meldet ein Mitglied still von allen Hinweisen ab.
 import { assertEquals, assertNotEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  APNS_HOST_PROD,
+  APNS_HOST_SANDBOX,
   apnsEndpunkt,
   apnsJwt,
   apnsKoerper,
   apnsKopfzeilen,
+  apnsMitHostErkennung,
   base64url,
   bewerteApns,
   bewerteFcm,
@@ -255,4 +258,119 @@ Deno.test("apnsJwt signiert mit ES256 — und die Signatur haelt der Pruefung st
     new TextEncoder().encode(`${kopf}x.${nutzlast}`),
   );
   assertNotEquals(boese, true);
+});
+
+// ── Host-Erkennung aus dem Input (AGE-641) ──────────────────────────────────
+//
+// Ein Geraetetoken gehoert entweder zur Sandbox oder zur Produktion, und dem
+// Token sieht man das NICHT an. Bis zum 31.08. entschied `APNS_SANDBOX` den
+// Host fest — und ein Token der jeweils anderen Umgebung bekam
+// `BadDeviceToken`, was `bewerteApns` als `dauerhaft` einstuft: das Token wird
+// GELOESCHT. Ein Entwicklungsbuild gegen PROD meldete sich damit still von
+// allen Hinweisen ab (gemessen am 31.08. auf PROD).
+//
+// Deshalb entscheidet jetzt die Antwort, nicht die Konfiguration.
+
+Deno.test("Host-Erkennung: gelingt der erste Versuch, gibt es keinen zweiten", async () => {
+  const gesehen: string[] = [];
+  const b = await apnsMitHostErkennung(APNS_HOST_PROD, (host) => {
+    gesehen.push(host);
+    return Promise.resolve({ ergebnis: "zugestellt", grund: null } as const);
+  });
+  assertEquals(b.ergebnis, "zugestellt");
+  // Die Zusage ist die LAENGE. Ohne sie bliebe ein Ausweichversuch auf jedem
+  // Erfolg unbemerkt — doppelter Verkehr zu Apple bei jedem Hinweis.
+  assertEquals(gesehen, [APNS_HOST_PROD]);
+});
+
+Deno.test("Host-Erkennung: BadDeviceToken weicht auf den anderen Host aus (PROD -> Sandbox)", async () => {
+  const gesehen: string[] = [];
+  const b = await apnsMitHostErkennung(APNS_HOST_PROD, (host) => {
+    gesehen.push(host);
+    return Promise.resolve(
+      host === APNS_HOST_SANDBOX
+        ? ({ ergebnis: "zugestellt", grund: null } as const)
+        : bewerteApns(400, { reason: "BadDeviceToken" }),
+    );
+  });
+  assertEquals(gesehen, [APNS_HOST_PROD, APNS_HOST_SANDBOX]);
+  // Das Ergebnis des ZWEITEN Versuchs gilt — sonst bliebe `dauerhaft` stehen
+  // und das Token waere trotz erfolgreicher Zustellung geloescht.
+  assertEquals(b.ergebnis, "zugestellt");
+});
+
+Deno.test("Host-Erkennung: weicht auch in der Gegenrichtung aus (Sandbox -> PROD)", async () => {
+  const gesehen: string[] = [];
+  const b = await apnsMitHostErkennung(APNS_HOST_SANDBOX, (host) => {
+    gesehen.push(host);
+    return Promise.resolve(
+      host === APNS_HOST_PROD
+        ? ({ ergebnis: "zugestellt", grund: null } as const)
+        : bewerteApns(400, { reason: "BadDeviceToken" }),
+    );
+  });
+  assertEquals(gesehen, [APNS_HOST_SANDBOX, APNS_HOST_PROD]);
+  assertEquals(b.ergebnis, "zugestellt");
+});
+
+Deno.test("Host-Erkennung: kennt KEIN Host das Token, bleibt es dauerhaft", async () => {
+  const gesehen: string[] = [];
+  const b = await apnsMitHostErkennung(APNS_HOST_PROD, (host) => {
+    gesehen.push(host);
+    return Promise.resolve(bewerteApns(400, { reason: "BadDeviceToken" }));
+  });
+  assertEquals(gesehen.length, 2);
+  // Hier ist Loeschen richtig: das Token ist in BEIDEN Umgebungen unbekannt.
+  assertEquals(b.ergebnis, "dauerhaft");
+  assertEquals(b.grund, "BadDeviceToken");
+});
+
+Deno.test("Host-Erkennung: andere dauerhafte Gruende weichen NICHT aus", async () => {
+  // `Unregistered` und `DeviceTokenNotForTopic` sagen etwas ueber das Token,
+  // das am anderen Host genauso gilt. Ein zweiter Versuch verdoppelte nur den
+  // Verkehr fuer wirklich tote Tokens.
+  for (const [status, grund] of [[410, "Unregistered"], [400, "DeviceTokenNotForTopic"]] as const) {
+    const gesehen: string[] = [];
+    const b = await apnsMitHostErkennung(APNS_HOST_PROD, (host) => {
+      gesehen.push(host);
+      return Promise.resolve(bewerteApns(status, { reason: grund }));
+    });
+    assertEquals(gesehen, [APNS_HOST_PROD], grund);
+    assertEquals(b.ergebnis, "dauerhaft", grund);
+  }
+});
+
+Deno.test("Host-Erkennung: vorlaeufige Fehler weichen NICHT aus", async () => {
+  // 503 ist Apples Problem, nicht das des Tokens. Ausweichen hiesse, den
+  // Ausfall am anderen Host ein zweites Mal abzuwarten.
+  const gesehen: string[] = [];
+  const b = await apnsMitHostErkennung(APNS_HOST_PROD, (host) => {
+    gesehen.push(host);
+    return Promise.resolve(bewerteApns(503, { reason: "ServiceUnavailable" }));
+  });
+  assertEquals(gesehen, [APNS_HOST_PROD]);
+  assertEquals(b.ergebnis, "vorlaeufig");
+});
+
+Deno.test("Verdrahtung: `ueberApns` benutzt die Host-Erkennung wirklich", async () => {
+  // Ohne diese Zusage waere die Funktion tot und alles gruen: `deno test`
+  // typprueft nur, was ein Test importiert, und das ist `index.ts` gerade
+  // nicht. Dieselbe Falle wie bei `src/lib/ota.ts` (AGE-642, Runde 6).
+  const quelle = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  // Auf den AUFRUF geprueft, nicht auf den blossen Namen. Die erste Fassung
+  // dieser Zusage suchte "apnsMitHostErkennung" — und blieb gruen, als die
+  // Mutations-Gegenprobe den Aufruf durch eine anonyme Funktion ersetzte: der
+  // Name stand ja noch im Import und im Kommentar daneben. Gemessen, nicht
+  // vermutet (31.08.).
+  //
+  // Leerraum eingeebnet, damit ein Umbruch durch `deno fmt` die Zusage nicht
+  // roetet — die Zusage gilt dem Aufruf, nicht seiner Formatierung.
+  const kompakt = quelle.replace(/\s+/g, " ");
+  assertStringIncludes(kompakt, "apnsMitHostErkennung(ersterHost,");
+
+  // Und der zweite Versuch muss den Host auch BENUTZEN. Ohne diese Zeile
+  // koennte `apnsEndpunkt` weiter auf `ersterHost` zeigen: die Erkennung liefe,
+  // waere aber wirkungslos — und keine Zusage an der reinen Funktion saehe es,
+  // denn die kennt `apnsEndpunkt` gar nicht.
+  assertStringIncludes(kompakt, "apnsEndpunkt(host,");
 });

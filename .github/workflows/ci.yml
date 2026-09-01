@@ -120,7 +120,18 @@ jobs:
         with:
           deno-version: v2.x
       - name: Deno-Tests der Edge Functions
-        run: deno test --frozen --allow-env --allow-net supabase/functions/
+        # `--allow-read` ist auf `supabase/functions` BEGRENZT und nicht pauschal:
+        # gebraucht wird es von genau einer Sorte Zusage — der, die eine
+        # `index.ts` als Text liest und belegt, dass sie ihr Modul daneben
+        # wirklich aufruft (AGE-641, `anbieter.test.ts`). Warum es diese Sorte
+        # braucht, steht im Kommentar unter diesem Schritt.
+        #
+        # Ohne die Grenze waere es ein Freibrief fuers ganze Dateisystem, um
+        # sechs Dateien zu lesen. Und ohne das Flag ueberhaupt war der Lauf
+        # LOKAL gruen und in CI rot: hier stand `--allow-net --allow-env`, im
+        # Terminal lief `--allow-read` mit. Wer eine solche Zusage ergaenzt,
+        # faehrt diese Zeile woertlich, nicht die bequemere.
+        run: deno test --frozen --allow-env --allow-net --allow-read=supabase/functions supabase/functions/
       # `deno test` typprüft nur, was ein Test importiert — und das sind gerade
       # die reinen Module, nicht die `index.ts`. Ein Verdrahtungsfehler zwischen
       # `index.ts` und dem Modul daneben käme also grün durch. Aufgefallen beim
