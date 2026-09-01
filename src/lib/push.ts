@@ -41,20 +41,19 @@ let letztesToken: string | null = null;
 let zuhoererStehen = false;
 
 /**
- * Fragt die Erlaubnis, holt das Token und legt es ab.
+ * Holt das Token und legt es ab — mit oder ohne vorherige Frage.
  *
- * **Nicht beim Kaltstart aufrufen.** Wer beim ersten Start gefragt wird, sagt
- * nein — und iOS fragt kein zweites Mal, die Entscheidung ist dann endgültig.
- * Der Aufruf gehört an eine Stelle, an der die Frage erklärbar ist: wenn
- * jemand die Nachrichten öffnet.
+ * Beide Ausgänge unten teilen sich diesen Rumpf. Der einzige Unterschied ist
+ * `darfFragen`, und der ist eine Zeile: ob bei noch offener Erlaubnis der
+ * Systemdialog ausgelöst wird.
  */
-export async function pushEinrichten(): Promise<PushStand> {
+async function registriere(darfFragen: boolean): Promise<PushStand> {
   const ziel = pushPlattform(Capacitor.isNativePlatform(), Capacitor.getPlatform());
   if (!ziel) return "web";
 
   try {
     let erlaubnis = (await PushNotifications.checkPermissions()).receive;
-    if (erlaubnis === "prompt" || erlaubnis === "prompt-with-rationale") {
+    if (darfFragen && (erlaubnis === "prompt" || erlaubnis === "prompt-with-rationale")) {
       erlaubnis = (await PushNotifications.requestPermissions()).receive;
     }
     if (erlaubnis !== "granted") return "abgelehnt";
@@ -86,6 +85,38 @@ export async function pushEinrichten(): Promise<PushStand> {
     console.error("[push] unerwartet:", (e as Error).message);
     return "fehler";
   }
+}
+
+/**
+ * Fragt die Erlaubnis, holt das Token und legt es ab.
+ *
+ * **Nicht beim Kaltstart aufrufen.** Wer beim ersten Start gefragt wird, sagt
+ * nein — und iOS fragt kein zweites Mal, die Entscheidung ist dann endgültig.
+ * Der Aufruf gehört an eine Stelle, an der die Frage erklärbar ist: wenn
+ * jemand die Nachrichten öffnet.
+ */
+export function pushEinrichten(): Promise<PushStand> {
+  return registriere(true);
+}
+
+/**
+ * Legt ein BEREITS erlaubtes Token erneut ab — beim Start, ohne Dialog.
+ *
+ * **Der Zweck ist der Zeitstempel, nicht die Registrierung** (AGE-682). Die
+ * steht längst; erneuert wird `push_tokens.letzter_kontakt`. Ohne diesen Weg
+ * misst die Spalte nur, wann jemand zuletzt die NACHRICHTEN geöffnet hat —
+ * `pushEinrichten` hängt allein daran, und dort an einem Riegel je Konto. Wer
+ * die App täglich nutzt und nie in den Chat geht, hätte einen Wert, der nie
+ * wieder steigt, und verlöre sein funktionierendes Token an den Aufräumer.
+ *
+ * **Hier wird NICHT gefragt**, und das ist die tragende Eigenschaft: iOS zeigt
+ * den Systemdialog einmal. Ist die Erlaubnis offen, geschieht nichts — der
+ * Dialog bleibt dem Nachrichten-Weg vorbehalten, wo er erklärbar ist. Damit
+ * widerspricht dieser Aufruf der Anforderung „Der Start fragt nicht" nicht:
+ * sie verbietet das ANFORDERN, nicht das Erneuern eines erteilten Tokens.
+ */
+export function pushLebenszeichen(): Promise<PushStand> {
+  return registriere(false);
 }
 
 /**
