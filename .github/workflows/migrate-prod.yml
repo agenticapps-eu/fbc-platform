@@ -145,8 +145,20 @@ jobs:
       # Belegt am 05.08.2026 gegen den Live-Pooler: ohne CA scheitert die
       # Verbindung mit SELF_SIGNED_CERT_IN_CHAIN, mit CA erst an der
       # Postgres-Anmeldung — also nach bestandener Zertifikatspruefung.
+      #
+      # `prod` steht seit AGE-679 als PFLICHTANGABE dabei. Vorher fiel der Scan
+      # ohne Argument auf `SUPABASE_DB_URL_PROD` zurueck — bequem hier, aber
+      # eine Falle fuer jeden zweiten Aufrufer: ein Waechter mit einem Job je
+      # Seite, der das Argument vergisst, maesse PROD zweimal und DEV nie, und
+      # beide Laeufe waeren gruen.
+      #
+      # Seit AGE-679 prueft der Scan zusaetzlich das Schema `cron` und den
+      # Aktivzustand der Trigger. Ein Befund daraus roetet DIESEN Lauf — er
+      # blockiert keinen Deploy: `deploy.yml` haengt an
+      # `migration-drift-gate.ts`, nicht an diesem Scan. Und er stoppt keine
+      # Migration, weil er nach dem `db push` laeuft.
       - name: Objekt-Drift-Scan
         env:
           SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
           DB_SCAN_CA_CERT: scripts/supabase-root-2021-ca.crt
-        run: pnpm tsx scripts/db-drift-scan.ts
+        run: pnpm tsx scripts/db-drift-scan.ts prod

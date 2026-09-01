@@ -1,0 +1,110 @@
+name: Push-Waechter
+
+# Der Waechter ueber den Push-Zustellweg (AGE-679).
+#
+# WARUM ER HIER LAEUFT UND NICHT IN DER DATENBANK. Am 28.-31.08.2026 lagen drei
+# Zeilen mit dem richtigen Fehlergrund drei Tage lang in `push_zustellungen`,
+# und niemand hat hingesehen. Ein Waechter als zweiter `pg_cron`-Lauf haette
+# ueber denselben Fire-and-Forget-Weg gemeldet, dessen Blindheit das Problem
+# ist — und ein `supabase db reset` auf DEV haette ihn mitgenommen. Von hier
+# aus braucht er von Supabase nichts ausser der Verbindungszeichenkette.
+#
+# DIE FRISTEN HAENGEN AN EINER GEMESSENEN GROESSE. `pg_net.ttl` steht auf
+# beiden Projekten auf 6 Stunden; aelteres loescht pg_net selbst. Der Takt muss
+# deutlich darunter liegen, das Fenster ueber der Verspaetung eines geplanten
+# Laufs. 120 Minuten Fenster bei stuendlichem Takt tragen 60 Minuten Verzug.
+# Das ist eine Toleranz, keine Garantie: fuer `schedule:` ist kein Takt
+# zugesagt, und ein ganz ausgefallener Lauf hinterlaesst eine ungeprueft
+# gebliebene Zeitspanne.
+#
+# `pg_net.ttl` wird bei jedem Lauf mitgemessen. Wird sie ferngesteuert unter das
+# Fenster gesenkt, faellt das auf, statt den Waechter still blind zu machen.
+on:
+  schedule:
+    # Nicht zur vollen Stunde: dort draengen sich die geplanten Laeufe von
+    # GitHub, und die Verspaetung waechst.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      fenster:
+        description: "Beobachtungsfenster in Minuten"
+        required: false
+        default: "120"
+      hoechstpause:
+        description: "Erlaubtes Alter des juengsten Laufs in Minuten. 0 macht den Lauf mit Sicherheit rot — so wird der Meldeweg einmal echt ausgeloest."
+        required: false
+        default: "15"
+
+# Ein hier laufender Waechter wird nicht abgebrochen; zwei gleichzeitig braucht
+# niemand.
+concurrency:
+  group: push-waechter
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Ein Job je Seite, und jeder bekommt NUR das Secret seiner Seite. Ein Fehler
+  # in der Verdrahtung kann damit nicht dazu fuehren, dass zweimal dieselbe
+  # Instanz gemessen wird — der Laeufer bricht dann ab, statt gruen zu sein.
+  dev:
+    runs-on: ubuntu-latest
+    # Ohne Obergrenze haelte ein haengender Lauf mit `cancel-in-progress: false`
+    # jeden folgenden Waechterlauf auf — der Waechter wuerde still verschwinden.
+    # Aus der Diff-Review; der Laeufer hat zusaetzlich eigene Zeitgrenzen.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Zustellweg pruefen (DEV)
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          WAECHTER_FENSTER_MINUTEN: ${{ inputs.fenster || '120' }}
+          WAECHTER_HOECHSTPAUSE_MINUTEN: ${{ inputs.hoechstpause || '15' }}
+        run: pnpm tsx scripts/push-waechter.ts dev
+
+      # `always()`, damit ein roter Waechter den Drift-Befund nicht verdeckt:
+      # die beiden messen verschiedene Dinge, und beide will man sehen.
+      #
+      # DEV hatte bis heute GAR KEINEN Objekt-Drift-Scan: er stand allein in
+      # `migrate-prod.yml`, das nur von Hand laeuft. Ein `supabase db reset` auf
+      # DEV nahm damit Webhooks, Funktion und Zeitplanung still mit.
+      - name: Objekt-Drift-Scan (DEV)
+        if: always()
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          DB_SCAN_CA_CERT: scripts/supabase-root-2021-ca.crt
+        run: pnpm tsx scripts/db-drift-scan.ts dev
+
+  prod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Zustellweg pruefen (PROD)
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          WAECHTER_FENSTER_MINUTEN: ${{ inputs.fenster || '120' }}
+          WAECHTER_HOECHSTPAUSE_MINUTEN: ${{ inputs.hoechstpause || '15' }}
+        run: pnpm tsx scripts/push-waechter.ts prod
+
+      - name: Objekt-Drift-Scan (PROD)
+        if: always()
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          DB_SCAN_CA_CERT: scripts/supabase-root-2021-ca.crt
+        run: pnpm tsx scripts/db-drift-scan.ts prod

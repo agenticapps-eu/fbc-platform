@@ -1,13 +1,18 @@
 #!/usr/bin/env tsx
 /**
- * Objekt-Drift-Scan (AGE-496 Task 12.2).
+ * Objekt-Drift-Scan (AGE-496 Task 12.2, erweitert in AGE-679).
  *
- *   scripts/db-drift-scan.ts [<db-url>]
- *   (ohne Argument: $SUPABASE_DB_URL_PROD)
+ *   scripts/db-drift-scan.ts <dev|prod>
  *
- * Laeuft bei jedem `migrate-prod` mit — nicht nur beim Aufsetzen. Der Grund
- * steht in `db-drift-scan.logic.ts`: wird der Webhook-Trigger geloescht,
- * stirbt der Mailversand still.
+ * Laeuft bei jedem `migrate-prod` mit und seit AGE-679 zusaetzlich stuendlich
+ * gegen BEIDE Seiten. Der Grund steht in `db-drift-scan.logic.ts`: wird der
+ * Webhook-Trigger geloescht, stirbt der Mailversand still.
+ *
+ * **Die Seite ist eine Pflichtangabe, und das ist eine Korrektur.** Bis zum
+ * 01.09. las diese Datei `process.argv[2] || process.env.SUPABASE_DB_URL_PROD`
+ * — ohne Argument mass sie also immer PROD. Ein Waechter mit einem Job je
+ * Seite, der das Argument vergisst, pruefte damit PROD zweimal und DEV nie,
+ * und beide Laeufe waeren gruen. Gefunden hat das die Plan-Review zu AGE-679.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -15,7 +20,16 @@ import { fileURLToPath } from "node:url";
 
 import pg from "pg";
 
-import { ERWARTET_OHNE_MIGRATION, findeObjektDrift, type Bestand } from "./db-drift-scan.logic";
+import { evaluateStage1 } from "./db-push-prod.logic";
+import {
+  ERWARTET_OHNE_MIGRATION,
+  ERWARTETE_ZEITPLAENE,
+  findeObjektDrift,
+  findeZeitplanDrift,
+  type Bestand,
+  type ObjektDrift,
+  type Zeitplan,
+} from "./db-drift-scan.logic";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -24,8 +38,26 @@ function rot(nachricht: string): never {
   process.exit(1);
 }
 
-const dbUrl = process.argv[2] || process.env.SUPABASE_DB_URL_PROD;
+const seite = process.argv[2];
+if (seite !== "dev" && seite !== "prod") {
+  rot("Aufruf: pnpm tsx scripts/db-drift-scan.ts <dev|prod> — die Seite ist Pflicht.");
+}
+
+const dbUrl = seite === "prod" ? process.env.SUPABASE_DB_URL_PROD : process.env.SUPABASE_DB_URL_DEV;
+
+// Zielkontrolle am Projekt-Ref IN der URL: hinter dem Pooler heisst
+// `current_user` auf beiden Seiten `postgres`, und der Host ist regionsweit
+// gleich. Dieselbe geprüfte Funktion wie in `assert-target.ts`.
+const ziel = evaluateStage1({
+  dbUrl,
+  expectedRef: readFileSync(join(REPO, "scripts", `${seite}-project-ref.txt`), "utf8").trim(),
+  args: [],
+});
+if (ziel.kind === "abort") rot(`SUPABASE_DB_URL_${seite.toUpperCase()}: ${ziel.reason}`);
+// `evaluateStage1` bricht bereits bei fehlender URL ab; die Zeile ist fuer den
+// Typpruefer, der das nicht sieht.
 if (!dbUrl) rot("Keine Verbindungs-URL. Der Scan kann nicht messen und wird deshalb rot.");
+console.log(`Ziel: ${seite} = ${ziel.ref}`);
 
 const migrationsDir = join(REPO, "supabase", "migrations");
 const migrationsText = readdirSync(migrationsDir)
@@ -88,6 +120,34 @@ const views = await client.query<{ name: string }>(
 const policies = await client.query<{ name: string }>(
   `select policyname as name from pg_policies where schemaname = 'public' order by 1`,
 );
+// AGE-679, erstes Loch: das Schema `cron` wurde gar nicht abgefragt. Eine
+// abbestellte Zeitplanung fiel damit nicht auf.
+const zeitplaene = await client.query<Zeitplan>(
+  `select jobname, schedule, active, command from cron.job order by jobname`,
+);
+// AGE-679, zweites Loch: ein per `alter table … disable trigger` abgeschalteter
+// Trigger steht weiter in `pg_trigger`. Fuer die Namenspruefung oben ist er
+// vorhanden — sein Versand ist trotzdem tot.
+//
+// `tgenabled` kennt VIER Werte, und die erste Fassung hat sie in zwei Lager
+// geteilt (`<> 'O'`), was einen davon falsch einsortierte — gefunden in der
+// Diff-Review:
+//
+//   O  origin   — feuert im Normalbetrieb                       → aktiv
+//   A  always   — feuert auch als Replikat                      → aktiv, MEHR als O
+//   D  disabled — feuert nie                                    → tot
+//   R  replica  — feuert NUR als Replikat, hier also nie        → tot
+//
+// Gemeldet werden deshalb nur `D` und `R`. Das ist hier keine Feinheit: dieses
+// Projekt legt Trigger zum Stilllegen bewusst auf `session_replication_role`
+// um, `A` ist also ein Wert, der vorkommt.
+const abgeschaltet = await client.query<{ name: string }>(
+  `select t.tgname as name from pg_trigger t
+     join pg_class c on c.oid = t.tgrelid
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and not t.tgisinternal and t.tgenabled in ('D', 'R')
+    order by 1`,
+);
 await client.end();
 
 const bestand: Bestand = {
@@ -111,9 +171,18 @@ const inMigrationen = alleNamen.filter((n) =>
   new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(migrationsText),
 );
 
-let drift;
+let drift: ObjektDrift[];
 try {
-  drift = findeObjektDrift(bestand, inMigrationen, ERWARTET_OHNE_MIGRATION);
+  drift = [
+    ...findeObjektDrift(bestand, inMigrationen, ERWARTET_OHNE_MIGRATION),
+    ...findeZeitplanDrift(
+      {
+        zeitplaene: zeitplaene.rows,
+        abgeschalteteTrigger: abgeschaltet.rows.map((r) => r.name),
+      },
+      ERWARTETE_ZEITPLAENE,
+    ),
+  ];
 } catch (e) {
   rot((e as Error).message);
 }
@@ -121,20 +190,35 @@ try {
 console.log(
   `Bestand: ${bestand.funktionen.length} Funktionen, ${bestand.trigger.length} Trigger, ` +
     `${bestand.tabellen.length} Tabellen, ${bestand.views.length} Views, ` +
-    `${bestand.policies.length} Policies.`,
+    `${bestand.policies.length} Policies, ${zeitplaene.rows.length} Zeitplanungen ` +
+    `(${abgeschaltet.rows.length} abgeschaltete Trigger).`,
 );
 
-if (drift.length > 0) {
-  for (const d of drift) {
-    console.error(
-      d.art === "unbekannt"
-        ? `::error::DRIFT — ${d.typ} "${d.name}" steht in keiner Migration. War jemand am Dashboard?`
-        : `::error::DRIFT — "${d.name}" FEHLT. Es steht bewusst in keiner Migration und muss von Hand ` +
-            "wiederhergestellt werden (Vorlage: docs/secrets.md). Ohne ihn stirbt der zugehoerige " +
-            "Versand still — Mail oder Push, je nach Eintrag.",
-    );
+function meldung(d: ObjektDrift): string {
+  switch (d.art) {
+    case "unbekannt":
+      return `DRIFT — ${d.typ} "${d.name}" steht in keiner Migration. War jemand am Dashboard?`;
+    case "fehlt":
+      return (
+        `DRIFT — "${d.name}" FEHLT. Es steht bewusst in keiner Migration und muss von Hand ` +
+        "wiederhergestellt werden (Vorlage: docs/secrets.md). Ohne ihn stirbt der zugehoerige " +
+        "Versand still — Mail oder Push, je nach Eintrag."
+      );
+    // Die beiden Faelle, die eine reine Namenspruefung nie sieht: das Objekt
+    // ist da und tut nichts.
+    case "abgeschaltet":
+      return (
+        `DRIFT — ${d.typ} "${d.name}" ist ABGESCHALTET (${d.grund ?? "inaktiv"}). ` +
+        "Es steht im Katalog und laeuft trotzdem nicht."
+      );
+    case "abweichend":
+      return `DRIFT — ${d.typ} "${d.name}" weicht ab: ${d.grund ?? "unbekannt"}.`;
   }
-  rot(`${drift.length} Objekt-Abweichung(en).`);
 }
 
-console.log("OK — keine Objekt-Abweichung.");
+if (drift.length > 0) {
+  for (const d of drift) console.error(`::error::${meldung(d)}`);
+  rot(`${drift.length} Objekt-Abweichung(en) auf ${seite}.`);
+}
+
+console.log(`OK — keine Objekt-Abweichung auf ${seite}.`);
