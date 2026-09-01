@@ -555,7 +555,8 @@ Deshalb sind sie getrennt und werden nie ineinander übersetzt.
 | `antwort` | Ein `net.http_post` hat im Fenster nicht `200` geantwortet. **Nicht** notwendig Push: `net._http_response` trägt keine Ziel-URL und sammelt auch den Mail-Webhook. | Bei `401` den Bearer in beiden Trigger-Funktionen gegen `PUSH_WEBHOOK_SECRET` bzw. `CONTACT_WEBHOOK_SECRET` halten. Bei `502` die Function-Logs. |
 | `stillstand` | Der Wiederholungslauf läuft nicht mehr — jüngster erfolgreicher Lauf älter als 15 min, oder weniger als die Hälfte der erwarteten Läufe im Fenster. | `select * from cron.job` — steht der Eintrag noch, ist er `active`? Auf DEV: hat jemand `supabase db reset` gefahren? Der Drift-Scan im selben Job sagt es. |
 | `aufgabe` | Eine Zustellung ist nach fünf Versuchen endgültig gescheitert. | `select zustand, letzter_fehler, versuche from public.push_zustellungen where zustand = 'aufgegeben'`. Der Grund steht **nur dort** — der Wächter gibt ihn nicht aus. |
-| `messausfall` | Der Wächter selbst kam nicht an die Zahlen. Sagt über den Zustellweg **nichts**. | Secret rotiert? Zertifikat? Projekt pausiert? Nie als „der Takt steht" lesen. |
+| `stumm` | Der Takt läuft, aber es kommt kaum eine Antwort zurück. Verdacht: der pg_net-Arbeiter steht — `net.http_post` reiht dann weiter ein, und der cron-Lauf bleibt `succeeded`. | `select count(*) from net.http_request_queue` — staut sich die Warteschlange? Sonst Supabase-Status. |
+| `messausfall` | Der Wächter selbst kam nicht an die Zahlen. Sagt über den Zustellweg **nichts**. Ausgegeben wird der Fehler**code** (`ECONNREFUSED`, `28P01`), nicht der Meldungstext. | Secret rotiert? Zertifikat? Projekt pausiert? Nie als „der Takt steht" lesen. |
 
 **Warum `letzter_fehler` nicht im Protokoll steht.** Er ist kein Enum, sondern
 `e.message` aus `send-push/index.ts:205`, und die APNs-Adresse trägt den
@@ -563,12 +564,22 @@ Gerätetoken im Pfad (`/3/device/<token>`). Die Actions-Protokolle dieses
 Repositories sind öffentlich. Der Wächter meldet deshalb die **Anzahl**; den
 Grund liest man mit einem DB-Zugang in zehn Sekunden.
 
-**Was der Wächter nicht leistet.** Er ist flankengesteuert: `aufgabe` sieht
-Zeilen, die im Fenster *entstanden* sind. Bleibt der Anbieter kaputt und
-entsteht zwei Stunden lang kein neuer Hinweis, wird er grün, obwohl nichts
-repariert ist — der nächste Zustellversuch rötet ihn wieder. Und sein Fenster
-ist eine Toleranz, keine Garantie: für geplante Actions-Läufe ist kein Takt
-zugesagt.
+**Was der Wächter nicht leistet.** Drei benannte Grenzen:
+
+- Er ist **flankengesteuert**: `aufgabe` sieht Zeilen, die im Fenster
+  *entstanden* sind. Bleibt der Anbieter kaputt und entsteht zwei Stunden lang
+  kein neuer Hinweis, wird er grün, obwohl nichts repariert ist — der nächste
+  Zustellversuch rötet ihn wieder.
+- Eine aufgegebene Zeile kann **ganz verschwinden**: `push_zustellungen` hängt
+  über `on delete cascade` an `notifications` und `push_tokens`, und
+  `push_zustellung_quittieren` löscht bei `dauerhaft` das Token. Zwischen
+  Aufgabe und nächstem Lauf kann eine Meldung damit verlorengehen.
+- Sein Fenster ist eine **Toleranz, keine Garantie**: für geplante
+  Actions-Läufe ist kein Takt zugesagt.
+
+Die ersten beiden verlangen dieselbe Ergänzung — einen Zustand, der ein
+Ereignis festhält, statt eine Zeile zu zählen. Sie stehen hier, damit ein
+grüner Wächter nicht mehr behauptet, als er weiß.
 
 Von Hand auslösen (auch mit anderem Fenster) über *Actions → Push-Waechter →
 Run workflow*. `hoechstpause: 0` macht den Lauf mit Sicherheit rot — so prüft

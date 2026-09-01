@@ -95,9 +95,35 @@ export const ERWARTET_OHNE_MIGRATION = [
  * Vorlage zum Wiederherstellen: `docs/secrets.md:478` und `:587`.
  */
 export const ERWARTETE_ZEITPLAENE = [
-  { jobname: "push-wiederholung", schedule: "* * * * *", ruft: "public.push_wiederholung(" },
-  { jobname: "beitrag-ankuendigen", schedule: "* * * * *", ruft: "public.beitrag_ankuendigen(" },
+  {
+    jobname: "push-wiederholung",
+    schedule: "* * * * *",
+    command: "select public.push_wiederholung()",
+  },
+  {
+    jobname: "beitrag-ankuendigen",
+    schedule: "* * * * *",
+    command: "select public.beitrag_ankuendigen()",
+  },
 ] as const;
+
+/**
+ * Kleinschreibung, Leerraum weg, abschliessendes Semikolon weg.
+ *
+ * Verglichen wird der GANZE Befehl, nicht ein Teilstring darin. Die
+ * Diff-Review hat gezeigt, warum: ein Teilstring-Vergleich laesst
+ * `select 1` mit dem erwarteten Aufruf im Kommentar durch — also genau den
+ * ausgehoehlten Eintrag, gegen den die Pruefung gebaut ist. Die Normalisierung
+ * ist der Preis dafuer, dass der exakte Vergleich nicht an Formatierung
+ * scheitert; sonst wird er beim ersten Wiederherstellen von Hand rot und man
+ * gewoehnt sich das Wegklicken an.
+ */
+function normalisiereBefehl(befehl: string): string {
+  return befehl
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/;$/, "");
+}
 
 export type ErwarteterZeitplan = (typeof ERWARTETE_ZEITPLAENE)[number];
 
@@ -160,13 +186,24 @@ export function findeZeitplanDrift(
       });
       continue;
     }
-    if (!ist.command.includes(soll.ruft)) {
+    if (normalisiereBefehl(ist.command) !== normalisiereBefehl(soll.command)) {
       drift.push({
         art: "abweichend",
         typ: "zeitplan",
         name: soll.jobname,
-        grund: `Befehl ruft nicht "${soll.ruft}"`,
+        grund: `Befehl weicht ab, erwartet "${soll.command}"`,
       });
+    }
+  }
+
+  // Die andere Richtung, und die hat in der ersten Fassung gefehlt: geprueft
+  // wurde nur ueber die ERWARTETEN Namen. Ein im Dashboard angelegter Job, der
+  // jede Minute irgendetwas tut, erzeugte keinen Befund — dabei ist „war
+  // jemand am Dashboard?" die erste der zwei Fragen dieses Scans.
+  const erwarteteNamen = new Set<string>(erwartet.map((z) => z.jobname));
+  for (const ist of bestand.zeitplaene) {
+    if (!erwarteteNamen.has(ist.jobname)) {
+      drift.push({ art: "unbekannt", typ: "zeitplan", name: ist.jobname });
     }
   }
 

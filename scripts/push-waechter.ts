@@ -38,6 +38,13 @@ const HIER = dirname(fileURLToPath(import.meta.url));
  */
 const LAEUFE_JE_MINUTE = 1;
 
+/**
+ * Exit **2**, nicht 1: „der Waechter wurde falsch aufgerufen" ist etwas
+ * anderes als „der Waechter hat etwas gefunden" (das ist 1). Die Diff-Review
+ * hat die Uneinheitlichkeit gegenueber `db-drift-scan.ts` angemerkt — sie
+ * bleibt, weil sie genau die Unterscheidung traegt, die ein Betrachter zuerst
+ * braucht.
+ */
 function abbruch(nachricht: string): never {
   console.error(`::error::${nachricht}`);
   process.exit(2);
@@ -84,18 +91,53 @@ if (ziel.kind === "abort") {
 // innerhalb von `main()`.
 const zielRef = ziel.ref;
 
+/**
+ * TLS nur fuer den lokalen Stack abschalten — und die Entscheidung faellt am
+ * HOSTNAMEN, nicht an der ganzen URL.
+ *
+ * Die Diff-Review hat den Unterschied benannt: ein `u.includes("localhost")`
+ * trifft auch ein Passwort, das die Zeichenfolge enthaelt, und schaltete dann
+ * die Serverpruefung gegen den ECHTEN Supabase-Host ab. Ein unwahrscheinlicher
+ * Zufall mit einer sehr teuren Folge.
+ */
 function ssl(u: string): pg.ClientConfig["ssl"] {
-  if (u.includes("localhost") || u.includes("127.0.0.1")) return false;
+  const host = new URL(u).hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
   return {
     ca: readFileSync(join(HIER, "supabase-root-2021-ca.crt"), "utf8"),
     rejectUnauthorized: true,
   };
 }
 
+/**
+ * Was von einem Fehler ins Protokoll darf.
+ *
+ * Die Actions-Protokolle sind oeffentlich, und die Zusage lautet „nur
+ * Aggregate". Eine rohe Treiber-, TLS- oder Servermeldung ist das nicht: sie
+ * kann Infrastrukturwerte und Steuerzeichen tragen. Genommen wird deshalb der
+ * KENNCODE (`ECONNREFUSED`, `CERT_HAS_EXPIRED`, `28P01`) — ein festes
+ * Vokabular, das zum Diagnostizieren reicht.
+ */
+function fehlerkennung(e: unknown): string {
+  const k = e as { code?: unknown; name?: unknown };
+  if (typeof k?.code === "string" && k.code.length > 0 && k.code.length <= 40) return k.code;
+  if (typeof k?.name === "string" && k.name.length > 0 && k.name.length <= 40) return k.name;
+  return "unbekannt";
+}
+
 type Zeitplanzeile = { schedule: string; active: boolean };
 
 async function miss(): Promise<{ messung: Messung; zeitplan: Zeitplanzeile | null }> {
-  const client = new pg.Client({ connectionString: url!, ssl: ssl(url!) });
+  // Zeitgrenzen, und zwar beide. Ohne sie wartet node-postgres UNBEGRENZT:
+  // ein schwarzes Loch am anderen Ende erreichte den `messausfall`-Zweig nie,
+  // der Lauf haenge bis zur Job-Grenze, und `cancel-in-progress: false`
+  // hielte jeden folgenden Waechterlauf auf. Aus der Diff-Review.
+  const client = new pg.Client({
+    connectionString: url!,
+    ssl: ssl(url!),
+    connectionTimeoutMillis: 15_000,
+    query_timeout: 30_000,
+  });
   await client.connect();
   try {
     const fenster = [schwellen.fensterMinuten];
@@ -157,11 +199,7 @@ async function main() {
     // Kein `process.exit` hier: der Ausfall geht durch dieselbe Bewertung wie
     // alles andere und wird dort zu einem Befund. Sonst gaebe es zwei Wege
     // nach draussen und nur einer waere geprueft.
-    messung = {
-      art: "messausfall",
-      seite: seite as "dev" | "prod",
-      grund: e instanceof Error ? e.message : "unbekannt",
-    };
+    messung = { art: "messausfall", seite: seite as "dev" | "prod", grund: fehlerkennung(e) };
   }
 
   // Nur Aggregate. Nie `content`, nie `headers`, nie `letzter_fehler`, nie eine
@@ -195,6 +233,6 @@ async function main() {
 main().catch((e) => {
   // Hierher kommt nur, was die Bewertung selbst zerlegt — die Messung ist oben
   // schon abgefangen.
-  console.error(`::error::Der Waechter ist selbst gescheitert: ${(e as Error).message}`);
+  console.error(`::error::Der Waechter ist selbst gescheitert: ${fehlerkennung(e)}`);
   process.exit(1);
 });

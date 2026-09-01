@@ -158,6 +158,52 @@ describe("bewerteMessung — Stillstand", () => {
   });
 });
 
+describe("bewerteMessung — Stummheit (der Takt läuft, es kommt nichts zurück)", () => {
+  it("meldet einen laufenden Takt ohne jede Antwort", () => {
+    // Der Fall, den die Diff-Review gefunden hat — und den ICH selbst
+    // aufgerissen habe: als das Stille-Signal von `net._http_response` auf
+    // `cron.job_run_details` umzog, ist die Frage „kommt ueberhaupt etwas
+    // zurueck?" ersatzlos entfallen.
+    //
+    // Stirbt der pg_net-Worker, reiht `net.http_post` weiter ein, das SQL
+    // gelingt, der cron-Lauf ist `succeeded` — und es entsteht NIE eine
+    // Antwortzeile. Ohne diese Zusage bliebe der Waechter dauerhaft gruen,
+    // waehrend nichts zugestellt wird.
+    const m: Messung = { ...gesund, antworten: [] };
+
+    expect(arten(m)).toEqual(["stumm"]);
+  });
+
+  it("meldet einen Rueckstau, bei dem nur noch ein Bruchteil zurueckkommt", () => {
+    // Gemessen ist das Verhaeltnis 1:1 — ein cron-Lauf, eine Antwortzeile
+    // (DEV am 01.09.: 120 Laeufe, 120 Antworten im selben Fenster). Ein
+    // Rueckstand von ein, zwei Zeilen ist Laufzeit; die Haelfte ist ein Defekt.
+    const m: Messung = { ...gesund, antworten: [{ statusCode: 200, timedOut: false, fehler: false, anzahl: 40 }] };
+
+    expect(arten(m)).toEqual(["stumm"]);
+  });
+
+  it("meldet einen leichten Rueckstand NICHT", () => {
+    const m: Messung = { ...gesund, antworten: [{ statusCode: 200, timedOut: false, fehler: false, anzahl: 118 }] };
+
+    expect(bewerteMessung(m, schwellen)).toEqual([]);
+  });
+
+  it("meldet keine Stummheit, wenn gar kein Takt laeuft — das ist Stillstand", () => {
+    // Zwei verschiedene Ursachen, zwei verschiedene erste Handgriffe. Ohne
+    // Takt gibt es nichts, was antworten koennte; „stumm" waere dort eine
+    // Folgemeldung ohne eigenen Wert.
+    const m: Messung = {
+      ...gesund,
+      antworten: [],
+      juengsterLaufAlterSekunden: null,
+      laeufeImFenster: 0,
+    };
+
+    expect(arten(m)).toEqual(["stillstand"]);
+  });
+});
+
 describe("bewerteMessung — Aufgabe", () => {
   it("meldet eine im Fenster aufgegebene Zustellung", () => {
     const m: Messung = { ...gesund, aufgegeben: 1 };
@@ -165,14 +211,19 @@ describe("bewerteMessung — Aufgabe", () => {
     expect(arten(m)).toEqual(["aufgabe"]);
   });
 
-  it("nennt die Anzahl und nie den Fehlergrund", () => {
+  it("nennt die Anzahl", () => {
     // `letzter_fehler` kommt aus `e.message` (send-push/index.ts:205), und die
     // APNs-Adresse traegt den Geraetetoken im Pfad. Er darf nicht in ein
-    // oeffentliches Protokoll — deshalb kennt die Messung ihn gar nicht.
+    // oeffentliches Protokoll.
+    //
+    // Hier stand dazu `expect(Object.keys(m)).not.toContain("letzterFehler")`.
+    // Das war VAKUUM-GRUEN und hat die Diff-Review zu Recht geaergert: `m` ist
+    // das selbst gebaute Testobjekt, es enthaelt den Schluessel nie, und die
+    // Zusage haette auch bei einer Abfrage gehalten, die den Wert liest. Die
+    // Aussage traegt die Abfragen-Zusage weiter unten, nicht diese.
     const m: Messung = { ...gesund, aufgegeben: 3 };
 
     expect(bewerteMessung(m, schwellen)[0].text).toContain("3");
-    expect(Object.keys(m)).not.toContain("letzterFehler");
   });
 });
 
@@ -240,11 +291,26 @@ describe("Die Abfragen lesen keine Mitgliederdaten", () => {
     }
   });
 
+  it.each(Object.entries(ABFRAGEN))("%s waehlt keinen Stern aus", (_name, sql) => {
+    // Die Diff-Review hat die Luecke gefunden: eine Verbotsliste einzelner
+    // Spaltennamen faengt `select *` NICHT — und `net._http_response.*` traegt
+    // `content` und `headers`. Ein Stern liest ausserdem jede Spalte mit, die
+    // eine spaetere Migration hinzufuegt.
+    //
+    // Verboten ist der Stern als AUSWAHLLISTE — nach `select` oder nach einem
+    // Komma, auch tabellenqualifiziert (`r.*`). Erlaubt bleiben `count(*)` und
+    // die Multiplikation `$1 * interval '1 minute'`; an letzterer ist die
+    // erste, gröbere Fassung dieser Zusage haengengeblieben.
+    const norm = sql.toLowerCase().replace(/\s+/g, " ");
+
+    expect(norm).not.toMatch(/(select|,)\s+(\w+\.)?\*/);
+  });
+
   it("fuehrt die Spalten, um die es geht — sonst prueft die Zusage darueber nichts", () => {
     // Gegenprobe zur Zusage darueber: waere die Liste leer, waere sie gruen,
     // ohne etwas auszuschliessen.
     expect(VERBOTENE_SPALTEN).toEqual(
-      expect.arrayContaining(["content", "headers", "letzter_fehler", "token_id"]),
+      expect.arrayContaining(["content", "headers", "letzter_fehler", "token"]),
     );
   });
 });

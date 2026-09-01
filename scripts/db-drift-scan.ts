@@ -127,12 +127,25 @@ const zeitplaene = await client.query<Zeitplan>(
 );
 // AGE-679, zweites Loch: ein per `alter table … disable trigger` abgeschalteter
 // Trigger steht weiter in `pg_trigger`. Fuer die Namenspruefung oben ist er
-// vorhanden — sein Versand ist trotzdem tot. `O` heisst „origin", also an.
+// vorhanden — sein Versand ist trotzdem tot.
+//
+// `tgenabled` kennt VIER Werte, und die erste Fassung hat sie in zwei Lager
+// geteilt (`<> 'O'`), was einen davon falsch einsortierte — gefunden in der
+// Diff-Review:
+//
+//   O  origin   — feuert im Normalbetrieb                       → aktiv
+//   A  always   — feuert auch als Replikat                      → aktiv, MEHR als O
+//   D  disabled — feuert nie                                    → tot
+//   R  replica  — feuert NUR als Replikat, hier also nie        → tot
+//
+// Gemeldet werden deshalb nur `D` und `R`. Das ist hier keine Feinheit: dieses
+// Projekt legt Trigger zum Stilllegen bewusst auf `session_replication_role`
+// um, `A` ist also ein Wert, der vorkommt.
 const abgeschaltet = await client.query<{ name: string }>(
   `select t.tgname as name from pg_trigger t
      join pg_class c on c.oid = t.tgrelid
      join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and not t.tgisinternal and t.tgenabled <> 'O'
+    where n.nspname = 'public' and not t.tgisinternal and t.tgenabled in ('D', 'R')
     order by 1`,
 );
 await client.end();

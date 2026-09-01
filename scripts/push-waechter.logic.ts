@@ -36,6 +36,14 @@
  *     Fenster ENTSTANDEN sind. Bleibt der Anbieter kaputt und entsteht zwei
  *     Stunden lang kein neuer Hinweis, wird er grün, obwohl nichts repariert
  *     ist. Der nächste Zustellversuch rötet ihn wieder.
+ *  1b. **Und die Zeile kann ganz verschwinden.** `push_zustellungen` hängt
+ *     über `on delete cascade` an `notifications` UND `push_tokens`, und
+ *     `push_zustellung_quittieren` löscht bei `dauerhaft` das Token — die
+ *     aufgegebenen Zeilen dieses Geräts gehen mit. Zwischen Aufgabe und dem
+ *     nächsten stündlichen Lauf kann eine Meldung damit verlorengehen.
+ *     Gefunden in der Diff-Review. Die Behebung wäre ein nicht kaskadiertes
+ *     Ereignis mit `aufgegeben_at` — eine Migration, und damit derselbe
+ *     Zustand, den auch Grenze 1 verlangt.
  *  2. **Sein Fenster ist eine Toleranz, keine Garantie.** Für geplante
  *     Actions-Läufe ist kein Takt zugesagt; fällt einer ganz aus, bleibt eine
  *     ungeprüfte Zeitspanne.
@@ -62,7 +70,7 @@ export const VERBOTENE_SPALTEN = [
   "content",
   "headers",
   "letzter_fehler",
-  "token_id",
+  "token",
   "notification_id",
 ] as const;
 
@@ -125,7 +133,7 @@ export type Schwellen = {
 };
 
 export type Befund = {
-  art: "antwort" | "stillstand" | "aufgabe" | "messausfall" | "voraussetzung";
+  art: "antwort" | "stillstand" | "stumm" | "aufgabe" | "messausfall" | "voraussetzung";
   text: string;
 };
 
@@ -194,6 +202,30 @@ export function bewerteMessung(messung: Messung, schwellen: Schwellen): Befund[]
       text:
         `Der Wiederholungslauf steht: juengster erfolgreicher Lauf ${alter}, ` +
         `${messung.laeufeImFenster} von ${messung.laeufeErwartet} erwarteten im Fenster.`,
+    });
+  }
+
+  // Der Takt laeuft, aber es kommt nichts zurueck.
+  //
+  // Diese Pruefung ist beim Umbau des Stillstand-Signals von
+  // `net._http_response` auf `cron.job_run_details` ERSATZLOS ENTFALLEN, und
+  // die Diff-Review hat es gefunden. Der Fall ist nicht theoretisch: stirbt
+  // der pg_net-Worker, reiht `net.http_post` weiter ein, das SQL gelingt, der
+  // cron-Lauf ist `succeeded` — und es entsteht nie eine Antwortzeile. Ohne
+  // diesen Befund bliebe der Waechter dauerhaft gruen, waehrend nichts
+  // zugestellt wird.
+  //
+  // Nur wenn ueberhaupt ein Takt laeuft: ohne Lauf gibt es nichts, was
+  // antworten koennte, und der Stillstand-Befund sagt bereits alles.
+  const antwortenGesamt = messung.antworten.reduce((s, a) => s + a.anzahl, 0);
+  if (!zuAlt && !zuWenig && antwortenGesamt < messung.laeufeImFenster / 2) {
+    befunde.push({
+      art: "stumm",
+      text:
+        `Der Takt laeuft (${messung.laeufeImFenster} Laeufe im Fenster), aber nur ` +
+        `${antwortenGesamt} Antwort(en) sind zurueckgekommen. Verdacht: der ` +
+        "pg_net-Arbeiter steht — `net.http_post` reiht dann weiter ein, ohne dass " +
+        "je eine Antwort entsteht.",
     });
   }
 

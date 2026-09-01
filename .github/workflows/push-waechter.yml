@@ -50,6 +50,10 @@ jobs:
   # Instanz gemessen wird — der Laeufer bricht dann ab, statt gruen zu sein.
   dev:
     runs-on: ubuntu-latest
+    # Ohne Obergrenze haelte ein haengender Lauf mit `cancel-in-progress: false`
+    # jeden folgenden Waechterlauf auf — der Waechter wuerde still verschwinden.
+    # Aus der Diff-Review; der Laeufer hat zusaetzlich eigene Zeitgrenzen.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -81,6 +85,7 @@ jobs:
 
   prod:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

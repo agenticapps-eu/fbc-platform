@@ -292,6 +292,59 @@ describe("findeZeitplanDrift", () => {
     expect(drift[0]).toMatchObject({ art: "abweichend", typ: "zeitplan" });
   });
 
+  it("meldet einen Befehl, der den Aufruf nur im Kommentar trägt", () => {
+    // Aus der Diff-Review: ein Teilstring-Vergleich hätte
+    // `select 1 /* public.push_wiederholung( */` durchgelassen — genau der
+    // ausgehöhlte Eintrag, gegen den die Prüfung gebaut ist.
+    const bestand: Zeitplanbestand = {
+      ...gesund,
+      zeitplaene: gesund.zeitplaene.map((z) =>
+        z.jobname === "push-wiederholung"
+          ? { ...z, command: "select 1 /* public.push_wiederholung() */" }
+          : z,
+      ),
+    };
+
+    const drift = findeZeitplanDrift(bestand, ERWARTETE_ZEITPLAENE);
+
+    expect(drift).toHaveLength(1);
+    expect(drift[0]).toMatchObject({ art: "abweichend", typ: "zeitplan" });
+  });
+
+  it("verträgt Leerraum und ein abschließendes Semikolon", () => {
+    // Die Gegenprobe zur Zusage darüber: ein exakter Vergleich darf nicht an
+    // Formatierung scheitern, sonst wird er beim ersten Wiederherstellen von
+    // Hand rot und man gewöhnt sich das Wegklicken an.
+    const bestand: Zeitplanbestand = {
+      ...gesund,
+      zeitplaene: gesund.zeitplaene.map((z) =>
+        z.jobname === "push-wiederholung"
+          ? { ...z, command: "  SELECT   public.push_wiederholung( ) ;  " }
+          : z,
+      ),
+    };
+
+    expect(findeZeitplanDrift(bestand, ERWARTETE_ZEITPLAENE)).toEqual([]);
+  });
+
+  it("meldet einen unbekannten cron-Eintrag", () => {
+    // Aus der Diff-Review: die Prüfung lief nur über die ERWARTETEN Namen. Ein
+    // im Dashboard angelegter Job, der jede Minute irgendetwas tut, erzeugte
+    // keinen Befund — dabei ist „war jemand am Dashboard?" die erste der zwei
+    // Fragen, die dieser Scan beantworten soll.
+    const bestand: Zeitplanbestand = {
+      ...gesund,
+      zeitplaene: [
+        ...gesund.zeitplaene,
+        { jobname: "heimlich", schedule: "* * * * *", active: true, command: "select 1" },
+      ],
+    };
+
+    expect(findeZeitplanDrift(bestand, ERWARTETE_ZEITPLAENE)).toEqual([
+      { art: "unbekannt", typ: "zeitplan", name: "heimlich" },
+    ]);
+  });
+
   it("meldet einen abgeschalteten Trigger", () => {
     // `tgenabled = 'D'`. Er steht weiter im Katalog, sein Versand ist tot.
     const bestand: Zeitplanbestand = {

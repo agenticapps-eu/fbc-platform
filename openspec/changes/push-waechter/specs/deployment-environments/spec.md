@@ -41,9 +41,20 @@ Seite misst, ist zweimal grün und sagt über die andere nichts.
 Die Prüfung SHALL dabei nicht nur das Schema `public` abdecken, sondern auch die
 Zeitplanungen im Schema `cron`. Sie SHALL je Zeitplanung Name, Zeitplan,
 Aktivzustand **und** auszuführenden Befehl vergleichen — ein Eintrag mit
-richtigem Namen und leerem oder verändertem Befehl SHALL auffallen. Für Trigger
-SHALL sie zusätzlich den Aktivzustand prüfen: ein abgeschalteter Trigger steht
-weiter im Katalog, und sein Versand ist trotzdem tot.
+richtigem Namen und leerem oder verändertem Befehl SHALL auffallen. Der Befehl
+SHALL dabei vollständig verglichen werden, nach Angleichen von Schreibweise und
+Leerraum; ein Vergleich auf ein enthaltenes Teilstück würde einen wirkungslosen
+Befehl durchlassen, der den erwarteten Aufruf nur im Kommentar trägt.
+
+Die Prüfung SHALL auch **unbekannte** Zeitplanungen melden — eine, die in der
+Datenbank steht und in keiner Erwartung. Sonst beantwortet sie für das Schema
+`cron` nur die eine ihrer zwei Fragen.
+
+Für Trigger SHALL sie zusätzlich den Aktivzustand prüfen: ein abgeschalteter
+Trigger steht weiter im Katalog, und sein Versand ist trotzdem tot. Als
+abgeschaltet SHALL dabei nur gelten, was im Normalbetrieb wirklich nicht
+auslöst; ein Trigger, der zusätzlich als Replikat auslöst, ist aktiver als der
+Normalfall und SHALL NOT gemeldet werden.
 
 Was die Prüfung **nicht** leistet, SHALL in ihrem Kopf benannt bleiben: sie
 vergleicht Namen und die oben genannten Eigenschaften, nicht Funktionsrümpfe.
@@ -90,6 +101,12 @@ Rechten abgelegt werden.
 - **WHEN** ein cron-Eintrag seinen Namen und Zeitplan behält, sein Befehl aber
   nichts mehr ausführt
 - **THEN** meldet die Prüfung den abweichenden Befehl
+
+#### Scenario: Eine unbekannte Zeitplanung fällt auf
+
+- **WHEN** eine Zeitplanung angelegt wird, die in keiner Erwartung steht
+- **THEN** meldet die Prüfung sie, so wie sie ein unbekanntes Objekt in
+  `public` meldet
 
 #### Scenario: Ein Lauf ohne Zielangabe misst nicht die falsche Seite
 
