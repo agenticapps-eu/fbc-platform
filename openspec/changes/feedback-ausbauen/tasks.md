@@ -134,7 +134,15 @@
       Handelnden**, in einem fremden und _nicht_ markierten Faden — so steht es
       nach der Gegenprobe aus 0.4 fest. Der vorhandene Test 27 in
       `rls_test.sql` deckt nur das Mitglied im gewöhnlichen Faden ab und bliebe
-      auch dann grün, wenn 4.5 falsch geklammert wird.
+      auch dann grün, wenn 4.5 falsch geklammert wird. **Und es fängt sie
+      niemand sonst auf:** Test 27 ist über alle 23 CI-Dateien die einzige
+      Zusage, die auf die Freigabe anspricht. Die einzige weitere Datei, die
+      `contact_requests` überhaupt anfasst, ist `thread_aktivitaet_test.sql` —
+      dort steht die angenommene Anfrage als _Voraussetzung_ im Fixture, damit
+      die Positivkontrolle nicht aus einem sachfremden Grund scheitert; geprüft
+      wird sie nicht. Der Push-Pfad liegt hinter dem Tor, nicht darauf
+      (`push_auftraege_holen` nennt `contact_requests` mit keinem Wort). Diese
+      Zusage ist also keine Doppelung, sondern die einzige Abdeckung.
 - [ ] 4.9 pgTAP: zwei nebenläufige Öffnungs-Aufrufe erzeugen **ein** Gespräch;
       das vertauschte Paar liefert dasselbe.
 - [ ] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
