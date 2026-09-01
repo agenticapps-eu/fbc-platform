@@ -191,11 +191,16 @@ rendern**, wenn kein sichtbares Video ein Hashtag trägt. Damit trägt die Spalt
 auch auf dünnem Bestand, ohne eine leere Hülle zu zeigen — auf der Produktion
 steht heute genau ein Video, und keines trägt ein Hashtag.
 
-Auf dem Reiter **Redaktion** SHALL die Spalte ihre Felder nicht anbieten,
-sondern benennen, dass die kuratierten Lektionen nicht gefiltert werden. Sie
-SHALL dabei **stehen bleiben** und SHALL NOT verschwinden: eine Spalte, die beim
-Reiterwechsel weggeht, ändert die Inhaltsbreite um 16rem und lässt die Seite
-springen.
+Die Spalte SHALL ihre Felder nur auf dem Reiter anbieten, auf den sie
+**wirkt** — „Alle". Auf „Meine Academy" und „Redaktion" SHALL sie stattdessen
+benennen, warum hier nicht gefiltert wird. Der Grund SHALL festgehalten sein:
+die Redaktion ist eine Konstante im Code, und „Meine Academy" lädt sein zweites
+Regal über `fetchGelikteVideos`, das weder Suche noch Ordnung kennt — ein Feld,
+das die Hälfte der Liste nicht erreicht, ist eine Zusage ohne Deckung.
+
+Sie SHALL dabei auf allen drei Reitern **stehen bleiben** und SHALL NOT
+verschwinden: eine Spalte, die beim Reiterwechsel weggeht, ändert die
+Inhaltsbreite um 16rem und lässt die Seite springen.
 
 #### Scenario: Die Spalte trägt auch ohne Hashtags
 
@@ -222,6 +227,7 @@ springen.
 - **THEN** stehen die kuratierten Lektionen im Reiterinhalt und nicht in der
   Spalte
 - **AND** die Spalte steht weiterhin da, mit einem Hinweis statt mit Feldern
+- **AND** dasselbe gilt auf „Meine Academy"
 
 #### Scenario: Die Spalte beginnt auf Höhe der Reiter
 

@@ -61,58 +61,228 @@ const ACADEMY_LESSONS: Lesson[] = [
   },
 ];
 
+/** Die Reiter der Academy. Die Reihenfolge ist Donalds Entscheidung (01.09.). */
+type Reiter = "alle" | "meine" | "redaktion";
+
 export default function AcademyPage() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
+
+  /* Der Reiterzustand liegt HIER und nicht in `Tabs` (AGE-677). Die
+     Filterspalte umspannt Reiterzeile und Inhalt gemeinsam — sie steht also
+     ausserhalb der Reiter und muss trotzdem wissen, welcher offen ist. Vorher
+     stand sie IM Inhalt von „Alle": sie begann damit erst unterhalb der
+     Reiterzeile und fehlte auf „Meine Academy" ganz. */
+  const [reiter, setReiter] = useState<Reiter>("alle");
+
+  /* Auch der Filterzustand liegt hier, aus demselben Grund: die Felder stehen
+     in der Spalte, die Liste steht im Reiterinhalt. */
+  const [eingabe, setEingabe] = useState("");
+  const [suche, setSuche] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [ordnung, setOrdnung] = useState<FeedOrdnung>("neueste");
+
+  // Entprellt wie im Verzeichnis: sonst eine Serverrunde je Tastendruck.
+  useEffect(() => {
+    const id = setTimeout(() => setSuche(eingabe), 300);
+    return () => clearTimeout(id);
+  }, [eingabe]);
+
+  /* Die Facetten kommen aus der UNGEFILTERTEN Grundabfrage. Aus der gefilterten
+     Liste abgeleitet verschwänden nach dem ersten Haken alle anderen Marken,
+     und man käme aus dem Filter nicht mehr heraus. */
+  const facetten = useQuery({
+    queryKey: academyFacettenKey(uid, null),
+    queryFn: () => fetchFeed({ uid, nurVideos: true }),
+    enabled: reiter === "alle",
+    staleTime: Infinity,
+  });
+  const hashtagsImBestand = useMemo(
+    () => [...new Set((facetten.data?.posts ?? []).flatMap((p) => p.hashtags ?? []))].sort(),
+    [facetten.data],
+  );
 
   return (
     <div className="flex flex-col gap-8">
       <FormatHero meta={FORMAT_HERO["/academy"]} />
 
-      <section className="space-y-4">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
-          Aus der Redaktion
-        </h2>
-        {/* Behälter statt Fenster (AGE-629): mit der Filterspalte daneben
-            verengt sich diese Fläche, das Fenster nicht. 35rem und nicht
-            41rem wie bei den Karten der anderen Flächen — eine Lektion trägt
-            einen Videorahmen und wird darunter unbrauchbar; gemessen liefert
-            die Academy heute bei 1024 px zwei Kacheln zu 332 px. Der Deckel
-            bleibt bei ZWEI, damit ein breiter Schirm die Fläche nicht dichter
-            macht, als sie heute ist. */}
-        <div className="@container">
-          <div className="grid grid-cols-1 gap-6 @[35rem]:grid-cols-2">
-            {ACADEMY_LESSONS.map((lesson) => (
-              <Card key={lesson.url} className="flex flex-col gap-3">
-                <VideoEmbed url={lesson.url} title={lesson.title} />
-                <div>
-                  <CardTitle className="text-base">{lesson.title}</CardTitle>
-                  <CardDescription>{lesson.description}</CardDescription>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FilterSpalte
+        id="academy-filter"
+        filter={
+          reiter === "alle" ? (
+            <AcademyFilter
+              eingabe={eingabe}
+              onEingabe={setEingabe}
+              ordnung={ordnung}
+              onOrdnung={setOrdnung}
+              hashtags={hashtagsImBestand}
+              gewaehlt={tags}
+              onTag={(t) =>
+                setTags((v) => (v.includes(t) ? v.filter((x) => x !== t) : [...v, t]))
+              }
+            />
+          ) : (
+            /* Die Spalte BLEIBT stehen und wird nur leer. Verschwände sie,
+               spränge die Inhaltsbreite beim Reiterwechsel um 16rem. Felder
+               anzubieten, die hier nichts täten, wäre die andere Hälfte des
+               Fehlers: die Redaktion ist eine Konstante im Code, und „Meine
+               Academy" lädt sein zweites Regal über `fetchGelikteVideos`, das
+               weder Suche noch Ordnung kennt. */
+            <Card className="space-y-2">
+              <h2 className="font-display text-sm font-semibold text-ink">Filter</h2>
+              <p className="text-sm text-muted">
+                {reiter === "redaktion"
+                  ? "Die Lektionen der Redaktion sind eine feste Auswahl — hier gibt es nichts zu filtern."
+                  : "Suche und Sortierung wirken auf „Alle“."}
+              </p>
+            </Card>
+          )
+        }
+      >
+        <Tabs
+          value={reiter}
+          onValueChange={(v) => setReiter(v as Reiter)}
+          tabs={[
+            {
+              value: "alle",
+              label: "Alle",
+              content: <GeteilteVideos uid={uid} suche={suche} tags={tags} ordnung={ordnung} />,
+            },
+            {
+              value: "meine",
+              label: "Meine Academy",
+              content: <MeineAcademy uid={uid} />,
+            },
+            {
+              value: "redaktion",
+              label: "Redaktion",
+              content: <Redaktion />,
+            },
+          ]}
+        />
+      </FilterSpalte>
+    </div>
+  );
+}
 
-      {/* Der Reiterzustand ist eine reine Bedienentscheidung und kommt nicht aus
-          einer Abfrage — `useState` in <Tabs> ist hier also richtig. Die Falle
-          aus AGE-492 (ein Wert, der erst NACH dem Mount eintrifft, wird von
-          `useState(wert)` nie angenommen) trifft nur datengespeiste Zustände. */}
-      <Tabs
-        tabs={[
-          {
-            value: "alle",
-            label: "Alle",
-            content: <GeteilteVideos uid={uid} mitFilter />,
-          },
-          {
-            value: "meine",
-            label: "Meine Academy",
-            content: <MeineAcademy uid={uid} />,
-          },
-        ]}
-      />
+// ── Reiter „Redaktion“ ──────────────────────────────────────────────────────
+
+/**
+ * Die drei kuratierten Lektionen, als Streifen statt als Stapel (AGE-677).
+ *
+ * Video links, Text rechts. Gestapelt nahm der `aspect-video`-Rahmen die volle
+ * Kachelbreite und schob den Titel aus dem Bild — mit dem Einwilligungstor umso
+ * mehr, weil die ungeklickte Fläche dieselbe Höhe als Grau einnimmt. Gemeldet
+ * von Donald am 01.09. mit Screenshot.
+ *
+ * Die Schwelle ist eine BEHÄLTER-Abfrage. Ein Fenster-Präfix wäre hier gleich
+ * doppelt falsch: die Kachel steht in einem Raster, das die Filterspalte
+ * verengt, und `kartenraster.test.ts` zählt diese Datei zu den Kartenflächen.
+ */
+function Redaktion() {
+  return (
+    <div className="@container">
+      <ul className="space-y-4">
+        {ACADEMY_LESSONS.map((lesson) => (
+          <li key={lesson.url}>
+            <Card className="@[30rem]:flex-row @[30rem]:items-start flex flex-col gap-4">
+              {/* Feste Spaltenbreite im Streifen, damit die drei Videos eine
+                  gemeinsame Kante zeigen; gestapelt nimmt es die volle Breite. */}
+              <div className="@[30rem]:w-64 @[30rem]:shrink-0 w-full">
+                <VideoEmbed url={lesson.url} title={lesson.title} />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-base">{lesson.title}</CardTitle>
+                <CardDescription>{lesson.description}</CardDescription>
+              </div>
+            </Card>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── Die Felder der Spalte ───────────────────────────────────────────────────
+
+function AcademyFilter({
+  eingabe,
+  onEingabe,
+  ordnung,
+  onOrdnung,
+  hashtags,
+  gewaehlt,
+  onTag,
+}: {
+  eingabe: string;
+  onEingabe: (v: string) => void;
+  ordnung: FeedOrdnung;
+  onOrdnung: (v: FeedOrdnung) => void;
+  hashtags: string[];
+  gewaehlt: string[];
+  onTag: (t: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <label htmlFor="academy-suche" className="font-display text-sm font-semibold text-ink">
+          Suche
+        </label>
+        {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
+            `<label for>`, und ein `aria-label` ERSETZT dessen Text als
+            zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
+            „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
+            Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
+            kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
+        <Input
+          id="academy-suche"
+          type="search"
+          value={eingabe}
+          onChange={(e) => onEingabe(e.target.value)}
+          placeholder="Wonach suchst du?"
+        />
+      </Card>
+
+      <Card className="space-y-3">
+        <label htmlFor="academy-ordnung" className="font-display text-sm font-semibold text-ink">
+          Sortierung
+        </label>
+        {/* Die Ordnungen sind die der Feed-Schicht, nicht eigene. Sie führt
+            seit AGE-667 in allen drei `veroeffentlicht_ab` und trägt in
+            „Beliebteste" zusätzlich `like_count` im Cursor; eine zweite
+            Ordnung hier hiesse, diesen Vertrag ein zweites Mal zu bauen. */}
+        <Select
+          id="academy-ordnung"
+          value={ordnung}
+          onChange={(e) => onOrdnung(e.target.value as FeedOrdnung)}
+        >
+          <option value="neueste">Neueste zuerst</option>
+          <option value="beliebteste">Beliebteste zuerst</option>
+        </Select>
+      </Card>
+
+      {/* Abgeleitet, denn Hashtags sind Freitext. Ohne Werte rendert die
+          Karte nicht — auf der Produktion ist das heute der Fall. */}
+      {hashtags.length > 0 && (
+        <Card className="space-y-3">
+          <h2 className="font-display text-sm font-semibold text-ink">Hashtags</h2>
+          <ul className="space-y-1.5">
+            {hashtags.map((t) => (
+              <li key={t}>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={gewaehlt.includes(t)}
+                    onChange={() => onTag(t)}
+                    className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{t}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }
@@ -157,29 +327,23 @@ function GeteilteVideos({
   uid,
   autorId = null,
   leer,
-  mitFilter = false,
+  suche = "",
+  tags = [],
+  ordnung = "neueste",
 }: {
   uid: string | null;
   autorId?: string | null;
   leer?: { title: string; description: string };
   /**
-   * Nur das Regal „Alle" trägt die Filterspalte. „Meine Academy" lädt über
-   * `fetchGelikteVideos`, das weder Suche noch Ordnung kennt — eine Spalte, die
-   * dort nichts täte, wäre eine Zusage an der Oberfläche ohne Deckung.
+   * Suche, Marken und Ordnung kommen seit AGE-677 von der SEITE, nicht mehr aus
+   * eigenem Zustand: die Felder stehen in der Filterspalte, und die umspannt
+   * Reiterzeile und Inhalt gemeinsam. Ohne Angabe verhält sich die Liste wie
+   * ungefiltert — so laden die beiden Regale in „Meine Academy" weiter.
    */
-  mitFilter?: boolean;
+  suche?: string;
+  tags?: string[];
+  ordnung?: FeedOrdnung;
 }) {
-  const [eingabe, setEingabe] = useState("");
-  const [suche, setSuche] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [ordnung, setOrdnung] = useState<FeedOrdnung>("neueste");
-
-  // Entprellt wie im Verzeichnis: sonst eine Serverrunde je Tastendruck.
-  useEffect(() => {
-    const id = setTimeout(() => setSuche(eingabe), 300);
-    return () => clearTimeout(id);
-  }, [eingabe]);
-
   const liste = useInfiniteQuery({
     queryKey: academyKey(uid, autorId, suche, tags, ordnung),
     queryFn: ({ pageParam }) =>
@@ -188,20 +352,9 @@ function GeteilteVideos({
     getNextPageParam: (letzte) => letzte.nextCursor,
   });
 
-  const facetten = useQuery({
-    queryKey: academyFacettenKey(uid, autorId),
-    queryFn: () => fetchFeed({ uid, nurVideos: true, autorId }),
-    enabled: mitFilter,
-    staleTime: Infinity,
-  });
-  const hashtagsImBestand = useMemo(
-    () => [...new Set((facetten.data?.posts ?? []).flatMap((p) => p.hashtags ?? []))].sort(),
-    [facetten.data],
-  );
-
   const posts = (liste.data?.pages ?? []).flatMap((seite) => seite.posts);
 
-  const raster = (
+  return (
     <VideoRaster
       posts={posts}
       isLoading={liste.isLoading}
@@ -219,85 +372,8 @@ function GeteilteVideos({
       }
     />
   );
-
-  if (!mitFilter) return raster;
-
-  return (
-    <FilterSpalte
-      id="academy-filter"
-      filter={
-        <div className="space-y-4">
-          <Card className="space-y-3">
-            <label htmlFor="academy-suche" className="font-display text-sm font-semibold text-ink">
-              Suche
-            </label>
-            {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
-                `<label for>`, und ein `aria-label` ERSETZT dessen Text als
-                zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
-                „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
-                Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
-                kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
-            <Input
-              id="academy-suche"
-              type="search"
-              value={eingabe}
-              onChange={(e) => setEingabe(e.target.value)}
-              placeholder="Wonach suchst du?"
-            />
-          </Card>
-
-          <Card className="space-y-3">
-            <label
-              htmlFor="academy-ordnung"
-              className="font-display text-sm font-semibold text-ink"
-            >
-              Sortierung
-            </label>
-            {/* Die Ordnungen sind die der Feed-Schicht, nicht eigene. Sie führt
-                seit AGE-667 in allen drei `veroeffentlicht_ab` und trägt in
-                „Beliebteste" zusätzlich `like_count` im Cursor; eine zweite
-                Ordnung hier hiesse, diesen Vertrag ein zweites Mal zu bauen. */}
-            <Select
-              id="academy-ordnung"
-              value={ordnung}
-              onChange={(e) => setOrdnung(e.target.value as FeedOrdnung)}
-            >
-              <option value="neueste">Neueste zuerst</option>
-              <option value="beliebteste">Beliebteste zuerst</option>
-            </Select>
-          </Card>
-
-          {/* Abgeleitet, denn Hashtags sind Freitext. Ohne Werte rendert die
-              Karte nicht — auf der Produktion ist das heute der Fall. */}
-          {hashtagsImBestand.length > 0 && (
-            <Card className="space-y-3">
-              <h2 className="font-display text-sm font-semibold text-ink">Hashtags</h2>
-              <ul className="space-y-1.5">
-                {hashtagsImBestand.map((t) => (
-                  <li key={t}>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        checked={tags.includes(t)}
-                        onChange={() =>
-                          setTags((v) => (v.includes(t) ? v.filter((x) => x !== t) : [...v, t]))
-                        }
-                        className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                      />
-                      <span className="min-w-0 flex-1 truncate">{t}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-        </div>
-      }
-    >
-      {raster}
-    </FilterSpalte>
-  );
 }
+
 
 // ── Reiter „Meine Academy“ ──────────────────────────────────────────────────
 

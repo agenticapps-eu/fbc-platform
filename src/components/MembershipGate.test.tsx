@@ -51,8 +51,12 @@ describe("MembershipGate für Entdecken-Routen", () => {
       "href",
       REGISTRIEREN_PFAD,
     );
-    // Academy-Inhalt bleibt gesperrt.
-    expect(screen.queryByText("Mit dem „Warum“ beginnen")).not.toBeInTheDocument();
+    // Academy-Inhalt bleibt gesperrt. Geprüft an der REITERZEILE und nicht mehr
+    // am Titel einer kuratierten Lektion: seit AGE-677 liegt die Redaktion in
+    // einem Reiter, ihr Titel fehlte also auch dann, wenn die Seite sehr wohl
+    // gerendert hätte — die Verneinung wäre wahr geworden, ohne etwas zu
+    // belegen.
+    expect(screen.queryByRole("tab", { name: "Alle" })).not.toBeInTheDocument();
   });
 
   it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", async () => {
@@ -61,8 +65,12 @@ describe("MembershipGate für Entdecken-Routen", () => {
     // AGE-642: Die Seite kommt asynchron nach. Die Verneinung bleibt hinter der
     // positiven Zusage — vor dem Auflösen des Chunks fehlt die Wand ohnehin,
     // und das belegte nichts.
-    await screen.findByText("Mit dem „Warum“ beginnen");
-    expect(screen.getByText("Mit dem „Warum“ beginnen")).toBeInTheDocument();
+    // Die Marke ist die Reiterzeile, nicht mehr eine kuratierte Lektion: seit
+    // AGE-677 steht die Redaktion im dritten Reiter und ist beim Öffnen nicht
+    // sichtbar. Die Reiterzeile ist dafür der bessere Beleg — sie gehört der
+    // Seite selbst und nicht einer ihrer Sichten.
+    await screen.findByRole("tab", { name: "Alle" });
+    expect(screen.getByRole("tab", { name: "Redaktion" })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
     ).not.toBeInTheDocument();
