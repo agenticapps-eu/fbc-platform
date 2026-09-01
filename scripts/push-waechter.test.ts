@@ -136,6 +136,18 @@ describe("bewerteMessung — Stillstand", () => {
     expect(arten(m)).toEqual(["stillstand"]);
   });
 
+  it("ist mit Höchstpause 0 mit Sicherheit rot — der Abnahmebeleg hängt daran", () => {
+    // Der rote Lauf für 2.3/4.3 wird über `hoechstpauseMinuten: 0` erzeugt,
+    // nicht über ein winziges Fenster: das schriebe der Minutentakt während
+    // der Abfrage womöglich gerade voll. Damit der Beleg nicht flackert, muss
+    // AUCH ein Lauf, der in derselben Sekunde lag, den Befund auslösen —
+    // `extract(epoch ...)::int` schneidet auf 0 ab.
+    const m: Messung = { ...gesund, juengsterLaufAlterSekunden: 0 };
+    const jetztSofort: Schwellen = { fensterMinuten: 120, hoechstpauseMinuten: 0 };
+
+    expect(bewerteMessung(m, jetztSofort).map((b) => b.art)).toEqual(["stillstand"]);
+  });
+
   it("meldet einen leicht unvollständigen Takt NICHT", () => {
     // Ein halb laufender Takt verliert nichts, er verzögert nur — die
     // Anspruchsfrist holt die Auftraege nach. Die Schwelle soll „laeuft" von

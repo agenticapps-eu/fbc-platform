@@ -54,24 +54,40 @@ Beleg an der laufenden Anlage.
 
 ## 2 · Der Läufer
 
-- [ ] **2.1** `scripts/push-waechter.ts`: verlangt `dev|prod` als
+- [x] **2.1** `scripts/push-waechter.ts`: verlangt `dev|prod` als
       Pflichtangabe, verbindet über das passende Secret, TLS über
       `scripts/supabase-root-2021-ca.crt` wie `db-drift-scan.ts`, Zielkontrolle
-      über den Projekt-Ref **in der URL** (hinter dem Pooler heißt
-      `current_user` auf beiden Seiten `postgres`).
-- [ ] **2.2 Positivkontrolle gegen DEV** — der Läufer wird grün, und die
-      ausgegebenen Zahlen stimmen mit einer Handmessung überein (Stand 01.09.:
-      jüngster Lauf 46 s alt, 120 Läufe in 120 min, 360 Antwortzeilen, alle
-      `200`). Ohne diese Kontrolle ist ein grüner Lauf nicht von „hat gar nichts
+      über `evaluateStage1` am Projekt-Ref **in der URL** (hinter dem Pooler
+      heißt `current_user` auf beiden Seiten `postgres`). Belegt:
+
+      | Aufruf | Ergebnis |
+      | --- | --- |
+      | ohne Seite | Exit **2**, „die Seite ist Pflicht" — kein Rückfall auf PROD |
+      | `prod` im DEV-Kontext | Exit **2**, „`SUPABASE_DB_URL_PROD` nicht gesetzt" |
+- [x] **2.2 Positivkontrolle gegen beide Seiten** — grün, und die Zahlen decken
+      sich mit der Handmessung: DEV `120 von 120` Läufen, `200×120` Antworten,
+      `pg_net.ttl 21600 s`, Zeitplan `* * * * *, aktiv=true`; PROD dieselben
+      Werte. Ohne diese Kontrolle wäre ein grüner Lauf nicht von „hat gar nichts
       gemessen" zu unterscheiden.
-- [ ] **2.3 Echt rot gegen DEV, deterministisch.** Mit der Höchstpause `0` ist
-      der Stillstand-Befund mit Sicherheit wahr — ein „winziges Fenster" wäre
-      es nicht, weil der Minutentakt während der Abfrage eine frische Zeile
-      schreiben kann. Exit-Code ≠ 0, und der Befund nennt Stillstand, nicht
-      einen Fehler des Läufers.
-- [ ] **2.4 Die TTL wird bei jedem Lauf gemessen**, nicht angenommen. Der Läufer
-      liest `pg_net.ttl` und schlägt fehl, wenn sie das Fenster nicht mehr
-      übersteigt. Gegenprobe: mit einem Fenster größer als 6 h wird der Lauf rot.
+
+      Nebenbei belegt der PROD-Lauf die dokumentierte Flankensteuerung: die
+      `aufgegeben`-Zeile vom 29.08. steht noch da, liegt aber außerhalb des
+      Fensters — gemeldet wird `0`. Genau wie im Entwurf beschrieben, und genau
+      die Grenze, auf die beide Reviewer gezeigt haben.
+- [x] **2.3 Echt rot gegen DEV, deterministisch.** Über `Höchstpause 0`, nicht
+      über ein winziges Fenster. **Und das war zuerst flakig:** mit `>` wäre ein
+      Lauf, der in derselben Sekunde lag, grün geblieben (`extract(epoch)::int`
+      schneidet auf 0 ab). Der Vergleich steht jetzt auf `>=`, eine Zusage hält
+      das fest, und Mutation M18 (zurück auf `>`) rötet sie. Drei Läufe
+      hintereinander: `15 s`, `31 s`, `32 s` — jedes Mal Exit 1, jedes Mal
+      Befund `stillstand`, nie ein Fehler des Läufers.
+- [x] **2.4 Die TTL wird bei jedem Lauf gemessen**, nicht angenommen.
+      Gegenprobe mit `Fenster 400 min` gegen die gemessenen 360 min TTL: Exit 1,
+      Befund `voraussetzung`.
+- [x] **2.5 Der Messausfall geht durch dieselbe Bewertung.** Mit einer
+      unerreichbaren URL: Exit 1, Befund **`messausfall`** („connect
+      ECONNREFUSED"), nicht `stillstand`. Der Läufer hat dafür bewusst keinen
+      zweiten Ausgang — sonst wäre einer der beiden Wege ungeprüft.
 
 ## 3 · Der Drift-Scan sieht die Zeitplanung — und was sich verändert hat
 

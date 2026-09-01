@@ -170,15 +170,25 @@ export function bewerteMessung(messung: Messung, schwellen: Schwellen): Befund[]
 
   // Zwei Bedingungen, ein Befund. Das Alter faengt den harten Ausfall, die
   // Mindestmenge den Takt, der nur noch stottert.
+  // `>=`, nicht `>`. Der Unterschied ist im Betrieb bedeutungslos (eine
+  // Sekunde), trägt aber die Abnahme: mit `hoechstpauseMinuten: 0` ist der
+  // Befund damit MIT SICHERHEIT wahr, und der Meldeweg lässt sich einmal echt
+  // rot fahren. Mit `>` haette ein Lauf, der in derselben Sekunde lag
+  // (`extract(epoch ...)::int` schneidet ab), einen gruenen Lauf ergeben — ein
+  // flakiger Beleg, und genau darauf hat die Plan-Review gezeigt.
   const zuAlt =
     messung.juengsterLaufAlterSekunden === null ||
-    messung.juengsterLaufAlterSekunden > schwellen.hoechstpauseMinuten * 60;
+    messung.juengsterLaufAlterSekunden >= schwellen.hoechstpauseMinuten * 60;
   const zuWenig = messung.laeufeImFenster < messung.laeufeErwartet / 2;
   if (zuAlt || zuWenig) {
+    // Unter zwei Minuten in Sekunden: `Math.round(15 / 60)` waere „0 min alt"
+    // und liesse den Leser raten, ob gerade ein Lauf war oder keiner.
     const alter =
       messung.juengsterLaufAlterSekunden === null
         ? "gar keiner"
-        : `${Math.round(messung.juengsterLaufAlterSekunden / 60)} min alt`;
+        : messung.juengsterLaufAlterSekunden < 120
+          ? `${messung.juengsterLaufAlterSekunden} s alt`
+          : `${Math.round(messung.juengsterLaufAlterSekunden / 60)} min alt`;
     befunde.push({
       art: "stillstand",
       text:
