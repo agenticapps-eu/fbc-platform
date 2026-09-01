@@ -1,127 +1,125 @@
-# Session Handoff — 2026-08-31 (AGE-642: D3+D4 sind draussen, PR #299 offen)
+# Session Handoff — 2026-09-01 (AGE-641: Push lebt auf PROD, Betriebsrisiken sind dran)
 
-> ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
+> ## ⚠ ZUERST: Scope dieser Datei ist AGE-641 (Push)
 >
-> **AGE-642 (Capacitor-Hülle) gehört hierher, alles andere nicht** (Donald,
-> 31.08.). Frühere Fassungen schleppten fremde Punkte mit — das war der Grund
-> für drei Rebase-Konflikte auf dieser Datei in zwei Tagen. Wer den Stand
-> ausserhalb AGE-642 braucht, **fragt die Sitzung `fbc-platform-f4`**.
+> **AGE-642 (Capacitor-Hülle) hat einen EIGENEN Handoff** im Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle`, Stand 31.08. — dort steht das
+> vorbereitete D5-Runbook. **Nicht zusammenführen**: das Vermischen der beiden
+> hat in zwei Tagen drei Rebase-Konflikte auf dieser Datei gekostet.
 >
-> ### ⛔ Für AGE-599 gilt weiterhin: NICHT löschen
->
-> Die acht Objekte in `event-covers` auf DEV stammen aus dem Spiegel DEV ← PROD
-> (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
-> `openspec/specs/design-system/spec.md`.
+> Dieser Worktree (`donald-age-641-apns-host-erkennung`) ist **gemergt und
+> fertig**. Die nächste Aufgabe braucht einen eigenen.
 
-**Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`, rebasiert auf `origin/main` (`63f3237`).
-**PR #299 ist offen** — https://github.com/agenticapps-eu/fbc-platform/pull/299
+**PR #301 gemerged** (`b50b975`, 01.09. 06:19), CI grün, `send-push` auf PROD
+ausgeliefert. Linear AGE-641 steht auf *Done* — die Automation hat es beim
+Merge dorthin gekippt, wo Donald es am 28.08. selbst hatte. **14 Aufgaben in
+`push-fundament` sind trotzdem offen.**
 
-Change `capacitor-huelle`: **31 offen, 87 erledigt.**
+## Accomplished
 
-## Accomplished — D4 steht, D3+D4 sind gemeinsam hinausgegangen
+### 1 · Push war auf PROD nie scharf — jetzt ist er es
 
-Zwei Commits auf dem rebasierten Stand, alles grün: **2323 vitest (210 Dateien)
-· 133 Deno · `deno check` · typecheck · `pnpm lint` 0 Fehler · `openspec
-validate --all` 30/30.**
+Donald und Detlev haben am 31.08. am iPhone getestet: keine Push-Nachricht, die
+Nachricht in der App aber da. Ursache gemessen, nicht vermutet: drei Zeilen in
+`push_zustellungen` mit `letzter_fehler = apns_nicht_konfiguriert`, je fünf
+Versuche, `aufgegeben`. **Weder Infisical `prod` noch der Function-Secret-Store
+von PROD trugen ein einziges `APNS_*`.** Alles andere war in Ordnung — Hinweis
+angelegt, Zustellzeile angelegt, `PUSH_WEBHOOK_SECRET` deployed, Staffelung
+1-2-4-8-16 min sauber gelaufen.
 
-- `0978348` — `fix:` fehlender `cause` in `scripts/ota-buendel.logic.ts`.
-- `aca10bf` — `feat:` der Rückweg (D4).
+Alle sechs Werte gesetzt, per SHA-256 gegen DEV geprüft: byte-gleich, auch die
+mehrzeiligen (`.p8` 257 Zeichen, FCM-JSON 2385). Kein Redeploy nötig. Beleg:
+zwei zurückgesetzte Zustellungen gingen `zugestellt` durch, **0 Versuche**.
+Donald hat `infisical secrets set --env=prod` selbst nachgezogen (der
+Auto-Mode-Klassifikator blockt den Weg).
 
-### Der Befund, der D4 grösser gemacht hat als „Aufruf einbauen"
+### 2 · Der APNs-Host wird am Anbieter erkannt (PR #301)
 
-**`autoDeleteFailed` steht per Vorgabe auf `true`, und das macht aus dem
-Rückfall eine ENDLOSSCHLEIFE.** Am 31.08. an 8.51.15 auf beiden Plattformen an
-der Quelle gemessen:
+Donalds Vorgabe: *„das muss das System, basierend auf dem Input."* Richtig —
+ein Schalter hat einen Wert, und sobald Dev- und Store-Builds nebeneinander
+laufen, gibt es zwei Wahrheiten. Der Preis eines Irrtums ist kein Ausfall,
+sondern ein **gelöschtes Gerätetoken**: `BadDeviceToken` gilt als dauerhaft.
 
-1. `checkRevert()` setzt das kaputte Bündel auf `ERROR` und rollt zurück
-   (`CapacitorUpdaterPlugin.swift:3353-3399`, `.java:5140` ff.).
-2. Danach löscht `autoDeleteFailed` es mit `removeInfo: false` — und dieser
-   Zweig **überschreibt das eben gesetzte `ERROR` mit `DELETED`**
-   (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
-3. Beim nächsten Start würde `isErrorStatus()` abbrechen (`.swift:4391`,
-   `.java:4915`) — aber der Status ist `DELETED`, und der Zweig darüber wirft
-   die Registrierung weg und **lädt dasselbe Bündel erneut**
-   (`.swift:4364-4379`, `.java:4999`).
+`apnsMitHostErkennung` weicht bei `BadDeviceToken` auf den anderen Host aus;
+dessen Ergebnis gilt. Lehnen beide ab, bleibt `dauerhaft`. `APNS_SANDBOX`
+bleibt, ist aber nur noch die Vermutung, welcher Host ZUERST gefragt wird.
 
-Der Abbruch-Zweig ist mit der Vorgabe toter Code. **Der D3-Endpunkt kann das
-nicht auffangen:** `ota_buendel_neuestes` liefert, was streng später eingetragen
-wurde als das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
-kaputte Bündel ist also weiterhin „später". Nur das Gerät bricht die Schleife:
-`autoDeleteFailed: false`.
+**7 Zusagen, jede einzeln durch eine Mutation belegt** — und zwei davon waren
+zuerst falsch, was erst die Gegenprobe zeigte:
+
+- Die Verdrahtungsprüfung suchte den blossen Namen `apnsMitHostErkennung` und
+  blieb **grün**, als die Mutation den Aufruf entfernte — der Name stand noch
+  im Import. Prüft jetzt den Aufruf **und** `apnsEndpunkt(host,`.
+- Die Erfolgs-Zusage wurde von keiner der sechs Mutationen gerötet, belegte
+  also nichts. Eine siebte („weicht immer aus") rötet sie.
+
+### 3 · Ein CI-Wächter, den lokal niemand fährt
+
+Erster CI-Lauf rot: die Verdrahtungs-Zusage liest `index.ts` und braucht
+`--allow-read`. Lokal lief das Flag mit, `ci.yml` hatte nur
+`--allow-env --allow-net`. Behoben mit `--allow-read=supabase/functions` (eng
+begrenzt), und die Gegenprobe fährt jetzt den CI-Befehl **wörtlich**.
 
 ## Decisions
 
-- **`src/lib/ota.ts` ist ein Nebenwirkungs-Modul ohne Export**, in `main.tsx`
-  als zweiter Import direkt hinter `./instrument`. Der Import IST der Aufruf —
-  damit gibt es keine Funktion, die jemand zu rufen vergessen kann, und
-  „vergessen" bräche hier JEDES Gerät bis zur nächsten Store-Einreichung.
-- **Ohne Plattform-Bedingung.** Die Web-Umsetzung ist ein
-  `return { bundle: BUNDLE_BUILTIN }` (`dist/esm/web.js:172`) — sie kostet
-  nichts und kann nicht scheitern. Ein `if (nativ)` spart nichts und fügt eine
-  Stelle hinzu, an der die Bestätigung ausbleiben kann.
-- **Ohne `await`.** Ein top-level `await` machte aus einer hakenden Brücke einen
-  Startfehler — genau den Zustand, gegen den das Modul steht.
-- **Der Lint-Fix ist ein eigener Commit**, weil er eine Reparatur an D3 ist und
-  nicht zum Rückweg gehört. `pnpm lint` lief auf diesem Branch **rot**, und CI
-  fährt es (`ci.yml:41`); typecheck und die Testläufe sehen die Regel nicht.
-- **Push per `--force-with-lease` war korrekt und verlustfrei:** der Remote-Tip
-  (`a36b64d`) war der Vor-Squash-Stand von PR #295, dessen Inhalt längst als
-  `59390b3` in `main` liegt.
+- **`APNS_SANDBOX=1` steht auch auf PROD** und weicht damit bewusst von
+  `docs/secrets.md` ab (dort korrigiert). Es ist der Grund, warum ein
+  Xcode-Build funktioniert. Ohne die Host-Erkennung wäre es eine Zeitbombe;
+  mit ihr ist es nur noch eine Vermutung.
+- **Kein Skript ins Repo für die PROD-Sondierung** — die Abfragen liefen als
+  `.mts` aus dem Scratchpad über `pg` + das Wurzelzertifikat aus `scripts/`.
+- **Der Supabase-MCP taugt hier nicht mehr:** er sieht nur noch die
+  Organisation `cparx`, nicht die fbc-Projekte. Der `pg`-Weg gilt.
 
 ## Files modified
 
-`src/lib/ota.ts` (neu) · `src/lib/ota.test.ts` (neu, 3 Zusagen) ·
-`src/main.tsx` (ein Import, Zeile 2) · `capacitor.config.ts`
-(`autoDeleteFailed: false`, ausführlich begründet) ·
-`scripts/capacitor-config.test.ts` (+1 Zusage) ·
-`scripts/ota-buendel.logic.ts` (`cause`) ·
-`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage +
-Szenario „Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert") ·
-`openspec/changes/capacitor-huelle/tasks.md` (D4 abgehakt).
+`supabase/functions/send-push/anbieter.ts` (+`apnsMitHostErkennung`) ·
+`anbieter.test.ts` (+7 Zusagen) · `send-push/index.ts` (`ueberApns` ist
+dünner Aufrufer) · `.github/workflows/ci.yml` (`--allow-read=supabase/functions`) ·
+`openspec/changes/push-fundament/{tasks.md,specs/notifications/spec.md}` ·
+`docs/secrets.md`.
 
-## Next session: start here
+## Next session: start here — die Betriebsrisiken
 
-**Erster Handgriff: `gh pr checks 299` — und dann den Merge begleiten.**
-Danach, in dieser Reihenfolge:
+Eigenen Worktree aufmachen (`/wt-switch-create donald/age-XXX-...`); dieser hier
+ist gemergt. Die vier Punkte stehen in `push-fundament/tasks.md:537-551`.
 
-1. **`migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
-   Frontend-Deploy. Es sind **drei** Migrationen (…100000, …140000, …160000).
-   **Vor** dem ersten Deploy auf `main`, sonst scheitert der OTA-Schritt am
-   fehlenden Bucket.
-2. **Linear-Status von AGE-642 nachsehen.** Die Automation kippt ihn beim Merge
-   auf *Done*, und der Vorgang ist NICHT fertig (31 offene Aufgaben, Phase E
-   unangetastet). Vorbeugen geht nicht — der Branchname trägt das Kürzel.
-   Nachsehen und zurücksetzen ist die einzige gemessene Abhilfe.
-3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
-   live geschalteten Luftweg braucht.
+### Die Sentry-Frage ist schon beantwortet, und die Antwort ist NEIN
 
-**Zwei Dinge, die vorher gelesen gehören:**
+**Sentry hätte diesen Ausfall nicht gefangen.** Gemessen am Code
+(`send-push/index.ts:202-209`): der Fehler wird **gefangen**, als
+`zustellung_warf` protokolliert, als `vorlaeufig` verbucht — die Funktion gibt
+**200** zurück. Es fliegt nichts. Dazu kommt: Sentry ist hier heute
+**browser-only** (`@sentry/react`, `src/instrument.ts`); in
+`supabase/functions/` gibt es **keine einzige** Sentry-Zeile.
 
-- **Das Spec-Delta ist NACH Review-Runde 5 gewachsen** (die neue
-  Rückweg-Zusage). Der §18-Gate meldet das bei jedem Commit: „was reviewed, but
-  the artifacts changed since". Nicht blockend, aber vor dem Archivieren ist zu
-  entscheiden, ob eine Runde 6 über das geänderte Delta läuft. Im PR-Rumpf steht
-  ein Hinweis für die Review.
-- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
-  `git checkout -- src/content/release-entries.generated.ts`.
+Sentry in die Function zu holen hülfe also nur mit einem ausdrücklichen
+`captureMessage` — dann ist es kein Fehler-Melder mehr, sondern ein Wächter,
+und den kann man billiger haben.
 
-## Open questions — alle innerhalb AGE-642
+**Die Daten waren die ganze Zeit da.** Drei Tage lang standen die
+`aufgegeben`-Zeilen in `push_zustellungen`, mit dem richtigen Grund. Es hat nur
+niemand hingesehen. Der naheliegende Zuschnitt ist deshalb ein **Wächter auf
+der Tabelle** (pg_cron zählt `aufgegeben` seit X und meldet), nicht ein
+Fehler-Melder — er fängt zusätzlich den Fall, dass gar nichts mehr ankommt.
 
-- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
-  Endpunkte. Sichtbar wird er erst beim ersten Deploy auf `main`.
-- **Der Rückfall selbst ist unbelegt und absichtlich so markiert.** Er hängt an
-  einem Zeitgeber im nativen Teil und ist in jsdom nicht herstellbar. Belegt ist
-  unsere Hälfte: vier Zusagen, alle vier gegengeprüft (Plattform-Bedingung
-  lässt zwei umfallen, top-level `await` die dritte, `autoDeleteFailed: true`
-  die vierte).
-- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
-  C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
-  **und das kostet Donald die Anmeldung** — vorher ansagen.
-- **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
-  Donalds Hand. Das OTA-Schlüsselpaar ist erledigt und im Deploy gegengeprüft.
-- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand** (per `psql`
-  eingespielt, weil der Stack geteilt ist). Ein `supabase db reset` stellt sie
-  korrekt her.
-- **Nicht angefasst, ausserhalb AGE-642:** `scripts/sync-dev-auszug.test.ts` ist
-  per Bauart flakig. `ADR-0037` wird dreimal zitiert, existiert aber nicht.
+**Axiom ist raus** (Donald, 01.09.; ADR-0037 vom 10.08.). Nicht als Ziel
+vorschlagen.
+
+## Open questions
+
+- **`AXIOM_TOKEN` und `AXIOM_DATASET` liegen noch in Infisical `prod`.**
+  `docs/observability.md` nennt das Entfernen ausdrücklich als offene
+  Operator-Aufgabe („Deleting the code does not invalidate the token") — es ist
+  seit dem 10.08. nicht geschehen. Ein gültiges Ingest-Token für einen Dienst,
+  den niemand mehr nutzt.
+- **`ADR-0037` wird zitiert, existiert aber nicht** — `docs/decisions/` hat
+  keine solche Datei. Betrifft auch andere Stellen im Repo.
+- **AGE-641 steht auf *Done*, trägt aber 14 offene Aufgaben.** Donald hatte es
+  am 28.08. selbst so gesetzt; der Merge hat es dorthin zurückgedreht. Nicht
+  eigenmächtig ändern.
+- **`APNS_SANDBOX` aus `prod` nehmen, sobald ein Store-Build läuft.** Bricht bis
+  dahin nichts.
+- **Vier Gerätebelege stehen aus** (Android, iOS im Vorder-/Hintergrund,
+  Opt-out je Typ, Token-Entfernung nach Ablehnung). Bündeln, wenn das iPhone
+  ohnehin für AGE-642/D5 dranhängt.
