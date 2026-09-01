@@ -37,7 +37,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
-select plan(14);
+select plan(18);
 
 -- ── Impersonierung ──────────────────────────────────────────────────────────
 -- Eigene Kopien: jede Testdatei laeuft in ihrer eigenen Sitzung.
@@ -189,6 +189,41 @@ select alike(
 select alike(
   pg_temp.try_as_rolle('service_role', $$select public.push_tokens_aufraeumen()$$),
   'DENIED:%', 'service_role darf den Aufraeumer nicht rufen');
+
+-- Die drei Zusagen darueber messen die WIRKUNG, und `try_as` meldet jeden
+-- Fehler als DENIED — auch einen Tippfehler im Funktionsnamen oder einen
+-- Fehler im Rumpf. Sie bestuenden also auch dann, wenn EXECUTE erteilt waere.
+-- Deshalb daneben die ACL selbst, die nur eine Sache messen kann.
+-- (Befund der Diff-Review.)
+select is(
+  (select has_function_privilege('anon', 'public.push_tokens_aufraeumen()', 'EXECUTE')),
+  false, 'anon haelt kein EXECUTE — an der ACL gemessen, nicht an der Wirkung');
+
+select is(
+  (select has_function_privilege('authenticated', 'public.push_tokens_aufraeumen()', 'EXECUTE')),
+  false, 'authenticated haelt kein EXECUTE');
+
+-- ACHTUNG, DIESE EINE ZUSAGE BELEGT LOKAL WENIGER, ALS SIE ZU BELEGEN SCHEINT.
+-- Am 01.09. gemessen: verkuerzt man den Entzug in der Migration auf
+-- `from public`, bleiben hier trotzdem ALLE 18 gruen — lokal ist `proacl` null,
+-- also haengt jedes Recht an `PUBLIC`, und ein Entzug von `PUBLIC` nimmt allen
+-- Rollen alles. In PROD haelt `service_role` einen ROLLEN-EIGENEN Grant aus der
+-- Default-ACL, den derselbe Entzug NICHT beruehrt.
+--
+-- Die vierte Rolle im `revoke` ist also durch diesen Lauf nicht zu
+-- rechtfertigen, sondern durch die PROD-Katalogmessung aus AGE-602. Die Zusage
+-- steht hier als Wachposten gegen eine kuenftige Regression, nicht als Beweis.
+select is(
+  (select has_function_privilege('service_role', 'public.push_tokens_aufraeumen()', 'EXECUTE')),
+  false, 'service_role haelt kein EXECUTE (lokal schwach — siehe Kommentar darueber)');
+
+-- POSITIVKONTROLLE ZUM ENTZUG: der echte Einstieg muss weiter gehen. Ohne sie
+-- waere ein Entzug, der auch `push_auftraege_faellig` mit abschneidet, von
+-- einem richtigen nicht zu unterscheiden — drei rote Rollen saehen dann aus
+-- wie Erfolg, waehrend der Minutenlauf tot ist.
+select is(
+  pg_temp.try_as_rolle('service_role', $$select * from public.push_auftraege_faellig()$$),
+  'OK', 'service_role ruft weiterhin push_auftraege_faellig — und darueber den Aufraeumer');
 
 select * from finish();
 rollback;

@@ -137,9 +137,22 @@ Keiner. Beide Arme liefen mit Exit 0 innerhalb `REVIEWER_TIMEOUT=900`.
   Ballast, den ein Leser für eine gemessene Notwendigkeit hielte. Als benannte
   Anschlussfrage in den Entwurf, mit der Schwelle, ab der sie zu messen ist.
 
+### Was der Trailer NICHT behauptet
+
+Der `digest` unten deckt die Artefakte in ihrem **heutigen** Stand. Gelesen
+haben die Reviewer die **erste** Fassung — deren Prompt-Hash steht oben als
+`reviewed_artifacts_sha` und ist der ehrlichere der beiden Werte. Die
+Überarbeitung ist die Folge ihrer Befunde und wurde ihnen nicht erneut
+vorgelegt.
+
+Das ist bewusst so und keine Nachlässigkeit: eine zweite Runde auf demselben
+Plan hätte den Befund bestätigt, den die erste schon gefunden hat. Was den
+überarbeiteten Zuschnitt prüft, ist die Review auf den **Diff** (Schritt 4) —
+und die liest, was tatsächlich gebaut wurde, nicht was geplant war.
+
 <!-- openspec-review-trailer v1
 implementing-host: claude
 digest: sha256:e2ee0c53753b0a40fba45c839dd0c9ededce6ec50e6a0cd486ab84238fdc0e7d
 producer-version: 1.2.0
-tasks-digest: sha256:0712935c6c208f9386b58bf0a53d935256b33566854f0aef049baf90e390da7e
+tasks-digest: sha256:717b7903ca95dfbe6783ca861f307ebf641a0998c4eead1f3ddf932c453bd4dd
 -->

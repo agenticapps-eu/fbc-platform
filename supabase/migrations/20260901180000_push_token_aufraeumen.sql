@@ -57,14 +57,29 @@ begin
   return n;
 end $$;
 
--- Rechte AUSGESPROCHEN entzogen, nicht geerbt (AGE-312). Default Privileges
--- wirken auf Funktionen nicht — ein `revoke` an der Rolle waere hier ein No-op.
+-- Rechte AUSGESPROCHEN entzogen, je Funktion (AGE-312).
+--
+-- GENAU GENOMMEN, weil der pauschale Satz „Default Privileges wirken auf
+-- Funktionen nicht" falsch waere (Befund der Diff-Review, und die Messung aus
+-- AGE-602 sagt dasselbe): `alter default privileges … GRANT execute on
+-- functions` wirkt sehr wohl. Wirkungslos ist der umgekehrte Weg — `alter
+-- default privileges … REVOKE execute on functions from public` —, weil
+-- Postgres `EXECUTE` implizit an `PUBLIC` vergibt und die Default-ACL das
+-- nicht wegnimmt. Eine solche Zeile waere ein No-op, der wie Schutz aussieht.
+-- Deshalb steht der Entzug hier an der Funktion.
 --
 -- `service_role` steht ausdruecklich dabei, obwohl `public` die Allgemeinheit
--- deckt: dieses Projekt fuehrt rollen-eigene Default-Grants, und eine
--- LOESCHENDE `security definer`-Funktion, die per RPC erreichbar bleibt, ist
--- kein Restrisiko, sondern ein Loch. Der verschachtelte Aufruf aus
--- `push_auftraege_faellig` laeuft weiterhin unter dem Eigentuemer.
+-- deckt — und das ist keine Vorsicht, sondern eine Messung: in PROD haelt die
+-- Rolle einen ROLLEN-EIGENEN Grant aus der Default-ACL
+-- (`{=X,postgres=X,anon=X,authenticated=X,service_role=X}`), waehrend `proacl`
+-- lokal `null` ist. `revoke … from public` nimmt lokal alles und in PROD
+-- nichts. Eine LOESCHENDE `security definer`-Funktion, die dort per RPC
+-- erreichbar bliebe, ist kein Restrisiko, sondern ein Loch.
+--
+-- Der verschachtelte Aufruf aus `push_auftraege_faellig` laeuft weiterhin:
+-- jene Funktion ist selbst `security definer` und gehoert demselben
+-- Eigentuemer. Der pgTAP-Lauf belegt beide Haelften — Entzug aussen,
+-- Durchgang innen.
 revoke execute on function public.push_tokens_aufraeumen()
   from public, anon, authenticated, service_role;
 

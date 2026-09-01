@@ -23,13 +23,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * den Kanal für immer. Deshalb steht sie hier doppelt — einmal für `prompt`
  * und einmal für den Fall, dass die Erlaubnis schon erteilt ist.
  */
-const { checkPermissions, requestPermissions, register, addListener, rpc } = vi.hoisted(() => ({
-  checkPermissions: vi.fn(async () => ({ receive: "granted" as string })),
-  requestPermissions: vi.fn(async () => ({ receive: "granted" as string })),
-  register: vi.fn(async () => {}),
-  addListener: vi.fn(async () => {}),
-  rpc: vi.fn(async () => ({ error: null })),
-}));
+const { checkPermissions, requestPermissions, register, addListener, rpc, zuhoerer } = vi.hoisted(
+  () => {
+    // Die Zuhoerer werden FESTGEHALTEN, nicht bloss gezaehlt. Ohne das prueft
+    // der Lauf nur, DASS `register()` lief — und ein Diff, der
+    // `claim_push_token` herausnimmt, bliebe gruen, waehrend `letzter_kontakt`
+    // nie wieder steigt und der Aufraeumer lebende Token loescht. Genau dieser
+    // blinde Fleck kam aus der Diff-Review.
+    const zuhoerer = new Map<string, (e: { value: string }) => Promise<void> | void>();
+    return {
+      checkPermissions: vi.fn(async () => ({ receive: "granted" as string })),
+      requestPermissions: vi.fn(async () => ({ receive: "granted" as string })),
+      register: vi.fn(async () => {}),
+      addListener: vi.fn(async (name: string, cb: (e: { value: string }) => void) => {
+        zuhoerer.set(name, cb);
+      }),
+      rpc: vi.fn(async () => ({ error: null })),
+      zuhoerer,
+    };
+  },
+);
 
 const { istNativ, plattform } = vi.hoisted(() => ({
   istNativ: vi.fn(() => true),
@@ -63,14 +76,34 @@ describe("pushLebenszeichen — erneuert, ohne zu fragen", () => {
     expect(requestPermissions).not.toHaveBeenCalled();
   });
 
+  it("legt das erneuerte Token über claim_push_token ab", async () => {
+    // DIE Zusage, an der der ganze Vorgang hängt: `register()` allein erneuert
+    // nichts. Erst das `registration`-Ereignis schreibt `letzter_kontakt` — und
+    // ohne diesen Test bliebe ein Diff grün, der genau diesen RPC entfernt.
+    await pushLebenszeichen();
+    const beiRegistrierung = zuhoerer.get("registration");
+    expect(beiRegistrierung).toBeTypeOf("function");
+
+    await beiRegistrierung!({ value: "tok-erneuert" });
+
+    expect(rpc).toHaveBeenCalledWith("claim_push_token", {
+      p_token: "tok-erneuert",
+      p_plattform: "ios",
+    });
+  });
+
   it("fragt NICHT, wenn die Erlaubnis noch offen ist — und registriert auch nicht", async () => {
     checkPermissions.mockResolvedValue({ receive: "prompt" });
 
     expect(await pushLebenszeichen()).toBe("abgelehnt");
     expect(requestPermissions).not.toHaveBeenCalled();
-    // Ohne Erlaubnis gibt es kein Token zu erneuern. `register()` liefe hier
-    // ins Leere und wäre auf iOS zudem der Auslöser des Dialogs.
+    // Ohne Erlaubnis gibt es kein Token zu erneuern — `register()` liefe ins
+    // Leere. NICHT, weil es den Dialog auslöste: `register()` ruft nur
+    // `registerForRemoteNotifications()`, der Dialog entsteht ausschliesslich
+    // über `requestPermissions()`. (Befund der Diff-Review; die erste Fassung
+    // dieses Kommentars behauptete das Gegenteil.)
     expect(register).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("fragt NICHT, wenn die Erlaubnis zurückgenommen wurde", async () => {

@@ -95,7 +95,11 @@ darf der Aufräumer nicht existieren.
       `pnpm lint` Exit 0. `pnpm format:check` ist Exit 1, aber mit **303**
       bestehenden Fremddateien und **keiner** aus diesem Diff — `pnpm format`
       schriebe rund 60 fremde Dateien um und bleibt deshalb aus.
-- [ ] Fremdreview auf den Diff — Migration und Rechte.
+- [x] Fremdreview auf den Diff — Migration und Rechte. gemini APPROVE, codex
+      REQUEST-CHANGES mit 6 Befunden; 5 übernommen, 1 gemessen und begründet
+      abgelehnt. Auflösung in `REVIEWS-DIFF.md`. Der schwerste Befund war
+      berechtigt: der Frontend-Test belegte `claim_push_token` nicht — jetzt
+      per Mutation E gerötet.
 - [ ] Im PR-Text: solange `push_tokens` fast leer ist, belegt der grüne Lauf die
       Funktion, nicht den Betrieb. Der Betriebsbeleg kommt mit den echten
       Geräten aus AGE-642. Und: das Löschen eines gültigen Tokens ist eine

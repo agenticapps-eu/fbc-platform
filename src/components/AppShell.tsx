@@ -646,13 +646,21 @@ export default function AppShell() {
   // wo er erklärbar ist — die Anforderung „Der Start fragt nicht" verbietet
   // das Anfordern, nicht das Erneuern eines bereits erteilten Tokens.
   //
-  // Abhängig von `user`, weil das Token dem angemeldeten Konto gehört: nach
-  // einem Kontowechsel in derselben Sitzung will das neue Konto seinen
-  // Zeitstempel. Ohne Anmeldung geschieht nichts.
+  // Abhängig von der KONTO-KENNUNG, nicht vom `user`-Objekt. Das Token gehört
+  // dem angemeldeten Konto: nach einem Kontowechsel in derselben Sitzung will
+  // das neue Konto seinen Zeitstempel. Ohne Anmeldung geschieht nichts.
+  //
+  // `[user]` waere hier die falsche Abhängigkeit gewesen, und zwar messbar:
+  // `user` ist `session?.user` (`AuthProvider.tsx:258`), und die Identität
+  // wechselt auch bei jeder Token-Erneuerung. Der Effekt liefe dann öfter als
+  // die Zusage „einmal je Montierung und Konto" behauptet — harmlos in der
+  // Wirkung, aber eine Abhängigkeit, die etwas anderes sagt als sie meint.
+  // (Befund der Diff-Review.)
+  const kontoId = user?.id ?? null;
   useEffect(() => {
-    if (!user) return;
+    if (!kontoId) return;
     void pushLebenszeichen();
-  }, [user]);
+  }, [kontoId]);
 
   // Ein Tipp auf die Mitteilung führt in ihr Gespräch (AGE-641 Phase B).
   //
