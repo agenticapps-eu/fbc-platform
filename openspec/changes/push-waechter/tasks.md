@@ -167,15 +167,25 @@ Beleg an der laufenden Anlage.
 
 ## 5 · Die Dokumentation sagt die Wahrheit
 
-- [ ] **5.1** `docs/supabase-environments.md:363` sagt „**Genau eines**" und
-      nennt nur den Contact-Webhook. Tatsächlich sind es **fünf Namen in
-      `ERWARTET_OHNE_MIGRATION`** (zwei Webhook-Paare plus `push_wiederholung`)
-      und dazu **zwei Zeitplanungen**, die dort noch gar nicht stehen. Die Liste
-      nachziehen, mit Begründung je Objekt.
-- [ ] **5.2** Den Wächter in `docs/secrets.md` eintragen, im Abschnitt zu
-      `send-push`: was jeder der vier Befunde bedeutet und was als Erstes zu
-      prüfen ist. **Nicht** in `docs/runbook.md` — die Datei existiert nicht
-      (AGE-179 ist dafür offen).
+- [x] **5.1** `docs/supabase-environments.md` sagte „**Genau eines**" und nannte
+      nur den Contact-Webhook. Jetzt: **vier Objekte mit fünf Namen** in
+      `public` plus **zwei Zeitplanungen**, je mit Begründung, dazu die zwei
+      neuen Zeilen in „Was `db push` nicht mitnimmt". Der Satz war seit dem
+      28.08. falsch; die maßgebliche Liste stand derweil im Code.
+
+      Zwei weitere Fehler in denselben Abschnitten mitgenommen, weil sie
+      unmittelbar neben der Korrektur standen: der Scan hiess dort
+      `db-drift-scan.**sh**` (die Datei hat es nie gegeben), und
+      `docs/secrets.md:353` behauptete, ein roter Objekt-Scan lasse den
+      Frontend-Deploy stumm ausfallen — **dieselbe** Gate-Verwechslung, die
+      130 Zeilen weiter unten schon als korrigiert markiert ist.
+- [x] **5.2** Der Wächter steht in `docs/secrets.md` im Abschnitt zu
+      `send-push`: eine Zeile je Befund mit Bedeutung und erstem Handgriff,
+      warum `letzter_fehler` nicht ins Protokoll geht, die zwei benannten
+      Grenzen, und wie man ihn von Hand rot fährt. **Nicht** in
+      `docs/runbook.md` — die Datei existiert nicht (AGE-179 ist dafür offen).
+      Dazu die inzwischen falsche Zusage bei `:504` ersetzt, eine abbestellte
+      Zeitplanung falle dem Scan nicht auf.
 
 ## 6 · Abnahme
 

@@ -353,6 +353,8 @@ fehlen danach:
 | `auth.users` | projektgebunden — Konten neu registrieren |
 | Storage-**Dateien** | gar nicht, und das ist gewollt |
 | Der Contact-Request-Webhook | von Hand, siehe unten |
+| Der Push-Webhook und `push_wiederholung()` | von Hand, siehe unten |
+| Die zwei cron-Zeitplanungen | von Hand, siehe unten |
 
 Storage-**Buckets** kommen dagegen mit: `avatars` wird in
 `20260613081627_profile_editor_storage.sql` per `insert into storage.buckets`
@@ -361,29 +363,67 @@ nach PROD.
 
 ### Objekte, die bewusst keine Migration sind
 
-**Genau eines**, und es ist eine bewusste Entscheidung, kein Versäumnis:
+> **Hier stand bis zum 01.09.2026 „Genau eines".** Das war seit dem 28.08.
+> falsch: mit dem Push-Fundament (AGE-641) kamen drei weitere Namen dazu und
+> mit den geplanten Beiträgen (AGE-667) eine zweite Zeitplanung. Der Satz ist
+> nie nachgezogen worden, und die maßgebliche Liste stand derweil im Code.
+> Gefunden hat es die Plan-Review zu AGE-679.
 
-- `public.notify_contact_request_webhook()` und der Trigger
-  `contact_requests_email_webhook` auf `public.contact_requests`.
+Es sind **vier Objekte mit fünf Namen in `public`**, dazu **zwei
+Zeitplanungen** im Schema `cron`. Jedes davon ist eine bewusste Entscheidung,
+kein Versäumnis.
 
-Der Trigger trägt den `CONTACT_WEBHOOK_SECRET` als Bearer **inline** — Supabase
-Vault ist auf diesen Projekten permission-locked (`_crypto_aead_det_noncegen`
-gehört `supabase_admin`), und das Repo ist öffentlich. Vorlage und Begründung
-stehen in `docs/secrets.md`.
+**Die drei mit inline gespeichertem Bearer.** Sie können nicht ins Repository,
+weil es öffentlich ist, und nicht in den Vault: Supabase Vault ist auf diesen
+Projekten permission-locked (`_crypto_aead_det_noncegen` gehört
+`supabase_admin`).
 
-**Beim Aufsetzen eines Projekts muss er von Hand angelegt werden**, mit dem
-Projekt-Ref *dieses* Projekts in der Ziel-URL. Vergisst man ihn, ist der
-Mailversand für Kontaktanfragen still tot: grün in jeder Prüfung, kaputt im
-Betrieb.
+| Objekt | Namen |
+|---|---|
+| Kontaktanfrage → `notify-contact-request` | `notify_contact_request_webhook()`, Trigger `contact_requests_email_webhook` auf `public.contact_requests` |
+| Hinweis → `send-push` | `notify_push_webhook()`, Trigger `notifications_push_webhook` auf `public.notifications` |
+| Wiederholungslauf der Push-Zustellung | `push_wiederholung()` |
+
+**Die zwei Zeitplanungen.** Ihre *Funktionen* liegen in Migrationen — nur die
+Zeitplanung nicht, weil ein `cron.schedule` in einer Migration den CI-Lauf
+gegen eine frische Datenbank bräche.
+
+| Eintrag | Zeitplan | Befehl |
+|---|---|---|
+| `push-wiederholung` | `* * * * *` | `select public.push_wiederholung()` |
+| `beitrag-ankuendigen` | `* * * * *` | `select public.beitrag_ankuendigen()` |
+
+Vorlagen und Begründungen stehen in `docs/secrets.md`; die maßgebliche Liste
+für die Prüfung ist `ERWARTET_OHNE_MIGRATION` und `ERWARTETE_ZEITPLAENE` in
+`scripts/db-drift-scan.logic.ts`.
+
+**Beim Aufsetzen eines Projekts müssen sie von Hand angelegt werden**, mit dem
+Projekt-Ref *dieses* Projekts in der Ziel-URL. Vergisst man eines, stirbt sein
+Weg still: grün in jeder Prüfung, kaputt im Betrieb. Genau das ist am
+28.–31.08.2026 geschehen — nur lag die Ursache dort in fehlenden Secrets, nicht
+in einem fehlenden Objekt.
 
 ### Der Drift-Scan
 
 Die einzige Prüfung, die „was steht in der Datenbank, das in keiner Migration
-steht" überhaupt beantwortet. Sie liegt als `scripts/db-drift-scan.sh` vor und
-**läuft bei jedem `migrate-prod` mit** — nicht nur beim Aufsetzen. Wird der
-Webhook-Trigger später versehentlich gelöscht, stirbt der Mailversand sonst
-wieder still, und das ist genau der Havarie-Modus, den dieses Runbook an anderer
-Stelle beschreibt.
+steht" überhaupt beantwortet. Sie liegt als `scripts/db-drift-scan.ts` vor
+(hier stand `.sh`; die Datei hat es nie gegeben) und verlangt seit AGE-679 die
+Seite als Pflichtangabe:
+
+```bash
+pnpm tsx scripts/db-drift-scan.ts <dev|prod>
+```
+
+Sie **läuft bei jedem `migrate-prod` mit** — nicht nur beim Aufsetzen — und
+seit AGE-679 zusätzlich **stündlich gegen beide Projekte**
+(`.github/workflows/push-waechter.yml`). Bis dahin sah sie DEV nie: ein
+`supabase db reset` dort nahm Webhooks, Funktion und Zeitplanungen still mit.
+
+Sie prüft seither auch, was **dasteht und trotzdem nicht läuft**: eine
+Zeitplanung mit richtigem Namen und ausgehöhltem Befehl, und einen Trigger, der
+per `disable trigger` abgeschaltet wurde und weiter im Katalog steht. Was sie
+weiterhin **nicht** sieht, steht im Kopf von `db-drift-scan.logic.ts` — allen
+voran veränderte Funktionsrümpfe.
 
 Die Logik, zum Nachvollziehen:
 
