@@ -189,12 +189,19 @@ Beleg an der laufenden Anlage.
 
 ## 6 · Abnahme
 
-- [ ] **6.1** `openspec validate --all` grün.
-- [ ] **6.2** Die fünf Abnahmepunkte aus AGE-679 sind je durch ein Artefakt
-      belegt, nicht durch eine Behauptung: Testlauf, Lauf-ID, Messwert.
-- [ ] **6.3** Der vierte Punkt der Reviewer-Liste (`net._http_response` wächst)
-      ist mit Zahlen widerlegt und in `push-fundament/tasks.md` als erledigt
-      markiert — mit dem Messwert, nicht mit einem Haken.
+- [x] **6.1** `openspec validate --all` grün, 31/31.
+- [ ] **6.2** Die Abnahmepunkte aus AGE-679, je mit Artefakt statt Behauptung:
+
+      | Abnahmepunkt | Beleg |
+      | --- | --- |
+      | Wächter meldet aufgegebene Zustellungen, durch Mutation belegt | M06 rötet die Zusage; Anzahl statt `letzter_fehler`, geprüft an den **Abfragen** (M11, M14–M17) |
+      | Wächter schlägt an, wenn der Wiederholungslauf steht | Quelle ist `cron.job_run_details`; M03/M04 röten beide Bedingungen; echter roter Lauf gegen DEV, dreimal |
+      | Wächter meldet seinen eigenen Messausfall als eigenen Befund | M07/M08; echter Lauf gegen eine unerreichbare URL → `messausfall`, nicht `stillstand` |
+      | DEV hat einen Wächter über die nicht-migrierten Objekte | Drift-Scan je Seite im stündlichen Workflow; gegen beide Instanzen grün gelaufen |
+      | **Der Meldeweg ist einmal ausgelöst** | **offen** — geht erst nach dem Merge, siehe 4.3 |
+- [x] **6.3** Der vierte Punkt der Reviewer-Liste (`net._http_response` wächst)
+      ist in `push-fundament/tasks.md` mit dem **Messwert** durchgestrichen, und
+      die drei übrigen tragen dort jetzt eine Zuordnung auf diesen Change.
 
 ## Nicht in diesem Change — bewusst
 

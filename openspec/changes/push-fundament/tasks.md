@@ -534,18 +534,41 @@ Phase B beginnt erst danach.
 Vier Punkte, die der Reviewer als Betriebsrisiken benannt hat. Sie stehen hier,
 damit ein grüner A5b-Haken nicht als Aussage gelesen wird, die er nicht trägt.
 
+> **Alle vier sind am 01.09. in AGE-679 (`push-waechter`) aufgenommen worden —
+> und einer davon ist dabei widerlegt worden.** Die Zuordnung steht je Punkt
+> darunter.
+
 - [ ] **Ein `supabase db reset` tilgt den Wiederholungslauf lautlos.** Funktion
       und cron-Eintrag sind keine Migrationen. Der Objekt-Drift-Scan misst nur
       PROD und läuft nur von Hand — **DEV hat gar keinen Wächter**. Nach einem
       Reset ist der Lauf dort still tot. Gleiches gilt seit jeher für das
       Webhook-Paar; neu ist nur, dass es jetzt drei Objekte sind.
+      → **AGE-679:** der Scan läuft jetzt stündlich gegen beide Seiten und
+      fragt zusätzlich `cron.job` ab. Es sind übrigens vier Objekte mit fünf
+      Namen plus zwei Zeitplanungen, nicht drei.
 - [ ] **Ein dauerhafter Zustellausfall ist unsichtbar.** `net.http_post` ist
       Fire-and-Forget: antwortet `send-push` durchgehend `401` (rotierter
       Bearer) oder `502`, bleibt der cron-Lauf `succeeded`. Nichts schlägt an.
-- [ ] **`net._http_response` wächst und wird von niemandem aufgeräumt** — beim
+      → **AGE-679:** die Daten waren die ganze Zeit da — `net._http_response`
+      trägt `status_code`, `timed_out` und `error_msg`, sechs Stunden weit
+      zurück. Es fehlte der Leser, nicht die Aufzeichnung.
+- [x] ~~**`net._http_response` wächst und wird von niemandem aufgeräumt** — beim
       Minutentakt rund 1440 Zeilen je Tag und Projekt. pg_net räumt nicht
-      selbst auf.
+      selbst auf.~~ **WIDERLEGT am 01.09. (AGE-679), mit Zahlen statt mit einem
+      Haken.** Gemessen an beiden Instanzen: pg_net **0.20.3** (DEV) /
+      **0.20.4** (PROD), `pg_net.ttl = 6 hours`, `batch_size = 200`, je
+      **360 Zeilen**, älteste 5 h 59 min. Das sind 6 h × 60 min — ein
+      Fließgleichgewicht genau an der TTL-Kante, auf beiden Seiten auf die
+      Zeile gleich. `worker.c` ruft `delete_expired_responses(guc_ttl,
+      guc_batch_size)` als **erste** Handlung jedes Schleifendurchlaufs.
+
+      Der Punkt hat null Zeilen Code gekostet. Was von ihm bleibt: die TTL ist
+      eine **Voraussetzung** des Wächters — sein Fenster muss kürzer sein — und
+      wird deshalb bei jedem Lauf mitgemessen.
 - [ ] **Das Gesundheitssignal verfällt mit Phase B.** Solange `push_tokens`
       leer ist, belegt `200 {"skipped":true}`, dass der Weg steht. Mit dem
       ersten echten Gerätetoken heisst dieselbe Antwort nur noch „nichts
       zuzustellen" — ein Nachfolge-Beleg fehlt.
+      → **AGE-679:** der Nachfolger ist das Stillstand-Signal auf
+      `cron.job_run_details`. Es trägt auch dann noch, wenn `push_tokens` nicht
+      mehr leer ist (PROD: 1 Gerät, DEV: 2).
