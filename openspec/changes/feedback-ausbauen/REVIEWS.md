@@ -15,6 +15,13 @@ beide Exit 0. Der Prompt umfasste Proposal, Design, Tasks und beide Spec-Deltas
 > Funktionen `digest_set`/`compute_digest` aus `openspec-change-gate.sh` selbst
 > berechnet.
 >
+> **Der Trailer-`digest` zeigt auf die ÜBERARBEITETEN Artefakte, nicht auf die
+> geprüften.** Er sagt „diese Review ist für diesen Stand aktuell", nicht „das
+> haben die Prüfer gesehen". Was sie gesehen haben, steht oben als SHA-256 des
+> Prompts (`69b8af1a…`) und war die erste Fassung. Beides auseinanderzuhalten
+> ist der Punkt: die Überarbeitung ist die Antwort auf die Review, nicht ihr
+> Gegenstand.
+>
 > **Laufzeit, weil es die nächste Runde plant:** `gemini` war in gut einer
 > Minute durch und hat den Text bewertet. `codex` brauchte **knapp 13 Minuten
 > und 22 Werkzeugaufrufe** — er hat `git log` gefahren, Migrationen und
@@ -82,7 +89,7 @@ Verweis mit aufräumt; das Non-Goal entsprechend schärfen.
 [HIGH] design 5 / tasks 2.2–2.3b — `screenshot_path` ist an nichts gebunden —
 weder an den Verfasser noch an ein existierendes Objekt. Ein Mitglied kann seine
 Zeile auf einen fremden Pfad zeigen lassen; die Admin-Fläche signiert oder
-löscht dann das falsche Objekt (*confused deputy*). — Eigentümer-Präfix für
+löscht dann das falsche Objekt (_confused deputy_). — Eigentümer-Präfix für
 nicht-leere Pfade erzwingen, möglichst ein Objekt je Feedback, und über die
 geprüfte Feedback-Identität löschen statt über einen vom Client gelieferten Pfad.
 
@@ -152,12 +159,12 @@ Keiner. Beide Prüfer lieferten Exit 0 innerhalb der Zeitgrenze.
 **Nachgemessen statt geglaubt.** Jeder prüfbare Befund von `codex` wurde vor der
 Annahme selbst gemessen, und **jeder hielt stand**:
 
-| Befund | Gegenprobe |
-| --- | --- |
-| `messages_insert` klammert Teilnahme mit ein | bestätigt an `20260806080100_activation_gate.sql:358-370` |
-| Typdatei liegt woanders | bestätigt: `src/lib/database.types.ts` existiert, `src/types/` nicht |
-| Fünf exakte Signatur-Bezüge | bestätigt: 2 in `rls_test.sql`, 3 in `admin_feedback_test.sql` |
-| Query-Schlüssel trägt nur die Seite | bestätigt: `AdminFeedbackPage.tsx:94` |
+| Befund                                       | Gegenprobe                                                           |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `messages_insert` klammert Teilnahme mit ein | bestätigt an `20260806080100_activation_gate.sql:358-370`            |
+| Typdatei liegt woanders                      | bestätigt: `src/lib/database.types.ts` existiert, `src/types/` nicht |
+| Fünf exakte Signatur-Bezüge                  | bestätigt: 2 in `rls_test.sql`, 3 in `admin_feedback_test.sql`       |
+| Query-Schlüssel trägt nur die Seite          | bestätigt: `AdminFeedbackPage.tsx:94`                                |
 
 **Angenommen und einzuarbeiten** — alle acht HIGH und alle MEDIUM ausser dem
 unten genannten. Der schwerwiegendste ist der zweite: mein Entwurf sagte, die
@@ -185,7 +192,7 @@ nicht gebaut.
 
 <!-- openspec-review-trailer v1
 implementing-host: claude
-digest: sha256:8d3438b57b4e457428502b5f1fe9acc60476a687930a65e8ddafa652e37dc964
+digest: sha256:e14087835b3f295ee888faab35170493a7d2ca73b162f2ce0749ea69d5434dd4
 producer-version: 1.2.0
-tasks-digest: sha256:979ffa52c2bef2672b7852112a70e202ad99336dee3ee1b99b185b55cd7d70ae
+tasks-digest: sha256:4a301ab81a1c0a069d7b8b7d67b15138bd3ec6a87896479b42f3b57862133f03
 -->

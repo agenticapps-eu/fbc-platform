@@ -18,6 +18,12 @@ ginge in der Filterliste als eigenes, namenloses Thema durch.
 Das QM-Formular SHALL das Thema zur Auswahl anbieten und mit „Generell"
 vorbelegt sein.
 
+Die Spalte SHALL einen **Vorgabewert** „Generell" tragen. Ohne ihn bräche jeder
+Schreibzugriff, der die Spalte nicht nennt — und das sind nach der Migration und
+vor dem Frontend-Deploy **alle**: die ausgelieferte Oberfläche, zwischen-
+gespeicherte Clients, die Seeds und die bestehenden SQL-Tests. Die Reihenfolge
+„Datenbank zuerst" ist damit nur haltbar, wenn die Spalte sich selbst füllt.
+
 #### Scenario: Das Formular schickt ein Thema mit
 
 - **WHEN** ein Mitglied das QM-Formular absendet, ohne das Thema anzufassen
@@ -28,6 +34,12 @@ vorbelegt sein.
 - **WHEN** ein Schreibzugriff `theme` auf einen Wert setzt, der nicht in der
   festgelegten Menge steht
 - **THEN** weist die Datenbank den Schreibzugriff ab
+
+#### Scenario: Ein Schreibzugriff ohne Thema bleibt möglich
+
+- **WHEN** ein Schreibzugriff eine `feedback`-Zeile anlegt, ohne `theme` zu
+  nennen — so wie die Oberfläche es tut, die vor dem Deploy noch läuft
+- **THEN** wird die Zeile angelegt und trägt „Generell"
 
 #### Scenario: Der Bestand bekommt „Generell", nicht NULL
 
@@ -48,6 +60,18 @@ Upload SHALL mit `upsert: false` erfolgen — bei `true` scheitert er an der
 SELECT-Policy, weil der Aufrufer die Zieldatei erst lesen müsste.
 
 Ein Feedback ohne Bild SHALL weiterhin möglich sein; das Bild ist optional.
+
+Der Bildverweis SHALL an den Verfasser gebunden sein: ein nicht-leerer Pfad
+SHALL im Präfix des Verfassers liegen. Ohne diese Bindung könnte ein Mitglied
+seine Zeile auf ein **fremdes** Objekt zeigen lassen, und die Admin-Fläche
+signierte oder löschte daraufhin das falsche Bild — sie handelte im Auftrag
+eines Angreifers, ohne es zu merken. Die Zuordnung SHALL zusätzlich eindeutig
+sein: ein Objekt gehört zu höchstens einer Feedback-Zeile.
+
+Das Löschen SHALL über die geprüfte **Feedback-Identität** geschehen und NOT
+über einen vom Aufrufer gelieferten Pfad. Es SHALL den Verweis an der Zeile
+mit aufräumen — ein Verweis, der ins Leere zeigt, ist schlimmer als keiner,
+weil die Fläche ihn weiter zu signieren versucht.
 
 Das Bild SHALL vom Verfasser **und** von einem Admin gelöscht werden können.
 Das Leserecht allein genügt hier nicht: ein missbräuchlich hochgeladenes Bild
@@ -82,6 +106,19 @@ hängen wie sein Leserecht und SHALL NOT weiter reichen als auf diesen Bucket.
 
 - **WHEN** ein Admin das Bild eines fremden Feedbacks löscht
 - **THEN** lässt der Speicher das Löschen zu
+- **AND** die Feedback-Zeile trägt danach keinen Bildverweis mehr
+
+#### Scenario: Ein fremder Pfad wird gar nicht erst angenommen
+
+- **WHEN** ein Mitglied seine Feedback-Zeile auf einen Pfad im Präfix eines
+  anderen Mitglieds zeigen lässt
+- **THEN** weist die Datenbank den Schreibzugriff ab
+
+#### Scenario: Ein deaktivierter Admin kommt nicht heran
+
+- **WHEN** ein Konto mit gesetzter Admin-Rolle, aber deaktiviert, ein fremdes
+  Bild lesen oder löschen will
+- **THEN** verweigert der Speicher beides
 
 #### Scenario: Ein Fremder kann das Bild nicht löschen
 
@@ -137,6 +174,22 @@ Der Weg SHALL das bestehende Gespräch öffnen, wenn es eines gibt, und sonst
 genau eines anlegen — nach derselben Normalisierung des Paares, die für jedes
 andere Gespräch gilt. Er SHALL NOT ein zweites Gespräch zu einem Paar erzeugen,
 das bereits eines hat.
+
+Der Weg SHALL NOT angeboten werden, wenn er ins Leere führte: nicht bei
+Feedback, das der handelnde Admin **selbst** geschrieben hat, und nicht bei
+einem Verfasser, dessen Konto deaktiviert oder gelöscht ist. `profile_id not
+null` belegt nur, dass eine Profilzeile existiert — nicht, dass sie zu jemand
+anderem gehört und nicht, dass dahinter noch jemand erreichbar ist.
+
+#### Scenario: Am eigenen Feedback gibt es keinen Weg
+
+- **WHEN** ein Admin eine Feedback-Zeile sieht, die er selbst geschrieben hat
+- **THEN** bietet die Fläche dort keinen Weg ins Gespräch an
+
+#### Scenario: Bei einem stillgelegten Verfasser gibt es keinen Weg
+
+- **WHEN** der Verfasser einer Feedback-Zeile deaktiviert oder gelöscht ist
+- **THEN** bietet die Fläche dort keinen Weg ins Gespräch an, und sagt warum
 
 #### Scenario: Der Admin springt in ein bestehendes Gespräch
 

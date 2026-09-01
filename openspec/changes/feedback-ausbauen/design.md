@@ -1,264 +1,294 @@
 ## Context
 
-Das QM-Feedback (AGE-300, AGE-587) steht: eine Tabelle, eine RLS-Zusage
-„jeder schreibt nur sein eigenes", eine `SECURITY DEFINER`-RPC für den Admin,
-eine eigene Route mit Blätterung. Was fehlt, sind die vier Mittel, mit der
+Das QM-Feedback (AGE-300, AGE-587) steht: eine Tabelle, eine RLS-Zusage „jeder
+schreibt nur sein eigenes", eine `SECURITY DEFINER`-RPC für den Admin, eine
+eigene Route mit Blätterung. Was fehlt, sind die vier Mittel, mit der
 gesammelten Menge zu arbeiten — Bild, Thema, Filter, Antwortweg.
 
-Drei Dinge im Bestand geben den Rahmen vor und sind vor dem Entwurf gemessen
-worden, nicht angenommen:
+> **Diese Fassung ist die zweite.** Der Plan-Review vom 2026-09-01 (`gemini`,
+> `codex`, beide REQUEST-CHANGES, siehe `REVIEWS.md`) hat vier Entscheidungen
+> der ersten Fassung widerlegt und zwei fehlende aufgedeckt. Die widerlegten
+> stehen unten mit dem, was an ihnen falsch war — nicht stillschweigend
+> ersetzt, weil ein weggeräumter Fehler denselben beim nächsten Mal wieder
+> einlädt.
 
-1. **`admin_list_feedback` ist bereits einmal abgerissen worden.** Die aktuelle
-   Fassung (`20260825120000`) hat die argumentlose Vorgängerin per `drop`
-   ersetzt, weil `create or replace` den Rückgabetyp nicht ändern kann. Ihr
-   eigener Kopf hält fest, dass ein `drop` „eine zweite Migration kostet, die
-   dieselbe Funktion ein zweites Mal abreißt" — das ist diese Migration.
-2. **Sieben Zusagen in `rls_test.sql` hängen an dieser Funktion**, und sie
-   zerfallen in zwei Sorten — am 2026-09-01 selbst nachgezählt, weil die
-   Zeilennummern im Migrationskommentar veraltet waren:
-   - **Fünf rufen sie argumentlos auf** (525, 532, 537, 542, 815). Jede neue
-     Signatur muss `admin_list_feedback()` ohne Argumente weiter auflösen.
-   - **Zwei nennen die Signatur wörtlich** (545, 549):
-     `has_function_privilege('anon', 'public.admin_list_feedback(int,int)', …)`
-     und dasselbe für `authenticated`. **Diese beiden brechen**, sobald die
-     Signatur vier Argumente trägt — und zwar nicht mit `false`, sondern mit
-     einem Fehler, weil die genannte Funktion dann nicht mehr existiert. Der
-     Migrationskommentar erwähnt nur die fünf; die zwei sind der teurere Teil.
-3. **Die Kontaktanfrage-Hürde steht in ZWEI Policies**, nicht einer:
-   `threads_insert` (`20260806080100_activation_gate.sql:341`) und
-   `messages_insert` (ebenda, 358). Beide tragen denselben
-   `exists (… contact_requests … 'accepted' …)`-Block.
+Vier Dinge im Bestand geben den Rahmen vor, alle gemessen und nicht angenommen:
 
-Die zwei Produktfragen, an denen der Vorgang seit dem 27.08. hing, sind
-beantwortet: **anonymes Feedback gibt es nicht** (AGE-588 am 01.09. abgebrochen;
-`feedback.profile_id` ist `not null` mit Fremdschlüssel), und **ein Admin darf
-die Kontaktanfrage-Hürde überspringen** (Donald, 01.09.).
+1. **`admin_list_feedback` ist bereits einmal abgerissen worden**
+   (`20260825120000`), weil `create or replace` den Rückgabetyp nicht ändern
+   kann. Der Kopf jener Migration sagt selbst voraus, die nächste Änderung müsse
+   sie erneut abreissen. Das ist diese.
+2. **Fünf Zusagen nennen die Signatur wörtlich**, verteilt auf **zwei** Dateien:
+   `rls_test.sql` (545, 549) und `admin_feedback_test.sql` (260, 262, 267 — die
+   letzte per `::regprocedure`). Sie **brechen mit einem Fehler**, sobald die
+   Funktion vier Argumente trägt. Meine erste Zählung fand nur die zwei aus
+   `rls_test.sql`, weil ich eine Datei durchsucht hatte statt das Verzeichnis.
+   Rund zwanzig weitere Aufrufe sind positionell zweiargumentig und lösen mit
+   Vorgabewerten weiter auf.
+3. **`messages_insert` hat keine eigenständige Kontaktanfrage-Prüfung.** Das
+   einzige `exists` verbindet `message_threads` **und** `contact_requests` und
+   belegt damit Teilnahme und Freigabe in einem Ausdruck.
+4. **`message_threads` trägt nur `unique (a_profile_id, b_profile_id)`** und
+   keine Bedingung, die die Normalisierung des Paares erzwingt.
+
+Die Produktfragen sind beantwortet: anonymes Feedback gibt es nicht (AGE-588
+abgebrochen), der Admin darf die Kontaktanfrage-Hürde überspringen **und** das
+Bild löschen (Donald, 01.09.), und ein so eröffnetes Gespräch ist **für beide
+Seiten** offen (Donald, 01.09., nach dem Review-Befund).
 
 ## Goals / Non-Goals
 
 **Goals:**
 
 - Ein Feedback trägt ein Thema aus einer Menge, die die Datenbank kennt.
-- Ein Feedback kann ein Bild tragen, dessen Grenzen serverseitig hängen.
+- Ein Feedback kann ein Bild tragen, dessen Grenzen serverseitig hängen und
+  dessen Verweis an seinen Verfasser gebunden ist.
 - Der Admin filtert den **Bestand**, nicht die geladene Seite.
-- Der Admin erreicht den Verfasser, ohne die Zugangszusage zu umgehen — die
-  Ausnahme wird ausgesprochen und in der Datenbank durchgesetzt.
+- Der Admin erreicht den Verfasser, und der kann **antworten**.
 
 **Non-Goals:**
 
-- Kein gemeinsames Bauteil für Kästchen-Facetten. Das Markup steht in fünf
-  Flächen dupliziert; das zusammenzuziehen ist ein eigener Vorgang.
-- Kein Schreibrecht des Admins am Feedback. `feedback_admin_read` bleibt
-  `for select`.
-- Keine Anonymität, keine Diskretionsstufe. AGE-588 ist entschieden.
-- Keine Volltextsuche über die Freitexte. Filtern heißt hier Thema und
-  Bewertung.
+- Kein gemeinsames Bauteil für Kästchen-Facetten (fünffach dupliziert, eigener
+  Vorgang).
+- Kein allgemeines Schreibrecht des Admins am Feedback. `feedback_admin_read`
+  bleibt `for select`; die **einzige** Mutation ist das Aufräumen des
+  Bildverweises beim Löschen, begrenzt auf dieses eine Feld.
+- Keine Anonymität, keine Diskretionsstufe.
+- Keine Volltextsuche über die Freitexte.
+- Kein Prüfpfad über Admin-Löschungen. Der Review nennt ihn als unausgesprochene
+  Annahme; er ist ein eigener Vorgang, sobald jemand ihn braucht.
 
 ## Decisions
 
 ### 1. Die Themenliste ist eine kleine Tabelle, kein `CHECK` mit Textliteralen
 
-**Gewählt:** `feedback_themes (key text primary key, label text not null,
-sort int not null)`, und `feedback.theme` bekommt einen Fremdschlüssel darauf.
+`feedback_themes (key text primary key, label text not null, sort int not null)`,
+und `feedback.theme` bekommt einen Fremdschlüssel darauf.
 
-**Warum nicht `CHECK (theme in ('generell', …))`:** Ein `CHECK` ist für die
-Datenbank eine Menge, für die Oberfläche aber nichts — sie kann ihn nicht lesen.
-Die Liste müsste also ein zweites Mal in TypeScript stehen, samt Beschriftungen
-und Reihenfolge. Zwei Abschriften einer Menge driften, und **nichts würde es
-messen**: ein Thema, das nur im Code steht, erzeugt beim Absenden einen
-Constraint-Fehler; eines, das nur in der Datenbank steht, taucht in keiner
-Filterliste auf. Beide Fälle sind still bis zur Laufzeit.
+Ein `CHECK` ist für die Datenbank eine Menge, für die Oberfläche aber nichts —
+sie kann ihn nicht lesen. Die Liste stünde ein zweites Mal in TypeScript, samt
+Beschriftung und Reihenfolge, und **nichts würde die Abschriften vergleichen**.
+Verworfen auch ein Postgres-`enum`: keine Beschriftung, keine Reihenfolge, und
+ein neues Thema wäre eine Migration _und_ ein Deploy.
 
-Dieses Repo hat die Regel am 25.08. selbst aufgeschrieben (Kopf von
-`20260825120000`, Entscheidung 1): „eine Abschrift, die nur ein Test
-zusammenhält, kann auf einem ausgewogenen Bestand grün bleiben, während ein
-Zweig falsch ist."
+Die Tabelle trägt RLS mit einer Lese-Policy für `authenticated`, und `select`
+wird ausdrücklich gegrantet. RLS ohne Policy liefert der Oberfläche eine leere
+Liste — ein Fehlerbild, das aussieht wie „es gibt keine Themen".
 
-**Verworfen: ein Postgres-`enum`.** Ein Thema hinzuzufügen wäre dann eine
-Migration _und_ ein Deploy, und `enum`-Werte tragen keine Beschriftung und keine
-Reihenfolge — beides landete doch wieder im Code.
+**Der Preis:** eine neue Tabelle bricht den Golden-Snapshot in `grants_test.sql`.
 
-**Der Preis, und er ist bekannt:** eine **neue Tabelle bricht den
-Golden-Snapshot in `grants_test.sql`**. Das ist kein Argument dagegen, aber es
-gehört in die Aufgabenliste, sonst steht CI rot und niemand weiß warum.
+### 2. `theme` bekommt einen Vorgabewert, nicht nur `not null`
 
-### 2. Der Bestand bekommt „Generell", und die Spalte wird `not null`
+**Erste Fassung war hier falsch.** Sie sagte „nullable anlegen, Bestand setzen,
+`set not null`" — und übersah, dass danach **jeder** Schreibzugriff bricht, der
+die Spalte nicht nennt. Genau das tun nach der Migration und vor dem
+Frontend-Deploy alle: die ausgelieferte Oberfläche, zwischengespeicherte
+Clients, die Seeds und die bestehenden SQL-Tests. Die Reihenfolge „Datenbank
+zuerst", die dieser Entwurf selbst vorschreibt, hätte den eigenen Rollout
+zerlegt.
 
-In zwei Schritten in **einer** Migration: Spalte nullable anlegen, Bestand
-setzen, dann `set not null`. Andersherum scheitert die Migration an der
-ersten vorhandenen Zeile.
+Also in dieser Reihenfolge, in einer Migration: Spalte nullable **mit**
+`default 'generell'` anlegen → Bestand setzen → Fremdschlüssel → `set not null`.
+Der Vorgabewert bleibt dauerhaft stehen, nicht nur für die Migration.
 
-`not null` und nicht „null heißt Generell": eine nullable Spalte erzeugt zwei
-Schreibweisen für dieselbe Aussage, und die Filterliste müsste beide kennen. Wer
-das vergisst, baut einen Filter, der „Generell" auswählt und die Altzeilen nicht
-findet.
+### 3. Die Filterargumente sind Arrays, und `null` heisst „keine Einschränkung"
 
-### 3. Die Filterargumente sind Arrays, und `null` heißt „keine Einschränkung"
+`p_themes text[] default null`, `p_ratings int[] default null`, beide als
+`(p_x is null or spalte = any(p_x))`.
 
-`p_themes text[] default null`, `p_ratings int[] default null`. In der
-`where`-Klausel als `(p_themes is null or f.theme = any(p_themes))`.
+Ein **leeres** Array als „alles" wäre falsch: `= any('{}')` ergibt `false`, der
+Normalfall lieferte also eine leere Liste. Die Oberfläche schickt deshalb `null`,
+wenn keine Marke gesetzt ist, und nicht `[]`.
 
-**Warum nicht ein leeres Array als „alles":** Weil `= any('{}')` **falsch**
-ergibt, nicht wahr. Ein leeres Array als Normalfall lieferte damit eine leere
-Liste — und zwar genau dann, wenn der Admin die Seite ohne Filter öffnet. Der
-Unterschied zwischen „nichts ausgewählt" und „nichts gefunden" muss in der
-Datenschicht gezogen werden, nicht in der Oberfläche.
+**Innerhalb** einer Facette wirken mehrere Marken als ODER. **Zwischen** den
+Facetten gilt UND: wer „Fehler" und „1 Stern" wählt, will die Schnittmenge. Die
+erste Fassung liess das offen; der Review hat es zu Recht bemängelt.
 
-Die Oberfläche schickt deshalb `null`, wenn keine Marke gesetzt ist, und **nicht**
-`[]`.
+Nebenbefund, festgehalten damit ihn niemand wegkürzt: die fünf argumentlosen
+Zusagen werden dadurch **Wächter über die Bedeutung von „kein Filter"**. Sie
+würden rot, wenn `null` je etwas anderes als „alles" hiesse.
 
-### 4. `drop` und neu anlegen — mit Vorgabewerten auf jedem Argument
+### 4. `drop` und neu anlegen — und fünf Zusagen ziehen mit
 
-Rückgabetyp **und** Signatur ändern sich, also `drop function
-public.admin_list_feedback(int, int)` und `create function` mit der neuen
-Signatur. Grants, `revoke` und der Kommentar kommen mit, wie beim letzten Mal.
+Rückgabetyp und Signatur ändern sich, also `drop function
+public.admin_list_feedback(int, int)` und `create function` neu. Alle vier
+Argumente bekommen Vorgabewerte, damit die argumentlosen Aufrufe weiter
+auflösen.
 
-**Die Fessel:** `p_limit`, `p_offset`, `p_themes` und `p_ratings` bekommen **alle**
-einen Vorgabewert, damit `admin_list_feedback()` argumentlos auflösbar bleibt.
-Fünf bestehende Zusagen rufen sie so auf; ohne Vorgabewerte melden sie `42883`.
+Die **fünf** Zusagen, die die Signatur ausschreiben, werden auf die neue
+gehoben. Das ist kein Aufweichen — dieselbe Zusage über dieselbe Funktion unter
+ihrem neuen Namen. Die positionellen Zweiargument-Aufrufe bleiben unverändert
+und werden dadurch zu Wächtern über die Vorgabewerte der beiden neuen Argumente.
 
-**Die zweite Fessel, und sie kostet einen Diff im Test:** zwei Zusagen prüfen
-das Ausführungsrecht über den ausgeschriebenen Funktionsnamen mit
-Argumenttypen. Die alte Schreibweise zeigt nach dem `drop` ins Leere. Sie
-müssen auf die neue Signatur gehoben werden — das ist kein Aufweichen einer
-Zusage, sondern dieselbe Zusage über dieselbe Funktion unter ihrem neuen Namen.
+Klemmung (1..100, `null` → Vorgabe) und die Ordnung (absteigend nach
+`created_at`, dann nach `id`) bleiben wörtlich. Der Filter greift **vor**
+`limit`/`offset`.
 
-**Was die fünf argumentlosen Zusagen nebenbei werden:** Wächter über die
-Bedeutung von „kein Filterargument". Sie zählen heute Zeilen ohne jede
-Einschränkung; wenn `p_themes = null` nicht mehr „alles" hiesse, würden sie rot.
-Das ist ein willkommener Nebeneffekt und war vorher niemandes Absicht — er wird
-hier festgehalten, damit ihn niemand später als überflüssig wegkürzt.
+### 5. Der Bucket folgt `post-media` — mit drei ausdrücklichen Abweichungen
 
-Die Klemmung von `p_limit` (1..100, `null` → Vorgabe) und der zweite
-Ordnungsschlüssel `id desc` bleiben **wörtlich** erhalten. Beide tragen eine
-eigene Zusage, und `id desc` ist keine Kosmetik: ohne ihn ist die Ordnung bei
-gleichen Zeitstempeln nicht total und dieselbe Zeile kann auf zwei Seiten
-stehen.
+Gemeinsam: privat, `on conflict (id) do update` beim Anlegen (mit `do nothing`
+bliebe ein falsch konfigurierter Bucket konserviert und der RLS-Test liefe grün
+dagegen), Präfix je Verfasser, `upsert: false` beim Hochladen.
 
-Der Filter greift **vor** `limit`/`offset` — das ist der ganze Punkt von
-Entscheidung 3 und steht als Szenario in der Spec.
+**Abweichung 1 — die Werte stehen hier, nicht „wie bei post-media".** Der Review
+hat zu Recht bemängelt, dass „Zeile für Zeile kopieren" 1 MiB **und nur WebP**
+bedeutet hätte: ein gewöhnlicher PNG-Screenshot fiele durch. Festgelegt: Bucket
+`feedback-screenshots`, **5 MiB**, `image/png`, `image/jpeg`, `image/webp`.
+Keine Umwandlung im Client — ein Screenshot soll ankommen, nicht verlustbehaftet
+werden. Signierte URLs mit kurzer Lebensdauer (60 s), je Zeile erst beim
+Anzeigen erzeugt.
 
-### 5. Der Screenshot-Bucket folgt `post-media` Zeile für Zeile
+**Abweichung 2 — es gibt einen Leser, der nicht der Eigentümer ist.** Also
+`is_activated() and (Eigentümer or is_admin())` für `select` und `delete`. Das
+`is_activated()` ist nicht dekorativ: ohne es käme ein **deaktiviertes** Konto
+mit noch gesetzter Admin-Rolle weiterhin an fremde Bilder — anders als bei
+`feedback_admin_read`.
 
-Privat, `file_size_limit` und `allowed_mime_types` **am Bucket**, Präfix je
-Verfasser (`(storage.foldername(name))[1] = auth.uid()::text`), Schreib-Policies
-mit `is_activated()`, `on conflict (id) do update` beim Anlegen.
+**Abweichung 3 — der Verweis ist gebunden.** `screenshot_path` liegt, wenn
+gesetzt, im Präfix des Verfassers, erzwungen in der Datenbank, und gehört
+höchstens einer Feedback-Zeile. Ohne das könnte ein Mitglied seine Zeile auf ein
+fremdes Objekt zeigen lassen; die Admin-Fläche signierte oder löschte dann das
+falsche Bild. Der Review nennt das beim Namen: _confused deputy_.
 
-Das `do update` ist nicht Kosmetik: mit `do nothing` bliebe ein bestehender
-Bucket mit falschen Einstellungen konserviert, und der RLS-Test liefe grün gegen
-eine falsche Konfiguration (Befund aus dem C6-Review, festgehalten im Kopf von
-`20260812090100`).
+### 6. Zwei Policies, und die Teilnahmeprüfung wird herausgelöst
 
-**Der Unterschied zu `post-media`:** hier gibt es einen **Leser, der nicht der
-Eigentümer ist** — der Admin. Also eine zusätzliche SELECT-Policy mit
-`public.is_admin()`. Und weil der Bucket privat ist, geht der Weg zum Bild über
-eine signierte URL, nicht über einen öffentlichen Pfad.
+**Erste Fassung war hier falsch, und zwar gefährlich falsch.** Sie sagte, die
+Teilnehmerprüfung bleibe „unangetastet", und beschrieb die Änderung als „die
+`contact_requests`-Bedingung wird `( exists (…) or public.is_admin() )`". Beides
+zusammen geht nicht: die Teilnahmeprüfung steht **innerhalb** desselben
+`exists`. Wer ihn als Ganzes klammert, hebt sie mit auf — und baut einen Admin,
+der in jedes fremde Gespräch schreiben darf. Das genaue Gegenteil der zugesagten
+engen Ausnahme.
 
-`upsert: false` beim Hochladen ist Pflicht, nicht Stil: bei `true` müsste der
-Aufrufer die Zieldatei erst lesen und scheitert an der SELECT-Policy.
+Die Ersetzung führt beide Bedingungen deshalb **getrennt**:
 
-### 6. Die Ausnahme steht in beiden Policies, und die Teilnahme bleibt
+```
+messages_insert:
+  is_activated()
+  and sender_id = auth.uid()
+  and exists (                         -- Teilnahme, eigenstaendig
+        select 1 from message_threads t
+        where t.id = messages.thread_id
+          and (t.a_profile_id = auth.uid() or t.b_profile_id = auth.uid()))
+  and (                                -- Freigabe, hier greift die Ausnahme
+        exists (select 1 from contact_requests cr ... status = 'accepted' ...)
+        or is_admin()
+        or exists (select 1 from message_threads t
+                    where t.id = messages.thread_id and t.admin_eroeffnet))
+```
 
-`threads_insert` und `messages_insert` bekommen die `contact_requests`-Bedingung
-als `( exists (…) or public.is_admin() )`. Alles andere bleibt unangetastet —
-`is_activated()`, `sender_id = auth.uid()`, und die Prüfung, dass der Aufrufer
-selbst am Gespräch beteiligt ist.
+`threads_insert` genauso: Teilnahme eigenständig, Ausnahme nur an der
+Freigabe-Bedingung.
 
-**Nur eine der beiden anzufassen wäre der schlimmere Fehler als keine:** ein
-Admin, der ein Gespräch anlegen, aber nicht hineinschreiben kann, sieht aus wie
-ein funktionierender Weg und bricht erst beim Absenden.
+**Beide Policies, nicht eine.** Ein Admin, der ein Gespräch anlegen, aber nicht
+hineinschreiben kann, sieht aus wie ein funktionierender Weg und bricht erst
+beim Absenden.
 
-`is_admin()` und nicht ein Feld an `profiles`: die Rolle steht in `staff_roles`
-und ist servergesteuert. `profiles.roles` ist vom Mitglied schreibbar.
+### 7. Fünf Themen, nach Art des Anliegens
 
-### 7. Die Themen: fünf, nach Art des Anliegens
+`generell`, `fehler`, `bedienung`, `inhalte`, `idee` (Donald, 01.09.). Nach Art
+und nicht nach Fläche — eine Aufteilung nach Bereichen verdoppelte die `route`,
+die ohnehin an jeder Zeile steht. `fehler` und `bedienung` bleiben getrennt:
+„kaputt" geht an die Technik, „umständlich" an die Gestaltung.
 
-Von Donald am 2026-09-01 entschieden:
+### 8. Der Admin darf das Bild löschen — über die Feedback-Identität
 
-| `key`       | `label`                      |
-| ----------- | ---------------------------- |
-| `generell`  | Generell                     |
-| `fehler`    | Fehler / etwas geht nicht    |
-| `bedienung` | Bedienung / Verständlichkeit |
-| `inhalte`   | Inhalte / Texte              |
-| `idee`      | Idee / Wunsch                |
-
-**Nach Art des Anliegens und nicht nach Fläche.** Eine Aufteilung nach Bereichen
-(Profil, Matching, Events …) verdoppelte die `route`, die ohnehin schon an jeder
-Zeile steht — das Feedback wüsste dann zweimal, wo es entstand, und einmal, was
-es meint. Die Art ist die Information, die fehlt.
-
-`fehler` und `bedienung` sind getrennt, weil sie verschiedene Arbeitsvorräte
-sind: „etwas ist kaputt" geht an die Technik, „etwas ist umständlich" an die
-Gestaltung.
-
-### 8. Der Admin darf das Bild auch löschen
-
-Von Donald am 2026-09-01 entschieden, gegen den Vorschlag des Entwurfs, es zu
-vertagen.
-
-Der Grund trägt: ein missbräuchlich hochgeladenes Bild bliebe sonst liegen, bis
-sein Verfasser es entfernt — und genau der hätte keinen Anlass dazu. Ein
+Donald am 01.09., gegen den Vorschlag des Entwurfs, es zu vertagen. Ein
 Leserecht ohne Löschrecht macht den Admin zum Zeugen ohne Handhabe.
 
-Die Ausnahme bleibt eng: dieselbe Rolle wie beim Leserecht (`is_admin()`,
-gespeist aus `staff_roles`), und nur auf diesem einen Bucket. Sie ist damit die
-**zweite** Ausnahme in diesem Change und gehört mit in den `cso`-Blick.
+Der Review hat zwei Löcher gefunden, die die erste Fassung offenliess: es gab
+**keine Bedienung** dafür, und das Löschen des Objekts hätte
+`feedback.screenshot_path` ins Leere zeigen lassen — während der Admin fremde
+Feedback-Zeilen absichtlich nicht ändern darf.
+
+Also ein `SECURITY DEFINER`-Weg, der die Feedback-Kennung entgegennimmt, die
+Admin-Eigenschaft prüft, das Objekt löscht **und** den Verweis an der Zeile
+leert. Er nimmt **keinen Pfad** vom Aufrufer entgegen — sonst wäre er derselbe
+_confused deputy_ wie in Entscheidung 5.
+
+### 9. Das Gespräch wird über einen serverseitigen Weg geöffnet
+
+**Fehlte in der ersten Fassung ganz.** Sie sagte nur „öffnet ein bestehendes
+oder legt genau eines an" und überliess das Wie der Umsetzung. Der Review hat
+zwei Wege gezeigt, wie das schiefgeht: die Tabelle erzwingt die Normalisierung
+**nicht** (ein vertauschtes Paar verletzt `unique (a, b)` nicht und läge als
+zweites Gespräch daneben), und zwischen Nachsehen und Anlegen liegt ein
+Wettrennen — das genau dann zuschlägt, wenn zwei Admins dieselbe Zeile öffnen.
+
+Also ein atomarer Aufruf, der das Paar normalisiert (`least`/`greatest`), per
+`on conflict ... do nothing` einfügt, die Kennung des bestehenden oder neuen
+Gesprächs zurückgibt, ein Selbstgespräch abweist und `admin_eroeffnet` **nur
+beim Neuanlegen** setzt.
+
+### 10. Die Freischaltung hängt am Gespräch, nicht an der Rolle
+
+Donald am 01.09.: beide Seiten dürfen senden. Umgesetzt als Markierung
+`admin_eroeffnet` an `message_threads`, nicht als Sonderregel für den Empfänger.
+
+Am Gespräch und nicht an der Rolle, aus zwei Gründen: die Freischaltung bleibt
+auf **genau diesen einen Faden** begrenzt — das Mitglied gewinnt kein Senderecht
+gegenüber sonst jemandem — und sie überlebt es, wenn der Admin später seine
+Rolle verliert. Eine Regel „wer eine Nachricht von einem Admin bekommen hat,
+darf antworten" wäre beides nicht.
+
+Die Markierung setzt nur der Weg aus Entscheidung 9; ein Mitglied kann sie nicht
+schreiben.
 
 ## Risks / Trade-offs
 
-**Eine neue Tabelle bricht `grants_test.sql`** → Der Golden-Snapshot wird im
-selben Change nachgezogen, und die Aufgabe steht ausdrücklich in `tasks.md`.
-Sonst steht CI rot und der nächste Leser sucht am falschen Ende.
+**Eine neue Tabelle bricht `grants_test.sql`** → im selben Change nachziehen,
+als ausdrückliche Aufgabe.
 
-**Die Ausnahme in Teil 6 weitet eine Zugangszusage** → pgTAP muss **beide
-Richtungen** belegen: Admin darf, Nicht-Admin darf weiterhin nicht. Ein Test,
-der nur die neue Richtung prüft, ließe eine Öffnung für alle unbemerkt — und
-eine bestehende Inventur findet ein fehlendes Gate nicht.
+**Der Change weitet jetzt DREI Zusagen** — Chat-Hürde, Löschrecht am Bild und
+die Freischaltung des Fadens → jede einzeln belegen. Ein pgTAP-Lauf, der sie
+zusammen prüft, kann grün bleiben, während eine zu weit greift. Und jede in
+**beide** Richtungen: wer darf, und wer weiterhin nicht.
 
-**`admin_list_feedback` wird zwischen Migration und Deploy kurz eine andere
-Funktion sein** → Der `drop`/`create` läuft in einer Transaktion, und die alte
-Oberfläche ruft die Funktion argumentlos auf, was die neue Signatur weiter
-auflöst. Der gefährliche Fall wäre eine Oberfläche, die die neuen Argumente
-schickt, bevor die Migration liegt — deshalb Migration vor Frontend-Deploy.
+**Ein bestehender Beleg wird still schwächer.** Wer heute aus „es gibt ein
+Gespräch" auf „es gab eine angenommene Kontaktanfrage" schliesst, liegt nach
+diesem Change nicht mehr immer richtig — und **nichts wird davon rot**. Vor dem
+Bau ist zu prüfen, ob eine bestehende Zusage so schliesst; eine Mutation ist der
+Weg, das zu belegen.
 
-**`database.types.ts` ist handgepflegt** → Von Hand nachziehen. `gen types` darf
-nicht darüberlaufen.
+**`database.types.ts` ist handgepflegt und liegt in `src/lib/`**, nicht in
+`src/types/` — die erste Fassung nannte einen Pfad, den es nicht gibt.
+`gen types` darf nicht darüberlaufen.
 
-**Zwei Ausnahmen in einem Change** → Die Chat-Hürde (Entscheidung 6) und das
-Löschrecht am Bild (Entscheidung 8) weiten beide eine Zusage, an verschiedenen
-Stellen. Sie gehören einzeln belegt: ein pgTAP-Lauf, der beide zusammen prüft,
-kann grün bleiben, während eine von beiden zu weit greift.
+**Kein Index für den neuen Zugriffsweg.** `feedback` hat heute nur einen auf
+`profile_id`. Bei der erwarteten Menge reicht das; die Entscheidung ist, **erst
+zu messen** und einen Index nur zu setzen, wenn die gefilterte, geordnete
+Abfrage ihn braucht.
 
-**Die Bildanzeige kann zur Preisgabe werden** → Der Bucket ist privat, die
-SELECT-Policy nennt Eigentümer **und** Admin einzeln, und ein pgTAP-Fall belegt,
-dass ein drittes Mitglied nicht herankommt. `storage.objects` tarnt sich in
-pgTAP gern als bestandener RLS-Test — der Fall muss wirklich Zeilen anfassen.
+**Screenshots können personenbezogene Daten enthalten.** Der Bucket ist privat,
+die URLs sind kurzlebig, und der Admin kann löschen. Eine Aufbewahrungs- und
+Moderationsregel darüber hinaus ist **nicht** Teil dieses Changes — der Review
+nennt sie zu Recht als unausgesprochene Annahme, und sie gehört Donald.
 
 ## Migration Plan
 
-1. Migration: `feedback_themes` anlegen und füllen, `feedback.theme` (nullable →
-   Bestand setzen → `not null`, FK), `feedback.screenshot_path`.
-2. Migration: Bucket + Policies.
-3. Migration: `admin_list_feedback` abreißen und neu anlegen, Grants und
-   Kommentar mit.
-4. Migration: die beiden RLS-Policies neu deklarieren.
-5. `grants_test.sql`-Snapshot nachziehen, pgTAP für beide Richtungen der
-   Ausnahme und für den fremden Bildzugriff.
-6. `database.types.ts` von Hand, dann Frontend.
-7. Deploy: **Migrationen vor dem Frontend.** Die alte Oberfläche läuft gegen die
-   neue Funktion weiter (argumentlos auflösbar), die neue nicht gegen die alte.
+Je Einheit gilt **RED vor GREEN**: erst die scheiternde Zusage, dann die
+Migration.
 
-Rücknahme: die Policies aus Schritt 4 tragen ihre Vorgängerfassung wörtlich im
-Kopf, sodass eine Gegenmigration sie ohne Archäologie wiederherstellen kann.
+1. `feedback_themes` (Tabelle, RLS, Policy, Grants) + `grants_test`-Snapshot.
+2. `feedback.theme`: nullable **mit Default** → Backfill → FK → `not null`.
+3. `feedback.screenshot_path` + Bucket + Policies + Pfadbindung.
+4. `admin_list_feedback` abreissen und neu anlegen; die fünf Signatur-Zusagen
+   heben.
+5. `message_threads.admin_eroeffnet`, der Öffnungs-Weg, dann die zwei Policies.
+6. Der Lösch-Weg für das Bild.
+7. `src/lib/database.types.ts` von Hand, dann Datenschicht, dann Oberfläche.
+8. Deploy: **Migrationen vor dem Frontend** — jetzt haltbar, weil der
+   Vorgabewert aus Entscheidung 2 die alte Oberfläche überleben lässt.
+
+Rücknahme: jede Policy trägt ihre Vorgängerfassung wörtlich im Migrationskopf.
 
 ## Open Questions
 
-Beide sind am 2026-09-01 von Donald beantwortet und stehen jetzt oben als
-Entscheidung 7 und 8. Es bleibt keine offene Frage, die den Bau blockiert.
+Keine, die den Bau blockiert. Zwei Dinge sind bewusst offen und stehen oben
+unter Non-Goals bzw. Risks: der Prüfpfad über Admin-Löschungen und die
+Aufbewahrungsregel für Screenshots.
 
-Was der Plan-Review noch beantworten kann, aber nicht muss:
-
-- Ob `bedienung` und `inhalte` sich in der Praxis trennen lassen oder ob der
-  Verfasser sie durcheinanderwirft. Das lässt sich nicht am Reissbrett klären
-  und kostet später eine Zeile in `feedback_themes`, keine Migration.
+Zur Korrektur einer Behauptung der ersten Fassung: „ein Thema hinzuzufügen
+kostet eine Zeile und keine Migration" war schief. Es kostet eine
+**Daten**-Migration — nur eben keinen Frontend-Deploy, weil die Oberfläche die
+Liste liest, statt sie zu kennen.

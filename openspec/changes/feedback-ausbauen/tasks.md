@@ -1,158 +1,184 @@
-> **Reihenfolge ist hier nicht Geschmack.** Die Datenbank kommt vor der
-> Oberfläche, und der Golden-Snapshot kommt im selben Change wie die neue
-> Tabelle — sonst steht CI rot und der nächste Leser sucht am falschen Ende.
+> **Zweite Fassung, nach dem Plan-Review** (`REVIEWS.md`, beide Prüfer
+> REQUEST-CHANGES). Die erste stellte Migration und Umsetzung vor die Tests —
+> gegen die verbindliche RED-vor-GREEN-Regel dieses Repos. Jede Einheit unten
+> beginnt jetzt mit der Zusage, die scheitern muss.
 >
-> **Vor dem ersten Code:** Plan-Review nach Schritt 2b des Workflows
-> (`openspec-change-review`, ≥2 Prüfer anderer Anbieter, `REVIEWS.md` mit
-> signiertem Trailer). Die beiden Produktfragen sind bereits beantwortet
-> (Donald, 01.09.) und stehen als Entscheidung 7 und 8 in `design.md`.
+> **Reihenfolge ist nicht Geschmack.** Datenbank vor Oberfläche, und der
+> `grants_test`-Snapshot im selben Change wie die neue Tabelle — sonst steht CI
+> rot und der Bruch sieht aus wie ein Rechtefehler.
 
 ## 0. Vorbedingungen
 
-- [x] 0.1 Beide Produktfragen sind am 01.09. von Donald beantwortet und stehen
-      als Entscheidung 7 und 8 in `design.md`: die fünf Themen (`generell`,
-      `fehler`, `bedienung`, `inhalte`, `idee`) und **ja**, der Admin darf das
-      Bild auch löschen.
-- [ ] 0.2 `pnpm install --frozen-lockfile` in diesem Worktree — er ist frisch
-      und hat noch kein `node_modules`.
-- [ ] 0.3 Plan-Review fahren und `REVIEWS.md` ablegen. Ohne signierten Trailer
-      zählt sie nicht, auch wenn sie niemanden blockt.
+- [x] 0.1 Produktfragen beantwortet (Donald, 01.09.): fünf Themen; der Admin
+      darf das Bild löschen; ein vom Admin eröffnetes Gespräch ist für **beide**
+      Seiten offen.
+- [x] 0.2 `pnpm install --frozen-lockfile` in diesem Worktree.
+- [x] 0.3 Plan-Review gefahren, `REVIEWS.md` liegt, Trailer vom Gate mit
+      `trailer_status: ok` bestätigt.
+- [ ] 0.4 **Prüfen, ob eine bestehende Zusage aus „es gibt ein Gespräch" auf „es
+      gab eine Freigabe" schliesst.** Nach diesem Change stimmt das nicht mehr
+      ausnahmslos, und **nichts würde davon rot**. Eine Mutation ist der Weg:
+      die Freigabe-Bedingung testweise entfernen und sehen, welche Zusage
+      fällt. Fällt keine, fehlt eine.
 
 ## 1. Themen: Tabelle, Spalte, Bestand
 
-- [ ] 1.1 Migration: Tabelle `feedback_themes` anlegen — Spalten `key`
-      (Primärschlüssel), `label` und `sort`, alle `not null` — und mit den fünf
-      abgestimmten Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
+- [ ] 1.1 **RED:** pgTAP, das `feedback_themes` liest — schlägt fehl, weil es
+      die Tabelle nicht gibt.
+- [ ] 1.2 Migration: Tabelle `feedback_themes` mit `key` (Primärschlüssel),
+      `label` und `sort`, alle `not null`; RLS an, Lese-Policy für
+      `authenticated`, `select` ausdrücklich gegrantet. Neue Tabellen erben hier
+      nichts, und RLS ohne Policy sieht aus wie „es gibt keine Themen".
+- [ ] 1.3 Die fünf Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
       etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit", `inhalte`
-      „Inhalte / Texte", `idee` „Idee / Wunsch". Grants **ausdrücklich**
-      aussprechen — `select` für `authenticated`. Neue Tabellen erben hier
-      nichts.
+      „Inhalte / Texte", `idee` „Idee / Wunsch".
+- [ ] 1.4 **`grants_test.sql`-Golden-Snapshot nachziehen.**
+- [ ] 1.5 **RED:** pgTAP, das eine `feedback`-Zeile **ohne** Thema anlegt und
+      erwartet, dass sie „Generell" trägt — schlägt fehl, solange es die Spalte
+      nicht gibt.
+- [ ] 1.6 Migration in dieser Reihenfolge: `theme` nullable **mit**
+      `default 'generell'` → Bestand setzen → Fremdschlüssel → `set not null`.
+      Der Vorgabewert bleibt dauerhaft; ohne ihn bricht jeder Schreibzugriff,
+      der die Spalte nicht nennt — und das sind vor dem Frontend-Deploy alle.
+- [ ] 1.7 pgTAP: ein Thema ausserhalb der Menge wird abgewiesen; der Bestand
+      trägt „Generell"; keine Zeile trägt `null`.
 
-## 2. Screenshot: Bucket und Policies
+## 2. Screenshot: Bucket, Bindung, Policies
 
-- [ ] 2.1 Migration: privater Bucket mit `file_size_limit` und
-      `allowed_mime_types`, angelegt mit `on conflict (id) do update` — **nicht**
-      `do nothing`, sonst konserviert ein bestehender Bucket falsche
-      Einstellungen und der RLS-Test läuft grün dagegen.
-- [ ] 2.2 Schreib-Policies nach dem Muster von `post-media`: Präfix je Verfasser
-      über `(storage.foldername(name))[1]`, `is_activated()`, je eine für
-      insert/update/delete.
-- [ ] 2.3 SELECT-Policy: Eigentümer **oder** `public.is_admin()`. Das ist der
-      Unterschied zu `post-media` — hier liest jemand, der nicht der Eigentümer
-      ist.
-- [ ] 2.3b DELETE-Policy: Eigentümer **oder** `public.is_admin()` (Donald,
-      01.09.). Ein Leserecht ohne Löschrecht macht den Admin zum Zeugen ohne
-      Handhabe. Die Ausnahme bleibt auf **diesen** Bucket beschränkt.
-- [ ] 2.4 `feedback.screenshot_path` anlegen (nullable — das Bild ist optional).
-- [ ] 2.5 pgTAP gegen `storage.objects`, und zwar so, dass er **wirklich Zeilen
-      anfasst**: ein drittes Mitglied kommt an ein fremdes Bild nicht heran, der
-      Eigentümer und der Admin schon. Ein Fall, der nichts anfasst, tarnt sich
-      hier als bestandener RLS-Test.
-- [ ] 2.6 pgTAP für das Löschen, **getrennt vom Lesen**: der Admin darf ein
-      fremdes Bild löschen, ein Nicht-Admin nicht. Getrennt, weil ein Lauf, der
-      Lesen und Löschen zusammen prüft, grün bleiben kann, während eines von
-      beidem zu weit greift.
+- [ ] 2.1 **RED:** pgTAP gegen `storage.objects`, das den Bucket und seine
+      Policies erwartet.
+- [ ] 2.2 Migration: Bucket `feedback-screenshots`, privat, **5 MiB**,
+      `image/png` `image/jpeg` `image/webp`, angelegt mit
+      `on conflict (id) do update` — mit `do nothing` bliebe ein falsch
+      konfigurierter Bucket konserviert und der Test liefe grün dagegen.
+- [ ] 2.3 Schreib-Policies nach dem Muster von `post-media`: Präfix je
+      Verfasser, `is_activated()`, je eine für insert/update/delete.
+- [ ] 2.4 Lese- und Lösch-Policy: aktiviert **und** (Eigentümer oder Admin) —
+      alle drei Bedingungen, nicht zwei. Das `is_activated()` ist der
+      Unterschied zur ersten Fassung: ohne es käme ein deaktiviertes Konto mit
+      noch gesetzter Admin-Rolle weiter an fremde Bilder.
+- [ ] 2.5 `feedback.screenshot_path` anlegen (nullable) **und binden**: ein
+      nicht-leerer Pfad muss im Präfix des Verfassers liegen, und ein Objekt
+      gehört höchstens einer Zeile. Ohne die Bindung zeigt eine Zeile auf ein
+      fremdes Objekt, und die Admin-Fläche signiert oder löscht das falsche Bild.
+- [ ] 2.6 pgTAP, der **wirklich Zeilen anfasst**: ein drittes Mitglied kommt
+      nicht heran, Eigentümer und Admin schon. Ein Fall, der nichts anfasst,
+      tarnt sich hier als bestandener RLS-Test.
+- [ ] 2.7 pgTAP fürs Löschen, **getrennt vom Lesen** — ein Lauf, der beides
+      zusammen prüft, kann grün bleiben, während eines zu weit greift.
+- [ ] 2.8 pgTAP: ein **deaktivierter** Admin darf weder lesen noch löschen.
+- [ ] 2.9 pgTAP: ein Mitglied kann seine Zeile nicht auf einen fremden Pfad
+      zeigen lassen.
 
 ## 3. Die RPC: abreissen und neu anlegen
 
-- [ ] 3.1 `drop function public.admin_list_feedback(int, int)` — der Rückgabetyp
-      **und** die Signatur ändern sich, `create or replace` kann das nicht.
-- [ ] 3.2 Neu anlegen mit `p_limit`, `p_offset`, `p_themes text[]`,
-      `p_ratings int[]` — **alle vier mit Vorgabewert**, damit
-      `admin_list_feedback()` argumentlos auflösbar bleibt. Fünf Zusagen in
-      `rls_test.sql` rufen sie so auf (Zeilen 525, 532, 537, 542, 815 — am
-      01.09. nachgezählt; die Nummern im Migrationskommentar sind veraltet).
+- [ ] 3.1 **RED:** pgTAP, das nach Thema filtert und erwartet, dass eine Zeile
+      jenseits der ersten Seite auf Seite 1 des gefilterten Ergebnisses steht.
+- [ ] 3.2 `drop function public.admin_list_feedback(int, int)` und neu anlegen
+      mit vier Argumenten, **alle mit Vorgabewert**, damit die argumentlosen
+      Aufrufe weiter auflösen.
 - [ ] 3.3 Rückgabe um `theme` und `screenshot_path` erweitern.
-- [ ] 3.4 Filter als `(p_themes is null or f.theme = any(p_themes))`. **`null`
-      heisst „keine Einschränkung", ein leeres Array nicht** — `= any('{}')` ist
-      falsch und lieferte im Normalfall eine leere Liste.
-- [ ] 3.5 Die Klemmung (1..100, `null` → Vorgabe) **wörtlich** übernehmen, und
-      ebenso die Ordnung: absteigend nach `created_at`, dann absteigend nach
-      `id`. Beide tragen eine eigene Zusage; der zweite Ordnungsschlüssel ist
-      keine Kosmetik.
-- [ ] 3.6 `revoke ... from public, anon` und `grant ... to authenticated` mit
-      der **neuen** Signatur, dazu den Kommentar — der `drop` nimmt beides mit.
-- [ ] 3.7 **`rls_test.sql` Zeile 545 und 549 heben.** Beide prüfen das
-      Ausführungsrecht über den ausgeschriebenen Funktionsnamen samt
-      Argumenttypen. Nach dem `drop` zeigt die alte Schreibweise ins Leere, und
-      der Test bricht dann mit einem Fehler statt mit `false`. Dieselbe Zusage,
-      neue Signatur — kein Aufweichen. Der Migrationskommentar von AGE-587
-      nennt nur die fünf argumentlosen Aufrufe; diese zwei sind der teurere
-      Teil und standen bisher in keiner Liste.
-- [ ] 3.8 pgTAP: die fünf argumentlosen Zusagen laufen weiter; der Filter
-      greift **vor** der Seitengrenze (eine Zeile, die ungefiltert erst auf
-      Seite 2 läge, steht gefiltert auf Seite 1); ohne Filterargument dieselbe
-      Menge wie zuvor; zwei Themen wirken als ODER.
+- [ ] 3.4 Filter: innerhalb einer Facette ODER, zwischen den Facetten UND.
+      `null` heisst „keine Einschränkung", ein leeres Array **nicht** —
+      `= any('{}')` ist falsch und lieferte im Normalfall eine leere Liste. Das
+      Bewertungs-Prädikat nicht vergessen; die erste Fassung hatte nur das
+      Themen-Prädikat.
+- [ ] 3.5 Klemmung und Ordnung wörtlich übernehmen: 1..100 mit Rückfall auf die
+      Vorgabe, absteigend nach `created_at`, dann nach `id`.
+- [ ] 3.6 `revoke` und `grant` mit der **neuen** Signatur, dazu den Kommentar.
+- [ ] 3.7 **Die fünf Signatur-Zusagen heben** — `rls_test.sql` 545 und 549,
+      `admin_feedback_test.sql` 260, 262 und 267. Sie nennen die Argumenttypen
+      ausgeschrieben und brechen nach dem `drop` mit einem Fehler statt mit
+      `false`. Die letzte benutzt `::regprocedure`.
+- [ ] 3.8 pgTAP: ohne Filterargument dieselbe Menge wie zuvor; zwei Themen als
+      ODER; Thema **und** Bewertung als UND; der Filter greift vor der
+      Seitengrenze.
 
 ## 4. Die Ausnahme im Zugangsmodell
 
-- [ ] 4.1 `threads_insert` neu deklarieren: die `contact_requests`-Bedingung
-      wird `( exists (…) or public.is_admin() )`. `is_activated()` und die
-      Teilnehmerprüfung bleiben **unangetastet**.
-- [ ] 4.2 `messages_insert` genauso. **Beide, nicht eine** — ein Admin, der ein
-      Gespräch anlegen, aber nicht hineinschreiben kann, sieht aus wie ein
-      funktionierender Weg und bricht erst beim Absenden.
-- [ ] 4.3 Die Vorgängerfassung beider Policies wörtlich in den Migrationskopf,
-      damit eine Rücknahme ohne Archäologie möglich ist.
-- [ ] 4.4 pgTAP **in beide Richtungen**: Admin darf ohne angenommene
-      Kontaktanfrage anlegen und schreiben; ein Nicht-Admin darf es weiterhin
-      nicht. Ein Test, der nur die neue Richtung prüft, ließe eine Öffnung für
-      alle unbemerkt.
-- [ ] 4.5 pgTAP für die Grenzen der Ausnahme: der Admin kann kein Gespräch
-      zwischen zwei anderen anlegen, keinen fremden `sender_id` vortäuschen und
-      nicht in ein Gespräch schreiben, an dem er nicht beteiligt ist.
-- [ ] 4.6 `cso` über den fertigen Diff laufen lassen. Dieser Change weitet
-      **zwei** Zusagen an verschiedenen Stellen — die Chat-Hürde hier und das
-      Löschrecht am Bild in 2.3b. Beide gehören in denselben Blick.
+- [ ] 4.1 **RED:** pgTAP, in dem ein Admin ohne angenommene Kontaktanfrage ein
+      Gespräch anlegt und hineinschreibt, und das andere Mitglied antwortet.
+      Alle drei müssen heute scheitern.
+- [ ] 4.2 Migration: `message_threads.admin_eroeffnet`, nicht vom Mitglied
+      schreibbar.
+- [ ] 4.3 Der serverseitige Öffnungs-Weg: normalisiert das Paar über `least` und
+      `greatest`, fügt mit `on conflict do nothing` ein, gibt die Kennung des
+      bestehenden **oder** neuen Gesprächs zurück, weist ein Selbstgespräch ab,
+      setzt die Markierung **nur beim Neuanlegen**.
+- [ ] 4.4 `threads_insert` neu deklarieren: Teilnahmeprüfung **eigenständig**,
+      Ausnahme nur an der Freigabe-Bedingung, `is_activated()` bleibt.
+- [ ] 4.5 `messages_insert` neu deklarieren, ebenso getrennt, plus den Zweig für
+      ein markiertes Gespräch. **Die Teilnahmeprüfung steht heute INNERHALB des
+      Ausdrucks, den man klammern möchte** — wer ihn als Ganzes klammert,
+      erlaubt dem Admin das Schreiben in jedes fremde Gespräch.
+- [ ] 4.6 Die Vorgängerfassung beider Policies wörtlich in den Migrationskopf.
+- [ ] 4.7 pgTAP in **beide** Richtungen und für jede der drei Zusagen einzeln:
+      Admin darf anlegen und schreiben, das Gegenüber darf im markierten Faden
+      antworten, ein Nicht-Admin darf weiterhin nichts davon.
+- [ ] 4.8 pgTAP für die Grenzen: kein Gespräch zwischen zwei Fremden, kein
+      fremder `sender_id`, kein Schreiben ohne eigene Teilnahme, kein
+      deaktivierter Admin, keine Freischaltung ausserhalb des markierten Fadens.
+- [ ] 4.9 pgTAP: zwei nebenläufige Öffnungs-Aufrufe erzeugen **ein** Gespräch;
+      das vertauschte Paar liefert dasselbe.
+- [ ] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
+      verschiedenen Stellen.
 
-## 5. Typen und Datenschicht
+## 5. Der Lösch-Weg fürs Bild
 
-- [ ] 5.1 `src/types/database.types.ts` **von Hand** nachziehen: neue Tabelle,
-      zwei neue Spalten, neue RPC-Signatur. `gen types` NICHT darüberlaufen
-      lassen.
-- [ ] 5.2 `src/lib/feedback.ts`: Thema und Bild beim Absenden, Upload mit
-      **`upsert: false`**, Filterargumente beim Abruf (`null` statt `[]`, wenn
-      nichts gewählt ist), signierte URL fürs Anzeigen.
-- [ ] 5.3 Tests der Datenschicht: der Upload-Aufruf trägt `upsert: false`; ein
-      leerer Filterzustand schickt `null` und nicht `[]`.
+- [ ] 5.1 **RED:** pgTAP, in dem ein Admin ein fremdes Bild löscht und erwartet,
+      dass der Verweis an der Zeile danach leer ist.
+- [ ] 5.2 `SECURITY DEFINER`-Weg, der die **Feedback-Kennung** entgegennimmt —
+      keinen Pfad vom Aufrufer, sonst ist es derselbe _confused deputy_ —, die
+      Admin-Eigenschaft prüft, das Objekt löscht und den Verweis leert.
+- [ ] 5.3 pgTAP: ein Nicht-Admin kommt damit nicht durch; ein Verweis auf ein
+      fremdes Objekt lässt sich darüber nicht löschen.
 
-## 6. Oberfläche: Abgeben
+## 6. Typen und Datenschicht
 
-- [ ] 6.1 `FeedbackButton.tsx`: Themenauswahl aus `feedback_themes`, vorbelegt
-      mit „Generell".
-- [ ] 6.2 Bildauswahl, optional. Die Grösse wird im Formular geprüft **und** am
-      Bucket — die Prüfung im Formular ist Komfort, nicht die Grenze.
-- [ ] 6.3 Die bestehende Zusage bleibt: ohne Sterne kein Absenden.
-- [ ] 6.4 Die bestehende Zusage bleibt: unterhalb `sm` steht der Knopf im
-      Dokumentfluss und schwebt nicht. Nach dem Umbau nachmessen, nicht
-      annehmen — das Formular wird höher.
+- [ ] 6.1 **`src/lib/database.types.ts`** von Hand nachziehen — nicht
+      `src/types/`, das gibt es nicht. `gen types` NICHT darüberlaufen lassen.
+- [ ] 6.2 `src/lib/feedback.ts`: Thema und Bild beim Absenden, Upload mit
+      `upsert: false`, Filterargumente beim Abruf (`null` statt `[]`), signierte
+      URL mit kurzer Lebensdauer erst beim Anzeigen.
+- [ ] 6.3 **Den React-Query-Schlüssel um die Filter erweitern.** Er trägt heute
+      nur die Seite (`AdminFeedbackPage.tsx:94`): ein Filterwechsel auf
+      derselben Seite liefert veraltete Treffer, und wer auf Seite 3 steht und
+      verengt, sieht fälschlich „keine Treffer".
+- [ ] 6.4 Beim Filterwechsel auf Seite 1 zurückspringen.
+- [ ] 6.5 Tests: `upsert: false` im Aufruf; leerer Filterzustand schickt `null`;
+      der Schlüssel unterscheidet zwei Filterzustände; die Seitenrückstellung
+      greift.
 
-## 7. Oberfläche: Admin
+## 7. Oberfläche: Abgeben
 
-- [ ] 7.1 `AdminFeedbackPage.tsx` in die bestehende `FilterSpalte` setzen
-      (**wiederverwenden, nicht nachbauen**).
-- [ ] 7.2 Kästchen für Thema und Bewertung, Mehrfachauswahl als ODER. Kein
-      Filter heisst alles.
-- [ ] 7.3 Der Filterzustand geht an die RPC, nicht an eine Filterung im Browser
-      — die Fläche pagiert.
-- [ ] 7.4 Ein Filter ohne Treffer sagt „zu dieser Auswahl liegt nichts vor" und
-      ist **unterscheidbar** von einem gescheiterten Aufruf. Die bestehende
-      Zusage „ein gescheiterter Ladevorgang ist kein leerer Bestand" bleibt.
-- [ ] 7.5 Bildanzeige an der Zeile über die signierte URL.
-- [ ] 7.6 Knopf „Gespräch öffnen" je Zeile, adressiert über `profile_id` und
-      **nicht** über den Anzeigenamen.
-- [ ] 7.7 Der Knopf öffnet ein bestehendes Gespräch oder legt genau eines an,
-      mit normalisiertem Paar. Kein zweites Gespräch zu einem Paar, das schon
-      eines hat.
-- [ ] 7.8 Tests: zwei gleichnamige Mitglieder, und der Sprung landet beim
+- [ ] 7.1 Themenauswahl aus `feedback_themes`, vorbelegt mit „Generell".
+- [ ] 7.2 Bildauswahl, optional; das Formular prüft dieselben Grenzen wie der
+      Bucket, aber die Grenze ist der Bucket.
+- [ ] 7.3 Die bestehenden Zusagen bleiben: ohne Sterne kein Absenden; unterhalb
+      `sm` steht der Knopf im Dokumentfluss. Nach dem Umbau **nachmessen** — das
+      Formular wird höher.
+
+## 8. Oberfläche: Admin
+
+- [ ] 8.1 `AdminFeedbackPage.tsx` in die bestehende `FilterSpalte` setzen
+      (wiederverwenden, nicht nachbauen).
+- [ ] 8.2 Kästchen für Thema und Bewertung; kein Filter heisst alles.
+- [ ] 8.3 Ein Filter ohne Treffer sagt „zu dieser Auswahl liegt nichts vor" und
+      ist unterscheidbar von einem gescheiterten Aufruf.
+- [ ] 8.4 Bildanzeige über die signierte URL, plus **Bedienung zum Löschen** —
+      die fehlte in der ersten Fassung ganz.
+- [ ] 8.5 Knopf „Gespräch öffnen", adressiert über `profile_id`, ruft den Weg
+      aus 4.3.
+- [ ] 8.6 Der Knopf fehlt am **eigenen** Feedback und bei einem deaktivierten
+      oder gelöschten Verfasser — mit einem Grund, nicht wortlos.
+- [ ] 8.7 Tests: zwei gleichnamige Mitglieder, und der Sprung landet beim
       richtigen.
 
-## 8. Abnahme
+## 9. Abnahme
 
-- [ ] 8.1 `pnpm lint`, `pnpm typecheck`, `pnpm test` — **Exit-Codes** lesen,
-      nicht die Ausgabe.
-- [ ] 8.2 `supabase test db` **mit Dateiliste** — ohne sie lügt der Lauf.
-- [ ] 8.3 `openspec validate --all` grün.
-- [ ] 8.4 Die Änderung im Browser zeigen, nicht nur grüne Tests: Abgeben mit
-      Bild und Thema, Filtern über eine Seitengrenze hinweg, Sprung in den Chat.
-- [ ] 8.5 Code-Review über den **Diff**, nicht über den Plan.
+- [ ] 9.1 `pnpm lint`, `pnpm typecheck`, `pnpm test` — **Exit-Codes** lesen.
+- [ ] 9.2 `supabase test db` **mit Dateiliste** — ohne sie lügt der Lauf.
+- [ ] 9.3 `openspec validate --all` grün.
+- [ ] 9.4 Im Browser zeigen: Abgeben mit Bild und Thema, Filtern über eine
+      Seitengrenze hinweg, Sprung in den Chat **und eine Antwort des Gegenübers**.
+- [ ] 9.5 Code-Review über den **Diff**, nicht über den Plan.
