@@ -18,12 +18,13 @@
 - [x] 0.4 **Geprüft: die Zusage gibt es, sie ist tragend — und sie deckt nur
       eine Richtung.** Gegenprobe am 01.09. gegen den lokalen Stack: die
       Freigabe-Bedingung aus `messages_insert` entfernt (der Verbund mit
-      `contact_requests`), die Teilnahmeprüfung stehen gelassen. Von 806
-      Zusagen fiel **genau eine** — `rls_test.sql` Test 27, „Ein bestehender
-      Thread allein reicht nicht — ohne angenommene Anfrage keine Nachricht":
-      `OK`, wo `DENIED:%` erwartet war. Vorher 806 PASS, verbogen 1 FAIL,
-      danach wieder 806 PASS; die Policy ist zeichengleich zurück, belegt mit
-      `diff` gegen den Abzug aus `pg_policies`. Ein `db reset` war **nicht**
+      `contact_requests`), die Teilnahmeprüfung stehen gelassen. Gemessen über
+      die **ganze** CI-Liste: 23 Dateien, 1028 Zusagen. Es fiel **genau eine**
+      — `rls_test.sql` Test 27, „Ein bestehender Thread allein reicht nicht —
+      ohne angenommene Anfrage keine Nachricht": `OK`, wo `DENIED:%` erwartet
+      war. Vorher 1028 PASS, verbogen 1 FAIL, danach wieder 1028 PASS; die
+      Policy ist zeichengleich zurück, belegt mit `diff` gegen den Abzug aus
+      `pg_policies`. Ein `db reset` war **nicht**
       nötig, die Dateien säen ihre eigenen Fixtures — die vier
       unversionierten Push-Objekte im geteilten Stack blieben unangetastet.
       **Und die Lücke, die daraus folgt:** Test 27 handelt als _Mitglied_ in
