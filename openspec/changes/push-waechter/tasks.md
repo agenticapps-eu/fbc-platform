@@ -91,26 +91,30 @@ Beleg an der laufenden Anlage.
 
 ## 3 · Der Drift-Scan sieht die Zeitplanung — und was sich verändert hat
 
-- [ ] **3.1 RED** — Zusagen in `scripts/db-drift-scan.logic.test.ts`: eine
-      fehlende Zeitplanung, eine inaktive Zeitplanung, eine mit verändertem
-      Befehl, und ein abgeschalteter Trigger sind je ein Befund.
-- [ ] **3.2 GREEN** — `db-drift-scan.ts` fragt `cron.job` und `tgenabled` ab,
+- [x] **3.1 RED** — 7 neue Zusagen in `scripts/db-drift-scan.test.ts` (so
+      heißt die Datei; es gibt kein `.logic.test.ts`): fehlende Zeitplanung,
+      inaktive Zeitplanung, veränderter Zeitplan, ausgehöhlter Befehl,
+      abgeschalteter Trigger, der Grünfall und die Positivkontrolle auf die
+      Erwartungsliste. Lauf: **7 rot, 13 bestehende grün** — die Erweiterung
+      hat nichts Bestehendes gebrochen.
+- [x] **3.2 GREEN** — `db-drift-scan.ts` fragt `cron.job` und `tgenabled` ab,
       `db-drift-scan.logic.ts` kennt die erwarteten Einträge
       (`push-wiederholung`, `beitrag-ankuendigen`, je `* * * * *`, aktiv,
       Befehl ruft die jeweilige Funktion). Der Befehl darf verglichen und
       genannt werden — gemessen trägt er weder Bearer noch URL (33 und 35
       Zeichen). Für die Webhook-Funktionen gilt das **nicht**; dort bleibt es
-      beim Namen.
-- [ ] **3.3** Gegen **beide** Instanzen laufen lassen: der erweiterte Scan ist
-      auf DEV und PROD grün. Ist-Stand am 01.09. gemessen — beide Zeitpläne
-      aktiv, alle zwölf Trigger auf `O`. Wird er rot, ist das ein Befund und
-      kein Grund, die Erwartung anzupassen.
-- [ ] **3.4 Der Pflicht-Parameter.** `db-drift-scan.ts:26` fällt heute ohne
-      Argument auf `SUPABASE_DB_URL_PROD` zurück — ein Wächter mit einem Job je
-      Seite, der das Argument vergisst, prüfte PROD zweimal und DEV nie, beide
-      Male grün. Der Scan verlangt künftig `dev|prod` und nennt den gemessenen
-      Projekt-Ref. Der Aufruf in `migrate-prod.yml:152` wird mitgezogen.
-- [ ] **3.5 Entschieden, nicht geprüft:** cron- und Trigger-Befunde dürfen einen
+      beim Namen. `ruft` ist ein Teilstring, kein Volltextvergleich: er fängt
+      den ausgehöhlten Eintrag und verträgt Leerraum.
+- [x] **3.3** Gegen **beide** Instanzen gelaufen, beide grün und mit
+      identischem Bestand: *89 Funktionen, 23 Trigger, 42 Tabellen, 1 View,
+      65 Policies, 2 Zeitplanungen, 0 abgeschaltete Trigger.* Der erweiterte
+      Scan startet damit grün — er blockiert nichts, was heute schon so ist.
+- [x] **3.4 Der Pflicht-Parameter.** `db-drift-scan.ts` las
+      `process.argv[2] || process.env.SUPABASE_DB_URL_PROD` und maß ohne
+      Argument immer PROD. Jetzt `dev|prod` als Pflicht, mit Zielkontrolle über
+      `evaluateStage1` und dem gemessenen Ref im Log. `migrate-prod.yml:152`
+      ruft ihn mit `prod` auf; das ist der einzige Aufrufer (geprüft).
+- [x] **3.5 Entschieden, nicht geprüft:** cron- und Trigger-Befunde dürfen einen
       `migrate-prod`-Lauf röten. Sie blockieren den Frontend-Deploy nicht —
       `deploy.yml:228` fährt `migration-drift-gate.ts`, der Objekt-Scan steht
       allein in `migrate-prod.yml`. Der Scan läuft dort **nach** dem `db push`;
