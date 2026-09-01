@@ -585,6 +585,17 @@ Von Hand auslösen (auch mit anderem Fenster) über *Actions → Push-Waechter �
 Run workflow*. `hoechstpause: 0` macht den Lauf mit Sicherheit rot — so prüft
 man, dass die Meldung noch ankommt, ohne auf einen echten Ausfall zu warten.
 
+> ⚠️ **Die Mail hängt an einer Kontoeinstellung, die in keinem Repo steht.**
+> Am 01.09. gemessen, an zwei sonst gleichen Läufen: der erste (15:44) wurde
+> rot und **blieb stumm**, der zweite (16:20) wurde rot und **mailte** — dazwischen
+> lag nur *github.com/settings/notifications → System → Actions →
+> „Email (Failed workflows only)"*.
+>
+> Ein roter Lauf belegt also **nicht**, dass jemand es erfährt. Wer den Wächter
+> übernimmt, muss diese Einstellung an seinem eigenen Konto setzen und einmal
+> per Dispatch nachprüfen — sonst ist er ein Baum, der im leeren Wald umfällt,
+> und das ist derselbe Fehler wie der Ausfall, gegen den er gebaut ist.
+
 #### Was „der Bearer liegt inline in der Datenbank" wirklich bedeutet
 
 Gilt für **alle drei** Funktionen dieser Sorte — `notify_contact_request_webhook`
