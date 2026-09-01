@@ -486,6 +486,20 @@ select cron.schedule('push-wiederholung', '* * * * *',
                      'select public.push_wiederholung()');
 ```
 
+> **Seit AGE-682 tut dieser Minutenlauf ZWEI Dinge** — aber `push_wiederholung`
+> selbst ist **unverändert**, und das ist Absicht. Der zweite Teil, das
+> Entfernen von Gerätetokens ohne Lebenszeichen seit 180 Tagen, steht in
+> `push_tokens_aufraeumen()` und wird als erste Anweisung aus
+> `push_auftraege_faellig()` gerufen. Beide liegen in einer **Migration**
+> (`20260901180000`), sind also in git, werden von CI angewandt und sind
+> pgTAP-geprüft.
+>
+> **Hier ist nichts nachzuziehen.** Wer den Block unten liest und den Aufräumer
+> vermisst, sucht an der falschen Stelle: in `push_wiederholung` hätte er kein
+> pgTAP, ein `db reset` tilgte ihn mit, und der Objekt-Drift-Scan vergleicht
+> Namen und Zeitplanungen — **keine Funktionsrümpfe**. Eine fehlende Zeile im
+> Rumpf fiele niemandem auf.
+
 **Der Name `push_wiederholung` ist verbindlich**, aus demselben Grund wie die
 zwei Webhook-Namen: er steht in `ERWARTET_OHNE_MIGRATION`
 (`scripts/db-drift-scan.logic.ts`). Fehlt die Funktion in PROD, bricht der

@@ -7,7 +7,7 @@ import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
 import { entscheideZurueck, hatVerlauf } from "../lib/zurueck";
-import { pushEinrichten, pushZielZuhoerer } from "../lib/push";
+import { pushEinrichten, pushLebenszeichen, pushZielZuhoerer } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
   ANFRAGEN_STALE_TIME_MS,
@@ -631,6 +631,28 @@ export default function AppShell() {
       if (stand === "fehler") pushGefragtFuer.current = null;
     });
   }, [user, nachrichtenOffen]);
+
+  // Das Lebenszeichen des Geräts (AGE-682).
+  //
+  // EIGENER EFFECT, und das ist keine Formsache. Der Effect darüber hängt an
+  // `nachrichtenOffen` und an einem Riegel je Konto — beides ist hier falsch.
+  // Genau daran hing bis jetzt auch `letzter_kontakt`, und die Spalte maß
+  // deshalb nicht Leben, sondern „wann zuletzt die Nachrichten offen waren".
+  // Wer die App täglich nutzt und nie in den Chat geht, hätte sein
+  // funktionierendes Token an den Aufräumer verloren.
+  //
+  // `pushLebenszeichen` FRAGT NICHT: ist die Erlaubnis offen, geschieht
+  // nichts. Der Systemdialog bleibt dem Weg über die Nachrichten vorbehalten,
+  // wo er erklärbar ist — die Anforderung „Der Start fragt nicht" verbietet
+  // das Anfordern, nicht das Erneuern eines bereits erteilten Tokens.
+  //
+  // Abhängig von `user`, weil das Token dem angemeldeten Konto gehört: nach
+  // einem Kontowechsel in derselben Sitzung will das neue Konto seinen
+  // Zeitstempel. Ohne Anmeldung geschieht nichts.
+  useEffect(() => {
+    if (!user) return;
+    void pushLebenszeichen();
+  }, [user]);
 
   // Ein Tipp auf die Mitteilung führt in ihr Gespräch (AGE-641 Phase B).
   //

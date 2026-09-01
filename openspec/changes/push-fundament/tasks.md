@@ -502,9 +502,15 @@ Phase B beginnt erst danach.
       von Donald am 28.08. gesehen und aufgenommen.
 - [ ] Opt-out je Typ am Gerät nachgewiesen.
 - [ ] Ungültiges Token wird nach Ablehnung entfernt.
-- [ ] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
+- [x] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
       deinstallierten App. APNs meldet es noch eine Weile als gültig, also
       kommt kein `dauerhaft` — von selbst verschwindet es **nie**.
+      → **AGE-682** (`push-token-aufraeumen`). Der Punkt kostete mehr als ein
+      `delete`: die Plan-Review zeigte, dass `letzter_kontakt` gar kein
+      Lebenszeichen war — `claim_push_token` hing allein am Öffnen der
+      Nachrichten, dort einmal je Konto. Der Change trägt deshalb beide
+      Hälften, das stille Erneuern beim Start und den Aufräumer darauf. Der
+      falsche Spaltenkommentar in `20260827210000:55-57` ist mitkorrigiert.
 
 ### B-Anzeige · Die Glocke fasst je Gespräch zusammen ✅
 

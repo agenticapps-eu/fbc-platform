@@ -22,14 +22,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `env(safe-area-inset-*)` und beim `backButton`. Die Grenze ist deshalb
  * bewusst das Modul: DASS es gerufen wird, wann, und wie oft.
  */
-const { pushEinrichten, pushZielZuhoerer } = vi.hoisted(() => ({
+const { pushEinrichten, pushLebenszeichen, pushZielZuhoerer } = vi.hoisted(() => ({
   pushEinrichten: vi.fn(async () => "web"),
+  // AGE-682: das stille Erneuern beim Start. Eigener Ausgang, weil es NICHT
+  // fragt — und eigene Attrappe, weil die Zusagen unten unterscheiden, WELCHER
+  // der beiden Wege gelaufen ist.
+  pushLebenszeichen: vi.fn(async () => "web"),
   // Der Ziel-Zuhoerer haengt seit AGE-641 Phase B am Montieren der Huelle.
   // Ohne Attrappe liefe der echte in jsdom — und ein fehlendes Feld hier machte
   // JEDE Zusage dieser Datei rot, nicht nur die zum Sprungziel.
   pushZielZuhoerer: vi.fn(async () => {}),
 }));
-vi.mock("../lib/push", () => ({ pushEinrichten, pushZielZuhoerer }));
+vi.mock("../lib/push", () => ({ pushEinrichten, pushLebenszeichen, pushZielZuhoerer }));
 
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),
@@ -111,6 +115,7 @@ const schliesser = () => screen.getByRole("button", { name: "Nachrichten-Leiste 
 beforeEach(() => {
   stelleTelefon();
   pushEinrichten.mockClear();
+  pushLebenszeichen.mockClear();
   localStorage.clear();
 });
 afterEach(() => {
@@ -211,5 +216,63 @@ describe("Die Push-Erlaubnis wird beim Öffnen der Nachrichten gefragt (AGE-641 
     renderApp("/aktivitaet", GAST);
     expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();
     expect(pushEinrichten).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * AGE-682 — das Lebenszeichen beim Start.
+ *
+ * ZWEI EFFEKTE, NICHT EINER. Der Effekt oben hängt an `nachrichtenOffen` und
+ * an einem Riegel je Konto; beides ist für ein Lebenszeichen falsch. Dieser
+ * Block prüft deshalb genau die Trennung: dass beim Start der stille Weg
+ * läuft und der fragende NICHT.
+ *
+ * Warum die Trennung zählt: verschmölzen die beiden, wäre entweder der
+ * Zeitstempel wieder an die Nachrichten gekettet — der Befund, der diesen
+ * Vorgang ausgelöst hat — oder der Systemdialog stünde im Kaltstart.
+ */
+describe("Das Lebenszeichen läuft beim Start, ohne zu fragen (AGE-682)", () => {
+  it("erneuert das Token beim Montieren der Hülle", async () => {
+    renderApp();
+    expect(await screen.findByRole("link", { name: /Nachrichten/ })).toBeInTheDocument();
+
+    await waitFor(() => expect(pushLebenszeichen).toHaveBeenCalledTimes(1));
+    // Die Gegenprobe im selben Test: der fragende Weg ist NICHT gelaufen.
+    // Ohne sie bliebe offen, ob beim Start doch ein Dialog kommt.
+    expect(pushEinrichten).not.toHaveBeenCalled();
+  });
+
+  it("erneuert einmal je Montierung, nicht je Ansicht", async () => {
+    renderApp();
+    expect(await screen.findByRole("link", { name: /Nachrichten/ })).toBeInTheDocument();
+    await waitFor(() => expect(pushLebenszeichen).toHaveBeenCalledTimes(1));
+
+    // Die Schublade auf und wieder zu: der Start-Effekt darf davon nichts
+    // mitbekommen, sonst hinge er doch an den Nachrichten.
+    fireEvent.click(oeffner());
+    await waitFor(() => expect(schliesser()).toBeInTheDocument());
+    fireEvent.click(schliesser());
+    await waitFor(() => expect(oeffner()).toBeInTheDocument());
+
+    expect(pushLebenszeichen).toHaveBeenCalledTimes(1);
+  });
+
+  it("erneuert erneut, wenn in derselben Sitzung das Konto wechselt", async () => {
+    // Ein Gerät, zwei Konten ist der Normalfall. Das Token gehört danach dem
+    // neuen Konto — und dessen `letzter_kontakt` will gesetzt sein.
+    const { wechsleKonto } = renderApp();
+    expect(await screen.findByRole("link", { name: /Nachrichten/ })).toBeInTheDocument();
+    await waitFor(() => expect(pushLebenszeichen).toHaveBeenCalledTimes(1));
+
+    wechsleKonto(ZWEITES_MITGLIED);
+    await waitFor(() => expect(pushLebenszeichen).toHaveBeenCalledTimes(2));
+    expect(pushEinrichten).not.toHaveBeenCalled();
+  });
+
+  it("erneuert für einen Gast nichts", async () => {
+    // Ohne Anmeldung gibt es kein Profil, dem ein Token gehören könnte.
+    renderApp("/aktivitaet", GAST);
+    expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();
+    expect(pushLebenszeichen).not.toHaveBeenCalled();
   });
 });
