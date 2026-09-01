@@ -4,14 +4,15 @@
 >
 > **Vor dem ersten Code:** Plan-Review nach Schritt 2b des Workflows
 > (`openspec-change-review`, ≥2 Prüfer anderer Anbieter, `REVIEWS.md` mit
-> signiertem Trailer). Die zwei offenen Fragen aus `design.md` gehören vorher
-> zu Donald.
+> signiertem Trailer). Die beiden Produktfragen sind bereits beantwortet
+> (Donald, 01.09.) und stehen als Entscheidung 7 und 8 in `design.md`.
 
 ## 0. Vorbedingungen
 
-- [ ] 0.1 Donald die Themenliste vorlegen (Vorschlag: `generell`, `fehler`,
-      `bedienung`, `inhalte`, `idee`) und die Frage zum Löschrecht des Admins
-      am Bild stellen. Beides steht in `design.md` unter Open Questions.
+- [x] 0.1 Beide Produktfragen sind am 01.09. von Donald beantwortet und stehen
+      als Entscheidung 7 und 8 in `design.md`: die fünf Themen (`generell`,
+      `fehler`, `bedienung`, `inhalte`, `idee`) und **ja**, der Admin darf das
+      Bild auch löschen.
 - [ ] 0.2 `pnpm install --frozen-lockfile` in diesem Worktree — er ist frisch
       und hat noch kein `node_modules`.
 - [ ] 0.3 Plan-Review fahren und `REVIEWS.md` ablegen. Ohne signierten Trailer
@@ -19,19 +20,12 @@
 
 ## 1. Themen: Tabelle, Spalte, Bestand
 
-- [ ] 1.1 Migration: `feedback_themes (key text primary key, label text not
-      null, sort int not null)` anlegen, mit den abgestimmten Zeilen füllen.
-      Grants **ausdrücklich** aussprechen — neue Tabellen erben hier nichts.
-- [ ] 1.2 In derselben Migration: `feedback.theme` nullable anlegen, Bestand auf
-      `generell` setzen, **dann** `set not null`, dann Fremdschlüssel auf
-      `feedback_themes`. Die Reihenfolge ist zwingend; andersherum scheitert es
-      an der ersten vorhandenen Zeile.
-- [ ] 1.3 RLS für `feedback_themes`: Lesen für `authenticated`. Die Liste ist
-      keine Preisgabe, aber sie braucht eine ausgesprochene Policy.
-- [ ] 1.4 **`grants_test.sql`-Golden-Snapshot nachziehen.** Die neue Tabelle
-      bricht ihn sonst, und der Bruch sieht aus wie ein Rechtefehler.
-- [ ] 1.5 pgTAP: ein Thema ausserhalb der Menge wird abgewiesen; der Bestand
-      trägt nach der Migration `generell` und keine Zeile trägt `null`.
+- [ ] 1.1 Migration: Tabelle `feedback_themes` anlegen — Spalten `key`
+      (Primärschlüssel), `label` und `sort`, alle `not null` — und mit den fünf
+      abgestimmten Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
+      etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit", `inhalte`
+      „Inhalte / Texte", `idee` „Idee / Wunsch". Grants **ausdrücklich**
+      aussprechen — neue Tabellen erben hier nichts.
 
 ## 2. Screenshot: Bucket und Policies
 
@@ -45,11 +39,18 @@
 - [ ] 2.3 SELECT-Policy: Eigentümer **oder** `public.is_admin()`. Das ist der
       Unterschied zu `post-media` — hier liest jemand, der nicht der Eigentümer
       ist.
+- [ ] 2.3b DELETE-Policy: Eigentümer **oder** `public.is_admin()` (Donald,
+      01.09.). Ein Leserecht ohne Löschrecht macht den Admin zum Zeugen ohne
+      Handhabe. Die Ausnahme bleibt auf **diesen** Bucket beschränkt.
 - [ ] 2.4 `feedback.screenshot_path` anlegen (nullable — das Bild ist optional).
 - [ ] 2.5 pgTAP gegen `storage.objects`, und zwar so, dass er **wirklich Zeilen
       anfasst**: ein drittes Mitglied kommt an ein fremdes Bild nicht heran, der
       Eigentümer und der Admin schon. Ein Fall, der nichts anfasst, tarnt sich
       hier als bestandener RLS-Test.
+- [ ] 2.6 pgTAP für das Löschen, **getrennt vom Lesen**: der Admin darf ein
+      fremdes Bild löschen, ein Nicht-Admin nicht. Getrennt, weil ein Lauf, der
+      Lesen und Löschen zusammen prüft, grün bleiben kann, während eines von
+      beidem zu weit greift.
 
 ## 3. Die RPC: abreissen und neu anlegen
 
@@ -63,14 +64,10 @@
 - [ ] 3.4 Filter als `(p_themes is null or f.theme = any(p_themes))`. **`null`
       heisst „keine Einschränkung", ein leeres Array nicht** — `= any('{}')` ist
       falsch und lieferte im Normalfall eine leere Liste.
-- [ ] 3.5 Die Klemmung (1..100, `null` → Vorgabe) und `order by created_at desc,
-      id desc` **wörtlich** übernehmen. Beide tragen eine eigene Zusage.
-- [ ] 3.6 `revoke ... from public, anon` und `grant ... to authenticated` mit der
-      **neuen** Signatur, dazu den Kommentar — der `drop` nimmt beides mit.
-- [ ] 3.7 pgTAP: die fünf argumentlosen Zusagen laufen weiter; der Filter greift
-      **vor** der Seitengrenze (eine Zeile, die ungefiltert erst auf Seite 2
-      läge, steht gefiltert auf Seite 1); ohne Filterargument dieselbe Menge wie
-      zuvor; zwei Themen wirken als ODER.
+- [ ] 3.5 Die Klemmung (1..100, `null` → Vorgabe) **wörtlich** übernehmen, und
+      ebenso die Ordnung: absteigend nach `created_at`, dann absteigend nach
+      `id`. Beide tragen eine eigene Zusage; der zweite Ordnungsschlüssel ist
+      keine Kosmetik.
 
 ## 4. Die Ausnahme im Zugangsmodell
 
@@ -89,8 +86,9 @@
 - [ ] 4.5 pgTAP für die Grenzen der Ausnahme: der Admin kann kein Gespräch
       zwischen zwei anderen anlegen, keinen fremden `sender_id` vortäuschen und
       nicht in ein Gespräch schreiben, an dem er nicht beteiligt ist.
-- [ ] 4.6 `cso` über den fertigen Diff laufen lassen — dieser Schritt weitet
-      eine Zugangszusage.
+- [ ] 4.6 `cso` über den fertigen Diff laufen lassen. Dieser Change weitet
+      **zwei** Zusagen an verschiedenen Stellen — die Chat-Hürde hier und das
+      Löschrecht am Bild in 2.3b. Beide gehören in denselben Blick.
 
 ## 5. Typen und Datenschicht
 

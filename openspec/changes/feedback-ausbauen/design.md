@@ -68,7 +68,7 @@ zusammenhält, kann auf einem ausgewogenen Bestand grün bleiben, während ein
 Zweig falsch ist."
 
 **Verworfen: ein Postgres-`enum`.** Ein Thema hinzuzufügen wäre dann eine
-Migration *und* ein Deploy, und `enum`-Werte tragen keine Beschriftung und keine
+Migration _und_ ein Deploy, und `enum`-Werte tragen keine Beschriftung und keine
 Reihenfolge — beides landete doch wieder im Code.
 
 **Der Preis, und er ist bekannt:** eine **neue Tabelle bricht den
@@ -152,6 +152,40 @@ ein funktionierender Weg und bricht erst beim Absenden.
 `is_admin()` und nicht ein Feld an `profiles`: die Rolle steht in `staff_roles`
 und ist servergesteuert. `profiles.roles` ist vom Mitglied schreibbar.
 
+### 7. Die Themen: fünf, nach Art des Anliegens
+
+Von Donald am 2026-09-01 entschieden:
+
+| `key`       | `label`                      |
+| ----------- | ---------------------------- |
+| `generell`  | Generell                     |
+| `fehler`    | Fehler / etwas geht nicht    |
+| `bedienung` | Bedienung / Verständlichkeit |
+| `inhalte`   | Inhalte / Texte              |
+| `idee`      | Idee / Wunsch                |
+
+**Nach Art des Anliegens und nicht nach Fläche.** Eine Aufteilung nach Bereichen
+(Profil, Matching, Events …) verdoppelte die `route`, die ohnehin schon an jeder
+Zeile steht — das Feedback wüsste dann zweimal, wo es entstand, und einmal, was
+es meint. Die Art ist die Information, die fehlt.
+
+`fehler` und `bedienung` sind getrennt, weil sie verschiedene Arbeitsvorräte
+sind: „etwas ist kaputt" geht an die Technik, „etwas ist umständlich" an die
+Gestaltung.
+
+### 8. Der Admin darf das Bild auch löschen
+
+Von Donald am 2026-09-01 entschieden, gegen den Vorschlag des Entwurfs, es zu
+vertagen.
+
+Der Grund trägt: ein missbräuchlich hochgeladenes Bild bliebe sonst liegen, bis
+sein Verfasser es entfernt — und genau der hätte keinen Anlass dazu. Ein
+Leserecht ohne Löschrecht macht den Admin zum Zeugen ohne Handhabe.
+
+Die Ausnahme bleibt eng: dieselbe Rolle wie beim Leserecht (`is_admin()`,
+gespeist aus `staff_roles`), und nur auf diesem einen Bucket. Sie ist damit die
+**zweite** Ausnahme in diesem Change und gehört mit in den `cso`-Blick.
+
 ## Risks / Trade-offs
 
 **Eine neue Tabelle bricht `grants_test.sql`** → Der Golden-Snapshot wird im
@@ -171,6 +205,11 @@ schickt, bevor die Migration liegt — deshalb Migration vor Frontend-Deploy.
 
 **`database.types.ts` ist handgepflegt** → Von Hand nachziehen. `gen types` darf
 nicht darüberlaufen.
+
+**Zwei Ausnahmen in einem Change** → Die Chat-Hürde (Entscheidung 6) und das
+Löschrecht am Bild (Entscheidung 8) weiten beide eine Zusage, an verschiedenen
+Stellen. Sie gehören einzeln belegt: ein pgTAP-Lauf, der beide zusammen prüft,
+kann grün bleiben, während eine von beiden zu weit greift.
 
 **Die Bildanzeige kann zur Preisgabe werden** → Der Bucket ist privat, die
 SELECT-Policy nennt Eigentümer **und** Admin einzeln, und ein pgTAP-Fall belegt,
@@ -196,14 +235,11 @@ Kopf, sodass eine Gegenmigration sie ohne Archäologie wiederherstellen kann.
 
 ## Open Questions
 
-- **Welche Themen genau?** Der Vorgang sagt nur „vorgegebene Themen, eines davon
-  Generell". Vorschlag zur Abstimmung mit Donald, bevor die Migration
-  geschrieben wird: `generell`, `fehler`, `bedienung`, `inhalte`, `idee`. Die
-  Menge zu ändern ist danach eine Zeile in `feedback_themes` und keine
-  Migration — die Frage blockiert also den Bau nicht, wohl aber die erste
-  Anzeige.
-- **Soll der Admin das Bild löschen können?** Heute liegt Löschen beim
-  Eigentümer. Ein Admin, der ein missbräuchlich hochgeladenes Bild nicht
-  entfernen kann, ist eine offene Flanke — aber Löschrecht ist ein anderes Recht
-  als Leserecht, und dieser Change spricht nur das Leserecht aus. Vorschlag:
-  eigener Vorgang, sobald der erste Fall auftritt.
+Beide sind am 2026-09-01 von Donald beantwortet und stehen jetzt oben als
+Entscheidung 7 und 8. Es bleibt keine offene Frage, die den Bau blockiert.
+
+Was der Plan-Review noch beantworten kann, aber nicht muss:
+
+- Ob `bedienung` und `inhalte` sich in der Praxis trennen lassen oder ob der
+  Verfasser sie durcheinanderwirft. Das lässt sich nicht am Reissbrett klären
+  und kostet später eine Zeile in `feedback_themes`, keine Migration.

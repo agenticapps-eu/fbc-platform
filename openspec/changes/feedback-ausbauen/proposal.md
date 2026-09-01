@@ -18,12 +18,17 @@ directly". Und die beiden offenen Produktfragen sind beantwortet (siehe unten).
 
 **1. Screenshot ans Feedback.** Beim Abgeben kann ein Bild mitgeschickt werden.
 Neuer privater Bucket; die Größenbegrenzung hängt serverseitig am Bucket, nicht
-nur im Formular. Der Admin sieht das Bild an der Feedback-Zeile.
+nur im Formular. Der Admin sieht das Bild an der Feedback-Zeile — und darf es
+löschen (Donald, 01.09.): ein Leserecht ohne Löschrecht ließe ein
+missbräuchliches Bild liegen, bis ausgerechnet sein Verfasser es entfernt.
 
-**2. Geschlossene Themenliste.** Eine neue Spalte `feedback.theme` mit `CHECK`
-auf eine feste Menge, darin **„Generell"**. Kein Freitext — sonst ist Filtern
-(Teil 3) wertlos. Bestandszeilen bekommen „Generell", weil eine leere Spalte
-sonst als eigenes Thema durchginge.
+**2. Geschlossene Themenliste.** Fünf Themen — Generell, Fehler, Bedienung,
+Inhalte, Idee (Donald, 01.09.) — als Zeilen in einer kleinen Tabelle
+`feedback_themes`, auf die `feedback.theme` per Fremdschlüssel zeigt. Kein
+Freitext, sonst ist Filtern (Teil 3) wertlos. Eine Tabelle und kein `CHECK`,
+weil die Oberfläche einen `CHECK` nicht lesen kann und die Liste sonst ein
+zweites Mal im Code stünde. Bestandszeilen bekommen „Generell", weil eine leere
+Spalte sonst als eigenes, namenloses Thema durchginge.
 
 **3. Filtern in der Admin-Übersicht.** Auswahlkästchen nach Thema und Bewertung,
 in der bestehenden `FilterSpalte` (AGE-629). Das Filtern geschieht **in der RPC**,
@@ -47,8 +52,8 @@ diese Hürde überspringen — von Donald am 01.09. entschieden. Die Ausnahme wi
   `AdminNeuigkeitenPage`). Das zu vereinheitlichen ist ein eigener Vorgang und
   kein Beifang hier — dieser Change verwendet die `FilterSpalte`-Hülle wieder
   und folgt dem bestehenden Markup.
-- **Der Admin verwaltet das Feedback.** `feedback_admin_read` ist bewusst nur
-  `for select`. Daran ändert sich nichts.
+- **Der Admin verwaltet die Feedback-Zeilen.** `feedback_admin_read` bleibt
+  `for select`; der Admin darf das **Bild** löschen, nicht die Zeile.
 
 ## Capabilities
 
@@ -71,8 +76,11 @@ Keine. Beide berührten Fähigkeiten bestehen.
 
 **Datenbank** (Migrationen, forward-only)
 
-- `feedback`: neue Spalten `theme` (`CHECK` auf die feste Menge, Bestand auf
-  „Generell" gesetzt) und `screenshot_path`.
+- Neue Tabelle `feedback_themes` (Schlüssel, Beschriftung, Reihenfolge). **Sie
+  bricht den Golden-Snapshot in `grants_test.sql`** — das wird im selben Change
+  nachgezogen, sonst steht CI rot und der Bruch sieht aus wie ein Rechtefehler.
+- `feedback`: neue Spalten `theme` (Fremdschlüssel, Bestand auf „Generell"
+  gesetzt, dann `not null`) und `screenshot_path`.
 - Neuer privater Storage-Bucket für die Screenshots, mit `file_size_limit` und
   `allowed_mime_types` am Bucket sowie eigenen Policies. Nach der Hausregel
   `upsert: false` beim Hochladen — bei `true` scheitert der Upload an der
@@ -95,7 +103,10 @@ Keine. Beide berührten Fähigkeiten bestehen.
 
 **Sicherheit**
 
-Die Ausnahme in Teil 4 erweitert eine Zugangszusage und gehört damit in die
-`cso`-Betrachtung und in eine pgTAP-Abdeckung, die beide Richtungen belegt:
-Admin darf, Nicht-Admin darf weiterhin nicht. Ein Test, der nur die neue
-Richtung prüft, ließe eine Öffnung für alle unbemerkt.
+Dieser Change weitet **zwei** Zusagen an verschiedenen Stellen: die
+Kontaktanfrage-Hürde (Teil 4) und das Löschrecht am Bild (Teil 1). Beide
+gehören in die `cso`-Betrachtung und je in eine pgTAP-Abdeckung, die **beide
+Richtungen** belegt — Admin darf, Nicht-Admin darf weiterhin nicht. Ein Test,
+der nur die neue Richtung prüft, ließe eine Öffnung für alle unbemerkt; und ein
+Lauf, der beide Ausnahmen zusammen prüft, kann grün bleiben, während eine von
+beiden zu weit greift.

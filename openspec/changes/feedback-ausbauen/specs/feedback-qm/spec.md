@@ -3,13 +3,15 @@
 ### Requirement: Ein Feedback trägt ein Thema aus einer geschlossenen Menge
 
 Das System SHALL an jeder `feedback`-Zeile ein `theme` führen, dessen Wert aus
-einer in der Datenbank per `CHECK` festgelegten Menge stammt, und diese Menge
-SHALL den Wert für „Generell" enthalten. Die Spalte SHALL NOT Freitext
-aufnehmen.
+einer **in der Datenbank** festgelegten Menge stammt, und diese Menge SHALL den
+Wert für „Generell" enthalten. Die Spalte SHALL NOT Freitext aufnehmen.
 
-Die Menge steht in der Datenbank und nicht nur im Code, weil ein Filter über
-einer Spalte, die alles aufnimmt, nicht filtert, sondern sortiert, was zufällig
-gleich geschrieben wurde. Bestehende Zeilen SHALL beim Einführen der Spalte
+Die Menge SHALL für die Oberfläche **lesbar** sein, samt Beschriftung und
+Reihenfolge — sonst müsste sie ein zweites Mal im Code stehen, und zwei
+Abschriften einer Menge driften, ohne dass etwas es misst.
+
+Der Grund: ein Filter über einer Spalte, die alles aufnimmt, filtert nicht,
+sondern sortiert, was zufällig gleich geschrieben wurde. Bestehende Zeilen SHALL beim Einführen der Spalte
 „Generell" erhalten und die Spalte SHALL `not null` sein: eine leere Spalte
 ginge in der Filterliste als eigenes, namenloses Thema durch.
 
@@ -25,7 +27,7 @@ vorbelegt sein.
 
 - **WHEN** ein Schreibzugriff `theme` auf einen Wert setzt, der nicht in der
   festgelegten Menge steht
-- **THEN** weist die `CHECK`-Bedingung den Schreibzugriff ab
+- **THEN** weist die Datenbank den Schreibzugriff ab
 
 #### Scenario: Der Bestand bekommt „Generell", nicht NULL
 
@@ -46,6 +48,12 @@ Upload SHALL mit `upsert: false` erfolgen — bei `true` scheitert er an der
 SELECT-Policy, weil der Aufrufer die Zieldatei erst lesen müsste.
 
 Ein Feedback ohne Bild SHALL weiterhin möglich sein; das Bild ist optional.
+
+Das Bild SHALL vom Verfasser **und** von einem Admin gelöscht werden können.
+Das Leserecht allein genügt hier nicht: ein missbräuchlich hochgeladenes Bild
+bliebe sonst liegen, bis sein Verfasser es selbst entfernt — und genau der
+hätte keinen Anlass dazu. Das Löschrecht des Admins SHALL an derselben Rolle
+hängen wie sein Leserecht und SHALL NOT weiter reichen als auf diesen Bucket.
 
 #### Scenario: Ein Bild wird mitgeschickt und ist am Feedback auffindbar
 
@@ -69,6 +77,17 @@ Ein Feedback ohne Bild SHALL weiterhin möglich sein; das Bild ist optional.
 - **WHEN** ein authentifiziertes Mitglied, das weder Verfasser noch Admin ist,
   das Bild eines fremden Feedbacks anfordert
 - **THEN** verweigert der Speicher den Zugriff
+
+#### Scenario: Der Admin entfernt ein missbräuchliches Bild
+
+- **WHEN** ein Admin das Bild eines fremden Feedbacks löscht
+- **THEN** lässt der Speicher das Löschen zu
+
+#### Scenario: Ein Fremder kann das Bild nicht löschen
+
+- **WHEN** ein authentifiziertes Mitglied ohne Admin-Rolle das Bild eines
+  fremden Feedbacks löschen will
+- **THEN** verweigert der Speicher das Löschen
 
 ### Requirement: Die Admin-Fläche filtert über die RPC, nicht über die geladene Seite
 
