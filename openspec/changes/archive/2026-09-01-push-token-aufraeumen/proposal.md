@@ -1,6 +1,8 @@
-## Why
+# Tote Gerätetokens: erst ein echtes Lebenszeichen, dann der Aufräumer
 
-Linear: AGE-682
+Linear: **AGE-682**
+
+## Why
 
 Beim iOS-Gerätetest am 28.08. meldete die Zustellung `{"zugestellt": 2}`, obwohl
 nur **ein** Gerät in der Hand war. Die zweite Zustellung ging an das Token einer

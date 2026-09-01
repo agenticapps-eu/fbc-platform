@@ -5,6 +5,23 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-01-push-token-aufraeumen",
+    datum: "2026-09-01",
+    titel: "Tote Gerätetokens: erst ein echtes Lebenszeichen, dann der Aufräumer",
+    linear: "AGE-682",
+    aenderungen: [
+      "Beim Start der App auf einer nativen Fläche wird das Gerätetoken **erneut abgelegt**, wenn die Erlaubnis **bereits erteilt** ist — ohne Dialog, ohne Frage, ohne Sichtbares.",
+      "Das widerspricht der bestehenden Anforderung nicht: sie verbietet, die **Erlaubnis** beim Start *anzufordern* (`push-fundament/specs/notifications/spec.md:330-332`). Wo nichts angefordert wird, wird auch nichts verbraucht — der iOS-Systemdialog bleibt für den Nachrichten-Weg reserviert.",
+      "Auf der Web-Fläche geschieht weiterhin nichts.",
+      "Der falsche Spaltenkommentar wird korrigiert.",
+      "**Neu:** `public.push_tokens_aufraeumen()` — entfernt Zeilen aus `push_tokens`, deren `letzter_kontakt` älter als **180 Tage** ist, und gibt die Zahl der entfernten Zeilen zurück. `security definer`, `search_path = ''`, Ausführungsrecht ausgesprochen entzogen für `public`, `anon`, `authenticated` **und `service_role`**.",
+      "**Kein Parameter.** Die Frist steht in der Funktion. Der Test altert die Fixtures (`now() - interval '181 days'`), nicht die Frist — damit gibt es auch keinen Aufruf, der versehentlich alles löscht.",
+      "**Geändert:** `public.push_auftraege_faellig()` ruft den Aufräumer als **erste** Anweisung. Damit läuft er auf dem bestehenden Minutenpfad.",
+      '**Eine Frist für beide Plattformen**, ausdrücklich: Android-Token verschwinden damit 90 Tage vor FCMs eigenem Verfall. Das ist gewollt — mit dem Lebenszeichen aus Hälfte 1 heisst 180 Tage auf beiden Plattformen dasselbe, nämlich „die App lief ein halbes Jahr nicht".',
+      "**Keine neue Zeitplanung, kein neues handangelegtes Objekt.** Die Erwartungslisten des Objekt-Drift-Scans aus AGE-679 bleiben unverändert: `inMigrationen` gilt, sobald der Name wörtlich in einer Migration steht (`scripts/db-drift-scan.ts:161-172`).",
+    ],
+  },
+  {
     slug: "2026-09-01-academy-reiter-und-streifen",
     datum: "2026-09-01",
     titel: "Die Redaktion wird ein Reiter, die Spalte seitenweit, die Vorschau ein Streifen",
