@@ -13,10 +13,17 @@ worden, nicht angenommen:
    ersetzt, weil `create or replace` den Rückgabetyp nicht ändern kann. Ihr
    eigener Kopf hält fest, dass ein `drop` „eine zweite Migration kostet, die
    dieselbe Funktion ein zweites Mal abreißt" — das ist diese Migration.
-2. **Fünf Zusagen in `rls_test.sql` rufen die Funktion argumentlos auf**
-   (Zeilen 479, 486, 491, 496, 769). Der Kommentar an der Migration nennt sie
-   ausdrücklich Wächter über die Vorgabewerte. Jede neue Signatur muss
-   `admin_list_feedback()` ohne Argumente weiter auflösen.
+2. **Sieben Zusagen in `rls_test.sql` hängen an dieser Funktion**, und sie
+   zerfallen in zwei Sorten — am 2026-09-01 selbst nachgezählt, weil die
+   Zeilennummern im Migrationskommentar veraltet waren:
+   - **Fünf rufen sie argumentlos auf** (525, 532, 537, 542, 815). Jede neue
+     Signatur muss `admin_list_feedback()` ohne Argumente weiter auflösen.
+   - **Zwei nennen die Signatur wörtlich** (545, 549):
+     `has_function_privilege('anon', 'public.admin_list_feedback(int,int)', …)`
+     und dasselbe für `authenticated`. **Diese beiden brechen**, sobald die
+     Signatur vier Argumente trägt — und zwar nicht mit `false`, sondern mit
+     einem Fehler, weil die genannte Funktion dann nicht mehr existiert. Der
+     Migrationskommentar erwähnt nur die fünf; die zwei sind der teurere Teil.
 3. **Die Kontaktanfrage-Hürde steht in ZWEI Policies**, nicht einer:
    `threads_insert` (`20260806080100_activation_gate.sql:341`) und
    `messages_insert` (ebenda, 358). Beide tragen denselben
@@ -109,6 +116,18 @@ Signatur. Grants, `revoke` und der Kommentar kommen mit, wie beim letzten Mal.
 **Die Fessel:** `p_limit`, `p_offset`, `p_themes` und `p_ratings` bekommen **alle**
 einen Vorgabewert, damit `admin_list_feedback()` argumentlos auflösbar bleibt.
 Fünf bestehende Zusagen rufen sie so auf; ohne Vorgabewerte melden sie `42883`.
+
+**Die zweite Fessel, und sie kostet einen Diff im Test:** zwei Zusagen prüfen
+das Ausführungsrecht über den ausgeschriebenen Funktionsnamen mit
+Argumenttypen. Die alte Schreibweise zeigt nach dem `drop` ins Leere. Sie
+müssen auf die neue Signatur gehoben werden — das ist kein Aufweichen einer
+Zusage, sondern dieselbe Zusage über dieselbe Funktion unter ihrem neuen Namen.
+
+**Was die fünf argumentlosen Zusagen nebenbei werden:** Wächter über die
+Bedeutung von „kein Filterargument". Sie zählen heute Zeilen ohne jede
+Einschränkung; wenn `p_themes = null` nicht mehr „alles" hiesse, würden sie rot.
+Das ist ein willkommener Nebeneffekt und war vorher niemandes Absicht — er wird
+hier festgehalten, damit ihn niemand später als überflüssig wegkürzt.
 
 Die Klemmung von `p_limit` (1..100, `null` → Vorgabe) und der zweite
 Ordnungsschlüssel `id desc` bleiben **wörtlich** erhalten. Beide tragen eine

@@ -25,7 +25,8 @@
       abgestimmten Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
       etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit", `inhalte`
       „Inhalte / Texte", `idee` „Idee / Wunsch". Grants **ausdrücklich**
-      aussprechen — neue Tabellen erben hier nichts.
+      aussprechen — `select` für `authenticated`. Neue Tabellen erben hier
+      nichts.
 
 ## 2. Screenshot: Bucket und Policies
 
@@ -59,7 +60,8 @@
 - [ ] 3.2 Neu anlegen mit `p_limit`, `p_offset`, `p_themes text[]`,
       `p_ratings int[]` — **alle vier mit Vorgabewert**, damit
       `admin_list_feedback()` argumentlos auflösbar bleibt. Fünf Zusagen in
-      `rls_test.sql` (479, 486, 491, 496, 769) rufen sie so auf.
+      `rls_test.sql` rufen sie so auf (Zeilen 525, 532, 537, 542, 815 — am
+      01.09. nachgezählt; die Nummern im Migrationskommentar sind veraltet).
 - [ ] 3.3 Rückgabe um `theme` und `screenshot_path` erweitern.
 - [ ] 3.4 Filter als `(p_themes is null or f.theme = any(p_themes))`. **`null`
       heisst „keine Einschränkung", ein leeres Array nicht** — `= any('{}')` ist
@@ -68,6 +70,19 @@
       ebenso die Ordnung: absteigend nach `created_at`, dann absteigend nach
       `id`. Beide tragen eine eigene Zusage; der zweite Ordnungsschlüssel ist
       keine Kosmetik.
+- [ ] 3.6 `revoke ... from public, anon` und `grant ... to authenticated` mit
+      der **neuen** Signatur, dazu den Kommentar — der `drop` nimmt beides mit.
+- [ ] 3.7 **`rls_test.sql` Zeile 545 und 549 heben.** Beide prüfen das
+      Ausführungsrecht über den ausgeschriebenen Funktionsnamen samt
+      Argumenttypen. Nach dem `drop` zeigt die alte Schreibweise ins Leere, und
+      der Test bricht dann mit einem Fehler statt mit `false`. Dieselbe Zusage,
+      neue Signatur — kein Aufweichen. Der Migrationskommentar von AGE-587
+      nennt nur die fünf argumentlosen Aufrufe; diese zwei sind der teurere
+      Teil und standen bisher in keiner Liste.
+- [ ] 3.8 pgTAP: die fünf argumentlosen Zusagen laufen weiter; der Filter
+      greift **vor** der Seitengrenze (eine Zeile, die ungefiltert erst auf
+      Seite 2 läge, steht gefiltert auf Seite 1); ohne Filterargument dieselbe
+      Menge wie zuvor; zwei Themen wirken als ODER.
 
 ## 4. Die Ausnahme im Zugangsmodell
 
