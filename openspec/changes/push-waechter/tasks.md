@@ -9,27 +9,48 @@ Beleg an der laufenden Anlage.
 
 ## 1 · Die Entscheidung als reine Funktion
 
-- [ ] **1.1 RED** — `scripts/push-waechter.logic.test.ts` mit einer Zusage je
-      Befund: Antwort ungleich `200`, `timed_out`, `error_msg`, Stillstand nach
-      Alter des jüngsten Laufs, Stillstand nach Mindestmenge, frisch
-      aufgegebene Zustellung, Messausfall, TTL kürzer als das Fenster, und der
-      Grünfall. Die Tests scheitern, weil `push-waechter.logic.ts` noch nicht
-      existiert.
-- [ ] **1.2 GREEN** — `scripts/push-waechter.logic.ts`: nimmt die gemessenen
+- [x] **1.1 RED** — `scripts/push-waechter.test.ts`, 23 Zusagen. Erster Lauf
+      rot am fehlenden Modul (`Failed to resolve import
+      "./push-waechter.logic"`). Namensform wie im Haus: `db-drift-scan.ts` +
+      `db-drift-scan.logic.ts` werden von `db-drift-scan.test.ts` geprüft.
+- [x] **1.2 GREEN** — `scripts/push-waechter.logic.ts`: nimmt die gemessenen
       Zahlen entgegen, gibt Befunde zurück. Keine Datenbank, kein `process.exit`,
       kein `console.log` — dieselbe Bauart wie `db-drift-scan.logic.ts`.
-- [ ] **1.3 Jede Zusage durch eine Mutation belegen.** Je Zusage eine Änderung
-      an der Logik, die genau sie rötet, mit Ergebnis festgehalten. Eine Zusage,
-      die von keiner Mutation gerötet wird, belegt nichts und wird ersetzt — das
-      ist am 31.08. an `apnsMitHostErkennung` zweimal passiert.
-- [ ] **1.4 Die Ausgabe trägt keine Mitgliederdaten.** Eine Zusage, die
-      fehlschlägt, sobald die Befund-Ausgabe einen Antwortrumpf, Kopfzeilen,
-      eine `notification_id`, eine `token_id` **oder `letzter_fehler`** enthält.
-      Der letzte Punkt kommt aus der Review: der Wert ist Freitext aus
-      `e.message`, und die APNs-Adresse trägt den Gerätetoken im Pfad.
-- [ ] **1.5 Messausfall ist nicht Stillstand.** Eine Zusage, die genau das
-      trennt — ein leeres Messergebnis darf nie als „der Takt steht" gemeldet
-      werden. Vorbild: `db-drift-scan.logic.ts:104` wirft bei leerem Bestand.
+      23/23 grün.
+- [x] **1.3 Jede Zusage durch eine Mutation belegt.** 17 Mutationen, und der
+      erste Satz von 13 hat die Lücke selbst gezeigt: **vier Zusagen rötete
+      keine einzige** — die Abfragen-Prüfung war nur für `aufgegeben` belegt,
+      für `antworten`, `laeufe`, `zeitplan` und `ttl` nicht. M14–M17 haben sie
+      geschlossen. Jetzt gilt: jede der 23 Zusagen wird von mindestens einer
+      Mutation gerötet.
+
+      | Mutation | rötet |
+      | --- | --- |
+      | M01 Antwort-Befund nie melden | 5 |
+      | M02 Befund behauptet „Push ist kaputt" | 1 |
+      | M03 Alter des jüngsten Laufs ignorieren | 2 |
+      | M04 Mindestmenge ignorieren | 1 |
+      | M05 Mindestmenge auf volle Erwartung | 1 |
+      | M06 Aufgabe erst ab zwei | 1 |
+      | M07 Messausfall als Stillstand melden | 2 |
+      | M08 Erwartungswert 0 durchlassen | 1 |
+      | M09 TTL nie prüfen | 1 |
+      | M10 nur den ersten Befund melden | 1 |
+      | M11–M17 je eine verbotene Spalte je Abfrage, Verbotsliste aushöhlen | je 1 |
+      | M13 einen Befund erfinden | 8 (alle Grünfälle) |
+
+      **M13 ist der Grund, warum die Grünfälle etwas belegen.** Ohne eine
+      Mutation, die einen Befund *hinzufügt*, wäre „meldet nichts" von „prüft
+      nichts" nicht zu unterscheiden.
+- [x] **1.4 Die Ausgabe trägt keine Mitgliederdaten.** Geprüft wird die
+      **Abfrage**, nicht der erzeugte Text: die Logik bekommt nie etwas
+      Verbotenes zu sehen, eine Zusage auf ihre Ausgabe wäre also leer. Was
+      schiefgehen kann, ist eine Abfrage, die eine Spalte zu viel liest —
+      deshalb stehen `ABFRAGEN` und `VERBOTENE_SPALTEN` im Logikmodul. Dazu
+      eine Gegenprobe auf die Verbotsliste selbst: wäre sie leer, wäre die
+      Zusage grün, ohne etwas auszuschließen (M12).
+- [x] **1.5 Messausfall ist nicht Stillstand.** Zwei Zusagen, gerötet von M07
+      und M08. Vorbild: `db-drift-scan.logic.ts:104` wirft bei leerem Bestand.
 
 ## 2 · Der Läufer
 
