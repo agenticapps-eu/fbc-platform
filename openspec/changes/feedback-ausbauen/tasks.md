@@ -15,11 +15,22 @@
 - [x] 0.2 `pnpm install --frozen-lockfile` in diesem Worktree.
 - [x] 0.3 Plan-Review gefahren, `REVIEWS.md` liegt, Trailer vom Gate mit
       `trailer_status: ok` bestätigt.
-- [ ] 0.4 **Prüfen, ob eine bestehende Zusage aus „es gibt ein Gespräch" auf „es
-      gab eine Freigabe" schliesst.** Nach diesem Change stimmt das nicht mehr
-      ausnahmslos, und **nichts würde davon rot**. Eine Mutation ist der Weg:
-      die Freigabe-Bedingung testweise entfernen und sehen, welche Zusage
-      fällt. Fällt keine, fehlt eine.
+- [x] 0.4 **Geprüft: die Zusage gibt es, sie ist tragend — und sie deckt nur
+      eine Richtung.** Gegenprobe am 01.09. gegen den lokalen Stack: die
+      Freigabe-Bedingung aus `messages_insert` entfernt (der Verbund mit
+      `contact_requests`), die Teilnahmeprüfung stehen gelassen. Von 806
+      Zusagen fiel **genau eine** — `rls_test.sql` Test 27, „Ein bestehender
+      Thread allein reicht nicht — ohne angenommene Anfrage keine Nachricht":
+      `OK`, wo `DENIED:%` erwartet war. Vorher 806 PASS, verbogen 1 FAIL,
+      danach wieder 806 PASS; die Policy ist zeichengleich zurück, belegt mit
+      `diff` gegen den Abzug aus `pg_policies`. Ein `db reset` war **nicht**
+      nötig, die Dateien säen ihre eigenen Fixtures — die vier
+      unversionierten Push-Objekte im geteilten Stack blieben unangetastet.
+      **Und die Lücke, die daraus folgt:** Test 27 handelt als _Mitglied_ in
+      einem gewöhnlichen Faden. Er bleibt nach 4.5 grün, gleichgültig ob der
+      Admin-Zweig richtig oder falsch geklammert ist — die Fehlklammerung, vor
+      der 4.5 warnt, lässt den Admin in **fremde** Fäden schreiben, und davon
+      sieht Test 27 nichts. Geschärft in 4.8.
 
 ## 1. Themen: Tabelle, Spalte, Bestand
 
@@ -118,6 +129,11 @@
 - [ ] 4.8 pgTAP für die Grenzen: kein Gespräch zwischen zwei Fremden, kein
       fremder `sender_id`, kein Schreiben ohne eigene Teilnahme, kein
       deaktivierter Admin, keine Freischaltung ausserhalb des markierten Fadens.
+      **„Kein Schreiben ohne eigene Teilnahme" führt einen `Admin` als
+      Handelnden**, in einem fremden und _nicht_ markierten Faden — so steht es
+      nach der Gegenprobe aus 0.4 fest. Der vorhandene Test 27 in
+      `rls_test.sql` deckt nur das Mitglied im gewöhnlichen Faden ab und bliebe
+      auch dann grün, wenn 4.5 falsch geklammert wird.
 - [ ] 4.9 pgTAP: zwei nebenläufige Öffnungs-Aufrufe erzeugen **ein** Gespräch;
       das vertauschte Paar liefert dasselbe.
 - [ ] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
