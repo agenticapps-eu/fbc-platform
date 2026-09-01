@@ -32,6 +32,20 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-08-31-suchspalte-rechts",
+    datum: "2026-08-31",
+    titel: "Suche und Filter stehen jetzt rechts und laufen beim Blättern mit",
+    linear: "AGE-629",
+    aenderungen: [
+      "**Die Kartenraster folgen ihrer Spalte statt dem Fenster.** Fünf Rasterdefinitionen bekommen einen `@container`-Behälter und Schwellen in Containerbreiten. Die Schwellen sind so gewählt, dass **jeder heute ausgelieferte Zustand unverändert bleibt**; nur die durch eine rechte Spalte verengten Fälle brechen um, statt sich zu quetschen.",
+      "**`/mitglieder`**: die vorhandene Suche samt Facetten zieht in die rechte Spalte; die erweiterten Filter stehen dort dauerhaft offen statt zugeklappt.",
+      "**`/events`**: neue rechte Spalte mit Volltextsuche (Titel · Beschreibung · Ort), Facette **Art** aus den fünf Werten des `events_type_check`-Constraints und Facette **Themen** aus dem Bestand.",
+      "**`/academy`**: neue rechte Spalte mit Volltextsuche über den Beitragstext, Facette **Hashtags** aus dem Bestand und Sortierung (Neueste · Beliebteste).",
+      "**Eine Facettenkarte ohne Werte rendert nicht** — das ist bereits das Muster der `/aktivitaet`-Spalte und wird übernommen, nicht erfunden. Suche und Sortierung stehen dagegen immer, damit jede Spalte auf jeder Datenlage trägt.",
+      "**Ein Test bindet die feste Art-Liste an den CHECK-Constraint.** Weichen sie voneinander ab, wird er rot; die Liste kann nicht still auslaufen, wenn jemand einen sechsten Typ migriert.",
+    ],
+  },
+  {
     slug: "2026-08-31-composer-aktionen-zusammen",
     datum: "2026-08-31",
     titel: 'Der Umbruch trennt „Abbrechen" nicht mehr von „Posten"',

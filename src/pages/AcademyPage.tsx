@@ -1,17 +1,21 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card, CardDescription, CardTitle } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
+import { FilterSpalte } from "../components/ui/FilterSpalte";
 import { FormatHero } from "../components/ui/FormatHero";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { Tabs } from "../components/ui/Tabs";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { FORMAT_HERO } from "../config/formatHero";
 import { displayAuthor } from "../lib/displayAuthor";
 import { fetchGelikteVideos, gelikteVideosKey, type AcademyCursor } from "../lib/academy";
-import { fetchFeed, type FeedCursor, type FeedPost } from "../lib/feed";
+import { fetchFeed, type FeedCursor, type FeedOrdnung, type FeedPost } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
 
 /**
@@ -69,16 +73,25 @@ export default function AcademyPage() {
         <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
           Aus der Redaktion
         </h2>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {ACADEMY_LESSONS.map((lesson) => (
-            <Card key={lesson.url} className="flex flex-col gap-3">
-              <VideoEmbed url={lesson.url} title={lesson.title} />
-              <div>
-                <CardTitle className="text-base">{lesson.title}</CardTitle>
-                <CardDescription>{lesson.description}</CardDescription>
-              </div>
-            </Card>
-          ))}
+        {/* Behälter statt Fenster (AGE-629): mit der Filterspalte daneben
+            verengt sich diese Fläche, das Fenster nicht. 35rem und nicht
+            41rem wie bei den Karten der anderen Flächen — eine Lektion trägt
+            einen Videorahmen und wird darunter unbrauchbar; gemessen liefert
+            die Academy heute bei 1024 px zwei Kacheln zu 332 px. Der Deckel
+            bleibt bei ZWEI, damit ein breiter Schirm die Fläche nicht dichter
+            macht, als sie heute ist. */}
+        <div className="@container">
+          <div className="grid grid-cols-1 gap-6 @[35rem]:grid-cols-2">
+            {ACADEMY_LESSONS.map((lesson) => (
+              <Card key={lesson.url} className="flex flex-col gap-3">
+                <VideoEmbed url={lesson.url} title={lesson.title} />
+                <div>
+                  <CardTitle className="text-base">{lesson.title}</CardTitle>
+                  <CardDescription>{lesson.description}</CardDescription>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -91,7 +104,7 @@ export default function AcademyPage() {
           {
             value: "alle",
             label: "Alle",
-            content: <GeteilteVideos uid={uid} />,
+            content: <GeteilteVideos uid={uid} mitFilter />,
           },
           {
             value: "meine",
@@ -106,8 +119,30 @@ export default function AcademyPage() {
 
 // ── Reiter „Alle“ ───────────────────────────────────────────────────────────
 
-const academyKey = (uid: string | null, autorId: string | null) =>
-  ["academy", "videos", uid, autorId] as const;
+/**
+ * Der Schlüssel trägt JEDEN Filter mit (AGE-629). Täte er es nicht, lieferte
+ * react-query beim Umschalten der Ordnung oder beim Tippen weiterhin das
+ * zwischengespeicherte Ergebnis der vorigen Frage — und zwar lautlos, weil
+ * nichts fehlschlägt.
+ */
+const academyKey = (
+  uid: string | null,
+  autorId: string | null,
+  suche: string,
+  tags: string[],
+  ordnung: FeedOrdnung,
+) => ["academy", "videos", uid, autorId, suche, [...tags].sort().join(","), ordnung] as const;
+
+/**
+ * Die Grundabfrage für die Hashtag-Facette — OHNE Suche und OHNE Tagfilter.
+ *
+ * Sie ist nicht dieselbe wie die Liste, und das ist der Punkt: leitete man die
+ * Facette aus der gefilterten Liste ab, verschwänden nach dem ersten Haken alle
+ * anderen Marken aus der Auswahl, und man käme aus dem Filter nicht mehr
+ * heraus. Dieselbe Rolle wie `fetchDirectoryBaseline` im Verzeichnis.
+ */
+const academyFacettenKey = (uid: string | null, autorId: string | null) =>
+  ["academy", "facetten", uid, autorId] as const;
 
 /**
  * Alle sichtbaren Beiträge mit Video, neueste zuerst — oder, mit `autorId`, nur
@@ -122,21 +157,51 @@ function GeteilteVideos({
   uid,
   autorId = null,
   leer,
+  mitFilter = false,
 }: {
   uid: string | null;
   autorId?: string | null;
   leer?: { title: string; description: string };
+  /**
+   * Nur das Regal „Alle" trägt die Filterspalte. „Meine Academy" lädt über
+   * `fetchGelikteVideos`, das weder Suche noch Ordnung kennt — eine Spalte, die
+   * dort nichts täte, wäre eine Zusage an der Oberfläche ohne Deckung.
+   */
+  mitFilter?: boolean;
 }) {
+  const [eingabe, setEingabe] = useState("");
+  const [suche, setSuche] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [ordnung, setOrdnung] = useState<FeedOrdnung>("neueste");
+
+  // Entprellt wie im Verzeichnis: sonst eine Serverrunde je Tastendruck.
+  useEffect(() => {
+    const id = setTimeout(() => setSuche(eingabe), 300);
+    return () => clearTimeout(id);
+  }, [eingabe]);
+
   const liste = useInfiniteQuery({
-    queryKey: academyKey(uid, autorId),
-    queryFn: ({ pageParam }) => fetchFeed({ uid, nurVideos: true, autorId, cursor: pageParam }),
+    queryKey: academyKey(uid, autorId, suche, tags, ordnung),
+    queryFn: ({ pageParam }) =>
+      fetchFeed({ uid, nurVideos: true, autorId, cursor: pageParam, suche, tags, ordnung }),
     initialPageParam: null as FeedCursor | null,
     getNextPageParam: (letzte) => letzte.nextCursor,
   });
 
+  const facetten = useQuery({
+    queryKey: academyFacettenKey(uid, autorId),
+    queryFn: () => fetchFeed({ uid, nurVideos: true, autorId }),
+    enabled: mitFilter,
+    staleTime: Infinity,
+  });
+  const hashtagsImBestand = useMemo(
+    () => [...new Set((facetten.data?.posts ?? []).flatMap((p) => p.hashtags ?? []))].sort(),
+    [facetten.data],
+  );
+
   const posts = (liste.data?.pages ?? []).flatMap((seite) => seite.posts);
 
-  return (
+  const raster = (
     <VideoRaster
       posts={posts}
       isLoading={liste.isLoading}
@@ -153,6 +218,84 @@ function GeteilteVideos({
         }
       }
     />
+  );
+
+  if (!mitFilter) return raster;
+
+  return (
+    <FilterSpalte
+      id="academy-filter"
+      filter={
+        <div className="space-y-4">
+          <Card className="space-y-3">
+            <label htmlFor="academy-suche" className="font-display text-sm font-semibold text-ink">
+              Suche
+            </label>
+            {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
+                `<label for>`, und ein `aria-label` ERSETZT dessen Text als
+                zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
+                „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
+                Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
+                kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
+            <Input
+              id="academy-suche"
+              type="search"
+              value={eingabe}
+              onChange={(e) => setEingabe(e.target.value)}
+              placeholder="Wonach suchst du?"
+            />
+          </Card>
+
+          <Card className="space-y-3">
+            <label
+              htmlFor="academy-ordnung"
+              className="font-display text-sm font-semibold text-ink"
+            >
+              Sortierung
+            </label>
+            {/* Die Ordnungen sind die der Feed-Schicht, nicht eigene. Sie führt
+                seit AGE-667 in allen drei `veroeffentlicht_ab` und trägt in
+                „Beliebteste" zusätzlich `like_count` im Cursor; eine zweite
+                Ordnung hier hiesse, diesen Vertrag ein zweites Mal zu bauen. */}
+            <Select
+              id="academy-ordnung"
+              value={ordnung}
+              onChange={(e) => setOrdnung(e.target.value as FeedOrdnung)}
+            >
+              <option value="neueste">Neueste zuerst</option>
+              <option value="beliebteste">Beliebteste zuerst</option>
+            </Select>
+          </Card>
+
+          {/* Abgeleitet, denn Hashtags sind Freitext. Ohne Werte rendert die
+              Karte nicht — auf der Produktion ist das heute der Fall. */}
+          {hashtagsImBestand.length > 0 && (
+            <Card className="space-y-3">
+              <h2 className="font-display text-sm font-semibold text-ink">Hashtags</h2>
+              <ul className="space-y-1.5">
+                {hashtagsImBestand.map((t) => (
+                  <li key={t}>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={tags.includes(t)}
+                        onChange={() =>
+                          setTags((v) => (v.includes(t) ? v.filter((x) => x !== t) : [...v, t]))
+                        }
+                        className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{t}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
+      }
+    >
+      {raster}
+    </FilterSpalte>
   );
 }
 
@@ -270,10 +413,14 @@ function VideoRaster({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2">
-        {posts.map((post) => (
-          <VideoKarte key={post.id} post={post} isLoggedIn={isLoggedIn} />
-        ))}
+      {/* Dieselbe Schwelle wie beim Redaktionsregal — es sind dieselben
+          Kacheln mit demselben Videorahmen. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-6 @[35rem]:grid-cols-2">
+          {posts.map((post) => (
+            <VideoKarte key={post.id} post={post} isLoggedIn={isLoggedIn} />
+          ))}
+        </div>
       </div>
       {hasNextPage && (
         <div className="flex justify-center">
