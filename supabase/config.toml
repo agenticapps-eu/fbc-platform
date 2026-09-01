@@ -172,10 +172,12 @@ max_indexes = 5
 #    gegen das DEV-Projekt, dessen Konfiguration im Dashboard steht.
 #
 # Die Werte und ihre Begruendung:
-#   site_url                  Custom Domain app.fairbusinessclub.de steht in der
-#                             Allow-List, ist aber nicht site_url: AGE-256 ist
-#                             blockiert. Der Umstieg ist ein zweiter Push in der
-#                             Go-Live-Woche.
+#   site_url                  app.effbeezee.com — seit 2026-09-01 kanonisch
+#                             (AGE-256). Donald hat den Wert an dem Tag um
+#                             18:38 ueber die Management-API auf PROD gesetzt;
+#                             was hier steht, ist die Nachmessung, nicht ein
+#                             Vorsatz. app.fairbusinessclub.de war nie gebaut
+#                             und ist ersatzlos raus.
 #   additional_redirect_urls  Strikt, ohne localhost und ohne
 #                             *.fbc-platform.pages.dev-Wildcard. Der
 #                             Preview-Wildcard gehoert zu DEV, nicht zu PROD.
@@ -202,12 +204,12 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://fbc-platform.pages.dev"
+site_url = "https://app.effbeezee.com"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
+  "https://app.effbeezee.com",
+  "https://app.effbeezee.com/**",
   "https://fbc-platform.pages.dev/**",
-  "https://app.fairbusinessclub.de",
-  "https://app.fairbusinessclub.de/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

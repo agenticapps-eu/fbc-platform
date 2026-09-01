@@ -549,8 +549,8 @@ Management-API** — links steht, was in `config.toml` gehört:
 
 | `config.toml`-Schlüssel | Wert | API-Feld (beim Nachprüfen) | Warum |
 |---|---|---|---|
-| `site_url` | `https://fbc-platform.pages.dev` | `site_url` | Custom Domain ist blockiert (AGE-256) |
-| `additional_redirect_urls` | `fbc-platform.pages.dev/**`, `app.fairbusinessclub.de`, `…/**` | `uri_allow_list` | **kein localhost, kein Preview-Wildcard** |
+| `site_url` | `https://app.effbeezee.com` | `site_url` | kanonische Domain seit 2026-09-01 (AGE-256) |
+| `additional_redirect_urls` | `app.effbeezee.com`, `…/**`, `fbc-platform.pages.dev/**` | `uri_allow_list` | **kein localhost, kein Preview-Wildcard**; Stand 2026-09-01 (AGE-256) |
 | `minimum_password_length` | `10` | `password_min_length` | echte Mitgliederkonten |
 | `[auth.rate_limit] email_sent` | `30` | `rate_limit_email_sent` | bei `2` blockieren zwei gleichzeitige Zurücksetzungen den Versand für alle |
 | `[auth.email] enable_confirmations` | `false` | `mailer_autoconfirm` (invertiert) | **Entscheidung, kein Versehen** — C3 baut den Aktivierungsweg über Resend |
@@ -614,7 +614,7 @@ Deploy-URL hinterher.
 | ~~`send-activation` deployen~~ | C3 | **erledigt 07.08.** — es wurden drei: `send-`, `resend-` und `redeem-activation`, auf PROD deployt und per `ezbr_sha256` gegen DEV gegengemessen. PROD trägt jetzt **sechs** Functions |
 | `notify-contact-request` auf PROD ist ein älterer Stand | 11.4 | `ezbr_sha256` weicht von DEV ab — vor dem Umzug klären |
 | Stripe-Webhook-URL auf `viwntbodrtqxgmqyxluh` umstellen | Phase 2 | für den Go-Live irrelevant, vorher nicht vergessen |
-| Custom Domain `app.fairbusinessclub.de` | AGE-256 | blockiert (Domain-Zugang); danach `site_url` umstellen |
+| Custom Domain `app.effbeezee.com` | AGE-256 | ✅ erledigt 2026-09-01; `site_url` ist umgestellt |
 | Umzug der zwei prod-Frontend-Werte | Go-Live-Woche | siehe oben |
 | ~~DEV regelmäßig aus PROD auffrischen~~ | AGE-576 | **erledigt 2026-08-20** — `pnpm sync:dev`, **ohne** Anonymisierung (entschieden gegen zwei HIGH-Reviews; der Ausgleich sind neutralisierte Passwort-Hashes und entschärfte Demo-Zugänge) |
 | **DEV trägt 72 echte Adressen und einen lebenden E-Mail-Webhook** | Rücknahmeliste vor Go-Live | neu seit dem Spiegel; der Resend-Zugang ist zu PROD byte-identisch. Heute verstellt durch neutralisierte Hashes und `contact_requests = 0`, aber die Selbstregistrierung ist offen |

@@ -11,6 +11,15 @@
 > werden nie automatisch freigegeben** — Sichtbarkeit wird **in der DB per RLS** erzwungen,
 > nicht nur im Frontend.
 
+> **Nachtrag 2026-09-01 (AGE-256):** Zwei Angaben unten sind ueberholt.
+> **Die Custom Domain steht** — sie heisst `app.effbeezee.com`, nicht
+> `app.fairbusinessclub.de`; letztere wurde nie gebaut. Und **der Seitentitel
+> lautet inzwischen `eff.bee.zee — Business-Netzwerk auf Werten`**. Die
+> `<title>Fair Business Club</title>`-Zeilen unten bleiben trotzdem stehen: sie
+> sind das Protokoll dessen, was am Messtag ausgeliefert wurde, nicht eine
+> Aussage ueber heute. `fbc-platform.pages.dev` antwortet weiter und bleibt
+> Zweitweg, damit schon verschickte Links gueltig bleiben.
+
 ---
 
 ## Prüfmethode (Transparenz)
