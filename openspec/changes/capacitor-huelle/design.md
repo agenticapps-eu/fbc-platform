@@ -210,8 +210,63 @@ legen. Der `updateUrl` bekommt ein POST mit Geräteangaben und antwortet mit
 `{ version, url, checksum, … }`; unter `url` liegt ein Zip mit `index.html` an
 der Wurzel.
 
-Damit ergibt sich: **Cloudflare Pages Functions** für die drei Endpunkte,
-**R2** für die Bündel-Zips. Beides steht bereits.
+**Fassungsfalle:** `latest` ist `8.51.15` und passt zu Capacitor 8. Es gibt auch
+`9.0.0` und `10.0.0` — die fordern aber `@capacitor/core: ^5.0.0`. Höhere Zahl,
+ältere Zusage; nicht darauf greifen.
+
+### Wo der Dienst wohnt — korrigiert am 31.08.
+
+Bis zum 31.08. stand hier **Cloudflare Pages Functions plus R2**, begründet mit
+einem einzigen Satz: „Beides steht bereits." **Der Satz war falsch.** Gemessen:
+Pages steht (`wrangler pages deploy ./dist --project-name=fbc-platform` in
+`deploy.yml`; `functions/` fährt automatisch mit). **R2 steht nicht** — kein
+`wrangler.toml`, keine Bucket-Bindung, kein Treffer im Repo. Die „R2"-Fundstellen
+sind eine Risiko-Kennung `R2` in `docs/w2-acceptance.md`, also Namensgleichheit.
+
+Supabase Storage steht dagegen wirklich: vier Buckets, **per Migration** angelegt
+mit `public`, `file_size_limit` und `allowed_mime_types`; `avatars` und `covers`
+sind bereits öffentlich. Das Kriterium, mit dem der Entwurf R2 wählte, spricht
+damit gegen R2.
+
+**Entscheidung Donald, 31.08.: alles auf Supabase.** Bündel im Storage-Bucket,
+Manifest als Tabelle, die drei Endpunkte als Edge Functions mit
+`verify_jwt = false`. Das berührt die Entscheidung vom 27.08. nicht — „selbst
+gehostet" war die Wahl **gegen** den bezahlten Ionic-Dienst, nicht für einen
+Anbieter. Supabase ist genauso selbst gehostet wie Cloudflare.
+
+Was dafür spricht, über „steht schon" hinaus:
+
+- **Ein Schlüssel weniger.** `SUPABASE_SERVICE_ROLE_KEY` liegt in Infisical
+  (`docs/secrets.md:132`), und `deploy.yml` fährt ohnehin alles über
+  `infisical run`. Eine Pages Function müsste das Manifest aus Supabase lesen und
+  bräuchte dafür einen Schlüssel in einer zweiten Umgebung — genau die Reibung,
+  die dieser Weg vermeidet.
+- **Der öffentliche Endpunkt ist hier eingespielt.** `verify_jwt = false` tragen
+  `stripe-webhook`, `send-activation` und `notify-contact-request`, jeweils mit
+  ausgeschriebener Begründung. Ein Gerät hat kein JWT; der Endpunkt muss ohne
+  auskommen.
+- **Öffentlich ist kein Zugeständnis** — und dieser Absatz hat die Begründung
+  dafür am 31.08. **zweimal** gewechselt. Die erste Fassung sagte „dasselbe
+  `dist/`, das Pages ohnehin ausliefert"; die zweite verwarf das und setzte auf
+  die Verschlüsselung, weil im Bucket Chiffrat liegt. **Die zweite war die
+  schlechtere.** Ein Fremd-Review am Diff hat sie widerlegt: der öffentliche
+  Schlüssel steckt in jeder ausgelieferten App, und der `sessionKey` kommt vom
+  Aktualisierungs-Endpunkt, der ohne JWT antwortet. Wer beides holt,
+  entschlüsselt das Bündel. **Die Verschlüsselung trägt Echtheit, nicht
+  Vertraulichkeit.**
+
+  Es gilt also wieder die erste Fassung, und sie war nie falsch, nur unbelegt:
+  im Bündel steht der Inhalt, den Pages ohnehin an jeden ausliefert. Es gibt
+  hier nichts zu verbergen. Zu schützen ist allein, dass niemand ANDEREN Code
+  unterschiebt — und das leistet die Signatur, nicht der Bucket.
+
+**Die Falle dabei, und sie ist still:** fehlt der `config.toml`-Block zu einer
+Function, gilt `verify_jwt = true`. Das Gateway antwortet dann mit 401, **bevor**
+der Handler läuft — die Schale sähe einen Fehler, den kein Log der Function
+erklärt.
+
+**Größe, gemessen am 31.08.:** `dist/` gezippt sind **2,71 MB** ohne Sourcemaps
+(4,43 MB mit; die Maps gehen zu Sentry, nicht aufs Gerät).
 
 ### Signieren ist keine Kür
 
@@ -223,6 +278,51 @@ Aus dem Android-Quelltext des Plugins (`CapgoUpdater.java`), nachgelesen:
   Downloads verglichen.
 - Ist ein `publicKey` gesetzt, aber keine `checksum` geliefert, wird die
   Installation mit `checksum_required` **abgelehnt**.
+
+### Was `publicKey` wirklich tut — nachgemessen am 31.08.
+
+Der Name führt in die Irre. `publicKey` ist laut `definitions.d.ts` „**end to end
+live update encryption Version 2**" (seit 6.2.0), nicht eine losgelöste Signatur.
+Der Mechanismus, aus `CryptoCipher.java` und `CryptoCipher.swift`:
+
+- Das Bündel wird beim Veröffentlichen mit einem zufälligen **AES**-Schlüssel
+  verschlüsselt (`AES/CBC/PKCS5Padding`).
+- Dieser Sitzungsschlüssel wird mit dem **privaten** RSA-Schlüssel verschlüsselt
+  und als Feld **`sessionKey`** in der Form `iv:sessionKey` (beides Base64,
+  durch Doppelpunkt getrennt) mitgeliefert.
+- Auf dem Gerät entschlüsselt `decryptRSA(sessionKey, publicKey)` mit dem
+  **öffentlichen** Schlüssel den AES-Schlüssel und damit die Datei. Auch die
+  **Prüfsumme** wird so entschlüsselt (`decryptChecksum`).
+
+RSA rückwärts also: was der private Schlüssel verschlossen hat, öffnet nur der
+passende öffentliche. Das ergibt **Echtheit**. Vertraulichkeit ergibt es
+**nicht**: der öffentliche Schlüssel ist öffentlich, und der `sessionKey` kommt
+über einen Endpunkt ohne JWT — wer beides hat, liest mit. Aber es
+heisst auch, dass **im Bucket kein lesbares `dist/` liegt, sondern Chiffrat.**
+
+**Formatfalle:** beide Plattformen prüfen ausdrücklich auf
+`-----BEGIN RSA PUBLIC KEY-----`, also **PKCS#1** (`CryptoCipher.java:145`,
+`CryptoCipher.swift:241`). Der Normalfall von `openssl rsa -pubout` ist PKCS#8
+(`-----BEGIN PUBLIC KEY-----`) und wird mit „The public key is not a valid RSA
+Public key" abgewiesen.
+
+**Längenfalle — gemessen am 31.08., nachmittags.** Die Schlüssellänge ist
+nicht frei: `decryptChecksum` bricht ab, wenn das Chiffrat der Prüfsumme
+**nicht genau 256 Byte** lang ist (`CryptoCipher.java:254`,
+`CryptoCipher.swift:74`, beide mit derselben Meldung „Checksum is not RSA
+encrypted"). 256 Byte heißt **RSA-2048**, und nichts anderes ist zulässig. Ein
+4096-Bit-Schlüssel liefert 512 Byte und macht jedes Bündel unbrauchbar — still,
+denn die Prüfsumme ist Pflicht, sobald ein `publicKey` gesetzt ist: das Bündel
+lädt, die Prüfung scheitert, das Gerät bleibt auf der alten Fassung. Genau ein
+solcher Schlüssel lag am Vormittag desselben Tages in Infisical, dreifach
+belegt — die drei Belege prüften Format, Übertragung und Rundlauf, und ein
+Rundlauf gelingt mit jeder Länge.
+
+**Und die Prüfsumme meint das Klartext-Zip.** Das Plugin entschlüsselt zuerst
+und rechnet dann (`CapgoUpdater.java:851-856`). Verschlüsselt und übertragen
+werden die **32 rohen Digest-Bytes**; das Gerät hext sie selbst auf und
+vergleicht mit `calcChecksum`, das Kleinbuchstaben-Hex liefert. Wer die SHA-256
+über die hochgeladene Datei bildet, liefert die falsche Zahl.
 
 **Der Unterschied, auf den es ankommt, ist Integrität gegen Echtheit.** Eine
 blanke Prüfsumme belegt, dass das Zip unterwegs nicht beschädigt wurde. Sie
@@ -269,11 +369,48 @@ Bündel.
 Eine Nummer, die man nur benennt, ist keine. Festzulegen sind drei Dinge, und
 zwar **vor** der ersten Zeile in Phase D:
 
-| | |
+Alle drei sind am 31.08. **am Quelltext des Plugins gemessen** festgelegt. Der
+Rumpf, den die Schale an `updateUrl` schickt, steht in `CapgoUpdater.java`
+(Z. 1994–2010); genau ein Feld darin taugt.
+
+| | Festgelegt 31.08. |
 | --- | --- |
-| **Feld** | worin die Schale ihre Nummer an `updateUrl` meldet. Das Plugin sendet Geräte- und Fassungsangaben mit; welches Feld diese Nummer trägt, ist eine Festlegung, keine Vorgabe des Plugins. |
-| **Stempelstelle** | wo die Schale die Nummer trägt. **Nicht** die App-Version: zwei Store-Builds derselben Version können verschiedene Plugin-Mengen haben, und genau dieser Fall ist der Anlass. |
+| **Feld** | **`version_build`.** Es kommt auf **beiden** Plattformen aus `plugins.CapacitorUpdater.version` — Android `CapacitorUpdaterPlugin.java:725`, iOS `CapacitorUpdaterPlugin.swift:268` — und fällt sonst auf die Marketing-Version zurück. `custom_id` scheidet aus: es wird aus **JavaScript** gesetzt (`setCustomId`) und in Preferences gehalten, die Web-Schicht erklärte also ihren eigenen Vertrag. `version_code` ist die Store-Build-Nummer, `plugin_version` capgos eigene. |
+| **Stempelstelle** | **`plugins.CapacitorUpdater.version` in `capacitor.config.ts`.** Der Beleg, auf den es ankommt: `capacitor.config.json` liegt in `android/app/src/main/assets/` und `ios/App/App/` — **neben** `public/`, nicht darin. OTA tauscht `public/`; die Nummer ist damit unabweisbar Sache der Schale und nur über den Store änderbar. Und sie ist **nicht** die App-Version: zwei Store-Builds derselben Version können verschiedene Plugin-Mengen haben, und genau dieser Fall ist der Anlass. |
 | **Regel** | die Nummer steigt in **jedem** Pull Request, der ein Plugin hinzufügt, entfernt oder seine native Fassung hebt — und ein solcher Pull Request geht über den Store. |
+| **Form** | **semver-förmig**, also `1.0.0` → `2.0.0`, nicht `1` → `2`. Gemessen am 31.08.: `version_build` wird zwar unvalidiert durchgereicht, aber **derselbe** Config-Wert wird eine Zeile später als Semver geparst (`CapacitorUpdaterPlugin.java:730`, `.swift:262`). Eine blanke Zahl liesse `currentVersionNative` auf iOS still auf `0.0.0` stehen, und die Verzögerungslogik rechnete mit dem falschen Wert. Der Vergleich im Endpunkt ist deshalb zahlenweise über `string_to_array(…, '.')::int[]` — ein Zeichenkettenvergleich stellte `10.0.0` vor `9.0.0`. |
+
+**Der Preis, benannt:** belegt die Vertragsnummer `version_build`, trägt dieses
+Feld nicht mehr die Marketing-Version. Sie bleibt über `version_code` sichtbar,
+das die Store-Build-Nummer führt — verloren geht nichts, aber wer die Statistik
+liest, muss die Umwidmung kennen.
+
+### Das Gerät entscheidet NICHT, was neuer ist — gemessen am 31.08.
+
+Die Stelle, an der ein Gerät „aktualisieren oder nicht" entscheidet, ist auf
+beiden Plattformen ein **Zeichenketten-Vergleich auf Ungleichheit**:
+
+```java
+// CapacitorUpdaterPlugin.java:4909
+!current.getVersionName().equals(latestVersionName)
+```
+```swift
+// CapacitorUpdaterPlugin.swift:4360
+current.getVersionName() != latestVersionName
+```
+
+Kein Semver, keine Ordnung, kein „grösser als". Zwei Folgen, und die zweite ist
+eine Anforderung an D3:
+
+1. **Unser Fassungsschema funktioniert.** `package.json` steht auf `0.0.0`, jede
+   Fassung heisst also `0.0.0+<SHA>`. Eine Semver-Ordnung könnte die nicht
+   unterscheiden — ein Ungleichheits-Vergleich schon.
+2. **Der Endpunkt trägt die ganze Verantwortung dafür, welches Bündel das
+   richtige ist.** Liefert er ein älteres, installiert das Gerät es, ohne zu
+   fragen. Ein Rückschritt ist damit kein Fehlerfall, gegen den sich ein Gerät
+   wehrt, sondern eine ganz normale Antwort. Die Abfrage in D3 muss also
+   ausdrücklich nach `created_at` ordnen; „die Zeile, die zuletzt kam" ist keine
+   Eigenschaft, die eine Tabelle von sich aus hat.
 
 ### Und der Rückweg
 
@@ -293,15 +430,33 @@ OTA überhaupt verantwortbar ist.
 Drei Endpunkte beantworten Anfragen; sie erzeugen nichts. Der
 Veröffentlichungs-Schritt gehört ausdrücklich dazu: `dist/` zu einem Zip mit
 `index.html` an der Wurzel, SHA-256 bilden, mit dem privaten Schlüssel
-signieren, nach R2 laden, Manifest registrieren. Ohne ihn steht ein
+signieren, in den Storage-Bucket laden, Manifest registrieren. Ohne ihn steht ein
 Aktualisierungsdienst, den nichts je befüllt.
+
+**Anlass, festgelegt am 31.08.:** jeder Deploy auf `main`. `deploy.yml` baut dort
+ohnehin `dist/` und lädt es zu Pages; der Veröffentlichungs-Schritt hängt sich an
+denselben Job. Jeder andere Anlass hieße, dass ein vergessener Auslöser Geräte
+still zurücklässt — und „still" ist hier das Problem, nicht „zurück".
+
+**Fassungsschema, festgelegt am 31.08.:** `<Semver aus package.json>+<kurzer
+SHA>`, etwa `1.4.0+8fbc49bdeadb`. **Zwölf** Stellen des SHA, nicht die sieben von
+`git rev-parse --short`: sieben sind 28 Bit, und bei tausend Auslieferungen
+liegt die Kollisionswahrscheinlichkeit schon bei rund 0,2 % — eine Kollision
+hiesse, dass zwei verschiedene Commits dieselbe Manifest-Zeile überschreiben
+(Befund Fremd-Review, 31.08.). Jede Fassung ist damit eindeutig und auf genau einen
+Commit rückführbar, und zwei Deploys derselben Semver kollidieren nicht. Das
+beantwortet zugleich die offene Frage, was gilt, wenn ein Store-Bau und ein
+`main`-Deploy sich überholen: sie tragen verschiedene SHAs, also verschiedene
+Fassungen, und die Vertragsnummer entscheidet getrennt davon, wer welches Bündel
+bekommt.
 
 ## Verworfene Alternativen
 
 | Verworfen | Warum |
 | --- | --- |
 | Eigenes Repository für die Hülle | Der Web-Build müsste als Artefakt veröffentlicht und drüben eingesammelt werden. Eine Bau-Pipeline ohne Gewinn (Issue, Entscheidung Donald). |
-| Capacitor Live Updates (Ionic, bezahlt) | Entscheidung Donald, 27.08.: selbst gehostet auf Cloudflare. Die Endpunkte sind drei Funktionen; die Infrastruktur steht schon. |
+| Capacitor Live Updates (Ionic, bezahlt) | Entscheidung Donald, 27.08.: selbst gehostet. Die Endpunkte sind drei Funktionen; sie liegen seit dem 31.08. auf Supabase (§8). |
+| Cloudflare Pages Functions + R2 für OTA | Bis 31.08. der Plan. Verworfen, weil seine einzige Begründung — „beides steht bereits" — gemessen falsch war: R2 stand nicht, Supabase Storage steht. Siehe §8. |
 | Vendor-Chunks statt Route-Splitting | Verschiebt Bytes, entfernt keine (siehe §2). |
 | Den Erfolgsradar löschen, um das Bündel zu senken | Er wiegt am Erststart **null**. Die Behauptung des Issues ist widerlegt, nicht umgesetzt. |
 | `framer-motion` aus der Shell lösen (127,2 kB) | Der zweitgrößte Posten, aber er hängt am Aussehen der Navigation. Design-Entscheidung, eigener Change. |

@@ -687,6 +687,35 @@ jobs:
           url="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | tail -1 || true)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
+      # ══ OTA — dasselbe dist/, noch einmal, fuer die native Huelle ═══════════
+      # Anlass ist JEDER Deploy auf main (Entscheidung 31.08., design.md Sec. 8).
+      # Jeder andere Anlass hiesse, dass ein vergessener Ausloeser Geraete STILL
+      # zurueckliesse — und "still" ist hier das Problem, nicht "zurueck".
+      #
+      # Nur auf main: das Buendel wird mit CAPGO_PRIVATE_KEY aus Infisical `prod`
+      # signiert, und eine Vorschau-Fassung hat auf keinem Geraet etwas zu
+      # suchen. Auf Pull Requests faellt der Schritt deshalb ganz weg, nicht nur
+      # der Upload.
+      #
+      # KEIN `continue-on-error`. Schlaegt der Schritt fehl, ist die Website
+      # bereits neu und die App bleibt alt — das gehoert gesehen. Der haeufigste
+      # Fehlschlag ist eine Laengenpruefung, und ihre Meldung nennt die Ursache
+      # (falsche RSA-Schluessellaenge) beim Namen.
+      #
+      # `zip` liegt auf ubuntu-latest vorinstalliert; eine npm-Abhaengigkeit
+      # dafuer wuerde in jedem `pnpm install` und jedem CI-Lauf mitfahren.
+      #
+      # `github.event_name == 'push'` steht mit dabei, obwohl `github.ref` heute
+      # allein reichte: dieser Workflow hoert auf `pull_request`, und dort ist
+      # der ref `refs/pull/N/merge`. Bei `pull_request_target` waere er aber
+      # `refs/heads/main` — ein PR-Lauf koennte dann mit dem Produktionsschluessel
+      # signieren und veroeffentlichen. Die zweite Klausel kostet nichts und
+      # macht die Zusage unabhaengig davon, welche Ausloeser spaeter dazukommen
+      # (Befund Fremd-Review, MEDIUM).
+      - name: OTA-Buendel veroeffentlichen
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: infisical run --env="$INFISICAL_ENV" -- pnpm tsx scripts/ota-buendel.ts
+
       - name: Comment preview URL on the PR
         if: github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9

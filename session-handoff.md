@@ -1,150 +1,127 @@
-# Session Handoff — 2026-08-31 (AGE-642 mobil: C2 und C3 gebaut)
+# Session Handoff — 2026-08-31 (AGE-642: D3+D4 sind draussen, PR #299 offen)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
-> Donald hat am 31.08. abgegrenzt: **AGE-642 (Capacitor-Hülle) gehört hierher,
-> alles andere nicht.** Frühere Fassungen dieser Datei schleppten fremde Punkte
-> mit — das war der Grund für drei Rebase-Konflikte auf `session-handoff.md` in
-> zwei Tagen. Wer den Stand ausserhalb AGE-642 braucht, fragt die Sitzung
-> **`fbc-platform-f4`** oder liest ihre Übergabe — sie stand zuletzt auf `main`
-> in **#294 (`a25ed92`)**, bis diese Datei sie ersetzte. Abgestimmt am 31.08.
+> **AGE-642 (Capacitor-Hülle) gehört hierher, alles andere nicht** (Donald,
+> 31.08.). Frühere Fassungen schleppten fremde Punkte mit — das war der Grund
+> für drei Rebase-Konflikte auf dieser Datei in zwei Tagen. Wer den Stand
+> ausserhalb AGE-642 braucht, **fragt die Sitzung `fbc-platform-f4`**.
 >
-> ### ⛔ Eine Anweisung aus ÄLTEREN Übergaben ist WIDERLEGT
+> ### ⛔ Für AGE-599 gilt weiterhin: NICHT löschen
 >
-> Im Verlauf dieser Datei steht für **AGE-599** „erst die acht Objekte in
-> `event-covers` auf DEV löschen, dann seeden". **Nicht tun — das macht DEV
-> kaputt.** Die Objekte stammen aus dem Spiegel DEV ← PROD (AGE-576), nicht aus
-> einem Seed-Lauf, und keines der Skripte stellt sie wieder her. Gemessen und
-> ausgeschrieben in `openspec/specs/design-system/spec.md` (#294), samt einem
-> SHALL NOT. **Donald, 31.08.:** DEV bleibt, PROD wird nicht angefasst. Der
-> wartende Neuigkeiten-Eintrag ist ebenfalls kein offener Punkt mehr.
+> Die acht Objekte in `event-covers` auf DEV stammen aus dem Spiegel DEV ← PROD
+> (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
+> `openspec/specs/design-system/spec.md`.
 
 **Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle` — auf `origin/main` rebased, **4 Commits
-davor**, Arbeitsbaum sauber. **Noch nicht gepusht:** der Remote-Branch trägt die
-Vor-Squash-Historie von PR #277 und bräuchte `--force-with-lease`.
-Change `capacitor-huelle`: **43 offen, 69 erledigt** (Einstieg 30.08.: 66/40).
+`donald/age-642-capacitor-huelle`, rebasiert auf `origin/main` (`63f3237`).
+**PR #299 ist offen** — https://github.com/agenticapps-eu/fbc-platform/pull/299
 
-## Accomplished
+Change `capacitor-huelle`: **31 offen, 87 erledigt.**
 
-**C2 „Android-Zurück"** — drei Zweige: offenes Overlay schliessen · sonst eine
-Seite zurück · sonst in den Hintergrund. Nie beenden.
+## Accomplished — D4 steht, D3+D4 sind gemeinsam hinausgegangen
 
-**C3 „Bild über einen Aufrufpunkt"** — sechs Flächen (Profilbild, Titelbild,
-Event-Cover, Willkommen, Feed ×2) laufen über `useBildauswahl`. Keine weiss, auf
-welcher Plattform sie läuft: sie ruft `oeffnen` und bekommt ihre Dateien in
-DERSELBEN Senke wie das `onChange` des Dateifeldes.
+Zwei Commits auf dem rebasierten Stand, alles grün: **2323 vitest (210 Dateien)
+· 133 Deno · `deno check` · typecheck · `pnpm lint` 0 Fehler · `openspec
+validate --all` 30/30.**
 
-| | |
-| --- | --- |
-| Tests | **2291 grün** (207 Dateien), `tsc`, `eslint` 0 Fehler, `build`, openspec 31/31 |
-| Neu | `src/lib/zurueck.ts`, `src/lib/bildauswahl.ts`, `useBildauswahl.tsx`, je mit Test |
-| Gegenproben | 3 Mutationen bei C2, 6 bei C3 — jede von der gemeinten Zusage gefangen |
+- `0978348` — `fix:` fehlender `cause` in `scripts/ota-buendel.logic.ts`.
+- `aca10bf` — `feat:` der Rückweg (D4).
 
-Dazu **14 Aufgaben allein durch Messen geschlossen** (C1 und der Grossteil von
-B5), ohne eine Zeile Code.
+### Der Befund, der D4 grösser gemacht hat als „Aufruf einbauen"
+
+**`autoDeleteFailed` steht per Vorgabe auf `true`, und das macht aus dem
+Rückfall eine ENDLOSSCHLEIFE.** Am 31.08. an 8.51.15 auf beiden Plattformen an
+der Quelle gemessen:
+
+1. `checkRevert()` setzt das kaputte Bündel auf `ERROR` und rollt zurück
+   (`CapacitorUpdaterPlugin.swift:3353-3399`, `.java:5140` ff.).
+2. Danach löscht `autoDeleteFailed` es mit `removeInfo: false` — und dieser
+   Zweig **überschreibt das eben gesetzte `ERROR` mit `DELETED`**
+   (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
+3. Beim nächsten Start würde `isErrorStatus()` abbrechen (`.swift:4391`,
+   `.java:4915`) — aber der Status ist `DELETED`, und der Zweig darüber wirft
+   die Registrierung weg und **lädt dasselbe Bündel erneut**
+   (`.swift:4364-4379`, `.java:4999`).
+
+Der Abbruch-Zweig ist mit der Vorgabe toter Code. **Der D3-Endpunkt kann das
+nicht auffangen:** `ota_buendel_neuestes` liefert, was streng später eingetragen
+wurde als das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
+kaputte Bündel ist also weiterhin „später". Nur das Gerät bricht die Schleife:
+`autoDeleteFailed: false`.
 
 ## Decisions
 
-- **C3: die Rückfrage „Aufnehmen oder aus der Mediathek?" stellt die App
-  selbst** (Donald, 31.08.). `@capacitor/camera` 8.2.3 führt `getPhoto` samt
-  eingebauter Quellen-Rückfrage als **veraltet** und verweist dafür auf eine
-  eigene Oberfläche. Ersatz sind `takePhoto` und `chooseFromGallery`; nur der
-  zweite kann Mehrfachauswahl — deshalb behält der Feed sie. Die Anforderung in
-  `specs/native-shell/spec.md` ist nachgezogen, sie sprach vom „nativen Ablauf
-  mit der Wahl".
-- **`limit` ist der REST, nicht das Maximum.** Im Web hält der Dateidialog
-  nichts, nativ hielte es niemand, und `waehleBilder` verwürfe den Überschuss
-  stumm.
-- **`EncodingType.JPEG` bei der Kamera** — die Lehre vom 17.08.: ein HEIC vom
-  iPhone zeigte im Zuschnitt eine leere Fläche und einen toten Knopf.
-  `chooseFromGallery` kennt die Option nicht; dort trägt der Zweig, den
-  `AvatarCropper` dafür schon hat.
-- **`useOverlay` bekam eine PFLICHT-Schliessfunktion** (C2), dazu
-  `istOverlayOffen()` und `schliesseOberstesOverlay()`. Pflicht aus dem Grund,
-  aus dem der Hook entstand (AGE-529): der Mangel wäre nicht die eine Fläche,
-  sondern die fehlende Regel — der Typ erzwingt sie an acht Anschlussstellen.
-- **`hatVerlauf` liest `window.history.state.idx`**, nicht
-  `location.key !== "default"`: `RequireAuth` und `HomeRedirect` **ersetzen**
-  beim Kaltstart den ersten Eintrag. In `react-router@7.18.2` gemessen —
-  `push` erhöht den Index, **`replace` nicht**.
-
-## Was diese Sitzung über das Verfahren gelernt hat
-
-Vier Memories: `catch-durch-den-aufrufer-nicht-belegbar` ·
-`neue-node-abhaengigkeit-macht-deno-job-rot` (nach `deno install --frozen=false`
-**zwingend** `pnpm install`) · `archivieren-zieht-neuigkeiten-nach` (jeder
-`pnpm build` schreibt `release-entries.generated.ts` unformatiert um) ·
-`handoff-ist-geteilt-scope-abgrenzen`. Dazu ohne Memory: dieser Branch liess
-sich **nicht normal rebasen** — die 21 Vor-Squash-Commits von #277 kollidieren
-mit dem eigenen, gemergten Inhalt; Weg war `rebase --onto`.
+- **`src/lib/ota.ts` ist ein Nebenwirkungs-Modul ohne Export**, in `main.tsx`
+  als zweiter Import direkt hinter `./instrument`. Der Import IST der Aufruf —
+  damit gibt es keine Funktion, die jemand zu rufen vergessen kann, und
+  „vergessen" bräche hier JEDES Gerät bis zur nächsten Store-Einreichung.
+- **Ohne Plattform-Bedingung.** Die Web-Umsetzung ist ein
+  `return { bundle: BUNDLE_BUILTIN }` (`dist/esm/web.js:172`) — sie kostet
+  nichts und kann nicht scheitern. Ein `if (nativ)` spart nichts und fügt eine
+  Stelle hinzu, an der die Bestätigung ausbleiben kann.
+- **Ohne `await`.** Ein top-level `await` machte aus einer hakenden Brücke einen
+  Startfehler — genau den Zustand, gegen den das Modul steht.
+- **Der Lint-Fix ist ein eigener Commit**, weil er eine Reparatur an D3 ist und
+  nicht zum Rückweg gehört. `pnpm lint` lief auf diesem Branch **rot**, und CI
+  fährt es (`ci.yml:41`); typecheck und die Testläufe sehen die Regel nicht.
+- **Push per `--force-with-lease` war korrekt und verlustfrei:** der Remote-Tip
+  (`a36b64d`) war der Vor-Squash-Stand von PR #295, dessen Inhalt längst als
+  `59390b3` in `main` liegt.
 
 ## Files modified
 
-Commits `106504d` (C2) und `aff6954` (C3):
-
-- **neu**: `src/lib/zurueck.ts`, `src/lib/bildauswahl.ts`,
-  `src/components/ui/useBildauswahl.tsx` — je mit Testdatei
-- `useOverlay.ts` + Test (Stapel-Ausgänge, Pflichtargument), `AppShell.tsx`
-  (`backButton`-Zuhörer), die sieben weiteren `useOverlay`-Stellen, die sechs
-  Bildstellen samt `CommunityFeed.composer.test.tsx`
-- `package.json`, `pnpm-lock.yaml`, `deno.lock` — `@capacitor/app@8.1.1`,
-  `@capacitor/camera@8.2.3`; dazu `cap update` in drei nativen Dateien
-- `openspec/changes/capacitor-huelle/` — `tasks.md` und die
-  `native-shell`-Anforderung; überholte Lesarten **sichtbar widerrufen**
+`src/lib/ota.ts` (neu) · `src/lib/ota.test.ts` (neu, 3 Zusagen) ·
+`src/main.tsx` (ein Import, Zeile 2) · `capacitor.config.ts`
+(`autoDeleteFailed: false`, ausführlich begründet) ·
+`scripts/capacitor-config.test.ts` (+1 Zusage) ·
+`scripts/ota-buendel.logic.ts` (`cause`) ·
+`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage +
+Szenario „Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert") ·
+`openspec/changes/capacitor-huelle/tasks.md` (D4 abgehakt).
 
 ## Next session: start here
 
-**Zuerst entscheiden, ob der Branch gepusht wird** (`--force-with-lease`, weil
-#277 gequetscht gemergt wurde). Damit ist alles an C1–C3 erledigt, was ohne
-Geräte geht.
+**Erster Handgriff: `gh pr checks 299` — und dann den Merge begleiten.**
+Danach, in dieser Reihenfolge:
 
-Danach bleibt in diesem Change nur noch **Phase D (OTA)** — 29 offene Punkte
-über D1–D5, plus **B3 Signaturmaterial** (4 offen). Der Grundsatz ist gefallen
-(selbst gehostet auf Cloudflare, Donald 27.08.); offen sind Anlass,
-Fassungsschema und das Signaturschlüsselpaar. D1 ist der Einstieg: der Weg, auf
-dem ein Bündel entsteht.
+1. **`migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
+   Frontend-Deploy. Es sind **drei** Migrationen (…100000, …140000, …160000).
+   **Vor** dem ersten Deploy auf `main`, sonst scheitert der OTA-Schritt am
+   fehlenden Bucket.
+2. **Linear-Status von AGE-642 nachsehen.** Die Automation kippt ihn beim Merge
+   auf *Done*, und der Vorgang ist NICHT fertig (31 offene Aufgaben, Phase E
+   unangetastet). Vorbeugen geht nicht — der Branchname trägt das Kürzel.
+   Nachsehen und zurücksetzen ist die einzige gemessene Abhilfe.
+3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
+   live geschalteten Luftweg braucht.
 
-## Zwei flackernde Tests — erst neu laufen lassen, dann suchen
+**Zwei Dinge, die vorher gelesen gehören:**
 
-Von `fbc-platform-f4` am 31.08. **auf einem Diff ohne eine einzige Quelldatei**
-gemessen, also beides Bestand: `use-gespraech.test.tsx` → „bietet den Weg wieder
-an, wenn eine Neuabfrage Älteres meldet" (1 von 2259, Rerun grün) · ein
-`ReferenceError: window is not defined` aus `AdminMitgliederPage.test.tsx`.
-
-**Der zweite zeigt scheinbar hierher** — `AdminMitgliederPage.tsx` ist eine der
-acht `useOverlay`-Stellen —, wurde aber gesehen, **bevor dieser Code irgendwo
-lag**. Bei rotem `verify` also erst `gh run rerun --failed`. Roter Beleg bei f4
-gesichert: Lauf `33371323105`, Job `99422887270`, Commit `7e8184b`.
+- **Das Spec-Delta ist NACH Review-Runde 5 gewachsen** (die neue
+  Rückweg-Zusage). Der §18-Gate meldet das bei jedem Commit: „was reviewed, but
+  the artifacts changed since". Nicht blockend, aber vor dem Archivieren ist zu
+  entscheiden, ob eine Runde 6 über das geänderte Delta läuft. Im PR-Rumpf steht
+  ein Hinweis für die Review.
+- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
+  `git checkout -- src/content/release-entries.generated.ts`.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen (Kamera und
-  Mediathek, Bild danach sichtbar) · C2 auf Android · C1 auf iOS · B5 der
-  Startbildschirm. **Für B5 muss die App gelöscht werden**
-  (Launch-Screen-Zwischenspeicher), **und das kostet Donald die Anmeldung** —
-  vorher ansagen.
-- **C3 ändert an zwei Stellen die Optik**, unvermeidbar: `WillkommenPage` und
-  das Bearbeiten-Formular im Feed trugen ein *sichtbares* Dateifeld, das
-  zugleich der Auslöser war. Ein `<label>` löst sein Feld unabweisbar selbst
-  aus — es gäbe keine Stelle für die Rückfrage. Beide liegen jetzt hinter einem
-  Knopf. **Im Browser ansehen, bevor das gemergt wird.**
-- **`useBildauswahl.tsx` trägt eine Fast-Refresh-Warnung** — dieselbe, die vier
-  bestehende Dateien schon tragen. Eine eigene Datei dafür wäre eine
-  Abstraktion für einen einzigen Aufrufer.
-- **`.env` hier war eine ATTRAPPE** (`.env.ATTRAPPE-MESSUNG.bak`) — ein blankes
-  `pnpm build` erzeugt kein lauffähiges Gerätebündel. Android zusätzlich:
-  `.../assets/public` ist veraltete `cap sync`-Ausgabe; `pnpm build:prod` →
-  `npx cap sync android`.
-- **`push-fundament` (13 offen)** hängt am selben Gerät, darunter drei Punkte,
-  die von selbst nie auffallen: ein `supabase db reset` tilgt den
-  Wiederholungslauf lautlos · ein dauerhafter Zustellausfall ist unsichtbar ·
-  `net._http_response` wächst unaufgeräumt. Dazu tote Gerätetokens.
-- **AGE-641 steht auf Done**, hat aber 13 offene Aufgaben — Donalds
-  Entscheidung. **AGE-642 springt beim Merge selbst auf Done**; vorbeugen geht
-  nicht, nur nachsehen.
-
-*Alles ausserhalb AGE-642 — AGE-664/660/618, die Bucket-Zahlen, der Doku-Branch
-`donald/uebergabe-dev-migration-blockiert` — steht bewusst NICHT mehr hier.
-AGE-599 und der Neuigkeiten-Eintrag sind erledigt bzw. entschieden; siehe den
-Kasten oben, der auch sagt, warum die alte AGE-599-Anweisung gefährlich ist.*
+- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
+  Endpunkte. Sichtbar wird er erst beim ersten Deploy auf `main`.
+- **Der Rückfall selbst ist unbelegt und absichtlich so markiert.** Er hängt an
+  einem Zeitgeber im nativen Teil und ist in jsdom nicht herstellbar. Belegt ist
+  unsere Hälfte: vier Zusagen, alle vier gegengeprüft (Plattform-Bedingung
+  lässt zwei umfallen, top-level `await` die dritte, `autoDeleteFailed: true`
+  die vierte).
+- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
+  C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
+  **und das kostet Donald die Anmeldung** — vorher ansagen.
+- **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
+  Donalds Hand. Das OTA-Schlüsselpaar ist erledigt und im Deploy gegengeprüft.
+- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand** (per `psql`
+  eingespielt, weil der Stack geteilt ist). Ein `supabase db reset` stellt sie
+  korrekt her.
+- **Nicht angefasst, ausserhalb AGE-642:** `scripts/sync-dev-auszug.test.ts` ist
+  per Bauart flakig. `ADR-0037` wird dreimal zitiert, existiert aber nicht.

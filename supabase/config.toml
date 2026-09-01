@@ -555,6 +555,44 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# ══ Die drei Endpunkte des Luftwegs (AGE-642, Phase D3) ═════════════════════
+# ota-update, ota-channel und ota-stats sind die eigenen Ziele fuer
+# `updateUrl`, `channelUrl` und `statsUrl` in `capacitor.config.ts`.
+#
+# verify_jwt = false gilt fuer alle drei aus DEMSELBEN, einfachen Grund: der
+# Aufrufer ist eine native Schale ohne Sitzung. Ein Geraet hat kein JWT, und es
+# gibt keinen Punkt in seinem Lebenslauf, an dem es eines haette — es fragt nach
+# einer Aktualisierung, bevor irgendjemand angemeldet ist.
+#
+# Ohne diese drei Bloecke gilt die Vorgabe verify_jwt = true, und dann weist das
+# Gateway jede Anfrage mit 401 ab, BEVOR der jeweilige Handler laeuft. Kein Log
+# der Function erklaert das, und auf dem Geraet sieht es aus wie ein
+# Netzwerkfehler. Bewacht von scripts/functions-config.test.ts.
+#
+# Was hier offensteht, ist eng: ota-update beantwortet „welches Buendel gilt
+# fuer Schale X" und gibt url, checksum und sessionKey heraus. Keines davon ist
+# ein Geheimnis — der oeffentliche Schluessel steckt ohnehin in jeder
+# ausgelieferten App, und im Buendel steht dasselbe dist/, das Cloudflare Pages
+# an jeden ausliefert. Die Verschluesselung traegt Echtheit, nicht
+# Vertraulichkeit (Entwurf §8).
+[functions.ota-update]
+enabled = true
+verify_jwt = false
+
+# ota-channel und ota-stats speichern nichts und beantworten nichts, was uns
+# interessiert. Sie stehen hier, weil eine LEERE Angabe in capacitor.config.ts
+# die Funktion nicht abschaltet, sondern auf capgos eigene Server zeigt
+# (CapacitorUpdaterPlugin.java:98-100, .swift:101-103) — samt device_id und
+# app_id jedes Geraets. Der Endpunkt, den niemand aufruft, ist der, der uns
+# gehoeren muss.
+[functions.ota-channel]
+enabled = true
+verify_jwt = false
+
+[functions.ota-stats]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

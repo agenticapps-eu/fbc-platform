@@ -114,9 +114,13 @@ Startseite.
 `EventCoverPicker.tsx:120`, `WillkommenPage.tsx:603`). Im Web bleibt das
 `<input>` unverändert.
 
-**8 · OTA von Anfang an, selbst gehostet auf Cloudflare** (Entscheidung Donald,
-27.08.) über `@capgo/capacitor-updater`: `updateUrl`, `channelUrl` und
-`statsUrl` zeigen auf eigene Cloudflare-Pages-Functions, das Bündel liegt in R2.
+**8 · OTA von Anfang an, selbst gehostet** (Entscheidung Donald, 27.08.) über
+`@capgo/capacitor-updater`: `updateUrl`, `channelUrl` und `statsUrl` zeigen auf
+eigene Endpunkte. **Wo diese wohnen, ist am 31.08. korrigiert worden** — nicht
+Cloudflare Pages Functions plus R2, sondern **Supabase**: Bündel im
+Storage-Bucket, Manifest als Tabelle, die drei Endpunkte als Edge Functions mit
+`verify_jwt = false`. Grund: die einzige Begründung für R2 lautete „steht
+bereits" und war gemessen falsch. Siehe `design.md` §8.
 **Mit `publicKey` und signierter Prüfsumme** — ohne beides prüft das Plugin die
 Integrität des heruntergeladenen Codes überhaupt nicht, und der Aktualisierungs-
 Endpunkt wäre ein Weg, beliebigen Code auf jedes Gerät zu bringen.
@@ -150,8 +154,9 @@ die fehlenden FCM-Geheimnisse den Push-Change in Phase A angehalten haben.
   zu starten (die Abnahme verlangt genau das, nicht den Simulator).
 - **Ein Android-Keystore**, erzeugt und **außerhalb des Repos gesichert**. Er
   ist unersetzlich: ohne ihn ist die App im Play Store nie wieder aktualisierbar.
-- **Ein Cloudflare-R2-Bucket** für die OTA-Bündel und ein Schlüsselpaar für
-  deren Signatur.
+- **Ein Schlüsselpaar** für die Signatur der OTA-Bündel; der private Teil nach
+  Infisical. Ein **Bucket** wird hier nicht mehr von Hand gebraucht: er entsteht
+  seit dem 31.08. wie die vier bestehenden per Migration (siehe `design.md` §8).
 - **Bekannt vor M4, nicht in diesem Change fällig:** Apple verlangt zur
   Einreichung ein `PrivacyInfo.xcprivacy`; `@capacitor/preferences` nutzt
   UserDefaults und fällt damit unter die „Required Reason"-APIs. Steht hier,

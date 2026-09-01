@@ -72,6 +72,18 @@ describe("supabase/config.toml", () => {
     expect(verifyJwt(CONFIG, "send-push")).toBe(false);
   });
 
+  it.each(["ota-update", "ota-channel", "ota-stats"])(
+    "schaltet die JWT-Pruefung fuer `%s` ab — eine native Schale traegt keines",
+    (name) => {
+      // Dieselbe Bauart wie bei `send-push`, aber der Ausfall sieht anders aus:
+      // dort haengt ein DB-Webhook, hier haengt jedes ausgelieferte Geraet. Mit
+      // `verify_jwt = true` antwortet das Gateway mit 401, bevor der Handler
+      // laeuft — und der Luftweg steht still, ohne dass eine Zeile in einem
+      // unserer Logs davon erzaehlt.
+      expect(verifyJwt(CONFIG, name)).toBe(false);
+    },
+  );
+
   it("zaehlt einen auskommentierten Block NICHT als Deklaration", () => {
     // Die Gegenprobe zum Wächter selbst: eine Zusage, die ein Kommentar
     // erfuellt, misst den Kommentar und nicht die Konfiguration.
