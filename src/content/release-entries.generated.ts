@@ -5,6 +5,18 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-01-academy-reiter-und-streifen",
+    datum: "2026-09-01",
+    titel: "Die Redaktion wird ein Reiter, die Spalte seitenweit, die Vorschau ein Streifen",
+    linear: "AGE-677",
+    aenderungen: [
+      '**Die Redaktion wird der dritte Reiter**, hinter „Alle" und „Meine Academy". Startreiter bleibt „Alle" (Donald, 01.09.).',
+      "**Die Filterspalte umspannt die Seite** statt eines Reiterinhalts: ein Raster um Reiterzeile und Inhalt, die Spalte in Zeile 1, mit denselben vier Sticky-Bedingungen wie bisher — sie stehen bereits in `FilterSpalte`.",
+      "**Die Redaktionskachel wird ein Streifen**: Video links, Titel und Beschreibung rechts daneben statt darunter.",
+      "**Die Spalte richtet ihre Felder nach dem aktiven Reiter.** Suche und Sortierung wirken auf `posts`; die Redaktion ist eine Konstante im Code und wird nicht gefiltert.",
+    ],
+  },
+  {
     slug: "2026-08-31-titelbild-bestand-auf-dev",
     datum: "2026-08-31",
     titel: "Der Bestand auf DEV: warum ein Seed-Lauf ihn nicht heilt",
