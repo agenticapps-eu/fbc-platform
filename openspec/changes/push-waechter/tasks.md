@@ -122,16 +122,24 @@ Beleg an der laufenden Anlage.
 
 ## 4 · Der Workflow
 
-- [ ] **4.1** `.github/workflows/push-waechter.yml`: `schedule:` stündlich, dazu
-      `workflow_dispatch` mit Eingabewerten für Fenster und Höchstpause. Ein Job
-      je Seite mit **nur** dem Secret dieser Seite, damit ein Fehler nicht
-      unbemerkt die andere misst. Laufzeit wie in `deploy.yml`:
-      `pnpm/action-setup`, `setup-node` (Node 22), `pnpm install
-      --frozen-lockfile`, dann `pnpm tsx`.
-- [ ] **4.2 Der Drift-Scan läuft im selben Job** — je Seite, mit dem
-      Pflicht-Parameter aus 3.4. Ohne diesen Schritt hätte DEV weiterhin keinen
-      Lauf, und die geänderte Anforderung „regelmäßig gegen beide Projekte"
-      hätte keine umsetzende Aufgabe. Beide Reviewer haben die Lücke gefunden.
+- [x] **4.1** `.github/workflows/push-waechter.yml`: `schedule: 17 * * * *`
+      (nicht zur vollen Stunde — dort drängen sich die geplanten Läufe von
+      GitHub und die Verspätung wächst), dazu `workflow_dispatch` mit
+      Eingabewerten für Fenster und Höchstpause. Ein Job je Seite mit **nur**
+      dem Secret dieser Seite. Laufzeit wie in `deploy.yml`: gepinnte
+      `pnpm/action-setup` und `setup-node` (Node 22), `pnpm install
+      --frozen-lockfile`, dann `pnpm tsx`. YAML gegengelesen: 2 Jobs, je 6
+      Schritte, `on` = schedule + workflow_dispatch.
+
+      Die Eingabewerte gehen in `env:`, nicht in `run:` — die sichere Form. Der
+      Läufer prüft sie zusätzlich (`zahlAusUmgebung` bricht bei allem ab, was
+      keine Zahl ≥ 0 ist).
+- [x] **4.2 Der Drift-Scan läuft im selben Job** — je Seite, mit dem
+      Pflicht-Parameter aus 3.4, und mit `if: always()`, damit ein roter
+      Wächter den Drift-Befund nicht verdeckt. Ohne diesen Schritt hätte DEV
+      weiterhin keinen Lauf, und die geänderte Anforderung „regelmäßig gegen
+      beide Projekte" hätte keine umsetzende Aufgabe. Beide Reviewer haben die
+      Lücke gefunden.
 - [ ] **4.3 Der Meldeweg wird ausgelöst — und der Beleg wird nicht überdehnt.**
       Ein `workflow_dispatch` mit Höchstpause `0` macht den Lauf **echt rot**;
       Lauf-ID festhalten. Das belegt, dass der Wächter rot wird. Es belegt
@@ -139,12 +147,23 @@ Beleg an der laufenden Anlage.
       an den Auslöser, ein `schedule`-Fehlschlag folgt den
       Benachrichtigungseinstellungen des Repositories. Beides getrennt festhalten.
 - [ ] **4.4** Danach ein regulärer Lauf, der grün ist — die Gegenprobe zu 4.3.
-- [ ] **4.5** Nachsehen, ob der neue Workflow von den bestehenden Wächtern
-      erfasst wird. `tsconfig.json:22` schließt `scripts` ein und `lint` ist
-      `eslint .` — beide greifen also; das ist geprüft, nicht angenommen.
+- [x] **4.5 Die bestehenden Wächter greifen — geprüft, nicht angenommen.**
+      `tsconfig.json:22` schließt `scripts` ein, `lint` ist `eslint .`. Und der
+      Beleg dafür ist kein Vakuum: `typecheck` hat beim Bauen des Läufers
+      **einen echten Fehler gefangen** (die Verengung von `evaluateStage1` gilt
+      nicht in die Closure hinein). Für Workflow-Dateien gibt es **keinen**
+      Wächter im Repo — kein actionlint, kein YAML-Schema; die Datei ist von
+      Hand gegengelesen und geparst.
 - [ ] **4.6 Den ersten geplanten Lauf abwarten und nachsehen**, ob er zur
       erwarteten Zeit kam und wie spät er war. Die Verspätung ist die Größe, an
       der das 120-Minuten-Fenster hängt; sie steht bisher als Annahme da.
+
+> **4.3, 4.4 und 4.6 gehen erst nach dem Merge.** GitHub führt `schedule:` nur
+> auf dem Vorgabe-Branch aus, und ein `workflow_dispatch` verlangt, dass der
+> Workflow dort liegt. Auf diesem Branch ist der Wächter also weder auslösbar
+> noch geplant. Das ist keine Nachlässigkeit, sondern die Reihenfolge, die
+> GitHub vorgibt — und es heißt, dass der Change **mit drei offenen
+> Abnahmepunkten gemergt wird**, die unmittelbar danach abzuarbeiten sind.
 
 ## 5 · Die Dokumentation sagt die Wahrheit
 
