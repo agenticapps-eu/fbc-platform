@@ -84,6 +84,21 @@ neu öffnen. Das Plugin fragt beim Start; geladen wird im Hintergrund, in
 Betrieb geht das Bündel beim **nächsten** Start. Also einmal mehr schliessen
 und öffnen als man erwartet.
 
+> ### ⚠ `devicectl --terminate-existing` löst die Übernahme NICHT aus
+>
+> Gemessen 02.09.: der Auslöser ist der Wechsel in den **Hintergrund**, nicht
+> der Start. Im Log steht dann `Check for pending update` →
+> `Background timestamp saved` → `Reloading <id>`; das Plugin kündigt es sogar
+> an mit *„Update will occur next time app moves to background."*
+>
+> `xcrun devicectl device process launch --terminate-existing` **killt** den
+> Prozess, er geht nie in den Hintergrund. Die drei Zeilen kamen in einem
+> solchen Lauf **0 Mal** vor, und das fertig entpackte Bündel blieb `pending` —
+> was wie ein kaputter Luftweg aussieht, aber das Messverfahren ist.
+>
+> Die Geste muss **am Gerät** passieren: Home (nach oben wischen), kurz warten,
+> App wieder öffnen. Die Konsole taugt zum Mitlesen, nicht zum Auslösen.
+
 **Beleg:** der rote Balken unten links steht da. ✅ Kästchen 1.
 
 ## 3 · Probe 2 — der Rückweg

@@ -1110,8 +1110,55 @@ das Aufräumen —, die Griffe sind am gebauten `dist/` gemessen und fassen
 einer BEREITS eingetragenen Fassung ist ein Upsert und überschreibt das gute
 Bündel.
 
-- [ ] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
-      einmal vollständig durchgespielt.
+- [x] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
+      einmal vollständig durchgespielt. **02.09., iPhone 17 Pro, iOS 26.6.**
+      Bündel `0.0.0+feedbeef` (Marke am gebauten `dist/`, keine Quelldatei
+      angefasst): heruntergeladen, entschlüsselt, entpackt, Prüfsumme
+      abgeglichen, in Betrieb genommen. Beleg auf beiden Seiten — der rote
+      Balken stand am Gerät, und im Log:
+      `Version successfully loaded: … "version": "0.0.0+feedbeef" … "status":
+      "success"` samt `[notifyAppReady was called]`. Danach ist es auch
+      `Fallback bundle`, hat sich also bewährt.
+
+      **Möglich wurde das erst durch den `session_key`-Fix** (`d398500`): davor
+      brach die Entschlüsselung ab (`Encryption not set, no public key or
+      session, ignored` → `cannotUnzip`), und zwar bei JEDEM Bündel, nicht nur
+      bei der Probe. Gegenprobe nach dem Fix: die fünf alten Fehlerbilder
+      kommen **0 Mal** vor, bei 36 CapgoUpdater-Zeilen als Positivkontrolle.
+
+      **Falle fürs Runbook:** `devicectl … --terminate-existing` löst die
+      Übernahme NICHT aus. Es killt den Prozess, statt ihn in den Hintergrund
+      zu schicken — und die Übernahme hängt genau an diesem Wechsel
+      (`Check for pending update` → `Background timestamp saved` →
+      `Reloading`). Diese Zeilen kamen im Kill-Lauf 0 Mal vor. Die Konsole
+      taugt zum Mitlesen, die Geste muss am Gerät passieren.
+- [x] **Vorbedingung des Rückwegs: `ota-stats` war blind.** Behoben 02.09.,
+      bevor die Probe lief — sonst hätte sie nichts gemessen.
+
+      capgo puffert die Statistik und sendet **Stapel**: auf der Leitung steht
+      ein JSON-**Array**, nicht ein Objekt (iOS `CapgoUpdater.swift:3300`
+      `parameters: eventsToSend`, Android `CapgoUpdater.java:3084`
+      `new JSONArray()`). Der Endpunkt las `rumpf.action` an genau diesem
+      Array, bekam `undefined` und schrieb `ohne` — im Gerätelauf `Sent 9
+      events` gegen dreimal `action: "ohne"`. Daneben bleibt die Einzelform
+      echt (`sendRateLimitStatistic` in beiden Schalen, Androids
+      `DownloadService.sendStatsAsync`), also nimmt der Endpunkt **beide**.
+
+      **Zweiter Fehler am selben Ort, schwerer als der erste:** die Rumpfgrenze
+      stand auf 8 KiB. Ein voller Stapel sind 200 Ereignisse
+      (`maxPendingStats` == `MAX_PENDING_STATS`, beide Schalen), gemessen
+      **~94 KiB** — es passten **17 von 200** hindurch. Und `413` gilt keiner
+      Schale als vorübergehend (`isTransientStatsFailure`: nur 429, 408,
+      >= 500), das Gerät verwirft den Stapel also **endgültig**. Die Grenze war
+      kein Schutz, sondern stiller Verlust. Jetzt 256 KiB, plus ein Deckel von
+      `MAX_EREIGNISSE = 200` protokollierten Aktionen, damit der offene
+      Endpunkt durch die weitere Grenze nicht zum Log-Verstärker wird.
+
+      Vorgehen wie beim `session_key`-Fix: erst die Zusagen umgedreht (RED
+      gesehen: 5 rot / 3 grün), dann der Code. Die Entscheidung liegt jetzt in
+      `meldung.ts`, geprüft mit 11 Zusagen; eine davon liest `index.ts` als
+      Text und belegt die Verdrahtung. Alle fünf tragenden Zusagen sind
+      mutations-gegengeprobt — Rückbau rötet je einzeln.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
@@ -1135,7 +1182,10 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       **813,32 kB roh / 253,03 kB gzip.** Unter 1.024 kB, Abstand 210,68 kB.
       Die einzige Zeile dieser Phase, die kein Gerät braucht: dieselbe Datei
       lädt die Schale.
-- [ ] OTA einmal durchgespielt.
+- [x] OTA einmal durchgespielt. Siehe D5 — `0.0.0+feedbeef` am 02.09. auf dem
+      iPhone 17 Pro. Aufgeräumt ist es auch: `0.0.0+c1ea4ed1` liegt ohne Marke
+      obenauf, ein Gerät auf `feedbeef` bekommt es angeboten (am Endpunkt
+      gegengeprüft).
 
 ## Vor dem Abschluss
 
