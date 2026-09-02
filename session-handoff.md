@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-02 abends (AGE-642: der Rückweg ist messbar, der Fix ist reviewt)
+# Session Handoff — 2026-09-02 abends (AGE-642: Rückweg messbar, Review abgearbeitet, Nähte zu)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -13,10 +13,9 @@
 > (AGE-576); kein Skript stellt sie wieder her. SHALL NOT in
 > `openspec/specs/design-system/spec.md`.
 
-Branch `donald/age-642-capacitor-huelle`, **0 hinter `main`**. **PR #314 und
-#315 sind gemerged** (`86c4afe`, `6dae148`) und beide auf PROD ausgerollt
-(`functions: success`). `openspec validate --all` 31/31, **157/157** Deno-Tests
-(waren 140).
+Branch `donald/age-642-capacitor-huelle`, **0 hinter `main`**. **PR #314–#317 sind gemerged**
+(`86c4afe`, `6dae148`, `e7d9054`, `2a049c0`) und auf PROD ausgerollt.
+`openspec validate --all` 31/31, **174/174** Deno-Tests (waren 140).
 
 **Der einzige echte Rückstand im Luftweg ist weg — Probe 2 ist jetzt messbar.**
 
@@ -41,54 +40,56 @@ Deckel `MAX_EREIGNISSE = 200`, damit die weitere Grenze den offenen Endpunkt
 nicht zum Log-Verstärker macht. Neben `actions` steht `gesamt`, sonst wäre der
 Deckel selbst eine stille Kürzung.
 
-### Wie es belegt ist
-
-RED zuerst gesehen (5 rot / 3 grün), dann der Code. Am **live ausgelieferten**
-Artefakt gegengeprüft, mit Positivkontrolle: 45 KiB → `200` (alte Fassung:
-`413`), Logzeile `gesamt: 100` mit 100 echten Aktionen; 317 KiB → `413`. Die
-Tabelle steht in `tasks.md`.
-
 ### Der Fremd-Review fand den Fix selbst — und er hatte denselben Fehler
 
-Zwei unabhängige Reviewer (gemini + ein Haus-Reviewer nach der Skill-Vorlage;
-`opencode` lief mit, `codex` bewusst nicht eingeplant) trafen **denselben
-Kern**: `meldung.status` war im Betrieb **tot**, `index.ts` hartkodierte die
-Statuscodes. Belegt per Mutation, alle blieben **11/11 grün**:
+Zwei unabhängige Reviewer (gemini + ein Haus-Reviewer; `opencode` lief mit,
+`codex` bewusst nicht) trafen **denselben Kern**: `meldung.status` war im
+Betrieb **tot**, `index.ts` hartkodierte die Statuscodes. Per Mutation belegt —
+`413` → `400`, der 413-Zweig auf `200 ok`, der 405-Wächter gelöscht, `actions`
+aus der Logzeile, und **`req.clone()` mit dem Rohrumpf samt `device_id` ins
+Log**: alle blieben **11/11 grün**. Ausgerechnet `413` entscheidet, ob das
+Gerät wiederholt oder endgültig verwirft — derselbe Fehler wie der behobene,
+eine Ebene höher.
 
-| Mutation an `index.ts` | |
-|---|---|
-| `status: 413` → `400` | grün |
-| 413-Zweig antwortet `200 ok` | grün |
-| `405`-Wächter gelöscht | grün |
-| `actions` / `gesamt` aus der Logzeile | grün |
-| **`req.clone()`, Rohrumpf samt `device_id` ins Log** | grün |
+**Ursache war die Zusage:** sie las `index.ts` als *Text* und grepte auf den
+Aufruf. Behoben in `6dae148` — Handler als `behandleAnfrage` in `meldung.ts`,
+**ausgeführt** geprüft, Logzeile auf ihre exakte Feldmenge festgenagelt.
+`index.ts` ist drei Zeilen `Deno.serve`. Alle sieben Mutationen röten, das Leck
+eingeschlossen.
 
-Ausgerechnet `413` entscheidet, ob das Gerät wiederholt oder **endgültig
-verwirft** — also derselbe Fehler wie der behobene, nur eine Ebene höher: der
-tragende Wert steht zweimal da, getestet war die Hälfte, die niemand liest.
-
-**Ursache war die Zusage.** Sie las `index.ts` als *Text* und grepte auf den
-Aufruf — das Haus-Muster aus `send-push/anbieter.test.ts`. Es prüft sich
-selbst, nicht das Verhalten.
-
-**Behoben in `6dae148`:** der Handler ist `behandleAnfrage` in `meldung.ts` und
-wird **ausgeführt** geprüft — echte `Request`, echte `Response`, mitgeschriebene
-Logzeilen, die Logzeile auf ihre exakte Feldmenge festgenagelt. `index.ts` ist
-ein dreizeiliges `Deno.serve`. **Alle sieben Mutationen röten jetzt**, das Leck
-eingeschlossen. 17 Zusagen statt 11. Live nach dem Deploy: `GET` → 405 · Stapel
-→ 200 `ok` · 45 KiB → 200 `ok` · unlesbar → 200 `discarded` · 317 KiB → 413.
-
-Zwei kleinere Befunde mit übernommen: `RUMPF_GRENZE` zählt UTF-16-Einheiten,
-nicht Bytes (bis 768 KiB — kein Schutzloch, `req.text()` puffert vorher voll;
-Kommentar richtiggestellt statt mit `TextEncoder` umgerechnet, der eine zweite
-Kopie angelegt hätte), und sechs Herstellerverweise standen 1–118 Zeilen
-daneben — jetzt Symbolnamen. **Nicht übernommen:** die Grenze auf 128 KiB
-senken (gemini) — sie ist nicht die DoS-Kontrolle, und `413` ist endgültiger
-Verlust.
+Zwei kleinere Befunde mit: `RUMPF_GRENZE` zählt UTF-16-Einheiten statt Bytes
+(kein Schutzloch, `req.text()` puffert vorher voll — Kommentar richtiggestellt
+statt mit `TextEncoder` umgerechnet, der eine zweite Kopie angelegt hätte), und
+sechs Herstellerverweise standen 1–118 Zeilen daneben → jetzt Symbolnamen.
+**Nicht übernommen:** Grenze auf 128 KiB senken.
 
 **Zur Reviewer-Wahl:** gemini stufte den UTF-16-Punkt als HOCH ein, mit falscher
-Kausalkette und einem Fix, der es verschlimmert hätte — und **alle vier** seiner
+Kausalkette und einem Fix, der es verschlimmert hätte — und alle vier
 Zeilenverweise waren falsch. Verdikt zählt, Belege nicht.
+
+### Nachgezogen: dieselbe Naht in den zwei Nachbarn (`2a049c0`)
+
+Donald, 02.09.: „zieh das nach". Das Quelltext-Grep-Muster steckte auch in
+`ota-update` und `send-push`.
+
+- **`send-push` war der wertvollere Fund.** Die **Webhook-Authentifizierung**
+  (`timingSafeEqual`, 401) hatte **null** Abdeckung, ebenso fehlendes Secret
+  (500), unlesbarer Rumpf (400) und die Weiche Webhook/Wiederholungslauf. Alle
+  bestehenden Zusagen galten `anbieter.ts` und `nachrichten.ts` — den reinen
+  Modulen *dahinter*. Die Tore liegen jetzt als `pruefeAufruf` in `aufruf.ts`,
+  12 ausgeführte Zusagen. Es **baut die Ablehnungsantwort selbst**, statt einen
+  Statuscode zu melden — sonst wäre die `ota-stats`-Doppelung zurück.
+- **`ota-update`** — Handler als `behandleAnfrage` in `antwort.ts`. Ungedeckt
+  waren `405`, der `catch` auf `req.json()` und der `content-type`. Der
+  Statusfehler existierte hier **nicht**, `ergebnis.status` wurde konsumiert.
+
+**Zehn Mutationen, zehnmal rot** (u. a. „401 → 200", „Vergleich übersprungen",
+„Status hartkodiert"). Live nachgeprüft: `send-push` GET → 405, ohne Auth →
+401, falscher Bearer → 401; `ota-update` GET → 405, unlesbar → **lautes** 400,
+gültig → echtes Bündel.
+
+**Eine beabsichtigte Verhaltensänderung:** ein Rumpf `null` warf vorher in
+`aufruf.record?.id` eine `TypeError` → 500; jetzt sauberes 400, zugesagt.
 
 ## Decisions
 
@@ -108,13 +109,15 @@ Zeilenverweise waren falsch. Verdikt zählt, Belege nicht.
 
 ## Files modified
 
-Alles unter `supabase/functions/ota-stats/`: **`meldung.ts`** (neu — Grenzen,
-`werteRumpf`, `protokoll`, `behandleAnfrage`), **`meldung.test.ts`** (neu, 17
-Zusagen), **`index.ts`** (auf drei Zeilen `Deno.serve` geschrumpft). Dazu
-`openspec/changes/capacitor-huelle/tasks.md` und diese Datei.
+`supabase/functions/ota-stats/` — **`meldung.ts`** (neu: Grenzen, `werteRumpf`,
+`protokoll`, `behandleAnfrage`), **`meldung.test.ts`** (neu, 17 Zusagen),
+`index.ts` (drei Zeilen). `ota-update/` — Handler nach `antwort.ts`, 5 Zusagen
+dazu. `send-push/` — **`aufruf.ts`** + **`aufruf.test.ts`** (neu, 12 Zusagen),
+`index.ts` verschlankt. Dazu `openspec/changes/capacitor-huelle/tasks.md` und
+diese Datei.
 
-Gemerged in `86c4afe` (#314, der Fix) und `6dae148` (#315, Review-Befunde +
-Live-Beleg). `7ddb0f7`, die Belegdoku der Gerätesitzung, ging in #314 mit.
+Gemerged als `86c4afe` (#314) · `6dae148` (#315) · `e7d9054` (#316) ·
+`2a049c0` (#317).
 
 ## Next session: start here
 
@@ -132,24 +135,23 @@ dem Assistenten sperrt ihn der Klassifikator.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Der Review ist gelaufen und abgearbeitet** (Donald, 02.09.: „mache
-  review"). Was er fand, steht oben. Offen bleibt daraus nur eins: das
-  Quelltext-Grep-Muster steckt noch in `send-push/anbieter.test.ts`, und
-  `ota-update/index.ts` hat dieselbe ungetestete Naht. **Beim nächsten
-  Anfassen mitziehen, nicht auf Vorrat.**
+- **Review gelaufen UND nachgezogen** (Donald: „mache review", dann „zieh das
+  nach"). Beides steht oben. **Eine Naht bleibt bewusst offen:** `Zustellung`
+  liegt weiter in `send-push/index.ts`, und die Zusage auf
+  `apnsMitHostErkennung` grept dort noch Quelltext. Das herauszulösen wäre ein
+  Umbau der **Zustellschleife** — verhaltenstragender Code, keine Testgerüste.
+  Lohnt sich, wenn diese Schleife ohnehin angefasst wird.
 - **Der PROD-Schreibweg bleibt dem Assistenten gesperrt.** Bestätigt; Donald
   fährt die Zeile.
-- **`[error] Semaphore wait timed out after 0ms`** — die einzige Fehlerzeile
-  der Geräteläufe. Sie sitzt im `semaphore.wait()` von
-  `sendRateLimitStatistic`/`flushStatsQueue` (`CapgoUpdater.swift`), also im
-  Statistikweg. Nichts verhindert; kehrt sie wieder, lohnt jetzt ein Blick
-  genau dort.
-- **B3 Signaturmaterial** bleibt offen (Zertifikat, Profile, Keystore,
-  Workflow) — für Gerätetests nicht nötig, ein Xcode-Lauf genügt.
+- **`[error] Semaphore wait timed out after 0ms`** — einzige Fehlerzeile der
+  Geräteläufe, sitzt im `semaphore.wait()` des Statistikwegs
+  (`CapgoUpdater.swift`). Nichts verhindert; kehrt sie wieder, dort nachsehen.
+- **B3 Signaturmaterial** offen (Zertifikat, Profile, Keystore, Workflow) —
+  für Gerätetests nicht nötig, ein Xcode-Lauf genügt.
 - **Android ist unberührt.** Die halbe Abnahmeliste des Issues (beide
   Plattformen, Zurück-Taste, Sitzung überlebt Neustart) steht noch aus.
-- **AGE-642 stand nach dem Merge zum achten Mal auf *Done*** (Branchname).
-  Zurückgesetzt auf *In Progress*. Nach dem nächsten Merge wieder nachsehen.
+- **AGE-642 setzt sich bei JEDEM Merge auf *Done*** (Branchname) — heute
+  viermal, jedes Mal zurückgesetzt. Nach dem nächsten Merge wieder nachsehen.
 - **Nicht angefasst, ausserhalb AGE-642:** `docs/prod-neuaufbau-plan.md:31-32`
   nennt noch `foelowldexkcqzewvrcf` · `scripts/sync-dev-auszug.test.ts` ist per
   Bauart flakig · `ADR-0037` wird dreimal zitiert, existiert aber nicht.
