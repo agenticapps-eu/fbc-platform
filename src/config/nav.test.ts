@@ -93,3 +93,53 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     expect(events?.section).toBe("sub");
   });
 });
+
+/**
+ * AGE-642 (A2): Der Umbau auf `lazy()` fasst `Component` an — die Zusage ist,
+ * dass er sonst nichts anfasst.
+ *
+ * Gemessen an Mutationen, nicht am Vorkommen der Namen (31 Läufe der vollen
+ * Suite, 210 Dateien). `path` und `section` waren je Route bereits gedeckt:
+ * jede Änderung rötete 1 bis 11 Dateien, und fehlt das Feld ganz, fällt `tsc`.
+ * Die Sidebar-Hälfte ebenso — die Beschriftung in `AppShell.tsx` gegen den Pfad
+ * getauscht rötet 5 Dateien, der Abschnitts-Filter entfernt 7.
+ *
+ * `label` war die Lücke, und zwar genau für die neun Einträge, die dieser Datei
+ * bis hier nur als `section: "sub"` vorkommen. Drei Mutationen liefen still
+ * durch — typecheck grün, 210/210 grün: „Nachrichten" zurück auf „Chat",
+ * „Neu in der App" auf „Neues", ein LEERES Label auf `/chat`. Und `/neues`
+ * samt seinem `lazy()`-Import ganz entfernt ebenfalls: die Route wäre
+ * verschwunden, ohne dass eine Zusage darauf zeigte.
+ *
+ * Deshalb hier das vollständige Verzeichnis. Der Preis ist ehrlich: eine
+ * gewollte Umbenennung kostet jetzt eine Zeile in dieser Liste — genau die
+ * Bestätigung, die AGE-583 („Chat" → „Nachrichten") lautlos passieren ließ.
+ * Nach Pfad sortiert verglichen, nicht in Quelltext-Reihenfolge: die
+ * verbindliche Reihenfolge steht oben je Abschnitt, und eine zweite Zusage
+ * darüber röte bei einer folgenlosen Umsortierung der `sub`-Einträge.
+ */
+const ALLE_ROUTEN: ReadonlyArray<readonly [pfad: string, label: string]> = [
+  ["/", "Start"],
+  ["/academy", "Academy"],
+  ["/aktivitaet", "Aktivität"],
+  ["/chat", "Nachrichten"],
+  ["/einstellungen", "Einstellungen"],
+  ["/events", "Events"],
+  ["/kompass", "Kompass"],
+  ["/kontakte", "Meine Kontakte"],
+  ["/meine-events", "Meine Events"],
+  ["/mitglieder", "Mitglieder"],
+  ["/mitgliedschaft", "Mitgliedschaft"],
+  ["/neues", "Neu in der App"],
+  ["/profil", "Mein Profil"],
+  ["/profil/bearbeiten", "Profil bearbeiten"],
+];
+
+describe("Jede Route trägt Pfad und Beschriftung (AGE-642, A2)", () => {
+  it("führt genau diese vierzehn Routen, mit genau diesen Beschriftungen", () => {
+    const ist = navItems
+      .map((i) => [i.path, i.label] as const)
+      .sort(([a], [b]) => a.localeCompare(b));
+    expect(ist).toEqual(ALLE_ROUTEN.map((e) => [...e]));
+  });
+});

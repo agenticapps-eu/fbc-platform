@@ -1,4 +1,4 @@
-# Session Handoff — 2026-08-31 (AGE-642: D3+D4 sind draussen, PR #299 offen)
+# Session Handoff — 2026-08-31 (AGE-642: D5 ist vorbereitet, das Gerät fehlt)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -13,115 +13,110 @@
 > (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
 > `openspec/specs/design-system/spec.md`.
 
-**Worktree:** `fbc-platform.donald-age-642-capacitor-huelle`, Branch
-`donald/age-642-capacitor-huelle`, rebasiert auf `origin/main` (`63f3237`).
-**PR #299 ist offen** — https://github.com/agenticapps-eu/fbc-platform/pull/299
+Branch `donald/age-642-capacitor-huelle`, sauber, gepusht, **7 Commits vor
+`origin/main`** (vier Handoffs, zwei aus dieser Sitzung, einer der Feature-Merge
+davor). Change `capacitor-huelle`: **29 offen, 89 erledigt** (war 31/87).
+`openspec validate --all` 30/30. Linear steht auf *In Progress*.
 
-Change `capacitor-huelle`: **31 offen, 87 erledigt.**
+**Kein Code angefasst.** Diese Sitzung hat gemessen und vorbereitet.
 
-## Accomplished — D4 steht, D3+D4 sind gemeinsam hinausgegangen
+## Accomplished
 
-Zwei Commits auf dem rebasierten Stand, alles grün: **2323 vitest (210 Dateien)
-· 133 Deno · `deno check` · typecheck · `pnpm lint` 0 Fehler · `openspec
-validate --all` 30/30.**
+### 1 · Der Krypto-Weg, am LEBENDEN Bündel nachgestellt
 
-- `0978348` — `fix:` fehlender `cause` in `scripts/ota-buendel.logic.ts`.
-- `aca10bf` — `feat:` der Rückweg (D4).
+`pruefeSchluesselpaar` läuft im Deploy und vergleicht zwei Schlüssel
+miteinander — **es fasst das ausgelieferte Bündel nie an.** Nichts belegte, dass
+die Kette am fertigen Artefakt aufgeht. Jetzt schon, gegen PROD
+(`viwntbodrtqxgmqyxluh`), Manifest `0.0.0+e8a2abcdcb21`, mit dem Schlüssel **aus
+`capacitor.config.ts` gelesen** statt abgeschrieben:
 
-### Der Befund, der D4 grösser gemacht hat als „Aufruf einbauen"
+1. `sessionKey` RSA-geöffnet (PKCS#1) → AES-128-CBC-Schlüssel und IV.
+2. Chiffrat 2.997.808 B entschlüsselt → 2.997.792 B, beginnend mit `PK`.
+3. SHA-256 des Klartext-Zips == RSA-geöffnete `checksum`, **byte-gleich**
+   (`ec0737e811bd8ed2…`).
 
-**`autoDeleteFailed` steht per Vorgabe auf `true`, und das macht aus dem
-Rückfall eine ENDLOSSCHLEIFE.** Am 31.08. an 8.51.15 auf beiden Plattformen an
-der Quelle gemessen:
+**Mit Positivkontrolle:** ein gekipptes Byte → `8d75277684dff5db…`, die Probe
+rötet. Genau der Fehlschlag, der auf dem Gerät still bliebe. Steht als eigener
+Punkt unter D3 in `tasks.md`.
 
-1. `checkRevert()` setzt das kaputte Bündel auf `ERROR` und rollt zurück
-   (`CapacitorUpdaterPlugin.swift:3353-3399`, `.java:5140` ff.).
-2. Danach löscht `autoDeleteFailed` es mit `removeInfo: false` — und dieser
-   Zweig **überschreibt das eben gesetzte `ERROR` mit `DELETED`**
-   (`CapgoUpdater.swift:2325`, `CapgoUpdater.java:1632`).
-3. Beim nächsten Start würde `isErrorStatus()` abbrechen (`.swift:4391`,
-   `.java:4915`) — aber der Status ist `DELETED`, und der Zweig darüber wirft
-   die Registrierung weg und **lädt dasselbe Bündel erneut**
-   (`.swift:4364-4379`, `.java:4999`).
+### 2 · Zwei stehengebliebene Kästchen, beide Messungen
 
-Der Abbruch-Zweig ist mit der Vorgabe toter Code. **Der D3-Endpunkt kann das
-nicht auffangen:** `ota_buendel_neuestes` liefert, was streng später eingetragen
-wurde als das Laufende — nach dem Rückfall läuft wieder die ältere Fassung, das
-kaputte Bündel ist also weiterhin „später". Nur das Gerät bricht die Schleife:
-`autoDeleteFailed: false`.
+- **B5 Grössenzuwachs** — mit `actool` (Xcode 26.6) am **kompilierten**
+  `Assets.car` gemessen: **+329.936 B**, iOS allein. Die Quelldateien hätten
+  +277.162 B gesagt, **~53 KB zu niedrig**: die Capacitor-Vorgabe brachte drei
+  byte-identische PNG mit (Blob `33ea6c9`), die `actool` einmal ablegt.
+- **D3 `publicKey`** — stand als offen, war es seit D3 nicht mehr
+  (`capacitor.config.ts:105`, testbewacht).
+
+### 3 · Das Runbook für die Gerätesitzung
+
+`openspec/changes/capacitor-huelle/geraetesitzung-d5.md`. Donald hat es dieser
+Sitzung ausdrücklich vorgezogen, statt D5 sofort zu fahren.
+
+**Der teuerste Fehler liegt VOR der Sitzung:**
+`ota_buendel_veroeffentlichen` ist ein **Upsert auf `version`**. Das defekte
+Bündel unter der Fassung des guten veröffentlicht, überschreibt dessen `url`,
+`checksum` und `session_key`, während `created_at` stehen bleibt — danach gibt
+es im Manifest nichts mehr, worauf zurückgerollt werden könnte. Und derselbe
+Mechanismus macht einen Aufräum-Lauf unter bekannter Fassung wirkungslos.
+
+Deshalb drei eigene Fassungen über `GITHUB_SHA`, **ohne einen einzigen Commit**:
+`0.0.0+600df00d` (heil, sichtbare Marke) · `0.0.0+defec7ed` (defekt) ·
+`0.0.0+c1ea4ed0` (Aufräumen). Sprechendes Hex, im Manifest ohne Nachschlagen
+erkennbar.
+
+**Beide Griffe fassen keine Quelldatei an**, sondern das gebaute `dist/` — es
+gibt nichts, das jemand zurückzunehmen vergessen kann.
 
 ## Decisions
 
-- **`src/lib/ota.ts` ist ein Nebenwirkungs-Modul ohne Export**, in `main.tsx`
-  als zweiter Import direkt hinter `./instrument`. Der Import IST der Aufruf —
-  damit gibt es keine Funktion, die jemand zu rufen vergessen kann, und
-  „vergessen" bräche hier JEDES Gerät bis zur nächsten Store-Einreichung.
-- **Ohne Plattform-Bedingung.** Die Web-Umsetzung ist ein
-  `return { bundle: BUNDLE_BUILTIN }` (`dist/esm/web.js:172`) — sie kostet
-  nichts und kann nicht scheitern. Ein `if (nativ)` spart nichts und fügt eine
-  Stelle hinzu, an der die Bestätigung ausbleiben kann.
-- **Ohne `await`.** Ein top-level `await` machte aus einer hakenden Brücke einen
-  Startfehler — genau den Zustand, gegen den das Modul steht.
-- **Der Lint-Fix ist ein eigener Commit**, weil er eine Reparatur an D3 ist und
-  nicht zum Rückweg gehört. `pnpm lint` lief auf diesem Branch **rot**, und CI
-  fährt es (`ci.yml:41`); typecheck und die Testläufe sehen die Regel nicht.
-- **Push per `--force-with-lease` war korrekt und verlustfrei:** der Remote-Tip
-  (`a36b64d`) war der Vor-Squash-Stand von PR #295, dessen Inhalt längst als
-  `59390b3` in `main` liegt.
+- **Der Griff für das defekte Bündel ist `#root` entfernen**, nicht ein `throw`
+  in `src/`. `ota.ts` beschreibt den Fall unten selbst: ohne `#root` richtet das
+  Modul planmässig nichts ein, `main.tsx` wirft, der Bildschirm bleibt leer.
+  Preis, ehrlich benannt: **der Beobachter aus Runde 6 wird dabei umgangen.**
+  Belegt wird die Plugin-Hälfte (Frist, `checkRevert`, ERROR bleibt liegen); die
+  andere trägt `ota.test.ts` mit sieben gegengeprüften Zusagen.
+- **Gemessen statt vermutet:** `<div id="root"></div>` und `</body>` stehen im
+  gebauten HTML wörtlich und je genau einmal; `createRoot(null)` wirft in jsdom
+  gegen das echte react-dom, mit `#root` nicht (Positivkontrolle).
+- **Kein Skript ins Repo.** Die Griffe sind je vier Zeilen im Runbook. Ein
+  Werkzeug für einen Lauf, der einmal stattfindet, wäre mehr Rahmen als Inhalt.
 
 ## Files modified
 
-`src/lib/ota.ts` (neu) · `src/lib/ota.test.ts` (neu, 3 Zusagen) ·
-`src/main.tsx` (ein Import, Zeile 2) · `capacitor.config.ts`
-(`autoDeleteFailed: false`, ausführlich begründet) ·
-`scripts/capacitor-config.test.ts` (+1 Zusage) ·
-`scripts/ota-buendel.logic.ts` (`cause`) ·
-`openspec/changes/capacitor-huelle/specs/native-shell/spec.md` (neue Zusage +
-Szenario „Ein zurückgerolltes Bündel wird nicht ein zweites Mal installiert") ·
-`openspec/changes/capacitor-huelle/tasks.md` (D4 abgehakt).
+`openspec/changes/capacitor-huelle/tasks.md` (Krypto-Beleg unter D3;
+Grössenzuwachs gemessen; `publicKey` nachgeführt; D5 zeigt aufs Runbook) ·
+`openspec/changes/capacitor-huelle/geraetesitzung-d5.md` (**neu**) ·
+`session-handoff.md`.
 
 ## Next session: start here
 
-**Erster Handgriff: `gh pr checks 299` — und dann den Merge begleiten.**
-Danach, in dieser Reihenfolge:
+**Das Runbook fahren — `geraetesitzung-d5.md`, §0 zuerst.** Die Vorbedingung
+ist die, die am leichtesten übersehen wird: die App auf dem Gerät **muss aus
+`ddbd8ad` oder neuer gebaut sein**. Eine ältere Schale bestätigt ihren Start
+blank im Modulrumpf, rollt nie zurück — und Probe 2 belegte dann nichts.
 
-1. **`migrate-prod` dispatchen**, sonst blockt der Drift-Gate den
-   Frontend-Deploy. Es sind **drei** Migrationen (…100000, …140000, …160000).
-   **Vor** dem ersten Deploy auf `main`, sonst scheitert der OTA-Schritt am
-   fehlenden Bucket.
-2. **Linear-Status von AGE-642 nachsehen.** Die Automation kippt ihn beim Merge
-   auf *Done*, und der Vorgang ist NICHT fertig (31 offene Aufgaben, Phase E
-   unangetastet). Vorbeugen geht nicht — der Branchname trägt das Kürzel.
-   Nachsehen und zurücksetzen ist die einzige gemessene Abhilfe.
-3. **Dann D5**: der Gerätebeleg. Er geht erst NACH dem Deploy, weil er den
-   live geschalteten Luftweg braucht.
-
-**Zwei Dinge, die vorher gelesen gehören:**
-
-- **Das Spec-Delta ist NACH Review-Runde 5 gewachsen** (die neue
-  Rückweg-Zusage). Der §18-Gate meldet das bei jedem Commit: „was reviewed, but
-  the artifacts changed since". Nicht blockend, aber vor dem Archivieren ist zu
-  entscheiden, ob eine Runde 6 über das geänderte Delta läuft. Im PR-Rumpf steht
-  ein Hinweis für die Review.
-- **Nach JEDEM `pnpm build`, vor jedem `git add`:**
-  `git checkout -- src/content/release-entries.generated.ts`.
+Danach §2, §3, §4 der Reihe nach. **§4 ist nicht optional:** `defec7ed` bleibt
+sonst das neueste Bündel im Manifest, und jede Neuinstallation zieht es.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Der Weg über das Netz bleibt ungeprüft:** Upload, RPC-Aufruf und die drei
-  Endpunkte. Sichtbar wird er erst beim ersten Deploy auf `main`.
-- **Der Rückfall selbst ist unbelegt und absichtlich so markiert.** Er hängt an
-  einem Zeitgeber im nativen Teil und ist in jsdom nicht herstellbar. Belegt ist
-  unsere Hälfte: vier Zusagen, alle vier gegengeprüft (Plattform-Bedingung
-  lässt zwei umfallen, top-level `await` die dritte, `autoDeleteFailed: true`
-  die vierte).
-- **Vier Gerätebelege stehen aus:** C3 auf beiden Plattformen · C2 auf Android ·
-  C1 auf iOS · B5 der Startbildschirm. **Für B5 muss die App gelöscht werden**,
-  **und das kostet Donald die Anmeldung** — vorher ansagen.
-- **B3 Signaturmaterial (4 offen):** Zertifikat, Provisioning Profile, Keystore.
-  Donalds Hand. Das OTA-Schlüsselpaar ist erledigt und im Deploy gegengeprüft.
-- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand** (per `psql`
-  eingespielt, weil der Stack geteilt ist). Ein `supabase db reset` stellt sie
-  korrekt her.
-- **Nicht angefasst, ausserhalb AGE-642:** `scripts/sync-dev-auszug.test.ts` ist
-  per Bauart flakig. `ADR-0037` wird dreimal zitiert, existiert aber nicht.
+- **Kein einziger Beleg stammt von einem Gerät.** Neu belegt ist die
+  Krypto-Hälfte am ausgelieferten Artefakt; alles danach — installieren, neu
+  starten, `notifyAppReady`, Rückfall — bleibt Gerätebeleg.
+- **Vier weitere Gerätebelege**, in §6 des Runbooks gesammelt: C3 auf beiden
+  Plattformen · C2 auf Android · C1 auf iOS · B5 der Startbildschirm.
+  **B5 verlangt, die App zu löschen, und das kostet die Anmeldung** — deshalb
+  zuletzt.
+- **B3 Signaturmaterial (3 offen):** Zertifikat, Provisioning Profile, Keystore,
+  plus der Workflow, der sie einspeist. Donalds Hand. **Für D5 nicht nötig** —
+  ein Xcode-Lauf aufs eigene Gerät genügt (`DEVELOPMENT_TEAM` von Hand).
+- **A2, Kästchen Z. 70** (`navItems`-RED-Zusage) steht offen, ist aber womöglich
+  längst von `nav.test.ts` und den zwei `SidebarNav`-Tests gedeckt. Ungemessen —
+  eine der vier Optionen, die Donald diese Sitzung nicht gewählt hat.
+- **Der lokale Stack trägt die drei OTA-Migrationen nur von Hand.** Ein
+  `supabase db reset` stellt sie korrekt her.
+- **Nicht angefasst, ausserhalb AGE-642:** `docs/prod-neuaufbau-plan.md:31-32`
+  nennt noch `foelowldexkcqzewvrcf` als Live-Fläche (falsch seit 24.08.) ·
+  `scripts/sync-dev-auszug.test.ts` ist per Bauart flakig · `ADR-0037` wird
+  dreimal zitiert, existiert aber nicht.

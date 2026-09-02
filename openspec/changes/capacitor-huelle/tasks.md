@@ -67,9 +67,36 @@ allein und zuerst.
 
 - [x] Grundlinie festhalten: `pnpm build`, Größe des Eintrittsbündels roh und
       gzip notieren. Gemessen am 27.08. auf `0dd4b8b`: **1.181,77 kB / 347,78 kB**.
-- [ ] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
+- [x] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
       und `section`, und die Sidebar rendert unverändert. Der Umbau berührt
       `Component`; die Zusage ist, dass er sonst nichts berührt.
+      **Gemessen 01.09., an Mutationen statt am Vorkommen der Namen** — 31 Läufe
+      der vollen Suite (210 Dateien, 2.327 Tests, 15 s je Lauf), jede Mutation
+      einzeln, das Original danach jedes Mal wieder grün:
+      * **`path` je Route: war gedeckt.** `/aktivitaet` verstellt → 11 Dateien
+        rot; `/chat` → 2; `/profil/bearbeiten` → 1. Feld ganz weg: `tsc` fällt.
+      * **`section` je Route: war gedeckt.** Drei Mutationen, 1 bis 4 Dateien
+        rot. Feld ganz weg: `tsc` fällt, plus `nav.test.ts`.
+      * **Sidebar unverändert: war gedeckt.** In `AppShell.tsx` die Beschriftung
+        gegen den Pfad getauscht → 5 Dateien rot; den Abschnitts-Filter
+        entfernt → 7. Die Zusage „die Sidebar liest `path`, `label`, `section`,
+        nicht `Component`" trägt also.
+      * **`label` war die Lücke, und nur für die neun `sub`-Einträge.** Drei
+        Umbenennungen liefen **still** durch — typecheck grün, 210/210 grün:
+        „Nachrichten" zurück auf „Chat" (die Änderung, die AGE-583 mit Begründung
+        vorgenommen hat), „Neu in der App" auf „Neues", `/profil/bearbeiten` auf
+        „Profil". Ein **leeres** Label auf `/chat` ebenso: ein Link ohne
+        zugänglichen Namen, von nichts bemerkt. Feld ganz weg → nur `tsc`.
+      * **Und der schwerste: `/neues` ganz entfernt, samt `lazy()`-Import.**
+        typecheck grün, 210/210 grün. Die Route aus AGE-631 wäre verschwunden,
+        ohne dass eine Zusage darauf zeigte. (Ohne den Import wäre es
+        `noUnusedLocals` aufgefallen — ein Zufallstreffer, keine Zusage.)
+      * **Geschlossen:** ein vollständiges Routen-Verzeichnis in
+        `src/config/nav.test.ts` (Pfad + Beschriftung, alle 14, nach Pfad
+        sortiert verglichen — die verbindliche Reihenfolge steht schon je
+        Abschnitt darüber). **Gegenprobe: alle sechs vorher stillen Mutationen
+        röten jetzt**, das Original bleibt grün. Preis, ehrlich benannt: eine
+        gewollte Umbenennung kostet eine Zeile in der Liste.
 - [x] `Component` in `src/config/nav.ts` auf `lazy()` umstellen; die statischen
       Seitenimporte in `src/App.tsx` ebenso — **außer** `HomeRedirect` und
       `LoginPage`.
@@ -470,7 +497,27 @@ betroffenen Punkten.
       LOW/MEDIUM):* iOS hält den Startbildschirm in einem Zwischenspeicher; ein
       Beleg ohne vorheriges Löschen zeigt womöglich die alte Fläche und belegt
       nichts. Bildschirmfoto im Hoch- **und** im Querformat.
-- [ ] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
+- [x] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
+      **Gemessen am 31.08. mit `actool` (Xcode 26.6), also am KOMPILIERTEN
+      `Assets.car` und nicht an den Quelldateien** — die beiden Zahlen gehen
+      auseinander, und nur die erste wird ausgeliefert:
+
+      | | `Assets.car` | Quelldateien |
+      |---|---|---|
+      | Capacitor-Vorgabe (`8710c18^`) | 62.104 B | 124.222 B |
+      | Marken-Startfläche (HEAD) | 392.040 B | 401.384 B |
+      | **Zuwachs** | **+329.936 B ≈ +322 KiB** | +277.162 B |
+
+      **Die Quelldateien hätten den Zuwachs um ~53 KB zu NIEDRIG angegeben.**
+      Grund ist die Vorgabe, nicht unsere Fläche: ihre drei `splash-2732x2732*.png`
+      sind byte-identisch (derselbe Blob `33ea6c9`), und `actool` legt sie einmal
+      ab — 123.819 B Quelle werden zu 62.104 B. Wer hier die Dateigrössen
+      subtrahiert, misst eine Ersparnis mit, die es im Paket nie gab.
+
+      Der Zuwachs ist **iOS-allein**; Android bleibt unberührt (siehe die Zeile
+      dazu weiter unten). Getragen wird er fast vollständig von
+      `splash-band.jpg` (310.891 B) — dem einzigen Foto-Motiv der drei.
+
       Ein Optimierer wie `oxipng` kommt bewusst **nicht** dazu: eine weitere
       Werkzeug-Abhängigkeit für einen Lauf, der ein paarmal im Jahr stattfindet.
 - [ ] **Offen, als eigener Vorgang notiert:** `pnpm splash --check` in der CI,
@@ -794,9 +841,14 @@ was das System je befüllt.
       Ein mit dem 4096-Bit-Schlüssel gebildetes Chiffrat (1024 Zeichen) wird
       beim Schreiben abgewiesen, statt dass jedes Gerät das Bündel schweigend
       verweigert. `ota_buendel_test.sql` belegt beide Richtungen.
-- [ ] Öffentlichen Schlüssel als `publicKey` in `capacitor.config.ts` eintragen.
-      Steht erst mit D3 an, wo das Plugin dazukommt — vorher wäre es tote
-      Konfiguration. Die Datei liegt bereit.
+- [x] Öffentlichen Schlüssel als `publicKey` in `capacitor.config.ts` eintragen.
+      **Erledigt mit D3** — `capacitor.config.ts:105`, PKCS#1 und 2048 Bit,
+      bewacht von `scripts/capacitor-config.test.ts` (Kopfzeile wörtlich,
+      `modulusLength === 2048`). Die Zeile stand hier als offen, war es am
+      31.08. aber nicht mehr; nachgeführt am 31.08. Dass es der RICHTIGE
+      Schlüssel ist und nicht bloss irgendeiner derselben Bauart, hält
+      `pruefeSchluesselpaar` im Veröffentlichungs-Schritt — und seit dem
+      31.08. der Beleg am lebenden Bündel unter D3.
 
 ### D2. Die Vertragsnummer der Schale — Feld, Stempelstelle, Regel
 
@@ -922,6 +974,30 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
         Veröffentlichungs-Schritt — der `publicKey` der Schale muss zum
         privaten Schlüssel des Deploys gehören, sonst fällt der Job. Vorher
         belegte nichts mehr als „irgendein 2048-Bit-Schlüssel".
+      * **Neu am 31.08.: der Krypto-Weg des Geräts, nachgestellt am LEBENDEN
+        Bündel.** `pruefeSchluesselpaar` läuft im Deploy und vergleicht zwei
+        Schlüssel miteinander — es fasst das ausgelieferte Bündel nie an. Nichts
+        belegte bis dahin, dass die Kette am fertigen Artefakt aufgeht. Jetzt
+        schon, gegen PROD (`viwntbodrtqxgmqyxluh`), Manifest
+        `0.0.0+e8a2abcdcb21`, mit dem Schlüssel **aus `capacitor.config.ts`
+        gelesen** statt abgeschrieben:
+
+        1. `sessionKey` RSA-geöffnet (PKCS#1) → AES-128-CBC-Schlüssel und IV.
+        2. Chiffrat (2.997.808 B) entschlüsselt → 2.997.792 B, beginnend mit
+           `PK` — ein echtes Zip, nicht Unsinn, der zufällig durchläuft.
+        3. SHA-256 des Klartext-Zips == RSA-geöffnete `checksum`,
+           **byte-gleich** (`ec0737e811bd8ed2…`).
+
+        **Mit Positivkontrolle, sonst belegte ein grüner Lauf nichts:** ein
+        einziges gekipptes Byte im Chiffrat → `8d75277684dff5db…` statt
+        `ec0737e8…`, die Probe rötet. Das ist genau der Fehlschlag, der auf dem
+        Gerät still bliebe.
+
+        **Was das NICHT belegt:** das ist unsere Nachbildung von `CryptoCipher`,
+        nicht das Plugin selbst — und alles danach (installieren, neu starten,
+        `notifyAppReady`, Rückfall) bleibt Gerätebeleg. Belegt ist die
+        Krypto-Hälfte, und zwar am ausgelieferten Artefakt statt an einer
+        Vorrichtung.
       * **Offen, und zwar als Gerätebeleg:** dass das Gerät ein Bündel mit
         falscher Prüfsumme verwirft **und auf der laufenden Fassung bleibt**,
         ist Verhalten des Plugins. Ein Mock könnte es nur behaupten. Der zweite
@@ -981,6 +1057,13 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       wenn das Plugin einmal ausgetauscht wird.
 
 ### D5. Beleg
+
+**Runbook: `geraetesitzung-d5.md`** (31.08.). Die drei Proben tragen sprechende
+Fassungen — `0.0.0+600df00d` heil, `0.0.0+defec7ed` defekt, `0.0.0+c1ea4ed0`
+das Aufräumen —, die Griffe sind am gebauten `dist/` gemessen und fassen
+**keine Quelldatei** an. Die Falle, die dort ganz oben steht: eine Probe unter
+einer BEREITS eingetragenen Fassung ist ein Upsert und überschreibt das gute
+Bündel.
 
 - [ ] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
       einmal vollständig durchgespielt.
