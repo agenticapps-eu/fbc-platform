@@ -134,6 +134,51 @@ allein und zuerst.
       **Nicht** gewandert ist der Supabase-Client: 202,89 kB, jetzt in einer
       eigenen Datei, die trotzdem vorgeladen wird. Wer nur auf die Grösse des
       Eintrittsbündels sieht, hält das für einen Gewinn. Es ist keiner.
+
+      **Nachgemessen 02.09. am LIVE ausgelieferten Artefakt — die Zahlen oben
+      sind nicht die, die ankommen.** Sie entstanden mit `pnpm build` ohne
+      Secrets, und zwei Variablen ändern das Bündel erheblich:
+
+      * **`VITE_SENTRY_DSN` fehlt → das Sentry-SDK fällt heraus.** `dsn` wird
+        zur Bauzeit durch `undefined` ersetzt, `if (dsn)` fällt weg, und mit ihm
+        `replayIntegration` und das Browser-Tracing (`instrument.ts:20-23`).
+        Gegenprobe am selben Baum, heute, nur der DSN verstellt: **644,83 kB
+        ohne, 813,12 kB mit** — 168,29 kB Unterschied im Eintrittsbündel. Und
+        die Zerlegung selbst ändert sich mit: **10 Dateien in der Erstlast ohne,
+        22 mit**.
+      * **Die Supabase-Variablen fehlen → der Client schrumpft auf 9,12 kB**
+        statt 209,99 kB. Ein Vergleich Datei für Datei zwischen dem Bau mit DSN
+        und dem Live-Stand zeigt genau **einen** Unterschied, und das ist dieser
+        (+200,87 kB); alles andere ist byte-gleich.
+
+      Der Deploy baut mit `infisical run --env=prod` und hat beides. Gemessen am
+      ausgelieferten Bündel (`app.effbeezee.com`, `2c6e86a`, 02.09.):
+
+      | | notiert (ohne Secrets) | **live ausgeliefert** |
+      | --- | ---: | ---: |
+      | Eintrittsbündel roh | 600,53 kB | **813,32 kB** |
+      | Erstlast roh (mit CSS) | 927,26 kB | **1.254,40 kB** |
+      | Erstlast gzip | 269,95 kB | **378,22 kB** |
+      | Dateien in der Erstlast | 11 | **22** |
+
+      **Was davon berührt die Zusage: nichts.** Die Spec verlangt das
+      Eintrittsbündel unter 1.024 kB roh — 813,32 kB, Abstand 210,68 kB. Der
+      Abstand ist aber ein Fünftel und nicht die zwei Fünftel, die 600,53 kB
+      nahelegen, und er schrumpft schon: derselbe Befehl, der am 27.08. 600,53
+      kB ergab, ergibt heute 644,83 kB.
+
+      **Was NICHT nachgemessen ist: die −26 %.** Die Grundlinie entstand
+      ebenfalls ohne Secrets; eine Grundlinie mit ihnen gibt es nicht, und
+      `0dd4b8b` nachzubauen hilft nicht — `package.json` und die Sperrdatei sind
+      seither stark gewandert, ein Bau dort misst auch andere Abhängigkeiten.
+      Die beiden notierten Zahlen sind also untereinander vergleichbar, nur
+      eben nicht mit dem, was ausgeliefert wird.
+
+      **Der Wächter trägt auch die echte Form:** gegen den Bau mit DSN — 21
+      JS-Dateien in der Erstlast statt 9 — meldet
+      `scripts/entry-chunk-guard.ts` weiterhin „keine unerlaubte Seite darin".
+      Das war nicht selbstverständlich: im CI-Job `verify` läuft er ohne
+      Secrets und sieht damit eine andere Zerlegung als die ausgelieferte.
 - [x] **Beleg 2 (Struktur) — als Skript, nicht als Behauptung.** Die Spec
       verspricht „strukturell geprüft"; eine Messung von Hand erfüllt das genau
       einmal und ist bei der nächsten Abhängigkeit wertlos. Also ein Skript, das
@@ -745,7 +790,7 @@ was das System je befüllt.
       das Zip mit einem zufälligen **AES**-Schlüssel verschlüsseln; diesen
       Sitzungsschlüssel **und** die Prüfsumme mit dem **privaten** RSA-Schlüssel
       verschlüsseln; Chiffrat in den Bucket laden; Manifest-Zeile mit `version`,
-      `url`, `checksum` und `sessionKey` schreiben. Das ist capgos „end to end
+      `url`, `checksum` und `session_key` schreiben. Das ist capgos „end to end
       encryption v2", nicht eine losgelöste Signatur — siehe `design.md` §8.
       Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus Infisical — der Job fährt
       ohnehin über `infisical run`.
@@ -966,7 +1011,7 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       Zusage hat zwei Hälften, und nur eine liegt in unserem Code:
       * **Unsere Hälfte, belegt:** ein Angebot ist vollständig oder es ist
         keines (`antwort.test.ts`). Fehlte `checksum`, lehnte das Gerät mit
-        `checksum_required` ab; fehlte `sessionKey`, gälte die Verschlüsselung
+        `checksum_required` ab; fehlte `session_key`, gälte die Verschlüsselung
         als nicht gesetzt (`CryptoCipher.java:141`), das Gerät entpackte
         Chiffrat und scheiterte **ohne Hinweis auf die Ursache**. Dazu §38 der
         pgTAP-Datei: die vier Spalten kommen der richtigen Zuordnung zurück.
@@ -1083,7 +1128,13 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
 - [ ] Kein Inhalt unter Notch oder Home-Indikator.
 - [ ] Android-Zurück navigiert, statt die App zu schließen.
 - [ ] Realtime im Chat funktioniert im Vordergrund.
-- [ ] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
+- [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
+      **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
+      `2c6e86a`) statt an einem Bau auf der eigenen Maschine — ein Bau ohne
+      Secrets unterschätzt es um 168 kB, siehe A2, Beleg 1:
+      **813,32 kB roh / 253,03 kB gzip.** Unter 1.024 kB, Abstand 210,68 kB.
+      Die einzige Zeile dieser Phase, die kein Gerät braucht: dieselbe Datei
+      lädt die Schale.
 - [ ] OTA einmal durchgespielt.
 
 ## Vor dem Abschluss

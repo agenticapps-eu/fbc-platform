@@ -11,14 +11,44 @@
 // Der Rumpf daneben (`index.ts`) baut nur die echten Abhängigkeiten.
 //
 // ══ DIE ANTWORTFELDER SIND GEMESSEN, NICHT GERATEN ══════════════════════════
-// Gelesen am 31.08. in @capgo/capacitor-updater@8.51.15:
+// Gelesen am 31.08. in @capgo/capacitor-updater@8.51.15 — damals NUR in der
+// Android-Quelle, und genau daran scheiterte Befund 1. Am 02.09. gegen die
+// iOS-Quelle nachgeprüft: Befund 1 war falsch (unten korrigiert), Befund 2 und 3
+// halten (`CapacitorUpdaterPlugin.swift:4107` führt dieselben drei `kind`-Werte
+// und normalisiert alles andere auf `failed`).
 //
-// 1. **`sessionKey`, nicht `session_key`.** Die Spalte heißt `session_key`, das
-//    Antwortfeld `sessionKey` (`CapacitorUpdaterPlugin.java:5035`). Das ist die
-//    einzige Stelle, an der die Eins-zu-eins-Abbildung der Spaltennamen bricht,
-//    und sie bricht still: ein falsch geschriebenes Feld wird als „keine
-//    Verschlüsselung gesetzt" gelesen (`CryptoCipher.java:141`), das Gerät
-//    versucht Chiffrat zu entpacken und scheitert ohne Hinweis auf die Ursache.
+// Die Lehre steht über den Befunden, weil sie für jeden neuen gilt: **eine
+// Aussage übers Drahtformat braucht BEIDE Schalen.** Die Schalen sind nicht
+// symmetrisch, und Android ist die nachsichtigere — was dort läuft, belegt für
+// iOS nichts.
+//
+// 1. **`session_key` — wie die Spalte.** KORRIGIERT am 02.09. nach dem ersten
+//    Gerätelauf; bis dahin stand hier `sessionKey`, und genau daran scheiterte
+//    die Installation. Die Eins-zu-eins-Abbildung der Spaltennamen bricht hier
+//    NICHT.
+//
+//    Die beiden Schalen sind nicht symmetrisch, und nur eine Schreibweise
+//    kommt auf beiden an:
+//
+//    - **iOS akzeptiert ausschließlich `session_key`.** Die Antwort geht durch
+//      ein nacktes `JSONDecoder().decode(AppVersionDec.self, …)`
+//      (`CapgoUpdater.swift:1141`) ohne `keyDecodingStrategy`; das Feld heißt
+//      dort wörtlich `session_key` (`InternalUtils.swift:258`).
+//    - **Android akzeptiert beide** — aus Versehen. Es geht über die rohe
+//      Antwort und benennt `session_key` nach `sessionKey` um
+//      (`CapgoUpdater.java:2350`); ein bereits camelCase geschriebenes Feld
+//      landet über den `else`-Zweig unter demselben Namen.
+//
+//    Die alte Begründung berief sich auf `CapacitorUpdaterPlugin.java:5035`.
+//    Diese Zeile liest aber die bereits umbenannte interne Map, eine Ebene
+//    HINTER der Leitung — sie sagt über das Drahtformat nichts aus.
+//
+//    Der Fehler bricht still: ein falsch geschriebenes Feld wird als „keine
+//    Verschlüsselung gesetzt" gelesen (`CryptoCipher.swift:237`,
+//    `CryptoCipher.java:141`), das Gerät versucht Chiffrat zu entpacken und
+//    scheitert ohne Hinweis auf die Ursache. Am Gerät gemessen (iPhone 17 Pro,
+//    iOS 26.6): `Encryption not set, no public key or session, ignored`,
+//    danach `Failed to unzip file  Error: cannotUnzip`.
 //
 // 2. **Eine Antwort ohne Aktualisierung MUSS `error` oder `kind` tragen.** Das
 //    Plugin verzweigt auf `jsRes.has("error") || jsRes.has("kind")`
@@ -147,7 +177,7 @@ export async function ermittleAntwort(rumpf: unknown, deps: Deps): Promise<Ergeb
       version: buendel.version,
       url: buendel.url,
       checksum: buendel.checksum,
-      sessionKey: buendel.session_key,
+      session_key: buendel.session_key,
     },
     status: 200,
   };

@@ -288,8 +288,13 @@ Der Mechanismus, aus `CryptoCipher.java` und `CryptoCipher.swift`:
 - Das Bündel wird beim Veröffentlichen mit einem zufälligen **AES**-Schlüssel
   verschlüsselt (`AES/CBC/PKCS5Padding`).
 - Dieser Sitzungsschlüssel wird mit dem **privaten** RSA-Schlüssel verschlüsselt
-  und als Feld **`sessionKey`** in der Form `iv:sessionKey` (beides Base64,
-  durch Doppelpunkt getrennt) mitgeliefert.
+  und als Feld **`session_key`** in der Form `iv:sessionKey` (beides Base64,
+  durch Doppelpunkt getrennt) mitgeliefert. Das Feld heißt auf der Leitung wie
+  die Spalte; iOS liest ausschließlich diese Schreibweise
+  (`InternalUtils.swift:258`, nacktes `JSONDecoder`), Android nimmt beide, weil
+  es `session_key` vorher umbenennt (`CapgoUpdater.java:2350`). KORRIGIERT am
+  02.09. — bis dahin stand hier `sessionKey`, und daran scheiterte die erste
+  Installation auf dem Gerät.
 - Auf dem Gerät entschlüsselt `decryptRSA(sessionKey, publicKey)` mit dem
   **öffentlichen** Schlüssel den AES-Schlüssel und damit die Datei. Auch die
   **Prüfsumme** wird so entschlüsselt (`decryptChecksum`).
