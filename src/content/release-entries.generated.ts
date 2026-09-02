@@ -5,6 +5,18 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-02-feedback-ausbauen",
+    datum: "2026-09-02",
+    titel: "Feedback ausbauen (AGE-628)",
+    linear: "AGE-628",
+    aenderungen: [
+      "**Screenshot ans Feedback.** Beim Abgeben lässt sich ein Bild mitschicken. Der Admin sieht es an der Rückmeldung und kann es entfernen.",
+      '**Thema zur Auswahl.** Fünf feste Themen — Generell, Fehler, Bedienung, Inhalte, Idee. Bereits abgegebene Rückmeldungen zählen als „Generell".',
+      "**Filter in der Admin-Übersicht.** Nach Thema und Bewertung, über den ganzen Bestand statt nur über die gerade geladene Seite.",
+      "**Sprung in den Chat.** Aus einer Rückmeldung heraus lässt sich das Gespräch mit der Person öffnen, ohne vorherige Kontaktanfrage. Beide Seiten dürfen in diesem Gespräch schreiben.",
+    ],
+  },
+  {
     slug: "2026-09-01-push-token-aufraeumen",
     datum: "2026-09-01",
     titel: "Tote Gerätetokens: erst ein echtes Lebenszeichen, dann der Aufräumer",

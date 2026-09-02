@@ -1,5 +1,7 @@
 # Feedback ausbauen (AGE-628)
 
+Linear: **AGE-628**
+
 ## Why
 
 Das QM-Feedback sammelt heute Sterne und drei Freitexte — mehr nicht. Wer es
@@ -15,6 +17,18 @@ ausdrücklich, das geschehe, „so that a later capability can address the autho
 directly". Und die beiden offenen Produktfragen sind beantwortet (siehe unten).
 
 ## What Changes
+
+- **Screenshot ans Feedback.** Beim Abgeben lässt sich ein Bild mitschicken. Der
+  Admin sieht es an der Rückmeldung und kann es entfernen.
+- **Thema zur Auswahl.** Fünf feste Themen — Generell, Fehler, Bedienung,
+  Inhalte, Idee. Bereits abgegebene Rückmeldungen zählen als „Generell".
+- **Filter in der Admin-Übersicht.** Nach Thema und Bewertung, über den ganzen
+  Bestand statt nur über die gerade geladene Seite.
+- **Sprung in den Chat.** Aus einer Rückmeldung heraus lässt sich das Gespräch
+  mit der Person öffnen, ohne vorherige Kontaktanfrage. Beide Seiten dürfen in
+  diesem Gespräch schreiben.
+
+Im Einzelnen:
 
 **1. Screenshot ans Feedback.** Beim Abgeben kann ein Bild mitgeschickt werden.
 Neuer privater Bucket; die Größenbegrenzung hängt serverseitig am Bucket, nicht
@@ -54,7 +68,7 @@ Nachsehen-dann-Anlegen im Browser ginge zweimal schief: die Tabelle erzwingt
 die Normalisierung des Paares nicht, und zwischen Nachsehen und Anlegen liegt
 ein Wettrennen.
 
-**Was NICHT Teil dieses Changes ist**
+## Was NICHT Teil dieses Changes ist
 
 - **Anonymes Feedback.** AGE-588 ist am 01.09. abgebrochen. `feedback.profile_id`
   ist `not null` mit Fremdschlüssel — jede Zeile trägt ihren Verfasser. Der
