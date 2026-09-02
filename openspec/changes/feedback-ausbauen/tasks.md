@@ -304,13 +304,35 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 5. Der Lösch-Weg fürs Bild
 
-- [ ] 5.1 **RED:** pgTAP, in dem ein Admin ein fremdes Bild löscht und erwartet,
-      dass der Verweis an der Zeile danach leer ist.
-- [ ] 5.2 `SECURITY DEFINER`-Weg, der die **Feedback-Kennung** entgegennimmt —
-      keinen Pfad vom Aufrufer, sonst ist es derselbe _confused deputy_ —, die
-      Admin-Eigenschaft prüft, das Objekt löscht und den Verweis leert.
-- [ ] 5.3 pgTAP: ein Nicht-Admin kommt damit nicht durch; ein Verweis auf ein
-      fremdes Objekt lässt sich darüber nicht löschen.
+- [x] 5.1 **RED stand:** Abschnitt 7 in `feedback_screenshots_test.sql`, die
+      Datei von 30 auf 37 Zusagen — **5 rot** (31, 32, 34, 35, 37). Die zwei
+      Nachlese-Zusagen (33, 36) waren dabei grün, und das ist richtig so: sie
+      sagen zu, dass nichts geschieht, und heute geschieht nichts.
+- [x] 5.2 **Migration `20260902130000_admin_feedback_bild_loeschen.sql`.** Sie
+      nimmt die Feedback-Kennung, prüft `is_admin()`, liest den Pfad aus der
+      Zeile, leert den Verweis und **gibt den Pfad zurück**.
+      **Abweichung von der Aufgabe, ausdrücklich:** sie löscht das Objekt
+      **nicht** selbst. `storage.objects` ist die Metazeile; die Bytes liegen
+      im Speicher-Backend, und die Zeile wegzulöschen liesse die Datei für
+      immer liegen — genau davor steht `storage.protect_delete()` mit dem
+      Hinweis „prevents accidental data loss from orphaned objects". Das
+      Objekt entfernt deshalb der Aufrufer über die Storage-API; dafür trägt
+      er die DELETE-Policy aus 2.4, die sonst gar keinen Zweck hätte.
+      Die Reihenfolge — erst die Zeile, dann das Objekt — ist die, die
+      `removePostMedia` in `src/lib/feed.ts` seit AGE-582 ausgeschrieben
+      trägt. Aufgabe 8.4 muss beide Hälften rufen.
+      Fehler statt stillem Nichts bei Nicht-Admin (`42501`) und unbekannter
+      Kennung (`22023`); ein zweiter Aufruf auf einer geleerten Zeile ist
+      **kein** Fehler — derselbe Knopf darf zweimal getroffen werden.
+- [x] 5.3 **Sieben Zusagen**, und zwei Gegenproben belegen sie (jede über 26
+      Dateien / 1118 Zusagen, danach zeichengleich zurück):
+      | Gegenprobe | Es fielen |
+      |---|---|
+      | `where id = …` am UPDATE weggelassen | **2** — beide Nachlese-Zusagen; die Funktion leerte die Spalte tabellenweit, ihr Rückgabewert blieb dabei richtig |
+      | `is_admin()`-Prüfung weggelassen | **2** — die Ablehnung und ihre Nachlese |
+      Die erste Zeile ist der Grund, warum die Nachlese-Zusagen überhaupt
+      dastehen: ohne sie wäre eine tabellenweit leerende Funktion grün
+      durchgelaufen.
 
 ## 6. Typen und Datenschicht
 

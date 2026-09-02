@@ -44,7 +44,7 @@
 --     ueber die gezaehlte Zeilenzahl belegt, nicht ueber den Rueckgabewert.
 
 begin;
-select plan(30);
+select plan(37);
 
 -- ── 1. Der Bucket und seine Grenzen (Aufgabe 2.2) ───────────────────────────
 select is(
@@ -395,6 +395,101 @@ select is(
          returning 1)
        select count(*)::text from neu$q$),
   '2', 'Beliebig viele Zeilen duerfen OHNE Screenshot bestehen — der Index ist partiell');
+
+
+-- ── 7. Der Loesch-Weg fuers Bild (Aufgaben 5.1–5.3) ────────────────────────
+-- ══ WAS DIESER WEG TUT — UND WAS BEWUSST DER AUFRUFER TUT ══════════════════
+-- Er nimmt die FEEDBACK-KENNUNG entgegen, nie einen Pfad. Ein Pfad vom
+-- Aufrufer waere derselbe _confused deputy_, gegen den der CHECK in Abschnitt 6
+-- steht: der Admin duerfte damit jedes Objekt im Bucket nennen.
+--
+-- Er leert den Verweis und gibt den Pfad ZURUECK. Das OBJEKT entfernt der
+-- Aufrufer danach ueber die Storage-API — genau dafuer traegt er die
+-- DELETE-Policy aus 2.4, und genau in dieser Reihenfolge macht es
+-- `removePostMedia` in `src/lib/feed.ts` seit AGE-582:
+--
+--   „Reihenfolge mit Absicht: erst die Zeile, dann das Objekt. Andersherum
+--    bliebe bei einem Abbruch dazwischen eine Zeile stehen, die auf ein Bild
+--    zeigt, das es nicht mehr gibt — und die Kachel bliebe fuer immer leer.
+--    So herum ist der schlimmste Ausgang ein verwaistes Objekt, das niemand
+--    sieht."
+--
+-- Ein `delete from storage.objects` im Rumpf waere die scheinbar kuerzere
+-- Fassung und die falsche: `storage.objects` ist die Metazeile, die BYTES
+-- liegen im Speicher-Backend. Die Zeile wegzuloeschen liesse die Datei fuer
+-- immer liegen — deshalb steht davor der Trigger `storage.protect_delete()`,
+-- und ihn zu uebergehen hiesse, seine Begruendung zu ignorieren.
+
+-- Fixture: zwei Zeilen mit Bild, je eine pro Verfasser. Die zweite ist die
+-- Gegenprobe — nur die GENANNTE Zeile darf sich aendern.
+insert into storage.objects (bucket_id, name) values
+  ('feedback-screenshots', 'fc000000-0000-0000-0000-00000000000a/loeschen-bild.png'),
+  ('feedback-screenshots', 'fc000000-0000-0000-0000-00000000000b/bleibt.png');
+
+insert into public.feedback (id, profile_id, rating, likes, screenshot_path) values
+  ('fc111111-0000-4000-8000-000000000001', 'fc000000-0000-0000-0000-00000000000a',
+   2, 'mit Bild', 'fc000000-0000-0000-0000-00000000000a/loeschen-bild.png'),
+  ('fc111111-0000-4000-8000-000000000002', 'fc000000-0000-0000-0000-00000000000b',
+   2, 'auch mit Bild', 'fc000000-0000-0000-0000-00000000000b/bleibt.png');
+
+-- 7.1 Der Weg gibt den Pfad zurueck. Ohne ihn wuesste der Aufrufer nicht,
+-- welches Objekt er zu entfernen hat — und muesste ihn sich selbst
+-- zusammensuchen, womit der Pfad wieder aus dem Client kaeme.
+select is(
+  pg_temp.als('fc000000-0000-0000-0000-00000000000c',
+    $q$select public.admin_feedback_bild_loeschen(
+         'fc111111-0000-4000-8000-000000000001')$q$),
+  'fc000000-0000-0000-0000-00000000000a/loeschen-bild.png',
+  'Der Loesch-Weg gibt den Pfad zurueck, damit der Aufrufer das Objekt entfernen kann');
+
+-- 7.2 Und der Verweis an der Zeile ist danach leer.
+select is(
+  (select coalesce(screenshot_path, 'LEER') from public.feedback
+    where id = 'fc111111-0000-4000-8000-000000000001'),
+  'LEER', '… und der Verweis an der Feedback-Zeile ist geleert');
+
+-- 7.3 Die Nachbarzeile ist unberuehrt. Ohne diese Zusage bliebe offen, ob der
+-- Weg genau EINE Zeile anfasst oder die Spalte tabellenweit leert.
+select is(
+  (select coalesce(screenshot_path, 'LEER') from public.feedback
+    where id = 'fc111111-0000-4000-8000-000000000002'),
+  'fc000000-0000-0000-0000-00000000000b/bleibt.png',
+  '… waehrend die Zeile eines anderen Verfassers ihren Verweis behaelt');
+
+-- 7.4 Idempotent. Ein zweiter Aufruf auf derselben Zeile darf nicht brechen —
+-- die Oberflaeche kann denselben Knopf zweimal treffen.
+select is(
+  pg_temp.als('fc000000-0000-0000-0000-00000000000c',
+    $q$select coalesce(public.admin_feedback_bild_loeschen(
+         'fc111111-0000-4000-8000-000000000001'), 'NICHTS')$q$),
+  'NICHTS', 'Ein zweiter Aufruf auf derselben Zeile liefert nichts und wirft nicht');
+
+-- 7.5 Ein Nicht-Admin kommt nicht durch — und zwar mit einem Fehler, nicht mit
+-- einem stillen Nichts. Ein stilles Nichts saehe fuer die Oberflaeche aus wie
+-- „war schon geloescht".
+select alike(
+  pg_temp.als('fc000000-0000-0000-0000-00000000000b',
+    $q$select public.admin_feedback_bild_loeschen(
+         'fc111111-0000-4000-8000-000000000002')$q$),
+  'FEHLER:%forbidden%',
+  'Ein gewoehnliches Mitglied kommt ueber den Loesch-Weg nicht durch');
+
+-- 7.6 Nachlese dazu. Ohne sie belegte die Zeile darueber nur, dass es einen
+-- Fehler gab — nicht, dass nichts geschehen ist.
+select is(
+  (select coalesce(screenshot_path, 'LEER') from public.feedback
+    where id = 'fc111111-0000-4000-8000-000000000002'),
+  'fc000000-0000-0000-0000-00000000000b/bleibt.png',
+  '… und die Zeile, die es anfassen wollte, traegt ihren Verweis unveraendert');
+
+-- 7.7 Eine unbekannte Kennung ist ein Fehler und kein Nichts. Sonst meldete
+-- die Oberflaeche „erledigt", wo sie nichts getroffen hat.
+select alike(
+  pg_temp.als('fc000000-0000-0000-0000-00000000000c',
+    $q$select public.admin_feedback_bild_loeschen(
+         'fc111111-0000-4000-8000-0000000000ff')$q$),
+  'FEHLER:%unbekannte Feedback-Kennung%',
+  'Eine unbekannte Feedback-Kennung bricht ab statt still nichts zu tun');
 
 select * from finish();
 rollback;
