@@ -531,6 +531,17 @@ function ContactBody({
   }
 
   if (!canRequestContact) {
+    /* Solange die eigene Stufe nicht feststeht, wird KEIN Grund behauptet.
+       Diese Route liegt hinter <RequireAuth>, nicht hinter <MembershipGate> —
+       sie rendert also, bevor `levelRank` da ist, und `null` sähe hier wie
+       Rang 0 aus. Ein `discover`-Konto läse dann für einen Moment, es dürfe
+       niemanden anschreiben. Dieselbe Regel wie bei den Zählern im
+       Verzeichnis: eine Aussage erscheint erst, wenn sie stimmt.
+
+       Sie greift auch, wenn die Stufenabfrage FEHLSCHLÄGT (`levelRank` bleibt
+       dann null) — auch dort ist „wir wissen es nicht" die Wahrheit. */
+    if (absenderRang === null) return null;
+
     /* Zwei Huerden, zwei Begruendungen (AGE-598, D5-Gedanke auf die
        Kontaktflaeche uebertragen). Ein `basic`-Konto kann NIEMANDEN
        anschreiben; ein `connect`-Konto kann es schon, nur nicht dieses Profil.

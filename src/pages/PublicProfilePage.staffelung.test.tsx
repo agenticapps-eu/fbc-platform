@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
-import { AuthFixture, authAsTier } from "../test/auth-fixtures";
+import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
 import type { PublicProfileData } from "../lib/public-profile";
 
 /**
@@ -160,6 +160,31 @@ describe("Kontaktanfrage: die Staffelung an der Oberfläche (AGE-598, 7.1)", () 
 
     await screen.findByText(KONTAKTKARTE);
     expect(screen.getByRole("button", KNOPF)).toBeInTheDocument();
+  });
+
+  /**
+   * Der Fall, den die Datei beim Schreiben nicht hatte und der Diff-Review
+   * gefunden hat: `/p/:id` liegt hinter <RequireAuth>, NICHT hinter
+   * <MembershipGate>. Die Seite rendert also, bevor die eigene Stufe geladen
+   * ist — und `levelRank === null` sieht wie Rang 0 aus.
+   *
+   * Ohne die Bremse läse ein `discover`-Konto für einen Moment, es dürfe
+   * niemanden anschreiben. Eine falsche Auskunft über die eigenen Rechte ist
+   * schlimmer als gar keine, und sie steht ausgerechnet vor denen, die
+   * aufsteigen sollen.
+   */
+  it("behauptet keinen Grund, solange die eigene Stufe nicht feststeht", async () => {
+    mockedFetch.mockResolvedValue(sicht("impact"));
+    // Eingeloggt, aber `levelRank` steht noch nicht — genau der Zustand
+    // zwischen <RequireAuth> und dem Eintreffen der Profilzeile.
+    renderPage(fakeAuthValue({ user: { id: "test-user" } as AuthContextValue["user"] }));
+
+    await screen.findByText(KONTAKTKARTE);
+    const karte = kontaktkarte();
+    expect(within(karte).queryByRole("button", KNOPF)).toBeNull();
+    // Weder die eine noch die andere Begründung — es steht schlicht nichts da.
+    expect(within(karte).queryByText(/Mitgliedsstufe/)).toBeNull();
+    expect(within(karte).queryByText(/Mitglieder der Stufe/)).toBeNull();
   });
 
   /**
