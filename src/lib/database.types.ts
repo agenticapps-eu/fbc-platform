@@ -2024,6 +2024,10 @@ export type Database = {
           /** Pfad im Bucket `feedback-screenshots`, optional. Die Fläche
            *  braucht eine signierte URL, um ihn anzuzeigen. */
           screenshot_path: string | null;
+          /** Hat der Verfasser noch Zugang — bestaetigt UND nicht deaktiviert
+           *  UND nicht geloescht? Die Flaeche bietet ihm sonst kein Gespraech
+           *  an: er koennte darin nicht antworten (AGE-628). */
+          author_aktiv: boolean;
         }[];
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the

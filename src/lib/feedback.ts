@@ -152,6 +152,23 @@ export async function deleteFeedbackScreenshot(feedbackId: string): Promise<void
   await supabase.storage.from(FEEDBACK_SCREENSHOT_BUCKET).remove([pfad]);
 }
 
+/**
+ * Öffnet das Gespräch zwischen dem aufrufenden Admin und `zielProfilId` und
+ * gibt dessen Kennung zurück — das **bestehende** oder ein neues.
+ *
+ * Der ganze Weg liegt im Server: Normalisierung des Paares, `on conflict`, die
+ * Markierung. Ein von Hand über `message_threads` angelegtes Gespräch trüge
+ * keine Marke und wäre eine Einbahnstrasse — der Admin schriebe darin, das
+ * Gegenüber nicht.
+ */
+export async function oeffneAdminGespraech(zielProfilId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("admin_gespraech_oeffnen", {
+    p_ziel: zielProfilId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 /** Ein Thema aus `feedback_themes` — Schlüssel, Beschriftung, Reihenfolge. */
 export type FeedbackThema = Database["public"]["Tables"]["feedback_themes"]["Row"];
 

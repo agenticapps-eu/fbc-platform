@@ -356,10 +356,10 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 - [x] 6.3 **Der Schlüssel trägt jetzt Seite und Filter**, die Marken sortiert:
       er beschreibt eine Auswahl, keine Reihenfolge — sonst wären „Fehler,
       Idee" und „Idee, Fehler" zwei Abfragen mit garantiert gleichem Ergebnis.
-- [ ] 6.4 Beim Filterwechsel auf Seite 1 zurückspringen. **Verschoben nach 8.2**
-      — der Rücksprung sitzt im Setter des Filters, und den gibt es erst mit
-      den Kästchen. Ihn hier zu bauen hiesse, einen Zustand ohne Bedienung
-      anzulegen.
+- [x] 6.4 Beim Filterwechsel auf Seite 1 zurückspringen. **In 8.2 gebaut** —
+      der Rücksprung sitzt im Setter des Filters, und den gibt es erst mit den
+      Kästchen. Ihn in Einheit 6 zu bauen hiesse, einen Zustand ohne Bedienung
+      anzulegen. Zusage und Mutationsprobe stehen dort.
 - [x] 6.5 **Datenschicht-Tests: 17 neue Zusagen, dazu drei bestehende
       gehoben** (zwei in `feedback.test.ts`, eine in
       `AdminFeedbackPage.test.tsx` — sie schrieben die RPC-Argumente
@@ -418,19 +418,49 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 8. Oberfläche: Admin
 
-- [ ] 8.1 `AdminFeedbackPage.tsx` in die bestehende `FilterSpalte` setzen
-      (wiederverwenden, nicht nachbauen).
-- [ ] 8.2 Kästchen für Thema und Bewertung; kein Filter heisst alles.
-- [ ] 8.3 Ein Filter ohne Treffer sagt „zu dieser Auswahl liegt nichts vor" und
-      ist unterscheidbar von einem gescheiterten Aufruf.
-- [ ] 8.4 Bildanzeige über die signierte URL, plus **Bedienung zum Löschen** —
-      die fehlte in der ersten Fassung ganz.
-- [ ] 8.5 Knopf „Gespräch öffnen", adressiert über `profile_id`, ruft den Weg
-      aus 4.3.
-- [ ] 8.6 Der Knopf fehlt am **eigenen** Feedback und bei einem deaktivierten
-      oder gelöschten Verfasser — mit einem Grund, nicht wortlos.
-- [ ] 8.7 Tests: zwei gleichnamige Mitglieder, und der Sprung landet beim
-      richtigen.
+- [x] 8.1 **`FilterSpalte` wiederverwendet**, nicht nachgebaut — sie trägt vier
+      Zusagen zur Anordnung, die einzeln lautlos brechen, wenn eine Kopie sie
+      verliert.
+- [x] 8.2 **Kästchen für Thema und Bewertung.** Die Themen kommen aus der
+      Datenbank; ohne sie rendert der Block nicht. Kein Filter heisst alles —
+      und **abwählen** fällt auf `null` zurück, nicht auf `[]` (eigene Zusage:
+      `[]` wäre fatal, `= any('{}')` ist false).
+      Die Bewertungs-Kästchen heissen **„3 Sterne"**, nicht „3 von 5 Sternen":
+      genau so heisst der Vorlesetext an jeder Zeile, und zwei Stellen mit
+      demselben zugänglichen Namen sind per Sprache nicht unterscheidbar. Beim
+      ersten Lauf sind sie deshalb kollidiert.
+      **Dazu 6.4 nachgeholt:** der Setter springt auf Seite 1 zurück.
+- [x] 8.3 **Drei unterscheidbare Zustände**: Fehler, „Noch kein Feedback" und
+      „Zu dieser Auswahl liegt nichts vor."
+- [x] 8.4 **Bild über die signierte URL, plus Löschknopf.** Signiert wird erst
+      **beim Anzeigen** — eine Seite mit 25 Zeilen stellte sonst 25 Signaturen
+      aus, von denen die meisten niemand ansieht. Der Löschknopf ruft beide
+      Hälften (RPC, dann Storage-API) und lädt die Liste neu, statt die Zeile
+      im Zwischenspeicher zurechtzubiegen.
+- [x] 8.5 **„Gespräch öffnen"**, adressiert über `profile_id`, springt nach
+      `/chat/:threadId`.
+- [x] 8.6 **Der Knopf fehlt mit Grund** — am eigenen Feedback („Das ist deine
+      eigene Rückmeldung.") und bei einem Verfasser ohne Zugang („… könnte
+      nicht antworten."). Dafür gibt die RPC seit dieser Einheit
+      **`author_aktiv`** heraus (Migration `20260902140000`): über `profiles`
+      käme die Fläche an ein deaktiviertes Profil nicht heran, und eine zweite
+      Abfrage je Zeile wären 25 Abfragen je Seite.
+- [x] 8.7 **17 neue Zusagen**, darunter die zwei gleichnamigen Mitglieder — der
+      Sprung folgt der Kennung, nicht dem Text, und die beiden Profillinks
+      zeigen ebenfalls auf verschiedene Ziele.
+      **Mutationsprobe**, sieben Mutationen, danach zeichengleich zurück:
+      | Mutation | Es fielen |
+      |---|---|
+      | Seitenrücksprung weg | **1** |
+      | gefilterter Leerzustand wie der ungefilterte | **1** |
+      | Gespräch über den **Namen** adressiert | **2** |
+      | Knopf auch am eigenen Feedback | **1** |
+      | Knopf auch ohne Zugang des Verfassers | **1** |
+      | immer signieren statt erst beim Anzeigen | **2** |
+      | Löschknopf auch ohne Bild | **1** |
+      Die sechste Mutation war beim ersten Versuch **wirkungslos** (nur ein
+      Kommentar) und lief grün durch — nachgeholt in der Fassung, die wirklich
+      etwas ändert. Eine Mutation, die nichts ändert, belegt nichts.
 
 ## 9. Abnahme
 

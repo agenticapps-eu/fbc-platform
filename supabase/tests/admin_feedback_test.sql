@@ -23,7 +23,7 @@
 -- wäre nicht unterscheidbar von ihrer Abwesenheit.
 
 begin;
-select plan(28);
+select plan(29);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -428,6 +428,32 @@ select is(
   'a0000000-0000-0000-0000-000000000001=fb000000-0000-0000-0000-00000000000a/bild.png,'
   || 'a0000000-0000-0000-0000-000000000002=OHNE',
   'Die Rueckgabe traegt `screenshot_path` — und die Nachbarzeile ohne Bild traegt null');
+
+
+-- ── 10. Hat der Verfasser noch Zugang? (AGE-628, Aufgaben 8.5/8.6) ──────────
+-- Die Admin-Flaeche bietet „Gespraech oeffnen" an — aber nicht bei einem
+-- deaktivierten oder geloeschten Verfasser: `admin_gespraech_oeffnen` legte
+-- den Faden zwar an, doch schreiben koennte dort nur noch der Admin. Ein Knopf,
+-- der nur scheitern kann, ist ein Versprechen ins Leere.
+--
+-- Die Auskunft muss aus DIESER RPC kommen. Ueber `profiles` kaeme die Flaeche
+-- nicht an ein deaktiviertes Profil heran (`profiles_public` blendet es aus),
+-- und eine zweite Abfrage je Zeile waere 25 Abfragen je Seite.
+--
+-- Bodo wird hier deaktiviert — nach dem Einfuegen seiner Zeile, damit die
+-- Blaetterungs-Zusagen daruber unberuehrt bleiben.
+update public.profiles set disabled_at = now()
+ where id = 'fb000000-0000-0000-0000-00000000000b';
+
+-- Als PAAR, in EINER Zusage: welche Kennung traegt welchen Zustand. Zwei
+-- getrennte Einzelzusagen liessen ein Vertauschen der beiden durchgehen.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(distinct profile_id::text || '=' || author_aktiv::text, ',')
+         from public.admin_list_feedback(p_limit => 100)$q$),
+  'fb000000-0000-0000-0000-00000000000a=true,'
+  || 'fb000000-0000-0000-0000-00000000000b=false',
+  'Die Rueckgabe sagt, ob der Verfasser noch Zugang hat — Bodo ist deaktiviert, Anna nicht');
 
 select * from finish();
 rollback;
