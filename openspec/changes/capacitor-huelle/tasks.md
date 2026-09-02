@@ -1159,6 +1159,52 @@ Bündel.
       `meldung.ts`, geprüft mit 11 Zusagen; eine davon liest `index.ts` als
       Text und belegt die Verdrahtung. Alle fünf tragenden Zusagen sind
       mutations-gegengeprobt — Rückbau rötet je einzeln.
+
+      **Am LIVE ausgelieferten Endpunkt gegengeprüft** (PROD, nach Deploy
+      `86c4afe`), nicht an den Eingaben — drei Sonden mit Positivkontrolle:
+
+      | Sonde | Rumpf | HTTP | Logzeile |
+      |---|---|---|---|
+      | Stapel, klein | 1.358 B | 200 | `gesamt: 3`, `actions: ["download_complete","update_fail","set"]` |
+      | Stapel, 100 Ereignisse | 45.301 B | 200 | `gesamt: 100`, 100 echte Aktionen |
+      | zu gross | 317.101 B | 413 | `rumpf_zu_gross, laenge: 317101` |
+
+      Die mittlere Sonde ist der Unterschied: 45 KiB lagen über der alten
+      8-KiB-Grenze, die alte Fassung hätte `413` geantwortet. Die dritte ist
+      die Positivkontrolle — ohne sie wäre „kein 413" auch dann grün, wenn die
+      Grenze schlicht verschwunden wäre. Und die Aktionen stehen namentlich im
+      Log statt dreimal `ohne`.
+
+      **Fremd-Review 02.09. — der Fix hatte denselben Fehler eine Ebene höher.**
+      Zwei unabhängige Reviewer (gemini, plus ein Haus-Reviewer) fanden
+      denselben Kern: `meldung.status` war im Betrieb **tot**, `index.ts`
+      hartkodierte die Statuscodes. Belegt per Mutation — `413` → `400`, der
+      413-Zweig auf `200 ok` gedreht, der 405-Wächter gelöscht, `actions` aus
+      der Logzeile entfernt: **alle blieben 11/11 grün.** Ausgerechnet dieser
+      Status entscheidet, ob das Gerät wiederholt oder endgültig verwirft.
+
+      Ursache war die Zusage selbst: sie las `index.ts` als **Text** und
+      grepte auf den Aufruf. Ein Reviewer zeigte, dass sogar ein Datenleck
+      (`req.clone()`, Rohrumpf ins Log — mit `device_id`) so hindurchkam.
+
+      Behoben: der Handler liegt jetzt als `behandleAnfrage` in `meldung.ts`
+      und wird **ausgeführt** geprüft — echte `Request`, echte Antwort, echte
+      Logzeile. `index.ts` ist ein dreizeiliges `Deno.serve` und entscheidet
+      nichts mehr. Alle sieben Mutationen oben röten jetzt, das Leck
+      eingeschlossen. 17 Zusagen statt 11.
+
+      Zwei kleinere Befunde mit übernommen: `RUMPF_GRENZE` zählt
+      UTF-16-Einheiten, nicht Bytes (bis zu 768 KiB — kein Schutzloch, weil
+      `req.text()` vorher ohnehin voll puffert; im Kommentar richtiggestellt,
+      denn `TextEncoder` legte eine zweite Kopie an und machte es schlimmer),
+      und die Herstellerverweise standen als Zeilennummern da, sechs davon 1
+      bis 118 Zeilen daneben — jetzt Symbolnamen, die beim nächsten
+      Plugin-Update nicht driften.
+
+      Nicht übernommen: die Rumpfgrenze auf 128 KiB zu senken (gemini,
+      MITTEL). Die Grenze ist nicht die DoS-Kontrolle — `req.text()` puffert
+      davor —, und `413` ist endgültiger Verlust. Bei dieser Fehlerrichtung ist
+      Luft nach oben das sichere Ende.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
