@@ -67,9 +67,36 @@ allein und zuerst.
 
 - [x] Grundlinie festhalten: `pnpm build`, Größe des Eintrittsbündels roh und
       gzip notieren. Gemessen am 27.08. auf `0dd4b8b`: **1.181,77 kB / 347,78 kB**.
-- [ ] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
+- [x] **RED**: Test — `navItems` trägt für jede Route weiterhin `path`, `label`
       und `section`, und die Sidebar rendert unverändert. Der Umbau berührt
       `Component`; die Zusage ist, dass er sonst nichts berührt.
+      **Gemessen 01.09., an Mutationen statt am Vorkommen der Namen** — 31 Läufe
+      der vollen Suite (210 Dateien, 2.327 Tests, 15 s je Lauf), jede Mutation
+      einzeln, das Original danach jedes Mal wieder grün:
+      * **`path` je Route: war gedeckt.** `/aktivitaet` verstellt → 11 Dateien
+        rot; `/chat` → 2; `/profil/bearbeiten` → 1. Feld ganz weg: `tsc` fällt.
+      * **`section` je Route: war gedeckt.** Drei Mutationen, 1 bis 4 Dateien
+        rot. Feld ganz weg: `tsc` fällt, plus `nav.test.ts`.
+      * **Sidebar unverändert: war gedeckt.** In `AppShell.tsx` die Beschriftung
+        gegen den Pfad getauscht → 5 Dateien rot; den Abschnitts-Filter
+        entfernt → 7. Die Zusage „die Sidebar liest `path`, `label`, `section`,
+        nicht `Component`" trägt also.
+      * **`label` war die Lücke, und nur für die neun `sub`-Einträge.** Drei
+        Umbenennungen liefen **still** durch — typecheck grün, 210/210 grün:
+        „Nachrichten" zurück auf „Chat" (die Änderung, die AGE-583 mit Begründung
+        vorgenommen hat), „Neu in der App" auf „Neues", `/profil/bearbeiten` auf
+        „Profil". Ein **leeres** Label auf `/chat` ebenso: ein Link ohne
+        zugänglichen Namen, von nichts bemerkt. Feld ganz weg → nur `tsc`.
+      * **Und der schwerste: `/neues` ganz entfernt, samt `lazy()`-Import.**
+        typecheck grün, 210/210 grün. Die Route aus AGE-631 wäre verschwunden,
+        ohne dass eine Zusage darauf zeigte. (Ohne den Import wäre es
+        `noUnusedLocals` aufgefallen — ein Zufallstreffer, keine Zusage.)
+      * **Geschlossen:** ein vollständiges Routen-Verzeichnis in
+        `src/config/nav.test.ts` (Pfad + Beschriftung, alle 14, nach Pfad
+        sortiert verglichen — die verbindliche Reihenfolge steht schon je
+        Abschnitt darüber). **Gegenprobe: alle sechs vorher stillen Mutationen
+        röten jetzt**, das Original bleibt grün. Preis, ehrlich benannt: eine
+        gewollte Umbenennung kostet eine Zeile in der Liste.
 - [x] `Component` in `src/config/nav.ts` auf `lazy()` umstellen; die statischen
       Seitenimporte in `src/App.tsx` ebenso — **außer** `HomeRedirect` und
       `LoginPage`.
