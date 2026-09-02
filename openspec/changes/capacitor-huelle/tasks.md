@@ -1132,6 +1132,33 @@ Bündel.
       (`Check for pending update` → `Background timestamp saved` →
       `Reloading`). Diese Zeilen kamen im Kill-Lauf 0 Mal vor. Die Konsole
       taugt zum Mitlesen, die Geste muss am Gerät passieren.
+- [x] **Vorbedingung des Rückwegs: `ota-stats` war blind.** Behoben 02.09.,
+      bevor die Probe lief — sonst hätte sie nichts gemessen.
+
+      capgo puffert die Statistik und sendet **Stapel**: auf der Leitung steht
+      ein JSON-**Array**, nicht ein Objekt (iOS `CapgoUpdater.swift:3300`
+      `parameters: eventsToSend`, Android `CapgoUpdater.java:3084`
+      `new JSONArray()`). Der Endpunkt las `rumpf.action` an genau diesem
+      Array, bekam `undefined` und schrieb `ohne` — im Gerätelauf `Sent 9
+      events` gegen dreimal `action: "ohne"`. Daneben bleibt die Einzelform
+      echt (`sendRateLimitStatistic` in beiden Schalen, Androids
+      `DownloadService.sendStatsAsync`), also nimmt der Endpunkt **beide**.
+
+      **Zweiter Fehler am selben Ort, schwerer als der erste:** die Rumpfgrenze
+      stand auf 8 KiB. Ein voller Stapel sind 200 Ereignisse
+      (`maxPendingStats` == `MAX_PENDING_STATS`, beide Schalen), gemessen
+      **~94 KiB** — es passten **17 von 200** hindurch. Und `413` gilt keiner
+      Schale als vorübergehend (`isTransientStatsFailure`: nur 429, 408,
+      >= 500), das Gerät verwirft den Stapel also **endgültig**. Die Grenze war
+      kein Schutz, sondern stiller Verlust. Jetzt 256 KiB, plus ein Deckel von
+      `MAX_EREIGNISSE = 200` protokollierten Aktionen, damit der offene
+      Endpunkt durch die weitere Grenze nicht zum Log-Verstärker wird.
+
+      Vorgehen wie beim `session_key`-Fix: erst die Zusagen umgedreht (RED
+      gesehen: 5 rot / 3 grün), dann der Code. Die Entscheidung liegt jetzt in
+      `meldung.ts`, geprüft mit 11 Zusagen; eine davon liest `index.ts` als
+      Text und belegt die Verdrahtung. Alle fünf tragenden Zusagen sind
+      mutations-gegengeprobt — Rückbau rötet je einzeln.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
