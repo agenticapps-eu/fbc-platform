@@ -22,14 +22,31 @@
 --
 -- ══ DREI BEDINGUNGEN, NICHT ZWEI ═══════════════════════════════════════════
 -- Lesen und Loeschen verlangen `is_activated()` UND den Bucket UND
--- (Eigentuemer ODER Admin). Das `is_activated()` ist der Unterschied zur
--- ersten Entwurfsfassung: ohne es kaeme ein DEAKTIVIERTES Konto mit noch
--- gesetzter Admin-Rolle weiter an fremde Bilder.
+-- (Eigentuemer ODER Admin).
+--
+-- KORREKTUR vom 02.09., gemessen statt behauptet: die erste Fassung dieses
+-- Kopfes begruendete das `is_activated()` mit dem deaktivierten ADMIN. Das war
+-- falsch. `is_admin()` traegt seit AGE-581 (20260823120000) die GANZE
+-- Zugangsbedingung selbst — aktiviert UND nicht deaktiviert UND nicht
+-- geloescht —, der Admin-Zweig des ODER ist also schon geschlossen, bevor
+-- `is_activated()` ueberhaupt gefragt wird.
+--
+-- Was `is_activated()` hier wirklich traegt, ist der ANDERE Zweig: der
+-- deaktivierte EIGENTUEMER. Ohne die Bedingung kaeme ein gesperrtes oder
+-- geloeschtes Konto mit gueltigem Token weiter an seine eigenen Screenshots,
+-- lesen wie loeschen. Belegt durch Gegenprobe am lokalen Stack: die Bedingung
+-- aus beiden Policies herausgenommen, ueber die ganze CI-Liste gemessen (25
+-- Dateien, 1080 Zusagen) — es fielen GENAU DREI, alle drei aus Abschnitt 5b
+-- der Testdatei, keine einzige aus dem Admin-Fall.
 --
 -- Und die Klammer um `(Eigentuemer oder Admin)` ist tragend. Wer den ganzen
 -- Ausdruck klammert — `is_activated() and (bucket and eigentuemer or admin)` —
 -- gibt dem Admin jeden Bucket dieser Instanz frei, nicht nur diesen. Dieselbe
 -- Klammerfalle steht in Aufgabe 4.5 fuer `messages_insert`.
+-- Auch das ist am 02.09. gemessen worden, nicht nur behauptet: die Klammer
+-- verschoben, ueber alle 1080 Zusagen gefahren — es fiel GENAU EINE, die
+-- Koeder-Zusage auf den `avatars`-Bucket in der Testdatei. Vor ihr gab es im
+-- ganzen Bestand keine Abdeckung dieser Falle.
 --
 -- ══ DIE BINDUNG (2.5) ══════════════════════════════════════════════════════
 -- Ohne sie zeigt eine Feedback-Zeile auf ein FREMDES Objekt, und die

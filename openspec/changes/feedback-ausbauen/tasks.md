@@ -103,7 +103,8 @@
       Kommando. Ob die Policies das Richtige _erlauben_, sagt sie nicht zu.
       Insbesondere bliebe sie grün, wenn die Klammer in 2.4 falsch stünde. Das
       ist Aufgabe von 2.6–2.9, und bis die stehen, ist Einheit 2 **nicht**
-      belegt.
+      belegt. — **Erledigt am 02.09.**: dieselbe Datei trägt jetzt 30 Zusagen,
+      davon 22 mit echten Zeilen, und die Klammer ist gemessen.
 - [x] 2.2 **Bucket liegt** — `feedback-screenshots`, privat, 5 MiB,
       `image/png` `image/jpeg` `image/webp`, per `on conflict (id) do update`.
       Mit `do nothing` bliebe ein falsch konfigurierter Bucket konserviert und
@@ -116,27 +117,55 @@
       eine zusätzliche Eigentümer-Policy neben 2.4 wäre also wirkungslose
       Verdopplung. Löschen trägt allein die Policy aus 2.4.
 - [x] 2.4 **Lesen und Löschen: aktiviert UND Bucket UND (Eigentümer ODER
-      Admin)** — drei Bedingungen, nicht zwei. Ohne `is_activated()` käme ein
-      deaktiviertes Konto mit noch gesetzter Admin-Rolle weiter an fremde
-      Bilder.
+      Admin)** — drei Bedingungen, nicht zwei.
+      **Korrigiert am 02.09., nachdem 2.8 es gemessen hat:** die Begründung für
+      das `is_activated()` stand hier falsch. Sie nannte den deaktivierten
+      *Admin* — aber `is_admin()` trägt seit AGE-581 die ganze
+      Zugangsbedingung selbst, der Admin-Zweig ist also längst geschlossen,
+      bevor `is_activated()` gefragt wird. Was die Bedingung wirklich trägt,
+      ist der deaktivierte **Eigentümer**. Gegenprobe: Bedingung aus beiden
+      Policies entfernt, über 25 Dateien / 1080 Zusagen gemessen — es fielen
+      **genau drei**, alle drei der Eigentümer-Fall, keine einzige aus dem
+      Admin-Fall.
       Die **Klammer** um „(Eigentümer oder Admin)" ist tragend: wer den ganzen
       Ausdruck klammert, gibt dem Admin jeden Bucket dieser Instanz frei, nicht
-      nur diesen. Dieselbe Falle steht in 4.5. Im Migrationskopf notiert —
-      **gemessen wird sie erst in 2.6/2.8.**
+      nur diesen. Dieselbe Falle steht in 4.5. **Jetzt gemessen:** Klammer
+      verschoben → **genau eine** von 1080 Zusagen fiel, die neue
+      Köder-Zusage auf `avatars`. Vorher gab es dafür keine Abdeckung.
 - [x] 2.5 **`feedback.screenshot_path` liegt und ist gebunden**, in zwei
       getrennten Zusagen, weil es zwei verschiedene Fehler sind: ein `CHECK`
       hält den Pfad im Präfix des Verfassers (ein leerer Text fällt mit heraus,
       `split_part('', '/', 1)` ist nie eine Kennung), und ein **partieller**
       Unique-Index bindet ein Objekt an höchstens eine Zeile. Partiell, damit
       beliebig viele Zeilen `null` tragen dürfen — ein Screenshot ist optional.
-- [ ] 2.6 pgTAP, der **wirklich Zeilen anfasst**: ein drittes Mitglied kommt
-      nicht heran, Eigentümer und Admin schon. Ein Fall, der nichts anfasst,
-      tarnt sich hier als bestandener RLS-Test.
-- [ ] 2.7 pgTAP fürs Löschen, **getrennt vom Lesen** — ein Lauf, der beides
-      zusammen prüft, kann grün bleiben, während eines zu weit greift.
-- [ ] 2.8 pgTAP: ein **deaktivierter** Admin darf weder lesen noch löschen.
-- [ ] 2.9 pgTAP: ein Mitglied kann seine Zeile nicht auf einen fremden Pfad
-      zeigen lassen.
+- [x] 2.6 **Steht, sechs Zusagen.** Das dritte Mitglied zählt 0 auf dem fremden
+      Screenshot, Eigentümer und Admin je 1. Dazu zwei Kontrollen, ohne die
+      die Nullen nichts belegten: dasselbe dritte Mitglied sieht seinen
+      **eigenen** Screenshot (die Abfrage trägt also), und der **Köder** im
+      `avatars`-Bucket — der Bucket ohne SELECT-Policy, den eine falsch
+      gesetzte Klammer dem Admin aufmachte. Die Köder-Zusage ist die einzige
+      Abdeckung der Klammer im ganzen Bestand (gemessen, siehe 2.4).
+- [x] 2.7 **Steht, vier Zusagen, getrennt vom Lesen.** Je ein eigenes Objekt
+      pro Fall — ein gemeinsames hätte der erste erfolgreiche Löschfall
+      mitgenommen, und die folgenden hätten „0 Zeilen" gemeldet, ohne dass die
+      Policy je gefragt worden wäre. Der Beleg ist überall die **gezählte**
+      Zeilenzahl aus `with … returning`, nie der Rückgabewert; die Freigabe
+      `storage.allow_delete_query` steht einmal oben, sonst läge der Trigger
+      unter jedem Ergebnis statt der Policy.
+- [x] 2.8 **Steht, fünf Zusagen — und sie hat 2.4 widerlegt.** Der deaktivierte
+      Admin liest und löscht nicht, aber **nicht** wegen `is_activated()` in
+      der Policy: `is_admin()` selbst gibt für ihn schon `false` zurück
+      (AGE-581). Die Zusagen sagen jetzt genau das, samt Positivkontrolle
+      (die `staff_roles`-Zeile liegt wirklich).
+      **Neu dazu: 5b, der deaktivierte Eigentümer** — drei Zusagen, und die
+      einzige Abdeckung von `is_activated()` in diesen beiden Policies.
+- [x] 2.9 **Steht, vier Zusagen — und sie schliessen zugleich die Lücke aus
+      2.5.** Dessen zwei zugesagte Bindungs-Prüfungen gab es in keiner
+      Testdatei; sie stehen jetzt hier. Ein fremdes Präfix prallt am `CHECK`
+      ab (an `feedback_screenshot_path_praefix` verankert, nicht an „es hat
+      gekracht"), das eigene geht durch, derselbe Pfad ein zweites Mal prallt
+      am `…_uniq` ab, und zwei Zeilen **ohne** Screenshot gehen durch — die
+      Zusage, dass der Index partiell ist.
 
 ## 3. Die RPC: abreissen und neu anlegen
 
