@@ -46,6 +46,7 @@ event_registrations/authenticated=DELETE,INSERT,SELECT,UPDATE
 events/anon=SELECT
 events/authenticated=DELETE,INSERT,SELECT,UPDATE
 feedback/authenticated=DELETE,INSERT,SELECT,UPDATE
+feedback_themes/authenticated=SELECT
 goals/authenticated=DELETE,INSERT,SELECT,UPDATE
 matches/authenticated=SELECT
 member_settings/authenticated=INSERT,SELECT,UPDATE
