@@ -40,7 +40,7 @@
 -- entscheidet es dort bewusst und nicht nebenbei.
 
 begin;
-select plan(16);
+select plan(22);
 
 -- ── Impersonierung ──────────────────────────────────────────────────────────
 -- Eigene Kopie: jede Testdatei laeuft in ihrer eigenen Sitzung. Anders als
@@ -139,6 +139,62 @@ select is(
     'select string_agg(label, '' | '' order by sort) from public.feedback_themes'),
   'Generell | Fehler / etwas geht nicht | Bedienung / Verständlichkeit | Inhalte / Texte | Idee / Wunsch',
   'Die Beschriftungen stehen in der Datenbank, nicht in TypeScript');
+
+-- ── 4. Die Spalte feedback.theme (Aufgaben 1.5–1.6) ─────────────────────────
+-- Die eigentliche Zusage ist die letzte, und sie ist der Grund, warum der
+-- Vorgabewert DAUERHAFT bleiben muss: bis die neue Oberflaeche ausgeliefert
+-- ist, nennt KEIN Schreibzugriff die Spalte. Ohne `default 'generell'` braeche
+-- in diesem Fenster jedes Absenden von Feedback.
+select has_column('public', 'feedback', 'theme',
+  'feedback traegt die Spalte theme');
+
+select col_type_is('public', 'feedback', 'theme', 'text',
+  'feedback.theme ist text');
+
+select is(
+  pg_temp.lies_als('fe000000-0000-0000-0000-00000000000a',
+    $q$ with neu as (
+          insert into public.feedback (profile_id, rating, likes)
+          values ('fe000000-0000-0000-0000-00000000000a', 4, 'ohne Thema abgeschickt')
+          returning theme
+        )
+        select theme from neu $q$),
+  'generell',
+  'Ein Absenden OHNE Thema traegt „Generell" — der Vorgabewert haelt die alte Oberflaeche am Leben');
+
+-- ── 5. Die Grenzen der Spalte (Aufgabe 1.7) ─────────────────────────────────
+-- „Keine Zeile traegt null" wird hier STRUKTURELL zugesagt und nicht gezaehlt:
+-- eine Zaehlung ueber die ganze Tabelle waere in CI vakuum-gruen (nach
+-- `db reset` ist `feedback` leer) und lokal vom geteilten Stack abhaengig.
+-- Die Bedingung, die wirklich traegt, ist das `not null` selbst.
+select col_not_null('public', 'feedback', 'theme',
+  'feedback.theme ist not null — keine Zeile kann ohne Thema existieren');
+
+-- Negativ- und Positivfall als PAAR. Der Negativfall allein waere auch dann
+-- gruen, wenn das Schreiben aus einem voellig anderen Grund scheiterte —
+-- deshalb ist das Muster auf den Fremdschluessel festgenagelt, und der
+-- Nachbarfall erzeugt eine Zeile.
+select alike(
+  pg_temp.lies_als('fe000000-0000-0000-0000-00000000000a',
+    $q$ with neu as (
+          insert into public.feedback (profile_id, rating, likes, theme)
+          values ('fe000000-0000-0000-0000-00000000000a', 4, 'erfundenes Thema', 'quatsch')
+          returning theme
+        )
+        select theme from neu $q$),
+  'FEHLER:%feedback_theme_fkey%',
+  'Ein Thema ausserhalb der Liste wird abgewiesen, und zwar vom Fremdschluessel');
+
+select is(
+  pg_temp.lies_als('fe000000-0000-0000-0000-00000000000a',
+    $q$ with neu as (
+          insert into public.feedback (profile_id, rating, likes, theme)
+          values ('fe000000-0000-0000-0000-00000000000a', 4, 'echtes Thema', 'idee')
+          returning theme
+        )
+        select theme from neu $q$),
+  'idee',
+  'Positivkontrolle: ein Thema AUS der Liste geht durch — sonst belegt der Fall darueber nichts');
 
 select * from finish();
 rollback;

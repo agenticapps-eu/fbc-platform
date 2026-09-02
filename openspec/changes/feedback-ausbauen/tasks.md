@@ -66,15 +66,33 @@
       damit sichtbar den Snapshot und muss es begründen.
       **GREEN belegt:** dieselben 16 Zusagen aus 1.1 sind grün, und der
       Gesamtlauf steht bei 24 Dateien, **1044 Zusagen, PASS**.
-- [ ] 1.5 **RED:** pgTAP, das eine `feedback`-Zeile **ohne** Thema anlegt und
-      erwartet, dass sie „Generell" trägt — schlägt fehl, solange es die Spalte
-      nicht gibt.
-- [ ] 1.6 Migration in dieser Reihenfolge: `theme` nullable **mit**
-      `default 'generell'` → Bestand setzen → Fremdschlüssel → `set not null`.
-      Der Vorgabewert bleibt dauerhaft; ohne ihn bricht jeder Schreibzugriff,
-      der die Spalte nicht nennt — und das sind vor dem Frontend-Deploy alle.
-- [ ] 1.7 pgTAP: ein Thema ausserhalb der Menge wird abgewiesen; der Bestand
-      trägt „Generell"; keine Zeile trägt `null`.
+- [x] 1.5 **RED stand:** Zusagen 17–19 in `feedback_themes_test.sql`, alle drei
+      rot mit `column "theme" does not exist` — die tragende ist 19, das
+      Absenden **ohne** Thema, das „Generell" tragen muss. Die 16 aus 1.1
+      blieben dabei grün.
+- [x] 1.6 **Migration `20260902093000_feedback_theme_spalte.sql` liegt**, in
+      der vorgeschriebenen Reihenfolge: nullable **mit** `default 'generell'` →
+      Bestand setzen → Fremdschlüssel → `set not null`. Der Vorgabewert bleibt
+      **dauerhaft** — bis die neue Oberfläche ausgeliefert ist, nennt kein
+      Schreibzugriff die Spalte, und ohne ihn bräche in diesem Fenster jedes
+      Absenden. Begründet im Migrationskopf, samt der Angabe, warum jede andere
+      Reihenfolge bricht.
+      **Gemessen statt vermutet:** das `update` traf **0 Zeilen** — Postgres
+      füllt den Bestand bei `add column … default` selbst. Es bleibt trotzdem
+      stehen, für den Fall einer Instanz, in der die Spalte schon ohne
+      Vorgabewert existiert; ein `set not null` über einer einzigen
+      `null`-Zeile bräche die Migration, und das wäre auf PROD teuer.
+- [x] 1.7 **Zusagen 20–22.** „Keine Zeile trägt `null`" ist **strukturell**
+      zugesagt (`col_not_null`) und nicht gezählt: eine Zählung über die ganze
+      Tabelle wäre in CI vakuum-grün, weil `feedback` nach `db reset` leer ist.
+      Der abgewiesene Fall ist auf `feedback_theme_fkey` festgenagelt — ein
+      Muster auf „irgendein Fehler" wäre auch dann grün, wenn das Schreiben aus
+      einem anderen Grund scheitert — und trägt eine Positivkontrolle daneben,
+      die eine Zeile **erzeugt**.
+      **Gegenprobe gefahren**, weil diese drei Zusagen nach dem Code entstanden
+      sind und ihr Grün für sich nichts belegt: Fremdschlüssel testweise
+      entfernt → **genau Zusage 21 wird rot**, 21 von 22 bleiben grün; wieder
+      angelegt → 22 von 22 grün.
 
 ## 2. Screenshot: Bucket, Bindung, Policies
 
