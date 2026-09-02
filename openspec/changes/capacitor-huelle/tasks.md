@@ -1159,6 +1159,21 @@ Bündel.
       `meldung.ts`, geprüft mit 11 Zusagen; eine davon liest `index.ts` als
       Text und belegt die Verdrahtung. Alle fünf tragenden Zusagen sind
       mutations-gegengeprobt — Rückbau rötet je einzeln.
+
+      **Am LIVE ausgelieferten Endpunkt gegengeprüft** (PROD, nach Deploy
+      `86c4afe`), nicht an den Eingaben — drei Sonden mit Positivkontrolle:
+
+      | Sonde | Rumpf | HTTP | Logzeile |
+      |---|---|---|---|
+      | Stapel, klein | 1.358 B | 200 | `gesamt: 3`, `actions: ["download_complete","update_fail","set"]` |
+      | Stapel, 100 Ereignisse | 45.301 B | 200 | `gesamt: 100`, 100 echte Aktionen |
+      | zu gross | 317.101 B | 413 | `rumpf_zu_gross, laenge: 317101` |
+
+      Die mittlere Sonde ist der Unterschied: 45 KiB lagen über der alten
+      8-KiB-Grenze, die alte Fassung hätte `413` geantwortet. Die dritte ist
+      die Positivkontrolle — ohne sie wäre „kein 413" auch dann grün, wenn die
+      Grenze schlicht verschwunden wäre. Und die Aktionen stehen namentlich im
+      Log statt dreimal `ohne`.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
