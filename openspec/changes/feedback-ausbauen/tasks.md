@@ -96,22 +96,39 @@
 
 ## 2. Screenshot: Bucket, Bindung, Policies
 
-- [ ] 2.1 **RED:** pgTAP gegen `storage.objects`, das den Bucket und seine
-      Policies erwartet.
-- [ ] 2.2 Migration: Bucket `feedback-screenshots`, privat, **5 MiB**,
-      `image/png` `image/jpeg` `image/webp`, angelegt mit
-      `on conflict (id) do update` — mit `do nothing` bliebe ein falsch
-      konfigurierter Bucket konserviert und der Test liefe grün dagegen.
-- [ ] 2.3 Schreib-Policies nach dem Muster von `post-media`: Präfix je
-      Verfasser, `is_activated()`, je eine für insert/update/delete.
-- [ ] 2.4 Lese- und Lösch-Policy: aktiviert **und** (Eigentümer oder Admin) —
-      alle drei Bedingungen, nicht zwei. Das `is_activated()` ist der
-      Unterschied zur ersten Fassung: ohne es käme ein deaktiviertes Konto mit
-      noch gesetzter Admin-Rolle weiter an fremde Bilder.
-- [ ] 2.5 `feedback.screenshot_path` anlegen (nullable) **und binden**: ein
-      nicht-leerer Pfad muss im Präfix des Verfassers liegen, und ein Objekt
-      gehört höchstens einer Zeile. Ohne die Bindung zeigt eine Zeile auf ein
-      fremdes Objekt, und die Admin-Fläche signiert oder löscht das falsche Bild.
+- [x] 2.1 **RED stand:** `supabase/tests/feedback_screenshots_test.sql`, 8 von
+      8 rot. In `ci.yml` eingetragen (jetzt 25 Dateien).
+      **Was diese Datei bewusst NICHT kann:** sie prüft den Katalog — dass es
+      den Bucket mit den richtigen Grenzen gibt und je eine Policy pro
+      Kommando. Ob die Policies das Richtige _erlauben_, sagt sie nicht zu.
+      Insbesondere bliebe sie grün, wenn die Klammer in 2.4 falsch stünde. Das
+      ist Aufgabe von 2.6–2.9, und bis die stehen, ist Einheit 2 **nicht**
+      belegt.
+- [x] 2.2 **Bucket liegt** — `feedback-screenshots`, privat, 5 MiB,
+      `image/png` `image/jpeg` `image/webp`, per `on conflict (id) do update`.
+      Mit `do nothing` bliebe ein falsch konfigurierter Bucket konserviert und
+      die Zusagen 2–4 liefen grün dagegen; derselbe Befund kam schon aus dem
+      C6-Review.
+- [x] 2.3 **Schreib-Policies nach dem Muster von `post-media`** — Präfix je
+      Verfasser, `is_activated()`, je eine für insert und update.
+      Die dritte, `delete`, ist bewusst **keine** eigene Eigentümer-Policy
+      geworden: mehrere Policies für dasselbe Kommando werden ODER-verknüpft,
+      eine zusätzliche Eigentümer-Policy neben 2.4 wäre also wirkungslose
+      Verdopplung. Löschen trägt allein die Policy aus 2.4.
+- [x] 2.4 **Lesen und Löschen: aktiviert UND Bucket UND (Eigentümer ODER
+      Admin)** — drei Bedingungen, nicht zwei. Ohne `is_activated()` käme ein
+      deaktiviertes Konto mit noch gesetzter Admin-Rolle weiter an fremde
+      Bilder.
+      Die **Klammer** um „(Eigentümer oder Admin)" ist tragend: wer den ganzen
+      Ausdruck klammert, gibt dem Admin jeden Bucket dieser Instanz frei, nicht
+      nur diesen. Dieselbe Falle steht in 4.5. Im Migrationskopf notiert —
+      **gemessen wird sie erst in 2.6/2.8.**
+- [x] 2.5 **`feedback.screenshot_path` liegt und ist gebunden**, in zwei
+      getrennten Zusagen, weil es zwei verschiedene Fehler sind: ein `CHECK`
+      hält den Pfad im Präfix des Verfassers (ein leerer Text fällt mit heraus,
+      `split_part('', '/', 1)` ist nie eine Kennung), und ein **partieller**
+      Unique-Index bindet ein Objekt an höchstens eine Zeile. Partiell, damit
+      beliebig viele Zeilen `null` tragen dürfen — ein Screenshot ist optional.
 - [ ] 2.6 pgTAP, der **wirklich Zeilen anfasst**: ein drittes Mitglied kommt
       nicht heran, Eigentümer und Admin schon. Ein Fall, der nichts anfasst,
       tarnt sich hier als bestandener RLS-Test.
