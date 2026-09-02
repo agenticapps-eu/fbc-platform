@@ -103,3 +103,63 @@ Abbruch nach der Lieferung, kein Timeout vor ihr — die Stimme zählt.
 Gate-Trailer fehlt deshalb bewusst: er bindet den Review per Digest an die
 Artefakte, und ihn von Hand nachzutragen behauptete eine Bindung, die es nicht
 gibt. Der Gate meldet das als `trailer-absent` und blockt nicht.
+
+---
+
+# Diff-Review (Aufgabe 8.7) — 2026-09-02
+
+Gegenstand ist der **Diff**, nicht der Plan: `git diff main...HEAD` ohne
+`session-handoff.md` und `openspec/`, 2.245 Zeilen, in `.gstack/age598-diff.txt`
+(gitignoriert). Zwei Arme direkt per Bash, `REVIEWER_TIMEOUT=900`. `claude` ist
+ausgeschlossen (eigener Anbieter), `codex` nicht eingeplant.
+
+## Reviewer: opencode (`hf:moonshotai/Kimi-K3`)
+
+**VERDICT: Freigabe.** Drei Befunde, alle NIEDRIG.
+
+Er hat **selbst gemessen** statt gelesen: den lokalen Stack befragt, den Katalog
+gelesen (`prosecdef`, `proconfig`, Funktionsrechte), `cr_insert_self` über
+`pg_get_expr(polwithcheck)` Klausel für Klausel gegen den Vorstand aus
+`20260806080100_activation_gate.sql:312-333` verglichen, ein `connect`-Konto
+impersoniert und `vitest` über die sieben berührten Testdateien gefahren.
+
+| Befund | Antwort |
+|---|---|
+| **1 — NIEDRIG:** ein geteilter Link mit `theme=…`/`competency=…` schicke bei einem `connect`-Konto einen verdeckten Filter an die RPC | **Reproduziert NICHT.** `DIRECTORY_QUERY_PARAM` ist `"q"`, und der Anfangszustand liest daraus **nur** `query` (`MemberDirectory.tsx:56`). `theme`, `competency`, `offering`, `offers`, `needs` kommen nie aus der Adresszeile. Der Kommentar an derselben Stelle sagt das seit AGE-629 ausdrücklich. Die „Messbar"-Zeile des Befundes trägt an der entscheidenden Stelle einen Platzhalter statt einer URL — er hat den Link nie gebaut. |
+| **2 — NIEDRIG:** `branche` in `profiles_public` ist eine **Preisgabe-Erweiterung**: die Sicht ist RLS-umgehend und ohne Stufenschwelle, die Branche ist damit für jedes aktivierte Konto lesbar, auch für `basic` | **Zutreffend, und es ist eine Entscheidung, kein Fehler** — so auch von opencode eingeordnet. Sie steht in D7 und im Migrationskopf (§6), und sie war nötig, damit der Branchenfilter für `connect` nicht wortlos leer läuft. **Für Donald aufgeschrieben**, weil sie die einzige Stelle des Changes ist, an der Daten für eine Stufe sichtbar werden, die die Verzeichnisfläche gar nicht betritt. |
+| **3 — NIEDRIG:** der Basis-Vektor läuft ohne den GIN-Index | **Bekannt und im Migrationskopf (§5) benannt**, samt der Schwelle, ab der es falsch wird: das Paging. Bei 74 Profilen folgenlos; ab Rang 3 läuft weiterhin der indizierte Weg. Als bestätigte Beobachtung übernommen, nicht als Nacharbeit. |
+
+Seine Negativbefunde decken die sechs Prüffragen ab: kein Leck über den
+`left join`, keine Orakel-Funktion über die Filterparameter, der Basis-Vektor
+ist echte Teilmenge von `search_doc`, `darf_kontaktanfrage_senden` ist gehärtet
+und öffnet `anon` keinen Weg, `cr_insert_self` ist bis auf den absichtlich
+gestrichenen Welpenschutz vollständig, die pgTAP-Planzahlen stimmen
+(35 · 32 · 435 = 437−2) und die Ablehnungen sind an der RLS-Meldung verankert.
+
+## Reviewer: gemini (Modell nicht ausgewiesen)
+
+**VERDICT: Nacharbeit — beide Befunde am Repo widerlegt.** Er hat den Diff aus
+dem Scratchpad gelesen und trotzdem auf erfundene Belege gestützt:
+
+- Der HOCH-Befund gilt einer Datei `supabase/tests/database/age-598-rechte-matrix.test.sql`.
+  **Es gibt sie nicht**, und das Verzeichnis `supabase/tests/database/` auch nicht.
+  `is_empty` kommt in `directory_search_test.sql` **null**mal vor.
+- Der MITTEL-Befund behauptet, `search_directory` prüfe den Vektor
+  `profiles_public.search_doc`. Die Sicht **hat keine solche Spalte**; der
+  Rumpf liest `p.search_doc` aus der RLS-gefilterten Tabelle
+  (`20260902150000…:224`), und genau darauf beruht die Maskierung.
+
+Die Sache hinter dem MITTEL-Befund — leckt der Volltext? — ist von Zusage 11.1
+in `directory_search_test.sql` abgedeckt und von opencode unabhängig
+nachgemessen. Das ist dasselbe Bild wie am 28.08.: geminis Verdikt taugt als
+zweite Stimme, seine Belege nicht.
+
+## Was der Review NICHT gefunden hat, die Sichtprobe aber schon
+
+`/p/:id` liegt hinter `<RequireAuth>`, nicht hinter `<MembershipGate>`. Die
+Seite rendert also, bevor `levelRank` da ist — und `null` sah in der neuen
+Begründung wie Rang 0 aus. Ein `discover`-Konto las für einen Moment, es dürfe
+niemanden anschreiben. Behoben in `8bbae86`, mit Zusage und Gegenprobe.
+
+**Kein Gate-Trailer:** er bindet einen Review per Digest an die Artefakte des
+Plans. Dieser Review gilt einem Diff, nicht den Artefakten.

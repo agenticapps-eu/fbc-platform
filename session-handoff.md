@@ -82,18 +82,15 @@ CI-Dateien **1160/1160** · `lint`, `typecheck`, `build` Exit 0 ·
 
 ## Next session: start here
 
-**Erster Handgriff: den opencode-Review lesen** — `.gstack/age598-opencode.log`
-(gitignoriert). Er lief bei Sitzungsende noch und misst selbst am Repo und am
-laufenden Katalog. Befunde einarbeiten, dann 8.7 abhaken und **REVIEWS.md
-ergänzen** (Trailer von Hand nachzutragen wäre eine Bindung, die es nie gab).
+**Gruppe 8 ist vollständig, der Diff-Review steht in `REVIEWS.md`.** `opencode`
+hat **Freigabe** gegeben (drei NIEDRIG: einer reproduziert nicht, zwei sind
+dokumentierte Entscheidungen aus dem Migrationskopf); `gemini` war unbrauchbar,
+beide Belege erfunden — **nicht noch einmal aufrollen.**
 
-**`gemini` ist erledigt und war unbrauchbar:** beide Befunde am Repo widerlegt,
-beide Belege erfunden (eine Datei `supabase/tests/database/…`, die es nicht
-gibt; `is_empty` kommt in `directory_search_test.sql` **null**mal vor;
-`search_doc` wird aus `p` gelesen, nicht aus `pp`). Nicht noch einmal aufrollen.
-
-Danach Gruppe 9 (Ausrollen) — **9.3 `migrate-prod` ausdrücklich bei Donald
-erfragen**, und 9.6: **kein Flag umlegen.**
+**Erster Handgriff: Gruppe 9, das Ausrollen.** PR öffnen, CI grün abwarten,
+mergen (9.1), dann `migrate-dev` auf demselben SHA (9.2). **9.3 `migrate-prod`
+ausdrücklich bei Donald erfragen** — Schreibzugriff auf PROD. Und 9.6: **kein
+Flag umlegen**, weder `open_contact` noch sonst etwas.
 
 Der Worktree ist sauber, Basis `1872d1e`, letzter Code-Commit `8bbae86`
 (darüber liegt nur noch dieser Doku-Commit), **nichts gepusht**.
@@ -118,6 +115,12 @@ steht, ist es fremd.
   ein `discover`-Konto darf im geschlossenen Modus an jeden senden. Donald hat
   die *Richtung* nie ausdrücklich bestätigt; sie folgt aus seiner Entscheidung
   vom 25.08. Vor dem Ausrollen ansprechen.
+- **`branche` ist jetzt für JEDES aktivierte Konto lesbar**, auch für `basic`,
+  das die Verzeichnisfläche gar nicht betritt — `profiles_public` ist
+  RLS-umgehend und ohne Stufenschwelle. Das ist die Entscheidung aus D7 (ohne
+  sie liefe der Branchenfilter für `connect` wortlos leer), aber es ist die
+  einzige Stelle des Changes, an der Daten für eine niedrigere Stufe sichtbar
+  werden. Von opencode im Diff-Review benannt. **Donald vorlegen.**
 - **`open_contact` auf `false`** wartet weiter auf Donald. Gemessen folgenlos.
 - **`EmojiAuswahl.test.tsx` flakt im Gesamtlauf** — einmal rot („rotes Herz"
   nicht gefunden), allein und im Wiederholungslauf grün. Gehört zu AGE-645.

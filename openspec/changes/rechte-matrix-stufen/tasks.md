@@ -378,13 +378,17 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 - [x] 8.6 `openspec validate --all` — 32 passed, 0 failed. Und der Delta-Spec
       **gegengelesen**: er beschreibt, was gebaut wurde (Validate prüft nur die
       Form)
-- [ ] 8.7 `requesting-code-review` auf den **Diff**, nicht auf den Plan.
-      **`gemini`: Befunde am Repo widerlegt** — beide Belege erfunden (eine
-      Datei `supabase/tests/database/age-598-rechte-matrix.test.sql`, die es
-      nicht gibt; `is_empty` kommt in `directory_search_test.sql` **null**mal
-      vor; `search_doc` wird aus `p` gelesen, nicht aus `pp`). Die Sache selbst
-      — leckt der Volltext? — ist von Zusage 11.1 abgedeckt.
-      **`opencode` läuft.**
+- [x] 8.7 `requesting-code-review` auf den **Diff**, nicht auf den Plan.
+      Ausgeschrieben in `REVIEWS.md`, Abschnitt „Diff-Review".
+      **`opencode`: VERDICT Freigabe**, drei NIEDRIG-Befunde — einer
+      reproduziert nicht (kein erweiterter Filter kommt aus der Adresszeile,
+      `DIRECTORY_QUERY_PARAM` ist `"q"`), zwei sind Entscheidungen, die im
+      Migrationskopf stehen (§5, §6). Er hat selbst gemessen: Katalog,
+      `pg_get_expr(polwithcheck)` gegen den Vorstand, Impersonation, vitest.
+      **`gemini`: beide Befunde am Repo widerlegt** — Belege erfunden (eine
+      Datei `supabase/tests/database/…`, die es nicht gibt; `is_empty` kommt in
+      `directory_search_test.sql` **null**mal vor; `search_doc` wird aus `p`
+      gelesen, nicht aus `pp`)
 - [x] 8.8 `qa` auf der Verzeichnis-Fläche mit einem `connect`-Konto, gegen den
       **lokalen** Stack (die Migrationen sind nicht auf DEV). Belegt: die Liste
       steht, Branche und Region sind gefüllt und filtern, die vier maskierten
@@ -393,7 +397,11 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
       tagesfrisch, `open_contact = false` — das belegt Staffelung UND
       gestrichenen Welpenschutz in einem), `connect`→`impact` von der Policy
       abgewiesen. Umgebung vollständig zurückgebaut
-- [ ] 8.9 `verification-before-completion`
+- [x] 8.9 `verification-before-completion` — jede Zahl oben stammt aus einem
+      Lauf in dieser Sitzung, nicht aus einer Erwartung. Zusätzlich zwei
+      Gegenproben gefahren: die Bremse aus `8bbae86` herausgenommen (genau die
+      eine neue Zusage wurde rot), und `connect`→`impact` als Sonde gegen die
+      laufende Policy (abgewiesen mit der RLS-Meldung)
 
 ## 9. Ausrollen — getrennt und ausdrücklich
 
