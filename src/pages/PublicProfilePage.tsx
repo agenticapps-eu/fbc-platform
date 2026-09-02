@@ -11,6 +11,7 @@ import { VideoEmbed } from "../components/ui/VideoEmbed";
 import { useToast } from "../components/ui/toast-context";
 import {
   contactRelationQueryKey,
+  darfKontaktanfrageSenden,
   fetchContactRelation,
   sendContactRequest,
   type ContactRelation,
@@ -82,14 +83,17 @@ export default function PublicProfilePage() {
   // erreicht der Admin über die Suche auf /admin, weil profiles_public sie für
   // niemanden führt.
   const istAdmin = staffRole === "admin" && !isOwn;
-  // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie: die
-  // erweiterten Felder gehören zum „vollständigen Verzeichnis" (ab `discover`),
-  // eine Kontaktanfrage ist eine Stufe teurer (ab `exchange`) — das ist der
-  // Welpenschutz-Kern: Sichtbarkeit ≠ Kontaktrecht.
-  // §2: Kontaktrecht ab `exchange`. Der Admin-Flag open_contact (AGE-455) öffnet es
-  // fürs Event für alle — die RLS (cr_insert_self) erzwingt dieselbe Regel.
+  // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie, und
+  // AGE-598 trennt sie noch einmal anders: die erweiterten Felder gehören zum
+  // „vollständigen Verzeichnis" (ab `discover`), das Kontaktrecht ist seit dem
+  // 02.09. nicht mehr eine Stufe teurer, sondern GESTAFFELT — `basic` gar
+  // nicht, `connect` nur an genau `connect`, ab `discover` an alle. Der Kern
+  // bleibt: Sichtbarkeit ≠ Kontaktrecht.
+  //
+  // Der Admin-Flag open_contact (AGE-455) steht davor und öffnet es für alle.
+  // Dieselbe Veroderung wie in `cr_insert_self`, und die RLS bleibt die Grenze.
   const canRequestContact =
-    (platform?.openContact ?? false) || (levelRank ?? 0) >= LEVEL_RANK.exchange;
+    (platform?.openContact ?? false) || darfKontaktanfrageSenden(levelRank, profile.tier);
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,6 +123,7 @@ export default function PublicProfilePage() {
         profileId={profile.id}
         isOwn={isOwn}
         canRequestContact={canRequestContact}
+        absenderRang={levelRank}
         name={profile.name}
       />
     </div>
@@ -426,12 +431,15 @@ function ContactArea({
   profileId,
   isOwn,
   canRequestContact,
+  absenderRang,
   name,
 }: {
   viewerId: string | null;
   profileId: string;
   isOwn: boolean;
   canRequestContact: boolean;
+  /** Eigene Stufe — sie entscheidet, WELCHE Begründung dasteht (AGE-598). */
+  absenderRang: number | null;
   name: string;
 }) {
   const { data: relation } = useQuery({
@@ -465,6 +473,7 @@ function ContactArea({
         viewerId={viewerId}
         profileId={profileId}
         canRequestContact={canRequestContact}
+        absenderRang={absenderRang}
         name={name}
         relation={relation ?? null}
       />
@@ -481,12 +490,14 @@ function ContactBody({
   viewerId,
   profileId,
   canRequestContact,
+  absenderRang,
   name,
   relation,
 }: {
   viewerId: string | null;
   profileId: string;
   canRequestContact: boolean;
+  absenderRang: number | null;
   name: string;
   relation: ContactRelation | null;
 }) {
@@ -520,10 +531,43 @@ function ContactBody({
   }
 
   if (!canRequestContact) {
+    /* Solange die eigene Stufe nicht feststeht, wird KEIN Grund behauptet.
+       Diese Route liegt hinter <RequireAuth>, nicht hinter <MembershipGate> —
+       sie rendert also, bevor `levelRank` da ist, und `null` sähe hier wie
+       Rang 0 aus. Ein `discover`-Konto läse dann für einen Moment, es dürfe
+       niemanden anschreiben. Dieselbe Regel wie bei den Zählern im
+       Verzeichnis: eine Aussage erscheint erst, wenn sie stimmt.
+
+       Sie greift auch, wenn die Stufenabfrage FEHLSCHLÄGT (`levelRank` bleibt
+       dann null) — auch dort ist „wir wissen es nicht" die Wahrheit. */
+    if (absenderRang === null) return null;
+
+    /* Zwei Huerden, zwei Begruendungen (AGE-598, D5-Gedanke auf die
+       Kontaktflaeche uebertragen). Ein `basic`-Konto kann NIEMANDEN
+       anschreiben; ein `connect`-Konto kann es schon, nur nicht dieses Profil.
+       Dieselbe Meldung fuer beide beantwortete jeweils die falsche Frage.
+
+       Der Fall `absenderRang >= discover` steht hier nicht: dann waere
+       `canRequestContact` wahr. */
     return (
       <p className="text-sm text-muted">
-        Kontaktanfragen sind ab der Mitgliedsstufe{" "}
-        <span className="font-medium text-ink">{LEVELS.exchange.label}</span> möglich.
+        {(absenderRang ?? 0) >= LEVEL_RANK.connect ? (
+          <>
+            Auf der Mitgliedsstufe{" "}
+            <span className="font-medium text-ink">{LEVELS.connect.label}</span> kannst du
+            Mitglieder der Stufe{" "}
+            <span className="font-medium text-ink">{LEVELS.connect.label}</span> anschreiben. Ab{" "}
+            <span className="font-medium text-ink">{LEVELS.discover.label}</span> erreichst du
+            jedes Mitglied.
+          </>
+        ) : (
+          <>
+            Kontaktanfragen sind ab der Mitgliedsstufe{" "}
+            <span className="font-medium text-ink">{LEVELS.connect.label}</span> möglich — dort an
+            Mitglieder derselben Stufe, ab{" "}
+            <span className="font-medium text-ink">{LEVELS.discover.label}</span> an jedes Mitglied.
+          </>
+        )}
       </p>
     );
   }
@@ -589,13 +633,24 @@ function ContactRequestComposer({
         }
         return;
       }
-      // RLS-Ablehnung (42501): der Insert scheitert an is_contactable/Welpenschutz/
-      // Level-Gate. Nie den rohen Postgres-String zeigen (AGE-455).
+      // RLS-Ablehnung (42501). Nie den rohen Postgres-String zeigen (AGE-455).
+      //
+      // Bis AGE-598 nannte diese Meldung den Welpenschutz („an neue Mitglieder
+      // nur über ein gemeinsames Match"). Den gibt es nicht mehr — die Klausel
+      // ist gestrichen —, und eine Meldung, die eine abgeschaffte Regel
+      // erklärt, schickt den Leser auf einen Weg, den es nicht gibt.
+      //
+      // Wer diesen Knopf überhaupt sieht, hat die Staffelung passiert (sie
+      // entscheidet weiter oben, ob er dasteht). Übrig bleibt als lebender
+      // Grund das Opt-out des Empfängers, und der wird benannt. Bliebe der
+      // Stufenfall doch einmal übrig, wäre das ein Wechsel der Stufe zwischen
+      // Laden und Klicken — dann ist „gerade nicht möglich" die richtige
+      // Auskunft und nicht die falsche.
       if (code === "42501") {
         toast({
           variant: "error",
           title: "Anfrage nicht möglich",
-          description: `Eine Kontaktanfrage an ${name} ist gerade nicht möglich. An neue Mitglieder ist eine Anfrage nur über ein gemeinsames Match möglich.`,
+          description: `${name} nimmt zurzeit keine Kontaktanfragen an.`,
         });
         return;
       }

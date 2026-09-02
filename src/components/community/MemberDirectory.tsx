@@ -13,7 +13,7 @@ import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { cn } from "../../lib/cn";
-import { levelLabel } from "../../config/levels";
+import { LEVEL_RANK, levelLabel } from "../../config/levels";
 import {
   deriveFacets,
   DIRECTORY_QUERY_PARAM,
@@ -110,8 +110,32 @@ export default function MemberDirectory() {
   // Filterzustand und setzt ihn nicht zurück.
   const [reiter, setReiter] = useState<"alle" | "kontakte">("alle");
 
-  const { user } = useAuth();
+  const { user, levelRank } = useAuth();
   const uid = user?.id ?? null;
+
+  // ── Welche Filter überhaupt etwas finden können (AGE-598, D5) ─────────────
+  //
+  // Seit `20260902150000_verzeichnis_ab_connect.sql` beginnt die LISTE bei
+  // `connect` (Rang 2), die ERWEITERTEN FELDER aber weiterhin bei `discover`
+  // (Rang 3): `search_directory` joint `profiles_public` (RLS-umgehend) mit
+  // `public.profiles` (Rang-3-Policy), und unterhalb Rang 3 kommt die rechte
+  // Seite als NULL an. Vier Filter arbeiten auf genau diesen Spalten —
+  // Kompetenz, Thema, Angebotsart und die beiden Chip-Gruppen — und finden
+  // dort SYSTEMATISCH nichts.
+  //
+  // Sie werden deshalb ausgeblendet und nicht leer laufen gelassen: ein
+  // sichtbarer Filter ist ein Versprechen, und einer, der nie etwas findet,
+  // bricht es bei jeder Benutzung und erzeugt dabei die Frage, die er nicht
+  // beantwortet — „liegt es an mir?".
+  //
+  // Branche und Region stehen in `profiles_public` und bleiben deshalb —
+  // `branche` erst seit dieser Migration, vorher wäre der Filter für `connect`
+  // wortlos leer gelaufen.
+  //
+  // `levelRank` ist hier ohne Flackern zu haben: die Route liegt hinter
+  // <MembershipGate min="connect">, und das rendert erst, wenn die Stufe steht.
+  // Komfort, keine Grenze — die trägt die RPC.
+  const erweiterteFilter = (levelRank ?? 0) >= LEVEL_RANK.discover;
   const contacts = useQuery({
     queryKey: contactsQueryKey(uid ?? ""),
     queryFn: () => fetchContactIds(uid!),
@@ -260,13 +284,15 @@ export default function MemberDirectory() {
             Der Hinweis „Erweiterte Filter sind aktiv" ist damit nicht
             weggefallen, sondern an den Spalten-Schalter gewandert: er gehört
             dorthin, wo etwas verborgen wird, und das ist jetzt die Spalte. */}
-                <FilterSelect
-                  label="Thema"
-                  value={filters.theme}
-                  onChange={(v) => setFilter("theme", v)}
-                  allLabel="Alle Themen"
-                  options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
-                />
+                {erweiterteFilter && (
+                  <FilterSelect
+                    label="Thema"
+                    value={filters.theme}
+                    onChange={(v) => setFilter("theme", v)}
+                    allLabel="Alle Themen"
+                    options={THEME_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+                  />
+                )}
                 <FilterSelect
                   label="Branche"
                   value={filters.branche}
@@ -281,39 +307,56 @@ export default function MemberDirectory() {
                   allLabel="Alle Regionen"
                   options={facets.regionen.map((r) => ({ value: r, label: r }))}
                 />
-                <FilterSelect
-                  label="Kompetenz"
-                  value={filters.competency}
-                  onChange={(v) => setFilter("competency", v)}
-                  allLabel="Alle Kompetenzen"
-                  options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
-                />
-                <FilterSelect
-                  label="Sucht / bietet"
-                  value={filters.offering}
-                  onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
-                  allLabel="Egal"
-                  options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                />
+                {erweiterteFilter && (
+                  <>
+                    <FilterSelect
+                      label="Kompetenz"
+                      value={filters.competency}
+                      onChange={(v) => setFilter("competency", v)}
+                      allLabel="Alle Kompetenzen"
+                      options={facets.kompetenzen.map((c) => ({ value: c, label: c }))}
+                    />
+                    <FilterSelect
+                      label="Sucht / bietet"
+                      value={filters.offering}
+                      onChange={(v) => setFilter("offering", v as DirectoryFilters["offering"])}
+                      allLabel="Egal"
+                      options={OFFERING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                    />
+                  </>
+                )}
+
+                {/* Das Ausblenden ALLEIN wäre ein zweites Verschweigen: die
+            Fläche würde einfach weniger können und nicht sagen, warum. Der
+            Hinweis benennt die Stufe — `levelLabel` und nicht „Discover" als
+            Wort, damit eine Umbenennung ein Einzeiler in `config/levels` bleibt. */}
+                {!erweiterteFilter && (
+                  <p className="text-sm text-muted @[27rem]:col-span-2 @[41rem]:col-span-3">
+                    Ab {levelLabel("discover")} kommen Filter für Kompetenz, Thema und Angebote
+                    dazu.
+                  </p>
+                )}
 
                 {/* AGE-494: Der Kompass hat keine eigene Seite mehr — er wirkt hier. Zwei
             Gruppen, Mehrfachauswahl: ODER innerhalb einer Gruppe, UND zwischen
             beiden. Sechs Optionen je Seite, nicht elf: die Elf aus dem Issue ist
             die Vereinigung, `immobilien` steht in beiden. */}
-                <div className="@[27rem]:col-span-2 @[41rem]:col-span-3 grid grid-cols-1 gap-3 border-t border-line pt-3 @[27rem]:grid-cols-2">
-                  <ChipFilterGroup
-                    label="Bietet"
-                    options={OFFER_CATEGORY_OPTIONS}
-                    selected={filters.offers}
-                    onToggle={(v) => toggleCategory("offers", v)}
-                  />
-                  <ChipFilterGroup
-                    label="Sucht"
-                    options={NEED_CATEGORY_OPTIONS}
-                    selected={filters.needs}
-                    onToggle={(v) => toggleCategory("needs", v)}
-                  />
-                </div>
+                {erweiterteFilter && (
+                  <div className="@[27rem]:col-span-2 @[41rem]:col-span-3 grid grid-cols-1 gap-3 border-t border-line pt-3 @[27rem]:grid-cols-2">
+                    <ChipFilterGroup
+                      label="Bietet"
+                      options={OFFER_CATEGORY_OPTIONS}
+                      selected={filters.offers}
+                      onToggle={(v) => toggleCategory("offers", v)}
+                    />
+                    <ChipFilterGroup
+                      label="Sucht"
+                      options={NEED_CATEGORY_OPTIONS}
+                      selected={filters.needs}
+                      onToggle={(v) => toggleCategory("needs", v)}
+                    />
+                  </div>
+                )}
 
                 {active && (
                   <div className="flex items-end">

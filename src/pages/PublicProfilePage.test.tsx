@@ -235,11 +235,19 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     });
   });
 
-  // §2 trennt zwei Schwellen, die bis AGE-311 beide auf Prime lagen: das
+  // §2 trennte zwei Schwellen, die bis AGE-311 beide auf Prime lagen: das
   // „vollständige Verzeichnis" (erweiterte Felder, ab `discover`) und das
-  // Kontaktrecht (ab `exchange`). Genau diese Lücke ist der verteidigbare Kern —
-  // Sichtbarkeit ist kein Kontaktrecht —, deshalb je ein eigener Test.
-  it("zeigt Discover die erweiterten Felder, aber KEINEN Kontaktanfrage-Button", async () => {
+  // Kontaktrecht (bis AGE-598 ab `exchange`).
+  //
+  // Seit dem 02.09. FALLEN SIE ZUSAMMEN: die Staffelung erlaubt ab `discover`
+  // jeden Empfänger, und dieser Test sagt jetzt das Gegenteil dessen zu, was er
+  // bis dahin sagte. Das ist die Erweiterung aus AGE-598 und kein Versehen —
+  // umgeschrieben statt stillschweigend gedreht.
+  //
+  // Die Lücke „Sichtbarkeit ist kein Kontaktrecht" bleibt trotzdem messbar, nur
+  // eine Stufe tiefer: `connect` sieht die Liste und darf nur `connect`
+  // anschreiben. Das steht in `PublicProfilePage.staffelung.test.tsx`.
+  it("zeigt Discover die erweiterten Felder UND den Kontaktanfrage-Button (AGE-598)", async () => {
     mockedFetch.mockResolvedValue(fullView);
     renderPage(authAsTier("discover"));
 
@@ -259,10 +267,9 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.getByText("Beteiligungskapital")).toBeInTheDocument();
     expect(screen.getByText("Impact-Projekte")).toBeInTheDocument();
 
-    // Sehen ja, anschreiben nein.
-    expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Kontaktanfragen sind ab der Mitgliedsstufe/)).toBeInTheDocument();
-    expect(screen.getByText("Exchange")).toBeInTheDocument();
+    // Sehen ja, anschreiben seit AGE-598 auch.
+    expect(screen.getByRole("button", { name: "Kontaktanfrage senden" })).toBeInTheDocument();
+    expect(screen.queryByText(/Kontaktanfragen sind ab der Mitgliedsstufe/)).not.toBeInTheDocument();
   });
 
   it("zeigt Exchange zusätzlich den Kontaktanfrage-Button", async () => {
@@ -348,7 +355,12 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Kontaktanfrage senden" }));
     fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));
 
-    expect(await screen.findByText(/nur über ein gemeinsames Match möglich/)).toBeInTheDocument();
+    // Bis AGE-598 stand hier der Welpenschutz („nur über ein gemeinsames
+    // Match"). Er ist gestrichen, und eine Meldung, die eine abgeschaffte Regel
+    // erklärt, schickt den Leser auf einen Weg, den es nicht gibt. Übrig bleibt
+    // als lebender Grund das Opt-out des Empfängers.
+    expect(await screen.findByText(/nimmt zurzeit keine Kontaktanfragen an/)).toBeInTheDocument();
+    expect(screen.queryByText(/gemeinsames Match/)).not.toBeInTheDocument();
     expect(screen.queryByText(/row-level security/)).not.toBeInTheDocument();
   });
 });
