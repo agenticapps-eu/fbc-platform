@@ -1110,8 +1110,28 @@ das Aufräumen —, die Griffe sind am gebauten `dist/` gemessen und fassen
 einer BEREITS eingetragenen Fassung ist ein Upsert und überschreibt das gute
 Bündel.
 
-- [ ] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
-      einmal vollständig durchgespielt.
+- [x] Eine sichtbare Änderung erreicht ein Gerät ohne Store-Einreichung —
+      einmal vollständig durchgespielt. **02.09., iPhone 17 Pro, iOS 26.6.**
+      Bündel `0.0.0+feedbeef` (Marke am gebauten `dist/`, keine Quelldatei
+      angefasst): heruntergeladen, entschlüsselt, entpackt, Prüfsumme
+      abgeglichen, in Betrieb genommen. Beleg auf beiden Seiten — der rote
+      Balken stand am Gerät, und im Log:
+      `Version successfully loaded: … "version": "0.0.0+feedbeef" … "status":
+      "success"` samt `[notifyAppReady was called]`. Danach ist es auch
+      `Fallback bundle`, hat sich also bewährt.
+
+      **Möglich wurde das erst durch den `session_key`-Fix** (`d398500`): davor
+      brach die Entschlüsselung ab (`Encryption not set, no public key or
+      session, ignored` → `cannotUnzip`), und zwar bei JEDEM Bündel, nicht nur
+      bei der Probe. Gegenprobe nach dem Fix: die fünf alten Fehlerbilder
+      kommen **0 Mal** vor, bei 36 CapgoUpdater-Zeilen als Positivkontrolle.
+
+      **Falle fürs Runbook:** `devicectl … --terminate-existing` löst die
+      Übernahme NICHT aus. Es killt den Prozess, statt ihn in den Hintergrund
+      zu schicken — und die Übernahme hängt genau an diesem Wechsel
+      (`Check for pending update` → `Background timestamp saved` →
+      `Reloading`). Diese Zeilen kamen im Kill-Lauf 0 Mal vor. Die Konsole
+      taugt zum Mitlesen, die Geste muss am Gerät passieren.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
@@ -1135,7 +1155,10 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       **813,32 kB roh / 253,03 kB gzip.** Unter 1.024 kB, Abstand 210,68 kB.
       Die einzige Zeile dieser Phase, die kein Gerät braucht: dieselbe Datei
       lädt die Schale.
-- [ ] OTA einmal durchgespielt.
+- [x] OTA einmal durchgespielt. Siehe D5 — `0.0.0+feedbeef` am 02.09. auf dem
+      iPhone 17 Pro. Aufgeräumt ist es auch: `0.0.0+c1ea4ed1` liegt ohne Marke
+      obenauf, ein Gerät auf `feedbeef` bekommt es angeboten (am Endpunkt
+      gegengeprüft).
 
 ## Vor dem Abschluss
 
