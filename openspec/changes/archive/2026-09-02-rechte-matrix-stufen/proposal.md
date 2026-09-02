@@ -1,6 +1,25 @@
-# Rechte-Matrix: Verzeichnis ab connect, Kontaktanfragen nach Stufe
+# Das Mitgliederverzeichnis ist ab Connect sichtbar
 
 Linear: AGE-598
+
+<!-- Die Überschrift ist bewusst die MITGLIEDER-Sicht und nicht mehr
+     „Rechte-Matrix: Verzeichnis ab connect, Kontaktanfragen nach Stufe".
+     `parseArchivEintrag` nimmt die erste `# `-Zeile als Titel des
+     Neuigkeiten-Eintrags, und der geht genau einmal an alle aktivierten
+     Mitglieder. Der Change heisst im Repo weiterhin `rechte-matrix-stufen`. -->
+
+<!-- Zum Abschnitt `## What Changes` darunter: seine `- `-Zeilen werden
+     ungefiltert zu den `aenderungen` des Neuigkeiten-Eintrags
+     (`scripts/release-entries.logic.ts:39`). Sie sind deshalb in
+     Mitglieder-Sprache geschrieben und beschreiben nur, was jemand HEUTE
+     merkt. Die technische Fassung steht unter „Im Einzelnen" als
+     Fettabsätze — die erntet der Erzeuger nicht.
+
+     Und der Ausschluss-Abschnitt trägt jetzt `##` statt `###`: der Parser
+     schneidet bei `/^#{1,2} /`, ein `###` beendet den Abschnitt NICHT. Vor
+     dieser Korrektur hätte der Eintrag 12 Punkte getragen, darunter die vier
+     Ausschlüsse als das Ausgelieferte (dieselbe Falle wie AGE-628). -->
+
 
 ## Why
 
@@ -29,37 +48,66 @@ schief ist, kostet die Umstellung fast niemanden etwas.
 
 ## What Changes
 
-- **Die Verzeichnisliste bekommt eine eigene, niedrigere Schwelle bei `connect`
-  (Rang 2).** Heute gibt es sie nicht: Liste *und* erweiterte Felder hängen an
-  derselben Policy `profiles_select_self_or_discover` (`has_level(3)`), und
-  `search_directory` läuft als `SECURITY INVOKER` darüber. Die Aufgabe ist
-  deshalb eine **zweite Schwelle einziehen**, nicht eine Zahl ändern.
-- **Erweiterte Felder bleiben bei `discover`.** Interessen, Kompetenzen,
-  Kompass und Themen-Scores werden nicht angefasst. Die bestehende Rang-3-Grenze
-  bleibt Wort für Wort stehen.
-- **`nav.ts` gibt `/mitglieder` ab `connect` frei** statt ab `discover`.
-- **Kontaktanfragen werden gestaffelt** und ersetzen das flache
-  `exchange`-Gate: `basic` darf **nicht** senden · `connect` darf **nur an
-  genau `connect`** senden · ab `discover` an alle.
-- **Der 30-Tage-Welpenschutz entfällt ersatzlos** (Donald, 02.09.) — samt dem
-  dann verwaisten Prädikat `is_new_member(uuid)`. Damit wirkt `open_contact`
-  nur noch auf die Staffelung, weil es nichts anderes mehr gibt. Die Kopplung,
-  an der Teil B bisher scheiterte, löst sich auf, statt gelöst zu werden.
-  **Gemessen:** alle 74 Profile sind jünger als 30 Tage; die Regel hätte die
-  Kontaktfunktion plattformweit stillgelegt und war deshalb nie einschaltbar.
-- **Der Volltext bekommt eine zweite, magere Fassung.** `search_doc` enthält
-  `competencies` und `interests`, und die Suche ist heute nur an die
-  Aktivierung gebunden, nicht an die Stufe. Ohne diesen Zusatz könnte ein
-  `connect`-Konto über das Suchfeld erfragen, was die Ausgabe ihm maskiert.
-- **`branche` wird ein Basisfeld** und kommt in `profiles_public`. Sonst fiele
-  die Spalte still aus der Verzeichnisantwort und der Branchenfilter liefe
-  wortlos leer.
-- **BREAKING (latent, nicht sofort):** Die Staffelung wird erst wirksam, wenn
-  jemand `open_contact` auf `false` setzt. Dieser Change **fasst kein Flag auf
-  PROD an**. Gemessen ist auch dieser Schritt folgenlos: alle 74 Konten liegen
-  auf Rang 3 oder darüber, für die die Staffelung jeden Empfänger erlaubt.
+- **Das Mitgliederverzeichnis ist ab der Stufe Connect sichtbar.** Wer Connect
+  hat, sieht die Liste aller Mitglieder, kann sie durchsuchen und nach Branche
+  und Region filtern. Bisher begann das Verzeichnis erst bei Discover.
+- **Die ausführlichen Profilangaben bleiben ab Discover.** Kompetenzen,
+  Interessen, Kompass-Themen und das Such-/Bieteprofil sind weiterhin erst ab
+  Discover zu sehen — auf den Karten im Verzeichnis bleiben sie darunter leer.
+  Auch die Suche findet darunter nichts, was in diesen Feldern steht.
+- **Die Filter für Kompetenz, Thema und Angebote erscheinen erst ab Discover.**
+  Darunter standen sie zwar da, konnten aber nichts finden. Jetzt stehen sie
+  nicht mehr da, und an ihrer Stelle steht, ab welcher Stufe es sie gibt.
 
-### Was NICHT Teil dieses Changes ist
+Im Einzelnen — die technische Fassung. Diese Absätze sind bewusst **keine**
+Aufzählung: der Erzeuger der Neuigkeiten erntet nur `- `-Zeilen, und das hier
+ist Repo-Sprache.
+
+**Die Verzeichnisliste bekommt eine eigene, niedrigere Schwelle bei `connect`
+(Rang 2).** Vorher gab es sie nicht: Liste *und* erweiterte Felder hingen an
+derselben Policy `profiles_select_self_or_discover` (`has_level(3)`), und
+`search_directory` lief als `SECURITY INVOKER` darüber. Die Aufgabe war deshalb
+eine **zweite Schwelle einziehen**, nicht eine Zahl ändern.
+
+**Erweiterte Felder bleiben bei `discover`.** Interessen, Kompetenzen, Kompass
+und Themen-Scores werden nicht angefasst. Die bestehende Rang-3-Grenze bleibt
+Wort für Wort stehen.
+
+**`nav.ts` gibt `/mitglieder` ab `connect` frei** statt ab `discover`.
+
+**Kontaktanfragen werden gestaffelt** und ersetzen das flache `exchange`-Gate:
+`basic` darf **nicht** senden · `connect` darf **nur an genau `connect`**
+senden · ab `discover` an alle. Das steht bewusst **nicht** in der
+Mitglieder-Aufzählung oben: solange `open_contact` auf `true` steht, hebt der
+Schalter die Staffelung auf, und am Tag des Ausrollens ändert sich für niemanden
+etwas. Der Hinweis gehört an den Tag, an dem der Schalter fällt.
+
+**Der 30-Tage-Welpenschutz entfällt ersatzlos** (Donald, 02.09.) — samt dem dann
+verwaisten Prädikat `is_new_member(uuid)`. Damit wirkt `open_contact` nur noch
+auf die Staffelung, weil es nichts anderes mehr gibt. Die Kopplung, an der Teil B
+bisher scheiterte, löst sich auf, statt gelöst zu werden. **Gemessen:** alle 74
+Profile sind jünger als 30 Tage; die Regel hätte die Kontaktfunktion
+plattformweit stillgelegt und war deshalb nie einschaltbar. Auch das steht nicht
+in der Aufzählung oben — die Regel war seit dem 05.08. durch `open_contact`
+ohnehin aufgehoben, gemerkt hat sie niemand.
+
+**Der Volltext bekommt eine zweite, magere Fassung.** `search_doc` enthält
+`competencies` und `interests`, und die Suche war vorher nur an die Aktivierung
+gebunden, nicht an die Stufe. Ohne diesen Zusatz könnte ein `connect`-Konto über
+das Suchfeld erfragen, was die Ausgabe ihm maskiert.
+
+**`branche` wird ein Basisfeld** und kommt in `profiles_public`. Sonst fiele die
+Spalte still aus der Verzeichnisantwort und der Branchenfilter liefe wortlos
+leer. Damit ist die Branche für jedes aktivierte Konto lesbar, auch unterhalb
+der Verzeichnisschwelle — eine bewusste Erweiterung dessen, was die View
+preisgibt.
+
+**BREAKING (latent, nicht sofort):** Die Staffelung wird erst wirksam, wenn
+jemand `open_contact` auf `false` setzt. Dieser Change **fasst kein Flag auf
+PROD an**. Gemessen ist auch dieser Schritt folgenlos: alle 74 Konten liegen auf
+Rang 3 oder darüber, für die die Staffelung jeden Empfänger erlaubt.
+
+## Was NICHT Teil dieses Changes ist
 
 - **Keine Listungs-Untergrenze.** `basic` bleibt im Verzeichnis **gelistet**.
   Die Untergrenze kommt, wenn der Stufenweg live ist; heute beträfe der Filter
