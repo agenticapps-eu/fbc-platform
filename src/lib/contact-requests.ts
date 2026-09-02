@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { LEVEL_RANK } from "../config/levels";
 
 /**
  * Kontaktanfrage-Flow (AGE-247) — Datenschicht. Spec: docs/matching-spec.md §6.
@@ -18,6 +19,33 @@ import { supabase } from "./supabase";
  * Kontaktdaten (`profile_contacts`) werden NIE vor `accepted` sichtbar — das
  * garantiert die RLS (`contacts_select_self_or_released`), nicht dieses Modul.
  */
+
+// ── Staffelung (AGE-598) ──────────────────────────────────────────────────────
+/**
+ * Darf ein Konto dieser Stufe ein Profil jener Stufe anschreiben?
+ *
+ *   `basic`       gar nicht
+ *   `connect`     nur an GENAU `connect`
+ *   ab `discover` an alle
+ *
+ * Das ist die Frontend-Fassung von `public.darf_kontaktanfrage_senden(uuid)`.
+ * Die Kopie ist Absicht und aus demselben Grund harmlos wie die Ränge in
+ * `config/levels.ts`: die Grenze ist die Policy `cr_insert_self`, unabhängig
+ * vom Client. Was hier steht, entscheidet nur, ob ein Knopf ein Versprechen
+ * bricht — und ein Knopf, der systematisch in einen `42501` läuft, tut das.
+ *
+ * `open_contact` steht in der Policy VOR dieser Regel und gehört deshalb nicht
+ * hierher: der Aufrufer verodert selbst, so wie es die Klausel tut.
+ */
+export function darfKontaktanfrageSenden(
+  absenderRang: number | null,
+  zielStufe: string | null,
+): boolean {
+  const rang = absenderRang ?? 0;
+  if (rang >= LEVEL_RANK.discover) return true;
+  if (rang >= LEVEL_RANK.connect) return zielStufe === "connect";
+  return false;
+}
 
 // ── Senden (Sender-Seite, §6.1) ───────────────────────────────────────────────
 export interface SendContactRequestInput {

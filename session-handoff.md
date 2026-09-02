@@ -1,157 +1,130 @@
-# Session Handoff — 2026-09-02 abends (AGE-642: Rückweg messbar, Review abgearbeitet, Nähte zu)
+# Session Handoff — 2026-09-02 (AGE-598: Teil A und B gebaut, Ausrollen offen)
 
-> ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
+> ## ⚠ ZUERST — drei Dinge
 >
-> **AGE-642 (Capacitor-Hülle) gehört hierher, alles andere nicht** (Donald,
-> 31.08.). Frühere Fassungen schleppten fremde Punkte mit — das war der Grund
-> für drei Rebase-Konflikte auf dieser Datei in zwei Tagen. Wer den Stand
-> ausserhalb AGE-642 braucht, **fragt die Sitzung `fbc-platform-f4`**.
+> **1. Diese Datei ist geteilt und trägt jeweils EINEN Vorgang.** Sie steht auf
+> AGE-598. Die AGE-642-Fassung ist nicht verloren
+> (`git show origin/main:session-handoff.md`). **Nicht zusammenführen.**
 >
-> ### ⛔ Für AGE-599 gilt weiterhin: NICHT löschen
+> **2. AGE-642 läuft PARALLEL** (Worktree `fbc-platform.donald-age-642-capacitor-huelle`).
+> **Nicht anfassen.** Der lokale Supabase-Stack ist geteilt.
 >
-> Die acht Objekte in `event-covers` auf DEV stammen aus dem Spiegel DEV ← PROD
-> (AGE-576); kein Skript stellt sie wieder her. SHALL NOT in
-> `openspec/specs/design-system/spec.md`.
-
-Branch `donald/age-642-capacitor-huelle`, **0 hinter `main`**. **PR #314–#317 sind gemerged**
-(`86c4afe`, `6dae148`, `e7d9054`, `2a049c0`) und auf PROD ausgerollt.
-`openspec validate --all` 31/31, **174/174** Deno-Tests (waren 140).
-
-**Der einzige echte Rückstand im Luftweg ist weg — Probe 2 ist jetzt messbar.**
+> **3. Gruppen 1–8 sind fertig, 9 und 10 nicht angefangen.** Ab Gruppe 9 geht es
+> ans Ausrollen, und 9.3 (`migrate-prod`) braucht Donalds ausdrückliche Freigabe.
 
 ## Accomplished
 
-### `ota-stats` war blind — zwei Fehler an derselben Stelle, beide still
+Sechs Aufgabengruppen (4, 5, 6, 7, 8) in acht Commits. Teil A stand schon.
 
-**1 · Der Rumpf ist ein Array, nicht ein Objekt.** capgo puffert die Statistik
-und sendet **Stapel** (iOS `flushStatsQueue` → `parameters: eventsToSend`,
-Android → `new JSONArray()`). Der Endpunkt las `rumpf.action` an genau diesem
-Array, bekam `undefined` und schrieb `ohne` — im Gerätelauf `Sent 9 events`
-gegen dreimal `action: "ohne"`. `200 ok` sah dabei aus wie Erfolg. Die
-**Einzelform** bleibt daneben echt (`sendRateLimitStatistic` in beiden Schalen,
-Androids `sendStatsAsync`), also nimmt der Endpunkt beide.
+| Commit | Was |
+|---|---|
+| `678b0f3` | **RED** Gruppe 4 — ausgeblendete Filter |
+| `e4eb844` | **GREEN** Gruppe 4 — Filter auf maskierten Spalten weg, Hinweis dafür |
+| `d84bb71` | **RED** Gruppe 5 — neue pgTAP-Datei + Eintrag in `ci.yml` |
+| `a9109a0` | **GREEN** Gruppe 5 — Migration `…180000_kontaktanfrage_staffelung.sql` |
+| `1d049d7` | **RED** Gruppe 6 — Welpenschutz |
+| `0949864` | **GREEN** Gruppe 6 — Migration `…190000_welpenschutz_entfernen.sql` |
+| `5b1dfde` | **RED** Gruppe 7 — Staffelung an der Kontaktfläche |
+| `bd338b7` | **GREEN** Gruppe 7 — Begründung an der Stelle des Knopfes |
+| `8bbae86` | **fix** — kein Grund, solange `levelRank` null ist |
 
-**2 · Die Rumpfgrenze war stiller Verlust, kein Schutz.** Sie stand auf 8 KiB;
-ein voller Stapel sind 200 Ereignisse (`maxPendingStats` == `MAX_PENDING_STATS`)
-und gemessen **~94 KiB** — es passten **17 von 200** hindurch. Und `413` gilt
-**keiner** Schale als vorübergehend (`isTransientStatsFailure`: nur 429, 408,
->= 500), das Gerät verwirft den Stapel also **endgültig**. Jetzt 256 KiB, plus
-Deckel `MAX_EREIGNISSE = 200`, damit die weitere Grenze den offenen Endpunkt
-nicht zum Log-Verstärker macht. Neben `actions` steht `gesamt`, sonst wäre der
-Deckel selbst eine stille Kürzung.
+**Endstand:** `pnpm test` **2473/2473** · `supabase test db` über die **27**
+CI-Dateien **1160/1160** · `lint`, `typecheck`, `build` Exit 0 ·
+`openspec validate --all` 32/0.
 
-### Der Fremd-Review fand den Fix selbst — und er hatte denselben Fehler
+### Was jetzt gilt
 
-Zwei unabhängige Reviewer (gemini + ein Haus-Reviewer; `opencode` lief mit,
-`codex` bewusst nicht) trafen **denselben Kern**: `meldung.status` war im
-Betrieb **tot**, `index.ts` hartkodierte die Statuscodes. Per Mutation belegt —
-`413` → `400`, der 413-Zweig auf `200 ok`, der 405-Wächter gelöscht, `actions`
-aus der Logzeile, und **`req.clone()` mit dem Rohrumpf samt `device_id` ins
-Log**: alle blieben **11/11 grün**. Ausgerechnet `413` entscheidet, ob das
-Gerät wiederholt oder endgültig verwirft — derselbe Fehler wie der behobene,
-eine Ebene höher.
-
-**Ursache war die Zusage:** sie las `index.ts` als *Text* und grepte auf den
-Aufruf. Behoben in `6dae148` — Handler als `behandleAnfrage` in `meldung.ts`,
-**ausgeführt** geprüft, Logzeile auf ihre exakte Feldmenge festgenagelt.
-`index.ts` ist drei Zeilen `Deno.serve`. Alle sieben Mutationen röten, das Leck
-eingeschlossen.
-
-Zwei kleinere Befunde mit: `RUMPF_GRENZE` zählt UTF-16-Einheiten statt Bytes
-(kein Schutzloch, `req.text()` puffert vorher voll — Kommentar richtiggestellt
-statt mit `TextEncoder` umgerechnet, der eine zweite Kopie angelegt hätte), und
-sechs Herstellerverweise standen 1–118 Zeilen daneben → jetzt Symbolnamen.
-**Nicht übernommen:** Grenze auf 128 KiB senken.
-
-**Zur Reviewer-Wahl:** gemini stufte den UTF-16-Punkt als HOCH ein, mit falscher
-Kausalkette und einem Fix, der es verschlimmert hätte — und alle vier
-Zeilenverweise waren falsch. Verdikt zählt, Belege nicht.
-
-### Nachgezogen: dieselbe Naht in den zwei Nachbarn (`2a049c0`)
-
-Donald, 02.09.: „zieh das nach". Das Quelltext-Grep-Muster steckte auch in
-`ota-update` und `send-push`.
-
-- **`send-push` war der wertvollere Fund.** Die **Webhook-Authentifizierung**
-  (`timingSafeEqual`, 401) hatte **null** Abdeckung, ebenso fehlendes Secret
-  (500), unlesbarer Rumpf (400) und die Weiche Webhook/Wiederholungslauf. Alle
-  bestehenden Zusagen galten `anbieter.ts` und `nachrichten.ts` — den reinen
-  Modulen *dahinter*. Die Tore liegen jetzt als `pruefeAufruf` in `aufruf.ts`,
-  12 ausgeführte Zusagen. Es **baut die Ablehnungsantwort selbst**, statt einen
-  Statuscode zu melden — sonst wäre die `ota-stats`-Doppelung zurück.
-- **`ota-update`** — Handler als `behandleAnfrage` in `antwort.ts`. Ungedeckt
-  waren `405`, der `catch` auf `req.json()` und der `content-type`. Der
-  Statusfehler existierte hier **nicht**, `ergebnis.status` wurde konsumiert.
-
-**Zehn Mutationen, zehnmal rot** (u. a. „401 → 200", „Vergleich übersprungen",
-„Status hartkodiert"). Live nachgeprüft: `send-push` GET → 405, ohne Auth →
-401, falscher Bearer → 401; `ota-update` GET → 405, unlesbar → **lautes** 400,
-gültig → echtes Bündel.
-
-**Eine beabsichtigte Verhaltensänderung:** ein Rumpf `null` warf vorher in
-`aufruf.record?.id` eine `TypeError` → 500; jetzt sauberes 400, zugesagt.
+- **Verzeichnis** ab `connect`, erweiterte Felder ab `discover` (Teil A).
+- **Filter** für Kompetenz, Thema, Angebotsart und die Chip-Gruppen erscheinen
+  unterhalb Rang 3 **gar nicht**; an ihrer Stelle steht „Ab Discover kommen
+  Filter für Kompetenz, Thema und Angebote dazu." Branche und Region bleiben.
+- **Kontaktanfragen gestaffelt**: `basic` gar nicht · `connect` nur an genau
+  `connect` · ab `discover` an alle. Prädikat
+  `public.darf_kontaktanfrage_senden(uuid)`.
+- **Welpenschutz ersatzlos weg**, `public.is_new_member(uuid)` gedroppt.
 
 ## Decisions
 
-- **Keine neue Spec-Zusage für `ota-stats`.** Die Senke speichert nichts und
-  ist Infrastruktur; der Fix läuft unter den bestehenden Rückweg-Szenarien.
-  Wer das anders sieht, müsste eine Anforderung „die Senke verliert keine
-  Ereignisse" schreiben — bewusst nicht getan, das wäre Scope-Ausweitung.
-- **256 KiB statt Grenze weg.** Eine Grenze bleibt nötig (offener Endpunkt);
-  sie muss nur über dem echten Maximum liegen statt darunter.
-- **Handler ins reine Modul, nicht nur `meldung.status` verdrahten.** Die
-  Ein-Zeilen-Variante hätte den Befund geschlossen und die Naht gelassen; sechs
-  weitere Mutationen wären grün geblieben.
-- **Lint/fmt nicht angefasst.** `deno lint` beanstandet den `jsr:`-Import — in
-  **allen 12** bestehenden Testdateien gleichermassen, und CI fährt weder
-  `deno lint` noch `deno fmt` für Functions. Haus-Muster geschlagen hätte
-  bedeutet, eine fremde Aufräumrunde in den Diff zu ziehen.
+- **Gruppe 5 und 6 in ZWEI Migrationen, nicht einer.** *Warum:* die Staffelung
+  gilt auch ohne das Streichen, und das Streichen ist eine eigene
+  Produktentscheidung. Eine gemeinsame Migration hätte beide unlesbar gemacht.
+- **Die Frontend-Kopie des Prädikats ist Absicht** (`darfKontaktanfrageSenden`
+  in `lib/contact-requests.ts`). *Warum:* dieselbe Begründung wie bei den Rängen
+  in `config/levels.ts` — die Grenze ist die Policy. Was die Kopie entscheidet,
+  ist nur, ob ein Knopf ein Versprechen bricht.
+- **Die Begründung steht an der Stelle des Knopfes, nicht in einem Toast.** Eine
+  Hürde, die man erst nach dem Klicken erfährt, ist zweimal enttäuschend.
+- **Zwei Sätze statt einem.** `basic` kann niemanden anschreiben, `connect` kann
+  es schon, nur nicht dieses Profil. Eine gemeinsame Meldung beantwortete
+  jeweils die falsche Frage.
+- **Die 42501-Meldung nennt jetzt das Opt-out.** Sie nannte den Welpenschutz —
+  eine abgeschaffte Regel zu erklären schickt den Leser auf einen Weg, den es
+  nicht gibt.
+- **Drei Bestandszusagen umgeschrieben, nicht gedreht:** `rls_test.sql:260`
+  (Erweiterung), die zwei Welpenschutz-Zusagen (gestrichen), „Discover sieht,
+  darf aber nicht anschreiben" und die 42501-Meldung in
+  `PublicProfilePage.test.tsx`. `plan(437)` → `plan(435)`.
+- **Aufgabe 7.3 ist gegenstandslos geworden** — es gibt keine
+  Welpenschutz-Ablehnung mehr. In `tasks.md` ausgeschrieben, nicht abgehakt.
 
 ## Files modified
 
-`supabase/functions/ota-stats/` — **`meldung.ts`** (neu: Grenzen, `werteRumpf`,
-`protokoll`, `behandleAnfrage`), **`meldung.test.ts`** (neu, 17 Zusagen),
-`index.ts` (drei Zeilen). `ota-update/` — Handler nach `antwort.ts`, 5 Zusagen
-dazu. `send-push/` — **`aufruf.ts`** + **`aufruf.test.ts`** (neu, 12 Zusagen),
-`index.ts` verschlankt. Dazu `openspec/changes/capacitor-huelle/tasks.md` und
-diese Datei.
-
-Gemerged als `86c4afe` (#314) · `6dae148` (#315) · `e7d9054` (#316) ·
-`2a049c0` (#317).
+- **neu** `supabase/migrations/20260902180000_kontaktanfrage_staffelung.sql`
+- **neu** `supabase/migrations/20260902190000_welpenschutz_entfernen.sql`
+- **neu** `supabase/tests/kontaktanfrage_staffelung_test.sql` (32 Zusagen)
+- **neu** `src/components/community/MemberDirectory.stufen.test.tsx`
+- **neu** `src/pages/PublicProfilePage.staffelung.test.tsx` (6 Zusagen)
+- `.github/workflows/ci.yml` — die neue pgTAP-Datei eingetragen
+- `supabase/tests/rls_test.sql` — 437 → 435
+- `src/components/community/MemberDirectory.tsx` + drei Testdateien
+- `src/lib/contact-requests.ts`, `src/pages/PublicProfilePage.tsx` + Tests
+- `openspec/changes/rechte-matrix-stufen/tasks.md`
 
 ## Next session: start here
 
-**Probe 2, der Rückweg** — die Vorbedingung ist weg, sie misst jetzt wirklich
-etwas. Runbook §3: ein absichtlich defektes Bündel ausliefern, das Gerät muss
-auf der vorigen Fassung landen. Der Beleg ist doppelt zu führen: am Gerätelog
-(`Reloading`/Fallback) **und** an der `ota-stats`-Logzeile, die dann
-`update_fail` bzw. `revert` namentlich tragen muss statt `ohne`.
+**Gruppe 8 ist vollständig, der Diff-Review steht in `REVIEWS.md`.** `opencode`
+hat **Freigabe** gegeben (drei NIEDRIG: einer reproduziert nicht, zwei sind
+dokumentierte Entscheidungen aus dem Migrationskopf); `gemini` war unbrauchbar,
+beide Belege erfunden — **nicht noch einmal aufrollen.**
 
-Zwei Fallen aus den Vorsitzungen, beide vorher lesen:
-`devicectl --terminate-existing` löst die Übernahme NICHT aus (der Wechsel in
-den **Hintergrund** tut es), und den Schreibbefehl auf PROD
-(`infisical run --env=prod -- pnpm tsx scripts/ota-buendel.ts`) fährt Donald —
-dem Assistenten sperrt ihn der Klassifikator.
+**Erster Handgriff: Gruppe 9, das Ausrollen.** PR öffnen, CI grün abwarten,
+mergen (9.1), dann `migrate-dev` auf demselben SHA (9.2). **9.3 `migrate-prod`
+ausdrücklich bei Donald erfragen** — Schreibzugriff auf PROD. Und 9.6: **kein
+Flag umlegen**, weder `open_contact` noch sonst etwas.
 
-## Open questions — alle innerhalb AGE-642
+Der Worktree ist sauber, Basis `1872d1e`, letzter Code-Commit `8bbae86`
+(darüber liegt nur noch dieser Doku-Commit), **nichts gepusht**.
 
-- **Review gelaufen UND nachgezogen** (Donald: „mache review", dann „zieh das
-  nach"). Beides steht oben. **Eine Naht bleibt bewusst offen:** `Zustellung`
-  liegt weiter in `send-push/index.ts`, und die Zusage auf
-  `apnsMitHostErkennung` grept dort noch Quelltext. Das herauszulösen wäre ein
-  Umbau der **Zustellschleife** — verhaltenstragender Code, keine Testgerüste.
-  Lohnt sich, wenn diese Schleife ohnehin angefasst wird.
-- **Der PROD-Schreibweg bleibt dem Assistenten gesperrt.** Bestätigt; Donald
-  fährt die Zeile.
-- **`[error] Semaphore wait timed out after 0ms`** — einzige Fehlerzeile der
-  Geräteläufe, sitzt im `semaphore.wait()` des Statistikwegs
-  (`CapgoUpdater.swift`). Nichts verhindert; kehrt sie wieder, dort nachsehen.
-- **B3 Signaturmaterial** offen (Zertifikat, Profile, Keystore, Workflow) —
-  für Gerätetests nicht nötig, ein Xcode-Lauf genügt.
-- **Android ist unberührt.** Die halbe Abnahmeliste des Issues (beide
-  Plattformen, Zurück-Taste, Sitzung überlebt Neustart) steht noch aus.
-- **AGE-642 setzt sich bei JEDEM Merge auf *Done*** (Branchname) — heute
-  viermal, jedes Mal zurückgesetzt. Nach dem nächsten Merge wieder nachsehen.
-- **Nicht angefasst, ausserhalb AGE-642:** `docs/prod-neuaufbau-plan.md:31-32`
-  nennt noch `foelowldexkcqzewvrcf` · `scripts/sync-dev-auszug.test.ts` ist per
-  Bauart flakig · `ADR-0037` wird dreimal zitiert, existiert aber nicht.
+### Rezept für die Sichtprobe, falls sie noch einmal gebraucht wird
+
+Die Migrationen liegen **nur lokal**. `.env.local` mit
+`VITE_SUPABASE_URL=http://127.0.0.1:54321` + ANON_KEY aus `supabase status`,
+dann `pnpm exec vite --port 5210 --strictPort` (**nicht** `pnpm dev`), Konten per
+GoTrue-Admin (`password` **und** `email_confirm: true`), danach `tier`/
+`activated_at` per SQL. **Die App hängt über `localhost:5210`, nicht über
+`127.0.0.1:5210`** — letzteres antwortet mit 000.
+
+**Alles zurückgebaut:** `.env.local` gelöscht, vite gestoppt, die drei
+QA-Konten per GoTrue-Admin entfernt, `open_contact` wieder auf `true`. Der
+lokale Stack trägt jetzt **0 Profile und 0 Kontaktanfragen** — falls dort etwas
+steht, ist es fremd.
+
+## Open questions
+
+- **Die Rechte-Erweiterung für Rang 3** ist jetzt **gebaut**, nicht nur geplant:
+  ein `discover`-Konto darf im geschlossenen Modus an jeden senden. Donald hat
+  die *Richtung* nie ausdrücklich bestätigt; sie folgt aus seiner Entscheidung
+  vom 25.08. Vor dem Ausrollen ansprechen.
+- **`branche` ist jetzt für JEDES aktivierte Konto lesbar**, auch für `basic`,
+  das die Verzeichnisfläche gar nicht betritt — `profiles_public` ist
+  RLS-umgehend und ohne Stufenschwelle. Das ist die Entscheidung aus D7 (ohne
+  sie liefe der Branchenfilter für `connect` wortlos leer), aber es ist die
+  einzige Stelle des Changes, an der Daten für eine niedrigere Stufe sichtbar
+  werden. Von opencode im Diff-Review benannt. **Donald vorlegen.**
+- **`open_contact` auf `false`** wartet weiter auf Donald. Gemessen folgenlos.
+- **`EmojiAuswahl.test.tsx` flakt im Gesamtlauf** — einmal rot („rotes Herz"
+  nicht gefunden), allein und im Wiederholungslauf grün. Gehört zu AGE-645.
+- **Der Neuigkeiten-Eintrag `2026-09-02-feedback-ausbauen`** ist weiterhin nicht
+  freigegeben.
+- Unverändert offen — **High:** 610. **Medium:** 618 · 542 · 512 · 605 · 607 ·
+  630 · 669 · 680 · 684 · 688. **Low:** 664 · 660 · 606.

@@ -78,12 +78,14 @@ describe("MembershipGate für Entdecken-Routen", () => {
 
   // AGE-450: /meine-chancen ist keine gegatete Route mehr (leitet auf /). Diese
   // beiden Fälle — „Zur Startseite" statt „Mitglied werden", und der Upgrade-Weg —
-  // prüfen wir jetzt an /mitglieder, der verbleibenden discover-gegateten Route.
+  // prüfen wir jetzt an /mitglieder, der verbleibenden stufen-gegateten Route.
+  // Seit AGE-598 steht die Schranke dort auf `connect` statt `discover`; `basic`
+  // liegt weiterhin darunter, der Fall bleibt also derselbe.
   it("zeigt einer zu niedrigen Stufe die Stufen-Wand mit „Zur Startseite“ statt CTA", () => {
     renderAt("/mitglieder", authAsTier("basic"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Connect verfügbar" }),
     ).toBeInTheDocument();
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
     // Seit AGE-616 ist der CTA ein Link — beide Rollen prüfen, sonst ginge eine
@@ -111,14 +113,25 @@ describe("MembershipGate für Entdecken-Routen", () => {
  * /verzeichnis und leitete zu niedrige Stufen weg. Als Top-Level-Eintrag „Mitglieder"
  * mauert es stattdessen (Spec §1) — die Zusage ist dieselbe, nur die Einlösung ist neu.
  */
-describe("Stufen-Gating für /mitglieder (min Discover)", () => {
+describe("Stufen-Gating für /mitglieder (min Connect)", () => {
   it("zeigt Basic die Wand statt Mitgliederdaten", () => {
     renderAt("/mitglieder", authAsTier("basic"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Connect verfügbar" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
+  });
+
+  // AGE-598. Diese Zusage konnte es vorher nicht geben: `connect` stand unter
+  // der Schranke und sah dieselbe Wand wie `basic`. Sie ist der Grund des
+  // Changes, an der Fläche gemessen — und die Wache darüber, dass die Schranke
+  // nicht später stillschweigend zurückwandert.
+  it("lässt Connect das Verzeichnis sehen — die neue Schwelle", async () => {
+    renderAt("/mitglieder", authAsTier("connect"));
+
+    await screen.findByRole("heading", { name: "Verzeichnis" });
+    expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
   });
 
   it("lässt Discover das Verzeichnis sehen", async () => {
@@ -150,7 +163,7 @@ describe("Stufen-Gating für /mitglieder (min Discover)", () => {
     renderAt("/mitglieder", authLoadingTier());
 
     expect(
-      screen.queryByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.queryByRole("heading", { name: "Dieser Bereich ist ab Connect verfügbar" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });

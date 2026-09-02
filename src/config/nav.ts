@@ -90,9 +90,19 @@ export const navItems: NavItem[] = [
     label: "Mitglieder",
     Component: MitgliederPage,
     section: "entdecken",
-    // §2: „vollständiges Mitgliederverzeichnis" ab `discover`. Darunter greift die
-    // Wand; die RLS liefert ohnehin höchstens die eigene Zeile.
-    minTier: "discover",
+    // AGE-598: eine Stufe tiefer. Die LISTE beginnt seit 20260902150000 bei
+    // `connect` (Rang 2); die erweiterten Felder — Kompetenzen, Biete/Suche —
+    // bleiben unverändert bei `discover` (Rang 3), maskiert in derselben RPC.
+    //
+    // Die Schranke folgt der Datenbank, sie führt sie nicht: die Zusage trägt
+    // `search_directory`, hier steht nur Komfort. Sie wird trotzdem mitgezogen,
+    // weil eine Fläche, die die RLS freigibt und die Navigation verbirgt,
+    // schlechter ist als beides zu.
+    //
+    // (Stand bis AGE-598 auf `discover`, mit der Begründung aus §2:
+    // „vollständiges Mitgliederverzeichnis" ab `discover`. Das VOLLSTÄNDIGE
+    // Verzeichnis fängt weiterhin dort an — nur die Liste nicht mehr.)
+    minTier: "connect",
   },
   { path: "/aktivitaet", label: "Aktivität", Component: AktivitaetPage, section: "entdecken" },
 
