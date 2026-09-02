@@ -169,27 +169,49 @@
 
 ## 3. Die RPC: abreissen und neu anlegen
 
-- [ ] 3.1 **RED:** pgTAP, das nach Thema filtert und erwartet, dass eine Zeile
-      jenseits der ersten Seite auf Seite 1 des gefilterten Ergebnisses steht.
-- [ ] 3.2 `drop function public.admin_list_feedback(int, int)` und neu anlegen
-      mit vier Argumenten, **alle mit Vorgabewert**, damit die argumentlosen
-      Aufrufe weiter auflösen.
-- [ ] 3.3 Rückgabe um `theme` und `screenshot_path` erweitern.
-- [ ] 3.4 Filter: innerhalb einer Facette ODER, zwischen den Facetten UND.
-      `null` heisst „keine Einschränkung", ein leeres Array **nicht** —
-      `= any('{}')` ist falsch und lieferte im Normalfall eine leere Liste. Das
-      Bewertungs-Prädikat nicht vergessen; die erste Fassung hatte nur das
-      Themen-Prädikat.
-- [ ] 3.5 Klemmung und Ordnung wörtlich übernehmen: 1..100 mit Rückfall auf die
-      Vorgabe, absteigend nach `created_at`, dann nach `id`.
-- [ ] 3.6 `revoke` und `grant` mit der **neuen** Signatur, dazu den Kommentar.
-- [ ] 3.7 **Die fünf Signatur-Zusagen heben** — `rls_test.sql` 545 und 549,
-      `admin_feedback_test.sql` 260, 262 und 267. Sie nennen die Argumenttypen
-      ausgeschrieben und brechen nach dem `drop` mit einem Fehler statt mit
-      `false`. Die letzte benutzt `::regprocedure`.
-- [ ] 3.8 pgTAP: ohne Filterargument dieselbe Menge wie zuvor; zwei Themen als
-      ODER; Thema **und** Bewertung als UND; der Filter greift vor der
-      Seitengrenze.
+- [x] 3.1 **RED stand:** `admin_feedback_test.sql` von 18 auf 19 Zusagen, die
+      neunzehnte rot mit `FEHLER:42883`. Die Datei bricht dabei **nicht** ab —
+      dafür der neue Helfer `pg_temp.versuch_as`: `text_as` fängt nichts, und
+      ein `42883` darin risse die Testtransaktion mit, sodass die 18
+      bestehenden Zusagen nicht mehr messbar wären.
+      Die Fixture markiert drei Zeilen **ganz hinten** (`a…001`/`a…002` sind
+      bei `id desc` die Plätze 106 und 105, also Seite 5). Eine Marke auf der
+      ersten Seite wäre wertlos gewesen: sie stünde dort auch ohne Filter.
+      Der Aufruf nennt das Argument **beim Namen** — positionell wäre er nach
+      3.2 auch dann gültig, wenn die Argumente anders herum stünden.
+- [x] 3.2 **Migration `20260902110000_admin_feedback_filter.sql`.** `drop` und
+      neu anlegen mit vier Argumenten, alle mit Vorgabewert. Die Reihenfolge
+      ist festgelegt (`p_limit`, `p_offset`, dann die Filter): ein Vertauschen
+      bräche jeden positionellen Aufruf im Bestand **lautlos** —
+      `admin_list_feedback(25, 0)` bliebe gültig und meinte etwas anderes.
+- [x] 3.3 **`theme` und `screenshot_path` gehen mit**, und zwei Zusagen prüfen
+      nicht, dass die Spalten *da* sind, sondern dass sie den Wert **ihrer**
+      Zeile tragen — mit der Nachbarzeile ohne Bild als Gegenstück, sonst
+      bliebe offen, ob die Spalte überall denselben Wert trägt.
+      Dazu gehoben: `src/lib/database.types.ts` ist handgepflegt und nennt die
+      Signatur ausdrücklich; sie stand sonst falsch im Repo.
+- [x] 3.4 **Filter gebaut und gemessen.** `(p_x is null or spalte = any(p_x))`,
+      innerhalb einer Facette ODER, zwischen den Facetten UND. Das
+      Bewertungs-Prädikat hat eine **eigene** Zusage ohne Themenfilter — ohne
+      sie fiele sein Fehlen nicht auf, weil die UND-Zusage schon durch ihr
+      Themen-Prädikat auf eine Zeile einengt. Gegenprobe: Prädikat entfernt →
+      **zwei** Zusagen fallen, genau diese beiden.
+- [x] 3.5 Klemmung und Ordnung wörtlich übernommen; die zehn bestehenden
+      Klemm- und Blätterungs-Zusagen laufen unverändert grün weiter.
+- [x] 3.6 `revoke`/`grant`/`comment` mit der neuen Signatur
+      `(int, int, text[], int[])`.
+- [x] 3.7 **Fünf Zusagen gehoben**, alle auf `(int,int,text[],int[])`:
+      `rls_test.sql` (zwei) und `admin_feedback_test.sql` (drei, die letzte
+      über `::regprocedure`). Ohne das brächen sie mit einem Fehler statt mit
+      `false` — und ein Fehler in `has_function_privilege` reisst die Datei ab.
+- [x] 3.8 **Acht Zusagen, und drei Gegenproben belegen sie.** Jede über die
+      ganze CI-Liste (25 Dateien, 1090 Zusagen), jede danach zeichengleich
+      zurück (`diff` gegen `pg_get_functiondef`):
+      | Gegenprobe | Es fielen |
+      |---|---|
+      | Bewertungs-Prädikat entfernt | **2** — die UND-Zusage und die Zusage über den Bewertungsfilter allein |
+      | leeres Array als „alles" behandelt | **1** — „ein leeres Array trifft nichts" |
+      | Filter erst **nach** `limit`/`offset` | **7** — beide Seitengrenzen-Zusagen, 3.1, und die vier, die Treffer von Seite 5 erwarten |
 
 ## 4. Die Ausnahme im Zugangsmodell
 

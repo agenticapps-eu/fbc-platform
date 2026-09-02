@@ -23,7 +23,7 @@
 -- wäre nicht unterscheidbar von ihrer Abwesenheit.
 
 begin;
-select plan(19);
+select plan(28);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -80,6 +80,14 @@ update public.feedback set theme = 'fehler'
  where id = 'a0000000-0000-0000-0000-000000000002';
 update public.feedback set theme = 'idee'
  where id = 'a0000000-0000-0000-0000-000000000003';
+
+-- Genau EINE Zeile bekommt einen Screenshot. Der Pfad muss im Praefix ihres
+-- Verfassers liegen, sonst weist ihn `feedback_screenshot_path_praefix` ab —
+-- Anna ist hier die Verfasserin. Dass die Nachbarzeile `null` traegt, ist Teil
+-- der Zusage: `screenshot_path` ist optional.
+update public.feedback
+   set screenshot_path = 'fb000000-0000-0000-0000-00000000000a/bild.png'
+ where id = 'a0000000-0000-0000-0000-000000000001';
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 -- SQLSTATE statt SQLERRM: die Zusage in 3.2 lautet „geklemmt, NICHT abgewiesen".
@@ -296,14 +304,14 @@ select is(
   'KEIN FEHLER', 'Und es bekommt eine leere Liste, keinen Fehler — anders als die Zähl-RPC');
 
 -- ── 6. Rechte werden ausgesprochen, nicht geerbt (AGE-312, Aufgabe 3.7) ─────
-select is(has_function_privilege('anon', 'public.admin_list_feedback(int,int)', 'execute'),
+select is(has_function_privilege('anon', 'public.admin_list_feedback(int,int,text[],int[])', 'execute'),
   false, 'admin_list_feedback: anon darf nicht ausführen');
-select is(has_function_privilege('authenticated', 'public.admin_list_feedback(int,int)', 'execute'),
+select is(has_function_privilege('authenticated', 'public.admin_list_feedback(int,int,text[],int[])', 'execute'),
   true, 'admin_list_feedback: authenticated darf ausführen');
 select ok(
   not exists (
     select 1 from aclexplode((select proacl from pg_proc
-                               where oid = 'public.admin_list_feedback(int,int)'::regprocedure)) a
+                               where oid = 'public.admin_list_feedback(int,int,text[],int[])'::regprocedure)) a
      where a.grantee = 0),
   'admin_list_feedback: PUBLIC hält kein EXECUTE');
 
@@ -327,6 +335,99 @@ select is(
                       p_themes => array['fehler']))::text$q$),
   '{a0000000-0000-0000-0000-000000000002,a0000000-0000-0000-0000-000000000001}',
   'Nach Thema gefiltert steht eine Zeile von Seite 5 auf Seite 1 — der Filter greift VOR der Seitengrenze');
+
+-- ── 8. Was „kein Filter" heisst, und was es NICHT heisst (Aufgabe 3.8) ──────
+-- Die erste Zusage ist die wichtigste der ganzen Einheit: `null` muss „alles"
+-- heissen. Hiesse es je etwas anderes, braechen ausserdem die fuenf
+-- argumentlosen Aufrufe im Bestand — sie sind dadurch Waechter, nicht Altlast.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::text from public.admin_list_feedback(
+         p_limit => 9999, p_themes => null, p_ratings => null)$q$),
+  '100', 'Ohne Filterargument dieselbe Menge wie zuvor — null heisst KEINE Einschraenkung');
+
+-- Der Gegenfall, und er ist bewusst so zugesagt: ein LEERES Array ist nicht
+-- „alles". `spalte = any('{}')` ist false, nicht true. Die Oberflaeche schickt
+-- deshalb `null`, wenn keine Marke gesetzt ist, und niemals `[]` — diese
+-- Zusage haelt fest, was passierte, wenn sie es doch taete.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select count(*)::text from public.admin_list_feedback(
+         p_limit => 9999, p_themes => array[]::text[])$q$),
+  '0', 'Ein LEERES Array heisst nicht „alles" — es trifft nichts');
+
+-- Innerhalb einer Facette ODER.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_themes => array['fehler', 'idee']))::text$q$),
+  '{a0000000-0000-0000-0000-000000000003,'
+  || 'a0000000-0000-0000-0000-000000000002,'
+  || 'a0000000-0000-0000-0000-000000000001}',
+  'Zwei Themen wirken als ODER — die Vereinigung, nicht die Schnittmenge');
+
+-- Zwischen den Facetten UND. Beide Zeilen tragen `fehler`, aber nur `a…001`
+-- traegt die Bewertung 1: die Schnittmenge ist EINE Zeile. Eine ODER-Fassung
+-- lieferte hier zwei.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_themes => array['fehler'], p_ratings => array[1]))::text$q$),
+  '{a0000000-0000-0000-0000-000000000001}',
+  'Thema UND Bewertung ist die Schnittmenge — zwischen den Facetten gilt UND');
+
+-- Das Bewertungs-Praedikat ALLEIN. Die erste Entwurfsfassung hatte nur das
+-- Themen-Praedikat; `p_ratings` waere ein Argument gewesen, das die Funktion
+-- annimmt und stillschweigend ignoriert. Ohne diese Zeile faellt das nicht auf:
+-- die Zusage darueber bliebe gruen, weil ihr Themen-Praedikat schon auf eine
+-- Zeile einengt.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_ratings => array[5]))::text$q$),
+  '{fbfbfbfb-0000-0000-0000-00000000000b}',
+  'Der Bewertungsfilter wirkt auch OHNE Themenfilter — er wird nicht ignoriert');
+
+-- Der Filter greift vor der Seitengrenze, jetzt an der Grenze selbst gemessen.
+-- Zwei Treffer, Seitengroesse 1: Seite 1 traegt den ersten, Seite 2 den
+-- zweiten. Wirkte der Filter erst auf die fertige Seite, waeren beide leer.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_limit => 1, p_themes => array['fehler']))::text$q$),
+  '{a0000000-0000-0000-0000-000000000002}',
+  'Geblaettert wird das GEFILTERTE Ergebnis: Seite 1 bei Seitengroesse 1');
+
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_limit => 1, p_offset => 1, p_themes => array['fehler']))::text$q$),
+  '{a0000000-0000-0000-0000-000000000001}',
+  '… und Seite 2 traegt den zweiten Treffer, nicht die 106. Zeile des Bestands');
+
+-- ── 9. Die beiden neuen Spalten (Aufgabe 3.3) ───────────────────────────────
+-- Nicht „die Spalten sind da", sondern: sie tragen den Wert IHRER Zeile. Eine
+-- Spalte, die irgendein Thema traegt, waere schlimmer als keine.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text || '=' || theme, ',' order by id::text)
+         from public.admin_list_feedback(p_themes => array['fehler', 'idee'])$q$),
+  'a0000000-0000-0000-0000-000000000001=fehler,'
+  || 'a0000000-0000-0000-0000-000000000002=fehler,'
+  || 'a0000000-0000-0000-0000-000000000003=idee',
+  'Die Rueckgabe traegt `theme`, und zwar das der jeweiligen Zeile');
+
+-- Und `screenshot_path` — mitsamt dem `null` der Nachbarzeile. Ohne die
+-- Nachbarzeile bliebe offen, ob die Spalte den Wert traegt oder ueberall
+-- denselben.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select string_agg(id::text || '=' || coalesce(screenshot_path, 'OHNE'),
+                         ',' order by id::text)
+         from public.admin_list_feedback(p_themes => array['fehler'])$q$),
+  'a0000000-0000-0000-0000-000000000001=fb000000-0000-0000-0000-00000000000a/bild.png,'
+  || 'a0000000-0000-0000-0000-000000000002=OHNE',
+  'Die Rueckgabe traegt `screenshot_path` — und die Nachbarzeile ohne Bild traegt null');
 
 select * from finish();
 rollback;

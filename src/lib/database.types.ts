@@ -1925,9 +1925,10 @@ export type Database = {
        *  `admin_audit`. Bricht mit 22023 ab, wenn das Ziel schon bestaetigt ist. */
       admin_activate_member: { Args: { target: string }; Returns: string };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
-      // admin_list_feedback(int, int) RPC from
-      // 20260825120000_admin_zaehler_und_feedback_blaetterung.sql (admin-only enriched
-      // read of QM feedback with the author name; empty for non-admins, geblaettert).
+      // admin_list_feedback(int, int, text[], int[]) RPC from
+      // 20260902110000_admin_feedback_filter.sql (admin-only enriched read of QM
+      // feedback with the author name; empty for non-admins, geblaettert und
+      // gefiltert).
       admin_list_feedback: {
         Args: {
           /** 1..100, geklemmt statt abgewiesen; null faellt auf 25 zurueck. */
@@ -1936,6 +1937,14 @@ export type Database = {
            *  damit total — ohne den zweiten Schluessel koennte dieselbe Zeile
            *  auf zwei Seiten stehen. */
           p_offset?: number | null;
+          /** Themenschluessel aus `feedback_themes`. `null` heisst KEINE
+           *  Einschraenkung; ein LEERES Array heisst es nicht — `= any('{}')`
+           *  ist false und liefert eine leere Liste. Wer keine Marke gesetzt
+           *  hat, schickt `null`. Mehrere Marken wirken als ODER. */
+          p_themes?: string[] | null;
+          /** Bewertungen 1..5, sonst wie `p_themes`. Zwischen den beiden
+           *  Facetten gilt UND, nicht ODER. */
+          p_ratings?: number[] | null;
         };
         Returns: {
           id: string;
@@ -1948,6 +1957,12 @@ export type Database = {
           created_at: string;
           author_name: string;
           profile_id: string;
+          /** Schluessel aus `feedback_themes`; `not null` mit Vorgabewert
+           *  `generell` (AGE-628). */
+          theme: string;
+          /** Pfad im Bucket `feedback-screenshots`, optional. Die Fläche
+           *  braucht eine signierte URL, um ihn anzuzeigen. */
+          screenshot_path: string | null;
         }[];
       };
       // Hand-maintained until `supabase gen types` is re-run (AGE-249). Mirrors the
