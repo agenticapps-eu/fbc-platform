@@ -2,7 +2,7 @@ import { captureException } from "@sentry/react";
 
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
-import { SIGNATUR_GUELTIGKEIT_SEK } from "./post-media";
+import { SIGNATUR_GUELTIGKEIT_SEK, SIGNATUR_STALE_MS } from "./post-media";
 
 /**
  * Plattformweites QM-Feedback (AGE-300) — Spec §3.5 in
@@ -108,6 +108,16 @@ export async function uploadFeedbackScreenshot(uid: string, datei: File): Promis
  */
 export const feedbackScreenshotKey = (pfad: string) =>
   ["feedback-screenshot", "sign", pfad] as const;
+
+/**
+ * Weitergereicht, nicht neu gewählt — wie `SIGNATUR_GUELTIGKEIT_SEK` unten.
+ * Die beiden Zahlen hängen aneinander (`post-media.ts`): der Token steckt IN
+ * der URL, also lädt der Browser bei jeder Neusignatur das Bild neu. Ohne
+ * `staleTime` gilt die Vorgabe 0 plus `refetchOnWindowFocus` — jeder Wechsel
+ * zurück auf die Admin-Fläche signierte dann jeden sichtbaren Screenshot neu
+ * und lüde ihn erneut herunter.
+ */
+export { SIGNATUR_STALE_MS };
 
 /**
  * Signiert EINEN Screenshot — erst beim Anzeigen, nicht beim Laden der Liste.

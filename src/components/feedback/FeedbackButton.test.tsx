@@ -313,6 +313,81 @@ describe("Screenshot (AGE-628, 7.2)", () => {
   });
 });
 
+describe("Was ein zweiter Versuch NICHT anrichten darf (AGE-628, 9.5)", () => {
+  function waehleBild(datei: File) {
+    const feld = screen.getByLabelText(/screenshot auswählen/i) as HTMLInputElement;
+    fireEvent.change(feld, { target: { files: [datei] } });
+  }
+
+  it("laedt nach einem gescheiterten Einfuegen NICHT ein zweites Mal hoch", async () => {
+    // Der Pfad kommt aus `Date.now()` — ein zweiter Upload traefe also nie
+    // dieselbe Stelle und liesse pro Versuch eine Waise im privaten Bucket
+    // zurueck, die niemand je wieder sieht. Das Hochladen gelingt hier, das
+    // EINFUEGEN scheitert: genau die Reihenfolge, in der die Waise entsteht.
+    mockedSubmit.mockRejectedValueOnce(new Error("Einfuegen kaputt"));
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    waehleBild(bilddatei("schuss.png", "image/png", 100));
+    fireEvent.click(screen.getByRole("radio", { name: "2 von 5 Sternen" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /absenden/i }));
+    await screen.findByText(/konnte nicht gespeichert werden/i);
+    expect(mockedUpload).toHaveBeenCalledTimes(1);
+
+    // Zweiter Druck auf denselben Knopf.
+    fireEvent.click(screen.getByRole("button", { name: /absenden/i }));
+    await waitFor(() => expect(mockedSubmit).toHaveBeenCalledTimes(2));
+
+    expect(mockedUpload).toHaveBeenCalledTimes(1);
+    // Und die Zeile traegt beide Male DENSELBEN Pfad — nicht `null`.
+    expect(mockedSubmit).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ screenshotPath: "u1/1.png" }),
+    );
+  });
+
+  it("laedt nach einem gescheiterten Versuch das NEU gewaehlte Bild hoch", async () => {
+    // Die Kehrseite des Merkers: wer nach dem Fehlschlag ein anderes Bild
+    // waehlt, muss das ANDERE bekommen. Ohne das Zuruecksetzen haenge der
+    // alte Pfad an der Zeile, waehrend auf dem Bildschirm der neue Name steht.
+    mockedSubmit.mockRejectedValueOnce(new Error("Einfuegen kaputt"));
+    mockedUpload.mockResolvedValueOnce("u1/1.png").mockResolvedValueOnce("u1/2.png");
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    waehleBild(bilddatei("erst.png", "image/png", 100));
+    fireEvent.click(screen.getByRole("radio", { name: "2 von 5 Sternen" }));
+    fireEvent.click(screen.getByRole("button", { name: /absenden/i }));
+    await screen.findByText(/konnte nicht gespeichert werden/i);
+
+    waehleBild(bilddatei("dann.png", "image/png", 100));
+    fireEvent.click(screen.getByRole("button", { name: /absenden/i }));
+    await waitFor(() => expect(mockedSubmit).toHaveBeenCalledTimes(2));
+
+    expect(mockedUpload).toHaveBeenCalledTimes(2);
+    expect(mockedSubmit).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ screenshotPath: "u1/2.png" }),
+    );
+  });
+
+  it("nimmt das Bild mit, wenn abgebrochen wird — es haengt sonst wortlos wieder dran", async () => {
+    // Im Browser gemessen (02.09.): nach „Abbrechen" und erneutem Oeffnen
+    // stand der Dateiname samt „Entfernen" unveraendert da. Der TEXT bleibt
+    // bewusst stehen; ein stillschweigend wieder angehaengter Screenshot ist
+    // etwas anderes, weil ihn niemand im Formular sucht.
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    waehleBild(bilddatei("schuss.png", "image/png", 100));
+    expect(await screen.findByText("schuss.png")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /abbrechen/i }));
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+
+    expect(await screen.findByLabelText(/worum geht es/i)).toBeInTheDocument();
+    expect(screen.queryByText("schuss.png")).toBeNull();
+  });
+});
+
 describe("Was der Umbau NICHT verändert haben darf (AGE-628, 7.3)", () => {
   it("sperrt das Absenden weiterhin ohne Sterne — auch mit Thema und Bild", async () => {
     renderAt("/");

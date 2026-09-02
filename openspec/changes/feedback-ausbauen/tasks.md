@@ -276,8 +276,34 @@
       Aufruf → dieselbe Kennung, genau ein Faden für das Paar), er **findet**
       den Faden, den der gewöhnliche Weg angelegt hat, **ohne ihn nachträglich
       zu markieren**, und ein Selbstgespräch bricht mit `22023` ab.
-- [ ] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
-      verschiedenen Stellen. **Offen** — steht noch aus.
+- [x] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
+      verschiedenen Stellen. **Gefahren am 02.09., `--diff` über
+      `origin/main...HEAD`: null Befunde ab MEDIUM.** Bericht in
+      `.gstack/security-reports/2026-09-02-age628-diff.json` (gitignored).
+
+      Was dabei am laufenden Stack **gemessen** wurde, nicht gelesen:
+      | Frage | Befund |
+      |---|---|
+      | Kann ein Mitglied `admin_eroeffnet` nachträglich setzen? | **Nein.** `authenticated` hält auf `message_threads` und `messages` nur INSERT und SELECT — kein UPDATE, kein DELETE. `not admin_eroeffnet` in `threads_insert` ist damit das ganze Tor. |
+      | Ist dieses Tor gedeckt? | **Ja, jetzt belegt.** Klausel entfernt, vier Dateien / 524 Zusagen gefahren → es fielen **2** (Zusage 10 direkt, 11 als ihre Positivkontrolle). Zurückgespielt, gegen den `pg_policies`-Abzug zeichengleich, 524/524 wieder grün. |
+      | Hält `anon` Rechte an den drei DEFINER-Wegen? | **Nein** — nur `authenticated` und `postgres`, alle drei mit `search_path=''`. |
+      | Blieb eine verwaiste `admin_list_feedback`-Signatur stehen? | **Nein**, genau ein Overload. Die 2-Argument-Fassung ist sauber gedroppt. |
+      | Gibt der vom Admin eröffnete Faden Kontaktdaten frei? | **Nein.** Die Freigabe hängt an `contact_requests.status='accepted'`; `admin_gespraech_oeffnen` legt keine Kontaktanfrage an. |
+      | Secrets in den 22 Branch-Commits? | **0 Treffer** (AKIA, `ghp_`, `xoxb-`, `sk-ant-`, `sk_live_`, PRIVATE KEY, `eyJhbGciOi`). |
+
+      **Zwei Beobachtungen unter dem Melde-Tor**, beide gehören nach 9.5 und
+      nicht in diesen Change:
+      * `or is_admin()` in `messages_insert` trägt **nur** den Faden aus dem
+        gewöhnlichen Insert-Weg (die Einbahnstrasse) und hat weiterhin keine
+        eigene Zusage — 0 von 1111 in der Vorsitzung. Kein Rechtegewinn, weil
+        die Teilnahmeprüfung als eigener Konjunktionsteil danebensteht; aber
+        eine ungedeckte Klausel in einer Sicherheits-Policy ist genau die
+        Stelle, die eine spätere Sitzung versehentlich weitet.
+      * `feedback_own` ist `ALL`. Bricht der Lösch-Weg zwischen RPC und
+        Storage-API ab, kann der Verfasser seine Zeile per direktem UPDATE
+        wieder auf das überlebende Objekt zeigen lassen. Bestandspolicy aus
+        AGE-358, kein fremder Zugriff (CHECK + partieller Unique-Index binden
+        den Pfad), nach einem vollständigen Lauf ist der Pfad tot.
 
 ### Was die Gegenproben zu Einheit 4 ergeben haben (02.09.)
 
@@ -475,6 +501,82 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 - [x] 9.2 **`supabase test db` mit Dateiliste**, aus `ci.yml` gezogen:
       **26 Dateien, 1119 Zusagen, PASS.**
 - [x] 9.3 **`openspec validate --all` grün** — 32 von 32.
-- [ ] 9.4 Im Browser zeigen: Abgeben mit Bild und Thema, Filtern über eine
-      Seitengrenze hinweg, Sprung in den Chat **und eine Antwort des Gegenübers**.
-- [ ] 9.5 Code-Review über den **Diff**, nicht über den Plan.
+- [x] 9.4 Im Browser gezeigt am **02.09.**, gegen den **lokalen Stack**
+      (Donalds Entscheidung; DEV und PROD bleiben unberührt). App per
+      `.env.local` auf `http://127.0.0.1:54321`, belegt über
+      `performance.getEntriesByType('resource')` — jede Supabase-Anfrage der
+      Seite ging dorthin. Zwei Konten angelegt (`admin@lokal.test` mit
+      `staff_roles.admin`, `mitglied@lokal.test`), 60 Feedback-Zeilen gesät,
+      davon 40 mit Thema `fehler`, damit auch die **gefilterte** Liste eine
+      Seitengrenze überschreitet.
+
+      | Was 9.4 verlangt | Gemessen |
+      |---|---|
+      | Abgeben mit Bild und Thema | Zeile geschrieben: `theme='fehler'`, `rating=4`, `screenshot_path='<uid>/1788348079592.png'`; Objekt im Bucket **7853 Bytes, `image/png`**, im Präfix des Verfassers. |
+      | Filtern über eine Seitengrenze | Unfiltriert 61 Zeilen (Seiten 1–25 / 26–50 / 51–61). Filter `fehler` **auf Seite 2 gesetzt** → Liste springt auf **„Rückmeldungen 1–25"** zurück, „Zurück" wieder aus (das ist 6.4). Gefiltert 41 Treffer; Seite 2 zeigt **„26–41", 16 Karten, alle 16 mit Thema „Fehler"** und „Weiter" aus. Der Filter greift also VOR `limit/offset`. |
+      | Sprung in den Chat | „Gespräch öffnen" → `/chat/dfd7ece8…`. Faden trägt **`admin_eroeffnet = t`**, Paar über `least/greatest` normalisiert. **`contact_requests`: 0 Zeilen** — der Admin hat die Hürde wirklich übersprungen. |
+      | **Antwort des Gegenübers** | Admin schreibt, das Mitglied sieht „1 ungelesen", öffnet und **antwortet**. Zwei Zeilen in `messages`, eine je Seite. Das ist die Zusage aus Einheit 4, end-to-end und ohne jede Kontaktanfrage. |
+      | *(nicht verlangt, aber 5.2 weicht ab)* | „Bild entfernen" in der Admin-Fläche: danach **0 Zeilen mit Verweis UND 0 Objekte im Bucket** — die zweistufige Ordnung (RPC leert, Aufrufer entfernt über die Storage-API) trägt gegen ein echtes Speicher-Backend. |
+
+      **Das Nachmessen aus 7.3, an der kleinen Kante statt am Schreibtisch:**
+      auf 1688×1234 läuft nichts über (Panel 644 px gegen 1110 px Deckel). Auf
+      **375×667** deckelt `max-h-[90vh]` auf 600 px, der Inhalt misst 661 px —
+      **61 px Überlauf**, `overflow-y-auto` greift, und nach dem Scrollen IM
+      Panel steht „Absenden" bei 599–643 von 667, also vollständig im Bild.
+      Die Deckelung trägt das gewachsene Formular; die Seite scrollt nirgends
+      waagerecht.
+
+      **Ein Bestandsbefund nebenbei, KEINE Regression:** unter `sm` sitzt der
+      Feedback-Knopf in der Navigationsschublade, und die bleibt beim Öffnen
+      des Formulars stehen. Dann tragen **zwei** Dialoge gleichzeitig
+      `aria-modal="true"` bei identischem `z-index: 50`; der A11y-Baum zeigt
+      nur die Schublade, das Formular ist für Vorlesesoftware unerreichbar.
+      `role="dialog" aria-modal="true"` steht schon auf `origin/main` —
+      gehört in einen eigenen Vorgang, nicht in AGE-628.
+- [x] 9.5 Code-Review über den **Diff** gefahren (`origin/main...HEAD`, hohe
+      Stufe). Die sicherheitskritischen Teile hielten stand: die Klammertrennung
+      in `messages_insert`, `null`-vs-`[]` in beiden Richtungen, die Klammer um
+      `(Eigentümer oder Admin)`, die Feedback-Kennung statt eines Pfades in
+      `admin_feedback_bild_loeschen`, und die Reihenfolge der `theme`-Migration.
+      Auch geprüft: `scripts/probe-activation-gate.ts` ruft `admin_list_feedback`
+      mit `{}` auf und läuft über die neuen Vorgabewerte weiter.
+
+      **Drei Befunde, alle drei nachgeprüft statt übernommen, alle drei behoben:**
+
+      1. **`AdminFeedbackPage.tsx` — die Signatur hatte kein `staleTime`.**
+         Nachgezählt: **fünf** andere signierte Bilder im Bestand setzen
+         `SIGNATUR_STALE_MS`, diese eine nicht. Ohne sie gilt `staleTime: 0`
+         plus `refetchOnWindowFocus` — und weil der Token IN der URL steckt
+         (`post-media.ts`), signiert jeder Tabwechsel jeden sichtbaren
+         Screenshot neu und lädt ihn erneut herunter. `SIGNATUR_STALE_MS` wird
+         jetzt über `feedback.ts` weitergereicht, wie `event-cover.ts` es tut.
+      2. **`anfangsOffen={gefiltert}` war tote Verdrahtung.** `FilterSpalte`
+         liest die Vorgabe genau einmal (`useState(anfangsOffen)`), und hier
+         startet der Filter immer als `LEERER_FEEDBACK_FILTER` — `gefiltert`
+         ist beim ersten Zeichnen also zwingend `false`. Dieselbe Falle wie in
+         `test-mit-vorbelegtem-kontext-falsche-zeitachse`. Entfernt, mit
+         Begründung an der Stelle. **`FilterSpalte` und `MemberDirectory`
+         bleiben unangetastet** — dort kommen die Filter aus der URL und stehen
+         beim ersten Zeichnen wirklich schon da, die Vorgabe ist dort lebendig.
+      3. **Ein gescheitertes Einfügen liess pro Versuch eine Waise im Bucket.**
+         Das Bild geht ZUERST hoch; scheitert danach die Zeile, lud der zweite
+         Druck auf „Absenden" unter einem neuen `Date.now()`-Pfad erneut hoch.
+         Jetzt merkt sich das Bauteil den Pfad und benutzt ihn wieder; ein
+         **neues** Bild und „Entfernen" setzen den Merker zurück. Dazu: `close()`
+         nahm das Bild nicht mit — im Browser gemessen, nach „Abbrechen" und
+         erneutem Öffnen stand der Dateiname unverändert da. Der TEXT bleibt
+         bewusst stehen, der Screenshot nicht.
+
+      **Drei neue Zusagen, jede an einer Mutation belegt** (Datei vorher
+      gesichert, nach jeder Probe zeichengleich zurück, per `diff` geprüft):
+      | Mutation | Es fiel |
+      |---|---|
+      | Merker beim Absenden ignoriert | **1** — „laedt … NICHT ein zweites Mal hoch" |
+      | neues Bild setzt den Merker nicht zurück | **1** — „laedt … das NEU gewaehlte Bild hoch" |
+      | `close()` lässt das Bild stehen | **1** — „nimmt das Bild mit, wenn abgebrochen wird" |
+
+      Jede Mutation tötet **genau** ihre eigene Zusage, keine andere.
+      Abnahme danach: lint 0, typecheck 0, `pnpm test` 0 (**217 Dateien, 2462
+      Zusagen**), `pnpm build` 0, `supabase test db` **26 Dateien / 1119 PASS**,
+      `openspec validate --all` 32/32. Die von `build` umgeschriebene
+      `release-entries.generated.ts` wurde zurückgeholt.

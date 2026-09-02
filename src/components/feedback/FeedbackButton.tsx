@@ -64,6 +64,14 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   // Der Schlüssel des gewählten Themas, "" heisst „noch nichts gewählt".
   const [thema, setThema] = useState("");
   const [bild, setBild] = useState<File | null>(null);
+  /**
+   * Der Pfad des BEREITS hochgeladenen Bildes. Er überlebt einen
+   * fehlgeschlagenen Versuch, damit der zweite Druck auf „Absenden" nicht
+   * ein zweites Objekt anlegt: `uploadFeedbackScreenshot` baut den Pfad aus
+   * `Date.now()`, ein erneuter Aufruf träfe also nie dieselbe Stelle und
+   * liesse pro Versuch eine Waise im Bucket zurück, die niemand mehr sieht.
+   */
+  const [hochgeladenerPfad, setHochgeladenerPfad] = useState<string | null>(null);
   const dateiRef = useRef<HTMLInputElement>(null);
   const bildWahl = useBildauswahl(([datei]) => uebernehmeBild(datei));
 
@@ -99,6 +107,15 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   function close() {
     setOpen(false);
     setError(null);
+    // Das Bild MUSS mit weg. Sonst hängt beim nächsten Öffnen wortlos die
+    // Datei aus dem abgebrochenen Versuch wieder dran — gemessen im Browser
+    // am 02.09.: nach „Abbrechen" und erneutem Öffnen stand der Dateiname
+    // samt „Entfernen" unverändert da. Der Text bleibt bewusst stehen (ein
+    // versehentliches Schliessen soll den Entwurf nicht kosten); ein
+    // stillschweigend wieder angehängter Screenshot ist etwas anderes, weil
+    // ihn niemand im Formular sucht.
+    setBild(null);
+    setHochgeladenerPfad(null);
   }
 
   /**
@@ -120,6 +137,10 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
     }
     setError(null);
     setBild(datei);
+    // Ein neues Bild macht den gemerkten Pfad ungültig: sonst hinge nach einem
+    // gescheiterten Versuch das ALTE Objekt an der Zeile, obwohl auf dem
+    // Bildschirm der neue Dateiname steht.
+    setHochgeladenerPfad(null);
   }
 
   async function submit() {
@@ -130,7 +151,17 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
       // dazwischen eine Feedback-Zeile ohne ihr Bild — und niemand wüsste,
       // dass eines gemeint war. So herum ist der schlimmste Ausgang ein
       // verwaistes Objekt, das niemand sieht.
-      const screenshotPath = bild ? await uploadFeedbackScreenshot(profileId, bild) : null;
+      //
+      // Und HÖCHSTENS EINMAL hochladen: scheitert das Einfügen der Zeile,
+      // liegt das Objekt schon oben. Ein zweiter Druck auf „Absenden" ohne
+      // diesen Merker lüde es unter einem neuen `Date.now()`-Pfad erneut hoch
+      // und liesse das erste als Waise zurück — in einem privaten Bucket, den
+      // nichts aufräumt.
+      let screenshotPath: string | null = null;
+      if (bild) {
+        screenshotPath = hochgeladenerPfad ?? (await uploadFeedbackScreenshot(profileId, bild));
+        setHochgeladenerPfad(screenshotPath);
+      }
       await submitPlatformFeedback({
         profileId,
         rating,
@@ -151,6 +182,7 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
       setIdea("");
       setThema("");
       setBild(null);
+      setHochgeladenerPfad(null);
       setOpen(false);
     } catch {
       setError("Dein Feedback konnte nicht gespeichert werden. Bitte versuche es noch einmal.");
@@ -313,7 +345,13 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => setBild(null)}
+                      onClick={() => {
+                        setBild(null);
+                        // Mit dem Bild geht auch der gemerkte Pfad: sonst
+                        // trüge die Zeile ein Objekt, das der Verfasser
+                        // gerade weggenommen hat.
+                        setHochgeladenerPfad(null);
+                      }}
                       aria-label="Bild entfernen"
                     >
                       Entfernen

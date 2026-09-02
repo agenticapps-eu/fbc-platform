@@ -18,6 +18,7 @@ import {
   LEERER_FEEDBACK_FILTER,
   oeffneAdminGespraech,
   signFeedbackScreenshot,
+  SIGNATUR_STALE_MS,
   type AdminFeedbackRow,
   type FeedbackFilter,
 } from "../lib/feedback";
@@ -64,6 +65,11 @@ function Screenshot({ pfad }: { pfad: string }) {
   const { data, isError } = useQuery({
     queryKey: feedbackScreenshotKey(pfad),
     queryFn: () => signFeedbackScreenshot(pfad),
+    // Ohne diese Zeile gilt `staleTime: 0` und `refetchOnWindowFocus` — jeder
+    // Wechsel zurück auf den Tab signierte jeden sichtbaren Screenshot neu,
+    // und weil der Token IN der URL steckt, lüde der Browser jedes Bild
+    // erneut. Dieselbe Zahl wie an allen anderen signierten Bildern.
+    staleTime: SIGNATUR_STALE_MS,
   });
 
   // Ein Fehler bekommt eine eigene Meldung. „Kein Bild" und „das Bild lässt
@@ -336,7 +342,13 @@ export default function AdminFeedbackPage() {
 
       <FilterSpalte
         id="admin-feedback-filter"
-        anfangsOffen={gefiltert}
+        // KEIN `anfangsOffen`: `FilterSpalte` liest die Vorgabe genau einmal
+        // (`useState(anfangsOffen)`), und beim ersten Zeichnen ist der Filter
+        // hier immer leer — er startet als LEERER_FEEDBACK_FILTER und kann nur
+        // gesetzt werden, wenn die Spalte schon offen ist. `anfangsOffen`
+        // wäre also dauerhaft `false` und die Verdrahtung tot. Bei
+        // `MemberDirectory` ist das anders: dort kommen die Filter aus der URL
+        // und stehen schon beim ersten Zeichnen.
         hinweisWennZu={gefiltert ? "Ein Filter ist aktiv." : undefined}
         filter={
           <Filter
