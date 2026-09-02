@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(437);
+select plan(435);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -74,9 +74,10 @@ insert into public.member_settings (profile_id) values
 insert into public.compass_responses (profile_id, theme, answers) values
   ('dddddddd-0000-0000-0000-00000000000d', 'tun', '{"a":1}'::jsonb);
 
--- Welpenschutz (§2) gilt 30 Tage ab Registrierung. Ohne Rückdatierung stünden ALLE
--- Fixtures darunter und jede Kontaktanfrage im Test wäre aus dem falschen Grund
--- verboten. '7777…' bleibt bewusst frisch — das ist der Welpenschutz-Fall.
+-- Die Rückdatierung stammt aus dem Welpenschutz (§2), der seit AGE-598 weg ist.
+-- Sie bleibt, weil sie den Fixtures ein plausibles Alter gibt und mehrere
+-- Zusagen an `created_at` hängen. '7777…' bleibt bewusst tagesfrisch: es ist
+-- jetzt der Beleg dafür, dass das Alter des EMPFÄNGERS nichts mehr verbietet.
 update public.profiles set created_at = now() - interval '90 days'
   where id <> '77777777-7777-7777-7777-777777777777';
 
@@ -274,16 +275,28 @@ select is(
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''66666666-6666-6666-6666-666666666666'')'),
   'OK', 'Exchange kann eine Kontaktanfrage senden');
 
--- ── 5. Welpenschutz (§2) — an neue Mitglieder nur über ein Match ─────────────
-select alike(
-  pg_temp.try_as('44444444-4444-4444-4444-444444444444',
-    'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''77777777-7777-7777-7777-777777777777'')'),
-  'DENIED:%', 'Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar');
-
-select is(
-  pg_temp.try_as('44444444-4444-4444-4444-444444444444',
-    'insert into public.contact_requests (from_id, to_id, match_id) values (''44444444-4444-4444-4444-444444444444'', ''77777777-7777-7777-7777-777777777777'', ''cccccccc-cccc-cccc-cccc-cccccccccccc'')'),
-  'OK', 'Über ein Match ist dasselbe neue Mitglied erreichbar');
+-- ── 5. Welpenschutz — ERSATZLOS GESTRICHEN (AGE-598, 02.09.) ─────────────────
+-- Hier standen zwei Zusagen. Beide sind mit
+-- `20260902190000_welpenschutz_entfernen.sql` weggefallen, und beide aus einem
+-- eigenen Grund:
+--
+--   * „Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar"
+--     war DIE Welpenschutz-Zusage. Sie fällt mit ihm. Ihre Nachfolge steht in
+--     `kontaktanfrage_staffelung_test.sql` §3c und sagt das Gegenteil zu — die
+--     Kaltanfrage an ein tagesfrisches Konto geht durch, in BEIDEN
+--     Schalterstellungen.
+--
+--   * „Über ein Match ist dasselbe neue Mitglied erreichbar" hätte man behalten
+--     können; sie wäre grün geblieben. Aber nicht mehr aus ihrem Grund:
+--     `exchange` darf nach dem Streichen ohnehin senden, das `match_id` belegt
+--     nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer
+--     als eine rote — sie sagt weiterhin etwas zu, das niemand mehr misst.
+--     Was das `match_id` WIRKLICH noch trägt, ist die Paarbindung, und die
+--     steht in `kontaktanfrage_staffelung_test.sql` §3 — in beiden Stellungen.
+--
+-- Der Bestand, der es entschieden hat: alle 74 Profile auf PROD sind jünger als
+-- 30 Tage. Eine Schutzregel, die man wegen ihrer eigenen Wirkung nie
+-- einschalten kann, ist keine Regel.
 
 -- ── 6. Opt-out des Empfängers (member_settings) ──────────────────────────────
 select alike(
@@ -291,17 +304,19 @@ select alike(
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''88888888-8888-8888-8888-888888888888'')'),
   'DENIED:%', 'Wer Kontaktanfragen abgeschaltet hat, bekommt keine (Opt-out wird erzwungen)');
 
--- ── 6b. open_contact öffnet BEIDE Gates (AGE-455) ───────────────────────────
--- Mit dem Flag darf jedes eingeloggte Mitglied jeden anschreiben — Level-Gate und
--- Welpenschutz offen. Das Empfänger-Opt-out bleibt in JEDEM Modus erzwungen.
+-- ── 6b. open_contact öffnet die Staffelung (AGE-455) ────────────────────────
+-- Mit dem Flag darf jedes eingeloggte Mitglied jeden anschreiben. Bis AGE-598
+-- öffnete es ZWEI Gates; seit dem Streichen des Welpenschutzes gibt es nur noch
+-- eines. Das Empfänger-Opt-out bleibt in JEDEM Modus erzwungen.
 update public.platform_settings set open_contact = true;
 
--- Basic (rank 1) an ein FRISCHES Mitglied (7777) OHNE Match: geschlossen doppelt
--- verboten (Level + Welpenschutz), offen erlaubt → belegt, dass beide Gates fallen.
+-- Basic (rank 1) an ein FRISCHES Mitglied (7777) OHNE Match: geschlossen von der
+-- Staffelung verboten (`basic` darf an niemanden), offen erlaubt → belegt, dass
+-- das Flag vor der Staffelung steht.
 select is(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'insert into public.contact_requests (from_id, to_id) values (''11111111-1111-1111-1111-111111111111'', ''77777777-7777-7777-7777-777777777777'')'),
-  'OK', 'open_contact: Basic darf ein neues Mitglied kalt anschreiben (Level + Welpenschutz offen)');
+  'OK', 'open_contact: Basic darf ein neues Mitglied kalt anschreiben (Staffelung offen)');
 
 -- Das Opt-out (8888) bleibt auch im offenen Modus geschützt.
 select alike(

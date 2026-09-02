@@ -300,17 +300,17 @@ Entschieden in D5: sie werden **ausgeblendet**, nicht leer laufen gelassen.
 
 Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
-- [ ] 6.1 **RED**: pgTAP — eine Kaltanfrage **ohne** `match_id` an ein Konto,
+- [x] 6.1 **RED**: pgTAP — eine Kaltanfrage **ohne** `match_id` an ein Konto,
       das am selben Tag registriert wurde, geht durch. Bei `open_contact = true`
       **und** bei `false` (dort mit einem Absender ab Rang 3). Das ist die
       Zusage, die heute nur zufällig gilt, weil das Flag offen steht
-- [ ] 6.2 **GREEN**: Klausel 332 aus `cr_insert_self` **streichen** — nicht
+- [x] 6.2 **GREEN**: Klausel 332 aus `cr_insert_self` **streichen** — nicht
       umbauen, nicht durch einen Schalter ersetzen
-- [ ] 6.3 **GREEN**: `drop function public.is_new_member(uuid)`. Gemessen genau
+- [x] 6.3 **GREEN**: `drop function public.is_new_member(uuid)`. Gemessen genau
       **ein** lebender Aufrufer, und das war Klausel 332
-- [ ] 6.4 **RED/GREEN**: pgTAP — `public.is_new_member(uuid)` existiert nicht
+- [x] 6.4 **RED/GREEN**: pgTAP — `public.is_new_member(uuid)` existiert nicht
       mehr. Ohne diese Zusage bliebe der Drop unbelegt
-- [ ] 6.5 Vorher prüfen, dass kein pgTAP-Bestandstest den Welpenschutz
+- [x] 6.5 Vorher prüfen, dass kein pgTAP-Bestandstest den Welpenschutz
       **oder die Rang-4-Grenze** zusagt — sonst wird die Änderung an einer
       alten Zusage rot, und das sähe wie ein Fehler aus statt wie die Absicht.
       **Drei sind bereits gefunden und namentlich zu behandeln** (`cso`,
@@ -319,9 +319,9 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
   | Fundstelle | Was mit ihr geschieht |
   |---|---|
   | `rls_test.sql:260` „Discover kann keine Kontaktanfrage senden (rank < exchange)" | **ERLEDIGT mit 5.4** (umgeschrieben, `is(… , 'OK')`). **Kippte von DENIED auf OK.** Das ist Teil B, nicht der Welpenschutz: Klausel 320 geht von `has_level(4)` auf das Prädikat, und das erlaubt ab Rang 3 jeden Empfänger. Muss umgeschrieben werden, und zwar als das, was sie ist — eine **Erweiterung** |
-  | `rls_test.sql:268` „Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar" | kippt auf OK. Das ist die Welpenschutz-Zusage; sie fällt mit ihm |
-  | `rls_test.sql:272` „Über ein Match ist dasselbe neue Mitglied erreichbar" | bleibt grün — **aber nicht mehr aus ihrem Grund.** `exchange` darf nach der Streichung ohnehin senden, das `match_id` belegt nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer als eine rote |
-- [ ] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: die Staffelung darf durch das
+  | `rls_test.sql:268` „Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar" | **ERLEDIGT mit 6.2**: gestrichen. Kippte auf OK. Nachfolge ist `kontaktanfrage_staffelung_test.sql` §3c, die das Gegenteil zusagt |
+  | `rls_test.sql:272` „Über ein Match ist dasselbe neue Mitglied erreichbar" | **ERLEDIGT mit 6.2**: gestrichen. Sie wurde beim Messen sogar ROT — die Vorgängerzusage legt jetzt dieselbe Zeile an und das Unique-Paar ist verbraucht. Die Paarbindung steht in `kontaktanfrage_staffelung_test.sql` §3. Ursprüngliche Diagnose: bleibt grün — **aber nicht mehr aus ihrem Grund.** `exchange` darf nach der Streichung ohnehin senden, das `match_id` belegt nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer als eine rote |
+- [x] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: die Staffelung darf durch das
       Streichen weder schärfer noch weicher geworden sein
 
 ## 6b. Das Alter des Bestands messen — erledigt, und es hat 6. entschieden
