@@ -215,10 +215,20 @@ Kompass-Kategorien) SHALL ein Wechsel des Suchbegriffs **nicht** zurücksetzen.
   Begriff abgeschickt wird
 - **THEN** bleiben die gesetzten Filter erhalten
 
-#### Scenario: Unterhalb von connect führt Enter auf die Aufstiegsseite
+#### Scenario: Unterhalb von discover führt Enter auf die Aufstiegsseite
 
-- **WHEN** ein aktiviertes Mitglied unterhalb von `connect` einen Begriff
-  eingibt und Enter drückt
+<!-- Der Titel bleibt zeichengleich, obwohl die Schwelle jetzt `connect` heisst.
+     `openspec archive` ordnet Szenarien über ihre Überschrift zu und bricht ab,
+     wenn eine verschwindet — ein umbenannter Titel wirkt wie ein gelöschtes
+     Szenario. Die Hausregel dazu: den RUMPF schärfen, nie den Titel.
+
+     Der Rumpf steht deshalb auf `basic`. Damit ist er unter BEIDEN Lesarten
+     wahr — `basic` liegt unterhalb von `discover` wie von `connect` —, und der
+     interessante neue Fall (`connect` kommt jetzt durch) steht bereits im
+     ersten Szenario dieser Anforderung. -->
+
+- **WHEN** ein aktiviertes Mitglied auf `basic` einen Begriff eingibt und Enter
+  drückt
 - **THEN** öffnet sich die Aufstiegsseite statt des Verzeichnisses
 
 ### Requirement: Der Sucheinstieg zeigt sich nur, wem er nützt
@@ -270,17 +280,27 @@ nachgebaut werden; der **Nachweis** SHALL an der Datenbank geführt werden.
 - **THEN** erscheint ein Fehlerzustand
 - **AND** weder eine „nichts gefunden"-Meldung noch ein Aufstiegs-Hinweis
 
-#### Scenario: Unterhalb connect und leer erscheint der Aufstiegs-Hinweis
+#### Scenario: Unterhalb discover und leer erscheint der Aufstiegs-Hinweis
 
-- **WHEN** ein aktiviertes Mitglied unterhalb von `connect` sucht **und** die
+<!-- Titel zeichengleich zur heutigen Fassung, Rumpf auf `basic` geschaerft —
+     siehe die Begruendung am Szenario „Unterhalb von discover fuehrt Enter auf
+     die Aufstiegsseite". `basic` liegt unterhalb beider Schwellen, die Zusage
+     bleibt also unter alter wie neuer Lesart wahr. -->
+
+- **WHEN** ein aktiviertes Mitglied auf `basic` sucht **und** die
   Abfrage erfolgreich keine Zeile liefert
 - **THEN** erscheint ein Hinweis, der die nötige Stufe nennt und zum Aufstieg
   führt
 - **AND** es erscheint keine Meldung, es sei nichts gefunden worden
 
-#### Scenario: Unterhalb connect wird die eigene Zeile trotzdem gezeigt
+#### Scenario: Unterhalb discover wird die eigene Zeile trotzdem gezeigt
 
-- **WHEN** ein aktiviertes Mitglied unterhalb von `connect` nach seinem eigenen
+<!-- Titel zeichengleich, Rumpf auf `basic`. Genau dieser Fall ist der Grund
+     fuer den Selbst-Zweig im Eintrittstor von `search_directory`: ein Konto
+     unterhalb der Verzeichnisschwelle findet in der Kopfzeilen-Suche weiterhin
+     sich selbst. -->
+
+- **WHEN** ein aktiviertes Mitglied auf `basic` nach seinem eigenen
   Namen sucht und die Abfrage seine eigene Zeile liefert
 - **THEN** erscheint dieser Treffer normal
 - **AND** er wird nicht wegen der Stufe unterdrückt
@@ -371,7 +391,12 @@ die Suchergebnisse („Suchergebnisse überleben keinen Wechsel der Identität")
   `/mitglieder` öffnet
 - **THEN** stehen beide Reiter da, „Meine Kontakte" mit dem Zähler 0
 
-#### Scenario: Unterhalb von connect gibt es die Fläche gar nicht
+#### Scenario: Unterhalb von discover gibt es die Fläche gar nicht
+
+<!-- Titel zeichengleich zur heutigen Fassung. Der Rumpf stand schon vorher auf
+     `basic` und bleibt damit unter alter wie neuer Schwelle wahr — hier war
+     nichts zu schärfen, nur der Titel zurückzunehmen. -->
+
 
 - **WHEN** ein Mitglied auf `basic` mit einem angenommenen Kontakt
   `/mitglieder` aufruft
