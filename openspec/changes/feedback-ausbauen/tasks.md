@@ -464,9 +464,17 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 9. Abnahme
 
-- [ ] 9.1 `pnpm lint`, `pnpm typecheck`, `pnpm test` — **Exit-Codes** lesen.
-- [ ] 9.2 `supabase test db` **mit Dateiliste** — ohne sie lügt der Lauf.
-- [ ] 9.3 `openspec validate --all` grün.
+- [x] 9.1 **Exit-Codes gelesen, nicht die Ausgabe:** `pnpm lint` 0,
+      `pnpm typecheck` 0, `pnpm test` 0 (217 Dateien, 2459 Zusagen),
+      `pnpm build` 0.
+      **Achtung, bekannte Falle:** `pnpm build` schreibt
+      `src/content/release-entries.generated.ts` **unformatiert um** — inhaltlich
+      identisch (geprüft: gleich nach Entfernen aller Leerzeichen und
+      Zeilenumbrüche), aber mit quotierten Schlüsseln und ohne
+      Komma am Zeilenende. Die committete Fassung wurde zurückgeholt.
+- [x] 9.2 **`supabase test db` mit Dateiliste**, aus `ci.yml` gezogen:
+      **26 Dateien, 1119 Zusagen, PASS.**
+- [x] 9.3 **`openspec validate --all` grün** — 32 von 32.
 - [ ] 9.4 Im Browser zeigen: Abgeben mit Bild und Thema, Filtern über eine
       Seitengrenze hinweg, Sprung in den Chat **und eine Antwort des Gegenübers**.
 - [ ] 9.5 Code-Review über den **Diff**, nicht über den Plan.
