@@ -1205,6 +1205,35 @@ Bündel.
       MITTEL). Die Grenze ist nicht die DoS-Kontrolle — `req.text()` puffert
       davor —, und `413` ist endgültiger Verlust. Bei dieser Fehlerrichtung ist
       Luft nach oben das sichere Ende.
+
+      **Nachgezogen 02.09.: dieselbe Naht in den zwei Nachbarn** (Donald: „zieh
+      das nach"). Das Quelltext-Grep-Muster steckte auch in `ota-update` und
+      `send-push`.
+
+      * **`ota-update`** — Handler nach `antwort.ts` als `behandleAnfrage`,
+        ausgeführt geprüft. Ungedeckt waren der 405-Wächter, der `catch` auf
+        `req.json()` und der `content-type`. Der Statusfehler von `ota-stats`
+        existierte hier **nicht**: `ergebnis.status` wurde bereits konsumiert.
+      * **`send-push`** — die Torwächter nach `aufruf.ts` als `pruefeAufruf`.
+        Das war der wertvollere Fund: die **Webhook-Authentifizierung**
+        (`timingSafeEqual`, 401) hatte **null** Abdeckung, ebenso das fehlende
+        Secret (500) und die Weiche Webhook/Wiederholungslauf. Alle
+        bestehenden Zusagen der Function galten `anbieter.ts` und
+        `nachrichten.ts`.
+
+      **Zehn Mutationen, zehnmal rot** — darunter „401 → 200", „Vergleich
+      übersprungen", „Status hartkodiert". Die Sonde selbst brauchte dabei eine
+      Positivkontrolle: eine syntaktisch kaputte Mutante lief gar nicht und sah
+      im ersten Anlauf wie GRÜN aus.
+
+      Eine **beabsichtigte** Verhaltensänderung: ein Rumpf `null` warf vorher in
+      `aufruf.record?.id` eine `TypeError` und wurde zu 500; jetzt ist es ein
+      400, und es ist zugesagt.
+
+      **Offen geblieben:** `Zustellung` liegt weiter in `send-push/index.ts`,
+      und die Zusage auf `apnsMitHostErkennung` grept dort noch Quelltext. Das
+      herauszulösen wäre ein Umbau der Zustellschleife — verhaltenstragender
+      Code, keine Testgerüste. Bewusst nicht mitgenommen.
 - [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.

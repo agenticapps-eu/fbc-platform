@@ -18,7 +18,7 @@
 // Secrets: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (plattform-injiziert).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { ermittleAntwort, manifestZugriff, type RpcClient } from "./antwort.ts";
+import { behandleAnfrage, manifestZugriff, type RpcClient } from "./antwort.ts";
 
 function log(
   level: "info" | "warn" | "error",
@@ -30,34 +30,20 @@ function log(
   );
 }
 
-Deno.serve(async (req) => {
-  // Kein CORS-Vorflug: der Aufrufer ist die native Schale über OkHttp bzw.
-  // URLSession (`CapgoUpdater.java:2246`), kein Browser.
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
-
-  let rumpf: unknown;
-  try {
-    rumpf = await req.json();
-  } catch {
-    rumpf = null;
-  }
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
-  // Der Funktionsname und die zwei Parameter, die hinausgehen, stehen in
-  // `manifestZugriff` und werden dort geprueft — dieser Rumpf baut nur noch die
-  // Abhaengigkeiten. Die Zusicherung auf `RpcClient` verengt den Client auf den
-  // einen Aufruf, den dieser Weg braucht.
-  const ergebnis = await ermittleAntwort(rumpf, {
-    neuestesBuendel: manifestZugriff(supabase as unknown as RpcClient),
+// Diese Datei entscheidet nichts. Der Handler steht in `antwort.ts` und wird
+// dort AUSGEFUEHRT geprueft; hier stehen nur die zwei echten Abhaengigkeiten.
+Deno.serve((req) =>
+  behandleAnfrage(req, {
+    // Der Funktionsname und die zwei Parameter, die hinausgehen, stehen in
+    // `manifestZugriff` und werden dort geprueft. Die Zusicherung auf
+    // `RpcClient` verengt den Klienten auf den einen Aufruf, den dieser Weg
+    // braucht.
+    neuestesBuendel: manifestZugriff(
+      createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      ) as unknown as RpcClient,
+    ),
     log,
-  });
-
-  return new Response(JSON.stringify(ergebnis.body), {
-    status: ergebnis.status,
-    headers: { "content-type": "application/json" },
-  });
-});
+  })
+);
