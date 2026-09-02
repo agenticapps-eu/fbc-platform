@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(24);
+select plan(26);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -26,7 +26,12 @@ insert into auth.users (id, aud, role, email) values
   ('d1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'bea@dir.test.fbc'),
   ('d1000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'cem@dir.test.fbc'),
   ('d1000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'dora@dir.test.fbc'),
-  ('d1000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'egon@dir.test.fbc');
+  ('d1000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'egon@dir.test.fbc'),
+  -- Frida und Gero kamen mit AGE-598 dazu: die Datei kannte bis dahin keine
+  -- Stufe ZWISCHEN `basic` und `impact`, und genau dort liegt die Grenze, die
+  -- der Change verschiebt.
+  ('d1000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'frida@dir.test.fbc'),
+  ('d1000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'gero@dir.test.fbc');
 
 update public.profiles set tier = 'impact', name = 'Anna', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000001';
@@ -41,6 +46,22 @@ update public.profiles set tier = 'impact', name = 'Dora', is_public = true
 -- Egon steht unter `discover` (rank 3) — er ist der Sichtbarkeits-Gegenbeweis.
 update public.profiles set tier = 'basic', name = 'Egon', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000005';
+-- Frida steht GENAU auf `discover` (rank 3) — die Stufe, an der die erweiterten
+-- Felder heute aufgehen. Anna (impact) belegt das nicht: sie liegt drei Ränge
+-- darüber, und eine Zusage, die bei rank 6 hält, sagt über rank 3 nichts.
+update public.profiles set tier = 'discover', name = 'Frida', is_public = true
+  where id = 'd1000000-0000-0000-0000-000000000006';
+-- Gero steht auf `connect` (rank 2) — die Stufe, die AGE-598 in die Liste holt.
+-- Bis dahin ist er der Beleg für den Ist-Zustand, nicht für den Fortschritt.
+update public.profiles set tier = 'connect', name = 'Gero', is_public = true
+  where id = 'd1000000-0000-0000-0000-000000000007';
+
+-- Annas Kompetenzen. Sie sind das erweiterte Feld, an dem sich die Rang-3-Grenze
+-- MESSEN lässt: `search_directory` gibt die Spalte heraus, und die profiles-RLS
+-- entscheidet, ob sie gefüllt ankommt. Ohne einen Wert hier wäre „leer bei
+-- connect" auch dann grün, wenn die Grenze gefallen ist — leer ist leer.
+update public.profiles set competencies = array['Bilanzanalyse']
+  where id = 'd1000000-0000-0000-0000-000000000001';
 
 -- Cover als PFAD, nicht als URL (AGE-595). Seit AGE-580 steht in `cover_url` ein
 -- relativer Pfad im Bucket `covers`; gerendert wird über `bildUrl("covers", …)`.
@@ -102,7 +123,7 @@ end $$;
 -- Test die Umgebung mit und schlägt für den falschen Grund fehl — in der CI mit
 -- frischem `db reset` fiele das nie auf.
 create function pg_temp.fixtures() returns text[] language sql immutable as $$
-  select array['Anna','Bea','Cem','Dora','Egon']::text[];
+  select array['Anna','Bea','Cem','Dora','Egon','Frida','Gero']::text[];
 $$;
 
 -- Anna (impact, rank 6) ist die Aufruferin der Sichtbarkeits-Fälle.
@@ -351,6 +372,44 @@ select isnt(
     'pg_proc'),
   null,
   'search_directory traegt nach dem drop/create wieder einen Kommentar');
+
+-- ── 9. Positivkontrollen zur Rang-3-Grenze (AGE-598, Aufgaben 2.2/2.3) ──────
+-- Diese beiden Zusagen sind KEIN Fortschritt und sollen es nicht sein. Sie sind
+-- die Grundlinie: sie halten den Ist-Zustand fest, BEVOR AGE-598 die
+-- Verzeichnisschwelle von Rang 3 auf Rang 2 senkt.
+--
+-- Warum das nötig ist: die Senkung lässt mehr Zeilen durch. „Mehr Zeilen kommen
+-- an" ist aber auch genau das Bild, das ein versehentlich mitgenommenes
+-- Rang-3-Gate erzeugt. Ohne 9.1 sähe der teuerste denkbare Fehler dieses
+-- Changes wie sein Erfolg aus.
+--
+-- Die Datei sagt oben „RED vor GREEN". Diese zwei sind die Ausnahme und dürfen
+-- es sein: sie sind Gegenproben und müssen HEUTE grün stehen. Eine Gegenprobe,
+-- die erst rot ist, misst nichts.
+
+-- 9.1 (Aufgabe 2.2) Frida steht auf `discover` und bekommt Annas Kompetenzen
+-- GEFÜLLT. Nach AGE-598 muss diese Zusage unverändert halten — sie ist die
+-- Wache über die Grenze, die der Change NICHT anfassen darf.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+    select array_to_string(competencies, ',') from public.search_directory()
+     where name = 'Anna'
+  $q$),
+  'Bilanzanalyse',
+  'discover bekommt die fremden competencies gefüllt — die Rang-3-Grenze, '
+  'gegen die sich AGE-598 später messen lässt');
+
+-- 9.2 (Aufgabe 2.3) Gero steht auf `connect` und sieht HEUTE nur sich selbst.
+-- Diese Zusage kippt mit AGE-598 absichtlich — sie steht hier, damit das
+-- Kippen ein sichtbares Ereignis ist und kein stiller Nebeneffekt.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Gero',
+  'connect sieht heute nur die eigene Zeile — der Ist-Zustand, den AGE-598 '
+  'umdreht');
 
 select * from finish();
 rollback;

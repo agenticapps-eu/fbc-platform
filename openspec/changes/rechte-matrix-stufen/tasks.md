@@ -78,12 +78,37 @@ Erfolg aus.
   (AGE-622, rollen-eigene Grants). Für Zeilensichtbarkeit ist das folgenlos,
   für `grants_test.sql` wäre es das nicht — die Datei ist hier bewusst nicht
   Teil der Grundlinie.
-- [ ] 2.2 **RED**: pgTAP-Zusage, dass ein `discover`-Konto `competencies`
-      **gefüllt** aus `search_directory` bekommt — muss heute schon grün sein
-      und ist die Gegenprobe, nicht der Fortschritt
-- [ ] 2.3 **RED**: pgTAP-Zusage, dass ein `connect`-Konto heute nur die
-      **eigene** Zeile aus `search_directory` bekommt — dokumentiert den
-      Ist-Zustand, den 3.x umdreht
+- [x] 2.2 ~~**RED**~~ **Gegenprobe**: pgTAP-Zusage, dass ein `discover`-Konto
+      `competencies` **gefüllt** aus `search_directory` bekommt — muss heute
+      schon grün sein und ist die Gegenprobe, nicht der Fortschritt.
+      `directory_search_test.sql` Zusage 25, **grün**
+- [x] 2.3 ~~**RED**~~ **Gegenprobe**: pgTAP-Zusage, dass ein `connect`-Konto
+      heute nur die **eigene** Zeile aus `search_directory` bekommt —
+      dokumentiert den Ist-Zustand, den 3.x umdreht.
+      `directory_search_test.sql` Zusage 26, **grün**
+
+  **Das „RED" oben ist durchgestrichen, und zwar mit Absicht.** Die Kopfzeile
+  dieser Datei sagt „RED vor GREEN", und für 3.x bis 7.x gilt das. Diese beiden
+  sind die Ausnahme: ihr eigener Aufgabentext sagt „muss heute schon grün sein"
+  und „dokumentiert den Ist-Zustand". Eine Gegenprobe, die erst rot ist, misst
+  nichts. Der Widerspruch stand im Plan und wird hier aufgelöst statt
+  stillschweigend in eine Richtung entschieden.
+
+  **Zwei neue Fixtures, weil die Datei die fragliche Stufe gar nicht kannte.**
+  Sie kannte `basic` (Egon) und `impact` (Anna, Bea, Dora) — zwischen ihnen
+  liegt die Grenze, um die es geht. Neu: **Frida** auf genau `discover`
+  (Rang 3) und **Gero** auf `connect` (Rang 2). Eine Zusage, die bei Rang 6
+  hält, sagt über Rang 3 nichts.
+
+  **Und beide sind gesondert gesondiert.** Grün allein belegt hier nichts: eine
+  Zusage über eine Stufengrenze ist auch dann grün, wenn sie in Wahrheit die
+  Umgebung misst. Probe: in einer Wegwerf-Kopie die beiden Stufen **vertauscht**
+  (Frida → `connect`, Gero → `discover`) und den Lauf wiederholt. Ergebnis
+  **24 bestanden, 2 fehlgeschlagen — genau 25 und 26, keine andere.** Die zwei
+  hängen also an der Stufe und an nichts sonst.
+
+  Grundlinie danach: `rls_test.sql` 437 + `directory_search_test.sql` **26** =
+  **463**, `supabase test db` grün.
 
 ## 3. Verzeichnisliste ab `connect` (Teil A)
 
