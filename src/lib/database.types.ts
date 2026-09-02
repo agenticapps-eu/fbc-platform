@@ -384,6 +384,11 @@ export type Database = {
         ];
       };
       feedback: {
+        // `theme` und `screenshot_path` kamen mit AGE-628. `theme` ist in der
+        // Datenbank `not null` MIT Vorgabewert `generell` — deshalb hier in Row
+        // ohne `| null`, in Insert aber optional: wer es weglaesst, bekommt
+        // „Generell". Genau daran haengt, dass die alte Oberflaeche zwischen
+        // Migration und Deploy weiter absenden kann.
         Row: {
           created_at: string;
           id: string;
@@ -396,6 +401,8 @@ export type Database = {
           ref_id: string | null;
           ref_type: string | null;
           route: string | null;
+          screenshot_path: string | null;
+          theme: string;
         };
         Insert: {
           created_at?: string;
@@ -409,6 +416,8 @@ export type Database = {
           ref_id?: string | null;
           ref_type?: string | null;
           route?: string | null;
+          screenshot_path?: string | null;
+          theme?: string;
         };
         Update: {
           created_at?: string;
@@ -422,6 +431,8 @@ export type Database = {
           ref_id?: string | null;
           ref_type?: string | null;
           route?: string | null;
+          screenshot_path?: string | null;
+          theme?: string;
         };
         Relationships: [
           {
@@ -439,6 +450,21 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      // Die Themenliste des Feedbacks (AGE-628). DATEN, keine abgeschriebene
+      // Menge: die Beschriftungen stehen in der Datenbank, damit sie nicht ein
+      // zweites Mal in TypeScript stehen und lautlos auseinanderlaufen.
+      // Nur lesbar — `authenticated` haelt hier ausschliesslich SELECT, `anon`
+      // gar nichts. Deshalb kein Schreibweg in Insert/Update.
+      feedback_themes: {
+        Row: {
+          key: string;
+          label: string;
+          sort: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
       };
       goals: {
         Row: {
@@ -659,8 +685,14 @@ export type Database = {
         // UPDATE auf dieser Tabelle, und ein beim INSERT mitgegebener Wert
         // wird vom BEFORE-Trigger verworfen. Sie in Insert/Update zu fuehren
         // hiesse, einen Schreibweg anzubieten, den es nicht gibt.
+        //
+        // `admin_eroeffnet` (AGE-628) steht aus demselben Grund nur in Row: die
+        // threads_insert-Policy verbietet einem Mitglied ausdruecklich, die
+        // Marke zu setzen, und gesetzt wird sie allein von
+        // `admin_gespraech_oeffnen`.
         Row: {
           a_profile_id: string;
+          admin_eroeffnet: boolean;
           b_profile_id: string;
           created_at: string;
           id: string;
@@ -1924,6 +1956,35 @@ export type Database = {
       /** Aktiviert ein fremdes Profil und schreibt in DERSELBEN Transaktion nach
        *  `admin_audit`. Bricht mit 22023 ab, wenn das Ziel schon bestaetigt ist. */
       admin_activate_member: { Args: { target: string }; Returns: string };
+      // Hand-maintained (AGE-628). Mirrors admin_feedback_bild_loeschen(uuid)
+      // from 20260902130000_admin_feedback_bild_loeschen.sql.
+      //
+      // Sie nimmt die FEEDBACK-KENNUNG entgegen, nie einen Pfad — ein Pfad vom
+      // Aufrufer waere ein confused deputy ueber den ganzen Bucket. Sie leert
+      // `screenshot_path` und gibt den Pfad zurueck; das OBJEKT entfernt der
+      // Aufrufer danach ueber die Storage-API (dafuer traegt der Admin die
+      // DELETE-Policy). `null` heisst „die Zeile trug kein Bild" und ist KEIN
+      // Fehler; ein Nicht-Admin bekommt 42501, eine unbekannte Kennung 22023.
+      admin_feedback_bild_loeschen: {
+        Args: { p_feedback_id: string };
+        Returns: string | null;
+      };
+      // Hand-maintained (AGE-628). Mirrors admin_gespraech_oeffnen(uuid) from
+      // 20260902120000_admin_gespraech.sql.
+      //
+      // Oeffnet das Gespraech zwischen dem aufrufenden Admin und p_ziel und
+      // gibt dessen Kennung zurueck — das BESTEHENDE oder ein neues. Setzt
+      // `admin_eroeffnet` nur beim Neuanlegen; ein bestehendes, gewoehnliches
+      // Gespraech wird dadurch nicht nachtraeglich freigeschaltet. 42501 fuer
+      // Nicht-Admins, 22023 fuer ein Selbstgespraech.
+      //
+      // DIES ist der ganze Weg. Ein von Hand ueber `message_threads` angelegtes
+      // Gespraech traegt keine Marke und ist eine Einbahnstrasse: der Admin
+      // schreibt darin, das Gegenueber nicht.
+      admin_gespraech_oeffnen: {
+        Args: { p_ziel: string };
+        Returns: string;
+      };
       // Hand-maintained until `supabase gen types` is re-run (AGE-358). Mirrors the
       // admin_list_feedback(int, int, text[], int[]) RPC from
       // 20260902110000_admin_feedback_filter.sql (admin-only enriched read of QM

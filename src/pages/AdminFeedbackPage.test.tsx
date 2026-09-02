@@ -98,9 +98,14 @@ describe("Die Feedback-Seite zeigt, was die Karte zeigte (5.1)", () => {
     await screen.findByText("Der Compass ist klar");
 
     expect(rpc.mock.calls[0][0]).toBe("admin_list_feedback");
+    // Ohne gesetzten Filter gehen BEIDE Facetten als `null` hinüber, nicht als
+    // `[]` (AGE-628): `spalte = any('{}')` ist in PostgreSQL false, ein leeres
+    // Array liesse die ungefilterte Seite leer.
     expect(lastArgs()).toEqual({
       p_limit: FEEDBACK_SEITENGROESSE + 1,
       p_offset: 0,
+      p_themes: null,
+      p_ratings: null,
     });
   });
 });

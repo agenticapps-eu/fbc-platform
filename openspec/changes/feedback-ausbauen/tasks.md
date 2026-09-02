@@ -336,19 +336,47 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 6. Typen und Datenschicht
 
-- [ ] 6.1 **`src/lib/database.types.ts`** von Hand nachziehen — nicht
-      `src/types/`, das gibt es nicht. `gen types` NICHT darüberlaufen lassen.
-- [ ] 6.2 `src/lib/feedback.ts`: Thema und Bild beim Absenden, Upload mit
-      `upsert: false`, Filterargumente beim Abruf (`null` statt `[]`), signierte
-      URL mit kurzer Lebensdauer erst beim Anzeigen.
-- [ ] 6.3 **Den React-Query-Schlüssel um die Filter erweitern.** Er trägt heute
-      nur die Seite (`AdminFeedbackPage.tsx:94`): ein Filterwechsel auf
-      derselben Seite liefert veraltete Treffer, und wer auf Seite 3 steht und
-      verengt, sieht fälschlich „keine Treffer".
-- [ ] 6.4 Beim Filterwechsel auf Seite 1 zurückspringen.
-- [ ] 6.5 Tests: `upsert: false` im Aufruf; leerer Filterzustand schickt `null`;
-      der Schlüssel unterscheidet zwei Filterzustände; die Seitenrückstellung
-      greift.
+- [x] 6.1 **`src/lib/database.types.ts` von Hand nachgezogen.** `feedback` um
+      `theme` und `screenshot_path`, `feedback_themes` neu (nur `Row` —
+      `authenticated` hält dort ausschliesslich SELECT, also gibt es keinen
+      Schreibweg zu beschreiben), `message_threads.admin_eroeffnet` ebenfalls
+      nur in `Row`, dazu die zwei neuen RPCs. `admin_list_feedback` war schon
+      in Einheit 3 gehoben.
+      `theme` steht in `Row` **ohne** `| null` und in `Insert` **optional** —
+      genau das ist die Zusage des dauerhaften Vorgabewerts.
+- [x] 6.2 **`src/lib/feedback.ts`.** Thema und Bild beim Absenden (beide nur
+      mitgeschickt, wenn gesetzt — ein `theme: undefined` überträgt PostgREST
+      als `null` und liefe gegen das `not null`), `uploadFeedbackScreenshot`
+      mit `upsert: false`, `signFeedbackScreenshot` einzeln und erst beim
+      Anzeigen, `deleteFeedbackScreenshot` mit **beiden** Hälften (RPC, dann
+      Storage-API), `fetchFeedbackThemen`.
+      Die Signaturgültigkeit ist aus `post-media` **übernommen** und nicht neu
+      gewählt: sie ist zugleich die Nachlaufzeit eines Sichtbarkeitswechsels,
+      und zwei Werte im selben Produkt wären zwei Antworten auf dieselbe Frage.
+- [x] 6.3 **Der Schlüssel trägt jetzt Seite und Filter**, die Marken sortiert:
+      er beschreibt eine Auswahl, keine Reihenfolge — sonst wären „Fehler,
+      Idee" und „Idee, Fehler" zwei Abfragen mit garantiert gleichem Ergebnis.
+- [ ] 6.4 Beim Filterwechsel auf Seite 1 zurückspringen. **Verschoben nach 8.2**
+      — der Rücksprung sitzt im Setter des Filters, und den gibt es erst mit
+      den Kästchen. Ihn hier zu bauen hiesse, einen Zustand ohne Bedienung
+      anzulegen.
+- [x] 6.5 **Datenschicht-Tests: 17 neue Zusagen, dazu drei bestehende
+      gehoben** (zwei in `feedback.test.ts`, eine in
+      `AdminFeedbackPage.test.tsx` — sie schrieben die RPC-Argumente
+      wörtlich aus und werden dadurch zu Wächtern über „kein Filter heisst
+      `null`").
+      **Mutationsprobe gefahren**, weil diese Zusagen nach dem Code entstanden
+      sind — sechs Mutationen, jede einzeln, danach zeichengleich zurück:
+      | Mutation | Es fielen |
+      |---|---|
+      | `[]` statt `null` an die RPC | **3** — darunter die zwei gehobenen Altzusagen |
+      | Filter aus dem Query-Key | **2** — je eine pro Facette |
+      | `upsert: true` | **1** |
+      | `theme` immer mitschicken | **1** |
+      | Fehler der Lösch-RPC ignoriert | **1** — das Objekt würde sonst ohne Recht entfernt |
+      | Pfad nicht ins eigene Präfix | **2** |
+      Keine Mutation lief grün durch; es gibt also keine unbelegte Zeile.
+      Die Seitenrückstellung gehört zu 6.4 und wird mit 8.2 geprüft.
 
 ## 7. Oberfläche: Abgeben
 
