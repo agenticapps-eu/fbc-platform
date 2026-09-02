@@ -8,13 +8,17 @@ Sonde durchläuft.
 
 ## 1. Fremdreview vor der ersten Codezeile
 
-- [ ] 1.1 `openspec validate --all` grün (erledigt beim Anlegen: 32/32) — vor
-      dem Review erneut fahren, falls der Delta sich noch ändert
-- [ ] 1.2 `openspec-change-review` mit **≥2 Reviewern anderer Anbieter** über
+- [x] 1.1 `openspec validate --all` grün (erledigt beim Anlegen: 32/32) — vor
+      dem Review erneut fahren, falls der Delta sich noch ändert. **02.09. nach
+      der Überarbeitung erneut gefahren: 32 passed, 0 failed**
+- [x] 1.2 `openspec-change-review` mit **≥2 Reviewern anderer Anbieter** über
       den Delta laufen lassen, `REVIEWS.md` schreiben (Trailer nicht vergessen —
-      von Hand gezählte Reviews zählen nicht)
-- [ ] 1.3 Einwände abarbeiten oder begründet zurückweisen; bei Änderungen am
-      Delta 1.1 wiederholen
+      von Hand gezählte Reviews zählen nicht). **gemini + opencode, beide
+      REQUEST-CHANGES.** Der Gate-Trailer fehlt bewusst: die Artefakte sind
+      nach dem Review geändert worden, der Digest bindet also nicht mehr
+- [x] 1.3 Einwände abarbeiten oder begründet zurückweisen; bei Änderungen am
+      Delta 1.1 wiederholen. **Sechs Befunde, fünf übernommen, einer begründet
+      zurückgewiesen** — Resolution-Tabelle in `REVIEWS.md`
 - [ ] 1.4 `cso` über den Delta: beide Änderungen sind Rechte-Änderungen
 
 ## 2. Positivkontrollen sichern, bevor irgendetwas wackelt
@@ -23,9 +27,43 @@ Diese Gruppe schreibt **keine** neue Funktionalität. Sie stellt sicher, dass ei
 Rückschritt auffällt — ohne sie sieht ein Schaden an der Rang-3-Grenze wie ein
 Erfolg aus.
 
-- [ ] 2.1 Bestehende `rls_test.sql`-Zusagen zur Rang-3-Grenze auf dem lokalen
+- [x] 2.1 Bestehende `rls_test.sql`-Zusagen zur Rang-3-Grenze auf dem lokalen
       Stack fahren und die Zahl der bestandenen Zusagen **notieren**; sie ist
       die Grundlinie
+
+  **Grundlinie, gemessen am 02.09. gegen eine frische Abbildung**
+  (`supabase db reset` über alle 120 Migrationen, dann
+  `supabase test db supabase/tests/rls_test.sql supabase/tests/directory_search_test.sql`):
+
+  | Datei | bestanden | fehlgeschlagen |
+  |---|---|---|
+  | `rls_test.sql` | **437** | 0 |
+  | `directory_search_test.sql` | **24** | 0 |
+  | zusammen | **461** | 0 |
+
+  Die Zusagen, die die **Rang-3-Grenze selbst** tragen — sie sind es, die nach
+  3.4 unverändert grün bleiben müssen, und ein Schaden an ihnen sähe ohne diese
+  Liste wie ein Erfolg aus:
+
+  | Nr. | Zusage |
+  |---|---|
+  | rls 6 | Basic sieht Impact im öffentlichen Verzeichnis (`profiles_public`) |
+  | rls 7 | **Connect liest KEINE fremde Vollzeile (erweiterte Felder)** |
+  | rls 8 | **Discover liest die fremde Vollzeile** |
+  | rls 10 | Discover sieht fremde Interessen |
+  | rls 12 | Discover sieht fremde Angebote |
+  | rls 213 | Discover sieht die fremden Altdaten NICHT — obwohl es die Vollzeile sieht |
+  | dir 11 | unterhalb von discover verrät der Kategoriefilter weder Zeilen noch Kategorien |
+
+  **Zwei Vorbehalte, die zur Zahl gehören.** Erstens stand der lokale Stack vor
+  dem Lauf verdriftet da — Schema teilweise voraus (die 4-argumentige
+  `admin_list_feedback` existierte), Historie elf Zeilen hinterher. Die
+  Grundlinie ist deshalb gegen eine **frische** Abbildung gemessen, nicht gegen
+  den vorgefundenen Datenträger; Donald hat den `db reset` am 02.09.
+  freigegeben. Zweitens ist die lokale CLI **2.111.0**, CI pinnt **2.116.0**
+  (AGE-622, rollen-eigene Grants). Für Zeilensichtbarkeit ist das folgenlos,
+  für `grants_test.sql` wäre es das nicht — die Datei ist hier bewusst nicht
+  Teil der Grundlinie.
 - [ ] 2.2 **RED**: pgTAP-Zusage, dass ein `discover`-Konto `competencies`
       **gefüllt** aus `search_directory` bekommt — muss heute schon grün sein
       und ist die Gegenprobe, nicht der Fortschritt
