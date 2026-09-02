@@ -130,9 +130,19 @@ und öffnen als man erwartet.
 
 > ### ⚠ Vorher: der Rückfall braucht eine sichtbare Marke — sonst belegt Probe 2 nichts
 >
-> Stand 02.09. 20:12 UTC trägt das neueste Bündel (`5091813459c8`, der CI-Bau
-> zum Merge von #319) **keine** Marke; die aus Probe 1 (`feedbeef`) liegt
-> sieben Bündel darunter. Läuft Probe 2 gegen diesen Stand, ist der Beleg für
+> **Der Kopf wandert bei jedem Merge** (§1) — die Zahl hier ist deshalb ein
+> Beispiel, kein Zustand. Vor Probenbeginn selbst nachsehen, ohne Anmeldung:
+>
+> ```bash
+> curl -s -X POST https://viwntbodrtqxgmqyxluh.supabase.co/functions/v1/ota-update \
+>   -H 'content-type: application/json' \
+>   -d '{"version_build":"1.0.0","version_name":"builtin"}'
+> ```
+>
+> Nennt die Antwort ein CI-Bündel (Fassung = ein `main`-Commit), trägt der
+> Kopf **keine** Marke — ein CI-Bau trägt nie eine. Gemessen 02.09. 20:12 UTC:
+> `5091813459c8`, der Bau zum Merge von #319; die Marke aus Probe 1
+> (`feedbeef`) lag sieben Bündel darunter. Läuft Probe 2 so, ist der Beleg für
 > Schritt 3 nur noch „der Bildschirm ist nicht weiss" — und genauso sieht es
 > aus, wenn das defekte Bündel **nie installiert wurde**. Der Rückweg wäre dann
 > wieder eine Behauptung, diesmal eine grüne.
