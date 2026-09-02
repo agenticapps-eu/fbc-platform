@@ -23,7 +23,7 @@
 -- wäre nicht unterscheidbar von ihrer Abwesenheit.
 
 begin;
-select plan(18);
+select plan(19);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -65,6 +65,21 @@ select ('a0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
 insert into public.feedback (id, profile_id, rating, likes, route, created_at) values
   ('fbfbfbfb-0000-0000-0000-00000000000b', 'fb000000-0000-0000-0000-00000000000b',
    5, 'Bodos Lob', '/bodo', timestamptz '2026-08-01 12:00:00+00');
+
+-- Themen und Bewertungen fuer die Filter-Zusagen (AGE-628, Aufgaben 3.1/3.8).
+-- Alles andere traegt den Vorgabewert `generell` und die Bewertung 3.
+--
+-- Die drei markierten Zeilen liegen BEWUSST ganz hinten: `a…001` und `a…002`
+-- sind bei `id desc` die Plaetze 106 und 105, also Seite 5. Eine Marke auf
+-- einer Zeile der ersten Seite waere als Zusage wertlos — sie stuende dort
+-- auch ohne Filter, und „der Filter greift vor der Seitengrenze" liesse sich
+-- daran nicht von „der Filter greift gar nicht" unterscheiden.
+update public.feedback set theme = 'fehler', rating = 1
+ where id = 'a0000000-0000-0000-0000-000000000001';
+update public.feedback set theme = 'fehler'
+ where id = 'a0000000-0000-0000-0000-000000000002';
+update public.feedback set theme = 'idee'
+ where id = 'a0000000-0000-0000-0000-000000000003';
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 -- SQLSTATE statt SQLERRM: die Zusage in 3.2 lautet „geklemmt, NICHT abgewiesen".
@@ -120,6 +135,30 @@ begin
     json_build_object('sub', uid, 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
   execute q into t;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return t;
+end $$;
+
+-- Wie `text_as`, aber FAENGT den Fehler. Nur fuer die Filter-Zusagen (AGE-628):
+-- solange die Funktion die neuen Argumente nicht kennt, wirft ein Aufruf mit
+-- `p_themes => …` einen `42883`, und der risse in `text_as` die ganze
+-- Testtransaktion mit — die RED-Stufe scheiterte dann als ABBRUCH statt als
+-- Zusage, und die 18 Zusagen darueber waeren nicht mehr messbar.
+-- SQLSTATE statt SQLERRM, damit die Meldung nicht an einem Wortlaut haengt.
+create function pg_temp.versuch_as(uid uuid, q text) returns text language plpgsql as $$
+declare t text;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    execute q into t;
+  exception when others then
+    reset role;
+    perform set_config('request.jwt.claims', '', true);
+    return 'FEHLER:' || SQLSTATE;
+  end;
   reset role;
   perform set_config('request.jwt.claims', '', true);
   return t;
@@ -267,6 +306,27 @@ select ok(
                                where oid = 'public.admin_list_feedback(int,int)'::regprocedure)) a
      where a.grantee = 0),
   'admin_list_feedback: PUBLIC hält kein EXECUTE');
+
+-- ── 7. Der Filter nach Thema (AGE-628, Aufgabe 3.1) ─────────────────────────
+-- DIE Zusage, um die es in Einheit 3 geht, und sie ist bewusst als EINE
+-- geschrieben: sie sagt nicht „es kommt irgendetwas Gefiltertes", sondern
+-- nennt beide Kennungen in ihrer Reihenfolge.
+--
+-- Was sie unterscheidbar macht: `a…002` und `a…001` sind ohne Filter die
+-- Plätze 105 und 106, stehen also auf Seite 5. Käme der Filter ERST NACH
+-- `limit`/`offset` zum Zug, läge hier eine leere Liste — die erste Seite trägt
+-- keine einzige Zeile mit dem Thema `fehler`. Und griffe der Filter gar nicht,
+-- stünden hier 25 Kennungen.
+--
+-- Der Aufruf nennt das Argument BEIM NAMEN. Positionell wäre er nach dem
+-- `drop`/`create` aus 3.2 auch dann noch gültig, wenn die Argumente in einer
+-- anderen Reihenfolge stünden.
+select is(
+  pg_temp.versuch_as('fb000000-0000-0000-0000-0000000000ad',
+    $q$select array(select id from public.admin_list_feedback(
+                      p_themes => array['fehler']))::text$q$),
+  '{a0000000-0000-0000-0000-000000000002,a0000000-0000-0000-0000-000000000001}',
+  'Nach Thema gefiltert steht eine Zeile von Seite 5 auf Seite 1 — der Filter greift VOR der Seitengrenze');
 
 select * from finish();
 rollback;
