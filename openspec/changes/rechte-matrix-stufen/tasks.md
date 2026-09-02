@@ -257,13 +257,13 @@ verborgen und über das Suchfeld erfragbar.
 
 Entschieden in D5: sie werden **ausgeblendet**, nicht leer laufen gelassen.
 
-- [ ] 4.1 **RED**: Frontend-Test — ein `connect`-Konto sieht die Filter für
+- [x] 4.1 **RED**: Frontend-Test — ein `connect`-Konto sieht die Filter für
       Kompetenz, Biete-/Suche-Kategorien, Thema und Angebotsart **gar nicht**
-- [ ] 4.2 **RED**: Frontend-Test — an ihrer Stelle steht ein Hinweis, ab welcher
+- [x] 4.2 **RED**: Frontend-Test — an ihrer Stelle steht ein Hinweis, ab welcher
       Stufe es sie gibt; das Ausblenden allein wäre ein zweites Verschweigen
-- [ ] 4.3 **RED**: Frontend-Test — der Branchenfilter bleibt für `connect`
+- [x] 4.3 **RED**: Frontend-Test — der Branchenfilter bleibt für `connect`
       sichtbar und funktionsfähig (er filtert nach 3c auf einem Basisfeld)
-- [ ] 4.4 **GREEN**: umsetzen. Die drei Leerzustände aus `directory-search`
+- [x] 4.4 **GREEN**: umsetzen. Die drei Leerzustände aus `directory-search`
       („Fehler" · „Stufe zu niedrig" · „echter Nulltreffer") bleiben
       unterscheidbar und unberührt
 

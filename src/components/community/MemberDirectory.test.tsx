@@ -35,9 +35,15 @@ vi.mock("../../lib/supabase", () => ({
 /* AGE-595: `MemberDirectory` liest seit den Reitern die eigene Kennung, um
    die Kontaktmenge zu laden. Ohne diesen Mock wirft `useAuth` „muss innerhalb
    von <AuthProvider> verwendet werden" — die Datei praefte dann gar nichts
-   mehr. Ein Konto mit Kennung und ohne Kontakte ist hier der neutrale Fall. */
+   mehr. Ein Konto mit Kennung und ohne Kontakte ist hier der neutrale Fall.
+
+   AGE-598: Die Stufe kommt dazu. Seit D5 blendet die Filterspalte unterhalb
+   Rang 3 die Filter auf maskierten Spalten aus — ohne `levelRank` waere dieses
+   Konto ein `basic`-Konto, und die Zusagen dieser Datei ueber Kompetenz-,
+   Themen- und Chip-Filter waeren still an der falschen Stufe gescheitert. Rang 3
+   ist der Fall, den sie immer gemeint haben. */
 vi.mock("../../providers/auth-context", () => ({
-  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" } }),
+  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: 3 }),
 }));
 
 function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
