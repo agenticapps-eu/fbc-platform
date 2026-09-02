@@ -19,7 +19,21 @@ Sonde durchläuft.
 - [x] 1.3 Einwände abarbeiten oder begründet zurückweisen; bei Änderungen am
       Delta 1.1 wiederholen. **Sechs Befunde, fünf übernommen, einer begründet
       zurückgewiesen** — Resolution-Tabelle in `REVIEWS.md`
-- [ ] 1.4 `cso` über den Delta: beide Änderungen sind Rechte-Änderungen
+- [x] 1.4 `cso` über den Delta: beide Änderungen sind Rechte-Änderungen.
+      **Gefahren am 02.09., gescopt auf den Delta statt aufs Repo. Vier
+      Befunde, alle am laufenden Schema gemessen: 3 × MEDIUM, 1 × LOW, kein
+      HIGH und kein CRITICAL.** Bericht:
+      `.gstack/security-reports/2026-09-02-170000.json` (nicht eingecheckt,
+      `.gstack/` steht in `.gitignore`). Alle vier sind unten eingearbeitet —
+      in 3.3, 3c.2, 5.6 und 6.5. Drei Verdächtige haben sich am Code
+      **widerlegt** und sind ausdrücklich keine Befunde:
+      `p_theme`/`p_offering`/`p_offers`/`p_needs`/`p_competency` sind kein
+      Orakel (`offers`, `needs`, `profile_interests` tragen alle `has_level(3)`
+      in ihrer SELECT-Policy, gemessen — die Filter liefern für Rang 2 leer,
+      genau wie D1 zusagt); `is_contactable` ist `security definer`, das
+      Empfänger-Opt-out wirkt also auf fremde Zeilen wirklich und 5.5 misst
+      etwas; und das neue Prädikat ist für `authenticated` kein Stufen-Orakel,
+      weil `tier` ohnehin in `profiles_public` steht
 
 ## 2. Positivkontrollen sichern, bevor irgendetwas wackelt
 
@@ -79,7 +93,12 @@ Erfolg aus.
       `competencies`, `offer_categories`, `need_categories` als leere Arrays und
       `has_offers`/`has_needs` false; für die **eigene** Zeile gefüllt
 - [ ] 3.3 **RED**: pgTAP — ein `basic`-Konto erhält weiterhin höchstens die
-      eigene Zeile
+      eigene Zeile **aus `search_directory`**. Die Zusage gilt der RPC, nicht
+      den Daten, und das gehört in ihren Text: dieselben Basisfelder holt
+      dasselbe Konto mit einem Aufruf auf `profiles_public` (gemessen —
+      `security_invoker=off`, keine Stufenbedingung, `grant select` für
+      `authenticated`; `rls_test.sql` Zusage 6 sagt es zu). Wer sie als
+      Datengrenze liest, liest sie falsch — siehe den Zusatz in D1
 - [ ] 3.4 **GREEN**: Migration — `search_directory` neu: Eintrittstor bei Rang 2,
       Basisfelder aus `profiles_public`, erweiterte Spalten weiterhin aus
       `public.profiles` unter der unveränderten Rang-3-Policy. Die Zahl `3`
@@ -115,8 +134,12 @@ verborgen und über das Suchfeld erfragbar.
 
 - [ ] 3c.1 **RED**: pgTAP — ein `connect`-Konto bekommt `branche` **gefüllt**
       aus `search_directory`, und `p_branche` filtert für es korrekt
-- [ ] 3c.2 **GREEN**: `branche` in `profiles_public` aufnehmen; Grants nach dem
-      `create or replace view` erneut aussprechen
+- [ ] 3c.2 **GREEN**: `branche` in `profiles_public` aufnehmen — **als letzte
+      Spalte, hinter `cover_url`.** `create or replace view` erlaubt nur
+      ANGEHÄNGTE Spalten; an eine „logische" Stelle gesetzt (etwa hinter
+      `region`) scheitert die Migration. Heutige Reihenfolge: `id`, `name`,
+      `avatar_url`, `region`, `company`, `short_bio`, `tier`, `roles`,
+      `cover_url`. Grants nach dem `create or replace view` erneut aussprechen
 - [ ] 3c.3 Gegenprobe: die View gibt weiterhin **keine** erweiterten Felder her
 - [ ] 3c.4 Die Spalten-Aufzählung im Delta gegen den tatsächlichen
       Rückgabetyp von `search_directory` abgleichen — **jede** Spalte ist
@@ -153,8 +176,17 @@ Entschieden in D5: sie werden **ausgeblendet**, nicht leer laufen gelassen.
 - [ ] 5.5 **RED**: pgTAP — die vier unverändert geltenden Zusagen
       (Selbst-`from_id`, `pending`, `match_id`-Paarbindung, `is_contactable`)
       halten in **beiden** Schalterstellungen
-- [ ] 5.6 `grants_test.sql` nachziehen: das neue Prädikat bricht sonst den
-      Golden-Snapshot in CI
+- [ ] 5.6 `grants_test.sql` **Abschnitt 6 muss unverändert grün bleiben** —
+      die Liste wird *nicht* angefasst. Sie zählt abschliessend auf, welche
+      Funktionen `anon` ausführen darf, und eine neue Funktion erbt EXECUTE
+      über PUBLIC (der Test sagt das in seinem eigenen Kopf, Zeile 262). Wird
+      5.2 richtig gemacht, bricht Abschnitt 6 **gar nicht**. Bricht er, ist
+      **das** der Befund: der `revoke ... from public, anon` aus 5.2 fehlt.
+      `darf_kontaktanfrage_senden` in die Golden-Liste einzutragen wäre die
+      falsche Reparatur — sie erteilte einem ausgeloggten Aufrufer dauerhaft
+      EXECUTE auf ein `security definer`-Prädikat, das `profiles.tier` fremder
+      UUIDs liest. `anon` hält auf `profiles_public` kein SELECT (gemessen),
+      das wäre also ein neuer Weg und kein bestehender
 
 ## 6. Welpenschutz entfernen
 
@@ -170,9 +202,17 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
       **ein** lebender Aufrufer, und das war Klausel 332
 - [ ] 6.4 **RED/GREEN**: pgTAP — `public.is_new_member(uuid)` existiert nicht
       mehr. Ohne diese Zusage bliebe der Drop unbelegt
-- [ ] 6.5 Vorher prüfen, dass kein pgTAP-Bestandstest den Welpenschutz zusagt —
-      sonst wird die Streichung an einer alten Zusage rot, und das sähe wie ein
-      Fehler aus statt wie die Absicht
+- [ ] 6.5 Vorher prüfen, dass kein pgTAP-Bestandstest den Welpenschutz
+      **oder die Rang-4-Grenze** zusagt — sonst wird die Änderung an einer
+      alten Zusage rot, und das sähe wie ein Fehler aus statt wie die Absicht.
+      **Drei sind bereits gefunden und namentlich zu behandeln** (`cso`,
+      02.09.):
+
+  | Fundstelle | Was mit ihr geschieht |
+  |---|---|
+  | `rls_test.sql:260` „Discover kann keine Kontaktanfrage senden (rank < exchange)" | **kippt von DENIED auf OK.** Das ist Teil B, nicht der Welpenschutz: Klausel 320 geht von `has_level(4)` auf das Prädikat, und das erlaubt ab Rang 3 jeden Empfänger. Muss umgeschrieben werden, und zwar als das, was sie ist — eine **Erweiterung** |
+  | `rls_test.sql:268` „Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar" | kippt auf OK. Das ist die Welpenschutz-Zusage; sie fällt mit ihm |
+  | `rls_test.sql:272` „Über ein Match ist dasselbe neue Mitglied erreichbar" | bleibt grün — **aber nicht mehr aus ihrem Grund.** `exchange` darf nach der Streichung ohnehin senden, das `match_id` belegt nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer als eine rote |
 - [ ] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: die Staffelung darf durch das
       Streichen weder schärfer noch weicher geworden sein
 

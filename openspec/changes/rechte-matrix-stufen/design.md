@@ -103,6 +103,22 @@ oder Biete-/Suche-Kategorie filtert, bekommt **leer** — die Filter greifen auf
 Daten, die es nicht sehen darf. Das ist richtig, aber es muss die Oberfläche
 sagen, sonst sieht es wie ein Fehler aus.
 
+**Und die zweite Folge, die der `cso`-Lauf am 02.09. nachgetragen hat: die
+Rang-2-Schwelle ist keine Datengrenze.** Sie sitzt im Rumpf einer Funktion,
+und dieselben Basisfelder liegen daneben offen — `profiles_public` läuft mit
+`security_invoker=off`, trägt keine Stufenbedingung und hält `grant select`
+für `authenticated`. Ein `basic`-Konto liest dort Name, Firma, Region,
+Kurzbio, Stufe, Rollen, Avatar und Cover **aller** gelisteten Mitglieder, ohne
+die RPC je aufzurufen; `rls_test.sql` Zusage 6 sagt genau das zu. Was ein
+`connect`-Konto über ein `basic`-Konto hinaus gewinnt, sind **Filter, Ordnung
+und Suche** — nicht der Zugang zu diesen Feldern.
+
+Das ist kein Widerspruch zum Non-Goal „keine Schwelle auf `profiles_public`",
+sondern seine ausgeschriebene Kehrseite: das Non-Goal sagt, was nicht getan
+wird, dieser Absatz sagt, was daraus folgt. Ohne ihn liest sich Aufgabe 3.3
+(„ein `basic`-Konto erhält höchstens die eigene Zeile") wie eine Zusicherung
+über Daten, und sie trägt nur eine über die RPC.
+
 ### D2 — Die Staffelung ist ein eigenes Prädikat, keine Bedingungskette
 
 **Entscheidung:** Ein Prädikat `darf_kontaktanfrage_senden(p_to_id uuid)`,
@@ -119,6 +135,16 @@ single authority for gating") vorsieht.
 `connect`-Konto darf fremde volle Zeilen nicht lesen — ohne DEFINER fiele das
 Prädikat still auf „kein Recht" und verböte **jede** Anfrage. Dasselbe Muster
 und derselbe Grund wie bei `is_new_member` (`six_level_model.sql:152`).
+
+**Gegenüber heute ist das für Rang 3 eine ERWEITERUNG, und die will benannt
+sein.** Klausel 320 lautet heute `is_contact_open() or has_level(4)`: im
+geschlossenen Modus darf ein `discover`-Konto **nicht** senden, und
+`rls_test.sql:260` sagt das seit AGE-455 zu. Nach dieser Entscheidung darf es
+an jeden senden. Der Change liest sich sonst durchweg als Einschränkung — er
+ist an dieser einen Stelle das Gegenteil. Heute betrifft das genau **ein**
+Konto (Bestand: 1 × `discover`), und wirksam wird es ohnehin erst, wenn
+`open_contact` auf `false` geht. Trotzdem gehört es hierher und nicht in eine
+Zeile Migrationskopf.
 
 **Die Auslegung von Entscheidung 4 ist „genau `connect`", nicht „`connect` und
 darüber".** Donald hat das am 25.08. ausdrücklich so entschieden, mitsamt der
