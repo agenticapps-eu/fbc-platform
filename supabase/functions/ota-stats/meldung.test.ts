@@ -20,8 +20,14 @@
 // `session_key`-Fall gilt weiter: eine Aussage uebers Drahtformat braucht
 // BEIDE Schalen — hier decken sie sich, das ist gemessen und nicht vermutet.
 
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
-import { ACTION_GRENZE, MAX_EREIGNISSE, RUMPF_GRENZE, werteRumpf } from "./meldung.ts";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
+import {
+  ACTION_GRENZE,
+  behandleAnfrage,
+  MAX_EREIGNISSE,
+  RUMPF_GRENZE,
+  werteRumpf,
+} from "./meldung.ts";
 
 /** Ein Ereignis in der Form, die StatsEvent (iOS) auf die Leitung legt. */
 function ereignis(action: string) {
@@ -75,7 +81,7 @@ Deno.test("RED: ein voller Stapel passt durch die Rumpfgrenze", () => {
   const roh = JSON.stringify(Array.from({ length: 200 }, () => ereignis("update_fail")));
 
   // Die Messung, die die Grenze begruendet, steht als Zusage da:
-  if (roh.length <= 8 * 1024) throw new Error("Annahme kaputt: 200 Ereignisse waeren <= 8 KiB");
+  assert(roh.length > 8 * 1024, "Annahme kaputt: 200 Ereignisse waeren <= 8 KiB");
 
   const m = werteRumpf(roh);
   assertEquals(m.event, "gemeldet");
@@ -142,19 +148,87 @@ Deno.test("Bei einem gewoehnlichen Stapel sind gesamt und actions gleich lang", 
   assertEquals(m.event === "gemeldet" ? m.actions.length : -1, 2);
 });
 
-Deno.test("Verdrahtung: `index.ts` wertet den Rumpf wirklich hier aus", async () => {
-  // Ohne diese Zusage waere `werteRumpf` tot und alles gruen: `deno test`
-  // typprueft nur, was ein Test importiert, und das ist `index.ts` gerade
-  // nicht. Gleiches Muster wie `send-push/anbieter.test.ts`.
+// ══ DER HANDLER, AUSGEFUEHRT ════════════════════════════════════════════════
+//
+// Bis 02.09. stand hier stattdessen eine Zusage, die `index.ts` als TEXT las und
+// auf den Aufruf greppte. Beide Fremd-Reviews haben unabhaengig gezeigt, dass
+// das zu wenig ist: sechs von sieben Mutationen an der Verdrahtung blieben
+// gruen — darunter `413` -> `400`, der 413-Zweig auf `200 ok` gedreht, der
+// 405-Waechter geloescht und `actions` aus der Logzeile entfernt.
+//
+// Ausgerechnet der Status entscheidet, ob das Geraet wiederholt oder ENDGUELTIG
+// verwirft. Er gehoert damit zu den Werten, die ausgefuehrt geprueft werden
+// muessen und nicht gelesen.
+
+/** Fuehrt den Handler aus und gibt Antwort samt mitgeschriebenen Logzeilen zurueck. */
+async function ruf(init: RequestInit & { body?: string } = {}) {
+  const zeilen: Array<{ level: string; zeile: string }> = [];
+  const antwort = await behandleAnfrage(
+    new Request("https://example.test/ota-stats", { method: "POST", ...init }),
+    (level, zeile) => zeilen.push({ level, zeile }),
+  );
+  return { antwort, zeilen, text: await antwort.text() };
+}
+
+Deno.test("Handler: ein Stapel wird mit 200 ok quittiert", async () => {
+  const { antwort, text } = await ruf({ body: JSON.stringify([ereignis("set")]) });
+  assertEquals(antwort.status, 200);
+  assertEquals(text, '{"status":"ok"}');
+});
+
+Deno.test("Handler: ein zu grosser Rumpf antwortet WIRKLICH mit 413", async () => {
+  // Die Zusage, die am meisten traegt. `413` ist der einzige Status, den beide
+  // Schalen als endgueltig lesen — ein `200` an dieser Stelle sieht aus wie
+  // Erfolg, waehrend die Daten weg sind.
+  const { antwort, text } = await ruf({ body: "x".repeat(RUMPF_GRENZE + 1) });
+  assertEquals(antwort.status, 413);
+  assertEquals(text, "Payload Too Large");
+});
+
+Deno.test("Handler: unlesbarer Rumpf antwortet 200 mit discarded", async () => {
+  const { antwort, text } = await ruf({ body: "{kein json" });
+  assertEquals(antwort.status, 200);
+  assertEquals(text, '{"status":"discarded"}');
+});
+
+Deno.test("Handler: alles ausser POST wird abgewiesen", async () => {
+  const { antwort } = await ruf({ method: "GET" });
+  assertEquals(antwort.status, 405);
+});
+
+Deno.test("Handler: die Logzeile traegt GENAU vier Felder — nie device_id", async () => {
+  // Die Datenschutz-Zusage, ausgefuehrt statt behauptet. Ein zusaetzliches Feld
+  // — etwa ein mitprotokollierter Rohrumpf — roetet hier, und genau so eine
+  // Leckage kam im Fremd-Review durch die alte Textzusage hindurch.
+  const rumpf = JSON.stringify([ereignis("set"), ereignis("update_fail")]);
+  const { zeilen } = await ruf({ body: rumpf });
+  assertEquals(zeilen.length, 1);
+  assertEquals(zeilen[0].level, "log");
+  const geloggt = JSON.parse(zeilen[0].zeile);
+  assertEquals(Object.keys(geloggt).sort(), ["actions", "event", "fn", "gesamt"]);
+  assertEquals(geloggt.actions, ["set", "update_fail"]);
+  assertEquals(geloggt.gesamt, 2);
+  // Und die Gegenprobe am ganzen Rumpf: keine Geraetekennung, egal wo.
+  assert(!zeilen[0].zeile.includes("device_id"));
+  assert(!zeilen[0].zeile.includes("F1A2B3C4"));
+});
+
+Deno.test("Handler: der zu grosse Rumpf protokolliert die Laenge, als Warnung", async () => {
+  const { zeilen } = await ruf({ body: "x".repeat(RUMPF_GRENZE + 5) });
+  assertEquals(zeilen[0].level, "warn");
+  const geloggt = JSON.parse(zeilen[0].zeile);
+  assertEquals(Object.keys(geloggt).sort(), ["event", "fn", "laenge"]);
+  assertEquals(geloggt.laenge, RUMPF_GRENZE + 5);
+});
+
+Deno.test("Verdrahtung: `index.ts` entscheidet selbst nichts mehr", async () => {
+  // Der Rumpf darf weder Grenzen noch Status noch Logfelder ein zweites Mal
+  // fuehren — genau diese Doppelung war der Befund: die eine Fassung wurde
+  // repariert, die andere nicht.
   const quelle = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   const kompakt = quelle.replace(/\s+/g, " ");
-
-  // Auf den AUFRUF geprueft, nicht auf den blossen Namen — der stuende sonst
-  // schon durch den Import da.
-  assertStringIncludes(kompakt, "werteRumpf(await req.text())");
-
-  // Und der Rumpf darf die Grenze nicht ein zweites Mal selbst ziehen: genau
-  // diese Doppelung war der Fehler, denn die eine Fassung wurde repariert und
-  // die andere nicht.
-  assertEquals(kompakt.includes("RUMPF_GRENZE ="), false);
+  assertStringIncludes(kompakt, "behandleAnfrage(req,");
+  for (const verboten of ["RUMPF_GRENZE =", "status: 413", "status: 200", "ota-stats\"", "405"]) {
+    assertEquals(kompakt.includes(verboten), false, `index.ts fuehrt \`${verboten}\` doppelt`);
+  }
 });
