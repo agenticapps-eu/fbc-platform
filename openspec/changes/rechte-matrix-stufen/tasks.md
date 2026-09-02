@@ -343,12 +343,27 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
 ## 7. Oberfläche der Kontaktanfrage
 
-- [ ] 7.1 **RED**: Test — ein Konto, das nach der Staffelung nicht senden darf,
-      bekommt eine benannte Begründung statt eines rohen `42501`
-- [ ] 7.2 **GREEN**: umsetzen in `src/lib/contact-requests.ts` und der Fläche,
-      die den Knopf zeigt
-- [ ] 7.3 **RED/GREEN**: derselbe Weg für die Welpenschutz-Ablehnung — sie hat
-      einen **anderen** Grund und darf nicht dieselbe Meldung tragen
+- [x] 7.1 **RED**: Test — ein Konto, das nach der Staffelung nicht senden darf,
+      bekommt eine benannte Begründung statt eines rohen `42501`.
+      `PublicProfilePage.staffelung.test.tsx`, fünf Zusagen. **Zwei Ziel-Stufen**,
+      weil die `connect`→`connect`-Regel sonst nie gemessen würde
+- [x] 7.2 **GREEN**: umsetzen in `src/lib/contact-requests.ts`
+      (`darfKontaktanfrageSenden`) und in `PublicProfilePage.tsx`. Die
+      Begründung steht **an der Stelle des Knopfes**, nicht in einem Toast: eine
+      Hürde, die man erst nach dem Klicken erfährt, ist zweimal enttäuschend.
+      Zwei Sätze, nicht einer — `basic` kann niemanden anschreiben, `connect`
+      kann es schon, nur nicht dieses Profil
+- [x] 7.3 **GEGENSTANDSLOS GEWORDEN, und dabei eine Altlast gefunden.** Es gibt
+      keine Welpenschutz-Ablehnung mehr — Aufgabe 6.2 hat die Klausel
+      gestrichen. Die Aufgabe war beim Planen richtig und ist es durch D3 nicht
+      mehr.
+
+      Was stattdessen zu tun war: die **bestehende** `42501`-Meldung nannte den
+      Welpenschutz („an neue Mitglieder nur über ein gemeinsames Match") und
+      erklärte damit eine abgeschaffte Regel — sie schickte den Leser auf einen
+      Weg, den es nicht gibt. Sie nennt jetzt den einzigen lebenden Grund, der
+      an dieser Stelle übrig bleibt: das Opt-out des Empfängers. Die
+      Bestandszusage in `PublicProfilePage.test.tsx` ist mit umgeschrieben
 
 ## 8. Abnahme
 

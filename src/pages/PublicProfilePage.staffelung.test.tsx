@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
@@ -92,6 +92,15 @@ const KNOPF = { name: "Kontaktanfrage senden" };
    („kein Knopf") wäre dann grün, bevor überhaupt etwas dastand. */
 const KONTAKTKARTE = "E-Mail, Telefon und Anschrift werden nie automatisch angezeigt.";
 
+/* Und die Zusagen gelten IN dieser Karte. „Discover" steht auf derselben Seite
+   ein zweites Mal — die Karte der erweiterten Felder nennt dieselbe Stufe für
+   eine ganz andere Schwelle. Ein `getByText(/Discover/)` über die ganze Seite
+   fand deshalb zwei Treffer und hätte, mit `getAllByText` beruhigt, auch dann
+   gehalten, wenn in der Kontaktkarte gar nichts stünde. */
+function kontaktkarte(): HTMLElement {
+  return screen.getByText(KONTAKTKARTE).parentElement!;
+}
+
 beforeEach(() => {
   mockedFetch.mockReset();
   mockedRelation.mockReset();
@@ -112,8 +121,9 @@ describe("Kontaktanfrage: die Staffelung an der Oberfläche (AGE-598, 7.1)", () 
     // Die erste Stufe, auf der überhaupt etwas geht, heisst Connect — und dass
     // es dort nur an Connect geht, gehört mit dazu. „Ab Discover" allein wäre
     // bequemer und würde eine Stufe verschweigen, die es gibt.
-    expect(screen.getByText(/Connect/)).toBeInTheDocument();
-    expect(screen.getByText(/Discover/)).toBeInTheDocument();
+    const karte = kontaktkarte();
+    expect(within(karte).getByText("Connect")).toBeInTheDocument();
+    expect(within(karte).getByText("Discover")).toBeInTheDocument();
   });
 
   it("lässt ein connect-Konto ein connect-Profil anschreiben", async () => {
@@ -132,8 +142,11 @@ describe("Kontaktanfrage: die Staffelung an der Oberfläche (AGE-598, 7.1)", () 
     expect(screen.queryByRole("button", KNOPF)).not.toBeInTheDocument();
     // Die Begründung ist eine ANDERE als beim basic-Konto: hier geht schon
     // etwas, nur nicht dieses Profil.
-    expect(screen.getByText(/Mitglieder der Stufe/)).toBeInTheDocument();
-    expect(screen.getByText(/Discover/)).toBeInTheDocument();
+    const karte = kontaktkarte();
+    expect(within(karte).getByText(/Mitglieder der Stufe/)).toBeInTheDocument();
+    expect(within(karte).getByText("Discover")).toBeInTheDocument();
+    // Und ausdruecklich NICHT die basic-Meldung — zwei Huerden, zwei Saetze.
+    expect(within(karte).queryByText(/sind ab der Mitgliedsstufe/)).toBeNull();
   });
 
   /**
