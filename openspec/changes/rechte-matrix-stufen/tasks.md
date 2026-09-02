@@ -367,15 +367,32 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
 ## 8. Abnahme
 
-- [ ] 8.1 `pnpm lint` — Exit-Code prüfen, nicht die Ausgabe
-- [ ] 8.2 `pnpm typecheck`
-- [ ] 8.3 `pnpm test`
-- [ ] 8.4 `pnpm build`
-- [ ] 8.5 `supabase test db` **mit ausdrücklicher Dateiliste** — ohne sie lügt
-      der Lauf
-- [ ] 8.6 `openspec validate --all` grün
-- [ ] 8.7 `requesting-code-review` auf den **Diff**, nicht auf den Plan
-- [ ] 8.8 `qa` auf der Verzeichnis-Fläche mit einem `connect`-Konto
+- [x] 8.1 `pnpm lint` — Exit-Code **0** (7 Warnungen, alle Bestand)
+- [x] 8.2 `pnpm typecheck` — Exit-Code **0**
+- [x] 8.3 `pnpm test` — **2473/2473**
+- [x] 8.4 `pnpm build` — Exit-Code **0**. **Achtung:** der Build schreibt
+      `src/content/release-entries.generated.ts` unformatiert um. Zurückgenommen,
+      der Arbeitsbaum ist sauber
+- [x] 8.5 `supabase test db` mit der Dateiliste aus `ci.yml` (27 Dateien) —
+      **1160/1160**. Die neue Datei steht in der Liste, sonst liefe sie nie
+- [x] 8.6 `openspec validate --all` — 32 passed, 0 failed. Und der Delta-Spec
+      **gegengelesen**: er beschreibt, was gebaut wurde (Validate prüft nur die
+      Form)
+- [ ] 8.7 `requesting-code-review` auf den **Diff**, nicht auf den Plan.
+      **`gemini`: Befunde am Repo widerlegt** — beide Belege erfunden (eine
+      Datei `supabase/tests/database/age-598-rechte-matrix.test.sql`, die es
+      nicht gibt; `is_empty` kommt in `directory_search_test.sql` **null**mal
+      vor; `search_doc` wird aus `p` gelesen, nicht aus `pp`). Die Sache selbst
+      — leckt der Volltext? — ist von Zusage 11.1 abgedeckt.
+      **`opencode` läuft.**
+- [x] 8.8 `qa` auf der Verzeichnis-Fläche mit einem `connect`-Konto, gegen den
+      **lokalen** Stack (die Migrationen sind nicht auf DEV). Belegt: die Liste
+      steht, Branche und Region sind gefüllt und filtern, die vier maskierten
+      Filter fehlen, der Hinweis steht da. Kontaktfläche: `connect`→`connect`
+      **wirklich gesendet** (Zeile in `contact_requests`, `match_id` NULL, Ziel
+      tagesfrisch, `open_contact = false` — das belegt Staffelung UND
+      gestrichenen Welpenschutz in einem), `connect`→`impact` von der Policy
+      abgewiesen. Umgebung vollständig zurückgebaut
 - [ ] 8.9 `verification-before-completion`
 
 ## 9. Ausrollen — getrennt und ausdrücklich
