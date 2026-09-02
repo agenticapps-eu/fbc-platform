@@ -215,26 +215,44 @@
 
 ## 4. Die Ausnahme im Zugangsmodell
 
-- [ ] 4.1 **RED:** pgTAP, in dem ein Admin ohne angenommene Kontaktanfrage ein
-      Gespräch anlegt und hineinschreibt, und das andere Mitglied antwortet.
-      Alle drei müssen heute scheitern.
-- [ ] 4.2 Migration: `message_threads.admin_eroeffnet`, nicht vom Mitglied
-      schreibbar.
-- [ ] 4.3 Der serverseitige Öffnungs-Weg: normalisiert das Paar über `least` und
-      `greatest`, fügt mit `on conflict do nothing` ein, gibt die Kennung des
-      bestehenden **oder** neuen Gesprächs zurück, weist ein Selbstgespräch ab,
-      setzt die Markierung **nur beim Neuanlegen**.
-- [ ] 4.4 `threads_insert` neu deklarieren: Teilnahmeprüfung **eigenständig**,
-      Ausnahme nur an der Freigabe-Bedingung, `is_activated()` bleibt.
-- [ ] 4.5 `messages_insert` neu deklarieren, ebenso getrennt, plus den Zweig für
-      ein markiertes Gespräch. **Die Teilnahmeprüfung steht heute INNERHALB des
-      Ausdrucks, den man klammern möchte** — wer ihn als Ganzes klammert,
-      erlaubt dem Admin das Schreiben in jedes fremde Gespräch.
-- [ ] 4.6 Die Vorgängerfassung beider Policies wörtlich in den Migrationskopf.
-- [ ] 4.7 pgTAP in **beide** Richtungen und für jede der drei Zusagen einzeln:
-      Admin darf anlegen und schreiben, das Gegenüber darf im markierten Faden
-      antworten, ein Nicht-Admin darf weiterhin nichts davon.
-- [ ] 4.8 pgTAP für die Grenzen: kein Gespräch zwischen zwei Fremden, kein
+- [x] 4.1 **RED stand:** neue Datei `admin_gespraech_test.sql`, drei Zusagen,
+      alle drei rot; in `ci.yml` eingetragen (jetzt **26** Dateien).
+      **Korrektur vom 02.09.:** die Commit-Nachricht des RED erklärte die
+      beiden `42501` mit einem `thread_id` von `null`. Das war falsch. Sie
+      kamen aus **„permission denied for table faden"** — `authenticated` hält
+      an einer pgTAP-Hilfstabelle keine Rechte, und dieser Fehler trägt
+      denselben SQLSTATE wie eine RLS-Ablehnung. Zwei Zusagen waren damit rot,
+      ohne die Policy je gefragt zu haben, und wären es nach dem Bau geblieben.
+      Genau die Falle, vor der `rls-test-pgtap-alike` warnt.
+      Behoben an zwei Stellen: die Kennung wird per `format` als **Literal**
+      eingesetzt statt im impersonierten Ausdruck gelesen, und der Helfer gibt
+      **SQLERRM mit** zurück, damit jede Ablehnung an
+      `%row-level security policy%` verankert werden kann.
+- [x] 4.2 **Migration `20260902120000_admin_gespraech.sql`.**
+      `message_threads.admin_eroeffnet`, `not null default false`. Nicht vom
+      Mitglied schreibbar: `threads_insert` trägt `not admin_eroeffnet`, und
+      eine UPDATE-Policy gibt es auf der Tabelle gar nicht (Default-Deny).
+- [x] 4.3 **`admin_gespraech_oeffnen(uuid)`** — normalisiert über
+      `least`/`greatest` (der Unique-Index auf (a, b) erzwingt die Ordnung
+      **nicht**), `on conflict do nothing` plus Nachschlag, Selbstgespräch mit
+      `22023`, Nicht-Admin mit `42501`, Marke **nur in der `values`-Liste**.
+      Zum Wettlauf ausdrücklich: `on conflict do nothing` **wartet** auf eine
+      gleichzeitige Einfügung desselben Paares, und der Nachschlag sieht unter
+      **READ COMMITTED** die inzwischen festgeschriebene Zeile. Unter
+      REPEATABLE READ träfe das nicht zu — im Migrationskopf notiert.
+- [x] 4.4 `threads_insert` neu: Teilnahme eigenständig, Ausnahme nur an der
+      Freigabe, `is_activated()` bleibt, dazu `not admin_eroeffnet`.
+- [x] 4.5 `messages_insert` neu: Teilnahme in einem **eigenen** `exists`, die
+      Freigabe in einem zweiten, und nur der zweite trägt die Ausnahme.
+- [x] 4.6 Beide Vorgängerfassungen stehen wörtlich im Migrationskopf, aus
+      `pg_policies` gezogen — dort ist die Falle schwarz auf weiss zu sehen.
+- [x] 4.7 **Fünf Zusagen, beide Richtungen.** Admin legt an und schreibt, das
+      Gegenüber antwortet im markierten Faden; ein Nicht-Admin bekommt weder
+      den Öffnungs-Weg (`42501 forbidden`) noch legt er von Hand ein Gespräch
+      an. Dazu die Zusage, dass der Admin auch über `threads_insert` anlegen
+      darf — die Ausnahme steht in **beiden** Policies, sonst sähe der Weg
+      funktionierend aus und bräche erst beim Absenden.
+- [x] 4.8 **Neun Zusagen für die Grenzen.** Zugesagt: kein Gespräch zwischen zwei Fremden, kein
       fremder `sender_id`, kein Schreiben ohne eigene Teilnahme, kein
       deaktivierter Admin, keine Freischaltung ausserhalb des markierten Fadens.
       **„Kein Schreiben ohne eigene Teilnahme" führt einen `Admin` als
@@ -250,10 +268,39 @@
       wird sie nicht. Der Push-Pfad liegt hinter dem Tor, nicht darauf
       (`push_auftraege_holen` nennt `contact_requests` mit keinem Wort). Diese
       Zusage ist also keine Doppelung, sondern die einzige Abdeckung.
-- [ ] 4.9 pgTAP: zwei nebenläufige Öffnungs-Aufrufe erzeugen **ein** Gespräch;
-      das vertauschte Paar liefert dasselbe.
+      **Am 02.09. gemessen und bestätigt:** die Klammer verschoben, über
+      1111 Zusagen gefahren — es fiel **genau diese eine**.
+- [x] 4.9 **Vier Zusagen.** Echte Nebenläufigkeit lässt sich in einer
+      pgTAP-Sitzung nicht herstellen; zugesagt wird deshalb das, was den
+      Wettlauf überhaupt erst harmlos macht: der Weg ist **idempotent** (zweiter
+      Aufruf → dieselbe Kennung, genau ein Faden für das Paar), er **findet**
+      den Faden, den der gewöhnliche Weg angelegt hat, **ohne ihn nachträglich
+      zu markieren**, und ein Selbstgespräch bricht mit `22023` ab.
 - [ ] 4.10 `cso` über den fertigen Diff. Der Change weitet **drei** Zusagen an
-      verschiedenen Stellen.
+      verschiedenen Stellen. **Offen** — steht noch aus.
+
+### Was die Gegenproben zu Einheit 4 ergeben haben (02.09.)
+
+Vier Stück, jede über die ganze CI-Liste (26 Dateien, zuletzt 1111 Zusagen),
+jede danach zeichengleich zurück (`diff` gegen den `pg_policies`-Abzug):
+
+| Gegenprobe | Es fielen |
+|---|---|
+| **die Klammerfalle** — Teilnahme und Freigabe wieder in EINEN `exists` | **genau 1** von 1111: die dafür geschriebene Zusage. Sonst nichts im ganzen Bestand — die Messung aus 0.4 bestätigt sich |
+| `admin_eroeffnet`-Zweig entfernt | **1** — das Mitglied antwortet nicht mehr |
+| `not admin_eroeffnet` aus `threads_insert` entfernt | **2** — die Marken-Zusage und ihre Positivkontrolle |
+| `or is_admin()` aus `messages_insert` entfernt | **beim ersten Mal 0** |
+
+Die letzte Zeile ist der Ertrag. **`or is_admin()` war unbelegt** — kein
+einziger Fall im Bestand brauchte ihn, weil der Admin immer im markierten Faden
+schrieb. Belegt wird er erst von einem Faden, den der Admin über
+`threads_insert` selbst angelegt hat: der trägt **keine** Marke.
+
+Und damit steht eine Grenze fest, die vorher niemand ausgesprochen hatte: **ein
+von Hand angelegtes Gespräch ist eine Einbahnstrasse.** Der Admin schreibt
+darin, das Gegenüber nicht. Der ganze Weg ist `admin_gespraech_oeffnen`; zwei
+neue Zusagen halten beide Hälften fest, damit das niemand für einen Fehler
+hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 5. Der Lösch-Weg fürs Bild
 
