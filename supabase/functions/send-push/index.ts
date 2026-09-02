@@ -57,7 +57,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
-import { timingSafeEqual } from "jsr:@std/crypto@1/timing-safe-equal";
+import { pruefeAufruf } from "./aufruf.ts";
 import { baueBenachrichtigung, type Auftrag } from "./nachrichten.ts";
 import {
   apnsEndpunkt,
@@ -86,11 +86,6 @@ function log(
   );
 }
 
-interface WebhookAufruf {
-  record?: { id?: string } | null;
-  modus?: string;
-}
-
 /**
  * Nur der Ausschnitt des Supabase-Klienten, den diese Datei benutzt.
  *
@@ -109,41 +104,21 @@ interface RpcKlient {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
-
-  const erwartet = Deno.env.get("PUSH_WEBHOOK_SECRET");
-  if (!erwartet) {
-    log("error", "missing_webhook_secret");
-    return new Response("Server misconfigured", { status: 500 });
+  // Verfahren, Geheimnis und Rumpf entscheidet `aufruf.ts` — und es baut die
+  // Ablehnungsantwort gleich mit. Wuerde hier nur ein Statuscode ankommen und
+  // die Antwort daneben gebaut, waere die Doppelung zurueck, an der `ota-stats`
+  // scheiterte: der geprueften Haelfte gegenueber steht dann eine ungepruefte.
+  const pruefung = await pruefeAufruf(req, Deno.env.get("PUSH_WEBHOOK_SECRET"));
+  if (!pruefung.weiter) {
+    if (pruefung.log) log(pruefung.log.level, pruefung.log.event);
+    return pruefung.antwort;
   }
-  const enc = new TextEncoder();
-  const gegeben = enc.encode(req.headers.get("authorization") ?? "");
-  const gewollt = enc.encode(`Bearer ${erwartet}`);
-  if (gegeben.byteLength !== gewollt.byteLength || !timingSafeEqual(gegeben, gewollt)) {
-    log("warn", "unauthorized");
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  let aufruf: WebhookAufruf;
-  try {
-    aufruf = await req.json();
-  } catch {
-    return new Response("Bad Request", { status: 400 });
-  }
+  const { hinweisId, faellig } = pruefung;
 
   const supabase: RpcKlient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
-
-  // Zwei Wege in dieselbe Zustellung: der Webhook nennt eine Kennung, der
-  // Wiederholungslauf nennt keine.
-  const hinweisId = aufruf.record?.id;
-  const faellig = aufruf.modus === "faellig";
-  if (!hinweisId && !faellig) {
-    log("warn", "kein_hinweis_und_kein_modus");
-    return new Response("Bad Request", { status: 400 });
-  }
 
   const { data, error } = faellig
     ? await supabase.rpc("push_auftraege_faellig")

@@ -10,8 +10,9 @@
 // SQL und steht in `supabase/tests/ota_buendel_test.sql` §32; ein Mock, der
 // beides behauptet, prüfte nur sich selbst.
 
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  behandleAnfrage,
   type Buendel,
   type Deps,
   ermittleAntwort,
@@ -230,4 +231,73 @@ Deno.test("ein Fehler der Abfrage wird als failed gemeldet, nicht als aktuell", 
   // hat kein JWT vor sich, und eine durchgereichte Meldung nennt Funktions-,
   // Spalten- und bei Rechtefehlern Rollennamen (Befund Fremd-Review, LOW).
   assertEquals(ergebnis.body.message, "Das Manifest ist derzeit nicht lesbar.");
+});
+
+// ══ DER HANDLER, AUSGEFUEHRT ════════════════════════════════════════════════
+//
+// Nachgezogen am 02.09. Bis dahin lag der Rumpf in `index.ts`, und `index.ts`
+// importiert kein Test — `deno test` typprueft nur, was ein Test anfasst. Der
+// 405-Waechter, der `catch` auf `req.json()` und der `content-type` der
+// Antwort waren damit ungeprueft.
+//
+// Der Anlass: bei `ota-stats` verbarg genau dieser blinde Fleck einen echten
+// Defekt. Dort war der Status frei aenderbar, ohne dass eine Zusage rot wurde —
+// und ausgerechnet er entscheidet, ob ein Geraet wiederholt oder endgueltig
+// verwirft.
+
+/** Fuehrt den Handler aus; die Abfrage antwortet mit dem uebergebenen Ergebnis. */
+async function rufe(
+  init: RequestInit & { body?: string },
+  antwort: { data: Buendel[] | null; error: { message: string } | null } = LEER,
+) {
+  const { deps, protokoll } = baueDeps(antwort);
+  const res = await behandleAnfrage(
+    new Request("https://example.test/ota-update", { method: "POST", ...init }),
+    deps,
+  );
+  return { res, protokoll, text: await res.text() };
+}
+
+Deno.test("Handler: alles ausser POST wird abgewiesen", async () => {
+  const { res } = await rufe({ method: "GET" });
+  assertEquals(res.status, 405);
+});
+
+Deno.test("Handler: ein unlesbarer Rumpf faellt auf null und wird LAUT beantwortet", async () => {
+  // Nicht `up_to_date`: als „alles aktuell" beantwortet, stuende jedes Geraet
+  // dieser Schale still auf seinem Stand, und niemand erfuehre es.
+  const { res, text, protokoll } = await rufe({ body: "{kein json" });
+  assertEquals(res.status, 400);
+  assertEquals(JSON.parse(text).error, "invalid_version_build");
+  assertEquals(protokoll, ["warn:version_build_missgebildet"]);
+});
+
+Deno.test("Handler: eine gueltige Anfrage traegt Status und content-type", async () => {
+  const { res, text } = await rufe(
+    { body: JSON.stringify({ version_build: "1.0.0", version_name: "0.0.0+alt" }) },
+    OK,
+  );
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("content-type"), "application/json");
+  assertEquals(JSON.parse(text).session_key, BUENDEL.session_key);
+});
+
+Deno.test("Handler: ohne Buendel bleibt die laufende Fassung in Betrieb", async () => {
+  const { res, text } = await rufe(
+    { body: JSON.stringify({ version_build: "1.0.0", version_name: "0.0.0+alt" }) },
+    LEER,
+  );
+  assertEquals(res.status, 200);
+  assertEquals(JSON.parse(text).kind, "up_to_date");
+});
+
+Deno.test("Verdrahtung: `index.ts` entscheidet selbst nichts mehr", async () => {
+  const quelle = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const kompakt = quelle.replace(/\s+/g, " ");
+  assertStringIncludes(kompakt, "behandleAnfrage(req,");
+  // Kein Status, kein Waechter, keine Kopfzeile ein zweites Mal — genau die
+  // Doppelung, an der `ota-stats` scheiterte.
+  for (const verboten of ["status: 405", "req.json()", "content-type", "ermittleAntwort("]) {
+    assertEquals(kompakt.includes(verboten), false, `index.ts fuehrt \`${verboten}\` doppelt`);
+  }
 });

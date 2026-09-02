@@ -217,3 +217,35 @@ export function manifestZugriff(client: RpcClient): Deps["neuestesBuendel"] {
     return { data: data as Buendel[] | null, error };
   };
 }
+
+/**
+ * Der ganze Endpunkt, ohne `Deno.serve` — damit er ausgefuehrt geprueft werden kann.
+ *
+ * Vorher stand dieser Rumpf in `index.ts`, und `index.ts` importiert kein Test:
+ * `deno test` typprueft nur, was ein Test anfasst. Damit war weder der
+ * 405-Waechter gedeckt noch der `catch`, der einen unlesbaren Rumpf zu `null`
+ * macht, noch der `content-type` der Antwort. Nachgezogen am 02.09., nachdem
+ * derselbe blinde Fleck bei `ota-stats` einen echten Defekt verborgen hatte:
+ * dort liess sich der Status frei aendern, ohne dass eine Zusage rot wurde.
+ */
+export async function behandleAnfrage(req: Request, deps: Deps): Promise<Response> {
+  // Kein CORS-Vorflug: der Aufrufer ist die native Schale ueber OkHttp bzw.
+  // URLSession, kein Browser.
+  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+
+  let rumpf: unknown;
+  try {
+    rumpf = await req.json();
+  } catch {
+    // Bewusst kein 400: `ermittleAntwort` beantwortet einen leeren Rumpf
+    // selbst, und zwar LAUT (`invalid_version_build`). Zwei Stellen, die
+    // dasselbe entscheiden, waeren eine zu viel.
+    rumpf = null;
+  }
+
+  const ergebnis = await ermittleAntwort(rumpf, deps);
+  return new Response(JSON.stringify(ergebnis.body), {
+    status: ergebnis.status,
+    headers: { "content-type": "application/json" },
+  });
+}
