@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(26);
+select plan(30);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -62,6 +62,11 @@ update public.profiles set tier = 'connect', name = 'Gero', is_public = true
 -- connect" auch dann grün, wenn die Grenze gefallen ist — leer ist leer.
 update public.profiles set competencies = array['Bilanzanalyse']
   where id = 'd1000000-0000-0000-0000-000000000001';
+-- Gero bekommt EIGENE erweiterte Daten. Ohne sie liesse sich „die eigene Zeile
+-- kommt gefüllt" gar nicht messen — und ein Test, der nur die Maskierung prüft,
+-- ist auch von einer Funktion erfüllt, die die Spalten für JEDEN leert.
+update public.profiles set competencies = array['Eigenkompetenz']
+  where id = 'd1000000-0000-0000-0000-000000000007';
 
 -- Cover als PFAD, nicht als URL (AGE-595). Seit AGE-580 steht in `cover_url` ein
 -- relativer Pfad im Bucket `covers`; gerendert wird über `bildUrl("covers", …)`.
@@ -86,7 +91,10 @@ insert into public.offers (profile_id, category, title) values
   ('d1000000-0000-0000-0000-000000000001', 'kapital',  'Annas zweites Kapitalangebot'),
   ('d1000000-0000-0000-0000-000000000002', 'kapital',  'Beas Kapital'),
   ('d1000000-0000-0000-0000-000000000003', 'kapital',  'Cems Kapital'),
-  ('d1000000-0000-0000-0000-000000000004', null,       'Dora ohne Kategorie');
+  ('d1000000-0000-0000-0000-000000000004', null,       'Dora ohne Kategorie'),
+  -- Eigene Kategorie, absichtlich in keinem bestehenden Filter: sonst
+  -- verschöbe Geros Zeile die Erwartungswerte der Abschnitte 1-3.
+  ('d1000000-0000-0000-0000-000000000007', 'weiterbildung', 'Geros Angebot');
 
 insert into public.needs (profile_id, category, title) values
   ('d1000000-0000-0000-0000-000000000001', 'experten',   'Anna sucht Experten'),
@@ -410,6 +418,72 @@ select is(
   'Gero',
   'connect sieht heute nur die eigene Zeile — der Ist-Zustand, den AGE-598 '
   'umdreht');
+
+-- ── 10. Verzeichnisliste ab `connect` (AGE-598, Aufgaben 3.1-3.3) ───────────
+-- ROT gegen das heutige Schema, und das ist der Zweck. `search_directory` liest
+-- `public.profiles` unter `profiles_select_self_or_discover` (`has_level(3)`);
+-- Gero steht auf `connect` und bekommt deshalb heute nur sich selbst.
+--
+-- Grün werden sie mit der Migration aus Aufgabe 3.4: Basisfelder aus
+-- `profiles_public`, erweiterte Spalten weiterhin aus `public.profiles` unter
+-- der UNVERÄNDERTEN Rang-3-Policy.
+
+-- 10.1 (Aufgabe 3.1) Die Zeilen. Cem fehlt und muss fehlen — `is_public = false`
+-- ist keine Stufenfrage und wird von der neuen Schwelle nicht berührt.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Anna,Bea,Dora,Egon,Frida,Gero',
+  'connect bekommt die Basisfelder ALLER öffentlichen Profile aktivierter '
+  'Eigentümer — Cem bleibt draussen, er ist nicht öffentlich');
+
+-- 10.2 (Aufgabe 3.2) Die Maskierung an einer FREMDEN Zeile. Fünf erweiterte
+-- Felder in einer Zusage, weil sie eine einzige Frage stellen: kommt hier etwas
+-- an, das die Rang-3-Grenze nicht hergeben darf? Leere Arrays und false, nicht
+-- NULL — NULL wäre ein anderer Wert und die Oberfläche unterscheidet ihn.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+    select competencies::text || ' | ' || has_offers::text || ' | '
+        || offer_categories::text || ' | ' || has_needs::text || ' | '
+        || need_categories::text
+      from public.search_directory() where name = 'Anna'
+  $q$),
+  '{} | false | {} | false | {}',
+  'connect bekommt für FREMDE Zeilen leere erweiterte Felder, keine NULLs');
+
+-- 10.3 (Aufgabe 3.2) Die Gegenprobe an der EIGENEN Zeile. Ohne sie wäre 10.2
+-- auch von einer Funktion erfüllt, die die Spalten für jeden leert — und die
+-- hätte die Rang-3-Grenze nicht gewahrt, sondern abgeschafft.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+    select competencies::text || ' | ' || has_offers::text || ' | '
+        || offer_categories::text
+      from public.search_directory() where name = 'Gero'
+  $q$),
+  '{Eigenkompetenz} | true | {weiterbildung}',
+  '… und für die EIGENE Zeile weiterhin gefüllt');
+
+-- 10.4 (Aufgabe 3.3) `basic` bekommt GENAU die eigene Zeile — nicht null Zeilen.
+--
+-- Die Aufgabe sagte „höchstens die eigene Zeile", und das liesse beides zu. Es
+-- ist aber entschieden, und zwar anderswo: `HeaderSearch.tsx` (AGE-540, Punkt 2
+-- im Kopf) verlässt sich ausdrücklich darauf, dass „die Policy einem Konto
+-- unterhalb `discover` die EIGENE Zeile zurückgibt, und die ist ein gültiger
+-- Treffer". Ein blosses `has_level(2)` als Eintrittstor gäbe null Zeilen und
+-- bräche diese Zusage STILL — die Kopfzeilen-Suche eines `basic`-Kontos fände
+-- danach nicht einmal mehr das eigene Profil.
+--
+-- Das Tor muss deshalb `has_level(2) or p.id = auth.uid()` lauten. Die Rangzahl
+-- steht weiterhin an genau einer Stelle; der Selbst-Zweig trägt keine.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000005', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Egon',
+  'basic bekommt genau die eigene Zeile — der Selbst-Zweig aus AGE-540 bleibt');
 
 select * from finish();
 rollback;

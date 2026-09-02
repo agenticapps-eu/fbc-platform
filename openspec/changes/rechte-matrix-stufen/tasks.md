@@ -112,19 +112,42 @@ Erfolg aus.
 
 ## 3. Verzeichnisliste ab `connect` (Teil A)
 
-- [ ] 3.1 **RED**: pgTAP — `connect`-Konto erhält die Basisfelder **aller**
-      öffentlichen Profile aktivierter Eigentümer aus `search_directory`
-- [ ] 3.2 **RED**: pgTAP — dasselbe `connect`-Konto erhält für **fremde** Zeilen
+- [x] 3.1 **RED**: pgTAP — `connect`-Konto erhält die Basisfelder **aller**
+      öffentlichen Profile aktivierter Eigentümer aus `search_directory`.
+      `directory_search_test.sql` Zusage 27, **rot**: `have: Gero`,
+      `want: Anna,Bea,Dora,Egon,Frida,Gero`
+- [x] 3.2 **RED**: pgTAP — dasselbe `connect`-Konto erhält für **fremde** Zeilen
       `competencies`, `offer_categories`, `need_categories` als leere Arrays und
-      `has_offers`/`has_needs` false; für die **eigene** Zeile gefüllt
-- [ ] 3.3 **RED**: pgTAP — ein `basic`-Konto erhält weiterhin höchstens die
-      eigene Zeile **aus `search_directory`**. Die Zusage gilt der RPC, nicht
-      den Daten, und das gehört in ihren Text: dieselben Basisfelder holt
-      dasselbe Konto mit einem Aufruf auf `profiles_public` (gemessen —
-      `security_invoker=off`, keine Stufenbedingung, `grant select` für
-      `authenticated`; `rls_test.sql` Zusage 6 sagt es zu). Wer sie als
-      Datengrenze liest, liest sie falsch — siehe den Zusatz in D1
-- [ ] 3.4 **GREEN**: Migration — `search_directory` neu: Eintrittstor bei Rang 2,
+      `has_offers`/`has_needs` false; für die **eigene** Zeile gefüllt.
+      Zusage 28 (fremd), **rot**: `have: (leer)`,
+      `want: {} | false | {} | false | {}`. Zusage 29 (eigen) steht **grün** und
+      muss es bleiben — ohne sie wäre 28 auch von einer Funktion erfüllt, die
+      die Spalten für jeden leert, und die hätte die Rang-3-Grenze nicht
+      gewahrt, sondern abgeschafft
+- [x] 3.3 ~~**RED**~~ **Gegenprobe**: pgTAP — ein `basic`-Konto erhält
+      **genau** die eigene Zeile aus `search_directory`. Zusage 30, **grün**
+
+  **Aus „höchstens" ist „genau" geworden, und das ist ein Befund, kein
+  Formulierungsgeschmack.** „Höchstens die eigene Zeile" liesse null Zeilen zu,
+  und ein blosses `has_level(2)` als Eintrittstor lieferte genau die. Das wäre
+  ein stiller Bruch: **`HeaderSearch.tsx` verlässt sich ausdrücklich auf den
+  Selbst-Zweig** — im Kopf der Datei, Punkt 2, seit AGE-540: „die Policy gibt
+  einem Konto unterhalb `discover` die EIGENE Zeile zurück, und die ist ein
+  gültiger Treffer." Ein `basic`-Konto fände nach einem harten Rang-2-Tor in
+  der Kopfzeilen-Suche nicht einmal mehr das eigene Profil, und nichts wäre
+  rot geworden.
+
+  **Folge für 3.4:** Das Tor lautet `has_level(2) or p.id = auth.uid()`, nicht
+  `has_level(2)`. Die Rangzahl steht weiterhin an genau einer Stelle — der
+  Selbst-Zweig trägt keine.
+
+  **Und die Zusage gilt der RPC, nicht den Daten.** Dieselben Basisfelder holt
+  dasselbe Konto mit einem Aufruf auf `profiles_public` (gemessen —
+  `security_invoker=off`, keine Stufenbedingung, `grant select` für
+  `authenticated`; `rls_test.sql` Zusage 6 sagt es zu). Wer 3.3 als Datengrenze
+  liest, liest sie falsch — siehe den Zusatz in D1
+- [ ] 3.4 **GREEN**: Migration — `search_directory` neu: Eintrittstor bei Rang 2
+      **plus Selbst-Zweig** (siehe 3.3),
       Basisfelder aus `profiles_public`, erweiterte Spalten weiterhin aus
       `public.profiles` unter der unveränderten Rang-3-Policy. Die Zahl `3`
       SHALL im neuen Rumpf **nicht** vorkommen

@@ -119,6 +119,19 @@ wird, dieser Absatz sagt, was daraus folgt. Ohne ihn liest sich Aufgabe 3.3
 („ein `basic`-Konto erhält höchstens die eigene Zeile") wie eine Zusicherung
 über Daten, und sie trägt nur eine über die RPC.
 
+**Das Eintrittstor braucht einen Selbst-Zweig, und der ist keine Bequemlichkeit.**
+`has_level(2) or p.id = (select auth.uid())`, nicht `has_level(2)` allein.
+Grund: `HeaderSearch.tsx` verlässt sich seit AGE-540 ausdrücklich darauf, dass
+ein Konto unterhalb der Verzeichnisschwelle die **eigene** Zeile als gültigen
+Treffer zurückbekommt (Punkt 2 im Kopf der Datei — der Rang formuliert dort nur
+den leeren Fall und unterdrückt keine Abfrage). Ein hartes Rang-2-Tor gäbe null
+Zeilen, und ein `basic`-Konto fände in der Kopfzeilen-Suche nicht einmal mehr
+sich selbst. Nichts wäre dabei rot geworden.
+
+Die Zusage „die Rangzahl steht an genau einer Stelle" bleibt davon unberührt:
+der Selbst-Zweig trägt keine Rangzahl. Er bildet ab, was die heutige Policy
+`id = auth.uid() or has_level(3)` in ihrer ersten Hälfte ohnehin schon tut.
+
 ### D2 — Die Staffelung ist ein eigenes Prädikat, keine Bedingungskette
 
 **Entscheidung:** Ein Prädikat `darf_kontaktanfrage_senden(p_to_id uuid)`,
