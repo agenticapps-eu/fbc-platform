@@ -1238,6 +1238,47 @@ Bündel.
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
 
+      **Vorbereitet 02.09. abends — in der Fassung von heute Mittag hätte die
+      Probe nichts belegt.** Drei Befunde, alle am Manifest bzw. am lebenden
+      Endpunkt gemessen, alle im Runbook (`geraetesitzung-d5.md`) nachgezogen:
+
+      * **Der Rückfall trug keine Marke mehr.** Das neueste Bündel ist
+        `8d3cd941f991`, ein normaler CI-Bau; die Marke aus Probe 1
+        (`feedbeef`) liegt sechs Bündel darunter. Der Beleg für Schritt 3 wäre
+        auf „der Bildschirm ist nicht weiss" zusammengefallen — und genauso
+        sieht es aus, wenn das defekte Bündel **nie installiert** wurde. Probe
+        2 veröffentlicht deshalb zuerst ein markiertes gutes Bündel
+        (`600dfeed`), dann erst `defec7ed`.
+      * **Das Manifest bewegt sich von allein.** `deploy.yml:715` veröffentlicht
+        bei **jedem** `main`-Push ein Bündel, auch bei einem Doku-Commit —
+        sechs Stück zwischen 14:03 und 16:04. Ein Merge während Probe 2 macht
+        `defec7ed` still zum Vorletzten und nimmt Schritt 4 den
+        `autoDeleteFailed`-Beleg. Also Merge-Sperre für die Dauer der Probe;
+        umgekehrt räumt der nächste Merge `defec7ed` von selbst ab.
+      * **Die Aufräum-Kennung des Runbooks war belegt.** §4 veröffentlichte
+        unter `c1ea4ed0` — seit 12:47 im Manifest. Der Lauf wäre ein Upsert mit
+        altem `created_at` gewesen, also **nicht** das neueste Bündel: das
+        Aufräumen hätte grün ausgesehen und nichts aufgeräumt. Jetzt `c1ea4ed2`,
+        als frei geprüft (23 Bündel im Manifest, keines trägt sie).
+
+      **Die zweite Belegseite ist am ausgelieferten Artefakt nachgestellt**,
+      nicht am Quelltext gelesen: ein Stapel gegen den PROD-Endpunkt ergab
+      02.09. um 18:54:17 UTC
+      `{"fn":"ota-stats","event":"gemeldet","gesamt":2,"actions":["update_fail","revert"]}`.
+      Die Senke benennt die Aktionen also wirklich, statt wie bis heute Mittag
+      `action: "ohne"` zu schreiben. **Diese eine Zeile stammt von der Probe,
+      nicht vom Gerät** — der Beleg für Probe 2 ist nur eine Zeile *nach* deren
+      Beginn.
+
+      Der Lesepfad dafür steht als Befehl im Runbook (§3b) und ist wörtlich aus
+      der Datei heraus ausgeführt. Fünf stille Fallen dabei, die erste neu:
+      **ohne `iso_timestamp_end` antwortet die API `{"result":[]}`**, obwohl sie
+      „defaults to the current time" zusagt; das 24-h-Fenster schneidet das
+      **Ende** ab (eine 31-h-Spanne verschwieg alles nach Stunde 24 und sah aus
+      wie „Gerät sendet nicht mehr"); die Aufnahme hinkt Minuten hinterher;
+      `edge_logs` ist die falsche Quelle; und der Supabase-MCP ist gesperrt, der
+      Weg ist die Management-API mit `SUPABASE_ACCESS_TOKEN` aus Infisical dev.
+
 ## Phase E — Abnahme
 
 Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.

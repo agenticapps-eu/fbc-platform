@@ -30,15 +30,20 @@ werden.
 ## 1 · Wie eine Fassung entsteht
 
 `scripts/ota-buendel.ts` bildet die Fassung als `<semver>+<sha[0..12]>`, und
-`GITHUB_SHA` sticht `git rev-parse HEAD`. Wir nutzen das und geben den drei
+`GITHUB_SHA` sticht `git rev-parse HEAD`. Wir nutzen das und geben den
 Proben **sprechende, hexadezimale** Kennungen — wer später ins Manifest sieht,
 erkennt sie ohne Nachschlagen:
 
-| Probe | Fassung | Was sie ist |
-|---|---|---|
-| 1 | `0.0.0+600df00d` | heil, mit sichtbarer Marke |
-| 2 | `0.0.0+defec7ed` | **absichtlich defekt** |
-| 3 | `0.0.0+c1ea4ed0` | das Aufräumen danach |
+| Probe | Fassung | Was sie ist | Stand 02.09. |
+|---|---|---|---|
+| 1 | `0.0.0+feedbeef` | heil, mit sichtbarer Marke | ✅ gelaufen (geplant war `600df00d`) |
+| 2a | `0.0.0+600dfeed` | heil, mit Marke — der Rückfallpunkt | offen, Kennung frei |
+| 2b | `0.0.0+defec7ed` | **absichtlich defekt** | offen, Kennung frei |
+| 3 | `0.0.0+c1ea4ed2` | das Aufräumen danach | offen; `c1ea4ed0`/`c1ea4ed1` sind **belegt** |
+
+Die Spalte rechts ist der Grund, warum diese Tabelle überhaupt einen Stand
+trägt: von den ursprünglich geplanten drei Kennungen sind zwei verbraucht, und
+eine verbrauchte Kennung wiederzuverwenden ist genau die Falle darunter.
 
 > ### ⛔ Die Falle, die alles kostet: NIE denselben Commit zweimal
 >
@@ -52,6 +57,23 @@ erkennt sie ohne Nachschlagen:
 > **bereits eingetragenen** Fassung behält deren altes `created_at` und ist
 > damit **nicht** das neueste Bündel. Er räumt dann nichts auf. Deshalb trägt
 > auch Probe 3 eine eigene Kennung.
+
+> ### ⛔ Zweite Falle, gemessen 02.09.: das Manifest bewegt sich von allein
+>
+> `.github/workflows/deploy.yml:715` veröffentlicht bei **jedem** Push auf
+> `main` ein Bündel — auch bei einem reinen Doku-Commit. Zwischen dem
+> Aufräum-Bündel `c1ea4ed1` (13:46) und 16:04 sind so **sechs** CI-Bündel
+> entstanden; obenauf liegt `8d3cd941f991`, der Doku-Commit `8d3cd94`.
+>
+> Zwei Folgen, und die erste kostet Probe 2:
+>
+> * **Während Probe 2 darf nichts nach `main`.** Ein Merge veröffentlicht ein
+>   neueres Bündel als `defec7ed` — dann misst Schritt 4 nicht mehr, ob das
+>   Gerät das defekte Bündel liegen lässt, sondern nur noch, dass es ein
+>   neueres nimmt. Der `autoDeleteFailed`-Beleg fällt still aus.
+> * **Probe 3 von Hand ist nicht mehr nötig.** Der nächste Merge räumt
+>   `defec7ed` ohnehin ab. Von Hand bleibt der schnellere Weg, wenn kein Merge
+>   ansteht — und aufgeräumt gehört sofort, nicht irgendwann.
 
 ## 2 · Probe 1 — eine sichtbare Änderung erreicht das Gerät
 
@@ -103,6 +125,27 @@ und öffnen als man erwartet.
 
 ## 3 · Probe 2 — der Rückweg
 
+> ### ⚠ Vorher: der Rückfall braucht eine sichtbare Marke — sonst belegt Probe 2 nichts
+>
+> Stand 02.09. abends trägt das neueste Bündel (`8d3cd941f991`, ein normaler
+> CI-Bau) **keine** Marke; die aus Probe 1 (`feedbeef`) liegt sechs Bündel
+> darunter. Läuft Probe 2 gegen diesen Stand, ist der Beleg für Schritt 3 nur
+> noch „der Bildschirm ist nicht weiss" — und genauso sieht es aus, wenn das
+> defekte Bündel **nie installiert wurde**. Der Rückweg wäre dann wieder eine
+> Behauptung, diesmal eine grüne.
+>
+> Deshalb sind es **zwei** Veröffentlichungen, in dieser Reihenfolge:
+>
+> | # | Fassung | Was sie ist | 02.09. als frei geprüft |
+> |---|---|---|---|
+> | 2a | `0.0.0+600dfeed` | heil, **mit** Marke — der Rückfallpunkt | ✅ |
+> | 2b | `0.0.0+defec7ed` | absichtlich defekt | ✅ |
+>
+> `600dfeed` entsteht mit dem Griff aus §2 (Markentext auf `OTA-PROBE 600dfeed`
+> setzen), `defec7ed` mit dem Griff unten. Dazwischen muss das Gerät `600dfeed`
+> **wirklich übernommen haben** — die Marke unten links ist die Quittung. Erst
+> dann das defekte Bündel veröffentlichen; vorher misst Schritt 3 nichts.
+
 Das defekte Bündel muss **gültig signiert** sein und sauber installieren; sonst
 prüft man die Prüfsumme aus D3 und nicht den Rückweg. Es darf nur eines nicht:
 ein Bild zeigen.
@@ -150,23 +193,83 @@ Am Gerät, in dieser Reihenfolge:
    `appReadyTimeout` 10 s, auf Android für ein noch unbestätigtes Bündel
    mindestens 30 s. **Die App in dieser Zeit offen lassen** — wer sofort
    wegwischt, unterbricht die Messung.
-3. Schliessen, öffnen → **die Marke `600df00d` ist zurück.** ✅ Kästchen 2.
+3. Schliessen, öffnen → **die Marke `600dfeed` ist zurück.** ✅ Kästchen 2.
 4. **Und noch einmal schliessen und öffnen.** Das ist die Zugabe, und sie ist
    der Grund für `autoDeleteFailed: false`: `ota_buendel_neuestes` bietet
-   `defec7ed` weiterhin an — es wurde später eingetragen als `600df00d`, und
-   nach dem Rückfall läuft wieder `600df00d`. Das Gerät **muss** es trotzdem
+   `defec7ed` weiterhin an — es wurde später eingetragen als `600dfeed`, und
+   nach dem Rückfall läuft wieder `600dfeed`. Das Gerät **muss** es trotzdem
    liegen lassen (Status ERROR). Kommt der weisse Bildschirm hier wieder,
    ist der Rückfall eine Endlosschleife und `autoDeleteFailed` hat nicht
    gegriffen.
 
+## 3b · Die zweite Belegseite: die `ota-stats`-Zeile
+
+Am Gerätelog allein hängt der Beleg schief — die Senke muss die Aktion
+**benennen**. Bis zum 02.09. schrieb sie dreimal `action: "ohne"`, während das
+Gerät `Sent 9 events` meldete; genau das ist repariert. Dass die reparierte
+Fassung wirklich ausgeliefert ist, ist am **live laufenden Endpunkt**
+nachgestellt statt am Quelltext gelesen (02.09., 18:54:17 UTC, Funktion
+Fassung 6):
+
+```
+{"fn":"ota-stats","event":"gemeldet","gesamt":2,"actions":["update_fail","revert"]}
+```
+
+So liest man mit — beide Zeitmarken sind Pflicht, siehe die Fallen darunter:
+
+```bash
+infisical run --env=dev --silent -- bash -c "
+curl -s -G 'https://api.supabase.com/v1/projects/viwntbodrtqxgmqyxluh/analytics/endpoints/logs.all' \
+  --data-urlencode \"sql=select timestamp, event_message from function_logs where event_message like '%ota-stats%' order by timestamp desc limit 60\" \
+  --data-urlencode 'iso_timestamp_start=<Probe-Beginn, ISO mit Z>' \
+  --data-urlencode 'iso_timestamp_end=<jetzt, ISO mit Z>' \
+  -H \"Authorization: Bearer \$SUPABASE_ACCESS_TOKEN\""
+```
+
+Fünf Fallen, alle am 02.09. eingetreten und keine davon laut:
+
+* **Ohne `iso_timestamp_end` kommt `{"result":[]}` zurück** — obwohl die API
+  „defaults to the current time" zusagt. Dieselbe Abfrage mit Ende liefert die
+  Zeile. Leer heisst hier also nicht „nichts passiert".
+* **Das Fenster ist auf 24 h gedeckelt, und der Deckel schneidet das ENDE ab.**
+  Eine Spanne von 31 h lieferte lautlos nichts nach Stunde 24 — es sah aus, als
+  habe das Gerät seit Mittag nichts mehr gesendet. Es hatte: `function_edge_logs`
+  zeigt Aufrufe bis 14:50 UTC.
+* **Die Aufnahme hinkt Minuten hinterher.** Zwei Minuten nach dem Aufruf stand
+  die Zeile noch nicht da, nach acht schon. Wer nach dem Rückfall sofort
+  nachsieht, sieht nichts und schliesst das Falsche.
+* **`edge_logs` ist die falsche Quelle** und liefert 0 Treffer.
+  `function_edge_logs` trägt die Anfragen (Methode, Status),
+  `function_logs` die `console.log`-Zeilen. Beide zusammen trennen „Gerät hat
+  nicht gesendet" von „Endpunkt hat nichts protokolliert".
+* **Der Supabase-MCP (`query_logs`) ist vom Klassifikator gesperrt.** Der Weg
+  ist die Management-API mit `SUPABASE_ACCESS_TOKEN` aus Infisical **dev** —
+  der CLI-Login liegt im Keychain und taugt dafür nicht.
+
+> ⚠ **Eine Zeile im Protokoll stammt nicht vom Gerät.** Die Nachstellung oben
+> hat am 02.09. um **18:54:17 UTC** eine Zeile mit genau `update_fail` und
+> `revert` geschrieben. Ein Grep auf die beiden Wörter findet sie mit. Der Beleg
+> für Probe 2 ist deshalb nur eine Zeile **nach** dem Beginn der Probe.
+
 ## 4 · Probe 3 — aufräumen, und zwar sofort
+
+> **Kennung gewandert, 02.09.:** hier stand `c1ea4ed0` — die Fassung ist seit
+> 12:47 im Manifest, `c1ea4ed1` seit 13:46. Ein zweiter Lauf darunter wäre ein
+> Upsert, behielte das alte `created_at` und wäre damit **nicht** das neueste
+> Bündel: das Aufräumen sähe grün aus und räumte nichts. Deshalb `c1ea4ed2`.
+> Vor jedem Lauf gilt die Regel aus §1 — erst nachsehen, ob die Kennung frei ist.
+>
+> **Und es geht auch ohne diesen Lauf:** der nächste Merge nach `main`
+> veröffentlicht ohnehin ein neueres Bündel (§1). Wer eines in der Hand hat,
+> braucht Probe 3 nicht; wer keines hat, nimmt den Lauf, denn liegen bleiben
+> darf `defec7ed` nicht.
 
 `defec7ed` ist nach Probe 2 **das neueste Bündel im Manifest**. Donalds Gerät
 lässt es liegen, jedes andere Gerät und jede Neuinstallation nicht.
 
 ```bash
 infisical run --env=prod -- pnpm build   # unveraendert, ohne jeden Griff
-GITHUB_SHA=c1ea4ed0 infisical run --env=prod -- pnpm tsx scripts/ota-buendel.ts
+GITHUB_SHA=c1ea4ed2 infisical run --env=prod -- pnpm tsx scripts/ota-buendel.ts
 rm -rf dist
 ```
 
@@ -178,7 +281,7 @@ curl -s -X POST https://viwntbodrtqxgmqyxluh.supabase.co/functions/v1/ota-update
   -d '{"version_build":"1.0.0","version_name":"builtin"}'
 ```
 
-Die Antwort **muss** `0.0.0+c1ea4ed0` nennen. Steht dort noch `defec7ed`, ist
+Die Antwort **muss** `0.0.0+c1ea4ed2` nennen. Steht dort noch `defec7ed`, ist
 das Aufräumen nicht durch — dann stimmt die Fassung nicht (siehe die Falle in
 §1).
 
