@@ -1559,8 +1559,12 @@ export type Database = {
     };
     Views: {
       profiles_public: {
+        // `branche` seit AGE-598 (20260902150000): Verzeichnis-Facet und damit
+        // ein Basisfeld. Ohne die Spalte hier fiele sie fuer `connect` still auf
+        // null und der Branchenfilter liefe wortlos leer.
         Row: {
           avatar_url: string | null;
+          branche: string | null;
           company: string | null;
           cover_url: string | null;
           id: string | null;
@@ -1572,6 +1576,7 @@ export type Database = {
         };
         Insert: {
           avatar_url?: string | null;
+          branche?: string | null;
           company?: string | null;
           cover_url?: string | null;
           id?: string | null;
@@ -1583,6 +1588,7 @@ export type Database = {
         };
         Update: {
           avatar_url?: string | null;
+          branche?: string | null;
           company?: string | null;
           cover_url?: string | null;
           id?: string | null;

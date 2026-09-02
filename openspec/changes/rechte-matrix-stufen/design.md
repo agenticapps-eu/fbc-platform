@@ -255,10 +255,38 @@ Genau diese Orakelklasse hat AGE-291 für den **Namen** erkannt und geschlossen
 seiner eigenen Zusage, dass ein Filter auf maskierten Spalten leer liefert —
 der Volltext ist funktional so ein Filter, und er lieferte eben nicht leer.
 
-**Entscheidung:** Ein **zweiter tsvector** über ausschließlich Basisfelder
-(`name`, `company`, `region`, `short_bio`, `branche`). Aufrufer unterhalb Rang 3
-werden gegen diesen geprüft, ab Rang 3 gilt weiterhin `search_doc`. Die Bindung
-folgt der Form aus AGE-291.
+**Entscheidung:** Ein **zweiter tsvector** über ausschließlich Basisfelder.
+Aufrufer unterhalb Rang 3 werden gegen diesen geprüft, ab Rang 3 gilt weiterhin
+`search_doc`. Die Bindung folgt der Form aus AGE-291.
+
+**Die Feldliste lautet `name`, `company`, `branche`, `short_bio`, `roles`** —
+und weicht damit an zwei Stellen von der ersten Fassung (`name`, `company`,
+`region`, `short_bio`, `branche`) ab. Beide Abweichungen folgen einer Regel, die
+die erste Fassung nicht ausgesprochen hatte:
+
+> **Der Basis-Vektor muss eine Teilmenge von `search_doc` sein.**
+
+- **`roles` kommt dazu.** Es steht in `profiles_public` — also auf der Karte,
+  die ein `connect`-Konto sieht — und in `search_doc`. Es wegzulassen machte ein
+  sichtbares Feld unauffindbar. Das ist dieselbe Klasse Lücke, die der
+  Fremd-Review für `branche` gefunden hat (HIGH-2): eine handgeschriebene Liste,
+  die hinter ihrem eigenen Prinzip zurückbleibt.
+- **`region` fällt weg.** Es steht in `profiles_public`, aber **nicht** in
+  `search_doc`. Nähme man es auf, könnte ein `connect`-Konto nach der Region
+  suchen und ein `discover`-Konto nicht — die niedrigere Stufe bekäme eine
+  Fähigkeit, die der höheren fehlt. Das widerspräche der Zusage, dass die
+  Bindung die Suche für Berechtigte nicht verengt.
+
+Wer `region` künftig durchsuchbar machen will, muss es in **beide** Vektoren
+aufnehmen. Zusage 36 in `directory_search_test.sql` hält das fest und wird rot,
+wenn es nur in einem landet.
+
+**Die Bindung kommt ohne Rangzahl aus.** Statt eines `case` über `has_level(3)`
+nutzt sie dieselbe Asymmetrie wie die Spaltenmaskierung:
+`coalesce(p.search_doc, <Basis-Vektor>) @@ suchbegriff_zu_tsquery(…)`. Ab Rang 3
+ist `p.search_doc` da und gilt; darunter ist es NULL und der Basis-Vektor
+übernimmt. Für die **eigene** Zeile gilt auch unterhalb Rang 3 der reiche
+Vektor — richtig so, die eigenen Kompetenzen darf man durchsuchen.
 
 **Warum nicht das Orakel als gewollt erklären?** Weil es der einzige Weg wäre,
 der zum Rest dieses Changes nicht passt: Wir maskieren die Spalte in der

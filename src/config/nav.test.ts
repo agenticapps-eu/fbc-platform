@@ -61,9 +61,9 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     }
   });
 
-  it("hält das Verzeichnis ab Discover — die Schranke bleibt, sie mauert nur statt wegzuleiten", () => {
+  it("hält das Verzeichnis ab Connect — die Schranke bleibt, sie steht nur eine Stufe tiefer", () => {
     const mitglieder = navItems.find((i) => i.path === "/mitglieder");
-    expect(mitglieder?.minTier).toBe("discover");
+    expect(mitglieder?.minTier).toBe("connect");
   });
 
   /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese Routen

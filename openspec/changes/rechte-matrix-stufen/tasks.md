@@ -146,18 +146,49 @@ Erfolg aus.
   `security_invoker=off`, keine Stufenbedingung, `grant select` für
   `authenticated`; `rls_test.sql` Zusage 6 sagt es zu). Wer 3.3 als Datengrenze
   liest, liest sie falsch — siehe den Zusatz in D1
-- [ ] 3.4 **GREEN**: Migration — `search_directory` neu: Eintrittstor bei Rang 2
+- [x] 3.4 **GREEN**: Migration — `search_directory` neu: Eintrittstor bei Rang 2
       **plus Selbst-Zweig** (siehe 3.3),
       Basisfelder aus `profiles_public`, erweiterte Spalten weiterhin aus
       `public.profiles` unter der unveränderten Rang-3-Policy. Die Zahl `3`
-      SHALL im neuen Rumpf **nicht** vorkommen
-- [ ] 3.5 Prüfen, dass die Migration `profiles_select_self_or_discover`
+      SHALL im neuen Rumpf **nicht** vorkommen.
+      **`supabase/migrations/20260902150000_verzeichnis_ab_connect.sql`** —
+      eine Migration für 3.4, 3b.4 und 3c.2 zusammen. Drei getrennte ergäben
+      zwei Zwischenzustände, die niemand haben will und die trotzdem in der
+      Historie stünden: ohne 3b wäre die Maskierung Kulisse, ohne 3c fiele
+      `branche` still auf NULL
+- [x] 3.5 Prüfen, dass die Migration `profiles_select_self_or_discover`
       **nicht** anfasst — `grep` über den Migrationsrumpf, nicht aus dem
-      Gedächtnis
-- [ ] 3.6 2.2 erneut fahren: muss **weiterhin grün** sein
-- [ ] 3.7 `src/config/nav.ts:95` — `minTier` von `discover` auf `connect`, mit
-      Begründung im Kommentar daneben
-- [ ] 3.8 Test für 3.7: `/mitglieder` trägt `minTier: "connect"`
+      Gedächtnis. **Ein einziger Treffer, und der steht in einem Kommentar
+      (Zeile 23).** Dazu gegengeprüft: keine `create/drop/alter policy`- und
+      keine `alter table`-Anweisung in der Datei
+
+  **Die Zahl `3` ist am ARTEFAKT geprüft, nicht an der Eingabe.** Ein `grep`
+  über die Migrationsdatei fände die Ziffer fünfmal — jedes Mal in einem
+  Kommentar. Gemessen wurde deshalb der Katalog:
+  `regexp_replace(prosrc, '--[^\n]*', '', 'g') ~ '3'` über `pg_proc` →
+  **keine Ziffer 3 im Rumpf.** Die Datei ist die Eingabe, die Funktion ist das
+  Ausgelieferte, und nur das zweite zählt
+
+- [x] 3.6 2.2 erneut fahren: muss **weiterhin grün** sein. **Zusage 25 grün** —
+      und der eigentliche Beleg steht daneben: **`rls_test.sql` steht
+      unverändert bei 437/437.** Das ist die Grundlinie aus 2.1, und sie ist
+      der Beweis, dass die neue Rang-2-Schwelle die alte Rang-3-Grenze nicht
+      mitgenommen hat
+- [x] 3.7 `src/config/nav.ts:95` — `minTier` von `discover` auf `connect`, mit
+      Begründung im Kommentar daneben. Erledigt, Zeile 105
+- [x] 3.8 Test für 3.7: `/mitglieder` trägt `minTier: "connect"`.
+      `nav.test.ts` umgestellt (RED → GREEN belegt).
+
+  **Dabei fielen zwei Frontend-Zusagen, die der Plan nicht genannt hat.**
+  `MembershipGate.test.tsx` prüft die Wand über ihre Überschrift, und die
+  lautet jetzt „Dieser Bereich ist ab **Connect** verfügbar". Zwei Zusagen rot,
+  eine dritte (`queryByRole ... not.toBeInTheDocument`) wäre still grün
+  geblieben — aus dem falschen Grund. Alle drei nachgezogen.
+
+  **Und eine Zusage neu, die es vorher nicht geben konnte:** „lässt Connect das
+  Verzeichnis sehen". Sonde: `minTier` versuchsweise auf `discover`
+  zurückgesetzt → **3 rot, darunter die neue.** Sie hängt an der Schwelle und
+  nicht an der Umgebung
 
 ## 3b. Das Volltext-Orakel schliessen (Befund opencode HIGH-1)
 
@@ -172,26 +203,55 @@ verborgen und über das Suchfeld erfragbar.
 - [ ] 3b.3 **RED**: pgTAP — ein `discover`-Konto findet den Kompetenz-Begriff
       weiterhin. Positivkontrolle: die Bindung darf die Suche für Berechtigte
       nicht verengen
-- [ ] 3b.4 **GREEN**: zweiter tsvector über `name`, `company`, `region`,
-      `short_bio`, `branche`; Bindung in `search_directory` nach der Form aus
-      AGE-291 (Entscheidung 3, Volltext ans Recht binden)
-- [ ] 3b.5 Prüfen, dass `search_doc` selbst **unverändert** bleibt — es bedient
-      weiterhin Rang 3 und die Kopfzeilen-Suche
+- [x] 3b.4 **GREEN**: zweiter tsvector — **`name`, `company`, `branche`,
+      `short_bio`, `roles`.** Zwei Abweichungen von der Liste im Entwurf, beide
+      aus einer Regel: **der Basis-Vektor muss eine Teilmenge von `search_doc`
+      sein.** `roles` kommt dazu (steht in `profiles_public` *und* in
+      `search_doc` — es wegzulassen machte ein sichtbares Feld unauffindbar,
+      dieselbe Klasse wie HIGH-2 für `branche`); `region` fällt weg (steht in
+      `profiles_public`, aber **nicht** in `search_doc` — aufgenommen könnte
+      `connect` nach der Region suchen und `discover` nicht, die niedrigere
+      Stufe bekäme eine Fähigkeit, die der höheren fehlt). Als Zusage 36
+      festgehalten, nicht als Kommentar.
+
+  **Die Bindung kommt ohne Rangzahl aus** und nutzt dieselbe Asymmetrie wie die
+  Spaltenmaskierung: `coalesce(p.search_doc, <Basis-Vektor aus pp>) @@ …`. Ab
+  Rang 3 ist `p.search_doc` da und gilt; darunter ist es NULL und der
+  Basis-Vektor übernimmt. Kein `case`, kein `has_level(3)`, keine zweite Kopie
+  der Grenze.
+
+  **Bewusst inline statt als generierte Spalte mit GIN-Index.** Bei 74 Profilen
+  folgenlos, und den indizierten Weg über `search_doc` nimmt weiterhin jeder ab
+  Rang 3. Die Schwelle, ab der das falsch wird, ist dieselbe, die
+  `src/lib/directory.ts` für die Kontaktliste benennt: das Paging
+- [x] 3b.5 Prüfen, dass `search_doc` selbst **unverändert** bleibt — es bedient
+      weiterhin Rang 3 und die Kopfzeilen-Suche. **Keine `generated`-,
+      `alter table`- oder `fbc_profile_search_doc`-Anweisung in der Migration**
+      (gegengeprüft). Zusage 33 belegt die Wirkung: `discover` findet den
+      Kompetenz-Begriff weiterhin
 
 ## 3c. `branche` wird Basisfeld (Befund opencode HIGH-2)
 
 - [ ] 3c.1 **RED**: pgTAP — ein `connect`-Konto bekommt `branche` **gefüllt**
       aus `search_directory`, und `p_branche` filtert für es korrekt
-- [ ] 3c.2 **GREEN**: `branche` in `profiles_public` aufnehmen — **als letzte
-      Spalte, hinter `cover_url`.** `create or replace view` erlaubt nur
-      ANGEHÄNGTE Spalten; an eine „logische" Stelle gesetzt (etwa hinter
-      `region`) scheitert die Migration. Heutige Reihenfolge: `id`, `name`,
-      `avatar_url`, `region`, `company`, `short_bio`, `tier`, `roles`,
-      `cover_url`. Grants nach dem `create or replace view` erneut aussprechen
-- [ ] 3c.3 Gegenprobe: die View gibt weiterhin **keine** erweiterten Felder her
-- [ ] 3c.4 Die Spalten-Aufzählung im Delta gegen den tatsächlichen
+- [x] 3c.2 **GREEN**: `branche` in `profiles_public` aufgenommen — **als letzte
+      Spalte, hinter `cover_url`**, Grants erneut ausgesprochen. Dazu
+      `src/lib/database.types.ts` nachgezogen: die Datei ist handgepflegt,
+      `gen types` darf nicht darüberlaufen
+- [x] 3c.3 Gegenprobe: die View gibt weiterhin **keine** erweiterten Felder her.
+      Am Katalog gemessen — `profiles_public` trägt genau
+      `id, name, avatar_url, region, company, short_bio, tier, roles,
+      cover_url, branche`. Kein `competencies`, kein `has_offers`/`has_needs`,
+      keine Kategorien, kein `headline`, keine `interests`
+- [x] 3c.4 Die Spalten-Aufzählung im Delta gegen den tatsächlichen
       Rückgabetyp von `search_directory` abgleichen — **jede** Spalte ist
-      entweder Basis oder erweitert, keine ohne Zuordnung
+      entweder Basis oder erweitert, keine ohne Zuordnung. **15 Spalten,
+      15 zugeordnet:**
+
+  | Herkunft | Spalten |
+  |---|---|
+  | **Basis** — aus `profiles_public` (10) | `id` · `name` · `avatar_url` · `cover_url` · `region` · `company` · `short_bio` · `branche` · `tier` · `roles` |
+  | **Erweitert** — aus `public.profiles` / `offers` / `needs` unter Rang 3 (5) | `competencies` · `has_offers` · `has_needs` · `offer_categories` · `need_categories` |
 
 ## 4. Filter, die ein `connect`-Konto nicht bedienen kann
 
