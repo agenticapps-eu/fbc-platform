@@ -74,9 +74,17 @@ eine verbrauchte Kennung wiederzuverwenden ist genau die Falle darunter.
 >   neueres Bündel als `defec7ed` — dann misst Schritt 4 nicht mehr, ob das
 >   Gerät das defekte Bündel liegen lässt, sondern nur noch, dass es ein
 >   neueres nimmt. Der `autoDeleteFailed`-Beleg fällt still aus.
-> * **Probe 3 von Hand ist nicht mehr nötig.** Der nächste Merge räumt
->   `defec7ed` ohnehin ab. Von Hand bleibt der schnellere Weg, wenn kein Merge
->   ansteht — und aufgeräumt gehört sofort, nicht irgendwann.
+> * **Probe 3 von Hand ist nicht mehr nötig — sofern `deploy` auch läuft.**
+>   Der Aufräum-Merge räumt `defec7ed` nur ab, wenn der Job `deploy` in
+>   `deploy.yml` durchkommt; die Veröffentlichung steckt als Schritt darin.
+>   `deploy` hängt an `needs: [migrate-dev, drift-gate]` und **entfällt still**,
+>   sobald eines der beiden rot ist. Gemessen 02.09. 20:22 UTC: `drift-gate`
+>   rot (drei Migrationen aus AGE-598 liegen im Repo, aber nicht auf PROD),
+>   `deploy` übersprungen, kein Bündel veröffentlicht — der Merge von #321
+>   liess den Kopf auf `5091813459c8` stehen. **Also vor dem Verlassen auf
+>   den Merge den Kopf nachsehen** (Einzeiler in §3); steht dort noch
+>   `defec7ed`, ist Probe 3 von Hand Pflicht. Aufgeräumt gehört sofort,
+>   nicht irgendwann.
 
 ## 2 · Probe 1 — eine sichtbare Änderung erreicht das Gerät
 
@@ -272,10 +280,12 @@ Fünf Fallen, alle am 02.09. eingetreten und keine davon laut:
 > Bündel: das Aufräumen sähe grün aus und räumte nichts. Deshalb `c1ea4ed2`.
 > Vor jedem Lauf gilt die Regel aus §1 — erst nachsehen, ob die Kennung frei ist.
 >
-> **Und es geht auch ohne diesen Lauf:** der nächste Merge nach `main`
-> veröffentlicht ohnehin ein neueres Bündel (§1). Wer eines in der Hand hat,
-> braucht Probe 3 nicht; wer keines hat, nimmt den Lauf, denn liegen bleiben
-> darf `defec7ed` nicht.
+> **Und es geht auch ohne diesen Lauf — aber nur, wenn `deploy` durchkommt:**
+> der nächste Merge nach `main` veröffentlicht dann ein neueres Bündel. Ist
+> `drift-gate` oder `migrate-dev` rot, entfällt der Job still und der Merge
+> räumt nichts ab (§1, gemessen 02.09.). Wer den Kopf nachgesehen und ein
+> neueres Bündel in der Hand hat, braucht Probe 3 nicht; sonst nimmt er den
+> Lauf, denn liegen bleiben darf `defec7ed` nicht.
 
 `defec7ed` ist nach Probe 2 **das neueste Bündel im Manifest**. Donalds Gerät
 lässt es liegen, jedes andere Gerät und jede Neuinstallation nicht.
