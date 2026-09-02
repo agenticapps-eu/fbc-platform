@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-02 abends (AGE-642: der Rückweg ist jetzt messbar)
+# Session Handoff — 2026-09-02 abends (AGE-642: der Rückweg ist messbar, der Fix ist reviewt)
 
 > ## ⚠ ZUERST: Diese Sitzung macht NUR die mobile Hülle
 >
@@ -10,12 +10,13 @@
 > ### ⛔ Für AGE-599 gilt weiterhin: NICHT löschen
 >
 > Die acht Objekte in `event-covers` auf DEV stammen aus dem Spiegel DEV ← PROD
-> (AGE-576); kein Skript stellt sie wieder her. Steht als SHALL NOT in
+> (AGE-576); kein Skript stellt sie wieder her. SHALL NOT in
 > `openspec/specs/design-system/spec.md`.
 
-Branch `donald/age-642-capacitor-huelle`, **0 hinter `main`**. **PR #314 ist
-gemerged** (`86c4afe`, squash) und auf PROD ausgerollt (`functions: success`).
-`openspec validate --all` 31/31, **151/151** Deno-Tests (waren 140).
+Branch `donald/age-642-capacitor-huelle`, **0 hinter `main`**. **PR #314 und
+#315 sind gemerged** (`86c4afe`, `6dae148`) und beide auf PROD ausgerollt
+(`functions: success`). `openspec validate --all` 31/31, **157/157** Deno-Tests
+(waren 140).
 
 **Der einzige echte Rückstand im Luftweg ist weg — Probe 2 ist jetzt messbar.**
 
@@ -24,45 +25,70 @@ gemerged** (`86c4afe`, squash) und auf PROD ausgerollt (`functions: success`).
 ### `ota-stats` war blind — zwei Fehler an derselben Stelle, beide still
 
 **1 · Der Rumpf ist ein Array, nicht ein Objekt.** capgo puffert die Statistik
-und sendet **Stapel**:
+und sendet **Stapel** (iOS `flushStatsQueue` → `parameters: eventsToSend`,
+Android → `new JSONArray()`). Der Endpunkt las `rumpf.action` an genau diesem
+Array, bekam `undefined` und schrieb `ohne` — im Gerätelauf `Sent 9 events`
+gegen dreimal `action: "ohne"`. `200 ok` sah dabei aus wie Erfolg. Die
+**Einzelform** bleibt daneben echt (`sendRateLimitStatistic` in beiden Schalen,
+Androids `sendStatsAsync`), also nimmt der Endpunkt beide.
 
-| Schale | Belegstelle |
-|---|---|
-| iOS | `CapgoUpdater.swift:3300` `parameters: eventsToSend` |
-| Android | `CapgoUpdater.java:3084` `new JSONArray()` |
-
-Der Endpunkt las `rumpf.action` an genau diesem Array, bekam `undefined` und
-schrieb `ohne` — im Gerätelauf `Sent 9 events` gegen dreimal `action: "ohne"`.
-`200 ok` sah dabei von aussen aus wie Erfolg.
-
-Die **Einzelform** bleibt daneben echt (`sendRateLimitStatistic` in *beiden*
-Schalen, dazu Androids `DownloadService.sendStatsAsync`), also nimmt der
-Endpunkt beide Formen. Gemessen, nicht vorsorglich.
-
-**2 · Die Rumpfgrenze war stiller Verlust, kein Schutz.** Sie stand auf 8 KiB.
-Ein voller Stapel sind 200 Ereignisse (`maxPendingStats` ==
-`MAX_PENDING_STATS`, beide Schalen), gemessen **~94 KiB** — es passten **17 von
-200** hindurch. Und `413` gilt **keiner** Schale als vorübergehend
-(`isTransientStatsFailure`: nur 429, 408, >= 500), das Gerät verwirft den
-Stapel also **endgültig**.
-
-Jetzt 256 KiB, plus ein Deckel `MAX_EREIGNISSE = 200`: ohne ihn machte die
-weitere Grenze den offenen Endpunkt (`verify_jwt = false`) zum Log-Verstärker.
-Neben `actions` steht `gesamt`, sonst wäre der Deckel selbst eine stille
-Kürzung.
+**2 · Die Rumpfgrenze war stiller Verlust, kein Schutz.** Sie stand auf 8 KiB;
+ein voller Stapel sind 200 Ereignisse (`maxPendingStats` == `MAX_PENDING_STATS`)
+und gemessen **~94 KiB** — es passten **17 von 200** hindurch. Und `413` gilt
+**keiner** Schale als vorübergehend (`isTransientStatsFailure`: nur 429, 408,
+>= 500), das Gerät verwirft den Stapel also **endgültig**. Jetzt 256 KiB, plus
+Deckel `MAX_EREIGNISSE = 200`, damit die weitere Grenze den offenen Endpunkt
+nicht zum Log-Verstärker macht. Neben `actions` steht `gesamt`, sonst wäre der
+Deckel selbst eine stille Kürzung.
 
 ### Wie es belegt ist
 
-- Vorgehen wie beim `session_key`-Fix: **erst die Zusagen umgedreht** (RED
-  gesehen: 5 rot / 3 grün), dann der Code.
-- 11 Zusagen in `meldung.ts`; eine liest `index.ts` als Text und belegt die
-  **Verdrahtung** (Muster aus `send-push/anbieter.test.ts`).
-- **Mutations-Gegenprobe:** alle fünf tragenden Zusagen röten beim Rückbau
-  einzeln — Array-Behandlung, `ACTION_GRENZE`, `MAX_EREIGNISSE`,
-  `RUMPF_GRENZE`, Verdrahtung.
-- **Am live ausgelieferten Artefakt**, mit Positivkontrolle: 45 KiB → `200`
-  (alte Fassung: `413`), Logzeile `gesamt: 100` mit 100 echten Aktionen;
-  317 KiB → `413`. Die Tabelle steht in `tasks.md`.
+RED zuerst gesehen (5 rot / 3 grün), dann der Code. Am **live ausgelieferten**
+Artefakt gegengeprüft, mit Positivkontrolle: 45 KiB → `200` (alte Fassung:
+`413`), Logzeile `gesamt: 100` mit 100 echten Aktionen; 317 KiB → `413`. Die
+Tabelle steht in `tasks.md`.
+
+### Der Fremd-Review fand den Fix selbst — und er hatte denselben Fehler
+
+Zwei unabhängige Reviewer (gemini + ein Haus-Reviewer nach der Skill-Vorlage;
+`opencode` lief mit, `codex` bewusst nicht eingeplant) trafen **denselben
+Kern**: `meldung.status` war im Betrieb **tot**, `index.ts` hartkodierte die
+Statuscodes. Belegt per Mutation, alle blieben **11/11 grün**:
+
+| Mutation an `index.ts` | |
+|---|---|
+| `status: 413` → `400` | grün |
+| 413-Zweig antwortet `200 ok` | grün |
+| `405`-Wächter gelöscht | grün |
+| `actions` / `gesamt` aus der Logzeile | grün |
+| **`req.clone()`, Rohrumpf samt `device_id` ins Log** | grün |
+
+Ausgerechnet `413` entscheidet, ob das Gerät wiederholt oder **endgültig
+verwirft** — also derselbe Fehler wie der behobene, nur eine Ebene höher: der
+tragende Wert steht zweimal da, getestet war die Hälfte, die niemand liest.
+
+**Ursache war die Zusage.** Sie las `index.ts` als *Text* und grepte auf den
+Aufruf — das Haus-Muster aus `send-push/anbieter.test.ts`. Es prüft sich
+selbst, nicht das Verhalten.
+
+**Behoben in `6dae148`:** der Handler ist `behandleAnfrage` in `meldung.ts` und
+wird **ausgeführt** geprüft — echte `Request`, echte `Response`, mitgeschriebene
+Logzeilen, die Logzeile auf ihre exakte Feldmenge festgenagelt. `index.ts` ist
+ein dreizeiliges `Deno.serve`. **Alle sieben Mutationen röten jetzt**, das Leck
+eingeschlossen. 17 Zusagen statt 11. Live nach dem Deploy: `GET` → 405 · Stapel
+→ 200 `ok` · 45 KiB → 200 `ok` · unlesbar → 200 `discarded` · 317 KiB → 413.
+
+Zwei kleinere Befunde mit übernommen: `RUMPF_GRENZE` zählt UTF-16-Einheiten,
+nicht Bytes (bis 768 KiB — kein Schutzloch, `req.text()` puffert vorher voll;
+Kommentar richtiggestellt statt mit `TextEncoder` umgerechnet, der eine zweite
+Kopie angelegt hätte), und sechs Herstellerverweise standen 1–118 Zeilen
+daneben — jetzt Symbolnamen. **Nicht übernommen:** die Grenze auf 128 KiB
+senken (gemini) — sie ist nicht die DoS-Kontrolle, und `413` ist endgültiger
+Verlust.
+
+**Zur Reviewer-Wahl:** gemini stufte den UTF-16-Punkt als HOCH ein, mit falscher
+Kausalkette und einem Fix, der es verschlimmert hätte — und **alle vier** seiner
+Zeilenverweise waren falsch. Verdikt zählt, Belege nicht.
 
 ## Decisions
 
@@ -72,6 +98,9 @@ Kürzung.
   Ereignisse" schreiben — bewusst nicht getan, das wäre Scope-Ausweitung.
 - **256 KiB statt Grenze weg.** Eine Grenze bleibt nötig (offener Endpunkt);
   sie muss nur über dem echten Maximum liegen statt darunter.
+- **Handler ins reine Modul, nicht nur `meldung.status` verdrahten.** Die
+  Ein-Zeilen-Variante hätte den Befund geschlossen und die Naht gelassen; sechs
+  weitere Mutationen wären grün geblieben.
 - **Lint/fmt nicht angefasst.** `deno lint` beanstandet den `jsr:`-Import — in
   **allen 12** bestehenden Testdateien gleichermassen, und CI fährt weder
   `deno lint` noch `deno fmt` für Functions. Haus-Muster geschlagen hätte
@@ -79,14 +108,13 @@ Kürzung.
 
 ## Files modified
 
-**Gemerged in `86c4afe` (PR #314):**
-`supabase/functions/ota-stats/meldung.ts` (neu, die Entscheidung) ·
-`meldung.test.ts` (neu, 11 Zusagen) · `index.ts` (verdrahtet; Kopfkommentar
-korrigiert — er behauptete, der Rumpf werde „nur bis `RUMPF_GRENZE` gelesen",
-aber `req.text()` puffert ihn vollständig) ·
-`openspec/changes/capacitor-huelle/tasks.md`.
+Alles unter `supabase/functions/ota-stats/`: **`meldung.ts`** (neu — Grenzen,
+`werteRumpf`, `protokoll`, `behandleAnfrage`), **`meldung.test.ts`** (neu, 17
+Zusagen), **`index.ts`** (auf drei Zeilen `Deno.serve` geschrumpft). Dazu
+`openspec/changes/capacitor-huelle/tasks.md` und diese Datei.
 
-Enthielt ausserdem `7ddb0f7`, die Belegdoku der Gerätesitzung (war ungepusht).
+Gemerged in `86c4afe` (#314, der Fix) und `6dae148` (#315, Review-Befunde +
+Live-Beleg). `7ddb0f7`, die Belegdoku der Gerätesitzung, ging in #314 mit.
 
 ## Next session: start here
 
@@ -104,10 +132,11 @@ dem Assistenten sperrt ihn der Klassifikator.
 
 ## Open questions — alle innerhalb AGE-642
 
-- **Kein unabhängiger Review auf diesem Diff.** Der Workflow sieht Stufe 4 vor,
-  aber diese Sitzung läuft unter „keine Subagenten ohne Auftrag". Der Diff
-  berührt einen offenen Endpunkt und eine Grenze — falls ein Fremdreview
-  gewünscht ist, ist das die eine offene Zusage.
+- **Der Review ist gelaufen und abgearbeitet** (Donald, 02.09.: „mache
+  review"). Was er fand, steht oben. Offen bleibt daraus nur eins: das
+  Quelltext-Grep-Muster steckt noch in `send-push/anbieter.test.ts`, und
+  `ota-update/index.ts` hat dieselbe ungetestete Naht. **Beim nächsten
+  Anfassen mitziehen, nicht auf Vorrat.**
 - **Der PROD-Schreibweg bleibt dem Assistenten gesperrt.** Bestätigt; Donald
   fährt die Zeile.
 - **`[error] Semaphore wait timed out after 0ms`** — die einzige Fehlerzeile
