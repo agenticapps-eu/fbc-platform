@@ -253,11 +253,21 @@ select is(
 -- steht auf true (Sommerfest), daher hier explizit aus.
 update public.platform_settings set open_contact = false;
 
--- ── 4. Kontaktanfragen — ab `exchange` (rank 4) ──────────────────────────────
-select alike(
+-- ── 4. Kontaktanfragen — gestaffelt (AGE-598) ────────────────────────────────
+-- Bis zum 02.09. lautete Klausel 320 `is_contact_open() or has_level(4)`, und
+-- hier stand die Zusage, dass `discover` im geschlossenen Modus NICHT senden
+-- kann. Sie ist mit der Staffelung gekippt, und das ist die Absicht: das
+-- Prädikat `darf_kontaktanfrage_senden` erlaubt ab Rang 3 jeden Empfänger.
+--
+-- Das ist eine ERWEITERUNG und wird als solche zugesagt — der Change ist sonst
+-- durchweg eine Einschränkung, und eine stillschweigend gedrehte Zusage sähe
+-- hier aus wie ein Versehen. Die Staffelung selbst (sechs Absenderstufen gegen
+-- zwei Zielstufen) steht in `kontaktanfrage_staffelung_test.sql`; hier steht
+-- nur, dass die alte Rang-4-Grenze weg ist.
+select is(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'insert into public.contact_requests (from_id, to_id) values (''33333333-3333-3333-3333-333333333333'', ''66666666-6666-6666-6666-666666666666'')'),
-  'DENIED:%', 'Discover kann keine Kontaktanfrage senden (rank < exchange)');
+  'OK', 'Discover kann jetzt eine Kontaktanfrage senden (Staffelung ab rank 3)');
 
 select is(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',

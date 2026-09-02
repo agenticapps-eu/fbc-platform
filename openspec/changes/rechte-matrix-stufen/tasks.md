@@ -269,22 +269,22 @@ Entschieden in D5: sie werden **ausgeblendet**, nicht leer laufen gelassen.
 
 ## 5. Gestaffelte Kontaktanfragen (Teil B)
 
-- [ ] 5.1 **RED**: pgTAP für das Prädikat `darf_kontaktanfrage_senden(uuid)` —
+- [x] 5.1 **RED**: pgTAP für das Prädikat `darf_kontaktanfrage_senden(uuid)` —
       über **alle sechs** Absenderstufen gegen mindestens `connect` und
       `impact` als Ziel. Ein Test gegen nur `basic` und `discover` sieht die
       `connect`→`connect`-Regel nicht
-- [ ] 5.2 **GREEN**: Migration — Prädikat anlegen (`stable`,
+- [x] 5.2 **GREEN**: Migration — Prädikat anlegen (`stable`,
       `security definer`, `set search_path = ''`), `revoke` von `public`/`anon`,
       `grant execute` an `authenticated` **ausdrücklich** (neue Funktionen
       erben nichts)
-- [ ] 5.3 **RED**: pgTAP — `cr_insert_self` lehnt bei `open_contact = false` die
+- [x] 5.3 **RED**: pgTAP — `cr_insert_self` lehnt bei `open_contact = false` die
       Anfrage eines `basic`-Kontos ab und lässt `connect`→`connect` durch
-- [ ] 5.4 **GREEN**: `cr_insert_self` neu setzen — Klausel 320 wird
+- [x] 5.4 **GREEN**: `cr_insert_self` neu setzen — Klausel 320 wird
       `( is_contact_open() or darf_kontaktanfrage_senden(to_id) )`
-- [ ] 5.5 **RED**: pgTAP — die vier unverändert geltenden Zusagen
+- [x] 5.5 **RED**: pgTAP — die vier unverändert geltenden Zusagen
       (Selbst-`from_id`, `pending`, `match_id`-Paarbindung, `is_contactable`)
       halten in **beiden** Schalterstellungen
-- [ ] 5.6 `grants_test.sql` **Abschnitt 6 muss unverändert grün bleiben** —
+- [x] 5.6 `grants_test.sql` **Abschnitt 6 muss unverändert grün bleiben** —
       die Liste wird *nicht* angefasst. Sie zählt abschliessend auf, welche
       Funktionen `anon` ausführen darf, und eine neue Funktion erbt EXECUTE
       über PUBLIC (der Test sagt das in seinem eigenen Kopf, Zeile 262). Wird
@@ -318,7 +318,7 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
   | Fundstelle | Was mit ihr geschieht |
   |---|---|
-  | `rls_test.sql:260` „Discover kann keine Kontaktanfrage senden (rank < exchange)" | **kippt von DENIED auf OK.** Das ist Teil B, nicht der Welpenschutz: Klausel 320 geht von `has_level(4)` auf das Prädikat, und das erlaubt ab Rang 3 jeden Empfänger. Muss umgeschrieben werden, und zwar als das, was sie ist — eine **Erweiterung** |
+  | `rls_test.sql:260` „Discover kann keine Kontaktanfrage senden (rank < exchange)" | **ERLEDIGT mit 5.4** (umgeschrieben, `is(… , 'OK')`). **Kippte von DENIED auf OK.** Das ist Teil B, nicht der Welpenschutz: Klausel 320 geht von `has_level(4)` auf das Prädikat, und das erlaubt ab Rang 3 jeden Empfänger. Muss umgeschrieben werden, und zwar als das, was sie ist — eine **Erweiterung** |
   | `rls_test.sql:268` „Ein neues Mitglied ist in den ersten 30 Tagen nicht KALT kontaktierbar" | kippt auf OK. Das ist die Welpenschutz-Zusage; sie fällt mit ihm |
   | `rls_test.sql:272` „Über ein Match ist dasselbe neue Mitglied erreichbar" | bleibt grün — **aber nicht mehr aus ihrem Grund.** `exchange` darf nach der Streichung ohnehin senden, das `match_id` belegt nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer als eine rote |
 - [ ] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: die Staffelung darf durch das
