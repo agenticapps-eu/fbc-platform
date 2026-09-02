@@ -380,12 +380,41 @@ hält. Nach ihnen fällt die Gegenprobe wie erwartet auf **1**.
 
 ## 7. Oberfläche: Abgeben
 
-- [ ] 7.1 Themenauswahl aus `feedback_themes`, vorbelegt mit „Generell".
-- [ ] 7.2 Bildauswahl, optional; das Formular prüft dieselben Grenzen wie der
-      Bucket, aber die Grenze ist der Bucket.
-- [ ] 7.3 Die bestehenden Zusagen bleiben: ohne Sterne kein Absenden; unterhalb
-      `sm` steht der Knopf im Dokumentfluss. Nach dem Umbau **nachmessen** — das
-      Formular wird höher.
+- [x] 7.1 **Themenauswahl aus `feedback_themes`.** Weder Schlüssel noch
+      Beschriftung stehen im Bauteil: die Vorbelegung ist `themen[0].key` —
+      die Reihenfolge steht in `sort`, und die erste Zeile **ist** „Generell".
+      Eine Zusage dreht die Fixture-Reihenfolge um; ein hier hingeschriebenes
+      `"generell"` fällt daran auf (gemessen, siehe unten).
+      Lädt die Liste nicht, erscheint **kein** Auswahlfeld und das Absenden
+      bleibt möglich — die Spalte trägt dann ihren dauerhaften Vorgabewert.
+      Ein leeres Auswahlfeld sähe aus wie ein Fehler, ein gesperrtes Absenden
+      wäre einer.
+- [x] 7.2 **Bildauswahl, optional.** Verstecktes Dateifeld plus Knopf, nativ
+      über `useBildauswahl` (Muster von `EventCoverPicker`). Das Formular prüft
+      Typ und Grösse aus **denselben Konstanten**, die die Datenschicht
+      benutzt — aber die Grenze ist der Bucket; hier ist es Komfort.
+      Reihenfolge beim Absenden: **erst das Bild, dann die Zeile.** Scheitert
+      der Upload, entsteht gar keine Zeile — sonst stünde eine Rückmeldung
+      ohne ihr Bild da und niemand wüsste, dass eines gemeint war.
+- [x] 7.3 **Die bestehenden Zusagen stehen unverändert** (ohne Sterne kein
+      Absenden — jetzt zusätzlich mit gesetztem Thema und Bild geprüft; der
+      Auslöser trägt weiterhin kein `fixed`).
+      Zur Höhe: das Panel ist `max-h-[90vh] overflow-y-auto` und wächst
+      deshalb nicht über den Bildschirm, es scrollt. jsdom rechnet kein
+      Layout, gemessen wird dort also die Zusage selbst; das **Nachmessen im
+      Browser** gehört zu 9.4 und steht dort.
+      **Mutationsprobe über die 12 neuen Zusagen** (sie sind nach dem Code
+      entstanden), sieben Mutationen, danach zeichengleich zurück:
+      | Mutation | Es fielen |
+      |---|---|
+      | Thema als Literal `"generell"` vorbelegt | **2** |
+      | Typprüfung des Bildes weg | **1** |
+      | Grössenprüfung weg | **1** |
+      | Zeile trotz gescheitertem Upload schreiben | **1** |
+      | Thema nicht mitschicken | **3** |
+      | Pfad nicht mitschicken | **2** |
+      | Deckelung des Panels entfernt | **1** |
+      Keine Mutation lief grün durch.
 
 ## 8. Oberfläche: Admin
 
