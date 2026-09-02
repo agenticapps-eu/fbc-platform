@@ -60,14 +60,18 @@ und das **Alter des Bestands ist nirgends gemessen** — `is_new_member` liest
 
 ## Decisions
 
-- **`open_contact` bleibt, bekommt aber einen Zwilling.** *Warum:* Donald wollte
-  am 02.09. „zwei Schalter statt einem". Der erste Entwurf lieferte einen und
-  einen bedingungslos scharfen Welpenschutz — beide Reviewer haben das
-  angezeigt. Jetzt: `welpenschutz_aktiv boolean not null default false`. **Das
-  Ausrollen legt damit nichts um.**
-- **Die Vorgabe `false` bricht §2 des Stufenmodells, und das steht so da.**
-  *Warum:* sie bildet den heutigen *wirksamen* Zustand ab. Eine Migration soll
-  nichts umlegen, was ein Mensch umlegen sollte.
+- **Der Welpenschutz geht ersatzlos raus** (Donald, 02.09., Endstand).
+  *Warum:* zuerst war ein zweiter Schalter `welpenschutz_aktiv` mit Vorgabe
+  `false` entworfen. Dann kam die Messung — **alle 74 Profile sind jünger als
+  30 Tage**, der Fluchtweg deckt rund 2 % der Paare. Eine Regel, die man wegen
+  ihrer eigenen Wirkung nie einschalten kann, ist keine Regel. Donalds
+  Begründung trägt weiter: „haben andere Plattformen auch nicht."
+- **Was seine Aufgabe übernimmt, ist die Staffelung.** Ein `basic`-Konto darf
+  gar nicht senden. Sie fragt, **wer sendet**, statt wer empfängt — und
+  schliesst die Angriffsfläche an der Wurzel.
+- **`is_new_member(uuid)` wird mitgedroppt.** *Warum:* gemessen genau **ein**
+  lebender Aufrufer, und das war die entfallende Klausel. Ein Prädikat ohne
+  Aufrufer wird später falsch wieder angeschlossen.
 - **`profiles_public` bekommt KEINE Stufenschwelle.** *Warum:* 15 Leser, es ist
   das Namensauflösungs-Rückgrat. Eine Schwelle nähme einem `basic`-Konto nicht
   das Verzeichnis, sondern die Namen im Feed. Als Nicht-Zusage geschrieben.
@@ -88,10 +92,16 @@ und das **Alter des Bestands ist nirgends gemessen** — `is_new_member` liest
 - **`bf4ce70`** (dieser Worktree) — `openspec/changes/rechte-matrix-stufen/`,
   7 Dateien, 1.382 Zeilen: proposal · design · tasks · zwei Delta-Specs ·
   REVIEWS.md · .openspec.yaml
+- **`bb0f7d8`** — der Welpenschutz raus, gemessen begründet
 - **`e3d371a`** (`main`, via #313) — `docs/lastenheft.md`,
   `docs/technisches-handbuch.md`, unverändert eingecheckt
 - Zwei neue Erinnerungen: `matching-engine-lebt-oberflaeche-ist-weg`,
-  `volltextindex-ist-ein-orakel`
+  `volltextindex-ist-ein-orakel`. Eine korrigiert:
+  `open-contact-flag-hebelt-zwei-gates` behauptete, Abschalten sperre alle aus —
+  gemessen ist es folgenlos.
+- **Memory-Index kompaktiert:** 182 → 134 Dateien, Index 184 → 139 Zeilen. Zehn
+  Themendateien, jeder Satz wortgleich übernommen, alte Slugs im Kopf jeder
+  Datei. Sicherung: `MEMORY.md.bak-2026-09-02`.
 
 ## Next session: start here
 
@@ -110,19 +120,11 @@ Basis `3ddb1a0`, sauber ausser dieser Datei.
 
 ## Open questions
 
-- **Die Memory-Index-Kompaktierung steht aus.** Der Hook mahnt sie bei jedem
-  Schreiben an: 184 Zeilen, Ziel unter 140. **Es ist keine Nebenbei-Aufgabe** —
-  jeder Eintrag ist bereits eine Zeile, Hooks kürzen spart also nichts. Von 184
-  auf 140 hiesse ~44 Einträge zusammenlegen oder streichen, und die sechs
-  „ÜBERHOLT"-Einträge sind genau die, die davon abhalten, den veralteten Glauben
-  neu herzuleiten. Braucht einen eigenen, sorgfältigen Durchgang.
-- **Zwei Schalter warten auf Donald,** beide erst nach dem Ausrollen:
-  `open_contact` auf `false` (sonst bleibt die Staffelung wirkungslos) und
-  `welpenschutz_aktiv` auf `true` — letzteres **erst nach Aufgabe 6b**, der
-  Messung des Bestandsalters.
-- **Folgefrage, falls 6b den Verdacht bestätigt:** liest `is_new_member` das
-  richtige Datum? Für importierte Mitglieder ist `created_at` das Datum des
-  Imports, nicht ihres Beitritts. Eigener Vorgang, nicht dieser Change.
+- **Ein Schalter wartet auf Donald,** nach dem Ausrollen: `open_contact` auf
+  `false`, sonst bleibt die Staffelung wirkungslos. **Gemessen folgenlos** —
+  alle 74 Konten liegen auf Rang 3 oder darüber, für die die Staffelung jeden
+  Empfänger erlaubt. Richtiger Zeitpunkt ist **vor** dem Öffnen der
+  Selbstregistrierung.
 - **AGE-688** (`sm`-Doppelmodal) liegt unangefasst im Backlog.
 - **Der Neuigkeiten-Eintrag `2026-09-02-feedback-ausbauen`** ist weiterhin nicht
   freigegeben — er liegt in `AdminNeuigkeitenPage` unter `offen`.
