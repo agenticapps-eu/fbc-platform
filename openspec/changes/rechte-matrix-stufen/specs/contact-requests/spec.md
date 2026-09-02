@@ -74,72 +74,39 @@ Empfängers (`is_contactable`) SHALL greifen.
   aktualisiert
 - **THEN** verweigert die Policy `platform_settings_update_admin` den Schreibzugriff
 
-### Requirement: Der Welpenschutz hat einen eigenen Schalter
+### Requirement: Eine Kaltanfrage hängt nicht am Alter des Empfängers
 
-Das System SHALL den 30-Tage-Welpenschutz über eine **eigene** Einstellung
-`platform_settings.welpenschutz_aktiv` steuern, mit demselben
-`is_admin()`-Schreibrecht wie `open_contact`. Solange sie `true` ist, SHALL
-eine Kaltanfrage — eine Anfrage ohne `match_id` — an ein Mitglied, das sich
-innerhalb der letzten 30 Tage registriert hat (`is_new_member`), abgelehnt
-werden.
+Das System SHALL die Erlaubnis, eine Kontaktanfrage einzufügen, **nicht** vom
+Registrierungsdatum des Empfängers abhängig machen. Ein Mitglied, das nach der
+Staffelung senden darf, SHALL auch an ein frisch registriertes Konto senden
+dürfen, mit oder ohne `match_id`.
 
-`platform_settings.open_contact` SHALL diese Regel **nicht** mehr beeinflussen,
-und `welpenschutz_aktiv` SHALL die Staffelung nicht beeinflussen. Zwei Regeln,
-zwei Schalter — das ist der Zweck dieser Änderung.
+Das Prädikat `is_new_member(uuid)` SHALL nach dieser Änderung **nicht mehr
+existieren**. Es hatte genau einen lebenden Aufrufer — die entfallende
+Welpenschutz-Klausel — und ein Prädikat ohne Aufrufer ist eine Einladung, es
+später falsch wieder anzuschliessen.
 
-**Die Vorgabe SHALL `false` sein.** Sie bildet den heutigen *wirksamen* Zustand
-ab: `open_contact` steht seit dem 05.08.2026 auf `true` und hebt den
-Welpenschutz damit faktisch auf. Eine Vorgabe `true` stellte ihn beim Ausrollen
-scharf, **ohne dass ein Mensch etwas entscheidet** — ein Mitglied, das heute ein
-neues Konto anschreiben kann, könnte es danach nicht mehr. Diese Vorgabe erfüllt
-die Zusage aus §2 des Stufenmodells damit **nicht**; sie erfüllt statt dessen
-die Zusage, dass eine Migration nichts umlegt, was ein Mensch umlegen sollte.
-Beides SHALL ausgesprochen bleiben, damit die Lücke nicht für ein Versehen
-gehalten wird.
+Was den Schutz übernimmt, SHALL die Staffelung selbst sein: ein `basic`-Konto
+darf gar nicht senden, ein `connect`-Konto nur an `connect`. Sie fragt, **wer
+sendet**, statt wer empfängt.
 
-Der Fluchtweg SHALL eine bestehende Übereinstimmung bleiben. Er ist tragfähig
-und nicht bloß theoretisch: Übereinstimmungen entstehen weiterhin beim Speichern
-von Kompass, Profil und Biete/Suche, und die Kontaktbeziehung reicht ein
-vorhandenes `match_id` beim Senden von sich aus mit — ohne dass eine
-Matching-Oberfläche existiert.
+#### Scenario: Kaltanfrage an ein frisch registriertes Konto geht durch
 
-#### Scenario: Die Vorgabe ändert beim Ausrollen nichts
+- **WHEN** ein sendeberechtigtes Mitglied eine Anfrage **ohne** `match_id` an
+  einen Empfänger sendet, der sich am selben Tag registriert hat
+- **THEN** lässt die Policy das INSERT zu
 
-- **WHEN** die Migration angewandt wurde und niemand eine Einstellung geändert
-  hat, und ein Mitglied eine Kaltanfrage an ein Konto jünger als 30 Tage sendet
-- **THEN** wird das INSERT zugelassen — genau wie vor der Migration
+#### Scenario: Auch bei geschlossenem Schalter zählt nur die Stufe
 
-#### Scenario: Eingeschaltet lehnt der Welpenschutz die Kaltanfrage ab
+- **WHEN** `open_contact` false ist und ein Mitglied ab Rang 3 dieselbe Anfrage
+  an dasselbe frische Konto sendet
+- **THEN** lässt die Policy das INSERT zu — es entscheidet die Staffelung, nicht
+  das Alter des Empfängers
 
-- **WHEN** `welpenschutz_aktiv` true ist und ein Mitglied eine Anfrage ohne
-  `match_id` an einen Empfänger sendet, der sich vor weniger als 30 Tagen
-  registriert hat
-- **THEN** wird das INSERT von der Welpenschutz-Klausel abgelehnt
+#### Scenario: Das Prädikat ist fort
 
-#### Scenario: Der offene Kontakt-Schalter rettet die Kaltanfrage nicht
-
-- **WHEN** `welpenschutz_aktiv` true und `open_contact` **ebenfalls true** ist
-  und dieselbe Kaltanfrage gesendet wird
-- **THEN** wird das INSERT weiterhin abgelehnt — `open_contact` wirkt nur noch
-  auf die Staffelung
-
-#### Scenario: Mit Übereinstimmung geht dieselbe Anfrage durch
-
-- **WHEN** `welpenschutz_aktiv` true ist und dasselbe Mitglied dieselbe Anfrage
-  mit einem `match_id` sendet, das dem Paar gehört
-- **THEN** lässt die Welpenschutz-Klausel das INSERT zu
-
-#### Scenario: Nach 30 Tagen entfällt der Schutz
-
-- **WHEN** `welpenschutz_aktiv` true ist und eine Kaltanfrage an einen Empfänger
-  geht, der sich vor mehr als 30 Tagen registriert hat
-- **THEN** lässt die Welpenschutz-Klausel das INSERT zu
-
-#### Scenario: Nur Admins schreiben den neuen Schalter
-
-- **WHEN** ein Mitglied ohne `is_admin()` `platform_settings.welpenschutz_aktiv`
-  aktualisiert
-- **THEN** verweigert die Policy den Schreibzugriff
+- **WHEN** `public.is_new_member(uuid)` aufgerufen wird
+- **THEN** existiert die Funktion nicht
 
 ## REMOVED Requirements
 
@@ -161,7 +128,13 @@ jedem Modus, und der Schalter bleibt `is_admin()`-schreibbar. Was entfällt, ist
 allein die Formulierung „both the level gate and the Welpenschutz SHALL be
 lifted" und die Nennung von `exchange`.
 
+**Der Welpenschutz kehrt nicht wieder.** Diese Anforderung war seine einzige
+Fundstelle in den Specs; mit ihr endet die Zusage aus §2 des Stufenmodells,
+neue Mitglieder seien 30 Tage lang nur über eine Übereinstimmung erreichbar.
+Das ist eine Produktentscheidung vom 02.09.2026, keine Auslassung — sie steht
+ausgeschrieben in „Eine Kaltanfrage hängt nicht am Alter des Empfängers".
+
 **Kein Bruch beim Ausrollen**: Wer heute eine Kaltanfrage senden darf, darf es
-nach der Migration weiterhin — `open_contact` steht auf `true` und hebt die
-Staffelung auf, `welpenschutz_aktiv` steht per Vorgabe auf `false`. Die
-Ablösung verschiebt die Regeln, sie stellt keine scharf.
+nach der Migration weiterhin. `open_contact` steht auf `true` und hebt die
+Staffelung auf; der Welpenschutz, der heute ohnehin nicht greift, ist danach
+fort. Die Ablösung lockert, sie verschärft nichts.

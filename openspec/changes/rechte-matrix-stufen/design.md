@@ -57,14 +57,17 @@ Deshalb konnte Donald den Welpenschutz unverändert lassen.
   beweisen, nicht behaupten.
 - Kontaktanfragen staffeln: `basic` gar nicht · `connect` nur an genau
   `connect` · ab `discover` an alle.
-- `open_contact` so umbauen, dass es **nur noch** die Staffelung aufhebt.
+- Den 30-Tage-Welpenschutz **entfernen**, samt seinem verwaisten Prädikat.
+  `open_contact` wirkt danach nur noch auf die Staffelung — nicht weil es
+  entkoppelt wurde, sondern weil es nichts anderes mehr gibt.
 
 **Non-Goals:**
 
 - Keine Listungs-Untergrenze. `basic` bleibt gelistet.
 - Keine Schwelle auf `profiles_public`.
 - Kein Schreibzugriff auf `platform_settings` in PROD.
-- Keine inhaltliche Änderung am Welpenschutz.
+- **Kein Ersatz für den Welpenschutz.** Kein zweiter Schalter, keine
+  abgeschwächte Fassung, keine Frist. Er geht ersatzlos.
 - Kein Zurückholen der Matching-Oberfläche.
 
 ## Decisions
@@ -123,40 +126,42 @@ benannten Folge: bei heute 72 `impact` und 0 `connect` darf ein
 `connect`-Mitglied **niemanden** anschreiben. Das ist kein Versehen und wird
 hier nicht stillschweigend geglättet.
 
-### D3 — Zwei Schalter statt eines, und keiner davon kippt beim Ausrollen
+### D3 — Der Welpenschutz entfällt ersatzlos
 
-**Entscheidung:** Klausel 320 wird zu
+**Entscheidung (Donald, 02.09.):** Klausel 332 wird **gestrichen**, nicht
+umgebaut. Der 30-Tage-Welpenschutz verschwindet aus der Plattform. Klausel 320
+wird zu
 `( public.is_contact_open() or public.darf_kontaktanfrage_senden(to_id) )`.
-Klausel 332 wird zu
-`( not public.ist_welpenschutz_aktiv() or match_id is not null
-   or not public.is_new_member(to_id) )`.
 
-Dazu eine **zweite** Spalte in `platform_settings`:
-`welpenschutz_aktiv boolean not null default false`, mit demselben
-Admin-Schreibrecht wie `open_contact`.
+Damit erledigt sich das Entkopplungsproblem, statt gelöst zu werden:
+`open_contact` wirkt danach **nur noch** auf die Staffelung, weil es nichts
+anderes mehr gibt, worauf es wirken könnte. Kein zweiter Schalter, keine zweite
+Vorgabe, keine zweite Zusage.
 
-**Warum nicht bedingungslos, wie zuerst entworfen?** Der erste Entwurf liess
-`is_contact_open() or` in Klausel 332 ersatzlos weg. Das hätte den Welpenschutz
-**beim Ausrollen sofort scharf gestellt**, ohne dass ein Admin etwas tut — er
-steht seit dem 05.08. faktisch aus, weil `open_contact` auf `true` steht. Ein
-Mitglied, das heute ein neues Konto anschreiben kann, könnte es nach dem Deploy
-nicht mehr; die einzige Milderung wäre ein Neuigkeiten-Eintrag gewesen. Der
-Plan-Review hat das als HIGH benannt, und zu Recht: es widerspricht der Zusage,
-unter der Donald am 02.09. entschieden hat („zwei Schalter statt einem", „auf
-PROD ändert sich heute nichts").
+**Der Weg dahin ist die Messung, nicht die Meinung.** Ein Zwischenentwurf sah
+einen zweiten Schalter `welpenschutz_aktiv` mit Vorgabe `false` vor. Dann wurde
+der Bestand gemessen (siehe Risiken), und das Ergebnis machte die Regel
+unhaltbar: **alle 74 Profile sind jünger als 30 Tage.** Ein eingeschalteter
+Welpenschutz hätte die Kontaktfunktion plattformweit stillgelegt — der einzige
+Fluchtweg wären 56 Übereinstimmungen gegen 2.701 mögliche Paare gewesen, rund
+2 %. Eine Schutzregel, die man wegen ihrer eigenen Wirkung nie einschalten
+kann, ist keine Regel, sondern toter Code mit einem Schalter davor.
 
-**Die Vorgabe `false` bildet den heutigen *wirksamen* Zustand ab, nicht den
-angestrebten.** Das ist bewusst und muss so dastehen: §2 des Stufenmodells sagt
-den Welpenschutz zu, und die Vorgabe erfüllt diese Zusage nicht. Sie erfüllt
-statt dessen die Zusage, dass eine Migration nichts umlegt, was ein Mensch
-umlegen sollte. Wer den Schutz will, schaltet ihn ein — mit derselben Bewegung
-wie beim Stufen-Gate.
+**Donalds Begründung, und sie trägt weiter als der Messwert:** andere
+Plattformen haben so etwas auch nicht. Die Regel stammt aus §2 des
+Stufenmodells und war nie im Betrieb — seit dem 05.08. hebt `open_contact` sie
+auf, davor gab es kaum Selbstregistrierungen.
 
-**Ergebnis: zwei unabhängige Stellschrauben.** `open_contact` hebt die
-Staffelung auf und **nur** sie. `welpenschutz_aktiv` schaltet den Welpenschutz
-und **nur** ihn. Die Kopplung, an der Teil B bisher scheiterte, ist damit
-gelöst, ohne eine neue zu schaffen — und **das Ausrollen ändert für Mitglieder
-nichts**, in keiner der beiden Regeln.
+**Was den Schutz übernimmt:** die Staffelung selbst, und besser. Der Zweck des
+Welpenschutzes war, ein frisches Konto vor Kaltansprache zu bewahren. Nach
+Teil B darf ein `basic`-Konto **gar nicht** senden und ein `connect`-Konto nur
+an `connect`. Die Angriffsfläche, gegen die der Welpenschutz stand, schliesst
+die Stufenregel an der Wurzel — sie fragt, wer sendet, statt wer empfängt.
+
+**Aufräumen:** `is_new_member(uuid)` hat nach dieser Änderung **keinen
+Aufrufer mehr** — gemessen, ein einziger lebender Treffer, und das war Klausel
+332. Die Funktion wird in derselben Migration gedroppt. Ein Prädikat ohne
+Aufrufer ist eine Einladung, es später falsch wieder anzuschliessen.
 
 ### D5 — Filter, die eine Stufe nicht bedienen kann, werden ausgeblendet
 
@@ -262,16 +267,33 @@ dass das Ausrollen nichts umlegt. Der Fluchtweg über ein Match ist gemessen
 lebendig, setzt aber voraus, dass beide Seiten Kompass oder Biete/Suche gefüllt
 haben.
 
-**[Der ganze Bestand könnte als „neu" gelten]** → `is_new_member` liest
-`profiles.created_at`, und der WordPress-Import hat die 72 Bestandsprofile in
-**einem** Lauf angelegt. Liegt dieser Lauf weniger als 30 Tage zurück, gelten
-**alle** als neu, und ein aktiver Welpenschutz machte praktisch die gesamte
-Mitgliedschaft kalt unerreichbar. Das ist **nicht gemessen** und muss es sein,
-**bevor** `welpenschutz_aktiv` je auf `true` geht — nicht vor dem Ausrollen,
-weil die Vorgabe `false` ist. Steht als eigene Aufgabe. Sollte sich der Verdacht
-bestätigen, ist die Frage nicht „schalten oder nicht", sondern ob
-`is_new_member` das richtige Datum liest: für importierte Mitglieder ist
-`created_at` das Datum des Imports, nicht ihres Beitritts.
+**[Der ganze Bestand galt als „neu" — die Messung, die den Welpenschutz
+erledigt hat]** → Am 02.09.2026 gegen PROD gelesen (read-only, Supabase-MCP):
+
+| angelegt | Profile | wäre „erwachsen" ab |
+|---|---|---|
+| 05.08. | 2 | 04.09. |
+| 16.08. | 69 | 15.09. |
+| 24.08. | 1 | 23.09. |
+| 25.08. | 2 | 24.09. |
+
+**Alle 74 Profile sind jünger als 30 Tage.** Ein aktiver Welpenschutz hätte die
+Kontaktfunktion plattformweit stillgelegt: 56 Übereinstimmungen gegen 2.701
+mögliche Paare, rund 2 % Durchlass. Das war der Anlass, ihn nicht zu schalten
+sondern zu **entfernen** (D3) — das Risiko ist damit gegenstandslos, es steht
+hier nur noch als Beleg für die Entscheidung.
+
+**Die Folgefrage entfällt mit ihm:** ob `is_new_member` für importierte
+Mitglieder das richtige Datum liest (`created_at` ist das Datum des Imports,
+nicht des Beitritts), muss niemand mehr beantworten. Die Funktion wird
+gedroppt.
+
+**[Die Staffelung trifft heute niemanden — auch das gemessen]** → 73 × `impact`,
+1 × `discover`, **0 × `connect`, 0 × `basic`**. Alle Konten liegen auf Rang 3
+oder darüber, und die Staffelung erlaubt ab Rang 3 jeden Empfänger.
+`open_contact` auf `false` zu setzen wäre also **folgenlos** und kann jederzeit
+nach dem Ausrollen geschehen — am besten **bevor** die Selbstregistrierung
+`basic`-Konten erzeugt, denn dann greift die Regel zum ersten Mal wirklich.
 
 **[Ein `connect`-Konto filtert und bekommt leer, ohne zu erfahren warum]** →
 Siehe D1. Die Oberfläche braucht denselben Aufstiegs-Hinweis, den
@@ -309,13 +331,16 @@ nachzuziehen.
 ## Open Questions
 
 - **Wann wird `open_contact` umgelegt?** Gehört nicht in diesen Change, aber
-  ohne diesen Schritt bleibt die Staffelung wirkungslos. Donalds Schalter.
-- **Wann wird `welpenschutz_aktiv` umgelegt?** Ebenfalls Donalds Schalter — und
-  erst, nachdem das Alter des Bestands gemessen ist (siehe Risiken).
-- **Ist `created_at` für importierte Mitglieder das richtige Datum?** Fällt erst
-  an, wenn die Messung zeigt, dass der Import innerhalb der 30-Tage-Frist liegt.
-  Dann wäre zu entscheiden, ob der Welpenschutz ein eigenes Beitrittsdatum
-  braucht. **Nicht Teil dieses Changes**, aber es hängt an ihm.
+  ohne diesen Schritt bleibt die Staffelung wirkungslos. Donalds Schalter — und
+  gemessen **folgenlos**: alle 74 Konten liegen auf Rang 3 oder darüber, für die
+  die Staffelung ohnehin jeden Empfänger erlaubt. Er kann also jederzeit nach
+  dem Ausrollen umgelegt werden, am besten **bevor** die Selbstregistrierung
+  `basic`-Konten erzeugt.
 
-**Erledigt seit dem Plan-Review:** ob die Filter für `connect` leer laufen oder
-verschwinden — entschieden in D5, sie verschwinden.
+**Erledigt seit dem Plan-Review:**
+
+- ob die Filter für `connect` leer laufen oder verschwinden — entschieden in D5,
+  sie verschwinden.
+- was mit dem Welpenschutz geschieht — entschieden in D3, er geht ersatzlos.
+  Damit entfallen der zweite Schalter, die Frage nach seiner Vorgabe und die
+  Frage nach dem richtigen Datum für `is_new_member`.

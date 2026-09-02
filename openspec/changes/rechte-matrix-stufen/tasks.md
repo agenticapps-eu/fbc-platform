@@ -118,40 +118,42 @@ Entschieden in D5: sie werden **ausgeblendet**, nicht leer laufen gelassen.
 - [ ] 5.6 `grants_test.sql` nachziehen: das neue Prädikat bricht sonst den
       Golden-Snapshot in CI
 
-## 6. Welpenschutz bekommt einen eigenen Schalter
+## 6. Welpenschutz entfernen
 
-- [ ] 6.1 **RED**: pgTAP — **nach** der Migration und ohne dass jemand eine
-      Einstellung ändert, geht eine Kaltanfrage an ein Konto jünger als 30 Tage
-      weiterhin durch. Das ist die Zusage „das Ausrollen legt nichts um", und
-      sie ist die wichtigste dieser Gruppe
-- [ ] 6.2 **RED**: pgTAP — mit `welpenschutz_aktiv = true` wird dieselbe Anfrage
-      abgelehnt, **auch wenn** `open_contact` auf `true` steht
-- [ ] 6.3 **RED**: pgTAP — dieselbe Anfrage **mit** paar-eigenem `match_id` geht
-      durch
-- [ ] 6.4 **RED**: pgTAP — ein Nicht-Admin darf `welpenschutz_aktiv` nicht
-      schreiben
-- [ ] 6.5 **GREEN**: Spalte `welpenschutz_aktiv boolean not null default false`
-      in `platform_settings`, Spalten-`grant update` wie bei `open_contact`,
-      Prädikat `ist_welpenschutz_aktiv()`; Klausel 332 zu
-      `( not ist_welpenschutz_aktiv() or match_id is not null
-        or not is_new_member(to_id) )`
-- [ ] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: `open_contact` muss die
-      Staffelung noch aufheben können und den Welpenschutz **nicht** mehr
+Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
-## 6b. Das Alter des Bestands messen (Befund opencode HIGH-4)
+- [ ] 6.1 **RED**: pgTAP — eine Kaltanfrage **ohne** `match_id` an ein Konto,
+      das am selben Tag registriert wurde, geht durch. Bei `open_contact = true`
+      **und** bei `false` (dort mit einem Absender ab Rang 3). Das ist die
+      Zusage, die heute nur zufällig gilt, weil das Flag offen steht
+- [ ] 6.2 **GREEN**: Klausel 332 aus `cr_insert_self` **streichen** — nicht
+      umbauen, nicht durch einen Schalter ersetzen
+- [ ] 6.3 **GREEN**: `drop function public.is_new_member(uuid)`. Gemessen genau
+      **ein** lebender Aufrufer, und das war Klausel 332
+- [ ] 6.4 **RED/GREEN**: pgTAP — `public.is_new_member(uuid)` existiert nicht
+      mehr. Ohne diese Zusage bliebe der Drop unbelegt
+- [ ] 6.5 Vorher prüfen, dass kein pgTAP-Bestandstest den Welpenschutz zusagt —
+      sonst wird die Streichung an einer alten Zusage rot, und das sähe wie ein
+      Fehler aus statt wie die Absicht
+- [ ] 6.6 Gegenprobe, dass 5.x weiterhin grün ist: die Staffelung darf durch das
+      Streichen weder schärfer noch weicher geworden sein
 
-Blockiert **nicht** das Ausrollen — die Vorgabe `false` schützt davor. Es
-blockiert das Umlegen des Schalters.
+## 6b. Das Alter des Bestands messen — erledigt, und es hat 6. entschieden
 
-- [ ] 6b.1 Auf PROD lesen, wie `profiles.created_at` verteilt ist: wie viele der
-      Bestandsprofile liegen innerhalb der 30-Tage-Frist? Lesend, per `pg` +
-      tsx — Schreibwege sind hier ohnehin gesperrt
-- [ ] 6b.2 Das Ergebnis **als Zahl** in den Entwurf schreiben, nicht als
-      Einschätzung. Das Repository ist öffentlich: Zahlen, keine Namen
-- [ ] 6b.3 Liegt der Import innerhalb der Frist, Donald vorlegen: dann ist die
-      Frage nicht „schalten oder nicht", sondern ob `is_new_member` das richtige
-      Datum liest — für importierte Mitglieder ist `created_at` das Datum des
-      Imports, nicht ihres Beitritts. Eigener Vorgang, nicht dieser Change
+- [x] 6b.1 Auf PROD gelesen (02.09., Supabase-MCP, read-only): **alle 74
+      Profile jünger als 30 Tage.** 05.08. → 2 · 16.08. → 69 · 24.08. → 1 ·
+      25.08. → 2. `open_contact` steht auf `true`, es gibt 56 Übereinstimmungen
+      gegen 2.701 mögliche Paare — rund 2 % Durchlass
+- [x] 6b.2 Ergebnis als Zahlen im Entwurf, unter „Risks" — keine Namen, das
+      Repository ist öffentlich
+- [x] 6b.3 Donald vorgelegt (02.09.). **Ergebnis: der Welpenschutz geht ganz.**
+      Eine Regel, die man wegen ihrer eigenen Wirkung nie einschalten kann, ist
+      keine Regel. Damit entfallen der zweite Schalter, die Frage nach seiner
+      Vorgabe und die Frage nach dem richtigen Datum für `is_new_member`
+- [x] 6b.4 Nebenbefund, ebenfalls gemessen: **73 × `impact`, 1 × `discover`,
+      0 × `connect`, 0 × `basic`.** Alle Konten liegen auf Rang 3 oder darüber,
+      für die die Staffelung jeden Empfänger erlaubt — `open_contact` auf
+      `false` zu setzen ist damit heute **folgenlos**
 
 ## 7. Oberfläche der Kontaktanfrage
 
