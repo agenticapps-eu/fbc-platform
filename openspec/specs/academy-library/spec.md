@@ -9,50 +9,10 @@ schema, enrollment, or progress tracking. Reconstructed from code as of the
 OpenSpec migration. A data-driven academy with real courses and enrollment is
 tracked as open work (AGE-262) and does not exist yet.
 ## Requirements
-### Requirement: Academy lists curated video lessons
-
-The system SHALL render an Academy page that displays a fixed, code-defined list
-of curated lessons, each with a title, a description, and an embedded video from
-an external host (YouTube/Vimeo) via a reusable embed component. The platform
-SHALL NOT host video content itself.
-
-Die Einbettung SHALL dem Einwilligungstor des Design-Systems folgen: die Karte
-zeigt zuerst eine Fläche aus dem eigenen Ursprung, und der Player des Anbieters
-wird erst auf Anforderung geladen. Die Academy SHALL dafür **keine Ausnahme**
-kennen — sie erhält das Verhalten aus derselben Komponente wie jede andere
-Fläche.
-
-Die kuratierte Liste SHALL als **redaktioneller Block oben** auf der Seite
-stehen, oberhalb der geteilten Videos, damit die Academy am Starttag nicht leer
-ist.
-
-Sie SHALL eine Konstante im Code bleiben und SHALL NOT in die Datenbank
-überführt werden. Der Grund SHALL festgehalten sein: drei von der Redaktion
-gewählte Videos sind kein Inhaltsmodell. Sie in `posts` zu schreiben gäbe ihnen
-einen Autor, eine Sichtbarkeit, Likes und Kommentare, die niemand bestellt hat —
-und ein Kurs-Schema wäre AGE-262, nicht dieser Change.
-
-#### Scenario: Academy shows the curated lessons
-
-- **WHEN** a member opens the Academy page
-- **THEN** each hard-coded lesson is shown as a card with its title, its
-  description, and the embed component in place of the player
-
-#### Scenario: Der kuratierte Block steht über den geteilten Videos
-
-- **WHEN** ein Mitglied die Academy öffnet und Beiträge mit Video bestehen
-- **THEN** stehen die drei kuratierten Lektionen oben, die geteilten Videos
-  darunter
-
-#### Scenario: Eine kuratierte Lektion lädt den Anbieter nicht ungefragt
-
-- **WHEN** ein Mitglied die Academy öffnet
-- **THEN** geht für keine der kuratierten Lektionen ein Aufruf an den Anbieter
-  hinaus, bevor die jeweilige Fläche aktiviert wurde
-
 ### Requirement: Die Academy zeigt geteilte Videos in zwei Reitern
 
-Das System SHALL unterhalb des kuratierten Blocks zwei Reiter anbieten:
+Das System SHALL für geteilte Videos zwei Reiter anbieten, in **derselben
+Reiterzeile** wie die Redaktion:
 
 - **Alle** — alle für den Betrachter sichtbaren Beiträge mit `video_url`,
   neueste zuerst.
@@ -188,4 +148,149 @@ AGE-262.
 - **WHEN** ein Mitglied ein eigenes Video geteilt und selbst geliked hat
 - **THEN** erscheint es sowohl bei den selbst geteilten als auch bei den
   gelikten
+
+### Requirement: Die Academy hat Suche, Hashtags und Sortierung in einer rechten Spalte
+
+Die Academy SHALL eine rechte Inhaltsspalte führen, die beim Blättern mitläuft,
+mit denselben Massen und demselben Umbruchverhalten wie die Filterspalte der
+Aktivität: 16rem breit, 24 px Abstand, ab `lg` neben dem Inhalt, darunter im
+Fluss hinter einem zugeklappten Schalter.
+
+Die Spalte SHALL die **ganze Seite** umspannen und SHALL NOT im Inhalt eines
+einzelnen Reiters liegen. Das Raster SHALL Reiterzeile **und** Reiterinhalt
+umfassen, sodass die Spalte in derselben Zeile beginnt wie die Reiter — dasselbe
+Muster wie bei der Aktivität. Der Grund SHALL festgehalten sein: innerhalb eines
+Reiterinhalts beginnt die Spalte erst unterhalb der Reiterzeile und liest sich
+als Kasten neben einer Liste, und die übrigen Reiter tragen sie überhaupt nicht.
+
+Die Spalte SHALL enthalten:
+
+- ein **Volltextfeld**, das über den Beitragstext sucht,
+- die Facette **Hashtags**, deren Werte aus dem Bestand der sichtbaren Videos
+  abgeleitet werden SHALL,
+- die **Sortierung** mit den Ordnungen, die die Feed-Schicht bereits führt —
+  „Neueste" und „Beliebteste".
+
+Die Sortierung SHALL die vorhandenen Ordnungen der Feed-Schicht benutzen und
+keine eigene einführen. Die Academy ist eine gefilterte Sicht auf `posts`, und
+deren Blätterung trägt seit AGE-667 in allen drei Ordnungen
+`veroeffentlicht_ab` als führendes Feld, in der Ordnung „Beliebteste"
+zusätzlich `like_count` im Cursor. Eine zweite, eigene Ordnung hier hiesse, den
+Cursorvertrag ein zweites Mal zu bauen.
+
+Volltextfeld und Sortierung SHALL immer stehen. Die Hashtag-Karte SHALL **nicht
+rendern**, wenn kein sichtbares Video ein Hashtag trägt. Damit trägt die Spalte
+auch auf dünnem Bestand, ohne eine leere Hülle zu zeigen — auf der Produktion
+steht heute genau ein Video, und keines trägt ein Hashtag.
+
+Die Spalte SHALL ihre Felder nur auf dem Reiter anbieten, auf den sie
+**wirkt** — „Alle". Auf „Meine Academy" und „Redaktion" SHALL sie stattdessen
+benennen, warum hier nicht gefiltert wird. Der Grund SHALL festgehalten sein:
+die Redaktion ist eine Konstante im Code, und „Meine Academy" lädt sein zweites
+Regal über `fetchGelikteVideos`, das weder Suche noch Ordnung kennt — ein Feld,
+das die Hälfte der Liste nicht erreicht, ist eine Zusage ohne Deckung.
+
+Sie SHALL dabei auf allen drei Reitern **stehen bleiben** und SHALL NOT
+verschwinden: eine Spalte, die beim Reiterwechsel weggeht, ändert die
+Inhaltsbreite um 16rem und lässt die Seite springen.
+
+#### Scenario: Die Spalte trägt auch ohne Hashtags
+
+- **WHEN** die Academy geöffnet wird und kein sichtbares Video ein Hashtag
+  trägt
+- **THEN** erscheint keine Hashtag-Karte
+- **AND** Volltextfeld und Sortierung stehen trotzdem
+
+#### Scenario: Die Hashtag-Facette kommt aus dem Bestand
+
+- **WHEN** sichtbare Videos die Hashtags `leadership` und `marketing` tragen
+- **THEN** bietet die Facette genau diese beiden zur Auswahl
+
+#### Scenario: Die Sortierung nutzt die vorhandenen Ordnungen
+
+- **WHEN** „Beliebteste" gewählt und weitergeblättert wird
+- **THEN** führt `like_count` die Ordnung
+- **AND** der Cursor trägt `likeCount`, wie es die Feed-Schicht für diese
+  Ordnung verlangt
+
+#### Scenario: Die kuratierten Lektionen bleiben oben
+
+- **WHEN** der Reiter „Redaktion" ab `lg` geöffnet wird
+- **THEN** stehen die kuratierten Lektionen im Reiterinhalt und nicht in der
+  Spalte
+- **AND** die Spalte steht weiterhin da, mit einem Hinweis statt mit Feldern
+- **AND** dasselbe gilt auf „Meine Academy"
+
+#### Scenario: Die Spalte beginnt auf Höhe der Reiter
+
+- **WHEN** die Academy ab `lg` geöffnet wird
+- **THEN** beginnt die Spalte in derselben Zeile wie die Reiterzeile, nicht
+  unterhalb des Reiterinhalts
+- **AND** sie steht auf jedem der drei Reiter
+
+### Requirement: Die Redaktion ist der dritte Reiter und ihre Kachel ein Streifen
+
+Das System SHALL eine feste, im Code definierte Liste kuratierter Lektionen
+führen, jede mit Titel, Beschreibung und einem eingebetteten Video eines
+externen Anbieters (YouTube/Vimeo) über ein wiederverwendbares Bauteil. Die
+Plattform SHALL NOT Videoinhalte selbst hosten.
+
+Die Einbettung SHALL dem Einwilligungstor des Design-Systems folgen: die Karte
+zeigt zuerst eine Fläche aus dem eigenen Ursprung, und der Player des Anbieters
+wird erst auf Anforderung geladen. Die Academy SHALL dafür **keine Ausnahme**
+kennen — sie erhält das Verhalten aus derselben Komponente wie jede andere
+Fläche.
+
+Sie SHALL eine Konstante im Code bleiben und SHALL NOT in die Datenbank
+überführt werden. Der Grund SHALL festgehalten sein: drei von der Redaktion
+gewählte Videos sind kein Inhaltsmodell. Sie in `posts` zu schreiben gäbe ihnen
+einen Autor, eine Sichtbarkeit, Likes und Kommentare, die niemand bestellt hat —
+und ein Kurs-Schema wäre AGE-262, nicht dieser Change.
+
+Die kuratierte Liste SHALL als **dritter Reiter** stehen, hinter „Alle" und
+„Meine Academy", und SHALL NOT als eigener Block oberhalb der Reiterzeile
+liegen. Der Grund SHALL festgehalten sein: die Reiterzeile ist auf den übrigen
+Flächen der Ort, an dem Sichten nebeneinander stehen; ein Block darüber ist eine
+vierte Anordnung für dieselbe Sache. Der Startreiter SHALL „Alle" bleiben.
+
+Die Kachel einer Lektion SHALL das Video **neben** Titel und Beschreibung
+zeigen, nicht darüber. Der Grund SHALL festgehalten sein: über dem Text nimmt
+ein `aspect-video`-Rahmen die volle Kachelbreite ein und schiebt den Titel aus
+dem Bild — mit dem Einwilligungstor umso mehr, weil die ungeklickte Fläche
+dieselbe Höhe als Grau einnimmt.
+
+Unterhalb einer Behälter-Schwelle SHALL der Streifen in die gestapelte
+Anordnung zurückfallen. Die Schwelle SHALL eine **Behälter**-Abfrage sein und
+SHALL NOT am Fenster hängen: die Kachel steht in einem Raster, das die
+Filterspalte verengt, während das Fenster gleich breit bleibt.
+
+#### Scenario: Academy shows the curated lessons
+
+- **WHEN** a member opens the Academy page
+- **THEN** each hard-coded lesson is shown as a card with its title, its
+  description, and the embed component in place of the player
+
+#### Scenario: Die Redaktion ist der dritte Reiter
+
+- **WHEN** ein Mitglied die Academy öffnet
+- **THEN** trägt die Reiterzeile „Alle", „Meine Academy" und „Redaktion" in
+  dieser Reihenfolge
+- **AND** „Alle" ist ausgewählt
+- **AND** oberhalb der Reiterzeile steht kein Block mit kuratierten Lektionen
+
+#### Scenario: Die Kachel zeigt das Video neben dem Text
+
+- **WHEN** der Reiter „Redaktion" ab der Behälter-Schwelle dargestellt wird
+- **THEN** steht das Video links und Titel samt Beschreibung rechts daneben
+
+#### Scenario: Schmal fällt der Streifen zurück
+
+- **WHEN** der Behälter der Kachel unter die Schwelle fällt
+- **THEN** steht das Video über Titel und Beschreibung
+
+#### Scenario: Eine kuratierte Lektion lädt den Anbieter nicht ungefragt
+
+- **WHEN** ein Mitglied die Academy öffnet
+- **THEN** geht für keine der kuratierten Lektionen ein Aufruf an den Anbieter
+  hinaus, bevor die jeweilige Fläche aktiviert wurde
 

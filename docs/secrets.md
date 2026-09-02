@@ -141,7 +141,7 @@ must **never** reach the client.
 | `APNS_KEY_ID`               | Kennung ebendieses Schlüssels (steht in Apples Dateinamen `AuthKey_<KEYID>.p8`) |
 | `APNS_TEAM_ID`              | Apple-Team, fährt als `iss` im Provider-JWT mit |
 | `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
-| `APNS_SANDBOX`              | `1` schickt an Apples Sandbox-Host. In `prod` **nicht setzen** |
+| `APNS_SANDBOX`              | `1` fragt Apples Sandbox-Host **zuerst**. Nur eine Vermutung — den Host erkennt `send-push` an der Antwort (siehe unten) |
 | `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
 
 ## Setting and reading secrets
@@ -351,9 +351,16 @@ darüber, und besteht wie dieser aus **zwei** Objekten in `public`:
 Beide Namen stehen in `ERWARTET_OHNE_MIGRATION`
 (`scripts/db-drift-scan.logic.ts`) und müssen in **beiden** Projekten exakt so
 lauten. Weicht ein Name ab oder fehlt das Objekt, bricht der Objekt-Drift-Scan
-in `migrate-prod.yml` ab; weil `deploy.yml` dann am Migrations-Gate hängen
-bleibt, fällt der Frontend-Deploy **stumm** aus. Die Zusagen in
-`db-drift-scan.test.ts` lesen die Liste selbst, keine Kopie.
+ab — beim nächsten Handlauf von `migrate-prod` und seit AGE-679 spätestens
+innerhalb einer Stunde im `Push-Waechter`.
+
+> **Korrigiert am 01.09.2026.** Hier stand, dann bleibe `deploy.yml` am
+> Migrations-Gate hängen und der Frontend-Deploy falle **stumm** aus. Das
+> verwechselt zwei Gates — dieselbe Verwechslung, die 130 Zeilen weiter unten
+> schon als korrigiert markiert ist. Ein roter **Objekt**-Scan blockiert
+> keinen Deploy; das tut allein `migration-drift-gate.ts` in `deploy.yml`.
+
+Die Zusagen in `db-drift-scan.test.ts` lesen die Liste selbst, keine Kopie.
 
 Anwenden mit eingesetztem Token — nicht committen, das Repo ist öffentlich:
 
@@ -479,6 +486,20 @@ select cron.schedule('push-wiederholung', '* * * * *',
                      'select public.push_wiederholung()');
 ```
 
+> **Seit AGE-682 tut dieser Minutenlauf ZWEI Dinge** — aber `push_wiederholung`
+> selbst ist **unverändert**, und das ist Absicht. Der zweite Teil, das
+> Entfernen von Gerätetokens ohne Lebenszeichen seit 180 Tagen, steht in
+> `push_tokens_aufraeumen()` und wird als erste Anweisung aus
+> `push_auftraege_faellig()` gerufen. Beide liegen in einer **Migration**
+> (`20260901180000`), sind also in git, werden von CI angewandt und sind
+> pgTAP-geprüft.
+>
+> **Hier ist nichts nachzuziehen.** Wer den Block unten liest und den Aufräumer
+> vermisst, sucht an der falschen Stelle: in `push_wiederholung` hätte er kein
+> pgTAP, ein `db reset` tilgte ihn mit, und der Objekt-Drift-Scan vergleicht
+> Namen und Zeitplanungen — **keine Funktionsrümpfe**. Eine fehlende Zeile im
+> Rumpf fiele niemandem auf.
+
 **Der Name `push_wiederholung` ist verbindlich**, aus demselben Grund wie die
 zwei Webhook-Namen: er steht in `ERWARTET_OHNE_MIGRATION`
 (`scripts/db-drift-scan.logic.ts`). Fehlt die Funktion in PROD, bricht der
@@ -499,11 +520,23 @@ ohne Namen ist „unbekannt", ein Name ohne Objekt ist „fehlt". Beides rot.
 > **erst in PROD anlegen, dann den Namen mergen** bleibt trotzdem richtig — nur
 > ist ihr Preis ein abgebrochener Migrationslauf, kein stiller Deploy-Ausfall.
 
-Der Scan deckt davon allerdings nur die Hälfte ab. Die Funktion liegt in
-`public`, die Zeitplanung im Schema `cron` — und der Scan fragt ausschliesslich
-`public` ab (`db-drift-scan.ts:61-90`). Eine **abbestellte Zeitplanung fällt
-ihm nicht auf**: `push_wiederholung` stünde weiter da und würde nie gerufen.
-Dafür gibt es `scripts/probe-age641-pg-cron.ts <dev|prod>`.
+**Seit AGE-679 deckt der Scan beide Hälften ab.** Bis zum 01.09.2026 stand hier,
+er frage ausschliesslich `public` ab und eine abbestellte Zeitplanung falle ihm
+deshalb nicht auf — `push_wiederholung` stünde weiter da und würde nie gerufen.
+Das galt und war die teuerste seiner Lücken.
+
+Er prüft jetzt zusätzlich `cron.job` gegen `ERWARTETE_ZEITPLAENE`, und zwar
+Name, Zeitplan, Aktivzustand **und Befehl**: ein Eintrag mit richtigem Namen und
+`select 1` als Befehl liefe jede Minute und täte nichts. Ebenso prüft er
+`tgenabled` — ein per `disable trigger` abgeschalteter Trigger steht weiter in
+`pg_trigger`, und sein Versand ist trotzdem tot.
+
+Der Aufruf verlangt seither die Seite: `pnpm tsx scripts/db-drift-scan.ts
+<dev|prod>`. Vorher fiel er ohne Argument auf PROD zurück, was für einen
+zweiten Aufrufer eine Falle war.
+
+`scripts/probe-age641-pg-cron.ts <dev|prod>` bleibt als Handprobe nützlich —
+sie zeigt mehr als der Scan prüft, etwa die letzten Läufe und Antworten.
 
 #### Prüfen — zwei getrennte Belege, keiner genügt allein
 
@@ -524,6 +557,58 @@ ganze Kette: ohne `modus` antwortete `index.ts` mit **400**, mit falschem
 Bearer mit **401**, bei fehlgeschlagener RPC mit **502**. `skipped` heisst
 also: Auth durch, `faellig`-Zweig gelaufen, `push_auftraege_faellig` leer —
 solange `push_tokens` leer ist, das richtige Ergebnis.
+
+#### Der Wächter, und was ein roter Lauf bedeutet
+
+`.github/workflows/push-waechter.yml` läuft stündlich (`17 * * * *`), ein Job
+je Seite. Er hat vier Befunde, und sie haben **verschiedene erste Handgriffe**.
+Deshalb sind sie getrennt und werden nie ineinander übersetzt.
+
+| Befund | Was er heißt | Zuerst prüfen |
+|---|---|---|
+| `antwort` | Ein `net.http_post` hat im Fenster nicht `200` geantwortet. **Nicht** notwendig Push: `net._http_response` trägt keine Ziel-URL und sammelt auch den Mail-Webhook. | Bei `401` den Bearer in beiden Trigger-Funktionen gegen `PUSH_WEBHOOK_SECRET` bzw. `CONTACT_WEBHOOK_SECRET` halten. Bei `502` die Function-Logs. |
+| `stillstand` | Der Wiederholungslauf läuft nicht mehr — jüngster erfolgreicher Lauf älter als 15 min, oder weniger als die Hälfte der erwarteten Läufe im Fenster. | `select * from cron.job` — steht der Eintrag noch, ist er `active`? Auf DEV: hat jemand `supabase db reset` gefahren? Der Drift-Scan im selben Job sagt es. |
+| `aufgabe` | Eine Zustellung ist nach fünf Versuchen endgültig gescheitert. | `select zustand, letzter_fehler, versuche from public.push_zustellungen where zustand = 'aufgegeben'`. Der Grund steht **nur dort** — der Wächter gibt ihn nicht aus. |
+| `stumm` | Der Takt läuft, aber es kommt kaum eine Antwort zurück. Verdacht: der pg_net-Arbeiter steht — `net.http_post` reiht dann weiter ein, und der cron-Lauf bleibt `succeeded`. | `select count(*) from net.http_request_queue` — staut sich die Warteschlange? Sonst Supabase-Status. |
+| `messausfall` | Der Wächter selbst kam nicht an die Zahlen. Sagt über den Zustellweg **nichts**. Ausgegeben wird der Fehler**code** (`ECONNREFUSED`, `28P01`), nicht der Meldungstext. | Secret rotiert? Zertifikat? Projekt pausiert? Nie als „der Takt steht" lesen. |
+
+**Warum `letzter_fehler` nicht im Protokoll steht.** Er ist kein Enum, sondern
+`e.message` aus `send-push/index.ts:205`, und die APNs-Adresse trägt den
+Gerätetoken im Pfad (`/3/device/<token>`). Die Actions-Protokolle dieses
+Repositories sind öffentlich. Der Wächter meldet deshalb die **Anzahl**; den
+Grund liest man mit einem DB-Zugang in zehn Sekunden.
+
+**Was der Wächter nicht leistet.** Drei benannte Grenzen:
+
+- Er ist **flankengesteuert**: `aufgabe` sieht Zeilen, die im Fenster
+  *entstanden* sind. Bleibt der Anbieter kaputt und entsteht zwei Stunden lang
+  kein neuer Hinweis, wird er grün, obwohl nichts repariert ist — der nächste
+  Zustellversuch rötet ihn wieder.
+- Eine aufgegebene Zeile kann **ganz verschwinden**: `push_zustellungen` hängt
+  über `on delete cascade` an `notifications` und `push_tokens`, und
+  `push_zustellung_quittieren` löscht bei `dauerhaft` das Token. Zwischen
+  Aufgabe und nächstem Lauf kann eine Meldung damit verlorengehen.
+- Sein Fenster ist eine **Toleranz, keine Garantie**: für geplante
+  Actions-Läufe ist kein Takt zugesagt.
+
+Die ersten beiden verlangen dieselbe Ergänzung — einen Zustand, der ein
+Ereignis festhält, statt eine Zeile zu zählen. Sie stehen hier, damit ein
+grüner Wächter nicht mehr behauptet, als er weiß.
+
+Von Hand auslösen (auch mit anderem Fenster) über *Actions → Push-Waechter →
+Run workflow*. `hoechstpause: 0` macht den Lauf mit Sicherheit rot — so prüft
+man, dass die Meldung noch ankommt, ohne auf einen echten Ausfall zu warten.
+
+> ⚠️ **Die Mail hängt an einer Kontoeinstellung, die in keinem Repo steht.**
+> Am 01.09. gemessen, an zwei sonst gleichen Läufen: der erste (15:44) wurde
+> rot und **blieb stumm**, der zweite (16:20) wurde rot und **mailte** — dazwischen
+> lag nur *github.com/settings/notifications → System → Actions →
+> „Email (Failed workflows only)"*.
+>
+> Ein roter Lauf belegt also **nicht**, dass jemand es erfährt. Wer den Wächter
+> übernimmt, muss diese Einstellung an seinem eigenen Konto setzen und einmal
+> per Dispatch nachprüfen — sonst ist er ein Baum, der im leeren Wald umfällt,
+> und das ist derselbe Fehler wie der Ausfall, gegen den er gebaut ist.
 
 #### Was „der Bearer liegt inline in der Datenbank" wirklich bedeutet
 
@@ -677,14 +762,29 @@ umgebungsspezifischen Auth-Key — er gilt teamweit, und mit der Einstellung
 Versäumnis, sondern unvermeidbar (anders als bei Stripe und Resend, siehe die
 Trennungsregel oben).
 
-Unterschiedlich ist genau **ein** Wert: `APNS_SANDBOX=1` in `dev`, in `prod`
-gar nicht gesetzt.
+`APNS_SANDBOX` steht in `dev` auf `1` und seit dem 31.08. auch in `prod` — dort,
+solange das einzige Gerät ein Xcode-Build ist.
 
-> ⚠️ Zeigt ein Entwicklungs-Build auf **PROD**, schickt PROD ein Sandbox-Token
-> an den Produktions-Host. Apple antwortet `BadDeviceToken`, und `send-push`
-> stuft das korrekt als `dauerhaft` ein — es **löscht das Gerätetoken**. Beim
-> nächsten App-Start heilt sich das über `claim_push_token`, sieht aber wie ein
-> Fehler aus. Dev-Builds gehören auf DEV.
+> **Seit dem 31.08. entscheidet dieser Wert nichts mehr.** Er sagt nur noch,
+> welcher Host **zuerst** gefragt wird.
+>
+> Bis dahin stand hier die Regel „in `prod` gar nicht setzen" und die Warnung
+> „Dev-Builds gehören auf DEV". Beides ist überholt, und die Regel war von
+> Anfang an nicht haltbar: ein Wert kann nicht zwei Wahrheiten tragen, sobald
+> Entwicklungs- und Store-Builds nebeneinander laufen. Der Preis eines Irrtums
+> war auch keine ausgefallene Zustellung, sondern ein **gelöschtes
+> Gerätetoken** — `BadDeviceToken` gilt als dauerhaft, das Mitglied war still
+> von allen Hinweisen abgemeldet und heilte sich beim nächsten App-Start
+> wieder: ein Fehlerbild, das wie Sporadik aussieht und keines ist.
+>
+> `apnsMitHostErkennung` (`supabase/functions/send-push/anbieter.ts`) fängt das
+> ab: auf `BadDeviceToken` wird derselbe Versand am anderen Host wiederholt,
+> und dessen Ergebnis gilt. Lehnen **beide** ab, ist das Token wirklich tot und
+> wird entfernt. Ein Dev-Build darf damit auf PROD zeigen.
+>
+> Sobald ein Store-Build läuft, gehört `APNS_SANDBOX` aus `prod` heraus — nicht
+> weil es sonst bräche, sondern damit die Vermutung stimmt und der zweite Weg
+> die Ausnahme bleibt.
 
 ### Der Firebase-Dienstschlüssel: die Organisationsrichtlinie
 

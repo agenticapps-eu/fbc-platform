@@ -5,6 +5,35 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-01-push-token-aufraeumen",
+    datum: "2026-09-01",
+    titel: "Tote Gerätetokens: erst ein echtes Lebenszeichen, dann der Aufräumer",
+    linear: "AGE-682",
+    aenderungen: [
+      "Beim Start der App auf einer nativen Fläche wird das Gerätetoken **erneut abgelegt**, wenn die Erlaubnis **bereits erteilt** ist — ohne Dialog, ohne Frage, ohne Sichtbares.",
+      "Das widerspricht der bestehenden Anforderung nicht: sie verbietet, die **Erlaubnis** beim Start *anzufordern* (`push-fundament/specs/notifications/spec.md:330-332`). Wo nichts angefordert wird, wird auch nichts verbraucht — der iOS-Systemdialog bleibt für den Nachrichten-Weg reserviert.",
+      "Auf der Web-Fläche geschieht weiterhin nichts.",
+      "Der falsche Spaltenkommentar wird korrigiert.",
+      "**Neu:** `public.push_tokens_aufraeumen()` — entfernt Zeilen aus `push_tokens`, deren `letzter_kontakt` älter als **180 Tage** ist, und gibt die Zahl der entfernten Zeilen zurück. `security definer`, `search_path = ''`, Ausführungsrecht ausgesprochen entzogen für `public`, `anon`, `authenticated` **und `service_role`**.",
+      "**Kein Parameter.** Die Frist steht in der Funktion. Der Test altert die Fixtures (`now() - interval '181 days'`), nicht die Frist — damit gibt es auch keinen Aufruf, der versehentlich alles löscht.",
+      "**Geändert:** `public.push_auftraege_faellig()` ruft den Aufräumer als **erste** Anweisung. Damit läuft er auf dem bestehenden Minutenpfad.",
+      '**Eine Frist für beide Plattformen**, ausdrücklich: Android-Token verschwinden damit 90 Tage vor FCMs eigenem Verfall. Das ist gewollt — mit dem Lebenszeichen aus Hälfte 1 heisst 180 Tage auf beiden Plattformen dasselbe, nämlich „die App lief ein halbes Jahr nicht".',
+      "**Keine neue Zeitplanung, kein neues handangelegtes Objekt.** Die Erwartungslisten des Objekt-Drift-Scans aus AGE-679 bleiben unverändert: `inMigrationen` gilt, sobald der Name wörtlich in einer Migration steht (`scripts/db-drift-scan.ts:161-172`).",
+    ],
+  },
+  {
+    slug: "2026-09-01-academy-reiter-und-streifen",
+    datum: "2026-09-01",
+    titel: "Die Redaktion wird ein Reiter, die Spalte seitenweit, die Vorschau ein Streifen",
+    linear: "AGE-677",
+    aenderungen: [
+      '**Die Redaktion wird der dritte Reiter**, hinter „Alle" und „Meine Academy". Startreiter bleibt „Alle" (Donald, 01.09.).',
+      "**Die Filterspalte umspannt die Seite** statt eines Reiterinhalts: ein Raster um Reiterzeile und Inhalt, die Spalte in Zeile 1, mit denselben vier Sticky-Bedingungen wie bisher — sie stehen bereits in `FilterSpalte`.",
+      "**Die Redaktionskachel wird ein Streifen**: Video links, Titel und Beschreibung rechts daneben statt darunter.",
+      "**Die Spalte richtet ihre Felder nach dem aktiven Reiter.** Suche und Sortierung wirken auf `posts`; die Redaktion ist eine Konstante im Code und wird nicht gefiltert.",
+    ],
+  },
+  {
     slug: "2026-08-31-titelbild-bestand-auf-dev",
     datum: "2026-08-31",
     titel: "Der Bestand auf DEV: warum ein Seed-Lauf ihn nicht heilt",
@@ -29,6 +58,20 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
       '**Der Feed bleibt ausgeschlossen, aber mit dem richtigen Grund.** Er ist die einzige Fläche, die noch beschneidet (`aspect-[3/1]` **mit** `object-cover`). Der Ausschluss ruht damit auf einer offenen Entscheidung — AGE-664 — und nicht mehr auf „anderes Bildmaterial".',
       "**Der Seed-Absatz geht in die Vergangenheitsform** und behält seine gemessene Zahl. Ergänzt um den Zustand, der wirklich noch offen ist: der **Bestand**.",
       "**Die Bucket-Zahlen werden als datierter Beleg gekennzeichnet** (Stand 25.08.), nicht als fortlaufende Zusage.",
+    ],
+  },
+  {
+    slug: "2026-08-31-suchspalte-rechts",
+    datum: "2026-08-31",
+    titel: "Suche und Filter stehen jetzt rechts und laufen beim Blättern mit",
+    linear: "AGE-629",
+    aenderungen: [
+      "**Die Kartenraster folgen ihrer Spalte statt dem Fenster.** Fünf Rasterdefinitionen bekommen einen `@container`-Behälter und Schwellen in Containerbreiten. Die Schwellen sind so gewählt, dass **jeder heute ausgelieferte Zustand unverändert bleibt**; nur die durch eine rechte Spalte verengten Fälle brechen um, statt sich zu quetschen.",
+      "**`/mitglieder`**: die vorhandene Suche samt Facetten zieht in die rechte Spalte; die erweiterten Filter stehen dort dauerhaft offen statt zugeklappt.",
+      "**`/events`**: neue rechte Spalte mit Volltextsuche (Titel · Beschreibung · Ort), Facette **Art** aus den fünf Werten des `events_type_check`-Constraints und Facette **Themen** aus dem Bestand.",
+      "**`/academy`**: neue rechte Spalte mit Volltextsuche über den Beitragstext, Facette **Hashtags** aus dem Bestand und Sortierung (Neueste · Beliebteste).",
+      "**Eine Facettenkarte ohne Werte rendert nicht** — das ist bereits das Muster der `/aktivitaet`-Spalte und wird übernommen, nicht erfunden. Suche und Sortierung stehen dagegen immer, damit jede Spalte auf jeder Datenlage trägt.",
+      "**Ein Test bindet die feste Art-Liste an den CHECK-Constraint.** Weichen sie voneinander ab, wird er rot; die Liste kann nicht still auslaufen, wenn jemand einen sechsten Typ migriert.",
     ],
   },
   {

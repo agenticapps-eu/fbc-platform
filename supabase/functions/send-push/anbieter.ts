@@ -181,6 +181,49 @@ export function bewerteApns(status: number, koerper: unknown): Bewertung {
   return { ergebnis: "vorlaeufig", grund };
 }
 
+/**
+ * Welcher APNs-Host zu einem Geraetetoken gehoert, entscheidet der ANBIETER —
+ * nicht unsere Konfiguration (AGE-641, Entscheidung Donald 31.08.).
+ *
+ * ══ WARUM DER FESTE SCHALTER NICHT REICHT ═══════════════════════════════════
+ * Ein Token stammt entweder aus der Sandbox (Xcode-Entwicklungsbuild) oder aus
+ * der Produktion (TestFlight, App Store). **Dem Token sieht man das nicht an** —
+ * beide sind 64 Hex-Zeichen. Bis zum 31.08. waehlte `APNS_SANDBOX` den Host
+ * fest, und ein Token der jeweils anderen Umgebung bekam `BadDeviceToken`.
+ *
+ * Das ist nicht bloss eine gescheiterte Zustellung: `bewerteApns` stuft
+ * `BadDeviceToken` als `dauerhaft` ein, und `push_zustellung_quittieren`
+ * **loescht daraufhin das Token**. Ein Entwicklungsbuild gegen PROD meldete
+ * sich also still von allen Hinweisen ab — und heilte sich beim naechsten
+ * App-Start wieder, was aussieht wie ein sporadischer Fehler und keiner ist.
+ *
+ * Ein Schalter kann das prinzipiell nicht loesen, sobald BEIDE Buildsorten
+ * gleichzeitig unterwegs sind: er hat einen Wert, und es gibt zwei Wahrheiten.
+ *
+ * ══ WAS `ersterHost` DANN NOCH TUT ══════════════════════════════════════════
+ * Es ist nur noch eine **Vermutung, welcher Host haeufiger stimmt** — sie
+ * spart den zweiten Weg, entscheidet aber nichts. Faellt sie falsch aus,
+ * kostet das eine Anfrage, nicht die Zustellung.
+ *
+ * ══ WARUM NUR BEI `BadDeviceToken` ══════════════════════════════════════════
+ * `Unregistered` und `DeviceTokenNotForTopic` sagen etwas ueber das Token, das
+ * am anderen Host genauso gilt; ein zweiter Versuch verdoppelte nur den
+ * Verkehr fuer wirklich tote Tokens. Und ein `vorlaeufig` (503, 429) ist
+ * Apples Zustand, nicht der des Tokens — dort auszuweichen hiesse, denselben
+ * Ausfall zweimal abzuwarten. Die Wiederholung dafuer ist `push-wiederholung`.
+ */
+export async function apnsMitHostErkennung(
+  ersterHost: string,
+  sende: (host: string) => Promise<Bewertung>,
+): Promise<Bewertung> {
+  const erste = await sende(ersterHost);
+  if (erste.grund !== "BadDeviceToken") return erste;
+
+  // Genau ein zweiter Versuch, am anderen Host. Kennt auch der das Token
+  // nicht, bleibt `dauerhaft` stehen — dann ist Loeschen richtig.
+  return await sende(ersterHost === APNS_HOST_SANDBOX ? APNS_HOST_PROD : APNS_HOST_SANDBOX);
+}
+
 // ── Zugangstoken ────────────────────────────────────────────────────────────
 
 export interface Dienstkonto {

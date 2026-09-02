@@ -616,7 +616,8 @@ Grund ist Menge, nicht Richtigkeit: ein Mitglied mit gepflegtem Kompass trägt
 zehn und mehr Marken, seine Karte wird doppelt so hoch wie die seiner Nachbarn,
 und im Raster liest sich das als Unordnung statt als Information. Die
 Kategorien SHALL an den beiden Stellen unverändert bleiben, an denen sie eine
-Frage beantworten: als **Filter** über der Liste und auf dem **Profil**.
+Frage beantworten: als **Filter in der rechten Inhaltsspalte** und auf dem
+**Profil**.
 
 Die Karte SHALL das Hintergrundbild des Mitglieds zeigen, wenn eines hinterlegt
 ist. Eine Karte ohne Bild SHALL dieselbe Höhe behalten wie eine mit Bild, damit
@@ -638,7 +639,7 @@ dabei grün. Prüffixtures SHALL deshalb Pfade tragen.
 
 Dass die Karte die Kategorien nicht mehr zeigt, SHALL NOT heissen, dass die RPC
 sie nicht mehr liefert. `offer_categories` und `need_categories` bleiben im
-Rückgabesatz: der Filter oben liest sie, und eine Anforderung, die eine
+Rückgabesatz: der Filter in der Spalte liest sie, und eine Anforderung, die eine
 Darstellung ändert, darf keine Datenschicht mitreissen.
 
 #### Scenario: Eine Karte zeigt keine Kompass-Marken
@@ -660,8 +661,9 @@ Darstellung ändert, darf keine Datenschicht mitreissen.
 
 #### Scenario: Der Filter behält seine Kategorien
 
-- **WHEN** die erweiterte Suche geöffnet wird
-- **THEN** stehen die Kompass-Kategorien dort unverändert zur Auswahl
+- **WHEN** das Verzeichnis ab `lg` geöffnet wird
+- **THEN** stehen die Kompass-Kategorien in der rechten Spalte unverändert zur
+  Auswahl
 
 #### Scenario: Eine Karte ohne Hintergrundbild franst nicht aus
 
@@ -890,4 +892,38 @@ already broken.
 - **WHEN** a read path reaches profile rows without the activation gate in front of it
 - **THEN** the resolver still returns the masked label to a caller below the
   threshold, because it re-checks the caller itself
+
+### Requirement: Suche und Filter stehen in einer mitlaufenden rechten Spalte
+
+Das Mitgliederverzeichnis SHALL sein Suchfeld und seine Facetten in einer
+rechten Inhaltsspalte führen, die beim Blättern mitläuft. Die Spalte SHALL
+**innerhalb** des Inhaltsbereichs unter der Kopfzeile sitzen, nicht an der
+Viewport-Kante — das unterscheidet sie von den beiden angedockten Leisten.
+
+Die Spalte SHALL erst ab `lg` neben der Liste stehen. Darunter SHALL sie in den
+Fluss fallen und hinter einem Aufklapp-Schalter liegen, der zugeklappt startet.
+
+Die erweiterten Filter SHALL in der Spalte **dauerhaft offen** stehen. Ihr
+bisheriges Zuklappen war eine Antwort auf fehlende Höhe über der Liste; in einer
+eigenen Spalte gibt es diesen Mangel nicht mehr.
+
+Die Spalte SHALL 16rem breit sein und 24 px Abstand zur Liste halten — dieselben
+Masse wie die Filterspalte der Aktivität, damit beide Flächen dieselbe Kante
+zeigen.
+
+#### Scenario: Ab lg steht die Spalte rechts und läuft mit
+
+- **WHEN** das Verzeichnis ab `lg` dargestellt und die Liste gescrollt wird
+- **THEN** bleibt die Spalte sichtbar, statt wegzuscrollen
+
+#### Scenario: Unterhalb von lg klappt sie zu
+
+- **WHEN** das Verzeichnis unterhalb von `lg` geöffnet wird
+- **THEN** steht die Spalte im Fluss und ist zugeklappt
+- **AND** ein Schalter klappt sie auf
+
+#### Scenario: Die erweiterten Filter stehen offen
+
+- **WHEN** das Verzeichnis ab `lg` geöffnet wird
+- **THEN** sind die erweiterten Filter ohne weiteres Zutun sichtbar
 

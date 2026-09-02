@@ -32,7 +32,6 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
-
 /* AGE-595: `MemberDirectory` liest seit den Reitern die eigene Kennung, um
    die Kontaktmenge zu laden. Ohne diesen Mock wirft `useAuth` „muss innerhalb
    von <AuthProvider> verwendet werden" — die Datei praefte dann gar nichts
@@ -71,12 +70,6 @@ function renderDirectory() {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-}
-
-/** Die Filter liegen seit AGE-566 hinter „Erweiterte Suche" — Chips und
- *  Auswahlfelder sind erst danach im DOM. */
-function erweiterteSucheOeffnen() {
-  fireEvent.click(screen.getByRole("button", { name: "Erweiterte Suche" }));
 }
 
 /** Die zuletzt an `search_directory` übergebenen Argumente. */
@@ -154,7 +147,6 @@ afterEach(() => vi.clearAllMocks());
 describe("Kompass-Filter (AGE-494)", () => {
   it("schickt ohne Auswahl keine Kategorie-Argumente", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
     await waitFor(() => expect(rpc).toHaveBeenCalled());
 
     expect(lastArgs().p_offers).toBeUndefined();
@@ -163,7 +155,6 @@ describe("Kompass-Filter (AGE-494)", () => {
 
   it("sammelt mehrere Chips einer Gruppe in EIN Argument (ODER-Verknüpfung)", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
     await waitFor(() => expect(rpc).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Kapital & Beteiligungen" }));
@@ -176,7 +167,6 @@ describe("Kompass-Filter (AGE-494)", () => {
 
   it("führt beide Gruppen getrennt (UND zwischen ihnen)", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
     await waitFor(() => expect(rpc).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Kapital & Beteiligungen" }));
@@ -190,7 +180,6 @@ describe("Kompass-Filter (AGE-494)", () => {
 
   it("nimmt einen abgewählten Chip wieder aus dem Argument", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
     await waitFor(() => expect(rpc).toHaveBeenCalled());
 
     const chip = screen.getByRole("button", { name: "Kapital & Beteiligungen" });
@@ -204,7 +193,6 @@ describe("Kompass-Filter (AGE-494)", () => {
 
   it("räumt mit „Filter zurücksetzen“ auch die Chips ab", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
     await waitFor(() => expect(rpc).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Kapital & Beteiligungen" }));
@@ -224,7 +212,6 @@ describe("Kompass-Filter (AGE-494)", () => {
      das als Unordnung. Filter und Profil behalten die Kategorien. */
   it("zeigt auf der Karte KEINE Kompass-Marken mehr", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
     expect(karte.queryByText("Bietet: Kapital")).not.toBeInTheDocument();
@@ -238,7 +225,6 @@ describe("Kompass-Filter (AGE-494)", () => {
      abräumt — und der Filter ist der Ort, an dem sie eine Frage beantworten. */
   it("… behält sie aber im Filter über der Liste", async () => {
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     expect(
       await screen.findByRole("button", { name: "Kapital & Beteiligungen" }),
@@ -248,7 +234,6 @@ describe("Kompass-Filter (AGE-494)", () => {
   it("zeigt die Branche weiterhin", async () => {
     rpc.mockResolvedValue({ data: [member({ branche: "Beratung" })], error: null });
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
     expect(karte.getByText("Beratung")).toBeInTheDocument();
@@ -266,7 +251,6 @@ describe("Kompass-Filter (AGE-494)", () => {
     rpc.mockResolvedValue({ data: [alteAntwort], error: null });
 
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     expect(await screen.findByText("Anna Beispiel")).toBeInTheDocument();
     // Seit AGE-595 trägt die Karte gar keine Marken mehr, also ist die Zusage
@@ -284,7 +268,6 @@ describe("Kompass-Filter (AGE-494)", () => {
     rpc.mockResolvedValue({ data: [alteAntwort], error: null });
 
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
     expect(karte.queryByRole("presentation")).not.toBeInTheDocument();
@@ -301,7 +284,6 @@ describe("Kompass-Filter (AGE-494)", () => {
       error: null,
     });
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     const karte = within(await screen.findByRole("link", { name: /Anna Beispiel/ }));
     expect(karte.queryByText("Bietet")).not.toBeInTheDocument();
@@ -321,7 +303,6 @@ describe("Kompass-Filter (AGE-494)", () => {
   it("zeigt das Cover über den Bild-Auflöser, nicht als rohen Pfad", async () => {
     rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
     const { container } = renderDirectory();
-    erweiterteSucheOeffnen();
     await screen.findByText("Anna Beispiel");
 
     const img = bildfeld(container)?.querySelector("img");
@@ -337,7 +318,6 @@ describe("Kompass-Filter (AGE-494)", () => {
   it("passt das Bild ein, statt es zu beschneiden", async () => {
     rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
     const { container } = renderDirectory();
-    erweiterteSucheOeffnen();
     await screen.findByText("Anna Beispiel");
 
     const feld = bildfeld(container);
@@ -363,7 +343,6 @@ describe("Kompass-Filter (AGE-494)", () => {
   it("lässt das Cover randlos sitzen — keine geerbte Kartenpolsterung", async () => {
     rpc.mockResolvedValue({ data: [member({ cover_url: COVER_PFAD })], error: null });
     const { container } = renderDirectory();
-    erweiterteSucheOeffnen();
     await screen.findByText("Anna Beispiel");
 
     const karte = container.querySelector<HTMLElement>(".fbc-card");
@@ -373,7 +352,6 @@ describe("Kompass-Filter (AGE-494)", () => {
   it("behält das Bildfeld auch ohne Cover — sonst franst das Raster aus", async () => {
     rpc.mockResolvedValue({ data: [member({ cover_url: null })], error: null });
     const { container } = renderDirectory();
-    erweiterteSucheOeffnen();
     await screen.findByText("Anna Beispiel");
 
     const feld = bildfeld(container);
@@ -436,7 +414,6 @@ describe("Suchbegriff aus der Adresszeile (AGE-540)", () => {
   it("wirft bei einem Wechsel des Begriffs die übrigen Filter nicht weg", async () => {
     renderDirectoryAt("/mitglieder");
     await waitFor(() => expect(trefferAufrufe().length).toBeGreaterThan(0));
-    erweiterteSucheOeffnen();
 
     fireEvent.click(screen.getByRole("button", { name: "Kapital & Beteiligungen" }));
     await waitFor(() => expect(lastArgs().p_offers).toEqual(["kapital"]));
@@ -495,7 +472,6 @@ describe("Das öffentliche Verzeichnis verweist weiter auf /p/:id (AGE-566)", ()
     const anna = member({ name: "Anna Beispiel" });
     rpc.mockResolvedValue({ data: [anna], error: null });
     renderDirectory();
-    erweiterteSucheOeffnen();
 
     const link = await screen.findByRole("link", { name: /Anna Beispiel/ });
     expect(link).toHaveAttribute("href", `/p/${anna.id}`);

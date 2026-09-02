@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { FilterSpalte } from "../ui/FilterSpalte";
+import { Input } from "../ui/Input";
 import { Tabs } from "../ui/Tabs";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
 import {
   createEvent,
+  EVENT_TYPE_OPTIONS,
   eventsListKey,
   fetchEvents,
   partitionEvents,
@@ -85,12 +88,46 @@ function EventsBody({
   query: ReturnType<typeof useQuery<EventListItem[]>>;
   hostId: string | null;
 }) {
+  // Die Zustandsgrößen stehen VOR den frühen Rückgaben. Ein `useState` hinter
+  // `if (isLoading) return` liefe beim ersten Rendern nicht und beim zweiten
+  // doch — React verlangt dieselbe Reihenfolge in jedem Durchlauf.
+  const [suche, setSuche] = useState("");
+  const [arten, setArten] = useState<string[]>([]);
+  const [themen, setThemen] = useState<string[]>([]);
+
+  const all = useMemo(() => query.data ?? [], [query.data]);
+
+  /** Themen kommen aus dem Bestand — das Schema kennt für `topics` keine Liste. */
+  const themenImBestand = useMemo(
+    () => [...new Set(all.flatMap((e) => e.topics ?? []))].sort(),
+    [all],
+  );
+
+  const gefiltert = useMemo(() => {
+    const begriff = suche.trim().toLowerCase();
+    return all.filter((e) => {
+      if (begriff) {
+        // Titel, Beschreibung UND Ort: ein Online-Format findet man sonst nie
+        // über das, worum es darin geht.
+        const heuhaufen = [e.title, e.description, e.location]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!heuhaufen.includes(begriff)) return false;
+      }
+      // Mehrere Marken einer Facette wirken als ODER, die Facetten
+      // untereinander als UND — dieselbe Regel wie im Verzeichnis.
+      if (arten.length > 0 && (e.type === null || !arten.includes(e.type))) return false;
+      if (themen.length > 0 && !(e.topics ?? []).some((t) => themen.includes(t))) return false;
+      return true;
+    });
+  }, [all, suche, arten, themen]);
+
   if (query.isLoading) return <p className="text-sm text-muted">Events werden geladen…</p>;
   if (query.isError)
     return (
       <p className="text-sm text-danger">Events konnten nicht geladen werden. Bitte neu laden.</p>
     );
-  const all = query.data ?? [];
   if (all.length === 0) {
     return (
       // AGE-494: Am 17.08. sehen ~70 Menschen diesen Zustand beim ersten Login.
@@ -103,8 +140,8 @@ function EventsBody({
     );
   }
   const now = new Date();
-  const { upcoming, past } = partitionEvents(all, now);
-  const mine = selectMyEvents(all, hostId, now);
+  const { upcoming, past } = partitionEvents(gefiltert, now);
+  const mine = selectMyEvents(gefiltert, hostId, now);
 
   const tabs = [
     {
@@ -127,26 +164,140 @@ function EventsBody({
     });
   }
 
-  return <Tabs tabs={tabs} />;
+  return (
+    <FilterSpalte
+      id="events-filter"
+      filter={
+        <div className="space-y-4">
+          <Card className="space-y-3">
+            <label htmlFor="events-suche" className="font-display text-sm font-semibold text-ink">
+              Suche
+            </label>
+            {/* Kein `aria-label`: das Feld trägt schon ein sichtbares
+                `<label for>`, und ein `aria-label` ERSETZT dessen Text als
+                zugänglichen Namen, statt ihn zu ergänzen. Wer per Sprache
+                „Suche" sagt, träfe das Feld dann nicht mehr (WCAG 2.5.3).
+                Auf `/mitglieder` ist das `aria-label` richtig — dort gibt es
+                kein sichtbares Label. Beim Übernehmen kam hier eines dazu. */}
+            <Input
+              id="events-suche"
+              type="search"
+              value={suche}
+              onChange={(e) => setSuche(e.target.value)}
+              placeholder="Titel, Beschreibung, Ort …"
+            />
+          </Card>
+
+          {/* FESTE Liste aus dem Schema, nicht aus dem Bestand: auf der
+              Produktion steht heute ein einziges künftiges Event mit einem
+              einzigen Typ, und eine Auswahl mit einem Eintrag ist keine.
+              `events.arten.test.ts` hält die Liste am CHECK-Constraint fest. */}
+          <MarkenFacette
+            titel="Art"
+            optionen={EVENT_TYPE_OPTIONS.map((o) => ({ wert: o.value, label: o.label }))}
+            gewaehlt={arten}
+            onUmschalten={(w) => setArten(umschalten(arten, w))}
+          />
+
+          {/* ABGELEITET, denn `topics` ist Freitext ohne Schema-Liste. Ohne
+              Werte rendert die Karte nicht — dasselbe Muster wie die Tag-Karte
+              der Aktivität. */}
+          <MarkenFacette
+            titel="Themen"
+            optionen={themenImBestand.map((t) => ({ wert: t, label: t }))}
+            gewaehlt={themen}
+            onUmschalten={(w) => setThemen(umschalten(themen, w))}
+          />
+        </div>
+      }
+    >
+      <Tabs tabs={tabs} />
+    </FilterSpalte>
+  );
+}
+
+/** Eine Marke hinzufügen oder wegnehmen. */
+function umschalten(menge: string[], wert: string): string[] {
+  return menge.includes(wert) ? menge.filter((w) => w !== wert) : [...menge, wert];
+}
+
+/**
+ * Eine Facette aus Auswahlkästchen.
+ *
+ * Kästchen und keine Chips: sie versprechen Mehrfachauswahl, und genau die gibt
+ * es hier — mehrere Marken wirken als ODER. Dieselbe Begründung wie in der
+ * Filterspalte der Aktivität.
+ *
+ * OHNE Optionen rendert sie GAR NICHT. Eine leere Facettenkarte nähme 280 px
+ * Breite und gäbe nichts zurück; auf der Produktion wäre das heute der Fall.
+ */
+function MarkenFacette({
+  titel,
+  optionen,
+  gewaehlt,
+  onUmschalten,
+}: {
+  titel: string;
+  optionen: { wert: string; label: string }[];
+  gewaehlt: string[];
+  onUmschalten: (wert: string) => void;
+}) {
+  if (optionen.length === 0) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-display text-sm font-semibold text-ink">{titel}</h2>
+      <ul className="space-y-1.5">
+        {optionen.map((o) => (
+          <li key={o.wert}>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={gewaehlt.includes(o.wert)}
+                onChange={() => onUmschalten(o.wert)}
+                className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              />
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
 }
 
 /**
  * Drei Kacheln je Reihe (Entscheidung Meeting 03.08., AGE-531). Vorher standen
  * hier zwei — das Mockup zeigt vier, entschieden wurden drei; der Schritt ist
  * also 2 → 3 und nicht, wie im Issue formuliert, 4 → 3.
+ *
+ * Die DREI bleibt; seit AGE-629 wechselt nur ihr Auslöser. Vorher hing sie am
+ * Fenster, jetzt an der Breite dieser Liste — mit der Filterspalte daneben
+ * verengt sich die Liste, das Fenster aber nicht, und ein Viewport-Breakpoint
+ * quetschte drei Kacheln in eine Fläche, die eine trägt: gemessen 115 px je
+ * Kachel bei 1280 px Fenster.
+ *
+ * Der Behälter ist ein eigenes `div` und nicht die `<ul>` selbst: ein Element
+ * kann seinen EIGENEN Container nicht abfragen, `@[41rem]:` an der Liste
+ * fragte sonst einen Vorfahren — oder gar nichts — und wäre lautlos wirkungslos.
+ *
+ * 41rem = 3 × 208 px + 2 × 16 px Abstand, 27rem = 2 × 208 px + 16 px. Die
+ * 208 px sind keine Wahl: es ist die schmalste Kachel, die die Anwendung
+ * heute schon ausliefert (1280 px mit angedockter Nachrichten-Leiste, AGE-627).
  */
 function CardGrid({ events, empty }: { events: EventListItem[]; empty: string }) {
   // Ein Signieraufruf für die ganze Reiterseite, nicht einer je Kachel.
   const covers = useEventCovers(events);
   if (events.length === 0) return <p className="text-sm text-muted">{empty}</p>;
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {events.map((e) => (
-        <li key={e.id}>
-          <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
-        </li>
-      ))}
-    </ul>
+    <div className="@container">
+      <ul className="grid grid-cols-1 gap-4 @[27rem]:grid-cols-2 @[41rem]:grid-cols-3">
+        {events.map((e) => (
+          <li key={e.id}>
+            <EventCard event={e} coverUrl={e.coverPath ? covers[e.coverPath] : null} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

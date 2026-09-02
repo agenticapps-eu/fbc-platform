@@ -11,10 +11,31 @@ export interface TabsProps {
   tabs: TabItem[];
   defaultValue?: string;
   className?: string;
+  /**
+   * Gesteuerter Betrieb (AGE-677). Wird `value` gesetzt, führt der Aufrufer den
+   * Zustand und bekommt jeden Wechsel über `onValueChange`; ohne `value` bleibt
+   * es beim eigenen `useState` wie bisher.
+   *
+   * Die Academy braucht das, weil ihre Filterspalte AUSSERHALB der Reiter steht
+   * — sie umspannt Reiterzeile und Inhalt — und trotzdem wissen muss, welcher
+   * Reiter offen ist. Ein Zustand, den nur `Tabs` kennt, ist von dort nicht
+   * lesbar.
+   */
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
-export function Tabs({ tabs, defaultValue, className }: TabsProps) {
-  const [active, setActive] = useState(defaultValue ?? tabs[0]?.value);
+export function Tabs({ tabs, defaultValue, className, value, onValueChange }: TabsProps) {
+  const [eigener, setEigener] = useState(defaultValue ?? tabs[0]?.value);
+  // `value !== undefined` und nicht `value ??`: eine leere Zeichenkette wäre ein
+  // gültiger Reiterwert, und `??` fiele dabei nicht zurück — `||` täte es und
+  // wäre der Fehler.
+  const gesteuert = value !== undefined;
+  const active = gesteuert ? value : eigener;
+  function waehlen(next: string) {
+    if (!gesteuert) setEigener(next);
+    onValueChange?.(next);
+  }
   const activeTab = tabs.find((t) => t.value === active) ?? tabs[0];
 
   return (
@@ -39,7 +60,7 @@ export function Tabs({ tabs, defaultValue, className }: TabsProps) {
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => setActive(tab.value)}
+              onClick={() => waehlen(tab.value)}
               className={cn(
                 "-mb-px shrink-0 border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
                 isActive

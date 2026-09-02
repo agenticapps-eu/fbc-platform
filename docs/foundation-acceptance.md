@@ -1,5 +1,14 @@
 # Foundation Acceptance — W1 · Fundament (Smoke Test)
 
+> **Nachtrag 2026-09-01 (AGE-256):** Zwei Angaben unten sind ueberholt.
+> **Die Custom Domain steht** — sie heisst `app.effbeezee.com`, nicht
+> `app.fairbusinessclub.de`; letztere wurde nie gebaut. Und **der Seitentitel
+> lautet inzwischen `eff.bee.zee — Business-Netzwerk auf Werten`**. Die
+> `<title>Fair Business Club</title>`-Zeilen unten bleiben trotzdem stehen: sie
+> sind das Protokoll dessen, was am Messtag ausgeliefert wurde, nicht eine
+> Aussage ueber heute. `fbc-platform.pages.dev` antwortet weiter und bleibt
+> Zweitweg, damit schon verschickte Links gueltig bleiben.
+
 > **Nachtrag 2026-08-20 (AGE-576):** Wo dieses Dokument die Demo-Personas
 > (`@fbcdemo.com`, `@demo.fbc.invalid`, Jonas/Carla/Eleonora) als Prüfweg
 > benutzt, ist es **nicht mehr nachvollziehbar**: DEV trägt seit dem Spiegel die
@@ -42,7 +51,7 @@
 | Test-Event an **Axiom** (`/api/log`) angenommen | ✅ |
 | Prod-Deploy `pages.dev` erreichbar, SPA-Deep-Routes, Login/Redirect | ✅ |
 | CI grün auf `main` | ✅ |
-| **Custom Domain `app.fairbusinessclub.de`** | ⏳ **offen** (Follow-up, Domain-Zugang blockiert) |
+| **Custom Domain `app.effbeezee.com`** | ✅ seit 2026-09-01 (AGE-256; `app.fairbusinessclub.de` wurde nie gebaut) |
 
 ---
 
@@ -157,11 +166,12 @@ eigene Profilzeile).
 
 ## 5. Offene Punkte / Risiken für W2 (Profil & Verzeichnis)
 
-- ⏳ **Custom Domain `app.fairbusinessclub.de` steht noch aus.** Der Prototyp läuft
-  auf der Default-Domain `https://fbc-platform.pages.dev`. Anbindung der eigenen
-  Domain (CNAME/DNS, SSL, danach Supabase Site-URL/Redirects ergänzen) ist
-  **durch fehlenden Domain-Zugang blockiert** → eigenes Follow-up-Issue, referenziert
-  auf AGE-253.
+- ✅ **Erledigt am 2026-09-01 (AGE-256): die Custom Domain steht.** Sie heisst
+  `https://app.effbeezee.com` — nicht `app.fairbusinessclub.de`, die nie gebaut
+  wurde. Gebunden per CNAME an Cloudflare Pages; Zertifikat von Google Trust
+  Services. `site_url` und die Redirect-Allow-List in Supabase sind
+  nachgezogen. `https://fbc-platform.pages.dev` antwortet weiter und bleibt
+  Zweitweg, damit schon verschickte Links gültig bleiben.
 - **AGE-233 (Supabase-Projekt & Umgebungen):** Kern erfüllt (Projekt EU/Frankfurt,
   Auth-Config, Secrets in Infisical). **Carry-over:** Storage-Bucket für Avatare
   wird mit dem Profil-Editor angelegt (**AGE-238**); nur `dev`/`prod`-Envs

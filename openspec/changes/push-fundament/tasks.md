@@ -185,6 +185,43 @@ Issue. Siehe `REVIEWS.md`.
       `APNS_TEAM_ID`, `APNS_BUNDLE_ID` (`com.effbeezee.app`), `APNS_SANDBOX=1`.
       Derselbe `.p8` gehört später byte-gleich nach `prod` — Apple kennt keinen
       umgebungsspezifischen Auth-Key —, dort aber **ohne** `APNS_SANDBOX`.
+      **Nachtrag 31.08.: der letzte Halbsatz war eine Fehlplanung**, und was
+      daraus folgte, steht zwei Zeilen tiefer.
+- [x] **PROD scharf geschaltet** (31.08.). Alle sechs Werte im
+      Function-Secret-Store von `viwntbodrtqxgmqyxluh`, per SHA-256 gegen DEV
+      geprüft: byte-gleich. Beleg: eine zurückgesetzte Zustellung ging
+      `zugestellt` durch, **0 Versuche**. Vorher standen dort drei Zeilen
+      `aufgegeben` mit `apns_nicht_konfiguriert` — Push hatte auf PROD nie
+      funktioniert. Ein Redeploy war nicht nötig.
+- [x] **Der Host wird am Anbieter erkannt, nicht an der Konfiguration**
+      (Entscheidung Donald, 31.08.: *„das muss das System, basierend auf dem
+      Input"*). `apnsMitHostErkennung` in `anbieter.ts`: antwortet der zuerst
+      gefragte Host `BadDeviceToken`, wird derselbe Versand am anderen Host
+      wiederholt, und dessen Ergebnis gilt.
+      **Warum der Plan oben nicht trug:** `APNS_SANDBOX` hat einen Wert, und
+      sobald Entwicklungs- und Store-Builds nebeneinander laufen, gibt es zwei
+      Wahrheiten. Der Preis eines Irrtums ist nicht eine ausgefallene
+      Zustellung, sondern ein **gelöschtes Gerätetoken** — `BadDeviceToken`
+      gilt als dauerhaft. Das Mitglied wäre still von allen Hinweisen
+      abgemeldet und hätte sich beim nächsten App-Start wieder geheilt: ein
+      Fehlerbild, das wie Sporadik aussieht und keines ist.
+      **`APNS_SANDBOX` bleibt, bedeutet aber etwas anderes:** nur noch die
+      Vermutung, welcher Host häufiger stimmt. Sie spart einen Weg und
+      entscheidet nichts.
+      **7 Deno-Zusagen, jede einzeln durch eine Mutation gegengeprüft** —
+      Ausweichen entfernt · Bedingung entfernt · erstes statt zweites Ergebnis ·
+      zweimal derselbe Host · `index.ts` ruft die Erkennung nicht auf ·
+      `index.ts` ignoriert den erkannten Host · weicht immer aus. Die letzte
+      war nötig, weil die Erfolgs-Zusage sonst von keiner Mutation gerötet
+      wurde und damit nichts belegt hätte.
+      **Und eine Zusage war zuerst falsch:** die Verdrahtungsprüfung suchte den
+      blossen Namen `apnsMitHostErkennung` und blieb grün, als die Mutation den
+      Aufruf entfernte — der Name stand ja noch im Import. Sie prüft jetzt den
+      Aufruf (`apnsMitHostErkennung(ersterHost,`) und dass der erkannte Host
+      auch benutzt wird (`apnsEndpunkt(host,`).
+- [ ] **`APNS_SANDBOX` von PROD nehmen, sobald ein Store-Build läuft.** Heute
+      steht es dort auf `1`, weil das einzige Gerät ein Xcode-Build ist — die
+      Erkennung fängt den Irrtum ohnehin ab, aber die Vermutung soll stimmen.
 - [x] **APNs gegen den echten Anbieter gemessen.** Sandbox und Produktion
       antworten `400 BadDeviceToken` auf ein erfundenes Token: authentifiziert,
       nur das Token verworfen. Belegt damit `apnsJwt`, `importierePkcs8`, die
@@ -465,9 +502,15 @@ Phase B beginnt erst danach.
       von Donald am 28.08. gesehen und aufgenommen.
 - [ ] Opt-out je Typ am Gerät nachgewiesen.
 - [ ] Ungültiges Token wird nach Ablehnung entfernt.
-- [ ] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
+- [x] **Tote Gerätetokens aufräumen.** `zugestellt: 2` kam von einem Token der
       deinstallierten App. APNs meldet es noch eine Weile als gültig, also
       kommt kein `dauerhaft` — von selbst verschwindet es **nie**.
+      → **AGE-682** (`push-token-aufraeumen`). Der Punkt kostete mehr als ein
+      `delete`: die Plan-Review zeigte, dass `letzter_kontakt` gar kein
+      Lebenszeichen war — `claim_push_token` hing allein am Öffnen der
+      Nachrichten, dort einmal je Konto. Der Change trägt deshalb beide
+      Hälften, das stille Erneuern beim Start und den Aufräumer darauf. Der
+      falsche Spaltenkommentar in `20260827210000:55-57` ist mitkorrigiert.
 
 ### B-Anzeige · Die Glocke fasst je Gespräch zusammen ✅
 
@@ -497,18 +540,41 @@ Phase B beginnt erst danach.
 Vier Punkte, die der Reviewer als Betriebsrisiken benannt hat. Sie stehen hier,
 damit ein grüner A5b-Haken nicht als Aussage gelesen wird, die er nicht trägt.
 
+> **Alle vier sind am 01.09. in AGE-679 (`push-waechter`) aufgenommen worden —
+> und einer davon ist dabei widerlegt worden.** Die Zuordnung steht je Punkt
+> darunter.
+
 - [ ] **Ein `supabase db reset` tilgt den Wiederholungslauf lautlos.** Funktion
       und cron-Eintrag sind keine Migrationen. Der Objekt-Drift-Scan misst nur
       PROD und läuft nur von Hand — **DEV hat gar keinen Wächter**. Nach einem
       Reset ist der Lauf dort still tot. Gleiches gilt seit jeher für das
       Webhook-Paar; neu ist nur, dass es jetzt drei Objekte sind.
+      → **AGE-679:** der Scan läuft jetzt stündlich gegen beide Seiten und
+      fragt zusätzlich `cron.job` ab. Es sind übrigens vier Objekte mit fünf
+      Namen plus zwei Zeitplanungen, nicht drei.
 - [ ] **Ein dauerhafter Zustellausfall ist unsichtbar.** `net.http_post` ist
       Fire-and-Forget: antwortet `send-push` durchgehend `401` (rotierter
       Bearer) oder `502`, bleibt der cron-Lauf `succeeded`. Nichts schlägt an.
-- [ ] **`net._http_response` wächst und wird von niemandem aufgeräumt** — beim
+      → **AGE-679:** die Daten waren die ganze Zeit da — `net._http_response`
+      trägt `status_code`, `timed_out` und `error_msg`, sechs Stunden weit
+      zurück. Es fehlte der Leser, nicht die Aufzeichnung.
+- [x] ~~**`net._http_response` wächst und wird von niemandem aufgeräumt** — beim
       Minutentakt rund 1440 Zeilen je Tag und Projekt. pg_net räumt nicht
-      selbst auf.
+      selbst auf.~~ **WIDERLEGT am 01.09. (AGE-679), mit Zahlen statt mit einem
+      Haken.** Gemessen an beiden Instanzen: pg_net **0.20.3** (DEV) /
+      **0.20.4** (PROD), `pg_net.ttl = 6 hours`, `batch_size = 200`, je
+      **360 Zeilen**, älteste 5 h 59 min. Das sind 6 h × 60 min — ein
+      Fließgleichgewicht genau an der TTL-Kante, auf beiden Seiten auf die
+      Zeile gleich. `worker.c` ruft `delete_expired_responses(guc_ttl,
+      guc_batch_size)` als **erste** Handlung jedes Schleifendurchlaufs.
+
+      Der Punkt hat null Zeilen Code gekostet. Was von ihm bleibt: die TTL ist
+      eine **Voraussetzung** des Wächters — sein Fenster muss kürzer sein — und
+      wird deshalb bei jedem Lauf mitgemessen.
 - [ ] **Das Gesundheitssignal verfällt mit Phase B.** Solange `push_tokens`
       leer ist, belegt `200 {"skipped":true}`, dass der Weg steht. Mit dem
       ersten echten Gerätetoken heisst dieselbe Antwort nur noch „nichts
       zuzustellen" — ein Nachfolge-Beleg fehlt.
+      → **AGE-679:** der Nachfolger ist das Stillstand-Signal auf
+      `cron.job_run_details`. Es trägt auch dann noch, wenn `push_tokens` nicht
+      mehr leer ist (PROD: 1 Gerät, DEV: 2).

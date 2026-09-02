@@ -66,6 +66,7 @@ import {
   apnsKopfzeilen,
   APNS_HOST_PROD,
   APNS_HOST_SANDBOX,
+  apnsMitHostErkennung,
   bewerteApns,
   bewerteFcm,
   fcmEndpunkt,
@@ -233,14 +234,24 @@ class Zustellung {
     const bundleId = Deno.env.get("APNS_BUNDLE_ID");
     if (!p8 || !keyId || !teamId || !bundleId) throw new Error("apns_nicht_konfiguriert");
 
-    this.appleToken ??= await apnsJwt({ p8, keyId, teamId });
-    const host = Deno.env.get("APNS_SANDBOX") === "1" ? APNS_HOST_SANDBOX : APNS_HOST_PROD;
-    const res = await fetch(apnsEndpunkt(host, auftrag.token), {
-      method: "POST",
-      headers: { ...apnsKopfzeilen(this.appleToken, bundleId), "content-type": "application/json" },
-      body: JSON.stringify(apnsKoerper(n)),
+    // In eine lokale Bindung, nicht `this.appleToken!` im Closure: die
+    // Verengung aus `??=` gilt dort nicht mehr, und ein `!` waere hier eine
+    // unterdrueckte Pruefung statt einer belegten Zusage.
+    const jwt = (this.appleToken ??= await apnsJwt({ p8, keyId, teamId }));
+
+    // `APNS_SANDBOX` waehlt nur noch, welcher Host ZUERST gefragt wird — die
+    // Entscheidung faellt an der Antwort. Warum, steht bei
+    // `apnsMitHostErkennung`.
+    const ersterHost = Deno.env.get("APNS_SANDBOX") === "1" ? APNS_HOST_SANDBOX : APNS_HOST_PROD;
+
+    return await apnsMitHostErkennung(ersterHost, async (host) => {
+      const res = await fetch(apnsEndpunkt(host, auftrag.token), {
+        method: "POST",
+        headers: { ...apnsKopfzeilen(jwt, bundleId), "content-type": "application/json" },
+        body: JSON.stringify(apnsKoerper(n)),
+      });
+      return bewerteApns(res.status, await res.json().catch(() => null));
     });
-    return bewerteApns(res.status, await res.json().catch(() => null));
   }
 
   private async quittiere(auftrag: Auftrag, bewertung: Bewertung): Promise<void> {
