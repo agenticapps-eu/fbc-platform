@@ -30,12 +30,13 @@
 -- Klausel durch, die diese Datei gar nicht misst — und der RED sähe plausibel
 -- aus, wäre aber aus dem falschen Grund rot. Deshalb sind die Ziele alt.
 --
--- Nach dem Streichen von Klausel 332 bleiben dieselben Zusagen grün; die
--- Kaltanfrage an ein TAGESFRISCHES Konto sagt Aufgabe 6.1 zu, dort gehört sie
--- hin.
+-- Nach dem Streichen von Klausel 332 bleiben dieselben Zusagen grün. Genau EIN
+-- Ziel ist deshalb tagesfrisch (`…0004`): es ist der Beleg, dass die Klausel
+-- wirklich weg ist, und es kam mit Aufgabe 6.1 dazu — vorher wäre es an einer
+-- Klausel gescheitert, die diese Datei gar nicht misst.
 
 begin;
-select plan(29);
+select plan(32);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- `auth.users`-Insert feuert `handle_new_user()` und legt die `public.profiles`-
@@ -49,7 +50,8 @@ insert into auth.users (id, aud, role, email) values
   ('10000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'staffel-impact@test.fbc'),
   ('20000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'ziel-connect@test.fbc'),
   ('20000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'ziel-impact@test.fbc'),
-  ('20000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'ziel-optout@test.fbc');
+  ('20000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'ziel-optout@test.fbc'),
+  ('20000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'ziel-frisch@test.fbc');
 
 update public.profiles set tier = 'basic',    name = 'Sender Basic'    where id = '10000000-0000-0000-0000-000000000001';
 update public.profiles set tier = 'connect',  name = 'Sender Connect'  where id = '10000000-0000-0000-0000-000000000002';
@@ -60,6 +62,12 @@ update public.profiles set tier = 'impact',   name = 'Sender Impact'   where id 
 update public.profiles set tier = 'connect',  name = 'Ziel Connect'    where id = '20000000-0000-0000-0000-000000000001';
 update public.profiles set tier = 'impact',   name = 'Ziel Impact'     where id = '20000000-0000-0000-0000-000000000002';
 update public.profiles set tier = 'impact',   name = 'Ziel OptOut'     where id = '20000000-0000-0000-0000-000000000003';
+update public.profiles set tier = 'impact',   name = 'Ziel Frisch'     where id = '20000000-0000-0000-0000-000000000004';
+
+-- Das tagesfrische Ziel: aktiviert, aber `created_at` bleibt auf `now()`. Es
+-- steht ausserhalb der Rückdatierung unten — es IST der Welpenschutz-Fall.
+update public.profiles set activated_at = now()
+ where id = '20000000-0000-0000-0000-000000000004';
 
 -- Aktivierung: `cr_insert_self` trägt `is_activated()` als erste Klausel. Ohne
 -- diese Zeile fiele jede Zusage dieser Datei am Gate durch, und keine einzige
@@ -282,6 +290,40 @@ select alike(
     pg_temp.anfrage('10000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000003')),
   'FEHLER:42501 %row-level security policy%',
   'offen: ein Empfaenger mit Opt-out ist nicht erreichbar');
+
+-- ── 3c. Der Welpenschutz ist weg (6.1, 6.4) ─────────────────────────────────
+-- Eine KALTE Anfrage — ohne `match_id` — an ein Konto, das am selben Tag
+-- registriert wurde. Bis zum 02.09. wies Klausel 332 sie im geschlossenen
+-- Modus ab; sie ist ersatzlos gestrichen.
+--
+-- Der Grund ist gemessen, nicht gemeint: alle 74 Profile auf PROD sind jünger
+-- als 30 Tage. Ein eingeschalteter Welpenschutz hätte die Kontaktfunktion
+-- plattformweit stillgelegt, mit rund 2 % Durchlass über Übereinstimmungen.
+-- Eine Schutzregel, die man wegen ihrer eigenen Wirkung nie einschalten kann,
+-- ist keine Regel.
+--
+-- Beide Schalterstellungen, weil der Schalter sie bis heute verdeckt hat: bei
+-- `open_contact = true` (dem Stand seit dem 05.08.) war die Klausel ohnehin
+-- offen, und ein Test allein in dieser Stellung hätte das Streichen gar nicht
+-- bemerkt.
+select is(
+  pg_temp.try_as('10000000-0000-0000-0000-000000000005',
+    pg_temp.anfrage('10000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000004')),
+  'OK', 'offen: eine Kaltanfrage an ein tagesfrisches Konto geht durch');
+
+update public.platform_settings set open_contact = false;
+
+-- Absender ab Rang 3, damit die Staffelung nicht die Antwort gibt: was hier
+-- gemessen wird, ist der Welpenschutz und nichts sonst.
+select is(
+  pg_temp.try_as('10000000-0000-0000-0000-000000000003',
+    pg_temp.anfrage('10000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000004')),
+  'OK', 'geschlossen: eine Kaltanfrage an ein tagesfrisches Konto geht durch');
+
+-- Ohne diese Zusage bliebe der Drop unbelegt: die Klausel zu streichen und die
+-- Funktion stehen zu lassen sähe von aussen genauso aus.
+select hasnt_function('public', 'is_new_member', array['uuid'],
+  'is_new_member(uuid) existiert nicht mehr');
 
 -- ── 4. Die Form des Prädikats (5.2) ─────────────────────────────────────────
 -- Was das Verhalten oben nicht zeigt, aber trägt. `security definer` ist der
