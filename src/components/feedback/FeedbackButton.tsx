@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 
-import { submitPlatformFeedback } from "../../lib/feedback";
+import {
+  FEEDBACK_SCREENSHOT_MAX_BYTES,
+  FEEDBACK_SCREENSHOT_TYPEN,
+  feedbackThemenQueryKey,
+  fetchFeedbackThemen,
+  submitPlatformFeedback,
+  uploadFeedbackScreenshot,
+} from "../../lib/feedback";
 import { useAuth } from "../../providers/auth-context";
-import { Button, Textarea, useToast } from "../ui";
+import { Button, Select, Textarea, useToast } from "../ui";
+import { useBildauswahl } from "../ui/useBildauswahl";
 import { useOverlay } from "../ui/useOverlay";
 import { Icon } from "../ui/icons";
 
@@ -52,6 +61,34 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   const [idea, setIdea] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Der Schlüssel des gewählten Themas, "" heisst „noch nichts gewählt".
+  const [thema, setThema] = useState("");
+  const [bild, setBild] = useState<File | null>(null);
+  /**
+   * Der Pfad des BEREITS hochgeladenen Bildes. Er überlebt einen
+   * fehlgeschlagenen Versuch, damit der zweite Druck auf „Absenden" nicht
+   * ein zweites Objekt anlegt: `uploadFeedbackScreenshot` baut den Pfad aus
+   * `Date.now()`, ein erneuter Aufruf träfe also nie dieselbe Stelle und
+   * liesse pro Versuch eine Waise im Bucket zurück, die niemand mehr sieht.
+   */
+  const [hochgeladenerPfad, setHochgeladenerPfad] = useState<string | null>(null);
+  const dateiRef = useRef<HTMLInputElement>(null);
+  const bildWahl = useBildauswahl(([datei]) => uebernehmeBild(datei));
+
+  /**
+   * Die Themen kommen aus der DATENBANK (AGE-628, design.md Entscheidung 1).
+   * Weder Schlüssel noch Beschriftung stehen hier — stünden sie, gäbe es die
+   * Liste zweimal, und nichts verglichen die beiden Abschriften.
+   *
+   * Deshalb auch die Vorbelegung über `themen[0]` und nicht über ein Literal
+   * `"generell"`: die Reihenfolge steht in `feedback_themes.sort`, und die
+   * erste Zeile IST „Generell".
+   */
+  const { data: themen = [] } = useQuery({
+    queryKey: feedbackThemenQueryKey,
+    queryFn: fetchFeedbackThemen,
+  });
+  const gewaehltesThema = thema || themen[0]?.key || "";
   // VOR dem frühen `return null` unten (AGE-529): stünde der Hook dahinter,
   // verletzte jeder Wechsel des Anmeldezustands die Hook-Regeln. `Boolean(user)`
   // in der Bedingung sorgt außerdem dafür, dass ein Sitzungsverlust bei offenem
@@ -70,12 +107,61 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   function close() {
     setOpen(false);
     setError(null);
+    // Das Bild MUSS mit weg. Sonst hängt beim nächsten Öffnen wortlos die
+    // Datei aus dem abgebrochenen Versuch wieder dran — gemessen im Browser
+    // am 02.09.: nach „Abbrechen" und erneutem Öffnen stand der Dateiname
+    // samt „Entfernen" unverändert da. Der Text bleibt bewusst stehen (ein
+    // versehentliches Schliessen soll den Entwurf nicht kosten); ein
+    // stillschweigend wieder angehängter Screenshot ist etwas anderes, weil
+    // ihn niemand im Formular sucht.
+    setBild(null);
+    setHochgeladenerPfad(null);
+  }
+
+  /**
+   * Dieselben Grenzen wie am Bucket, und zwar HIER schon — aber die Grenze IST
+   * der Bucket (`feedback-screenshots`: privat, 5 MiB, png/jpeg/webp). Was hier
+   * passiert, ist Komfort: ein verständlicher Satz statt einer
+   * Storage-Fehlermeldung, und zwar bevor jemand fünf Minuten auf einen Upload
+   * wartet, der ohnehin abgewiesen wird.
+   */
+  function uebernehmeBild(datei: File | undefined) {
+    if (!datei) return;
+    if (!(FEEDBACK_SCREENSHOT_TYPEN as readonly string[]).includes(datei.type)) {
+      setError("Bitte ein Bild als PNG, JPEG oder WebP auswählen.");
+      return;
+    }
+    if (datei.size > FEEDBACK_SCREENSHOT_MAX_BYTES) {
+      setError("Das Bild ist grösser als 5 MB.");
+      return;
+    }
+    setError(null);
+    setBild(datei);
+    // Ein neues Bild macht den gemerkten Pfad ungültig: sonst hinge nach einem
+    // gescheiterten Versuch das ALTE Objekt an der Zeile, obwohl auf dem
+    // Bildschirm der neue Dateiname steht.
+    setHochgeladenerPfad(null);
   }
 
   async function submit() {
     setSaving(true);
     setError(null);
     try {
+      // ERST das Bild, dann die Zeile. Andersherum stünde bei einem Abbruch
+      // dazwischen eine Feedback-Zeile ohne ihr Bild — und niemand wüsste,
+      // dass eines gemeint war. So herum ist der schlimmste Ausgang ein
+      // verwaistes Objekt, das niemand sieht.
+      //
+      // Und HÖCHSTENS EINMAL hochladen: scheitert das Einfügen der Zeile,
+      // liegt das Objekt schon oben. Ein zweiter Druck auf „Absenden" ohne
+      // diesen Merker lüde es unter einem neuen `Date.now()`-Pfad erneut hoch
+      // und liesse das erste als Waise zurück — in einem privaten Bucket, den
+      // nichts aufräumt.
+      let screenshotPath: string | null = null;
+      if (bild) {
+        screenshotPath = hochgeladenerPfad ?? (await uploadFeedbackScreenshot(profileId, bild));
+        setHochgeladenerPfad(screenshotPath);
+      }
       await submitPlatformFeedback({
         profileId,
         rating,
@@ -83,12 +169,20 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
         misses,
         idea,
         route: pathname,
+        // Leer heisst „nicht nennen": dann trägt die Spalte ihren dauerhaften
+        // Vorgabewert. Solange die Themenliste nicht geladen ist, ist das der
+        // richtige Weg — und nicht ein hier hingeschriebenes „generell".
+        theme: gewaehltesThema || undefined,
+        screenshotPath,
       });
       toast({ title: "Danke für dein Feedback!" });
       setRating(0);
       setLikes("");
       setMisses("");
       setIdea("");
+      setThema("");
+      setBild(null);
+      setHochgeladenerPfad(null);
       setOpen(false);
     } catch {
       setError("Dein Feedback konnte nicht gespeichert werden. Bitte versuche es noch einmal.");
@@ -157,6 +251,32 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
                 ))}
               </div>
 
+              {/* Die Auswahl erscheint erst, wenn die Themen da sind. Eine
+                  Liste mit einem hier hingeschriebenen „Generell" wäre die
+                  zweite Abschrift, gegen die design.md antritt — und ein
+                  leeres Auswahlfeld sähe aus wie ein Fehler. Ohne die Liste
+                  trägt die Zeile den Vorgabewert der Spalte, das Absenden
+                  bleibt also möglich. */}
+              {themen.length > 0 && (
+                <>
+                  <label className="mt-4 block text-sm font-medium text-ink" htmlFor="fb-thema">
+                    Worum geht es?
+                  </label>
+                  <Select
+                    id="fb-thema"
+                    className="mt-1"
+                    value={gewaehltesThema}
+                    onChange={(e) => setThema(e.target.value)}
+                  >
+                    {themen.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </Select>
+                </>
+              )}
+
               <label className="mt-4 block text-sm font-medium text-ink" htmlFor="fb-likes">
                 Was gefällt dir?
               </label>
@@ -187,6 +307,59 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
                 onChange={(e) => setIdea(e.target.value)}
               />
 
+              {/* Optional, und das steht auch dran. Der Screenshot ist der
+                  Unterschied zwischen „irgendwas ist komisch" und einer
+                  Meldung, mit der jemand etwas anfangen kann.
+
+                  Das Dateifeld ist versteckt und wird vom Knopf ausgelöst —
+                  dasselbe Muster wie `EventCoverPicker`. Nativ übernimmt
+                  `useBildauswahl` die Rückfrage „Kamera oder Galerie"; im Web
+                  klickt sie schlicht dieses Feld an. */}
+              <p className="mt-4 text-sm font-medium text-ink">Screenshot (optional)</p>
+              <input
+                ref={dateiRef}
+                type="file"
+                accept={FEEDBACK_SCREENSHOT_TYPEN.join(",")}
+                className="hidden"
+                aria-label="Screenshot auswählen"
+                onChange={(e) => {
+                  uebernehmeBild(e.target.files?.[0]);
+                  // Zurücksetzen, damit dieselbe Datei ein zweites Mal
+                  // ausgewählt werden kann — sonst feuert `change` nicht.
+                  e.target.value = "";
+                }}
+              />
+              <div className="mt-1 flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => bildWahl.oeffnen(dateiRef.current)}
+                >
+                  {bild ? "Anderes Bild" : "Bild wählen"}
+                </Button>
+                {bild && (
+                  <>
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted">{bild.name}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setBild(null);
+                        // Mit dem Bild geht auch der gemerkte Pfad: sonst
+                        // trüge die Zeile ein Objekt, das der Verfasser
+                        // gerade weggenommen hat.
+                        setHochgeladenerPfad(null);
+                      }}
+                      aria-label="Bild entfernen"
+                    >
+                      Entfernen
+                    </Button>
+                  </>
+                )}
+              </div>
+
               {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
               <div className="mt-5 flex justify-end gap-2">
@@ -201,6 +374,10 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
           </div>,
           document.body,
         )}
+      {/* Muss gerendert werden — im Web immer `null`, nativ die Rückfrage
+          „Kamera oder Galerie". Ausserhalb des Panels, damit sie nicht
+          verschwindet, während der native Dialog offen ist. */}
+      {bildWahl.rueckfrage}
     </>
   );
 }

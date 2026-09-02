@@ -543,11 +543,11 @@ select is(
   0, 'Ein gewöhnliches Mitglied bekommt aus admin_list_feedback() nichts');
 
 select is(
-  has_function_privilege('anon', 'public.admin_list_feedback(int,int)', 'execute'),
+  has_function_privilege('anon', 'public.admin_list_feedback(int,int,text[],int[])', 'execute'),
   false, 'anon darf admin_list_feedback() nicht ausführen — gesperrt wie die Geschwister');
 
 select is(
-  has_function_privilege('authenticated', 'public.admin_list_feedback(int,int)', 'execute'),
+  has_function_privilege('authenticated', 'public.admin_list_feedback(int,int,text[],int[])', 'execute'),
   true, 'authenticated darf admin_list_feedback() ausführen (der RPC-Aufruf der Sicht)');
 
 -- ── apply_upgrade: nur-Upgrade, idempotent, service-role-only (§3.3/§3.4) ─────

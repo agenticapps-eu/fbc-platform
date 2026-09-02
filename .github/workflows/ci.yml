@@ -229,6 +229,9 @@ jobs:
           supabase/tests/geplante_beitraege_test.sql
           supabase/tests/ota_buendel_test.sql
           supabase/tests/push_token_aufraeumen_test.sql
+          supabase/tests/feedback_themes_test.sql
+          supabase/tests/feedback_screenshots_test.sql
+          supabase/tests/admin_gespraech_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
