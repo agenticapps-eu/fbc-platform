@@ -7,7 +7,7 @@
 // `scripts/functions-config.test.ts`.
 //
 // Was hier offensteht, ist die Frage „welches Bündel gilt für Schale X". Die
-// Antwort enthält `url`, `checksum` und `sessionKey` — kein Geheimnis: der
+// Antwort enthält `url`, `checksum` und `session_key` — kein Geheimnis: der
 // öffentliche Schlüssel steckt ohnehin in jeder ausgelieferten App, und im
 // Bündel steht dasselbe `dist/`, das Cloudflare Pages an jeden ausliefert. Die
 // Verschlüsselung trägt Echtheit, nicht Vertraulichkeit (Entwurf §8).

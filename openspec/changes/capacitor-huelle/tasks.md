@@ -790,7 +790,7 @@ was das System je befüllt.
       das Zip mit einem zufälligen **AES**-Schlüssel verschlüsseln; diesen
       Sitzungsschlüssel **und** die Prüfsumme mit dem **privaten** RSA-Schlüssel
       verschlüsseln; Chiffrat in den Bucket laden; Manifest-Zeile mit `version`,
-      `url`, `checksum` und `sessionKey` schreiben. Das ist capgos „end to end
+      `url`, `checksum` und `session_key` schreiben. Das ist capgos „end to end
       encryption v2", nicht eine losgelöste Signatur — siehe `design.md` §8.
       Hochladen über `SUPABASE_SERVICE_ROLE_KEY` aus Infisical — der Job fährt
       ohnehin über `infisical run`.
@@ -1011,7 +1011,7 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
       Zusage hat zwei Hälften, und nur eine liegt in unserem Code:
       * **Unsere Hälfte, belegt:** ein Angebot ist vollständig oder es ist
         keines (`antwort.test.ts`). Fehlte `checksum`, lehnte das Gerät mit
-        `checksum_required` ab; fehlte `sessionKey`, gälte die Verschlüsselung
+        `checksum_required` ab; fehlte `session_key`, gälte die Verschlüsselung
         als nicht gesetzt (`CryptoCipher.java:141`), das Gerät entpackte
         Chiffrat und scheiterte **ohne Hinweis auf die Ursache**. Dazu §38 der
         pgTAP-Datei: die vier Spalten kommen der richtigen Zuordnung zurück.

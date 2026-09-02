@@ -55,7 +55,7 @@ Deno.test("RED: eine Schale mit zu niedriger Vertragsnummer bekommt kein Buendel
 
   assertEquals(ergebnis.body.kind, "up_to_date");
   assertEquals(ergebnis.body.url, undefined);
-  assertEquals(ergebnis.body.sessionKey, undefined);
+  assertEquals(ergebnis.body.session_key, undefined);
   // Und die Vertragsnummer der Schale ist auch wirklich die Frage, die gestellt
   // wurde. Ohne diese Zeile waere die Zusage auch gruen, wenn der Endpunkt eine
   // feste Zahl weiterreichte.
@@ -91,16 +91,33 @@ Deno.test("Positivkontrolle: mit passendem Buendel kommt es auch heraus", async 
   assertEquals(ergebnis.body.kind, undefined);
 });
 
-Deno.test("das Feld heisst sessionKey, die Spalte session_key", async () => {
-  // Die einzige Stelle, an der die Eins-zu-eins-Abbildung bricht. Falsch
-  // geschrieben gilt die Verschluesselung als nicht gesetzt
-  // (`CryptoCipher.java:141`): das Geraet entpackt Chiffrat und scheitert ohne
-  // Hinweis auf die Ursache.
+Deno.test("das Feld heisst session_key — iOS liest NUR diese Schreibweise", async () => {
+  // Am Geraet gemessen (02.09., iPhone 17 Pro, iOS 26.6): mit `sessionKey` auf
+  // der Leitung meldete das Plugin `Encryption not set, no public key or
+  // session, ignored` und danach `Failed to unzip file / cannotUnzip` — das
+  // Buendel blieb Chiffrat.
+  //
+  // Die beiden Schalen sind NICHT symmetrisch:
+  //
+  // - **iOS akzeptiert ausschliesslich `session_key`.** Die Antwort geht durch
+  //   ein nacktes `JSONDecoder().decode(AppVersionDec.self, …)`
+  //   (`CapgoUpdater.swift:1141`) ohne `keyDecodingStrategy`, und das Feld
+  //   heisst dort woertlich `session_key` (`InternalUtils.swift:258`). Ein
+  //   `sessionKey` faellt still auf den Boden.
+  // - **Android akzeptiert beide** — aus Versehen. Es laeuft ueber die rohe
+  //   Antwort und benennt `session_key` nach `sessionKey` um
+  //   (`CapgoUpdater.java:2350`); ein bereits camelCase geschriebenes Feld
+  //   landet ueber den `else`-Zweig unter demselben Namen.
+  //
+  // `session_key` ist damit die einzige Schreibweise, die auf BEIDEN Schalen
+  // ankommt. Bis 02.09. stand hier das Gegenteil, belegt mit
+  // `CapacitorUpdaterPlugin.java:5035` — diese Zeile liest aber die bereits
+  // umbenannte interne Map, nicht die Leitung.
   const { deps } = baueDeps(OK);
   const ergebnis = await ermittleAntwort({ version_build: "9.0.0" }, deps);
 
-  assertEquals(ergebnis.body.sessionKey, BUENDEL.session_key);
-  assertEquals(ergebnis.body.session_key, undefined);
+  assertEquals(ergebnis.body.session_key, BUENDEL.session_key);
+  assertEquals(ergebnis.body.sessionKey, undefined);
   assertEquals(ergebnis.body.checksum, BUENDEL.checksum);
   assertEquals(ergebnis.body.url, BUENDEL.url);
 });
@@ -114,14 +131,14 @@ Deno.test("RED: ein Angebot ist vollstaendig oder es ist keines", async () => {
   //
   // Was hier zaehlt: setzt `capacitor.config.ts` einen `publicKey`, MUSS die
   // Antwort eine `checksum` tragen, sonst lehnt das Geraet die Installation mit
-  // `checksum_required` ab (Entwurf §8). Und fehlte `sessionKey`, gaelte die
+  // `checksum_required` ab (Entwurf §8). Und fehlte `session_key`, gaelte die
   // Verschluesselung als nicht gesetzt (`CryptoCipher.java:141`) — dann bliebe
   // das Buendel Chiffrat und das Entpacken scheiterte OHNE Hinweis. Eine
   // halbe Antwort ist also schlechter als gar keine.
   const { deps } = baueDeps(OK);
   const ergebnis = await ermittleAntwort({ version_build: "9.0.0" }, deps);
 
-  for (const feld of ["version", "url", "checksum", "sessionKey"]) {
+  for (const feld of ["version", "url", "checksum", "session_key"]) {
     const wert = ergebnis.body[feld];
     assertEquals(typeof wert, "string", feld);
     assertEquals((wert as string).length > 0, true, feld);
