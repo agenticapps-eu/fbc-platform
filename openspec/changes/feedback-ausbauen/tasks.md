@@ -42,20 +42,30 @@
       scheitert RED als Zusage und nicht als Abbruch, und die Fassung nach 1.2
       misst mit denselben 16. In `ci.yml` eingetragen (jetzt 24 Dateien).
       Gesamtlauf: 1044 Zusagen, genau 16 rot, alle in dieser Datei.
-- [ ] 1.2 Migration: Tabelle `feedback_themes` mit `key` (Primärschlüssel),
-      `label` und `sort`, alle `not null`; RLS an, Lese-Policy für
-      `authenticated`, `select` ausdrücklich gegrantet. Neue Tabellen erben hier
-      nichts, und RLS ohne Policy sieht aus wie „es gibt keine Themen".
-      **Hier zu entscheiden, nicht nebenbei:** ob `anon` lesen darf. Das
-      Vorbild `membership_tiers` grantet `select` an anon **und**
-      authenticated (Policy `tiers_read_all`); `design.md` nennt nur
-      `authenticated`, weil Feedback hinter der Anmeldung liegt. Der Test aus
-      1.1 behauptet über `anon` bewusst nichts — festgelegt wird es vom
-      Golden-Snapshot in 1.4.
-- [ ] 1.3 Die fünf Zeilen füllen: `generell` „Generell", `fehler` „Fehler /
-      etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit", `inhalte`
-      „Inhalte / Texte", `idee` „Idee / Wunsch".
-- [ ] 1.4 **`grants_test.sql`-Golden-Snapshot nachziehen.**
+- [x] 1.2 **Migration `20260902090000_feedback_themes.sql` liegt.** Tabelle mit
+      `key` (Primärschlüssel), `label` und `sort`, alle `not null`; RLS an,
+      Policy `feedback_themes_read` für `authenticated`, `select` ausdrücklich
+      gegrantet — im selben Schritt wie das `enable`, weil RLS ohne Policy der
+      Oberfläche eine leere Liste liefert und das nicht wie ein Rechtefehler
+      aussieht.
+      **Die `anon`-Frage ist entschieden, und nicht nebenbei:** `anon` bekommt
+      nichts — weder Policy noch `grant`. Nicht nach `design.md` allein,
+      sondern nach dem Vorbild im Repo: `grants_test.sql` führt für die
+      Schwestertabelle `feedback/authenticated=…` und **keine** anon-Zeile.
+      `membership_tiers` grantet an beide, wird aber vor der Anmeldung
+      gebraucht; die Themen nicht. Begründet im Migrationskopf.
+- [x] 1.3 **Die fünf Zeilen stehen** — `generell` „Generell", `fehler` „Fehler
+      / etwas geht nicht", `bedienung` „Bedienung / Verständlichkeit",
+      `inhalte` „Inhalte / Texte", `idee` „Idee / Wunsch". Eingefügt mit
+      `on conflict (key) do update`, nicht `do nothing`: eine vorhandene, aber
+      falsch beschriftete Zeile bliebe sonst konserviert und der Test liefe
+      grün dagegen.
+- [x] 1.4 **Golden-Snapshot nachgezogen** — eine Zeile,
+      `feedback_themes/authenticated=SELECT`. Dass **keine** anon-Zeile
+      danebensteht, ist die Zusage aus 1.2: wer `anon` später öffnet, ändert
+      damit sichtbar den Snapshot und muss es begründen.
+      **GREEN belegt:** dieselben 16 Zusagen aus 1.1 sind grün, und der
+      Gesamtlauf steht bei 24 Dateien, **1044 Zusagen, PASS**.
 - [ ] 1.5 **RED:** pgTAP, das eine `feedback`-Zeile **ohne** Thema anlegt und
       erwartet, dass sie „Generell" trägt — schlägt fehl, solange es die Spalte
       nicht gibt.
