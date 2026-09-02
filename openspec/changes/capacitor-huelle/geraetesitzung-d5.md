@@ -63,7 +63,10 @@ eine verbrauchte Kennung wiederzuverwenden ist genau die Falle darunter.
 > `.github/workflows/deploy.yml:715` veröffentlicht bei **jedem** Push auf
 > `main` ein Bündel — auch bei einem reinen Doku-Commit. Zwischen dem
 > Aufräum-Bündel `c1ea4ed1` (13:46) und 16:04 sind so **sechs** CI-Bündel
-> entstanden; obenauf liegt `8d3cd941f991`, der Doku-Commit `8d3cd94`.
+> entstanden; obenauf lag `8d3cd941f991`, der Doku-Commit `8d3cd94`. Der
+> Merge von PR #319 um 20:10 UTC hat daraus ein **siebtes** gemacht —
+> `5091813459c8`, am Endpunkt gemessen. Diese Falle ist damit nicht mehr
+> nur beschrieben, sie ist eingetreten.
 >
 > Zwei Folgen, und die erste kostet Probe 2:
 >
@@ -127,12 +130,12 @@ und öffnen als man erwartet.
 
 > ### ⚠ Vorher: der Rückfall braucht eine sichtbare Marke — sonst belegt Probe 2 nichts
 >
-> Stand 02.09. abends trägt das neueste Bündel (`8d3cd941f991`, ein normaler
-> CI-Bau) **keine** Marke; die aus Probe 1 (`feedbeef`) liegt sechs Bündel
-> darunter. Läuft Probe 2 gegen diesen Stand, ist der Beleg für Schritt 3 nur
-> noch „der Bildschirm ist nicht weiss" — und genauso sieht es aus, wenn das
-> defekte Bündel **nie installiert wurde**. Der Rückweg wäre dann wieder eine
-> Behauptung, diesmal eine grüne.
+> Stand 02.09. 20:12 UTC trägt das neueste Bündel (`5091813459c8`, der CI-Bau
+> zum Merge von #319) **keine** Marke; die aus Probe 1 (`feedbeef`) liegt
+> sieben Bündel darunter. Läuft Probe 2 gegen diesen Stand, ist der Beleg für
+> Schritt 3 nur noch „der Bildschirm ist nicht weiss" — und genauso sieht es
+> aus, wenn das defekte Bündel **nie installiert wurde**. Der Rückweg wäre dann
+> wieder eine Behauptung, diesmal eine grüne.
 >
 > Deshalb sind es **zwei** Veröffentlichungen, in dieser Reihenfolge:
 >
