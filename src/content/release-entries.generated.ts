@@ -5,6 +5,16 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-03-escape-trifft-das-oberste",
+    datum: "2026-09-03",
+    titel: "Die Escape-Taste schliesst das Feedback-Fenster, nicht das Menü darunter",
+    linear: "AGE-697",
+    aenderungen: [
+      "**Escape schliesst das Feedback-Formular.** Bisher tat der Tastendruck dort entweder nichts (am grossen Bildschirm) oder das Falsche (am Telefon: er schloss das Menü darunter und riss das Formular mit weg).",
+      "**Ein Escape schliesst genau eine Fläche.** Steht das Formular über dem geöffneten Menü, schliesst das erste Escape das Formular; das Menü bleibt stehen, und ein zweites Escape schliesst es.",
+    ],
+  },
+  {
     slug: "2026-09-03-ein-modal-zur-zeit",
     datum: "2026-09-03",
     titel: "Feedback vom Telefon aus ist mit Vorlesesoftware erreichbar",
