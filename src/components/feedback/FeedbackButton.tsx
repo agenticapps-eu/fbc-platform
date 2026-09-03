@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 
@@ -50,7 +50,20 @@ function FeedbackIcon() {
   return <Icon name="feedback" className="h-5 w-5 shrink-0" />;
 }
 
-export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
+export function FeedbackButton({
+  collapsed = false,
+  onOffenChange,
+}: {
+  collapsed?: boolean;
+  /**
+   * Meldet der aufrufenden Fläche, ob das Formular offen ist (AGE-688).
+   *
+   * Die Off-Canvas-Navigation braucht das: sie trägt selbst `aria-modal`, und
+   * dieses Formular hängt per Portal an `body`, also AUSSERHALB von ihr. Trügen
+   * beide das Attribut, hielte Vorlesesoftware genau das Formular für inert.
+   */
+  onOffenChange?: (offen: boolean) => void;
+}) {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const { toast } = useToast();
@@ -94,6 +107,30 @@ export function FeedbackButton({ collapsed = false }: { collapsed?: boolean }) {
   // in der Bedingung sorgt außerdem dafür, dass ein Sitzungsverlust bei offenem
   // Panel keine Sperre ohne sichtbares Overlay zurücklässt.
   const overlay = useOverlay(Boolean(user) && open, () => setOpen(false));
+
+  // Als Effekt auf `open` und NICHT an den einzelnen `setOpen(false)`-Stellen:
+  // die liegen in `close()`, im Erfolgszweig von `submit()` und im Rückweg von
+  // `useOverlay` — eine davon zu übersehen liesse die Schublade ohne
+  // `aria-modal` zurück, und das sähe niemand, weil sichtbar alles stimmt.
+  //
+  // Das Aufräumen spart genau EINEN Renderdurchgang, und das ist ehrlich so
+  // gemessen: hängt der Auslöser samt Schublade ab (Sprung über `lg`) und geht
+  // sie später wieder auf, meldet die neu gemountete Instanz beim Aufsetzen
+  // ohnehin `false`. Ohne das Aufräumen träfe das aber erst NACH dem ersten
+  // Render — die frisch geöffnete Schublade käme für einen Durchgang ohne
+  // `aria-modal` hoch. Kein Test unterscheidet die beiden Fassungen; die
+  // Zeile steht für den einen Durchgang, nicht für einen Fehlerfall.
+  // `Boolean(user) && open` und nicht bloss `open` — dieselbe Bedingung wie am
+  // Hook darüber und aus demselben Grund: geht die Sitzung bei offenem Panel
+  // verloren, rendert diese Komponente gar nichts mehr, und eine Meldung
+  // „offen" liesse die Schublade ohne `aria-modal` zurück, ohne dass etwas
+  // über ihr läge.
+  const panelOffen = Boolean(user) && open;
+  useEffect(() => {
+    if (!onOffenChange) return;
+    onOffenChange(panelOffen);
+    return () => onOffenChange(false);
+  }, [panelOffen, onOffenChange]);
 
   // Ohne Konto ist Feedback nicht speicherbar: feedback.profile_id ist `not null`
   // und feedback_own verlangt profile_id = auth.uid(). Einen Button zu zeigen, der
