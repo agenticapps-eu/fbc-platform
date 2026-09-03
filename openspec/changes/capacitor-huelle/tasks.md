@@ -1347,14 +1347,99 @@ Bündel.
 
 Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
 
-- [ ] Beide Apps starten auf echten Geräten.
+> ### Androidlauf 03.09. — Pixel 11 Pro, Android 17 (SDK 37)
+>
+> Sieben Punkte belegt, **zwei Fehler gefunden**, beide reproduziert und mit
+> Positivkontrolle. Werkzeuge: `adb` aus `~/Library/Android/sdk/platform-tools`
+> (nicht im PATH), und **JDK 21** — das JBR von Android Studio ist Java 25, an
+> dem Gradle 8.14.3 mit `Unsupported class file major version 69` abbricht.
+>
+> **Vorher war `@capgo/capacitor-updater` in der Android-Schale gar nicht
+> verdrahtet.** In `package.json` stand es, in `android/capacitor.settings.gradle`
+> nicht — jeder Android-Bau lief ohne Luftweg, und der Fehlermodus war
+> Schweigen. `cap sync android` hat es nachgezogen; die beiden Gradle-Dateien
+> sind Teil dieses Commits.
+
+- [x] Beide Apps starten auf echten Geräten. **Android 03.09.** (iOS seit D5).
 - [ ] Anmelden, Feed, Chat, Profil bearbeiten, Bild hochladen — je einmal auf
       iOS und Android.
-- [ ] Die Sitzung überlebt einen Neustart der App auf beiden Plattformen.
+
+      **Android 03.09.: alles bis auf den Bildupload.** Anmelden, Nachrichten-
+      liste, Konversation, Profil und „Profil bearbeiten" laden vollständig.
+
+      **⛔ Der Bildupload bricht still ab.** Gemessen zweimal, mit Zählpunkten
+      davor und danach: Bucket `avatars` **61 Dateien vorher, 61 nachher**,
+      neuestes Objekt unverändert vom 27.08., `profiles.avatar_url` bleibt
+      leer. Keine Fehlermeldung, kein Eintrag im Log.
+
+      Der Ablauf: Der gemeinsame Dialog („Aufnehmen" / „Aus der Mediathek")
+      erscheint, der System-Photo-Picker öffnet — **ohne** Berechtigungsabfrage,
+      das ist richtig so. Nach der Bildauswahl kommt **kein Zuschnitt-Fenster**;
+      die App landet auf der Startseite. Im Log steht dazu genau ein Ereignis:
+      `webview_dom_content_loaded` — **die WebView lädt neu**, der React-Zustand
+      ist weg, und der Ablauf, der nach der Auswahl weitergehen müsste, existiert
+      nicht mehr.
+
+      **Capgo ist ausgeschlossen** (`No new version available`, `Kein Buendel
+      fuer diese Schale`); der Prozess überlebt durchgehend. Belegt ist damit
+      der Reload, **nicht** seine Ursache — die naheliegende Erklärung ist, dass
+      Android die Activity zerstört, während der Picker im Vordergrund liegt.
+      Das ist noch zu graben.
+
+      **Die Tragweite reicht über den Avatar hinaus:** derselbe Mechanismus
+      trifft jeden Ablauf, der die App verlässt und zurückkommt — Kamera,
+      Dateiauswahl, ein externer Login.
+- [x] Die Sitzung überlebt einen Neustart der App auf beiden Plattformen.
+      **Android 03.09.:** harter `am force-stop` (Prozess nachweislich weg),
+      danach Neustart — weiterhin angemeldet. Der Storage-Umbau greift sichtbar:
+      `Preferences set` mit `sb-…-auth-token` beim Anmelden, `Preferences get`
+      beim Start. Nicht `localStorage`.
 - [ ] Eine bestehende Web-Sitzung ist nach dem Storage-Umbau weiterhin angemeldet.
-- [ ] Kein Inhalt unter Notch oder Home-Indikator.
-- [ ] Android-Zurück navigiert, statt die App zu schließen.
+- [x] Kein Inhalt unter Notch oder Home-Indikator. **Android 03.09.:** System
+      meldet einen Cutout von 172 px oben (Punch-Hole bei x=494–586); der
+      App-Header liegt darunter, die Fußzeile über dem Gestenbalken.
+
+      Notiz, kein Mangel: in Screenshots sind die **Systemleisten-Icons** auf
+      dem hellen Hintergrund kaum zu erkennen. Am Gerät sind sie laut Donald
+      lesbar — der Screenshot übertreibt den Kontrastverlust.
+- [x] Android-Zurück navigiert, statt die App zu schließen. **03.09., beide
+      Fälle:** auf einer Unterseite zurück zur Startseite, App läuft weiter; auf
+      der Wurzelseite zum Launcher, **Prozess lebt weiter** statt abgewürgt zu
+      werden.
 - [ ] Realtime im Chat funktioniert im Vordergrund.
+
+      Offen und **nicht allein messbar**: dafür muss jemand schreiben, während
+      die App offen ist. Ein Log-Beleg genügt nicht — Supabase Realtime läuft in
+      der WebView und schreibt nicht ins logcat.
+
+### ⛔ Android: die Push-Erlaubnis tötet die App (03.09.)
+
+**Wer „Erlauben" tippt, kann die App danach nicht mehr starten.** Reproduziert,
+Ursache belegt, mit Positivkontrolle: Berechtigung entzogen → App startet;
+Berechtigung erteilt → Prozess stirbt beim Start.
+
+```
+FATAL EXCEPTION: CapacitorPlugins
+java.lang.IllegalStateException: Default FirebaseApp is not initialized in this process
+  at com.google.firebase.messaging.FirebaseMessaging.getInstance
+  at PushNotificationsPlugin.register(PushNotificationsPlugin.java:103)
+```
+
+`android/app/google-services.json` fehlt (steht in `.gitignore`, das Repo ist
+öffentlich), also initialisiert Firebase nicht — und `register()` wirft. Der
+Dialog erscheint beim Öffnen der Nachrichten (`pushEinrichten`); danach genügt
+`AppShell.tsx:662` (`pushLebenszeichen` beim Start), um den Absturz bei **jedem
+weiteren Start** auszulösen, ohne dass noch jemand etwas antippt.
+
+**Das `try/catch` in `src/lib/push.ts:82` kann das prinzipiell nicht fangen.**
+Die Exception fliegt auf Capacitors nativem Plugin-Thread (`HandlerThread.run`),
+nicht im JS-Kontext — sie tötet den Prozess, bevor ein JS-Handler sie sieht. Die
+Absicherung sieht aus, als griffe sie, und greift nicht.
+
+Zu entscheiden (Donald): `google-services.json` bereitstellen löst es für den
+Regelbetrieb, aber nicht für Bauten ohne die Datei. Robuster wäre, `register()`
+nur zu rufen, wenn Firebase wirklich initialisiert ist — dann wird aus „Push
+geht nicht" wieder „Push geht nicht" statt „App geht nicht".
 - [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
       **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
       `2c6e86a`) statt an einem Bau auf der eigenen Maschine — ein Bau ohne
