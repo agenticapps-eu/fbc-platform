@@ -114,6 +114,82 @@ describe("Off-Canvas-Navigation — Overlay-Hygiene", () => {
     expect(document.body.style.position).toBe("");
   });
 
+  it("gibt der Schublade ihr `aria-modal` ab, solange Feedback darüber steht (AGE-688)", () => {
+    // Der Feedback-Zugang ist unterhalb von `lg` NUR hier zu haben. Trägt die
+    // Schublade ihr `aria-modal` weiter, tragen zwei Knoten es gleichzeitig —
+    // und das Formular hängt per Portal an `body`, also AUSSERHALB der
+    // Schublade. Vorlesesoftware, die `aria-modal` befolgt, hielte damit genau
+    // die Fläche für inert, die geöffnet wurde.
+    //
+    // Die Schublade bleibt dabei OFFEN, und das ist keine Bequemlichkeit: der
+    // Auslöser steht in ihr. Sie zu schliessen hängt ihn ab und nimmt den
+    // Zustand mit, an dem das Portal hängt — gemessen, das Formular ging dann
+    // gar nicht erst auf.
+    medienAbfrage(false);
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /menü öffnen/i }));
+
+    const schublade = screen.getByRole("dialog", { name: /navigation/i });
+    fireEvent.click(within(schublade).getByRole("button", { name: /^feedback$/i }));
+
+    const formular = screen.getByRole("dialog", { name: /feedback geben/i });
+    expect(schublade.isConnected).toBe(true);
+
+    // Über `document`, nicht über den `screen`-Container: das Formular ist
+    // portalisiert. Und die Identität über die Rolle samt Namen —
+    // `getByLabelText` ist nicht der zugängliche Name.
+    const modale = Array.from(document.querySelectorAll('[aria-modal="true"]'));
+    expect(modale).toHaveLength(1);
+    expect(modale[0]).toBe(formular);
+  });
+
+  it("gibt der Schublade ihr `aria-modal` zurück, wenn Feedback zugeht (AGE-688)", () => {
+    // Die Gegenrichtung, und sie ist die teurere: bleibt die Meldung beim
+    // Schliessen aus, stünde die Schublade danach dauerhaft ohne `aria-modal`
+    // da — ein Defekt, den niemand sieht, weil sichtbar alles stimmt.
+    medienAbfrage(false);
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /menü öffnen/i }));
+
+    const schublade = screen.getByRole("dialog", { name: /navigation/i });
+    fireEvent.click(within(schublade).getByRole("button", { name: /^feedback$/i }));
+
+    // Über „Abbrechen" IM Formular, nicht über Escape: `AppShell.tsx:508`
+    // schliesst auf Escape die Schublade selbst — ungeachtet dessen, was über
+    // ihr liegt. Das ist Bestand und nicht Gegenstand dieses Changes, würde
+    // hier aber die Schublade abhängen und die Zusage am losgelösten Knoten
+    // messen lassen.
+    const formular = screen.getByRole("dialog", { name: /feedback geben/i });
+    fireEvent.click(within(formular).getByRole("button", { name: /abbrechen/i }));
+
+    expect(screen.queryByRole("dialog", { name: /feedback geben/i })).toBeNull();
+    expect(schublade).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("meldet auch das Abhängen, sonst bleibt die Schublade dauerhaft ohne `aria-modal` (AGE-688)", () => {
+    // Der Fall, den keine der beiden Zusagen darüber trifft: die Schublade
+    // schliesst am Breakpoint, während das Formular offen steht. Der Auslöser
+    // hängt IN ihr und geht mit weg. Bliebe der gemeldete Zustand danach auf
+    // „offen", käme die nächste geöffnete Schublade ohne `aria-modal` hoch —
+    // und sichtbar wäre daran nichts.
+    const mq = medienAbfrage(false);
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /menü öffnen/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /navigation/i })).getByRole("button", {
+        name: /^feedback$/i,
+      }),
+    );
+
+    mq.aufBreitSchalten();
+    fireEvent.click(screen.getByRole("button", { name: /menü öffnen/i }));
+
+    expect(screen.getByRole("dialog", { name: /navigation/i })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
+  });
+
   it("lässt einen Klick in der Schublade weiterhin durch", () => {
     // Gegenprobe: die Falle darf die Bedienung nicht ersetzen.
     medienAbfrage(false);

@@ -45,42 +45,55 @@ Der Defekt ist **allein die `aria-modal`-Semantik**.
 
 ## What Changes
 
-- **Der Feedback-Zugang in der Schublade schliesst die Schublade**, so wie es
-  jeder andere Eintrag darin längst tut. Aus zwei gleichzeitig modalen Flächen
-  wird eine.
-- Der Feedback-Zugang in der ausgeklappten Seitenleiste ab `lg`
+- **Die Schublade gibt ihr `aria-modal` ab, solange das Feedback-Formular
+  darüber steht**, und bekommt es beim Schliessen zurück. Aus zwei gleichzeitig
+  modalen Flächen wird eine, ohne dass eine davon verschwindet.
+- **Sie erfährt es von ihrem eigenen Kind.** `FeedbackButton` meldet der
+  aufrufenden Fläche, ob sein Formular offen ist — über jeden Weg, auf dem es
+  zugeht, und beim Abhängen.
+- Der Feedback-Zugang in der angedockten Seitenleiste ab `lg`
   (`AppShell.tsx:866`) bleibt unverändert: dort gibt es keine Schublade, die
-  sich schliessen könnte.
+  etwas abgeben könnte.
 
-Preis, ehrlich benannt: nach dem Abschicken steht die Navigation nicht mehr
-offen. Sie kostet einen Tipp auf das Burger-Menü. Das ist derselbe Preis, den
-jeder Navigationseintrag in der Schublade heute schon kostet — und die
-Alternative wäre, dass die Fläche für Vorlesesoftware unerreichbar bleibt.
+Die Schublade bleibt dabei **offen**. Der Nutzer kehrt nach dem Abschicken in
+denselben Zustand zurück, aus dem er kam.
 
-## Warum nicht der andere Weg
+## Warum nicht der naheliegende Weg
 
-Das Issue nennt als zweite Richtung, der Schublade ihr `aria-modal` abzunehmen,
-solange ein Overlay über ihr liegt — `useOverlay` kenne die Stapeltiefe ja
-bereits (`istOverlayOffen`, AGE-642 C2).
+Der erste Entwurf dieses Changes schloss die Schublade beim Öffnen des
+Formulars — der Weg, den auch das Issue zuerst nennt. Er ist **gemessen
+unbrauchbar**, und die Messung gehört hierher, damit ihn niemand ein zweites
+Mal vorschlägt:
 
-Gemessen ist das teurer, als es aussieht: `useOverlay.ts:32` ist ein
-**Modulwert ohne Abonnement**. `istOverlayOffen()` liest ihn, benachrichtigt
-aber niemanden — ein `push` auf den Stapel löst in `AppShell` kein Render aus.
-Der Weg verlangte also zuerst eine Benachrichtigung an Abonnenten im geteilten
-Hook, an dem heute vier Overlays hängen, und das für eine Korrektur, die nichts
-als ein Attribut betrifft. Der gewählte Weg löst es an der Wurzel: gibt es nur
-ein Modal, gibt es auch nur ein `aria-modal`.
+`<FeedbackButton />` wird **innerhalb** der Schublade gerendert
+(`AppShell.tsx:1176`). Sie zu schliessen hängt die Komponente ab und nimmt den
+`open`-Zustand mit, an dem das Portal hängt. Am 03.09. mit genau dieser
+Implementierung gemessen: die Schublade ging zu, das Formular **gar nicht erst
+auf** — `0` Knoten mit `aria-modal="true"` statt `1`. Der Zugang, um den es
+geht, wäre damit auf dem Telefon nicht mehr bloss für Vorlesesoftware
+unerreichbar, sondern für alle.
+
+Ihn zu retten hiesse, Auslöser und Formular zu trennen und den Zustand in die
+Schale zu heben — ein Umbau an der Komponente, die AGE-628 gerade erst
+ausgeliefert hat, für eine Korrektur an einem Attribut.
+
+Die zweite Richtung aus dem Issue nennt `istOverlayOffen()` als Quelle. Auch das
+nicht: `useOverlay.ts:32` ist ein **Modulwert ohne Abonnement**, ein `push`
+darauf löst in `AppShell` kein Render aus. Die Schale braucht ihn aber gar
+nicht — das obere Overlay ist ihr **eigenes Kind** und kann es ihr direkt sagen.
 
 ## Was NICHT dazugehört
 
-- **Kein `<Dialog>`-Primitiv, kein Umbau von `useOverlay`.** Der Hook bleibt
-  unberührt; diese Änderung fasst ihn nicht an.
+- **Kein Umbau von `useOverlay`.** Der Hook bleibt unberührt; Sperre und
+  Fokus-Falle stimmen bereits (die Falle hängt an der Spitze des Stapels,
+  `useOverlay.ts:165`).
+- **Keine Trennung von Auslöser und Formular.** Siehe oben: das wäre der Umbau,
+  den dieser Change vermeidet.
 - **Keine allgemeine Zusage „höchstens ein `aria-modal` im Dokument".** Sieben
   weitere Flächen tragen das Attribut (Lightbox, Avatar-Zuschnitt,
   Kopfzeilensuche, Bildquellen-Rückfrage, Neuigkeiten, Mitgliederverwaltung,
   Nachrichten-Schublade). Ob eine von ihnen sich mit einer anderen stapeln kann,
   ist ungemessen — eine Zusage darüber wäre eine, die dieser Change nicht deckt.
-  Belegt und zugesagt wird der Weg aus der Schublade heraus.
 - **Die Nachrichten-Schublade rechts** (`AppShell.tsx:1185-1191`) trägt keinen
   Feedback-Zugang und ist von diesem Befund nicht betroffen.
 
@@ -90,10 +103,15 @@ ein Modal, gibt es auch nur ein `aria-modal`.
 Rechte, keine Sicherheitsgrenze — Donalds stehende Regel vom 26.08. `REVIEWS.md`
 entsteht deshalb nicht.
 
-## Die eine Falle beim Bauen
+## Die zwei Fallen beim Bauen
 
-`getByLabelText` ist **nicht** der zugängliche Name. Die Abnahme prüft über
-`getByRole("dialog", { name: … })`, sonst geht die Zusage an einer Fläche vorbei,
-die zufällig ein passendes Label trägt. Und die Zählung `aria-modal="true"` muss
-über `document.querySelectorAll` laufen, nicht über `screen` — das Formular hängt
-per Portal an `body` und damit ausserhalb des Render-Containers.
+1. **Die Meldung muss JEDEN Weg erfassen, auf dem das Formular zugeht** —
+   Abbrechen, Absenden, Escape, Klick auf den Schleier, und das Abhängen der
+   Komponente beim Sprung über `lg`. `setOpen(false)` steht in
+   `FeedbackButton.tsx` an mehreren Stellen; eine davon zu übersehen liesse die
+   Schublade dauerhaft ohne `aria-modal` zurück. Ein Effekt auf `open` samt
+   Aufräumen deckt alle auf einmal.
+2. **`getByLabelText` ist nicht der zugängliche Name.** Die Abnahme prüft über
+   `getByRole("dialog", { name: … })`. Und die Zählung `aria-modal="true"` läuft
+   über `document.querySelectorAll`, nicht über `screen` — das Formular hängt
+   per Portal an `body` und damit ausserhalb des Render-Containers.
