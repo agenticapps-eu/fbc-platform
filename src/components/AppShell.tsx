@@ -459,6 +459,11 @@ export default function AppShell() {
   // Off-Canvas-Sidebar (< lg). Schließt über Backdrop, `onNavigate` an jedem Link
   // und Escape. (setState im Event-Callback, nicht im Effect-Body.)
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Ob das Feedback-Formular AUS DER SCHUBLADE HERAUS offen steht (AGE-688).
+  // Solange es das tut, gibt die Schublade ihr `aria-modal` ab — sonst trügen
+  // zwei Knoten es gleichzeitig, und das Formular liegt portalisiert
+  // ausserhalb der Schublade.
+  const [feedbackInSchublade, setFeedbackInSchublade] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   useEffect(() => {
     try {
@@ -1149,7 +1154,7 @@ export default function AppShell() {
           ref={mobileNav}
           className="fixed inset-0 z-50 lg:hidden"
           role="dialog"
-          aria-modal="true"
+          aria-modal={!feedbackInSchublade}
           aria-label="Navigation"
         >
           <div
@@ -1173,7 +1178,7 @@ export default function AppShell() {
             {/* Auch in der Schublade: die Leiste ist auf dem Telefon der einzige
                 Ort, an dem der Zugang jetzt noch steht. */}
             <div className="mt-6 border-t border-chrome-border pt-2">
-              <FeedbackButton />
+              <FeedbackButton onOffenChange={setFeedbackInSchublade} />
             </div>
           </div>
         </div>
