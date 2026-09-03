@@ -36,10 +36,10 @@ erkennt sie ohne Nachschlagen:
 
 | Probe | Fassung | Was sie ist | Stand 02.09. |
 |---|---|---|---|
-| 1 | `0.0.0+feedbeef` | heil, mit sichtbarer Marke | ✅ gelaufen (geplant war `600df00d`) |
-| 2a | `0.0.0+600dfeed` | heil, mit Marke — der Rückfallpunkt | offen, Kennung frei |
-| 2b | `0.0.0+defec7ed` | **absichtlich defekt** | offen, Kennung frei |
-| 3 | `0.0.0+c1ea4ed2` | das Aufräumen danach | offen; `c1ea4ed0`/`c1ea4ed1` sind **belegt** |
+| 1 | `0.0.0+feedbeef` | heil, mit sichtbarer Marke | ✅ 02.09. (geplant war `600df00d`) |
+| 2a | `0.0.0+600dfee1` | heil, mit Marke — der Rückfallpunkt | ✅ 03.09.; `600dfeed` davor **verbrannt** |
+| 2b | `0.0.0+defec7ed` | **absichtlich defekt** | ✅ 03.09., Rückfall ausgelöst |
+| 3 | `0.0.0+c1ea4ed2` | das Aufräumen danach | ✅ 03.09.; `c1ea4ed0`/`c1ea4ed1` waren belegt |
 
 Die Spalte rechts ist der Grund, warum diese Tabelle überhaupt einen Stand
 trägt: von den ursprünglich geplanten drei Kennungen sind zwei verbraucht, und
@@ -57,6 +57,28 @@ eine verbrauchte Kennung wiederzuverwenden ist genau die Falle darunter.
 > **bereits eingetragenen** Fassung behält deren altes `created_at` und ist
 > damit **nicht** das neueste Bündel. Er räumt dann nichts auf. Deshalb trägt
 > auch Probe 3 eine eigene Kennung.
+
+> ### ⛔ Dritte Falle, gemessen 03.09.: zu schnelles Wischen verbrennt die Kennung
+>
+> Die Übernahme braucht **zwei getrennte Runden** — eine, die lädt
+> (`download_complete` → `set_next`), und eine, die übernimmt. Nach dem Öffnen
+> in Runde 2 läuft die Frist für `notifyAppReady`: **10 s**, und **jeder
+> weitere Hintergrundwechsel setzt sie zurück.**
+>
+> `0.0.0+600dfeed` ist genau daran gescheitert: drei Wechsel im
+> Vier-Sekunden-Takt, dreimal `webview_unclean_restart` mit `page_loaded` aber
+> ohne `app_launch_ready`, dann `app_launch_timeout` → `update_fail`. Das
+> Bündel war **heil** — dasselbe `dist/` rendert im Browser vollständig samt
+> Marke, und der Download war `download_complete`, nicht `download_fail`.
+>
+> Danach führt das Gerät die Kennung **dauerhaft als ERROR**
+> (`Latest bundle already exists and is in error state. Aborting update.`).
+> Sie ist verbrannt: ein zweiter Versuch darunter wäre zusätzlich der Upsert
+> von oben. Es kostete eine Ersatzkennung (`600dfee1`).
+>
+> **Also nach dem Öffnen in Runde 2 zwanzig Sekunden die Finger still.** Wer
+> prüfen will, ob überhaupt etwas ankommt, liest in der Konsole mit — nicht
+> durch weitere Gesten.
 
 > ### ⛔ Zweite Falle, gemessen 02.09.: das Manifest bewegt sich von allein
 >
@@ -112,10 +134,14 @@ PY
 GITHUB_SHA=600df00d infisical run --env=prod -- pnpm tsx scripts/ota-buendel.ts
 ```
 
-Dann am Gerät: App **vollständig** schliessen (aus dem App-Switcher wischen),
-neu öffnen. Das Plugin fragt beim Start; geladen wird im Hintergrund, in
-Betrieb geht das Bündel beim **nächsten** Start. Also einmal mehr schliessen
-und öffnen als man erwartet.
+Dann am Gerät, und **nicht** aus dem App-Switcher wischen — das killt den
+Prozess (Kasten unten). Die Geste ist Home nach oben, warten, wieder öffnen,
+und sie braucht **zwei Runden**:
+
+1. **Laden.** Home wischen, ~10 s warten, öffnen. Es läuft noch die alte
+   Fassung — das ist richtig, nicht der Fehler.
+2. **Übernehmen.** Home wischen, ~5 s warten, öffnen. Jetzt startet das neue
+   Bündel, und **ab hier 20 s nichts anfassen** (dritte Falle in §1).
 
 > ### ⚠ `devicectl --terminate-existing` löst die Übernahme NICHT aus
 >
@@ -209,13 +235,14 @@ Hälfte braucht keine Messung, sie steht im Code: `ota.ts` bindet beide Zweige a
 
 Am Gerät, in dieser Reihenfolge:
 
-1. Schliessen, öffnen → das defekte Bündel wird geladen.
-2. Schliessen, öffnen → **weisser Bildschirm.** Jetzt läuft die Frist:
+1. Home wischen, ~10 s warten, öffnen → das defekte Bündel wird geladen
+   (`download_complete` → `set_next`); es läuft noch die Marke.
+2. Home wischen, ~5 s warten, öffnen → **weisser Bildschirm.** Jetzt läuft die Frist:
    `appReadyTimeout` 10 s, auf Android für ein noch unbestätigtes Bündel
    mindestens 30 s. **Die App in dieser Zeit offen lassen** — wer sofort
    wegwischt, unterbricht die Messung.
-3. Schliessen, öffnen → **die Marke `600dfeed` ist zurück.** ✅ Kästchen 2.
-4. **Und noch einmal schliessen und öffnen.** Das ist die Zugabe, und sie ist
+3. Home wischen, öffnen → **die Marke ist zurück.** ✅ Kästchen 2.
+4. **Und noch einmal wischen und öffnen.** Das ist die Zugabe, und sie ist
    der Grund für `autoDeleteFailed: false`: `ota_buendel_neuestes` bietet
    `defec7ed` weiterhin an — es wurde später eingetragen als `600dfeed`, und
    nach dem Rückfall läuft wieder `600dfeed`. Das Gerät **muss** es trotzdem
@@ -266,6 +293,12 @@ Fünf Fallen, alle am 02.09. eingetreten und keine davon laut:
 * **Der Supabase-MCP (`query_logs`) ist vom Klassifikator gesperrt.** Der Weg
   ist die Management-API mit `SUPABASE_ACCESS_TOKEN` aus Infisical **dev** —
   der CLI-Login liegt im Keychain und taugt dafür nicht.
+
+> ⚠ **Das Gerät schreibt `set`, nicht `revert`.** Gemessen 03.09.: der echte
+> Rückfall protokolliert `app_launch_timeout, update_fail, set`. Das Paar
+> `update_fail`/`revert` oben stammt aus der Nachstellung und ist **nicht**,
+> wonach man grept. Wer nur `revert` sucht, findet die Nachstellung und hält
+> den echten Beleg für ausgeblieben.
 
 > ⚠ **Eine Zeile im Protokoll stammt nicht vom Gerät.** Die Nachstellung oben
 > hat am 02.09. um **18:54:17 UTC** eine Zeile mit genau `update_fail` und

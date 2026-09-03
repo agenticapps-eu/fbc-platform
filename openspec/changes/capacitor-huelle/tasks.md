@@ -1103,10 +1103,12 @@ Quelltext des Plugins gemessen** worden, nicht geraten.
 
 ### D5. Beleg
 
-**Runbook: `geraetesitzung-d5.md`** (31.08.). Die drei Proben tragen sprechende
-Fassungen — `0.0.0+600df00d` heil, `0.0.0+defec7ed` defekt, `0.0.0+c1ea4ed0`
-das Aufräumen —, die Griffe sind am gebauten `dist/` gemessen und fassen
-**keine Quelldatei** an. Die Falle, die dort ganz oben steht: eine Probe unter
+**Runbook: `geraetesitzung-d5.md`** (31.08.). Die Proben tragen sprechende
+Fassungen; **gelaufen sind am Ende `feedbeef` (Probe 1), `600dfee1` heil,
+`defec7ed` defekt und `c1ea4ed2` das Aufräumen** — die geplanten `600df00d`
+und `c1ea4ed0` wurden unterwegs verbraucht, `600dfeed` verbrannt (siehe unten).
+Die Griffe sind am gebauten `dist/` gemessen und fassen **keine Quelldatei**
+an. Die Falle, die dort ganz oben steht: eine Probe unter
 einer BEREITS eingetragenen Fassung ist ein Upsert und überschreibt das gute
 Bündel.
 
@@ -1234,9 +1236,71 @@ Bündel.
       und die Zusage auf `apnsMitHostErkennung` grept dort noch Quelltext. Das
       herauszulösen wäre ein Umbau der Zustellschleife — verhaltenstragender
       Code, keine Testgerüste. Bewusst nicht mitgenommen.
-- [ ] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
+- [x] Und einmal der Rückweg: ein absichtlich defektes Bündel ausliefern, Gerät
       landet wieder auf der vorigen Fassung. Ein Rückweg, den nie jemand
       ausgelöst hat, ist eine Behauptung.
+
+      **Ausgelöst 03.09., iPhone 17 Pro, iOS 26.6 — und zwar wirklich.** Die
+      Reihenfolge aus dem Runbook ist gelaufen: `0.0.0+600dfee1` heil und mit
+      Marke, am Gerät übernommen und bestätigt (`Updated to bundle` →
+      `Version successfully loaded` → `[notifyAppReady was called]`, Status von
+      `pending` auf `success`); erst danach `0.0.0+defec7ed`.
+
+      Dass das defekte Bündel **wirklich lief**, ist die Stelle, an der der
+      Beleg sonst schief hängt — im Log steht sie namentlich:
+
+      ```
+      Updated to bundle: … "version": "0.0.0+defec7ed"
+      endBackGroundTaskWithNotif Kein Buendel fuer diese Schale current: 0.0.0+defec7ed
+      [error] notifyAppReady was not called, roll back current bundle: … defec7ed
+      Storing info for bundle [TVwx3d82Pa] … "status": "error"
+      ```
+
+      Und die Zugabe, zweimal hintereinander gemessen (Gesten 4 und 5):
+      `Latest version is in error state. Aborting update. current: 0.0.0+600dfee1
+      latestVersionName: 0.0.0+defec7ed` — `defec7ed` bleibt im Manifest das
+      neueste und wird trotzdem liegen gelassen. `autoDeleteFailed: false`
+      greift.
+
+      **Zweite Belegseite, `ota-stats`, unabhängig und deckungsgleich** (alle
+      Zeilen nach Probenbeginn 14:34:12 UTC):
+
+      | UTC | Aktionen |
+      |---|---|
+      | 14:34:56 | `download_complete, set_next` |
+      | 14:35:12 | `set`, **`webview_javascript_error`**, `page_loaded` |
+      | 14:35:32 | **`app_launch_timeout, update_fail, set`** |
+      | 14:36:08 | `download_fail` |
+      | 14:36:14 | `download_fail` |
+
+      `webview_javascript_error` ist der Griff selbst: `#root` fehlt,
+      `main.tsx` wirft an `document.getElementById("root")!`. Die Seite lädt
+      (`page_loaded`), nur bestätigt sie nie.
+
+      **Abweichung vom Runbook §3b:** dort steht `update_fail`/**`revert`** als
+      erwartetes Paar. Das echte Gerät schreibt `update_fail`/**`set`**.
+      Inhaltlich dasselbe; wer nach `revert` grept, findet nur die
+      Nachstellung vom 02.09. §3b ist entsprechend berichtigt.
+
+      **Die Falle, die diesen Lauf einen Anlauf gekostet hat — und die im
+      Runbook fehlte.** Der erste Rückfallpunkt `0.0.0+600dfeed` ist
+      gescheitert und musste durch `600dfee1` ersetzt werden. Nicht am Bündel:
+      dasselbe `dist/` rendert im Browser vollständig samt Marke, ohne
+      Konsolenfehler, und der Download aufs Gerät war heil
+      (`download_complete`, nicht `download_fail`). Gescheitert ist es an
+      **drei Hintergrundwechseln im Vier-Sekunden-Takt** innerhalb der
+      Zehn-Sekunden-Frist: dreimal `webview_unclean_restart`, jedes Mal
+      `page_loaded` ohne `app_launch_ready`, dann `app_launch_timeout` →
+      `update_fail`. Danach führt das Gerät die Kennung dauerhaft als ERROR,
+      und sie ist verbrannt — ein zweiter Versuch darunter wäre zusätzlich der
+      Upsert aus §1.
+
+      Der Grund, warum das passiert: die Übernahme braucht **zwei getrennte
+      Runden** — eine, die lädt (`download_complete` → `set_next`), und eine,
+      die übernimmt. Das Runbook sagte „einmal mehr schliessen und öffnen als
+      man erwartet", aber nicht, dass jeder weitere Wechsel die Frist des
+      frisch gestarteten Bündels **zurücksetzt**. Nach dem Öffnen in Runde 2
+      gehört die App 20 Sekunden in Ruhe gelassen. §2 und §3 sagen das jetzt.
 
       **Vorbereitet 02.09. abends — in der Fassung von heute Mittag hätte die
       Probe nichts belegt.** Drei Befunde, alle am Manifest bzw. am lebenden
@@ -1299,9 +1363,11 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       Die einzige Zeile dieser Phase, die kein Gerät braucht: dieselbe Datei
       lädt die Schale.
 - [x] OTA einmal durchgespielt. Siehe D5 — `0.0.0+feedbeef` am 02.09. auf dem
-      iPhone 17 Pro. Aufgeräumt ist es auch: `0.0.0+c1ea4ed1` liegt ohne Marke
-      obenauf, ein Gerät auf `feedbeef` bekommt es angeboten (am Endpunkt
-      gegengeprüft).
+      iPhone 17 Pro, und der Rückweg am 03.09. Aufgeräumt ist es auch:
+      **`0.0.0+c1ea4ed2` liegt ohne Marke obenauf** (Probe 3, 03.09. 14:38 UTC
+      — am Endpunkt gegengeprüft, und am Gerät ist der rote Balken nach zwei
+      Gesten weg). Damit ist zugleich belegt, dass das Gerät nach dem Rückfall
+      wieder normal aktualisiert und nur `defec7ed` liegen lässt.
 
 ## Vor dem Abschluss
 
