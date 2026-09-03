@@ -154,16 +154,37 @@ describe("Off-Canvas-Navigation — Overlay-Hygiene", () => {
     const schublade = screen.getByRole("dialog", { name: /navigation/i });
     fireEvent.click(within(schublade).getByRole("button", { name: /^feedback$/i }));
 
-    // Über „Abbrechen" IM Formular, nicht über Escape: `AppShell.tsx:508`
-    // schliesst auf Escape die Schublade selbst — ungeachtet dessen, was über
-    // ihr liegt. Das ist Bestand und nicht Gegenstand dieses Changes, würde
-    // hier aber die Schublade abhängen und die Zusage am losgelösten Knoten
-    // messen lassen.
+    // Über „Abbrechen" IM Formular. Escape täte es seit AGE-697 auch — dafür
+    // steht die eigene Zusage darunter; hier bleibt der Zeigerweg, damit beide
+    // Wege je eine Zusage tragen.
     const formular = screen.getByRole("dialog", { name: /feedback geben/i });
     fireEvent.click(within(formular).getByRole("button", { name: /abbrechen/i }));
 
     expect(screen.queryByRole("dialog", { name: /feedback geben/i })).toBeNull();
     expect(schublade).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("Escape trifft das Formular, das zweite die Schublade (AGE-697)", () => {
+    // Bis AGE-697 schloss `AppShell.tsx:508` auf Escape die Schublade — ohne zu
+    // prüfen, ob etwas über ihr liegt. Das Formular verschwand dabei mit, weil
+    // sein Auslöser IN der Schublade steht. Ein Tastendruck nahm also beides.
+    medienAbfrage(false);
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: /menü öffnen/i }));
+
+    const schublade = screen.getByRole("dialog", { name: /navigation/i });
+    fireEvent.click(within(schublade).getByRole("button", { name: /^feedback$/i }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: /feedback geben/i })).toBeNull();
+    expect(screen.getByRole("dialog", { name: /navigation/i })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: /navigation/i })).toBeNull();
   });
 
   it("meldet auch das Abhängen, sonst bleibt die Schublade dauerhaft ohne `aria-modal` (AGE-688)", () => {

@@ -132,6 +132,31 @@ export function FeedbackButton({
     return () => onOffenChange(false);
   }, [panelOffen, onOffenChange]);
 
+  // Escape schliesst — dokumentweit und in der CAPTURE-Phase, nach dem Vorbild
+  // von `EmojiAuswahl.tsx` (AGE-697).
+  //
+  // CAPTURE und `stopPropagation`, weil `AppShell` die Navigationsschublade
+  // ihrerseits bei Escape über einen `document`-Lauscher schliesst
+  // (`AppShell.tsx:508`). In der Blasenphase nähme ein Tastendruck beides auf
+  // einmal — und zwar schlimmer als beim Emoji-Wähler: der Auslöser dieses
+  // Formulars steht IN der Schublade, sie zu schliessen hängt ihn ab und nimmt
+  // das Formular mit. So schliesst das erste Escape das Formular, das zweite
+  // die Schublade.
+  //
+  // `close()` und nicht `setOpen(false)`: Escape ist ein Abbruch, und ein
+  // angehängtes Bild muss dabei mit weg — sonst hinge es beim nächsten Öffnen
+  // wortlos wieder dran.
+  useEffect(() => {
+    if (!panelOffen) return;
+    function aufTaste(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      close();
+    }
+    document.addEventListener("keydown", aufTaste, true);
+    return () => document.removeEventListener("keydown", aufTaste, true);
+  }, [panelOffen]);
+
   // Ohne Konto ist Feedback nicht speicherbar: feedback.profile_id ist `not null`
   // und feedback_own verlangt profile_id = auth.uid(). Einen Button zu zeigen, der
   // nur scheitern kann, wäre ein Versprechen ins Leere.

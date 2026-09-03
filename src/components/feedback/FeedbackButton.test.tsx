@@ -78,6 +78,19 @@ describe("FeedbackButton", () => {
     expect(screen.queryByRole("button", { name: /feedback/i })).toBeNull();
   });
 
+  it("schliesst mit Escape, auch ohne Schublade darunter (AGE-697)", () => {
+    // Bis AGE-697 hatte das Formular ÜBERHAUPT keinen Escape. Unterhalb von
+    // `lg` schloss der Tastendruck die Navigationsschublade darunter und riss
+    // das Formular mit ab; hier, ohne Schublade, bewirkte er schlicht nichts.
+    renderAt("/");
+    fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
+    expect(screen.getByRole("dialog", { name: /feedback geben/i })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: /feedback geben/i })).toBeNull();
+  });
+
   it("sperrt das Absenden, solange keine Sterne gewählt sind", () => {
     renderAt("/");
     fireEvent.click(screen.getByRole("button", { name: /feedback/i }));
