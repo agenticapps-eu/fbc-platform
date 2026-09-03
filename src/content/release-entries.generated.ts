@@ -5,6 +5,17 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-02-rechte-matrix-stufen",
+    datum: "2026-09-02",
+    titel: "Das Mitgliederverzeichnis ist ab Connect sichtbar",
+    linear: "AGE-598",
+    aenderungen: [
+      "**Das Mitgliederverzeichnis ist ab der Stufe Connect sichtbar.** Wer Connect hat, sieht die Liste aller Mitglieder, kann sie durchsuchen und nach Branche und Region filtern. Bisher begann das Verzeichnis erst bei Discover.",
+      "**Die ausführlichen Profilangaben bleiben ab Discover.** Kompetenzen, Interessen, Kompass-Themen und das Such-/Bieteprofil sind weiterhin erst ab Discover zu sehen — auf den Karten im Verzeichnis bleiben sie darunter leer. Auch die Suche findet darunter nichts, was in diesen Feldern steht.",
+      "**Die Filter für Kompetenz, Thema und Angebote erscheinen erst ab Discover.** Darunter standen sie zwar da, konnten aber nichts finden. Jetzt stehen sie nicht mehr da, und an ihrer Stelle steht, ab welcher Stufe es sie gibt.",
+    ],
+  },
+  {
     slug: "2026-09-02-feedback-ausbauen",
     datum: "2026-09-02",
     titel: "Feedback ausbauen (AGE-628)",
