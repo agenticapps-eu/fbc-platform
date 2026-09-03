@@ -1,130 +1,112 @@
-# Session Handoff — 2026-09-02 (AGE-598: Teil A und B gebaut, Ausrollen offen)
+# Session Handoff — 2026-09-02 (AGE-598: fertig, ausgerollt, archiviert)
 
 > ## ⚠ ZUERST — drei Dinge
 >
 > **1. Diese Datei ist geteilt und trägt jeweils EINEN Vorgang.** Sie steht auf
-> AGE-598. Die AGE-642-Fassung ist nicht verloren
-> (`git show origin/main:session-handoff.md`). **Nicht zusammenführen.**
+> AGE-598. Die AGE-642-Fassung ist nicht verloren — sie liegt in der Historie
+> (`git log --oneline -- session-handoff.md`). **Nicht zusammenführen.**
 >
 > **2. AGE-642 läuft PARALLEL** (Worktree `fbc-platform.donald-age-642-capacitor-huelle`).
 > **Nicht anfassen.** Der lokale Supabase-Stack ist geteilt.
 >
-> **3. Gruppen 1–8 sind fertig, 9 und 10 nicht angefangen.** Ab Gruppe 9 geht es
-> ans Ausrollen, und 9.3 (`migrate-prod`) braucht Donalds ausdrückliche Freigabe.
+> **3. AGE-598 ist ABGESCHLOSSEN.** Gebaut, gemerged, auf PROD ausgerollt,
+> archiviert, Linear auf Done. Es ist nichts mehr zu tun — ausser den
+> Entscheidungen unten, und die gehören Donald.
 
 ## Accomplished
 
-Sechs Aufgabengruppen (4, 5, 6, 7, 8) in acht Commits. Teil A stand schon.
+Zwei PRs, beide gemerged. Gruppen 4 bis 10 der Aufgabenliste.
 
-| Commit | Was |
+| PR | Was |
 |---|---|
-| `678b0f3` | **RED** Gruppe 4 — ausgeblendete Filter |
-| `e4eb844` | **GREEN** Gruppe 4 — Filter auf maskierten Spalten weg, Hinweis dafür |
-| `d84bb71` | **RED** Gruppe 5 — neue pgTAP-Datei + Eintrag in `ci.yml` |
-| `a9109a0` | **GREEN** Gruppe 5 — Migration `…180000_kontaktanfrage_staffelung.sql` |
-| `1d049d7` | **RED** Gruppe 6 — Welpenschutz |
-| `0949864` | **GREEN** Gruppe 6 — Migration `…190000_welpenschutz_entfernen.sql` |
-| `5b1dfde` | **RED** Gruppe 7 — Staffelung an der Kontaktfläche |
-| `bd338b7` | **GREEN** Gruppe 7 — Begründung an der Stelle des Knopfes |
-| `8bbae86` | **fix** — kein Grund, solange `levelRank` null ist |
+| **#320** | Gruppen 4–8: Filter ausblenden, Staffelung, Welpenschutz raus, Kontaktfläche, Abnahme |
+| **#323** | Gruppe 10: archiviert, Delta-Specs gefaltet, Neuigkeiten-Eintrag |
 
-**Endstand:** `pnpm test` **2473/2473** · `supabase test db` über die **27**
-CI-Dateien **1160/1160** · `lint`, `typecheck`, `build` Exit 0 ·
-`openspec validate --all` 32/0.
+**Auf PROD:** `migrate-prod` (Lauf 33681817122) `plan` + `apply` grün; der vom
+`drift-gate` angehaltene Deploy per `gh run rerun --failed` nachgeholt, danach
+`drift-gate`/`deploy`/`functions` grün.
 
-### Was jetzt gilt
+**Endstand:** `pnpm test` **2473/2473** · `supabase test db` über 27 CI-Dateien
+**1160/1160** · `lint`, `typecheck`, `build` Exit 0 · `openspec validate --all`
+31/0 · Linear AGE-598 **Done**.
 
-- **Verzeichnis** ab `connect`, erweiterte Felder ab `discover` (Teil A).
+### Was jetzt live ist
+
+- **Verzeichnis ab `connect`**, erweiterte Felder ab `discover`.
 - **Filter** für Kompetenz, Thema, Angebotsart und die Chip-Gruppen erscheinen
-  unterhalb Rang 3 **gar nicht**; an ihrer Stelle steht „Ab Discover kommen
-  Filter für Kompetenz, Thema und Angebote dazu." Branche und Region bleiben.
-- **Kontaktanfragen gestaffelt**: `basic` gar nicht · `connect` nur an genau
-  `connect` · ab `discover` an alle. Prädikat
-  `public.darf_kontaktanfrage_senden(uuid)`.
-- **Welpenschutz ersatzlos weg**, `public.is_new_member(uuid)` gedroppt.
+  unterhalb Rang 3 nicht; an ihrer Stelle steht die Stufe. Branche und Region
+  bleiben.
+- **Kontaktanfragen gestaffelt** (`darf_kontaktanfrage_senden`): `basic` nie ·
+  `connect` nur an genau `connect` · ab `discover` an alle. **Wirkungslos,
+  solange `open_contact` auf `true` steht.**
+- **Welpenschutz ersatzlos weg**, `is_new_member(uuid)` gedroppt.
 
 ## Decisions
 
-- **Gruppe 5 und 6 in ZWEI Migrationen, nicht einer.** *Warum:* die Staffelung
-  gilt auch ohne das Streichen, und das Streichen ist eine eigene
-  Produktentscheidung. Eine gemeinsame Migration hätte beide unlesbar gemacht.
-- **Die Frontend-Kopie des Prädikats ist Absicht** (`darfKontaktanfrageSenden`
-  in `lib/contact-requests.ts`). *Warum:* dieselbe Begründung wie bei den Rängen
-  in `config/levels.ts` — die Grenze ist die Policy. Was die Kopie entscheidet,
-  ist nur, ob ein Knopf ein Versprechen bricht.
-- **Die Begründung steht an der Stelle des Knopfes, nicht in einem Toast.** Eine
-  Hürde, die man erst nach dem Klicken erfährt, ist zweimal enttäuschend.
-- **Zwei Sätze statt einem.** `basic` kann niemanden anschreiben, `connect` kann
-  es schon, nur nicht dieses Profil. Eine gemeinsame Meldung beantwortete
-  jeweils die falsche Frage.
-- **Die 42501-Meldung nennt jetzt das Opt-out.** Sie nannte den Welpenschutz —
-  eine abgeschaffte Regel zu erklären schickt den Leser auf einen Weg, den es
-  nicht gibt.
-- **Drei Bestandszusagen umgeschrieben, nicht gedreht:** `rls_test.sql:260`
-  (Erweiterung), die zwei Welpenschutz-Zusagen (gestrichen), „Discover sieht,
-  darf aber nicht anschreiben" und die 42501-Meldung in
-  `PublicProfilePage.test.tsx`. `plan(437)` → `plan(435)`.
-- **Aufgabe 7.3 ist gegenstandslos geworden** — es gibt keine
-  Welpenschutz-Ablehnung mehr. In `tasks.md` ausgeschrieben, nicht abgehakt.
+- **Der Neuigkeiten-Eintrag nennt NUR die Verzeichnisschwelle.** Staffelung und
+  Welpenschutz sind draussen: `open_contact` hebt die Staffelung auf, am Tag des
+  Ausrollens merkt niemand etwas. Der Hinweis gehört an den Tag, an dem der
+  Schalter fällt — dann als eigener Eintrag.
+- **Titel und `## What Changes` vor dem Archivieren in Mitglieder-Sprache
+  umgeschrieben.** Gemessen hätte der Eintrag sonst 12 Punkte getragen, davon
+  **vier Ausschlüsse als das Ausgelieferte** (die AGE-628-Falle: der Parser
+  schneidet bei `/^#{1,2} /`, „Was NICHT Teil…" stand unter `###`).
+- **Szenario-Titel beim Archivieren zurückgenommen, Rümpfe geschärft.** Drei
+  `MODIFIED`-Blöcke hatten Titel von `discover` auf `connect` umbenannt;
+  `openspec archive` kann das nicht von einer Löschung unterscheiden. Rümpfe
+  stehen jetzt auf `basic` — wahr unter alter wie neuer Schwelle.
+- **10.5 NICHT abgehakt.** Der Abnahmepunkt in AGE-610 deckt zwei Vorgänge, und
+  für AGE-598 lautet er dort „`open_contact` abschalten?".
+- **Auf PROD nichts eingefügt.** An `contact_requests` hängt ein
+  `net.http_post`-Trigger; eine Mail an ein echtes Mitglied wäre nicht
+  zurückzurollen. Der Verhaltensbeleg steht lokal, der Strukturbeleg auf PROD.
 
 ## Files modified
 
-- **neu** `supabase/migrations/20260902180000_kontaktanfrage_staffelung.sql`
-- **neu** `supabase/migrations/20260902190000_welpenschutz_entfernen.sql`
-- **neu** `supabase/tests/kontaktanfrage_staffelung_test.sql` (32 Zusagen)
-- **neu** `src/components/community/MemberDirectory.stufen.test.tsx`
-- **neu** `src/pages/PublicProfilePage.staffelung.test.tsx` (6 Zusagen)
-- `.github/workflows/ci.yml` — die neue pgTAP-Datei eingetragen
-- `supabase/tests/rls_test.sql` — 437 → 435
-- `src/components/community/MemberDirectory.tsx` + drei Testdateien
-- `src/lib/contact-requests.ts`, `src/pages/PublicProfilePage.tsx` + Tests
-- `openspec/changes/rechte-matrix-stufen/tasks.md`
+Alles auf `main`. Neu: zwei Migrationen (`20260902180000_kontaktanfrage_staffelung.sql`,
+`20260902190000_welpenschutz_entfernen.sql`), `supabase/tests/kontaktanfrage_staffelung_test.sql`
+(32 Zusagen, in `ci.yml` eingetragen), `MemberDirectory.stufen.test.tsx`,
+`PublicProfilePage.staffelung.test.tsx`. Geändert: `MemberDirectory.tsx`,
+`PublicProfilePage.tsx`, `lib/contact-requests.ts`, `rls_test.sql` (437 → 435),
+`.github/workflows/ci.yml`. Archiv:
+`openspec/changes/archive/2026-09-02-rechte-matrix-stufen/`.
 
 ## Next session: start here
 
-**Gruppe 8 ist vollständig, der Diff-Review steht in `REVIEWS.md`.** `opencode`
-hat **Freigabe** gegeben (drei NIEDRIG: einer reproduziert nicht, zwei sind
-dokumentierte Entscheidungen aus dem Migrationskopf); `gemini` war unbrauchbar,
-beide Belege erfunden — **nicht noch einmal aufrollen.**
+**Für AGE-598 gibt es keinen nächsten Handgriff.** Der Worktree kann weg
+(`wt remove`) — er ist nur noch die Hülle eines archivierten Change.
 
-**Erster Handgriff: Gruppe 9, das Ausrollen.** PR öffnen, CI grün abwarten,
-mergen (9.1), dann `migrate-dev` auf demselben SHA (9.2). **9.3 `migrate-prod`
-ausdrücklich bei Donald erfragen** — Schreibzugriff auf PROD. Und 9.6: **kein
-Flag umlegen**, weder `open_contact` noch sonst etwas.
+Wer hier weitermacht, nimmt einen neuen Vorgang: **High: 610.** **Medium:** 618 ·
+542 · 512 · 605 · 607 · 630 · 669 · 680 · 684 · 688. **Low:** 664 · 660 · 606.
 
-Der Worktree ist sauber, Basis `1872d1e`, letzter Code-Commit `8bbae86`
-(darüber liegt nur noch dieser Doku-Commit), **nichts gepusht**.
+### Was im Worktree liegt und nicht eingecheckt ist
 
-### Rezept für die Sichtprobe, falls sie noch einmal gebraucht wird
+`.gstack/` (gitignoriert) trägt die Messwerkzeuge dieser Sitzung:
+`prod-sonde.mts` / `prod-sonde2.mts` (Katalog auf PROD lesen, rein lesend),
+`prod-flag.mts`, `probe-eintrag.mts` (Vorschau des Neuigkeiten-Eintrags **vor**
+dem Archivieren — das Werkzeug, das die 12-Punkte-Falle gefunden hat), die
+Reviewer-Logs und die Sichtprobe als PNG. Aufrufbar über die `run-*.sh` daneben.
 
-Die Migrationen liegen **nur lokal**. `.env.local` mit
-`VITE_SUPABASE_URL=http://127.0.0.1:54321` + ANON_KEY aus `supabase status`,
-dann `pnpm exec vite --port 5210 --strictPort` (**nicht** `pnpm dev`), Konten per
-GoTrue-Admin (`password` **und** `email_confirm: true`), danach `tier`/
-`activated_at` per SQL. **Die App hängt über `localhost:5210`, nicht über
-`127.0.0.1:5210`** — letzteres antwortet mit 000.
-
-**Alles zurückgebaut:** `.env.local` gelöscht, vite gestoppt, die drei
-QA-Konten per GoTrue-Admin entfernt, `open_contact` wieder auf `true`. Der
-lokale Stack trägt jetzt **0 Profile und 0 Kontaktanfragen** — falls dort etwas
-steht, ist es fremd.
+**Der lokale Stack ist zurückgebaut:** 0 Profile, 0 Kontaktanfragen,
+`open_contact` auf `true`. Steht dort etwas, ist es fremd.
 
 ## Open questions
 
-- **Die Rechte-Erweiterung für Rang 3** ist jetzt **gebaut**, nicht nur geplant:
-  ein `discover`-Konto darf im geschlossenen Modus an jeden senden. Donald hat
-  die *Richtung* nie ausdrücklich bestätigt; sie folgt aus seiner Entscheidung
-  vom 25.08. Vor dem Ausrollen ansprechen.
-- **`branche` ist jetzt für JEDES aktivierte Konto lesbar**, auch für `basic`,
-  das die Verzeichnisfläche gar nicht betritt — `profiles_public` ist
-  RLS-umgehend und ohne Stufenschwelle. Das ist die Entscheidung aus D7 (ohne
-  sie liefe der Branchenfilter für `connect` wortlos leer), aber es ist die
-  einzige Stelle des Changes, an der Daten für eine niedrigere Stufe sichtbar
-  werden. Von opencode im Diff-Review benannt. **Donald vorlegen.**
-- **`open_contact` auf `false`** wartet weiter auf Donald. Gemessen folgenlos.
-- **`EmojiAuswahl.test.tsx` flakt im Gesamtlauf** — einmal rot („rotes Herz"
-  nicht gefunden), allein und im Wiederholungslauf grün. Gehört zu AGE-645.
+Die ersten drei gehören Donald, und alle drei sind mit dem Ausrollen **Tatsache
+geworden**, nicht erst geplant:
+
+- **`open_contact` auf `false`.** Erst dann wirkt die Staffelung überhaupt.
+  Gemessen folgenlos: alle 74 Konten liegen auf Rang 3 oder darüber. Dies ist
+  auch der Punkt, an dem AGE-610 hängt.
+- **Die Rechte-Erweiterung für Rang 3.** Ein `discover`-Konto darf im
+  geschlossenen Modus jetzt an jeden senden; vorher durfte es das nicht. Folgt
+  aus der Entscheidung vom 25.08., die *Richtung* stand dort nicht dabei.
+  Live nachgemessen: `discover` → `impact` ergibt `true`.
+- **`branche` ist für jedes aktivierte Konto lesbar**, auch für `basic`.
+  `profiles_public` umgeht die RLS und trägt keine Stufenschwelle. Ohne das
+  liefe der Branchenfilter für `connect` leer. Von opencode im Diff-Review
+  benannt.
+- **`EmojiAuswahl.test.tsx` flakt im Gesamtlauf** — einmal rot, allein und im
+  Wiederholungslauf grün. Gehört zu AGE-645.
 - **Der Neuigkeiten-Eintrag `2026-09-02-feedback-ausbauen`** ist weiterhin nicht
-  freigegeben.
-- Unverändert offen — **High:** 610. **Medium:** 618 · 542 · 512 · 605 · 607 ·
-  630 · 669 · 680 · 684 · 688. **Low:** 664 · 660 · 606.
+  freigegeben; der neue `2026-09-02-rechte-matrix-stufen` steht daneben.

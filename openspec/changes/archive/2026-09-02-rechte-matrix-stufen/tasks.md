@@ -192,15 +192,23 @@ Erfolg aus.
 
 ## 3b. Das Volltext-Orakel schliessen (Befund opencode HIGH-1)
 
+> **Nachtrag 02.09.:** 3b.1–3b.3 und 3c.1 wurden mit `1923aaa` gebaut, aber nie
+> abgehakt — aufgefallen beim Archivieren. Nachgemessen an
+> `directory_search_test.sql`: Zusagen 11.1 („connect findet ein Profil NICHT
+> über einen Begriff, der nur in seinen competencies steht"), 11.2 („… findet
+> dasselbe Profil über den Firmennamen aber sehr wohl"), 11.3 („discover findet
+> den Kompetenz-Begriff weiterhin") und 12 („connect bekommt branche GEFÜLLT").
+> Alle vier stehen in der CI-Dateiliste und liefen zuletzt grün.
+
 Ohne diese Gruppe macht 3.x aus der Maskierung eine Kulisse: die Spalte wäre
 verborgen und über das Suchfeld erfragbar.
 
-- [ ] 3b.1 **RED**: pgTAP — ein `connect`-Konto sucht einen Begriff, der **nur**
+- [x] 3b.1 **RED**: pgTAP — ein `connect`-Konto sucht einen Begriff, der **nur**
       in `competencies` oder `interests` eines fremden Profils vorkommt, und
       findet die Zeile **nicht**
-- [ ] 3b.2 **RED**: pgTAP — dasselbe Konto findet dieselbe Zeile über
+- [x] 3b.2 **RED**: pgTAP — dasselbe Konto findet dieselbe Zeile über
       Firmenname, Region oder Branche sehr wohl
-- [ ] 3b.3 **RED**: pgTAP — ein `discover`-Konto findet den Kompetenz-Begriff
+- [x] 3b.3 **RED**: pgTAP — ein `discover`-Konto findet den Kompetenz-Begriff
       weiterhin. Positivkontrolle: die Bindung darf die Suche für Berechtigte
       nicht verengen
 - [x] 3b.4 **GREEN**: zweiter tsvector — **`name`, `company`, `branche`,
@@ -232,7 +240,7 @@ verborgen und über das Suchfeld erfragbar.
 
 ## 3c. `branche` wird Basisfeld (Befund opencode HIGH-2)
 
-- [ ] 3c.1 **RED**: pgTAP — ein `connect`-Konto bekommt `branche` **gefüllt**
+- [x] 3c.1 **RED**: pgTAP — ein `connect`-Konto bekommt `branche` **gefüllt**
       aus `search_directory`, und `p_branche` filtert für es korrekt
 - [x] 3c.2 **GREEN**: `branche` in `profiles_public` aufgenommen — **als letzte
       Spalte, hinter `cover_url`**, Grants erneut ausgesprochen. Dazu
@@ -405,27 +413,69 @@ Entschieden von Donald am 02.09.: ersatzlos. Grundlage ist die Messung in 6b.
 
 ## 9. Ausrollen — getrennt und ausdrücklich
 
-- [ ] 9.1 PR, CI grün abwarten, mergen
-- [ ] 9.2 `migrate-dev` grün auf demselben SHA
-- [ ] 9.3 `migrate-prod` **ausdrücklich erfragen** — Schreibzugriff auf PROD
-- [ ] 9.4 Frontend-Deploy; auf `drift-gate` achten, der ihn stumm anhält
-- [ ] 9.5 Live nachmessen: ein `connect`-Konto sieht das Verzeichnis, seine
-      erweiterten Spalten sind leer
-- [ ] 9.6 **Kein Flag umlegen.** Weder `open_contact` noch
-      `welpenschutz_aktiv`. Beides sind Donalds Schritte und gehören nicht in
-      diesen Change
-- [ ] 9.7 Live gegenprüfen, dass eine Kaltanfrage an ein junges Konto **weiter
-      durchgeht** — die Zusage aus 6.1 am laufenden System, nicht nur in pgTAP
+- [x] 9.1 PR #320, alle vier Pflichtchecks grün, squash-gemerged als `292c8ca`.
+      `main` zog waehrend des PR zweimal weiter; zweimal rebased. Einzige
+      Ueberschneidung war `session-handoff.md` — nicht zusammengefuehrt
+- [x] 9.2 `migrate-dev` gruen auf `629f070`, dem Kopf, der die drei
+      Migrationen traegt
+- [x] 9.3 `migrate-prod` **von Donald ausdruecklich freigegeben** (02.09.),
+      Lauf 33681817122: `plan` und `apply` beide gruen
+- [x] 9.4 Frontend-Deploy. Der `drift-gate` hatte ihn angehalten — genau wie
+      hier vorhergesagt — und wurde mit `gh run rerun --failed` auf dem
+      **aktuellen** `main`-Kopf nachgeholt. `drift-gate`, `migrate-dev`,
+      `deploy`, `functions` alle gruen
+- [x] 9.5 Live nachgemessen, rein lesend. `search_directory` traegt
+      `has_level(2)` (im Code genau einmal, `has_level(3)` **null**mal) samt
+      Selbst-Zweig; `branche` steht in `profiles_public`; das Praedikat ist
+      `stable`/`security definer`/`search_path=""`, `anon` ohne EXECUTE.
+      **Was NICHT live messbar war:** ein `connect`-Konto gibt es auf PROD
+      nicht (73 × `impact`, 1 × `discover`), und eins anzulegen waere ein
+      Eingriff in Mitgliederdaten. Der Rang-2-Weg ist ueber CI (1160 Zusagen
+      gegen eine frische DB) und die lokale Sichtprobe belegt
+- [x] 9.6 **Kein Flag umgelegt.** Nachgelesen: `open_contact` steht unveraendert
+      auf `true`
+- [x] 9.7 Klausel und Praedikat sind auf PROD nachweislich fort
+      (`is_new_member` → `to_regprocedure` ist NULL, `is_new_member` kommt in
+      der Policy nicht mehr vor). **Bewusst NICHT als Insert gefahren:** an
+      `contact_requests` haengt ein `net.http_post`-Trigger, eine versendete
+      Mail an ein echtes Mitglied waere nicht zurueckzurollen. Der
+      Verhaltensbeleg steht lokal — echte Kaltanfrage, tagesfrisches Ziel,
+      `open_contact = false`
 
 ## 10. Nachlauf
 
-- [ ] 10.1 `openspec archive rechte-matrix-stufen` — beide Delta-Specs falten
-- [ ] 10.2 `pnpm release:entries`, danach den **Diff** von
-      `release-entries.generated.ts` lesen: beschreiben die `aenderungen`, was
-      gebaut wurde? Die Ausschlüsse dürfen nicht als das Ausgelieferte dastehen
-- [ ] 10.3 Im Neuigkeiten-Eintrag steht die **Verzeichnisschwelle** — sie ist
+- [x] 10.1 `openspec archive rechte-matrix-stufen` — beide Delta-Specs gefaltet.
+      **Drei Anläufe, alle drei am selben Grund:** `openspec archive` ordnet
+      Szenarien über ihre Überschrift zu und bricht ab, wenn eine verschwindet.
+      Der Delta hatte in drei `MODIFIED`-Blöcken je einen Titel von `discover`
+      auf `connect` umgeschrieben — für das Werkzeug nicht von einem gelöschten
+      Szenario zu unterscheiden. Titel zurückgenommen, Rümpfe stattdessen auf
+      `basic` geschärft: damit sind sie unter alter wie neuer Schwelle wahr
+- [x] 10.2 `pnpm release:entries` + einzeln prettier — **11 Zeilen** Diff, und
+      der Eintrag gelesen: Titel „Das Mitgliederverzeichnis ist ab Connect
+      sichtbar", `linear: AGE-598`, drei Punkte, keine Ausschlüsse
+- [x] 10.3 Im Neuigkeiten-Eintrag steht die **Verzeichnisschwelle** — sie ist
       das einzige sofort Spürbare, und sie gibt Rechte. Der Welpenschutz gehört
       **nicht** hinein: er wartet auf seinen Schalter und ändert am Tag des
-      Ausrollens nichts
-- [ ] 10.4 AGE-598 in Linear nachsehen; der Merge setzt den Status selbst
-- [ ] 10.5 AGE-610 Abnahmepunkt „AGE-598 entschieden" abhaken
+      Ausrollens nichts.
+
+      **Vor dem Archivieren repariert, und es war die Falle aus AGE-628.**
+      Gemessen hätte der Eintrag **12** Stichpunkte getragen, darunter die
+      **vier Ausschlüsse** als das Ausgelieferte: der Parser schneidet bei
+      `/^#{1,2} /`, und der Ausschluss-Abschnitt stand unter `###`. Jetzt
+      `##`, und die geernteten `- `-Zeilen sind drei Sätze in
+      Mitglieder-Sprache; die Repo-Sprache steht darunter als Fettabsätze,
+      die der Erzeuger nicht erntet. Auch die H1 ist nachgezogen — sie ist
+      der Titel, den Mitglieder lesen, und hiess vorher „Rechte-Matrix:
+      Verzeichnis ab connect, Kontaktanfragen nach Stufe".
+
+      **Die Staffelung steht bewusst nicht drin:** `open_contact` hebt sie
+      auf, am Tag des Ausrollens ändert sich für niemanden etwas. Der Hinweis
+      gehört an den Tag, an dem der Schalter fällt
+- [x] 10.4 AGE-598 in Linear nachgesehen: **Done**, vom Merge gesetzt (20:20 UTC)
+- [ ] 10.5 AGE-610 Abnahmepunkt **NICHT abgehakt, und das ist die Messung.**
+      Der Punkt lautet dort „AGE-293 und AGE-598 entschieden" — er deckt
+      **zwei** Vorgänge, und AGE-293 („Mein Bereich"?) ist offen. Für AGE-598
+      ist die Frage in §6 ausserdem namentlich `open_contact` **abschalten?**,
+      also genau die Entscheidung, die dieser Change ausdrücklich nicht trifft.
+      Ihn abzuhaken behauptete zweimal etwas Falsches. Bleibt bei Donald
