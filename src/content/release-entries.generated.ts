@@ -5,6 +5,17 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-03-ein-modal-zur-zeit",
+    datum: "2026-09-03",
+    titel: "Feedback vom Telefon aus ist mit Vorlesesoftware erreichbar",
+    linear: "AGE-688",
+    aenderungen: [
+      "**Das Feedback-Formular aus dem Menü ist mit Vorlesesoftware erreichbar.** Auf dem Telefon steht der Zugang zum Feedback im Menü. Wurde er dort geöffnet, meldete die Seite Menü und Formular gleichzeitig als das aktive Fenster — Vorlesesoftware blieb deshalb im Menü und las das Formular gar nicht vor. Jetzt ist immer nur eines von beiden das aktive.",
+      "**Am Bildschirm ändert sich nichts.** Das Menü bleibt offen, das Formular liegt wie bisher darüber, und nach dem Abschicken steht man wieder dort, wo man war.",
+      "**Der Zugang aus der Seitenleiste am grossen Bildschirm bleibt unverändert.**",
+    ],
+  },
+  {
     slug: "2026-09-02-rechte-matrix-stufen",
     datum: "2026-09-02",
     titel: "Das Mitgliederverzeichnis ist ab Connect sichtbar",

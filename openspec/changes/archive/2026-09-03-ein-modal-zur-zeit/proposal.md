@@ -1,4 +1,4 @@
-# Aus der Navigationsschublade heraus steht genau ein Modal
+# Feedback vom Telefon aus ist mit Vorlesesoftware erreichbar
 
 Linear: **AGE-688**
 
@@ -45,18 +45,19 @@ Der Defekt ist **allein die `aria-modal`-Semantik**.
 
 ## What Changes
 
-- **Die Schublade gibt ihr `aria-modal` ab, solange das Feedback-Formular
-  darüber steht**, und bekommt es beim Schliessen zurück. Aus zwei gleichzeitig
-  modalen Flächen wird eine, ohne dass eine davon verschwindet.
-- **Sie erfährt es von ihrem eigenen Kind.** `FeedbackButton` meldet der
-  aufrufenden Fläche, ob sein Formular offen ist — über jeden Weg, auf dem es
-  zugeht, und beim Abhängen.
-- Der Feedback-Zugang in der angedockten Seitenleiste ab `lg`
-  (`AppShell.tsx:866`) bleibt unverändert: dort gibt es keine Schublade, die
-  etwas abgeben könnte.
+- **Das Feedback-Formular aus dem Menü ist mit Vorlesesoftware erreichbar.** Auf
+  dem Telefon steht der Zugang zum Feedback im Menü. Wurde er dort geöffnet,
+  meldete die Seite Menü und Formular gleichzeitig als das aktive Fenster —
+  Vorlesesoftware blieb deshalb im Menü und las das Formular gar nicht vor.
+  Jetzt ist immer nur eines von beiden das aktive.
+- **Am Bildschirm ändert sich nichts.** Das Menü bleibt offen, das Formular
+  liegt wie bisher darüber, und nach dem Abschicken steht man wieder dort, wo
+  man war.
+- **Der Zugang aus der Seitenleiste am grossen Bildschirm bleibt unverändert.**
 
-Die Schublade bleibt dabei **offen**. Der Nutzer kehrt nach dem Abschicken in
-denselben Zustand zurück, aus dem er kam.
+Fachlich: die Schublade gibt ihr `aria-modal` ab, solange das Formular darüber
+steht, und bekommt es beim Schliessen zurück. Sie erfährt es von ihrem eigenen
+Kind — `FeedbackButton` meldet, ob sein Formular offen ist.
 
 ## Warum nicht der naheliegende Weg
 
