@@ -1,4 +1,4 @@
-# Escape schliesst das Feedback-Formular, nicht die Schublade darunter
+# Die Escape-Taste schliesst das Feedback-Fenster, nicht das Menü darunter
 
 Linear: **AGE-697**
 
