@@ -44,6 +44,30 @@ ausgeschlossen. Das OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD (19:32:08Z).
 > `0.0.0+3d20063d3913`, eines auf `feedbeef` ebenfalls, und eines, das schon
 > darauf läuft, bekommt nichts.
 
+**AGE-605 ist vollständig abgeschlossen** — gemergt (#342, #343), archiviert,
+auf PROD angewandt und dort rein lesend gegengemessen: beide Trigger aktiv,
+`…_exklusiv` INVOKER und `…_kapazitaet` DEFINER wie entworfen, `authenticated`
+hält nur noch SELECT, Spalten-UPDATE nur `status`/`rating`, Policy UPDATE-only,
+EXECUTE auf beiden Wächtern entzogen, 0 überbuchte Events. Linear steht auf Done.
+
+Die vollständige AGE-605-Übergabe — auch der Fund, der jene Sitzung getragen hat
+(Schicht 1 war als `SECURITY INVOKER`-Funktion fail-**OPEN**, weil sie unter der
+RLS des Schreibenden zählte) — steht in `git show e1dd52a:session-handoff.md` und
+dauerhaft in
+`openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/`.
+
+**Was von AGE-605 offen bleibt, liegt in `AGE-698`** (Backlog, drei
+Bestands-Befunde, keiner durch AGE-605 entstanden): der Gastgeber kann
+`capacity` unter die Belegung senken · Mitglieder unter `exchange` können sich
+anmelden, aber nicht direkt absagen (stammt aus AGE-448) · ein zweiter
+`register_for_event`-Aufruf degradiert ein bereits registriertes Mitglied auf
+die Warteliste, weil der RPC die eigene Zeile mitzählt.
+
+> **Herkunft dieser drei Absätze:** aus PR #346 der AGE-605-Sitzung, die
+> denselben Abschnitt korrigieren wollte und dabei zwei Minuten nach dem Merge
+> von #345 von einem älteren Stand gezweigt hatte. Inhalt hierher übernommen,
+> #346 ungemergt geschlossen — nicht verloren, nur an einer Stelle statt zweien.
+
 ## Accomplished
 
 **B3, Android-Hälfte, komplett — PR #344.** iOS ist bewusst ein eigener Vorgang.
@@ -103,9 +127,9 @@ Dazu `scripts/firebase-config{,.logic}.ts`: die Herkunftsangabe sagte fest
 
 ## Next session: start here
 
-**Der Workflow ist gebaut, aber noch nie gelaufen.** Erste Handlung: nach dem
-Merge von #344 einmal `workflow_dispatch` auf `android-release` auslösen und
-zusehen. Alles davor ist lokal belegt, die Runner-Seite nicht — offen sind dort
+**Der Workflow ist gebaut, aber noch nie gelaufen.** Erste Handlung: einmal
+`workflow_dispatch` auf `android-release` auslösen und zusehen (#344 ist
+gemergt). Alles davor ist lokal belegt, die Runner-Seite nicht — offen sind dort
 genau drei Annahmen: dass `android-actions/setup-android` die Build-Tools
 mitbringt, die `apksigner` findet; dass `jarsigner` aus `setup-java` im PATH
 steht; und dass `pnpm exec cap sync android` auf dem Runner dieselben fünf
@@ -113,6 +137,13 @@ Plugins verdrahtet wie lokal.
 
 Danach **`versionCode`** — ohne es lässt sich das Artefakt genau einmal zu Play
 hochladen.
+
+> ⚠ **Squash-Falle, am 04.09. zweimal eingetreten:** PRs aus diesem Branch
+> werden **squash**-gemergt. Der Squash-Commit ist damit kein Vorfahr des
+> Branches, git sieht alle Dateien des PRs als „beidseitig geändert", und der
+> NÄCHSTE PR meldet `CONFLICTING`, obwohl die Bäume identisch sind. Heilmittel
+> nach jedem Merge: `git diff origin/main HEAD` prüfen — ist er leer, gefahrlos
+> `git reset --hard origin/main`. Nicht mergen, das doppelt nur die Historie.
 
 > ⚠ **Java-Falle, am 04.09. eingetreten:** Android Studios mitgelieferte JBR ist
 > Java **25**, Gradle 8.14.3 bricht daran mit `Unsupported class file major
