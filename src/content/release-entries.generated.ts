@@ -5,6 +5,17 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-04-anon-waechter-reichweite",
+    datum: "2026-09-04",
+    titel: "Ausgeloggte Besucher lösen keine unnötige Anfrage mehr aus",
+    linear: "AGE-542",
+    aenderungen: [
+      "**Für Mitglieder ändert sich nichts Sichtbares.** Keine Seite, kein Knopf und kein Ablauf sieht anders aus als vorher.",
+      "**Wer nicht angemeldet ist, löst beim Seitenaufruf keine überflüssige Anfrage mehr aus.** Die App fragte im Hintergrund eine Liste ab, die ohne Anmeldung ohnehin nicht gelesen werden darf; die Anfrage entfällt jetzt.",
+      "**Die Prüfung, die den ausgeloggten Bereich absichert, deckt ab sofort alle öffentlich erreichbaren Seiten ab** statt nur vier Stellen. Das ist reine Absicherung im Hintergrund und für Mitglieder nicht bemerkbar.",
+    ],
+  },
+  {
     slug: "2026-09-03-escape-trifft-das-oberste",
     datum: "2026-09-03",
     titel: "Die Escape-Taste schliesst das Feedback-Fenster, nicht das Menü darunter",
