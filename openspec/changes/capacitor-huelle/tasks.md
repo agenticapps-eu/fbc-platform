@@ -1534,6 +1534,13 @@ fehlt im Manifest). Zwei Folgen, beide gemessen, keine davon ein Ausfall:
 1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
    und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht — daher
    `sound=null vibrate=null defaults=0`. Der Wert steht im Code und tut nichts.
+
+   **Korrektur vom Nachmittag, gemessen:** der Fallback-Kanal ist **nicht**
+   tonlos. Er trägt `mSound=content://settings/system/notification_sound`; die
+   drei Nullen oben sind Felder der NACHRICHT, nicht des Kanals. Was ihm fehlt,
+   ist `mVibrationEnabled=false` und `mImportance=3` — also Vibration und
+   Einblendung, nicht der Ton. Die Behauptung „deshalb kam die Testzustellung
+   stumm an" hält der Messung damit nicht stand und ist hiermit zurückgenommen.
 2. **In den Systemeinstellungen heisst der Kanal „Sonstiges".** Wer die
    Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
    bedeutet — und eine spätere Trennung nach Nachricht / Kontaktanfrage ist ohne
@@ -1591,8 +1598,71 @@ beides ausdrücklich.
       2.495 Tests) grün; `prettier --check` auf den berührten Dateien sauber.
       `pnpm format:check` ist repoweit schon vorher rot (323 Dateien) — nicht
       von diesem Diff.
-- [ ] **⛔ Der Beleg am Gerät steht aus.** Er ist derselbe billige Weg wie am
-      04.09.: bauen, installieren, `.gstack/run-android-push-probe.sh`, dann
+- [x] **Der Kanal ist am Gerät belegt — 04.09., 16:42, Pixel 11 Pro.** Und er
+      brauchte dafür keine Zustellung: `dumpsys notification` führt die Kanäle
+      eines Pakets unter `AppSettings:` auf, unabhängig davon, ob je etwas
+      angekommen ist. Damit ist die Messung von der blockierten Sonde
+      **entkoppelt**.
+
+      *Vorher*, aus dem laufenden Bau von 09:19 — die Positivkontrolle, am
+      selben Gerät genommen, nicht aus dem Protokoll übernommen:
+
+      ```
+      AppSettings: com.effbeezee.app  importance=DEFAULT userSet=true
+        NotificationChannel{mId='fcm_fallback_notification_channel',
+          mName=Miscellaneous, mImportance=3, mVibrationEnabled=false}
+      ```
+
+      Genau ein Kanal, und es ist der von FCM.
+
+      *Nachher*, nachdem das Bündel mit dem Kanal lief:
+
+      ```
+      NotificationChannel{mId='mitteilungen',
+        mName=Nachrichten und Kontaktanfragen, mDescription=hasDescription,
+        mImportance=4, mSound=content://settings/system/notification_sound,
+        mVibrationEnabled=true, mDeleted=false}
+      ```
+
+      Drei Zusagen dieses Vorgangs stehen damit **gemessen** da, nicht
+      begründet: `mImportance=4`, `mVibrationEnabled=true` (ohne die
+      ausdrückliche Zeile stünde hier `false`, wie beim Fallback daneben) und
+      `mSound=…/notification_sound` — der Standardton des Systems, **weil**
+      kein `sound` übergeben wurde.
+- [x] Auch die Deklaration ist am **Artefakt** belegt, nicht an der Quelle:
+      `aapt2 dump xmltree --file AndroidManifest.xml app-debug.apk` zeigt
+      `…default_notification_channel_id` mit `="mitteilungen"` (Zeile 109).
+- [x] **Und die zugestellte Mitteilung trägt ihn — 04.09., 17:11:15.** Donald
+      hat die Sonde ausgelöst (`HTTP 200`, `bewerteFcm {"ergebnis":"zugestellt"}`),
+      danach am Gerät gemessen:
+
+      ```
+      NotificationRecord  pkg=com.effbeezee.app  tag=FCM-Notification:112503055
+        Notification(channel=mitteilungen …)   importance=4
+      ```
+
+      **Die beste Gegenprobe liefert dasselbe Gerät gleich mit:** die
+      Zustellung vom Vormittag liegt noch in der Leiste und trägt weiterhin
+      `tag=FCM-Notification:84878922 … channel=fcm_fallback_notification_channel`.
+      Zwei Zustellungen, dieselbe App, dasselbe Gerät, verschiedene Kanäle —
+      vorher und nachher nebeneinander, nicht nacheinander behauptet.
+
+      `importance=4` **am Datensatz** (vormittags stand dort `3`) ist der
+      Beleg, dass die Einstufung wirklich vom Kanal kommt und nicht vom
+      Versand: an `fcmKoerper` hat sich nichts geändert.
+
+      `vibrate=null sound=null defaults=0` steht weiterhin an der Mitteilung —
+      und das ist **richtig so**, kein Rest: es sind Felder der NACHRICHT, und
+      seit Android 8 entscheidet der Kanal. Genau das war der Befund.
+
+      *Nicht gemessen:* ob es hörbar geklingelt hat. Der Dump führt in dieser
+      Fassung kein `mLastAudiblyAlertedMs`. Kanal, Stufe und
+      `mVibrationEnabled=true` stehen; das Ohr am Gerät ist Donalds.
+- [x] Der Fallback-Kanal bleibt als Objekt liegen (`AppSettings` führt ihn
+      weiter) — er wird nur nicht mehr benutzt. Löschen wäre möglich, ist aber
+      nicht nötig und nicht Teil dieses Vorgangs.
+
+      Für Wiederholungen steht die Sonde hier:
 
       ```bash
       adb shell dumpsys notification --noredact | grep -i effbeezee
@@ -1613,6 +1683,53 @@ beides ausdrücklich.
 
 **iOS ist nicht betroffen** und der Diff fasst `ios/` nicht an.
 
+##### Und der teuerste Befund des Nachmittags: `adb install` belegt die Weboberflaeche NICHT
+
+Die erste Messung sagte **„Kanal nicht entstanden"** — nach `assembleDebug`,
+`adb install -r` und einem Start. Das war ein **falsches Negativ, erzeugt vom
+Messaufbau**, nicht vom Code:
+
+```
+APK eingebaut:   assets/public/assets/index-BD2EPi9B.js   ← enthaelt den Kanal
+Geraet fuehrt:   index-DYeyA4YQ.js  (capgo-Buendel 95eQQYkgGH)  ← vom Vortag
+```
+
+**Capgos gespeichertes Buendel gewinnt gegen die frisch installierte Schale.**
+Ein `adb install` tauscht die native Huelle; die Weboberflaeche kommt weiter aus
+`files/versions/<id>/`. Wer nach dem Installieren misst, misst den Stand von
+vorgestern und haelt seine Aenderung fuer wirkungslos.
+
+Erkennbar ist es an genau zwei Zeilen im logcat — und nur an ihnen:
+
+```
+CapgoUpdater: notifyAppReady was called. This is fine: <buendel-id>
+Capacitor/Console: File: https://localhost/assets/index-XXXX.js
+```
+
+Steht dort eine andere `index-*.js` als in der APK (`unzip -l app-debug.apk`),
+laeuft OTA-Code. **Vor jeder Messung am Geraet diese beiden Werte
+gegeneinanderhalten** — sonst prueft man Eingaben statt des Artefakts.
+
+**Was NICHT hilft:** `am force-stop` und neu starten. Einmal gefahren, das
+Buendel blieb dasselbe. Capgo haengt an Hintergrund/Vordergrund, nicht am
+Prozesstod.
+
+**Was half:** die zwei Runden aus D5 — `KEYCODE_HOME`, ~8 s, wieder oeffnen,
+dann **25 s nichts anfassen**. Danach lief `wi3AmIcidl` / `index-Cvttx3UQ.js`
+mit `notifyAppReady` bestaetigt. Das Buendel war zu diesem Zeitpunkt bereits
+geladen (16:39, waehrend des ersten Starts) und wartete auf die Uebernahme.
+
+**Was NICHT noetig war und die Anmeldung gekostet haette:** `pm clear`. Die
+Sitzung liegt in `shared_prefs/CapacitorStorage.xml` unter genau einem
+Schluessel; ein `pm clear` haette sie mitgenommen und den Bildupload-Test
+(Aufgabe 2) blockiert, der eine Anmeldung braucht.
+
+*Nebenbei, aus demselben Log:* dieser **Debug**-Bau schreibt die vollstaendige
+Supabase-Sitzung ins logcat — Capacitors ausfuehrliche Plugin-Protokollierung
+gibt `Preferences.get` samt Ergebnis aus. Kein Fund fuer die Oeffentlichkeit,
+aber vor der Store-Einreichung am **Release**-Bau gegenzupruefen, dass die
+Stufe dort wirklich aus ist. Eigener Vorgang, nicht hier.
+
 - [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
       **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
       `2c6e86a`) statt an einem Bau auf der eigenen Maschine — ein Bau ohne
@@ -1626,6 +1743,128 @@ beides ausdrücklich.
       — am Endpunkt gegengeprüft, und am Gerät ist der rote Balken nach zwei
       Gesten weg). Damit ist zugleich belegt, dass das Gerät nach dem Rückfall
       wieder normal aktualisiert und nur `defec7ed` liegen lässt.
+
+### Der Bildupload — die Ursache ist NICHT der Activity-Lebenszyklus (04.09.)
+
+**Die Vermutung aus der Uebergabe ist widerlegt, und zwar mit dem Werkzeug, das
+sie belegen sollte.** „Aktivitaeten nicht behalten" war der vorgeschlagene Weg,
+aus dem Zufallsfund einen wiederholbaren Test zu machen. Er macht ihn nicht
+wiederholbar — er zeigt, dass die Zerstoerung gar nicht die Ursache ist.
+
+Fuenf Messungen am Pixel 11 Pro, alle am 04.09. zwischen 17:16 und 17:22.
+
+| # | Weg | `always_finish` | Buendel wartete? | Ausgang |
+|---|---|---|---|---|
+| 1 | HOME und zurueck | an | ja | kein Neuladen |
+| 2 | Mediathek | an | **ja** | **Zuschnitt erscheint** |
+| 3 | Kamera | an | **ja** | **Zustand weg, Startseite** |
+| 4 | Kamera | an | **nein** | **Zuschnitt erscheint** |
+
+Lauf 3 ist der Fehler, wie Donald ihn beschrieben hat: zurueck auf der
+Startseite, kein Zuschnitt, kein Upload, kein Fehler. Lauf 4 ist derselbe Weg
+unter derselben Zerstoerungs-Einstellung — und er funktioniert. **Der
+Unterschied ist nicht der Lebenszyklus, sondern ob ein OTA-Buendel bereitlag.**
+
+In Lauf 3 wechselte die ausgelieferte Datei mitten im Rundlauf:
+
+```
+vorher:  index-Cvttx3UQ.js   (Buendel wi3AmIcidl)
+nachher: index-DZY1foks.js   (Buendel nfYiJ5mlLy)   ← waehrend die Kamera lief
+```
+
+**Der Mechanismus, aus capgos eigenen Logzeilen:**
+
+1. `capacitor.config.ts` setzt weder `autoUpdate` noch `directUpdate` — es gelten
+   die Vorgaben `autoUpdate: true`, `directUpdate: false`. Im Log steht es
+   woertlich: `setNext: true`, `directUpdate: false`.
+2. Damit wird ein geladenes Buendel **nicht** sofort uebernommen, sondern beim
+   naechsten `handleOnStart` — also wenn die App aus dem GESTOPPTEN Zustand
+   zurueckkehrt.
+3. Ein nativer Rundlauf ist genau das. Die Uebernahme laedt die WebView neu, und
+   damit stirbt alles, was noch lief: der React-Zustand, die Route **und das
+   offene `await Camera.takePhoto()` in `bilderVonQuelle`**. Kein Ergebnis, kein
+   `catch`, kein Wort — der Aufrufer existiert nicht mehr.
+
+**Warum die Mediathek verschont bleibt** (Lauf 2, obwohl ein Buendel wartete):
+der Google-Fotos-Picker legt sich als durchscheinendes Blatt ueber die App. Die
+Activity ist `visible=false`, aber nur PAUSIERT, nie gestoppt — `handleOnStart`
+feuert nicht, also wird nichts uebernommen. Die Kamera ist eine
+Vollbild-Activity und stoppt sie.
+
+**Und warum der Fehler so sprunghaft wirkte:** er tritt nur auf, wenn gerade ein
+Buendel bereitliegt — also in den Minuten nach einem Deploy. Am 03. und 04.09.
+wurde im Takt veroeffentlicht.
+
+**Zwei Messfehler, die dieser Lauf mit aufdeckt** — beide haetten die naechste
+Sitzung genauso in die Irre gefuehrt:
+
+- **`notifyAppReady` im Log ist KEIN Beleg fuer ein Neuladen.** Es ist capgos
+  eigener Timer: `handleOnStart` → `Wait for 10000ms` → zehn Sekunden spaeter
+  die Zeile. Sie kommt bei JEDER Rueckkehr, auch ohne Wechsel. Der belastbare
+  Beleg ist die angeforderte Dokumentwurzel bzw. der Dateiname `index-*.js`.
+- **`always_finish_activities=1` hat in KEINEM der vier Laeufe die WebView neu
+  geladen.** Die Einstellung tut nicht, was ihr Name verspricht, sobald eine
+  Activity auf ein Ergebnis wartet.
+
+**Was daraus folgt — und was NICHT.** Belegt ist ein Fehlschlag (Lauf 3) mit
+einem Mechanismus, der ihn vollstaendig erklaert, plus zwei Gegenproben. Das ist
+mehr als eine Vermutung und weniger als eine Serie. **Die falsifizierbare
+Vorhersage:** mit wartendem Buendel scheitert der Kameraweg immer, ohne
+wartendes Buendel nie. Nach dem naechsten Deploy ist das in fuenf Minuten
+gegengeprueft — und wenn es nicht eintritt, ist diese Erklaerung falsch.
+
+`android:configChanges` ist damit **nicht** die Baustelle. Der Diff dort waere
+wirkungslos gewesen und haette die Ursache verdeckt.
+
+#### Die Gegenmassnahme — Donalds Wahl vom 04.09.
+
+Gewaehlt ist der chirurgische Weg: der Aufschub liegt um den nativen Rundlauf,
+nicht global. `directUpdate: true` haette die ganze Klasse erschlagen, aber
+jeden Start verlaengert und D4/D5 mitverdreht — eine Entscheidung fuer einen
+eigenen Vorgang, nicht fuer diesen Fix.
+
+- [x] `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` vor dem nativen
+      Aufruf, `cancelDelay()` im `finally` danach — in `bilderVonQuelle`
+      (`src/lib/bildauswahl.ts`). **Dort und nirgends sonst:** seit C3 ist das
+      die einzige Stelle, an der ein Bildweg die App verlaesst.
+- [x] `kind: "kill"` und nicht `background`: es ist die einzige Bedingung ohne
+      Frist. Eine Zeitspanne waere geraten und liefe in einem langen Rundlauf ab.
+- [x] Der bisherige Rumpf steht unveraendert in `hole()` — nur damit der
+      Aufschub ein `finally` bekommt, das JEDEN Ausgang einschliesst.
+- [x] **Beide Aufrufe duerfen nie werfen.** Ein Aufschub, der die Bildauswahl
+      abbricht, erzeugte genau den stummen Ausgang, den er verhindern soll:
+      `waehlen()` im Hook fuehrt kein `catch`, eine Rejection bliebe unsichtbar.
+      Zwei Tests halten das fest.
+- [x] Der Abbruch-Zweig ist der wichtigste: er ist der HAEUFIGSTE Ausgang, und
+      bliebe der Aufschub dabei stehen, naehme das Geraet ab dem ersten
+      abgebrochenen Waehler ueberhaupt keine Aktualisierung mehr an — bis zum
+      Neustart. Das waere ein schlimmerer Fehler als der behobene.
+- [x] Gegenprobe, vier Mutationen, alle rot: Aufschub entfernt (3 Zusagen) ·
+      Freigabe entfernt (4) · Aufschub NACH dem Aufruf statt davor (3) ·
+      `kind` auf `background` (1). Die dritte ist die subtilste — ein Aufschub,
+      der zu spaet gesetzt wird, sieht im Diff richtig aus und ist wirkungslos.
+- [x] `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (222 Dateien,
+      2.534 Tests), `prettier --check`, `native-secrets-guard` — alle gruen.
+- [ ] **⛔ Am Geraet gegenzupruefen, und das ist zugleich die Gegenprobe zur
+      Ursache.** Die Bedingung muss hergestellt werden: es braucht ein
+      WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft. Also
+      zwei Veroeffentlichungen nacheinander — die erste bringt den Fix aufs
+      Geraet, die zweite legt das Buendel bereit. Dann den Kameraweg einmal
+      gehen.
+
+      Erwartet: der Zuschnitt erscheint, obwohl ein Buendel wartet. Bleibt er
+      aus, ist entweder der Aufschub wirkungslos oder die Ursache eine andere —
+      beides waere ein Befund, kein Rueckschlag.
+
+**Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
+nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
+die Uebernahme, bis die App wirklich beendet und neu gestartet wird;
+`cancelDelay()` nimmt das zurueck. Um den nativen Rundlauf gelegt, kann kein
+Wechsel mehr hineinplatzen — und `bilderVonQuelle` ist seit C3 der EINE
+Aufrufpunkt, durch den jeder Bildweg geht. Die Alternative waere
+`directUpdate: true` (Uebernahme beim Start statt beim Zurueckkommen), das aber
+jeden Start um den Wechsel verlaengert und weit ueber den Bildupload hinausgeht.
+**Entscheidung steht aus, Code ist noch keiner geschrieben.**
 
 ## Vor dem Abschluss
 

@@ -1,4 +1,5 @@
 import { Camera, EncodingType, MediaTypeSelection } from "@capacitor/camera";
+import { CapacitorUpdater } from "@capgo/capacitor-updater";
 
 /**
  * Woher ein Bild kommt (AGE-642 C3).
@@ -57,11 +58,59 @@ export function entscheideBildauswahl({
  *
  * Ein Abbruch ist kein Fehler, sondern der haeufigste Ausgang: beide Aufrufe
  * werfen dabei, und daraus wird eine leere Liste.
+ *
+ * ══ WARUM HIER DIE OTA-UEBERNAHME ANGEHALTEN WIRD ══════════════════════════
+ *
+ * Gemessen am 04.09. am Pixel 11 Pro, und es war drei Tage lang als
+ * Activity-Lebenszyklus-Fehler fehlgedeutet:
+ *
+ * `capacitor.config.ts` setzt weder `autoUpdate` noch `directUpdate`, es gelten
+ * also die Vorgaben `true`/`false`. Ein geladenes Buendel wird damit NICHT
+ * sofort uebernommen, sondern beim naechsten `handleOnStart` — bei der Rueckkehr
+ * aus dem GESTOPPTEN Zustand. Die Kamera ist eine Vollbild-Activity und stoppt
+ * uns; die Uebernahme laedt die WebView neu; und damit stirbt das `await` unten
+ * mitsamt dem React-Zustand des Aufrufers. Kein Ergebnis, kein `catch`, kein
+ * Wort — genau das Bild, das ein Mitglied als „nichts passiert" meldet.
+ *
+ * Der Mediathek-Weg blieb verschont, weil der Fotos-Picker ein DURCHSCHEINENDES
+ * Blatt ist: pausiert, nie gestoppt, also kein `handleOnStart`. Das ist kein
+ * Trost, sondern der Grund, warum der Fehler sprunghaft wirkte — er trifft nur,
+ * wenn gerade ein Buendel bereitliegt, also in den Minuten nach einem Deploy.
+ *
+ * `kind: "kill"` schiebt die Uebernahme bis zum echten Neustart. Wird die App
+ * waehrenddessen wirklich abgeraeumt, greift sie beim naechsten Start — dann ist
+ * der Rundlauf ohnehin verloren, und das ist kein Rueckschritt.
+ *
+ * **HIER und nicht in `useBildauswahl`**: das ist die einzige Stelle, an der ein
+ * nativer Aufruf die App verlaesst. Seit C3 gehen alle Bildwege durch sie.
  */
 export async function bilderVonQuelle(
   quelle: Bildquelle,
   { mehrere, limit }: { mehrere: boolean; limit: number },
 ): Promise<File[]> {
+  // Beide Aufrufe duerfen NIE werfen. Ein Aufschub, der die Bildauswahl
+  // abbricht, waere schlimmer als gar keiner: er erzeugte denselben stummen
+  // Ausgang, den er verhindern soll — `waehlen()` im Hook fuehrt kein `catch`.
+  try {
+    await CapacitorUpdater.setMultiDelay({ delayConditions: [{ kind: "kill" }] });
+  } catch (e) {
+    console.error("[bildauswahl] OTA-Aufschub nicht gesetzt:", (e as Error).message);
+  }
+
+  try {
+    return await hole(quelle, mehrere, limit);
+  } finally {
+    try {
+      await CapacitorUpdater.cancelDelay();
+    } catch (e) {
+      console.error("[bildauswahl] OTA-Aufschub nicht zurueckgenommen:", (e as Error).message);
+    }
+  }
+}
+
+/** Der bisherige Rumpf, unveraendert — nur damit der Aufschub oben ein
+ *  `finally` bekommt, das jeden Ausgang einschliesst. */
+async function hole(quelle: Bildquelle, mehrere: boolean, limit: number): Promise<File[]> {
   let pfade: string[];
   try {
     if (quelle === "kamera") {
