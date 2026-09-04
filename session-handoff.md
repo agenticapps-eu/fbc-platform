@@ -7,9 +7,12 @@
 > **nicht zusammenführen**, überschreiben.
 >
 > **2. Vorher stand hier AGE-605** (Anmeldungen/Kapazität, PR #342). Vollständig
-> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus gilt weiter und
-> **betrifft AGE-642 unmittelbar** — sie steht deshalb unten unter „Von AGE-605
-> übernommen", nicht im Verlauf.
+> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus war eine
+> **Sperre für AGE-642** — der blockierte Deploy von `main`. Sie ist seit dem
+> Abend des 04.09. **aufgehoben**; der Abschnitt „Von AGE-605 übernommen" unten
+> trägt die Auflösung samt Laufnummern und wird nicht gelöscht, damit niemand
+> die alte Warnung aus einer früheren Fassung wieder aufgreift. **Es ist von
+> dort nichts mehr zu tun.**
 >
 > **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
 > `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
