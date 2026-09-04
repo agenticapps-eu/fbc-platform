@@ -9,8 +9,71 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**Der Bildupload.** Push ist durch (siehe unten), er ist es nicht — und er ist
-der letzte ⛔ auf der Abnahmeliste.
+**PR #331 nachsehen** (`gh pr view 331 --json state`). Ist er gemergt, in Linear
+prüfen: AGE-642 fällt nach jedem Merge auf `Done` und gehört zurück auf
+`In Progress`, solange die Abnahmeliste offen ist.
+
+Dann die zwei Aufgaben dieser Runde, in dieser Reihenfolge (Donald, 04.09.):
+
+### 1. Der Mitteilungskanal — klein, gemessen, abgegrenzt
+
+Push läuft, aber die App deklariert **keinen** Kanal. Gemessen am 04.09. mit
+`dumpsys notification`, nachdem die Zustellung durch war:
+
+```
+channel=fcm_fallback_notification_channel   sound=null  vibrate=null  defaults=0
+logcat: Missing Default Notification Channel metadata in AndroidManifest
+```
+
+Die Mitteilung landet in dem Kanal, den **FCM sich selbst anlegt**. Zwei Folgen,
+beide belegt:
+
+1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
+   und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht. Der
+   Wert steht im Code und tut nichts — das ist der Grund, warum die Testzustellung
+   stumm ankam.
+2. In den Systemeinstellungen heisst der Kanal **„Sonstiges"**. Wer die
+   Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
+   bedeutet.
+
+Was zu tun ist, und wo es aufhört:
+
+- `com.google.firebase.messaging.default_notification_channel_id` als
+  `<meta-data>` in `android/app/src/main/AndroidManifest.xml`. Die Datei ist
+  **nicht** von `cap sync` erzeugt und darf angefasst werden (die Kamera-Rechte
+  stehen schon von Hand darin).
+- Den Kanal selbst anlegen. Capacitors Push-Plugin tut das nicht.
+  `@capacitor/push-notifications` bringt `createChannel()` mit — damit bleibt es
+  in TypeScript und braucht keinen nativen Code. **Beim Start anlegen, nicht
+  beim ersten Push:** ein Kanal, den es zum Zustellzeitpunkt nicht gibt, fällt
+  wieder auf den Fallback zurück.
+- **Erst EIN Kanal.** Eine Trennung nach Nachricht / Kontaktanfrage wäre die
+  naheliegende zweite Stufe und ist hier ausdrücklich nicht dran — ein Kanal, den
+  ein Mitglied einmal abgeschaltet hat, lässt sich aus der App nie wieder
+  einschalten. Das ist ein Entwurf, kein Anbau.
+
+**Der Beleg ist derselbe Weg wie am 04.09.**, und er ist billig: bauen,
+installieren, `.gstack/run-android-push-probe.sh`, dann
+
+```bash
+adb shell dumpsys notification --noredact | grep -i effbeezee
+```
+
+Erwartet: `channel=` trägt den eigenen Namen, **nicht**
+`fcm_fallback_notification_channel`. *Positivkontrolle,* sonst belegt der Lauf
+nichts: vor dem Umbau steht dort der Fallback — dieser Stand ist oben
+protokolliert und muss sich ändern.
+
+**iOS ist nicht betroffen** — Kanäle gibt es dort nicht. Der Diff darf `ios/`
+nicht anfassen.
+
+### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
+
+Siehe „Was noch aussteht" unten. **Belegt ist der Reload, nicht seine Ursache**,
+und der nächste Schritt ist ausdrücklich, das zu belegen statt es zu vermuten:
+„Aktivitäten nicht behalten" in den Entwickleroptionen erzwingt die
+Activity-Zerstörung und macht aus dem Zufallsfund einen wiederholbaren Test.
+Erst wenn der greift, ist `android:configChanges` die richtige Baustelle.
 
 Push kann ab jetzt jederzeit nachgestellt werden mit
 
@@ -22,7 +85,7 @@ Erwartet: `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`. Wer stattdessen
 `SENDER_ID_MISMATCH` sieht, hat eine Konfiguration aus einem fremden
 Firebase-Projekt im Bau. Aus Claude Code heraus lässt sich das Werkzeug **nicht**
 starten — der Klassifikator blockt jeden sendenden Lauf unter `--env=prod`
-ebenso wie den `INSERT` in `notifications` auf PROD.
+ebenso wie den `INSERT` in `notifications` auf PROD. Donald löst es aus.
 
 ## Die Werkzeugkette (kostet sonst zwanzig Minuten)
 
