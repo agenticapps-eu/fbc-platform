@@ -7,27 +7,49 @@
 > **nicht zusammenführen**, überschreiben.
 >
 > **2. Vorher stand hier AGE-605** (Anmeldungen/Kapazität, PR #342). Vollständig
-> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus gilt weiter und
-> **betrifft AGE-642 unmittelbar** — sie steht deshalb unten unter „Von AGE-605
-> übernommen", nicht im Verlauf.
+> in `git show e1dd52a:session-handoff.md`. Die eine Zeile daraus, die AGE-642
+> unmittelbar betraf — die Deploy-Sperre —, ist **aufgelöst**; die Auflösung
+> steht unten unter „Von AGE-605 übernommen", nicht im Verlauf.
 >
 > **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
 > `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
 > Phase E. Diese Datei bleibt der Überblick.
 
-## Von AGE-605 übernommen — gilt weiter
+## Von AGE-605 übernommen — ERLEDIGT, die Sperre ist weg
 
-**Der Deploy von `main` ist blockiert, bis die PROD-Migration läuft.** Das
-`drift-gate` ist rot, korrekt und wie vorgesehen:
+> Dieser Abschnitt stand hier als **offene Sperre** und ist seit dem
+> 04.09. abends überholt. Er bleibt stehen statt zu verschwinden, weil er in der
+> vorigen Fassung dieser Datei eine Handlungsanweisung war — wer sie im Kopf
+> hat, soll hier die Auflösung finden und nicht die alte Warnung.
 
-```
-DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260904160000
-```
+**Der Deploy von `main` ist wieder frei.** Die PROD-Migration ist gelaufen
+(`migrate-prod`, Lauf 33911148557, `plan` und `apply` grün), das `drift-gate`
+meldet `OK — 123 Migrationen, Historie abweichungsfrei`. Der blockierte Lauf
+33904874723 wurde per `gh run rerun --failed` nachgeholt und ist **vollständig
+grün** — `drift-gate`, `migrate-dev`, `functions`, `deploy`. Damit ist auch
+AGE-642s B3-Merge (#344) mit ausgeliefert; der OTA-Kopf steht auf
+`0.0.0+3d20063d3913`, dem Commit dieses Laufs.
 
-Das trifft **jeden** Deploy von `main`, AGE-642 eingeschlossen. Der `CI`-Lauf ist
-davon nicht betroffen, die Pflichtchecks auch nicht — Merges gehen weiter. Der
-PROD-Lauf ist ein eigener, ausdrücklicher Schritt (AGE-605 Aufgabe 10.4) und
-**braucht Donalds Freigabe**.
+**AGE-605 ist damit vollständig abgeschlossen** — gemergt (#342, #343),
+archiviert, auf PROD angewandt und dort rein lesend gegengemessen: beide Trigger
+aktiv, `…_exklusiv` INVOKER und `…_kapazitaet` DEFINER wie entworfen,
+`authenticated` hält nur noch SELECT, Spalten-UPDATE nur `status`/`rating`,
+Policy UPDATE-only, EXECUTE auf beiden Wächtern entzogen, 0 überbuchte Events.
+Linear AGE-605 steht auf Done. **Es ist dort nichts mehr offen.**
+
+Die vollständige AGE-605-Übergabe — auch der Fund, der die Sitzung getragen hat
+(Schicht 1 war als eine `SECURITY INVOKER`-Funktion fail-OPEN, weil sie unter
+der RLS des Schreibenden zählte) — steht in `git show e1dd52a:session-handoff.md`
+und dauerhaft in `openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/`.
+
+**Was von AGE-605 offen BLEIBT, liegt jetzt in `AGE-698`** (Backlog): drei
+Bestands-Befunde, keiner durch AGE-605 entstanden, jeder mit eigener
+Entscheidung — der Gastgeber kann `capacity` unter die Belegung senken;
+Mitglieder unter `exchange` können sich anmelden, aber nicht direkt absagen
+(stammt aus AGE-448); und ein zweiter `register_for_event`-Aufruf degradiert ein
+bereits registriertes Mitglied auf die Warteliste, weil der RPC die eigene Zeile
+mitzählt. Der Neuigkeiten-Eintrag zu AGE-605 wird auf Donalds Entscheidung vom
+04.09. **nicht freigegeben**.
 
 ## Accomplished
 
