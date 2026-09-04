@@ -1,21 +1,91 @@
-# Übergabe — Androidlauf 03.09.
+# Übergabe — Androidlauf, Stand 04.09.
 
 > Diese Datei liegt hier und **nicht** in `session-handoff.md`: die geteilte
 > Übergabedatei trägt je einen Vorgang und steht seit dem 03.09. auf AGE-688.
 > Was AGE-642 betrifft, gehört in den Change.
 
-Pixel 11 Pro, Android 17 (SDK 37), Debug-Bau aus `1f68804`.
-Ausführliche Belege in `tasks.md` Phase E, hier nur, was die nächste Sitzung
-braucht.
+Pixel 11 Pro, Android 17 (SDK 37). Ausführliche Belege in `tasks.md` Phase E,
+hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**PR #330 nachsehen** (`gh pr view 330 --json state`). Ist er gemergt, in Linear
+**PR #331 nachsehen** (`gh pr view 331 --json state`). Ist er gemergt, in Linear
 prüfen: AGE-642 fällt nach jedem Merge auf `Done` und gehört zurück auf
 `In Progress`, solange die Abnahmeliste offen ist.
 
-**Dann der Push-Absturz** — er ist der einzige Fund, der die App unbenutzbar
-macht, und er ist entscheidungsreif.
+Dann die zwei Aufgaben dieser Runde, in dieser Reihenfolge (Donald, 04.09.):
+
+### 1. Der Mitteilungskanal — klein, gemessen, abgegrenzt
+
+Push läuft, aber die App deklariert **keinen** Kanal. Gemessen am 04.09. mit
+`dumpsys notification`, nachdem die Zustellung durch war:
+
+```
+channel=fcm_fallback_notification_channel   sound=null  vibrate=null  defaults=0
+logcat: Missing Default Notification Channel metadata in AndroidManifest
+```
+
+Die Mitteilung landet in dem Kanal, den **FCM sich selbst anlegt**. Zwei Folgen,
+beide belegt:
+
+1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
+   und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht. Der
+   Wert steht im Code und tut nichts — das ist der Grund, warum die Testzustellung
+   stumm ankam.
+2. In den Systemeinstellungen heisst der Kanal **„Sonstiges"**. Wer die
+   Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
+   bedeutet.
+
+Was zu tun ist, und wo es aufhört:
+
+- `com.google.firebase.messaging.default_notification_channel_id` als
+  `<meta-data>` in `android/app/src/main/AndroidManifest.xml`. Die Datei ist
+  **nicht** von `cap sync` erzeugt und darf angefasst werden (die Kamera-Rechte
+  stehen schon von Hand darin).
+- Den Kanal selbst anlegen. Capacitors Push-Plugin tut das nicht.
+  `@capacitor/push-notifications` bringt `createChannel()` mit — damit bleibt es
+  in TypeScript und braucht keinen nativen Code. **Beim Start anlegen, nicht
+  beim ersten Push:** ein Kanal, den es zum Zustellzeitpunkt nicht gibt, fällt
+  wieder auf den Fallback zurück.
+- **Erst EIN Kanal.** Eine Trennung nach Nachricht / Kontaktanfrage wäre die
+  naheliegende zweite Stufe und ist hier ausdrücklich nicht dran — ein Kanal, den
+  ein Mitglied einmal abgeschaltet hat, lässt sich aus der App nie wieder
+  einschalten. Das ist ein Entwurf, kein Anbau.
+
+**Der Beleg ist derselbe Weg wie am 04.09.**, und er ist billig: bauen,
+installieren, `.gstack/run-android-push-probe.sh`, dann
+
+```bash
+adb shell dumpsys notification --noredact | grep -i effbeezee
+```
+
+Erwartet: `channel=` trägt den eigenen Namen, **nicht**
+`fcm_fallback_notification_channel`. *Positivkontrolle,* sonst belegt der Lauf
+nichts: vor dem Umbau steht dort der Fallback — dieser Stand ist oben
+protokolliert und muss sich ändern.
+
+**iOS ist nicht betroffen** — Kanäle gibt es dort nicht. Der Diff darf `ios/`
+nicht anfassen.
+
+### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
+
+Siehe „Was noch aussteht" unten. **Belegt ist der Reload, nicht seine Ursache**,
+und der nächste Schritt ist ausdrücklich, das zu belegen statt es zu vermuten:
+„Aktivitäten nicht behalten" in den Entwickleroptionen erzwingt die
+Activity-Zerstörung und macht aus dem Zufallsfund einen wiederholbaren Test.
+Erst wenn der greift, ist `android:configChanges` die richtige Baustelle.
+
+Push kann ab jetzt jederzeit nachgestellt werden mit
+
+```sh
+.gstack/run-android-push-probe.sh
+```
+
+Erwartet: `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`. Wer stattdessen
+`SENDER_ID_MISMATCH` sieht, hat eine Konfiguration aus einem fremden
+Firebase-Projekt im Bau. Aus Claude Code heraus lässt sich das Werkzeug **nicht**
+starten — der Klassifikator blockt jeden sendenden Lauf unter `--env=prod`
+ebenso wie den `INSERT` in `notifications` auf PROD. Donald löst es aus.
 
 ## Die Werkzeugkette (kostet sonst zwanzig Minuten)
 
@@ -24,6 +94,7 @@ macht, und er ist entscheidungsreif.
 | `adb` | `~/Library/Android/sdk/platform-tools/adb` — **nicht im PATH**, mit vollem Pfad rufen |
 | `JAVA_HOME` | `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home` |
 | `ANDROID_HOME` | `~/Library/Android/sdk` |
+| `aapt2` | `~/Library/Android/sdk/build-tools/36.0.0/aapt2` — 35.0.0 liegt daneben |
 | Gerät | `67011FDKX006NA`, USB-Debugging steht |
 
 **Das JBR von Android Studio taugt nicht.** Es ist Java 25, und Gradle 8.14.3
@@ -33,11 +104,17 @@ gibt es auf dieser Maschine nicht.
 Bauen und installieren:
 
 ```bash
+infisical run --env=dev  -- pnpm android:firebase   # NEU, siehe unten
 infisical run --env=prod -- pnpm build
 infisical run --env=prod -- pnpm exec cap sync android
 cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+**Die erste Zeile ist seit dem 04.09. Pflicht**, und sie erzwingt sich selbst:
+fehlt `android/app/google-services.json`, bricht `./gradlew` mit einer
+`GradleException` ab, die den Befehl nennt. Vorher baute Capacitors `try`/`catch`
+schweigend eine Schale, die auf dem Gerät stirbt.
 
 `cap sync` muss durch `infisical`: `capacitor.config.ts` **wirft**, wenn
 `VITE_SUPABASE_URL` fehlt — mit Absicht, damit `updateUrl` nicht stillschweigend
@@ -45,67 +122,84 @@ auf `plugin.capgo.app` zurückfällt und `device_id` an einen Dritten geht.
 
 ## Zustand des Geräts
 
-**Die Benachrichtigungs-Berechtigung ist entzogen**, und das ist der Zustand, in
-dem die App läuft. Wer sie erteilt, macht die App unbrauchbar (siehe unten).
-Zurücknehmen geht mit
+**Die Benachrichtigungs-Berechtigung ist seit dem 04.09. ERTEILT** — das ist die
+Umkehrung des Stands vom 03.09., und sie ist der Beleg: mit erteilter Erlaubnis
+startet die App jetzt. Sie stand auf `USER_FIXED`, die App durfte also selbst
+nicht mehr fragen; erteilt wurde per
 
 ```bash
-adb shell pm revoke com.effbeezee.app android.permission.POST_NOTIFICATIONS
+adb shell pm grant com.effbeezee.app android.permission.POST_NOTIFICATIONS
 ```
 
-Danach fragt die App beim nächsten Öffnen der Nachrichten erneut — dort
-**„Nicht erlauben"**, solange der Fehler steht.
+Zurücknehmen ginge mit `pm revoke` — es gibt aber keinen Grund mehr dafür.
 
-## Die zwei Fehler
+## Der behobene Fehler, und was er gelehrt hat
 
-### 1. Push-Erlaubnis tötet die App
+**Push läuft, Ende zu Ende belegt am 04.09. um 09:30:** `HTTP 200`,
+`bewerteFcm {"ergebnis":"zugestellt"}`, `FirebaseMessaging` in logcat eine
+Sekunde später, und in der Mitteilungsleiste steht „Neue Nachricht — Androidprobe
+hat Ihnen geschrieben." mit dem Markensymbol. `200` allein hätte nur „von FCM
+angenommen" geheissen.
 
-`AppShell.tsx:662` ruft beim Start `pushLebenszeichen()`; bei erteilter Erlaubnis
-läuft `PushNotifications.register()`, Firebase ist ohne `google-services.json`
-nicht initialisiert, und es wirft — **FATAL auf Capacitors nativem
-Plugin-Thread**, nicht im JS-Kontext. Das `try/catch` in `push.ts:82` kann das
-prinzipiell nicht fangen.
+`PushNotifications.register()` tötete den Prozess bei jedem Start, sobald die
+Erlaubnis erteilt war. Am 03.09. stand als Ursache „`google-services.json`
+fehlt". Das war die Folge, nicht der Grund:
 
-Zu entscheiden: `google-services.json` bereitstellen löst es für den
-Regelbetrieb, aber nicht für Bauten ohne die Datei. Robuster wäre, `register()`
-nur zu rufen, wenn Firebase initialisiert ist — dann wird aus „Push geht nicht"
-wieder „Push geht nicht" statt „App geht nicht". **Formal M1-Scope, blockiert
-aber die Abnahme hier.**
-
-### 2. Bildupload bricht still ab
-
-Nach der Bildauswahl lädt die WebView neu (`webview_dom_content_loaded`), der
-React-Zustand ist weg, kein Zuschnitt, kein Upload, kein Fehler. Capgo ist
-ausgeschlossen. **Belegt ist der Reload, nicht seine Ursache** — die naheliegende
-Vermutung ist, dass Android die Activity zerstört, während der Photo-Picker im
-Vordergrund liegt.
-
-Nächster Schritt wäre, das zu belegen statt zu vermuten: `android:configChanges`
-und der Activity-Lebenszyklus in `MainActivity`, dazu ein Lauf mit
-„Aktivitäten nicht behalten" in den Entwickleroptionen — das erzwingt die
-Zerstörung und macht aus dem Zufallsfund einen reproduzierbaren Test.
-
-Messpunkte für die Gegenprobe (beide ohne Anmeldung am Gerät ablesbar):
-
-```sql
-select count(*), max(created_at) from storage.objects where bucket_id='avatars';
--- Stand 03.09.: 61 Dateien, neuestes vom 27.08.
+```
+GET firebase.googleapis.com/v1beta1/projects/effbeezee-f9b48/androidApps → 200 {}
 ```
 
-`profiles.updated_at` taugt **nicht** als Beleg — der Zeitstempel wird auch ohne
-Bearbeitung gesetzt (gemessen: zwei Änderungen ohne jede Profilbearbeitung).
+**Im Firebase-Projekt war gar keine Android-App registriert.** Die Datei fehlte,
+weil ihr Gegenstück fehlte. Dass FCM am 28.08. als „authentifiziert" belegt war,
+widerspricht dem nicht — die v1-Sende-API antwortet auf Projektebene und sagt
+über registrierte Apps nichts. **Ein Beleg der Senderseite deckt die
+Empfängerseite nicht.**
+
+Registriert per `androidApps.create` mit dem Dienstkonto aus
+`FCM_SERVICE_ACCOUNT`; `testIamPermissions` wies `firebase.clients.create`
+vorher aus. App-ID `1:837618406403:android:764720a952fb886c5aea36`. Ein
+SHA-1-Fingerabdruck ist **nicht** nötig — den verlangt Google Sign-In, nicht FCM.
+
+**`GOOGLE_SERVICES_JSON` steht nur in Infisical `dev`.** `secrets set --env=prod`
+ist aus Claude Code heraus geblockt. Es ist ein einziges Firebase-Projekt für
+beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
 
 ## Was noch aussteht
 
+- **⛔ Der Bildupload bricht still ab.** Nach der Bildauswahl lädt die WebView
+  neu (`webview_dom_content_loaded`), der React-Zustand ist weg, kein Zuschnitt,
+  kein Upload, kein Fehler. Capgo ist ausgeschlossen. **Belegt ist der Reload,
+  nicht seine Ursache.** Nächster Schritt: `android:configChanges` und der
+  Activity-Lebenszyklus in `MainActivity`, dazu ein Lauf mit „Aktivitäten nicht
+  behalten" in den Entwickleroptionen — das erzwingt die Zerstörung und macht
+  aus dem Zufallsfund einen reproduzierbaren Test. Die Tragweite reicht über den
+  Avatar hinaus: derselbe Mechanismus trifft Kamera, Dateiauswahl und jeden
+  externen Login.
+
+  Messpunkte für die Gegenprobe, beide ohne Anmeldung am Gerät ablesbar:
+
+  ```sql
+  select count(*), max(created_at) from storage.objects where bucket_id='avatars';
+  -- Stand 03.09.: 61 Dateien, neuestes vom 27.08.
+  ```
+
+  `profiles.updated_at` taugt **nicht** als Beleg — der Zeitstempel wird auch
+  ohne Bearbeitung gesetzt (gemessen: zwei Änderungen ohne jede Profilbearbeitung).
 - **Realtime im Chat** — nicht allein messbar, es muss jemand schreiben, während
   die App offen ist. Ein Log-Beleg genügt nicht: Supabase Realtime läuft in der
-  WebView und schreibt nicht ins logcat.
+  WebView und schreibt nicht ins logcat. Fällt mit der Push-Zustellung oben
+  zusammen, wenn Detlev schreibt.
 - **Web-Sitzung nach dem Storage-Umbau** — geht am Rechner, ohne Gerät.
 - **Bildupload auf iOS** ist ebenfalls ungeprüft. Wenn die Ursache die
-  Activity-Zerstörung ist, verhält sich iOS anders — das ist eine eigene Messung,
-  keine Ableitung.
+  Activity-Zerstörung ist, verhält sich iOS anders — eigene Messung, keine
+  Ableitung.
 - **B5 Startbildschirm** (Runbook §6) verlangt Deinstallieren und **kostet die
-  Anmeldung**. Zuletzt machen.
+  Anmeldung**. Zuletzt machen. Für Android ist die Fläche ohnehin ein eigener
+  Vorgang: seit Android 12 zeichnet die SplashScreen-API, Capacitors
+  `@drawable/splash` wird nicht mehr gezeigt.
+- **B3 Keystore und Signier-Workflow** — nichts davon existiert; in
+  `.github/workflows/` steht kein einziger Gradle-Lauf. Ohne das kein
+  Release-Bau und keine Store-Einreichung (M4).
 
 ## Kleinigkeiten, gemessen aber nicht verfolgt
 
@@ -116,6 +210,16 @@ Bearbeitung gesetzt (gemessen: zwei Änderungen ohne jede Profilbearbeitung).
   abgeschnitten.
 - Die Systemleisten-Icons sind in Screenshots auf hellem Grund kaum zu erkennen;
   **am Gerät laut Donald lesbar**. Notiz, kein Mangel.
+- **Die App deklariert keinen Mitteilungskanal.** Gemessen:
+  `channel=fcm_fallback_notification_channel`, `sound=null vibrate=null
+  defaults=0`; logcat sagt `Missing Default Notification Channel metadata in
+  AndroidManifest`. Folge: `default_sound: true` in `fcmKoerper` ist auf
+  Android 8+ wirkungslos (Ton ist dort Sache des Kanals), und in den
+  Systemeinstellungen heisst der Kanal „Sonstiges". Kein Ausfall, eigener
+  Vorgang — iOS ist nicht betroffen.
+- Beim Start feuert `registration` **zweimal** und `claim_push_token` läuft
+  zweimal — in `push_tokens` steht trotzdem genau eine Zeile, es ist ein Upsert.
+  Kein Mangel, aber es erklärt die doppelte Logzeile.
 - `scripts/ota-buendel.logic.test.ts` ist auf CI flaky: der Test erzeugt einen
   4096-Bit-Schlüssel und reißt Vitests 5-Sekunden-Vorgabe. Er misst Verhalten,
   nicht Laufzeit — ein eigenes Timeout ist hier die Korrektur, kein Verdecken.

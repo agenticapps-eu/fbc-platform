@@ -1412,11 +1412,11 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       die App offen ist. Ein Log-Beleg genügt nicht — Supabase Realtime läuft in
       der WebView und schreibt nicht ins logcat.
 
-### ⛔ Android: die Push-Erlaubnis tötet die App (03.09.)
+### ✅ Android: die Push-Erlaubnis tötete die App — behoben 04.09.
 
-**Wer „Erlauben" tippt, kann die App danach nicht mehr starten.** Reproduziert,
-Ursache belegt, mit Positivkontrolle: Berechtigung entzogen → App startet;
-Berechtigung erteilt → Prozess stirbt beim Start.
+**Der Befund vom 03.09.:** wer „Erlauben" tippte, konnte die App danach nicht
+mehr starten. Reproduziert, mit Positivkontrolle: Berechtigung entzogen → App
+startet; Berechtigung erteilt → Prozess stirbt beim Start.
 
 ```
 FATAL EXCEPTION: CapacitorPlugins
@@ -1425,21 +1425,123 @@ java.lang.IllegalStateException: Default FirebaseApp is not initialized in this 
   at PushNotificationsPlugin.register(PushNotificationsPlugin.java:103)
 ```
 
-`android/app/google-services.json` fehlt (steht in `.gitignore`, das Repo ist
-öffentlich), also initialisiert Firebase nicht — und `register()` wirft. Der
-Dialog erscheint beim Öffnen der Nachrichten (`pushEinrichten`); danach genügt
-`AppShell.tsx:662` (`pushLebenszeichen` beim Start), um den Absturz bei **jedem
-weiteren Start** auszulösen, ohne dass noch jemand etwas antippt.
+Der Dialog erschien beim Öffnen der Nachrichten (`pushEinrichten`); danach
+genügte `AppShell.tsx:662` (`pushLebenszeichen` beim Start), um den Absturz bei
+**jedem weiteren Start** auszulösen, ohne dass noch jemand etwas antippte.
 
-**Das `try/catch` in `src/lib/push.ts:82` kann das prinzipiell nicht fangen.**
+**Das `try/catch` in `src/lib/push.ts:82` konnte das prinzipiell nicht fangen.**
 Die Exception fliegt auf Capacitors nativem Plugin-Thread (`HandlerThread.run`),
-nicht im JS-Kontext — sie tötet den Prozess, bevor ein JS-Handler sie sieht. Die
-Absicherung sieht aus, als griffe sie, und greift nicht.
+nicht im JS-Kontext — sie tötet den Prozess, bevor ein JS-Handler sie sieht.
 
-Zu entscheiden (Donald): `google-services.json` bereitstellen löst es für den
-Regelbetrieb, aber nicht für Bauten ohne die Datei. Robuster wäre, `register()`
-nur zu rufen, wenn Firebase wirklich initialisiert ist — dann wird aus „Push
-geht nicht" wieder „Push geht nicht" statt „App geht nicht".
+#### Die Ursache lag eine Ebene tiefer als vermutet
+
+Am 03.09. stand hier „`google-services.json` fehlt". Das stimmte, war aber nicht
+der Grund, sondern die Folge. Gemessen am 04.09. gegen die Firebase-Management-API:
+
+```
+GET firebase.googleapis.com/v1beta1/projects/effbeezee-f9b48/androidApps → 200 {}
+```
+
+**Im Firebase-Projekt war gar keine Android-App registriert.** Es gab die Datei
+nicht, weil es das Gegenstück nicht gab. Dass FCM am 28.08. als „authentifiziert"
+belegt wurde (`400 INVALID_ARGUMENT` auf ein erfundenes Token), widerspricht dem
+nicht: die v1-Sende-API antwortet auf Projektebene und sagt über registrierte
+Apps nichts. Der Beleg deckte die Senderseite, nie die Empfängerseite.
+
+- [x] **Android-App im Firebase-Projekt registrieren.** Per
+      `androidApps.create` mit dem Dienstkonto aus `FCM_SERVICE_ACCOUNT` —
+      `testIamPermissions` wies `firebase.clients.create` vorher aus, geraten
+      wurde nichts. App-ID `1:837618406403:android:764720a952fb886c5aea36`.
+      Ein SHA-1-Fingerabdruck ist **nicht** nötig; den verlangt Google Sign-In,
+      nicht FCM.
+- [x] **Die Konfiguration kommt aus Infisical, nicht aus dem Repo.**
+      `GOOGLE_SERVICES_JSON` (Umgebung `dev`) → `pnpm android:firebase` schreibt
+      `android/app/google-services.json`. Die Datei steht in `.gitignore` und
+      wird vom `native-secrets-guard` gemeldet; nach dem Erzeugen bleibt er
+      grün bei 1462 Dateien — ignorierte Pfade sind dort absichtlich aussen vor
+      (siehe B2).
+
+      **`prod` trägt den Wert nicht.** `infisical secrets set --env=prod` ist aus
+      Claude Code heraus geblockt. Es ist ein einziges Firebase-Projekt für
+      beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
+- [x] **RED gemessen**, nicht behauptet: gegen einen Stub, der immer
+      `{fehler: null}` gibt, waren **6 von 7** Zusagen in
+      `firebase-config.logic.test.ts` rot — und die eine grüne war genau die
+      Positivkontrolle „lässt die passende Konfiguration durch". Nach der
+      Umsetzung 7/7.
+
+      Geprüft wird **eine** Sache, und zwar die, die der Gradle-Lauf nicht
+      prüft: dass die Projektkennung der Datei die des Dienstkontos ist. Ein
+      falscher *Paketname* bricht den Bau von selbst ab („No matching client
+      found for package name") — das doppelt zu prüfen wäre Ballast. Die
+      Konfiguration eines **fremden** Projekts mit demselben Paketnamen baut
+      dagegen sauber durch, und der Fehler fiele erst auf, wenn FCM
+      `SenderId mismatch` antwortet.
+- [x] **Fehlt die Datei, bricht der Bau** (Donalds Entscheidung, 04.09.).
+      Capacitors Vorlage stand als `try`/`catch` mit einer `logger.info`-Zeile
+      in `android/app/build.gradle` — sie baute schweigend eine Schale, die auf
+      dem Gerät stirbt. Jetzt eine `GradleException`, die den Befehl nennt.
+      *Positivkontrolle vor dem Erzeugen der Datei:* `./gradlew :app:help` →
+      `BUILD FAILED`, `build.gradle` Zeile 62, mit
+      `infisical run --env=dev -- pnpm android:firebase` im Text.
+
+      Der Preis ist benannt und angenommen: ohne das Secret lässt sich Android
+      nicht mehr bauen.
+- [x] **Beleg am Artefakt, nicht an der Eingabe.** `aapt2 dump resources` auf
+      `app-debug.apk`: `google_app_id`, `gcm_defaultSenderId 837618406403`,
+      `project_id effbeezee-f9b48` liegen im gebauten Paket.
+- [x] **Beleg am Gerät (Pixel 11 Pro, 04.09.).** Erlaubnis per
+      `pm grant … POST_NOTIFICATIONS` erteilt — sie stand auf `USER_FIXED`, die
+      App hätte selbst nicht mehr fragen dürfen. Dann **drei Kaltstarts**
+      (`am force-stop` je davor): drei lebende Prozesse, **0 FATAL** im
+      `crash`-Puffer, dreimal `[push] Token abgelegt, Plattform android`. Genau
+      der Fehlermodus, der bisher jeden *weiteren* Start tötete.
+- [x] **Beleg auf PROD:** `push_tokens` trägt erstmals eine `android`-Zeile,
+      `created_at` 07:19:15 UTC — dieselbe Sekunde wie die Logzeile. Eine Zeile,
+      nicht zwei: die doppelte `registration` beim Start ist ein Upsert.
+- [x] **Die Zustellung selbst — belegt 04.09., 09:30 UTC+2.** Donald hat
+      `.gstack/run-android-push-probe.sh` ausgelöst; das Werkzeug benutzt
+      `fcmKoerper` und `baueBenachrichtigung` aus `send-push` selbst, nicht
+      einen Nachbau.
+
+      ```
+      HTTP 200 {"name":"projects/effbeezee-f9b48/messages/0:1788507051231731%…"}
+      bewerteFcm: {"ergebnis":"zugestellt","grund":null}
+      ```
+
+      **Und `200` allein wäre kein Beleg** — es heisst „von FCM angenommen",
+      nicht „angezeigt". Auf dem Gerät nachgemessen: `FirebaseMessaging` in
+      logcat eine Sekunde später, zwei aktive Mitteilungen des Pakets, und im
+      Screenshot der Mitteilungsleiste steht „**Neue Nachricht** — Androidprobe
+      hat Ihnen geschrieben." mit dem Markensymbol. Damit ist die Kette
+      Token → FCM → Gerät → Anzeige geschlossen.
+
+#### Nebenbefund derselben Messung: die App deklariert keinen Mitteilungskanal
+
+Gefunden, weil `dumpsys notification` mitgelesen wurde — nicht gesucht:
+
+```
+channel=fcm_fallback_notification_channel  importance=3
+sound=null  vibrate=null  defaults=0
+```
+
+logcat dazu: `Missing Default Notification Channel metadata in AndroidManifest`.
+
+Die Mitteilung landet in dem Kanal, den **FCM selbst anlegt**, weil die App
+keinen benennt (`com.google.firebase.messaging.default_notification_channel_id`
+fehlt im Manifest). Zwei Folgen, beide gemessen, keine davon ein Ausfall:
+
+1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
+   und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht — daher
+   `sound=null vibrate=null defaults=0`. Der Wert steht im Code und tut nichts.
+2. **In den Systemeinstellungen heisst der Kanal „Sonstiges".** Wer die
+   Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
+   bedeutet — und eine spätere Trennung nach Nachricht / Kontaktanfrage ist ohne
+   eigene Kanäle gar nicht möglich.
+
+**Eigener Vorgang, nicht hier.** Push funktioniert; das ist eine Frage der
+Güte, nicht der Funktion, und sie berührt iOS nicht (Kanäle gibt es dort nicht).
+
 - [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
       **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
       `2c6e86a`) statt an einem Bau auf der eigenen Maschine — ein Bau ohne

@@ -143,6 +143,7 @@ must **never** reach the client.
 | `APNS_BUNDLE_ID`            | `apns-topic` — die Bundle-ID der App (`com.effbeezee.app`) |
 | `APNS_SANDBOX`              | `1` fragt Apples Sandbox-Host **zuerst**. Nur eine Vermutung — den Host erkennt `send-push` an der Antwort (siehe unten) |
 | `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
+| `GOOGLE_SERVICES_JSON`      | Die Firebase-Konfiguration der Android-SCHALE. Kein Function-Secret — sie wird zur Bauzeit zu `android/app/google-services.json` (siehe unten) |
 
 ## Setting and reading secrets
 
@@ -785,6 +786,37 @@ solange das einzige Gerät ein Xcode-Build ist.
 > Sobald ein Store-Build läuft, gehört `APNS_SANDBOX` aus `prod` heraus — nicht
 > weil es sonst bräche, sondern damit die Vermutung stimmt und der zweite Weg
 > die Ausnahme bleibt.
+
+### `GOOGLE_SERVICES_JSON`: die andere Hälfte von Push auf Android
+
+`FCM_SERVICE_ACCOUNT` ist die Senderseite. **`GOOGLE_SERVICES_JSON` ist die
+Empfängerseite**, und bis zum 04.09. fehlte sie ganz — im Firebase-Projekt war
+gar keine Android-App registriert. Ohne sie initialisiert Firebase auf dem Gerät
+nicht, `PushNotifications.register()` wirft auf Capacitors nativem
+Plugin-Thread, und der Prozess stirbt bei jedem Start. Das `try/catch` in
+`src/lib/push.ts` kann das prinzipiell nicht fangen.
+
+Sie ist **kein** Function-Secret: sie gehört in den Android-Bau, nicht in den
+Supabase-Secret-Store. Deshalb auch nicht in der Digest-Gegenprobe oben.
+
+```bash
+# Erzeugt android/app/google-services.json (gitignored, vom
+# native-secrets-guard bewacht). Ohne die Datei bricht `./gradlew` ab.
+infisical run --env=dev -- pnpm android:firebase
+```
+
+`scripts/firebase-config.ts` prüft dabei genau eine Sache, und zwar die, die der
+Gradle-Lauf **nicht** prüft: dass die Projektkennung der Datei die des
+Dienstkontos ist, mit dem `send-push` zustellt. Ein falscher *Paketname* bricht
+den Bau von selbst ab; die Konfiguration eines **fremden** Firebase-Projekts mit
+demselben Paketnamen baut dagegen sauber durch — und fällt erst auf, wenn FCM
+`SenderId mismatch` antwortet und `send-push` das Gerätetoken als dauerhaft
+ungültig löscht.
+
+> ⚠️ **`prod` trägt den Wert noch nicht.** Er steht am 04.09. nur in `dev`;
+> `infisical secrets set --env=prod` ist aus Claude Code heraus geblockt. Da es
+> ein einziges Firebase-Projekt für beide Umgebungen gibt, ist es derselbe Wert.
+> Donald muss ihn nachtragen.
 
 ### Der Firebase-Dienstschlüssel: die Organisationsrichtlinie
 

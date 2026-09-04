@@ -44,11 +44,22 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+// ══ FEHLT DIE DATEI, BRICHT DER BAU (AGE-642) ══════════════════════════════
+// Capacitors Vorlage stand hier als `try`/`catch` mit einer info-Logzeile. Sie
+// baute eine Schale, in der Firebase nicht initialisiert — und in der
+// `PushNotifications.register()` den Prozess auf dem nativen Plugin-Thread
+// toetet, sobald jemand die Benachrichtigungen erlaubt. Gemessen am 03.09. am
+// Pixel 11 Pro: Erlaubnis erteilt, App startet nie wieder.
+//
+// Das `try/catch` in `src/lib/push.ts` kann das prinzipiell nicht fangen; die
+// Ausnahme fliegt ausserhalb des JS-Kontexts. Der einzige Ort, an dem das
+// Fehlen ueberhaupt noch harmlos ist, ist dieser hier — Minuten vor dem Geraet.
+//
+// Der Preis ist benannt: ohne das Secret laesst sich Android nicht mehr bauen.
+def servicesJSON = file('google-services.json')
+if (!servicesJSON.exists() || servicesJSON.text.trim().isEmpty()) {
+    throw new GradleException(
+        "android/app/google-services.json fehlt. Erzeugen mit:\n" +
+        "  infisical run --env=dev -- pnpm android:firebase")
 }
+apply plugin: 'com.google.gms.google-services'
