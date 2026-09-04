@@ -9,31 +9,52 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**Aufgabe 2, der Bildupload** — Aufgabe 1 ist seit dem 04.09. 17:11 vollstaendig
-belegt und abgeschlossen (siehe unten). Der Bildupload ist damit der letzte ⛔
-der Abnahmeliste.
+**Den Bildupload am Geraet gegenpruefen** — der Fix ist gebaut und gemergt
+(PR #337), der Geraetebeleg ist das Letzte, was fehlt. Die Bedingung muss
+hergestellt werden, und genau dieser Commit stellt sie her: es braucht ein
+WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft.
 
-Belegt ist dort **der Reload, nicht seine Ursache**, und der naechste Schritt
-ist ausdruecklich, das zu belegen statt es zu vermuten: „Aktivitaeten nicht
-behalten" in den Entwickleroptionen erzwingt die Activity-Zerstoerung und macht
-aus dem Zufallsfund einen wiederholbaren Test. Erst wenn der greift, ist
-`android:configChanges` die richtige Baustelle. Einzelheiten unter Punkt 2.
+1. Auf dem Geraet laeuft `TjIm4wNJiK` (`index-xwvuPX6v.js`) — die Fassung mit
+   dem Aufschub. Nachpruefbar mit
+   `adb shell run-as com.effbeezee.app cat files/versions/<id>/assets/index-*.js | grep -c delayConditions`.
+2. Der Merge dieses Commits veroeffentlicht das naechste Buendel. Einmal
+   Hintergrundwechsel, damit es geladen und auf `setNext` gesetzt wird —
+   **aber nicht die zweite Runde**, sonst ist es uebernommen statt wartend.
+3. Dann den Kameraweg gehen: Profil bearbeiten → Bild hochladen → Aufnehmen →
+   ausloesen → Haken.
 
-**Das Geraet ist vorbereitet:** Bau vom 04.09. 16:39, OTA-Buendel `wi3AmIcidl`
-uebernommen und bestaetigt, angemeldet.
+**Erwartet:** der Zuschnitt erscheint, obwohl ein Buendel wartet. Bleibt er
+aus, ist entweder der Aufschub wirkungslos oder die Ursache eine andere —
+beides waere ein Befund, kein Rueckschlag.
 
 > ⚠️ **Vor JEDER Messung am Geraet:** pruefen, welche Weboberflaeche wirklich
 > laeuft. `adb install` tauscht nur die Huelle — capgos gespeichertes Buendel
-> gewinnt, und eine frisch installierte Aenderung sieht dann wirkungslos aus.
-> Das hat am 04.09. drei Messungen gekostet. Rezept und Erkennungszeichen in
-> `tasks.md`, Phase E, „`adb install` belegt die Weboberflaeche NICHT".
+> gewinnt. Und `notifyAppReady` im Log belegt **kein** Neuladen; es ist capgos
+> eigener 10-Sekunden-Timer. Beides steht in `tasks.md`, Phase E.
+
+### 1. Der Bildupload — Ursache gefunden, Fix gemergt, Beleg offen
+
+**Die Vermutung aus der letzten Uebergabe war falsch, und das Werkzeug, das sie
+belegen sollte, hat sie widerlegt.** Nicht der Activity-Lebenszyklus: ein
+wartendes capgo-Buendel wird bei der Rueckkehr aus dem GESTOPPTEN Zustand
+uebernommen (`handleOnStart`), laedt die WebView neu und toetet das offene
+`await Camera.takePhoto()`. Die Kamera ist Vollbild und stoppt uns; der
+Fotos-Picker ist ein durchscheinendes Blatt und pausiert nur — daher traf es
+nur den einen Weg und nur nach einem Deploy.
+
+Gebaut ist der Aufschub in `bilderVonQuelle` (`setMultiDelay` / `cancelDelay`,
+`kind: "kill"`), vier Mutationen gegengeprueft. Messreihe und Begruendung in
+`tasks.md`, Phase E, „Der Bildupload — die Ursache ist NICHT der
+Activity-Lebenszyklus".
+
+`android:configChanges` ist **nicht** die Baustelle und braucht keinen Diff.
 
 Push kann jederzeit nachgestellt werden mit `.gstack/run-android-push-probe.sh`
 (erwartet `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`). Aus Claude
 Code heraus laesst sich das Werkzeug **nicht** starten — der Klassifikator
 blockt jeden sendenden Lauf unter `--env=prod`. Donald loest es aus.
 
-### 1. Der Mitteilungskanal — ERLEDIGT, Ende zu Ende belegt (04.09.)
+### 2. Der Mitteilungskanal — ERLEDIGT, Ende zu Ende belegt (04.09.)
 
 Vollständig protokolliert in `tasks.md`, Phase E, „Nachtrag 04.09.". Kurz:
 
@@ -85,26 +106,6 @@ nicht tonlos, er traegt denselben Standardton. Die `sound=null vibrate=null`
 sind Felder der NACHRICHT, nicht des Kanals — und sie stehen auch jetzt noch
 dort, richtigerweise. Dem Fallback fehlten Vibration und Einblendung, nicht der
 Ton.
-
-### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
-
-Siehe „Was noch aussteht" unten. **Belegt ist der Reload, nicht seine Ursache**,
-und der nächste Schritt ist ausdrücklich, das zu belegen statt es zu vermuten:
-„Aktivitäten nicht behalten" in den Entwickleroptionen erzwingt die
-Activity-Zerstörung und macht aus dem Zufallsfund einen wiederholbaren Test.
-Erst wenn der greift, ist `android:configChanges` die richtige Baustelle.
-
-Push kann ab jetzt jederzeit nachgestellt werden mit
-
-```sh
-.gstack/run-android-push-probe.sh
-```
-
-Erwartet: `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`. Wer stattdessen
-`SENDER_ID_MISMATCH` sieht, hat eine Konfiguration aus einem fremden
-Firebase-Projekt im Bau. Aus Claude Code heraus lässt sich das Werkzeug **nicht**
-starten — der Klassifikator blockt jeden sendenden Lauf unter `--env=prod`
-ebenso wie den `INSERT` in `notifications` auf PROD. Donald löst es aus.
 
 ## Die Werkzeugkette (kostet sonst zwanzig Minuten)
 
@@ -185,25 +186,14 @@ beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
 
 ## Was noch aussteht
 
-- **⛔ Der Bildupload bricht still ab.** Nach der Bildauswahl lädt die WebView
-  neu (`webview_dom_content_loaded`), der React-Zustand ist weg, kein Zuschnitt,
-  kein Upload, kein Fehler. Capgo ist ausgeschlossen. **Belegt ist der Reload,
-  nicht seine Ursache.** Nächster Schritt: `android:configChanges` und der
-  Activity-Lebenszyklus in `MainActivity`, dazu ein Lauf mit „Aktivitäten nicht
-  behalten" in den Entwickleroptionen — das erzwingt die Zerstörung und macht
-  aus dem Zufallsfund einen reproduzierbaren Test. Die Tragweite reicht über den
-  Avatar hinaus: derselbe Mechanismus trifft Kamera, Dateiauswahl und jeden
-  externen Login.
-
-  Messpunkte für die Gegenprobe, beide ohne Anmeldung am Gerät ablesbar:
+- **Der Bildupload** — Ursache gefunden, Fix gemergt (PR #337), Geraetebeleg
+  offen. Siehe oben, Punkt 1. `profiles.updated_at` taugt **nicht** als Beleg —
+  der Zeitstempel wird auch ohne Bearbeitung gesetzt. Der Messpunkt ist
 
   ```sql
   select count(*), max(created_at) from storage.objects where bucket_id='avatars';
   -- Stand 03.09.: 61 Dateien, neuestes vom 27.08.
   ```
-
-  `profiles.updated_at` taugt **nicht** als Beleg — der Zeitstempel wird auch
-  ohne Bearbeitung gesetzt (gemessen: zwei Änderungen ohne jede Profilbearbeitung).
 - **Realtime im Chat** — nicht allein messbar, es muss jemand schreiben, während
   die App offen ist. Ein Log-Beleg genügt nicht: Supabase Realtime läuft in der
   WebView und schreibt nicht ins logcat. Fällt mit der Push-Zustellung oben
