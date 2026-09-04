@@ -46,8 +46,21 @@ APNs-Schlüssel (`.p8`) SHALL NOT im Repository liegen. Sie SHALL in Infisical
 verwaltet werden.
 
 Der Android-Keystore SHALL **zusätzlich außerhalb** von Infisical und Repository
-gesichert sein. Er ist unersetzlich: geht er verloren, lässt sich die Anwendung
-im Play Store nie wieder aktualisieren.
+gesichert sein.
+
+Die Begründung ist ausdrücklich **nicht** „er ist unersetzlich". Unter Play App
+Signing — für neue Apps verpflichtend — hält Google den eigentlichen
+App-Signaturschlüssel; unserer ist der **Upload**-Schlüssel, und der lässt sich
+über die Play Console zurücksetzen. Die zweite Sicherung deckt deshalb zweierlei
+Geringeres, aber Wirkliches: den Ausfall von Infisical, und die Tage, die ein
+Zurücksetzen bei Google dauert und in denen keine Fassung ausgeliefert werden
+kann.
+
+Die schärfere Pflicht ist die **Geheimhaltung**, nicht die Verfügbarkeit. Der
+Schlüssel allein genügt allerdings nicht, um etwas zu veröffentlichen — dafür
+braucht es zusätzlich Zugang zur Play Console oder zur Publishing-API. Er ist
+der zweite von zwei Faktoren, und die Sicherung schützt entsprechend: sie
+verhindert, dass ein kompromittierter Konto-Zugang allein genügt.
 
 Die nativen **Projektordner selbst** SHALL im Repository liegen — das macht den
 Bau reproduzierbar. Erzeugtes (`ios/App/Pods/`, `android/.gradle/`, `*/build/`,

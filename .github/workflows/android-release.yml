@@ -1,0 +1,201 @@
+name: android-release
+
+# ══ WARUM DIESER WORKFLOW EIGEN IST (AGE-642 B3) ═══════════════════════════
+# Das Delta verlangt es namentlich: „Ein nativer Bau laeuft nur, wenn er
+# angefordert wird." Der Web-Deploy darf nicht nativ bauen, und dieser hier
+# darf nicht bei jedem Push mitlaufen.
+#
+# Der Ausloeser-Block unten ist deshalb die eigentliche Zusage der Datei, und er
+# hat einen Test: `scripts/android-release.workflow.test.ts` prueft, dass hier
+# weder `pull_request` noch `branches:` steht. Eine Verneinung („ein reiner
+# Web-PR loest ihn nicht aus") ist am laufenden System kaum zu belegen — man
+# sieht, dass nichts passiert ist, und weiss nicht, ob das an der Konfiguration
+# lag. Am Ausloeser-Block ist sie strukturell.
+#
+# ══ WAS DIESER ZUSCHNITT NICHT LEISTET, AUSDRUECKLICH ══════════════════════
+# Beide Ausloeser bauen den Ref, auf dem sie stehen — auch einen, der nie durch
+# einen Review ging. Wer ein Tag setzen kann, kann also Code mit Zugriff auf die
+# prod-Geheimnisse ausfuehren.
+#
+# Das ist KEINE neue Fläche: wer Schreibrecht hat, kann ebenso `deploy.yml`
+# aendern, das denselben Token traegt und auf jeden Push nach `main` laeuft.
+# Enger wird es erst mit einem geschuetzten GitHub-**Environment** samt
+# Freigeber — das ist eine Einstellung im Repository, kein Diff, und steht als
+# offener Punkt in `tasks.md` B3.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "android-v*"
+
+# Zwei Laeufe auf demselben Ref werden gereiht statt nebeneinander gefahren.
+# Das ist eine Ordnungs-, KEINE Sicherheitsmassnahme: jeder Lauf bekommt einen
+# eigenen Runner mit eigenem Dateisystem, sie koennten sich also ohnehin nicht
+# ins Gehege kommen. `cancel-in-progress: false`, weil ein halb abgebrochener
+# Release-Bau nichts Gutes hinterlaesst.
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    env:
+      # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
+      INFISICAL_API_URL: https://eu.infisical.com/api
+      # IMMER prod, nie nach Ref verzweigt wie in `deploy.yml`. Ein Release-Bau
+      # geht in den Store und spricht dort die produktive Datenbank an; ein
+      # Buendel mit DEV-Werten waere auf einem Mitgliedsgeraet ein Datenleck in
+      # die falsche Richtung. Der Preis ist benannt: dieser Workflow kann
+      # deshalb nichts gegen DEV bauen.
+      INFISICAL_ENV: prod
+      # Der erwartete Upload-Schluessel, als SHA-256 seines Zertifikats.
+      # Er ist OEFFENTLICH — Play zeigt ihn selbst an, und er steckt in jedem
+      # ausgelieferten Artefakt. Hier steht er, damit ein VERTAUSCHTES Secret
+      # sofort auffaellt statt erst bei Plays Ablehnung; siehe den Schritt
+      # „Signatur nachweisen".
+      ERWARTETER_FINGERABDRUCK: 7ae18622574a1d1b5388173a8fcef6f80439721c9080fe5a368ea10ef4d12fda
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # AGP 8.13 verlangt mindestens JDK 17. 21 ist die aktuelle LTS und die,
+      # gegen die Gradle 8.14 getestet ist.
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+
+      # Gleiche Installation wie in `deploy.yml`. Ein Checksum-Pin ist nicht zu
+      # haben — Infisical verteilt die CLI ueber sein eigenes Repository
+      # (offener Punkt aus AGE-495, Audit 8.6). Kein `-E`: das Setup-Skript
+      # braucht nichts aus dieser Job-Umgebung.
+      - name: Install Infisical CLI
+        run: |
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo bash
+          sudo apt-get update && sudo apt-get install -y infisical
+
+      # ══ DAS SIGNATURMATERIAL ═══════════════════════════════════════════════
+      # Beide Dateien entstehen hier und nur hier, unter einer Ignorierzeile.
+      # Sie gehen nirgends ins Artefakt (siehe den Upload-Schritt: er nennt
+      # genau zwei Pfade, nie ein Verzeichnis).
+      #
+      # Die Pruefungen stehen in den Skripten, nicht als Shell-Zeilen hier —
+      # dort haben sie Tests daneben. Fehlt ein Wert, nennen sie ihn beim Namen
+      # samt Herkunft.
+      - name: Signaturmaterial und Firebase-Konfiguration erzeugen
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          infisical run --env="$INFISICAL_ENV" --silent -- pnpm android:keystore
+          infisical run --env="$INFISICAL_ENV" --silent -- pnpm android:firebase
+
+      - name: Web-Buendel bauen
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+        run: infisical run --env="$INFISICAL_ENV" -- pnpm build
+
+      # `cap sync` kopiert `dist/` nach `android/app/src/main/assets/public`
+      # UND verdrahtet die Plugins. Ohne diesen Schritt baut Gradle die alte
+      # Weboberflaeche mit — und meldet das nicht.
+      - name: Native Schale synchronisieren
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: infisical run --env="$INFISICAL_ENV" --silent -- pnpm exec cap sync android
+
+      # Zwei Artefakte, zwei Abnehmer: das Bundle geht zu Play, das APK auf ein
+      # physisches Geraet (Phase E verlangt genau das — ein Bundle laesst sich
+      # nicht installieren).
+      - name: Signierten Release-Bau
+        working-directory: android
+        run: ./gradlew --no-daemon bundleRelease assembleRelease
+
+      # Der Beleg, dass wirklich signiert wurde. Ohne ihn waere ein
+      # unsigniertes Artefakt von einem signierten am Lauf nicht zu
+      # unterscheiden: `signingConfig` ungesetzt ist in Gradle kein Fehler,
+      # sondern eine stille Ausgabe ohne Signatur. Der Abbruch in
+      # `build.gradle` faengt den Fall ab, in dem `key.properties` FEHLT —
+      # dieser hier den Fall, in dem sie da ist und trotzdem nichts greift.
+      - name: Signatur nachweisen
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/release/app-release.apk"
+          aab="android/app/build/outputs/bundle/release/app-release.aab"
+
+          for f in "$apk" "$aab"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f fehlt. Hat Gradle ein unsigniertes Artefakt geschrieben (…-unsigned)?"
+              find android/app/build/outputs -type f -name "app-release*" || true
+              exit 1
+            fi
+          done
+
+          # Der Pfad wird gesucht, nicht geschrieben: die Build-Tools-Version im
+          # Runner-Image aendert sich ohne Ankuendigung, und ein fester Pfad
+          # braeche diesen Nachweis — also genau die Kontrolle, die den stillen
+          # Ausgang faengt.
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner nicht gefunden unter $ANDROID_HOME/build-tools."
+            exit 1
+          fi
+
+          # ══ NICHT NUR *DASS*, SONDERN *WOMIT* ════════════════════════════════
+          # `apksigner verify` allein beantwortet nur „ist irgendeine gueltige
+          # Signatur dran". Ein VERTAUSCHTER Keystore — jemand rotiert das Secret
+          # in Infisical, oder es zeigt auf ein anderes Projekt — ergaebe einen
+          # vollstaendig gruenen Lauf und ein Artefakt, das Play erst beim
+          # Hochladen ablehnt („signed with the wrong key"). Das ist eine Stufe
+          # zu spaet und weit weg von der Ursache.
+          ist="$("$apksigner" verify --print-certs "$apk" \
+                 | awk -F': ' '/SHA-256 digest/ {print $2; exit}' | tr -d ' ')"
+          if [ "$ist" != "$ERWARTETER_FINGERABDRUCK" ]; then
+            echo "::error::Signiert mit dem falschen Schluessel."
+            echo "  erwartet:   $ERWARTETER_FINGERABDRUCK"
+            echo "  tatsaechlich: $ist"
+            echo "  Steht in Infisical prod noch der Upload-Schluessel von AGE-642 B3?"
+            exit 1
+          fi
+          echo "APK signiert mit dem erwarteten Upload-Schluessel ($ist)."
+
+          # Das AAB ist das Artefakt, das zu Play geht — es traegt eine
+          # JAR-Signatur, die `apksigner` nicht liest. `jarsigner` kommt mit dem
+          # JDK aus dem setup-java-Schritt.
+          #
+          # OHNE `-strict`, und das ist gemessen, nicht uebersehen: `-strict`
+          # wertet eine selbstsignierte Zertifikatskette als Warnung und endet
+          # mit exit 4 — ein Upload-Schluessel ist aber IMMER selbstsigniert,
+          # der Schritt waere also dauerhaft rot. Positivkontrolle am 04.09.:
+          # signiertes AAB -> exit 0, dasselbe AAB ohne `META-INF/` -> exit 1.
+          jarsigner -verify "$aab" > /dev/null
+          echo "AAB verifiziert."
+
+      # Genau zwei Pfade, nie ein Verzeichnis: `android/app/` traegt in diesem
+      # Moment `upload-keystore.jks`, und `android/` traegt `key.properties`.
+      # Ein breiterer Pfad legte den Signierschluessel als Artefakt ab — in
+      # einem OEFFENTLICHEN Repository, wo jeder Leser ihn herunterladen kann.
+      #
+      # Die beiden Dateien unten sind dagegen unbedenklich: sie enthalten den
+      # Schluessel nicht, sondern nur seine Signatur, und dasselbe Buendel geht
+      # ohnehin in den Store.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
