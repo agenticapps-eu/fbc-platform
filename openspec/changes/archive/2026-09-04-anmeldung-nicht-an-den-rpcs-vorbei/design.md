@@ -37,6 +37,44 @@ also genau dort, wo ein neuer Trigger feuert. Ein Trigger, der diesen Weg
 mitsperrt, bräche die Wiederanmeldung, während eine Positivkontrolle, die nur
 den INSERT-Zweig prüft, grün bliebe.
 
+### Die vier Wege sind belegt, nicht behauptet (2026-09-04, lokaler Stack)
+
+Vor der Migration ausgeführt, jeder Weg mit eigenem Angreifer und eigenem Event —
+eine Probe, die aus zwei Gründen anschlägt, belegt keinen davon. Alle vier gingen
+**durch**, und zwar mit Wirkung, nicht nur ohne Fehlermeldung:
+
+| Weg | Ergebnis | Wirkung |
+|---|---|---|
+| A — INSERT `registered` am vollen Event | ging durch | `capacity` 1 → **2** registrierte Anmeldungen |
+| B — UPDATE `waitlist → registered` | ging durch | `capacity` 1 → **2** |
+| C — UPDATE `checked_in = true` | ging durch | **1** Teilnehmer ohne Host-Zutun anwesend |
+| D — UPDATE `event_id` auf ein volles Event | ging durch | `capacity` 1 → **2** |
+
+### Ausgangsmessung auf PROD (2026-09-04, rein lesend)
+
+Über `pg` + tsx gegen die Produktionsinstanz, nur SELECT. Ausgegeben werden
+ausschliesslich Zahlen — das Repositorium ist öffentlich.
+
+| Messung | Zahl |
+|---|---|
+| Events insgesamt | **2** |
+| davon mit gesetzter `capacity` | **0** |
+| Anmeldungen insgesamt | **4** (alle `registered`) |
+| **Überbuchte Events** (`registered > capacity`) | **0** |
+| Eingecheckte Anmeldungen | **0** |
+
+**Die Null ist nicht das Verdienst einer Schranke.** Kein einziges Event trägt
+heute überhaupt eine `capacity`, und ohne `capacity` ist Überbuchung
+strukturell unmöglich. Die Lücke stand also offen und ist nur deshalb nicht
+ausgenutzt worden, weil es nichts auszunutzen gab. Das ist der Grund, diesen
+Change **vor** dem ersten Event mit Platzbegrenzung zu fahren, nicht danach.
+
+**Selbst-Check-ins sind historisch NICHT messbar** (Befund codex, MEDIUM) und
+werden deshalb nicht gezählt: `checked_in = true` an der Zeile eines Nicht-Hosts
+ist der Normalzustand nach einem legitimen Host-Check-in, und die Zeile
+speichert den Handelnden nicht. Hier steht die Grenze der Messung statt einer
+erfundenen Zahl — auf PROD sind ohnehin null Anmeldungen eingecheckt.
+
 ### Was daraus folgt
 
 `regs_write_own` ist `for all to authenticated` und prüft in `with check` nur
@@ -142,6 +180,66 @@ Was ein Mitglied direkt setzen darf, bleibt: `status = 'cancelled'` und `rating`
 über den Eigentümer. Wird eine RPC künftig auf `SECURITY INVOKER` gestellt oder
 umgehängt, bricht sie — laut, aber sie bricht. Schicht 1 hält die eigentliche
 Zusage auch dann.
+
+#### D3a — Nachtrag: Schicht 1 war als EIN Trigger fail-OPEN (gemessen 04.09.)
+
+Die Entscheidung oben ist richtig; ihre **erste Umsetzung** war es nicht, und der
+Fehler sass genau unter dem Satz „Schicht 1 hält die eigentliche Zusage auch
+dann". Sie hielt sie nicht.
+
+Beide Schichten standen in **einer** Triggerfunktion, und die war
+`SECURITY INVOKER` — nötig für Schicht 2, die ein aussagekräftiges `current_user`
+braucht. Damit lief aber auch Schicht 1 unter der RLS des Schreibenden, und
+`regs_select_self_or_host` lässt ein Mitglied nur die **eigenen** Anmeldezeilen
+sehen. Die Schicht, die Überbuchung verhindern soll, zählte für jeden Angreifer
+**null belegte Plätze**.
+
+Gemessen, mit Positivkontrolle, weil eine einzelne Beobachtung hier zwei Ursachen
+gehabt haben könnte:
+
+| Sonde | Zähler sieht | INSERT ins volle Event |
+|---|---|---|
+| Event von jemand anderem gehostet | **0** | **ging durch** |
+| Event vom Schreibenden selbst gehostet | **1** | abgewiesen (23514) |
+
+Derselbe Trigger, dieselbe `capacity` — die in **beiden** Fällen sichtbar war,
+womit die zweite denkbare Ursache (RLS auf `events` macht `capacity` unsichtbar)
+ausgeschlossen ist. Der einzige Unterschied ist, was die RLS den Zähler sehen
+lässt.
+
+**Die Korrektur: zwei Trigger statt einem**, weil die zwei Schichten
+gegensätzliche Rechtemodelle brauchen.
+
+| | Schicht 2 — `…_wache_exklusiv` | Schicht 1 — `…_wache_kapazitaet` |
+|---|---|---|
+| Aufgabe | wer schreibt | wieviele sitzen schon |
+| Modell | `SECURITY INVOKER` | `SECURITY DEFINER` |
+| Warum | braucht `current_user` | muss ALLE Zeilen sehen |
+| Liest | nur den Katalog | `events` und `event_registrations` |
+
+`force row level security` ist auf beiden Tabellen **aus** und der Eigentümer ist
+`postgres` — nachgesehen, nicht angenommen; sonst trüge auch die Definer-Variante
+nicht.
+
+Zwei Folgen, die zum Entwurf gehören:
+
+1. **Die Reihenfolge hängt am NAMEN.** Gleichartige `before`-Trigger feuern
+   alphabetisch, `…_exklusiv` also vor `…_kapazitaet`. So nennt ein direkter
+   Statuswechsel an einem vollen Event den Grund „nicht direkt" statt „voll" —
+   die Meldung benennt den Mechanismus, der wirklich gegriffen hat. Eine Zusage
+   pinnt das fest; Umbenennen macht sie rot.
+2. **Schicht 1 deckt jetzt auch Weg D.** Sie feuert zusätzlich, wenn eine bereits
+   `registered` gesetzte Zeile das Event wechselt (`old.event_id is distinct from
+   new.event_id`). Ohne diesen Zweig sähe eine reine Übergangsregel dort nichts —
+   der Status ändert sich ja nicht, der Platz am Zielevent ist trotzdem neu belegt.
+
+**Warum das nur eine gezielte Zusage findet:** die vier Wege scheitern schon an
+den Spaltenrechten. Eine Testdatei, die nur sie prüft, bliebe grün, während
+Schicht 1 vollständig wirkungslos ist — sie käme nie zum Zug. Deshalb stellt
+Abschnitt 4 der Testdatei eine spätere Lockerung der Rechte **nach** und ist die
+einzige Zusage, die `SECURITY DEFINER` wirklich festhält. Gegenprobe gefahren:
+mit `security invoker` gehen dort beide Sonden auf `OK` — die Überbuchung
+passiert wirklich.
 
 **Verworfen: ein Sitzungsflag** (`set_config` in der RPC, das der Trigger liest).
 Es wäre eine zweite, selbstgebaute Wahrheit über „ich bin der erlaubte Weg", die

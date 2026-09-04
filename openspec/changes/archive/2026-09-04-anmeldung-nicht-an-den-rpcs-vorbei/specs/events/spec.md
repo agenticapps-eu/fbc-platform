@@ -84,7 +84,7 @@ SHALL NOT be able to reach the same result:
   `with check` condition cannot see the old row and would have to forbid
   `registered` outright — which would break writing a rating on an already
   registered row.
-- The trigger SHALL work in **two layers**, and the lower one SHALL NOT depend on
+- The guard SHALL work in **two layers**, and the lower one SHALL NOT depend on
   who is writing. Layer one checks the capacity invariant itself for **every**
   path into `status = 'registered'`, the `SECURITY DEFINER` functions included;
   it is the guarantee that holds even if an assumption about roles or ownership
@@ -93,6 +93,23 @@ SHALL NOT be able to reach the same result:
   refused — so that an unknown or future role is blocked rather than let
   through. A rule phrased as `current_user = 'authenticated'` would fail **open**
   and SHALL NOT be used.
+- The two layers SHALL be **two separate triggers**, because they require
+  opposite privilege models. Layer two SHALL be `SECURITY INVOKER`, since it can
+  only distinguish callers through a meaningful `current_user`. Layer one SHALL
+  be `SECURITY DEFINER`, since it SHALL count **all** registrations of the
+  event: read under the writer's own row-level security it sees only that
+  member's rows, counts zero occupied seats and lets the overbooking through.
+  A single `SECURITY INVOKER` trigger carrying both layers therefore fails
+  **open** on exactly the guarantee layer one is supposed to make, and SHALL NOT
+  be used.
+- Layer one SHALL also fire when a row that already holds `status = 'registered'`
+  changes its `event_id`, since the status does not change on that path while the
+  seat at the target event is newly taken.
+- Neither trigger function SHALL be executable by `public`, `anon`,
+  `authenticated` or `service_role`. A trigger's `EXECUTE` privilege is checked
+  when the trigger is created, not when it fires, so both keep working; without
+  the revoke, layer one would additionally be a tool for computing the occupancy
+  of events the caller cannot see.
 
 `regs_write_own` SHALL therefore permit UPDATE only, not INSERT or DELETE. A
 registration is cancelled (`status = 'cancelled'`), never deleted — deleting it
@@ -104,11 +121,25 @@ would additionally circumvent the uniqueness of `(event_id, profile_id)`.
 - **THEN** the result contains only `event_id`, `registered_count`, and
   `waitlist_count`, never attendee identities
 
-#### Scenario: A direct insert cannot create a registration
+#### Scenario: Direct write bypasses capacity logic (known constraint)
+
+<!-- Der TITEL bleibt woertlich stehen, obwohl er jetzt das Gegenteil des Rumpfes
+     behauptet — und das ist Absicht. `openspec archive` ordnet ein Szenario
+     ueber seine Ueberschrift zu; ein neuer Titel wuerde das alte nicht mehr
+     finden und es beim Falten still LOESCHEN. Genau daran hat der Archivierer
+     diesen Change am 04.09. abgebrochen, zu Recht: der erste Entwurf des Deltas
+     hatte die Zusage unter neuem Namen („A direct insert cannot create a
+     registration") danebengestellt, statt die alte umzudrehen.
+
+     Die Bedingung wird also im RUMPF geschaerft, nie im Titel. Dass „(known
+     constraint)" nach diesem Change keine Einschraenkung mehr benennt, ist der
+     Preis dafuer, dass die Zeile nachvollziehbar dieselbe bleibt. -->
 
 - **WHEN** an activated member with rank ≥ `exchange` inserts an
   `event_registrations` row directly instead of calling `register_for_event`
-- **THEN** the insert is refused, and no row is created
+- **THEN** the insert is refused for lack of privilege, and no row is created —
+  the constraint this scenario used to record is lifted: overbooking is no
+  longer prevented "only via the RPC"
 
 #### Scenario: A member cannot promote themselves off the waitlist
 
@@ -122,6 +153,26 @@ would additionally circumvent the uniqueness of `(event_id, profile_id)`.
   a different, full event
 - **THEN** the write is refused — `event_id`, `profile_id`, `id` and `created_at`
   SHALL NOT be updatable by `authenticated`
+
+#### Scenario: The capacity layer holds on its own
+
+<!-- Die vier Wege scheitern schon an den Spaltenrechten. Ohne dieses Szenario
+     bliebe die Abnahme gruen, waehrend Schicht 1 vollstaendig wirkungslos ist —
+     sie kaeme nie zum Zug. Genau das war der Fall, bis es gemessen wurde. -->
+
+- **GIVEN** the column and table privileges are widened again, so that
+  `authenticated` may insert rows and write `event_id`
+- **WHEN** such a write would put a row into `status = 'registered'` at an event
+  that is already at capacity — whether by insert or by moving an already
+  registered row to that event
+- **THEN** layer one refuses it on its own, naming the capacity as the reason
+
+#### Scenario: A refusal names the mechanism that actually applied
+
+- **WHEN** a member directly moves their own row into `status = 'registered'` at
+  an event that is **also** at capacity
+- **THEN** the refusal names the direct status change, not the capacity — layer
+  two applies before layer one
 
 #### Scenario: The RPC path is unaffected on insert
 

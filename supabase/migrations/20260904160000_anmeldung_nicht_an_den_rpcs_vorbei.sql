@@ -29,16 +29,42 @@
 --    wäre wirkungslos, solange das tabellenweite UPDATE-Recht besteht. Deshalb
 --    erst das Tabellenrecht entziehen, dann genau die erlaubten Spalten zurück.
 --
--- 2. Der TRIGGER hat ZWEI SCHICHTEN, und die untere kennt keine Rollen.
---    Schicht 1 prüft die Kapazitätsinvariante für JEDEN Weg, die RPC
---    eingeschlossen — sie hängt an keiner Annahme darüber, wer schreibt.
---    Schicht 2 sperrt den direkten Statuswechsel und ist als AUSSCHLUSS
---    formuliert (alles ausser dem Eigentümer), damit eine unbekannte oder
---    künftige Rolle GESPERRT und nicht durchgelassen wird.
+-- 2. ZWEI SCHICHTEN IN ZWEI TRIGGERN, weil sie GEGENSÄTZLICHE Rechtemodelle
+--    brauchen. Das ist die Form, und sie ist nicht kosmetisch:
 --
+--    Schicht 2 (Exklusivität) muss wissen, WER schreibt — sie braucht ein
+--    aussagekräftiges `current_user` und ist deshalb SECURITY INVOKER. Sie ist
+--    als AUSSCHLUSS formuliert (alles ausser dem Eigentümer), damit eine
+--    unbekannte oder künftige Rolle GESPERRT und nicht durchgelassen wird.
 --    Die erste Fassung des Entwurfs prüfte `current_user = 'authenticated'`.
 --    Das wäre fail-OPEN gewesen: jede andere Rolle wäre daran vorbeigelaufen.
 --    Beide Planungs-Reviewer haben es gefunden.
+--
+--    Schicht 1 (Kapazität) muss ALLE Zeilen SEHEN — und genau daran ist die
+--    erste Fassung gescheitert. Sie stand als SECURITY INVOKER im selben
+--    Trigger und zählte deshalb unter der RLS des Schreibenden. Gemessen am
+--    04.09. gegen den lokalen Stack, mit Positivkontrolle:
+--
+--      Zähler am FREMD gehosteten Event   0   -> INSERT ging DURCH
+--      Zähler am SELBST gehosteten Event  1   -> INSERT wurde abgewiesen
+--
+--    Derselbe Trigger, dieselbe `capacity` (in beiden Fällen sichtbar, das
+--    war die zweite geprüfte Ursache), gegensätzlicher Ausgang — der einzige
+--    Unterschied ist, was `regs_select_self_or_host` den Zähler sehen lässt.
+--    Ein Mitglied sieht nur die EIGENEN Anmeldezeilen, also zählte die
+--    Schicht, die überbuchen verhindern soll, für jeden Angreifer null.
+--
+--    Sie war damit fail-OPEN, und zwar an genau der Stelle, an der der Kopf
+--    hier zusagte, sie halte unabhängig von Schicht 2. Deshalb ist Schicht 1
+--    jetzt ein eigener Trigger mit SECURITY DEFINER: sie liest als Eigentümer
+--    der Tabelle und kennt wirklich keine Rollen. `force row level security`
+--    ist auf beiden Tabellen aus — nachgesehen, nicht angenommen.
+--
+--    Die REIHENFOLGE der beiden Trigger ist tragend und hängt am NAMEN:
+--    gleichartige BEFORE-Trigger feuern alphabetisch, `…_exklusiv` vor
+--    `…_kapazitaet`. So nennt ein direkter Statuswechsel an einem vollen
+--    Event den Grund „nicht direkt" und nicht „voll" — die Meldung benennt
+--    den Mechanismus, der wirklich gegriffen hat. Eine Zusage pinnt das fest.
 --
 -- 3. `register_for_event` IST EIN UPSERT, und das ist der teuerste Fallstrick
 --    dieses Changes:
@@ -102,24 +128,24 @@ grant update (status, rating) on public.event_registrations to authenticated;
 -- jemand die Policy lockert" — und derselbe Schutz hinge hier an einer Policy.
 revoke insert, delete on public.event_registrations from authenticated;
 
--- ── 3. Der Trigger ──────────────────────────────────────────────────────────
-create or replace function public.event_registrations_wache()
+-- ── 3. Schicht 2: Exklusivitaet (SECURITY INVOKER) ──────────────────────────
+-- Muss wissen, WER schreibt, und braucht deshalb ein aussagekraeftiges
+-- `current_user`. Sie liest KEINE Tabelle — nur den Katalog. Damit stellt sich
+-- die RLS-Frage hier gar nicht erst.
+create or replace function public.event_registrations_wache_exklusiv()
 returns trigger
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
-  v_capacity int;
-  v_belegt   int;
-  v_eigner   name := (
+  v_eigner name := (
     select pg_get_userbyid(p.proowner)
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'register_for_event'
      limit 1
   );
 begin
-  -- ── Schicht 2: Exklusivitaet, als AUSSCHLUSS formuliert ───────────────────
   -- Nur beim UPDATE, und nur wenn sich der Status in Richtung eines belegten
   -- Platzes bewegt. `cancelled` und `rating` bleiben dem Mitglied.
   --
@@ -134,22 +160,60 @@ begin
       using errcode = '42501';
   end if;
 
-  -- ── Schicht 1: die Invariante, rollenunabhaengig ──────────────────────────
-  -- Gilt fuer JEDEN Weg, die RPC eingeschlossen. Sie ist fuer die RPC ein Netz
-  -- und kein Hindernis: die zaehlt vorher unter Zeilensperre und setzt
-  -- `waitlist`, sobald die Kapazitaet erreicht ist.
+  return new;
+end;
+$$;
+
+comment on function public.event_registrations_wache_exklusiv() is
+  'AGE-605, Schicht 2: der direkte Statuswechsel nach registered/waitlist nur '
+  'fuer den Eigentuemer von register_for_event. Als AUSSCHLUSS formuliert, damit '
+  'eine unbekannte Rolle gesperrt und nicht durchgelassen wird. SECURITY INVOKER, '
+  'weil genau das `current_user` gebraucht wird — die Kapazitaet prueft der '
+  'zweite Trigger, der dafuer das Gegenteil braucht.';
+
+-- ── 4. Schicht 1: die Kapazitaetsinvariante (SECURITY DEFINER) ──────────────
+-- Sie muss ALLE Zeilen SEHEN, sonst zaehlt sie falsch und faellt OFFEN aus.
+-- Als SECURITY INVOKER zaehlte sie unter der RLS des Schreibenden und sah bei
+-- einem Angreifer null belegte Plaetze — gemessen, siehe Kopf. Deshalb liest
+-- sie hier als Eigentuemer der Tabelle und kennt wirklich keine Rollen.
+--
+-- Fuer die RPC ist sie ein Netz und kein Hindernis: die zaehlt vorher unter
+-- Zeilensperre und setzt `waitlist`, sobald die Kapazitaet erreicht ist.
+create or replace function public.event_registrations_wache_kapazitaet()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_capacity int;
+  v_belegt   int;
+begin
+  -- Der dritte Zweig ist Weg D: eine Zeile, die bereits `registered` ist, wird
+  -- auf ein ANDERES Event umgehaengt. Der Status aendert sich dabei nicht, eine
+  -- reine Uebergangsregel saehe also nichts — der Platz am Zielevent ist
+  -- trotzdem neu belegt.
   if new.status = 'registered'
-     and (tg_op = 'INSERT' or old.status is distinct from 'registered')
+     and ( tg_op = 'INSERT'
+           or old.status is distinct from 'registered'
+           or old.event_id is distinct from new.event_id )
   then
+    -- `for update` ist nicht Zierrat: ohne die Zeilensperre zaehlt der Trigger
+    -- unter READ COMMITTED gegen einen Stand, den ein gleichzeitiger Schreiber
+    -- schon veraendert hat. Bei `belegt = capacity - 1` kaemen dann BEIDE durch,
+    -- und die Zusage „Schicht 1 haelt allein" waere ueberzeichnet (Befund
+    -- opencode aus dem Diff-Review, NIEDRIG). Auf dem RPC-Weg kostet das nichts:
+    -- `register_for_event` haelt dieselbe Sperre auf derselben Zeile bereits,
+    -- ein erneutes Anfordern ist dort ein No-op.
     select e.capacity into v_capacity
-      from public.events e where e.id = new.event_id;
+      from public.events e where e.id = new.event_id for update;
 
     if v_capacity is not null then
       select count(*) into v_belegt
         from public.event_registrations r
        where r.event_id = new.event_id
          and r.status = 'registered'
-         and r.id <> new.id;
+         and r.id is distinct from new.id;
 
       if v_belegt >= v_capacity then
         raise exception 'event is at capacity' using errcode = '23514';
@@ -161,20 +225,34 @@ begin
 end;
 $$;
 
-comment on function public.event_registrations_wache() is
-  'AGE-605. Zwei Schichten: (1) die Kapazitaetsinvariante rollenunabhaengig fuer '
-  'jeden Weg nach status=registered, (2) der direkte Statuswechsel nur fuer den '
-  'Eigentuemer von register_for_event, als AUSSCHLUSS formuliert damit eine '
-  'unbekannte Rolle gesperrt und nicht durchgelassen wird. Schicht 1 haelt die '
-  'Zusage auch dann, wenn die Annahme aus Schicht 2 ueber Eigentuemer oder '
-  'SECURITY DEFINER eines Tages nicht mehr stimmt.';
+comment on function public.event_registrations_wache_kapazitaet() is
+  'AGE-605, Schicht 1: keine Ueberbuchung, auf JEDEM Weg nach status=registered '
+  '— INSERT, Statuswechsel und das Umhaengen einer bereits registrierten Zeile '
+  'auf ein anderes Event (Weg D). SECURITY DEFINER, weil sie sonst unter der RLS '
+  'des Schreibenden zaehlt und bei einem Angreifer null belegte Plaetze sieht; '
+  'als SECURITY INVOKER war sie fail-OPEN, gemessen am 04.09.';
 
 -- Neue Funktionen bekommen EXECUTE ueber PUBLIC. Ohne diesen Entzug wird die
 -- geschlossene Funktionsliste in grants_test.sql rot — und zwar zu Recht.
-revoke execute on function public.event_registrations_wache()
+-- Ein Trigger prueft EXECUTE nicht zur Laufzeit, sondern beim CREATE TRIGGER;
+-- beide Funktionen feuern also weiterhin. Bei der DEFINER-Funktion ist der
+-- Entzug ausserdem der Unterschied zwischen einem Trigger und einem Werkzeug,
+-- mit dem sich jeder Angemeldete die Belegung fremder Events ausrechnen kann.
+revoke execute on function public.event_registrations_wache_exklusiv()
+  from public, anon, authenticated, service_role;
+revoke execute on function public.event_registrations_wache_kapazitaet()
   from public, anon, authenticated, service_role;
 
-drop trigger if exists event_registrations_wache on public.event_registrations;
-create trigger event_registrations_wache
+-- Die Reihenfolge haengt am NAMEN: gleichartige BEFORE-Trigger feuern
+-- alphabetisch, `…_exklusiv` also vor `…_kapazitaet`. So nennt ein direkter
+-- Statuswechsel an einem VOLLEN Event den Grund „nicht direkt" und nicht
+-- „voll". Umbenennen heisst hier: die Meldung aendert sich.
+drop trigger if exists event_registrations_wache_exklusiv on public.event_registrations;
+create trigger event_registrations_wache_exklusiv
   before insert or update on public.event_registrations
-  for each row execute function public.event_registrations_wache();
+  for each row execute function public.event_registrations_wache_exklusiv();
+
+drop trigger if exists event_registrations_wache_kapazitaet on public.event_registrations;
+create trigger event_registrations_wache_kapazitaet
+  before insert or update on public.event_registrations
+  for each row execute function public.event_registrations_wache_kapazitaet();

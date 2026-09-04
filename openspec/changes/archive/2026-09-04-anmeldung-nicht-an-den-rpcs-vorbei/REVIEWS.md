@@ -111,3 +111,44 @@ statt stillschweigend übergangen.
 die Kapazität unter die Belegung senken kann, und dass Mitglieder unterhalb von
 `exchange` sich anmelden, aber nicht direkt absagen können. Beide sind Bestand,
 nicht durch diesen Change entstanden.
+
+---
+
+# Diff-Review (2026-09-04, Aufgabe 9.5)
+
+Zwei fremde Anbieter auf dem fertigen Diff (909 Zeilen), nach dem Umbau auf zwei
+Trigger. **Beide APPROVE.**
+
+| Arm | Modell | Ergebnis |
+|---|---|---|
+| `opencode` | `hf:moonshotai/Kimi-K3` | APPROVE, 3 × NIEDRIG — hat die Trigger in einer eigenen Miniaturtabelle **nachgebaut und gemessen**, statt den Diff nur zu lesen |
+| `gemini` | Standardmodell (ohne `-m`) | APPROVE, 1 × NIEDRIG |
+
+Kein Befund über NIEDRIG, und keiner der vier Wege wurde als offen gemeldet.
+
+## Befunde und was daraus wurde
+
+| Befund | Arm | Was daraus wurde |
+|---|---|---|
+| **NIEDRIG — Schicht 1 zählt ohne Sperre.** Unter READ COMMITTED können zwei gleichzeitige Schreiber bei `belegt = capacity - 1` beide durchgehen; die Zusage „Schicht 1 hält allein" wäre dann überzeichnet. | opencode | **Übernommen, und zwar durch die Sperre statt durch eine schwächere Zusage.** Schicht 1 liest die `events`-Zeile jetzt `for update`. Auf dem RPC-Weg kostet das nichts — `register_for_event` hält dieselbe Sperre bereits. **Nachgemessen mit zwei Sitzungen:** B läuft an genau dieser Zeile in den `lock_timeout` (`while locking tuple … in relation "events"`), statt zu überbuchen. |
+| **NIEDRIG — `tasks.md` 8.1 erwartet „eine Funktion kommt dazu" im Golden-Snapshot**, der Diff ändert dort aber nur die Tabellenrechte. | opencode | **Übernommen — die Erwartung war falsch.** Abschnitt 6 von `grants_test.sql` führt die Funktionen, die **`anon` ausführen darf**; die beiden neuen bekommen den `revoke execute` und erscheinen deshalb zu Recht nicht. Am vollständigen Testkopf nachgesehen und `tasks.md` 8.1 korrigiert. Rot wurde genau eine Zeile. |
+| **NIEDRIG — Blindspot des Diffs:** die tragende `if`-Bedingung von `…_exklusiv` und der NULL-`capacity`-Zweig stehen teils in unverändertem Kontext und sind aus dem Diff allein nicht verifizierbar. | opencode | **Kein Defekt, aber richtig beobachtet.** opencode hat es durch den Nachbau kompensiert; im Repo decken es die Zusagen ab (Weg B für die Bedingung, die Positivkontrollen für den NULL-Zweig). Hier festgehalten, weil es eine Aussage über die Review-METHODE ist, nicht über den Code. |
+| **NIEDRIG — die Trigger-Reihenfolge hängt an der alphabetischen Sortierung der Namen** und ist damit implizit statt deklariert. | gemini | **Kein Änderungsbedarf, und gemini sagt das selbst:** „Das Verhalten wird in der Dokumentation explizit gemacht und eine Testzusage pinnt die resultierende Fehlermeldung fest … Die Konstruktion ist daher als tragfähig zu bewerten." Postgres garantiert die Reihenfolge; Migrationskopf, `design.md` und Spec-Delta benennen sie, und Zusage 2 wird bei einer Umbenennung rot. |
+
+## Was der Diff-Review NICHT geleistet hat
+
+**Den teuersten Fehler dieses Changes hat kein Reviewer gefunden — er war beim
+Diff schon behoben.** Dass Schicht 1 als `SECURITY INVOKER` unter der RLS des
+Schreibenden zählte und damit fail-OPEN war, kam aus dem **Lauf gegen die
+Datenbank**, nicht aus einer Review. Die Planungs-Review konnte ihn nicht sehen
+(sie prüfte einen Entwurf ohne RLS-Kontext), und der Diff-Review sah bereits die
+Korrektur.
+
+Das ist die Lehre dieses Changes: **eine Migration, die nie gegen eine Datenbank
+gelaufen ist, ist ungeprüft** — auch wenn zwei fremde Anbieter ihren Plan
+abgesegnet haben.
+
+<!-- Kein signierter Gate-Trailer: dieser Abschnitt ist von Hand geschrieben,
+     die Reviewer wurden direkt per Bash gerufen. Das Gate meldet die Datei als
+     `trailer-absent`; es blockt nichts, aber sie zaehlt dort nicht als
+     verifizierbar. Gilt fuer JEDE REVIEWS.md dieses Repos. -->
