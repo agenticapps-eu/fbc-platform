@@ -1,130 +1,135 @@
-# Session Handoff — 2026-09-04 (AGE-642: Mitteilungskanal und Bildupload, beide am Gerät belegt)
+# Session Handoff — 2026-09-04 (AGE-605 halb fertig · AGE-542 und AGE-618 ausgeliefert)
 
-> ## ⚠ ZUERST — Scope dieser Übergabe
+> ## ⚠ ZUERST — vier Dinge
 >
-> **Sie führt nur AGE-642 (M2, Capacitor-Hülle).** Die Datei ist für alle
-> parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase — **nicht
-> zusammenführen.**
+> **1. Diese Übergabe führt AGE-605.** AGE-542 und AGE-618 stehen darin nur als
+> Endstand; ihre ausführliche Fassung liegt auf `main` (`1a95ca0`).
+> Die Datei ist für alle parallelen Sitzungen dieselbe und kollidiert bei jedem
+> Rebase. **Nicht zusammenführen.**
 >
-> **Vorher stand hier AGE-542 und AGE-618.** Beide sind abgeschlossen,
-> ausgeliefert und archiviert; jene Sitzung hatte nichts Offenes mehr, was ihr
-> gehörte. Ihre allgemeinen offenen Fragen (rotes `pnpm lint` im Haupt-Checkout
-> aus `.gstack/`, drei Remote-Zweige nach dem Merge, die Verortung der
-> anon-Anforderung) sind **nicht** übernommen und stehen im Verlauf:
-> `git show 1a95ca0:session-handoff.md`.
+> **2. AGE-605 IST NICHT FERTIG.** Geplant, fremdreviewt, Migration geschrieben —
+> **die Tests fehlen vollständig.** Nichts davon ist gegen eine Datenbank
+> gelaufen. Der Stand ist committet und gepusht (`82d1b52` auf
+> `donald/age-605-anmeldung-nicht-an-den-rpcs-vorbei`), damit er nicht ungepusht
+> unsichtbar liegt — nicht, weil er fertig wäre.
 >
-> **Die Gerätebelege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
-> Phase E. Diese Datei bleibt der Überblick.
+> **3. AGE-642 läuft PARALLEL** (Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle`). **Nicht anfassen.** Hat am
+> 04.09. selbst #330, #331 und #333 nach `main` gebracht.
+>
+> **4. AGE-630 kommt NACH AGE-605**, und zwar in einer eigenen frischen Sitzung
+> — so von Donald am 04.09. festgelegt. Nicht vorziehen.
 
 ## Accomplished
 
-Zwei Aufgaben, beide Ende zu Ende am Pixel 11 Pro belegt. Fünf PRs, alle
-gemerged, CI grün.
+### Ausgeliefert und abgeschlossen
 
-| PR | Was |
-|---|---|
-| **#333** | Mitteilungskanal auf Android — die App überließ ihn FCM |
-| **#337** | Die OTA-Übernahme darf nicht in den Bildwähler platzen |
-| #338 · #339 · #340 | Übergabe und Messprotokolle |
+| Vorgang | PRs | Stand |
+|---|---|---|
+| **AGE-542** — anon-Wächter leitet seine Fläche ab | #332, #334 | Done, archiviert |
+| **AGE-618** — Wächter gegen Einbettung am VideoEmbed vorbei | #335 | Done |
+| Übergabe dazu | #336 | auf `main` (`1a95ca0`) |
 
-**1 · Der Mitteilungskanal.** Die App deklarierte keinen; FCM legte sich seinen
-eigenen an („Sonstiges"). Jetzt `<meta-data …default_notification_channel_id>`
-im Manifest plus `pushKanalAnlegen()` beim Montieren der Hülle. Belegt:
+`main` steht bei `1a95ca0`, `pnpm test` **2536/2536** in 223 Dateien.
 
-```
-vorher:  fcm_fallback_notification_channel | Miscellaneous | imp=3 | vib=false
-nachher: mitteilungen | Nachrichten und Kontaktanfragen | imp=4 | vib=true
-zugestellt 17:11: tag=…112503055  channel=mitteilungen  importance=4
-```
+### AGE-605 — die Hälfte, die zählt, ist getan
 
-Die Zustellung vom Vormittag liegt als Gegenprobe daneben und trägt weiter den
-Fallback — zwei Zustellungen, dasselbe Gerät, verschiedene Kanäle.
+Der **Plan** steht und ist durch zwei fremde Anbieter gegangen. Das war die
+teure, entscheidungslastige Hälfte; was fehlt, ist mechanisch.
 
-**2 · Der Bildupload.** Ursache gefunden und **die bisherige Vermutung
-widerlegt**: nicht der Activity-Lebenszyklus, sondern ein wartendes
-capgo-Bündel, das bei der Rückkehr aus dem *gestoppten* Zustand übernommen wird,
-die WebView neu lädt und das offene `await Camera.takePhoto()` tötet. Fix:
-`setMultiDelay({delayConditions:[{kind:"kill"}]})` / `cancelDelay()` um den
-nativen Rundlauf. Gegenprobe unter hergestellter Fehlerbedingung:
-
-| Lauf | Kamera | Bündel wartete | Aufschub | Ausgang |
-|---|---|---|---|---|
-| 17:19 | ja | ja | nein | Zustand weg |
-| 17:22 | ja | nein | nein | Zuschnitt |
-| **18:37** | ja | ja | **ja** | **Zuschnitt** |
-| 18:39 | — | ja | gefallen | Übernahme läuft normal |
-
-Zeile 3 unterscheidet sich von Zeile 1 in **einer** Variablen.
+- `openspec/changes/anmeldung-nicht-an-den-rpcs-vorbei/` — Vorschlag, Entwurf,
+  Aufgaben, Spec-Delta. `openspec validate --all` **32/32**.
+- `REVIEWS.md` — gemini und codex, **beide REQUEST-CHANGES**, alle Befunde
+  eingearbeitet.
+- `supabase/migrations/20260904160000_anmeldung_nicht_an_den_rpcs_vorbei.sql` —
+  geschrieben, **nie ausgeführt**.
 
 ## Decisions
 
-- **Ein Kanal, nicht zwei.** Eine Trennung nach Nachricht/Kontaktanfrage wäre
-  naheliegend — aber einen abgeschalteten Kanal kann die App nie wieder
-  einschalten. Entwurf, kein Anbau.
-- **`vibration: true` ausdrücklich**, weil Capacitors Manager das Feld mit
-  Vorgabe **false** liest (anders als Android). Kein `sound`, weil der Kanal
-  ohne den Schlüssel den Systemton behält; ein Wert verlangte `res/raw`.
-- **`PUSH_KANAL_ID` darf sich nie ändern** — eine neue Kennung ist für Android
-  ein neuer Kanal und setzt eine Abschaltung des Mitglieds zurück.
-- **Chirurgischer Aufschub statt `directUpdate: true`** (Donald, 04.09.):
-  letzteres erschlüge die ganze Klasse, verlängert aber jeden Start und verdreht
-  D4/D5 mit. Eigener Vorgang, wenn überhaupt.
-- **`default_sound: true` im Versand bleibt stehen** — unter Android 8 gibt es
-  keine Kanäle, und `minSdkVersion = 24` reicht bis Android 7.0.
-- **Der Upload wurde bewusst NICHT abgeschlossen** (`Abbrechen` statt
-  `Übernehmen`): es hätte ein Foto einer dunklen Fläche als Donalds Profilbild
-  auf PROD gesetzt.
+- **Der Trigger hat zwei Schichten.** Schicht 1 prüft die Kapazitätsinvariante
+  **rollenunabhängig** für jeden Weg (die RPC eingeschlossen); Schicht 2 sperrt
+  den direkten Statuswechsel und ist als **Ausschluss** formuliert
+  (`current_user <> <eigentuemer>`), damit eine unbekannte Rolle gesperrt und
+  nicht durchgelassen wird.
+- **`checked_in` wird über ein Spaltenrecht entzogen**, nicht über eine
+  Policy-Bedingung — und die Form ist tragend: erst `revoke update` auf der
+  Tabelle, dann `grant update (status, rating)`. Ein `revoke update (checked_in)`
+  allein ist ein **No-op**, solange das Tabellenrecht besteht.
+- **INSERT und DELETE fallen auch auf Rechte-Ebene**, nicht nur über die Policy.
+- **Die Zusage ist eingegrenzt** auf „neue Anmeldungen und Statuswechsel erzeugen
+  keine Überbuchung" — nicht „ein Event ist nie überbucht". Grund unten.
 
-## Files modified
+## Die drei HIGH-Befunde der Planungs-Review
 
-| Pfad | Was |
-|---|---|
-| `android/app/src/main/AndroidManifest.xml` | `<meta-data>` für den Vorgabekanal |
-| `src/lib/push.ts` | `PUSH_KANAL_ID` + `pushKanalAnlegen()` |
-| `src/lib/push.kanal.test.ts` | neu — hält Manifest und Konstante zusammen |
-| `src/components/AppShell.tsx` | Kanal beim Montieren, eigener Effect |
-| `src/components/AppShell.push.test.tsx` | Attrappe erweitert, drei Zusagen |
-| `src/lib/bildauswahl.ts` | OTA-Aufschub um den nativen Rundlauf; Rumpf nach `hole()` |
-| `src/lib/bildauswahl.test.ts` | Reihenfolge, Abbruch-Freigabe, Fehlerfälle |
-| `openspec/changes/capacitor-huelle/specs/native-shell/spec.md` | Anforderung Mitteilungskanal |
-| `openspec/changes/capacitor-huelle/tasks.md` | Messreihen, Ursache, Messfallen |
-| `openspec/changes/capacitor-huelle/uebergabe-android.md` | Gerätebezogene Übergabe |
+Alle am Quelltext nachgeprüft, alle zutreffend. **Zwei hätten den Change falsch
+gemacht.**
+
+1. **Mein Trigger-Entwurf war fail-OPEN.** Er sollte bei
+   `current_user = 'authenticated'` greifen und behauptete im selben Absatz,
+   geschlossen auszufallen. Jede andere Rolle wäre vorbeigelaufen.
+2. **`register_for_event` ist ein UPSERT**
+   (`on conflict … do update set status = excluded.status`). Eine
+   Wiederanmeldung nach dem Absagen läuft über den **UPDATE**-Zweig — genau dort,
+   wo der neue Trigger feuert. Meine Positivkontrollen hätten nur den
+   INSERT-Zweig geprüft und wären grün geblieben, während ein produktiver Weg
+   bricht. Genau der Fehler, den ich im Risikoabschnitt selbst als teuersten
+   benannt hatte.
+3. **Ein vierter Bypass:** die eigene `registered`-Zeile auf ein anderes, volles
+   Event umhängen (`event_id` ändern). Der Status bleibt `registered`, eine
+   Übergangsregel sieht nichts.
 
 ## Next session: start here
 
-**B3 — Keystore und Signier-Workflow.** In `.github/workflows/` steht bis heute
-kein einziger Gradle-Lauf; ohne ihn gibt es keinen Release-Bau und keine
-Store-Einreichung (M4). Das ist der größte verbleibende Block von AGE-642. Erste
-Handlung: klären, wo der Android-Keystore erzeugt und **zusätzlich außerhalb des
-Repos** gesichert wird — er ist unersetzlich, und ohne ihn ist die App im Store
-tot. Danach der eigene Workflow, manuell oder per Tag ausgelöst, **nicht** in
-`deploy.yml`.
+**Worktree:** `/Users/donald/worktrees/fbc-platform/donald-age-605-anmeldung-nicht-an-den-rpcs-vorbei`,
+Zweig `donald/age-605-anmeldung-nicht-an-den-rpcs-vorbei`, Stand `82d1b52`.
 
-Davor zwei Wischer am Gerät, wenn Donald mag: den Bildweg einmal mit
-`Übernehmen` zu Ende gehen, damit auch der Upload selbst belegt ist. Messpunkt
-`select count(*), max(created_at) from storage.objects where bucket_id='avatars'`
-(Stand 03.09.: 61 Dateien, neuestes vom 27.08.); `profiles.updated_at` taugt
-**nicht** als Beleg.
+**Erster Handgriff: `tasks.md` Gruppe 2 und 3.** Die Migration ist geschrieben,
+aber **nie gelaufen** — sie kann Syntaxfehler enthalten. Reihenfolge:
 
-> ⚠ **Vor jeder Gerätemessung**, drei Fallen, alle am 04.09. eingetreten:
-> `adb install` belegt die Weboberfläche **nicht** (capgos Bündel gewinnt) ·
-> `notifyAppReady` belegt **kein** Neuladen (capgos 10-Sekunden-Timer) · die
-> Bildschirmsperre hochsetzen, sonst laufen die Taps an den Sperrbildschirm.
+1. Ausgangsmessung (Gruppe 2): auf PROD rein lesend zählen, ob es überbuchte
+   Events gibt. **Selbst-Check-ins sind historisch NICHT messbar** — die Zeile
+   speichert den Handelnden nicht; das ist benannt, keine Zahl erfinden.
+2. `supabase/tests/anmeldung_rpc_exklusiv_test.sql` bauen: vier Exploit-Proben,
+   vier dauerhafte Zusagen, sieben Positivkontrollen. Die Namen der Zusagen
+   stehen in `tasks.md` Gruppen 3, 4, 6 und 7.
+3. **Die Datei MUSS in `.github/workflows/ci.yml` eingetragen werden.** Eine
+   pgTAP-Datei mit `plan()` ist kein Beleg, dass sie läuft — zwei lagen hier
+   schon monatelang tot im Repo.
+4. Golden-Snapshot in `grants_test.sql` nachziehen (Gruppe 8): aus einem
+   Tabellenrecht werden Spaltenrechte, und eine Funktion kommt dazu. **Die
+   Differenz benennen, nicht die Liste blind ersetzen.**
+5. Diff-Review, PR, archivieren.
+
+**Werkzeuge im Haupt-Checkout unter `.gstack/`** (gitignoriert):
+`probe-eintrag.mts` (Neuigkeiten-Vorschau **vor** dem Archivieren),
+`prod-anon-katalog.mts` (rein lesende PROD-Messung), `eingriff.py`.
 
 ## Open questions
 
-- **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat**
-  (Capacitors ausführliche Plugin-Protokollierung gibt `Preferences.get` samt
-  Ergebnis aus). Vor der Store-Einreichung am **Release**-Bau gegenprüfen, dass
-  die Stufe dort wirklich aus ist. Eigener Vorgang.
-- **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`, Zeile 375) — schlug
-  auf einem reinen Doku-PR fehl, lokal 5 von 5 grün. Rerun genügte. Kommt er
-  wieder, misst er Laufzeit statt Verhalten und gehört repariert.
-- **Realtime im Chat** ist weiterhin ungemessen — es muss jemand schreiben,
-  während die App offen ist; ein Log-Beleg genügt nicht.
-- **Bildupload auf iOS** ist ungeprüft. Die Ursache war capgo, nicht Android —
-  iOS ist also vermutlich genauso betroffen, aber das ist eine Ableitung, keine
-  Messung.
-- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung —
-  zuletzt machen. Für Android ohnehin eigener Vorgang (SplashScreen-API).
+- **Zwei Befunde gehören Donald**, beide **Bestand** und nicht durch diesen
+  Change entstanden. Für keinen wurde ein Vorgang angelegt — fremde Vorgänge
+  nicht ungefragt anlegen:
+  - **Ein Gastgeber kann `events.capacity` unter die bestehende Belegung
+    senken.** `updateEvent` (`src/lib/events.ts:601`) schreibt das Feld regulär.
+    Deshalb ist die Zusage dieses Changes eingegrenzt.
+  - **Mitglieder unter `exchange` können sich anmelden, aber nicht direkt
+    absagen.** Die RPC lässt öffentliche Events ab `basic` und Mitglieder-Events
+    ab `has_level(3)` zu, `regs_write_own` verlangt `has_level(4)`.
+- **`REVIEWS.md` trägt keinen signierten Trailer** — ich habe sie von Hand
+  geschrieben. Das Gate meldet sie als `trailer-absent`; es blockt nichts, aber
+  sie zählt dort nicht als verifizierbar.
+- **Der Neuigkeiten-Eintrag zu AGE-542 wird NICHT freigegeben** — Donalds
+  Entscheidung vom 04.09.: für Mitglieder ändert sich nichts Sichtbares.
+- **`pnpm lint` ist im Haupt-Checkout rot, vorbestehend und fremd** — alle Fehler
+  aus `.gstack/age595/` und `.gstack/age602/`. CI sieht das nie; über
+  `src scripts functions` steht es bei 0 Fehlern.
+- **`node_modules` veraltet nach einem `main`-Pull** (Capacitor-Pakete aus
+  AGE-642). 102 rote Testdateien, `typecheck` Exit 2 — sieht aus wie ein eigener
+  Schaden und ist keiner. `pnpm install` behebt es.
+- **Drei Remote-Zweige stehen nach dem Merge noch auf `origin`**
+  (`age-542-*` zweimal, `age-618-*`). Lokal weg; Aufräumen ist Donalds
+  Entscheidung.
+- **Nach AGE-605 kommt AGE-630** (Event-Vorlagen und Serientermine) in einer
+  eigenen frischen Sitzung. Der Vorgang nennt vier offene Produktentscheidungen
+  und drei Schema-Fallen — darunter, dass `events_cover_path_key` **UNIQUE** ist
+  und eine Serie sich das Coverbild deshalb nicht teilen kann.
