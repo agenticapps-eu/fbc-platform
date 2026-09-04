@@ -16,6 +16,17 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ],
   },
   {
+    slug: "2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei",
+    datum: "2026-09-04",
+    titel: "Anmeldungen zu Events halten sich an die Kapazität",
+    linear: "AGE-605",
+    aenderungen: [
+      "**Für Mitglieder ändert sich nichts Sichtbares.** Anmelden, Abmelden und Bewerten funktionieren unverändert.",
+      '**Eine neue Anmeldung belegt ein Event nicht mehr über seine Kapazität hinaus.** Die Grenze hängt nicht länger daran, dass man den vorgesehenen Weg benutzt. (Bewusst auf Anmeldungen begrenzt: ein Gastgeber kann die Kapazität weiterhin unter die bestehende Belegung senken — siehe „Nicht in diesem Change".)',
+      "**Den Anwesenheitsstatus setzt weiterhin nur der Gastgeber** — und das gilt jetzt auch dann, wenn jemand die Oberfläche umgeht.",
+    ],
+  },
+  {
     slug: "2026-09-03-escape-trifft-das-oberste",
     datum: "2026-09-03",
     titel: "Die Escape-Taste schliesst das Feedback-Fenster, nicht das Menü darunter",

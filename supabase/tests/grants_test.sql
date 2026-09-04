@@ -27,6 +27,21 @@ select plan(15);
 -- auch kein Grant. anon steht nur auf den fuenf Tabellen, die eine anon-Policy
 -- haben. TRUNCATE/REFERENCES/TRIGGER/MAINTAIN kommen bewusst nirgends vor: an
 -- ihnen greift RLS nicht.
+--
+-- ── AGE-605, 04.09.: GENAU EINE Zeile hat sich verschoben ────────────────────
+--   event_registrations/authenticated
+--     vorher  DELETE,INSERT,SELECT,UPDATE
+--     jetzt   SELECT
+-- INSERT und DELETE sind entzogen (Anmeldungen legt `register_for_event` an,
+-- abgesagt wird per `status`), das tabellenweite UPDATE ist zu Spaltenrechten
+-- auf `status` und `rating` verengt.
+--
+-- ACHTUNG, blinder Fleck dieser Liste: `role_table_grants` zeigt SPALTENRECHTE
+-- NICHT. Dass `authenticated` weiterhin `status` und `rating` schreiben darf,
+-- ist hier also unsichtbar — und ein vollstaendiger Rechteverlust auf der
+-- Tabelle saehe an dieser Stelle genauso aus wie die gewollte Verengung.
+-- Deshalb steht die Zusage Spalte fuer Spalte per `has_column_privilege` in
+-- supabase/tests/anmeldung_rpc_exklusiv_test.sql.
 
 select is(
   (select coalesce(string_agg(table_name || '/' || grantee || '=' || privs, E'\n'
@@ -42,7 +57,7 @@ badges/authenticated=SELECT
 comments/authenticated=INSERT,SELECT
 compass_responses/authenticated=DELETE,INSERT,SELECT,UPDATE
 contact_requests/authenticated=INSERT,SELECT
-event_registrations/authenticated=DELETE,INSERT,SELECT,UPDATE
+event_registrations/authenticated=SELECT
 events/anon=SELECT
 events/authenticated=DELETE,INSERT,SELECT,UPDATE
 feedback/authenticated=DELETE,INSERT,SELECT,UPDATE
