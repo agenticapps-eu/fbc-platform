@@ -100,6 +100,15 @@ export function FeedbackButton({
   const { data: themen = [] } = useQuery({
     queryKey: feedbackThemenQueryKey,
     queryFn: fetchFeedbackThemen,
+    // `feedback_themes` trägt sein SELECT nur für `authenticated`
+    // (`grants_test.sql`). Ohne diese Zeile fragt die Hülle die Relation auch
+    // ausgeloggt an — der Knopf steht in der Seitenleiste, die per CSS
+    // versteckt, aber im Baum ist, und der Hook läuft VOR dem `return null`
+    // unten. Ergebnis war ein 401 auf jedem ausgeloggten Seitenaufruf.
+    //
+    // Behoben wird die ABFRAGE, nicht das Recht (AGE-542): für Ausgeloggte gibt
+    // es nichts zu zeigen, wofür die Themen gebraucht würden.
+    enabled: Boolean(user),
   });
   const gewaehltesThema = thema || themen[0]?.key || "";
   // VOR dem frühen `return null` unten (AGE-529): stünde der Hook dahinter,
