@@ -9,33 +9,31 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**Die Push-Sonde ausloesen** — das ist der letzte offene Punkt aus Aufgabe 1,
-und nur noch die kleinere Haelfte davon. Der Kanal selbst ist am Geraet
-gemessen (siehe unten); offen ist, dass eine ZUGESTELLTE Mitteilung ihn traegt.
+**Aufgabe 2, der Bildupload** — Aufgabe 1 ist seit dem 04.09. 17:11 vollstaendig
+belegt und abgeschlossen (siehe unten). Der Bildupload ist damit der letzte ⛔
+der Abnahmeliste.
 
-```bash
-.gstack/run-android-push-probe.sh
-adb shell dumpsys notification --noredact | grep -i effbeezee
-```
+Belegt ist dort **der Reload, nicht seine Ursache**, und der naechste Schritt
+ist ausdruecklich, das zu belegen statt es zu vermuten: „Aktivitaeten nicht
+behalten" in den Entwickleroptionen erzwingt die Activity-Zerstoerung und macht
+aus dem Zufallsfund einen wiederholbaren Test. Erst wenn der greift, ist
+`android:configChanges` die richtige Baustelle. Einzelheiten unter Punkt 2.
 
-Erwartet in der `NotificationRecord`-Zeile: `channel=mitteilungen`, **nicht**
-`fcm_fallback_notification_channel`. Aus Claude Code heraus laesst sich das
-Werkzeug nicht starten (der Klassifikator blockt jeden sendenden Lauf unter
-`--env=prod`); Donald loest es aus.
-
-**Das Geraet ist vorbereitet:** Bau vom 04.09. 16:39 installiert, OTA-Buendel
-`wi3AmIcidl` uebernommen und bestaetigt, Kanal `mitteilungen` steht. Nichts
-weiter noetig.
+**Das Geraet ist vorbereitet:** Bau vom 04.09. 16:39, OTA-Buendel `wi3AmIcidl`
+uebernommen und bestaetigt, angemeldet.
 
 > ⚠️ **Vor JEDER Messung am Geraet:** pruefen, welche Weboberflaeche wirklich
 > laeuft. `adb install` tauscht nur die Huelle — capgos gespeichertes Buendel
 > gewinnt, und eine frisch installierte Aenderung sieht dann wirkungslos aus.
-> Das hat heute drei Messungen gekostet. Rezept und Erkennungszeichen stehen in
+> Das hat am 04.09. drei Messungen gekostet. Rezept und Erkennungszeichen in
 > `tasks.md`, Phase E, „`adb install` belegt die Weboberflaeche NICHT".
 
-Danach Aufgabe 2, der Bildupload.
+Push kann jederzeit nachgestellt werden mit `.gstack/run-android-push-probe.sh`
+(erwartet `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`). Aus Claude
+Code heraus laesst sich das Werkzeug **nicht** starten — der Klassifikator
+blockt jeden sendenden Lauf unter `--env=prod`. Donald loest es aus.
 
-### 1. Der Mitteilungskanal — gebaut und am Gerät belegt (04.09.)
+### 1. Der Mitteilungskanal — ERLEDIGT, Ende zu Ende belegt (04.09.)
 
 Vollständig protokolliert in `tasks.md`, Phase E, „Nachtrag 04.09.". Kurz:
 
@@ -69,10 +67,24 @@ ausdrueckliche Zeile stuende dort `false`, wie beim Fallback daneben) und der
 Standardton, **weil** kein `sound` uebergeben wurde. Die Deklaration ist
 zusaetzlich am Artefakt belegt (`aapt2 dump xmltree` auf der APK).
 
-**Eine Behauptung vom Vormittag ist damit zurueckgenommen:** der Fallback-Kanal
-ist nicht tonlos, er traegt denselben Standardton. Die `sound=null vibrate=null`
-im Protokoll sind Felder der NACHRICHT, nicht des Kanals. Ihm fehlten Vibration
-und Einblendung — nicht der Ton.
+**Und die zugestellte Mitteilung traegt ihn**, 17:11:15 nach Donalds Sonde:
+
+```
+tag=FCM-Notification:112503055   Notification(channel=mitteilungen …)  importance=4
+```
+
+Die Gegenprobe liefert dasselbe Geraet gleich mit: die Zustellung vom Vormittag
+liegt noch in der Leiste und traegt weiter
+`tag=FCM-Notification:84878922 … channel=fcm_fallback_notification_channel`.
+Zwei Zustellungen, dieselbe App, verschiedene Kanaele — nebeneinander, nicht
+nacheinander behauptet. `importance=4` am Datensatz (vormittags `3`) belegt,
+dass die Einstufung vom Kanal kommt: an `fcmKoerper` hat sich nichts geaendert.
+
+**Eine Behauptung vom Vormittag ist zurueckgenommen:** der Fallback-Kanal ist
+nicht tonlos, er traegt denselben Standardton. Die `sound=null vibrate=null`
+sind Felder der NACHRICHT, nicht des Kanals — und sie stehen auch jetzt noch
+dort, richtigerweise. Dem Fallback fehlten Vibration und Einblendung, nicht der
+Ton.
 
 ### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
 
@@ -217,9 +229,8 @@ beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
   abgeschnitten.
 - Die Systemleisten-Icons sind in Screenshots auf hellem Grund kaum zu erkennen;
   **am Gerät laut Donald lesbar**. Notiz, kein Mangel.
-- ~~Die App deklariert keinen Mitteilungskanal.~~ **Erledigt am 04.09.**, am
-  Gerät gemessen, siehe oben. Offen ist nur noch der Kanal einer zugestellten
-  Mitteilung.
+- ~~Die App deklariert keinen Mitteilungskanal.~~ **Erledigt am 04.09.**, Ende
+  zu Ende am Gerät belegt, siehe oben.
 - Beim Start feuert `registration` **zweimal** und `claim_push_token` läuft
   zweimal — in `push_tokens` steht trotzdem genau eine Zeile, es ist ein Upsert.
   Kein Mangel, aber es erklärt die doppelte Logzeile.

@@ -1632,9 +1632,37 @@ beides ausdrücklich.
 - [x] Auch die Deklaration ist am **Artefakt** belegt, nicht an der Quelle:
       `aapt2 dump xmltree --file AndroidManifest.xml app-debug.apk` zeigt
       `…default_notification_channel_id` mit `="mitteilungen"` (Zeile 109).
-- [ ] **⛔ Was noch aussteht: dass eine ZUGESTELLTE Mitteilung diesen Kanal
-      trägt.** Das ist die kleinere Hälfte — die Deklaration steht im Artefakt,
-      der Kanal steht am Gerät —, aber sie braucht die Sonde:
+- [x] **Und die zugestellte Mitteilung trägt ihn — 04.09., 17:11:15.** Donald
+      hat die Sonde ausgelöst (`HTTP 200`, `bewerteFcm {"ergebnis":"zugestellt"}`),
+      danach am Gerät gemessen:
+
+      ```
+      NotificationRecord  pkg=com.effbeezee.app  tag=FCM-Notification:112503055
+        Notification(channel=mitteilungen …)   importance=4
+      ```
+
+      **Die beste Gegenprobe liefert dasselbe Gerät gleich mit:** die
+      Zustellung vom Vormittag liegt noch in der Leiste und trägt weiterhin
+      `tag=FCM-Notification:84878922 … channel=fcm_fallback_notification_channel`.
+      Zwei Zustellungen, dieselbe App, dasselbe Gerät, verschiedene Kanäle —
+      vorher und nachher nebeneinander, nicht nacheinander behauptet.
+
+      `importance=4` **am Datensatz** (vormittags stand dort `3`) ist der
+      Beleg, dass die Einstufung wirklich vom Kanal kommt und nicht vom
+      Versand: an `fcmKoerper` hat sich nichts geändert.
+
+      `vibrate=null sound=null defaults=0` steht weiterhin an der Mitteilung —
+      und das ist **richtig so**, kein Rest: es sind Felder der NACHRICHT, und
+      seit Android 8 entscheidet der Kanal. Genau das war der Befund.
+
+      *Nicht gemessen:* ob es hörbar geklingelt hat. Der Dump führt in dieser
+      Fassung kein `mLastAudiblyAlertedMs`. Kanal, Stufe und
+      `mVibrationEnabled=true` stehen; das Ohr am Gerät ist Donalds.
+- [x] Der Fallback-Kanal bleibt als Objekt liegen (`AppSettings` führt ihn
+      weiter) — er wird nur nicht mehr benutzt. Löschen wäre möglich, ist aber
+      nicht nötig und nicht Teil dieses Vorgangs.
+
+      Für Wiederholungen steht die Sonde hier:
 
       ```bash
       adb shell dumpsys notification --noredact | grep -i effbeezee
