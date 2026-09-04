@@ -24,11 +24,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Nicht geprüft wird, was Android daraus MACHT — das entsteht in jsdom nie.
  * Der Beleg dafür bleibt der Lauf am Gerät.
  */
-// Die Attrappe nimmt ihr Argument AN, statt es zu verwerfen: `vi.fn(async () =>
-// {})` hätte eine leere Parameterliste, und `mock.calls[0][0]` wäre dann nicht
-// bloss `unknown`, sondern ein Typfehler.
+// Der Typ steht am `vi.fn`, nicht als Parameter am Rumpf: ohne ihn hat die
+// Attrappe eine leere Parameterliste, und `mock.calls[0][0]` ist dann kein
+// `unknown`, sondern ein Typfehler. Ein Parameter, den der Rumpf nicht liest,
+// wäre die andere Lösung — und ein eslint-Fehler, denn dieses Projekt führt
+// kein `argsIgnorePattern`.
 const { createChannel } = vi.hoisted(() => ({
-  createChannel: vi.fn(async (_kanal: Record<string, unknown>) => {}),
+  createChannel: vi.fn<(kanal: Record<string, unknown>) => Promise<void>>(async () => {}),
 }));
 
 const { istNativ, plattform } = vi.hoisted(() => ({
