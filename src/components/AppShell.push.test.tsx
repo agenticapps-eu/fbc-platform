@@ -22,18 +22,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `env(safe-area-inset-*)` und beim `backButton`. Die Grenze ist deshalb
  * bewusst das Modul: DASS es gerufen wird, wann, und wie oft.
  */
-const { pushEinrichten, pushLebenszeichen, pushZielZuhoerer } = vi.hoisted(() => ({
-  pushEinrichten: vi.fn(async () => "web"),
-  // AGE-682: das stille Erneuern beim Start. Eigener Ausgang, weil es NICHT
-  // fragt — und eigene Attrappe, weil die Zusagen unten unterscheiden, WELCHER
-  // der beiden Wege gelaufen ist.
-  pushLebenszeichen: vi.fn(async () => "web"),
-  // Der Ziel-Zuhoerer haengt seit AGE-641 Phase B am Montieren der Huelle.
-  // Ohne Attrappe liefe der echte in jsdom — und ein fehlendes Feld hier machte
-  // JEDE Zusage dieser Datei rot, nicht nur die zum Sprungziel.
-  pushZielZuhoerer: vi.fn(async () => {}),
+const { pushEinrichten, pushKanalAnlegen, pushLebenszeichen, pushZielZuhoerer } = vi.hoisted(
+  () => ({
+    pushEinrichten: vi.fn(async () => "web"),
+    // AGE-682: das stille Erneuern beim Start. Eigener Ausgang, weil es NICHT
+    // fragt — und eigene Attrappe, weil die Zusagen unten unterscheiden, WELCHER
+    // der beiden Wege gelaufen ist.
+    pushLebenszeichen: vi.fn(async () => "web"),
+    // Der Ziel-Zuhoerer haengt seit AGE-641 Phase B am Montieren der Huelle.
+    // Ohne Attrappe liefe der echte in jsdom — und ein fehlendes Feld hier machte
+    // JEDE Zusage dieser Datei rot, nicht nur die zum Sprungziel.
+    pushZielZuhoerer: vi.fn(async () => {}),
+    // AGE-642: der Mitteilungskanal, ebenfalls am Montieren. Auch hier gilt:
+    // ein fehlendes Feld in dieser Attrappe röte JEDE Zusage der Datei.
+    pushKanalAnlegen: vi.fn(async () => "entfaellt"),
+  }),
+);
+vi.mock("../lib/push", () => ({
+  pushEinrichten,
+  pushKanalAnlegen,
+  pushLebenszeichen,
+  pushZielZuhoerer,
 }));
-vi.mock("../lib/push", () => ({ pushEinrichten, pushLebenszeichen, pushZielZuhoerer }));
 
 vi.mock("../lib/chat", async (original) => ({
   ...(await original<typeof import("../lib/chat")>()),
@@ -116,6 +126,7 @@ beforeEach(() => {
   stelleTelefon();
   pushEinrichten.mockClear();
   pushLebenszeichen.mockClear();
+  pushKanalAnlegen.mockClear();
   localStorage.clear();
 });
 afterEach(() => {
@@ -274,5 +285,52 @@ describe("Das Lebenszeichen läuft beim Start, ohne zu fragen (AGE-682)", () => 
     renderApp("/aktivitaet", GAST);
     expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();
     expect(pushLebenszeichen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * AGE-642 — der Mitteilungskanal beim Start.
+ *
+ * OHNE JEDE BEDINGUNG, und das ist die ganze Zusage dieses Blocks. Ein Kanal,
+ * den es im Moment der Zustellung noch nicht gibt, fällt auf
+ * `fcm_fallback_notification_channel` zurück — die Mitteilung ist dann bereits
+ * lautlos angekommen, und ein danach angelegter Kanal ändert daran nichts.
+ * Deshalb darf der Aufruf weder am Konto noch am Öffnen der Nachrichten hängen,
+ * und der Gast-Fall unten ist keine Randnotiz, sondern der Kern.
+ *
+ * Was der Kanal am Gerät bewirkt, entsteht in jsdom nie und steht hier nicht.
+ * Geprüft wird die Aufrufstelle; der Inhalt des Aufrufs steht in
+ * `src/lib/push.kanal.test.ts`.
+ */
+describe("Der Mitteilungskanal entsteht beim Start (AGE-642)", () => {
+  it("legt den Kanal beim Montieren der Hülle an", async () => {
+    renderApp();
+    expect(await screen.findByRole("link", { name: /Nachrichten/ })).toBeInTheDocument();
+
+    await waitFor(() => expect(pushKanalAnlegen).toHaveBeenCalledTimes(1));
+  });
+
+  it("legt ihn auch für einen Gast an", async () => {
+    // Die Gegenprobe zum Lebenszeichen darüber, das für einen Gast NICHTS tut:
+    // ein Kanal gehört keinem Konto, kostet keine Erlaubnis, und wer sich erst
+    // nach der Anmeldung einen anlegte, hätte ihn beim ersten Push noch nicht.
+    renderApp("/aktivitaet", GAST);
+    expect(await screen.findByRole("button", { name: "Anmelden" })).toBeInTheDocument();
+
+    await waitFor(() => expect(pushKanalAnlegen).toHaveBeenCalledTimes(1));
+    expect(pushLebenszeichen).not.toHaveBeenCalled();
+  });
+
+  it("legt ihn einmal je Montierung an, nicht je Ansicht", async () => {
+    renderApp();
+    expect(await screen.findByRole("link", { name: /Nachrichten/ })).toBeInTheDocument();
+    await waitFor(() => expect(pushKanalAnlegen).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(oeffner());
+    await waitFor(() => expect(schliesser()).toBeInTheDocument());
+    fireEvent.click(schliesser());
+    await waitFor(() => expect(oeffner()).toBeInTheDocument());
+
+    expect(pushKanalAnlegen).toHaveBeenCalledTimes(1);
   });
 });

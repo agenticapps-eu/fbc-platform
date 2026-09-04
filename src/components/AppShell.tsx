@@ -7,7 +7,7 @@ import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
 import { entscheideZurueck, hatVerlauf } from "../lib/zurueck";
-import { pushEinrichten, pushLebenszeichen, pushZielZuhoerer } from "../lib/push";
+import { pushEinrichten, pushKanalAnlegen, pushLebenszeichen, pushZielZuhoerer } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
   ANFRAGEN_STALE_TIME_MS,
@@ -666,6 +666,24 @@ export default function AppShell() {
     if (!kontoId) return;
     void pushLebenszeichen();
   }, [kontoId]);
+
+  // Der Mitteilungskanal (AGE-642).
+  //
+  // BEIM MONTIEREN und ohne Bedingung — nicht am Konto, nicht an der Erlaubnis,
+  // nicht am Öffnen der Nachrichten. Ein Kanal, den es im Moment der Zustellung
+  // noch nicht gibt, fällt auf `fcm_fallback_notification_channel` zurück, und
+  // die Mitteilung ist dann schon lautlos angekommen. Anlegen kostet keine
+  // Erlaubnis und nichts sonst.
+  //
+  // EIGENER EFFECT, aus demselben Grund wie das Lebenszeichen darüber: die
+  // Zusage ist „einmal je Montierung", und die hielte kein Effect, der an
+  // `navigate` oder am Konto hängt.
+  //
+  // Ohne Abhängigkeiten, weil `pushKanalAnlegen` selbst die Weiche stellt: auf
+  // iOS und im Web gibt es Kanäle nicht, dort gibt der Aufruf sofort zurück.
+  useEffect(() => {
+    void pushKanalAnlegen();
+  }, []);
 
   // Ein Tipp auf die Mitteilung führt in ihr Gespräch (AGE-641 Phase B).
   //

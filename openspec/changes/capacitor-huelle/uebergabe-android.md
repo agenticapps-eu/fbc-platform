@@ -1,4 +1,4 @@
-# Übergabe — Androidlauf, Stand 04.09.
+# Übergabe — Androidlauf, Stand 04.09. (nachmittags)
 
 > Diese Datei liegt hier und **nicht** in `session-handoff.md`: die geteilte
 > Übergabedatei trägt je einen Vorgang und steht seit dem 03.09. auf AGE-688.
@@ -9,63 +9,52 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**PR #331 nachsehen** (`gh pr view 331 --json state`). Ist er gemergt, in Linear
-prüfen: AGE-642 fällt nach jedem Merge auf `Done` und gehört zurück auf
-`In Progress`, solange die Abnahmeliste offen ist.
+**Den Kanal am Gerät nachmessen** — das ist der einzige offene Punkt aus
+Aufgabe 1, und er kostet zehn Minuten. Bauen und installieren wie unten, dann
 
-Dann die zwei Aufgaben dieser Runde, in dieser Reihenfolge (Donald, 04.09.):
+```bash
+.gstack/run-android-push-probe.sh
+adb shell dumpsys notification --noredact | grep -i effbeezee
+```
 
-### 1. Der Mitteilungskanal — klein, gemessen, abgegrenzt
+Erwartet: `channel=mitteilungen`, **nicht** `fcm_fallback_notification_channel`,
+dazu `vibrate` ungleich `null`. *Die Positivkontrolle steht unten* — der
+Fallback ist als Vorzustand protokolliert und muss sich ändern. Aus Claude Code
+heraus lässt sich das Werkzeug nicht starten (der Klassifikator blockt jeden
+sendenden Lauf unter `--env=prod`); Donald löst es aus.
 
-Push läuft, aber die App deklariert **keinen** Kanal. Gemessen am 04.09. mit
-`dumpsys notification`, nachdem die Zustellung durch war:
+Zwei Fallen dabei: der Kanal entsteht **beim Start**, eine Zustellung vor dem
+ersten Start der neuen Schale trägt also noch den Fallback. Und ein bereits
+angelegter Kanal ändert sich durch ein erneutes `createChannel` **nicht** — wer
+Stufe oder Vibration später verstellt, sieht es erst nach dem Deinstallieren.
+
+Danach Aufgabe 2, der Bildupload.
+
+### 1. Der Mitteilungskanal — gebaut am 04.09., Gerätebeleg offen
+
+Vollständig protokolliert in `tasks.md`, Phase E, „Nachtrag 04.09.". Kurz:
+
+- `<meta-data …default_notification_channel_id>` im `AndroidManifest.xml`,
+  Wert `mitteilungen`.
+- `pushKanalAnlegen()` in `src/lib/push.ts`, gerufen in `AppShell.tsx` beim
+  Montieren — ohne Bedingung, auch ohne Anmeldung.
+- **Ein** Kanal, „Nachrichten und Kontaktanfragen", `importance: 4`.
+- `vibration: true` **ausdrücklich**: Capacitors `NotificationChannelManager`
+  liest das Feld mit dem Vorgabewert **false** und ruft `enableVibration(false)`
+  — anders als Android selbst. Ohne die Zeile bliebe `vibrate=null`.
+- Kein `sound` — ohne den Schlüssel behält der Kanal den Standardton; ein Wert
+  verlangte eine Datei unter `res/raw`.
+- `default_sound: true` im Versand bleibt stehen: unterhalb von Android 8 gibt
+  es keine Kanäle, und `minSdkVersion = 24` reicht bis Android 7.0.
+- `src/lib/push.kanal.test.ts` hält Manifest und `PUSH_KANAL_ID` zusammen; vier
+  Mutationen gegengeprüft, alle rot. `ios/` ist nicht angefasst.
+
+Der gemessene Vorzustand vom 04.09., als Positivkontrolle:
 
 ```
 channel=fcm_fallback_notification_channel   sound=null  vibrate=null  defaults=0
 logcat: Missing Default Notification Channel metadata in AndroidManifest
 ```
-
-Die Mitteilung landet in dem Kanal, den **FCM sich selbst anlegt**. Zwei Folgen,
-beide belegt:
-
-1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
-   und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht. Der
-   Wert steht im Code und tut nichts — das ist der Grund, warum die Testzustellung
-   stumm ankam.
-2. In den Systemeinstellungen heisst der Kanal **„Sonstiges"**. Wer die
-   Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
-   bedeutet.
-
-Was zu tun ist, und wo es aufhört:
-
-- `com.google.firebase.messaging.default_notification_channel_id` als
-  `<meta-data>` in `android/app/src/main/AndroidManifest.xml`. Die Datei ist
-  **nicht** von `cap sync` erzeugt und darf angefasst werden (die Kamera-Rechte
-  stehen schon von Hand darin).
-- Den Kanal selbst anlegen. Capacitors Push-Plugin tut das nicht.
-  `@capacitor/push-notifications` bringt `createChannel()` mit — damit bleibt es
-  in TypeScript und braucht keinen nativen Code. **Beim Start anlegen, nicht
-  beim ersten Push:** ein Kanal, den es zum Zustellzeitpunkt nicht gibt, fällt
-  wieder auf den Fallback zurück.
-- **Erst EIN Kanal.** Eine Trennung nach Nachricht / Kontaktanfrage wäre die
-  naheliegende zweite Stufe und ist hier ausdrücklich nicht dran — ein Kanal, den
-  ein Mitglied einmal abgeschaltet hat, lässt sich aus der App nie wieder
-  einschalten. Das ist ein Entwurf, kein Anbau.
-
-**Der Beleg ist derselbe Weg wie am 04.09.**, und er ist billig: bauen,
-installieren, `.gstack/run-android-push-probe.sh`, dann
-
-```bash
-adb shell dumpsys notification --noredact | grep -i effbeezee
-```
-
-Erwartet: `channel=` trägt den eigenen Namen, **nicht**
-`fcm_fallback_notification_channel`. *Positivkontrolle,* sonst belegt der Lauf
-nichts: vor dem Umbau steht dort der Fallback — dieser Stand ist oben
-protokolliert und muss sich ändern.
-
-**iOS ist nicht betroffen** — Kanäle gibt es dort nicht. Der Diff darf `ios/`
-nicht anfassen.
 
 ### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
 
@@ -210,13 +199,8 @@ beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
   abgeschnitten.
 - Die Systemleisten-Icons sind in Screenshots auf hellem Grund kaum zu erkennen;
   **am Gerät laut Donald lesbar**. Notiz, kein Mangel.
-- **Die App deklariert keinen Mitteilungskanal.** Gemessen:
-  `channel=fcm_fallback_notification_channel`, `sound=null vibrate=null
-  defaults=0`; logcat sagt `Missing Default Notification Channel metadata in
-  AndroidManifest`. Folge: `default_sound: true` in `fcmKoerper` ist auf
-  Android 8+ wirkungslos (Ton ist dort Sache des Kanals), und in den
-  Systemeinstellungen heisst der Kanal „Sonstiges". Kein Ausfall, eigener
-  Vorgang — iOS ist nicht betroffen.
+- ~~Die App deklariert keinen Mitteilungskanal.~~ **Gebaut am 04.09.**, siehe
+  oben. Der Gerätebeleg steht noch aus.
 - Beim Start feuert `registration` **zweimal** und `claim_push_token` läuft
   zweimal — in `push_tokens` steht trotzdem genau eine Zeile, es ist ein Upsert.
   Kein Mangel, aber es erklärt die doppelte Logzeile.
