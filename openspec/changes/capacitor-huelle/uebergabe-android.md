@@ -9,28 +9,33 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**Den Kanal am Gerät nachmessen** — das ist der einzige offene Punkt aus
-Aufgabe 1, und er kostet zehn Minuten. Bauen und installieren wie unten, dann
+**Die Push-Sonde ausloesen** — das ist der letzte offene Punkt aus Aufgabe 1,
+und nur noch die kleinere Haelfte davon. Der Kanal selbst ist am Geraet
+gemessen (siehe unten); offen ist, dass eine ZUGESTELLTE Mitteilung ihn traegt.
 
 ```bash
 .gstack/run-android-push-probe.sh
 adb shell dumpsys notification --noredact | grep -i effbeezee
 ```
 
-Erwartet: `channel=mitteilungen`, **nicht** `fcm_fallback_notification_channel`,
-dazu `vibrate` ungleich `null`. *Die Positivkontrolle steht unten* — der
-Fallback ist als Vorzustand protokolliert und muss sich ändern. Aus Claude Code
-heraus lässt sich das Werkzeug nicht starten (der Klassifikator blockt jeden
-sendenden Lauf unter `--env=prod`); Donald löst es aus.
+Erwartet in der `NotificationRecord`-Zeile: `channel=mitteilungen`, **nicht**
+`fcm_fallback_notification_channel`. Aus Claude Code heraus laesst sich das
+Werkzeug nicht starten (der Klassifikator blockt jeden sendenden Lauf unter
+`--env=prod`); Donald loest es aus.
 
-Zwei Fallen dabei: der Kanal entsteht **beim Start**, eine Zustellung vor dem
-ersten Start der neuen Schale trägt also noch den Fallback. Und ein bereits
-angelegter Kanal ändert sich durch ein erneutes `createChannel` **nicht** — wer
-Stufe oder Vibration später verstellt, sieht es erst nach dem Deinstallieren.
+**Das Geraet ist vorbereitet:** Bau vom 04.09. 16:39 installiert, OTA-Buendel
+`wi3AmIcidl` uebernommen und bestaetigt, Kanal `mitteilungen` steht. Nichts
+weiter noetig.
+
+> ⚠️ **Vor JEDER Messung am Geraet:** pruefen, welche Weboberflaeche wirklich
+> laeuft. `adb install` tauscht nur die Huelle — capgos gespeichertes Buendel
+> gewinnt, und eine frisch installierte Aenderung sieht dann wirkungslos aus.
+> Das hat heute drei Messungen gekostet. Rezept und Erkennungszeichen stehen in
+> `tasks.md`, Phase E, „`adb install` belegt die Weboberflaeche NICHT".
 
 Danach Aufgabe 2, der Bildupload.
 
-### 1. Der Mitteilungskanal — gebaut am 04.09., Gerätebeleg offen
+### 1. Der Mitteilungskanal — gebaut und am Gerät belegt (04.09.)
 
 Vollständig protokolliert in `tasks.md`, Phase E, „Nachtrag 04.09.". Kurz:
 
@@ -49,12 +54,25 @@ Vollständig protokolliert in `tasks.md`, Phase E, „Nachtrag 04.09.". Kurz:
 - `src/lib/push.kanal.test.ts` hält Manifest und `PUSH_KANAL_ID` zusammen; vier
   Mutationen gegengeprüft, alle rot. `ios/` ist nicht angefasst.
 
-Der gemessene Vorzustand vom 04.09., als Positivkontrolle:
+**Am Geraet gemessen, 16:42** — und dafuer brauchte es keine Zustellung:
+`dumpsys notification` fuehrt die Kanaele eines Pakets unter `AppSettings:`
+auf. Vorher genau ein Kanal, der von FCM; nachher:
 
 ```
-channel=fcm_fallback_notification_channel   sound=null  vibrate=null  defaults=0
-logcat: Missing Default Notification Channel metadata in AndroidManifest
+mId='fcm_fallback_notification_channel' | Miscellaneous              | imp=3 | vib=false
+mId='mitteilungen'                      | Nachrichten und Kontaktanfragen | imp=4 | vib=true
+                                          mSound=content://settings/system/notification_sound
 ```
+
+Damit stehen drei Zusagen gemessen da: Stufe 4, Vibration an (ohne die
+ausdrueckliche Zeile stuende dort `false`, wie beim Fallback daneben) und der
+Standardton, **weil** kein `sound` uebergeben wurde. Die Deklaration ist
+zusaetzlich am Artefakt belegt (`aapt2 dump xmltree` auf der APK).
+
+**Eine Behauptung vom Vormittag ist damit zurueckgenommen:** der Fallback-Kanal
+ist nicht tonlos, er traegt denselben Standardton. Die `sound=null vibrate=null`
+im Protokoll sind Felder der NACHRICHT, nicht des Kanals. Ihm fehlten Vibration
+und Einblendung — nicht der Ton.
 
 ### 2. Der Bildupload — der letzte ⛔ der Abnahmeliste
 
@@ -199,8 +217,9 @@ beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
   abgeschnitten.
 - Die Systemleisten-Icons sind in Screenshots auf hellem Grund kaum zu erkennen;
   **am Gerät laut Donald lesbar**. Notiz, kein Mangel.
-- ~~Die App deklariert keinen Mitteilungskanal.~~ **Gebaut am 04.09.**, siehe
-  oben. Der Gerätebeleg steht noch aus.
+- ~~Die App deklariert keinen Mitteilungskanal.~~ **Erledigt am 04.09.**, am
+  Gerät gemessen, siehe oben. Offen ist nur noch der Kanal einer zugestellten
+  Mitteilung.
 - Beim Start feuert `registration` **zweimal** und `claim_push_token` läuft
   zweimal — in `push_tokens` steht trotzdem genau eine Zeile, es ist ein Upsert.
   Kein Mangel, aber es erklärt die doppelte Logzeile.

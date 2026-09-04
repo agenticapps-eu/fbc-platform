@@ -1534,6 +1534,13 @@ fehlt im Manifest). Zwei Folgen, beide gemessen, keine davon ein Ausfall:
 1. **`default_sound: true` in `fcmKoerper` ist auf Android 8+ wirkungslos.** Ton
    und Vibration sind dort Eigenschaften des KANALS, nicht der Nachricht — daher
    `sound=null vibrate=null defaults=0`. Der Wert steht im Code und tut nichts.
+
+   **Korrektur vom Nachmittag, gemessen:** der Fallback-Kanal ist **nicht**
+   tonlos. Er trägt `mSound=content://settings/system/notification_sound`; die
+   drei Nullen oben sind Felder der NACHRICHT, nicht des Kanals. Was ihm fehlt,
+   ist `mVibrationEnabled=false` und `mImportance=3` — also Vibration und
+   Einblendung, nicht der Ton. Die Behauptung „deshalb kam die Testzustellung
+   stumm an" hält der Messung damit nicht stand und ist hiermit zurückgenommen.
 2. **In den Systemeinstellungen heisst der Kanal „Sonstiges".** Wer die
    Mitteilungen der App feiner einstellen will, findet keinen Namen, der etwas
    bedeutet — und eine spätere Trennung nach Nachricht / Kontaktanfrage ist ohne
@@ -1591,8 +1598,43 @@ beides ausdrücklich.
       2.495 Tests) grün; `prettier --check` auf den berührten Dateien sauber.
       `pnpm format:check` ist repoweit schon vorher rot (323 Dateien) — nicht
       von diesem Diff.
-- [ ] **⛔ Der Beleg am Gerät steht aus.** Er ist derselbe billige Weg wie am
-      04.09.: bauen, installieren, `.gstack/run-android-push-probe.sh`, dann
+- [x] **Der Kanal ist am Gerät belegt — 04.09., 16:42, Pixel 11 Pro.** Und er
+      brauchte dafür keine Zustellung: `dumpsys notification` führt die Kanäle
+      eines Pakets unter `AppSettings:` auf, unabhängig davon, ob je etwas
+      angekommen ist. Damit ist die Messung von der blockierten Sonde
+      **entkoppelt**.
+
+      *Vorher*, aus dem laufenden Bau von 09:19 — die Positivkontrolle, am
+      selben Gerät genommen, nicht aus dem Protokoll übernommen:
+
+      ```
+      AppSettings: com.effbeezee.app  importance=DEFAULT userSet=true
+        NotificationChannel{mId='fcm_fallback_notification_channel',
+          mName=Miscellaneous, mImportance=3, mVibrationEnabled=false}
+      ```
+
+      Genau ein Kanal, und es ist der von FCM.
+
+      *Nachher*, nachdem das Bündel mit dem Kanal lief:
+
+      ```
+      NotificationChannel{mId='mitteilungen',
+        mName=Nachrichten und Kontaktanfragen, mDescription=hasDescription,
+        mImportance=4, mSound=content://settings/system/notification_sound,
+        mVibrationEnabled=true, mDeleted=false}
+      ```
+
+      Drei Zusagen dieses Vorgangs stehen damit **gemessen** da, nicht
+      begründet: `mImportance=4`, `mVibrationEnabled=true` (ohne die
+      ausdrückliche Zeile stünde hier `false`, wie beim Fallback daneben) und
+      `mSound=…/notification_sound` — der Standardton des Systems, **weil**
+      kein `sound` übergeben wurde.
+- [x] Auch die Deklaration ist am **Artefakt** belegt, nicht an der Quelle:
+      `aapt2 dump xmltree --file AndroidManifest.xml app-debug.apk` zeigt
+      `…default_notification_channel_id` mit `="mitteilungen"` (Zeile 109).
+- [ ] **⛔ Was noch aussteht: dass eine ZUGESTELLTE Mitteilung diesen Kanal
+      trägt.** Das ist die kleinere Hälfte — die Deklaration steht im Artefakt,
+      der Kanal steht am Gerät —, aber sie braucht die Sonde:
 
       ```bash
       adb shell dumpsys notification --noredact | grep -i effbeezee
@@ -1612,6 +1654,53 @@ beides ausdrücklich.
       verstellt, sieht die Änderung erst nach dem Deinstallieren der App.
 
 **iOS ist nicht betroffen** und der Diff fasst `ios/` nicht an.
+
+##### Und der teuerste Befund des Nachmittags: `adb install` belegt die Weboberflaeche NICHT
+
+Die erste Messung sagte **„Kanal nicht entstanden"** — nach `assembleDebug`,
+`adb install -r` und einem Start. Das war ein **falsches Negativ, erzeugt vom
+Messaufbau**, nicht vom Code:
+
+```
+APK eingebaut:   assets/public/assets/index-BD2EPi9B.js   ← enthaelt den Kanal
+Geraet fuehrt:   index-DYeyA4YQ.js  (capgo-Buendel 95eQQYkgGH)  ← vom Vortag
+```
+
+**Capgos gespeichertes Buendel gewinnt gegen die frisch installierte Schale.**
+Ein `adb install` tauscht die native Huelle; die Weboberflaeche kommt weiter aus
+`files/versions/<id>/`. Wer nach dem Installieren misst, misst den Stand von
+vorgestern und haelt seine Aenderung fuer wirkungslos.
+
+Erkennbar ist es an genau zwei Zeilen im logcat — und nur an ihnen:
+
+```
+CapgoUpdater: notifyAppReady was called. This is fine: <buendel-id>
+Capacitor/Console: File: https://localhost/assets/index-XXXX.js
+```
+
+Steht dort eine andere `index-*.js` als in der APK (`unzip -l app-debug.apk`),
+laeuft OTA-Code. **Vor jeder Messung am Geraet diese beiden Werte
+gegeneinanderhalten** — sonst prueft man Eingaben statt des Artefakts.
+
+**Was NICHT hilft:** `am force-stop` und neu starten. Einmal gefahren, das
+Buendel blieb dasselbe. Capgo haengt an Hintergrund/Vordergrund, nicht am
+Prozesstod.
+
+**Was half:** die zwei Runden aus D5 — `KEYCODE_HOME`, ~8 s, wieder oeffnen,
+dann **25 s nichts anfassen**. Danach lief `wi3AmIcidl` / `index-Cvttx3UQ.js`
+mit `notifyAppReady` bestaetigt. Das Buendel war zu diesem Zeitpunkt bereits
+geladen (16:39, waehrend des ersten Starts) und wartete auf die Uebernahme.
+
+**Was NICHT noetig war und die Anmeldung gekostet haette:** `pm clear`. Die
+Sitzung liegt in `shared_prefs/CapacitorStorage.xml` unter genau einem
+Schluessel; ein `pm clear` haette sie mitgenommen und den Bildupload-Test
+(Aufgabe 2) blockiert, der eine Anmeldung braucht.
+
+*Nebenbei, aus demselben Log:* dieser **Debug**-Bau schreibt die vollstaendige
+Supabase-Sitzung ins logcat — Capacitors ausfuehrliche Plugin-Protokollierung
+gibt `Preferences.get` samt Ergebnis aus. Kein Fund fuer die Oeffentlichkeit,
+aber vor der Store-Einreichung am **Release**-Bau gegenzupruefen, dass die
+Stufe dort wirklich aus ist. Eigener Vorgang, nicht hier.
 
 - [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
       **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
