@@ -5,9 +5,22 @@
 > **1. Diese Übergabe führt AGE-605.** Die Datei ist für alle parallelen
 > Sitzungen dieselbe und kollidiert bei jedem Rebase. **Nicht zusammenführen.**
 >
-> **2. Die Migration ist NICHT auf PROD.** Sie liegt auf dem lokalen Stack und
-> im PR. Der PROD-Lauf ist ein eigener, ausdrücklicher Schritt (Aufgabe 10.4)
-> und **nicht vom Merge gedeckt** — vorher fragen.
+> **2. DER DEPLOY VON `main` IST BLOCKIERT, bis die Migration auf PROD läuft.**
+> Das ist die dringendste Zeile dieser Datei. Das `drift-gate` ist seit dem
+> Merge rot — korrekt und wie vorgesehen:
+>
+> ```
+> DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260904160000
+> Migrationshistorie weicht ab. Erst `migrate-prod` freigeben, dann deployen.
+> ```
+>
+> Das trifft **jeden** Deploy von `main`, auch fremde — **AGE-642 eingeschlossen**.
+> Der `CI`-Lauf selbst ist grün; rot ist allein der `Deploy`-Workflow. Die vier
+> Pflichtchecks sind davon nicht betroffen, Merges gehen also weiter.
+>
+> **Der PROD-Lauf ist ein eigener, ausdrücklicher Schritt (Aufgabe 10.4) und
+> nicht vom Merge gedeckt — er braucht Donalds Freigabe.** Danach ist der Deploy
+> wieder frei.
 >
 > **3. AGE-642 läuft PARALLEL und stand VORHER in dieser Datei.** Der Worktree
 > ist `fbc-platform.donald-age-642-capacitor-huelle` — **nicht anfassen.** Seine
@@ -112,12 +125,15 @@ zeigt sie, was sie behauptet.
 
 ## Next session: start here
 
-**Erster Handgriff: `gh pr checks 342`.** Bei grünem CI mergen (Freigabe steht),
-danach nachsehen, ob der Merge wirklich durchging und ob Linear AGE-605 auf Done
-gesprungen ist — der Status setzt sich über die PR-Kennung selbst.
+**PR #342 ist gemergt** (`7849ff2`, 04.09. 17:40Z), CI auf `main` grün, Linear
+AGE-605 steht durch die Automation auf **Done**. Der Branch ist damit erledigt.
 
-**Danach die PROD-Migration ausdrücklich mit Donald klären.** Sie ist nicht vom
-Merge gedeckt. Die DEV-Fläche zuerst.
+**Erster Handgriff: die PROD-Migration mit Donald klären** — sie ist der einzige
+offene Punkt und blockt bis dahin jeden Deploy (siehe Kasten oben). `migrate-dev`
+ist im Deploy-Lauf bereits **grün durchgelaufen**, die DEV-Fläche trägt die
+Migration also schon; offen ist allein PROD.
+
+Danach: `wt remove` für diesen Worktree, und die drei alten Remote-Zweige.
 
 **Und dann AGE-630** (Event-Vorlagen und Serientermine) in einer **eigenen
 frischen Sitzung** — so von Donald am 04.09. festgelegt, nicht vorziehen. Der
