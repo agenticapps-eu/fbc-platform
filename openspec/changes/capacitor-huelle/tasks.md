@@ -1816,6 +1816,46 @@ gegengeprueft — und wenn es nicht eintritt, ist diese Erklaerung falsch.
 `android:configChanges` ist damit **nicht** die Baustelle. Der Diff dort waere
 wirkungslos gewesen und haette die Ursache verdeckt.
 
+#### Die Gegenmassnahme — Donalds Wahl vom 04.09.
+
+Gewaehlt ist der chirurgische Weg: der Aufschub liegt um den nativen Rundlauf,
+nicht global. `directUpdate: true` haette die ganze Klasse erschlagen, aber
+jeden Start verlaengert und D4/D5 mitverdreht — eine Entscheidung fuer einen
+eigenen Vorgang, nicht fuer diesen Fix.
+
+- [x] `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` vor dem nativen
+      Aufruf, `cancelDelay()` im `finally` danach — in `bilderVonQuelle`
+      (`src/lib/bildauswahl.ts`). **Dort und nirgends sonst:** seit C3 ist das
+      die einzige Stelle, an der ein Bildweg die App verlaesst.
+- [x] `kind: "kill"` und nicht `background`: es ist die einzige Bedingung ohne
+      Frist. Eine Zeitspanne waere geraten und liefe in einem langen Rundlauf ab.
+- [x] Der bisherige Rumpf steht unveraendert in `hole()` — nur damit der
+      Aufschub ein `finally` bekommt, das JEDEN Ausgang einschliesst.
+- [x] **Beide Aufrufe duerfen nie werfen.** Ein Aufschub, der die Bildauswahl
+      abbricht, erzeugte genau den stummen Ausgang, den er verhindern soll:
+      `waehlen()` im Hook fuehrt kein `catch`, eine Rejection bliebe unsichtbar.
+      Zwei Tests halten das fest.
+- [x] Der Abbruch-Zweig ist der wichtigste: er ist der HAEUFIGSTE Ausgang, und
+      bliebe der Aufschub dabei stehen, naehme das Geraet ab dem ersten
+      abgebrochenen Waehler ueberhaupt keine Aktualisierung mehr an — bis zum
+      Neustart. Das waere ein schlimmerer Fehler als der behobene.
+- [x] Gegenprobe, vier Mutationen, alle rot: Aufschub entfernt (3 Zusagen) ·
+      Freigabe entfernt (4) · Aufschub NACH dem Aufruf statt davor (3) ·
+      `kind` auf `background` (1). Die dritte ist die subtilste — ein Aufschub,
+      der zu spaet gesetzt wird, sieht im Diff richtig aus und ist wirkungslos.
+- [x] `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (222 Dateien,
+      2.534 Tests), `prettier --check`, `native-secrets-guard` — alle gruen.
+- [ ] **⛔ Am Geraet gegenzupruefen, und das ist zugleich die Gegenprobe zur
+      Ursache.** Die Bedingung muss hergestellt werden: es braucht ein
+      WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft. Also
+      zwei Veroeffentlichungen nacheinander — die erste bringt den Fix aufs
+      Geraet, die zweite legt das Buendel bereit. Dann den Kameraweg einmal
+      gehen.
+
+      Erwartet: der Zuschnitt erscheint, obwohl ein Buendel wartet. Bleibt er
+      aus, ist entweder der Aufschub wirkungslos oder die Ursache eine andere —
+      beides waere ein Befund, kein Rueckschlag.
+
 **Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
 nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
 die Uebernahme, bis die App wirklich beendet und neu gestartet wird;
