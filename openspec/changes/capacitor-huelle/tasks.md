@@ -1744,6 +1744,88 @@ Stufe dort wirklich aus ist. Eigener Vorgang, nicht hier.
       Gesten weg). Damit ist zugleich belegt, dass das Gerät nach dem Rückfall
       wieder normal aktualisiert und nur `defec7ed` liegen lässt.
 
+### Der Bildupload — die Ursache ist NICHT der Activity-Lebenszyklus (04.09.)
+
+**Die Vermutung aus der Uebergabe ist widerlegt, und zwar mit dem Werkzeug, das
+sie belegen sollte.** „Aktivitaeten nicht behalten" war der vorgeschlagene Weg,
+aus dem Zufallsfund einen wiederholbaren Test zu machen. Er macht ihn nicht
+wiederholbar — er zeigt, dass die Zerstoerung gar nicht die Ursache ist.
+
+Fuenf Messungen am Pixel 11 Pro, alle am 04.09. zwischen 17:16 und 17:22.
+
+| # | Weg | `always_finish` | Buendel wartete? | Ausgang |
+|---|---|---|---|---|
+| 1 | HOME und zurueck | an | ja | kein Neuladen |
+| 2 | Mediathek | an | **ja** | **Zuschnitt erscheint** |
+| 3 | Kamera | an | **ja** | **Zustand weg, Startseite** |
+| 4 | Kamera | an | **nein** | **Zuschnitt erscheint** |
+
+Lauf 3 ist der Fehler, wie Donald ihn beschrieben hat: zurueck auf der
+Startseite, kein Zuschnitt, kein Upload, kein Fehler. Lauf 4 ist derselbe Weg
+unter derselben Zerstoerungs-Einstellung — und er funktioniert. **Der
+Unterschied ist nicht der Lebenszyklus, sondern ob ein OTA-Buendel bereitlag.**
+
+In Lauf 3 wechselte die ausgelieferte Datei mitten im Rundlauf:
+
+```
+vorher:  index-Cvttx3UQ.js   (Buendel wi3AmIcidl)
+nachher: index-DZY1foks.js   (Buendel nfYiJ5mlLy)   ← waehrend die Kamera lief
+```
+
+**Der Mechanismus, aus capgos eigenen Logzeilen:**
+
+1. `capacitor.config.ts` setzt weder `autoUpdate` noch `directUpdate` — es gelten
+   die Vorgaben `autoUpdate: true`, `directUpdate: false`. Im Log steht es
+   woertlich: `setNext: true`, `directUpdate: false`.
+2. Damit wird ein geladenes Buendel **nicht** sofort uebernommen, sondern beim
+   naechsten `handleOnStart` — also wenn die App aus dem GESTOPPTEN Zustand
+   zurueckkehrt.
+3. Ein nativer Rundlauf ist genau das. Die Uebernahme laedt die WebView neu, und
+   damit stirbt alles, was noch lief: der React-Zustand, die Route **und das
+   offene `await Camera.takePhoto()` in `bilderVonQuelle`**. Kein Ergebnis, kein
+   `catch`, kein Wort — der Aufrufer existiert nicht mehr.
+
+**Warum die Mediathek verschont bleibt** (Lauf 2, obwohl ein Buendel wartete):
+der Google-Fotos-Picker legt sich als durchscheinendes Blatt ueber die App. Die
+Activity ist `visible=false`, aber nur PAUSIERT, nie gestoppt — `handleOnStart`
+feuert nicht, also wird nichts uebernommen. Die Kamera ist eine
+Vollbild-Activity und stoppt sie.
+
+**Und warum der Fehler so sprunghaft wirkte:** er tritt nur auf, wenn gerade ein
+Buendel bereitliegt — also in den Minuten nach einem Deploy. Am 03. und 04.09.
+wurde im Takt veroeffentlicht.
+
+**Zwei Messfehler, die dieser Lauf mit aufdeckt** — beide haetten die naechste
+Sitzung genauso in die Irre gefuehrt:
+
+- **`notifyAppReady` im Log ist KEIN Beleg fuer ein Neuladen.** Es ist capgos
+  eigener Timer: `handleOnStart` → `Wait for 10000ms` → zehn Sekunden spaeter
+  die Zeile. Sie kommt bei JEDER Rueckkehr, auch ohne Wechsel. Der belastbare
+  Beleg ist die angeforderte Dokumentwurzel bzw. der Dateiname `index-*.js`.
+- **`always_finish_activities=1` hat in KEINEM der vier Laeufe die WebView neu
+  geladen.** Die Einstellung tut nicht, was ihr Name verspricht, sobald eine
+  Activity auf ein Ergebnis wartet.
+
+**Was daraus folgt — und was NICHT.** Belegt ist ein Fehlschlag (Lauf 3) mit
+einem Mechanismus, der ihn vollstaendig erklaert, plus zwei Gegenproben. Das ist
+mehr als eine Vermutung und weniger als eine Serie. **Die falsifizierbare
+Vorhersage:** mit wartendem Buendel scheitert der Kameraweg immer, ohne
+wartendes Buendel nie. Nach dem naechsten Deploy ist das in fuenf Minuten
+gegengeprueft — und wenn es nicht eintritt, ist diese Erklaerung falsch.
+
+`android:configChanges` ist damit **nicht** die Baustelle. Der Diff dort waere
+wirkungslos gewesen und haette die Ursache verdeckt.
+
+**Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
+nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
+die Uebernahme, bis die App wirklich beendet und neu gestartet wird;
+`cancelDelay()` nimmt das zurueck. Um den nativen Rundlauf gelegt, kann kein
+Wechsel mehr hineinplatzen — und `bilderVonQuelle` ist seit C3 der EINE
+Aufrufpunkt, durch den jeder Bildweg geht. Die Alternative waere
+`directUpdate: true` (Uebernahme beim Start statt beim Zurueckkommen), das aber
+jeden Start um den Wechsel verlaengert und weit ueber den Bildupload hinausgeht.
+**Entscheidung steht aus, Code ist noch keiner geschrieben.**
+
 ## Vor dem Abschluss
 
 - [ ] `openspec validate --all` grün.
