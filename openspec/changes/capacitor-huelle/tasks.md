@@ -1805,6 +1805,13 @@ Sitzung genauso in die Irre gefuehrt:
 - **`always_finish_activities=1` hat in KEINEM der vier Laeufe die WebView neu
   geladen.** Die Einstellung tut nicht, was ihr Name verspricht, sobald eine
   Activity auf ein Ergebnis wartet.
+- **Die Bildschirmsperre gehoert VOR jeden Geraetelauf hochgesetzt.** Ein Lauf
+  am 04.09. abends lief vollstaendig ins Leere, weil das Telefon nach fuenf
+  Minuten sperrte: die Taps gingen an den Sperrbildschirm, der Screenshot zeigte
+  die Uhr, und ohne Fingerabdruck kommt man aus Claude Code nicht weiter.
+  `settings put system screen_off_timeout 1800000` vorher, danach zuruecksetzen
+  (Ausgangswert hier: `300000`). Das Gegenstueck zu „Automatische Sperre auf
+  Nie" beim iPhone-Lauf.
 
 **Was daraus folgt — und was NICHT.** Belegt ist ein Fehlschlag (Lauf 3) mit
 einem Mechanismus, der ihn vollstaendig erklaert, plus zwei Gegenproben. Das ist
@@ -1845,6 +1852,12 @@ eigenen Vorgang, nicht fuer diesen Fix.
       der zu spaet gesetzt wird, sieht im Diff richtig aus und ist wirkungslos.
 - [x] `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (222 Dateien,
       2.534 Tests), `prettier --check`, `native-secrets-guard` — alle gruen.
+- [x] **Der Fix ist auf dem Geraet** — 04.09. 18:24, Buendel `3IErMyx5C6`,
+      `index-BXGLv_bY.js`. Nachgewiesen nicht am Commit, sondern am
+      ausgelieferten Artefakt:
+      `run-as com.effbeezee.app cat files/versions/3IErMyx5C6/assets/index-*.js | grep -c delayConditions`
+      → `1`. Das aeltere `Eatz8mgucQ` liegt mit `0` daneben und ist die
+      Gegenprobe zur Messung selbst.
 - [ ] **⛔ Am Geraet gegenzupruefen, und das ist zugleich die Gegenprobe zur
       Ursache.** Die Bedingung muss hergestellt werden: es braucht ein
       WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft. Also
