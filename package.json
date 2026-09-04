@@ -10,6 +10,7 @@
     "app:icons": "tsx scripts/app-icons.ts",
     "splash": "tsx scripts/splash.ts",
     "android:firebase": "tsx scripts/firebase-config.ts",
+    "android:keystore": "tsx scripts/android-keystore.ts",
     "prebuild": "tsx scripts/generate-release-entries.ts",
     "build": "tsc --noEmit && vite build",
     "build:prod": "tsc --noEmit && infisical run --env=prod -- sh -c 'VITE_SENTRY_RELEASE=$(git rev-parse HEAD) vite build'",

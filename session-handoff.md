@@ -1,181 +1,124 @@
-# Session Handoff — 2026-09-04 (AGE-605 abgeschlossen, PR #342)
+# Session Handoff — 2026-09-04 (AGE-642 B3: Android-Signierung und Release-Workflow)
 
-> ## ⚠ ZUERST — drei Dinge
+> ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Diese Übergabe führt AGE-605.** Die Datei ist für alle parallelen
-> Sitzungen dieselbe und kollidiert bei jedem Rebase. **Nicht zusammenführen.**
+> **1. Sie führt nur AGE-642 (M2, Capacitor-Hülle), Block B3.** Die Datei ist
+> für alle parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
+> **nicht zusammenführen**, überschreiben.
 >
-> **2. DER DEPLOY VON `main` IST BLOCKIERT, bis die Migration auf PROD läuft.**
-> Das ist die dringendste Zeile dieser Datei. Das `drift-gate` ist seit dem
-> Merge rot — korrekt und wie vorgesehen:
+> **2. Vorher stand hier AGE-605** (Anmeldungen/Kapazität, PR #342). Vollständig
+> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus gilt weiter und
+> **betrifft AGE-642 unmittelbar** — sie steht deshalb unten unter „Von AGE-605
+> übernommen", nicht im Verlauf.
 >
-> ```
-> DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260904160000
-> Migrationshistorie weicht ab. Erst `migrate-prod` freigeben, dann deployen.
-> ```
->
-> Das trifft **jeden** Deploy von `main`, auch fremde — **AGE-642 eingeschlossen**.
-> Der `CI`-Lauf selbst ist grün; rot ist allein der `Deploy`-Workflow. Die vier
-> Pflichtchecks sind davon nicht betroffen, Merges gehen also weiter.
->
-> **Der PROD-Lauf ist ein eigener, ausdrücklicher Schritt (Aufgabe 10.4) und
-> nicht vom Merge gedeckt — er braucht Donalds Freigabe.** Danach ist der Deploy
-> wieder frei.
->
-> **3. AGE-642 läuft PARALLEL und stand VORHER in dieser Datei.** Der Worktree
-> ist `fbc-platform.donald-age-642-capacitor-huelle` — **nicht anfassen.** Seine
-> Übergabe ist hier überschrieben, wie es die Konvention vorsieht; sie steht
-> vollständig in `git show 6ed68c4:session-handoff.md`. Die Gerätebelege im
-> Detail liegen ohnehin dauerhaft in
-> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in dessen
-> `tasks.md`, Phase E — die sind von diesem Überschreiben nicht betroffen.
+> **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
+> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
+> Phase E. Diese Datei bleibt der Überblick.
+
+## Von AGE-605 übernommen — gilt weiter
+
+**Der Deploy von `main` ist blockiert, bis die PROD-Migration läuft.** Das
+`drift-gate` ist rot, korrekt und wie vorgesehen:
+
+```
+DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260904160000
+```
+
+Das trifft **jeden** Deploy von `main`, AGE-642 eingeschlossen. Der `CI`-Lauf ist
+davon nicht betroffen, die Pflichtchecks auch nicht — Merges gehen weiter. Der
+PROD-Lauf ist ein eigener, ausdrücklicher Schritt (AGE-605 Aufgabe 10.4) und
+**braucht Donalds Freigabe**.
 
 ## Accomplished
 
-**AGE-605 ist fertig und liegt als PR #342 vor.** Der Stand aus der letzten
-Sitzung (geplant, fremdreviewt, Migration geschrieben, Tests fehlten) ist
-abgeschlossen — **und die Migration war beim Übernehmen kaputt.**
+**B3, Android-Hälfte, komplett — PR #344.** iOS ist bewusst ein eigener Vorgang.
 
-| Artefakt | Stand |
+| Datei | Was |
 |---|---|
-| Migration `20260904160000_…` | umgebaut, gegen die DB gelaufen |
-| `supabase/tests/anmeldung_rpc_exklusiv_test.sql` | **neu, 25 Zusagen**, in `ci.yml` |
-| `grants_test.sql` | Snapshot nachgezogen, genau **eine** Zeile |
-| Change | archiviert als `2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei` |
-| Neuigkeiten-Eintrag | erzeugt, **Freigabe offen** (siehe unten) |
+| `scripts/android-keystore{,.logic}.ts` + 3 Testdateien | erzeugt `key.properties` + Keystore aus Infisical, Muster von `firebase-config.ts` |
+| `android/app/build.gradle` | `signingConfigs.release` + Abbruch, wenn Material fehlt |
+| `.github/workflows/android-release.yml` | `workflow_dispatch` + Tag `android-v*`, baut AAB **und** APK |
 
-Abnahme: pgTAP **28 Dateien / 1185** grün (vorher 27 / 1160) ·
-lint/typecheck/build je **Exit 0** · `openspec validate` **31/31**.
-`pnpm test` **2543** nach dem Rebase auf `6ed68c4` (vorher 2536 — die sieben
-neuen kommen aus AGE-642s `bildauswahl.test.ts`, nicht von hier).
+**Der Widerspruch der Aufgabe ist aufgelöst:** der Keystore darf nirgends im
+öffentlichen Repo liegen, muss dem Bau aber vorliegen → über die **ignorierten**
+Dateien, die der `native-secrets-guard` absichtlich nicht ansieht.
+
+**Der stille Ausgang, der jetzt laut ist:** ohne `key.properties` bricht Gradle
+**nicht** ab, sondern schreibt klaglos ein unsigniertes Release-Artefakt.
+
+**Gemessen, nicht behauptet:**
+
+| Lauf | Material | Ausgang |
+|---|---|---|
+| `assembleRelease bundleRelease` | ja | BUILD SUCCESSFUL, beide signiert |
+| `assembleRelease` | **nein** | exit 1 bei `packageReleaseResources`, **kein Artefakt** |
+| `assembleDebug` | nein | exit 0 — unberührt |
+
+`apksigner` meldet SHA-256 `7ae18622…2fda`, zeichengleich mit dem Fingerabdruck
+des Keystores. Kette reproduziert: beide Dateien gelöscht, aus `infisical run
+--env=prod` neu erzeugt → derselbe Fingerabdruck.
 
 ## Decisions
 
-### Der Fund, der die Sitzung getragen hat: Schicht 1 war fail-OPEN
+- **Der Keystore ist NICHT unersetzlich** — die Aussage stand in `proposal.md`
+  und im Delta und ist seit Aug. 2021 falsch. Play App Signing ist für neue Apps
+  verpflichtend, Google hält den App-Signaturschlüssel, unserer ist der
+  **Upload**-Schlüssel und über die Play Console zurücksetzbar. Beide Stellen
+  korrigiert; die Sicherung bleibt gefordert, aus schwächerem Grund.
+- **Infisical + eine Offline-Kopie** (Donald, 04.09.) statt Tresor-Disziplin.
+- **Android zuerst, iOS eigener Vorgang** (Donald, 04.09.).
+- **`versionCode` bewusst NICHT mitgenommen.** Das Schema ist eine Entscheidung
+  und verzahnt sich mit `version_build` des OTA-Wegs.
+- **`ERWARTETER_FINGERABDRUCK` im Workflow**, nachträglich auf Reviewer-Befund:
+  `apksigner verify` allein belegt nur, *dass* signiert wurde, nicht *womit*.
 
-Die geplante Fassung hatte **beide Schichten in EINER `SECURITY INVOKER`-
-Triggerfunktion**. Damit zählte die Kapazitätsschicht unter der RLS des
-Schreibenden, und `regs_select_self_or_host` lässt ein Mitglied nur die
-**eigenen** Anmeldezeilen sehen — sie sah bei jedem Angreifer **null belegte
-Plätze**. Genau an der Zusage, die sie tragen sollte.
+## ⚠ Zwei Handgriffe, die nur Donald tun kann
 
-Gemessen mit Positivkontrolle, weil eine einzelne Beobachtung zwei Ursachen
-hätte haben können:
-
-| Sonde | Zähler sieht | INSERT ins volle Event |
-|---|---|---|
-| fremd gehostetes Event | 0 | **ging durch** |
-| selbst gehostetes Event | 1 | abgewiesen (23514) |
-
-`capacity` war in **beiden** Fällen sichtbar — RLS auf `events` ist damit als
-Ursache ausgeschlossen.
-
-**Warum keine Review das gefunden hat:** die Planungs-Review prüfte einen
-Entwurf ohne RLS-Kontext, der Diff-Review sah schon die Korrektur. Es kam
-allein aus dem Lauf gegen die Datenbank. **Eine Migration, die nie gegen eine
-Datenbank gelaufen ist, ist ungeprüft** — auch mit zwei fremden Freigaben auf
-dem Plan.
-
-### Zwei Trigger statt einem
-
-Weil die Schichten gegensätzliche Rechtemodelle brauchen: `…_wache_exklusiv`
-ist `SECURITY INVOKER` (braucht `current_user`), `…_wache_kapazitaet` ist
-`SECURITY DEFINER` (muss alle Zeilen sehen). `force row level security` ist auf
-beiden Tabellen aus, Eigentümer `postgres` — nachgesehen, nicht angenommen.
-
-**Die Reihenfolge hängt am NAMEN** (BEFORE-Trigger feuern alphabetisch), damit
-ein direkter Statuswechsel an einem vollen Event „nicht direkt" meldet und nicht
-„voll". Zusage 2 pinnt das fest; Umbenennen macht sie rot.
-
-### Schicht 1 sperrt die `events`-Zeile
-
-Aus dem Diff-Review (opencode): ohne `for update` kämen unter READ COMMITTED bei
-`belegt = capacity - 1` zwei gleichzeitige Schreiber **beide** durch. Ich habe
-die Sperre aufgenommen statt die Zusage abzuschwächen. Mit zwei Sitzungen
-nachgemessen: die zweite läuft an genau dieser Zeile in den `lock_timeout`.
-
-### Der Test hält den Mechanismus, nicht nur das Ergebnis
-
-Die vier Wege scheitern schon an den **Spaltenrechten**. Eine Datei, die nur sie
-prüft, bliebe grün, während die Kapazitätsschicht wirkungslos ist — sie käme nie
-zum Zug. Abschnitt 4 stellt deshalb eine spätere Lockerung der Rechte **nach**
-und ist die einzige Zusage, die `SECURITY DEFINER` festhält.
-
-**Drei Mutationen gefahren**, jede fing genau die richtigen Zusagen:
-DEFINER→INVOKER (24, 25), Schicht 2 entfernt (2), Tabellenrecht zurück (3, 4,
-7–11). Und ohne CI-Eintrag wird der Dateilisten-Wächter rot.
-
-Eine Zusage habe ich dabei **nachgeschärft**: „Schicht 1 allein" prüfte in
-Wahrheit die Policy mit, solange die Nachstellung sie stehen ließ — die Mutation
-meldete eine RLS-Ablehnung statt der Überbuchung. Erst mit gelockerter Policy
-zeigt sie, was sie behauptet.
+1. **`~/Downloads/effbeezee-android-upload-keystore/` an einen verschlüsselten
+   Ort bringen und den Ordner dann löschen.** Dort liegt das Passwort im
+   Klartext. Das ist die beschlossene Offline-Kopie; `LIESMICH.md` erklärt alles.
+2. **PR #344 hat `mergeable=CONFLICTING` gemeldet** — Ursache war allein diese
+   Übergabedatei, jetzt gemergt und aufgelöst. Nach dem Push neu prüfen.
 
 ## Files modified
 
-- `supabase/migrations/20260904160000_anmeldung_nicht_an_den_rpcs_vorbei.sql` —
-  zwei Trigger statt einem, Schicht 1 `SECURITY DEFINER` + `for update` + Weg D
-- `supabase/tests/anmeldung_rpc_exklusiv_test.sql` — **neu**, 25 Zusagen
-- `supabase/tests/grants_test.sql` — Snapshot; Kopf benennt den blinden Fleck
-  (`role_table_grants` zeigt **keine** Spaltenrechte)
-- `.github/workflows/ci.yml` — neue pgTAP-Datei eingetragen
-- `openspec/specs/events/spec.md` — Delta gefaltet (2 Anforderungen)
-- `openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/` —
-  archiviert, `REVIEWS.md` um den Diff-Review ergänzt
-- `src/content/release-entries.generated.ts` — ein Eintrag
+Siehe PR #344 — 13 Dateien. Die drei, die zählen, stehen oben in der Tabelle.
+Dazu `scripts/firebase-config{,.logic}.ts`: die Herkunftsangabe sagte fest
+„Umgebung dev", und der Release-Bau ruft jetzt auch mit `prod`.
 
 ## Next session: start here
 
-**PR #342 ist gemergt** (`7849ff2`, 04.09. 17:40Z), CI auf `main` grün, Linear
-AGE-605 steht durch die Automation auf **Done**. Der Branch ist damit erledigt.
+**Der Workflow ist gebaut, aber noch nie gelaufen.** Erste Handlung: nach dem
+Merge von #344 einmal `workflow_dispatch` auf `android-release` auslösen und
+zusehen. Alles davor ist lokal belegt, die Runner-Seite nicht — offen sind dort
+genau drei Annahmen: dass `android-actions/setup-android` die Build-Tools
+mitbringt, die `apksigner` findet; dass `jarsigner` aus `setup-java` im PATH
+steht; und dass `pnpm exec cap sync android` auf dem Runner dieselben fünf
+Plugins verdrahtet wie lokal.
 
-**Erster Handgriff: die PROD-Migration mit Donald klären** — sie ist der einzige
-offene Punkt und blockt bis dahin jeden Deploy (siehe Kasten oben). `migrate-dev`
-ist im Deploy-Lauf bereits **grün durchgelaufen**, die DEV-Fläche trägt die
-Migration also schon; offen ist allein PROD.
+Danach **`versionCode`** — ohne es lässt sich das Artefakt genau einmal zu Play
+hochladen.
 
-Danach: `wt remove` für diesen Worktree, und die drei alten Remote-Zweige.
-
-**Und dann AGE-630** (Event-Vorlagen und Serientermine) in einer **eigenen
-frischen Sitzung** — so von Donald am 04.09. festgelegt, nicht vorziehen. Der
-Vorgang nennt vier offene Produktentscheidungen und drei Schema-Fallen, darunter
-dass `events_cover_path_key` **UNIQUE** ist und eine Serie sich das Coverbild
-deshalb nicht teilen kann.
+> ⚠ **Java-Falle, am 04.09. eingetreten:** Android Studios mitgelieferte JBR ist
+> Java **25**, Gradle 8.14.3 bricht daran mit `Unsupported class file major
+> version 69` ab. Lokal `JAVA_HOME=/opt/homebrew/opt/openjdk@21` setzen;
+> `/usr/bin/keytool` ohne JAVA_HOME ist nur ein Stub.
 
 ## Open questions
 
-- **Der Neuigkeiten-Eintrag ist erzeugt, aber nicht freigegeben.** Sein erster
-  Punkt lautet „Für Mitglieder ändert sich nichts Sichtbares" — dieselbe Lage
-  wie bei AGE-542, das Donald deshalb zurückgehalten hat. **Entscheidung offen.**
-  Nebenbei: der zweite Punkt verweist auf „Nicht in diesem Change", einen
-  Abschnittsnamen aus dem Proposal — in einem mitgliedersichtbaren Text ein
-  Fremdkörper. Fiele beim Zurückhalten ohnehin weg.
-- **Drei Befunde gehören Donald**, alle **Bestand** und nicht durch diesen
-  Change entstanden. Für keinen wurde ein Vorgang angelegt:
-  - **Ein Gastgeber kann `events.capacity` unter die bestehende Belegung
-    senken** (`updateEvent`, `src/lib/events.ts:601`). Deshalb ist die Zusage
-    dieses Changes eingegrenzt.
-  - **Mitglieder unter `exchange` können sich anmelden, aber nicht direkt
-    absagen.** Die RPC lässt öffentliche Events ab `basic` zu, `regs_write_own`
-    verlangt `has_level(4)`.
-  - **NEU, am 04.09. gemessen:** ein **zweiter** `register_for_event`-Aufruf
-    degradiert ein bereits registriertes Mitglied auf die Warteliste — der RPC
-    zählt die eigene Zeile mit (`v_count` schliesst `v_uid` nicht aus). Bei
-    `capacity` 1: `registered → waitlist`. **Selbstheilend**, der dritte Aufruf
-    stellt `registered` wieder her; deshalb kein Blocker, aber für ein Mitglied
-    sichtbar.
-- **PROD-Ausgangsmessung:** 0 überbuchte Events — bei **2** Events, von denen
-  **keines** eine `capacity` trägt. Die Null ist kein Verdienst einer Schranke.
-  Sobald das erste Event mit Platzbegrenzung angelegt wird, zählt diese
-  Migration; vorher ist sie gegenstandslos. Das ist das Argument für den
-  PROD-Lauf, nicht gegen ihn.
-- **`REVIEWS.md` trägt keinen signierten Trailer** — von Hand geschrieben, die
-  Reviewer direkt per Bash gerufen. Das Gate meldet `trailer-absent`; blockt
-  nichts, gilt für **jede** `REVIEWS.md` dieses Repos.
-- **Neue Reviewer-Falle, heute gemessen:** gemini kann den Diff **weder** aus
-  `.gstack/` (ignoriert) **noch** aus dem Scratchpad unter `/private/tmp/…`
-  lesen — letzterer liegt ausserhalb seines Arbeitsverzeichnisses („Path not in
-  workspace"). Beide bisher dokumentierten Ablagen fallen damit aus. Was
-  funktioniert: **den Diff direkt in den Prompt legen** (54 kB liefen problemlos).
-  `opencode` liest `.gstack/` weiterhin.
-- **Drei Remote-Zweige stehen nach früheren Merges noch auf `origin`**
-  (`age-542-*` zweimal, `age-618-*`). Aufräumen ist Donalds Entscheidung.
+- **Geschütztes GitHub-Environment für `android-release`.** Beide Auslöser bauen
+  den Ref, auf dem sie stehen — wer ein Tag setzen kann, führt Code mit Zugriff
+  auf die prod-Geheimnisse aus. Keine **neue** Fläche (`deploy.yml` trägt
+  denselben Token), aber die Stelle, an der sie sich verengen ließe. Ist eine
+  Repository-Einstellung, kein Diff.
+- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
+  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur
+  im neuen Workflow löst, erzeugte zwei Wahrheiten.
+- **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat.** Vor
+  der Store-Einreichung am **Release**-Bau gegenprüfen. Eigener Vorgang.
+- **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
+- **Realtime im Chat** ist weiterhin ungemessen.
+- **Bildupload auf iOS** ist ungeprüft. Die Ursache war capgo, nicht Android —
+  iOS ist vermutlich genauso betroffen, aber das ist eine Ableitung.
+- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung —
+  zuletzt machen.

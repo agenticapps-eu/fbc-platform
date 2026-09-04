@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// ══ SIGNATURMATERIAL (AGE-642 B3) ══════════════════════════════════════════
+// `key.properties` und der Keystore daneben liegen NICHT im Repo — es ist
+// oeffentlich. Beide entstehen vor einem Release-Bau aus Infisical:
+//   infisical run --env=prod -- pnpm android:keystore
+//
+// Gelesen wird hier nur, was da ist. Ein DEBUG-Bau darf nie an dieser Datei
+// haengen: der taegliche Rundlauf am Geraet laeuft ueber `assembleDebug`, und
+// ein Gradle, das dort nach dem Signaturmaterial verlangte, machte jede
+// Messung von einem Secret abhaengig, das mit ihr nichts zu tun hat.
+def keystorePropertiesFile = rootProject.file('key.properties')
+def keystoreProperties = new Properties()
+def keystoreVorhanden = keystorePropertiesFile.exists()
+if (keystoreVorhanden) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.effbeezee.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +32,48 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystoreVorhanden) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystoreVorhanden) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+// ══ DER STILLE AUSGANG, DEN DIESE ZEILEN VERHINDERN ════════════════════════
+// Ohne `key.properties` bleibt oben `signingConfig` ungesetzt. Gradle bricht
+// dann NICHT ab, sondern erzeugt klaglos ein UNSIGNIERTES Release-Artefakt:
+// der Lauf ist gruen, das Buendel unbrauchbar, und es faellt erst beim
+// Hochladen zu Play auf — eine Stufe zu spaet und weit weg von der Ursache.
+//
+// Der Abbruch haengt deshalb an den Release-Aufgaben und nur an ihnen. Waere
+// er stattdessen oben beim Einlesen, braeche er auch `assembleDebug`.
+//
+// `package` steht bewusst in der Liste, nicht nur `assemble`/`bundle`: gemessen
+// am 04.09. laeuft `packageRelease` VOR `assembleRelease` durch und legt dabei
+// `app-release-unsigned.apk` ab. Der Bau scheiterte auch so — aber er liesse
+// eine unsignierte Datei mit plausiblem Namen im Ausgabeordner zurueck, und die
+// naechste Hand, die dort `*.apk` einsammelt, faende sie.
+tasks.matching { it.name ==~ /^(assemble|bundle|package)Release.*/ }.configureEach {
+    doFirst {
+        if (!keystoreVorhanden) {
+            throw new GradleException(
+                "android/key.properties fehlt — das Release-Artefakt waere unsigniert.\n" +
+                "Erzeugen mit:\n" +
+                "  infisical run --env=prod -- pnpm android:keystore")
         }
     }
 }

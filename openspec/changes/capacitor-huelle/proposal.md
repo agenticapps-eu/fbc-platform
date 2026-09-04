@@ -152,8 +152,15 @@ die fehlenden FCM-Geheimnisse den Push-Change in Phase A angehalten haben.
 - **Apple Developer Program** (99 $/Jahr) und **Google Play Console** (25 $
   einmalig) — für M4 zwingend, für M2 schon nötig, um auf einem **echten Gerät**
   zu starten (die Abnahme verlangt genau das, nicht den Simulator).
-- **Ein Android-Keystore**, erzeugt und **außerhalb des Repos gesichert**. Er
-  ist unersetzlich: ohne ihn ist die App im Play Store nie wieder aktualisierbar.
+- **Ein Android-Keystore**, erzeugt und **außerhalb des Repos gesichert**.
+  **Korrigiert am 04.09.:** hier stand „er ist unersetzlich: ohne ihn ist die App
+  im Play Store nie wieder aktualisierbar". Das gilt seit August 2021 nicht mehr
+  — Play App Signing ist für neue Apps verpflichtend, Google hält den
+  App-Signaturschlüssel, und unserer ist der **Upload**-Schlüssel, der sich über
+  die Play Console zurücksetzen lässt
+  ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/9842756)).
+  Die Sicherung bleibt gefordert, aber aus schwächerem Grund; die Begründung
+  steht in `specs/native-shell/spec.md`.
 - **Ein Schlüsselpaar** für die Signatur der OTA-Bündel; der private Teil nach
   Infisical. Ein **Bucket** wird hier nicht mehr von Hand gebraucht: er entsteht
   seit dem 31.08. wie die vier bestehenden per Migration (siehe `design.md` §8).

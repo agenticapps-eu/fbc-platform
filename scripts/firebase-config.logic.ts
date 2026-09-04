@@ -40,7 +40,7 @@ export function pruefeGoogleServices(
   if (roh === undefined || roh.trim() === "") {
     return {
       fehler:
-        "GOOGLE_SERVICES_JSON fehlt (Herkunft: Infisical, Umgebung dev). " +
+        "GOOGLE_SERVICES_JSON fehlt (Herkunft: Infisical, Umgebung dev bzw. prod). " +
         "Aufruf: `infisical run --env=dev -- pnpm android:firebase`.",
       datei: "",
     };

@@ -386,17 +386,119 @@ Die Signierung kommt **vor** dem Workflow und vor Phase E: ein physisches Gerät
 nimmt keine unsignierte App an. Ohne diesen Schritt ist die Abnahme „startet auf
 echten Geräten" nicht erreichbar, und das fiele erst ganz am Ende auf.
 
+**Zuschnitt (Donald, 04.09.): Android zuerst, iOS als eigener Vorgang.** Die
+iOS-Hälfte hat eigene Fallen (ASC-Schlüssel, Provisioning Profile,
+macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
+
 - [ ] **iOS:** Entwickler-Zertifikat und Provisioning Profile (oder
       App-Store-Connect-API-Schlüssel) bereitstellen. Woher sie kommen, gehört
       in dieselbe Zeile wie ihr Name — nach Infisical, nicht ins Repo.
-- [ ] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
+      **Zurückgestellt** — siehe Zuschnitt oben.
+- [x] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
       `key.properties` aus CI-Secrets erzeugen lassen. Derselbe Keystore, der
       nirgends im Repo liegen darf, muss dem Workflow zur Laufzeit vorliegen —
       das ist der Widerspruch, den diese Zeile auflöst.
-- [ ] Neuer Workflow, ausgelöst per `workflow_dispatch` und Tag, der das
-      Material aus den Secrets einspeist.
-- [ ] **Beleg:** ein Pull Request, der nur Web-Dateien ändert, löst ihn **nicht**
+
+      **Aufgelöst ist er über die IGNORIERTEN Dateien.** Der
+      `native-secrets-guard` sieht verfolgte und unverfolgt-nicht-ignorierte
+      Dateien an, ignorierte absichtlich nicht (B2 hat das so entschieden, damit
+      er nicht auf jedem Rechner rot ist, der bauen kann). Der Keystore entsteht
+      also vor dem Bau aus Infisical, unter `.gitignore:51`, und verschwindet mit
+      dem Runner. Gegengeprüft: `git check-ignore -v` nennt für beide Dateien die
+      Zeile, und der Wächter meldet über 1.486 Dateien „kein natives Geheimnis".
+
+      **Erzeugt am 04.09.:** RSA 2048, PKCS#12, Alias `upload`, gültig bis
+      20.01.2054 (Play verlangt mindestens bis 22.10.2033). Fingerabdruck
+      SHA-256 `7A:E1:86:22:…:2F:DA` — er ist öffentlich, Play zeigt ihn selbst
+      an, und er steht hier, damit ein späterer Lauf einen **vertauschten**
+      Keystore erkennt, ohne ihn erst hochzuladen.
+
+      **Vier Werte in Infisical `prod`:** `ANDROID_KEYSTORE_BASE64`,
+      `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+      Dazu musste `GOOGLE_SERVICES_JSON` von `dev` nach `prod` gespiegelt werden
+      — es lag nur in `dev`, und der Release-Bau läuft gegen `prod`. Per Digest
+      geprüft: byte-gleich.
+
+- [x] Neuer Workflow, ausgelöst per `workflow_dispatch` und Tag, der das
+      Material aus den Secrets einspeist. → `.github/workflows/android-release.yml`
+
+      **Der stille Ausgang, den `build.gradle` jetzt verhindert:** ohne
+      `key.properties` bricht Gradle NICHT ab, sondern schreibt klaglos ein
+      **unsigniertes** Release-Artefakt — grüner Lauf, unbrauchbares Bündel, und
+      der Befund fiele erst beim Hochladen zu Play an. Der Abbruch hängt deshalb
+      an den Release-Aufgaben und nur an ihnen; ein Debug-Bau darf das Material
+      nie brauchen, weil der tägliche Rundlauf am Gerät darüber läuft.
+
+- [x] **Beleg:** ein Pull Request, der nur Web-Dateien ändert, löst ihn **nicht**
       aus, und der Web-Deploy läuft wie bisher.
+
+      Belegt am **Auslöser-Block**, nicht am laufenden System: eine Verneinung
+      („es ist nichts passiert") ist dort nicht von „gerade hat niemand
+      gedrückt" zu unterscheiden. Stehen im `on:`-Block nur `workflow_dispatch`
+      und ein Tag-Muster, KANN kein PR ihn starten.
+      `scripts/android-release.workflow.test.ts` prüft das, plus die andere
+      Hälfte: `deploy.yml` trägt weder `gradlew` noch `ANDROID_KEYSTORE_BASE64`.
+
+- [x] **Gemessene Kette, 04.09., lokal — nicht behauptet:**
+
+      | Lauf | `key.properties` | Ausgang |
+      |---|---|---|
+      | `assembleRelease bundleRelease` | ja, aus Infisical `prod` | **BUILD SUCCESSFUL**, `app-release.apk` + `.aab`, signiert |
+      | `assembleRelease` | **nein** | exit 1 bei `packageReleaseResources`, **kein Artefakt geschrieben** |
+      | `assembleDebug` | nein | exit 0 — unberührt |
+
+      Der Signaturnachweis ist zeichengleich: `apksigner verify --print-certs`
+      meldet `Signer #1 … SHA-256 7ae18622…2fda`, und das ist der Fingerabdruck
+      des Keystores. Und die Kette reproduziert: beide Dateien gelöscht, aus
+      `infisical run --env=prod` neu erzeugt → derselbe Fingerabdruck.
+
+      **Warum `package` in der Aufgabenliste steht und nicht nur
+      `assemble`/`bundle`:** in der ersten Fassung hing der Abbruch an
+      `assembleRelease`. Gemessen lief `packageRelease` dann VORHER durch und
+      legte `app-release-unsigned.apk` ab — der Bau scheiterte zwar, hinterliess
+      aber eine unsignierte Datei mit plausiblem Namen im Ausgabeordner. Mit
+      `package` in der Liste bricht er bei `packageReleaseResources` ab, und der
+      Ordner entsteht gar nicht erst. Nachgemessen: `find … -name "*.apk"`
+      liefert nichts, und der Fehllauf dauert 5 statt 30 Sekunden.
+
+      **Die Falle, die 2 Minuten kostete:** Android Studios mitgelieferte JBR ist
+      Java **25**, und Gradle 8.14.3 bricht daran mit `Unsupported class file
+      major version 69` ab. Der Workflow pinnt deshalb temurin **21**; lokal
+      liegt es unter `/opt/homebrew/opt/openjdk@21`. `/usr/bin/keytool` ohne
+      JAVA_HOME ist nur ein Stub und meldet „Unable to locate a Java Runtime".
+
+- [x] **Diff-Review (codex, 04.09.)** — Sicherheit berührt, also fällig nach der
+      Regel vom 26.08. Zehn Befunde, davon **fünf behoben**:
+
+      | Schwere | Befund | Behandlung |
+      |---|---|---|
+      | HOCH | `apksigner verify` belegt nur, DASS signiert wurde — nicht WOMIT, und das AAB gar nicht | behoben: Fingerabdruck-Vergleich gegen `ERWARTETER_FINGERABDRUCK` + `jarsigner` aufs AAB |
+      | HOCH | `INFISICAL_TOKEN` auf Job-Ebene, also auch für `pnpm install` samt Lifecycle-Skripten sichtbar | behoben: auf die drei Schritte gezogen, die ihn brauchen |
+      | NIEDRIG | `writeFileSync(…, {mode})` wirkt **nur beim Anlegen** — eine bestehende Datei behielt weitere Rechte | behoben: erst `rmSync`, dann anlegen |
+      | NIEDRIG | `concurrency`-Begründung falsch (getrennte Runner teilen keinen Pfad) | behoben: Kommentar sagt jetzt, dass es Ordnung ist, nicht Sicherheit |
+      | NIEDRIG | Kommentar behauptete, der Wächter melde die erzeugten Dateien — er sieht ignorierte ausdrücklich nicht an | behoben: beide Schichten getrennt beschrieben |
+      | MITTEL | `packageRelease` nicht vom Abbruch erfasst | war beim Eintreffen des Reviews **schon behoben** (siehe oben) |
+      | MITTEL | Aussage „Play nimmt es als unseres an" überzogen | behoben im Delta: der Schlüssel ist der zweite von zwei Faktoren |
+      | MITTEL | `versionCode 1` | **bleibt offen**, siehe die Zeile darunter |
+      | HOCH | `curl \| sudo bash` für die Infisical-CLI ungepinnt | **nicht behoben** — bestehende Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur hier löst, erzeugte zwei Wahrheiten. |
+      | HOCH | Beide Auslöser bauen einen ungeprüften Ref mit prod-Token | **nicht behoben, benannt** — siehe unten |
+
+- [ ] **OFFEN — geschütztes GitHub-Environment für `android-release`.**
+      Der Workflow baut den Ref, auf dem er steht; wer ein Tag setzen kann,
+      führt Code mit Zugriff auf die prod-Geheimnisse aus. Keine **neue** Fläche
+      (`deploy.yml` trägt denselben Token und läuft auf jeden Push nach `main`),
+      aber die Stelle, an der sie sich verengen liesse: ein Environment mit
+      Freigeber in den Repository-Einstellungen. Das ist eine Einstellung, kein
+      Diff — deshalb kann diese Sitzung sie nicht setzen.
+
+- [ ] **OFFEN, und M4 hängt daran: `versionCode` steht auf `1`.**
+      `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
+      `versionName "1.0"`). Der Workflow baut damit ein Artefakt, das sich genau
+      **einmal** zu Play hochladen lässt — jeder weitere Upload wird mit
+      „Version code 1 has already been used" abgelehnt. Bewusst NICHT in B3
+      hineingezogen: das Schema ist eine Entscheidung (Tag? Lauf-Nummer? eigene
+      `VERSION`?) und verzahnt sich mit `version_build` des OTA-Wegs, der
+      semver-förmig sein muss. Gehört vor die erste Einreichung.
 
 ### B4. Das App-Symbol ✅
 

@@ -24,7 +24,7 @@ function main(): void {
   const dienstkonto = process.env.FCM_SERVICE_ACCOUNT;
   if (dienstkonto === undefined || dienstkonto.trim() === "") {
     throw new Error(
-      "FCM_SERVICE_ACCOUNT fehlt (Herkunft: Infisical, Umgebung dev). Ohne es " +
+      "FCM_SERVICE_ACCOUNT fehlt (Herkunft: Infisical, Umgebung dev bzw. prod). Ohne es " +
         "ist nicht pruefbar, ob die Konfiguration zum richtigen Firebase-Projekt gehoert.",
     );
   }
