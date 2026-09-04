@@ -342,6 +342,14 @@ benennt die Ursache:
 | C — Rand | `expected [ 'App.tsx:247 — /probe' ] to deeply equal []` | 1 von 33 |
 | zurückgenommen | — | **33/33 grün** |
 
+Zusätzlich, weil die Abnahme im Vorgang wörtlich eine *für `anon` ausführbare*
+Funktion verlangt (Eingriff B nutzt mit `search_directory` eine, die es nicht
+ist): dieselbe Probe mit `suchbegriff_zu_tsquery` — steht in der Sechserliste,
+`anon` DARF sie ausführen, der Client ruft sie nicht — meldet
+`expected [ 'suchbegriff_zu_tsquery' ] to deeply equal []`, ebenfalls 1 von 33.
+Die Positivliste ist eine Whitelist von drei Namen; sie fängt damit auch das,
+was die Grants erlauben, der Client aber nicht rufen soll.
+
 **Die erste Fassung der Kontrollen war fehlerhaft und ist korrigiert.** Kontrolle
 A verglich gegen `[]` statt gegen den Bestand; sie schlug bei Eingriff C mit an,
 weil `/probe` ebenfalls ungeführt ist. Ein Eingriff, der zwei Zusagen trifft,
