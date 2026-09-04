@@ -15,19 +15,34 @@
 > `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
 > Phase E. Diese Datei bleibt der Überblick.
 
-## Von AGE-605 übernommen — gilt weiter
+## Von AGE-605 übernommen — ⚠ ERLEDIGT am 04.09. abends, nicht mehr gültig
 
-**Der Deploy von `main` ist blockiert, bis die PROD-Migration läuft.** Das
-`drift-gate` ist rot, korrekt und wie vorgesehen:
+Hier stand: *„Der Deploy von `main` ist blockiert, bis die PROD-Migration
+läuft."* Das galt bis 19:32 und ist **aufgehoben**. Der Satz bleibt als
+Korrektur stehen, damit niemand ihn aus einer älteren Fassung wieder aufgreift.
 
-```
-DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260904160000
-```
+Abgelaufen in dieser Reihenfolge, alles auf Commit `3d20063`:
 
-Das trifft **jeden** Deploy von `main`, AGE-642 eingeschlossen. Der `CI`-Lauf ist
-davon nicht betroffen, die Pflichtchecks auch nicht — Merges gehen weiter. Der
-PROD-Lauf ist ein eigener, ausdrücklicher Schritt (AGE-605 Aufgabe 10.4) und
-**braucht Donalds Freigabe**.
+1. **`migrate-prod` (Lauf 33911148557), grün** — die AGE-605-Sitzung hat ihn
+   angestossen. `Applying migration 20260904160000_anmeldung_nicht_an_den_rpcs_
+   vorbei.sql` · `OK — 123 Migrationen, Historie abweichungsfrei` · Objekt-
+   Drift-Scan `OK — keine Objekt-Abweichung auf prod`.
+2. **`Deploy` (Lauf 33904874723) nach Re-Run, alle vier Jobs grün** —
+   `drift-gate`, `migrate-dev`, `functions`, `deploy`.
+
+**An der Kante gegengemessen, nicht am Job-Status:** `app.effbeezee.com` liefert
+`assets/index-GEx8cTIJ.js` als `application/javascript`; die Negativkontrolle auf
+einen erfundenen Pfad liefert `text/html`, der SPA-Fallback ist damit
+ausgeschlossen. Das OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD (19:32:08Z).
+
+> **Ein Verdacht, der geprüft und ausgeräumt ist** — damit ihn niemand neu
+> aufmacht: alle 49 Bündel tragen dieselbe Semver `0.0.0`, und eines heisst
+> `0.0.0+feedbeef` (Testbündel vom 02.09.). Würde die Auswahl über die
+> Versions-Zeichenkette tiebreaken, gewänne `feedbeef` lexikalisch. Tut sie
+> nicht: `ota_buendel_neuestes` ordnet `created_at desc, version desc`, **Zeit
+> zuerst**. An der Funktion gemessen: ein Gerät auf `builtin` bekommt
+> `0.0.0+3d20063d3913`, eines auf `feedbeef` ebenfalls, und eines, das schon
+> darauf läuft, bekommt nichts.
 
 ## Accomplished
 
@@ -77,8 +92,8 @@ des Keystores. Kette reproduziert: beide Dateien gelöscht, aus `infisical run
 1. **`~/Downloads/effbeezee-android-upload-keystore/` an einen verschlüsselten
    Ort bringen und den Ordner dann löschen.** Dort liegt das Passwort im
    Klartext. Das ist die beschlossene Offline-Kopie; `LIESMICH.md` erklärt alles.
-2. **PR #344 hat `mergeable=CONFLICTING` gemeldet** — Ursache war allein diese
-   Übergabedatei, jetzt gemergt und aufgelöst. Nach dem Push neu prüfen.
+2. ~~PR #344 hat `mergeable=CONFLICTING` gemeldet~~ — erledigt, gemergt als
+   `3d20063`, CI grün, auf PROD ausgerollt.
 
 ## Files modified
 
