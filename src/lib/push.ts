@@ -120,6 +120,86 @@ export function pushLebenszeichen(): Promise<PushStand> {
 }
 
 /**
+ * Die Kennung des Mitteilungskanals (AGE-642).
+ *
+ * **Zeichengleich mit `com.google.firebase.messaging.default_notification_channel_id`
+ * in `android/app/src/main/AndroidManifest.xml`.** `push.kanal.test.ts` hält
+ * beide zusammen, denn der Fehlermodus einer Abweichung ist Schweigen: FCM legt
+ * sich dann wieder seinen eigenen `fcm_fallback_notification_channel` an, der
+ * Kanal von hier steht ungenutzt daneben, und am Gerät sieht alles aus wie
+ * vorher.
+ *
+ * **Sie darf sich nie wieder ändern.** Für Android ist eine neue Kennung ein
+ * neuer Kanal — wer den alten leiser gestellt oder abgeschaltet hatte, bekommt
+ * ihn ungefragt wieder auf laut.
+ */
+export const PUSH_KANAL_ID = "mitteilungen";
+
+/**
+ * Legt den Mitteilungskanal an — Android, beim Start.
+ *
+ * **Warum es ihn braucht.** Gemessen am 04.09. mit `dumpsys notification`:
+ * `channel=fcm_fallback_notification_channel`, `sound=null vibrate=null
+ * defaults=0`, dazu im logcat `Missing Default Notification Channel metadata in
+ * AndroidManifest`. Die App deklarierte keinen Kanal, also legte FCM sich
+ * einen an. Zwei Folgen: `default_sound: true` in `fcmKoerper` ist auf
+ * Android 8+ wirkungslos — Ton und Vibration sind dort Eigenschaften des
+ * KANALS, nicht der Nachricht —, und in den Systemeinstellungen heisst der
+ * Kanal „Sonstiges".
+ *
+ * **BEIM START, nicht beim ersten Push.** Ein Kanal, den es im Moment der
+ * Zustellung nicht gibt, fällt auf denselben Fallback zurück; die Mitteilung
+ * ist dann schon zugestellt, und der später angelegte Kanal ändert daran
+ * nichts mehr.
+ *
+ * **EIN Kanal, bewusst.** Eine Trennung nach Nachricht und Kontaktanfrage wäre
+ * die naheliegende zweite Stufe und ist hier ausdrücklich nicht dran: einen
+ * Kanal, den ein Mitglied einmal abgeschaltet hat, kann die App nie wieder
+ * einschalten. Das ist ein Entwurf, kein Anbau.
+ *
+ * **iOS ist nicht betroffen** — Kanäle gibt es dort nicht, und die Brücke
+ * meldete den Aufruf als `unimplemented`. Die Weiche oben hält ihn davon fern.
+ */
+export async function pushKanalAnlegen(): Promise<"angelegt" | "entfaellt" | "fehler"> {
+  if (pushPlattform(Capacitor.isNativePlatform(), Capacitor.getPlatform()) !== "android") {
+    return "entfaellt";
+  }
+
+  try {
+    await PushNotifications.createChannel({
+      id: PUSH_KANAL_ID,
+      // Sichtbar in den Systemeinstellungen. Er nennt beides, was hier
+      // ankommt — „Mitteilungen" wäre so nichtssagend wie das „Sonstiges",
+      // das er ersetzt.
+      name: "Nachrichten und Kontaktanfragen",
+      description: "Wenn Ihnen jemand schreibt oder Sie kennenlernen möchte.",
+      // 4 = HIGH: Ton und Einblendung. Der Versand setzt `priority: "high"`,
+      // damit die Nachricht nicht bis zum nächsten Doze-Wartungsfenster
+      // liegen bleibt — käme sie dann lautlos in der Leiste an, wäre dafür
+      // nichts gewonnen. Herunterstellen kann das Mitglied selbst; von der
+      // App aus geht es nach dem Anlegen in keine Richtung mehr.
+      importance: 4,
+      // AUSDRÜCKLICH, und das ist keine Verzierung: Capacitors
+      // `NotificationChannelManager` liest `vibration` mit dem Vorgabewert
+      // FALSE und ruft `enableVibration(false)` — anders als Android selbst,
+      // wo ein Kanal dieser Stufe vibriert. Ohne diese Zeile bliebe der am
+      // 04.09. gemessene Zustand `vibrate=null` bestehen.
+      vibration: true,
+      // KEIN `sound`: ohne den Schlüssel ruft die Brücke `setSound` gar nicht
+      // erst, und der Kanal behält den Standardton des Systems. Ein Wert hier
+      // verlangte eine eigene Datei unter `res/raw`.
+    });
+    return "angelegt";
+  } catch (e) {
+    // Nur auf die Konsole. Unterhalb von Android 8 antwortet die Brücke mit
+    // `unavailable` — dort gibt es keine Kanäle, und `default_sound` im
+    // Versand greift wieder. Ein Fehler hier darf den Start nicht aufhalten.
+    console.error("[push] Kanal nicht angelegt:", (e as Error).message);
+    return "fehler";
+  }
+}
+
+/**
  * Nimmt das Gerätetoken beim Abmelden mit — bester Versuch, keine Garantie.
  *
  * **Vor** `auth.signOut()` zu rufen ist Pflicht: die Zeile gehört dem

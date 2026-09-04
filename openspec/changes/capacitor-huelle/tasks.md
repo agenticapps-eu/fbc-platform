@@ -1542,6 +1542,77 @@ fehlt im Manifest). Zwei Folgen, beide gemessen, keine davon ein Ausfall:
 **Eigener Vorgang, nicht hier.** Push funktioniert; das ist eine Frage der
 Güte, nicht der Funktion, und sie berührt iOS nicht (Kanäle gibt es dort nicht).
 
+##### Nachtrag 04.09.: doch hier — der Kanal ist gebaut, der Beleg steht aus
+
+Donald hat den Vorgang am 04.09. hierher gezogen, klein und abgegrenzt. Gebaut
+ist er, am Gerät gemessen ist er noch **nicht** — dieser Abschnitt trennt
+beides ausdrücklich.
+
+- [x] `com.google.firebase.messaging.default_notification_channel_id` steht als
+      `<meta-data>` im `AndroidManifest.xml`. Die Datei ist nicht von
+      `cap sync` erzeugt; die Kamera-Rechte stehen schon von Hand darin.
+- [x] Der Kanal wird angelegt: `pushKanalAnlegen()` in `src/lib/push.ts`, über
+      `createChannel()` des Push-Plugins — kein nativer Code. Gerufen in
+      `AppShell.tsx` **beim Montieren, ohne Bedingung**: nicht am Konto, nicht
+      an der Erlaubnis, nicht am Öffnen der Nachrichten. Ein Kanal, den es zum
+      Zustellzeitpunkt nicht gibt, fällt auf den Fallback zurück, und die
+      Mitteilung ist dann schon stumm angekommen.
+- [x] **Ein** Kanal, `id=mitteilungen`, Name „Nachrichten und
+      Kontaktanfragen". Keine Trennung nach Art — ein abgeschalteter Kanal
+      lässt sich aus der App nie wieder einschalten.
+- [x] `importance: 4` (HIGH: Ton und Einblendung). Der Versand setzt
+      `priority: "high"`, damit die Nachricht nicht bis zum nächsten
+      Doze-Wartungsfenster liegen bleibt — käme sie dann lautlos an, wäre dafür
+      nichts gewonnen. Herunterstellen kann das Mitglied selbst; von der App
+      aus geht es nach dem Anlegen in keine Richtung mehr.
+- [x] `vibration: true` **ausdrücklich**, und das ist der eine nicht
+      offensichtliche Griff: Capacitors `NotificationChannelManager` liest das
+      Feld mit dem Vorgabewert **false** und ruft dann `enableVibration(false)`
+      — anders als Android selbst, wo ein Kanal dieser Stufe vibriert. Ohne die
+      Zeile bliebe `vibrate=null` genau so bestehen, wie oben gemessen.
+- [x] **Kein** `sound`: ohne den Schlüssel ruft die Brücke `setSound` gar nicht
+      erst, und der Kanal behält den Standardton des Systems. Ein Wert dort
+      verlangte eine eigene Datei unter `res/raw` — und ein `sound` ohne diese
+      Datei wäre ein stummer Kanal, also derselbe Ausgang wie vorher.
+- [x] `default_sound: true` in `fcmKoerper` bleibt **stehen**. Es ist nicht tot:
+      unterhalb von Android 8 gibt es keine Kanäle, dort greift es weiterhin,
+      und `minSdkVersion = 24` (`android/variables.gradle`) reicht bis
+      Android 7.0 — API 24 und 25 liegen darunter. Auf denselben Geräten
+      antwortet `createChannel` mit `unavailable` — deshalb fängt
+      `pushKanalAnlegen` und gibt `"fehler"` zurück, statt den Start aufzuhalten.
+- [x] Die Kennung steht an zwei Stellen und wird zusammengehalten:
+      `src/lib/push.kanal.test.ts` liest das Manifest und vergleicht mit
+      `PUSH_KANAL_ID`. Ohne diese Prüfung ist eine Abweichung stumm — FCM legt
+      sich wieder seinen Fallback an, der eigene Kanal steht ungenutzt daneben.
+- [x] Gegenprobe gefahren, vier Mutationen, alle rot: Manifestwert verstellt ·
+      `<meta-data>` ganz entfernt · `vibration: true` entfernt · den Aufruf aus
+      `AppShell` entfernt. Danach wieder grün.
+- [x] `pnpm typecheck`, `pnpm lint` (0 Fehler), `pnpm test` (221 Dateien,
+      2.495 Tests) grün; `prettier --check` auf den berührten Dateien sauber.
+      `pnpm format:check` ist repoweit schon vorher rot (323 Dateien) — nicht
+      von diesem Diff.
+- [ ] **⛔ Der Beleg am Gerät steht aus.** Er ist derselbe billige Weg wie am
+      04.09.: bauen, installieren, `.gstack/run-android-push-probe.sh`, dann
+
+      ```bash
+      adb shell dumpsys notification --noredact | grep -i effbeezee
+      ```
+
+      Erwartet: `channel=mitteilungen`, **nicht**
+      `fcm_fallback_notification_channel`, dazu `vibrate` ungleich `null`.
+      *Die Positivkontrolle steht oben* — der Fallback ist als Vorzustand
+      protokolliert und muss sich ändern. Aus Claude Code heraus lässt sich das
+      Werkzeug nicht starten (der Klassifikator blockt jeden sendenden Lauf
+      unter `--env=prod`); Donald löst es aus.
+
+      **Zwei Fallen beim Nachmessen.** Der Kanal wird beim Start angelegt: eine
+      Zustellung, die vor dem ersten Start der neuen Schale ankommt, trägt noch
+      den Fallback. Und ein bereits angelegter Kanal ändert sich durch ein
+      erneutes `createChannel` **nicht** — wer Stufe oder Vibration später
+      verstellt, sieht die Änderung erst nach dem Deinstallieren der App.
+
+**iOS ist nicht betroffen** und der Diff fasst `ios/` nicht an.
+
 - [x] Eintrittsbündel gemessen unter 1.024 kB roh (Grundlinie 1.181,77 kB).
       **Gemessen 02.09. am ausgelieferten Artefakt** (`app.effbeezee.com`,
       `2c6e86a`) statt an einem Bau auf der eigenen Maschine — ein Bau ohne

@@ -24,6 +24,29 @@
 
         </activity>
 
+        <!--
+          AGE-642: der Mitteilungskanal, in dem Push landet.
+
+          Ohne diese Zeile legt FCM sich selbst einen an. Gemessen am 04.09.
+          mit `dumpsys notification`, nachdem die Zustellung durch war:
+          `channel=fcm_fallback_notification_channel`, `sound=null
+          vibrate=null defaults=0`; im logcat dazu `Missing Default
+          Notification Channel metadata in AndroidManifest`. In den
+          Systemeinstellungen heisst dieser Kanal „Sonstiges".
+
+          Der Wert MUSS zeichengleich mit `PUSH_KANAL_ID` in `src/lib/push.ts`
+          sein — `push.kanal.test.ts` haelt beide zusammen. Diese Datei nennt
+          nur die Kennung; angelegt wird der Kanal beim Start ueber
+          `pushKanalAnlegen()`, denn ein Kanal, den es zum Zustellzeitpunkt
+          nicht gibt, faellt wieder auf den Fallback zurueck.
+
+          Diese Datei ist NICHT von `cap sync` erzeugt und darf angefasst
+          werden — die Kamera-Rechte unten stehen ebenso von Hand darin.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="mitteilungen" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

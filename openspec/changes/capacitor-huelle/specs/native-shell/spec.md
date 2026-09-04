@@ -437,3 +437,48 @@ nicht sicher unterscheiden.
   Erzeugung erneut läuft
 - **THEN** trägt die erzeugte Startfläche die Änderung, ohne dass eine Datei von
   Hand nachgezogen wird
+
+### Requirement: Eine Mitteilung auf Android landet in einem Kanal, den die App benennt
+
+Die Android-Hülle SHALL einen eigenen Mitteilungskanal deklarieren und ihn
+anlegen. Sie SHALL NOT die Mitteilung dem Kanal überlassen, den der
+Zustelldienst sich mangels Angabe selbst anlegt.
+
+**Warum das kein Feinschliff ist.** Seit Android 8 sind Ton, Vibration und
+Einblendung Eigenschaften des KANALS, nicht der einzelnen Nachricht. Ohne eigenen
+Kanal ist jede Angabe dazu im Versand wirkungslos, die Mitteilung kommt stumm an,
+und in den Systemeinstellungen heisst sie „Sonstiges" — wer die Mitteilungen der
+App feiner einstellen will, findet dort keinen Namen, der etwas bedeutet.
+
+Die Kennung SHALL an beiden Stellen, an denen sie steht — im Manifest der Hülle
+und im Quelltext, der den Kanal anlegt — **zeichengleich** sein, und diese
+Gleichheit SHALL geprüft werden. Weichen sie ab, entsteht der Ausgangszustand
+zurück, ohne Fehler und ohne Logzeile.
+
+Der Kanal SHALL **beim Start** der Anwendung angelegt werden, nicht bei der
+ersten Zustellung: ein Kanal, den es im Moment der Zustellung nicht gibt, fällt
+auf den Fallback zurück, und die Mitteilung ist dann bereits stumm angekommen.
+Das Anlegen SHALL an keine Anmeldung und an keine Mitteilungs-Erlaubnis
+gebunden sein.
+
+Es SHALL **ein** Kanal sein. Eine Trennung nach Art der Mitteilung SHALL NOT
+Teil dieser Anforderung sein — einen Kanal, den ein Mitglied einmal
+abgeschaltet hat, kann die Anwendung nie wieder einschalten.
+
+iOS kennt keine Kanäle und ist von dieser Anforderung nicht betroffen.
+
+#### Scenario: Eine zugestellte Mitteilung trägt den Kanal der App
+
+- **WHEN** eine Push-Mitteilung auf einem Android-Gerät zugestellt wurde
+- **THEN** nennt `dumpsys notification` für sie den Kanal der Anwendung
+- **AND** **nicht** `fcm_fallback_notification_channel`
+
+#### Scenario: Die Kennung im Manifest und die im Quelltext sind dieselbe
+
+- **WHEN** die Kennung an einer der beiden Stellen geändert wird
+- **THEN** schlägt die Prüfung fehl
+
+#### Scenario: Der Kanal steht vor der ersten Mitteilung
+
+- **WHEN** die Anwendung startet, ohne dass jemand angemeldet ist
+- **THEN** ist der Kanal angelegt
