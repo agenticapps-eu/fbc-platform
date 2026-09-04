@@ -9,30 +9,25 @@ hier nur, was die nächste Sitzung braucht.
 
 ## Erste Handlung
 
-**Den Bildupload am Geraet gegenpruefen** — der Fix ist gebaut und gemergt
-(PR #337), der Geraetebeleg ist das Letzte, was fehlt. Die Bedingung muss
-hergestellt werden, und genau dieser Commit stellt sie her: es braucht ein
-WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft.
+**Beide Aufgaben dieser Runde sind erledigt und am Geraet belegt.** Was von
+AGE-642 noch offen ist, steht unter „Was noch aussteht" — der naechste
+sinnvolle Griff ist **B3, Keystore und Signier-Workflow**: ohne ihn gibt es
+keinen Release-Bau und keine Store-Einreichung (M4), und es existiert bis heute
+kein einziger Gradle-Lauf in `.github/workflows/`.
 
-1. Auf dem Geraet laeuft `TjIm4wNJiK` (`index-xwvuPX6v.js`) — die Fassung mit
-   dem Aufschub. Nachpruefbar mit
-   `adb shell run-as com.effbeezee.app cat files/versions/<id>/assets/index-*.js | grep -c delayConditions`.
-2. Der Merge dieses Commits veroeffentlicht das naechste Buendel. Einmal
-   Hintergrundwechsel, damit es geladen und auf `setNext` gesetzt wird —
-   **aber nicht die zweite Runde**, sonst ist es uebernommen statt wartend.
-3. Dann den Kameraweg gehen: Profil bearbeiten → Bild hochladen → Aufnehmen →
-   ausloesen → Haken.
+Eine Kleinigkeit haengt noch am Bildupload: den Weg einmal bis zum Ende gehen,
+also `Uebernehmen` statt `Abbrechen`, damit auch der Upload selbst belegt ist.
+Ich habe das bewusst gelassen — es setzte ein Foto einer dunklen Flaeche als
+Donalds Profilbild auf PROD. Zwei Wischer am Geraet, mit einem Bild seiner Wahl.
 
-**Erwartet:** der Zuschnitt erscheint, obwohl ein Buendel wartet. Bleibt er
-aus, ist entweder der Aufschub wirkungslos oder die Ursache eine andere —
-beides waere ein Befund, kein Rueckschlag.
+> ⚠️ **Vor JEDER Messung am Geraet**, drei Fallen, alle am 04.09. eingetreten:
+> `adb install` belegt die Weboberflaeche **nicht** (capgos Buendel gewinnt) ·
+> `notifyAppReady` belegt **kein** Neuladen (es ist capgos 10-Sekunden-Timer) ·
+> die **Bildschirmsperre** hochsetzen, sonst laufen die Taps an den
+> Sperrbildschirm und ohne Fingerabdruck geht es nicht weiter. Einzelheiten in
+> `tasks.md`, Phase E.
 
-> ⚠️ **Vor JEDER Messung am Geraet:** pruefen, welche Weboberflaeche wirklich
-> laeuft. `adb install` tauscht nur die Huelle — capgos gespeichertes Buendel
-> gewinnt. Und `notifyAppReady` im Log belegt **kein** Neuladen; es ist capgos
-> eigener 10-Sekunden-Timer. Beides steht in `tasks.md`, Phase E.
-
-### 1. Der Bildupload — Ursache gefunden, Fix gemergt, Beleg offen
+### 1. Der Bildupload — ERLEDIGT, Ursache und Fix am Geraet belegt (04.09.)
 
 **Die Vermutung aus der letzten Uebergabe war falsch, und das Werkzeug, das sie
 belegen sollte, hat sie widerlegt.** Nicht der Activity-Lebenszyklus: ein
@@ -48,6 +43,23 @@ Gebaut ist der Aufschub in `bilderVonQuelle` (`setMultiDelay` / `cancelDelay`,
 Activity-Lebenszyklus".
 
 `android:configChanges` ist **nicht** die Baustelle und braucht keinen Diff.
+
+**Am Geraet gegengeprueft, 18:37**, unter der hergestellten Fehlerbedingung —
+laufend die Fassung mit dem Aufschub, dazu `setNext: true` und ein wartendes
+Buendel, also Zeile fuer Zeile die Lage von 17:19:
+
+| Lauf | Kamera | Buendel wartete | Aufschub | Ausgang |
+|---|---|---|---|---|
+| 17:19 | ja | ja | nein | Zustand weg |
+| 17:22 | ja | nein | nein | Zuschnitt |
+| **18:37** | **ja** | **ja** | **ja** | **Zuschnitt** |
+| 18:39 | — | ja | gefallen | Uebernahme laeuft normal |
+
+Die dritte Zeile unterscheidet sich von der ersten in **einer** Variablen. Und
+die vierte ist die zweite Haelfte der Zusage: beim naechsten gewoehnlichen
+Hintergrundwechsel wurde das wartende Buendel uebernommen — `cancelDelay()`
+wirkt, die Aktualisierung ist verschoben und nicht abgestellt. Ohne diese Zeile
+waere der Fix ein schlimmerer Fehler als der behobene.
 
 Push kann jederzeit nachgestellt werden mit `.gstack/run-android-push-probe.sh`
 (erwartet `HTTP 200` und `bewerteFcm {"ergebnis":"zugestellt"}`). Aus Claude
@@ -186,8 +198,9 @@ beide Umgebungen, also derselbe Wert — Donald muss ihn nachtragen.
 
 ## Was noch aussteht
 
-- **Der Bildupload** — Ursache gefunden, Fix gemergt (PR #337), Geraetebeleg
-  offen. Siehe oben, Punkt 1. `profiles.updated_at` taugt **nicht** als Beleg —
+- ~~Der Bildupload bricht still ab.~~ **Erledigt am 04.09.**, Ursache und Fix
+  am Geraet belegt (PR #337). Offen ist nur noch der Weg bis zum Ende
+  (`Uebernehmen` statt `Abbrechen`), siehe oben. `profiles.updated_at` taugt **nicht** als Beleg —
   der Zeitstempel wird auch ohne Bearbeitung gesetzt. Der Messpunkt ist
 
   ```sql

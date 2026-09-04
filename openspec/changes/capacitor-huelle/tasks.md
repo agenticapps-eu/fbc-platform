@@ -1858,16 +1858,43 @@ eigenen Vorgang, nicht fuer diesen Fix.
       `run-as com.effbeezee.app cat files/versions/3IErMyx5C6/assets/index-*.js | grep -c delayConditions`
       → `1`. Das aeltere `Eatz8mgucQ` liegt mit `0` daneben und ist die
       Gegenprobe zur Messung selbst.
-- [ ] **⛔ Am Geraet gegenzupruefen, und das ist zugleich die Gegenprobe zur
-      Ursache.** Die Bedingung muss hergestellt werden: es braucht ein
-      WARTENDES Buendel, waehrend die Fassung MIT dem Aufschub laeuft. Also
-      zwei Veroeffentlichungen nacheinander — die erste bringt den Fix aufs
-      Geraet, die zweite legt das Buendel bereit. Dann den Kameraweg einmal
-      gehen.
+- [x] **Am Geraet belegt — 04.09., 18:37, unter der Fehlerbedingung.** Die
+      Bedingung wurde hergestellt, nicht abgewartet: zwei Veroeffentlichungen
+      nacheinander, die erste bringt den Fix aufs Geraet, die zweite legt das
+      Buendel bereit.
 
-      Erwartet: der Zuschnitt erscheint, obwohl ein Buendel wartet. Bleibt er
-      aus, ist entweder der Aufschub wirkungslos oder die Ursache eine andere —
-      beides waere ein Befund, kein Rueckschlag.
+      Ausgangslage, vor dem Lauf gemessen: laufend `index-BXGLv_bY.js`
+      (Buendel `3IErMyx5C6`, traegt `delayConditions`), dazu `setNext: true`
+      und `updateAvailable` — Buendel `htPinueITv` **wartet**. Das ist Zeile
+      fuer Zeile die Lage von 17:19, nur mit dem Aufschub im laufenden Code.
+
+      Kameraweg gegangen. Ergebnis: **der Zuschnitt erscheint**, die App steht
+      weiter auf „Profil bearbeiten", und die ausgelieferte Datei ist vor und
+      nach dem Rundlauf dieselbe — `index-BXGLv_bY.js`. **Kein Wechsel, obwohl
+      einer bereitlag.**
+- [x] **Und der Aufschub faellt wieder** — die zweite Haelfte der Zusage, ohne
+      die der Fix ein schlimmerer Fehler waere als der behobene. Beim naechsten
+      gewoehnlichen Hintergrundwechsel, 18:39, wurde `htPinueITv` uebernommen
+      (`index-B7zqiqxd.js`, `notifyAppReady ... htPinueITv`). `cancelDelay()`
+      wirkt also am Geraet; die Aktualisierung ist verschoben, nicht abgestellt.
+
+      **Damit ist die Kette geschlossen** und die Ursache nicht nur erklaert,
+      sondern gegengeprueft:
+
+      | Lauf | Kamera | Buendel wartete | Aufschub | Ausgang |
+      |---|---|---|---|---|
+      | 17:19 | ja | ja | nein | Zustand weg |
+      | 17:22 | ja | nein | nein | Zuschnitt |
+      | **18:37** | **ja** | **ja** | **ja** | **Zuschnitt** |
+      | 18:39 | — | ja | gefallen | Uebernahme laeuft normal |
+
+      Die dritte Zeile ist die entscheidende: sie unterscheidet sich von der
+      ersten in **einer** Variablen.
+- [ ] Offen bleibt nur, den Weg einmal bis zum Ende zu gehen — `Uebernehmen`
+      statt `Abbrechen`, damit auch der Upload selbst am Geraet belegt ist.
+      Das habe ich bewusst nicht getan: es setzte ein Foto einer dunklen Flaeche
+      als Donalds Profilbild auf PROD. Der Messpunkt dafuer steht in der
+      Uebergabe (`storage.objects`, Bucket `avatars`).
 
 **Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
 nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
