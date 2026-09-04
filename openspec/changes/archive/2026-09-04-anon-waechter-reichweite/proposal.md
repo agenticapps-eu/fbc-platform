@@ -1,3 +1,7 @@
+# Ausgeloggte Besucher lösen keine unnötige Anfrage mehr aus
+
+Linear: **AGE-542**
+
 ## Why
 
 AGE-542. Der ausgeloggte Wächter (`src/lib/anon-anreicherung.test.ts`) prüft über
@@ -20,6 +24,24 @@ Menschen, die sich niemand merkt.
 
 ## What Changes
 
+- **Für Mitglieder ändert sich nichts Sichtbares.** Keine Seite, kein Knopf und
+  kein Ablauf sieht anders aus als vorher.
+- **Wer nicht angemeldet ist, löst beim Seitenaufruf keine überflüssige Anfrage
+  mehr aus.** Die App fragte im Hintergrund eine Liste ab, die ohne Anmeldung
+  ohnehin nicht gelesen werden darf; die Anfrage entfällt jetzt.
+- **Die Prüfung, die den ausgeloggten Bereich absichert, deckt ab sofort alle
+  öffentlich erreichbaren Seiten ab** statt nur vier Stellen. Das ist reine
+  Absicherung im Hintergrund und für Mitglieder nicht bemerkbar.
+
+## Technisch — was gebaut wurde
+
+<!-- ABSICHTLICH unter einer eigenen `##`-Ueberschrift und NICHT unter
+     „What Changes": der Parser fuer den Neuigkeiten-Eintrag schneidet bei
+     `/^#{1,2} /`. Diese Punkte sind Entwicklersprache und haben in einer
+     Mitglieder-Nachricht nichts verloren — sie standen bis zur Umsetzung
+     oben und waeren so hinausgegangen, samt eines Namens
+     (`ANON_DARF_AUSFUEHREN`), den design.md D4 laengst verworfen hat. -->
+
 - Die **Prüffläche wird aus dem Routentisch abgeleitet statt abgeschrieben.** Der
   Wächter montiert jede ausgeloggt renderbare Route, statt vier lib-Funktionen zu
   rufen. Die Liste entsteht aus `navItems` (Einträge ohne `requiresAuth` und ohne
@@ -30,7 +52,7 @@ Menschen, die sich niemand merkt.
   durch) und rufen selbst Daten ab — sie standen in keinem der vier bisherigen
   Aufrufe.
 - **Funktionsaufrufe werden erfasst.** Der Stub hält den `rpc()`-Namen fest; eine
-  zweite Positivliste `ANON_DARF_AUSFUEHREN` sagt, welche Funktion ausgeloggt
+  zweite Positivliste `ANON_RUFT_AUF` sagt, welche Funktion ausgeloggt
   gerufen werden darf.
 - **Eine Zusage gegen die Handliste selbst.** Eine `<Route>` in `App.tsx`, die
   weder in `navItems` steht noch hinter `RequireAuth`/`RequireStaff`/

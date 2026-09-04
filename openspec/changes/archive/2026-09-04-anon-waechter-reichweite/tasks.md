@@ -128,14 +128,14 @@ könnte, belegt keine davon (Befund aus der Planungs-Review).
 
 ## 9. Abschluss
 
-- [ ] 9.1 Change archivieren, Delta in `openspec/specs/directory-search/spec.md`
+- [x] 9.1 Change archivieren, Delta in `openspec/specs/directory-search/spec.md`
       falten.
-- [ ] 9.2 Vor dem Archivieren den Neuigkeiten-Eintrag in der Vorschau ansehen.
+- [x] 9.2 Vor dem Archivieren den Neuigkeiten-Eintrag in der Vorschau ansehen.
       Der Change trägt seine Ausschlüsse unter einer `##`-Überschrift, damit der
       Parser sie nicht als das Ausgelieferte listet. Ob es überhaupt einen
       Eintrag gibt, ist zu entscheiden — für Mitglieder ändert sich nichts.
-- [ ] 9.3 Commit, PR, Linear AGE-542 auf Done.
-- [ ] 9.4 **Vor dem Merge nach `main`:** bei der AGE-642-Sitzung nachfragen, ob
+- [x] 9.3 Commit, PR, Linear AGE-542 auf Done.
+- [x] 9.4 **Vor dem Merge nach `main`:** bei der AGE-642-Sitzung nachfragen, ob
       Geräteprobe 2 durch ist. `deploy.yml` veröffentlicht bei jedem Push auf
       `main` ein OTA-Bündel — ohne Pfadfilter, also auch bei einem reinen
       Testcommit. Während Probe 2 muss `0.0.0+defec7ed` das neueste Bündel im
