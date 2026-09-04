@@ -1,113 +1,129 @@
-# Session Handoff — 2026-09-03 (AGE-688 + AGE-697: beide fertig, beide ausgeliefert)
+# Session Handoff — 2026-09-04 (AGE-542: fertig, gemerged, archiviert)
 
-> ## ⚠ ZUERST — drei Dinge
+> ## ⚠ ZUERST — Scope dieser Datei
 >
-> **1. Diese Datei ist geteilt und trägt EINE Sitzung.** Sie stand vorher auf
-> AGE-598 (erledigt, in der Historie: `git log --oneline -- session-handoff.md`).
-> Sie trägt jetzt AGE-688 und AGE-697 — zwei Vorgänge, aber **eine** Arbeit:
-> 697 ist der Nachlauf, den 688 gefunden hat. **Nicht zusammenführen.**
+> **Diese Übergabe führt AUSSCHLIESSLICH AGE-542.** Die Datei ist für alle
+> parallelen fbc-platform-Sitzungen dieselbe und kollidiert bei jedem Rebase.
+> **Nicht zusammenführen** — fremde Punkte gehören der Sitzung, die sie
+> bearbeitet. Frühere Fassungen: `git log --oneline -- session-handoff.md`.
 >
-> **2. AGE-642 läuft PARALLEL** (Worktree `fbc-platform.donald-age-642-capacitor-huelle`).
-> **Nicht anfassen.** Mit dieser Sitzung abgestimmt: die Datei gehört hier her,
-> ihre eigene Fassung ist absichtlich uncommitted und geht nie nach `main`.
+> **Was hier NICHT hineingehört und wem es gehört:**
+> - **AGE-642** (Capacitor-Hülle) — läuft parallel im Worktree
+>   `fbc-platform.donald-age-642-capacitor-huelle`. **Nicht anfassen.** Hat am
+>   04.09. selbst #330 und #331 nach `main` gebracht.
+> - **Der Push-Absturz am Gerät** (`AppShell.tsx:662` → Firebase FATAL) — von
+>   Donald am 04.09. entschieden: **bleibt bei AGE-642.** Diese Sitzung hat
+>   `AppShell.tsx` nicht angefasst.
+> - **AGE-688 / AGE-697** — abgeschlossen, PRs #326–#329.
 >
-> **3. Beides ist ABGESCHLOSSEN.** Gebaut, gemerged, archiviert, Linear auf Done.
-> Offen ist nur, was unter „Open questions" steht — und das gehört Donald.
+> **Die Merge-Sperre ist erledigt.** Sie galt, solange AGE-642 Geräteprobe 2
+> fuhr. Diese Sitzung hat inzwischen selbst nach `main` gemerged; Donald hat den
+> Merge am 04.09. ausdrücklich freigegeben.
 
 ## Accomplished
 
-Vier PRs, alle gemerged. `main` steht bei `e9a3b0e` plus dem Archiv-PR dieser
-Übergabe.
+**AGE-542 ist gebaut, fremdreviewt, gemerged und archiviert.** 44 von 44
+Aufgaben erledigt.
 
-| PR | Was |
+| | |
 |---|---|
-| **#326** | AGE-688: über der Schublade trägt nur noch das Formular `aria-modal` |
-| **#327** | AGE-688 archiviert, Neuigkeiten nachgezogen |
-| **#328** | AGE-697: Escape schliesst das Formular, nicht die Schublade darunter |
-| **#329** | AGE-697 archiviert, Neuigkeiten nachgezogen, diese Übergabe |
+| Code-PR | **#332**, squash-gemerged als `a725be2` |
+| Archiv-PR | siehe unten — Zweig `donald/age-542-archiv` |
+| Tests | **2517/2517** in 221 Dateien |
+| Tore | `lint`, `typecheck`, `build` je Exit 0 · `openspec validate --all` 31/31 |
+| Spec | Delta gefaltet nach `openspec/specs/directory-search/spec.md` |
+| Neuigkeiten | ein Eintrag, in Mitglieder-Sprache, **noch nicht freigegeben** |
 
-**Endstand:** `pnpm test` **2478/2478** (219 Dateien) · `lint`, `typecheck`,
-`build` je Exit 0 · `openspec validate --all` 32/32 · Linear 688 und 697 **Done**.
+### Was der Change tut
 
-### Was jetzt live ist
+Der anon-Wächter **leitet seine Prüffläche ab, statt sie abzuschreiben**: aus
+`navItems` (ohne `requiresAuth`/`minTier`), aus der importierten
+`rechtsseiten`-Registry und aus einer namentlich geführten Restliste. Jede Route
+wird **montiert**, samt echtem `AuthProvider`; `src/test/anon-sonde.ts` hält jede
+Relation und jeden Funktionsnamen fest. Der Rand ist über den TypeScript-AST auf
+`App.tsx` selbst zugesichert und fällt geschlossen aus.
 
-- **Die Navigationsschublade gibt ihr `aria-modal` ab**, solange das
-  Feedback-Formular darüber steht, und bekommt es beim Schliessen zurück. Sie
-  bleibt dabei offen.
-- **Das Feedback-Formular hat einen Escape** — vorher hatte es gar keinen. Der
-  Lauscher hängt am `document` in der **Capture**-Phase und stoppt die
-  Weitergabe: erstes Escape schliesst das Formular, zweites die Schublade.
+### Die vier Funde, die nicht geplant waren
+
+1. **Das Repo war blind, nicht nur der Wächter.** Mit allen drei Eingriffen im
+   Baum blieb die VOLLSTÄNDIGE Suite grün — 2478/2478.
+2. **Der Prüfstand war zweimal still grün**, bevor er stand: zwischen Hülle und
+   Seite liegen ~295 ms, weil die Seiten seit AGE-642 `lazy()` sind. Vorwärmen
+   der Module hilft nicht (71 Module, `import` danach 0 ms, Zeitachse
+   unverändert). Steht als Gedächtniseintrag unter [[vitest-und-jsdom-fallen]].
+3. **`pnpm build` schreibt `release-entries.generated.ts` unformatiert um.** Vom
+   Diff-Review gefunden, wäre sonst mitgewandert.
+4. **Der Neuigkeiten-Eintrag hätte einen verworfenen Namen ausgeliefert.** Das
+   Proposal nannte in „What Changes" noch `ANON_DARF_AUSFUEHREN`, den `design.md`
+   D4 längst durch `ANON_RUFT_AUF` ersetzt hatte. Die Vorschau **vor** dem
+   Archivieren hat es gefangen.
 
 ## Decisions
 
-- **Die Schublade zu schliessen war der falsche Weg, und das ist gemessen.**
-  `<FeedbackButton />` steht INNERHALB der Schublade; sie zu schliessen hängt ihn
-  ab und nimmt den `open`-Zustand mit, an dem das Portal hängt. Ergebnis: `0`
-  statt `1` Knoten mit `aria-modal="true"` — das Formular ging gar nicht erst
-  auf. Zurückgenommen, nicht repariert.
-- **`istOverlayOffen()` ist als Quelle untauglich.** Der Stapel in `useOverlay`
-  ist ein Modulwert **ohne Abonnement**; ein `push` löst in der Schale kein
-  Render aus. Die Schale erfährt es stattdessen vom **eigenen Kind**
-  (`onOffenChange`). Für eine Abfrage im Event-Callback taugt der Stapel weiter.
-- **Der Escape-Fix sitzt NICHT in `AppShell.tsx`.** Die Regel steht im Repo
-  bereits (`EmojiAuswahl.tsx:131-152`): das obere Overlay nimmt Escape in der
-  Capture-Phase für sich. Ein Umbau auf `schliesseOberstesOverlay()` müsste alle
-  Escape-Lauscher der Schale durch dieselbe Stelle führen — eigener Vorgang.
-- **Ein Delta zurückgenommen, statt es stehenzulassen.** Die Gegenprobe „Aufräumen
-  im Effekt entfernt" blieb **grün**: die neu gemountete Instanz meldet beim
-  Aufsetzen ohnehin `false`. Die Zusage steht deshalb auf dem beobachtbaren
-  Verhalten, nicht auf der Zeile.
-- **Beide Neuigkeiten-Einträge in Mitglieder-Sprache**, bei AGE-697 **vor** dem
-  Archivieren geprüft (`.gstack/probe-eintrag.mts`), bei AGE-688 erst danach —
-  das war der teurere Weg, siehe Notiz im Gedächtnis.
+- **Der Bestandsfehler wird an der Abfrage behoben, nicht am Recht.**
+  `enabled: Boolean(user)` am `FeedbackButton`; `feedback_themes` bleibt für
+  `anon` gesperrt. Einziger Eingriff in Produktivcode.
+- **Die Sonde liegt in `src/test/`**, nicht in `src/lib/__proben__/` wie geplant
+  — dort liegt schon `auth-fixtures.tsx`, eine zweite Konvention wäre gegen
+  „match the existing style".
+- **Die Rüstung übernimmt den Provider-STAPEL aus `App.test.tsx`, nicht dessen
+  Auth-Weg.** D7 und D2 widersprechen sich wörtlich: `App.test.tsx` umgeht über
+  `AuthFixture` gerade den `AuthProvider`, den D2 mitlaufen sehen will.
+- **Die Kette der Sonde ist ein Proxy, keine Aufzählung** — sonst bräche sie beim
+  ersten neuen Kettenglied mit einem Absturz, der wie ein Fund aussieht.
+- **Die Sicherheit liegt in der Positivkontrolle, nicht im Ruhefenster.**
+  Gegengeprüft: Fenster auf 10 ms → rot, zurück auf 450 ms → grün.
+- **Der Neuigkeiten-Eintrag sagt ehrlich, dass sich nichts Sichtbares ändert.**
+  Es gibt keinen Weg, einen archivierten Change von den Neuigkeiten
+  auszunehmen — jeder erzeugt einen Eintrag, das Tor ist die Admin-Freigabe.
+  Die technischen Punkte stehen jetzt unter einer eigenen `##`-Überschrift, wo
+  der Parser sie nicht mehr liest.
 
 ## Files modified
 
-Alles auf `main`. Geändert: `src/components/AppShell.tsx` (Zustand
-`feedbackInSchublade`, `aria-modal` daran), `src/components/feedback/FeedbackButton.tsx`
-(`onOffenChange` + Escape in Capture), `src/components/AppShell.overlay.test.tsx`
-(vier neue Zusagen), `src/components/feedback/FeedbackButton.test.tsx` (eine),
-`openspec/specs/design-system/spec.md` (zwei neue Anforderungen, nur Zusatz),
-`src/content/release-entries.generated.ts`. Archiv:
-`openspec/changes/archive/2026-09-03-ein-modal-zur-zeit/` und
-`.../2026-09-03-escape-trifft-das-oberste/`.
-
-## Next session: start here
-
-**Für 688 und 697 gibt es keinen nächsten Handgriff.** Der Worktree
-`donald-age-697-escape-trifft-das-oberste` kann weg (`wt remove`); der von
-AGE-688 ist bereits abgeräumt.
-
-Wer hier weitermacht, nimmt einen neuen Vorgang. **Zuerst aber die
-Push-Absturz-Frage unten lesen** — sie blockiert eine fremde Abnahmeliste und
-gehört Donald.
+`src/components/feedback/FeedbackButton.tsx` (eine `enabled`-Zeile),
+`src/lib/anon-anreicherung.test.ts` (Flächen-Wächter ausgezogen, 301 → 148
+Zeilen), **neu** `src/lib/anon-flaeche.test.tsx` (33 Zusagen) und
+`src/test/anon-sonde.ts`. Archiv:
+`openspec/changes/archive/2026-09-04-anon-waechter-reichweite/`.
+Gefaltet: `openspec/specs/directory-search/spec.md`. Nachgezogen:
+`src/content/release-entries.generated.ts`.
 
 ### Was im Worktree liegt und nicht eingecheckt ist
 
-`.gstack/probe-eintrag.mts` (gitignoriert): zeigt den Neuigkeiten-Eintrag, den
-der Parser aus einem Proposal machen würde — **vor** dem Archivieren.
-`pnpm tsx .gstack/probe-eintrag.mts`.
+`.gstack/eingriff.py` — schaltet die drei Abnahme-Eingriffe einzeln ein und aus
+(`python3 .gstack/eingriff.py A|B|C on|off`, `status`), Bauteile in
+`.gstack/eingriffe/`. `.gstack/probe-eintrag.mts` — zeigt den
+Neuigkeiten-Eintrag, den der Parser aus einem Proposal machen würde, **vor** dem
+Archivieren (`pnpm tsx .gstack/probe-eintrag.mts <change-id>`). Beides
+gitignoriert.
+
+## Next session: start here
+
+**Für AGE-542 gibt es keinen nächsten Handgriff**, sobald der Archiv-PR gemerged
+ist. Danach `wt remove` für diesen Worktree.
+
+Wer hier weitermacht, nimmt einen neuen Vorgang. Offene Kandidaten im Go-Live-
+Projekt, alle noch ungeplant: **AGE-618** (Wächter gegen Einbettung am
+VideoEmbed vorbei), **AGE-605** (`event_registrations`: direkte Schreibzugriffe
+umgehen die DEFINER-RPCs), **AGE-607** (Überlauf im Browser messen statt im
+Quelltext), **AGE-630** (Events: Vorlagen und wiederkehrende Termine).
 
 ## Open questions
 
-- **Harter Absturz am Gerät, gemeldet von der AGE-642-Sitzung, gehört Donald.**
-  `AppShell.tsx:662` ruft beim Start `pushLebenszeichen()`. Steht die
-  Benachrichtigungs-Erlaubnis auf `granted`, läuft `PushNotifications.register()`,
-  und ohne `google-services.json` wirft Firebase als **FATAL EXCEPTION auf
-  Capacitors nativem Plugin-Thread** (`Default FirebaseApp is not initialized`).
-  Die App startet danach **gar nicht mehr**, bis man die Berechtigung entzieht.
-  Reproduziert mit Positivkontrolle. Das `try/catch` in `src/lib/push.ts:82`
-  kann das **prinzipiell nicht** fangen — die Exception fliegt nativ, nicht im
-  JS-Kontext. Formal M1-Scope, blockiert aber deren Abnahmeliste. **Wer es
-  fixt, ist offen**; die AGE-642-Sitzung wartet auf Donalds Entscheidung und
-  fasst `AppShell.tsx` sonst nicht an.
-- **Zwei Escape-Lauscher derselben Bauart sind ungemessen:** `AppShell.tsx:186`
-  (Profilmenü) und `AppShell.tsx:521` (Nachrichten-Schublade). Ob über ihnen ein
-  Overlay stehen kann, hat niemand geprüft. Kein Vorgang dafür angelegt.
-- **Keine Sichtprobe im Browser** für beide Changes. Begründung in beiden
-  `tasks.md`: der Diff verschiebt kein Pixel, und der lokale Stack trägt die
-  Gerätesitzung aus AGE-642. Nachzuholen, falls jemand die Fläche ohnehin
-  aufmacht.
-- **Die Neuigkeiten-Einträge sind nicht freigegeben.** Drei stehen jetzt offen:
-  `feedback-ausbauen`, `rechte-matrix-stufen` und die zwei von heute. Sie gehen
-  erst hinaus, wenn ein Admin sie in der Redaktion freigibt.
+- **Der Neuigkeiten-Eintrag ist nicht freigegeben** und sollte es vielleicht
+  nicht werden: für Mitglieder ändert sich nichts Sichtbares. Donalds Entscheid
+  in der Redaktion. Mehrere ältere Einträge stehen dort ebenfalls offen.
+- **Gehört die Anforderung noch unter `directory-search`?** Sie regelt jetzt
+  Feed, Events, Anmeldung, Hülle und Funktionsaufrufe; codex schlug
+  `access-control` vor. Bewusst **nicht** in diesem Change — der Umzug ist ein
+  `REMOVED` plus `ADDED` über zwei Capabilities, also genau die Archiv-Mechanik,
+  an der AGE-598 Zeit verloren hat. Eigener, rein ordnender Vorgang.
+- **`/styleguide` ist eine namentliche Ausnahme** in `NUR_IM_DEV_BUENDEL`, statt
+  ihre DEV-Bedingung im AST nachzuweisen. Die weichste Stelle des Prüfstands:
+  wer die Liste missbraucht, umgeht die Randzusage.
+- **Edge Functions sind nicht erfasst**, bewusst — sie gehen nicht über die
+  Grants der Datenbankrolle. Als Grenze in der Spec benannt.
+- **Zwei Escape-Lauscher derselben Bauart sind weiterhin ungemessen**
+  (`AppShell.tsx`, Profilmenü und Nachrichten-Schublade) — offen aus AGE-697,
+  kein Vorgang dafür angelegt.
