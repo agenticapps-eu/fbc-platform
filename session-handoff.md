@@ -69,21 +69,22 @@ OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD.
   sonst läuft `packageRelease` vorher durch und lässt `app-release-unsigned.apk`
   im Ausgabeordner liegen.
 
-## ⚠ Zwei Handgriffe, die nur Donald tun kann
+## Handgriffe, die nur Donald tun kann
 
-1. **`~/Downloads/effbeezee-android-upload-keystore/` an einen verschlüsselten
-   Ort bringen und den Ordner dann löschen.** Dort liegt das Passwort im
-   Klartext. `LIESMICH.md` erklärt alles. Zweite Kopie in Infisical `prod`.
+1. ~~Offline-Kopie des Keystores aus `~/Downloads` wegräumen~~ — **erledigt
+   (Donald, 05.09.)**, nachgemessen: Ordner weg, kein `*.jks` mehr in
+   `~/Downloads`, Infisical `prod` hält alle vier `ANDROID_*`-Werte weiter. Wo
+   die Kopie jetzt liegt, weiß nur Donald — das steht bewusst nirgends im Repo.
 2. **Geschütztes GitHub-Environment für `android-release`** — Repository-
-   Einstellung, kein Diff. Siehe Open questions.
+   Einstellung, kein Diff. Siehe Open questions. **Noch offen.**
 
 ## Files modified
 
 Siehe **PR #344**, 13 Dateien. Die drei, die zählen:
 `scripts/android-keystore{,.logic}.ts` (+ 3 Testdateien) ·
 `android/app/build.gradle` · `.github/workflows/android-release.yml`.
-Dazu `scripts/firebase-config{,.logic}.ts`: die Herkunftsangabe sagte fest
-„Umgebung dev", und der Release-Bau ruft jetzt auch mit `prod`.
+Dazu `scripts/firebase-config{,.logic}.ts` — die Herkunftsangabe sagte fest
+„Umgebung dev", der Release-Bau ruft jetzt auch mit `prod`.
 
 ## Next session: start here
 
