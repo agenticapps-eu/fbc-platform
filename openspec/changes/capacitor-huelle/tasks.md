@@ -483,13 +483,35 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
       | HOCH | `curl \| sudo bash` für die Infisical-CLI ungepinnt | **nicht behoben** — bestehende Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur hier löst, erzeugte zwei Wahrheiten. |
       | HOCH | Beide Auslöser bauen einen ungeprüften Ref mit prod-Token | **nicht behoben, benannt** — siehe unten |
 
-- [ ] **OFFEN — geschütztes GitHub-Environment für `android-release`.**
-      Der Workflow baut den Ref, auf dem er steht; wer ein Tag setzen kann,
-      führt Code mit Zugriff auf die prod-Geheimnisse aus. Keine **neue** Fläche
-      (`deploy.yml` trägt denselben Token und läuft auf jeden Push nach `main`),
-      aber die Stelle, an der sie sich verengen liesse: ein Environment mit
-      Freigeber in den Repository-Einstellungen. Das ist eine Einstellung, kein
-      Diff — deshalb kann diese Sitzung sie nicht setzen.
+- [x] **Geschütztes GitHub-Environment `android-release` — gesetzt am 05.09.**
+      Der Workflow baut den Ref, auf dem er steht; wer ein Tag setzen oder von
+      einem beliebigen Branch dispatchen kann, führt Code mit Zugriff auf die
+      prod-Geheimnisse aus. Der Job trägt jetzt `environment: android-release`,
+      und das Environment hält zwei Regeln von sehr ungleichem Gewicht:
+
+      | Einstellung | Wert | Was sie wert ist |
+      |---|---|---|
+      | Freigeber | `DonaldVl` | **Selbstfreigabe** — es gibt genau einen Kollaborator mit Schreibrecht. Kein Vier-Augen-Prinzip, sondern Pause plus Protokoll. Harter Anteil: die Secrets liegen erst nach dem Klick im Job. |
+      | `prevent_self_review` | `false` | muss aus bleiben, sonst könnte niemand freigeben |
+      | Admin-Bypass | `false` | sonst wäre die Freigeber-Regel für den einzigen Menschen im Repo Dekoration |
+      | Freigabe-Refs | Branch `main`, Tag `android-v*` | **die eigentliche Verengung** — bindet ohne zweiten Menschen und ist nicht wegklickbar. Ein Dispatch von einem ungeprüften Feature-Branch scheitert daran. |
+
+      Reihenfolge-Falle, an `production` ablesbar: zeigt `environment:` auf ein
+      Environment, das im Repository nicht existiert, legt GitHub es beim ersten
+      Lauf still und **ungeschützt** selbst an. Genau so steht `production`
+      heute da (`migrate-prod.yml`, Job `apply`, zurückgestellt am 05.08.). Erst
+      die Einstellung, dann der Diff.
+
+      **Nicht gelöst, ausdrücklich:** `INFISICAL_TOKEN` bleibt ein Repo-Secret,
+      weil `deploy.yml` es braucht — und das läuft auf `pull_request`. Der Token
+      ist aus jedem Same-Repo-PR schon heute erreichbar. Das Environment schützt
+      diesen Workflow, nicht den Token; dafür bräuchte es einen eigenen,
+      projektbeschränkten Infisical-Token. **Eigener Vorgang.**
+
+      Gegengelesen über die API, nicht behauptet:
+      `gh api /repos/agenticapps-eu/fbc-platform/environments/android-release`
+      meldet `can_admins_bypass: false` und `required_reviewers: [DonaldVl]`;
+      `…/deployment-branch-policies` meldet `branch main` und `tag android-v*`.
 
 - [ ] **OFFEN, und M4 hängt daran: `versionCode` steht auf `1`.**
       `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
