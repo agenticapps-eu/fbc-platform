@@ -103,7 +103,7 @@ Die Regel liegt als getippte Spalten an der Vorlage, nicht als
 | `wiederholung` | `woechentlich` \| `monatlich_tag` \| `monatlich_n_ter_wochentag` |
 | `wochentag` | 1–7 (ISO, Montag = 1); bei `woechentlich` und `monatlich_n_ter_wochentag` |
 | `tag_im_monat` | 1–31; nur bei `monatlich_tag` |
-| `position` | 1–4; nur bei `monatlich_n_ter_wochentag` |
+| `wochentag_position` | 1–4; nur bei `monatlich_n_ter_wochentag`. Nicht `position` — das ist in SQL ein Funktionsname und als Spaltenname eine Stolperstelle. |
 
 Ein `check`-Constraint erzwingt, dass genau die zur Form gehörenden Spalten
 gesetzt und die übrigen `null` sind. Eine Zeichenkette wäre erst beim Auswerten

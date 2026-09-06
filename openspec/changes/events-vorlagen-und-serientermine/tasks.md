@@ -7,23 +7,23 @@
 
 ## 2. Datenmodell — `event_vorlagen`
 
-- [ ] 2.1 RED: pgTAP-Test, der `public.event_vorlagen` erwartet und rot ist, weil es die Tabelle nicht gibt
-- [ ] 2.2 Tabelle anlegen: inhaltliche Felder (Titel, Typ, Ort, Beschreibung, Kapazität, Sichtbarkeit, Topics, `cover_path`), Regelspalten aus D3, `ortszeit`, `zeitzone`, `dauer`
-- [ ] 2.3 `check`-Constraints aus D3: je Form genau die zugehörigen Spalten gesetzt, die übrigen `null`
-- [ ] 2.4 RED: `zeitzone = 'Europe/Belin'` wird beim Speichern abgewiesen — `check` gegen `pg_timezone_names`
-- [ ] 2.5 Entscheidungen in den Migrationskopf: warum `INVOKER` **und warum die Policy trotzdem mitwachsen musste**, warum Kopie je Cover, warum getippte Spalten statt `RRULE`, warum `slot_datum`
-- [ ] 2.6 RLS aktivieren und Policy analog `events_write_host` (`is_activated()` + `host_id = auth.uid()` + Cover-Pfadbindung)
-- [ ] 2.7 Grants **ausdrücklich** erteilen — neue Tabellen erben nichts
-- [ ] 2.8 Unique index auf `event_vorlagen (id, host_id)` — Voraussetzung für den komposit-FK aus 3.3
-- [ ] 2.9 Spalten- und Policy-Kommentare setzen; im Kopf vermerken, dass das Fehlen eines `has_level`-Gates bei Events **gemessen** ist (Stil des Hauses)
+- [x] 2.1 RED: pgTAP-Test, der `public.event_vorlagen` erwartet und rot ist, weil es die Tabelle nicht gibt
+- [x] 2.2 Tabelle anlegen: inhaltliche Felder (Titel, Typ, Ort, Beschreibung, Kapazität, Sichtbarkeit, Topics, `cover_path`), Regelspalten aus D3, `ortszeit`, `zeitzone`, `dauer`
+- [x] 2.3 `check`-Constraints aus D3: je Form genau die zugehörigen Spalten gesetzt, die übrigen `null`
+- [x] 2.4 RED: `zeitzone = 'Europe/Belin'` wird beim Speichern abgewiesen — `check` gegen `pg_timezone_names`
+- [x] 2.5 Entscheidungen in den Migrationskopf: warum `INVOKER` **und warum die Policy trotzdem mitwachsen musste**, warum Kopie je Cover, warum getippte Spalten statt `RRULE`, warum `slot_datum`
+- [x] 2.6 RLS aktivieren und Policy analog `events_write_host` (`is_activated()` + `host_id = auth.uid()` + Cover-Pfadbindung)
+- [x] 2.7 Grants **ausdrücklich** erteilen — neue Tabellen erben nichts
+- [x] 2.8 Unique index auf `event_vorlagen (id, host_id)` — Voraussetzung für den komposit-FK aus 3.3
+- [x] 2.9 Spalten- und Policy-Kommentare setzen; im Kopf vermerken, dass das Fehlen eines `has_level`-Gates bei Events **gemessen** ist (Stil des Hauses)
 
 ## 3. Datenmodell — Anbindung an `events`
 
-- [ ] 3.1 RED: Test, der `events.vorlage_id` und `events.slot_datum` erwartet
-- [ ] 3.2 **RED (Sicherheit): ein Host fügt ein eigenes Event mit FREMDER `vorlage_id` ein → muss abgewiesen werden.** Das ist der HOCH-Befund; der Test muss vor dem Fix rot sein
-- [ ] 3.3 `vorlage_id` und `slot_datum` ergänzen; komposit-FK `(vorlage_id, host_id) → event_vorlagen (id, host_id)` mit `on delete set null`
-- [ ] 3.4 Eindeutiger Index auf `(vorlage_id, slot_datum)` — **nicht** auf `starts_at`
-- [ ] 3.5 Nachweisen, dass der Index den Bestand nicht berührt: bestehende Events tragen `vorlage_id is null`, und `null` kollidiert in Postgres nicht
+- [x] 3.1 RED: Test, der `events.vorlage_id` und `events.slot_datum` erwartet
+- [x] 3.2 **RED (Sicherheit): ein Host fügt ein eigenes Event mit FREMDER `vorlage_id` ein → muss abgewiesen werden.** Das ist der HOCH-Befund; der Test muss vor dem Fix rot sein
+- [x] 3.3 `vorlage_id` und `slot_datum` ergänzen; komposit-FK `(vorlage_id, host_id) → event_vorlagen (id, host_id)` mit `on delete set null`
+- [x] 3.4 Eindeutiger Index auf `(vorlage_id, slot_datum)` — **nicht** auf `starts_at`
+- [x] 3.5 Nachweisen, dass der Index den Bestand nicht berührt: bestehende Events tragen `vorlage_id is null`, und `null` kollidiert in Postgres nicht
 
 ## 4. Die Wiederholungsregel
 

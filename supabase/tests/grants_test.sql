@@ -58,6 +58,7 @@ comments/authenticated=INSERT,SELECT
 compass_responses/authenticated=DELETE,INSERT,SELECT,UPDATE
 contact_requests/authenticated=INSERT,SELECT
 event_registrations/authenticated=SELECT
+event_vorlagen/authenticated=DELETE,INSERT,SELECT,UPDATE
 events/anon=SELECT
 events/authenticated=DELETE,INSERT,SELECT,UPDATE
 feedback/authenticated=DELETE,INSERT,SELECT,UPDATE
