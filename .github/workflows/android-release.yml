@@ -12,16 +12,29 @@ name: android-release
 # sieht, dass nichts passiert ist, und weiss nicht, ob das an der Konfiguration
 # lag. Am Ausloeser-Block ist sie strukturell.
 #
-# ══ WAS DIESER ZUSCHNITT NICHT LEISTET, AUSDRUECKLICH ══════════════════════
-# Beide Ausloeser bauen den Ref, auf dem sie stehen — auch einen, der nie durch
-# einen Review ging. Wer ein Tag setzen kann, kann also Code mit Zugriff auf die
-# prod-Geheimnisse ausfuehren.
+# ══ WAS DER SCHUTZ LEISTET — UND WAS NICHT ═════════════════════════════════
+# Beide Ausloeser bauen den Ref, auf dem sie stehen. Ungebremst hiesse das: wer
+# ein Tag setzen oder von einem beliebigen Branch dispatchen kann, fuehrt Code
+# mit Zugriff auf die prod-Geheimnisse aus. Der Job haengt deshalb am
+# geschuetzten Environment `android-release` (Repository-Einstellung, seit
+# 05.09.), und zwar an zwei Regeln mit sehr ungleichem Gewicht:
 #
-# Das ist KEINE neue Fläche: wer Schreibrecht hat, kann ebenso `deploy.yml`
-# aendern, das denselben Token traegt und auf jeden Push nach `main` laeuft.
-# Enger wird es erst mit einem geschuetzten GitHub-**Environment** samt
-# Freigeber — das ist eine Einstellung im Repository, kein Diff, und steht als
-# offener Punkt in `tasks.md` B3.
+#  1. FREIGEBER. Bei einem einzigen Kollaborator ist das eine SELBSTfreigabe —
+#     kein Vier-Augen-Prinzip, sondern eine bewusste Pause plus Protokoll. Ihr
+#     einziger harter Anteil: die Secrets liegen erst NACH dem Klick im Job.
+#     `prevent_self_review` ist aus (sonst koennte niemand freigeben),
+#     Admin-Bypass ebenfalls (sonst waere die Regel fuer den einzigen Menschen
+#     im Repo Dekoration).
+#  2. FREIGABE-REFS: `main` und Tags `android-v*`. DIESE Regel bindet auch ohne
+#     zweiten Menschen und ist nicht wegklickbar — ein Dispatch von einem
+#     ungeprueften Feature-Branch scheitert an ihr. Sie ist die eigentliche
+#     Verengung. Wer hier einen Branch ergaenzt, hebt sie auf.
+#
+# NICHT geloest, ausdruecklich: `INFISICAL_TOKEN` bleibt ein Repo-Secret, weil
+# `deploy.yml` es braucht — und das laeuft auf `pull_request`. Der Token ist
+# also aus jedem Same-Repo-PR schon heute erreichbar. Das Environment schuetzt
+# diesen Workflow, nicht den Token. Dafuer braeuchte es einen eigenen,
+# projektbeschraenkten Infisical-Token; eigener Vorgang.
 on:
   workflow_dispatch:
   push:
@@ -43,6 +56,11 @@ permissions:
 jobs:
   bauen:
     runs-on: ubuntu-latest
+    # Ohne diese Zeile waeren die Regeln oben wirkungslos. Umgekehrt gilt auch:
+    # zeigt sie auf ein Environment, das im Repository nicht existiert, legt
+    # GitHub es beim ersten Lauf still und UNGESCHUETZT selbst an — so steht
+    # `production` heute da (siehe `migrate-prod.yml`). Einstellung zuerst.
+    environment: android-release
     env:
       # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
       INFISICAL_API_URL: https://eu.infisical.com/api
