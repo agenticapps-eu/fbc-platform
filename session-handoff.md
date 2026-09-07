@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-07 (AGE-630: Gruppe 9, die Oberfläche)
+# Session Handoff — 2026-09-07 (AGE-630: Gruppe 10, die Abnahme)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
@@ -6,137 +6,133 @@
 > Branch `donald/age-630-event-vorlagen-und-serien`, Worktree unter
 > `~/worktrees/fbc-platform/`. Die Datei ist für alle parallelen Sitzungen
 > dieselbe und kollidiert bei jedem Rebase — **nicht zusammenführen**,
-> überschreiben.
+> überschreiben. Heute genau einmal passiert, genau so gelöst.
 >
-> **2. AGE-642 läuft in einer EIGENEN Sitzung** (`fbc-platform-donald-age-642-
-> capacitor-hu-57`). Von hier aus ist daran **nichts** zu tun, und die Fassung
-> dieser Datei vom 07.09. morgens war dort bereits überholt: der
-> `android-release`-Workflow ist inzwischen **zweimal gelaufen**, das geschützte
-> Environment steht, Dependabot #349–#351 sind freigegeben. Wer AGE-642 sucht,
-> liest `git show origin/main:session-handoff.md`, nicht diese Datei.
+> **2. AGE-642 läuft in einer EIGENEN Sitzung**
+> (`fbc-platform-donald-age-642-capacitor-hu-57`). Von hier aus ist daran
+> **nichts** zu tun. Wer AGE-642 sucht: `git show origin/main:session-handoff.md`.
 
 ## Accomplished
 
-**Gruppe 9 ist vollständig — die Oberfläche steht.** Zwei Commits, beide mit
-grüner Abnahme.
+**Gruppe 10 ist vollständig — der Change ist archiviert.** Zwei Commits.
 
 | Commit | Was |
 | --- | --- |
-| `4f3601d` | 9.1 + 9.4 — vierter Reiter, Vorlagenformular, Typen von Hand |
-| `39b28fd` | 9.2 + 9.3 + Client-Hälfte von 7.7 — Erzeugen mit Vorschau, Serienzeile |
+| `ab0fe95` | 10.1 + 10.4 — Obergrenze, Cover-Reihenfolge, Fehlerzustand, `grants_test` §8b |
+| `83eb1fc` | 10.6 — archiviert, 10 Requirements in `openspec/specs/events/spec.md` |
 
-**Abnahme gemessen, Exit-Codes geprüft statt der Ausgabe:** `pnpm test`
-**2596/2596**, `pnpm typecheck` 0, `pnpm lint` 0, `openspec validate --all`
-32/32.
+**Abnahme, Exit-Codes geprüft statt der Ausgabe:** `pnpm test` **2597/2597**,
+`typecheck` 0, `lint` 0, `openspec validate --all` 31/31, DB-Seite 8 Dateien /
+550 Zusagen. Nach dem Rebase auf `origin/main` **erneut gefahren**, weil `main`
+sich um 6 Commits bewegt hatte.
 
-### Die Entscheidung, die Gruppe 9 blockiert hatte
+### Der Befund, den nichts anderes gesehen hätte
 
-**Die Vorlagen bekommen keine eigene Seite, sondern den vierten Reiter unter
-`/events`** (Donald, 07.09.). Der Repo-Verlauf hatte die Frage fast schon
-beantwortet, und das steht jetzt auch im Test: `src/config/nav.ts` trägt zwei
-Vorgänger — AGE-442 legte „Meine Events" als dritten Reiter hierher,
-ausdrücklich mit „keine weitere Unterseite", und AGE-494 entfernte mehrere
-Menüpunkte, weil ein eigener Eintrag daneben „ein dritter Weg zum selben Ort"
-sei.
+**`event_serie_slots()` hatte keine Obergrenze für `p_anzahl`.** Die 52er-Grenze
+sitzt in `event_serie_erzeugen()` — aber `authenticated` ruft die Slot-Funktion
+**direkt** auf, das braucht die Vorschau. Gemessen:
 
-### Neue Dateien
+```
+select count(*) from public.event_serie_slots(
+  'woechentlich','19:00','Europe/Berlin','2026-09-01', 100000, 2);
+-> 100000
+```
 
-| Pfad | Was |
-| --- | --- |
-| `src/lib/event-vorlagen.ts` | Datenschicht: CRUD, `regelVollstaendig`, `serienCoverPfade`, `slotsMitCover`, `serieSlots`, `serieErzeugen` |
-| `src/components/events/VorlageForm.tsx` | Zwilling von `EventForm` — bewusst kein Umbau davon |
-| `src/components/events/VorlagenPanel.tsx` | Inhalt des Reiters |
-| `src/components/events/SerieErzeugen.tsx` | Erzeugen-Dialog mit Vorschau |
-| dazu 4 Testdateien | 23 neue Zusagen |
+Kein Datenleck — die Funktion liest keine Zeile. **Verfügbarkeit:**
+`return query` materialisiert in einen Tuplestore, ein Aufruf mit 10^8 fordert
+unbegrenzt Speicher und CPU je Anfrage, auf der geteilten Datenbank. Jedes
+aktivierte Konto konnte das mit einem Aufruf.
+
+Behoben in `20260907120000_event_serie_slots_obergrenze.sql`. **Die Grenze ist
+53, nicht 52** — der Enddatum-Pfad sondiert absichtlich mit 53, um „mehr als 52
+im Zeitraum" zu erkennen; 52 hätte genau diese Prüfung erschlagen. Beide
+Hälften stehen als Zusage, die zweite als Positivkontrolle zur ersten.
+
+Er war in keiner Plan-Review, in keiner Sichtprobe und in keinem der 2596 Tests
+sichtbar, weil er nicht am Verhalten hängt, sondern an einer Grenze, die zwei
+Funktionen weiter steht.
+
+### Die Sichtprobe (10.3) hat zwei Dinge belegt, die kein Test zeigt
+
+Gegen den lokalen Stack, mit Beleg dass die App wirklich lokal hängt
+(`performance.getEntriesByType('resource')` → einzige Backend-Herkunft
+`127.0.0.1:54321`):
+
+- **Die Zeitumstellung am gebauten Weg.** 8 Dienstage ab 07.09.2026 enden am
+  27.10., also nach der Umstellung. `starts_at` springt dort von `16:30+00` auf
+  `17:30+00`, die Ortszeit bleibt 18:30.
+- **Der Rundruf zählt richtig:** 8 Termine → **1** Hinweis (`serie_anzahl: 8`),
+  Feed-Spiegel dagegen 8 Beiträge.
 
 ## Decisions
 
-- **`VorlageForm` ist ein Zwilling von `EventForm`, kein Umbau.** Ein Event hat
-  einen Zeitpunkt (`starts_at`), eine Vorlage eine Uhrzeit plus Regel und gar
-  kein Datum. Ein gemeinsames Formular müsste die halbe Feldliste ein- und
-  ausblenden. Wiederverwendet sind die Feld-Bausteine und der
-  `EventCoverPicker` samt Cropper — es gibt keinen zweiten Zuschnitt.
-- **Die Vorschau ruft `event_serie_slots()`**, dieselbe Funktion, die danach
-  schreibt. Eine nachgebaute Datumsrechnung wäre eine zweite Wahrheit, die an
-  der nächsten Zeitumstellung auseinanderläuft.
-- **Erzeugen bleibt gesperrt, bis die Vorschau gesehen wurde**, und jede
-  Eingabeänderung verwirft sie. 52 Termine nimmt kein Klick zurück.
-- **Die Zeitzone steht nicht im Formular.** Alle Clubtermine liegen in
-  derselben; ein Auswahlfeld mit einem sinnvollen Wert ist keine Auswahl. Spalte
-  hat Vorgabe plus Trigger gegen unbekannte Zonen.
-- **`slotsMitCover` sortiert ausdrücklich nach `slot_datum`**, statt sich auf
-  die Reihenfolge der Funktion zu verlassen — siehe „Was hätte schiefgehen
-  können" unten.
-- **Ohne Titelbild `null` statt `[]`** an `p_cover_pfade`: ein leeres Array
-  träfe auf die Anzahlprüfung und ergäbe 22023 für eine Vorlage ohne Bild.
+- **`grants_test.sql` bekommt Abschnitt 8b statt einer nachgezogenen Liste.**
+  Die Tabellenzeile stand schon aus Gruppe 1 — der Test war grün, **bevor er
+  etwas über diese Gruppe sagte**. Abschnitt 6 deckt nur `anon`; ein
+  stehengebliebener `authenticated`-Grant auf `hinweis_rundruf` wäre unsichtbar
+  geblieben, und genau dessen Unerreichbarkeit ist die Begründung des
+  Anweisungs-Triggers. `hinweis_rundruf` steht deshalb mit in der Liste, obwohl
+  AGE-630 sie nicht anfasst.
+- **Drei Review-Befunde bewusst NICHT behoben**, jeder mit Grund in `REVIEWS.md`:
+  der doppelte `Europe/Berlin`-Fallback (ein dritter Ort wäre teurer als die
+  Doppelung), die stille Kappung im Bis-Datum-Modus des Clients (Produktfrage —
+  Vorschau und Erzeugen bleiben deckungsgleich), und `v_anzahl = 0` ohne 22023
+  (Verhaltensänderung an einer RPC ohne belegten Schaden).
+- **Der Release-Eintrag behält Ingenieurssprache.** Der Admin schreibt ihn vor
+  dem Versand ohnehin um — das ist der vorgesehene Weg, kein offener Punkt.
+  Geprüft ist dagegen, dass keiner der acht Bullets eine AUSSCHLUSS-Zeile ist.
 
-## Zwei Funde beim Bauen, beide mitbehoben
+## Files modified
 
-1. **Der Leerzustand verschluckte die ganze Reiterleiste.** Bei null Events gab
-   `EventsBody` die `EmptyState` **statt** der Tabs zurück. Der neue Reiter wäre
-   damit genau im wichtigsten Zustand unerreichbar gewesen: erste Vorlage
-   angelegt, noch kein Termin erzeugt. Angemeldet ist der Leerzustand jetzt der
-   **Inhalt des ersten Reiters**; ausgeloggt bleibt alles wie bisher, dort gäbe
-   es nur einen Reiter mit demselben Inhalt. Die AGE-494-Meldung steht wortgleich.
-2. **`versionCode`/`version_build` sind NICHT verzahnt** — das betrifft AGE-642,
-   nicht diese Spur, und ist dort bereits gemeldet und bestätigt.
-
-## Was hätte schiefgehen können — und warum es jetzt nicht mehr geht
-
-`event_serie_erzeugen` ordnet `p_cover_pfade` den Terminen **nach Position** zu,
-und „n-ter Termin" heißt: nach `slot_datum` aufsteigend. Die RPC prüft Anzahl,
-Präfix und Eindeutigkeit — aber sie kann nicht prüfen, ob die Reihenfolge die
-gemeinte ist. **Der Fehler wäre leise gewesen:** die Serie entstünde
-vollständig, jeder Termin trüge ein Bild, und es wäre das eines anderen Datums.
-`slotsMitCover` sortiert deshalb selbst, und der Test prüft es mit einer
-absichtlich durcheinandergewürfelten Liste.
-
-Ebenso die Pfadvergabe: `uploadEventCover` nimmt `Date.now()` und kollidiert nie,
-weil ein Mensch je Klick ein Bild hochlädt. Bei 52 Kopien in derselben
-Millisekunde wäre derselbe Zeitstempel genau der Fehler, den er dort verhindert
-— `cover_path` ist unique. Daher UUID.
+- `supabase/migrations/20260907120000_event_serie_slots_obergrenze.sql` — **neu**
+- `supabase/tests/event_serie_regel_test.sql` — §9, Obergrenze + Positivkontrolle (14→16)
+- `supabase/tests/event_serie_cover_test.sql` — §1b, Cover-Reihenfolge (8→9)
+- `supabase/tests/grants_test.sql` — §8b, fünf Funktionen × zwei Rollen (15→16)
+- `src/components/events/EventsList.tsx` — `vorlagenFehler` durchgereicht
+- `src/components/events/VorlagenPanel.tsx` — Fehlerzweig neben dem Leerzustand
+- `src/components/events/EventsList.vorlagen.test.tsx` — Zusage dazu
+- `openspec/changes/archive/2026-09-07-events-vorlagen-und-serientermine/` —
+  verschoben, plus `# `-Titel und `Linear:`-Zeile im Proposal
+- `openspec/specs/events/spec.md` — +10 Requirements
+- `src/content/release-entries.generated.ts` — neu erzeugt, einzeln prettier
 
 ## Next session: start here
 
-**Gruppe 10, und zwar in dieser Reihenfolge**, weil 10.1 die anderen blockieren
-kann:
+**Der Branch ist fertig und noch nicht gepusht.** 15 Commits vor `origin/main`,
+0 dahinter, Arbeitsbaum sauber. Erste Handlung: `git push -u origin
+donald/age-630-event-vorlagen-und-serien` und PR gegen `main` — **das war die
+Frage an Donald am Ende dieser Sitzung; sie ist nicht beantwortet.**
 
-1. **10.1 `grants_test.sql` nachziehen.** ⚠ Die Falle steht schon in der Aufgabe:
-   bei **Tabellen** heißt Rot „die Liste ist veraltet", bei **Funktionen** heißt
-   Rot „der `revoke` fehlt" — die Liste dort blind nachzuziehen erteilt `anon`
-   das Ausführungsrecht. Diese Gruppe hat drei neue Funktionen.
-2. **10.3 Sichtprobe gegen den lokalen Stack**: Vorlage anlegen, Termine
-   erzeugen, an einem anmelden. Der Stack trägt alle sechs Migrationen bereits
-   (per `psql` eingespielt, **nicht** `db reset` — er ist geteilt).
-3. **10.4 Fremdreview des Diffs**, zweite Stufe, mit besonderem Augenmerk auf
-   `event_cover_lesbar()`.
-4. Dann 10.5 / 10.6 (archivieren, danach `pnpm release:entries`).
-
-**Noch kein PR.** Der Branch steht auf `39b28fd`, 11 Commits vor `origin/main`
-und 2 dahinter — vor dem PR rebasen; erfahrungsgemäß kollidiert dabei nur
-`session-handoff.md`, und die wird überschrieben, nicht zusammengeführt.
+Danach: CI abwarten, mergen, `wt remove`. Und **nach dem Merge in Linear
+nachsehen** — die Automatik kippt AGE-630 auf Done, sobald das Kürzel im
+PR-Titel steht.
 
 > ⚠ **`supabase test db` mit der ganzen CI-Liste scheitert in diesem Worktree an
 > der Pfadlänge** (`NOTESTS`) und legt bei unquotierter Dateiliste
 > Streuverzeichnisse unter `supabase/tests/` an, die danach `pnpm lint` mit
-> `ENAMETOOLONG` töten. **In Blöcken zu 7 fahren, Liste immer als Array
-> übergeben.**
+> `ENAMETOOLONG` töten. **In Blöcken zu 7 fahren, Liste immer als Array.**
 
-> ⚠ **`@testing-library/user-event` ist NICHT installiert.** Der Repo-Stil ist
-> `fireEvent`. Eine neue Node-Abhängigkeit macht ausserdem den Deno-Job rot.
+> ⚠ **Der lokale Stack trägt jetzt alle ACHT Migrationen** — die letzte per
+> `psql` eingespielt, Historienzeile von Hand nachgetragen. Er ist geteilt; die
+> Sichtprobe ist restlos zurückgebaut (`vorlagen=0 serientermine=0
+> probe_profile=0`), `.env.local` gelöscht, vite beendet.
+
+> ⚠ **Ein `drop` im Kopf einer Migrationsdatei verhindert ihre Wiederverwendung
+> still.** `20260907110000` beginnt mit `drop function
+> …erzeugen(uuid,date,int,date)` — diese Signatur gibt es nicht mehr. Wer die
+> Datei zum Zurückspielen benutzt, bekommt **Exit 3 und keine Änderung**, was
+> beim ersten Versuch wie ein bestandener Test aussah. Für Mutationsproben die
+> `drop`-Zeile entfernen und `create function` → `create or replace` ändern.
 
 ## Open questions
 
-- **Beim Löschen einer Vorlage anbieten, zukünftige leere Termine mitzunehmen?**
-  (Review NIEDRIG.) Heute sagt der Toast ausdrücklich „Bereits erzeugte Termine
-  bleiben bestehen" — DB-Standard `set null` ist das Netz.
-- **`REVIEWS.md` trägt keinen signierten Trailer** — das §18-Gate meldet das bei
-  jedem Commit als `NOTE`, blockt aber nicht. **Vor dem Archivieren nachziehen.**
-- **Cover-Größenverteilung im Bucket ist nicht gemessen** (design.md D5).
+- **PR öffnen?** Siehe oben — die einzige wirklich offene Frage.
+- **Cover-Größenverteilung im Bucket ist nicht gemessen** (design.md D5). Bei 52
+  Kopien je Serie ist das eine Speicher-, keine Korrektheitsfrage.
+- **Beim Löschen einer Vorlage zukünftige leere Termine mitnehmen?** (Review
+  NIEDRIG.) Heute sagt der Toast „Bereits erzeugte Termine bleiben bestehen".
+- **`REVIEWS.md` trägt keinen signierten Trailer.** Wird als `trailer-absent`
+  gemeldet, blockt nicht — und von Hand nachgetragen behauptete er eine Bindung,
+  die es nie gab. Steht so auch in der Datei selbst.
 - **`events.vorlage_id` ist für fremde Mitglieder lesbar** — bewusst
-  hingenommen, unter Risks vermerkt. Die neue Serienzeile auf der Detailseite
-  nutzt genau das aus und schafft **keine** neue Fläche; wer das Risiko später
-  anders bewertet, muss beide Stellen anfassen.
-- **Die vier Zusagen des Erzeugen-Dialogs liefen beim ersten Mal grün** — der
-  Code stand vorher, das war kein RED→GREEN. Deshalb mit zwei Mutationen
-  gegengeprobt (3 von 4 fallen bzw. 1 fällt). Steht so auch in `tasks.md`.
+  hingenommen, unter Risks vermerkt.
