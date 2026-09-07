@@ -98,25 +98,51 @@ Gegen den lokalen Stack, mit Beleg dass die App wirklich lokal hängt
 
 ## Next session: start here
 
-**PR [#359](https://github.com/agenticapps-eu/fbc-platform/pull/359) ist offen
-und wartet auf die Freigabe.** Donald hat Push und PR am 07.09. ausdrücklich
-freigegeben; **gemergt ist nichts**.
+**AGE-630 ist gemergt und AUSGELIEFERT** — PR
+[#359](https://github.com/agenticapps-eu/fbc-platform/pull/359), Squash
+`ccf186d`. Alle drei Flächen sind durch, in dieser Reihenfolge und mit dieser
+Begründung:
 
-Der erste CI-Durchlauf war **komplett grün** — vier Pflichtchecks (`verify`,
-`migrations`, `pr-title`, `edge-functions`) plus `deploy`; `migrate-dev`,
-`functions` und `drift-gate` übersprungen. `migrations` fuhr die **ganze**
-CI-Liste gegen eine frische Datenbank: `Files=34, Tests=1269, Result: PASS` —
-das ist der Lauf, den dieser Worktree lokal nicht fahren kann (Pfadlänge).
+| Fläche | Weg | Beleg |
+|---|---|---|
+| DB **DEV** | `migrate-dev` automatisch | success |
+| DB **PROD** | `migrate-prod` von Hand | `plan`+`apply` success; Historie danach `OK — 131 Migrationen, abweichungsfrei` |
+| Frontend + OTA | `gh run rerun 34127308569 --failed` | `deploy` success; OTA-Kopf `0.0.0+ccf186d50a97` |
 
-**Danach hat `main` sich noch einmal bewegt** (#358, AGE-642), der PR ging auf
-`CONFLICTING`. Erneut rebased, kollidiert war wieder **nur**
-`session-handoff.md`. Der Push danach braucht `--force-with-lease`, und CI läuft
-neu — **das Ergebnis dieses zweiten Laufs ist zu prüfen**, das erste Grün gilt
-für die alte Basis.
+Edge Functions sind **nicht** betroffen — der Change fasst keine an.
 
-Erste Handlung der nächsten Sitzung: `gh pr checks 359`. Dann mergen (mit
-Donalds Freigabe), `wt remove`, und **in Linear nachsehen** — die Automatik
-kippt AGE-630 auf Done, sobald das Kürzel im PR-Titel steht. Es steht drin.
+**`migrate-prod` musste Donald selbst starten.** Der Auto-Klassifikator blockt
+den PROD-Schreibweg (`gh workflow run migrate-prod.yml`), zweimal versucht.
+Trockenlauf vorher gelesen: exakt die acht AGE-630-Versionen, kein
+`remote-nur`-Drift.
+
+**Am PROD-Katalog nachgemessen, nicht dem Log geglaubt:** `event_vorlagen`
+existiert, vier neue Funktionen, Tabellenrechte
+`authenticated=DELETE,INSERT,SELECT,UPDATE` ohne `anon`-Zeile, Funktionsrechte
+identisch zu `grants_test.sql` §8b, und die neue Obergrenze **greift dort**
+(`hoechstens 53 Vorkommnisse je Aufruf, 100000 verlangt`).
+
+> Das schliesst nebenbei eine Lücke, die `grants_test.sql` selbst benennt: ein
+> lokaler Test kann die FORMULIERUNG eines `revoke` nicht prüfen, der
+> PROD-Rechtezustand galt dort ausdrücklich als **UNBELEGT** bis zu einer
+> Messung nach `migrate-prod`. Sie liegt jetzt vor.
+
+**Live belegt nach den fünf Fallen:** Deploy-URL aus dem Lauf geholt
+(`00c526da.fbc-platform.pages.dev`), Bündelname dort **und** auf der Apex-URL
+identisch (`index-DRFoY2oy.js`) — also propagiert. Inhaltssonde im richtigen
+Chunk (`EventsPage-C8GToC92.js`, `application/javascript`, 19 616 B): „Du hast
+noch keine Vorlage" und „Vorlagen konnten nicht geladen werden" sind drin, und
+beide standen im Vorgängerstand **nicht** (`git grep` gegen `b1bc6ec` = 0).
+Negativkontrolle gegen den SPA-Fallback: erfundener Chunk liefert `text/html`,
+5 444 B.
+
+**Was noch offen ist:**
+
+1. **Linear-Status prüfen** — konnte ich nicht, das Linear-MCP-Token war
+   abgelaufen. Der PR-Titel trägt AGE-630, die Automatik hat den Vorgang also
+   sehr wahrscheinlich auf Done gekippt; nachsehen, ob das gewollt ist.
+2. **`wt remove`** für diesen Worktree. Nicht aus einer Sitzung heraus, die
+   darin läuft — und `--reap` nicht vergessen, sonst bleiben vite-Zombies.
 
 > ⚠ **`supabase test db` mit der ganzen CI-Liste scheitert in diesem Worktree an
 > der Pfadlänge** (`NOTESTS`) und legt bei unquotierter Dateiliste
