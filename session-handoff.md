@@ -113,8 +113,13 @@ AGE-516 (Rückstufung bei geplatzter Zahlung).
   Termine mitnehmen? `events.vorlage_id` ist für fremde Mitglieder lesbar
   (bewusst hingenommen).
 
-> ⚠ **Ein Doku-PR mit einem Issue-Kürzel im Titel SCHLIESST diesen Vorgang.**
-> AGE-630 wurde dadurch heute dreimal auf- und zugemacht. Deshalb trägt der
-> Titel dieser Übergabe **AGE-630** (dort ein No-op, weil schon Done) und
-> **nicht** AGE-705 — sonst stünde die morgige Arbeit vor dem Anfangen auf
-> *Done*.
+> ⚠ **Nicht der Titel schliesst den Vorgang, sondern der BRANCHNAME.** Diese
+> Übergabe ist der Beleg: ihr PR-Titel trug bewusst AGE-630 und nicht AGE-705 —
+> der Branch hiess trotzdem `donald/uebergabe-age-705`, und der Merge von #362
+> setzte **AGE-705 auf Done**, zwei Sekunden nach dem Merge, an einem Vorgang
+> ohne eine Zeile Code. Zurückgesetzt auf *Todo* um 16:32.
+>
+> **Die Regel lautet deshalb:** vor `git checkout -b` fragen, ob dieser PR den
+> Vorgang wirklich erledigt. Wenn nein, gehört **kein Kürzel in den Branchnamen**
+> — auch nicht in den Titel, aber der Branch allein genügt der Automation. Und
+> danach trotzdem nachsehen: `list_issues` mit `updatedAt: -PT1H`.
