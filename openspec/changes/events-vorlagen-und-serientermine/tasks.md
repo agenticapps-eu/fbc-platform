@@ -37,16 +37,16 @@
 
 ## 5. Die Erzeugungs-RPC
 
-- [ ] 5.1 RED: Aufruf ohne `anzahl` und ohne `bis_datum` wird abgewiesen
-- [ ] 5.2 RED: `anzahl` = 53 wird abgewiesen, und es entsteht **kein** Termin (kein Teilergebnis von 52)
-- [ ] 5.3 RED: `bis_datum` jenseits des 52. Vorkommnisses wird ebenso abgewiesen
-- [ ] 5.4 RED: regellose Vorlage mit `anzahl` statt Datum wird abgewiesen
-- [ ] 5.5 RED: Erzeugen legt keine einzige Anmeldezeile an
-- [ ] 5.6 RED: erneutes Erzeugen lässt einen bestehenden Termin mit Anmeldungen unangetastet
-- [ ] 5.7 RED: ein verschobener Termin kehrt bei erneuter Erzeugung **nicht** zurück (prüft `slot_datum`)
-- [ ] 5.8 RED: ein fremder Host kann aus meiner Vorlage nichts erzeugen
-- [ ] 5.9 Funktion als `SECURITY INVOKER`, **`on conflict (vorlage_id, slot_datum) do nothing` mit Ziel**, Obergrenze an der Kandidatenliste vor dem Einfügen
-- [ ] 5.10 `revoke`/`grant` sauber setzen — Default Privileges wirken auf Funktionen **nicht**
+- [x] 5.1 RED: Aufruf ohne `anzahl` und ohne `bis_datum` wird abgewiesen
+- [x] 5.2 RED: `anzahl` = 53 wird abgewiesen, und es entsteht **kein** Termin (kein Teilergebnis von 52)
+- [x] 5.3 RED: `bis_datum` jenseits des 52. Vorkommnisses wird ebenso abgewiesen
+- [x] 5.4 RED: regellose Vorlage mit `anzahl` statt Datum wird abgewiesen
+- [x] 5.5 RED: Erzeugen legt keine einzige Anmeldezeile an
+- [x] 5.6 RED: erneutes Erzeugen lässt einen bestehenden Termin mit Anmeldungen unangetastet
+- [x] 5.7 RED: ein verschobener Termin kehrt bei erneuter Erzeugung **nicht** zurück (prüft `slot_datum`)
+- [x] 5.8 RED: ein fremder Host kann aus meiner Vorlage nichts erzeugen
+- [x] 5.9 Funktion als `SECURITY INVOKER`, **`on conflict (vorlage_id, slot_datum) do nothing` mit Ziel**, Obergrenze an der Kandidatenliste vor dem Einfügen
+- [x] 5.10 `revoke`/`grant` sauber setzen — Default Privileges wirken auf Funktionen **nicht**
 
 ## 6. Serienänderung
 
@@ -59,7 +59,7 @@
 
 - [ ] 7.1 RED: vier erzeugte Termine tragen vier verschiedene Cover-Pfade, alle im `{uid}/`-Präfix, Namen **unvorhersagbar** (UUID)
 - [ ] 7.2 RED: Vorlage ohne Cover erzeugt Termine ohne Cover und scheitert nicht
-- [ ] 7.3 RED: Positivkontrolle, dass die Cover-Pfad-Eindeutigkeit weiterhin greift
+- [ ] 7.3 RED: Positivkontrolle, dass die Cover-Pfad-Eindeutigkeit weiterhin greift. **Dazu gehört die Zusage aus 5.9, die Gruppe 5 nicht belegen konnte:** ein zielloses `on conflict do nothing` liess dort alle 17 Zusagen grün, weil ohne Cover kein zweiter eindeutiger Index existiert. Hier muss es fallen.
 - [ ] 7.4 RED: fremdes Mitglied und `anon` erhalten das Cover einer **Vorlage** nicht; der eigene Host erhält es
 - [ ] 7.5 `event_cover_lesbar()` um den Host-Zweig aus D5a **erweitern** (kein `anon`-, kein `members`-Zweig)
 - [ ] 7.6 **Gegenprobe: `anon`- und `members`-Verhalten für Event-Cover ist unverändert** — das ist eine eigene Aufgabe, kein Nebensatz

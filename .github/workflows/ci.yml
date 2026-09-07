@@ -236,6 +236,7 @@ jobs:
           supabase/tests/anmeldung_rpc_exklusiv_test.sql
           supabase/tests/event_vorlagen_test.sql
           supabase/tests/event_serie_regel_test.sql
+          supabase/tests/event_serie_erzeugen_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
