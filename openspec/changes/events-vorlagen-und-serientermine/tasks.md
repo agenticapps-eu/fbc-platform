@@ -50,10 +50,10 @@
 
 ## 6. Serienänderung
 
-- [ ] 6.1 RED: Ortszeit 19→20 geändert, erneut erzeugt → zukünftige anmeldungsfreie Termine liegen auf 20:00, **kein** 19:00-Termin derselben Woche daneben
-- [ ] 6.2 RED: derselbe Vorgang lässt einen zukünftigen Termin **mit** Anmeldungen unverändert
-- [ ] 6.3 RED: derselbe Vorgang lässt vergangene Termine unverändert
-- [ ] 6.4 Aktualisierungslogik implementieren
+- [x] 6.1 RED: Ortszeit 19→20 geändert, erneut erzeugt → zukünftige anmeldungsfreie Termine liegen auf 20:00, **kein** 19:00-Termin derselben Woche daneben
+- [x] 6.2 RED: derselbe Vorgang lässt einen zukünftigen Termin **mit** Anmeldungen unverändert
+- [x] 6.3 RED: derselbe Vorgang lässt vergangene Termine unverändert
+- [x] 6.4 Aktualisierungslogik implementieren
 
 ## 7. Cover je Termin
 
