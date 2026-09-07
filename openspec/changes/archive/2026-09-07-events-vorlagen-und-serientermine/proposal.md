@@ -1,3 +1,7 @@
+# Wiederkehrende Termine aus einer Vorlage
+
+Linear: **AGE-630**
+
 ## Why
 
 Wiederkehrende Formate — der monatliche Stammtisch, der Dienstagabend — müssen

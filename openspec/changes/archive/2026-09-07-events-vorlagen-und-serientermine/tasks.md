@@ -234,4 +234,13 @@
       `lint` 0, DB-Seite 7 Dateien / 94 Zusagen plus `rls_test` 440 — alle Exit 0.
 
 - [x] 10.5 `openspec validate --all` erneut grün
-- [ ] 10.6 Change archivieren, danach `pnpm release:entries`
+- [x] 10.6 Change archivieren, danach `pnpm release:entries`
+
+      Vorher auf `origin/main` rebased (13 Commits, 0 dahinter). Kollidiert ist
+      **nur** `session-handoff.md`, wie vorhergesagt — mit der Fassung dieser
+      Spur überschrieben, nicht zusammengeführt. Abnahme danach erneut gefahren,
+      weil `main` sich bewegt hatte: `pnpm test` **2597/2597**, `typecheck` 0,
+      `lint` 0.
+
+      `openspec archive --yes` hat **10 Requirements** nach
+      `openspec/specs/events/spec.md` gezogen (+10, ~0, -0).
