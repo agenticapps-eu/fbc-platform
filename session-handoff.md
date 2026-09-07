@@ -1,139 +1,117 @@
-# Session Handoff — 2026-09-07 (AGE-642 B3: Environment, erster Release-Lauf)
+# Session Handoff — 2026-09-07 (AGE-630: Event-Vorlagen und Serientermine)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie führt nur AGE-642 (M2, Capacitor-Hülle), Block B3.** Die Datei ist
-> für alle parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
+> **1. Sie führt nur AGE-630** (Event-Vorlagen und wiederkehrende Termine),
+> Branch `donald/age-630-event-vorlagen-und-serien`. Die Datei ist für alle
+> parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
 > **nicht zusammenführen**, überschreiben.
 >
-> **2. Sie ersetzt die Fassung vom 04.09. vollständig.** Deren offene Punkte
-> sind erledigt: das geschützte Environment steht, der Workflow ist gelaufen,
-> die drei Runner-Annahmen sind belegt. Wer die alte Fassung braucht:
-> `git show 12661a4:session-handoff.md`.
+> **2. Vorher stand hier AGE-642 B3** (Android-Signierung, Release-Workflow).
+> Vollständig in `git show 118ed46:session-handoff.md` (PR #354, auf `main`
+> seit 06.09. — der frühere Zeiger auf `b346043` ist überholt). **Diese Sitzung
+> läuft noch** — Linear steht auf *In Progress*, und ihr Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle` **darf nicht abgeräumt
+> werden**. Offen dort: iOS-Signierung, `versionCode` = 1, der
+> `android-release`-Workflow ist gebaut, aber **nie gelaufen** — er wartet auf
+> ein geschütztes GitHub-Environment, das nur Donald anlegen kann; solange
+> dürfen auch Dependabot #349–#351 nicht gemergt werden. Dazu B5.
+> Von AGE-630 aus ist daran nichts zu tun.
 >
-> **3. Die Belege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/tasks.md`, Abschnitt B3.
+> **3. Die Begründungen im Detail stehen NICHT hier**, sondern in
+> `openspec/changes/events-vorlagen-und-serientermine/` — `design.md` (D1–D8),
+> `REVIEWS.md` (13 Befunde) und im Kopf der Migration. Diese Datei ist der
+> Überblick.
 
 ## Accomplished
 
-**Der Android-Release-Bau läuft, ist signiert und liegt als Artefakt vor.** Zwei
-PRs, beide gemergt.
-
-| PR | | |
-|---|---|---|
-| **#354** | `118ed46` | Job hängt am geschützten Environment `android-release` |
-| **#355** | `6771279` | Signaturnachweis las den Fingerabdruck nach Feldposition |
-
-**Das Environment** (Repository-Einstellung, in keinem Commit — über die API
-zurückgelesen, nicht behauptet):
-
-| Einstellung | Wert |
-|---|---|
-| Freigeber | `DonaldVl` |
-| `prevent_self_review` | `false` — muss aus bleiben, sonst kann niemand freigeben |
-| Admin-Bypass | `false` |
-| Freigabe-Refs | Branch `main`, Tag `android-v*` |
-
-**Zwei Läufe, der erste war der lehrreichere:**
-
-| Lauf | Ausgang |
-|---|---|
-| `34090816888` | rot in `Signatur nachweisen` — **die Meldung war falsch** |
-| `34092615595` | grün, alle 14 Schritte, APK + AAB hochgeladen |
-
-Der rote Lauf meldete „Signiert mit dem falschen Schluessel". Der Schlüssel
-stimmte; gescheitert war der Parser. Behoben in #355.
-
-**Belegt statt behauptet:** `apksigner` liest lokal am **heruntergeladenen**
-Artefakt denselben Fingerabdruck `7ae18622…2fda`; das Artefakt enthält genau
-zwei Dateien, kein Signaturmaterial; `assets/capacitor.plugins.json` im APK
-listet alle fünf Plugins.
+- **Worktree-Landschaft aufgeräumt.** AGE-605-Worktree entfernt (PR #342
+  gemergt, 777,9 MiB), fünf Residuen-Verzeichnisse gelöscht, **15 verwaiste
+  vite/vitest-Prozesse** beendet (ältester vom 25.08.), Ports 5173–5202 frei.
+  Übrig: `main`, AGE-642 (fremd), AGE-630.
+- **AGE-630 geplant, fremdreviewt, überarbeitet.** OpenSpec-Change
+  `events-vorlagen-und-serientermine`, 4 Artefakte, `validate` grün.
+- **Plan-Review durch zwei fremde Anbieter**, beide REQUEST-CHANGES:
+  `gemini-pro` (6 Befunde) und `opencode`/`hf:moonshotai/Kimi-K3` (7 Befunde),
+  zusammen **6 HOCH**. Alle behandelt, Plan in 2. Fassung.
+- **Gruppe 2 + 3 gebaut** (Datenmodell): RED → GREEN → Gegenprobe.
+  `Files=4, Tests=496, Result: PASS`.
+- Zwei Commits: `b26aff9` (Plan), `84676f4` (Datenmodell).
 
 ## Decisions
 
-- **Freigabe per API statt Klick** (Donald, 07.09.), nachdem ich den Einwand
-  vorgetragen hatte. Der Kommentar im Freigabe-Protokoll sagt deshalb
-  ausdrücklich, wie sie zustande kam — sonst wäre sie von einem Klick nicht zu
-  unterscheiden.
-- **Die Freigeber-Regel ist eine Selbstfreigabe** und wird als solche
-  dokumentiert. Es gibt genau einen Kollaborator mit Schreibrecht; die Regel
-  kauft Pause und Protokoll, kein Vier-Augen-Prinzip. Die Regel, die ohne
-  zweiten Menschen bindet, ist die **Ref-Liste**.
-- **`INFISICAL_TOKEN` bleibt Repo-Secret.** `deploy.yml` braucht es und läuft
-  auf `pull_request` — der Token ist aus jedem Same-Repo-PR erreichbar. Das
-  Environment schützt den Workflow, nicht den Token. Eigener Vorgang.
-- **`production` bleibt ungeschützt** (`migrate-prod.yml`), Entscheidung vom
-  05.08. steht. Nicht mitgezogen.
+- **Materialisieren statt rechnen.** `event_registrations` hängt per FK an
+  `events.id`, und `register_for_event` sperrt diese Zeile zum Zählen. Eine
+  berechnete Serie hätte für einen künftigen Termin keine `id`.
+- **Vorlagen UND Wiederholung in einem Change** (Donald, gegen meinen
+  Vorschlag, erst Vorlagen zu bauen).
+- **Rechte wie bei Events heute.** Gemessen: `events_write_host` trägt **kein**
+  `has_level`-Gate; die Stufenprüfung sitzt auf `regs_write_own`.
+- **Komposit-FK `(vorlage_id, host_id)`** statt einfachem FK. Aus der Review:
+  `events_write_host` kennt `vorlage_id` nicht, und die FK-Prüfung läuft
+  **nicht** unter der RLS der Zieltabelle — sonst hätte ein Host Events auf die
+  Slots einer fremden Reihe schreiben können, deren Erzeugung danach lautlos in
+  `on conflict do nothing` gelaufen wäre.
+- **`slot_datum` statt `starts_at`** als Idempotenzschlüssel. Beide Reviewer
+  unabhängig: hängt sie an `starts_at`, legt die Regel einen verschobenen
+  Termin erneut an.
+- **Cover: zweiter Lese-Zweig nur für den Host, Kopie durch den Client, UUID.**
+  Die erste Fassung war **nicht baubar** — eine SQL-Funktion kann die Datei
+  nicht kopieren, und `event_cover_lesbar()` schlägt nur über
+  `events.cover_path` nach, das Vorlagen-Cover wäre selbst seinem Host unlesbar.
+- **Ein Rundruf je Erzeugung, Feed je Termin.** Gemessen: zwei
+  `after insert for each row`-Trigger auf `events` — 52 Termine hätten 52
+  plattformweite Rundrufe samt Push in einer Transaktion ausgelöst.
+- **Zeitzone per Trigger, nicht `check`.** Ein `check` darf keine Unterabfrage
+  enthalten. Die Abkürzung „Hilfsfunktion als `immutable`" wäre eine
+  Falschaussage.
+- **Obergrenze 52** je Aufruf; **Vorlage löschen** lässt Termine überleben
+  (`on delete set null`, `cascade` verworfen).
+- **Frühjahrsumstellung: weiterschalten** (02:30 → 03:30), nicht auslassen —
+  ein still fehlender Termin ist der schlechtere Ausgang.
 
 ## Files modified
 
-- `.github/workflows/android-release.yml` — `environment: android-release` am
-  Job; Kommentarkopf sagt jetzt, welche der zwei Regeln ohne zweiten Menschen
-  bindet und dass der Token unberührt bleibt; Fingerabdruck wird als Hex-Wert
-  gelesen, Rohzeile ins Log, zwei Ausgänge = zwei Meldungen.
-- `openspec/changes/capacitor-huelle/tasks.md` — B3: Environment abgehakt, die
-  beiden Läufe und die drei belegten Runner-Annahmen nachgetragen.
+| Pfad | Was |
+| --- | --- |
+| `openspec/changes/events-vorlagen-und-serientermine/proposal.md` | Warum, Umfang, Impact |
+| `…/design.md` | **2. Fassung** nach Review, D1–D8, gemessene Zeitzonenwerte |
+| `…/specs/events/spec.md` | Delta, 11 Requirements — u. a. Slot-Besetzung, Rundruf, Serienänderung |
+| `…/tasks.md` | 10 Gruppen; 1–3 abgehakt |
+| `…/REVIEWS.md` | beide Reviews, je Befund die Behandlung |
+| `supabase/migrations/20260906090000_event_vorlagen_und_serientermine.sql` | **neu** — Tabelle, komposit-FK, Indizes, Zeitzonen-Trigger |
+| `supabase/tests/event_vorlagen_test.sql` | **neu** — 21 Zusagen inkl. Sicherheitszusage + Positivkontrollen |
+| `supabase/tests/grants_test.sql` | Golden um `event_vorlagen` ergänzt |
+| `.github/workflows/ci.yml` | neue Testdatei in die Liste |
 
 ## Next session: start here
 
-**B3 ist zu.** Der Android-Release-Bau ist eingerichtet, gelaufen, signiert,
-versioniert und gegen aktuelle Actions gebaut. Was als Nächstes ansteht, ist
-nicht mehr die Pipeline, sondern **die iOS-Hälfte** und **M4 (Store-Einreichung)**
-— beides eigene Vorgänge.
+**Gruppe 4, die Wiederholungsregel — RED zuerst.** Die Datenschicht steht und
+ist grün; es fehlt die Auswertung der drei Regelformen. Erste Handlung: in
+`supabase/tests/` eine Datei für die Regel anlegen (oder
+`event_vorlagen_test.sql` erweitern) mit den **bereits verifizierten** Daten aus
+`specs/events/spec.md` — wöchentlich ab 01.09.2026 → 01./08./15./22.09.; erster
+Dienstag ab 09/2026 → 01.09., 06.10., 03.11., 01.12.2026 (kalendarisch geprüft,
+auch von opencode unabhängig nachgerechnet). Dazu die vier Grenzfälle:
+Monatsstart *ist* der gesuchte Wochentag (01.09.2026 ist ein Dienstag),
+`monatlich_tag = 31` überspringt Monate und zählt sie **nicht** in `anzahl`
+mit, Frühjahrslücke (02:30 → 03:30), Herbstüberlappung (genau ein Termin,
+erste Lesart). Erst danach die Auswertung bauen. Anschließend Gruppen 5–8 (RPC,
+Serienänderung, Cover, Rundruf) — Donald hat „durchlaufen" gesagt, also nicht
+nach jeder Gruppe rückfragen.
 
-Der letzte Stand, an dem sich alles ablesen lässt, ist **Lauf 6**
-(`34104357476`). Vier Dimensionen am ausgelieferten APK gleichzeitig gemessen:
-
-| | |
-|---|---|
-| `versionCode` | `6` — gleich der `run_number` |
-| Signatur | `7ae18622…2fda`, der erwartete Upload-Schlüssel |
-| Plugins | 5 von 5 in `assets/capacitor.plugins.json` |
-| Artefakt | genau 2 Dateien, kein Signaturmaterial |
-
-**`versionCode` kommt aus `github.run_number`.** Zwei Dinge, die dabei zu wissen
-sind: der ausgelieferte Wert steht in **keinem Commit**, und ein **Re-Run**
-derselben Lauf-Nummer erzeugt denselben Code, den Play dann ablehnt — bei einem
-Re-Run neu auslösen statt wiederholen.
-
-> ⚠ Die zuerst vorgelegte Gradle-Zeile war **nicht lauffähig**:
-> `versionCode (…) as int` liest Groovy als `(versionCode(…)) as int`, der Cast
-> trifft den null-Rückgabewert des Aufrufs, Gradle meldet `Value is null` und
-> nennt nur die Zeilennummer. Richtig ist
-> `versionCode ((project.findProperty('versionCode') ?: 1) as int)`.
-
-**Dependabot #349–#351 sind gemergt** (07.09.), einzeln und mit je einem grünen
-`android-release`-Lauf dazwischen: `setup-java` 6.0.0 (Lauf 4),
-`upload-artifact` 7.0.1 (Lauf 5), `setup-android` 4.0.1 (Lauf 6). Nach #350
-zusätzlich geprüft, dass überhaupt noch etwas hochgeladen wird — ein grüner
-Schritt belegt das bei einer Major-Änderung an genau dieser Action nicht von
-selbst.
-
-> ⚠ **`Deploy` ist auf Dependabot-PRs strukturell rot** und kein Befund:
-> Dependabots eigene Läufe bekommen den Infisical-Token nicht („Failed to
-> automatically trigger login flow"), und `deploy` ist **keiner** der vier
-> Pflichtchecks (`verify`, `migrations`, `pr-title`, `edge-functions`). Auf die
-> vier sehen, nicht auf die Ampel des PRs.
-
-> ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Die Automatik liest
-> das Kürzel im PR-Titel. Am 06. und 07.09. mehrfach zurückgesetzt. Nach jedem
-> Merge nachsehen. Die Dependabot-Merges lösen ihn nicht aus — ihre Titel tragen
-> kein Kürzel.
-
-> ⚠ **Squash-Falle, weiterhin scharf.** Nach jedem Merge `git diff origin/main
-> HEAD` prüfen — ist er leer, `git reset --hard origin/main`. Der Remote-Branch
-> steht danach auf der Vor-Squash-Historie; der nächste Push braucht
-> `--force-with-lease`.
+**Vor dem Messen:** `pnpm install --frozen-lockfile` (ein frischer Worktree hat
+keine `node_modules`), und der lokale Stack trägt die Migration bereits — sie
+wurde per `psql` eingespielt, **nicht** per `db reset`, weil der Stack geteilt
+ist und Objekte trägt, die in keiner Migration stehen.
 
 ## Open questions
 
-- **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat.** Vor
-  der Store-Einreichung am **Release**-Bau gegenprüfen. Eigener Vorgang.
-- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
-  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6.
-- **Bildupload auf iOS** ist ungeprüft — die Ursache war capgo, nicht Android.
-  Ableitung, keine Messung.
-- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung:
-  zuletzt.
-- **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
-  **Realtime im Chat** ist weiterhin ungemessen.
+- **Vorlagenliste: eigene Seite oder in die bestehende Eventverwaltung?**
+  Reine Oberflächenfrage, blockiert das Datenmodell nicht.
+- **Beim Löschen einer Vorlage anbieten, zukünftige leere Termine mitzunehmen?**
+  (Review NIEDRIG, gemini.) DB-Standard `set null` bleibt in jedem Fall das Netz.
+- **Cover-Größenverteilung im Bucket ist nicht gemessen.** Steht so in `design.md`
+  D5 — nachholen, falls jemand die Speicherkosten der Kopie-je-Termin bestreitet.
+- **`events.vorlage_id` ist für fremde Mitglieder lesbar** — Grobstruktur fremder
+  Serien ableitbar. Bewusst hingenommen, unter Risks vermerkt.
