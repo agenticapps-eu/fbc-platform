@@ -566,10 +566,30 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
 
       **Folge für Dependabot:** #349–#351 (`setup-java`, `upload-artifact`,
       `setup-android`, alle drei Major) waren zurückgestellt, bis ein grüner
-      Lauf existiert. Der existiert jetzt — sie sind freigegeben, aber
-      **einzeln, mit einem `android-release`-Lauf nach jedem** (entschieden
-      07.09.). Bei allen dreien auf einmal wäre ein Fehlschlag zwischen drei
-      Major-Sprüngen nicht zuzuordnen.
+      Lauf existiert. **Am 07.09. gehoben — einzeln, mit je einem
+      `android-release`-Lauf dazwischen**, damit ein Fehlschlag zuzuordnen
+      bliebe:
+
+      | PR | Sprung | Merge | Gegenprobe |
+      |---|---|---|---|
+      | #349 | `setup-java` 4.7.1 → 6.0.0 | `b0763cf` | Lauf 4 grün |
+      | #350 | `upload-artifact` 4.6.2 → 7.0.1 | `cb32fe9` | Lauf 5 grün |
+      | #351 | `setup-android` 3.2.2 → 4.0.1 | `7eac348` | Lauf 6 grün |
+
+      Nach #350 zusätzlich nachgesehen, ob überhaupt noch etwas hochgeladen
+      wird: ein grüner Schritt belegt das bei einer Major-Änderung an genau
+      dieser Action nicht von selbst. Artefakt vorhanden, 27,4 MB.
+
+      **`Deploy` war auf allen drei PRs rot — strukturell, kein Befund.**
+      Dependabots eigene Läufe bekommen den Infisical-Token nicht (`Failed to
+      automatically trigger login flow`), und `deploy` ist keiner der vier
+      Pflichtchecks (`verify`, `migrations`, `pr-title`, `edge-functions`). Wer
+      hier auf die Ampel des PRs sieht statt auf die vier, hält eine Konstante
+      für ein Ergebnis.
+
+      **Endstand am APK aus Lauf 6**, vier Dimensionen gleichzeitig gemessen,
+      nachdem alle drei Actions gehoben waren: `versionCode='6'` (= Lauf-Nummer),
+      Signatur `7ae18622…2fda`, 5 von 5 Plugins, genau 2 Dateien im Artefakt.
 
 - [x] **`versionCode` kommt aus der CI-Laufnummer** (entschieden 07.09.).
       `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
