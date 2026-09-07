@@ -67,10 +67,10 @@
 
 ## 8. Rundruf und Feed
 
-- [ ] 8.1 RED: eine Erzeugung von 52 Terminen löst **höchstens einen** Rundruf aus
-- [ ] 8.2 RED: dieselbe Erzeugung erzeugt 52 Feed-Beiträge
-- [ ] 8.3 RED: ein einzeln angelegtes Event löst wie bisher genau einen Rundruf aus (Positivkontrolle gegen eine zu breite Unterdrückung)
-- [ ] 8.4 Unterdrückung für `vorlage_id`-Termine plus einen Serien-Hinweis implementieren
+- [x] 8.1 RED: eine Erzeugung von 52 Terminen löst **höchstens einen** Rundruf aus
+- [x] 8.2 RED: dieselbe Erzeugung erzeugt 52 Feed-Beiträge
+- [x] 8.3 RED: ein einzeln angelegtes Event löst wie bisher genau einen Rundruf aus (Positivkontrolle gegen eine zu breite Unterdrückung)
+- [x] 8.4 Unterdrückung für `vorlage_id`-Termine plus einen Serien-Hinweis implementieren
 
 ## 9. Oberfläche
 
