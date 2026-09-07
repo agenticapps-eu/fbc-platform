@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { EVENT_COVER_BUCKET } from "./event-cover";
 import type { EventType, EventVisibility } from "./events";
 
 /**
@@ -87,6 +88,41 @@ export function regelVollstaendig(r: VorlageRegel): boolean {
  */
 export function serienCoverPfade(uid: string, anzahl: number): string[] {
   return Array.from({ length: anzahl }, () => `${uid}/${crypto.randomUUID()}.webp`);
+}
+
+/** Ein von `event_serie_slots()` errechneter Termin. */
+export interface SerieSlot {
+  /** Das Kalenderdatum in der Zeitzone der Vorlage, „YYYY-MM-DD". */
+  slotDatum: string;
+  /** Derselbe Termin als Zeitpunkt — die Umrechnung macht Postgres, nicht der Client. */
+  startsAt: string;
+}
+
+/**
+ * Paart die Termine einer Serie mit den Zielpfaden ihrer Cover-Kopien.
+ *
+ * `event_serie_erzeugen` ordnet `p_cover_pfade` den Terminen **nach Position**
+ * zu, und „n-ter Termin" heißt dort: nach `slot_datum` aufsteigend. Die RPC
+ * prüft Anzahl, Präfix und Eindeutigkeit, aber sie kann nicht prüfen, ob die
+ * Reihenfolge die gemeinte ist — der Fehler wäre leise: die Serie entsteht
+ * vollständig, jeder Termin trägt ein Bild, und es ist das des falschen Datums.
+ * Deshalb wird hier ausdrücklich sortiert, statt sich auf die Reihenfolge der
+ * Funktion zu verlassen.
+ *
+ * `null` statt `[]`, wenn die Vorlage kein Titelbild hat: `p_cover_pfade` ist
+ * `default null`, ein leeres Array träfe dagegen auf die Anzahlprüfung und
+ * ergäbe 22023 für eine Vorlage, die schlicht kein Bild hat.
+ */
+export function slotsMitCover(
+  uid: string,
+  slots: SerieSlot[],
+  hatCover: boolean,
+): { slots: SerieSlot[]; pfade: string[] | null } {
+  const sortiert = [...slots].sort((a, b) => a.slotDatum.localeCompare(b.slotDatum));
+  return {
+    slots: sortiert,
+    pfade: hatCover ? serienCoverPfade(uid, sortiert.length) : null,
+  };
 }
 
 export interface VorlageItem extends VorlageRegel {
@@ -221,6 +257,74 @@ export async function updateVorlage(id: string, input: VorlageInput): Promise<vo
   if (input.coverPath !== undefined) patch.cover_path = input.coverPath;
   const { error } = await supabase.from("event_vorlagen").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Die Vorschau: dieselbe Funktion, die das Schreiben danach benutzt.
+ *
+ * Sie ist `security invoker` und rechnet nur mit Kalender und Zonendatenbank —
+ * sie liest keine Zeile. Genau deshalb darf `authenticated` sie aufrufen, und
+ * genau deshalb kann die Vorschau nicht von dem abweichen, was gleich entsteht.
+ * Eine im Client nachgebaute Datumsrechnung wäre eine zweite Wahrheit, die bei
+ * der ersten Zeitumstellung auseinanderläuft.
+ */
+export async function serieSlots(
+  vorlage: VorlageItem,
+  ab: string,
+  anzahl: number,
+): Promise<SerieSlot[]> {
+  const { data, error } = await supabase.rpc("event_serie_slots", {
+    p_wiederholung: vorlage.wiederholung ?? "",
+    p_ortszeit: vorlage.ortszeit,
+    p_zeitzone: vorlage.zeitzone,
+    p_ab: ab,
+    p_anzahl: anzahl,
+    p_wochentag: vorlage.wochentag,
+    p_tag_im_monat: vorlage.tagImMonat,
+    p_wochentag_position: vorlage.wochentagPosition,
+  });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ slotDatum: r.slot_datum, startsAt: r.starts_at }));
+}
+
+/**
+ * Erzeugt die Termine einer Serie.
+ *
+ * Das Kopieren der Titelbilder passiert HIER und nicht in der RPC: ein
+ * `storage.copy()` aus SQL heraus gibt es nicht. Die RPC bekommt fertige Pfade
+ * und prüft Anzahl, Präfix und Eindeutigkeit — vergeben muss sie der Client.
+ *
+ * Reihenfolge der beiden Schritte: erst kopieren, dann schreiben. Andersherum
+ * stünden Events auf Pfade, die es noch nicht gibt. Schlägt das Kopieren fehl,
+ * ist noch kein Termin entstanden; schlägt die RPC fehl, bleiben verwaiste
+ * Kopien im Bucket liegen — das ist die billigere der beiden Hälften.
+ */
+export async function serieErzeugen(
+  uid: string,
+  vorlage: VorlageItem,
+  ab: string,
+  slots: SerieSlot[],
+): Promise<number> {
+  const { slots: sortiert, pfade } = slotsMitCover(uid, slots, vorlage.coverPath !== null);
+
+  if (pfade !== null && vorlage.coverPath !== null) {
+    for (const ziel of pfade) {
+      const { error } = await supabase.storage
+        .from(EVENT_COVER_BUCKET)
+        .copy(vorlage.coverPath, ziel);
+      if (error) throw error;
+    }
+  }
+
+  const { data, error } = await supabase.rpc("event_serie_erzeugen", {
+    p_vorlage_id: vorlage.id,
+    p_ab: ab,
+    p_anzahl: sortiert.length,
+    p_bis_datum: null,
+    p_cover_pfade: pfade,
+  });
+  if (error) throw error;
+  return (data ?? []).length;
 }
 
 /**

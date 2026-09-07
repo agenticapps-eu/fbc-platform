@@ -42,6 +42,7 @@ function evt(id: string, startsAt: string | null): EventListItem {
     registeredCount: 0,
     waitlistCount: 0,
     myStatus: null,
+    vorlageId: null,
   };
 }
 

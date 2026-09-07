@@ -431,6 +431,17 @@ function DetailsCard({ event }: { event: EventListItem }) {
             {event.location}
           </DetailZeile>
         )}
+        {/* AGE-630: Ein Termin aus einer Serie sieht sonst aus wie jeder andere
+            — und „ist das der eine Abend oder einer von zwölf?" ist genau die
+            Frage, die sich beim Anmelden stellt. Bei einem einzeln angelegten
+            Event bleibt die Zeile WEG statt „Einzeltermin" zu sagen:
+            `vorlage_id` ist bei jedem Bestandsevent null, die Zeile stünde
+            damit unter allen und beantwortete eine Frage, die niemand hat. */}
+        {event.vorlageId && (
+          <DetailZeile icon="kalender" label="Serie">
+            Teil einer Serie
+          </DetailZeile>
+        )}
         {/* Die Sichtbarkeit als Satz. Sie beantwortet die Frage, die sich
             genau beim Anmelden stellt, und stand vorher nirgends. */}
         <DetailZeile icon="personen" label="Sichtbarkeit">

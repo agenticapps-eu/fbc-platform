@@ -44,6 +44,12 @@ export interface EventListItem {
   waitlistCount: number;
   /** Eigener Registrierungsstatus (null = nicht angemeldet / abgemeldet). */
   myStatus: RegistrationStatus | null;
+  /**
+   * AGE-630: Herkunft aus einer Vorlage. null bei allen einzeln angelegten und
+   * allen vor der Migration bestehenden Events. Nur zum ANZEIGEN gelesen — die
+   * Serie selbst wird über den Vorlagen-Reiter geführt, nicht von hier aus.
+   */
+  vorlageId: string | null;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -304,6 +310,7 @@ interface EventRow {
   capacity: number | null;
   host_id: string | null;
   host_partner_id: string | null;
+  vorlage_id: string | null;
 }
 
 // EINE Zeichenkette, nicht zusammengesetzt: supabase-js leitet die Zeilenform
@@ -311,7 +318,7 @@ interface EventRow {
 // und die Abfrage fiele still auf `GenericStringError` zurück.
 // prettier-ignore
 const EVENT_COLUMNS =
-  "id, title, type, starts_at, ends_at, location, description, cover_path, topics, visibility, capacity, host_id, host_partner_id";
+  "id, title, type, starts_at, ends_at, location, description, cover_path, topics, visibility, capacity, host_id, host_partner_id, vorlage_id";
 
 /**
  * Hosts je Event auflösen. Profil-Hosts aus der View `profiles_public`,
@@ -450,6 +457,7 @@ function toItem(
     waitlistCount: c?.waitlist ?? 0,
     // Eine abgemeldete Registrierung gilt als „nicht angemeldet".
     myStatus: status === "cancelled" ? null : status,
+    vorlageId: r.vorlage_id,
   };
 }
 

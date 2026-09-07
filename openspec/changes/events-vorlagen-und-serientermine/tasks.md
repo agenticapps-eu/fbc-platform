@@ -91,8 +91,35 @@
       der Leerzustand jetzt der **Inhalt des ersten Reiters** statt dessen
       Ersatz; ausgeloggt bleibt alles wie bisher, dort gäbe es nur einen Reiter
       mit demselben Inhalt. Die Meldung selbst steht wortgleich weiter (AGE-494).
-- [ ] 9.2 Erzeugen-Dialog mit Regelauswahl, Anzahl bzw. Enddatum und einer Vorschau der Termine vor dem Schreiben
-- [ ] 9.3 Serienzugehörigkeit am Event sichtbar machen
+- [x] 9.2 Erzeugen-Dialog (`SerieErzeugen.tsx`) mit Startdatum, **Anzahl ODER
+      Enddatum** und einer Vorschau vor dem Schreiben. Die Vorschau ruft
+      `event_serie_slots()` — dieselbe Funktion, die danach schreibt; eine im
+      Client nachgebaute Datumsrechnung wäre eine zweite Wahrheit, die
+      spätestens an der nächsten Zeitumstellung auseinanderläuft. Das Enddatum
+      wird als „bis zu 52 Termine, davon die bis zum Stichtag" aufgelöst, weil
+      die Funktion kein „bis" kennt.
+      **Erzeugen bleibt gesperrt, bis die Vorschau gesehen wurde**, und jede
+      Änderung an den Eingaben verwirft sie wieder. Beides ist als Zusage
+      geprüft und mit zwei Mutationen gegengeprobt (Wächter am Knopf entfernt →
+      3 von 4 Zusagen fallen; Verwerfen entfernt → 1 fällt).
+- [x] 9.2a **Client-Hälfte von 7.7 mitgeliefert.** `slotsMitCover()` sortiert
+      die Termine ausdrücklich nach `slot_datum` und paart sie mit UUID-Pfaden;
+      `serieErzeugen()` kopiert erst im Storage, dann schreibt die RPC. Ohne
+      Titelbild geht `null` statt `[]` — ein leeres Array träfe auf die
+      Anzahlprüfung und ergäbe 22023 für eine Vorlage, die schlicht kein Bild
+      hat. Der Fehler, den die Sortierung verhindert, wäre leise: die Serie
+      entstünde vollständig, jeder Termin trüge ein Bild, und es wäre das des
+      falschen Datums.
+- [x] 9.3 Serienzugehörigkeit am Event sichtbar: `vorlage_id` wandert durch
+      `EVENT_COLUMNS` → `EventRow` → `EventListItem.vorlageId`, und die
+      Detailkarte trägt „Teil einer Serie". Bei einem einzeln angelegten Event
+      bleibt die Zeile **weg**, statt „Einzeltermin" zu sagen — `vorlage_id` ist
+      bei jedem Bestandsevent null, die Zeile stünde damit unter allen.
+      Ohne Rechteprüfung angezeigt, und das ist Absicht: dass `vorlage_id` für
+      fremde Mitglieder lesbar ist, steht als hingenommenes Risiko in
+      `design.md`. Die Anzeige nutzt es aus und schafft keine neue Fläche.
+      Folgekosten, mitgetragen: fünf bestehende Fixtures brauchten das neue
+      Feld.
 - [x] 9.4 `src/lib/database.types.ts` **von Hand** nachgezogen — `events` um
       `vorlage_id`/`slot_datum` und den ZUSAMMENGESETZTEN Fremdschlüssel
       `(vorlage_id, host_id)`, dazu `event_vorlagen` und die zwei Funktionen.

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { useToast } from "../ui/toast-context";
+import { SerieErzeugen } from "./SerieErzeugen";
 import { VorlageForm } from "./VorlageForm";
 import {
   WIEDERHOLUNG_OPTIONS,
@@ -44,6 +45,9 @@ export function VorlagenPanel({ hostId, vorlagen }: { hostId: string; vorlagen: 
   // Vorlage. Ein einzelner Zustand statt zweier Flags: „anlegen UND bearbeiten
   // gleichzeitig offen" ist kein Zustand, den es geben soll.
   const [offen, setOffen] = useState<string | null>(null);
+  /** Die Vorlage, deren Erzeugen-Dialog offen ist — getrennt von `offen`, weil
+   *  Erzeugen und Bearbeiten verschiedene Fragen an dieselbe Zeile sind. */
+  const [serie, setSerie] = useState<string | null>(null);
 
   const invalidieren = () =>
     queryClient.invalidateQueries({ queryKey: vorlagenListKey(hostId) });
@@ -117,7 +121,13 @@ export function VorlagenPanel({ hostId, vorlagen }: { hostId: string; vorlagen: 
 
       <ul className="space-y-3">
         {vorlagen.map((v) =>
-          offen === v.id ? (
+          serie === v.id ? (
+            <li key={v.id}>
+              <Card>
+                <SerieErzeugen vorlage={v} onDone={() => setSerie(null)} />
+              </Card>
+            </li>
+          ) : offen === v.id ? (
             <li key={v.id}>
               <Card>
                 <VorlageForm
@@ -138,6 +148,14 @@ export function VorlagenPanel({ hostId, vorlagen }: { hostId: string; vorlagen: 
                     <p className="text-sm text-muted">{regelText(v)}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {/* Nur mit Regel: ohne `wiederholung` gibt es keine Serie,
+                        und `event_serie_slots()` hätte nichts zu rechnen. Der
+                        Knopf fehlt dann, statt in einen leeren Dialog zu führen. */}
+                    {v.wiederholung !== null && (
+                      <Button variant="ghost" size="sm" onClick={() => setSerie(v.id)}>
+                        Termine erzeugen
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => setOffen(v.id)}>
                       Bearbeiten
                     </Button>
