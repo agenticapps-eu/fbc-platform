@@ -155,6 +155,32 @@ describe("Vorlagen-Reiter", () => {
     expect(await screen.findByText(/noch keine Vorlage/i)).toBeTruthy();
   });
 
+  // Diff-Review (opencode, NIEDRIG): `vorlagen.data ?? []` machte aus einer
+  // gescheiterten Abfrage eine leere Liste — der Reiter zeigte „Vorlagen (0)"
+  // und den Erstkontakt-Text, obwohl Vorlagen existieren. Für die Events-
+  // Abfrage daneben gibt es diesen Fehlerzustand seit jeher; für Vorlagen
+  // nicht. Der Fehler wäre erst beim nächsten Anlegen aufgefallen.
+  it("unterscheidet eine gescheiterte Abfrage von einer leeren Liste", async () => {
+    vi.mocked(fetchEvents).mockResolvedValue([]);
+    vi.mocked(fetchVorlagen).mockRejectedValue(new Error("PGRST301"));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={["/events"]}>
+            <EventsList />
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Vorlagen (0)" }));
+    expect(await screen.findByText(/konnten nicht geladen werden/i)).toBeTruthy();
+    // Und ausdrücklich NICHT die Meldung, die eine Aussage über den Bestand
+    // macht, die niemand geprüft hat.
+    expect(screen.queryByText(/noch keine Vorlage/i)).toBeNull();
+  });
+
   it("bietet im Reiter das Anlegen an und öffnet das Formular", async () => {
     renderEvents([]);
 

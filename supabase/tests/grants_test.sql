@@ -20,7 +20,7 @@
 -- Der Diff im Testlauf zeigt genau, was sich verschoben hat.
 
 begin;
-select plan(15);
+select plan(16);
 
 -- ── 1. Tabellen-Grants ───────────────────────────────────────────────────────
 -- Jedes Recht hier ist durch eine Policy gedeckt; wo keine Policy ist, steht
@@ -384,6 +384,46 @@ set_event_check_in: anon=false auth=true$$,
 -- vorliegt, gilt der PROD-Rechte-Zustand laut `directory-search` ausdruecklich
 -- als UNBELEGT. Die REGEL dahinter — warum die Formulierung beide Rollen nennen
 -- muss — haelt Abschnitt 9, und die ist instanzunabhaengig.
+
+-- ── 8b. Die fuenf Funktionen rund um Serientermine (AGE-630) ────────────────
+-- Abschnitt 6 deckt nur `anon` und wuerde einen stehengebliebenen
+-- `authenticated`-Grant nicht bemerken — bei diesen Funktionen ist genau der
+-- die Gefahr, nicht der anon-Grant.
+--
+-- `hinweis_rundruf` steht mit in der Liste, obwohl AGE-630 sie nicht anfasst:
+-- Sie ist `SECURITY DEFINER` und schreibt eine Hinweiszeile je aktiviertem
+-- Mitglied. Wer sie aufrufen darf, kann die gesamte Mitgliedschaft anschreiben,
+-- mit beliebigem Inhalt und beliebig oft. Der Kopf von
+-- 20260907113000_event_serie_rundruf.sql begruendet den Anweisungs-Trigger
+-- ausdruecklich damit, dass der Rundruf so „in Triggerland, nicht aufrufbar"
+-- bleibt — statt ihn ans Ende der `SECURITY INVOKER`-RPC zu haengen, was
+-- `authenticated` genau dieses Recht gekostet haette. Diese Zeile ist die
+-- Messung dieser Begruendung; ohne sie waere sie ein Kommentar.
+--
+-- `event_vorlagen_zeitzone_pruefen` und `hinweis_neue_serie` sind
+-- Trigger-Funktionen: `auth=false` ist dort kein Verzicht, sondern der
+-- Normalzustand — ein Trigger laeuft ohne EXECUTE-Recht des Aufrufers.
+-- `event_serie_slots` und `event_serie_erzeugen` sind die beiden RPCs, die der
+-- Client wirklich ruft; sie sind `SECURITY INVOKER`, die RLS von `events` und
+-- `event_vorlagen` bleibt also die Grenze.
+
+select is(
+  (select coalesce(string_agg(
+            p.proname || ': anon=' || has_function_privilege('anon', p.oid, 'execute')::text
+                      || ' auth=' || has_function_privilege('authenticated', p.oid, 'execute')::text,
+            E'\n' order by p.proname), '(keine)')
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+     and p.proname in ('event_serie_erzeugen','event_serie_slots',
+                       'event_vorlagen_zeitzone_pruefen','hinweis_neue_serie',
+                       'hinweis_rundruf')),
+$$event_serie_erzeugen: anon=false auth=true
+event_serie_slots: anon=false auth=true
+event_vorlagen_zeitzone_pruefen: anon=false auth=false
+hinweis_neue_serie: anon=false auth=false
+hinweis_rundruf: anon=false auth=false$$,
+  'AGE-630: die beiden Serien-RPCs stehen `authenticated` offen, die beiden '
+  'Trigger-Funktionen und der Rundruf niemandem');
 
 -- ── 9. WARUM `from public` ALLEIN NICHT GENUEGT — der Mechanismus (AGE-602) ──
 -- Diese Zusage ist als Antwort auf eine Mutationsprobe entstanden. Baut man den

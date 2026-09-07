@@ -38,7 +38,15 @@ function errMsg(error: unknown): string {
   return "Unbekannter Fehler.";
 }
 
-export function VorlagenPanel({ hostId, vorlagen }: { hostId: string; vorlagen: VorlageItem[] }) {
+export function VorlagenPanel({
+  hostId,
+  vorlagen,
+  fehler,
+}: {
+  hostId: string;
+  vorlagen: VorlageItem[];
+  fehler: boolean;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   // `null` = geschlossen, `"neu"` = Anlegen, sonst die id der bearbeiteten
@@ -112,7 +120,17 @@ export function VorlagenPanel({ hostId, vorlagen }: { hostId: string; vorlagen: 
         </Card>
       )}
 
-      {vorlagen.length === 0 && offen === null && (
+      {/* Eine gescheiterte Abfrage ist keine leere Liste. Ohne diesen Zweig
+          stünde hier „Du hast noch keine Vorlage", während welche existieren —
+          der Fehler fiele erst beim nächsten Anlegen auf. Wortlaut und Ton wie
+          im Fehlerzweig der Events-Abfrage nebenan. */}
+      {fehler && offen === null && (
+        <p className="text-sm text-danger">
+          Vorlagen konnten nicht geladen werden. Bitte neu laden.
+        </p>
+      )}
+
+      {!fehler && vorlagen.length === 0 && offen === null && (
         <p className="text-sm text-muted">
           Du hast noch keine Vorlage. Eine Vorlage hält Titel, Ort und Uhrzeit eines Formats fest —
           und erzeugt daraus auf einen Schlag alle Termine einer Serie.

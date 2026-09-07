@@ -30,7 +30,7 @@
 -- `scripts/pgtap-dateiliste.test.ts` prüft die Liste in beide Richtungen.
 
 begin;
-select plan(8);
+select plan(9);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -115,6 +115,30 @@ select is(
       and cover_path = 'c0000000-0000-0000-0000-000000000031/vorlage.webp'),
   0,
   'kein Termin zeigt auf die Datei der Vorlage selbst');
+
+-- ── 1b. WELCHER Pfad an WELCHEM Termin (Diff-Review, opencode) ──────────────
+-- Die drei Zusagen darüber prüfen Anzahl, Verschiedenheit und Präfix — also
+-- alles ausser der Zuordnung selbst. Genau die ist aber der leise Fehler, vor
+-- dem der Kopf von 20260907110000 warnt: die Serie entstünde vollständig, jeder
+-- Termin trüge ein Bild, und es wäre das eines anderen Datums.
+--
+-- Die RPC ordnet über `row_number() over (order by s.slot_datum)`. Ersetzte
+-- eine Mutation das durch `order by s.starts_at`, fiele bisher KEIN Test — und
+-- die beiden sind bei der Zeitumstellung nicht überall gleichbedeutend.
+-- Deshalb hier die Reihenfolge ausgeschrieben, nicht bloss gezählt.
+--
+-- Die Client-Hälfte derselben Zusage steht in
+-- `src/lib/event-vorlagen.serie.test.ts` (`slotsMitCover` sortiert selbst).
+-- Beide Hälften braucht es: die eine ordnet, die andere verlässt sich darauf.
+select is(
+  (select string_agg(cover_path, E'\n' order by slot_datum)
+     from public.events
+    where vorlage_id = '11111111-0000-0000-0000-000000000031'),
+  'c0000000-0000-0000-0000-000000000031/a1b2c3d4-0000-4000-8000-000000000001.webp' || E'\n' ||
+  'c0000000-0000-0000-0000-000000000031/a1b2c3d4-0000-4000-8000-000000000002.webp' || E'\n' ||
+  'c0000000-0000-0000-0000-000000000031/a1b2c3d4-0000-4000-8000-000000000003.webp' || E'\n' ||
+  'c0000000-0000-0000-0000-000000000031/a1b2c3d4-0000-4000-8000-000000000004.webp',
+  'der n-te Pfad hängt am n-ten Termin — nach slot_datum aufsteigend, nicht nur irgendwie verteilt');
 
 -- ── 2. Ohne Cover ───────────────────────────────────────────────────────────
 select is(

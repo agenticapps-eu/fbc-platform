@@ -170,3 +170,139 @@ wäre. Genau dafür steht 2b vor der ersten Codezeile.
 Der Plan wird überarbeitet, bevor Code entsteht. Drei Befunde brauchen eine
 Entscheidung des Auftraggebers und nicht bloß eine Textänderung:
 Cover-Protokoll, Rundruf-Verhalten bei Serien, Zuschnitt der Serienänderung.
+
+---
+
+# Diff-Review — zweite Stufe (07.09., Aufgabe 10.4)
+
+Derselbe Weg wie Stufe 1: `reviewer-cli.sh <vendor> <prompt-datei>`,
+`REVIEWER_TIMEOUT=900`, beide Arme **andere Anbieter** als der Autor. Geprüft
+wurde diesmal der **gebaute Diff** (2754 Zeilen: alle sieben Migrationen,
+`src/lib/event-vorlagen.ts`, `src/components/events/*`, `EventDetailPage.tsx`),
+nicht der Plan.
+
+| Arm | Aufgelöstes Modell | Verdikt | Befunde |
+| --- | --- | --- | --- |
+| `gemini` | `Gemini Pro` | APPROVE | 3 (1 HOCH, 1 MITTEL, 1 NIEDRIG) |
+| `opencode` | `hf:moonshotai/Kimi-K3` | APPROVE | 5 (1 MITTEL, 4 NIEDRIG) |
+
+Rohausgaben im Scratchpad; Prompt in `.gstack/age630-review-prompt.md`
+(gitignoriert). Beide Läufe tragen eine `^MODEL:`-Zeile und ein `VERDICT:` —
+geprüft wurde der **Inhalt**, nicht der Exit-Code.
+
+## geminis Befunde zählen als eine Stimme, nicht als drei
+
+Zwei seiner drei „Befunde" **sind keine**. Der als HOCH etikettierte endet
+wörtlich mit „Das ist das beabsichtigte Verhalten. Es gibt hier keinen Fehler.
+Die Implementierung ist korrekt und sicher."; der MITTEL ebenso („Ein Angriff
+wird korrekt verhindert."). Es hat die Prüffragen des Auftrags durchbuchstabiert
+und die Antworten in Befundform gegossen. Seine eine prüfbare Behauptung —
+`select … into strict` unter RLS wehrt eine fremde `vorlage_id` ab — habe ich am
+Repo nachgeschlagen: **sie stimmt** (`20260907110000:64`, samt Kommentar, der
+genau das begründet).
+
+Bleibt ein echter NIEDRIG: `"Europe/Berlin"` steht als Client-Fallback in
+`VorlageForm.tsx` **und** als Spalten-Default in der Migration. Zwei Orte für
+einen Wert. **Nicht geändert** — die Entscheidung „Zeitzone ist kein Feld"
+(Gruppe 9) macht den Client-Wert zum Anzeigefall des DB-Defaults, und ein
+dritter Ort (Konfiguration) wäre für einen Verein mit einer Zeitzone teurer als
+die Doppelung. Als offene Frage vermerkt.
+
+## opencodes MITTEL — der teuerste Befund des Tages, und er ist behoben
+
+**`event_serie_slots()` hatte keine Obergrenze für `p_anzahl`.** Die 52er-Grenze
+sitzt in `event_serie_erzeugen()`; die Slot-Funktion darf `authenticated` aber
+**direkt** aufrufen — das ist gewollt, die Vorschau braucht sie. opencode hat es
+nicht behauptet, sondern **am Stack gemessen**, und ich habe die Messung
+wiederholt:
+
+```
+select count(*) from public.event_serie_slots(
+  'woechentlich','19:00','Europe/Berlin','2026-09-01', 100000, 2);
+-> 100000
+```
+
+Kein Datenleck — die Funktion liest keine Zeile. Es ist eine
+**Verfügbarkeits**-Lücke: `return query` materialisiert in einen Tuplestore,
+also fordert ein Aufruf mit 10^8 unbegrenzt Speicher und CPU je HTTP-Anfrage,
+auf einer Datenbank, die sich alle Mitglieder teilen. Jedes aktivierte Konto
+konnte das mit einem Aufruf.
+
+**Behoben in `20260907120000_event_serie_slots_obergrenze.sql`.** Die Grenze ist
+**53, nicht 52** — und das ist der Teil, den man falsch machen kann: der
+Enddatum-Pfad der RPC sondiert absichtlich mit 53, um „mehr als 52 im Zeitraum"
+zu erkennen. Eine Grenze von 52 hätte genau diese Prüfung erschlagen. Beide
+Hälften stehen als Zusagen in `event_serie_regel_test.sql` (§9), die zweite
+ausdrücklich als Positivkontrolle zur ersten.
+
+**RED gemessen, nicht angenommen:** die Zusage lief gegen den Stack **vor** der
+Migration rot (Test 15, Exit 1), danach grün (16/16, Exit 0).
+
+`p_anzahl = 0` und negative Werte liefern weiterhin still die leere Menge. Das
+ist bewusst: hier sind sie harmlos, und `event_serie_erzeugen()` weist sie dort
+ab, wo sie eine Bedeutung haben.
+
+## opencodes NIEDRIG-Befunde, einzeln entschieden
+
+**a) Die Cover-Zuordnung war datenbankseitig nicht festgezurrt — behoben.**
+Der Test belegte Anzahl, Verschiedenheit und Präfix, aber nie, *welcher* Pfad an
+*welchem* `slot_datum` landet. Genau das ist der leise Fehler, vor dem der
+Migrationskopf warnt. Neue Zusage in `event_serie_cover_test.sql` (§1b), die die
+Reihenfolge ausschreibt statt sie zu zählen.
+
+**Gegenprobe gefahren, und sie ist der Beleg:** mit `order by s.slot_datum desc`
+im RPC fällt **genau diese eine** Zusage — die vier bereits vorhandenen bleiben
+grün. Vor §1b hätte eine vertauschte Cover-Reihenfolge die gesamte Suite
+passiert.
+
+**b) Fehlerzustand der Vorlagen-Abfrage — behoben.** `vorlagen.data ?? []` machte
+aus einer gescheiterten Abfrage eine leere Liste: der Reiter zeigte
+„Vorlagen (0)" und „Du hast noch keine Vorlage", während Vorlagen existieren.
+Für die Events-Abfrage daneben gibt es diesen Zweig seit jeher. `EventsBody`
+bekommt `vorlagenFehler`, `VorlagenPanel` einen `fehler`-Zweig im Ton der
+Nachbarmeldung. Zusage in `EventsList.vorlagen.test.tsx`; **gegengeprobt** —
+mit entferntem Zweig fällt sie (1 failed | 5 passed).
+
+**c) Der `p_bis_datum`-Pfad der RPC ist vom Client unerreichbar — nicht
+geändert.** Der Client holt 52 Slots und filtert selbst; liegen mehr im Zeitraum,
+kappt er still, statt die Ablehnung der RPC auszulösen. **Vorschau und Erzeugen
+bleiben deckungsgleich** — das ist der Teil, der zählt, und er ist getestet. Ob
+die Oberfläche „im Zeitraum liegen weitere 8 Termine" sagen soll, ist eine
+Produktfrage, keine Korrektheitsfrage. Als offene Frage vermerkt.
+
+**d) `v_anzahl = 0` im Enddatum-Pfad endet still statt mit 22023 — nicht
+geändert.** Inkonsistent zum `p_anzahl`-Pfad, praktisch folgenlos (der Knopf ist
+bei leerer Vorschau gesperrt). Eine Änderung hier wäre eine Verhaltensänderung
+an einer RPC ohne belegten Schaden. Als offene Frage vermerkt.
+
+## Was opencode gegengeprüft hat — und selbst nachgemessen
+
+Der Arm hat nicht gelesen, sondern **gemessen**: eigener Stack-Lauf über acht
+Testdateien (531 Zusagen, PASS), `storage.foldername` gegen vier entartete
+Eingaben (`'ohne-slash'`, `''`, `'/fuehrend/x'`, `'a/b/c'`), und ein
+Zeichenvergleich des alten `event_cover_lesbar`-Zweigs gegen `20260812100200`.
+
+Zur **Kernfrage der Aufgabe** (`event_cover_lesbar()`, besonderes Augenmerk):
+kein Befund. Der neue Zweig verlangt innerhalb desselben `exists` Pfadgleichheit,
+Präfixbindung, `is_activated()` **und** `v.host_id = auth.uid()`; für `anon` ist
+`v.host_id = null` → NULL → zu. Die NULL-Semantik der entarteten Pfade fällt
+durchweg **zu**. Der alte Zweig ist zeichengleich, die Rechte überleben
+`create or replace`.
+
+Ebenfalls ohne Befund und mit Beleg: fremde `vorlage_id` (P0002 unter RLS, plus
+Komposit-FK `(vorlage_id, host_id)` als zweite Sperre), die 52er-Grenze in allen
+Pfaden, Cover-Anzahl/Eindeutigkeit/Präfix, der Rundruf (52 → 1, Opt-out greift,
+Mehr-Vorlagen-Anweisung zählt je Reihe), beide Zeitumstellungen, und der
+Doppelklick (`isPending` plus Unique-Index).
+
+## Bilanz Stufe 2
+
+**Beide Arme: APPROVE.** Ein MITTEL und zwei NIEDRIG sind behoben, drei
+NIEDRIG bewusst offengelassen und benannt. Drei Zusagen sind dazugekommen
+(Obergrenze, Cover-Reihenfolge, Fehlerzustand), **jede davon gegengeprobt** —
+zwei per Mutation, eine per RED→GREEN.
+
+Der Ertrag ist derselbe wie in Stufe 1 und liegt wieder beim schärferen Arm:
+der MITTEL-Befund war in keiner Plan-Review, in keiner Sichtprobe und in keinem
+der 2596 Tests sichtbar, weil er nicht am Verhalten hängt, sondern an einer
+Grenze, die zwei Funktionen weiter steht.

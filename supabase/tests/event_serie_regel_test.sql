@@ -44,7 +44,7 @@
 -- `scripts/pgtap-dateiliste.test.ts` prüft die Liste in beide Richtungen.
 
 begin;
-select plan(14);
+select plan(16);
 
 -- ── 1. Wöchentlich ──────────────────────────────────────────────────────────
 select results_eq(
@@ -240,6 +240,39 @@ select throws_ok(
       p_anzahl   => 4)$$,
   '22023', null,
   'ein Aufruf ohne Wiederholungsform wird abgewiesen, statt still leer zu liefern');
+
+-- ── 9. Die Obergrenze — eine VERFÜGBARKEITS-Zusage (Diff-Review, opencode) ──
+-- Die 52er-Grenze sitzt in `event_serie_erzeugen()`. Diese Funktion hier darf
+-- `authenticated` aber DIREKT aufrufen (die Vorschau braucht sie), und ohne
+-- eigene Grenze lieferte `p_anzahl => 100000` auch 100000 Zeilen — gemessen am
+-- lokalen Stack vor 20260907120000. Kein Datenleck: sie liest keine Zeile. Aber
+-- `return query` materialisiert, und die Datenbank teilen sich alle Mitglieder.
+select throws_ok(
+  $$select * from public.event_serie_slots(
+      'woechentlich',
+      p_wochentag => 2,
+      p_ortszeit  => '19:00',
+      p_zeitzone  => 'Europe/Berlin',
+      p_ab        => '2026-09-01',
+      p_anzahl    => 100000)$$,
+  '22023', null,
+  'ein Aufruf über der Obergrenze wird abgewiesen, statt 100000 Zeilen zu bauen');
+
+-- Die Grenze ist 53, nicht 52 — und das ist die Zusage, die den Enddatum-Pfad
+-- von `event_serie_erzeugen()` am Leben hält. Er sondiert dort mit genau 53,
+-- um „mehr als 52 im Zeitraum" zu erkennen. Eine Grenze von 52 erschlüge diese
+-- Prüfung, und die Serie mit 53 Terminen käme als Fehler aus der falschen
+-- Funktion. Positivkontrolle zur Zusage darüber: 53 geht noch durch.
+select is(
+  (select count(*)::int from public.event_serie_slots(
+      'woechentlich',
+      p_wochentag => 2,
+      p_ortszeit  => '19:00',
+      p_zeitzone  => 'Europe/Berlin',
+      p_ab        => '2026-09-01',
+      p_anzahl    => 53)),
+  53,
+  '53 ist erlaubt — die Sonde des Enddatum-Pfads bleibt aufrufbar');
 
 select finish();
 rollback;

@@ -187,6 +187,29 @@ wer viele Events anlegen will, kann sie seit jeher einzeln anlegen.
 `anzahl` zählt **erzeugte Termine**, nicht durchlaufene Monate. Die Obergrenze
 wird an der Kandidatenliste **vor** dem Einfügen geprüft.
 
+**Auch die reine Vorausberechnung ist begrenzt.** Die Funktion, die die
+Datumsreihe rechnet, ohne etwas zu schreiben, MUSS einen Aufruf abweisen, der
+mehr als **53** Vorkommnisse verlangt. Sie ist für die Vorschau unmittelbar
+aufrufbar, und ohne eigene Grenze könnte ein einzelner Aufruf beliebig viel
+Rechenzeit und Speicher der gemeinsamen Datenbank binden. Diese Grenze schützt
+die Verfügbarkeit, nicht die Sichtbarkeit — die Funktion liest keine Zeile.
+
+Sie liegt bei 53 statt 52, weil der Enddatum-Weg der Erzeugung **absichtlich ein
+Vorkommnis mehr** anfordert, als er erlaubt: fällt auch das 53. noch in den
+Zeitraum, verlangt der Aufruf mehr als 52. Eine Grenze von 52 würde genau diese
+Prüfung erschlagen.
+
+#### Scenario: Vorausberechnung über der Obergrenze
+
+- **WHEN** die Datumsreihe für 100000 Vorkommnisse angefordert wird
+- **THEN** wird der Aufruf abgewiesen
+- **AND** es wird keine Reihe gebaut
+
+#### Scenario: Die Sonde des Enddatum-Wegs bleibt aufrufbar
+
+- **WHEN** die Datumsreihe für genau 53 Vorkommnisse angefordert wird
+- **THEN** liefert sie 53 Termine
+
 #### Scenario: Anzahl über der Obergrenze
 
 - **WHEN** eine Erzeugung 53 Termine anfordert

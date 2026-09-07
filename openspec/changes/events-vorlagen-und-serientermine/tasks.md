@@ -127,9 +127,111 @@
 
 ## 10. Wächter und Abnahme
 
-- [ ] 10.1 `grants_test.sql` nachziehen — bricht bei jeder neuen Tabelle; bei **Funktionen** heißt Rot dagegen „der `revoke` fehlt", die Liste dort nicht blind nachziehen
-- [ ] 10.2 `pnpm typecheck`, `pnpm lint` und `pnpm test` grün, Exit-Code geprüft statt der Ausgabe
-- [ ] 10.3 Sichtprobe gegen den lokalen Stack: Vorlage anlegen, Termine erzeugen, an einem anmelden
-- [ ] 10.4 Fremdreview des **Diffs** (zweite Stufe) — mit besonderem Augenmerk auf `event_cover_lesbar()`
-- [ ] 10.5 `openspec validate --all` erneut grün
+- [x] 10.1 `grants_test.sql` nachziehen — bricht bei jeder neuen Tabelle; bei **Funktionen** heißt Rot dagegen „der `revoke` fehlt", die Liste dort nicht blind nachziehen
+
+      Die Tabellenzeile `event_vorlagen/authenticated=DELETE,INSERT,SELECT,UPDATE`
+      stand schon aus Gruppe 1. Der Test war also **grün, bevor er etwas über
+      diese Gruppe sagte** — und genau das war die Lücke: Abschnitt 6 zählt nur
+      auf, was `anon` ausführen darf, und alle vier neuen Funktionen entziehen
+      `anon` korrekt. Ein stehengebliebener `authenticated`-Grant wäre unsichtbar
+      geblieben.
+
+      Deshalb Abschnitt **8b** ergänzt (`plan(15)` → `plan(16)`): beide
+      Client-Rollen, für die vier neuen Funktionen **und** für `hinweis_rundruf`.
+      Letztere fasst AGE-630 nicht an — aber der Kopf von
+      `20260907113000_event_serie_rundruf.sql` begründet den Anweisungs-Trigger
+      ausdrücklich damit, dass der Rundruf „in Triggerland, nicht aufrufbar"
+      bleibt. Bis jetzt war das ein Kommentar; jetzt ist es gemessen.
+
+      Gemessen: `supabase test db supabase/tests/grants_test.sql` 16/16, Exit 0.
+      **Positivkontrolle:** Erwartung auf `hinweis_rundruf: … auth=true`
+      mutiert → Test 12 fällt (Exit 1), danach zurückgesetzt → wieder grün. Die
+      Zusage liest den Katalog, nicht sich selbst.
+
+- [x] 10.2 `pnpm typecheck`, `pnpm lint` und `pnpm test` grün, Exit-Code geprüft statt der Ausgabe
+
+      `pnpm typecheck` Exit 0 · `pnpm lint` Exit 0 · `pnpm test` Exit 0,
+      **231 Dateien / 2596 Zusagen**. Dazu die DB-Seite gegen den lokalen Stack:
+      die sechs AGE-630-pgTAP-Dateien 75/75 (Exit 0) und `rls_test.sql` 440/440
+      (Exit 0) — in Blöcken gefahren, siehe Handoff-Warnung zur Pfadlänge.
+- [x] 10.3 Sichtprobe gegen den lokalen Stack: Vorlage anlegen, Termine erzeugen, an einem anmelden
+
+      Durchgefahren am 07.09. gegen `http://localhost:5211` (`pnpm exec vite`,
+      **nicht** `pnpm dev` — das schöbe Infisical und damit DEV davor).
+      **Belegt, dass die App wirklich lokal hängt**, statt es anzunehmen:
+      `performance.getEntriesByType('resource')` zeigt als einzige
+      Backend-Herkunft `http://127.0.0.1:54321`, kein `*.supabase.co`.
+
+      **Was die Sichtprobe gezeigt hat, das kein Test zeigt:**
+
+      * Der vierte Reiter steht neben den drei anderen, und der **Leerzustand
+        ist der Inhalt des ersten Reiters** — die Reiterleiste bleibt bei null
+        Events sichtbar. Das ist der Fund aus Gruppe 9, hier im Bild.
+      * `regelVollstaendig` greift sichtbar: „Wiederholung = Wöchentlich" blendet
+        das Feld „Wochentag" ein, und „Vorlage anlegen" bleibt **gesperrt**, bis
+        ein Wochentag gewählt ist.
+      * **Die Vorschau-Sperre hält in beide Richtungen.** „Termine erzeugen" ist
+        vor der Vorschau gesperrt; nach der Vorschau offen; und eine Änderung an
+        der Anzahl (8 → 5) **verwirft die Vorschau und sperrt wieder**.
+      * **Die Zeitumstellung, am gebauten Weg statt an der Funktion.** 8
+        wöchentliche Termine ab 07.09.2026 enden am **27.10.2026**, also nach der
+        Umstellung am 25.10. Gemessen in `events`:
+
+        | slot_datum | starts_at (UTC) | Ortszeit |
+        |---|---|---|
+        | 2026-09-08 … 2026-10-20 | 16:30+00 | 18:30 |
+        | **2026-10-27** | **17:30+00** | **18:30** |
+
+        Der UTC-Abstand springt um eine Stunde, die Ortszeit steht still.
+      * **Der Rundruf zählt richtig:** 8 Termine → **1** Zeile in `notifications`
+        (`event_created`, `payload.serie_anzahl = 8`), nicht 8. Der
+        Feed-Spiegel bleibt dagegen **8 Beiträge** — genau die Entscheidung aus
+        `20260907113000`.
+      * Die **Serienzeile** auf der Detailseite steht da („Serie: Teil einer
+        Serie"), und die Anmeldung eines zweiten Kontos an einem erzeugten
+        Termin landet in `event_registrations` (`status = registered`).
+      * Konsole über beide Sitzungen hinweg: **0 Fehler, 0 Warnungen**.
+
+      **Der Stack ist geteilt — die Sichtprobe ist restlos zurückgebaut.** Gesät
+      waren 2 Konten, 1 Vorlage, 8 Termine, 8 Feed-Beiträge, 1 Hinweis, 1
+      Anmeldung; nachgezählt danach: `vorlagen=0 serientermine=0
+      probe_profile=0`. `.env.local` ist gelöscht und der vite-Prozess beendet
+      — beides sonst eine Zeitbombe für die nächste Sitzung.
+- [x] 10.4 Fremdreview des **Diffs** (zweite Stufe) — mit besonderem Augenmerk auf `event_cover_lesbar()`
+
+      Zwei Arme über `reviewer-cli.sh <vendor> <prompt-datei>`, beide **APPROVE**:
+      `gemini` (`Gemini Pro`, 3 Befunde) und `opencode` (`hf:moonshotai/Kimi-K3`,
+      5 Befunde). Vollständig in `REVIEWS.md`, Abschnitt „Diff-Review — zweite
+      Stufe".
+
+      **Zur Kernfrage der Aufgabe kein Befund**, und zwar von beiden Armen mit
+      Beleg: der neue Zweig von `event_cover_lesbar()` verlangt innerhalb
+      desselben `exists` Pfadgleichheit, Präfixbindung, `is_activated()` UND
+      `v.host_id = auth.uid()`; für `anon` ist `v.host_id = null` → NULL → zu.
+      opencode hat zusätzlich `storage.foldername` gegen vier entartete Eingaben
+      gemessen (`'ohne-slash'`, `''`, `'/fuehrend/x'`, `'a/b/c'`) — alle fallen
+      **zu** — und den alten Zweig zeichengleich gegen `20260812100200` geprüft.
+
+      **Drei Befunde behoben, drei bewusst offengelassen.** Der teuerste:
+
+      * **`event_serie_slots()` hatte keine Obergrenze für `p_anzahl`** (MITTEL).
+        Die 52 sitzt in `event_serie_erzeugen()`, aber `authenticated` ruft die
+        Slot-Funktion direkt auf. Gemessen und nachgemessen: `p_anzahl = 100000`
+        liefert **100000 Zeilen**. Kein Datenleck — sie liest keine Zeile —,
+        sondern Verfügbarkeit: `return query` materialisiert, und die Datenbank
+        teilen sich alle Mitglieder. Behoben in
+        `20260907120000_event_serie_slots_obergrenze.sql`, Grenze **53 statt
+        52**, weil der Enddatum-Pfad absichtlich mit 53 sondiert. RED gemessen
+        (Test 15 rot vor der Migration), dann grün.
+      * **Die Cover-Zuordnung war DB-seitig nicht festgezurrt** (NIEDRIG).
+        Gegenprobe: mit `order by s.slot_datum desc` im RPC fällt **genau die
+        neue** Zusage, die vier bestehenden bleiben grün.
+      * **Fehlerzustand der Vorlagen-Abfrage** (NIEDRIG). `vorlagen.data ?? []`
+        machte aus einem Fehlschlag „Du hast noch keine Vorlage". Gegenprobe:
+        mit entferntem Zweig fällt die neue Zusage.
+
+      Neue Abnahme nach den Änderungen: `pnpm test` **2597/2597**, `typecheck` 0,
+      `lint` 0, DB-Seite 7 Dateien / 94 Zusagen plus `rls_test` 440 — alle Exit 0.
+
+- [x] 10.5 `openspec validate --all` erneut grün
 - [ ] 10.6 Change archivieren, danach `pnpm release:entries`

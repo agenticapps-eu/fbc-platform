@@ -63,7 +63,12 @@ export default function EventsList() {
         </Card>
       )}
 
-      <EventsBody query={events} hostId={user?.id ?? null} vorlagen={vorlagen.data ?? []} />
+      <EventsBody
+        query={events}
+        hostId={user?.id ?? null}
+        vorlagen={vorlagen.data ?? []}
+        vorlagenFehler={vorlagen.isError}
+      />
     </section>
   );
 }
@@ -97,10 +102,15 @@ function EventsBody({
   query,
   hostId,
   vorlagen,
+  vorlagenFehler,
 }: {
   query: ReturnType<typeof useQuery<EventListItem[]>>;
   hostId: string | null;
   vorlagen: VorlageItem[];
+  // Getrennt von `vorlagen`, weil eine leere Liste und eine gescheiterte
+  // Abfrage sonst dasselbe waeren — und die Meldung „Du hast noch keine
+  // Vorlage" waere im Fehlerfall schlicht falsch (Diff-Review, opencode).
+  vorlagenFehler: boolean;
 }) {
   // Die Zustandsgrößen stehen VOR den frühen Rückgaben. Ein `useState` hinter
   // `if (isLoading) return` liefe beim ersten Rendern nicht und beim zweiten
@@ -186,7 +196,7 @@ function EventsBody({
     tabs.push({
       value: "vorlagen",
       label: `Vorlagen (${vorlagen.length})`,
-      content: <VorlagenPanel hostId={hostId} vorlagen={vorlagen} />,
+      content: <VorlagenPanel hostId={hostId} vorlagen={vorlagen} fehler={vorlagenFehler} />,
     });
   }
 
