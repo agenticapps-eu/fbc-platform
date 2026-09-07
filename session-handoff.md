@@ -7,111 +7,117 @@
 > parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
 > **nicht zusammenführen**, überschreiben.
 >
-> **2. Vorher stand hier AGE-642 B3** (Android-Signierung, Release-Workflow).
-> Vollständig in `git show 118ed46:session-handoff.md` (PR #354, auf `main`
-> seit 06.09. — der frühere Zeiger auf `b346043` ist überholt). **Diese Sitzung
-> läuft noch** — Linear steht auf *In Progress*, und ihr Worktree
+> **2. Daneben läuft AGE-642 B3** (Android-Signierung, Release-Workflow).
+> Vollständig in `git show 118ed46:session-handoff.md` (PR #354). **Diese
+> Sitzung läuft noch** — Linear steht auf *In Progress*, ihr Worktree
 > `fbc-platform.donald-age-642-capacitor-huelle` **darf nicht abgeräumt
 > werden**. Offen dort: iOS-Signierung, `versionCode` = 1, der
 > `android-release`-Workflow ist gebaut, aber **nie gelaufen** — er wartet auf
 > ein geschütztes GitHub-Environment, das nur Donald anlegen kann; solange
-> dürfen auch Dependabot #349–#351 nicht gemergt werden. Dazu B5.
+> dürfen Dependabot #349–#351 nicht gemergt werden. Dazu B5.
 > Von AGE-630 aus ist daran nichts zu tun.
 >
 > **3. Die Begründungen im Detail stehen NICHT hier**, sondern in
 > `openspec/changes/events-vorlagen-und-serientermine/` — `design.md` (D1–D8),
-> `REVIEWS.md` (13 Befunde) und im Kopf der Migration. Diese Datei ist der
-> Überblick.
+> `REVIEWS.md` und in den Migrationsköpfen. Diese Datei ist der Überblick.
 
 ## Accomplished
 
-- **Worktree-Landschaft aufgeräumt.** AGE-605-Worktree entfernt (PR #342
-  gemergt, 777,9 MiB), fünf Residuen-Verzeichnisse gelöscht, **15 verwaiste
-  vite/vitest-Prozesse** beendet (ältester vom 25.08.), Ports 5173–5202 frei.
-  Übrig: `main`, AGE-642 (fremd), AGE-630.
-- **AGE-630 geplant, fremdreviewt, überarbeitet.** OpenSpec-Change
-  `events-vorlagen-und-serientermine`, 4 Artefakte, `validate` grün.
-- **Plan-Review durch zwei fremde Anbieter**, beide REQUEST-CHANGES:
-  `gemini-pro` (6 Befunde) und `opencode`/`hf:moonshotai/Kimi-K3` (7 Befunde),
-  zusammen **6 HOCH**. Alle behandelt, Plan in 2. Fassung.
-- **Gruppe 2 + 3 gebaut** (Datenmodell): RED → GREEN → Gegenprobe.
-  `Files=4, Tests=496, Result: PASS`.
-- Zwei Commits: `b26aff9` (Plan), `84676f4` (Datenmodell).
+**Gruppen 4–8 gebaut, jede RED → GREEN → Gegenprobe.** Fünf Commits, dazu der
+Rebase auf `origin/main` (nur `session-handoff.md` kollidierte).
+
+| Gruppe | Was steht |
+| --- | --- |
+| 4 | `event_serie_slots()` — drei Regelformen, Ortszeit, beide Umstellungen |
+| 5 | `event_serie_erzeugen()` — Obergrenze 52 vor dem Einfügen, Idempotenz |
+| 6 | D7: erneute Erzeugung zieht die **unbelegte Zukunft** nach |
+| 7 | Cover je Termin + zweiter Lese-Zweig in `event_cover_lesbar()` |
+| 8 | Ein Rundruf je Erzeugung statt 52, Feed bleibt je Termin |
+
+**Abnahme gemessen, nicht behauptet:** pgTAP 34 Dateien / **1265 Zusagen** grün
+(in Blöcken gefahren, siehe unten), `pnpm typecheck` 0, `pnpm lint` 0,
+`pnpm test` **2568/2568**, `openspec validate --all` 32/32.
+
+**Gegenproben:** 15 Mutationen gefahren, 14 fallen. Die eine, die grün blieb
+(zielloses `on conflict`), ist in Gruppe 7 nachgeholt und fällt dort.
 
 ## Decisions
 
-- **Materialisieren statt rechnen.** `event_registrations` hängt per FK an
-  `events.id`, und `register_for_event` sperrt diese Zeile zum Zählen. Eine
-  berechnete Serie hätte für einen künftigen Termin keine `id`.
-- **Vorlagen UND Wiederholung in einem Change** (Donald, gegen meinen
-  Vorschlag, erst Vorlagen zu bauen).
-- **Rechte wie bei Events heute.** Gemessen: `events_write_host` trägt **kein**
-  `has_level`-Gate; die Stufenprüfung sitzt auf `regs_write_own`.
-- **Komposit-FK `(vorlage_id, host_id)`** statt einfachem FK. Aus der Review:
-  `events_write_host` kennt `vorlage_id` nicht, und die FK-Prüfung läuft
-  **nicht** unter der RLS der Zieltabelle — sonst hätte ein Host Events auf die
-  Slots einer fremden Reihe schreiben können, deren Erzeugung danach lautlos in
-  `on conflict do nothing` gelaufen wäre.
-- **`slot_datum` statt `starts_at`** als Idempotenzschlüssel. Beide Reviewer
-  unabhängig: hängt sie an `starts_at`, legt die Regel einen verschobenen
-  Termin erneut an.
-- **Cover: zweiter Lese-Zweig nur für den Host, Kopie durch den Client, UUID.**
-  Die erste Fassung war **nicht baubar** — eine SQL-Funktion kann die Datei
-  nicht kopieren, und `event_cover_lesbar()` schlägt nur über
-  `events.cover_path` nach, das Vorlagen-Cover wäre selbst seinem Host unlesbar.
-- **Ein Rundruf je Erzeugung, Feed je Termin.** Gemessen: zwei
-  `after insert for each row`-Trigger auf `events` — 52 Termine hätten 52
-  plattformweite Rundrufe samt Push in einer Transaktion ausgelöst.
-- **Zeitzone per Trigger, nicht `check`.** Ein `check` darf keine Unterabfrage
-  enthalten. Die Abkürzung „Hilfsfunktion als `immutable`" wäre eine
-  Falschaussage.
-- **Obergrenze 52** je Aufruf; **Vorlage löschen** lässt Termine überleben
-  (`on delete set null`, `cascade` verworfen).
-- **Frühjahrsumstellung: weiterschalten** (02:30 → 03:30), nicht auslassen —
-  ein still fehlender Termin ist der schlechtere Ausgang.
+- **Der Plan war an einer Stelle falsch und ist korrigiert.** D4 und das
+  Spec-Delta sagten für die Herbstüberlappung „erste Lesart (Sommerzeit), das
+  Postgres-Verhalten". Beides zugleich ist unmöglich; die Sonde, auf die sie
+  sich beriefen, wandelte 02:30 hin und zurück und bekam 02:30 — das gilt für
+  **beide** Lesarten. Gegen UTC gemessen liefert Postgres 01:30Z = 02:30 CET =
+  die **zweite** Lesart. Übernommen wurde das Gemessene; tragend bleibt „genau
+  ein Termin". `design.md`, Spec-Delta und `tasks.md` sind nachgezogen.
+- **Der Rundruf läuft als Anweisungs-Trigger, nicht aus der RPC.** Ein Aufruf
+  von `hinweis_rundruf()` in der `INVOKER`-RPC hätte `authenticated` das
+  Ausführungsrecht darauf gekostet — wer sie aufrufen darf, schreibt an jedes
+  aktivierte Mitglied, beliebig oft.
+- **Der Hinweistyp bleibt `event_created`.** `hinweis_erwuenscht()` hat ein
+  `case` ohne `else` hinter `coalesce(…, true)`; ein eigener Typ ginge an
+  **jedes** Mitglied, auch an die mit abgeschaltetem `notify_app_event`.
+  Gemessen: die Mutation auf einen eigenen Typ lässt genau diese Zusage fallen.
+- **Die Anmeldungsprüfung in D7 ruht auf einer fremden Policy.**
+  `not exists (… event_registrations …)` läuft unter RLS und trägt nur, weil
+  `regs_select_self_or_host` dem Host die Anmeldungen seiner Events zeigt.
+  Steht im Migrationskopf; Wächter ist Zusage 5 in
+  `event_serie_aenderung_test.sql`.
+- **Gemessene Folge, keine Absicht:** ein verschobener, anmeldungsfreier
+  Zukunftstermin wird von der erneuten Erzeugung auf seinen Slot
+  zurückgeholt. Folgt zwingend aus D7. Als eigene Zusage festgehalten.
+- **`events.arten.test.ts` umgestellt** von „genau eine Constraint-Definition"
+  auf „alle sagen dasselbe" — strenger, nicht schwächer.
 
 ## Files modified
 
 | Pfad | Was |
 | --- | --- |
-| `openspec/changes/events-vorlagen-und-serientermine/proposal.md` | Warum, Umfang, Impact |
-| `…/design.md` | **2. Fassung** nach Review, D1–D8, gemessene Zeitzonenwerte |
-| `…/specs/events/spec.md` | Delta, 11 Requirements — u. a. Slot-Besetzung, Rundruf, Serienänderung |
-| `…/tasks.md` | 10 Gruppen; 1–3 abgehakt |
-| `…/REVIEWS.md` | beide Reviews, je Befund die Behandlung |
-| `supabase/migrations/20260906090000_event_vorlagen_und_serientermine.sql` | **neu** — Tabelle, komposit-FK, Indizes, Zeitzonen-Trigger |
-| `supabase/tests/event_vorlagen_test.sql` | **neu** — 21 Zusagen inkl. Sicherheitszusage + Positivkontrollen |
-| `supabase/tests/grants_test.sql` | Golden um `event_vorlagen` ergänzt |
-| `.github/workflows/ci.yml` | neue Testdatei in die Liste |
+| `supabase/migrations/20260907090000_event_serie_regel.sql` | **neu** — `event_serie_slots()` |
+| `…/20260907093000_event_serie_erzeugen.sql` | **neu** — die RPC |
+| `…/20260907100000_event_serie_aenderung.sql` | **neu** — D7-Aktualisierung |
+| `…/20260907103000_event_cover_lesbar_vorlagen.sql` | **neu** — zweiter Lese-Zweig |
+| `…/20260907110000_event_serie_cover.sql` | **neu** — `p_cover_pfade`, drop+Neuanlage |
+| `…/20260907113000_event_serie_rundruf.sql` | **neu** — Rundruf je Erzeugung |
+| `supabase/tests/event_serie_{regel,erzeugen,aenderung,cover,rundruf}_test.sql` | **neu** — 52 Zusagen |
+| `supabase/tests/rls_test.sql` | +5 Zusagen zum Vorlagen-Cover, plan 435 → 440 |
+| `src/lib/events.arten.test.ts` | Wächter auf „alle sagen dasselbe" |
+| `.github/workflows/ci.yml` | fünf neue pgTAP-Dateien in die Liste |
+| `openspec/changes/…/{design,tasks}.md`, `specs/events/spec.md` | Herbst-Korrektur, Gruppen 4–8 abgehakt |
 
 ## Next session: start here
 
-**Gruppe 4, die Wiederholungsregel — RED zuerst.** Die Datenschicht steht und
-ist grün; es fehlt die Auswertung der drei Regelformen. Erste Handlung: in
-`supabase/tests/` eine Datei für die Regel anlegen (oder
-`event_vorlagen_test.sql` erweitern) mit den **bereits verifizierten** Daten aus
-`specs/events/spec.md` — wöchentlich ab 01.09.2026 → 01./08./15./22.09.; erster
-Dienstag ab 09/2026 → 01.09., 06.10., 03.11., 01.12.2026 (kalendarisch geprüft,
-auch von opencode unabhängig nachgerechnet). Dazu die vier Grenzfälle:
-Monatsstart *ist* der gesuchte Wochentag (01.09.2026 ist ein Dienstag),
-`monatlich_tag = 31` überspringt Monate und zählt sie **nicht** in `anzahl`
-mit, Frühjahrslücke (02:30 → 03:30), Herbstüberlappung (genau ein Termin,
-erste Lesart). Erst danach die Auswertung bauen. Anschließend Gruppen 5–8 (RPC,
-Serienänderung, Cover, Rundruf) — Donald hat „durchlaufen" gesagt, also nicht
-nach jeder Gruppe rückfragen.
+**Gruppe 9, die Oberfläche — aber erst die offene Frage klären.** Der Rest ist
+gebaut und grün; es fehlt die UI und danach Gruppe 10 (Abnahme, Diff-Review,
+Archivieren). Erste Handlung: Donald fragen, ob die **Vorlagenliste eine eigene
+Seite** bekommt oder in die bestehende Eventverwaltung gehört — das entscheidet
+den Zuschnitt von 9.1 und ist nicht ableitbar.
 
-**Vor dem Messen:** `pnpm install --frozen-lockfile` (ein frischer Worktree hat
-keine `node_modules`), und der lokale Stack trägt die Migration bereits — sie
-wurde per `psql` eingespielt, **nicht** per `db reset`, weil der Stack geteilt
-ist und Objekte trägt, die in keiner Migration stehen.
+Was in Gruppe 9 sonst wartet, alles schon vorbereitet:
+`EventForm` und den bestehenden Cropper wiederverwenden (9.1); der
+Erzeugen-Dialog kann die Vorschau direkt aus `event_serie_slots()` holen, die
+Funktion trägt `grant execute` an `authenticated` (9.2); **die Client-Hälfte von
+7.7** — `storage.copy()` je Termin mit **UUID**-Namen vor dem RPC-Aufruf, die
+Reihenfolge der Pfade muss der nach `slot_datum` sortierten Slotliste
+entsprechen, die RPC prüft die Länge und weist Abweichungen mit 22023 ab; und
+`src/lib/database.types.ts` **von Hand** nachziehen, `supabase gen types` darf
+nicht darüberlaufen (9.4).
+
+**Vor dem Messen:** der lokale Stack trägt alle sechs Migrationen bereits (per
+`psql` eingespielt, **nicht** `db reset` — der Stack ist geteilt). Und:
+`supabase test db` mit der ganzen CI-Liste scheitert in diesem Worktree an der
+Pfadlänge (`NOTESTS`) und legt bei unquotierter Dateiliste Streuverzeichnisse
+unter `supabase/tests/` an, die danach `pnpm lint` mit `ENAMETOOLONG` töten. In
+Blöcken zu 7 fahren, Liste immer als Array übergeben.
 
 ## Open questions
 
 - **Vorlagenliste: eigene Seite oder in die bestehende Eventverwaltung?**
-  Reine Oberflächenfrage, blockiert das Datenmodell nicht.
+  Blockiert Gruppe 9, sonst nichts.
 - **Beim Löschen einer Vorlage anbieten, zukünftige leere Termine mitzunehmen?**
-  (Review NIEDRIG, gemini.) DB-Standard `set null` bleibt in jedem Fall das Netz.
-- **Cover-Größenverteilung im Bucket ist nicht gemessen.** Steht so in `design.md`
-  D5 — nachholen, falls jemand die Speicherkosten der Kopie-je-Termin bestreitet.
-- **`events.vorlage_id` ist für fremde Mitglieder lesbar** — Grobstruktur fremder
-  Serien ableitbar. Bewusst hingenommen, unter Risks vermerkt.
+  (Review NIEDRIG.) DB-Standard `set null` bleibt in jedem Fall das Netz.
+- **Cover-Größenverteilung im Bucket ist nicht gemessen** (design.md D5).
+- **`REVIEWS.md` trägt keinen signierten Trailer** — das §18-Gate meldet das bei
+  jedem Commit als `NOTE`, blockt aber nicht. Vor dem Archivieren nachziehen.
+- **`events.vorlage_id` ist für fremde Mitglieder lesbar** — bewusst
+  hingenommen, unter Risks vermerkt.
