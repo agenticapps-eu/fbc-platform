@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-04 (AGE-642 B3: Android-Signierung, Release-Workflow, PROD-Deploy)
+# Session Handoff — 2026-09-07 (AGE-642 B3: Environment, erster Release-Lauf)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
@@ -6,146 +6,107 @@
 > für alle parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
 > **nicht zusammenführen**, überschreiben.
 >
-> **2. AGE-605 ist vollständig zu** und blockiert nichts mehr. Der Deploy von
-> `main` war bis zum Abend des 04.09. gesperrt; die Sperre ist aufgehoben.
-> Einzelheiten unten, Vollständiges in `git show e1dd52a:session-handoff.md`
-> und in `openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/`.
-> Was von dort offen bleibt, liegt in **AGE-698** (Backlog).
+> **2. Sie ersetzt die Fassung vom 04.09. vollständig.** Deren offene Punkte
+> sind erledigt: das geschützte Environment steht, der Workflow ist gelaufen,
+> die drei Runner-Annahmen sind belegt. Wer die alte Fassung braucht:
+> `git show 12661a4:session-handoff.md`.
 >
-> **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
-> Phase E. Diese Datei bleibt der Überblick.
+> **3. Die Belege im Detail stehen NICHT hier**, sondern in
+> `openspec/changes/capacitor-huelle/tasks.md`, Abschnitt B3.
 
 ## Accomplished
 
-**B3, Android-Hälfte, vollständig — und auf PROD ausgeliefert.** Vier PRs,
-alle gemergt, CI grün.
+**Der Android-Release-Bau läuft, ist signiert und liegt als Artefakt vor.** Zwei
+PRs, beide gemergt.
 
 | PR | | |
 |---|---|---|
-| **#344** | `3d20063` | Android-Signierung + eigener Release-Workflow |
-| #345 · #347 · #348 | | Übergabe-Korrekturen (siehe „Was schiefging") |
+| **#354** | `118ed46` | Job hängt am geschützten Environment `android-release` |
+| **#355** | `6771279` | Signaturnachweis las den Fingerabdruck nach Feldposition |
 
-**Der Widerspruch der Aufgabe ist aufgelöst:** der Keystore darf nirgends im
-öffentlichen Repo liegen, muss dem Bau aber vorliegen → über die **ignorierten**
-Dateien, die der `native-secrets-guard` absichtlich nicht ansieht.
+**Das Environment** (Repository-Einstellung, in keinem Commit — über die API
+zurückgelesen, nicht behauptet):
 
-**Der stille Ausgang, der jetzt laut ist:** ohne `key.properties` bricht Gradle
-**nicht** ab, sondern schreibt klaglos ein unsigniertes Release-Artefakt.
+| Einstellung | Wert |
+|---|---|
+| Freigeber | `DonaldVl` |
+| `prevent_self_review` | `false` — muss aus bleiben, sonst kann niemand freigeben |
+| Admin-Bypass | `false` |
+| Freigabe-Refs | Branch `main`, Tag `android-v*` |
 
-**Gemessen, nicht behauptet:**
+**Zwei Läufe, der erste war der lehrreichere:**
 
-| Lauf | Material | Ausgang |
-|---|---|---|
-| `assembleRelease bundleRelease` | ja | BUILD SUCCESSFUL, APK + AAB signiert |
-| `assembleRelease` | **nein** | exit 1 bei `packageReleaseResources`, **kein Artefakt** |
-| `assembleDebug` | nein | exit 0 — unberührt |
+| Lauf | Ausgang |
+|---|---|
+| `34090816888` | rot in `Signatur nachweisen` — **die Meldung war falsch** |
+| `34092615595` | grün, alle 14 Schritte, APK + AAB hochgeladen |
 
-`apksigner` meldet SHA-256 `7ae18622…2fda`, zeichengleich mit dem Keystore.
-Kette reproduziert: beide Dateien gelöscht, aus `infisical run --env=prod` neu
-erzeugt → derselbe Fingerabdruck.
+Der rote Lauf meldete „Signiert mit dem falschen Schluessel". Der Schlüssel
+stimmte; gescheitert war der Parser. Behoben in #355.
 
-**PROD-Deploy durch** (angestoßen von der AGE-605-Sitzung, von mir unabhängig
-gegengemessen): `migrate-prod` 33911148557 grün, danach `Deploy` 33904874723
-mit allen vier Jobs grün. `app.effbeezee.com` liefert
-`assets/index-GEx8cTIJ.js` als `application/javascript`; Negativkontrolle auf
-einen erfundenen Pfad liefert `text/html`, der SPA-Fallback ist ausgeschlossen.
-OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD.
+**Belegt statt behauptet:** `apksigner` liest lokal am **heruntergeladenen**
+Artefakt denselben Fingerabdruck `7ae18622…2fda`; das Artefakt enthält genau
+zwei Dateien, kein Signaturmaterial; `assets/capacitor.plugins.json` im APK
+listet alle fünf Plugins.
 
 ## Decisions
 
-- **Der Keystore ist NICHT unersetzlich.** Stand dreimal falsch da (proposal,
-  Delta, Linear-Beschreibung) — alle drei korrigiert. Play App Signing ist für
-  neue Apps verpflichtend, Google hält den App-Signaturschlüssel, unserer ist
-  der **Upload**-Schlüssel und über die Play Console zurücksetzbar. Sicherung
-  bleibt gefordert, aus schwächerem Grund. **Nicht neu aufrollen.**
-- **Infisical + eine Offline-Kopie** (Donald, 04.09.), nicht Tresor-Disziplin.
-- **Android zuerst, iOS eigener Vorgang** (Donald, 04.09.).
-- **`versionCode` bewusst NICHT mitgenommen** — das Schema ist eine Entscheidung
-  und verzahnt sich mit `version_build` des OTA-Wegs.
-- **`ERWARTETER_FINGERABDRUCK` im Workflow**, nachträglich auf Reviewer-Befund:
-  `apksigner verify` allein belegt nur, *dass* signiert wurde, nicht *womit*.
-- **`package` in der Gradle-Aufgabenliste**, nicht nur `assemble`/`bundle`:
-  sonst läuft `packageRelease` vorher durch und lässt `app-release-unsigned.apk`
-  im Ausgabeordner liegen.
-
-## Handgriffe, die nur Donald tun kann
-
-1. ~~Offline-Kopie des Keystores aus `~/Downloads` wegräumen~~ — **erledigt
-   (Donald, 05.09.)**, nachgemessen: Ordner weg, kein `*.jks` mehr in
-   `~/Downloads`, Infisical `prod` hält alle vier `ANDROID_*`-Werte weiter. Wo
-   die Kopie jetzt liegt, weiß nur Donald — das steht bewusst nirgends im Repo.
-2. **Geschütztes GitHub-Environment für `android-release`** — Repository-
-   Einstellung, kein Diff. Siehe Open questions. **Noch offen.**
+- **Freigabe per API statt Klick** (Donald, 07.09.), nachdem ich den Einwand
+  vorgetragen hatte. Der Kommentar im Freigabe-Protokoll sagt deshalb
+  ausdrücklich, wie sie zustande kam — sonst wäre sie von einem Klick nicht zu
+  unterscheiden.
+- **Die Freigeber-Regel ist eine Selbstfreigabe** und wird als solche
+  dokumentiert. Es gibt genau einen Kollaborator mit Schreibrecht; die Regel
+  kauft Pause und Protokoll, kein Vier-Augen-Prinzip. Die Regel, die ohne
+  zweiten Menschen bindet, ist die **Ref-Liste**.
+- **`INFISICAL_TOKEN` bleibt Repo-Secret.** `deploy.yml` braucht es und läuft
+  auf `pull_request` — der Token ist aus jedem Same-Repo-PR erreichbar. Das
+  Environment schützt den Workflow, nicht den Token. Eigener Vorgang.
+- **`production` bleibt ungeschützt** (`migrate-prod.yml`), Entscheidung vom
+  05.08. steht. Nicht mitgezogen.
 
 ## Files modified
 
-Siehe **PR #344**, 13 Dateien. Die drei, die zählen:
-`scripts/android-keystore{,.logic}.ts` (+ 3 Testdateien) ·
-`android/app/build.gradle` · `.github/workflows/android-release.yml`.
-Dazu `scripts/firebase-config{,.logic}.ts` — die Herkunftsangabe sagte fest
-„Umgebung dev", der Release-Bau ruft jetzt auch mit `prod`.
+- `.github/workflows/android-release.yml` — `environment: android-release` am
+  Job; Kommentarkopf sagt jetzt, welche der zwei Regeln ohne zweiten Menschen
+  bindet und dass der Token unberührt bleibt; Fingerabdruck wird als Hex-Wert
+  gelesen, Rohzeile ins Log, zwei Ausgänge = zwei Meldungen.
+- `openspec/changes/capacitor-huelle/tasks.md` — B3: Environment abgehakt, die
+  beiden Läufe und die drei belegten Runner-Annahmen nachgetragen.
 
 ## Next session: start here
 
-**`workflow_dispatch` auf `android-release` auslösen.** Der Workflow ist
-vollständig und lokal Ende zu Ende belegt, aber **nie gelaufen**. Offen sind
-genau drei Runner-Annahmen, gut einzeln abhakbar:
+**`versionCode` steht auf `1`.** Das AAB ist genau **einmal** zu Play
+hochladbar; jeder weitere Upload wird mit „Version code 1 has already been
+used" abgelehnt. Das Schema ist eine Entscheidung (Tag? Lauf-Nummer? eigene
+`VERSION`?) und verzahnt sich mit `version_build` des OTA-Wegs, der
+semver-förmig sein muss. **Gehört vor die erste Einreichung**, und M4 hängt
+daran.
 
-1. `android-actions/setup-android` bringt Build-Tools mit, die `apksigner` findet
-2. `jarsigner` aus `setup-java` steht im PATH
-3. `pnpm exec cap sync android` verdrahtet auf dem Runner dieselben fünf Plugins
+**Dependabot #349–#351 sind freigegeben.** Sie heben `setup-java` 4.7.1→6.0.0,
+`upload-artifact` 4.6.2→7.0.1 und `setup-android` 3.2.2→4.0.1 — alle drei
+Major, alle drei von diesem Workflow gepinnt. Die Sperre lautete „erst den
+ersten Lauf grün sehen"; der ist grün. Nach dem Heben **einen Lauf gegenprüfen**,
+sonst ist ein späterer Fehlschlag nicht zuzuordnen.
 
-> ⚠ **Dependabot hat über Nacht #349–#351 geöffnet** und will genau die drei
-> Actions heben, die dieser Workflow pinnt (`setup-java` 4.7.1→6.0.0,
-> `upload-artifact` 4.6.2→7.0.1, `setup-android` 3.2.2→4.0.1) — alle drei
-> **Major**-Sprünge. **Erst den ersten Lauf grün sehen, dann heben.** Sonst ist
-> ein Fehlschlag nicht mehr zuzuordnen. #352/#353 sind normale Dependency-Gruppen.
+> ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Die Automatik liest
+> das Kürzel im PR-Titel. Am 06. und 07.09. je einmal zurückgesetzt; in der
+> Statushistorie ist das der 26. Wechsel dieser Art. Nach jedem Merge nachsehen.
 
-Danach **`versionCode`** — es steht auf `1`, das Artefakt ist genau **einmal**
-zu Play hochladbar.
-
-> ⚠ **Squash-Falle, am 04.09. dreimal eingetreten:** PRs aus diesem Branch
-> werden squash-gemergt. Der Squash-Commit ist damit kein Vorfahr des Branches,
-> git sieht alle Dateien als „beidseitig geändert", und der NÄCHSTE PR meldet
-> `CONFLICTING` bei identischen Bäumen. Heilmittel nach jedem Merge:
-> `git diff origin/main HEAD` prüfen — ist er leer, gefahrlos
-> `git reset --hard origin/main`. Nicht mergen, das verdoppelt nur die Historie.
-
-> ⚠ **Java-Falle:** Android Studios JBR ist Java **25**, Gradle 8.14.3 bricht
-> daran mit `Unsupported class file major version 69` ab. Lokal
-> `JAVA_HOME=/opt/homebrew/opt/openjdk@21`. `/usr/bin/keytool` ohne JAVA_HOME
-> ist nur ein Stub.
-
-## Was schiefging — damit es sich nicht wiederholt
-
-Drei der vier PRs waren Korrekturen an Doku, die ich kurz zuvor selbst
-geschrieben hatte. **Zwei der drei Fehler hat die AGE-605-Sitzung gefunden,
-nicht ich.** Ursachen, alle behoben:
-
-- `git push` in eine Pipe → Exit-Code verschluckt, PR entstand gegen einen nicht
-  gepushten Commit und zeigte auf bereits Gemergtes. **Zustandsändernde
-  git-Befehle nie pipen.**
-- Warteschleife, die ein **leeres** Statusfeld für ein Ergebnis hielt. Auf
-  `status == "completed"` warten, nicht auf „nicht in_progress". `gh pr checks`
-  zeigt ausserdem minutenlang veraltete Daten — `gh run view` ist die Wahrheit.
-- Zeitkritische Sätze punktuell statt im Durchgang geprüft. Bei jeder
-  Doku-Korrektur das **ganze** Dokument auf `gilt weiter` / `blockiert` /
-  `steht aus` / PR-Nummern absuchen.
+> ⚠ **Squash-Falle, weiterhin scharf.** Nach jedem Merge `git diff origin/main
+> HEAD` prüfen — ist er leer, `git reset --hard origin/main`. Der Remote-Branch
+> steht danach auf der Vor-Squash-Historie; der nächste Push braucht
+> `--force-with-lease`.
 
 ## Open questions
 
-- **Geschütztes GitHub-Environment für `android-release`.** Beide Auslöser bauen
-  den Ref, auf dem sie stehen — wer ein Tag setzen kann, führt Code mit Zugriff
-  auf die prod-Geheimnisse aus. Keine **neue** Fläche (`deploy.yml` trägt
-  denselben Token), aber die Stelle, an der sie sich verengen ließe.
-- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
-  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur
-  im neuen Workflow löst, erzeugte zwei Wahrheiten.
 - **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat.** Vor
   der Store-Einreichung am **Release**-Bau gegenprüfen. Eigener Vorgang.
+- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
+  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6.
+- **Bildupload auf iOS** ist ungeprüft — die Ursache war capgo, nicht Android.
+  Ableitung, keine Messung.
+- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung:
+  zuletzt.
 - **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
   **Realtime im Chat** ist weiterhin ungemessen.
-- **Bildupload auf iOS** ist ungeprüft — die Ursache war capgo, nicht Android,
-  iOS ist also vermutlich betroffen. Ableitung, keine Messung. **B5
-  Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung: zuletzt.

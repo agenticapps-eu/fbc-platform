@@ -513,6 +513,61 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
       meldet `can_admins_bypass: false` und `required_reviewers: [DonaldVl]`;
       `…/deployment-branch-policies` meldet `branch main` und `tag android-v*`.
 
+- [x] **Der Workflow ist gelaufen — zweimal, und der erste Lauf war der
+      wertvollere.** Bis zum 07.09. stand hier „nie gelaufen"; das gilt nicht
+      mehr.
+
+      | Lauf | Ausgang |
+      |---|---|
+      | `34090816888` | **rot** in `Signatur nachweisen` — und die Meldung war falsch |
+      | `34092615595` | **grün**, alle 14 Schritte, Artefakte hochgeladen |
+
+      **Der rote Lauf meldete „Signiert mit dem falschen Schluessel" und log
+      damit über die Ursache.** Der Schlüssel stimmte; gescheitert war der
+      Parser, der ihn lesen sollte: `awk -F': ' {print $2}` nimmt an, dass vor
+      dem Hash genau EIN `": "` steht. Lokal trifft das zu (build-tools 35.0.0
+      und 36.0.0, beide gemessen: `Signer #1 certificate SHA-256 digest: …`),
+      auf dem Runner nicht — dort steht `V2 Signer: certificate SHA-256 digest:
+      …`, ein Doppelpunkt mehr, und `$2` war der Text statt des Werts.
+
+      Behoben in **PR #355**: der Fingerabdruck wird als 64-stelliger Hex-Wert
+      gelesen statt nach Feldposition, die Rohzeile geht ins Log, und
+      **„nicht lesbar" und „falscher Schlüssel" sind jetzt zwei Meldungen.**
+      Das ist der eigentliche Fix — ein Parser-Befund, der als Aussage über den
+      Schlüssel auftritt, schickt den nächsten Leser zu Infisical statt zum
+      `awk`. Sechs Fälle gegengeprüft, inklusive Negativkontrollen; die
+      Großschreibung zeigte denselben Fehlertyp ein zweites Mal und ist mit `tr`
+      geschlossen.
+
+      **Die drei offenen Runner-Annahmen sind damit alle belegt:**
+
+      | Annahme | Beleg |
+      |---|---|
+      | `setup-android` bringt Build-Tools, die `apksigner` findet | ja — er lief schon im roten Lauf |
+      | `jarsigner` steht im PATH | ja — „AAB verifiziert." im grünen Lauf |
+      | `cap sync` verdrahtet dieselben fünf Plugins | ja — **am Artefakt**, siehe unten |
+
+      Die dritte **nicht** an `cap ls` geprüft, sondern am ausgelieferten APK:
+      `assets/capacitor.plugins.json` listet `@capacitor/app`,
+      `@capacitor/camera`, `@capacitor/preferences`,
+      `@capacitor/push-notifications` und `@capgo/capacitor-updater` — fünf von
+      fünf, deckungsgleich mit `package.json`. `cap ls` meldet Plugins, die noch
+      gar nicht verdrahtet sind; der Fehlermodus ist Schweigen.
+
+      **Zwei unabhängige Gegenproben am heruntergeladenen Artefakt**, damit die
+      Prüfung nicht bloss mit sich selbst einig ist:
+
+      - lokaler `apksigner` liest denselben Fingerabdruck `7ae18622…2fda`
+      - das Artefakt enthält genau **zwei** Dateien, kein Keystore, kein
+        `key.properties` — in einem öffentlichen Repo die wichtigere der beiden
+
+      **Das Environment-Gate hat bei beiden Läufen gehalten:** Status `waiting`,
+      kein Checkout, kein Secret im Job, bis die Freigabe erteilt war.
+
+      **Folge für Dependabot:** #349–#351 (`setup-java`, `upload-artifact`,
+      `setup-android`, alle drei Major) waren zurückgestellt, bis ein grüner
+      Lauf existiert. Der existiert jetzt — sie sind freigegeben.
+
 - [ ] **OFFEN, und M4 hängt daran: `versionCode` steht auf `1`.**
       `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
       `versionName "1.0"`). Der Workflow baut damit ein Artefakt, das sich genau
