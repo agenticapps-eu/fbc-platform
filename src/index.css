@@ -377,3 +377,72 @@ footer.fbc-shell-offset {
     transform: none;
   }
 }
+
+/* ══ DIE BOOT-FLÄCHE (AGE-642, B5) ══════════════════════════════════════════
+ *
+ * Sie überbrückt die Lücke zwischen dem nativen Startbildschirm und dem ersten
+ * Bild der Anwendung. Das Markup steht in `index.html` INNERHALB von `#root`;
+ * hier steht nur, wie es aussieht — und ob es überhaupt zu sehen ist.
+ *
+ * Die Vorgabe ist `display: none`, und das ist die eigentliche Zusage dieses
+ * Blocks: ohne `html[data-boot="nativ"]` (gesetzt vom Inline-Skript im `<head>`,
+ * nur nativ) greift KEINE Regel mit einem `url()`. Der Browser lädt die beiden
+ * Bilder deshalb nie — anders als bei einem `<img>`, das auch unter
+ * `display: none` geladen würde.
+ *
+ * Die Geometrie ist dieselbe wie im Storyboard, und die Zahlen stehen als
+ * benannte Konstanten in `scripts/splash.logic.ts`:
+ *   BAND_ANTEIL 0.62 · SCHRIFTZUG_OBEN 0.58 · SCHRIFTZUG_HOEHE 0.25 · 32 pt links
+ * Alles in Prozent der Höhe, nicht in Punkten — die App erlaubt Hoch- und
+ * Querformat, und der Startbildschirm hängt aus demselben Grund am Verhältnis.
+ */
+.boot-flaeche {
+  display: none;
+}
+
+html[data-boot="nativ"] .boot-flaeche {
+  display: block;
+  position: fixed;
+  inset: 0;
+  /* Der Grundton des Storyboards, ausdrücklich weiss und nicht `--color-soft`:
+     die untere Hälfte beider Flächen muss dieselbe Farbe tragen, sonst springt
+     sie beim Übergang. Gemessen: Storyboard #ffffff gegen body #f6f8fb. */
+  background-color: #ffffff;
+}
+
+html[data-boot="nativ"] .boot-flaeche__band {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 62%;
+  /* Zwei Ebenen in einer Regel — im Storyboard sind es zwei ImageViews:
+     die Rampe DARÜBER, das Foto darunter. Die vier Stopps sind die des
+     Login-Panels (`RAMPE` in `scripts/splash.logic.ts`, `LoginPage.tsx:277`);
+     zwei ergäben bei 26 % eine sichtbare Kante. */
+  background-image:
+    linear-gradient(
+      0deg,
+      #ffffff 0%,
+      #ffffff 22%,
+      rgb(255 255 255 / 0.7) 32%,
+      rgb(255 255 255 / 0.25) 44%,
+      rgb(255 255 255 / 0) 58%
+    ),
+    url("/brand/splash-band.webp");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size:
+    100% 100%,
+    cover;
+}
+
+html[data-boot="nativ"] .boot-flaeche__schriftzug {
+  position: absolute;
+  top: 58%;
+  left: 32px;
+  right: 0;
+  height: 25%;
+  /* `auto 100%` statt `aspect-ratio`: das Bild trägt sein Verhältnis (1,2)
+     selbst, damit deckt es den Rahmen des Storyboards genau — und es braucht
+     keine CSS-Eigenschaft, die ältere WebViews nicht kennen. */
+  background: url("/brand/splash-schriftzug.png") no-repeat left top / auto 100%;
+}

@@ -775,18 +775,133 @@ betroffenen Punkten.
       Favicon gelesen und nicht abgeschrieben ist. Mit Mutations-Gegenprobe:
       Rampe auf zwei Stopps · Schriftzug über die Invariante geschoben · Marke
       fest verdrahtet → jeweils rot.
-- [ ] **Boot-Fläche: die Entscheidung fällt im `<head>`, nicht im Anwendungscode.**
-      *Aus der Review (opencode, MEDIUM), und der Befund war richtig:* Inhalt in
-      `#root` steht im ausgelieferten Dokument und wird gezeichnet, **bevor**
-      irgendein Modul lädt — `Capacitor.isNativePlatform()` käme zu spät, und die
-      Boot-Fläche erschiene auch im Browser. Das Inline-Skript im `<head>`, das
-      heute schon vor dem First Paint die Design-Variante setzt, entscheidet es
-      mit. **Erst messen, ob die Lücke überhaupt sichtbar ist** — sie ist heute
-      weiß auf weiß.
+- [x] **Gemessen am 07.09. — und „weiß auf weiß" gilt nur für das untere
+      Drittel.** Die Lücke ist genau das ausgelieferte Dokument OHNE ausgeführtes
+      JavaScript; so ist sie auch aufgenommen (CDP,
+      `Emulation.setScriptExecutionDisabled`, 390×844@3x), statt aus dem CSS
+      abgeleitet zu werden. Regionsweise gemessen wie beim RED oben, nicht als
+      Mittelwert:
+
+      | Region | Startbildschirm | Boot-Fläche | App |
+      |---|---|---|---|
+      | oberste 20 % | `#b8b7ad`, Streuung **67** | `#f6f8fb`, Streuung **0** | `#dbdee4`, Streuung 59 |
+      | Mitte 48–52 % | `#ffffff`, Streuung 1 | `#f6f8fb`, Streuung 0 | `#b0b0b3`, Streuung 85 |
+      | unterste Zeile | `#ffffff`, Streuung 0 | `#f6f8fb`, Streuung 0 | `#ced3db`, Streuung 56 |
+
+      **Unten stimmt die Behauptung:** Storyboard-Grundton `#ffffff` gegen
+      `body { background-color: var(--color-soft) }` = `#f6f8fb` — 9/7/4 in
+      8 Bit, das sieht niemand. **Oben stimmt sie nicht:** dort weicht ein Foto
+      (Streuung 67) einer vollkommen leeren Fläche (Streuung 0). Foto,
+      Schriftzug und Claim verschwinden gleichzeitig, und es kommt nichts nach.
+
+      **Wie lange**, am gebauten Bündel über `vite preview` gemessen, Lücke =
+      `first-contentful-paint` − `first-paint`:
+
+      | CPU-Bremse | first-paint | `#root` gefüllt | FCP | **leer** |
+      |---|---|---|---|---|
+      | 1× (dieser Mac) | 40 ms | 65 ms | 80 ms | **40 ms** |
+      | 4× | 40 ms | 146 ms | 172 ms | **132 ms** |
+      | 6× | 52 ms | 238 ms | 280 ms | **228 ms** |
+
+      Das ist Desktop-Chrome mit Bremse, **kein Gerät**. Die Bremse steht für
+      den Abstand Mac↔Telefon, sie misst ihn nicht; und was capgo beim Auflösen
+      des Bündels vor dem ersten Paint kostet, ist hier gar nicht enthalten. Die
+      Zahl am Gerät ist eher grösser als kleiner.
+- [x] **Entschieden (Donald, 07.09.): füllen, und zwar den Startbildschirm
+      nachgebaut.** Die Zwischenlösung „nur den Grundton auf `#ffffff`" ist
+      verworfen — die eigene Messung oben sagt, dass sie genau die Stelle
+      repariert, die man ohnehin nicht sieht.
+- [x] **Gebaut.** Markup in `index.html` **innerhalb von `#root`**, Regeln in
+      `src/index.css`, freigeschaltet von einem zweiten Inline-Skript im
+      `<head>`. *Aus der Review (opencode, MEDIUM), und der Befund war richtig:*
+      im Anwendungscode käme die Entscheidung zu spät.
+- [x] **`window.Capacitor` steht dem `<head>`-Skript zur Verfügung** — Capacitor
+      spritzt `native-bridge.js` vor jedem Skript des Dokuments ein: iOS als
+      `WKUserScript` mit `injectionTime: .atDocumentStart`
+      (`JSExport.swift:20,107`), Android über
+      `WebViewCompat.addDocumentStartJavaScript` (`Bridge.java:266`). **Und wenn
+      nicht**, fällt der Ausdruck auf `false`: das Attribut bleibt weg, es gilt
+      das Verhalten von vorher. Ein Fehlschlag kostet die Verbesserung, nicht
+      die Anwendung.
+- [x] **Sie steht in `#root`, damit React sie selbst wegräumt.** Kein
+      Aufräum-Code, der vergessen werden kann — und sie verschwindet in
+      demselben Bild, in dem die Anwendung erscheint, nicht davor. **Gemessen,
+      nicht angenommen:** die Aufnahme nach dem Einschwingen misst regionsweise
+      exakt die Werte der App ohne Boot-Fläche (`#dbdee4`/59 · `#b0b0b3`/85 ·
+      `#ced3db`/56).
+- [x] **Im Browser kostet sie null Bytes.** Die zwei Bilder hängen an
+      CSS-`url()` unter `html[data-boot="nativ"]` und nicht an `<img>` — ein
+      `<img>` würde auch unter `display: none` geladen. **Am Netzwerk gemessen**
+      (CDP, `Network.requestWillBeSent`): ohne Capacitor **0** Bildanfragen, mit
+      gestelltem Capacitor **2**.
+- [x] **Die Bilder kommen aus `pnpm splash`, aus derselben SVG-Quelle wie die
+      nativen** — keine zweite Geometrie im CSS. Neu sind zwei Web-Fassungen in
+      `public/brand/`: `splash-band.webp` (41,6 kB) und `splash-schriftzug.png`
+      (42,2 kB), zusammen **83,8 kB**. Die nativen Dateien sind dabei
+      **byte-gleich geblieben** (`git status ios/` leer).
+
+      | | JPEG q80 | **WebP q80** |
+      |---|---|---|
+      | Band, 900 px breit | 154.860 B | **41.600 B** |
+
+      Deshalb `cwebp` als viertes Werkzeug des Skripts (`brew install webp`).
+      Die native Fassung bleibt JPEG — der Asset-Katalog will sie so. Der
+      Schriftzug bleibt PNG: Text auf durchsichtigem Grund, dort sieht man
+      verlustbehaftete Kanten.
+- [x] **Der Schriftzug ist ein BILD und kein Text**, und das ist gemessen
+      begründet: alle vier `@font-face` stehen auf `font-display: swap`, im
+      `<head>` wird nichts vorgeladen. Als Text käme er zuerst in einer
+      Ersatzschrift und spränge dann um — mitten in dem Moment, den die Fläche
+      glätten soll.
+- [x] **Beleg: die Boot-Fläche trifft den Startbildschirm regionsweise.**
+      Aufgenommen am gebauten Bündel, mit gesperrtem Einstiegsmodul — also die
+      Fläche im Stillstand, nicht nachgestellt:
+
+      | Region | Startbildschirm | Boot-Fläche | Browser |
+      |---|---|---|---|
+      | oberste 20 % | `#b8b7ad`, Streuung 67 | `#b8b7ac`, Streuung 67 | `#f6f8fb`, 0 |
+      | Mitte 48–52 % | `#ffffff`, 1 | `#ffffff`, 1 | `#f6f8fb`, 0 |
+      | unterste Zeile | `#ffffff`, 0 | `#ffffff`, 0 | `#f6f8fb`, 0 |
+
+      Ein Bit Abweichung im Blaukanal des Mittelwerts, aus der WebP-Quantisierung.
+- [x] **GREEN:** acht Zusagen in `src/boot-flaeche.test.ts` über `index.html`,
+      `src/index.css` und `splash.logic.ts`. Mit Gegenprobe, sechs Mutationen,
+      **alle rot**: Fläche aus `#root` herausgeschoben · Vorgabe `display: none`
+      entfernt · nativer Wächter aus einem Selektor gestrichen · Bandhöhe 62 %
+      auf 60 % · ein Stopp der Rampe gestrichen · Dateiname im CSS verdreht.
+- [x] **Abnahme:** `pnpm typecheck` 0, `pnpm lint` **Exit 0** (7 Warnungen,
+      alle bestehend), `pnpm test` **2605/2605** in 232 Dateien,
+      `native-secrets-guard` (1526 Dateien) und `entry-chunk-guard` grün.
+- [ ] **Offen: der Beleg am Gerät.** Alles oben ist am gebauten Bündel im
+      Desktop-Chrome gemessen. Ob `window.Capacitor` im `<head>` am echten
+      Gerät steht, kann nur das Gerät sagen — und es ist der eine Punkt, an dem
+      diese Fläche still ausfallen würde.
 - [ ] **Beleg auf dem Gerät, NACH dem Löschen der App.** *Aus der Review (beide,
       LOW/MEDIUM):* iOS hält den Startbildschirm in einem Zwischenspeicher; ein
       Beleg ohne vorheriges Löschen zeigt womöglich die alte Fläche und belegt
       nichts. Bildschirmfoto im Hoch- **und** im Querformat.
+
+      ⚠ **Und er hat eine Vorgeschichte, die fast verlorengegangen wäre.** Am
+      29.08. stand in der Übergabe (`8710c18:session-handoff.md:125`) die
+      Beobachtung:
+
+      > **Startbildschirm erscheint nicht** — Verdacht eins bleiben die von Hand
+      > geschriebenen Constraints, Zwischenspeicher des Launch Screens die
+      > zweite Spur. Erst die Marke.
+
+      `746f5f7` hat sie einen Tag später beim Neuschreiben der Übergabe
+      entfernt; in `tasks.md` ist sie nie angekommen. Wiedergefunden am 07.09.,
+      und nur, weil Donald sich an sie erinnerte. **Deshalb steht sie jetzt
+      hier.**
+
+      Nachgeprüft, so weit es ohne Gerät geht: **Verdacht eins hält nicht.**
+      `Info.plist` trägt `UILaunchStoryboardName = LaunchScreen`, das Storyboard
+      hat `launchScreen="YES"`, `initialViewController`, `useSafeAreas` und alle
+      drei Bilder unter `<resources>`; die Constraints sind vollständig. Und die
+      Beobachtung ist **vom 29.08., die Marken-Startfläche entstand am 30.08.** —
+      damals war dort noch Capacitors weisses PNG, und „erscheint nicht" ist bei
+      einer weissen Fläche vor einem weissen WebView von „erscheint" nicht zu
+      unterscheiden. Sie wurde seither nie wiederholt.
 - [x] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
       **Gemessen am 31.08. mit `actool` (Xcode 26.6), also am KOMPILIERTEN
       `Assets.car` und nicht an den Quelldateien** — die beiden Zahlen gehen
@@ -2140,16 +2255,6 @@ eigenen Vorgang, nicht fuer diesen Fix.
       Das habe ich bewusst nicht getan: es setzte ein Foto einer dunklen Flaeche
       als Donalds Profilbild auf PROD. Der Messpunkt dafuer steht in der
       Uebergabe (`storage.objects`, Bucket `avatars`).
-
-**Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
-nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
-die Uebernahme, bis die App wirklich beendet und neu gestartet wird;
-`cancelDelay()` nimmt das zurueck. Um den nativen Rundlauf gelegt, kann kein
-Wechsel mehr hineinplatzen — und `bilderVonQuelle` ist seit C3 der EINE
-Aufrufpunkt, durch den jeder Bildweg geht. Die Alternative waere
-`directUpdate: true` (Uebernahme beim Start statt beim Zurueckkommen), das aber
-jeden Start um den Wechsel verlaengert und weit ueber den Bildupload hinausgeht.
-**Entscheidung steht aus, Code ist noch keiner geschrieben.**
 
 ## Vor dem Abschluss
 
