@@ -74,10 +74,29 @@
 
 ## 9. Oberfläche
 
-- [ ] 9.1 Vorlagenliste und -formular; `EventForm` und den bestehenden Cropper wiederverwenden, nicht ersetzen
+- [x] 9.1 Vorlagenliste und -formular als **vierter Reiter unter `/events`** — keine
+      eigene Seite und kein Menüpunkt (Donald, 07.09.). Der Ort folgt zwei
+      dokumentierten Vorgängern in `src/config/nav.ts`: AGE-442 legte „Meine
+      Events" als dritten Reiter hierher, ausdrücklich mit „keine weitere
+      Unterseite", und AGE-494 entfernte mehrere Menüpunkte, weil ein eigener
+      Eintrag daneben „ein dritter Weg zum selben Ort" sei.
+      `VorlageForm` ist bewusst ein **Zwilling** von `EventForm` und kein Umbau
+      davon: ein Event hat einen Zeitpunkt, eine Vorlage eine Uhrzeit plus Regel
+      und gar kein Datum. Wiederverwendet sind die Feld-Bausteine und der
+      `EventCoverPicker` samt Cropper — es gibt keinen zweiten Zuschnitt.
+- [x] 9.1a **Fund beim Bauen, mitbehoben:** bei null Events ersetzte der
+      Leerzustand die ganze Reiterleiste (`EventsList.tsx`). Der neue Reiter
+      wäre damit genau in dem Zustand unerreichbar gewesen, in dem man ihn
+      braucht — erste Vorlage angelegt, noch kein Termin erzeugt. Angemeldet ist
+      der Leerzustand jetzt der **Inhalt des ersten Reiters** statt dessen
+      Ersatz; ausgeloggt bleibt alles wie bisher, dort gäbe es nur einen Reiter
+      mit demselben Inhalt. Die Meldung selbst steht wortgleich weiter (AGE-494).
 - [ ] 9.2 Erzeugen-Dialog mit Regelauswahl, Anzahl bzw. Enddatum und einer Vorschau der Termine vor dem Schreiben
 - [ ] 9.3 Serienzugehörigkeit am Event sichtbar machen
-- [ ] 9.4 `src/lib/database.types.ts` **von Hand** nachziehen — `supabase gen types` darf nicht darüberlaufen
+- [x] 9.4 `src/lib/database.types.ts` **von Hand** nachgezogen — `events` um
+      `vorlage_id`/`slot_datum` und den ZUSAMMENGESETZTEN Fremdschlüssel
+      `(vorlage_id, host_id)`, dazu `event_vorlagen` und die zwei Funktionen.
+      `supabase gen types` ist NICHT darübergelaufen (AGE-498).
 
 ## 10. Wächter und Abnahme
 
