@@ -98,14 +98,25 @@ Gegen den lokalen Stack, mit Beleg dass die App wirklich lokal hängt
 
 ## Next session: start here
 
-**Der Branch ist fertig und noch nicht gepusht.** 15 Commits vor `origin/main`,
-0 dahinter, Arbeitsbaum sauber. Erste Handlung: `git push -u origin
-donald/age-630-event-vorlagen-und-serien` und PR gegen `main` — **das war die
-Frage an Donald am Ende dieser Sitzung; sie ist nicht beantwortet.**
+**PR [#359](https://github.com/agenticapps-eu/fbc-platform/pull/359) ist offen
+und wartet auf die Freigabe.** Donald hat Push und PR am 07.09. ausdrücklich
+freigegeben; **gemergt ist nichts**.
 
-Danach: CI abwarten, mergen, `wt remove`. Und **nach dem Merge in Linear
-nachsehen** — die Automatik kippt AGE-630 auf Done, sobald das Kürzel im
-PR-Titel steht.
+Der erste CI-Durchlauf war **komplett grün** — vier Pflichtchecks (`verify`,
+`migrations`, `pr-title`, `edge-functions`) plus `deploy`; `migrate-dev`,
+`functions` und `drift-gate` übersprungen. `migrations` fuhr die **ganze**
+CI-Liste gegen eine frische Datenbank: `Files=34, Tests=1269, Result: PASS` —
+das ist der Lauf, den dieser Worktree lokal nicht fahren kann (Pfadlänge).
+
+**Danach hat `main` sich noch einmal bewegt** (#358, AGE-642), der PR ging auf
+`CONFLICTING`. Erneut rebased, kollidiert war wieder **nur**
+`session-handoff.md`. Der Push danach braucht `--force-with-lease`, und CI läuft
+neu — **das Ergebnis dieses zweiten Laufs ist zu prüfen**, das erste Grün gilt
+für die alte Basis.
+
+Erste Handlung der nächsten Sitzung: `gh pr checks 359`. Dann mergen (mit
+Donalds Freigabe), `wt remove`, und **in Linear nachsehen** — die Automatik
+kippt AGE-630 auf Done, sobald das Kürzel im PR-Titel steht. Es steht drin.
 
 > ⚠ **`supabase test db` mit der ganzen CI-Liste scheitert in diesem Worktree an
 > der Pfadlänge** (`NOTESTS`) und legt bei unquotierter Dateiliste
