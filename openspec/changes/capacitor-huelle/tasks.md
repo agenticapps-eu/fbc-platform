@@ -566,16 +566,62 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
 
       **Folge für Dependabot:** #349–#351 (`setup-java`, `upload-artifact`,
       `setup-android`, alle drei Major) waren zurückgestellt, bis ein grüner
-      Lauf existiert. Der existiert jetzt — sie sind freigegeben.
+      Lauf existiert. Der existiert jetzt — sie sind freigegeben, aber
+      **einzeln, mit einem `android-release`-Lauf nach jedem** (entschieden
+      07.09.). Bei allen dreien auf einmal wäre ein Fehlschlag zwischen drei
+      Major-Sprüngen nicht zuzuordnen.
 
-- [ ] **OFFEN, und M4 hängt daran: `versionCode` steht auf `1`.**
+- [x] **`versionCode` kommt aus der CI-Laufnummer** (entschieden 07.09.).
       `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
       `versionName "1.0"`). Der Workflow baut damit ein Artefakt, das sich genau
       **einmal** zu Play hochladen lässt — jeder weitere Upload wird mit
       „Version code 1 has already been used" abgelehnt. Bewusst NICHT in B3
       hineingezogen: das Schema ist eine Entscheidung (Tag? Lauf-Nummer? eigene
-      `VERSION`?) und verzahnt sich mit `version_build` des OTA-Wegs, der
-      semver-förmig sein muss. Gehört vor die erste Einreichung.
+      `VERSION`?). Gehört vor die erste Einreichung.
+
+      > **Korrigiert am 07.09.:** hier stand, das Schema „verzahnt sich mit
+      > `version_build` des OTA-Wegs, der semver-förmig sein muss". **Das ist
+      > falsch**, und der Satz hat es von hier bis in die Übergabe geschafft.
+      > Gemessen: `version_build` kommt aus `plugins.CapacitorUpdater.version`
+      > (`capacitor.config.ts`, steht auf `1.0.0`), wird von
+      > `scripts/ota-buendel.ts` gelesen und von
+      > `supabase/functions/ota-update/antwort.ts` als Vertragsnummer der Form
+      > `1.0.0` validiert. `versionCode` ist Plays monotone Ganzzahl aus
+      > `android/app/build.gradle`. Zwei Dateien, zwei Verbraucher, **keine
+      > Verbindung im Code** — die Wahl des Schemas ist also freier als
+      > behauptet. Aufgedeckt von der AGE-630-Sitzung, nicht von mir.
+
+      **Gewählt aus dreien** (Laufnummer / Datumsstempel / von Hand in git):
+      `github.run_number` steigt je Workflow monoton, und genau das verlangt
+      Play. `build.gradle` hält die `1` nur noch als Rückfall für den lokalen
+      Bau, wo nichts hochgeladen wird.
+
+      ```
+      versionCode ((project.findProperty('versionCode') ?: 1) as int)
+      ./gradlew --no-daemon -PversionCode=${{ github.run_number }} …
+      ```
+
+      **Die Klammern sind gemessen, nicht Geschmack.** Die zuerst vorgelegte
+      Form `versionCode (…) as int` bricht ab: Groovy liest sie als
+      `(versionCode(…)) as int` — erst der Aufruf, dann der Cast auf dessen
+      Rückgabewert, und der ist null. Gradle meldet dann `Value is null` und
+      nennt nur die Zeilennummer. Hätte ich den Ausdruck bloss übernommen,
+      wäre der nächste Release-Lauf daran gescheitert.
+
+      **Am Manifest belegt, mit Negativkontrolle** (`processDebugMainManifest`,
+      `--rerun-tasks`):
+
+      | Aufruf | `android:versionCode` im Manifest |
+      |---|---|
+      | `-PversionCode=4242` | `4242` |
+      | ohne `-P` | `1` |
+      | `-PversionCode=777` | `777` |
+
+      **Der Preis, benannt statt entdeckt:** der ausgelieferte Wert steht in
+      KEINEM Commit — wer wissen will, welcher `versionCode` zu welchem Stand
+      gehört, muss den Lauf nachschlagen. Und ein **Re-Run** derselben
+      Lauf-Nummer erzeugt denselben Code; Play lehnt den zweiten Upload ab. Bei
+      einem Re-Run also neu auslösen statt wiederholen.
 
 ### B4. Das App-Symbol ✅
 
