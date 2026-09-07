@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(435);
+select plan(440);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -2668,6 +2668,53 @@ select is(pg_temp.count_as_anon(
   $$select count(*)::int from storage.objects where bucket_id = 'event-covers'
       and name = 'c8c8c8c8-0000-0000-0000-0000000000a1/members.webp'$$),
   0, '… und das des Mitglieder-Events nicht');
+
+-- 20.7b Das Cover einer VORLAGE (AGE-630). Eine Vorlage hat keine
+-- Sichtbarkeit — ihr Bild ist ausschliesslich für ihren eigenen Host lesbar.
+-- Kein anon-Zweig, kein members-Zweig: die Sichtbarkeitslogik der `events`-Zeile
+-- auf eine Tabelle ohne `visibility`-Semantik zu verbiegen wäre die
+-- „Reparatur", vor der die Plan-Review gewarnt hat (D5a).
+--
+-- Die Gegenprobe zu diesem Zweig sind die Zusagen 20.5–20.7 DARÜBER: sie messen
+-- das anon- und members-Verhalten für Event-Cover und müssen unverändert grün
+-- bleiben. `event_cover_lesbar()` wird ERWEITERT, nicht umgebaut.
+insert into public.event_vorlagen
+  (id, host_id, title, ortszeit, zeitzone, cover_path) values
+  ('c8000010-0000-4000-8000-000000000010', 'c8c8c8c8-0000-0000-0000-0000000000a1',
+   'C8 Vorlage', '19:00', 'Europe/Berlin',
+   'c8c8c8c8-0000-0000-0000-0000000000a1/vorlage.webp'),
+  -- Derselbe Diebstahl wie 20.6, eine Tabelle weiter: die Vorlage gehört a2,
+  -- der Pfad trägt das Präfix von a1. An der Policy vorbei eingesetzt, weil die
+  -- Frage das LESEN ist, nicht das Schreiben.
+  ('c8000011-0000-4000-8000-000000000011', 'c8c8c8c8-0000-0000-0000-0000000000a2',
+   'C8 Vorlage mit geklautem Pfad', '19:00', 'Europe/Berlin',
+   'c8c8c8c8-0000-0000-0000-0000000000a1/vorlage-geklaut.webp'),
+  -- Die Vorlage des UNBESTAETIGTEN Kontos. Ohne sie bliebe `is_activated()` im
+  -- neuen Zweig ungemessen: eine Mutation, die es entfernt, faende sonst
+  -- keinen einzigen roten Test.
+  ('c8000012-0000-4000-8000-000000000012', 'c8c8c8c8-0000-0000-0000-0000000000a5',
+   'C8 Vorlage des unbestaetigten Kontos', '19:00', 'Europe/Berlin',
+   'c8c8c8c8-0000-0000-0000-0000000000a5/vorlage-unbestaetigt.webp');
+
+select is(pg_temp.bool_as_anon(
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/vorlage.webp')$$),
+  false, 'event_cover_lesbar: ohne Session bleibt das Cover einer Vorlage zu — sie hat keine Sichtbarkeit');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a3',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/vorlage.webp')$$),
+  false, '… auch für ein aktiviertes fremdes Mitglied, anders als beim Mitglieder-Event');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a1',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/vorlage.webp')$$),
+  true, '… und für ihren eigenen Host geht es auf — die Positivkontrolle zu den beiden Zeilen darüber');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a2',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a1/vorlage-geklaut.webp')$$),
+  false, 'event_cover_lesbar: ein fremder Pfad an der EIGENEN Vorlage bleibt zu — dieselbe Pfadbindung wie bei Events');
+
+select is(pg_temp.bool_as('c8c8c8c8-0000-0000-0000-0000000000a5',
+  $$select public.event_cover_lesbar('c8c8c8c8-0000-0000-0000-0000000000a5/vorlage-unbestaetigt.webp')$$),
+  false, 'event_cover_lesbar: das Aktivierungs-Gate steht auch vor dem Cover der EIGENEN Vorlage');
 
 -- 20.8 Schreiben in den Bucket. Hier GIBT es einen Fehler, und er ist der Beleg.
 select is(pg_temp.try_as('c8c8c8c8-0000-0000-0000-0000000000a1',

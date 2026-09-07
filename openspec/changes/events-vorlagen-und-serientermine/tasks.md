@@ -57,13 +57,13 @@
 
 ## 7. Cover je Termin
 
-- [ ] 7.1 RED: vier erzeugte Termine tragen vier verschiedene Cover-Pfade, alle im `{uid}/`-Präfix, Namen **unvorhersagbar** (UUID)
-- [ ] 7.2 RED: Vorlage ohne Cover erzeugt Termine ohne Cover und scheitert nicht
-- [ ] 7.3 RED: Positivkontrolle, dass die Cover-Pfad-Eindeutigkeit weiterhin greift. **Dazu gehört die Zusage aus 5.9, die Gruppe 5 nicht belegen konnte:** ein zielloses `on conflict do nothing` liess dort alle 17 Zusagen grün, weil ohne Cover kein zweiter eindeutiger Index existiert. Hier muss es fallen.
-- [ ] 7.4 RED: fremdes Mitglied und `anon` erhalten das Cover einer **Vorlage** nicht; der eigene Host erhält es
-- [ ] 7.5 `event_cover_lesbar()` um den Host-Zweig aus D5a **erweitern** (kein `anon`-, kein `members`-Zweig)
-- [ ] 7.6 **Gegenprobe: `anon`- und `members`-Verhalten für Event-Cover ist unverändert** — das ist eine eigene Aufgabe, kein Nebensatz
-- [ ] 7.7 Kopieren im Client vor dem RPC-Aufruf (`storage.copy()` je Termin), RPC nimmt fertige Pfade entgegen
+- [x] 7.1 RED: vier erzeugte Termine tragen vier verschiedene Cover-Pfade, alle im `{uid}/`-Präfix, Namen **unvorhersagbar** (UUID)
+- [x] 7.2 RED: Vorlage ohne Cover erzeugt Termine ohne Cover und scheitert nicht
+- [x] 7.3 RED: Positivkontrolle, dass die Cover-Pfad-Eindeutigkeit weiterhin greift. **Dazu gehört die Zusage aus 5.9, die Gruppe 5 nicht belegen konnte:** ein zielloses `on conflict do nothing` liess dort alle 17 Zusagen grün, weil ohne Cover kein zweiter eindeutiger Index existiert. Hier muss es fallen.
+- [x] 7.4 RED: fremdes Mitglied und `anon` erhalten das Cover einer **Vorlage** nicht; der eigene Host erhält es
+- [x] 7.5 `event_cover_lesbar()` um den Host-Zweig aus D5a **erweitern** (kein `anon`-, kein `members`-Zweig)
+- [x] 7.6 **Gegenprobe: `anon`- und `members`-Verhalten für Event-Cover ist unverändert** — das ist eine eigene Aufgabe, kein Nebensatz
+- [~] 7.7 Kopieren im Client vor dem RPC-Aufruf (`storage.copy()` je Termin), RPC nimmt fertige Pfade entgegen — **Datenbankhälfte steht** (`p_cover_pfade text[]`, Längen-, Präfix- und Eindeutigkeitsprüfung, gemessen). Die Client-Hälfte hat heute keinen Aufrufer und gehört zu Gruppe 9; dort auch die UUID-Vergabe, die die RPC nicht zusagen kann.
 
 ## 8. Rundruf und Feed
 
