@@ -5,6 +5,22 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    slug: "2026-09-07-events-vorlagen-und-serientermine",
+    datum: "2026-09-07",
+    titel: "Wiederkehrende Termine aus einer Vorlage",
+    linear: "AGE-630",
+    aenderungen: [
+      "**Neu: `event_vorlagen`.** Ein Host legt die inhaltlichen Felder eines Events einmal ab (Titel, Typ, Ort, Beschreibung, Kapazität, Sichtbarkeit, Topics, Cover) und erzeugt daraus wiederholt Termine.",
+      "**Neu: Wiederholungsregel an der Vorlage.** Drei Formen, Donalds Beispiele: `jeden 1. des Monats`, `jeden Dienstag`, `jeden ersten Dienstag im Monat`. Die dritte ist die nicht-triviale (`BYDAY=1TU` aus RFC 5545) — sie ist keine feste Tagesdifferenz.",
+      "**Neu: Termine werden materialisiert.** Die Regel erzeugt echte `public.events`-Zeilen im Voraus, nicht eine zur Laufzeit berechnete Liste. Ein erzeugter Termin ist danach ein gewöhnliches Event und erbt Kapazität, Warteliste, Check-in und Anmeldung unverändert.",
+      "**Neu: Serienzugehörigkeit an `events`.** Eine Spalte verweist auf die Vorlage, aus der ein Termin entstanden ist; sie ist `null` für alle bisherigen und alle einzeln angelegten Events.",
+      "**Cover wird je Termin kopiert.** Jeder erzeugte Termin bekommt eine eigene Datei im `{uid}/`-Präfix des Hosts. `events_cover_path_key` bleibt unangetastet — siehe Impact, das ist eine Sicherheitszusage, keine Kosmetik.",
+      '**Ausnahmen brauchen kein eigenes Modell.** Weil Termine echte Zeilen sind, ist „einzelnen Termin verschieben" das Bearbeiten dieser Zeile und „absagen" das Löschen. Kein `EXDATE`, kein Override-Begriff.',
+      "**Rechte bleiben, wie sie bei Events sind.** Wer heute ein Event einstellen darf, darf eine Vorlage anlegen und daraus Termine erzeugen. Keine neue Stufenregel, keine Admin-Sonderrolle.",
+      '**Begrenzte Vorausschau.** Eine Erzeugung schreibt eine ausdrücklich genannte Anzahl Termine bzw. bis zu einem Enddatum, mit einer harten Obergrenze. Ohne Grenze wäre „jeden Dienstag" unendlich.',
+    ],
+  },
+  {
     slug: "2026-09-04-anon-waechter-reichweite",
     datum: "2026-09-04",
     titel: "Ausgeloggte Besucher lösen keine unnötige Anfrage mehr aus",
