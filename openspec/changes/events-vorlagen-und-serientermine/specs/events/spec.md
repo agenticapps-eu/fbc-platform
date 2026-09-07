@@ -270,7 +270,8 @@ Für die beiden Umstellungstage MUSS das Verhalten festgelegt sein:
 
 - **Frühjahr**, wenn die Ortszeit in die übersprungene Stunde fällt: der Termin
   schaltet weiter und entfällt **nicht**.
-- **Herbst**, wenn die Ortszeit doppelt vorkommt: es gilt die erste Lesart.
+- **Herbst**, wenn die Ortszeit doppelt vorkommt: es gilt die zweite Lesart
+  (Normalzeit). Tragend ist, dass **genau ein** Termin entsteht.
 
 #### Scenario: Über die Umstellung im Oktober hinweg
 
@@ -292,7 +293,7 @@ Für die beiden Umstellungstage MUSS das Verhalten festgelegt sein:
 - **WHEN** eine Regel einen Termin auf 02:30 Ortszeit am Tag der
   Herbstumstellung legt
 - **THEN** entsteht genau ein Termin
-- **AND** er liegt auf der ersten der beiden Lesarten
+- **AND** er liegt auf der zweiten der beiden Lesarten, der Normalzeit
 
 #### Scenario: Unbekannte Zeitzone
 

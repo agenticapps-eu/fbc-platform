@@ -27,13 +27,13 @@
 
 ## 4. Die Wiederholungsregel
 
-- [ ] 4.1 RED: alle drei Formen mit den **verifizierten** Daten aus der Spec — jeden Dienstag ab 01.09.2026 → 01./08./15./22.09.; erster Dienstag ab 09/2026 → 01.09., 06.10., 03.11., 01.12.
-- [ ] 4.2 RED: Grenzfall „Monatsstart ist selbst der gesuchte Wochentag" (01.09.2026 ist ein Dienstag)
-- [ ] 4.3 RED: Grenzfall „Monat ohne den geforderten Tag wird übersprungen" (`monatlich_tag` = 31), und dass übersprungene Monate **nicht** in `anzahl` zählen
-- [ ] 4.4 RED: Herbstumstellung — Termine um den 25.10.2026, Erwartung 19:00 Ortszeit auf beiden Seiten, UTC-Abstand um eine Stunde abweichend
-- [ ] 4.5 RED: **Frühjahrslücke** — 02:30 am Umstelltag ergibt einen Termin um 03:30 Ortszeit, kein Ausfall
-- [ ] 4.6 RED: **Herbstüberlappung** — 02:30 am Umstelltag ergibt genau einen Termin, erste Lesart
-- [ ] 4.7 Regelauswertung implementieren, bis 4.1–4.6 grün sind
+- [x] 4.1 RED: alle drei Formen mit den **verifizierten** Daten aus der Spec — jeden Dienstag ab 01.09.2026 → 01./08./15./22.09.; erster Dienstag ab 09/2026 → 01.09., 06.10., 03.11., 01.12.
+- [x] 4.2 RED: Grenzfall „Monatsstart ist selbst der gesuchte Wochentag" (01.09.2026 ist ein Dienstag)
+- [x] 4.3 RED: Grenzfall „Monat ohne den geforderten Tag wird übersprungen" (`monatlich_tag` = 31), und dass übersprungene Monate **nicht** in `anzahl` zählen
+- [x] 4.4 RED: Herbstumstellung — Termine um den 25.10.2026, Erwartung 19:00 Ortszeit auf beiden Seiten, UTC-Abstand um eine Stunde abweichend
+- [x] 4.5 RED: **Frühjahrslücke** — 02:30 am Umstelltag ergibt einen Termin um 03:30 Ortszeit, kein Ausfall
+- [x] 4.6 RED: **Herbstüberlappung** — 02:30 am Umstelltag ergibt genau einen Termin. **Korrigiert 07.09.:** es ist die _zweite_ Lesart (Normalzeit), gemessen — die Plan-Sonde konnte die Lesarten nicht unterscheiden. Siehe design.md D4.
+- [x] 4.7 Regelauswertung implementieren, bis 4.1–4.6 grün sind
 
 ## 5. Die Erzeugungs-RPC
 

@@ -133,6 +133,20 @@ notorisch unzuverlässig, also nachgeprüft):
 2026-10-25 02:30 → 01:30Z  → zurück: 02:30 Ortszeit   (Stunde existiert ZWEIMAL)
 ```
 
+**Korrigiert am 07.09., beim Schreiben des RED-Tests zu Aufgabe 4.** Die dritte
+Zeile oben unterscheidet die beiden Lesarten **nicht**: das Rückwandeln ergibt
+für beide 02:30. Unterscheidend gemessen wird gegen UTC:
+
+```
+02:30+02 (CEST, erste Lesart)  = 00:30Z
+02:30+01 (CET,  zweite Lesart) = 01:30Z
+timestamp '2026-10-25 02:30' at time zone 'Europe/Berlin'  =  01:30Z
+```
+
+Postgres liefert also die **zweite** Lesart. Die erste Fassung dieses Abschnitts
+behauptete beides zugleich — „erste Lesart" *und* „das Postgres-Verhalten" —
+und stützte sich dabei auf eine Sonde, die es nicht zeigen konnte.
+
 **Geändert nach Review (MITTEL, beide Arme).** Die erste Fassung deckte nur den
 Herbst und nur 19:00 Uhr. Festgelegt wird jetzt beides, und zwar auf das
 Postgres-Verhalten — aber **ausdrücklich und getestet**, statt es dem Zufall der
@@ -143,7 +157,13 @@ Implementierung zu überlassen:
   Termin einer laufenden Reihe ist der schlechtere Ausgang — er fehlt im
   Kalender, ohne dass jemand es merkt, während eine um eine Stunde verschobene
   Nachtveranstaltung sichtbar bleibt und von Hand korrigierbar ist.
-- **Herbstüberlappung:** erste Lesart (Sommerzeit), das Postgres-Verhalten.
+- **Herbstüberlappung:** **zweite** Lesart (Normalzeit) — das gemessene
+  Postgres-Verhalten. Tragend ist ohnehin „genau ein Termin, weder zwei noch
+  keiner"; das gilt unter beiden Lesarten. Die erste zu erzwingen hiesse, die
+  Mehrdeutigkeit von Hand zu erkennen und den Zeitpunkt mit festem Offset zu
+  bauen — Aufwand für einen Fall ohne praktische Folge. Die Absicht von D4 war
+  „das Postgres-Verhalten, aber festgelegt und getestet"; falsch war das
+  Etikett, nicht die Absicht.
 
 `zeitzone` bekommt einen `check` gegen `pg_timezone_names` — ohne ihn ist
 `'Europe/Belin'` speicherbar und tötet die Erzeugung erst zur Laufzeit
