@@ -1,134 +1,120 @@
-# Session Handoff — 2026-09-07 (AGE-630 abgeschlossen und ausgeliefert)
+# Session Handoff — 2026-09-07 (AGE-630 zu, AGE-705 liegt bereit)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie führt AGE-630, und AGE-630 ist fertig.** Kein Branch, kein Worktree,
-> nichts Offenes. Die Datei ist für alle parallelen Sitzungen dieselbe und
-> kollidiert bei jedem Rebase — **nicht zusammenführen**, überschreiben.
+> **1. Sie führt AGE-705**, und AGE-705 ist noch nicht angefangen: kein Branch,
+> kein Worktree, keine Zeile Code. Die Datei ist für alle parallelen Sitzungen
+> dieselbe und kollidiert bei jedem Rebase — **nicht zusammenführen**,
+> überschreiben.
 >
 > **2. AGE-642 läuft in einer EIGENEN Sitzung**
 > (`fbc-platform-donald-age-642-capacitor-hu-57`), Worktree
 > `../fbc-platform.donald-age-642-capacitor-huelle`. Von hier aus ist daran
 > **nichts** zu tun — und der Worktree darf nicht abgeräumt werden.
 >
-> **3. Die Details stehen NICHT hier**, sondern in
-> `openspec/changes/archive/2026-09-07-events-vorlagen-und-serientermine/` —
-> `tasks.md` (Belege je Aufgabe), `REVIEWS.md` (beide Review-Stufen),
-> `design.md` (D1–D8). Diese Datei ist der Überblick.
+> **3. AGE-630 ist abgeschlossen und ausgeliefert.** Die Details dazu stehen in
+> `openspec/changes/archive/2026-09-07-events-vorlagen-und-serientermine/`
+> (`tasks.md`, `REVIEWS.md`, `design.md`) — nicht hier. Die vorige Fassung
+> dieser Datei führte sie im Detail; sie ist damit erledigt.
 
 ## Accomplished
 
-**AGE-630 „Event-Vorlagen und Serientermine" ist gebaut, geprüft, gemergt,
-migriert und live.** PR [#359](https://github.com/agenticapps-eu/fbc-platform/pull/359)
-(Squash `ccf186d`) und [#360](https://github.com/agenticapps-eu/fbc-platform/pull/360)
-(Übergabe). Change archiviert, **10 Requirements** in `openspec/specs/events/spec.md`.
-
-Ein Host legt eine Vorlage an (Titel, Ort, Uhrzeit, Wiederholungsregel) und
-erzeugt daraus bis zu 52 Termine — mit Pflichtvorschau davor. Erzeugte Termine
-sind gewöhnliche `events`-Zeilen und erben Kapazität, Warteliste, Check-in und
-Anmeldung unverändert.
-
-**Alle drei Flächen sind durch:**
-
-| Fläche | Weg | Beleg |
-|---|---|---|
-| DB **DEV** | `migrate-dev` automatisch | success |
-| DB **PROD** | `migrate-prod` **von Hand** | Historie danach `OK — 131 Migrationen, abweichungsfrei` |
-| Frontend + OTA | `gh run rerun <id> --failed` | `deploy` success, OTA-Kopf `0.0.0+ccf186d50a97` |
-
-Edge Functions sind nicht betroffen. Linear steht auf **Done**.
+- **AGE-630 vollständig geschlossen.** PR [#361](https://github.com/agenticapps-eu/fbc-platform/pull/361)
+  (Squash `6490c0e`) war noch offen — CI grün, gemergt, `main` nachgezogen.
+  Linear steht auf **Done** (15:47:51; der Merge hat ihn selbst zugemacht).
+- **Die zwei AGE-630-Nachzügler abgearbeitet**, beide als Entscheidung, nicht
+  als Fix:
+  - **Release-Text in Mitgliedersprache geschrieben** (8 Stichpunkte). Er ist
+    **nicht versendet** — und soll es womöglich auch nicht mehr einzeln, siehe
+    AGE-705.
+  - **Cover-Größen gegen PROD gemessen** (design.md D5, unten).
+- **AGE-705 angelegt** — Donalds Zuruf vom 07.09., der nächste Punkt für den
+  08.09.
 
 ## Decisions
 
-- **Die Vorlagen bekommen keine eigene Seite**, sondern den vierten Reiter unter
-  `/events` — in der Linie von AGE-442 („keine weitere Unterseite") und AGE-494
-  („ein dritter Weg zum selben Ort").
-- **Die Vorschau ruft dieselbe Funktion, die danach schreibt.** Eine nachgebaute
-  Datumsrechnung wäre eine zweite Wahrheit, die an der nächsten Zeitumstellung
-  auseinanderläuft.
-- **Ein Anweisungs-Trigger statt eines Aufrufs in der RPC.** Der naheliegende Weg
-  hätte `authenticated` das Ausführungsrecht auf `hinweis_rundruf` gekostet — und
-  wer die aufrufen darf, kann die gesamte Mitgliedschaft anschreiben.
-- **Drei Review-Befunde bewusst NICHT behoben**, jeder mit Grund in `REVIEWS.md`:
-  doppelter `Europe/Berlin`-Fallback, stille Kappung im Bis-Datum-Modus des
-  Clients, `v_anzahl = 0` ohne 22023.
+- **Der Release-Entwurf wird nicht an der Quelle repariert.**
+  `src/lib/release-entwurf.ts` sagt im Kopf selbst, der generierte Text sei ein
+  Vorschlag zum Überschreiben. Das archivierte Proposal umzuschreiben hätte eine
+  abgeschlossene OpenSpec-Change verändert, um ein Symptom zu behandeln, das per
+  Design vorgesehen ist.
+- **Der Versand bleibt Donalds Klick.** Ein Rundruf erreicht alle 74 Profile.
+- **AGE-705 kam in „Go-Live August 2026", nicht in den Nach-Go-Live-Backlog** —
+  es ist die nächste aktive Arbeit, kein Später.
+- **AGE-560 wurde NICHT angefasst.** Sie heißt „Release-Mechanismus neu denken"
+  und liest sich wie ein Duplikat, gehört aber zu **fx-signals**
+  (`apps/web/src/components/WhatsNew.tsx`). Falsches Repo, gleiche Wörter.
 
-### Der Befund, den nichts anderes gesehen hätte
+### Der Befund, nach dem niemand gefragt hatte
 
-**`event_serie_slots()` hatte keine Obergrenze für `p_anzahl`.** Die 52er-Grenze
-sitzt in `event_serie_erzeugen()` — aber `authenticated` ruft die Slot-Funktion
-direkt auf, das braucht die Vorschau. Gemessen: `p_anzahl = 100000` lieferte
-100000 Zeilen. Kein Datenleck (die Funktion liest keine Zeile), sondern
-**Verfügbarkeit** auf einer geteilten Datenbank.
+Beim Messen von D5: **4 der 7 Objekte in `event-covers` (PROD) hängen an keinem
+Event.** Grund ist, dass **nie etwas aus dem Bucket gelöscht wird** — `feed.ts`
+und `feedback.ts` rufen `storage.remove()`, die Event- und Profilpfade nie; in
+`src/lib/profile.cover.test.ts:137` steht das ausdrücklich als Absicht.
 
-Behoben in `20260907120000`. **Die Grenze ist 53, nicht 52** — der Enddatum-Pfad
-sondiert absichtlich mit 53; eine 52 hätte genau diese Prüfung erschlagen.
+Ein gelöschtes Event, ein ausgetauschtes Titelbild und eine verworfene
+Vorlagen-Erzeugung lassen ihre Datei dauerhaft liegen — und eine Serie legt bis
+zu 52 Kopien an. **Hat noch keinen Vorgang.** Donald wurde gefragt und hat
+stattdessen AGE-705 gesetzt; die Frage ist also offen, nicht abgelehnt.
 
-Er war in keiner Plan-Review, in keiner Sichtprobe und in keinem der 2596 Tests
-sichtbar — er hängt nicht am Verhalten, sondern an einer Grenze zwei Funktionen
-weiter. Gefunden hat ihn der Diff-Review (opencode), der trotzdem APPROVE gab.
+Die eigentliche D5-Zahl ist dagegen langweilig, und das ist die Antwort: 7
+WebP-Bilder, 84.876–115.486 B, **Median 89.820 B**. Eine 52er-Serie kostet
+**≈ 4,5 MiB** — neben `ota-buendel` (189 MB in 63 Objekten) belanglos.
+**D5 ist keine Speicherfrage.**
 
 ## Files modified
 
-Vollständige Liste in `…/archive/2026-09-07-…/tasks.md`. Die Substanz:
-
-- 8 Migrationen (`20260906090000` … `20260907120000`)
-- `src/lib/event-vorlagen.ts`, `VorlageForm/VorlagenPanel/SerieErzeugen.tsx`
-- 6 neue pgTAP-Dateien; `grants_test.sql` §8b, `rls_test.sql` §20.7b
-- `openspec/specs/events/spec.md` — +10 Requirements
+- `session-handoff.md` — diese Datei (die vorige Fassung ist als `6490c0e` auf
+  `main`).
+- Sonst **keine** Code-Änderung in dieser Sitzung.
+- Ausserhalb des Repos: `cover-seitenverhaeltnisse-gemessen.md` in der Memory um
+  die PROD-Messung und den Waisen-Befund ergänzt; der Release-Text liegt im
+  Scratchpad (`release-age-630-mitgliederfassung.md`) — **flüchtig**, er steht
+  vollständig im Sitzungsprotokoll und im Kern in AGE-705.
 
 ## Next session: start here
 
-**Im Projekt „eff.bee.zee — Go-Live August 2026" ist nichts mehr *In
-Progress*** — AGE-630 war das letzte. Offen sind dort nur Backlog-Vorgänge
-(Stand 07.09., in Linear gemessen):
+**AGE-705 lesen, nicht neu messen.** Der Ist-Zustand steht vollständig im
+Issue-Rumpf: 76 Archiv-Verzeichnisse → 75 Einträge → **263 Stichpunkte**, davon
+57 mit AGE-Bezug; der heutige Weg Entwurf → `/admin/neuigkeiten` → `release_notes`
+(draft→sent) → `ReleaseNoteModal`; `posts_kind_check` als geschlossene Menge;
+die Domain- und die RLS-Lage.
 
-| Vorgang | Prio | Worum es geht |
-|---|---|---|
-| AGE-610 | High | Klärungen mit Detlev und dem Anwalt — **kein Code** |
-| AGE-684 | Medium | Resend als SMTP in Supabase Auth; erst danach lässt sich `rate_limit_email_sent` anheben |
-| AGE-512 | Medium | Stripe- und Resend-Secrets zwischen DEV und PROD trennen |
-| AGE-607 | Medium | Überlauf-Messung im Browser statt im Quelltext |
-| AGE-606 | Low | `format:check` rot (211 Dateien), läuft in keinem Workflow |
-| AGE-516 | — | Rückstufung bei geplatzter Zahlung |
+Der erste Schritt ist **keine Zeile Code**, sondern die eine Entscheidung, aus
+der alle anderen folgen: **wo der lesbare Text dauerhaft lebt** — in
+`release_notes` (DB als Quelle, Website und Aktivität lesen daraus) oder im Repo
+(Build als Quelle, der Admin-Versand liest daraus). Danach die Auswahl treffen,
+welche der 75 Einträge ein Mitglied überhaupt interessieren. Erst dann ein
+OpenSpec-Proposal.
 
-**Empfehlung: AGE-684 und AGE-512 zusammen.** Beide hängen an Resend und der
-Trennung der Secrets zwischen den zwei Projekten; einzeln fasst man dieselbe
-Konfiguration zweimal an. Es ist ausserdem der Pfad, den ein **neues** Mitglied
-zuerst trifft. Präzedenzfall aus der Memory: ein für lokales Testen gesetztes
-`APP_URL` liess **jede** Mail der Live-Seite auf `localhost` zeigen.
+**Reihenfolge-Vorschlag aus dem Issue:** Quelle + Auswahl (ohne Code) →
+Aktivität (kleinste Fläche, ganz in der App) → Website. Die Tutorials sind der
+grösste Textblock und hängen an keinem der drei technischen Schritte.
 
-**Nicht anfassen: die Mobile-Spur.** AGE-642 (M2, Urgent) ist *In Progress* und
-gehört der anderen Sitzung; AGE-643 (Deep Links) und AGE-644
-(Store-Einreichung) hängen daran.
+**Nicht anfassen: die Mobile-Spur.** AGE-642 (M2) ist *In Progress* und gehört
+der anderen Sitzung; AGE-643 (Deep Links) und AGE-644 (Store-Einreichung) hängen
+daran.
 
-### Zwei Nachzügler aus AGE-630 — Entscheidungen, keine Fixes
-
-1. **Der Release-Eintrag ist ein Entwurf in Ingenieurssprache.** Er heisst
-   „Wiederkehrende Termine aus einer Vorlage" und trägt AGE-630, aber die acht
-   Stichpunkte reden von `event_vorlagen` und `BYDAY=1TU`. Der Admin schreibt
-   ihn vor dem Versand um — bis dahin erfährt kein Mitglied, dass es die
-   Funktion gibt.
-2. **Die Cover-Größenverteilung im Bucket ist ungemessen** (design.md D5). Bei
-   52 Kopien je Serie eine Speicher-, keine Korrektheitsfrage — aber eine Zahl
-   dazu wäre billig und steht bisher nirgends.
+**Sonst offen im Projekt** (Stand 07.09.): AGE-610 (Klärungen mit Detlev und
+dem Anwalt, kein Code), AGE-684 + AGE-512 (Resend als SMTP und die Trennung der
+Secrets — beide fassen dieselbe Konfiguration an, gehören zusammen), AGE-607
+(Überlauf im Browser messen), AGE-606 (`format:check` rot, 211 Dateien),
+AGE-516 (Rückstufung bei geplatzter Zahlung).
 
 ## Open questions
 
-- **Beim Löschen einer Vorlage zukünftige leere Termine mitnehmen?** (Review
-  NIEDRIG.) Heute sagt der Toast „Bereits erzeugte Termine bleiben bestehen".
-- **`events.vorlage_id` ist für fremde Mitglieder lesbar** — bewusst
-  hingenommen, unter Risks vermerkt.
-- **`REVIEWS.md` trägt keinen signierten Trailer.** Wird als `trailer-absent`
-  gemeldet, blockt nicht — von Hand nachgetragen behauptete er eine Bindung, die
-  es nie gab.
+- **Bekommen die Waisen-Cover einen Vorgang?** Siehe oben — gefragt, nicht
+  beantwortet.
+- **Wird der AGE-630-Release-Text noch einzeln versendet**, oder geht er in der
+  neuen Systematik aus AGE-705 auf? Im Issue ist er als Nachzügler vermerkt.
+- **`effbeezee.com` ohne `www`** — Weiterleitung bei Strato, oder gar nicht?
+  Der Apex kann kein CNAME, das ist gemessen und steht in AGE-256.
+- Aus AGE-630 unverändert offen: beim Löschen einer Vorlage zukünftige leere
+  Termine mitnehmen? `events.vorlage_id` ist für fremde Mitglieder lesbar
+  (bewusst hingenommen).
 
-> ⚠ **`wt remove --reap` am eigenen Worktree beendet die Shell darin mit** (Exit
-> 144), und die Sitzung bleibt danach auf den gelöschten Pfad **gepinnt** —
-> `git -C …` wird noch abgelehnt. Der Ausweg ist kein Befehl, sondern
-> **`ExitWorktree` mit `action: "keep"`**. Hat auf Anhieb funktioniert, obwohl
-> die Werkzeugbeschreibung sagt, es wirke nur auf `EnterWorktree`-Sitzungen.
-
-> ⚠ **Ein Doku-Nachzügler macht den Linear-Vorgang wieder auf.** Merge von #359
-> → Done (13:25), **Öffnen** von #360 → In Progress (13:38), Merge von #360 →
-> Done (15:33). Nach dem Merge eines Folge-PRs also **noch einmal** nachsehen.
+> ⚠ **Ein Doku-PR mit einem Issue-Kürzel im Titel SCHLIESST diesen Vorgang.**
+> AGE-630 wurde dadurch heute dreimal auf- und zugemacht. Deshalb trägt der
+> Titel dieser Übergabe **AGE-630** (dort ein No-op, weil schon Done) und
+> **nicht** AGE-705 — sonst stünde die morgige Arbeit vor dem Anfangen auf
+> *Done*.
