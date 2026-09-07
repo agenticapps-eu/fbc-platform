@@ -178,8 +178,32 @@ jobs:
           # vollstaendig gruenen Lauf und ein Artefakt, das Play erst beim
           # Hochladen ablehnt („signed with the wrong key"). Das ist eine Stufe
           # zu spaet und weit weg von der Ursache.
-          ist="$("$apksigner" verify --print-certs "$apk" \
-                 | awk -F': ' '/SHA-256 digest/ {print $2; exit}' | tr -d ' ')"
+          #
+          # NICHT nach Feldposition, und das ist der Fix vom 07.09.: der erste
+          # Lauf (34090816888) scheiterte genau hier. `awk -F': ' {print $2}`
+          # nimmt an, dass vor dem Hash genau EIN ": " steht. Der apksigner des
+          # Runners schreibt aber einen Doppelpunkt mehr als der lokale, und
+          # $2 war dann „certificate SHA-256 digest" statt des Hashes. Der
+          # Schritt meldete daraufhin „signiert mit dem falschen Schluessel" —
+          # eine Parser-Panne, die als Aussage ueber den Schluessel auftrat und
+          # damit in die falsche Richtung zeigte. Ein 64-stelliger Hex-Wert ist
+          # formatunabhaengig; `|| true`, weil `grep` ohne Treffer unter
+          # `pipefail` den Schritt vor der eigenen Fehlermeldung abbraeche.
+          zeile="$("$apksigner" verify --print-certs "$apk" | grep -i 'SHA-256 digest' | head -1 || true)"
+          echo "apksigner: ${zeile:-<keine Zeile mit \"SHA-256 digest\">}"
+          # `tr` nicht aus Ordnungsliebe: apksigner schreibt lokal klein, und
+          # ein Wechsel auf Grossschreibung waere WIEDER ein Formatunterschied,
+          # den der Vergleich als falschen Schluessel meldete. Gleicher Fehler,
+          # andere Stelle — deshalb hier gleich mit erledigt.
+          ist="$(printf '%s' "$zeile" | grep -oiE '[0-9a-f]{64}' | head -1 | tr 'A-F' 'a-f' || true)"
+
+          # Zwei Ausgaenge, zwei Meldungen — das ist der eigentliche Punkt des
+          # Fixes. „Nicht lesbar" und „falscher Schluessel" sind verschiedene
+          # Befunde und duerfen nicht dieselbe Fehlermeldung teilen.
+          if [ -z "$ist" ]; then
+            echo "::error::Fingerabdruck nicht lesbar. Das ist ein PARSER-Fehler, KEINE Aussage ueber den Schluessel — die Rohzeile steht eine Zeile darueber."
+            exit 1
+          fi
           if [ "$ist" != "$ERWARTETER_FINGERABDRUCK" ]; then
             echo "::error::Signiert mit dem falschen Schluessel."
             echo "  erwartet:   $ERWARTETER_FINGERABDRUCK"
