@@ -137,9 +137,15 @@ jobs:
       # Zwei Artefakte, zwei Abnehmer: das Bundle geht zu Play, das APK auf ein
       # physisches Geraet (Phase E verlangt genau das — ein Bundle laesst sich
       # nicht installieren).
+      # `versionCode` kommt aus der Lauf-Nummer, nicht aus dem Baum: Play
+      # verlangt fuer jeden Upload einen hoeheren Wert, und `github.run_number`
+      # steigt je Workflow monoton. `build.gradle` haelt die 1 nur als
+      # Rueckfall fuer den lokalen Bau. Entschieden am 07.09.; der Preis steht
+      # im Kommentar dort — der Wert liegt in keinem Commit, und ein Re-Run
+      # derselben Nummer erzeugt denselben Code.
       - name: Signierten Release-Bau
         working-directory: android
-        run: ./gradlew --no-daemon bundleRelease assembleRelease
+        run: ./gradlew --no-daemon -PversionCode=${{ github.run_number }} bundleRelease assembleRelease
 
       # Der Beleg, dass wirklich signiert wurde. Ohne ihn waere ein
       # unsigniertes Artefakt von einem signierten am Lauf nicht zu

@@ -76,18 +76,24 @@ listet alle fünf Plugins.
 
 ## Next session: start here
 
-**`versionCode` steht auf `1`.** Das AAB ist genau **einmal** zu Play
-hochladbar; jeder weitere Upload wird mit „Version code 1 has already been
-used" abgelehnt. Das Schema ist eine Entscheidung (Tag? Lauf-Nummer? eigene
-`VERSION`?) und verzahnt sich mit `version_build` des OTA-Wegs, der
-semver-förmig sein muss. **Gehört vor die erste Einreichung**, und M4 hängt
-daran.
+**`versionCode` kommt seit dem 07.09. aus `github.run_number`** — entschieden,
+gebaut, am Manifest belegt (mit `-P` → der Wert, ohne → `1`). Zwei Dinge, die
+dabei zu wissen sind: der ausgelieferte Wert steht in **keinem Commit**, und ein
+**Re-Run** derselben Lauf-Nummer erzeugt denselben Code, den Play dann ablehnt —
+bei einem Re-Run neu auslösen statt wiederholen.
+
+> ⚠ Die zuerst vorgelegte Gradle-Zeile war **nicht lauffähig**:
+> `versionCode (…) as int` liest Groovy als `(versionCode(…)) as int`, der Cast
+> trifft den null-Rückgabewert des Aufrufs, Gradle meldet `Value is null` und
+> nennt nur die Zeilennummer. Richtig ist
+> `versionCode ((project.findProperty('versionCode') ?: 1) as int)`.
 
 **Dependabot #349–#351 sind freigegeben.** Sie heben `setup-java` 4.7.1→6.0.0,
 `upload-artifact` 4.6.2→7.0.1 und `setup-android` 3.2.2→4.0.1 — alle drei
 Major, alle drei von diesem Workflow gepinnt. Die Sperre lautete „erst den
-ersten Lauf grün sehen"; der ist grün. Nach dem Heben **einen Lauf gegenprüfen**,
-sonst ist ein späterer Fehlschlag nicht zuzuordnen.
+ersten Lauf grün sehen"; der ist grün. **Einzeln heben, nach jedem ein
+`android-release`-Lauf zur Gegenprobe** (entschieden 07.09.) — bei allen dreien
+auf einmal wäre ein Fehlschlag zwischen drei Major-Sprüngen nicht zuzuordnen.
 
 > ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Die Automatik liest
 > das Kürzel im PR-Titel. Am 06. und 07.09. je einmal zurückgesetzt; in der
