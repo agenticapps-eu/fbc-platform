@@ -438,14 +438,32 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
       Environment entfernt · Nachweis aufs Archiv gelegt · Upload nennt ein
       Verzeichnis · Schlüssel in den Arbeitsbaum · Versions-Überschreibung
       entfernt.
-- [ ] **Offen, und nur von Hand zu machen:**
-      1. Die drei `ASC_*`-Werte nach Infisical `prod` (der Schlüssel liegt heute
-         nur lokal unter `~/.appstoreconnect/private_keys/`). Dokumentiert in
-         `docs/secrets.md`.
-      2. Das Environment `ios-release` als Repository-Einstellung anlegen —
-         **bevor** der Workflow das erste Mal läuft. Sonst legt GitHub es still
-         und UNGESCHÜTZT selbst an, so wie `production` heute dasteht.
-      3. Erster Lauf, dann die Einreichung nach TestFlight (M4).
+- [x] **Die drei `ASC_*`-Werte liegen in Infisical `prod`** (07.09.).
+      Dokumentiert in `docs/secrets.md`. **Und der Weg dorthin ist belegt, nicht
+      angenommen:** ein PEM kann durch eine Secret-Ablage seine Zeilenumbrüche
+      verlieren, und das fiele erst im Signierschritt auf. Gegengeprüft mit
+      genau der Form, die `ios-release.yml` benutzt (`printf "%s"`):
+      SHA-256 `056bff9e…2449` — **byte-gleich mit der lokalen Datei**, und
+      `openssl pkey` liest sie als gültigen P-256-Schlüssel.
+- [x] **Environment `ios-release` angelegt** (07.09., per API, wie das
+      Android-Gegenstück am 05.09.). Zurückgelesen und gegen `android-release`
+      gehalten — beide tragen jetzt dieselben vier Einstellungen:
+
+      | | android-release | ios-release |
+      |---|---|---|
+      | Freigeber | `DonaldVl` | `DonaldVl` |
+      | `prevent_self_review` | `false` | `false` |
+      | Admin-Bypass | `false` | `false` |
+      | Freigabe-Refs | `main`, Tag `android-v*` | `main`, Tag `ios-v*` |
+
+      ⚠ **Admin-Bypass stand nach dem Anlegen auf `true`** und musste in einem
+      zweiten Schritt gesetzt werden — GitHubs Vorgabe für ein neues
+      Environment. Wer nur anlegt und nicht zurückliest, hat die Freigaberegel
+      als Dekoration: der einzige Mensch im Repo ist Admin und dürfte sie
+      übergehen.
+- [ ] **Erster Lauf — erst NACH dem Merge.** Die Ref-Liste lässt `main` und
+      Tags `ios-v*` zu; ein `workflow_dispatch` vom Feature-Branch scheitert an
+      ihr. Danach die Einreichung nach TestFlight (M4, eigener Vorgang).
 - [x] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
       `key.properties` aus CI-Secrets erzeugen lassen. Derselbe Keystore, der
       nirgends im Repo liegen darf, muss dem Workflow zur Laufzeit vorliegen —
