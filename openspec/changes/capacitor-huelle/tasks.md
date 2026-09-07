@@ -390,10 +390,62 @@ echten Geräten" nicht erreichbar, und das fiele erst ganz am Ende auf.
 iOS-Hälfte hat eigene Fallen (ASC-Schlüssel, Provisioning Profile,
 macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
 
-- [ ] **iOS:** Entwickler-Zertifikat und Provisioning Profile (oder
-      App-Store-Connect-API-Schlüssel) bereitstellen. Woher sie kommen, gehört
-      in dieselbe Zeile wie ihr Name — nach Infisical, nicht ins Repo.
-      **Zurückgestellt** — siehe Zuschnitt oben.
+- [x] **iOS: die Kette ist durchgemessen (07.09.), lokal, vom Web-Bündel bis
+      zu Apples Urteil.** Bewusst zuerst lokal und nicht im CI — der
+      Android-Workflow kostete einen roten Lauf, dessen Meldung falsch war, und
+      das Suchen fand dort statt. Der Workflow ist jetzt die Abschrift einer
+      Befehlsfolge, die nachweislich läuft.
+
+      **Der Befund, der die Arbeit halbiert: es gibt kein Zertifikat als
+      Secret.** `-allowProvisioningUpdates` mit dem ASC-Schlüssel lässt Apple
+      **serverseitig** signieren. Das `.ipa` trägt `Apple Distribution`, während
+      der Schlüsselbund weiterhin **nur** `Apple Development` führt und
+      `/v1/certificates` ebenfalls — das Verteil-Zertifikat ist cloud-verwaltet.
+      Kein `.p12`, kein Keychain-Import, drei Werte statt vier plus Datei.
+
+      Am ausgelieferten `.ipa` gemessen, nicht am Archiv:
+
+      | | |
+      |---|---|
+      | Signatur | `Apple Distribution: Donald Vlahovic (WQZJ8649TN)` |
+      | Profil | `iOS Team Store Provisioning Profile: com.effbeezee.app`, ohne Geräteliste |
+      | `aps-environment` | `production` |
+      | Bundle · Version | `com.effbeezee.app` · 1.0 (1) |
+      | Boot-Fläche (B5) | `splash-band.webp` + `splash-schriftzug.png` in `App.app/public/brand/` |
+      | Apples Urteil | `xcrun altool --validate-app` → **VERIFY SUCCEEDED with no errors** |
+
+      **Validiert, nicht hochgeladen.** Dadurch ist Build-Nummer 1 noch frei und
+      der Workflow kann bei `run_number` 1 anfangen, ohne Sonderregel.
+
+      ⚠ **Das ARCHIV ist mit `Apple Development` signiert, und das ist normal.**
+      Der Archivlauf endet mit ARCHIVE SUCCEEDED und meldet dabei die
+      Entwickler-Identität; erst `-exportArchive` signiert neu. Wer den
+      Signaturnachweis aufs Archiv legt, prüft die falsche Datei.
+
+      ⚠ **Der Archivlauf hat die Versions-Überschreibung NICHT belegt:** er
+      benutzte `CURRENT_PROJECT_VERSION=1`, und 1 ist auch die Vorgabe im
+      Projekt. Nachgeholt mit `-showBuildSettings CURRENT_PROJECT_VERSION=4242`
+      → die Einstellung nimmt den Wert an.
+- [x] **`ios-release.yml`** als Spiegel der Android-Seite: `workflow_dispatch`
+      plus Tag `ios-v*`, geschütztes Environment `ios-release`, Infisical,
+      `cap sync ios`, Archiv + Export, Signaturnachweis **am `.ipa`** (vier
+      Fragen: Verteil-Zertifikat · unser Team · Store-Profil ohne Geräteliste ·
+      `aps-environment: production` · Build-Nummer = Lauf-Nummer), genau eine
+      Datei als Artefakt. Er lädt **nicht** zu TestFlight hoch — wie die
+      Android-Seite hört er beim signierten Artefakt auf, die Einreichung ist M4.
+- [x] **GREEN:** elf Zusagen in `scripts/ios-release.workflow.test.ts`, mit
+      Gegenprobe über sechs Mutationen, alle rot: `pull_request` im Auslöser ·
+      Environment entfernt · Nachweis aufs Archiv gelegt · Upload nennt ein
+      Verzeichnis · Schlüssel in den Arbeitsbaum · Versions-Überschreibung
+      entfernt.
+- [ ] **Offen, und nur von Hand zu machen:**
+      1. Die drei `ASC_*`-Werte nach Infisical `prod` (der Schlüssel liegt heute
+         nur lokal unter `~/.appstoreconnect/private_keys/`). Dokumentiert in
+         `docs/secrets.md`.
+      2. Das Environment `ios-release` als Repository-Einstellung anlegen —
+         **bevor** der Workflow das erste Mal läuft. Sonst legt GitHub es still
+         und UNGESCHÜTZT selbst an, so wie `production` heute dasteht.
+      3. Erster Lauf, dann die Einreichung nach TestFlight (M4).
 - [x] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
       `key.properties` aus CI-Secrets erzeugen lassen. Derselbe Keystore, der
       nirgends im Repo liegen darf, muss dem Workflow zur Laufzeit vorliegen —

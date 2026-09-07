@@ -144,6 +144,9 @@ must **never** reach the client.
 | `APNS_SANDBOX`              | `1` fragt Apples Sandbox-Host **zuerst**. Nur eine Vermutung — den Host erkennt `send-push` an der Antwort (siehe unten) |
 | `FCM_SERVICE_ACCOUNT`       | Dienstkonto-JSON des Firebase-Projekts (Android). Die Projekt-ID liest der Code daraus — kein eigenes Secret |
 | `GOOGLE_SERVICES_JSON`      | Die Firebase-Konfiguration der Android-SCHALE. Kein Function-Secret — sie wird zur Bauzeit zu `android/app/google-services.json` (siehe unten) |
+| `ASC_KEY_P8`                | Der App-Store-Connect-API-Schlüssel als PEM. **Nicht** der gleichnamige APNs-Schlüssel — dieselbe Falle wie bei `APNS_KEY_P8`, siehe unten |
+| `ASC_KEY_ID`                | Kennung ebendieses Schlüssels (aus Apples Dateinamen `AuthKey_<KEYID>.p8`) |
+| `ASC_ISSUER_ID`             | Die Issuer-UUID zum ASC-Schlüssel. Steht **nicht** in der `.p8` und ist aus ihr nicht ableitbar — ohne sie ist der Schlüssel wertlos |
 
 ## Setting and reading secrets
 
@@ -723,6 +726,24 @@ versehentlicher Push eine Rotation im Apple-Portal bedeutete, kein `git rm`.
 Ein ASC-Schlüssel braucht zusätzlich die **Issuer-ID** (eine UUID). Sie steht
 **nicht** in der `.p8` und ist aus ihr nicht ableitbar — ohne Notiz ist der
 Schlüssel wertlos.
+
+### Der ASC-Schlüssel: was er signiert, und was NICHT mitreist
+
+Die drei `ASC_*`-Werte oben sind das **gesamte** Signaturmaterial der
+iOS-Seite. Es gibt kein Zertifikat als Secret, und das ist kein Versäumnis,
+sondern gemessen (07.09., AGE-642 B3):
+
+`xcodebuild -allowProvisioningUpdates` mit diesem Schlüssel lässt Apple
+**serverseitig** signieren. Das fertige `.ipa` trägt
+`Apple Distribution: … (WQZJ8649TN)` — während der lokale Schlüsselbund
+weiterhin **nur** `Apple Development` führt und Apples `/v1/certificates`
+ebenfalls. Das Verteil-Zertifikat ist cloud-verwaltet: es liegt nirgends als
+Datei, verbraucht keinen der drei Zertifikatsplätze und kann deshalb auch nicht
+in ein Secret. Wer hier ein `.p12` sucht, sucht etwas, das es nicht gibt.
+
+Die **Team-ID bekommt keinen eigenen `ASC_`-Namen.** `ios-release.yml` liest
+`APNS_TEAM_ID` — es ist dasselbe Apple-Team, und eine zweite Kopie wäre die
+erste, die auseinanderläuft, sobald jemand eine davon rotiert.
 
 **3. Zwei Einstellungen sind nach dem Speichern unveränderlich.** Gewählt:
 
