@@ -76,11 +76,25 @@ listet alle fünf Plugins.
 
 ## Next session: start here
 
-**`versionCode` kommt seit dem 07.09. aus `github.run_number`** — entschieden,
-gebaut, am Manifest belegt (mit `-P` → der Wert, ohne → `1`). Zwei Dinge, die
-dabei zu wissen sind: der ausgelieferte Wert steht in **keinem Commit**, und ein
-**Re-Run** derselben Lauf-Nummer erzeugt denselben Code, den Play dann ablehnt —
-bei einem Re-Run neu auslösen statt wiederholen.
+**B3 ist zu.** Der Android-Release-Bau ist eingerichtet, gelaufen, signiert,
+versioniert und gegen aktuelle Actions gebaut. Was als Nächstes ansteht, ist
+nicht mehr die Pipeline, sondern **die iOS-Hälfte** und **M4 (Store-Einreichung)**
+— beides eigene Vorgänge.
+
+Der letzte Stand, an dem sich alles ablesen lässt, ist **Lauf 6**
+(`34104357476`). Vier Dimensionen am ausgelieferten APK gleichzeitig gemessen:
+
+| | |
+|---|---|
+| `versionCode` | `6` — gleich der `run_number` |
+| Signatur | `7ae18622…2fda`, der erwartete Upload-Schlüssel |
+| Plugins | 5 von 5 in `assets/capacitor.plugins.json` |
+| Artefakt | genau 2 Dateien, kein Signaturmaterial |
+
+**`versionCode` kommt aus `github.run_number`.** Zwei Dinge, die dabei zu wissen
+sind: der ausgelieferte Wert steht in **keinem Commit**, und ein **Re-Run**
+derselben Lauf-Nummer erzeugt denselben Code, den Play dann ablehnt — bei einem
+Re-Run neu auslösen statt wiederholen.
 
 > ⚠ Die zuerst vorgelegte Gradle-Zeile war **nicht lauffähig**:
 > `versionCode (…) as int` liest Groovy als `(versionCode(…)) as int`, der Cast
@@ -88,16 +102,23 @@ bei einem Re-Run neu auslösen statt wiederholen.
 > nennt nur die Zeilennummer. Richtig ist
 > `versionCode ((project.findProperty('versionCode') ?: 1) as int)`.
 
-**Dependabot #349–#351 sind freigegeben.** Sie heben `setup-java` 4.7.1→6.0.0,
-`upload-artifact` 4.6.2→7.0.1 und `setup-android` 3.2.2→4.0.1 — alle drei
-Major, alle drei von diesem Workflow gepinnt. Die Sperre lautete „erst den
-ersten Lauf grün sehen"; der ist grün. **Einzeln heben, nach jedem ein
-`android-release`-Lauf zur Gegenprobe** (entschieden 07.09.) — bei allen dreien
-auf einmal wäre ein Fehlschlag zwischen drei Major-Sprüngen nicht zuzuordnen.
+**Dependabot #349–#351 sind gemergt** (07.09.), einzeln und mit je einem grünen
+`android-release`-Lauf dazwischen: `setup-java` 6.0.0 (Lauf 4),
+`upload-artifact` 7.0.1 (Lauf 5), `setup-android` 4.0.1 (Lauf 6). Nach #350
+zusätzlich geprüft, dass überhaupt noch etwas hochgeladen wird — ein grüner
+Schritt belegt das bei einer Major-Änderung an genau dieser Action nicht von
+selbst.
+
+> ⚠ **`Deploy` ist auf Dependabot-PRs strukturell rot** und kein Befund:
+> Dependabots eigene Läufe bekommen den Infisical-Token nicht („Failed to
+> automatically trigger login flow"), und `deploy` ist **keiner** der vier
+> Pflichtchecks (`verify`, `migrations`, `pr-title`, `edge-functions`). Auf die
+> vier sehen, nicht auf die Ampel des PRs.
 
 > ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Die Automatik liest
-> das Kürzel im PR-Titel. Am 06. und 07.09. je einmal zurückgesetzt; in der
-> Statushistorie ist das der 26. Wechsel dieser Art. Nach jedem Merge nachsehen.
+> das Kürzel im PR-Titel. Am 06. und 07.09. mehrfach zurückgesetzt. Nach jedem
+> Merge nachsehen. Die Dependabot-Merges lösen ihn nicht aus — ihre Titel tragen
+> kein Kürzel.
 
 > ⚠ **Squash-Falle, weiterhin scharf.** Nach jedem Merge `git diff origin/main
 > HEAD` prüfen — ist er leer, `git reset --hard origin/main`. Der Remote-Branch
