@@ -2001,12 +2001,17 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       echte Mitgliederdaten hineinzuschreiben. Donalds Entscheidung: „ich kann
       das nicht einfach so machen, weil ja produktiv."
 
-      **Der Weg dafür ist DEV, nicht PROD**, und er ist bereits vorhanden: dort
-      steht ein QA-Konto, und ein zweites lässt sich anlegen, ohne jemandem eine
+      **Der Weg dafür wäre DEV, nicht PROD**, und er ist vorhanden: dort steht
+      ein QA-Konto, und ein zweites lässt sich anlegen, ohne jemandem eine
       Nachricht zu schicken, die ihn wirklich erreicht. Das kostet allerdings
       einen Bau gegen DEV — die Geräte tragen heute PROD-Bündel, und ein
-      Umschalten kostet die Anmeldung. **Eigene Sitzung, mit dieser Reihenfolge:
-      erst DEV-Bau, dann Chat, dann zurück.**
+      Umschalten kostet die Anmeldung.
+
+      **Entschieden (Donald, 08.09.): wird NICHT nachgeholt.** „Das werde ich
+      schon melden, wenn es nicht geht." Die Zeile bleibt bewusst offen und ist
+      **kein Rückstand, den eine spätere Sitzung abarbeiten soll** — sie steht
+      hier, damit niemand sie für ein Versäumnis hält und anfängt, sie zu jagen.
+      Dasselbe gilt für die Chat-Zeile weiter oben und die Web-Sitzung.
 
 ### ✅ Android: die Push-Erlaubnis tötete die App — behoben 04.09.
 
