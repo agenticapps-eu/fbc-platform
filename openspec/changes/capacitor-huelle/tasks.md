@@ -1175,8 +1175,12 @@ nicht wiederholt.
       `index = getIndex() + 1` · **`replace` `index = getIndex()`**. Für
       `LegalZurueck` bleibt die alte Regel richtig — dort entscheidet sie eine
       Aufschrift nach einer Navigation, die stattgefunden hat.
-- [ ] **Beleg auf einem Android-Gerät:** durch drei Ebenen navigieren, Overlay
-      öffnen, zweimal zurück — Overlay zu, eine Ebene zurück, App noch offen.
+- [x] **Beleg auf einem Android-Gerät — erbracht 08.09.**, Pixel 11 Pro
+      (`67011FDKX006NA`, `grizzly`): durch drei Ebenen navigiert, Overlay
+      geöffnet, zweimal zurück — Overlay zu, eine Ebene zurück, App offen.
+      Gegengemessen statt nur gesehen: `dumpsys activity activities` meldet
+      danach `topResumedActivity: com.effbeezee.app/.MainActivity`, die App
+      stand also noch im Vordergrund und hatte sich nicht geschlossen.
 
 ### C3. Kamera und Fotoauswahl
 
@@ -1214,14 +1218,18 @@ nicht wiederholt.
       mit.
 - [x] **Beleg:** Zuschnitt und Upload dahinter sind unverändert — dieselben
       Seitenverhältnisse je Bucket wie bisher.
-- [ ] **Beleg auf beiden Geräten**, wie bei C1 und C2: einmal aus der Kamera,
+- [x] **Beleg auf beiden Geräten**, wie bei C1 und C2: einmal aus der Kamera,
       einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
       Auswahl ist genau der Teil, den kein Test im Browser je berührt.
 
       **iOS erbracht 08.09.**, iPhone 17 Pro: die *eigene* Rückfrage geht auf
       (nicht der iOS-Dateidialog), Kamera und Galerie liefern beide, das Bild
-      steht danach auf dem Profil. **Android bleibt offen** — an diesem Mac
-      hängt kein Android-Gerät, `adb` ist nicht einmal im Pfad.
+      steht danach auf dem Profil. **Android ebenfalls erbracht 08.09.**,
+      Pixel 11 Pro, derselbe Ablauf.
+
+      ⚠ **An diesem Mac lässt sich immer nur EIN Gerät prüfen** — beide hängen
+      am selben Anschluss, Donald musste umstecken. Wer beide Plattformen in
+      einer Sitzung belegen will, plant das ein.
 - [x] **Und der Beleg fand einen Fehler, den kein Test finden konnte: der
       Zoom-Regler im Zuschnitt war am Finger praktisch nicht zu bedienen.**
       Donalds Wortlaut: „der Button ist kaum zu sehen weil weiss, und ausserdem
@@ -1248,6 +1256,26 @@ nicht wiederholt.
       Klasse aus dem Regler gestrichen · `appearance: none` entfernt ·
       Trefffläche auf 30 px · Knopf auf 16 px · Knopf wieder weiss ·
       Firefox-Schiene gestrichen.
+- [x] **Der Fix ist auf beiden Geräten belegt, und einmal davon ohne Auge.**
+      Ausgeliefert wurde er über OTA — der Merge von `3fc0f7b` erzeugte
+      `0.0.0+3fc0f7b0229e`, beide Geräte holten es sich selbst, ohne
+      Neuinstallation und ohne Abmeldung. Sichtprobe iPhone und Pixel: der
+      Regler ist bedienbar.
+
+      Der belastbarere Beleg steht daneben und stammt vom **Artefakt auf dem
+      Gerät**: `adb shell run-as com.effbeezee.app cat
+      files/versions/kloBmA6Vth/assets/index-PGy4maTF.css` zeigt alle fünf
+      Regeln (`height:44px`, Knopf `28px`, `var(--color-accent-strong)`), und
+      das zuvor aktive Bündel `mFhneNaJLK` hat **0 Treffer** für `fbc-regler` —
+      Positivkontrolle zur Negativprobe.
+
+      ⚠ **Dabei fiel auf, was die Zusagen NICHT sehen:** der Minifier liefert
+      im Basis-Selektor nur `appearance:none` aus und lässt
+      `-webkit-appearance: none` weg. `src/zoom-regler.test.ts` prüft die
+      Quelle, nicht das gebaute CSS, und hätte das nie bemerkt. Folgenlos —
+      unpräfixiertes `appearance` trägt seit Safari 15.4, und das iPhone
+      bestätigt es —, aber es ist dieselbe Lücke wie in
+      „Prüfung vergleicht Eingaben, nicht das Artefakt".
 - [ ] **Offen, eigener Vorgang: `OnboardingPage.tsx:212` trägt denselben Fehler
       schärfer.** Der Regler dort steht auf `appearance-none` **ohne jede**
       Knopf-Regel — der Knopf dürfte damit in jedem WebKit unsichtbar sein,
@@ -1907,6 +1935,12 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
 - [ ] Anmelden, Feed, Chat, Profil bearbeiten, Bild hochladen — je einmal auf
       iOS und Android.
 
+      **Stand 08.09.: alles ausser dem Chat, auf beiden Plattformen.** Anmelden,
+      Feed, Profil bearbeiten und Bildupload sind an diesem Tag auf iPhone 17
+      Pro und Pixel 11 Pro durchgespielt (siehe A1 und C3). Es fehlt allein der
+      **Chat** — aus demselben Grund wie die Realtime-Zeile weiter unten: die
+      Geräte laufen gegen PROD.
+
       **Android 03.09.: alles bis auf den Bildupload.** Anmelden, Nachrichten-
       liste, Konversation, Profil und „Profil bearbeiten" laden vollständig.
 
@@ -1938,6 +1972,11 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       `Preferences set` mit `sb-…-auth-token` beim Anmelden, `Preferences get`
       beim Start. Nicht `localStorage`.
 - [ ] Eine bestehende Web-Sitzung ist nach dem Storage-Umbau weiterhin angemeldet.
+
+      Am 08.09. angesetzt, zusammen mit der Realtime-Zeile liegengeblieben.
+      Kostet nichts und braucht kein Gerät: `app.effbeezee.com` in einem
+      Browser öffnen, in dem seit dem Umbau **nicht** neu angemeldet wurde.
+      Meldet der sich frisch an, belegt es nur, dass Anmelden geht.
 - [x] Kein Inhalt unter Notch oder Home-Indikator. **Android 03.09.:** System
       meldet einen Cutout von 172 px oben (Punch-Hole bei x=494–586); der
       App-Header liegt darunter, die Fußzeile über dem Gestenbalken.
@@ -1954,6 +1993,20 @@ Die Liste des Issues, jede Zeile auf **echter Hardware**, nicht im Simulator.
       Offen und **nicht allein messbar**: dafür muss jemand schreiben, während
       die App offen ist. Ein Log-Beleg genügt nicht — Supabase Realtime läuft in
       der WebView und schreibt nicht ins logcat.
+
+      ⚠ **Am 08.09. angesetzt und bewusst abgebrochen, das ist der eigentliche
+      Befund dieser Zeile.** Beide Geräte hingen bereit, der Mitschnitt lief —
+      und dann stand die Sache still: die Geräte laufen gegen **PROD**, und
+      Donald hat dort kein zweites Konto. Ein Realtime-Beleg hätte bedeutet, in
+      echte Mitgliederdaten hineinzuschreiben. Donalds Entscheidung: „ich kann
+      das nicht einfach so machen, weil ja produktiv."
+
+      **Der Weg dafür ist DEV, nicht PROD**, und er ist bereits vorhanden: dort
+      steht ein QA-Konto, und ein zweites lässt sich anlegen, ohne jemandem eine
+      Nachricht zu schicken, die ihn wirklich erreicht. Das kostet allerdings
+      einen Bau gegen DEV — die Geräte tragen heute PROD-Bündel, und ein
+      Umschalten kostet die Anmeldung. **Eigene Sitzung, mit dieser Reihenfolge:
+      erst DEV-Bau, dann Chat, dann zurück.**
 
 ### ✅ Android: die Push-Erlaubnis tötete die App — behoben 04.09.
 
