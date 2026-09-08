@@ -1599,3 +1599,130 @@ describe("Die Verzeichniskarte in der Admin-Ansicht (AGE-595)", () => {
     expect(screen.queryByText(/^Sucht/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Stufe setzen aus der Liste heraus (AGE-707).
+ *
+ * Geprüft wird gegen den `rpc`-Spion und nicht gegen einen Ersatz für
+ * `setzeStufe`: die Zusage gilt dem Aufruf, der die Datenbank ERREICHT. Ein
+ * Ersatz eine Ebene höher liesse offen, ob der Weg dorthin überhaupt steht.
+ */
+function stufenAufrufe(): unknown[][] {
+  return rpc.mock.calls.filter((args) => args[0] === "admin_set_tier");
+}
+
+async function oeffneStufenDialog(m: AdminMember): Promise<HTMLElement> {
+  const menue = await oeffneMenue(m.id);
+  fireEvent.click(within(menue).getByRole("menuitem", { name: /Stufe setzen/i }));
+  return await screen.findByRole("dialog");
+}
+
+describe("Stufe setzen steht im Zeilenmenü (AGE-707, 2.1)", () => {
+  it.each([
+    ["bestätigten", AKTIV],
+    ["unbestätigten", OFFEN],
+    ["deaktivierten", DEAKTIVIERT],
+    ["gelöschten", GELOESCHT],
+  ])("steht an einer %s Zeile", async (_name, m) => {
+    // An JEDER Zeile: `admin_set_tier` kennt keinen Vorbehalt gegen ein
+    // gesperrtes Konto, und genau der Importfehler an einem deaktivierten
+    // Mitglied ist der Fall, für den es gebaut wurde.
+    rpc.mockResolvedValue({ data: [m], error: null });
+    renderPage();
+
+    const menue = await oeffneMenue(m.id);
+    expect(within(menue).getByRole("menuitem", { name: /Stufe setzen/i })).toBeInTheDocument();
+  });
+});
+
+describe("Im Reiter „Mitgliedschaft“ bleibt die Zeile lesbar, das Menü nicht (AGE-707)", () => {
+  it("führt „Stufe setzen“ im Menü, ohne der Zeile ein zweites Auswahlfeld zu geben", async () => {
+    // Die geltende Zusage (9.2) verbietet den BEILÄUFIGEN Wechsel in der Zeile.
+    // Sie verbietet nicht die Erreichbarkeit. Beide Hälften stehen hier
+    // nebeneinander, sonst löste die eine die andere still ab.
+    rpc.mockResolvedValue({ data: [MIT_DATUM], error: null });
+    renderMitRouter("/admin/mitglieder?tab=mitgliedschaft");
+
+    const zeile = await screen.findByTestId(`mitglied-${MIT_DATUM.id}`);
+    expect(within(zeile).getAllByRole("combobox")).toHaveLength(1);
+
+    const menue = await oeffneMenue(MIT_DATUM.id);
+    expect(within(menue).getByRole("menuitem", { name: /Stufe setzen/i })).toBeInTheDocument();
+  });
+});
+
+describe("Der Stufen-Dialog lässt nicht mehr durch als die Datenbank (AGE-707, 1.1)", () => {
+  it("sperrt das Bestätigen ohne Begründung und ruft NICHTS", async () => {
+    // Die Kernzusage. `admin_set_tier` bricht bei leerer Begründung mit 22023
+    // ab — ein roher Datenbankfehler NACH dem Bestätigen ist kein Ersatz für
+    // ein gesperrtes Bestätigen davor.
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+
+    const dialog = await oeffneStufenDialog(AKTIV);
+    const bestaetigen = within(dialog).getByRole("button", { name: /^Stufe setzen$/i });
+
+    expect(bestaetigen).toBeDisabled();
+    fireEvent.click(bestaetigen);
+    expect(stufenAufrufe()).toHaveLength(0);
+  });
+
+  it("nennt das Mitglied namentlich und stellt alle sechs Stufen zur Wahl", async () => {
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+
+    const dialog = await oeffneStufenDialog(AKTIV);
+
+    expect(within(dialog).getByText(/Carla Aktiv/)).toBeInTheDocument();
+    const auswahl = within(dialog).getByLabelText("Neue Stufe") as HTMLSelectElement;
+    expect(auswahl.options).toHaveLength(6);
+    // Und die Folge eines späteren Stripe-Kaufs steht dabei — dieselbe Zusage,
+    // die die Karte in der Einzelbearbeitung schon trägt.
+    expect(within(dialog).getByText(/Stripe/i)).toBeInTheDocument();
+  });
+
+  it("reicht Ziel-Stufe und Begründung unverändert an die Datenbank", async () => {
+    // Ohne diese Zusage wäre die Sperre oben auch dann grün, wenn der Dialog
+    // ÜBERHAUPT nichts ruft.
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+
+    const dialog = await oeffneStufenDialog(AKTIV);
+    fireEvent.change(within(dialog).getByLabelText("Neue Stufe"), { target: { value: "impact" } });
+    fireEvent.change(within(dialog).getByLabelText("Begründung"), {
+      target: { value: "Aufnahme ausserhalb von Stripe" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Stufe setzen$/i }));
+
+    await waitFor(() => expect(stufenAufrufe()).toHaveLength(1));
+    expect(stufenAufrufe()[0][1]).toEqual({
+      p_profile_id: AKTIV.id,
+      p_tier: "impact",
+      p_grund: "Aufnahme ausserhalb von Stripe",
+    });
+  });
+});
+
+describe("Die gesetzte Stufe steht danach in der Zeile (AGE-707, 2.3)", () => {
+  it("lädt die Liste nach, statt das alte Abzeichen stehen zu lassen", async () => {
+    // Bliebe das Abzeichen auf dem alten Wert, hielte der Admin den Aufruf für
+    // gescheitert und setzte ein zweites Mal.
+    rpc.mockResolvedValue({ data: [AKTIV], error: null });
+    renderPage();
+
+    const dialog = await oeffneStufenDialog(AKTIV);
+    fireEvent.change(within(dialog).getByLabelText("Neue Stufe"), { target: { value: "impact" } });
+    fireEvent.change(within(dialog).getByLabelText("Begründung"), {
+      target: { value: "Korrektur" },
+    });
+
+    const vorher = rpc.mock.calls.filter((a) => a[0] === "admin_list_members").length;
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Stufe setzen$/i }));
+
+    await waitFor(() =>
+      expect(rpc.mock.calls.filter((a) => a[0] === "admin_list_members").length).toBeGreaterThan(
+        vorher,
+      ),
+    );
+  });
+});
