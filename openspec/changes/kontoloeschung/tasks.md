@@ -24,7 +24,7 @@
 
 ## 2. Datenbank
 
-- [ ] 2.1 Migration: `profiles_id_fkey` **entfernen** — nicht ohne Kaskade neu
+- [x] 2.1 Migration: `profiles_id_fkey` **entfernen** — nicht ohne Kaskade neu
       setzen. `no action` verhindert die Auth-Löschung, statt sie zu erlauben (D2)
 - [ ] 2.2 Migration: eigener, dauerhafter **Löschzustand** (D7) — nicht
       `deleted_at` allein, weil `admin_restore_member` das zurücksetzt
