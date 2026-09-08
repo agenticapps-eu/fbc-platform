@@ -272,7 +272,7 @@ export function AvatarCropper({
                 step={0.01}
                 value={zoom}
                 onChange={(e) => changeZoom(Number(e.target.value))}
-                className="flex-1 accent-accent-strong"
+                className="fbc-regler flex-1"
                 aria-label="Zoom"
               />
             </label>

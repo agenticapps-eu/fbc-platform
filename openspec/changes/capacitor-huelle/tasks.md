@@ -54,14 +54,25 @@ allein und zuerst.
       `/auth/v1/token`-Anfrage raus, ohne dass eine Fehlermeldung erschien. Ob
       das nur an der Automatisierung liegt oder auch einen Passwortmanager
       betrifft, ist offen. **Eigene Aufgabe wert, hier bewusst nicht verfolgt.**
-- [ ] **Beleg (Gerät), sobald Phase B steht — nicht erst in Phase E.** Alle drei
-      RED-Tests oben laufen in jsdom gegen eine **Attrappe** von `Preferences`.
-      Ein Adapter, dessen `removeItem` auf dem Gerät ins Leere läuft, wäre dort
-      grün und hier kaputt — genau die Sorte Vakuum-Test, die dieses Repo
-      wiederholt getroffen hat. Sobald eine Schale startet: anmelden, App
-      beenden, neu starten (angemeldet), abmelden, neu starten (Anmeldung).
-      Diese Zeile ist der eigentliche Beweis für A1; die drei jsdom-Tests
-      sichern nur die Verdrahtung.
+- [x] **Beleg (Gerät) — erbracht 08.09. am iPhone 17 Pro, und er hat die
+      Attrappe entlarvt, vor der die Zeile warnte.** Zwei Richtungen, beide am
+      Gerät durchgespielt: anmelden → App wegwischen → neu starten → **Feed**;
+      abmelden → App wegwischen → neu starten → **Anmeldemaske**. Die zweite
+      ist die wertvollere, denn ein `removeItem`, das am Gerät ins Leere liefe,
+      wäre in jsdom grün.
+
+      Dazu ein Beleg aus der Gerätekonsole, den kein Blick auf den Schirm
+      liefert: beim Start steht dort `To Native -> Preferences get` gefolgt von
+      `TO JS {"value":"{\"access_token\":\"eyJhbGciOiJFUzI1NiIs…`. Die Sitzung
+      liegt also wirklich in Preferences und nicht im `localStorage` — die
+      Weiche aus A1 greift nativ.
+
+      **Warum die Zeile überhaupt stand:** alle drei RED-Tests oben laufen in
+      jsdom gegen eine **Attrappe** von `Preferences`. Ein Adapter, dessen
+      `removeItem` auf dem Gerät ins Leere läuft, wäre dort grün und hier
+      kaputt — genau die Sorte Vakuum-Test, die dieses Repo wiederholt
+      getroffen hat. Dieser Beleg ist der eigentliche Beweis für A1; die drei
+      jsdom-Tests sichern nur die Verdrahtung.
 
 ### A2. Die Routen werden geteilt
 
@@ -942,14 +953,61 @@ betroffenen Punkten.
 - [x] **Abnahme:** `pnpm typecheck` 0, `pnpm lint` **Exit 0** (7 Warnungen,
       alle bestehend), `pnpm test` **2605/2605** in 232 Dateien,
       `native-secrets-guard` (1526 Dateien) und `entry-chunk-guard` grün.
-- [ ] **Offen: der Beleg am Gerät.** Alles oben ist am gebauten Bündel im
-      Desktop-Chrome gemessen. Ob `window.Capacitor` im `<head>` am echten
-      Gerät steht, kann nur das Gerät sagen — und es ist der eine Punkt, an dem
-      diese Fläche still ausfallen würde.
-- [ ] **Beleg auf dem Gerät, NACH dem Löschen der App.** *Aus der Review (beide,
-      LOW/MEDIUM):* iOS hält den Startbildschirm in einem Zwischenspeicher; ein
-      Beleg ohne vorheriges Löschen zeigt womöglich die alte Fläche und belegt
-      nichts. Bildschirmfoto im Hoch- **und** im Querformat.
+- [x] **Der Beleg am Gerät — erbracht 08.09.** Alles oben war am gebauten
+      Bündel im Desktop-Chrome gemessen. Ob `window.Capacitor` im `<head>` am
+      echten Gerät steht, kann nur das Gerät sagen — und es war der eine Punkt,
+      an dem diese Fläche still ausgefallen wäre.
+
+      Gemessen mit einer Sonde, die **nur ins gebaute `dist/`** geschrieben
+      wurde (kein Quelltext, nichts zurückzunehmen), ausgelesen über
+      `xcrun devicectl … --console`. iPhone 17 Pro, iOS 26.6, `builtin`:
+
+      ```
+      [B5-SONDE] head            {"capacitor":"object","isNativePlatform":"function",
+                                  "ergebnis":true,"plattform":"ios","boot":"nativ"}
+      [B5-SONDE] domcontentloaded {"element":true,"display":"block","hoehe":874,"boot":"nativ"}
+      [B5-SONDE] nach 5s          {"nochDa":false}
+      ```
+
+      Die `head`-Zeile hängt **nicht** in der Bedingung — bliebe sie aus, hiesse
+      das „Skript lief nicht", und das ist etwas anderes als „Bedingung war
+      falsch". `display: block` und 874 px belegen, dass die Fläche wirklich
+      gezeichnet wird und nicht nur ein Attribut steht; `nochDa: false` belegt,
+      dass React sie beim ersten `render()` wegräumt. Quer gehalten misst
+      dieselbe Zeile `hoehe: 402`.
+
+      ⚠ **Und das Verfahren scheiterte beim ersten Anlauf, auf eine Art, die
+      wie ein Sachfehlschlag aussah.** Der erste Lauf brachte **keine einzige**
+      Sondenzeile. Grund war nicht die Fläche, sondern capgo: die WebView lud
+      `0.0.0+ab7732c5a532` vom Server, nicht `App.app/public/`. Im Protokoll
+      steht es wörtlich — `CapgoUpdater : Version successfully loaded: {"id":
+      "bvlIRVRtZU", "version": "0.0.0+ab7732c5a532"}`. **Eine Installation über
+      `devicectl` erreicht die Weboberfläche nicht**, solange ein OTA-Bündel
+      liegt; erst das Deinstallieren wischt capgos Zustand, danach läuft
+      `builtin` (`"id":"builtin","version":"1.0.0"`). Das ist dieselbe Falle,
+      die auf Android schon mit `adb install` zuschlug.
+- [x] **Beleg auf dem Gerät, NACH dem Löschen der App — erbracht 08.09.**
+      *Aus der Review (beide, LOW/MEDIUM):* iOS hält den Startbildschirm in
+      einem Zwischenspeicher; ein Beleg ohne vorheriges Löschen zeigt womöglich
+      die alte Fläche und belegt nichts. Also deinstalliert, neu installiert,
+      und die Messung oben stammt aus genau diesem Lauf.
+
+      Sichtprobe durch Donald, **hochkant:** „Startbildschirm für sehr kurz und
+      dann Feed" — keine leere Fläche dazwischen. Das ist die Lücke, die B5
+      schliessen sollte.
+
+      **Bildschirmfotos vom Gerät gibt es nicht, und das ist eine Grenze, keine
+      Auslassung:** die Fläche steht rund 200 ms, und für das iPhone liegt hier
+      kein Werkzeug, das zu diesem Zeitpunkt auslöst. Was stattdessen abgelegt
+      ist: die Zahlen oben aus der Gerätekonsole, plus zwei Renderings
+      **desselben** ausgelieferten `dist/` bei 402×874 und 874×402.
+
+      ⚠ **Der Verdacht vom 29.08. ist damit auch erledigt, aber anders als
+      gedacht.** Quer meldete Donald „nur weisser Bildschirm". Erste Vermutung
+      war ein am oberen Rand ausgerichtetes `scaleAspectFill`, das quer nur den
+      hellen Wandstreifen des Fotos zeigt — **falsch**, UIKit zentriert.
+      Zentriert nachgebaut stimmen native und Web-Fläche quer praktisch
+      überein; es gibt also **keine Naht** und nichts ist kaputt.
 
       ⚠ **Und er hat eine Vorgeschichte, die fast verlorengegangen wäre.** Am
       29.08. stand in der Übergabe (`8710c18:session-handoff.md:125`) die
@@ -972,6 +1030,19 @@ betroffenen Punkten.
       damals war dort noch Capacitors weisses PNG, und „erscheint nicht" ist bei
       einer weissen Fläche vor einem weissen WebView von „erscheint" nicht zu
       unterscheiden. Sie wurde seither nie wiederholt.
+- [ ] **Offen, eigener Vorgang: quer ist die Komposition ausgewaschen.**
+      Kein Fehler — genau das, was der zentrierte Ausschnitt eines
+      Hochformat-Fotos in einem 3,5:1-Band ergibt: er trifft die helle Wand
+      *zwischen* den beiden Personen, die Gesichter fallen oben und unten raus.
+      Gemessen am Bandmittelwert: hochkant RGB **129/123/117**, quer
+      **148/139/134**. Beide Schichten tun dasselbe, es sieht nur nach fast
+      nichts aus — Donalds Wortlaut war „nur weisser Bildschirm quer".
+
+      Das zu ändern hiesse, einen eigenen Querformat-Ausschnitt zu wählen (im
+      Asset-Katalog als Variante, plus die Web-Entsprechung aus
+      `scripts/splash.ts`). Das ist eine Entscheidung über Bildmaterial, keine
+      Zeile Code, und gehört deshalb nicht in diesen Change.
+
 - [x] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
       **Gemessen am 31.08. mit `actool` (Xcode 26.6), also am KOMPILIERTEN
       `Assets.car` und nicht an den Quelldateien** — die beiden Zahlen gehen
@@ -1052,8 +1123,13 @@ nicht wiederholt.
       alle `env(safe-area-inset-*)` null, und jede weitere Zeile wirkungslos.
 - [x] `env(safe-area-inset-*)` **ergänzend** (nicht ersetzend) an Kopfzeile,
       beiden angedockten Leisten und Chatfenster.
-- [ ] **Beleg auf dem Gerät**, ausdrücklich nicht in jsdom: dort sind die Insets
+- [x] **Beleg auf dem Gerät**, ausdrücklich nicht in jsdom: dort sind die Insets
       immer null, und ein Test darüber wäre grün, gleich was die App tut.
+      **Erbracht 08.09.** am iPhone 17 Pro (Dynamic Island), Sichtprobe durch
+      Donald: Kopfzeile steht unter der Insel statt darunter durchzulaufen, die
+      angedockte Leiste wird vom Home-Indikator nicht verdeckt, das Chatfenster
+      steht über ihm. Kein Bildschirmfoto abgelegt — im Feed stehen echte
+      Mitglieder, und dieses Repo ist öffentlich.
 
 ### C2. Android-Zurück
 
@@ -1141,6 +1217,43 @@ nicht wiederholt.
 - [ ] **Beleg auf beiden Geräten**, wie bei C1 und C2: einmal aus der Kamera,
       einmal aus der Galerie, Bild danach auf dem Profil sichtbar. Die native
       Auswahl ist genau der Teil, den kein Test im Browser je berührt.
+
+      **iOS erbracht 08.09.**, iPhone 17 Pro: die *eigene* Rückfrage geht auf
+      (nicht der iOS-Dateidialog), Kamera und Galerie liefern beide, das Bild
+      steht danach auf dem Profil. **Android bleibt offen** — an diesem Mac
+      hängt kein Android-Gerät, `adb` ist nicht einmal im Pfad.
+- [x] **Und der Beleg fand einen Fehler, den kein Test finden konnte: der
+      Zoom-Regler im Zuschnitt war am Finger praktisch nicht zu bedienen.**
+      Donalds Wortlaut: „der Button ist kaum zu sehen weil weiss, und ausserdem
+      muss ich schon sehr drücken um ihn zu bewegen."
+
+      Zwei Ursachen, beide am Desktop unsichtbar. Der System-Knopf von iOS ist
+      **weiss**, und der Zuschnitt steht auf `--color-canvas` (#ffffff) — weiss
+      auf weiss. `accent-color` (Tailwind `accent-accent-strong`, die bisherige
+      Klasse) half nicht: es färbt auf iOS die **Schiene**, nicht den Knopf.
+      Dazu ist die Trefffläche eines Standard-Reglers rund 30 px hoch, Apple
+      nennt 44 px. Am Desktop fällt beides nicht auf — ein Mauszeiger trifft
+      pixelgenau, und WebKit zeichnet den Knopf auf macOS dunkel.
+
+      Behoben in `.fbc-regler` (`src/index.css`): 28-px-Knopf in
+      `--color-accent-strong` mit 2-px-Ring in `--color-canvas`, 44 px
+      Trefffläche über einer 6 px hohen Schiene. **Die Falle beim Bauen:**
+      `appearance: none` — ohne das ignoriert WebKit jede Knopf-Regel — nimmt
+      in WebKit **und** in Firefox Schiene und Knopf weg. Wer nur den
+      WebKit-Satz schreibt, macht den Regler in Firefox unsichtbar statt bloss
+      blass, also schlimmer als vorher. Beide Sätze stehen, beide sind mit
+      einer Mutation abgesichert.
+
+      `src/zoom-regler.test.ts`, sieben Zusagen, **sechs Mutationen alle rot**:
+      Klasse aus dem Regler gestrichen · `appearance: none` entfernt ·
+      Trefffläche auf 30 px · Knopf auf 16 px · Knopf wieder weiss ·
+      Firefox-Schiene gestrichen.
+- [ ] **Offen, eigener Vorgang: `OnboardingPage.tsx:212` trägt denselben Fehler
+      schärfer.** Der Regler dort steht auf `appearance-none` **ohne jede**
+      Knopf-Regel — der Knopf dürfte damit in jedem WebKit unsichtbar sein,
+      auch am Desktop. Hier bewusst nicht mitgeändert: die Fläche hat eigene
+      Schienen-Optik auf dunklem Chrome, und die ist nie am Gerät gesehen
+      worden. Am Gerät gemessen ist bisher nur der Zuschnitt.
 
 ## Phase D — OTA · selbst gehostet auf Supabase
 

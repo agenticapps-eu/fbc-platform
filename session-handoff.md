@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-08 (AGE-642: B5 Boot-Fläche, iOS-Hälfte von B3)
+# Session Handoff — 2026-09-08 (AGE-642: die Gerätesitzung, A1/C1/C3/B5)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
@@ -7,132 +7,119 @@
 > parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase — **nicht
 > zusammenführen**, überschreiben.
 >
-> **2. Sie ersetzt die AGE-705-Fassung.** Wer die sucht:
-> `git show 97e3df6:session-handoff.md`. An AGE-705 ist von hier aus **nichts**
-> zu tun.
+> **2. Sie ersetzt die Fassung vom Vormittag** (B5 Boot-Fläche, iOS-Hälfte von
+> B3). Wer die sucht: `git show f7116df:session-handoff.md`.
 >
 > **3. Die Belege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/tasks.md`, Abschnitte B3 und B5.
+> `openspec/changes/capacitor-huelle/tasks.md`, Abschnitte A1, C1, C3 und B5.
 
 ## Accomplished
 
-Zwei PRs, beide gemergt: **#364** (`f38fdc2`), **#365** (`8f5f6c5`).
+Die Gerätesitzung aus der letzten Übergabe ist gelaufen, iPhone 17 Pro
+(`544B9818-…`), iOS 26.6. **Vier Gerätebelege zu, einer bleibt offen, und
+unterwegs fiel ein echter Fehler an.**
 
-### B5 — die Boot-Fläche schliesst die Lücke beim App-Start
+### Belegt
 
-Zwischen nativem Startbildschirm und erstem Bild der Anwendung stand eine leere
-Fläche. In `tasks.md` stand dazu die Vermutung „weiss auf weiss, also
-unsichtbar". **Regionsweise gemessen gilt das nur fürs untere Drittel:** oben
-weicht ein Foto (`#b8b7ad`, Streuung 67) einer vollkommen leeren Fläche
-(`#f6f8fb`, Streuung 0), 40 ms (dieser Mac) bis 228 ms (6-fache CPU-Bremse).
+- **A1** — die Sitzung überlebt einen Neustart (Feed), und nach dem Abmelden
+  kommt die Anmeldemaske. Die zweite Richtung ist die wertvollere: ein
+  `removeItem`, das am Gerät ins Leere liefe, wäre in jsdom grün. Dazu aus der
+  Konsole `Preferences get` → `access_token` — die Weiche greift nativ.
+- **C1** — Kopfzeile unter der Dynamic Island, Leiste frei vom Home-Indikator,
+  Chatfenster darüber. Sichtprobe, kein Bildschirmfoto (öffentliches Repo).
+- **C3 (iOS)** — eigene Rückfrage geht auf, Kamera **und** Galerie liefern, Bild
+  steht danach auf dem Profil. **Android bleibt offen**, hier hängt kein Gerät.
+- **B5** — `[B5-SONDE] head {"capacitor":"object","isNativePlatform":"function",`
+  `"ergebnis":true,"plattform":"ios","boot":"nativ"}`, dazu `display: "block"`
+  und `hoehe: 874` (quer 402) und `nochDa: false` nach 5 s. Damit ist die eine
+  Frage beantwortet, an der die Fläche still ausgefallen wäre. Hochkant
+  ausserdem Donalds Blick: „Startbildschirm für sehr kurz und dann Feed".
 
-Jetzt zeigt die Fläche dieselbe Komposition wie das Storyboard — Markup in
-`index.html` **innerhalb von `#root`** (React räumt es beim ersten `render()`
-selbst weg), freigeschaltet vom Inline-Skript im `<head>` über
-`window.Capacitor.isNativePlatform()`. Gemessen: Boot-Fläche `#b8b7ac`/67 gegen
-Startbildschirm `#b8b7ad`/67; im Browser **0 Bildanfragen**, nativ 2.
+### Gefunden und behoben — der Zoom-Regler im Zuschnitt
 
-### B3 — die iOS-Hälfte, erst gemessen, dann geschrieben
+Donald am Gerät: „der Button ist kaum zu sehen weil weiss, und ausserdem muss
+ich schon sehr drücken um ihn zu bewegen." Zwei Ursachen, beide am Desktop
+unsichtbar: der System-Knopf von iOS ist **weiss** auf `--color-canvas`
+(#ffffff), und `accent-color` färbt auf iOS die Schiene, nicht den Knopf; dazu
+rund 30 px Trefffläche gegen Apples 44.
 
-Die ganze Kette lokal durchgefahren, danach `ios-release.yml` als Abschrift.
-**Erster CI-Lauf grün, alle 13 Schritte, 2 min 55 s** (nicht die 12–15 min, die
-ich veranschlagt hatte — es gibt kein CocoaPods, SPM löst aus dem Cache).
-
-Am **heruntergeladenen** Artefakt nachgeprüft, nicht nur im Log:
-`Apple Distribution: Donald Vlahovic (WQZJ8649TN)` · Store-Profil ohne
-Geräteliste · `aps-environment: production` · 1.0 (1) · Boot-Fläche liegt drin ·
-`codesign --verify --deep --strict` bestanden · genau **eine** Datei im
-Artefakt, kein Signaturmaterial.
-
-**Der Befund, der die Arbeit halbiert:** es gibt kein Zertifikat als Secret.
-`-allowProvisioningUpdates` lässt Apple **serverseitig** signieren — das `.ipa`
-trägt `Apple Distribution`, während der Schlüsselbund weiterhin nur
-`Apple Development` führt und `/v1/certificates` ebenfalls. Kein `.p12`, kein
-Keychain-Import.
-
-Dazu: App-Datensatz in App Store Connect angelegt (von Donald), drei `ASC_*`
-in Infisical `prod`, Environment `ios-release` als Spiegel von `android-release`.
+Behoben als `.fbc-regler` — 28-px-Knopf in `--color-accent-strong`, 2-px-Ring in
+`--color-canvas`, 44 px Trefffläche über 6 px Schiene. Sieben Zusagen,
+**sechs Mutationen alle rot**.
 
 ## Decisions
 
-- **Boot-Fläche füllen statt stehen lassen** (Donald, 07.09.). Die
-  Zwischenlösung „nur den Grundton auf `#ffffff`" ist verworfen — die eigene
-  Messung sagt, sie repariert genau die Stelle, die man ohnehin nicht sieht.
-- **Der Schriftzug bleibt ein Bild, kein Text.** Alle vier `@font-face` stehen
-  auf `font-display: swap`, nichts wird vorgeladen; als Text spränge er mitten
-  im geglätteten Moment um.
-- **WebP statt JPEG** für die Web-Fassung des Bandes: bei gleichen 900 px
-  154.860 → 41.600 B. Preis: `cwebp` als viertes Werkzeug von `pnpm splash`.
-- **iOS zuerst lokal messen, dann den Workflow schreiben.** Die Android-Hälfte
-  kostete einen roten Lauf, dessen Meldung falsch war, und das Suchen fand im
-  CI statt.
-- **Validiert, nicht hochgeladen** (`--validate-app` → VERIFY SUCCEEDED).
-  Dadurch bleibt Build-Nummer 1 frei und der Workflow fängt bei `run_number` 1
-  an, ohne Sonderregel.
-- **Die Team-ID bekommt keinen `ASC_`-Namen.** `ios-release.yml` liest
-  `APNS_TEAM_ID` — dasselbe Apple-Team, eine zweite Kopie wäre die erste, die
-  auseinanderläuft.
-- **Der Workflow hört beim signierten Artefakt auf.** TestFlight ist M4
-  (AGE-644), wie auf der Android-Seite.
-- **Freigabe des Erstlaufs per API**, mit Kommentar im Protokoll, der sagt wie
-  sie zustande kam — Verfahren von Donald am 04.09. festgelegt.
+- **Der Regler-Fix gehört in diesen Change**, obwohl er nicht im Plan stand: er
+  liegt auf genau der Fläche, die C3 gerade belegt hat, und ein Zuschnitt, den
+  man nicht bedienen kann, macht den nativen Bildweg wertlos.
+- **`OnboardingPage.tsx:212` wird NICHT mitgeändert.** Der Regler dort trägt
+  denselben Fehler schärfer (`appearance-none` ohne jede Knopf-Regel, also
+  vermutlich in jedem WebKit unsichtbar), aber er hat eigene Schienen-Optik auf
+  dunklem Chrome, die nie am Gerät gesehen wurde. Eigener Vorgang.
+- **Quer bleibt, wie es ist.** Die Komposition wäscht quer aus (Bandmittelwert
+  RGB 148/139/134 gegen 129/123/117 hochkant), weil der zentrierte Ausschnitt
+  eines Hochformat-Fotos in einem 3,5:1-Band die Wand *zwischen* den Personen
+  trifft. Beide Schichten tun dasselbe, es gibt keine Naht. Das zu ändern wäre
+  eine Entscheidung über **Bildmaterial**, keine Zeile Code.
+- **Beide Pseudoelement-Sätze, nicht nur WebKit.** `appearance: none` nimmt in
+  WebKit *und* Firefox Schiene und Knopf weg; nur den WebKit-Satz zu schreiben
+  machte den Regler in Firefox unsichtbar statt blass — schlimmer als vorher.
+- **Sonde nur ins gebaute `dist/`**, nie in `src/` — dieselbe Regel wie im
+  D5-Runbook: kein Quelltext, den jemand zurückzunehmen vergisst.
 
 ## Files modified
 
-- `index.html` — Boot-Flächen-Markup in `#root`, zweites Inline-Skript im `<head>`
-- `src/index.css` — Regeln der Boot-Fläche, Vorgabe `display: none`
-- `src/boot-flaeche.test.ts` — **neu**, acht Zusagen
-- `scripts/splash.ts` · `scripts/splash.logic.ts` — Web-Fassungen aus derselben Quelle
-- `public/brand/splash-band.webp` (41,6 kB) · `splash-schriftzug.png` (42,2 kB) — **neu**
-- `.github/workflows/ios-release.yml` — **neu**, 13 Schritte
-- `scripts/ios-release.workflow.test.ts` — **neu**, elf Zusagen
-- `docs/secrets.md` — drei `ASC_*`-Zeilen plus Abschnitt zum cloud-verwalteten Zertifikat
-- `openspec/changes/capacitor-huelle/tasks.md` — B3 iOS und B5 nachgezogen
+- `src/index.css` — `.fbc-regler`, vier Regeln (Rumpf, zwei Schienen, zwei Knöpfe)
+- `src/components/profile/AvatarCropper.tsx` — `accent-accent-strong` → `fbc-regler`
+- `src/zoom-regler.test.ts` — **neu**, sieben Zusagen
+- `openspec/changes/capacitor-huelle/tasks.md` — A1, C1, C3, B5 nachgezogen;
+  zwei neue offene Zeilen (Onboarding-Regler, Querformat-Komposition)
 
 ## Next session: start here
 
-**Beides sind eigene Sitzungen, so von Donald gewollt.** Die Gerätebelege
-zuerst: `openspec/changes/capacitor-huelle/geraetesitzung-d5.md` ist das
-Runbook, offen sind A1, C1, C2, C3 und B5 — und **B5 zuletzt**, weil es
-Deinstallieren verlangt und das die Anmeldung kostet. Der wichtigste Punkt
-dabei ist neu und steht in keinem Runbook: **ob `window.Capacitor` im `<head>`
-am echten Gerät schon steht.** Steht es nicht, bleibt das Attribut `data-boot`
-weg, die Boot-Fläche erscheint nicht, und alles sieht aus wie vorher — kein
-Fehler, kein Log. Prüfen lässt es sich am Gerät über die Konsole
-(`document.documentElement.dataset.boot`). Danach TestFlight unter **AGE-644**.
+**Der Regler-Fix ist noch nicht am Finger geprüft**, und das ist der erste
+Punkt. Er braucht nichts: sobald das hier auf `main` ist, baut die CI ein
+OTA-Bündel, und das Gerät holt es sich beim nächsten Hintergrundwechsel von
+allein — **kein Neuinstallieren, keine erneute Abmeldung**. Also mergen, Donald
+den Zuschnitt einmal aufmachen lassen, dann ist C3 ganz zu. Danach TestFlight
+unter **AGE-644**, eigener Vorgang.
 
-> ⚠ **„Build-Nummer = Lauf-Nummer" ist weiterhin NICHT bewiesen.** Lauf 1
-> verglich 1 mit 1, und 1 ist auch die Projektvorgabe. Die Zusage wird erst bei
-> Lauf 2 echt. Grün heisst hier noch nichts.
+> ⚠ **Eine Installation über `devicectl` erreicht die Weboberfläche NICHT.**
+> Gemessen 08.09.: die erste Sondenmessung kam mit **null** Zeilen zurück, weil
+> die WebView capgos Bündel `0.0.0+ab7732c5a532` lud statt `App.app/public/`
+> (`CapgoUpdater : Version successfully loaded: {"id":"bvlIRVRtZU"…}`). Das sah
+> aus wie „die Boot-Fläche fällt aus" und war das Messverfahren. Erst
+> **Deinstallieren** wischt capgos Zustand, danach läuft `builtin`
+> (`"version":"1.0.0"`). Dieselbe Falle wie mit `adb install` auf Android.
 
-> ⚠ **Admin-Bypass ist bei einem neuen GitHub-Environment `true`.** Beim
-> Anlegen von `ios-release` stand er so da, während Android auf `false` steht —
-> die Freigaberegel wäre Dekoration gewesen. Nachgezogen. Wer ein Environment
-> anlegt, muss es zurücklesen.
+> ⚠ **`--terminate-existing` verhindert die OTA-Übernahme.** Der Prozess wird
+> getötet, geht also nie in den Hintergrund — deshalb lief nach dem
+> Deinstallieren auch bei jedem weiteren Konsolenstart noch `builtin`. Zum
+> Mitlesen taugt der Schalter, zum Auslösen nicht.
+
+> ⚠ **Nachbau eines Storyboards: `scaleAspectFill` ZENTRIERT.** Am oberen Rand
+> ausgerichtet nachgebaut ergab es „quer zeigt nur die weisse Wand" — eine
+> Diagnose, die vollständig aus meinem eigenen Messfehler stammte. Zentriert
+> stimmen native und Web-Fläche überein.
 
 > ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Der Branchname trägt
-> `age-642` und löst allein aus; vorbeugen geht nicht. Am 07.09. zweimal
-> zurückgesetzt. Nach jedem Merge nachsehen.
+> `age-642`. Nach dem Merge nachsehen und zurücksetzen.
 
-> ⚠ **Squash-Falle, weiterhin scharf.** Nach jedem Merge `git log
-> origin/main..HEAD` prüfen — ist es leer, `git reset --hard origin/main`. Der
-> nächste Push braucht `--force-with-lease`.
+> ⚠ **Squash-Falle.** Nach jedem Merge `git log origin/main..HEAD` prüfen — ist
+> es leer, `git reset --hard origin/main`. Heute früh schon einmal nötig
+> gewesen.
 
-> ⚠ **Zwei Dateien nie mitcommitten.** `prettier --write` auf `tasks.md`
-> schreibt ~1000 fremde Zeilen um (und Prettier ist in KEINEM CI-Gate);
-> `src/content/release-entries.generated.ts` wird von jedem `pnpm build`
-> unformatiert neu geschrieben — zurücknehmen.
+> ⚠ **`tasks.md` nie durch `prettier --write` schicken** (~1000 fremde Zeilen).
+> Sie ist bereits an `HEAD` unformatiert, das ist der Normalzustand.
 
 ## Open questions
 
-- **Der ASC-Schlüssel `ND87HL4S75` ist Team Scoped** und am 25.07. für Donalds
-  andere App angelegt. Er funktioniert, aber ein CI-Runner mit Zugriff auf jede
-  App des Teams ist mehr Reichweite als nötig. Rotieren geht jederzeit.
-- **Der Name im Store ist „eff.bee.zee."**, mit Punkt am Ende. Umbenennen geht,
-  solange nicht eingereicht ist.
-- **`APNS_SANDBOX` steht auf `1`**, ein Store-Build spricht Produktions-APNs an.
-  `send-push` erkennt den Host an der Antwort, sollte sich also selbst fangen —
-  beim ersten TestFlight-Build nachsehen.
-- **Der Debug-Bau schreibt die Supabase-Sitzung ins logcat.** Vor der
-  Einreichung am Release-Bau gegenprüfen. Eigener Vorgang.
-- **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
+- **C2 und die Android-Hälfte von C3** brauchen ein Android-Gerät. An diesem Mac
+  hängt keines, `adb` ist nicht im Pfad.
+- **Querformat-Startfläche** — auswaschen lassen oder eigenen Ausschnitt
+  wählen? Entscheidung über Bildmaterial, siehe oben.
+- **„Build-Nummer = Lauf-Nummer" ist weiterhin NICHT bewiesen.** Lauf 1 verglich
+  1 mit 1. Erst Lauf 2 macht die Zusage echt.
+- **`APNS_SANDBOX` steht auf `1`**, ein Store-Build spricht Produktions-APNs an
+  — beim ersten TestFlight-Build nachsehen.
+- **Der ASC-Schlüssel `ND87HL4S75` ist Team Scoped**, mehr Reichweite als nötig.
