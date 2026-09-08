@@ -28,11 +28,11 @@
       setzen. `no action` verhindert die Auth-Löschung, statt sie zu erlauben (D2)
 - [x] 2.2 Migration: eigener, dauerhafter **Löschzustand** (D7) — nicht
       `deleted_at` allein, weil `admin_restore_member` das zurücksetzt
-- [ ] 2.3 Migration: Anonymisierungs-Funktion — leert die PII-Spalten **nach
+- [x] 2.3 Migration: Anonymisierungs-Funktion — leert die PII-Spalten **nach
       datenmatrix.md**, setzt den Löschzustand, lässt die Inhaltstabellen
       unberührt. `search_doc` NICHT anfassen: `generated always`, sie zieht mit,
       sobald alle acht Quellspalten leer sind
-- [ ] 2.4 Migration: künftige Anmeldungen auf `cancelled`, geplante Beiträge
+- [x] 2.4 Migration: künftige Anmeldungen auf `cancelled`, geplante Beiträge
       löschen, offene Kontaktanfragen zurückziehen (D10)
 - [x] 2.5 ~~Sichtbarkeits-Prädikate ergänzen~~ — **entfällt, gemessen.** Die
       Löschung setzt `deleted_at` mit, und die vorhandenen Prädikate lesen es
@@ -46,9 +46,9 @@
       gegengeprüft (genau eine Zusage fällt)
 - [x] 2.7 `admin_restore_member` verweigert den Löschzustand; die weiche Löschung
       bleibt für alle anderen Konten wiederherstellbar
-- [ ] 2.8 `revoke execute` für `public`, `anon` und `authenticated` ausdrücklich
+- [x] 2.8 `revoke execute` für `public`, `anon` und `authenticated` ausdrücklich
       aussprechen, `grant` nur an `service_role`; geerbte Rechte reichen nicht
-- [ ] 2.9 Den Grants-Schnappschuss der CI nachziehen — eine neue Funktion bricht
+- [x] 2.9 Den Grants-Schnappschuss der CI nachziehen — eine neue Funktion bricht
       ihn sonst, und die Liste blind zu erweitern erteilt `anon` das Recht
 
 ## 3. Serverseite
@@ -76,32 +76,34 @@
 
 ## 5. Nachweis
 
-- [ ] 5.1 Test gegen die Datenmatrix aus 1.1: nach der Löschung trägt keine der
+- [x] 5.1 Test gegen die Datenmatrix aus 1.1: nach der Löschung trägt keine der
       dort als „geleert" geführten Spalten noch einen Personenbezug
-- [ ] 5.2 Test: die Suche nach dem alten Namen findet nichts — der Volltextindex
+- [x] 5.2 Test: die Suche nach dem alten Namen findet nichts — der Volltextindex
       ist der stille Rückkanal, ohne diesen Test ist die Anonymisierung unbelegt
-- [ ] 5.3 Test: Beiträge, Kommentare, Nachrichten und angenommene Kontaktanfragen
+- [x] 5.3 Test: Beiträge, Kommentare, Nachrichten und angenommene Kontaktanfragen
       existieren nach der Löschung noch
-- [ ] 5.4 Test: der Gesprächspartner sieht seinen Verlauf weiter, mit
+- [x] 5.4 Test: der Gesprächspartner sieht seinen Verlauf weiter, mit
       „Ehemaliges Mitglied" statt des Namens
-- [ ] 5.5 Test: `auth.users` ist weg — **und** die Löschung gelingt trotz
+- [x] 5.5 Test: `auth.users` ist weg — **und** die Löschung gelingt trotz
       erhaltener Profilzeile (der Negativfall zu 2.1)
-- [ ] 5.6 Test: ein **vor** der Löschung gesichertes Zugriffstoken kann danach
+- [x] 5.6 Test: ein **vor** der Löschung gesichertes Zugriffstoken kann danach
       weder Mitgliedsdaten schreiben noch Dateien hochladen (D8). Eine Abmeldung
       im Client belegt das nicht
-- [ ] 5.7 Test: `admin_restore_member` verweigert ein gelöschtes Konto, stellt ein
+- [x] 5.7 Test: `admin_restore_member` verweigert ein gelöschtes Konto, stellt ein
       weich gelöschtes aber weiterhin her
-- [ ] 5.8 Test: das gelöschte Mitglied erscheint nicht im Verzeichnis, nicht in
+- [x] 5.8 Test: das gelöschte Mitglied erscheint nicht im Verzeichnis, nicht in
       der Suche, nicht im Matching
-- [ ] 5.9 Test: `authenticated` und `anon` können die Anonymisierungs-Funktion
-      nicht direkt rufen; fremde Ziel-ID wird abgelehnt
-- [ ] 5.10 Test: künftige Anmeldung ist storniert und der Platz frei; geplanter
+- [ ] 5.9 Test: ~~`authenticated` und `anon` können die Anonymisierungs-Funktion
+      nicht direkt rufen~~ **belegt (Zusage 13)**; offen bleibt „fremde Ziel-ID
+      wird abgelehnt" — das entscheidet die Edge Function, nicht die Datenbank
+- [x] 5.10 Test: künftige Anmeldung ist storniert und der Platz frei; geplanter
       Beitrag erscheint nie; vergangene Anmeldung steht anonym noch da
-- [ ] 5.11 Test: Abbruch nach jedem Schritt meldet keinen Erfolg, und eine
-      Wiederholung führt zu Ende (Idempotenz); fremde Dateien bleiben unberührt
-- [ ] 5.12 Test (Positivkontrolle): derselbe Nachweis schlägt fehl, wenn die
+- [ ] 5.11 Test: ~~Wiederholung führt zu Ende (Idempotenz)~~ **belegt
+      (Zusage 25)**; offen bleiben „Abbruch meldet keinen Erfolg" und „fremde
+      Dateien bleiben unberührt" — beides liegt in der Edge Function
+- [x] 5.12 Test (Positivkontrolle): derselbe Nachweis schlägt fehl, wenn die
       Anonymisierung nicht lief — sonst belegt die Testreihe nichts
-- [ ] 5.13 Alle Nachweise gegen den **lokalen** Stack, mit eigens angelegtem
+- [x] 5.13 Alle Nachweise gegen den **lokalen** Stack, mit eigens angelegtem
       Konto; nie gegen DEV oder PROD
 
 ## 6. Ausrollen

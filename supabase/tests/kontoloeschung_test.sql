@@ -37,7 +37,7 @@
 --     selbst an und liest sie danach namentlich zurück.
 
 begin;
-select plan(12);
+select plan(28);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -254,6 +254,247 @@ select alike(
        values ('e5000000-0000-0000-0000-000000000003', 'darf nicht durchkommen') $$),
   'FEHLER:42501%row-level security policy%',
   'das geloeschte Konto wird beim Schreiben von der POLICY abgewiesen');
+
+-- ══ DIE ANONYMISIERUNG ═════════════════════════════════════════════════════
+-- Der eigentliche Vorgang. Was sie mit welcher Zeile tut, steht in
+-- `openspec/changes/kontoloeschung/datenmatrix.md` — die Zusagen hier sind
+-- gegen diese Matrix geschrieben, nicht gegen die Implementierung.
+--
+-- Das Mitglied `…05` bekommt dafür einen vollständigen Datensatz: Profilfelder,
+-- Kontaktdaten, ein Angebot, einen veröffentlichten und einen geplanten
+-- Beitrag, eine Unterhaltung mit `…06`, eine angenommene und eine offene
+-- Kontaktanfrage, eine vergangene und eine künftige Veranstaltungsanmeldung.
+
+-- `…07` gibt es, weil `contact_requests` ein `unique (from_id, to_id)` traegt:
+-- die angenommene und die offene Anfrage koennen nicht dasselbe Gegenueber
+-- haben.
+insert into auth.users (id, aud, role, email) values
+  ('e5000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'kl-voll@test.fbc'),
+  ('e5000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'kl-gegenueber@test.fbc'),
+  ('e5000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'kl-dritter@test.fbc');
+
+update public.profiles
+   set name = 'Wilhelmine Sonderbach', company = 'Sonderbach Consulting',
+       branche = 'Beratung', short_bio = 'Begleitet Familienunternehmen',
+       headline = 'Beraterin', roles = array['Beirat'],
+       competencies = array['Nachfolge'], interests = array['Segeln'],
+       region = 'Oberbayern', goals = 'Mehr Sichtbarkeit',
+       next_steps = array['Profil schaerfen'], website = 'https://sonderbach.example',
+       socials = '{"linkedin":"sonderbach"}'::jsonb,
+       member_number = 'M-9911', member_since = '2019-04-01',
+       dev_focus = 'wirken', dev_progress = 42,
+       avatar_url = 'avatars/e5.../a.jpg', cover_url = 'covers/e5.../c.jpg',
+       videos = array['https://example.invalid/v'],
+       activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-000000000005';
+update public.profiles
+   set name = 'Kl Gegenueber', activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-000000000006';
+update public.profiles
+   set name = 'Kl Dritter', activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-000000000007';
+
+insert into public.profile_contacts (profile_id, email, phone, street, postal_code, city, country)
+values ('e5000000-0000-0000-0000-000000000005', 'w.sonderbach@example.invalid',
+        '+49 89 1234', 'Beispielweg 3', '80331', 'Muenchen', 'DE');
+
+insert into public.offers (id, profile_id, title) values
+  ('e5000000-0000-0000-0000-0000000000c1', 'e5000000-0000-0000-0000-000000000005', 'Ein Angebot');
+
+-- Ein veroeffentlichter Beitrag (bleibt) und ein geplanter (geht).
+insert into public.posts (id, author_id, body, visibility, veroeffentlicht_ab) values
+  ('e5000000-0000-0000-0000-0000000000a5', 'e5000000-0000-0000-0000-000000000005',
+   'Veroeffentlichter Beitrag', 'members', now() - interval '1 day'),
+  ('e5000000-0000-0000-0000-0000000000a6', 'e5000000-0000-0000-0000-000000000005',
+   'Geplanter Beitrag', 'members', now() + interval '7 days');
+
+-- Eine Unterhaltung. Der Verlauf gehoert AUCH dem Gegenueber.
+insert into public.message_threads (id, a_profile_id, b_profile_id) values
+  ('e5000000-0000-0000-0000-0000000000d1',
+   'e5000000-0000-0000-0000-000000000005', 'e5000000-0000-0000-0000-000000000006');
+insert into public.messages (id, thread_id, sender_id, body) values
+  ('e5000000-0000-0000-0000-0000000000d2', 'e5000000-0000-0000-0000-0000000000d1',
+   'e5000000-0000-0000-0000-000000000005', 'Nachricht an das Gegenueber');
+
+-- Eine angenommene Anfrage (bleibt, sie ist Teil des fremden Verlaufs) und
+-- eine offene (geht, sie bindet das Gegenueber an ein Konto ohne Eigentuemer).
+insert into public.contact_requests (id, from_id, to_id, status) values
+  ('e5000000-0000-0000-0000-0000000000e1', 'e5000000-0000-0000-0000-000000000005',
+   'e5000000-0000-0000-0000-000000000006', 'accepted'),
+  ('e5000000-0000-0000-0000-0000000000e2', 'e5000000-0000-0000-0000-000000000005',
+   'e5000000-0000-0000-0000-000000000007', 'pending');
+
+insert into public.events (id, title, starts_at, visibility) values
+  ('e5000000-0000-0000-0000-0000000000f1', 'Vergangenes Treffen', now() - interval '30 days', 'public'),
+  ('e5000000-0000-0000-0000-0000000000f2', 'Kuenftiges Treffen',  now() + interval '30 days', 'public');
+insert into public.event_registrations (id, event_id, profile_id, status) values
+  ('e5000000-0000-0000-0000-0000000000f3', 'e5000000-0000-0000-0000-0000000000f1',
+   'e5000000-0000-0000-0000-000000000005', 'registered'),
+  ('e5000000-0000-0000-0000-0000000000f4', 'e5000000-0000-0000-0000-0000000000f2',
+   'e5000000-0000-0000-0000-000000000005', 'registered');
+
+-- ── 13. Kein Client-Rolle darf die Funktion rufen ───────────────────────────
+-- VOR dem Aufruf, damit die Zusage nicht an einem schon geleerten Konto misst.
+-- `has_function_privilege` statt eines Aufrufversuchs: ein Aufruf haette auch
+-- aus einem anderen Grund scheitern koennen und waere damit kein Rechtebeleg.
+select is(
+  (select bool_or(has_function_privilege(r, 'public.konto_anonymisieren(uuid)', 'EXECUTE'))
+     from unnest(array['anon','authenticated','public']) r),
+  false,
+  'weder anon noch authenticated noch public duerfen konto_anonymisieren rufen');
+
+-- Vorbedingung: der Name ist im Volltextindex, BEVOR anonymisiert wird.
+-- Ohne sie waere Zusage 16 auch dann gruen, wenn der Index nie etwas trug.
+select is(
+  (select count(*)::int from public.profiles
+    where id = 'e5000000-0000-0000-0000-000000000005'
+      and search_doc @@ websearch_to_tsquery('german', 'Sonderbach')),
+  1,
+  'Vorbedingung: der Name steht im Volltextindex');
+
+select public.konto_anonymisieren('e5000000-0000-0000-0000-000000000005');
+
+-- ── 15. Jede Spalte der Matrix ist leer ─────────────────────────────────────
+select is(
+  (select count(*)::int from public.profiles
+    where id = 'e5000000-0000-0000-0000-000000000005'
+      and (name is not null or company is not null or branche is not null
+        or short_bio is not null or headline is not null or roles is not null
+        or competencies is not null or interests is not null or region is not null
+        or goals is not null or next_steps is not null or website is not null
+        or socials is not null or member_number is not null
+        or member_since is not null or dev_focus is not null
+        or dev_progress is not null or avatar_url is not null
+        or cover_url is not null or videos <> '{}')),
+  0,
+  'keine Profilspalte der Datenmatrix traegt noch einen Personenbezug');
+
+-- ── 16. …auch nicht der Volltextindex ───────────────────────────────────────
+-- Der stille Rueckkanal: `search_doc` ist `generated always` ueber acht
+-- Quellspalten. Bleibt EINE davon gefuellt, ist das Mitglied weiter auffindbar,
+-- obwohl jede andere leer ist.
+select is(
+  (select count(*)::int from public.profiles
+    where id = 'e5000000-0000-0000-0000-000000000005'
+      and search_doc @@ websearch_to_tsquery('german', 'Sonderbach')),
+  0,
+  'der alte Name ist aus dem Volltextindex verschwunden');
+
+-- ── 17. Kontakt- und Adressdaten sind fort ──────────────────────────────────
+select is(
+  (select count(*)::int from public.profile_contacts
+    where profile_id = 'e5000000-0000-0000-0000-000000000005'),
+  0,
+  'die Kontakt- und Adresszeile ist geloescht');
+
+-- ── 18. Beide Marken stehen ─────────────────────────────────────────────────
+select is(
+  (select deleted_at is not null and erased_at is not null from public.profiles
+    where id = 'e5000000-0000-0000-0000-000000000005'),
+  true,
+  'deleted_at traegt die Sichtbarkeit, erased_at den Riegel');
+
+-- ── 19./20. Der fremde Gespraechsfaden steht ───────────────────────────────
+select is(
+  (select count(*)::int from public.messages
+    where id = 'e5000000-0000-0000-0000-0000000000d2'),
+  1,
+  'die Nachricht an das Gegenueber steht noch');
+
+select is(
+  (select count(*)::int from public.posts
+    where id = 'e5000000-0000-0000-0000-0000000000a5'),
+  1,
+  'der veroeffentlichte Beitrag steht noch');
+
+-- ── 21. Der geplante Beitrag ist fort ───────────────────────────────────────
+-- Er ist noch niemandes Gespraechsfaden — und wuerde sonst nach der Loeschung
+-- im Namen eines Kontos erscheinen, das keinen Eigentuemer mehr hat.
+select is(
+  (select count(*)::int from public.posts
+    where id = 'e5000000-0000-0000-0000-0000000000a6'),
+  0,
+  'der geplante, nie veroeffentlichte Beitrag ist geloescht');
+
+-- ── 22. Angenommene Anfrage bleibt, offene geht ─────────────────────────────
+select is(
+  (select string_agg(id::text, ',' order by id) from public.contact_requests
+    where from_id = 'e5000000-0000-0000-0000-000000000005'),
+  'e5000000-0000-0000-0000-0000000000e1',
+  'die angenommene Anfrage bleibt, die offene ist zurueckgezogen');
+
+-- ── 23./24. Kuenftige Anmeldung storniert, vergangene bleibt ────────────────
+-- `event_registrations` fuehrt eine `waitlist`; eine stehenbleibende anonyme
+-- Anmeldung haette den Platz blockiert, ohne dass jemand nachrueckt.
+select is(
+  (select status from public.event_registrations
+    where id = 'e5000000-0000-0000-0000-0000000000f4'),
+  'cancelled',
+  'die Anmeldung zur kuenftigen Veranstaltung ist storniert');
+
+select is(
+  (select status from public.event_registrations
+    where id = 'e5000000-0000-0000-0000-0000000000f3'),
+  'registered',
+  'die vergangene Teilnahme steht anonym weiter da');
+
+-- ── 25. Der Aufruf ist wiederholbar ─────────────────────────────────────────
+-- Ein Abbruch nach diesem Schritt muss durch erneutes Fahren heilbar sein.
+select lives_ok(
+  $$ select public.konto_anonymisieren('e5000000-0000-0000-0000-000000000005') $$,
+  'ein zweiter Aufruf laeuft ohne Fehler durch (idempotent)');
+
+-- ══ DIE SICHT DER ANDEREN ══════════════════════════════════════════════════
+-- Bis hierher hat der Test als Eigentuemer gelesen, also an der RLS vorbei.
+-- Die Entscheidung „anonymisieren, Fremdsicht bleibt" ist aber eine Aussage
+-- ueber das, was ein ANDERES MITGLIED sieht. Die letzten drei Zusagen lesen
+-- deshalb in der Identitaet des Gegenuebers.
+
+create function pg_temp.zaehl_als(uid uuid, q text) returns int language plpgsql as $$
+declare n int;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute q into n;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return n;
+end $$;
+
+-- ── 26. Das Gegenueber hat seinen Verlauf behalten ──────────────────────────
+select is(
+  pg_temp.zaehl_als('e5000000-0000-0000-0000-000000000006',
+    $$ select count(*)::int from public.messages
+        where id = 'e5000000-0000-0000-0000-0000000000d2' $$),
+  1,
+  'das Gegenueber sieht die Nachricht des geloeschten Mitglieds weiterhin');
+
+-- ── 27. …und sieht dort „Ehemaliges Mitglied" ───────────────────────────────
+-- `former_member_entries` (AGE-581) ist die vorhandene Auskunft dafuer. Dass
+-- sie ohne Aenderung auch fuer eine Kontoloeschung greift, ist der Grund,
+-- warum dieser Change die Anzeige nicht neu bauen musste — sie haengt an
+-- `deleted_at`, und die Anonymisierung setzt es mit.
+select is(
+  pg_temp.zaehl_als('e5000000-0000-0000-0000-000000000006',
+    $$ select count(*)::int from public.former_member_entries(
+         array['e5000000-0000-0000-0000-0000000000a5']::uuid[], '{}'::uuid[])
+        where former $$),
+  1,
+  'der Beitrag wird dem Gegenueber als „Ehemaliges Mitglied" ausgewiesen');
+
+-- ── 28. …und findet das Mitglied im Verzeichnis nicht mehr ──────────────────
+-- Der Beleg zu Aufgabe 2.5: es wurde KEINE neue Sichtbarkeitsregel geschrieben.
+-- Die Unsichtbarkeit kommt allein daher, dass die Anonymisierung `deleted_at`
+-- mitsetzt und die vorhandenen Praedikate es ohnehin lesen — auch
+-- `profiles_public`, das mit `security_invoker = off` laeuft und deshalb sonst
+-- eine eigene Baustelle gewesen waere.
+select is(
+  pg_temp.zaehl_als('e5000000-0000-0000-0000-000000000006',
+    $$ select count(*)::int from public.profiles_public
+        where id = 'e5000000-0000-0000-0000-000000000005' $$),
+  0,
+  'das geloeschte Mitglied ist aus profiles_public verschwunden');
 
 select * from finish();
 rollback;

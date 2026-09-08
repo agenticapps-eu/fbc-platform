@@ -12,7 +12,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(440);
+select plan(441);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -3152,8 +3152,21 @@ select is(
        where ref_id = 'c9e00001-0000-4000-8000-000000000001'$$),
   1, '… und jetzt auch seinen Feed-Beitrag (AGE-601 löst die Asymmetrie auf)');
 
--- 22.20 Die asymmetrische Kaskade, gepint statt nur beschrieben (opencode, LOW):
--- ein gelöschtes Host-Profil nimmt den BEITRAG mit, das EVENT bleibt.
+-- 22.20 Die asymmetrische Kaskade, gepint statt nur beschrieben (opencode, LOW).
+--
+-- ══ SEIT AGE-708 HAENGT SIE AN EINER ANDEREN HANDLUNG ══════════════════════
+-- Bis zum 08.09. loeste `delete from auth.users` diesen Block aus: die
+-- Profilzeile ging ueber `profiles_id_fkey` mit, und mit ihr der Beitrag.
+--
+-- Dieser Fremdschluessel ist fort (Kontoloeschung, AGE-708) — ein Auth-Abgang
+-- nimmt die Profilzeile NICHT mehr mit, und damit auch nichts, was an ihr
+-- haengt. Genau das ist der Zweck: eine Kontoloeschung sollte nicht still
+-- fremde Gespraechsfaeden zerreissen.
+--
+-- Die Kaskade SELBST besteht unveraendert weiter. Sie haengt jetzt nur an der
+-- Handlung, zu der sie gehoert — dem Loeschen der PROFILZEILE. Beide Haelften
+-- stehen deshalb hier: erst, dass der Auth-Abgang nichts mitnimmt, dann, dass
+-- die Kaskade greift, wenn wirklich das Profil verschwindet.
 insert into auth.users (id, aud, role, email) values
   ('c9c9c9c9-0000-0000-0000-0000000000b5', 'authenticated', 'authenticated', 'c9weg@test.fbc');
 update public.profiles set tier = 'impact', activated_at = now()
@@ -3161,11 +3174,19 @@ update public.profiles set tier = 'impact', activated_at = now()
 insert into public.events (id, title, host_id, visibility, starts_at) values
   ('c9e00004-0000-4000-8000-000000000004', 'C9 Event eines verschwundenen Hosts',
    'c9c9c9c9-0000-0000-0000-0000000000b5', 'public', now() + interval '10 days');
+
 delete from auth.users where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
 
 select is(
   (select count(*)::int from public.posts where ref_id = 'c9e00004-0000-4000-8000-000000000004'),
-  0, 'Host-Profil gelöscht: sein Event-Beitrag fällt über posts.author_id …');
+  1, 'Auth-Abgang allein: der Event-Beitrag BLEIBT (AGE-708, kein FK mehr auf auth.users)');
+
+-- Jetzt die Profilzeile selbst — die Kaskade, um die es diesem Block geht.
+delete from public.profiles where id = 'c9c9c9c9-0000-0000-0000-0000000000b5';
+
+select is(
+  (select count(*)::int from public.posts where ref_id = 'c9e00004-0000-4000-8000-000000000004'),
+  0, 'Profilzeile gelöscht: sein Event-Beitrag fällt über posts.author_id …');
 
 select is(
   (select count(*)::int from public.events where id = 'c9e00004-0000-4000-8000-000000000004'),
