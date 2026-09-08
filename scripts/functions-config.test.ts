@@ -72,6 +72,22 @@ describe("supabase/config.toml", () => {
     expect(verifyJwt(CONFIG, "send-push")).toBe(false);
   });
 
+  it("verlangt die JWT-Pruefung fuer `konto-loeschen` — der Handler prueft selbst nicht", () => {
+    // Die Gegenrichtung zu den Zusagen darunter, und sie fehlte bis AGE-708:
+    // gepint war nur, WO die Pruefung aus sein muss, nirgends, wo sie an sein
+    // muss. Gemessen am 08.09. blieb dieser Wächter gruen, als
+    // `konto-loeschen` versuchsweise auf `verify_jwt = false` stand.
+    //
+    // Bei dieser Function ist das besonders teuer. Sie LIEST den `sub` aus dem
+    // Token (`jwtSub`) und prueft ihn nicht — unter den asymmetrischen
+    // Signaturschluesseln der Produktion geht es nicht anders, `getUser()`
+    // liefert null und `getClaims()` scheitert am JWKS-Abruf (AGE-259). Die
+    // Verifikation liegt also VOLLSTAENDIG beim Gateway. Faellt sie weg,
+    // loescht die Function das Konto, dessen `sub` in einem beliebig
+    // zusammengebauten Token steht.
+    expect(verifyJwt(CONFIG, "konto-loeschen")).toBe(true);
+  });
+
   it.each(["ota-update", "ota-channel", "ota-stats"])(
     "schaltet die JWT-Pruefung fuer `%s` ab — eine native Schale traegt keines",
     (name) => {

@@ -37,7 +37,7 @@
 --     selbst an und liest sie danach namentlich zurück.
 
 begin;
-select plan(28);
+select plan(30);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -495,6 +495,36 @@ select is(
         where id = 'e5000000-0000-0000-0000-000000000005' $$),
   0,
   'das geloeschte Mitglied ist aus profiles_public verschwunden');
+
+-- ══ DER SCHEMAWAECHTER ═════════════════════════════════════════════════════
+-- ── 29. Bei unvorbereitetem Schema wird die Loeschung verweigert ────────────
+-- Der teuerste denkbare Fehlzustand: die Funktion liegt in einer Umgebung, in
+-- der der kaskadierende Fremdschluessel noch steht. Dann wuerde der naechste
+-- Schritt — `auth.users` entfernen — die Profilzeile und 35 Tabellen mit
+-- fremden Beitraegen mitnehmen.
+--
+-- `not valid` beim Wiederanlegen ist Absicht: der Test hat oben schon eine
+-- Profilzeile ohne auth-Zeile erzeugt (Zusage 4), eine vollstaendige Pruefung
+-- des Bestands wuerde also am eigenen Aufbau scheitern statt am Gegenstand.
+-- Fuer den Katalog — und nur den liest der Waechter — ist die Bedingung
+-- trotzdem da.
+alter table public.profiles
+  add constraint kl_probe_fkey foreign key (id)
+  references auth.users (id) on delete cascade not valid;
+
+select throws_ok(
+  $$ select public.konto_anonymisieren('e5000000-0000-0000-0000-000000000002') $$,
+  '55000',
+  null,
+  'bei noch stehendem Fremdschluessel verweigert die Anonymisierung (fail closed)');
+
+alter table public.profiles drop constraint kl_probe_fkey;
+
+-- Die Gegenprobe: ohne den Fremdschluessel laeuft derselbe Aufruf durch.
+-- Ohne sie belegte Zusage 29 nur, dass die Funktion ueberhaupt wirft.
+select lives_ok(
+  $$ select public.konto_anonymisieren('e5000000-0000-0000-0000-000000000002') $$,
+  'ohne den Fremdschluessel laeuft derselbe Aufruf durch');
 
 select * from finish();
 rollback;

@@ -621,3 +621,17 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# konto-loeschen (AGE-708): ein Mitglied loescht sein eigenes Konto. Apple
+# verlangt den Weg IN der App; in AGE-644 ist er eine Abnahmezeile.
+#
+# verify_jwt = true, und hier haengt mehr daran als anderswo: der Handler
+# LIEST den `sub` aus dem Token (jwtSub), er PRUEFT ihn nicht. Unter den
+# asymmetrischen Signaturschluesseln der Produktion geht das nicht anders —
+# getUser() liefert null, getClaims() scheitert am JWKS-Abruf (AGE-259).
+# Faellt dieser Block weg, verifiziert niemand mehr, und die Function loescht
+# das Konto, dessen `sub` im mitgeschickten Token steht. Bewacht von
+# scripts/functions-config.test.ts.
+[functions.konto-loeschen]
+enabled = true
+verify_jwt = true

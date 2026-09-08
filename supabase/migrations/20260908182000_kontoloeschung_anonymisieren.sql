@@ -73,6 +73,35 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- ── Der Schemawaechter ────────────────────────────────────────────────────
+  -- Aus dem Plan-Review (codex, HIGH #11). Diese Funktion bereitet eine
+  -- Loeschung vor, die als NAECHSTES `auth.users` entfernt. Traegt `profiles`
+  -- dabei noch den kaskadierenden Fremdschluessel, reisst dieser Schritt die
+  -- Profilzeile und ueber sie 35 Tabellen mit — Beitraege, Kommentare,
+  -- Nachrichten und Kontaktanfragen inbegriffen.
+  --
+  -- Sich darauf zu verlassen, dass die Migrationen „ja in der richtigen
+  -- Reihenfolge laufen", ist keine Absicherung, sondern eine Hoffnung: sie
+  -- gilt nur, solange niemand eine Umgebung von Hand nachzieht. Der Waechter
+  -- steht deshalb HIER und nicht in der Edge Function — an der Stelle, die
+  -- das Schema selbst lesen kann, und so, dass jeder Aufrufer ihn erbt.
+  --
+  -- Fail closed: lieber keine Loeschung als eine, die fremde Faeden zerreisst.
+  if exists (
+    select 1
+      from pg_constraint con
+      join pg_class c     on c.oid = con.conrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname = 'profiles'
+       and con.contype = 'f'
+       and con.confrelid = 'auth.users'::regclass
+  ) then
+    raise exception
+      'Schema nicht vorbereitet: profiles zeigt noch per Fremdschluessel auf auth.users — die Loeschung wuerde die Inhaltstabellen mitreissen'
+      using errcode = '55000';
+  end if;
+
   if not exists (select 1 from public.profiles where id = p_profile_id) then
     raise exception 'Profil % existiert nicht', p_profile_id using errcode = 'P0002';
   end if;

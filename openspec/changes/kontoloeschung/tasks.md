@@ -53,15 +53,15 @@
 
 ## 3. Serverseite
 
-- [ ] 3.1 Edge Function als einziger Eingang. **Verifikationsort festschreiben**
+- [x] 3.1 Edge Function als einziger Eingang. **Verifikationsort festschreiben**
       (D4): entweder Gateway-Verifikation, die die Deployment-Konfiguration
       erzwingt, oder `getClaims()` in der Funktion — `sub` lesen ist keine Prüfung
-- [ ] 3.2 Reihenfolge nach D5: sperren → Inventar → **Dateien** → anonymisieren →
+- [x] 3.2 Reihenfolge nach D5: sperren → Inventar → **Dateien** → anonymisieren →
       **`auth.users` zuletzt**. Ein fehlendes Objekt ist kein Fehler
-- [ ] 3.3 Jeder Schritt idempotent; ein Teilfehler meldet **nicht** Erfolg
-- [ ] 3.4 Fremde Ziel-ID wird **abgelehnt**, nicht ignoriert; ohne gültige Sitzung
+- [x] 3.3 Jeder Schritt idempotent; ein Teilfehler meldet **nicht** Erfolg
+- [x] 3.4 Fremde Ziel-ID wird **abgelehnt**, nicht ignoriert; ohne gültige Sitzung
       ablehnen, ohne etwas zu ändern
-- [ ] 3.5 Schemazustand prüfen und bei unvorbereitetem Schema verweigern — die
+- [x] 3.5 Schemazustand prüfen und bei unvorbereitetem Schema verweigern — die
       Reihenfolge des Ausrollens ist keine Absicherung
 
 ## 4. Oberfläche
@@ -93,14 +93,14 @@
       weich gelöschtes aber weiterhin her
 - [x] 5.8 Test: das gelöschte Mitglied erscheint nicht im Verzeichnis, nicht in
       der Suche, nicht im Matching
-- [ ] 5.9 Test: ~~`authenticated` und `anon` können die Anonymisierungs-Funktion
-      nicht direkt rufen~~ **belegt (Zusage 13)**; offen bleibt „fremde Ziel-ID
-      wird abgelehnt" — das entscheidet die Edge Function, nicht die Datenbank
+- [x] 5.9 Test: `authenticated` und `anon` können die Anonymisierungs-Funktion
+      nicht direkt rufen (pgTAP 13); fremde Ziel-ID wird abgelehnt statt
+      ignoriert (Deno `pruefeAuftrag`)
 - [x] 5.10 Test: künftige Anmeldung ist storniert und der Platz frei; geplanter
       Beitrag erscheint nie; vergangene Anmeldung steht anonym noch da
-- [ ] 5.11 Test: ~~Wiederholung führt zu Ende (Idempotenz)~~ **belegt
-      (Zusage 25)**; offen bleiben „Abbruch meldet keinen Erfolg" und „fremde
-      Dateien bleiben unberührt" — beides liegt in der Edge Function
+- [x] 5.11 Test: Wiederholung führt zu Ende (pgTAP 25); ein Teilerfolg meldet
+      207 statt 200 (Deno `antwortFuer`); geräumt wird nur unterhalb von
+      `<uid>/`, fremde Dateien sind unerreichbar (Deno `objektPfade`)
 - [x] 5.12 Test (Positivkontrolle): derselbe Nachweis schlägt fehl, wenn die
       Anonymisierung nicht lief — sonst belegt die Testreihe nichts
 - [x] 5.13 Alle Nachweise gegen den **lokalen** Stack, mit eigens angelegtem
