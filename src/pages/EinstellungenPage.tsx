@@ -18,6 +18,7 @@ import {
   saveMemberTheme,
   type MemberSettings,
 } from "../lib/member-settings";
+import { kontoLoeschen } from "../lib/konto-loeschen";
 import { MIN_PASSWORT_LAENGE } from "../config/auth";
 import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
@@ -102,6 +103,97 @@ function PasswordCard() {
           Passwort ändern
         </Button>
       </form>
+    </Card>
+  );
+}
+
+/**
+ * Konto löschen (AGE-708). Apple verlangt den Weg IN der App; in AGE-644 ist er
+ * eine Abnahmezeile.
+ *
+ * ══ WARUM ZWEI STUFEN UND KEIN „Sind Sie sicher?" ═══════════════════════════
+ * Die Löschung ist unwiderruflich — ein Admin kann sie nicht zurücknehmen, das
+ * ist im Datenbank-Riegel `erased_at` festgeschrieben. Eine Rückfrage, die nur
+ * nach Sicherheit fragt, hilft dabei niemandem: wer versehentlich getippt hat,
+ * tippt auch „Ja" versehentlich. Die zweite Stufe benennt deshalb die FOLGE,
+ * und der auslösende Knopf trägt sie im Namen.
+ *
+ * Was stehen bleibt, steht bewusst dabei: Beiträge und Nachrichten
+ * verschwinden nicht, sie verlieren nur den Namen. Das ist keine Einschränkung,
+ * die man versteckt — es ist die Entscheidung, die verhindert, dass fremde
+ * Gesprächsfäden zerreissen, und wer sein Konto löscht, soll sie kennen.
+ */
+function KontoLoeschenCard() {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [gefragt, setGefragt] = useState(false);
+
+  const loeschen = useMutation({
+    mutationFn: kontoLoeschen,
+    onSuccess: async () => {
+      // Abmelden, nicht nur wegnavigieren: die Sitzung ist serverseitig
+      // ohnehin tot, aber ein Client, der ihren Rest behält, zeigt danach
+      // Ladefehler statt der Anmeldemaske.
+      await signOut();
+      navigate("/login", { replace: true });
+    },
+    onError: (error) => {
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Unbekannter Fehler.";
+      toast({ variant: "error", title: "Löschen fehlgeschlagen", description: message });
+    },
+  });
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <CardTitle>Konto löschen</CardTitle>
+      {!gefragt ? (
+        <>
+          <CardDescription>
+            Löscht Ihr Konto und Ihre persönlichen Daten endgültig.
+          </CardDescription>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="self-start"
+            onClick={() => setGefragt(true)}
+          >
+            Konto löschen
+          </Button>
+        </>
+      ) : (
+        <>
+          <CardDescription>
+            Das lässt sich nicht rückgängig machen — auch nicht durch die Vereinsleitung.
+            Ihr Profil, Ihre Kontaktdaten und Ihre Bilder werden gelöscht, und Sie können
+            sich danach nicht mehr anmelden.
+          </CardDescription>
+          <CardDescription>
+            Ihre Beiträge, Kommentare und Nachrichten bleiben ohne Ihren Namen stehen,
+            damit die Gespräche der anderen Mitglieder nicht zerreissen.
+          </CardDescription>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => loeschen.mutate()}
+              disabled={loeschen.isPending}
+            >
+              {loeschen.isPending ? "Wird gelöscht …" : "Konto endgültig löschen"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setGefragt(false)}
+              disabled={loeschen.isPending}
+            >
+              Abbrechen
+            </Button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -317,6 +409,8 @@ export default function EinstellungenPage() {
           disabled={save.isPending}
         />
       </Card>
+
+      <KontoLoeschenCard />
     </div>
   );
 }

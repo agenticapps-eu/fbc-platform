@@ -107,6 +107,26 @@ describe("CommunityFeed — jeder Tag erscheint genau einmal", () => {
     expect(link).toHaveAttribute("href", "https://fair-business-club.de");
     expect(link).toHaveAttribute("target", "_blank");
   });
+
+  it("macht aus der Erwähnung eines gelöschten Mitglieds keinen toten Verweis (AGE-708)", async () => {
+    // Die Erwähnungen dieses Projekts lösen über den NAMEN auf
+    // (`buildMentionResolver`). Löscht ein Mitglied sein Konto, verschwindet
+    // sein Name aus `profiles` — der Name im Beitragstext eines ANDEREN bleibt
+    // aber stehen, denn fremden Freitext schreibt die Löschung nicht um
+    // (design.md D9).
+    //
+    // Was die Oberfläche daraus machen muss: schlichten Text. Ein Verweis auf
+    // ein Profil, das es nicht mehr gibt, führte ins Leere.
+    await renderFeed([
+      post({
+        body: "Damals hat @Wilhelmine das aufgebracht — viel gelernt.",
+        hashtags: [],
+      }),
+    ]);
+
+    const erwaehnung = await screen.findByText("@Wilhelmine");
+    expect(erwaehnung.closest("a")).toBeNull();
+  });
 });
 
 describe("CommunityFeed — ältere Beiträge sind erreichbar", () => {

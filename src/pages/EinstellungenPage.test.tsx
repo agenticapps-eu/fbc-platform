@@ -24,12 +24,15 @@ import {
 } from "../lib/member-settings";
 vi.mock("../lib/feedback", () => ({ fetchAdminFeedback: vi.fn() }));
 import { fetchAdminFeedback } from "../lib/feedback";
+vi.mock("../lib/konto-loeschen", () => ({ kontoLoeschen: vi.fn() }));
+import { kontoLoeschen } from "../lib/konto-loeschen";
 import EinstellungenPage from "./EinstellungenPage";
 
 const mockedFetch = vi.mocked(fetchMemberSettings);
 const mockedSave = vi.mocked(saveMemberSettings);
 const mockedSaveTheme = vi.mocked(saveMemberTheme);
 const mockedAdminFeedback = vi.mocked(fetchAdminFeedback);
+const mockedLoeschen = vi.mocked(kontoLoeschen);
 
 beforeEach(() => {
   mockedFetch.mockReset();
@@ -40,6 +43,8 @@ beforeEach(() => {
   mockedSaveTheme.mockResolvedValue();
   mockedAdminFeedback.mockReset();
   mockedAdminFeedback.mockResolvedValue({ feedbacks: [], hatWeitere: false });
+  mockedLoeschen.mockReset();
+  mockedLoeschen.mockResolvedValue();
   localStorage.clear();
 });
 
@@ -257,5 +262,66 @@ describe("EinstellungenPage", () => {
     ]) {
       expect(screen.getByRole("switch", { name })).toBeInTheDocument();
     }
+  });
+});
+
+describe("Konto löschen (AGE-708)", () => {
+  it("löst mit EINER Berührung nichts aus — die Folge steht erst in der zweiten Stufe", async () => {
+    // Die Zusage aus dem Spec: „kann nicht durch eine einzige versehentliche
+    // Betätigung ausgelöst werden". Nach dem ersten Knopf darf nichts
+    // geschehen sein.
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Konto löschen" }));
+
+    expect(mockedLoeschen).not.toHaveBeenCalled();
+    expect(screen.getByText(/lässt sich nicht rückgängig machen/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Konto endgültig löschen" })).toBeInTheDocument();
+  });
+
+  it("benennt, was bleibt — nicht nur, was geht", async () => {
+    // Wer sein Konto löscht, soll wissen, dass seine Beiträge stehenbleiben.
+    // Das ist die Entscheidung „fremde Gesprächsfäden bleiben" von der Seite
+    // dessen aus gesehen, der geht.
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Konto löschen" }));
+
+    expect(screen.getByText(/bleiben ohne Ihren Namen stehen/)).toBeInTheDocument();
+  });
+
+  it("Abbrechen führt zurück, ohne etwas zu tun", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Konto löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+
+    expect(mockedLoeschen).not.toHaveBeenCalled();
+    expect(screen.queryByText(/lässt sich nicht rückgängig machen/)).not.toBeInTheDocument();
+  });
+
+  it("löscht erst nach der zweiten Bestätigung und meldet dann ab", async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    renderPage(null, { signOut });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Konto löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Konto endgültig löschen" }));
+
+    await waitFor(() => expect(mockedLoeschen).toHaveBeenCalledTimes(1));
+    // Abmelden gehört dazu: die Sitzung ist serverseitig tot, ein Client mit
+    // ihrem Rest zeigt danach Ladefehler statt der Anmeldemaske.
+    await waitFor(() => expect(signOut).toHaveBeenCalled());
+  });
+
+  it("meldet bei einer unvollständigen Löschung NICHT ab", async () => {
+    // Der Server antwortet mit 207, wenn ein Schritt offen blieb, und die
+    // Bibliothek wirft daraufhin. Das Mitglied muss angemeldet bleiben und den
+    // Fehler sehen — sonst glaubt es eine Löschung, die nicht stattfand.
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    mockedLoeschen.mockRejectedValue(new Error("unvollstaendig"));
+    renderPage(null, { signOut });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Konto löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Konto endgültig löschen" }));
+
+    await waitFor(() => expect(mockedLoeschen).toHaveBeenCalled());
+    expect(signOut).not.toHaveBeenCalled();
   });
 });

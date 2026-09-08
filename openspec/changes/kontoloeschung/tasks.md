@@ -66,12 +66,14 @@
 
 ## 4. Oberfläche
 
-- [ ] 4.1 Einstiegspunkt in den Einstellungen
-- [ ] 4.2 Eigene Rückfrage, die die Folge benennt — nicht mit einer Berührung
+- [x] 4.1 Einstiegspunkt in den Einstellungen
+- [x] 4.2 Eigene Rückfrage, die die Folge benennt — nicht mit einer Berührung
       auslösbar, nicht „Sind Sie sicher?"
-- [ ] 4.3 Nach der Löschung abmelden und zur Anmeldemaske führen
-- [ ] 4.4 Nicht auflösbare @-Erwähnung als schlichten Text darstellen statt als
-      toten Verweis (D9)
+- [x] 4.3 Nach der Löschung abmelden und zur Anmeldemaske führen
+- [x] 4.4 Nicht auflösbare @-Erwähnung als schlichten Text darstellen statt als
+      toten Verweis (D9) — **war bereits so gebaut**, `CommunityFeed` rendert
+      einen `<span>` statt `<Link>`. Nur der Beleg fehlte; Zusage ergänzt und
+      per Mutation gegengeprüft
 - [ ] 4.5 An der laufenden Oberfläche zeigen, in hell und navy
 
 ## 5. Nachweis
