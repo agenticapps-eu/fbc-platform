@@ -26,7 +26,7 @@
 
 - [x] 2.1 Migration: `profiles_id_fkey` **entfernen** — nicht ohne Kaskade neu
       setzen. `no action` verhindert die Auth-Löschung, statt sie zu erlauben (D2)
-- [ ] 2.2 Migration: eigener, dauerhafter **Löschzustand** (D7) — nicht
+- [x] 2.2 Migration: eigener, dauerhafter **Löschzustand** (D7) — nicht
       `deleted_at` allein, weil `admin_restore_member` das zurücksetzt
 - [ ] 2.3 Migration: Anonymisierungs-Funktion — leert die PII-Spalten **nach
       datenmatrix.md**, setzt den Löschzustand, lässt die Inhaltstabellen
@@ -34,12 +34,17 @@
       sobald alle acht Quellspalten leer sind
 - [ ] 2.4 Migration: künftige Anmeldungen auf `cancelled`, geplante Beiträge
       löschen, offene Kontaktanfragen zurückziehen (D10)
-- [ ] 2.5 Sichtbarkeits-Prädikate um den Löschzustand ergänzen — an **drei**
-      Stellen: RLS, `profiles_public` (`security_invoker = off`) und die
-      DEFINER-RPCs mit abgeschriebenem Prädikat, darunter `former_member_entries`
-- [ ] 2.6 **Schreibende** Prädikate und die Storage-Regeln sperren den
-      Löschzustand (D8) — sonst schreibt ein noch gültiges Zugriffstoken weiter
-- [ ] 2.7 `admin_restore_member` verweigert den Löschzustand; die weiche Löschung
+- [x] 2.5 ~~Sichtbarkeits-Prädikate ergänzen~~ — **entfällt, gemessen.** Die
+      Löschung setzt `deleted_at` mit, und die vorhandenen Prädikate lesen es
+      bereits über `is_activated()`; auch `profiles_public` und
+      `former_member_entries` hängen daran. Keine neue Regel an keiner der drei
+      Stellen. Zu belegen statt zu bauen — Test 5.8
+- [x] 2.6 ~~Schreibende Prädikate sperren~~ — **entfällt, gemessen.** 34 von 34
+      schreibenden `public`-Policies prüfen `is_activated()`, bei
+      `storage.objects` jede schreibende ebenso. Null Lücken, also nichts zu
+      bauen. Festgehalten in den Zusagen 11 und 12, letztere per Mutation
+      gegengeprüft (genau eine Zusage fällt)
+- [x] 2.7 `admin_restore_member` verweigert den Löschzustand; die weiche Löschung
       bleibt für alle anderen Konten wiederherstellbar
 - [ ] 2.8 `revoke execute` für `public`, `anon` und `authenticated` ausdrücklich
       aussprechen, `grant` nur an `service_role`; geerbte Rechte reichen nicht

@@ -154,7 +154,7 @@ hier.
 
 <!-- openspec-review-trailer v1
 implementing-host: claude
-digest: sha256:388bf1c22159cf3f587726998fd4fc9c25fe036067de59523c846848a200e389
+digest: sha256:c3e6349fafffd7e27f37b4581663cec255dc7dc8e70782a22dc8349ef11e1d82
 producer-version: 1.2.0
-tasks-digest: sha256:dbe66bdbcdea65a96486234a9b931aebf1ceb4a18502597d42b8423eac9661d9
+tasks-digest: sha256:28a15f2d2a375b3376f576d946e3f4e27315df589a5bba8d50b384a7bbe1a6cb
 -->

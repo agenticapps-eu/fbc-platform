@@ -37,13 +37,19 @@
 --     selbst an und liest sie danach namentlich zurück.
 
 begin;
-select plan(6);
+select plan(12);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- Der auth.users-Insert feuert handle_new_user() und legt public.profiles an.
 insert into auth.users (id, aud, role, email) values
   ('e5000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'kl-geht@test.fbc'),
-  ('e5000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'kl-bleibt@test.fbc');
+  ('e5000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'kl-bleibt@test.fbc'),
+  ('e5000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'kl-erased@test.fbc'),
+  ('e5000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'kl-weich@test.fbc'),
+  ('e5000000-0000-0000-0000-0000000000ad', 'authenticated', 'authenticated', 'kl-admin@test.fbc');
+
+insert into public.staff_roles (profile_id, role) values
+  ('e5000000-0000-0000-0000-0000000000ad', 'admin');
 
 update public.profiles
    set name = 'Kl Geht', activated_at = now(), is_public = true, tier = 'impact'
@@ -51,6 +57,51 @@ update public.profiles
 update public.profiles
    set name = 'Kl Bleibt', activated_at = now(), is_public = true, tier = 'impact'
  where id = 'e5000000-0000-0000-0000-000000000002';
+update public.profiles
+   set name = 'Kl Erased', activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-000000000003';
+update public.profiles
+   set name = 'Kl Weich', activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-000000000004';
+update public.profiles
+   set name = 'Kl Admin', activated_at = now(), is_public = true, tier = 'impact'
+ where id = 'e5000000-0000-0000-0000-0000000000ad';
+
+-- ── Helfer ──────────────────────────────────────────────────────────────────
+-- Liefert SQLSTATE UND SQLERRM. Nur der SQLSTATE reicht hier nicht: ein
+-- fehlendes Tabellenrecht und eine RLS-Ablehnung sind BEIDE `42501`. Eine
+-- Zusage, die nur auf `42501` prueft, bliebe gruen, wenn das Gate ausfaellt
+-- und statt seiner das ACL abweist — sie misst dann etwas anderes, als sie
+-- behauptet. Darum wird unten an `%row-level security policy%` verankert.
+create function pg_temp.fehler_als(uid uuid, q text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  begin
+    execute q;
+  exception when others then
+    reset role;
+    perform set_config('request.jwt.claims', '', true);
+    return 'FEHLER:' || SQLSTATE || ' ' || SQLERRM;
+  end;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return 'KEIN FEHLER';
+end $$;
+
+-- Liest is_activated() in der Identitaet des uebergebenen Mitglieds.
+create function pg_temp.aktiviert_als(uid uuid) returns boolean language plpgsql as $$
+declare r boolean;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select public.is_activated() into r;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return r;
+end $$;
 
 -- Der Beitrag des gehenden Mitglieds, mit einem Kommentar des bleibenden.
 -- Das ist der fremde Gesprächsfaden, um den es geht: verschwindet der Beitrag,
@@ -123,6 +174,86 @@ select is(
     where id = 'e5000000-0000-0000-0000-0000000000b1'),
   1,
   'der Kommentar des bleibenden Mitglieds hat seinen Anfang behalten');
+
+-- ══ DER LÖSCHZUSTAND (D7) ══════════════════════════════════════════════════
+-- `deleted_at` allein trägt die Unwiderruflichkeit NICHT: `admin_restore_member`
+-- setzt genau dieses Feld auf `null` zurück. Ein Restore hätte den geleerten
+-- Grabstein wieder ins Verzeichnis geholt — gefunden im Plan-Review (codex,
+-- HIGH), und der Befund stand in einer Datei, die beim Planen offen lag.
+--
+-- Deshalb eine zweite, eigene Marke: `erased_at`. Sie wird nie geleert.
+
+-- ── 7. Die Marke existiert ──────────────────────────────────────────────────
+select is(
+  (select count(*)::int
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'profiles'
+      and column_name  = 'erased_at'),
+  1,
+  'profiles traegt die Marke erased_at');
+
+-- Zwei Konten, die sich in GENAU EINEM Feld unterscheiden: beide sind
+-- `deleted_at`, nur eines ist zusaetzlich `erased_at`. Damit misst der
+-- Unterschied zwischen Test 8 und Test 10 die Marke und nichts sonst.
+update public.profiles set deleted_at = now(), erased_at = now()
+ where id = 'e5000000-0000-0000-0000-000000000003';
+update public.profiles set deleted_at = now()
+ where id = 'e5000000-0000-0000-0000-000000000004';
+
+-- ── 8. Der Restore verweigert ein geloeschtes Konto ─────────────────────────
+select throws_ok(
+  $$ select public.admin_restore_member(
+       'e5000000-0000-0000-0000-000000000003',
+       'e5000000-0000-0000-0000-0000000000ad') $$,
+  '22023',
+  null,
+  'admin_restore_member verweigert ein endgueltig geloeschtes Konto');
+
+-- ── 9. …und das Konto ist danach immer noch geloescht ───────────────────────
+-- Ohne diese Nachlese belegt Test 8 nur, dass IRGENDEIN Fehler kam — nicht,
+-- dass der Zustand unangetastet blieb.
+select is(
+  (select deleted_at is not null from public.profiles
+    where id = 'e5000000-0000-0000-0000-000000000003'),
+  true,
+  'nach der verweigerten Wiederherstellung ist das Konto weiter geloescht');
+
+-- ── 10. Ein NUR weich geloeschtes Konto laesst sich weiter herstellen ───────
+-- Die Gegenprobe zu Test 8. Ohne sie waere „Restore verweigert" auch dann
+-- gruen, wenn admin_restore_member schlicht immer wirft.
+select lives_ok(
+  $$ select public.admin_restore_member(
+       'e5000000-0000-0000-0000-000000000004',
+       'e5000000-0000-0000-0000-0000000000ad') $$,
+  'die weiche Admin-Loeschung aus AGE-581 bleibt wiederherstellbar');
+
+-- ══ DIE ZUGRIFFSSPERRE (D8) ════════════════════════════════════════════════
+-- `deleteUser()` entwertet ein bereits ausgestelltes Zugriffstoken nicht; da
+-- die Profilzeile absichtlich stehenbleibt, liefert `auth.uid()` weiter
+-- dieselbe ID. Die Sperre muss also aus der Datenbank kommen, nicht aus dem
+-- Client. Sie tut es bereits: `is_activated()` liest `deleted_at`, und
+-- gemessen am 08.09. pruefen 34 von 34 schreibenden public-Policies diese
+-- Funktion. Diese zwei Zusagen halten das fest, damit es so bleibt.
+
+-- ── 11. Das geloeschte Konto gilt nicht mehr als aktiviert ──────────────────
+select is(
+  pg_temp.aktiviert_als('e5000000-0000-0000-0000-000000000003'),
+  false,
+  'is_activated() ist fuer das geloeschte Konto falsch');
+
+-- ── 12. …und es kann tatsaechlich nichts mehr schreiben ─────────────────────
+-- `offers` und nicht `posts`: auf `posts` hat `authenticated` gar kein
+-- INSERT-Recht, dort haette die Ablehnung aus dem ACL kommen koennen statt aus
+-- der Policy — die Zusage haette dann nicht das Gate gemessen. Verankert an
+-- der Meldung, weil beide Faelle `42501` sind.
+select alike(
+  pg_temp.fehler_als(
+    'e5000000-0000-0000-0000-000000000003',
+    $$ insert into public.offers (profile_id, title)
+       values ('e5000000-0000-0000-0000-000000000003', 'darf nicht durchkommen') $$),
+  'FEHLER:42501%row-level security policy%',
+  'das geloeschte Konto wird beim Schreiben von der POLICY abgewiesen');
 
 select * from finish();
 rollback;

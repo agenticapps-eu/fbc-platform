@@ -191,11 +191,28 @@ abgeschrieben führen — darunter `former_member_entries`.
 > `auth.uid()` weiterhin dieselbe ID — das gelöschte Konto könnte in diesem
 > Fenster weiter schreiben und neue PII anlegen.
 
-Der Löschzustand aus D7 muss deshalb **serverseitig durchgesetzt** werden: die
-schreibenden RLS-Prädikate und die Storage-Regeln lehnen ein Konto in diesem
-Zustand ab, unabhängig davon, ob sein Token noch gültig ist. Der Nachweis ist ein
-**vor** der Löschung gesichertes Token, das danach gegen diese Flächen läuft und
-scheitert. Eine Abmeldung im Client belegt das nicht.
+Der Löschzustand muss deshalb **serverseitig durchgesetzt** werden.
+
+**Gemessen am 08.09.: er wird es bereits.** `is_activated()` liest
+`deleted_at`, und die Zählung über `pg_policies` ergibt:
+
+| Fläche | schreibende Policies mit `is_activated()` | ohne |
+|---|---|---|
+| Schema `public` | **34** | **0** |
+| `storage.objects` | alle (INSERT über `with_check`, UPDATE über beide, DELETE über `qual`) | 0 |
+
+Weil die Löschung `deleted_at` mitsetzt (D7), ist das Konto damit in dem
+Augenblick schreibgesperrt — Datenbank wie Objektspeicher —, in dem die
+Anonymisierung durchläuft, und zwar unabhängig von jedem noch gültigen Token.
+Hier ist also **nichts zu bauen, nur etwas festzuhalten**: die Zusagen 11 und 12
+in `kontoloeschung_test.sql` halten die Null fest.
+
+Zusage 12 ist per Mutation gegengeprüft: nimmt man `is_activated()` aus
+`offers_write_own` heraus, fällt **genau diese eine** Zusage — nicht mehr und
+nicht weniger. Sie misst also das Gate und nicht seine Nachbarschaft. Sie
+schreibt bewusst gegen `offers` und nicht gegen `posts`: dort hat
+`authenticated` kein INSERT-Recht, die Ablehnung käme aus dem ACL statt aus der
+Policy, und beide melden `42501`.
 
 ### D9 — Freitext bleibt, und das Versprechen wird entsprechend formuliert
 
