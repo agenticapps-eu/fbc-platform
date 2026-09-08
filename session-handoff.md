@@ -1,4 +1,4 @@
-# Session Handoff — 2026-09-07 (AGE-630 zu, AGE-705 liegt bereit)
+# Session Handoff — 2026-09-08 (AGE-630 zu, AGE-705 liegt bereit)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
@@ -30,6 +30,9 @@
   - **Cover-Größen gegen PROD gemessen** (design.md D5, unten).
 - **AGE-705 angelegt** — Donalds Zuruf vom 07.09., der nächste Punkt für den
   08.09.
+- **Ein selbst verursachter Fehlschluss gefunden und geheilt:** der Merge dieser
+  Übergabe setzte AGE-705 auf *Done*. Zurückgesetzt, korrigiert (PR #363), die
+  Lehre steht unten im Kasten.
 
 ## Decisions
 
@@ -41,6 +44,13 @@
 - **Der Versand bleibt Donalds Klick.** Ein Rundruf erreicht alle 74 Profile.
 - **AGE-705 kam in „Go-Live August 2026", nicht in den Nach-Go-Live-Backlog** —
   es ist die nächste aktive Arbeit, kein Später.
+- **Die Waisen-Cover bekommen KEINEN Vorgang** (Donald, 07.09.: „die
+  waisen-cover sollen an detlev hängen einfach"). Gemessen: **alle 7** Objekte
+  in `event-covers` liegen im Präfix **eines einzigen Profils** — auf PROD hat
+  bisher genau eine Person je ein Event-Titelbild eingestellt, und ihr gehören
+  auch die 4 Waisen. Sie liegen in einem privaten `{uid}/`-Ordner und sind für
+  niemanden sonst lesbar. Das ist die Entscheidung, nicht ein Vergessen: **nicht
+  neu aufrollen.**
 - **AGE-560 wurde NICHT angefasst.** Sie heißt „Release-Mechanismus neu denken"
   und liest sich wie ein Duplikat, gehört aber zu **fx-signals**
   (`apps/web/src/components/WhatsNew.tsx`). Falsches Repo, gleiche Wörter.
@@ -54,8 +64,8 @@ und `feedback.ts` rufen `storage.remove()`, die Event- und Profilpfade nie; in
 
 Ein gelöschtes Event, ein ausgetauschtes Titelbild und eine verworfene
 Vorlagen-Erzeugung lassen ihre Datei dauerhaft liegen — und eine Serie legt bis
-zu 52 Kopien an. **Hat noch keinen Vorgang.** Donald wurde gefragt und hat
-stattdessen AGE-705 gesetzt; die Frage ist also offen, nicht abgelehnt.
+zu 52 Kopien an. **Entschieden: kein Vorgang** (siehe Decisions). Der Mechanismus
+bleibt trotzdem wahr — wer ihn später doch angeht, muss ihn nicht neu messen.
 
 Die eigentliche D5-Zahl ist dagegen langweilig, und das ist die Antwort: 7
 WebP-Bilder, 84.876–115.486 B, **Median 89.820 B**. Eine 52er-Serie kostet
@@ -68,9 +78,11 @@ WebP-Bilder, 84.876–115.486 B, **Median 89.820 B**. Eine 52er-Serie kostet
   `main`).
 - Sonst **keine** Code-Änderung in dieser Sitzung.
 - Ausserhalb des Repos: `cover-seitenverhaeltnisse-gemessen.md` in der Memory um
-  die PROD-Messung und den Waisen-Befund ergänzt; der Release-Text liegt im
-  Scratchpad (`release-age-630-mitgliederfassung.md`) — **flüchtig**, er steht
-  vollständig im Sitzungsprotokoll und im Kern in AGE-705.
+  die PROD-Messung, den Waisen-Befund und die Eigentümerfrage ergänzt;
+  `issue-kuerzel-im-doku-pr-titel-schliesst.md` um den zweiten Fall vom 07.09.
+  Der Release-Text liegt im Scratchpad
+  (`release-age-630-mitgliederfassung.md`) — **flüchtig**, er steht vollständig
+  im Sitzungsprotokoll und im Kern in AGE-705.
 
 ## Next session: start here
 
@@ -103,8 +115,6 @@ AGE-516 (Rückstufung bei geplatzter Zahlung).
 
 ## Open questions
 
-- **Bekommen die Waisen-Cover einen Vorgang?** Siehe oben — gefragt, nicht
-  beantwortet.
 - **Wird der AGE-630-Release-Text noch einzeln versendet**, oder geht er in der
   neuen Systematik aus AGE-705 auf? Im Issue ist er als Nachzügler vermerkt.
 - **`effbeezee.com` ohne `www`** — Weiterleitung bei Strato, oder gar nicht?
