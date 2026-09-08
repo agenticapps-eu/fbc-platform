@@ -13,6 +13,7 @@ import { PageSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
+import { LEVEL_ORDER, levelLabel } from "../config/levels";
 import { requestActivationLink } from "../lib/activation";
 import {
   activateMember,
@@ -22,6 +23,7 @@ import {
   fetchAdminMembers,
   SEITENGROESSE,
   setMemberBan,
+  setzeStufe,
   updateMitgliedschaft,
   ZAHLUNGSARTEN,
   type AdminMember,
@@ -95,7 +97,13 @@ function leseReiter(wert: string | null): Reiter {
 /** Was im Zeilenmenü stehen kann. Nicht jede Aktion an jeder Zeile — was wo
  *  gilt, entscheidet `aktionenFuer`. */
 type Zeilenaktion =
-  "zugangslink" | "aktivieren" | "deaktivieren" | "reaktivieren" | "loeschen" | "wiederherstellen";
+  | "zugangslink"
+  | "aktivieren"
+  | "stufe"
+  | "deaktivieren"
+  | "reaktivieren"
+  | "loeschen"
+  | "wiederherstellen";
 
 /**
  * Die drei Aktionen mit Rückfrage — und die Liste ist die Regel selbst, nicht
@@ -194,6 +202,8 @@ export default function AdminMitgliederPage() {
    *  blosses `true`: der Dialog muss beides nennen, und zwar das Mitglied
    *  NAMENTLICH. */
   const [rueckfrage, setRueckfrage] = useState<OffeneRueckfrage | null>(null);
+  /** Das Mitglied, für das der Stufen-Dialog offen ist (AGE-707). */
+  const [stufenDialog, setStufenDialog] = useState<AdminMember | null>(null);
 
   const filter = { query, status, seite };
   const { data, isLoading, isError, error } = useQuery({
@@ -237,6 +247,33 @@ export default function AdminMitgliederPage() {
         description: fehlerText(e),
         variant: "error",
       }),
+  });
+
+  /**
+   * Die Stufe eines Mitglieds aus der Liste heraus setzen (AGE-707).
+   *
+   * Dieselbe RPC wie in der Einzelbearbeitung — kein zweiter Schreibweg. Die
+   * Pflichtbegründung wird hier NICHT noch einmal geprüft: der Dialog setzt
+   * ohne sie gar nicht ab, und `admin_set_tier` wiese sie ohnehin mit `22023`
+   * zurück. Eine dritte Prüfung dazwischen wäre eine dritte Stelle, an der die
+   * Regel altern kann.
+   */
+  const stufeSetzen = useMutation({
+    mutationFn: (v: { m: AdminMember; tier: string; grund: string }) =>
+      setzeStufe(v.m.id, v.tier, v.grund),
+    onSuccess: async (_daten, v) => {
+      setStufenDialog(null);
+      toast({
+        title: `${v.m.name ?? "Mitglied"} steht auf ${levelLabel(v.tier)}`,
+        variant: "success",
+      });
+      // Ohne das Nachladen bliebe das Abzeichen derselben Zeile auf dem alten
+      // Wert stehen — der Admin hielte den Aufruf für gescheitert und setzte
+      // ein zweites Mal.
+      await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+    },
+    onError: (e) =>
+      toast({ title: "Stufe nicht gesetzt", description: fehlerText(e), variant: "error" }),
   });
 
   const aktivieren = useMutation({
@@ -326,6 +363,13 @@ export default function AdminMitgliederPage() {
     }
     if (was === "zugangslink") {
       zugangslink.mutate(m);
+      return;
+    }
+    // Eigener Dialog, NICHT `BRAUCHT_RUECKFRAGE` (AGE-707): dessen drei Fälle
+    // sind Ja/Nein über etwas, das jemandem etwas nimmt. Dieser hat zwei
+    // Eingaben, und eine davon ist Pflicht.
+    if (was === "stufe") {
+      setStufenDialog(m);
       return;
     }
     lebenszyklus.mutate({ m, was: was === "reaktivieren" ? "enable" : "restore" });
@@ -610,6 +654,15 @@ export default function AdminMitgliederPage() {
         )}
       </div>
 
+      {stufenDialog && (
+        <StufenDialog
+          member={stufenDialog}
+          laeuft={stufeSetzen.isPending}
+          onAbbrechen={() => setStufenDialog(null)}
+          onBestaetigen={(tier, grund) => stufeSetzen.mutate({ m: stufenDialog, tier, grund })}
+        />
+      )}
+
       {rueckfrage && (
         <Rueckfrage
           member={rueckfrage.member}
@@ -851,6 +904,12 @@ function aktionenFuer(m: AdminMember): { id: Zeilenaktion; label: string; gefahr
   // Nur an unbestätigten Zeilen. An einer bestätigten bräche
   // `admin_activate_member` mit 22023 ab.
   if (!gesperrt && !m.bestaetigt) eintraege.push({ id: "aktivieren", label: "Direkt aktivieren" });
+  // AGE-707: OHNE Vorbehalt, anders als die beiden darüber. Die beiden hängen
+  // daran, ob das Konto sich anmelden kann; eine Stufe hängt daran nicht, und
+  // `admin_set_tier` kennt keinen solchen Zweig. Ein engeres Menü machte genau
+  // den Fall unkorrigierbar, für den die Funktion gebaut wurde: ein irrtümlich
+  // zu hoch importiertes Mitglied, das inzwischen deaktiviert ist.
+  eintraege.push({ id: "stufe", label: "Stufe setzen" });
   // NICHT bloss `!gesperrt`. Eine deaktivierte Zeile, deren Ban FEHLT, ist ein
   // halber Zustand — `admin_disable_member` bricht dort nicht mit 22023 ab,
   // sondern setzt den Ban nach. Ohne diesen Zweig wäre der Nachsetz-Weg über
@@ -1194,6 +1253,102 @@ function Rueckfrage({
           </Button>
           <Button type="button" disabled={laeuft} onClick={onBestaetigen}>
             {text.knopf}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Der Stufen-Dialog (AGE-707).
+ *
+ * WARUM EIGENES BAUTEIL UND NICHT `Rueckfrage`: jene drei Fälle sind Ja/Nein
+ * über etwas, das jemandem etwas nimmt. Dieser hat zwei Eingaben. Sie in
+ * denselben Verteiler zu pressen hiesse, den Rückfragedialog um Felder zu
+ * erweitern, die drei Vierteln seiner Benutzer nichts sagen.
+ *
+ * WARUM DER KNOPF OHNE BEGRÜNDUNG GESPERRT IST: `admin_set_tier` bricht bei
+ * leerer Begründung mit `22023` ab. Ein roher Datenbankfehler NACH dem
+ * Bestätigen ist kein Ersatz für ein gesperrtes Bestätigen davor — dieselbe
+ * Regel, nach der `aktionenFuer` schon heute keinen Eintrag anbietet, dessen
+ * einziger Ausgang ein Fehler ist.
+ */
+function StufenDialog({
+  member,
+  laeuft,
+  onAbbrechen,
+  onBestaetigen,
+}: {
+  member: AdminMember;
+  laeuft: boolean;
+  onAbbrechen: () => void;
+  onBestaetigen: (tier: string, grund: string) => void;
+}) {
+  const overlay = useOverlay(true, onAbbrechen);
+  const name = member.name ?? "Dieses Mitglied";
+  // Vorbelegt mit der Stufe, auf der das Mitglied steht: der Dialog beantwortet
+  // „worauf setzen", und dazu gehört sichtbar, wovon aus.
+  const [tier, setTier] = useState<string>(member.tier);
+  const [grund, setGrund] = useState("");
+
+  return (
+    <div
+      ref={overlay}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Mitgliedsstufe von ${name} ändern`}
+    >
+      <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={onAbbrechen} />
+      <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-6 shadow-soft">
+        <h2 className="font-display text-lg font-semibold text-ink">Stufe setzen</h2>
+        <p className="mt-2 text-sm text-muted">
+          <strong>{name}</strong> steht auf {levelLabel(member.tier)}.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-4">
+          <Field label="Neue Stufe">
+            {({ id }) => (
+              <Select id={id} value={tier} onChange={(e) => setTier(e.target.value)}>
+                {LEVEL_ORDER.map((key) => (
+                  <option key={key} value={key}>
+                    {levelLabel(key)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Begründung">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={grund}
+                onChange={(e) => setGrund(e.target.value)}
+                placeholder="Warum wird die Stufe gesetzt?"
+              />
+            )}
+          </Field>
+        </div>
+
+        {/* Dieselbe Zusage, die die Karte in der Einzelbearbeitung trägt: die
+            Fläche benennt, was ein späterer Stripe-Kauf mit dieser Stufe tut. */}
+        <p className="mt-4 text-sm text-muted">
+          Die Änderung landet mit alter Stufe, neuer Stufe und Begründung im Admin-Protokoll. Kauft
+          das Mitglied später eine höhere Stufe, überschreibt Stripe diese Angabe; eine niedrigere
+          überschreibt sie nicht.
+        </p>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onAbbrechen}>
+            Abbrechen
+          </Button>
+          <Button
+            type="button"
+            disabled={laeuft || grund.trim() === ""}
+            onClick={() => onBestaetigen(tier, grund.trim())}
+          >
+            Stufe setzen
           </Button>
         </div>
       </div>
