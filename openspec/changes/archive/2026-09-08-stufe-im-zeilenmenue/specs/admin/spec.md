@@ -82,7 +82,7 @@ verliert.
 - **WHEN** ein Admin den Reiter „Gelöscht" wählt und die Seite neu lädt
 - **THEN** steht er wieder auf „Gelöscht"
 
-#### Scenario: Die Stufe lässt sich in der Zeile nicht ändern
+#### Scenario: Die Stufe lässt sich hier nicht ändern
 
 - **WHEN** ein Admin im Reiter „Mitgliedschaft" die Stufe eines Mitglieds
   ansieht

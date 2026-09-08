@@ -1326,6 +1326,29 @@ anbieten und SHALL NOT einen erfinden.
 nehmen einem Menschen den Zugang; eine optische Trennung allein SHALL NOT als
 Schutz gelten.
 
+**Das Menü SHALL „Stufe setzen" führen.** Die Mitgliederliste zeigt die Stufe
+je Zeile bereits an; ein angezeigter Wert, dessen Änderung nur über einen an
+der Liste nicht erkennbaren Umweg erreichbar ist, ist dieselbe Sackgasse wie
+eine Handlung ohne Menüeintrag.
+
+Diese Handlung SHALL an **jeder** Zeile stehen, auch an einer deaktivierten
+oder gelöschten. Sie hängt nicht daran, ob das Konto sich anmelden kann, und
+`admin_set_tier` kennt keinen solchen Vorbehalt; ein engeres Menü machte ein
+gesperrtes Mitglied unkorrigierbar.
+
+Sie SHALL einen Dialog öffnen, der das Mitglied **namentlich** nennt, die
+Zielstufe zur Wahl stellt und eine **Begründung verlangt**. Der Dialog SHALL
+den Aufruf NOT absetzen, solange die Begründung leer ist: `admin_set_tier`
+bricht dann mit `22023` ab, und ein roher Datenbankfehler nach dem Bestätigen
+ist kein Ersatz für ein gesperrtes Bestätigen davor. Die Fläche SHALL NOT mehr
+durchlassen als die Datenbank.
+
+Der Dialog SHALL wie die bestehende Fläche benennen, was ein späterer
+Stripe-Kauf mit der gesetzten Stufe tut.
+
+Nach einer erfolgreichen Änderung SHALL die Zeile die **neue** Stufe zeigen,
+ohne dass die Seite neu geladen wird.
+
 Das Menü SHALL mit der Tastatur bedienbar sein und SHALL sich beim Verlassen
 schliessen.
 
@@ -1363,6 +1386,32 @@ schliessen.
 - **THEN** bleibt `deleted_at` unverändert und es entsteht keine
   `admin_audit`-Zeile
 
+#### Scenario: Die Stufe ist aus der Liste heraus erreichbar
+
+- **WHEN** ein Admin das Menü einer beliebigen Zeile öffnet
+- **THEN** steht dort „Stufe setzen"
+
+#### Scenario: Ohne Begründung setzt der Dialog nichts ab
+
+- **GIVEN** ein geöffneter Dialog „Stufe setzen" mit gewählter Zielstufe und
+  leerer Begründung
+- **WHEN** ein Admin bestätigen will
+- **THEN** ist das Bestätigen gesperrt, und es geht **kein** Aufruf an
+  `admin_set_tier`
+
+#### Scenario: Die gesetzte Stufe steht danach in der Zeile
+
+- **WHEN** ein Admin über den Dialog eine Stufe setzt und der Aufruf gelingt
+- **THEN** zeigt dieselbe Zeile die neue Stufe, ohne dass die Seite neu geladen
+  wurde
+
+#### Scenario: Auch eine gesperrte Zeile lässt sich korrigieren
+
+- **GIVEN** ein deaktiviertes Mitglied
+- **WHEN** ein Admin sein Menü öffnet
+- **THEN** steht dort „Stufe setzen" — anders als „Zugangslink schicken" und
+  „direkt aktivieren", die dort fehlen
+
 ### Requirement: Die Admin-Mitgliederfläche trennt die Zustände in Reiter
 
 Das System SHALL unter `/admin/mitglieder` fünf Reiter führen: **Alle**,
@@ -1392,11 +1441,23 @@ aktiven zu führen, macht jede Zählung auf dieser Fläche unbrauchbar. Für
 Zahlungszeitraum, der noch etwas bedeutet.
 
 Der Reiter „Mitgliedschaft" SHALL je Mitglied Stufe, `paid_until` und
-`payment_type` zeigen. **Änderbar SHALL dabei nur `paid_until` und
-`payment_type` sein; die Stufe SHALL hier nur lesbar sein.** Ein Stufenwechsel
-berührt Rechte und Preise und hat einen eigenen Weg (AGE-516); ihn nebenbei in
-einer Tabellenzeile zu erlauben, wäre die folgenreichste Änderung auf dieser
-Fläche und zugleich die unauffälligste.
+`payment_type` zeigen. **Die Stufe SHALL in der Tabellenzeile nur lesbar sein**
+und SHALL NOT dort als Eingabe- oder Auswahlfeld erscheinen; änderbar SHALL in
+der Zeile nur `paid_until` und `payment_type` sein.
+
+Das Verbot gilt der **beiläufigen** Änderung, nicht der Erreichbarkeit. Ein
+Stufenwechsel berührt Rechte und Preise; ihn nebenbei in einer Tabellenzeile zu
+erlauben, wäre die folgenreichste Änderung auf dieser Fläche und zugleich die
+unauffälligste. Über das **Zeilenmenü** SHALL er dagegen erreichbar sein — dort
+ist er weder beiläufig noch unauffällig: er verlangt einen eigenen Dialog, nennt
+das Mitglied namentlich, verlangt eine Begründung und hinterlässt eine Spur.
+Diese Anforderung SHALL NOT so gelesen werden, dass sie ihn von dieser Fläche
+fernhält.
+
+*Ergänzt für AGE-707.* Die frühere Fassung verwies für den Stufenwechsel auf
+„einen eigenen Weg" und meinte damit die Einzelbearbeitung. Seit AGE-707 gibt es
+zwei Wege, und die Unterscheidung, auf die es ankommt, ist nicht „welche Fläche",
+sondern „beiläufig oder ausdrücklich".
 
 Ein Mitglied ohne `paid_until` SHALL ein LEERES Feld zeigen und SHALL NOT ein
 geratenes Datum tragen. Das leere Feld ist die Auskunft; ein Wort daneben SHALL
@@ -1438,6 +1499,12 @@ verliert.
 - **WHEN** ein Admin im Reiter „Mitgliedschaft" die Stufe eines Mitglieds
   ansieht
 - **THEN** wird sie angezeigt, aber nicht als Eingabefeld angeboten
+
+#### Scenario: Über das Zeilenmenü ist sie trotzdem erreichbar
+
+- **WHEN** ein Admin im Reiter „Mitgliedschaft" das Menü einer Zeile öffnet
+- **THEN** steht dort „Stufe setzen", und der Weg führt über den Dialog mit
+  Pflichtbegründung — nicht über ein Feld in der Zeile
 
 #### Scenario: „Mitgliedschaft" zeigt dieselbe Menge wie „Alle"
 

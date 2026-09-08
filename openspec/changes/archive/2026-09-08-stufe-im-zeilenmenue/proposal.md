@@ -2,7 +2,7 @@
 
 Linear: AGE-707
 
-## Warum
+## Why
 
 Detlev nimmt ein neues Mitglied auf und schickt ihm über `/admin/mitglieder`
 einen Zugangslink. Das Konto steht danach auf `basic`. Um es auf `impact` zu
@@ -25,13 +25,21 @@ einen Wert anzeigt und für seine Änderung auf einen nicht erkennbaren Umweg
 verweist, ist genau die Sorte Sackgasse, gegen die AGE-592 schon einmal gebaut
 wurde.
 
-## Was sich ändert
+## What Changes
 
-Ein siebter Eintrag **„Stufe setzen“** im Zeilenmenü, mit einem Dialog: Stufe
-wählen, Begründung eingeben, bestätigen. Danach steht die neue Stufe am
-Abzeichen derselben Zeile.
-
-Dieselbe RPC. **Keine Migration, keine neue Funktion, kein neuer Schreibweg.**
+- **Ein siebter Eintrag „Stufe setzen“ im Zeilenmenü der Mitgliederliste.** Er
+  öffnet einen Dialog: Stufe wählen, Begründung eingeben, bestätigen. Danach
+  steht die neue Stufe am Abzeichen derselben Zeile, ohne Neuladen.
+- **Der Eintrag steht an jeder Zeile**, auch an einer deaktivierten oder
+  gelöschten. Eine Stufe hängt nicht daran, ob das Konto sich anmelden kann.
+- **Die Begründung ist Pflicht, und der Knopf bleibt bis dahin gesperrt.** Ohne
+  sie geht kein Aufruf hinaus — die Datenbank wiese ihn ohnehin ab, und ein
+  Fehler nach dem Bestätigen ist kein Ersatz für eine Sperre davor.
+- **Dieselbe RPC wie in der Einzelbearbeitung.** Keine Migration, keine neue
+  Funktion, kein zweiter Schreibweg; die Karte auf `/admin/mitglied/:id` bleibt
+  unverändert bestehen.
+- **Im Reiter „Mitgliedschaft“ bleibt die Stufe in der Zeile eine Anzeige.** Das
+  Verbot dort gilt der beiläufigen Änderung, nicht der Erreichbarkeit.
 
 ## Was sich NICHT ändert
 

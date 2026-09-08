@@ -49,8 +49,8 @@ einem Dialog führt, der `22023` auslöst, wäre schlechter als kein Menüeintra
       `pnpm build`, `entry-chunk-guard`.
 - [x] **4.3** Sichtprobe gegen den lokalen Stack: Menü öffnen, Stufe setzen,
       Abzeichen prüfen. Grüne Tests belegen keine Fläche.
-- [ ] **4.4** Code-Review auf dem **Diff**, nicht auf dem Plan.
-- [ ] **4.5** Archivieren, danach `pnpm release:entries`.
+- [x] **4.4** Code-Review auf dem **Diff**, nicht auf dem Plan.
+- [x] **4.5** Archivieren, danach `pnpm release:entries`.
 
 ## Nicht in diesem Change
 
