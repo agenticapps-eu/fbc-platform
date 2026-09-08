@@ -64,9 +64,59 @@
         } catch (e) {}
       })();
     </script>
+
+    <!-- AGE-642 B5: schaltet die Boot-Flaeche unten frei — nativ ja, Browser nein.
+
+         WARUM HIER UND NICHT IM ANWENDUNGSCODE. Die Flaeche steht als Markup im
+         ausgelieferten Dokument und wird gezeichnet, BEVOR irgendein Modul
+         laedt. `Capacitor.isNativePlatform()` aus `@capacitor/core` kaeme damit
+         zu spaet — und ohne Entscheidung erschiene die Flaeche auch im Browser.
+
+         WARUM `window.Capacitor` HIER SCHON DA IST: Capacitor spritzt
+         `native-bridge.js` vor jedem Skript des Dokuments ein — auf iOS als
+         `WKUserScript` mit `injectionTime: .atDocumentStart`
+         (`JSExport.swift:20,107`), auf Android ueber
+         `WebViewCompat.addDocumentStartJavaScript` (`Bridge.java:266`).
+
+         UND WENN NICHT: dann faellt der Ausdruck auf `false`, das Attribut
+         bleibt weg, und es gilt genau das Verhalten von vor dieser Aenderung.
+         Ein Fehlschlag kostet die Verbesserung, nicht die Anwendung. -->
+    <script>
+      (function () {
+        try {
+          if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            document.documentElement.dataset.boot = "nativ";
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- AGE-642 B5: die Boot-Flaeche — dieselbe Komposition wie der native
+         Startbildschirm (`LaunchScreen.storyboard`), damit zwischen ihm und dem
+         ersten Bild der Anwendung keine leere Flaeche steht.
+
+         Gemessen am 07.09.: die Luecke dauert 40 ms (dieser Mac) bis 228 ms
+         (6-fache CPU-Bremse) und zeigt in den oberen 20 % nichts (`#f6f8fb`,
+         Streuung 0), wo der Startbildschirm ein Foto zeigt (Streuung 67).
+
+         SIE STEHT IN `#root`, und das ist Absicht: React raeumt den Inhalt des
+         Containers beim ersten `render()` selbst weg. Es braucht also keinen
+         Aufraeum-Code, der vergessen werden koennte — und die Flaeche
+         verschwindet genau in dem Bild, in dem die Anwendung erscheint, nicht
+         davor.
+
+         Sichtbar wird sie nur ueber `html[data-boot="nativ"]` (Skript oben).
+         Die zwei Bilder haengen deshalb an CSS-`url()` und nicht an `<img>`:
+         ein `<img>` wird auch dann geladen, wenn es auf `display: none` steht,
+         ein Hintergrundbild nicht. Im Browser kostet die Flaeche damit
+         null Bytes. -->
+    <div id="root">
+      <div class="boot-flaeche" aria-hidden="true">
+        <div class="boot-flaeche__band"></div>
+        <div class="boot-flaeche__schriftzug"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

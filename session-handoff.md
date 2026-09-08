@@ -1,173 +1,135 @@
-# Session Handoff — 2026-09-04 (AGE-642 B3: Android-Signierung und Release-Workflow)
+# Session Handoff — 2026-09-08 (AGE-630 zu, AGE-705 liegt bereit)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie führt nur AGE-642 (M2, Capacitor-Hülle), Block B3.** Die Datei ist
-> für alle parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
-> **nicht zusammenführen**, überschreiben.
+> **1. Sie führt AGE-705**, und AGE-705 ist noch nicht angefangen: kein Branch,
+> kein Worktree, keine Zeile Code. Die Datei ist für alle parallelen Sitzungen
+> dieselbe und kollidiert bei jedem Rebase — **nicht zusammenführen**,
+> überschreiben.
 >
-> **2. Vorher stand hier AGE-605** (Anmeldungen/Kapazität, PR #342). Vollständig
-> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus war eine
-> **Sperre für AGE-642** — der blockierte Deploy von `main`. Sie ist seit dem
-> Abend des 04.09. **aufgehoben**; der Abschnitt „Von AGE-605 übernommen" unten
-> trägt die Auflösung samt Laufnummern und wird nicht gelöscht, damit niemand
-> die alte Warnung aus einer früheren Fassung wieder aufgreift. **Es ist von
-> dort nichts mehr zu tun.**
+> **2. AGE-642 läuft in einer EIGENEN Sitzung**
+> (`fbc-platform-donald-age-642-capacitor-hu-57`), Worktree
+> `../fbc-platform.donald-age-642-capacitor-huelle`. Von hier aus ist daran
+> **nichts** zu tun — und der Worktree darf nicht abgeräumt werden.
 >
-> **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
-> Phase E. Diese Datei bleibt der Überblick.
-
-## Von AGE-605 übernommen — ⚠ ERLEDIGT am 04.09. abends, nicht mehr gültig
-
-Hier stand: *„Der Deploy von `main` ist blockiert, bis die PROD-Migration
-läuft."* Das galt bis 19:32 und ist **aufgehoben**. Der Satz bleibt als
-Korrektur stehen, damit niemand ihn aus einer älteren Fassung wieder aufgreift.
-
-Abgelaufen in dieser Reihenfolge, alles auf Commit `3d20063`:
-
-1. **`migrate-prod` (Lauf 33911148557), grün** — die AGE-605-Sitzung hat ihn
-   angestossen. `Applying migration 20260904160000_anmeldung_nicht_an_den_rpcs_
-   vorbei.sql` · `OK — 123 Migrationen, Historie abweichungsfrei` · Objekt-
-   Drift-Scan `OK — keine Objekt-Abweichung auf prod`.
-2. **`Deploy` (Lauf 33904874723) nach Re-Run, alle vier Jobs grün** —
-   `drift-gate`, `migrate-dev`, `functions`, `deploy`.
-
-**An der Kante gegengemessen, nicht am Job-Status:** `app.effbeezee.com` liefert
-`assets/index-GEx8cTIJ.js` als `application/javascript`; die Negativkontrolle auf
-einen erfundenen Pfad liefert `text/html`, der SPA-Fallback ist damit
-ausgeschlossen. Das OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD (19:32:08Z).
-
-> **Ein Verdacht, der geprüft und ausgeräumt ist** — damit ihn niemand neu
-> aufmacht: alle 49 Bündel tragen dieselbe Semver `0.0.0`, und eines heisst
-> `0.0.0+feedbeef` (Testbündel vom 02.09.). Würde die Auswahl über die
-> Versions-Zeichenkette tiebreaken, gewänne `feedbeef` lexikalisch. Tut sie
-> nicht: `ota_buendel_neuestes` ordnet `created_at desc, version desc`, **Zeit
-> zuerst**. An der Funktion gemessen: ein Gerät auf `builtin` bekommt
-> `0.0.0+3d20063d3913`, eines auf `feedbeef` ebenfalls, und eines, das schon
-> darauf läuft, bekommt nichts.
-
-**AGE-605 ist vollständig abgeschlossen** — gemergt (#342, #343), archiviert,
-auf PROD angewandt und dort rein lesend gegengemessen: beide Trigger aktiv,
-`…_exklusiv` INVOKER und `…_kapazitaet` DEFINER wie entworfen, `authenticated`
-hält nur noch SELECT, Spalten-UPDATE nur `status`/`rating`, Policy UPDATE-only,
-EXECUTE auf beiden Wächtern entzogen, 0 überbuchte Events. Linear steht auf Done.
-
-Die vollständige AGE-605-Übergabe — auch der Fund, der jene Sitzung getragen hat
-(Schicht 1 war als `SECURITY INVOKER`-Funktion fail-**OPEN**, weil sie unter der
-RLS des Schreibenden zählte) — steht in `git show e1dd52a:session-handoff.md` und
-dauerhaft in
-`openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/`.
-
-**Was von AGE-605 offen bleibt, liegt in `AGE-698`** (Backlog, drei
-Bestands-Befunde, keiner durch AGE-605 entstanden): der Gastgeber kann
-`capacity` unter die Belegung senken · Mitglieder unter `exchange` können sich
-anmelden, aber nicht direkt absagen (stammt aus AGE-448) · ein zweiter
-`register_for_event`-Aufruf degradiert ein bereits registriertes Mitglied auf
-die Warteliste, weil der RPC die eigene Zeile mitzählt.
-
-> **Herkunft dieser drei Absätze:** aus PR #346 der AGE-605-Sitzung, die
-> denselben Abschnitt korrigieren wollte und dabei zwei Minuten nach dem Merge
-> von #345 von einem älteren Stand gezweigt hatte. Inhalt hierher übernommen,
-> #346 ungemergt geschlossen — nicht verloren, nur an einer Stelle statt zweien.
+> **3. AGE-630 ist abgeschlossen und ausgeliefert.** Die Details dazu stehen in
+> `openspec/changes/archive/2026-09-07-events-vorlagen-und-serientermine/`
+> (`tasks.md`, `REVIEWS.md`, `design.md`) — nicht hier. Die vorige Fassung
+> dieser Datei führte sie im Detail; sie ist damit erledigt.
 
 ## Accomplished
 
-**B3, Android-Hälfte, komplett — PR #344.** iOS ist bewusst ein eigener Vorgang.
-
-| Datei | Was |
-|---|---|
-| `scripts/android-keystore{,.logic}.ts` + 3 Testdateien | erzeugt `key.properties` + Keystore aus Infisical, Muster von `firebase-config.ts` |
-| `android/app/build.gradle` | `signingConfigs.release` + Abbruch, wenn Material fehlt |
-| `.github/workflows/android-release.yml` | `workflow_dispatch` + Tag `android-v*`, baut AAB **und** APK |
-
-**Der Widerspruch der Aufgabe ist aufgelöst:** der Keystore darf nirgends im
-öffentlichen Repo liegen, muss dem Bau aber vorliegen → über die **ignorierten**
-Dateien, die der `native-secrets-guard` absichtlich nicht ansieht.
-
-**Der stille Ausgang, der jetzt laut ist:** ohne `key.properties` bricht Gradle
-**nicht** ab, sondern schreibt klaglos ein unsigniertes Release-Artefakt.
-
-**Gemessen, nicht behauptet:**
-
-| Lauf | Material | Ausgang |
-|---|---|---|
-| `assembleRelease bundleRelease` | ja | BUILD SUCCESSFUL, beide signiert |
-| `assembleRelease` | **nein** | exit 1 bei `packageReleaseResources`, **kein Artefakt** |
-| `assembleDebug` | nein | exit 0 — unberührt |
-
-`apksigner` meldet SHA-256 `7ae18622…2fda`, zeichengleich mit dem Fingerabdruck
-des Keystores. Kette reproduziert: beide Dateien gelöscht, aus `infisical run
---env=prod` neu erzeugt → derselbe Fingerabdruck.
+- **AGE-630 vollständig geschlossen.** PR [#361](https://github.com/agenticapps-eu/fbc-platform/pull/361)
+  (Squash `6490c0e`) war noch offen — CI grün, gemergt, `main` nachgezogen.
+  Linear steht auf **Done** (15:47:51; der Merge hat ihn selbst zugemacht).
+- **Die zwei AGE-630-Nachzügler abgearbeitet**, beide als Entscheidung, nicht
+  als Fix:
+  - **Release-Text in Mitgliedersprache geschrieben** (8 Stichpunkte). Er ist
+    **nicht versendet** — und soll es womöglich auch nicht mehr einzeln, siehe
+    AGE-705.
+  - **Cover-Größen gegen PROD gemessen** (design.md D5, unten).
+- **AGE-705 angelegt** — Donalds Zuruf vom 07.09., der nächste Punkt für den
+  08.09.
+- **Ein selbst verursachter Fehlschluss gefunden und geheilt:** der Merge dieser
+  Übergabe setzte AGE-705 auf *Done*. Zurückgesetzt, korrigiert (PR #363), die
+  Lehre steht unten im Kasten.
 
 ## Decisions
 
-- **Der Keystore ist NICHT unersetzlich** — die Aussage stand in `proposal.md`
-  und im Delta und ist seit Aug. 2021 falsch. Play App Signing ist für neue Apps
-  verpflichtend, Google hält den App-Signaturschlüssel, unserer ist der
-  **Upload**-Schlüssel und über die Play Console zurücksetzbar. Beide Stellen
-  korrigiert; die Sicherung bleibt gefordert, aus schwächerem Grund.
-- **Infisical + eine Offline-Kopie** (Donald, 04.09.) statt Tresor-Disziplin.
-- **Android zuerst, iOS eigener Vorgang** (Donald, 04.09.).
-- **`versionCode` bewusst NICHT mitgenommen.** Das Schema ist eine Entscheidung
-  und verzahnt sich mit `version_build` des OTA-Wegs.
-- **`ERWARTETER_FINGERABDRUCK` im Workflow**, nachträglich auf Reviewer-Befund:
-  `apksigner verify` allein belegt nur, *dass* signiert wurde, nicht *womit*.
+- **Der Release-Entwurf wird nicht an der Quelle repariert.**
+  `src/lib/release-entwurf.ts` sagt im Kopf selbst, der generierte Text sei ein
+  Vorschlag zum Überschreiben. Das archivierte Proposal umzuschreiben hätte eine
+  abgeschlossene OpenSpec-Change verändert, um ein Symptom zu behandeln, das per
+  Design vorgesehen ist.
+- **Der Versand bleibt Donalds Klick.** Ein Rundruf erreicht alle 74 Profile.
+- **AGE-705 kam in „Go-Live August 2026", nicht in den Nach-Go-Live-Backlog** —
+  es ist die nächste aktive Arbeit, kein Später.
+- **Die Waisen-Cover bekommen KEINEN Vorgang** (Donald, 07.09.: „die
+  waisen-cover sollen an detlev hängen einfach"). Gemessen: **alle 7** Objekte
+  in `event-covers` liegen im Präfix **eines einzigen Profils** — auf PROD hat
+  bisher genau eine Person je ein Event-Titelbild eingestellt, und ihr gehören
+  auch die 4 Waisen. Sie liegen in einem privaten `{uid}/`-Ordner und sind für
+  niemanden sonst lesbar. Das ist die Entscheidung, nicht ein Vergessen: **nicht
+  neu aufrollen.**
+- **AGE-560 wurde NICHT angefasst.** Sie heißt „Release-Mechanismus neu denken"
+  und liest sich wie ein Duplikat, gehört aber zu **fx-signals**
+  (`apps/web/src/components/WhatsNew.tsx`). Falsches Repo, gleiche Wörter.
 
-## ⚠ Zwei Handgriffe, die nur Donald tun kann
+### Der Befund, nach dem niemand gefragt hatte
 
-1. **`~/Downloads/effbeezee-android-upload-keystore/` an einen verschlüsselten
-   Ort bringen und den Ordner dann löschen.** Dort liegt das Passwort im
-   Klartext. Das ist die beschlossene Offline-Kopie; `LIESMICH.md` erklärt alles.
-2. ~~PR #344 hat `mergeable=CONFLICTING` gemeldet~~ — erledigt, gemergt als
-   `3d20063`, CI grün, auf PROD ausgerollt.
+Beim Messen von D5: **4 der 7 Objekte in `event-covers` (PROD) hängen an keinem
+Event.** Grund ist, dass **nie etwas aus dem Bucket gelöscht wird** — `feed.ts`
+und `feedback.ts` rufen `storage.remove()`, die Event- und Profilpfade nie; in
+`src/lib/profile.cover.test.ts:137` steht das ausdrücklich als Absicht.
+
+Ein gelöschtes Event, ein ausgetauschtes Titelbild und eine verworfene
+Vorlagen-Erzeugung lassen ihre Datei dauerhaft liegen — und eine Serie legt bis
+zu 52 Kopien an. **Entschieden: kein Vorgang** (siehe Decisions). Der Mechanismus
+bleibt trotzdem wahr — wer ihn später doch angeht, muss ihn nicht neu messen.
+
+Die eigentliche D5-Zahl ist dagegen langweilig, und das ist die Antwort: 7
+WebP-Bilder, 84.876–115.486 B, **Median 89.820 B**. Eine 52er-Serie kostet
+**≈ 4,5 MiB** — neben `ota-buendel` (189 MB in 63 Objekten) belanglos.
+**D5 ist keine Speicherfrage.**
 
 ## Files modified
 
-Siehe PR #344 — 13 Dateien. Die drei, die zählen, stehen oben in der Tabelle.
-Dazu `scripts/firebase-config{,.logic}.ts`: die Herkunftsangabe sagte fest
-„Umgebung dev", und der Release-Bau ruft jetzt auch mit `prod`.
+- `session-handoff.md` — diese Datei (die vorige Fassung ist als `6490c0e` auf
+  `main`).
+- Sonst **keine** Code-Änderung in dieser Sitzung.
+- Ausserhalb des Repos: `cover-seitenverhaeltnisse-gemessen.md` in der Memory um
+  die PROD-Messung, den Waisen-Befund und die Eigentümerfrage ergänzt;
+  `issue-kuerzel-im-doku-pr-titel-schliesst.md` um den zweiten Fall vom 07.09.
+  Der Release-Text liegt im Scratchpad
+  (`release-age-630-mitgliederfassung.md`) — **flüchtig**, er steht vollständig
+  im Sitzungsprotokoll und im Kern in AGE-705.
 
 ## Next session: start here
 
-**Der Workflow ist gebaut, aber noch nie gelaufen.** Erste Handlung: einmal
-`workflow_dispatch` auf `android-release` auslösen und zusehen (#344 ist
-gemergt). Alles davor ist lokal belegt, die Runner-Seite nicht — offen sind dort
-genau drei Annahmen: dass `android-actions/setup-android` die Build-Tools
-mitbringt, die `apksigner` findet; dass `jarsigner` aus `setup-java` im PATH
-steht; und dass `pnpm exec cap sync android` auf dem Runner dieselben fünf
-Plugins verdrahtet wie lokal.
+**AGE-705 lesen, nicht neu messen.** Der Ist-Zustand steht vollständig im
+Issue-Rumpf: 76 Archiv-Verzeichnisse → 75 Einträge → **263 Stichpunkte**, davon
+57 mit AGE-Bezug; der heutige Weg Entwurf → `/admin/neuigkeiten` → `release_notes`
+(draft→sent) → `ReleaseNoteModal`; `posts_kind_check` als geschlossene Menge;
+die Domain- und die RLS-Lage.
 
-Danach **`versionCode`** — ohne es lässt sich das Artefakt genau einmal zu Play
-hochladen.
+Der erste Schritt ist **keine Zeile Code**, sondern die eine Entscheidung, aus
+der alle anderen folgen: **wo der lesbare Text dauerhaft lebt** — in
+`release_notes` (DB als Quelle, Website und Aktivität lesen daraus) oder im Repo
+(Build als Quelle, der Admin-Versand liest daraus). Danach die Auswahl treffen,
+welche der 75 Einträge ein Mitglied überhaupt interessieren. Erst dann ein
+OpenSpec-Proposal.
 
-> ⚠ **Squash-Falle, am 04.09. zweimal eingetreten:** PRs aus diesem Branch
-> werden **squash**-gemergt. Der Squash-Commit ist damit kein Vorfahr des
-> Branches, git sieht alle Dateien des PRs als „beidseitig geändert", und der
-> NÄCHSTE PR meldet `CONFLICTING`, obwohl die Bäume identisch sind. Heilmittel
-> nach jedem Merge: `git diff origin/main HEAD` prüfen — ist er leer, gefahrlos
-> `git reset --hard origin/main`. Nicht mergen, das doppelt nur die Historie.
+**Reihenfolge-Vorschlag aus dem Issue:** Quelle + Auswahl (ohne Code) →
+Aktivität (kleinste Fläche, ganz in der App) → Website. Die Tutorials sind der
+grösste Textblock und hängen an keinem der drei technischen Schritte.
 
-> ⚠ **Java-Falle, am 04.09. eingetreten:** Android Studios mitgelieferte JBR ist
-> Java **25**, Gradle 8.14.3 bricht daran mit `Unsupported class file major
-> version 69` ab. Lokal `JAVA_HOME=/opt/homebrew/opt/openjdk@21` setzen;
-> `/usr/bin/keytool` ohne JAVA_HOME ist nur ein Stub.
+**Nicht anfassen: die Mobile-Spur.** AGE-642 (M2) ist *In Progress* und gehört
+der anderen Sitzung; AGE-643 (Deep Links) und AGE-644 (Store-Einreichung) hängen
+daran.
+
+**Sonst offen im Projekt** (Stand 07.09.): AGE-610 (Klärungen mit Detlev und
+dem Anwalt, kein Code), AGE-684 + AGE-512 (Resend als SMTP und die Trennung der
+Secrets — beide fassen dieselbe Konfiguration an, gehören zusammen), AGE-607
+(Überlauf im Browser messen), AGE-606 (`format:check` rot, 211 Dateien),
+AGE-516 (Rückstufung bei geplatzter Zahlung).
 
 ## Open questions
 
-- **Geschütztes GitHub-Environment für `android-release`.** Beide Auslöser bauen
-  den Ref, auf dem sie stehen — wer ein Tag setzen kann, führt Code mit Zugriff
-  auf die prod-Geheimnisse aus. Keine **neue** Fläche (`deploy.yml` trägt
-  denselben Token), aber die Stelle, an der sie sich verengen ließe. Ist eine
-  Repository-Einstellung, kein Diff.
-- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
-  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur
-  im neuen Workflow löst, erzeugte zwei Wahrheiten.
-- **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat.** Vor
-  der Store-Einreichung am **Release**-Bau gegenprüfen. Eigener Vorgang.
-- **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
-- **Realtime im Chat** ist weiterhin ungemessen.
-- **Bildupload auf iOS** ist ungeprüft. Die Ursache war capgo, nicht Android —
-  iOS ist vermutlich genauso betroffen, aber das ist eine Ableitung.
-- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung —
-  zuletzt machen.
+- **Wird der AGE-630-Release-Text noch einzeln versendet**, oder geht er in der
+  neuen Systematik aus AGE-705 auf? Im Issue ist er als Nachzügler vermerkt.
+- **`effbeezee.com` ohne `www`** — Weiterleitung bei Strato, oder gar nicht?
+  Der Apex kann kein CNAME, das ist gemessen und steht in AGE-256.
+- Aus AGE-630 unverändert offen: beim Löschen einer Vorlage zukünftige leere
+  Termine mitnehmen? `events.vorlage_id` ist für fremde Mitglieder lesbar
+  (bewusst hingenommen).
+
+> ⚠ **Nicht der Titel schliesst den Vorgang, sondern der BRANCHNAME.** Diese
+> Übergabe ist der Beleg: ihr PR-Titel trug bewusst AGE-630 und nicht AGE-705 —
+> der Branch hiess trotzdem `donald/uebergabe-age-705`, und der Merge von #362
+> setzte **AGE-705 auf Done**, zwei Sekunden nach dem Merge, an einem Vorgang
+> ohne eine Zeile Code. Zurückgesetzt auf *Todo* um 16:32.
+>
+> **Die Regel lautet deshalb:** vor `git checkout -b` fragen, ob dieser PR den
+> Vorgang wirklich erledigt. Wenn nein, gehört **kein Kürzel in den Branchnamen**
+> — auch nicht in den Titel, aber der Branch allein genügt der Automation. Und
+> danach trotzdem nachsehen: `list_issues` mit `updatedAt: -PT1H`.

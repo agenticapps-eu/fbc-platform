@@ -390,10 +390,80 @@ echten Geräten" nicht erreichbar, und das fiele erst ganz am Ende auf.
 iOS-Hälfte hat eigene Fallen (ASC-Schlüssel, Provisioning Profile,
 macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
 
-- [ ] **iOS:** Entwickler-Zertifikat und Provisioning Profile (oder
-      App-Store-Connect-API-Schlüssel) bereitstellen. Woher sie kommen, gehört
-      in dieselbe Zeile wie ihr Name — nach Infisical, nicht ins Repo.
-      **Zurückgestellt** — siehe Zuschnitt oben.
+- [x] **iOS: die Kette ist durchgemessen (07.09.), lokal, vom Web-Bündel bis
+      zu Apples Urteil.** Bewusst zuerst lokal und nicht im CI — der
+      Android-Workflow kostete einen roten Lauf, dessen Meldung falsch war, und
+      das Suchen fand dort statt. Der Workflow ist jetzt die Abschrift einer
+      Befehlsfolge, die nachweislich läuft.
+
+      **Der Befund, der die Arbeit halbiert: es gibt kein Zertifikat als
+      Secret.** `-allowProvisioningUpdates` mit dem ASC-Schlüssel lässt Apple
+      **serverseitig** signieren. Das `.ipa` trägt `Apple Distribution`, während
+      der Schlüsselbund weiterhin **nur** `Apple Development` führt und
+      `/v1/certificates` ebenfalls — das Verteil-Zertifikat ist cloud-verwaltet.
+      Kein `.p12`, kein Keychain-Import, drei Werte statt vier plus Datei.
+
+      Am ausgelieferten `.ipa` gemessen, nicht am Archiv:
+
+      | | |
+      |---|---|
+      | Signatur | `Apple Distribution: Donald Vlahovic (WQZJ8649TN)` |
+      | Profil | `iOS Team Store Provisioning Profile: com.effbeezee.app`, ohne Geräteliste |
+      | `aps-environment` | `production` |
+      | Bundle · Version | `com.effbeezee.app` · 1.0 (1) |
+      | Boot-Fläche (B5) | `splash-band.webp` + `splash-schriftzug.png` in `App.app/public/brand/` |
+      | Apples Urteil | `xcrun altool --validate-app` → **VERIFY SUCCEEDED with no errors** |
+
+      **Validiert, nicht hochgeladen.** Dadurch ist Build-Nummer 1 noch frei und
+      der Workflow kann bei `run_number` 1 anfangen, ohne Sonderregel.
+
+      ⚠ **Das ARCHIV ist mit `Apple Development` signiert, und das ist normal.**
+      Der Archivlauf endet mit ARCHIVE SUCCEEDED und meldet dabei die
+      Entwickler-Identität; erst `-exportArchive` signiert neu. Wer den
+      Signaturnachweis aufs Archiv legt, prüft die falsche Datei.
+
+      ⚠ **Der Archivlauf hat die Versions-Überschreibung NICHT belegt:** er
+      benutzte `CURRENT_PROJECT_VERSION=1`, und 1 ist auch die Vorgabe im
+      Projekt. Nachgeholt mit `-showBuildSettings CURRENT_PROJECT_VERSION=4242`
+      → die Einstellung nimmt den Wert an.
+- [x] **`ios-release.yml`** als Spiegel der Android-Seite: `workflow_dispatch`
+      plus Tag `ios-v*`, geschütztes Environment `ios-release`, Infisical,
+      `cap sync ios`, Archiv + Export, Signaturnachweis **am `.ipa`** (vier
+      Fragen: Verteil-Zertifikat · unser Team · Store-Profil ohne Geräteliste ·
+      `aps-environment: production` · Build-Nummer = Lauf-Nummer), genau eine
+      Datei als Artefakt. Er lädt **nicht** zu TestFlight hoch — wie die
+      Android-Seite hört er beim signierten Artefakt auf, die Einreichung ist M4.
+- [x] **GREEN:** elf Zusagen in `scripts/ios-release.workflow.test.ts`, mit
+      Gegenprobe über sechs Mutationen, alle rot: `pull_request` im Auslöser ·
+      Environment entfernt · Nachweis aufs Archiv gelegt · Upload nennt ein
+      Verzeichnis · Schlüssel in den Arbeitsbaum · Versions-Überschreibung
+      entfernt.
+- [x] **Die drei `ASC_*`-Werte liegen in Infisical `prod`** (07.09.).
+      Dokumentiert in `docs/secrets.md`. **Und der Weg dorthin ist belegt, nicht
+      angenommen:** ein PEM kann durch eine Secret-Ablage seine Zeilenumbrüche
+      verlieren, und das fiele erst im Signierschritt auf. Gegengeprüft mit
+      genau der Form, die `ios-release.yml` benutzt (`printf "%s"`):
+      SHA-256 `056bff9e…2449` — **byte-gleich mit der lokalen Datei**, und
+      `openssl pkey` liest sie als gültigen P-256-Schlüssel.
+- [x] **Environment `ios-release` angelegt** (07.09., per API, wie das
+      Android-Gegenstück am 05.09.). Zurückgelesen und gegen `android-release`
+      gehalten — beide tragen jetzt dieselben vier Einstellungen:
+
+      | | android-release | ios-release |
+      |---|---|---|
+      | Freigeber | `DonaldVl` | `DonaldVl` |
+      | `prevent_self_review` | `false` | `false` |
+      | Admin-Bypass | `false` | `false` |
+      | Freigabe-Refs | `main`, Tag `android-v*` | `main`, Tag `ios-v*` |
+
+      ⚠ **Admin-Bypass stand nach dem Anlegen auf `true`** und musste in einem
+      zweiten Schritt gesetzt werden — GitHubs Vorgabe für ein neues
+      Environment. Wer nur anlegt und nicht zurückliest, hat die Freigaberegel
+      als Dekoration: der einzige Mensch im Repo ist Admin und dürfte sie
+      übergehen.
+- [ ] **Erster Lauf — erst NACH dem Merge.** Die Ref-Liste lässt `main` und
+      Tags `ios-v*` zu; ein `workflow_dispatch` vom Feature-Branch scheitert an
+      ihr. Danach die Einreichung nach TestFlight (M4, eigener Vorgang).
 - [x] **Android:** Keystore erzeugen, **außerhalb des Repos sichern**,
       `key.properties` aus CI-Secrets erzeugen lassen. Derselbe Keystore, der
       nirgends im Repo liegen darf, muss dem Workflow zur Laufzeit vorliegen —
@@ -483,22 +553,165 @@ macOS-Runner) und teilt mit der Android-Hälfte nichts als die Überschrift.
       | HOCH | `curl \| sudo bash` für die Infisical-CLI ungepinnt | **nicht behoben** — bestehende Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur hier löst, erzeugte zwei Wahrheiten. |
       | HOCH | Beide Auslöser bauen einen ungeprüften Ref mit prod-Token | **nicht behoben, benannt** — siehe unten |
 
-- [ ] **OFFEN — geschütztes GitHub-Environment für `android-release`.**
-      Der Workflow baut den Ref, auf dem er steht; wer ein Tag setzen kann,
-      führt Code mit Zugriff auf die prod-Geheimnisse aus. Keine **neue** Fläche
-      (`deploy.yml` trägt denselben Token und läuft auf jeden Push nach `main`),
-      aber die Stelle, an der sie sich verengen liesse: ein Environment mit
-      Freigeber in den Repository-Einstellungen. Das ist eine Einstellung, kein
-      Diff — deshalb kann diese Sitzung sie nicht setzen.
+- [x] **Geschütztes GitHub-Environment `android-release` — gesetzt am 05.09.**
+      Der Workflow baut den Ref, auf dem er steht; wer ein Tag setzen oder von
+      einem beliebigen Branch dispatchen kann, führt Code mit Zugriff auf die
+      prod-Geheimnisse aus. Der Job trägt jetzt `environment: android-release`,
+      und das Environment hält zwei Regeln von sehr ungleichem Gewicht:
 
-- [ ] **OFFEN, und M4 hängt daran: `versionCode` steht auf `1`.**
+      | Einstellung | Wert | Was sie wert ist |
+      |---|---|---|
+      | Freigeber | `DonaldVl` | **Selbstfreigabe** — es gibt genau einen Kollaborator mit Schreibrecht. Kein Vier-Augen-Prinzip, sondern Pause plus Protokoll. Harter Anteil: die Secrets liegen erst nach dem Klick im Job. |
+      | `prevent_self_review` | `false` | muss aus bleiben, sonst könnte niemand freigeben |
+      | Admin-Bypass | `false` | sonst wäre die Freigeber-Regel für den einzigen Menschen im Repo Dekoration |
+      | Freigabe-Refs | Branch `main`, Tag `android-v*` | **die eigentliche Verengung** — bindet ohne zweiten Menschen und ist nicht wegklickbar. Ein Dispatch von einem ungeprüften Feature-Branch scheitert daran. |
+
+      Reihenfolge-Falle, an `production` ablesbar: zeigt `environment:` auf ein
+      Environment, das im Repository nicht existiert, legt GitHub es beim ersten
+      Lauf still und **ungeschützt** selbst an. Genau so steht `production`
+      heute da (`migrate-prod.yml`, Job `apply`, zurückgestellt am 05.08.). Erst
+      die Einstellung, dann der Diff.
+
+      **Nicht gelöst, ausdrücklich:** `INFISICAL_TOKEN` bleibt ein Repo-Secret,
+      weil `deploy.yml` es braucht — und das läuft auf `pull_request`. Der Token
+      ist aus jedem Same-Repo-PR schon heute erreichbar. Das Environment schützt
+      diesen Workflow, nicht den Token; dafür bräuchte es einen eigenen,
+      projektbeschränkten Infisical-Token. **Eigener Vorgang.**
+
+      Gegengelesen über die API, nicht behauptet:
+      `gh api /repos/agenticapps-eu/fbc-platform/environments/android-release`
+      meldet `can_admins_bypass: false` und `required_reviewers: [DonaldVl]`;
+      `…/deployment-branch-policies` meldet `branch main` und `tag android-v*`.
+
+- [x] **Der Workflow ist gelaufen — zweimal, und der erste Lauf war der
+      wertvollere.** Bis zum 07.09. stand hier „nie gelaufen"; das gilt nicht
+      mehr.
+
+      | Lauf | Ausgang |
+      |---|---|
+      | `34090816888` | **rot** in `Signatur nachweisen` — und die Meldung war falsch |
+      | `34092615595` | **grün**, alle 14 Schritte, Artefakte hochgeladen |
+
+      **Der rote Lauf meldete „Signiert mit dem falschen Schluessel" und log
+      damit über die Ursache.** Der Schlüssel stimmte; gescheitert war der
+      Parser, der ihn lesen sollte: `awk -F': ' {print $2}` nimmt an, dass vor
+      dem Hash genau EIN `": "` steht. Lokal trifft das zu (build-tools 35.0.0
+      und 36.0.0, beide gemessen: `Signer #1 certificate SHA-256 digest: …`),
+      auf dem Runner nicht — dort steht `V2 Signer: certificate SHA-256 digest:
+      …`, ein Doppelpunkt mehr, und `$2` war der Text statt des Werts.
+
+      Behoben in **PR #355**: der Fingerabdruck wird als 64-stelliger Hex-Wert
+      gelesen statt nach Feldposition, die Rohzeile geht ins Log, und
+      **„nicht lesbar" und „falscher Schlüssel" sind jetzt zwei Meldungen.**
+      Das ist der eigentliche Fix — ein Parser-Befund, der als Aussage über den
+      Schlüssel auftritt, schickt den nächsten Leser zu Infisical statt zum
+      `awk`. Sechs Fälle gegengeprüft, inklusive Negativkontrollen; die
+      Großschreibung zeigte denselben Fehlertyp ein zweites Mal und ist mit `tr`
+      geschlossen.
+
+      **Die drei offenen Runner-Annahmen sind damit alle belegt:**
+
+      | Annahme | Beleg |
+      |---|---|
+      | `setup-android` bringt Build-Tools, die `apksigner` findet | ja — er lief schon im roten Lauf |
+      | `jarsigner` steht im PATH | ja — „AAB verifiziert." im grünen Lauf |
+      | `cap sync` verdrahtet dieselben fünf Plugins | ja — **am Artefakt**, siehe unten |
+
+      Die dritte **nicht** an `cap ls` geprüft, sondern am ausgelieferten APK:
+      `assets/capacitor.plugins.json` listet `@capacitor/app`,
+      `@capacitor/camera`, `@capacitor/preferences`,
+      `@capacitor/push-notifications` und `@capgo/capacitor-updater` — fünf von
+      fünf, deckungsgleich mit `package.json`. `cap ls` meldet Plugins, die noch
+      gar nicht verdrahtet sind; der Fehlermodus ist Schweigen.
+
+      **Zwei unabhängige Gegenproben am heruntergeladenen Artefakt**, damit die
+      Prüfung nicht bloss mit sich selbst einig ist:
+
+      - lokaler `apksigner` liest denselben Fingerabdruck `7ae18622…2fda`
+      - das Artefakt enthält genau **zwei** Dateien, kein Keystore, kein
+        `key.properties` — in einem öffentlichen Repo die wichtigere der beiden
+
+      **Das Environment-Gate hat bei beiden Läufen gehalten:** Status `waiting`,
+      kein Checkout, kein Secret im Job, bis die Freigabe erteilt war.
+
+      **Folge für Dependabot:** #349–#351 (`setup-java`, `upload-artifact`,
+      `setup-android`, alle drei Major) waren zurückgestellt, bis ein grüner
+      Lauf existiert. **Am 07.09. gehoben — einzeln, mit je einem
+      `android-release`-Lauf dazwischen**, damit ein Fehlschlag zuzuordnen
+      bliebe:
+
+      | PR | Sprung | Merge | Gegenprobe |
+      |---|---|---|---|
+      | #349 | `setup-java` 4.7.1 → 6.0.0 | `b0763cf` | Lauf 4 grün |
+      | #350 | `upload-artifact` 4.6.2 → 7.0.1 | `cb32fe9` | Lauf 5 grün |
+      | #351 | `setup-android` 3.2.2 → 4.0.1 | `7eac348` | Lauf 6 grün |
+
+      Nach #350 zusätzlich nachgesehen, ob überhaupt noch etwas hochgeladen
+      wird: ein grüner Schritt belegt das bei einer Major-Änderung an genau
+      dieser Action nicht von selbst. Artefakt vorhanden, 27,4 MB.
+
+      **`Deploy` war auf allen drei PRs rot — strukturell, kein Befund.**
+      Dependabots eigene Läufe bekommen den Infisical-Token nicht (`Failed to
+      automatically trigger login flow`), und `deploy` ist keiner der vier
+      Pflichtchecks (`verify`, `migrations`, `pr-title`, `edge-functions`). Wer
+      hier auf die Ampel des PRs sieht statt auf die vier, hält eine Konstante
+      für ein Ergebnis.
+
+      **Endstand am APK aus Lauf 6**, vier Dimensionen gleichzeitig gemessen,
+      nachdem alle drei Actions gehoben waren: `versionCode='6'` (= Lauf-Nummer),
+      Signatur `7ae18622…2fda`, 5 von 5 Plugins, genau 2 Dateien im Artefakt.
+
+- [x] **`versionCode` kommt aus der CI-Laufnummer** (entschieden 07.09.).
       `android/app/build.gradle` trägt bis heute die Vorlage (`versionCode 1`,
       `versionName "1.0"`). Der Workflow baut damit ein Artefakt, das sich genau
       **einmal** zu Play hochladen lässt — jeder weitere Upload wird mit
       „Version code 1 has already been used" abgelehnt. Bewusst NICHT in B3
       hineingezogen: das Schema ist eine Entscheidung (Tag? Lauf-Nummer? eigene
-      `VERSION`?) und verzahnt sich mit `version_build` des OTA-Wegs, der
-      semver-förmig sein muss. Gehört vor die erste Einreichung.
+      `VERSION`?). Gehört vor die erste Einreichung.
+
+      > **Korrigiert am 07.09.:** hier stand, das Schema „verzahnt sich mit
+      > `version_build` des OTA-Wegs, der semver-förmig sein muss". **Das ist
+      > falsch**, und der Satz hat es von hier bis in die Übergabe geschafft.
+      > Gemessen: `version_build` kommt aus `plugins.CapacitorUpdater.version`
+      > (`capacitor.config.ts`, steht auf `1.0.0`), wird von
+      > `scripts/ota-buendel.ts` gelesen und von
+      > `supabase/functions/ota-update/antwort.ts` als Vertragsnummer der Form
+      > `1.0.0` validiert. `versionCode` ist Plays monotone Ganzzahl aus
+      > `android/app/build.gradle`. Zwei Dateien, zwei Verbraucher, **keine
+      > Verbindung im Code** — die Wahl des Schemas ist also freier als
+      > behauptet. Aufgedeckt von der AGE-630-Sitzung, nicht von mir.
+
+      **Gewählt aus dreien** (Laufnummer / Datumsstempel / von Hand in git):
+      `github.run_number` steigt je Workflow monoton, und genau das verlangt
+      Play. `build.gradle` hält die `1` nur noch als Rückfall für den lokalen
+      Bau, wo nichts hochgeladen wird.
+
+      ```
+      versionCode ((project.findProperty('versionCode') ?: 1) as int)
+      ./gradlew --no-daemon -PversionCode=${{ github.run_number }} …
+      ```
+
+      **Die Klammern sind gemessen, nicht Geschmack.** Die zuerst vorgelegte
+      Form `versionCode (…) as int` bricht ab: Groovy liest sie als
+      `(versionCode(…)) as int` — erst der Aufruf, dann der Cast auf dessen
+      Rückgabewert, und der ist null. Gradle meldet dann `Value is null` und
+      nennt nur die Zeilennummer. Hätte ich den Ausdruck bloss übernommen,
+      wäre der nächste Release-Lauf daran gescheitert.
+
+      **Am Manifest belegt, mit Negativkontrolle** (`processDebugMainManifest`,
+      `--rerun-tasks`):
+
+      | Aufruf | `android:versionCode` im Manifest |
+      |---|---|
+      | `-PversionCode=4242` | `4242` |
+      | ohne `-P` | `1` |
+      | `-PversionCode=777` | `777` |
+
+      **Der Preis, benannt statt entdeckt:** der ausgelieferte Wert steht in
+      KEINEM Commit — wer wissen will, welcher `versionCode` zu welchem Stand
+      gehört, muss den Lauf nachschlagen. Und ein **Re-Run** derselben
+      Lauf-Nummer erzeugt denselben Code; Play lehnt den zweiten Upload ab. Bei
+      einem Re-Run also neu auslösen statt wiederholen.
 
 ### B4. Das App-Symbol ✅
 
@@ -632,18 +845,133 @@ betroffenen Punkten.
       Favicon gelesen und nicht abgeschrieben ist. Mit Mutations-Gegenprobe:
       Rampe auf zwei Stopps · Schriftzug über die Invariante geschoben · Marke
       fest verdrahtet → jeweils rot.
-- [ ] **Boot-Fläche: die Entscheidung fällt im `<head>`, nicht im Anwendungscode.**
-      *Aus der Review (opencode, MEDIUM), und der Befund war richtig:* Inhalt in
-      `#root` steht im ausgelieferten Dokument und wird gezeichnet, **bevor**
-      irgendein Modul lädt — `Capacitor.isNativePlatform()` käme zu spät, und die
-      Boot-Fläche erschiene auch im Browser. Das Inline-Skript im `<head>`, das
-      heute schon vor dem First Paint die Design-Variante setzt, entscheidet es
-      mit. **Erst messen, ob die Lücke überhaupt sichtbar ist** — sie ist heute
-      weiß auf weiß.
+- [x] **Gemessen am 07.09. — und „weiß auf weiß" gilt nur für das untere
+      Drittel.** Die Lücke ist genau das ausgelieferte Dokument OHNE ausgeführtes
+      JavaScript; so ist sie auch aufgenommen (CDP,
+      `Emulation.setScriptExecutionDisabled`, 390×844@3x), statt aus dem CSS
+      abgeleitet zu werden. Regionsweise gemessen wie beim RED oben, nicht als
+      Mittelwert:
+
+      | Region | Startbildschirm | Boot-Fläche | App |
+      |---|---|---|---|
+      | oberste 20 % | `#b8b7ad`, Streuung **67** | `#f6f8fb`, Streuung **0** | `#dbdee4`, Streuung 59 |
+      | Mitte 48–52 % | `#ffffff`, Streuung 1 | `#f6f8fb`, Streuung 0 | `#b0b0b3`, Streuung 85 |
+      | unterste Zeile | `#ffffff`, Streuung 0 | `#f6f8fb`, Streuung 0 | `#ced3db`, Streuung 56 |
+
+      **Unten stimmt die Behauptung:** Storyboard-Grundton `#ffffff` gegen
+      `body { background-color: var(--color-soft) }` = `#f6f8fb` — 9/7/4 in
+      8 Bit, das sieht niemand. **Oben stimmt sie nicht:** dort weicht ein Foto
+      (Streuung 67) einer vollkommen leeren Fläche (Streuung 0). Foto,
+      Schriftzug und Claim verschwinden gleichzeitig, und es kommt nichts nach.
+
+      **Wie lange**, am gebauten Bündel über `vite preview` gemessen, Lücke =
+      `first-contentful-paint` − `first-paint`:
+
+      | CPU-Bremse | first-paint | `#root` gefüllt | FCP | **leer** |
+      |---|---|---|---|---|
+      | 1× (dieser Mac) | 40 ms | 65 ms | 80 ms | **40 ms** |
+      | 4× | 40 ms | 146 ms | 172 ms | **132 ms** |
+      | 6× | 52 ms | 238 ms | 280 ms | **228 ms** |
+
+      Das ist Desktop-Chrome mit Bremse, **kein Gerät**. Die Bremse steht für
+      den Abstand Mac↔Telefon, sie misst ihn nicht; und was capgo beim Auflösen
+      des Bündels vor dem ersten Paint kostet, ist hier gar nicht enthalten. Die
+      Zahl am Gerät ist eher grösser als kleiner.
+- [x] **Entschieden (Donald, 07.09.): füllen, und zwar den Startbildschirm
+      nachgebaut.** Die Zwischenlösung „nur den Grundton auf `#ffffff`" ist
+      verworfen — die eigene Messung oben sagt, dass sie genau die Stelle
+      repariert, die man ohnehin nicht sieht.
+- [x] **Gebaut.** Markup in `index.html` **innerhalb von `#root`**, Regeln in
+      `src/index.css`, freigeschaltet von einem zweiten Inline-Skript im
+      `<head>`. *Aus der Review (opencode, MEDIUM), und der Befund war richtig:*
+      im Anwendungscode käme die Entscheidung zu spät.
+- [x] **`window.Capacitor` steht dem `<head>`-Skript zur Verfügung** — Capacitor
+      spritzt `native-bridge.js` vor jedem Skript des Dokuments ein: iOS als
+      `WKUserScript` mit `injectionTime: .atDocumentStart`
+      (`JSExport.swift:20,107`), Android über
+      `WebViewCompat.addDocumentStartJavaScript` (`Bridge.java:266`). **Und wenn
+      nicht**, fällt der Ausdruck auf `false`: das Attribut bleibt weg, es gilt
+      das Verhalten von vorher. Ein Fehlschlag kostet die Verbesserung, nicht
+      die Anwendung.
+- [x] **Sie steht in `#root`, damit React sie selbst wegräumt.** Kein
+      Aufräum-Code, der vergessen werden kann — und sie verschwindet in
+      demselben Bild, in dem die Anwendung erscheint, nicht davor. **Gemessen,
+      nicht angenommen:** die Aufnahme nach dem Einschwingen misst regionsweise
+      exakt die Werte der App ohne Boot-Fläche (`#dbdee4`/59 · `#b0b0b3`/85 ·
+      `#ced3db`/56).
+- [x] **Im Browser kostet sie null Bytes.** Die zwei Bilder hängen an
+      CSS-`url()` unter `html[data-boot="nativ"]` und nicht an `<img>` — ein
+      `<img>` würde auch unter `display: none` geladen. **Am Netzwerk gemessen**
+      (CDP, `Network.requestWillBeSent`): ohne Capacitor **0** Bildanfragen, mit
+      gestelltem Capacitor **2**.
+- [x] **Die Bilder kommen aus `pnpm splash`, aus derselben SVG-Quelle wie die
+      nativen** — keine zweite Geometrie im CSS. Neu sind zwei Web-Fassungen in
+      `public/brand/`: `splash-band.webp` (41,6 kB) und `splash-schriftzug.png`
+      (42,2 kB), zusammen **83,8 kB**. Die nativen Dateien sind dabei
+      **byte-gleich geblieben** (`git status ios/` leer).
+
+      | | JPEG q80 | **WebP q80** |
+      |---|---|---|
+      | Band, 900 px breit | 154.860 B | **41.600 B** |
+
+      Deshalb `cwebp` als viertes Werkzeug des Skripts (`brew install webp`).
+      Die native Fassung bleibt JPEG — der Asset-Katalog will sie so. Der
+      Schriftzug bleibt PNG: Text auf durchsichtigem Grund, dort sieht man
+      verlustbehaftete Kanten.
+- [x] **Der Schriftzug ist ein BILD und kein Text**, und das ist gemessen
+      begründet: alle vier `@font-face` stehen auf `font-display: swap`, im
+      `<head>` wird nichts vorgeladen. Als Text käme er zuerst in einer
+      Ersatzschrift und spränge dann um — mitten in dem Moment, den die Fläche
+      glätten soll.
+- [x] **Beleg: die Boot-Fläche trifft den Startbildschirm regionsweise.**
+      Aufgenommen am gebauten Bündel, mit gesperrtem Einstiegsmodul — also die
+      Fläche im Stillstand, nicht nachgestellt:
+
+      | Region | Startbildschirm | Boot-Fläche | Browser |
+      |---|---|---|---|
+      | oberste 20 % | `#b8b7ad`, Streuung 67 | `#b8b7ac`, Streuung 67 | `#f6f8fb`, 0 |
+      | Mitte 48–52 % | `#ffffff`, 1 | `#ffffff`, 1 | `#f6f8fb`, 0 |
+      | unterste Zeile | `#ffffff`, 0 | `#ffffff`, 0 | `#f6f8fb`, 0 |
+
+      Ein Bit Abweichung im Blaukanal des Mittelwerts, aus der WebP-Quantisierung.
+- [x] **GREEN:** acht Zusagen in `src/boot-flaeche.test.ts` über `index.html`,
+      `src/index.css` und `splash.logic.ts`. Mit Gegenprobe, sechs Mutationen,
+      **alle rot**: Fläche aus `#root` herausgeschoben · Vorgabe `display: none`
+      entfernt · nativer Wächter aus einem Selektor gestrichen · Bandhöhe 62 %
+      auf 60 % · ein Stopp der Rampe gestrichen · Dateiname im CSS verdreht.
+- [x] **Abnahme:** `pnpm typecheck` 0, `pnpm lint` **Exit 0** (7 Warnungen,
+      alle bestehend), `pnpm test` **2605/2605** in 232 Dateien,
+      `native-secrets-guard` (1526 Dateien) und `entry-chunk-guard` grün.
+- [ ] **Offen: der Beleg am Gerät.** Alles oben ist am gebauten Bündel im
+      Desktop-Chrome gemessen. Ob `window.Capacitor` im `<head>` am echten
+      Gerät steht, kann nur das Gerät sagen — und es ist der eine Punkt, an dem
+      diese Fläche still ausfallen würde.
 - [ ] **Beleg auf dem Gerät, NACH dem Löschen der App.** *Aus der Review (beide,
       LOW/MEDIUM):* iOS hält den Startbildschirm in einem Zwischenspeicher; ein
       Beleg ohne vorheriges Löschen zeigt womöglich die alte Fläche und belegt
       nichts. Bildschirmfoto im Hoch- **und** im Querformat.
+
+      ⚠ **Und er hat eine Vorgeschichte, die fast verlorengegangen wäre.** Am
+      29.08. stand in der Übergabe (`8710c18:session-handoff.md:125`) die
+      Beobachtung:
+
+      > **Startbildschirm erscheint nicht** — Verdacht eins bleiben die von Hand
+      > geschriebenen Constraints, Zwischenspeicher des Launch Screens die
+      > zweite Spur. Erst die Marke.
+
+      `746f5f7` hat sie einen Tag später beim Neuschreiben der Übergabe
+      entfernt; in `tasks.md` ist sie nie angekommen. Wiedergefunden am 07.09.,
+      und nur, weil Donald sich an sie erinnerte. **Deshalb steht sie jetzt
+      hier.**
+
+      Nachgeprüft, so weit es ohne Gerät geht: **Verdacht eins hält nicht.**
+      `Info.plist` trägt `UILaunchStoryboardName = LaunchScreen`, das Storyboard
+      hat `launchScreen="YES"`, `initialViewController`, `useSafeAreas` und alle
+      drei Bilder unter `<resources>`; die Constraints sind vollständig. Und die
+      Beobachtung ist **vom 29.08., die Marken-Startfläche entstand am 30.08.** —
+      damals war dort noch Capacitors weisses PNG, und „erscheint nicht" ist bei
+      einer weissen Fläche vor einem weissen WebView von „erscheint" nicht zu
+      unterscheiden. Sie wurde seither nie wiederholt.
 - [x] **Grössenzuwachs des Bündels messen und nennen** (*Review gemini, LOW*).
       **Gemessen am 31.08. mit `actool` (Xcode 26.6), also am KOMPILIERTEN
       `Assets.car` und nicht an den Quelldateien** — die beiden Zahlen gehen
@@ -1997,16 +2325,6 @@ eigenen Vorgang, nicht fuer diesen Fix.
       Das habe ich bewusst nicht getan: es setzte ein Foto einer dunklen Flaeche
       als Donalds Profilbild auf PROD. Der Messpunkt dafuer steht in der
       Uebergabe (`storage.objects`, Bucket `avatars`).
-
-**Die Gegenmassnahme, die das Plugin dafuer mitbringt** (in 8.51.15 vorhanden,
-nachgesehen): `setMultiDelay({ delayConditions: [{ kind: "kill" }] })` verschiebt
-die Uebernahme, bis die App wirklich beendet und neu gestartet wird;
-`cancelDelay()` nimmt das zurueck. Um den nativen Rundlauf gelegt, kann kein
-Wechsel mehr hineinplatzen — und `bilderVonQuelle` ist seit C3 der EINE
-Aufrufpunkt, durch den jeder Bildweg geht. Die Alternative waere
-`directUpdate: true` (Uebernahme beim Start statt beim Zurueckkommen), das aber
-jeden Start um den Wechsel verlaengert und weit ueber den Bildupload hinausgeht.
-**Entscheidung steht aus, Code ist noch keiner geschrieben.**
 
 ## Vor dem Abschluss
 

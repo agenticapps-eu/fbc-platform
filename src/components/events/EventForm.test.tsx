@@ -66,6 +66,7 @@ const basis: EventListItem = {
   registeredCount: 0,
   waitlistCount: 0,
   myStatus: null,
+  vorlageId: null,
 };
 
 describe("EventForm — die Pflichtfelder bleiben zwei", () => {
