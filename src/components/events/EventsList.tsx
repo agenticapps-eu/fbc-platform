@@ -19,13 +19,16 @@ import {
   type EventInput,
   type EventListItem,
 } from "../../lib/events";
+import { fetchVorlagen, vorlagenListKey, type VorlageItem } from "../../lib/event-vorlagen";
 import { EventCard } from "./EventCard";
 import { EventForm } from "./EventForm";
+import { VorlagenPanel } from "./VorlagenPanel";
 import { useEventCovers } from "./useEventCovers";
 
 /**
- * Events-Übersicht (AGE-251). Drei Reiter: Kommende, Vergangene, Meine Events
- * (AGE-442 — gebuchte und selbst gehostete zusammen, keine eigene Unterseite mehr).
+ * Events-Übersicht (AGE-251). Vier Reiter: Kommende, Vergangene, Meine Events
+ * (AGE-442 — gebuchte und selbst gehostete zusammen, keine eigene Unterseite mehr)
+ * und Vorlagen (AGE-630, aus demselben Grund hier statt auf einer eigenen Seite).
  * Sichtbarkeit erzwingt die RLS — der Client zeigt nur, was `fetchEvents` zurückgibt.
  */
 export default function EventsList() {
@@ -34,6 +37,15 @@ export default function EventsList() {
   const [creating, setCreating] = useState(false);
 
   const events = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
+  // `enabled`, nicht nur ein verstecktes Ergebnis: eine Vorlage gehört immer
+  // genau einem Host, ausgeloggt gäbe `vorlagen_own` ohnehin nichts heraus. Die
+  // Abfrage zu stellen und die leere Antwort zu verwerfen wäre eine Anfrage je
+  // Seitenaufruf für eine Auskunft, die schon feststeht.
+  const vorlagen = useQuery({
+    queryKey: vorlagenListKey(uid),
+    queryFn: fetchVorlagen,
+    enabled: uid !== null,
+  });
 
   return (
     <section className="space-y-6">
@@ -51,7 +63,12 @@ export default function EventsList() {
         </Card>
       )}
 
-      <EventsBody query={events} hostId={user?.id ?? null} />
+      <EventsBody
+        query={events}
+        hostId={user?.id ?? null}
+        vorlagen={vorlagen.data ?? []}
+        vorlagenFehler={vorlagen.isError}
+      />
     </section>
   );
 }
@@ -84,9 +101,16 @@ function CreateEvent({ hostId, onDone }: { hostId: string; onDone: () => void })
 function EventsBody({
   query,
   hostId,
+  vorlagen,
+  vorlagenFehler,
 }: {
   query: ReturnType<typeof useQuery<EventListItem[]>>;
   hostId: string | null;
+  vorlagen: VorlageItem[];
+  // Getrennt von `vorlagen`, weil eine leere Liste und eine gescheiterte
+  // Abfrage sonst dasselbe waeren — und die Meldung „Du hast noch keine
+  // Vorlage" waere im Fehlerfall schlicht falsch (Diff-Review, opencode).
+  vorlagenFehler: boolean;
 }) {
   // Die Zustandsgrößen stehen VOR den frühen Rückgaben. Ein `useState` hinter
   // `if (isLoading) return` liefe beim ersten Rendern nicht und beim zweiten
@@ -128,17 +152,23 @@ function EventsBody({
     return (
       <p className="text-sm text-danger">Events konnten nicht geladen werden. Bitte neu laden.</p>
     );
-  if (all.length === 0) {
-    return (
-      // AGE-494: Am 17.08. sehen ~70 Menschen diesen Zustand beim ersten Login.
-      // „Sobald Veranstaltungen geplant sind, erscheinen sie hier" ist eine
-      // Zustandsmeldung — sie sagt, was fehlt, statt was als Nächstes passiert.
-      <EmptyState
-        title="Die ersten Termine entstehen gerade"
-        description="Der Club trifft sich regelmäßig — Sommerfest, Stammtische, Formate der Mitglieder. Sobald ein Termin steht, findest du ihn hier und kannst dich direkt anmelden."
-      />
-    );
-  }
+  // AGE-494: Am 17.08. sehen ~70 Menschen diesen Zustand beim ersten Login.
+  // „Sobald Veranstaltungen geplant sind, erscheinen sie hier" ist eine
+  // Zustandsmeldung — sie sagt, was fehlt, statt was als Nächstes passiert.
+  const leer = (
+    <EmptyState
+      title="Die ersten Termine entstehen gerade"
+      description="Der Club trifft sich regelmäßig — Sommerfest, Stammtische, Formate der Mitglieder. Sobald ein Termin steht, findest du ihn hier und kannst dich direkt anmelden."
+    />
+  );
+  // AGE-630: OHNE Anmeldung ersetzt der Leerzustand weiterhin die ganze Leiste
+  // — es gäbe dort nur einen Reiter mit demselben Inhalt.
+  //
+  // MIT Anmeldung wird er zum Inhalt des ersten Reiters, statt die Leiste zu
+  // ersetzen. Sonst wäre der Vorlagen-Reiter genau in dem Zustand unerreichbar,
+  // in dem man ihn braucht: erste Vorlage angelegt, noch kein Termin erzeugt.
+  // Die Meldung selbst bleibt wortgleich stehen.
+  if (all.length === 0 && hostId === null) return leer;
   const now = new Date();
   const { upcoming, past } = partitionEvents(gefiltert, now);
   const mine = selectMyEvents(gefiltert, hostId, now);
@@ -147,7 +177,8 @@ function EventsBody({
     {
       value: "upcoming",
       label: `Kommende (${upcoming.length})`,
-      content: <CardGrid events={upcoming} empty="Keine kommenden Events." />,
+      content:
+        all.length === 0 ? leer : <CardGrid events={upcoming} empty="Keine kommenden Events." />,
     },
     {
       value: "past",
@@ -155,12 +186,17 @@ function EventsBody({
       content: <CardGrid events={past} empty="Keine vergangenen Events." />,
     },
   ];
-  // Ohne Login gibt es nichts Eigenes — dann bleibt der Reiter weg statt leer.
+  // Ohne Login gibt es nichts Eigenes — dann bleiben die Reiter weg statt leer.
   if (hostId) {
     tabs.push({
       value: "mine",
       label: `Meine Events (${mine.length})`,
       content: <CardGrid events={mine} empty="Du hast noch keine Events gebucht oder angelegt." />,
+    });
+    tabs.push({
+      value: "vorlagen",
+      label: `Vorlagen (${vorlagen.length})`,
+      content: <VorlagenPanel hostId={hostId} vorlagen={vorlagen} fehler={vorlagenFehler} />,
     });
   }
 

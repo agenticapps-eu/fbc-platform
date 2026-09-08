@@ -116,6 +116,40 @@ export const BAND_BILD = { breite: 1290, hoehe: 1734 } as const;
 export const SCHRIFTZUG_BILD = { breite: 1200, hoehe: 1000 } as const;
 export const VERLAUF_BILD = { breite: 8, hoehe: 1024 } as const;
 
+/**
+ * Kantenlängen der WEB-Fassungen derselben zwei Ebenen (AGE-642, B5).
+ *
+ * Die Boot-Fläche im WebView zeigt dieselbe Komposition wie der native
+ * Startbildschirm — aber sie zeigt sie in einem WebView von höchstens ein paar
+ * hundert CSS-Pixeln Breite, nicht auf einem Asset-Katalog. Die nativen
+ * Fassungen dafür zu nehmen hiesse, `splash-band.jpg` mit 310 kB in den
+ * Startweg zu ziehen, also genau die Zeit zu bezahlen, die die Fläche
+ * überbrücken soll.
+ *
+ * **Warum sie hier entstehen und nicht von Hand:** der Ausschnitt des Fotos
+ * (`AUSSCHNITT`) und das Seitenverhältnis des Schriftzugs sind schon einmal
+ * gerechnet. Eine zweite Fassung, die dieselbe Geometrie im CSS nachbaut, wäre
+ * eine zweite Wahrheit — und die erste, die auseinanderläuft, sobald jemand
+ * `AUSSCHNITT` anfasst. `pnpm splash` erzeugt deshalb beide Fassungen aus
+ * derselben SVG-Quelle im selben Lauf.
+ *
+ * **Warum der Schriftzug ein BILD bleibt und kein Text wird:** alle vier
+ * `@font-face` dieser App stehen auf `font-display: swap` und nichts wird im
+ * `<head>` vorgeladen. Als Text käme er zuerst in einer Ersatzschrift und
+ * spränge dann um — mitten in dem Moment, den die Fläche glätten soll. Im Bild
+ * ist die Schrift schon gerastert.
+ */
+export const BAND_WEB = { breite: 900 } as const;
+export const SCHRIFTZUG_WEB = { breite: 600 } as const;
+
+/** Die zwei Dateien, die `pnpm splash` fuer die Boot-Flaeche schreibt, und die
+ *  `src/index.css` per `url()` holt. Beide Seiten lesen diese Konstante —
+ *  `src/boot-flaeche.test.ts` haelt sie zusammen. */
+export const WEB_DATEIEN = {
+  band: "splash-band.webp",
+  schriftzug: "splash-schriftzug.png",
+} as const;
+
 type Groesse = { breite: number; hoehe: number };
 type Lage = { x: number; y: number; breite: number; hoehe: number };
 

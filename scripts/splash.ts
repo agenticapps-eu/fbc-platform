@@ -42,9 +42,12 @@ import { dirname, join } from "node:path";
 import { leseMarke } from "./app-icons.logic";
 import {
   BAND_BILD,
+  BAND_WEB,
   GRUND,
   SCHRIFTZUG_BILD,
+  SCHRIFTZUG_WEB,
   VERLAUF_BILD,
+  WEB_DATEIEN,
   bandSvg,
   contentsJson,
   schriftzugSvg,
@@ -55,6 +58,10 @@ const FAVICON = "public/brand/compass-favicon.svg";
 const FOTO = "public/images/hero-mitglieder.webp";
 const SCHRIFTEN = ["inter-latin", "fraunces-latin"];
 const XCASSETS = "ios/App/App/Assets.xcassets";
+/** Wohin die Web-Fassungen gehen. `public/`, weil die Boot-Fläche sie über
+ *  CSS-`url()` holt und Vite alles darunter unverändert nach `dist/` legt. */
+const WEB = "public/brand";
+
 
 /** Die drei Ebenen. `Splash` behält seinen Namen: das Storyboard kennt ihn
  *  schon, und was sich ändert, ist sein Inhalt, nicht seine Rolle. */
@@ -241,6 +248,7 @@ function legeAb(ebene: { set: string; datei: string }, png: string): void {
 function main(): void {
   werkzeug("rsvg-convert", "Auf macOS: `brew install librsvg`.");
   werkzeug("woff2_decompress", "Auf macOS: `brew install woff2`.");
+  werkzeug("cwebp", "Auf macOS: `brew install webp`.");
 
   const arbeit = mkdtempSync(join(tmpdir(), "fbc-splash-"));
   try {
@@ -314,6 +322,23 @@ function main(): void {
     legeAb(EBENEN.schriftzug, schriftzugPng);
     for (const e of Object.values(EBENEN)) {
       console.log(`ios      ${XCASSETS}/${e.set}.imageset/${e.datei}`);
+    }
+
+    // Dieselben zwei Ebenen noch einmal, klein, für die Boot-Fläche im WebView
+    // (B5). Aus DENSELBEN SVG, im selben Lauf — siehe BAND_WEB in der Logik.
+    // Der Verlauf kommt dort nicht als Bild dazu: er ist im CSS ein
+    // `linear-gradient` mit denselben vier Stopps.
+    const bandWebPng = join(arbeit, "band-web.png");
+    rastere(bandDatei, bandWebPng, BAND_WEB.breite, env);
+    mkdirSync(WEB, { recursive: true });
+    // WebP und nicht JPEG, gemessen an denselben 900 px: 42 kB gegen 155 kB.
+    // Das ist der Unterschied zwischen einer Fläche, die den Start überbrückt,
+    // und einer, die ihn verlängert. Der Schriftzug bleibt PNG — er ist Text
+    // auf durchsichtigem Grund, und verlustbehaftete Kanten sieht man dort.
+    execFileSync("cwebp", ["-quiet", "-q", "80", bandWebPng, "-o", `${WEB}/${WEB_DATEIEN.band}`]);
+    rastere(EBENEN.schriftzug.svg, `${WEB}/${WEB_DATEIEN.schriftzug}`, SCHRIFTZUG_WEB.breite, env);
+    for (const datei of Object.values(WEB_DATEIEN)) {
+      console.log(`web      ${WEB}/${datei}`);
     }
   } finally {
     rmSync(arbeit, { recursive: true, force: true });

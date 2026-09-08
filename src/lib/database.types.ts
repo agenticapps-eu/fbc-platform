@@ -323,9 +323,11 @@ export type Database = {
           location: string | null;
           starts_at: string;
           title: string;
+          slot_datum: string | null;
           topics: string[] | null;
           type: string | null;
           visibility: string;
+          vorlage_id: string | null;
         };
         Insert: {
           capacity?: number | null;
@@ -337,11 +339,13 @@ export type Database = {
           host_partner_id?: string | null;
           id?: string;
           location?: string | null;
+          slot_datum?: string | null;
           starts_at: string;
           title: string;
           topics?: string[] | null;
           type?: string | null;
           visibility?: string;
+          vorlage_id?: string | null;
         };
         Update: {
           capacity?: number | null;
@@ -353,11 +357,13 @@ export type Database = {
           host_partner_id?: string | null;
           id?: string;
           location?: string | null;
+          slot_datum?: string | null;
           starts_at?: string;
           title?: string;
           topics?: string[] | null;
           type?: string | null;
           visibility?: string;
+          vorlage_id?: string | null;
         };
         Relationships: [
           {
@@ -379,6 +385,100 @@ export type Database = {
             columns: ["host_partner_id"];
             isOneToOne: false;
             referencedRelation: "partners";
+            referencedColumns: ["id"];
+          },
+          // AGE-630, von Hand ergänzt: der Fremdschlüssel ist ZUSAMMENGESETZT
+          // — `(vorlage_id, host_id)` auf `(id, host_id)`, nicht `vorlage_id`
+          // auf `id`. Das ist keine Stilfrage: die FK-Prüfung läuft nicht unter
+          // der RLS der Zieltabelle, ein einfacher FK auf `(id)` wäre damit ein
+          // Existenz-Orakel für fremde Vorlagen. Der Migrationskopf von
+          // 20260906090000 trägt die Begründung.
+          {
+            foreignKeyName: "events_vorlage_fkey";
+            columns: ["vorlage_id", "host_id"];
+            isOneToOne: false;
+            referencedRelation: "event_vorlagen";
+            referencedColumns: ["id", "host_id"];
+          },
+        ];
+      };
+      event_vorlagen: {
+        // AGE-630, von Hand ergänzt. Zwei Dinge, die der Generator nicht
+        // ausdrücken kann und die hier bewusst als Kommentar stehen:
+        //
+        // 1. `wiederholung` und die drei Regelfelder hängen über den
+        //    CHECK `event_vorlagen_regelform` zusammen — je Regelform ist
+        //    genau eine Teilmenge gesetzt und der Rest muss null sein. Der
+        //    Typ lässt jede Kombination zu; die Datenbank nicht.
+        // 2. `ortszeit` ist `time` und `dauer` ein `interval` — beide kommen
+        //    als Zeichenkette über PostgREST („18:30:00", „02:00:00"), nicht
+        //    als Zahl.
+        Row: {
+          capacity: number | null;
+          cover_path: string | null;
+          created_at: string;
+          dauer: string | null;
+          description: string | null;
+          host_id: string;
+          id: string;
+          location: string | null;
+          ortszeit: string;
+          tag_im_monat: number | null;
+          title: string;
+          topics: string[] | null;
+          type: string | null;
+          visibility: string;
+          wiederholung: string | null;
+          wochentag: number | null;
+          wochentag_position: number | null;
+          zeitzone: string;
+        };
+        Insert: {
+          capacity?: number | null;
+          cover_path?: string | null;
+          created_at?: string;
+          dauer?: string | null;
+          description?: string | null;
+          host_id: string;
+          id?: string;
+          location?: string | null;
+          ortszeit: string;
+          tag_im_monat?: number | null;
+          title: string;
+          topics?: string[] | null;
+          type?: string | null;
+          visibility?: string;
+          wiederholung?: string | null;
+          wochentag?: number | null;
+          wochentag_position?: number | null;
+          zeitzone?: string;
+        };
+        Update: {
+          capacity?: number | null;
+          cover_path?: string | null;
+          created_at?: string;
+          dauer?: string | null;
+          description?: string | null;
+          host_id?: string;
+          id?: string;
+          location?: string | null;
+          ortszeit?: string;
+          tag_im_monat?: number | null;
+          title?: string;
+          topics?: string[] | null;
+          type?: string | null;
+          visibility?: string;
+          wiederholung?: string | null;
+          wochentag?: number | null;
+          wochentag_position?: number | null;
+          zeitzone?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "event_vorlagen_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1812,6 +1912,47 @@ export type Database = {
         Returns: string;
       };
       current_tier_rank: { Args: never; Returns: number };
+      /** AGE-630: rechnet die Termine einer Serienregel aus — Kalender und
+       *  Zonendatenbank, keine gelesene Zeile. Deshalb `security invoker` und
+       *  `execute` an `authenticated`: die Vorschau im Erzeugen-Dialog ruft
+       *  dieselbe Funktion, die das Schreiben danach benutzt, und kann nicht
+       *  auseinanderlaufen.
+       *
+       *  Die drei optionalen Parameter sind je Regelform verschieden Pflicht
+       *  (`woechentlich` → `p_wochentag`; `monatlich_tag` → `p_tag_im_monat`;
+       *  `monatlich_n_ter_wochentag` → beide Wochentag-Felder). Der Typ kann
+       *  das nicht ausdrücken, der CHECK auf der Vorlage schon. */
+      event_serie_slots: {
+        Args: {
+          p_wiederholung: string;
+          p_ortszeit: string;
+          p_zeitzone: string;
+          p_ab: string;
+          p_anzahl: number;
+          p_wochentag?: number | null;
+          p_tag_im_monat?: number | null;
+          p_wochentag_position?: number | null;
+        };
+        Returns: { slot_datum: string; starts_at: string }[];
+      };
+      /** AGE-630: legt die Termine einer Vorlage an und gibt die erzeugten
+       *  Events zurueck. `security invoker` — die Vorlage muss dem Aufrufer
+       *  gehoeren, das traegt die RLS, nicht diese Funktion.
+       *
+       *  `p_anzahl` ODER `p_bis_datum`, nicht beides; Obergrenze 52. Und
+       *  `p_cover_pfade` muss, wenn gesetzt, GENAU so viele Pfade tragen wie
+       *  Termine entstehen, in der nach `slot_datum` sortierten Reihenfolge —
+       *  sonst 22023. Das Kopieren im Storage passiert vorher im Client. */
+      event_serie_erzeugen: {
+        Args: {
+          p_vorlage_id: string;
+          p_ab: string;
+          p_anzahl?: number | null;
+          p_bis_datum?: string | null;
+          p_cover_pfade?: string[] | null;
+        };
+        Returns: Database["public"]["Tables"]["events"]["Row"][];
+      };
       /** AGE-641 Phase B: nimmt ein Geraetetoken entgegen und ordnet es dem
        *  aufrufenden Konto zu. `security definer`, weil `push_tokens`
        *  owner-only-RLS traegt und ein Token, das vorher einem anderen Konto

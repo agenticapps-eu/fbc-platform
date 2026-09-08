@@ -1,0 +1,250 @@
+name: ios-release
+
+# ══ DER SPIEGEL VON `android-release.yml` (AGE-642 B3, iOS-Haelfte) ════════
+# Dieselbe Zusage, dieselbe Form: „Ein nativer Bau laeuft nur, wenn er
+# angefordert wird." Der Ausloeser-Block unten ist die eigentliche Zusage der
+# Datei und hat einen Test daneben (`scripts/ios-release.workflow.test.ts`).
+#
+# ══ WAS AUF DER IOS-SEITE ANDERS IST — UND ES IST WENIGER ══════════════════
+# Am 07.09. lokal durchgemessen, vom Web-Buendel bis zu Apples Urteil:
+#
+#  1. ES GIBT KEIN ZERTIFIKAT ALS SECRET. Auf der Android-Seite reist der
+#     Keystore als `ANDROID_KEYSTORE_BASE64` mit. Hier signiert Apple
+#     SERVERSEITIG: `-allowProvisioningUpdates` plus ASC-Schluessel erzeugt ein
+#     cloud-verwaltetes Verteil-Zertifikat. Gemessen: das fertige `.ipa` traegt
+#     `Apple Distribution`, waehrend der lokale Schluesselbund weiterhin NUR
+#     `Apple Development` fuehrt und Apples `/v1/certificates` ebenfalls. Der
+#     Job braucht deshalb drei Werte statt vier plus Datei.
+#
+#  2. DAS ARCHIV IST MIT DEM FALSCHEN ZERTIFIKAT SIGNIERT, UND DAS IST NORMAL.
+#     Der Archivlauf meldet `Signing Identity: "Apple Development: …"` und
+#     endet mit ARCHIVE SUCCEEDED. Erst `-exportArchive` signiert mit
+#     `Apple Distribution` neu. Wer den Signaturnachweis auf das ARCHIV legt,
+#     prueft die falsche Datei und bekommt einen dauerhaft roten oder — je nach
+#     Vergleich — dauerhaft gruenen Schritt. Der Nachweis unten liegt deshalb
+#     auf dem `.ipa`.
+#
+#  3. DIE TEAM-ID KOMMT AUS `APNS_TEAM_ID` und bekommt hier KEINEN zweiten
+#     Namen. Es ist dasselbe Apple-Team; eine zweite Kopie waere eine zweite
+#     Wahrheit, und die erste, die auseinanderlaeuft, sobald jemand eine davon
+#     rotiert.
+#
+# ══ WAS DIESER WORKFLOW NICHT TUT ══════════════════════════════════════════
+# Er laedt NICHT zu TestFlight hoch. Wie die Android-Seite legt er ein
+# signiertes Artefakt ab und hoert dort auf; die Einreichung ist M4 und ein
+# eigener Vorgang. Der Weg ist gemessen und funktioniert
+# (`xcrun altool --validate-app` → „VERIFY SUCCEEDED with no errors"), er ist
+# hier nur bewusst nicht verdrahtet.
+#
+# ══ SCHUTZ ════════════════════════════════════════════════════════════════
+# Wie bei Android haengt der Job an einem geschuetzten Environment. Und wie
+# dort gilt: zeigt die Zeile auf ein Environment, das im Repository NICHT
+# existiert, legt GitHub es beim ersten Lauf still und UNGESCHUETZT selbst an.
+# `ios-release` muss also als Repository-Einstellung stehen, BEVOR dieser
+# Workflow das erste Mal laeuft — Freigeber, `prevent_self_review` aus,
+# Admin-Bypass aus, Freigabe-Refs `main` und Tags `ios-v*`.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "ios-v*"
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bauen:
+    # macOS ist Pflicht — `xcodebuild` gibt es nur dort. Der Lauf kostet das
+    # Zehnfache eines Linux-Laufs an Minuten; das ist der Preis dafuer, dass
+    # dieser Workflow nur auf Anforderung laeuft und nicht bei jedem Push.
+    runs-on: macos-latest
+    environment: ios-release
+    env:
+      INFISICAL_API_URL: https://eu.infisical.com/api
+      # IMMER prod, aus demselben Grund wie auf der Android-Seite: ein
+      # Release-Bau geht in den Store und spricht dort die produktive Datenbank
+      # an. Der Preis ist benannt — dieser Workflow kann nichts gegen DEV bauen.
+      INFISICAL_ENV: prod
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Nicht Ordnungsliebe: das Runner-Image hebt Xcode ohne Ankuendigung, und
+      # die Fassung entscheidet ueber Signierverhalten und SDK. Steht sie im
+      # Log, ist ein Bruch nach einem Image-Wechsel in einer Zeile zu sehen
+      # statt in einer Fehlersuche. Lokal belegt mit Xcode 26.6 (17F113).
+      - name: Xcode-Fassung nennen
+        run: xcodebuild -version
+
+      - name: Install Infisical CLI
+        run: brew install infisical/get-cli/infisical
+
+      # ══ DER ASC-SCHLUESSEL ═════════════════════════════════════════════════
+      # Er landet unter `$RUNNER_TEMP` und damit AUSSERHALB des Arbeitsbaums.
+      # Das ist keine Vorsicht auf Verdacht: `scripts/native-secrets-guard.ts`
+      # prueft den Baum, und der Upload-Schritt unten nennt genau einen Pfad.
+      # Ein `.p8` im Baum waere ein Schluessel in einem OEFFENTLICHEN Repo.
+      - name: ASC-Schluessel bereitstellen
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          infisical run --env="$INFISICAL_ENV" --silent -- sh -c '
+            set -eu
+            : "${ASC_KEY_P8:?fehlt in Infisical prod (AGE-642 B3, iOS)}"
+            : "${ASC_KEY_ID:?fehlt in Infisical prod (AGE-642 B3, iOS)}"
+            : "${ASC_ISSUER_ID:?fehlt in Infisical prod (AGE-642 B3, iOS)}"
+            : "${APNS_TEAM_ID:?fehlt in Infisical prod}"
+            umask 077
+            printf "%s" "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+            {
+              echo "ASC_KEY_ID=$ASC_KEY_ID"
+              echo "ASC_ISSUER_ID=$ASC_ISSUER_ID"
+              echo "APPLE_TEAM_ID=$APNS_TEAM_ID"
+            } >> "$GITHUB_ENV"
+          '
+          # Ein leeres Secret schriebe eine leere Datei, und `xcodebuild`
+          # meldete das erst zwoelf Minuten spaeter als Signierfehler.
+          test -s "$RUNNER_TEMP/asc.p8"
+
+      - name: Web-Buendel bauen
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+        run: infisical run --env="$INFISICAL_ENV" -- pnpm build
+
+      # Wie auf der Android-Seite: ohne diesen Schritt baut Xcode die alte
+      # Weboberflaeche mit — und meldet das nicht.
+      - name: Native Schale synchronisieren
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: infisical run --env="$INFISICAL_ENV" --silent -- pnpm exec cap sync ios
+
+      # `CURRENT_PROJECT_VERSION` ist Apples Build-Nummer und muss je Version
+      # steigen. Sie kommt aus der Lauf-Nummer, genau wie Androids
+      # `versionCode` seit #357 — mit demselben Preis: der ausgelieferte Wert
+      # steht in KEINEM Commit, und ein Re-Run derselben Nummer erzeugt
+      # dieselbe Build-Nummer, die App Store Connect dann ablehnt. Bei einem
+      # Re-Run neu ausloesen statt wiederholen.
+      - name: Archivieren
+        run: |
+          set -euo pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            archive
+
+      - name: Exportieren
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      # ══ NICHT NUR *DASS*, SONDERN *WOMIT* ══════════════════════════════════
+      # Dieselbe Lehre wie auf der Android-Seite, wo ein vertauschter Keystore
+      # einen vollstaendig gruenen Lauf ergeben haette. Vier Fragen an das
+      # AUSGELIEFERTE `.ipa` — nicht an das Archiv (siehe Kopf, Punkt 2):
+      #
+      #   1. Ist es mit `Apple Distribution` signiert und mit UNSEREM Team?
+      #      Ein Entwickler-Zertifikat hier hiesse: das Archiv wurde nicht neu
+      #      signiert, und App Store Connect lehnte es ab.
+      #   2. Traegt das eingebettete Profil KEINE Geraeteliste? Ein
+      #      Entwickler-/Ad-hoc-Profil traegt eine, ein Store-Profil nicht.
+      #   3. Steht `aps-environment` auf `production`? Sonst spraeche der Push
+      #      der Store-App Apples Sandbox an.
+      #   4. Ist die Build-Nummer die Lauf-Nummer? Belegt, dass die
+      #      Ueberschreibung oben ueberhaupt greift. Am 07.09. lokal mit
+      #      `-showBuildSettings CURRENT_PROJECT_VERSION=4242` bestaetigt — der
+      #      Archivlauf davor hatte 1 benutzt, was auch die Vorgabe im Projekt
+      #      ist und deshalb nichts bewiesen haette.
+      - name: Signatur und Profil nachweisen
+        run: |
+          set -euo pipefail
+          ipa="$RUNNER_TEMP/export/App.ipa"
+          if [ ! -f "$ipa" ]; then
+            echo "::error::$ipa fehlt. Was hat der Export geschrieben?"
+            ls -la "$RUNNER_TEMP/export" || true
+            exit 1
+          fi
+
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa"
+          (cd "$RUNNER_TEMP/ipa" && unzip -q "$ipa")
+          app="$RUNNER_TEMP/ipa/Payload/App.app"
+
+          echo "── codesign ──"
+          codesign -dvvv "$app" 2>&1 | grep -E '^(Authority|TeamIdentifier|Identifier)' || true
+
+          if ! codesign -dvvv "$app" 2>&1 | grep -q "Authority=Apple Distribution"; then
+            echo "::error::Nicht mit einem Verteil-Zertifikat signiert. Hat der Export neu signiert?"
+            exit 1
+          fi
+          if ! codesign -dvvv "$app" 2>&1 | grep -q "TeamIdentifier=$APPLE_TEAM_ID"; then
+            echo "::error::Fremdes Team. Steht in Infisical prod noch dieselbe APNS_TEAM_ID?"
+            exit 1
+          fi
+
+          security cms -D -i "$app/embedded.mobileprovision" > "$RUNNER_TEMP/profil.plist"
+          echo "Profil: $(plutil -extract Name raw "$RUNNER_TEMP/profil.plist")"
+          if plutil -extract ProvisionedDevices raw "$RUNNER_TEMP/profil.plist" >/dev/null 2>&1; then
+            echo "::error::Das Profil traegt eine Geraeteliste — das ist ein Entwickler- oder Ad-hoc-Profil, kein Store-Profil."
+            exit 1
+          fi
+          aps="$(plutil -extract Entitlements.aps-environment raw "$RUNNER_TEMP/profil.plist" 2>/dev/null || echo '<fehlt>')"
+          if [ "$aps" != "production" ]; then
+            echo "::error::aps-environment ist '$aps' statt 'production' — der Push der Store-App spraeche Apples Sandbox an."
+            exit 1
+          fi
+
+          ist="$(plutil -extract CFBundleVersion raw "$app/Info.plist")"
+          if [ "$ist" != "${{ github.run_number }}" ]; then
+            echo "::error::Build-Nummer ist '$ist' statt '${{ github.run_number }}' — die Ueberschreibung im Archivschritt greift nicht."
+            exit 1
+          fi
+          echo "Signiert mit Apple Distribution ($APPLE_TEAM_ID), Store-Profil, aps=production, Build $ist."
+
+      # Genau ein Pfad, nie ein Verzeichnis — dieselbe Regel wie auf der
+      # Android-Seite. Der ASC-Schluessel liegt zwar unter `$RUNNER_TEMP` und
+      # nicht im Baum, aber ein breiterer Pfad bliebe die Sorte Fehler, die man
+      # genau einmal macht.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-release
+          path: ${{ runner.temp }}/export/App.ipa
+          if-no-files-found: error
+          retention-days: 14

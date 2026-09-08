@@ -54,6 +54,7 @@ function evt(over: Partial<EventListItem> = {}): EventListItem {
     registeredCount: 0,
     waitlistCount: 0,
     myStatus: null,
+    vorlageId: null,
     ...over,
   };
 }

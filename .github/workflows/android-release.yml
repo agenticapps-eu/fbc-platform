@@ -12,16 +12,29 @@ name: android-release
 # sieht, dass nichts passiert ist, und weiss nicht, ob das an der Konfiguration
 # lag. Am Ausloeser-Block ist sie strukturell.
 #
-# ══ WAS DIESER ZUSCHNITT NICHT LEISTET, AUSDRUECKLICH ══════════════════════
-# Beide Ausloeser bauen den Ref, auf dem sie stehen — auch einen, der nie durch
-# einen Review ging. Wer ein Tag setzen kann, kann also Code mit Zugriff auf die
-# prod-Geheimnisse ausfuehren.
+# ══ WAS DER SCHUTZ LEISTET — UND WAS NICHT ═════════════════════════════════
+# Beide Ausloeser bauen den Ref, auf dem sie stehen. Ungebremst hiesse das: wer
+# ein Tag setzen oder von einem beliebigen Branch dispatchen kann, fuehrt Code
+# mit Zugriff auf die prod-Geheimnisse aus. Der Job haengt deshalb am
+# geschuetzten Environment `android-release` (Repository-Einstellung, seit
+# 05.09.), und zwar an zwei Regeln mit sehr ungleichem Gewicht:
 #
-# Das ist KEINE neue Fläche: wer Schreibrecht hat, kann ebenso `deploy.yml`
-# aendern, das denselben Token traegt und auf jeden Push nach `main` laeuft.
-# Enger wird es erst mit einem geschuetzten GitHub-**Environment** samt
-# Freigeber — das ist eine Einstellung im Repository, kein Diff, und steht als
-# offener Punkt in `tasks.md` B3.
+#  1. FREIGEBER. Bei einem einzigen Kollaborator ist das eine SELBSTfreigabe —
+#     kein Vier-Augen-Prinzip, sondern eine bewusste Pause plus Protokoll. Ihr
+#     einziger harter Anteil: die Secrets liegen erst NACH dem Klick im Job.
+#     `prevent_self_review` ist aus (sonst koennte niemand freigeben),
+#     Admin-Bypass ebenfalls (sonst waere die Regel fuer den einzigen Menschen
+#     im Repo Dekoration).
+#  2. FREIGABE-REFS: `main` und Tags `android-v*`. DIESE Regel bindet auch ohne
+#     zweiten Menschen und ist nicht wegklickbar — ein Dispatch von einem
+#     ungeprueften Feature-Branch scheitert an ihr. Sie ist die eigentliche
+#     Verengung. Wer hier einen Branch ergaenzt, hebt sie auf.
+#
+# NICHT geloest, ausdruecklich: `INFISICAL_TOKEN` bleibt ein Repo-Secret, weil
+# `deploy.yml` es braucht — und das laeuft auf `pull_request`. Der Token ist
+# also aus jedem Same-Repo-PR schon heute erreichbar. Das Environment schuetzt
+# diesen Workflow, nicht den Token. Dafuer braeuchte es einen eigenen,
+# projektbeschraenkten Infisical-Token; eigener Vorgang.
 on:
   workflow_dispatch:
   push:
@@ -43,6 +56,11 @@ permissions:
 jobs:
   bauen:
     runs-on: ubuntu-latest
+    # Ohne diese Zeile waeren die Regeln oben wirkungslos. Umgekehrt gilt auch:
+    # zeigt sie auf ein Environment, das im Repository nicht existiert, legt
+    # GitHub es beim ersten Lauf still und UNGESCHUETZT selbst an — so steht
+    # `production` heute da (siehe `migrate-prod.yml`). Einstellung zuerst.
+    environment: android-release
     env:
       # Our Infisical org is on EU Cloud; the CLI defaults to US otherwise.
       INFISICAL_API_URL: https://eu.infisical.com/api
@@ -70,12 +88,12 @@ jobs:
 
       # AGP 8.13 verlangt mindestens JDK 17. 21 ist die aktuelle LTS und die,
       # gegen die Gradle 8.14 getestet ist.
-      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
 
       # Gleiche Installation wie in `deploy.yml`. Ein Checksum-Pin ist nicht zu
       # haben — Infisical verteilt die CLI ueber sein eigenes Repository
@@ -119,9 +137,15 @@ jobs:
       # Zwei Artefakte, zwei Abnehmer: das Bundle geht zu Play, das APK auf ein
       # physisches Geraet (Phase E verlangt genau das — ein Bundle laesst sich
       # nicht installieren).
+      # `versionCode` kommt aus der Lauf-Nummer, nicht aus dem Baum: Play
+      # verlangt fuer jeden Upload einen hoeheren Wert, und `github.run_number`
+      # steigt je Workflow monoton. `build.gradle` haelt die 1 nur als
+      # Rueckfall fuer den lokalen Bau. Entschieden am 07.09.; der Preis steht
+      # im Kommentar dort — der Wert liegt in keinem Commit, und ein Re-Run
+      # derselben Nummer erzeugt denselben Code.
       - name: Signierten Release-Bau
         working-directory: android
-        run: ./gradlew --no-daemon bundleRelease assembleRelease
+        run: ./gradlew --no-daemon -PversionCode=${{ github.run_number }} bundleRelease assembleRelease
 
       # Der Beleg, dass wirklich signiert wurde. Ohne ihn waere ein
       # unsigniertes Artefakt von einem signierten am Lauf nicht zu
@@ -160,8 +184,32 @@ jobs:
           # vollstaendig gruenen Lauf und ein Artefakt, das Play erst beim
           # Hochladen ablehnt („signed with the wrong key"). Das ist eine Stufe
           # zu spaet und weit weg von der Ursache.
-          ist="$("$apksigner" verify --print-certs "$apk" \
-                 | awk -F': ' '/SHA-256 digest/ {print $2; exit}' | tr -d ' ')"
+          #
+          # NICHT nach Feldposition, und das ist der Fix vom 07.09.: der erste
+          # Lauf (34090816888) scheiterte genau hier. `awk -F': ' {print $2}`
+          # nimmt an, dass vor dem Hash genau EIN ": " steht. Der apksigner des
+          # Runners schreibt aber einen Doppelpunkt mehr als der lokale, und
+          # $2 war dann „certificate SHA-256 digest" statt des Hashes. Der
+          # Schritt meldete daraufhin „signiert mit dem falschen Schluessel" —
+          # eine Parser-Panne, die als Aussage ueber den Schluessel auftrat und
+          # damit in die falsche Richtung zeigte. Ein 64-stelliger Hex-Wert ist
+          # formatunabhaengig; `|| true`, weil `grep` ohne Treffer unter
+          # `pipefail` den Schritt vor der eigenen Fehlermeldung abbraeche.
+          zeile="$("$apksigner" verify --print-certs "$apk" | grep -i 'SHA-256 digest' | head -1 || true)"
+          echo "apksigner: ${zeile:-<keine Zeile mit \"SHA-256 digest\">}"
+          # `tr` nicht aus Ordnungsliebe: apksigner schreibt lokal klein, und
+          # ein Wechsel auf Grossschreibung waere WIEDER ein Formatunterschied,
+          # den der Vergleich als falschen Schluessel meldete. Gleicher Fehler,
+          # andere Stelle — deshalb hier gleich mit erledigt.
+          ist="$(printf '%s' "$zeile" | grep -oiE '[0-9a-f]{64}' | head -1 | tr 'A-F' 'a-f' || true)"
+
+          # Zwei Ausgaenge, zwei Meldungen — das ist der eigentliche Punkt des
+          # Fixes. „Nicht lesbar" und „falscher Schluessel" sind verschiedene
+          # Befunde und duerfen nicht dieselbe Fehlermeldung teilen.
+          if [ -z "$ist" ]; then
+            echo "::error::Fingerabdruck nicht lesbar. Das ist ein PARSER-Fehler, KEINE Aussage ueber den Schluessel — die Rohzeile steht eine Zeile darueber."
+            exit 1
+          fi
           if [ "$ist" != "$ERWARTETER_FINGERABDRUCK" ]; then
             echo "::error::Signiert mit dem falschen Schluessel."
             echo "  erwartet:   $ERWARTETER_FINGERABDRUCK"
@@ -191,7 +239,7 @@ jobs:
       # Die beiden Dateien unten sind dagegen unbedenklich: sie enthalten den
       # Schluessel nicht, sondern nur seine Signatur, und dasselbe Buendel geht
       # ohnehin in den Store.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-release
           path: |

@@ -23,7 +23,25 @@ android {
         applicationId "com.effbeezee.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Play verlangt fuer JEDEN Upload einen hoeheren versionCode; eine feste
+        // 1 macht das Artefakt genau einmal einreichbar. Der Wert kommt deshalb
+        // vom Bau: `-PversionCode=` setzt ihn, der Release-Workflow reicht
+        // `github.run_number` durch. Die 1 bleibt als Rueckfall fuer den
+        // lokalen Bau stehen — dort ist der Wert egal, weil nichts hochgeladen
+        // wird.
+        //
+        // DER PREIS, benannt statt entdeckt: der ausgelieferte Wert steht in
+        // KEINEM Commit. Wer wissen will, welcher versionCode zu welchem Stand
+        // gehoert, muss den Lauf nachschlagen. Und ein Re-Run derselben
+        // Lauf-Nummer erzeugt DENSELBEN Code — Play lehnt den zweiten Upload
+        // dann ab. Bei einem Re-Run also neu ausloesen statt wiederholen.
+        //
+        // Die Klammern um den GESAMTEN Ausdruck sind nicht Kosmetik, sondern
+        // gemessen: `versionCode (…) as int` liest Groovy als
+        // `(versionCode(…)) as int` — erst der Aufruf, dann der Cast auf
+        // dessen Rueckgabewert. Der ist null, und Gradle bricht mit
+        // „Value is null" ab, ohne die Zeile zu erklaeren.
+        versionCode ((project.findProperty('versionCode') ?: 1) as int)
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

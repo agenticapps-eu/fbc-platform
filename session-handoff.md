@@ -1,173 +1,138 @@
-# Session Handoff — 2026-09-04 (AGE-642 B3: Android-Signierung und Release-Workflow)
+# Session Handoff — 2026-09-08 (AGE-642: B5 Boot-Fläche, iOS-Hälfte von B3)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie führt nur AGE-642 (M2, Capacitor-Hülle), Block B3.** Die Datei ist
-> für alle parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase —
-> **nicht zusammenführen**, überschreiben.
+> **1. Sie führt nur AGE-642** (M2, Capacitor-Hülle), Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle`. Die Datei ist für alle
+> parallelen Sitzungen dieselbe und kollidiert bei jedem Rebase — **nicht
+> zusammenführen**, überschreiben.
 >
-> **2. Vorher stand hier AGE-605** (Anmeldungen/Kapazität, PR #342). Vollständig
-> in `git show e1dd52a:session-handoff.md`. Eine Zeile daraus war eine
-> **Sperre für AGE-642** — der blockierte Deploy von `main`. Sie ist seit dem
-> Abend des 04.09. **aufgehoben**; der Abschnitt „Von AGE-605 übernommen" unten
-> trägt die Auflösung samt Laufnummern und wird nicht gelöscht, damit niemand
-> die alte Warnung aus einer früheren Fassung wieder aufgreift. **Es ist von
-> dort nichts mehr zu tun.**
+> **2. Sie ersetzt die AGE-705-Fassung.** Wer die sucht:
+> `git show 97e3df6:session-handoff.md`. An AGE-705 ist von hier aus **nichts**
+> zu tun.
 >
-> **3. Die Gerätebelege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/uebergabe-android.md` und in `tasks.md`,
-> Phase E. Diese Datei bleibt der Überblick.
-
-## Von AGE-605 übernommen — ⚠ ERLEDIGT am 04.09. abends, nicht mehr gültig
-
-Hier stand: *„Der Deploy von `main` ist blockiert, bis die PROD-Migration
-läuft."* Das galt bis 19:32 und ist **aufgehoben**. Der Satz bleibt als
-Korrektur stehen, damit niemand ihn aus einer älteren Fassung wieder aufgreift.
-
-Abgelaufen in dieser Reihenfolge, alles auf Commit `3d20063`:
-
-1. **`migrate-prod` (Lauf 33911148557), grün** — die AGE-605-Sitzung hat ihn
-   angestossen. `Applying migration 20260904160000_anmeldung_nicht_an_den_rpcs_
-   vorbei.sql` · `OK — 123 Migrationen, Historie abweichungsfrei` · Objekt-
-   Drift-Scan `OK — keine Objekt-Abweichung auf prod`.
-2. **`Deploy` (Lauf 33904874723) nach Re-Run, alle vier Jobs grün** —
-   `drift-gate`, `migrate-dev`, `functions`, `deploy`.
-
-**An der Kante gegengemessen, nicht am Job-Status:** `app.effbeezee.com` liefert
-`assets/index-GEx8cTIJ.js` als `application/javascript`; die Negativkontrolle auf
-einen erfundenen Pfad liefert `text/html`, der SPA-Fallback ist damit
-ausgeschlossen. Das OTA-Bündel `0.0.0+3d20063d3913` steht auf PROD (19:32:08Z).
-
-> **Ein Verdacht, der geprüft und ausgeräumt ist** — damit ihn niemand neu
-> aufmacht: alle 49 Bündel tragen dieselbe Semver `0.0.0`, und eines heisst
-> `0.0.0+feedbeef` (Testbündel vom 02.09.). Würde die Auswahl über die
-> Versions-Zeichenkette tiebreaken, gewänne `feedbeef` lexikalisch. Tut sie
-> nicht: `ota_buendel_neuestes` ordnet `created_at desc, version desc`, **Zeit
-> zuerst**. An der Funktion gemessen: ein Gerät auf `builtin` bekommt
-> `0.0.0+3d20063d3913`, eines auf `feedbeef` ebenfalls, und eines, das schon
-> darauf läuft, bekommt nichts.
-
-**AGE-605 ist vollständig abgeschlossen** — gemergt (#342, #343), archiviert,
-auf PROD angewandt und dort rein lesend gegengemessen: beide Trigger aktiv,
-`…_exklusiv` INVOKER und `…_kapazitaet` DEFINER wie entworfen, `authenticated`
-hält nur noch SELECT, Spalten-UPDATE nur `status`/`rating`, Policy UPDATE-only,
-EXECUTE auf beiden Wächtern entzogen, 0 überbuchte Events. Linear steht auf Done.
-
-Die vollständige AGE-605-Übergabe — auch der Fund, der jene Sitzung getragen hat
-(Schicht 1 war als `SECURITY INVOKER`-Funktion fail-**OPEN**, weil sie unter der
-RLS des Schreibenden zählte) — steht in `git show e1dd52a:session-handoff.md` und
-dauerhaft in
-`openspec/changes/archive/2026-09-04-anmeldung-nicht-an-den-rpcs-vorbei/`.
-
-**Was von AGE-605 offen bleibt, liegt in `AGE-698`** (Backlog, drei
-Bestands-Befunde, keiner durch AGE-605 entstanden): der Gastgeber kann
-`capacity` unter die Belegung senken · Mitglieder unter `exchange` können sich
-anmelden, aber nicht direkt absagen (stammt aus AGE-448) · ein zweiter
-`register_for_event`-Aufruf degradiert ein bereits registriertes Mitglied auf
-die Warteliste, weil der RPC die eigene Zeile mitzählt.
-
-> **Herkunft dieser drei Absätze:** aus PR #346 der AGE-605-Sitzung, die
-> denselben Abschnitt korrigieren wollte und dabei zwei Minuten nach dem Merge
-> von #345 von einem älteren Stand gezweigt hatte. Inhalt hierher übernommen,
-> #346 ungemergt geschlossen — nicht verloren, nur an einer Stelle statt zweien.
+> **3. Die Belege im Detail stehen NICHT hier**, sondern in
+> `openspec/changes/capacitor-huelle/tasks.md`, Abschnitte B3 und B5.
 
 ## Accomplished
 
-**B3, Android-Hälfte, komplett — PR #344.** iOS ist bewusst ein eigener Vorgang.
+Zwei PRs, beide gemergt: **#364** (`f38fdc2`), **#365** (`8f5f6c5`).
 
-| Datei | Was |
-|---|---|
-| `scripts/android-keystore{,.logic}.ts` + 3 Testdateien | erzeugt `key.properties` + Keystore aus Infisical, Muster von `firebase-config.ts` |
-| `android/app/build.gradle` | `signingConfigs.release` + Abbruch, wenn Material fehlt |
-| `.github/workflows/android-release.yml` | `workflow_dispatch` + Tag `android-v*`, baut AAB **und** APK |
+### B5 — die Boot-Fläche schliesst die Lücke beim App-Start
 
-**Der Widerspruch der Aufgabe ist aufgelöst:** der Keystore darf nirgends im
-öffentlichen Repo liegen, muss dem Bau aber vorliegen → über die **ignorierten**
-Dateien, die der `native-secrets-guard` absichtlich nicht ansieht.
+Zwischen nativem Startbildschirm und erstem Bild der Anwendung stand eine leere
+Fläche. In `tasks.md` stand dazu die Vermutung „weiss auf weiss, also
+unsichtbar". **Regionsweise gemessen gilt das nur fürs untere Drittel:** oben
+weicht ein Foto (`#b8b7ad`, Streuung 67) einer vollkommen leeren Fläche
+(`#f6f8fb`, Streuung 0), 40 ms (dieser Mac) bis 228 ms (6-fache CPU-Bremse).
 
-**Der stille Ausgang, der jetzt laut ist:** ohne `key.properties` bricht Gradle
-**nicht** ab, sondern schreibt klaglos ein unsigniertes Release-Artefakt.
+Jetzt zeigt die Fläche dieselbe Komposition wie das Storyboard — Markup in
+`index.html` **innerhalb von `#root`** (React räumt es beim ersten `render()`
+selbst weg), freigeschaltet vom Inline-Skript im `<head>` über
+`window.Capacitor.isNativePlatform()`. Gemessen: Boot-Fläche `#b8b7ac`/67 gegen
+Startbildschirm `#b8b7ad`/67; im Browser **0 Bildanfragen**, nativ 2.
 
-**Gemessen, nicht behauptet:**
+### B3 — die iOS-Hälfte, erst gemessen, dann geschrieben
 
-| Lauf | Material | Ausgang |
-|---|---|---|
-| `assembleRelease bundleRelease` | ja | BUILD SUCCESSFUL, beide signiert |
-| `assembleRelease` | **nein** | exit 1 bei `packageReleaseResources`, **kein Artefakt** |
-| `assembleDebug` | nein | exit 0 — unberührt |
+Die ganze Kette lokal durchgefahren, danach `ios-release.yml` als Abschrift.
+**Erster CI-Lauf grün, alle 13 Schritte, 2 min 55 s** (nicht die 12–15 min, die
+ich veranschlagt hatte — es gibt kein CocoaPods, SPM löst aus dem Cache).
 
-`apksigner` meldet SHA-256 `7ae18622…2fda`, zeichengleich mit dem Fingerabdruck
-des Keystores. Kette reproduziert: beide Dateien gelöscht, aus `infisical run
---env=prod` neu erzeugt → derselbe Fingerabdruck.
+Am **heruntergeladenen** Artefakt nachgeprüft, nicht nur im Log:
+`Apple Distribution: Donald Vlahovic (WQZJ8649TN)` · Store-Profil ohne
+Geräteliste · `aps-environment: production` · 1.0 (1) · Boot-Fläche liegt drin ·
+`codesign --verify --deep --strict` bestanden · genau **eine** Datei im
+Artefakt, kein Signaturmaterial.
+
+**Der Befund, der die Arbeit halbiert:** es gibt kein Zertifikat als Secret.
+`-allowProvisioningUpdates` lässt Apple **serverseitig** signieren — das `.ipa`
+trägt `Apple Distribution`, während der Schlüsselbund weiterhin nur
+`Apple Development` führt und `/v1/certificates` ebenfalls. Kein `.p12`, kein
+Keychain-Import.
+
+Dazu: App-Datensatz in App Store Connect angelegt (von Donald), drei `ASC_*`
+in Infisical `prod`, Environment `ios-release` als Spiegel von `android-release`.
 
 ## Decisions
 
-- **Der Keystore ist NICHT unersetzlich** — die Aussage stand in `proposal.md`
-  und im Delta und ist seit Aug. 2021 falsch. Play App Signing ist für neue Apps
-  verpflichtend, Google hält den App-Signaturschlüssel, unserer ist der
-  **Upload**-Schlüssel und über die Play Console zurücksetzbar. Beide Stellen
-  korrigiert; die Sicherung bleibt gefordert, aus schwächerem Grund.
-- **Infisical + eine Offline-Kopie** (Donald, 04.09.) statt Tresor-Disziplin.
-- **Android zuerst, iOS eigener Vorgang** (Donald, 04.09.).
-- **`versionCode` bewusst NICHT mitgenommen.** Das Schema ist eine Entscheidung
-  und verzahnt sich mit `version_build` des OTA-Wegs.
-- **`ERWARTETER_FINGERABDRUCK` im Workflow**, nachträglich auf Reviewer-Befund:
-  `apksigner verify` allein belegt nur, *dass* signiert wurde, nicht *womit*.
-
-## ⚠ Zwei Handgriffe, die nur Donald tun kann
-
-1. **`~/Downloads/effbeezee-android-upload-keystore/` an einen verschlüsselten
-   Ort bringen und den Ordner dann löschen.** Dort liegt das Passwort im
-   Klartext. Das ist die beschlossene Offline-Kopie; `LIESMICH.md` erklärt alles.
-2. ~~PR #344 hat `mergeable=CONFLICTING` gemeldet~~ — erledigt, gemergt als
-   `3d20063`, CI grün, auf PROD ausgerollt.
+- **Boot-Fläche füllen statt stehen lassen** (Donald, 07.09.). Die
+  Zwischenlösung „nur den Grundton auf `#ffffff`" ist verworfen — die eigene
+  Messung sagt, sie repariert genau die Stelle, die man ohnehin nicht sieht.
+- **Der Schriftzug bleibt ein Bild, kein Text.** Alle vier `@font-face` stehen
+  auf `font-display: swap`, nichts wird vorgeladen; als Text spränge er mitten
+  im geglätteten Moment um.
+- **WebP statt JPEG** für die Web-Fassung des Bandes: bei gleichen 900 px
+  154.860 → 41.600 B. Preis: `cwebp` als viertes Werkzeug von `pnpm splash`.
+- **iOS zuerst lokal messen, dann den Workflow schreiben.** Die Android-Hälfte
+  kostete einen roten Lauf, dessen Meldung falsch war, und das Suchen fand im
+  CI statt.
+- **Validiert, nicht hochgeladen** (`--validate-app` → VERIFY SUCCEEDED).
+  Dadurch bleibt Build-Nummer 1 frei und der Workflow fängt bei `run_number` 1
+  an, ohne Sonderregel.
+- **Die Team-ID bekommt keinen `ASC_`-Namen.** `ios-release.yml` liest
+  `APNS_TEAM_ID` — dasselbe Apple-Team, eine zweite Kopie wäre die erste, die
+  auseinanderläuft.
+- **Der Workflow hört beim signierten Artefakt auf.** TestFlight ist M4
+  (AGE-644), wie auf der Android-Seite.
+- **Freigabe des Erstlaufs per API**, mit Kommentar im Protokoll, der sagt wie
+  sie zustande kam — Verfahren von Donald am 04.09. festgelegt.
 
 ## Files modified
 
-Siehe PR #344 — 13 Dateien. Die drei, die zählen, stehen oben in der Tabelle.
-Dazu `scripts/firebase-config{,.logic}.ts`: die Herkunftsangabe sagte fest
-„Umgebung dev", und der Release-Bau ruft jetzt auch mit `prod`.
+- `index.html` — Boot-Flächen-Markup in `#root`, zweites Inline-Skript im `<head>`
+- `src/index.css` — Regeln der Boot-Fläche, Vorgabe `display: none`
+- `src/boot-flaeche.test.ts` — **neu**, acht Zusagen
+- `scripts/splash.ts` · `scripts/splash.logic.ts` — Web-Fassungen aus derselben Quelle
+- `public/brand/splash-band.webp` (41,6 kB) · `splash-schriftzug.png` (42,2 kB) — **neu**
+- `.github/workflows/ios-release.yml` — **neu**, 13 Schritte
+- `scripts/ios-release.workflow.test.ts` — **neu**, elf Zusagen
+- `docs/secrets.md` — drei `ASC_*`-Zeilen plus Abschnitt zum cloud-verwalteten Zertifikat
+- `openspec/changes/capacitor-huelle/tasks.md` — B3 iOS und B5 nachgezogen
 
 ## Next session: start here
 
-**Der Workflow ist gebaut, aber noch nie gelaufen.** Erste Handlung: einmal
-`workflow_dispatch` auf `android-release` auslösen und zusehen (#344 ist
-gemergt). Alles davor ist lokal belegt, die Runner-Seite nicht — offen sind dort
-genau drei Annahmen: dass `android-actions/setup-android` die Build-Tools
-mitbringt, die `apksigner` findet; dass `jarsigner` aus `setup-java` im PATH
-steht; und dass `pnpm exec cap sync android` auf dem Runner dieselben fünf
-Plugins verdrahtet wie lokal.
+**Beides sind eigene Sitzungen, so von Donald gewollt.** Die Gerätebelege
+zuerst: `openspec/changes/capacitor-huelle/geraetesitzung-d5.md` ist das
+Runbook, offen sind A1, C1, C2, C3 und B5 — und **B5 zuletzt**, weil es
+Deinstallieren verlangt und das die Anmeldung kostet. Der wichtigste Punkt
+dabei ist neu und steht in keinem Runbook: **ob `window.Capacitor` im `<head>`
+am echten Gerät schon steht.** Steht es nicht, bleibt das Attribut `data-boot`
+weg, die Boot-Fläche erscheint nicht, und alles sieht aus wie vorher — kein
+Fehler, kein Log. Prüfen lässt es sich am Gerät über die Konsole
+(`document.documentElement.dataset.boot`). Danach TestFlight unter **AGE-644**.
 
-Danach **`versionCode`** — ohne es lässt sich das Artefakt genau einmal zu Play
-hochladen.
+> ⚠ **„Build-Nummer = Lauf-Nummer" ist weiterhin NICHT bewiesen.** Lauf 1
+> verglich 1 mit 1, und 1 ist auch die Projektvorgabe. Die Zusage wird erst bei
+> Lauf 2 echt. Grün heisst hier noch nichts.
 
-> ⚠ **Squash-Falle, am 04.09. zweimal eingetreten:** PRs aus diesem Branch
-> werden **squash**-gemergt. Der Squash-Commit ist damit kein Vorfahr des
-> Branches, git sieht alle Dateien des PRs als „beidseitig geändert", und der
-> NÄCHSTE PR meldet `CONFLICTING`, obwohl die Bäume identisch sind. Heilmittel
-> nach jedem Merge: `git diff origin/main HEAD` prüfen — ist er leer, gefahrlos
-> `git reset --hard origin/main`. Nicht mergen, das doppelt nur die Historie.
+> ⚠ **Admin-Bypass ist bei einem neuen GitHub-Environment `true`.** Beim
+> Anlegen von `ios-release` stand er so da, während Android auf `false` steht —
+> die Freigaberegel wäre Dekoration gewesen. Nachgezogen. Wer ein Environment
+> anlegt, muss es zurücklesen.
 
-> ⚠ **Java-Falle, am 04.09. eingetreten:** Android Studios mitgelieferte JBR ist
-> Java **25**, Gradle 8.14.3 bricht daran mit `Unsupported class file major
-> version 69` ab. Lokal `JAVA_HOME=/opt/homebrew/opt/openjdk@21` setzen;
-> `/usr/bin/keytool` ohne JAVA_HOME ist nur ein Stub.
+> ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done.** Der Branchname trägt
+> `age-642` und löst allein aus; vorbeugen geht nicht. Am 07.09. zweimal
+> zurückgesetzt. Nach jedem Merge nachsehen.
+
+> ⚠ **Squash-Falle, weiterhin scharf.** Nach jedem Merge `git log
+> origin/main..HEAD` prüfen — ist es leer, `git reset --hard origin/main`. Der
+> nächste Push braucht `--force-with-lease`.
+
+> ⚠ **Zwei Dateien nie mitcommitten.** `prettier --write` auf `tasks.md`
+> schreibt ~1000 fremde Zeilen um (und Prettier ist in KEINEM CI-Gate);
+> `src/content/release-entries.generated.ts` wird von jedem `pnpm build`
+> unformatiert neu geschrieben — zurücknehmen.
 
 ## Open questions
 
-- **Geschütztes GitHub-Environment für `android-release`.** Beide Auslöser bauen
-  den Ref, auf dem sie stehen — wer ein Tag setzen kann, führt Code mit Zugriff
-  auf die prod-Geheimnisse aus. Keine **neue** Fläche (`deploy.yml` trägt
-  denselben Token), aber die Stelle, an der sie sich verengen ließe. Ist eine
-  Repository-Einstellung, kein Diff.
-- **`curl | sudo bash` für die Infisical-CLI** bleibt ungepinnt — bestehende
-  Praxis in `deploy.yml`, offener Punkt AGE-495 Audit 8.6. Ein Diff, der das nur
-  im neuen Workflow löst, erzeugte zwei Wahrheiten.
-- **Der Debug-Bau schreibt die vollständige Supabase-Sitzung ins logcat.** Vor
-  der Store-Einreichung am **Release**-Bau gegenprüfen. Eigener Vorgang.
+- **Der ASC-Schlüssel `ND87HL4S75` ist Team Scoped** und am 25.07. für Donalds
+  andere App angelegt. Er funktioniert, aber ein CI-Runner mit Zugriff auf jede
+  App des Teams ist mehr Reichweite als nötig. Rotieren geht jederzeit.
+- **Der Name im Store ist „eff.bee.zee."**, mit Punkt am Ende. Umbenennen geht,
+  solange nicht eingereicht ist.
+- **`APNS_SANDBOX` steht auf `1`**, ein Store-Build spricht Produktions-APNs an.
+  `send-push` erkennt den Host an der Antwort, sollte sich also selbst fangen —
+  beim ersten TestFlight-Build nachsehen.
+- **Der Debug-Bau schreibt die Supabase-Sitzung ins logcat.** Vor der
+  Einreichung am Release-Bau gegenprüfen. Eigener Vorgang.
 - **`use-gespraech.test.tsx` ist CI-flaky** (`hatAeltere`) — rerun genügt.
-- **Realtime im Chat** ist weiterhin ungemessen.
-- **Bildupload auf iOS** ist ungeprüft. Die Ursache war capgo, nicht Android —
-  iOS ist vermutlich genauso betroffen, aber das ist eine Ableitung.
-- **B5 Startbildschirm** verlangt Deinstallieren und kostet die Anmeldung —
-  zuletzt machen.
