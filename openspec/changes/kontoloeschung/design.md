@@ -93,16 +93,18 @@ jemand einen Nutzer direkt in der GoTrue-Konsole löscht. Bewusster Tausch: ein
 verwaistes, aber sichtbares Profil ist reparierbar, eine still gelöschte
 Beitragskette nicht.
 
-### D3 — `search_doc` muss neu berechnet werden, nicht nur die Spalten geleert
+### D3 — `search_doc` pflegt sich selbst; die Pflicht liegt bei seinen acht Quellspalten
 
-`profiles.search_doc` ist ein `tsvector` und trägt den Namen und die Kompetenzen
-des Mitglieds. Wird er nach dem Leeren der Spalten nicht neu gesetzt, bleibt das
-gelöschte Mitglied **über die Volltextsuche auffindbar**, obwohl jede Spalte leer
-ist. Der Index ist an dieser Stelle ein eigener Datenspeicher, kein Abbild.
+*Gemessen am lokalen Stack, 08.09.:* `profiles.search_doc` ist eine
+`generated always as … stored`-Spalte über `name, company, branche, short_bio,
+headline, roles, competencies, interests`. Sie **kann** nicht von Hand gesetzt
+werden und muss es auch nicht.
 
-Ob ein Trigger ihn ohnehin nachzieht, ist vor der Umsetzung nachzusehen und in
-beiden Fällen durch einen Test festzuhalten — ein Spaltenkommentar belegt keinen
-Aufrufer.
+Die Sorge war trotzdem berechtigt, sie trifft nur eine andere Stelle: der Index
+bleibt genau so lange durchsuchbar, wie **eine** dieser acht Spalten noch etwas
+enthält. Die erste Fassung dieses Plans führte nur vier davon als PII —
+`branche`, `short_bio`, `roles`, `competencies` und `interests` fehlten. Die
+Datenmatrix führt jetzt alle acht; Test 5.2 sichert die Vollständigkeit ab.
 
 ### D4 — Edge Function als einziger Eingang; wo die Identität verifiziert wird
 
@@ -125,10 +127,19 @@ abgelaufenes Token und fremde Ziel-ID gehören in die Tests.
 
 ### D5 — Reihenfolge: Dateien ZUERST, `auth.users` ZULETZT
 
-> **Korrektur aus dem Plan-Review (codex, HIGH).** Der erste Entwurf löschte
-> `auth.users` vor den Dateien. `storage.objects` führt eine Eigentümerspalte auf
-> `auth.users`; solange dem Konto Objekte gehören, kann die Nutzerlöschung daran
-> scheitern. Ausserdem widersprach die Liste ihrer eigenen Erläuterung.
+> **Korrektur aus dem Plan-Review (codex, HIGH) — mit einer Einschränkung.** Der
+> erste Entwurf löschte `auth.users` vor den Dateien und widersprach dabei seiner
+> eigenen Erläuterung; das ist korrigiert.
+>
+> Codex' *Begründung* misst sich auf diesem Schema allerdings **nicht**:
+> `storage.objects` trägt zwar `owner` und `owner_id`, aber **keinen
+> Fremdschlüssel auf `auth.users`** — der einzige ist `bucket_id →
+> storage.buckets` (gemessen am lokalen Stack, 08.09.). Die Nutzerlöschung
+> scheitert hier also nicht an Objekteigentum.
+>
+> Die Reihenfolge bleibt trotzdem umgedreht, aus dem zweiten Grund: ist
+> `auth.users` erst weg, kann bei einem Abbruch niemand mehr die Pfade
+> nachschlagen. Der Befund war richtig, seine Begründung trägt hier nur nicht.
 
 1. Schreibzugriff des Kontos sperren (siehe D8), damit kein paralleler Upload das
    Inventar überholt

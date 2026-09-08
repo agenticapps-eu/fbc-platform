@@ -2,24 +2,24 @@
 
 ## 1. Datenmatrix — die Fläche vermessen, bevor etwas gebaut wird
 
-- [ ] 1.1 **Verbindliche Datenmatrix** erstellen: je Tabelle/Spalte, Objekt und
+- [x] 1.1 **Verbindliche Datenmatrix** erstellen: je Tabelle/Spalte, Objekt und
       externem Speicher die Löschaktion und, wo nichts geschieht, die Begründung.
       Sie ist das Abnahmedokument für 5.1 und gehört in den Migrationskopf
-- [ ] 1.2 Dabei trennen: **geleert** (Profil, Kontaktdaten, Adresse, Bilder) ·
+- [x] 1.2 Dabei trennen: **geleert** (Profil, Kontaktdaten, Adresse, Bilder) ·
       **anonym stehengelassen** (Beiträge, Kommentare, Nachrichten, angenommene
       Kontaktanfragen, vergangene Anmeldungen) · **freigegeben** (künftige
       Anmeldungen, geplante Beiträge, offene Kontaktanfragen) · **aufbewahrt**
       (Rechnungen, heute leer)
-- [ ] 1.3 Prüfen, welche der zu leerenden Spalten `not null`, `check` oder Trigger
+- [x] 1.3 Prüfen, welche der zu leerenden Spalten `not null`, `check` oder Trigger
       tragen, und für sie einen neutralen Ersatzwert festlegen
-- [ ] 1.4 Nachsehen, ob ein Trigger `profiles.search_doc` beim Leeren nachzieht —
+- [x] 1.4 Nachsehen, ob ein Trigger `profiles.search_doc` beim Leeren nachzieht —
       das Ergebnis entscheidet über 2.3, und der Spaltenkommentar belegt es nicht
-- [ ] 1.5 Objektinventar festlegen: alle Dateien des Kontos je Bucket
+- [x] 1.5 Objektinventar festlegen: alle Dateien des Kontos je Bucket
       (`avatars`, `covers`, `post-media`, `feedback-screenshots`), **einschliesslich
       ersetzter Avatare und Waisen** — die stehen in keiner Profilspalte.
       `event-covers` ausdrücklich entscheiden (Vorschlag: bleiben, sie gehören zur
       Veranstaltung)
-- [ ] 1.6 Messen, ob `storage.objects` eine Eigentümerspalte auf `auth.users`
+- [x] 1.6 Messen, ob `storage.objects` eine Eigentümerspalte auf `auth.users`
       führt — davon hängt ab, ob Schritt 5 ohne Schritt 3 überhaupt durchläuft
 
 ## 2. Datenbank
@@ -28,8 +28,10 @@
       setzen. `no action` verhindert die Auth-Löschung, statt sie zu erlauben (D2)
 - [ ] 2.2 Migration: eigener, dauerhafter **Löschzustand** (D7) — nicht
       `deleted_at` allein, weil `admin_restore_member` das zurücksetzt
-- [ ] 2.3 Migration: Anonymisierungs-Funktion — leert die PII-Spalten, setzt
-      `search_doc` neu, setzt den Löschzustand, lässt die Inhaltstabellen unberührt
+- [ ] 2.3 Migration: Anonymisierungs-Funktion — leert die PII-Spalten **nach
+      datenmatrix.md**, setzt den Löschzustand, lässt die Inhaltstabellen
+      unberührt. `search_doc` NICHT anfassen: `generated always`, sie zieht mit,
+      sobald alle acht Quellspalten leer sind
 - [ ] 2.4 Migration: künftige Anmeldungen auf `cancelled`, geplante Beiträge
       löschen, offene Kontaktanfragen zurückziehen (D10)
 - [ ] 2.5 Sichtbarkeits-Prädikate um den Löschzustand ergänzen — an **drei**
