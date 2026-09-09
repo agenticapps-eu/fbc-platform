@@ -1,102 +1,103 @@
-# Session Handoff — 2026-09-09 (AGE-708 Kontolöschung: fertig und archiviert)
+# Session Handoff — 2026-09-09 (AGE-642 archiviert; AGE-708 war schon zu)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie beschreibt AGE-708** (Worktree
-> `fbc-platform/donald-age-708-kontoloeschung`) und **ersetzt** die Fassung vom
-> selben Tag (`1516e81`), die noch zwei offene Augenscheins-Punkte auswies.
-> Die Datei ist für alle parallelen Sitzungen dieselbe und kollidiert bei jedem
-> Rebase — **nicht zusammenführen**, überschreiben.
+> **1. Sie beschreibt AGE-642** (Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle`) und **ersetzt** die
+> AGE-708-Fassung, die auf `main` steht. Die Datei ist für alle parallelen
+> Sitzungen dieselbe und kollidiert bei jedem Rebase — **nicht
+> zusammenführen**, überschreiben.
 >
-> **2. AGE-708 ist zu.** Wer hier weitermacht, arbeitet an etwas anderem. Die
-> Details des Changes liegen jetzt unter
-> `openspec/changes/archive/2026-09-09-kontoloeschung/`, die dauerhafte Wahrheit
-> in `openspec/specs/privacy/spec.md`.
+> **2. AGE-642 ist mit PR #379 zu.** Details liegen unter
+> `openspec/changes/archive/2026-09-09-capacitor-huelle/`, die dauerhafte
+> Wahrheit in `openspec/specs/native-shell/spec.md`.
+>
+> **3. Eine Fremdsitzung arbeitet parallel:** `fbc-platform-f4` sitzt in
+> `~/worktrees/fbc-platform/donald-age-705-oeffentlicher-release-blog`
+> (AGE-705). Deren Übergabe ist ungepusht und gehört nicht hierher.
 
 ## Accomplished
 
-**Die Kontolöschung ist fertig — 42 von 42 Aufgaben, archiviert.** Diese Sitzung
-hat die zwei letzten Augenscheins-Punkte erledigt und den Change geschlossen.
+**AGE-642 stand nur noch am Abschluss-Tor** — der Code lag seit PR #371
+vollständig auf `main`, es fehlte allein das Archivieren.
 
 | | |
 |---|---|
-| **4.5 Sichtprobe** | gegen den lokalen Stack, hell und navy, PR **#377** |
-| **6.4 Gerätetest** | Android per `adb`, iOS von Donald am Gerät, PR **#378** |
-| **Archiviert** | `2026-09-09-kontoloeschung`, neue Spec `privacy` |
+| **Archiviert** | `2026-09-09-capacitor-huelle`, neue Capability `native-shell` |
+| **PR** | **#379** — Deltas eingefaltet, Neuigkeiten-Eintrag, zehn offene Kästchen ausgeschrieben |
+| **AGE-708** | war bereits zu (PR #378 gemerged 14:17:38, Linear `Done` 14:17:40) |
 
-**4.5** — Karte, zweistufige Rückfrage mit beiden Absätzen und *Abbrechen*
-zurück in den Ausgangszustand, je in `hell` und `navy`. Der Inhalt sieht in
-beiden gleich aus, und das ist richtig: `navy` färbt nur den Rahmen
-(`src/index.css:208`). Sichtbar unterscheiden sich allein die
-`secondary`-Knöpfe, die auf den Chrome-Tokens sitzen.
-
-**6.4** — auf **beiden** Geräten dasselbe Bild. Der Nebenbefund zählt für
-AGE-644: **die Karte war ohne Neuinstallation da**, das ausgelieferte
-capgo-Bündel trägt sie bereits. Die endgültige Löschung wurde auf keinem Gerät
-ausgelöst; beide Konten sind echt.
+Abnahme, jeweils am Exit-Code gelesen: `openspec validate --all` **32/32** ·
+`pnpm lint` 0 Fehler · `pnpm typecheck` 0 · **2.639 Tests in 234 Dateien grün**
+· `entry-chunk-guard` 0 · `native-secrets-guard` 0 (1.558 Dateien).
 
 ## Decisions
 
-- **Sichtprobe gegen den lokalen Stack, nicht gegen Live** — die Löschung ist
-  unwiderruflich, und ein Wegwerf-Konto gibt es nur lokal. Konto, `.env.local`
-  und der vite-Prozess sind wieder weg.
-- **Den Weg am Gerät über die Systemgeste verlassen, nicht über *Abbrechen***
-  (Donald hat das Fahren der Geräte freigegeben, ausdrücklich ohne Löschung).
-  Der Abbrechen-Knopf steht direkt neben *Konto endgültig löschen*.
-- **Der Neuigkeiten-Eintrag wurde vor dem Archivieren umgeschrieben.** Er hatte
-  keine H1 (Titel wäre der Slug gewesen), keine eigene `Linear:`-Zeile
-  (`linear: null`) und neun Punkte in Repo-Sprache. Jetzt fünf Punkte in
-  Mitglieder-Sprache, der technische Text unverändert unter „Im Einzelnen:".
-- **Branchnamen:** #377 ohne Kürzel (AGE-708 sollte nicht verfrüht kippen),
-  #378 **mit** Kürzel, weil dieser Merge den Vorgang wirklich abschliesst.
+- **Mit zehn offenen Kästchen archiviert, keins davon abgehakt.** Ein Haken ohne
+  Beleg wäre schlimmer als ein offenes Kästchen. Sie stehen jetzt am Kopf der
+  `tasks.md` in drei Gruppen (vier eigene Vorgänge, fünf Gerätebelege, einer
+  nach dem Merge). `openspec archive` bestätigt die Zahl unabhängig:
+  *„10 incomplete task(s)"*.
+- **Angesprochen über den Wortlaut, nicht über Zeilennummern.** Die erste
+  Fassung trug geratene Nummern; sie verschieben sich bei jeder Änderung an der
+  Datei — die Lehre stand schon im Gedächtnis.
+- **Der Neuigkeiten-Eintrag nennt ausdrücklich, dass die App in keinem Store
+  ist.** Ohne diesen Punkt hätte er „die App ist da" nahegelegt. AGE-644 steht
+  auf Backlog, es gibt nichts herunterzuladen.
+- **Handoff auf denselben Branch statt als Folge-PR** — ein zweiter PR mit
+  `age-642` im Branchnamen machte den gerade geschlossenen Vorgang wieder auf.
 
 ## Files modified
 
-- `openspec/changes/kontoloeschung/` → `openspec/changes/archive/2026-09-09-kontoloeschung/`
-  (`proposal.md` mit neuem Kopf und umgebautem `## What Changes`, `tasks.md` mit
-  4.5 und 6.4 abgehakt)
-- `openspec/specs/privacy/spec.md` *(neu)* — das vom Archivieren gesetzte
-  `Purpose: TBD` ist durch einen echten Zweck ersetzt
-- `src/content/release-entries.generated.ts` — 77 Einträge, 13 Zeilen Diff
+- `openspec/changes/capacitor-huelle/` → `openspec/changes/archive/2026-09-09-capacitor-huelle/`
+  (`tasks.md` mit neuem Kopfabschnitt und erfülltem Abschluss-Tor,
+  `proposal.md` mit Stichpunkten in Mitglieder-Sprache vor „Im Einzelnen:")
+- `openspec/specs/native-shell/spec.md` *(neu)* — `Purpose: TBD` ersetzt
+- `openspec/specs/access-control/spec.md` (+44, additiv) ·
+  `openspec/specs/design-system/spec.md` (+57 −5; der `MODIFIED` löst die
+  AGE-499-Klausel zum Ring ausdrücklich ab)
+- `src/content/release-entries.generated.ts` — 78 Einträge, 14 Zeilen Diff
+  **ohne prettier** (Rohstil des Erzeugers ist der kleinere Diff)
 
 ## Next session: start here
 
-**Für AGE-708 gibt es nichts mehr zu tun.** Der nächste Auftrag kommt aus
-Linear; das naheliegende Anschlussstück ist **AGE-644** (Store-Einreichung), für
-die dieser Change die harte Abnahmezeile „Kontolöschung im Produkt vorhanden und
-getestet" erfüllt — der Beleg dafür steht in
-`openspec/changes/archive/2026-09-09-kontoloeschung/tasks.md`, Aufgabe 6.4.
+**Erst nachsehen, ob PR #379 grün ist und gemerged wurde**, und danach
+**Linear AGE-642 prüfen** — der Branchname trägt das Kürzel, der Merge setzt
+den Vorgang auf Done. Das ist hier gewollt.
 
-Erster Schritt dort wie immer: `wt list` ansehen und nach einem bestehenden
-Branch suchen, bevor etwas Neues entsteht.
+Danach liegen **vier Anschlussvorgänge zum Anlegen** bereit; Titel und Rumpf
+stehen im Kopf von
+`openspec/changes/archive/2026-09-09-capacitor-huelle/tasks.md`:
+Querformat-Startfläche · `splash --check` + `app:icons --check` in der CI ·
+Android-Startfläche nach SplashScreen-API · Regler in `OnboardingPage.tsx:212`.
+**Donald legt sie an, nicht das Modell.**
+
+Der nächste grosse Auftrag ist **AGE-643** (M3 Deep Links) oder **AGE-644**
+(M4 Store-Einreichung); M4 verlangt laut eigenem Vorgang, dass M1–M3 vorher
+fertig sind. Erster Schritt wie immer: `wt list` und nach einem bestehenden
+Branch sehen.
 
 ## Open questions
 
-Unverändert aus der Vorgängerfassung, keine davon blockt:
-
-- **`event-covers` bleibt bei der Löschung stehen** (Titelbild gehört zur
-  Veranstaltung). Vorschlag in `datenmatrix.md` §5, von Donald nicht
-  ausdrücklich bestätigt.
-- **Laufende Stripe-Abos** beendet die Kontolöschung nicht. Ausserhalb dieses
-  Changes, aber real.
-- **AGE-260** bleibt offen und ist jetzt kleiner: dessen Aufgaben 2.1, 2.3, 3.1
-  und 5.4 sowie das Requirement *„Erasure respects retention duties…"* sind hier
-  abgedeckt und dürfen dort nicht ein zweites Mal eingeführt werden.
-- **Der Archiv-Eintrag geht in die Neuigkeiten** und damit einmal an alle
-  aktivierten Mitglieder. Er ist bewusst in Mitglieder-Sprache geschrieben und
-  zum Versenden gedacht, nicht zum Überspringen — aber jemand sollte ihn in
-  `AdminNeuigkeitenPage` freigeben, nicht durchrutschen lassen.
+- **Sechs Specs tragen noch `Purpose: TBD`** aus früheren Archivierungen:
+  `member-onboarding`, `password-reset`, `member-import`, `environment-sync`,
+  `legal-pages`, `design-system`. Altbestand, blockt nichts.
+- **Der Archiv-Eintrag zu AGE-708 wartet weiterhin auf Freigabe** in
+  `AdminNeuigkeitenPage` und geht dann an alle aktivierten Mitglieder. Jetzt
+  kommt der zu AGE-642 dazu — **zwei** Einträge, beide zum Versenden gedacht.
+- **`APNS_SANDBOX` steht auf `1`** — beim ersten TestFlight-Build nachsehen.
+- **„Build-Nummer = Lauf-Nummer" ist nicht bewiesen** (Lauf 1 verglich 1 mit 1).
+- **TestFlight hat keinen Vorgang.** AGE-644 schliesst es ausdrücklich aus.
 
 ## Zwei Lehren dieser Sitzung
 
-Beide stehen im Gedächtnis:
-
-1. **`archivieren-zieht-neuigkeiten-nach`** hat sich umgedreht. Die Notiz sagte
-   „prettier ist Pflicht, sonst 889 Zeilen". Heute steht die eingecheckte
-   `release-entries.generated.ts` im **Rohstil des Erzeugers**, also gibt *kein*
-   prettier 13 Zeilen und prettier 626/612. Neue Regel ohne Richtungsangabe:
-   nach `pnpm release:entries` den Diff messen, die kleinere Zahl gewinnt.
-2. **`geraetetest-iphone-fallen`**: `devicectl` kann auf iOS starten und die
-   Konsole mitlesen, aber **weder Screenshot noch Tap**. Der iOS-Teil jeder
-   „am Gerät zeigen"-Aufgabe ist Handarbeit — einplanen, nicht erst beim Anlauf
-   merken. Android geht per `adb` vollständig.
+1. **`/add-dir` hebt die Worktree-Isolation nicht auf.** Die Freigabe lässt das
+   `cd` stehen, aber der Wächter lehnt danach **jeden** Befehl im fremden
+   Worktree ab — und die Sitzung ist festgefahren, weil auch das `cd` zurück
+   abgewiesen wird. Ausweg ist ein Werkzeug, kein Befehl: **`ExitWorktree` mit
+   `action: "keep"`** löst die Pinnung. Stand so schon im Gedächtnis; ich habe
+   erst herumprobiert und dann nachgelesen. Umgekehrt wäre billiger gewesen.
+2. **Zustandsändernde git-Befehle nicht pipen und nicht verketten.**
+   `git merge --ff-only origin/main | tail -3` wurde vom Klassifikator
+   abgelehnt, der blosse Befehl lief sofort durch. Dasselbe Muster wie die
+   bekannte Exit-Code-Falle.
