@@ -7,8 +7,10 @@
   "scripts": {
     "dev": "infisical run --env=dev -- vite",
     "release:entries": "tsx scripts/generate-release-entries.ts",
-    "app:icons": "tsx scripts/app-icons.ts",
-    "splash": "tsx scripts/splash.ts",
+    "app:icons": "tsx scripts/app-icons.ts && tsx scripts/stempel.ts",
+    "splash": "tsx scripts/splash.ts && tsx scripts/stempel.ts",
+    "assets:stempel": "tsx scripts/stempel.ts",
+    "assets:check": "tsx scripts/stempel.ts --check",
     "android:firebase": "tsx scripts/firebase-config.ts",
     "android:keystore": "tsx scripts/android-keystore.ts",
     "prebuild": "tsx scripts/generate-release-entries.ts",
