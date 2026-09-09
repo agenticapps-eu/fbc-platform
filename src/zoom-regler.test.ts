@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
  */
 const CSS = readFileSync("src/index.css", "utf8");
 const CROPPER = readFileSync("src/components/profile/AvatarCropper.tsx", "utf8");
+const ONBOARDING = readFileSync("src/pages/OnboardingPage.tsx", "utf8");
 
 /** Apples Mindestmass für eine Trefffläche. */
 const TREFFFLAECHE_MIN = 44;
@@ -93,4 +94,74 @@ describe("Der Zoom-Regler ist am Finger bedienbar", () => {
       expect(px(regel(CSS, selektor), "height")).toBeGreaterThan(0);
     },
   );
+});
+
+/**
+ * Derselbe Fehler im Onboarding (AGE-711) — und dort schärfer.
+ *
+ * Der Kommentar am Ende des Blocks oben nannte die Stelle schon beim Namen:
+ * `OnboardingPage.tsx:212` stand auf `appearance-none` **ohne jede**
+ * Knopf-Regel. `accent-color` (dort als `accent-accent`) hilft nicht — es färbt
+ * die Schiene, nicht den Knopf. Der Knopf war damit in WebKit und in Firefox
+ * unsichtbar, und zwar auch am Schreibtisch, nicht nur am Telefon.
+ *
+ * WARUM EIN EIGENER SATZ REGELN und nicht `.fbc-regler`: der Zuschnitt sitzt
+ * auf `--color-canvas`, das Onboarding auf den **Chrome**-Tokens. Die kippen mit
+ * `html[data-variant="navy"]` (index.css:209) — `--color-chrome` ist hell weiss
+ * und navy `#081527`. Die Regeln hier müssen deshalb Tokens tragen, keine festen
+ * Farben, sonst ist der Knopf in genau einer der beiden Varianten wieder weg.
+ */
+describe("Der Regler im Onboarding ist sichtbar und bedienbar", () => {
+  // Mutation: die Klasse aus dem `<input type="range">` streichen → rot.
+  it("der Regler im Onboarding trägt die Klasse", () => {
+    const eingabe = ONBOARDING.match(/<input[^>]*type="range"[\s\S]*?\/>/);
+    expect(eingabe, 'kein <input type="range"> im Onboarding gefunden').not.toBeNull();
+    expect(eingabe![0]).toMatch(/className="[^"]*\bfbc-regler-chrome\b/);
+  });
+
+  // Mutation: `appearance: none` streichen → rot, wie oben.
+  it("der Regler wird selbst gezeichnet", () => {
+    const rumpf = regel(CSS, ".fbc-regler-chrome");
+    expect(rumpf).toMatch(/-webkit-appearance:\s*none/);
+    expect(rumpf).toMatch(/(?:^|;)\s*appearance:\s*none/);
+  });
+
+  // Mutation: die Höhe auf 8px setzen (der Stand vor AGE-711, `h-2`) → rot.
+  it("die Trefffläche hält Apples Mindestmass", () => {
+    expect(px(regel(CSS, ".fbc-regler-chrome"), "height")).toBeGreaterThanOrEqual(
+      TREFFFLAECHE_MIN,
+    );
+  });
+
+  // DIE Zusage des Vorgangs. Mutation: einen der beiden Sätze streichen → rot.
+  // Genau das war der Zustand: `appearance-none` nimmt den Knopf in BEIDEN
+  // Maschinen weg, und ohne Ersatz ist er unsichtbar statt nur blass.
+  //
+  // Mutation: `background` auf eine feste Farbe setzen → rot. Ein fester Wert
+  // sitzt in einer der beiden Chrome-Varianten falsch.
+  it.each([
+    [".fbc-regler-chrome::-webkit-slider-thumb", "WebKit — iOS und Chrome"],
+    [".fbc-regler-chrome::-moz-range-thumb", "Firefox"],
+  ])("%s ist gross genug und trägt einen Chrome-Token (%s)", (selektor) => {
+    const rumpf = regel(CSS, selektor);
+    expect(px(rumpf, "width")).toBeGreaterThanOrEqual(KNOPF_MIN);
+    expect(px(rumpf, "height")).toBeGreaterThanOrEqual(KNOPF_MIN);
+    expect(rumpf).toMatch(/background:\s*var\(--color-accent-on-chrome\)/);
+  });
+
+  // Mutation: eine der beiden Schienen-Regeln streichen → rot.
+  it.each([
+    ".fbc-regler-chrome::-webkit-slider-runnable-track",
+    ".fbc-regler-chrome::-moz-range-track",
+  ])("%s wird mitgezeichnet", (selektor) => {
+    expect(px(regel(CSS, selektor), "height")).toBeGreaterThan(0);
+  });
+
+  // Positivkontrolle gegen den eigentlichen Rückfall: `accent-color` allein
+  // genügt NICHT, und die alte Klasse `accent-accent` liesse genau das
+  // zurück. Sie darf am Regler nicht mehr stehen.
+  it("verlässt sich nicht mehr auf accent-color allein", () => {
+    const eingabe = ONBOARDING.match(/<input[^>]*type="range"[\s\S]*?\/>/)![0];
+    expect(eingabe).not.toMatch(/\baccent-accent\b/);
+  });
 });

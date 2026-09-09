@@ -216,7 +216,7 @@ function ScaleField({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={step.prompt}
-        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-chrome-elevated accent-accent"
+        className="fbc-regler-chrome w-full"
       />
       <div className="flex justify-between text-sm text-on-chrome-muted">
         <span>{step.minLabel}</span>
