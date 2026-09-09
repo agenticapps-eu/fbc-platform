@@ -74,7 +74,19 @@
       toten Verweis (D9) — **war bereits so gebaut**, `CommunityFeed` rendert
       einen `<span>` statt `<Link>`. Nur der Beleg fehlte; Zusage ergänzt und
       per Mutation gegengeprüft
-- [ ] 4.5 An der laufenden Oberfläche zeigen, in hell und navy
+- [x] 4.5 An der laufenden Oberfläche zeigen, in hell und navy — 09.09. gegen den
+      lokalen Stack mit einem eigens angelegten Wegwerf-Konto (danach entfernt,
+      `.env.local` und der vite-Prozess ebenso). Gesehen: die Karte als letzte
+      der Einstellungsseite, die zweistufige Rückfrage mit beiden Absätzen,
+      *Abbrechen* zurück in den Ausgangszustand — je in `hell` und `navy`,
+      umgeschaltet über den eigenen Schalter „Dunkles Design (Navy)".
+      **Der Inhalt sieht in beiden Varianten gleich aus, und das ist richtig:**
+      `navy` färbt nur den Rahmen (`src/index.css:208`, Entscheidung 04.08.,
+      kein Nachtmodus). Sichtbar unterscheiden sich allein die
+      `secondary`-Knöpfe (*Konto löschen* im Ausgangszustand, *Abbrechen* in der
+      Rückfrage) — sie sitzen bewusst auf den Chrome-Tokens
+      (`src/components/ui/button.tsx:20`) und sind in `navy` dunkelblau gefüllt
+      statt hell umrandet. Die endgültige Löschung wurde **nicht** ausgelöst
 
 ## 5. Nachweis
 
