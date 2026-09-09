@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ERZEUGT von scripts/splash.ts. Nicht von Hand aendern. -->
+<resources>
+    <color name="splashHintergrund">#ffffff</color>
+</resources>

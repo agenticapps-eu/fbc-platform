@@ -312,6 +312,75 @@ export function schriftzugSvg(marke: Marke): string {
 }
 
 /**
+ * Das Symbolfeld der Android-Startfläche (AGE-713).
+ *
+ * **Warum Android eine eigene Fassung braucht und nicht das Storyboard erbt.**
+ * Seit Android 12 zeichnet die SplashScreen-API die Fläche aus genau zwei
+ * Dingen: `windowSplashScreenBackground` und einem Symbol. Das Bitmap unter
+ * `@drawable/splash`, das `npx cap add` anlegt, wird **nicht mehr gezeigt** —
+ * Foto, Verlauf und Schriftzug haben dort kein Gegenstück. Sie nachzubauen ist
+ * nicht „noch offen", sondern von der Plattform nicht vorgesehen.
+ *
+ * **Die Zahlen.** Android zeigt vom Symbolfeld nur den inneren Bereich und
+ * beschneidet den Rest; die Vorgabe ist ein Feld von 288 dp, dessen Inhalt in
+ * den inneren 192 dp liegt. Ein Stern, der die volle Fläche füllte, käme mit
+ * abgesägten Spitzen heraus — und das sähe aus wie ein Zeichenfehler, nicht wie
+ * ein Layoutfehler.
+ */
+export const ANDROID_SYMBOL = { flaeche: 288, inhalt: 192 } as const;
+
+/**
+ * Die Farbe des Sterns auf der Android-Startfläche.
+ *
+ * `--color-accent-strong`, und damit **derselbe Wert, den das Favicon als
+ * `fill` trägt**. Das App-Symbol färbt den Stern weiss, aber das steht auf
+ * navy; hier steht er auf Weiss und braucht den dunklen Ton.
+ *
+ * Dass die Zahl hier ein zweites Mal steht, ist der Preis dafür, dass
+ * `leseMarke` nur Form und Kante liefert. Ein Test hält beide Stellen zusammen
+ * — ohne ihn wäre das genau die stille Abweichung, vor der der Kommentar im
+ * Favicon warnt.
+ */
+export const MARKE_AUF_WEISS = "#1F53B0";
+
+/**
+ * Der Stern als Android Vector Drawable.
+ *
+ * Vector statt Raster, aus demselben Grund wie überall hier: die Marke kommt
+ * aus dem Favicon und wird nicht abgeschrieben. Ein PNG-Satz über fünf Dichten
+ * wäre ausserdem genau das, was dieser Vorgang beseitigt.
+ *
+ * Die Skalierung kommt aus `marke.kante`, nicht aus einer festen Zahl — ein
+ * Favicon mit anderer `viewBox` ergäbe sonst still ein falsch grosses Symbol,
+ * und ein Vector Drawable meldet so etwas nicht.
+ */
+export function androidSymbolXml(marke: Marke, farbe: string = MARKE_AUF_WEISS): string {
+  const { flaeche, inhalt } = ANDROID_SYMBOL;
+  const rand = (flaeche - inhalt) / 2;
+  const faktor = inhalt / marke.kante;
+  return [
+    `<?xml version="1.0" encoding="utf-8"?>`,
+    `<!-- ERZEUGT von scripts/splash.ts aus public/brand/compass-favicon.svg.`,
+    `     Nicht von Hand aendern - "pnpm splash" ueberschreibt diese Datei. -->`,
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"`,
+    `    android:width="${flaeche}dp"`,
+    `    android:height="${flaeche}dp"`,
+    `    android:viewportWidth="${flaeche}"`,
+    `    android:viewportHeight="${flaeche}">`,
+    `  <group`,
+    `      android:scaleX="${faktor}"`,
+    `      android:scaleY="${faktor}"`,
+    `      android:translateX="${rand}"`,
+    `      android:translateY="${rand}">`,
+    `    <path`,
+    `        android:fillColor="${farbe}"`,
+    `        android:pathData="${marke.stern}" />`,
+    `  </group>`,
+    `</vector>`,
+  ].join("\n");
+}
+
+/**
  * Der Eintrag eines Image Sets.
  *
  * Ein einziger, universeller Slot statt der drei, die Capacitor anlegt: die
