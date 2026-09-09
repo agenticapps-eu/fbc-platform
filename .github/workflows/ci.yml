@@ -38,6 +38,22 @@ jobs:
       - name: Kein natives Geheimnis im Baum
         run: pnpm tsx scripts/native-secrets-guard.ts
 
+      # AGE-714: Startflaeche und App-Symbole werden aus Quellen im Repo
+      # erzeugt, und bis hierhin prueft nichts, ob die eingecheckten
+      # Ergebnisse noch zu diesen Quellen passen. Wer das Foto oder die Marke
+      # aendert und `pnpm splash` vergisst, liefert still das alte Bild aus.
+      #
+      # Warum ein Stempel und nicht `--check` mit Neuerzeugung: die Erzeugung
+      # braucht `sips` (nur macOS) sowie rsvg-convert, cwebp und woff2 — und
+      # sie waere ausserdem nur so verlaesslich wie die Gleichheit der
+      # Werkzeugversionen. Der Stempel rechnet nur SHA-256 und laeuft deshalb
+      # auf diesem Runner. Details im Kopf von scripts/stempel.logic.ts.
+      #
+      # Steht ebenfalls vorn: ein Fund heisst, dass das Gebaute nicht zu den
+      # Quellen gehoert.
+      - name: Startflaeche und App-Symbole passen zu ihren Quellen
+        run: pnpm assets:check
+
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -1,0 +1,43 @@
+{
+  "eingaben": {
+    "public/brand/compass-favicon.svg": "87e5f338d31d2bf994e5a3daf178c743629da3f3389b74bdb10e4dda190c4feb",
+    "public/fonts/fraunces-latin.woff2": "48282a415ec22e31beaf0a0666e6fae0c8cbddcd0b1f6e729f27c3ade8a64e43",
+    "public/fonts/inter-latin.woff2": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4",
+    "public/images/hero-mitglieder.webp": "f6419438e2178397799640cc25c77a6b95bc26ad2f9b97aa482049cc00f43ad8"
+  },
+  "ergebnisse": {
+    "android/app/src/main/res/drawable/splash_icon.xml": "c9cc99680a87498726d8c5d86fb63d2cd2ab947ee692729912d59b355dbbb20f",
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher.png": "a76011337969eef9f7c0df76d958e9384acccacfc9e4e86f0bbb40d4c060c8ae",
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": "fd80395bc8d32d92d65a5e272e45ca1d17433a233b0e58753455728fd739484d",
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": "60356ddc4c62b372192f5b94316a4905478bb026468295ed6dce69b178aed0de",
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher.png": "1c7a1bd1c38adc4c95bd98b22355fbea235ff679779ccd7ecf2c4d75bc3dc1f9",
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": "70498e9c2e6abdbd704afe9957b6c64e44ddbdc2bd8840284ca227610600c59b",
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": "4e5fe66de3fa1b1534cb6adcc049aacef115f4a7b61dea3ffa1a54b6db3a16a8",
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": "bb0f0d52c3bcf65f4b584a487702a0491455eaeadde03d1402e916033c34ea4a",
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": "ceefafc8273b7ced146e8ba21ea766d4cd1ee0b6c5a127228aaf109891ffe169",
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": "6f0c479303fe549a55567c7346c5fa15c3777c4888e1531ad4ebb67617693291",
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": "ff7d241c0e8bb25bda726949631d5d0aeb43afbb608d563c7fb823cd7c746c15",
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": "4ba5bf26db2ac015a8db120e95445f868c2e39f0d99aff5d4c489c817e091913",
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": "94afc1dc7b59c39eb20ebf4f72663a3f8e7a130516413aa7e6c8699234e3193d",
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": "c0a104b53bce02fad999d563c7614d4de294a2895099063058d8ceaa3a7eb983",
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": "1779b6b946f7a5dfd58ec7fcfb8411c5cd8384690b8d04156f9be9da56e79cfb",
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": "a80d641f12469855d827ca3d025b432059c69b683c62af17c11a0abdb92ebd36",
+    "android/app/src/main/res/values/ic_launcher_background.xml": "eb6afbe9c50a93ad30f9d2556ff3599730f00db098aa32b867df0e2caf9e860c",
+    "android/app/src/main/res/values/splash.xml": "c389ba9b7e21044cb748fa63daa1d5b1c00321d728db477deacc344b63598150",
+    "assets/app-icon-foreground.svg": "1aa57144137316de448819a54637142156984d3abd65997a4d230b7434dd3b05",
+    "assets/app-icon-round.svg": "91f08ec4d4b3e0e90002d6cb0c710c47709b5524985f22dc2671164652476096",
+    "assets/app-icon.svg": "00dc5865ff4f0138f89b663be20dfb416fc9e401ee2486d050a37824ef37301f",
+    "assets/splash-schriftzug.svg": "075f8c4cb09023c31e30df1ab597ab9d8aa5bbb0eb26d6da37e9e7b9f34da65b",
+    "assets/splash-verlauf.svg": "a4206adb16f9650f2dcdf811125590ab59d03de035d8fa77e6a0e88fa81bfb23",
+    "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png": "d76d5d2cbaa307028cd989d0a3fd2ead8e2c4926052de99fe2bc6d7f8f1b9df0",
+    "ios/App/App/Assets.xcassets/Splash.imageset/Contents.json": "32ef261d0c169f0eecc81ff98de89b378f754a9ebd976dab5a08108b8fe90388",
+    "ios/App/App/Assets.xcassets/Splash.imageset/splash-band-quer.jpg": "4ec3c9e5a4942a6f3ea6f3ce38599d2f93508362063b89e48e5d6b03ed13bafa",
+    "ios/App/App/Assets.xcassets/Splash.imageset/splash-band.jpg": "395460acf80ae8095c38b10dc26868e89d7a66e4fb47a613a3eee2438657e19a",
+    "ios/App/App/Assets.xcassets/SplashSchriftzug.imageset/Contents.json": "d4ae03e30e986d643ba8264da51df57b43b378878b79d270ff221ae3858cea51",
+    "ios/App/App/Assets.xcassets/SplashSchriftzug.imageset/splash-schriftzug.png": "16625afcddb49d84a2251e6daab44545591ebce0ef9c681b58e91a33326924f7",
+    "ios/App/App/Assets.xcassets/SplashVerlauf.imageset/Contents.json": "f4538013dab38cb2fcc0065425e6c243a96bdf02a7534d9749f37c58d0e92bc9",
+    "ios/App/App/Assets.xcassets/SplashVerlauf.imageset/splash-verlauf.png": "aab9f873590568d1d1cce8ca8d609676d4058571211c8fbbbc08ee597c61cd36",
+    "public/brand/splash-band.webp": "fcace678d4fa6ce12af076d8f4e2f0d408adb50749a11d7d3960d0d3fccdeee8",
+    "public/brand/splash-schriftzug.png": "e745fbe280c13ef7d9ce6c64dd2eb819ba66ffd46b7aadfc10d2bde6d70e66db"
+  }
+}
