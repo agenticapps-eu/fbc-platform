@@ -1,125 +1,105 @@
-# Session Handoff — 2026-09-08 (AGE-642 Phase C zu; nächster Auftrag: Kontolöschung)
+# Session Handoff — 2026-09-09 (AGE-708 Kontolöschung: live, zwei Augenscheins-Punkte offen)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie schliesst die AGE-642-Gerätesitzung ab** (Worktree
-> `fbc-platform.donald-age-642-capacitor-huelle`) **und zeigt auf einen anderen
-> Vorgang weiter.** Die Datei ist für alle parallelen Sitzungen dieselbe und
-> kollidiert bei jedem Rebase — **nicht zusammenführen**, überschreiben.
+> **1. Sie beschreibt AGE-708** (Worktree
+> `fbc-platform/donald-age-708-kontoloeschung`) und **ersetzt** die Fassung vom
+> 08.09. (`4e4b7e0`), die auf die Kontolöschung als nächsten Auftrag zeigte.
+> Die Datei ist für alle parallelen Sitzungen dieselbe und kollidiert bei jedem
+> Rebase — **nicht zusammenführen**, überschreiben.
 >
-> **2. Sie ersetzt drei frühere Fassungen von heute:** `f7116df`, `3fc0f7b`,
-> `55aae39` — jeweils `git show <sha>:session-handoff.md`.
->
-> **3. Die AGE-642-Belege im Detail stehen NICHT hier**, sondern in
-> `openspec/changes/capacitor-huelle/tasks.md` (A1, C1, C2, C3, B5, Phase E).
+> **2. Details stehen NICHT hier**, sondern in
+> `openspec/changes/kontoloeschung/` — `datenmatrix.md` ist das Abnahmedokument,
+> `design.md` trägt die zehn Entscheidungen, `REVIEWS.md` die Resolution.
 
 ## Accomplished
 
-**Phase C ist zu.** Fünf Gerätezeilen standen morgens offen, alle fünf sind
-belegt — iPhone 17 Pro (`544B9818-…`) und Pixel 11 Pro (`67011FDKX006NA`).
+**Die Kontolöschung ist gebaut, reviewt, ausgerollt und auf PROD
+zurückgelesen.** 40 von 42 Aufgaben. Zwei PRs: **#373** (Code), **#374** (Doku
+zum Ausrollen).
 
-| | Beleg |
+| Schicht | Was |
 |---|---|
-| **A1** | Neustart → Feed; abmelden + Neustart → Anmeldemaske. Dazu `Preferences get` → `access_token` aus der Gerätekonsole |
-| **C1** | Kopfzeile unter der Dynamic Island, Leiste frei vom Home-Indikator |
-| **C2** | drei Ebenen, Overlay, zweimal zurück — gegengemessen: `topResumedActivity` steht noch auf der App |
-| **C3** | iOS **und** Android: eigene Rückfrage, Kamera, Galerie, Bild auf dem Profil |
-| **B5** | `[B5-SONDE] head {…"ergebnis":true,"boot":"nativ"}`, `display:"block"`, `hoehe: 874` (quer 402), `nochDa:false` |
+| **Datenbank** | Fremdschlüssel `profiles → auth.users` **entfernt** · `erased_at` als Riegel gegen `admin_restore_member` · `konto_anonymisieren` inkl. Schemawächter |
+| **Server** | Edge Function `konto-loeschen`, einziger Eingang, `verify_jwt = true` |
+| **Oberfläche** | Karte in den Einstellungen, zweistufige Rückfrage |
 
-**Ein Fehler gefunden, behoben, ausgeliefert:** der Zoom-Regler im Zuschnitt war
-am Finger nicht bedienbar (weisser System-Knopf auf weisser Karte, 30 px
-Trefffläche). `.fbc-regler`, PR **#369** (`3fc0f7b`), per OTA auf beide Geräte —
-ohne Neuinstallation, ohne Abmeldung. Belegt am Artefakt: das aktive Bündel
-`kloBmA6Vth` trägt alle fünf Regeln, das vorherige `mFhneNaJLK` hat 0 Treffer.
-PR **#370** (`55aae39`) trägt die Belege nach.
+**Abnahme:** pgTAP 30/30 neu, CI-Liste 35 Dateien / ~1300 Zusagen · Deno 185 ·
+vitest 2639/2639 · lint, typecheck, build je 0. Alle neuen Sicherheitszusagen
+per Mutation gegengeprüft.
+
+**PROD zurückgelesen** (09.09., Supabase-MCP, read-only): FK auf `auth.users`
+**0** · `erased_at` da · Funktion + Schemawächter da · Restore-Riegel da ·
+**0** Grants für anon/authenticated/PUBLIC · 35 FKs auf `profiles` unverändert ·
+`konto-loeschen` ACTIVE v1 mit `verify_jwt: true`.
 
 ## Decisions
 
-- **Chat, Realtime und die Web-Sitzung werden NICHT belegt** (Donald, 08.09.):
-  „das werde ich schon melden, wenn es nicht geht." Die Geräte laufen gegen
-  PROD, dort gibt es kein zweites Konto — ein Realtime-Beleg hiesse, in echte
-  Mitgliederdaten zu schreiben. **Die drei Kästchen bleiben offen und sollen
-  offen bleiben. Nicht jagen.**
-- **Nächster Auftrag ist die Kontolöschung**, nicht TestFlight und nicht die
-  Store-Einreichung (Donald, 08.09., nach der Korrektur unten).
-- **Quer bleibt, wie es ist** — die Startfläche wäscht quer aus, beide Schichten
-  tun aber dasselbe, es gibt keine Naht. Eigener Ausschnitt wäre eine
-  Entscheidung über Bildmaterial.
-- **`OnboardingPage.tsx:212` bleibt unangetastet** — derselbe Reglerfehler
-  schärfer, aber eigene Optik auf dunklem Chrome, nie am Gerät gesehen.
+- **Zuschnitt: nur die Löschung** (Donald, 08.09.). AGE-260 steht auf *Backlog /
+  nach Go-Live* und hängt an Detlev und dem Anwalt — daran soll die
+  Store-Einreichung nicht hängen. Export, Einwilligung und Audit-Log bleiben dort.
+- **Anonymisieren, Fremdsicht bleibt** (Donald, 08.09.). Fremde Gesprächsfäden
+  zerreissen sonst. Kehrseite bewusst getragen: **Freitext anderer wird nicht
+  umgeschrieben** (design.md D9) — eine Nachricht mit einer Telefonnummer und
+  eine @-Erwähnung im Beitrag eines anderen bleiben stehen.
+- **Apple-Restrisiko getragen** (Donald, 08.09.). codex hielt das Erhalten
+  geteilter Inhalte für einen möglichen Ablehnungsgrund. Bewertet als schärfer
+  als die Quellenlage; **in AGE-644 als Kommentar vermerkt**, samt der Antwort
+  für den Fall der Ablehnung.
+- **Branchname ohne Kürzel für Folge-PRs** — AGE-708 soll nicht verfrüht auf
+  *Done* kippen. Hat funktioniert: der Vorgang steht korrekt auf *In Progress*.
 
 ## Files modified
 
-Alles gemergt, Arbeitsbaum sauber, Branch auf `origin/main` (`55aae39`).
+Alles gemergt (`49b2121`), Arbeitsbaum sauber, lokal auf `origin/main`.
 
-- `src/index.css` · `src/components/profile/AvatarCropper.tsx` ·
-  `src/zoom-regler.test.ts` *(neu)* — in `3fc0f7b`
-- `openspec/changes/capacitor-huelle/tasks.md` — in beiden PRs
+- `supabase/migrations/20260908180000|181000|182000_kontoloeschung_*.sql` *(neu)*
+- `supabase/functions/konto-loeschen/{index,loeschen,loeschen.test}.ts` *(neu)*
+- `supabase/tests/kontoloeschung_test.sql` *(neu, 30 Zusagen)* · `rls_test.sql`
+  (Block 22.20 umgeschrieben, plan 440→441)
+- `src/lib/konto-loeschen.ts` *(neu)* · `src/pages/EinstellungenPage.tsx` +
+  `.test.tsx` · `src/components/community/CommunityFeed.test.tsx`
+- `supabase/config.toml` · `scripts/functions-config.test.ts` · `.github/workflows/ci.yml`
+- `openspec/changes/kontoloeschung/*` inkl. `datenmatrix.md`
 
 ## Next session: start here
 
-**Die Kontolöschung ist bereits geplant und reviewt — es fehlt allein die
-Umsetzung.** Nicht bei null anfangen, nicht neu proposen:
+**Nur noch zwei Augenscheins-Punkte, keine Bauarbeit.** Der Weg ist live und für
+ein Mitglied erreichbar.
 
-```
-openspec/changes/add-dsgvo-compliance/     16 Aufgaben, 0 erledigt
-  proposal.md · specs/privacy/spec.md · tasks.md · REVIEWS.md
-```
+- **4.5 Sichtprobe** der Einstellungskarte in hell und navy.
+- **6.4 Gerätetest** iOS und Android. Achtung: an diesem Mac immer nur **ein**
+  Gerät, und eine Installation über `devicectl`/`adb` erreicht die Weboberfläche
+  nicht, solange ein OTA-Bündel liegt.
 
-Die einschlägigen Stellen: `tasks.md` **2.3** („Erasure that deletes/anonymises
-app data AND removes `auth.users`") und **5.4** (der Test dazu), im Spec die
-Requirements *„Members can exercise access, portability, and erasure"* und
-*„Erasure respects retention duties and the auth identity"*.
+Danach `openspec archive kontoloeschung` (Schritt 6 des Workflows) und AGE-708
+auf Done. **Vorher nicht archivieren** — der Change ist erst mit dem Augenschein
+fertig.
 
-**Erste Handlung — die Zuschnittsfrage stellen, bevor irgendetwas gebaut wird.**
-Apple verlangt genau eine Sache: wer ein Konto in der App anlegen kann, muss es
-**in der App** löschen können. Der Change daneben ist viel grösser (Rechtsgrund
-je Zweck, versionierte Einwilligung, DSAR-Export, Audit-Log). Entweder die
-Löschung als eigener, kleiner Change herausschneiden, oder den grossen ganz
-umsetzen — **das ist Donalds Entscheidung, nicht die des nächsten Modells.**
+> ⚠ **Beim Testen der Löschung NIE ein echtes Konto nehmen.** Sie ist
+> unwiderruflich, `admin_restore_member` verweigert sie ausdrücklich, und PROD
+> trägt echte Mitgliederdaten. Nachweise gehören gegen den lokalen Stack mit
+> eigens angelegtem Konto.
 
-Danach Worktree anlegen, nicht hier weiterarbeiten:
-`/wt-switch-create donald/age-260-…` (Linear-Format wie in diesem Repo üblich).
+> ⚠ **Der lokale Stack ist repariert, aber der Grund merkenswert:** Ich hatte die
+> drei Migrationen per `psql -f` eingespielt, die Historie kannte sie nicht —
+> Schema voraus, Historie hinterher. Per `supabase migration repair --status
+> applied … --local` nachgetragen, `migration up` läuft jetzt sauber durch. Wer
+> lokal eine Migration von Hand einspielt, trägt sie auch nach.
 
-> ⚠ **`REVIEWS.md` dieses Changes steht auf `REQUEST-CHANGES`** (gemini,
-> 26.07.), und niemand hat es abgearbeitet: bemängelt werden unscharfe
-> Definitionen („personal data", „sensitive member data") und ein fehlender
-> Einwilligungs-Lebenszyklus. Das §18-Gate meldet die Datei ausserdem als
-> **trailer-absent**. Vor dem ersten Code klären, sonst baut man gegen einen
-> Plan, den ein Reviewer schon zurückgewiesen hat.
-
-> ⚠ **KORREKTUR, die seit Tagen in jeder Übergabe falsch stand:** „danach
-> TestFlight unter AGE-644" stimmt nicht. **AGE-644 schliesst TestFlight
-> ausdrücklich aus** („Nicht in diesem Change: TestFlight-Beta für Mitglieder").
-> AGE-644 ist die Store-Einreichung und hängt an Konto-Entscheidungen (Person
-> oder Firma → Detlev), Prüfer-Zugang, Datenschutzformularen — **und genau an
-> der Kontolöschung.** Wer TestFlight will, braucht dafür einen eigenen Vorgang;
-> `ios-release.yml` hört heute bei `--validate-app` auf.
-
-> ⚠ **`src/vision/` ist toter Code** und der einzige Treffer bei einer Suche
-> nach „Konto löschen". Es gibt heute nichts davon im Produkt.
-
-> ⚠ **Der Linear-Status kippt bei JEDEM Merge auf Done** (Branchname trägt die
-> Issue-Nummer). Heute dreimal zurückgesetzt. Nach jedem Merge nachsehen.
-
-> ⚠ **Squash-Falle.** Nach jedem Merge `git log origin/main..HEAD` prüfen und
-> auf `origin/main` zurücksetzen; der nächste Push braucht `--force-with-lease`.
-
-> ⚠ **`tasks.md` nie durch `prettier --write` schicken** (~1000 fremde Zeilen).
-> Sie ist bereits an `HEAD` unformatiert, das ist der Normalzustand.
-
-> ⚠ **Aus der Gerätesitzung, falls wieder eine ansteht:** eine Installation über
-> `devicectl`/`adb` erreicht die **Weboberfläche nicht**, solange ein OTA-Bündel
-> liegt — auf iOS hilft nur Deinstallieren (kostet die Anmeldung), auf Android
-> die zwei Runden. Und an diesem Mac lässt sich immer nur **ein** Gerät prüfen.
+> ⚠ **`donald/age-708-kontoloeschung` auf `origin` ist der Vor-Merge-Stand**
+> (lokal `behind`), der Inhalt liegt gesquasht in `main`. Der Branch kann weg.
 
 ## Open questions
 
-- **Zuschnitt der Kontolöschung** — kleiner eigener Change oder der ganze
-  DSGVO-Block? Siehe oben, gehört Donald.
-- **TestFlight** hat heute keinen Vorgang. Fremde Vorgänge lege ich nicht selbst
-  an.
-- **Querformat-Startfläche**, **Regler in `OnboardingPage.tsx:212`**,
-  **`pnpm splash --check` in der CI** — drei kleine offene Punkte aus AGE-642.
-- **„Build-Nummer = Lauf-Nummer" ist NICHT bewiesen** — Lauf 1 verglich 1 mit 1.
-- **`APNS_SANDBOX` steht auf `1`** — beim ersten TestFlight-Build nachsehen.
+- **Die Sichtprobe braucht ein angemeldetes Konto.** Das Rezept biegt über
+  `.env.local` später `pnpm dev` um — vor dem Loslegen entscheiden, ob gegen den
+  lokalen Stack oder gegen die Live-Seite geprüft wird.
+- **`event-covers` bleibt bei der Löschung stehen** (Titelbild gehört zur
+  Veranstaltung). Vorschlag steht in `datenmatrix.md` §5, von Donald nicht
+  ausdrücklich bestätigt.
+- **Laufende Stripe-Abos** beendet die Kontolöschung nicht. Ausserhalb dieses
+  Changes, aber real — `profile_legacy.paid_until` trägt ohnehin kein Downgrade.
+- **AGE-260** bleibt offen und ist jetzt kleiner: dessen Aufgaben 2.1, 2.3, 3.1
+  und 5.4 sowie das Requirement *„Erasure respects retention duties…"* sind hier
+  abgedeckt und dürfen dort nicht ein zweites Mal eingeführt werden.
