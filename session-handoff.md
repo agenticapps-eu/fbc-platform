@@ -72,51 +72,43 @@ Alle drei sind in Linear korrigiert. Sie stünden sonst dauerhaft falsch dort.
 
 ## Next session: start here
 
-### ⚠ Zwei Commits liegen auf `main` und sind NICHT ausgeliefert
+### Die Deploy-Störung ist erledigt — nichts nachzuziehen
 
-**Der Deploy ist seit 17:31 kaputt, aus fremdem Grund.** Der Schritt „Install
-Infisical CLI" ruft `apt-get update`, und Googles Chrome-Paketquelle liefert
-einen kaputten Index:
+Zwischen 17:31 und 17:55 scheiterte **jeder** Job, der die Infisical-CLI
+installiert (`deploy` und `drift-gate`, auf PRs wie auf `main`): Googles
+Chrome-Paketquelle lieferte beim `apt-get update` einen kaputten Index
+(`Hash Sum mismatch`). Zwei Commits lagen dadurch auf `main`, ohne ausgeliefert
+zu sein — `279ff59` (AGE-713) und `9e5a81b` (AGE-714).
 
-```
-E: Failed to fetch https://dl.google.com/linux/chrome-stable/.../Packages.gz
-   Hash Sum mismatch
-```
+**Aufgelöst am selben Abend.** Statt anzunehmen, die Störung halte an, wurde sie
+mit dem harmlosesten verfügbaren Lauf sondiert — einem **Vorschau**-Deploy, nicht
+PROD. Der war grün, also war Googles Index repariert. Der Merge dieser Übergabe
+(`95a9c39`) hat den `main`-Deploy dann von selbst angestossen, und weil er alles
+Vorherige enthält, kamen beide liegengebliebenen Commits damit mit.
 
-Das trifft jeden Job, der Infisical installiert — `deploy` **und**
-`drift-gate`, auf PRs wie auf `main`.
+| Lauf | Ausgang |
+|---|---|
+| Vorschau-Deploy PR #384 (Sonde) | grün |
+| PROD-Deploy `95a9c39` | **grün** — alles ausgeliefert |
 
-| Zeit | Commit | Deploy |
-|---|---|---|
-| 17:17 | `7a2624c` AGE-712 | grün |
-| **17:31** | **`279ff59` AGE-713** | **rot** |
-| **17:51** | **`9e5a81b` AGE-714** | **rot** |
+**Die Lehre, nicht der Vorgang:** nach zwei identischen Fehlschlägen hatte ich
+die Störung als „anhaltend" bezeichnet. Beobachtet war das nur bis 17:55 —
+danach hat schlicht nichts mehr die Paketquelle angefasst. Eine Störung, die
+niemand mehr misst, ist nicht *bestätigt anhaltend*, sondern **unbekannt**. Wer
+das verwechselt, wartet auf etwas, das längst vorbei ist. Die billige Sonde
+gegen eine ungefährliche Fläche beantwortet es in drei Minuten.
 
-Zweimal neu gestartet, beide Male identisch gescheitert. **Kein Aussetzer,
-sondern anhaltend.** Geht von selbst weg, wenn Google den Index repariert.
-
-**Der erste Handgriff der nächsten Sitzung:**
-
-```
-gh run rerun 34385506856 --failed      # der Lauf für 9e5a81b
-```
-
-**Ein Lauf genügt für beides.** Der Deploy baut aus dem ausgecheckten Commit,
-und `9e5a81b` enthält AGE-713 bereits — `279ff59` muss NICHT eigens nachgezogen
-werden. Vorher kurz prüfen, ob der Fehler noch derselbe ist; ist er weg, geht
-der Lauf durch.
-
-**Nicht erzwingen.** Weder einen PROD-Deploy an der Prüfung vorbei noch einen
-Umbau der Infisical-Installation, um die Paketquelle zu umgehen — das erste ist
-ein PROD-Schreibzugriff ausserhalb der Merge-Freigabe, das zweite eine Änderung
-an der Geheimnis-Kette.
-
-### Danach
+### Es gibt hier nichts mehr zu tun — der nächste Auftrag ist AGE-643
 
 Linear ist geprüft und sauber: AGE-642, 711, 712, 713, 714 stehen auf `Done`,
 jeder `completedAt` passt auf seinen Merge. **Teamweit gegengeprüft** — der
 einzige Treffer ausserhalb des Projekts (AGE-701, cPARX, 17:19) stammt aus PR
 #185 im Repo `cparx`, nicht von hier.
+
+Der nächste Meilenstein ist **AGE-643** (M3 Deep Links). Erster Schritt wie
+immer: `wt list` ansehen und nach einem bestehenden Branch suchen, bevor etwas
+Neues entsteht. Die vier Gerätebelege unten sind davon unabhängig und brauchen
+Donald am Gerät, nicht eine neue Sitzung am Rechner.
 
 ## Open questions
 
