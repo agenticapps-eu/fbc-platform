@@ -75,6 +75,24 @@ steht die Umkehrung unten als eigener Punkt und nicht als stille Korrektur.
 
 ## What Changes
 
+- **Die Plattform startet spürbar schneller** — auch im Browser. Was beim ersten
+  Aufruf geladen wird, ist von **1.182 kB auf 813 kB** geschrumpft (übertragen:
+  348 kB auf 253 kB). Erreicht wurde das, indem jede Seite erst geladen wird,
+  wenn Sie sie öffnen.
+- **Der Zoom-Regler beim Zuschneiden des Profilbilds lässt sich wieder
+  bedienen.** Am Telefon war er praktisch unsichtbar und zu schmal zum Treffen.
+- **Es gibt jetzt eine App-Hülle für iPhone und Android** — dieselbe Anwendung,
+  die Sie aus dem Browser kennen, kein zweites Produkt mit eigenem Stand.
+- **Noch ist die App in keinem Store.** Die Einreichung bei Apple und Google ist
+  ein eigener Schritt und steht noch aus. Bis dahin ändert sich für Sie nur das,
+  was oben steht.
+- **In der App bleiben Sie zuverlässig angemeldet.** Die Sitzung liegt im
+  geschützten Speicher des Geräts statt im Browserspeicher, den iPhones bei
+  Platzmangel leeren — das war der Grund für Abmeldungen ohne erkennbaren Anlass.
+- **Korrekturen erreichen die App künftig ohne Store-Aktualisierung.**
+
+Im Einzelnen:
+
 **1 · Die Sitzung zieht um — und zwar nur nativ.** `src/lib/supabase.ts`
 bekommt eine `auth.storage`-Weiche: im Web bleibt es bei `localStorage`, exakt
 mit denselben Schlüsseln, nativ übernimmt `@capacitor/preferences`

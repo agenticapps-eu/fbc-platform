@@ -5,6 +5,48 @@ Repository und läuft sofort. Ab Phase B braucht es Xcode, Android Studio und
 Konten — siehe „Voraussetzungen" im Proposal. Die Reihenfolge ist bewusst: das
 Riskanteste zuerst, solange es noch im Browser prüfbar ist.
 
+## ⚠ Beim Archivieren (09.09.): zehn Kästchen bleiben offen — mit Absicht
+
+Der Change wird mit **163 erledigten und 14 offenen** Aufgaben archiviert. Vier
+der vierzehn sind das Abschluss-Tor selbst („Vor dem Abschluss") und werden mit
+diesem Schritt erfüllt. Die übrigen **zehn** sind **keine Restarbeit, die jemand
+vergessen hat** — jede ist eine Entscheidung, die im Verlauf gefallen und an
+ihrer Stelle belegt ist. Sie werden **nicht abgehakt**, weil ein Haken ohne
+Beleg schlimmer wäre als ein offenes Kästchen.
+
+Wer diesen Change später liest, soll die zehn hier finden und nicht in 2.500
+Zeilen suchen müssen. Angesprochen sind sie über ihren Wortlaut, nicht über
+Zeilennummern — die verschieben sich bei jeder Änderung an dieser Datei.
+
+### Vier gehen in eigene Vorgänge — Anschlussarbeit, nicht Rest
+
+| Aufgabe (Anfang der Zeile) | Warum nicht hier |
+| --- | --- |
+| „quer ist die Komposition ausgewaschen" | Der zentrierte Ausschnitt eines Hochformat-Fotos im 3,5:1-Band trifft die helle Wand zwischen den beiden Personen — Bandmittelwert quer **148/139/134** gegen hochkant **129/123/117**. Kein Fehler, sondern das erwartbare Ergebnis; ein eigener Ausschnitt wäre eine Entscheidung über Bildmaterial. |
+| „`pnpm splash --check` in der CI" | Ohne sie ist „eine Änderung an der Quelle erreicht die Startfläche" von Hand gehalten, nicht erzwungen. Gilt für `pnpm app:icons` (B4) genauso — **ein** Vorgang für beide. *Review opencode, MEDIUM.* |
+| „Android bleibt hier bewusst aussen vor" | Seit Android 12 zeichnet die SplashScreen-API aus `windowSplashScreenBackground` und einem Symbol; das Bitmap unter `@drawable/splash`, das Capacitor anlegt, wird nicht mehr gezeigt. Zehn weitere PNG wären tote Dateien. |
+| „`OnboardingPage.tsx:212` trägt denselben Fehler schärfer" | `appearance-none` **ohne jede** Knopf-Regel — der Knopf dürfte in jedem WebKit unsichtbar sein. Bewusst nicht mitgeändert: eigene Schienen-Optik auf dunklem Chrome, nie am Gerät gesehen. Mitändern hiesse blind ändern. |
+
+### Fünf sind Gerätebelege, die bewusst nicht erzwungen wurden
+
+| Aufgabe (Anfang der Zeile) | Warum offen |
+| --- | --- |
+| „**RED**: Test — ein Bündel ohne passende Prüfsumme wird abgewiesen" | Die **Krypto-Hälfte ist belegt**, am ausgelieferten Artefakt gegen PROD, byte-gleich und mit Positivkontrolle (ein gekipptes Byte rötet die Probe). Offen ist Plugin-Verhalten, das nur ein Gerät zeigt — ein Mock könnte es bloss behaupten. Hängt zudem an D4. |
+| „Anmelden, Feed, Chat, Profil bearbeiten, Bild hochladen" | Alles ausser dem **Chat** ist am 08.09. auf iPhone 17 Pro und Pixel 11 Pro belegt. |
+| „Eine bestehende Web-Sitzung ist nach dem Storage-Umbau weiterhin angemeldet" | Braucht einen Browser, in dem seit dem Umbau **nicht** neu angemeldet wurde. Der ist nachträglich nicht herstellbar. |
+| „Realtime im Chat funktioniert im Vordergrund" | Nicht allein messbar: jemand muss schreiben, während die App offen ist. Ein Log-Beleg genügt nicht — Realtime läuft in der WebView und schreibt nicht ins logcat. |
+| „den Weg einmal bis zum Ende zu gehen — `Uebernehmen`" | Der Weg ist bis zur letzten Rückfrage belegt (die Tabelle darüber: drei Läufe, die entscheidende Zeile unterscheidet sich in **einer** Variablen). Das Ende zu gehen setzte **ein Foto einer dunklen Fläche als Donalds Profilbild auf PROD**. |
+
+Die Zeilen zu **Chat, Realtime und Web-Sitzung** sind **Donalds ausdrückliche
+Entscheidung vom 08.09.**: „das werde ich schon melden, wenn es nicht geht."
+Sie sollen offen bleiben und nicht nachgejagt werden.
+
+### Eine hängt an einem Ereignis, das nach diesem Change liegt
+
+| Aufgabe (Anfang der Zeile) | Warum offen |
+| --- | --- |
+| „**Erster Lauf — erst NACH dem Merge**" | Die Ref-Liste des Workflows lässt nur `main` und Tags `ios-v*` zu; ein `workflow_dispatch` vom Feature-Branch scheitert an ihr. Der Lauf **kann** vor dem Merge nicht stattfinden — und die Einreichung danach ist **M4 (AGE-644)**, ausdrücklich ein eigener Vorgang. |
+
 ## Phase A — im Browser prüfbar, ohne eine Zeile nativen Codes
 
 ### A1. Der Sitzungsspeicher zieht um
@@ -2499,8 +2541,16 @@ eigenen Vorgang, nicht fuer diesen Fix.
 
 ## Vor dem Abschluss
 
-- [ ] `openspec validate --all` grün.
-- [ ] `REVIEWS.md`: mindestens zwei Reviewer **fremder** Anbieter, vor der
-      ersten Codezeile.
-- [ ] Code-Review auf den Diff, nicht auf den Plan.
-- [ ] `openspec archive capacitor-huelle`.
+- [x] `openspec validate --all` grün. **09.09. gemessen: 32 von 32 bestanden,
+      0 gescheitert**, `change/capacitor-huelle` eingeschlossen.
+- [x] `REVIEWS.md`: mindestens zwei Reviewer **fremder** Anbieter, vor der
+      ersten Codezeile. **Erfüllt** — `reviewers: [gemini, opencode]`
+      (`hf:moonshotai/Kimi-K3`), beide mit `REQUEST-CHANGES` vor der ersten
+      Codezeile, über mehrere Runden abgearbeitet; die nicht übernommenen
+      Punkte stehen begründet in der Datei. Der eigene Anbieter (`claude`) hat
+      nicht als Stimme gezählt. Signierter Trailer vorhanden
+      (`openspec-review-trailer v1`, `producer-version: 1.2.0`).
+- [x] Code-Review auf den Diff, nicht auf den Plan. **Pro PR gelaufen** — der
+      Code dieses Changes liegt vollständig auf `main`; der Branch trug beim
+      Abschluss **null** eigene Commits gegen `origin/main`.
+- [x] `openspec archive capacitor-huelle`. **09.09.**

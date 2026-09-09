@@ -18,6 +18,20 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-09-capacitor-huelle",
+    "datum": "2026-09-09",
+    "titel": "Dieselbe Anwendung, in einer nativen Hülle",
+    "linear": "AGE-642",
+    "aenderungen": [
+      "**Die Plattform startet spürbar schneller** — auch im Browser. Was beim ersten Aufruf geladen wird, ist von **1.182 kB auf 813 kB** geschrumpft (übertragen: 348 kB auf 253 kB). Erreicht wurde das, indem jede Seite erst geladen wird, wenn Sie sie öffnen.",
+      "**Der Zoom-Regler beim Zuschneiden des Profilbilds lässt sich wieder bedienen.** Am Telefon war er praktisch unsichtbar und zu schmal zum Treffen.",
+      "**Es gibt jetzt eine App-Hülle für iPhone und Android** — dieselbe Anwendung, die Sie aus dem Browser kennen, kein zweites Produkt mit eigenem Stand.",
+      "**Noch ist die App in keinem Store.** Die Einreichung bei Apple und Google ist ein eigener Schritt und steht noch aus. Bis dahin ändert sich für Sie nur das, was oben steht.",
+      "**In der App bleiben Sie zuverlässig angemeldet.** Die Sitzung liegt im geschützten Speicher des Geräts statt im Browserspeicher, den iPhones bei Platzmangel leeren — das war der Grund für Abmeldungen ohne erkennbaren Anlass.",
+      "**Korrekturen erreichen die App künftig ohne Store-Aktualisierung.**"
+    ]
+  },
+  {
     "slug": "2026-09-08-stufe-im-zeilenmenue",
     "datum": "2026-09-08",
     "titel": "Stufe setzen im Zeilenmenü der Admin-Mitgliederliste",
