@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-09-kontoloeschung",
+    "datum": "2026-09-09",
+    "titel": "Sie können Ihr Konto jetzt selbst löschen",
+    "linear": "AGE-708",
+    "aenderungen": [
+      "Sie können Ihr Konto **selbst löschen** — in der App, unter *Einstellungen*, hinter einer eigenen Rückfrage. Auf iPhone, Android und im Browser derselbe Weg.",
+      "Die Löschung ist **endgültig**: Profil, Kontaktdaten und Ihre Bilder verschwinden, und Sie können sich danach nicht mehr anmelden. Auch die Vereinsleitung kann sie nicht rückgängig machen.",
+      "Ihre **Beiträge, Kommentare und Nachrichten bleiben ohne Ihren Namen stehen**, damit die Gespräche der anderen Mitglieder nicht zerreissen.",
+      "Anmeldungen zu künftigen Veranstaltungen werden storniert, offene Kontaktanfragen zurückgezogen.",
+      "**Ausgestellte Rechnungen bleiben erhalten** — dazu verpflichten HGB und AO."
+    ]
+  },
+  {
     "slug": "2026-09-08-stufe-im-zeilenmenue",
     "datum": "2026-09-08",
     "titel": "Stufe setzen im Zeilenmenü der Admin-Mitgliederliste",

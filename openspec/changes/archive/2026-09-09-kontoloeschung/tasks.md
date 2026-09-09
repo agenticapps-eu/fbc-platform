@@ -131,7 +131,18 @@
       `konto_anonymisieren` da mit Schemawächter; `admin_restore_member` trägt den
       `erased_at`-Riegel; **0** Grants für anon/authenticated/PUBLIC, `service_role`
       darf; die 35 Fremdschlüssel auf `profiles` unverändert
-- [ ] 6.4 Am Gerät zeigen, dass der Weg auf iOS und Android erreichbar ist
+- [x] 6.4 Am Gerät zeigen, dass der Weg auf iOS und Android erreichbar ist —
+      09.09. auf beiden. **Android** (Pixel, `com.effbeezee.app`) per `adb`
+      gefahren: Menü → Einstellungen → Karte *Konto löschen* am Fuss der Seite,
+      Tippen auf *Konto löschen* klappt die Rückfrage mit beiden Absätzen auf,
+      *Konto endgültig löschen* und *Abbrechen* stehen bei dieser Breite
+      nebeneinander ohne Umbruch. **iOS** (iPhone 17 Pro, iOS 26.6,
+      `com.effbeezee.app` 1.0 (1)): von Donald am Gerät nachvollzogen, Bild
+      gleich wie Android. Nebenbefund, der für den Store zählt: die Karte war
+      auf beiden Geräten **ohne Neuinstallation** da — das ausgelieferte
+      capgo-Bündel trägt sie bereits. Verlassen wurde die Seite über die
+      Systemgeste, nicht über einen Knopf; **die endgültige Löschung wurde auf
+      keinem Gerät ausgelöst** (beide Konten sind echt)
 
 ## Out of scope (named follow-ups)
 
