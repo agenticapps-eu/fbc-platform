@@ -1,128 +1,102 @@
-# Session Handoff — 2026-09-09 (AGE-708 Kontolöschung: live, zwei Augenscheins-Punkte offen)
+# Session Handoff — 2026-09-09 (AGE-708 Kontolöschung: fertig und archiviert)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
 > **1. Sie beschreibt AGE-708** (Worktree
 > `fbc-platform/donald-age-708-kontoloeschung`) und **ersetzt** die Fassung vom
-> 08.09. (`4e4b7e0`), die auf die Kontolöschung als nächsten Auftrag zeigte.
+> selben Tag (`1516e81`), die noch zwei offene Augenscheins-Punkte auswies.
 > Die Datei ist für alle parallelen Sitzungen dieselbe und kollidiert bei jedem
 > Rebase — **nicht zusammenführen**, überschreiben.
 >
-> **2. Details stehen NICHT hier**, sondern in
-> `openspec/changes/kontoloeschung/` — `datenmatrix.md` ist das Abnahmedokument,
-> `design.md` trägt die zehn Entscheidungen, `REVIEWS.md` die Resolution.
+> **2. AGE-708 ist zu.** Wer hier weitermacht, arbeitet an etwas anderem. Die
+> Details des Changes liegen jetzt unter
+> `openspec/changes/archive/2026-09-09-kontoloeschung/`, die dauerhafte Wahrheit
+> in `openspec/specs/privacy/spec.md`.
 
 ## Accomplished
 
-**Die Kontolöschung ist gebaut, reviewt, ausgerollt und auf PROD
-zurückgelesen.** 40 von 42 Aufgaben. Drei PRs, alle gemergt: **#373** (Code),
-**#374** (Ausrollen), **#375** (diese Übergabe).
+**Die Kontolöschung ist fertig — 42 von 42 Aufgaben, archiviert.** Diese Sitzung
+hat die zwei letzten Augenscheins-Punkte erledigt und den Change geschlossen.
 
-| Schicht | Was |
+| | |
 |---|---|
-| **Datenbank** | Fremdschlüssel `profiles → auth.users` **entfernt** · `erased_at` als Riegel gegen `admin_restore_member` · `konto_anonymisieren` inkl. Schemawächter |
-| **Server** | Edge Function `konto-loeschen`, einziger Eingang, `verify_jwt = true` |
-| **Oberfläche** | Karte in den Einstellungen, zweistufige Rückfrage |
+| **4.5 Sichtprobe** | gegen den lokalen Stack, hell und navy, PR **#377** |
+| **6.4 Gerätetest** | Android per `adb`, iOS von Donald am Gerät, PR **#378** |
+| **Archiviert** | `2026-09-09-kontoloeschung`, neue Spec `privacy` |
 
-**Abnahme:** pgTAP 30/30 neu, CI-Liste 35 Dateien / ~1300 Zusagen · Deno 185 ·
-vitest 2639/2639 · lint, typecheck, build je 0. Alle neuen Sicherheitszusagen
-per Mutation gegengeprüft.
+**4.5** — Karte, zweistufige Rückfrage mit beiden Absätzen und *Abbrechen*
+zurück in den Ausgangszustand, je in `hell` und `navy`. Der Inhalt sieht in
+beiden gleich aus, und das ist richtig: `navy` färbt nur den Rahmen
+(`src/index.css:208`). Sichtbar unterscheiden sich allein die
+`secondary`-Knöpfe, die auf den Chrome-Tokens sitzen.
 
-**PROD zurückgelesen** (09.09., Supabase-MCP, read-only): FK auf `auth.users`
-**0** · `erased_at` da · Funktion + Schemawächter da · Restore-Riegel da ·
-**0** Grants für anon/authenticated/PUBLIC · 35 FKs auf `profiles` unverändert ·
-`konto-loeschen` ACTIVE v1 mit `verify_jwt: true`.
+**6.4** — auf **beiden** Geräten dasselbe Bild. Der Nebenbefund zählt für
+AGE-644: **die Karte war ohne Neuinstallation da**, das ausgelieferte
+capgo-Bündel trägt sie bereits. Die endgültige Löschung wurde auf keinem Gerät
+ausgelöst; beide Konten sind echt.
 
 ## Decisions
 
-- **Zuschnitt: nur die Löschung** (Donald, 08.09.). AGE-260 steht auf *Backlog /
-  nach Go-Live* und hängt an Detlev und dem Anwalt — daran soll die
-  Store-Einreichung nicht hängen. Export, Einwilligung und Audit-Log bleiben dort.
-- **Anonymisieren, Fremdsicht bleibt** (Donald, 08.09.). Fremde Gesprächsfäden
-  zerreissen sonst. Kehrseite bewusst getragen: **Freitext anderer wird nicht
-  umgeschrieben** (design.md D9) — eine Nachricht mit einer Telefonnummer und
-  eine @-Erwähnung im Beitrag eines anderen bleiben stehen.
-- **Apple-Restrisiko getragen** (Donald, 08.09.). codex hielt das Erhalten
-  geteilter Inhalte für einen möglichen Ablehnungsgrund. Bewertet als schärfer
-  als die Quellenlage; **in AGE-644 als Kommentar vermerkt**, samt der Antwort
-  für den Fall der Ablehnung.
-- **Branchname ohne Kürzel für Folge-PRs** — AGE-708 soll nicht verfrüht auf
-  *Done* kippen. Hat funktioniert: der Vorgang steht korrekt auf *In Progress*.
+- **Sichtprobe gegen den lokalen Stack, nicht gegen Live** — die Löschung ist
+  unwiderruflich, und ein Wegwerf-Konto gibt es nur lokal. Konto, `.env.local`
+  und der vite-Prozess sind wieder weg.
+- **Den Weg am Gerät über die Systemgeste verlassen, nicht über *Abbrechen***
+  (Donald hat das Fahren der Geräte freigegeben, ausdrücklich ohne Löschung).
+  Der Abbrechen-Knopf steht direkt neben *Konto endgültig löschen*.
+- **Der Neuigkeiten-Eintrag wurde vor dem Archivieren umgeschrieben.** Er hatte
+  keine H1 (Titel wäre der Slug gewesen), keine eigene `Linear:`-Zeile
+  (`linear: null`) und neun Punkte in Repo-Sprache. Jetzt fünf Punkte in
+  Mitglieder-Sprache, der technische Text unverändert unter „Im Einzelnen:".
+- **Branchnamen:** #377 ohne Kürzel (AGE-708 sollte nicht verfrüht kippen),
+  #378 **mit** Kürzel, weil dieser Merge den Vorgang wirklich abschliesst.
 
 ## Files modified
 
-Alles gemergt (`fd60c7d`), Arbeitsbaum sauber, Branches aufgeräumt.
-
-- `supabase/migrations/20260908180000|181000|182000_kontoloeschung_*.sql` *(neu)*
-- `supabase/functions/konto-loeschen/{index,loeschen,loeschen.test}.ts` *(neu)*
-- `supabase/tests/kontoloeschung_test.sql` *(neu, 30 Zusagen)* · `rls_test.sql`
-  (Block 22.20 umgeschrieben, plan 440→441)
-- `src/lib/konto-loeschen.ts` *(neu)* · `src/pages/EinstellungenPage.tsx` +
-  `.test.tsx` · `src/components/community/CommunityFeed.test.tsx`
-- `supabase/config.toml` · `scripts/functions-config.test.ts` · `.github/workflows/ci.yml`
-- `openspec/changes/kontoloeschung/*` inkl. `datenmatrix.md`
+- `openspec/changes/kontoloeschung/` → `openspec/changes/archive/2026-09-09-kontoloeschung/`
+  (`proposal.md` mit neuem Kopf und umgebautem `## What Changes`, `tasks.md` mit
+  4.5 und 6.4 abgehakt)
+- `openspec/specs/privacy/spec.md` *(neu)* — das vom Archivieren gesetzte
+  `Purpose: TBD` ist durch einen echten Zweck ersetzt
+- `src/content/release-entries.generated.ts` — 77 Einträge, 13 Zeilen Diff
 
 ## Next session: start here
 
-**Nur noch zwei Augenscheins-Punkte, keine Bauarbeit.** Der Weg ist live und für
-ein Mitglied erreichbar.
+**Für AGE-708 gibt es nichts mehr zu tun.** Der nächste Auftrag kommt aus
+Linear; das naheliegende Anschlussstück ist **AGE-644** (Store-Einreichung), für
+die dieser Change die harte Abnahmezeile „Kontolöschung im Produkt vorhanden und
+getestet" erfüllt — der Beleg dafür steht in
+`openspec/changes/archive/2026-09-09-kontoloeschung/tasks.md`, Aufgabe 6.4.
 
-- **4.5 Sichtprobe** der Einstellungskarte in hell und navy.
-- **6.4 Gerätetest** iOS und Android. Achtung: an diesem Mac immer nur **ein**
-  Gerät, und eine Installation über `devicectl`/`adb` erreicht die Weboberfläche
-  nicht, solange ein OTA-Bündel liegt.
-
-Danach `openspec archive kontoloeschung` (Schritt 6 des Workflows) und AGE-708
-auf Done. **Vorher nicht archivieren** — der Change ist erst mit dem Augenschein
-fertig.
-
-> ⚠ **Beim Testen der Löschung NIE ein echtes Konto nehmen.** Sie ist
-> unwiderruflich, `admin_restore_member` verweigert sie ausdrücklich, und PROD
-> trägt echte Mitgliederdaten. Nachweise gehören gegen den lokalen Stack mit
-> eigens angelegtem Konto.
-
-> ⚠ **Der lokale Stack ist repariert, aber der Grund merkenswert:** Ich hatte die
-> drei Migrationen per `psql -f` eingespielt, die Historie kannte sie nicht —
-> Schema voraus, Historie hinterher. Per `supabase migration repair --status
-> applied … --local` nachgetragen, `migration up` läuft jetzt sauber durch. Wer
-> lokal eine Migration von Hand einspielt, trägt sie auch nach.
-
-> ⚠ **Der Worktree steht auf `main` und trägt keinen eigenen Branch mehr.**
-> `donald/age-708-kontoloeschung` ist auf `origin` gelöscht, der Inhalt liegt
-> gesquasht in `main` (`fd60c7d`). Wer hier weitermacht, legt für 4.5/6.4 einen
-> neuen Branch an — **ohne Kürzel**, solange AGE-708 nicht wirklich fertig ist.
+Erster Schritt dort wie immer: `wt list` ansehen und nach einem bestehenden
+Branch suchen, bevor etwas Neues entsteht.
 
 ## Open questions
 
-- **Die Sichtprobe braucht ein angemeldetes Konto.** Das Rezept biegt über
-  `.env.local` später `pnpm dev` um — vor dem Loslegen entscheiden, ob gegen den
-  lokalen Stack oder gegen die Live-Seite geprüft wird.
+Unverändert aus der Vorgängerfassung, keine davon blockt:
+
 - **`event-covers` bleibt bei der Löschung stehen** (Titelbild gehört zur
-  Veranstaltung). Vorschlag steht in `datenmatrix.md` §5, von Donald nicht
+  Veranstaltung). Vorschlag in `datenmatrix.md` §5, von Donald nicht
   ausdrücklich bestätigt.
 - **Laufende Stripe-Abos** beendet die Kontolöschung nicht. Ausserhalb dieses
-  Changes, aber real — `profile_legacy.paid_until` trägt ohnehin kein Downgrade.
+  Changes, aber real.
 - **AGE-260** bleibt offen und ist jetzt kleiner: dessen Aufgaben 2.1, 2.3, 3.1
   und 5.4 sowie das Requirement *„Erasure respects retention duties…"* sind hier
   abgedeckt und dürfen dort nicht ein zweites Mal eingeführt werden.
+- **Der Archiv-Eintrag geht in die Neuigkeiten** und damit einmal an alle
+  aktivierten Mitglieder. Er ist bewusst in Mitglieder-Sprache geschrieben und
+  zum Versenden gedacht, nicht zum Überspringen — aber jemand sollte ihn in
+  `AdminNeuigkeitenPage` freigeben, nicht durchrutschen lassen.
 
-## Zwei Lehren, die über AGE-708 hinausgehen
+## Zwei Lehren dieser Sitzung
 
-Beide stehen ausführlich im Gedächtnis
-(`kontoloeschung-was-wo-haengt`, `waechter-pinnen-oft-nur-eine-richtung`):
+Beide stehen im Gedächtnis:
 
-1. **Ein Fremdschlüssel OHNE `on delete` ist `no action` — der BLOCKT.** Der
-   erste Plan wollte den Auth-Fremdschlüssel „ohne Kaskade neu setzen" und hätte
-   damit die Löschung verhindert statt sie zu ermöglichen. Im Schema sehen beide
-   Zustände ähnlich aus, im Katalog nicht. Gefunden vom Plan-Review, bevor eine
-   Zeile Code existierte.
-2. **Einen geerbten Wächter erst mit der EIGENEN Fehlkonfiguration testen.**
-   `scripts/functions-config.test.ts` sah vollständig aus und blieb grün, als
-   `konto-loeschen` versuchsweise auf `verify_jwt = false` stand — gepint war nur,
-   *wo* die Prüfung aus sein muss, nirgends, wo sie an sein muss.
-
-Und eine dritte, kleinere: **`erst messen, dann bauen` hat hier zwei Aufgaben
-ersatzlos gestrichen.** `is_activated()` liest `deleted_at`, und 34 von 34
-schreibenden Policies prüfen `is_activated()` — die geplante Arbeit
-„Sichtbarkeits-Prädikate ergänzen" und „schreibende Prädikate sperren" war schon
-getan, sie musste nur belegt werden.
+1. **`archivieren-zieht-neuigkeiten-nach`** hat sich umgedreht. Die Notiz sagte
+   „prettier ist Pflicht, sonst 889 Zeilen". Heute steht die eingecheckte
+   `release-entries.generated.ts` im **Rohstil des Erzeugers**, also gibt *kein*
+   prettier 13 Zeilen und prettier 626/612. Neue Regel ohne Richtungsangabe:
+   nach `pnpm release:entries` den Diff messen, die kleinere Zahl gewinnt.
+2. **`geraetetest-iphone-fallen`**: `devicectl` kann auf iOS starten und die
+   Konsole mitlesen, aber **weder Screenshot noch Tap**. Der iOS-Teil jeder
+   „am Gerät zeigen"-Aufgabe ist Handarbeit — einplanen, nicht erst beim Anlauf
+   merken. Android geht per `adb` vollständig.
