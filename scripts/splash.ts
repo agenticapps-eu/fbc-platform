@@ -50,6 +50,7 @@ import {
   SCHRIFTZUG_WEB,
   VERLAUF_BILD,
   WEB_DATEIEN,
+  androidSymbolXml,
   bandSvg,
   contentsJson,
   schriftzugSvg,
@@ -58,6 +59,11 @@ import {
 
 const FAVICON = "public/brand/compass-favicon.svg";
 const FOTO = "public/images/hero-mitglieder.webp";
+/** Die Android-Startfläche (AGE-713). Zwei Dateien, mehr sieht die
+ *  SplashScreen-API nicht: eine Grundfarbe und ein Symbol. */
+const ANDROID_RES = "android/app/src/main/res";
+const ANDROID_SYMBOL_DATEI = `${ANDROID_RES}/drawable/splash_icon.xml`;
+const ANDROID_FARBEN_DATEI = `${ANDROID_RES}/values/splash.xml`;
 const SCHRIFTEN = ["inter-latin", "fraunces-latin"];
 const XCASSETS = "ios/App/App/Assets.xcassets";
 /** Wohin die Web-Fassungen gehen. `public/`, weil die Boot-Fläche sie über
@@ -385,6 +391,25 @@ function main(): void {
     for (const datei of Object.values(WEB_DATEIEN)) {
       console.log(`web      ${WEB}/${datei}`);
     }
+
+    // Android (AGE-713). KEIN Foto, kein Verlauf, kein Schriftzug: seit
+    // Android 12 zeichnet die SplashScreen-API nur Grundfarbe plus Symbol, und
+    // das Bitmap unter `@drawable/splash` wird nicht mehr gezeigt. Was hier
+    // entsteht, ist deshalb absichtlich weniger als auf iOS — nicht unfertig.
+    schreibe(ANDROID_SYMBOL_DATEI, androidSymbolXml(marke) + "\n");
+    schreibe(
+      ANDROID_FARBEN_DATEI,
+      [
+        `<?xml version="1.0" encoding="utf-8"?>`,
+        `<!-- ERZEUGT von scripts/splash.ts. Nicht von Hand aendern. -->`,
+        `<resources>`,
+        `    <color name="splashHintergrund">${GRUND}</color>`,
+        `</resources>`,
+        ``,
+      ].join("\n"),
+    );
+    console.log(`android  ${ANDROID_SYMBOL_DATEI}`);
+    console.log(`android  ${ANDROID_FARBEN_DATEI}`);
   } finally {
     rmSync(arbeit, { recursive: true, force: true });
   }

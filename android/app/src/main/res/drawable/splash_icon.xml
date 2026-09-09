@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ERZEUGT von scripts/splash.ts aus public/brand/compass-favicon.svg.
+     Nicht von Hand aendern - "pnpm splash" ueberschreibt diese Datei. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+  <group
+      android:scaleX="4"
+      android:scaleY="4"
+      android:translateX="48"
+      android:translateY="48">
+    <path
+        android:fillColor="#1F53B0"
+        android:pathData="M24 2 L27.15 20.85 L46 24 L27.15 27.15 L24 46 L20.85 27.15 L2 24 L20.85 20.85 Z M27.89 20.11 L29.64 19.9 L34.58 13.42 L28.1 18.36 Z M27.89 27.89 L28.1 29.64 L34.58 34.58 L29.64 28.1 Z M20.11 27.89 L18.36 28.1 L13.42 34.58 L19.9 29.64 Z M20.11 20.11 L19.9 18.36 L13.42 13.42 L18.36 19.9 Z" />
+  </group>
+</vector>

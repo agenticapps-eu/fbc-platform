@@ -18,6 +18,9 @@ import {
   SCHRIFTZUG_OBEN,
   SCHRIFTZUG_SEITENVERHAELTNIS,
   SUBLINE,
+  ANDROID_SYMBOL,
+  MARKE_AUF_WEISS,
+  androidSymbolXml,
   bandSvg,
   bildLage,
   schriftzugSvg,
@@ -292,5 +295,81 @@ describe("Das Band ist nur das Foto — der Verlauf liegt darüber", () => {
     // Beschneiden mitbeschnitten — quer läge seine Unterkante mitten im
     // Farbverlauf, und die Kante des Fotos wäre sichtbar.
     expect(svg).not.toContain("linearGradient");
+  });
+});
+
+/**
+ * Die Startfläche auf ANDROID (AGE-713).
+ *
+ * WAS HIER ANDERS IST ALS AUF iOS: seit Android 12 zeichnet die
+ * SplashScreen-API die Fläche aus genau zwei Dingen — einer Grundfarbe und
+ * einem Symbol. Das Bitmap unter `@drawable/splash`, das Capacitor anlegt, wird
+ * NICHT mehr gezeigt. Foto, Verlauf und Schriftzug des iOS-Storyboards haben
+ * dort also kein Gegenstück; sie nachzubauen ist nicht „noch nicht gemacht",
+ * sondern von der Plattform nicht vorgesehen.
+ *
+ * Donalds Entscheidung vom 09.09.: weisser Grund, Stern zentriert. Weiss ist
+ * dieselbe Farbe wie `GRUND`, auf der auch die Boot-Fläche dahinter sitzt —
+ * damit hat der Übergang keine sichtbare Kante.
+ */
+describe("Die Android-Startfläche kommt aus derselben Marke", () => {
+  const marke = leseMarke(readFileSync("public/brand/compass-favicon.svg", "utf8"));
+
+  // Dieselbe Zusage wie für das iOS-Symbol: der Stern wird gelesen, nicht
+  // abgeschrieben. Mutation: den Pfad im Favicon ändern → dieser Test folgt ihm,
+  // eine Kopie im Skript täte es nicht.
+  it("trägt den Stern wörtlich so, wie er im Favicon steht", () => {
+    expect(androidSymbolXml(marke)).toContain(marke.stern);
+  });
+
+  // Die Farbe steht in `splash.logic.ts` ein zweites Mal, weil `leseMarke` nur
+  // Form und Kante liefert. Dieser Test ist der Ersatz für die fehlende
+  // Kopplung — ohne ihn wäre genau das die stille Abweichung, vor der der
+  // Kommentar im Favicon warnt: der Tab trüge ein anders gefärbtes Logo als
+  // die Startfläche. Mutation: einen der beiden Werte ändern → rot.
+  it("trägt dieselbe Farbe, die im Favicon steht", () => {
+    const imFavicon = /fill="(#[0-9A-Fa-f]{6})"/.exec(
+      readFileSync("public/brand/compass-favicon.svg", "utf8"),
+    );
+    expect(imFavicon, "kein fill am Stern im Favicon").not.toBeNull();
+    expect(MARKE_AUF_WEISS.toLowerCase()).toBe(imFavicon![1].toLowerCase());
+    expect(androidSymbolXml(marke)).toContain(`android:fillColor="${MARKE_AUF_WEISS}"`);
+  });
+
+  it("ist ein Vector Drawable, kein Raster", () => {
+    const xml = androidSymbolXml(marke);
+    expect(xml).toMatch(/^<\?xml/);
+    expect(xml).toContain("<vector");
+    expect(xml).toContain("android:pathData=");
+  });
+
+  // Android zeigt vom Symbolfeld nur den inneren Bereich; der Rest wird
+  // beschnitten. Ein Stern, der die volle Fläche füllt, käme mit abgesägten
+  // Spitzen heraus — und das sähe wie ein Zeichenfehler aus, nicht wie ein
+  // Layoutfehler. Mutation: `inhalt` auf `flaeche` setzen → rot.
+  it("lässt den Rand frei, den Android beschneidet", () => {
+    expect(ANDROID_SYMBOL.inhalt).toBeLessThan(ANDROID_SYMBOL.flaeche);
+    const anteil = ANDROID_SYMBOL.inhalt / ANDROID_SYMBOL.flaeche;
+    expect(anteil).toBeLessThanOrEqual(2 / 3);
+  });
+
+  it("setzt den Stern mittig in die Fläche", () => {
+    const rand = (ANDROID_SYMBOL.flaeche - ANDROID_SYMBOL.inhalt) / 2;
+    const xml = androidSymbolXml(marke);
+    expect(xml).toContain(`android:translateX="${rand}"`);
+    expect(xml).toContain(`android:translateY="${rand}"`);
+  });
+
+  // Die Skalierung muss aus der Favicon-Kante kommen. Wäre sie fest verdrahtet,
+  // ergäbe ein Favicon mit anderer viewBox ein falsch grosses Symbol — und zwar
+  // still, weil ein Vector Drawable nichts meldet.
+  it("skaliert aus der Kante des Favicons, nicht aus einer festen Zahl", () => {
+    const gross = leseMarke(
+      readFileSync("public/brand/compass-favicon.svg", "utf8").replace(
+        'viewBox="0 0 48 48"',
+        'viewBox="0 0 96 96"',
+      ),
+    );
+    expect(androidSymbolXml(marke)).not.toEqual(androidSymbolXml(gross));
   });
 });
