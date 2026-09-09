@@ -156,5 +156,5 @@ hier.
 implementing-host: claude
 digest: sha256:c3e6349fafffd7e27f37b4581663cec255dc7dc8e70782a22dc8349ef11e1d82
 producer-version: 1.2.0
-tasks-digest: sha256:3bd2264a173c40da30b72ca122964419a3821f8f0f1bb31284532ad9e7def0cb
+tasks-digest: sha256:802f5cac97b2cbd4517f625dd6fb6a55b1715612cd9b2640ba50ba205fc8bf94
 -->

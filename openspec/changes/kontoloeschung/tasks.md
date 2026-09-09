@@ -110,10 +110,15 @@
 
 ## 6. Ausrollen
 
-- [ ] 6.1 Migration auf DEV ausrollen und **zurücklesen**, dass der Fremdschlüssel
-      **weg** ist — nicht nur die Kaskade; `no action` sähe ähnlich aus
-- [ ] 6.2 Erst danach die Edge Function deployen
-- [ ] 6.3 Denselben Rückleseschritt auf **PROD**, bevor der Weg dort erreichbar ist
+- [x] 6.1 Migration auf DEV ausrollen — `migrate-dev` grün im Deploy-Lauf zu #373
+- [x] 6.2 Edge Function deployt — `konto-loeschen` auf PROD `ACTIVE`, Version 1,
+      **`verify_jwt: true`** (die dritte Fläche eigens gegengeprüft, sie wird von
+      keinem Migrationsschritt miterledigt)
+- [x] 6.3 PROD zurückgelesen (09.09., Supabase-MCP, read-only) — Fremdschlüssel
+      auf `auth.users`: **0**, also WEG und nicht `no action`; `erased_at` da;
+      `konto_anonymisieren` da mit Schemawächter; `admin_restore_member` trägt den
+      `erased_at`-Riegel; **0** Grants für anon/authenticated/PUBLIC, `service_role`
+      darf; die 35 Fremdschlüssel auf `profiles` unverändert
 - [ ] 6.4 Am Gerät zeigen, dass der Weg auf iOS und Android erreichbar ist
 
 ## Out of scope (named follow-ups)
