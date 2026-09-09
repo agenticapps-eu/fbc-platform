@@ -216,10 +216,18 @@ The system SHALL render the brand mark as an inline SVG compass star that takes 
 colour from `currentColor`, so that one asset serves both themes. The system SHALL
 NOT keep a raster lockup, nor a second asset selected by theme.
 
-The star's four points SHALL break out of the surrounding ring rather than sit
-inside it — enclosed, the mark reads as a filled circle with a pattern instead of a
-compass. The favicon SHALL carry the same silhouette, so the browser tab and the
-application do not show two different marks.
+The star SHALL stand free, with **no surrounding ring**, and SHALL carry eight
+points: four long ones on the axes and four slender ones on the diagonals. The ring
+was removed on 2026-08-29 (AGE-642) after the mark was measured against the brand
+template — the numbers, the method and the coverage check are in
+`docs/marke-neu/entwurf-messung.md`. This supersedes the AGE-499 clause that the
+star's points SHALL break out of the surrounding ring: there is no longer a ring
+for them to break out of, and that clause SHALL NOT be read as still binding.
+
+The favicon SHALL carry the same silhouette, so the browser tab and the application
+do not show two different marks. With the ring gone the two are now shape-identical:
+the favicon's former thickening of the ring for 16 px applied to exactly the line
+that no longer exists, and SHALL NOT be reintroduced as a difference between them.
 
 The wordmark is `eff.bee.zee`, lowercase throughout, with the separating dots in
 the accent colour. On the chrome the mark SHALL use the chrome's foreground and
@@ -233,7 +241,8 @@ accent tokens. Accessible names for the mark SHALL read `eff.bee.zee`.
 #### Scenario: The mark and the favicon show the same shape
 
 - **WHEN** the inline mark and `compass-favicon.svg` are compared
-- **THEN** both show the star breaking out of the ring
+- **THEN** both show the same free-standing star — four long points on the axes,
+  four slender points on the diagonals, and no ring around either
 
 ### Requirement: The application shell docks the navigation to the viewport edge
 
@@ -1846,4 +1855,42 @@ ihnen ein Overlay stehen kann, ist ungemessen.
 - **WHEN** das Feedback-Formular aus der angedockten Seitenleiste geöffnet wurde
   und Escape gedrückt wird
 - **THEN** ist das Formular geschlossen
+
+### Requirement: Kein Inhalt liegt unter Notch, Statusleiste oder Home-Indikator
+
+Die Anwendung SHALL die sicheren Bereiche des Geräts achten. Flächen, die den
+Fensterrand berühren — die Kopfzeile, die beiden angedockten Leisten und das
+Chatfenster —, SHALL ihren Abstand zum Rand um die jeweiligen
+`env(safe-area-inset-*)` ergänzen.
+
+Das Dokument SHALL dafür `viewport-fit=cover` in seiner `viewport`-Angabe
+tragen. **Ohne diese Angabe sind sämtliche `env(safe-area-inset-*)` null** — die
+Abstände zu setzen und das Meta zu vergessen, sieht aus wie erledigt und wirkt
+nicht.
+
+Die Abstände SHALL **ergänzt** und SHALL NOT ersetzt werden. Ein Rand, der auf
+einem Gerät ohne Notch zu null wird, nimmt dort den gestalteten Abstand mit.
+
+Dies ist die senkrechte Fortsetzung der Zusage, dass sich keine Seite seitlich
+schieben lässt. Sie SHALL wie jene **auf dem Gerät** geprüft werden und SHALL
+NOT in einer Testumgebung ohne echte Insets als erfüllt gelten: dort sind alle
+Insets null, und eine Zusage darüber wäre grün, gleich was die Anwendung tut.
+
+#### Scenario: Die Kopfzeile beginnt unter der Statusleiste
+
+- **WHEN** die Anwendung auf einem Gerät mit Notch im Hochformat läuft
+- **THEN** liegt kein Text und kein Bedienelement der Kopfzeile unter der
+  Statusleiste oder der Notch
+
+#### Scenario: Die unterste Zeile bleibt über dem Home-Indikator
+
+- **WHEN** das Chatfenster auf einem Gerät mit Home-Indikator geöffnet ist
+- **THEN** liegt das Eingabefeld vollständig über dem Indikator und ist
+  bedienbar
+
+#### Scenario: Ein Gerät ohne Notch verliert seinen Abstand nicht
+
+- **WHEN** dieselbe Fläche auf einem Gerät ohne sichere Bereiche dargestellt
+  wird
+- **THEN** trägt sie weiterhin den gestalteten Abstand zum Rand
 
