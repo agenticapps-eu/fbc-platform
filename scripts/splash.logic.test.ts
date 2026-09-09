@@ -5,7 +5,9 @@ import { leseMarke } from "./app-icons.logic";
 import {
   AKZENT,
   AUSSCHNITT,
+  AUSSCHNITT_QUER,
   BAND_ANTEIL,
+  BAND_QUER,
   CLAIM,
   GEDAEMPFT,
   GRUND,
@@ -133,6 +135,97 @@ describe("Der Ausschnitt ist ein Anteil, keine Pixelkoordinate", () => {
     // sie wirkt — sonst wäre sie beim nächsten Bildtausch stumm verschwunden.
     expect(AUSSCHNITT.oben).toBeGreaterThan(0);
     expect(AUSSCHNITT.hoehe).toBeLessThan(1);
+  });
+});
+
+/**
+ * Der Querformat-Ausschnitt (AGE-712).
+ *
+ * WAS HIER SCHIEFGING: das Band ist hochkant (1290×1734), und der Storyboard-
+ * `imageView` steht auf `scaleAspectFill`. Auf einem quer gehaltenen Telefon
+ * schneidet das mittig einen 3,5:1-Streifen aus einem Bild, das seinerseits
+ * schon ein Ausschnitt war. Beschnitten wird also ZWEIMAL, und übrig bleibt die
+ * helle Fensterwand ZWISCHEN den beiden Personen — beide Köpfe fallen heraus.
+ * Donalds Wortlaut am Gerät: „nur weisser Bildschirm quer."
+ *
+ * WARUM KEINE HELLIGKEITSPRÜFUNG: der naheliegende Test wäre „quer darf nicht
+ * heller werden". Er wäre falsch. Gemessen ist der richtige Ausschnitt
+ * **185/172/157** und damit HELLER als der kaputte (148/139/134) — weil der
+ * kaputte Oberkörper in dunklen Anzügen zeigt und der richtige Gesichter vor
+ * einem hellen Fenster. Die Helligkeit misst hier das Gegenteil dessen, was
+ * gemeint ist. „Beide Gesichter sind im Bild" ist kein Skalar; das trägt der
+ * Augenschein. Hier steht nur die GEOMETRIE, damit sie niemand still verschiebt.
+ */
+describe("Quer bekommt ein eigenes Fenster, nicht den Mittelstreifen des Hochkantbandes", () => {
+  const QUELLE = { breite: 1600, hoehe: 1068 };
+
+  // DIE Regressionsschranke. Wäre `AUSSCHNITT_QUER` dasselbe Fenster wie
+  // hochkant, wäre der Fehler zurück — nur an anderer Stelle geschrieben.
+  it("ist flacher als das Hochkantfenster", () => {
+    expect(AUSSCHNITT_QUER.hoehe).toBeLessThan(AUSSCHNITT.hoehe);
+  });
+
+  it("hält das Seitenverhältnis, das der Storyboard-Ausschnitt verlangt", () => {
+    expect(BAND_QUER.breite / BAND_QUER.hoehe).toBeCloseTo(3.5, 1);
+  });
+
+  // Donalds Entscheidung vom 09.09.: „beide Gesichter, volle Breite". Das Foto
+  // ist quer (1600×1068) — was quer fehlt, liegt darin schon vor. Ein Fenster,
+  // das Breite wegwirft, wirft genau die Personen weg.
+  // Die Zusage ist „wirft keine Breite weg", nicht „trifft die Kante exakt".
+  // Exakt zu treffen wäre sogar falsch: ein Fenster ohne Rundungsreserve
+  // erzeugt einen durchsichtigen Haarstrich an der Kante (siehe den Kommentar
+  // an `AUSSCHNITT_QUER`). Geprüft wird deshalb der Anteil.
+  //
+  // Mutation: `mitteX` auf 0.40625 setzen (der Hochkantwert) → rot, denn dann
+  // sitzt das Fenster links und schneidet die rechte Person an.
+  it("nutzt praktisch die volle Breite der Quelle", () => {
+    const lage = bildLage(QUELLE, BAND_QUER, AUSSCHNITT_QUER);
+    const ueberstandLinks = -lage.x / lage.breite;
+    const ueberstandRechts = (lage.x + lage.breite - BAND_QUER.breite) / lage.breite;
+    expect(ueberstandLinks).toBeLessThan(0.01);
+    expect(ueberstandRechts).toBeLessThan(0.01);
+    // Und symmetrisch, sonst sitzt das Fenster nicht auf der Bildmitte.
+    expect(Math.abs(ueberstandLinks - ueberstandRechts)).toBeLessThan(0.005);
+  });
+
+  it("deckt die Zielfläche vollständig ab", () => {
+    const lage = bildLage(QUELLE, BAND_QUER, AUSSCHNITT_QUER);
+    expect(lage.x).toBeLessThanOrEqual(0);
+    expect(lage.y).toBeLessThanOrEqual(0);
+    expect(lage.x + lage.breite).toBeGreaterThanOrEqual(BAND_QUER.breite);
+    expect(lage.y + lage.hoehe).toBeGreaterThanOrEqual(BAND_QUER.hoehe);
+  });
+
+  // Das Fenster sitzt auf den Gesichtern, nicht einfach oben. Mutation: `oben`
+  // auf 0 setzen → rot, und genau dann stünde der Fensterrahmen im Bild statt
+  // der Personen.
+  it("sitzt auf den Gesichtern, nicht am oberen Rand", () => {
+    expect(AUSSCHNITT_QUER.oben).toBeGreaterThan(0.1);
+    const unterkante = AUSSCHNITT_QUER.oben + AUSSCHNITT_QUER.hoehe;
+    expect(unterkante).toBeLessThan(1);
+  });
+
+  it("bleibt beim Tausch des Quellbildes derselbe Bildbereich", () => {
+    const klein = bildLage(QUELLE, BAND_QUER, AUSSCHNITT_QUER);
+    const gross = bildLage(
+      { breite: QUELLE.breite * 2, hoehe: QUELLE.hoehe * 2 },
+      BAND_QUER,
+      AUSSCHNITT_QUER,
+    );
+    expect(gross.x).toBeCloseTo(klein.x, 1);
+    expect(gross.y).toBeCloseTo(klein.y, 1);
+    expect(gross.breite).toBeCloseTo(klein.breite, 1);
+  });
+
+  // `bandSvg` muss das Fenster durchreichen. Ohne das entstünde die Querdatei
+  // aus dem HOCHKANT-Fenster — also wieder der Fehler, diesmal in einer Datei,
+  // die „quer" heisst.
+  it("bandSvg nimmt das Querfenster an", () => {
+    const svg = bandSvg("foto.png", QUELLE, BAND_QUER, AUSSCHNITT_QUER);
+    const hoch = bandSvg("foto.png", QUELLE, BAND_QUER, AUSSCHNITT);
+    expect(svg).toContain(`width="${BAND_QUER.breite}"`);
+    expect(svg).not.toEqual(hoch);
   });
 });
 

@@ -4,6 +4,12 @@
       "idiom": "universal",
       "filename": "splash-band.jpg",
       "scale": "1x"
+    },
+    {
+      "idiom": "universal",
+      "height-class": "compact",
+      "filename": "splash-band-quer.jpg",
+      "scale": "1x"
     }
   ],
   "info": {

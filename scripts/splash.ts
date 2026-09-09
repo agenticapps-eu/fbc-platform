@@ -41,7 +41,9 @@ import { dirname, join } from "node:path";
 
 import { leseMarke } from "./app-icons.logic";
 import {
+  AUSSCHNITT_QUER,
   BAND_BILD,
+  BAND_QUER,
   BAND_WEB,
   GRUND,
   SCHRIFTZUG_BILD,
@@ -71,7 +73,10 @@ const EBENEN = {
   // `Assets.car` von 108 KB auf 1,3 MB wachsen, also um 8 % des ganzen Bündels,
   // für ein Bild, das beim Start dekodiert wird. Verlauf und Schriftzug bleiben
   // PNG; beide sind durchsichtig und wären als JPEG kaputt.
-  band: { set: "Splash", datei: "splash-band.jpg" },
+  // `querDatei` ist die Fassung für `height-class: compact`, also für ein quer
+  // gehaltenes Telefon (AGE-712). Sie hängt an DEMSELBEN Image Set — der
+  // Katalog wählt, nicht das Storyboard.
+  band: { set: "Splash", datei: "splash-band.jpg", querDatei: "splash-band-quer.jpg" },
   verlauf: {
     set: "SplashVerlauf",
     datei: "splash-verlauf.png",
@@ -234,7 +239,11 @@ function rastere(svg: string, png: string, breite: number, env: NodeJS.ProcessEn
   execFileSync("rsvg-convert", ["-w", String(breite), svg, "-o", png], { env });
 }
 
-function legeAb(ebene: { set: string; datei: string }, png: string): void {
+function legeAb(
+  ebene: { set: string; datei: string; querDatei?: string },
+  png: string,
+  querPng?: string,
+): void {
   const ordner = `${XCASSETS}/${ebene.set}.imageset`;
   // Erst leeren: `Splash` trägt heute drei identische 2732er-PNG des
   // Frameworks. Blieben sie liegen, lägen sie im Bündel weiter mit — und der
@@ -242,7 +251,10 @@ function legeAb(ebene: { set: string; datei: string }, png: string): void {
   rmSync(ordner, { recursive: true, force: true });
   mkdirSync(ordner, { recursive: true });
   writeFileSync(`${ordner}/${ebene.datei}`, readFileSync(png));
-  writeFileSync(`${ordner}/Contents.json`, contentsJson(ebene.datei));
+  if (ebene.querDatei && querPng) {
+    writeFileSync(`${ordner}/${ebene.querDatei}`, readFileSync(querPng));
+  }
+  writeFileSync(`${ordner}/Contents.json`, contentsJson(ebene.datei, ebene.querDatei));
 }
 
 function main(): void {
@@ -270,6 +282,14 @@ function main(): void {
     // Arbeitsordner; versioniert werden die beiden, die man im Diff LESEN kann.
     const bandDatei = join(arbeit, "band.svg");
     writeFileSync(bandDatei, bandSvg("foto.png", quelle) + "\n");
+    // Dasselbe Foto, EIGENES Fenster (AGE-712). Ohne diese Datei schnitte das
+    // Storyboard quer mittig aus dem Hochkantband — und traefe die Wand
+    // zwischen den beiden Personen statt ihrer Gesichter.
+    const bandQuerDatei = join(arbeit, "band-quer.svg");
+    writeFileSync(
+      bandQuerDatei,
+      bandSvg("foto.png", quelle, BAND_QUER, AUSSCHNITT_QUER) + "\n",
+    );
     schreibe(EBENEN.verlauf.svg, verlaufSvg() + "\n");
     schreibe(EBENEN.schriftzug.svg, schriftzugSvg(marke) + "\n");
 
@@ -284,6 +304,14 @@ function main(): void {
       {
         stdio: "ignore",
       },
+    );
+    const bandQuerPng = join(arbeit, "band-quer.png");
+    const bandQuerJpg = join(arbeit, EBENEN.band.querDatei);
+    rastere(bandQuerDatei, bandQuerPng, BAND_QUER.breite, env);
+    execFileSync(
+      "sips",
+      ["-s", "format", "jpeg", "-s", "formatOptions", "85", bandQuerPng, "--out", bandQuerJpg],
+      { stdio: "ignore" },
     );
     rastere(EBENEN.verlauf.svg, verlaufPng, VERLAUF_BILD.breite, env);
     rastere(EBENEN.schriftzug.svg, schriftzugPng, SCHRIFTZUG_BILD.breite, env);
@@ -315,9 +343,26 @@ function main(): void {
           "Die Kante des Fotos wäre sichtbar. Es wurde nichts geschrieben.",
       );
     }
-    console.log(`Band oben: ${oben} (nicht Weiss) · Verlauf unten: ${unten}`);
+    // Derselbe Nachweis für das quere Band. Es hat einen EIGENEN Ausschnitt und
+    // ist damit ein eigener Weg, auf dem das Foto ausbleiben kann — ein grüner
+    // Hochkant-Befund belegt für quer nichts.
+    const querOben = farbe(bandQuerJpg, arbeit, {
+      x: 0,
+      y: 0,
+      breite: BAND_QUER.breite,
+      hoehe: Math.round(BAND_QUER.hoehe * 0.2),
+    });
+    if (querOben.toLowerCase() === GRUND.toLowerCase()) {
+      throw new Error(
+        "splash: die obere Region des QUEREN Bandes ist reines Weiss — das Foto ist " +
+          "nicht angekommen. Es wurde nichts geschrieben.",
+      );
+    }
+    console.log(
+      `Band oben: ${oben} (nicht Weiss) · quer oben: ${querOben} · Verlauf unten: ${unten}`,
+    );
 
-    legeAb(EBENEN.band, bandJpg);
+    legeAb(EBENEN.band, bandJpg, bandQuerJpg);
     legeAb(EBENEN.verlauf, verlaufPng);
     legeAb(EBENEN.schriftzug, schriftzugPng);
     for (const e of Object.values(EBENEN)) {
