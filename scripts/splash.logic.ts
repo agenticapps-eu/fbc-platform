@@ -105,6 +105,41 @@ export const AUSSCHNITT = {
   mitteX: 0.40625,
 } as const;
 
+/**
+ * Der Ausschnitt für das QUERE Band (AGE-712) — ein eigenes, flacheres Fenster.
+ *
+ * **Warum nicht dasselbe Fenster.** `AUSSCHNITT` nimmt 88,2 % der Quellhöhe.
+ * Für ein 3,5:1-Ziel bräuchte dieses Fenster eine Breite von 942 × 3,5 ≈ 3.298
+ * px — mehr als die Quelle hat. Es KANN quer nicht dasselbe Fenster sein.
+ *
+ * Was ohne eigenen Ausschnitt passierte: das fertige Hochkantband ging mit
+ * `scaleAspectFill` ins Storyboard, und quer schnitt iOS mittig einen
+ * 3,5:1-Streifen heraus. Beschnitten wurde also zweimal, und übrig blieb die
+ * helle Fensterwand ZWISCHEN den beiden Personen — beide Köpfe fielen heraus.
+ *
+ * **Die Zahlen.** Bei einer Quelle von 1600×1068 ergibt `hoehe: 0.425` ein
+ * Fenster von rund 454 px Höhe; mal 3,5 sind das rund 1589 px — knapp UNTER
+ * den 1600 px Quellbreite. `mitteX: 0.5` nutzt damit praktisch die volle
+ * Breite, und genau darin liegen die beiden Personen. `oben: 0.179` setzt das
+ * Fenster auf die Gesichter statt an den oberen Rand, wo nur die Fensterfront
+ * steht.
+ *
+ * **Die 11 px Luft sind Absicht, nicht Schlamperei.** Mit `hoehe: 0.428` war
+ * das Fenster rechnerisch 1600,36 px breit — 0,36 px MEHR als die Quelle. Die
+ * Folge war ein `x` von **+0,18** statt eines negativen Werts, also ein
+ * durchsichtiger Haarstrich an der linken Kante der Startfläche. Ein Fenster,
+ * das exakt so breit ist wie seine Quelle, hat keine Reserve für Rundung; ein
+ * geringfügig schmaleres hat sie.
+ *
+ * Anteile statt Pixel, aus demselben Grund wie oben: ein getauschtes Quellbild
+ * soll denselben Bildbereich treffen, nicht dieselben Koordinaten.
+ */
+export const AUSSCHNITT_QUER = {
+  oben: 0.179,
+  hoehe: 0.425,
+  mitteX: 0.5,
+} as const;
+
 /** Die Worte. Dieselben, die das Login-Panel zeigt — die Startfläche darf
  *  nichts anderes versprechen als die Seite, auf der man gleich landet. */
 export const CLAIM = ["Gemeinsam", "erfolgreich"] as const;
@@ -113,6 +148,9 @@ export const SUBLINE = "verbinden, wachsen, vertrauen";
 /** Kantenlängen der erzeugten Bilder. Rechengrössen: gerastert wird über
  *  `rsvg-convert -w`, die SVG selbst sind auflösungsfrei. */
 export const BAND_BILD = { breite: 1290, hoehe: 1734 } as const;
+/** Das quere Band (AGE-712). 3,5:1 — das Verhältnis, das der Storyboard-
+ *  `scaleAspectFill` auf einem quer gehaltenen Telefon ausschneidet. */
+export const BAND_QUER = { breite: 1600, hoehe: 457 } as const;
 export const SCHRIFTZUG_BILD = { breite: 1200, hoehe: 1000 } as const;
 export const VERLAUF_BILD = { breite: 8, hoehe: 1024 } as const;
 
@@ -164,11 +202,15 @@ function rund(n: number): number {
  * Formatfüllend, also über die Breite des Fensters skaliert; das Fenster selbst
  * bekommt das Seitenverhältnis der Zielfläche, sonst verzerrte der Ausschnitt.
  */
-export function bildLage(quelle: Groesse, ziel: Groesse): Lage {
-  const fensterHoehe = quelle.hoehe * AUSSCHNITT.hoehe;
+export function bildLage(
+  quelle: Groesse,
+  ziel: Groesse,
+  ausschnitt: typeof AUSSCHNITT | typeof AUSSCHNITT_QUER = AUSSCHNITT,
+): Lage {
+  const fensterHoehe = quelle.hoehe * ausschnitt.hoehe;
   const fensterBreite = fensterHoehe * (ziel.breite / ziel.hoehe);
-  const fensterOben = quelle.hoehe * AUSSCHNITT.oben;
-  const fensterLinks = quelle.breite * AUSSCHNITT.mitteX - fensterBreite / 2;
+  const fensterOben = quelle.hoehe * ausschnitt.oben;
+  const fensterLinks = quelle.breite * ausschnitt.mitteX - fensterBreite / 2;
 
   const faktor = ziel.breite / fensterBreite;
   return {
@@ -187,8 +229,13 @@ export function bildLage(quelle: Groesse, ziel: Groesse): Lage {
  * über gdk-pixbuf und fällt bei fehlendem WebP-Loader still aus. Dekodiert wird
  * vorher, in `splash.ts`, mit Abbruch.
  */
-export function bandSvg(pngPfad: string, quelle: Groesse, ziel: Groesse = BAND_BILD): string {
-  const lage = bildLage(quelle, ziel);
+export function bandSvg(
+  pngPfad: string,
+  quelle: Groesse,
+  ziel: Groesse = BAND_BILD,
+  ausschnitt: typeof AUSSCHNITT | typeof AUSSCHNITT_QUER = AUSSCHNITT,
+): string {
+  const lage = bildLage(quelle, ziel, ausschnitt);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"`,
     `     width="${ziel.breite}" height="${ziel.hoehe}" viewBox="0 0 ${ziel.breite} ${ziel.hoehe}">`,
@@ -272,11 +319,29 @@ export function schriftzugSvg(marke: Marke): string {
  * intrinsische Grösse des Bildes. Drei identische Auflösungen wären drei Mal
  * dieselbe Datei im Bündel.
  */
-export function contentsJson(dateiname: string): string {
+export function contentsJson(dateiname: string, querDatei?: string): string {
+  const images: Record<string, string>[] = [
+    { idiom: "universal", filename: dateiname, scale: "1x" },
+  ];
+  // Die Querfassung als GRÖSSENKLASSE, nicht als zweites Image Set (AGE-712).
+  //
+  // Ein quer gehaltenes Telefon ist `height-class: compact`. Der Katalog löst
+  // denselben Namen `Splash` dann auf die zweite Datei auf — das Storyboard
+  // bleibt unangetastet, und es gibt keine zweite Stelle, die wissen müsste,
+  // welche Orientierung gerade gilt. Der Eintrag ohne Klasse oben ist der
+  // Rückfall für alles andere, hochkant eingeschlossen.
+  if (querDatei) {
+    images.push({
+      idiom: "universal",
+      "height-class": "compact",
+      filename: querDatei,
+      scale: "1x",
+    });
+  }
   return (
     JSON.stringify(
       {
-        images: [{ idiom: "universal", filename: dateiname, scale: "1x" }],
+        images,
         info: { author: "xcode", version: 1 },
       },
       null,
