@@ -508,3 +508,51 @@ html[data-boot="nativ"] .boot-flaeche__schriftzug {
   border: 2px solid var(--color-canvas);
   box-shadow: 0 1px 4px rgb(15 29 51 / 0.35);
 }
+
+/* Derselbe Regler auf CHROME statt auf `canvas` — Onboarding, AGE-711.
+ *
+ * Warum nicht `.fbc-regler` mitbenutzen: die Chrome-Tokens kippen mit
+ * `html[data-variant="navy"]` weiter unten, `--color-chrome` ist hell weiss und
+ * navy #081527. Ein Knopf, der `--color-canvas` als Rand trägt, sitzt dort in
+ * einer der beiden Varianten falsch. Deshalb dieselbe Bauart, andere Tokens —
+ * und ausschliesslich Tokens, keine festen Farben. */
+.fbc-regler-chrome {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fbc-regler-chrome::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-chrome-elevated);
+}
+
+.fbc-regler-chrome::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--color-accent-on-chrome);
+  border: 2px solid var(--color-chrome);
+  box-shadow: 0 1px 4px rgb(15 29 51 / 0.35);
+  /* (28 − 8) / 2 — wie bei `.fbc-regler`, nur gegen die 8px-Schiene hier. */
+  margin-top: -10px;
+}
+
+.fbc-regler-chrome::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-chrome-elevated);
+}
+
+.fbc-regler-chrome::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--color-accent-on-chrome);
+  border: 2px solid var(--color-chrome);
+  box-shadow: 0 1px 4px rgb(15 29 51 / 0.35);
+}
