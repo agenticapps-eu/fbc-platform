@@ -1,141 +1,126 @@
-# Session Handoff — 2026-09-09 (AGE-642 archiviert, vier Anschlussvorgänge gebaut)
+# Session Handoff — 2026-09-09 (M2 ist zu; nächster Auftrag ist M3 / AGE-643)
 
 > ## ⚠ ZUERST — Scope dieser Übergabe
 >
-> **1. Sie beschreibt AGE-642 und dessen vier Anschlussvorgänge** (Worktree
-> `fbc-platform.donald-age-642-capacitor-huelle`) und **ersetzt** die Fassung
-> vom selben Tag. Die Datei ist für alle parallelen Sitzungen dieselbe und
-> kollidiert bei jedem Rebase — **nicht zusammenführen**, überschreiben.
+> **1. Sie schliesst die AGE-642-Sitzung ab** (Worktree
+> `fbc-platform.donald-age-642-capacitor-huelle`) und **zeigt auf AGE-643
+> weiter.** Die Datei ist für alle parallelen Sitzungen dieselbe und kollidiert
+> bei jedem Rebase — **nicht zusammenführen**, überschreiben.
 >
 > **2. `fbc-platform-f4` arbeitet parallel an AGE-705** (Release-Blog),
-> vollständig ungepusht — nichts davon liegt auf `main`. Abgestimmt am 09.09.
+> vollständig ungepusht. Nichts davon liegt auf `main`. Abgestimmt am 09.09.
+>
+> **3. Donald will in einer FRISCHEN Sitzung mit M3 weitermachen.** Der
+> Abschnitt „Next session" unten ist für genau diese Sitzung geschrieben.
 
 ## Accomplished
 
-**AGE-642 archiviert, danach alle vier Anschlussvorgänge angelegt und gebaut.**
+**M2 (AGE-642) archiviert, danach alle vier Anschlussvorgänge gebaut und
+ausgeliefert.** Sieben PRs, alle gemergt, PROD-Deploy grün.
 
-| | Vorgang | PR | Stand |
-|---|---|---|---|
-| — | AGE-642 Capacitor-Hülle | #379 | **gemerged** `555894e`, Linear `Done` |
-| A | AGE-711 Regler im Onboarding | #380 | **gemerged** `97b3119` |
-| D | AGE-712 Querformat-Startfläche | #381 | **gemerged** `7a2624c` |
-| C | AGE-713 Android-Startfläche | #382 | **gemerged** `279ff59` |
-| B | AGE-714 Assets-Stempel | #383 | **gemerged** `9e5a81b` |
+| Vorgang | PR | Linear |
+|---|---|---|
+| AGE-642 Capacitor-Hülle archiviert | #379 | Done |
+| AGE-711 Regler im Onboarding | #380 | Done |
+| AGE-712 Querformat-Startfläche | #381 | Done |
+| AGE-713 Android-Startfläche | #382 | Done |
+| AGE-714 Assets-Stempel | #383 | Done |
+| Übergabe + zwei Korrekturen | #384, #385 | — |
 
-Tests von 2.639 auf **2.672** gewachsen. `pnpm lint` 0 Fehler, `pnpm typecheck`
-0 durchgehend.
-
-## Decisions
-
-- **AGE-642 mit zehn offenen Kästchen archiviert, keins abgehakt.** Sie stehen
-  am Kopf der archivierten `tasks.md` in drei Gruppen. `openspec archive`
-  bestätigt die Zahl unabhängig: *„10 incomplete task(s)"*.
-- **Querformat (D): eigenes, flacheres Fenster** statt Mittelstreifen des
-  Hochkantbandes, ausgeliefert über eine **Grössenklasse** (`height-class:
-  compact`) im selben Image Set. Das Storyboard bleibt unangetastet.
-- **Android (C): weisser Grund, Stern zentriert** (Donald, 09.09.). Weiss ist
-  dieselbe Farbe wie `GRUND`, auf der die Boot-Fläche sitzt — kein sichtbarer
-  Übergang.
-- **Stempel statt Neuerzeugung (B), Abweichung vom Vorgangstext.** „Neu erzeugen
-  und diffen" scheitert an `sips` (nur macOS) und grundsätzlicher daran, dass
-  das Ergebnis an den Werkzeugversionen hängt. Ein Wächter, der bei neuer
-  librsvg rot wird, wird abgeschaltet.
+Tests **2.639 → 2.672**, `pnpm lint` 0 Fehler, `pnpm typecheck` 0 durchgehend.
+Linear teamweit gegengeprüft: nichts Fremdes zugegangen.
 
 ## Drei Befunde, die meine eigenen Vorgangstexte widerlegt haben
 
-Alle drei sind in Linear korrigiert. Sie stünden sonst dauerhaft falsch dort.
+Alle in Linear korrigiert. Grüne Tests allein hätten keinen davon gefunden.
 
-1. **AGE-711:** „auch am Schreibtisch unsichtbar" war zu weit gefasst — in
-   Chrome zeichnet die alte Fassung sehr wohl einen Knopf. Der Fehler ist enger
-   (iOS-WebKit, Firefox, 8-px-Trefffläche überall) und trotzdem real.
+1. **AGE-711:** „auch am Schreibtisch unsichtbar" war zu weit gefasst — Chrome
+   zeichnet den alten Knopf sehr wohl. Real sind iOS-WebKit, Firefox und die
+   8-px-Trefffläche überall.
 2. **AGE-712:** der Bandmittelwert ist der **falsche Massstab**. Der richtige
-   Ausschnitt misst 185/172/157 und ist damit *heller* als der kaputte
-   (148/139/134) — der kaputte zeigt dunkle Anzüge, der richtige Gesichter vor
-   hellem Fenster. „Beide Gesichter im Bild" ist kein Skalar.
-3. **AGE-713 (Nebenbefund, mitgenommen):** `capacitor.settings.gradle` zeigte
-   auf pnpm-Pfade mit `@capacitor+core@8.5.0`; im Lockfile steht 8.5.1. **Der
-   Android-Bau war auf `main` für jeden kaputt** (`No variants exist`). Ohne den
-   Fix kann niemand C nachprüfen.
+   Ausschnitt ist *heller* (185/172/157) als der kaputte (148/139/134) — der
+   kaputte zeigt dunkle Anzüge, der richtige Gesichter vor hellem Fenster.
+3. **AGE-713:** `capacitor.settings.gradle` zeigte auf pnpm-Pfade mit
+   `@capacitor+core@8.5.0`, im Lockfile stand 8.5.1 — **der Android-Bau war auf
+   `main` für jeden kaputt.** Mitgenommen, sonst hätte niemand C nachprüfen
+   können.
 
-## Files modified
+## Next session: start here — AGE-643 (M3 Deep Links)
 
-- **Archiv:** `openspec/changes/archive/2026-09-09-capacitor-huelle/`,
-  `openspec/specs/native-shell/spec.md` *(neu, `Purpose` von Hand gesetzt)*
-- **Regler:** `.fbc-regler-chrome` in `src/index.css`, angewandt in
-  `OnboardingPage.tsx`, gehalten von `src/zoom-regler.test.ts`
-- **Startfläche:** `scripts/splash.logic.ts` trägt jetzt `AUSSCHNITT_QUER`,
-  `BAND_QUER`, `ANDROID_SYMBOL`, `MARKE_AUF_WEISS`, `androidSymbolXml`
-- **Android:** `values/styles.xml` umgestellt, `values/splash.xml` und
-  `drawable/splash_icon.xml` neu, 11 tote `splash.png` entfernt (124 KB)
-- **Wächter:** `scripts/stempel*.ts`, `assets/erzeugt.stempel.json`,
-  ein Schritt in `.github/workflows/ci.yml`, zwei Skripte in `package.json`
+### ⚠ Der Vorgangstext ist an zwei Stellen überholt. Nicht darauf aufbauen.
 
-## Next session: start here
+**1 · „Blockiert durch AGE-256" gilt NICHT mehr.** AGE-256 steht auf `Done`,
+und die App läuft **seit 01.09. auf `app.effbeezee.com`** (CNAME bei Strato auf
+`fbc-platform.pages.dev`, Zertifikat von Cloudflare). M3 ist startklar.
 
-### Die Deploy-Störung ist erledigt — nichts nachzuziehen
+**2 · Die Domain im Vorgang ist falsch.** Dort steht `fbc.de` — die gehört
+GoDaddy und nicht dazu. Es gilt `app.effbeezee.com`. Details in
+`domainlandschaft-effbeezee` im Gedächtnis; `fbc-platform.pages.dev` bleibt als
+Zweitweg stehen, damit verschickte Links gültig bleiben.
 
-Zwischen 17:31 und 17:55 scheiterte **jeder** Job, der die Infisical-CLI
-installiert (`deploy` und `drift-gate`, auf PRs wie auf `main`): Googles
-Chrome-Paketquelle lieferte beim `apt-get update` einen kaputten Index
-(`Hash Sum mismatch`). Zwei Commits lagen dadurch auf `main`, ohne ausgeliefert
-zu sein — `279ff59` (AGE-713) und `9e5a81b` (AGE-714).
+### Stand im Repo: grüne Wiese
 
-**Aufgelöst am selben Abend.** Statt anzunehmen, die Störung halte an, wurde sie
-mit dem harmlosesten verfügbaren Lauf sondiert — einem **Vorschau**-Deploy, nicht
-PROD. Der war grün, also war Googles Index repariert. Der Merge dieser Übergabe
-(`95a9c39`) hat den `main`-Deploy dann von selbst angestossen, und weil er alles
-Vorherige enthält, kamen beide liegengebliebenen Commits damit mit.
+Gemessen — es gibt **nichts** davon: kein `public/.well-known/`, keine
+`apple-app-site-association`, keine `assetlinks.json`, keinen OpenSpec-Change,
+keinen Branch. `appId` ist `com.effbeezee.app` (`capacitor.config.ts:64`).
 
-| Lauf | Ausgang |
-|---|---|
-| Vorschau-Deploy PR #384 (Sonde) | grün |
-| PROD-Deploy `95a9c39` | **grün** — alles ausgeliefert |
+### Zwei Fallen, die vor dem ersten Code geklärt gehören
 
-**Die Lehre, nicht der Vorgang:** nach zwei identischen Fehlschlägen hatte ich
-die Störung als „anhaltend" bezeichnet. Beobachtet war das nur bis 17:55 —
-danach hat schlicht nichts mehr die Paketquelle angefasst. Eine Störung, die
-niemand mehr misst, ist nicht *bestätigt anhaltend*, sondern **unbekannt**. Wer
-das verwechselt, wartet auf etwas, das längst vorbei ist. Die billige Sonde
-gegen eine ungefährliche Fläche beantwortet es in drei Minuten.
+**A · `assetlinks.json` braucht den APP-Signaturschlüssel, nicht den Upload-
+Schlüssel.** Im Repo steht `ERWARTETER_FINGERABDRUCK`
+(`android-release.yml:78`, `7ae18622…2fda`) — das ist der **Upload**-Schlüssel.
+Bei Play App Signing hält Google den eigentlichen App-Signaturschlüssel, und
+**nur dessen** SHA-256 gehört in `assetlinks.json`. Den falschen einzutragen
+ergibt App Links, die still nicht verifizieren.
 
-### Es gibt hier nichts mehr zu tun — der nächste Auftrag ist AGE-643
+**Folge, die die Reihenfolge M3→M4 durcheinanderbringt:** dieser Fingerabdruck
+existiert erst, wenn die App in der Play Console angelegt und ein Bündel
+hochgeladen ist — also **innerhalb von AGE-644**. Auf Android hängt M3 damit an
+einem Stück M4. Das ist zu entscheiden, nicht zu übersehen: entweder AGE-644 so
+weit vorziehen, dass der Schlüssel existiert, oder M3 zunächst nur auf iOS
+abschliessen.
 
-Linear ist geprüft und sauber: AGE-642, 711, 712, 713, 714 stehen auf `Done`,
-jeder `completedAt` passt auf seinen Merge. **Teamweit gegengeprüft** — der
-einzige Treffer ausserhalb des Projekts (AGE-701, cPARX, 17:19) stammt aus PR
-#185 im Repo `cparx`, nicht von hier.
+**B · Die Apple-Team-ID steht nicht im Repo.** `DEVELOPMENT_TEAM` fehlt in
+`project.pbxproj` (deshalb braucht `xcodebuild` sie von Hand). Die
+`apple-app-site-association` verlangt aber `TEAMID.com.effbeezee.app`. Die ID
+kommt von Donald aus dem Developer-Konto.
 
-Der nächste Meilenstein ist **AGE-643** (M3 Deep Links). Erster Schritt wie
-immer: `wt list` ansehen und nach einem bestehenden Branch suchen, bevor etwas
-Neues entsteht. Die vier Gerätebelege unten sind davon unabhängig und brauchen
-Donald am Gerät, nicht eine neue Sitzung am Rechner.
+### Der Fall, der den Zuschnitt bestimmt
+
+**Der Aktivierungslink erreicht Menschen, die die App noch nicht haben** — er
+ist der erste Kontakt überhaupt. Er muss beides können: App öffnen, wenn
+installiert; sonst die Website, und die darf den Aktivierungsvorgang **nicht**
+mit einem „Lade die App"-Banner verstellen. Universal Links leisten das, ein
+eigenes Schema (`effbeezee://`) nicht. Deshalb Universal Links.
+
+Vier Ziele laut Vorgang: `/aktivierung?token=…` (das wichtigste),
+`/chat/:threadId`, `/events/:id`, `/p/:id`.
+
+Dazu die Sitzungsübergabe: wer im Browser angemeldet ist, ist es in der App
+nicht (getrennte Speicher). Beim Token unkritisch; bei `/chat/:threadId` landet
+man auf dem Login und sollte danach ans **ursprüngliche Ziel** weitergeleitet
+werden, nicht auf die Startseite.
+
+### Erster Handgriff
+
+`wt list` ansehen und nach einem bestehenden Branch suchen (es gibt keinen),
+dann `/wt-switch-create donald/age-643-deep-links`. Danach der OpenSpec-Weg:
+proposal → validate → **plan-review mit zwei fremden Anbietern, vor der ersten
+Codezeile**.
 
 ## Open questions
 
-- **Vier Gerätebelege stehen aus**, alle in ihren Vorgängen als offenes
-  Kästchen: AGE-711 (Regler nie am Gerät gesehen), AGE-712 und AGE-713 (quer
-  und hochkant, iOS und Android). **iOS ist dafür Handarbeit** — `devicectl`
-  kann weder Screenshot noch Tap.
-- **Drei Neuigkeiten-Einträge warten auf Freigabe** in `AdminNeuigkeitenPage`:
-  AGE-708 (Kontolöschung), AGE-642 (Hülle) und beim nächsten Archivieren die
-  weiteren. Alle sind zum Versenden geschrieben.
-- **Sechs Specs tragen noch `Purpose: TBD`** aus früheren Archivierungen:
-  `member-onboarding`, `password-reset`, `member-import`, `environment-sync`,
-  `legal-pages`, `design-system`. Altbestand, blockt nichts.
-- **`APNS_SANDBOX` steht auf `1`** — beim ersten TestFlight-Build nachsehen.
-- **Der nächste Meilenstein ist AGE-643** (M3 Deep Links). AGE-644 verlangt
-  M1–M3 vorher und hängt zusätzlich an einer Entscheidung, die Donald und
-  Detlev gehört: Entwicklerkonto auf Einzelperson oder Firma.
-
-## Zwei Lehren dieser Sitzung
-
-Beide stehen im Gedächtnis, mit den Messwerten.
-
-1. **`/add-dir` hebt die Worktree-Isolation nicht auf.** Danach hält das `cd`,
-   aber jeder Befehl im fremden Worktree wird abgewiesen — auch das `cd`
-   zurück, die Sitzung ist festgefahren. Ausweg ist ein Werkzeug, kein Befehl:
-   **`ExitWorktree` mit `action: "keep"`**. Stand schon dort; ich habe erst
-   herumprobiert und dann nachgelesen. Umgekehrt wäre billiger gewesen.
-2. **„Neu erzeugen und vergleichen" ist nicht immer der bessere Wächter** — er
-   ist Geisel der Werkzeugversionen. Ein Stempel über Eingaben *und* Ergebnisse
-   ist unabhängig davon, und was er nicht kann, gehört neben ihn geschrieben.
+- **Vier Gerätebelege stehen aus**, je als offenes Kästchen in ihrem Vorgang:
+  AGE-711 (Regler nie am Gerät gesehen), AGE-712 und AGE-713 (quer und
+  hochkant, iOS und Android). **iOS ist Handarbeit** — `devicectl` kann weder
+  Screenshot noch Tap; Android geht per `adb` vollständig.
+- **Zwei Neuigkeiten-Einträge warten auf Freigabe** in `AdminNeuigkeitenPage`
+  (AGE-708 Kontolöschung, AGE-642 Hülle). Beide sind zum Versenden geschrieben.
+- **Sechs Specs tragen noch `Purpose: TBD`** aus früheren Archivierungen.
+  Altbestand, blockt nichts.
+- **AGE-644 hängt zusätzlich an einer Entscheidung, die Donald und Detlev
+  gehört:** Entwicklerkonto auf Einzelperson oder Firma. Im Store steht der
+  Kontoinhaber als Anbieter.
+- **Der Worktree dieser Sitzung steht noch.** `wt remove
+  donald/age-642-capacitor-huelle` ist ein Handgriff für später — nicht aus
+  einer Sitzung heraus, die darin sitzt.
