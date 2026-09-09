@@ -15,8 +15,8 @@
 ## Accomplished
 
 **Die Kontolöschung ist gebaut, reviewt, ausgerollt und auf PROD
-zurückgelesen.** 40 von 42 Aufgaben. Zwei PRs: **#373** (Code), **#374** (Doku
-zum Ausrollen).
+zurückgelesen.** 40 von 42 Aufgaben. Drei PRs, alle gemergt: **#373** (Code),
+**#374** (Ausrollen), **#375** (diese Übergabe).
 
 | Schicht | Was |
 |---|---|
@@ -51,7 +51,7 @@ per Mutation gegengeprüft.
 
 ## Files modified
 
-Alles gemergt (`49b2121`), Arbeitsbaum sauber, lokal auf `origin/main`.
+Alles gemergt (`fd60c7d`), Arbeitsbaum sauber, Branches aufgeräumt.
 
 - `supabase/migrations/20260908180000|181000|182000_kontoloeschung_*.sql` *(neu)*
 - `supabase/functions/konto-loeschen/{index,loeschen,loeschen.test}.ts` *(neu)*
@@ -87,8 +87,10 @@ fertig.
 > applied … --local` nachgetragen, `migration up` läuft jetzt sauber durch. Wer
 > lokal eine Migration von Hand einspielt, trägt sie auch nach.
 
-> ⚠ **`donald/age-708-kontoloeschung` auf `origin` ist der Vor-Merge-Stand**
-> (lokal `behind`), der Inhalt liegt gesquasht in `main`. Der Branch kann weg.
+> ⚠ **Der Worktree steht auf `main` und trägt keinen eigenen Branch mehr.**
+> `donald/age-708-kontoloeschung` ist auf `origin` gelöscht, der Inhalt liegt
+> gesquasht in `main` (`fd60c7d`). Wer hier weitermacht, legt für 4.5/6.4 einen
+> neuen Branch an — **ohne Kürzel**, solange AGE-708 nicht wirklich fertig ist.
 
 ## Open questions
 
@@ -103,3 +105,24 @@ fertig.
 - **AGE-260** bleibt offen und ist jetzt kleiner: dessen Aufgaben 2.1, 2.3, 3.1
   und 5.4 sowie das Requirement *„Erasure respects retention duties…"* sind hier
   abgedeckt und dürfen dort nicht ein zweites Mal eingeführt werden.
+
+## Zwei Lehren, die über AGE-708 hinausgehen
+
+Beide stehen ausführlich im Gedächtnis
+(`kontoloeschung-was-wo-haengt`, `waechter-pinnen-oft-nur-eine-richtung`):
+
+1. **Ein Fremdschlüssel OHNE `on delete` ist `no action` — der BLOCKT.** Der
+   erste Plan wollte den Auth-Fremdschlüssel „ohne Kaskade neu setzen" und hätte
+   damit die Löschung verhindert statt sie zu ermöglichen. Im Schema sehen beide
+   Zustände ähnlich aus, im Katalog nicht. Gefunden vom Plan-Review, bevor eine
+   Zeile Code existierte.
+2. **Einen geerbten Wächter erst mit der EIGENEN Fehlkonfiguration testen.**
+   `scripts/functions-config.test.ts` sah vollständig aus und blieb grün, als
+   `konto-loeschen` versuchsweise auf `verify_jwt = false` stand — gepint war nur,
+   *wo* die Prüfung aus sein muss, nirgends, wo sie an sein muss.
+
+Und eine dritte, kleinere: **`erst messen, dann bauen` hat hier zwei Aufgaben
+ersatzlos gestrichen.** `is_activated()` liest `deleted_at`, und 34 von 34
+schreibenden Policies prüfen `is_activated()` — die geplante Arbeit
+„Sichtbarkeits-Prädikate ergänzen" und „schreibende Prädikate sperren" war schon
+getan, sie musste nur belegt werden.
