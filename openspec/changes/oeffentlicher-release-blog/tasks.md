@@ -292,6 +292,8 @@ Für die Details einer Woche klickte man viermal und las auf vier Seiten.
       gelockertes Schema. Drei Tests halten das — die erlaubte Adresse grün,
       eine ähnliche (`app.effbeezee.com.beispiel.tld`) und eine andere Seite
       derselben Anwendung rot.
-- [ ] **9.14** Der Fussverweis in der Anwendung ist **noch nicht ausgeliefert**
-      — er geht mit dem nächsten App-Deploy über `main` live, nicht mit dem
-      Blog-Deploy. Nach dem Merge auf `app.effbeezee.com` nachsehen.
+- [x] **9.14** Der Fussverweis in der Anwendung ging mit dem Merge von PR #390
+      (`7c4bbf7`) live. **Am ausgelieferten Artefakt belegt, nicht am grünen
+      Workflow:** `app.effbeezee.com/assets/index-CvmrtGZG.js` enthält
+      `www.effbeezee.com` und die Beschriftung „Neu im Club: Blog und
+      Tutorials".
