@@ -387,6 +387,19 @@ function main(): void {
     // und einer, die ihn verlängert. Der Schriftzug bleibt PNG — er ist Text
     // auf durchsichtigem Grund, und verlustbehaftete Kanten sieht man dort.
     execFileSync("cwebp", ["-quiet", "-q", "80", bandWebPng, "-o", `${WEB}/${WEB_DATEIEN.band}`]);
+    // Das quere Band (AGE-716) aus DEMSELBEN Raster wie die iOS-Fassung, nur
+    // anders kodiert. Hier wird bewusst nicht verkleinert wie hochkant:
+    // `BAND_QUER.breite` ist schon die Breite der Quelle, ein Raster darüber
+    // wäre Hochrechnen. Und trotz der grösseren Kantenlänge ist es das kleinere
+    // Bild — 1600×457 sind 731 kpx gegen 900×1210 = 1.089 kpx hochkant.
+    execFileSync("cwebp", [
+      "-quiet",
+      "-q",
+      "80",
+      bandQuerPng,
+      "-o",
+      `${WEB}/${WEB_DATEIEN.bandQuer}`,
+    ]);
     rastere(EBENEN.schriftzug.svg, `${WEB}/${WEB_DATEIEN.schriftzug}`, SCHRIFTZUG_WEB.breite, env);
     for (const datei of Object.values(WEB_DATEIEN)) {
       console.log(`web      ${WEB}/${datei}`);

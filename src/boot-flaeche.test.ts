@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BAND_ANTEIL,
+  QUER_SCHWELLE,
   RAMPE,
   SCHRIFTZUG_HOEHE,
   SCHRIFTZUG_OBEN,
@@ -23,10 +24,16 @@ import {
 const HTML = readFileSync("index.html", "utf8");
 const CSS = readFileSync("src/index.css", "utf8");
 
-/** Der Block einer Regel, roh — für Selektor-Fragen reicht der Text davor. */
+/** Der Block einer Regel, roh — für Selektor-Fragen reicht der Text davor.
+ *
+ *  `[^{}]*` im Rumpf und nicht `[^}]*`: sonst schluckt der erste Treffer eines
+ *  `@media`-Blocks dessen Bedingung als „Selektor" und die innere Regel als
+ *  Rumpf — die Prüfung auf `data-boot` ginge dann fälschlich rot. So überspringt
+ *  der Ausdruck den äusseren Block und findet die Regel darin. Für flache
+ *  Regeln sind beide Fassungen identisch. */
 function regelnMitUrl(css: string): { selektor: string; url: string }[] {
   const treffer: { selektor: string; url: string }[] = [];
-  const muster = /([^{}]+)\{([^}]*)\}/g;
+  const muster = /([^{}]+)\{([^{}]*)\}/g;
   for (const [, selektor, rumpf] of css.matchAll(muster)) {
     for (const [, url] of rumpf.matchAll(/url\("([^"]+)"\)/g)) {
       treffer.push({ selektor: selektor.trim(), url });
@@ -70,7 +77,9 @@ describe("Im Browser kostet sie nichts", () => {
   // obwohl es dort nie gezeigt wird.
   it('nennt die Bilder ausschliesslich unter `html[data-boot="nativ"]`', () => {
     const mitUrl = regelnMitUrl(CSS).filter((r) => r.url.includes("/brand/splash-"));
-    expect(mitUrl.length).toBe(2);
+    // An `WEB_DATEIEN` gebunden und nicht als Zahl hingeschrieben: eine vierte
+    // Fassung soll diesen Test mitziehen, nicht ihn brechen.
+    expect(mitUrl.length).toBe(Object.keys(WEB_DATEIEN).length);
     for (const r of mitUrl) {
       expect(r.selektor, `Regel ohne nativen Wächter: ${r.selektor}`).toContain(
         'html[data-boot="nativ"]',
@@ -102,12 +111,27 @@ describe("Sie zeigt dieselbe Komposition wie der Startbildschirm", () => {
     expect(Number(zug.match(/height:\s*([\d.]+)%/)?.[1])).toBeCloseTo(SCHRIFTZUG_HOEHE * 100, 6);
   });
 
+  // Mutation: die Schwelle im CSS auf eine andere Zahl setzen, oder die Regel
+  // auf `(orientation: landscape)` allein kürzen → rot. Sie ist die vierte Zahl
+  // der Komposition und stünde sonst als einzige nur im Stylesheet. Von ihr
+  // hängt ab, welche Geräte quer welches Band sehen: ein Tablet quer bekommt
+  // nativ das Hochkantband, und eine reine Orientierungsregel risse dort die
+  // Naht auf, die AGE-713 als nahtlos gemessen hat.
+  it("nimmt quer unterhalb der Schwelle das quere Band", () => {
+    const block = CSS.match(
+      /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*(\d+)px\)\s*\{([\s\S]*?)\n\}/,
+    );
+    expect(block, "keine Querregel im CSS gefunden").not.toBe(null);
+    expect(Number(block?.[1])).toBe(QUER_SCHWELLE);
+    expect(block?.[2]).toContain(`url("/brand/${WEB_DATEIEN.bandQuer}")`);
+  });
+
   // Mutation: einen Stopp der Rampe streichen → rot. Mit zwei Stopps entstand
   // im Login-Panel eine sichtbare Kante bei 26 % — dieselbe Rampe, derselbe
   // Fehler, nur eine Fläche weiter.
   it("trägt alle vier Übergänge der Rampe, nicht einen", () => {
     const regel = CSS.match(/\.boot-flaeche__band\s*\{([^}]*)\}/)?.[1] ?? "";
-    const verlauf = regel.match(/linear-gradient\(([\s\S]*?)\),\s*url/)?.[1] ?? "";
+    const verlauf = regel.match(/linear-gradient\(([\s\S]*?)\),\s*var\(--boot-band\)/)?.[1] ?? "";
     const stopps = [...verlauf.matchAll(/([\d.]+)%/g)].map((m) => Number(m[1]) / 100);
     expect(stopps).toEqual(RAMPE.map((s) => s.offset));
   });

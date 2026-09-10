@@ -418,6 +418,11 @@ html[data-boot="nativ"] .boot-flaeche__band {
      die Rampe DARÜBER, das Foto darunter. Die vier Stopps sind die des
      Login-Panels (`RAMPE` in `scripts/splash.logic.ts`, `LoginPage.tsx:277`);
      zwei ergäben bei 26 % eine sichtbare Kante. */
+  /* Das Foto steht als eigene Eigenschaft, damit die Querfassung weiter unten
+     NUR das Bild tauscht und die Rampe nicht abschreibt. Zwei Kopien derselben
+     vier Stopps liefen auseinander, sobald jemand eine anfasst — und der Test
+     unten liest nur die erste. */
+  --boot-band: url("/brand/splash-band.webp");
   background-image:
     linear-gradient(
       0deg,
@@ -427,12 +432,29 @@ html[data-boot="nativ"] .boot-flaeche__band {
       rgb(255 255 255 / 0.25) 44%,
       rgb(255 255 255 / 0) 58%
     ),
-    url("/brand/splash-band.webp");
+    var(--boot-band);
   background-repeat: no-repeat;
   background-position: center;
   background-size:
     100% 100%,
     cover;
+}
+
+/* Quer auf einem Telefon: dasselbe Band aus einem EIGENEN Fenster (AGE-716).
+   Das Hochkantband hat 0,744:1, quer ist die Fläche rund 3,6:1 — mit `cover`
+   blieben davon 20,7 % der Bildhöhe stehen, und zwar die Wand ZWISCHEN den
+   beiden Personen. Nur das Bild wird getauscht; Höhe, Rampe und `cover` gelten
+   aus der Regel darüber weiter.
+
+   Die `max-height` ist NICHT kosmetisch. `TARGETED_DEVICE_FAMILY = "1,2"` —
+   das iPad ist ein Ziel und bekommt nativ auch quer das HOCHKANTBAND
+   (`height-class: regular`). Ohne die Schwelle stünden dort zwei verschiedene
+   Ausschnitte nebeneinander. Die Zahl ist `QUER_SCHWELLE` in
+   `scripts/splash.logic.ts`, gehalten von `src/boot-flaeche.test.ts`. */
+@media (orientation: landscape) and (max-height: 500px) {
+  html[data-boot="nativ"] .boot-flaeche__band {
+    --boot-band: url("/brand/splash-band-quer.webp");
+  }
 }
 
 html[data-boot="nativ"] .boot-flaeche__schriftzug {

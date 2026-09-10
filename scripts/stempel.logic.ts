@@ -82,6 +82,7 @@ export const ERGEBNISSE = [
   "assets/splash-schriftzug.svg",
   // Startfläche — Web (Boot-Fläche)
   "public/brand/splash-band.webp",
+  "public/brand/splash-band-quer.webp",
   "public/brand/splash-schriftzug.png",
   // Startfläche — Android
   "android/app/src/main/res/drawable/splash_icon.xml",
