@@ -131,10 +131,14 @@ Zugänge, die hier nicht liegen.
 
 ## 6 · Abnahme
 
-- [ ] **6.1** `openspec validate --all` grün.
-- [ ] **6.2** `pnpm lint` (Exit-Code, nicht die Ausgabe — die 14 Fehler aus dem
+- [x] **6.1** `openspec validate --all` grün — 33/33 (10.09.).
+- [x] **6.2** `pnpm lint` (Exit-Code, nicht die Ausgabe — die 14 Fehler aus dem
       gitignorierten `.gstack/` sind nicht Teil dieses Diffs), `pnpm typecheck`,
       `pnpm test`, `pnpm build`, beide Erstlast-Wächter.
+      **Gemessen am 10.09.:** lint Exit 0 (0 Fehler, 7 Warnungen Vorzustand),
+      typecheck 0, test 2765 grün in 240 Dateien, build 0, `blog:build`
+      32 Seiten. `entry-chunk-guard` grün (10 Dateien, keine unerlaubte Seite);
+      keine zurückgezogenen Tokens und keine fremde Schrift.
 - [x] **6.3** Plan-Review (2b) vor der ersten Codezeile — `REVIEWS.md`,
       gemini + codex, 2 HIGH und 6 MEDIUM eingearbeitet.
 - [ ] **6.4** Code-Review auf dem **Diff**, nicht auf dem Plan.
