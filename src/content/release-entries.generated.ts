@@ -5,6 +5,13 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-10-oeffentlicher-release-blog",
+    "datum": "2026-09-10",
+    "titel": "Ein öffentlicher Release-Blog, und eine Quelle für den lesbaren Text",
+    "linear": "AGE-705",
+    "aenderungen": []
+  },
+  {
     "slug": "2026-09-09-kontoloeschung",
     "datum": "2026-09-09",
     "titel": "Sie können Ihr Konto jetzt selbst löschen",
