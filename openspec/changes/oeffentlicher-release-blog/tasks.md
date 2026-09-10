@@ -111,8 +111,13 @@ Zugänge, die hier nicht liegen.
       (`wrangler pages deploy` mit eigenem Ordner und eigenem
       `--project-name`). Er läuft **unabhängig** vom Deploy der Anwendung: ein
       Fehlschlag des einen lässt das andere unverändert.
-- [ ] **5.3 [Donald]** `www.effbeezee.com` bei Strato als CNAME auf das
-      Pages-Projekt. `www` ist eine Subdomain und geht denselben Weg wie
+- [x] **5.3** `www.effbeezee.com` bei Strato als CNAME auf das
+      Pages-Projekt. **Erledigt am 10.09.:** Donald hat den CNAME gesetzt
+      (`www.effbeezee.com` → `fbc-blog.pages.dev`, gemessen). Der DNS allein
+      genügt NICHT — die Domain muss zusätzlich am Pages-Projekt hängen, sonst
+      beansprucht niemand den Namen und es gibt kein Zertifikat (`curl` Exit
+      35). `wrangler` 4 kennt dafür keinen Befehl mehr; angehängt über
+      `POST /accounts/{id}/pages/projects/{projekt}/domains`. `www` ist eine Subdomain und geht denselben Weg wie
       `app.effbeezee.com` seit dem 01.09.; der nackte Apex kann das **nicht**
       (AGE-256) und ist hier ausdrücklich nicht Gegenstand.
 - [ ] **5.4** Ein Aufruf der Live-Adresse belegt die Auslieferung. Ein grüner
@@ -240,3 +245,22 @@ Für die Details einer Woche klickte man viermal und las auf vier Seiten.
       VORGÄNGER-Deploys. `/2026-08-26-…` gab dort noch 200 mit dem Rumpf der
       404-Seite; mit Cache-Umgehung und auf der Deployment-Adresse sauber 404.
       Nach einem Deploy also mit `?cb=…` oder auf `<hash>.pages.dev` messen.
+
+- [x] **9.10** Produktions-Deployment auf `www.effbeezee.com` — mit dem
+      **echten** `pnpm blog:build`, also 3 Seiten: zwei leere Übersichten und
+      die 404-Seite. Ohne Produktions-Deployment liefe die Domain ins Leere;
+      mit der Vorschau darauf wären 23 nicht abgenommene Texte öffentlich.
+      Gemessen: Startseite 200 mit „Hier erscheinen die Ausgaben, sobald die
+      erste freigegeben ist", unbekannte Adresse 404, **ein nicht
+      freigegebener Text 404**. Das ist 5.4 für den leeren Stand; nach der
+      Freigabe erneut.
+- [ ] **9.11** `robots.txt` mit `Disallow: /` liegt **von Hand** in beiden
+      Bündeln und ist NICHT Teil des Erzeugers. Sie gehört zum unfertigen
+      Stand und muss mit der Freigabe wieder raus — sonst bleibt der fertige
+      Blog dauerhaft aus dem Index.
+- [ ] **9.12 [Donald]** `effbeezee.com` ohne `www`. Der Apex liefert heute die
+      Strato-Parkseite („Domain reserved"), und **`https://effbeezee.com` hat
+      dort kein Zertifikat** (Exit 35). Ein CNAME kann der Apex bei Strato
+      nicht (AGE-256), also bleibt die Strato-Weiterleitung — und die muss
+      **mit SSL** eingerichtet sein, sonst scheitert jeder Browser, der den
+      nackten Namen zuerst über HTTPS versucht.
