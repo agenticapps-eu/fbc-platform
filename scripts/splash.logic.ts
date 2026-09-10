@@ -180,13 +180,39 @@ export const VERLAUF_BILD = { breite: 8, hoehe: 1024 } as const;
 export const BAND_WEB = { breite: 900 } as const;
 export const SCHRIFTZUG_WEB = { breite: 600 } as const;
 
-/** Die zwei Dateien, die `pnpm splash` fuer die Boot-Flaeche schreibt, und die
+/** Die drei Dateien, die `pnpm splash` fuer die Boot-Flaeche schreibt, und die
  *  `src/index.css` per `url()` holt. Beide Seiten lesen diese Konstante —
  *  `src/boot-flaeche.test.ts` haelt sie zusammen. */
 export const WEB_DATEIEN = {
   band: "splash-band.webp",
+  bandQuer: "splash-band-quer.webp",
   schriftzug: "splash-schriftzug.png",
 } as const;
+
+/**
+ * Bis zu welcher Flächenhöhe die Boot-Fläche quer das QUERE Band nimmt — in
+ * CSS-Pixeln (AGE-716).
+ *
+ * **Warum die Höhe und nicht die Orientierung.** `TARGETED_DEVICE_FAMILY` steht
+ * auf `"1,2"`, das iPad ist also ein Ziel, und `Info.plist` erlaubt ihm alle
+ * vier Lagen. Nativ wählt das Storyboard das Querband über
+ * `"height-class": "compact"` — ein iPad quer ist *regular* und bekommt dort
+ * weiterhin das HOCHKANTBAND. Eine reine `orientation: landscape`-Regel zeigte
+ * im WebView daneben das Querband, und zwischen den beiden Flächen stünden zwei
+ * verschiedene Ausschnitte desselben Fotos. Genau diese Naht ist am 10.09. als
+ * nahtlos gemessen worden (AGE-713).
+ *
+ * **Warum 500.** iPhone quer rund 390–430 pt, Pixel 11 Pro quer rund 411 px,
+ * iPad quer 768–1024 pt. Der ganze Spielraum liegt zwischen 430 und 768; 500
+ * sitzt darin mit Abstand nach beiden Seiten. Android-Tablets fallen damit auf
+ * die iPad-Seite, was richtig ist — sie haben quer dieselbe Höhe zur Verfügung.
+ *
+ * Die Zahl steht hier und nicht nur im Stylesheet, aus demselben Grund wie
+ * `BAND_ANTEIL` und die beiden Schriftzug-Anteile: `src/boot-flaeche.test.ts`
+ * hält sie gegen die Regel, die sie anwendet. Eine Schwelle, die niemand prüft,
+ * verschiebt sich lautlos.
+ */
+export const QUER_SCHWELLE = 500;
 
 type Groesse = { breite: number; hoehe: number };
 type Lage = { x: number; y: number; breite: number; hoehe: number };
