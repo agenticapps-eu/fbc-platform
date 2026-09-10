@@ -58,6 +58,23 @@ const TUTORIAL_MOTIV = "hero-compass.webp";
 /** Derselbe Ausdruck wie im Test der Quelle — hier, weil daraus ein Pfad wird. */
 const SLUG = /^[a-z0-9-]+$/;
 
+/** Das Datumspräfix, das jeder Archiv-Slug trägt: `2026-08-26-passwort-…`. */
+const DATUMSPRAEFIX = /^\d{4}-\d{2}-\d{2}-/;
+
+/**
+ * Der öffentliche Pfadbestandteil einer Geschichte — der Slug OHNE sein Datum.
+ *
+ * Der Slug ist der Schlüssel zum Archiveintrag und trägt dessen Datum. Als
+ * Adresse widerspräche das der Ausgabe, in der die Geschichte steht:
+ * `/2026-08-26-…` in der Woche vom 1. August. Das Ausgabedatum ist das
+ * einzige Datum, das die Leserschaft sehen soll, also verschwindet dieses
+ * hier — der Slug selbst bleibt unangetastet, sonst risse die Verbindung
+ * zum Archiv.
+ */
+export function pfadVon(g: { slug: string }): string {
+  return g.slug.replace(DATUMSPRAEFIX, "");
+}
+
 /**
  * Auch aus dem Bildpfad wird ein Pfad — ein Ziel, in das kopiert wird.
  * Dieselbe Überlegung wie beim Slug, eine Zeile später eingesetzt.
@@ -401,15 +418,18 @@ ${rumpf}
 `;
 }
 
-/** Ein Anriss-Block, wie ihn beide Übersichten verwenden. */
-function anrissArtikel(g: ReleaseGeschichte, mitBild: boolean): string {
-  const ziel = `/${maskiere(g.slug)}.html`;
+/**
+ * Ein Anriss-Block — nur noch für die TUTORIAL-Übersicht.
+ *
+ * Die Blog-Ausgabe zeigt seit dem 10.09. die vollen Texte (`kapitelAbschnitt`);
+ * das Tutorial bleibt eine Wegbeschreibung und verweist weiter auf die
+ * einzelnen Kapitelseiten.
+ */
+function anrissArtikel(g: ReleaseGeschichte): string {
+  const ziel = `/${maskiere(pfadVon(g))}.html`;
   // Zwei Wege in dieselbe Geschichte, und das ist Absicht: der Titel für den,
   // der den Gegenstand kennt, „Weiterlesen“ für den, den der Anriss geholt hat.
-  // Das Bild ist bewusst KEIN dritter — es ist die Abbildung, nicht die
-  // Schaltfläche.
-  const bild = mitBild ? `\n          ${bildMarkup(g.bild, true)}` : "";
-  return `        <article>${bild}
+  return `        <article>
           <h3><a href="${ziel}">${maskiere(g.titel)}</a></h3>
           <p>${maskiere(anriss(g.text))}</p>
           <p><a href="${ziel}">Weiterlesen</a></p>
@@ -443,7 +463,33 @@ ${punkte || "      <p>Hier erscheinen die Ausgaben, sobald die erste freigegeben
     </main>`;
 }
 
-/** Eine Ausgabe: die Einleitung, dann die Geschichten, die sie vorstellt. */
+/**
+ * Ein Themenabschnitt INNERHALB der Ausgabe — Bild, Titel, voller Text.
+ *
+ * Kein Anriss und kein „Weiterlesen“: eine Ausgabe ist **ein** Blogeintrag,
+ * und wer ihn öffnet, hat sich für die Details der Woche entschieden. Der
+ * Anriss gehört auf die Übersicht, wo man noch wählt, nicht hierher, wo man
+ * schon gewählt hat.
+ */
+function kapitelAbschnitt(g: ReleaseGeschichte): string {
+  return `        <article>
+          ${bildMarkup(g.bild, true)}
+          <h3>${maskiere(g.titel)}</h3>
+${absaetze(g.text, "          ")}
+        </article>`;
+}
+
+/**
+ * Eine Ausgabe: der Überblick, dann die Details — auf DERSELBEN Seite.
+ *
+ * Bis zum 10.09. standen hier Anrisse mit je einem „Weiterlesen“ auf eine
+ * eigene Kapitelseite. Wer die Woche lesen wollte, klickte vier Mal und las
+ * auf vier Seiten. Ein Blogeintrag pro Woche heisst: einmal Weiterlesen von
+ * der Übersicht, danach steht alles hier.
+ *
+ * Die Kapitelseiten bleiben — das **Tutorial** führt Etappe für Etappe durch
+ * sie hindurch, und dort ist eine Seite je Schritt genau richtig.
+ */
 function ausgabeSeite(a: ReleaseAusgabe, geschichten: ReleaseGeschichte[]): string {
   return `    <header>
       <nav><a href="/index.html">← Alle Ausgaben</a></nav>
@@ -453,7 +499,7 @@ function ausgabeSeite(a: ReleaseAusgabe, geschichten: ReleaseGeschichte[]): stri
       <time datetime="${maskiere(a.datum)}">${maskiere(datumLang(a.datum))}</time>
 ${absaetze(a.einleitung)}
       <h2>Was dazugekommen ist</h2>
-${geschichten.map((g) => anrissArtikel(g, true)).join("\n")}
+${geschichten.map(kapitelAbschnitt).join("\n")}
     </main>`;
 }
 
@@ -471,7 +517,7 @@ function tutorialUebersicht(
       if (kapitel.length === 0) return "";
       return `      <h2>${maskiere(e.titel)}</h2>
       <p class="etappe">${maskiere(e.einleitung)}</p>
-${kapitel.map((g) => anrissArtikel(g, false)).join("\n")}`;
+${kapitel.map(anrissArtikel).join("\n")}`;
     })
     .filter(Boolean);
 
@@ -488,7 +534,7 @@ function kapitelSeite(
   naechste: ReleaseGeschichte | undefined,
 ): string {
   const weiter = naechste
-    ? `      <p class="weiter"><a href="/${maskiere(naechste.slug)}.html">Weiter: ${maskiere(naechste.titel)}</a></p>`
+    ? `      <p class="weiter"><a href="/${maskiere(pfadVon(naechste))}.html">Weiter: ${maskiere(naechste.titel)}</a></p>`
     : "";
   return `${kopfbereich(etappe.motiv, g.titel, etappe.titel)}
     <main>
@@ -525,11 +571,29 @@ export function erzeugeSeiten({ geschichten, ausgaben, etappen }: BlogEingabe): 
     // wird zu einem Pfad, und ein Pfadbestandteil, der ungeprüft aus Daten
     // entsteht, ist die Stelle, an der man später nicht mehr nachsehen will.
     if (!SLUG.test(g.slug)) throw new Error(`build-blog: unzulässiger Slug „${g.slug}“`);
+    // Aus dem ABGELEITETEN Pfad wird der Dateiname — ein Slug, der nur aus
+    // seinem Datum bestünde, ergäbe hier die leere Zeichenkette.
+    if (!SLUG.test(pfadVon(g))) {
+      throw new Error(`build-blog: „${g.slug}“ ergibt keinen Pfad`);
+    }
     // Und derselbe Gedanke fürs Bild: aus dem Pfad wird ein Kopierziel.
     if (!BILDPFAD.test(g.bild.src)) {
       throw new Error(`build-blog: unzulässiger Bildpfad „${g.bild.src}“ bei ${g.slug}`);
     }
   }
+  // Zwei Geschichten unter einem Pfad wären zwei Seiten unter einer Adresse —
+  // die zweite überschriebe die erste lautlos. Die Slugs sind eindeutig; ihre
+  // ABLEITUNGEN sind es nur, solange sich zwei nicht bloss im Datum
+  // unterscheiden.
+  const pfade = new Map<string, string>();
+  for (const g of geschichten) {
+    const vorher = pfade.get(pfadVon(g));
+    if (vorher !== undefined) {
+      throw new Error(`build-blog: „${vorher}“ und „${g.slug}“ ergeben denselben Pfad`);
+    }
+    pfade.set(pfadVon(g), g.slug);
+  }
+
   for (const a of ausgaben) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(a.datum)) {
       throw new Error(`build-blog: unzulässiges Ausgabedatum „${a.datum}“`);
@@ -588,7 +652,7 @@ export function erzeugeSeiten({ geschichten, ausgaben, etappen }: BlogEingabe): 
         throw new Error(`build-blog: ${g.slug} steht in keiner Tutorial-Etappe`);
       }
       return {
-        pfad: `${g.slug}.html`,
+        pfad: `${pfadVon(g)}.html`,
         html: rahmen(
           `${g.titel} · ${TITEL}`,
           "tutorial",

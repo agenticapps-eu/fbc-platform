@@ -182,6 +182,44 @@ erneut.
       eine Adresse im Stil, an die der Wächter nicht herankommt.
 - [x] **8.6** Sichtprobe beider Flächen und einer Kapitelseite in hell und
       dunkel, breit und auf 390 px.
-- [ ] **8.7 [Donald]** Entscheiden, ob die **gesetzten** Ausgabedaten (ab
+- [x] **8.7 [Donald]** Entscheiden, ob die **gesetzten** Ausgabedaten (ab
       1. August, wöchentlich) so bleiben. Die Funktionen sind echt, die
       Bündelung in Wochen ist redaktionell erfunden.
+      **Entschieden am 10.09. (Donald): so lassen.** Sechs Wochenausgaben ab
+      dem 1. August bleiben unverändert; `release-ausgaben.ts` wird nicht
+      angefasst. Die Daten bleiben damit redaktionell gesetzt und sind
+      ausdrücklich keine Messung.
+
+## 9 · Ein Blogeintrag pro Woche
+
+Nachgezogen am 10.09. auf Donalds Befund an der Abnahmefläche: der Blog hatte
+**drei** Ebenen. Übersicht → Ausgabe (nur Anrisse) → 23 einzelne Kapitelseiten.
+Für die Details einer Woche klickte man viermal und las auf vier Seiten.
+
+- [x] **9.1** Die Ausgabenseite trägt die **vollen** Texte, je Geschichte ein
+      Abschnitt mit Bild und Titel. Kein Anriss, kein „Weiterlesen“ je
+      Geschichte — von der Übersicht führt **ein** Verweis in die Woche.
+- [x] **9.2** Die Kapitelseiten bleiben, aber nur noch fürs **Tutorial**. Dort
+      geht man einen Weg entlang, und eine Seite je Schritt ist die richtige
+      Form. `anrissArtikel` bedient nur noch das Tutorial; der Bildparameter,
+      den 9.1 verwaiste, ist entfallen.
+- [x] **9.3 [Donald]** Das Datum aus der öffentlichen Adresse nehmen
+      (`/2026-08-26-password-reset-flow.html` → `/password-reset-flow.html`).
+      **Der Slug bleibt unverändert** — er ist der Schlüssel zum Archiveintrag,
+      und ein Test pinnt das. Der Pfad wird abgeleitet, statt als zweites Feld
+      gepflegt zu werden: 23 Slugs ergeben 23 eindeutige Namen, gemessen.
+- [x] **9.4** Wächter gegen Pfadkollision: zwei Slugs, die sich nur im Datum
+      unterscheiden, ergäben eine Seite, die die andere lautlos überschreibt.
+      Der Erzeuger bricht jetzt ab.
+- [x] **9.5** Tests nachgezogen. Der eine rote Test hielt die alten
+      Kapitelverweise fest; er prüft jetzt den vollen Text, und ein zweiter
+      schliesst die dritte Ebene aktiv aus. Die Ableitung ist mit **echtem**
+      Datumspräfix gepinnt — die Fixtures benutzen datumsfreie Slugs, dort
+      belegte sie nichts. **Durch Mutation belegt:** Ableitung abgeschaltet,
+      genau die drei neuen Tests röten.
+- [x] **9.6** Spec-Delta nachgezogen: „Eine Ausgabe ist ein Blogeintrag“ und
+      „Die öffentliche Adresse trägt kein Datum“ neu, die Anriss-Anforderung
+      gilt ausdrücklich nur noch für die beiden Übersichten.
+- [ ] **9.7 [Donald]** Die redaktionelle Abnahme (4.5) läuft **an der
+      Vorschau**, nicht mehr am Fahnenabzug — sie zeigt genau das, was
+      ausgeliefert würde. Entschieden am 10.09.

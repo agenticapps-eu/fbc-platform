@@ -137,13 +137,71 @@ describe("build-blog — der Blog gliedert nach Ausgaben", () => {
     expect(new Set(ziele)).toEqual(new Set(["/ausgabe-2026-08-08.html"]));
   });
 
-  it("zeigt auf der Ausgabeseite ihre Geschichten mit Bild und Verweis", () => {
+  it("zeigt auf der Ausgabeseite ihre Geschichten mit Bild und VOLLEM Text", () => {
     const s = seite(erzeugeSeiten(STANDARD), "ausgabe-2026-08-08.html");
     const titel = [...s.querySelectorAll("main article h3")].map((h) => h.textContent);
     expect(titel).toEqual(["Die zweite", "Die dritte"]);
     expect(s.querySelector("main article img")?.getAttribute("src")).toBe("/bilder/ein-bild.png");
-    const ziele = [...s.querySelectorAll("main article a")].map((a) => a.getAttribute("href"));
-    expect(ziele).toContain("/zweite.html");
+    const texte = [...s.querySelectorAll("main article p")].map((p) => p.textContent);
+    expect(texte).toContain("Einstieg zwei.");
+  });
+
+  it("verweist von der Ausgabe NICHT auf einzelne Kapitelseiten", () => {
+    // Ein Blogeintrag pro Woche: von der Übersicht einmal „Weiterlesen“,
+    // danach steht alles auf dieser Seite. Ein Verweis je Geschichte wäre die
+    // dritte Ebene, die genau das wieder aufbräche — der Weg zurück zur
+    // Übersicht ist der einzige, den die Ausgabe anbietet.
+    const s = seite(erzeugeSeiten(STANDARD), "ausgabe-2026-08-08.html");
+    const ziele = [...s.querySelectorAll("main a")].map((a) => a.getAttribute("href"));
+    expect(ziele).not.toContain("/zweite.html");
+    expect(ziele).not.toContain("/dritte.html");
+  });
+});
+
+describe("build-blog — die Adresse trägt kein Datum", () => {
+  /**
+   * Der Slug ist der Schlüssel zum Archiveintrag und trägt dessen Datum. Als
+   * Adresse widerspräche das der Ausgabe, in der die Geschichte steht.
+   *
+   * Die Fixtures oben benutzen datumsfreie Slugs — dort ist die Ableitung
+   * wirkungslos und belegt nichts. Hier steht sie deshalb mit echtem Präfix.
+   */
+  const DATIERT = {
+    geschichten: [
+      geschichte({
+        slug: "2026-08-26-password-reset-flow",
+        titel: "Passwort vergessen",
+        text: "So kommst du zurück.",
+      }),
+    ],
+    ausgaben: [ausgabe({ geschichten: ["2026-08-26-password-reset-flow"] })],
+    etappen: [etappe({ kapitel: ["2026-08-26-password-reset-flow"] })],
+  };
+
+  it("legt die Kapitelseite unter den Pfad OHNE Datum", () => {
+    expect(erzeugeSeiten(DATIERT).map((s) => s.pfad)).toContain("password-reset-flow.html");
+    expect(erzeugeSeiten(DATIERT).map((s) => s.pfad)).not.toContain(
+      "2026-08-26-password-reset-flow.html",
+    );
+  });
+
+  it("verweist auch aus dem Tutorial ohne Datum", () => {
+    const s = seite(erzeugeSeiten(DATIERT), "tutorial.html");
+    const ziele = [...s.querySelectorAll("main a")].map((a) => a.getAttribute("href"));
+    expect(ziele).toContain("/password-reset-flow.html");
+    expect(ziele.some((z) => z?.includes("2026-08-26"))).toBe(false);
+  });
+
+  it("wirft, wenn zwei Slugs sich nur im Datum unterscheiden", () => {
+    // Sonst überschriebe die zweite Seite die erste lautlos.
+    const zwei = {
+      ...DATIERT,
+      geschichten: [
+        ...DATIERT.geschichten,
+        geschichte({ slug: "2026-09-02-password-reset-flow", titel: "Noch einmal" }),
+      ],
+    };
+    expect(() => erzeugeSeiten(zwei)).toThrow(/denselben Pfad/);
   });
 });
 
