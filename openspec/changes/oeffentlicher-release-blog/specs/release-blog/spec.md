@@ -343,6 +343,30 @@ richtige Form.
 - **WHEN** eine Ausgabe gezeigt wird
 - **THEN** führt kein Verweis von ihr auf die Seite einer einzelnen Geschichte
 
+### Requirement: Eine unbekannte Adresse antwortet mit 404
+
+Der Blog SHALL eine Seite `404.html` ausliefern, und zwar auch dann, wenn keine
+einzige Geschichte freigegeben ist.
+
+Der Grund ist gemessen und nicht theoretisch: ohne diese Datei liefert
+Cloudflare Pages bei **jeder** unbekannten Adresse die Startseite mit Status
+**200** (10.09., `/gibt-es-nicht.html` und
+`/2026-08-26-password-reset-flow.html` gaben beide 200 und den Index).
+
+Damit wäre eine Zusage dieses Changes unprüfbar: dass keine nicht freigegebene
+Geschichte erreichbar ist, lässt sich an einer Fläche, auf der jede Adresse
+antwortet, nicht mehr feststellen.
+
+#### Scenario: Eine Adresse ohne Seite
+
+- **WHEN** eine Adresse abgerufen wird, zu der keine Seite gehört
+- **THEN** antwortet der Blog mit 404 und nicht mit der Startseite
+
+#### Scenario: Auch eine leere Fläche hat eine 404-Seite
+
+- **WHEN** keine Geschichte freigegeben ist
+- **THEN** enthält die Auslieferung dennoch `404.html`
+
 ### Requirement: Die öffentliche Adresse einer Geschichte trägt kein Datum
 
 Der Pfad einer Kapitelseite SHALL aus dem Slug der Geschichte OHNE dessen

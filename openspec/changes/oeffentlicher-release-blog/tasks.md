@@ -103,7 +103,10 @@ Zugänge, die hier nicht liegen.
 
 ## 5 · Auslieferung — erst nach der Freigabe
 
-- [ ] **5.1 [Donald]** Cloudflare-Pages-Projekt für den Blog anlegen.
+- [x] **5.1** Cloudflare-Pages-Projekt für den Blog anlegen. **Erledigt am
+      10.09.:** `fbc-blog`, Produktionszweig `main`, Adresse
+      `fbc-blog.pages.dev`. Auf Donalds Zuruf „baue alles und deploye" von
+      dieser Sitzung angelegt statt von Hand.
 - [ ] **5.2** Deploy-Schritt nach dem Muster von `deploy.yml:685`
       (`wrangler pages deploy` mit eigenem Ordner und eigenem
       `--project-name`). Er läuft **unabhängig** vom Deploy der Anwendung: ein
@@ -223,3 +226,17 @@ Für die Details einer Woche klickte man viermal und las auf vier Seiten.
 - [ ] **9.7 [Donald]** Die redaktionelle Abnahme (4.5) läuft **an der
       Vorschau**, nicht mehr am Fahnenabzug — sie zeigt genau das, was
       ausgeliefert würde. Entschieden am 10.09.
+
+- [x] **9.8** `404.html` — **gemessen am Live-Stand**, nicht angenommen: ohne
+      sie lieferte Cloudflare Pages bei JEDER unbekannten Adresse die
+      Startseite mit Status 200. Damit wäre 5.4 („keine nicht freigegebene
+      Geschichte ist erreichbar") unprüfbar gewesen, weil jede Adresse
+      antwortet. Jetzt 404, auch wenn nichts freigegeben ist.
+- [x] **9.9** Vorschau-Deploy auf `vorschau.fbc-blog.pages.dev` — Freigabe nur
+      im Build erzwungen, **die Quelle bleibt bei 23× `freigegeben: false`**;
+      Vorschau-Zweig statt Produktionsadresse; `robots.txt` mit `Disallow: /`
+      im Bündel. Das redaktionelle Urteil steht damit weiter aus.
+      **Falle:** die Alias-Adresse liefert den Zwischenspeicher des
+      VORGÄNGER-Deploys. `/2026-08-26-…` gab dort noch 200 mit dem Rumpf der
+      404-Seite; mit Cache-Umgehung und auf der Deployment-Adresse sauber 404.
+      Nach einem Deploy also mit `?cb=…` oder auf `<hash>.pages.dev` messen.

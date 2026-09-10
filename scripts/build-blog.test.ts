@@ -94,8 +94,9 @@ function seite(seiten: { pfad: string; html: string }[], pfad: string): Document
 }
 
 describe("build-blog — die Seitenmenge", () => {
-  it("erzeugt beide Übersichten, je Ausgabe und je Kapitel eine Seite", () => {
+  it("erzeugt beide Übersichten, die 404-Seite, je Ausgabe und je Kapitel eine", () => {
     expect(erzeugeSeiten(STANDARD).map((s) => s.pfad).sort()).toEqual([
+      "404.html",
       "ausgabe-2026-08-01.html",
       "ausgabe-2026-08-08.html",
       "dritte.html",
@@ -155,6 +156,26 @@ describe("build-blog — der Blog gliedert nach Ausgaben", () => {
     const ziele = [...s.querySelectorAll("main a")].map((a) => a.getAttribute("href"));
     expect(ziele).not.toContain("/zweite.html");
     expect(ziele).not.toContain("/dritte.html");
+  });
+});
+
+describe("build-blog — eine unbekannte Adresse", () => {
+  it("liefert eine 404-Seite mit, auch wenn nichts freigegeben ist", () => {
+    // Cloudflare Pages fällt ohne diese Datei auf den Index zurück, mit
+    // Status 200 — gemessen am 10.09. Dann antwortet JEDE Adresse, und die
+    // Zusage „kein Entwurf ist erreichbar“ wird unprüfbar.
+    const leer = {
+      geschichten: DREI.map((g) => ({ ...g, freigegeben: false })),
+      ausgaben: AUSGABEN,
+      etappen: ETAPPEN,
+    };
+    expect(erzeugeSeiten(leer).map((s) => s.pfad)).toContain("404.html");
+  });
+
+  it("führt von der 404-Seite zurück zur Übersicht", () => {
+    const s = seite(erzeugeSeiten(STANDARD), "404.html");
+    const ziele = [...s.querySelectorAll("main a")].map((a) => a.getAttribute("href"));
+    expect(ziele).toContain("/index.html");
   });
 });
 
@@ -426,6 +447,7 @@ describe("build-blog — nur Freigegebenes wird erzeugt", () => {
   it("erzeugt für eine nicht freigegebene Geschichte keine Seite", () => {
     expect(erzeugeSeiten(GEMISCHT).map((s) => s.pfad)).toEqual([
       "index.html",
+      "404.html",
       "tutorial.html",
       "ausgabe-2026-08-01.html",
       "frei.html",

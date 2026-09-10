@@ -436,6 +436,25 @@ function anrissArtikel(g: ReleaseGeschichte): string {
         </article>`;
 }
 
+/**
+ * Die Seite für eine Adresse, die es nicht gibt.
+ *
+ * Ohne sie liefert Cloudflare Pages bei jeder unbekannten Adresse die
+ * Startseite — mit Status **200**. Gemessen am 10.09.: `/gibt-es-nicht.html`
+ * und `/2026-08-26-password-reset-flow.html` gaben beide 200 und den Index.
+ *
+ * Das ist nicht nur unsauber, es macht eine Zusage unprüfbar: dass keine
+ * nicht freigegebene Geschichte erreichbar ist, lässt sich an einer Fläche,
+ * auf der JEDE Adresse antwortet, nicht mehr feststellen.
+ */
+function nichtGefunden(): string {
+  return `${kopfbereich(BLOG_MOTIV, "Diese Seite gibt es nicht", "Vielleicht ist sie umgezogen.")}
+    <main>
+      <p>Unter dieser Adresse liegt nichts. Möglicherweise stimmt der Verweis nicht, über den du hergekommen bist.</p>
+      <p><a href="/index.html">Zur Übersicht der Ausgaben</a></p>
+    </main>`;
+}
+
 /** Die Blog-Übersicht: Ausgaben, jüngste zuerst. */
 function blogUebersicht(
   ausgaben: { ausgabe: ReleaseAusgabe; geschichten: ReleaseGeschichte[] }[],
@@ -626,6 +645,11 @@ export function erzeugeSeiten({ geschichten, ausgaben, etappen }: BlogEingabe): 
     {
       pfad: "index.html",
       html: rahmen(TITEL, "blog", blogUebersicht(ausgabenAbsteigend)),
+    },
+    {
+      // Cloudflare Pages liefert genau diesen Namen mit Status 404 aus.
+      pfad: "404.html",
+      html: rahmen(`Nicht gefunden · ${TITEL}`, "blog", nichtGefunden()),
     },
     {
       pfad: "tutorial.html",
