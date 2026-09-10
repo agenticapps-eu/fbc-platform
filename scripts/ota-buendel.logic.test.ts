@@ -148,12 +148,24 @@ describe("bildeBuendel — der Rundlauf, den das Gerät geht", () => {
     expect(b.checksum).toMatch(/^[0-9a-f]+$/);
   });
 
-  it("weist einen 4096-Bit-Schlüssel ab, statt ihn ins Manifest zu lassen", () => {
-    // Der Fall, der am 31.08. bis in Infisical durchkam. Auf dem Gerät wäre er
-    // still gescheitert; hier fällt der Job.
-    const zuGross = schluesselpaar(4096);
-    expect(() => bildeBuendel(ZIP, zuGross.privat)).toThrow(/2048|256 Byte/);
-  });
+  it(
+    "weist einen 4096-Bit-Schlüssel ab, statt ihn ins Manifest zu lassen",
+    () => {
+      // Der Fall, der am 31.08. bis in Infisical durchkam. Auf dem Gerät wäre er
+      // still gescheitert; hier fällt der Job.
+      const zuGross = schluesselpaar(4096);
+      expect(() => bildeBuendel(ZIP, zuGross.privat)).toThrow(/2048|256 Byte/);
+    },
+    // Eigene Frist, weil die voreingestellten 5 s hier die AUSLASTUNG messen
+    // und nicht die Richtigkeit: `schluesselpaar` ruft `openssl genrsa` als
+    // Unterprozess, und dessen Primsuche ist zufällig. Lokal am 10.09. über
+    // 15 Läufe 66–450 ms; im CI riss die Frist zweimal hintereinander, weil
+    // dort mehrere vitest-Arbeiter um wenige Kerne konkurrieren.
+    //
+    // Die Frist hochzusetzen verdeckt nichts: der Test behauptet eine
+    // ZURÜCKWEISUNG, und wie lange sie dauert, sagt über sie nichts aus.
+    30_000,
+  );
 });
 
 describe("pruefeSchluesselpaar — die Haelften gehoeren zusammen", () => {
