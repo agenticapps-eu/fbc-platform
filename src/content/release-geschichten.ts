@@ -51,7 +51,7 @@ Ein bestätigtes Konto genügt.`,
       width: 180,
       height: 64,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-27-chat-rechte-sidebar",
@@ -74,7 +74,7 @@ Schreiben kannst du jemandem, sobald zwischen euch eine Kontaktanfrage angenomme
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-27-chatfenster-angedockt",
@@ -97,7 +97,7 @@ Auf schmaleren Fenstern und auf dem Telefon gibt es die Reihe nicht. Dort ist di
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-28-emoji-und-zeitstempel-im-chat",
@@ -118,7 +118,7 @@ Getippte Emoticons werden beim Absenden zu Emoji: aus einem Doppelpunkt mit Bind
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-28-chat-verlauf-paging",
@@ -139,7 +139,7 @@ Das gilt in der vollständigen Ansicht und in den kleinen Fenstern gleichermaße
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Aktivität ─────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ Ohne Anmeldung siehst du „Alle Beiträge“. Die beiden anderen Reiter beziehe
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-25-feed-beitragstyp-mehrfachauswahl",
@@ -181,7 +181,7 @@ Für die Themen gilt dasselbe: mehrere zusammen zeigen alles, was zu einem davon
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-30-geplante-beitraege",
@@ -202,7 +202,7 @@ Wer nichts plant, merkt davon nichts.`,
       width: 769,
       height: 250,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-31-composer-abbruch",
@@ -219,7 +219,7 @@ Klappst du das Feld danach wieder auf, beginnt es leer.`,
       width: 400,
       height: 64,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-31-suchspalte-rechts",
@@ -242,7 +242,7 @@ Auf einem schmalen Fenster oder auf dem Telefon rückt die Spalte in den normale
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Events ────────────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ Wer ein Event anlegen darf, darf auch eine Vorlage anlegen und daraus Termine er
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-25-event-anmeldeknopf-teilnahmeschwelle",
@@ -286,7 +286,7 @@ Sehen kannst du beide Arten von Events. Die Stufe entscheidet über die Anmeldun
       width: 1034,
       height: 180,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Verzeichnis ───────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ Diese Grenzen sitzen im Server, nicht in der Oberfläche. Was du nicht sehen dar
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-25-verzeichnis-reiter-und-kartencover",
@@ -326,7 +326,7 @@ Wie ausführlich eine Karte ausfällt, hängt von deiner Stufe ab.`,
       width: 770,
       height: 62,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-25-profil-biete-suche-und-radar",
@@ -347,7 +347,7 @@ Ist dein Profil noch leer, steht das auch so da, zusammen mit dem Weg zum Ausfü
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Hinweise ──────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ Die Glocke zeigt ausschließlich deine eigenen Hinweise.`,
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-25-stille-fehlschlaege-und-anfragen-weg",
@@ -389,7 +389,7 @@ Versuchst du dich mit einer Adresse zu registrieren, zu der es schon ein Konto g
       width: 270,
       height: 205,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Bedienung ─────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ Was du einklappst, bleibt eingeklappt, auch nach einem Neuladen. Der Zustand lie
       width: 460,
       height: 500,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-26-fix-mobile-overflow",
@@ -429,7 +429,7 @@ Ein Prüfschritt im Testlauf achtet darauf, dass keine feste Spaltenbreite ohne 
       width: 390,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-26-add-video-consent-gate",
@@ -450,7 +450,7 @@ Das gilt überall, wo Videos vorkommen, auch ohne Konto.`,
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-08-27-video-freigabe-merken",
@@ -471,7 +471,7 @@ Die Freigabe liegt auf deinem Gerät, nicht in deinem Konto. An einem anderen Re
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 
   // ── Konto ─────────────────────────────────────────────────────────────────
@@ -494,7 +494,7 @@ Wie oft ein solcher Link angefordert werden kann, ist begrenzt: nicht öfter als
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
   {
     slug: "2026-09-02-feedback-ausbauen",
@@ -515,6 +515,6 @@ Anonym ist Feedback damit nicht: es hängt an deinem Konto, weil sonst niemand z
       width: 1440,
       height: 900,
     },
-    freigegeben: false,
+    freigegeben: true,
   },
 ];

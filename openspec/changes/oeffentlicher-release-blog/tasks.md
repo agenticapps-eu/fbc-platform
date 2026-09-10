@@ -96,32 +96,49 @@ Zugänge, die hier nicht liegen.
       Profil-, Beitrags- oder Nachrichteninhalte einzelner Mitglieder. Beispiele
       sind erfunden. Das Repository ist öffentlich, und der Wächter aus 1.6
       erkennt keinen Klarnamen.
-- [ ] **4.5 [Donald]** Redaktionelle Abnahme, danach `freigegeben: true`. Bis
+- [x] **4.5 [Donald]** Redaktionelle Abnahme, danach `freigegeben: true`. Bis
       dahin liegen die Geschichten im Repository, ohne öffentlich zu sein.
       Die Auswahl ist eine redaktionelle Entscheidung und keine Zusage — sie
       darf sich ändern, ohne dass eine Anforderung bricht.
 
 ## 5 · Auslieferung — erst nach der Freigabe
 
-- [ ] **5.1 [Donald]** Cloudflare-Pages-Projekt für den Blog anlegen.
+- [x] **5.1** Cloudflare-Pages-Projekt für den Blog anlegen. **Erledigt am
+      10.09.:** `fbc-blog`, Produktionszweig `main`, Adresse
+      `fbc-blog.pages.dev`. Auf Donalds Zuruf „baue alles und deploye" von
+      dieser Sitzung angelegt statt von Hand.
 - [ ] **5.2** Deploy-Schritt nach dem Muster von `deploy.yml:685`
       (`wrangler pages deploy` mit eigenem Ordner und eigenem
       `--project-name`). Er läuft **unabhängig** vom Deploy der Anwendung: ein
       Fehlschlag des einen lässt das andere unverändert.
-- [ ] **5.3 [Donald]** `www.effbeezee.com` bei Strato als CNAME auf das
-      Pages-Projekt. `www` ist eine Subdomain und geht denselben Weg wie
+- [x] **5.3** `www.effbeezee.com` bei Strato als CNAME auf das
+      Pages-Projekt. **Erledigt am 10.09.:** Donald hat den CNAME gesetzt
+      (`www.effbeezee.com` → `fbc-blog.pages.dev`, gemessen). Der DNS allein
+      genügt NICHT — die Domain muss zusätzlich am Pages-Projekt hängen, sonst
+      beansprucht niemand den Namen und es gibt kein Zertifikat (`curl` Exit
+      35). `wrangler` 4 kennt dafür keinen Befehl mehr; angehängt über
+      `POST /accounts/{id}/pages/projects/{projekt}/domains`. `www` ist eine Subdomain und geht denselben Weg wie
       `app.effbeezee.com` seit dem 01.09.; der nackte Apex kann das **nicht**
       (AGE-256) und ist hier ausdrücklich nicht Gegenstand.
-- [ ] **5.4** Ein Aufruf der Live-Adresse belegt die Auslieferung. Ein grüner
+- [x] **5.4** Ein Aufruf der Live-Adresse belegt die Auslieferung. Ein grüner
       Workflow belegt sie nicht. Dabei gegenprüfen, dass keine nicht
-      freigegebene Geschichte erreichbar ist.
+      freigegebene Geschichte erreichbar ist. **Gemessen am 10.09. auf
+      `www.effbeezee.com`:** Startseite 12 Verweise auf 6 Ausgaben, Tutorial
+      200, Kapitelseite 200, Ausgabe 15.08. mit 5 Volltextabschnitten und 0
+      Kapitelverweisen, unbekannte Adresse 404, alte datierte Adresse 404.
+      Alle 23 sind freigegeben, es gibt also keinen Entwurf mehr, gegen den zu
+      prüfen wäre — der 404 auf die datierte Adresse belegt die Regel.
 
 ## 6 · Abnahme
 
-- [ ] **6.1** `openspec validate --all` grün.
-- [ ] **6.2** `pnpm lint` (Exit-Code, nicht die Ausgabe — die 14 Fehler aus dem
+- [x] **6.1** `openspec validate --all` grün — 33/33 (10.09.).
+- [x] **6.2** `pnpm lint` (Exit-Code, nicht die Ausgabe — die 14 Fehler aus dem
       gitignorierten `.gstack/` sind nicht Teil dieses Diffs), `pnpm typecheck`,
       `pnpm test`, `pnpm build`, beide Erstlast-Wächter.
+      **Gemessen am 10.09.:** lint Exit 0 (0 Fehler, 7 Warnungen Vorzustand),
+      typecheck 0, test 2765 grün in 240 Dateien, build 0, `blog:build`
+      32 Seiten. `entry-chunk-guard` grün (10 Dateien, keine unerlaubte Seite);
+      keine zurückgezogenen Tokens und keine fremde Schrift.
 - [x] **6.3** Plan-Review (2b) vor der ersten Codezeile — `REVIEWS.md`,
       gemini + codex, 2 HIGH und 6 MEDIUM eingearbeitet.
 - [ ] **6.4** Code-Review auf dem **Diff**, nicht auf dem Plan.
@@ -182,6 +199,99 @@ erneut.
       eine Adresse im Stil, an die der Wächter nicht herankommt.
 - [x] **8.6** Sichtprobe beider Flächen und einer Kapitelseite in hell und
       dunkel, breit und auf 390 px.
-- [ ] **8.7 [Donald]** Entscheiden, ob die **gesetzten** Ausgabedaten (ab
+- [x] **8.7 [Donald]** Entscheiden, ob die **gesetzten** Ausgabedaten (ab
       1. August, wöchentlich) so bleiben. Die Funktionen sind echt, die
       Bündelung in Wochen ist redaktionell erfunden.
+      **Entschieden am 10.09. (Donald): so lassen.** Sechs Wochenausgaben ab
+      dem 1. August bleiben unverändert; `release-ausgaben.ts` wird nicht
+      angefasst. Die Daten bleiben damit redaktionell gesetzt und sind
+      ausdrücklich keine Messung.
+
+## 9 · Ein Blogeintrag pro Woche
+
+Nachgezogen am 10.09. auf Donalds Befund an der Abnahmefläche: der Blog hatte
+**drei** Ebenen. Übersicht → Ausgabe (nur Anrisse) → 23 einzelne Kapitelseiten.
+Für die Details einer Woche klickte man viermal und las auf vier Seiten.
+
+- [x] **9.1** Die Ausgabenseite trägt die **vollen** Texte, je Geschichte ein
+      Abschnitt mit Bild und Titel. Kein Anriss, kein „Weiterlesen“ je
+      Geschichte — von der Übersicht führt **ein** Verweis in die Woche.
+- [x] **9.2** Die Kapitelseiten bleiben, aber nur noch fürs **Tutorial**. Dort
+      geht man einen Weg entlang, und eine Seite je Schritt ist die richtige
+      Form. `anrissArtikel` bedient nur noch das Tutorial; der Bildparameter,
+      den 9.1 verwaiste, ist entfallen.
+- [x] **9.3 [Donald]** Das Datum aus der öffentlichen Adresse nehmen
+      (`/2026-08-26-password-reset-flow.html` → `/password-reset-flow.html`).
+      **Der Slug bleibt unverändert** — er ist der Schlüssel zum Archiveintrag,
+      und ein Test pinnt das. Der Pfad wird abgeleitet, statt als zweites Feld
+      gepflegt zu werden: 23 Slugs ergeben 23 eindeutige Namen, gemessen.
+- [x] **9.4** Wächter gegen Pfadkollision: zwei Slugs, die sich nur im Datum
+      unterscheiden, ergäben eine Seite, die die andere lautlos überschreibt.
+      Der Erzeuger bricht jetzt ab.
+- [x] **9.5** Tests nachgezogen. Der eine rote Test hielt die alten
+      Kapitelverweise fest; er prüft jetzt den vollen Text, und ein zweiter
+      schliesst die dritte Ebene aktiv aus. Die Ableitung ist mit **echtem**
+      Datumspräfix gepinnt — die Fixtures benutzen datumsfreie Slugs, dort
+      belegte sie nichts. **Durch Mutation belegt:** Ableitung abgeschaltet,
+      genau die drei neuen Tests röten.
+- [x] **9.6** Spec-Delta nachgezogen: „Eine Ausgabe ist ein Blogeintrag“ und
+      „Die öffentliche Adresse trägt kein Datum“ neu, die Anriss-Anforderung
+      gilt ausdrücklich nur noch für die beiden Übersichten.
+- [ ] **9.7 [Donald]** Die redaktionelle Abnahme (4.5) läuft **an der
+      Vorschau**, nicht mehr am Fahnenabzug — sie zeigt genau das, was
+      ausgeliefert würde. Entschieden am 10.09.
+
+- [x] **9.8** `404.html` — **gemessen am Live-Stand**, nicht angenommen: ohne
+      sie lieferte Cloudflare Pages bei JEDER unbekannten Adresse die
+      Startseite mit Status 200. Damit wäre 5.4 („keine nicht freigegebene
+      Geschichte ist erreichbar") unprüfbar gewesen, weil jede Adresse
+      antwortet. Jetzt 404, auch wenn nichts freigegeben ist.
+- [x] **9.9** Vorschau-Deploy auf `vorschau.fbc-blog.pages.dev` — Freigabe nur
+      im Build erzwungen, **die Quelle bleibt bei 23× `freigegeben: false`**;
+      Vorschau-Zweig statt Produktionsadresse; `robots.txt` mit `Disallow: /`
+      im Bündel. Das redaktionelle Urteil steht damit weiter aus.
+      **Falle:** die Alias-Adresse liefert den Zwischenspeicher des
+      VORGÄNGER-Deploys. `/2026-08-26-…` gab dort noch 200 mit dem Rumpf der
+      404-Seite; mit Cache-Umgehung und auf der Deployment-Adresse sauber 404.
+      Nach einem Deploy also mit `?cb=…` oder auf `<hash>.pages.dev` messen.
+
+- [x] **9.10** Produktions-Deployment auf `www.effbeezee.com` — mit dem
+      **echten** `pnpm blog:build`, also 3 Seiten: zwei leere Übersichten und
+      die 404-Seite. Ohne Produktions-Deployment liefe die Domain ins Leere;
+      mit der Vorschau darauf wären 23 nicht abgenommene Texte öffentlich.
+      Gemessen: Startseite 200 mit „Hier erscheinen die Ausgaben, sobald die
+      erste freigegeben ist", unbekannte Adresse 404, **ein nicht
+      freigegebener Text 404**. Das ist 5.4 für den leeren Stand; nach der
+      Freigabe erneut.
+- [x] **9.11** `robots.txt` mit `Disallow: /` lag **von Hand** in beiden
+      Bündeln und war NICHT Teil des Erzeugers. **Mit der Freigabe raus.**
+      Gegengeprüft: unter `/robots.txt` liegt jetzt Cloudflares eigene,
+      zonenweite Datei (Content-Signals) — **ohne `Disallow`**, der Blog ist
+      also indexierbar. Merkposten: eine eigene `robots.txt` im Bündel
+      übersteuert diese, eine fehlende lässt Cloudflares durch.
+- [ ] ~~**9.12 [Donald]** `effbeezee.com` ohne `www`.~~ **Zurückgestellt am
+      10.09. (Donald: „effbeezee.com ignorieren").** Der Befund bleibt
+      festgehalten, falls es wieder aufkommt: Der Apex liefert heute die
+      Strato-Parkseite („Domain reserved"), und **`https://effbeezee.com` hat
+      dort kein Zertifikat** (Exit 35). Ein CNAME kann der Apex bei Strato
+      nicht (AGE-256), also bleibt die Strato-Weiterleitung — und die muss
+      **mit SSL** eingerichtet sein, sonst scheitert jeder Browser, der den
+      nackten Namen zuerst über HTTPS versucht.
+
+- [x] **9.13** Beide Richtungen verlinkt (Donald, 10.09.: „www.effbeezee.com
+      bitte in der App gut verlinken und andersherum auch").
+      **Blog → Anwendung:** in der Leiste, auf jeder Seite, **abgesetzt** unter
+      Blog und Tutorial — die beiden sind zwei Ordnungen desselben Ortes, die
+      Anwendung ist ein anderer. Als dritter Reiter läse er sich wie eine
+      dritte Fläche.
+      **Anwendung → Blog:** in `AppFooter`, über den Pflichtlinks und NICHT in
+      ihnen — `RechtsLinks` ist eine `nav` namens „Rechtliches", ein Blogverweis
+      darin würde einem Screenreader als Rechtsdokument angesagt.
+      **Der Wächter musste dafür aufgemacht werden**, und zwar so eng wie
+      möglich: eine Liste **vollständiger** Adressen, kein Präfix und kein
+      gelockertes Schema. Drei Tests halten das — die erlaubte Adresse grün,
+      eine ähnliche (`app.effbeezee.com.beispiel.tld`) und eine andere Seite
+      derselben Anwendung rot.
+- [ ] **9.14** Der Fussverweis in der Anwendung ist **noch nicht ausgeliefert**
+      — er geht mit dem nächsten App-Deploy über `main` live, nicht mit dem
+      Blog-Deploy. Nach dem Merge auf `app.effbeezee.com` nachsehen.

@@ -209,10 +209,15 @@ Entscheidung sein und SHALL NOT Gegenstand einer Zusage sein.
 - **WHEN** eine Geschichte im Repository liegt, aber nicht freigegeben ist
 - **THEN** erscheint sie weder in der Übersicht noch als eigene Seite
 
-### Requirement: Die Übersicht reisst an, statt nur zu verlinken
+### Requirement: Eine Übersicht reisst an, statt nur zu verlinken
 
-Die Übersicht SHALL zu jeder freigegebenen Geschichte einen **Anriss** führen —
-den ersten Absatz ihres Textes — und daneben Titel, Datum und Bild.
+Eine **Übersicht** — die Blog-Übersicht über die Ausgaben und die
+Tutorial-Übersicht über die Kapitel — SHALL zu jedem Eintrag einen **Anriss**
+führen, den ersten Absatz seines Textes, und daneben Titel, Datum und Bild.
+
+Diese Anforderung gilt für die Übersichten und ausdrücklich NOT für die Seite
+einer Ausgabe: dort steht der volle Text (siehe „Eine Ausgabe ist ein
+Blogeintrag").
 
 Der Anriss SHALL aus dem Text entstehen und SHALL NOT als eigenes Feld gepflegt
 werden. Der Grund ist die Pflegestelle: ein zweites Textfeld wäre eine zweite
@@ -300,7 +305,7 @@ freigegeben ist.
 
 - **WHEN** eine Ausgabe erscheint
 - **THEN** führt sie ihren einleitenden Text und die Geschichten, die sie
-  vorstellt, mit Verweis auf deren Seite
+  vorstellt
 
 #### Scenario: Keine Geschichte steht in zwei Ausgaben
 
@@ -311,6 +316,80 @@ freigegeben ist.
 
 - **WHEN** keine Geschichte einer Ausgabe freigegeben ist
 - **THEN** erscheint die Ausgabe weder in der Übersicht noch als eigene Seite
+
+### Requirement: Eine Ausgabe ist ein Blogeintrag und trägt die vollen Texte
+
+Die Seite einer Ausgabe SHALL den einleitenden Text und danach den
+**vollständigen** Text jeder Geschichte tragen, die sie vorstellt, je als
+eigener Abschnitt mit Titel und Bild.
+
+Sie SHALL NOT auf die Seiten der einzelnen Geschichten verweisen. Der Grund ist
+die Anzahl der Ebenen: von der Übersicht führt **ein** „Weiterlesen" in die
+Woche, und wer dort ist, hat sich für ihre Details entschieden. Ein Verweis je
+Geschichte machte daraus eine dritte Ebene und verteilte eine Woche auf fünf
+Seiten — die Leserschaft klickte viermal für das, was ein Eintrag ist.
+
+Die Kapitelseiten SHALL gleichwohl bestehen bleiben: das **Tutorial** führt
+Etappe für Etappe durch sie hindurch, und dort ist eine Seite je Schritt die
+richtige Form.
+
+#### Scenario: Die Woche steht auf einer Seite
+
+- **WHEN** eine Ausgabe mit mehreren Geschichten gezeigt wird
+- **THEN** steht der volle Text jeder ihrer Geschichten auf dieser Seite
+
+#### Scenario: Die Ausgabe verweist nicht auf einzelne Kapitelseiten
+
+- **WHEN** eine Ausgabe gezeigt wird
+- **THEN** führt kein Verweis von ihr auf die Seite einer einzelnen Geschichte
+
+### Requirement: Eine unbekannte Adresse antwortet mit 404
+
+Der Blog SHALL eine Seite `404.html` ausliefern, und zwar auch dann, wenn keine
+einzige Geschichte freigegeben ist.
+
+Der Grund ist gemessen und nicht theoretisch: ohne diese Datei liefert
+Cloudflare Pages bei **jeder** unbekannten Adresse die Startseite mit Status
+**200** (10.09., `/gibt-es-nicht.html` und
+`/2026-08-26-password-reset-flow.html` gaben beide 200 und den Index).
+
+Damit wäre eine Zusage dieses Changes unprüfbar: dass keine nicht freigegebene
+Geschichte erreichbar ist, lässt sich an einer Fläche, auf der jede Adresse
+antwortet, nicht mehr feststellen.
+
+#### Scenario: Eine Adresse ohne Seite
+
+- **WHEN** eine Adresse abgerufen wird, zu der keine Seite gehört
+- **THEN** antwortet der Blog mit 404 und nicht mit der Startseite
+
+#### Scenario: Auch eine leere Fläche hat eine 404-Seite
+
+- **WHEN** keine Geschichte freigegeben ist
+- **THEN** enthält die Auslieferung dennoch `404.html`
+
+### Requirement: Die öffentliche Adresse einer Geschichte trägt kein Datum
+
+Der Pfad einer Kapitelseite SHALL aus dem Slug der Geschichte OHNE dessen
+Datumspräfix entstehen. Der Slug selbst SHALL unverändert bleiben — er ist der
+Schlüssel zum Archiveintrag.
+
+Der Grund ist ein Widerspruch, den die Adresse sonst behauptet: der Slug trägt
+das Datum des Archiveintrags, die Geschichte steht aber in der Ausgabe einer
+Woche, die davon abweicht. Das **Ausgabedatum** ist das einzige Datum, das die
+Leserschaft sehen soll.
+
+Der Erzeuger SHALL zurückweisen, wenn zwei Geschichten denselben Pfad ergeben —
+die zweite Seite überschriebe die erste sonst lautlos.
+
+#### Scenario: Die Adresse nennt das Datum nicht
+
+- **WHEN** eine Geschichte mit datiertem Slug ausgeliefert wird
+- **THEN** trägt weder ihr Dateiname noch ein Verweis auf sie dieses Datum
+
+#### Scenario: Zwei Slugs, die sich nur im Datum unterscheiden
+
+- **WHEN** zwei Geschichten nach Abzug des Datums denselben Pfad ergäben
+- **THEN** bricht der Erzeuger ab, statt eine Seite zu überschreiben
 
 ### Requirement: Das Tutorial führt in einer festen Reihenfolge durch die Anwendung
 

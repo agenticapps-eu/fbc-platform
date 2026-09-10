@@ -59,6 +59,28 @@ describe("pruefeArtefakt — vier untergeschobene Gestalten", () => {
     expect(pruefeArtefakt(RUMPF('<a href="https://fremde.example/">Text</a>'))).toMatch(/href/i);
   });
 
+  it("lässt genau die Adresse der Anwendung durch", () => {
+    // Der einzige Verweis des Blogs nach draussen. Ohne diese Ausnahme wäre er
+    // nicht baubar; mit einer aufgeweichten Regel („https: ist erlaubt") wäre
+    // jede fremde Herkunft wieder offen.
+    expect(pruefeArtefakt(RUMPF('<a href="https://app.effbeezee.com/">Zur App</a>'))).toBeNull();
+  });
+
+  it("rötet eine Adresse, die der erlaubten nur ähnelt", () => {
+    // Deshalb eine Liste vollständiger Adressen und kein Präfix-Vergleich.
+    expect(
+      pruefeArtefakt(RUMPF('<a href="https://app.effbeezee.com.beispiel.tld/">Text</a>')),
+    ).toMatch(/href/i);
+  });
+
+  it("rötet auch eine andere Seite derselben Anwendung", () => {
+    // Die Ausnahme ist EINE Adresse, kein Host. Wächst der Bedarf, gehört die
+    // neue Adresse auf die Liste — und nicht die Regel gelockert.
+    expect(
+      pruefeArtefakt(RUMPF('<a href="https://app.effbeezee.com/verzeichnis">Text</a>')),
+    ).toMatch(/href/i);
+  });
+
   it("lässt die erlaubte Menge durch", () => {
     // Die Gegenprobe: ohne sie wäre ein Wächter, der alles rötet, grün.
     expect(
