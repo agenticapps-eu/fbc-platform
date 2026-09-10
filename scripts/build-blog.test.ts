@@ -159,6 +159,24 @@ describe("build-blog — der Blog gliedert nach Ausgaben", () => {
   });
 });
 
+describe("build-blog — der Weg zurueck in die Anwendung", () => {
+  it("führt von JEDER Seite in die Anwendung", () => {
+    // Auf jeder Seite, weil die Leiste auf jeder Seite steht. Faende sich der
+    // Verweis nur auf der Übersicht, endete jeder Leseweg in einer Sackgasse.
+    for (const seite of erzeugeSeiten(STANDARD)) {
+      expect(seite.html, seite.pfad).toContain('href="https://app.effbeezee.com/"');
+    }
+  });
+
+  it("setzt ihn von den beiden Flächen ab", () => {
+    // Blog und Tutorial sind zwei Ordnungen desselben Ortes; die Anwendung ist
+    // ein anderer. Als dritter Reiter läse er sich wie eine dritte Fläche.
+    const s = seite(erzeugeSeiten(STANDARD), "index.html");
+    const reiter = [...s.querySelectorAll("aside nav a")].map((a) => a.getAttribute("href"));
+    expect(reiter).toEqual(["/tutorial.html", "/index.html"]);
+  });
+});
+
 describe("build-blog — eine unbekannte Adresse", () => {
   it("liefert eine 404-Seite mit, auch wenn nichts freigegeben ist", () => {
     // Cloudflare Pages fällt ohne diese Datei auf den Index zurück, mit

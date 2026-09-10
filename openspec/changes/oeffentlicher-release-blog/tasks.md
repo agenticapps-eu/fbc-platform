@@ -96,7 +96,7 @@ Zugänge, die hier nicht liegen.
       Profil-, Beitrags- oder Nachrichteninhalte einzelner Mitglieder. Beispiele
       sind erfunden. Das Repository ist öffentlich, und der Wächter aus 1.6
       erkennt keinen Klarnamen.
-- [ ] **4.5 [Donald]** Redaktionelle Abnahme, danach `freigegeben: true`. Bis
+- [x] **4.5 [Donald]** Redaktionelle Abnahme, danach `freigegeben: true`. Bis
       dahin liegen die Geschichten im Repository, ohne öffentlich zu sein.
       Die Auswahl ist eine redaktionelle Entscheidung und keine Zusage — sie
       darf sich ändern, ohne dass eine Anforderung bricht.
@@ -120,9 +120,14 @@ Zugänge, die hier nicht liegen.
       `POST /accounts/{id}/pages/projects/{projekt}/domains`. `www` ist eine Subdomain und geht denselben Weg wie
       `app.effbeezee.com` seit dem 01.09.; der nackte Apex kann das **nicht**
       (AGE-256) und ist hier ausdrücklich nicht Gegenstand.
-- [ ] **5.4** Ein Aufruf der Live-Adresse belegt die Auslieferung. Ein grüner
+- [x] **5.4** Ein Aufruf der Live-Adresse belegt die Auslieferung. Ein grüner
       Workflow belegt sie nicht. Dabei gegenprüfen, dass keine nicht
-      freigegebene Geschichte erreichbar ist.
+      freigegebene Geschichte erreichbar ist. **Gemessen am 10.09. auf
+      `www.effbeezee.com`:** Startseite 12 Verweise auf 6 Ausgaben, Tutorial
+      200, Kapitelseite 200, Ausgabe 15.08. mit 5 Volltextabschnitten und 0
+      Kapitelverweisen, unbekannte Adresse 404, alte datierte Adresse 404.
+      Alle 23 sind freigegeben, es gibt also keinen Entwurf mehr, gegen den zu
+      prüfen wäre — der 404 auf die datierte Adresse belegt die Regel.
 
 ## 6 · Abnahme
 
@@ -254,13 +259,35 @@ Für die Details einer Woche klickte man viermal und las auf vier Seiten.
       erste freigegeben ist", unbekannte Adresse 404, **ein nicht
       freigegebener Text 404**. Das ist 5.4 für den leeren Stand; nach der
       Freigabe erneut.
-- [ ] **9.11** `robots.txt` mit `Disallow: /` liegt **von Hand** in beiden
-      Bündeln und ist NICHT Teil des Erzeugers. Sie gehört zum unfertigen
-      Stand und muss mit der Freigabe wieder raus — sonst bleibt der fertige
-      Blog dauerhaft aus dem Index.
-- [ ] **9.12 [Donald]** `effbeezee.com` ohne `www`. Der Apex liefert heute die
+- [x] **9.11** `robots.txt` mit `Disallow: /` lag **von Hand** in beiden
+      Bündeln und war NICHT Teil des Erzeugers. **Mit der Freigabe raus.**
+      Gegengeprüft: unter `/robots.txt` liegt jetzt Cloudflares eigene,
+      zonenweite Datei (Content-Signals) — **ohne `Disallow`**, der Blog ist
+      also indexierbar. Merkposten: eine eigene `robots.txt` im Bündel
+      übersteuert diese, eine fehlende lässt Cloudflares durch.
+- [ ] ~~**9.12 [Donald]** `effbeezee.com` ohne `www`.~~ **Zurückgestellt am
+      10.09. (Donald: „effbeezee.com ignorieren").** Der Befund bleibt
+      festgehalten, falls es wieder aufkommt: Der Apex liefert heute die
       Strato-Parkseite („Domain reserved"), und **`https://effbeezee.com` hat
       dort kein Zertifikat** (Exit 35). Ein CNAME kann der Apex bei Strato
       nicht (AGE-256), also bleibt die Strato-Weiterleitung — und die muss
       **mit SSL** eingerichtet sein, sonst scheitert jeder Browser, der den
       nackten Namen zuerst über HTTPS versucht.
+
+- [x] **9.13** Beide Richtungen verlinkt (Donald, 10.09.: „www.effbeezee.com
+      bitte in der App gut verlinken und andersherum auch").
+      **Blog → Anwendung:** in der Leiste, auf jeder Seite, **abgesetzt** unter
+      Blog und Tutorial — die beiden sind zwei Ordnungen desselben Ortes, die
+      Anwendung ist ein anderer. Als dritter Reiter läse er sich wie eine
+      dritte Fläche.
+      **Anwendung → Blog:** in `AppFooter`, über den Pflichtlinks und NICHT in
+      ihnen — `RechtsLinks` ist eine `nav` namens „Rechtliches", ein Blogverweis
+      darin würde einem Screenreader als Rechtsdokument angesagt.
+      **Der Wächter musste dafür aufgemacht werden**, und zwar so eng wie
+      möglich: eine Liste **vollständiger** Adressen, kein Präfix und kein
+      gelockertes Schema. Drei Tests halten das — die erlaubte Adresse grün,
+      eine ähnliche (`app.effbeezee.com.beispiel.tld`) und eine andere Seite
+      derselben Anwendung rot.
+- [ ] **9.14** Der Fussverweis in der Anwendung ist **noch nicht ausgeliefert**
+      — er geht mit dem nächsten App-Deploy über `main` live, nicht mit dem
+      Blog-Deploy. Nach dem Merge auf `app.effbeezee.com` nachsehen.

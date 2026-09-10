@@ -184,7 +184,20 @@ function kopfbereich(motiv: string, titel: string, unterzeile: string): string {
     </header>`;
 }
 
-/** Die Navigation, auf jeder Seite dieselbe, mit der aktuellen Fläche ausgezeichnet. */
+/** Die Adresse der Anwendung — der einzige Verweis des Blogs nach draussen. */
+const APP = "https://app.effbeezee.com/";
+
+/**
+ * Die Navigation, auf jeder Seite dieselbe, mit der aktuellen Fläche ausgezeichnet.
+ *
+ * Der Verweis in die Anwendung steht **abgesetzt** unter den beiden Flächen und
+ * nicht als dritter Reiter daneben: Blog und Tutorial sind zwei Ordnungen
+ * desselben Ortes, die Anwendung ist ein anderer Ort. Als gleichrangiger
+ * Reiter läse er sich wie eine dritte Fläche dieser Seite.
+ *
+ * Er ist der einzige Verweis des Blogs auf eine fremde Herkunft und deshalb im
+ * Artefakt-Wächter namentlich zugelassen.
+ */
 function navigation(aktiv: "blog" | "tutorial"): string {
   const marke = (fuer: "blog" | "tutorial") => (fuer === aktiv ? ' class="aktiv"' : "");
   return `    <aside>
@@ -193,6 +206,7 @@ function navigation(aktiv: "blog" | "tutorial"): string {
         <a href="/tutorial.html"${marke("tutorial")}>Tutorial</a>
         <a href="/index.html"${marke("blog")}>Blog</a>
       </nav>
+      <p class="zurapp"><a href="${APP}">Zur App anmelden</a></p>
     </aside>`;
 }
 
@@ -268,6 +282,21 @@ const STIL = `
     }
     aside nav a:hover { background: var(--canvas); }
     aside nav a.aktiv { background: var(--canvas); color: var(--akzent); }
+    /* Abgesetzt von den beiden Flaechen — die Anwendung ist ein anderer Ort. */
+    .zurapp {
+      margin: 1.5rem 0 0;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--linie);
+    }
+    .zurapp a {
+      display: block;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      text-decoration: none;
+      font-weight: 600;
+      color: var(--akzent);
+    }
+    .zurapp a:hover { background: var(--canvas); }
     header, main, footer {
       grid-column: 2;
       width: 100%;
@@ -391,6 +420,7 @@ const STIL = `
         border-bottom: 1px solid var(--linie);
       }
       .marke { margin: 0; }
+      .zurapp { margin: 0 0 0 auto; padding-top: 0; border-top: 0; }
       aside nav { flex-direction: row; gap: 0.25rem; }
       header, main, footer { padding: 0 1.25rem; }
       header.hero { margin: 1rem auto 2rem; padding: 1.5rem 1.25rem; min-height: 8rem; }
