@@ -32,7 +32,10 @@
 ## 4. Abschluss
 
 - [x] 4.1 Diff gegen die Aufgaben und das Spec-Delta lesen
-- [ ] 4.2 Archivieren, PR, AGE-716 nachziehen
-- [ ] 4.3 **Offen und ausdrücklich: der Gerätebeleg quer am Pixel steht aus.**
-      Belegt ist die Auswahl am GEBAUTEN Artefakt im Browser (drei Flächen,
-      Vorher-/Nachher-Paar bei 918x411), nicht am Gerät.
+- [x] 4.2 Archivieren, PR, AGE-716 nachziehen
+- [x] 4.3 Gerätebeleg quer am Pixel 11 Pro — **erbracht am 11.09.**
+      (`67011FDKX006NA`). Kaltstart aus dem OTA-Bündel `PFK6NoZC8b`, das
+      `splash-band-quer.webp` führt; vorher lief das Bündel vom Vortag ohne
+      die Datei, eine Messung davor hätte den alten Zustand gezeigt.
+      `cur=2410x1080` zweimal geprüft, 3 s Nachlauf gegen die Drehanimation,
+      `screenrecord`, zerlegt bei 60 B/s. Beide Gesichter über der Rampe.
