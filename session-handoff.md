@@ -1,150 +1,139 @@
-# Session Handoff — 2026-09-10 (AGE-705; alles gemergt, es fehlt die Freigabe)
+# Session Handoff — 2026-09-11 (AGE-643 M3: geplant, Gate durch, kein Code)
 
-> ## ⚠ ZUERST — und die erste Handlung steht ganz unten
+> ## ⚠ ZUERST — Scope und Arbeitsplatz
 >
-> **1. Sie führt AGE-705**, Change `oeffentlicher-release-blog`. Blöcke 1–4, 7
-> und 8 sind fertig **bis auf 4.5 und 8.7 — beides Donalds Entscheidungen und
-> beides blockiert alles Weitere.** Offen ausserdem: Block 5, Block 6.
+> **1. Diese Übergabe führt AGE-643** (M3, Deep Links), Change `deep-links`.
+> Arbeitsplatz ist **dieser** Worktree:
+> `~/worktrees/fbc-platform/donald-age-643-deep-links`, Branch
+> `donald/age-643-deep-links`, Stand **`30d7e98`** (ein eigener Commit über
+> `origin/main` `d9721f4`).
 >
-> **2. Der Code ist vollständig gemergt.** PR #387 → `c8bcfdb`, PR #388 →
-> `3eedaf3`, beide am 10.09. CI und Deploy auf `main` grün.
-> Arbeitsplatz bleibt der Worktree
-> `~/worktrees/fbc-platform/donald-age-705-oeffentlicher-release-blog`
-> (Branch gleichen Namens, nicht gelöscht, steht auf `3eedaf3`).
-> **`main` ist hier NICHT auscheckbar** — das Hauptverzeichnis hält es.
+> **2. Die Fassung dieser Datei auf `main` ist NICHT Dein Auftrag.** Dort steht
+> noch die AGE-705-Übergabe vom 10.09. — der Blog ist ausgeliefert und
+> archiviert. Sie zeigt auf einen fremden Worktree. **Nicht zusammenführen.**
 >
-> **3. Nichts ist veröffentlicht.** 23× `freigegeben: false`, 0× `true` auf
-> `main` nachgezählt; `pnpm blog:build` schreibt darum zwei leere Übersichten.
-> Öffentlich *lesbar* sind Texte und Bilder gleichwohl — das Repo ist öffentlich.
+> **3. AGE-718 läuft parallel in einer EIGENEN Sitzung** (`fbc-platform-f1`,
+> Worktree `donald-age-718-…`). Nicht anfassen. Am 11.09. haben zwei Sitzungen
+> dort gleichzeitig dieselbe Testdatei geschrieben; das ist abgestimmt und
+> erledigt.
 >
-> **4. AGE-642/AGE-708 haben eine EIGENE Sitzung.** Diese Datei gehörte auf
-> `main` ihr und trug den Zeiger auf M3/AGE-643; `c8bcfdb` hat sie ersetzt, die
-> alte steht in `git show 6a22bd9:session-handoff.md`, die Sitzung ist per
-> `SendMessage` unterrichtet. **Nicht zusammenführen.**
->
-> **5. Der Merge setzt AGE-705 jedes Mal auf „Done"** — der Branchname genügt
-> dafür. Zweimal passiert, zweimal zurückgesetzt. **Nach jedem Merge nachsehen.**
+> **4. Vor der ersten Handlung `ListAgents`.** Peer-Namen tragen KEIN
+> Vorgangskürzel mehr — wem ein Worktree gehört, steht in `wt list` (🤖/💬) und
+> im Alter der untracked Dateien, nicht im Sitzungsnamen.
 
-## Was gebaut wurde
+## Accomplished
 
-**Der Blog hat zwei Flächen** — auf Donalds Befund, die thematische Gliederung
-sei verwirrend:
+**Der Change ist vollständig geplant und das Gate ist passiert. Keine Zeile
+Produktionscode.** `openspec validate --all` grün, `deep-links` darunter; das
+Gate zählt beide Reviewer namentlich und verifiziert den Trailer.
 
-| Fläche | Frage | Ordnung | Quelle |
-|---|---|---|---|
-| **Blog** (`index.html`) | Was ist neu? | 6 Wochenausgaben, jüngste zuerst | `release-ausgaben.ts` |
-| **Tutorial** (`tutorial.html`) | Wie geht das? | 7 Etappen, ein Weg | `release-tutorial.ts` |
+Gemessen, bevor geplant wurde — diese Zahlen sind belastbar und **nicht zu
+wiederholen**:
 
-Beide zeigen auf dieselbe Kapitelseite; jede verweist aufs nächste, das letzte
-endet. Links auf jeder Seite eine Leiste mit beiden Flächen, oben ein
-Kopfbereich wie in der App; eine Kapitelseite erbt das Motiv ihrer Etappe.
+| Gegenstand | Stand |
+| --- | --- |
+| `/.well-known/apple-app-site-association` live | **fehlt** |
+| `/.well-known/assetlinks.json` live | **fehlt** |
+| `associated-domains` in `App.entitlements` | fehlt (nur `aps-environment`) |
+| App-Link-`intent-filter` im Manifest | fehlt (nur `MAIN`/`LAUNCHER`) |
+| Vite kopiert `public/.well-known/` nach `dist/` | **ja**, per Sonde belegt |
+| Sprung aus der Push-Mitteilung ins Gespräch | **gebaut** (M1, `pushZielZuhoerer`) |
 
-**Alle 23 Screenshots** ohne fremde Gesichter. **Der Artefakt-Wächter** nahm
-`img`/`aside` in die Erlaubnisliste auf, und `src` geht durch **dieselbe**
-Ursprungsregel wie `href` — drei rote Tests belegen das.
+**Die wichtigste Messung ist die erste Zeile.** Beide Adressen antworten mit
+**HTTP 200** und liefern die Startseite: `text/html`, **7986 Bytes**,
+zeichengleich mit `/`. Das ist der SPA-Fallback. Ein Test auf den Statuscode
+wäre grün gewesen, bevor es die Dateien gibt — **jede Prüfung liest den Rumpf.**
 
-## Entscheidungen (mit Grund)
+Plan-Review mit **gemini** und **opencode** (`hf:moonshotai/Kimi-K3`), beide
+REQUEST-CHANGES, zehn Befunde, **alle** eingearbeitet.
 
-- **Die Ausgabedaten sind GESETZT, nicht gemessen** (Donald: „erstmal erfundene
-  Daten"): sechs Wochen ab 1. August, 3–5 Funktionen je Ausgabe. Die Funktionen
-  sind echt und gegen die Anwendung geprüft, nur die Bündelung in Wochen ist
-  redaktionell erfunden. **Vor dem Live-Gang zu entscheiden** (8.7).
-- **Nur die Einleitung einer Ausgabe darf „neu" sagen** — sie meldet einen
-  Zeitraum; der Text der Geschichte bleibt zeitlos, weil er auch im Tutorial
-  steht. Als benannte Ausnahme im Spec-Delta.
-- **`thema` und `RELEASE_THEMEN` sind raus.** Keine Fläche liest sie mehr; ein
-  drittes Ordnungsmerkmal wäre eine zweite Antwort auf dieselbe Frage.
-- **Keine Avatare von `i.pravatar.cc`** (Donald, auf Vorlage): Fotos echter
-  Menschen unter erfundenen Namen, in einem öffentlichen Repo. `avatar_url =
-  null`, die App zeigt Monogramme. **Nicht** weichzeichnen — das läse sich wie
-  ein zensierter echter Datensatz. Kartencover aus den eigenen
-  `public/images/hero-*.webp` statt `picsum.photos`, dieselbe Frage in klein.
-- **Das Kopfbild ist ein `<img>`, kein `background-image`** — der Wächter liest
-  Elemente und Attribute; eine Adresse im Stil entzöge sich ihm.
-- **Bilder unter `blog/bilder/`, nicht `public/`** — sonst gingen sie mit jedem
-  App-Deploy mit; kopiert werden **nur die freigegebenen**.
+## Decisions
 
-## Fallen
+- **Universal Links, kein eigenes Schema.** Ein Schema tut nichts, wenn die App
+  fehlt — und der Aktivierungslink erreicht gerade die, die sie noch nicht haben.
+- **Dateien in `public/`, keine Pages Function.** Die Werte sind fest, `_headers`
+  setzt den Inhaltstyp. Eine Function wäre Laufzeit für etwas, das ein Bau
+  erledigt.
+- **Der SPA-Fallback bleibt unangetastet.** Er ist der Grund, warum der Weg OHNE
+  App funktioniert. Statische Dateien haben bei Pages ohnehin Vorrang.
+- **Android beansprucht dieselben vier Pfade wie iOS** (Entscheidung 9, beide
+  Reviewer). Ohne `pathPrefix` beanspruchte Android die **ganze Domain**: ein
+  Passwort-Link öffnete dort die App und auf iOS den Browser.
+- **Die Zielerhaltung läuft über den Navigationszustand, nicht über einen
+  Query-Parameter.** `LoginPage` führt schon `?modus=`, und ein Ziel im Query
+  stünde in jedem Zugriffsprotokoll.
+- **`/passwort-neu` bleibt bewusst draußen** (Entscheidung 10). Wer zurücksetzt,
+  kommt gerade nicht hinein; der Browser ist dafür der verlässlichere Ort.
+- **Der Upload-Fingerabdruck jetzt, Googles in M4** (Entscheidung 6). „M3 fertig"
+  heißt danach *am Gerät belegt*, **nicht** *über den Store funktionierend*.
 
-Vier dauerhaft im Gedächtnis unter `blog-bau-vier-fallen` (Backtick im
-CSS-Kommentar, `grid-row: 1 / -1`, `bildUrl()`, `update` ohne `where`); die
-Screenshot-Fallen in `werkzeug/LOKALER-STAND-09-09.md`. **Und: ein Werkzeug der
-Werkbank kann an einer Änderung im Repo brechen, ohne dass es jemand merkt** —
-`dump.ts` lag einen Tag tot, weil `RELEASE_THEMEN` entfiel. Vor dem Weiterreichen
-ausführen, nicht nur nennen.
+### Zwei Befunde, am Repo nachgeprüft und bestätigt
+
+- **`RequireAuth.tsx` verwirft den Ort.** `<Navigate to="/login" replace />` —
+  die Zielerhaltung hat heute keinen Anker im Bestand.
+- **Der Aktivierungs-Token steht im FRAGMENT**, nicht im Query
+  (`src/instrument.test.ts:37`, `App.test.tsx:232`). Die Übersetzung muss
+  `pathname` + `search` + **`hash`** mitführen, sonst öffnet die App den
+  Aktivierungsweg ohne Token.
+
+### Einer teilweise widerlegt
+
+`ActivationGate` **navigiert nicht**, es tauscht den gerenderten Baum
+(`return <ActivationScreen />`). Die Adresse bleibt stehen, das Ziel geht dort
+nicht verloren. Die Zusage ist trotzdem gepinnt (Aufgabe 7.3b), weil sie heute
+nur aus der Bauart folgt.
 
 ## Files modified
 
-Alles in `c8bcfdb` (`git show --stat c8bcfdb`). Wo man weiterarbeitet:
+Alles in `30d7e98`, ausschliesslich unter `openspec/changes/deep-links/`:
+`proposal.md`, `design.md` (11 Entscheidungen), `specs/native-shell/spec.md`
+(alles ADDED), `tasks.md` (9 Blöcke), `REVIEWS.md` (mit verifiziertem Trailer).
 
-- `src/content/release-geschichten.ts` — 23 Kapitel, alle `freigegeben: false`.
-  **Hier setzt 4.5 an.**
-- `release-ausgaben.ts` / `release-tutorial.ts` — die zwei Ordnungen.
-- `scripts/build-blog.ts` und `blog-artefakt-waechter.ts` — Erzeuger und Wächter.
-- `openspec/changes/oeffentlicher-release-blog/tasks.md` — Blöcke 5 und 6 offen.
-- Unberührt: `supabase/`, `release-entries.generated.ts`, `AdminNeuigkeitenPage.tsx`.
+**Unberührt:** `src/`, `ios/`, `android/`, `public/`, `supabase/`.
 
-## Abnahme (Stand `3eedaf3`)
-
-`pnpm test` **2751 grün** (239 Dateien) · `typecheck` 0 · `lint` 0 (0 Fehler,
-7 Warnungen Vorzustand) · `pnpm build` 0 · `openspec validate --all` 33/33 ·
-`pnpm blog:build` schreibt **2 Seiten**, weil nichts freigegeben ist ·
-Sichtprobe beider Übersichten und einer Kapitelseite in hell und dunkel, auf
-1440 und 390 px. CI auf #387 und #388 grün, danach `CI` und `Deploy` auf `main`
-`success`. Der Edge-Functions-Schritt meldet „Nichts auszuliefern" — richtig,
-der Blog fasst `supabase/` nicht an, **PROD ist unverändert.**
-
-Alle Zahlen NACH dem Rebase gemessen — er zog 18 fremde Commits ein, die eigene
-Tests mitbrachten; die alten 2695/237 beschrieben eine Basis, die es nicht gibt.
+Verworfen wurden die `cap sync`-Rückstände der Vorsitzung (`Package.swift`,
+`Package.resolved`, Capacitor 8.5.0 → 8.5.1). Sie sind eine **vorbestehende
+Drift auf `main`** — dort steht 8.5.0, während `package.json` `^8.5.1` sagt —
+und gehören nicht in diesen Change. Gesichert als Patch im Scratchpad.
 
 ## Next session: start here
 
-**Die erste Handlung ist, Donald die 23 Texte zum Lesen zu geben.** Alles
-Weitere hängt daran: solange nichts freigegeben ist, baut `blog:build` zwei
-leere Übersichten, und ein Cloudflare-Deploy lieferte genau die aus.
+**Erster Handgriff: §3, die drei roten Tests für die Auslieferung.** Ohne die
+Dateien am Netz ist alles Weitere nicht belegbar.
 
 ```
-cd ~/worktrees/fbc-platform/donald-age-705-oeffentlicher-release-blog
-pnpm exec tsx ~/worktrees/fbc-blog-bilder/werkzeug/dump.ts /tmp/abnahme.json
-pnpm exec tsx ~/worktrees/fbc-blog-bilder/werkzeug/fahne.ts /tmp/abnahme.json /tmp/abnahme.html
-open /tmp/abnahme.html
+cd ~/worktrees/fbc-platform/donald-age-643-deep-links
+git log --oneline -1          # muss 30d7e98 sein
+cat openspec/changes/deep-links/tasks.md
 ```
 
-Erwartet: `23 Geschichten, 7 Etappen` · `freigegeben=true: 0` · `23 Fahnen`.
-Kein lokaler Stack nötig. **`dump.ts` war kaputt und ist am 10.09. repariert** —
-es importierte `RELEASE_THEMEN`, das mit diesem Change entfiel; es gruppiert
-jetzt nach den Tutorial-Etappen. Eine erzeugte Fassung liegt zum Vergleich als
-`werkzeug/abnahme-BEISPIEL.html`.
+Danach §4 (die beiden Dateien), §6 (Zuhörer auf `appUrlOpen`, **mit Fragment**),
+§7 (Zielerhaltung in `RequireAuth.tsx` und `LoginPage.tsx`).
 
-Den fertigen Blog ansehen, ohne die Quelle anzufassen (setzt die Freigabe nur
-im Lauf, nicht in der Datei):
-`pnpm exec tsx ~/worktrees/fbc-blog-bilder/werkzeug/vorschau.ts <ordner>` — 31 Seiten.
+**Was Donald tun muss, und erst bei §5 bzw. §8:**
 
-Danach, in dieser Reihenfolge:
+1. **Apple-Portal:** Fähigkeit *Associated Domains* an der App-ID setzen —
+   **vor** dem ersten Bau. Sonst greift die Signierung zum Wildcard-Profil und
+   der Bau scheitert, wie bei `aps-environment` in M2.
+2. **Ein Gerät.** Entitlement und Manifest reisen **nicht** über OTA. Geplanter
+   Weg: Direktinstallation aus Xcode auf ein registriertes Gerät.
 
-1. **[Donald] 4.5** die Abnahme, **8.7** die Ausgabedaten bestätigen. Dann
-   `freigegeben: true` setzen — **erst dann** schreibt `blog:build` mehr als
-   die zwei leeren Übersichten.
-2. **[Donald] 5.1** Cloudflare-Pages-Projekt anlegen; der Name ist die einzige
-   Angabe, die 5.2 braucht (Vorschlag `fbc-blog`). Der vorhandene
-   `CLOUDFLARE_API_TOKEN` in Infisical muss es abdecken.
-3. **5.2** Deploy als **eigener Job** in `deploy.yml`, nicht als Schritt im
-   bestehenden — ein Fehlschlag des einen muss das andere unverändert lassen,
-   und ein Schritt im selben Job liefe nach einem gescheiterten App-Deploy gar
-   nicht erst. Muster in `deploy.yml:677`; kein `pnpm build` nötig, nur
-   `pnpm blog:build` und `wrangler pages deploy ./dist-blog`.
-   **Bewusst noch nicht geschrieben:** ohne das Projekt aus 5.1 wäre er rot.
-4. **[Donald] 5.3** Bei Strato `www.effbeezee.com` als CNAME auf
-   `<projekt>.pages.dev`, danach die Domain im Pages-Projekt eintragen. Der
-   nackte Apex kann kein CNAME (AGE-256).
-5. **5.4** Live-Adresse aufrufen — ein grüner Workflow belegt die Auslieferung
-   **nicht**. Dabei gegenprüfen, dass keine nicht freigegebene Geschichte
-   erreichbar ist.
+**Und die grössere Reihenfolge:** Donald hat am 11.09. entschieden, **erst M3,
+dann M4**. In AGE-644 wartet der längste Weg des ganzen Vorhabens — Googles
+Testzwang für neue Einzelentwickler-Konten ist eine **Wartezeit**, keine
+Qualitätshürde, und kann unabhängig von M3 starten. Wenn er das Google-Konto
+anlegt, sollte er die Mindestzahl Tester und die Mindestlaufzeit **in der Play
+Console ablesen**, nicht schätzen.
 
 ## Open questions
 
-- **4.5 und 8.7** — beide unbeantwortet, beide blockieren alles Weitere.
-- **Sollen die Texte kürzer werden?** Weiter kürzen heißt Inhalt streichen.
-- **Release-Notes in der Aktivität** — unverändert offen, bleibt draußen?
-- **`pnpm format:check` ist rot** — Vorzustand, läuft in KEINEM CI-Workflow.
-- **`effbeezee.com` ohne `www`** — Weiterleitung bei Strato, oder gar nicht?
+- **Liest diese Sitzung den Keystore aus Infisical?** Ungemessen. `pnpm
+  android:keystore` ist der Weg; sonst ist Aufgabe 4.2 ein Handgriff für Donald.
+  Der Keystore darf den Baum nicht verlassen — der Wächter bricht sonst den Lauf.
+- **`_headers` für eine endungslose Datei ist ungemessen.** Dass die Datei
+  ausgeliefert wird, ist belegt; dass die Typ-Regel greift, nicht.
+- **AGE-643 trägt im Rumpf noch „blockiert durch AGE-256"**, obwohl AGE-256
+  erledigt ist und die Domain seit dem 01.09. läuft. Beim Abschluss entfernen
+  (Aufgabe 9.6).
+- **`pnpm format:check` ist rot** — Vorzustand, läuft in keinem CI-Workflow.
+  Niemals `pnpm format` laufen lassen, es schreibt ~60 fremde Dateien um.
