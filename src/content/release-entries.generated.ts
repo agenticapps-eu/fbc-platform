@@ -5,6 +5,15 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-11-bootflaeche-quer",
+    "datum": "2026-09-11",
+    "titel": "Die Startfläche passt sich dem Querformat an",
+    "linear": "AGE-716",
+    "aenderungen": [
+      "Beim Start im Querformat zeigt die Übergangsfläche jetzt einen eigenen Bildausschnitt: beide Personen sind im Bild, statt nur der hellen Wand zwischen ihnen."
+    ]
+  },
+  {
     "slug": "2026-09-10-oeffentlicher-release-blog",
     "datum": "2026-09-10",
     "titel": "Ein öffentlicher Release-Blog, und eine Quelle für den lesbaren Text",

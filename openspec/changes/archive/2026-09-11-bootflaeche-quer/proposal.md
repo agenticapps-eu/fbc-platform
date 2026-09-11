@@ -1,4 +1,4 @@
-# Die Boot-Fläche bekommt eine Querfassung
+# Die Startfläche passt sich dem Querformat an
 
 Linear: **AGE-716**
 
@@ -43,6 +43,12 @@ ins Web und die Regel, die sie quer wählt.
 
 ## What Changes
 
+- Beim Start im Querformat zeigt die Übergangsfläche jetzt einen eigenen
+  Bildausschnitt: beide Personen sind im Bild, statt nur der hellen Wand
+  zwischen ihnen.
+
+Im Einzelnen:
+
 | Stelle                        | Änderung                                                                        |
 | ----------------------------- | ------------------------------------------------------------------------------- |
 | `scripts/splash.logic.ts`     | `WEB_DATEIEN.bandQuer` und `QUER_SCHWELLE`, beide mit Begründung                |
@@ -52,7 +58,9 @@ ins Web und die Regel, die sie quer wählt.
 | `src/boot-flaeche.test.ts`    | die Schwelle gegen das CSS halten, wie die drei bestehenden Zahlen              |
 | `openspec/specs/native-shell` | die Auswahl und ihr Merkmal als Zusage                                          |
 
-**Nicht dabei:** der iOS-Katalog, das Storyboard, die Android-Startfläche. Die
+## Was NICHT dazugehört
+
+Der iOS-Katalog, das Storyboard, die Android-Startfläche. Sie
 tragen den Querausschnitt schon (AGE-712) beziehungsweise können ihn nicht
 tragen (AGE-713: die SplashScreen-API kennt keine Orientierungsvarianten).
 
