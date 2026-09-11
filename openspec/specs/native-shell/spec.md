@@ -16,7 +16,6 @@ ohne durch den Store zu gehen** — die OTA-Übernahme samt Rückweg, denn ohne
 Rückfall ist eine Auslieferung am Store vorbei eine Einbahnstraße.
 
 Die Store-Einreichung selbst gehört **nicht** hierher, sondern zu AGE-644.
-
 ## Requirements
 ### Requirement: Die App für iOS und Android ist derselbe Build wie das Web
 
@@ -398,6 +397,23 @@ Gerätefamilien** halten — die Anwendung erlaubt Hoch- und Querformat und ist 
 universelles Bündel gebaut. Bild, Verlauf und Schriftzug SHALL NOT gegeneinander
 verrutschen können.
 
+**Die Boot-Fläche SHALL dafür eine eigene Querfassung des Bildes laden, nicht
+dieselbe formatfüllend beschnittene.** Ein Hochkantband, das quer mit `cover` in
+ein Band von rund 3,6:1 gelegt wird, zeigt nur etwa ein Fünftel seiner Höhe —
+gemessen am Pixel 11 Pro 670 von 3239 Zeilen, also 20,7 %, gegen rund 97 %
+hochkant. Übrig bleibt die Wand zwischen den beiden abgebildeten Personen, und
+beide Gesichter fallen heraus. Was die native Fläche über ihre eigene
+Querfassung auswählt, SHALL die Boot-Fläche im WebView ebenso auswählen.
+
+**Das Merkmal dieser Auswahl SHALL die verfügbare HÖHE sein, nicht die
+Orientierung allein.** Die Anwendung ist ein universelles Bündel; ein Tablet quer
+hat reichlich Höhe und bekommt nativ weiterhin das Hochkantband. Eine Regel, die
+nur nach der Orientierung fragt, zeigte dort im WebView das Querband und risse
+damit genau die Naht auf, die diese Anforderung weiter oben zusagt. Die Schwelle
+SHALL als benannte Konstante neben den übrigen Zahlen der Komposition stehen und
+maschinell gegen die Regel geprüft werden, die sie anwendet — sonst stünde sie
+allein im Stylesheet, wo die drei anderen Zahlen ausdrücklich nicht stehen.
+
 Der Verlauf, der das Bild ausblendet, SHALL in derselben Farbe enden, auf der
 der Schriftzug steht, und SHALL diese Farbe an der Unterkante seiner Fläche
 erreichen — **in jeder Orientierung**. Ein in das Bild eingebackener Verlauf
@@ -468,6 +484,20 @@ nicht sicher unterscheiden.
   Erzeugung erneut läuft
 - **THEN** trägt die erzeugte Startfläche die Änderung, ohne dass eine Datei von
   Hand nachgezogen wird
+
+#### Scenario: Die Boot-Fläche quer zeigt die Gesichter, nicht die Wand dazwischen
+
+- **WHEN** die Boot-Fläche auf einem quer gehaltenen Telefon gezeichnet wird
+- **THEN** zeigt sie den queren Ausschnitt des Bildes, denselben Bildbereich, den
+  die native Fläche dort zeigt
+- **AND** sie zeigt nicht das hochkant beschnittene Band
+
+#### Scenario: Eine Fläche mit viel Höhe behält quer das Hochkantband
+
+- **WHEN** die Boot-Fläche quer gezeichnet wird und die Höhe der Fläche die
+  Schwelle überschreitet
+- **THEN** zeigt sie dasselbe Hochkantband, das die native Startfläche dort zeigt
+- **AND** zwischen den beiden Flächen entsteht keine Naht
 
 ### Requirement: Eine Mitteilung auf Android landet in einem Kanal, den die App benennt
 
