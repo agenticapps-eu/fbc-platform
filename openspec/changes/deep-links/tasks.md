@@ -99,6 +99,24 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       `dist/.well-known/apple-app-site-association` und ist zeichengleich mit
       der Quelle (gemessen 12.09.). Das belegt den Bau, nicht die Auslieferung.
 
+      **Auf der VORSCHAU-Fläche des PR gemessen (12.09.,
+      `donald-age-643-deep-links.fbc-platform.pages.dev`), und damit ist die
+      letzte offene Frage dieses Changes beantwortet:** Cloudflare wendet die
+      Inhaltstyp-Regel auf die endungslose Datei an.
+
+      | Adresse | Status | Inhaltstyp | Bytes |
+      | --- | --- | --- | --- |
+      | `/.well-known/apple-app-site-association` | 200 | `application/json` | 272 |
+      | `/.well-known/assetlinks.json` | 200 | `application/json` | 325 |
+      | `/chat/abc-123` (Gegenprobe) | 200 | `text/html` | **7986** |
+
+      Die 7986 sind dieselbe Zahl wie in 1.1 — dort war sie der Fehlschlag, hier
+      ist sie der Beleg: der SPA-Fallback antwortet unverändert und zeichengleich
+      mit `/`. Der Browserweg ist also unberührt.
+
+      **Offen bleibt dieselbe Messung gegen `app.effbeezee.com`** nach dem Merge.
+      Die Vorschau belegt das Verhalten des Projekts, nicht das der Produktionsfläche.
+
 ## 5. Die Anmeldung der Domain an beiden Plattformen
 
 - [x] 5.1 **Erledigt von Donald am 12.09.** Apple-Portal: Fähigkeit *Associated Domains* an der App-ID setzen.
