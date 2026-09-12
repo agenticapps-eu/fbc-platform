@@ -630,9 +630,20 @@ Leser ins Manifest, wo nichts falsch ist.
       mehr — ein Pfad ohne `/` am Ende steht als `android:path`. Die Anforderung
       spricht jetzt die Weite aus, nicht das Attribut, und die dauerhafte Spec
       hätte sonst einer Zusage widersprochen, die im Test steht.
-- [ ] 9.6 PR, Linear auf den richtigen Endstand. **Dabei den überholten
-      Blockervermerk „blockiert durch AGE-256" aus dem Rumpf von AGE-643
-      nehmen** — AGE-256 ist erledigt, die Domain läuft seit dem 01.09.
+- [x] 9.6 PR, Linear auf den richtigen Endstand. **PR #403** am 12.09., Branch
+      `donald/deep-links-abnahme`. **Der überholte Blockervermerk „blockiert
+      durch AGE-256" ist aus dem Rumpf von AGE-643 raus** — der Absatz bleibt
+      stehen, weil er erklärt, warum die Domain zuerst kommen musste, aber die
+      Überschrift sagt jetzt, dass er erledigt ist.
+      Die Abnahmeliste des Vorgangs ist einzeln nachgezogen, mit den Belegen
+      daneben — und **zwei Punkte bleiben offen und stehen mit dem Grund da**:
+      der Push-Sprung gehört zu M1 und wurde hier bewusst nicht erneut geprüft,
+      und die Zielerhaltung über die Anmeldung hinweg ist gebaut und getestet,
+      aber am Gerät nicht nachgestellt. Dazu ein Abschnitt „Offen nach M3" mit
+      der Play-Fassung und dem einmaligen Vorkommnis auf dem iPhone.
+      **Der Status bleibt `In Progress`, bis der PR gemergt ist** — der
+      Branchname trägt kein Vorgangskürzel, der Merge setzt ihn also nicht von
+      selbst.
 - [x] 9.7 In AGE-644 den Nachtrag festhalten: Play-App-Signing-Fingerabdruck in
       `assetlinks.json`. Ohne ihn verifiziert die über Play verteilte App ihre
       Links nicht, und das Fehlerbild führt in die Irre. **Eingetragen am
