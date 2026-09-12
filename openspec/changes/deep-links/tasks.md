@@ -43,91 +43,121 @@
 
 Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
 
-- [ ] 3.1 **RED:** Test, dass `apple-app-site-association` die App-Kennung
+- [x] 3.1 **RED:** Test, dass `apple-app-site-association` die App-Kennung
       `WQZJ8649TN.com.effbeezee.app` und alle vier Pfade führt. Rot, solange die
       Datei fehlt.
-- [ ] 3.2 **RED:** Test, dass `assetlinks.json` gültiges JSON ist, den
+- [x] 3.2 **RED:** Test, dass `assetlinks.json` gültiges JSON ist, den
       Paketnamen `com.effbeezee.app` führt und **mindestens einen**
       SHA-256-Fingerabdruck trägt.
-- [ ] 3.3 **RED:** Test, dass `public/_headers` der endungslosen Datei
+- [x] 3.3 **RED:** Test, dass `public/_headers` der endungslosen Datei
       `application/json` zuweist. Ohne den Typ lehnt Apple sie ab, und man sieht
       es der Datei nicht an.
-- [ ] 3.4 Die drei Tests laufen lassen und die **roten** Ausgaben festhalten.
+- [x] 3.3b **RED, nachgetragen:** Test, dass der Vermerk über den fehlenden
+      Play-Fingerabdruck in `public/_headers` steht. Die Spec verlangt ihn
+      (Szenario „Die offene Stelle ist auffindbar vermerkt"), §3 zählte ihn
+      nicht auf — eine unbelegte Zusage.
+- [x] 3.4 Rot festgehalten, 4/4, und **jede aus dem richtigen Grund**: zweimal
+      „Datei fehlt", zweimal „keine Regel in `_headers`". Alle vier stehen in
+      `src/deep-links.auslieferung.test.ts`.
 
 ## 4. Die beiden Dateien
 
-- [ ] 4.1 `public/.well-known/apple-app-site-association` anlegen: `applinks`
+- [x] 4.1 `public/.well-known/apple-app-site-association` angelegt: `applinks`
       mit `appIDs` und `components`. Die Pfade stehen dort als **Muster**, nicht
       als Routen: `/aktivierung`, `/chat/*`, `/events/*`, `/p/*` — ein
       Doppelpunkt-Platzhalter aus der Routentabelle wäre dort wirkungslos
       (Befund gemini, NIEDRIG). Kein Kommentar im JSON — die Datei muss strikt
       geparst werden können.
-- [ ] 4.2 Den Upload-Fingerabdruck beschaffen: `pnpm android:keystore` erzeugt
+- [ ] 4.2 **BLOCKIERT — Handgriff für Donald.** Den Upload-Fingerabdruck beschaffen: `pnpm android:keystore` erzeugt
       den Keystore aus Infisical, danach der SHA-256 über `keytool`/`apksigner`.
       **Der Keystore darf den Baum nicht verlassen** — er liegt unter einer
       Ignorierzeile, und der Wächter aus `native-shell` bricht den Lauf, wenn
       eine `.keystore`/`.jks` im Baum liegt. Nach dem Ablesen entfernen.
-- [ ] 4.3 `public/.well-known/assetlinks.json` anlegen, mit dem
+      **Gemessen am 12.09.:** `infisical` liegt auf der Maschine, ist in dieser
+      Sitzung aber NICHT angemeldet — `infisical run --env=prod` bricht mit
+      „Failed to automatically trigger login flow" ab und verlangt `infisical
+      login` interaktiv. Der Weg ist offen, die Anmeldung fehlt.
+      Ein Debug-Bau hilft nicht: `android/app/build/outputs/apk/debug/` trägt
+      den DEBUG-Schlüssel — genau das irreführende Bild aus 8.3.
+- [ ] 4.3 **Wartet auf 4.2.** `public/.well-known/assetlinks.json` anlegen, mit dem
       Upload-Fingerabdruck **und dem Vermerk über die Lücke** — der
       Play-App-Signing-Fingerabdruck fehlt und wird in AGE-644 nachgetragen.
       Der Vermerk steht als `#`-Kommentar neben der Inhaltstyp-Regel in
       `public/_headers` und in der Abnahme von AGE-644 — nicht in der Datei:
       `assetlinks.json` ist strikt geparstes JSON, ein Zusatzschlüssel wäre ein
       Fehler statt eines Hinweises.
-- [ ] 4.4 `public/_headers`: Inhaltstyp für die endungslose Datei.
-- [ ] 4.5 Die drei Tests aus §3 laufen lassen — jetzt grün.
-- [ ] 4.6 Nach dem Deploy **live** messen, ohne `-L` und mit Blick auf den
+- [x] 4.4 `public/_headers`: Inhaltstyp für die endungslose Datei — samt dem
+      Vermerk aus 4.3 und dem Verweis auf `src/lib/deep-links.ts`, den die
+      beiden JSON-Dateien selbst nicht tragen können.
+- [x] 4.5 3 von 4 grün. Die vierte (`assetlinks.json`) bleibt rot, bis 4.2
+      läuft — sie ist der einzige rote Test im Zweig.
+- [ ] 4.6 **Nach dem Deploy.** Live messen, ohne `-L` und mit Blick auf den
       Rumpf: beide Adressen liefern ihr eigenes JSON, nicht die Startseite.
       Gegen die Zahl aus 1.1 halten (7986 Bytes wären der Fehlschlag).
+      Der Bau trägt die Datei: nach `pnpm build` liegt sie als
+      `dist/.well-known/apple-app-site-association` und ist zeichengleich mit
+      der Quelle (gemessen 12.09.). Das belegt den Bau, nicht die Auslieferung.
 
 ## 5. Die Anmeldung der Domain an beiden Plattformen
 
-- [ ] 5.1 Apple-Portal: Fähigkeit *Associated Domains* an der App-ID setzen.
+- [ ] 5.1 **Handgriff für Donald.** Apple-Portal: Fähigkeit *Associated Domains* an der App-ID setzen.
       **Vor** dem ersten Bau — sonst greift die automatische Signierung zum
       Wildcard-Profil und der Bau scheitert, wie bei `aps-environment` in M2.
-- [ ] 5.2 `ios/App/App/App.entitlements`: `applinks:app.effbeezee.com`.
-- [ ] 5.3 `AndroidManifest.xml`: **ein** `intent-filter` mit
+- [x] 5.2 `ios/App/App/App.entitlements`: `applinks:app.effbeezee.com`.
+- [x] 5.3 `AndroidManifest.xml`: **ein** `intent-filter` mit
       `android:autoVerify="true"`, `VIEW`/`DEFAULT`/`BROWSABLE`,
       `android:scheme="https"`, `android:host="app.effbeezee.com"` und **je
       einem `android:pathPrefix`** für die vier Pfade.
-- [ ] 5.3b Test, dass der Filter die vier Pfade nennt und **nicht** die ganze
+- [x] 5.3b Test, dass der Filter die vier Pfade nennt und **nicht** die ganze
       Domain beansprucht. Ohne die Einschränkung öffnete `/passwort-neu` oder
       `/login` auf Android die App und auf iOS den Browser — eine Asymmetrie,
       die niemand entschieden hat (Befund opencode, HOCH).
-- [ ] 5.4 Beide Bauten laufen lassen und **nur den Bau** prüfen, bevor
+      `src/deep-links.native.test.ts` hält beide Plattformen gegen dieselbe
+      Liste. **Gegenprobe gefahren:** ein `data`-Element ohne `pathPrefix`
+      macht den Test rot — Android verschmilzt alle `data`-Elemente eines
+      Filters, ein einziges ohne Präfix beanspruchte den ganzen Host, und die
+      drei anderen Zeilen sähen weiter richtig aus.
+- [ ] 5.4 **Nach 5.1.** Beide Bauten laufen lassen und **nur den Bau** prüfen, bevor
       irgendetwas am Gerät gemessen wird. Ein gescheiterter Bau sieht sonst wie
       ein gescheiterter Deep Link aus.
 
 ## 6. Der Weg ins Routing — RED, dann GREEN
 
-- [ ] 6.1 **RED:** Test, dass eine geöffnete Adresse in den Pfad übersetzt wird
+- [x] 6.1 **RED:** Test, dass eine geöffnete Adresse in den Pfad übersetzt wird
       und die Navigation auslöst.
-- [ ] 6.1b **RED, und das ist der teuerste Pfad:** Test, dass `#token=…` die
+- [x] 6.1b **RED, und das ist der teuerste Pfad:** Test, dass `#token=…` die
       Übersetzung überlebt. Der Aktivierungs-Token steht im **Fragment**, nicht
       im Query (am Repo bestätigt: `src/instrument.test.ts:37`,
       `App.test.tsx:232`). Wer nur `pathname` und `search` mitführt, öffnet die
       App auf dem Aktivierungspfad ohne Token (Befund opencode, MITTEL).
-- [ ] 6.2 **RED:** Test, dass eine Adresse ohne bekannten Pfad **nichts**
+- [x] 6.2 **RED:** Test, dass eine Adresse ohne bekannten Pfad **nichts**
       bewegt. Das ist die Gegenprobe — ohne sie belegte ein grüner Test auch
       einen Sprung auf gut Glück.
-- [ ] 6.3 Zuhörer auf `appUrlOpen` in `AppShell.tsx`, nach dem Vorbild von
+- [x] 6.3 Zuhörer auf `appUrlOpen` in `AppShell.tsx`, nach dem Vorbild von
       `pushZielZuhoerer`: er steht, sobald die Hülle steht, nicht nach dem
       Anmelden.
-- [ ] 6.3b Die vier Pfade **einmal** als Modul aussprechen; AASA und Manifest
+- [x] 6.3b Die vier Pfade **einmal** als Modul aussprechen; AASA und Manifest
       verweisen im Kommentar darauf. Sonst stehen sie an drei Stellen und laufen
       auseinander, ohne dass es jemand vor dem Gerätetest merkt.
-- [ ] 6.4 Test, dass der Zuhörer beim Abräumen wieder entfernt wird — dasselbe
+- [x] 6.4 Test, dass der Zuhörer beim Abräumen wieder entfernt wird — dasselbe
       Muster, das der `backButton`-Zuhörer daneben bereits trägt.
+
+**Gemessen, nicht behauptet.** Vier Mutationen an `src/lib/deep-links.ts`, jede
+fing der Test: `hash` weggelassen (1 rot), Host-Prüfung entfernt (2 rot),
+frühes Abräumen entfernt (1 rot), Präfix-Prüfung entfernt (5 rot). Die
+Verdrahtung hängt an einer eigenen Datei — `AppShell.deep-links.test.tsx`, 3 rot,
+sobald der Effect aus `AppShell.tsx` verschwindet. Ein ausgewertetes Modul ist
+kein Zuhörer, der hängt.
 
 ## 7. Die Zielerhaltung über die Anmeldung
 
-- [ ] 7.1 **RED:** Test, dass ein nicht angemeldetes Mitglied nach der Anmeldung
+- [x] 7.1 **RED:** Test, dass ein nicht angemeldetes Mitglied nach der Anmeldung
       am ursprünglichen Ziel steht und nicht auf der Startseite.
-- [ ] 7.2 **RED, und das ist der Sicherheitsteil:** Test, dass ein Ziel mit
+- [x] 7.2 **RED, und das ist der Sicherheitsteil:** Test, dass ein Ziel mit
       Schema, Host oder führendem `//` **verworfen** wird und die Anmeldung auf
       die Startseite führt. Ohne diese Verengung ist die Zielerhaltung eine
       offene Weiterleitung, ausgelöst direkt nach der Eingabe der Zugangsdaten.
-- [ ] 7.3 Umsetzen, und zwar **an diesen beiden Stellen**:
+- [x] 7.3 Umsetzen, und zwar **an diesen beiden Stellen**:
       `src/components/RequireAuth.tsx` reicht das Ziel über den
       Navigationszustand weiter — es tut heute `<Navigate to="/login" replace />`
       und **verwirft den Ort vollständig** (am Repo bestätigt, Befund opencode
@@ -135,13 +165,29 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       Anmeldung. **Kein Query-Parameter:** `LoginPage` führt bereits `?modus=`
       (Zeile 89), und ein Ziel im Query stünde in jedem Zugriffsprotokoll.
       Der Aktivierungsweg bleibt ausgenommen — das Token trägt die Identität.
-- [ ] 7.3b Test, dass ein angemeldetes, **nicht aktiviertes** Konto sein Ziel
+- [x] 7.3b Test, dass ein angemeldetes, **nicht aktiviertes** Konto sein Ziel
       behält. `ActivationGate` tauscht den gerenderten Baum aus und navigiert
       NICHT, die Adresse bleibt also stehen — geprüft am Repo. Die Review
       vermutete hier eine zweite Wand; es ist keine. Die Zusage gehört trotzdem
       gepinnt, weil sie heute nur aus der Bauart folgt.
-- [ ] 7.4 Test, dass der Aktivierungsvorgang **keine** Anmeldung verlangt und
+- [x] 7.4 Test, dass der Aktivierungsvorgang **keine** Anmeldung verlangt und
       kein Hinweis auf die App davorliegt.
+
+Alle sieben stehen in `src/zielerhaltung.test.tsx`, gegen die echte Hülle: die
+Sitzung erscheint per Neurendern, so wie eine erfolgreiche Anmeldung sie meldet.
+**Gegenprobe zu 7.2:** ohne die Verengung in `zielNachAnmeldung` gehen genau
+die drei Sicherheitszusagen rot.
+
+**Zwei Annahmen des Plans haben beim Messen nicht gehalten:**
+
+- `/events/:id` liegt **nicht** hinter `RequireAuth` (`src/App.tsx:156` —
+  „anon darf öffentliche Events sehen"). Ein Event-Link verlangt dort also gar
+  keine Anmeldung, und die Zielerhaltung ist nie im Spiel. Die Fälle 7.1/7.2
+  laufen deshalb über `/chat/:threadId` und `/p/:id`.
+- Die tatsächlich greifende Stelle in `LoginPage` ist **nicht** das `navigate`
+  nach `signIn`, sondern der `<Navigate>`-Guard am Kopf der Komponente: der
+  Auth-Zuhörer meldet die Sitzung, bevor `signIn` auflöst. Beide führen jetzt
+  dasselbe Ziel; stünde es nur an einer, wäre es die falsche.
 
 ## 8. Gerätebeleg
 

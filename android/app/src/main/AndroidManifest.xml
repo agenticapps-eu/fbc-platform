@@ -22,6 +22,35 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+              AGE-643 (M3): App Links. `autoVerify` laesst Android beim
+              Installieren `https://app.effbeezee.com/.well-known/assetlinks.json`
+              holen und den Signierer der installierten App dagegen halten.
+              Ein DEBUG-Bau scheitert daran zwangslaeufig — verglichen wird
+              gegen den Upload-Fingerabdruck, nicht gegen den Debug-Schluessel.
+
+              DIE VIER `pathPrefix` SIND DER PUNKT, nicht Feinschliff. Ohne sie
+              beansprucht Android JEDE Adresse des Hosts, waehrend AASA auf
+              dieselben vier Pfade einschraenkt: `/passwort-neu` oder `/login`
+              oeffnete dann auf Android die App und auf iOS den Browser — eine
+              Asymmetrie, die niemand entschieden hat. Ausgesprochen ist die
+              Menge einmal, in `src/lib/deep-links.ts`; `deep-links.native.test.ts`
+              haelt diese Datei dagegen.
+
+              Scheme und Host stehen auf JEDEM `data`-Element. Android
+              verschmilzt zwar alle `data`-Elemente eines Filters, aber die
+              Wiederholung macht jede Zeile fuer sich lesbar.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/aktivierung" />
+                <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/chat/" />
+                <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/events/" />
+                <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/p/" />
+            </intent-filter>
+
         </activity>
 
         <!--

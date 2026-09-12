@@ -7,6 +7,7 @@ import AppFooter from "./AppFooter";
 import { cn } from "../lib/cn";
 import { wischtVonRechts } from "../lib/wischgeste";
 import { entscheideZurueck, hatVerlauf } from "../lib/zurueck";
+import { deepLinkZuhoerer } from "../lib/deep-links";
 import { pushEinrichten, pushKanalAnlegen, pushLebenszeichen, pushZielZuhoerer } from "../lib/push";
 import { navItems, type NavSection } from "../config/nav";
 import {
@@ -699,6 +700,19 @@ export default function AppShell() {
   useEffect(() => {
     void pushZielZuhoerer((ziel) => navigate(ziel));
   }, [navigate]);
+
+  // Ein Link aus Mail oder Nachricht führt in die App (AGE-643, M3).
+  //
+  // DIESELBE STELLE UND DIESELBE BEGRÜNDUNG wie beim Zuhörer darüber, nur ist
+  // der Anlass hier noch härter: der Aktivierungslink ist für viele Mitglieder
+  // der erste Kontakt mit der Plattform überhaupt, und er kommt per Definition
+  // bei geschlossener App an. Hinge der Zuhörer an einer Bedingung, die erst
+  // nach dem Anmelden gilt, fiele genau dieser Fall aus.
+  //
+  // Mit Abräumen, anders als beim Push-Zuhörer: der hängt sich über einen
+  // Riegel genau einmal an und geht nie wieder ab. Hier gibt `deepLinkZuhoerer`
+  // das Entfernen zurück, nach dem Muster des `backButton`-Zuhörers unten.
+  useEffect(() => deepLinkZuhoerer((ziel) => navigate(ziel)), [navigate]);
 
   // Die Android-Zurück-Taste (AGE-642 C2).
   //

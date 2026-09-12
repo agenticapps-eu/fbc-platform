@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["WQZJ8649TN.com.effbeezee.app"],
+        "components": [
+          { "/": "/aktivierung" },
+          { "/": "/chat/*" },
+          { "/": "/events/*" },
+          { "/": "/p/*" }
+        ]
+      }
+    ]
+  }
+}
