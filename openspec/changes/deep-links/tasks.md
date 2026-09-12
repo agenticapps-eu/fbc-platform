@@ -271,7 +271,7 @@ fremden Host und an zwei Betriebssystemen.
       `applinks:app.effbeezee.com` und `application-identifier
       WQZJ8649TN.com.effbeezee.app`, **zeichengleich mit der `appIDs`-Zeile der
       live ausgelieferten AASA**.
-- [ ] 8.1 **iOS, App installiert:** Aktivierungslink aus einer echten Mail
+- [x] 8.1 **iOS, App installiert:** Aktivierungslink aus einer echten Mail
       öffnen. Die App öffnet sich am Ziel. Beim Messen den Entwicklermodus der
       Association verwenden und das im Beleg **vermerken** — Apple
       zwischenspeichert die Datei, und ein Lauf ohne diesen Vermerk belegt
@@ -284,7 +284,13 @@ fremden Host und an zwei Betriebssystemen.
       antwortet **200, `application/json`, 272 Bytes**, inhaltsgleich mit dem
       Ursprung. Ein Gerät ohne Entwicklermodus bekommt also dieselbe Datei.
       `devicectl` kennt kein „URL öffnen", und iOS lässt sich weder tippen noch
-      abfotografieren — der Rest ist Handarbeit.
+      abfotografieren — den Tipp hat Donald am 12.09. gemacht.
+      **Ergebnis: die App öffnet sich am Ziel und zeigt „Passwort festlegen".**
+      Gemessen aus dem Kaltstart und, im zweiten Anlauf, auch aus dem
+      Hintergrund. Der Entwicklermodus war **nicht** eingeschaltet und wird
+      laut CDN-Messung auch nicht gebraucht — der Vermerk, den diese Aufgabe
+      verlangt, lautet also: ohne Entwicklermodus gemessen, gegen die Fassung,
+      die Apples CDN ausliefert.
 - [ ] 8.2 **iOS, App nicht installiert:** derselbe Link öffnet die Website und
       der Vorgang läuft zu Ende.
 - [x] 8.3 **Android, direkt installiertes Paket:** dasselbe Paar. Das Paket
@@ -332,12 +338,14 @@ fremden Host und an zwei Betriebssystemen.
       Gmail oder WhatsApp. Für die Zustellung des Links ist das dasselbe
       (`VIEW`/`BROWSABLE`, dieselbe Adresse), für die Rückkehr in die
       Absender-App nicht — das ist 8.4b.
-- [ ] 8.4b Den **Rückweg** prüfen: die Brotkrume oben links auf iOS und die
+- [x] 8.4b Den **Rückweg** prüfen: die Brotkrume oben links auf iOS und die
       Zurück-Taste auf Android führen in die Anwendung zurück, aus der der Link
       kam (Befund gemini, NIEDRIG). Das leistet das Betriebssystem, aber nur bei
       einem echten Universal Link — bricht es, ist es ein Hinweis darauf, dass
-      der Link anders geöffnet wurde als gedacht. **Braucht eine echte
-      Absender-App, also Handarbeit.**
+      der Link anders geöffnet wurde als gedacht. **Auf iOS am 12.09. belegt:**
+      die Brotkrume oben links stand da und führte zurück in die Mail, aus der
+      der Link kam. Das ist zugleich der beste Beleg dafür, dass es wirklich
+      ein Universal Link war und keine gewöhnliche Browser-Weiterleitung.
 - [ ] 8.5 Gerät zurückstellen, wie es übernommen wurde. **Offen und eine
       Entscheidung:** auf dem Pixel stand ein DEBUG-Bau vom 10.09. ohne
       Link-Filter, jetzt steht dort der Release-Bau. Der alte liegt gesichert
@@ -389,10 +397,18 @@ Was danach gemessen wurde:
 | iOS | kalt, angemeldet | „Passwort festlegen" (Donald) |
 | iOS | **warm**, angemeldet | **Startseite** (Donald, einmalig) |
 
-Der Warmstart als solcher ist damit **nicht** die Ursache — auf Android trägt
-er. Offen bleiben zwei Kandidaten, die sich nur am iPhone trennen lassen: die
-Plattform selbst, oder der angemeldete Zustand. Ein zweiter Warmlauf auf dem
-iPhone steht aus.
+| iOS | **warm**, angemeldet, zweiter Anlauf | „Passwort festlegen" (Donald) |
+
+**Der zweite Warmlauf auf dem iPhone trug.** Damit ist es nicht reproduzierbar,
+und es bleibt **ein unerklärtes Vorkommnis** — festgehalten statt weggelassen,
+weil der Weg, auf dem das Token reist, eine stille Verlustmöglichkeit hat.
+
+Die naheliegende Erklärung dafür wurde ebenfalls gemessen und **widerlegt**:
+zwei Tipps auf denselben Pfad innerhalb **einer** Lebensdauer der App
+(`…#token=ZWEIMAL-AAA`, dann `…#token=ZWEIMAL-BBB`, dazwischen nur der
+Wechsel in den Hintergrund) zeigten **beide Male** das Formular. Die
+Einmal-Entnahme greift nicht, weil `ActivationRedeemPage` bei jedem Sprung neu
+einhängt und die Adresszeile dann bereits das neue Fragment trägt.
 
 **Der Weg, auf dem das Token reist, erklärt, warum das überhaupt heikel ist:**
 `entnimmAktivierungsFragment()` läuft als allererstes in `instrument.ts`, legt
