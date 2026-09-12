@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReleaseAusgabe, ReleaseGeschichte, TutorialEtappe } from "../src/types/release";
-import { erzeugeSeiten } from "./build-blog";
+import { erzeugeSeiten, markeMitThemen } from "./build-blog";
 
 /**
  * Der Blog-Erzeuger (AGE-705, Blöcke 2 und 8).
@@ -95,7 +95,11 @@ function seite(seiten: { pfad: string; html: string }[], pfad: string): Document
 
 describe("build-blog — die Seitenmenge", () => {
   it("erzeugt beide Übersichten, die 404-Seite, je Ausgabe und je Kapitel eine", () => {
-    expect(erzeugeSeiten(STANDARD).map((s) => s.pfad).sort()).toEqual([
+    expect(
+      erzeugeSeiten(STANDARD)
+        .map((s) => s.pfad)
+        .sort(),
+    ).toEqual([
       "404.html",
       "ausgabe-2026-08-01.html",
       "ausgabe-2026-08-08.html",
@@ -284,14 +288,16 @@ describe("build-blog — das Tutorial ist ein Weg", () => {
     };
     const seiten = erzeugeSeiten(mitEntwurf);
     expect(seiten.map((s) => s.pfad)).not.toContain("zweite.html");
-    expect(
-      seite(seiten, "erste.html").querySelector("main .weiter a")?.getAttribute("href"),
-    ).toBe("/dritte.html");
+    expect(seite(seiten, "erste.html").querySelector("main .weiter a")?.getAttribute("href")).toBe(
+      "/dritte.html",
+    );
   });
 
   it("gibt der Kapitelseite den Kopfbereich ihrer Etappe", () => {
     const s = seite(erzeugeSeiten(STANDARD), "dritte.html");
-    expect(s.querySelector("header.hero img")?.getAttribute("src")).toBe("/bilder/hero-events.webp");
+    expect(s.querySelector("header.hero img")?.getAttribute("src")).toBe(
+      "/bilder/hero-events.webp",
+    );
     expect(s.querySelector("header.hero h1")?.textContent).toBe("Die dritte");
     expect(s.querySelector("header.hero p")?.textContent).toBe("Weitergehen");
   });
@@ -506,5 +512,34 @@ describe("build-blog — der Ausbruch aus der Textspalte", () => {
       ["/bilder/breit.png", "breit"],
       ["/bilder/schmal.png", null],
     ]);
+  });
+});
+
+describe("build-blog — die Marke traegt beide Themen", () => {
+  const QUELLE =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">\n  <path d="M24 2 Z" fill="#1F53B0" />\n</svg>';
+
+  it("ersetzt die feste Farbe durch eine Klasse und legt die Regel dazu", () => {
+    const svg = markeMitThemen(QUELLE);
+
+    expect(svg).not.toContain('fill="#1F53B0"');
+    expect(svg).toContain('class="strahl"');
+    // Hell wie in der Anwendung, dunkel weiss wie `text-on-chrome-active`.
+    expect(svg).toContain(".strahl{fill:#1F53B0}");
+    expect(svg).toContain("prefers-color-scheme: dark");
+    expect(svg).toContain(".strahl{fill:#ffffff}");
+  });
+
+  it("wirft, wenn die Quelldatei die erwartete Farbe nicht genau einmal traegt", () => {
+    // DIE eigentliche Zusage. Ohne sie liefert eine umbenannte oder umgefaerbte
+    // Quelldatei still eine Marke aus, die auf dunklem Chrome verschwindet —
+    // und zwar erst beim Leser. Beide Richtungen, denn zwei Treffer waeren
+    // genauso ein Formwechsel wie keiner.
+    expect(() => markeMitThemen('<svg><path d="M0 0" fill="#123456" /></svg>')).toThrow(
+      /erwartet 1x/,
+    );
+    expect(() =>
+      markeMitThemen('<svg><path fill="#1F53B0" /><path fill="#1F53B0" /></svg>'),
+    ).toThrow(/erwartet 1x/);
   });
 });
