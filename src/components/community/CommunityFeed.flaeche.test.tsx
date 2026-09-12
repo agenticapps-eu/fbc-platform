@@ -57,6 +57,7 @@ function post(overrides: Partial<FeedPost> = {}): FeedPost {
     videoUrl: null,
     kind: "member",
     event: null,
+    releaseNote: null,
     media: [],
     ...overrides,
   };

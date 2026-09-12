@@ -1170,12 +1170,15 @@ function FeedList({
   return (
     <div className="space-y-5">
       <Stagger className="space-y-5">
-        {/* Zwei Kartentypen, EINE Liste: die Event-Karte steht chronologisch
-            zwischen den Beiträgen, nicht als getrennte Liste daneben. */}
+        {/* DREI Kartentypen, EINE Liste: Event- und Release-Karte stehen
+            chronologisch zwischen den Beiträgen, nicht als getrennte Liste
+            daneben. */}
         {posts.map((post) => (
           <StaggerItem key={post.id}>
             {post.kind === "event" ? (
               <EventCard post={post} currentUserId={currentUserId} coverUrls={coverUrls} />
+            ) : post.kind === "release" ? (
+              <ReleaseCard post={post} currentUserId={currentUserId} />
             ) : (
               <PostCard
                 post={post}
@@ -1456,15 +1459,73 @@ function EventCard({
   );
 }
 
-// ── Likes und Kommentare — von BEIDEN Kartentypen benutzt ───────────────────
+// ── Release-Karte ───────────────────────────────────────────────────────────
+
+/**
+ * Eine zugestellte Release-Note im Feed (AGE-718).
+ *
+ * Sie steht in derselben Liste wie die übrigen Karten, chronologisch an ihrem
+ * Zustelldatum. Alles, was sie zeigt, kommt aus `post.releaseNote` und damit
+ * zur Laufzeit aus `release_notes`; am Beitrag selbst steht davon nichts.
+ *
+ * **Der Absender führt nirgendwohin.** In `post.author.id` steht der Admin, der
+ * zugestellt hat — er ist nicht der Verfasser, und ein Verweis auf sein Profil
+ * behauptete eine Autorschaft, die es nicht gibt. Der Name kommt aus
+ * `feed.ts` (`absenderDerAnwendung`), hier wird bloss kein `Link` gezeichnet.
+ *
+ * **Der Text wird als Text gerendert**, wie im Modal auf `/neues`: er stammt
+ * aus der Redaktion eines Admins, aber `dangerouslySetInnerHTML` wäre auch dann
+ * eine Einladung, die niemand braucht.
+ */
+function ReleaseCard({ post, currentUserId }: { post: FeedPost; currentUserId: string | null }) {
+  const note = post.releaseNote;
+  // Ist die Mitteilung für den Betrachter nicht lesbar, liefert die Einbettung
+  // null. Dann entfällt die Karte — sie erscheint NICHT leer. Dieselbe Regel
+  // wie bei der Event-Karte.
+  if (!note) return null;
+
+  return (
+    <Card className="space-y-4">
+      <header className="flex items-start gap-3">
+        {/* Kein `Link` um den Avatar und keiner um den Namen — siehe oben. */}
+        <Avatar name={post.author.name} src={null} size="md" className="ring-1 ring-accent/40" />
+        <div className="min-w-0 flex-1">
+          <span className="font-display text-base font-semibold text-ink">{post.author.name}</span>
+          <p className="text-xs text-muted">Neu in der App · {timeAgo(post.veroeffentlichtAb)}</p>
+        </div>
+      </header>
+
+      <div className="space-y-2">
+        <h3 className="font-display text-lg font-semibold text-ink">{note.title}</h3>
+        <p className="whitespace-pre-line text-sm text-ink">{note.body}</p>
+      </div>
+
+      <div>
+        {/* Auf die Mitteilung selbst, nicht nur auf die Fläche: dieselbe Adresse,
+            die die Glocke baut. */}
+        <Link to={`/neues?note=${encodeURIComponent(note.id)}`}>
+          <Button variant="secondary" size="sm">
+            Alle Neuerungen
+          </Button>
+        </Link>
+      </div>
+
+      {/* GETEILT, nicht kopiert: unter dieser Karte liegt dieselbe `posts`-Zeile
+          wie unter einem Textbeitrag. */}
+      <InteraktionsLeiste post={post} currentUserId={currentUserId} />
+    </Card>
+  );
+}
+
+// ── Likes und Kommentare — von ALLEN DREI Kartentypen benutzt ───────────────
 
 /**
  * Der Interaktionsbereich einer Karte (AGE-533).
  *
- * Bewusst GETEILT und nicht kopiert: unter einer Event-Karte liegt dieselbe
- * `posts`-Zeile wie unter einem Textbeitrag, Likes und Kommentare funktionieren
- * dort also ohne Sonderweg. Zwei Fassungen desselben Bereichs würden driften —
- * und die Spec sagt diese Gleichheit ausdrücklich zu.
+ * Bewusst GETEILT und nicht kopiert: unter einer Event- oder Release-Karte
+ * liegt dieselbe `posts`-Zeile wie unter einem Textbeitrag, Likes und
+ * Kommentare funktionieren dort also ohne Sonderweg. Zwei Fassungen desselben
+ * Bereichs würden driften — und die Spec sagt diese Gleichheit ausdrücklich zu.
  */
 function InteraktionsLeiste({
   post,
