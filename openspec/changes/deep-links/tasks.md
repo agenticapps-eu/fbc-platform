@@ -92,7 +92,7 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       beiden JSON-Dateien selbst nicht tragen können.
 - [x] 4.5 **4 von 4 grün.** Kein roter Test mehr im Zweig. Beide Dateien
       liegen nach `pnpm build` zeichengleich in `dist/.well-known/`.
-- [ ] 4.6 **Nach dem Deploy.** Live messen, ohne `-L` und mit Blick auf den
+- [x] 4.6 Live gemessen, ohne `-L` und mit Blick auf den
       Rumpf: beide Adressen liefern ihr eigenes JSON, nicht die Startseite.
       Gegen die Zahl aus 1.1 halten (7986 Bytes wären der Fehlschlag).
       Der Bau trägt die Datei: nach `pnpm build` liegt sie als
@@ -114,8 +114,18 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       ist sie der Beleg: der SPA-Fallback antwortet unverändert und zeichengleich
       mit `/`. Der Browserweg ist also unberührt.
 
-      **Offen bleibt dieselbe Messung gegen `app.effbeezee.com`** nach dem Merge.
-      Die Vorschau belegt das Verhalten des Projekts, nicht das der Produktionsfläche.
+      **Gegen `app.effbeezee.com` wiederholt, nach dem Merge von #399
+      (12.09., Deploy auf `e2abc83` grün) — zeichengleiches Ergebnis:**
+
+      | Adresse | Status | Inhaltstyp | Bytes |
+      | --- | --- | --- | --- |
+      | `/.well-known/apple-app-site-association` | 200 | `application/json` | 272 |
+      | `/.well-known/assetlinks.json` | 200 | `application/json` | 325 |
+      | `/chat/abc-123` (Gegenprobe) | 200 | `text/html` | **7986**, zeichengleich mit `/` |
+
+      Damit ist 4.6 erfüllt und die Anforderung „Beide Dateien sind als sie
+      selbst abrufbar" am Netz belegt, nicht am Bau. Die Gegenprobe deckt
+      zugleich „Der Browserweg bleibt unberührt" ab.
 
 ## 5. Die Anmeldung der Domain an beiden Plattformen
 
