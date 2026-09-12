@@ -18,6 +18,21 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-12-deep-links",
+    "datum": "2026-09-12",
+    "titel": "deep-links",
+    "linear": null,
+    "aenderungen": [
+      "**Zwei Verifizierungsdateien** unter `public/.well-known/`, ausgeliefert an `app.effbeezee.com`. Gemessen: Vite kopiert das Punktverzeichnis nach `dist/`; eine Sonde in `public/.well-known/probe.txt` lag nach `pnpm build` in `dist/.well-known/`.",
+      "**`apple-app-site-association`** trägt `WQZJ8649TN.com.effbeezee.app` und die vier Pfade. Die Datei hat **keine Endung** und braucht `application/json` über `public/_headers` — sonst weist Apple sie ab.",
+      "**`assetlinks.json`** trägt den SHA-256-Fingerabdruck des **Upload**-Schlüssels.",
+      "**iOS: Associated Domains**, `applinks:app.effbeezee.com`, plus die Fähigkeit an der App-ID im Apple-Portal.",
+      "**Android: ein `intent-filter`** mit `android:autoVerify=\"true\"`, `VIEW`/ `DEFAULT`/`BROWSABLE`, `https` auf `app.effbeezee.com` — und **je einem `pathPrefix` für die vier Pfade**, damit Android nicht die ganze Domain beansprucht, während AASA auf vier Pfade einschränkt.",
+      "**Ein Zuhörer auf `appUrlOpen`** führt die geöffnete Adresse ins Client-Routing, **mitsamt Fragment** — der Aktivierungs-Token steht dort, nicht im Query. Der Zuhörer fehlt heute ganz: `AppShell.tsx` hört `backButton`, sonst nichts.",
+      "**Das Ziel überlebt die Anmeldung.** Wer nicht angemeldet ist, landet nach dem Login am ursprünglichen Ziel statt auf der Startseite."
+    ]
+  },
+  {
     "slug": "2026-09-11-bootflaeche-quer",
     "datum": "2026-09-11",
     "titel": "Die Startfläche passt sich dem Querformat an",

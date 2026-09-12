@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { DEEP_LINK_PRAEFIXE } from "./lib/deep-links";
+import { DEEP_LINK_HOST, DEEP_LINK_PRAEFIXE } from "./lib/deep-links";
 
 /**
  * Die Anmeldung der Domain an beiden Plattformen (AGE-643, §5).
@@ -17,7 +17,12 @@ import { DEEP_LINK_PRAEFIXE } from "./lib/deep-links";
  * Passwort-Link öffnete dann auf Android die App und auf iOS den Browser.
  */
 
-const HOST = "app.effbeezee.com";
+// Aus der Quelle, NICHT abgeschrieben (Diff-Review AGE-643, opencode, MITTEL).
+// `deep-links.ts` sagt zu, diese Datei halte Entitlements und Manifest gegen
+// den dort ausgesprochenen Host. Mit einem eigenen Literal hielte sie beide
+// gegen sich selbst: wer nur die Konstante aendert, haette den Router auf der
+// neuen und die Auslieferung auf der alten Domain — und alles bliebe gruen.
+const HOST = DEEP_LINK_HOST;
 
 const ENTITLEMENTS = readFileSync("ios/App/App/App.entitlements", "utf8");
 const MANIFEST = readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
@@ -59,14 +64,24 @@ describe("Domain-Anmeldung auf beiden Plattformen (AGE-643)", () => {
       expect(element).toContain('android:scheme="https"');
       expect(element).toContain(`android:host="${HOST}"`);
       // **Die Gegenprobe.** Android verschmilzt alle `data`-Elemente eines
-      // Filters: ein einziges ohne `pathPrefix` beansprucht den ganzen Host,
-      // und die drei anderen Zeilen sähen weiter richtig aus.
-      expect(element, `data-Element ohne pathPrefix: ${element.trim()}`).toMatch(
-        /android:pathPrefix="/,
+      // Filters: ein einziges ohne jede Pfadangabe beansprucht den ganzen
+      // Host, und die drei anderen Zeilen sähen weiter richtig aus.
+      expect(element, `data-Element ohne Pfadangabe: ${element.trim()}`).toMatch(
+        /android:path(Prefix)?="/,
       );
     }
 
-    const praefixe = daten.map((e) => /android:pathPrefix="([^"]+)"/.exec(e)?.[1]);
-    expect(praefixe.sort()).toEqual([...DEEP_LINK_PRAEFIXE].sort());
+    // **Die Art der Angabe gehört zur Zusage, nicht nur ihr Wert**
+    // (Diff-Review AGE-643, opencode, MITTEL). Ein Pfad ohne `/` am Ende ist
+    // eine einzelne Route und muss `android:path` sein; `pathPrefix` träfe
+    // dort auch `/aktivierungsfeier`, während die AASA daneben exakt bleibt.
+    // Ein Vergleich der blossen Strings sähe diesen Unterschied nie.
+    const gemessen = daten
+      .map((e) => /android:(path|pathPrefix)="([^"]+)"/.exec(e))
+      .map((m) => `${m?.[1]}:${m?.[2]}`);
+    const erwartet = DEEP_LINK_PRAEFIXE.map(
+      (pfad) => `${pfad.endsWith("/") ? "pathPrefix" : "path"}:${pfad}`,
+    );
+    expect(gemessen.sort()).toEqual([...erwartet].sort());
   });
 });
