@@ -101,9 +101,14 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
 
 ## 5. Die Anmeldung der Domain an beiden Plattformen
 
-- [ ] 5.1 **Handgriff für Donald.** Apple-Portal: Fähigkeit *Associated Domains* an der App-ID setzen.
+- [x] 5.1 **Erledigt von Donald am 12.09.** Apple-Portal: Fähigkeit *Associated Domains* an der App-ID setzen.
       **Vor** dem ersten Bau — sonst greift die automatische Signierung zum
       Wildcard-Profil und der Bau scheitert, wie bei `aps-environment` in M2.
+      **Kein Profil nachzuziehen:** dieser Bau signiert serverseitig
+      (`-allowProvisioningUpdates` plus ASC-Schlüssel, siehe Kopf von
+      `.github/workflows/ios-release.yml`). Es gibt kein gespeichertes
+      Provisioning-Profil als Secret, das die neue Fähigkeit nachtragen müsste —
+      Xcode und CI ziehen beim nächsten Bau ein frisches.
 - [x] 5.2 `ios/App/App/App.entitlements`: `applinks:app.effbeezee.com`.
 - [x] 5.3 `AndroidManifest.xml`: **ein** `intent-filter` mit
       `android:autoVerify="true"`, `VIEW`/`DEFAULT`/`BROWSABLE`,
@@ -118,9 +123,27 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       macht den Test rot — Android verschmilzt alle `data`-Elemente eines
       Filters, ein einziges ohne Präfix beanspruchte den ganzen Host, und die
       drei anderen Zeilen sähen weiter richtig aus.
-- [ ] 5.4 **Nach 5.1.** Beide Bauten laufen lassen und **nur den Bau** prüfen, bevor
+- [x] 5.4 Beide Bauten gelaufen und **nur den Bau** prüfen, bevor
       irgendetwas am Gerät gemessen wird. Ein gescheiterter Bau sieht sonst wie
       ein gescheiterter Deep Link aus.
+      **Beide grün am 12.09., und beide am ARTEFAKT nachgemessen, nicht an der
+      Eingabe:**
+      Android `assembleDebug` BUILD SUCCESSFUL (exit 0, ohne Pipe gelesen). Das
+      **gebaute** Manifest unter
+      `android/app/build/intermediates/merged_manifests/debug/` trägt genau
+      EINEN `autoVerify`-Filter mit allen vier `pathPrefix` — der Test in §5.3b
+      liest die Quelle, dies liest das Ergebnis der Zusammenführung.
+      iOS `xcodebuild … -destination generic/platform=iOS` BUILD SUCCEEDED
+      (exit 0). `codesign -d --entitlements` auf der gebauten `App.app` zeigt
+      `com.apple.developer.associated-domains` mit
+      `applinks:app.effbeezee.com` — die Fähigkeit aus 5.1 hat es also bis ins
+      signierte Binary geschafft, und nicht nur ins Portal.
+      Zwei Anmerkungen für den nächsten Lauf: `DEVELOPMENT_TEAM` steht NICHT im
+      Projekt, es muss wie in CI auf der Kommandozeile mitgegeben werden
+      (`DEVELOPMENT_TEAM=WQZJ8649TN`), sonst bricht der Bau mit „requires a
+      development team" ab. Und `cap sync` erzeugt erneut die **vorbestehende**
+      Drift auf `Package.swift`/`Package.resolved` (8.5.0 → 8.5.1); sie wurde
+      wieder verworfen, weil sie nicht zu diesem Change gehört.
 
 ## 6. Der Weg ins Routing — RED, dann GREEN
 
