@@ -362,6 +362,45 @@ nach einem `force-stop` aufgenommen, das Konto auf dem Gerät **abgemeldet**:
 man sich auf dem Gerät anmelden. Sie hängt an dem `<Navigate>`-Wächter am Kopf
 von `LoginPage` und ist dort durch Tests gedeckt, nicht durch diesen Lauf.
 
+### Der offene Punkt: ein Warmstart auf iOS verlor den Token (12.09.)
+
+Donald tippte den Aktivierungslink in der Mail an, während die App auf dem
+iPhone **im Hintergrund lief und angemeldet war**. Die App kam nach vorn und
+zeigte die **Startseite**, nicht das Formular.
+
+**Die naheliegende Erklärung ist falsch**, und das ist der Grund, warum der
+Punkt hier steht: „angemeldet, deshalb Startseite" trägt nicht. Die
+Weiterleitung in `ActivationRedeemPage` steht hinter
+
+```
+if (!token && user && isActivated === true && zweck === "aktivierung")
+```
+
+— sie verlangt ausdrücklich **kein** Token. Mit Token rendert die Seite das
+Formular, angemeldet oder nicht. Die Startseite belegt also, dass `token`
+leer war: entweder ging der Sprung nicht los, oder er verlor das Fragment.
+
+Was danach gemessen wurde:
+
+| Plattform | Zustand | Ergebnis |
+| --- | --- | --- |
+| Android | kalt, abgemeldet | „Passwort festlegen" |
+| Android | **warm**, abgemeldet | „Passwort festlegen" |
+| iOS | kalt, angemeldet | „Passwort festlegen" (Donald) |
+| iOS | **warm**, angemeldet | **Startseite** (Donald, einmalig) |
+
+Der Warmstart als solcher ist damit **nicht** die Ursache — auf Android trägt
+er. Offen bleiben zwei Kandidaten, die sich nur am iPhone trennen lassen: die
+Plattform selbst, oder der angemeldete Zustand. Ein zweiter Warmlauf auf dem
+iPhone steht aus.
+
+**Der Weg, auf dem das Token reist, erklärt, warum das überhaupt heikel ist:**
+`entnimmAktivierungsFragment()` läuft als allererstes in `instrument.ts`, legt
+das Token in eine Modulvariable und **räumt das Fragment per `replaceState`
+aus der Adresszeile**. `holeAktivierungsToken()` gibt es **genau einmal**
+heraus. Wer diesen Pfad zweimal in derselben Lebensdauer der App durchläuft,
+bekommt beim zweiten Mal `null` — ohne dass irgendwo ein Fehler erscheint.
+
 ### Eine Sonde, die wie ein Beleg aussieht und keiner ist
 
 `cmd package resolve-activity -a VIEW -c BROWSABLE -d <adresse>` meldete für
