@@ -1,3 +1,7 @@
+# Neuerungen an der App stehen jetzt auch in der Aktivität
+
+Linear: **AGE-718**
+
 ## Why
 
 AGE-718. Eine Release-Note erreicht ein Mitglied heute **einmal** — als Hinweis in
@@ -20,26 +24,42 @@ zeigen.
 
 ## What Changes
 
-- **Eine dritte Beitragsart** `kind = 'release'` auf `public.posts`, mit einer
-  **eigenen** Spalte `release_note_id` (FK auf `public.release_notes`).
-  `ref_id` kann sie nicht tragen: die Spalte hat einen Fremdschlüssel auf
-  `public.events`.
-- **Der Beitrag entsteht beim Zustellen**, nicht beim Entwerfen — ein Trigger am
-  Übergang `draft → sent`. Er liegt damit hinter demselben Riegel, der die
-  Doppelzustellung verhindert: nur `send_release_note()` kann diesen Übergang
-  schreiben, weil die UPDATE-Policy `status = 'draft'` erzwingt.
-- **Der Beitrag speichert keinen Text.** `body` bleibt leer, Titel und Text
-  kommen zur Laufzeit aus `release_notes` — dasselbe Muster wie beim
-  Event-Beitrag. Zwei Kopien desselben Textes könnten auseinanderlaufen, und die
-  redigierte Fassung ist in `release_notes` schon da.
-- **Eine Release-Karte im Feed**, chronologisch zwischen den übrigen Beiträgen,
-  mit einem Weg zur vollen Mitteilung auf `/neues`.
-- **Kein Autor an der Karte.** `posts.author_id` bleibt unverändert `not null`
-  und trägt den versendenden Admin; die Oberfläche zeigt ihn nicht, sondern
-  einen Absender „Neu in der App" — nach dem Muster von `ehemaligesMitglied()`,
-  das für autorlose Karten bereits existiert.
-- **Ein Backfill** für die bereits zugestellten Notes, mit `created_at` aus
-  `sent_at` — sonst stünden alle Altbestände als frischeste Beiträge oben.
+- Eine Mitteilung über Neuerungen erscheint jetzt als eigene Karte in der
+  Aktivität — chronologisch zwischen den Beiträgen, nicht als getrennte Liste.
+- Die Karte lässt sich liken und kommentieren wie jeder andere Beitrag.
+- Sie nennt `eff.bee.zee` als Absender. Die App spricht unter ihrem eigenen
+  Namen; ein Profil steckt nicht dahinter.
+- Ein Weg von der Karte zur vollen Mitteilung auf „Neu in der App".
+- Auch die unterste Mitgliedsstufe sieht die Karte. Ein Besucher ohne Anmeldung
+  sieht sie nicht.
+
+Im Einzelnen:
+
+**Eine dritte Beitragsart** `kind = 'release'` auf `public.posts`, mit einer
+**eigenen** Spalte `release_note_id` (FK auf `public.release_notes`). `ref_id`
+kann sie nicht tragen: die Spalte hat einen Fremdschlüssel auf `public.events`.
+
+**Der Beitrag entsteht beim Zustellen**, nicht beim Entwerfen — ein Trigger am
+Übergang `draft → sent`. Er liegt damit hinter demselben Riegel, der die
+Doppelzustellung verhindert: nur `send_release_note()` kann diesen Übergang
+schreiben, weil die UPDATE-Policy `status = 'draft'` erzwingt.
+
+**Der Beitrag speichert keinen Text.** `body` bleibt leer, Titel und Text kommen
+zur Laufzeit aus `release_notes` — dasselbe Muster wie beim Event-Beitrag. Zwei
+Kopien desselben Textes könnten auseinanderlaufen, und die redigierte Fassung
+ist in `release_notes` schon da.
+
+**Kein Autor an der Karte.** `posts.author_id` bleibt unverändert `not null` und
+trägt den versendenden Admin; die Oberfläche zeigt ihn nicht, sondern den
+Absender `eff.bee.zee` — nach dem Muster von `ehemaligesMitglied()`, das für
+autorlose Karten bereits existiert. Ein Verweis auf ein Profil entsteht nicht.
+
+**Ein Backfill** für die bereits zugestellten Notes, mit **`created_at` UND
+`veroeffentlicht_ab`** aus `sent_at` — der Feed ordnet über die zweite Spalte,
+und sie trägt `default now()`. Nur `created_at` zu setzen stellte alle
+Altbestände als frischeste Beiträge nach oben.
+
+## Was NICHT Teil dieses Changes ist
 
 **Kein BREAKING Change.** Die beiden bestehenden Arten, der Modal-Weg (AGE-632)
 und der öffentliche Blog (AGE-705) bleiben unberührt.

@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-12-release-notes-in-der-aktivitaet",
+    "datum": "2026-09-12",
+    "titel": "Neuerungen an der App stehen jetzt auch in der Aktivität",
+    "linear": "AGE-718",
+    "aenderungen": [
+      "Eine Mitteilung über Neuerungen erscheint jetzt als eigene Karte in der Aktivität — chronologisch zwischen den Beiträgen, nicht als getrennte Liste.",
+      "Die Karte lässt sich liken und kommentieren wie jeder andere Beitrag.",
+      "Sie nennt `eff.bee.zee` als Absender. Die App spricht unter ihrem eigenen Namen; ein Profil steckt nicht dahinter.",
+      "Ein Weg von der Karte zur vollen Mitteilung auf „Neu in der App\".",
+      "Auch die unterste Mitgliedsstufe sieht die Karte. Ein Besucher ohne Anmeldung sieht sie nicht."
+    ]
+  },
+  {
     "slug": "2026-09-11-bootflaeche-quer",
     "datum": "2026-09-11",
     "titel": "Die Startfläche passt sich dem Querformat an",
