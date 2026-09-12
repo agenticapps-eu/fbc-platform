@@ -257,6 +257,7 @@ jobs:
           supabase/tests/event_serie_cover_test.sql
           supabase/tests/event_serie_rundruf_test.sql
           supabase/tests/kontoloeschung_test.sql
+          supabase/tests/release_beitrag_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
