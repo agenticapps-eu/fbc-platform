@@ -2,11 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "../components/ui/Button";
 import { Logo } from "../components/ui/Logo";
 import RechtsLinks from "../components/RechtsLinks";
+import { zielNachAnmeldung } from "../lib/deep-links";
 import { useAuth } from "../providers/auth-context";
 
 const schema = z.object({
@@ -105,7 +106,13 @@ export const REGISTRIEREN_PFAD = `/login?${MODUS_PARAM}=${MODUS_REGISTRIEREN}`;
 export default function LoginPage() {
   const { user, isLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const ort = useLocation();
   const [suchParameter, setzeSuchParameter] = useSearchParams();
+
+  // Wohin es nach dem Anmelden geht (AGE-643). `RequireAuth` legt den Ort in
+  // den Navigationszustand; `zielNachAnmeldung` verwirft alles, was kein
+  // anwendungsinterner Pfad ist, und gibt sonst die Startseite zurück.
+  const ziel = zielNachAnmeldung(ort.state);
   const mode: Mode =
     suchParameter.get(MODUS_PARAM) === MODUS_REGISTRIEREN ? "register" : "login";
 
@@ -157,7 +164,12 @@ export default function LoginPage() {
   // Bereits eingeloggt → kein Grund für die Login-Seite. „/" zeigt seit AGE-494
   // ausnahmslos die Startseite; der Erstlogin wird nicht mehr in den
   // Kompass-Assistenten umgeleitet (HomeRedirect).
-  if (!isLoading && user) return <Navigate to="/" replace />;
+  //
+  // UND DIES IST DIE STELLE, DIE NACH DEM ANMELDEN TATSÄCHLICH GREIFT: der
+  // Auth-Zuhörer meldet die Sitzung, BEVOR `signIn` auflöst — dieser Guard
+  // räumt die Seite also ab, bevor das `navigate` unten läuft. Beide führen
+  // deshalb dasselbe Ziel.
+  if (!isLoading && user) return <Navigate to={ziel} replace />;
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
@@ -181,7 +193,7 @@ export default function LoginPage() {
         setFormError(error.message);
         return;
       }
-      navigate("/", { replace: true });
+      navigate(ziel, { replace: true });
       return;
     }
 

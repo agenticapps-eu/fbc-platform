@@ -23,7 +23,7 @@
  *
  * Aufruf: `pnpm blog:build`.
  */
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { RELEASE_AUSGABEN } from "../src/content/release-ausgaben";
@@ -86,6 +86,65 @@ const BILDER_QUELLE = "blog/bilder";
 
 /** Die Motive der Kopfbereiche sind die der Anwendung (`CREDITS.md` daneben). */
 const MOTIV_QUELLE = "public/images";
+
+/**
+ * Die Schriften der Anwendung, selbst ausgeliefert.
+ *
+ * Der Blog lief bis zum 11.09. in der Systemschrift und in Georgia, während
+ * die Anwendung Inter und Fraunces trägt. Nebeneinander gestellt war das der
+ * auffälligste Unterschied überhaupt — vor Farbe und Fläche.
+ *
+ * KOPIERT und nicht verlinkt: `app.effbeezee.com/fonts/…` wäre eine fremde
+ * Herkunft, die der Artefakt-Wächter zu Recht rötet, und ein CDN erst recht.
+ * Die beiden `-ext`-Schnitte bleiben draussen: der Blog ist deutsch, und
+ * `latin` deckt ihn ab.
+ */
+const SCHRIFT_QUELLE = "public/fonts";
+const SCHRIFTEN = ["inter-latin.woff2", "fraunces-latin.woff2"];
+
+/**
+ * Die Kompassmarke — KOPIERT, nicht abgeschrieben.
+ *
+ * Der Pfad der Marke liegt im Repo an drei Stellen, die zusammen geändert
+ * werden müssen (CompassMark.tsx, diese Datei, docs/design-system.html), und
+ * `scripts/app-icons.logic.ts` liest genau sie. Eine vierte Kopie hier wäre die
+ * Stelle, die beim nächsten Formwechsel vergessen wird — deshalb liest der Bau
+ * die vorhandene Datei und schreibt sie um, statt sie nachzubilden.
+ *
+ * Als BILD und nicht als eingebettetes `svg`: der Artefakt-Wächter führt `svg`
+ * nicht in seiner Erlaubnisliste, und ein Sicherheitswächter wird nicht für ein
+ * Logo aufgeweicht. Ein `img` mit einer Adresse ab `/` ist ihm bereits recht,
+ * und eine SVG-Datei in einem `img` ist ein Kontext ohne Skript.
+ */
+const MARKE_QUELLE = "public/brand/compass-favicon.svg";
+const MARKE_ZIEL = "marke.svg";
+
+/** Die Farbe, die die Marke in der Quelldatei trägt. */
+const MARKE_FARBE = 'fill="#1F53B0"';
+
+/**
+ * Dieselbe Form, aber mitdenkend beim Theme.
+ *
+ * Die Quelldatei trägt die Farbe fest, weil ein Favicon keine Umgebung hat. In
+ * der Anwendung erbt die Marke ihre Farbe (`currentColor`) — das geht in einem
+ * `img` nicht, denn das eingebettete Dokument kennt die Schriftfarbe der Seite
+ * nicht. Die Fallunterscheidung zieht deshalb IN die Datei: auf dunklem Chrome
+ * steht die Marke weiss, so wie `text-on-chrome-active` es in Logo.tsx tut.
+ *
+ * Der Austausch ist an die Zahl EINS gebunden und bricht sonst laut ab. Eine
+ * stille Ersetzung, die nichts findet, lieferte eine Marke aus, die auf dunklem
+ * Grund verschwindet — und zwar erst beim Leser.
+ */
+export function markeMitThemen(quelle: string): string {
+  const treffer = quelle.split(MARKE_FARBE).length - 1;
+  if (treffer !== 1) {
+    throw new Error(`build-blog: ${MARKE_QUELLE} trägt ${treffer}x ${MARKE_FARBE}, erwartet 1x`);
+  }
+  const stil =
+    "<style>.strahl{fill:#1F53B0}" +
+    "@media (prefers-color-scheme: dark){.strahl{fill:#ffffff}}</style>";
+  return quelle.replace(MARKE_FARBE, 'class="strahl"').replace(/(<svg\b[^>]*>)/, `$1\n  ${stil}`);
+}
 
 /** Die Textspalte in Pixeln (40rem). Breitere Bilder treten aus ihr heraus. */
 const SPALTE = 640;
@@ -201,7 +260,7 @@ const APP = "https://app.effbeezee.com/";
 function navigation(aktiv: "blog" | "tutorial"): string {
   const marke = (fuer: "blog" | "tutorial") => (fuer === aktiv ? ' class="aktiv"' : "");
   return `    <aside>
-      <p class="marke">${maskiere(MARKE)}</p>
+      <p class="marke"><img src="/bilder/${MARKE_ZIEL}" alt="" width="32" height="32" />${maskiere(MARKE)}</p>
       <nav>
         <a href="/tutorial.html"${marke("tutorial")}>Tutorial</a>
         <a href="/index.html"${marke("blog")}>Blog</a>
@@ -211,6 +270,37 @@ function navigation(aktiv: "blog" | "tutorial"): string {
 }
 
 const STIL = `
+    /* Die Schriften der Anwendung, selbst ausgeliefert (Kopie aus public/fonts
+       in schreibeBlog). Kein Google-CDN: derselbe Grund wie in AGE-492, und der
+       Artefakt-Wächter erlaubt ohnehin keine fremde Herkunft.
+
+       font-display: swap zeigt sofort den Rückfall und tauscht nach. Die
+       unicode-ranges der Anwendung stehen hier NICHT — der Blog ist deutsch und
+       lädt beide Schnitte ohnehin; eine zweite Kopie der Bereiche wäre eine
+       zweite Pflegestelle. */
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url("/schriften/inter-latin.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fraunces";
+      font-style: normal;
+      font-weight: 400 500;
+      font-display: swap;
+      src: url("/schriften/fraunces-latin.woff2") format("woff2");
+    }
+
+    /* Die Werte stammen aus src/index.css und sind dort begründet. Sie stehen
+       hier als Kopie, weil der Blog ein eigenständiges Artefakt ohne Bündel ist
+       — gepinnt wird die Übereinstimmung im Test, nicht durch einen Import.
+
+       ZUR BENENNUNG, weil genau hier der Fehler sass: --canvas sind die
+       KARTEN (weiss), --soft ist der GRUND darunter (#f6f8fb). Bis zum
+       11.09. war es umgekehrt eingesetzt — weisser Grund, graue Leiste —, und
+       damit fehlte der Seite die Ebene, aus der die Anwendung ihre Ruhe zieht. */
     :root {
       color-scheme: light dark;
       --canvas: #ffffff;
@@ -220,34 +310,62 @@ const STIL = `
       --gedaempft: #626f85;
       --linie: #e2e8f0;
       --akzent: #1f53b0;
-      --schleier: 0.32;
+      --akzent-flaeche: #2f6bd1;
+      --akzent-schrift: #ffffff;
+      /* Das Chrome — Leiste und ihre Zustände. */
+      --chrome: #ffffff;
+      --chrome-rand: #e2e8f0;
+      --auf-chrome: #475569;
+      --auf-chrome-gedaempft: #64748b;
+      --chrome-aktiv: #eff5fd;
+      --auf-chrome-aktiv: #1f53b0;
+      --radius: 14px;
+      /* Das Randmass der Inhaltsspalte. Als Variable, weil der Kopfbereich es
+         ABZIEHEN muss: er ist selbst die Karte und nicht ihr Behaelter, also
+         traegt er die Polsterung des Textes und kann nicht zusaetzlich die
+         Spaltenpolsterung tragen. Zwei Zahlen von Hand gleichzuhalten war
+         genau der Versatz, der auf dem ersten Bau zu sehen war. */
+      --rand: 1.5rem;
+      --schatten: 0 1px 2px rgb(15 29 51 / 0.05), 0 4px 16px rgb(15 29 51 / 0.05);
+      --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     }
+    /* Die Anwendung hat bewusst KEINEN Nachtmodus (AGE-499: navy färbt nur
+       das Chrome). Der Blog ist eine öffentliche Seite ohne Themenschalter und
+       behält seinen — er folgt dem System, nicht der Anwendung. Angeglichen
+       sind die Flächenrollen, nicht die Entscheidung darüber. */
     @media (prefers-color-scheme: dark) {
       :root {
-        --canvas: #081527;
-        --soft: #0c2043;
+        --canvas: #0e1f38;
+        --soft: #081527;
         --ink: #dce9fa;
         --ink-stark: #ffffff;
         /* NICHT derselbe Ton wie --akzent: im Dunklen lasen sich Datum und
            Fusszeile sonst wie Verweise. Gesehen, nicht gerechnet. */
         --gedaempft: #93a7c4;
-        --linie: #123061;
+        --linie: rgb(255 255 255 / 0.08);
         --akzent: #8eb5ec;
-        /* Dieselben Motive sind auf dunklem Grund heller — gemessen an der
-           Lesbarkeit der Überschrift darüber, nicht geschätzt. */
-        --schleier: 0.24;
+        --akzent-flaeche: #2f6bd1;
+        --chrome: #081527;
+        --chrome-rand: rgb(255 255 255 / 0.08);
+        --auf-chrome: #9fb4d2;
+        --auf-chrome-gedaempft: #8fa5c4;
+        --chrome-aktiv: #1f53b0;
+        --auf-chrome-aktiv: #ffffff;
+        --schatten: 0 1px 2px rgb(0 0 0 / 0.4);
       }
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--canvas);
+      background: var(--soft);
       color: var(--ink);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 1.0625rem;
+      font-family: var(--font-sans);
+      font-size: 1rem;
       line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
       display: grid;
-      grid-template-columns: 15rem minmax(0, 1fr);
+      grid-template-columns: 15.5rem minmax(0, 1fr);
       /* Die drei Zeilen stehen EXPLIZIT da, und das ist keine Zierde: ohne sie
          gibt es keine Linie -1, die Zeilenangabe der Leiste fällt auf eine
          einzige Zeile zusammen, und ihre Bildschirmhöhe zieht die erste Zeile
@@ -261,97 +379,160 @@ const STIL = `
       top: 0;
       align-self: start;
       height: 100vh;
-      padding: 1.5rem 1.25rem;
-      border-right: 1px solid var(--linie);
-      background: var(--soft);
+      padding: 1.25rem 0.75rem;
+      border-right: 1px solid var(--chrome-rand);
+      background: var(--chrome);
     }
+    /* Die Wortmarke der Anwendung, ohne ihr Zeichen: der Kompassstern ist ein
+       SVG, und der Artefakt-Wächter führt svg nicht in seiner Erlaubnisliste.
+       Ihn aufzunehmen wäre eine Änderung an einem Sicherheitswächter und
+       gehört nicht in eine Angleichung des Aussehens. */
     .marke {
-      font-weight: 700;
-      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0 0 1.5rem;
+      padding: 0.25rem 0.75rem;
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1;
       color: var(--ink-stark);
-      margin: 0 0 1.75rem;
     }
-    aside nav { display: flex; flex-direction: column; gap: 0.25rem; }
+    /* Die Marke ist kein Inhaltsbild: kein Rahmen, keine Flaeche, kein Abstand.
+       Ohne diese Zeile erbt sie die Regel fuer Aufnahmen weiter unten. */
+    .marke img {
+      width: 2rem;
+      height: 2rem;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+    }
+    aside nav { display: flex; flex-direction: column; gap: 0.125rem; }
     aside nav a {
+      position: relative;
       display: block;
       padding: 0.5rem 0.75rem;
-      border-radius: 0.5rem;
+      border-radius: 0.375rem;
       text-decoration: none;
-      color: var(--ink);
+      font-size: 0.875rem;
+      color: var(--auf-chrome);
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    aside nav a:hover { background: var(--soft); color: var(--auf-chrome-aktiv); }
+    aside nav a.aktiv {
+      background: var(--chrome-aktiv);
+      color: var(--auf-chrome-aktiv);
       font-weight: 600;
     }
-    aside nav a:hover { background: var(--canvas); }
-    aside nav a.aktiv { background: var(--canvas); color: var(--akzent); }
-    /* Abgesetzt von den beiden Flaechen — die Anwendung ist ein anderer Ort. */
+    /* Der Balken am linken Rand des aktiven Eintrags — dieselbe Geometrie wie
+       in SidebarNav.tsx: 2 px breit, oben und unten um 0,375rem eingerückt. */
+    aside nav a.aktiv::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.375rem;
+      bottom: 0.375rem;
+      width: 2px;
+      border-radius: 999px;
+      background: var(--auf-chrome-aktiv);
+    }
+    /* Abgesetzt von den beiden Flaechen — die Anwendung ist ein anderer Ort.
+       Als gefüllter Knopf, weil die Anwendung ihren Weg hinein genauso zeigt. */
     .zurapp {
-      margin: 1.5rem 0 0;
+      margin: 1.25rem 0 0;
       padding-top: 1.25rem;
-      border-top: 1px solid var(--linie);
+      border-top: 1px solid var(--chrome-rand);
     }
     .zurapp a {
       display: block;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.5rem;
+      padding: 0 1.25rem;
+      height: 2.75rem;
+      line-height: 2.75rem;
+      border-radius: 0.375rem;
+      text-align: center;
       text-decoration: none;
-      font-weight: 600;
-      color: var(--akzent);
+      font-size: 0.875rem;
+      font-weight: 500;
+      background: var(--akzent-flaeche);
+      color: var(--akzent-schrift);
+      transition: background-color 0.15s ease;
     }
-    .zurapp a:hover { background: var(--canvas); }
+    .zurapp a:hover { background: var(--akzent); }
+    /* EINE Spalte fuer alles. Vorher war der Kopfbereich 54rem breit und die
+       Karten darunter 46rem: vier verschiedene senkrechte Kanten auf einer
+       Seite, die nach nichts aussehen ausser nach Versehen. Die Anwendung
+       setzt Kopfbereich und Inhalt auf dieselben Kanten. */
     header, main, footer {
       grid-column: 2;
       width: 100%;
-      max-width: 52rem;
+      max-width: calc(46rem + 2 * var(--rand));
       margin: 0 auto;
-      padding: 0 1.5rem;
+      padding: 0 var(--rand);
     }
+    /* Der Kopfbereich der Anwendung, Zug um Zug: weisse Karte auf dem Grund,
+       das Motiv rechts, darüber ein Verlauf von der Kartenfläche nach
+       transparent. Der Text steht damit auf Fläche und nicht auf Foto.
+
+       Vorher lag das Motiv als 32-%-Deckkraft unter dem GANZEN Kopfbereich —
+       Fließtext auf Foto, und beides trüb. (PageHero.tsx trägt dieselben vier
+       Stopps; hier als Pseudo-Element, weil der Wächter kein <div> erlaubt.) */
     header.hero {
       position: relative;
+      isolation: isolate;
       overflow: hidden;
-      margin: 1.5rem auto 2.5rem;
-      padding: 2.25rem 2rem;
-      min-height: 11rem;
+      width: calc(100% - 2 * var(--rand));
+      margin: 1.5rem auto 2rem;
+      padding: 2.5rem 2rem;
+      min-height: 12rem;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      border-radius: 0.75rem;
-      background: var(--soft);
+      border: 1px solid var(--linie);
+      border-radius: var(--radius);
+      background: var(--canvas);
     }
-    /* Das Motiv liegt unter dem Text und nicht hinter ihm: eine Deckkraft statt
-       eines Verlaufs, weil ein Verlauf über zwei Themes zwei Verläufe wären.
-       (Keine Backticks in diesem Block — er steht in einem Template-Literal.) */
     header.hero img {
       position: absolute;
-      inset: 0;
-      width: 100%;
+      inset: 0 0 0 auto;
+      width: 70%;
       height: 100%;
       object-fit: cover;
-      opacity: var(--schleier);
       margin: 0;
       border: 0;
       border-radius: 0;
     }
-    header.hero h1, header.hero p { position: relative; margin: 0; }
-    header.hero h1 { font-size: 2rem; }
-    header.hero p { color: var(--ink-stark); margin-top: 0.35rem; }
-    main { max-width: 40rem; }
+    header.hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        var(--canvas) 0%,
+        var(--canvas) 38%,
+        color-mix(in srgb, var(--canvas) 55%, transparent) 62%,
+        transparent 88%
+      );
+    }
+    header.hero h1, header.hero p { position: relative; z-index: 1; margin: 0; max-width: 34rem; }
+    header.hero h1 { font-size: 2.25rem; }
+    header.hero p { color: var(--gedaempft); margin-top: 0.75rem; }
     h1, h2, h3 {
-      font-family: Georgia, "Times New Roman", serif;
+      font-family: var(--font-display);
+      font-weight: 500;
       color: var(--ink-stark);
-      line-height: 1.25;
+      line-height: 1.2;
+      letter-spacing: -0.012em;
     }
     h1 { font-size: 1.875rem; margin: 0 0 0.5rem; }
-    h2 {
-      font-size: 1.375rem;
-      margin: 3rem 0 0.5rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--linie);
-    }
+    h2 { font-size: 1.5rem; margin: 2.5rem 0 1rem; }
     main > h2:first-child { margin-top: 0; }
     p { margin: 0 0 1.15rem; }
     a { color: var(--akzent); }
     nav a { text-decoration: none; font-size: 0.9375rem; }
     nav a:hover { text-decoration: underline; }
-    time { color: var(--gedaempft); font-size: 0.9375rem; }
+    time { color: var(--gedaempft); font-size: 0.875rem; }
     main > time { display: block; margin-bottom: 1.75rem; }
     main > nav { display: block; margin-bottom: 1.5rem; }
     /* Die Aufnahmen sind sehr verschieden gross — von einem 180 px breiten
@@ -369,27 +550,54 @@ const STIL = `
     }
     main > img { margin-bottom: 1.75rem; }
     /* Wo Platz ist, tritt das Bild aus der Textspalte heraus. Ein Fenster-
-       Screenshot auf 40rem ist eine Briefmarke — man sieht, DASS da etwas ist,
+       Screenshot auf 46rem ist eine Briefmarke — man sieht, DASS da etwas ist,
        und nicht, WAS. Der Ausbruch ist genau so breit wie die Reserve. */
-    @media (min-width: 76rem) {
-      main img.breit { max-width: 52rem; margin-left: -6rem; margin-right: -6rem; }
+    @media (min-width: 82rem) {
+      main > img.breit { max-width: 54rem; margin-left: -4rem; margin-right: -4rem; }
     }
+    /* Ein Anriss ist eine KARTE auf dem Grund, keine Zeile zwischen zwei
+       Trennlinien. Das ist der Unterschied, der die Seite neben der Anwendung
+       hat alt aussehen lassen: dort trägt jede Einheit ihre eigene Fläche. */
     article {
-      margin: 0 0 2rem;
-      padding-bottom: 2rem;
-      border-bottom: 1px solid var(--linie);
+      --karte-polster: 1.5rem;
+      margin: 0 0 1.25rem;
+      padding: var(--karte-polster);
+      border: 1px solid var(--linie);
+      border-radius: var(--radius);
+      background: var(--canvas);
+      box-shadow: var(--schatten);
     }
-    article:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+    article:last-child { margin-bottom: 0; }
     /* Im Anriss ist das Bild ein Blickfang und nicht der Beleg — deshalb
        gedeckelt und von oben beschnitten. Auf der Kapitelseite steht es
-       vollständig; dort ist es der Gegenstand. */
-    article img { max-height: 15rem; object-fit: cover; object-position: top; }
-    article h3 { font-size: 1.1875rem; margin: 0 0 0.35rem; }
+       vollständig; dort ist es der Gegenstand.
+
+       Es liegt BÜNDIG in der Karte und nicht darin eingerückt: eine Aufnahme
+       mit eigenem Rand innerhalb einer Karte mit Rand sind zwei Rahmen um
+       dieselbe Sache. Die negativen Ränder holen genau die Polsterung zurück,
+       deshalb steht sie als Variable an der Karte — zwei Zahlen, die getrennt
+       gepflegt werden, laufen beim ersten schmalen Bildschirm auseinander.
+
+       Der Ausbruch aus der Textspalte (.breit) gilt hier NICHT mehr: er stammt
+       aus der Zeit ohne Karten und schob die Aufnahme über beide Kartenränder
+       hinaus. Gesehen am gebauten Artefakt, nicht im Kopf ausgerechnet. */
+    article img {
+      max-width: none;
+      width: calc(100% + 2 * var(--karte-polster));
+      margin: calc(-1 * var(--karte-polster)) calc(-1 * var(--karte-polster)) 1.25rem;
+      max-height: 13rem;
+      object-fit: cover;
+      object-position: top;
+      border: 0;
+      border-bottom: 1px solid var(--linie);
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    article h3 { font-size: 1.25rem; margin: 0 0 0.25rem; }
     article h3 a { color: var(--ink-stark); text-decoration: none; }
     article h3 a:hover { text-decoration: underline; }
     article time { display: block; margin-bottom: 0.75rem; }
     article p { margin: 0 0 0.75rem; }
-    article p:last-child { margin-bottom: 0; font-weight: 600; }
+    article p:last-child { margin-bottom: 0; font-weight: 500; }
     .etappe { margin: 0 0 1.25rem; color: var(--gedaempft); }
     .weiter {
       margin-top: 2.5rem;
@@ -398,12 +606,12 @@ const STIL = `
       font-weight: 600;
     }
     footer {
-      margin: 3.5rem auto 0;
+      margin: 3rem auto 0;
       padding-top: 1.5rem;
       padding-bottom: 3rem;
       border-top: 1px solid var(--linie);
       color: var(--gedaempft);
-      font-size: 0.9375rem;
+      font-size: 0.875rem;
     }
     /* Schmal: aus der Spalte wird eine Zeile über dem Inhalt. Ohne JavaScript
        gibt es keine Schublade, und eine Schublade ohne Schalter wäre keine. */
@@ -413,18 +621,48 @@ const STIL = `
         position: static;
         height: auto;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 1.25rem;
-        padding: 0.75rem 1.25rem;
+        gap: 0.5rem 1rem;
+        padding: 0.625rem 1rem;
         border-right: 0;
-        border-bottom: 1px solid var(--linie);
+        border-bottom: 1px solid var(--chrome-rand);
       }
-      .marke { margin: 0; }
+      .marke { margin: 0; padding: 0; }
       .zurapp { margin: 0 0 0 auto; padding-top: 0; border-top: 0; }
-      aside nav { flex-direction: row; gap: 0.25rem; }
-      header, main, footer { padding: 0 1.25rem; }
-      header.hero { margin: 1rem auto 2rem; padding: 1.5rem 1.25rem; min-height: 8rem; }
-      header.hero h1 { font-size: 1.5rem; }
+      /* nowrap, weil der Knopf eine feste Hoehe traegt: bricht die Beschriftung
+         um, steht die zweite Zeile UNTER der Flaeche und nicht darin. Auf 390
+         Punkten gesehen — „anmelden" lag frei auf der Seite. */
+      .zurapp a {
+        height: 2.25rem;
+        line-height: 2.25rem;
+        padding: 0 0.875rem;
+        white-space: nowrap;
+      }
+      aside nav { flex-direction: row; gap: 0.125rem; }
+      aside nav a.aktiv::before { display: none; }
+      :root { --rand: 1rem; }
+      /* Schmal wird aus dem Nebeneinander ein Untereinander: das Motiv als Band
+         oben, der Text darunter auf ruhiger Flaeche. Der Verlauf nach rechts
+         traegt hier nicht — bei 390 Punkten sind seine 38 % deckende Flaeche
+         rund 148 Punkte, und die Ueberschrift laeuft laengst darueber hinaus.
+         Auf dem Telefon gemessen, nicht aus der Regel abgeleitet. */
+      header.hero {
+        margin: 1rem auto 1.5rem;
+        padding: 0;
+        min-height: 0;
+        display: block;
+      }
+      header.hero img {
+        position: static;
+        width: 100%;
+        height: 8rem;
+        opacity: 1;
+      }
+      header.hero::after { display: none; }
+      header.hero h1 { font-size: 1.625rem; margin: 1.25rem 1.25rem 0; }
+      header.hero p { margin: 0.5rem 1.25rem 1.5rem; }
+      article { --karte-polster: 1.25rem; }
     }
 `;
 
@@ -603,9 +841,7 @@ ${weiter}
  * Text, aber nicht für das Bild daneben.
  */
 export function bilderZumAusliefern(geschichten: ReleaseGeschichte[]): string[] {
-  return geschichten
-    .filter((g) => g.freigegeben)
-    .map((g) => g.bild.src.slice("/bilder/".length));
+  return geschichten.filter((g) => g.freigegeben).map((g) => g.bild.src.slice("/bilder/".length));
 }
 
 /** Die Motive: die der Etappen plus die beiden Flächen-Motive. */
@@ -691,11 +927,7 @@ export function erzeugeSeiten({ geschichten, ausgaben, etappen }: BlogEingabe): 
     },
     ...ausgabenAbsteigend.map((a) => ({
       pfad: `ausgabe-${a.ausgabe.datum}.html`,
-      html: rahmen(
-        `${a.ausgabe.titel} · ${TITEL}`,
-        "blog",
-        ausgabeSeite(a.ausgabe, a.geschichten),
-      ),
+      html: rahmen(`${a.ausgabe.titel} · ${TITEL}`, "blog", ausgabeSeite(a.ausgabe, a.geschichten)),
     })),
     ...weg.map((g, i) => {
       const etappe = etappeZu.get(g.slug);
@@ -707,11 +939,7 @@ export function erzeugeSeiten({ geschichten, ausgaben, etappen }: BlogEingabe): 
       }
       return {
         pfad: `${pfadVon(g)}.html`,
-        html: rahmen(
-          `${g.titel} · ${TITEL}`,
-          "tutorial",
-          kapitelSeite(g, etappe, weg[i + 1]),
-        ),
+        html: rahmen(`${g.titel} · ${TITEL}`, "tutorial", kapitelSeite(g, etappe, weg[i + 1])),
       };
     }),
   ];
@@ -730,6 +958,18 @@ export function schreibeBlog(ziel: string, eingabe: BlogEingabe): BlogSeite[] {
   }
   for (const datei of motiveZumAusliefern(eingabe.etappen)) {
     copyFileSync(join(resolve(process.cwd(), MOTIV_QUELLE), datei), join(ziel, "bilder", datei));
+  }
+  // Dieselbe Überlegung wie beim Bild: was die Seite braucht, liegt neben ihr.
+  writeFileSync(
+    join(ziel, "bilder", MARKE_ZIEL),
+    markeMitThemen(readFileSync(resolve(process.cwd(), MARKE_QUELLE), "utf8")),
+  );
+  mkdirSync(join(ziel, "schriften"), { recursive: true });
+  for (const datei of SCHRIFTEN) {
+    copyFileSync(
+      join(resolve(process.cwd(), SCHRIFT_QUELLE), datei),
+      join(ziel, "schriften", datei),
+    );
   }
   return seiten;
 }
