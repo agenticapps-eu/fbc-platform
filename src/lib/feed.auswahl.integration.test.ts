@@ -545,11 +545,47 @@ describe("5.14 — die von Hand nachgezogenen Typen stimmen mit dem Schema über
   });
 });
 
-describe("Das Schaufenster spricht post_saves nicht an", () => {
+describe("Das Schaufenster spricht post_saves und release_notes nicht an", () => {
   it("ausgeloggt lädt der Feed — die Einbettung liefe in 401", async () => {
     await supabase.auth.signOut();
     const seite = await fetchFeed({ uid: null, tags: [MARKE] });
     expect(seite.posts.length).toBe(FEED_SEITE);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: (
+        await pg.query<{ email: string }>("select email from auth.users where id = $1", [ich])
+      ).rows[0].email,
+      password: KENNWORT,
+    });
+    expect(error).toBeNull();
+  });
+
+  /**
+   * AGE-718, und es ist derselbe Fehler ein zweites Mal — gefunden am 12.09.
+   * beim `cso`-Gate, nicht von einer Testsuite.
+   *
+   * `anon` hält auf `release_notes` kein SELECT-Recht. Eine Einbettung darauf
+   * nimmt der GANZEN Abfrage die Antwort (`42501 permission denied for table
+   * release_notes`, HTTP 401) — das Schaufenster lädt dann überhaupt nicht,
+   * es bleibt nicht etwa ohne Release-Karten. Weder `pnpm test` noch pgTAP
+   * hätten das gesehen: der Mock zeichnet die Spaltenliste auf und fragt
+   * keinen Server, und pgTAP kennt PostgREST nicht.
+   *
+   * Die Zusage darüber deckt denselben Weg ab und wurde tatsächlich rot. Diese
+   * hier steht daneben, weil sie den GRUND benennt: eine dritte Spaltenliste
+   * ohne die Einbettung.
+   */
+  it("ausgeloggt fragt der Feed die Mitteilung gar nicht erst ab", async () => {
+    await supabase.auth.signOut();
+    const seite = await fetchFeed({ uid: null, tags: [MARKE] });
+    expect(seite.posts.length).toBe(FEED_SEITE);
+    // Auf die ART geprüft, NICHT auf `releaseNote === null` (Befund opencode im
+    // Diff-Review, MITTEL): auf diesem Weg wird die Einbettung per Konstruktion
+    // nie geholt, und `releaseNote` ist deshalb IMMER null — die Zusage könnte
+    // gar nicht falsch werden. Die Art misst dagegen die Sichtbarkeitsgrenze:
+    // ein Release-Beitrag trägt `visibility = 'members'` und darf ohne Sitzung
+    // nicht auftauchen.
+    expect(seite.posts.every((p) => p.kind !== "release")).toBe(true);
+
     const { error } = await supabase.auth.signInWithPassword({
       email: (
         await pg.query<{ email: string }>("select email from auth.users where id = $1", [ich])

@@ -269,7 +269,11 @@ describe("5.4 — jede Ordnung hat ihren eigenen Keyset-Pfad", () => {
 });
 
 describe("5.12 / AGE-590 — die Typen stehen in der Anfrage, nicht in einer Nachfilterung", () => {
-  const TEXT_AUSDRUCK = "and(video_url.is.null,kind.neq.event,post_media.is.null)";
+  // Seit AGE-718 nennt „Text" die gemeinte Art, statt eine andere zu verneinen:
+  // `kind.neq.event` fing jede kuenftige Art still mit ein. Diese Zeile pinnt
+  // die ZEICHENKETTE und ist deshalb erwartbar mitgewandert — die Absicht
+  // dahinter steht in `feed.release.test.ts` 3.2.
+  const TEXT_AUSDRUCK = "and(video_url.is.null,kind.eq.member,post_media.is.null)";
 
   it("Video über video_url", async () => {
     await fetchFeed({ uid: ICH, typen: ["video"] });

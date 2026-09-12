@@ -59,6 +59,7 @@ function eventPost(overrides: Partial<FeedPost> = {}): FeedPost {
       location: "Hamburg",
       coverPath: null,
     },
+    releaseNote: null,
     ...overrides,
   };
 }
