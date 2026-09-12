@@ -619,10 +619,25 @@ Leser ins Manifest, wo nichts falsch ist.
       `<Navigate>` auf die eigene Route, also ein No-op. Eine Sonderregel gegen
       einen Zustand, der nicht auftreten kann, ist genau die Art Schutz, die
       später niemand mehr erklären kann.
-- [ ] 9.5 `openspec archive deep-links`.
+- [x] 9.5 `openspec archive deep-links` — vorher den `MODIFIED`-Block
+      klauselweise gegen die Wirklichkeit gelesen und den `RENAMED`-Kopf
+      zeichengleich geprüft. **Beides entfiel: das Delta ist reines `ADDED`**
+      (sechs Requirements, kein `MODIFIED`, kein `RENAMED`) — nachgesehen, nicht
+      angenommen.
+      **Dabei ist ein Widerspruch aufgefallen und behoben**, und zwar genau der,
+      den ein Archivieren dauerhaft gemacht hätte: das Delta verlangte die vier
+      Pfade „über `android:pathPrefix`". Nach dem Befund aus 9.4 stimmt das nicht
+      mehr — ein Pfad ohne `/` am Ende steht als `android:path`. Die Anforderung
+      spricht jetzt die Weite aus, nicht das Attribut, und die dauerhafte Spec
+      hätte sonst einer Zusage widersprochen, die im Test steht.
 - [ ] 9.6 PR, Linear auf den richtigen Endstand. **Dabei den überholten
       Blockervermerk „blockiert durch AGE-256" aus dem Rumpf von AGE-643
       nehmen** — AGE-256 ist erledigt, die Domain läuft seit dem 01.09.
-- [ ] 9.7 In AGE-644 den Nachtrag festhalten: Play-App-Signing-Fingerabdruck in
+- [x] 9.7 In AGE-644 den Nachtrag festhalten: Play-App-Signing-Fingerabdruck in
       `assetlinks.json`. Ohne ihn verifiziert die über Play verteilte App ihre
-      Links nicht, und das Fehlerbild führt in die Irre.
+      Links nicht, und das Fehlerbild führt in die Irre. **Eingetragen am
+      12.09.** — als Abnahmepunkt **vor** „Beide Apps veröffentlicht" und als
+      eigener Abschnitt mit der Begründung, wo der Fingerabdruck herkommt
+      (Play Console → Test and release → App Integrity), warum er kein
+      Geheimnis ist, und mit der Gegenprobe für danach
+      (`pm get-app-links` muss `verified` melden).
