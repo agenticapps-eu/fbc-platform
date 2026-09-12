@@ -345,6 +345,23 @@ fremden Host und an zwei Betriebssystemen.
       die Verifizierung wieder verlieren; das iPhone wurde nur überschrieben und
       ist unverändert angemeldet.
 
+### Was die vier Starts auf dem Bildschirm ergaben (12.09., entsperrtes Gerät)
+
+Die Tabelle oben sagt, dass die App startet. Sie sagt nicht, **wo** sie landet.
+Vier Bildschirmfotos im Ablageordner der Sitzung (`age643/01-…04-…png`), jedes
+nach einem `force-stop` aufgenommen, das Konto auf dem Gerät **abgemeldet**:
+
+| Adresse | Bildschirm | Warum das richtig ist |
+| --- | --- | --- |
+| `/aktivierung#token=…` | „Passwort festlegen" | Der Token aus dem **Fragment** ist angekommen, sonst stünde hier ein Fehler. Das ist der teuerste Weg des Changes, und er trägt. |
+| `/chat/<uuid>` | Login | liegt hinter `RequireAuth`, und niemand ist angemeldet |
+| `/events/<uuid>` | Event-Seite, „existiert nicht oder ist für dich nicht sichtbar" | liegt **nicht** hinter `RequireAuth` (`src/App.tsx:156`) — die Seite kommt ohne Anmeldung, die erfundene UUID findet nichts |
+| `/p/<uuid>` | Login | hinter `RequireAuth` |
+
+**Nicht belegt ist die Zielerhaltung über die Anmeldung hinweg** — dafür müsste
+man sich auf dem Gerät anmelden. Sie hängt an dem `<Navigate>`-Wächter am Kopf
+von `LoginPage` und ist dort durch Tests gedeckt, nicht durch diesen Lauf.
+
 ### Eine Sonde, die wie ein Beleg aussieht und keiner ist
 
 `cmd package resolve-activity -a VIEW -c BROWSABLE -d <adresse>` meldete für
