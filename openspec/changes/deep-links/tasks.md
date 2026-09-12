@@ -464,9 +464,60 @@ Leser ins Manifest, wo nichts falsch ist.
       / 7 Warnungen (Vorzustand) · `pnpm build` grün (unter
       `infisical run --env=prod`, seit vite 8 nötig) ·
       `openspec validate --all` 34/34.
-- [ ] 9.2 `cso`-Gate: die Domain-Assoziation gibt nichts frei, was die Website
+- [x] 9.2 `cso`-Gate: die Domain-Assoziation gibt nichts frei, was die Website
       nicht ohnehin freigibt, und die Zielerhaltung verlässt die Anwendung
-      nicht.
+      nicht. **Gelaufen am 12.09. über die neun Dateien aus PR #399.**
+
+      **Frage 1 — gibt die Assoziation etwas frei? Nein.** Beide Dateien tragen
+      ausschliesslich öffentliche Kennungen: Team-Kennung, Bündel- und
+      Paketname, und den SHA-256 des Upload-Zertifikats. Der Fingerabdruck ist
+      aus jedem installierten Paket ablesbar, er ist kein Geheimnis. Die vier
+      beanspruchten Pfade sind Routennamen, die schon im ausgelieferten
+      JS-Bündel stehen. `_headers` gibt der Datei **nur** einen Inhaltstyp,
+      keine CORS-Freigabe und keine Zwischenspeicher-Regel. Und die Assoziation
+      verschafft keinen Datenzugang: die Grenze bleibt die RLS, der Link öffnet
+      dieselben Routen, die ein Browser auch öffnet. Eine fremde App kann die
+      Domain nicht beanspruchen, ohne unseren Signierschlüssel zu haben.
+
+      **Frage 2 — ist die Zielerhaltung eine offene Weiterleitung? Nein,
+      dreifach nicht.** (a) Das Ziel reist im `state` von react-router, nicht in
+      der Adresse — wer einen Link baut, kann es gar nicht setzen, und
+      `history.state` lässt sich nur gleicher Herkunft schreiben. (b)
+      `zielNachAnmeldung` verwirft alles, was nicht mit `/` beginnt, und
+      zusätzlich `//` und `/\`. (c) `navigate`/`<Navigate>` wechselt nur die
+      Route der Anwendung; eine Navigation auf eine fremde Herkunft entsteht
+      dort nicht. Jede der drei Schichten trüge allein.
+
+      **Benannt und hingenommen:** jede App auf dem Gerät darf eine
+      `VIEW`-Absicht auf unsere vier Routen abfeuern. Das verschafft ihr
+      nichts, was der Nutzer nicht selbst durch Öffnen des Links täte, und
+      `deepLinkZiel` prüft vorher Protokoll, Host und Präfix.
+
+      **Ein Befund ist dabei entstanden, und er ist kein Sicherheitsbefund,
+      sondern einer der Richtigkeit** — siehe 9.2b.
+- [ ] 9.2b **BEFUND aus dem Gate: der Zuhörer lebt nur, solange `AppShell`
+      steht.** `deepLinkZuhoerer` hängt in einem `useEffect` in
+      `AppShell.tsx:715` und gibt sein Abräumen zurück. `/login`,
+      `/aktivierung`, `/passwort-vergessen` und `/passwort-neu` liegen in
+      `src/App.tsx` **neben** der Layoutroute mit `AppShell`, nicht darin.
+      Steht eine dieser Seiten im Vordergrund, ist der Zuhörer **abgeräumt** —
+      ein dann eintreffender Link wird lautlos verworfen.
+
+      Der Weg dorthin ist kein Sonderfall: ein neues Mitglied tippt den
+      Aktivierungslink, landet auf `/aktivierung`, wechselt die App, und tippt
+      den Link ein zweites Mal, weil beim ersten Mal scheinbar nichts passiert
+      ist. Genau dann geschieht wirklich nichts.
+
+      **Stand: aus dem Quelltext gelesen, am Gerät noch nicht nachgestellt**
+      (das Pixel hing beim Messversuch nicht mehr am Rechner). Der Versuch
+      braucht **zwei verschiedene Zielrouten**: kalt auf `/aktivierung`, in den
+      Hintergrund, dann ein Link auf `/events/…`. Bleibt die Aktivierungsseite
+      stehen, ist der Befund belegt.
+
+      Ob er auch Donalds einmaliges Vorkommnis auf dem iPhone erklärt, ist
+      **offen** — er berichtete die Startseite, und die liegt innerhalb von
+      `AppShell`.
+
 - [ ] 9.3 `qa`-Gate auf dem Aktivierungsweg — er ist der teuerste Fehlerfall und
       der einzige, den niemand meldet.
 - [ ] 9.4 `requesting-code-review` auf dem **Diff**.
