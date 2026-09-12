@@ -13,5 +13,21 @@
 	     Distributions-Profil `production`; das gehoert nach B3, nicht hierher. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- AGE-643 (M3): ohne diesen Eintrag oeffnet KEIN Link die App, und zwar
+	     ohne Fehlermeldung — iOS behandelt die Adresse dann einfach als
+	     Weblink. Dieselbe Mechanik wie bei `aps-environment` daneben: die
+	     Faehigkeit *Associated Domains* muss an der App-ID im Portal gesetzt
+	     sein, sonst greift die automatische Signierung zum Wildcard-Profil
+	     (`WQZJ8649TN.*`), das den Eintrag nicht tragen kann, und der BAU
+	     scheitert.
+
+	     Die vier beanspruchten Pfade stehen NICHT hier, sondern in
+	     `public/.well-known/apple-app-site-association`; ausgesprochen werden
+	     sie einmal in `src/lib/deep-links.ts`. Der Eintrag hier nennt nur die
+	     Domain. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:app.effbeezee.com</string>
+	</array>
 </dict>
 </plist>

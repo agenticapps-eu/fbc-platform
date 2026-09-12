@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.effbeezee.app",
+      "sha256_cert_fingerprints": [
+        "7A:E1:86:22:57:4A:1D:1B:53:88:17:3A:8F:CE:F6:F8:04:39:72:1C:90:80:FE:5A:36:8E:A1:0E:F4:D1:2F:DA"
+      ]
+    }
+  }
+]
