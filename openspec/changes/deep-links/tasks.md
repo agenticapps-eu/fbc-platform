@@ -529,9 +529,96 @@ Leser ins Manifest, wo nichts falsch ist.
       unveränderte Bildschirm nicht vom neu aufgebauten unterscheiden lässt.
       Erst die zweite Zielroute macht die Messung aussagekräftig.
 
-- [ ] 9.3 `qa`-Gate auf dem Aktivierungsweg — er ist der teuerste Fehlerfall und
-      der einzige, den niemand meldet.
-- [ ] 9.4 `requesting-code-review` auf dem **Diff**.
+- [x] 9.3 `qa`-Gate auf dem Aktivierungsweg — er ist der teuerste Fehlerfall und
+      der einzige, den niemand meldet. **Gemessen am 12.09. gegen
+      `app.effbeezee.com`**, also gegen das, was ein Mitglied wirklich bekommt.
+
+      **Der wichtigste Befund ist ein Negativbefund, und er ist der Grund, warum
+      dieser Weg der teuerste ist:** in der gerenderten Seite steht das Token
+      **null Mal**. Gezählt im vollständigen DOM nach dem Rendern
+      (`--dump-dom`, `grep -c`). Die Adresszeile ist zu diesem Zeitpunkt
+      bereits aufgeräumt — genau die Zusage, die `activation-fragment.ts` im
+      Kopf beschreibt und begründet: solange das Token in der Adresse steht,
+      trägt jeder Sentry-Replay es mit. Ein Test dafür wäre grün, auch wenn das
+      Aufräumen zu spät käme; diese Zählung sieht den Endzustand.
+
+      Daneben: die Seite rendert das **Formular** (`Passwort festlegen`,
+      `Zugang freischalten`), nicht die Anforderungsseite — das Token ist also
+      angekommen und trotzdem nicht sichtbar. Auf 1440 px sauber zentriert
+      (Foto `qa-1440-aktivierung.png`). Für die Telefonbreite gilt der
+      Gerätebeleg aus §8 (Android, 1080 px physisch ≈ 393 CSS-px, Karte mit
+      gleichen Rändern) — **die kopflose Aufnahme auf 390 px ist als Beleg
+      untauglich** und deshalb nicht abgelegt: sie schneidet rechts ab, was ein
+      Artefakt der Fenstergrösse ist und kein Überlaufen.
+
+      **Was NICHT geprüft wurde und warum:** die Browserkonsole. Der geteilte
+      `chrome-devtools`-Browser war von einer Nachbarsitzung belegt, und die
+      Erweiterung war nicht verbunden. Auf dem Gerät war die Konsole beim
+      Android-Lauf von §8 ohne Fehler.
+- [x] 9.4 `requesting-code-review` auf dem **Diff**. Gelaufen am 12.09. über
+      `reviewer-cli.sh` mit dem Diff von `e2abc83` (1108 Zeilen Code, ohne die
+      OpenSpec-Artefakte), zwei Arme, Auftrag mit dem Kopf gegen das
+      Abschweifen.
+
+      | Arm | Verdikt | Befunde |
+      | --- | --- | --- |
+      | gemini | APPROVE | 1 (NIEDRIG) |
+      | opencode (`hf:moonshotai/Kimi-K3`) | REQUEST-CHANGES | 4 (2 MITTEL, 2 NIEDRIG) |
+
+      **Drei Befunde übernommen, zwei begründet abgelehnt.**
+
+      **Übernommen 1 (gemini, NIEDRIG) — die AASA-Pfadmenge war nur in eine
+      Richtung gepinnt.** Die Zusage lief über die *erwarteten* Muster; ein
+      **zusätzlicher** Eintrag in der Datei wäre nie aufgefallen, und der
+      erweitert lautlos, welche Adressen die App abfängt. Das Manifest daneben
+      war längst auf Mengengleichheit gepinnt — dieselbe Zusage, zwei
+      Strengegrade. Behoben, Gegenprobe mit `/admin/*` rot.
+
+      **Übernommen 2 (opencode, MITTEL) — `pathPrefix="/aktivierung"` traf auch
+      `/aktivierungsfeier`.** Die AASA bleibt dort exakt, `deepLinkZiel`
+      verwirft den Pfad, also hätte Android die App geöffnet und der Router die
+      Adresse weggeworfen: der Nutzer säße in einer App, die nichts tut,
+      während iOS den Browser öffnet. Genau die Asymmetrie, die der Kommentar
+      über dem Filter zu verhindern verspricht. Jetzt `android:path`.
+      **Am Gerät nachgemessen, mit neu gebautem und neu installiertem APK:**
+
+      | Adresse | landet in |
+      | --- | --- |
+      | `/aktivierung#token=…` | App |
+      | **`/aktivierungsfeier`** | **Chrome** |
+      | `/chat/<uuid>`, `/events/<uuid>`, `/p/<uuid>` | App |
+      | `/passwort-neu#token=…` | Chrome |
+
+      Dass die alte Fassung dort die App geöffnet hätte, folgt aus der
+      Bedeutung von `pathPrefix` und ist **nicht** gemessen — das alte Paket
+      war zu dem Zeitpunkt schon überschrieben.
+
+      **Übernommen 3 (opencode, MITTEL) — der Test hielt beide Artefakte gegen
+      ein eigenes Host-Literal.** `deep-links.ts` sagt zu, diese Datei halte
+      Entitlements und Manifest gegen den dort ausgesprochenen Host; sie hielt
+      sie gegen sich selbst. Wer nur die Konstante ändert, hätte den Router auf
+      der neuen und die Auslieferung auf der alten Domain, alles grün. Jetzt
+      importiert. Gegenprobe: Host in der Quelle geändert → **zwei** Zusagen
+      rot, Entitlements und Manifest.
+
+      **Abgelehnt 1 (opencode, NIEDRIG) — „kein `getLaunchUrl()`-Rückfallweg
+      für den Kaltstart".** Der Einwand ist über den Diff richtig und über die
+      Wirklichkeit nicht: der Kaltstart aus dem Link ist auf **beiden**
+      Plattformen gemessen (§8.0 Android mit `rootOfTask=true`, iOS von Donald
+      aus der Gmail-App) und landet am Ziel. Capacitor liefert die Start-URL
+      also als `appUrlOpen`. Einen zweiten Weg für einen gemessenen Fall zu
+      bauen, wäre Vorrat ohne Anlass. **Der Teil des Einwands, der bleibt:**
+      kein Test würde es merken, wenn Capacitor das eines Tages ändert — das
+      fängt der Gerätebeleg, und der läuft nicht in CI.
+
+      **Abgelehnt 2 (opencode, NIEDRIG) — `zielNachAnmeldung` lässt `/login`
+      durch.** Zutreffend gelesen, und der Reviewer sagt selbst, es sei kein
+      Sicherheitsproblem. `RequireAuth` erzeugt diesen Zustand nie, weil die
+      Anmeldeseite nicht hinter dem Gate liegt; er entstünde nur aus einem
+      gleicher Herkunft geschriebenen Navigationszustand. Die Wirkung wäre ein
+      `<Navigate>` auf die eigene Route, also ein No-op. Eine Sonderregel gegen
+      einen Zustand, der nicht auftreten kann, ist genau die Art Schutz, die
+      später niemand mehr erklären kann.
 - [ ] 9.5 `openspec archive deep-links`.
 - [ ] 9.6 PR, Linear auf den richtigen Endstand. **Dabei den überholten
       Blockervermerk „blockiert durch AGE-256" aus dem Rumpf von AGE-643
