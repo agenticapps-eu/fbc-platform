@@ -1224,6 +1224,7 @@ export type Database = {
           kind: string;
           like_count: number;
           ref_id: string | null;
+          release_note_id: string | null;
           veroeffentlicht_ab: string;
           video_url: string | null;
           visibility: string;
@@ -1238,6 +1239,7 @@ export type Database = {
           kind?: string;
           like_count?: number;
           ref_id?: string | null;
+          release_note_id?: string | null;
           veroeffentlicht_ab?: string;
           video_url?: string | null;
           visibility?: string;
@@ -1252,6 +1254,7 @@ export type Database = {
           kind?: string;
           like_count?: number;
           ref_id?: string | null;
+          release_note_id?: string | null;
           veroeffentlicht_ab?: string;
           video_url?: string | null;
           visibility?: string;
@@ -1276,6 +1279,13 @@ export type Database = {
             columns: ["ref_id"];
             isOneToOne: false;
             referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "posts_release_note_id_fkey";
+            columns: ["release_note_id"];
+            isOneToOne: false;
+            referencedRelation: "release_notes";
             referencedColumns: ["id"];
           },
         ];

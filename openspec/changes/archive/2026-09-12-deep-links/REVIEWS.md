@@ -121,3 +121,25 @@ digest: sha256:7fcfca2c09fce60bb2bfd798aa438fa1efe9722f4ef40be132665f2924940117
 producer-version: 1.2.0
 tasks-digest: sha256:8db562c275e3f47f627a692f2e299cda36d3b29561a990ad33ca48acdcfbd958
 -->
+
+---
+
+## Diff-Review (Aufgabe 9.4, 12.09.2026)
+
+Nach dem Merge von PR #399, über `reviewer-cli.sh` mit dem Diff von `e2abc83`
+(1108 Zeilen Code ohne die OpenSpec-Artefakte). **Kein signierter Trailer** —
+dieser Abschnitt ist von Hand nachgetragen und bindet nichts per Digest.
+
+| Arm | Modell | Verdikt | Befunde |
+| --- | --- | --- | --- |
+| gemini | (ohne `MODEL:`-Zeile geliefert) | APPROVE | 1 NIEDRIG |
+| opencode | `hf:moonshotai/Kimi-K3` | REQUEST-CHANGES | 2 MITTEL, 2 NIEDRIG |
+
+Drei Befunde übernommen und behoben (AASA-Pfadmenge nur einseitig gepinnt;
+`pathPrefix="/aktivierung"` traf auch `/aktivierungsfeier`; der native Test
+hielt beide Artefakte gegen ein eigenes Host-Literal), zwei begründet abgelehnt
+(fehlender `getLaunchUrl()`-Rückfallweg für einen gemessenen Fall; `/login` als
+Ziel der Zielerhaltung, ein Zustand, der nicht entstehen kann).
+
+**Die Auflösung samt Gegenproben steht in `tasks.md` unter 9.4** und wird hier
+nicht verdoppelt.

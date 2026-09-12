@@ -29,14 +29,14 @@ import { tokenizePostBody } from "./video-url";
 export type PostVisibility = "public" | "members";
 
 /**
- * Spiegelt `posts_kind_check` (20260813100000). Bewusst eine geschlossene Menge
- * und nicht `string`, obwohl der Typgenerator für eine `text`-Spalte `string`
- * liefert: die Feed-Liste verzweigt auf diesen Wert, und eine dritte Ausprägung
- * soll beim Übersetzen auffallen statt still als Mitgliedsbeitrag zu erscheinen
- * (Befund opencode im Diff-Review, LOW). Verengt wird an der Grenze, in
- * `fetchFeed`.
+ * Spiegelt `posts_kind_check` (20260813100000, dreiwertig seit 20260912100000).
+ * Bewusst eine geschlossene Menge und nicht `string`, obwohl der Typgenerator
+ * für eine `text`-Spalte `string` liefert: die Feed-Liste verzweigt auf diesen
+ * Wert, und eine weitere Ausprägung soll beim Übersetzen auffallen statt still
+ * als Mitgliedsbeitrag zu erscheinen (Befund opencode im Diff-Review, LOW).
+ * Verengt wird an der Grenze, in `fetchFeed`.
  */
-export type PostKind = "member" | "event";
+export type PostKind = "member" | "event" | "release";
 
 /**
  * Die drei Reiter des Feeds (AGE-582).
@@ -108,6 +108,20 @@ export interface FeedEvent {
   coverPath: string | null;
 }
 
+/**
+ * Die bezogene Mitteilung eines Beitrags mit `kind = 'release'` (AGE-718).
+ *
+ * Wie beim Event stehen diese Felder NICHT am Beitrag: `posts.body` ist leer,
+ * und Titel wie Text kommen bei jedem Abruf frisch aus `release_notes`. Eine
+ * nachgebesserte Mitteilung zeigt sich damit sofort, ohne dass irgendwo etwas
+ * nachgezogen wird.
+ */
+export interface FeedReleaseNote {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface FeedPost {
   id: string;
   author: FeedAuthor;
@@ -155,7 +169,10 @@ export interface FeedPost {
    * filtert) könnte Beiträge zeigen, deren Karte etwas anderes einbettet.
    */
   videoUrl: string | null;
-  /** `member` (Default) oder `event` — ein vom Trigger erzeugter Event-Beitrag. */
+  /**
+   * `member` (Default), `event` oder `release` — die letzten beiden sind vom
+   * Trigger erzeugt und systemverwaltet.
+   */
   kind: PostKind;
   /**
    * Das bezogene Event, zur Laufzeit gejoint. `null` heißt eines von zwei
@@ -164,6 +181,13 @@ export interface FeedPost {
    * Fall entfällt die Karte, statt leer zu erscheinen.
    */
   event: FeedEvent | null;
+  /**
+   * Die bezogene Mitteilung, zur Laufzeit gejoint. `null` heißt eines von zwei
+   * Dingen: gewöhnlicher Beitrag, oder die Mitteilung ist für den Betrachter
+   * nicht lesbar (`release_notes_read_sent` wertet die Einbettung selbst aus).
+   * Im zweiten Fall entfällt die Karte, statt leer zu erscheinen.
+   */
+  releaseNote: FeedReleaseNote | null;
 }
 
 export interface FeedComment {
@@ -305,10 +329,22 @@ export const FEED_TYPEN: readonly FeedTyp[] = ["bild", "video", "event", "text"]
  *
  * Die Abbildung der vollen Menge auf die leere ist der Grund, warum `null` als
  * dritter Zustand entfallen ist: alle vier angehakt liefert dieselbe Liste wie
- * gar keiner angehakt — die vier Typen decken den Bestand lueckenlos ab, weil
- * „Text" als Abwesenheit der drei anderen bestimmt ist. Ohne die Abbildung
- * stuenden zwei Schluessel fuer ein Ergebnis, und der Feed laedt dieselbe
- * Auswahl ein zweites Mal.
+ * gar keiner angehakt. Ohne die Abbildung stuenden zwei Schluessel fuer ein
+ * Ergebnis, und der Feed laedt dieselbe Auswahl ein zweites Mal.
+ *
+ * SEIT AGE-718 IST DAS EINE ZUSAMMENLEGUNG UND KEINE IDENTITAET. Die
+ * Begruendung lautete bis dahin, die vier Typen deckten den Bestand lueckenlos
+ * ab, weil „Text" die Abwesenheit der drei anderen sei. Das stimmt nicht mehr:
+ * „Text" nennt jetzt `kind.eq.member`, und keiner der vier Ausdruecke nennt
+ * `release`. Vier Haken erzeugten als echte Typgruppe also eine ANDERE Menge
+ * als kein Haken — eine ohne Release-Karten.
+ *
+ * Die Zusammenlegung bleibt trotzdem (Donald, 11.09.): vier Haken sind
+ * buchstaeblich kein Filter, und der Preis des Gegenteils waere ein zweiter
+ * Cache-Schluessel fuer ein Ergebnis, das sich um eine Karte je Woche
+ * unterscheidet — genau der Nachladefehler, den AGE-590 beseitigt hat. Die
+ * Regel „ein Haken, keine Release-Karten" traegt die volle Auswahl damit als
+ * BENANNTE Ausnahme.
  *
  * Sie sitzt HIER und nicht im Zustand der Oberflaeche: wer vier Haken gesetzt
  * hat, soll weiter vier Haken sehen.
@@ -389,6 +425,22 @@ function authorOf(byId: Map<string, FeedAuthor>, id: string): FeedAuthor {
 /** Der Urheber ist entfernt: kein Name, kein Bild, keine Stufe (AGE-581). */
 function ehemaligesMitglied(id: string): FeedAuthor {
   return { id, name: "Ehemaliges Mitglied", avatarUrl: null, tier: null, former: true };
+}
+
+/**
+ * Der Absender einer Release-Karte (AGE-718) — dasselbe Muster wie oben.
+ *
+ * In `author_id` steht der Admin, der zugestellt hat. Er ist nicht der
+ * Verfasser, und eine Karte, die ihn nennt, behauptete eine Autorschaft, die es
+ * nicht gibt. Die Anwendung spricht stattdessen unter ihrem eigenen Namen
+ * (Donald, 11.09.); die Schreibweise mit Punkten ist die der Marke.
+ *
+ * `former` bleibt `false` — das Feld sagt „der Mensch dahinter ist gegangen"
+ * und waere hier eine falsche Aussage. Dass der Absender NIRGENDWOHIN fuehrt,
+ * entscheidet die Karte: sie zeichnet gar keinen Profilverweis.
+ */
+function absenderDerAnwendung(id: string): FeedAuthor {
+  return { id, name: "eff.bee.zee", avatarUrl: null, tier: null, former: false };
 }
 
 /**
@@ -592,15 +644,21 @@ export interface FetchFeedArgs {
  * Uebersetzen. Eine Stelle je Typ ist die einzige Stelle, an der er falsch sein
  * kann.
  *
- * `text` ist die Verneinung der drei anderen und damit die zerbrechlichste
- * Zeile: kommt je ein fuenfter Typ dazu, ist sie MITZUAENDERN, sonst faellt der
- * neue Typ still auch unter „Text".
+ * `text` heisst seit AGE-718: ein MITGLIEDSBEITRAG ohne Video und ohne Bild.
+ * Vorher stand dort `kind.neq.event` — die Verneinung EINER anderen Art, und
+ * damit eine Zeile, die jede kuenftige Art still mitfing. Eine Release-Karte
+ * waere darin als Textbeitrag erschienen, mit leerem Text.
+ *
+ * Die Folge ist ausgesprochen: sobald irgendein Typ angehakt ist, traegt die
+ * Liste keine Release-Karten mehr — keiner der vier Ausdruecke nennt sie. Ohne
+ * Haken erscheinen sie. Das ist die benannte Ausnahme zur Regel „alle vier
+ * Haken sind dasselbe wie kein Haken" (Entscheidung 10 im Design).
  */
 const TYP_AUSDRUCK: Record<FeedTyp, string> = {
   bild: "post_media.not.is.null",
   video: "video_url.not.is.null",
   event: "kind.eq.event",
-  text: "and(video_url.is.null,kind.neq.event,post_media.is.null)",
+  text: "and(video_url.is.null,kind.eq.member,post_media.is.null)",
 };
 
 /**
@@ -612,7 +670,7 @@ const TYP_AUSDRUCK: Record<FeedTyp, string> = {
  * daran (`post_media=not.is.null` bzw. `=is.null`).
  */
 const FEED_SPALTEN =
-  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, release_note_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path), release_notes!posts_release_note_id_fkey(id, title, body)";
 
 /**
  * Dasselbe mit dem Pflicht-Join auf die EIGENEN Speicherungen — der Reiter
@@ -630,8 +688,29 @@ const FEED_SPALTEN =
  * `post_saves` gibt ohnehin nur eigene zurück — sie bleibt das Gate, der Join
  * ist der Weg dorthin und keine Nachkorrektur im Client.
  */
+/**
+ * Dieselbe Liste OHNE die Einbettung auf `release_notes` — der Weg ohne Sitzung.
+ *
+ * **Gemessen am lokalen Stack am 12.09., und es ist derselbe Fehler, den
+ * `post_saves` schon einmal erzeugt hat:** `anon` hält auf `release_notes` kein
+ * SELECT-Recht (die Tabelle gibt es nur `to authenticated`, AGE-631). Die
+ * Einbettung nimmt damit der GANZEN Abfrage die Antwort — HTTP 401,
+ * `42501 permission denied for table release_notes` —, sie bleibt nicht etwa
+ * leer. Das Schaufenster für Ausgeloggte lädt dann überhaupt nicht mehr.
+ *
+ * Der Verzicht kostet nichts: ein Release-Beitrag trägt `visibility =
+ * 'members'` und erscheint ohne Sitzung ohnehin nicht.
+ *
+ * **Weder `pnpm test` noch pgTAP hätten das gefunden.** Der Vitest-Mock
+ * zeichnet die Spaltenliste auf und fragt keinen Server; pgTAP kennt PostgREST
+ * nicht. Nur der Aufruf gegen den laufenden Stack zeigt es — deshalb steht die
+ * Zusage dazu in `feed.auswahl.integration.test.ts`.
+ */
+const FEED_SPALTEN_OHNE_SITZUNG =
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, release_note_id, like_count, post_media(post_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+
 const FEED_SPALTEN_GESPEICHERT =
-  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, like_count, post_media(post_id), post_saves!inner(profile_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path)";
+  "id, author_id, body, hashtags, visibility, created_at, veroeffentlicht_ab, video_url, kind, ref_id, release_note_id, like_count, post_media(post_id), post_saves!inner(profile_id), events!posts_ref_id_fkey(id, title, starts_at, location, cover_path), release_notes!posts_release_note_id_fkey(id, title, body)";
 
 /**
  * Der Keyset-Ausdruck der jeweiligen Ordnung.
@@ -666,6 +745,14 @@ function cursorAusdruck(ordnung: FeedOrdnung, c: FeedCursor): string {
  * bleibt `null` — das ist der Normalfall (gewöhnlicher Beitrag) und zugleich
  * die Antwort der RLS auf ein Event, das der Betrachter nicht sehen darf.
  */
+function releaseNoteVon(roh: unknown): FeedReleaseNote | null {
+  const n = Array.isArray(roh) ? roh[0] : roh;
+  if (!n || typeof n !== "object") return null;
+  const z = n as Record<string, unknown>;
+  if (typeof z.id !== "string" || typeof z.title !== "string") return null;
+  return { id: z.id, title: z.title, body: typeof z.body === "string" ? z.body : "" };
+}
+
 function eventVon(roh: unknown): FeedEvent | null {
   const e = Array.isArray(roh) ? roh[0] : roh;
   if (!e || typeof e !== "object") return null;
@@ -714,7 +801,11 @@ export async function fetchFeed({
   // `string`, und die eingebettete Zeile faellt auf `GenericStringError`
   // zurueck.
   let query = (
-    reiter === "gespeichert" ? basis.select(FEED_SPALTEN_GESPEICHERT) : basis.select(FEED_SPALTEN)
+    uid === null
+      ? basis.select(FEED_SPALTEN_OHNE_SITZUNG)
+      : reiter === "gespeichert"
+        ? basis.select(FEED_SPALTEN_GESPEICHERT)
+        : basis.select(FEED_SPALTEN)
   )
     // EINE Zeile mehr als die Seite trägt: die Spähzeile. Ohne sie ist „volle
     // Seite" das einzige Indiz dafür, dass es weitergeht — und bei genau 20
@@ -850,9 +941,12 @@ export async function fetchFeed({
   return {
     posts: rows.map((r) => ({
       id: r.id,
-      author: entfernteBeitraege.has(r.id)
-        ? ehemaligesMitglied(r.author_id)
-        : authorOf(authors, r.author_id),
+      author:
+        r.kind === "release"
+          ? absenderDerAnwendung(r.author_id)
+          : entfernteBeitraege.has(r.id)
+            ? ehemaligesMitglied(r.author_id)
+            : authorOf(authors, r.author_id),
       body: r.body,
       hashtags: r.hashtags ?? [],
       visibility: r.visibility,
@@ -865,11 +959,19 @@ export async function fetchFeed({
       media: media.get(r.id) ?? [],
       videoUrl: r.video_url,
       // Verengung an der Grenze: die Datenbank liefert `text`, der Constraint
-      // lässt aber nur zwei Werte zu. Alles Unerwartete gilt als Mitgliedsbeitrag
-      // — die harmlose Richtung, denn ein Event-Beitrag ohne lesbares Event
-      // entfällt ohnehin.
-      kind: r.kind === "event" ? "event" : "member",
+      // lässt aber nur drei Werte zu. Alles Unerwartete gilt weiterhin als
+      // Mitgliedsbeitrag — dass das die harmlose Richtung sei, stimmte
+      // allerdings nur, solange es genau eine andere Art gab: seit AGE-718
+      // erschiene eine hier vergessene Art als Beitrag mit leerem Text und dem
+      // Namen des Zustellers. Die Menge steht deshalb einmal in `PostKind` und
+      // einmal hier, und beide fallen zusammen auf.
+      kind: r.kind === "event" ? "event" : r.kind === "release" ? "release" : "member",
       event: eventVon(r.events),
+      // `in` statt `r.release_notes`: der Weg ohne Sitzung holt die Einbettung
+      // gar nicht erst, und die Spalte fehlt dort im Zeilentyp. Das ist keine
+      // Vorsichtsmassnahme, sondern die Stelle, an der der Übersetzer die
+      // dritte Spaltenliste erzwingt.
+      releaseNote: releaseNoteVon("release_notes" in r ? r.release_notes : null),
     })),
     // Nur wenn die Spähzeile kam, gibt es wirklich mehr. Sonst brächte der
     // Cursor eine leere Anfrage — und eine Schaltfläche, die nichts tut.

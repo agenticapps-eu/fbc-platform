@@ -40,12 +40,22 @@
               Scheme und Host stehen auf JEDEM `data`-Element. Android
               verschmilzt zwar alle `data`-Elemente eines Filters, aber die
               Wiederholung macht jede Zeile fuer sich lesbar.
+
+              `/aktivierung` steht als `android:path`, die drei anderen als
+              `android:pathPrefix` — und das ist dieselbe Asymmetrie-Frage
+              eine Ebene tiefer (Diff-Review AGE-643, opencode, MITTEL).
+              `pathPrefix="/aktivierung"` traefe auch `/aktivierungsfeier`.
+              Die AASA setzt dort bewusst KEIN `*`, und `deepLinkZiel`
+              verwuerfe das Ziel: Android oeffnete die App, der Router
+              verwerfe die Adresse, und der Nutzer saesse in einer App, die
+              nichts tut, waehrend iOS brav den Browser oeffnet. Die drei
+              anderen enden auf `/` und sind als Praefix genau richtig.
             -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/aktivierung" />
+                <data android:scheme="https" android:host="app.effbeezee.com" android:path="/aktivierung" />
                 <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/chat/" />
                 <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/events/" />
                 <data android:scheme="https" android:host="app.effbeezee.com" android:pathPrefix="/p/" />

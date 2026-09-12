@@ -1,3 +1,15 @@
+# Links aus Mail und Nachrichten öffnen die App
+
+Linear: AGE-643
+
+> **Nach dem Archivieren korrigiert (12.09.).** Diese drei Zeilen und zwei
+> Stellen weiter unten sind nachgetragen, nicht Teil des ursprünglichen
+> Vorschlags. Grund: `scripts/generate-release-entries.ts` liest aus dieser
+> Datei den Entwurf für die Neuigkeiten, den ein Admin vor dem Versenden
+> überarbeitet. Ohne H1 trug der Entwurf den Verzeichnisnamen `deep-links` als
+> Titel und `linear: null` — und zwei Stichpunkte sagten das Gegenteil dessen,
+> was am Ende gebaut wurde. Der Rest der Datei ist unverändert.
+
 ## Why
 
 AGE-643, M3. Ein Link aus einer Mail oder aus WhatsApp öffnet heute den Browser —
@@ -43,13 +55,16 @@ erfüllt und hängt nicht an diesem Change.
 - **iOS: Associated Domains**, `applinks:app.effbeezee.com`, plus die Fähigkeit
   an der App-ID im Apple-Portal.
 - **Android: ein `intent-filter`** mit `android:autoVerify="true"`, `VIEW`/
-  `DEFAULT`/`BROWSABLE`, `https` auf `app.effbeezee.com` — und **je einem
-  `pathPrefix` für die vier Pfade**, damit Android nicht die ganze Domain
-  beansprucht, während AASA auf vier Pfade einschränkt.
+  `DEFAULT`/`BROWSABLE`, `https` auf `app.effbeezee.com` — und **einer
+  Pfadangabe je Pfad**, damit Android nicht die ganze Domain beansprucht,
+  während AASA auf vier Pfade einschränkt. *(Nachgetragen: gebaut wurde
+  `pathPrefix` für die drei Pfade mit `/` am Ende und `path` für
+  `/aktivierung` — als Präfix träfe der auch `/aktivierungsfeier`.)*
 - **Ein Zuhörer auf `appUrlOpen`** führt die geöffnete Adresse ins
   Client-Routing, **mitsamt Fragment** — der Aktivierungs-Token steht dort, nicht
-  im Query. Der Zuhörer fehlt heute ganz: `AppShell.tsx` hört `backButton`,
-  sonst nichts.
+  im Query. *(Der Satz „der Zuhörer fehlt heute ganz" stand hier als Befund vor
+  der Arbeit und ist nachträglich entfernt: gebaut ist er, und im Entwurf für
+  die Neuigkeiten las er sich wie eine Lücke.)*
 - **Das Ziel überlebt die Anmeldung.** Wer nicht angemeldet ist, landet nach dem
   Login am ursprünglichen Ziel statt auf der Startseite.
 

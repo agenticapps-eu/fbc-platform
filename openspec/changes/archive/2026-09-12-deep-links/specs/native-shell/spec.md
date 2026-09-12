@@ -50,9 +50,18 @@ Das System SHALL auf iOS `com.apple.developer.associated-domains` mit
 mit `android:autoVerify="true"`, der `VIEW`, `DEFAULT` und `BROWSABLE` trägt,
 `android:scheme="https"` und `android:host="app.effbeezee.com"`.
 
-**Beide Plattformen SHALL dieselbe Pfadmenge beanspruchen.** Der
-`intent-filter` SHALL die vier Pfade über `android:pathPrefix` einschränken und
-NOT die ganze Domain beanspruchen.
+**Beide Plattformen SHALL dieselbe Pfadmenge beanspruchen** — und zwar mit
+derselben Weite. Der `intent-filter` SHALL die vier Pfade einschränken und NOT
+die ganze Domain beanspruchen. Ein Pfad, der auf `/` endet, SHALL als
+`android:pathPrefix` stehen; ein Pfad ohne `/` am Ende ist eine einzelne Route
+und SHALL als `android:path` stehen.
+
+Die Unterscheidung ist nicht Feinschliff: `pathPrefix="/aktivierung"` träfe
+auch `/aktivierungsfeier`, während die AASA daneben exakt bleibt und das
+Client-Routing den Pfad verwirft. Android öffnete dann die App, der Router
+wiese die Adresse ab, und das Mitglied säße in einer App, die nichts tut,
+während iOS den Browser öffnet — dieselbe Asymmetrie wie unten, nur eine Ebene
+tiefer und schwerer zu sehen.
 
 Ohne diese Einschränkung beansprucht Android jede Adresse des Hosts, während
 AASA auf vier Pfade begrenzt: ein Passwort-Link, `/login` oder eine künftige
