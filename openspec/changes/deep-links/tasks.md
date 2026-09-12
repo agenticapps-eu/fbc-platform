@@ -290,9 +290,25 @@ fremden Host und an zwei Betriebssystemen.
       Hintergrund. Der Entwicklermodus war **nicht** eingeschaltet und wird
       laut CDN-Messung auch nicht gebraucht — der Vermerk, den diese Aufgabe
       verlangt, lautet also: ohne Entwicklermodus gemessen, gegen die Fassung,
-      die Apples CDN ausliefert.
-- [ ] 8.2 **iOS, App nicht installiert:** derselbe Link öffnet die Website und
-      der Vorgang läuft zu Ende.
+      die Apples CDN ausliefert. Getippt wurde in der **Gmail-App**.
+- [x] 8.2 **iOS, App nicht installiert:** derselbe Link öffnet die Website und
+      der Vorgang läuft zu Ende. **Am 12.09. gemessen**, mit derselben Mail und
+      demselben Link wie in 8.1: App über `devicectl` deinstalliert (nachgesehen,
+      sie war weg), dann in der **Gmail-App** getippt. **Safari** ging auf und
+      zeigte „Passwort festlegen".
+
+      Zwei Dinge stehen darin, die man leicht übersieht. Es war **Safari**, nicht
+      Gmails eingebauter Browser — der Weg ohne App führt also in einen
+      vollwertigen Browser und nicht in eine Hülle, in der die Anmeldung später
+      nicht auffindbar wäre. Und die Seite zeigte das **Formular**, nicht die
+      Anforderungsseite: das Formular rendert nur bei vorhandenem Token, also
+      hat auch der Webweg das Fragment gelesen.
+
+      **Was hier NICHT belegt ist:** dass der Vorgang bis zum freigeschalteten
+      Zugang durchläuft. Der Token war eine Attrappe. Das Freischalten selbst
+      ist der Browserweg aus AGE-495, den dieser Change nicht anfasst.
+      Danach wurde die App sofort wieder aufgespielt; das Gerät ist
+      **abgemeldet**, weil das Löschen die Sitzung mitnimmt.
 - [x] 8.3 **Android, direkt installiertes Paket:** dasselbe Paar. Das Paket
       MUSS mit dem **Upload-Schlüssel** signiert sein, nicht mit dem
       Debug-Schlüssel — `autoVerify` vergleicht den Signierer der installierten
@@ -343,9 +359,14 @@ fremden Host und an zwei Betriebssystemen.
       kam (Befund gemini, NIEDRIG). Das leistet das Betriebssystem, aber nur bei
       einem echten Universal Link — bricht es, ist es ein Hinweis darauf, dass
       der Link anders geöffnet wurde als gedacht. **Auf iOS am 12.09. belegt:**
-      die Brotkrume oben links stand da und führte zurück in die Mail, aus der
+      die Brotkrume oben links stand da und führte zurück in die App, aus der
       der Link kam. Das ist zugleich der beste Beleg dafür, dass es wirklich
       ein Universal Link war und keine gewöhnliche Browser-Weiterleitung.
+      **Absender-App war die Gmail-App** (Postfach der Factiv-Adresse), nicht
+      Apple Mail. Das ist der realistischere Fall: die Einladungsmail landet bei
+      den meisten Mitgliedern in einem Fremdclient, und ein solcher öffnet Links
+      gern in seinem eigenen eingebauten Browser. Er tat es hier nicht — der
+      Universal Link greift auch aus Gmail heraus.
 - [x] 8.5 Gerät zurückstellen, wie es übernommen wurde. **Donalds
       Entscheidung am 12.09.: der Release-Bau bleibt auf dem Pixel.** Vorher
       stand dort ein Debug-Bau vom 10.09. ohne Link-Filter; der ist gesichert,
