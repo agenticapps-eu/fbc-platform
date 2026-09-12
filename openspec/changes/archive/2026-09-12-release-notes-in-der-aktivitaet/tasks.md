@@ -409,7 +409,7 @@ der Integrationsläufe (`age582-*`) — deren `auth.users` sind entfernt, ihre
       aufgeweichter `posts_write_own` fällt **2.1** (und der Lauf bricht danach
       am Unique-Index ab, weil die aufgeweichte Policy die Zeile aus 2.1 stehen
       lässt — erklärt, nicht übersehen).
-- [ ] 8.2 **Migration VOR dem Merge auf PROD anwenden.** Der Grund gilt
+- [x] 8.2 **Migration VOR dem Merge auf PROD anwenden.** Der Grund gilt
       unverändert: `deploy.yml` läuft automatisch beim Push auf `main`,
       `migrate-prod.yml` nur von Hand. Ein gewöhnlicher Merge rollte sonst das
       Frontend gegen ein Schema ohne `release_note_id` aus, und PostgREST ließe
@@ -435,8 +435,30 @@ der Integrationsläufe (`age582-*`) — deren `auth.users` sind entfernt, ihre
       **Das Gate ist richtig und wird nicht aufgeweicht.** Es sagt „PROD kommt
       nach DEV, nicht davor", und DEV bekommt Migrationen nur über `main`.
 
-- [ ] 8.2a **Vorgeschlagener Weg: in zwei Schritten liefern** (expand, dann
-      migrate). Entscheidung offen, weil es die Zuschnittsform ändert.
+- [x] 8.2a **So ausgeliefert (Donald, 12.09.): in zwei Schritten** (expand, dann
+      migrate).
+
+      **Gefahren am 12.09.:** PR **#400** (nur die Migration, drei Dateien, nur
+      Hinzufügungen) → Merge `5bb2130` → `migrate-dev` grün, DEV hat die Spalte
+      → `migrate-prod.yml` per `workflow_dispatch` auf `main`, Lauf
+      **34693613679**, `plan` und `apply` grün, „Applying migration
+      20260912100000_release_beitrag_im_feed.sql… OK — 135 Migrationen,
+      Historie abweichungsfrei" → PR **#401** (Lesepfad, Karte, Artefakte) →
+      Merge `1d3af94`.
+
+      **Gegen PROD nachgelesen, nachdem `apply` durch war:** Spalte, Auslöser
+      und Unique-Index stehen; `posts where kind = 'release'` = **0** — der
+      Sollwert aus 1.1. `posts.kind` trägt dort weiterhin nur `event` und
+      `member`, 11 Zeilen gesamt.
+
+      **Und der Riegel, den der Plan nicht kannte, hat gehalten:** der
+      `drift-gate`-Job in `deploy.yml` misst die Migrationshistorie gegen
+      **PROD** und liess den `deploy`-Job aus —
+      `DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260912100000 …
+      Erst migrate-prod freigeben, dann deployen.` Das Frontend wäre also auch
+      bei einem gewöhnlichen Merge nicht vor der Spalte hinausgegangen. Der
+      zweistufige Weg war trotzdem der richtige: er vermeidet den roten Lauf
+      auf `main`, statt ihn nachträglich wiederholen zu müssen.
 
       1. **PR A — nur die Migration**: die Migrationsdatei, `release_beitrag_test.sql`
          und die `ci.yml`-Zeile. Merge auf `main` → `deploy.yml` fährt
@@ -463,10 +485,28 @@ der Integrationsläufe (`age582-*`) — deren `auth.users` sind entfernt, ihre
       kommt nach DEV" sagt, wird nicht für die Bequemlichkeit eines Zuschnitts
       aufgeweicht.
 
-- [ ] 8.2b Nach der PROD-Migration und **vor** dem Merge von PR B prüfen, dass
-      die Aktivität mit dem **alten** Frontend weiterhin lädt. Belegen statt
-      annehmen.
-- [ ] 8.3 `openspec archive release-notes-in-der-aktivitaet` — vorher den
-      `MODIFIED`-Block klauselweise gegen die Wirklichkeit lesen und den
-      `RENAMED`-Kopf zeichengleich prüfen.
-- [ ] 8.4 PR, Linear auf den richtigen Endstand.
+- [x] 8.2b Belegt, nicht angenommen: die **wörtliche** Spaltenliste aus dem live
+      ausgelieferten Stand (`origin/main:src/lib/feed.ts` vor #401) unangemeldet
+      gegen die migrierte PROD-Instanz — **HTTP 200**. Damit ist gemessen, dass
+      PostgREST jede Spalte und jede Einbettung gegen das neue Schema auflöst.
+
+      **Die Null daneben ist erklärt, nicht übersehen:** die Antwort trägt 0
+      Zeilen, weil alle 11 Beiträge auf PROD `visibility = 'members'` haben und
+      es dort keinen öffentlichen gibt. Der Beleg ist der Statuscode, nicht die
+      Zeilenzahl — eine gebrochene Einbettung antwortete mit 400/401, nicht mit
+      200 und einer leeren Liste.
+- [x] 8.3 Archiviert. **Vorher geprüft**, weil ein `MODIFIED`-Block beim Falten
+      ALLES bekräftigt, was in ihm steht — auch unverändert übernommene Sätze:
+
+      * `RENAMED`-Kopf zeichengleich im Bestand gefunden
+        (`### Requirement: Der Feed zeigt zwei Kartentypen`).
+      * Beide `MODIFIED`-Anforderungen klauselweise gegen die Wirklichkeit
+        gelesen. Die heikelste Stelle ist „Text SHALL die Beitragsart namentlich
+        prüfen" — sie ist seit #401 wahr und war es beim Schreiben des Deltas
+        nicht.
+
+      `openspec archive` meldet: **+9 hinzugefügt, ~2 geändert, →1 umbenannt.**
+- [x] 8.4 Zwei PRs (#400, #401) plus dieser Archiv-PR. Linear auf den richtigen
+      Endstand — **und zwar zweimal nachgesehen**: der Merge von #400 hat
+      AGE-718 über den Branchnamen bereits auf Done gesetzt, obwohl die Hälfte
+      noch fehlte. Zurückgesetzt auf In Progress, erst nach #401 wieder Done.
