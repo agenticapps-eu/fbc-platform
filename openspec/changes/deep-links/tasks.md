@@ -346,12 +346,15 @@ fremden Host und an zwei Betriebssystemen.
       die Brotkrume oben links stand da und führte zurück in die Mail, aus der
       der Link kam. Das ist zugleich der beste Beleg dafür, dass es wirklich
       ein Universal Link war und keine gewöhnliche Browser-Weiterleitung.
-- [ ] 8.5 Gerät zurückstellen, wie es übernommen wurde. **Offen und eine
-      Entscheidung:** auf dem Pixel stand ein DEBUG-Bau vom 10.09. ohne
-      Link-Filter, jetzt steht dort der Release-Bau. Der alte liegt gesichert
-      im Ablageordner der Sitzung (`alt-debug.apk`, 18 MB). Zurückspielen hiesse
-      die Verifizierung wieder verlieren; das iPhone wurde nur überschrieben und
-      ist unverändert angemeldet.
+- [x] 8.5 Gerät zurückstellen, wie es übernommen wurde. **Donalds
+      Entscheidung am 12.09.: der Release-Bau bleibt auf dem Pixel.** Vorher
+      stand dort ein Debug-Bau vom 10.09. ohne Link-Filter; der ist gesichert,
+      wird aber nicht zurückgespielt, weil das die Verifizierung wieder kostete.
+      Was zurückgesetzt wurde: die Bildschirmsperre, die für die Messreihe auf
+      30 Minuten stand, steht wieder auf **300000 ms**. Das Gerät ist
+      **abgemeldet** — die Neuinstallation hat die Sitzung gelöscht, weil
+      Debug- und Release-Signatur verschieden sind. Das iPhone wurde nur
+      überschrieben und ist unverändert angemeldet.
 
 ### Was die vier Starts auf dem Bildschirm ergaben (12.09., entsperrtes Gerät)
 
