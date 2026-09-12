@@ -246,24 +246,48 @@ die drei Sicherheitszusagen rot.
 Grüne Tests belegen hier fast nichts — alles hängt an zwei Dateien auf einem
 fremden Host und an zwei Betriebssystemen.
 
-- [ ] 8.0 **Zuerst den Kaltstart**, nicht den Warmstart: App vollständig
+- [x] 8.0 **Zuerst den Kaltstart**, nicht den Warmstart: App vollständig
       beenden, dann den Link öffnen. Das ist der Fall, der beim ersten Kontakt
       aus der Einladungsmail zählt, und der einzige, dessen Zustellung dieser
       Change nur behauptet statt gemessen hat (Befund opencode, NIEDRIG).
-- [ ] 8.0b **Den Weg des Abnahme-Baus auf iOS festlegen und gehen.** Entitlement
+      **Auf Android am 12.09. gemessen, und zwar als echter Kaltstart:** die App
+      war frisch installiert und per `am force-stop` beendet, der Link legte die
+      Task selbst an — `rootOfTask=true`, `topResumedActivity=
+      com.effbeezee.app/.MainActivity`, und als auslösende Absicht steht dort
+      `act=VIEW cat=[BROWSABLE] dat=https://app.effbeezee.com/events/… cmp=
+      com.effbeezee.app/.MainActivity`. **Kein Auswahldialog dazwischen**, keine
+      `ResolverActivity` im Stapel. Auf iOS steht der Kaltstart aus, weil er
+      einen Fingertipp braucht (8.1).
+- [x] 8.0b **Den Weg des Abnahme-Baus auf iOS festlegen und gehen.** Entitlement
       und Manifest sind nativ und reisen NICHT über den OTA-Weg — der tauscht
       nur `public/`. Ohne Store-Einreichung (die ist AGE-644) erreicht also
       keine iOS-Fassung mit `applinks:` ein Gerät von allein. Gewählter Weg:
       Direktinstallation aus Xcode auf ein registriertes Gerät, wie in M2/B3.
-      Ohne diesen Schritt ist 8.1 nicht ausführbar (Befund opencode, MITTEL).
+      **Gegangen am 12.09.**: `xcodebuild … -destination id=544B9818-…
+      DEVELOPMENT_TEAM=WQZJ8649TN` (BUILD SUCCEEDED), danach
+      `xcrun devicectl device install app` auf das iPhone 17 Pro — **über** die
+      bestehende App, die Anmeldung bleibt also stehen. Am gebauten Artefakt
+      gemessen, nicht an der Quelle: `codesign -d --entitlements` nennt
+      `applinks:app.effbeezee.com` und `application-identifier
+      WQZJ8649TN.com.effbeezee.app`, **zeichengleich mit der `appIDs`-Zeile der
+      live ausgelieferten AASA**.
 - [ ] 8.1 **iOS, App installiert:** Aktivierungslink aus einer echten Mail
       öffnen. Die App öffnet sich am Ziel. Beim Messen den Entwicklermodus der
       Association verwenden und das im Beleg **vermerken** — Apple
       zwischenspeichert die Datei, und ein Lauf ohne diesen Vermerk belegt
       nicht, was er zu belegen scheint.
+      **Vorarbeit erledigt, der Tipp fehlt.** Die App liegt installiert auf dem
+      Gerät (8.0b). **Der Entwicklermodus wird nicht gebraucht**, und das ist
+      gemessen statt angenommen: Apples CDN führt die Datei bereits in der
+      richtigen Fassung —
+      `https://app-site-association.cdn-apple.com/a/v1/app.effbeezee.com`
+      antwortet **200, `application/json`, 272 Bytes**, inhaltsgleich mit dem
+      Ursprung. Ein Gerät ohne Entwicklermodus bekommt also dieselbe Datei.
+      `devicectl` kennt kein „URL öffnen", und iOS lässt sich weder tippen noch
+      abfotografieren — der Rest ist Handarbeit.
 - [ ] 8.2 **iOS, App nicht installiert:** derselbe Link öffnet die Website und
       der Vorgang läuft zu Ende.
-- [ ] 8.3 **Android, direkt installiertes Paket:** dasselbe Paar. Das Paket
+- [x] 8.3 **Android, direkt installiertes Paket:** dasselbe Paar. Das Paket
       MUSS mit dem **Upload-Schlüssel** signiert sein, nicht mit dem
       Debug-Schlüssel — `autoVerify` vergleicht den Signierer der installierten
       App gegen `assetlinks.json`, und ein Debug-Bau scheitert mit genau dem
@@ -271,19 +295,76 @@ fremden Host und an zwei Betriebssystemen.
       `apksigner verify --print-certs` gegen den in 4.3 eingetragenen
       Fingerabdruck halten (Befund opencode, MITTEL). Der Beleg gilt
       ausdrücklich **nicht** für die Play-Fassung (Entscheidung 6).
-- [ ] 8.4 Die drei übrigen Pfade je einmal auf einer Plattform, aus WhatsApp und
+      **Am 12.09. vollständig gemessen**, jeder Schritt am Artefakt oder am
+      Gerät, keiner an der Quelle:
+
+      | Was | Gemessen woran | Ergebnis |
+      | --- | --- | --- |
+      | Signierer | `apksigner verify --print-certs` auf dem gebauten APK | `7ae186…d12fda` |
+      | Erwartung | live ausgelieferte `assetlinks.json` | derselbe Wert |
+      | Filter | `aapt2 dump xmltree` **auf dem APK** | genau **ein** `autoVerify`, alle vier `pathPrefix` |
+      | Bauart | `dumpsys package` nach der Installation | `DEBUGGABLE` ist **weg** |
+      | Signatur am Gerät | `pm get-app-links` | `7A:E1:…:DA` |
+      | Verifizierung | `pm get-app-links` | `app.effbeezee.com: verified` |
+
+      Der Debug-Bau davor trug in `pm get-app-links` **gar keine Domain** — die
+      Gegenprobe zur Verifizierung ist also der Vorzustand selbst.
+- [x] 8.4 Die drei übrigen Pfade je einmal auf einer Plattform, aus WhatsApp und
       aus Mail heraus.
+      **Alle vier Pfade auf Android gemessen, je aus dem Kaltstart** — und
+      daneben zwei Gegenproben, die NICHT in der App landen dürfen:
+
+      | Adresse | landet in |
+      | --- | --- |
+      | `/aktivierung#token=…` | App |
+      | `/chat/<uuid>` | App |
+      | `/events/<uuid>` | App |
+      | `/p/<uuid>` | App |
+      | `/passwort-neu#token=…` | **Chrome** (bewusst draussen, Entscheidung 10) |
+      | `/verzeichnis` | **Chrome** (gewöhnliche Anwendungsroute) |
+
+      **Das Fragment überlebt den Weg durchs Betriebssystem:** die zugestellte
+      Absicht trägt wörtlich
+      `dat=https://app.effbeezee.com/aktivierung#token=PROBE-12345`. Genau
+      dieser Teil ist der teure — `pathname`+`search` allein öffneten die App
+      ohne Token.
+      **Was hier NICHT belegt ist:** die Absicht kam aus `am start`, nicht aus
+      Gmail oder WhatsApp. Für die Zustellung des Links ist das dasselbe
+      (`VIEW`/`BROWSABLE`, dieselbe Adresse), für die Rückkehr in die
+      Absender-App nicht — das ist 8.4b.
 - [ ] 8.4b Den **Rückweg** prüfen: die Brotkrume oben links auf iOS und die
       Zurück-Taste auf Android führen in die Anwendung zurück, aus der der Link
       kam (Befund gemini, NIEDRIG). Das leistet das Betriebssystem, aber nur bei
       einem echten Universal Link — bricht es, ist es ein Hinweis darauf, dass
-      der Link anders geöffnet wurde als gedacht.
-- [ ] 8.5 Gerät zurückstellen, wie es übernommen wurde.
+      der Link anders geöffnet wurde als gedacht. **Braucht eine echte
+      Absender-App, also Handarbeit.**
+- [ ] 8.5 Gerät zurückstellen, wie es übernommen wurde. **Offen und eine
+      Entscheidung:** auf dem Pixel stand ein DEBUG-Bau vom 10.09. ohne
+      Link-Filter, jetzt steht dort der Release-Bau. Der alte liegt gesichert
+      im Ablageordner der Sitzung (`alt-debug.apk`, 18 MB). Zurückspielen hiesse
+      die Verifizierung wieder verlieren; das iPhone wurde nur überschrieben und
+      ist unverändert angemeldet.
+
+### Eine Sonde, die wie ein Beleg aussieht und keiner ist
+
+`cmd package resolve-activity -a VIEW -c BROWSABLE -d <adresse>` meldete für
+alle vier Pfade `android/…ResolverActivity`, also den Auswahldialog — das las
+sich wie „die Verifizierung greift nicht". **Der wirkliche Start ging in
+demselben Zustand direkt in die App**, ohne Dialog, nachgelesen im
+Aktivitätenstapel. `resolve-activity` bildet die App-Link-Vorzugsregel nicht ab.
+Ebenso harmlos: `pm get-app-links` führt die Domain unter
+`Selection state → Disabled`; die Auswahl gilt nur für **un**verifizierte
+Domains. Wer eine dieser beiden Ausgaben als Befund meldet, schickt den nächsten
+Leser ins Manifest, wo nichts falsch ist.
 
 ## 9. Abnahme und Abschluss
 
-- [ ] 9.1 `pnpm test`, `typecheck`, `lint`, `build`, `openspec validate --all` —
-      alle grün, Zahlen festhalten.
+- [x] 9.1 `pnpm test`, `typecheck`, `lint`, `build`, `openspec validate --all` —
+      alle grün, Zahlen festhalten. Gemessen am 12.09. auf `60eaa4e`:
+      `pnpm test` **2803 grün** (245 Dateien) · `typecheck` 0 · `lint` 0 Fehler
+      / 7 Warnungen (Vorzustand) · `pnpm build` grün (unter
+      `infisical run --env=prod`, seit vite 8 nötig) ·
+      `openspec validate --all` 34/34.
 - [ ] 9.2 `cso`-Gate: die Domain-Assoziation gibt nichts frei, was die Website
       nicht ohnehin freigibt, und die Zielerhaltung verlässt die Anwendung
       nicht.
