@@ -59,7 +59,13 @@ describe("Verifizierungsdateien für Universal Links (AGE-643)", () => {
     expect(details.flatMap((d) => d.appIDs ?? [])).toContain(APP_ID);
 
     const muster = details.flatMap((d) => (d.components ?? []).map((k) => k["/"]));
-    for (const erwartet of AASA_MUSTER) expect(muster).toContain(erwartet);
+    // Mengengleichheit, nicht „enthält" — und zwar aus demselben Grund, aus dem
+    // `deep-links.native.test.ts:70` es für das Manifest längst so hält
+    // (Diff-Review AGE-643, gemini, NIEDRIG). Ein zusätzlicher Eintrag in der
+    // AASA erweitert lautlos, welche Adressen unserer Domain die App abfängt;
+    // eine Schleife über die ERWARTETEN Muster sieht das nie, weil sie nur in
+    // eine Richtung prüft.
+    expect([...muster].sort()).toEqual([...AASA_MUSTER].sort());
 
     // Ein Doppelpunkt-Platzhalter aus der Routentabelle (`/chat/:threadId`) ist
     // hier wirkungslos und träfe nie zu — Apple kennt nur `*` und `?`.
