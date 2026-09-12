@@ -495,28 +495,39 @@ Leser ins Manifest, wo nichts falsch ist.
 
       **Ein Befund ist dabei entstanden, und er ist kein Sicherheitsbefund,
       sondern einer der Richtigkeit** — siehe 9.2b.
-- [ ] 9.2b **BEFUND aus dem Gate: der Zuhörer lebt nur, solange `AppShell`
-      steht.** `deepLinkZuhoerer` hängt in einem `useEffect` in
+- [x] 9.2b **Ein Befund aus dem Gate — und er hat die Gegenprobe NICHT
+      überlebt. Er steht hier als widerlegter Befund, nicht als Mangel.**
+
+      Gelesen wurde: `deepLinkZuhoerer` hängt in einem `useEffect` in
       `AppShell.tsx:715` und gibt sein Abräumen zurück. `/login`,
       `/aktivierung`, `/passwort-vergessen` und `/passwort-neu` liegen in
-      `src/App.tsx` **neben** der Layoutroute mit `AppShell`, nicht darin.
-      Steht eine dieser Seiten im Vordergrund, ist der Zuhörer **abgeräumt** —
-      ein dann eintreffender Link wird lautlos verworfen.
+      `src/App.tsx` **neben** der Layoutroute mit `AppShell` — der Quelltext
+      sagt es dort sogar selbst („außerhalb der Shell (wie /login)"). Daraus
+      folgte die Vorhersage: steht eine dieser Seiten im Vordergrund, ist der
+      Zuhörer abgeräumt und ein eintreffender Link wird lautlos verworfen. Der
+      Weg dorthin wäre kein Sonderfall — ein neues Mitglied, das den Link ein
+      zweites Mal antippt, weil beim ersten Mal scheinbar nichts geschah.
 
-      Der Weg dorthin ist kein Sonderfall: ein neues Mitglied tippt den
-      Aktivierungslink, landet auf `/aktivierung`, wechselt die App, und tippt
-      den Link ein zweites Mal, weil beim ersten Mal scheinbar nichts passiert
-      ist. Genau dann geschieht wirklich nichts.
+      **Am Gerät gemessen (12.09., Pixel), mit ZWEI VERSCHIEDENEN Zielrouten,
+      damit Erfolg und Nullfall unterscheidbar sind:** kalt auf
+      `/aktivierung#token=LAUSCHER-A` (die Aktivierungsseite steht, Foto 08a),
+      dann in den Hintergrund, dann ein Link auf `/events/…`. **Die App sprang
+      auf die Event-Seite** (Foto 08b). Der Zuhörer war also da. Die Vorhersage
+      ist damit **falsch**, und es gibt nichts zu beheben.
 
-      **Stand: aus dem Quelltext gelesen, am Gerät noch nicht nachgestellt**
-      (das Pixel hing beim Messversuch nicht mehr am Rechner). Der Versuch
-      braucht **zwei verschiedene Zielrouten**: kalt auf `/aktivierung`, in den
-      Hintergrund, dann ein Link auf `/events/…`. Bleibt die Aktivierungsseite
-      stehen, ist der Befund belegt.
+      **Warum sie falsch ist, ist offen** und ausdrücklich nicht aufgeklärt.
+      Die Einheitstests in `AppShell.deep-links.test.tsx` belegen, dass der
+      Zuhörer beim Abräumen abgeht — in jsdom, gegen ein nachgebildetes Plugin.
+      Kandidaten für die Abweichung am Gerät: die Hülle bleibt dort entgegen
+      der Routentabelle montiert, oder die Webansicht wird beim zweiten Intent
+      neu geladen und hängt den Zuhörer dabei erneut an. **Das ist eine Frage
+      an den Mechanismus, keine an das Verhalten** — das Verhalten ist
+      gemessen und richtig.
 
-      Ob er auch Donalds einmaliges Vorkommnis auf dem iPhone erklärt, ist
-      **offen** — er berichtete die Startseite, und die liegt innerhalb von
-      `AppShell`.
+      **Die Lehre gehört zum Befund:** ein Widerlegungsversuch mit zwei Links
+      auf **dieselbe** Route hatte vorher genau nichts belegt, weil sich der
+      unveränderte Bildschirm nicht vom neu aufgebauten unterscheiden lässt.
+      Erst die zweite Zielroute macht die Messung aussagekräftig.
 
 - [ ] 9.3 `qa`-Gate auf dem Aktivierungsweg — er ist der teuerste Fehlerfall und
       der einzige, den niemand meldet.
