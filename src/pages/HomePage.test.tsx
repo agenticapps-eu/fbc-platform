@@ -33,6 +33,7 @@ function makePost(body: string): FeedPost {
     videoUrl: extractFirstVideo(body)?.url ?? null,
     kind: "member",
     event: null,
+    releaseNote: null,
   };
 }
 

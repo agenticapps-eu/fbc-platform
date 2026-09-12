@@ -41,3 +41,22 @@
   # `no-referrer`. Wer einen der beiden „doppelt" findet und löscht, kann damit
   # die schärfere Regel entfernen.
   Referrer-Policy: no-referrer
+
+/.well-known/apple-app-site-association
+  # AGE-643: die Datei trägt KEINE Endung, und ohne diese Regel liefert Pages
+  # sie als `text/plain` aus. Apple lehnt sie dann ab — an der ausgelieferten
+  # Datei ist das nicht zu sehen, sie kommt vollständig und mit 200 an.
+  #
+  # Die vier beanspruchten Pfade stehen einmal in `src/lib/deep-links.ts`.
+  # Dort auch die Begründung, warum `/passwort-neu` nicht dazugehört. Weder
+  # `apple-app-site-association` noch `assetlinks.json` können den Verweis
+  # selbst tragen: beide sind strikt geparstes JSON ohne Kommentarsyntax.
+  #
+  # DIE ANDROID-SEITE IST UNVOLLSTÄNDIG, und dies ist die Stelle, an der es
+  # jemand findet. `assetlinks.json` führt den Fingerabdruck des UPLOAD-
+  # Schlüssels. Unter Play App Signing signiert Google die verteilte App mit
+  # einem anderen Schlüssel; dessen Fingerabdruck existiert erst mit dem
+  # Play-Console-Eintrag und wird in AGE-644 nachgetragen. Bis dahin
+  # verifiziert nur ein direkt installiertes Paket. Das Fehlerbild ohne den
+  # Nachtrag lautet „Deep Links funktionieren nicht" und führt in die Irre.
+  Content-Type: application/json

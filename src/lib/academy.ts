@@ -178,6 +178,7 @@ export async function fetchGelikteVideos({ uid, cursor }: FetchGelikteArgs): Pro
       // kann ihn beschreiben).
       kind: "member",
       event: null,
+      releaseNote: null,
     });
   }
 
