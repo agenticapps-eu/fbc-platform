@@ -1,115 +1,133 @@
-# Session Handoff — 2026-09-12 (AGE-643 M3 ist abgeschlossen)
+# Session Handoff — 2026-09-12 (Abend: Aufräumen, Dependabot, AGE-644 angefangen)
 
 > ## ⚠ ZUERST
 >
-> **1. AGE-643 (M3, Deep Links) ist fertig.** Zwei PRs gemergt: **#403**
-> (`901fc67`, Gerätebeleg und drei Korrekturen aus dem Review) und **#404**
-> (`3532a6d`, Übergabe plus eine Korrektur am Neuigkeiten-Entwurf). Change
-> archiviert als `openspec/changes/archive/2026-09-12-deep-links`, Linear auf
-> **Done**. **Hier ist nichts mehr offen.**
+> **1. AGE-643 (M3, Deep Links) ist und bleibt zu.** Nichts daran offen. Die
+> vorige Übergabe stimmt in diesem Punkt; dieser Abschnitt ersetzt sie nur,
+> weil danach noch etwas passiert ist.
 >
-> **2. Diese Übergabe deckt NUR AGE-643.** AGE-718 lief am selben Tag in einer
-> eigenen Sitzung (`fbc-platform-f1`) und hat eigene Commits auf `main`
-> (#400–#402). Nicht zusammenführen, nicht nacharbeiten.
+> **2. Die vorige Übergabe irrt an einer Stelle, und die kostet sonst Tage.**
+> Sie nennt „Kontolöschung im Produkt" als Bauarbeit für AGE-644. **Die ist
+> seit dem 09.09. fertig und auf PROD ausgerollt** — AGE-708, fünf PRs
+> (#373–#378), `src/lib/konto-loeschen.ts`, drei Migrationen, ein pgTAP-Test
+> und neun Requirements in `openspec/specs/privacy/spec.md`. In AGE-644 ist
+> das Häkchen trotzdem leer. **Nicht neu bauen.**
 >
-> **3. Der Worktree `donald-age-643-deep-links` darf weg** (`wt remove`). Der
-> Branch `donald/deep-links-abnahme` ist gemergt, die Remote-Fassung gelöscht;
-> lokal lebt er nur noch, weil eine Sitzung darin saß.
+> **3. Die Dependabot-Schlange ist leer.** #394–#397 alle gemergt, `main` grün
+> (CI und Deploy auf `2521854e`). Darunter der Major-Sprung Vitest 4 → 5.
 >
-> **4. Zwei Geräte sind verändert und BEIDE abgemeldet** — siehe
-> „Gerätezustand". Das ist der einzige Teil, der jemanden noch betrifft.
->
-> **5. Diese Datei ist NICHT committet.** Die Fassung auf `main` (aus `3532a6d`)
-> ist inhaltlich fast gleich, kennt aber den Merge von #404 und die Korrektur am
-> Neuigkeiten-Entwurf noch nicht. Wer sie festhalten will, macht einen kleinen
-> PR ohne Vorgangskürzel — direkt auf `main` committen ist verboten.
+> **4. Alle Worktrees bis auf `main` sind weg.** 2,5 GiB frei. Es gibt keinen
+> Worktree mehr, in dem noch jemand sitzt.
 
-## Was erledigt ist
+## Was diese Sitzung getan hat
 
-§8 (Gerätebeleg auf echten Geräten) und §9 (Sicherheits-Gate, QA-Gate,
-Diff-Review, Archiv, PR, Nachtrag) sind vollständig. Die Belege stehen
-klauselweise in `tasks.md` des archivierten Changes, mit den Zahlen daneben.
+### Aufgeräumt
 
-| Fall | Ergebnis |
+Drei Worktrees entfernt, alle drei vorher **dateiweise** gegen `main` geprüft,
+nicht nur am Commit-Graphen — jeder trug zwei Commits, die als Squash schon in
+`main` standen.
+
+| Worktree | Wo der Inhalt liegt |
 | --- | --- |
-| Android, vier Pfade | App, aus dem Kaltstart, ohne Auswahldialog |
-| Android, drei Gegenproben | Browser (`/passwort-neu`, `/verzeichnis`, `/aktivierungsfeier`) |
-| iOS mit App | App am Ziel, getippt in der **Gmail-App** |
-| iOS ohne App | **Safari**, Formular rendert |
-| Rückweg (Brotkrume) | führt zurück in die Absender-App |
+| `donald-age-643-deep-links` | `3532a6d` |
+| `donald-age-705-...-blog` | `8a6d47c` |
+| `donald-age-708-kontoloeschung` | 0 Commits vor `main` |
 
-Abnahme zuletzt: **2821 Tests grün** (247 Dateien), `typecheck` 0, `lint` 0
-Fehler / 7 Warnungen (Vorzustand), `build` grün, `openspec validate --all` 33/33.
+### Dependabot
 
-## Vier Korrekturen, die erst der Review gefunden hat
+Vier PRs, nacheinander, nie parallel — das Rezept aus dem Gedächtnis trug
+unverändert.
 
-1. **`pathPrefix="/aktivierung"` traf auch `/aktivierungsfeier`** — jetzt
-   `android:path`. Ein echter Verhaltensfehler: Android hätte die App geöffnet
-   und der Router die Adresse verworfen. Am Gerät nachgemessen.
-2. **Der native Test hielt beide Artefakte gegen ein eigenes Host-Literal**
-   statt gegen `DEEP_LINK_HOST`.
-3. **Die AASA-Pfadmenge war nur in eine Richtung gepinnt** — ein zusätzlicher
-   Eintrag wäre nie aufgefallen.
-4. **Der Neuigkeiten-Entwurf war falsch** (nach dem Archivieren gefunden, Hinweis
-   der Nachbarsitzung): ohne H1 hiess er `deep-links`, ohne `Linear:`-Zeile trug
-   er `linear: null`, und zwei Stichpunkte standen noch in Planungszeit — einer
-   behauptete, der Zuhörer fehle. Korrigiert, der Eingriff ist im Kopf der
-   archivierten `proposal.md` benannt.
+| PR | Inhalt | Nacharbeit |
+| --- | --- | --- |
+| #394 | `pnpm/action-setup` 6.0.10 → 6.1.0 | keine, nur Basis nachziehen |
+| #395 | `supabase-js`, `framer-motion` | `deno install --frozen=false` |
+| #396 | vier Entwicklungsabhängigkeiten | `deno install --frozen=false` |
+| #397 | **Vitest 4 → 5** | Konflikt in beiden Sperrdateien aufgelöst |
 
-Zwei weitere Befunde sind begründet **abgelehnt**; die Gründe stehen in
-`tasks.md` unter 9.4.
+**Bei #397 haben beide Sperrdateien kollidiert**, weil #396 vorher landete.
+Aufgelöst wie im Gedächtnis beschrieben: `--theirs`, dann `pnpm install
+--lockfile-only` und `deno install --frozen=false`, beide **erzeugt**, nicht
+zusammengeschrieben. Aus `package.json` blieb Vitest 5 aus dem Branch und
+Wrangler 4.130.0 aus `main`.
 
-## Gerätezustand
+**Die Zahl, auf die es beim Major-Sprung ankam:** Vitest 5 fährt **247 Dateien
+und 2821 Tests** — genau so viele wie Vitest 4. Ein grünes CI allein hätte
+nicht ausgeschlossen, dass die Suite still schrumpft.
 
-- **Pixel 11 Pro:** trägt den **Release**-Bau (Donalds Entscheidung), die
-  Debug-Fassung vom 10.09. ist weg. Das Gerät ist **abgemeldet** — Debug- und
-  Release-Signatur sind verschieden, die Neuinstallation hat die Sitzung
-  gelöscht. Bildschirmsperre wieder auf 300000 ms.
-- **iPhone 17 Pro:** App aus Xcode installiert, für 8.2 gelöscht und wieder
-  aufgespielt. **Auch dort ist die Anmeldung weg.**
+Nebenbei gemessen und für später wichtig: `deploy` ist auf einem
+Dependabot-PR rot, solange nur Dependabot gepusht hat. Nach `gh pr
+update-branch` läuft er im normalen Secret-Kontext und wird grün. Er ist
+ohnehin kein Pflichtcheck.
 
-Wer an einem der beiden misst, plant die Anmeldung vorweg ein.
+### AGE-644 angefangen — und der technische Kern ist nicht, was dort steht
 
-## Offen, aber nicht hier
+Der Vorgang liest sich wie Kontoarbeit. Gemessen ist die Lage anders.
 
-- **Die Play-Fassung verifiziert ihre Links nicht** — `assetlinks.json` führt
-  nur den Upload-Fingerabdruck. Steht als Abnahmepunkt in **AGE-644**, samt
-  Herkunft (Play Console → Test and release → App Integrity), Begründung und
-  Gegenprobe.
-- **Zielerhaltung über die Anmeldung hinweg**: gebaut und durch Tests gedeckt,
-  am Gerät **nicht** nachgestellt. Dafür müsste man sich auf dem Testgerät
-  anmelden.
-- **Ein einmaliges, nicht reproduzierbares Vorkommnis auf dem iPhone**: ein
-  Warmstart landete auf der Startseite statt am Ziel. Der zweite Anlauf trug,
-  die naheliegende Erklärung ist gemessen und widerlegt.
+**Von neun Abnahmezeilen sind sieben Donalds Arbeit oder blockiert:**
+Google-Konto und Testzwang, Tester anfragen, Store-Formulare, Veröffentlichen,
+Verlängerungstermine. Der Play-Fingerabdruck für `assetlinks.json` hängt daran,
+dass die App in der Play Console existiert. Die Kontolöschung ist erledigt
+(siehe oben).
 
-## Drei Messfehler dieser Sitzung
+**Übrig bleibt eine einzige echte Frage, und sie ist offen:** wie ein
+Store-Prüfer in die App kommt, ohne echte Mitgliederdaten zu sehen.
 
-Alle drei stehen im Gedächtnis, alle drei kosten sonst wieder Zeit.
+Gemessener Stand dazu:
 
-1. **Zwei Sonden auf DASSELBE Ziel trennen die Fälle nicht.** Ein Bildschirm,
-   der sich nicht verändert hat, sieht aus wie einer, der neu aufgebaut wurde.
-   Vor dem Messen fragen, wie der **Misserfolg** aussähe.
-2. **`resolve-activity` und `Selection state: Disabled` sehen wie Fehlschläge
-   aus und sind keine.** Der Beleg für App Links steht im Aktivitätenstapel nach
-   `am start`.
-3. **`openspec archive` allein macht CI rot** — `pnpm release:entries` gehört
-   dazu. Und vorher einmal `proposal.md` gegen den Erzeuger lesen (H1,
-   `Linear:`-Zeile, Stichpunkte im Perfekt statt im Plan).
+- **Das Verzeichnis ist ab `connect` gegated** (`src/config/nav.ts:105`) — ein
+  Prüfer auf `basic` sähe es nicht.
+- **Aber das reicht nicht.** `/aktivitaet` und `/events` tragen **gar kein**
+  `minTier`. Der Prüfer sähe dort Beiträge, Namen und Bilder echter
+  Mitglieder, egal auf welcher Stufe sein Konto steht.
+- **Auf DEV ausweichen geht nicht.** Seit dem Spiegel (AGE-576) trägt DEV die
+  echten Mitglieder aus PROD, und `docs/demo-zugang.md` ist als historisch
+  markiert: die Demo-Welt existiert nicht mehr, 0 von 72 Konten sind Demo.
+
+Es gibt also **heute keine Stufe und keine Fläche**, auf der ein Prüfer eine
+funktionierende App ohne echte Personendaten sieht. Das ist keine Formalie:
+die Frage ist ungelöst, und sie steht vor der Einreichung, nicht danach.
+
+## Die Entscheidung, die Donald treffen muss
+
+Drei Wege, alle mit einem echten Preis:
+
+1. **Hinnehmen.** Der Prüfer bekommt ein normales Konto und sieht die echte
+   Gemeinschaft. Null Bauarbeit. Der Preis ist eine Datenschutz-Entscheidung
+   über 70 Mitglieder, die dem nicht zugestimmt haben.
+2. **Demo-Sicht bauen.** Ein Prüferkonto sieht einen erfundenen Bestand. Das
+   ist RLS-Arbeit quer über Feed, Events und Verzeichnis — nach Donalds eigener
+   Regel mit Fremdreviewer, und der teuerste der drei Wege.
+3. **Leeres Konto.** Der Prüfer sieht eine funktionierende, aber fast leere
+   App. Kostet vermutlich eine Ablehnungsrunde nach Richtlinie 4.2, also
+   mehrere Tage — genau das, was AGE-644 vermeiden will.
+
+**Ohne diese Entscheidung lässt sich für AGE-644 kein OpenSpec-Change
+schreiben**, weil Weg 1 und 3 gar keinen brauchen und Weg 2 ein großer ist.
+
+## Noch offen, klein
+
+- **85 verwaiste Remote-Branches** aus gemergten PRs. GitHub löscht sie hier
+  nicht automatisch. Aufräumen ist ein Einzeiler, aber es ist ein Schreibzugriff
+  auf die Fernkopie und wurde deshalb nicht ungefragt gemacht.
+- **AGE-644 trägt das Kontolöschungs-Häkchen unangehakt.** Bewusst nicht
+  angefasst — Donald hatte die Korrektur nicht mit ausgewählt.
 
 ## Next session: start here
 
-Nichts an AGE-643. Der nächste Schritt der Reihe ist **AGE-644 (M4,
-Store-Einreichung)** — Donald hat ihn noch nicht freigegeben, also **vorher
-fragen**. Drei Dinge stehen dort in dieser Reihenfolge an:
+**Zuerst fragen, welcher der drei Prüferzugangs-Wege gilt.** Erst danach steht
+fest, ob AGE-644 überhaupt einen OpenSpec-Change bekommt. Parallel dazu ist der
+längste Weg unverändert das Google-Konto samt Testzwang-Bedingungen, und den
+kann nur Donald gehen.
 
-1. **Google-Konto anlegen und die Testzwang-Bedingungen dort ABLESEN**
-   (Mindestzahl Tester, Mindestlaufzeit). Mehrere Wochen Vorlauf, und sie
-   gehören vor jede Terminzusage. Der längste Weg im M4-Zeitplan.
-2. **Kontolöschung im Produkt** — Apple verlangt sie, es gibt sie heute nicht.
-   Das ist Bauarbeit, keine Formalie.
-3. **Play-App-Signing-Fingerabdruck** in `assetlinks.json` nachtragen, sobald
-   die App in der Play Console angelegt ist.
+Vor dem Anfangen `ListAgents` — am 12.09. liefen sechs Sitzungen, zwei davon in
+diesem Repo.
 
-Vor dem Anfangen `ListAgents` — am 12.09. liefen zwei Sitzungen gleichzeitig im
-selben Repo, und einmal sogar im selben Worktree.
+## Zwei Fallen dieser Sitzung
+
+1. **Ein `cd` in einen Worktree verschiebt die Sitzung stumm mit.** Zweimal
+   passiert, beide Male beim bloßen *Lesen* eines fremden Worktrees. Mit
+   `git -C <pfad>` arbeiten, nie mit `cd`.
+2. **Eine Übergabe ist kein Beleg.** Die vorige nannte die Kontolöschung als
+   offene Bauarbeit; sie war seit drei Tagen live. Der Unterschied kostete
+   einen `grep`, hätte aber sonst Tage gekostet.
