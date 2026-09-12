@@ -68,18 +68,19 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
       Doppelpunkt-Platzhalter aus der Routentabelle wäre dort wirkungslos
       (Befund gemini, NIEDRIG). Kein Kommentar im JSON — die Datei muss strikt
       geparst werden können.
-- [ ] 4.2 **BLOCKIERT — Handgriff für Donald.** Den Upload-Fingerabdruck beschaffen: `pnpm android:keystore` erzeugt
+- [x] 4.2 Den Upload-Fingerabdruck beschafft: `pnpm android:keystore` erzeugt
       den Keystore aus Infisical, danach der SHA-256 über `keytool`/`apksigner`.
       **Der Keystore darf den Baum nicht verlassen** — er liegt unter einer
       Ignorierzeile, und der Wächter aus `native-shell` bricht den Lauf, wenn
       eine `.keystore`/`.jks` im Baum liegt. Nach dem Ablesen entfernen.
-      **Gemessen am 12.09.:** `infisical` liegt auf der Maschine, ist in dieser
-      Sitzung aber NICHT angemeldet — `infisical run --env=prod` bricht mit
-      „Failed to automatically trigger login flow" ab und verlangt `infisical
-      login` interaktiv. Der Weg ist offen, die Anmeldung fehlt.
-      Ein Debug-Bau hilft nicht: `android/app/build/outputs/apk/debug/` trägt
-      den DEBUG-Schlüssel — genau das irreführende Bild aus 8.3.
-- [ ] 4.3 **Wartet auf 4.2.** `public/.well-known/assetlinks.json` anlegen, mit dem
+      **Gelaufen am 12.09.,** nachdem Donald `infisical login` ausgeführt hat:
+      `infisical run --env=prod -- pnpm android:keystore` schrieb 2648 Bytes,
+      `keytool -list -v` gab den SHA-256. Keystore und `key.properties` sind
+      unmittelbar danach wieder aus dem Baum — nachgesehen, es liegt keine
+      `.jks` mehr darin.
+      Ein Debug-Bau hätte nicht geholfen: `android/app/build/outputs/apk/debug/`
+      trägt den DEBUG-Schlüssel — genau das irreführende Bild aus 8.3.
+- [x] 4.3 `public/.well-known/assetlinks.json` angelegt, mit dem
       Upload-Fingerabdruck **und dem Vermerk über die Lücke** — der
       Play-App-Signing-Fingerabdruck fehlt und wird in AGE-644 nachgetragen.
       Der Vermerk steht als `#`-Kommentar neben der Inhaltstyp-Regel in
@@ -89,8 +90,8 @@ Ohne die Dateien am Netz ist alles Weitere nicht belegbar.
 - [x] 4.4 `public/_headers`: Inhaltstyp für die endungslose Datei — samt dem
       Vermerk aus 4.3 und dem Verweis auf `src/lib/deep-links.ts`, den die
       beiden JSON-Dateien selbst nicht tragen können.
-- [x] 4.5 3 von 4 grün. Die vierte (`assetlinks.json`) bleibt rot, bis 4.2
-      läuft — sie ist der einzige rote Test im Zweig.
+- [x] 4.5 **4 von 4 grün.** Kein roter Test mehr im Zweig. Beide Dateien
+      liegen nach `pnpm build` zeichengleich in `dist/.well-known/`.
 - [ ] 4.6 **Nach dem Deploy.** Live messen, ohne `-L` und mit Blick auf den
       Rumpf: beide Adressen liefern ihr eigenes JSON, nicht die Startseite.
       Gegen die Zahl aus 1.1 halten (7986 Bytes wären der Fehlschlag).
