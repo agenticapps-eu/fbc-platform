@@ -427,12 +427,15 @@ Was danach gemessen wurde:
 und es bleibt **ein unerklärtes Vorkommnis** — festgehalten statt weggelassen,
 weil der Weg, auf dem das Token reist, eine stille Verlustmöglichkeit hat.
 
-Die naheliegende Erklärung dafür wurde ebenfalls gemessen und **widerlegt**:
-zwei Tipps auf denselben Pfad innerhalb **einer** Lebensdauer der App
-(`…#token=ZWEIMAL-AAA`, dann `…#token=ZWEIMAL-BBB`, dazwischen nur der
-Wechsel in den Hintergrund) zeigten **beide Male** das Formular. Die
-Einmal-Entnahme greift nicht, weil `ActivationRedeemPage` bei jedem Sprung neu
-einhängt und die Adresszeile dann bereits das neue Fragment trägt.
+**Ein Widerlegungsversuch dazu war selbst untauglich, und das gehört hierher,
+weil er sonst als Beleg weitergereicht wird.** Gemessen wurden zwei Tipps
+innerhalb **einer** Lebensdauer der App (`…#token=ZWEIMAL-AAA`, dann
+`…#token=ZWEIMAL-BBB`, dazwischen nur der Wechsel in den Hintergrund); beide
+Male stand das Formular da. **Das beweist nichts:** beide Adressen zeigen auf
+**dieselbe** Route, und ein Bildschirm, der sich nicht verändert hat, sieht
+genauso aus wie einer, der neu aufgebaut wurde. „Der zweite Sprung kam an" und
+„es geschah überhaupt nichts" sind an diesem Foto nicht zu unterscheiden. Der
+Versuch muss mit **zwei verschiedenen Zielrouten** wiederholt werden.
 
 **Der Weg, auf dem das Token reist, erklärt, warum das überhaupt heikel ist:**
 `entnimmAktivierungsFragment()` läuft als allererstes in `instrument.ts`, legt
