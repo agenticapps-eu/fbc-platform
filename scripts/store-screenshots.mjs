@@ -1,3 +1,4 @@
+/* global document, location */ // laufen in page.evaluate(), also im Browser
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 const require = createRequire(process.env.S + "/x.js");

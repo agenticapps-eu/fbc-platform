@@ -9,6 +9,7 @@
  *   S=$(mktemp -d) && npm --prefix "$S" install playwright-core
  *   S=$S node scripts/store-feature-graphic.mjs
  */
+/* global document */ // laeuft in page.evaluate(), also im Browser
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
