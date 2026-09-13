@@ -34,9 +34,18 @@ Plugins genau dorthin zeigt — die Datei warnt selbst davor.
 ### 2. Stripe ist verdrahtet, und das ist ein Apple-Risiko — kein Datenschutzthema
 
 `/mitgliedschaft` ruft `create-checkout-session` (`MitgliedschaftPage.tsx:35`)
-und führt zu Stripe-Checkout für Stufen-Upgrades. Die Route hat **keinen
-Menüeintrag** (`nav.ts`, `section: "sub"`), und zum Go-Live sind alle Mitglieder
-`impact` — es gibt faktisch nichts zu kaufen.
+und führt zu Stripe-Checkout für Stufen-Upgrades.
+
+> ⚠️ **Korrigiert am 13.09. nach der Sichtprobe.** Hier stand zuerst, die Route
+> sei „unverlinkt". Das stimmt nur für das Hauptmenü. Auf dem Screenshot der
+> Profilseite steht ein sichtbarer Knopf **„Mitgliedschaft verwalten"** —
+> `MembershipSummary.tsx:30`, ein `<Link to="/mitgliedschaft">`, und er
+> erscheint auch auf der höchsten Stufe. Ein Prüfer findet den Weg also auf der
+> zweiten Seite, die er öffnet, nicht nur durch Raten einer Adresse. Der Befund
+> wurde damit deutlich schärfer, nicht milder.
+
+Zum Go-Live sind alle Mitglieder `impact` — zu kaufen gibt es faktisch nichts,
+aber der Weg dorthin ist sichtbar und funktionsfähig.
 
 Für das Datenschutzformular ändert das wenig. **Für die Apple-Prüfung schon:**
 Richtlinie 3.1.1 verlangt In-App-Kauf für digitale Inhalte, die in der App
@@ -44,9 +53,11 @@ genutzt werden. Eine erreichbare Route zu externem Checkout ist die
 Standardursache für eine Ablehnung nach 3.1.1 — und anders als 4.2 lässt sie
 sich nicht wegargumentieren.
 
-**Empfehlung: die Route vor der iOS-Einreichung abschalten.** Sie ist ohnehin
-unverlinkt und ohne Funktion. Das ist eine Zeile und nimmt eine ganze
-Ablehnungsklasse vom Tisch. Deine Entscheidung — ich habe nichts geändert.
+**Empfehlung: vor der iOS-Einreichung den Knopf und die Route abschalten.**
+`showManageCta` auf der einen Seite, der Route-Eintrag auf der anderen — zwei
+Stellen, beide klein. Zum Go-Live ist ohnehin nichts zu kaufen, und es nimmt
+eine ganze Ablehnungsklasse vom Tisch. Deine Entscheidung; ich habe nichts
+geändert.
 
 ### 3. `POST_NOTIFICATIONS` steht in keinem Manifest
 
