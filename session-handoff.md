@@ -32,6 +32,7 @@
 | #407 | vier transitive Sicherheitsmeldungen per `pnpm.overrides` gehoben | gemerged `2f2f0f6` |
 | #408 | `docs/pruefer-zugang.md` — Weg 1 belegt | gemerged `e8e9537` |
 | #409 | `docs/store-datenschutzangaben.md` + `docs/store-assets/` (11 Bilder, 2 Skripte) | gemerged `9b4116f` |
+| #411 | Mitteilungen auf dem Gerät in der Datenschutzerklärung | gemerged `433e644` |
 
 Repo danach: **ein Branch, sauberer Arbeitsbaum**, `main` grün.
 
@@ -54,10 +55,17 @@ kein Standort (keine API, kein Plugin, keine Berechtigung — `profiles.region`
 ist getippter Freitext), keine Gerätekontakte, kein Suchverlauf, keine
 Reichweitenmessung.
 
-**Zwei Empfänger fehlen in der Datenschutzerklärung:** §13 wurde am 26.08.
-erhoben, Push kam danach — **Apple APNs** und **Google FCM**. Entwarnung bei
-capgo: Bibliothek, kein Empfänger, weil `capacitor.config.ts:97-99` alle drei
-Adressen auf eigene Supabase-Funktionen legt.
+**Zwei Empfänger fehlten in der Datenschutzerklärung** — ✅ **erledigt mit
+#411.** §13 war auf dem Stand vom 26.08., Push kam danach. Beim Nachziehen
+zeigte sich, dass die Lücke größer war: `Push`, `Mitteilung`,
+`Benachrichtigung`, `Apple` und `Google` kamen im ganzen Text **null Mal** vor,
+§10 kannte nur E-Mail. Es fehlte nicht der Empfänger, sondern die Verarbeitung.
+Jetzt ein eigener Abschnitt „Mitteilungen auf dem Gerät" plus beide Empfänger
+in §13.
+
+Entwarnung bei capgo: Bibliothek, kein Empfänger, weil
+`capacitor.config.ts:97-99` alle drei Adressen auf eigene Supabase-Funktionen
+legt.
 
 ### Store-Material (#409)
 
@@ -92,10 +100,10 @@ braucht). Gegenprobe:
 1. **Donald fragen, wie es mit Stripe weitergeht** (abschalten oder 3.1.1-Risiko
    tragen). Das ist die einzige Frage, die Bauarbeit auslösen kann.
 2. **`POST_NOTIFICATIONS` am Gerät nachmessen.** Braucht Donalds Telefon.
-3. **§13 der Datenschutzerklärung um APNs und FCM ergänzen** — das kann ohne
-   Rückfrage gebaut werden, `src/content/legal/datenschutz.ts`.
-4. Unverändert der längste Weg im Zeitplan: **Google-Konto anlegen und die
+3. Unverändert der längste Weg im Zeitplan: **Google-Konto anlegen und die
    Testzwang-Bedingungen dort ablesen.** Nur Donald.
+
+~~§13 der Datenschutzerklärung um APNs und FCM ergänzen~~ — mit #411 erledigt.
 
 Vor dem Anfangen `ListAgents` — am 13.09. liefen sechs Sitzungen, zwei in
 diesem Repo.
@@ -110,10 +118,11 @@ diesem Repo.
 
 ## Fünf Fallen dieser Sitzung
 
-1. **Der Branchname ohne Kürzel verhindert das falsche *Done* — zweimal
+1. **Der Branchname ohne Kürzel verhindert das falsche *Done* — viermal
    belegt.** Meine Notiz sagte bisher „Vorbeugen geht gar nicht"; das war
-   falsch. Ausgelöst wird von Branchname ODER PR-Titel, **nicht** vom
-   Commit-Rumpf und nicht von Linear-Kommentaren.
+   falsch. Ausgelöst wird von Branchname ODER PR-Titel — **nicht** vom
+   Commit-Rumpf, nicht von Linear-Kommentaren und (bei #411 versehentlich
+   getestet) **auch nicht vom Commit-Betreff auf `main`**.
 2. **Die erste Screenshot-Runde schoss die ausgeloggte Sicht.** `/` trägt kein
    Anmeldeformular, es liegt auf `/login`; die Beiträge standen unter „Ein
    Mitglied". Sah brauchbar aus. Das Skript bricht jetzt ab, wenn keine Sitzung
