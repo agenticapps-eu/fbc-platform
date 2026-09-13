@@ -40,6 +40,12 @@ describe("Genannte Empfaenger", () => {
     ["Resend", /Resend[^\n]*E-Mail/i],
     ["Sentry", /Sentry[^\n]*Fehler/i],
     ["Stripe", /Stripe[^\n]*Zahlung/i],
+    // AGE-644: seit den Mitteilungen auf dem Geraet zwei Empfaenger mehr. Die
+    // Diensteliste stand bis zum 13.09. auf dem Stand vom 26.08. und nannte
+    // beide nicht — aufgefallen beim Erheben der Store-Datenschutzangaben,
+    // nicht hier. Eine Aufstellung mit Erhebungsdatum veraltet still.
+    ["Apple", /Apple[^\n]*Mitteilung/i],
+    ["Google", /Google[^\n]*Mitteilung/i],
   ])("%s ist mit Zweck genannt", (_name, muster) => {
     expect(volltext).toMatch(muster);
   });
@@ -49,6 +55,25 @@ describe("Genannte Empfaenger", () => {
     // Anwalt ausdruecklich gefragt hat.
     expect(volltext).toMatch(/YouTube/);
     expect(volltext).toMatch(/Vimeo/);
+  });
+
+  it("beschreibt die Mitteilungen auf dem Geraet, nicht nur den Empfaenger", () => {
+    // Bis zum 13.09. kamen `Push`, `Mitteilung` und `Benachrichtigung` im
+    // ganzen Text NULL Mal vor: §10 kannte nur E-Mail. Die Luecke war also
+    // nicht die Empfaengerliste, sondern die Verarbeitung selbst.
+    expect(volltext).toMatch(/Push-Benachrichtigungen/);
+    expect(volltext).toMatch(/Token/);
+    expect(volltext).toMatch(/abstellen/);
+  });
+
+  it("sagt zu, dass kein Nachrichtentext auf dem Sperrbildschirm steht", () => {
+    // Das ist die einzige Zusage dieses Abschnitts, die ueber „wir speichern X"
+    // hinausgeht — und sie ist DURCHGESETZT, nicht nur behauptet:
+    // `supabase/functions/send-push/nachrichten.test.ts` schiebt in
+    // „untergeschobener Freitext erreicht keinen der drei Ausgaenge" absichtlich
+    // Freitext unter und prueft, dass er nirgends herauskommt. Dieser Test hier
+    // haelt nur den TEXT; der Beleg fuer das Verhalten liegt dort.
+    expect(volltext).toMatch(/Inhalt einer Nachricht steht dort NICHT/);
   });
 
   it("nennt die Aufzeichnung im Fehlerfall, statt sie zu verschweigen", () => {
@@ -68,7 +93,7 @@ describe("Region nur, wo belegt", () => {
     expect(volltext).toMatch(/Sentry[^\n]*Europäischen Union/i);
   });
 
-  it.each(["Cloudflare", "Resend", "Stripe"])(
+  it.each(["Cloudflare", "Resend", "Stripe", "Apple", "Google"])(
     "sagt bei %s ausdruecklich, dass die Region nicht belegt ist",
     (dienst) => {
       // Der erste Planentwurf haette hier drei Regionen erfunden, um den

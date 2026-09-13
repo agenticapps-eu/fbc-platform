@@ -349,6 +349,35 @@ export const datenschutz: Rechtsdokument = {
       ],
     },
     {
+      titel: "Mitteilungen auf dem Gerät (Push-Benachrichtigungen)",
+      bloecke: [
+        {
+          art: "absatz",
+          inhalt: [
+            "Wenn Sie eff.bee.zee als App auf einem Mobilgerät nutzen, können wir Sie über Ereignisse in der Plattform auch dann benachrichtigen, wenn die App nicht geöffnet ist. Ihr Gerät fragt Sie beim ersten Mal, ob Sie das möchten; ohne Ihre Zustimmung wird keine Mitteilung zugestellt.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Dafür speichern wir eine von Ihrem Gerät vergebene Kennung (ein sogenanntes Token), die Angabe, ob es sich um ein Gerät mit iOS oder mit Android handelt, und den Zeitpunkt des letzten Kontakts. Die Kennung sagt nichts über Sie aus und wird nur verwendet, um die Mitteilung an das richtige Gerät zu leiten.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "In der Mitteilung selbst steht, WER etwas getan hat und WAS für ein Ereignis es war — zum Beispiel „Neue Nachricht“ und darunter „[Name des Mitglieds] hat Ihnen geschrieben.“ Der Inhalt einer Nachricht steht dort NICHT, auch nicht auszugsweise. Das ist keine Einstellung, sondern im Aufbau festgelegt: der Teil der Plattform, der diese Sätze bildet, bekommt den Text einer Nachricht gar nicht erst zu sehen. Ein Sperrbildschirm liegt oft offen auf einem Tisch.",
+          ],
+        },
+        {
+          art: "absatz",
+          inhalt: [
+            "Sie können die Mitteilungen jederzeit abstellen — je Ereignisart in den Einstellungen der App, und insgesamt in den Einstellungen Ihres Geräts.",
+          ],
+        },
+      ],
+    },
+    {
       titel: "11. Kontakt und Support",
       bloecke: [
         {
@@ -419,7 +448,7 @@ export const datenschutz: Rechtsdokument = {
         {
           art: "absatz",
           inhalt: [
-            "Die folgenden Dienste erhalten personenbezogene Daten, damit die Plattform betrieben werden kann. Die Aufstellung wurde am 26. August 2026 am Quelltext der Plattform erhoben.",
+            "Die folgenden Dienste erhalten personenbezogene Daten, damit die Plattform betrieben werden kann. Die Aufstellung wurde am 26. August 2026 am Quelltext der Plattform erhoben und am 13. September 2026 um die beiden Empfänger ergänzt, die mit den Mitteilungen auf dem Gerät hinzugekommen sind.",
           ],
         },
         {
@@ -437,6 +466,12 @@ export const datenschutz: Rechtsdokument = {
             ["Sentry — Erfassung technischer Fehler. Verarbeitung in der Europäischen Union."],
             [
               "Stripe — Abwicklung von Zahlungen bei kostenpflichtigen Mitgliedschaften. Verarbeitungsregion noch nicht belegt.",
+            ],
+            [
+              "Apple — Zustellung von Mitteilungen an Geräte mit iOS über den Apple Push Notification service. Verarbeitungsregion noch nicht belegt.",
+            ],
+            [
+              "Google — Zustellung von Mitteilungen an Geräte mit Android über Firebase Cloud Messaging. Verarbeitungsregion noch nicht belegt.",
             ],
           ],
         },
