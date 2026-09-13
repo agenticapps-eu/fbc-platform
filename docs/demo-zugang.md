@@ -19,6 +19,9 @@
 > Das Dokument bleibt als Beleg dessen stehen, was Phase 1 vorgeführt hat.
 > Wer heute vorführen will, braucht eine neue Entscheidung darüber, woran —
 > nicht dieses Drehbuch.
+>
+> **Für den Store-Prüfer-Zugang ist diese Entscheidung am 2026-09-13 gefallen:
+> siehe `docs/pruefer-zugang.md`.**
 
 # Demo-Zugang für Detlev — FBC Plattform (Phase-1-Prototyp)
 
