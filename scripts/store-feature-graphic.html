@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>Feature Graphic</title>
+<style>
+  @font-face { font-family: "Fraunces"; src: url("/fonts/fraunces-latin.woff2") format("woff2");
+               font-weight: 100 900; font-display: block; }
+  @font-face { font-family: "Inter"; src: url("/fonts/inter-latin.woff2") format("woff2");
+               font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; }
+  body { width: 1024px; height: 500px; overflow: hidden;
+         background: radial-gradient(120% 140% at 78% 18%, #16376e 0%, #0c2043 58%, #081733 100%);
+         color: #fff; font-family: "Inter", system-ui, sans-serif;
+         display: grid; grid-template-columns: 1fr auto; align-items: center;
+         padding: 0 76px; box-sizing: border-box; }
+  .mark { position: absolute; right: -60px; top: -70px; width: 640px; height: 640px; opacity: .10; }
+  .mark path { fill: #ffffff; }
+  .wort { display: flex; align-items: center; gap: 22px; }
+  .wort svg { width: 66px; height: 66px; }
+  .wort svg path { fill: #ffffff; }
+  .name { font-size: 58px; font-weight: 700; letter-spacing: -.022em; }
+  .punkt { color: #5b90e0; }
+  h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 76px;
+       line-height: 1.03; letter-spacing: -.018em; margin: 30px 0 16px; }
+  p  { font-size: 27px; color: #b9c8e4; margin: 0; letter-spacing: .004em; }
+  .inhalt { position: relative; z-index: 1; }
+</style>
+<svg class="mark" viewBox="0 0 48 48"><path d="M24 2 L27.15 20.85 L46 24 L27.15 27.15 L24 46 L20.85 27.15 L2 24 L20.85 20.85 Z M27.89 20.11 L29.64 19.9 L34.58 13.42 L28.1 18.36 Z M27.89 27.89 L28.1 29.64 L34.58 34.58 L29.64 28.1 Z M20.11 27.89 L18.36 28.1 L13.42 34.58 L19.9 29.64 Z M20.11 20.11 L19.9 18.36 L13.42 13.42 L18.36 19.9 Z"/></svg>
+<div class="inhalt">
+  <div class="wort">
+    <svg viewBox="0 0 48 48"><path d="M24 2 L27.15 20.85 L46 24 L27.15 27.15 L24 46 L20.85 27.15 L2 24 L20.85 20.85 Z M27.89 20.11 L29.64 19.9 L34.58 13.42 L28.1 18.36 Z M27.89 27.89 L28.1 29.64 L34.58 34.58 L29.64 28.1 Z M20.11 27.89 L18.36 28.1 L13.42 34.58 L19.9 29.64 Z M20.11 20.11 L19.9 18.36 L13.42 13.42 L18.36 19.9 Z"/></svg>
+    <span class="name">eff<span class="punkt">.</span>bee<span class="punkt">.</span>zee</span>
+  </div>
+  <h1>Gemeinsam erfolgreich</h1>
+  <p>verbinden, wachsen, vertrauen</p>
+</div>
