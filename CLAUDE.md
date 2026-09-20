@@ -132,7 +132,7 @@ dem **6-Level-Modell** (`basic` → `connect` → `discover` → `exchange` → 
 der Legacy-Docs. See `openspec/specs/membership-tiers/spec.md`.
 
 <!-- BEGIN: agentic-apps-workflow sections (do not remove this marker) -->
-<!-- section-version: 1.0.0 -->
+<!-- section-version: 1.1.0 -->
 
 ## The AgenticApps workflow
 
@@ -143,5 +143,11 @@ skill for the loop, the gates and the coding discipline.
 This repository carries two workflow artifacts: `openspec/`, which is its
 durable truth, and this instruction file. Everything else — skills, hooks,
 enforcement — is machine-level and comes from `install.sh`.
+
+## Decisions and domain language
+
+Decision records in this repository live in `docs/decisions/` and nowhere else,
+whatever directory an installed skill defaults to. The domain glossary is
+`CONTEXT.md` at the root. When and how to write either is in the same skill.
 
 <!-- END: agentic-apps-workflow sections -->
