@@ -35,15 +35,20 @@ wir sonst selbst bauen müssten.
   ankommt, wird mit Namen und Grund vermerkt, und das Issue entsteht trotzdem.
 - **Legt an, ändert nie.** Es gibt keinen Pfad, der ein bestehendes Issue
   berührt.
-- **Rate-Begrenzung** nach dem Muster `activation_attempts`, mit einer **neuen**
-  Migration.
+- **Rate-Begrenzung**: höchstens 20 angelegte Issues pro Stunde, global, nach
+  der Bauform von `activation_attempts` (RLS ohne Policy, DEFINER-Funktionen),
+  mit einer **neuen** Migration. Gezählt wird, was Linear bestätigt hat.
+- **Dateien nur von OpenAIs Host**, ohne Weiterleitungen, mit Signaturprüfung und
+  Fristen, die unter ChatGPTs 45 Sekunden bleiben.
 - **Antwort 201** mit `nummer` (z. B. `AGE-901`) und `hinweis`, ohne Linear-URL.
 - **Probelauf-Schalter per Secret**, damit ein Testlauf gegen DEV kein echtes
-  Issue anlegt.
+  Issue anlegt. Er antwortet 200 ohne Nummer.
+- **Jede Ablehnung ist ein Satz** (`{ fehler }` bei 400, 401, 405, 429, 500 und
+  502), und das Log trägt keine Inhalte.
 - `docs/secrets.md` bekommt `LINEAR_API_KEY` und `ANFORDERUNG_SCHLUESSEL` in die
   Tabelle und den `supabase secrets set`-Befehl, `.env.example` Platzhalter.
-- `docs/custom-gpt-anforderungen.md` Teil 4 wird nachgezogen, wo Felder,
-  Grenzen oder Antworten abweichen (mindestens die Antwort bei Linear-Ausfall).
+- `docs/custom-gpt-anforderungen.md` Teil 4 wird nachgezogen: `{ fehler }` für
+  401, 429, 500 und 502, dazu die Grenzen der Dateien.
 
 ## Capabilities
 
@@ -52,8 +57,8 @@ wir sonst selbst bauen müssten.
 - `anforderungen`: Der Eingang für Anforderungen von außen. Wer darf einreichen
   (geteiltes Geheimnis), was muss eine Anforderung tragen, wohin geht sie (fest
   verdrahtetes Linear-Ziel), wie werden Dateien übernommen und was bekommt der
-  Einreicher zurück. **Die Wahl der Capability entscheidet Donald**, siehe
-  `design.md`, offene Frage 1. Die Alternative ist ein Delta auf `feedback-qm`.
+  Einreicher zurück. Neu statt als Delta auf `feedback-qm`, entschieden von
+  Donald am 22.09. (Begründung: `design.md`, offene Frage 1).
 
 ### Modified Capabilities
 
