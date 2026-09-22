@@ -15,30 +15,32 @@
 
 ## 2. Drossel (Migration)
 
-- [ ] 2.1 pgTAP-Test `supabase/tests/anforderung_drossel_test.sql` zuerst:
+- [x] 2.1 pgTAP-Test `supabase/tests/anforderung_drossel_test.sql` zuerst:
       `anforderung_frei` ist bei 19 frei und bei 20 nicht, `anforderung_vermerken`
       räumt alte Einträge, `anon`/`authenticated` ohne EXECUTE und ohne
       Tabellenzugriff, `service_role` mit EXECUTE. Rot belegen.
-- [ ] 2.2 Neue Migration `supabase/migrations/<ts>_anforderung_eingang_drossel.sql`:
+- [x] 2.2 Neue Migration `supabase/migrations/<ts>_anforderung_eingang_drossel.sql`:
       Tabelle ohne IP und ohne Inhalt, RLS an ohne Policy, zwei Funktionen
       `security definer` mit `search_path = ''`, Grants ausdrücklich. Begründung im
       Migrationskopf.
-- [ ] 2.3 Die Testdatei in die Liste in `ci.yml` eintragen. Abschnitt 6 von
-      `grants_test.sql` bleibt unverändert grün. Lokal grün belegen.
+- [x] 2.3 Die Testdatei in die Liste in `ci.yml` eintragen. Abschnitt 6 von
+      `grants_test.sql` bleibt unverändert grün. Lokal grün belegen: erst rot
+      (0 von 13, Funktionen fehlen), nach `supabase migration up --local` 13 von
+      13; `grants_test` + `rls_test` 457 von 457 unverändert.
 
 ## 3. Reine Logik mit Deno-Tests
 
 - [x] 3.1 `pruefung.ts` + `pruefung.test.ts` (19 Tests grün).
-- [ ] 3.2 `beschreibung.ts` + Tests: Reihenfolge, „Bilder" nur mit Dateien,
+- [x] 3.2 `beschreibung.ts` + Tests: Reihenfolge, „Bilder" nur mit Dateien,
       Bild/Video, Vermerke mit Grund, „Route: unklar", `TT.MM.JJJJ, HH:MM` in
       Europe/Berlin über den Sommerzeitwechsel, Markdown in Name, Einreicher und
       Route bleibt Text.
-- [ ] 3.3 `linear.ts` + Tests: `fileUpload` → `PUT` (Header-Reihenfolge, Linears
+- [x] 3.3 `linear.ts` + Tests: `fileUpload` → `PUT` (Header-Reihenfolge, Linears
       Werte gewinnen), `issueCreate` mit Antwortprüfung und Frist von 8 s.
-- [ ] 3.4 `dateien.ts` + Tests: Fixture aus der OpenAI-Doku, String-Eintrag,
+- [x] 3.4 `dateien.ts` + Tests: Fixture aus der OpenAI-Doku, String-Eintrag,
       Host, 3xx, 403, Größe mit und ohne `Content-Length`, Signatur, Frist je
       Datei, Gesamtfrist, hängender `PUT`.
-- [ ] 3.5 `eingang.ts` + Tests mit aufzeichnendem `fetch`-Ersatz und
+- [x] 3.5 `eingang.ts` + Tests mit aufzeichnendem `fetch`-Ersatz und
       Positivkontrollen: 401 ohne Aufrufe (auch bei Header über 512 Zeichen),
       kaputtes JSON gibt 400, 429 ohne Download, fest verdrahtete IDs trotz
       fremder Felder, abgelaufener Link gibt 201 mit Vermerk, Zähler nur nach
@@ -49,29 +51,34 @@
 
 ## 4. Function verdrahten
 
-- [ ] 4.1 `index.ts` als dünner Rumpf nach dem Muster `redeem-activation`.
-- [ ] 4.2 Block `[functions.anforderung-eingang]` mit `verify_jwt = false` und
+- [x] 4.1 `index.ts` als dünner Rumpf nach dem Muster `redeem-activation`.
+- [x] 4.2 Block `[functions.anforderung-eingang]` mit `verify_jwt = false` und
       Begründung in `supabase/config.toml`. Wächter in
       `scripts/functions-config.test.ts` ergänzen, rot/grün belegen.
-- [ ] 4.3 `README.md` in der Function: Zweck, Secrets, Probelauf, Deploy.
+- [x] 4.3 `README.md` in der Function: Zweck, Secrets, Probelauf, Deploy.
 
 ## 5. Dokumentation und Vertrag
 
-- [ ] 5.1 `docs/secrets.md`: `LINEAR_API_KEY`, `ANFORDERUNG_SCHLUESSEL` und
+- [x] 5.1 `docs/secrets.md`: `LINEAR_API_KEY`, `ANFORDERUNG_SCHLUESSEL` und
       `ANFORDERUNG_PROBELAUF` (nur DEV) in die Tabelle und den Befehl, mit
       Hash-Prüfung. Dazu der Vermerk, dass `SUPABASE_URL` und
       `SUPABASE_SERVICE_ROLE_KEY` automatisch bereitgestellt werden.
-- [ ] 5.2 `.env.example`: Platzhalter für die drei Namen.
-- [ ] 5.3 `docs/custom-gpt-anforderungen.md` Teil 4: `{ fehler }` für 401, 429,
+- [x] 5.2 `.env.example`: Platzhalter für die drei Namen.
+- [x] 5.3 `docs/custom-gpt-anforderungen.md` Teil 4: `{ fehler }` für 401, 429,
       500 und 502, dazu Dateigrenzen und Typen in der Beschreibung von
       `openaiFileIdRefs`.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `pnpm typecheck`, `pnpm test`, `deno test` und `deno check` für die
-      Functions, pgTAP, `openspec validate --all`, alle grün.
+- [x] 6.1 `pnpm typecheck`, `pnpm test` (2828), `deno test` (261, davon 75 hier)
+      und `deno check` für die Functions, pgTAP, `openspec validate --all`, alle
+      grün. `eslint` auf den geänderten Dateien sauber. Zusätzlich lokal per
+      `supabase functions serve` gegen den echten Stack: 401, 400 (kaputtes
+      JSON, Pflichtfelder), 200 im Probelauf (fremder Host und String-Eintrag
+      vermerkt), 502 mit ungültigem Linear-Schlüssel gegen das echte Linear
+      (Zähler bleibt 0), 429 bei 20 Einträgen (schreibt nichts).
 - [ ] 6.2 Code-Review, Befunde eingearbeitet.
-- [ ] 6.3 `supabase/functions/bildtest/` lokal gelöscht (nie committet).
+- [x] 6.3 `supabase/functions/bildtest/` lokal gelöscht (nie committet).
 - [ ] 6.4 PR auf `main`, mit den Schritten von Hand im PR-Text.
 
 ## 7. Von Hand, nach dem Merge (Donald)
