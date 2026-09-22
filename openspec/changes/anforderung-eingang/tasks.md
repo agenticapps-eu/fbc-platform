@@ -77,7 +77,8 @@
       JSON, Pflichtfelder), 200 im Probelauf (fremder Host und String-Eintrag
       vermerkt), 502 mit ungültigem Linear-Schlüssel gegen das echte Linear
       (Zähler bleibt 0), 429 bei 20 Einträgen (schreibt nichts).
-- [ ] 6.2 Code-Review, Befunde eingearbeitet.
+- [x] 6.2 Code-Review (codex, opencode), Befunde eingearbeitet oder begründet
+      abgelehnt; Auflösung im PR-Text.
 - [x] 6.3 `supabase/functions/bildtest/` lokal gelöscht (nie committet).
 - [ ] 6.4 PR auf `main`, mit den Schritten von Hand im PR-Text.
 

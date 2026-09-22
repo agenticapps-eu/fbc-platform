@@ -301,6 +301,19 @@ paths:
                   items:
                     type: string
       responses:
+        "200":
+          description: >
+            Nur im Probelauf (Test-GPT gegen DEV): alles geprüft, nichts
+            angelegt. Trägt keine Nummer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  probelauf:
+                    type: boolean
+                  hinweis:
+                    type: string
         "201":
           description: Angelegt.
           content:
@@ -322,6 +335,12 @@ paths:
                 $ref: "#/components/schemas/Fehler"
         "401":
           description: Der Schlüssel fehlt oder stimmt nicht.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fehler"
+        "405":
+          description: Die Adresse nimmt nur POST entgegen.
           content:
             application/json:
               schema:

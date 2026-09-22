@@ -278,3 +278,26 @@ Deno.test("Steuerzeichen und Überlänge im Namen werden vor dem Hochladen berei
   assert(!hochgeladen[0].name.includes("\n"));
   assertEquals([...hochgeladen[0].name].length, 100);
 });
+
+Deno.test("QuickTime braucht `ftyp`; ein beliebiges Atom an Byte 4 genügt nicht", async () => {
+  const MDAT = new Uint8Array([0, 0, 0, 8, 0x6d, 0x64, 0x61, 0x74, 1, 2]);
+  const { deps } = baueDeps({ "a.mov": ok(MDAT) });
+  const r = await uebernehmeDateien([ref("a.mov", "video/quicktime")], deps);
+  assertEquals(r[0].ergebnis, { name: "a.mov", grund: "Inhalt passt nicht zum Typ" });
+});
+
+Deno.test("läuft die Frist beim Lesen ab, wird der Download-Strom abgebrochen", async () => {
+  let abgebrochen = false;
+  const strom = new ReadableStream<Uint8Array>({
+    start(c) {
+      c.enqueue(PNG.slice());
+    },
+    cancel() {
+      abgebrochen = true;
+    },
+  });
+  const { deps } = baueDeps({ "a.png": () => new Response(strom) }, { fristJeDateiMs: 30 });
+  const r = await uebernehmeDateien([ref("a.png", "image/png")], deps);
+  assertEquals(r[0].ergebnis, { name: "a.png", grund: "Zeit überschritten" });
+  assert(abgebrochen, "der Strom läuft sonst im Hintergrund weiter");
+});

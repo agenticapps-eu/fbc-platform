@@ -25,12 +25,13 @@ const log: Log = (level, event, felder = {}) => {
 };
 
 Deno.serve(async (req) => {
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
   try {
+    // Im `try`: fehlt eine der plattform-injizierten Variablen, wirft
+    // `createClient`, und die Antwort bleibt trotzdem `{ fehler }`.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
     return await verarbeite(req, {
       env: {
         schluessel: Deno.env.get("ANFORDERUNG_SCHLUESSEL"),

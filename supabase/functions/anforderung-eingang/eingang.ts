@@ -14,7 +14,8 @@
 // Link, keinen Schlüssel (Spec „Das Log trägt keine Inhalte").
 
 import { baueBeschreibung } from "./beschreibung.ts";
-import { uebernehmeDateien } from "./dateien.ts";
+import { leseBegrenzt, uebernehmeDateien } from "./dateien.ts";
+import { bisAbbruch } from "./frist.ts";
 import { ladeHoch, legeIssueAn, LinearFehler } from "./linear.ts";
 import { type Art, pruefeAnforderung } from "./pruefung.ts";
 
@@ -32,10 +33,13 @@ export const LINEAR_ZIEL = {
   } satisfies Record<Art | "vonDetlev", string>,
 } as const;
 
-/** 25 s + 8 s bleiben unter ChatGPTs 45 s (OpenAI-Doku, actions/production). */
-const FRISTEN = { jeDateiMs: 12_000, gesamtMs: 25_000, issueMs: 8_000 };
+/** 5 s + 25 s + 8 s bleiben unter ChatGPTs 45 s (OpenAI-Doku, actions/production). */
+const FRISTEN = { jeDateiMs: 12_000, gesamtMs: 25_000, issueMs: 8_000, rpcMs: 5_000 };
 
 const MAX_SCHLUESSEL = 512;
+
+/** OpenAI begrenzt den Rumpf auf 100.000 Zeichen; das hier lässt Umlauten Luft. */
+const MAX_RUMPF_BYTES = 256 * 1024;
 
 export type Log = (level: "info" | "warn" | "error", event: string, felder?: Record<string, unknown>) => void;
 
@@ -87,9 +91,16 @@ export async function verarbeite(req: Request, deps: EingangDeps): Promise<Respo
     return fehler(401, "Der Schlüssel fehlt oder stimmt nicht. Bitte prüfe die Einstellungen der Action.");
   }
 
+  // Begrenzt gelesen, auch ohne `Content-Length`: sonst läge ein beliebig
+  // großer Rumpf ganz im Speicher, bevor irgendetwas ihn prüft.
+  const zuGross = fehler(400, "Die Anfrage ist zu groß.");
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_RUMPF_BYTES) return zuGross;
+  const roh = await leseBegrenzt(req.body, MAX_RUMPF_BYTES);
+  if (roh === null) return zuGross;
+
   let rumpf: unknown;
   try {
-    rumpf = JSON.parse(await req.text());
+    rumpf = JSON.parse(new TextDecoder().decode(roh));
   } catch {
     return fehler(400, "Die Anfrage war nicht lesbar.");
   }
@@ -102,7 +113,7 @@ export async function verarbeite(req: Request, deps: EingangDeps): Promise<Respo
   const anforderung = pruefung.anforderung;
 
   try {
-    if (!(await deps.anforderungFrei())) {
+    if (!(await bisAbbruch(deps.anforderungFrei(), AbortSignal.timeout(fristen.rpcMs)))) {
       deps.log("warn", "gedrosselt");
       return fehler(
         429,
@@ -126,11 +137,7 @@ export async function verarbeite(req: Request, deps: EingangDeps): Promise<Respo
   const beschreibung = baueBeschreibung(anforderung, uebernahmen.map((u) => u.ergebnis), deps.jetzt());
 
   if (probelauf) {
-    deps.log("info", "probelauf", {
-      art: anforderung.art,
-      dateien: protokoll,
-      beschreibung_zeichen: beschreibung.length,
-    });
+    deps.log("info", "probelauf", { art: anforderung.art, dateien: protokoll });
     return Response.json({
       probelauf: true,
       hinweis: "Das war ein Probelauf. Es wurde nichts angelegt.",
@@ -160,7 +167,7 @@ export async function verarbeite(req: Request, deps: EingangDeps): Promise<Respo
   // Das Issue existiert. Scheitert das Zählen, bleibt die Antwort 201 — sonst
   // schickte der GPT eine Anforderung erneut, die schon angekommen ist.
   try {
-    await deps.anforderungVermerken();
+    await bisAbbruch(deps.anforderungVermerken(), AbortSignal.timeout(fristen.rpcMs));
   } catch (e) {
     deps.log("error", "vermerken_fehler", { nummer, fehler: e instanceof Error ? e.message : String(e) });
   }

@@ -53,7 +53,7 @@ export function formatiereZeitpunkt(zeitpunkt: Date): string {
 
 function dateizeile(d: Dateiergebnis): string {
   const name = maskiere(d.name);
-  if ("grund" in d) return `- Nicht übertragen: ${name} (${d.grund})`;
+  if ("grund" in d) return `- Nicht übertragen: ${name} (${maskiere(d.grund)})`;
   return d.art === "bild" ? `![${name}](${d.assetUrl})` : `[${name}](${d.assetUrl})`;
 }
 

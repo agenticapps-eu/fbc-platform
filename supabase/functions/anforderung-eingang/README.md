@@ -32,7 +32,8 @@ aus dem Repo-Wurzelverzeichnis. Kein Test ruft das Netz oder legt ein Issue an.
 |---|---|
 | Dateien | höchstens 10; PNG, JPEG, WebP, GIF, MP4, MOV; je 25 MB |
 | Download | nur `https://files.oaiusercontent.com`, keine Weiterleitungen |
-| Zeit | 12 s je Datei, 25 s für alle, 8 s für `issueCreate`. ChatGPT bricht nach 45 s ab |
+| Zeit | 5 s je Datenbankaufruf, 12 s je Datei, 25 s für alle, 8 s für `issueCreate`. ChatGPT bricht nach 45 s ab |
+| Rumpf | höchstens 256 KB, begrenzt gelesen, auch ohne `Content-Length` |
 | Drossel | 20 angelegte Issues pro Stunde, global (`anforderung_frei`, `anforderung_vermerken`) |
 
 ## Secrets

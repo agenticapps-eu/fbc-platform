@@ -76,7 +76,9 @@ export function pruefeAnforderung(rumpf: unknown): Pruefergebnis {
   }
 
   const route = text(r.route);
-  if (route !== null && zeichen(route) > 200) {
+  if (r.route !== undefined && r.route !== null && typeof r.route !== "string") {
+    maengel.push("Die Angabe zur Seite muss ein Text sein.");
+  } else if (route !== null && zeichen(route) > 200) {
     maengel.push("Die Angabe zur Seite ist zu lang, sie darf höchstens 200 Zeichen haben.");
   }
 

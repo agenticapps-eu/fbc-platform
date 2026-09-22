@@ -126,3 +126,11 @@ Deno.test("fremde Felder werden ignoriert, nicht übernommen", () => {
     "art", "beschreibung", "dateien", "einreicher", "route", "titel",
   ]);
 });
+
+Deno.test("route mit falschem Typ wird abgelehnt, null gilt als nicht angegeben", () => {
+  assertSatz(fehlerVon({ ...GUELTIG, route: { teamId: "x" } }));
+  assertSatz(fehlerVon({ ...GUELTIG, route: 7 }));
+  const e = pruefeAnforderung({ ...GUELTIG, route: null });
+  assert(e.ok);
+  assertEquals(e.anforderung.route, null);
+});

@@ -197,6 +197,23 @@ Deno.test("kaputtes JSON: 400 mit Satz, nichts aufgerufen", async () => {
   assertEquals(welt.aufrufe, []);
 });
 
+Deno.test("zu großer Rumpf: 400, auch ohne Content-Length, nichts aufgerufen", async () => {
+  const gross = JSON.stringify({ ...RUMPF, beschreibung: "x".repeat(300 * 1024) });
+  for (const mitLaenge of [true, false]) {
+    const { deps, welt } = baue();
+    const body = mitLaenge ? gross : new Blob([gross]).stream();
+    const req = new Request("https://x.supabase.co/functions/v1/anforderung-eingang", {
+      method: "POST",
+      headers: { "x-anforderung-schluessel": SCHLUESSEL },
+      body,
+    });
+    if (!mitLaenge) assertEquals(req.headers.get("content-length"), null);
+    const f = await fehlerAntwort(await verarbeite(req, deps), 400);
+    assertStringIncludes(f, "zu groß");
+    assertEquals(welt.aufrufe, []);
+  }
+});
+
 Deno.test("Pflichtfeld fehlt: 400, weder Drossel noch Download noch Linear", async () => {
   const { deps, welt } = baue();
   const f = await fehlerAntwort(await verarbeite(anfrage({ ...RUMPF, titel: "" }), deps), 400);
@@ -214,6 +231,23 @@ Deno.test("Drossel nicht erreichbar: 500, nichts angelegt", async () => {
   const { deps, welt } = baue({ frei: () => Promise.reject(new Error("db")) });
   await fehlerAntwort(await verarbeite(anfrage(), deps), 500);
   assertEquals(welt.aufrufe, []);
+});
+
+Deno.test("hängende Drossel: 500 nach der Frist, kein Download", async () => {
+  const { deps, welt } = baue({
+    frei: () => new Promise<boolean>(() => {}),
+    fristen: { jeDateiMs: 1_000, gesamtMs: 1_000, issueMs: 1_000, rpcMs: 30 },
+  });
+  await fehlerAntwort(await verarbeite(anfrage(), deps), 500);
+  assertEquals(welt.aufrufe, []);
+});
+
+Deno.test("hängendes Vermerken: trotzdem 201 nach der Frist", async () => {
+  const { deps } = baue({
+    vermerken: () => new Promise<void>(() => {}),
+    fristen: { jeDateiMs: 1_000, gesamtMs: 1_000, issueMs: 1_000, rpcMs: 30 },
+  });
+  assertEquals((await verarbeite(anfrage(), deps)).status, 201);
 });
 
 Deno.test("abgelaufener Link: das Issue entsteht trotzdem, mit Vermerk", async () => {
@@ -235,7 +269,7 @@ Deno.test("Linear lehnt ab: 502 mit „nicht bestätigt“, nichts vermerkt", as
 Deno.test("issueCreate hängt: 502 nach der Frist, nichts vermerkt", async () => {
   const { deps, welt } = baue({
     issue: () => new Promise<Response>(() => {}),
-    fristen: { jeDateiMs: 1_000, gesamtMs: 1_000, issueMs: 30 },
+    fristen: { jeDateiMs: 1_000, gesamtMs: 1_000, issueMs: 30, rpcMs: 1_000 },
   });
   await fehlerAntwort(await verarbeite(anfrage(), deps), 502);
   assertEquals(welt.vermerkt, 0);
@@ -265,6 +299,7 @@ Deno.test("das Log trägt weder Text noch Namen noch Link noch Schlüssel", asyn
     await verarbeite(anfrage(), deps);
     const log = welt.logs.join("\n");
     assert(welt.logs.length > 0);
+    assert(!log.includes("beschreibung_zeichen"), log);
     for (const verboten of ["GEHEIMER-TEXT", "GEHEIMNAME", "GEHEIMLINK", "Detlev", "Suche zu klein", SCHLUESSEL]) {
       assert(!log.includes(verboten), `${verboten} im Log:\n${log}`);
     }

@@ -80,30 +80,38 @@ function passtZumTyp(b: Uint8Array, typ: Typ): boolean {
     case "image/webp":
       return text(0, "RIFF") && text(8, "WEBP");
     case "video/mp4":
-      return text(4, "ftyp");
     case "video/quicktime":
-      // Ältere QuickTime-Dateien beginnen ohne `ftyp` direkt mit einem Atom.
-      return ["ftyp", "moov", "mdat", "wide", "free"].some((a) => text(4, a));
+      // Beide sind ISO-BMFF mit `ftyp` an Byte 4. Die Marke dahinter wird nicht
+      // unterschieden: ein Video geht nur als Link ins Issue, nicht eingebettet.
+      return text(4, "ftyp");
   }
 }
 
-async function leseBegrenzt(
+/** Liest höchstens `max` Bytes; darüber wird abgebrochen und `null` geliefert. */
+export async function leseBegrenzt(
   body: ReadableStream<Uint8Array> | null,
-  signal: AbortSignal,
-): Promise<Uint8Array<ArrayBuffer>> {
+  max: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer> | null> {
   const teile: Uint8Array[] = [];
   let n = 0;
   if (body) {
     const leser = body.getReader();
-    while (true) {
-      const { done, value } = await bisAbbruch(leser.read(), signal);
-      if (done) break;
-      n += value.byteLength;
-      if (n > MAX_BYTES) {
-        await leser.cancel().catch(() => {});
-        throw new Abgelehnt("zu groß (mehr als 25 MB)");
+    try {
+      while (true) {
+        const { done, value } = await bisAbbruch(leser.read(), signal);
+        if (done) break;
+        n += value.byteLength;
+        if (n > max) {
+          await leser.cancel().catch(() => {});
+          return null;
+        }
+        teile.push(value);
       }
-      teile.push(value);
+    } catch (e) {
+      // Sonst liefe der Download nach einer abgelaufenen Frist im Hintergrund weiter.
+      await leser.cancel().catch(() => {});
+      throw e;
     }
   }
   const alles = new Uint8Array(n);
@@ -172,7 +180,8 @@ async function uebernehmeEine(
       await res.body?.cancel().catch(() => {});
       throw new Abgelehnt("zu groß (mehr als 25 MB)");
     }
-    const bytes = await leseBegrenzt(res.body, signal);
+    const bytes = await leseBegrenzt(res.body, MAX_BYTES, signal);
+    if (bytes === null) throw new Abgelehnt("zu groß (mehr als 25 MB)");
     protokoll.groesse = bytes.byteLength;
     if (!passtZumTyp(bytes, typ as Typ)) throw new Abgelehnt("Inhalt passt nicht zum Typ");
 
