@@ -9,6 +9,8 @@
 // Abbruch durch die Frist —, wird zu `LinearFehler`. Der Aufrufer entscheidet,
 // was daraus wird (Vermerk bei einer Datei, 502 beim Issue).
 
+import { bisAbbruch } from "./frist.ts";
+
 export const LINEAR_GRAPHQL = "https://api.linear.app/graphql";
 
 export class LinearFehler extends Error {}
@@ -38,13 +40,13 @@ async function graphql(
   let res: Response;
   let body: { data?: Record<string, unknown>; errors?: unknown };
   try {
-    res = await deps.fetch(LINEAR_GRAPHQL, {
+    res = await bisAbbruch(deps.fetch(LINEAR_GRAPHQL, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: deps.apiKey },
       body: JSON.stringify({ query, variables }),
       signal,
-    });
-    body = await res.json();
+    }), signal);
+    body = await bisAbbruch(res.json(), signal);
   } catch (e) {
     throw new LinearFehler(`Linear nicht erreichbar: ${e instanceof Error ? e.name : "?"}`);
   }
@@ -91,7 +93,10 @@ export async function ladeHoch(
 
   let res: Response;
   try {
-    res = await deps.fetch(f.uploadUrl, { method: "PUT", headers, body: datei.bytes, signal });
+    res = await bisAbbruch(
+      deps.fetch(f.uploadUrl, { method: "PUT", headers, body: datei.bytes, signal }),
+      signal,
+    );
     await res.body?.cancel();
   } catch (e) {
     throw new LinearFehler(`Upload abgebrochen: ${e instanceof Error ? e.name : "?"}`);

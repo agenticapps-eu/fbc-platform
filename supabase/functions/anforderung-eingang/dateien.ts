@@ -27,6 +27,7 @@
 // Nacheinander, nicht parallel: im Speicher liegt immer nur eine Datei.
 
 import { bereinige, type Dateiergebnis } from "./beschreibung.ts";
+import { bisAbbruch } from "./frist.ts";
 
 export const MAX_BYTES = 25 * 1024 * 1024;
 export const ERLAUBTE_HOSTS = ["files.oaiusercontent.com"];
@@ -65,16 +66,6 @@ export interface Uebernahme {
 }
 
 class Abgelehnt extends Error {}
-
-/** Lässt ein Versprechen spätestens mit dem Signal scheitern — auch eines, das das Signal nicht kennt. */
-function bisAbbruch<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((ja, nein) => {
-    if (signal.aborted) return nein(signal.reason);
-    const weg = () => nein(signal.reason);
-    signal.addEventListener("abort", weg, { once: true });
-    p.then(ja, nein).finally(() => signal.removeEventListener("abort", weg));
-  });
-}
 
 function passtZumTyp(b: Uint8Array, typ: Typ): boolean {
   const ab = (o: number, s: number[]) => s.every((x, i) => b[o + i] === x);
