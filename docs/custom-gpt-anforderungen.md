@@ -295,7 +295,9 @@ paths:
                   maxItems: 10
                   description: >
                     Alle Bilder und Videos zu dieser Anforderung, auch vom
-                    GPT erzeugte Zielbilder.
+                    GPT erzeugte Zielbilder. Erlaubt sind PNG, JPEG, WebP, GIF,
+                    MP4 und MOV bis 25 MB je Datei. Was nicht passt, wird im
+                    Eintrag vermerkt; die Anforderung kommt trotzdem an.
                   items:
                     type: string
       responses:
@@ -317,15 +319,42 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  fehler:
-                    type: string
-                    description: Meldung in deutscher Sprache, zum Vorlesen geeignet.
+                $ref: "#/components/schemas/Fehler"
         "401":
           description: Der Schlüssel fehlt oder stimmt nicht.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fehler"
         "429":
           description: Zu viele Anforderungen in kurzer Zeit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fehler"
+        "500":
+          description: Der Eingang ist nicht eingerichtet oder gestört.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fehler"
+        "502":
+          description: >
+            Die Übergabe an Linear ist nicht bestätigt. Die Anforderung ist
+            vielleicht trotzdem angekommen; nicht sofort erneut senden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fehler"
+components:
+  schemas:
+    Fehler:
+      type: object
+      required: [fehler]
+      properties:
+        fehler:
+          type: string
+          description: Meldung in ganzen deutschen Sätzen, zum Vorlesen geeignet.
 ```
 
 ---
