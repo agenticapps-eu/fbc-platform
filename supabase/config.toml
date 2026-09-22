@@ -635,3 +635,15 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.konto-loeschen]
 enabled = true
 verify_jwt = true
+
+# anforderung-eingang (AGE-830): Detlevs Custom GPT legt ueber eine
+# ChatGPT-Action direkt ein Linear-Issue an (ADR-0006).
+#
+# verify_jwt = false, weil die Action kein Supabase-JWT traegt. Schutz ist das
+# geteilte Geheimnis im Header `x-anforderung-schluessel`, geprueft im Handler
+# in konstanter Zeit, bevor irgendetwas anderes geschieht. Gemessen am 22.09.:
+# das Gateway verlangt bei `false` keinen `apikey`-Header zusaetzlich. Bewacht
+# von scripts/functions-config.test.ts.
+[functions.anforderung-eingang]
+enabled = true
+verify_jwt = false
