@@ -100,6 +100,14 @@ describe("supabase/config.toml", () => {
     },
   );
 
+  it("schaltet die JWT-Pruefung fuer `anforderung-eingang` ab — die ChatGPT-Action traegt keines", () => {
+    // AGE-830. Die Action schickt nur den Header `x-anforderung-schluessel`;
+    // gemessen am 22.09., dass das Gateway bei `verify_jwt = false` keinen
+    // weiteren Header verlangt. Mit `true` antwortet es mit 401, bevor der
+    // Handler den Schluessel ueberhaupt prueft — und Detlev hoert nur „Fehler".
+    expect(verifyJwt(CONFIG, "anforderung-eingang")).toBe(false);
+  });
+
   it("zaehlt einen auskommentierten Block NICHT als Deklaration", () => {
     // Die Gegenprobe zum Wächter selbst: eine Zusage, die ein Kommentar
     // erfuellt, misst den Kommentar und nicht die Konfiguration.

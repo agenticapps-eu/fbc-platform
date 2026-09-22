@@ -147,6 +147,9 @@ must **never** reach the client.
 | `ASC_KEY_P8`                | Der App-Store-Connect-API-Schlüssel als PEM. **Nicht** der gleichnamige APNs-Schlüssel — dieselbe Falle wie bei `APNS_KEY_P8`, siehe unten |
 | `ASC_KEY_ID`                | Kennung ebendieses Schlüssels (aus Apples Dateinamen `AuthKey_<KEYID>.p8`) |
 | `ASC_ISSUER_ID`             | Die Issuer-UUID zum ASC-Schlüssel. Steht **nicht** in der `.p8` und ist aus ihr nicht ableitbar — ohne sie ist der Schlüssel wertlos |
+| `LINEAR_API_KEY`            | Personal API Key für Linear, `anforderung-eingang` legt damit Issues an (AGE-830). In `dev` und `prod` gleich |
+| `ANFORDERUNG_SCHLUESSEL`    | Geteiltes Geheimnis im Header `x-anforderung-schluessel` der ChatGPT-Action. **Je Umgebung verschieden** |
+| `ANFORDERUNG_PROBELAUF`     | `1` **nur auf DEV**: `anforderung-eingang` prüft und lädt alles, legt aber nichts an |
 
 ## Setting and reading secrets
 
@@ -901,3 +904,48 @@ select count(*) from public.posts
 -- `cron` nicht, eine abbestellte Zeitplanung fällt ihm also NICHT auf.
 select jobname, active, schedule from cron.job where jobname = 'beitrag-ankuendigen';
 ```
+
+## Supabase Edge Function secrets (`anforderung-eingang`, AGE-830)
+
+Detlevs Custom GPT ruft `anforderung-eingang` über eine ChatGPT-Action, und die
+Function legt direkt ein Linear-Issue an (ADR-0006). Die Werte stehen in
+Infisical `fbc-platform`, `LINEAR_API_KEY` in `dev` und `prod` gleich,
+`ANFORDERUNG_SCHLUESSEL` je Umgebung verschieden. Plattform-injiziert sind
+`SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`, die setzt man **nicht**.
+
+```bash
+# DEV — mit Probelauf: prüft Schlüssel, Rumpf, Drossel und Downloads, legt nichts an
+infisical run --env=dev --silent -- sh -c \
+  'supabase secrets set --project-ref foelowldexkcqzewvrcf \
+     LINEAR_API_KEY="$LINEAR_API_KEY" ANFORDERUNG_SCHLUESSEL="$ANFORDERUNG_SCHLUESSEL" \
+     ANFORDERUNG_PROBELAUF=1'
+
+# PROD — OHNE Probelauf
+infisical run --env=prod --silent -- sh -c \
+  'supabase secrets set --project-ref viwntbodrtqxgmqyxluh \
+     LINEAR_API_KEY="$LINEAR_API_KEY" ANFORDERUNG_SCHLUESSEL="$ANFORDERUNG_SCHLUESSEL"'
+```
+
+> ⚠️ **`ANFORDERUNG_PROBELAUF` gehört nie auf PROD.** Ist es dort `1`, antwortet
+> die Function Detlev mit „Probelauf, nichts angelegt", und seine Anforderung
+> geht verloren. Für den echten Test auf DEV setzt man es auf `0`
+> (`supabase secrets set … ANFORDERUNG_PROBELAUF=0`), nicht durch Löschen und
+> Vergessen.
+
+**Nach dem Setzen per Hash prüfen** — wie oben beschrieben, ohne einen Wert
+anzuzeigen:
+
+```bash
+infisical run --env=<dev|prod> --silent -- sh -c \
+  'for k in LINEAR_API_KEY ANFORDERUNG_SCHLUESSEL; do eval "v=\$$k"; \
+     printf "%-24s %s\n" "$k" "$(printf %s "$v" | shasum -a 256 | cut -d" " -f1)"; done'
+supabase secrets list --project-ref <ref>
+```
+
+Auf PROD darf `ANFORDERUNG_PROBELAUF` in der Liste **gar nicht** auftauchen.
+
+Deploy: `supabase functions deploy anforderung-eingang --project-ref <ref>`
+(`verify_jwt = false` steht in `config.toml`, bewacht von
+`scripts/functions-config.test.ts`). Den Schlüssel trägt Detlev in die Action ein
+(`docs/custom-gpt-anforderungen.md`, Teil 1, Schritt 3). Er bekommt ihn am
+Telefon, nie per Mail oder Chat.
