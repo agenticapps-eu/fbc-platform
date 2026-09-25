@@ -120,7 +120,7 @@ Nachweis am Artefakt bestanden ist.
 Zugesagt ist damit die Übertragung nach außen, nicht die Ablage im Lauf: Ein
 Handstart SHALL weiterhin ein Artefakt zur Abholung ablegen dürfen. Der
 Unterschied ist, wer es bekommt — ein Artefakt liegt im Lauf und wird abgeholt,
-eine Übertragung ist bei Apple und kommt nicht zurück.
+eine Übertragung ist beim Store und kommt nicht zurück.
 
 Denn der Unterschied zum Bau ist die Umkehrbarkeit. Ein unangeforderter Bau
 kostet Runner-Minuten; eine unangeforderte Übertragung verbraucht eine
@@ -141,6 +141,14 @@ Ebenso SHALL das Artefakt **vor** der Übertragung abgelegt werden. Scheitert di
 Übertragung, ist das der Fall, in dem das geprüfte Bündel am dringendsten
 gebraucht wird; stünde die Ablage dahinter, entfiele sie nach der üblichen
 Regel, dass ein fehlgeschlagener Schritt die folgenden überspringt.
+
+Fehlen die Zugangsdaten für die Übertragung, SHALL der Lauf **abbrechen** und
+die fehlende Stelle benennen. Er SHALL NOT die Übertragung still überspringen.
+
+Ein grüner Lauf auf einem Versions-Tag ist die Aussage „ausgeliefert". Wer ihn
+grün lässt, ohne etwas übertragen zu haben, macht aus einer fehlenden
+Einstellung ein stilles Nichts — und das fällt erst auf, wenn jemand im Store
+nach einer Fassung sucht, die nie ankam.
 
 Die Store-Einreichung selbst — Konto, Angaben, Prüfgruppen, Freigabe — bleibt
 davon unberührt und außerhalb dieser Spezifikation. Zugesagt ist nur, **wohin
@@ -172,13 +180,17 @@ ein gebautes Bündel geht und unter welcher Bedingung**.
 - **WHEN** der native Release-Workflow durch das Schieben eines Versions-Tags
   ausgelöst wird
 - **THEN** wird das Bündel nach bestandenem Nachweis an den Store übertragen
-- **AND** dieselben Zugangsdaten authentifizieren, die schon signiert haben
+- **AND** die Zugangsdaten für die Übertragung liegen in der
+  Geheimnisverwaltung, nicht im Repository — ob es dieselben sind, die
+  signiert haben, entscheidet die Plattform und nicht diese Zusage
 
 #### Scenario: Ein Bündel ohne bestandenen Nachweis erreicht den Store nicht
 
-- **WHEN** der Nachweis am Artefakt fehlschlägt — fremdes Team, Entwickler-
-  statt Verteil-Zertifikat, Geräteliste im Profil, falsche Push-Umgebung oder
-  eine Build-Nummer, die nicht aus dem Lauf stammt
+- **WHEN** der Nachweis am Artefakt fehlschlägt — auf der einen Plattform
+  fremdes Team, Entwickler- statt Verteil-Zertifikat, Geräteliste im Profil,
+  falsche Push-Umgebung oder eine Build-Nummer, die nicht aus dem Lauf stammt;
+  auf der anderen ein Fingerabdruck, der nicht dem erwarteten Upload-Schlüssel
+  entspricht, oder ein Bündel, dessen Signatur sich nicht verifizieren lässt
 - **THEN** bricht der Lauf ab
 - **AND** es wird nichts übertragen, unabhängig davon, ob ein Tag den Lauf
   ausgelöst hat
@@ -188,6 +200,13 @@ ein gebautes Bündel geht und unter welcher Bedingung**.
 - **WHEN** der Nachweis besteht, die Übertragung an den Store aber fehlschlägt
 - **THEN** ist der Lauf rot
 - **AND** das geprüfte Artefakt liegt trotzdem zur Abholung bereit
+
+#### Scenario: Fehlende Zugangsdaten brechen den Lauf, statt ihn zu überspringen
+
+- **WHEN** ein Versions-Tag den Lauf auslöst, die Zugangsdaten für die
+  Übertragung aber nicht hinterlegt sind
+- **THEN** bricht der Lauf ab und nennt, welches Geheimnis fehlt
+- **AND** der Lauf ist **nicht** grün
 
 ### Requirement: Der Erststart lädt nur, was der erste Bildschirm braucht
 
