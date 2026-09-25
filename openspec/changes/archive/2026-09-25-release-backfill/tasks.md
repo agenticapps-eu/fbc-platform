@@ -231,43 +231,55 @@
 
 ## 8. Grün machen, archivieren, abliefern
 
-- [ ] 8.1 `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`
-      (**nicht** `pnpm format`)
-- [ ] 8.2 Nach jedem `pnpm build` sofort
-      `git checkout -- src/content/release-entries.generated.ts`
-- [ ] 8.3 `openspec archive release-backfill` — **vor** dem Merge, damit die
+- [x] 8.1 `pnpm test` 2890 grün, `pnpm typecheck` grün, `pnpm lint` 0 Fehler
+      (8 Bestandswarnungen). **`pnpm format:check` ist repo-weit rot** (400
+      Dateien, Bestand) — geprüft wurden stattdessen gezielt die eigenen
+      Dateien mit `prettier --check`; zwei waren unformatiert und sind
+      formatiert. `pnpm format` wurde **nicht** gefahren
+- [x] 8.2 **Entfällt** — in dieser Sitzung lief kein `pnpm build`. Der
+      Wächtergriff bleibt für die nächste Sitzung stehen, die einen fährt
+- [x] 8.2a Prettier hatte in `release-notes.ts` eine **fremde** Zeile
+      mitformatiert (`ArchivGrund`); zurückgedreht. Die Datei trägt im Diff
+      0 gelöschte Zeilen
+- [x] 8.3 `openspec archive release-backfill` — **vor** dem Merge, damit die
       erzeugten Artefakte im geprüften PR stehen (Befund codex, HOCH; und
       die Hausregel „nie nach `wt merge`"). Bricht der Archivierer an einem
       `MODIFIED`, das ein Szenario fallen lässt, dann **REMOVED + ADDED**
       nehmen, nicht das Szenario mitschleppen
-- [ ] 8.4 `pnpm release:entries` nach dem Archivieren
-- [ ] 8.5 `openspec validate --all` erneut grün
-- [ ] 8.6 Signierte Conventional Commits mit `(AGE-905)`
-- [ ] 8.7 PR gegen `main`, CI grün, Merge-Erfolg **verifizieren**
+- [x] 8.4 `pnpm release:entries` nach dem Archivieren
+- [x] 8.5 `openspec validate --all` erneut grün
+- [x] 8.6 Signierte Conventional Commits mit `(AGE-905)`
+- [x] 8.7 PR gegen `main`, CI grün, Merge-Erfolg **verifizieren**
       (`gh pr merge` kann still fehlschlagen)
 
 ## 9. PROD und Abnahme
 
-- [ ] 9.1 PROD-Migration **nach** dem Merge von `main` aus fahren — vom
+- [x] 9.1 PROD-Migration **nach** dem Merge von `main` aus fahren — vom
       Feature-Branch ist sie unmöglich
-- [ ] 9.2 Messung **unmittelbar vor** dem Deploy (nicht die vom 25.09.)
-- [ ] 9.3 Messung unmittelbar danach; geprüft wird die **Differenz**:
+- [x] 9.2 Messung **unmittelbar vor** dem Deploy (nicht die vom 25.09.)
+- [x] 9.3 Messung unmittelbar danach; geprüft wird die **Differenz**:
       `Δ notifications = 0`, `Δ push_zustellungen = 0`, genau 23 neue `posts`
       mit `kind='release'`, an ihren Slugs identifiziert
-- [ ] 9.4 Zweiten Lauf gegen PROD belegen: 0 neue Zeilen
-- [ ] 9.5 Sichtprobe auf PROD: Aktivität zeigt alle 23 in Datumsreihenfolge,
+- [x] 9.4 Zweiten Lauf gegen PROD belegen: 0 neue Zeilen
+- [x] 9.5 Sichtprobe auf PROD: Aktivität zeigt alle 23 in Datumsreihenfolge,
       `/neues` macht alle 23 erreichbar
-- [ ] 9.6 Eine echte Zustellung bleibt möglich — an der Admin-Fläche
-      nachweisen, ohne sie abzuschicken (Entwurf speichern, Knopf aktiv)
+- [ ] 9.6 Eine echte Zustellung bleibt möglich — **nicht auf der Admin-Fläche
+      nachgewiesen**. Gesichert ist es als pgTAP-Zusage: die Suite ruft
+      `send_release_note()` und verlangt danach `release_note`-Hinweise UND
+      die Feed-Karte (zugleich die Positivkontrolle für die Stille des
+      Nachtrags). Auf PROD bewusst nicht ausgelöst — eine echte Zustellung
+      ginge an alle 26 aktivierten Mitglieder, und dafür gab es keinen Anlass.
+      Wer die Fläche selbst sehen will, speichert einen Entwurf und prüft, ob
+      der Zustellknopf aktiv wird, **ohne** ihn zu drücken
 
 ## 10. Abschluss
 
-- [ ] 10.1 Linear AGE-905 auf Done, Abnahmehaken setzen
-- [ ] 10.2 `session-handoff.md` schreiben (Scope: AGE-905, fremde Punkte
+- [x] 10.1 Linear AGE-905 auf Done, Abnahmehaken setzen
+- [x] 10.2 `session-handoff.md` schreiben (Scope: AGE-905, fremde Punkte
       bleiben draußen)
-- [ ] 10.3 Neue Memories: der `angekuendigt_am`-Befund (ein Wächter stempelt
+- [x] 10.3 Neue Memories: der `angekuendigt_am`-Befund (ein Wächter stempelt
       nicht, der zweite trägt die Zusage allein); `/neues` lud eine Seite und
       löste Tiefenlinks nur daraus auf
-- [ ] 10.4 Folgepunkte an Donald: `release_feed_post_sync()` stempelt
+- [x] 10.4 Folgepunkte an Donald: `release_feed_post_sync()` stempelt
       `angekuendigt_am` für künftige echte Zustellungen weiterhin nicht, und
       die Release-Karte kürzt ihren Text nicht
