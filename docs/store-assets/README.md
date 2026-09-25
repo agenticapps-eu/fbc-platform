@@ -15,20 +15,34 @@ Je fünf Bildschirme: Aktivität (Feed) · Mitglieder (Verzeichnis) · Events ·
 Profil · Nachrichten. Beide Stores nehmen mindestens zwei, Apple bis zu zehn,
 Google bis zu acht.
 
-> ⚠️ **Der Profil-Screenshot ist veraltet und muss vor der Einreichung neu
-> entstehen.** Er zeigt den Knopf „Mitgliedschaft verwalten", den es in der App
-> seit `935b987` (PR #419, AGE-907) nicht mehr gibt.
+> ✅ **Profil neu aufgenommen am 2026-09-25** (`ios-4-profil.png`,
+> `android-4-profil.png`). Die Fassung vom 13.09. zeigte den Knopf
+> „Mitgliedschaft verwalten", den PR #419 (`935b987`, AGE-907) entfernt hat —
+> ein Kaufeinstieg, den die App nicht mehr hat, unter genau der Richtlinie
+> 3.1.1, die #419 entschärfen sollte.
 >
-> Die Entscheidung zu Richtlinie 3.1.1 **ist gefallen**: Der Kaufweg ruht,
-> `/mitgliedschaft` leitet auf `/` um, und sieben Einstiege sind entfernt. Damit
-> hat sich die frühere Warnung („sollte dieses Bild nicht an Apple gehen")
-> erledigt — und in ihr Gegenteil verkehrt. Das Bild zeigt jetzt einen
-> Kaufeinstieg, den die App nicht mehr hat, und geht damit **doppelt** falsch an
-> Apple: als veraltete Oberfläche und als Beleg für genau die Richtlinie, die
-> #419 entschärft hat.
+> **Tatsächlich geändert hat sich nur `ios-4-profil.png`.** Der Play-Ausschnitt
+> (360 × 640) endet oberhalb der Mitgliedschaftskarte, dort stand der Knopf also
+> nie — `android-4-profil.png` kam **byte-identisch** aus dem neuen Lauf zurück
+> (`69a634d1…` vorher wie nachher). Das ist nebenbei der Beleg, dass die
+> Aufnahme deterministisch ist und die Demo-Daten unverändert sind.
 >
-> Das Aufnahmeskript unten erzeugt den Screenshot neu; die App unter ihm ist
-> bereits richtig. Es muss also nur jemand den Lauf wiederholen.
+> **Die anderen acht Bilder stammen weiter vom 13.09.** Das ist Absicht: Der
+> lokale Stack trägt inzwischen 45 statt 14 Beiträge (Backfill aus AGE-905), ein
+> neuer Aktivitäts-Screenshot wäre korrekt, aber als Store-Bild nicht
+> repräsentativ.
+>
+> Dass die anderen vier Bildschirme weiter gültig sind, ist **gemessen**, nicht
+> angenommen: `/aktivitaet`, `/mitglieder`, `/events` und `/chat` tragen im DOM
+> weder einen Link nach `/mitgliedschaft` noch eines der Kaufwörter.
+>
+> ⚠️ **Falle beim Wiederholen: `cover_url` zeigt auf
+> `public/images/.sichtprobe/`, und das Verzeichnis wird nach jeder Aufnahme
+> gelöscht** (es liegt in `public/` und würde ausgeliefert). Der erste Lauf am
+> 25.09. ergab deshalb ein Profilbild mit **kaputtem Bild-Symbol** an der Stelle
+> des Titelbilds — sichtbar nur im Augenschein, kein Skript meldet es. Vor der
+> Aufnahme also erst die Zuschnitte wieder herstellen (Rezept unten), danach
+> wieder löschen.
 
 ## Warum die Bilder keine echten Personen zeigen
 
