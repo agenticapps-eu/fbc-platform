@@ -11,8 +11,10 @@ import {
   submitPlatformFeedback,
   uploadFeedbackScreenshot,
 } from "../../lib/feedback";
+import { cn } from "../../lib/cn";
 import { useAuth } from "../../providers/auth-context";
 import { Button, Select, Textarea, useToast } from "../ui";
+import { navEintragAbstaende } from "../ui/navEintragAbstaende";
 import { useBildauswahl } from "../ui/useBildauswahl";
 import { useOverlay } from "../ui/useOverlay";
 import { Icon } from "../ui/icons";
@@ -285,21 +287,19 @@ export function FeedbackButton({
         onClick={() => setOpen(true)}
         title={collapsed ? "Feedback" : undefined}
         aria-label={collapsed ? "Feedback" : undefined}
-        // AGE-929: Polsterung und Symbolabstand sind DIESELBEN wie an einem
-        // `NavLink` in `SidebarNav` — `gap-3 px-3 py-2` offen, `px-2 py-2.5`
-        // (ohne `gap`, das Symbol steht allein) eingeklappt. Seit der
-        // Support-Abschnitt ein gewöhnlicher Abschnitt ist, stehen dieser Knopf
-        // und „Tutorials" untereinander in derselben Spalte; vorher wich er mit
-        // `gap-2` und `py-2` ab, und 4 px Symbolabstand in der zweiten Zeile
-        // sieht man, ohne benennen zu können, woran es liegt.
+        // AGE-929: Die Abstände kommen aus `SidebarNav` und stehen nicht hier.
+        // Seit der Support-Abschnitt ein gewöhnlicher Abschnitt ist, stehen
+        // dieser Knopf und „Tutorials" untereinander in derselben Spalte —
+        // „wie ein Eintrag der Leiste sitzt" ist EINE Tatsache, und sie gehört
+        // an die Stelle, die die Einträge zeichnet.
         //
         // Der Fokusring bleibt, obwohl `NavLink` keinen trägt: ihn abzuräumen
         // wäre eine Angleichung nach unten. Dass die Einträge daneben keinen
         // haben, ist ein eigener Befund.
-        className={
-          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
-          (collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2")
-        }
+        className={cn(
+          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          navEintragAbstaende(collapsed),
+        )}
       >
         <FeedbackIcon />
         {!collapsed && <span>Feedback</span>}

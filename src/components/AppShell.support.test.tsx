@@ -42,6 +42,20 @@ const BASIC = fakeAuthValue({
  * Konto ohne Rolle fehlt der Abschnitt, gegen den geprüft wird, und eine
  * Fassung, die Support hinter die Administration hängt, bliebe grün.
  */
+/**
+ * Ohne Konto. Der Abschnitt steht auch dann da — unbedingt, wie vor AGE-929 —,
+ * aber `FeedbackButton` gibt ohne Konto `null` zurück: Feedback ist ohne Konto
+ * nicht speicherbar, und ein Knopf, der nur scheitern kann, ist ein Versprechen
+ * ins Leere.
+ *
+ * Die Zusage steht hier, seit der Code-Review darauf gezeigt hat, dass die
+ * Anforderung „genau zwei Einträge" den ausgeloggten Fall überdehnte. Am
+ * Verhalten ändert dieser Change nichts — nur daran, wie sichtbar es ist: aus
+ * einem Block am Fuss ist ein Abschnitt mit eigener Überschrift und eigener
+ * Trennlinie geworden.
+ */
+const ANON = fakeAuthValue({ user: null, tier: null, levelRank: null });
+
 const ADMIN = fakeAuthValue({
   user: { id: "u2", email: "adam@demo.local" } as AuthContextValue["user"],
   tier: "basic",
@@ -112,6 +126,26 @@ function abschnittsgriffe(): string[] {
   );
 }
 
+/**
+ * Die layoutrelevanten Klassen eines Eintrags, sortiert — Polsterung und
+ * Symbolabstand, sonst nichts.
+ *
+ * Der Ausdruck fängt `gap-`, `gap-x-`, `gap-y-`, `p-` und JEDE gerichtete
+ * Polsterung (`px- py- pt- pb- pl- pr- ps- pe-`). Die erste Fassung war
+ * `/^(gap|px|py|p)-/` und übersah damit genau die gerichteten — ein Wächter,
+ * der nur in eine Richtung hält: `py-2.5` gegen `pt-2 pb-3` zu tauschen wäre
+ * unbemerkt durchgegangen.
+ *
+ * `pointer-events-…` und `placeholder-…` fallen nicht hinein: nach dem `p` muss
+ * entweder sofort ein Strich stehen oder genau EIN Buchstabe aus der Liste.
+ */
+function layout(el: Element): string {
+  return Array.from(el.classList)
+    .filter((c) => /^(gap(-[xy])?|p[xytblrse]?)-/.test(c))
+    .sort()
+    .join(" ");
+}
+
 function renderApp(start = "/aktivitaet", auth: AuthContextValue = BASIC) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -179,6 +213,18 @@ describe("Support-Abschnitt — offen, eingeklappt, in der Schublade", () => {
     expect(abschnittsgriffe()).toEqual(["Mein Bereich", "Support"]);
   });
 
+  it("lässt „Feedback“ weg, wenn niemand angemeldet ist", () => {
+    breite(true);
+    renderApp("/", ANON);
+
+    // Der Abschnitt steht, „Tutorials" steht — beides unverändert gegenüber dem
+    // Zustand vor AGE-929.
+    expect(screen.getByRole("button", { name: /^Support$/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tutorials" })).toBeInTheDocument();
+    // Der Feedback-Eintrag nicht: ohne Konto könnte er nur scheitern.
+    expect(screen.queryByRole("button", { name: /^feedback$/i })).toBeNull();
+  });
+
   it("klappt über seine Überschrift zu und wieder auf", () => {
     // Das ist der Unterschied zum Sonderbau: seine Überschrift war ein totes
     // `<p>`. Eine Fassung, die Support ohne `klappbar` einreiht, sieht offen
@@ -211,12 +257,6 @@ describe("Support-Abschnitt — offen, eingeklappt, in der Schublade", () => {
     renderApp();
 
     const support = supportAbschnitt();
-    const layout = (el: Element) =>
-      Array.from(el.classList)
-        .filter((c) => /^(gap|px|py|p)-/.test(c))
-        .sort()
-        .join(" ");
-
     const tutorials = within(support).getByRole("link", { name: "Tutorials" });
     const feedback = within(support).getByRole("button", { name: /^feedback$/i });
     expect(layout(feedback)).toBe(layout(tutorials));
@@ -251,13 +291,23 @@ describe("Support-Abschnitt — offen, eingeklappt, in der Schublade", () => {
     breite(true);
     renderApp();
 
-    expect(screen.getByRole("link", { name: "Tutorials" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
+    const tutorials = screen.getByRole("link", { name: "Tutorials" });
+    const feedback = screen.getByRole("button", { name: "Feedback" });
+    expect(tutorials).toBeInTheDocument();
+    expect(feedback).toBeInTheDocument();
     // Die Überschrift fällt weg — in einem Rail von Symbolbreite hat sie keinen
     // Platz, und damit auch der Griff. Die Namen oben tragen den Abschnitt
     // allein.
     expect(screen.queryByText("Support")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Support$/ })).toBeNull();
+
+    // Die ZWEITE Hälfte der Angleichung. Offen wurde `gap-2` zu `gap-3`,
+    // eingeklappt `py-2` zu `py-2.5` — und bis der Code-Review es fand, hielt
+    // nur die erste eine Zusage. `py-2.5` zurückzudrehen wäre durch die ganze
+    // Suite gerutscht, in genau dem Zustand, für den die Zusage geschrieben
+    // wurde.
+    expect(layout(feedback)).toBe(layout(tutorials));
+    expect(layout(tutorials)).toBe("px-2 py-2.5");
   });
 
   it("trägt beide Einträge auch in der Schublade", () => {

@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { useDesignVariantValue } from "../../providers/design-variant-context";
 import { Icon } from "./icons";
+import { navEintragAbstaende } from "./navEintragAbstaende";
 import { NavIcon } from "./NavIcon";
 
 export interface SidebarNavItem {
@@ -194,7 +195,7 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               className={({ isActive }) =>
                 cn(
                   "relative flex items-center rounded-md text-sm transition-colors",
-                  collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
+                  navEintragAbstaende(collapsed),
                   isActive
                     ? "bg-chrome-active font-semibold text-on-chrome-active"
                     : "text-on-chrome hover:bg-chrome-elevated hover:text-on-chrome-active",

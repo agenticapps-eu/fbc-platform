@@ -23,7 +23,12 @@ Reihenfolge der Abschnitte ist Hauptnavigation → **Mein Bereich** → **Suppor
 **Administration**. Für ein Konto ohne Admin-Rolle SHALL er der letzte Abschnitt
 sein.
 
-Er SHALL genau zwei Einträge tragen: **Tutorials** und **Feedback**.
+Einem **angemeldeten** Konto SHALL er genau zwei Einträge tragen: **Tutorials**
+und **Feedback**. Ohne Konto SHALL „Feedback" entfallen — es ist ohne Konto nicht
+speicherbar, und ein Knopf, der nur scheitern kann, ist ein Versprechen ins
+Leere. Das ist keine Neuerung dieses Changes; es steht hier, weil der Abschnitt
+jetzt eine eigene Überschrift und eine eigene Trennlinie hat und der Fall damit
+sichtbarer ist als am Fuss der Leiste.
 
 Er SHALL die Form der übrigen Abschnitte haben und SHALL NOT als Sonderbau
 danebenstehen: Überschrift, zuklappbar über die Überschrift, dieselbe Trennlinie
@@ -63,9 +68,15 @@ nebeneinander unterscheiden nichts mehr.
 
 #### Scenario: Der Abschnitt zeigt beide Einträge unter seiner Überschrift
 
-- **WHEN** die Seitenleiste offen dargestellt wird
+- **WHEN** die Seitenleiste einem angemeldeten Konto offen dargestellt wird
 - **THEN** steht über den Einträgen die Überschrift „Support"
 - **AND** der Abschnitt führt „Tutorials" und „Feedback", und sonst nichts
+
+#### Scenario: Ohne Konto entfällt der Feedback-Eintrag
+
+- **WHEN** die Seitenleiste ohne angemeldetes Konto dargestellt wird
+- **THEN** erscheint „Feedback" nicht
+- **AND** der Abschnitt führt keinen Eintrag, der ohne Konto nur scheitern kann
 
 #### Scenario: Die Überschrift klappt den Abschnitt zu
 

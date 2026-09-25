@@ -36,6 +36,13 @@ Mein Bereich → Support → Administration.
   Schublade heraus offen steht) und AGE-697 (Escape trifft das oberste Overlay)
   gelten unverändert weiter und werden weiter geprüft.
 
+**Dies ersetzt die Verortung aus AGE-904 vom selben Tag.** Dort hiess es „ein
+Abschnitt „Support" am Fuss der Seitenleiste, über dem Einklapp-Schalter" — der
+Abschnitt ist derselbe und trägt dieselben zwei Einträge, er steht nur nicht
+mehr am Fuss. Der Satz steht hier, weil die Neuigkeiten-Einträge aus diesem
+Abschnitt erzeugt werden und beide Einträge sonst nebeneinander stünden, ohne
+dass einer den anderen aufhebt.
+
 Keine Breaking Changes: keine Route ändert sich, kein Recht, kein Schema.
 
 ## Capabilities
