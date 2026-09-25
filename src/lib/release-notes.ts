@@ -38,6 +38,15 @@ export const releaseNotesQueryKey = (
   was: "draft" | "sent" | "alle-zugestellten" | "uebersprungen",
 ) => ["release-notes", was] as const;
 
+/**
+ * Der Schlüssel für EINE einzeln nachgeholte Mitteilung (AGE-905).
+ *
+ * Eigener Schlüssel und nicht `sent` mit Parameter: die Einzelabfrage liefert
+ * eine Zeile, die geseitete Abfrage eine Liste. Unter demselben Schlüssel
+ * überschriebe die eine die andere.
+ */
+export const releaseNoteEinzelKey = (id: string) => ["release-notes", "einzeln", id] as const;
+
 const SPALTEN =
   "id, title, body, entry_slugs, status, created_by, created_at, sent_at, recipient_count";
 
@@ -176,6 +185,38 @@ export async function fetchAngekuendigt(): Promise<
     .order("sent_at", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as Awaited<ReturnType<typeof fetchAngekuendigt>>;
+}
+
+/**
+ * EINE zugestellte Mitteilung, an ihrer Kennung (AGE-905).
+ *
+ * **Warum es das braucht.** Die Glocke und die Release-Karte im Feed verlinken
+ * `/neues?note=<id>`. Die Fläche löste diesen Verweis bisher ausschliesslich
+ * aus der geladenen Liste auf — und die trägt eine Seite. Bei mehr
+ * zugestellten Mitteilungen als einer Seitengrösse öffnete ein Verweis auf eine
+ * ältere Mitteilung deshalb **nichts**: kein Fehler, kein Hinweis, ein Knopf,
+ * der tot aussieht. Mit den 23 Nachträgen aus AGE-905 wären das drei davon
+ * gewesen. (Befund des Fremd-Plan-Reviews, codex.)
+ *
+ * `maybeSingle()` und nicht `single()`: eine unbekannte oder gelöschte Kennung
+ * ist der NORMALFALL dieser Fläche (ein Hinweis kann eine Mitteilung
+ * überleben), kein Fehler. Sie liefert `null`, und die Fläche öffnet nichts —
+ * dieselbe Zusage wie bisher.
+ *
+ * `status = 'sent'` steht hier AUSDRÜCKLICH, obwohl `release_notes_read_sent`
+ * dasselbe erzwingt: ein Admin darf Entwürfe lesen, und ohne diese Zeile
+ * öffnete ein Tiefenlink ihm einen Entwurf auf einer Fläche, die
+ * ausschliesslich Zugestelltes zeigt.
+ */
+export async function fetchEineNote(id: string): Promise<ReleaseNote | null> {
+  const { data, error } = await supabase
+    .from("release_notes")
+    .select(SPALTEN)
+    .eq("id", id)
+    .eq("status", "sent")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ReleaseNote | null) ?? null;
 }
 
 /** Die Slugs, die ein Admin als „nicht relevant" markiert hat (AGE-636).

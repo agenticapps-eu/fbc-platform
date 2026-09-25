@@ -1,10 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
 import { ReleaseNoteModal, formatDatum } from "../components/release/ReleaseNoteModal";
+import { Button } from "../components/ui/Button";
 import { Card, CardTitle } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
-import { fetchZugestellte, releaseNotesQueryKey } from "../lib/release-notes";
+import {
+  RELEASE_NOTES_SEITE,
+  fetchEineNote,
+  fetchZugestellte,
+  releaseNoteEinzelKey,
+  releaseNotesQueryKey,
+} from "../lib/release-notes";
 
 /**
  * „Neu in der App" — was wir geändert haben (AGE-631, Modal AGE-632).
@@ -28,15 +35,48 @@ import { fetchZugestellte, releaseNotesQueryKey } from "../lib/release-notes";
  */
 export default function NeuesPage() {
   const [params, setParams] = useSearchParams();
-  const notes = useQuery({
+
+  // Seitenweise (AGE-905). Vorher lud die Fläche EINE Seite und bot kein
+  // Nachladen an: ab der 21. zugestellten Mitteilung stand der Rest in keiner
+  // Liste — auf einer Fläche, die „alle Neuerungen" heisst. Der Fehler war bis
+  // AGE-905 unsichtbar, weil es null zugestellte Mitteilungen gab.
+  const notes = useInfiniteQuery({
     queryKey: releaseNotesQueryKey("sent"),
-    queryFn: () => fetchZugestellte(),
+    queryFn: ({ pageParam }) => fetchZugestellte({ offset: pageParam }),
+    initialPageParam: 0,
+    // Eine KURZE Seite ist das Ende. Über `offset + length` statt über eine
+    // Gesamtzahl: die müsste eine zweite Abfrage liefern und könnte zwischen
+    // beiden veralten.
+    getNextPageParam: (letzte, alle) =>
+      letzte.length < RELEASE_NOTES_SEITE
+        ? undefined
+        : alle.reduce((n, seite) => n + seite.length, 0),
   });
+
+  const geladene = notes.data?.pages.flat() ?? [];
+  const gesucht = params.get("note");
 
   // Eine Note kann gelöscht sein, während der Hinweis noch in der Glocke steht.
   // Dann steht hier `undefined` und es öffnet sich nichts — ein leeres Modal
   // wäre schlechter als keines.
-  const offene = (notes.data ?? []).find((n) => n.id === params.get("note"));
+  const inListe = geladene.find((n) => n.id === gesucht);
+
+  // Steht die gesuchte Mitteilung NICHT auf einer geladenen Seite, wird sie
+  // einzeln nachgeholt. Ohne das öffnete ein Verweis der Glocke oder der
+  // Release-Karte auf eine ältere Mitteilung nichts — ununterscheidbar von
+  // einem toten Knopf.
+  // `notes.isSuccess` gehört in die Bedingung, nicht nur `inListe === undefined`.
+  // Solange die erste Seite unterwegs ist, ist die Liste leer und JEDE gesuchte
+  // Mitteilung sähe wie „steht nicht drauf" aus — auch die, die gleich als
+  // erste erscheint. Die Einzelabfrage liefe dann bei jedem Tiefenlink
+  // zusätzlich, und zwar umsonst.
+  const nachgeholt = useQuery({
+    queryKey: releaseNoteEinzelKey(gesucht ?? ""),
+    queryFn: () => fetchEineNote(gesucht as string),
+    enabled: gesucht !== null && notes.isSuccess && inListe === undefined,
+  });
+
+  const offene = inListe ?? nachgeholt.data ?? undefined;
 
   return (
     <div className="mx-auto flex max-w-[760px] flex-col gap-6">
@@ -59,14 +99,14 @@ export default function NeuesPage() {
         </Card>
       ) : notes.isLoading ? (
         <p className="text-sm text-muted">Wird geladen…</p>
-      ) : (notes.data ?? []).length === 0 ? (
+      ) : geladene.length === 0 ? (
         <EmptyState
           title="Noch nichts angekündigt"
           description="Sobald sich etwas an der Anwendung ändert, steht es hier."
         />
       ) : (
         <ol className="flex flex-col gap-4">
-          {(notes.data ?? []).map((n) => (
+          {geladene.map((n) => (
             <li key={n.id}>
               {/* Die ganze Karte ist der Auslöser, nicht ein Link darin: ein
                   Ziel von der Größe einer Textzeile trifft auf dem Telefon
@@ -90,6 +130,21 @@ export default function NeuesPage() {
             </li>
           ))}
         </ol>
+      )}
+
+      {/* Der Knopf steht nur, solange es etwas nachzuladen gibt — sonst wäre er
+          eine Fläche, die nichts tut. */}
+      {notes.hasNextPage && (
+        <div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={notes.isFetchingNextPage}
+            onClick={() => notes.fetchNextPage()}
+          >
+            {notes.isFetchingNextPage ? "Wird geladen …" : "Ältere laden"}
+          </Button>
+        </div>
       )}
 
       {offene && (
