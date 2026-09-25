@@ -48,6 +48,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-25-play-upload",
+    "datum": "2026-09-25",
+    "titel": "play-upload",
+    "linear": null,
+    "aenderungen": [
+      "**`android-release.yml` lädt in den geschlossenen Testkanal hoch**, über die Play-Publishing-API, nur auf ein **geschobenes** Tag `android-v*`.",
+      "**Der Upload steht hinter dem Signaturnachweis und hinter der Artefaktablage** — wie auf der iOS-Seite, aus denselben zwei Gründen.",
+      "**Fehlt das Service-Konto, bricht der Lauf laut ab** statt still zu überspringen. Ein grüner Tag-Lauf, der nichts ausgeliefert hat, wäre die schlechteste aller Antworten.",
+      "Der Wächter `scripts/android-release.workflow.test.ts` bekommt Zusagen für Bedingung, Reihenfolge und Kanal.",
+      "**Ein neues Secret**: `PLAY_SERVICE_ACCOUNT_JSON` in Infisical `prod`."
+    ]
+  },
+  {
     "slug": "2026-09-25-kaufweg-ruhend",
     "datum": "2026-09-25",
     "titel": "Der Kaufweg wird ruhend gestellt, nicht abgebaut",
