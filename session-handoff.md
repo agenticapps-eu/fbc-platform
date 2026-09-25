@@ -1,137 +1,123 @@
-# Session Handoff — 2026-09-13 (Weg 1 entschieden, M4 vorbereitet)
+# Session Handoff — 2026-09-25 (AGE-905 Release-Backfill, gebaut, nicht committet)
 
-> **Scope dieser Übergabe: M4 / AGE-644 — Store-Einreichung.** Prüfer-Zugang,
-> Datenschutzangaben, Store-Material, dazu die vier Sicherheitsmeldungen. Fremde
-> offene Punkte stehen hier bewusst NICHT; sie gehören den Sitzungen, die daran
-> arbeiten. Die Fassung vom 12.09. führte den ganzen Repo-Zustand — das war
-> Aufräumarbeit, die es nicht mehr gibt, und kein Grund, ihn wieder einzutragen.
+> **Scope dieser Übergabe: AGE-905.** Fremde offene Punkte stehen hier bewusst
+> NICHT. Die vorige Fassung (13.09., M4 / AGE-644) steht in
+> `git log -- session-handoff.md` und gehört der Sitzung, die daran arbeitet.
+>
+> Worktree `donald-age-905-release-backfill`, Branch
+> `donald/age-905-release-backfill`. **Nichts ist committet.**
 
-> ## ⚠ ZUERST
+> ## ⚠ ZUERST — drei Dinge, die auf dem Rechner zurückgeblieben sind
 >
-> **1. Der Prüfer-Zugang ist entschieden: Weg 1.** Donald am 13.09. — normales
-> Mitgliedskonto, Stufe `connect`, der Prüfer sieht die echte Gemeinschaft.
-> Nicht neu aufrollen. Alles Operative steht in **`docs/pruefer-zugang.md`**,
-> inklusive fertigem englischem Prüfhinweis-Text zum Einsetzen.
->
-> **2. Zwei Risiken gefunden, die niemand gesucht hatte — beide OFFEN.**
-> Stripe ist per sichtbarem Knopf auf der Profilseite erreichbar (Apple 3.1.1),
-> und `POST_NOTIFICATIONS` steht in keinem Manifest (Android-Push käme nicht
-> an). Details unten. **Ich habe nichts geändert** — beides ist Donalds Call.
->
-> **3. AGE-644 stand fälschlich auf *Done*** und steht wieder auf *In Progress*.
-> Geschlossen hatte es der Merge der Übergabe-PR #405, deren Branchname das
-> Kürzel trug — bei acht offenen Abnahmezeilen.
->
-> **4. Der lokale Supabase-Stack trägt jetzt meine Demo-Daten.** Zahlen unten.
-> Wer dort fremde Datensätze findet: das sind meine.
+> 1. **`.env.local` liegt im Worktree** (gitignored) und zeigt auf den lokalen
+>    Stack. Solange sie da ist, zeigt **jedes** `pnpm dev` in diesem Worktree
+>    auf lokal statt DEV, ohne das zu sagen. **Nach der Sichtprobe löschen.**
+> 2. **Ein vite-Server läuft auf Port 5219** (`pnpm exec vite --port 5219
+>    --strictPort`, Log in `/tmp/905-vite.log`). Beenden, wenn die Sichtprobe
+>    durch ist.
+> 3. **Eine geliehene Adminzeile steht in der lokalen `staff_roles`.** Sie war
+>    vorher leer. Zurücknehmen mit:
+>    `delete from public.staff_roles where profile_id = '00000000-0000-0000-0000-000000000238';`
 
-## Was diese Sitzung getan hat
+## Accomplished
 
-| PR | Inhalt | Zustand |
+- Abstimmung mit fbc-platform-61 (AGE-907) **vor** der ersten Codezeile: keine
+  Kollision, lokaler Stack freigegeben. Zwei Hinweise von dort übernommen.
+- OpenSpec-Change `release-backfill`: Proposal, Design, zwei Delta-Specs,
+  Tasks, REVIEWS.md mit signiertem Trailer. `openspec validate --all` grün.
+- **Fremdreview vor dem Code** (Regel für DB-Arbeit): gemini und codex, beide
+  REQUEST-CHANGES, 4× HOCH / 4× MITTEL / 2× NIEDRIG. Alle eingearbeitet ausser
+  einem begründet abgelehnten. Das Gate zählt 2 Reviewer.
+- Migration `20260925120000_release_backfill.sql`: 23 Notes + 23 Feed-Karten,
+  über den bestehenden Auslöser, ohne `send_release_note()`.
+- `scripts/mess-905.ts` + `.logic.ts` + 11 Zusagen: misst **Differenzen**,
+  jede Zusage mit Positivkontrolle.
+- `supabase/tests/release_backfill_test.sql`: 23 pgTAP-Zusagen, in `ci.yml`
+  eingetragen, Wächter grün.
+- `/neues` lädt nach und löst Tiefenlinks auch ausserhalb der ersten Seite auf
+  (+ 8 Zusagen in `NeuesPage.paging.test.tsx`).
+- Lokal: 2881 Tests grün, `pnpm lint` 0 Fehler, `pnpm typecheck` grün.
+
+## Decisions
+
+- **Migration mit Datensätzen statt Admin-Skript** (Donald, 25.09.): kein
+  Client kann `status='sent'` schreiben, ein Skript bräuchte also erst eine
+  DEFINER-RPC — eine dauerhafte API-Fläche für einen einmaligen Lauf.
+- **Ausgabe-Datum, minutenweise gestaffelt** (Donald, 25.09.): der Feed ordnet
+  über `(veroeffentlicht_ab desc, id desc)`; gleiche Zeitstempel ordneten die
+  Karten einer Ausgabe nach uuid, also auf jedem Bestand anders.
+- **Das Ausgabe-Datum gilt auch auf `/neues` als Datum der Mitteilung**
+  (Donald, 25.09.), obwohl `release-ausgaben.ts` seine Daten „gesetzt und
+  nicht gemessen" nennt.
+- **`/neues` bekommt Paging in diesem Change** (Donald, 25.09.): ohne das
+  hätten drei der 23 Karten einen Knopf getragen, der nichts öffnet.
+- **Der Halbsatz „und wo du zur Mitgliedschaft kommst" ist gestrichen**
+  (Donald, 25.09.): AGE-907 hat den Weg mit `935b987` entfernt, der Satz steht
+  seit AGE-904 live und falsch im Tutorial — und der Nachtrag wäre die letzte
+  Gelegenheit gewesen, ihn vor dem Einfrieren zu korrigieren.
+- **`angekuendigt_am` wird in der MIGRATION gestempelt, nicht im Auslöser**
+  (gegen den Vorschlag von gemini): der Auslöser gehört jeder künftigen echten
+  Zustellung, nicht diesem Nachtrag.
+
+## Files modified
+
+- `supabase/migrations/20260925120000_release_backfill.sql` — neu, 606 Zeilen
+- `supabase/tests/release_backfill_test.sql` — neu, 23 Zusagen
+- `.github/workflows/ci.yml` — eine Zeile: die neue Suite in die Dateiliste
+- `scripts/mess-905.ts`, `mess-905.logic.ts`, `mess-905.logic.test.ts` — neu
+- `src/pages/NeuesPage.tsx` — Paging + Tiefenlink-Auflösung
+- `src/pages/NeuesPage.paging.test.tsx` — neu, 8 Zusagen
+- `src/lib/release-notes.ts` — `fetchEineNote`, `releaseNoteEinzelKey` (rein
+  additiv, 0 gelöschte Zeilen)
+- `src/content/release-geschichten.ts` — **eine** Zeile (der Halbsatz)
+- `openspec/changes/release-backfill/` — die fünf Artefakte
+
+## Gemessene Belege
+
+| Fläche | vorher | nachher |
 | --- | --- | --- |
-| #407 | vier transitive Sicherheitsmeldungen per `pnpm.overrides` gehoben | gemerged `2f2f0f6` |
-| #408 | `docs/pruefer-zugang.md` — Weg 1 belegt | gemerged `e8e9537` |
-| #409 | `docs/store-datenschutzangaben.md` + `docs/store-assets/` (11 Bilder, 2 Skripte) | gemerged `9b4116f` |
-| #411 | Mitteilungen auf dem Gerät in der Datenschutzerklärung | gemerged `433e644` |
+| PROD `release_notes` | 0 | *(noch nicht gefahren)* |
+| PROD `notifications` | 308 (0 × `release_note`) | muss 308 bleiben |
+| PROD `push_zustellungen` | 0 | muss 0 bleiben |
+| lokal `posts kind=release` | 0 | **23** |
+| lokal `notifications` | 47 | **47 (Δ 0)** |
+| lokal `push_zustellungen` | 0 | **0 (Δ 0)** |
 
-Repo danach: **ein Branch, sauberer Arbeitsbaum**, `main` grün.
+Zweiter Lauf lokal: `INSERT 0 0`, Δ 0 überall.
 
-### Sicherheitsmeldungen (#407)
-
-Alle vier steckten transitiv in `pnpm-lock.yaml`, nicht in `package.json` —
-deshalb hatte Dependabot nichts geöffnet und `pnpm update` hätte sie nicht
-erreicht. Es brauchte `pnpm.overrides`. `sharp` lag doppelt im Lock; der
-Override kollabiert beide, daher **−318 Zeilen**.
-
-Der riskante Sprung war **`uuid` 7 → 11** in `xcode`, das die Xcode-Projektdatei
-schreibt. Nachgestellt statt angenommen: `generateUuid()` liefert unverändert
-eine 24-stellige Kennung. Testzahl vorher wie nachher **247 / 2821**.
-
-### Datenschutzangaben (#409)
-
-Art für Art ausfüllfertig für Apple App Privacy und Google Data safety, jede
-Zeile mit Beleg. Die gemessenen **Nein**-Zeilen kürzen das Formular am meisten:
-kein Standort (keine API, kein Plugin, keine Berechtigung — `profiles.region`
-ist getippter Freitext), keine Gerätekontakte, kein Suchverlauf, keine
-Reichweitenmessung.
-
-**Zwei Empfänger fehlten in der Datenschutzerklärung** — ✅ **erledigt mit
-#411.** §13 war auf dem Stand vom 26.08., Push kam danach. Beim Nachziehen
-zeigte sich, dass die Lücke größer war: `Push`, `Mitteilung`,
-`Benachrichtigung`, `Apple` und `Google` kamen im ganzen Text **null Mal** vor,
-§10 kannte nur E-Mail. Es fehlte nicht der Empfänger, sondern die Verarbeitung.
-Jetzt ein eigener Abschnitt „Mitteilungen auf dem Gerät" plus beide Empfänger
-in §13.
-
-Entwarnung bei capgo: Bibliothek, kein Empfänger, weil
-`capacitor.config.ts:97-99` alle drei Adressen auf eigene Supabase-Funktionen
-legt.
-
-### Store-Material (#409)
-
-Zehn Screenshots (1290×2796 für Apple, 1080×1920 für Play) plus die
-1024×500-Feature-Grafik, die Google zwingend verlangt. Gegen den lokalen Stack,
-**kein Bild zeigt echte Mitglieder**: alle 27 `avatar_url` genullt (der Seed
-setzt `i.pravatar.cc` — Fotos echter Menschen unter erfundenen Namen).
-
-Beide Aufnahmeskripte liegen unter `scripts/`, das Rezept in
-`docs/store-assets/README.md`.
-
-## Die zwei offenen Risiken
-
-**Stripe ist verlinkt, nicht nur erreichbar.** `/mitgliedschaft` →
-`create-checkout-session` → Stripe. „Unverlinkt" stimmt nur fürs Hauptmenü: auf
-der Profilseite steht **„Mitgliedschaft verwalten"** (`MembershipSummary.tsx:30`,
-`<Link to="/mitgliedschaft">`), sichtbar auch auf `impact`. Apple-Richtlinie
-**3.1.1** ist anders als 4.2 nicht wegargumentierbar. Abschalten wären zwei
-kleine Stellen (`showManageCta` + Routeneintrag). ⚠️ Der Profil-Screenshot zeigt
-diesen Knopf — solange offen, nicht an Apple geben.
-
-**`POST_NOTIFICATIONS` steht in keinem Manifest.** Nur `INTERNET` und `CAMERA`;
-kein Plugin-Manifest und keine Firebase-Artefakte deklarieren sie. Bei
-`targetSdkVersion = 36` ist sie für Android 13+ Pflicht. **Verdacht, kein
-Beweis** — das zusammengeführte Manifest liess sich nicht bauen
-(`cordova.variables.gradle` entsteht erst bei `cap sync`, das Infisical
-braucht). Gegenprobe:
-`adb shell dumpsys package com.effbeezee.app | grep -i post_notifications`.
+**Drei Mutationen als Positivkontrolle**, jede zurückgenommen und die Rücknahme
+per `diff` belegt: Auslöser auf `now()` → 3 Zusagen rot; Art-Filter in
+`beitrag_ankuendigen()` entfernt → die gemeinte Zusage rot; Nachladen in
+`NeuesPage` entfernt → 3 Zusagen rot. Dazu die zwei Riegel gegen den fremden
+Entwurf **einzeln** gemessen: jeder allein verhindert den Schaden.
 
 ## Next session: start here
 
-1. **Donald fragen, wie es mit Stripe weitergeht** (abschalten oder 3.1.1-Risiko
-   tragen). Das ist die einzige Frage, die Bauarbeit auslösen kann.
-2. **`POST_NOTIFICATIONS` am Gerät nachmessen.** Braucht Donalds Telefon.
-3. Unverändert der längste Weg im Zeitplan: **Google-Konto anlegen und die
-   Testzwang-Bedingungen dort ablesen.** Nur Donald.
+**Die Sichtprobe fehlt, sonst nichts.** Das chrome-devtools-Profil war von
+einer anderen Sitzung belegt, und es abzuschiessen hätte fremden Browserzustand
+gekostet — Donald hat die Übergabe gewählt. Der Server läuft bereits auf
+`http://localhost:5219/` (**`localhost`, nicht `127.0.0.1`** — vite bindet an
+den ersten Treffer der Namensauflösung). Anmelden mit
+`age905-sichtprobe@example.invalid` / `Sichtprobe905!x` (Stufe `connect`,
+aktiviert). Zu prüfen: die Aktivität zeigt sechs Ausgaben vom 05.09. zurück zum
+01.08., innerhalb jeder Ausgabe in Leseordnung; Glocke und Ungelesen-Zähler
+unverändert; `/neues` zeigt 20 und holt die letzten drei über „Ältere laden";
+ein Tiefenlink von der ältesten Karte öffnet ihre Mitteilung; ausgeloggt
+erscheint keine Release-Karte; und der Tutorialsatz unter `/hilfe/tutorials`
+endet jetzt bei „welche Stufe nötig ist." Danach **die drei Aufräumpunkte oben
+abarbeiten**, dann committen (Conventional Commits mit `(AGE-905)`),
+archivieren **vor** dem Merge, `pnpm release:entries`, PR gegen `main`. Die
+PROD-Migration läuft erst **nach** dem Merge von `main` aus — vom Feature-Branch
+ist sie unmöglich, das sind zwei Schritte.
 
-~~§13 der Datenschutzerklärung um APNs und FCM ergänzen~~ — mit #411 erledigt.
+## Open questions
 
-Vor dem Anfangen `ListAgents` — am 13.09. liefen sechs Sitzungen, zwei in
-diesem Repo.
-
-## Lokaler Stack — meine Zahlen
-
-27 Profile (alle aktiviert, alle `avatar_url = null`), 14 Beiträge, 8 Events,
-6 Nachrichten, 44 Angebote, 47 Gesuche. Anmeldung
-`hans-peter.stadler@demo.fbc.invalid` / `sichtprobe-lokal-2026`, Stufe `impact`.
-`.env.local`, der vite-Server auf 5209 und `public/images/.sichtprobe/` sind
-**entfernt**.
-
-## Fünf Fallen dieser Sitzung
-
-1. **Der Branchname ohne Kürzel verhindert das falsche *Done* — viermal
-   belegt.** Meine Notiz sagte bisher „Vorbeugen geht gar nicht"; das war
-   falsch. Ausgelöst wird von Branchname ODER PR-Titel — **nicht** vom
-   Commit-Rumpf, nicht von Linear-Kommentaren und (bei #411 versehentlich
-   getestet) **auch nicht vom Commit-Betreff auf `main`**.
-2. **Die erste Screenshot-Runde schoss die ausgeloggte Sicht.** `/` trägt kein
-   Anmeldeformular, es liegt auf `/login`; die Beiträge standen unter „Ein
-   Mitglied". Sah brauchbar aus. Das Skript bricht jetzt ab, wenn keine Sitzung
-   im Speicher liegt.
-3. **Der Opt-in-Wächter des Demo-Seeds prüft den Zielhost nicht.** Er warnt
-   wörtlich „This is the LIVE shared Supabase project", egal wohin er zeigt.
-   Verlassen kann man sich nur auf `Target Postgres:` darüber.
-4. **`cover_url` ist seit `bild_pfade_statt_urls` ein Speicherpfad.** Ein Wert
-   ohne URI-Schema landet im Bucket-Pfad und bricht still als Bildplatzhalter.
-5. **`deno install` vor `pnpm install`, nie danach** — die umgekehrte
-   Reihenfolge zerlegt `node_modules`, und der Fehler (`Cannot find package
-   '@tailwindcss/vite'`) sieht nach einem kaputten Projekt aus.
+- Keine offenen Entscheidungen. Zwei **Folgepunkte**, bewusst nicht gebaut:
+  `release_feed_post_sync()` stempelt `angekuendigt_am` für künftige echte
+  Zustellungen weiterhin nicht (heute folgenlos, weil `beitrag_ankuendigen()`
+  nach `kind` filtert), und die Release-Karte kürzt ihren Text nicht — bei 23
+  Karten zu 480–1279 Zeichen wird die Aktivität lang.
+- Nach dem Nachtrag bestehen 58 % der PROD-Aktivität aus Release-Karten
+  (23 von 40). Gewollt und im Design begründet: die sechs Ausgabe-Daten liegen
+  überwiegend **vor** dem ältesten Bestandsbeitrag (17.08.), die Karten sammeln
+  sich also unten.

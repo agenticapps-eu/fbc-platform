@@ -273,7 +273,7 @@ Wer ein Event anlegen darf, darf auch eine Vorlage anlegen und daraus Termine er
     titel: "Warum manchmal ein grauer Knopf dasteht",
     text: `Events gibt es in zwei Sichtbarkeiten. Öffentliche Events stehen jedem bestätigten Konto offen. Events für Mitglieder verlangen zum Anmelden die Stufe Discover.
 
-Reicht deine Stufe für ein Event nicht, bleibt der Anmeldeknopf gesperrt. Daneben steht, warum: welche Stufe nötig ist und wo du zur Mitgliedschaft kommst.
+Reicht deine Stufe für ein Event nicht, bleibt der Anmeldeknopf gesperrt. Daneben steht, warum: welche Stufe nötig ist.
 
 Wer ein Event ausrichtet, darf sich zum eigenen Event immer anmelden, unabhängig von seiner Stufe.
 

@@ -33,6 +33,21 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-25-release-backfill",
+    "datum": "2026-09-25",
+    "titel": "Release-Backfill: alle freigegebenen Geschichten in der Aktivität",
+    "linear": "AGE-905",
+    "aenderungen": [
+      "**Eine Migration mit Datensätzen** legt für jede der 23 freigegebenen Geschichten eine `release_notes`-Zeile an und setzt sie in einem zweiten Schritt auf `status = 'sent'`. Der bestehende Auslöser `trg_release_feed_post` erzeugt daraus die `posts`-Zeile mit `kind = 'release'` — es entsteht **kein zweiter Insert-Pfad** in den Feed.",
+      "**`send_release_note()` wird NICHT gerufen.** Sie ist der einzige Schreiber von `notifications`-Zeilen des Typs `release_note`; der Backfill umgeht sie und schreibt damit 0 Hinweise, 0 Glocke, 0 Ungelesen-Zähler, 0 Push.",
+      "**Das Datum ist das Ausgabe-Datum aus `release-ausgaben.ts`**, nicht das Datum des Archiveintrags. Innerhalb einer Ausgabe minutenweise gestaffelt entlang `ausgabe.geschichten[]` — das ist laut Typkommentar die Leseordnung, und der Feed ordnet über `(veroeffentlicht_ab desc, id desc)`, würde gleiche Zeitstempel also nach uuid sortieren.",
+      "**Idempotenz über `release_notes.entry_slugs`.** Der Geschichte-Slug ist laut Typkommentar zeichengleich mit dem Slug des Archiveintrags, und `entry_slugs` ist die Spalte, die genau diese Zuordnung trägt. Ein zweiter Lauf findet die Zeile und legt nichts an.",
+      "**Der Weg für neue Geschichten bleibt unverändert**: Admin-Fläche „Neuigkeiten\" → Entwurf → `send_release_note()` → Glocke, Push und Feed-Karte. Der Backfill ist ein einmaliger Nachtrag, keine zweite Zustellart.",
+      "**Keine Bilder.** `release_notes` trägt `title` und `body`, und die Feed-Karte rendert genau diese zwei. Die 23 Aufnahmen aus `public/tutorial/` erscheinen im Tutorial, nicht auf der Karte. Eine Bildspalte auf `release_notes` wäre eine neue Fähigkeit und gehört nicht in einen Nachtrag.",
+      "**Keine Rückdatierung von `created_at` auf `release_notes`.** Nur `sent_at` wird zurückdatiert; das ist die Spalte, aus der der Auslöser beide Zeitspalten des Beitrags speist."
+    ]
+  },
+  {
     "slug": "2026-09-25-kaufweg-ruhend",
     "datum": "2026-09-25",
     "titel": "Der Kaufweg wird ruhend gestellt, nicht abgebaut",
