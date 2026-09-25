@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ToastProvider } from "./components/ui/Toast";
@@ -275,6 +275,73 @@ describe("/onboarding liegt hinter der Aktivierungswand (AGE-495, Befund F1)", (
       </AuthFixture>,
     );
   }
+
+  /**
+   * AGE-907: Der Kaufweg ruht, und das ist die Zusage, die ihn wirklich
+   * zuhält — alles andere nimmt nur Links weg.
+   *
+   * Gemessen wird mit `impact` UND mit `connect`. `impact` allein wäre die
+   * wertlose Hälfte: `MitgliedschaftPage.tsx:31` zeigt einem `impact`-Konto
+   * ohnehin keine Preise, der Test wäre also auch ohne Redirect grün. `connect`
+   * ist die Stufe des Prüferkontos (`docs/pruefer-zugang.md`) und sah dort am
+   * 25.09. sechs Preiskarten und vier Stripe-Knöpfe.
+   */
+  describe("/mitgliedschaft ist umgeleitet, nicht geroutet (AGE-907)", () => {
+    /**
+     * Gemessen wird die ADRESSE, nicht der Inhalt der Zielseite — nach dem
+     * Muster von `HeaderSearch.test.tsx`.
+     *
+     * Zwei Fassungen davor waren wertlos, und beide hat erst der Mutationstest
+     * überführt. Die erste wartete auf /Deine Mitgliedschaft|Aktivität/:
+     * „Aktivität" ist ein Eintrag der Seitenleiste und steht sofort da, egal
+     * welche Seite rendert — mit zurückgeholter Route blieb der Test GRÜN, weil
+     * die Verneinungen liefen, bevor der lazy-Chunk der Preisseite geladen war.
+     * Die zweite wartete auf „Deine aktuelle Stufe" aus `MemberDashboard` und
+     * war rot im RICHTIGEN Zustand: `HomeRedirect` rendert `null`, solange die
+     * Onboarding-Abfrage läuft, und was danach kommt, hängt an ihr.
+     *
+     * Die Adresse hat mit beidem nichts zu tun. Sie ist genau die Zusage
+     * („der Pfad leitet auf `/` um") und hängt an keinem Chunk und an keiner
+     * Abfrage.
+     */
+    function Adresse() {
+      const { pathname } = useLocation();
+      return <span data-testid="adresse">{pathname}</span>;
+    }
+
+    function renderAufMitgliedschaft(value: AuthContextValue) {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      return render(
+        <AuthFixture value={value}>
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>
+              <MemoryRouter initialEntries={["/mitgliedschaft"]}>
+                <Adresse />
+                <App />
+              </MemoryRouter>
+            </ToastProvider>
+          </QueryClientProvider>
+        </AuthFixture>,
+      );
+    }
+
+    /**
+     * `connect` UND `impact`. `impact` allein wäre die wertlose Hälfte:
+     * `MitgliedschaftPage.tsx:31` zeigt einem `impact`-Konto ohnehin keine
+     * Preise, eine Prüfung auf „keine Preise" wäre dort also auch ohne Redirect
+     * grün. `connect` ist die Stufe des Prüferkontos
+     * (`docs/pruefer-zugang.md`) und sah dort am 25.09. sechs Preiskarten und
+     * vier Stripe-Knöpfe.
+     */
+    it.each([["connect"], ["impact"]] as const)(
+      "leitet %s von /mitgliedschaft auf / um",
+      async (stufe) => {
+        renderAufMitgliedschaft(authAsTier(stufe));
+
+        await waitFor(() => expect(screen.getByTestId("adresse").textContent).toBe("/"));
+      },
+    );
+  });
 
   it("zeigt einem unbestätigten Konto die Wand statt des Kompass-Assistenten", () => {
     renderOnboarding(

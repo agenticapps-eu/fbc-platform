@@ -84,31 +84,34 @@ describe("Identität im Rahmen (AGE-494)", () => {
   });
 
   /**
-   * Der Weg zu den Preisen steht nur denen offen, für die sie gelten (AGE-633).
+   * AGE-907: Hier standen ZWEI Zusagen — „zeigt „Mitgliedschaft" im Profilmenü
+   * NICHT, wer schon impact trägt" (AGE-633) und „zeigt ihn einer niedrigeren
+   * Stufe weiterhin". Genau diese Unterscheidung war das 3.1.1-Problem: sie
+   * verbarg den Weg zum Kaufen vor dem Import-Kreis und zeigte ihn dem
+   * Prüferkonto, das auf `connect` steht (`docs/pruefer-zugang.md`), und jedem
+   * selbstregistrierten Mitglied auf `basic`.
    *
-   * Der Menüeintrag in der Sidebar ist seit AGE-494 fort; im Profilmenü stand
-   * der Link weiter. Für den Import-Kreis — jedes übernommene Mitglied liegt
-   * auf `impact` — führt er zu vier zahlenden Stufen, von denen keine gilt.
+   * Der Kaufweg ruht, also gibt es keine Stufe mehr, die ihn sieht. Die erste
+   * Zusage allein stehen zu lassen wäre wertlos geworden: sie ist jetzt für jede
+   * Stufe wahr und würde nicht mehr bemerken, wenn der Eintrag für die anderen
+   * zurückkäme. Deshalb wird über ALLE sechs Stufen gemessen.
    */
-  it("zeigt „Mitgliedschaft\" im Profilmenü NICHT, wer schon impact trägt", () => {
-    renderApp(MIT_EMAIL);
-    fireEvent.click(screen.getByRole("button", { name: "Profilmenü" }));
+  it.each([["basic"], ["connect"], ["discover"], ["exchange"], ["focus"], ["impact"]] as const)(
+    "zeigt „Mitgliedschaft\" im Profilmenü auf keiner Stufe — hier %s",
+    (stufe) => {
+      renderApp(
+        fakeAuthValue({
+          user: { id: "test-user", email: "bea@demo.local" } as AuthContextValue["user"],
+          tier: stufe,
+          levelRank: LEVEL_RANK[stufe],
+        }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Profilmenü" }));
 
-    expect(screen.queryByRole("menuitem", { name: "Mitgliedschaft" })).not.toBeInTheDocument();
-    // Positivkontrolle: das Menü ist offen und trägt seine übrigen Einträge.
-    expect(screen.getByRole("menuitem", { name: "Profil" })).toBeInTheDocument();
-  });
-
-  it("zeigt ihn einer niedrigeren Stufe weiterhin", () => {
-    renderApp(
-      fakeAuthValue({
-        user: { id: "test-user", email: "bea@demo.local" } as AuthContextValue["user"],
-        tier: "discover",
-        levelRank: LEVEL_RANK.discover,
-      }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Profilmenü" }));
-
-    expect(screen.getByRole("menuitem", { name: "Mitgliedschaft" })).toBeInTheDocument();
-  });
+      expect(screen.queryByRole("menuitem", { name: "Mitgliedschaft" })).not.toBeInTheDocument();
+      // Positivkontrolle: das Menü ist offen und trägt seine übrigen Einträge.
+      // Ohne sie wäre die Verneinung auch bei geschlossenem Menü wahr.
+      expect(screen.getByRole("menuitem", { name: "Profil" })).toBeInTheDocument();
+    },
+  );
 });

@@ -53,13 +53,67 @@ genutzt werden. Eine erreichbare Route zu externem Checkout ist die
 Standardursache für eine Ablehnung nach 3.1.1 — und anders als 4.2 lässt sie
 sich nicht wegargumentieren.
 
-**Empfehlung: vor der iOS-Einreichung den Knopf und die Route abschalten.**
-`showManageCta` auf der einen Seite, der Route-Eintrag auf der anderen — zwei
-Stellen, beide klein. Zum Go-Live ist ohnehin nichts zu kaufen, und es nimmt
-eine ganze Ablehnungsklasse vom Tisch. Deine Entscheidung; ich habe nichts
-geändert.
+> ### ✅ ERLEDIGT am 25.09. (AGE-907) — der Kaufweg ruht
+>
+> Die Empfehlung hier lautete, „den Knopf und die Route abzuschalten —
+> `showManageCta` auf der einen Seite, der Route-Eintrag auf der anderen, zwei
+> Stellen, beide klein". **Die Zahl war falsch: es waren sieben.** Gezählt am
+> 25.09. mit `grep -rn '"/mitgliedschaft"' src/` — neben dem Knopf auf der
+> Profilseite ein Eintrag im Profilmenü, eine Kachel auf der Startseite, ein
+> Knopf in den Einstellungen, der Knopf „Upgrade" auf jeder Stufen-Wand, der
+> Sprung aus der Kopfzeilen-Suche und ein Link am Event.
+>
+> **Und der Befund war noch schärfer als der Nachtrag vom 13.09. sagt.** Dort
+> steht, der Knopf erscheine „auch auf der höchsten Stufe" — das trifft den Knopf,
+> aber nicht die Preise. `MitgliedschaftPage.tsx:31` trägt
+> `zeigtPreise = tier !== "impact"`: ein `impact`-Konto sieht die Seite ohne jede
+> Preiskarte, und weil der Import-Kreis **ganz** auf `impact` liegt, wirkte die
+> Fläche beim Nachsehen leer. Mit `connect` gerendert — der Stufe des
+> Prüferkontos nach `docs/pruefer-zugang.md` — waren es sechs Preiskarten, vier
+> Upgrade-Knöpfe und die Beträge 150/300/600/1200 € pro Jahr.
+>
+> Umgesetzt ist nicht „abschalten", sondern **ruhend stellen**: alle sieben
+> Einstiege sind fort, `/mitgliedschaft` leitet in `App.tsx` auf `/` um, und
+> Seite, Preiskarten und beide Edge Functions bleiben unverändert im Code. Der
+> Rückweg für AGE-908 sind zwei Zeilen. `redirect-targets.test.ts` hält es zu.
 
-### 3. `POST_NOTIFICATIONS` steht in keinem Manifest
+### 3. `POST_NOTIFICATIONS` — der Verdacht war falsch
+
+> ### ✅ WIDERLEGT am 25.09. (AGE-907). `POST_NOTIFICATIONS` **steht** im
+> zusammengeführten Manifest. Es ist **nichts zu ergänzen.**
+>
+> Beigetragen von **`com.google.firebase:firebase-messaging:25.0.1`**, laut
+> `android/app/build/outputs/logs/manifest-merger-debug-report.txt`:
+> `ADDED from [com.google.firebase:firebase-messaging:25.0.1] … :23:5-77`.
+>
+> Gemessen in **beiden** Varianten — `processDebugMainManifest` und
+> `processReleaseMainManifest`, Berechtigungsmengen zeichengleich. Die
+> Release-Variante zählt, denn die Beta wird als Release gebaut. Vollständig:
+> `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE`, `INTERNET`,
+> `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`.
+>
+> **Warum der Verdacht entstand, und warum er trotzdem falsch war:** die zwei
+> Messungen unten stimmen beide — die Quelldatei führt wirklich nur `INTERNET`
+> und `CAMERA`, und kein `@capacitor`-Plugin deklariert die Berechtigung
+> (`push-notifications@8.1.2` deklariert nur seinen `MessagingService`). Nur war
+> das die falsche Frage: eine Berechtigung kann aus **jedem** AAR der
+> Abhängigkeitskette kommen, und `firebase-messaging` ist die Bibliothek, die
+> Push überhaupt ausliefert. Eine Verneinung über die Quelldatei und die
+> Plugin-Manifeste kann über das Zusammengeführte nichts sagen.
+>
+> **Der Weg zum Merge-Ergebnis, weil er beim ersten Versuch scheiterte:**
+> `npx cap update android` mit gesetztem `VITE_SUPABASE_URL` (der Wert ist für
+> das Manifest belanglos — er baut nur die OTA-Endpunkte), davor
+> `mkdir -p android/app/src/main/assets` und ein `dist/index.html`, weil `cap
+> copy` sonst abbricht; dann `./gradlew :app:processDebugMainManifest` mit
+> `JAVA_HOME` auf JDK 21 und `ANDROID_HOME` gesetzt. `android/app/build.gradle`
+> verlangt zusätzlich `google-services.json` — für eine reine Manifest-Messung
+> genügt eine Attrappe mit passendem `package_name`. **Und ohne Pipe laufen
+> lassen:** `./gradlew … | tail` meldet Exit 0, während im Text `BUILD FAILED`
+> steht.
+>
+> Der Gerätetest unten bleibt trotzdem sinnvoll — er belegt die **erteilte**
+> Erlaubnis, nicht die deklarierte. Das sind zwei verschiedene Dinge.
 
 Gemessen: `android/app/src/main/AndroidManifest.xml` führt nur `INTERNET` und
 `CAMERA`. Kein Plugin-Manifest unter `node_modules/@capacitor*/` deklariert
@@ -67,10 +121,12 @@ Gemessen: `android/app/src/main/AndroidManifest.xml` führt nur `INTERNET` und
 `targetSdkVersion = 36` ist sie für Android 13+ **Pflicht**, sonst kann die
 Laufzeitabfrage nicht gewährt werden und es erscheint nie eine Mitteilung.
 
-⚠️ **Das ist ein Verdacht, kein Beweis.** Das zusammengeführte Manifest konnte
-ich nicht bauen — `./gradlew :app:processDebugMainManifest` bricht an
+⚠️ ~~**Das ist ein Verdacht, kein Beweis.**~~ Aufgelöst, siehe Kasten oben. Das
+zusammengeführte Manifest ließ sich am 13.09. nicht bauen —
+`./gradlew :app:processDebugMainManifest` brach an
 `capacitor-cordova-android-plugins/cordova.variables.gradle` ab, das erst
-`cap sync` erzeugt, und das braucht Infisical. Entschieden wird es am Gerät:
+`cap sync` erzeugt. Am Gerät nachmessen lohnt weiter, aber für eine andere
+Frage:
 
 ```
 adb shell dumpsys package com.effbeezee.app | grep -i post_notifications
@@ -179,9 +235,14 @@ Text steht in `docs/pruefer-zugang.md`.
 
 1. **§13 der Datenschutzerklärung um APNs und FCM ergänzen** (Befund 1). Die
    Formulare dürfen nicht mehr nennen als die Erklärung.
-2. **Über Stripe entscheiden** (Befund 2): Route für iOS abschalten, oder das
-   3.1.1-Risiko bewusst tragen.
-3. **`POST_NOTIFICATIONS` am Gerät nachmessen** (Befund 3).
+2. ~~**Über Stripe entscheiden** (Befund 2)~~ — **erledigt am 25.09.** (AGE-907):
+   der Kaufweg ruht, `/mitgliedschaft` ist umgeleitet. Nicht „für iOS", sondern
+   überall.
+3. ~~**`POST_NOTIFICATIONS` am Gerät nachmessen** (Befund 3)~~ — als
+   Voraussetzung **entfallen**: die Berechtigung steht im zusammengeführten
+   Manifest (25.09., aus `firebase-messaging:25.0.1`). Der Gerätetest bleibt als
+   Beleg der **erteilten** Erlaubnis sinnvoll und steht in AGE-907, blockiert die
+   Formulare aber nicht.
 4. **Die Stripe-Zeile in Googles „geteilt"-Spalte** selbst beantworten.
 5. Verarbeitungsregionen für Cloudflare, Resend und Stripe nachtragen — die
    Erklärung sagt an drei Stellen selbst „noch nicht belegt".

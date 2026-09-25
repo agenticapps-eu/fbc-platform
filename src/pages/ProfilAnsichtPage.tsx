@@ -119,7 +119,10 @@ function ProfilView({ uid }: { uid: string }) {
         />
       )}
 
-      <MembershipSummary current={p.tier} showManageCta />
+      {/* AGE-907: ohne `showManageCta` — die Eigenschaft gibt es nicht mehr.
+          „Mitgliedschaft verwalten" war der einzige Knopf dieser Seite in den
+          jetzt ruhenden Kaufweg. Die Karte nennt die Stufe unverändert. */}
+      <MembershipSummary current={p.tier} />
 
       {/* AGE-539: Erfolgsradar, Auszeichnungen, Ziele und Entwicklung sind hier
           ausgebaut — die Kompass-Oberfläche ist für den Go-Live vertagt (AGE-494),

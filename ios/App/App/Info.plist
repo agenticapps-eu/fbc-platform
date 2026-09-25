@@ -22,6 +22,19 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- AGE-907: Exportangabe. Ohne diesen Schluessel fragt App Store Connect
+	     bei JEDEM Upload nach, und der Build bleibt in „Missing Compliance"
+	     stehen — er erscheint in TestFlight gar nicht. Das Fehlerbild ist ein
+	     Build, der einfach nicht auftaucht, nicht eine Meldung im Log.
+
+	     `false` ist richtig, weil die App keine eigene Verschluesselung
+	     mitbringt: sie spricht HTTPS, und genau darauf bezieht sich die
+	     Ausnahme. Wer hier spaeter eigene Kryptografie einbaut — einen
+	     verschluesselten lokalen Speicher etwa —, bewertet diesen Wert neu,
+	     statt den Waechter anzupassen
+	     (`scripts/ios-export-compliance.test.ts`). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- AGE-642: Ohne diese beiden Texte beendet iOS die App beim ERSTEN

@@ -1,14 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { MembershipSummary } from "./MembershipSummary";
 
-function renderSummary(current: string | null, showManageCta = false) {
-  render(
-    <MemoryRouter>
-      <MembershipSummary current={current} showManageCta={showManageCta} />
-    </MemoryRouter>,
-  );
+// AGE-907: ohne `MemoryRouter`. Die Karte enthält keinen Link mehr, seit
+// `showManageCta` mit dem Kaufweg entfallen ist — ein Router drumherum wäre
+// Kulisse und ließe den nächsten Leser eine Navigation vermuten, die es hier
+// nicht gibt.
+function renderSummary(current: string | null) {
+  render(<MembershipSummary current={current} />);
 }
 
 describe("MembershipSummary", () => {
@@ -29,14 +28,14 @@ describe("MembershipSummary", () => {
     expect(screen.getByText("Basic")).toBeInTheDocument();
   });
 
-  it("renders the manage CTA only when requested", () => {
-    renderSummary("discover", true);
-    const link = screen.getByRole("link", { name: /Mitgliedschaft verwalten/i });
-    expect(link).toHaveAttribute("href", "/mitgliedschaft");
-  });
-
-  it("hides the CTA by default", () => {
+  // AGE-907: Zwei Zusagen standen hier — „renders the manage CTA only when
+  // requested" und „hides the CTA by default". Der Knopf ist mit dem ruhenden
+  // Kaufweg entfallen, also gibt es keine Bedingung mehr zu prüfen, sondern nur
+  // noch eine Abwesenheit. Und die trägt eine Positivkontrolle: ohne die zweite
+  // Zeile wäre der Test auch grün, wenn die Karte gar nichts mehr rendert.
+  it("trägt überhaupt keinen Weg zur Mitgliedschaft mehr", () => {
     renderSummary("discover");
-    expect(screen.queryByRole("link", { name: /Mitgliedschaft verwalten/i })).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("Deine Mitgliedschaft")).toBeInTheDocument();
   });
 });

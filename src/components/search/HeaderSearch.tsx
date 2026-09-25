@@ -221,7 +221,13 @@ export default function HeaderSearch() {
   function alleErgebnisse() {
     if (!begriff) return;
     schliessen();
-    navigate(reichtStufe ? directoryUrlForQuery(begriff) : "/mitgliedschaft");
+    // AGE-907: Die Verzweigung ist weg. Bis zum 25.09. ging Enter unterhalb
+    // `discover` auf `/mitgliedschaft` — in den Kaufweg, der jetzt ruht. Beide
+    // Stufen gehen deshalb ins Verzeichnis: ein Konto unter `connect` findet
+    // dort die Wand von `MembershipGate`, die die nötige Stufe nennt und sagt,
+    // wer sie freischaltet. Der Hinweis über dem Knopf hat das ohnehin schon
+    // angekündigt.
+    navigate(directoryUrlForQuery(begriff));
   }
 
   function schliesseMobil() {
@@ -444,12 +450,15 @@ function Ergebnisse({
         <p className="text-sm text-muted">
           Das Mitgliederverzeichnis ist ab {levelLabel("discover")} verfügbar.
         </p>
+        {/* AGE-907: hieß „Mitgliedschaft ansehen" und führte in den ruhenden
+            Kaufweg. Beide Zweige tragen jetzt dasselbe Ziel und deshalb dieselbe
+            Aufschrift — der Satz darüber trägt den Unterschied. */}
         <button
           type="button"
           onClick={onAlle}
           className="mt-2 text-sm font-medium text-accent-strong hover:underline"
         >
-          Mitgliedschaft ansehen
+          Im Verzeichnis weitersuchen
         </button>
       </div>
     );

@@ -76,12 +76,25 @@ describe("Go-Live-Navigation (AGE-494)", () => {
      darunter prüft. */
   it.each([
     ["/kompass", "Kompass"],
-    ["/mitgliedschaft", "Mitgliedschaft"],
     ["/kontakte", "Meine Kontakte"],
   ])("blendet %s aus dem Menü aus, hält die Route aber erreichbar", (pfad) => {
     const item = navItems.find((i) => i.path === pfad);
     expect(item).toBeDefined();
     expect(item?.section).toBe("sub");
+  });
+
+  /* AGE-907 — `/mitgliedschaft` stand in der Liste darüber und ist jetzt raus:
+     nicht ausgeblendet, sondern umgeleitet (Apple 3.1.1, der Kaufweg ruht).
+
+     Diese Zusage ist die Gegenprobe zur Liste darüber, und sie ist nötig, weil
+     ein bloßes Streichen dort auch grün wäre, wenn die Route mit einem
+     Menüeintrag zurückkäme. Der Redirect selbst steht in `App.tsx` und wird in
+     `App.test.tsx` geprüft. */
+  it("führt /mitgliedschaft gar nicht mehr als Route — auch nicht als sub", () => {
+    expect(navItems.find((i) => i.path === "/mitgliedschaft")).toBeUndefined();
+    // Positivkontrolle: die Suche findet Routen überhaupt. Ohne sie wäre die
+    // Verneinung auch bei leerem `navItems` wahr.
+    expect(navItems.find((i) => i.path === "/kompass")).toBeDefined();
   });
 
   /* AGE-442 — „Keine weitere Unterseite": gebuchte und eigene Events stehen jetzt
@@ -130,14 +143,20 @@ const ALLE_ROUTEN: ReadonlyArray<readonly [pfad: string, label: string]> = [
   ["/kontakte", "Meine Kontakte"],
   ["/meine-events", "Meine Events"],
   ["/mitglieder", "Mitglieder"],
-  ["/mitgliedschaft", "Mitgliedschaft"],
+  // AGE-907: `/mitgliedschaft` stand hier. Der Kaufweg ruht, die Route ist
+  // umgeleitet statt geroutet.
   ["/neues", "Neu in der App"],
   ["/profil", "Mein Profil"],
   ["/profil/bearbeiten", "Profil bearbeiten"],
 ];
 
 describe("Jede Route trägt Pfad und Beschriftung (AGE-642, A2)", () => {
-  it("führt genau diese fünfzehn Routen, mit genau diesen Beschriftungen", () => {
+  // Vierzehn: AGE-904 hat `/hilfe/tutorials` ergänzt (14 → 15), AGE-907 hat
+  // `/mitgliedschaft` genommen (15 → 14). Beide Changes standen gleichzeitig
+  // offen, und der Rebase-Konflikt bestand aus genau diesem Zahlwort — die
+  // Liste selbst hat git richtig zusammengeführt. Die Zahl steht nur im Titel
+  // und wird nicht maschinell geprüft, also erinnert daran nichts.
+  it("führt genau diese vierzehn Routen, mit genau diesen Beschriftungen", () => {
     const ist = navItems
       .map((i) => [i.path, i.label] as const)
       .sort(([a], [b]) => a.localeCompare(b));

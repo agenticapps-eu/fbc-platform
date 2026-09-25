@@ -272,14 +272,10 @@ export default function EinstellungenPage() {
           <TierBadge tier={tier ?? DEFAULT_LEVEL} />
           <span className="text-sm text-muted">{levelLabel(tier ?? DEFAULT_LEVEL)}-Mitglied</span>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="self-start"
-          onClick={() => navigate("/mitgliedschaft")}
-        >
-          Stufe ansehen &amp; upgraden
-        </Button>
+        {/* AGE-907: Hier stand „Stufe ansehen & upgraden". Der Kaufweg ist
+            ruhend; die Karte beantwortet weiter „welche Stufe habe ich?" über
+            Abzeichen und Namen, und das war ohnehin ihr Titel. Zurückholen für
+            AGE-908 ist dieser Knopf. */}
       </Card>
 
       {/* Darstellung (AGE-492). Läuft bewusst NICHT über die `save`-Mutation
