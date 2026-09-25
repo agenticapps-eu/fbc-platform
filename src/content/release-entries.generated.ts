@@ -18,6 +18,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-25-kaufweg-ruhend",
+    "datum": "2026-09-25",
+    "titel": "Der Kaufweg wird ruhend gestellt, nicht abgebaut",
+    "linear": "AGE-907",
+    "aenderungen": [
+      "**`/mitgliedschaft` wird unerreichbar.** Der `navItem`-Block entfällt, und `App.tsx` leitet den Pfad auf `/` um — die Bauform von `/meine-chancen` (AGE-450). Lesezeichen laufen nicht ins Leere, sie landen auf der Startseite.",
+      "**Alle sieben Einstiege entfallen**, jeder auf die Art, die zu seiner Fläche passt (design.md, Entscheidung 3). Drei behalten ihre Aussage und verlieren nur den Weg; einer wird zu einem Satz; einer fällt mit einem Zweig weg.",
+      "**`showManageCta` entfällt ganz**, samt Knopf und den beiden Zusagen dazu. Der Entwurf wollte die Eigenschaft als Rückweg stehen lassen; der Wächter hat gezeigt, dass sie dann einen toten Link im Baum hinterlässt (design.md, Entscheidung 4).",
+      "**Kein neuer Wächter.** `src/config/redirect-targets.test.ts` leistet das seit AGE-494 und **leitet** seine Routenliste aus `App.tsx` ab — `/mitgliedschaft` erscheint dort von selbst, sobald der Redirect steht. An ihm sind zwei Dinge geschärft worden: er sah bisher keinen `navigate(x ? … : \"/route\")` und hatte keine Positivkontrollen (design.md, Entscheidung 6).",
+      "**Nichts an der Kaufstrecke selbst.** `MitgliedschaftPage`, `PricingCard`, `create-checkout-session`, `stripe-webhook`, `apply_upgrade`, die Preise in `levels.ts` — unverändert."
+    ]
+  },
+  {
     "slug": "2026-09-12-release-notes-in-der-aktivitaet",
     "datum": "2026-09-12",
     "titel": "Neuerungen an der App stehen jetzt auch in der Aktivität",
