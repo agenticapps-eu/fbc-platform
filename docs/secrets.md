@@ -327,9 +327,21 @@ Plattform-injiziert (nicht setzen): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `STRIPE_WEBHOOK_SECRET` setzen.
 5. Migration anwenden: `pnpm db:push` (setzt `apply_upgrade`).
 
-Danach: als Basic-Nutzer auf ein gesperrtes Format → Wand → „Upgrade" →
-`/mitgliedschaft` → Testkarte `4242 4242 4242 4242` → der Webhook hebt `profiles.tier`,
-und der zuvor gesperrte Inhalt wird sichtbar.
+> ⚠️ **Diese Testrunde ist seit `935b987` (PR #419, AGE-907) nicht mehr
+> ausführbar.** Sie führte über „Wand → ‚Upgrade' → `/mitgliedschaft`"; beide
+> Stationen gibt es nicht mehr. Die Wand trägt statt des Knopfes einen Satz, und
+> `/mitgliedschaft` leitet auf `/` um.
+>
+> **Der Flow selbst ist intakt**, nur unerreichbar: `create-checkout-session`,
+> `stripe-webhook` und `apply_upgrade` sind unverändert im Code, und die Stufe
+> setzt weiterhin allein der Webhook. Wer den Weg heute prüfen will, ruft die
+> Edge Function direkt auf, statt durch die Oberfläche zu gehen.
+>
+> Die Wiederinbetriebnahme hängt an **AGE-908** (Stripe live, wartet auf
+> Detlevs Freigabe). Wenn dort der Kaufweg zurückkommt, gilt wieder: als Nutzer
+> einer niedrigen Stufe auf ein gesperrtes Format → Wand → `/mitgliedschaft` →
+> Testkarte `4242 4242 4242 4242` → der Webhook hebt `profiles.tier`, und der
+> zuvor gesperrte Inhalt wird sichtbar.
 
 ## Supabase Edge Function secrets (`send-push`, AGE-641)
 

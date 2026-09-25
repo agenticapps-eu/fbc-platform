@@ -451,7 +451,8 @@ erscheint:
 | `/profil` | mein-bereich | Eigenes Profil |
 | `/einstellungen` | mein-bereich | Einstellungen inkl. Theme |
 | `/kompass` | sub | „Ich biete / Ich suche" |
-| `/meine-events` · `/kontakte` · `/mitgliedschaft` | sub | Eigene Events, Kontakte, Stufe |
+| `/meine-events` · `/kontakte` | sub | Eigene Events, Kontakte |
+| ~~`/mitgliedschaft`~~ | — | **Umgeleitet auf `/`** seit `935b987` (AGE-907). Die Seite liegt noch im Baum, ist aber von nichts mehr importiert; Rückweg über AGE-908 |
 | `/profil/bearbeiten` | sub | Profil-Editor |
 | `/chat` | sub | Gespräche |
 | `/neues` | sub | Neues in der App |
