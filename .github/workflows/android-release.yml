@@ -247,3 +247,76 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      # ══ AB HIER GEHT ETWAS NACH AUSSEN (AGE-907) ═══════════════════════════
+      # Alles darueber laeuft bei jedem angeforderten Bau. Die zwei Schritte
+      # unten laufen NUR auf ein GESCHOBENES Tag `android-v*`.
+      #
+      # ⚠ NICHTS AN DIESEN ZWEI SCHRITTEN IST GEMESSEN. Die iOS-Seite konnte
+      # `altool` wenigstens lokal mit erfundenen Werten aufrufen; hier gibt es
+      # weder Service-Konto noch Schluessel noch Kanal, an dem sich etwas
+      # nachstellen liesse. Der erste getaggte Lauf ist die erste Erprobung und
+      # wird wahrscheinlich mindestens einmal rot.
+      #
+      #  1. BEIDE HAELFTEN DER BEDINGUNG. GitHubs „Use workflow from" fuehrt
+      #     auch Tags — `startsWith(github.ref, …)` allein liesse einen
+      #     HANDSTART auf `android-v1.0.0` ausliefern, bei gruenem Lauf.
+      #
+      #  2. DAS ARTEFAKT STEHT DAVOR. GitHub ueberspringt Folgeschritte nach
+      #     einem Fehlschlag; dahinter fehlte das geprüfte AAB ausgerechnet
+      #     dann, wenn die Uebertragung gescheitert ist.
+      #
+      #  3. DER SCHLUESSEL REIST ALS DATEI, nicht ueber `$GITHUB_ENV`. Roh-JSON
+      #     traegt Zeilenumbrueche, und ein aus Infisical geholter Wert ist
+      #     NICHT GitHub-maskiert — eine Pruefung „kein `echo`" belegt also
+      #     keine Log-Sicherheit. Dieselbe Bauform wie der ASC-Schluessel in
+      #     `ios-release.yml`.
+      #
+      #  4. FEHLT DER SCHLUESSEL, BRICHT DER LAUF. Kein `if` auf seine
+      #     Anwesenheit: ein gruener Tag-Lauf, der nichts ausgeliefert hat,
+      #     waere die schlechteste aller Antworten. Bis der Wert in Infisical
+      #     liegt, ist jedes `android-v*`-Tag also rot. Das ist gewollt.
+      #
+      #  5. KANAL `internal` — Donalds Entscheidung vom 25.09., keine
+      #     Vermutung. ⚠ Er zaehlt NICHT auf die Testpflicht ein (12 Tester,
+      #     14 Tage); dafuer braucht es einen GESCHLOSSENEN Test. `internal`
+      #     belegt erst einmal, dass Authentifizierung, Rechte und Upload
+      #     stimmen.
+      #
+      #  6. NUR DAS AAB. Play nimmt fuer neue Apps kein APK; das APK bleibt
+      #     Artefakt fuer `adb install`.
+      #
+      # ⚠ VOR DEM ERSTEN TAG von Hand zu erledigen: Service-Konto in der Google
+      # Cloud anlegen, in der Play Console verknuepfen, ihm die Release-Rolle
+      # geben, den JSON-Schluessel als `PLAY_SERVICE_ACCOUNT_JSON` nach
+      # Infisical `prod` legen. Fehlt die ROLLE statt des Schluessels, meldet
+      # die API einen Rechte- und keinen Authentifizierungsfehler — die beiden
+      # sind im Log leicht zu verwechseln.
+      - name: Play-Schluessel bereitstellen
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v')
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          infisical run --env="$INFISICAL_ENV" --silent -- sh -c '
+            set -eu
+            : "${PLAY_SERVICE_ACCOUNT_JSON:?fehlt in Infisical prod (AGE-907, Play-Upload)}"
+            umask 077
+            printf "%s" "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
+          '
+          # Ein leeres Secret schriebe eine leere Datei, und die Action meldete
+          # das erst als unverstaendlichen Authentifizierungsfehler.
+          test -s "$RUNNER_TEMP/play.json"
+
+      # `versionCode` kommt aus der Lauf-Nummer (siehe oben). Play lehnt einen
+      # doppelten `versionCode` ab, wie Apple eine doppelte Build-Nummer: bei
+      # einem Re-Run neu ausloesen statt wiederholen.
+      - name: Nach Google Play hochladen
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v')
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJson: ${{ runner.temp }}/play.json
+          packageName: com.effbeezee.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed

@@ -184,6 +184,18 @@ describe("Der Upload nach TestFlight", () => {
     expect(ifBedingung(hochladen)).not.toBe("");
   });
 
+  // Nachgezogen am 25.09., nachdem der Code-Review am ANDROID-Wächter dieselbe
+  // Lücke gefunden hat: `|| true` an die Bedingung gehängt lässt beide
+  // Teilzeichenketten stehen und hebelt sie trotzdem aus. Die Gleichheit ist
+  // der Riegel, die Halbzusagen darunter sagen, welche Hälfte fehlt.
+  const ERWARTETE_BEDINGUNG =
+    "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ios-v')";
+
+  it("die aktive Bedingung ist GENAU der erwartete Ausdruck", () => {
+    expect(ifBedingung(validieren)).toBe(ERWARTETE_BEDINGUNG);
+    expect(ifBedingung(hochladen)).toBe(ERWARTETE_BEDINGUNG);
+  });
+
   it.each([
     ["den Ausloeser", "github.event_name == 'push'"],
     ["die Tag-Referenz", "startsWith(github.ref, 'refs/tags/ios-v')"],
