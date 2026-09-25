@@ -69,20 +69,20 @@
 
 ## 5. Sichtprobe
 
-- [ ] 5.1 Lokalen Stack starten, gegen ihn anmelden (eigenes Wegwerf-Konto,
+- [x] 5.1 Lokalen Stack starten, gegen ihn anmelden (eigenes Wegwerf-Konto,
       `age907-sichtprobe@example.invalid` nicht anfassen).
-- [ ] 5.2 Aufnahmen: Leiste offen, eingeklappt, mobile Schublade — je als Admin
+- [x] 5.2 Aufnahmen: Leiste offen, eingeklappt, mobile Schublade — je als Admin
       und als Mitglied ohne Admin-Rolle. Beide Themes.
-- [ ] 5.3 Auf der niedrigsten geprüften Höhe ansehen, ob der Abschnitt aus dem
+- [x] 5.3 Auf der niedrigsten geprüften Höhe ansehen, ob der Abschnitt aus dem
       Bild läuft (er scrollt jetzt mit — gewollt, aber anzusehen).
-- [ ] 5.4 Aufnahmen in den PR.
+- [x] 5.4 Aufnahmen in den PR.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `pnpm typecheck`, `pnpm lint`, `pnpm test` grün; nach jedem `pnpm build`
+- [x] 6.1 `pnpm typecheck`, `pnpm lint`, `pnpm test` grün; nach jedem `pnpm build`
       vor `git add`: `git checkout -- src/content/release-entries.generated.ts`.
 - [x] 6.2 `openspec validate --all` grün.
-- [ ] 6.3 Code-Review auf den Diff (nicht auf den Plan).
+- [x] 6.3 Code-Review auf den Diff (nicht auf den Plan).
 - [ ] 6.4 `openspec archive support-als-abschnitt` — die Deltas falten sich in
       `openspec/specs/support-tutorials/` und `openspec/specs/feedback-qm/`.
 - [ ] 6.4a Nach dem Archivieren die **Prosa** nachziehen, die kein Delta fasst:

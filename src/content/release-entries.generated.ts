@@ -33,6 +33,21 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-09-25-support-als-abschnitt",
+    "datum": "2026-09-25",
+    "titel": "support-als-abschnitt",
+    "linear": null,
+    "aenderungen": [
+      "Der Abschnitt „Support\" wird ein gewöhnlicher Sidebar-Abschnitt: mit Überschrift, klappbar (`klappbar: true`), mit derselben Trennlinie und denselben Abständen wie „Mein Bereich\" und „Administration\".",
+      "**Reihenfolge**: hinter „Mein Bereich\", vor „Administration\". Für ein Konto ohne Admin-Rolle ist Support damit der letzte Abschnitt.",
+      "Der Sonderbau `SupportAbschnitt` in `AppShell.tsx` entfällt, samt seiner eigenen `<nav aria-label=\"Support\">`-Landmarke und seinen beiden Wrappern (Fuss der Desktop-Leiste, Fuss der Schublade).",
+      "`SidebarNav` lernt, dass ein Abschnitt neben seinen Einträgen **einen Eintrag mit Aktion statt Pfad** tragen kann — die kleinste Form dafür, weil „Feedback\" kein Ort ist, sondern ein Overlay öffnet.",
+      "`NavIcon` bekommt das Symbol für `/hilfe/tutorials`. Ohne diese Zeile fiele der Eintrag beim Umzug in `SidebarNav` still auf den Platzhalter `dot` zurück, wo der Sonderbau `bulb` zeichnet.",
+      "Die Einträge bleiben, was sie sind: **Tutorials** (`/hilfe/tutorials`) und **Feedback** (öffnet das bestehende Formular). Kein dritter Eintrag, kein Verweis auf Mitgliedschaft oder Kaufweg.",
+      "Die Zusagen aus AGE-688 (genau ein `aria-modal`, wenn das Formular aus der Schublade heraus offen steht) und AGE-697 (Escape trifft das oberste Overlay) gelten unverändert weiter und werden weiter geprüft."
+    ]
+  },
+  {
     "slug": "2026-09-25-release-backfill",
     "datum": "2026-09-25",
     "titel": "Release-Backfill: alle freigegebenen Geschichten in der Aktivität",
