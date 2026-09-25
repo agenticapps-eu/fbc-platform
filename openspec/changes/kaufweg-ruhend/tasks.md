@@ -109,9 +109,30 @@
 - [x] 6.1 `pnpm typecheck` grün, `pnpm lint` 0 Fehler (7 Warnungen, alle
       vorbestehend und in fremden Dateien), `pnpm test` 2846 Zusagen grün.
       Kein `pnpm format`.
-- [ ] 6.2 Sichtprobe im Browser mit einem Konto **unter** `impact` — sonst belegt
-      sie nichts. Profil, Einstellungen, Konto-Menü, Startseite, Stufen-Wand,
-      Event; `/mitgliedschaft` landet auf `/`.
+- [x] 6.2 Sichtprobe im Browser, gegen den **lokalen** Stack, mit einem eigens
+      angelegten Konto auf `connect` (der Stufe des Prüferkontos) und danach auf
+      `basic`. Belegt, dass die App wirklich lokal hängt, statt es anzunehmen:
+      alle Supabase-Anfragen gingen an `127.0.0.1:54321`, kein einziger
+      `supabase.co`-Host.
+
+      | Fläche | Befund |
+      | --- | --- |
+      | `/profil` | Karte „Deine Mitgliedschaft / Connect / Nächster Schritt: Discover" da, **kein** Knopf „Mitgliedschaft verwalten", kein Link |
+      | Profilmenü | „Mein Bereich", „Profil", „Logout" — **kein** „Mitgliedschaft"; das Stufen-Abzeichen „Connect" steht weiter darin |
+      | `/einstellungen` | „Mitgliedschaft / Connect / Connect-Mitglied", **kein** „Stufe ansehen & upgraden" |
+      | `/` (Startseite) | Kachel „Mitgliedschaft / Connect / Deine aktuelle Stufe" **ohne** „Plan verwalten →"; die Nachbarkachel trägt ihr „Zur Aktivität →" weiter — die Positivkontrolle, dass Kachel-Pfeile überhaupt rendern |
+      | `/mitgliedschaft` | landet auf `/`; 0 Preiskarten im DOM, keine Beträge, kein Jahr/Monat-Schalter, kein „Upgrade", kein „Testzahlung" |
+      | Stufen-Wand (`/mitglieder` als `basic`) | „Dieser Bereich ist ab Connect verfügbar" + „Höhere Stufen schaltet der Fair Business Club für dich frei — sprich uns an."; **genau ein** Knopf, „Zur Startseite" |
+      | Kopfzeilen-Suche als `basic` | Enter führt auf `/mitglieder?q=anna`, nicht in den Kaufweg |
+
+      Der Link am Event ist **nicht** von Hand geprüft — er bräuchte ein Event mit
+      Mindeststufe `discover`; er ist durch den Diff und die Tests gedeckt.
+
+      Aufgeräumt: Konto gelöscht (`DELETE /auth/v1/admin/users` antwortet 200 und
+      lässt `profiles` UND `member_settings` stehen — beide Zeilen von Hand
+      entfernt), Stufenverteilung wieder wie vorgefunden (basic 3, connect 4,
+      discover 3, exchange 3, focus 6, impact 8), `.env.local` gelöscht,
+      vite auf 5219 gestoppt.
 - [ ] 6.3 Code-Review durch einen unabhängigen Reviewer, auf dem Diff.
 - [x] 6.4 `openspec validate --all` erneut grün.
 
