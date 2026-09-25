@@ -24,6 +24,7 @@ const NeuesPage = lazy(() => import("../pages/NeuesPage"));
 const CompassPage = lazy(() => import("../pages/CompassPage"));
 const EventsPage = lazy(() => import("../pages/EventsPage"));
 const EinstellungenPage = lazy(() => import("../pages/EinstellungenPage"));
+const HilfeTutorialsPage = lazy(() => import("../pages/HilfeTutorialsPage"));
 const KontaktePage = lazy(() => import("../pages/KontaktePage"));
 const MeineEventsPage = lazy(() => import("../pages/MeineEventsPage"));
 const MitgliederPage = lazy(() => import("../pages/MitgliederPage"));
@@ -194,6 +195,22 @@ export const navItems: NavItem[] = [
     path: "/neues",
     label: "Neu in der App",
     Component: NeuesPage,
+    section: "sub",
+    requiresAuth: true,
+  },
+  // Die Tutorials (AGE-904). `section: "sub"` wie `/neues`: der Weg dorthin ist
+  // der Abschnitt „Support" am Fuss der Seitenleiste, kein achter Menüeintrag —
+  // Hilfe ist nachgeordnet (V5, Bauplan §4). Kein `minTier`: was die Anwendung
+  // kann, ist keine Frage der Mitgliedsstufe, und gerade das Konto auf der
+  // untersten Stufe hat den grössten Bedarf, es zu erfahren.
+  //
+  // KEIN Deep Link: `src/lib/deep-links.ts` führt die Adresse nicht, Manifest
+  // und AASA halten sich daran. Von aussen angeklickt öffnet sie den Browser,
+  // nicht die App — für eine Hilfeseite richtig, und kein Versehen.
+  {
+    path: "/hilfe/tutorials",
+    label: "Tutorials",
+    Component: HilfeTutorialsPage,
     section: "sub",
     requiresAuth: true,
   },
