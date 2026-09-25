@@ -18,8 +18,15 @@ import { useOverlay } from "../ui/useOverlay";
 import { Icon } from "../ui/icons";
 
 /**
- * QM-Feedback (AGE-300) — Spec §3.5. Eintrag am FUSS DER SEITENLEISTE, über
- * dem Einklapp-Schalter.
+ * QM-Feedback (AGE-300) — Spec §3.5. Der zweite Eintrag im Abschnitt
+ * „Support" der Seitenleiste, zwischen „Mein Bereich" und „Administration".
+ *
+ * SEIT AGE-929 dort und nicht mehr am Fuss der Leiste: der Abschnitt ist ein
+ * gewöhnlicher geworden, und dieser Knopf hängt als `nachtrag` an ihm
+ * (`SidebarNav.tsx`). Er ist kein `NavLink`, weil er kein Ziel öffnet — und
+ * genau deshalb wandert er als fertiges Bauteil dorthin, statt seinen
+ * Offen-Zustand nach oben zu geben: an dem hängen AGE-688 und AGE-697, und
+ * beide wohnen hier.
  *
  * SEIT AGE-566 nicht mehr schwebend: der Knopf hing über dem Inhalt und deckte
  * auf der Startseite den Aufruf „Mitglieder entdecken" halb zu. Das war kein

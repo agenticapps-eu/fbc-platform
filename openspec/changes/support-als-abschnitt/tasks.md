@@ -52,6 +52,13 @@
       Formular. Die bestehenden Zusagen laufen, ohne angefasst zu werden — wenn
       doch eine angefasst werden muss, ist das ein Befund, kein Handgriff.
 - [ ] 3.4 `nav.test.ts` und `redirect-targets.test.ts` unverändert grün.
+- [ ] 3.5 Die Spezifikationen nach der alten Verortung durchsuchen („am Fuss der
+      Seitenleiste", „über dem Einklapp-Schalter"). `feedback-qm` trägt eine
+      eigene Anforderung dazu — sie braucht ein Delta, sonst behauptet die
+      durchgeschriebene Wahrheit das Gegenteil des Codes.
+- [ ] 3.6 Dieselbe Suche über die Kommentare im Code (`nav.ts`,
+      `FeedbackButton.tsx`). Ein Kommentar, den der eigene Diff falsch macht,
+      gehört in diesen Diff.
 
 ## 4. Positivkontrolle
 
@@ -76,7 +83,12 @@
       vor `git add`: `git checkout -- src/content/release-entries.generated.ts`.
 - [ ] 6.2 `openspec validate --all` grün.
 - [ ] 6.3 Code-Review auf den Diff (nicht auf den Plan).
-- [ ] 6.4 `openspec archive support-als-abschnitt` — das Delta faltet sich in
-      `openspec/specs/support-tutorials/`.
+- [ ] 6.4 `openspec archive support-als-abschnitt` — die Deltas falten sich in
+      `openspec/specs/support-tutorials/` und `openspec/specs/feedback-qm/`.
+- [ ] 6.4a Nach dem Archivieren die **Prosa** nachziehen, die kein Delta fasst:
+      `openspec/specs/support-tutorials/spec.md` sagt im Abschnitt „Purpose"
+      weiter „ein Abschnitt am Fuss der Seitenleiste". Deltas tragen nur
+      Anforderungen; der Zweck-Text bleibt sonst stehen und widerspricht den
+      Anforderungen unter ihm.
 - [ ] 6.5 Commit (Conventional, signiert, `AGE-929` im Rumpf), PR gegen `main`
       mit `AGE-929` im Titel, Linear auf Done.

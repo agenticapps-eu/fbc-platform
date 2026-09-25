@@ -54,8 +54,22 @@ Keine.
   Zuständen der Leiste und zum unangetasteten Feedback-Formular bleiben
   inhaltlich bestehen.
 
-Die Capability `feedback-qm` wird **nicht** geändert: das Formular selbst bleibt,
-wie es ist. Dieser Change bewegt nur seinen Auslöser.
+- `feedback-qm`: Die Anforderung „Der Feedback-Eintrag steht in der Leiste und
+  verdeckt nichts" verortet ihn „am Fuss, über dem Einklapp-Schalter" und sagt
+  das in einem eigenen Szenario noch einmal zu. Beides wird falsch. Sie wird
+  ersetzt durch „Der Feedback-Eintrag steht im **Support-Abschnitt** und
+  verdeckt nichts" — dieselben Zusagen gegen Überdecken und für den zugänglichen
+  Namen, neue Verortung, dazu die Zusage, dass er in Polsterung und
+  Symbolabstand wie ein Eintrag mit Pfad sitzt.
+
+  Das **Formular** selbst bleibt unverändert: Inhalt, Overlay, Zustand, die
+  beiden Effekte. Dieser Change bewegt nur seinen Auslöser und zieht die
+  Beschreibung nach.
+
+  Beim ersten Entwurf stand hier „`feedback-qm` wird nicht geändert". Das war
+  falsch, und es fiel erst beim Durchsuchen der Spezifikationen nach der alten
+  Verortung auf — nicht bei `validate`, das eine Anforderung, die der Code
+  widerlegt, nicht sehen kann.
 
 ## Impact
 
