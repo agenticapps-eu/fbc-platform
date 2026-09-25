@@ -133,14 +133,20 @@
       entfernt), Stufenverteilung wieder wie vorgefunden (basic 3, connect 4,
       discover 3, exchange 3, focus 6, impact 8), `.env.local` gelöscht,
       vite auf 5219 gestoppt.
-- [ ] 6.3 Code-Review durch einen unabhängigen Reviewer, auf dem Diff.
+- [~] 6.3 Code-Review durch einen unabhängigen Reviewer, auf dem Diff.
+      **Bewusst entfallen** (Donalds Regel 26.08.: Fremdreviewer nur bei
+      Schema, Rechten, Sicherheit — dies ist reine UI- und Dokumentarbeit).
+      Stattdessen der `MODIFIED`-Block klauselweise gegen die durable Spec
+      gemessen.
 - [x] 6.4 `openspec validate --all` erneut grün.
 
 ## 7. Abschluss
 
-- [ ] 7.1 Conventional Commit mit `AGE-907`, signiert.
-- [ ] 7.2 PR gegen `main`. In den Text: der Rückweg für AGE-908, der widerlegte
+- [x] 7.1 Conventional Commit mit `AGE-907`, signiert. `0bf422b` (Code) und
+      `39051a0` (Sichtprobe).
+- [x] 7.2 PR gegen `main`. In den Text: der Rückweg für AGE-908, der widerlegte
       Manifest-Verdacht, die drei wertlosen Testfassungen und was sie überführt
       hat, und dass der Merge AGE-907 wahrscheinlich schließt, obwohl alle
       Handschritte offen bleiben.
-- [ ] 7.3 Archivieren **erst nach** dem Merge, dann `pnpm release:entries`.
+- [x] 7.3 Archivieren **erst nach** dem Merge, dann `pnpm release:entries`.
+      PR #419 als `935b987` auf `main` gemerged (25.09.), danach archiviert.
