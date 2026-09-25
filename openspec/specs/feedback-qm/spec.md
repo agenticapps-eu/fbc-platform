@@ -388,11 +388,12 @@ anderem gehört und nicht, dass dahinter noch jemand erreichbar ist.
 - **THEN** führt der Weg zum Verfasser dieser Zeile und nicht zum
   gleichnamigen anderen Mitglied
 
-### Requirement: Der Feedback-Eintrag steht in der Leiste und verdeckt nichts
+### Requirement: Der Feedback-Eintrag steht im Support-Abschnitt und verdeckt nichts
 
-Der Weg zum Feedback SHALL ein Eintrag **in der Seitenleiste** sein — am Fuss,
-über dem Einklapp-Schalter, seit AGE-904 als einer von zwei Einträgen des
-Abschnitts „Support". Unterhalb des `lg`-Breakpoints SHALL er in der
+Der Weg zum Feedback SHALL ein Eintrag **in der Seitenleiste** sein — seit
+AGE-904 als einer von zwei Einträgen des Abschnitts „Support", seit AGE-929 an
+der Stelle, an der dieser Abschnitt steht: zwischen „Mein Bereich" und
+„Administration". Unterhalb des `lg`-Breakpoints SHALL er in der
 Navigationsschublade stehen, dem einzigen Ort, an dem die Leiste dort erreichbar
 ist.
 
@@ -411,6 +412,10 @@ konkurriert der Eintrag mit nichts.
 In der eingeklappten Leiste SHALL er sein Symbol ohne Beschriftung zeigen und
 dabei einen zugänglichen Namen behalten.
 
+Er SHALL in Polsterung und Symbolabstand nicht von einem Eintrag mit Pfad zu
+unterscheiden sein. Er steht in derselben Spalte wie sie; eine eigene Form
+liesse den Abschnitt an seiner zweiten Zeile auseinanderfallen.
+
 #### Scenario: Auf dem Telefon verdeckt er keine Bedienelemente
 
 - **WHEN** die Seite auf 375 px Breite mit geöffnetem Composer am Seitenanfang
@@ -419,11 +424,17 @@ dabei einen zugänglichen Namen behalten.
 - **AND** `document.elementFromPoint` in der Mitte jeder sichtbaren kuratierten
   Kachel liefert diese Kachel, nicht den Feedback-Auslöser
 
-#### Scenario: Am Schreibtisch steht er am Fuss der Leiste
+#### Scenario: Am Schreibtisch steht er im Support-Abschnitt
 
 - **WHEN** die Seitenleiste dargestellt wird
-- **THEN** steht der Eintrag „Feedback" an ihrem Fuss, über dem
-  Einklapp-Schalter
+- **THEN** steht der Eintrag „Feedback" im Abschnitt „Support"
+- **AND** dieser Abschnitt steht zwischen „Mein Bereich" und „Administration"
+
+#### Scenario: Er sitzt wie ein Eintrag mit Pfad
+
+- **WHEN** der Abschnitt „Support" offen dargestellt wird
+- **THEN** trägt „Feedback" dieselbe Polsterung und denselben Symbolabstand wie
+  „Tutorials"
 
 #### Scenario: Eingeklappt bleibt er benennbar
 

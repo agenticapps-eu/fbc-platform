@@ -11,15 +11,24 @@ import {
   submitPlatformFeedback,
   uploadFeedbackScreenshot,
 } from "../../lib/feedback";
+import { cn } from "../../lib/cn";
 import { useAuth } from "../../providers/auth-context";
 import { Button, Select, Textarea, useToast } from "../ui";
+import { navEintragAbstaende } from "../ui/navEintragAbstaende";
 import { useBildauswahl } from "../ui/useBildauswahl";
 import { useOverlay } from "../ui/useOverlay";
 import { Icon } from "../ui/icons";
 
 /**
- * QM-Feedback (AGE-300) — Spec §3.5. Eintrag am FUSS DER SEITENLEISTE, über
- * dem Einklapp-Schalter.
+ * QM-Feedback (AGE-300) — Spec §3.5. Der zweite Eintrag im Abschnitt
+ * „Support" der Seitenleiste, zwischen „Mein Bereich" und „Administration".
+ *
+ * SEIT AGE-929 dort und nicht mehr am Fuss der Leiste: der Abschnitt ist ein
+ * gewöhnlicher geworden, und dieser Knopf hängt als `nachtrag` an ihm
+ * (`SidebarNav.tsx`). Er ist kein `NavLink`, weil er kein Ziel öffnet — und
+ * genau deshalb wandert er als fertiges Bauteil dorthin, statt seinen
+ * Offen-Zustand nach oben zu geben: an dem hängen AGE-688 und AGE-697, und
+ * beide wohnen hier.
  *
  * SEIT AGE-566 nicht mehr schwebend: der Knopf hing über dem Inhalt und deckte
  * auf der Startseite den Aufruf „Mitglieder entdecken" halb zu. Das war kein
@@ -278,10 +287,19 @@ export function FeedbackButton({
         onClick={() => setOpen(true)}
         title={collapsed ? "Feedback" : undefined}
         aria-label={collapsed ? "Feedback" : undefined}
-        className={
-          "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" +
-          (collapsed ? " justify-center px-2" : "")
-        }
+        // AGE-929: Die Abstände kommen aus `SidebarNav` und stehen nicht hier.
+        // Seit der Support-Abschnitt ein gewöhnlicher Abschnitt ist, stehen
+        // dieser Knopf und „Tutorials" untereinander in derselben Spalte —
+        // „wie ein Eintrag der Leiste sitzt" ist EINE Tatsache, und sie gehört
+        // an die Stelle, die die Einträge zeichnet.
+        //
+        // Der Fokusring bleibt, obwohl `NavLink` keinen trägt: ihn abzuräumen
+        // wäre eine Angleichung nach unten. Dass die Einträge daneben keinen
+        // haben, ist ein eigener Befund.
+        className={cn(
+          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          navEintragAbstaende(collapsed),
+        )}
       >
         <FeedbackIcon />
         {!collapsed && <span>Feedback</span>}

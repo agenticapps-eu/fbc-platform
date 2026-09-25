@@ -135,3 +135,86 @@ describe("Die toten Sektions-Labels sind fort (AGE-293)", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Der Eintrag mit AKTION statt Pfad (AGE-929).
+ *
+ * „Feedback" öffnet kein Ziel, sondern ein Overlay — es ist kein `NavLink` und
+ * kann keiner sein. Der Abschnitt trägt es deshalb als `nachtrag`, hinter
+ * seinen Einträgen.
+ *
+ * Die zweite Zusage ist die eigentliche: der Nachtrag muss dem Akkordeon
+ * GEHORCHEN. Eine Fassung, die ihn ausserhalb der `offen`-Bedingung rendert,
+ * sieht offen völlig richtig aus und lässt beim Zuklappen einen Knopf unter
+ * einer zugeklappten Überschrift stehen — sichtbar nur, wenn jemand klappt.
+ */
+const MIT_NACHTRAG: SidebarNavSection[] = [
+  {
+    title: "Support",
+    klappbar: true,
+    items: [{ path: "/hilfe/tutorials", label: "Tutorials" }],
+    nachtrag: (
+      <button type="button" onClick={() => {}}>
+        Feedback
+      </button>
+    ),
+  },
+];
+
+function renderMitNachtrag(collapsed = false) {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <SidebarNav sections={MIT_NACHTRAG} collapsed={collapsed} />
+    </MemoryRouter>,
+  );
+}
+
+const supportGriff = () => screen.getByRole("button", { name: /^Support$/i });
+
+describe("Ein Abschnitt kann einen Eintrag mit Aktion tragen (AGE-929)", () => {
+  it("rendert den Nachtrag hinter den Einträgen des Abschnitts", () => {
+    renderMitNachtrag();
+
+    const tutorials = screen.getByRole("link", { name: "Tutorials" });
+    const feedback = screen.getByRole("button", { name: "Feedback" });
+
+    // Dokumentreihenfolge, nicht bloss „beide da": der Nachtrag ist der ZWEITE
+    // Eintrag des Abschnitts. `compareDocumentPosition` liefert
+    // DOCUMENT_POSITION_FOLLOWING, wenn `feedback` hinter `tutorials` steht.
+    expect(tutorials.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // Und im selben Abschnitt, nicht irgendwo darunter: derselbe Kasten trägt
+    // beide. Ohne diese Zeile wäre auch eine Fassung grün, die den Nachtrag
+    // hinter ALLE Abschnitte hängt.
+    expect(tutorials.closest("div")).toBe(feedback.closest("div"));
+  });
+
+  it("klappt den Nachtrag mit zu — ein Knopf unter zugeklappter Überschrift wäre der Fehler", () => {
+    renderMitNachtrag();
+
+    fireEvent.click(supportGriff());
+    expect(screen.queryByRole("link", { name: "Tutorials" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Feedback" })).toBeNull();
+
+    fireEvent.click(supportGriff());
+    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
+  });
+
+  it("trägt den Nachtrag auch in der schmalen Leiste", () => {
+    renderMitNachtrag(true);
+
+    // Dort gibt es keinen Griff, also auch nichts zum Zuklappen — der Eintrag
+    // muss bedienbar bleiben, wie jeder andere.
+    expect(screen.queryByRole("button", { name: /^Support$/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Feedback" })).toBeInTheDocument();
+  });
+
+  it("lässt einen Abschnitt OHNE Nachtrag unangetastet", () => {
+    renderNav();
+
+    // Die Gegenprobe: `nachtrag` ist optional, und ein Abschnitt ohne ihn darf
+    // nichts Zusätzliches rendern.
+    expect(screen.queryByRole("button", { name: "Feedback" })).toBeNull();
+  });
+});

@@ -206,10 +206,14 @@ export const navItems: NavItem[] = [
     requiresAuth: true,
   },
   // Die Tutorials (AGE-904). `section: "sub"` wie `/neues`: der Weg dorthin ist
-  // der Abschnitt „Support" am Fuss der Seitenleiste, kein achter Menüeintrag —
-  // Hilfe ist nachgeordnet (V5, Bauplan §4). Kein `minTier`: was die Anwendung
-  // kann, ist keine Frage der Mitgliedsstufe, und gerade das Konto auf der
-  // untersten Stufe hat den grössten Bedarf, es zu erfahren.
+  // der Abschnitt „Support" zwischen „Mein Bereich" und „Administration"
+  // (AGE-929 — bis dahin stand er am Fuss der Leiste). Der Eintrag wird dort
+  // aufgezählt, nicht aus dieser Liste gefiltert; `sub` ist genau das, was ihn
+  // aus den sieben sichtbaren Menüeinträgen heraushält, ohne die Route
+  // anzutasten — kein achter Menüeintrag, Hilfe ist nachgeordnet (V5, Bauplan
+  // §4). Kein `minTier`: was die Anwendung kann, ist keine Frage der
+  // Mitgliedsstufe, und gerade das Konto auf der untersten Stufe hat den
+  // grössten Bedarf, es zu erfahren.
   //
   // KEIN Deep Link: `src/lib/deep-links.ts` führt die Adresse nicht, Manifest
   // und AASA halten sich daran. Von aussen angeklickt öffnet sie den Browser,
