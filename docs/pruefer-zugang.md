@@ -59,11 +59,32 @@ die verworfenen Alternativen unten.
   eine Store-Prüfung ohne Nutzen. Was der Prüfer nicht braucht, muss er nicht
   sehen.
 - **`connect`** zeigt eine vollständig wirkende App und lässt die Rang-3-Felder
-  zu. Es ist die kleinste Stufe, die beides leistet.
+  aus. Es ist die kleinste Stufe, die beides leistet.
 
 Reicht es wider Erwarten nicht, ist das Hochsetzen ein Feldwechsel in
 `profiles.tier` und **ohne Neuanmeldung wirksam** — die Prüfung muss dafür nicht
 neu beginnen.
+
+### ⚠ Nach AGE-903 heißt diese Stufe DISCOVER — und der Wechsel ist Pflicht
+
+`connect` gilt, **solange die heutige Leiter gilt**: `basic`(1) · `connect`(2) ·
+`discover`(3) · `exchange`(4) · `focus`(5) · `impact`(6). Stand 25.09. ist das so;
+AGE-903 steht auf *Todo*, und `boost`/`active` kommen in `src/config/` und
+`supabase/migrations/` null Mal vor.
+
+AGE-903 verschiebt die ganze Leiter. Dort ist **DISCOVER der neue Rang 4**
+(heute `exchange`), und der FBC beginnt erst dort. Alles, was heute unter Rang 4
+freigeschaltet ist — auch die Mitgliederliste — wandert auf Rang 4. Ein
+Prüferkonto, das dann noch auf Rang 2 steht, sähe genau den ins Leere laufenden
+Hauptmenüpunkt, den die Entscheidung oben vermeiden wollte. Der Nachzug steht in
+AGE-903 in Umfang und Abnahme.
+
+**Die Falle ist der Schlüsselname, nicht der Rang.** „DISCOVER" aus AGE-903 ist
+*nicht* der heutige Schlüssel `discover` (Rang 3). Wer das Konto vor AGE-903
+anlegt und `discover` einträgt, trifft weder die Entscheidung vom 13.09. noch
+AGE-903. Genau diese Verwechslung ist hier schon einmal passiert — siehe den
+Warnhinweis im Kopf von `src/config/levels.ts`: „ACHTUNG: `discover` existierte
+vorher mit ANDERER Bedeutung."
 
 ## Der Text für die Prüfhinweise
 
