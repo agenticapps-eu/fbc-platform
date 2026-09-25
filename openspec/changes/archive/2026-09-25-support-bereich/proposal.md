@@ -29,9 +29,11 @@ ersten von zwei Einträgen eines Abschnitts, der einen Namen bekommt: **Support*
   und `release-geschichten.ts` — **dieselbe Quelle wie der Blog, keine Kopie**.
 - **Die 23 Kapitelbilder ziehen ins Bündel der Anwendung um**, als WebP:
   `blog/bilder/*.png` → `public/tutorial/*.webp`. Gemessen mit `cwebp -q 82`:
-  5,0 MB → 884 KB bei gleichen Abmessungen. Der Blog-Bau liest sie danach von
-  dort und liefert sie weiter unter `/bilder/` aus — er bleibt bis AGE-906
-  vollständig arbeitsfähig.
+  5.177.430 B → 868.296 B bei gleichen Abmessungen. Der Blog-Bau liest sie
+  danach von dort und liefert sie unter **derselben** Adresse aus, die in den
+  Daten steht (`/tutorial/`) — `bild.src` ist eine Zeichenkette für zwei
+  Flächen. Die Motive der Kopfbereiche bleiben unter `/bilder/`. Der Blog bleibt
+  bis AGE-906 vollständig arbeitsfähig.
 - **Kein Deep Link.** `/hilfe/tutorials` kommt NICHT in `src/lib/deep-links.ts`;
   von aussen angeklickt öffnet die Adresse den Browser, nicht die App. Das ist
   die Entscheidung und kein Versehen — die Menge der Deep Links zu erweitern

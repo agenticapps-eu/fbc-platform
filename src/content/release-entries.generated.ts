@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-25-support-bereich",
+    "datum": "2026-09-25",
+    "titel": "support-bereich",
+    "linear": "AGE-904",
+    "aenderungen": [
+      "**Ein Abschnitt „Support\" am Fuss der Seitenleiste** mit genau zwei Einträgen: **Tutorials** (neue Route) und **Feedback** (bestehendes Verhalten, unverändert). Er steht an der Stelle des heutigen Feedback-Knopfs, über dem Einklapp-Schalter. Beide Einträge sind in der eingeklappten Leiste und in der mobilen Schublade erreichbar. **Sonst ändert sich an der Navigation nichts** — die sieben Menüeinträge aus AGE-494 bleiben, wie sie sind.",
+      "**Eine neue Route `/hilfe/tutorials`** als `section: \"sub\"` (geroutet, kein Menüeintrag — wie `/neues` und `/chat`). Kein `minTier`: was die Anwendung kann, ist keine Frage der Mitgliedsstufe.",
+      "**Eine Tutorial-Seite als EINE Seite** mit Sprungmarken über die sieben Etappen, darunter Etappe für Etappe die Kapitel mit Bild und vollem Text (Entscheidung Donald, 25.09.). Sie liest `src/content/release-tutorial.ts` und `release-geschichten.ts` — **dieselbe Quelle wie der Blog, keine Kopie**.",
+      "**Die 23 Kapitelbilder ziehen ins Bündel der Anwendung um**, als WebP: `blog/bilder/*.png` → `public/tutorial/*.webp`. Gemessen mit `cwebp -q 82`: 5.177.430 B → 868.296 B bei gleichen Abmessungen. Der Blog-Bau liest sie danach von dort und liefert sie unter **derselben** Adresse aus, die in den Daten steht (`/tutorial/`) — `bild.src` ist eine Zeichenkette für zwei Flächen. Die Motive der Kopfbereiche bleiben unter `/bilder/`. Der Blog bleibt bis AGE-906 vollständig arbeitsfähig.",
+      "**Kein Deep Link.** `/hilfe/tutorials` kommt NICHT in `src/lib/deep-links.ts`; von aussen angeklickt öffnet die Adresse den Browser, nicht die App. Das ist die Entscheidung und kein Versehen — die Menge der Deep Links zu erweitern kostet drei Dateien, einen Deploy und eine Gegenprobe am Gerät."
+    ]
+  },
+  {
     "slug": "2026-09-12-release-notes-in-der-aktivitaet",
     "datum": "2026-09-12",
     "titel": "Neuerungen an der App stehen jetzt auch in der Aktivität",

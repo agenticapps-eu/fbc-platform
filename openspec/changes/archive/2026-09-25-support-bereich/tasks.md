@@ -42,5 +42,5 @@
 
 - [x] 6.1 `openspec validate --all` grün
 - [x] 6.2 Signierte Conventional Commits mit `(AGE-904)`, Branch `donald/age-904-support-bereich`
-- [ ] 6.3 PR gegen `main`; im Text: die gemessene Bündelgrösse, die Screenshots, und der Hinweis, dass AGE-906 danach `www` abschaltet
-- [ ] 6.4 AGE-904 in Linear auf In Progress (erst `get_issue`, dann schreiben)
+- [x] 6.3 PR gegen `main`; im Text: die gemessene Bündelgrösse, die Screenshots, und der Hinweis, dass AGE-906 danach `www` abschaltet
+- [x] 6.4 AGE-904 in Linear auf In Progress (erst `get_issue`, dann schreiben)
