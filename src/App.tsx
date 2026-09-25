@@ -113,6 +113,21 @@ function AppInner() {
             um, damit direkte Links/Lesezeichen nicht ins Leere laufen. Reversibel:
             navItem zurück + diese Redirects entfernen. */}
         <Route path="/meine-chancen" element={<Navigate to="/" replace />} />
+        {/* AGE-907: Der Kaufweg ist RUHEND, nicht abgebaut. `MitgliedschaftPage`
+            schickt den Browser über `create-checkout-session` zu Stripe, und eine
+            erreichbare Route dorthin ist die Standardursache für eine Ablehnung
+            nach Apples Richtlinie 3.1.1 — auch für die Beta-Prüfung. V5 will den
+            Weg ohnehin nicht: Stufen setzt der Admin von Hand (AGE-707).
+
+            Dieselbe Bauform wie /meine-chancen eine Zeile höher: Seite,
+            Preiskarten und beide Edge Functions bleiben unverändert im Code, nur
+            kommt niemand mehr hin. Zurückholen für AGE-908 = diese Zeile weg plus
+            den navItem-Block in `nav.ts`.
+
+            Auf `/`, nicht auf `/profil`: die Seite beantwortete „was kostet was?",
+            und darauf gibt es derzeit keine Antwort — irgendeine andere Seite als
+            Ersatz auszugeben wäre eine Behauptung. */}
+        <Route path="/mitgliedschaft" element={<Navigate to="/" replace />} />
         {/* AGE-533: „Meine Kurse" ist gelöscht — „Meine Academy" ist als
             Reiter an ihre Stelle getreten. Anders als bei /meine-chancen
             führt der Redirect NICHT auf die Startseite, sondern dorthin,

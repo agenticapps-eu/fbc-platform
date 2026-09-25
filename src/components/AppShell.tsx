@@ -236,21 +236,15 @@ function UserMenu({
           >
             Profil
           </Link>
-          {/* Nur, wem Preise etwas sagen (AGE-633). Jedes aus WordPress
-              übernommene Mitglied liegt auf `impact` und hat damit die höchste
-              Stufe bereits — für diesen Kreis führte der Eintrag zu vier
-              zahlenden Stufen, von denen keine gilt. Die Seite selbst bleibt
-              erreichbar; sie zeigt dort nur die eigene Mitgliedschaft. */}
-          {tier !== "impact" && (
-            <Link
-              to="/mitgliedschaft"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="block px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/[0.04] hover:text-ink"
-            >
-              Mitgliedschaft
-            </Link>
-          )}
+          {/* AGE-907: Hier stand „Mitgliedschaft", sichtbar für alle unter
+              `impact` (AGE-633). Genau diese Bedingung machte den Eintrag zum
+              3.1.1-Problem: sie verbarg ihn vor Donald und jedem importierten
+              Mitglied und zeigte ihn dem Prüferkonto, das auf `connect` steht
+              (`docs/pruefer-zugang.md`) — und selbstregistrierten Mitgliedern auf
+              `basic`. Die Fläche wirkte beim Nachsehen leer und war es nicht.
+
+              Der Kaufweg ist ruhend; das Abzeichen oben im selben Menü nennt die
+              Stufe weiterhin. Zurückholen für AGE-908 ist dieser Block. */}
           <button
             type="button"
             role="menuitem"

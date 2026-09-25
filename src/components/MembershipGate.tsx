@@ -44,15 +44,21 @@ function MembershipWall({ min, loggedIn }: { min?: MembershipLevel; loggedIn: bo
         </h2>
         <p className="mx-auto mt-3 max-w-md text-muted">
           {loggedIn
-            ? "Deine Mitgliedsstufe reicht für diesen Bereich noch nicht."
+            ? // AGE-907: Der zweite Satz ersetzt den Knopf „Upgrade", der hier
+              // in den ruhenden Kaufweg führte. Den Mangel zu benennen und zu
+              // schweigen, wohin man sich wendet, wäre eine Sackgasse — und
+              // erzeugte genau die Rückfrage, die dieser Satz beantwortet.
+              // Er ist die Wahrheit nach V5: höhere Stufen setzt der Admin von
+              // Hand (AGE-707). Holt AGE-908 den Kauf zurück, wird hier wieder
+              // ein Knopf daraus.
+              "Deine Mitgliedsstufe reicht für diesen Bereich noch nicht. Höhere Stufen schaltet der Fair Business Club für dich frei — sprich uns an."
             : "Werde Mitglied im Fair Business Club, um Zugang zu erhalten."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          {loggedIn ? (
-            <Button variant="primary" onClick={() => navigate("/mitgliedschaft")}>
-              Upgrade
-            </Button>
-          ) : (
+          {/* Nur die anonyme Fläche trägt hier noch einen Hauptknopf. Die
+              Registrierung bleibt unverändert: sie kostet nichts und ist keine
+              Zahlungsstrecke. */}
+          {!loggedIn && (
             // Führt in die REGISTRIERUNG, nicht in den Login (AGE-616). Wer
             // hier steht, hat kein Konto — das sagt die Bedingung eine Zeile
             // höher. Ein Anmeldeformular verlangt von ihm etwas, was er gerade

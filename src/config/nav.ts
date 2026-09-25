@@ -28,7 +28,6 @@ const HilfeTutorialsPage = lazy(() => import("../pages/HilfeTutorialsPage"));
 const KontaktePage = lazy(() => import("../pages/KontaktePage"));
 const MeineEventsPage = lazy(() => import("../pages/MeineEventsPage"));
 const MitgliederPage = lazy(() => import("../pages/MitgliederPage"));
-const MitgliedschaftPage = lazy(() => import("../pages/MitgliedschaftPage"));
 const ProfilAnsichtPage = lazy(() => import("../pages/ProfilAnsichtPage"));
 const ProfilPage = lazy(() => import("../pages/ProfilPage"));
 
@@ -66,9 +65,14 @@ export interface NavItem {
  * AGE-494: Das Menü zeigt nur noch, was es zum Go-Live wirklich gibt — sieben
  * Einträge in zwei Gruppen. Der Kompass hat keinen eigenen Punkt mehr: als eigene
  * Seite ist er im MVP dünn, als Filter über der Mitgliederliste und als Block im
- * Profil ist derselbe Inhalt sofort nützlich. `/kompass`, `/mitgliedschaft`
- * und `/kontakte` bleiben als `sub` geroutet — nichts wird gelöscht, es wird
- * nur unerreichbar, und das Zurückholen ist diese eine Zeile.
+ * Profil ist derselbe Inhalt sofort nützlich. `/kompass` und `/kontakte` bleiben
+ * als `sub` geroutet — nichts wird gelöscht, es wird nur aus dem Menü genommen,
+ * und das Zurückholen ist diese eine Zeile.
+ *
+ * AGE-907: `/mitgliedschaft` stand in diesem Satz und ist seit dem 25.09. nicht
+ * mehr geroutet, sondern umgeleitet. Der Satz sagte „unerreichbar" und meinte
+ * „ohne Menüeintrag" — die Route war von sieben Stellen aus verlinkt. Was
+ * `section: "sub"` leistet, ist das Fehlen im Menü, nicht Unerreichbarkeit.
  *
  * AGE-533: `/meine-kurse` ist die Ausnahme von diesem Satz — die Seite ist
  * GELÖSCHT, nicht ausgeblendet. „Meine Academy" ist als Reiter an ihre Stelle
@@ -158,16 +162,19 @@ export const navItems: NavItem[] = [
     section: "sub",
     requiresAuth: true,
   },
-  // AGE-443 gab ihr einen Menüeintrag. AGE-494 nimmt ihn wieder: zum Go-Live sind
-  // alle `impact`, es gibt nichts zu kaufen. Kein Redirect — wer den Link kennt,
-  // soll die Seite sehen dürfen.
-  {
-    path: "/mitgliedschaft",
-    label: "Mitgliedschaft",
-    Component: MitgliedschaftPage,
-    section: "sub",
-    requiresAuth: true,
-  },
+  // AGE-907: `/mitgliedschaft` steht hier NICHT mehr, und diesmal ist die Route
+  // wirklich zu. AGE-443 gab ihr einen Menüeintrag, AGE-494 nahm ihn wieder und
+  // schrieb an diese Stelle „kein Redirect — wer den Link kennt, soll die Seite
+  // sehen dürfen". Genau das ist der 3.1.1-Befund: die Seite schickt den Browser
+  // über `create-checkout-session` zu Stripe, und am 25.09. führten SIEBEN
+  // Stellen dorthin, keine davon ein Menüeintrag. „Unerreichbar" war seit AGE-494
+  // eine Zusage, die nie gestimmt hat.
+  //
+  // Der Redirect steht jetzt in `App.tsx`, die Bauform von `/meine-chancen`
+  // (AGE-450): Seite und Preiskarten bleiben unverändert im Code,
+  // `MitgliedschaftPage` wird nur von nichts mehr importiert — wie
+  // `MeineChancenPage`. Zurückholen für AGE-908 ist dieser Block plus das
+  // Entfernen der Redirect-Zeile. Bewacht von `scripts/kaufweg-ruhend.test.ts`.
 
   // Unterbereiche: geroutet, kein Menüeintrag.
   {

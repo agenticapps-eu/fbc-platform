@@ -51,15 +51,57 @@ function quelldateien(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
+/**
+ * `to="/x"` (Link, NavLink, CardLink, Navigate), `href="/x"` und jedes
+ * `navigate(…"/x"…)` auf einer Zeile.
+ *
+ * AGE-907: Der letzte Teil hiess bis zum 25.09. `navigate\(["']…["']` und verlangte
+ * damit, dass die Route UNMITTELBAR hinter der Klammer steht. `HeaderSearch.tsx`
+ * schrieb `navigate(reichtStufe ? verzeichnisUrl(begriff) : "/mitgliedschaft")`
+ * — derselbe tote Link, nur in einem Bedingungsausdruck, und dieser Test hätte
+ * ihn nicht gesehen. Gefunden hat es der Versuch, denselben Waechter ein zweites
+ * Mal zu schreiben: die erste Fassung davon fand SECHS von SIEBEN Einstiegen,
+ * und der fehlende war genau dieser. Der zweite Waechter ist danach entfallen —
+ * dieser hier ist der bessere, weil er seine Routenliste aus `App.tsx` ABLEITET.
+ */
+function musterFuer(route: string): RegExp {
+  return new RegExp(
+    `(to=["']${route}["']|href=["']${route}["']|navigate\\([^\\n]*["']${route}["'])`,
+  );
+}
+
 describe("Tote Links (AGE-494)", () => {
   it.each(NUR_REDIRECT)("keine Navigation zeigt auf %s", (route) => {
-    // `to="/x"` (Link, NavLink, CardLink, Navigate) und `navigate("/x")`.
-    const muster = new RegExp(`(to=["']${route}["']|navigate\\(["']${route}["'])`);
+    const muster = musterFuer(route);
 
     const treffer = quelldateien("src")
       .filter((f) => !ERLAUBT.has(f))
       .filter((f) => muster.test(readFileSync(f, "utf8")));
 
     expect(treffer).toEqual([]);
+  });
+
+  /**
+   * Die Positivkontrolle zu den Verneinungen darüber. Ohne sie wäre jede von
+   * ihnen auch grün, wenn das Muster nichts mehr fände — und genau das ist am
+   * 25.09. beinahe passiert.
+   */
+  it.each([
+    ['<Link to="/zzz">x</Link>', "Link"],
+    ["<Link to='/zzz' />", "Link, einfache Anführungszeichen"],
+    ['<a href="/zzz">x</a>', "Anker"],
+    ['navigate("/zzz")', "Sprung"],
+    ['navigate(reicht ? url(begriff) : "/zzz")', "Sprung im Bedingungsausdruck"],
+  ])("das Muster findet %s (%s)", (zeile) => {
+    expect(musterFuer("/zzz").test(zeile)).toBe(true);
+  });
+
+  it.each([
+    ['<Route path="/zzz" element={<Navigate to="/" replace />} />', "die Registrierung selbst"],
+    ['FORMAT_HERO["/zzz"]', "die Route als Schlüssel einer Zuordnung"],
+    ['  "/zzz": "membership",', "die Route als Schlüssel einer Zuordnung"],
+    ["Mehr dazu steht unter /zzz im Handbuch.", "das blosse Wort in Prosa"],
+  ])("das Muster verschont %s (%s)", (zeile) => {
+    expect(musterFuer("/zzz").test(zeile)).toBe(false);
   });
 });

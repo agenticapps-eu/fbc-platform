@@ -172,12 +172,15 @@ export function MemberDashboard({ uid }: { uid: string }) {
           to={nextEvent ? `/events/${nextEvent.id}` : undefined}
           cta="Zum Event"
         />
+        {/* AGE-907: ohne `to`. Die Kachel nennt die Stufe weiter, sie führt nur
+            nicht mehr zum ruhenden Kaufweg. `DashTile` bewacht den Link mit
+            `{to && …}`, deshalb bleibt `cta` stehen — die Event-Kachel darüber
+            macht es ohne Event genauso. Zurückholen: diese eine Zeile. */}
         <DashTile
           label="Mitgliedschaft"
           value={levelLabel(profile.tier)}
           valueClassName="text-2xl"
           sub="Deine aktuelle Stufe"
-          to="/mitgliedschaft"
           cta="Plan verwalten"
           ton="zustand"
         />

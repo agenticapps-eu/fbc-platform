@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
@@ -95,16 +95,23 @@ describe("MembershipGate für Entdecken-Routen", () => {
     expect(screen.getByRole("button", { name: "Zur Startseite" })).toBeInTheDocument();
   });
 
-  it("bietet eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu /mitgliedschaft", async () => {
+  // AGE-907: Diese Zusage ist umgedreht worden. Bis zum 25.09. hieß sie „bietet
+  // eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu
+  // /mitgliedschaft" und klickte sich bis zur Preistabelle durch. Genau dieser
+  // Weg ist der 3.1.1-Befund — und er traf das Prüferkonto (`connect`) bei jedem
+  // `discover`-Bereich.
+  it("bietet keinen Kaufweg, sondern nennt, wer die Stufe freischaltet", () => {
     renderAt("/mitglieder", authAsTier("basic"));
 
-    const upgradeBtn = screen.getByRole("button", { name: "Upgrade" });
-    fireEvent.click(upgradeBtn);
-
-    // AGE-642: `/mitgliedschaft` kommt asynchron nach. Der Klick bleibt
-    // synchron — geprüft wird weiterhin, dass er dorthin führt.
-    await screen.findByRole("heading", { name: "Mitgliedschaft" });
-    expect(screen.getByRole("heading", { name: "Mitgliedschaft" })).toBeInTheDocument();
+    // Beide Rollen, wie beim CTA darüber: käme der Weg als Link zurück statt als
+    // Knopf, ginge er hier sonst unbemerkt durch.
+    expect(screen.queryByRole("button", { name: "Upgrade" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Upgrade" })).not.toBeInTheDocument();
+    // Die Positivkontrolle zur Verneinung: die Wand ist nicht stumm geworden,
+    // sie sagt jetzt etwas anderes. Ohne diese Zeile wäre der Test auch grün,
+    // wenn die Wand gar nicht mehr rendert.
+    expect(screen.getByText(/schaltet der Fair Business Club/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zur Startseite" })).toBeInTheDocument();
   });
 });
 

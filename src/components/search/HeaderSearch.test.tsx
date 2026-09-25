@@ -367,9 +367,15 @@ describe("Tastatur und Navigation", () => {
     await waitFor(() => expect(adresse()).toBe("/mitglieder?q=anna"));
   });
 
-  it("führt Enter unterhalb discover auf die Aufstiegsseite", async () => {
-    // `/mitglieder` liegt hinter MembershipGate min="discover" — MemberDirectory
-    // mountet dort nie, der Begriff verschwände hinter einer Wand.
+  // AGE-907: Hieß „führt Enter unterhalb discover auf die Aufstiegsseite" und
+  // erwartete `/mitgliedschaft`. Der Kaufweg ruht, also führt Enter auf jeder
+  // Stufe ins Verzeichnis — dort steht für ein Konto unter `connect` die Wand von
+  // `MembershipGate`, die die nötige Stufe nennt und sagt, wer sie freischaltet.
+  //
+  // Die alte Begründung nannte „MembershipGate min='discover'"; die Schranke auf
+  // `/mitglieder` steht seit AGE-598 auf `connect`. Für `basic` ändert das nichts,
+  // für `connect` schon: dort rendert das Verzeichnis, und der Begriff kommt an.
+  it("führt Enter unterhalb discover ins Verzeichnis, nicht in den Kaufweg", async () => {
     auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     renderSuche();
     tippe("anna");
@@ -377,7 +383,7 @@ describe("Tastatur und Navigation", () => {
 
     fireEvent.keyDown(feld(), { key: "Enter" });
 
-    await waitFor(() => expect(adresse()).toBe("/mitgliedschaft"));
+    await waitFor(() => expect(adresse()).toBe("/mitglieder?q=anna"));
   });
 
   it("schließt die Liste nach der Auswahl eines Treffers", async () => {

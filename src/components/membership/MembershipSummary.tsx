@@ -1,15 +1,21 @@
-import { Link } from "react-router-dom";
 import { LEVELS, LEVEL_ORDER, isMembershipLevel } from "../../config/levels";
 import { Card } from "../ui/Card";
-import { Button } from "../ui/Button";
 
-export function MembershipSummary({
-  current,
-  showManageCta = false,
-}: {
-  current: string | null;
-  showManageCta?: boolean;
-}) {
+/**
+ * AGE-907: Hier gab es eine Eigenschaft `showManageCta`, die einen Knopf
+ * „Mitgliedschaft verwalten" nach `/mitgliedschaft` einblendete. Der Kaufweg
+ * ruht (Apple 3.1.1), und sie ist mit dem Knopf entfernt worden — nicht bloß
+ * ungenutzt gelassen.
+ *
+ * Das war eine Korrektur am eigenen Entwurf: geplant war, sie als Rückweg für
+ * AGE-908 stehen zu lassen. Dann wäre der Link auf die Route weiter im Baum
+ * gestanden, eine Eigenschaft von der Rückkehr entfernt — und
+ * `redirect-targets.test.ts` hätte ihn zu Recht als toten Link gemeldet. Eine
+ * Ausnahme für diese Datei wäre die schlechtere Hälfte des Tauschs: sie
+ * versteckt den nächsten Verstoß. Der Rückweg ist jetzt, den Knopf wieder zu
+ * schreiben — vier Zeilen, und sie stehen in der Historie dieses Commits.
+ */
+export function MembershipSummary({ current }: { current: string | null }) {
   const cur = current && isMembershipLevel(current) ? LEVELS[current] : LEVELS.basic;
   const nextKey = LEVEL_ORDER.find((k) => LEVELS[k].rank === cur.rank + 1);
   return (
@@ -26,13 +32,6 @@ export function MembershipSummary({
           </p>
         )}
       </div>
-      {showManageCta && (
-        <Link to="/mitgliedschaft" className="shrink-0">
-          <Button variant="ghost" size="sm">
-            Mitgliedschaft verwalten
-          </Button>
-        </Link>
-      )}
     </Card>
   );
 }

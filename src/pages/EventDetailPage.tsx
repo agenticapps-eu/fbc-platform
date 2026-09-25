@@ -643,12 +643,14 @@ function RegistrationPanel({ event, uid }: { event: EventListItem; uid: string |
           </Button>
           {/* Der Grund steht DANEBEN, nicht statt des Knopfes: Ein grauer Knopf
               ohne Erklärung ist seinerseits eine Fläche, die nichts sagt. */}
+          {/* AGE-907: Der Link „Mitgliedschaft ansehen" stand hinter dem Satz und
+              führte zum ruhenden Kaufweg. Der Grund bleibt stehen — er ist die
+              Auskunft, die diese Fläche schuldet. Wer die Stufe braucht, bekommt
+              sie vom Club (V5, AGE-707); das sagt die Wand in `MembershipGate`,
+              wo ein Mitglied mit zu niedriger Stufe landet. */}
           {!zugelassen && (
             <p className="text-sm text-muted">
-              Dieses Event ist Mitgliedern ab Stufe „{LEVELS.discover.label}" vorbehalten.{" "}
-              <Link to="/mitgliedschaft" className="text-accent-strong hover:underline">
-                Mitgliedschaft ansehen
-              </Link>
+              Dieses Event ist Mitgliedern ab Stufe „{LEVELS.discover.label}" vorbehalten.
             </p>
           )}
         </>
