@@ -91,8 +91,15 @@ export interface ReleaseGeschichte {
    * Ein optionales Feld hiesse, dass die Übersicht zwei Gestalten hätte, und
    * beide müssten aussehen, als wären sie so gemeint.
    *
-   * `src` zeigt in den Ausgabeordner des Blogs (`/bilder/…`), nicht in das
-   * Bündel der Anwendung — der Blog wird getrennt ausgeliefert.
+   * `src` zeigt in das Bündel der ANWENDUNG (`/tutorial/…`) — seit AGE-904,
+   * wo das Tutorial eine Fläche in der Anwendung bekam. Bis dahin zeigte es in
+   * den Ausgabeordner des Blogs, was mit dem Abschalten von
+   * `www.effbeezee.com` (AGE-906) ein Tutorial ohne Bilder ergeben hätte.
+   *
+   * Der Blog liest dieselbe Zeichenkette und liefert deshalb unter derselben
+   * Adresse aus; seine Quelle ist jetzt `public/tutorial/`. Zwei Flächen, eine
+   * Angabe — eine zweite wäre die Stelle, an der genau eine von beiden ins
+   * Leere zeigt.
    */
   bild: ReleaseBild;
   /**

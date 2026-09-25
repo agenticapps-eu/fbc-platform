@@ -31,7 +31,7 @@ function beispiel(text: string): ReleaseGeschichte {
     titel: "Eine Terminreihe aus einer Vorlage anlegen",
     text,
     bild: {
-      src: "/bilder/event-vorlagen.png",
+      src: "/tutorial/event-vorlagen.webp",
       alt: "Der Reiter Vorlagen unter Events mit drei Terminreihen",
       width: 1440,
       height: 900,
@@ -194,7 +194,7 @@ describe("Bilder — jede Geschichte zeigt ihre Fläche", () => {
   // Zeichenkette dasteht; dass sie auf eine Datei zeigt, belegt er nicht.
   // Über den Projektpfad, nicht über `import.meta.url`: im jsdom-Transform ist
   // der keine `file:`-Adresse — dieselbe Falle wie in `anon-flaeche.test.tsx`.
-  const BILDER = resolve(process.cwd(), "blog/bilder");
+  const BILDER = resolve(process.cwd(), "public/tutorial");
 
   it("gibt jeder Geschichte ein Bild mit Alternativtext und Massen", () => {
     for (const g of RELEASE_GESCHICHTEN) {
@@ -209,8 +209,8 @@ describe("Bilder — jede Geschichte zeigt ihre Fläche", () => {
 
   it("zeigt mit jedem Bild auf eine Datei, die es gibt", () => {
     for (const g of RELEASE_GESCHICHTEN) {
-      expect(g.bild.src, `Bildpfad von ${g.slug}`).toMatch(/^\/bilder\/[a-z0-9-]+\.png$/);
-      const datei = join(BILDER, g.bild.src.slice("/bilder/".length));
+      expect(g.bild.src, `Bildpfad von ${g.slug}`).toMatch(/^\/tutorial\/[a-z0-9-]+\.webp$/);
+      const datei = join(BILDER, g.bild.src.slice("/tutorial/".length));
       expect(existsSync(datei), `keine Datei zu ${g.slug}: ${g.bild.src}`).toBe(true);
     }
   });
@@ -224,10 +224,10 @@ describe("Bilder — jede Geschichte zeigt ihre Fläche", () => {
   });
 
   it("lässt den Alternativtext etwas anderes sein als den Dateinamen", () => {
-    // Sonst wäre die Zusage oben mit `alt: "glocke.png"` erfüllt, und
+    // Sonst wäre die Zusage oben mit `alt: "glocke.webp"` erfüllt, und
     // Vorlesesoftware bekäme einen Dateinamen vorgelesen.
     for (const g of RELEASE_GESCHICHTEN) {
-      expect(g.bild.alt, `Alternativtext von ${g.slug}`).not.toContain(".png");
+      expect(g.bild.alt, `Alternativtext von ${g.slug}`).not.toContain(".webp");
       expect(g.bild.alt.length, `Alternativtext von ${g.slug}`).toBeGreaterThan(20);
     }
   });

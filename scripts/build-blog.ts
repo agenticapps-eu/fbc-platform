@@ -79,10 +79,25 @@ export function pfadVon(g: { slug: string }): string {
  * Auch aus dem Bildpfad wird ein Pfad — ein Ziel, in das kopiert wird.
  * Dieselbe Überlegung wie beim Slug, eine Zeile später eingesetzt.
  */
-const BILDPFAD = /^\/bilder\/[a-z0-9-]+\.(png|webp)$/;
+const BILDPFAD = /^\/tutorial\/[a-z0-9-]+\.webp$/;
 
-/** Die Aufnahmen liegen hier, NICHT unter `public/` — das ist das Bündel der App. */
-const BILDER_QUELLE = "blog/bilder";
+/**
+ * Die Aufnahmen liegen seit AGE-904 im Bündel der ANWENDUNG.
+ *
+ * Bis dahin lagen sie unter `blog/bilder/` und ausdrücklich NICHT unter
+ * `public/` — der Blog war die einzige Fläche, die sie zeigte. Mit dem Tutorial
+ * in der Anwendung zeigen sie zwei Flächen, und die App muss sie ohne den Blog
+ * ausliefern können: `www.effbeezee.com` wird abgeschaltet (AGE-906).
+ *
+ * Der Blog liest deshalb jetzt aus `public/` und liefert unter derselben
+ * Adresse aus, die in den Daten steht (`/tutorial/…`). Eine eigene Adresse
+ * hiesse zwei Angaben für dasselbe Bild — und genau eine von beiden zeigte
+ * irgendwann ins Leere.
+ */
+const BILDER_QUELLE = "public/tutorial";
+
+/** Der Ordner, in den der Blog sie legt — zeichengleich mit dem Pfad in den Daten. */
+const BILDER_ZIEL = "tutorial";
 
 /** Die Motive der Kopfbereiche sind die der Anwendung (`CREDITS.md` daneben). */
 const MOTIV_QUELLE = "public/images";
@@ -841,7 +856,9 @@ ${weiter}
  * Text, aber nicht für das Bild daneben.
  */
 export function bilderZumAusliefern(geschichten: ReleaseGeschichte[]): string[] {
-  return geschichten.filter((g) => g.freigegeben).map((g) => g.bild.src.slice("/bilder/".length));
+  return geschichten
+    .filter((g) => g.freigegeben)
+    .map((g) => g.bild.src.slice(`/${BILDER_ZIEL}/`.length));
 }
 
 /** Die Motive: die der Etappen plus die beiden Flächen-Motive. */
@@ -952,10 +969,17 @@ export function schreibeBlog(ziel: string, eingabe: BlogEingabe): BlogSeite[] {
   // Das Bild wandert in dasselbe Artefakt wie die Seite, die es zeigt. Damit
   // hält die Zusage „nichts von fremder Herkunft“ ohne weitere Absprache: es
   // gibt keine zweite Stelle, von der aus jemand es später ausliefern könnte.
-  mkdirSync(join(ziel, "bilder"), { recursive: true });
+  mkdirSync(join(ziel, BILDER_ZIEL), { recursive: true });
   for (const datei of bilderZumAusliefern(eingabe.geschichten)) {
-    copyFileSync(join(resolve(process.cwd(), BILDER_QUELLE), datei), join(ziel, "bilder", datei));
+    copyFileSync(
+      join(resolve(process.cwd(), BILDER_QUELLE), datei),
+      join(ziel, BILDER_ZIEL, datei),
+    );
   }
+  // Die MOTIVE bleiben unter `/bilder/`: sie stehen nicht in den Daten, sondern
+  // werden hier verlinkt (`kopfbereich`), teilen ihre Adresse also mit
+  // niemandem.
+  mkdirSync(join(ziel, "bilder"), { recursive: true });
   for (const datei of motiveZumAusliefern(eingabe.etappen)) {
     copyFileSync(join(resolve(process.cwd(), MOTIV_QUELLE), datei), join(ziel, "bilder", datei));
   }

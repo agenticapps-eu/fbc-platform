@@ -46,7 +46,7 @@ Steht statt einer Zahl ein Ausrufezeichen, ließ sich die Anzahl gerade nicht ab
 
 Ein bestätigtes Konto genügt.`,
     bild: {
-      src: "/bilder/sprechblase-zaehler.png",
+      src: "/tutorial/sprechblase-zaehler.webp",
       alt: "Die Kopfzeile mit der Sprechblase, die eine 4 für vier ungelesene Nachrichten trägt",
       width: 180,
       height: 64,
@@ -69,7 +69,7 @@ Zu jedem Gespräch siehst du die letzte Nachricht. Das ist eine Vorschau, keine 
 
 Schreiben kannst du jemandem, sobald zwischen euch eine Kontaktanfrage angenommen ist.`,
     bild: {
-      src: "/bilder/rechte-leiste.png",
+      src: "/tutorial/rechte-leiste.webp",
       alt: "Das Verzeichnis mit der aufgeklappten Nachrichtenleiste rechts daneben, darin drei Gespräche",
       width: 1440,
       height: 900,
@@ -92,7 +92,7 @@ Ein aufgezogenes Fenster setzt deinen Lesestand vor, genau wie die vollständige
 
 Auf schmaleren Fenstern und auf dem Telefon gibt es die Reihe nicht. Dort ist die Nachrichtenseite der Weg.`,
     bild: {
-      src: "/bilder/chatfenster.png",
+      src: "/tutorial/chatfenster.webp",
       alt: "Drei angedockte Chatfenster nebeneinander am unteren Rand, während im Hintergrund das Verzeichnis offen bleibt",
       width: 1440,
       height: 900,
@@ -113,7 +113,7 @@ Zwischen den Tagen steht ein Marker: „Heute“, „Gestern“, sonst der Woche
 
 Getippte Emoticons werden beim Absenden zu Emoji: aus einem Doppelpunkt mit Bindestrich und Klammer wird ein lächelndes Gesicht. Die Liste ist bewusst kurz und greift nur an Wortgrenzen, damit Hausnummern und Beträge unangetastet bleiben. Was schon geschrieben ist, ändert sich nicht mehr.`,
     bild: {
-      src: "/bilder/emoji-feld.png",
+      src: "/tutorial/emoji-feld.webp",
       alt: "Ein Gespräch mit geöffneter Emoji-Auswahl über dem Schreibfeld und Uhrzeiten an den Nachrichten",
       width: 1440,
       height: 900,
@@ -134,7 +134,7 @@ Die Tagesmarker rücken mit: lädst du ältere Nachrichten desselben Tages nach,
 
 Das gilt in der vollständigen Ansicht und in den kleinen Fenstern gleichermaßen.`,
     bild: {
-      src: "/bilder/aeltere-laden.png",
+      src: "/tutorial/aeltere-laden.webp",
       alt: "Ein Gesprächsverlauf mit dem Knopf „Ältere laden“ über der obersten Nachricht und Tagestrennern dazwischen",
       width: 1440,
       height: 900,
@@ -157,7 +157,7 @@ Darunter siehst du die aktivsten Mitglieder, gezählt nach der Anzahl ihrer Beit
 
 Ohne Anmeldung siehst du „Alle Beiträge“. Die beiden anderen Reiter beziehen sich auf dich und setzen ein Konto voraus.`,
     bild: {
-      src: "/bilder/aktivitaet.png",
+      src: "/tutorial/aktivitaet.webp",
       alt: "Die Seite Aktivität mit Beitragsfeld, den drei Reitern, der Sortierung und der rechten Spalte",
       width: 1440,
       height: 900,
@@ -176,7 +176,7 @@ Kein Haken heißt „alle Arten“. Einen eigenen Eintrag „Alle Typen“ gibt 
 
 Für die Themen gilt dasselbe: mehrere zusammen zeigen alles, was zu einem davon passt, nicht nur das, was zu allen passt.`,
     bild: {
-      src: "/bilder/feed-filter.png",
+      src: "/tutorial/feed-filter.webp",
       alt: "Der Feed mit zwei angehakten Beitragsarten und dem Merkzettel „Gefiltert nach“ über der Liste",
       width: 1440,
       height: 900,
@@ -197,7 +197,7 @@ Ist der Zeitpunkt da, erscheint der Beitrag im Feed, als wäre er in diesem Mome
 
 Wer nichts plant, merkt davon nichts.`,
     bild: {
-      src: "/bilder/beitrag-planen.png",
+      src: "/tutorial/beitrag-planen.webp",
       alt: "Ein Beitrag mit dem Hinweis, für welchen Tag und welche Uhrzeit er geplant ist",
       width: 769,
       height: 250,
@@ -214,7 +214,7 @@ Verworfen wird alles auf einmal: der Text, ein eingefügter Video-Link samt dem 
 
 Klappst du das Feld danach wieder auf, beginnt es leer.`,
     bild: {
-      src: "/bilder/beitrag-abbrechen.png",
+      src: "/tutorial/beitrag-abbrechen.webp",
       alt: "Die Knopfreihe unter dem Beitragsfeld mit Bild, Video, Abbrechen und Posten",
       width: 400,
       height: 64,
@@ -237,7 +237,7 @@ Eine Filterkarte, zu der es gerade keine Werte gibt, erscheint gar nicht. Suche 
 
 Auf einem schmalen Fenster oder auf dem Telefon rückt die Spalte in den normalen Fluss der Seite. Die Kartenraster richten sich nach dem Platz, den ihre Spalte tatsächlich hat, und brechen um, statt sich zu quetschen.`,
     bild: {
-      src: "/bilder/suchspalte.png",
+      src: "/tutorial/suchspalte.webp",
       alt: "Weit heruntergeblätterte Mitgliederkarten, während die Filterspalte rechts daneben stehen bleibt",
       width: 1440,
       height: 900,
@@ -260,7 +260,7 @@ Jeder erzeugte Termin ist danach ein gewöhnliches Event. Anmeldung, Kapazität,
 
 Wer ein Event anlegen darf, darf auch eine Vorlage anlegen und daraus Termine erzeugen. Der Reiter erscheint, sobald du angemeldet bist.`,
     bild: {
-      src: "/bilder/event-vorlagen.png",
+      src: "/tutorial/event-vorlagen.webp",
       alt: "Der Reiter Vorlagen unter Events mit drei Terminreihen und dem Knopf „Termine erzeugen“",
       width: 1440,
       height: 900,
@@ -281,7 +281,7 @@ Solange deine Stufe noch geladen wird, ist der Knopf nicht gesperrt.
 
 Sehen kannst du beide Arten von Events. Die Stufe entscheidet über die Anmeldung, nicht darüber, ob ein Termin im Kalender auftaucht.`,
     bild: {
-      src: "/bilder/anmeldeknopf-gesperrt.png",
+      src: "/tutorial/anmeldeknopf-gesperrt.webp",
       alt: "Ein Event mit grau gesperrtem Anmeldeknopf und der Begründung mit der nötigen Stufe daneben",
       width: 1034,
       height: 180,
@@ -302,7 +302,7 @@ Passend dazu erscheinen die Filter für Kompetenz, Thema und Angebote erst ab Di
 
 Diese Grenzen sitzen im Server, nicht in der Oberfläche. Was du nicht sehen darfst, wird gar nicht erst ausgeliefert.`,
     bild: {
-      src: "/bilder/mitgliederliste.png",
+      src: "/tutorial/mitgliederliste.webp",
       alt: "Das Verzeichnis mit Mitgliederkarten, jede mit Titelbild, Stufe und einem Satz zur Person",
       width: 1440,
       height: 900,
@@ -321,7 +321,7 @@ Auf den Karten steht das Titelbild des Profils, dazu Name und Branche. Wer kein 
 
 Wie ausführlich eine Karte ausfällt, hängt von deiner Stufe ab.`,
     bild: {
-      src: "/bilder/verzeichnis-reiter.png",
+      src: "/tutorial/verzeichnis-reiter.webp",
       alt: "Die beiden Reiter „Alle Mitglieder“ und „Meine Kontakte“, jeder mit seiner Anzahl daneben",
       width: 770,
       height: 62,
@@ -342,7 +342,7 @@ Was frühere Entwürfe als „Erfolgsradar“ zeigten, gibt es nicht. Dasselbe g
 
 Ist dein Profil noch leer, steht das auch so da, zusammen mit dem Weg zum Ausfüllen. Wie viel andere davon sehen, hängt von deren Stufe ab.`,
     bild: {
-      src: "/bilder/mein-profil.png",
+      src: "/tutorial/mein-profil.webp",
       alt: "Ein Profil mit Titelbild, Rollen, Ort und den drei Zählern für Netzwerk, Events und Nachrichten",
       width: 1440,
       height: 900,
@@ -365,7 +365,7 @@ Was dir davon zu viel ist, schaltest du in den Einstellungen ab — ein Schalter
 
 Die Glocke zeigt ausschließlich deine eigenen Hinweise.`,
     bild: {
-      src: "/bilder/glocke.png",
+      src: "/tutorial/glocke.webp",
       alt: "Die geöffnete Glocke mit fünf Hinweisen und der Zeile „Alle als gelesen markieren“ darunter",
       width: 1440,
       height: 900,
@@ -384,7 +384,7 @@ Lässt sich die Liste der Anfragen gerade nicht laden, steht das auch so da. Ein
 
 Versuchst du dich mit einer Adresse zu registrieren, zu der es schon ein Konto gibt, bekommst du einen neutralen Hinweis mit dem Weg zum Zugangslink. Eine Meldung, die ausspricht, dass es dieses Konto gibt, bekämst du nicht.`,
     bild: {
-      src: "/bilder/meine-anfragen.png",
+      src: "/tutorial/meine-anfragen.webp",
       alt: "Der Menüpunkt „Meine Anfragen“ mit einer Anzahl offener Anfragen daneben",
       width: 270,
       height: 205,
@@ -405,7 +405,7 @@ Ist die rechte Leiste eingeklappt, bleibt die Sprechblase darin anklickbar. Sie 
 
 Was du einklappst, bleibt eingeklappt, auch nach einem Neuladen. Der Zustand liegt auf deinem Gerät.`,
     bild: {
-      src: "/bilder/leisten-einklappen.png",
+      src: "/tutorial/leisten-einklappen.webp",
       alt: "Die eingeklappte Navigation als schmale Symbolleiste, daneben der Knopf zum Wiederaufziehen",
       width: 460,
       height: 500,
@@ -424,7 +424,7 @@ Wo eine Tabelle sich beim besten Willen nicht schmaler machen lässt — etwa in
 
 Ein Prüfschritt im Testlauf achtet darauf, dass keine feste Spaltenbreite ohne Rückfall für schmale Geräte hinzukommt. Die Zusage wird also bewacht, nicht nur einmal hergestellt.`,
     bild: {
-      src: "/bilder/schmal.png",
+      src: "/tutorial/schmal.webp",
       alt: "Dieselbe Verzeichnisseite auf einem 390 Pixel breiten Fenster, einspaltig und ohne Querlauf",
       width: 390,
       height: 900,
@@ -445,7 +445,7 @@ Bis du klickst, wird nichts vom Anbieter nachgeladen: kein Player, kein Vorschau
 
 Das gilt überall, wo Videos vorkommen, auch ohne Konto.`,
     bild: {
-      src: "/bilder/video-gesperrt.png",
+      src: "/tutorial/video-gesperrt.webp",
       alt: "Ein Beitrag mit Video-Platzhalter, dem Knopf „Video von YouTube laden“ und dem Anbieterhinweis darunter",
       width: 1440,
       height: 900,
@@ -466,7 +466,7 @@ Zurücknehmen kannst du die Freigabe auf der Datenschutzseite, je Anbieter einze
 
 Die Freigabe liegt auf deinem Gerät, nicht in deinem Konto. An einem anderen Rechner wirst du wieder gefragt.`,
     bild: {
-      src: "/bilder/datenschutz-widerruf.png",
+      src: "/tutorial/datenschutz-widerruf.webp",
       alt: "Der Abschnitt der Datenschutzseite mit dem Knopf, über den sich eine erteilte Video-Freigabe widerrufen lässt",
       width: 1440,
       height: 900,
@@ -489,7 +489,7 @@ Hast du den Vorgang nicht angestoßen, kannst du die Nachricht ignorieren. Ohne 
 
 Wie oft ein solcher Link angefordert werden kann, ist begrenzt: nicht öfter als einmal pro Minute, und innerhalb von 24 Stunden nur eine begrenzte Zahl je Adresse. Das schützt dein Postfach davor, als Werkzeug benutzt zu werden.`,
     bild: {
-      src: "/bilder/passwort-vergessen.png",
+      src: "/tutorial/passwort-vergessen.webp",
       alt: "Die Seite „Passwort vergessen“ mit dem Feld für die E-Mail-Adresse und dem Knopf „Link senden“",
       width: 1440,
       height: 900,
@@ -510,7 +510,7 @@ Deine Rückmeldung geht an die Administration, die sie nach Thema und Bewertung 
 
 Anonym ist Feedback damit nicht: es hängt an deinem Konto, weil sonst niemand zurückfragen könnte.`,
     bild: {
-      src: "/bilder/feedback.png",
+      src: "/tutorial/feedback.webp",
       alt: "Das Feedback-Fenster mit Sternen, Themenauswahl und drei Feldern für Lob, Fehlendes und Ideen",
       width: 1440,
       height: 900,

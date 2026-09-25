@@ -104,16 +104,22 @@ describe("pruefeArtefakt — über den erzeugten Dateien", () => {
     // Ohne diese Zeile wäre der Test auch dann grün, wenn gar nichts entstünde.
     expect(dateien.length).toBe(geschrieben.length);
     // Und die Bilder liegen daneben — eine Seite mit totem Bildverweis wäre
-    // grün geprüft und im Browser eine leere Fläche. Je Geschichte eine
-    // Aufnahme, dazu die Motive der Etappen und der beiden Übersichten.
-    const bilder = readdirSync(join(ordner, "bilder"));
-    expect(bilder.filter((b) => b.endsWith(".png"))).toHaveLength(RELEASE_GESCHICHTEN.length);
-    expect(bilder.filter((b) => b.endsWith(".webp")).length).toBeGreaterThan(0);
-    // Jede Bildadresse im Markup zeigt auf eine Datei, die wirklich dort liegt.
+    // grün geprüft und im Browser eine leere Fläche. Seit AGE-904 in ZWEI
+    // Ordnern: die Aufnahmen unter `tutorial/` (dieselbe Adresse, die in den
+    // Daten steht und unter der die Anwendung sie ausliefert), die Motive der
+    // Etappen und der beiden Übersichten unter `bilder/` (hier verlinkt, in
+    // keiner Datei gepflegt).
+    const aufnahmen = readdirSync(join(ordner, "tutorial"));
+    expect(aufnahmen.filter((b) => b.endsWith(".webp"))).toHaveLength(RELEASE_GESCHICHTEN.length);
+    const motive = readdirSync(join(ordner, "bilder"));
+    expect(motive.filter((b) => b.endsWith(".webp")).length).toBeGreaterThan(0);
+    // Jede Bildadresse im Markup zeigt auf eine Datei, die wirklich dort liegt —
+    // und zwar in dem Ordner, den ihre Adresse nennt.
     for (const datei of dateien) {
       const html = readFileSync(join(ordner, datei), "utf8");
-      for (const treffer of html.matchAll(/src="\/bilder\/([^"]+)"/g)) {
-        expect(bilder, `${datei} verweist auf ${treffer[1]}`).toContain(treffer[1]);
+      for (const treffer of html.matchAll(/src="\/(bilder|tutorial)\/([^"]+)"/g)) {
+        const inhalt = treffer[1] === "tutorial" ? aufnahmen : motive;
+        expect(inhalt, `${datei} verweist auf ${treffer[0]}`).toContain(treffer[2]);
       }
     }
     for (const datei of dateien) {

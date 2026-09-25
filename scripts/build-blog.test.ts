@@ -24,7 +24,7 @@ function geschichte(teil: Partial<ReleaseGeschichte>): ReleaseGeschichte {
     titel: "Ein Titel",
     text: "Ein Absatz.",
     bild: {
-      src: "/bilder/ein-bild.png",
+      src: "/tutorial/ein-bild.webp",
       alt: "Was auf dem Bild zu sehen ist",
       width: 800,
       height: 500,
@@ -131,7 +131,7 @@ describe("build-blog — der Blog gliedert nach Ausgaben", () => {
     // Eine Ausgabe hat kein eigenes Bild und soll auch keins bekommen — das
     // wäre ein weiteres Feld, das gepflegt werden muss.
     const artikel = seite(erzeugeSeiten(STANDARD), "index.html").querySelector("main article");
-    expect(artikel?.querySelector("img")?.getAttribute("src")).toBe("/bilder/ein-bild.png");
+    expect(artikel?.querySelector("img")?.getAttribute("src")).toBe("/tutorial/ein-bild.webp");
     expect(artikel?.querySelector("img")?.getAttribute("loading")).toBe("lazy");
   });
 
@@ -146,7 +146,7 @@ describe("build-blog — der Blog gliedert nach Ausgaben", () => {
     const s = seite(erzeugeSeiten(STANDARD), "ausgabe-2026-08-08.html");
     const titel = [...s.querySelectorAll("main article h3")].map((h) => h.textContent);
     expect(titel).toEqual(["Die zweite", "Die dritte"]);
-    expect(s.querySelector("main article img")?.getAttribute("src")).toBe("/bilder/ein-bild.png");
+    expect(s.querySelector("main article img")?.getAttribute("src")).toBe("/tutorial/ein-bild.webp");
     const texte = [...s.querySelectorAll("main article p")].map((p) => p.textContent);
     expect(texte).toContain("Einstieg zwei.");
   });
@@ -402,7 +402,7 @@ describe("build-blog — jedes eingesetzte Feld wird maskiert", () => {
       geschichten: [
         geschichte({
           slug: "erste",
-          bild: { src: "/bilder/x.png", alt: '" onerror="alert(1)', width: 10, height: 10 },
+          bild: { src: "/tutorial/x.webp", alt: '" onerror="alert(1)', width: 10, height: 10 },
         }),
         DREI[1],
         DREI[2],
@@ -439,7 +439,7 @@ describe("build-blog — jedes eingesetzte Feld wird maskiert", () => {
   });
 
   it("weist einen Bildpfad ab, der einen Pfadwechsel bedeutete", () => {
-    for (const src of ["/bilder/../../ausserhalb.png", "https://fremde.example/x.png", "x.png"]) {
+    for (const src of ["/tutorial/../../ausserhalb.webp", "https://fremde.example/x.webp", "x.webp"]) {
       expect(
         () =>
           erzeugeSeiten({
@@ -495,11 +495,11 @@ describe("build-blog — der Ausbruch aus der Textspalte", () => {
       geschichten: [
         geschichte({
           slug: "breit",
-          bild: { src: "/bilder/breit.png", alt: "Ein ganzes Fenster", width: 1440, height: 900 },
+          bild: { src: "/tutorial/breit.webp", alt: "Ein ganzes Fenster", width: 1440, height: 900 },
         }),
         geschichte({
           slug: "schmal",
-          bild: { src: "/bilder/schmal.png", alt: "Ein Ausschnitt", width: 180, height: 64 },
+          bild: { src: "/tutorial/schmal.webp", alt: "Ein Ausschnitt", width: 180, height: 64 },
         }),
       ],
       ausgaben: [ausgabe({ geschichten: ["breit", "schmal"] })],
@@ -509,8 +509,8 @@ describe("build-blog — der Ausbruch aus der Textspalte", () => {
       ...seite(seiten, "ausgabe-2026-08-01.html").querySelectorAll("main article img"),
     ].map((i) => [i.getAttribute("src"), i.getAttribute("class")]);
     expect(klassen).toEqual([
-      ["/bilder/breit.png", "breit"],
-      ["/bilder/schmal.png", null],
+      ["/tutorial/breit.webp", "breit"],
+      ["/tutorial/schmal.webp", null],
     ]);
   });
 });
