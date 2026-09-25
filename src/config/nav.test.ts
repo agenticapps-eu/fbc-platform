@@ -125,6 +125,7 @@ const ALLE_ROUTEN: ReadonlyArray<readonly [pfad: string, label: string]> = [
   ["/chat", "Nachrichten"],
   ["/einstellungen", "Einstellungen"],
   ["/events", "Events"],
+  ["/hilfe/tutorials", "Tutorials"],
   ["/kompass", "Kompass"],
   ["/kontakte", "Meine Kontakte"],
   ["/meine-events", "Meine Events"],
@@ -136,7 +137,7 @@ const ALLE_ROUTEN: ReadonlyArray<readonly [pfad: string, label: string]> = [
 ];
 
 describe("Jede Route trägt Pfad und Beschriftung (AGE-642, A2)", () => {
-  it("führt genau diese vierzehn Routen, mit genau diesen Beschriftungen", () => {
+  it("führt genau diese fünfzehn Routen, mit genau diesen Beschriftungen", () => {
     const ist = navItems
       .map((i) => [i.path, i.label] as const)
       .sort(([a], [b]) => a.localeCompare(b));

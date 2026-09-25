@@ -335,6 +335,65 @@ function useOffeneAnfragen(uid: string | null): SidebarNavSection["items"][numbe
 
 /** Sidebar-Inhalt — geteilt von angedockter Desktop-Sidebar und Off-Canvas-Drawer.
  *  Reine Navigation: die Abschnitte aus `navItems`, für Admins ein eigener dazu. */
+/**
+ * Der Abschnitt „Support" am Fuss der Leiste (AGE-904).
+ *
+ * Er entsteht UM den Feedback-Knopf herum, der seit AGE-566 ohnehin hier steht
+ * — nicht in ihm. `FeedbackButton` bleibt unverändert, samt seiner beiden
+ * Zusagen: `onOffenChange` gibt der Schublade ihr `aria-modal` ab (AGE-688),
+ * und Escape trifft in der Capture-Phase erst das Formular (AGE-697).
+ *
+ * KEIN achter Menüeintrag: `nav.test.ts` nagelt die Navigation auf sieben
+ * sichtbare Einträge fest, und Hilfe ist nachgeordnet (V5, Bauplan §4). Der
+ * Abschnitt steht deshalb ausserhalb von `SidebarNav`, mit eigenem Landmark.
+ *
+ * „Tutorials" geht über `onNavigate` — den Weg, der die Schublade schliesst.
+ * Der Feedback-Eintrag darf das GERADE NICHT: sein Formular hängt an ihm, und
+ * die Schublade zu schliessen nähme es mit.
+ */
+function SupportAbschnitt({
+  collapsed = false,
+  onNavigate,
+  onFeedbackOffenChange,
+}: {
+  collapsed?: boolean;
+  onNavigate?: () => void;
+  onFeedbackOffenChange?: (offen: boolean) => void;
+}) {
+  return (
+    <nav aria-label="Support" className="flex flex-col gap-0.5">
+      {/* Eingeklappt ist die Leiste ein Symbol breit — eine Überschrift hätte
+          dort keinen Platz. Die Einträge behalten ihren zugänglichen Namen
+          trotzdem, über `title` und `aria-label` (dasselbe Muster wie in
+          `SidebarNav`). */}
+      {!collapsed && (
+        <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">
+          Support
+        </p>
+      )}
+      <Link
+        to="/hilfe/tutorials"
+        onClick={onNavigate}
+        title={collapsed ? "Tutorials" : undefined}
+        aria-label={collapsed ? "Tutorials" : undefined}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          collapsed && "justify-center px-2",
+        )}
+      >
+        {/* Nicht `academy`: dieses Symbol trägt zwei Zeilen höher den
+            Menüeintrag „Academy". Zwei Einträge derselben Leiste mit demselben
+            Symbol heben sich gegenseitig auf — es unterscheidet dann nicht
+            mehr, es dekoriert nur noch (die Begründung steht ausführlich an
+            `FeedbackIcon`). */}
+        <Icon name="bulb" className="h-5 w-5 shrink-0" />
+        {!collapsed && <span>Tutorials</span>}
+      </Link>
+      <FeedbackButton collapsed={collapsed} onOffenChange={onFeedbackOffenChange} />
+    </nav>
+  );
+}
+
 function SidebarContent({
   onNavigate,
   collapsed = false,
@@ -896,11 +955,12 @@ export default function AppShell() {
           <SidebarContent collapsed={collapsed} />
         </div>
 
-        {/* Feedback direkt über dem Einklapp-Schalter (AGE-566). Vorher schwebte
-            der Knopf über dem Inhalt und deckte auf der Startseite den Aufruf
-            „Mitglieder entdecken" halb zu. */}
+        {/* Support direkt über dem Einklapp-Schalter (AGE-566 für Feedback,
+            AGE-904 für den Abschnitt). Vorher schwebte der Feedback-Knopf über
+            dem Inhalt und deckte auf der Startseite den Aufruf „Mitglieder
+            entdecken" halb zu. */}
         <div className="shrink-0 border-t border-chrome-border p-2">
-          <FeedbackButton collapsed={collapsed} />
+          <SupportAbschnitt collapsed={collapsed} />
         </div>
 
         {/* Der Einklapp-Schalter sass bis AGE-638 hier unten als eigene Zeile,
@@ -1210,7 +1270,10 @@ export default function AppShell() {
             {/* Auch in der Schublade: die Leiste ist auf dem Telefon der einzige
                 Ort, an dem der Zugang jetzt noch steht. */}
             <div className="mt-6 border-t border-chrome-border pt-2">
-              <FeedbackButton onOffenChange={setFeedbackInSchublade} />
+              <SupportAbschnitt
+                onNavigate={() => setMobileNavOpen(false)}
+                onFeedbackOffenChange={setFeedbackInSchublade}
+              />
             </div>
           </div>
         </div>
